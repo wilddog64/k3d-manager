@@ -71,7 +71,6 @@ function install_colima() {
    if ! command_exist colima ; then
       echo colima does not exist, install it
       brew install colima
-      colima start
    else
       echo colima installed already
    fi
