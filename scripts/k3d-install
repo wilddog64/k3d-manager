@@ -20,7 +20,6 @@
 #   test_nfs_connectivity            # Test network connectivity to NFS
 #   test_nfs_direct                  # Test direct NFS mounting
 #   debug_nfs_storage                # Run NFS troubleshooting
-#   test_nfs_in_pod [ip] [ns] [path] # Test NFS with PV/PVC/Pod
 #
 # Note: The above script functions list in NFS DEBUGGING section do not address K3d NFS mounting issues on macOS. The code leave here for the reference purpose only
 
@@ -276,106 +275,6 @@ EOF
   echo "Waiting for pod to be ready..."
   sleep 5
   kubectl logs nfs-test-direct
-}
-
-function debug_nfs_storage() {
-  echo "===== DEBUGGING NFS STORAGE ====="
-
-  echo "1. Checking NFS server status..."
-  sudo nfsd status
-  echo "NFS exports:"
-  cat /etc/exports
-
-  echo "2. Verifying NFS connectivity from host..."
-  showmount -e localhost
-
-  echo "3. Checking CSI driver pods..."
-  kubectl get pods -n kube-system -l app.kubernetes.io/instance=csi-nfs
-
-  echo "4. Checking StorageClass..."
-  kubectl get sc nfs-mac -o yaml
-
-  echo "5. Checking for PVC events..."
-  kubectl get events -n storage-test | grep -i persistentvolumeclaim
-
-  echo "6. Checking PVC status..."
-  kubectl get pvc -n storage-test nfs-test-claim -o yaml
-
-  kubectl get pv
-  echo "===== DEBUG COMPLETE ====="
-}
-
-function test_nfs_in_pod() {
-  local nfs_ip="${1:-192.168.39.164}"  # Set to your LAN IP
-  local namespace="${2:-storage-test}"
-  local nfs_path="${3:-/tmp/k3d-nfs}"
-
-  # Create namespace if it doesn't exist
-  kubectl get ns "$namespace" >/dev/null 2>&1 || kubectl create ns "$namespace"
-
-  # Create PV
-  cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: nfs-pv
-spec:
-  capacity:
-    storage: 5Gi
-  accessModes:
-    - ReadWriteMany
-  persistentVolumeReclaimPolicy: Retain
-  nfs:
-    server: $nfs_ip
-    path: $nfs_path
-EOF
-
-  # Create PVC
-  cat <<EOF | kubectl apply -n "${namespace}" -f -
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: nfs-pvc
-spec:
-  accessModes:
-    - ReadWriteMany
-  resources:
-    requests:
-      storage: 5Gi
-  volumeName: nfs-pv
-  storageClassName: ""
-EOF
-
-  # Create test pod
-  cat <<EOF | kubectl apply -n "${namespace}" -f -
-apiVersion: v1
-kind: Pod
-metadata:
-  name: nfs-test
-spec:
-  containers:
-  - name: app
-    image: busybox
-    command: ["sh", "-c", "echo Hello from NFS > /mnt/test.txt && sleep 3600"]
-    volumeMounts:
-    - name: nfs-vol
-      mountPath: /mnt
-  volumes:
-  - name: nfs-vol
-    persistentVolumeClaim:
-      claimName: nfs-pvc
-EOF
-
-  # Wait for pod to be ready
-  echo "Waiting for pod to be ready..."
-  kubectl wait --for=condition=Ready pod/nfs-test -n "$namespace" --timeout=60s
-
-  # Test file inside pod
-  echo "Checking file content in pod:"
-  kubectl exec -n "$namespace" nfs-test -- cat /mnt/test.txt
-
-  # Clean up resources on exit
-  # trap "kubectl delete pod nfs-test -n $namespace; kubectl delete pvc nfs-pvc -n $namespace; kubectl delete pv nfs-pv" EXIT
 }
 
 ## -- main --
