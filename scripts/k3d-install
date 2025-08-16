@@ -28,7 +28,6 @@ function command_exist() {
     command -v "$1" &> /dev/null
 }
 
-
 function is_mac() {
    if [[ "$(uname -s)" == "Darwin" ]]; then
       return 0
