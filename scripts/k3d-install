@@ -199,9 +199,8 @@ function install_helm() {
 
 function install_smb_csi_driver() {
    if is_mac ; then
-      echo "SMB CSI driver is not supported on macOS"
-      echo "use nfs storage class instead"
-      exit 1
+      echo "warning: SMB CSI driver is not supported on macOS"
+      exit 0
    fi
    install_helm
    helm repo add smb-csi-driver https://kubernetes-sigs.github.io/smb-csi-driver
