@@ -16,10 +16,12 @@
 #   install_smb_csi_driver           # Install SMB CSI driver (Linux only)
 #   create_nfs_share                 # Setup NFS export on host
 #
+# ISTIO TESTING:
+#   test_istio                       # Istio functionality tests
+#
 # NFS DEBUGGING (for issue #1383 - github.com/k3d-io/k3d/issues/1383):
 #   test_nfs_connectivity            # Test network connectivity to NFS
 #   test_nfs_direct                  # Test direct NFS mounting
-#   debug_nfs_storage                # Run NFS troubleshooting
 #
 # Note: The above script functions list in NFS DEBUGGING section do not address K3d NFS mounting issues on macOS. The code leave here for the reference purpose only
 
