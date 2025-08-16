@@ -318,15 +318,28 @@ EOF
     # Wait for deployment
     kubectl rollout status deployment/nginx-test -n istio-test --timeout=60s
 
+    # Verify that the Istio proxy has been injected
+    echo "Checking for Istio sidecar..."
+    if kubectl get pod -n istio-test -l app=nginx-test -o jsonpath='{.items[0].spec.containers[*].name}' | grep -q istio-proxy; then
+        echo "✅ Istio sidecar injection is working!"
+    else
+        echo "❌ Istio sidecar was not injected! Check your Istio installation."
+        return 1
+    fi
+
     # Test direct access first (bypassing Istio)
     echo "Testing direct pod access..."
     kubectl port-forward -n istio-test svc/nginx-test 8888:80 &
     PF_PID=$!
     sleep 3
-    curl -v localhost:8888
+    if curl -s localhost:8888 | grep -q "Welcome to nginx"; then
+        echo "✅ Direct access to the pod is working!"
+    else
+        echo "❌ Failed to access the pod directly"
+    fi
     kill $PF_PID
 
-    # Then configure Istio routing
+    # Create Istio Gateway and VirtualService
     kubectl apply -f - -n istio-test <<EOF
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
@@ -360,13 +373,41 @@ spec:
           number: 80
 EOF
 
+    # Verify Gateway creation
+    if kubectl get gateway -n istio-test test-gateway; then
+        echo "✅ Istio Gateway created successfully"
+    else
+        echo "❌ Failed to create Istio Gateway"
+        return 1
+    fi
+
+    # Verify VirtualService creation
+    if kubectl get virtualservice -n istio-test test-vs; then
+        echo "✅ Istio VirtualService created successfully"
+    else
+        echo "❌ Failed to create Istio VirtualService"
+        return 1
+    fi
+
     # Test through Istio gateway
     echo "Testing through Istio gateway..."
     kubectl port-forward -n istio-system svc/istio-ingressgateway 8080:80 &
     GATEWAY_PF_PID=$!
     sleep 3
-    curl -v localhost:8080
 
+    echo "Making request through Istio Gateway..."
+    if curl -s localhost:8080 | grep -q "Welcome to nginx"; then
+        echo "✅ Request through Istio Gateway successful!"
+        echo "🎉 ISTIO IS WORKING CORRECTLY! 🎉"
+    else
+        echo "❌ Failed to access through Istio Gateway"
+        echo "Detailed response:"
+        curl -v localhost:8080
+    fi
+
+    echo "For a more complete test, you could try accessing the Istio ingress gateway's external IP:"
+    kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+    echo ""
     trap 'cleanup_istio_test_namespace' EXIT TERM
 }
 
