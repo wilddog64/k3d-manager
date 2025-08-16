@@ -22,7 +22,7 @@
 #   debug_nfs_storage                # Run NFS troubleshooting
 #   test_nfs_in_pod [ip] [ns] [path] # Test NFS with PV/PVC/Pod
 #
-# Note: This script does not addresses K3d NFS mounting issues on macOS . The code leave here for the reference purpose only
+# Note: The above script functions list in NFS DEBUGGING section do not address K3d NFS mounting issues on macOS. The code leave here for the reference purpose only
 
 function command_exist() {
     command -v "$1" &> /dev/null
