@@ -106,7 +106,7 @@ function install_docker() {
 function install_k3d() {
    install_docker
 
-   if  ! command_exist k3d ; then
+   if ! command_exist k3d ; then
       echo k3d does not exist, install it
       curl -f -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
    else
