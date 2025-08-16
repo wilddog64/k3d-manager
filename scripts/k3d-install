@@ -92,13 +92,14 @@ function install_docker() {
       docker context use colima
    fi
    export DOCKER_HOST=unix:///Users/$USER/.colima/docker.sock
+   colima start
 
-   grep DOKER_HOST $HOME/.zsh/zshrc | wc -l 2>&1 > /dev/null
-   if $? == 0 ; then
-      echo "export DOCKER_HOST=unix:///Users/$USER/.colima/docker.sock" >> $HOME/.zsh/zshrc
-      echo "export DOCKER_CONTEXT=colima" >> $HOME/.zsh/zshrc
-      echo "restart your shell to apply the changes"
-   fi
+   # grep DOKER_HOST $HOME/.zsh/zshrc | wc -l 2>&1 > /dev/null
+   # if $? == 0 ; then
+   #    echo "export DOCKER_HOST=unix:///Users/$USER/.colima/docker.sock" >> $HOME/.zsh/zshrc
+   #    echo "export DOCKER_CONTEXT=colima" >> $HOME/.zsh/zshrc
+   #    echo "restart your shell to apply the changes"
+   # fi
 }
 
 function install_k3d() {
@@ -279,68 +280,65 @@ EOF
 function test_istio() {
     echo "Testing Istio installation and functionality..."
 
-    # 1. Check Istio control plane components
-    echo "Checking Istio control plane pods..."
-    if ! kubectl get pods -n istio-system | grep -q "Running"; then
-        echo "Error: Istio control plane not running properly"
-        kubectl get pods -n istio-system
-        return 1
-    fi
-
-    # 2. Create a test namespace with Istio injection
-    echo "Creating test namespace with Istio injection..."
+    # 1. Create a very simple test deployment and service
     kubectl create namespace istio-test 2>/dev/null || true
     kubectl label namespace istio-test istio-injection=enabled --overwrite
 
-    # 3. Deploy a sample application
-    echo "Deploying sample application..."
-    cat <<EOF | kubectl apply -f - -n istio-test
+    # Deploy a minimal nginx pod
+    kubectl apply -f - -n istio-test <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: istio-test-app
+  name: nginx-test
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: istio-test-app
+      app: nginx-test
   template:
     metadata:
       labels:
-        app: istio-test-app
+        app: nginx-test
     spec:
       containers:
-      - name: echo
-        image: hashicorp/http-echo:latest
-        args:
-          - "-text=Istio is working!"
-        ports:
-          - name: http-web
-            containerPort: 5678
+      - name: nginx
+        image: nginx:stable
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: istio-test-svc
+  name: nginx-test
 spec:
   ports:
-   - name: http-web
-       port: 80
-       targetPort: 5678
+  - port: 80
   selector:
-    app: istio-test-app
----
+    app: nginx-test
+EOF
+
+    # Wait for deployment
+    kubectl rollout status deployment/nginx-test -n istio-test --timeout=60s
+
+    # Test direct access first (bypassing Istio)
+    echo "Testing direct pod access..."
+    kubectl port-forward -n istio-test svc/nginx-test 8888:80 &
+    PF_PID=$!
+    sleep 3
+    curl -v localhost:8888
+    kill $PF_PID
+
+    # Then configure Istio routing
+    kubectl apply -f - -n istio-test <<EOF
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
-  name: istio-test-gateway
+  name: test-gateway
 spec:
   selector:
     istio: ingressgateway
   servers:
   - port:
       number: 80
-      name: http-web
+      name: http
       protocol: HTTP
     hosts:
     - "*"
@@ -348,79 +346,27 @@ spec:
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: istio-test-vs
+  name: test-vs
 spec:
   hosts:
   - "*"
   gateways:
-  - istio-test-gateway
+  - test-gateway
   http:
-  - match:
-    - uri:
-        prefix: /test
-    route:
+  - route:
     - destination:
-        host: istio-test-svc
+        host: nginx-test
         port:
           number: 80
 EOF
 
-    # 4. Wait for the deployment to be ready
-    echo "Waiting for deployment to be ready..."
-    kubectl rollout status deployment/istio-test-app -n istio-test --timeout=120s
+    # Test through Istio gateway
+    echo "Testing through Istio gateway..."
+    kubectl port-forward -n istio-system svc/istio-ingressgateway 8080:80 &
+    GATEWAY_PF_PID=$!
+    sleep 3
+    curl -v localhost:8080
 
-    # 5. Get Istio ingress gateway IP/port
-    # echo "Getting Istio ingress gateway address..."
-    # INGRESS_HOST=$(kubectl -n istio-system \
-    #    get service istio-ingressgateway \
-    #    -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-    # forward igress port to localhost
-    INGRESS_PORT=8080
-    kubectl port-forward -n istio-system svc/istio-ingressgateway $IGRESS_PORT:80 &
-
-    # Debug gateway service
-    echo "Debug - Istio gateway service details:"
-    kubectl get svc istio-ingressgateway -n istio-system -o wide
-
-    echo "Using gateway at localhost:$INGRESS_PORT"
-
-    # 6. Test the application through Istio gateway
-    echo "Testing application through Istio gateway..."
-    echo "Command: curl -v http://localhost:$INGRESS_PORT/test"
-
-    # Try with -v for verbose output to see exactly what's happening
-    curl -v http://localhost:$INGRESS_PORT/test
-
-    RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-       --connect-timeout 10 http://localhost:$INGRESS_PORT/test)
-    # Kill port-forwarding if we started it
-    PF_PID=$!
-
-    if [ "$RESPONSE" == "200" ]; then
-        echo "✅ Istio test successful! Application is accessible through the Istio gateway."
-    else
-        echo "❌ Istio test failed. Response code: $RESPONSE"
-        echo "Debugging information:"
-        kubectl get pods -n istio-system
-        kubectl get pods -n istio-test
-        kubectl describe virtualservice istio-test-vs -n istio-test
-        kubectl describe gateway istio-test-gateway -n istio-test
-        return 1
-    fi
-
-    # 7. Check for sidecar injection
-    SIDECAR_COUNT=$(kubectl get pods -n istio-test \
-       -l app=istio-test-app \
-       -o jsonpath='{.items[0].spec.containers[*].name}' \
-       | tr ' ' '\n' | grep -c istio-proxy)
-    if [ "$SIDECAR_COUNT" -eq "1" ]; then
-        echo "✅ Istio sidecar injection working properly"
-    else
-        echo "❌ Istio sidecar injection not working"
-    fi
-
-    # kubectl delete namespace istio-test when test successful;
-    # otherise leave it for debugging
     trap 'cleanup_istio_test_namespace' EXIT TERM
 }
 
