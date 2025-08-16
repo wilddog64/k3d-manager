@@ -397,10 +397,4 @@ fi
 install_k3d
 create_k3d_cluster "k3d-cluster"
 configure_k3d_cluster_istio "k3d-cluster"
-if is_mac ; then
-   install_nfscsi_storage_drivers
-   test_nfs_storage
-   test_nfs_direct
-elif is_linux ; then
-   install_smb_csi_driver
-fi
+install_smb_csi_driver
