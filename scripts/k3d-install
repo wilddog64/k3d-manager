@@ -64,12 +64,6 @@ function is_wsl() {
 }
 
 function install_colima() {
-
-   if ! is_mac ; then
-      echo "Colima is only supported on macOS"
-      exit 1
-   fi
-
    if ! command_exist colima ; then
       echo colima does not exist, install it
       brew install colima
@@ -83,7 +77,8 @@ function install_docker() {
    if is_mac; then
       install_colima
    fi
-   if  ! command_exist docker ; then
+
+   if  ! command_exist docker && is_mac ; then
       echo docker does not exist, install it
       brew install docker
    else
@@ -93,6 +88,7 @@ function install_docker() {
    if is_mac; then
       docker context use colima
    fi
+
    export DOCKER_HOST=unix:///Users/$USER/.colima/docker.sock
    colima start
 
