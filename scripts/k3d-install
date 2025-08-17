@@ -576,7 +576,6 @@ if [[ $# -gt 0 ]]; then
         echo "Error: Function '$function_name' not found"
         exit 1
     fi
-    exit 0
 fi
 
 install_k3d
