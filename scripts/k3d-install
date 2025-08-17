@@ -504,8 +504,14 @@ EOF
         echo "✅ Direct access to the pod is working!"
     else
         echo "❌ Failed to access the pod directly"
+        exit -1
     fi
-    kill $PF_PID
+    if is_mac ; then
+       echo here
+       lsof -iTCP:8080 -sTCP:LISTEN -nP | awk '$1 == "kubectl" {print $2}' | xargs kill
+    else
+       sudo lsof -iTCP:8080 -sTCP:LISTEN -nP | awk '$1 == "kubectl" {print $2}' | sudo xargs kill
+    fi
 
     # Create Istio Gateway and VirtualService
     _kubectl apply -f - -n istio-test <<EOF
@@ -546,7 +552,7 @@ EOF
         echo "✅ Istio Gateway created successfully"
     else
         echo "❌ Failed to create Istio Gateway"
-        return 1
+        exit -1
     fi
 
     # Verify VirtualService creation
@@ -554,7 +560,7 @@ EOF
         echo "✅ Istio VirtualService created successfully"
     else
         echo "❌ Failed to create Istio VirtualService"
-        return 1
+        exit -1
     fi
 
     # Test through Istio gateway
@@ -571,7 +577,7 @@ EOF
         echo "❌ Failed to access through Istio Gateway"
         echo "Detailed response:"
         _curl -v localhost:8080
-        return -1
+        exit -1
     fi
 
     echo "For a more complete test, you could try accessing the Istio ingress gateway's external IP:"
