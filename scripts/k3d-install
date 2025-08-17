@@ -112,9 +112,33 @@ function install_k3d() {
 }
 
 function install_istioctl() {
-   if  ! command_exist istioctl ; then
-      curl -f -s https://raw.githubusercontent.com/istio/istio/master/release/downloadIstioCandidate.sh | bash
+   install_dir="${1:-$HOME/.local/bin}"
+
+   if command_exist istioctl ; then
+      echo "istioctl already exists, skip installation"
+      return 0
    fi
+
+   echo "install dir: ${install_dir}"
+   if [[ ! -e "$install_dir" && ! -d "$install_dir" ]]; then
+      mkdir -p "${install_dir}"
+   fi
+
+   if  ! command_exist istioctl ; then
+      echo installing istioctl
+      tmp_script=$(mktemp)
+      pushd /tmp
+      curl -f -s https://raw.githubusercontent.com/istio/istio/master/release/downloadIstioCandidate.sh -o "$tmp_script"
+      istio_bin=$(bash "$tmp_script" | perl -nle 'print $1 if /add the (.*) directory/')
+      if [[ -z "$istio_bin" ]]; then
+         echo "Failed to download istioctl"
+         exit 1
+      fi
+      cp -v "$istio_bin/istioctl" "${install_dir}/"
+      popd
+   fi
+
+   trap 'rm -rf /tmp/istio-*' EXIT TERM
 }
 
 function create_k3d_cluster() {
@@ -441,4 +465,4 @@ fi
 install_k3d
 create_k3d_cluster "k3d-cluster"
 configure_k3d_cluster_istio "k3d-cluster"
-install_smb_csi_driver
+# install_smb_csi_driver
