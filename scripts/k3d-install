@@ -127,10 +127,10 @@ function install_docker() {
 
    if is_mac; then
       docker context use colima
+      export DOCKER_HOST=unix:///Users/$USER/.colima/docker.sock
+      colima start
    fi
 
-   export DOCKER_HOST=unix:///Users/$USER/.colima/docker.sock
-   colima start
 
    # grep DOKER_HOST $HOME/.zsh/zshrc | wc -l 2>&1 > /dev/null
    # if $? == 0 ; then
