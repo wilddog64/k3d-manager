@@ -201,6 +201,14 @@ function _list_k3d_cluster() {
    fi
 }
 
+function get_ip() {
+   if is_mac ; then
+      ifconfig en0 | grep inet | awk '$1=="inet" {print $2}'
+   else
+      ip -4 route get 8.8.8.8 | perl -nle 'print $1 if /src (.*) uid/'
+   fi
+}
+
 function create_k3d_cluster() {
    cluster_name=$1
 
@@ -232,7 +240,7 @@ options:
       - arg: "--disable=local-storage"
         nodeFilters: ["server:*"]
 hostAliases:
-  - ip: "$(ifconfig en0 | grep inet | awk '$1=="inet" {print $2}')"
+  - ip: "$(get_ip)"
     hostnames: ["host.k3d.internal"]
 EOF
 
