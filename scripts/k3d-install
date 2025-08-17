@@ -183,10 +183,28 @@ function install_istioctl() {
    trap 'rm -rf /tmp/istio-*' EXIT TERM
 }
 
+function _create_k3d_cluster() {
+   cluster_yaml=$1
+
+   if is_mac ; then
+     k3d cluster create --config "${cluster_yaml}"
+   elif is_redhat_family ; then
+     sudo k3d cluster create --config "${cluster_yaml}"
+   fi
+}
+
+function _list_k3d_cluster() {
+   if is_mac ; then
+      k3d cluster list
+   elif is_redhat_family ; then
+      sudo k3d cluster list
+   fi
+}
+
 function create_k3d_cluster() {
    cluster_name=$1
 
-   if k3d cluster list | grep -q "$cluster_name"; then
+   if _list_k3d_cluster | grep -q "$cluster_name"; then
       echo "Cluster $cluster_name already exists, skip"
       return 0
    fi
@@ -218,10 +236,9 @@ hostAliases:
     hostnames: ["host.k3d.internal"]
 EOF
 
-   k3d cluster create --config "$yaml"
+   _create_k3d_cluster "$yaml"
 
    trap 'cleanup_on_success "$yaml"' EXIT
-
 }
 
 function cleanup_on_success() {
