@@ -201,6 +201,46 @@ function _list_k3d_cluster() {
    fi
 }
 
+function _kubectl() {
+   if ! command_exist kubectl ; then
+      echo "kubectl is not installed. Please install it first."
+      exit 1
+   fi
+
+   if is_mac ; then
+      kubectl "$@"
+   else
+      sudo kubectl "$@"
+   fi
+}
+
+function _istioctl() {
+   if ! command_exist istioctl ; then
+      echo "istioctl is not installed. Please install it first."
+      exit 1
+   fi
+
+   if is_mac ; then
+      istioctl "$@"
+   else
+      sudo istioctl "$@"
+   fi
+}
+
+function _helm() {
+   if ! command_exist helm ; then
+      echo "helm is not installed. Please install it first."
+      exit 1
+   fi
+
+   if is_mac ; then
+      helm "$@"
+   else
+      sudo helm "$@"
+   fi
+}
+
+
 function get_ip() {
    if is_mac ; then
       ifconfig en0 | grep inet | awk '$1=="inet" {print $2}'
@@ -264,8 +304,8 @@ function configure_k3d_cluster_istio() {
 
    install_kubernetes_cli
    install_istioctl
-   istioctl x precheck
-   istioctl install -y \
+   _istioctl x precheck
+   _istioctl install -y \
      --set profile=default \
      --set values.pilot.resources.requests.cpu=100m \
      --set values.pilot.resources.requests.memory=256Mi \
@@ -274,9 +314,8 @@ function configure_k3d_cluster_istio() {
      --set values.gateways.istio-ingressgateway.resources.requests.cpu=100m \
      --set values.gateways.istio-ingressgateway.resources.requests.memory=256Mi \
      --set values.gateways.istio-ingressgateway.type=LoadBalancer
-   kubectl label ns default istio-injection=enabled --overwrite
+   _kubectl label ns default istio-injection=enabled --overwrite
 }
-
 
 function install_smb_csi_driver() {
    if is_mac ; then
@@ -284,9 +323,9 @@ function install_smb_csi_driver() {
       exit 0
    fi
    install_helm
-   helm repo add smb-csi-driver https://kubernetes-sigs.github.io/smb-csi-driver
-   helm repo update
-   helm upgrade --install smb-csi-driver smb-csi-driver/smb-csi-driver \
+   _helm repo add smb-csi-driver https://kubernetes-sigs.github.io/smb-csi-driver
+   _helm repo update
+   _helm upgrade --install smb-csi-driver smb-csi-driver/smb-csi-driver \
       --namespace kube-system
 
    if [[ $? != 0 ]]; then
@@ -323,7 +362,7 @@ function test_nfs_connectivity() {
   echo "Testing basic connectivity to NFS server..."
 
   # Create a pod with networking tools
-  kubectl run nfs-connectivity-test --image=nicolaka/netshoot --rm -it --restart=Never -- bash -c "
+  _kubectl run nfs-connectivity-test --image=nicolaka/netshoot --rm -it --restart=Never -- bash -c "
     echo 'Attempting to reach NFS port on host...'
     nc -zv host.k3d.internal 2049
     echo 'DNS lookup for host...'
@@ -339,7 +378,7 @@ function test_nfs_direct() {
   echo "Testing NFS connectivity directly from a pod..."
 
   # Create a pod that mounts NFS directly
-  cat <<EOF | kubectl apply -f -
+  cat <<EOF | _kubectl apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -356,18 +395,19 @@ EOF
 
   echo "Waiting for pod to be ready..."
   sleep 5
-  kubectl logs nfs-test-direct
+  _kubectl logs nfs-test-direct
 }
+
 
 function test_istio() {
     echo "Testing Istio installation and functionality..."
 
     # 1. Create a very simple test deployment and service
-    kubectl create namespace istio-test 2>/dev/null || true
-    kubectl label namespace istio-test istio-injection=enabled --overwrite
+    _kubectl create namespace istio-test 2>/dev/null || true
+    _kubectl label namespace istio-test istio-injection=enabled --overwrite
 
     # Deploy a minimal nginx pod
-    kubectl apply -f - -n istio-test <<EOF
+    _kubectl apply -f - -n istio-test <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -398,11 +438,11 @@ spec:
 EOF
 
     # Wait for deployment
-    kubectl rollout status deployment/nginx-test -n istio-test --timeout=60s
+    _kubectl rollout status deployment/nginx-test -n istio-test --timeout=60s
 
     # Verify that the Istio proxy has been injected
     echo "Checking for Istio sidecar..."
-    if kubectl get pod -n istio-test -l app=nginx-test -o jsonpath='{.items[0].spec.containers[*].name}' | grep -q istio-proxy; then
+    if _kubectl get pod -n istio-test -l app=nginx-test -o jsonpath='{.items[0].spec.containers[*].name}' | sudo grep -q istio-proxy; then
         echo "✅ Istio sidecar injection is working!"
     else
         echo "❌ Istio sidecar was not injected! Check your Istio installation."
@@ -411,7 +451,7 @@ EOF
 
     # Test direct access first (bypassing Istio)
     echo "Testing direct pod access..."
-    kubectl port-forward -n istio-test svc/nginx-test 8888:80 &
+    _kubectl port-forward -n istio-test svc/nginx-test 8888:80 &
     PF_PID=$!
     sleep 3
     if curl -s localhost:8888 | grep -q "Welcome to nginx"; then
@@ -422,7 +462,7 @@ EOF
     kill $PF_PID
 
     # Create Istio Gateway and VirtualService
-    kubectl apply -f - -n istio-test <<EOF
+    _kubectl apply -f - -n istio-test <<EOF
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
@@ -456,7 +496,7 @@ spec:
 EOF
 
     # Verify Gateway creation
-    if kubectl get gateway -n istio-test test-gateway; then
+    if _kubectl get gateway -n istio-test test-gateway; then
         echo "✅ Istio Gateway created successfully"
     else
         echo "❌ Failed to create Istio Gateway"
@@ -464,7 +504,7 @@ EOF
     fi
 
     # Verify VirtualService creation
-    if kubectl get virtualservice -n istio-test test-vs; then
+    if _kubectl get virtualservice -n istio-test test-vs; then
         echo "✅ Istio VirtualService created successfully"
     else
         echo "❌ Failed to create Istio VirtualService"
@@ -473,22 +513,23 @@ EOF
 
     # Test through Istio gateway
     echo "Testing through Istio gateway..."
-    kubectl port-forward -n istio-system svc/istio-ingressgateway 8080:80 &
+    _kubectl port-forward -n istio-system svc/istio-ingressgateway 8080:80 &
     GATEWAY_PF_PID=$!
-    sleep 3
+    sleep 15
 
     echo "Making request through Istio Gateway..."
-    if curl -s localhost:8080 | grep -q "Welcome to nginx"; then
+    if sudo curl -s localhost:8080 | sudo grep -q "Welcome to nginx"; then
         echo "✅ Request through Istio Gateway successful!"
         echo "🎉 ISTIO IS WORKING CORRECTLY! 🎉"
     else
         echo "❌ Failed to access through Istio Gateway"
         echo "Detailed response:"
-        curl -v localhost:8080
+        sudo curl -v localhost:8080
+        return -1
     fi
 
     echo "For a more complete test, you could try accessing the Istio ingress gateway's external IP:"
-    kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+    _kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
     echo ""
     trap 'cleanup_istio_test_namespace' EXIT TERM
 }
@@ -500,9 +541,9 @@ function cleanup_istio_test_namespace() {
     if [[ $? == 0 ]]; then
        # Kill the port-forwarding process if it exists
        if [ ! -z "$PF_PID" ]; then
-           kill $PF_PID 2>/dev/null || true
+           sudo kill $PF_PID 2>/dev/null || true
        fi
-       kubectl delete namespace istio-test --ignore-not-found
+       _kubectl delete namespace istio-test --ignore-not-found
     fi
 }
 
