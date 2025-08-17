@@ -40,6 +40,7 @@ function install_kubernetes_cli() {
      install_redhat_kubernetes_client
    fi
 }
+
 function is_mac() {
    if [[ "$(uname -s)" == "Darwin" ]]; then
       return 0
@@ -256,6 +257,35 @@ function _helm() {
 
 }
 
+function _curl() {
+   if ! command_exist curl ; then
+      echo "curl is not installed. Please install it first."
+      exit 1
+   fi
+
+   if is_mac ; then
+      curl "$@"
+   else
+      sudo curl "$@"
+   fi
+
+   if [[ $? != 0 ]]; then
+      echo "Curl command failed: $@"
+      exit 1
+   fi
+}
+
+function _kill() {
+   if is_mac ; then
+      kill "$@"
+   else
+      sudo kill "$@"
+   fi
+   if [[ $? != 0 ]]; then
+      echo "Kill command failed: $@"
+      exit 1
+   fi
+}
 
 function _ip() {
    if is_mac ; then
@@ -458,7 +488,7 @@ EOF
 
     # Verify that the Istio proxy has been injected
     echo "Checking for Istio sidecar..."
-    if _kubectl get pod -n istio-test -l app=nginx-test -o jsonpath='{.items[0].spec.containers[*].name}' | sudo grep -q istio-proxy; then
+    if _kubectl get pod -n istio-test -l app=nginx-test -o jsonpath='{.items[0].spec.containers[*].name}' | grep -q istio-proxy; then
         echo "✅ Istio sidecar injection is working!"
     else
         echo "❌ Istio sidecar was not injected! Check your Istio installation."
@@ -534,13 +564,13 @@ EOF
     sleep 15
 
     echo "Making request through Istio Gateway..."
-    if sudo curl -s localhost:8080 | sudo grep -q "Welcome to nginx"; then
+    if _curl -s localhost:8080 | grep -q "Welcome to nginx"; then
         echo "✅ Request through Istio Gateway successful!"
         echo "🎉 ISTIO IS WORKING CORRECTLY! 🎉"
     else
         echo "❌ Failed to access through Istio Gateway"
         echo "Detailed response:"
-        sudo curl -v localhost:8080
+        _curl -v localhost:8080
         return -1
     fi
 
@@ -557,7 +587,8 @@ function cleanup_istio_test_namespace() {
     if [[ $? == 0 ]]; then
        # Kill the port-forwarding process if it exists
        if [ ! -z "$PF_PID" ]; then
-           sudo kill $PF_PID 2>/dev/null || true
+           echo "port forward PID: $PF_PID" | tee /tmp/pf_id.txt
+           _kill $PF_PID 2>/dev/null || true
        fi
        _kubectl delete namespace istio-test --ignore-not-found
     fi
