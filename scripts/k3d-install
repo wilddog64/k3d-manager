@@ -257,7 +257,7 @@ function _helm() {
 }
 
 
-function get_ip() {
+function _ip() {
    if is_mac ; then
       ifconfig en0 | grep inet | awk '$1=="inet" {print $2}'
    else
@@ -296,7 +296,7 @@ options:
       - arg: "--disable=local-storage"
         nodeFilters: ["server:*"]
 hostAliases:
-  - ip: "$(get_ip)"
+  - ip: "$(_ip)"
     hostnames: ["host.k3d.internal"]
 EOF
 
