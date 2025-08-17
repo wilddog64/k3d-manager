@@ -154,7 +154,7 @@ function install_k3d() {
 }
 
 function install_istioctl() {
-   install_dir="${1:-$HOME/.local/bin}"
+   install_dir="${1:-/usr/local/bin}"
 
    if command_exist istioctl ; then
       echo "istioctl already exists, skip installation"
@@ -176,7 +176,7 @@ function install_istioctl() {
          echo "Failed to download istioctl"
          exit 1
       fi
-      cp -v "$istio_bin/istioctl" "${install_dir}/"
+      sudo cp -v "$istio_bin/istioctl" "${install_dir}/"
       popd
    fi
 
