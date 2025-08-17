@@ -212,6 +212,11 @@ function _kubectl() {
    else
       sudo kubectl "$@"
    fi
+
+   if [[ $? != 0 ]]; then
+      echo "Kubectl command failed: $@"
+      exit 1
+   fi
 }
 
 function _istioctl() {
@@ -224,6 +229,11 @@ function _istioctl() {
       istioctl "$@"
    else
       sudo istioctl "$@"
+   fi
+
+   if [[ $? != 0 ]]; then
+      echo "Istioctl command failed: $@"
+      exit 1
    fi
 }
 
@@ -238,6 +248,12 @@ function _helm() {
    else
       sudo helm "$@"
    fi
+
+   if [[ $? != 0 ]]; then
+      echo "Helm command failed: $@"
+      exit 1
+   fi
+
 }
 
 
