@@ -300,9 +300,11 @@ function _kubectl() {
       exit 1
    fi
 
-   if is_mac ; then
+   # Check if user has direct kubectl access
+   if [ -f "$HOME/.kube/config" ] && kubectl get nodes 2>&1 >/dev/null; then
       kubectl "$@"
    else
+      echo use sudo
       sudo kubectl "$@"
    fi
 
@@ -336,7 +338,7 @@ function _helm() {
       exit 1
    fi
 
-   if is_mac ; then
+   if [[ -f $HOME/.kube/config ]] && kubectl get nodes 2>&1 > /dev/null ; then
       helm "$@"
    else
       sudo helm "$@"
@@ -355,7 +357,7 @@ function _curl() {
       exit 1
    fi
 
-   if is_mac ; then
+   if [[ -f $HOME/.kube/config ]] && kubectl get nodes 2>&1 > /dev/null ; then
       curl "$@"
    else
       sudo curl "$@"
@@ -368,11 +370,13 @@ function _curl() {
 }
 
 function _kill() {
-   if is_mac ; then
+
+   if [[ -f "$HOME/.kube/config" ]] && kubectl get nodes 2>&1 > /dev/null ; then
       kill "$@"
    else
       sudo kill "$@"
    fi
+
    if [[ $? != 0 ]]; then
       echo "Kill command failed: $@"
       exit 1
@@ -592,7 +596,7 @@ EOF
     _kubectl port-forward -n istio-test svc/nginx-test 8888:80 &
     PF_PID=$!
     sleep 3
-    if curl -s localhost:8888 | grep -q "Welcome to nginx"; then
+    if _curl -s localhost:8888 | grep -q "Welcome to nginx"; then
         echo "✅ Direct access to the pod is working!"
     else
         echo "❌ Failed to access the pod directly"
@@ -692,12 +696,40 @@ function cleanup_istio_test_namespace() {
     fi
 }
 
+function configure_user_kubectl_access() {
+   cluster_name="${1:-k3d-cluster}"
+
+   echo "Configuring kubectl access for non-root user..."
+
+   # Create kube directory in user's home if it doesn't exist
+   mkdir -p $HOME/.kube
+
+   # Get kubeconfig from k3d and save it to user's directory
+   sudo k3d kubeconfig get "$cluster_name" > $HOME/.kube/config-"$cluster_name"
+
+   # Set proper permissions
+   chmod 600 $HOME/.kube/config-"$cluster_name"
+
+   # Create/update the main config file
+   if [ -f "$HOME/.kube/config" ]; then
+      echo "Backing up existing kubeconfig to $HOME/.kube/config.bak"
+      cp $HOME/.kube/config $HOME/.kube/config.bak
+   fi
+
+   cp $HOME/.kube/config-"$cluster_name" $HOME/.kube/config
+
+   echo "kubectl is now configured for non-root access to $cluster_name"
+   echo "You can verify with: kubectl get nodes"
+   echo "If you have other clusters, you may want to merge configs using the KUBECONFIG environment variable"
+}
+
 function deploy_k3d_cluster() {
    cluster_name="${1:-k3d-cluster}"
 
    install_k3d
    create_k3d_cluster "$cluster_name"
    configure_k3d_cluster_istio "$cluster_name"
+   configure_user_kubectl_access "$cluster_name"
    # install_smb_csi_driver
 }
 
