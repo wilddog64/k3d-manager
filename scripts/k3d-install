@@ -691,6 +691,7 @@ function cleanup_istio_test_namespace() {
 function deploy_k3d_cluster() {
    cluster_name="${1:-k3d-cluster}"
 
+   install_k3d
    create_k3d_cluster "$cluster_name"
    configure_k3d_cluster_istio "$cluster_name"
    # install_smb_csi_driver
