@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-# k3d-install - K3d Kubernetes cluster setup with Istio and storage configuration
+# k3d-manager - K3d Kubernetes cluster setup with Istio and storage configuration
 #
 # USAGE:
-#   ./k3d-install                    # Run default installation workflow
-#   ./k3d-install <function> [args]  # Run specific function
+#   ./k3d-manager                    # Run default installation workflow
+#   ./k3d-manager <function> [args]  # Run specific function
 #
 # FUNCTIONS:
 #   install_colima                   # Install Colima container runtime (macOS)

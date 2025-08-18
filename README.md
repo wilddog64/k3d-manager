@@ -1,4 +1,4 @@
-# k3d-install - K3d Kubernetes Cluster Setup with Istio and Storage Support
+# k3d-manager - K3d Kubernetes Cluster Setup with Istio and Storage Support
 
 A comprehensive utility script for setting up K3d Kubernetes clusters with Istio service mesh and storage configurations across different operating systems.
 
@@ -21,17 +21,15 @@ This script automates the deployment of K3d Kubernetes clusters with the followi
 ## Quick Start
 
 # Clone this repository
-git clone https://github.com/yourusername/k3d-install.git
+git clone https://github.com/yourusername/k3d-manager.git
 cd k3d-install
 
-# Make script executable
-chmod +x scripts/k3d-install
 
 # Run default installation workflow
-./scripts/k3d-install
+./scripts/k3d-manager
 
 # Or run a specific function
-./scripts/k3d-install create_k3d_cluster my-cluster
+./scripts/k3d-manager create_k3d_cluster my-cluster
 ```
 
 ## Supported Platforms
@@ -67,8 +65,8 @@ chmod +x scripts/k3d-install
 ## Command Reference
 
 USAGE:
-  ./scripts/k3d-install                    # Run default installation workflow
-  ./scripts/k3d-install <function> [args]  # Run specific function
+  ./scripts/k3d-manager                    # Run default installation workflow
+  ./scripts/k3d-manager <function> [args]  # Run specific function
 
 FUNCTIONS:
   install_colima                   # Install Colima container runtime (macOS)
@@ -90,14 +88,14 @@ ISTIO TESTING:
 If you encounter port forwarding issues during testing, you may need to manually clean up orphaned processes:
 ```bash
 # Find and kill processes using specific ports
-lsof -ti:8080,8443 | xargs kill
+lsof -iTCP:8080 -sTCP:LISTEN -nP | awk '$1 == "kubectl" {print $2}' | xargs kill
 
 ### NFS Connection Problems
 NFS connectivity issues between host and K3d containers are known on macOS. The script includes diagnostic functions to help troubleshoot.
 
 ## License
 
-MIT
+(Apache License 2.0)[./LICENSE]
 
 ## Contributing
 
