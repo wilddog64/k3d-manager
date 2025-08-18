@@ -149,11 +149,7 @@ function install_colima() {
    fi
 }
 
-function install_docker() {
-
-   if is_mac; then
-      install_colima
-   fi
+function _install_mac_docker() {
 
    if  ! command_exist docker && is_mac ; then
       echo docker does not exist, install it
@@ -175,6 +171,62 @@ function install_docker() {
    #    echo "export DOCKER_CONTEXT=colima" >> $HOME/.zsh/zshrc
    #    echo "restart your shell to apply the changes"
    # fi
+}
+
+function _install_debian_docker() {
+  echo "Installing Docker on Debian/Ubuntu system..."
+  # Update apt
+  sudo apt-get update
+  # Install dependencies
+  sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+  # Add Docker's GPG key
+  if [[ ! -e "/usr/share/keyrings/docker-archive-keyring.gpg" ]]; then
+     curl -fsSL https://download.docker.com/linux/$(lsb_release -is \
+        | tr '[:upper:]' '[:lower:]')/gpg \
+        | sudo gpg --dearmor \
+        -o /usr/share/keyrings/docker-archive-keyring.gpg
+  fi
+  # Add Docker repository
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]') $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  # Update package list
+  sudo apt-get update
+  # Install Docker
+  sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+  # Start and enable Docker
+  sudo systemctl start docker
+  sudo systemctl enable docker
+  # Add current user to docker group
+  sudo usermod -aG docker $USER
+  echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
+}
+
+function _install_redhat_docker() {
+  echo "Installing Docker on RHEL/Fedora/CentOS system..."
+  # Install required packages
+  sudo dnf install -y dnf-plugins-core
+  # Add Docker repository
+  sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+  # Install Docker
+  sudo dnf install -y docker-ce docker-ce-cli containerd.io
+  # Start and enable Docker
+  sudo systemctl start docker
+  sudo systemctl enable docker
+  # Add current user to docker group
+  sudo usermod -aG docker $USER
+  echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
+}
+
+function install_docker() {
+   if is_mac; then
+      _install_mac_docker
+   elif is_debian_family; then
+      _install_debian_docker
+   elif is_redhat_family ; then
+      _install_redhat_docker
+   else
+      echo "Unsupported Linux distribution. Please install Docker manually."
+      exit 1
+   fi
 }
 
 function install_k3d() {
@@ -225,7 +277,7 @@ function _create_k3d_cluster() {
 
    if is_mac ; then
      k3d cluster create --config "${cluster_yaml}"
-   elif is_redhat_family ; then
+   elif is_linux ; then
      sudo k3d cluster create --config "${cluster_yaml}"
    fi
 }
@@ -233,7 +285,7 @@ function _create_k3d_cluster() {
 function _list_k3d_cluster() {
    if is_mac ; then
       k3d cluster list
-   elif is_redhat_family ; then
+   elif is_linux ; then
       sudo k3d cluster list
    fi
 }
