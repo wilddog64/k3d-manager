@@ -572,7 +572,7 @@ spec:
 EOF
 
     # Wait for deployment
-    _kubectl rollout status deployment/nginx-test -n istio-test --timeout=60s
+    _kubectl rollout status deployment/nginx-test -n istio-test --timeout=120s
 
     # Verify that the Istio proxy has been injected
     echo "Checking for Istio sidecar..."
