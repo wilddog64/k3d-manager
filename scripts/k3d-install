@@ -29,15 +29,51 @@ function command_exist() {
     command -v "$1" &> /dev/null
 }
 
-function install_redhat_kubernetes_client() {
+function _install_redhat_kubernetes_client() {
   if ! command_exist kubectl; then
      sudo dnf install -y kubernetes-client
   fi
 }
 
+function _install_debian_kubernetes_client() {
+   if command_exist kubectl ; then
+      echo "kubectl already installed, skipping"
+      return 0
+   fi
+
+   echo "Installing kubectl on Debian/Ubuntu system..."
+
+   # Create the keyrings directory if it doesn't exist
+   sudo mkdir -p /etc/apt/keyrings
+
+   # Download the Kubernetes signing key
+   if [[ ! -e "/etc/apt/keyrings/kubernetes-apt-keyring.gpg" ]]; then
+      curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key \
+         | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+   fi
+
+   # Add the Kubernetes apt repository
+   echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
+
+   # Update apt package index
+   sudo apt-get update -y
+
+   # Install kubectl
+   sudo apt-get install -y kubectl
+
+   if [[ $? == 0 ]]; then
+      echo "kubectl installed successfully"
+   else
+      echo "Failed to install kubectl"
+      exit 1
+   fi
+}
+
 function install_kubernetes_cli() {
    if is_redhat_family ; then
-     install_redhat_kubernetes_client
+      _install_redhat_kubernetes_client
+    elif is_debian_family ; then
+      _install_debian_kubernetes_client
    fi
 }
 
