@@ -602,12 +602,7 @@ EOF
         echo "❌ Failed to access the pod directly"
         exit -1
     fi
-    if is_mac ; then
-       echo here
-       lsof -iTCP:8080 -sTCP:LISTEN -nP | awk '$1 == "kubectl" {print $2}' | xargs kill
-    else
-       sudo lsof -iTCP:8080 -sTCP:LISTEN -nP | awk '$1 == "kubectl" {print $2}' | sudo xargs kill
-    fi
+    lsof -iTCP:8888 -sTCP:LISTEN -nP | awk '$1 == "kubectl" {print $2}' | xargs kill
 
     # Create Istio Gateway and VirtualService
     _kubectl apply -f - -n istio-test <<EOF
@@ -690,7 +685,7 @@ function cleanup_istio_test_namespace() {
        # Kill the port-forwarding process if it exists
        if [ ! -z "$PF_PID" ]; then
            echo "port forward PID: $PF_PID" | tee /tmp/pf_id.txt
-           _kill $PF_PID 2>/dev/null || true
+           lsof -iTCP:8080 -sTCP:LISTEN -nP | awk '$1 == "kubectl" {print $2}' | xargs kill
        fi
        _kubectl delete namespace istio-test --ignore-not-found
     fi
