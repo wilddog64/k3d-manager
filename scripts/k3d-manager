@@ -666,7 +666,6 @@ EOF
     else
         echo "❌ Failed to access through Istio Gateway"
         echo "Detailed response:"
-        _curl -v localhost:8080
         exit -1
     fi
 
