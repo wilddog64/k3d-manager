@@ -683,7 +683,11 @@ function cleanup_istio_test_namespace() {
        # Kill the port-forwarding process if it exists
        if [ ! -z "$PF_PID" ]; then
            echo "port forward PID: $PF_PID" | tee /tmp/pf_id.txt
-           lsof -iTCP:8080 -sTCP:LISTEN -nP | awk '$1 == "kubectl" {print $2}' | xargs kill
+           _kill $PF_PID
+           PID=$(lsof -iTCP:8085 -sTCP:LISTEN -nP | awk '$1 == "kubectl" {print $2}')
+           if [[ ! -z $PID ]]; then
+              _kill $PID
+           fi
        fi
        _kubectl delete namespace istio-test --ignore-not-found
     fi
