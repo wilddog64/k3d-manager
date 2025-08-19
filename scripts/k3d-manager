@@ -72,7 +72,7 @@ function _install_debian_kubernetes_client() {
 function install_kubernetes_cli() {
    if is_redhat_family ; then
       _install_redhat_kubernetes_client
-    elif is_debian_family ; then
+   elif is_debian_family ; then
       _install_debian_kubernetes_client
    elif is_wsl ; then
       if grep "debian" /etc/os-release &> /dev/null; then
