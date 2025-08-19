@@ -655,7 +655,6 @@ EOF
 
     # Test through Istio gateway
     echo "Testing through Istio gateway..."
-    GATEWAY_PF_PID=$!
     _kubectl port-forward -n istio-system svc/istio-ingressgateway 8085:80 &
     sleep 15
 
