@@ -655,12 +655,12 @@ EOF
 
     # Test through Istio gateway
     echo "Testing through Istio gateway..."
-    _kubectl port-forward -n istio-system svc/istio-ingressgateway 8080:80 &
     GATEWAY_PF_PID=$!
+    _kubectl port-forward -n istio-system svc/istio-ingressgateway 8085:80 &
     sleep 15
 
     echo "Making request through Istio Gateway..."
-    if _curl -s localhost:8080 | grep -q "Welcome to nginx"; then
+    if _curl -s localhost:8085 | grep -q "Welcome to nginx"; then
         echo "✅ Request through Istio Gateway successful!"
         echo "🎉 ISTIO IS WORKING CORRECTLY! 🎉"
     else
