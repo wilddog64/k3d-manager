@@ -680,14 +680,7 @@ function cleanup_istio_test_namespace() {
     echo "warning: port forwarding will not remove if process failed"
     if [[ $? == 0 ]]; then
        # Kill the port-forwarding process if it exists
-       if [ ! -z "$PF_PID" ]; then
-           echo "port forward PID: $PF_PID" | tee /tmp/pf_id.txt
-           _kill $PF_PID
-           PID=$(lsof -iTCP:8085 -sTCP:LISTEN -nP | awk '$1 == "kubectl" {print $2}')
-           if [[ ! -z $PID ]]; then
-              _kill $PID
-           fi
-       fi
+       ps aux | grep kubectl | awk '{ print $2 }' | xargs kill
        _kubectl delete namespace istio-test --ignore-not-found
     fi
 }
