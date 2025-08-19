@@ -602,7 +602,6 @@ EOF
         echo "❌ Failed to access the pod directly"
         exit -1
     fi
-    lsof -iTCP:8888 -sTCP:LISTEN -nP | awk '$1 == "kubectl" {print $2}' | xargs kill
 
     # Create Istio Gateway and VirtualService
     _kubectl apply -f - -n istio-test <<EOF
