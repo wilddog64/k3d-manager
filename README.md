@@ -1,4 +1,4 @@
-# k3d-manager - K3d Kubernetes Cluster Setup with Istio and Storage Support
+# K3d Installation Script
 
 A comprehensive utility script for setting up K3d Kubernetes clusters with Istio service mesh and storage configurations across different operating systems.
 
@@ -10,6 +10,7 @@ This script automates the deployment of K3d Kubernetes clusters with the followi
 - Istio service mesh installation and configuration
 - Storage options (NFS, SMB CSI driver support)
 - Cross-platform support (macOS, RedHat/Fedora, Debian)
+- **Modular design:** Core functions are organized in separate files (`system.sh`, `test.sh`) for easier maintenance and extension.
 
 ## Prerequisites
 
@@ -20,16 +21,29 @@ This script automates the deployment of K3d Kubernetes clusters with the followi
 
 ## Quick Start
 
+```bash
 # Clone this repository
 git clone https://github.com/yourusername/k3d-manager.git
-cd k3d-install
+cd k3d-manager
 
+# Make script executable
+chmod +x scripts/k3d-manager
 
 # Run default installation workflow
 ./scripts/k3d-manager
 
 # Or run a specific function
 ./scripts/k3d-manager create_k3d_cluster my-cluster
+```
+
+## Project Structure
+
+```
+scripts/
+  k3d-manager # Main entrypoint script
+  system.sh   # System/environment detection and setup functions
+  test.sh     # Istio and cluster testing functions
+  ...         # (other supporting scripts or plugins)
 ```
 
 ## Supported Platforms
@@ -64,11 +78,13 @@ cd k3d-install
 
 ## Command Reference
 
+```
 USAGE:
   ./scripts/k3d-manager                    # Run default installation workflow
   ./scripts/k3d-manager <function> [args]  # Run specific function
 
 FUNCTIONS:
+  (See system.sh and test.sh for available system and test functions)
   install_colima                   # Install Colima container runtime (macOS)
   install_docker                   # Install Docker CLI and configure it
   install_k3d                      # Install K3d Kubernetes distribution
@@ -77,26 +93,30 @@ FUNCTIONS:
   install_helm                     # Install Helm package manager
   install_smb_csi_driver           # Install SMB CSI driver (Linux only)
   create_nfs_share                 # Setup NFS export on host
-  deploy_k3d_cluster <name> [args] # Deploy K3d cluster with optional args
+  deploy_k3d_cluster <name>        # Deploy K3d cluster with Istio and storage
 
 ISTIO TESTING:
-  test_istio                       # Istio functionality tests
+  test_istio                       # Istio functionality tests (see test.sh)
 ```
+
 ## Troubleshooting
 
 ### Port Forwarding Issues
 If you encounter port forwarding issues during testing, you may need to manually clean up orphaned processes:
+
 ```bash
 # Find and kill processes using specific ports
-lsof -iTCP:8080 -sTCP:LISTEN -nP | awk '$1 == "kubectl" {print $2}' | xargs kill
+pkill -f "kubectl" # this will kill all kubectl port-forward processes
+```
 
 ### NFS Connection Problems
 NFS connectivity issues between host and K3d containers are known on macOS. The script includes diagnostic functions to help troubleshoot.
 
 ## License
 
-(Apache License 2.0)[./LICENSE]
+[Apache License 2.0](LICENSE)
 
 ## Contributing
 
 Contributions welcome! Please feel free to submit a Pull Request.
+
