@@ -26,14 +26,19 @@ This script automates the deployment of K3d Kubernetes clusters with the followi
 git clone https://github.com/yourusername/k3d-manager.git
 cd k3d-manager
 
-# Make script executable
-chmod +x scripts/k3d-manager
+# symlink k3d-manager script to a directory in your PATH
+sudo ln -sf $(pwd)/scripts/k3d-manager /usr/local/bin/k3d-manager
 
 # Run default installation workflow
-./scripts/k3d-manager
+k3d-manager
 
 # Or run a specific function
 ./scripts/k3d-manager create_k3d_cluster my-cluster
+```
+# Testing istio functionality
+To test Istio functionality after deployment, you can run:
+```bash
+k3d-manager test_istio
 ```
 
 ## Project Structure
