@@ -50,7 +50,7 @@ function install_kubernetes_cli() {
    elif is_wsl ; then
       if grep "debian" /etc/os-release &> /dev/null; then
         _install_debian_kubernetes_client
-      elif grep "redhat" /etc/os-release &> /dev/null;
+      elif grep "redhat" /etc/os-release &> /dev/null; then
          _install_redhat_kubernetes_client
       fi
    fi
