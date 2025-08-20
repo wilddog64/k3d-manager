@@ -181,3 +181,20 @@ function cleanup_istio_test_namespace() {
        _kubectl delete namespace istio-test --ignore-not-found
     fi
 }
+
+function test_nfs_connectivity() {
+  echo "Testing basic connectivity to NFS server..."
+
+  # Create a pod with networking tools
+  _kubectl run nfs-connectivity-test --image=nicolaka/netshoot --rm -it --restart=Never -- bash -c "
+    echo 'Attempting to reach NFS port on host...'
+    nc -zv host.k3d.internal 2049
+    echo 'DNS lookup for host...'
+    nslookup host.k3d.internal
+    echo 'Tracing route to host...'
+    traceroute host.k3d.internal
+    echo 'Testing rpcinfo...'
+    rpcinfo -p host.k3d.internal 2>/dev/null || echo 'RPC failed'
+  "
+}
+
