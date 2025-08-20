@@ -545,11 +545,22 @@ function test_istio() {
     echo "Testing Istio installation and functionality..."
 
     # 1. Create a very simple test deployment and service
-    _kubectl create namespace istio-test 2>/dev/null || true
-    _kubectl label namespace istio-test istio-injection=enabled --overwrite
 
     # Deploy a minimal nginx pod
     _kubectl apply -f - -n istio-test <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    istio-injection: enabled
+    kubernetes.io/metadata.name: istio-test
+  name: istio-test
+spec:
+  finalizers:
+  - kubernetes
+status:
+  phase: Active
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
