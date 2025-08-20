@@ -35,9 +35,9 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 
 # load our library functions
-source "${SCRIPT_DIR}/system.sh"
-source "${SCRIPT_DIR}/test.sh"
-source "${SCRIPT_DIR}/core.sh"
+source "${SCRIPT_DIR}/lib/system.sh"
+source "${SCRIPT_DIR}/lib/test.sh"
+source "${SCRIPT_DIR}/lib/core.sh"
 
 ## -- main --
 # Command line argument handling
