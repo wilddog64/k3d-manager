@@ -114,7 +114,8 @@ function configure_user_kubectl_access() {
    mkdir -p $HOME/.kube
 
    # Get kubeconfig from k3d and save it to user's directory
-   sudo k3d kubeconfig get "$cluster_name" > $HOME/.kube/config-"$cluster_name"
+      _k3d kubeconfig get "$cluster_name" \
+         > $HOME/.kube/config-"$cluster_name"
 
    # Set proper permissions
    chmod 600 $HOME/.kube/config-"$cluster_name"

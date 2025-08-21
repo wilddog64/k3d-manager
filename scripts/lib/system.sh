@@ -365,3 +365,21 @@ function _ip() {
       ip -4 route get 8.8.8.8 | perl -nle 'print $1 if /src (.*) uid/'
    fi
 }
+
+function _k3d() {
+   if ! command_exist k3d ; then
+      echo "k3d is not installed. Please install it first."
+      exit 1
+   fi
+
+   if [[ -f $HOME/.kube/config ]] && kubectl get nodes 2>&1 > /dev/null ; then
+      k3d "$@"
+   else
+      sudo k3d "$@"
+   fi
+
+   if [[ $? != 0 ]]; then
+      echo "k3d command failed: $@"
+      exit 1
+   fi
+}
