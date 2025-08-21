@@ -1,41 +1,39 @@
 function create_k3d_cluster() {
    cluster_name=$1
 
-   if _list_k3d_cluster | grep -q "$cluster_name"; then
-      echo "Cluster $cluster_name already exists, skip"
-      return 0
+   export CLUSTER_NAME="$cluster_name"
+
+   if [[ -z "$cluster_name" ]]; then
+      echo "Cluster name is required"
+      exit 1
    fi
 
-   yaml=$(mktemp -t k3d-XXXX.yaml)
-    cat > "$yaml" <<EOF
-apiVersion: k3d.io/v1alpha5
-kind: Simple
-metadata:
-  name: $cluster_name
-servers: 1
-agents: 3
-ports:
-  - port: 8080:80
-    nodeFilters: [loadbalancer]
-  - port: 8443:443
-    nodeFilters: [loadbalancer]
-options:
-  k3d:
-    wait: true
-  k3s:
-    extraArgs:
-      - arg: "--disable=traefik"
-        nodeFilters: ["server:*"]
-      - arg: "--disable=local-storage"
-        nodeFilters: ["server:*"]
-hostAliases:
-  - ip: "$(_ip)"
-    hostnames: ["host.k3d.internal"]
-EOF
+   cluster_template="$(dirname $SOURCE)/etc/cluster.yaml.tmpl"
+   cluster_var="$(dirname $SOURCE)/etc/cluster_var.sh"
 
-   _create_k3d_cluster "$yaml"
+   if [[ ! -r "$cluster_template" ]]; then
+      echo "Cluster template file not found: $cluster_template"
+      exit 1
+   fi
 
-   trap 'cleanup_on_success "$yaml"' EXIT
+   if [[ ! -r "$cluster_var" ]]; then
+      echo "Cluster variable file not found: $cluster_var"
+      exit 1
+   fi
+
+   source "$cluster_var"
+
+   yamlfile=$(mktemp -t)
+   envsubst < "$cluster_template" > "$yamlfile"
+
+
+   if _list_k3d_cluster | grep -q "$cluster_name"; then
+      echo "Cluster $cluster_name already exists, skip"
+   fi
+
+   _create_k3d_cluster "$yamlfile"
+
+   trap 'cleanup_on_success "$yamlfile"' EXIT
 }
 
 function cleanup_on_success() {
