@@ -11,6 +11,7 @@ This script automates the deployment of K3d Kubernetes clusters with the followi
 - Storage options (NFS, SMB CSI driver support)
 - Cross-platform support (macOS, RedHat/Fedora, Debian)
 - **Modular design:** Core functions are organized in separate files (`system.sh`, `test.sh`) for easier maintenance and extension.
+- A simple lazy-loading plugin system to extend functionality without modifying core scripts.
 
 ## Prerequisites
 
@@ -41,12 +42,17 @@ To test Istio functionality after deployment, you can run:
 k3d-manager test_istio
 ```
 
+## Add a plugin
+
+The script support plugins. To add a plugin, simply create a <plugin_name>.sh file in the `scripts/plugins` directory. The plugin will be automatically loaded when you run the `k3d-manager` script.
+
+You can take a look at the [hello.sh](./scripts/plugins/hello.sh) plugin in the `scripts/plugins` directory as an example.
 ## Project Structure
 
-```
-[ 38K]  .
+``` 
+[ 39K]  .
 ├── [ 11K]  LICENSE
-├── [4.0K]  README.md
+├── [4.3K]  README.md
 └── [ 23K]  scripts
     ├── [1.6K]  etc
     │   ├── [  78]  cluster_var.sh
@@ -54,11 +60,12 @@ k3d-manager test_istio
     │   ├── [ 153]  istio_var.sh
     │   └── [ 748]  istio-operator.yaml.tmpl
     ├── [2.1K]  k3d-manager
-    └── [ 19K]  lib
-        ├── [4.4K]  core.sh
-        ├── [9.3K]  system.sh
-        └── [5.2K]  test.sh
-
+    ├── [ 19K]  lib
+    │   ├── [4.4K]  core.sh
+    │   ├── [9.7K]  system.sh
+    │   └── [5.2K]  test.sh
+    └── [ 146]  plugins
+        └── [  50]  hello.sh
 ```
 
 ## Supported Platforms
@@ -90,6 +97,9 @@ k3d-manager test_istio
 ### Storage Options
 - NFS share setup and configuration
 - SMB CSI driver installation (Linux only)
+
+### Lazy-loading Plugin System
+- Easily extend functionality by adding scripts to the `plugins` directory
 
 ## Command Reference
 
