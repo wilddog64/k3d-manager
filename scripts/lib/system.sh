@@ -383,3 +383,21 @@ function _k3d() {
       exit 1
    fi
 }
+
+function try_load_plugin() {
+   PLUGIN_DIR="${SCRIPT_DIR}/plugins"
+   local func="$1"
+   for plugin in "$PLUGIN_DIR"/*.sh; do
+     if grep -q "function $func" "$plugin"; then
+       source "$plugin"
+       # Check again if function is now available
+       if [[ "$(type -t $func)" == "function" ]]; then
+         $func "${@:2}"
+         exit 0
+       fi
+     fi
+   done
+   echo "Error: Function '$func' not found in plugins"
+   exit 1
+}
+

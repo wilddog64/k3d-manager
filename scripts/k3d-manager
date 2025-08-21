@@ -49,7 +49,6 @@ if [[ $# -gt 0 ]]; then
         # Call the function with remaining arguments
         $function_name "$@"
     else
-        echo "Error: Function '$function_name' not found"
-        exit 1
+        try_load_plugin "$function_name"
     fi
 fi
