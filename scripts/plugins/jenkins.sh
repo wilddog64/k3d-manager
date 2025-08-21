@@ -22,8 +22,19 @@ function _create_jenkins_namespace() {
    trap 'cleanup_on_success "$yamfile"' EXIT
 }
 
+function _create_jenkins_secret() {
+   jenkins_namespce=$1
+
+   _kubectl create -n "$jenkins_namespace" \
+      secret generic jenkins-admin \
+      --from-literal=admin='admin' \
+      --from-literal=admin-password=$(openssl rand -base64 16) 2>&1 > /dev/null
+   echo "jenkins admin secret created"
+}
+
 function deploy_jenkins() {
-   jenkins_namespace=${1:-jenkins}
+   jenkins_namespace="${1:-jenkins}"
 
    _create_jenkins_namespace "$jenkins_namespace"
+   _create_jenkins_secret "$jenkins_namespace" 
 }
