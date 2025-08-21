@@ -33,7 +33,7 @@ sudo ln -sf $(pwd)/scripts/k3d-manager /usr/local/bin/k3d-manager
 k3d-manager
 
 # Or run a specific function
-./scripts/k3d-manager create_k3d_cluster my-cluster
+k3d-manager create_k3d_cluster my-cluster
 ```
 # Testing istio functionality
 To test Istio functionality after deployment, you can run:
@@ -44,11 +44,21 @@ k3d-manager test_istio
 ## Project Structure
 
 ```
-scripts/
-  k3d-manager # Main entrypoint script
-  system.sh   # System/environment detection and setup functions
-  test.sh     # Istio and cluster testing functions
-  ...         # (other supporting scripts or plugins)
+[ 38K]  .
+├── [ 11K]  LICENSE
+├── [4.0K]  README.md
+└── [ 23K]  scripts
+    ├── [1.6K]  etc
+    │   ├── [  78]  cluster_var.sh
+    │   ├── [ 465]  cluster.yaml.tmpl
+    │   ├── [ 153]  istio_var.sh
+    │   └── [ 748]  istio-operator.yaml.tmpl
+    ├── [2.1K]  k3d-manager
+    └── [ 19K]  lib
+        ├── [4.4K]  core.sh
+        ├── [9.3K]  system.sh
+        └── [5.2K]  test.sh
+
 ```
 
 ## Supported Platforms
