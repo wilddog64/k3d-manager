@@ -1,4 +1,4 @@
-# K3d Installation Script
+# K3d-manager - a shell script that manage k3d clusters with Istio and storage options
 
 A comprehensive utility script for setting up K3d Kubernetes clusters with Istio service mesh and storage configurations across different operating systems.
 
