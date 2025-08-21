@@ -1,0 +1,6 @@
+export PILOT_K8S_CPU=100m
+export PILOT_K8S_MEM=256Mi
+export ING_K8S_CPU=100m
+export ING_K8S_MEM=256Mi
+export GLO_PROXY_CPU=50m
+export GLO_PROXY_MEM=64Mi

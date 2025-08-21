@@ -49,20 +49,32 @@ function cleanup_on_success() {
 function configure_k3d_cluster_istio() {
    cluster_name=$1
 
+   istio_yaml_template="$(dirname $SOURCE)/etc/istio-operator.yaml.tmpl"
+   istio_var="$(dirname $SOURCE)/etc/istio_var.sh"
+
+   if [[ ! -r "$istio_yaml_template" ]]; then
+      echo "Istio template file not found: $istio_yaml_template"
+      exit 1
+   fi
+
+   if [[ ! -r "$istio_var" ]]; then
+      echo "Istio variable file not found: $istio_var"
+      exit 1
+   fi
+
+   source "$istio_var"
+   isito_yamlfile=$(mktemp -t)
+   envsubst < "$istio_yaml_template" > "$isito_yamlfile"
+
    install_kubernetes_cli
    install_istioctl
    _istioctl x precheck
-   _istioctl install -y \
-     --set profile=default \
-     --set values.pilot.resources.requests.cpu=100m \
-     --set values.pilot.resources.requests.memory=256Mi \
-     --set values.global.proxy.resources.requests.cpu=50m \
-     --set values.global.proxy.resources.requests.memory=64Mi \
-     --set values.gateways.istio-ingressgateway.resources.requests.cpu=100m \
-     --set values.gateways.istio-ingressgateway.resources.requests.memory=256Mi \
-     --set values.gateways.istio-ingressgateway.type=LoadBalancer
+   _istioctl install -y -f "$isito_yamlfile"
    _kubectl label ns default istio-injection=enabled --overwrite
+
+   trap "cleanup_on_success $isito_yamlfile" EXIT
 }
+
 
 function install_smb_csi_driver() {
    if is_mac ; then
