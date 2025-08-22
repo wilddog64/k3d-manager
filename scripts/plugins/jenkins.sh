@@ -5,7 +5,7 @@ fi
 function _create_jenkins_namespace() {
    jenkins_namespace="${1:-jenkins}"
    export namespace="${jenkins_namespace}"
-   jenkins_namespace_template="$(dirname $SOURCE)/etc/jenkins-namespace.yaml.tmpl"
+   jenkins_namespace_template="$(dirname $SOURCE)/etc/jenkins/jenkins-namespace.yaml.tmpl"
    if [[ ! -r "$jenkins_namespace_template" ]]; then
       echo "Jenkins namespace template file not found: $jenkins_namespace_template"
       exit 1
@@ -53,7 +53,7 @@ function _create_jenkins_pv_pvc() {
       mkdir -p "$JENKINS_HOME_PATH"
    fi
 
-   jenkins_plugins="$SCRIPT_DIR/etc/jenkins-plugins.txt"
+   jenkins_plugins="$SCRIPT_DIR/etc/jenkins/jenkins-plugins.txt"
    if [[ ! -r "$jenkins_plugins" ]]; then
       echo "Jenkins plugins file not found: $jenkins_plugins"
       exit 1
@@ -61,7 +61,7 @@ function _create_jenkins_pv_pvc() {
       cp -v "${jenkins_plugins}" "$JENKINS_HOME_PATH"
    fi
 
-   jenkins_pv_template="$(dirname $SOURCE)/etc/jenkins-home-pv.yaml.tmpl"
+   jenkins_pv_template="$(dirname $SOURCE)/etc/jenkins/jenkins-home-pv.yaml.tmpl"
    if [[ ! -r "$jenkins_pv_template" ]]; then
       echo "Jenkins PV template file not found: $jenkins_pv_template"
       exit 1
