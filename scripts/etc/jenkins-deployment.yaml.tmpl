@@ -1,0 +1,45 @@
+kind: Deployment
+metadata:
+  name: $JENKINS_NAMESPACE
+  namespace: $NAMESPACE
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: $JENKINS_NAMESPACE
+  template:
+    metadata:
+      labels:
+        app: $JENKINS_NAMESPACE
+    spec:
+      containers:
+      - name: jenkins
+        image: jenkins/jenkins:$JENKINS_VERSION
+        env:
+        - name: JAVA_OPTS
+          value: "-Djenkins.install.runSetupWizard=false"
+        - name: JENKINS_ADMIN_ID
+          valueFrom:
+            secretKeyRef:
+              name: jenkins-admin
+              key: jenkins-admin-user
+        - name: JENKINS_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: jenkins-admin
+              key: jenkins-admin-password
+        volumeMounts:
+        - name: jenkins-home
+          mountPath: /var/jenkins_home
+        - name: plugins
+          mountPath: /usr/share/jenkins/ref/plugins.txt
+          subPath: plugins.txt
+        - name: jenkins-init-groovy
+          mountPath: /usr/share/jenkins/ref/init.groovy.d
+      volumes:
+      - name: jenkins-home
+        persistentVolumeClaim:
+          claimName: jenkins-home
+      - name: plugins
+        configMap:
+          name: jenkins-plugins

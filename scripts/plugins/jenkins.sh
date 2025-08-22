@@ -73,8 +73,14 @@ function _create_jenkins_pv_pvc() {
    trap 'cleanup_on_success "$jenkinsyamfile"' EXIT
 }
 
+function _deploy_jenkins_image() {
+   jenkins_namespace=$2
+   jenkins_version=$1
+}
+
 function deploy_jenkins() {
    jenkins_namespace="${1:-jenkins}"
+   jenkins_version="${2:-lts}"
 
    _create_jenkins_namespace "$jenkins_namespace"
    _create_jenkins_secret "$jenkins_namespace"
