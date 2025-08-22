@@ -74,8 +74,8 @@ function _create_jenkins_pv_pvc() {
 }
 
 function _deploy_jenkins_image() {
-   jenkins_namespace=$2
-   jenkins_version=$1
+   jenkins_namespace=$1
+   jenkins_version=$2
 }
 
 function deploy_jenkins() {
