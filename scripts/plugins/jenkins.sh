@@ -68,7 +68,7 @@ function _create_jenkins_pv_pvc() {
    fi
    jenkinsyamfile=$(mktemp -t)
    envsubst < "$jenkins_pv_template" > "$jenkinsyamfile"
-   _kubectl apply -f "$jenkinsyamfile"
+   _kubectl apply -f "$jenkinsyamfile" -n "$jenkins_namespace"
 
    trap 'cleanup_on_success "$jenkinsyamfile"' EXIT
 }
