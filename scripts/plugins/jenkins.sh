@@ -12,10 +12,11 @@ function _create_jenkins_namespace() {
    fi
    local yamfile=$(mktemp -t)
    envsubst < "$jenkins_namespace_template" > "$yamfile"
-   if _kubectl get namespace "$jenkins_namespace" >/dev/null 2>&1; then
+
+   if [[ $(_kubectl get namespace "$jenkins_namespace" 2>&1 > /dev/null) == 0 ]]; then
       echo "Namespace $jenkins_namespace already exists, skip"
    else
-      _kubectl apply -f "$yamfile"
+      _kubectl apply -f "$yamfile" 2>&1 > /dev/null
       echo "Namespace $jenkins_namespace created"
    fi
 
@@ -25,7 +26,7 @@ function _create_jenkins_namespace() {
 function _create_jenkins_secret() {
    jenkins_namespce=$1
 
-   if _kubectl get secret jenkins-admin -n "$jenkins_namespace" >/dev/null 2>&1; then
+   if _kubectl get -n "$jenkins_namespace" secrets 'jenkins-admin' > /dev/null 2>&1 ; then
       echo "jenkins admin secret already exists, skip"
       return 0
    fi
@@ -33,8 +34,11 @@ function _create_jenkins_secret() {
    _kubectl create -n "$jenkins_namespace" \
       secret generic jenkins-admin \
       --from-literal=admin='admin' \
-      --from-literal=admin-password=$(openssl rand -base64 16) 2>&1 > /dev/null
-   echo "jenkins admin secret created"
+      --from-literal=admin-password=$(openssl rand -base64 16)  >/dev/null 2>&1
+
+   if [[ $? != 0 ]]; then
+      echo "jenkins admin secret already exists, skip"
+   fi
 }
 
 function _create_jenkins_pv_pvc() {
