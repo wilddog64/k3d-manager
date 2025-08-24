@@ -40,7 +40,7 @@ function cleanup_on_success() {
    file_to_cleanup=$1
    echo "Cleaning up temporary files..."
    if [[ $? == 0 ]]; then
-      rm -f "$file_to_cleanup"
+      rm -rf "$file_to_cleanup"
    else
       echo "Error occurred, not cleaning up $file_to_cleanup"
    fi
