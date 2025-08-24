@@ -270,23 +270,31 @@ function _list_k3d_cluster() {
 }
 
 function _kubectl() {
-   if ! command_exist kubectl ; then
-      echo "kubectl is not installed. Please install it first."
-      exit 1
-   fi
+  # ensure kubectl exists
+  if ! command_exist kubectl ; then
+    echo "kubectl is not installed. Please install it first." >&2
+    return 127
+  fi
 
-   # Check if user has direct kubectl access
-   if [ -f "$HOME/.kube/config" ] && kubectl get nodes 2>&1 >/dev/null; then
-      kubectl "$@"
-   else
-      echo use sudo
-      sudo kubectl "$@"
-   fi
+  # choose runner: try user kubeconfig first, then sudo's kubeconfig
+  local runner
+  if kubectl config current-context >/dev/null 2>&1; then
+    runner=(kubectl)
+  elif sudo -n kubectl config current-context >/dev/null 2>&1; then
+    runner=(sudo -n kubectl)
+  else
+    echo "No usable kubeconfig (user or sudo). Check ~/.kube/config or sudo credentials." >&2
+    return 1
+  fi
 
-   if [[ $? != 0 ]]; then
-      echo "Kubectl command failed: $@"
-      exit 1
-   fi
+  # run and preserve exit code
+  "${runner[@]}" "$@"
+  local rc=$?
+
+  if (( rc != 0 )); then
+    printf 'kubectl command failed (%d): %q %s\n' "$rc" "${runner[0]}" "$*" >&2
+  fi
+  return "$rc"
 }
 
 function _istioctl() {
