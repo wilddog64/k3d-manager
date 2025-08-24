@@ -8,6 +8,78 @@ function _install_redhat_kubernetes_client() {
   fi
 }
 
+# _run_command [--quiet] [--prefer-sudo|--require-sudo] [--probe '<subcmd>'] -- <prog> [args...]
+# - --quiet         : suppress wrapper error message (still returns real exit code)
+# - --prefer-sudo   : use sudo -n if available, otherwise run as user
+# - --require-sudo  : fail if sudo -n not available
+# - --probe '...'   : subcommand to test env/permissions (e.g., for kubectl: 'config current-context')
+# - --              : end of options; after this comes <prog> and its args
+#
+# Returns the command's real exit code; prints a helpful error unless --quiet.
+_run_command() {
+  local quiet=0 prefer_sudo=0 require_sudo=0 probe=
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --quiet)        quiet=1; shift;;
+      --prefer-sudo)  prefer_sudo=1; shift;;
+      --require-sudo) require_sudo=1; shift;;
+      --probe)        probe="$2"; shift 2;;
+      --)             shift; break;;
+      *)              break;;
+    esac
+  done
+
+  local prog="${1:?usage: _run_command [opts] -- <prog> [args...]}"
+  shift
+
+  if ! command -v "$prog" >/dev/null 2>&1; then
+    (( quiet )) || echo "$prog: not found in PATH" >&2
+    return 127
+  fi
+
+  # Decide runner: user vs sudo -n
+  local runner
+  if (( require_sudo )); then
+    if sudo -n true >/dev/null 2>&1; then
+      runner=(sudo -n "$prog")
+    else
+      (( quiet )) || echo "sudo non-interactive not available" >&2
+      return 1
+    fi
+  else
+    if [[ -n "$probe" ]]; then
+      # Try user first; if probe fails, try sudo -n
+      if "$prog" $probe >/dev/null 2>&1; then
+        runner=("$prog")
+      elif sudo -n "$prog" $probe >/dev/null 2>&1; then
+        runner=(sudo -n "$prog")
+      elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
+        runner=(sudo -n "$prog")
+      else
+        runner=("$prog")
+      fi
+    else
+      if (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
+        runner=(sudo -n "$prog")
+      else
+        runner=("$prog")
+      fi
+    fi
+  fi
+
+  # Execute and preserve exit code
+  "${runner[@]}" "$@"
+  local rc=$?
+
+  if (( rc != 0 && quiet == 0 )); then
+    printf '%s command failed (%d): ' "$prog" "$rc" >&2
+    printf '%q ' "${runner[@]}" "$@" >&2
+    printf '\n' >&2
+  fi
+  return "$rc"
+}
+
 function _install_debian_kubernetes_client() {
    if command_exist kubectl ; then
       echo "kubectl already installed, skipping"
@@ -270,31 +342,7 @@ function _list_k3d_cluster() {
 }
 
 function _kubectl() {
-  # ensure kubectl exists
-  if ! command_exist kubectl ; then
-    echo "kubectl is not installed. Please install it first." >&2
-    return 127
-  fi
-
-  # choose runner: try user kubeconfig first, then sudo's kubeconfig
-  local runner
-  if kubectl config current-context >/dev/null 2>&1; then
-    runner=(kubectl)
-  elif sudo -n kubectl config current-context >/dev/null 2>&1; then
-    runner=(sudo -n kubectl)
-  else
-    echo "No usable kubeconfig (user or sudo). Check ~/.kube/config or sudo credentials." >&2
-    return 1
-  fi
-
-  # run and preserve exit code
-  "${runner[@]}" "$@"
-  local rc=$?
-
-  if (( rc != 0 )); then
-    printf 'kubectl command failed (%d): %q %s\n' "$rc" "${runner[0]}" "$*" >&2
-  fi
-  return "$rc"
+   _run_command --probe 'config current-context' -- kubectl "$@"
 }
 
 function _istioctl() {
