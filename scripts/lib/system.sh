@@ -363,23 +363,25 @@ function _istioctl() {
    fi
 }
 
-function _helm() {
-   if ! command_exist helm ; then
-      echo "helm is not installed. Please install it first."
-      exit 1
-   fi
+# Optional: global default flags you want on every helm call
+# export HELM_GLOBAL_ARGS="--debug"   # example
 
-   if [[ -f $HOME/.kube/config ]] && kubectl get nodes 2>&1 > /dev/null ; then
-      helm "$@"
-   else
-      sudo helm "$@"
-   fi
+_helm() {
+  # Pass-through mini-parser so you can do: _helm --quiet ...  (like _run_command)
+  local pre=() ; while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --quiet|--prefer-sudo|--require-sudo) pre+=("$1"); shift;;
+      --) shift; break;;
+      *)  break;;
+    esac
+  done
 
-   if [[ $? != 0 ]]; then
-      echo "Helm command failed: $@"
-      exit 1
-   fi
-
+  # If you keep global flags, splice them in *before* user args:
+  if [[ -n "${HELM_GLOBAL_ARGS:-}" ]]; then
+    _run_command "${pre[@]}" --probe 'version --short' -- helm ${HELM_GLOBAL_ARGS} "$@"
+  else
+    _run_command "${pre[@]}" --probe 'version --short' -- helm "$@"
+  fi
 }
 
 function _curl() {
