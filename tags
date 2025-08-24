@@ -1,0 +1,52 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+_create_jenkins_namespace	scripts/plugins/jenkins.sh	/^function _create_jenkins_namespace() {$/;"	f
+_create_jenkins_pv_pvc	scripts/plugins/jenkins.sh	/^function _create_jenkins_pv_pvc() {$/;"	f
+_create_jenkins_secret	scripts/plugins/jenkins.sh	/^function _create_jenkins_secret() {$/;"	f
+_create_k3d_cluster	scripts/lib/system.sh	/^function _create_k3d_cluster() {$/;"	f
+_curl	scripts/lib/system.sh	/^function _curl() {$/;"	f
+_deploy_jenkins_image	scripts/plugins/jenkins.sh	/^function _deploy_jenkins_image() {$/;"	f
+_helm	scripts/lib/system.sh	/^function _helm() {$/;"	f
+_install_debian_docker	scripts/lib/system.sh	/^function _install_debian_docker() {$/;"	f
+_install_debian_kubernetes_client	scripts/lib/system.sh	/^function _install_debian_kubernetes_client() {$/;"	f
+_install_mac_docker	scripts/lib/system.sh	/^function _install_mac_docker() {$/;"	f
+_install_redhat_docker	scripts/lib/system.sh	/^function _install_redhat_docker() {$/;"	f
+_install_redhat_kubernetes_client	scripts/lib/system.sh	/^function _install_redhat_kubernetes_client() {$/;"	f
+_ip	scripts/lib/system.sh	/^function _ip() {$/;"	f
+_istioctl	scripts/lib/system.sh	/^function _istioctl() {$/;"	f
+_k3d	scripts/lib/system.sh	/^function _k3d() {$/;"	f
+_kill	scripts/lib/system.sh	/^function _kill() {$/;"	f
+_kubectl	scripts/lib/system.sh	/^function _kubectl() {$/;"	f
+_list_k3d_cluster	scripts/lib/system.sh	/^function _list_k3d_cluster() {$/;"	f
+cleanup_istio_test_namespace	scripts/lib/test.sh	/^function cleanup_istio_test_namespace() {$/;"	f
+cleanup_on_success	scripts/lib/core.sh	/^function cleanup_on_success() {$/;"	f
+command_exist	scripts/lib/system.sh	/^function command_exist() {$/;"	f
+configure_k3d_cluster_istio	scripts/lib/core.sh	/^function configure_k3d_cluster_istio() {$/;"	f
+configure_user_kubectl_access	scripts/lib/core.sh	/^function configure_user_kubectl_access() {$/;"	f
+create_k3d_cluster	scripts/lib/core.sh	/^function create_k3d_cluster() {$/;"	f
+create_nfs_share	scripts/lib/core.sh	/^function create_nfs_share() {$/;"	f
+deploy_jenkins	scripts/plugins/jenkins.sh	/^function deploy_jenkins() {$/;"	f
+deploy_k3d_cluster	scripts/lib/core.sh	/^function deploy_k3d_cluster() {$/;"	f
+install_colima	scripts/lib/system.sh	/^function install_colima() {$/;"	f
+install_docker	scripts/lib/system.sh	/^function install_docker() {$/;"	f
+install_helm	scripts/lib/system.sh	/^function install_helm() {$/;"	f
+install_istioctl	scripts/lib/system.sh	/^function install_istioctl() {$/;"	f
+install_k3d	scripts/lib/system.sh	/^function install_k3d() {$/;"	f
+install_kubernetes_cli	scripts/lib/system.sh	/^function install_kubernetes_cli() {$/;"	f
+install_mac_helm	scripts/lib/system.sh	/^function install_mac_helm() {$/;"	f
+install_redhat_helm	scripts/lib/system.sh	/^function install_redhat_helm() {$/;"	f
+install_smb_csi_driver	scripts/lib/core.sh	/^function install_smb_csi_driver() {$/;"	f
+is_debian_family	scripts/lib/system.sh	/^function is_debian_family() {$/;"	f
+is_linux	scripts/lib/system.sh	/^function is_linux() {$/;"	f
+is_mac	scripts/lib/system.sh	/^function is_mac() {$/;"	f
+is_redhat_family	scripts/lib/system.sh	/^function is_redhat_family() {$/;"	f
+is_wsl	scripts/lib/system.sh	/^function is_wsl() {$/;"	f
+say_hello	scripts/plugins/hello.sh	/^function say_hello() {$/;"	f
+test_istio	scripts/lib/test.sh	/^function test_istio() {$/;"	f
+test_nfs_connectivity	scripts/lib/test.sh	/^function test_nfs_connectivity() {$/;"	f
+test_nfs_direct	scripts/lib/test.sh	/^function test_nfs_direct() {$/;"	f
+try_load_plugin	scripts/lib/system.sh	/^function try_load_plugin() {$/;"	f
