@@ -10,7 +10,7 @@ _create_jenkins_secret	scripts/plugins/jenkins.sh	/^function _create_jenkins_sec
 _create_k3d_cluster	scripts/lib/system.sh	/^function _create_k3d_cluster() {$/;"	f
 _curl	scripts/lib/system.sh	/^function _curl() {$/;"	f
 _deploy_jenkins_image	scripts/plugins/jenkins.sh	/^function _deploy_jenkins_image() {$/;"	f
-_helm	scripts/lib/system.sh	/^function _helm() {$/;"	f
+_helm	scripts/lib/system.sh	/^_helm() {$/;"	f
 _install_debian_docker	scripts/lib/system.sh	/^function _install_debian_docker() {$/;"	f
 _install_debian_kubernetes_client	scripts/lib/system.sh	/^function _install_debian_kubernetes_client() {$/;"	f
 _install_mac_docker	scripts/lib/system.sh	/^function _install_mac_docker() {$/;"	f
@@ -22,15 +22,24 @@ _k3d	scripts/lib/system.sh	/^function _k3d() {$/;"	f
 _kill	scripts/lib/system.sh	/^function _kill() {$/;"	f
 _kubectl	scripts/lib/system.sh	/^function _kubectl() {$/;"	f
 _list_k3d_cluster	scripts/lib/system.sh	/^function _list_k3d_cluster() {$/;"	f
+_lookup_bw_machine_token	scripts/plugins/bitwarden.sh	/^function _lookup_bw_machine_token() {$/;"	f
+_no_trace	scripts/lib/system.sh	/^function _no_trace() { ( set +x +v; "$@" ); }$/;"	f
+_run_command	scripts/lib/system.sh	/^_run_command() {$/;"	f
+_secret_tool	scripts/lib/system.sh	/^function _secret_tool() {$/;"	f
+_security	scripts/lib/system.sh	/^function _security() { _run_command --sensitive --quiet -- security "$@"; }$/;"	f
 cleanup_istio_test_namespace	scripts/lib/test.sh	/^function cleanup_istio_test_namespace() {$/;"	f
 cleanup_on_success	scripts/lib/core.sh	/^function cleanup_on_success() {$/;"	f
 command_exist	scripts/lib/system.sh	/^function command_exist() {$/;"	f
+config_bitwarden_eso	scripts/plugins/bitwarden.sh	/^function config_bitwarden_eso() {$/;"	f
 configure_k3d_cluster_istio	scripts/lib/core.sh	/^function configure_k3d_cluster_istio() {$/;"	f
 configure_user_kubectl_access	scripts/lib/core.sh	/^function configure_user_kubectl_access() {$/;"	f
 create_k3d_cluster	scripts/lib/core.sh	/^function create_k3d_cluster() {$/;"	f
 create_nfs_share	scripts/lib/core.sh	/^function create_nfs_share() {$/;"	f
+deploy_eso	scripts/plugins/eso.sh	/^function deploy_eso() {$/;"	f
 deploy_jenkins	scripts/plugins/jenkins.sh	/^function deploy_jenkins() {$/;"	f
 deploy_k3d_cluster	scripts/lib/core.sh	/^function deploy_k3d_cluster() {$/;"	f
+eso_example_by_uuid	scripts/plugins/bitwarden.sh	/^function eso_example_by_uuid() {$/;"	f
+get_bw_machine_token	scripts/plugins/bitwarden.sh	/^function get_bw_machine_token() {$/;"	f
 install_colima	scripts/lib/system.sh	/^function install_colima() {$/;"	f
 install_docker	scripts/lib/system.sh	/^function install_docker() {$/;"	f
 install_helm	scripts/lib/system.sh	/^function install_helm() {$/;"	f
