@@ -80,6 +80,14 @@ _run_command() {
   return "$rc"
 }
 
+function _secret_tool() {
+   _ensure_secret_tool >/dev/null 2>&1
+   _run_command --quiet -- secret-tool "$@";
+}
+
+# macOS only
+function _security() { _run_command --quiet -- security "$@"; }
+
 function _install_debian_kubernetes_client() {
    if command_exist kubectl ; then
       echo "kubectl already installed, skipping"
