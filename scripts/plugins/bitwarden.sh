@@ -22,7 +22,7 @@ function get_bw_access_token() {
 function config_bitwarden_eso() {
   local org_id="${1:?org_id required}"
   local project_id="${2:?project_id required}"
-  local token="${3:-$BW_MACHINE_TOKEN}"
+  local token="${3:-$BW_ACCESS_TOKEN}"
   local ns="${4:-external-secrets}"
 
   if [[ -z "$token" ]]; then
