@@ -19,53 +19,53 @@ function get_bw_access_token() {
 }
 
 # Configure a SecretStore for Bitwarden Secrets Manager
-# Usage: eso_config_bitwarden <org_id> <project_id> [machine_token] [namespace]
-function config_bitwarden_eso() {
-  local org_id="${1:?org_id required}"
-  local project_id="${2:?project_id required}"
-  local token="${3:-$BW_ACCESS_TOKEN}"
+# Usage: eso_config_bitwarden <org_id> <project_id>
+function config_bws_eso() {
+  local org_id="$1"
+  local project_id="$2"
+
+  local bws_vars="${SCRIPT_DIR}/etc/bitwarden/bws-vars.sh"
+  if [[ ! -f "${bws_vars}" ]]; then
+      echo "Bitwarden vars file ${bws_vars} not found!" >&2
+      exit -1
+  fi
+  source "${bws_vars}"
+  export ORG_ID="${org_id:-${ORG_ID:?set ORG_ID or pass org_id}}"
+  export PROJECT_ID="${project_id:-${PROJECT_ID:?set PROJECT_ID or pass project_id}}"
+
   local ns="${4:-external-secrets}"
 
-  if [[ -z "$token" ]]; then
-    echo "Bitwarden machine token is required (arg3 or BW_MACHINE_TOKEN env)." >&2
-    return 1
+  # Kubernetes Secret with the token
+  bws_exist=$(_run_command --quiet --probe "${HOME}/.kube/config" -- \
+      _kubectl -n "$ns" \
+         get secret bws-access-token >/dev/null 2>&1
+      )
+  if [[ ! "${bws_exist}" ]]; then
+     _run_command --quiet --probe "${HOME}/.kube/config" -- _kubectl -n "${ns}" \
+        create secret generic bws-access-token \
+        --from-file=token=<(get_bw_access_token) >/dev/null 2>&1
   fi
 
-  # Kubernetes Secret with the token
-  _kubectl -n "$ns" delete secret bitwarden-access-token >/dev/null 2>&1 || true
-  _kubectl -n "$ns" create secret generic bitwarden-access-token \
-    --from-literal=token="$token" >/dev/null 2>&1
-
   # Grab the CA bundle from the tls secret (already base64 encoded)
-  local ca_b64
-  ca_b64="$(_kubectl -n "$ns" get secret bitwarden-tls-certs \
-             -o jsonpath='{.data.tls\.crt}')"
+  local ca_b64=$(_run_command --quiet --probe "${HOME}/.kube/config" -- \
+     _kubectl -n "$ns" get secret bitwarden-tls-certs \
+             -o jsonpath='{.data.tls\.crt}')
+
+  local yamlfile=$(mktemp -t)
+  local bws_tmpl="${SCRIPT_DIR}/etc/bitwarden/bws-eso.yaml.tmpl"
+  trap 'cleanup_on_success "${yamlfile}"' EXIT INT TERM RETURN
+
+  if [[ ! -f "${bws_tmpl}" ]]; then
+      echo "Template file ${bws_tmpl} not found!" >&2
+      exit -1
+  fi
+  envsubst < "$bws_tmpl" > "$yamlfile"
 
   # Build and apply SecretStore
-  cat <<EOF | _kubectl apply -f -
-apiVersion: external-secrets.io/v1
-kind: SecretStore
-metadata:
-  name: bitwarden-secretsmanager
-  namespace: ${ns}
-spec:
-  provider:
-    bitwardensecretsmanager:
-      # Defaults shown; override if you self-host Bitwarden SM
-      apiURL: https://api.bitwarden.com
-      identityURL: https://identity.bitwarden.com
-      bitwardenServerSDKURL: https://bitwarden-sdk-server.${ns}.svc.cluster.local:9998
-      caBundle: ${ca_b64}
-      organizationID: ${org_id}
-      projectID: ${project_id}
-      auth:
-        secretRef:
-          credentials:
-            name: bitwarden-access-token
-            key: token
-EOF
+  _run_command --quiet --probe "${HOME}/.kube/config" -- \
+     _kubectl apply -n "${ns}" -f "${yamlfile}"
 
-  echo "Created SecretStore 'bitwarden-secretsmanager' in namespace ${ns}"
+  echo "Created SecretStore 'bws-secretsmanager' in namespace ${ns}"
 }
 
 # Example: materialize a Kubernetes Secret from Bitwarden by UUID or by name
@@ -85,7 +85,7 @@ metadata:
 spec:
   refreshInterval: 1h
   secretStoreRef:
-    name: bitwarden-secretsmanager
+    name: bws-secretsmanager
     kind: SecretStore
   data:
     - secretKey: ${k8s_key}
