@@ -45,31 +45,21 @@ function config_bws_eso() {
       echo "Bitwarden vars file ${bws_vars} not found!" >&2
       exit -1
   fi
+  # shellcheck source=/dev/null
   source "${bws_vars}"
   export ORG_ID="${org_id:-${ORG_ID:?set ORG_ID or pass org_id}}"
   export PROJECT_ID="${project_id:-${PROJECT_ID:?set PROJECT_ID or pass project_id}}"
 
-  local ns="${4:-external-secrets}"
+  # Ensure the token Secret exists (idempotent)
+  ensure_bws_secret "$ns"
 
-  # Kubernetes Secret with the token
-  bws_exist=$(_run_command --quiet --probe "${HOME}/.kube/config" -- \
-      _kubectl -n "$ns" \
-         get secret bws-access-token >/dev/null 2>&1
-      )
-  if [[ ! "${bws_exist}" ]]; then
-     _run_command --quiet --probe "${HOME}/.kube/config" -- _kubectl -n "${ns}" \
-        create secret generic bws-access-token \
-        --from-file=token=<(get_bw_access_token) >/dev/null 2>&1
-  fi
+  # Grab the CA bundle from the tls secret (already base64-encoded)
+  local ca_b64="$(_kubectl -n "$ns" get secret bitwarden-tls-certs -o jsonpath='{.data.tls\.crt}')"
 
-  # Grab the CA bundle from the tls secret (already base64 encoded)
-  local ca_b64=$(_run_command --quiet --probe "${HOME}/.kube/config" -- \
-     _kubectl -n "$ns" get secret bitwarden-tls-certs \
-             -o jsonpath='{.data.tls\.crt}')
-
-  local yamlfile=$(mktemp -t)
+  # Render SecretStore from template and apply
+  local yamlfile="$(mktemp)"  # mktemp -t creates a file *and* returns a path; plain mktemp is fine here
   local bws_tmpl="${SCRIPT_DIR}/etc/bitwarden/bws-eso.yaml.tmpl"
-  trap 'cleanup_on_success "${yamlfile}"' EXIT INT TERM RETURN
+  trap 'cleanup_on_success "'"$yamlfile"'"' EXIT INT TERM  # avoid RETURN to prevent multiple triggers
 
   if [[ ! -f "${bws_tmpl}" ]]; then
       echo "Template file ${bws_tmpl} not found!" >&2
@@ -78,8 +68,7 @@ function config_bws_eso() {
   envsubst < "$bws_tmpl" > "$yamlfile"
 
   # Build and apply SecretStore
-  _run_command --quiet --probe "${HOME}/.kube/config" -- \
-     _kubectl apply -n "${ns}" -f "${yamlfile}"
+  _kubectl apply -n "$ns" -f "$yamlfile"
 
   echo "Created SecretStore 'bws-secretsmanager' in namespace ${ns}"
 }
