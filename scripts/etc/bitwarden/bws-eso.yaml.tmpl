@@ -1,7 +1,7 @@
 apiVersion: external-secrets.io/v1
 kind: SecretStore
 metadata:
-  name: bitwarden-secretsmanager
+  name: bws-secretsmanager
 spec:
   provider:
     bitwardensecretsmanager:
@@ -10,8 +10,8 @@ spec:
       identityURL: https://identity.bitwarden.com
       bitwardenServerSDKURL: https://bitwarden-sdk-server.${ns}.svc.cluster.local:9998
       caBundle: ${ca_b64}
-      organizationID: ${org_id}
-      projectID: ${project_id}
+      organizationID: ${ORG_ID}
+      projectID: ${PROJECT_ID}
       auth:
         secretRef:
           credentials:
