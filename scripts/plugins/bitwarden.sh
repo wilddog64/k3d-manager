@@ -1,18 +1,32 @@
+# Returns the Bitwarden machine token to stdout.
+# Exits if lookup fails or token is empty. No noise on stdout.
 function _lookup_bw_access_token() {
-   local tmpdir=$(mktemp -d)
-   fifo="${tmpdir}/$(mktemp -t)"
-   mkfifo -m 600 "$fifo"
-   trap 'cleanup_on_success "$fifo"' EXIT INT TERM RETURN
-   if is_mac ; then
-      (_security find-generic-password -a esobw -s BW_MACHINE_TOKEN -w > "$fifo") &
-   elif is_linux ; then
-      (_secret_tool lookup service BW_MACHINE_TOKEN account esobw > "$fifo") &
-   fi
-   writer=$!
+  local token
 
-   cat "$fifo"
-   wait "$writer"
-   return $?
+  if is_mac; then
+    token="$(_security find-generic-password -a esobw -s BW_MACHINE_TOKEN -w 2>/dev/null)" || exit 1
+  elif is_linux; then
+    _ensure_secret_tool >/dev/null 2>&1
+    token="$(_run_command --no-exit -- secret-tool lookup service BW_MACHINE_TOKEN account esobw 2>/dev/null)" || true
+  else
+    echo "unsupported OS" >&2
+    exit 1
+  fi
+
+  [[ -n $token ]] || { echo "empty Bitwarden token" >&2; exit 1; }
+  printf '%s' "$token"
+}
+
+# Create or update the kubernetes Secret: bws-access-token in ${ns}
+function ensure_bws_secret() {
+  local ns="${1:-external-secrets}"
+  local token
+
+  # Create/update the secret atomically via apply
+  _run_command -- kubectl -n "$ns" create secret generic bws-access-token \
+     --from-literal=token="$(_lookup_bw_access_token)" \
+      --dry-run=client -o yaml \
+    | _run_command -- kubectl -n "$ns" apply -f -
 }
 
 function get_bw_access_token() {
@@ -24,6 +38,7 @@ function get_bw_access_token() {
 function config_bws_eso() {
   local org_id="$1"
   local project_id="$2"
+  local ns="${3:-external-secrets}"
 
   local bws_vars="${SCRIPT_DIR}/etc/bitwarden/bws-vars.sh"
   if [[ ! -f "${bws_vars}" ]]; then
