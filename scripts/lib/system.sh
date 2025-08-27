@@ -28,10 +28,11 @@ function cleanup_on_success() {
 #
 # Returns the command's real exit code; prints a helpful error unless --quiet.
 _run_command() {
-  local quiet=0 prefer_sudo=0 require_sudo=0 probe=
+  local quiet=0 prefer_sudo=0 require_sudo=0 probe= soft=0
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      --no-exist|--soft) soft=1; shift;;
       --quiet)        quiet=1; shift;;
       --prefer-sudo)  prefer_sudo=1; shift;;
       --require-sudo) require_sudo=1; shift;;
@@ -46,7 +47,10 @@ _run_command() {
 
   if ! command -v "$prog" >/dev/null 2>&1; then
     (( quiet )) || echo "$prog: not found in PATH" >&2
-    return 127
+    if (( soft )); then
+      return 127
+   else
+      exit 127
   fi
 
   # Decide runner: user vs sudo -n
@@ -56,7 +60,7 @@ _run_command() {
       runner=(sudo -n "$prog")
     else
       (( quiet )) || echo "sudo non-interactive not available" >&2
-      return 1
+      exit -1
     fi
   else
     if [[ -n "$probe" ]]; then
@@ -83,12 +87,52 @@ _run_command() {
   "${runner[@]}" "$@"
   local rc=$?
 
-  if (( rc != 0 && quiet == 0 )); then
-    printf '%s command failed (%d): ' "$prog" "$rc" >&2
-    printf '%q ' "${runner[@]}" "$@" >&2
-    printf '\n' >&2
+  if (( rc != 0 )); then
+     if (( quiet == 0 )); then
+       printf '%s command failed (%d): ' "$prog" "$rc" >&2
+       printf '%q ' "${runner[@]}" "$@" >&2
+       printf '\n' >&2
+     fi
+
+     if (( soft )); then
+         return "$rc"
+     else
+         exit "$rc"
+     fi
   fi
-  return "$rc"
+
+  return 0
+}
+
+_ensure_secret_tool() {
+  command_exist secret-tool && return 0
+  is_linux || return 1
+
+  if command_exist apt-get ; then
+    _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update
+    _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y libsecret-tools
+  elif command_exist dnf ; then
+    _run_command --prefer-sudo -- dnf -y install libsecret
+  elif command_exist -v yum >/dev/null 2>&1; then
+    _run_command --prefer-sudo -- yum -y install libsecret
+  elif command_exist microdnf ; then
+    _run_command --prefer-sudo -- microdnf -y install libsecret
+  else
+    echo "Cannot install secret-tool: no known package manager found" >&2
+    exit -1
+  fi
+
+  command -v secret-tool >/dev/null 2>&1
+}
+
+function _install_redhat_kubernetes_client() {
+  if ! command_exist kubectl; then
+     _run_command --prefer-sudo -- dnf install -y kubernetes-client
+     if [[ $? != 0  ]]; then
+         echo "Failed to install kubectl"
+         exit 1
+     fi
+  fi
 }
 
 function _secret_tool() {
