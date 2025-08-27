@@ -2,23 +2,6 @@ function command_exist() {
     command -v "$1" &> /dev/null
 }
 
-function _install_redhat_kubernetes_client() {
-  if ! command_exist kubectl; then
-     sudo dnf install -y kubernetes-client
-  fi
-}
-
-function cleanup_on_success() {
-    file_to_cleanup=$1
-    echo "Cleaning up temporary files..."
-    if [[ $? == 0 ]]; then
-       rm -f "$file_to_cleanup"
-       rm -rf "$file_to_cleanup"
-    else
-       echo "Error occurred, not cleaning up $file_to_cleanup"
-    fi
-}
-
 # _run_command [--quiet] [--prefer-sudo|--require-sudo] [--probe '<subcmd>'] -- <prog> [args...]
 # - --quiet         : suppress wrapper error message (still returns real exit code)
 # - --prefer-sudo   : use sudo -n if available, otherwise run as user
@@ -128,20 +111,17 @@ _ensure_secret_tool() {
 function _install_redhat_kubernetes_client() {
   if ! command_exist kubectl; then
      _run_command --prefer-sudo -- dnf install -y kubernetes-client
-     if [[ $? != 0  ]]; then
-         echo "Failed to install kubectl"
-         exit 1
-     fi
-  fi
 }
 
 function _secret_tool() {
    _ensure_secret_tool >/dev/null 2>&1
-   _run_command --quiet -- secret-tool "$@";
+   local $rc=$(_run_command --quiet -- secret-tool "$@")
 }
 
 # macOS only
-function _security() { _run_command --quiet -- security "$@"; }
+function _security() {
+   local $rc=$(_run_command --quiet -- security "$@";)
+}
 
 function _install_debian_kubernetes_client() {
    if command_exist kubectl ; then
@@ -152,29 +132,23 @@ function _install_debian_kubernetes_client() {
    echo "Installing kubectl on Debian/Ubuntu system..."
 
    # Create the keyrings directory if it doesn't exist
-   sudo mkdir -p /etc/apt/keyrings
+   _run_command --require-sudo -- mkdir -p /etc/apt/keyrings
 
    # Download the Kubernetes signing key
    if [[ ! -e "/etc/apt/keyrings/kubernetes-apt-keyring.gpg" ]]; then
       curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key \
-         | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+         | _run_command --require-sudo -- gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
    fi
 
    # Add the Kubernetes apt repository
-   echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
+   echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" | _run_command --require-sudo - tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
 
    # Update apt package index
-   sudo apt-get update -y
+   _run_command --require-sudo -- apt-get update -y
 
    # Install kubectl
-   sudo apt-get install -y kubectl
+   _run_command --require-sudo -- apt-get install -y kubectl
 
-   if [[ $? == 0 ]]; then
-      echo "kubectl installed successfully"
-   else
-      echo "Failed to install kubectl"
-      exit 1
-   fi
 }
 
 function install_kubernetes_cli() {
@@ -200,19 +174,11 @@ function is_mac() {
 }
 
 function install_mac_helm() {
-  brew install helm
-  if [[ $? != 0 ]]; then
-    echo problem install helm
-    exit -1
-  fi
+  _run_command --quiet -- brew install helm
 }
 
 function install_redhat_helm() {
-  sudo dnf install -y helm
-  if [[ $? != 0 ]]; then
-    echo problem install helm
-    exit -1
-  fi
+  _run_command --require-sudo -- dnf install -y helm
 }
 
 function install_helm() {
@@ -257,7 +223,7 @@ function is_wsl() {
 function install_colima() {
    if ! command_exist colima ; then
       echo colima does not exist, install it
-      brew install colima
+      _run_command --quiet -- brew install colima
    else
       echo colima installed already
    fi
@@ -290,43 +256,43 @@ function _install_mac_docker() {
 function _install_debian_docker() {
   echo "Installing Docker on Debian/Ubuntu system..."
   # Update apt
-  sudo apt-get update
+  _run_command --require-sudo -- apt-get update
   # Install dependencies
-  sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+  _run_command --require-sudo -- apt-get install -y apt-transport-https ca-certificates curl software-properties-common
   # Add Docker's GPG key
   if [[ ! -e "/usr/share/keyrings/docker-archive-keyring.gpg" ]]; then
-     curl -fsSL https://download.docker.com/linux/$(lsb_release -is \
+     _curl -fsSL https://download.docker.com/linux/$(lsb_release -is \
         | tr '[:upper:]' '[:lower:]')/gpg \
         | sudo gpg --dearmor \
         -o /usr/share/keyrings/docker-archive-keyring.gpg
   fi
   # Add Docker repository
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]') $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]') $(lsb_release -cs) stable" | _run_command --require-sudo -- tee /etc/apt/sources.list.d/docker.list > /dev/null
   # Update package list
-  sudo apt-get update
+  _run_command --require-sudo -- apt-get update
   # Install Docker
-  sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+  _run_command --require-sudo -- apt-get install -y docker-ce docker-ce-cli containerd.io
   # Start and enable Docker
-  sudo systemctl start docker
-  sudo systemctl enable docker
+  _run_command --require-sudo -- systemctl start docker
+  _run_command --require-sudo -- systemctl enable docker
   # Add current user to docker group
-  sudo usermod -aG docker $USER
+  _run_command --require-sudo -- usermod -aG docker $USER
   echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
 }
 
 function _install_redhat_docker() {
   echo "Installing Docker on RHEL/Fedora/CentOS system..."
   # Install required packages
-  sudo dnf install -y dnf-plugins-core
+  _run_command --require-sudo -- dnf install -y dnf-plugins-core
   # Add Docker repository
-  sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+  _run_command --require-sudo -- dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
   # Install Docker
-  sudo dnf install -y docker-ce docker-ce-cli containerd.io
+  _run_command --require-sudo -- dnf install -y docker-ce docker-ce-cli containerd.io
   # Start and enable Docker
-  sudo systemctl start docker
-  sudo systemctl enable docker
+  _run_command --require-sudo -- systemctl start docker
+  _run_command --require-sudo -- systemctl enable docker
   # Add current user to docker group
-  sudo usermod -aG docker $USER
+  _run_command --require-sudo -- usermod -aG docker $USER
   echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
 }
 
@@ -350,7 +316,7 @@ function install_k3d() {
 
    if ! command_exist k3d ; then
       echo k3d does not exist, install it
-      curl -f -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+      _curl -f -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
    else
       echo k3d installed already
    fi
@@ -372,6 +338,7 @@ function install_istioctl() {
    if  ! command_exist istioctl ; then
       echo installing istioctl
       tmp_script=$(mktemp)
+      trap 'rm -rf /tmp/istio-*' EXIT TERM
       pushd /tmp
       curl -f -s https://raw.githubusercontent.com/istio/istio/master/release/downloadIstioCandidate.sh -o "$tmp_script"
       istio_bin=$(bash "$tmp_script" | perl -nle 'print $1 if /add the (.*) directory/')
@@ -379,29 +346,24 @@ function install_istioctl() {
          echo "Failed to download istioctl"
          exit 1
       fi
-      sudo cp -v "$istio_bin/istioctl" "${install_dir}/"
+      _run_command --require-sudo cp -v "$istio_bin/istioctl" "${install_dir}/"
       popd
    fi
 
-   trap 'rm -rf /tmp/istio-*' EXIT TERM
 }
 
 function _create_k3d_cluster() {
    cluster_yaml=$1
 
    if is_mac ; then
-     k3d cluster create --config "${cluster_yaml}"
+     _run_command --quiet -- k3d cluster create --config "${cluster_yaml}"
    elif is_linux ; then
-     sudo k3d cluster create --config "${cluster_yaml}"
+     _run_command --require-sudo k3d cluster create --config "${cluster_yaml}"
    fi
 }
 
 function _list_k3d_cluster() {
-   if is_mac ; then
-      k3d cluster list
-   elif is_linux ; then
-      sudo k3d cluster list
-   fi
+   _run_command --quiet -- k3d cluster list
 }
 
 function _kubectl() {
@@ -414,16 +376,8 @@ function _istioctl() {
       exit 1
    fi
 
-   if is_mac ; then
-      istioctl "$@"
-   else
-      sudo istioctl "$@"
-   fi
+   _run_command --quiet -- isitoctl "$@"
 
-   if [[ $? != 0 ]]; then
-      echo "Istioctl command failed: $@"
-      exit 1
-   fi
 }
 
 # Optional: global default flags you want on every helm call
@@ -453,30 +407,11 @@ function _curl() {
       exit 1
    fi
 
-   if [[ -f $HOME/.kube/config ]] && kubectl get nodes 2>&1 > /dev/null ; then
-      curl "$@"
-   else
-      sudo curl "$@"
-   fi
-
-   if [[ $? != 0 ]]; then
-      echo "Curl command failed: $@"
-      exit 1
-   fi
+   _run_command --quiet -- curl "$@"
 }
 
 function _kill() {
-
-   if [[ -f "$HOME/.kube/config" ]] && kubectl get nodes 2>&1 > /dev/null ; then
-      kill "$@"
-   else
-      sudo kill "$@"
-   fi
-
-   if [[ $? != 0 ]]; then
-      echo "Kill command failed: $@"
-      exit 1
-   fi
+   _run_command --quiet -- kill "$@"
 }
 
 function _ip() {
@@ -493,16 +428,7 @@ function _k3d() {
       exit 1
    fi
 
-   if [[ -f $HOME/.kube/config ]] && kubectl get nodes 2>&1 > /dev/null ; then
-      k3d "$@"
-   else
-      sudo k3d "$@"
-   fi
-
-   if [[ $? != 0 ]]; then
-      echo "k3d command failed: $@"
-      exit 1
-   fi
+   _run_command --quiet --probe $HOME/.kube/config -- k3d cluster list >/dev/null 2>&1
 }
 
 function try_load_plugin() {
