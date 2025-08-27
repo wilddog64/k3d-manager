@@ -15,7 +15,7 @@ _run_command() {
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --no-exist|--soft) soft=1; shift;;
+      --no-exit|--soft) soft=1; shift;;
       --quiet)        quiet=1; shift;;
       --prefer-sudo)  prefer_sudo=1; shift;;
       --require-sudo) require_sudo=1; shift;;
@@ -32,8 +32,9 @@ _run_command() {
     (( quiet )) || echo "$prog: not found in PATH" >&2
     if (( soft )); then
       return 127
-   else
+    else
       exit 127
+    fi
   fi
 
   # Decide runner: user vs sudo -n
@@ -111,16 +112,17 @@ _ensure_secret_tool() {
 function _install_redhat_kubernetes_client() {
   if ! command_exist kubectl; then
      _run_command --prefer-sudo -- dnf install -y kubernetes-client
+  fi
 }
 
 function _secret_tool() {
    _ensure_secret_tool >/dev/null 2>&1
-   local $rc=$(_run_command --quiet -- secret-tool "$@")
+   _run_command --quiet -- secret-tool "$@"
 }
 
 # macOS only
 function _security() {
-   local $rc=$(_run_command --quiet -- security "$@";)
+   _run_command --quiet -- security "$@"
 }
 
 function _install_debian_kubernetes_client() {
@@ -376,7 +378,7 @@ function _istioctl() {
       exit 1
    fi
 
-   _run_command --quiet -- isitoctl "$@"
+   _run_command --quiet -- istioctl "$@"
 
 }
 
