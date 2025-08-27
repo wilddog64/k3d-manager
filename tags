@@ -10,6 +10,7 @@ _create_jenkins_secret	scripts/plugins/jenkins.sh	/^function _create_jenkins_sec
 _create_k3d_cluster	scripts/lib/system.sh	/^function _create_k3d_cluster() {$/;"	f
 _curl	scripts/lib/system.sh	/^function _curl() {$/;"	f
 _deploy_jenkins_image	scripts/plugins/jenkins.sh	/^function _deploy_jenkins_image() {$/;"	f
+_ensure_secret_tool	scripts/lib/system.sh	/^_ensure_secret_tool() {$/;"	f
 _helm	scripts/lib/system.sh	/^_helm() {$/;"	f
 _install_debian_docker	scripts/lib/system.sh	/^function _install_debian_docker() {$/;"	f
 _install_debian_kubernetes_client	scripts/lib/system.sh	/^function _install_debian_kubernetes_client() {$/;"	f
@@ -25,7 +26,7 @@ _list_k3d_cluster	scripts/lib/system.sh	/^function _list_k3d_cluster() {$/;"	f
 _lookup_bw_access_token	scripts/plugins/bitwarden.sh	/^function _lookup_bw_access_token() {$/;"	f
 _run_command	scripts/lib/system.sh	/^_run_command() {$/;"	f
 _secret_tool	scripts/lib/system.sh	/^function _secret_tool() {$/;"	f
-_security	scripts/lib/system.sh	/^function _security() { _run_command --quiet -- security "$@"; }$/;"	f
+_security	scripts/lib/system.sh	/^function _security() {$/;"	f
 cleanup_istio_test_namespace	scripts/lib/test.sh	/^function cleanup_istio_test_namespace() {$/;"	f
 cleanup_on_success	scripts/lib/core.sh	/^function cleanup_on_success() {$/;"	f
 command_exist	scripts/lib/system.sh	/^function command_exist() {$/;"	f
