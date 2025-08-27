@@ -26,6 +26,11 @@
 # Note: The above script functions list in NFS DEBUGGING section do not address K3d NFS mounting issues on macOS. The code leave here for the reference purpose only
 
 # resolve symlink so that we can figure out where script is actually located
+DEBUG=${DEBUG:-0}
+if [[ $DEBUG -gt 0 ]]; then
+      set -xv
+fi
+
 SOURCE="${BASH_SOURCE[0]}"
 while [ -L "$SOURCE" ]; do
   DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
