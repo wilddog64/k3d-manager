@@ -1,6 +1,6 @@
 function _lookup_bw_access_token() {
-   fifo="$(mktemp -u)"
-   trap 'clean_on_success "$fifo"' EXIT INT TERM RETURN
+   local tmpdir=$(mktemp -d)
+   fifo="${tmpdir}/$(mktemp -t)"
    mkfifo -m 600 "$fifo"
    if is_mac ; then
       (_security find-generic-password -a esobw -s BW_MACHINE_TOKEN -w > "$fifo") &
