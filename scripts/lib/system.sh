@@ -8,6 +8,17 @@ function _install_redhat_kubernetes_client() {
   fi
 }
 
+function cleanup_on_success() {
+    file_to_cleanup=$1
+    echo "Cleaning up temporary files..."
+    if [[ $? == 0 ]]; then
+       rm -f "$file_to_cleanup"
+       rm -rf "$file_to_cleanup"
+    else
+       echo "Error occurred, not cleaning up $file_to_cleanup"
+    fi
+}
+
 # _run_command [--quiet] [--prefer-sudo|--require-sudo] [--probe '<subcmd>'] -- <prog> [args...]
 # - --quiet         : suppress wrapper error message (still returns real exit code)
 # - --prefer-sudo   : use sudo -n if available, otherwise run as user
