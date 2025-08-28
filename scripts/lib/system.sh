@@ -450,3 +450,34 @@ function try_load_plugin() {
    exit 1
 }
 
+function _sha256_12() {
+   local s="$1" line hash
+
+   if command_exist shasum; then
+      line=$(_run_command -- shasum -a 256 <<<"$s")
+   elif command_exist sha256sum; then
+      line=$(_run_command <<<"$s")
+   else
+      echo "No SHA256 command found" >&2
+      exit -1
+   fi
+
+   hash=${line%% *}
+   printf %s "${hash:0:12}"
+}
+
+function _compare_token() {
+   local token1="$1"
+   local token2="$2"
+
+   if [[ -z "$token1" ]] && [[ -z "$token2" ]]; then
+      echo "One or both tokens are empty" >&2
+      exit -1
+   fi
+
+   if [[ "$token1" == "$token2" ]]; then
+      echo "✅ Bitwarden token in k3d matches local token."
+   else
+      return 0
+   fi
+}
