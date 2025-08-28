@@ -1,3 +1,17 @@
+local bitwarden_lib="$PLUGINS_DIR/bitwarden.sh"
+
+if [[ -f "$bitwarden_lib" ]]; then
+   source $PLUGINS_DIR/bitwarden.sh
+fi
+
+function eso_bw_get_jenkins_admin_user() {
+   _bw_lookup_secret "jenkins-admin" "jenkins"
+}
+
+function eso_bw_get_jenkins_admin_passwd() {
+   _bw_lookup_secret "jenkins-admin-password" "jenkins"
+}
+
 function _create_jenkins_namespace() {
    jenkins_namespace="${1:-jenkins}"
    export namespace="${jenkins_namespace}"
@@ -19,21 +33,51 @@ function _create_jenkins_namespace() {
    trap 'cleanup_on_success "$yamfile"' EXIT
 }
 
-function _create_jenkins_secret() {
-   jenkins_namespce=$1
+function _create_eso_jenkins_secret() {
+  local ns="${1:-jenkins}"
 
-   if _kubectl get -n "$jenkins_namespace" secrets 'jenkins-admin' > /dev/null 2>&1 ; then
-      echo "jenkins admin secret already exists, skip"
-      return 0
+  cat <<-YAML | kubectl apply -n "$ns" -f -
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: jenkins-admin
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: bws-secretsmanager
+    kind: SecretStore
+  target:
+    name: jenkins-admin
+    creationPolicy: Merge
+  data:
+    - secretKey: admin
+      remoteRef:
+        key: "$(eso_bw_get_jenkins_admin_user)"
+    - secretKey: admin-password
+      remoteRef:
+        key: "$(eso_bw_get_jenkins_admin_passwd)"
+YAML
+
+   _verify_jenkins_secret "$jenkins_namespace"
+}
+
+function _verify_jenkins_secret() {
+   local ns="${1:-jenkins}"
+
+   if ! _is_same_token "$(_bw_lookup_secret "jenkins-admin" "jenkins" | _sha256_12 )" \
+      "$k3d_jenkins_admin_sha"; then
+      echo "❌ Jenkins admin user in k3d does NOT match Bitwarden!" >&2
+      exit -1
+   else
+      echo "✅ Jenkins admin user in k3d matches Bitwarden."
    fi
 
-   _kubectl create -n "$jenkins_namespace" \
-      secret generic jenkins-admin \
-      --from-literal=admin='admin' \
-      --from-literal=admin-password=$(openssl rand -base64 16)  >/dev/null 2>&1
-
-   if [[ $? != 0 ]]; then
-      echo "jenkins admin secret already exists, skip"
+   if ! _is_same_token "$(_bw_lookup_secret "jenkins-admin-password" "jenkins" | _sha256_12 )" \
+      "$k3d_jenkins_admin_passwd_sha"; then
+      echo "❌ Jenkins admin password in k3d does NOT match Bitwarden!" >&2
+      exit -1
+   else
+      echo "✅ Jenkins admin password in k3d matches Bitwarden."
    fi
 }
 
@@ -74,8 +118,18 @@ function _create_jenkins_pv_pvc() {
 }
 
 function _deploy_jenkins_image() {
-   jenkins_namespace=$1
-   jenkins_version=$2
+   local ns="${1:-jenkins}"
+
+   local jenkins_admin_sha="$(_bw_lookup_secret "jenkins-admin" "jenkins" | _sha256_12 )"
+   local jenkins_admin_passwd_sha="$(_bw_lookup_secret "jenkins-admin-password" "jenkins" \
+      | _sha256_12 )"
+
+   if ! is_same_token "$jenkins_admin_sha" "$k3d_jenkins_admin_sha"; then
+      echo "❌ Jenkins admin user in k3d does NOT match Bitwarden!" >&2
+      exit -1
+   else
+      echo "✅ Jenkins admin user in k3d matches Bitwarden."
+   fi
 }
 
 function deploy_jenkins() {
@@ -83,6 +137,6 @@ function deploy_jenkins() {
    jenkins_version="${2:-lts}"
 
    _create_jenkins_namespace "$jenkins_namespace"
-   _create_jenkins_secret "$jenkins_namespace"
+   _create_eso_jenkins_secret "$jenkins_namespace"
    _create_jenkins_pv_pvc "$jenkins_namespace"
 }
