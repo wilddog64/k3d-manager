@@ -70,6 +70,8 @@ function config_bws_eso() {
   # Build and apply SecretStore
   _kubectl apply -n "$ns" -f "$yamlfile"
 
+  verify_bws_token
+
   echo "Created SecretStore 'bws-secretsmanager' in namespace ${ns}"
 }
 
@@ -98,4 +100,18 @@ spec:
         key: "${uuid}"
 EOF
   echo "ExternalSecret '${k8s_name}' created (namespace ${ns})."
+}
+
+function verify_bws_token() {
+   local ns="${1:-external-secrets}"
+
+   local bws_token_sha=$(get_bw_access_token | _sha256_12 )
+   local k3d_bws_sha=$(_run_command -- kubectl -n "$ns" get secret bws-access-token \
+      -o jsonpath='{.data.token}' | base64 --decode | _sha256_12)
+   if _compare_token "$bws_token_sha" "$k3d_bws_token"; then
+      echo "✅ Bitwarden token in k3d matches local token."
+   else
+      echo "❌ Bitwarden token in k3d does NOT match local token!" >&2
+      exit -1
+   fi
 }
