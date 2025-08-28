@@ -1,7 +1,3 @@
-if [[ ! -z "$DEBUG" ]]; then
-   set -xv
-fi
-
 function _create_jenkins_namespace() {
    jenkins_namespace="${1:-jenkins}"
    export namespace="${jenkins_namespace}"
