@@ -434,20 +434,38 @@ function _k3d() {
 }
 
 function try_load_plugin() {
-   PLUGIN_DIR="${SCRIPT_DIR}/plugins"
-   local func="$1"
-   for plugin in "$PLUGIN_DIR"/*.sh; do
-     if grep -q "function $func" "$plugin"; then
-       source "$plugin"
-       # Check again if function is now available
-       if [[ "$(type -t $func)" == "function" ]]; then
-         $func "${@:2}"
-         exit 0
-       fi
-     fi
-   done
-   echo "Error: Function '$func' not found in plugins"
-   exit 1
+  local func="${1:?usage: try_load_plugin <function> [args...]}"
+  local plugin
+
+  # 1) refuse "private" functions and invalid names
+  #    (bash identifier, not starting with "_")
+  if [[ "$func" == _* ]]; then
+    echo "Error: '$func' is private (names starting with '_' cannot be invoked)." >&2
+    exit 1
+  fi
+  if [[ ! "$func" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]]; then
+    echo "Error: invalid function name: '$func'" >&2
+    exit 1
+  fi
+
+  # 2) iterate plugins safely (no literal *.sh if empty)
+  shopt -s nullglob
+  for plugin in "$PLUGINS_DIR"/*.sh; do
+    # quick prefilter: does this file define 'func'?
+    if grep -Eq "^[[:space:]]*(function[[:space:]]+$func[[:space:]]*\(\)|$func[[:space:]]*\(\))[[:space:]]*\{" "$plugin"; then
+      # shellcheck source=/dev/null
+      source "$plugin"
+      # defined now?
+      if [[ "$(type -t -- "$func")" == "function" ]]; then
+        "$func" "${@:2}"
+        exit 0
+      fi
+    fi
+  done
+  shopt -u nullglob
+
+  echo "Error: Function '$func' not found in plugins" >&2
+  exit 1
 }
 
 function _sha256_12() {
