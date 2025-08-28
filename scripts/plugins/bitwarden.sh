@@ -1,3 +1,17 @@
+function _install_bws() {
+   if command_exist bws ; then
+      echo "bws already installed"
+      return
+   fi
+   _ensure_cargo
+   _run_command -- cargo install --locked bws
+}
+
+function _bws() {
+   _install_bws
+   _run_command -- bws "$@"
+}
+
 # Returns the Bitwarden machine token to stdout.
 # Exits if lookup fails or token is empty. No noise on stdout.
 function _lookup_bw_access_token() {
