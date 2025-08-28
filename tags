@@ -4,6 +4,7 @@
 !_TAG_PROGRAM_NAME	Exuberant Ctags	//
 !_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
 !_TAG_PROGRAM_VERSION	5.8	//
+_compare_token	scripts/lib/system.sh	/^function _compare_token() {$/;"	f
 _create_jenkins_namespace	scripts/plugins/jenkins.sh	/^function _create_jenkins_namespace() {$/;"	f
 _create_jenkins_pv_pvc	scripts/plugins/jenkins.sh	/^function _create_jenkins_pv_pvc() {$/;"	f
 _create_jenkins_secret	scripts/plugins/jenkins.sh	/^function _create_jenkins_secret() {$/;"	f
@@ -27,6 +28,7 @@ _lookup_bw_access_token	scripts/plugins/bitwarden.sh	/^function _lookup_bw_acces
 _run_command	scripts/lib/system.sh	/^_run_command() {$/;"	f
 _secret_tool	scripts/lib/system.sh	/^function _secret_tool() {$/;"	f
 _security	scripts/lib/system.sh	/^function _security() {$/;"	f
+_sha256_12	scripts/lib/system.sh	/^function _sha256_12() {$/;"	f
 cleanup_istio_test_namespace	scripts/lib/test.sh	/^function cleanup_istio_test_namespace() {$/;"	f
 cleanup_on_success	scripts/lib/core.sh	/^function cleanup_on_success() {$/;"	f
 command_exist	scripts/lib/system.sh	/^function command_exist() {$/;"	f
@@ -38,6 +40,7 @@ create_nfs_share	scripts/lib/core.sh	/^function create_nfs_share() {$/;"	f
 deploy_eso	scripts/plugins/eso.sh	/^function deploy_eso() {$/;"	f
 deploy_jenkins	scripts/plugins/jenkins.sh	/^function deploy_jenkins() {$/;"	f
 deploy_k3d_cluster	scripts/lib/core.sh	/^function deploy_k3d_cluster() {$/;"	f
+ensure_bws_secret	scripts/plugins/bitwarden.sh	/^function ensure_bws_secret() {$/;"	f
 eso_example_by_uuid	scripts/plugins/bitwarden.sh	/^function eso_example_by_uuid() {$/;"	f
 get_bw_access_token	scripts/plugins/bitwarden.sh	/^function get_bw_access_token() {$/;"	f
 install_colima	scripts/lib/system.sh	/^function install_colima() {$/;"	f
@@ -59,3 +62,4 @@ test_istio	scripts/lib/test.sh	/^function test_istio() {$/;"	f
 test_nfs_connectivity	scripts/lib/test.sh	/^function test_nfs_connectivity() {$/;"	f
 test_nfs_direct	scripts/lib/test.sh	/^function test_nfs_direct() {$/;"	f
 try_load_plugin	scripts/lib/system.sh	/^function try_load_plugin() {$/;"	f
+verify_bws_token	scripts/plugins/bitwarden.sh	/^function verify_bws_token() {$/;"	f
