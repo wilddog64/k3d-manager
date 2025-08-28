@@ -7,7 +7,7 @@ function _lookup_bw_access_token() {
     token="$(_security find-generic-password -a esobw -s BW_MACHINE_TOKEN -w 2>/dev/null)" || exit 1
   elif is_linux; then
     _ensure_secret_tool >/dev/null 2>&1
-    token="$(_run_command --no-exit -- secret-tool lookup service BW_MACHINE_TOKEN account esobw 2>/dev/null)" || true
+    token="$(secret-tool lookup service BW_MACHINE_TOKEN account esobw 2>/dev/null)" || true
   else
     echo "unsupported OS" >&2
     exit 1
@@ -23,13 +23,13 @@ function ensure_bws_secret() {
   local token
 
   # Create/update the secret atomically via apply
-  _run_command -- kubectl -n "$ns" create secret generic bws-access-token \
+  _kubectl -n "$ns" create secret generic bws-access-token \
      --from-literal=token="$(_lookup_bw_access_token)" \
       --dry-run=client -o yaml \
-    | _run_command -- kubectl -n "$ns" apply -f -
+    | _kubectl -n "$ns" apply -f -
 }
 
-function get_bw_access_token() {
+function _get_bw_access_token() {
    _lookup_bw_access_token
 }
 
@@ -105,8 +105,8 @@ EOF
 function verify_bws_token() {
    local ns="${1:-external-secrets}"
 
-   local bws_token_sha=$(get_bw_access_token | _sha256_12 )
-   local k3d_bws_sha=$(_run_command -- kubectl -n "$ns" get secret bws-access-token \
+   local bws_token_sha=$(_get_bw_access_token | _sha256_12 )
+   local k3d_bws_sha=$(_kubectl -n "$ns" get secret bws-access-token \
       -o jsonpath='{.data.token}' | base64 --decode | _sha256_12)
    if _compare_token "$bws_token_sha" "$k3d_bws_token"; then
       echo "✅ Bitwarden token in k3d matches local token."
