@@ -466,7 +466,7 @@ function _sha256_12() {
    printf %s "${hash:0:12}"
 }
 
-function _compare_token() {
+function _is_same_token() {
    local token1="$1"
    local token2="$2"
 
@@ -477,6 +477,7 @@ function _compare_token() {
 
    if [[ "$token1" == "$token2" ]]; then
       echo "✅ Bitwarden token in k3d matches local token."
+      return 1
    else
       return 0
    fi
