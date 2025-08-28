@@ -482,3 +482,30 @@ function _is_same_token() {
       return 0
    fi
 }
+
+function _ensure_cargo() {
+   if command_exist cargo ; then
+      return 0
+   fi
+
+   if is_mac && command_exist brew ; then
+      brew install rust
+      return 0
+   fi
+
+   if is_debian_family ; then
+      _run_command --require-sudo -- apt-get update
+      _run_command --require-sudo -- apt-get install -y cargo
+   elif is_redhat_family ; then
+      _run_command --require-sudo -- dnf install -y cargo
+   elif is_wsl && grep -qi "debian" /etc/os-release &> /dev/null; then
+      _run_command --require-sudo -- apt-get update
+      _run_command --require-sudo -- apt-get install -y cargo
+   elif is_wsl && grep -qi "redhat" /etc/os-release &> /dev/null; then
+      _run_command --require-sudo -- apt-get update
+      _run_command --require-sudo -- apt-get install -y cargo
+   else
+      echo "Cannot install cargo: unsupported OS or missing package manager" >&2
+      exit -1
+   fi
+}
