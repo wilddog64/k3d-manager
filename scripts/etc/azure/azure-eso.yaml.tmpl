@@ -1,0 +1,18 @@
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: akv-eso-sp
+  namespace: ${NS}
+spec:
+  provider:
+    azurekv:
+      tenantId: "${TENANT_ID}"
+      vaultUrl: "https://${KV_NAME}.vault.azure.net/"
+      authType: ServicePrincipal
+      authSecretRef:
+        clientId:
+          name: akv-sp-creds
+          key: "${CLIENT_ID}"
+        clientSecret:
+          name: akv-sp-creds
+          key: "${CLIENT_SECRET}"

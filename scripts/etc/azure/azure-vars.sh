@@ -1,0 +1,5 @@
+export KV_NAME="${KV_NAME:-azuree-kv-eso}"
+export APP_ID="${APP_ID:-$(jq -r .appId <<<${AZ_JSON}})}"
+export CLIENT_SECRET="${CLIENT_SECRET:-$(jq -r .password <<<${AZ_JSON}})}"
+export TENANT_ID="${TENANT_ID:-$(jq -r .tenant <<<${AZ_JSON}})}"
+export KV_ID="${KV_ID:-$(az keyvault show --name ${KV_NAME} --query id -o tsv)}"
