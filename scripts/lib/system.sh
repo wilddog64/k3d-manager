@@ -298,62 +298,6 @@ function _install_redhat_docker() {
   echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
 }
 
-function install_docker() {
-   if is_mac; then
-      _install_mac_docker
-   elif is_debian_family; then
-      _install_debian_docker
-   elif is_redhat_family ; then
-      _install_redhat_docker
-   else
-      echo "Unsupported Linux distribution. Please install Docker manually."
-      exit 1
-   fi
-}
-
-function install_k3d() {
-   install_docker
-   install_helm
-   install_istioctl
-
-   if ! command_exist k3d ; then
-      echo k3d does not exist, install it
-      _curl -f -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-   else
-      echo k3d installed already
-   fi
-}
-
-function install_istioctl() {
-   install_dir="${1:-/usr/local/bin}"
-
-   if command_exist istioctl ; then
-      echo "istioctl already exists, skip installation"
-      return 0
-   fi
-
-   echo "install dir: ${install_dir}"
-   if [[ ! -e "$install_dir" && ! -d "$install_dir" ]]; then
-      mkdir -p "${install_dir}"
-   fi
-
-   if  ! command_exist istioctl ; then
-      echo installing istioctl
-      tmp_script=$(mktemp)
-      trap 'rm -rf /tmp/istio-*' EXIT TERM
-      pushd /tmp
-      curl -f -s https://raw.githubusercontent.com/istio/istio/master/release/downloadIstioCandidate.sh -o "$tmp_script"
-      istio_bin=$(bash "$tmp_script" | perl -nle 'print $1 if /add the (.*) directory/')
-      if [[ -z "$istio_bin" ]]; then
-         echo "Failed to download istioctl"
-         exit 1
-      fi
-      _run_command --require-sudo cp -v "$istio_bin/istioctl" "${install_dir}/"
-      popd
-   fi
-
-}
-
 function _create_k3d_cluster() {
    cluster_yaml=$1
 
@@ -480,7 +424,7 @@ function _sha256_12() {
       exit -1
    fi
 
-   hash=${line%% *}
+   hash="${line%% *}"
    printf %s "${hash:0:12}"
 }
 
