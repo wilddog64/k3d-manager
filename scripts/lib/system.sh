@@ -183,7 +183,7 @@ function install_redhat_helm() {
   _run_command --require-sudo -- dnf install -y helm
 }
 
-function install_helm() {
+function _install_helm() {
   if command_exist helm; then
     echo helm already installed, skip
     return 0

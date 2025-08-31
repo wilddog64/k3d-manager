@@ -13,7 +13,7 @@ function install_docker() {
 
 function install_k3d() {
    install_docker
-   install_helm
+   _install_helm
    install_istioctl
 
    if ! command_exist k3d ; then
@@ -105,8 +105,8 @@ function cleanup_on_success() {
 function configure_k3d_cluster_istio() {
    cluster_name=$1
 
-   istio_yaml_template="$(dirname $SOURCE)/etc/istio-operator.yaml.tmpl"
-   istio_var="$(dirname $SOURCE)/etc/istio_var.sh"
+   istio_yaml_template="$(dirname "$SOURCE")/etc/istio-operator.yaml.tmpl"
+   istio_var="$(dirname "$SOURCE")/etc/istio_var.sh"
 
    if [[ ! -r "$istio_yaml_template" ]]; then
       echo "Istio template file not found: $istio_yaml_template"
@@ -128,7 +128,7 @@ function configure_k3d_cluster_istio() {
    _istioctl install -y -f "$isito_yamlfile"
    _kubectl label ns default istio-injection=enabled --overwrite
 
-   trap "cleanup_on_success $isito_yamlfile" EXIT
+   trap 'cleanup_on_success "$isito_yamlfile"' EXIT
 }
 
 
@@ -137,16 +137,11 @@ function install_smb_csi_driver() {
       echo "warning: SMB CSI driver is not supported on macOS"
       exit 0
    fi
-   install_helm
+   _install_helm
    _helm repo add smb-csi-driver https://kubernetes-sigs.github.io/smb-csi-driver
    _helm repo update
    _helm upgrade --install smb-csi-driver smb-csi-driver/smb-csi-driver \
       --namespace kube-system
-
-   if [[ $? != 0 ]]; then
-      echo "Failed to install SMB CSI driver"
-      exit 1
-   fi
 }
 
 function create_nfs_share() {
