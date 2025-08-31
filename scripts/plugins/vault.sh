@@ -94,6 +94,7 @@ function deploy_vault() {
    [[ -n "$version" ]] && args+=("--version" "$version")
    _helm "${args[@]}"
 
+   _vault_verify "$mode"
 }
 
 function _vault_wait_ready() {
@@ -195,4 +196,43 @@ function _vault_deploy_ha() {
    _vault_init_unseal "$ns" "$release"
    echo "[vault] ha ready in ns=$ns release=$release (initialized + unsealed)"
    _vault_portforward_help "$ns" "$release"
+}
+
+
+function _vault_health_ok() {
+  local mode="${1:?}" code="${2:?}"
+  case "$mode" in
+    dev) [[ "$code" == "200" ]];;
+    ha)  [[ "$code" =~ ^(200|429|472|473)$ ]];;
+    *)   return 1;;
+  esac
+}
+
+function _vault_health_code_incluster() {
+  local ns="${1:?}" release="${2:?}" scheme="${3:-http}" port="${4:-8200}"
+  local host="${release}-server.${ns}.svc"
+  local name="vault-health-$RANDOM$RANDOM"
+  _kubectl -n "$ns" run "$name" --rm -i --restart=Never \
+    --image=curlimages/curl:8.10.1 --command -- sh -c \
+    "curl -s -o /dev/null -w '%{http_code}' '${scheme}://${host}:${port}/v1/sys/health' || true"
+}
+
+function _vault_verify() {
+  local mode="${1:?usage: vault_verify <dev|ha> [ns] [release] [scheme] [port]}"
+  local ns="${2:-$VAULT_NS_DEFAULT}"
+  local release="${3:-$VAULT_RELEASE_DEFAULT}"
+  local scheme="${4:-http}"
+  local port="${5:-8200}"
+
+  [[ "$mode" == "dev" || "$mode" == "ha" ]] || { echo "[vault] mode must be dev|ha" >&2; return 2; }
+
+  local code
+  code="$(_vault_health_code_incluster "$ns" "$release" "$scheme" "$port")" || { echo "[vault] health probe pod failed" >&2; return 1; }
+
+  if _vault_health_ok "$mode" "$code"; then
+    echo "[vault] OK (mode=$mode, health=$code)"
+  else
+    echo "[vault] health check failed: HTTP $code (mode=$mode)" >&2
+    return 1
+  fi
 }
