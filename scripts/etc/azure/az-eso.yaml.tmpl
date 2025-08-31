@@ -1,0 +1,17 @@
+apiVersion: external-secrets.io/v1beta1
+kind: ClusterSecretStore
+metadata:
+  name: azure-kv-{{KV_NAME}}
+spec:
+  provider:
+    azurekv:
+      authType: ServicePrincipal
+      vaultUrl: {{VAULT_URL}}
+      tenantId: {{TENANT_ID}}
+      clientId: {{APP_ID}}
+      clientSecret:
+        secretRef:
+          name: azure-sp-eso
+          key: clientSecret
+          namespace: {{NS}}
+YAML
