@@ -44,7 +44,7 @@ _run_command() {
       runner=(sudo -n "$prog")
     else
       (( quiet )) || echo "sudo non-interactive not available" >&2
-      exit -1
+      exit 127
     fi
   else
     if [[ -n "$probe" ]]; then
@@ -313,7 +313,19 @@ function _list_k3d_cluster() {
 }
 
 function _kubectl() {
-   _run_command --probe 'config current-context' -- kubectl "$@"
+
+  # Pass-through mini-parser so you can do: _helm --quiet ...  (like _run_command)
+  local pre=()
+  while [[ $# -gt 0 ]]; do
+     case "$1" in
+         --quiet|--prefer-sudo|--require-sudo|--no-exit) pre+=("$1");
+            shift;;
+         --) shift;
+            break;;
+         *)  break;;
+     esac
+  done
+   _run_command "${pre[@]}" -- kubectl "$@"
 }
 
 function _istioctl() {
