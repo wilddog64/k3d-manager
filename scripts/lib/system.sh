@@ -472,6 +472,24 @@ function _ensure_cargo() {
    fi
 }
 
+function _add_exit_trap() {
+   local handler="$1"
+   local cur="$(trap -p EXIT | sed -E "s/.*'(.+)'/\1/")"
+
+   if [[ -n "$cur" ]]; then
+      trap '"$cur"; "$handler"' EXIT
+   else
+      trap '"$handler"' EXIT
+   fi
+}
+
+function _cleanup_register() {
+   if [[ -z "$__CLEANUP_TRAP_INSTALLED" ]]; then
+      _add_exit_trap '[[ -n "$__CLEANUP_PATHS" ]] && rm -rf "$__CLEANUP_PATHS"'
+   fi
+   __CLEANUP_PATHS+=" $*"
+}
+
 # ---------- tiny log helpers (no parentheses, no single-quote apostrophes) ----------
 function _info() { printf 'INFO: %s\n' "$*"; }
 function _warn() { printf 'WARN: %s\n' "$*" >&2; }
