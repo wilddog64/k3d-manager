@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # k3d-manager :: HashiCorp Vault helpers (ESO-friendly)
 # Style: uses command / _kubectl / _helm, no set -e, minimal locals.
 
@@ -56,13 +57,19 @@ injector:
 csi:
   enabled: false
 YAML
+echo "$f"
 }
 
 function deploy_vault() {
-   mode="${1:-dev}"
-   ns="${2:-$VAULT_NS_DEFAULT}"
-   release="${3:-$VAULT_RELEASE_DEFAULT}"
-   version="${4:-$VAULT_CHART_VERSION}"  # optional
+   local mode="${1:-}"
+   local ns="${2:-$VAULT_NS_DEFAULT}"
+   local release="${3:-$VAULT_RELEASE_DEFAULT}"
+   local version="${4:-$VAULT_CHART_VERSION}"  # optional
+
+   if [[ "$mode" != "dev" && "$mode" != "ha" ]]; then
+      echo "[vault] usage: deploy_vault <dev|ha> [<ns> [<release> [<chart-version>]]]" >&2
+      exit 1
+   fi
 
    _vault_ns_ensure "$ns"
    _vault_repo_setup
@@ -77,7 +84,7 @@ function deploy_vault() {
       exit 127
    fi
 
-   values="$(_vault_values_${mode})" || { echo "[vault] cannot create values for mode '$mode'" >&2; return 1; }
+   values="$(_vault_values_"${mode}")"
    if [[ -z "$values" || ! -f "$values" ]]; then
       echo "[vault] cannot create values for mode '$mode'" >&2
       return 1
