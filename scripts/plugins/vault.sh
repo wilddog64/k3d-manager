@@ -1,5 +1,5 @@
 # k3d-manager :: HashiCorp Vault helpers (ESO-friendly)
-# Style: uses _run_command / _kubectl / _helm, no set -e, minimal locals.
+# Style: uses command / _kubectl / _helm, no set -e, minimal locals.
 
 # Defaults (override via env or args to the top-levels)
 VAULT_NS_DEFAULT="${VAULT_NS_DEFAULT:-vault}"
@@ -11,16 +11,15 @@ VAULT_SC="${VAULT_SC:-local-path}"   # k3d/k3s default
 
 function _vault_ns_ensure() {
    ns="${1:-$VAULT_NS_DEFAULT}"
-   _run_command --quiet --probe "${HOME}/.kube/config" -- \
-      _kubectl get ns "$ns" >/dev/null 2>&1 \
-      || _run_command --quiet --probe "${HOME}/.kube/config" -- \
+
+   if ! _kubectl --no-exit get ns "$ns" >/dev/null 2>&1 ; then
       _kubectl create ns "$ns"
+   fi
 }
 
 function _vault_repo_setup() {
-   _run_command --quiet --probe "${HOME}/.kube/config" -- \
-      _helm repo add hashicorp https://helm.releases.hashicorp.com >/dev/null 2>&1 || true
-   _run_command --quiet --probe "${HOME}/.kube/config" -- _helm repo update >/dev/null 2>&1
+   _helm repo add hashicorp https://helm.releases.hashicorp.com >/dev/null 2>&1 || true
+   _helm repo update >/dev/null 2>&1
 }
 
 # Produce a values file path for a mode (dev|ha); echoes the filename
@@ -78,16 +77,15 @@ function deploy_vault() {
       exit 127
    fi
 
-   _vault_values_"${mode}" || { echo "[vault] values generation failed" >&2; return 1;  }
-   if [[ -z "$VAULT_VALUES_FILE" || ! -f "$VAULT_VALUES_FILE"  ]]; then
-      echo "[vault] values file missing" >&2
+   values="$(_vault_values_${mode})" || { echo "[vault] cannot create values for mode '$mode'" >&2; return 1; }
+   if [[ -z "$values" || ! -f "$values" ]]; then
+      echo "[vault] cannot create values for mode '$mode'" >&2
       return 1
    fi
 
-   args=(upgrade --install "$release" "$VAULT_CHART" -n "$ns" -f "$VAULT_VALUES_FILE")
-   [[ -n "$version"  ]] && args+=(--version "$version")
-
-   _run_command --quiet --probe "${HOME}/.kube/config" -- _helm "${args[@]}"
+   args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$values" --wait)
+   [[ -n "$version" ]] && args+=("--version" "$version")
+   _helm "${args[@]}"
 
 }
 
@@ -95,13 +93,11 @@ function _vault_wait_ready() {
    ns="${1:-$VAULT_NS_DEFAULT}"
    release="${2:-$VAULT_RELEASE_DEFAULT}"
    # StatefulSet name is <release>-server per chart
-   _run_command --quiet --probe "${HOME}/.kube/config" -- \
-      _kubectl -n "$ns" rollout status statefulset/"$release"-server --timeout=180s || true
+   _kubectl --no-exit -n "$ns" rollout status statefulset/"$release"-server --timeout=180s || true
 
-   _run_command --quiet --probe "${HOME}/.kube/config" -- \
-      _kubectl -n "$ns" wait --for=condition=ready pod \
-      -l "app.kubernetes.io/name=vault,app.kubernetes.io/instance=$release" \
-      --timeout=180s
+   _kubectl -n "$ns" wait --for=condition=ready pod \
+   -l "app.kubernetes.io/name=vault,app.kubernetes.io/instance=$release" \
+   --timeout=180s
 }
 
 # Initialize and unseal once (1 share / threshold 1); store keys in Secret/vault-root
@@ -110,11 +106,10 @@ function _vault_init_unseal() {
    release="${2:-$VAULT_RELEASE_DEFAULT}"
 
    pod="$(
-      _run_command --quiet --probe "${HOME}/.kube/config" -- \
-         _kubectl -n "$ns" get pod \
-         -l "app.kubernetes.io/name=vault,app.kubernetes.io/instance=$release,component=server" \
-         -o jsonpath='{.items[0].metadata.name}'
-      )"
+       _kubectl -n "$ns" get pod \
+       -l "app.kubernetes.io/name=vault,app.kubernetes.io/instance=$release,component=server" \
+       -o jsonpath='{.items[0].metadata.name}'
+   )"
 
       if [[ -z "$pod" ]]; then
          echo "[vault] no vault server pod found in ns=$ns release=$release" >&2
@@ -122,10 +117,9 @@ function _vault_init_unseal() {
       fi
 
       initd="$(
-         _run_command --quiet --probe "${HOME}/.kube/config" -- \
-            _kubectl -n "$ns" exec "$pod" -- sh -lc 'vault status -format=json \
+          _kubectl --no-exit -n "$ns" exec "$pod" -- sh -lc 'vault status -format=json \
             | jq -r .initialized' 2>/dev/null
-         )"
+      )"
       if [[ "$initd" == "true" ]]; then
          echo "[vault] already initialized."
          return 0
@@ -133,10 +127,7 @@ function _vault_init_unseal() {
 
       tmp="$(mktemp -t)"
       _cleanup_register "$tmp"
-      _run_command --quiet --probe "${HOME}/.kube/config" -- \
-         _kubectl -n "$ns" exec "$pod" -- sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json' >"$tmp" || {
-            echo "[vault] init failed" >&2; rm -f "$tmp"; return 1;
-         }
+      _kubectl --no-exit -n "$ns" exec "$pod" -- sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json' >"$tmp" || { echo "[vault] init failed" >&2; rm -f "$tmp"; return 1; }
 
       unseal_key="$(jq -r '.unseal_keys_b64[0]' "$tmp")"
       root_token="$(jq -r '.root_token' "$tmp")"
@@ -146,16 +137,14 @@ function _vault_init_unseal() {
          return 1
       fi
 
-      _run_command --quiet --probe "${HOME}/.kube/config" -- \
-         _kubectl -n "$ns" exec "$pod" -- sh -lc "vault operator unseal '$unseal_key'"
+      _kubectl -n "$ns" exec "$pod" -- sh -lc "vault operator unseal '$unseal_key'"
 
       # Save for lab convenience
-      _run_command --quiet --probe "${HOME}/.kube/config" -- \
-         _kubectl -n "$ns" create secret generic vault-root \
-         --from-literal=root_token="$root_token" \
-         --from-literal=unseal_key="$unseal_key" \
-         --dry-run=client -o yaml | \
-         _run_command --quiet --probe "${HOME}/.kube/config" -- _kubectl apply -f -
+      _kubectl --no-exit -n "$ns" create secret generic vault-root \
+      --from-literal=root_token="$root_token" \
+      --from-literal=unseal_key="$unseal_key" \
+      --dry-run=client -o yaml | \
+      _kubectl apply -f -
 }
 
 function _vault_portforward_help() {
