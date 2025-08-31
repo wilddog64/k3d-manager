@@ -31,6 +31,19 @@ if [[ $DEBUG -gt 0 ]]; then
       set -xv
 fi
 
+ENABLE_TRACE=${ENABLE_TRACE:-0}
+if [[ $ENABLE_TRACE -gt 0 ]]; then
+   export PS4='+ ${BASH_SOURCE##*/}:${LINENO}:${FUNCNAME[0]}() '
+   exec 19> /tmp/k3d.trace
+   export BASH_XTRACEFD=19
+   set -x
+   # run the same k3d-manager command as before
+   # set +x
+   #
+   # grep -n -- '--hsm-name' /tmp/k3d.trace | head
+   #
+fi
+
 SOURCE="${BASH_SOURCE[0]}"
 while [ -L "$SOURCE" ]; do
   DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
