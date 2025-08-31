@@ -25,7 +25,13 @@
 #
 # Note: The above script functions list in NFS DEBUGGING section do not address K3d NFS mounting issues on macOS. The code leave here for the reference purpose only
 
-# resolve symlink so that we can figure out where script is actually located
+# ensure we are running bash
+if [[ -n $"BASH_VERSION" ]]; then
+   echo "running under bash version ${BASH_VERSION}"
+elif [[ -n $"ZSH_VERSION" ]]; then
+   echo "running under zsh version ${ZSH_VERSION}"
+fi
+
 DEBUG=${DEBUG:-0}
 if [[ $DEBUG -gt 0 ]]; then
       set -xv
@@ -40,6 +46,7 @@ if [[ $ENABLE_TRACE -gt 0 ]]; then
    set -x
 fi
 
+# resolve symlink so that we can figure out where script is actually located
 SOURCE="${BASH_SOURCE[0]}"
 while [ -L "$SOURCE" ]; do
   DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
@@ -60,10 +67,10 @@ if [[ $# -gt 0 ]]; then
     function_name=$1
     shift  # Remove the function name from the arguments
 
-    if [[ "$(type -t $function_name)" == "function" ]]; then
+    if [[ "$(type -t "$function_name")" == "function" ]]; then
         # Call the function with remaining arguments
         $function_name "$@"
     else
-        try_load_plugin "$function_name"
+         _try_load_plugin "$function_name" "$@"
     fi
 fi

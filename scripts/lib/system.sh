@@ -389,39 +389,67 @@ function _k3d() {
    _run_command --quiet --probe $HOME/.kube/config -- k3d cluster list >/dev/null 2>&1
 }
 
-function try_load_plugin() {
-  local func="${1:?usage: try_load_plugin <function> [args...]}"
+function _try_load_plugin() {
+  local func="${1:?usage: _try_load_plugin <function> [args...]}"
+  shift
   local plugin
 
-  # 1) refuse "private" functions and invalid names
-  #    (bash identifier, not starting with "_")
   if [[ "$func" == _* ]]; then
     echo "Error: '$func' is private (names starting with '_' cannot be invoked)." >&2
-    exit 1
+    return 1
   fi
   if [[ ! "$func" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]]; then
     echo "Error: invalid function name: '$func'" >&2
-    exit 1
+    return 1
   fi
 
-  # 2) iterate plugins safely (no literal *.sh if empty)
   shopt -s nullglob
   for plugin in "$PLUGINS_DIR"/*.sh; do
-    # quick prefilter: does this file define 'func'?
-    if grep -Eq "^[[:space:]]*(function[[:space:]]+$func[[:space:]]*\(\)|$func[[:space:]]*\(\))[[:space:]]*\{" "$plugin"; then
+    if command grep -Eq "^[[:space:]]*(function[[:space:]]+${func}[[:space:]]*\(\)|${func}[[:space:]]*\(\))[[:space:]]*\{" "$plugin"; then
       # shellcheck source=/dev/null
       source "$plugin"
-      # defined now?
       if [[ "$(type -t -- "$func")" == "function" ]]; then
-        "$func" "${@:2}"
-        exit 0
+        "$func" "$@"
+        return $?
       fi
     fi
   done
   shopt -u nullglob
 
   echo "Error: Function '$func' not found in plugins" >&2
-  exit 1
+  return 1
+}
+
+function _try_load_function() {
+  local func="${1:?usage: _try_load_function <function> [args...]}"
+  shift
+  local plugin
+
+  if [[ "$func" == _* ]]; then
+    echo "Error: '$func' is private (names starting with '_' cannot be invoked)." >&2
+    return 1
+  fi
+  if [[ ! "$func" =~ ^[A-Za-z][A-Za-z0-9_]*$ ]]; then
+    echo "Error: invalid function name: '$func'" >&2
+    return 1
+  fi
+
+  shopt -s nullglob
+  for plugin in "$PLUGINS_DIR"/*.sh; do
+    if command grep -Eq "^[[:space:]]*(function[[:space:]]+${func}[[:space:]]*\(\)|${func}[[:space:]]*\(\))[[:space:]]*\{" "$plugin"; then
+      # shellcheck source=/dev/null
+      source "$plugin"
+      if [[ "$(type -t -- "$func")" == "function" ]]; then
+        shopt -u nullglob
+        "$func" "$@"
+        return $?
+      fi
+    fi
+  done
+  shopt -u nullglob
+
+  echo "Error: Function '$func' not found in plugins" >&2
+  return 1
 }
 
 function _sha256_12() {
