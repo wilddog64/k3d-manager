@@ -49,9 +49,9 @@ _run_command() {
   else
     if [[ -n "$probe" ]]; then
       # Try user first; if probe fails, try sudo -n
-      if "$prog" $probe >/dev/null 2>&1; then
+      if "$prog" "$probe" >/dev/null 2>&1; then
         runner=("$prog")
-      elif sudo -n "$prog" $probe >/dev/null 2>&1; then
+      elif sudo -n "$prog" "$probe" >/dev/null 2>&1; then
         runner=(sudo -n "$prog")
       elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
         runner=(sudo -n "$prog")
@@ -103,7 +103,7 @@ _ensure_secret_tool() {
     _run_command --prefer-sudo -- microdnf -y install libsecret
   else
     echo "Cannot install secret-tool: no known package manager found" >&2
-    exit -1
+    exit 127
   fi
 
   command -v secret-tool >/dev/null 2>&1
@@ -215,7 +215,7 @@ function is_debian_family() {
 function is_wsl() {
    if [[ -n "$WSL_DISTRO_NAME" ]]; then
       return 0
-   elif egrep -qi "(Microsoft|WSL)" /proc/version &> /dev/null; then
+   elif grep -Eqi "(Microsoft|WSL)" /proc/version &> /dev/null; then
       return 0
    else
       return 1
@@ -468,7 +468,7 @@ function _ensure_cargo() {
       _run_command --require-sudo -- apt-get install -y cargo
    else
       echo "Cannot install cargo: unsupported OS or missing package manager" >&2
-      exit -1
+      exit 127
    fi
 }
 
