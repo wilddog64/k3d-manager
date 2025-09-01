@@ -530,6 +530,17 @@ function _cleanup_register() {
    __CLEANUP_PATHS+=" $*"
 }
 
+function _failfast_on() {
+  set -Eeuo pipefail
+  set -o errtrace
+  trap '_err "[fatal] rc=$? at $BASH_SOURCE:$LINENO: ${BASH_COMMAND}"' ERR
+}
+
+function _failfast_off() {
+  trap - ERR
+  set +Eeuo pipefail
+}
+
 # ---------- tiny log helpers (no parentheses, no single-quote apostrophes) ----------
 function _info() { printf 'INFO: %s\n' "$*"; }
 function _warn() { printf 'WARN: %s\n' "$*" >&2; }
