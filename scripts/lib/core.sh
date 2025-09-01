@@ -168,40 +168,11 @@ function create_nfs_share() {
    fi
 }
 
-function configure_user_kubectl_access() {
-   cluster_name="${1:-k3d-cluster}"
-
-   echo "Configuring kubectl access for non-root user..."
-
-   # Create kube directory in user's home if it doesn't exist
-   mkdir -p $HOME/.kube
-
-   # Get kubeconfig from k3d and save it to user's directory
-      _k3d kubeconfig get "$cluster_name" \
-         > $HOME/.kube/config-"$cluster_name"
-
-   # Set proper permissions
-   chmod 600 $HOME/.kube/config-"$cluster_name"
-
-   # Create/update the main config file
-   if [ -f "$HOME/.kube/config" ]; then
-      echo "Backing up existing kubeconfig to $HOME/.kube/config.bak"
-      cp $HOME/.kube/config $HOME/.kube/config.bak
-   fi
-
-   cp $HOME/.kube/config-"$cluster_name" $HOME/.kube/config
-
-   echo "kubectl is now configured for non-root access to $cluster_name"
-   echo "You can verify with: kubectl get nodes"
-   echo "If you have other clusters, you may want to merge configs using the KUBECONFIG environment variable"
-}
-
 function deploy_k3d_cluster() {
    cluster_name="${1:-k3d-cluster}"
 
    install_k3d
    create_k3d_cluster "$cluster_name"
    configure_k3d_cluster_istio "$cluster_name"
-   configure_user_kubectl_access "$cluster_name"
    # install_smb_csi_driver
 }
