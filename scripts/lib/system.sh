@@ -81,7 +81,7 @@ _run_command() {
      if (( soft )); then
          return "$rc"
      else
-         exit "$rc"
+         _err "failed to execute ${runner[@]} $@: $rc"
      fi
   fi
 
