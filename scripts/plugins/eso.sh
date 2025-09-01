@@ -6,7 +6,7 @@ function deploy_eso() {
   local ns="${1:-external-secrets}"
 
   # Namespace
-  _kubectl --quiet get ns "$ns" >/dev/null 2>&1 || _kubectl create ns "$ns"
+  _kubectl --no-exit --quiet get ns "$ns" >/dev/null 2>&1 || _kubectl create ns "$ns"
 
   # Helm repo
   _helm repo add external-secrets https://charts.external-secrets.io >/dev/null 2>&1 || true
@@ -38,6 +38,6 @@ function deploy_eso() {
   _kubectl -n "$ns" rollout status deploy/bitwarden-sdk-server --timeout=120s
 
   trap 'cleanup_on_success "$tmpdir"' EXIT
-  echo "ESO installed with Bitwarden SDK server in namespace $ns"
+   echo "ESO installed with Bitwarden SDK server in namespace $ns"
 }
 
