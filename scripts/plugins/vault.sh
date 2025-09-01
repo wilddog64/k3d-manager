@@ -86,15 +86,14 @@ function deploy_vault() {
 
    values="$(_vault_values_"${mode}")"
    if [[ -z "$values" || ! -f "$values" ]]; then
-      echo "[vault] cannot create values for mode '$mode'" >&2
-      return 1
+      _err "[vault] cannot create values for mode '$mode'"
    fi
 
    args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$values" --wait)
    [[ -n "$version" ]] && args+=("--version" "$version")
    _helm "${args[@]}"
 
-   _vault_verify "$mode"
+   _vault_bootstrap_ha "$ns" "$release"
 }
 
 function _vault_wait_ready() {
@@ -108,51 +107,77 @@ function _vault_wait_ready() {
    --timeout=180s
 }
 
-# Initialize and unseal once (1 share / threshold 1); store keys in Secret/vault-root
-function _vault_init_unseal() {
-   ns="${1:-$VAULT_NS_DEFAULT}"
-   release="${2:-$VAULT_RELEASE_DEFAULT}"
+# function _vault_server_pods() {
+#   local ns="${1:?}" release="${2:?}"
+#   _kubectl -n "$ns" get pod -l "app.kubernetes.io/name=vault,app.kubernetes.io/instance=${release},app.kubernetes.io/component=server" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'
+# }
 
-   pod="$(
-       _kubectl -n "$ns" get pod \
-       -l "app.kubernetes.io/name=vault,app.kubernetes.io/instance=$release,component=server" \
-       -o jsonpath='{.items[0].metadata.name}'
-   )"
+function _vault_status_code() {
+  local ns="${1:?}" pod="${2:?}"
+  _kubectl --no-exit -n "$ns" exec "$pod" -c vault -- sh -lc 'VAULT_ADDR=http://127.0.0.1:8200 vault status >/dev/null 2>&1; echo $?'
+}
 
-      if [[ -z "$pod" ]]; then
-         echo "[vault] no vault server pod found in ns=$ns release=$release" >&2
-         return 1
-      fi
+# function _with_deadline() { date -u +%s; }
+#
+# function _vault_init_if_needed() {
+#   local ns="${1:?}" release="${2:?}"
+#   local sel="app.kubernetes.io/name=vault,app.kubernetes.io/instance=${release},component=server"
+#   local pod deadline=$(( $(_with_deadline) + 300 ))
+#   while (( $(_with_deadline) < deadline )); do
+#     pod="$(
+#       _kubectl --no-exit -n "$ns" get pod -l "$sel" \
+#         -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | awk '{print $1}'
+#     )"
+#     [[ -n "$pod" ]] && { echo "$pod"; return 0; }
+#     sleep 2
+#   done
+#   _err "[vault] timeout waiting for server pod (ns=$ns release=$release)" >&2
+# }
 
-      initd="$(
-          _kubectl --no-exit -n "$ns" exec "$pod" -- sh -lc 'vault status -format=json \
-            | jq -r .initialized' 2>/dev/null
-      )"
-      if [[ "$initd" == "true" ]]; then
-         echo "[vault] already initialized."
-         return 0
-      fi
+function _vault_get_unseal_key() {
+  local ns="${1:?}"
+  _kubectl -n "$ns" get secret vault-root -o jsonpath='{.data.unseal_key}' 2>/dev/null | base64 -d
+}
 
-      tmp="$(mktemp -t)"
-      _cleanup_register "$tmp"
-      _kubectl --no-exit -n "$ns" exec "$pod" -- sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json' >"$tmp" || { echo "[vault] init failed" >&2; rm -f "$tmp"; return 1; }
+function _vault_unseal_all() {
+  local ns="${1:?}" release="${2:?}" key="${3:?}" ok=0
+  while read -r p; do
+    [[ -n "$p" ]] || continue
+    _kubectl --no-exit -n "$ns" exec "$p" -c vault -- sh -lc "VAULT_ADDR=http://127.0.0.1:8200 vault operator unseal '$key'" >/dev/null || ok=1
+  done < <(_vault_server_pods "$ns" "$release")
+  return $ok
+}
 
-      unseal_key="$(jq -r '.unseal_keys_b64[0]' "$tmp")"
-      root_token="$(jq -r '.root_token' "$tmp")"
+function _vault_health_code_incluster() {
+  local ns="${1:?}" release="${2:?}" scheme="${3:-http}" port="${4:-8200}"
+  local svc="${release}-server.${ns}.svc"
+  local name="vault-health-$RANDOM$RANDOM"
+  _kubectl -n "$ns" run "$name" --rm -i --restart=Never --image=curlimages/curl:8.10.1 --command -- sh -lc \
+    "curl -s -o /dev/null -w '%{http_code}' '${scheme}://${svc}:${port}/v1/sys/health' || true"
+}
 
-      if [[ -z "$unseal_key" || -z "$root_token" ]]; then
-         echo "[vault] parse init output failed" >&2
-         return 1
-      fi
+function _is_vault_deployed() {
+   local ns="${1:?}" release="${2:?}"
+   _helm --no-exit -n "$ns" status "$release" >/dev/null 2>&1
+}
 
-      _kubectl -n "$ns" exec "$pod" -- sh -lc "vault operator unseal '$unseal_key'"
+function _vault_bootstrap_ha() {
+  local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+  if ! _is_vault_deployed "$ns" "$release"; then
+      _err "[vault] not deployed in ns=$ns release=$release" >&2
+  fi
 
-      # Save for lab convenience
-      _kubectl --no-exit -n "$ns" create secret generic vault-root \
-      --from-literal=root_token="$root_token" \
-      --from-literal=unseal_key="$unseal_key" \
-      --dry-run=client -o yaml | \
-      _kubectl apply -f -
+  local key="$(_vault_get_unseal_key "$ns")"
+  [[ -n "$key" ]] || { echo "[vault] missing unseal key" >&2; return 1; }
+  _vault_unseal_all "$ns" "$release" "$key" || _err "[vault] unseal failed"
+
+  local tries=30 code
+  while (( tries-- > 0 )); do
+    code="$(_vault_health_code_incluster "$ns" "$release")" || true
+    [[ "$code" =~ ^(200|429|472|473)$ ]] && { echo "[vault] OK health=$code"; return 0; }
+    sleep 2
+  done
+  _err "[vault] health check failed last=$code" >&2
 }
 
 function _vault_portforward_help() {
