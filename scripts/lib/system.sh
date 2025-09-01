@@ -525,7 +525,7 @@ function _add_exit_trap() {
 
 function _cleanup_register() {
    if [[ -z "$__CLEANUP_TRAP_INSTALLED" ]]; then
-      _add_exit_trap '[[ -n "$__CLEANUP_PATHS" ]] && rm -rf "$__CLEANUP_PATHS"'
+      _add_exit_trap [[ -n "$__CLEANUP_PATHS" ]] && rm -rf "$__CLEANUP_PATHS"
    fi
    __CLEANUP_PATHS+=" $*"
 }
