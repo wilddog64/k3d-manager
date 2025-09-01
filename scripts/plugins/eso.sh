@@ -12,49 +12,20 @@ function deploy_eso() {
   _helm repo add external-secrets https://charts.external-secrets.io >/dev/null 2>&1 || true
   _helm repo update >/dev/null 2>&1
 
-# Ensure TLS secret for the Bitwarden SDK server exists (self-signed quick path)
-if ! _kubectl --quiet -n "$ns" get secret bitwarden-tls-certs >/dev/null 2>&1; then
-  echo "Generating self-signed TLS for Bitwarden SDK server in namespace $ns"
-  tmpdir="$(mktemp -d)"
-  openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
-    -subj "/CN=bitwarden-sdk-server.${ns}.svc" \
-    -addext "subjectAltName=DNS:bitwarden-sdk-server.${ns}.svc,DNS:bitwarden-sdk-server.${ns}.svc.cluster.local" \
-    -keyout "$tmpdir/tls.key" -out "$tmpdir/tls.crt" >/dev/null 2>&1
-  cp "$tmpdir/tls.crt" "$tmpdir/ca.crt"   # self-signed: use server cert as CA
-  _kubectl -n "$ns" create secret generic bitwarden-tls-certs \
-    --from-file=tls.crt="$tmpdir/tls.crt" \
-    --from-file=tls.key="$tmpdir/tls.key" \
-    --from-file=ca.crt="$tmpdir/ca.crt" >/dev/null 2>&1
-  rm -rf "$tmpdir"
-fi
-# Ensure TLS secret for the Bitwarden SDK server exists (self-signed quick path)
-if ! _kubectl --quiet -n "$ns" get secret bitwarden-tls-certs >/dev/null 2>&1; then
-  echo "Generating self-signed TLS for Bitwarden SDK server in namespace $ns"
-  tmpdir="$(mktemp -d)"
-  openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
-    -subj "/CN=bitwarden-sdk-server.${ns}.svc" \
-    -addext "subjectAltName=DNS:bitwarden-sdk-server.${ns}.svc,DNS:bitwarden-sdk-server.${ns}.svc.cluster.local" \
-    -keyout "$tmpdir/tls.key" -out "$tmpdir/tls.crt" >/dev/null 2>&1
-  cp "$tmpdir/tls.crt" "$tmpdir/ca.crt"   # self-signed: use server cert as CA
-  _kubectl -n "$ns" create secret generic bitwarden-tls-certs \
-    --from-file=tls.crt="$tmpdir/tls.crt" \
-    --from-file=tls.key="$tmpdir/tls.key" \
-    --from-file=ca.crt="$tmpdir/ca.crt" >/dev/null 2>&1
-fi
-# Ensure TLS secret for the Bitwarden SDK server exists (self-signed quick path)
-if ! _kubectl --quiet -n "$ns" get secret bitwarden-tls-certs >/dev/null 2>&1; then
-  echo "Generating self-signed TLS for Bitwarden SDK server in namespace $ns"
-  tmpdir="$(mktemp -d)"
-  openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
-    -subj "/CN=bitwarden-sdk-server.${ns}.svc" \
-    -addext "subjectAltName=DNS:bitwarden-sdk-server.${ns}.svc,DNS:bitwarden-sdk-server.${ns}.svc.cluster.local" \
-    -keyout "$tmpdir/tls.key" -out "$tmpdir/tls.crt" >/dev/null 2>&1
-  cp "$tmpdir/tls.crt" "$tmpdir/ca.crt"   # self-signed: use server cert as CA
-  _kubectl -n "$ns" create secret generic bitwarden-tls-certs \
-    --from-file=tls.crt="$tmpdir/tls.crt" \
-    --from-file=tls.key="$tmpdir/tls.key" \
-    --from-file=ca.crt="$tmpdir/ca.crt" >/dev/null 2>&1
-fi
+  # Ensure TLS secret for the Bitwarden SDK server exists (self-signed quick path)
+  if ! _kubectl --no-exit --quiet -n "$ns" get secret bitwarden-tls-certs >/dev/null 2>&1; then
+    echo "Generating self-signed TLS for Bitwarden SDK server in namespace $ns"
+    tmpdir="$(mktemp -d)"
+    _run_command -- openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
+      -subj "/CN=bitwarden-sdk-server.${ns}.svc" \
+      -addext "subjectAltName=DNS:bitwarden-sdk-server.${ns}.svc,DNS:bitwarden-sdk-server.${ns}.svc.cluster.local" \
+      -keyout "$tmpdir/tls.key" -out "$tmpdir/tls.crt" >/dev/null 2>&1
+    _run_command -- cp "$tmpdir/tls.crt" "$tmpdir/ca.crt"   # self-signed: use server cert as CA
+    _kubectl -n "$ns" create secret generic bitwarden-tls-certs \
+      --from-file=tls.crt="$tmpdir/tls.crt" \
+      --from-file=tls.key="$tmpdir/tls.key" \
+      --from-file=ca.crt="$tmpdir/ca.crt" >/dev/null 2>&1
+  fi
 
   # Install ESO + CRDs + Bitwarden SDK server
   _helm upgrade --install external-secrets external-secrets/external-secrets \
