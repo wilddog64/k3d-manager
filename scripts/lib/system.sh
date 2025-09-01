@@ -544,4 +544,4 @@ function _failfast_off() {
 # ---------- tiny log helpers (no parentheses, no single-quote apostrophes) ----------
 function _info() { printf 'INFO: %s\n' "$*"; }
 function _warn() { printf 'WARN: %s\n' "$*" >&2; }
-function _err() { print f 'ERROR: %s\n' "$*" >&2; exit 127; }
+function _err() { printf 'ERROR: %s\n' "$*" >&2; exit 127; }
