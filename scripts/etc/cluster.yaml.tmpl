@@ -4,6 +4,8 @@ metadata:
   name: "${CLUSTER_NAME}"
 servers: 1
 agents: 3
+kubeAPI:
+  hostIP: "127.0.0.1"   # or "0.0.0.0" if you need remote access
 ports:
   - port: 8080:80
     nodeFilters: [loadbalancer]
@@ -12,12 +14,14 @@ ports:
 options:
   k3d:
     wait: true
+  kubeconfig:
+    updateDefaultKubeconfig: true   # write to ~/.kube/config
+    switchCurrentContext: true      # switch kubectl context to this cluster
   k3s:
     extraArgs:
       - arg: "--disable=traefik"
         nodeFilters: ["server:*"]
-      - arg: "--disable=local-storage"
-        nodeFilters: ["server:*"]
 hostAliases:
   - ip: "${IP}"
     hostnames: ["host.k3d.internal"]
+
