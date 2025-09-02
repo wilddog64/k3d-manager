@@ -94,6 +94,7 @@ function deploy_vault() {
    _helm "${args[@]}"
 
    _vault_bootstrap_ha "$ns" "$release"
+   _enable_kv2_k8s_auth "$ns" "$release"
 }
 
 function _vault_wait_ready() {
@@ -198,4 +199,36 @@ function _is_vault_health() {
      200|429|472|473) _info "return code: $rc"; return 1 ;;
      *)               _info "return code: $rc"; return 0 ;;
   esac
+}
+
+function _enable_kv2_k8s_auth() {
+  local ns="${1:-$VAULT_NS_DEFAULT}"
+  local release="${2:-$VAULT_RELEASE_DEFAULT}"
+  local eso_sa="${3:-external-secrets}"          # ← optional: ESO SA name
+  local eso_ns="${4:-external-secrets}"          # ← optional: ESO SA namespace
+
+  # kubernetes auth so no token stored in k8s
+  cat <<'SH' | _kubectl -n "$ns" exec -i vault-0 -- sh -
+set -e
+vault secrets enable -path=secret kv-v2 || true                     # FIX: kv-v2
+vault auth enable kubernetes || true
+
+vault write auth/kubernetes/config \
+  token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+  kubernetes_host="https://kubernetes.default.svc:443" \
+  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt   # FIX: .crt
+SH
+
+  # create a policy
+  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- vault policy write eso-app -
+path "secret/data/eso/*"     { capabilities = ["create","read","update","delete","list"] }
+path "secret/metadata/eso/*" { capabilities = ["list"] }
+HCL
+
+  # map ESO service account to the policy
+  _kubectl -n "$ns" exec -i vault-0 -- vault write auth/kubernetes/role/eso-app \
+    bound_service_account_names="${eso_sa}" \
+    bound_service_account_namespaces="${eso_ns}" \
+    policies=eso-app \
+    ttl=1h
 }
