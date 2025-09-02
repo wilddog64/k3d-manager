@@ -186,6 +186,13 @@ function _vault_bootstrap_ha() {
         sh -lc "vault operator unseal $unseal_key" >/dev/null 2>&1
      _info "[vault] unsealed $pod"
   done
+
+  if ! _is_vault_health "$ns" "$release" ; then
+     _err "[vault] vault not healthy after init/unseal"
+  else
+     _info "[vault] vault is ready to serve"
+     _vault_portforward_help "$ns" "$release"
+  fi
 }
 
 function _vault_portforward_help() {
@@ -241,13 +248,18 @@ function _vault_health_ok() {
   esac
 }
 
-function _vault_health_code_incluster() {
+function _is_vault_health() {
   local ns="${1:?}" release="${2:?}" scheme="${3:-http}" port="${4:-8200}"
-  local host="${release}-server.${ns}.svc"
+  local host="${release}.${ns}.svc"
   local name="vault-health-$RANDOM$RANDOM"
-  _kubectl -n "$ns" run "$name" --rm -i --restart=Never \
+  local rc=$(_kubectl --no-exit -n "$ns" run "$name" --rm -i --restart=Never \
     --image=curlimages/curl:8.10.1 --command -- sh -c \
-    "curl -s -o /dev/null -w '%{http_code}' '${scheme}://${host}:${port}/v1/sys/health' || true"
+    "curl -o /dev/null -s -w '%{http_code}' '${scheme}://${host}:${port}/v1/sys/health'")
+
+  case "$rc" in
+     200|429|472|473) _info "return code: $rc"; return 1 ;;
+     *)               _info "return code: $rc"; return 0 ;;
+  esac
 }
 
 function _vault_verify() {
