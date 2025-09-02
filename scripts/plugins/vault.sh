@@ -134,28 +134,6 @@ function _vault_status_code() {
 #   _err "[vault] timeout waiting for server pod (ns=$ns release=$release)" >&2
 # }
 
-function _vault_get_unseal_key() {
-  local ns="${1:?}"
-  _kubectl -n "$ns" get secret vault-root -o jsonpath='{.data.unseal_key}' 2>/dev/null | base64 -d
-}
-
-function _vault_unseal_all() {
-  local ns="${1:?}" release="${2:?}" key="${3:?}" ok=0
-  while read -r p; do
-    [[ -n "$p" ]] || continue
-    _kubectl --no-exit -n "$ns" exec "$p" -c vault -- sh -lc "VAULT_ADDR=http://127.0.0.1:8200 vault operator unseal '$key'" >/dev/null || ok=1
-  done < <(_vault_server_pods "$ns" "$release")
-  return $ok
-}
-
-function _vault_health_code_incluster() {
-  local ns="${1:?}" release="${2:?}" scheme="${3:-http}" port="${4:-8200}"
-  local svc="${release}-server.${ns}.svc"
-  local name="vault-health-$RANDOM$RANDOM"
-  _kubectl -n "$ns" run "$name" --rm -i --restart=Never --image=curlimages/curl:8.10.1 --command -- sh -lc \
-    "curl -s -o /dev/null -w '%{http_code}' '${scheme}://${svc}:${port}/v1/sys/health' || true"
-}
-
 function _is_vault_deployed() {
    local ns="${1:?}" release="${2:?}"
    _helm --no-exit -n "$ns" status "$release" >/dev/null 2>&1
@@ -208,20 +186,6 @@ function _vault_bootstrap_ha() {
         sh -lc "vault operator unseal $unseal_key" >/dev/null 2>&1
      _info "[vault] unsealed $pod"
   done
-
-  # login in with root token
-  # cat $jsonfile | jq -r .root_token | _kubectl -n "$ns" exec -it vault-0 -- vault login -
-  # local key="$(_vault_get_unseal_key "$ns")"
-  # [[ -n "$key" ]] || { echo "[vault] missing unseal key" >&2; return 1; }
-  # _vault_unseal_all "$ns" "$release" "$key" || _err "[vault] unseal failed"
-  #
-  # local tries=30 code
-  # while (( tries-- > 0 )); do
-  #   code="$(_vault_health_code_incluster "$ns" "$release")" || true
-  #   [[ "$code" =~ ^(200|429|472|473)$ ]] && { echo "[vault] OK health=$code"; return 0; }
-  #   sleep 2
-  # done
-  # _err "[vault] health check failed last=$code" >&2
 }
 
 function _vault_portforward_help() {
