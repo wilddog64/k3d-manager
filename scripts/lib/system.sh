@@ -341,11 +341,13 @@ function _istioctl() {
 # Optional: global default flags you want on every helm call
 # export HELM_GLOBAL_ARGS="--debug"   # example
 
-_helm() {
+function _helm() {
   # Pass-through mini-parser so you can do: _helm --quiet ...  (like _run_command)
-  local pre=() ; while [[ $# -gt 0 ]]; do
+  printf 'argc=%d first=[%q] all=' "$#" "$1"; printf '[%q] ' "$@"; printf '\n'
+  local pre=() ;
+  while [[ $# -gt 0 ]]; do
     case "$1" in
-      --quiet|--prefer-sudo|--require-sudo) pre+=("$1"); shift;;
+      --quiet|--prefer-sudo|--require-sudo|--no-exit) pre+=("$1"); shift;;
       --) shift; break;;
       *)  break;;
     esac
