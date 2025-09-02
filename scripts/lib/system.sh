@@ -343,7 +343,6 @@ function _istioctl() {
 
 function _helm() {
   # Pass-through mini-parser so you can do: _helm --quiet ...  (like _run_command)
-  printf 'argc=%d first=[%q] all=' "$#" "$1"; printf '[%q] ' "$@"; printf '\n'
   local pre=() ;
   while [[ $# -gt 0 ]]; do
     case "$1" in
