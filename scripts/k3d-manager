@@ -26,9 +26,9 @@
 # Note: The above script functions list in NFS DEBUGGING section do not address K3d NFS mounting issues on macOS. The code leave here for the reference purpose only
 
 # ensure we are running bash
-if [[ -n $"BASH_VERSION" ]]; then
+if [[ -n "$BASH_VERSION" ]]; then
    echo "running under bash version ${BASH_VERSION}"
-elif [[ -n $"ZSH_VERSION" ]]; then
+elif [[ -n "$ZSH_VERSION" ]]; then
    echo "running under zsh version ${ZSH_VERSION}"
 fi
 
