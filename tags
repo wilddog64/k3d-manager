@@ -22,6 +22,7 @@ _curl	scripts/lib/system.sh	/^function _curl() {$/;"	f
 _delete_k8s_resources	scripts/plugins/azure.sh	/^function _delete_k8s_resources() {$/;"	f
 _delete_sp_and_app	scripts/plugins/azure.sh	/^function _delete_sp_and_app() {$/;"	f
 _deploy_jenkins_image	scripts/plugins/jenkins.sh	/^function _deploy_jenkins_image() {$/;"	f
+_enable_kv2_k8s_auth	scripts/plugins/vault.sh	/^function _enable_kv2_k8s_auth() {$/;"	f
 _ensure_azure_cli	scripts/plugins/azure.sh	/^function _ensure_azure_cli() {$/;"	f
 _ensure_cargo	scripts/lib/system.sh	/^function _ensure_cargo() {$/;"	f
 _ensure_namespace	scripts/plugins/azure.sh	/^function _ensure_namespace() {$/;"	f
@@ -35,7 +36,7 @@ _find_latest_app_for_kv	scripts/plugins/azure.sh	/^function _find_latest_app_for
 _get_bw_access_token	scripts/plugins/bitwarden.sh	/^function _get_bw_access_token() {$/;"	f
 _grant_kv_access	scripts/plugins/azure.sh	/^function _grant_kv_access() {$/;"	f
 _helm	scripts/lib/system.sh	/^function _helm() {$/;"	f
-_info	scripts/lib/system.sh	/^function _info() { printf 'INFO: %s\\n' "$*"; }$/;"	f
+_info	scripts/lib/system.sh	/^function _info() { printf 'INFO: %s\\n' "$*" >&2; }$/;"	f
 _install_azure_eso	scripts/plugins/azure.sh	/^function _install_azure_eso() {$/;"	f
 _install_bws	scripts/plugins/bitwarden.sh	/^function _install_bws() {$/;"	f
 _install_debian_docker	scripts/lib/system.sh	/^function _install_debian_docker() {$/;"	f
@@ -66,13 +67,10 @@ _update_k8s_secret	scripts/plugins/azure.sh	/^function _update_k8s_secret() {$/;
 _vault_bootstrap	scratch/vault.sh	/^function _vault_bootstrap() {$/;"	f
 _vault_bootstrap_ha	scripts/plugins/vault.sh	/^function _vault_bootstrap_ha() {$/;"	f
 _vault_deploy_dev	scratch/vault.sh	/^function _vault_deploy_dev() {$/;"	f
-_vault_deploy_dev	scripts/plugins/vault.sh	/^function _vault_deploy_dev() {$/;"	f
 _vault_deploy_ha	scratch/vault.sh	/^function _vault_deploy_ha() {$/;"	f
-_vault_deploy_ha	scripts/plugins/vault.sh	/^function _vault_deploy_ha() {$/;"	f
 _vault_get_unseal_key	scratch/vault.sh	/^function _vault_get_unseal_key() {$/;"	f
 _vault_health_code_incluster	scratch/vault.sh	/^function _vault_health_code_incluster() {$/;"	f
 _vault_health_ok	scratch/vault.sh	/^function _vault_health_ok() {$/;"	f
-_vault_health_ok	scripts/plugins/vault.sh	/^function _vault_health_ok() {$/;"	f
 _vault_ns_ensure	scratch/vault.sh	/^function _vault_ns_ensure() {$/;"	f
 _vault_ns_ensure	scripts/plugins/vault.sh	/^function _vault_ns_ensure() {$/;"	f
 _vault_portforward_help	scratch/vault.sh	/^function _vault_portforward_help() {$/;"	f
@@ -80,14 +78,12 @@ _vault_portforward_help	scripts/plugins/vault.sh	/^function _vault_portforward_h
 _vault_repo_setup	scratch/vault.sh	/^function _vault_repo_setup() {$/;"	f
 _vault_repo_setup	scripts/plugins/vault.sh	/^function _vault_repo_setup() {$/;"	f
 _vault_status_code	scratch/vault.sh	/^function _vault_status_code() {$/;"	f
-_vault_status_code	scripts/plugins/vault.sh	/^function _vault_status_code() {$/;"	f
 _vault_unseal_all	scratch/vault.sh	/^function _vault_unseal_all() {$/;"	f
 _vault_values_dev	scratch/vault.sh	/^function _vault_values_dev() {$/;"	f
 _vault_values_dev	scripts/plugins/vault.sh	/^function _vault_values_dev() {$/;"	f
 _vault_values_ha	scratch/vault.sh	/^function _vault_values_ha() {$/;"	f
 _vault_values_ha	scripts/plugins/vault.sh	/^function _vault_values_ha() {$/;"	f
 _vault_verify	scratch/vault.sh	/^function _vault_verify() {$/;"	f
-_vault_verify	scripts/plugins/vault.sh	/^function _vault_verify() {$/;"	f
 _vault_verify_health	scratch/vault.sh	/^function _vault_verify_health() {$/;"	f
 _vault_wait_ready	scratch/vault.sh	/^function _vault_wait_ready() {$/;"	f
 _vault_wait_ready	scripts/plugins/vault.sh	/^function _vault_wait_ready() {$/;"	f
