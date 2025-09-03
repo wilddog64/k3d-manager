@@ -217,13 +217,13 @@ function _is_vault_health() {
 function _vault_policy_exists() {
   local ns="${1:-$VAULT_NS_DEFAULT}" name="${2:-eso-reader}"
 
-  local VAULT_TOKEN="$(_no_trace _kubectl --no-exit -n "$ns" \
-     get secret vault-root \
-     -o jsonpath='{.data.root_token}' | base64 -d)"
-  _no_trace printf '%s\n' "$VAULT_TOKEN" | \
-     _no_trace _kubectl --no-exit -n "$ns" exec -i vault-0 -- \
-     sh -lc "VAULT_TOKEN=$VAULT_TOKEN vault policy list" | grep -q "^${name}\$"
-  unset VAULT_TOKEN
+  # this long pipe to check policy exist seems to be complicated but is to 
+  # prevent vault login output to leak to user and hide sensitive info from being
+  # shown in the xtrace when that is turned on
+   _kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.root_token}' | \
+      base64 -d | \
+     _kubectl --no-exit -n "$ns" exec -i vault-0 -- \
+     sh -lc "vault login - >/dev/null 2>&1 ; vault policy list" | grep -q "^${name}\$"
 
   local rc=$?
   case "$rc" in
