@@ -145,8 +145,13 @@ function _vault_bootstrap_ha() {
          _err "[vault] timeout waiting for vault-0 to be Running (current=$vault_state)" >&2to3
       fi
   done
+  local vault_init=$(_kubectl --no-exit -n "$ns" exec -i vault-0 -- vault status -format json | jq -r '.initialized')
+  if [[ "$vault_init" == "true" ]]; then
+     _warn "[vault] already initialized, skipping init"
+     return 0
+  fi
   _kubectl -n "$ns" exec -it vault-0 -- \
-     sh -lc 'VAULT_ADDR=http://127.0.0.1:8200 vault operator init -key-shares=1 -key-threshold=1 -format=json' \
+     sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json' \
      > "$jsonfile"
 
   local root_token=$(jq -r '.root_token' "$jsonfile")
