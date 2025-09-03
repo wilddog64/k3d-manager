@@ -547,4 +547,10 @@ function _info() { printf 'INFO: %s\n' "$*" >&2; }
 function _warn() { printf 'WARN: %s\n' "$*" >&2; }
 function _err() { printf 'ERROR: %s\n' "$*" >&2; exit 127; }
 
-function _no_trace() { set +x; "$@"; local rc=$?; set -x; return $rc; }
+function _no_trace() {
+  local wasx=0
+  case $- in *x*) wasx=1; set +x;; esac
+  "$@"; local rc=$?
+  (( wasx )) && set -x
+  return $rc
+}
