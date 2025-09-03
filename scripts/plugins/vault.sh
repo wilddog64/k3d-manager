@@ -10,6 +10,13 @@ VAULT_SC="${VAULT_SC:-local-path}"   # k3d/k3s default
 
 # --- primitives ----------------------------------------------------
 
+ESO_PLUGIN="$PLUGINS_DIR/eso.sh"
+if [[ ! -f "$ESO_PLUGIN" ]]; then
+   _err "[vault] missing required plugin: $ESO_PLUGIN" >&2
+fi
+
+source "$ESO_PLUGIN"
+
 function _vault_ns_ensure() {
    ns="${1:-$VAULT_NS_DEFAULT}"
 
@@ -70,6 +77,8 @@ function deploy_vault() {
       echo "[vault] usage: deploy_vault <dev|ha> [<ns> [<release> [<chart-version>]]]" >&2
       exit 1
    fi
+
+   deploy_eso
 
    _vault_ns_ensure "$ns"
    _vault_repo_setup
