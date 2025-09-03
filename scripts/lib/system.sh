@@ -479,7 +479,7 @@ function _is_same_token() {
    fi
 
    if [[ "$token1" == "$token2" ]]; then
-      echo "✅ Bitwarden token in k3d matches local token."
+      echo "Bitwarden token in k3d matches local token."
       return 1
    else
       return 0
