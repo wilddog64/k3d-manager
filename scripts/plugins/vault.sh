@@ -165,12 +165,12 @@ function _vault_bootstrap_ha() {
 
   local root_token=$(jq -r '.root_token' "$jsonfile")
   local unseal_key=$(jq -r '.unseal_keys_b64[0]' "$jsonfile")
-  _kubectl -n "$ns" create secret generic vault-root \
+  _no_trace _kubectl -n "$ns" create secret generic vault-root \
      --from-literal=root_token="$root_token" \
      --from-literal=unseal_key="$unseal_key"
   # unseal all pods
   for pod in $(_kubectl --no-exit -n vault get pod -l 'app.kubernetes.io/name=vault,app.kubernetes.io/instance=vault' -o name); do
-     _kubectl -n "$ns" exec -i vault-0 -- \
+     _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
         sh -lc "vault operator unseal $unseal_key" >/dev/null 2>&1
      _info "[vault] unsealed $pod"
   done
@@ -218,9 +218,9 @@ function _is_vault_health() {
 function _vault_policy_exists() {
   local ns="${1:-$VAULT_NS_DEFAULT}" name="${2:-eso-app}"
 
-  local VAULT_TOKEN="$(_kubectl --no-exit -n "$ns" get secret vault-root \
+  local VAULT_TOKEN="$(_no_trace _kubectl --no-exit -n "$ns" get secret vault-root \
      -o jsonpath='{.data.root_token}' | base64 -d)"
-  local rc=$(_kubectl --no-exit -n "$ns" exec -i vault-0 -- \
+  local rc=$(_no_trace _no_trace _kubectl --no-exit -n "$ns" exec -i vault-0 -- \
     env VAULT_TOKEN="$VAULT_TOKEN" POL="$name" \
     sh -lc "vault policy read $POL >/dev/null" 2>&1)
 
@@ -236,7 +236,7 @@ function _enable_kv2_k8s_auth() {
   local eso_sa="${3:-external-secrets}"
   local eso_ns="${4:-external-secrets}"
 
-  if _vault_policy_exists "$ns" "eso-app"; then
+  if _no_trace _vault_policy_exists "$ns" "eso-app"; then
      _info "[vault] policy 'eso-app' already exists, skipping k8s auth setup"
      return 0
   fi
@@ -246,7 +246,7 @@ function _enable_kv2_k8s_auth() {
      -o jsonpath='{.data.root_token}' | base64 -d)"
 
   # kubernetes auth so no token stored in k8s
-  cat <<'SH' | _kubectl -n "$ns" exec -i vault-0 -- \
+  cat <<'SH' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
     env VAULT_TOKEN="$VAULT_TOKEN" sh -
 set -e
 vault secrets enable -path=secret kv-v2 || true
@@ -259,7 +259,7 @@ vault write auth/kubernetes/config \
 SH
 
   # create a policy
-  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- \
+  cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
     env VAULT_TOKEN="$VAULT_TOKEN" \
     vault policy write eso-app -
 path "secret/data/eso"     { capabilities = ["create","read","update","delete","list"] }
@@ -267,7 +267,7 @@ path "secret/metadata/eso" { capabilities = ["list"] }
 HCL
 
   # map ESO service account to the policy
-  _kubectl -n "$ns" exec -i vault-0 -- \
+  _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
     env VAULT_TOKEN="$VAULT_TOKEN" \
     vault write auth/kubernetes/role/eso-app \
       bound_service_account_names="$eso_sa" \
