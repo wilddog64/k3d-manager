@@ -216,7 +216,7 @@ function _is_vault_health() {
 }
 
 function _vault_policy_exists() {
-  local ns="${1:-$VAULT_NS_DEFAULT}" name="${2:-eso-app}"
+  local ns="${1:-$VAULT_NS_DEFAULT}" name="${2:-eso-reader}"
 
   local VAULT_TOKEN="$(_no_trace _kubectl --no-exit -n "$ns" get secret vault-root \
      -o jsonpath='{.data.root_token}' | base64 -d)"
@@ -236,8 +236,8 @@ function _enable_kv2_k8s_auth() {
   local eso_sa="${3:-external-secrets}"
   local eso_ns="${4:-external-secrets}"
 
-  if _no_trace _vault_policy_exists "$ns" "eso-app"; then
-     _info "[vault] policy 'eso-app' already exists, skipping k8s auth setup"
+  if _no_trace _vault_policy_exists "$ns" "eso-reader"; then
+     _info "[vault] policy 'eso-reader' already exists, skipping k8s auth setup"
      return 0
   fi
 
@@ -258,20 +258,24 @@ vault write auth/kubernetes/config \
   kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 SH
 
-  # create a policy
+  # create a policy -- eso-reader
   cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
     env VAULT_TOKEN="$VAULT_TOKEN" \
-    vault policy write eso-app -
-path "secret/data/eso"     { capabilities = ["create","read","update","delete","list"] }
-path "secret/metadata/eso" { capabilities = ["list"] }
+    vault policy write eso-reader -
+     # file: eso-reader.hcl
+     # read any keys under eso/*
+     path "secret/data/eso/*"      { capabilities = ["read"] }
+     path "secret/metadata/eso"    { capabilities = ["list"] }
+     path "secret/metadata/eso/*"  { capabilities = ["read","list"] }
+
 HCL
 
   # map ESO service account to the policy
   _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
     env VAULT_TOKEN="$VAULT_TOKEN" \
-    vault write auth/kubernetes/role/eso-app \
+    vault write auth/kubernetes/role/eso-reader \
       bound_service_account_names="$eso_sa" \
       bound_service_account_namespaces="$eso_ns" \
-      policies=eso-app \
+      policies=eso-reader \
       ttl=1h
 }
