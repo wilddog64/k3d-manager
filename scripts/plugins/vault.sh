@@ -215,6 +215,20 @@ function _is_vault_health() {
   esac
 }
 
+function _vault_policy_exists() {
+  local ns="${1:-$VAULT_NS_DEFAULT}" name="${2:-eso-app}"
+
+  local VAULT_TOKEN="$(_kubectl --no-exit -n "$ns" get secret vault-root \
+     -o jsonpath='{.data.root_token}' | base64 -d)"
+  local rc=$(_kubectl --no-exit -n "$ns" exec -i vault-0 -- \
+    env VAULT_TOKEN="$VAULT_TOKEN" POL="$name" \
+    sh -lc "vault policy read $POL >/dev/null" 2>&1)
+
+  case "$rc" in
+    0) return 1 ;;  # exists
+    1) return 0 ;;  # does not exist
+  esac
+}
 
 function _enable_kv2_k8s_auth() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
@@ -222,8 +236,13 @@ function _enable_kv2_k8s_auth() {
   local eso_sa="${3:-external-secrets}"
   local eso_ns="${4:-external-secrets}"
 
+  if _vault_policy_exists "$ns" "eso-app"; then
+     _info "[vault] policy 'eso-app' already exists, skipping k8s auth setup"
+     return 0
+  fi
+
   # ↓ NEW: fetch root token once
-  local VAULT_TOKEN="$(_kubectl -n "$ns" get secret vault-root \
+  local VAULT_TOKEN="$(_kubectl --no-exit -n "$ns" get secret vault-root \
      -o jsonpath='{.data.root_token}' | base64 -d)"
 
   # kubernetes auth so no token stored in k8s
