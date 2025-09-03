@@ -166,8 +166,7 @@ function _vault_bootstrap_ha() {
   local root_token=$(jq -r '.root_token' "$jsonfile")
   local unseal_key=$(jq -r '.unseal_keys_b64[0]' "$jsonfile")
   _no_trace _kubectl -n "$ns" create secret generic vault-root \
-     --from-literal=root_token="$root_token" \
-     --from-literal=unseal_key="$unseal_key"
+     --from-literal=root_token="$root_token"
   # unseal all pods
   for pod in $(_kubectl --no-exit -n vault get pod -l 'app.kubernetes.io/name=vault,app.kubernetes.io/instance=vault' -o name); do
      _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
