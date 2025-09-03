@@ -217,16 +217,20 @@ function _is_vault_health() {
 function _vault_policy_exists() {
   local ns="${1:-$VAULT_NS_DEFAULT}" name="${2:-eso-reader}"
 
-  local VAULT_TOKEN="$(_no_trace _kubectl --no-exit -n "$ns" get secret vault-root \
+  local VAULT_TOKEN="$(_no_trace _kubectl --no-exit -n "$ns" \
+     get secret vault-root \
      -o jsonpath='{.data.root_token}' | base64 -d)"
-  local rc=$(_no_trace _no_trace _kubectl --no-exit -n "$ns" exec -i vault-0 -- \
-    env VAULT_TOKEN="$VAULT_TOKEN" POL="$name" \
-    sh -lc "vault policy read $POL >/dev/null" 2>&1)
+  _no_trace printf '%s\n' "$VAULT_TOKEN" | \
+     _no_trace _kubectl --no-exit -n "$ns" exec -i vault-0 -- \
+     sh -lc "VAULT_TOKEN=$VAULT_TOKEN vault policy list" | grep -q "^${name}\$"
+  unset VAULT_TOKEN
 
+  local rc=$?
   case "$rc" in
-    0) return 1 ;;  # exists
-    1) return 0 ;;  # does not exist
+     0)  (( rc=1 )) ;;  # exists
+     1) (( rc=0 )) ;;  # does not exist
   esac
+  return "$rc"
 }
 
 function _enable_kv2_k8s_auth() {
@@ -235,7 +239,7 @@ function _enable_kv2_k8s_auth() {
   local eso_sa="${3:-external-secrets}"
   local eso_ns="${4:-external-secrets}"
 
-  if _vault_policy_exists "$ns" "eso-reader"; then
+  if ! _vault_policy_exists "$ns" "eso-reader"; then
      _info "[vault] policy 'eso-reader' already exists, skipping k8s auth setup"
      return 0
   fi
