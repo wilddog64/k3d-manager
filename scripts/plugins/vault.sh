@@ -206,34 +206,44 @@ function _is_vault_health() {
   esac
 }
 
+
 function _enable_kv2_k8s_auth() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
-  local eso_sa="${3:-external-secrets}"          # ← optional: ESO SA name
-  local eso_ns="${4:-external-secrets}"          # ← optional: ESO SA namespace
+  local eso_sa="${3:-external-secrets}"
+  local eso_ns="${4:-external-secrets}"
+
+  # ↓ NEW: fetch root token once
+  local VAULT_TOKEN="$(_kubectl -n "$ns" get secret vault-root \
+     -o jsonpath='{.data.root_token}' | base64 -d)"
 
   # kubernetes auth so no token stored in k8s
-  cat <<'SH' | _kubectl -n "$ns" exec -i vault-0 -- sh -
+  cat <<'SH' | _kubectl -n "$ns" exec -i vault-0 -- \
+    env VAULT_TOKEN="$VAULT_TOKEN" sh -
 set -e
-vault secrets enable -path=secret kv-v2 || true                     # FIX: kv-v2
+vault secrets enable -path=secret kv-v2 || true
 vault auth enable kubernetes || true
 
 vault write auth/kubernetes/config \
   token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
   kubernetes_host="https://kubernetes.default.svc:443" \
-  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt   # FIX: .crt
+  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 SH
 
   # create a policy
-  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- vault policy write eso-app -
-path "secret/data/eso/*"     { capabilities = ["create","read","update","delete","list"] }
-path "secret/metadata/eso/*" { capabilities = ["list"] }
+  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- \
+    env VAULT_TOKEN="$VAULT_TOKEN" \
+    vault policy write eso-app -
+path "secret/data/eso"     { capabilities = ["create","read","update","delete","list"] }
+path "secret/metadata/eso" { capabilities = ["list"] }
 HCL
 
   # map ESO service account to the policy
-  _kubectl -n "$ns" exec -i vault-0 -- vault write auth/kubernetes/role/eso-app \
-    bound_service_account_names="${eso_sa}" \
-    bound_service_account_namespaces="${eso_ns}" \
-    policies=eso-app \
-    ttl=1h
+  _kubectl -n "$ns" exec -i vault-0 -- \
+    env VAULT_TOKEN="$VAULT_TOKEN" \
+    vault write auth/kubernetes/role/eso-app \
+      bound_service_account_names="$eso_sa" \
+      bound_service_account_namespaces="$eso_ns" \
+      policies=eso-app \
+      ttl=1h
 }
