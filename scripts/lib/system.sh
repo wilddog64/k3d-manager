@@ -546,3 +546,5 @@ function _failfast_off() {
 function _info() { printf 'INFO: %s\n' "$*" >&2; }
 function _warn() { printf 'WARN: %s\n' "$*" >&2; }
 function _err() { printf 'ERROR: %s\n' "$*" >&2; exit 127; }
+
+function _no_trace() { set +x; "$@"; local rc=$?; set -x; return $rc; }
