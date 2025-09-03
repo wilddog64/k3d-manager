@@ -1,4 +1,4 @@
-# k3d-manager — Updated README
+# k3d-manager
 
 This update adds:
 
