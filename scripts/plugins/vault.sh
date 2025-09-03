@@ -235,7 +235,7 @@ function _enable_kv2_k8s_auth() {
   local eso_sa="${3:-external-secrets}"
   local eso_ns="${4:-external-secrets}"
 
-  if _no_trace _vault_policy_exists "$ns" "eso-reader"; then
+  if _vault_policy_exists "$ns" "eso-reader"; then
      _info "[vault] policy 'eso-reader' already exists, skipping k8s auth setup"
      return 0
   fi
