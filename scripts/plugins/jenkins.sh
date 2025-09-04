@@ -1,9 +1,7 @@
-local bitwarden_lib="$PLUGINS_DIR/bitwarden.sh"
-
 function _create_jenkins_namespace() {
    jenkins_namespace="${1:-jenkins}"
    export namespace="${jenkins_namespace}"
-   jenkins_namespace_template="$(dirname $SOURCE)/etc/jenkins/jenkins-namespace.yaml.tmpl"
+   jenkins_namespace_template="$(dirname "$SOURCE")/etc/jenkins/jenkins-namespace.yaml.tmpl"
    if [[ ! -r "$jenkins_namespace_template" ]]; then
       echo "Jenkins namespace template file not found: $jenkins_namespace_template"
       exit 1
@@ -14,7 +12,7 @@ function _create_jenkins_namespace() {
    if [[ $(_kubectl get namespace "$jenkins_namespace" 2>&1 > /dev/null) == 0 ]]; then
       echo "Namespace $jenkins_namespace already exists, skip"
    else
-      _kubectl apply -f "$yamfile" 2>&1 > /dev/null
+      _kubectl apply -f "$yamfile" > /dev/null 2>&1
       echo "Namespace $jenkins_namespace created"
    fi
 
