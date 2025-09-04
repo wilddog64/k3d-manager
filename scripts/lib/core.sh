@@ -93,13 +93,9 @@ function create_k3d_cluster() {
 }
 
 function cleanup_on_success() {
-   file_to_cleanup=$1
-   echo "Cleaning up temporary files..."
-   if [[ $? == 0 ]]; then
-      rm -rf "$file_to_cleanup"
-   else
-      echo "Error occurred, not cleaning up $file_to_cleanup"
-   fi
+   local file_to_cleanup=$1
+   echo "Cleaning up temporary files... : $file_to_cleanup :"
+   rm -rf "$file_to_cleanup"
 }
 
 function configure_k3d_cluster_istio() {
