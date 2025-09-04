@@ -34,7 +34,6 @@ function _deploy_vault_ha() {
    local ns="${1:-$VAULT_NS_DEFAULT}"
    local release="${2:-$VAULT_RELEASE_DEFAULT}"
    local f="$(mktemp -t)"
-   trap 'cleanup_on_success "$f"' EXIT
 
    sc="${VAULT_SC:-local-path}"
    cat >"$f" <<YAML
@@ -57,6 +56,7 @@ YAML
    args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$f" --wait)
    [[ -n "$version" ]] && args+=("--version" "$version")
    _helm "${args[@]}"
+   trap 'cleanup_on_success "$f"' EXIT
 }
 
 function deploy_vault() {
@@ -222,6 +222,16 @@ function _enable_kv2_k8s_auth() {
   local eso_sa="${3:-external-secrets}"
   local eso_ns="${4:-external-secrets}"
 
+  _vault_set_eso_reader "$ns" "$release" "$eso_sa" "$eso_ns"
+  _vault_set_eso_writer "$ns" "$release" "$eso_sa" "$eso_ns"
+}
+
+function _vault_set_eso_reader() {
+  local ns="${1:-$VAULT_NS_DEFAULT}"
+  local release="${2:-$VAULT_RELEASE_DEFAULT}"
+  local eso_sa="${3:-external-secrets}"
+  local eso_ns="${4:-external-secrets}"
+
   if ! _vault_policy_exists "$ns" "eso-reader"; then
      _info "[vault] policy 'eso-reader' already exists, skipping k8s auth setup"
      return 0
@@ -264,4 +274,35 @@ HCL
       bound_service_account_namespaces="$eso_ns" \
       policies=eso-reader \
       ttl=1h
+}
+
+function _vault_set_eso_writer() {
+  local ns="${1:-$VAULT_NS_DEFAULT}"
+  local release="${2:-$VAULT_RELEASE_DEFAULT}"
+  local eso_sa="${3:-external-secrets}"
+  local eso_ns="${4:-external-secrets}"
+
+  if ! _vault_policy_exists "$ns" "eso-writer"; then
+     _info "[vault] policy 'eso-writer' already exists, skipping k8s auth setup"
+     return 0
+  fi
+
+  # create a policy -- eso-writer
+  cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
+    env VAULT_TOKEN="$VAULT_TOKEN" \
+    vault policy write eso-writer -
+     # file: eso-writer.hcl
+     path "secret/data/eso/*"      { capabilities = ["create","update","read"] }
+     path "secret/metadata/eso"    { capabilities = ["list"] }
+     path "secret/metadata/eso/*"  { capabilities = ["read","list"] }
+HCL
+
+  # map ESO service account to the policy
+  _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
+    env VAULT_TOKEN="$VAULT_TOKEN" \
+    vault write auth/kubernetes/role/eso-writer \
+      bound_service_account_names="$eso_sa" \
+      bound_service_account_namespaces="$eso_ns" \
+      policies=eso-writer \
+      ttl=30m
 }
