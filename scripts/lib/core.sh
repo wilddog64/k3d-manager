@@ -48,7 +48,7 @@ function install_istioctl() {
          echo "Failed to download istioctl"
          exit 1
       fi
-      _run_command --require-sudo cp -v "$istio_bin/istioctl" "${install_dir}/"
+      _run_command -- sudo cp -v "$istio_bin/istioctl" "${install_dir}/"
       popd
    fi
 
