@@ -1,9 +1,29 @@
 !_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
 !_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
-!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
-!_TAG_PROGRAM_NAME	Exuberant Ctags	//
-!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
-!_TAG_PROGRAM_VERSION	5.8	//
+!_TAG_OUTPUT_EXCMD	mixed	/number, pattern, mixed, or combineV2/
+!_TAG_OUTPUT_FILESEP	slash	/slash or backslash/
+!_TAG_OUTPUT_MODE	u-ctags	/u-ctags or e-ctags/
+!_TAG_PATTERN_LENGTH_LIMIT	96	/0 for no limit/
+!_TAG_PROC_CWD	/home/parallels/src/gitrepo/personal/k3d-manager/	//
+!_TAG_PROGRAM_AUTHOR	Universal Ctags Team	//
+!_TAG_PROGRAM_NAME	Universal Ctags	/Derived from Exuberant Ctags/
+!_TAG_PROGRAM_URL	https://ctags.io/	/official site/
+!_TAG_PROGRAM_VERSION	5.9.0	//
+Directory structure	README.md	/^## Directory structure$/;"	s	chapter:k3d-manager
+EOF	scripts/lib/test.sh	/^    _kubectl apply -f - -n istio-test <<EOF$/;"	h
+EOF	scripts/lib/test.sh	/^  cat <<EOF | _kubectl apply -f -$/;"	h
+EOF	scripts/plugins/bitwarden.sh	/^  cat <<EOF | _kubectl apply -f -$/;"	h
+EOF	scripts/plugins/vault.sh	/^   cat <<EOF$/;"	h
+HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \\$/;"	h
+How the system fits together (high level)	README.md	/^## How the system fits together (high level)$/;"	s	chapter:k3d-manager
+Private helpers	README.md	/^## Private helpers$/;"	s	chapter:k3d-manager
+Public functions	README.md	/^## Public functions$/;"	s	chapter:k3d-manager
+SH	scripts/plugins/vault.sh	/^  cat <<'SH' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \\$/;"	h
+Shell script security considerations	README.md	/^## Shell script security considerations$/;"	s	chapter:k3d-manager
+Writing a plugin	README.md	/^## Writing a plugin$/;"	s	chapter:k3d-manager
+YAML	scripts/plugins/jenkins.sh	/^  cat <<-YAML | kubectl apply -n "$ns" -f -$/;"	h
+YAML	scripts/plugins/vault.sh	/^   cat >"$f" <<'YAML'$/;"	h
+YAML	scripts/plugins/vault.sh	/^   cat >"$f" <<YAML$/;"	h
 _add_exit_trap	scripts/lib/system.sh	/^function _add_exit_trap() {$/;"	f
 _apply_clustersecretstore	scripts/plugins/azure.sh	/^function _apply_clustersecretstore() {$/;"	f
 _az	scripts/plugins/azure.sh	/^function _az() {$/;"	f
@@ -47,15 +67,16 @@ _install_redhat_docker	scripts/lib/system.sh	/^function _install_redhat_docker()
 _install_redhat_kubernetes_client	scripts/lib/system.sh	/^function _install_redhat_kubernetes_client() {$/;"	f
 _ip	scripts/lib/system.sh	/^function _ip() {$/;"	f
 _is_same_token	scripts/lib/system.sh	/^function _is_same_token() {$/;"	f
-_is_vault_deployed	scratch/vault.sh	/^function _is_vault_deployed() {$/;"	f
 _is_vault_deployed	scripts/plugins/vault.sh	/^function _is_vault_deployed() {$/;"	f
 _is_vault_health	scripts/plugins/vault.sh	/^function _is_vault_health() {$/;"	f
 _istioctl	scripts/lib/system.sh	/^function _istioctl() {$/;"	f
 _k3d	scripts/lib/system.sh	/^function _k3d() {$/;"	f
+_k3d_cluster_exist	scripts/lib/system.sh	/^function _k3d_cluster_exist() {$/;"	f
 _kill	scripts/lib/system.sh	/^function _kill() {$/;"	f
 _kubectl	scripts/lib/system.sh	/^function _kubectl() {$/;"	f
 _list_k3d_cluster	scripts/lib/system.sh	/^function _list_k3d_cluster() {$/;"	f
 _lookup_bw_access_token	scripts/plugins/bitwarden.sh	/^function _lookup_bw_access_token() {$/;"	f
+_no_trace	scripts/lib/system.sh	/^function _no_trace() {$/;"	f
 _remove_role_assignments_for	scripts/plugins/azure.sh	/^function _remove_role_assignments_for() {$/;"	f
 _run_command	scripts/lib/system.sh	/^_run_command() {$/;"	f
 _secret_tool	scripts/lib/system.sh	/^function _secret_tool() {$/;"	f
@@ -64,28 +85,13 @@ _sha256_12	scripts/lib/system.sh	/^function _sha256_12() {$/;"	f
 _try_load_function	scripts/lib/system.sh	/^function _try_load_function() {$/;"	f
 _try_load_plugin	scripts/lib/system.sh	/^function _try_load_plugin() {$/;"	f
 _update_k8s_secret	scripts/plugins/azure.sh	/^function _update_k8s_secret() {$/;"	f
-_vault_bootstrap	scratch/vault.sh	/^function _vault_bootstrap() {$/;"	f
 _vault_bootstrap_ha	scripts/plugins/vault.sh	/^function _vault_bootstrap_ha() {$/;"	f
-_vault_deploy_dev	scratch/vault.sh	/^function _vault_deploy_dev() {$/;"	f
-_vault_deploy_ha	scratch/vault.sh	/^function _vault_deploy_ha() {$/;"	f
-_vault_get_unseal_key	scratch/vault.sh	/^function _vault_get_unseal_key() {$/;"	f
-_vault_health_code_incluster	scratch/vault.sh	/^function _vault_health_code_incluster() {$/;"	f
-_vault_health_ok	scratch/vault.sh	/^function _vault_health_ok() {$/;"	f
-_vault_ns_ensure	scratch/vault.sh	/^function _vault_ns_ensure() {$/;"	f
 _vault_ns_ensure	scripts/plugins/vault.sh	/^function _vault_ns_ensure() {$/;"	f
-_vault_portforward_help	scratch/vault.sh	/^function _vault_portforward_help() {$/;"	f
+_vault_policy_exists	scripts/plugins/vault.sh	/^function _vault_policy_exists() {$/;"	f
 _vault_portforward_help	scripts/plugins/vault.sh	/^function _vault_portforward_help() {$/;"	f
-_vault_repo_setup	scratch/vault.sh	/^function _vault_repo_setup() {$/;"	f
 _vault_repo_setup	scripts/plugins/vault.sh	/^function _vault_repo_setup() {$/;"	f
-_vault_status_code	scratch/vault.sh	/^function _vault_status_code() {$/;"	f
-_vault_unseal_all	scratch/vault.sh	/^function _vault_unseal_all() {$/;"	f
-_vault_values_dev	scratch/vault.sh	/^function _vault_values_dev() {$/;"	f
 _vault_values_dev	scripts/plugins/vault.sh	/^function _vault_values_dev() {$/;"	f
-_vault_values_ha	scratch/vault.sh	/^function _vault_values_ha() {$/;"	f
 _vault_values_ha	scripts/plugins/vault.sh	/^function _vault_values_ha() {$/;"	f
-_vault_verify	scratch/vault.sh	/^function _vault_verify() {$/;"	f
-_vault_verify_health	scratch/vault.sh	/^function _vault_verify_health() {$/;"	f
-_vault_wait_ready	scratch/vault.sh	/^function _vault_wait_ready() {$/;"	f
 _vault_wait_ready	scripts/plugins/vault.sh	/^function _vault_wait_ready() {$/;"	f
 _verify_jenkins_secret	scripts/plugins/jenkins.sh	/^function _verify_jenkins_secret() {$/;"	f
 _warn	scripts/lib/system.sh	/^function _warn() { printf 'WARN: %s\\n' "$*" >&2; }$/;"	f
@@ -101,7 +107,6 @@ deploy_azure_eso	scripts/plugins/azure.sh	/^function deploy_azure_eso() {$/;"	f
 deploy_eso	scripts/plugins/eso.sh	/^function deploy_eso() {$/;"	f
 deploy_jenkins	scripts/plugins/jenkins.sh	/^function deploy_jenkins() {$/;"	f
 deploy_k3d_cluster	scripts/lib/core.sh	/^function deploy_k3d_cluster() {$/;"	f
-deploy_vault	scratch/vault.sh	/^function deploy_vault() {$/;"	f
 deploy_vault	scripts/plugins/vault.sh	/^function deploy_vault() {$/;"	f
 ensure_bws_secret	scripts/plugins/bitwarden.sh	/^function ensure_bws_secret() {$/;"	f
 eso_akv	scripts/plugins/azure.sh	/^function eso_akv() {$/;"	f
@@ -121,6 +126,9 @@ is_linux	scripts/lib/system.sh	/^function is_linux() {$/;"	f
 is_mac	scripts/lib/system.sh	/^function is_mac() {$/;"	f
 is_redhat_family	scripts/lib/system.sh	/^function is_redhat_family() {$/;"	f
 is_wsl	scripts/lib/system.sh	/^function is_wsl() {$/;"	f
+k3d-manager	README.md	/^# k3d-manager$/;"	c
+pre=	scripts/lib/system.sh	/^  local pre=() ;$/;"	f
+pre=	scripts/lib/system.sh	/^  local pre=()$/;"	f
 say_hello	scripts/plugins/hello.sh	/^function say_hello() {$/;"	f
 test_istio	scripts/lib/test.sh	/^function test_istio() {$/;"	f
 test_nfs_connectivity	scripts/lib/test.sh	/^function test_nfs_connectivity() {$/;"	f
