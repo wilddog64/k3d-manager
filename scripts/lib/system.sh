@@ -111,7 +111,7 @@ _ensure_secret_tool() {
 
 function _install_redhat_kubernetes_client() {
   if ! command_exist kubectl; then
-     _run_command --require-sudo dnf install -y kubernetes-client
+     _run_command -- sudo dnf install -y kubernetes-client
   fi
 }
 
@@ -139,18 +139,18 @@ function _install_debian_kubernetes_client() {
    # Download the Kubernetes signing key
    if [[ ! -e "/etc/apt/keyrings/kubernetes-apt-keyring.gpg" ]]; then
       curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key \
-         | _run_command --require-sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+         | _run_command -- sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
    fi
 
    # Add the Kubernetes apt repository
    echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" | \
-      _run_command --require-sudo tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
+      _run_command -- sudo tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
 
    # Update apt package index
-   _run_command --require-sudo apt-get update -y
+   _run_command -- sudo apt-get update -y
 
    # Install kubectl
-   _run_command --require-sudo apt-get install -y kubectl
+   _run_command -- sudo apt-get install -y kubectl
 
 }
 
@@ -181,7 +181,7 @@ function install_mac_helm() {
 }
 
 function install_redhat_helm() {
-  _run_command --require-sudo dnf install -y helm
+  _run_command -- sudo dnf install -y helm
 }
 
 function _install_helm() {
@@ -259,9 +259,9 @@ function _install_mac_docker() {
 function _install_debian_docker() {
   echo "Installing Docker on Debian/Ubuntu system..."
   # Update apt
-  _run_command --require-sudo apt-get update
+  _run_command -- sudo apt-get update
   # Install dependencies
-  _run_command --require-sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+  _run_command -- sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
   # Add Docker's GPG key
   if [[ ! -e "/usr/share/keyrings/docker-archive-keyring.gpg" ]]; then
      _curl -fsSL https://download.docker.com/linux/$(lsb_release -is \
@@ -271,33 +271,44 @@ function _install_debian_docker() {
   fi
   # Add Docker repository
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]') $(lsb_release -cs) stable" | \
-     _run_command --require-sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+     _run_command -- sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
   # Update package list
-  _run_command --require-sudo apt-get update
+  _run_command -- sudo apt-get update
   # Install Docker
-  _run_command --require-sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+  _run_command -- sudo apt-get install -y docker-ce docker-ce-cli containerd.io
   # Start and enable Docker
-  _run_command --require-sudo systemctl start docker
-  _run_command --require-sudo systemctl enable docker
+  _run_command -- sudo systemctl start docker
+  _run_command -- sudo systemctl enable docker
   # Add current user to docker group
-  _run_command --require-sudo usermod -aG docker $USER
+  _run_command -- sudo usermod -aG docker $USER
   echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
 }
 
 function _install_redhat_docker() {
   echo "Installing Docker on RHEL/Fedora/CentOS system..."
   # Install required packages
-  _run_command --require-sudo dnf install -y dnf-plugins-core
+  _run_command -- sudo dnf install -y dnf-plugins-core
   # Add Docker repository
-  _run_command --require-sudo dnf config-manager --addrepo https://download.docker.com/linux/fedora/docker-ce.repo
+  _run_command -- sudo dnf config-manager addrepo --overwrite \
+     --from-repofile https://download.docker.com/linux/fedora/docker-ce.repo
   # Install Docker
-  _run_command --require-sudo dnf install -y docker-ce docker-ce-cli containerd.io
+  _run_command -- sudo dnf install -y docker-ce docker-ce-cli containerd.io
   # Start and enable Docker
-  _run_command  --require-sudo systemctl start docker
-  _run_command  --require-sudo systemctl enable docker
+  _run_command  -- sudo systemctl start docker
+  _run_command  -- sudo systemctl enable docker
   # Add current user to docker group
-  _run_command  --require-sudo usermod -aG docker $USER
+  _run_command  -- sudo usermod -aG docker $USER
   echo "Docker instsudo alled successfully. You may need to log out and back in for group changes to take effect."
+}
+
+function _k3d_cluster_exist() {
+   local cluster_name=$1
+
+   if _run_command --no-exit -- k3d cluster list "$cluster_name" >/dev/null 2&>1 ; then
+      return 1
+   else
+      return 0
+   fi
 }
 
 function _create_k3d_cluster() {
@@ -499,16 +510,16 @@ function _ensure_cargo() {
    fi
 
    if is_debian_family ; then
-      _run_command --require-sudo apt-get update
-      _run_command --require-sudo apt-get install -y cargo
+      _run_command -- sudo apt-get update
+      _run_command -- sudo apt-get install -y cargo
    elif is_redhat_family ; then
-      _run_command --require-sudo dnf install -y cargo
+      _run_command -- sudo dnf install -y cargo
    elif is_wsl && grep -qi "debian" /etc/os-release &> /dev/null; then
-      _run_command --require-sudo apt-get update
-      _run_command --require-sudo apt-get install -y cargo
+      _run_command -- sudo apt-get update
+      _run_command -- sudo apt-get install -y cargo
    elif is_wsl && grep -qi "redhat" /etc/os-release &> /dev/null; then
-      _run_command --require-sudo apt-get update
-      _run_command --require-sudo apt-get install -y cargo
+      _run_command -- sudo apt-get update
+      _run_command -- sudo apt-get install -y cargo
    else
       echo "Cannot install cargo: unsupported OS or missing package manager" >&2
       exit 127
