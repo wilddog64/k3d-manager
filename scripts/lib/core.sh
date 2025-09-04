@@ -172,7 +172,9 @@ function deploy_k3d_cluster() {
    cluster_name="${1:-k3d-cluster}"
 
    install_k3d
-   create_k3d_cluster "$cluster_name"
+   if ! _k3d_cluster_exist "$cluster_name" ; then
+      create_k3d_cluster "$cluster_name"
+   fi
    configure_k3d_cluster_istio "$cluster_name"
    # install_smb_csi_driver
 }
