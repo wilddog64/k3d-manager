@@ -80,9 +80,9 @@ EOF
     # Verify that the Istio proxy has been injected
     echo "Checking for Istio sidecar..."
     if _kubectl get pod -n istio-test -l app=nginx-test -o jsonpath='{.items[0].spec.containers[*].name}' | grep -q istio-proxy; then
-        echo "✅ Istio sidecar injection is working!"
+        echo "Istio sidecar injection is working!"
     else
-        echo "❌ Istio sidecar was not injected! Check your Istio installation."
+        echo "Istio sidecar was not injected! Check your Istio installation."
         return 1
     fi
 
@@ -92,9 +92,9 @@ EOF
     PF_PID=$!
     sleep 3
     if _curl -s localhost:8888 | grep -q "Welcome to nginx"; then
-        echo "✅ Direct access to the pod is working!"
+        echo "Direct access to the pod is working!"
     else
-        echo "❌ Failed to access the pod directly"
+        echo "Failed to access the pod directly"
         exit -1
     fi
 
@@ -136,17 +136,17 @@ EOF
 
     # Verify Gateway creation
     if _kubectl get gateway -n istio-test test-gateway; then
-        echo "✅ Istio Gateway created successfully"
+        echo "Istio Gateway created successfully"
     else
-        echo "❌ Failed to create Istio Gateway"
+        echo "Failed to create Istio Gateway"
         exit -1
     fi
 
     # Verify VirtualService creation
     if _kubectl get virtualservice -n istio-test test-vs; then
-        echo "✅ Istio VirtualService created successfully"
+        echo "Istio VirtualService created successfully"
     else
-        echo "❌ Failed to create Istio VirtualService"
+        echo "Failed to create Istio VirtualService"
         exit -1
     fi
 
@@ -157,10 +157,10 @@ EOF
 
     echo "Making request through Istio Gateway..."
     if _curl -s localhost:8085 | grep -q "Welcome to nginx"; then
-        echo "✅ Request through Istio Gateway successful!"
-        echo "🎉 ISTIO IS WORKING CORRECTLY! 🎉"
+        echo "Request through Istio Gateway successful!"
+        echo "ISTIO IS WORKING CORRECTLY!"
     else
-        echo "❌ Failed to access through Istio Gateway"
+        echo "Failed to access through Istio Gateway"
         echo "Detailed response:"
         exit -1
     fi
