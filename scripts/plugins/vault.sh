@@ -224,6 +224,7 @@ function _enable_kv2_k8s_auth() {
 
   _vault_set_eso_reader "$ns" "$release" "$eso_sa" "$eso_ns"
   _vault_set_eso_writer "$ns" "$release" "$eso_sa" "$eso_ns"
+  _vault_set_eso_init_jenkins_writer "$ns" "$release" "$eso_sa" "$eso_ns"
 }
 
 function _vault_set_eso_reader() {
@@ -305,4 +306,35 @@ HCL
       bound_service_account_namespaces="$eso_ns" \
       policies=eso-writer \
       ttl=30m
+}
+
+function _vault_set_eso_init_jenkins_writer() {
+  local ns="${1:-$VAULT_NS_DEFAULT}"
+  local release="${2:-$VAULT_RELEASE_DEFAULT}"
+  local eso_sa="${3:-external-secrets}"
+  local eso_ns="${4:-external-secrets}"
+
+  if ! _vault_policy_exists "$ns" "eso-init-jenkins-writer"; then
+     _info "[vault] policy 'eso-writer' already exists, skipping k8s auth setup"
+     return 0
+  fi
+
+  # create a policy -- eso-writer
+  cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
+    env VAULT_TOKEN="$VAULT_TOKEN" \
+    vault policy write eso-init-jenkins-writer -
+     # file: eso-writer.hcl
+     path "secret/data/eso/jenkins-admin"     { capabilities = ["create","update","read"] }
+     path "secret/metadata/eso/jenkins-admin" { capabilities = ["read","list"] }
+
+HCL
+
+  # map ESO service account to the policy
+  _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
+    env VAULT_TOKEN="$VAULT_TOKEN" \
+    vault write auth/kubernetes/role/eso-writer \
+      bound_service_account_names="$eso_sa" \
+      bound_service_account_namespaces="$eso_ns" \
+      policies=eso-writer \
+      ttl=15m
 }
