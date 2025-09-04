@@ -74,10 +74,9 @@ function _verify_jenkins_secret() {
 
    if ! _is_same_token "$(_bw_lookup_secret "jenkins-admin-password" "jenkins" | _sha256_12 )" \
       "$k3d_jenkins_admin_passwd_sha"; then
-      echo "❌ Jenkins admin password in k3d does NOT match Bitwarden!" >&2
-      exit -1
+      _err "Jenkins admin password in k3d does NOT match Bitwarden!" >&2
    else
-      echo "✅ Jenkins admin password in k3d matches Bitwarden."
+      _info "Jenkins admin password in k3d matches Bitwarden."
    fi
 }
 
@@ -125,10 +124,9 @@ function _deploy_jenkins_image() {
       | _sha256_12 )"
 
    if ! is_same_token "$jenkins_admin_sha" "$k3d_jenkins_admin_sha"; then
-      echo "❌ Jenkins admin user in k3d does NOT match Bitwarden!" >&2
-      exit -1
+      _err "Jenkins admin user in k3d does NOT match Bitwarden!" >&2
    else
-      echo "✅ Jenkins admin user in k3d matches Bitwarden."
+      _info "Jenkins admin user in k3d matches Bitwarden."
    fi
 }
 
