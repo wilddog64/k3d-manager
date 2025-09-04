@@ -1,17 +1,5 @@
 local bitwarden_lib="$PLUGINS_DIR/bitwarden.sh"
 
-if [[ -f "$bitwarden_lib" ]]; then
-   source $PLUGINS_DIR/bitwarden.sh
-fi
-
-function eso_bw_get_jenkins_admin_user() {
-   _bw_lookup_secret "jenkins-admin" "jenkins"
-}
-
-function eso_bw_get_jenkins_admin_passwd() {
-   _bw_lookup_secret "jenkins-admin-password" "jenkins"
-}
-
 function _create_jenkins_namespace() {
    jenkins_namespace="${1:-jenkins}"
    export namespace="${jenkins_namespace}"
@@ -31,53 +19,6 @@ function _create_jenkins_namespace() {
    fi
 
    trap 'cleanup_on_success "$yamfile"' EXIT
-}
-
-function _create_eso_jenkins_secret() {
-  local ns="${1:-jenkins}"
-
-  cat <<-YAML | kubectl apply -n "$ns" -f -
-apiVersion: external-secrets.io/v1
-kind: ExternalSecret
-metadata:
-  name: jenkins-admin
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: bws-secretsmanager
-    kind: SecretStore
-  target:
-    name: jenkins-admin
-    creationPolicy: Merge
-  data:
-    - secretKey: admin
-      remoteRef:
-        key: "$(eso_bw_get_jenkins_admin_user)"
-    - secretKey: admin-password
-      remoteRef:
-        key: "$(eso_bw_get_jenkins_admin_passwd)"
-YAML
-
-   _verify_jenkins_secret "$jenkins_namespace"
-}
-
-function _verify_jenkins_secret() {
-   local ns="${1:-jenkins}"
-
-   if ! _is_same_token "$(_bw_lookup_secret "jenkins-admin" "jenkins" | _sha256_12 )" \
-      "$k3d_jenkins_admin_sha"; then
-      echo "❌ Jenkins admin user in k3d does NOT match Bitwarden!" >&2
-      exit -1
-   else
-      echo "✅ Jenkins admin user in k3d matches Bitwarden."
-   fi
-
-   if ! _is_same_token "$(_bw_lookup_secret "jenkins-admin-password" "jenkins" | _sha256_12 )" \
-      "$k3d_jenkins_admin_passwd_sha"; then
-      _err "Jenkins admin password in k3d does NOT match Bitwarden!" >&2
-   else
-      _info "Jenkins admin password in k3d matches Bitwarden."
-   fi
 }
 
 function _create_jenkins_pv_pvc() {
@@ -135,6 +76,5 @@ function deploy_jenkins() {
    jenkins_version="${2:-lts}"
 
    _create_jenkins_namespace "$jenkins_namespace"
-   _create_eso_jenkins_secret "$jenkins_namespace"
    _create_jenkins_pv_pvc "$jenkins_namespace"
 }
