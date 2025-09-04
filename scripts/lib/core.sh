@@ -62,7 +62,7 @@ function destroy_k3d_cluster() {
       exit 1
    fi
 
-   if ! _k3d_cluster_exist "$cluster_name" ; then
+   if _k3d_cluster_exist "$cluster_name" ; then
       _info "Cluster $cluster_name does not exist, skip"
       return 0
    fi

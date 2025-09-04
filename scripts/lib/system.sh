@@ -395,12 +395,17 @@ function _ip() {
 }
 
 function _k3d() {
-   if ! command_exist k3d ; then
-      echo "k3d is not installed. Please install it first."
-      exit 1
-   fi
-
-   _run_command --quiet --probe $HOME/.kube/config -- k3d cluster list >/dev/null 2>&1
+   local pre=()
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         --quiet|--prefer-sudo|--require-sudo|--no-exit) pre+=("$1");
+            shift;;
+         --) shift;
+            break;;
+         *)  break;;
+      esac
+   done
+   _run_command "${pre[@]}" -- k3d "$@"
 }
 
 function _try_load_plugin() {
