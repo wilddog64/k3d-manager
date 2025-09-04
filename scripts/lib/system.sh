@@ -306,7 +306,7 @@ function _create_k3d_cluster() {
    if is_mac ; then
      _run_command --quiet -- k3d cluster create --config "${cluster_yaml}"
    elif is_linux ; then
-     _run_command --require-sudo k3d cluster create --config "${cluster_yaml}"
+     _run_command k3d cluster create --config "${cluster_yaml}"
    fi
 }
 
