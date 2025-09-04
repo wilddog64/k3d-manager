@@ -30,23 +30,12 @@ function _vault_repo_setup() {
    _helm repo update >/dev/null 2>&1
 }
 
-# Produce a values file path for a mode (dev|ha); echoes the filename
-function _vault_values_dev() {
-   local f="$(mktemp -t)"; _cleanup_register "$f"
-   cat >"$f" <<'YAML'
-server:
-  dev:
-    enabled: true
-injector:
-  enabled: false
-csi:
-  enabled: false
-YAML
-echo "$f"
-}
+function _deploy_vault_ha() {
+   local ns="${1:-$VAULT_NS_DEFAULT}"
+   local release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local f="$(mktemp -t)"
+   trap 'cleanup_on_success "$f"' EXIT
 
-function _vault_values_ha() {
-   local f="$(mktemp -t)"; _cleanup_register "$f"
    sc="${VAULT_SC:-local-path}"
    cat >"$f" <<YAML
 server:
@@ -64,7 +53,10 @@ injector:
 csi:
   enabled: false
 YAML
-echo "$f"
+
+   args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$f" --wait)
+   [[ -n "$version" ]] && args+=("--version" "$version")
+   _helm "${args[@]}"
 }
 
 function deploy_vault() {
@@ -83,24 +75,7 @@ function deploy_vault() {
    _vault_ns_ensure "$ns"
    _vault_repo_setup
 
-   if [[ "$mode" != "dev" && "$mode" != "ha" ]]; then
-      echo "[vault] unknown mode '$mode'" >&2
-      exit 127
-   fi
-
-   if ! declare -F "_vault_values_${mode}" >/dev/null 2>&1; then
-      echo "[vault] unknown mode '$mode'" >&2
-      exit 127
-   fi
-
-   values="$(_vault_values_"${mode}")"
-   if [[ -z "$values" || ! -f "$values" ]]; then
-      _err "[vault] cannot create values for mode '$mode'"
-   fi
-
-   args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$values" --wait)
-   [[ -n "$version" ]] && args+=("--version" "$version")
-   _helm "${args[@]}"
+   _deploy_vault_ha "$ns" "$release"
 
    _vault_bootstrap_ha "$ns" "$release"
    _enable_kv2_k8s_auth "$ns" "$release"
@@ -214,16 +189,24 @@ function _is_vault_health() {
   esac
 }
 
-function _vault_policy_exists() {
-  local ns="${1:-$VAULT_NS_DEFAULT}" name="${2:-eso-reader}"
+function _vault_exec() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" cmd="${2:-sh}" name="$3"
 
-  # this long pipe to check policy exist seems to be complicated but is to 
+
+  # this long pipe to check policy exist seems to be complicated but is to
   # prevent vault login output to leak to user and hide sensitive info from being
   # shown in the xtrace when that is turned on
    _kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.root_token}' | \
       base64 -d | \
      _kubectl --no-exit -n "$ns" exec -i vault-0 -- \
-     sh -lc "vault login - >/dev/null 2>&1 ; vault policy list" | grep -q "^${name}\$"
+     sh -lc "vault login - >/dev/null 2>&1 ; $cmd" | grep -q "^${name}\$"
+}
+
+function _vault_policy_exists() {
+  local ns="${1:-$VAULT_NS_DEFAULT}" name="${2:-eso-reader}"
+
+  #
+  _vault_exec "$ns" "vault policy list" "$name"
 
   local rc=$?
   case "$rc" in
