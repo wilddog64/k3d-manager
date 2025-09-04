@@ -54,6 +54,23 @@ function install_istioctl() {
 
 }
 
+function destroy_k3d_cluster() {
+   cluster_name=$1
+
+   if [[ -z "$cluster_name" ]]; then
+      echo "Cluster name is required"
+      exit 1
+   fi
+
+   if ! _k3d_cluster_exist "$cluster_name" ; then
+      _info "Cluster $cluster_name does not exist, skip"
+      return 0
+   fi
+
+   _info "Deleting k3d cluster: $cluster_name"
+   _k3d cluster delete "$cluster_name"
+}
+
 function create_k3d_cluster() {
    cluster_name=$1
 
