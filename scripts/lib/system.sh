@@ -10,7 +10,7 @@ function command_exist() {
 # - --              : end of options; after this comes <prog> and its args
 #
 # Returns the command's real exit code; prints a helpful error unless --quiet.
-_run_command() {
+function _run_command() {
   local quiet=0 prefer_sudo=0 require_sudo=0 probe= soft=0
 
   while [[ $# -gt 0 ]]; do
@@ -168,7 +168,7 @@ function install_kubernetes_cli() {
    fi
 }
 
-function is_mac() {
+function _is_mac() {
    if [[ "$(uname -s)" == "Darwin" ]]; then
       return 0
    else
@@ -176,12 +176,24 @@ function is_mac() {
    fi
 }
 
-function install_mac_helm() {
+function _install_mac_helm() {
   _run_command --quiet -- brew install helm
 }
 
-function install_redhat_helm() {
+function _install_redhat_helm() {
   _run_command -- sudo dnf install -y helm
+}
+
+function _install_debian_helm() {
+   _run_command --quiet -- sudo apt-get
+   _run_command --quiet -- install gpg apt-transport-https
+   _run_command --quiet -- curl -fsSL https://baltocdn.com/helm/signing.asc | \
+      gpg --dearmor -o /usr/share/keyrings/helm.gpg | \
+      sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+   _run_command "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | \
+      sudo tee /etc/apt/sources.list.d/helm.list > /dev/null
+   _run_command --quiet -- sudo apt-get update
+   _run_command --quiet -- sudo apt-get install -y helm
 }
 
 function _install_helm() {
@@ -190,10 +202,18 @@ function _install_helm() {
     return 0
   fi
 
-  if is_mac; then
-    install_mac_helm
+  if _is_mac; then
+    _install_mac_helm
   elif is_redhat_family ; then
-    install_redhat_helm
+    _install_redhat_helm
+ elif is_debian_family ; then
+    _install_debian_helm
+ elif is_wsl ; then
+    if grep "debian" /etc/os-release &> /dev/null; then
+      _install_debian_helm
+    elif grep "redhat" /etc/os-release &> /dev/null; then
+       _install_redhat_helm
+    fi
   fi
 }
 
@@ -234,14 +254,14 @@ function install_colima() {
 
 function _install_mac_docker() {
 
-   if  ! command_exist docker && is_mac ; then
+   if  ! command_exist docker && _is_mac ; then
       echo docker does not exist, install it
       brew install docker
    else
       echo docker installed already
    fi
 
-   if is_mac; then
+   if _is_mac; then
       docker context use colima
       export DOCKER_HOST=unix:///Users/$USER/.colima/docker.sock
       colima start
@@ -314,7 +334,7 @@ function _k3d_cluster_exist() {
 function _create_k3d_cluster() {
    cluster_yaml=$1
 
-   if is_mac ; then
+   if _is_mac ; then
      _run_command --quiet -- k3d cluster create --config "${cluster_yaml}"
    elif is_linux ; then
      _run_command k3d cluster create --config "${cluster_yaml}"
@@ -387,7 +407,7 @@ function _kill() {
 }
 
 function _ip() {
-   if is_mac ; then
+   if _is_mac ; then
       ifconfig en0 | grep inet | awk '$1=="inet" {print $2}'
    else
       ip -4 route get 8.8.8.8 | perl -nle 'print $1 if /src (.*) uid/'
@@ -509,7 +529,7 @@ function _ensure_cargo() {
       return 0
    fi
 
-   if is_mac && command_exist brew ; then
+   if _is_mac && command_exist brew ; then
       brew install rust
       return 0
    fi
