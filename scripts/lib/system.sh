@@ -185,15 +185,23 @@ function _install_redhat_helm() {
 }
 
 function _install_debian_helm() {
-   _run_command --quiet -- sudo apt-get
-   _run_command --quiet -- install gpg apt-transport-https
-   _run_command --quiet -- curl -fsSL https://baltocdn.com/helm/signing.asc | \
-      gpg --dearmor -o /usr/share/keyrings/helm.gpg | \
-      sudo tee /usr/share/keyrings/helm.gpg > /dev/null
-   _run_command "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | \
-      sudo tee /etc/apt/sources.list.d/helm.list > /dev/null
-   _run_command --quiet -- sudo apt-get update
-   _run_command --quiet -- sudo apt-get install -y helm
+  # 1) Prereqs
+  _run_command -- sudo apt-get update
+  _run_command -- sudo apt-get install -y curl gpg apt-transport-https
+
+   # 2) Add Helm’s signing key (to /usr/share/keyrings)
+   _run_command -- curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | \
+      _run_command -- gpg --dearmor | \
+      _run_command -- sudo tee /usr/share/keyrings/helm.gpg >/dev/null
+
+   # 3) Add the Helm repo (with signed-by, required on 24.04)
+   echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | \
+   sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+
+   # 4) Install
+   _run_command sudo apt-get update
+   _run_command sudo apt-get install -y helm
+
 }
 
 function _install_helm() {
