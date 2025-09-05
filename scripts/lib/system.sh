@@ -225,7 +225,7 @@ function _install_helm() {
   fi
 }
 
-function is_linux() {
+function _is_linux() {
    if [[ "$(uname -s)" == "Linux" ]]; then
       return 0
    else
@@ -233,15 +233,15 @@ function is_linux() {
    fi
 }
 
-function is_redhat_family() {
+function _is_redhat_family() {
    [[ -f /etc/redhat-release ]] && return 0 || return 1
 }
 
-function is_debian_family() {
+function _is_debian_family() {
    [[ -f /etc/debian_version ]] && return 0 || return 1
 }
 
-function is_wsl() {
+function _is_wsl() {
    if [[ -n "$WSL_DISTRO_NAME" ]]; then
       return 0
    elif grep -Eqi "(Microsoft|WSL)" /proc/version &> /dev/null; then
@@ -344,7 +344,7 @@ function _create_k3d_cluster() {
 
    if _is_mac ; then
      _run_command --quiet -- k3d cluster create --config "${cluster_yaml}"
-   elif is_linux ; then
+   elif _is_linux ; then
      _run_command k3d cluster create --config "${cluster_yaml}"
    fi
 }
@@ -542,15 +542,15 @@ function _ensure_cargo() {
       return 0
    fi
 
-   if is_debian_family ; then
+   if _is_debian_family ; then
       _run_command -- sudo apt-get update
       _run_command -- sudo apt-get install -y cargo
-   elif is_redhat_family ; then
+   elif _is_redhat_family ; then
       _run_command -- sudo dnf install -y cargo
-   elif is_wsl && grep -qi "debian" /etc/os-release &> /dev/null; then
+   elif _is_wsl && grep -qi "debian" /etc/os-release &> /dev/null; then
       _run_command -- sudo apt-get update
       _run_command -- sudo apt-get install -y cargo
-   elif is_wsl && grep -qi "redhat" /etc/os-release &> /dev/null; then
+   elif _is_wsl && grep -qi "redhat" /etc/os-release &> /dev/null; then
       _run_command -- sudo apt-get update
       _run_command -- sudo apt-get install -y cargo
    else

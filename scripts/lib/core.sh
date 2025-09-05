@@ -1,9 +1,9 @@
 function install_docker() {
-   if is_mac; then
+   if _is_mac; then
       _install_mac_docker
-   elif is_debian_family; then
+   elif _is_debian_family; then
       _install_debian_docker
-   elif is_redhat_family ; then
+   elif _is_redhat_family ; then
       _install_redhat_docker
    else
       echo "Unsupported Linux distribution. Please install Docker manually."
@@ -146,7 +146,7 @@ function configure_k3d_cluster_istio() {
 
 
 function install_smb_csi_driver() {
-   if is_mac ; then
+   if _is_mac ; then
       echo "warning: SMB CSI driver is not supported on macOS"
       exit 0
    fi
@@ -163,7 +163,7 @@ function create_nfs_share() {
       return 0
    fi
 
-   if is_mac ; then
+   if _is_mac ; then
       echo "Creating NFS share on macOS"
       mkdir -p $HOME/k3d-nfs
       if ! grep "$HOME/k3d-nfs" /etc/exports 2>&1 > /dev/null; then
