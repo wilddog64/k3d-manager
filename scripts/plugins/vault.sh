@@ -190,7 +190,7 @@ function _is_vault_health() {
 }
 
 function _vault_exec() {
-   local ns="${1:-$VAULT_NS_DEFAULT}" cmd="${2:-sh}" name="$3"
+   local ns="${1:-$VAULT_NS_DEFAULT}" name="$3" cmd="${2:-sh}"
 
 
   # this long pipe to check policy exist seems to be complicated but is to
@@ -206,7 +206,7 @@ function _vault_policy_exists() {
   local ns="${1:-$VAULT_NS_DEFAULT}" name="${2:-eso-reader}"
 
   #
-  _vault_exec "$ns" "vault policy list" "$name"
+  _vault_exec "$ns" "$name" "vault policy list"
 
   local rc=$?
   case "$rc" in
