@@ -199,14 +199,14 @@ function _vault_exec() {
    _kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.root_token}' | \
       base64 -d | \
      _kubectl --no-exit -n "$ns" exec -i vault-0 -- \
-     sh -lc "vault login - >/dev/null 2>&1 ; $cmd" | grep -q "^${name}\$"
+     sh -lc "vault login - >/dev/null 2>&1 ; $cmd"
 }
 
 function _vault_policy_exists() {
   local ns="${1:-$VAULT_NS_DEFAULT}" name="${2:-eso-reader}"
 
   #
-  _vault_exec "$ns" "$name" "vault policy list"
+  _vault_exec "$ns" "vault policy list" | grep -q "^${name}\$"
 
   local rc=$?
   case "$rc" in
