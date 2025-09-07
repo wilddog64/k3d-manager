@@ -2,6 +2,7 @@ controller:
   podAnnotations:
     sidecar.istio.io/rewriteAppHTTPProbers: "true"
     proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
+    sidecar.istio.io/inject: "false"
   image:
     registery: docker.io
     repository: jenkins/jenkins
@@ -53,6 +54,7 @@ controller:
       port: 8080
     initialDelaySeconds: 90
     periodSeconds: 5
+    failureThreshold: 60
   JCasC:
     configScripts:
       01-security.yaml: |
