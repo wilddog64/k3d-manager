@@ -15,6 +15,7 @@ if [[ ! -f "$ESO_PLUGIN" ]]; then
    _err "[vault] missing required plugin: $ESO_PLUGIN" >&2
 fi
 
+# shellcheck disable=SC1090
 source "$ESO_PLUGIN"
 
 function _vault_ns_ensure() {
@@ -202,6 +203,14 @@ function _vault_exec() {
      sh -lc "vault login - >/dev/null 2>&1 ; $cmd"
 }
 
+function _vault_login() {
+   local ns="${1:-$VAULT_NS_DEFAULT}"
+   _kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.root_token}' | \
+      base64 -d | \
+     _kubectl --no-exit -n "$ns" exec -i vault-0 -- \
+     sh -lc "vault login - >/dev/null 2>&1"
+}
+
 function _vault_policy_exists() {
   local ns="${1:-$VAULT_NS_DEFAULT}" name="${2:-eso-reader}"
 
@@ -238,13 +247,10 @@ function _vault_set_eso_reader() {
      return 0
   fi
 
-  # ↓ NEW: fetch root token once
-  local VAULT_TOKEN="$(_kubectl --no-exit -n "$ns" get secret vault-root \
-     -o jsonpath='{.data.root_token}' | base64 -d)"
-
+  _vault_login "$ns"
   # kubernetes auth so no token stored in k8s
   cat <<'SH' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
-    env VAULT_TOKEN="$VAULT_TOKEN" sh -
+    sh -
 set -e
 vault secrets enable -path=secret kv-v2 || true
 vault auth enable kubernetes || true
@@ -256,8 +262,7 @@ vault write auth/kubernetes/config \
 SH
 
   # create a policy -- eso-reader
-  cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
-    env VAULT_TOKEN="$VAULT_TOKEN" \
+  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- \
     vault policy write eso-reader -
      # file: eso-reader.hcl
      # read any keys under eso/*
@@ -268,8 +273,7 @@ SH
 HCL
 
   # map ESO service account to the policy
-  _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
-    env VAULT_TOKEN="$VAULT_TOKEN" \
+  _kubectl -n "$ns" exec -i vault-0 -- \
     vault write auth/kubernetes/role/eso-reader \
       bound_service_account_names="$eso_sa" \
       bound_service_account_namespaces="$eso_ns" \
@@ -289,9 +293,8 @@ function _vault_set_eso_writer() {
   fi
 
   # create a policy -- eso-writer
-  cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
-    env VAULT_TOKEN="$VAULT_TOKEN" \
-    vault policy write eso-writer -
+  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- sh - \
+    vault policy write eso-writer
      # file: eso-writer.hcl
      path "secret/data/eso/*"      { capabilities = ["create","update","read"] }
      path "secret/metadata/eso"    { capabilities = ["list"] }
@@ -299,8 +302,8 @@ function _vault_set_eso_writer() {
 HCL
 
   # map ESO service account to the policy
-  _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
-    env VAULT_TOKEN="$VAULT_TOKEN" \
+  _kubectl -n "$ns" exec -i vault-0 -- \
+    sh - \
     vault write auth/kubernetes/role/eso-writer \
       bound_service_account_names="$eso_sa" \
       bound_service_account_namespaces="$eso_ns" \
@@ -320,8 +323,8 @@ function _vault_set_eso_init_jenkins_writer() {
   fi
 
   # create a policy -- eso-writer
+  _vault_login "$ns"
   cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
-    env VAULT_TOKEN="$VAULT_TOKEN" \
     vault policy write eso-init-jenkins-writer -
      # file: eso-writer.hcl
      path "secret/data/eso/jenkins-admin"     { capabilities = ["create","update","read"] }
@@ -330,8 +333,7 @@ function _vault_set_eso_init_jenkins_writer() {
 HCL
 
   # map ESO service account to the policy
-  _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
-    env VAULT_TOKEN="$VAULT_TOKEN" \
+  _kubectl -n "$ns" exec -i vault-0 -- \
     vault write auth/kubernetes/role/eso-writer \
       bound_service_account_names="$eso_sa" \
       bound_service_account_namespaces="$eso_ns" \
