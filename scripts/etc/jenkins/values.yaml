@@ -1,0 +1,69 @@
+controller:
+  image:
+    registery: docker.io
+    repository: jenkins/jenkins
+    tag: lts
+    pullPolicy: IfNotPresent
+  installPlugins:
+    - credentials
+    - job-dsl
+    - matrix-auth
+    - matrix-project
+    - metrics
+    - mina-sshd-api-common
+    - mina-sshd-api-core
+    - okhttp-api
+    - script-security
+    - ssh-credentials
+    - ssh-slaves
+    - sshd
+  extraEnvVars:
+    - name: JENKINS_ADMIN_USER
+      value: "admin"
+    - name: JENKINS_ADMIN_PASS
+      valueFrom: { secretKeyRef: { name: jenkins-admin, key: jenkins-admin-password } }
+    - name: JAVA_OPTS
+      value: "-Djenkins.install.runSetupWizard=false"
+  serviceAccount:
+    create: true
+    name: jenkins-admin
+  podSecurityContext:
+    fsGroup: 1000
+    runAsUser: 1000
+  persistence:
+    enabled: true
+    size: 20Gi
+  serviceType: ClusterIP
+  serviePort: 8081
+  targetPort: 8089
+  servicePortName: http
+  readinessProbe:
+    httpGet:
+      path: /login
+      port: 8080
+    initialDelaySeconds: 90
+    periodSeconds: 5
+    failureThreshold: 120s
+  livenessProbe:
+    httpGet:
+      path: /login
+      port: 8080
+    initialDelaySeconds: 90
+    periodSeconds: 5
+  JCasC:
+    configScripts:
+      01-security.yaml: |
+        jenkins:
+          securityRealm:
+            local:
+              allowsSignup: false
+              users:
+                - id: "${JENKINS_ADMIN_USER}"
+                  password: "${JENKINS_ADMIN_PASS}"
+          authorizationStrategy:
+            projectMatrix:
+              permissions:
+                - "Overall/Administer:${vault:secret/eso/jenkins-admin#uername}"
+                - "Overall/Read:authenticated"
+                - "Overall/Administer:${JENKINS_ADMIN_USER}"
+
