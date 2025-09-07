@@ -1,4 +1,7 @@
 controller:
+  podAnnotations:
+    sidecar.istio.io/rewriteAppHTTPProbers: "true"
+    proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
   image:
     registery: docker.io
     repository: jenkins/jenkins
