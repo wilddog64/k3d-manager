@@ -78,7 +78,6 @@ controller:
           authorizationStrategy:
             projectMatrix:
               permissions:
-                - "Overall/Administer:${vault:secret/eso/jenkins-admin#username}"
-                - "Overall/Read:authenticated"
+                - "Overall/Read:${JENKINS_ADMIN_USER}"
                 - "Overall/Administer:${JENKINS_ADMIN_USER}"
 
