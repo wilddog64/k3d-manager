@@ -27,7 +27,7 @@ controller:
     - name: JENKINS_ADMIN_USER
       value: "admin"
     - name: JENKINS_ADMIN_PASS
-      valueFrom: { secretKeyRef: { name: jenkins-admin, key: jenkins-admin-password } }
+      valueFrom: { secretKeyRef: { name: jenkins, key: jenkins-admin-password } }
     - name: JAVA_OPTS
       value: "-Djenkins.install.runSetupWizard=false"
     - name: JENKINS_OPTS
