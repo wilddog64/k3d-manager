@@ -3,13 +3,15 @@ controller:
     sidecar.istio.io/rewriteAppHTTPProbers: "true"
     proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
   image:
-    registery: docker.io
+    registry: docker.io
     repository: jenkins/jenkins
     tag: lts
     pullPolicy: IfNotPresent
   installPlugins:
+    - configuration-as-code
     - credentials
     - job-dsl
+    - kubernetes
     - matrix-auth
     - matrix-project
     - metrics
