@@ -23,7 +23,7 @@ controller:
     - ssh-credentials
     - ssh-slaves
     - sshd
-  extraEnvVars:
+  containerEnv:
     - name: JENKINS_ADMIN_USER
       value: "admin"
     - name: JENKINS_ADMIN_PASS
