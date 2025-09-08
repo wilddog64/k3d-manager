@@ -130,10 +130,6 @@ function _create_jenkins_admin_vault_policy() {
    rule "charset" { charset = "!@#$%^&*()-_=+[]{};:,.?" }
 HCL
 
-   # generate + store under KV v2 path: secret/eso/jenkins-admin
-   _kubectl -n "$vault_namespace" exec -i vault-0 -- vault write -field=password \
-      sys/policies/password/jenkins-admin/generate
-
    _kubectl -n "$vault_namespace" exec -i vault-0 -- sh - \
       vault kv put secret/eso/jenkins-admin \
       username=admin password="$(_kubectl -n "$vault_namespace" exec -i vault-0 -- \
