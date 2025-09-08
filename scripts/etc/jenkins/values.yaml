@@ -2,7 +2,6 @@ controller:
   podAnnotations:
     sidecar.istio.io/rewriteAppHTTPProbers: "true"
     proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
-    sidecar.istio.io/inject: "false"
   image:
     registery: docker.io
     repository: jenkins/jenkins
@@ -28,6 +27,8 @@ controller:
       valueFrom: { secretKeyRef: { name: jenkins-admin, key: jenkins-admin-password } }
     - name: JAVA_OPTS
       value: "-Djenkins.install.runSetupWizard=false"
+    - name: JENKINS_OPTS
+      value: "--httpPort=8080 --httpListenAddress=0.0.0.0"
   serviceAccount:
     create: true
     name: jenkins-admin
@@ -42,6 +43,11 @@ controller:
   targetPort: 8080
   containerPort: 8080
   servicePortName: http
+  startupProbe:
+    tcpSocket:
+      port: 8080
+    initialDelaySeconds: 90
+    periodSeconds: 5
   readinessProbe:
     httpGet:
       path: /login
