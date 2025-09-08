@@ -1,0 +1,18 @@
+# jenkins/virtualservice.yaml
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: jenkins
+  namespace: jenkins
+spec:
+  gateways:
+    - jenkins.dev.local.me                # must match existing Gateway name
+  hosts:
+    - jenkins.dev.local.me
+  http:
+    - match:
+        - uri: { prefix: "/" }
+      route:
+        - destination:
+            host: jenkins.jenkins.svc.cluster.local
+            port: { number: 8081 }          # Service port (→ pod :8080)
