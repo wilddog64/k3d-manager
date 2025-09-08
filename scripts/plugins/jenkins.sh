@@ -100,12 +100,12 @@ function _deploy_jenkins() {
       --namespace "$ns" \
       -f "$JENKINS_CONFIG_DIR/values.yaml"
 
-   cat "$JENKINS_CONFIG_DIR/virtualservice.yaml" | \
-      _kubectl apply -n "$ns" --dry-run=client -f - | \
+      _kubectl apply -n "$ns" --dry-run=client \
+         -f "$JENKINS_CONFIG_DIR/virtualservice.yaml" | \
       _kubectl apply -n "$ns" -f -
 
-   cat "$JENKINS_CONFIG_DIR/destinationrule.yaml" | \
-      _kubectl apply -n "$ns" --dry-run=client -f - | \
+      _kubectl apply -n "$ns" --dry-run=client \
+         -f "$JENKINS_CONFIG_DIR/destinationrule.yaml" | \
       _kubectl apply -n "$ns" -f -
 }
 

@@ -10,6 +10,7 @@ controller:
   installPlugins:
     - configuration-as-code
     - credentials
+    - hashicorp-vault-plugin
     - job-dsl
     - kubernetes
     - matrix-auth
