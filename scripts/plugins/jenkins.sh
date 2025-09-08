@@ -94,7 +94,9 @@ function deploy_jenkins() {
 function _deploy_jenkins() {
    local ns="${1:-jenkins}"
 
-   _helm repo add jenkins https://charts.jenkins.io
+   if ! _helm repo list | grep -q jenkins >/dev/null 2>&1; then
+     _helm repo add jenkins https://charts.jenkins.io
+   fi
    _helm repo update
    _helm upgrade --install jenkins jenkins/jenkins \
       --namespace "$ns" \
