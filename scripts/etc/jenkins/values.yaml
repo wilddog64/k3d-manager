@@ -9,12 +9,6 @@ controller:
     pullPolicy: IfNotPresent
   installPlugins:
     - active-directory
-    - ant
-    - blueocean-commons
-    - blueocean-core-js
-    - blueocean-dashboard
-    - blueocean-rest
-    - blueocean-web
     - configuration-as-code
     - credentials
     - git
