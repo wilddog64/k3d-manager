@@ -8,6 +8,7 @@ controller:
     tag: lts
     pullPolicy: IfNotPresent
   installPlugins:
+    - active-directory
     - ant
     - blueocean-commons
     - blueocean-core-js
