@@ -27,6 +27,24 @@ controller:
     - mina-sshd-api-common
     - mina-sshd-api-core
     - okhttp-api
+    - parameterized-trigger
+    - pipeline-build-step
+    - pipeline-github-lib
+    - pipeline-graph-analysis
+    - pipeline-graph-view
+    - pipeline-groovy-lib
+    - pipeline-input-step
+    - pipeline-milestone-step
+    - pipeline-model-api
+    - pipeline-model-definition
+    - pipeline-model-extensions
+    - pipeline-rest-api
+    - pipeline-stage-step
+    - pipeline-stage-tags-metadata
+    - pipeline-stage-view
+    - pipeline-utility-steps
+    - plain-credentials
+    - plugin-util-api
     - script-security
     - ssh-credentials
     - ssh-slaves
