@@ -8,6 +8,12 @@ controller:
     tag: lts
     pullPolicy: IfNotPresent
   installPlugins:
+    - ant
+    - blueocean-commons
+    - blueocean-core-js
+    - blueocean-dashboard
+    - blueocean-rest
+    - blueocean-web
     - configuration-as-code
     - credentials
     - hashicorp-vault-plugin
