@@ -16,6 +16,7 @@ controller:
     - blueocean-web
     - configuration-as-code
     - credentials
+    - git
     - hashicorp-vault-plugin
     - job-dsl
     - kubernetes
