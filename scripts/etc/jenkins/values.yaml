@@ -77,7 +77,7 @@ controller:
     failureThreshold: 60
   JCasC:
     configScripts:
-      01-security.yaml: |
+      01-security: |
         jenkins:
           securityRealm:
             local:
