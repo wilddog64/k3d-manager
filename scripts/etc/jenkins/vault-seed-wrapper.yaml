@@ -1,0 +1,106 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-seed-writer
+  namespace: jenkins
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-seed-scripts
+  namespace: jenkins
+data:
+  common.sh: |
+    #!/usr/bin/env sh
+    set -euo pipefail
+    : "${VAULT_ADDR:?VAULT_ADDR required}"
+    : "${ROLE:?ROLE required}"
+    export VAULT_FORMAT=json
+    if [ "${VAULT_SKIP_VERIFY:-false}" = "true" ]; then export VAULT_SKIP_VERIFY=true; fi
+    k8s_login() {
+      JWT="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+      export VAULT_TOKEN="$(vault write -format=json auth/kubernetes/login role="$ROLE" jwt="$JWT" | jq -r .auth.client_token)"
+      [ -n "$VAULT_TOKEN" ] && [ "$VAULT_TOKEN" != "null" ] || { echo "Vault login failed" >&2; exit 1; }
+    }
+  seed.sh: |
+    #!/usr/bin/env sh
+    set -euo pipefail
+    . /scripts/common.sh
+    : "${SECRET_PATH:?SECRET_PATH required}"  # e.g. secret/jenkins/ad-ldap
+    if [ -n "${WRAP_TOKEN:-}" ]; then
+      # Optional: response-wrapped JSON {username,password}
+      JSON="$(vault write -format=json sys/wrapping/unwrap token="$WRAP_TOKEN")"
+      USERNAME="$(echo "$JSON" | jq -r '.data.username')"
+      PASSWORD="$(echo "$JSON" | jq -r '.data.password')"
+    else
+      : "${USERNAME:?USERNAME required}"
+      : "${PASSWORD:?PASSWORD required}"
+    fi
+    echo "[seed] Login to Vault"
+    k8s_login
+    echo "[seed] Writing ${SECRET_PATH}"
+    vault kv put "${SECRET_PATH}" username="${USERNAME}" password="${PASSWORD}"
+    echo "[seed] Version:"
+    vault kv get -format=json "${SECRET_PATH}" | jq -r '.metadata | "version=\(.version) created=\(.created_time)"'
+  purge.sh: |
+    #!/usr/bin/env sh
+    set -euo pipefail
+    . /scripts/common.sh
+    : "${SECRET_PATH:?SECRET_PATH required}"
+    echo "[purge] Login to Vault"
+    k8s_login
+    if [ "${PURGE_ALL:-false}" = "true" ]; then
+      echo "[purge] HARD delete metadata ${SECRET_PATH}"
+      vault kv metadata delete "${SECRET_PATH}"
+    else
+      echo "[purge] Soft delete latest version ${SECRET_PATH}"
+      vault kv delete "${SECRET_PATH}"
+    fi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-ad-wrapper
+  namespace: jenkins
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 600
+  template:
+    spec:
+      serviceAccountName: jenkins-seed-writer
+      restartPolicy: Never
+      containers:
+        - name: runner
+          image: hashicorp/vault:1.17
+          env:
+            - name: ACTION
+              value: "apply"  # apply (seed/rotate) or delete
+            - name: VAULT_ADDR
+              value: "https://vault.vault.svc:8200"
+            - name: ROLE
+              value: "jenkins-jcasc-writer"
+            - name: SECRET_PATH
+              value: "secret/jenkins/ad-ldap"  # default; override when creating from this template
+            - name: VAULT_SKIP_VERIFY
+              value: "false"
+            # Optional inputs (for ACTION=apply); override per run:
+            - name: USERNAME
+              value: ""
+            - name: PASSWORD
+              value: ""
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+          command: ["/bin/sh","-lc"]
+          args: |
+            set -e
+            chmod +x /scripts/*.sh
+            if [ "${ACTION}" = "apply" ]; then /scripts/seed.sh
+            elif [ "${ACTION}" = "delete" ]; then /scripts/purge.sh
+            else echo "Unknown ACTION=${ACTION}"; exit 2; fi
+      volumes:
+        - name: scripts
+          configMap:
+            name: vault-seed-scripts
+            defaultMode: 0755
