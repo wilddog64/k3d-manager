@@ -9,6 +9,7 @@ controller:
     pullPolicy: IfNotPresent
   installPlugins:
     - active-directory
+    - build-pipeline-plugin
     - configuration-as-code
     - credentials
     - git
@@ -22,8 +23,8 @@ controller:
     - mina-sshd-api-core
     - okhttp-api
     - parameterized-trigger
-    - pipeline
-    - pipeline-multi-branch
+    - workflow-aggregator
+    - workflow-multibranch
     - pipeline-build-step
     - pipeline-stage-view
     - pipeline-utility-steps
