@@ -87,7 +87,7 @@ function deploy_jenkins() {
 
    deploy_vault ha
    _create_jenkins_admin_vault_policy "vault"
-   _create_jenkins_
+   _create_jenkins_vault_ad_policy "vault" "$jenkins_namespace"
    _create_jenkins_namespace "$jenkins_namespace"
    _deploy_jenkins "$jenkins_namespace"
 }
