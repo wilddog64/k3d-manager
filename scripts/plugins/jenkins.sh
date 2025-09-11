@@ -19,7 +19,7 @@ function _create_jenkins_namespace() {
       echo "Jenkins namespace template file not found: $jenkins_namespace_template"
       exit 1
    fi
-   local yamfile=$(mktemp -t)
+   # shellcheck disable=SC
    envsubst < "$jenkins_namespace_template" > "$yamfile"
 
    if [[ $(_kubectl get namespace "$jenkins_namespace" 2>&1 > /dev/null) == 0 ]]; then
@@ -46,14 +46,6 @@ function _create_jenkins_pv_pvc() {
    if [[ ! -d "$JENKINS_HOME_PATH" ]]; then
       echo "Creating Jenkins home directory at $JENKINS_HOME_PATH"
       mkdir -p "$JENKINS_HOME_PATH"
-   fi
-
-   jenkins_plugins="$SCRIPT_DIR/etc/jenkins/jenkins-plugins.txt"
-   if [[ ! -r "$jenkins_plugins" ]]; then
-      echo "Jenkins plugins file not found: $jenkins_plugins"
-      exit 1
-   else
-      cp -v "${jenkins_plugins}" "$JENKINS_HOME_PATH"
    fi
 
    jenkins_pv_template="$(dirname $SOURCE)/etc/jenkins/jenkins-home-pv.yaml.tmpl"

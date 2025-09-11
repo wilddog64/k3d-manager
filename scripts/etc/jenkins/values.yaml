@@ -50,7 +50,7 @@ controller:
     runAsUser: 1000
   persistence:
     enabled: true
-    size: 20Gi
+    existingClaim: jenkins-home
   serviceType: ClusterIP
   servicePort: 8081
   targetPort: 8080
