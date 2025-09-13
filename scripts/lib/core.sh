@@ -99,14 +99,14 @@ function create_k3d_cluster() {
    yamlfile=$(mktemp -t)
    envsubst < "$cluster_template" > "$yamlfile"
 
+   trap 'cleanup_on_success "$yamlfile"' EXIT
 
    if _list_k3d_cluster | grep -q "$cluster_name"; then
       echo "Cluster $cluster_name already exists, skip"
+      return 0
    fi
 
    _create_k3d_cluster "$yamlfile"
-
-   trap 'cleanup_on_success "$yamlfile"' EXIT
 }
 
 function cleanup_on_success() {
