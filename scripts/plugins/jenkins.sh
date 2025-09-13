@@ -94,13 +94,24 @@ function _deploy_jenkins() {
       --namespace "$ns" \
       -f "$JENKINS_CONFIG_DIR/values.yaml"
 
-      _kubectl apply -n "$ns" --dry-run=client \
-         -f "$JENKINS_CONFIG_DIR/virtualservice.yaml" | \
-      _kubectl apply -n "$ns" -f -
+   # Ensure Istio resources are of the expected kind to avoid name collisions
+   if ! grep -q '^kind: VirtualService' "$JENKINS_CONFIG_DIR/virtualservice.yaml"; then
+      echo "virtualservice.yaml is not a VirtualService" >&2
+      return 1
+   fi
 
-      _kubectl apply -n "$ns" --dry-run=client \
-         -f "$JENKINS_CONFIG_DIR/destinationrule.yaml" | \
-      _kubectl apply -n "$ns" -f -
+   if ! grep -q '^kind: DestinationRule' "$JENKINS_CONFIG_DIR/destinationrule.yaml"; then
+      echo "destinationrule.yaml is not a DestinationRule" >&2
+      return 1
+   fi
+
+   _kubectl apply -n "$ns" --dry-run=client \
+      -f "$JENKINS_CONFIG_DIR/virtualservice.yaml" | \
+   _kubectl apply -n "$ns" -f -
+
+   _kubectl apply -n "$ns" --dry-run=client \
+      -f "$JENKINS_CONFIG_DIR/destinationrule.yaml" | \
+   _kubectl apply -n "$ns" -f -
 }
 
 function _create_jenkins_admin_vault_policy() {

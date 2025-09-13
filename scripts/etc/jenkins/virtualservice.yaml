@@ -6,7 +6,7 @@ metadata:
   namespace: jenkins
 spec:
   gateways:
-    - jenkins.dev.local.me                # must match existing Gateway name
+    - istio-system/ingress-gateway
   hosts:
     - jenkins.dev.local.me
   http:

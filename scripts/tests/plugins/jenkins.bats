@@ -43,3 +43,22 @@ setup() {
   [ "${calls[0]}" = "_create_jenkins_namespace" ]
   [ "${calls[1]}" = "_deploy_jenkins" ]
 }
+
+@test "VirtualService uses Istio ingress gateway" {
+  run grep -q 'istio-system/ingress-gateway' "$SCRIPT_DIR/etc/jenkins/virtualservice.yaml"
+  [ "$status" -eq 0 ]
+}
+
+@test "_deploy_jenkins applies Istio resources" {
+  run _deploy_jenkins sample-ns
+  [ "$status" -eq 0 ]
+  mapfile -t kubectl_calls < "$KUBECTL_LOG"
+  expected_vs="apply -n sample-ns --dry-run=client -f $SCRIPT_DIR/etc/jenkins/virtualservice.yaml"
+  expected_vs_apply="apply -n sample-ns -f -"
+  expected_dr="apply -n sample-ns --dry-run=client -f $SCRIPT_DIR/etc/jenkins/destinationrule.yaml"
+  expected_dr_apply="apply -n sample-ns -f -"
+  [ "${kubectl_calls[0]}" = "$expected_vs" ]
+  [ "${kubectl_calls[1]}" = "$expected_vs_apply" ]
+  [ "${kubectl_calls[2]}" = "$expected_dr" ]
+  [ "${kubectl_calls[3]}" = "$expected_dr_apply" ]
+}
