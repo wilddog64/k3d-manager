@@ -90,7 +90,7 @@ function _run_command() {
 
 _ensure_secret_tool() {
   command_exist secret-tool && return 0
-  is_linux || return 1
+  _is_linux || return 1
 
   if command_exist apt-get ; then
     _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update
@@ -212,11 +212,11 @@ function _install_helm() {
 
   if _is_mac; then
     _install_mac_helm
-  elif is_redhat_family ; then
+  elif _is_redhat_family ; then
     _install_redhat_helm
- elif is_debian_family ; then
+  elif _is_debian_family ; then
     _install_debian_helm
- elif is_wsl ; then
+  elif _is_wsl ; then
     if grep "debian" /etc/os-release &> /dev/null; then
       _install_debian_helm
     elif grep "redhat" /etc/os-release &> /dev/null; then
