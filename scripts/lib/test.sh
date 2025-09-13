@@ -95,7 +95,7 @@ EOF
         echo "Direct access to the pod is working!"
     else
         echo "Failed to access the pod directly"
-        exit -1
+        return 1
     fi
 
     # Create Istio Gateway and VirtualService
@@ -139,7 +139,7 @@ EOF
         echo "Istio Gateway created successfully"
     else
         echo "Failed to create Istio Gateway"
-        exit -1
+        return 1
     fi
 
     # Verify VirtualService creation
@@ -147,7 +147,7 @@ EOF
         echo "Istio VirtualService created successfully"
     else
         echo "Failed to create Istio VirtualService"
-        exit -1
+        return 1
     fi
 
     # Test through Istio gateway
@@ -162,7 +162,7 @@ EOF
     else
         echo "Failed to access through Istio Gateway"
         echo "Detailed response:"
-        exit -1
+        return 1
     fi
 
     echo "For a more complete test, you could try accessing the Istio ingress gateway's external IP:"
