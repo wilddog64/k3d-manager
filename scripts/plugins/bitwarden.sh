@@ -26,9 +26,9 @@ function _bw_lookup_secret(){
    local service="$2"
 
    local token
-   if is_mac ; then
+   if _is_mac ; then
       token=$(_security find-generic-password -a "$account" -s "$service" -w)
-   elif is_linux ; then
+   elif _is_linux ; then
       token=$(_secret_tool lookup service "$service" account "$account")
    fi
 
@@ -131,10 +131,10 @@ function verify_bws_token() {
    local bws_token_sha=$(_get_bw_access_token | _sha256_12 )
    local k3d_bws_sha=$(_kubectl -n "$ns" get secret bws-access-token \
       -o jsonpath='{.data.token}' | base64 --decode | _sha256_12)
-   if ! _is_same_token "$bws_token_sha" "$k3d_bws_token"; then
-      echo "❌ Bitwarden token in k3d does NOT match local token!" >&2
+   if ! _is_same_token "$bws_token_sha" "$k3d_bws_sha"; then
+      echo "Bitwarden token in k3d does NOT match local token!" >&2
       exit -1
    else
-      echo "✅ Bitwarden token in k3d matches local token."
+      echo "Bitwarden token in k3d matches local token."
    fi
 }
