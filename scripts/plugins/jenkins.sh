@@ -25,7 +25,7 @@ function _create_jenkins_namespace() {
       echo "Namespace $jenkins_namespace created"
    fi
 
-   trap 'cleanup_on_success "$yamlfile"' EXIT
+   trap 'cleanup_on_success "$yamlfile"' RETURN
 }
 
 function _create_jenkins_pv_pvc() {
