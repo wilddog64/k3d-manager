@@ -1,15 +1,22 @@
 # k3d-manager
 
-Utility scripts for creating a local [k3d](https://k3d.io/) Kubernetes cluster with Istio and related tools.  The entrypoint is `./scripts/k3d-manager`, which dispatches functions defined in the library and plugin files.
+Utility scripts for creating and managing a local [k3d](https://k3d.io/) Kubernetes cluster with Istio and related tools.  The main entry point is `./scripts/k3d-manager`, which dispatches functions defined in the core libraries and lazily loads plugin files on demand.
 
 ## Usage
 
 ```bash
-./scripts/k3d-manager            # show usage and core functions
-./scripts/k3d-manager <function> [args]
+./scripts/k3d-manager                     # show usage and core functions
+./scripts/k3d-manager <function> [args]   # invoke a core or plugin function
 ```
 
-Invoking the script with no arguments prints a usage message and lists the core functions.  If the requested function is not part of the core libraries, the launcher searches `scripts/plugins` and sources a matching plugin file at run time (lazy loading).
+Running the script without arguments prints a short help message.  When you call a function that is not part of the core libraries, the launcher searches `scripts/plugins` and sources a matching plugin file at runtime so unused plugins do not slow startup.
+
+Example:
+
+```bash
+./scripts/k3d-manager create_k3d_cluster mycluster
+./scripts/k3d-manager hello
+```
 
 ## Directory layout
 
