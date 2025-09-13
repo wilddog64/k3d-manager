@@ -442,7 +442,7 @@ function _load_plugin_function() {
   local plugin
 
   shopt -s nullglob
-  trap 'shopt -u nullglob; trap - RETURN' RETURN
+  trap 'shopt -u nullglob' RETURN
 
   for plugin in "$PLUGINS_DIR"/*.sh; do
     if command grep -Eq "^[[:space:]]*(function[[:space:]]+${func}[[:space:]]*\(\)|${func}[[:space:]]*\(\))[[:space:]]*\{" "$plugin"; then
