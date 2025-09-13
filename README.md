@@ -145,3 +145,10 @@ function _mytool_helper() {
 * `_run_command` and friends handle sudo, probing and exit codes safely.
 * Use `_cleanup_register` with `mktemp` to clean up temporary files automatically.
 
+
+## Tests
+
+Run the plugin tests using:
+
+```bash
+bats scripts/tests/plugins/jenkins.bats
