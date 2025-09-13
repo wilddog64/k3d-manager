@@ -31,12 +31,12 @@ scripts/
 ## How it fits together
 
 ```mermaid
-flowchart TD
+graph TD
   U[User CLI] --> KM[./scripts/k3d-manager]
   KM --> SYS[lib/system.sh]
   KM --> CORE[lib/core.sh]
   KM --> TEST[lib/test.sh]
-  KM -->|_try_load_plugin(func)| PLUG[plugins/*.sh]
+  KM --|_try_load_plugin(func)|--> PLUG[plugins/*.sh]
   PLUG --> HELM[helm]
   PLUG --> KUB[kubectl]
   CORE --> HELM
@@ -60,6 +60,8 @@ flowchart TD
   ESO <-- sync/reads --> BWD
 ```
 
+This diagram outlines how the CLI dispatches to core libraries and loads plugins on demand, which then use Helm and kubectl to manage the cluster.
+
 ```mermaid
 sequenceDiagram
   participant U as user
@@ -71,11 +73,14 @@ sequenceDiagram
 
   U->>KM: ./k3d-manager deploy_vault
   KM->>SYS: _try_load_plugin("deploy_vault")
-  SYS->>P: source plugins/vault.sh; call deploy_vault
+  SYS->>P: source plugins/vault.sh
+  SYS->>P: call deploy_vault
   P->>K: _helm install ... / _kubectl apply ...
   K->>C: apply charts/manifests
   Note over KM: public functions dispatch into plugins\nprivate helpers start with "_" and are not invokable
 ```
+
+The sequence shows a user invoking a plugin function, which loads the plugin and applies resources to the cluster.
 
 ## Public functions
 
