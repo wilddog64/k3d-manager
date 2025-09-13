@@ -325,14 +325,14 @@ function _install_redhat_docker() {
   _run_command  -- sudo systemctl start docker
   _run_command  -- sudo systemctl enable docker
   # Add current user to docker group
-  _run_command  -- sudo usermod -aG docker $USER
+  _run_command  -- sudo usermod -aG docker "$USER"
   echo "Docker instsudo alled successfully. You may need to log out and back in for group changes to take effect."
 }
 
 function _k3d_cluster_exist() {
    local cluster_name=$1
 
-   if _run_command --no-exit -- k3d cluster list "$cluster_name" >/dev/null 2&>1 ; then
+   if _run_command --no-exit -- k3d cluster list "$cluster_name" >/dev/null 2>&1 ; then
       return 0
    else
       return 1
