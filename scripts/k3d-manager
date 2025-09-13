@@ -3,27 +3,8 @@
 # k3d-manager - K3d Kubernetes cluster setup with Istio and storage configuration
 #
 # USAGE:
-#   ./k3d-manager                    # Run default installation workflow
+#   ./k3d-manager                    # Show usage and list core functions
 #   ./k3d-manager <function> [args]  # Run specific function
-#
-# FUNCTIONS:
-#   install_colima                   # Install Colima container runtime (macOS)
-#   install_docker                   # Install Docker CLI and configure it
-#   install_k3d                      # Install K3d Kubernetes distribution
-#   create_k3d_cluster <name>        # Create cluster with specified name
-#   configure_k3d_cluster_istio      # Install Istio on the cluster
-#   install_helm                     # Install Helm package manager
-#   install_smb_csi_driver           # Install SMB CSI driver (Linux only)
-#   create_nfs_share                 # Setup NFS export on host
-#
-# ISTIO TESTING:
-#   test_istio                       # Istio functionality tests
-#
-# NFS DEBUGGING (for issue #1383 - github.com/k3d-io/k3d/issues/1383):
-#   test_nfs_connectivity            # Test network connectivity to NFS
-#   test_nfs_direct                  # Test direct NFS mounting
-#
-# Note: The above script functions list in NFS DEBUGGING section do not address K3d NFS mounting issues on macOS. The code leave here for the reference purpose only
 
 # ensure we are running bash
 if [[ -n "$BASH_VERSION" ]]; then
@@ -61,16 +42,29 @@ source "${SCRIPT_DIR}/lib/system.sh"
 source "${SCRIPT_DIR}/lib/test.sh"
 source "${SCRIPT_DIR}/lib/core.sh"
 
-## -- main --
-# Command line argument handling
-if [[ $# -gt 0 ]]; then
-    function_name=$1
-    shift  # Remove the function name from the arguments
+function _usage() {
+    cat <<EOF
+Usage: ./k3d-manager <function> [args]
 
-    if [[ "$(type -t "$function_name")" == "function" ]]; then
-        # Call the function with remaining arguments
-        $function_name "$@"
-    else
-         _try_load_plugin "$function_name" "$@"
-    fi
+Available core functions:
+$(declare -F | awk '{print $3}' | grep -v '^_' | sort | sed 's/^/  /')
+
+Plugin functions are loaded on demand from scripts/plugins.
+EOF
+}
+
+## -- main --
+if [[ $# -eq 0 ]]; then
+    _usage
+    exit 0
+fi
+
+function_name=$1
+shift  # Remove the function name from the arguments
+
+if [[ "$(type -t "$function_name")" == "function" ]]; then
+    # Call the function with remaining arguments
+    $function_name "$@"
+else
+    _try_load_plugin "$function_name" "$@"
 fi
