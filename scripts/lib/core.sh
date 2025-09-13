@@ -81,8 +81,8 @@ function create_k3d_cluster() {
       exit 1
    fi
 
-   cluster_template="$(dirname $SOURCE)/etc/cluster.yaml.tmpl"
-   cluster_var="$(dirname $SOURCE)/etc/cluster_var.sh"
+   cluster_template="$(dirname "$SOURCE")/etc/cluster.yaml.tmpl"
+   cluster_var="$(dirname "$SOURCE")/etc/cluster_var.sh"
 
    if [[ ! -r "$cluster_template" ]]; then
       echo "Cluster template file not found: $cluster_template"
