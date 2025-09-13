@@ -99,7 +99,7 @@ sequenceDiagram
 | `eso_example_by_uuid` | `scripts/plugins/bitwarden.sh` | Example ESO lookup by UUID |
 | `verify_bws_token` | `scripts/plugins/bitwarden.sh` | Verify Bitwarden session token |
 | `deploy_eso` | `scripts/plugins/eso.sh` | Deploy External Secrets Operator |
-| `say_hello` | `scripts/plugins/hello.sh` | Example plugin |
+| `hello` | `scripts/plugins/hello.sh` | Example plugin |
 | `deploy_jenkins` | `scripts/plugins/jenkins.sh` | Deploy Jenkins |
 | `deploy_vault` | `scripts/plugins/vault.sh` | Deploy HashiCorp Vault |
 

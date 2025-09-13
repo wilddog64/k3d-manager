@@ -1,3 +1,3 @@
-function say_hello() {
+function hello() {
     echo "Hello, World!"
 }
