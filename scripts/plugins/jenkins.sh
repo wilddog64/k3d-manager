@@ -5,11 +5,6 @@ if [[ -r "$VAULT_PLUGIN" ]]; then
 fi
 
 JENKINS_CONFIG_DIR="$SCRIPT_DIR/etc/jenkins"
-VALUT_PLUGIN="$PLUGINS_DIR/vault.sh"
-if [[ -r "$VALUT_PLUGIN" ]]; then
-   # shellcheck disable=SC1090
-   source "$VALUT_PLUGIN"
-fi
 
 function _create_jenkins_namespace() {
    jenkins_namespace="${1:-jenkins}"
@@ -19,24 +14,25 @@ function _create_jenkins_namespace() {
       echo "Jenkins namespace template file not found: $jenkins_namespace_template"
       exit 1
    fi
+   yamlfile=$(mktemp -t)
    # shellcheck disable=SC
-   envsubst < "$jenkins_namespace_template" > "$yamfile"
+   envsubst < "$jenkins_namespace_template" > "$yamlfile"
 
-   if [[ $(_kubectl get namespace "$jenkins_namespace" 2>&1 > /dev/null) == 0 ]]; then
+   if _kubectl get namespace "$jenkins_namespace" >/dev/null 2>&1; then
       echo "Namespace $jenkins_namespace already exists, skip"
    else
-      _kubectl apply -f "$yamfile" > /dev/null 2>&1
+      _kubectl apply -f "$yamlfile" >/dev/null 2>&1
       echo "Namespace $jenkins_namespace created"
    fi
 
-   trap 'cleanup_on_success "$yamfile"' EXIT
+   trap 'cleanup_on_success "$yamlfile"' EXIT
 }
 
 function _create_jenkins_pv_pvc() {
    jenkins_namespace=$1
 
    export JENKINS_HOME_PATH="$SCRIPT_DIR/storage/jenkins_home"
-   export JENINS_NAMESPACE="$jenkins_namespace"
+   export JENKINS_NAMESPACE="$jenkins_namespace"
 
    if _kubectl get pv | grep -q jenkins-home-pv >/dev/null 2>&1; then
       echo "Jenkins PV already exists, skip"
@@ -66,8 +62,9 @@ function _deploy_jenkins_image() {
    local jenkins_admin_sha="$(_bw_lookup_secret "jenkins-admin" "jenkins" | _sha256_12 )"
    local jenkins_admin_passwd_sha="$(_bw_lookup_secret "jenkins-admin-password" "jenkins" \
       | _sha256_12 )"
+   local k3d_jenkins_admin_sha=$(_kubectl -n "$ns" get secret jenkins-admin -o jsonpath='{.data.username}' | base64 --decode | _sha256_12)
 
-   if ! is_same_token "$jenkins_admin_sha" "$k3d_jenkins_admin_sha"; then
+   if ! _is_same_token "$jenkins_admin_sha" "$k3d_jenkins_admin_sha"; then
       _err "Jenkins admin user in k3d does NOT match Bitwarden!" >&2
    else
       _info "Jenkins admin user in k3d matches Bitwarden."
