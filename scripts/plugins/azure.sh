@@ -11,19 +11,19 @@ function _ensure_azure_cli() {
       return 0
    fi
 
-   if is_mac && command_exist brew ; then
+   if _is_mac && command_exist brew ; then
       brew install azure-cli
       return 0
    fi
 
-   if is_debian_family ; then
+   if _is_debian_family ; then
       curl -sL https://aka.ms/InstallAzureCLIDeb | _run_command --require-sudo -- bash
-   elif is_redhat_family ; then
+   elif _is_redhat_family ; then
       _run_command --require-sudo -- dnf install -y https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
       _run_command --require-sudo -- dnf install -y azure-cli
-   elif is_wsl && grep -qi "debian" /etc/os-release &> /dev/null; then
+   elif _is_wsl && grep -qi "debian" /etc/os-release &> /dev/null; then
       curl -sL https://aka.ms/InstallAzureCLIDeb | _run_command --require-sudo -- bash
-   elif is_wsl && grep -qi "redhat" /etc/os-release &> /dev/null; then
+   elif _is_wsl && grep -qi "redhat" /etc/os-release &> /dev/null; then
       _run_command --require-sudo -- dnf install -y https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
       _run_command --require-sudo -- dnf install -y azure-cli
    else
@@ -92,8 +92,8 @@ function _create_azure_eso_store() {
    fi
    source "${azure_vars}"
 
-   _kubectl create namespace "${NS:-azure-external-secrets}" 2>/dev/null
-   _kubectl apply -n "${NS:-azure-external-secrets}" -f <(envsubst < "$azure_config_template") --dry-run=cient | _kubectl apply -n "" -f -
+   _kubectl create namespace "$ns" 2>/dev/null
+   _kubectl apply -n "$ns" -f <(envsubst < "$azure_config_template") --dry-run=client | _kubectl apply -n "$ns" -f -
 }
 
 function deploy_azure_eso() {
