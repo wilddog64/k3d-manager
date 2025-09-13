@@ -25,6 +25,8 @@ EOF
 
 function test_istio() {
     echo "Testing Istio installation and functionality..."
+    trap 'cleanup_istio_test_namespace' EXIT TERM
+    PF_PIDS=()
 
     # 1. Create a very simple test deployment and service
 
@@ -89,7 +91,7 @@ EOF
     # Test direct access first (bypassing Istio)
     echo "Testing direct pod access..."
     _kubectl port-forward -n istio-test svc/nginx-test 8888:80 &
-    PF_PID=$!
+    PF_PIDS+=($!)
     sleep 3
     if _curl -s localhost:8888 | grep -q "Welcome to nginx"; then
         echo "Direct access to the pod is working!"
@@ -153,6 +155,7 @@ EOF
     # Test through Istio gateway
     echo "Testing through Istio gateway..."
     _kubectl port-forward -n istio-system svc/istio-ingressgateway 8085:80 &
+    PF_PIDS+=($!)
     sleep 15
 
     echo "Making request through Istio Gateway..."
@@ -175,11 +178,10 @@ function cleanup_istio_test_namespace() {
 
     echo "Cleaning up Istio test namespace..."
     echo "warning: port forwarding will not remove if process failed"
-    if [[ $? == 0 ]]; then
-       # Kill the port-forwarding process if it exists
-       ps aux | grep kubectl | awk '{ print $2 }' | xargs kill
-       _kubectl delete namespace istio-test --ignore-not-found
-    fi
+    for pid in "${PF_PIDS[@]}"; do
+       kill "$pid" 2>/dev/null || true
+    done
+    _kubectl delete namespace istio-test --ignore-not-found
 }
 
 function test_nfs_connectivity() {
