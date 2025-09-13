@@ -32,9 +32,10 @@ function _create_jenkins_pv_pvc() {
    jenkins_namespace=$1
 
    export JENKINS_HOME_PATH="$SCRIPT_DIR/storage/jenkins_home"
+   export JENKINS_HOME_IN_CLUSTER="/data/jenkins"
    export JENKINS_NAMESPACE="$jenkins_namespace"
 
-   if _kubectl get pv | grep -q jenkins-home-pv >/dev/null 2>&1; then
+   if _kubectl get pv jenkins-home-pv >/dev/null 2>&1; then
       echo "Jenkins PV already exists, skip"
       return 0
    fi
@@ -78,6 +79,7 @@ function deploy_jenkins() {
    _create_jenkins_admin_vault_policy "vault"
    _create_jenkins_vault_ad_policy "vault" "$jenkins_namespace"
    _create_jenkins_namespace "$jenkins_namespace"
+   _create_jenkins_pv_pvc "$jenkins_namespace"
    _deploy_jenkins "$jenkins_namespace"
 }
 

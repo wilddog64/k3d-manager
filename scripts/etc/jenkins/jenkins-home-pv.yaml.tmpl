@@ -4,11 +4,11 @@ metadata:
   name: jenkins-home-pv
 spec:
   capacity:
-    storage: 5Gi
+    storage: 50Gi
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: "k3d-${CLUSTER_NAME}-agent-0"
+    path: "${JENKINS_HOME_IN_CLUSTER:-/data/jenkins}"
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
