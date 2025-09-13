@@ -6,16 +6,20 @@ function init_test_env() {
 
   KUBECTL_EXIT_CODES=()
   HELM_EXIT_CODES=()
+  RUN_EXIT_CODES=()
 
   KUBECTL_LOG="$BATS_TEST_TMPDIR/kubectl.log"
   HELM_LOG="$BATS_TEST_TMPDIR/helm.log"
+  RUN_LOG="$BATS_TEST_TMPDIR/run.log"
   : > "$KUBECTL_LOG"
   : > "$HELM_LOG"
+  : > "$RUN_LOG"
 
   cleanup_on_success() { :; }
 
   stub_kubectl
   stub_helm
+  stub_run_command
 }
 
 # Define kubectl stub that logs commands and uses scripted exit codes
@@ -58,9 +62,31 @@ function stub_helm() {
   }
 }
 
+# Define run_command stub that logs commands and uses scripted exit codes
+function stub_run_command() {
+  _run_command() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--soft|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --probe) shift 2 ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+    echo "$*" >> "$RUN_LOG"
+    local rc=0
+    if ((${#RUN_EXIT_CODES[@]})); then
+      rc=${RUN_EXIT_CODES[0]}
+      RUN_EXIT_CODES=("${RUN_EXIT_CODES[@]:1}")
+    fi
+    return "$rc"
+  }
+}
+
 # Export stub functions for visibility in subshells
 function export_stubs() {
   export -f cleanup_on_success
   export -f _kubectl
   export -f _helm
+  export -f _run_command
 }

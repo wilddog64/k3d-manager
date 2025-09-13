@@ -4,6 +4,26 @@ setup() {
   source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   init_test_env
   source "${BATS_TEST_DIRNAME}/../../plugins/eso.sh"
+  RUN_LOG="$BATS_TEST_TMPDIR/run.log"
+  : > "$RUN_LOG"
+  RUN_EXIT_CODES=()
+  _run_command() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+    echo "$*" >> "$RUN_LOG"
+    local rc=0
+    if ((${#RUN_EXIT_CODES[@]})); then
+      rc=${RUN_EXIT_CODES[0]}
+      RUN_EXIT_CODES=("${RUN_EXIT_CODES[@]:1}")
+    fi
+    return "$rc"
+  }
+  export -f _run_command
   export_stubs
 }
 
@@ -18,16 +38,16 @@ setup() {
   [ ! -s "$KUBECTL_LOG" ]
 }
 
-@test "Installs ESO when absent" {
+@test "Fresh install" {
   RUN_EXIT_CODES=(1)
-  run deploy_eso test-ns test-release
+  run deploy_eso sample-ns
   [ "$status" -eq 0 ]
   mapfile -t run_calls < "$RUN_LOG"
-  [ "${run_calls[0]}" = "helm -n test-ns status test-release" ]
+  [ "${run_calls[0]}" = "helm -n sample-ns status external-secrets" ]
   mapfile -t helm_calls < "$HELM_LOG"
   [ "${helm_calls[0]}" = "repo add external-secrets https://charts.external-secrets.io" ]
   [ "${helm_calls[1]}" = "repo update" ]
-  [[ "${helm_calls[2]}" == upgrade* ]]
+  [[ "${helm_calls[2]}" == upgrade\ --install\ -n\ sample-ns\ external-secrets\ external-secrets/external-secrets\ --create-namespace\ --set\ installCRDs=true ]]
   mapfile -t kubectl_calls < "$KUBECTL_LOG"
-  [ "${kubectl_calls[0]}" = "-n test-ns rollout status deploy/external-secrets --timeout=120s" ]
+  [ "${kubectl_calls[0]}" = "-n sample-ns rollout status deploy/external-secrets --timeout=120s" ]
 }
