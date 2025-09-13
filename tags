@@ -139,7 +139,7 @@ k3d-manager	README.md	/^# k3d-manager$/;"	c
 pre=	scripts/lib/system.sh	/^   local pre=()$/;"	f
 pre=	scripts/lib/system.sh	/^  local pre=() ;$/;"	f
 pre=	scripts/lib/system.sh	/^  local pre=()$/;"	f
-say_hello	scripts/plugins/hello.sh	/^function say_hello() {$/;"	f
+hello	scripts/plugins/hello.sh	/^function hello() {$/;"	f
 test_istio	scripts/lib/test.sh	/^function test_istio() {$/;"	f
 test_nfs_connectivity	scripts/lib/test.sh	/^function test_nfs_connectivity() {$/;"	f
 test_nfs_direct	scripts/lib/test.sh	/^function test_nfs_direct() {$/;"	f
