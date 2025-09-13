@@ -21,6 +21,13 @@ function init_test_env() {
 # Define kubectl stub that logs commands and uses scripted exit codes
 function stub_kubectl() {
   _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
     echo "$*" >> "$KUBECTL_LOG"
     local rc=0
     if ((${#KUBECTL_EXIT_CODES[@]})); then
@@ -34,6 +41,13 @@ function stub_kubectl() {
 # Define helm stub that logs commands and uses scripted exit codes
 function stub_helm() {
   _helm() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
     echo "$*" >> "$HELM_LOG"
     local rc=0
     if ((${#HELM_EXIT_CODES[@]})); then
