@@ -33,6 +33,9 @@ setup() {
     fi
     return "$rc"
   }
+  export -f cleanup_on_success
+  export -f _kubectl
+  export -f _helm
 }
 
 @test "Namespace creation" {
@@ -45,7 +48,7 @@ setup() {
 }
 
 @test "PV/PVC setup" {
-  KUBECTL_EXIT_CODES=(0 0)
+  KUBECTL_EXIT_CODES=(1 0)
   jhp="$SCRIPT_DIR/storage/jenkins_home"
   echo "JENKINS_HOME_PATH=$jhp"
   rm -rf "$jhp"
