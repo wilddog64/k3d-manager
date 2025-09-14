@@ -86,7 +86,7 @@ function deploy_jenkins() {
 function _deploy_jenkins() {
    local ns="${1:-jenkins}"
 
-   if ! _helm repo list | grep -q jenkins >/dev/null 2>&1; then
+   if ! _helm repo list 2>/dev/null | grep -q jenkins; then
      _helm repo add jenkins https://charts.jenkins.io
    fi
    _helm repo update

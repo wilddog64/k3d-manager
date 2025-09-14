@@ -11,6 +11,7 @@ function init_test_env() {
   KUBECTL_LOG="$BATS_TEST_TMPDIR/kubectl.log"
   HELM_LOG="$BATS_TEST_TMPDIR/helm.log"
   RUN_LOG="$BATS_TEST_TMPDIR/run.log"
+  export KUBECTL_LOG HELM_LOG RUN_LOG
   : > "$KUBECTL_LOG"
   : > "$HELM_LOG"
   : > "$RUN_LOG"
