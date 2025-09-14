@@ -133,11 +133,13 @@ function _create_jenkins_admin_vault_policy() {
    rule "charset" { charset = "!@#$%^&*()-_=+[]{};:,.?" }
 HCL
 
-   _kubectl -n "$vault_namespace" exec -i vault-0 -- sh - \
-      vault kv put secret/eso/jenkins-admin \
-      username=admin password="$(_kubectl -n "$vault_namespace" exec -i vault-0 -- \
-      vault read -field=password sys/policies/password/jenkins-admin/generate)"
-
+   cat <<'SH' | _no_trace _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+      sh -
+vault kv put secret/eso/jenkins-admin -<<'KV'
+username=admin
+password=$(vault read -field=password sys/policies/password/jenkins-admin/generate)
+KV
+SH
 }
 
 function _sync_vault_jenkins_admin() {
