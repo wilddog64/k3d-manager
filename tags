@@ -17,7 +17,7 @@ EOF	scripts/plugins/bitwarden.sh	/^  cat <<EOF | _kubectl apply -f -$/;"	h
 EOF	scripts/plugins/vault.sh	/^   cat <<EOF$/;"	h
 HCL	scripts/plugins/jenkins.sh	/^         vault policy write jenkins-jcasc-read - <<'HCL'$/;"	h
 HCL	scripts/plugins/jenkins.sh	/^         vault policy write jenkins-jcasc-write - <<'HCL'$/;"	h
-HCL	scripts/plugins/jenkins.sh	/^   cat > "$jenkins_admin_hcl" <<'HCL'$/;"	h
+HCL	scripts/plugins/jenkins.sh	/^   cat <<'HCL' | tee jenkins-admin.hcl | _kubectl -n "$vault_namespace" exec -i vault-0 -- \\$/;"	h
 HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- \\$/;"	h
 HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- sh - \\$/;"	h
 HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \\$/;"	h
@@ -40,8 +40,13 @@ _az	scripts/plugins/azure.sh	/^function _az() {$/;"	f
 _az_ok	scripts/plugins/azure.sh	/^function _az_ok() {$/;"	f
 _bw_lookup_secret	scripts/plugins/bitwarden.sh	/^function _bw_lookup_secret(){$/;"	f
 _bws	scripts/plugins/bitwarden.sh	/^function _bws() {$/;"	f
+_cleanup_istio_test_namespace	scripts/lib/test.sh	/^function _cleanup_istio_test_namespace() {$/;"	f
+_cleanup_on_success	scripts/lib/core.sh	/^function _cleanup_on_success() {$/;"	f
+_cleanup_on_success	scripts/tests/test_helpers.bash	/^  _cleanup_on_success() { :; }$/;"	f
 _cleanup_register	scripts/lib/system.sh	/^function _cleanup_register() {$/;"	f
+_command_exist	scripts/lib/system.sh	/^function _command_exist() {$/;"	f
 _compute_end_iso_macos	scripts/plugins/azure.sh	/^function _compute_end_iso_macos() {$/;"	f
+_configure_k3d_cluster_istio	scripts/lib/core.sh	/^function _configure_k3d_cluster_istio() {$/;"	f
 _create_azure_eso_store	scripts/plugins/azure.sh	/^function _create_azure_eso_store() {$/;"	f
 _create_client_secret	scripts/plugins/azure.sh	/^function _create_client_secret() {$/;"	f
 _create_jenkins_admin_vault_policy	scripts/plugins/jenkins.sh	/^function _create_jenkins_admin_vault_policy() {$/;"	f
@@ -58,6 +63,7 @@ _deploy_vault_ha	scripts/plugins/vault.sh	/^function _deploy_vault_ha() {$/;"	f
 _enable_kv2_k8s_auth	scripts/plugins/vault.sh	/^function _enable_kv2_k8s_auth() {$/;"	f
 _ensure_azure_cli	scripts/plugins/azure.sh	/^function _ensure_azure_cli() {$/;"	f
 _ensure_cargo	scripts/lib/system.sh	/^function _ensure_cargo() {$/;"	f
+_ensure_jenkins_cert	scripts/plugins/jenkins.sh	/^function _ensure_jenkins_cert() {$/;"	f
 _ensure_namespace	scripts/plugins/azure.sh	/^function _ensure_namespace() {$/;"	f
 _ensure_secret_tool	scripts/lib/system.sh	/^_ensure_secret_tool() {$/;"	f
 _err	scripts/lib/system.sh	/^function _err() { printf 'ERROR: %s\\n' "$*" >&2; exit 127; }$/;"	f
@@ -73,15 +79,21 @@ _helm	scripts/tests/test_helpers.bash	/^  _helm() {$/;"	f
 _info	scripts/lib/system.sh	/^function _info() { printf 'INFO: %s\\n' "$*" >&2; }$/;"	f
 _install_azure_eso	scripts/plugins/azure.sh	/^function _install_azure_eso() {$/;"	f
 _install_bws	scripts/plugins/bitwarden.sh	/^function _install_bws() {$/;"	f
+_install_colima	scripts/lib/system.sh	/^function _install_colima() {$/;"	f
 _install_debian_docker	scripts/lib/system.sh	/^function _install_debian_docker() {$/;"	f
 _install_debian_helm	scripts/lib/system.sh	/^function _install_debian_helm() {$/;"	f
 _install_debian_kubernetes_client	scripts/lib/system.sh	/^function _install_debian_kubernetes_client() {$/;"	f
+_install_docker	scripts/lib/core.sh	/^function _install_docker() {$/;"	f
 _install_helm	scripts/lib/system.sh	/^function _install_helm() {$/;"	f
+_install_istioctl	scripts/lib/core.sh	/^function _install_istioctl() {$/;"	f
+_install_k3d	scripts/lib/core.sh	/^function _install_k3d() {$/;"	f
+_install_kubernetes_cli	scripts/lib/system.sh	/^function _install_kubernetes_cli() {$/;"	f
 _install_mac_docker	scripts/lib/system.sh	/^function _install_mac_docker() {$/;"	f
 _install_mac_helm	scripts/lib/system.sh	/^function _install_mac_helm() {$/;"	f
 _install_redhat_docker	scripts/lib/system.sh	/^function _install_redhat_docker() {$/;"	f
 _install_redhat_helm	scripts/lib/system.sh	/^function _install_redhat_helm() {$/;"	f
 _install_redhat_kubernetes_client	scripts/lib/system.sh	/^function _install_redhat_kubernetes_client() {$/;"	f
+_install_smb_csi_driver	scripts/lib/core.sh	/^function _install_smb_csi_driver() {$/;"	f
 _ip	scripts/lib/system.sh	/^function _ip() {$/;"	f
 _is_debian_family	scripts/lib/system.sh	/^function _is_debian_family() {$/;"	f
 _is_linux	scripts/lib/system.sh	/^function _is_linux() {$/;"	f
@@ -124,12 +136,7 @@ _vault_set_eso_reader	scripts/plugins/vault.sh	/^function _vault_set_eso_reader(
 _vault_set_eso_writer	scripts/plugins/vault.sh	/^function _vault_set_eso_writer() {$/;"	f
 _vault_wait_ready	scripts/plugins/vault.sh	/^function _vault_wait_ready() {$/;"	f
 _warn	scripts/lib/system.sh	/^function _warn() { printf 'WARN: %s\\n' "$*" >&2; }$/;"	f
-cleanup_istio_test_namespace	scripts/lib/test.sh	/^function cleanup_istio_test_namespace() {$/;"	f
-cleanup_on_success	scripts/lib/core.sh	/^function cleanup_on_success() {$/;"	f
-cleanup_on_success	scripts/tests/test_helpers.bash	/^  cleanup_on_success() { :; }$/;"	f
-command_exist	scripts/lib/system.sh	/^function command_exist() {$/;"	f
 config_bws_eso	scripts/plugins/bitwarden.sh	/^function config_bws_eso() {$/;"	f
-configure_k3d_cluster_istio	scripts/lib/core.sh	/^function configure_k3d_cluster_istio() {$/;"	f
 create_az_sp	scripts/plugins/azure.sh	/^function create_az_sp() {$/;"	f
 create_k3d_cluster	scripts/lib/core.sh	/^function create_k3d_cluster() {$/;"	f
 create_nfs_share	scripts/lib/core.sh	/^function create_nfs_share() {$/;"	f
@@ -146,16 +153,11 @@ eso_example_by_uuid	scripts/plugins/bitwarden.sh	/^function eso_example_by_uuid(
 export_stubs	scripts/tests/test_helpers.bash	/^function export_stubs() {$/;"	f
 hello	scripts/plugins/hello.sh	/^function hello() {$/;"	f
 init_test_env	scripts/tests/test_helpers.bash	/^function init_test_env() {$/;"	f
-install_colima	scripts/lib/system.sh	/^function install_colima() {$/;"	f
-install_docker	scripts/lib/core.sh	/^function install_docker() {$/;"	f
-install_istioctl	scripts/lib/core.sh	/^function install_istioctl() {$/;"	f
-install_k3d	scripts/lib/core.sh	/^function install_k3d() {$/;"	f
-install_kubernetes_cli	scripts/lib/system.sh	/^function install_kubernetes_cli() {$/;"	f
-install_smb_csi_driver	scripts/lib/core.sh	/^function install_smb_csi_driver() {$/;"	f
 k3d-manager	README.md	/^# k3d-manager$/;"	c
 pre=	scripts/lib/system.sh	/^   local pre=()$/;"	f
 pre=	scripts/lib/system.sh	/^  local pre=() ;$/;"	f
 pre=	scripts/lib/system.sh	/^  local pre=()$/;"	f
+probe_args=	scripts/lib/system.sh	/^  local -a probe_args=()$/;"	f
 stub_envsubst	scripts/tests/test_helpers.bash	/^function stub_envsubst() {$/;"	f
 stub_helm	scripts/tests/test_helpers.bash	/^function stub_helm() {$/;"	f
 stub_kubectl	scripts/tests/test_helpers.bash	/^function stub_kubectl() {$/;"	f

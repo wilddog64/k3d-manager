@@ -25,7 +25,7 @@ EOF
 
 function test_istio() {
     echo "Testing Istio installation and functionality..."
-    trap 'cleanup_istio_test_namespace' EXIT TERM
+    trap '_cleanup_istio_test_namespace' EXIT TERM
     PF_PIDS=()
 
     # 1. Create a very simple test deployment and service
@@ -171,10 +171,10 @@ EOF
     echo "For a more complete test, you could try accessing the Istio ingress gateway's external IP:"
     _kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
     echo ""
-    trap 'cleanup_istio_test_namespace' EXIT TERM
+    trap '_cleanup_istio_test_namespace' EXIT TERM
 }
 
-function cleanup_istio_test_namespace() {
+function _cleanup_istio_test_namespace() {
 
     echo "Cleaning up Istio test namespace..."
     echo "warning: port forwarding will not remove if process failed"

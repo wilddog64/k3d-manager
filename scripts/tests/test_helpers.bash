@@ -16,7 +16,7 @@ function init_test_env() {
   : > "$HELM_LOG"
   : > "$RUN_LOG"
 
-  cleanup_on_success() { :; }
+  _cleanup_on_success() { :; }
 
   stub_envsubst
   stub_kubectl
@@ -92,7 +92,7 @@ function stub_envsubst() {
 
 # Export stub functions for visibility in subshells
 function export_stubs() {
-  export -f cleanup_on_success
+  export -f _cleanup_on_success
   export -f _kubectl
   export -f _helm
   export -f _run_command

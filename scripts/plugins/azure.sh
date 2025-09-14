@@ -7,11 +7,11 @@ if [[ -r "${az_eso_vars}" ]]; then
 fi
 
 function _ensure_azure_cli() {
-   if command_exist az ; then
+   if _command_exist az ; then
       return 0
    fi
 
-   if _is_mac && command_exist brew ; then
+   if _is_mac && _command_exist brew ; then
       brew install azure-cli
       return 0
    fi
@@ -77,7 +77,7 @@ function _create_azure_eso_store() {
 
    # shellcheck disable=SC2155
    local yamlfile="$(mktemp -t)"
-   trap 'cleanup_on_success "'"$yamlfile"'"' EXIT INT TERM
+   trap '_cleanup_on_success "'"$yamlfile"'"' EXIT INT TERM
 
    azure_config_template="${SCRIPT_DIR}/etc/azure/azure-eso.yaml.tmpl"
    if [[ ! -f "${azure_config_template}" ]]; then
@@ -159,7 +159,7 @@ function _apply_clustersecretstore() {
 
    # shellcheck disable=SC2155
    local yamlfile="$(mktemp -t)"
-   trap 'cleanup_on_success "'"$yamlfile"'"' EXIT INT TERM
+   trap '_cleanup_on_success "'"$yamlfile"'"' EXIT INT TERM
    local yamltempl="${SCRIPT_DIR}/etc/azure/azure-eso.yaml.tmpl"
    if [[ ! -f "${yamltempl}" ]]; then
       echo "Azure eso template file ${yamltempl} not found!" >&2

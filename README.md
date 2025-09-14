@@ -95,20 +95,10 @@ The sequence shows a user invoking a plugin function, which loads the plugin and
 
 | Function | Location | Description |
 | --- | --- | --- |
-| `install_docker` | `scripts/lib/core.sh` | Install Docker CLI |
-| `install_k3d` | `scripts/lib/core.sh` | Install k3d |
-| `install_istioctl` | `scripts/lib/core.sh` | Install Istio CLI |
 | `destroy_k3d_cluster` | `scripts/lib/core.sh` | Delete a k3d cluster |
 | `create_k3d_cluster` | `scripts/lib/core.sh` | Create a k3d cluster |
-| `cleanup_on_success` | `scripts/lib/core.sh` | Remove temporary files |
-| `configure_k3d_cluster_istio` | `scripts/lib/core.sh` | Install Istio into the cluster |
-| `install_smb_csi_driver` | `scripts/lib/core.sh` | Install the SMB CSI driver |
 | `create_nfs_share` | `scripts/lib/core.sh` | Configure an NFS export on the host |
 | `deploy_k3d_cluster` | `scripts/lib/core.sh` | Create and configure a cluster |
-| `command_exist` | `scripts/lib/system.sh` | Check whether a command exists |
-| `install_kubernetes_cli` | `scripts/lib/system.sh` | Install kubectl and related tools |
-| `install_colima` | `scripts/lib/system.sh` | Install Colima (macOS) |
-| `cleanup_istio_test_namespace` | `scripts/lib/test.sh` | Remove Istio test namespace |
 | `test_istio` | `scripts/lib/test.sh` | Run Istio validation tests |
 | `test_nfs_connectivity` | `scripts/lib/test.sh` | Check network connectivity to NFS |
 | `test_nfs_direct` | `scripts/lib/test.sh` | Directly mount NFS for troubleshooting |

@@ -7,8 +7,8 @@ setup() {
   ip() { echo "8.8.8.8 via 0.0.0.0 dev eth0 src 127.0.0.1 uid 1000"; }
   export -f ip
   source "${BATS_TEST_DIRNAME}/../../lib/core.sh"
-  cleanup_on_success() { :; }
-  export -f cleanup_on_success
+  _cleanup_on_success() { :; }
+  export -f _cleanup_on_success
 }
 
 @test "creates cluster with default ports" {

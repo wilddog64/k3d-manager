@@ -28,7 +28,7 @@ function _create_jenkins_namespace() {
       echo "Namespace $jenkins_namespace created"
    fi
 
-   trap 'cleanup_on_success "$yamlfile"' RETURN
+   trap '_cleanup_on_success "$yamlfile"' RETURN
 }
 
 function _create_jenkins_pv_pvc() {
@@ -57,7 +57,7 @@ function _create_jenkins_pv_pvc() {
    envsubst < "$jenkins_pv_template" > "$jenkinsyamfile"
    _kubectl apply -f "$jenkinsyamfile" -n "$jenkins_namespace"
 
-   trap 'cleanup_on_success "$jenkinsyamfile"' EXIT
+   trap '_cleanup_on_success "$jenkinsyamfile"' EXIT
 }
 
 function _ensure_jenkins_cert() {

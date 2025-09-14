@@ -1,5 +1,5 @@
 function _install_bws() {
-   if command_exist bws ; then
+   if _command_exist bws ; then
       echo "bws already installed"
       return
    fi
@@ -82,7 +82,7 @@ function config_bws_eso() {
   # Render SecretStore from template and apply
   local yamlfile="$(mktemp)"  # mktemp -t creates a file *and* returns a path; plain mktemp is fine here
   local bws_tmpl="${SCRIPT_DIR}/etc/bitwarden/bws-eso.yaml.tmpl"
-  trap 'cleanup_on_success "'"$yamlfile"'"' EXIT INT TERM  # avoid RETURN to prevent multiple triggers
+  trap '_cleanup_on_success "'"$yamlfile"'"' EXIT INT TERM  # avoid RETURN to prevent multiple triggers
 
   if [[ ! -f "${bws_tmpl}" ]]; then
       echo "Template file ${bws_tmpl} not found!" >&2

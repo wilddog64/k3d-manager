@@ -1,4 +1,4 @@
-function install_docker() {
+function _install_docker() {
    if _is_mac; then
       _install_mac_docker
    elif _is_debian_family; then
@@ -11,12 +11,12 @@ function install_docker() {
    fi
 }
 
-function install_k3d() {
-   install_docker
+function _install_k3d() {
+   _install_docker
    _install_helm
-   install_istioctl
+   _install_istioctl
 
-   if ! command_exist k3d ; then
+   if ! _command_exist k3d ; then
       echo k3d does not exist, install it
       _curl -f -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
    else
@@ -24,10 +24,10 @@ function install_k3d() {
    fi
 }
 
-function install_istioctl() {
+function _install_istioctl() {
    install_dir="${1:-/usr/local/bin}"
 
-   if command_exist istioctl ; then
+   if _command_exist istioctl ; then
       echo "istioctl already exists, skip installation"
       return 0
    fi
@@ -37,7 +37,7 @@ function install_istioctl() {
       mkdir -p "${install_dir}"
    fi
 
-   if  ! command_exist istioctl ; then
+   if  ! _command_exist istioctl ; then
       echo installing istioctl
       tmp_script=$(mktemp)
       trap 'rm -rf /tmp/istio-*' EXIT TERM
@@ -113,7 +113,7 @@ function create_k3d_cluster() {
    yamlfile=$(mktemp -t)
    envsubst < "$cluster_template" > "$yamlfile"
 
-   trap 'cleanup_on_success "$yamlfile"' RETURN
+   trap '_cleanup_on_success "$yamlfile"' RETURN
 
    if _list_k3d_cluster | grep -q "$cluster_name"; then
       echo "Cluster $cluster_name already exists, skip"
@@ -123,13 +123,13 @@ function create_k3d_cluster() {
    _create_k3d_cluster "$yamlfile"
 }
 
-function cleanup_on_success() {
+function _cleanup_on_success() {
    local file_to_cleanup=$1
    echo "Cleaning up temporary files... : $file_to_cleanup :"
    rm -rf "$file_to_cleanup"
 }
 
-function configure_k3d_cluster_istio() {
+function _configure_k3d_cluster_istio() {
    cluster_name=$1
 
    istio_yaml_template="$(dirname "$SOURCE")/etc/istio-operator.yaml.tmpl"
@@ -149,17 +149,17 @@ function configure_k3d_cluster_istio() {
    isito_yamlfile=$(mktemp -t)
    envsubst < "$istio_yaml_template" > "$isito_yamlfile"
 
-   install_kubernetes_cli
-   install_istioctl
+   _install_kubernetes_cli
+   _install_istioctl
    _istioctl x precheck
    _istioctl install -y -f "$isito_yamlfile"
    _kubectl label ns default istio-injection=enabled --overwrite
 
-   trap 'cleanup_on_success "$isito_yamlfile"' EXIT
+   trap '_cleanup_on_success "$isito_yamlfile"' EXIT
 }
 
 
-function install_smb_csi_driver() {
+function _install_smb_csi_driver() {
    if _is_mac ; then
       echo "warning: SMB CSI driver is not supported on macOS"
       exit 0
@@ -198,10 +198,10 @@ function create_nfs_share() {
 function deploy_k3d_cluster() {
    cluster_name="${1:-k3d-cluster}"
 
-   install_k3d
+   _install_k3d
    if ! _k3d_cluster_exist "$cluster_name" ; then
       create_k3d_cluster "$cluster_name"
    fi
-   configure_k3d_cluster_istio "$cluster_name"
-   # install_smb_csi_driver
+   _configure_k3d_cluster_istio "$cluster_name"
+   # _install_smb_csi_driver
 }

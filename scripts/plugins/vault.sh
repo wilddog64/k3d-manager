@@ -57,7 +57,7 @@ YAML
    args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$f" --wait)
    [[ -n "$version" ]] && args+=("--version" "$version")
    _helm "${args[@]}"
-   trap 'cleanup_on_success "$f"' EXIT
+   trap '_cleanup_on_success "$f"' EXIT
 }
 
 function deploy_vault() {

@@ -1,4 +1,4 @@
-function command_exist() {
+function _command_exist() {
     command -v "$1" &> /dev/null
 }
 
@@ -94,17 +94,17 @@ function _run_command() {
 }
 
 _ensure_secret_tool() {
-  command_exist secret-tool && return 0
+  _command_exist secret-tool && return 0
   _is_linux || return 1
 
-  if command_exist apt-get ; then
+  if _command_exist apt-get ; then
     _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update
     _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y libsecret-tools
-  elif command_exist dnf ; then
+  elif _command_exist dnf ; then
     _run_command --prefer-sudo -- dnf -y install libsecret
-  elif command_exist -v yum >/dev/null 2>&1; then
+  elif _command_exist -v yum >/dev/null 2>&1; then
     _run_command --prefer-sudo -- yum -y install libsecret
-  elif command_exist microdnf ; then
+  elif _command_exist microdnf ; then
     _run_command --prefer-sudo -- microdnf -y install libsecret
   else
     echo "Cannot install secret-tool: no known package manager found" >&2
@@ -115,7 +115,7 @@ _ensure_secret_tool() {
 }
 
 function _install_redhat_kubernetes_client() {
-  if ! command_exist kubectl; then
+  if ! _command_exist kubectl; then
      _run_command -- sudo dnf install -y kubernetes-client
   fi
 }
@@ -131,7 +131,7 @@ function _security() {
 }
 
 function _install_debian_kubernetes_client() {
-   if command_exist kubectl ; then
+   if _command_exist kubectl ; then
       echo "kubectl already installed, skipping"
       return 0
    fi
@@ -159,7 +159,7 @@ function _install_debian_kubernetes_client() {
 
 }
 
-function install_kubernetes_cli() {
+function _install_kubernetes_cli() {
    if _is_redhat_family ; then
       _install_redhat_kubernetes_client
    elif _is_debian_family ; then
@@ -210,7 +210,7 @@ function _install_debian_helm() {
 }
 
 function _install_helm() {
-  if command_exist helm; then
+  if _command_exist helm; then
     echo helm already installed, skip
     return 0
   fi
@@ -256,8 +256,8 @@ function _is_wsl() {
    fi
 }
 
-function install_colima() {
-   if ! command_exist colima ; then
+function _install_colima() {
+   if ! _command_exist colima ; then
       echo colima does not exist, install it
       _run_command --quiet -- brew install colima
    else
@@ -267,7 +267,7 @@ function install_colima() {
 
 function _install_mac_docker() {
 
-   if  ! command_exist docker && _is_mac ; then
+   if  ! _command_exist docker && _is_mac ; then
       echo docker does not exist, install it
       brew install docker
    else
@@ -375,7 +375,7 @@ function _kubectl() {
 }
 
 function _istioctl() {
-   if ! command_exist istioctl ; then
+   if ! _command_exist istioctl ; then
       echo "istioctl is not installed. Please install it first."
       exit 1
    fi
@@ -407,7 +407,7 @@ function _helm() {
 }
 
 function _curl() {
-   if ! command_exist curl ; then
+   if ! _command_exist curl ; then
       echo "curl is not installed. Please install it first."
       exit 1
    fi
@@ -483,9 +483,9 @@ function _try_load_plugin() {
 function _sha256_12() {
    local s="$1" line hash
 
-   if command_exist shasum; then
+   if _command_exist shasum; then
       line=$(_run_command -- shasum -a 256 <<<"$s")
-   elif command_exist sha256sum; then
+   elif _command_exist sha256sum; then
       line=$(_run_command <<<"$s")
    else
       echo "No SHA256 command found" >&2
@@ -514,11 +514,11 @@ function _is_same_token() {
 }
 
 function _ensure_cargo() {
-   if command_exist cargo ; then
+   if _command_exist cargo ; then
       return 0
    fi
 
-   if _is_mac && command_exist brew ; then
+   if _is_mac && _command_exist brew ; then
       brew install rust
       return 0
    fi

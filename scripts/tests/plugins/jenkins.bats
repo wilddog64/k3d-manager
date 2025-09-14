@@ -57,8 +57,8 @@ setup() {
     echo "$script" | _kubectl "$@"
   }
   export -f _no_trace
-  cleanup_on_success() { rm -f "$1"; }
-  export -f cleanup_on_success
+  _cleanup_on_success() { rm -f "$1"; }
+  export -f _cleanup_on_success
 
   run _create_jenkins_admin_vault_policy vault
   [ "$status" -eq 0 ]
