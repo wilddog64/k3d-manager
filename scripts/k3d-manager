@@ -52,14 +52,14 @@ $(declare -F | awk '{print $3}' | grep -v '^_' | sort | sed 's/^/  /')
 Plugin functions are loaded on demand from scripts/plugins.
 
 Subcommands:
-  test all|jenkins|vault|eso   Run BATS tests
+  test all|jenkins|vault|eso|run_command   Run BATS tests
 EOF
 }
 
 function test() {
     case "$1" in
         all)
-            bats scripts/tests/core/*.bats scripts/tests/plugins/*.bats
+            bats scripts/tests/lib/*.bats scripts/tests/core/*.bats scripts/tests/plugins/*.bats
             ;;
         jenkins)
             bats scripts/tests/plugins/jenkins.bats
@@ -70,8 +70,11 @@ function test() {
         eso)
             bats scripts/tests/plugins/eso.bats
             ;;
+        run_command)
+            bats scripts/tests/lib/run_command.bats
+            ;;
         *)
-            echo "test all|jenkins|vault|eso"
+            echo "test all|jenkins|vault|eso|run_command"
             return 1
             ;;
     esac
