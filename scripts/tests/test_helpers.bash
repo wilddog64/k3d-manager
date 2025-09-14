@@ -85,9 +85,9 @@ function stub_run_command() {
   }
 }
 
-# Define envsubst stub as a no-op pass-through
+# Define envsubst stub that uses the system envsubst for variable expansion
 function stub_envsubst() {
-  envsubst() { cat; }
+  envsubst() { command envsubst "$@"; }
 }
 
 # Export stub functions for visibility in subshells
