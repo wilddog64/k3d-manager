@@ -6,7 +6,7 @@ metadata:
   namespace: jenkins
 spec:
   gateways:
-    - istio-system/ingress-gateway
+    - istio-system/jenkins-gw
   hosts:
     - jenkins.dev.local.me
   http:

@@ -90,6 +90,34 @@ setup() {
   ! grep -q 'password=' "$KUBECTL_LOG"
 }
 
+@test "_ensure_jenkins_cert sets up PKI and TLS secret" {
+  _kubectl() {
+    local cmd="$*"
+    echo "$cmd" >> "$KUBECTL_LOG"
+    if [[ "$cmd" == *"get secret jenkins-cert"* ]]; then
+      return 1
+    fi
+    if [[ "$cmd" == *"vault secrets list"* ]]; then
+      return 1
+    fi
+    if [[ "$cmd" == *"vault write -format=json pki/issue/jenkins"* ]]; then
+      cat <<'JSON'
+{"data":{"certificate":"CERT","private_key":"KEY"}}
+JSON
+      return 0
+    fi
+    return 0
+  }
+  export -f _kubectl
+
+  run _ensure_jenkins_cert vault
+  [ "$status" -eq 0 ]
+  grep -q 'vault secrets enable pki' "$KUBECTL_LOG"
+  grep -q 'vault write pki/roles/jenkins' "$KUBECTL_LOG"
+  grep -q 'vault write -format=json pki/issue/jenkins' "$KUBECTL_LOG"
+  grep -q 'create secret tls jenkins-cert' "$KUBECTL_LOG"
+}
+
 @test "Full deployment" {
   CALLS_LOG="$BATS_TEST_TMPDIR/calls.log"
   : > "$CALLS_LOG"
@@ -97,17 +125,19 @@ setup() {
   _create_jenkins_admin_vault_policy() { :; }
   _create_jenkins_vault_ad_policy() { :; }
   _create_jenkins_namespace() { echo "_create_jenkins_namespace" >> "$CALLS_LOG"; }
+  _ensure_jenkins_cert() { echo "_ensure_jenkins_cert" >> "$CALLS_LOG"; }
   _deploy_jenkins() { echo "_deploy_jenkins" >> "$CALLS_LOG"; }
   run deploy_jenkins sample-ns
   [ "$status" -eq 0 ]
   mapfile -t calls < "$CALLS_LOG"
-  [ "${#calls[@]}" -eq 2 ]
+  [ "${#calls[@]}" -eq 3 ]
   [ "${calls[0]}" = "_create_jenkins_namespace" ]
-  [ "${calls[1]}" = "_deploy_jenkins" ]
+  [ "${calls[1]}" = "_ensure_jenkins_cert" ]
+  [ "${calls[2]}" = "_deploy_jenkins" ]
 }
 
-@test "VirtualService uses Istio ingress gateway" {
-  run grep -q 'istio-system/ingress-gateway' "$SCRIPT_DIR/etc/jenkins/virtualservice.yaml"
+@test "VirtualService references Jenkins gateway" {
+  run grep -q 'istio-system/jenkins-gw' "$SCRIPT_DIR/etc/jenkins/virtualservice.yaml"
   [ "$status" -eq 0 ]
 }
 
@@ -115,12 +145,16 @@ setup() {
   run _deploy_jenkins sample-ns
   [ "$status" -eq 0 ]
   mapfile -t kubectl_calls < "$KUBECTL_LOG"
+  expected_gw="apply -n istio-system --dry-run=client -f $SCRIPT_DIR/etc/jenkins/gateway.yaml"
+  expected_gw_apply="apply -n istio-system -f -"
   expected_vs="apply -n sample-ns --dry-run=client -f $SCRIPT_DIR/etc/jenkins/virtualservice.yaml"
   expected_vs_apply="apply -n sample-ns -f -"
   expected_dr="apply -n sample-ns --dry-run=client -f $SCRIPT_DIR/etc/jenkins/destinationrule.yaml"
   expected_dr_apply="apply -n sample-ns -f -"
-  [ "${kubectl_calls[0]}" = "$expected_vs" ]
-  [ "${kubectl_calls[1]}" = "$expected_vs_apply" ]
-  [ "${kubectl_calls[2]}" = "$expected_dr" ]
-  [ "${kubectl_calls[3]}" = "$expected_dr_apply" ]
+  [ "${kubectl_calls[0]}" = "$expected_gw" ]
+  [ "${kubectl_calls[1]}" = "$expected_gw_apply" ]
+  [ "${kubectl_calls[2]}" = "$expected_vs" ]
+  [ "${kubectl_calls[3]}" = "$expected_vs_apply" ]
+  [ "${kubectl_calls[4]}" = "$expected_dr" ]
+  [ "${kubectl_calls[5]}" = "$expected_dr_apply" ]
 }

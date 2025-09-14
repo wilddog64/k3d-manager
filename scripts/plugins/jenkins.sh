@@ -60,6 +60,43 @@ function _create_jenkins_pv_pvc() {
    trap 'cleanup_on_success "$jenkinsyamfile"' EXIT
 }
 
+function _ensure_jenkins_cert() {
+   local vault_namespace="${1:-vault}"
+   local k8s_namespace="istio-system"
+   local secret_name="jenkins-cert"
+   local common_name="jenkins.dev.local.me"
+
+   if _kubectl -n "$k8s_namespace" get secret "$secret_name" >/dev/null 2>&1; then
+      echo "TLS secret $secret_name already exists, skip"
+      return 0
+   fi
+
+   if ! _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+      sh -c 'vault secrets list | grep -q "^pki/"'; then
+      _kubectl -n "$vault_namespace" exec -i vault-0 -- vault secrets enable pki
+      _kubectl -n "$vault_namespace" exec -i vault-0 -- vault secrets tune -max-lease-ttl=87600h pki
+      _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+         vault write pki/root/generate/internal common_name="dev.local.me" ttl=87600h
+   fi
+
+   _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+      vault write pki/roles/jenkins allowed_domains=dev.local.me allow_subdomains=true max_ttl=72h
+
+   local json cert_file key_file
+   json=$(_kubectl -n "$vault_namespace" exec -i vault-0 -- \
+      vault write -format=json pki/issue/jenkins common_name="$common_name" ttl=72h)
+
+   cert_file=$(mktemp -t jenkins-cert.pem.XXXX)
+   key_file=$(mktemp -t jenkins-key.pem.XXXX)
+   echo "$json" | jq -r '.data.certificate' > "$cert_file"
+   echo "$json" | jq -r '.data.private_key' > "$key_file"
+
+   _kubectl -n "$k8s_namespace" create secret tls "$secret_name" \
+      --cert="$cert_file" --key="$key_file"
+
+   rm -f "$cert_file" "$key_file"
+}
+
 function _deploy_jenkins_image() {
    local ns="${1:-jenkins}"
 
@@ -83,6 +120,7 @@ function deploy_jenkins() {
    _create_jenkins_vault_ad_policy "vault" "$jenkins_namespace"
    _create_jenkins_namespace "$jenkins_namespace"
    _create_jenkins_pv_pvc "$jenkins_namespace"
+   _ensure_jenkins_cert "vault"
    _deploy_jenkins "$jenkins_namespace"
 }
 
@@ -107,6 +145,10 @@ function _deploy_jenkins() {
       echo "destinationrule.yaml is not a DestinationRule" >&2
       return 1
    fi
+
+   gw_yaml=$(_kubectl apply -n istio-system --dry-run=client \
+      -f "$JENKINS_CONFIG_DIR/gateway.yaml")
+   printf '%s\n' "$gw_yaml" | _kubectl apply -n istio-system -f -
 
    vs_yaml=$(_kubectl apply -n "$ns" --dry-run=client \
       -f "$JENKINS_CONFIG_DIR/virtualservice.yaml")
