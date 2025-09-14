@@ -44,10 +44,10 @@ setup() {
   [ "$status" -eq 0 ]
   read_lines "$RUN_LOG" run_calls
   [ "${run_calls[0]}" = "helm -n sample-ns status external-secrets" ]
-  mapfile -t helm_calls < "$HELM_LOG"
+  read_lines "$HELM_LOG" helm_calls
   [ "${helm_calls[0]}" = "repo add external-secrets https://charts.external-secrets.io" ]
   [ "${helm_calls[1]}" = "repo update" ]
   [[ "${helm_calls[2]}" == upgrade\ --install\ -n\ sample-ns\ external-secrets\ external-secrets/external-secrets\ --create-namespace\ --set\ installCRDs=true ]]
-  read_lines "$RUN_LOG" run_calls
+  read_lines "$KUBECTL_LOG" kubectl_calls
   [ "${kubectl_calls[0]}" = "-n sample-ns rollout status deploy/external-secrets --timeout=120s" ]
 }
