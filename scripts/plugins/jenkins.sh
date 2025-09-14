@@ -113,7 +113,12 @@ function _deploy_jenkins_image() {
 }
 
 function deploy_jenkins() {
-   jenkins_namespace="${1:-jenkins}"
+   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+      echo "Usage: deploy_jenkins [namespace=jenkins]"
+      return 0
+   fi
+
+   local jenkins_namespace="${1:-jenkins}"
 
    deploy_vault ha
    _create_jenkins_admin_vault_policy "vault"

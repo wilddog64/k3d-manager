@@ -27,6 +27,12 @@ setup() {
   export_stubs
 }
 
+@test "deploy_eso -h shows usage" {
+  run deploy_eso -h
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage: deploy_eso"* ]]
+}
+
 @test "Skips install if ESO already present" {
   RUN_EXIT_CODES=(0)
   run deploy_eso test-ns test-release

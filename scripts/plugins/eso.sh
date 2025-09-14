@@ -3,6 +3,10 @@
 
 # Install ESO and enable the Bitwarden SDK server dependency
 function deploy_eso() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Usage: deploy_eso [namespace=external-secrets] [release=external-secrets]"
+    return 0
+  fi
   local ns="${1:-external-secrets}"
   local release="${2:-external-secrets}"
 

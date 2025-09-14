@@ -61,6 +61,11 @@ YAML
 }
 
 function deploy_vault() {
+   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+      echo "Usage: deploy_vault <dev|ha> [namespace=${VAULT_NS_DEFAULT}] [release=${VAULT_RELEASE_DEFAULT}] [chart-version=${VAULT_CHART_VERSION}]"
+      return 0
+   fi
+
    local mode="${1:-}"
    local ns="${2:-$VAULT_NS_DEFAULT}"
    local release="${3:-$VAULT_RELEASE_DEFAULT}"
@@ -68,7 +73,7 @@ function deploy_vault() {
 
    if [[ "$mode" != "dev" && "$mode" != "ha" ]]; then
       echo "[vault] usage: deploy_vault <dev|ha> [<ns> [<release> [<chart-version>]]]" >&2
-      exit 1
+      return 1
    fi
 
    deploy_eso

@@ -7,6 +7,12 @@ setup() {
   export_stubs
 }
 
+@test "deploy_jenkins -h shows usage" {
+  run deploy_jenkins -h
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage: deploy_jenkins"* ]]
+}
+
 @test "Namespace creation" {
   KUBECTL_EXIT_CODES=(1 0)
   run _create_jenkins_namespace test-ns

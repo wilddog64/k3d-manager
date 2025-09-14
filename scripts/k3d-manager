@@ -61,6 +61,17 @@ EOF
 }
 
 function test() {
+    if [[ "$1" == "-h" || "$1" == "--help" || -z "$1" ]]; then
+        local test_suites
+        test_suites=$(find "${SCRIPT_DIR}/tests" -type f -name '*.bats' \
+            -exec basename {} .bats \; | sort | paste -sd '|' -)
+        cat <<EOF
+Usage: test all|${test_suites}
+Run BATS tests
+EOF
+        return 0
+    fi
+
     _ensure_bats
     local suite="$1"
     local search_dirs=("${SCRIPT_DIR}/tests/lib" "${SCRIPT_DIR}/tests/core" "${SCRIPT_DIR}/tests/plugins")

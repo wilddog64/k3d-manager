@@ -11,6 +11,18 @@ setup() {
   export -f _cleanup_on_success
 }
 
+@test "create_k3d_cluster -h shows usage" {
+  run create_k3d_cluster -h
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage: create_k3d_cluster"* ]]
+}
+
+@test "destroy_k3d_cluster -h shows usage" {
+  run destroy_k3d_cluster -h
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage: destroy_k3d_cluster"* ]]
+}
+
 @test "creates cluster with default ports" {
   _create_k3d_cluster() { cp "$1" "$BATS_TMPDIR/cluster.yaml"; }
   _list_k3d_cluster() { :; }

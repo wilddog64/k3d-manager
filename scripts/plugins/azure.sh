@@ -42,10 +42,15 @@ function _az_ok() {
 }
 
 function create_az_sp() {
-   local rg="${RG:-k3d-rg-eso}"
-   local region=${REGION:-eastus}
-   local kv_name="${KV_NAME:-k3d-kv-eso}"
-   local secret_name="${SECRET_NAME:-k3d-sp-secret}"
+   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+      echo "Usage: create_az_sp [resource-group] [region] [keyvault-name] [secret-name]"
+      return 0
+   fi
+
+   local rg="${1:-${RG:-k3d-rg-eso}}"
+   local region="${2:-${REGION:-eastus}}"
+   local kv_name="${3:-${KV_NAME:-k3d-kv-eso}}"
+   local secret_name="${4:-${SECRET_NAME:-k3d-sp-secret}}"
 
    AZ_JSON=$(_az account show)
 
@@ -97,16 +102,19 @@ function _create_azure_eso_store() {
 }
 
 function deploy_azure_eso() {
-   local ns="${NS:-azure-external-secrets}"
+   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+      echo "Usage: deploy_azure_eso [namespace=azure-external-secrets]"
+      return 0
+   fi
+
+   local ns="${1:-${NS:-azure-external-secrets}}"
    local kv_name="${KV_NAME:-k3d-kv-eso}"
-   local ns="${1:-azure-external-secrets}"
 
    _ensure_azure_cli
    if ! _az_ok; then
       echo "Please 'az login' first!" >&2
-      exit 127
+      return 127
    fi
-
 
    _create_az_sp
    _install_azure_eso
@@ -213,11 +221,20 @@ function _delete_sp_and_app() {
 
 # ---------- public commands ----------
 function eso_akv() {
-  local cmd="${1:-}"; shift || true
+  if [[ "$1" == "-h" || "$1" == "--help" || -z "$1" ]]; then
+    cat <<'EOF'
+Usage: eso_akv <up|down> ...
+  up   <resource-group> <keyvault-name> [namespace=external-secrets] [ttl_hours=8]
+  down <keyvault-name> [namespace=external-secrets]
+EOF
+    return 0
+  fi
+
+  local cmd="$1"; shift || true
   case "$cmd" in
     up)   _eso_akv_up "$@";;
     down) _eso_akv_down "$@";;
-    *)    printf 'usage: eso_akv {up|down}\n'; return 2;;
+    *)    printf 'usage: eso_akv <up|down>\n'; return 2;;
   esac
 }
 

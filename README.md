@@ -19,6 +19,13 @@ Example:
 ./scripts/k3d-manager hello
 ```
 
+Use `-h` or `--help` with any command to see a brief usage message:
+
+```bash
+./scripts/k3d-manager create_k3d_cluster -h
+./scripts/k3d-manager deploy_vault -h
+```
+
 You can run multiple clusters at once by giving each a unique name and
 port mapping:
 

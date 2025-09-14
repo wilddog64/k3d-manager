@@ -55,7 +55,12 @@ function _install_istioctl() {
 }
 
 function destroy_k3d_cluster() {
-   cluster_name=$1
+   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+      echo "Usage: destroy_k3d_cluster <cluster_name>"
+      return 0
+   fi
+
+   local cluster_name=$1
 
    if [[ -z "$cluster_name" ]]; then
       echo "Cluster name is required"
@@ -72,9 +77,14 @@ function destroy_k3d_cluster() {
 }
 
 function create_k3d_cluster() {
-   cluster_name=$1
-   http_port="${2:-8000}"
-   https_port="${3:-8443}"
+   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+      echo "Usage: create_k3d_cluster <cluster_name> [http_port=8000] [https_port=8443]"
+      return 0
+   fi
+
+   local cluster_name=$1
+   local http_port="${2:-8000}"
+   local https_port="${3:-8443}"
 
    export CLUSTER_NAME="$cluster_name"
    export HTTP_PORT="$http_port"
@@ -172,6 +182,11 @@ function _install_smb_csi_driver() {
 }
 
 function create_nfs_share() {
+   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+      echo "Usage: create_nfs_share"
+      return 0
+   fi
+
    if grep -q "k3d-nfs" /etc/exports ; then
       echo "NFS share already exists, skip"
       return 0
@@ -196,7 +211,12 @@ function create_nfs_share() {
 }
 
 function deploy_k3d_cluster() {
-   cluster_name="${1:-k3d-cluster}"
+   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+      echo "Usage: deploy_k3d_cluster [cluster_name=k3d-cluster]"
+      return 0
+   fi
+
+   local cluster_name="${1:-k3d-cluster}"
 
    _install_k3d
    if ! _k3d_cluster_exist "$cluster_name" ; then

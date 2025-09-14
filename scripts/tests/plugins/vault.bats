@@ -59,6 +59,12 @@ setup() {
   export -f deploy_eso
 }
 
+@test "deploy_vault -h shows usage" {
+  run deploy_vault -h
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage: deploy_vault"* ]]
+}
+
 @test "Namespace setup" {
   KUBECTL_EXIT_CODES=(1 0)
   run _vault_ns_ensure test-ns

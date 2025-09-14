@@ -42,6 +42,10 @@ function _bw_lookup_secret(){
 
 # Create or update the kubernetes Secret: bws-access-token in ${ns}
 function ensure_bws_secret() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Usage: ensure_bws_secret [namespace=external-secrets]"
+    return 0
+  fi
   local ns="${1:-external-secrets}"
   local token
 
@@ -59,6 +63,10 @@ function _get_bw_access_token() {
 # Configure a SecretStore for Bitwarden Secrets Manager
 # Usage: eso_config_bitwarden <org_id> <project_id>
 function config_bws_eso() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Usage: config_bws_eso <org_id> <project_id> [namespace=external-secrets]"
+    return 0
+  fi
   local org_id="$1"
   local project_id="$2"
   local ns="${3:-external-secrets}"
@@ -77,7 +85,7 @@ function config_bws_eso() {
   ensure_bws_secret "$ns"
 
   # Grab the CA bundle from the tls secret (already base64-encoded)
-  local ca_b64="$(_kubectl -n "$ns" get secret bitwarden-tls-certs -o jsonpath='{.data.tls\.crt}')"
+  local ca_b64="$(_kubectl -n "$ns" get secret bitwarden-tls-certs -o jsonpath='{.data.tls\\.crt}')"
 
   # Render SecretStore from template and apply
   local yamlfile="$(mktemp)"  # mktemp -t creates a file *and* returns a path; plain mktemp is fine here
@@ -101,6 +109,10 @@ function config_bws_eso() {
 # Example: materialize a Kubernetes Secret from Bitwarden by UUID or by name
 # Usage: eso_example_by_uuid <uuid> [namespace] [k8s_secret_name] [k8s_secret_key]
 function eso_example_by_uuid() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Usage: eso_example_by_uuid <uuid> [namespace] [k8s_secret_name] [k8s_secret_key]"
+    return 0
+  fi
   local uuid="${1:?bitwarden secret UUID required}"
   local ns="${2:-external-secrets}"
   local k8s_name="${3:-demo-bw}"
@@ -126,6 +138,10 @@ EOF
 }
 
 function verify_bws_token() {
+   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+      echo "Usage: verify_bws_token [namespace=external-secrets]"
+      return 0
+   fi
    local ns="${1:-external-secrets}"
 
    local bws_token_sha=$(_get_bw_access_token | _sha256_12 )
