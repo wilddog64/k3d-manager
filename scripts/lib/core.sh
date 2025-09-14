@@ -76,6 +76,10 @@ function create_k3d_cluster() {
    http_port="${2:-8000}"
    https_port="${3:-8443}"
 
+   export CLUSTER_NAME="$cluster_name"
+   export HTTP_PORT="$http_port"
+   export HTTPS_PORT="$https_port"
+
    if [[ -z "$cluster_name" ]]; then
       echo "Cluster name is required"
       exit 1
