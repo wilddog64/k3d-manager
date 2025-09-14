@@ -105,13 +105,13 @@ function _deploy_jenkins() {
       return 1
    fi
 
-   _kubectl apply -n "$ns" --dry-run=client \
-      -f "$JENKINS_CONFIG_DIR/virtualservice.yaml" | \
-   _kubectl apply -n "$ns" -f -
+   vs_yaml=$(_kubectl apply -n "$ns" --dry-run=client \
+      -f "$JENKINS_CONFIG_DIR/virtualservice.yaml")
+   printf '%s\n' "$vs_yaml" | _kubectl apply -n "$ns" -f -
 
-   _kubectl apply -n "$ns" --dry-run=client \
-      -f "$JENKINS_CONFIG_DIR/destinationrule.yaml" | \
-   _kubectl apply -n "$ns" -f -
+   dr_yaml=$(_kubectl apply -n "$ns" --dry-run=client \
+      -f "$JENKINS_CONFIG_DIR/destinationrule.yaml")
+   printf '%s\n' "$dr_yaml" | _kubectl apply -n "$ns" -f -
 }
 
 function _create_jenkins_admin_vault_policy() {
