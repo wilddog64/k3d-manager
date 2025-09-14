@@ -50,7 +50,31 @@ Available core functions:
 $(declare -F | awk '{print $3}' | grep -v '^_' | sort | sed 's/^/  /')
 
 Plugin functions are loaded on demand from scripts/plugins.
+
+Subcommands:
+  test all|jenkins|vault|eso   Run BATS tests
 EOF
+}
+
+function test() {
+    case "$1" in
+        all)
+            bats scripts/tests/core/*.bats scripts/tests/plugins/*.bats
+            ;;
+        jenkins)
+            bats scripts/tests/plugins/jenkins.bats
+            ;;
+        vault)
+            bats scripts/tests/plugins/vault.bats
+            ;;
+        eso)
+            bats scripts/tests/plugins/eso.bats
+            ;;
+        *)
+            echo "test all|jenkins|vault|eso"
+            return 1
+            ;;
+    esac
 }
 
 ## -- main --
