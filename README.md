@@ -14,7 +14,7 @@ Running the script without arguments prints a short help message.  When you call
 Example:
 
 ```bash
-./scripts/k3d-manager create_k3d_cluster mycluster             # default 8080/8443
+./scripts/k3d-manager create_k3d_cluster mycluster             # default 8000/8443
 ./scripts/k3d-manager create_k3d_cluster second 9090 9443      # custom ports
 ./scripts/k3d-manager hello
 ```
@@ -24,7 +24,7 @@ port mapping:
 
 ```bash
 ./scripts/k3d-manager create_k3d_cluster alpha
-./scripts/k3d-manager create_k3d_cluster beta 8081 8444
+./scripts/k3d-manager create_k3d_cluster beta 8001 8444
 ```
 
 ## Directory layout

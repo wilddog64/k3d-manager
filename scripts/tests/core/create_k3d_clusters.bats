@@ -20,7 +20,8 @@ setup() {
 
   [ "$HTTP_PORT" = "8000" ]
   [ "$HTTPS_PORT" = "8443" ]
-  [[ -f "$BATS_TMPDIR/cluster.yaml" ]]
+  grep -q 'port: 8000:80' "$BATS_TMPDIR/cluster.yaml"
+  grep -q 'port: 8443:443' "$BATS_TMPDIR/cluster.yaml"
 }
 
 @test "creates cluster with custom ports" {
