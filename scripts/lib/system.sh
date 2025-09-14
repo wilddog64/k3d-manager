@@ -12,6 +12,7 @@ function command_exist() {
 # Returns the command's real exit code; prints a helpful error unless --quiet.
 function _run_command() {
   local quiet=0 prefer_sudo=0 require_sudo=0 probe= soft=0
+  local -a probe_args=()
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -37,6 +38,10 @@ function _run_command() {
     fi
   fi
 
+  if [[ -n "$probe" ]]; then
+    read -r -a probe_args <<< "$probe"
+  fi
+
   # Decide runner: user vs sudo -n
   local runner
   if (( require_sudo )); then
@@ -47,11 +52,11 @@ function _run_command() {
       exit 127
     fi
   else
-    if [[ -n "$probe" ]]; then
+    if (( ${#probe_args[@]} )); then
       # Try user first; if probe fails, try sudo -n
-      if "$prog" "$probe" >/dev/null 2>&1; then
+      if "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
         runner=("$prog")
-      elif sudo -n "$prog" "$probe" >/dev/null 2>&1; then
+      elif sudo -n "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
         runner=(sudo -n "$prog")
       elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
         runner=(sudo -n "$prog")
