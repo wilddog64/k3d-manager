@@ -16,6 +16,15 @@ setup() {
   [ "${lines[1]}" = "b" ]
 }
 
+@test "read_lines handles quotes and backslashes" {
+  local file="$BATS_TEST_TMPDIR/sample_special"
+  printf 'line with "quotes"\nback\\slash\n' > "$file"
+  read_lines "$file" lines
+  [ "${#lines[@]}" -eq 2 ]
+  [ "${lines[0]}" = 'line with "quotes"' ]
+  [ "${lines[1]}" = "back\\slash" ]
+}
+
 @test "read_lines falls back on bash <4" {
   local file="$BATS_TEST_TMPDIR/sample2"
   printf "c\nd\n" > "$file"

@@ -100,8 +100,8 @@ function read_lines() {
     local line i=0
     unset "$array_name"
     while IFS= read -r line; do
-      printf -v "$array_name[$i]" '%s' "$line"
-      ((i++))
+      # Use printf -v to safely append to the target array without eval
+      printf -v "$array_name[i++]" '%s' "$line"
     done < "$file"
   fi
 }
