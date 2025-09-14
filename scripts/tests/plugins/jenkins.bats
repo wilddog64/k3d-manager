@@ -28,6 +28,52 @@ setup() {
   [[ "${kubectl_calls[1]}" == apply* ]]
 }
 
+@test "_create_jenkins_admin_vault_policy stores secret without logging password" {
+  _vault_policy_exists() { return 1; }
+  _kubectl() {
+    local cmd="$*"
+    if [[ "$cmd" == *"vault read -field=password sys/policies/password/jenkins-admin/generate"* ]]; then
+      echo "$cmd" >> "$KUBECTL_LOG"
+      echo "s3cr3t"
+      return 0
+    fi
+    if [[ "$cmd" == *password=* ]]; then
+      cmd="${cmd%%password=*}password=***"
+    fi
+    echo "$cmd" >> "$KUBECTL_LOG"
+    return 0
+  }
+  export -f _vault_policy_exists
+  export -f _kubectl
+
+  run _create_jenkins_admin_vault_policy vault
+  [ "$status" -eq 0 ]
+  grep -q 'vault kv put secret/eso/jenkins-admin' "$KUBECTL_LOG"
+  grep -q 'password=***' "$KUBECTL_LOG"
+  ! grep -q 's3cr3t' "$KUBECTL_LOG"
+}
+
+@test "_create_jenkins_vault_ad_policy creates policies" {
+  _vault_policy_exists() { return 1; }
+  _vault_policy() { return 1; }
+  _kubectl() {
+    echo "$*" >> "$KUBECTL_LOG"
+    return 0
+  }
+  export -f _vault_policy_exists
+  export -f _vault_policy
+  export -f _kubectl
+
+  run _create_jenkins_vault_ad_policy vault jenkins
+  [ "$status" -eq 0 ]
+  grep -q 'vault policy write jenkins-jcasc-read' "$KUBECTL_LOG"
+  grep -q 'vault write auth/kubernetes/role/jenkins-jcasc-reader' "$KUBECTL_LOG"
+  grep -q 'vault policy write jenkins-jcasc-write' "$KUBECTL_LOG"
+  grep -q 'vault write auth/kubernetes/role/jenkins-jcasc-writer' "$KUBECTL_LOG"
+  ! grep -q 'vault kv put' "$KUBECTL_LOG"
+  ! grep -q 'password=' "$KUBECTL_LOG"
+}
+
 @test "Full deployment" {
   CALLS_LOG="$BATS_TEST_TMPDIR/calls.log"
   : > "$CALLS_LOG"
