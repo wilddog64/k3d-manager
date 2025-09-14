@@ -11,8 +11,8 @@ setup() {
   export -f _cleanup_on_success
 }
 
-@test "create_k3d_cluster -h shows usage" {
-  run create_k3d_cluster -h
+@test "_create_k3d_cluster -h shows usage" {
+  run _create_k3d_cluster -h
   [ "$status" -eq 0 ]
   [[ "$output" == *"Usage: create_k3d_cluster"* ]]
 }
@@ -28,7 +28,7 @@ setup() {
   _list_k3d_cluster() { :; }
   export -f _create_k3d_cluster _list_k3d_cluster
 
-  create_k3d_cluster testcluster
+  _create_k3d_cluster testcluster
 
   [ "$HTTP_PORT" = "8000" ]
   [ "$HTTPS_PORT" = "8443" ]
@@ -41,7 +41,7 @@ setup() {
   _list_k3d_cluster() { :; }
   export -f _create_k3d_cluster _list_k3d_cluster
 
-  create_k3d_cluster altcluster 9090 9443
+  _create_k3d_cluster altcluster 9090 9443
 
   [ "$HTTP_PORT" = "9090" ]
   [ "$HTTPS_PORT" = "9443" ]
