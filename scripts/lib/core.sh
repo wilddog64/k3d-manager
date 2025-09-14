@@ -73,8 +73,8 @@ function destroy_k3d_cluster() {
 
 function create_k3d_cluster() {
    cluster_name=$1
-   http_port=$2
-   https_port=$3
+   http_port="${2:-8000}"
+   https_port="${3:-8443}"
 
    if [[ -z "$cluster_name" ]]; then
       echo "Cluster name is required"
