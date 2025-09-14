@@ -34,7 +34,11 @@ function _install_istioctl() {
 
    echo "install dir: ${install_dir}"
    if [[ ! -e "$install_dir" && ! -d "$install_dir" ]]; then
-      mkdir -p "${install_dir}"
+      if mkdir -p "${install_dir}" 2>/dev/null; then
+         :
+      else
+         _run_command --prefer-sudo -- mkdir -p "${install_dir}"
+      fi
    fi
 
    if  ! _command_exist istioctl ; then
@@ -48,7 +52,11 @@ function _install_istioctl() {
          echo "Failed to download istioctl"
          exit 1
       fi
-      _run_command -- sudo cp -v "$istio_bin/istioctl" "${install_dir}/"
+      if [[ -w "${install_dir}" ]]; then
+         _run_command -- cp -v "$istio_bin/istioctl" "${install_dir}/"
+      else
+         _run_command --prefer-sudo -- cp -v "$istio_bin/istioctl" "${install_dir}/"
+      fi
       popd
    fi
 
