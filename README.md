@@ -104,7 +104,6 @@ The sequence shows a user invoking a plugin function, which loads the plugin and
 | --- | --- | --- |
 | `destroy_k3d_cluster` | `scripts/lib/core.sh` | Delete a k3d cluster |
 | `create_k3d_cluster` | `scripts/lib/core.sh` | Create a k3d cluster |
-| `create_nfs_share` | `scripts/lib/core.sh` | Configure an NFS export on the host |
 | `deploy_k3d_cluster` | `scripts/lib/core.sh` | Create and configure a cluster |
 | `test_istio` | `scripts/lib/test.sh` | Run Istio validation tests |
 | `test_nfs_connectivity` | `scripts/lib/test.sh` | Check network connectivity to NFS |
