@@ -90,6 +90,22 @@ function stub_envsubst() {
   envsubst() { command envsubst "$@"; }
 }
 
+# Read lines from a file into an array variable
+function read_lines() {
+  local file="$1"
+  local array_name="$2"
+  if (( BASH_VERSINFO[0] >= 4 )); then
+    mapfile -t "$array_name" < "$file"
+  else
+    local line i=0
+    unset "$array_name"
+    while IFS= read -r line; do
+      printf -v "$array_name[$i]" '%s' "$line"
+      ((i++))
+    done < "$file"
+  fi
+}
+
 # Export stub functions for visibility in subshells
 function export_stubs() {
   export -f _cleanup_on_success

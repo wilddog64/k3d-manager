@@ -11,7 +11,7 @@ setup() {
   KUBECTL_EXIT_CODES=(1 0)
   run _create_jenkins_namespace test-ns
   [ "$status" -eq 0 ]
-  mapfile -t kubectl_calls < "$KUBECTL_LOG"
+  read_lines "$KUBECTL_LOG" kubectl_calls
   [[ "${kubectl_calls[1]}" == apply* ]]
   [[ "$output" == *"Namespace test-ns created"* ]]
 }
@@ -24,7 +24,7 @@ setup() {
   run _create_jenkins_pv_pvc test-ns
   [ "$status" -eq 0 ]
   [[ -d "$jhp" ]]
-  mapfile -t kubectl_calls < "$KUBECTL_LOG"
+  read_lines "$KUBECTL_LOG" kubectl_calls
   [[ "${kubectl_calls[1]}" == apply* ]]
 }
 
@@ -129,7 +129,7 @@ JSON
   _deploy_jenkins() { echo "_deploy_jenkins" >> "$CALLS_LOG"; }
   run deploy_jenkins sample-ns
   [ "$status" -eq 0 ]
-  mapfile -t calls < "$CALLS_LOG"
+  read_lines "$CALLS_LOG" calls
   [ "${#calls[@]}" -eq 3 ]
   [ "${calls[0]}" = "_create_jenkins_namespace" ]
   [ "${calls[1]}" = "_ensure_jenkins_cert" ]
@@ -144,7 +144,7 @@ JSON
 @test "_deploy_jenkins applies Istio resources" {
   run _deploy_jenkins sample-ns
   [ "$status" -eq 0 ]
-  mapfile -t kubectl_calls < "$KUBECTL_LOG"
+  read_lines "$KUBECTL_LOG" kubectl_calls
   expected_gw="apply -n istio-system --dry-run=client -f $SCRIPT_DIR/etc/jenkins/gateway.yaml"
   expected_gw_apply="apply -n istio-system -f -"
   expected_vs="apply -n sample-ns --dry-run=client -f $SCRIPT_DIR/etc/jenkins/virtualservice.yaml"

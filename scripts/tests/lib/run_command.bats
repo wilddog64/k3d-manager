@@ -3,6 +3,7 @@
 bats_require_minimum_version 1.5.0
 
 setup() {
+  source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   source "${BATS_TEST_DIRNAME}/../../lib/system.sh"
   RUN_LOG="$BATS_TEST_TMPDIR/run.log"
   : > "$RUN_LOG"
@@ -14,7 +15,7 @@ setup() {
   run _run_command --prefer-sudo -- echo hi
   [ "$status" -eq 0 ]
   [[ "$output" = "hi" ]]
-  mapfile -t log < "$RUN_LOG"
+  read_lines "$RUN_LOG" log
   [ "${log[1]}" = "sudo -n echo hi" ]
 }
 

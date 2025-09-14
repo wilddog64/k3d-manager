@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 setup() {
+  source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   SOURCE="${BATS_TEST_DIRNAME}/../../k3d-manager"
   SCRIPT_DIR="${BATS_TEST_DIRNAME}/../.."
   PLUGINS_DIR="${SCRIPT_DIR}/plugins"
@@ -62,14 +63,14 @@ setup() {
   KUBECTL_EXIT_CODES=(1 0)
   run _vault_ns_ensure test-ns
   [ "$status" -eq 0 ]
-  mapfile -t kubectl_calls <"$KUBECTL_LOG"
+  read_lines "$KUBECTL_LOG" kubectl_calls
   [ "${kubectl_calls[1]}" = "create ns test-ns" ]
 }
 
 @test "Helm repo setup" {
   run _vault_repo_setup
   [ "$status" -eq 0 ]
-  mapfile -t helm_calls <"$HELM_LOG"
+  read_lines "$HELM_LOG" helm_calls
   [[ "${helm_calls[0]}" == repo\ add\ hashicorp* ]]
   [[ "${helm_calls[1]}" == repo\ update* ]]
 }
