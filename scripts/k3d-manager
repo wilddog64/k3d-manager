@@ -43,6 +43,10 @@ source "${SCRIPT_DIR}/lib/test.sh"
 source "${SCRIPT_DIR}/lib/core.sh"
 
 function _usage() {
+    local test_suites
+    test_suites=$(find "${SCRIPT_DIR}/tests" -type f -name '*.bats' \
+        -exec basename {} .bats \; | sort | paste -sd '|' -)
+
     cat <<EOF
 Usage: ./k3d-manager <function> [args]
 
@@ -52,32 +56,31 @@ $(declare -F | awk '{print $3}' | grep -v '^_' | sort | sed 's/^/  /')
 Plugin functions are loaded on demand from scripts/plugins.
 
 Subcommands:
-  test all|jenkins|vault|eso|run_command   Run BATS tests
+  test all|${test_suites}   Run BATS tests
 EOF
 }
 
 function test() {
-    case "$1" in
-        all)
-            bats scripts/tests/lib/*.bats scripts/tests/core/*.bats scripts/tests/plugins/*.bats
-            ;;
-        jenkins)
-            bats scripts/tests/plugins/jenkins.bats
-            ;;
-        vault)
-            bats scripts/tests/plugins/vault.bats
-            ;;
-        eso)
-            bats scripts/tests/plugins/eso.bats
-            ;;
-        run_command)
-            bats scripts/tests/lib/run_command.bats
-            ;;
-        *)
-            echo "test all|jenkins|vault|eso|run_command"
-            return 1
-            ;;
-    esac
+    local suite="$1"
+    local search_dirs=("${SCRIPT_DIR}/tests/lib" "${SCRIPT_DIR}/tests/core" "${SCRIPT_DIR}/tests/plugins")
+    local tests
+    mapfile -t tests < <(find "${search_dirs[@]}" -maxdepth 1 -type f -name '*.bats' | sort)
+
+    if [[ "$suite" == "all" ]]; then
+        bats "${tests[@]}"
+        return
+    fi
+
+    for test_file in "${tests[@]}"; do
+        if [[ "$(basename "$test_file" .bats)" == "$suite" ]]; then
+            bats "$test_file"
+            return
+        fi
+    done
+
+    echo "No test suite matching '$suite'. Available suites:" >&2
+    printf '  %s\n' "${tests[@]##*/}" | sed 's/\.bats$//' >&2
+    return 1
 }
 
 ## -- main --
