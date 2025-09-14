@@ -18,6 +18,7 @@ function init_test_env() {
 
   cleanup_on_success() { :; }
 
+  stub_envsubst
   stub_kubectl
   stub_helm
   stub_run_command
@@ -84,10 +85,16 @@ function stub_run_command() {
   }
 }
 
+# Define envsubst stub as a no-op pass-through
+function stub_envsubst() {
+  envsubst() { cat; }
+}
+
 # Export stub functions for visibility in subshells
 function export_stubs() {
   export -f cleanup_on_success
   export -f _kubectl
   export -f _helm
   export -f _run_command
+  export -f envsubst
 }
