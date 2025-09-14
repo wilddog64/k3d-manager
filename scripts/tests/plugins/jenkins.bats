@@ -45,12 +45,27 @@ setup() {
   }
   export -f _vault_policy_exists
   export -f _kubectl
+  _no_trace() {
+    local cmd="$*"
+    local script
+    script=$(cat)
+    if [[ "$script" == *password=* ]]; then
+      script="${script/password=*/password=***}"
+    fi
+    echo "$cmd" >> "$KUBECTL_LOG"
+    echo "$script" >> "$KUBECTL_LOG"
+    echo "$script" | _kubectl "$@"
+  }
+  export -f _no_trace
+  cleanup_on_success() { rm -f "$1"; }
+  export -f cleanup_on_success
 
   run _create_jenkins_admin_vault_policy vault
   [ "$status" -eq 0 ]
   grep -q 'vault kv put secret/eso/jenkins-admin' "$KUBECTL_LOG"
   grep -q 'password=***' "$KUBECTL_LOG"
   ! grep -q 's3cr3t' "$KUBECTL_LOG"
+  [[ ! -f jenkins-admin.hcl ]]
 }
 
 @test "_create_jenkins_vault_ad_policy creates policies" {
