@@ -147,7 +147,12 @@ function _mytool_helper() {
 
 ## Tests
 
-Run the plugin tests using:
+Run the test suites via the manager script:
 
 ```bash
-bats scripts/tests/plugins/jenkins.bats
+./scripts/k3d-manager test all            # run all suites
+./scripts/k3d-manager test plugins        # run the plugins suite
+./scripts/k3d-manager test lib            # run the lib suite
+```
+
+Test subcommands are discovered automatically by scanning `scripts/tests` for `.bats` files.
