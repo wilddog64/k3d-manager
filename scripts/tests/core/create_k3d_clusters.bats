@@ -24,9 +24,9 @@ setup() {
 }
 
 @test "creates cluster with default ports" {
-  _create_k3d_cluster() { cp "$1" "$BATS_TMPDIR/cluster.yaml"; }
+  __create_k3d_cluster() { cp "$1" "$BATS_TMPDIR/cluster.yaml"; }
   _list_k3d_cluster() { :; }
-  export -f _create_k3d_cluster _list_k3d_cluster
+  export -f __create_k3d_cluster _list_k3d_cluster
 
   _create_k3d_cluster testcluster
 
@@ -37,9 +37,9 @@ setup() {
 }
 
 @test "creates cluster with custom ports" {
-  _create_k3d_cluster() { cp "$1" "$BATS_TMPDIR/cluster.yaml"; }
+  __create_k3d_cluster() { cp "$1" "$BATS_TMPDIR/cluster.yaml"; }
   _list_k3d_cluster() { :; }
-  export -f _create_k3d_cluster _list_k3d_cluster
+  export -f __create_k3d_cluster _list_k3d_cluster
 
   _create_k3d_cluster altcluster 9090 9443
 

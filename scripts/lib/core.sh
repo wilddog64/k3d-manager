@@ -130,7 +130,7 @@ function _create_k3d_cluster() {
       return 0
    fi
 
-   _create_k3d_cluster "$yamlfile"
+   __create_k3d_cluster "$yamlfile"
 }
 
 function _cleanup_on_success() {

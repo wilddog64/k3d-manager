@@ -10,9 +10,11 @@
 !_TAG_PROGRAM_URL	https://ctags.io/	/official site/
 !_TAG_PROGRAM_VERSION	5.9.0	//
 Directory layout	README.md	/^## Directory layout$/;"	s	chapter:k3d-manager
+EOF	scripts/k3d-manager	/^        cat <<EOF$/;"	h
 EOF	scripts/k3d-manager	/^    cat <<EOF$/;"	h
 EOF	scripts/lib/test.sh	/^    _kubectl apply -f - -n istio-test <<EOF$/;"	h
 EOF	scripts/lib/test.sh	/^  cat <<EOF | _kubectl apply -f -$/;"	h
+EOF	scripts/plugins/azure.sh	/^    cat <<'EOF'$/;"	h
 EOF	scripts/plugins/bitwarden.sh	/^  cat <<EOF | _kubectl apply -f -$/;"	h
 EOF	scripts/plugins/vault.sh	/^   cat <<EOF$/;"	h
 HCL	scripts/plugins/jenkins.sh	/^         vault policy write jenkins-jcasc-read - <<'HCL'$/;"	h
@@ -34,6 +36,7 @@ Tests	README.md	/^## Tests$/;"	s	chapter:k3d-manager
 Usage	README.md	/^## Usage$/;"	s	chapter:k3d-manager
 Writing a plugin	README.md	/^## Writing a plugin$/;"	s	chapter:k3d-manager
 YAML	scripts/plugins/vault.sh	/^   cat >"$f" <<YAML$/;"	h
+__create_k3d_cluster	scripts/lib/system.sh	/^function __create_k3d_cluster() {$/;"	f
 _add_exit_trap	scripts/lib/system.sh	/^function _add_exit_trap() {$/;"	f
 _apply_clustersecretstore	scripts/plugins/azure.sh	/^function _apply_clustersecretstore() {$/;"	f
 _az	scripts/plugins/azure.sh	/^function _az() {$/;"	f
@@ -53,7 +56,8 @@ _create_jenkins_admin_vault_policy	scripts/plugins/jenkins.sh	/^function _create
 _create_jenkins_namespace	scripts/plugins/jenkins.sh	/^function _create_jenkins_namespace() {$/;"	f
 _create_jenkins_pv_pvc	scripts/plugins/jenkins.sh	/^function _create_jenkins_pv_pvc() {$/;"	f
 _create_jenkins_vault_ad_policy	scripts/plugins/jenkins.sh	/^function _create_jenkins_vault_ad_policy() {$/;"	f
-_create_k3d_cluster	scripts/lib/system.sh	/^function _create_k3d_cluster() {$/;"	f
+_create_k3d_cluster	scripts/lib/core.sh	/^function _create_k3d_cluster() {$/;"	f
+_create_nfs_share	scripts/lib/core.sh	/^function _create_nfs_share() {$/;"	f
 _curl	scripts/lib/system.sh	/^function _curl() {$/;"	f
 _delete_k8s_resources	scripts/plugins/azure.sh	/^function _delete_k8s_resources() {$/;"	f
 _delete_sp_and_app	scripts/plugins/azure.sh	/^function _delete_sp_and_app() {$/;"	f
@@ -62,6 +66,7 @@ _deploy_jenkins_image	scripts/plugins/jenkins.sh	/^function _deploy_jenkins_imag
 _deploy_vault_ha	scripts/plugins/vault.sh	/^function _deploy_vault_ha() {$/;"	f
 _enable_kv2_k8s_auth	scripts/plugins/vault.sh	/^function _enable_kv2_k8s_auth() {$/;"	f
 _ensure_azure_cli	scripts/plugins/azure.sh	/^function _ensure_azure_cli() {$/;"	f
+_ensure_bats	scripts/lib/system.sh	/^function _ensure_bats() {$/;"	f
 _ensure_cargo	scripts/lib/system.sh	/^function _ensure_cargo() {$/;"	f
 _ensure_jenkins_cert	scripts/plugins/jenkins.sh	/^function _ensure_jenkins_cert() {$/;"	f
 _ensure_namespace	scripts/plugins/azure.sh	/^function _ensure_namespace() {$/;"	f
@@ -138,8 +143,6 @@ _vault_wait_ready	scripts/plugins/vault.sh	/^function _vault_wait_ready() {$/;"	
 _warn	scripts/lib/system.sh	/^function _warn() { printf 'WARN: %s\\n' "$*" >&2; }$/;"	f
 config_bws_eso	scripts/plugins/bitwarden.sh	/^function config_bws_eso() {$/;"	f
 create_az_sp	scripts/plugins/azure.sh	/^function create_az_sp() {$/;"	f
-create_k3d_cluster	scripts/lib/core.sh	/^function create_k3d_cluster() {$/;"	f
-create_nfs_share	scripts/lib/core.sh	/^function create_nfs_share() {$/;"	f
 deploy_azure_eso	scripts/plugins/azure.sh	/^function deploy_azure_eso() {$/;"	f
 deploy_eso	scripts/plugins/eso.sh	/^function deploy_eso() {$/;"	f
 deploy_jenkins	scripts/plugins/jenkins.sh	/^function deploy_jenkins() {$/;"	f
@@ -158,6 +161,7 @@ pre=	scripts/lib/system.sh	/^   local pre=()$/;"	f
 pre=	scripts/lib/system.sh	/^  local pre=() ;$/;"	f
 pre=	scripts/lib/system.sh	/^  local pre=()$/;"	f
 probe_args=	scripts/lib/system.sh	/^  local -a probe_args=()$/;"	f
+read_lines	scripts/tests/test_helpers.bash	/^function read_lines() {$/;"	f
 stub_envsubst	scripts/tests/test_helpers.bash	/^function stub_envsubst() {$/;"	f
 stub_helm	scripts/tests/test_helpers.bash	/^function stub_helm() {$/;"	f
 stub_kubectl	scripts/tests/test_helpers.bash	/^function stub_kubectl() {$/;"	f
@@ -166,4 +170,5 @@ test	scripts/k3d-manager	/^function test() {$/;"	f
 test_istio	scripts/lib/test.sh	/^function test_istio() {$/;"	f
 test_nfs_connectivity	scripts/lib/test.sh	/^function test_nfs_connectivity() {$/;"	f
 test_nfs_direct	scripts/lib/test.sh	/^function test_nfs_direct() {$/;"	f
+tests=	scripts/k3d-manager	/^    local -a tests=()$/;"	f
 verify_bws_token	scripts/plugins/bitwarden.sh	/^function verify_bws_token() {$/;"	f

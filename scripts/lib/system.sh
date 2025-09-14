@@ -344,7 +344,7 @@ function _k3d_cluster_exist() {
    fi
 }
 
-function _create_k3d_cluster() {
+function __create_k3d_cluster() {
    cluster_yaml=$1
 
    if _is_mac ; then
