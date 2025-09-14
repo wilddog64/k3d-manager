@@ -61,6 +61,7 @@ EOF
 }
 
 function test() {
+    _ensure_bats
     local suite="$1"
     local search_dirs=("${SCRIPT_DIR}/tests/lib" "${SCRIPT_DIR}/tests/core" "${SCRIPT_DIR}/tests/plugins")
     local tests

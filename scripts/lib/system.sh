@@ -513,6 +513,30 @@ function _is_same_token() {
    fi
 }
 
+function _ensure_bats() {
+   if _command_exist bats ; then
+      return 0
+   fi
+
+   if _command_exist brew ; then
+      _run_command -- brew install bats-core
+   elif _command_exist apt-get ; then
+      _run_command -- sudo apt-get update
+      _run_command -- sudo apt-get install -y bats
+   elif _command_exist dnf ; then
+      _run_command -- sudo dnf install -y bats
+   elif _command_exist yum ; then
+      _run_command -- sudo yum install -y bats
+   elif _command_exist microdnf ; then
+      _run_command -- sudo microdnf install -y bats
+   else
+      echo "Cannot install bats: no known package manager found" >&2
+      exit 127
+   fi
+
+   command -v bats >/dev/null 2>&1
+}
+
 function _ensure_cargo() {
    if _command_exist cargo ; then
       return 0

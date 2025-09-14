@@ -147,7 +147,9 @@ function _mytool_helper() {
 
 ## Tests
 
-Run the test suites via the manager script:
+Run the test suites via the manager script. The `_ensure_bats` helper in
+`scripts/lib/system.sh` installs [Bats](https://github.com/bats-core/bats-core)
+using your system package manager when needed:
 
 ```bash
 ./scripts/k3d-manager test all            # run all suites
