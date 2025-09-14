@@ -73,12 +73,22 @@ function destroy_k3d_cluster() {
 
 function create_k3d_cluster() {
    cluster_name=$1
-
-   export CLUSTER_NAME="$cluster_name"
+   http_port=$2
+   https_port=$3
 
    if [[ -z "$cluster_name" ]]; then
       echo "Cluster name is required"
       exit 1
+   fi
+
+   export CLUSTER_NAME="$cluster_name"
+
+   if [[ -n "$http_port" ]]; then
+      export HTTP_PORT="$http_port"
+   fi
+
+   if [[ -n "$https_port" ]]; then
+      export HTTPS_PORT="$https_port"
    fi
 
    cluster_template="$(dirname "$SOURCE")/etc/cluster.yaml.tmpl"
