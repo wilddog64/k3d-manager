@@ -157,40 +157,32 @@ function _create_jenkins_vault_ad_policy() {
    local jenkins_namespace="${2:-jenkins}"
 
    if ! _vault_policy_exists "$vault_namespace" "jenkins-jcasc-read"; then
-      cat > jenkins-jcasc-read.hcl <<'HCL' |
       _kubectl -n "$vault_namespace" exec -i vault-0 -- \
-         vault write sys/policies/password/jenkins-jcasc-read policy=-
-         path "secret/data/jenkins/ad-ldap"     { capabilities = ["read"] }
-         path "secret/data/jenkins/ad-adreader" { capabilities = ["read"] }
+         vault policy write jenkins-jcasc-read - <<'HCL'
+path "secret/data/jenkins/ad-ldap"     { capabilities = ["read"] }
+path "secret/data/jenkins/ad-adreader" { capabilities = ["read"] }
 HCL
-      _kubectl -n "$vault_namespace" exec -i vault-0 -- sh - \
-         vault policy write jenkins-jcasc-read
 
       _kubectl -n "$vault_namespace" exec -i vault-0 -- \
          vault write auth/kubernetes/role/jenkins-jcasc-reader - \
            bound_service_account_names=jenkins \
-           bound_service_account_namespaces=jenkins \
+           bound_service_account_namespaces="$jenkins_namespace" \
            policies=jenkins-jcasc-read \
            ttl=30m
-
-
    fi
 
-   if ! _vault_policy "$vault_namespace" "jenkins-jcasc-write"; then
-      cat > jenkins-jcasc-write.hcl <<'HCL' |
+   if ! _vault_policy_exists "$vault_namespace" "jenkins-jcasc-write"; then
       _kubectl -n "$vault_namespace" exec -i vault-0 -- \
-         vault write sys/policies/password/jenkins-jcasc-write policy=-
-         path "secret/data/jenkins/ad-ldap"     { capabilities = ["create", "update"] }
-         path "secret/data/jenkins/ad-adreader" { capabilities = ["create", "update"] }
+         vault policy write jenkins-jcasc-write - <<'HCL'
+path "secret/data/jenkins/ad-ldap"     { capabilities = ["create", "update"] }
+path "secret/data/jenkins/ad-adreader" { capabilities = ["create", "update"] }
 HCL
-      _kubectl -n "$vault_namespace" exec -i vault-0 -- sh - \
-         vault policy write jenkins-jcasc-write
 
       _kubectl -n "$vault_namespace" exec -i vault-0 -- \
          vault write auth/kubernetes/role/jenkins-jcasc-writer - \
            bound_service_account_names=jenkins \
-           bound_service_account_namespaces=jenkins \
+           bound_service_account_namespaces="$jenkins_namespace" \
            policies=jenkins-jcasc-write \
-             ttl=15m
+           ttl=15m
    fi
 }
