@@ -139,7 +139,7 @@ HCL
    jenkins_admin_pass=$(_kubectl -n "$vault_namespace" exec -i vault-0 -- \
       vault read -field=password sys/policies/password/jenkins-admin/generate)
    printf '' | _no_trace _kubectl -n "$vault_namespace" exec -i vault-0 -- \
-      vault kv put secret/eso/jenkins-admin username=admin \
+      vault kv put secret/eso/jenkins-admin username=jenkins-admin \
       password="$jenkins_admin_pass"
    rm -f jenkins-admin.hcl
 }
@@ -152,7 +152,7 @@ function _sync_vault_jenkins_admin() {
 
    _kubectl -n "$vault_namespace" exec -i vault-0 -- sh - \
       vault kv put secret/eso/jenkins-admin \
-      username=admin password="$(_kubectl -n "$vault_namespace" exec -i vault-0 -- \
+      username=jenkins-admin password="$(_kubectl -n "$vault_namespace" exec -i vault-0 -- \
       vault read -field=password sys/policies/password/jenkins-admin/generate)"
 }
 

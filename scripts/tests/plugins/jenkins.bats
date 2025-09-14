@@ -63,6 +63,7 @@ setup() {
   run _create_jenkins_admin_vault_policy vault
   [ "$status" -eq 0 ]
   grep -q 'vault kv put secret/eso/jenkins-admin' "$KUBECTL_LOG"
+  grep -q 'username=jenkins-admin' "$KUBECTL_LOG"
   grep -q 'password=***' "$KUBECTL_LOG"
   ! grep -q 's3cr3t' "$KUBECTL_LOG"
   [[ ! -f jenkins-admin.hcl ]]
