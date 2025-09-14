@@ -126,25 +126,22 @@ function _create_jenkins_admin_vault_policy() {
    fi
 
    # create policy once (idempotent)
-   jenkins_admin_hcl=$(mktemp -t)
-   cat > "$jenkins_admin_hcl" <<'HCL'
+   cat <<'HCL' | tee jenkins-admin.hcl | _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+      vault write sys/policies/password/jenkins-admin policy=-
 length = 24
 rule "charset" { charset = "abcdefghijklmnopqrstuvwxyz" }
 rule "charset" { charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" }
 rule "charset" { charset = "0123456789" }
 rule "charset" { charset = "!@#$%^&*()-_=+[]{};:,.?" }
 HCL
-   trap 'cleanup_on_success "$jenkins_admin_hcl"' RETURN
-   cat "$jenkins_admin_hcl" | _kubectl -n "$vault_namespace" exec -i vault-0 -- \
-      vault write sys/policies/password/jenkins-admin policy=-
 
    local jenkins_admin_pass
    jenkins_admin_pass=$(_kubectl -n "$vault_namespace" exec -i vault-0 -- \
       vault read -field=password sys/policies/password/jenkins-admin/generate)
-   _no_trace _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+   printf '' | _no_trace _kubectl -n "$vault_namespace" exec -i vault-0 -- \
       vault kv put secret/eso/jenkins-admin username=admin \
       password="$jenkins_admin_pass"
-    trap 'cleanup_on_success "$jenkins_admin_hcl"' RETURN
+   rm -f jenkins-admin.hcl
 }
 
 function _sync_vault_jenkins_admin() {
