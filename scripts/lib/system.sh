@@ -275,6 +275,7 @@ function _install_mac_docker() {
    fi
 
    if _is_mac; then
+      _install_colima
       docker context use colima
       export DOCKER_HOST=unix:///Users/$USER/.colima/docker.sock
       colima start
