@@ -186,15 +186,16 @@ function _cleanup_istio_test_namespace() {
 
 function test_jenkins() {
     echo "Testing Jenkins deployment..."
-    trap '_cleanup_jenkins_test_namespace' EXIT TERM
+    local JENKINS_NS="jenkins"
+    trap '_cleanup_jenkins_test_namespace; rm -f /tmp/jenkins-auth.json' EXIT TERM
     PF_PIDS=()
 
     deploy_jenkins
-    _wait_for_jenkins_ready jenkins
+    _wait_for_jenkins_ready "$JENKINS_NS"
 
     # Verify the Jenkins pod mounts the expected PVC
     local pvc
-    pvc=$(_kubectl get pod jenkins-0 -n jenkins -o jsonpath='{..persistentVolumeClaim.claimName}')
+    pvc=$(_kubectl get pod jenkins-0 -n "$JENKINS_NS" -o jsonpath='{..persistentVolumeClaim.claimName}')
     if [[ "$pvc" != "jenkins-home" ]]; then
         echo "Unexpected PVC: $pvc" >&2
         return 1
@@ -202,8 +203,8 @@ function test_jenkins() {
 
     # Ensure Istio routing resources exist
     _kubectl get gateway jenkins-gw -n istio-system >/dev/null
-    _kubectl get virtualservice jenkins -n jenkins >/dev/null
-    _kubectl get destinationrule jenkins -n jenkins >/dev/null
+    _kubectl get virtualservice jenkins -n "$JENKINS_NS" >/dev/null
+    _kubectl get destinationrule jenkins -n "$JENKINS_NS" >/dev/null
 
     # Port-forward the Istio ingress gateway for HTTPS access to Jenkins
     _kubectl -n istio-system port-forward svc/istio-ingressgateway 8443:443 &
@@ -234,14 +235,16 @@ function test_jenkins() {
     fi
 
     # Authenticate to Jenkins using the admin secret
-    local admin_pass http_code
-    admin_pass=$(_kubectl -n jenkins get secret jenkins -o jsonpath='{.data.jenkins-admin-password}' | base64 -d)
-    http_code=$(_curl --insecure --resolve jenkins.dev.local.me:8443:127.0.0.1 \
-        -s -o /dev/null -w '%{http_code}' -L -X POST \
-        -d "j_username=jenkins-admin&j_password=${admin_pass}&Submit=Sign+in" \
-        https://jenkins.dev.local.me:8443/j_acegi_security_check)
-    if [[ "$http_code" != "200" ]]; then
-        echo "Jenkins authentication failed with HTTP $http_code" >&2
+    _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 &
+    PF_PIDS+=($!)
+    sleep 5
+
+    local admin_user admin_pass auth_status
+    admin_user=$(_kubectl -n "$JENKINS_NS" get secret jenkins-admin -o jsonpath='{.data.username}' | base64 -d)
+    admin_pass=$(_kubectl -n "$JENKINS_NS" get secret jenkins-admin -o jsonpath='{.data.password}' | base64 -d)
+    auth_status=$(_curl -u "$admin_user:$admin_pass" -s -o /tmp/jenkins-auth.json -w '%{http_code}' http://127.0.0.1:8080/whoAmI/api/json)
+    if [[ "$auth_status" != "200" ]] || ! grep -q '"authenticated":true' /tmp/jenkins-auth.json; then
+        echo "Jenkins authentication failed" >&2
         return 1
     fi
 }
