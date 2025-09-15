@@ -143,13 +143,27 @@ JSON
   _create_jenkins_namespace() { echo "_create_jenkins_namespace" >> "$CALLS_LOG"; }
   _ensure_jenkins_cert() { echo "_ensure_jenkins_cert" >> "$CALLS_LOG"; }
   _deploy_jenkins() { echo "_deploy_jenkins" >> "$CALLS_LOG"; }
+  _wait_for_jenkins_ready() { echo "_wait_for_jenkins_ready" >> "$CALLS_LOG"; }
   run deploy_jenkins sample-ns
   [ "$status" -eq 0 ]
   read_lines "$CALLS_LOG" calls
-  [ "${#calls[@]}" -eq 3 ]
+  [ "${#calls[@]}" -eq 4 ]
   [ "${calls[0]}" = "_create_jenkins_namespace" ]
   [ "${calls[1]}" = "_ensure_jenkins_cert" ]
   [ "${calls[2]}" = "_deploy_jenkins" ]
+  [ "${calls[3]}" = "_wait_for_jenkins_ready" ]
+}
+
+@test "_wait_for_jenkins_ready waits for controller" {
+  KUBECTL_EXIT_CODES=(1 0)
+  sleep() { :; }
+  export -f sleep
+  run _wait_for_jenkins_ready test-ns 1s
+  [ "$status" -eq 0 ]
+  read_lines "$KUBECTL_LOG" kubectl_calls
+  [ "${#kubectl_calls[@]}" -eq 2 ]
+  expected="-n test-ns wait --for=condition=Ready pod -l app.kubernetes.io/component=jenkins-controller --timeout=1s"
+  [ "${kubectl_calls[0]}" = "$expected" ]
 }
 
 @test "VirtualService references Jenkins gateway" {

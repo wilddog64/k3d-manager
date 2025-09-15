@@ -129,6 +129,7 @@ function deploy_jenkins() {
    _create_jenkins_pv_pvc "$jenkins_namespace"
    _ensure_jenkins_cert "vault"
    _deploy_jenkins "$jenkins_namespace"
+   _wait_for_jenkins_ready "$jenkins_namespace"
 }
 
 function _deploy_jenkins() {
@@ -164,6 +165,27 @@ function _deploy_jenkins() {
    dr_yaml=$(_kubectl apply -n "$ns" --dry-run=client \
       -f "$JENKINS_CONFIG_DIR/destinationrule.yaml")
    printf '%s\n' "$dr_yaml" | _kubectl apply -n "$ns" -f -
+}
+
+function _wait_for_jenkins_ready() {
+   local ns="$1"
+   local timeout="${2:-5m}"
+
+   local total_seconds
+   case "$timeout" in
+      *m) total_seconds=$(( ${timeout%m} * 60 )) ;;
+      *s) total_seconds=${timeout%s} ;;
+      *) total_seconds=$timeout ;;
+   esac
+   local end=$((SECONDS + total_seconds))
+
+   until _kubectl -n "$ns" wait --for=condition=Ready pod -l app.kubernetes.io/component=jenkins-controller --timeout="$timeout"; do
+      if (( SECONDS >= end )); then
+         echo "Timed out waiting for Jenkins controller pod to be ready" >&2
+         return 1
+      fi
+      sleep 5
+   done
 }
 
 function _create_jenkins_admin_vault_policy() {
