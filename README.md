@@ -143,6 +143,31 @@ function _mytool_helper() {
 }
 ```
 
+### `_run_command` helper
+
+The `_run_command` wrapper executes system commands with consistent error handling
+and optional `sudo` support. Its general form is:
+
+```
+_run_command [--quiet] [--prefer-sudo|--require-sudo] [--probe '<subcmd>'] -- <prog> [args...]
+```
+
+Examples:
+
+```bash
+# install a package, preferring sudo but falling back to the current user
+_run_command --prefer-sudo -- apt-get install -y jq
+
+# require sudo and abort if it is unavailable
+_run_command --require-sudo -- mkdir /etc/myapp
+
+# probe a subcommand to decide if sudo is needed
+_run_command --probe 'config current-context' -- kubectl get nodes
+```
+
+Use `--` to separate `_run_command` options from the command being executed.
+Unless `--quiet` is specified, failures print the exit code and full command.
+
 ## Security notes
 
 * `_failfast_on`/`_failfast_off` toggle `set -Eeuo pipefail`.
