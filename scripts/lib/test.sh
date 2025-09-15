@@ -284,9 +284,18 @@ function test_eso() {
   local secret_val="swordfish"
 
   local root_token
+  local vault_started=0
+
+  if ! _kubectl --no-exit get ns "$vault_ns" >/dev/null 2>&1 || \
+     ! _kubectl --no-exit -n "$vault_ns" get secret vault-root >/dev/null 2>&1; then
+    echo "Vault not detected; deploying..."
+    "${SCRIPT_DIR}/k3d-manager" deploy_vault ha "$vault_ns"
+    vault_started=1
+  fi
+
   root_token=$(_kubectl -n "$vault_ns" get secret vault-root -o jsonpath='{.data.root_token}' | base64 -d)
 
-  trap "_cleanup_eso_test '$vault_ns' '$vault_secret_path' '$root_token' '$es_ns' '$es_name' '$store_name'" EXIT TERM
+  trap "_cleanup_eso_test '$vault_ns' '$vault_secret_path' '$root_token' '$es_ns' '$es_name' '$store_name' '$vault_started'" EXIT TERM
 
   echo "Creating secret in Vault..."
   _kubectl -n "$vault_ns" exec -i vault-0 -- \
@@ -356,6 +365,7 @@ function _cleanup_eso_test() {
   local es_ns="$4"
   local es_name="$5"
   local store_name="$6"
+  local vault_started="${7:-0}"
 
   echo "Cleaning up ESO test resources..."
   _kubectl -n "$es_ns" delete externalsecret "$es_name" --ignore-not-found >/dev/null 2>&1
@@ -363,6 +373,10 @@ function _cleanup_eso_test() {
   _kubectl delete clustersecretstore "$store_name" --ignore-not-found >/dev/null 2>&1
   _kubectl -n "$vault_ns" exec -i vault-0 -- \
     sh -c "VAULT_TOKEN='$root_token' vault kv delete secret/$vault_secret_path" >/dev/null 2>&1 || true
+
+  if [[ "$vault_started" -eq 1 ]]; then
+    "${SCRIPT_DIR}/k3d-manager" undeploy_vault "$vault_ns" >/dev/null 2>&1 || true
+  fi
 }
 
 function test_vault() {
