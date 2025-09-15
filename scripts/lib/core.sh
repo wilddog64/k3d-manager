@@ -12,9 +12,15 @@ function _install_docker() {
 }
 
 function _install_k3d() {
+   export K3D_INSTALL_DIR="${1:-/usr/local/bin}"
+
    _install_docker
    _install_helm
-   _install_istioctl
+   if _is_mac; then
+      _install_istioctl $HOME/.local/bin
+   else
+      _install_istioctl
+   fi
 
    if ! _command_exist k3d ; then
       echo k3d does not exist, install it
@@ -167,7 +173,6 @@ function _configure_k3d_cluster_istio() {
    isito_yamlfile=$(mktemp -t)
    envsubst < "$istio_yaml_template" > "$isito_yamlfile"
 
-   _install_kubernetes_cli
    _install_istioctl
    _istioctl x precheck
    _istioctl install -y -f "$isito_yamlfile"
@@ -222,7 +227,12 @@ function deploy_k3d_cluster() {
 
    local cluster_name="${1:-k3d-cluster}"
 
-   _install_k3d
+   if _is_mac; then
+      _install_k3d $HOME/.local/bin
+   else
+      _install_k3d /usr/local/bin
+   fi
+
    if ! _k3d_cluster_exist "$cluster_name" ; then
       _create_k3d_cluster "$cluster_name"
    fi
