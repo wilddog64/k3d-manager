@@ -164,6 +164,10 @@ function _install_kubernetes_cli() {
       _install_redhat_kubernetes_client
    elif _is_debian_family ; then
       _install_debian_kubernetes_client
+   elif _is_mac ; then
+      if ! _command_exist kubectl ; then
+         _run_command --quiet -- brew install kubectl
+      fi
    elif _is_wsl ; then
       if grep "debian" /etc/os-release &> /dev/null; then
         _install_debian_kubernetes_client
@@ -360,6 +364,8 @@ function _list_k3d_cluster() {
 }
 
 function _kubectl() {
+
+  _install_kubernetes_cli
 
   # Pass-through mini-parser so you can do: _helm --quiet ...  (like _run_command)
   local pre=()
