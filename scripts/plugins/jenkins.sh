@@ -21,7 +21,7 @@ function _create_jenkins_namespace() {
    # shellcheck disable=SC
    envsubst < "$jenkins_namespace_template" > "$yamlfile"
 
-   if _kubectl get namespace "$jenkins_namespace" >/dev/null 2>&1; then
+   if _kubectl --no-exit get namespace "$jenkins_namespace" >/dev/null 2>&1; then
       echo "Namespace $jenkins_namespace already exists, skip"
    else
       _kubectl apply -f "$yamlfile" >/dev/null 2>&1
@@ -38,7 +38,7 @@ function _create_jenkins_pv_pvc() {
    export JENKINS_HOME_IN_CLUSTER="/data/jenkins"
    export JENKINS_NAMESPACE="$jenkins_namespace"
 
-   if _kubectl get pv jenkins-home-pv >/dev/null 2>&1; then
+   if _kubectl --no-exit get pv jenkins-home-pv >/dev/null 2>&1; then
       echo "Jenkins PV already exists, skip"
       return 0
    fi
@@ -68,12 +68,13 @@ function _ensure_jenkins_cert() {
    local secret_name="jenkins-cert"
    local common_name="jenkins.dev.local.me"
 
-   if _kubectl -n "$k8s_namespace" get secret "$secret_name" >/dev/null 2>&1; then
+   if _kubectl --no-exit -n "$k8s_namespace" \
+      get secret "$secret_name" >/dev/null 2>&1; then
       echo "TLS secret $secret_name already exists, skip"
       return 0
    fi
 
-   if ! _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+   if ! _kubectl --no-exit -n "$vault_namespace" exec -i vault-0 -- \
       sh -c 'vault secrets list | grep -q "^pki/"'; then
       _kubectl -n "$vault_namespace" exec -i vault-0 -- vault secrets enable pki
       _kubectl -n "$vault_namespace" exec -i vault-0 -- vault secrets tune -max-lease-ttl=87600h pki
