@@ -270,6 +270,9 @@ function _install_colima() {
 }
 
 function _install_mac_docker() {
+   local cpu="${1:-${COLIMA_CPU:-4}}"
+   local memory="${2:-${COLIMA_MEMORY:-8}}"
+   local disk="${3:-${COLIMA_DISK:-20}}"
 
    if  ! _command_exist docker && _is_mac ; then
       echo docker does not exist, install it
@@ -282,7 +285,7 @@ function _install_mac_docker() {
       _install_colima
       docker context use colima
       export DOCKER_HOST=unix:///Users/$USER/.colima/docker.sock
-      colima start
+      colima start --cpu "$cpu" --memory "$memory" --disk "$disk"
    fi
 
 

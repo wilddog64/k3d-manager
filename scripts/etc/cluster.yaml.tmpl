@@ -11,9 +11,6 @@ ports:
     nodeFilters: [loadbalancer]
   - port: ${HTTPS_PORT}:443
     nodeFilters: [loadbalancer]
-volumes:
-  - volume: "${SCRIPT_DIR}/storage/jenkins_home:/data/jenkins"
-    nodeFilters: ["agent:0"]
 options:
   k3d:
     wait: true

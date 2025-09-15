@@ -49,3 +49,13 @@ setup() {
   grep -q "port: ${HTTP_PORT}:80" "$BATS_TMPDIR/cluster.yaml"
   grep -q "port: ${HTTPS_PORT}:443" "$BATS_TMPDIR/cluster.yaml"
 }
+
+@test "cluster template has no Jenkins volume" {
+  __create_k3d_cluster() { cp "$1" "$BATS_TMPDIR/cluster.yaml"; }
+  _list_k3d_cluster() { :; }
+  export -f __create_k3d_cluster _list_k3d_cluster
+
+  _create_k3d_cluster testcluster
+
+  ! grep -q 'jenkins_home' "$BATS_TMPDIR/cluster.yaml"
+}

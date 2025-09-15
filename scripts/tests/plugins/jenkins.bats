@@ -5,6 +5,11 @@ setup() {
   init_test_env
   source "${BATS_TEST_DIRNAME}/../../plugins/jenkins.sh"
   export_stubs
+  K3D_LOG="$BATS_TEST_TMPDIR/k3d.log"
+  : > "$K3D_LOG"
+  _k3d() { echo "$*" >> "$K3D_LOG"; }
+  export K3D_LOG
+  export -f _k3d
 }
 
 @test "deploy_jenkins -h shows usage" {
@@ -27,11 +32,16 @@ setup() {
   jhp="$SCRIPT_DIR/storage/jenkins_home"
   echo "JENKINS_HOME_PATH=$jhp"
   rm -rf "$jhp"
+  CLUSTER_NAME="testcluster"
+  export CLUSTER_NAME
   run _create_jenkins_pv_pvc test-ns
   [ "$status" -eq 0 ]
   [[ -d "$jhp" ]]
   read_lines "$KUBECTL_LOG" kubectl_calls
   [[ "${kubectl_calls[1]}" == apply* ]]
+  read_lines "$K3D_LOG" k3d_calls
+  expected="node edit ${CLUSTER_NAME}-agent-0 --volume-add ${jhp}:/data/jenkins"
+  [ "${k3d_calls[0]}" = "$expected" ]
 }
 
 @test "_create_jenkins_admin_vault_policy stores secret without logging password" {
