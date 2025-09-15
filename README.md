@@ -34,6 +34,14 @@ port mapping:
 ./scripts/k3d-manager create_k3d_cluster beta 8001 8444
 ```
 
+### Colima resource configuration (macOS)
+
+The macOS Docker setup uses [Colima](https://github.com/abiosoft/colima). Configure the VM resources through environment variables or by passing positional arguments to the internal `_install_mac_docker` helper:
+
+- `COLIMA_CPU` (default `4`) – number of CPUs
+- `COLIMA_MEMORY` (default `8`) – memory in GiB
+- `COLIMA_DISK` (default `20`) – disk size in GiB
+
 ## Directory layout
 
 ```
