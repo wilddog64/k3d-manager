@@ -272,3 +272,95 @@ function test_nfs_connectivity() {
   "
 }
 
+function test_eso() {
+  echo "Testing External Secrets Operator with Vault..."
+
+  local vault_ns="vault"
+  local store_name="vault-test"
+  local es_name="eso-test"
+  local es_ns="default"
+  local vault_secret_path="eso/test"
+  local secret_key="magic"
+  local secret_val="swordfish"
+
+  local root_token
+  root_token=$(_kubectl -n "$vault_ns" get secret vault-root -o jsonpath='{.data.root_token}' | base64 -d)
+
+  trap "_cleanup_eso_test '$vault_ns' '$vault_secret_path' '$root_token' '$es_ns' '$es_name' '$store_name'" EXIT TERM
+
+  echo "Creating secret in Vault..."
+  _kubectl -n "$vault_ns" exec -i vault-0 -- \
+    sh -c "VAULT_TOKEN='$root_token' vault kv put secret/$vault_secret_path $secret_key='$secret_val'"
+
+  echo "Creating ClusterSecretStore..."
+  cat <<EOF | _kubectl apply -f -
+apiVersion: external-secrets.io/v1beta1
+kind: ClusterSecretStore
+metadata:
+  name: ${store_name}
+spec:
+  provider:
+    vault:
+      server: "https://vault.${vault_ns}.svc:8200"
+      path: "secret"
+      version: "v2"
+      auth:
+        kubernetes:
+          mountPath: "kubernetes"
+          role: "eso-reader"
+      tls:
+        insecureSkipVerify: true
+EOF
+
+  echo "Creating ExternalSecret..."
+  cat <<EOF | _kubectl apply -f -
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: ${es_name}
+  namespace: ${es_ns}
+spec:
+  refreshInterval: 15s
+  secretStoreRef:
+    name: ${store_name}
+    kind: ClusterSecretStore
+  target:
+    name: ${es_name}
+  data:
+  - secretKey: ${secret_key}
+    remoteRef:
+      key: ${vault_secret_path}
+      property: ${secret_key}
+EOF
+
+  echo "Waiting for ExternalSecret to be synced..."
+  _kubectl -n "$es_ns" wait --for=condition=Ready externalsecret/${es_name} --timeout=120s
+
+  local synced
+  synced=$(_kubectl -n "$es_ns" get secret "$es_name" -o jsonpath='{.data.${secret_key}}' | base64 -d)
+
+  if [[ "$synced" == "$secret_val" ]]; then
+    echo "ESO synced secret successfully."
+  else
+    echo "Secret value mismatch: expected '$secret_val', got '$synced'"
+    return 1
+  fi
+
+  echo "ESO test completed successfully."
+}
+
+function _cleanup_eso_test() {
+  local vault_ns="$1"
+  local vault_secret_path="$2"
+  local root_token="$3"
+  local es_ns="$4"
+  local es_name="$5"
+  local store_name="$6"
+
+  echo "Cleaning up ESO test resources..."
+  _kubectl -n "$es_ns" delete externalsecret "$es_name" --ignore-not-found >/dev/null 2>&1
+  _kubectl -n "$es_ns" delete secret "$es_name" --ignore-not-found >/dev/null 2>&1
+  _kubectl delete clustersecretstore "$store_name" --ignore-not-found >/dev/null 2>&1
+  _kubectl -n "$vault_ns" exec -i vault-0 -- \
+    sh -c "VAULT_TOKEN='$root_token' vault kv delete secret/$vault_secret_path" >/dev/null 2>&1 || true
+}
