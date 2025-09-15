@@ -364,3 +364,98 @@ function _cleanup_eso_test() {
   _kubectl -n "$vault_ns" exec -i vault-0 -- \
     sh -c "VAULT_TOKEN='$root_token' vault kv delete secret/$vault_secret_path" >/dev/null 2>&1 || true
 }
+
+function test_vault() {
+  echo "Testing Vault deployment and Kubernetes auth..."
+  local vault_ns="vault"
+  local test_ns="vault-test"
+  local sa="vault-test-sa"
+
+  trap '_cleanup_vault_test' EXIT TERM
+
+  # Deploy Vault in HA mode
+  "${SCRIPT_DIR}/k3d-manager" deploy_vault ha "$vault_ns"
+
+  # Ensure jenkins-admin policy exists
+  source "${SCRIPT_DIR}/plugins/jenkins.sh"
+  _create_jenkins_admin_vault_policy "$vault_ns"
+
+  # Verify required policies
+  for policy in eso-reader jenkins-admin; do
+    if ! _kubectl -n "$vault_ns" exec vault-0 -- vault policy list | grep -q "$policy"; then
+      echo "Missing policy: $policy"
+      return 1
+    fi
+  done
+
+  # Prepare test namespace and service account
+  _kubectl create namespace "$test_ns"
+  _kubectl create sa "$sa" -n "$test_ns"
+
+  # Bind service account to Vault role
+  _kubectl -n "$vault_ns" exec -i vault-0 -- \
+    vault write auth/kubernetes/role/$sa \
+      bound_service_account_names="$sa" \
+      bound_service_account_namespaces="$test_ns" \
+      policies=eso-reader \
+      ttl=1h
+
+  # Seed a test secret
+  _kubectl -n "$vault_ns" exec -i vault-0 -- \
+    vault kv put secret/eso/test message=success
+
+  # Launch pod to read secret
+  cat <<POD | _kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vault-read
+  namespace: $test_ns
+spec:
+  serviceAccountName: $sa
+  containers:
+  - name: vault
+    image: hashicorp/vault:1.13.3
+    env:
+    - name: VAULT_ADDR
+      value: http://vault.$vault_ns.svc.cluster.local:8200
+    command:
+    - sh
+    - -c
+    - |
+      vault login -method=kubernetes role=$sa >/tmp/token
+      vault kv get -field=message secret/eso/test > /tmp/secret
+      sleep 3600
+POD
+
+  _kubectl wait --for=condition=Ready pod/vault-read -n "$test_ns" --timeout=120s
+  local secret
+  secret=$(_kubectl -n "$test_ns" exec vault-read -- cat /tmp/secret)
+  if [[ "$secret" != "success" ]]; then
+    echo "Failed to read secret via pod"
+    return 1
+  fi
+
+  # Kubernetes auth token exchange
+  local sa_jwt
+  sa_jwt=$(_kubectl create token "$sa" -n "$test_ns")
+  local vault_token
+  vault_token=$(_kubectl -n "$vault_ns" exec -i vault-0 -- \
+    sh -c "vault write -field=token auth/kubernetes/login role=$sa jwt=$sa_jwt")
+  local value
+  value=$(_kubectl -n "$vault_ns" exec -i vault-0 -- \
+    sh -c "VAULT_TOKEN=$vault_token vault kv get -field=message secret/eso/test")
+  if [[ "$value" != "success" ]]; then
+    echo "Kubernetes auth token exchange failed"
+    return 1
+  fi
+
+  echo "Vault test succeeded"
+}
+
+function _cleanup_vault_test() {
+  echo "Cleaning up Vault test resources..."
+  _kubectl delete namespace vault-test --ignore-not-found
+  _helm uninstall vault -n vault 2>/dev/null || true
+  _kubectl delete namespace vault --ignore-not-found
+}
