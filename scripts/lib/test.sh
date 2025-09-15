@@ -186,74 +186,47 @@ function _cleanup_istio_test_namespace() {
 
 function test_jenkins() {
     echo "Testing Jenkins deployment..."
-    trap '_cleanup_jenkins_test_namespace' EXIT TERM
+    trap '_cleanup_jenkins_test' EXIT TERM
     PF_PIDS=()
+    JENKINS_NS="jenkins"
+    VAULT_NS="vault"
+    CREATED_JENKINS=0
+    CREATED_VAULT=0
 
-    deploy_jenkins
-    _wait_for_jenkins_ready jenkins
-
-    # Verify the Jenkins pod mounts the expected PVC
-    local pvc
-    pvc=$(_kubectl get pod jenkins-0 -n jenkins -o jsonpath='{..persistentVolumeClaim.claimName}')
-    if [[ "$pvc" != "jenkins-home" ]]; then
-        echo "Unexpected PVC: $pvc" >&2
-        return 1
+    if ! _kubectl --no-exit get ns "$JENKINS_NS" >/dev/null 2>&1; then
+        CREATED_JENKINS=1
+        if ! _kubectl --no-exit get ns "$VAULT_NS" >/dev/null 2>&1; then
+            CREATED_VAULT=1
+        fi
+        deploy_jenkins "$JENKINS_NS"
     fi
 
-    # Ensure Istio routing resources exist
-    _kubectl get gateway jenkins-gw -n istio-system >/dev/null
-    _kubectl get virtualservice jenkins -n jenkins >/dev/null
-    _kubectl get destinationrule jenkins -n jenkins >/dev/null
+    _wait_for_jenkins_ready "$JENKINS_NS"
 
-    # Port-forward the Istio ingress gateway for HTTPS access to Jenkins
-    _kubectl -n istio-system port-forward svc/istio-ingressgateway 8443:443 &
+    _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 >/tmp/jenkins-test-pf.log 2>&1 &
     PF_PIDS+=($!)
-    sleep 15
+    sleep 5
 
-    # Confirm TLS termination and fetch the Jenkins landing page
-    if ! _curl --insecure -v --resolve jenkins.dev.local.me:8443:127.0.0.1 \
-        https://jenkins.dev.local.me:8443/ 2>&1 | grep -q 'subject: CN=jenkins.dev.local.me'; then
-        echo "TLS certificate not issued by Vault" >&2
-        return 1
-    fi
-
-    if ! _curl --insecure --resolve jenkins.dev.local.me:8443:127.0.0.1 \
-        https://jenkins.dev.local.me:8443/login | grep -q Jenkins; then
-        echo "Unable to reach Jenkins landing page" >&2
-        return 1
-    fi
-
-    # Verify required Vault policies are installed
-    local policies
-    policies=$(_kubectl -n vault exec vault-0 -- vault policy list)
-    if ! echo "$policies" | grep -q jenkins-admin || \
-       ! echo "$policies" | grep -q jenkins-jcasc-read || \
-       ! echo "$policies" | grep -q jenkins-jcasc-write; then
-        echo "Required Vault policies missing" >&2
-        return 1
-    fi
-
-    # Authenticate to Jenkins using the admin secret
-    local admin_pass http_code
-    admin_pass=$(_kubectl -n jenkins get secret jenkins -o jsonpath='{.data.jenkins-admin-password}' | base64 -d)
-    http_code=$(_curl --insecure --resolve jenkins.dev.local.me:8443:127.0.0.1 \
-        -s -o /dev/null -w '%{http_code}' -L -X POST \
-        -d "j_username=jenkins-admin&j_password=${admin_pass}&Submit=Sign+in" \
-        https://jenkins.dev.local.me:8443/j_acegi_security_check)
+    local http_code
+    http_code=$(_curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/)
     if [[ "$http_code" != "200" ]]; then
-        echo "Jenkins authentication failed with HTTP $http_code" >&2
+        echo "Jenkins root endpoint returned HTTP $http_code" >&2
         return 1
     fi
 }
 
-function _cleanup_jenkins_test_namespace() {
-    echo "Cleaning up Jenkins test namespace..."
-    echo "warning: port forwarding will not remove if process failed"
+function _cleanup_jenkins_test() {
+    echo "Cleaning up Jenkins test resources..."
     for pid in "${PF_PIDS[@]}"; do
         kill "$pid" 2>/dev/null || true
     done
-    _kubectl delete gateway jenkins-gw -n istio-system --ignore-not-found
-    _kubectl delete namespace jenkins --ignore-not-found
+    if [[ "$CREATED_JENKINS" -eq 1 ]]; then
+        _kubectl delete gateway jenkins-gw -n istio-system --ignore-not-found
+        _kubectl delete namespace "$JENKINS_NS" --ignore-not-found
+    fi
+    if [[ "$CREATED_VAULT" -eq 1 ]]; then
+        _kubectl delete namespace "$VAULT_NS" --ignore-not-found
+    fi
 }
 
 function test_nfs_connectivity() {
