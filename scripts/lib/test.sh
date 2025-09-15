@@ -186,13 +186,19 @@ function _cleanup_istio_test_namespace() {
 
 function test_jenkins() {
     echo "Testing Jenkins deployment..."
+<<<<<<< HEAD
     trap '_cleanup_jenkins_test' EXIT TERM
+=======
+    local JENKINS_NS="jenkins"
+    trap '_cleanup_jenkins_test_namespace; rm -f /tmp/jenkins-auth.json' EXIT TERM
+>>>>>>> dev
     PF_PIDS=()
     JENKINS_NS="jenkins"
     VAULT_NS="vault"
     CREATED_JENKINS=0
     CREATED_VAULT=0
 
+<<<<<<< HEAD
     if ! _kubectl --no-exit get ns "$JENKINS_NS" >/dev/null 2>&1; then
         CREATED_JENKINS=1
         if ! _kubectl --no-exit get ns "$VAULT_NS" >/dev/null 2>&1; then
@@ -202,15 +208,60 @@ function test_jenkins() {
     fi
 
     _wait_for_jenkins_ready "$JENKINS_NS"
+    deploy_jenkins
+    _wait_for_jenkins_ready "$JENKINS_NS"
+
+    # Verify the Jenkins pod mounts the expected PVC
+    local pvc
+    pvc=$(_kubectl get pod jenkins-0 -n "$JENKINS_NS" -o jsonpath='{..persistentVolumeClaim.claimName}')
+    if [[ "$pvc" != "jenkins-home" ]]; then
+        echo "Unexpected PVC: $pvc" >&2
+        return 1
+    fi
+
+    # Ensure Istio routing resources exist
+    _kubectl get gateway jenkins-gw -n istio-system >/dev/null
+    _kubectl get virtualservice jenkins -n "$JENKINS_NS" >/dev/null
+    _kubectl get destinationrule jenkins -n "$JENKINS_NS" >/dev/null
 
     _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 >/tmp/jenkins-test-pf.log 2>&1 &
     PF_PIDS+=($!)
     sleep 5
 
-    local http_code
-    http_code=$(_curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/)
-    if [[ "$http_code" != "200" ]]; then
-        echo "Jenkins root endpoint returned HTTP $http_code" >&2
+    # Confirm TLS termination and fetch the Jenkins landing page
+    if ! _curl --insecure -v --resolve jenkins.dev.local.me:8443:127.0.0.1 \
+        https://jenkins.dev.local.me:8443/ 2>&1 | grep -q 'subject: CN=jenkins.dev.local.me'; then
+        echo "TLS certificate not issued by Vault" >&2
+        return 1
+    fi
+
+    if ! _curl --insecure --resolve jenkins.dev.local.me:8443:127.0.0.1 \
+        https://jenkins.dev.local.me:8443/login | grep -q Jenkins; then
+        echo "Unable to reach Jenkins landing page" >&2
+        return 1
+    fi
+
+    # Verify required Vault policies are installed
+    local policies
+    policies=$(_kubectl -n vault exec vault-0 -- vault policy list)
+    if ! echo "$policies" | grep -q jenkins-admin || \
+       ! echo "$policies" | grep -q jenkins-jcasc-read || \
+       ! echo "$policies" | grep -q jenkins-jcasc-write; then
+        echo "Required Vault policies missing" >&2
+        return 1
+    fi
+
+    # Authenticate to Jenkins using the admin secret
+    _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 &
+    PF_PIDS+=($!)
+    sleep 5
+
+    local admin_user admin_pass auth_status
+    admin_user=$(_kubectl -n "$JENKINS_NS" get secret jenkins-admin -o jsonpath='{.data.username}' | base64 -d)
+    admin_pass=$(_kubectl -n "$JENKINS_NS" get secret jenkins-admin -o jsonpath='{.data.password}' | base64 -d)
+    auth_status=$(_curl -u "$admin_user:$admin_pass" -s -o /tmp/jenkins-auth.json -w '%{http_code}' http://127.0.0.1:8080/whoAmI/api/json)
+    if [[ "$auth_status" != "200" ]] || ! grep -q '"authenticated":true' /tmp/jenkins-auth.json; then
+        echo "Jenkins authentication failed" >&2
         return 1
     fi
 }
