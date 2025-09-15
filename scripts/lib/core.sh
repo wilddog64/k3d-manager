@@ -13,6 +13,7 @@ function _install_docker() {
 
 function _install_k3d() {
    export K3D_INSTALL_DIR="${1:-/usr/local/bin}"
+   export INSTALL_DIR="$K3D_INSTALL_DIR"
 
    _install_docker
    _install_helm
@@ -24,7 +25,7 @@ function _install_k3d() {
 
    if ! _command_exist k3d ; then
       echo k3d does not exist, install it
-      _curl -f -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+      _curl -f -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | INSTALL_DIR="$K3D_INSTALL_DIR" bash
    else
       echo k3d installed already
    fi
