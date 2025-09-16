@@ -1,3 +1,14 @@
+# Ensure SCRIPT_DIR is set when this library is sourced directly.
+if [[ -z "${SCRIPT_DIR:-}" ]]; then
+  SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
+fi
+
+# Load Jenkins plugin helpers so Jenkins tests have their dependencies.
+if [[ -f "${SCRIPT_DIR}/plugins/jenkins.sh" ]]; then
+  # shellcheck source=../plugins/jenkins.sh
+  source "${SCRIPT_DIR}/plugins/jenkins.sh"
+fi
+
 function test_nfs_direct() {
   echo "Testing NFS connectivity directly from a pod..."
 
@@ -215,6 +226,12 @@ function test_jenkins() {
     CREATED_VAULT=0
     CREATED_JENKINS_NS=""
     CREATED_VAULT_NS=""
+
+    if ! declare -F deploy_jenkins >/dev/null || ! declare -F _wait_for_jenkins_ready >/dev/null; then
+        echo "Required Jenkins helpers (deploy_jenkins/_wait_for_jenkins_ready) are unavailable." >&2
+        echo "Ensure scripts/plugins/jenkins.sh is sourced before running test_jenkins." >&2
+        return 1
+    fi
 
     if ! _kubectl --no-exit get ns "$JENKINS_NS" >/dev/null 2>&1; then
         CREATED_JENKINS=1
