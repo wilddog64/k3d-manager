@@ -205,20 +205,23 @@ function _wait_for_port_forward() {
 
 function test_jenkins() {
     echo "Testing Jenkins deployment..."
-    local JENKINS_NS="jenkins"
+    JENKINS_NS="${JENKINS_NS:-jenkins}"
+    VAULT_NS="${VAULT_NS:-vault}"
     local AUTH_FILE
     AUTH_FILE="$(mktemp)"
     trap "_cleanup_jenkins_test; rm -f '${AUTH_FILE}'" EXIT TERM
     PF_PIDS=()
-    JENKINS_NS="jenkins"
-    VAULT_NS="vault"
     CREATED_JENKINS=0
     CREATED_VAULT=0
+    CREATED_JENKINS_NS=""
+    CREATED_VAULT_NS=""
 
     if ! _kubectl --no-exit get ns "$JENKINS_NS" >/dev/null 2>&1; then
         CREATED_JENKINS=1
+        CREATED_JENKINS_NS="$JENKINS_NS"
         if ! _kubectl --no-exit get ns "$VAULT_NS" >/dev/null 2>&1; then
             CREATED_VAULT=1
+            CREATED_VAULT_NS="$VAULT_NS"
         fi
         deploy_jenkins "$JENKINS_NS"
     fi
@@ -292,10 +295,16 @@ function _cleanup_jenkins_test() {
     done
     if [[ "$CREATED_JENKINS" -eq 1 ]]; then
         _kubectl delete gateway jenkins-gw -n istio-system --ignore-not-found
-        _kubectl delete namespace "$JENKINS_NS" --ignore-not-found
+        local namespace_to_delete="${CREATED_JENKINS_NS:-$JENKINS_NS}"
+        if [[ -n "$namespace_to_delete" ]]; then
+            _kubectl delete namespace "$namespace_to_delete" --ignore-not-found
+        fi
     fi
     if [[ "$CREATED_VAULT" -eq 1 ]]; then
-        _kubectl delete namespace "$VAULT_NS" --ignore-not-found
+        local vault_namespace_to_delete="${CREATED_VAULT_NS:-$VAULT_NS}"
+        if [[ -n "$vault_namespace_to_delete" ]]; then
+            _kubectl delete namespace "$vault_namespace_to_delete" --ignore-not-found
+        fi
     fi
 }
 
