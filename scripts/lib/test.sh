@@ -219,6 +219,7 @@ function test_jenkins() {
     JENKINS_NS="${JENKINS_NS:-jenkins}"
     VAULT_NS="${VAULT_NS:-vault}"
     local AUTH_FILE
+    local jenkins_statefulset="statefulset/jenkins"
     AUTH_FILE="$(mktemp)"
     trap "_cleanup_jenkins_test; rm -f '${AUTH_FILE}'" EXIT TERM
     PF_PIDS=()
@@ -244,16 +245,36 @@ function test_jenkins() {
             CREATED_VAULT=1
             CREATED_VAULT_NS="$VAULT_NS"
         fi
-        deploy_jenkins "$JENKINS_NS"
-    fi
 
-    _wait_for_jenkins_ready "$JENKINS_NS"
-
-    if [[ "$CREATED_JENKINS" -eq 0 ]]; then
-        deploy_jenkins "$JENKINS_NS"
         _wait_for_jenkins_ready "$JENKINS_NS"
+        if deploy_jenkins "$JENKINS_NS"; then
+            if ! _kubectl --no-exit -n "$JENKINS_NS" \
+               get "$jenkins_statefulset" >/dev/null 2>&1; then
+                echo "Jenkins statefulset not found in namespace '$JENKINS_NS' after deployment." >&2
+                return 1
+            fi
+            _wait_for_jenkins_ready "$JENKINS_NS"
+        else
+            echo "Failed to deploy Jenkins in namespace '$JENKINS_NS'." >&2
+            return 1
+        fi
+
+        if ! _kubectl --no-exit -n "$JENKINS_NS" \
+           get "$jenkins_statefulset" >/dev/null 2>&1; then
+            echo "Jenkins statefulset not found in existing namespace '$JENKINS_NS'; attempting redeploy." >&2
+        fi
     fi
 
+    if deploy_jenkins "$JENKINS_NS"; then
+        if ! _kubectl --no-exit -n "$JENKINS_NS" get "$jenkins_statefulset" >/dev/null 2>&1; then
+            echo "Jenkins statefulset not found in namespace '$JENKINS_NS' after deployment." >&2
+            return 1
+        fi
+        _wait_for_jenkins_ready "$JENKINS_NS"
+    else
+        echo "Failed to deploy Jenkins in namespace '$JENKINS_NS'." >&2
+        return 1
+    fi
     # Verify the Jenkins pod mounts the expected PVC
     local pvc
     pvc=$(_kubectl get pod jenkins-0 -n "$JENKINS_NS" -o jsonpath='{..persistentVolumeClaim.claimName}')
