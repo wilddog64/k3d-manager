@@ -184,6 +184,25 @@ function _cleanup_istio_test_namespace() {
     _kubectl delete namespace istio-test --ignore-not-found
 }
 
+function _wait_for_port_forward() {
+    local pid="$1"
+    local url="http://127.0.0.1:8080/login"
+    local timeout=30
+    local interval=2
+    local elapsed=0
+
+    until _run_command --quiet --no-exit -- curl -fsS "$url" >/dev/null 2>&1; do
+        sleep "$interval"
+        elapsed=$((elapsed + interval))
+        if (( elapsed >= timeout )); then
+            echo "Port-forward to Jenkins did not become ready" >&2
+            kill "$pid" 2>/dev/null || true
+            return 1
+        fi
+    done
+}
+
+
 function test_jenkins() {
     echo "Testing Jenkins deployment..."
     local JENKINS_NS="jenkins"
@@ -222,8 +241,11 @@ function test_jenkins() {
     _kubectl get destinationrule jenkins -n "$JENKINS_NS" >/dev/null
 
     _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 >/tmp/jenkins-test-pf.log 2>&1 &
+    pf_pid=$!
     PF_PIDS+=($!)
-    sleep 5
+    if ! _wait_for_port_forward "$pf_pid"; then
+         return 1
+    fi
 
     # Confirm TLS termination and fetch the Jenkins landing page
     if ! _curl --insecure -v --resolve jenkins.dev.local.me:8443:127.0.0.1 \
