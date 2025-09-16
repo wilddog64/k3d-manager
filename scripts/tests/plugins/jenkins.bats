@@ -1,5 +1,7 @@
 #!/usr/bin/env bats
 
+bats_require_minimum_version 1.5.0
+
 setup() {
   source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   init_test_env
@@ -191,6 +193,26 @@ JSON
   [ "${#kubectl_calls[@]}" -eq 2 ]
   expected="-n test-ns wait --quiet --for=condition=Ready pod -l app.kubernetes.io/component=jenkins-controller --timeout=5s"
   [ "${kubectl_calls[0]}" = "$expected" ]
+}
+
+@test "_wait_for_jenkins_ready respects JENKINS_READY_TIMEOUT" {
+  KUBECTL_EXIT_CODES=(1 1)
+  sleep() {
+    local duration="${1:-0}"
+    duration=${duration%s}
+    if [[ -n "$duration" ]]; then
+      SECONDS=$((SECONDS + duration))
+    fi
+  }
+  export -f sleep
+  SECONDS=0
+  export JENKINS_READY_TIMEOUT=5s
+  run _wait_for_jenkins_ready test-ns
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"Timed out waiting for Jenkins controller pod to be ready"* ]]
+  read_lines "$KUBECTL_LOG" kubectl_calls
+  [ "${#kubectl_calls[@]}" -eq 2 ]
+  unset JENKINS_READY_TIMEOUT
 }
 
 @test "VirtualService references Jenkins gateway" {
