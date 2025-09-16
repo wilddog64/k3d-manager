@@ -162,7 +162,7 @@ JSON
   [ "$status" -eq 0 ]
   read_lines "$KUBECTL_LOG" kubectl_calls
   [ "${#kubectl_calls[@]}" -eq 2 ]
-  expected="-n test-ns wait --for=condition=Ready pod -l app.kubernetes.io/component=jenkins-controller --timeout=1s"
+  expected="-n test-ns wait --for=condition=Ready pod -l app.kubernetes.io/component=jenkins-controller --timeout=5s"
   [ "${kubectl_calls[0]}" = "$expected" ]
 }
 

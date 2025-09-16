@@ -186,7 +186,7 @@ function _wait_for_jenkins_ready() {
    esac
    local end=$((SECONDS + total_seconds))
 
-   until _kubectl -n "$ns" wait --for=condition=Ready pod -l app.kubernetes.io/component=jenkins-controller --timeout="$timeout"; do
+   until _kubectl --no-exit --quiet -n "$ns" wait --for=condition=Ready pod -l app.kubernetes.io/component=jenkins-controller --timeout=5s; do
       if (( SECONDS >= end )); then
          echo "Timed out waiting for Jenkins controller pod to be ready" >&2
          return 1
