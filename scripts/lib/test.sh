@@ -219,6 +219,7 @@ function test_jenkins() {
     JENKINS_NS="${JENKINS_NS:-jenkins}"
     VAULT_NS="${VAULT_NS:-vault}"
     local AUTH_FILE="$(mktemp)"
+    local pf_pid
     local jenkins_statefulset="statefulset/jenkins"
     local curl_max_time="${CURL_MAX_TIME:-30}"
     trap "_cleanup_jenkins_test; rm -f '${AUTH_FILE}'" EXIT TERM
@@ -295,7 +296,7 @@ function test_jenkins() {
 
     _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 >/tmp/jenkins-test-pf.log 2>&1 &
     pf_pid=$!
-    PF_PIDS+=($!)
+    PF_PIDS+=("$pf_pid")
     if ! _wait_for_port_forward "$pf_pid"; then
          return 1
     fi
@@ -327,8 +328,11 @@ function test_jenkins() {
 
     # Authenticate to Jenkins using the admin secret
     _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 &
-    PF_PIDS+=($!)
-    sleep 5
+    pf_pid=$!
+    PF_PIDS+=("$pf_pid")
+    if ! _wait_for_port_forward "$pf_pid"; then
+        return 1
+    fi
 
     local admin_user admin_pass auth_status
     admin_user=$(_kubectl -n "$JENKINS_NS" get secret jenkins-admin -o jsonpath='{.data.username}' | base64 -d)
