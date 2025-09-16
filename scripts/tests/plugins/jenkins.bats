@@ -44,6 +44,33 @@ setup() {
   [ "${k3d_calls[0]}" = "$expected" ]
 }
 
+@test "PV/PVC setup auto-detects cluster" {
+  KUBECTL_EXIT_CODES=(1 0)
+  jhp="$SCRIPT_DIR/storage/jenkins_home"
+  rm -rf "$jhp"
+  unset CLUSTER_NAME
+  _k3d() {
+    local cmd="$*"
+    echo "$cmd" >> "$K3D_LOG"
+    if [[ "$cmd" == *"cluster list"* ]]; then
+      cat <<'EOF'
+NAME   SERVERS   AGENTS   LOADBALANCER
+k3d-auto   1/1       1/1      true
+EOF
+    fi
+  }
+  export -f _k3d
+
+  run _create_jenkins_pv_pvc test-ns
+  [ "$status" -eq 0 ]
+  [[ -d "$jhp" ]]
+  read_lines "$K3D_LOG" k3d_calls
+  [ "${#k3d_calls[@]}" -eq 2 ]
+  [[ "${k3d_calls[0]}" == *"cluster list"* ]]
+  expected="node edit k3d-auto-agent-0 --volume-add ${jhp}:/data/jenkins"
+  [ "${k3d_calls[1]}" = "$expected" ]
+}
+
 @test "_create_jenkins_admin_vault_policy stores secret without logging password" {
   _vault_policy_exists() { return 1; }
   _kubectl() {
