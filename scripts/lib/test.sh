@@ -227,6 +227,10 @@ function test_jenkins() {
     CREATED_JENKINS_NS=""
     CREATED_VAULT_NS=""
 
+    if ! declare -F deploy_jenkins >/dev/null; then
+        _try_load_plugin deploy_jenkins
+    fi
+
     if ! declare -F deploy_jenkins >/dev/null || ! declare -F _wait_for_jenkins_ready >/dev/null; then
         echo "Required Jenkins helpers (deploy_jenkins/_wait_for_jenkins_ready) are unavailable." >&2
         echo "Ensure scripts/plugins/jenkins.sh is sourced before running test_jenkins." >&2
