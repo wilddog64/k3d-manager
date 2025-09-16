@@ -132,7 +132,7 @@ function _vault_bootstrap_ha() {
       sleep 2
       vault_state=$(_kubectl --no-exit -n "$ns" get pod vault-0 -o jsonpath='{.status.phase}')
       if (( current_time >= end_time )); then
-         _err "[vault] timeout waiting for vault-0 to be Running (current=$vault_state)" >&2to3
+         _err "[vault] timeout waiting for vault-0 to be Running (current=$vault_state)"
       fi
   done
   local vault_init=$(_kubectl --no-exit -n "$ns" exec -i vault-0 -- vault status -format json | jq -r '.initialized')
