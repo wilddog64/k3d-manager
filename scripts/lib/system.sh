@@ -368,7 +368,9 @@ function _list_k3d_cluster() {
 
 function _kubectl() {
 
-  _install_kubernetes_cli
+  if ! _command_exist kubectl; then
+     _install_kubernetes_cli
+  fi
 
   # Pass-through mini-parser so you can do: _helm --quiet ...  (like _run_command)
   local pre=()
