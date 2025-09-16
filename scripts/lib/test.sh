@@ -238,6 +238,11 @@ function test_jenkins() {
         return 1
     fi
 
+    local wait_for_ready_args=("$JENKINS_NS")
+    if [[ -n "${JENKINS_READY_TIMEOUT:-}" ]]; then
+        wait_for_ready_args+=("$JENKINS_READY_TIMEOUT")
+    fi
+
     if ! _kubectl --no-exit get ns "$JENKINS_NS" >/dev/null 2>&1; then
         CREATED_JENKINS=1
         CREATED_JENKINS_NS="$JENKINS_NS"
@@ -246,14 +251,14 @@ function test_jenkins() {
             CREATED_VAULT_NS="$VAULT_NS"
         fi
 
-        _wait_for_jenkins_ready "$JENKINS_NS"
+        _wait_for_jenkins_ready "${wait_for_ready_args[@]}"
         if deploy_jenkins "$JENKINS_NS"; then
             if ! _kubectl --no-exit -n "$JENKINS_NS" \
                get "$jenkins_statefulset" >/dev/null 2>&1; then
                 echo "Jenkins statefulset not found in namespace '$JENKINS_NS' after deployment." >&2
                 return 1
             fi
-            _wait_for_jenkins_ready "$JENKINS_NS"
+            _wait_for_jenkins_ready "${wait_for_ready_args[@]}"
         else
             echo "Failed to deploy Jenkins in namespace '$JENKINS_NS'." >&2
             return 1
@@ -270,7 +275,7 @@ function test_jenkins() {
             echo "Jenkins statefulset not found in namespace '$JENKINS_NS' after deployment." >&2
             return 1
         fi
-        _wait_for_jenkins_ready "$JENKINS_NS"
+        _wait_for_jenkins_ready "${wait_for_ready_args[@]}"
     else
         echo "Failed to deploy Jenkins in namespace '$JENKINS_NS'." >&2
         return 1
