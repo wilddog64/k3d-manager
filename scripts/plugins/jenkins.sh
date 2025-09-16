@@ -186,7 +186,16 @@ function _deploy_jenkins() {
 
 function _wait_for_jenkins_ready() {
    local ns="$1"
-   local timeout="${2:-5m}"
+   local timeout_arg="${2:-}"
+   local timeout
+
+   if [[ -n "$timeout_arg" ]]; then
+      timeout="$timeout_arg"
+   elif [[ -n "${JENKINS_READY_TIMEOUT:-}" ]]; then
+      timeout="$JENKINS_READY_TIMEOUT"
+   else
+      timeout="5m"
+   fi
 
    local total_seconds
    case "$timeout" in
