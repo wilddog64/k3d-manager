@@ -16,6 +16,7 @@ setup() {
 set -euo pipefail
 
 : "${PROJECT_ROOT:?}"
+export PLUGINS_DIR="${PROJECT_ROOT}/scripts/plugins"
 source "${PROJECT_ROOT}/scripts/lib/test.sh"
 
 cleanup_log="${CLEANUP_LOG:-}"
