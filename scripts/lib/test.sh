@@ -227,8 +227,11 @@ function test_jenkins() {
     fi
 
     _wait_for_jenkins_ready "$JENKINS_NS"
-    deploy_jenkins
-    _wait_for_jenkins_ready "$JENKINS_NS"
+
+    if [[ "$CREATED_JENKINS" -eq 0 ]]; then
+        deploy_jenkins "$JENKINS_NS"
+        _wait_for_jenkins_ready "$JENKINS_NS"
+    fi
 
     # Verify the Jenkins pod mounts the expected PVC
     local pvc
