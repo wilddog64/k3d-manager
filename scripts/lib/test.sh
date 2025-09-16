@@ -575,6 +575,6 @@ POD
 function _cleanup_vault_test() {
   echo "Cleaning up Vault test resources..."
   _kubectl delete namespace vault-test --ignore-not-found
-  _helm uninstall vault -n vault 2>/dev/null || true
-  _kubectl delete namespace vault --ignore-not-found
+  _kubectl delete clusterrolebinding vault-server-binding
+  _helm uninstall vault -n vault-test 2>/dev/null || true
 }
