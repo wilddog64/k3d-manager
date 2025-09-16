@@ -318,7 +318,7 @@ function test_jenkins() {
 
     # Verify required Vault policies are installed
     local policies
-    policies=$(_kubectl -n vault exec vault-0 -- vault policy list)
+    policies=$(_kubectl -n "$VAULT_NS" exec vault-0 -- vault policy list)
     if ! echo "$policies" | grep -q jenkins-admin || \
        ! echo "$policies" | grep -q jenkins-jcasc-read || \
        ! echo "$policies" | grep -q jenkins-jcasc-write; then
