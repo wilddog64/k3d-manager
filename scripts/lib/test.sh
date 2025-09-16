@@ -186,19 +186,16 @@ function _cleanup_istio_test_namespace() {
 
 function test_jenkins() {
     echo "Testing Jenkins deployment..."
-<<<<<<< HEAD
-    trap '_cleanup_jenkins_test' EXIT TERM
-=======
     local JENKINS_NS="jenkins"
-    trap '_cleanup_jenkins_test_namespace; rm -f /tmp/jenkins-auth.json' EXIT TERM
->>>>>>> dev
+    local AUTH_FILE
+    AUTH_FILE="$(mktemp)"
+    trap '_cleanup_jenkins_test_namespace; rm -f "$AUTH_FILE"' EXIT TERM
     PF_PIDS=()
     JENKINS_NS="jenkins"
     VAULT_NS="vault"
     CREATED_JENKINS=0
     CREATED_VAULT=0
 
-<<<<<<< HEAD
     if ! _kubectl --no-exit get ns "$JENKINS_NS" >/dev/null 2>&1; then
         CREATED_JENKINS=1
         if ! _kubectl --no-exit get ns "$VAULT_NS" >/dev/null 2>&1; then
@@ -259,8 +256,8 @@ function test_jenkins() {
     local admin_user admin_pass auth_status
     admin_user=$(_kubectl -n "$JENKINS_NS" get secret jenkins-admin -o jsonpath='{.data.username}' | base64 -d)
     admin_pass=$(_kubectl -n "$JENKINS_NS" get secret jenkins-admin -o jsonpath='{.data.password}' | base64 -d)
-    auth_status=$(_curl -u "$admin_user:$admin_pass" -s -o /tmp/jenkins-auth.json -w '%{http_code}' http://127.0.0.1:8080/whoAmI/api/json)
-    if [[ "$auth_status" != "200" ]] || ! grep -q '"authenticated":true' /tmp/jenkins-auth.json; then
+    auth_status=$(_curl -u "$admin_user:$admin_pass" -s -o "$AUTH_FILE" -w '%{http_code}' http://127.0.0.1:8080/whoAmI/api/json)
+    if [[ "$auth_status" != "200" ]] || ! grep -q '"authenticated":true' "$AUTH_FILE"; then
         echo "Jenkins authentication failed" >&2
         return 1
     fi
