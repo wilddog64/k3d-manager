@@ -499,14 +499,6 @@ function test_vault() {
   # Deploy Vault in HA mode
   "${SCRIPT_DIR}/k3d-manager" deploy_vault ha "$test_ns"
 
-  # Verify required policies
-  # for policy in eso-reader jenkins-admin; do
-  #   if ! _kubectl -n "$vault_ns" exec vault-0 -- vault policy list | grep -q "$policy"; then
-  #     echo "Missing policy: $policy"
-  #     return 1
-  #   fi
-  # done
-
   # Prepare test namespace and service account
   _kubectl create namespace "$test_ns"
   _kubectl create sa "$sa" -n "$test_ns"
@@ -576,5 +568,5 @@ function _cleanup_vault_test() {
   echo "Cleaning up Vault test resources..."
   _kubectl delete namespace vault-test --ignore-not-found
   _kubectl delete clusterrolebinding vault-server-binding
-  _helm uninstall vault -n vault-test 2>/dev/null || true
+  # _helm uninstall vault -n vault-test 2>/dev/null || true
 }
