@@ -207,7 +207,7 @@ JSON
   export -f sleep
   SECONDS=0
   export JENKINS_READY_TIMEOUT=5s
-  run _wait_for_jenkins_ready test-ns
+  run --separate-stderr _wait_for_jenkins_ready test-ns
   [ "$status" -eq 1 ]
   [[ "$stderr" == *"Timed out waiting for Jenkins controller pod to be ready"* ]]
   read_lines "$KUBECTL_LOG" kubectl_calls
