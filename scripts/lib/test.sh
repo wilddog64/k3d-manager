@@ -208,7 +208,7 @@ function test_jenkins() {
     local JENKINS_NS="jenkins"
     local AUTH_FILE
     AUTH_FILE="$(mktemp)"
-    trap '_cleanup_jenkins_test_namespace; rm -f "$AUTH_FILE"' EXIT TERM
+    trap "_cleanup_jenkins_test; rm -f '${AUTH_FILE}'" EXIT TERM
     PF_PIDS=()
     JENKINS_NS="jenkins"
     VAULT_NS="vault"
