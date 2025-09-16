@@ -422,7 +422,24 @@ function _curl() {
       exit 1
    fi
 
-   _run_command --quiet -- curl "$@"
+   local curl_max_time="${CURL_MAX_TIME:-30}"
+   local has_max_time=0
+   local arg
+   for arg in "$@"; do
+      case "$arg" in
+         --max-time|-m|--max-time=*|-m*)
+            has_max_time=1
+            break
+            ;;
+      esac
+   done
+
+   local -a curl_args=("$@")
+   if (( ! has_max_time )) && [[ -n "$curl_max_time" ]]; then
+      curl_args=(--max-time "$curl_max_time" "${curl_args[@]}")
+   fi
+
+   _run_command --quiet -- curl "${curl_args[@]}"
 }
 
 function _kill() {

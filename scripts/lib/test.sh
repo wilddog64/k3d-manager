@@ -218,9 +218,9 @@ function test_jenkins() {
     echo "Testing Jenkins deployment..."
     JENKINS_NS="${JENKINS_NS:-jenkins}"
     VAULT_NS="${VAULT_NS:-vault}"
-    local AUTH_FILE
+    local AUTH_FILE="$(mktemp)"
     local jenkins_statefulset="statefulset/jenkins"
-    AUTH_FILE="$(mktemp)"
+    local curl_max_time="${CURL_MAX_TIME:-30}"
     trap "_cleanup_jenkins_test; rm -f '${AUTH_FILE}'" EXIT TERM
     PF_PIDS=()
     CREATED_JENKINS=0
@@ -301,13 +301,15 @@ function test_jenkins() {
     fi
 
     # Confirm TLS termination and fetch the Jenkins landing page
-    if ! _curl --insecure -v --resolve jenkins.dev.local.me:8443:127.0.0.1 \
+    if ! CURL_MAX_TIME="$curl_max_time" \
+       _curl --insecure -v --resolve jenkins.dev.local.me:8443:127.0.0.1 \
         https://jenkins.dev.local.me:8443/ 2>&1 | grep -q 'subject: CN=jenkins.dev.local.me'; then
         echo "TLS certificate not issued by Vault" >&2
         return 1
     fi
 
-    if ! _curl --insecure --resolve jenkins.dev.local.me:8443:127.0.0.1 \
+    if ! CURL_MAX_TIME="$curl_max_time" \
+       _curl --insecure --resolve jenkins.dev.local.me:8443:127.0.0.1 \
         https://jenkins.dev.local.me:8443/login | grep -q Jenkins; then
         echo "Unable to reach Jenkins landing page" >&2
         return 1
@@ -331,7 +333,8 @@ function test_jenkins() {
     local admin_user admin_pass auth_status
     admin_user=$(_kubectl -n "$JENKINS_NS" get secret jenkins-admin -o jsonpath='{.data.username}' | base64 -d)
     admin_pass=$(_kubectl -n "$JENKINS_NS" get secret jenkins-admin -o jsonpath='{.data.password}' | base64 -d)
-    auth_status=$(_curl -u "$admin_user:$admin_pass" -s -o "$AUTH_FILE" -w '%{http_code}' http://127.0.0.1:8080/whoAmI/api/json)
+    auth_status=$(CURL_MAX_TIME="$curl_max_time" \
+       _curl -u "$admin_user:$admin_pass" -s -o "$AUTH_FILE" -w '%{http_code}' http://127.0.0.1:8080/whoAmI/api/json)
     if [[ "$auth_status" != "200" ]] || ! grep -q '"authenticated":true' "$AUTH_FILE"; then
         echo "Jenkins authentication failed" >&2
         return 1
