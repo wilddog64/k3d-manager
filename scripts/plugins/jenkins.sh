@@ -34,6 +34,8 @@ function _create_jenkins_namespace() {
 function _create_jenkins_pv_pvc() {
    local jenkins_namespace=$1
    local cluster_name="${2:-$CLUSTER_NAME}"
+   local detected_cluster_list
+   local detected_cluster_name
 
    export JENKINS_HOME_PATH="$SCRIPT_DIR/storage/jenkins_home"
    export JENKINS_HOME_IN_CLUSTER="/data/jenkins"
@@ -50,8 +52,16 @@ function _create_jenkins_pv_pvc() {
    fi
 
    if [[ -z "$cluster_name" ]]; then
-      echo "CLUSTER_NAME not set; cannot edit Jenkins node" >&2
-      return 1
+      if ! detected_cluster_list=$(_k3d cluster list 2>/dev/null); then
+         echo "Unable to detect k3d cluster name; set CLUSTER_NAME or pass the cluster name explicitly." >&2
+         return 1
+      fi
+      detected_cluster_name=$(awk 'NR>1 && NF {print $1; exit}' <<<"$detected_cluster_list")
+      if [[ -z "$detected_cluster_name" ]]; then
+         echo "Unable to detect k3d cluster name; set CLUSTER_NAME or pass the cluster name explicitly." >&2
+         return 1
+      fi
+      cluster_name="$detected_cluster_name"
    fi
 
    _k3d node edit "${cluster_name}-agent-0" --volume-add "${JENKINS_HOME_PATH}:${JENKINS_HOME_IN_CLUSTER}"
