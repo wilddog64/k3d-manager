@@ -225,6 +225,8 @@ function test_jenkins() {
 
     VAULT_NS="${VAULT_NS:-vault}"
     export VAULT_NS
+    local vault_release="${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}"
+    local vault_pod="${vault_release}-0"
     local AUTH_FILE="$(mktemp)"
     local pf_pid
     local jenkins_statefulset="statefulset/jenkins"
@@ -259,7 +261,7 @@ function test_jenkins() {
             CREATED_VAULT_NS="$VAULT_NS"
         fi
 
-        if deploy_jenkins "$JENKINS_NS" "$VAULT_NS"; then
+        if deploy_jenkins "$JENKINS_NS" "$VAULT_NS" "$vault_release"; then
             if ! _kubectl --no-exit -n "$JENKINS_NS" \
                get "$jenkins_statefulset" >/dev/null 2>&1; then
                 echo "Jenkins statefulset not found in namespace '$JENKINS_NS' after deployment." >&2
@@ -277,7 +279,7 @@ function test_jenkins() {
         fi
     fi
 
-    if deploy_jenkins "$JENKINS_NS" "$VAULT_NS"; then
+    if deploy_jenkins "$JENKINS_NS" "$VAULT_NS" "$vault_release"; then
         if ! _kubectl --no-exit -n "$JENKINS_NS" get "$jenkins_statefulset" >/dev/null 2>&1; then
             echo "Jenkins statefulset not found in namespace '$JENKINS_NS' after deployment." >&2
             return 1
@@ -335,7 +337,7 @@ function test_jenkins() {
 
     # Verify required Vault policies are installed
     local policies
-    policies=$(_kubectl -n "$VAULT_NS" exec vault-0 -- vault policy list)
+    policies=$(_kubectl -n "$VAULT_NS" exec "$vault_pod" -- vault policy list)
     if ! echo "$policies" | grep -q jenkins-admin || \
        ! echo "$policies" | grep -q jenkins-jcasc-read || \
        ! echo "$policies" | grep -q jenkins-jcasc-write; then
@@ -402,6 +404,8 @@ function test_eso() {
   echo "Testing External Secrets Operator with Vault..."
 
   local vault_ns="vault"
+  local vault_release="${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}"
+  local vault_pod="${vault_release}-0"
   local store_name="vault-test"
   local es_name="eso-test"
   local es_ns="default"
@@ -415,16 +419,16 @@ function test_eso() {
   if ! _kubectl --no-exit get ns "$vault_ns" >/dev/null 2>&1 || \
      ! _kubectl --no-exit -n "$vault_ns" get secret vault-root >/dev/null 2>&1; then
     echo "Vault not detected; deploying..."
-    "${SCRIPT_DIR}/k3d-manager" deploy_vault ha "$vault_ns"
+    "${SCRIPT_DIR}/k3d-manager" deploy_vault ha "$vault_ns" "$vault_release"
     vault_started=1
   fi
 
   root_token=$(_kubectl -n "$vault_ns" get secret vault-root -o jsonpath='{.data.root_token}' | base64 -d)
 
-  trap "_cleanup_eso_test '$vault_ns' '$vault_secret_path' '$root_token' '$es_ns' '$es_name' '$store_name' '$vault_started'" EXIT TERM
+  trap "_cleanup_eso_test '$vault_ns' '$vault_release' '$vault_secret_path' '$root_token' '$es_ns' '$es_name' '$store_name' '$vault_started'" EXIT TERM
 
   echo "Creating secret in Vault..."
-  _kubectl -n "$vault_ns" exec -i vault-0 -- \
+  _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
     sh -c "VAULT_TOKEN='$root_token' vault kv put secret/$vault_secret_path $secret_key='$secret_val'"
 
   echo "Creating ClusterSecretStore..."
@@ -486,18 +490,20 @@ EOF
 
 function _cleanup_eso_test() {
   local vault_ns="$1"
-  local vault_secret_path="$2"
-  local root_token="$3"
-  local es_ns="$4"
-  local es_name="$5"
-  local store_name="$6"
-  local vault_started="${7:-0}"
+  local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
+  local vault_secret_path="$3"
+  local root_token="$4"
+  local es_ns="$5"
+  local es_name="$6"
+  local store_name="$7"
+  local vault_started="${8:-0}"
+  local vault_pod="${vault_release}-0"
 
   echo "Cleaning up ESO test resources..."
   _kubectl -n "$es_ns" delete externalsecret "$es_name" --ignore-not-found >/dev/null 2>&1
   _kubectl -n "$es_ns" delete secret "$es_name" --ignore-not-found >/dev/null 2>&1
   _kubectl delete clustersecretstore "$store_name" --ignore-not-found >/dev/null 2>&1
-  _kubectl -n "$vault_ns" exec -i vault-0 -- \
+  _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
     sh -c "VAULT_TOKEN='$root_token' vault kv delete secret/$vault_secret_path" >/dev/null 2>&1 || true
 
   if [[ "$vault_started" -eq 1 ]]; then
@@ -508,20 +514,22 @@ function _cleanup_eso_test() {
 function test_vault() {
   echo "Testing Vault deployment and Kubernetes auth..."
   local vault_ns="vault"
+  local vault_release="${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}"
+  local vault_pod="${vault_release}-0"
   local test_ns="vault-test"
   local sa="vault-test-sa"
 
   trap '_cleanup_vault_test' EXIT TERM
 
   # Deploy Vault in HA mode
-  "${SCRIPT_DIR}/k3d-manager" deploy_vault ha "$test_ns"
+  "${SCRIPT_DIR}/k3d-manager" deploy_vault ha "$test_ns" "$vault_release"
 
   # Prepare test namespace and service account
   _kubectl create namespace "$test_ns"
   _kubectl create sa "$sa" -n "$test_ns"
 
   # Bind service account to Vault role
-  _kubectl -n "$vault_ns" exec -i vault-0 -- \
+  _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
     vault write auth/kubernetes/role/$sa \
       bound_service_account_names="$sa" \
       bound_service_account_namespaces="$test_ns" \
@@ -529,7 +537,7 @@ function test_vault() {
       ttl=1h
 
   # Seed a test secret
-  _kubectl -n "$vault_ns" exec -i vault-0 -- \
+  _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
     vault kv put secret/eso/test message=success
 
   # Launch pod to read secret
@@ -568,10 +576,10 @@ POD
   local sa_jwt
   sa_jwt=$(_kubectl create token "$sa" -n "$test_ns")
   local vault_token
-  vault_token=$(_kubectl -n "$vault_ns" exec -i vault-0 -- \
+  vault_token=$(_kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
     sh -c "vault write -field=token auth/kubernetes/login role=$sa jwt=$sa_jwt")
   local value
-  value=$(_kubectl -n "$vault_ns" exec -i vault-0 -- \
+  value=$(_kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
     sh -c "VAULT_TOKEN=$vault_token vault kv get -field=message secret/eso/test")
   if [[ "$value" != "success" ]]; then
     echo "Kubernetes auth token exchange failed"

@@ -50,6 +50,8 @@ _kubectl() {
   done
 
   local cmd="$*"
+  local expected_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
+  local expected_pod="${expected_release}-0"
   if [[ "$cmd" == "get ns jenkins" ]]; then
     return 0
   elif [[ "$cmd" == "get ns vault" ]]; then
@@ -66,7 +68,7 @@ _kubectl() {
   elif [[ "$cmd" == "-n jenkins port-forward svc/jenkins 8080:8080" ]]; then
     sleep 0.01
     return 0
-  elif [[ "$cmd" == "-n vault exec vault-0 -- vault policy list" ]]; then
+  elif [[ "$cmd" == "-n vault exec ${expected_pod} -- vault policy list" ]]; then
     printf '%s\n' 'jenkins-admin' 'jenkins-jcasc-read' 'jenkins-jcasc-write'
     return 0
   elif [[ "$cmd" == "-n jenkins get secret jenkins-admin -o jsonpath={.data.username}" ]]; then

@@ -80,9 +80,11 @@ function _create_jenkins_pv_pvc() {
 
 function _ensure_jenkins_cert() {
    local vault_namespace="${1:-vault}"
+   local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
    local k8s_namespace="istio-system"
    local secret_name="jenkins-cert"
    local common_name="jenkins.dev.local.me"
+   local pod="${vault_release}-0"
 
    if _kubectl --no-exit -n "$k8s_namespace" \
       get secret "$secret_name" >/dev/null 2>&1; then
@@ -90,19 +92,19 @@ function _ensure_jenkins_cert() {
       return 0
    fi
 
-   if ! _kubectl --no-exit -n "$vault_namespace" exec -i vault-0 -- \
+   if ! _kubectl --no-exit -n "$vault_namespace" exec -i "$pod" -- \
       sh -c 'vault secrets list | grep -q "^pki/"'; then
-      _kubectl -n "$vault_namespace" exec -i vault-0 -- vault secrets enable pki
-      _kubectl -n "$vault_namespace" exec -i vault-0 -- vault secrets tune -max-lease-ttl=87600h pki
-      _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+      _kubectl -n "$vault_namespace" exec -i "$pod" -- vault secrets enable pki
+      _kubectl -n "$vault_namespace" exec -i "$pod" -- vault secrets tune -max-lease-ttl=87600h pki
+      _kubectl -n "$vault_namespace" exec -i "$pod" -- \
          vault write pki/root/generate/internal common_name="dev.local.me" ttl=87600h
    fi
 
-   _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+   _kubectl -n "$vault_namespace" exec -i "$pod" -- \
       vault write pki/roles/jenkins allowed_domains=dev.local.me allow_subdomains=true max_ttl=72h
 
    local json cert_file key_file
-   json=$(_kubectl -n "$vault_namespace" exec -i vault-0 -- \
+   json=$(_kubectl -n "$vault_namespace" exec -i "$pod" -- \
       vault write -format=json pki/issue/jenkins common_name="$common_name" ttl=72h)
 
    cert_file=$(mktemp -t jenkins-cert.pem.XXXX)
@@ -133,19 +135,20 @@ function _deploy_jenkins_image() {
 
 function deploy_jenkins() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-      echo "Usage: deploy_jenkins [namespace=jenkins] [vault-namespace=${VAULT_NS:-vault}]"
+      echo "Usage: deploy_jenkins [namespace=jenkins] [vault-namespace=${VAULT_NS:-vault}] [vault-release=${VAULT_RELEASE_DEFAULT}]"
       return 0
    fi
 
    local jenkins_namespace="${1:-jenkins}"
    local vault_namespace="${2:-${VAULT_NS:-vault}}"
+   local vault_release="${3:-$VAULT_RELEASE_DEFAULT}"
 
-   deploy_vault ha "$vault_namespace"
-   _create_jenkins_admin_vault_policy "$vault_namespace"
-   _create_jenkins_vault_ad_policy "$vault_namespace" "$jenkins_namespace"
+   deploy_vault ha "$vault_namespace" "$vault_release"
+   _create_jenkins_admin_vault_policy "$vault_namespace" "$vault_release"
+   _create_jenkins_vault_ad_policy "$vault_namespace" "$vault_release" "$jenkins_namespace"
    _create_jenkins_namespace "$jenkins_namespace"
    _create_jenkins_pv_pvc "$jenkins_namespace"
-   _ensure_jenkins_cert "$vault_namespace"
+   _ensure_jenkins_cert "$vault_namespace" "$vault_release"
    _deploy_jenkins "$jenkins_namespace"
    _wait_for_jenkins_ready "$jenkins_namespace"
 }
@@ -220,14 +223,16 @@ function _wait_for_jenkins_ready() {
 
 function _create_jenkins_admin_vault_policy() {
    local vault_namespace="${1:-${VAULT_NS:-vault}}"
+   local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local pod="${vault_release}-0"
 
-   if _vault_policy_exists "$vault_namespace" "jenkins-admin"; then
+   if _vault_policy_exists "$vault_namespace" "$vault_release" "jenkins-admin"; then
       _info "Vault policy jenkins-admin already exists, skip"
       return 0
    fi
 
    # create policy once (idempotent)
-   cat <<'HCL' | tee jenkins-admin.hcl | _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+   cat <<'HCL' | tee jenkins-admin.hcl | _kubectl -n "$vault_namespace" exec -i "$pod" -- \
       vault write sys/policies/password/jenkins-admin policy=-
 length = 24
 rule "charset" { charset = "abcdefghijklmnopqrstuvwxyz" }
@@ -237,9 +242,9 @@ rule "charset" { charset = "!@#$%^&*()-_=+[]{};:,.?" }
 HCL
 
    local jenkins_admin_pass
-   jenkins_admin_pass=$(_kubectl -n "$vault_namespace" exec -i vault-0 -- \
+   jenkins_admin_pass=$(_kubectl -n "$vault_namespace" exec -i "$pod" -- \
       vault read -field=password sys/policies/password/jenkins-admin/generate)
-   printf '' | _no_trace _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+   printf '' | _no_trace _kubectl -n "$vault_namespace" exec -i "$pod" -- \
       vault kv put secret/eso/jenkins-admin username=jenkins-admin \
       password="$jenkins_admin_pass"
    rm -f jenkins-admin.hcl
@@ -247,28 +252,32 @@ HCL
 
 function _sync_vault_jenkins_admin() {
    local vault_namespace="${1:-vault}"
-   local jenkins_namespace="${2:-jenkins}"
-   _kubectl -n "$vault_namespace" exec -i vault-0 -- vault write -field=password \
+   local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local jenkins_namespace="${3:-jenkins}"
+   local pod="${vault_release}-0"
+   _kubectl -n "$vault_namespace" exec -i "$pod" -- vault write -field=password \
       sys/policies/password/jenkins-admin/generate
 
-   _kubectl -n "$vault_namespace" exec -i vault-0 -- sh - \
+   _kubectl -n "$vault_namespace" exec -i "$pod" -- sh - \
       vault kv put secret/eso/jenkins-admin \
-      username=jenkins-admin password="$(_kubectl -n "$vault_namespace" exec -i vault-0 -- \
+      username=jenkins-admin password="$(_kubectl -n "$vault_namespace" exec -i "$pod" -- \
       vault read -field=password sys/policies/password/jenkins-admin/generate)"
 }
 
 function _create_jenkins_vault_ad_policy() {
    local vault_namespace="${1:-${VAULT_NS:-vault}}"
-   local jenkins_namespace="${2:-jenkins}"
+   local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local jenkins_namespace="${3:-jenkins}"
+   local pod="${vault_release}-0"
 
-   if ! _vault_policy_exists "$vault_namespace" "jenkins-jcasc-read"; then
-      _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+   if ! _vault_policy_exists "$vault_namespace" "$vault_release" "jenkins-jcasc-read"; then
+      _kubectl -n "$vault_namespace" exec -i "$pod" -- \
          vault policy write jenkins-jcasc-read - <<'HCL'
 path "secret/data/jenkins/ad-ldap"     { capabilities = ["read"] }
 path "secret/data/jenkins/ad-adreader" { capabilities = ["read"] }
 HCL
 
-      _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+      _kubectl -n "$vault_namespace" exec -i "$pod" -- \
          vault write auth/kubernetes/role/jenkins-jcasc-reader - \
            bound_service_account_names=jenkins \
            bound_service_account_namespaces="$jenkins_namespace" \
@@ -276,14 +285,14 @@ HCL
            ttl=30m
    fi
 
-   if ! _vault_policy_exists "$vault_namespace" "jenkins-jcasc-write"; then
-      _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+   if ! _vault_policy_exists "$vault_namespace" "$vault_release" "jenkins-jcasc-write"; then
+      _kubectl -n "$vault_namespace" exec -i "$pod" -- \
          vault policy write jenkins-jcasc-write - <<'HCL'
 path "secret/data/jenkins/ad-ldap"     { capabilities = ["create", "update"] }
 path "secret/data/jenkins/ad-adreader" { capabilities = ["create", "update"] }
 HCL
 
-      _kubectl -n "$vault_namespace" exec -i vault-0 -- \
+      _kubectl -n "$vault_namespace" exec -i "$pod" -- \
          vault write auth/kubernetes/role/jenkins-jcasc-writer - \
            bound_service_account_names=jenkins \
            bound_service_account_namespaces="$jenkins_namespace" \
