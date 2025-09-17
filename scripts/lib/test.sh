@@ -259,7 +259,6 @@ function test_jenkins() {
             CREATED_VAULT_NS="$VAULT_NS"
         fi
 
-        _wait_for_jenkins_ready "${wait_for_ready_args[@]}"
         if deploy_jenkins "$JENKINS_NS"; then
             if ! _kubectl --no-exit -n "$JENKINS_NS" \
                get "$jenkins_statefulset" >/dev/null 2>&1; then
