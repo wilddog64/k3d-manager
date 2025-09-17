@@ -106,6 +106,8 @@ setup() {
 @test "_vault_bootstrap_ha uses release selector and unseals listed pods" {
   TEST_NS="custom-ns"
   TEST_RELEASE="custom-release"
+  TEST_POD="${TEST_RELEASE}-0"
+  TEST_POD_RESOURCE="pod/${TEST_POD}"
   : >"$KUBECTL_LOG"
 
   _is_vault_deployed() { return 0; }
@@ -135,23 +137,23 @@ setup() {
     local cmd="$*"
     echo "$cmd" >>"$KUBECTL_LOG"
     case "$cmd" in
-      "wait -n ${TEST_NS} --for=condition=Podscheduled pod/vault-0 --timeout=120s")
+      "wait -n ${TEST_NS} --for=condition=Podscheduled ${TEST_POD_RESOURCE} --timeout=120s")
         return 0 ;;
-      "-n ${TEST_NS} get pod vault-0 -o jsonpath={.status.phase}")
+      "-n ${TEST_NS} get pod ${TEST_POD} -o jsonpath={.status.phase}")
         echo "Running"
         return 0 ;;
-      "-n ${TEST_NS} exec -i vault-0 -- vault status -format json")
+      "-n ${TEST_NS} exec -i ${TEST_POD} -- vault status -format json")
         echo '{"initialized": false}'
         return 0 ;;
-      "-n ${TEST_NS} exec -it vault-0 -- sh -lc vault operator init -key-shares=1 -key-threshold=1 -format=json")
+      "-n ${TEST_NS} exec -it ${TEST_POD} -- sh -lc vault operator init -key-shares=1 -key-threshold=1 -format=json")
         printf '{"root_token":"root","unseal_keys_b64":["key"]}\n'
         return 0 ;;
       "-n ${TEST_NS} create secret generic vault-root --from-literal=root_token=root")
         return 0 ;;
       "-n ${TEST_NS} get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=${TEST_RELEASE} -o name")
-        echo "pod/${TEST_RELEASE}-0"
+        echo "pod/${TEST_POD}"
         return 0 ;;
-      "-n ${TEST_NS} exec -i ${TEST_RELEASE}-0 -- sh -lc vault operator unseal key")
+      "-n ${TEST_NS} exec -i ${TEST_POD} -- sh -lc vault operator unseal key")
         return 0 ;;
       *)
         return 0 ;;
@@ -163,18 +165,30 @@ setup() {
   [ "$status" -eq 0 ]
 
   read_lines "$KUBECTL_LOG" kubectl_calls
+  expected_wait="wait -n ${TEST_NS} --for=condition=Podscheduled ${TEST_POD_RESOURCE} --timeout=120s"
+  expected_get="-n ${TEST_NS} get pod ${TEST_POD} -o jsonpath={.status.phase}"
+  expected_status="-n ${TEST_NS} exec -i ${TEST_POD} -- vault status -format json"
+  expected_init="-n ${TEST_NS} exec -it ${TEST_POD} -- sh -lc vault operator init -key-shares=1 -key-threshold=1 -format=json"
   expected_selector="-n ${TEST_NS} get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=${TEST_RELEASE} -o name"
-  expected_unseal="-n ${TEST_NS} exec -i ${TEST_RELEASE}-0 -- sh -lc vault operator unseal key"
-  selector_found=0
-  unseal_found=0
-  for call in "${kubectl_calls[@]}"; do
-    if [[ "$call" == "$expected_selector" ]]; then
-      selector_found=1
-    fi
-    if [[ "$call" == "$expected_unseal" ]]; then
-      unseal_found=1
-    fi
+  expected_unseal="-n ${TEST_NS} exec -i ${TEST_POD} -- sh -lc vault operator unseal key"
+
+  expected_calls=(
+    "$expected_wait"
+    "$expected_get"
+    "$expected_status"
+    "$expected_init"
+    "$expected_selector"
+    "$expected_unseal"
+  )
+
+  for expected_call in "${expected_calls[@]}"; do
+    call_found=0
+    for call in "${kubectl_calls[@]}"; do
+      if [[ "$call" == "$expected_call" ]]; then
+        call_found=1
+        break
+      fi
+    done
+    [ "$call_found" -eq 1 ]
   done
-  [ "$selector_found" -eq 1 ]
-  [ "$unseal_found" -eq 1 ]
 }
