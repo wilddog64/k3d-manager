@@ -161,6 +161,30 @@ setup_vault_bootstrap_stubs() {
   done
 }
 
+@test "_is_vault_health ignores kubectl run prompts for healthy status" {
+  _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+
+    cat <<'OUT'
+If you don't see a command prompt, try pressing enter.
+
+pod "vault-health-123" deleted
+200
+OUT
+    return 0
+  }
+  export -f _kubectl
+
+  run _is_vault_health test-ns test-release
+  [ "$status" -eq 0 ]
+}
+
 @test "_is_vault_health fails for unhealthy HTTP statuses" {
   _kubectl() {
     while [[ $# -gt 0 ]]; do
