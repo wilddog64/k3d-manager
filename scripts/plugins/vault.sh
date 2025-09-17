@@ -191,13 +191,14 @@ function _is_vault_health() {
     --image=curlimages/curl:8.10.1 --command -- sh -c \
     "curl -o /dev/null -s -w '%{http_code}' '${scheme}://${host}:${port}/v1/sys/health'")
 
-  # kubectl may emit interactive prompts and deletion messages before the
-  # command output; grab the last three digit chunk for evaluation.
+  # kubectl may emit interactive prompts and deletion messages before or after
+  # the command output; grab the trailing three digit chunk for evaluation.
   rc=${rc//$'\r'/}
-  local status_line="${rc##*$'\n'}"
-  local status="$status_line"
-  if [[ "$status_line" =~ ([0-9]{3})$ ]]; then
-    status="${BASH_REMATCH[1]}"
+  local status
+  status=$(printf '%s\n' "$rc" | grep -Eo '[0-9]{3}' | tail -n1)
+  if [[ -z "$status" ]]; then
+    local status_line="${rc##*$'\n'}"
+    status="$status_line"
   fi
 
   case "$status" in
