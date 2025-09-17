@@ -102,3 +102,73 @@ setup() {
     [ "${CALLS[$i]}" = "${expected[$i]}" ]
   done
 }
+
+@test "_vault_bootstrap_ha lists pods in provided namespace" {
+  TEST_NS="custom-ns"
+  : >"$KUBECTL_LOG"
+
+  _is_vault_deployed() { return 0; }
+  _run_command() { return 1; }
+  _no_trace() { "$@"; }
+  _info() { :; }
+  _warn() { :; }
+  _is_vault_health() { return 0; }
+  _vault_portforward_help() { :; }
+
+  export -f _is_vault_deployed
+  export -f _run_command
+  export -f _no_trace
+  export -f _info
+  export -f _warn
+  export -f _is_vault_health
+  export -f _vault_portforward_help
+
+  _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+    local cmd="$*"
+    echo "$cmd" >>"$KUBECTL_LOG"
+    case "$cmd" in
+      "wait -n ${TEST_NS} --for=condition=Podscheduled pod/vault-0 --timeout=120s")
+        return 0 ;;
+      "-n ${TEST_NS} get pod vault-0 -o jsonpath={.status.phase}")
+        echo "Running"
+        return 0 ;;
+      "-n ${TEST_NS} exec -i vault-0 -- vault status -format json")
+        echo '{"initialized": false}'
+        return 0 ;;
+      "-n ${TEST_NS} exec -it vault-0 -- sh -lc vault operator init -key-shares=1 -key-threshold=1 -format=json")
+        printf '{"root_token":"root","unseal_keys_b64":["key"]}\n'
+        return 0 ;;
+      "-n ${TEST_NS} create secret generic vault-root --from-literal=root_token=root")
+        return 0 ;;
+      "-n ${TEST_NS} get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=vault -o name")
+        echo "pod/vault-0"
+        return 0 ;;
+      "-n ${TEST_NS} exec -i vault-0 -- sh -lc vault operator unseal key")
+        return 0 ;;
+      *)
+        return 0 ;;
+    esac
+  }
+  export -f _kubectl
+
+  run _vault_bootstrap_ha "$TEST_NS"
+  [ "$status" -eq 0 ]
+
+  read_lines "$KUBECTL_LOG" kubectl_calls
+  expected="-n ${TEST_NS} get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=vault -o name"
+  found=0
+  for call in "${kubectl_calls[@]}"; do
+    if [[ "$call" == "$expected" ]]; then
+      found=1
+      break
+    fi
+  done
+  [ "$found" -eq 1 ]
+}
