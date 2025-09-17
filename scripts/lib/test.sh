@@ -237,6 +237,7 @@ function test_jenkins() {
     CREATED_VAULT=0
     CREATED_JENKINS_NS="$JENKINS_NS"
     CREATED_VAULT_NS=""
+    CREATED_VAULT_RELEASE=""
 
     if ! declare -F deploy_jenkins >/dev/null; then
         _try_load_plugin deploy_jenkins
@@ -259,6 +260,7 @@ function test_jenkins() {
         if ! _kubectl --no-exit get ns "$VAULT_NS" >/dev/null 2>&1; then
             CREATED_VAULT=1
             CREATED_VAULT_NS="$VAULT_NS"
+            CREATED_VAULT_RELEASE="$vault_release"
         fi
 
         if deploy_jenkins "$JENKINS_NS" "$VAULT_NS" "$vault_release"; then
@@ -378,7 +380,11 @@ function _cleanup_jenkins_test() {
     fi
     if [[ "$CREATED_VAULT" -eq 1 ]]; then
         local vault_namespace_to_delete="${CREATED_VAULT_NS:-$VAULT_NS}"
+        local vault_release_to_delete="${CREATED_VAULT_RELEASE:-$VAULT_RELEASE}"
         if [[ -n "$vault_namespace_to_delete" ]]; then
+            if [[ -n "$vault_release_to_delete" ]]; then
+                _helm --no-exit uninstall "$vault_release_to_delete" -n "$vault_namespace_to_delete" >/dev/null 2>&1 || true
+            fi
             _kubectl delete namespace "$vault_namespace_to_delete" --ignore-not-found
         fi
     fi
