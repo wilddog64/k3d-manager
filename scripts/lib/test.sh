@@ -259,7 +259,7 @@ function test_jenkins() {
             CREATED_VAULT_NS="$VAULT_NS"
         fi
 
-        if deploy_jenkins "$JENKINS_NS"; then
+        if deploy_jenkins "$JENKINS_NS" "$VAULT_NS"; then
             if ! _kubectl --no-exit -n "$JENKINS_NS" \
                get "$jenkins_statefulset" >/dev/null 2>&1; then
                 echo "Jenkins statefulset not found in namespace '$JENKINS_NS' after deployment." >&2
@@ -277,7 +277,7 @@ function test_jenkins() {
         fi
     fi
 
-    if deploy_jenkins "$JENKINS_NS"; then
+    if deploy_jenkins "$JENKINS_NS" "$VAULT_NS"; then
         if ! _kubectl --no-exit -n "$JENKINS_NS" get "$jenkins_statefulset" >/dev/null 2>&1; then
             echo "Jenkins statefulset not found in namespace '$JENKINS_NS' after deployment." >&2
             return 1
