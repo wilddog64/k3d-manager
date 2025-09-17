@@ -166,21 +166,33 @@ JSON
 @test "Full deployment" {
   CALLS_LOG="$BATS_TEST_TMPDIR/calls.log"
   : > "$CALLS_LOG"
-  deploy_vault() { :; }
-  _create_jenkins_admin_vault_policy() { :; }
-  _create_jenkins_vault_ad_policy() { :; }
-  _create_jenkins_namespace() { echo "_create_jenkins_namespace" >> "$CALLS_LOG"; }
-  _ensure_jenkins_cert() { echo "_ensure_jenkins_cert" >> "$CALLS_LOG"; }
-  _deploy_jenkins() { echo "_deploy_jenkins" >> "$CALLS_LOG"; }
-  _wait_for_jenkins_ready() { echo "_wait_for_jenkins_ready" >> "$CALLS_LOG"; }
-  run deploy_jenkins sample-ns
+  deploy_vault() { echo "deploy_vault:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_admin_vault_policy() { echo "_create_jenkins_admin_vault_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_vault_ad_policy() { echo "_create_jenkins_vault_ad_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_namespace() { echo "_create_jenkins_namespace:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_pv_pvc() { echo "_create_jenkins_pv_pvc:$*" >> "$CALLS_LOG"; }
+  _ensure_jenkins_cert() { echo "_ensure_jenkins_cert:$*" >> "$CALLS_LOG"; }
+  _deploy_jenkins() { echo "_deploy_jenkins:$*" >> "$CALLS_LOG"; }
+  _wait_for_jenkins_ready() { echo "_wait_for_jenkins_ready:$*" >> "$CALLS_LOG"; }
+
+  run deploy_jenkins sample-ns custom-vault
   [ "$status" -eq 0 ]
+
   read_lines "$CALLS_LOG" calls
-  [ "${#calls[@]}" -eq 4 ]
-  [ "${calls[0]}" = "_create_jenkins_namespace" ]
-  [ "${calls[1]}" = "_ensure_jenkins_cert" ]
-  [ "${calls[2]}" = "_deploy_jenkins" ]
-  [ "${calls[3]}" = "_wait_for_jenkins_ready" ]
+  expected=(
+    "deploy_vault:ha custom-vault"
+    "_create_jenkins_admin_vault_policy:custom-vault"
+    "_create_jenkins_vault_ad_policy:custom-vault sample-ns"
+    "_create_jenkins_namespace:sample-ns"
+    "_create_jenkins_pv_pvc:sample-ns"
+    "_ensure_jenkins_cert:custom-vault"
+    "_deploy_jenkins:sample-ns"
+    "_wait_for_jenkins_ready:sample-ns"
+  )
+  [ "${#calls[@]}" -eq "${#expected[@]}" ]
+  for i in "${!expected[@]}"; do
+    [ "${calls[$i]}" = "${expected[$i]}" ]
+  done
 }
 
 @test "_wait_for_jenkins_ready waits for controller" {
