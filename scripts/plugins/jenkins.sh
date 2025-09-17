@@ -208,6 +208,7 @@ function _wait_for_jenkins_ready() {
    until _kubectl --no-exit -n "$ns" wait --quiet \
       --for=condition=Ready pod -l app.kubernetes.io/component=jenkins-controller \
       --timeout=5s >/dev/null 2>&1; do
+      echo "Waiting for Jenkins controller pod to be ready..."
       if (( SECONDS >= end )); then
          echo "Timed out waiting for Jenkins controller pod to be ready" >&2
          return 1
