@@ -133,18 +133,19 @@ function _deploy_jenkins_image() {
 
 function deploy_jenkins() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-      echo "Usage: deploy_jenkins [namespace=jenkins]"
+      echo "Usage: deploy_jenkins [namespace=jenkins] [vault-namespace=${VAULT_NS:-vault}]"
       return 0
    fi
 
    local jenkins_namespace="${1:-jenkins}"
+   local vault_namespace="${2:-${VAULT_NS:-vault}}"
 
-   deploy_vault ha
-   _create_jenkins_admin_vault_policy "vault"
-   _create_jenkins_vault_ad_policy "vault" "$jenkins_namespace"
+   deploy_vault ha "$vault_namespace"
+   _create_jenkins_admin_vault_policy "$vault_namespace"
+   _create_jenkins_vault_ad_policy "$vault_namespace" "$jenkins_namespace"
    _create_jenkins_namespace "$jenkins_namespace"
    _create_jenkins_pv_pvc "$jenkins_namespace"
-   _ensure_jenkins_cert "vault"
+   _ensure_jenkins_cert "$vault_namespace"
    _deploy_jenkins "$jenkins_namespace"
    _wait_for_jenkins_ready "$jenkins_namespace"
 }
@@ -218,7 +219,7 @@ function _wait_for_jenkins_ready() {
 }
 
 function _create_jenkins_admin_vault_policy() {
-   local vault_namespace="${1:-vault}"
+   local vault_namespace="${1:-${VAULT_NS:-vault}}"
 
    if _vault_policy_exists "$vault_namespace" "jenkins-admin"; then
       _info "Vault policy jenkins-admin already exists, skip"
@@ -257,7 +258,7 @@ function _sync_vault_jenkins_admin() {
 }
 
 function _create_jenkins_vault_ad_policy() {
-   local vault_namespace="${1:-vault}"
+   local vault_namespace="${1:-${VAULT_NS:-vault}}"
    local jenkins_namespace="${2:-jenkins}"
 
    if ! _vault_policy_exists "$vault_namespace" "jenkins-jcasc-read"; then
