@@ -179,13 +179,14 @@ JSON
   [ "$status" -eq 0 ]
 
   read_lines "$CALLS_LOG" calls
+  local release="${VAULT_RELEASE_DEFAULT:-vault}"
   expected=(
-    "deploy_vault:ha custom-vault"
-    "_create_jenkins_admin_vault_policy:custom-vault"
-    "_create_jenkins_vault_ad_policy:custom-vault sample-ns"
+    "deploy_vault:ha custom-vault ${release}"
+    "_create_jenkins_admin_vault_policy:custom-vault ${release}"
+    "_create_jenkins_vault_ad_policy:custom-vault ${release} sample-ns"
     "_create_jenkins_namespace:sample-ns"
     "_create_jenkins_pv_pvc:sample-ns"
-    "_ensure_jenkins_cert:custom-vault"
+    "_ensure_jenkins_cert:custom-vault ${release}"
     "_deploy_jenkins:sample-ns"
     "_wait_for_jenkins_ready:sample-ns"
   )
