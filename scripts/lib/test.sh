@@ -297,9 +297,20 @@ function test_jenkins() {
     fi
 
     # Ensure Istio routing resources exist
-    _kubectl get gateway jenkins-gw -n istio-system >/dev/null
-    _kubectl get virtualservice jenkins -n "$JENKINS_NS" >/dev/null
-    _kubectl get destinationrule jenkins -n "$JENKINS_NS" >/dev/null
+    if ! _kubectl --no-exit get gateway jenkins-gw -n istio-system >/dev/null 2>&1; then
+        echo "Jenkins Istio Gateway 'jenkins-gw' not found in namespace 'istio-system'." >&2
+        return 1
+    fi
+
+    if ! _kubectl --no-exit get virtualservice jenkins -n "$JENKINS_NS" >/dev/null 2>&1; then
+        echo "Jenkins VirtualService 'jenkins' not found in namespace '$JENKINS_NS'." >&2
+        return 1
+    fi
+
+    if ! _kubectl --no-exit get destinationrule jenkins -n "$JENKINS_NS" >/dev/null 2>&1; then
+        echo "Jenkins DestinationRule 'jenkins' not found in namespace '$JENKINS_NS'." >&2
+        return 1
+    fi
 
     _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 >/tmp/jenkins-test-pf.log 2>&1 &
     pf_pid=$!
