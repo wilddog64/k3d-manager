@@ -48,6 +48,7 @@
 --probe escalates to sudo when user probe fails	scripts/tests/lib/run_command.bats	/^@test "--probe escalates to sudo when user probe fails" {$/;"	t
 --probe supports multi-word subcommands	scripts/tests/lib/run_command.bats	/^@test "--probe supports multi-word subcommands" {$/;"	t
 --require-sudo fails when sudo unavailable	scripts/tests/lib/run_command.bats	/^@test "--require-sudo fails when sudo unavailable" {$/;"	t
+Colima resource configuration (macOS)	README.md	/^### Colima resource configuration (macOS)$/;"	S	section:k3d-manager""Usage
 Directory layout	README.md	/^## Directory layout$/;"	s	chapter:k3d-manager
 EOF	scripts/k3d-manager	/^        cat <<EOF$/;"	h
 EOF	scripts/k3d-manager	/^    cat <<EOF$/;"	h
@@ -56,12 +57,14 @@ EOF	scripts/lib/test.sh	/^  cat <<EOF | _kubectl apply -f -$/;"	h
 EOF	scripts/plugins/azure.sh	/^    cat <<'EOF'$/;"	h
 EOF	scripts/plugins/bitwarden.sh	/^  cat <<EOF | _kubectl apply -f -$/;"	h
 EOF	scripts/plugins/vault.sh	/^   cat <<EOF$/;"	h
+EOF	scripts/tests/plugins/jenkins.bats	/^      cat <<'EOF'$/;"	h
+EOF2	scripts/tests/core/install_k3d.bats	/^    cat <<EOF2$/;"	h
 Fresh install	scripts/tests/plugins/eso.bats	/^@test "Fresh install" {$/;"	t
 Full deployment	scripts/tests/plugins/jenkins.bats	/^@test "Full deployment" {$/;"	t
 Full deployment	scripts/tests/plugins/vault.bats	/^@test "Full deployment" {$/;"	t
 HCL	scripts/plugins/jenkins.sh	/^         vault policy write jenkins-jcasc-read - <<'HCL'$/;"	h
 HCL	scripts/plugins/jenkins.sh	/^         vault policy write jenkins-jcasc-write - <<'HCL'$/;"	h
-HCL	scripts/plugins/jenkins.sh	/^   cat <<'HCL' | tee jenkins-admin.hcl | _kubectl -n "$vault_namespace" exec -i vault-0 -- \\$/;"	h
+HCL	scripts/plugins/jenkins.sh	/^   cat <<'HCL' | tee jenkins-admin.hcl | _kubectl -n "$vault_namespace" exec -i "$pod" -- \\$/;"	h
 HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- \\$/;"	h
 HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- sh - \\$/;"	h
 HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \\$/;"	h
@@ -70,8 +73,11 @@ How it fits together	README.md	/^## How it fits together$/;"	s	chapter:k3d-manag
 JSON	scripts/tests/plugins/jenkins.bats	/^      cat <<'JSON'$/;"	h
 Namespace creation	scripts/tests/plugins/jenkins.bats	/^@test "Namespace creation" {$/;"	t
 Namespace setup	scripts/tests/plugins/vault.bats	/^@test "Namespace setup" {$/;"	t
+POD	scripts/lib/test.sh	/^  cat <<POD | _kubectl apply -f -$/;"	h
 PV/PVC setup	scripts/tests/plugins/jenkins.bats	/^@test "PV\/PVC setup" {$/;"	t
+PV/PVC setup auto-detects cluster	scripts/tests/plugins/jenkins.bats	/^@test "PV\/PVC setup auto-detects cluster" {$/;"	t
 Public functions	README.md	/^## Public functions$/;"	s	chapter:k3d-manager
+SCRIPT	scripts/tests/lib/test_auth_cleanup.bats	/^  cat <<'SCRIPT' > "$script"$/;"	h
 SH	scripts/plugins/vault.sh	/^  cat <<'SH' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \\$/;"	h
 Security notes	README.md	/^## Security notes$/;"	s	chapter:k3d-manager
 Skips install if ESO already present	scripts/tests/plugins/eso.bats	/^@test "Skips install if ESO already present" {$/;"	t
@@ -88,34 +94,41 @@ _az	scripts/plugins/azure.sh	/^function _az() {$/;"	f
 _az_ok	scripts/plugins/azure.sh	/^function _az_ok() {$/;"	f
 _bw_lookup_secret	scripts/plugins/bitwarden.sh	/^function _bw_lookup_secret(){$/;"	f
 _bws	scripts/plugins/bitwarden.sh	/^function _bws() {$/;"	f
+_cleanup_eso_test	scripts/lib/test.sh	/^function _cleanup_eso_test() {$/;"	f
 _cleanup_istio_test_namespace	scripts/lib/test.sh	/^function _cleanup_istio_test_namespace() {$/;"	f
+_cleanup_jenkins_test	scripts/lib/test.sh	/^function _cleanup_jenkins_test() {$/;"	f
 _cleanup_on_success	scripts/lib/core.sh	/^function _cleanup_on_success() {$/;"	f
 _cleanup_on_success	scripts/tests/core/create_k3d_clusters.bats	/^  _cleanup_on_success() { :; }$/;"	f
 _cleanup_on_success	scripts/tests/plugins/jenkins.bats	/^  _cleanup_on_success() { rm -f "$1"; }$/;"	f
 _cleanup_on_success	scripts/tests/test_helpers.bash	/^  _cleanup_on_success() { :; }$/;"	f
 _cleanup_register	scripts/lib/system.sh	/^function _cleanup_register() {$/;"	f
+_cleanup_vault_test	scripts/lib/test.sh	/^function _cleanup_vault_test() {$/;"	f
 _command_exist	scripts/lib/system.sh	/^function _command_exist() {$/;"	f
+_command_exist	scripts/tests/core/install_k3d.bats	/^  _command_exist() { return 1; }$/;"	f
+_command_exist	scripts/tests/lib/install_kubernetes_cli.bats	/^  _command_exist() { return 1; }$/;"	f
 _compute_end_iso_macos	scripts/plugins/azure.sh	/^function _compute_end_iso_macos() {$/;"	f
 _configure_k3d_cluster_istio	scripts/lib/core.sh	/^function _configure_k3d_cluster_istio() {$/;"	f
 _create_azure_eso_store	scripts/plugins/azure.sh	/^function _create_azure_eso_store() {$/;"	f
 _create_client_secret	scripts/plugins/azure.sh	/^function _create_client_secret() {$/;"	f
 _create_jenkins_admin_vault_policy	scripts/plugins/jenkins.sh	/^function _create_jenkins_admin_vault_policy() {$/;"	f
-_create_jenkins_admin_vault_policy	scripts/tests/plugins/jenkins.bats	/^  _create_jenkins_admin_vault_policy() { :; }$/;"	f
+_create_jenkins_admin_vault_policy	scripts/tests/plugins/jenkins.bats	/^  _create_jenkins_admin_vault_policy() { echo "_create_jenkins_admin_vault_policy:$*" >> "$CALLS/;"	f
 _create_jenkins_admin_vault_policy stores secret without logging password	scripts/tests/plugins/jenkins.bats	/^@test "_create_jenkins_admin_vault_policy stores secret without logging password" {$/;"	t
 _create_jenkins_namespace	scripts/plugins/jenkins.sh	/^function _create_jenkins_namespace() {$/;"	f
-_create_jenkins_namespace	scripts/tests/plugins/jenkins.bats	/^  _create_jenkins_namespace() { echo "_create_jenkins_namespace" >> "$CALLS_LOG"; }$/;"	f
+_create_jenkins_namespace	scripts/tests/plugins/jenkins.bats	/^  _create_jenkins_namespace() { echo "_create_jenkins_namespace:$*" >> "$CALLS_LOG"; }$/;"	f
 _create_jenkins_pv_pvc	scripts/plugins/jenkins.sh	/^function _create_jenkins_pv_pvc() {$/;"	f
+_create_jenkins_pv_pvc	scripts/tests/plugins/jenkins.bats	/^  _create_jenkins_pv_pvc() { echo "_create_jenkins_pv_pvc:$*" >> "$CALLS_LOG"; }$/;"	f
 _create_jenkins_vault_ad_policy	scripts/plugins/jenkins.sh	/^function _create_jenkins_vault_ad_policy() {$/;"	f
-_create_jenkins_vault_ad_policy	scripts/tests/plugins/jenkins.bats	/^  _create_jenkins_vault_ad_policy() { :; }$/;"	f
+_create_jenkins_vault_ad_policy	scripts/tests/plugins/jenkins.bats	/^  _create_jenkins_vault_ad_policy() { echo "_create_jenkins_vault_ad_policy:$*" >> "$CALLS_LOG";/;"	f
 _create_jenkins_vault_ad_policy creates policies	scripts/tests/plugins/jenkins.bats	/^@test "_create_jenkins_vault_ad_policy creates policies" {$/;"	t
 _create_k3d_cluster	scripts/lib/core.sh	/^function _create_k3d_cluster() {$/;"	f
 _create_k3d_cluster -h shows usage	scripts/tests/core/create_k3d_clusters.bats	/^@test "_create_k3d_cluster -h shows usage" {$/;"	t
 _create_nfs_share	scripts/lib/core.sh	/^function _create_nfs_share() {$/;"	f
 _curl	scripts/lib/system.sh	/^function _curl() {$/;"	f
+_curl	scripts/tests/core/install_k3d.bats	/^  _curl() {$/;"	f
 _delete_k8s_resources	scripts/plugins/azure.sh	/^function _delete_k8s_resources() {$/;"	f
 _delete_sp_and_app	scripts/plugins/azure.sh	/^function _delete_sp_and_app() {$/;"	f
 _deploy_jenkins	scripts/plugins/jenkins.sh	/^function _deploy_jenkins() {$/;"	f
-_deploy_jenkins	scripts/tests/plugins/jenkins.bats	/^  _deploy_jenkins() { echo "_deploy_jenkins" >> "$CALLS_LOG"; }$/;"	f
+_deploy_jenkins	scripts/tests/plugins/jenkins.bats	/^  _deploy_jenkins() { echo "_deploy_jenkins:$*" >> "$CALLS_LOG"; }$/;"	f
 _deploy_jenkins applies Istio resources	scripts/tests/plugins/jenkins.bats	/^@test "_deploy_jenkins applies Istio resources" {$/;"	t
 _deploy_jenkins_image	scripts/plugins/jenkins.sh	/^function _deploy_jenkins_image() {$/;"	f
 _deploy_vault_ha	scripts/plugins/vault.sh	/^function _deploy_vault_ha() {$/;"	f
@@ -126,7 +139,7 @@ _ensure_azure_cli	scripts/plugins/azure.sh	/^function _ensure_azure_cli() {$/;"	
 _ensure_bats	scripts/lib/system.sh	/^function _ensure_bats() {$/;"	f
 _ensure_cargo	scripts/lib/system.sh	/^function _ensure_cargo() {$/;"	f
 _ensure_jenkins_cert	scripts/plugins/jenkins.sh	/^function _ensure_jenkins_cert() {$/;"	f
-_ensure_jenkins_cert	scripts/tests/plugins/jenkins.bats	/^  _ensure_jenkins_cert() { echo "_ensure_jenkins_cert" >> "$CALLS_LOG"; }$/;"	f
+_ensure_jenkins_cert	scripts/tests/plugins/jenkins.bats	/^  _ensure_jenkins_cert() { echo "_ensure_jenkins_cert:$*" >> "$CALLS_LOG"; }$/;"	f
 _ensure_jenkins_cert sets up PKI and TLS secret	scripts/tests/plugins/jenkins.bats	/^@test "_ensure_jenkins_cert sets up PKI and TLS secret" {$/;"	t
 _ensure_namespace	scripts/plugins/azure.sh	/^function _ensure_namespace() {$/;"	f
 _ensure_secret_tool	scripts/lib/system.sh	/^_ensure_secret_tool() {$/;"	f
@@ -142,6 +155,7 @@ _helm	scripts/lib/system.sh	/^function _helm() {$/;"	f
 _helm	scripts/tests/plugins/vault.bats	/^  _helm() {$/;"	f
 _helm	scripts/tests/test_helpers.bash	/^  _helm() {$/;"	f
 _info	scripts/lib/system.sh	/^function _info() { printf 'INFO: %s\\n' "$*" >&2; }$/;"	f
+_info	scripts/tests/plugins/vault.bats	/^  _info() { :; }$/;"	f
 _install_azure_eso	scripts/plugins/azure.sh	/^function _install_azure_eso() {$/;"	f
 _install_bws	scripts/plugins/bitwarden.sh	/^function _install_bws() {$/;"	f
 _install_colima	scripts/lib/system.sh	/^function _install_colima() {$/;"	f
@@ -149,9 +163,13 @@ _install_debian_docker	scripts/lib/system.sh	/^function _install_debian_docker()
 _install_debian_helm	scripts/lib/system.sh	/^function _install_debian_helm() {$/;"	f
 _install_debian_kubernetes_client	scripts/lib/system.sh	/^function _install_debian_kubernetes_client() {$/;"	f
 _install_docker	scripts/lib/core.sh	/^function _install_docker() {$/;"	f
+_install_docker	scripts/tests/core/install_k3d.bats	/^  _install_docker() { :; }$/;"	f
 _install_helm	scripts/lib/system.sh	/^function _install_helm() {$/;"	f
+_install_helm	scripts/tests/core/install_k3d.bats	/^  _install_helm() { :; }$/;"	f
 _install_istioctl	scripts/lib/core.sh	/^function _install_istioctl() {$/;"	f
+_install_istioctl	scripts/tests/core/install_k3d.bats	/^  _install_istioctl() { :; }$/;"	f
 _install_k3d	scripts/lib/core.sh	/^function _install_k3d() {$/;"	f
+_install_k3d exports INSTALL_DIR	scripts/tests/core/install_k3d.bats	/^@test "_install_k3d exports INSTALL_DIR" {$/;"	t
 _install_kubernetes_cli	scripts/lib/system.sh	/^function _install_kubernetes_cli() {$/;"	f
 _install_mac_docker	scripts/lib/system.sh	/^function _install_mac_docker() {$/;"	f
 _install_mac_helm	scripts/lib/system.sh	/^function _install_mac_helm() {$/;"	f
@@ -161,15 +179,26 @@ _install_redhat_kubernetes_client	scripts/lib/system.sh	/^function _install_redh
 _install_smb_csi_driver	scripts/lib/core.sh	/^function _install_smb_csi_driver() {$/;"	f
 _ip	scripts/lib/system.sh	/^function _ip() {$/;"	f
 _is_debian_family	scripts/lib/system.sh	/^function _is_debian_family() {$/;"	f
+_is_debian_family	scripts/tests/lib/install_kubernetes_cli.bats	/^  _is_debian_family() { return 0; }$/;"	f
+_is_debian_family	scripts/tests/lib/install_kubernetes_cli.bats	/^  _is_debian_family() { return 1; }$/;"	f
 _is_linux	scripts/lib/system.sh	/^function _is_linux() {$/;"	f
 _is_mac	scripts/lib/system.sh	/^function _is_mac() {$/;"	f
+_is_mac	scripts/tests/core/install_k3d.bats	/^  _is_mac() { return 1; }$/;"	f
+_is_mac	scripts/tests/lib/install_kubernetes_cli.bats	/^  _is_mac() { return 0; }$/;"	f
+_is_mac	scripts/tests/lib/install_kubernetes_cli.bats	/^  _is_mac() { return 1; }$/;"	f
 _is_redhat_family	scripts/lib/system.sh	/^function _is_redhat_family() {$/;"	f
+_is_redhat_family	scripts/tests/lib/install_kubernetes_cli.bats	/^  _is_redhat_family() { return 1; }$/;"	f
 _is_same_token	scripts/lib/system.sh	/^function _is_same_token() {$/;"	f
 _is_vault_deployed	scripts/plugins/vault.sh	/^function _is_vault_deployed() {$/;"	f
+_is_vault_deployed	scripts/tests/plugins/vault.bats	/^  _is_vault_deployed() { return 0; }$/;"	f
 _is_vault_health	scripts/plugins/vault.sh	/^function _is_vault_health() {$/;"	f
+_is_vault_health	scripts/tests/plugins/vault.bats	/^  _is_vault_health() { return 0; }$/;"	f
 _is_wsl	scripts/lib/system.sh	/^function _is_wsl() {$/;"	f
+_is_wsl	scripts/tests/lib/install_kubernetes_cli.bats	/^  _is_wsl() { return 1; }$/;"	f
 _istioctl	scripts/lib/system.sh	/^function _istioctl() {$/;"	f
 _k3d	scripts/lib/system.sh	/^function _k3d() {$/;"	f
+_k3d	scripts/tests/plugins/jenkins.bats	/^  _k3d() { echo "$*" >> "$K3D_LOG"; }$/;"	f
+_k3d	scripts/tests/plugins/jenkins.bats	/^  _k3d() {$/;"	f
 _k3d_cluster_exist	scripts/lib/system.sh	/^function _k3d_cluster_exist() {$/;"	f
 _kill	scripts/lib/system.sh	/^function _kill() {$/;"	f
 _kubectl	scripts/lib/system.sh	/^function _kubectl() {$/;"	f
@@ -183,9 +212,11 @@ _lookup_bw_access_token	scripts/plugins/bitwarden.sh	/^function _lookup_bw_acces
 _no_trace	scripts/lib/system.sh	/^function _no_trace() {$/;"	f
 _no_trace	scripts/plugins/jenkins.sh	/^command -v _no_trace >\/dev\/null 2>&1 || _no_trace() { "$@"; }$/;"	f
 _no_trace	scripts/tests/plugins/jenkins.bats	/^  _no_trace() {$/;"	f
+_no_trace	scripts/tests/plugins/vault.bats	/^  _no_trace() { "$@"; }$/;"	f
 _remove_role_assignments_for	scripts/plugins/azure.sh	/^function _remove_role_assignments_for() {$/;"	f
 _run_command	scripts/lib/system.sh	/^function _run_command() {$/;"	f
 _run_command	scripts/tests/plugins/eso.bats	/^  _run_command() {$/;"	f
+_run_command	scripts/tests/plugins/vault.bats	/^  _run_command() { return 1; }$/;"	f
 _run_command	scripts/tests/test_helpers.bash	/^  _run_command() {$/;"	f
 _secret_tool	scripts/lib/system.sh	/^function _secret_tool() {$/;"	f
 _security	scripts/lib/system.sh	/^function _security() {$/;"	f
@@ -196,6 +227,7 @@ _update_k8s_secret	scripts/plugins/azure.sh	/^function _update_k8s_secret() {$/;
 _usage	scripts/k3d-manager	/^function _usage() {$/;"	f
 _vault_bootstrap_ha	scripts/plugins/vault.sh	/^function _vault_bootstrap_ha() {$/;"	f
 _vault_bootstrap_ha	scripts/tests/plugins/vault.bats	/^  _vault_bootstrap_ha() { CALLS+=("_vault_bootstrap_ha"); }$/;"	f
+_vault_bootstrap_ha uses release selector and unseals listed pods	scripts/tests/plugins/vault.bats	/^@test "_vault_bootstrap_ha uses release selector and unseals listed pods" {$/;"	t
 _vault_exec	scripts/plugins/vault.sh	/^function _vault_exec() {$/;"	f
 _vault_login	scripts/plugins/vault.sh	/^function _vault_login() {$/;"	f
 _vault_ns_ensure	scripts/plugins/vault.sh	/^function _vault_ns_ensure() {$/;"	f
@@ -204,13 +236,22 @@ _vault_policy	scripts/tests/plugins/jenkins.bats	/^  _vault_policy() { return 1;
 _vault_policy_exists	scripts/plugins/vault.sh	/^function _vault_policy_exists() {$/;"	f
 _vault_policy_exists	scripts/tests/plugins/jenkins.bats	/^  _vault_policy_exists() { return 1; }$/;"	f
 _vault_portforward_help	scripts/plugins/vault.sh	/^function _vault_portforward_help() {$/;"	f
+_vault_portforward_help	scripts/tests/plugins/vault.bats	/^  _vault_portforward_help() { :; }$/;"	f
 _vault_repo_setup	scripts/plugins/vault.sh	/^function _vault_repo_setup() {$/;"	f
 _vault_repo_setup	scripts/tests/plugins/vault.bats	/^  _vault_repo_setup() { CALLS+=("_vault_repo_setup"); }$/;"	f
 _vault_set_eso_init_jenkins_writer	scripts/plugins/vault.sh	/^function _vault_set_eso_init_jenkins_writer() {$/;"	f
 _vault_set_eso_reader	scripts/plugins/vault.sh	/^function _vault_set_eso_reader() {$/;"	f
 _vault_set_eso_writer	scripts/plugins/vault.sh	/^function _vault_set_eso_writer() {$/;"	f
 _vault_wait_ready	scripts/plugins/vault.sh	/^function _vault_wait_ready() {$/;"	f
+_wait_for_jenkins_ready	scripts/plugins/jenkins.sh	/^function _wait_for_jenkins_ready() {$/;"	f
+_wait_for_jenkins_ready	scripts/tests/plugins/jenkins.bats	/^  _wait_for_jenkins_ready() { echo "_wait_for_jenkins_ready:$*" >> "$CALLS_LOG"; }$/;"	f
+_wait_for_jenkins_ready respects JENKINS_READY_TIMEOUT	scripts/tests/plugins/jenkins.bats	/^@test "_wait_for_jenkins_ready respects JENKINS_READY_TIMEOUT" {$/;"	t
+_wait_for_jenkins_ready waits for controller	scripts/tests/plugins/jenkins.bats	/^@test "_wait_for_jenkins_ready waits for controller" {$/;"	t
+_wait_for_port_forward	scripts/lib/test.sh	/^function _wait_for_port_forward() {$/;"	f
 _warn	scripts/lib/system.sh	/^function _warn() { printf 'WARN: %s\\n' "$*" >&2; }$/;"	f
+_warn	scripts/tests/plugins/vault.bats	/^  _warn() { :; }$/;"	f
+`_run_command` helper	README.md	/^### `_run_command` helper$/;"	S	section:k3d-manager""Writing a plugin
+cluster template has no Jenkins volume	scripts/tests/core/create_k3d_clusters.bats	/^@test "cluster template has no Jenkins volume" {$/;"	t
 config_bws_eso	scripts/plugins/bitwarden.sh	/^function config_bws_eso() {$/;"	f
 create_az_sp	scripts/plugins/azure.sh	/^function create_az_sp() {$/;"	f
 creates cluster with custom ports	scripts/tests/core/create_k3d_clusters.bats	/^@test "creates cluster with custom ports" {$/;"	t
@@ -223,7 +264,7 @@ deploy_jenkins	scripts/plugins/jenkins.sh	/^function deploy_jenkins() {$/;"	f
 deploy_jenkins -h shows usage	scripts/tests/plugins/jenkins.bats	/^@test "deploy_jenkins -h shows usage" {$/;"	t
 deploy_k3d_cluster	scripts/lib/core.sh	/^function deploy_k3d_cluster() {$/;"	f
 deploy_vault	scripts/plugins/vault.sh	/^function deploy_vault() {$/;"	f
-deploy_vault	scripts/tests/plugins/jenkins.bats	/^  deploy_vault() { :; }$/;"	f
+deploy_vault	scripts/tests/plugins/jenkins.bats	/^  deploy_vault() { echo "deploy_vault:$*" >> "$CALLS_LOG"; }$/;"	f
 deploy_vault -h shows usage	scripts/tests/plugins/vault.bats	/^@test "deploy_vault -h shows usage" {$/;"	t
 destroy_k3d_cluster	scripts/lib/core.sh	/^function destroy_k3d_cluster() {$/;"	f
 destroy_k3d_cluster -h shows usage	scripts/tests/core/create_k3d_clusters.bats	/^@test "destroy_k3d_cluster -h shows usage" {$/;"	t
@@ -235,6 +276,7 @@ export_stubs	scripts/tests/test_helpers.bash	/^function export_stubs() {$/;"	f
 fakecmd	scripts/tests/lib/run_command.bats	/^  fakecmd() {$/;"	f
 hello	scripts/plugins/hello.sh	/^function hello() {$/;"	f
 init_test_env	scripts/tests/test_helpers.bash	/^function init_test_env() {$/;"	f
+installs kubectl via brew on macOS	scripts/tests/lib/install_kubernetes_cli.bats	/^@test "installs kubectl via brew on macOS" {$/;"	t
 ip	scripts/tests/core/create_k3d_clusters.bats	/^  ip() { echo "8.8.8.8 via 0.0.0.0 dev eth0 src 127.0.0.1 uid 1000"; }$/;"	f
 jenkins	scripts/etc/jenkins/destinationrule.yaml	/^  name: jenkins$/;"	p
 jenkins	scripts/etc/jenkins/virtualservice.yaml	/^  name: jenkins$/;"	p
@@ -246,11 +288,16 @@ read_lines falls back on bash <4	scripts/tests/lib/read_lines.bats	/^@test "read
 read_lines handles quotes and backslashes	scripts/tests/lib/read_lines.bats	/^@test "read_lines handles quotes and backslashes" {$/;"	t
 read_lines reads file into array	scripts/tests/lib/read_lines.bats	/^@test "read_lines reads file into array" {$/;"	t
 setup	scripts/tests/core/create_k3d_clusters.bats	/^setup() {$/;"	f
+setup	scripts/tests/core/install_k3d.bats	/^setup() {$/;"	f
+setup	scripts/tests/lib/install_kubernetes_cli.bats	/^setup() {$/;"	f
 setup	scripts/tests/lib/read_lines.bats	/^setup() {$/;"	f
 setup	scripts/tests/lib/run_command.bats	/^setup() {$/;"	f
+setup	scripts/tests/lib/test_auth_cleanup.bats	/^setup() {$/;"	f
 setup	scripts/tests/plugins/eso.bats	/^setup() {$/;"	f
 setup	scripts/tests/plugins/jenkins.bats	/^setup() {$/;"	f
 setup	scripts/tests/plugins/vault.bats	/^setup() {$/;"	f
+sleep	scripts/tests/plugins/jenkins.bats	/^  sleep() { :; }$/;"	f
+sleep	scripts/tests/plugins/jenkins.bats	/^  sleep() {$/;"	f
 stub_envsubst	scripts/tests/test_helpers.bash	/^function stub_envsubst() {$/;"	f
 stub_helm	scripts/tests/test_helpers.bash	/^function stub_helm() {$/;"	f
 stub_kubectl	scripts/tests/test_helpers.bash	/^function stub_kubectl() {$/;"	f
@@ -261,9 +308,14 @@ sudo	scripts/tests/lib/run_command.bats	/^  sudo() { echo "sudo $*" >> "$RUN_LOG
 sudo	scripts/tests/lib/run_command.bats	/^  sudo() { echo "sudo $*" >> "$RUN_LOG"; shift; return 0; }$/;"	f
 sudo	scripts/tests/lib/run_command.bats	/^  sudo() { return 1; }$/;"	f
 test	scripts/k3d-manager	/^function test() {$/;"	f
+test_eso	scripts/lib/test.sh	/^function test_eso() {$/;"	f
 test_istio	scripts/lib/test.sh	/^function test_istio() {$/;"	f
+test_jenkins	scripts/lib/test.sh	/^function test_jenkins() {$/;"	f
+test_jenkins trap removes auth file	scripts/tests/lib/test_auth_cleanup.bats	/^@test "test_jenkins trap removes auth file" {$/;"	t
 test_nfs_connectivity	scripts/lib/test.sh	/^function test_nfs_connectivity() {$/;"	f
 test_nfs_direct	scripts/lib/test.sh	/^function test_nfs_direct() {$/;"	f
+test_vault	scripts/lib/test.sh	/^function test_vault() {$/;"	f
+uses non-macOS installers when not on macOS	scripts/tests/lib/install_kubernetes_cli.bats	/^@test "uses non-macOS installers when not on macOS" {$/;"	t
 vault-ad-wrapper	scripts/etc/jenkins/vault-seed-wrapper.yaml	/^  name: vault-ad-wrapper$/;"	p
 vault-seed-scripts	scripts/etc/jenkins/vault-seed-wrapper.yaml	/^  name: vault-seed-scripts$/;"	p
 verify_bws_token	scripts/plugins/bitwarden.sh	/^function verify_bws_token() {$/;"	f
