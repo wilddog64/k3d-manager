@@ -79,7 +79,7 @@ function _create_jenkins_pv_pvc() {
 }
 
 function _ensure_jenkins_cert() {
-   local vault_namespace="${1:-vault}"
+   local vault_namespace="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
    local k8s_namespace="istio-system"
    local secret_name="jenkins-cert"
@@ -135,12 +135,12 @@ function _deploy_jenkins_image() {
 
 function deploy_jenkins() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-      echo "Usage: deploy_jenkins [namespace=jenkins] [vault-namespace=${VAULT_NS:-vault}] [vault-release=${VAULT_RELEASE_DEFAULT}]"
+      echo "Usage: deploy_jenkins [namespace=jenkins] [vault-namespace=${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}] [vault-release=${VAULT_RELEASE_DEFAULT}]"
       return 0
    fi
 
    local jenkins_namespace="${1:-jenkins}"
-   local vault_namespace="${2:-${VAULT_NS:-vault}}"
+   local vault_namespace="${2:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${3:-$VAULT_RELEASE_DEFAULT}"
 
    deploy_vault ha "$vault_namespace" "$vault_release"
@@ -222,7 +222,7 @@ function _wait_for_jenkins_ready() {
 }
 
 function _create_jenkins_admin_vault_policy() {
-   local vault_namespace="${1:-${VAULT_NS:-vault}}"
+   local vault_namespace="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
    local pod="${vault_release}-0"
 
@@ -251,7 +251,7 @@ HCL
 }
 
 function _sync_vault_jenkins_admin() {
-   local vault_namespace="${1:-vault}"
+   local vault_namespace="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
    local jenkins_namespace="${3:-jenkins}"
    local pod="${vault_release}-0"
@@ -265,7 +265,7 @@ function _sync_vault_jenkins_admin() {
 }
 
 function _create_jenkins_vault_ad_policy() {
-   local vault_namespace="${1:-${VAULT_NS:-vault}}"
+   local vault_namespace="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
    local jenkins_namespace="${3:-jenkins}"
    local pod="${vault_release}-0"
