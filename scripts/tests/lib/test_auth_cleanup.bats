@@ -52,9 +52,10 @@ _kubectl() {
   local cmd="$*"
   local expected_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
   local expected_pod="${expected_release}-0"
+  local expected_vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault-test}}"
   if [[ "$cmd" == "get ns jenkins" ]]; then
     return 0
-  elif [[ "$cmd" == "get ns vault" ]]; then
+  elif [[ "$cmd" == "get ns ${expected_vault_ns}" ]]; then
     return 0
   elif [[ "$cmd" == get\ pod\ jenkins-0\ -n\ *\ -o\ jsonpath={..persistentVolumeClaim.claimName} ]]; then
     printf '%s' 'jenkins-home'
@@ -68,7 +69,7 @@ _kubectl() {
   elif [[ "$cmd" == "-n jenkins port-forward svc/jenkins 8080:8080" ]]; then
     sleep 0.01
     return 0
-  elif [[ "$cmd" == "-n vault exec ${expected_pod} -- vault policy list" ]]; then
+  elif [[ "$cmd" == "-n ${expected_vault_ns} exec ${expected_pod} -- vault policy list" ]]; then
     printf '%s\n' 'jenkins-admin' 'jenkins-jcasc-read' 'jenkins-jcasc-write'
     return 0
   elif [[ "$cmd" == "-n jenkins get secret jenkins-admin -o jsonpath={.data.username}" ]]; then
