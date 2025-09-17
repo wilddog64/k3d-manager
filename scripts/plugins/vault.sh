@@ -198,38 +198,35 @@ function _is_vault_health() {
 }
 
 function _vault_exec() {
-   local ns="${1:-$VAULT_NS_DEFAULT}" name="$3" cmd="${2:-sh}"
-
+   local ns="${1:-$VAULT_NS_DEFAULT}" cmd="${2:-sh}" release="${3:-$VAULT_RELEASE_DEFAULT}"
+   local pod="${release}-0"
 
   # this long pipe to check policy exist seems to be complicated but is to
   # prevent vault login output to leak to user and hide sensitive info from being
   # shown in the xtrace when that is turned on
    _kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.root_token}' | \
       base64 -d | \
-     _kubectl --no-exit -n "$ns" exec -i vault-0 -- \
+     _kubectl --no-exit -n "$ns" exec -i "$pod" -- \
      sh -lc "vault login - >/dev/null 2>&1 ; $cmd"
 }
 
 function _vault_login() {
-   local ns="${1:-$VAULT_NS_DEFAULT}"
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local pod="${release}-0"
+
    _kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.root_token}' | \
       base64 -d | \
-     _kubectl --no-exit -n "$ns" exec -i vault-0 -- \
+     _kubectl --no-exit -n "$ns" exec -i "$pod" -- \
      sh -lc "vault login - >/dev/null 2>&1"
 }
 
 function _vault_policy_exists() {
-  local ns="${1:-$VAULT_NS_DEFAULT}" name="${2:-eso-reader}"
+  local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}" name="${3:-eso-reader}"
 
-  #
-  _vault_exec "$ns" "vault policy list" | grep -q "^${name}\$"
-
-  local rc=$?
-  case "$rc" in
-     0)  (( rc=1 )) ;;  # exists
-     1) (( rc=0 )) ;;  # does not exist
-  esac
-  return "$rc"
+  if _vault_exec "$ns" "vault policy list" "$release" | grep -q "^${name}\$"; then
+     return 0
+  fi
+  return 1
 }
 
 function _enable_kv2_k8s_auth() {
@@ -248,15 +245,16 @@ function _vault_set_eso_reader() {
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
   local eso_sa="${3:-external-secrets}"
   local eso_ns="${4:-external-secrets}"
+  local pod="${release}-0"
 
-  if ! _vault_policy_exists "$ns" "eso-reader"; then
+  if _vault_policy_exists "$ns" "$release" "eso-reader"; then
      _info "[vault] policy 'eso-reader' already exists, skipping k8s auth setup"
      return 0
   fi
 
-  _vault_login "$ns"
+  _vault_login "$ns" "$release"
   # kubernetes auth so no token stored in k8s
-  cat <<'SH' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
+  cat <<'SH' | _no_trace _kubectl -n "$ns" exec -i "$pod" -- \
     sh -
 set -e
 vault secrets enable -path=secret kv-v2 || true
@@ -269,7 +267,7 @@ vault write auth/kubernetes/config \
 SH
 
   # create a policy -- eso-reader
-  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- \
+  cat <<'HCL' | _kubectl -n "$ns" exec -i "$pod" -- \
     vault policy write eso-reader -
      # file: eso-reader.hcl
      # read any keys under eso/*
@@ -280,7 +278,7 @@ SH
 HCL
 
   # map ESO service account to the policy
-  _kubectl -n "$ns" exec -i vault-0 -- \
+  _kubectl -n "$ns" exec -i "$pod" -- \
     vault write auth/kubernetes/role/eso-reader \
       bound_service_account_names="$eso_sa" \
       bound_service_account_namespaces="$eso_ns" \
@@ -293,14 +291,15 @@ function _vault_set_eso_writer() {
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
   local eso_sa="${3:-external-secrets}"
   local eso_ns="${4:-external-secrets}"
+  local pod="${release}-0"
 
-  if ! _vault_policy_exists "$ns" "eso-writer"; then
+  if _vault_policy_exists "$ns" "$release" "eso-writer"; then
      _info "[vault] policy 'eso-writer' already exists, skipping k8s auth setup"
      return 0
   fi
 
   # create a policy -- eso-writer
-  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- sh - \
+  cat <<'HCL' | _kubectl -n "$ns" exec -i "$pod" -- sh - \
     vault policy write eso-writer
      # file: eso-writer.hcl
      path "secret/data/eso/*"      { capabilities = ["create","update","read"] }
@@ -309,7 +308,7 @@ function _vault_set_eso_writer() {
 HCL
 
   # map ESO service account to the policy
-  _kubectl -n "$ns" exec -i vault-0 -- \
+  _kubectl -n "$ns" exec -i "$pod" -- \
     sh - \
     vault write auth/kubernetes/role/eso-writer \
       bound_service_account_names="$eso_sa" \
@@ -323,15 +322,16 @@ function _vault_set_eso_init_jenkins_writer() {
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
   local eso_sa="${3:-external-secrets}"
   local eso_ns="${4:-external-secrets}"
+  local pod="${release}-0"
 
-  if ! _vault_policy_exists "$ns" "eso-init-jenkins-writer"; then
+  if _vault_policy_exists "$ns" "$release" "eso-init-jenkins-writer"; then
      _info "[vault] policy 'eso-writer' already exists, skipping k8s auth setup"
      return 0
   fi
 
   # create a policy -- eso-writer
-  _vault_login "$ns"
-  cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \
+  _vault_login "$ns" "$release"
+  cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i "$pod" -- \
     vault policy write eso-init-jenkins-writer -
      # file: eso-writer.hcl
      path "secret/data/eso/jenkins-admin"     { capabilities = ["create","update","read"] }
@@ -340,7 +340,7 @@ function _vault_set_eso_init_jenkins_writer() {
 HCL
 
   # map ESO service account to the policy
-  _kubectl -n "$ns" exec -i vault-0 -- \
+  _kubectl -n "$ns" exec -i "$pod" -- \
     vault write auth/kubernetes/role/eso-writer \
       bound_service_account_names="$eso_sa" \
       bound_service_account_namespaces="$eso_ns" \
