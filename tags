@@ -65,9 +65,9 @@ Full deployment	scripts/tests/plugins/vault.bats	/^@test "Full deployment" {$/;"
 HCL	scripts/plugins/jenkins.sh	/^         vault policy write jenkins-jcasc-read - <<'HCL'$/;"	h
 HCL	scripts/plugins/jenkins.sh	/^         vault policy write jenkins-jcasc-write - <<'HCL'$/;"	h
 HCL	scripts/plugins/jenkins.sh	/^   cat <<'HCL' | tee jenkins-admin.hcl | _kubectl -n "$vault_namespace" exec -i "$pod" -- \\$/;"	h
-HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- \\$/;"	h
-HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- sh - \\$/;"	h
-HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \\$/;"	h
+HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _kubectl -n "$ns" exec -i "$pod" -- \\$/;"	h
+HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _kubectl -n "$ns" exec -i "$pod" -- sh - \\$/;"	h
+HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i "$pod" -- \\$/;"	h
 Helm repo setup	scripts/tests/plugins/vault.bats	/^@test "Helm repo setup" {$/;"	t
 How it fits together	README.md	/^## How it fits together$/;"	s	chapter:k3d-manager
 JSON	scripts/tests/plugins/jenkins.bats	/^      cat <<'JSON'$/;"	h
@@ -78,7 +78,7 @@ PV/PVC setup	scripts/tests/plugins/jenkins.bats	/^@test "PV\/PVC setup" {$/;"	t
 PV/PVC setup auto-detects cluster	scripts/tests/plugins/jenkins.bats	/^@test "PV\/PVC setup auto-detects cluster" {$/;"	t
 Public functions	README.md	/^## Public functions$/;"	s	chapter:k3d-manager
 SCRIPT	scripts/tests/lib/test_auth_cleanup.bats	/^  cat <<'SCRIPT' > "$script"$/;"	h
-SH	scripts/plugins/vault.sh	/^  cat <<'SH' | _no_trace _kubectl -n "$ns" exec -i vault-0 -- \\$/;"	h
+SH	scripts/plugins/vault.sh	/^  cat <<'SH' | _no_trace _kubectl -n "$ns" exec -i "$pod" -- \\$/;"	h
 Security notes	README.md	/^## Security notes$/;"	s	chapter:k3d-manager
 Skips install if ESO already present	scripts/tests/plugins/eso.bats	/^@test "Skips install if ESO already present" {$/;"	t
 Tests	README.md	/^## Tests$/;"	s	chapter:k3d-manager
@@ -144,6 +144,7 @@ _ensure_jenkins_cert sets up PKI and TLS secret	scripts/tests/plugins/jenkins.ba
 _ensure_namespace	scripts/plugins/azure.sh	/^function _ensure_namespace() {$/;"	f
 _ensure_secret_tool	scripts/lib/system.sh	/^_ensure_secret_tool() {$/;"	f
 _err	scripts/lib/system.sh	/^function _err() { printf 'ERROR: %s\\n' "$*" >&2; exit 127; }$/;"	f
+_err	scripts/tests/plugins/vault.bats	/^  _err() { printf '%s\\n' "$*" >>"$ERR_LOG"; return 1; }$/;"	f
 _eso_akv_down	scripts/plugins/azure.sh	/^function _eso_akv_down() {$/;"	f
 _eso_akv_up	scripts/plugins/azure.sh	/^function _eso_akv_up() {$/;"	f
 _failfast_off	scripts/lib/system.sh	/^function _failfast_off() {$/;"	f
@@ -156,6 +157,7 @@ _helm	scripts/tests/plugins/vault.bats	/^  _helm() {$/;"	f
 _helm	scripts/tests/test_helpers.bash	/^  _helm() {$/;"	f
 _info	scripts/lib/system.sh	/^function _info() { printf 'INFO: %s\\n' "$*" >&2; }$/;"	f
 _info	scripts/tests/plugins/vault.bats	/^  _info() { :; }$/;"	f
+_info	scripts/tests/plugins/vault.bats	/^  _info() { printf '%s\\n' "$*" >>"$INFO_LOG"; }$/;"	f
 _install_azure_eso	scripts/plugins/azure.sh	/^function _install_azure_eso() {$/;"	f
 _install_bws	scripts/plugins/bitwarden.sh	/^function _install_bws() {$/;"	f
 _install_colima	scripts/lib/system.sh	/^function _install_colima() {$/;"	f
@@ -192,7 +194,11 @@ _is_same_token	scripts/lib/system.sh	/^function _is_same_token() {$/;"	f
 _is_vault_deployed	scripts/plugins/vault.sh	/^function _is_vault_deployed() {$/;"	f
 _is_vault_deployed	scripts/tests/plugins/vault.bats	/^  _is_vault_deployed() { return 0; }$/;"	f
 _is_vault_health	scripts/plugins/vault.sh	/^function _is_vault_health() {$/;"	f
+_is_vault_health	scripts/tests/plugins/vault.bats	/^  _is_vault_health() { _info "return code: 200"; return 0; }$/;"	f
+_is_vault_health	scripts/tests/plugins/vault.bats	/^  _is_vault_health() { _info "return code: 503"; return 1; }$/;"	f
 _is_vault_health	scripts/tests/plugins/vault.bats	/^  _is_vault_health() { return 0; }$/;"	f
+_is_vault_health fails for unhealthy HTTP statuses	scripts/tests/plugins/vault.bats	/^@test "_is_vault_health fails for unhealthy HTTP statuses" {$/;"	t
+_is_vault_health treats healthy HTTP statuses as success	scripts/tests/plugins/vault.bats	/^@test "_is_vault_health treats healthy HTTP statuses as success" {$/;"	t
 _is_wsl	scripts/lib/system.sh	/^function _is_wsl() {$/;"	f
 _is_wsl	scripts/tests/lib/install_kubernetes_cli.bats	/^  _is_wsl() { return 1; }$/;"	f
 _istioctl	scripts/lib/system.sh	/^function _istioctl() {$/;"	f
@@ -203,6 +209,7 @@ _k3d_cluster_exist	scripts/lib/system.sh	/^function _k3d_cluster_exist() {$/;"	f
 _kill	scripts/lib/system.sh	/^function _kill() {$/;"	f
 _kubectl	scripts/lib/system.sh	/^function _kubectl() {$/;"	f
 _kubectl	scripts/tests/plugins/jenkins.bats	/^  _kubectl() {$/;"	f
+_kubectl	scripts/tests/plugins/vault.bats	/^    _kubectl() {$/;"	f
 _kubectl	scripts/tests/plugins/vault.bats	/^  _kubectl() {$/;"	f
 _kubectl	scripts/tests/test_helpers.bash	/^  _kubectl() {$/;"	f
 _list_k3d_cluster	scripts/lib/system.sh	/^function _list_k3d_cluster() {$/;"	f
@@ -227,6 +234,8 @@ _update_k8s_secret	scripts/plugins/azure.sh	/^function _update_k8s_secret() {$/;
 _usage	scripts/k3d-manager	/^function _usage() {$/;"	f
 _vault_bootstrap_ha	scripts/plugins/vault.sh	/^function _vault_bootstrap_ha() {$/;"	f
 _vault_bootstrap_ha	scripts/tests/plugins/vault.bats	/^  _vault_bootstrap_ha() { CALLS+=("_vault_bootstrap_ha"); }$/;"	f
+_vault_bootstrap_ha errors when vault health check fails	scripts/tests/plugins/vault.bats	/^@test "_vault_bootstrap_ha errors when vault health check fails" {$/;"	t
+_vault_bootstrap_ha reports ready when health check succeeds	scripts/tests/plugins/vault.bats	/^@test "_vault_bootstrap_ha reports ready when health check succeeds" {$/;"	t
 _vault_bootstrap_ha uses release selector and unseals listed pods	scripts/tests/plugins/vault.bats	/^@test "_vault_bootstrap_ha uses release selector and unseals listed pods" {$/;"	t
 _vault_exec	scripts/plugins/vault.sh	/^function _vault_exec() {$/;"	f
 _vault_login	scripts/plugins/vault.sh	/^function _vault_login() {$/;"	f
@@ -237,6 +246,7 @@ _vault_policy_exists	scripts/plugins/vault.sh	/^function _vault_policy_exists() 
 _vault_policy_exists	scripts/tests/plugins/jenkins.bats	/^  _vault_policy_exists() { return 1; }$/;"	f
 _vault_portforward_help	scripts/plugins/vault.sh	/^function _vault_portforward_help() {$/;"	f
 _vault_portforward_help	scripts/tests/plugins/vault.bats	/^  _vault_portforward_help() { :; }$/;"	f
+_vault_portforward_help	scripts/tests/plugins/vault.bats	/^  _vault_portforward_help() { echo called >>"$PORT_LOG"; }$/;"	f
 _vault_repo_setup	scripts/plugins/vault.sh	/^function _vault_repo_setup() {$/;"	f
 _vault_repo_setup	scripts/tests/plugins/vault.bats	/^  _vault_repo_setup() { CALLS+=("_vault_repo_setup"); }$/;"	f
 _vault_set_eso_init_jenkins_writer	scripts/plugins/vault.sh	/^function _vault_set_eso_init_jenkins_writer() {$/;"	f
@@ -296,6 +306,7 @@ setup	scripts/tests/lib/test_auth_cleanup.bats	/^setup() {$/;"	f
 setup	scripts/tests/plugins/eso.bats	/^setup() {$/;"	f
 setup	scripts/tests/plugins/jenkins.bats	/^setup() {$/;"	f
 setup	scripts/tests/plugins/vault.bats	/^setup() {$/;"	f
+setup_vault_bootstrap_stubs	scripts/tests/plugins/vault.bats	/^setup_vault_bootstrap_stubs() {$/;"	f
 sleep	scripts/tests/plugins/jenkins.bats	/^  sleep() { :; }$/;"	f
 sleep	scripts/tests/plugins/jenkins.bats	/^  sleep() {$/;"	f
 stub_envsubst	scripts/tests/test_helpers.bash	/^function stub_envsubst() {$/;"	f

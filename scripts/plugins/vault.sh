@@ -192,8 +192,14 @@ function _is_vault_health() {
     "curl -o /dev/null -s -w '%{http_code}' '${scheme}://${host}:${port}/v1/sys/health'")
 
   case "$rc" in
-     200|429|472|473) _info "return code: $rc"; return 1 ;;
-     *)               _info "return code: $rc"; return 0 ;;
+     200|429|472|473)
+        _info "return code: $rc"
+        return 0
+        ;;
+     *)
+        _info "return code: $rc"
+        return 1
+        ;;
   esac
 }
 
