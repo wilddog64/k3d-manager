@@ -105,42 +105,43 @@ function _is_vault_deployed() {
 
 function _vault_bootstrap_ha() {
   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+  local leader="${release}-0"
   if ! _is_vault_deployed "$ns" "$release"; then
       _err "[vault] not deployed in ns=$ns release=$release" >&2
   fi
 
   if  _run_command --no-exit -- \
-     kubectl --no-exit exec -n "$ns" -it vault-0 -- vault status >/dev/null 2>&1; then
+     kubectl --no-exit exec -n "$ns" -it "$leader" -- vault status >/dev/null 2>&1; then
       echo "[vault] already initialized"
       return 0
   fi
 
   # check if vault sealed or not
   if _run_command --no-exit -- \
-     kubectl exec -n "$ns" -it vault-0 -- vault status 2>&1 | grep -q 'unseal'; then
+     kubectl exec -n "$ns" -it "$leader" -- vault status 2>&1 | grep -q 'unseal'; then
       _warn "[vault] already initialized (sealed), skipping init"
       return 0
   fi
 
   local jsonfile="/tmp/init-vault.json";
-  _kubectl wait -n "$ns" --for=condition=Podscheduled pod/vault-0 --timeout=120s
-  local vault_state=$(_kubectl --no-exit -n "$ns" get pod vault-0 -o jsonpath='{.status.phase}')
+  _kubectl wait -n "$ns" --for=condition=Podscheduled pod/"$leader" --timeout=120s
+  local vault_state=$(_kubectl --no-exit -n "$ns" get pod "$leader" -o jsonpath='{.status.phase}')
   end_time=$((SECONDS + 120))
   current_time=$SECONDS
   while [[ "$vault_state" != "Running" ]]; do
-      echo "[vault] waiting for vault-0 to be Running (current=$vault_state)"
+      echo "[vault] waiting for $leader to be Running (current=$vault_state)"
       sleep 2
-      vault_state=$(_kubectl --no-exit -n "$ns" get pod vault-0 -o jsonpath='{.status.phase}')
+      vault_state=$(_kubectl --no-exit -n "$ns" get pod "$leader" -o jsonpath='{.status.phase}')
       if (( current_time >= end_time )); then
-         _err "[vault] timeout waiting for vault-0 to be Running (current=$vault_state)"
+         _err "[vault] timeout waiting for $leader to be Running (current=$vault_state)"
       fi
   done
-  local vault_init=$(_kubectl --no-exit -n "$ns" exec -i vault-0 -- vault status -format json | jq -r '.initialized')
+  local vault_init=$(_kubectl --no-exit -n "$ns" exec -i "$leader" -- vault status -format json | jq -r '.initialized')
   if [[ "$vault_init" == "true" ]]; then
      _warn "[vault] already initialized, skipping init"
      return 0
   fi
-  _kubectl -n "$ns" exec -it vault-0 -- \
+  _kubectl -n "$ns" exec -it "$leader" -- \
      sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json' \
      > "$jsonfile"
 
