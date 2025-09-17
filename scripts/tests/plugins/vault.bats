@@ -103,8 +103,9 @@ setup() {
   done
 }
 
-@test "_vault_bootstrap_ha lists pods in provided namespace" {
+@test "_vault_bootstrap_ha uses release selector and unseals listed pods" {
   TEST_NS="custom-ns"
+  TEST_RELEASE="custom-release"
   : >"$KUBECTL_LOG"
 
   _is_vault_deployed() { return 0; }
@@ -147,10 +148,10 @@ setup() {
         return 0 ;;
       "-n ${TEST_NS} create secret generic vault-root --from-literal=root_token=root")
         return 0 ;;
-      "-n ${TEST_NS} get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=vault -o name")
-        echo "pod/vault-0"
+      "-n ${TEST_NS} get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=${TEST_RELEASE} -o name")
+        echo "pod/${TEST_RELEASE}-0"
         return 0 ;;
-      "-n ${TEST_NS} exec -i vault-0 -- sh -lc vault operator unseal key")
+      "-n ${TEST_NS} exec -i ${TEST_RELEASE}-0 -- sh -lc vault operator unseal key")
         return 0 ;;
       *)
         return 0 ;;
@@ -158,17 +159,22 @@ setup() {
   }
   export -f _kubectl
 
-  run _vault_bootstrap_ha "$TEST_NS"
+  run _vault_bootstrap_ha "$TEST_NS" "$TEST_RELEASE"
   [ "$status" -eq 0 ]
 
   read_lines "$KUBECTL_LOG" kubectl_calls
-  expected="-n ${TEST_NS} get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=vault -o name"
-  found=0
+  expected_selector="-n ${TEST_NS} get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=${TEST_RELEASE} -o name"
+  expected_unseal="-n ${TEST_NS} exec -i ${TEST_RELEASE}-0 -- sh -lc vault operator unseal key"
+  selector_found=0
+  unseal_found=0
   for call in "${kubectl_calls[@]}"; do
-    if [[ "$call" == "$expected" ]]; then
-      found=1
-      break
+    if [[ "$call" == "$expected_selector" ]]; then
+      selector_found=1
+    fi
+    if [[ "$call" == "$expected_unseal" ]]; then
+      unseal_found=1
     fi
   done
-  [ "$found" -eq 1 ]
+  [ "$selector_found" -eq 1 ]
+  [ "$unseal_found" -eq 1 ]
 }
