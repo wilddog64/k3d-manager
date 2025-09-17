@@ -223,7 +223,7 @@ function test_jenkins() {
     fi
     export JENKINS_NS
 
-    VAULT_NS="${VAULT_NS:-vault-test}"
+    VAULT_NS="${VAULT_NS:-${VAULT_NS_DEFAULT:vault-test}}"
     export VAULT_NS
     local vault_release="${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}"
     local vault_pod="${vault_release}-0"
