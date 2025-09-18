@@ -333,10 +333,19 @@ function test_jenkins() {
         else
             VAULT_NS="vault-test"
         fi
+
     elif [[ -n "${VAULT_NS_DEFAULT_ENV:-}" && "$VAULT_NS" == "$VAULT_NS_DEFAULT_ENV" ]]; then
-        vault_ns_from_default=1
-    elif [[ -z "${VAULT_NS_DEFAULT_ENV:-}" && -n "${VAULT_NS_DEFAULT:-}" && "$VAULT_NS" == "$VAULT_NS_DEFAULT" ]]; then
-        vault_ns_from_default=1
+        vault_ns_from_default_env=1
+    else
+        local plugin_vault_ns_default="${TEST_LIB_VAULT_NS_DEFAULT_PLUGIN_VALUE:-}"
+        if [[ -n "${VAULT_NS_DEFAULT_ENV:-}" ]]; then
+              if [[ -n "$plugin_vault_ns_default" && "$VAULT_NS" == "$plugin_vault_ns_default" ]]; then
+                 VAULT_NS="$VAULT_NS_DEFAULT_ENV"
+              fi
+              if [[ "$VAULT_NS" == "$VAULT_NS_DEFAULT_ENV" ]]; then
+                  vault_ns_from_default_env=1
+              fi
+          fi
     fi
     export VAULT_NS
 
