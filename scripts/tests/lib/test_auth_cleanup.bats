@@ -35,12 +35,12 @@ if [[ "${TEST_LIB_RE_SOURCE_AFTER_OVERRIDE:-0}" == "1" ]]; then
   source_test_lib
 fi
 
-if [[ "${TEST_LIB_RESOURCE_WITH_EXPORTS:-0}" == "1" ]]; then
-  if [[ -n "${VAULT_NS_DEFAULT_EXPORT:-}" ]]; then
-    export VAULT_NS_DEFAULT="${VAULT_NS_DEFAULT_EXPORT}"
+if [[ "${TEST_LIB_RESOURCE_WITH_EXPORTS:-0}" == "1"  ]]; then
+  if [[ -n "${VAULT_NS_DEFAULT_EXPORT:-}"  ]]; then
+     export VAULT_NS_DEFAULT="${VAULT_NS_DEFAULT_EXPORT}"
   fi
-  if [[ -n "${VAULT_RELEASE_DEFAULT_EXPORT:-}" ]]; then
-    export VAULT_RELEASE_DEFAULT="${VAULT_RELEASE_DEFAULT_EXPORT}"
+  if [[ -n "${VAULT_RELEASE_DEFAULT_EXPORT:-}"  ]]; then
+     export VAULT_RELEASE_DEFAULT="${VAULT_RELEASE_DEFAULT_EXPORT}"
   fi
   source_test_lib
 fi
