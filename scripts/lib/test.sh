@@ -5,33 +5,51 @@ fi
 
 # Track whether Vault defaults were present prior to loading plugins. Guard the
 # capture so that repeated loads do not treat plugin-populated values as
-# user-supplied overrides.
-: "${TEST_LIB_VAULT_DEFAULTS_CAPTURED:=0}"
+# user-supplied overrides while still allowing user-provided values to be
+# detected if they are introduced before a subsequent load.
 : "${TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN:=0}"
 : "${TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN:=0}"
+: "${TEST_LIB_VAULT_NS_DEFAULT_PLUGIN_VALUE:=}"
+: "${TEST_LIB_VAULT_RELEASE_DEFAULT_PLUGIN_VALUE:=}"
 
-if [[ "${TEST_LIB_VAULT_DEFAULTS_CAPTURED}" != "1" ]]; then
+if [[ "${TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN}" != "1" ]]; then
   if [[ -n "${VAULT_NS_DEFAULT:-}" ]]; then
-    TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN=1
-    if [[ -z "${VAULT_NS_DEFAULT_ENV:-}" ]]; then
+    if [[ -n "${TEST_LIB_VAULT_NS_DEFAULT_PLUGIN_VALUE:-}" \
+          && "${VAULT_NS_DEFAULT}" == "${TEST_LIB_VAULT_NS_DEFAULT_PLUGIN_VALUE}" ]]; then
+      : # Skip plugin-provided defaults.
+    else
+      TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN=1
       VAULT_NS_DEFAULT_ENV="$VAULT_NS_DEFAULT"
     fi
   fi
+fi
 
+if [[ "${TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN}" != "1" ]]; then
   if [[ -n "${VAULT_RELEASE_DEFAULT:-}" ]]; then
-    TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN=1
-    if [[ -z "${VAULT_RELEASE_DEFAULT_ENV:-}" ]]; then
+    if [[ -n "${TEST_LIB_VAULT_RELEASE_DEFAULT_PLUGIN_VALUE:-}" \
+          && "${VAULT_RELEASE_DEFAULT}" == "${TEST_LIB_VAULT_RELEASE_DEFAULT_PLUGIN_VALUE}" ]]; then
+      : # Skip plugin-provided defaults.
+    else
+      TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN=1
       VAULT_RELEASE_DEFAULT_ENV="$VAULT_RELEASE_DEFAULT"
     fi
   fi
-
-  TEST_LIB_VAULT_DEFAULTS_CAPTURED=1
 fi
 
 # Load Jenkins plugin helpers so Jenkins tests have their dependencies.
 if [[ -f "${SCRIPT_DIR}/plugins/jenkins.sh" ]]; then
   # shellcheck source=../plugins/jenkins.sh
   source "${SCRIPT_DIR}/plugins/jenkins.sh"
+fi
+
+if [[ -z "${TEST_LIB_VAULT_NS_DEFAULT_PLUGIN_VALUE:-}" \
+      && "${TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN}" != "1" ]]; then
+  TEST_LIB_VAULT_NS_DEFAULT_PLUGIN_VALUE="${VAULT_NS_DEFAULT:-}"
+fi
+
+if [[ -z "${TEST_LIB_VAULT_RELEASE_DEFAULT_PLUGIN_VALUE:-}" \
+      && "${TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN}" != "1" ]]; then
+  TEST_LIB_VAULT_RELEASE_DEFAULT_PLUGIN_VALUE="${VAULT_RELEASE_DEFAULT:-}"
 fi
 
 function test_nfs_direct() {

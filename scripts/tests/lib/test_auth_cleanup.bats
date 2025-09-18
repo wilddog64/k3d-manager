@@ -18,7 +18,22 @@ set -euo pipefail
 
 : "${PROJECT_ROOT:?}"
 export PLUGINS_DIR="${PROJECT_ROOT}/scripts/plugins"
-source "${PROJECT_ROOT}/scripts/lib/test.sh"
+source_test_lib() {
+  # shellcheck source=../../lib/test.sh
+  source "${PROJECT_ROOT}/scripts/lib/test.sh"
+}
+
+source_test_lib
+
+if [[ "${TEST_LIB_RE_SOURCE_AFTER_OVERRIDE:-0}" == "1" ]]; then
+  if [[ -n "${VAULT_NS_DEFAULT_OVERRIDE:-}" ]]; then
+    export VAULT_NS_DEFAULT="${VAULT_NS_DEFAULT_OVERRIDE}"
+  fi
+  if [[ -n "${VAULT_RELEASE_DEFAULT_OVERRIDE:-}" ]]; then
+    export VAULT_RELEASE_DEFAULT="${VAULT_RELEASE_DEFAULT_OVERRIDE}"
+  fi
+  source_test_lib
+fi
 
 cleanup_log="${CLEANUP_LOG:-}"
 auth_path_log="${AUTH_PATH_LOG:-}"
@@ -203,9 +218,9 @@ SCRIPT
 
   : >"$deploy_log"
   run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" \
-    TEST_LIB_VAULT_DEFAULTS_CAPTURED=1 \
     TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN=0 \
     TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN=1 \
+    TEST_LIB_VAULT_RELEASE_DEFAULT_PLUGIN_VALUE="vault" \
     VAULT_NS_DEFAULT_ENV="vault-derived" \
     VAULT_NS_DEFAULT="vault-derived" \
     VAULT_RELEASE_DEFAULT="vault" \
@@ -214,4 +229,15 @@ SCRIPT
   run tail -n 1 "$deploy_log"
   [ "$status" -eq 0 ]
   [[ "$output" == "vault-derived" ]]
+
+  : >"$deploy_log"
+  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" \
+    TEST_LIB_RE_SOURCE_AFTER_OVERRIDE=1 \
+    VAULT_NS_DEFAULT_OVERRIDE="resourced-ns" \
+    VAULT_RELEASE_DEFAULT_OVERRIDE="resourced-release" \
+    "$script"
+  [ "$status" -eq 0 ]
+  run tail -n 1 "$deploy_log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "resourced-release" ]]
 }
