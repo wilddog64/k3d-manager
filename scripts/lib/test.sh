@@ -7,34 +7,52 @@ fi
 # capture so that repeated loads do not treat plugin-populated values as
 # user-supplied overrides while still allowing user-provided values to be
 # detected if they are introduced before a subsequent load.
+: "${TEST_LIB_VAULT_DEFAULTS_CAPTURED:=0}"
 : "${TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN:=0}"
 : "${TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN:=0}"
 : "${TEST_LIB_VAULT_NS_DEFAULT_PLUGIN_VALUE:=}"
 : "${TEST_LIB_VAULT_RELEASE_DEFAULT_PLUGIN_VALUE:=}"
 
-if [[ "${TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN}" != "1" ]]; then
-  if [[ -n "${VAULT_NS_DEFAULT:-}" ]]; then
-    if [[ -n "${TEST_LIB_VAULT_NS_DEFAULT_PLUGIN_VALUE:-}" \
-          && "${VAULT_NS_DEFAULT}" == "${TEST_LIB_VAULT_NS_DEFAULT_PLUGIN_VALUE}" ]]; then
-      : # Skip plugin-provided defaults.
-    else
-      TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN=1
-      VAULT_NS_DEFAULT_ENV="$VAULT_NS_DEFAULT"
-    fi
-  fi
-fi
+_test_lib_capture_vault_default() {
+  local defined_flag_var="$1"
+  local default_env_var="$2"
+  local value_var="$3"
+  local plugin_value_var="$4"
 
-if [[ "${TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN}" != "1" ]]; then
-  if [[ -n "${VAULT_RELEASE_DEFAULT:-}" ]]; then
-    if [[ -n "${TEST_LIB_VAULT_RELEASE_DEFAULT_PLUGIN_VALUE:-}" \
-          && "${VAULT_RELEASE_DEFAULT}" == "${TEST_LIB_VAULT_RELEASE_DEFAULT_PLUGIN_VALUE}" ]]; then
-      : # Skip plugin-provided defaults.
-    else
-      TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN=1
-      VAULT_RELEASE_DEFAULT_ENV="$VAULT_RELEASE_DEFAULT"
-    fi
+  local defined_flag="${!defined_flag_var:-0}"
+  if [[ "$defined_flag" == "1" ]]; then
+    return 0
   fi
-fi
+
+  local current_value="${!value_var:-}"
+  if [[ -z "$current_value" ]]; then
+    return 0
+  fi
+
+  local plugin_value="${!plugin_value_var:-}"
+  if [[ -n "$plugin_value" && "$current_value" == "$plugin_value" ]]; then
+    return 0
+  fi
+
+  printf -v "$defined_flag_var" '%s' "1"
+  printf -v "$default_env_var" '%s' "$current_value"
+
+  return 0
+}
+
+_test_lib_capture_vault_default \
+  TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN \
+  VAULT_NS_DEFAULT_ENV \
+  VAULT_NS_DEFAULT \
+  TEST_LIB_VAULT_NS_DEFAULT_PLUGIN_VALUE
+
+_test_lib_capture_vault_default \
+  TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN \
+  VAULT_RELEASE_DEFAULT_ENV \
+  VAULT_RELEASE_DEFAULT \
+  TEST_LIB_VAULT_RELEASE_DEFAULT_PLUGIN_VALUE
+
+TEST_LIB_VAULT_DEFAULTS_CAPTURED=1
 
 # Load Jenkins plugin helpers so Jenkins tests have their dependencies.
 if [[ -f "${SCRIPT_DIR}/plugins/jenkins.sh" ]]; then

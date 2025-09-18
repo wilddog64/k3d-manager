@@ -240,4 +240,14 @@ SCRIPT
   run tail -n 1 "$deploy_log"
   [ "$status" -eq 0 ]
   [[ "$output" == "resourced-release" ]]
+
+  : >"$deploy_log"
+  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" \
+    TEST_LIB_RE_SOURCE_AFTER_OVERRIDE=1 \
+    VAULT_NS_DEFAULT_OVERRIDE="resourced-ns-only" \
+    "$script"
+  [ "$status" -eq 0 ]
+  run tail -n 1 "$deploy_log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "resourced-ns-only" ]]
 }
