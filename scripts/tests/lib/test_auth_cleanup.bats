@@ -10,6 +10,7 @@ setup() {
   local script="$BATS_TEST_TMPDIR/run-test.sh"
   local cleanup_log="$BATS_TEST_TMPDIR/cleanup.log"
   local auth_path_log="$BATS_TEST_TMPDIR/auth-path.log"
+  local deploy_log="$BATS_TEST_TMPDIR/deploy.log"
 
   cat <<'SCRIPT' > "$script"
 #!/usr/bin/env bash
@@ -22,7 +23,12 @@ source "${PROJECT_ROOT}/scripts/lib/test.sh"
 cleanup_log="${CLEANUP_LOG:-}"
 auth_path_log="${AUTH_PATH_LOG:-}"
 
-deploy_jenkins() { :; }
+deploy_jenkins() {
+  if [[ -n "${DEPLOY_LOG:-}" ]]; then
+    printf '%s\n' "${3:-}" >> "${DEPLOY_LOG}"
+  fi
+  return 0
+}
 _wait_for_jenkins_ready() { :; }
 _wait_for_port_forward() { :; }
 sleep() { :; }
@@ -50,9 +56,27 @@ _kubectl() {
   done
 
   local cmd="$*"
-  local expected_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
+  local expected_vault_ns
+  if [[ -n "${VAULT_NS:-}" ]]; then
+    expected_vault_ns="$VAULT_NS"
+  elif [[ -n "${VAULT_NS_DEFAULT_ENV:-}" ]]; then
+    expected_vault_ns="$VAULT_NS_DEFAULT_ENV"
+  else
+    expected_vault_ns="${VAULT_NS_DEFAULT:-vault-test}"
+  fi
+
+  local expected_release
+  if [[ -n "${VAULT_RELEASE:-}" ]]; then
+    expected_release="$VAULT_RELEASE"
+  elif [[ -n "${VAULT_RELEASE_DEFAULT_ENV:-}" ]]; then
+    expected_release="$VAULT_RELEASE_DEFAULT_ENV"
+  elif [[ -n "${VAULT_NS_DEFAULT_ENV:-}" && "$expected_vault_ns" == "$VAULT_NS_DEFAULT_ENV" ]]; then
+    expected_release="$expected_vault_ns"
+  else
+    expected_release="${VAULT_RELEASE_DEFAULT:-vault}"
+  fi
+
   local expected_pod="${expected_release}-0"
-  local expected_vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault-test}}"
   if [[ "$cmd" == "get ns jenkins" ]]; then
     return 0
   elif [[ "$cmd" == "get ns ${expected_vault_ns}" ]]; then
@@ -135,7 +159,7 @@ SCRIPT
 
   chmod +x "$script"
 
-  run env PROJECT_ROOT="$PROJECT_ROOT" CLEANUP_LOG="$cleanup_log" AUTH_PATH_LOG="$auth_path_log" "$script"
+  run env PROJECT_ROOT="$PROJECT_ROOT" CLEANUP_LOG="$cleanup_log" AUTH_PATH_LOG="$auth_path_log" DEPLOY_LOG="$deploy_log" "$script"
   [ "$status" -eq 0 ]
 
   [ -f "$cleanup_log" ]
@@ -146,4 +170,30 @@ SCRIPT
   auth_file="$(cat "$auth_path_log")"
   [ -n "$auth_file" ]
   [ ! -e "$auth_file" ]
+
+  [ -f "$deploy_log" ]
+  run tail -n 1 "$deploy_log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "vault" ]]
+
+  : >"$deploy_log"
+  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" VAULT_RELEASE="explicit-release" "$script"
+  [ "$status" -eq 0 ]
+  run tail -n 1 "$deploy_log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "explicit-release" ]]
+
+  : >"$deploy_log"
+  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" VAULT_RELEASE_DEFAULT="user-default" VAULT_NS_DEFAULT="vault-from-default" "$script"
+  [ "$status" -eq 0 ]
+  run tail -n 1 "$deploy_log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "user-default" ]]
+
+  : >"$deploy_log"
+  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" VAULT_NS_DEFAULT="vault-derived" "$script"
+  [ "$status" -eq 0 ]
+  run tail -n 1 "$deploy_log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "vault-derived" ]]
 }

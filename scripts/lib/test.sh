@@ -3,6 +3,15 @@ if [[ -z "${SCRIPT_DIR:-}" ]]; then
   SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
 fi
 
+# Capture any user-supplied defaults before sourcing plugins that may set
+# library-provided values.
+if [[ -z "${VAULT_NS_DEFAULT_ENV:-}" && -n "${VAULT_NS_DEFAULT:-}" ]]; then
+  VAULT_NS_DEFAULT_ENV="$VAULT_NS_DEFAULT"
+fi
+if [[ -z "${VAULT_RELEASE_DEFAULT_ENV:-}" && -n "${VAULT_RELEASE_DEFAULT:-}" ]]; then
+  VAULT_RELEASE_DEFAULT_ENV="$VAULT_RELEASE_DEFAULT"
+fi
+
 # Load Jenkins plugin helpers so Jenkins tests have their dependencies.
 if [[ -f "${SCRIPT_DIR}/plugins/jenkins.sh" ]]; then
   # shellcheck source=../plugins/jenkins.sh
@@ -223,9 +232,29 @@ function test_jenkins() {
     fi
     export JENKINS_NS
 
-    VAULT_NS="${VAULT_NS:-vault-test}"
+    local vault_ns_from_default_env=0
+    if [[ -z "${VAULT_NS:-}" ]]; then
+        if [[ -n "${VAULT_NS_DEFAULT_ENV:-}" ]]; then
+            VAULT_NS="$VAULT_NS_DEFAULT_ENV"
+            vault_ns_from_default_env=1
+        else
+            VAULT_NS="vault-test"
+        fi
+    elif [[ -n "${VAULT_NS_DEFAULT_ENV:-}" && "$VAULT_NS" == "$VAULT_NS_DEFAULT_ENV" ]]; then
+        vault_ns_from_default_env=1
+    fi
     export VAULT_NS
-    local vault_release="${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}"
+
+    local vault_release
+    if [[ -n "${VAULT_RELEASE:-}" ]]; then
+        vault_release="$VAULT_RELEASE"
+    elif [[ -n "${VAULT_RELEASE_DEFAULT_ENV:-}" ]]; then
+        vault_release="$VAULT_RELEASE_DEFAULT_ENV"
+    elif (( vault_ns_from_default_env )); then
+        vault_release="$VAULT_NS"
+    else
+        vault_release="$VAULT_RELEASE_DEFAULT"
+    fi
     local vault_pod="${vault_release}-0"
     local AUTH_FILE="$(mktemp)"
     local pf_pid
