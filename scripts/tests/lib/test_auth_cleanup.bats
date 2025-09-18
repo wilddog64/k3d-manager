@@ -66,9 +66,13 @@ _kubectl() {
   fi
 
   local expected_release
+  local release_from_default_env=0
+  if [[ "${TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN:-0}" == "1" && -n "${VAULT_RELEASE_DEFAULT_ENV:-}" ]]; then
+    release_from_default_env=1
+  fi
   if [[ -n "${VAULT_RELEASE:-}" ]]; then
     expected_release="$VAULT_RELEASE"
-  elif [[ -n "${VAULT_RELEASE_DEFAULT_ENV:-}" ]]; then
+  elif (( release_from_default_env )); then
     expected_release="$VAULT_RELEASE_DEFAULT_ENV"
   elif [[ -n "${VAULT_NS_DEFAULT_ENV:-}" && "$expected_vault_ns" == "$VAULT_NS_DEFAULT_ENV" ]]; then
     expected_release="$expected_vault_ns"
@@ -192,6 +196,20 @@ SCRIPT
 
   : >"$deploy_log"
   run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" VAULT_NS_DEFAULT="vault-derived" "$script"
+  [ "$status" -eq 0 ]
+  run tail -n 1 "$deploy_log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "vault-derived" ]]
+
+  : >"$deploy_log"
+  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" \
+    TEST_LIB_VAULT_DEFAULTS_CAPTURED=1 \
+    TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN=0 \
+    TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN=1 \
+    VAULT_NS_DEFAULT_ENV="vault-derived" \
+    VAULT_NS_DEFAULT="vault-derived" \
+    VAULT_RELEASE_DEFAULT="vault" \
+    "$script"
   [ "$status" -eq 0 ]
   run tail -n 1 "$deploy_log"
   [ "$status" -eq 0 ]
