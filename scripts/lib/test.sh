@@ -3,13 +3,29 @@ if [[ -z "${SCRIPT_DIR:-}" ]]; then
   SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
 fi
 
-# Capture any user-supplied defaults before sourcing plugins that may set
-# library-provided values.
-if [[ -z "${VAULT_NS_DEFAULT_ENV:-}" && -n "${VAULT_NS_DEFAULT:-}" ]]; then
-  VAULT_NS_DEFAULT_ENV="$VAULT_NS_DEFAULT"
-fi
-if [[ -z "${VAULT_RELEASE_DEFAULT_ENV:-}" && -n "${VAULT_RELEASE_DEFAULT:-}" ]]; then
-  VAULT_RELEASE_DEFAULT_ENV="$VAULT_RELEASE_DEFAULT"
+# Track whether Vault defaults were present prior to loading plugins. Guard the
+# capture so that repeated loads do not treat plugin-populated values as
+# user-supplied overrides.
+: "${TEST_LIB_VAULT_DEFAULTS_CAPTURED:=0}"
+: "${TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN:=0}"
+: "${TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN:=0}"
+
+if [[ "${TEST_LIB_VAULT_DEFAULTS_CAPTURED}" != "1" ]]; then
+  if [[ -n "${VAULT_NS_DEFAULT:-}" ]]; then
+    TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN=1
+    if [[ -z "${VAULT_NS_DEFAULT_ENV:-}" ]]; then
+      VAULT_NS_DEFAULT_ENV="$VAULT_NS_DEFAULT"
+    fi
+  fi
+
+  if [[ -n "${VAULT_RELEASE_DEFAULT:-}" ]]; then
+    TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN=1
+    if [[ -z "${VAULT_RELEASE_DEFAULT_ENV:-}" ]]; then
+      VAULT_RELEASE_DEFAULT_ENV="$VAULT_RELEASE_DEFAULT"
+    fi
+  fi
+
+  TEST_LIB_VAULT_DEFAULTS_CAPTURED=1
 fi
 
 # Load Jenkins plugin helpers so Jenkins tests have their dependencies.
@@ -246,9 +262,10 @@ function test_jenkins() {
     export VAULT_NS
 
     local vault_release
+    local release_default_defined_before_plugin="${TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN:-0}"
     if [[ -n "${VAULT_RELEASE:-}" ]]; then
         vault_release="$VAULT_RELEASE"
-    elif [[ -n "${VAULT_RELEASE_DEFAULT_ENV:-}" ]]; then
+    elif [[ "$release_default_defined_before_plugin" == "1" && -n "${VAULT_RELEASE_DEFAULT_ENV:-}" ]]; then
         vault_release="$VAULT_RELEASE_DEFAULT_ENV"
     elif (( vault_ns_from_default_env )); then
         vault_release="$VAULT_NS"
