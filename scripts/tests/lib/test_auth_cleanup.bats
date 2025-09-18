@@ -35,6 +35,16 @@ if [[ "${TEST_LIB_RE_SOURCE_AFTER_OVERRIDE:-0}" == "1" ]]; then
   source_test_lib
 fi
 
+if [[ "${TEST_LIB_RESOURCE_WITH_EXPORTS:-0}" == "1" ]]; then
+  if [[ -n "${VAULT_NS_DEFAULT_EXPORT:-}" ]]; then
+    export VAULT_NS_DEFAULT="${VAULT_NS_DEFAULT_EXPORT}"
+  fi
+  if [[ -n "${VAULT_RELEASE_DEFAULT_EXPORT:-}" ]]; then
+    export VAULT_RELEASE_DEFAULT="${VAULT_RELEASE_DEFAULT_EXPORT}"
+  fi
+  source_test_lib
+fi
+
 cleanup_log="${CLEANUP_LOG:-}"
 auth_path_log="${AUTH_PATH_LOG:-}"
 
@@ -250,4 +260,15 @@ SCRIPT
   run tail -n 1 "$deploy_log"
   [ "$status" -eq 0 ]
   [[ "$output" == "resourced-ns-only" ]]
+
+  : >"$deploy_log"
+  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" \
+    TEST_LIB_RESOURCE_WITH_EXPORTS=1 \
+    VAULT_NS_DEFAULT_EXPORT="exported-ns" \
+    VAULT_RELEASE_DEFAULT_EXPORT="exported-release" \
+    "$script"
+  [ "$status" -eq 0 ]
+  run tail -n 1 "$deploy_log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "exported-release" ]]
 }
