@@ -40,6 +40,29 @@ _test_lib_capture_vault_default() {
   return 0
 }
 
+_test_lib_refresh_vault_default_snapshot() {
+  local defined_flag_var="$1"
+  local default_env_var="$2"
+  local value_var="$3"
+  local plugin_value_var="$4"
+
+  local current_value="${!value_var:-}"
+  local plugin_value="${!plugin_value_var:-}"
+
+  if [[ -z "$current_value" || ( -n "$plugin_value" && "$current_value" == "$plugin_value" ) ]]; then
+    printf -v "$defined_flag_var" '%s' "0"
+    printf -v "$default_env_var" '%s' ""
+    return 0
+  fi
+
+  printf -v "$defined_flag_var" '%s' "1"
+  if [[ "${!default_env_var:-}" != "$current_value" ]]; then
+    printf -v "$default_env_var" '%s' "$current_value"
+  fi
+
+  return 0
+}
+
 if [[ "${TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN:-0}" != "1"  ]]; then
    _test_lib_capture_vault_default \
    TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN \
@@ -287,16 +310,33 @@ function test_jenkins() {
     fi
     export JENKINS_NS
 
-    local vault_ns_from_default_env=0
+    _test_lib_refresh_vault_default_snapshot \
+      TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN \
+      VAULT_NS_DEFAULT_ENV \
+      VAULT_NS_DEFAULT \
+      TEST_LIB_VAULT_NS_DEFAULT_PLUGIN_VALUE
+
+    _test_lib_refresh_vault_default_snapshot \
+      TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN \
+      VAULT_RELEASE_DEFAULT_ENV \
+      VAULT_RELEASE_DEFAULT \
+      TEST_LIB_VAULT_RELEASE_DEFAULT_PLUGIN_VALUE
+
+    local vault_ns_from_default=0
     if [[ -z "${VAULT_NS:-}" ]]; then
         if [[ -n "${VAULT_NS_DEFAULT_ENV:-}" ]]; then
             VAULT_NS="$VAULT_NS_DEFAULT_ENV"
-            vault_ns_from_default_env=1
+            vault_ns_from_default=1
+        elif [[ -n "${VAULT_NS_DEFAULT:-}" ]]; then
+            VAULT_NS="$VAULT_NS_DEFAULT"
+            vault_ns_from_default=1
         else
             VAULT_NS="vault-test"
         fi
     elif [[ -n "${VAULT_NS_DEFAULT_ENV:-}" && "$VAULT_NS" == "$VAULT_NS_DEFAULT_ENV" ]]; then
-        vault_ns_from_default_env=1
+        vault_ns_from_default=1
+    elif [[ -z "${VAULT_NS_DEFAULT_ENV:-}" && -n "${VAULT_NS_DEFAULT:-}" && "$VAULT_NS" == "$VAULT_NS_DEFAULT" ]]; then
+        vault_ns_from_default=1
     fi
     export VAULT_NS
 
@@ -306,10 +346,12 @@ function test_jenkins() {
         vault_release="$VAULT_RELEASE"
     elif [[ "$release_default_defined_before_plugin" == "1" && -n "${VAULT_RELEASE_DEFAULT_ENV:-}" ]]; then
         vault_release="$VAULT_RELEASE_DEFAULT_ENV"
-    elif (( vault_ns_from_default_env )); then
+    elif (( vault_ns_from_default )); then
         vault_release="$VAULT_NS"
-    else
+    elif [[ -n "${VAULT_RELEASE_DEFAULT:-}" ]]; then
         vault_release="$VAULT_RELEASE_DEFAULT"
+    else
+        vault_release="vault"
     fi
     local vault_pod="${vault_release}-0"
     local AUTH_FILE="$(mktemp)"
