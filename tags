@@ -58,6 +58,7 @@ EOF	scripts/plugins/azure.sh	/^    cat <<'EOF'$/;"	h
 EOF	scripts/plugins/bitwarden.sh	/^  cat <<EOF | _kubectl apply -f -$/;"	h
 EOF	scripts/plugins/vault.sh	/^   cat <<EOF$/;"	h
 EOF	scripts/tests/plugins/jenkins.bats	/^      cat <<'EOF'$/;"	h
+EOF	scripts/tests/plugins/vault.bats	/^  cat <<EOF$/;"	h
 EOF2	scripts/tests/core/install_k3d.bats	/^    cat <<EOF2$/;"	h
 Fresh install	scripts/tests/plugins/eso.bats	/^@test "Fresh install" {$/;"	t
 Full deployment	scripts/tests/plugins/jenkins.bats	/^@test "Full deployment" {$/;"	t
@@ -198,6 +199,8 @@ _is_vault_health	scripts/tests/plugins/vault.bats	/^  _is_vault_health() { _info
 _is_vault_health	scripts/tests/plugins/vault.bats	/^  _is_vault_health() { _info "return code: 503"; return 1; }$/;"	f
 _is_vault_health	scripts/tests/plugins/vault.bats	/^  _is_vault_health() { return 0; }$/;"	f
 _is_vault_health fails for unhealthy HTTP statuses	scripts/tests/plugins/vault.bats	/^@test "_is_vault_health fails for unhealthy HTTP statuses" {$/;"	t
+_is_vault_health fails for unhealthy status in kubectl run output	scripts/tests/plugins/vault.bats	/^@test "_is_vault_health fails for unhealthy status in kubectl run output" {$/;"	t
+_is_vault_health ignores kubectl run prompts for healthy status	scripts/tests/plugins/vault.bats	/^@test "_is_vault_health ignores kubectl run prompts for healthy status" {$/;"	t
 _is_vault_health treats healthy HTTP statuses as success	scripts/tests/plugins/vault.bats	/^@test "_is_vault_health treats healthy HTTP statuses as success" {$/;"	t
 _is_wsl	scripts/lib/system.sh	/^function _is_wsl() {$/;"	f
 _is_wsl	scripts/tests/lib/install_kubernetes_cli.bats	/^  _is_wsl() { return 1; }$/;"	f
@@ -293,6 +296,7 @@ jenkins	scripts/etc/jenkins/virtualservice.yaml	/^  name: jenkins$/;"	p
 jenkins-gw	scripts/etc/jenkins/gateway.yaml	/^  name: jenkins-gw$/;"	p
 jenkins-seed-writer	scripts/etc/jenkins/vault-seed-wrapper.yaml	/^  name: jenkins-seed-writer$/;"	p
 k3d-manager	README.md	/^# k3d-manager$/;"	c
+kubectl_run_output_fixture	scripts/tests/plugins/vault.bats	/^kubectl_run_output_fixture() {$/;"	f
 read_lines	scripts/tests/test_helpers.bash	/^function read_lines() {$/;"	f
 read_lines falls back on bash <4	scripts/tests/lib/read_lines.bats	/^@test "read_lines falls back on bash <4" {$/;"	t
 read_lines handles quotes and backslashes	scripts/tests/lib/read_lines.bats	/^@test "read_lines handles quotes and backslashes" {$/;"	t
