@@ -84,6 +84,12 @@ function deploy_jenkins() {
 function _deploy_jenkins() {
    local ns="${1:-jenkins}"
 
+   JEKINS_VARS_FILE="$JENKINS_CONFIG_DIR/jenkins-vars.sh"
+   if [[ ! -r "$JEKINS_VARS_FILE" ]]; then
+      _err "Jenkins variable file not found: $JEKINS_VARS_FILE"
+   fi
+   # shellcheck source=./etc/jenkins/jenkins-vars.sh
+   source "$JEKINS_VARS_FILE"
    if ! _helm repo list | grep -q jenkins >/dev/null 2>&1; then
      _helm repo add jenkins https://charts.jenkins.io
    fi
@@ -92,13 +98,27 @@ function _deploy_jenkins() {
       --namespace "$ns" \
       -f "$JENKINS_CONFIG_DIR/values.yaml"
 
-      _kubectl apply -n "$ns" --dry-run=client \
-         -f "$JENKINS_CONFIG_DIR/virtualservice.yaml" | \
-      _kubectl apply -n "$ns" -f -
+   virtualservice_file="$JENKINS_CONFIG_DIR/virtualservice.yaml"
+   if [[ ! -r "$virtualservice_file" ]]; then
+      _err "Jenkins VirtualService file not found: $virtualservice_file"
+   fi
 
-      _kubectl apply -n "$ns" --dry-run=client \
-         -f "$JENKINS_CONFIG_DIR/destinationrule.yaml" | \
-      _kubectl apply -n "$ns" -f -
+   if ! _kubectl --no-exit apply -n "$ns" --dry-run=client \
+      -f "$virtualservice_file" | \
+        _kubectl apply -n "$ns" -f -; then
+      _err "Failed to apply $virualservice_file"
+   fi
+
+   destinationrule_file="$JENKINS_CONFIG_DIR/destinationrule.yaml"
+   if [[ ! -r "$destinationrule_file" ]]; then
+      _err "Jenkins DestinationRule file not found: $destinationrule_file"
+   fi
+
+   if ! _kubectl --no-exit apply -n "$ns" --dry-run=client \
+      -f "$destination_rule" | \
+      _kubectl apply -n "$ns" -f -; then
+      _err "Failed to apply $destinationrule_file"
+   fi
 }
 
 function _create_jenkins_admin_vault_policy() {
