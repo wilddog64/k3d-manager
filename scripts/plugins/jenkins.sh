@@ -144,7 +144,7 @@ function _create_jenkins_vault_ad_policy() {
    local jenkins_namespace="${2:-jenkins}"
 
    if ! _vault_policy_exists "$vault_namespace" "jenkins-jcasc-read"; then
-      cat > jenkins-jcasc-read.hcl <<'HCL' |
+      cat > /tmp/jenkins-jcasc-read.hcl <<'HCL' |
       _kubectl -n "$vault_namespace" exec -i vault-0 -- \
          vault write sys/policies/password/jenkins-jcasc-read policy=-
          path "secret/data/jenkins/ad-ldap"     { capabilities = ["read"] }
@@ -159,12 +159,10 @@ HCL
            bound_service_account_namespaces=jenkins \
            policies=jenkins-jcasc-read \
            ttl=30m
-
-
    fi
 
-   if ! _vault_policy "$vault_namespace" "jenkins-jcasc-write"; then
-      cat > jenkins-jcasc-write.hcl <<'HCL' |
+   if ! _vault_policy_exists "$vault_namespace" "jenkins-jcasc-write"; then
+      cat > /tmp/jenkins-jcasc-write.hcl <<'HCL' |
       _kubectl -n "$vault_namespace" exec -i vault-0 -- \
          vault write sys/policies/password/jenkins-jcasc-write policy=-
          path "secret/data/jenkins/ad-ldap"     { capabilities = ["create", "update"] }
@@ -174,10 +172,12 @@ HCL
          vault policy write jenkins-jcasc-write
 
       _kubectl -n "$vault_namespace" exec -i vault-0 -- \
-         vault write auth/kubernetes/role/jenkins-jcasc-writer - \
+         vault write auth/kubernetes/role/jenkins-jcasc-writer policy=- \
            bound_service_account_names=jenkins \
            bound_service_account_namespaces=jenkins \
            policies=jenkins-jcasc-write \
              ttl=15m
+   else
+      _info "Vault policy jenkins-jcasc-read already exists, skip"
    fi
 }
