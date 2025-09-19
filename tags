@@ -45,8 +45,8 @@ EOF	scripts/lib/test.sh	/^    _kubectl apply -f - -n istio-test <<EOF$/;"	h
 EOF	scripts/lib/test.sh	/^  cat <<EOF | _kubectl apply -f -$/;"	h
 EOF	scripts/plugins/bitwarden.sh	/^  cat <<EOF | _kubectl apply -f -$/;"	h
 EOF	scripts/plugins/vault.sh	/^   cat <<EOF$/;"	h
-HCL	scripts/plugins/jenkins.sh	/^      cat > jenkins-jcasc-read.hcl <<'HCL' |$/;"	h
-HCL	scripts/plugins/jenkins.sh	/^      cat > jenkins-jcasc-write.hcl <<'HCL' |$/;"	h
+HCL	scripts/plugins/jenkins.sh	/^      cat > \/tmp\/jenkins-jcasc-read.hcl <<'HCL' |$/;"	h
+HCL	scripts/plugins/jenkins.sh	/^      cat > \/tmp\/jenkins-jcasc-write.hcl <<'HCL' |$/;"	h
 HCL	scripts/plugins/jenkins.sh	/^   cat > jenkins-admin.hcl <<'HCL' |$/;"	h
 HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- \\$/;"	h
 HCL	scripts/plugins/vault.sh	/^  cat <<'HCL' | _kubectl -n "$ns" exec -i vault-0 -- sh - \\$/;"	h
@@ -84,7 +84,7 @@ _ensure_azure_cli	scripts/plugins/azure.sh	/^function _ensure_azure_cli() {$/;"	
 _ensure_cargo	scripts/lib/system.sh	/^function _ensure_cargo() {$/;"	f
 _ensure_namespace	scripts/plugins/azure.sh	/^function _ensure_namespace() {$/;"	f
 _ensure_secret_tool	scripts/lib/system.sh	/^_ensure_secret_tool() {$/;"	f
-_err	scripts/lib/system.sh	/^function _err() { printf 'ERROR: %s\\n' "$*" >&2; exit 127; }$/;"	f
+_err	scripts/lib/system.sh	/^_err() {$/;"	f
 _eso_akv_down	scripts/plugins/azure.sh	/^function _eso_akv_down() {$/;"	f
 _eso_akv_up	scripts/plugins/azure.sh	/^function _eso_akv_up() {$/;"	f
 _failfast_off	scripts/lib/system.sh	/^function _failfast_off() {$/;"	f
