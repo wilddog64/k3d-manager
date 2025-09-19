@@ -35,6 +35,7 @@ function _deploy_vault_ha() {
    local ns="${1:-$VAULT_NS_DEFAULT}"
    local release="${2:-$VAULT_RELEASE_DEFAULT}"
    local f="$(mktemp -t)"
+   trap 'cleanup_on_success "$f"' RETURN
 
    sc="${VAULT_SC:-local-path}"
    cat >"$f" <<YAML
@@ -57,7 +58,7 @@ YAML
    args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$f" --wait)
    [[ -n "$version" ]] && args+=("--version" "$version")
    _helm "${args[@]}"
-   trap 'cleanup_on_success "$f"' EXIT
+   rm -f -- "$f"; trap - RETURN
 }
 
 function deploy_vault() {
