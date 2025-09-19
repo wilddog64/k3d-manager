@@ -99,26 +99,10 @@ function _deploy_jenkins() {
       -f "$JENKINS_CONFIG_DIR/values.yaml"
 
    virtualservice_file="$JENKINS_CONFIG_DIR/virtualservice.yaml"
-   if [[ ! -r "$virtualservice_file" ]]; then
-      _err "Jenkins VirtualService file not found: $virtualservice_file"
-   fi
-
-   if ! _kubectl --no-exit apply -n "$ns" --dry-run=client \
-      -f "$virtualservice_file" | \
-        _kubectl apply -n "$ns" -f -; then
-      _err "Failed to apply $virualservice_file"
-   fi
+   _kubectl apply -n "$ns" -f "$virtualservice_file"; then
 
    destinationrule_file="$JENKINS_CONFIG_DIR/destinationrule.yaml"
-   if [[ ! -r "$destinationrule_file" ]]; then
-      _err "Jenkins DestinationRule file not found: $destinationrule_file"
-   fi
-
-   if ! _kubectl --no-exit apply -n "$ns" --dry-run=client \
-      -f "$destination_rule" | \
-      _kubectl apply -n "$ns" -f -; then
-      _err "Failed to apply $destinationrule_file"
-   fi
+   _kubectl apply -n "$ns" -f "$destinationrule_file"
 }
 
 function _create_jenkins_admin_vault_policy() {
