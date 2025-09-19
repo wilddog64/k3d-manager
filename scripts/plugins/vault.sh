@@ -117,7 +117,7 @@ function _vault_bootstrap_ha() {
       return 0
   fi
 
-  local jsonfile="/tmp/init-vault.json";
+  local jsonfile="$(mktemp -t)"
   _kubectl wait -n "$ns" --for=condition=Podscheduled pod/vault-0 --timeout=120s
   local vault_state=$(_kubectl --no-exit -n "$ns" get pod vault-0 -o jsonpath='{.status.phase}')
   local vault_init=$(_kubectl --no-exit -n "$ns" exec -i vault-0 -- vault status -format json | jq -r '.initialized')
@@ -128,6 +128,7 @@ function _vault_bootstrap_ha() {
   _kubectl -n "$ns" exec -it vault-0 -- \
      sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json' \
      > "$jsonfile"
+  trap 'cleanup_on_success "$jsonfile"' RETURN
 
   local root_token=$(jq -r '.root_token' "$jsonfile")
   local unseal_key=$(jq -r '.unseal_keys_b64[0]' "$jsonfile")
