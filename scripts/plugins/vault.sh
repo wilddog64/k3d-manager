@@ -87,7 +87,6 @@ function _vault_wait_ready() {
    ns="${1:-$VAULT_NS_DEFAULT}"
    release="${2:-$VAULT_RELEASE_DEFAULT}"
    # StatefulSet name is <release>-server per chart
-   _kubectl --no-exit -n "$ns" rollout status statefulset/"$release"-server --timeout=180s || true
 
    _kubectl -n "$ns" wait --for=condition=ready pod \
    -l "app.kubernetes.io/name=vault,app.kubernetes.io/instance=$release" \
