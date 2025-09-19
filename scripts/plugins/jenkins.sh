@@ -99,7 +99,7 @@ function _deploy_jenkins() {
       -f "$JENKINS_CONFIG_DIR/values.yaml"
 
    virtualservice_file="$JENKINS_CONFIG_DIR/virtualservice.yaml"
-   _kubectl apply -n "$ns" -f "$virtualservice_file"; then
+   _kubectl apply -n "$ns" -f "$virtualservice_file"
 
    destinationrule_file="$JENKINS_CONFIG_DIR/destinationrule.yaml"
    _kubectl apply -n "$ns" -f "$destinationrule_file"
