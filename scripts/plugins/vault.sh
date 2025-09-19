@@ -120,7 +120,6 @@ function _vault_bootstrap_ha() {
   local jsonfile="/tmp/init-vault.json";
   _kubectl wait -n "$ns" --for=condition=Podscheduled pod/vault-0 --timeout=120s
   local vault_state=$(_kubectl --no-exit -n "$ns" get pod vault-0 -o jsonpath='{.status.phase}')
-  _vault_wait_ready "$ns" "$release"
   local vault_init=$(_kubectl --no-exit -n "$ns" exec -i vault-0 -- vault status -format json | jq -r '.initialized')
   if [[ "$vault_init" == "true" ]]; then
      _warn "[vault] already initialized, skipping init"
