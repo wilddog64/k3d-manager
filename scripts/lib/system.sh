@@ -81,7 +81,12 @@ function _run_command() {
      if (( soft )); then
          return "$rc"
      else
-         _err "failed to execute ${runner[@]} $@: $rc"
+         __ERR_ORIGIN_CMD="$*"
+         __ERR_ORIGIN_FUNC="${FUNCNAME[1]:-MAIN}"
+         __ERR_ORIGIN_FILE="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
+         __ERR_ORIGIN_LINE="${BASH_LINENO[0]:-0}"
+         ERR_FRAME=1 _err "$rc" "wapper caugh failure"
+         unset __ERR_ORIGIN_CMD __ERR_ORIGIN_FUNC __ERR_ORIGIN_FILE __ERR_ORIGIN_LINE ERR_FRAME
      fi
   fi
 
@@ -567,7 +572,32 @@ function _failfast_off() {
 # ---------- tiny log helpers (no parentheses, no single-quote apostrophes) ----------
 function _info() { printf 'INFO: %s\n' "$*" >&2; }
 function _warn() { printf 'WARN: %s\n' "$*" >&2; }
-function _err() { printf 'ERROR: %s\n' "$*" >&2; exit 127; }
+# function _err() { printf 'ERROR: %s\n' "$*" >&2; exit 127; }
+
+_err() {
+  local rc msg
+  if [[ $# -ge 2 && $1 =~ ^[0-9]+$ ]]; then rc=$1; shift; else rc=${rc:-$?}; fi
+  msg="$*"
+
+  # CALL = direct caller of _err
+  local frame=${ERR_FRAME:-1}
+  local call_func="${FUNCNAME[$frame]:-MAIN}"
+  local call_file="${BASH_SOURCE[$frame]:-${BASH_SOURCE[0]}}"
+  local call_line="${BASH_LINENO[$((frame-1))]:-0}"
+
+  # ORIGIN = filled by wrapper/ERR trap; falls back to CALL if not set
+  local origin_func="${__ERR_ORIGIN_FUNC:-$call_func}"
+  local origin_file="${__ERR_ORIGIN_FILE:-$call_file}"
+  local origin_line="${__ERR_ORIGIN_LINE:-$call_line}"
+  local origin_cmd="${__ERR_ORIGIN_CMD:-}"
+
+  printf ' CALL   %s:%s in %s()\n'   "$call_file"   "$call_line"   "$call_func" >&2
+  printf ' ORIGIN %s:%s in %s()'     "$origin_file" "$origin_line" "$origin_func" >&2
+  [[ -n $origin_cmd ]] && printf '  cmd: %s' "$origin_cmd" >&2
+  printf '\n' >&2
+
+  exit 127
+}
 
 function _no_trace() {
   local wasx=0
