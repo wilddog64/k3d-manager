@@ -27,6 +27,7 @@ function _run_command() {
 
   local prog="${1:?usage: _run_command [opts] -- <prog> [args...]}"
   shift
+  __RUN_DEPTH=$(( ${__RUN_DEPTH:-0} + 1 ))
 
   if ! command -v "$prog" >/dev/null 2>&1; then
     (( quiet )) || echo "$prog: not found in PATH" >&2
@@ -70,6 +71,7 @@ function _run_command() {
   # Execute and preserve exit code
   "${runner[@]}" "$@"
   local rc=$?
+  local __cmd; printf -v __cmd '%q ' "${runner[@]}" "$@"; __cmd=${__cmd% }
 
   if (( rc != 0 )); then
      if (( quiet == 0 )); then
@@ -79,14 +81,17 @@ function _run_command() {
      fi
 
      if (( soft )); then
+         __RUN_DEPTH=$(( __RUN_DEPTH - 1  ))
          return "$rc"
      else
-         __ERR_ORIGIN_CMD="$*"
-         __ERR_ORIGIN_FUNC="${FUNCNAME[1]:-MAIN}"
-         __ERR_ORIGIN_FILE="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
-         __ERR_ORIGIN_LINE="${BASH_LINENO[0]:-0}"
-         ERR_FRAME=1 _err "$rc" "wapper caugh failure"
-         unset __ERR_ORIGIN_CMD __ERR_ORIGIN_FUNC __ERR_ORIGIN_FILE __ERR_ORIGIN_LINE ERR_FRAME
+        if (( __RUN_DEPTH == 1 )); then
+           __ERR_ORIGIN_CMD="$*"
+           __ERR_ORIGIN_FUNC="${FUNCNAME[1]:-MAIN}"
+           __ERR_ORIGIN_FILE="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
+           __ERR_ORIGIN_LINE="${BASH_LINENO[0]:-0}"
+           ERR_FRAME=1 ERR_FRAME_ORIGIN=2 _err "$rc" "cmd: $__cmd"
+           unset __ERR_ORIGIN_CMD __ERR_ORIGIN_FUNC __ERR_ORIGIN_FILE __ERR_ORIGIN_LINE ERR_FRAME
+        fi
      fi
   fi
 
