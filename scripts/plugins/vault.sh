@@ -35,6 +35,7 @@ function _deploy_vault_ha() {
    local ns="${1:-$VAULT_NS_DEFAULT}"
    local release="${2:-$VAULT_RELEASE_DEFAULT}"
    local f="$(mktemp -t)"
+   trap 'cleanup_on_success "$f"' RETURN
 
    sc="${VAULT_SC:-local-path}"
    cat >"$f" <<YAML
@@ -57,7 +58,7 @@ YAML
    args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$f" --wait)
    [[ -n "$version" ]] && args+=("--version" "$version")
    _helm "${args[@]}"
-   trap 'cleanup_on_success "$f"' EXIT
+   rm -f -- "$f"; trap - RETURN
 }
 
 function deploy_vault() {
@@ -86,7 +87,6 @@ function _vault_wait_ready() {
    ns="${1:-$VAULT_NS_DEFAULT}"
    release="${2:-$VAULT_RELEASE_DEFAULT}"
    # StatefulSet name is <release>-server per chart
-   _kubectl --no-exit -n "$ns" rollout status statefulset/"$release"-server --timeout=180s || true
 
    _kubectl -n "$ns" wait --for=condition=ready pod \
    -l "app.kubernetes.io/name=vault,app.kubernetes.io/instance=$release" \
@@ -117,19 +117,9 @@ function _vault_bootstrap_ha() {
       return 0
   fi
 
-  local jsonfile="/tmp/init-vault.json";
+  local jsonfile="$(mktemp -t)"
   _kubectl wait -n "$ns" --for=condition=Podscheduled pod/vault-0 --timeout=120s
   local vault_state=$(_kubectl --no-exit -n "$ns" get pod vault-0 -o jsonpath='{.status.phase}')
-  end_time=$((SECONDS + 120))
-  current_time=$SECONDS
-  while [[ "$vault_state" != "Running" ]]; do
-      echo "[vault] waiting for vault-0 to be Running (current=$vault_state)"
-      sleep 2
-      vault_state=$(_kubectl --no-exit -n "$ns" get pod vault-0 -o jsonpath='{.status.phase}')
-      if (( current_time >= end_time )); then
-         _err "[vault] timeout waiting for vault-0 to be Running (current=$vault_state)" >&2to3
-      fi
-  done
   local vault_init=$(_kubectl --no-exit -n "$ns" exec -i vault-0 -- vault status -format json | jq -r '.initialized')
   if [[ "$vault_init" == "true" ]]; then
      _warn "[vault] already initialized, skipping init"
@@ -138,6 +128,7 @@ function _vault_bootstrap_ha() {
   _kubectl -n "$ns" exec -it vault-0 -- \
      sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json' \
      > "$jsonfile"
+  trap 'cleanup_on_success "$jsonfile"' RETURN
 
   local root_token=$(jq -r '.root_token' "$jsonfile")
   local unseal_key=$(jq -r '.unseal_keys_b64[0]' "$jsonfile")
