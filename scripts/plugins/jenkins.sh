@@ -18,7 +18,7 @@ function _create_jenkins_namespace() {
    # shellcheck disable=SC
    envsubst < "$jenkins_namespace_template" > "$yamlfile"
 
-   if _kubectl get namespace "$jenkins_namespace" >/dev/null 2>&1; then
+   if _kubectl --no-exit get namespace "$jenkins_namespace" >/dev/null 2>&1; then
       echo "Namespace $jenkins_namespace already exists, skip"
    else
       _kubectl apply -f "$yamlfile" >/dev/null 2>&1
