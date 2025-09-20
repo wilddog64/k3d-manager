@@ -199,37 +199,44 @@ EOF
 function _is_vault_health() {
   local ns="${1:?}" release="${2:?}" scheme="${3:-http}" port="${4:-8200}"
   local host="${release}.${ns}.svc"
-  local name="vault-health-$RANDOM$RANDOM"
-  local rc=$(_kubectl --no-exit -n "$ns" run "$name" --rm -i --restart=Never \
-    --image=curlimages/curl:8.10.1 --command -- sh -c \
-    "curl -o /dev/null -s -w '%{http_code}' '${scheme}://${host}:${port}/v1/sys/health'")
+  local rc status attempt max_attempts=3
 
-  # kubectl may emit interactive prompts and deletion messages before or after
-  # the command output; grab the trailing status token for evaluation.
-  rc=${rc//$'\r'/}
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    local name="vault-health-$RANDOM$RANDOM"
+    rc=$(_kubectl --no-exit -n "$ns" run "$name" --rm -i --restart=Never \
+      --image=curlimages/curl:8.10.1 --command -- sh -c \
+      "curl -o /dev/null -s -w '%{http_code}' '${scheme}://${host}:${port}/v1/sys/health'")
 
-  local status
-  status=$(printf '%s\n' "$rc" | awk 'NF { last=$NF } END { print last }')
+    # kubectl may emit interactive prompts and deletion messages before or after
+    # the command output; grab the trailing status token for evaluation.
+    rc=${rc//$'\r'/}
 
-  if [[ ! "$status" =~ ^[0-9]{3}$ ]]; then
-    status=$(printf '%s\n' "$rc" | grep -Eo '[0-9]{3}' | tail -n1)
-  fi
+    status=$(printf '%s\n' "$rc" | awk 'NF { last=$NF } END { print last }')
 
-  if [[ -z "$status" ]]; then
-    local status_line="${rc##*$'\n'}"
-    status="$status_line"
-  fi
+    if [[ ! "$status" =~ ^[0-9]{3}$ ]]; then
+      status=$(printf '%s\n' "$rc" | grep -Eo '[0-9]{3}' | tail -n1)
+    fi
 
-  case "$status" in
-     200|429|472|473)
+    if [[ -z "$status" ]]; then
+      local status_line="${rc##*$'\n'}"
+      status="$status_line"
+    fi
+
+    case "$status" in
+      200|429|472|473)
         _info "return code: $status"
         return 0
         ;;
-     *)
+      *)
         _info "return code: $status"
-        return 1
+        if (( attempt < max_attempts )); then
+          _warn "[vault] health check attempt ${attempt}/${max_attempts} returned ${status}; retrying"
+        fi
         ;;
-  esac
+    esac
+  done
+
+  return 1
 }
 
 function _vault_exec() {

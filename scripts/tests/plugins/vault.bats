@@ -270,6 +270,92 @@ EOF
   done
 }
 
+@test "_is_vault_health retries unhealthy statuses before succeeding" {
+  KUBECTL_RESPONSES=(500 503 200)
+  KUBECTL_CALL_FILE="$BATS_TEST_TMPDIR/kubectl-call-count"
+  printf '0\n' >"$KUBECTL_CALL_FILE"
+  WARN_LOG="$BATS_TEST_TMPDIR/warn.log"
+  : >"$WARN_LOG"
+
+  _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+
+    local idx
+    idx=$(cat "$KUBECTL_CALL_FILE")
+    local response="${KUBECTL_RESPONSES[idx]}"
+    printf '%s\n' "$((idx + 1))" >"$KUBECTL_CALL_FILE"
+    printf '%s\n' "$response"
+    return 0
+  }
+
+  _warn() {
+    printf '%s\n' "$*" >>"$WARN_LOG"
+  }
+
+  export -f _kubectl
+  export -f _warn
+
+  run _is_vault_health test-ns test-release
+
+  [ "$status" -eq 0 ]
+  local calls
+  calls=$(cat "$KUBECTL_CALL_FILE")
+  [ "$calls" -eq 3 ]
+  mapfile -t WARN_MESSAGES <"$WARN_LOG"
+  [ "${#WARN_MESSAGES[@]}" -eq 2 ]
+  [[ "${WARN_MESSAGES[0]}" == *"attempt 1/3"* ]]
+  [[ "${WARN_MESSAGES[1]}" == *"attempt 2/3"* ]]
+}
+
+@test "_is_vault_health fails after three unhealthy statuses" {
+  KUBECTL_RESPONSES=(500 503 501)
+  KUBECTL_CALL_FILE="$BATS_TEST_TMPDIR/kubectl-call-count"
+  printf '0\n' >"$KUBECTL_CALL_FILE"
+  WARN_LOG="$BATS_TEST_TMPDIR/warn.log"
+  : >"$WARN_LOG"
+
+  _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+
+    local idx
+    idx=$(cat "$KUBECTL_CALL_FILE")
+    local response="${KUBECTL_RESPONSES[idx]}"
+    printf '%s\n' "$((idx + 1))" >"$KUBECTL_CALL_FILE"
+    printf '%s\n' "$response"
+    return 0
+  }
+
+  _warn() {
+    printf '%s\n' "$*" >>"$WARN_LOG"
+  }
+
+  export -f _kubectl
+  export -f _warn
+
+  run _is_vault_health test-ns test-release
+
+  [ "$status" -ne 0 ]
+  local calls
+  calls=$(cat "$KUBECTL_CALL_FILE")
+  [ "$calls" -eq 3 ]
+  mapfile -t WARN_MESSAGES <"$WARN_LOG"
+  [ "${#WARN_MESSAGES[@]}" -eq 2 ]
+  [[ "${WARN_MESSAGES[0]}" == *"attempt 1/3"* ]]
+  [[ "${WARN_MESSAGES[1]}" == *"attempt 2/3"* ]]
+}
+
 @test "_vault_enable_pki skips enabling when mount exists" {
   VAULT_LOGIN_CALLED=0
   VAULT_EXEC_LOG="$BATS_TEST_TMPDIR/vault_exec.log"
