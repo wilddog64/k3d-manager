@@ -242,12 +242,11 @@ rule "charset" { charset = "0123456789" }
 rule "charset" { charset = "!@#$%^&*()-_=+[]{};:,.?" }
 HCL
 
-   local jenkins_admin_pass
-   jenkins_admin_pass=$(_kubectl -n "$vault_namespace" exec -i "$pod" -- \
-      vault read -field=password sys/policies/password/jenkins-admin/generate)
-   printf '' | _no_trace _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-      vault kv put secret/eso/jenkins-admin username=jenkins-admin \
-      password="$jenkins_admin_pass"
+   cat <<'SCRIPT' | _no_trace _kubectl -n "$vault_namespace" exec -i "$pod" -- sh -
+      set -euo pipefail
+      jenkins_admin_pass=$(vault read -field=password sys/policies/password/jenkins-admin/generate)
+      vault kv put secret/eso/jenkins-admin username=jenkins-admin password="$jenkins_admin_pass"
+SCRIPT
    rm -f jenkins-admin.hcl
 }
 
