@@ -202,7 +202,7 @@ function _deploy_jenkins() {
    dr_rendered=$(mktemp -t jenkins-destinationrule.XXXXXX.yaml)
    envsubst < "$dr_template" > "$dr_rendered"
 
-   trap '_cleanup_on_success "$vs_rendered"; _cleanup_on_success "$dr_rendered"' EXIT
+   trap '_cleanup_on_success "$vs_rendered"; _cleanup_on_success "$dr_rendered"' EXIT RETURN
 
    if ! _kubectl apply -n "$ns" --dry-run=client -f "$vs_rendered"; then
       return $?
