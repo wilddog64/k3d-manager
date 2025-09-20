@@ -75,6 +75,9 @@ function _create_jenkins_pv_pvc() {
    envsubst < "$jenkins_pv_template" > "$jenkinsyamfile"
    _kubectl apply -f "$jenkinsyamfile" -n "$jenkins_namespace"
 
+   local agent_node="${cluster_name}-agent-0"
+   _k3d node edit "$agent_node" --volume-add "${JENKINS_HOME_PATH}:${JENKINS_HOME_IN_CLUSTER}"
+
    trap '_cleanup_on_success "$jenkinsyamfile"' EXIT
 }
 
