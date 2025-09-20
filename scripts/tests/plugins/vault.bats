@@ -270,6 +270,38 @@ EOF
   done
 }
 
+@test "_vault_pki_issue_tls_secret forwards overrides to secret issuance" {
+  : >"$KUBECTL_LOG"
+
+  _is_vault_pki_ready() { return 0; }
+  _vault_issue_pki_tls_secret() {
+    VAULT_ISSUE_ARGS=("$@")
+    _kubectl --no-exit -n "$1" echo "vault_issue_called"
+  }
+
+  export -f _is_vault_pki_ready
+  export -f _vault_issue_pki_tls_secret
+
+  VAULT_PKI_ISSUE_SECRET=1
+  export VAULT_PKI_ISSUE_SECRET
+
+  _vault_pki_issue_tls_secret custom-ns custom-release custom-path custom-role \
+    custom.host custom-secret-ns custom-secret-name
+  status=$?
+
+  [ "$status" -eq 0 ]
+  [ "${VAULT_ISSUE_ARGS[0]}" = "custom-ns" ]
+  [ "${VAULT_ISSUE_ARGS[1]}" = "custom-release" ]
+  [ "${VAULT_ISSUE_ARGS[2]}" = "custom-path" ]
+  [ "${VAULT_ISSUE_ARGS[3]}" = "custom-role" ]
+  [ "${VAULT_ISSUE_ARGS[4]}" = "custom.host" ]
+  [ "${VAULT_ISSUE_ARGS[5]}" = "custom-secret-ns" ]
+  [ "${VAULT_ISSUE_ARGS[6]}" = "custom-secret-name" ]
+
+  read_lines "$KUBECTL_LOG" kubectl_calls
+  [ "${kubectl_calls[0]}" = "-n custom-ns echo vault_issue_called" ]
+}
+
 @test "Full deployment" {
   _vault_ns_ensure() { CALLS+=("_vault_ns_ensure"); }
   _vault_repo_setup() { CALLS+=("_vault_repo_setup"); }

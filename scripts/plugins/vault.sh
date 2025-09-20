@@ -550,7 +550,7 @@ function _vault_pki_issue_tls_secret() {
    _is_vault_pki_ready "$ns" "$release" "$path"
 
    _vault_issue_pki_tls_secret "$ns" "$release" "$path" "$role" \
-      "$VAULT_PKI_LEAF_HOST" "$VAULT_PKI_SECRET_NS" "$VAULT_PKI_SECRET_NAME"
+      "$host" "$secret_ns" "$secret_name"
 
    _info "[vault] PKI setup complete (path=$path, role=$role)"
 }
