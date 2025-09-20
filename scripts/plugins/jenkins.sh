@@ -201,6 +201,9 @@ function _deploy_jenkins() {
    if ! _kubectl apply -n "$ns" -f - < "$dr_yaml"; then
       return $?
    fi
+
+   _vault_issue_pki_tls_secret "jenkins.dev.local.me" "istio-system" "jenkins-cert" \
+      "$vault_namespace" "$vault_release"
 }
 
 function _wait_for_jenkins_ready() {
