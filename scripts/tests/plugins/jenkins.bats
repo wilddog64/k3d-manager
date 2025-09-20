@@ -163,6 +163,24 @@ JSON
   grep -q 'create secret tls jenkins-cert' "$KUBECTL_LOG"
 }
 
+@test "_deploy_jenkins calls vault helper with namespace, release, and TLS overrides" {
+  VAULT_CALL_LOG="$BATS_TEST_TMPDIR/vault_call.log"
+  _vault_issue_pki_tls_secret() {
+    printf '%s\n' "$1" "$2" "$5" "$6" "$7" >"$VAULT_CALL_LOG"
+  }
+  export -f _vault_issue_pki_tls_secret
+
+  run _deploy_jenkins ci-namespace ci-vault ci-release
+  [ "$status" -eq 0 ]
+
+  read_lines "$VAULT_CALL_LOG" vault_args
+  [ "${vault_args[0]}" = "ci-vault" ]
+  [ "${vault_args[1]}" = "ci-release" ]
+  [ "${vault_args[2]}" = "jenkins.dev.local.me" ]
+  [ "${vault_args[3]}" = "istio-system" ]
+  [ "${vault_args[4]}" = "jenkins-cert" ]
+}
+
 @test "Full deployment" {
   CALLS_LOG="$BATS_TEST_TMPDIR/calls.log"
   : > "$CALLS_LOG"
@@ -187,7 +205,7 @@ JSON
     "_create_jenkins_namespace:sample-ns"
     "_create_jenkins_pv_pvc:sample-ns"
     "_ensure_jenkins_cert:custom-vault ${release}"
-    "_deploy_jenkins:sample-ns"
+    "_deploy_jenkins:sample-ns custom-vault ${release}"
     "_wait_for_jenkins_ready:sample-ns"
   )
   [ "${#calls[@]}" -eq "${#expected[@]}" ]

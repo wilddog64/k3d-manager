@@ -154,12 +154,14 @@ function deploy_jenkins() {
    _create_jenkins_namespace "$jenkins_namespace"
    _create_jenkins_pv_pvc "$jenkins_namespace"
    _ensure_jenkins_cert "$vault_namespace" "$vault_release"
-   _deploy_jenkins "$jenkins_namespace"
+   _deploy_jenkins "$jenkins_namespace" "$vault_namespace" "$vault_release"
    _wait_for_jenkins_ready "$jenkins_namespace"
 }
 
 function _deploy_jenkins() {
    local ns="${1:-jenkins}"
+   local vault_namespace="${2:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+   local vault_release="${3:-$VAULT_RELEASE_DEFAULT}"
 
    if ! _helm repo list 2>/dev/null | grep -q jenkins; then
      _helm repo add jenkins https://charts.jenkins.io
@@ -202,8 +204,12 @@ function _deploy_jenkins() {
       return $?
    fi
 
-   _vault_issue_pki_tls_secret "jenkins.dev.local.me" "istio-system" "jenkins-cert" \
-      "$vault_namespace" "$vault_release"
+   local jenkins_host="jenkins.dev.local.me"
+   local secret_namespace="istio-system"
+   local secret_name="jenkins-cert"
+
+   _vault_issue_pki_tls_secret "$vault_namespace" "$vault_release" "" "" \
+      "$jenkins_host" "$secret_namespace" "$secret_name"
 }
 
 function _wait_for_jenkins_ready() {
