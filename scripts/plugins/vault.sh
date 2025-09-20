@@ -66,7 +66,7 @@ function deploy_vault() {
       return 0
    fi
 
-   VAULT_VARS="$PLUGIN_DIR/etc/vault/vars.sh"
+   VAULT_VARS="$PLUGIN_DIRS/etc/vault/vars.sh"
    if [[ -f "$VAULT_VARS" ]]; then
       # shellcheck disable=SC1090
       source "$VAULT_VARS"
