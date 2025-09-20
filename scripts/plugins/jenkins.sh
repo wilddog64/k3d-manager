@@ -18,6 +18,7 @@ function _create_jenkins_namespace() {
       exit 1
    fi
    yamlfile=$(mktemp -t)
+   trap '_cleanup_on_success "$yamlfile"' EXIT
    # shellcheck disable=SC
    envsubst < "$jenkins_namespace_template" > "$yamlfile"
 
@@ -70,6 +71,7 @@ function _create_jenkins_pv_pvc() {
       exit 1
    fi
    jenkinsyamfile=$(mktemp -t)
+   trap '_cleanup_on_success "$jenkinsyamfile"' EXIT
    envsubst < "$jenkins_pv_template" > "$jenkinsyamfile"
    _kubectl apply -f "$jenkinsyamfile" -n "$jenkins_namespace"
 
@@ -105,15 +107,17 @@ function _ensure_jenkins_cert() {
    json=$(_kubectl -n "$vault_namespace" exec -i "$pod" -- \
       vault write -format=json pki/issue/jenkins common_name="$common_name" ttl=72h)
 
-   cert_file=$(mktemp -t jenkins-cert.pem.XXXX)
-   key_file=$(mktemp -t jenkins-key.pem.XXXX)
+   cert_file=$(mktemp -t)
+   key_file=$(mktemp -t)
+   declare -a CLEANUP_FILES=("$cert_file" "$key_file")
+   trap '_cleanup_on_success "${CLEANUP_FILES[@]}"' EXIT
+
    echo "$json" | jq -r '.data.certificate' > "$cert_file"
    echo "$json" | jq -r '.data.private_key' > "$key_file"
 
    _kubectl -n "$k8s_namespace" create secret tls "$secret_name" \
       --cert="$cert_file" --key="$key_file"
 
-   rm -f "$cert_file" "$key_file"
 }
 
 function _deploy_jenkins_image() {
