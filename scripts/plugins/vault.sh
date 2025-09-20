@@ -198,39 +198,37 @@ EOF
 
 function _is_vault_health() {
   local ns="${1:?}" release="${2:?}" scheme="${3:-http}" port="${4:-8200}"
-  local host="${release}.${ns}.svc"
+  local host="${release}.${ns}.svc" status_marker="VAULT_HTTP_STATUS"
   local rc status attempt max_attempts=3
 
   for ((attempt = 1; attempt <= max_attempts; attempt++)); do
     local name="vault-health-$RANDOM$RANDOM"
     rc=$(_kubectl --no-exit -n "$ns" run "$name" --rm -i --restart=Never \
       --image=curlimages/curl:8.10.1 --command -- sh -c \
-      "curl -o /dev/null -s -w '%{http_code}' '${scheme}://${host}:${port}/v1/sys/health'")
+      "curl -o /dev/null -s -w '${status_marker}:%{http_code}' '${scheme}://${host}:${port}/v1/sys/health'")
 
     # kubectl may emit interactive prompts and deletion messages before or after
-    # the command output; grab the trailing status token for evaluation.
+    # the command output; locate the explicit status marker to avoid false hits.
     rc=${rc//$'\r'/}
 
-    status=$(printf '%s\n' "$rc" | awk 'NF { last=$NF } END { print last }')
-
-    if [[ ! "$status" =~ ^[0-9]{3}$ ]]; then
-      status=$(printf '%s\n' "$rc" | grep -Eo '[0-9]{3}' | tail -n1)
+    local status_line
+    status_line=$(printf '%s\n' "$rc" | grep -Eo "${status_marker}:[0-9]{3}" | tail -n1)
+    status="${status_line##*:}"
+    if [[ "$status" == "$status_line" ]]; then
+      status=""
     fi
 
-    if [[ -z "$status" ]]; then
-      local status_line="${rc##*$'\n'}"
-      status="$status_line"
-    fi
+    local status_display="${status:-<missing>}"
 
     case "$status" in
       200|429|472|473)
-        _info "return code: $status"
+        _info "return code: $status_display"
         return 0
         ;;
       *)
-        _info "return code: $status"
+        _info "return code: $status_display"
         if (( attempt < max_attempts )); then
-          _warn "[vault] health check attempt ${attempt}/${max_attempts} returned ${status}; retrying"
+          _warn "[vault] health check attempt ${attempt}/${max_attempts} returned ${status_display}; retrying"
         fi
         ;;
     esac

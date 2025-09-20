@@ -247,7 +247,7 @@ JSON
 }
 
 @test "VirtualService references Jenkins gateway" {
-  run grep -q 'istio-system/jenkins-gw' "$SCRIPT_DIR/etc/jenkins/virtualservice.yaml"
+  run grep -q 'istio-system/jenkins-gw' "$SCRIPT_DIR/etc/jenkins/virtualservice.yaml.tmpl"
   [ "$status" -eq 0 ]
 }
 
@@ -257,14 +257,85 @@ JSON
   read_lines "$KUBECTL_LOG" kubectl_calls
   expected_gw="apply -n istio-system --dry-run=client -f $SCRIPT_DIR/etc/jenkins/gateway.yaml"
   expected_gw_apply="apply -n istio-system -f -"
-  expected_vs="apply -n sample-ns --dry-run=client -f $SCRIPT_DIR/etc/jenkins/virtualservice.yaml"
-  expected_vs_apply="apply -n sample-ns -f -"
-  expected_dr="apply -n sample-ns --dry-run=client -f $SCRIPT_DIR/etc/jenkins/destinationrule.yaml"
-  expected_dr_apply="apply -n sample-ns -f -"
+  expected_vs_prefix="apply -n sample-ns --dry-run=client -f /tmp/jenkins-virtualservice"
+  expected_vs_apply_prefix="apply -n sample-ns -f /tmp/jenkins-virtualservice"
+  expected_dr_prefix="apply -n sample-ns --dry-run=client -f /tmp/jenkins-destinationrule"
+  expected_dr_apply_prefix="apply -n sample-ns -f /tmp/jenkins-destinationrule"
   [ "${kubectl_calls[0]}" = "$expected_gw" ]
   [ "${kubectl_calls[1]}" = "$expected_gw_apply" ]
-  [ "${kubectl_calls[2]}" = "$expected_vs" ]
-  [ "${kubectl_calls[3]}" = "$expected_vs_apply" ]
-  [ "${kubectl_calls[4]}" = "$expected_dr" ]
-  [ "${kubectl_calls[5]}" = "$expected_dr_apply" ]
+  [[ "${kubectl_calls[2]}" == ${expected_vs_prefix}* ]]
+  [[ "${kubectl_calls[3]}" == ${expected_vs_apply_prefix}* ]]
+  [[ "${kubectl_calls[4]}" == ${expected_dr_prefix}* ]]
+  [[ "${kubectl_calls[5]}" == ${expected_dr_apply_prefix}* ]]
+}
+
+@test "deploy_jenkins renders manifests for namespace" {
+  local random_ns="jenkins-${RANDOM}"
+  deploy_vault() { :; }
+  _create_jenkins_admin_vault_policy() { :; }
+  _create_jenkins_vault_ad_policy() { :; }
+  _create_jenkins_namespace() { :; }
+  _create_jenkins_pv_pvc() { :; }
+  _ensure_jenkins_cert() { :; }
+  _wait_for_jenkins_ready() { :; }
+
+  MANIFEST_CAPTURE_DIR="$BATS_TEST_TMPDIR/manifests"
+  mkdir -p "$MANIFEST_CAPTURE_DIR"
+  _kubectl() {
+    local original=("$@")
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo)
+          shift
+          ;;
+        --)
+          shift
+          original=("$@")
+          break
+          ;;
+        *)
+          shift
+          ;;
+      esac
+    done
+
+    printf '%s\n' "${original[*]}" >> "$KUBECTL_LOG"
+
+    local dry_run=0 file=""
+    for ((i=0; i<${#original[@]}; i++)); do
+      case "${original[$i]}" in
+        --dry-run=client)
+          dry_run=1
+          ;;
+        -f)
+          if (( i + 1 < ${#original[@]} )); then
+            file="${original[$((i+1))]}"
+          fi
+          ;;
+      esac
+    done
+
+    if (( dry_run )) && [[ -n "$file" ]]; then
+      local dest="$MANIFEST_CAPTURE_DIR/$(basename "$file")"
+      cp "$file" "$dest"
+    fi
+
+    return 0
+  }
+  export -f _kubectl
+
+  run deploy_jenkins "$random_ns"
+  [ "$status" -eq 0 ]
+
+  local vs_file
+  vs_file=$(find "$MANIFEST_CAPTURE_DIR" -maxdepth 1 -type f -name 'jenkins-virtualservice*' -print -quit)
+  local dr_file
+  dr_file=$(find "$MANIFEST_CAPTURE_DIR" -maxdepth 1 -type f -name 'jenkins-destinationrule*' -print -quit)
+
+  [[ -n "$vs_file" ]]
+  [[ -n "$dr_file" ]]
+  grep -q "namespace: \"$random_ns\"" "$vs_file"
+  grep -q "jenkins.$random_ns.svc.cluster.local" "$vs_file"
+  grep -q "namespace: \"$random_ns\"" "$dr_file"
+  grep -q "jenkins.$random_ns.svc.cluster.local" "$dr_file"
 }

@@ -3,9 +3,9 @@ apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
   name: jenkins
-  namespace: jenkins
+  namespace: "${JENKINS_NAMESPACE}"
 spec:
-  host: jenkins.jenkins.svc.cluster.local
+  host: "jenkins.${JENKINS_NAMESPACE}.svc.cluster.local"
   trafficPolicy:
     tls:
       mode: DISABLE

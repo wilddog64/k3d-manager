@@ -182,25 +182,39 @@ function _deploy_jenkins() {
       return $?
    fi
 
-   local vs_yaml="$JENKINS_CONFIG_DIR/virtualservice.yaml"
-   if [[ ! -r "$vs_yaml" ]]; then
-      _err "VirtualService YAML file not found: $vs_yaml"
+   local vs_template="$JENKINS_CONFIG_DIR/virtualservice.yaml.tmpl"
+   if [[ ! -r "$vs_template" ]]; then
+      _err "VirtualService template file not found: $vs_template"
    fi
-   if ! _kubectl apply -n "$ns" --dry-run=client -f "$vs_yaml"; then
+
+   local dr_template="$JENKINS_CONFIG_DIR/destinationrule.yaml.tmpl"
+   if [[ ! -r "$dr_template" ]]; then
+      _err "DestinationRule template file not found: $dr_template"
+   fi
+
+   export JENKINS_NAMESPACE="$ns"
+
+   local vs_rendered
+   vs_rendered=$(mktemp -t jenkins-virtualservice.XXXXXX.yaml)
+   envsubst < "$vs_template" > "$vs_rendered"
+
+   local dr_rendered
+   dr_rendered=$(mktemp -t jenkins-destinationrule.XXXXXX.yaml)
+   envsubst < "$dr_template" > "$dr_rendered"
+
+   trap '_cleanup_on_success "$vs_rendered"; _cleanup_on_success "$dr_rendered"' EXIT
+
+   if ! _kubectl apply -n "$ns" --dry-run=client -f "$vs_rendered"; then
       return $?
    fi
-   if ! _kubectl apply -n "$ns" -f - < "$vs_yaml"; then
+   if ! _kubectl apply -n "$ns" -f "$vs_rendered"; then
       return $?
    fi
 
-   local dr_yaml="$JENKINS_CONFIG_DIR/destinationrule.yaml"
-   if [[ ! -r "$dr_yaml" ]]; then
-      _err "DestinationRule YAML file not found: $dr_yaml"
-   fi
-   if ! _kubectl apply -n "$ns" --dry-run=client -f "$dr_yaml"; then
+   if ! _kubectl apply -n "$ns" --dry-run=client -f "$dr_rendered"; then
       return $?
    fi
-   if ! _kubectl apply -n "$ns" -f - < "$dr_yaml"; then
+   if ! _kubectl apply -n "$ns" -f "$dr_rendered"; then
       return $?
    fi
 

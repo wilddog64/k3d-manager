@@ -60,13 +60,13 @@ setup() {
 }
 
 kubectl_run_output_fixture() {
-  local status="$1"
+  local status="$1" marker="${2:-VAULT_HTTP_STATUS}"
   cat <<EOF
 If you don't see a command prompt, try pressing enter.
 
-pod "vault-health-123" deleted
+${marker}:${status}
+pod "vault-health-123" deleted (age 42s)
 command terminated with exit code 0
-${status}
 EOF
 }
 
@@ -119,7 +119,7 @@ setup_vault_bootstrap_stubs() {
         return 0 ;;
       "-n ${TEST_NS} run "*)
         if [[ "$cmd" == *"vault-health-"* ]]; then
-          echo "$HEALTH_CODE"
+          kubectl_run_output_fixture "$HEALTH_CODE"
         fi
         return 0 ;;
       *)
@@ -198,7 +198,7 @@ EOF
           *) break ;;
         esac
       done
-      echo "$code"
+      echo "VAULT_HTTP_STATUS:${code}"
       return 0
     }
     export -f _kubectl
@@ -208,7 +208,7 @@ EOF
   done
 }
 
-@test "_is_vault_health ignores kubectl run prompts for healthy status" {
+@test "_is_vault_health ignores prompts and deletion digits for healthy status" {
   local statuses=(200 429 472 473)
   for code in "${statuses[@]}"; do
     _kubectl() {
@@ -227,6 +227,7 @@ EOF
 
     run _is_vault_health test-ns test-release
     [ "$status" -eq 0 ]
+    [[ "$output" == *"return code: ${code}"* ]]
   done
 }
 
@@ -239,13 +240,14 @@ EOF
         *) break ;;
       esac
     done
-    echo 503
+    echo "VAULT_HTTP_STATUS:503"
     return 0
   }
   export -f _kubectl
 
   run _is_vault_health test-ns test-release
   [ "$status" -ne 0 ]
+  [[ "$output" == *"return code: 503"* ]]
 }
 
 @test "_is_vault_health fails for unhealthy status in kubectl run output" {
@@ -267,6 +269,7 @@ EOF
 
     run _is_vault_health test-ns test-release
     [ "$status" -ne 0 ]
+    [[ "$output" == *"return code: ${code}"* ]]
   done
 }
 
@@ -290,7 +293,7 @@ EOF
     idx=$(cat "$KUBECTL_CALL_FILE")
     local response="${KUBECTL_RESPONSES[idx]}"
     printf '%s\n' "$((idx + 1))" >"$KUBECTL_CALL_FILE"
-    printf '%s\n' "$response"
+    kubectl_run_output_fixture "$response"
     return 0
   }
 
@@ -333,7 +336,7 @@ EOF
     idx=$(cat "$KUBECTL_CALL_FILE")
     local response="${KUBECTL_RESPONSES[idx]}"
     printf '%s\n' "$((idx + 1))" >"$KUBECTL_CALL_FILE"
-    printf '%s\n' "$response"
+    kubectl_run_output_fixture "$response"
     return 0
   }
 

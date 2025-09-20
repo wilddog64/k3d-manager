@@ -3,7 +3,7 @@ apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
   name: jenkins
-  namespace: jenkins
+  namespace: "${JENKINS_NAMESPACE}"
 spec:
   gateways:
     - istio-system/jenkins-gw
@@ -14,5 +14,5 @@ spec:
         - uri: { prefix: "/" }
       route:
         - destination:
-            host: jenkins.jenkins.svc.cluster.local
+            host: "jenkins.${JENKINS_NAMESPACE}.svc.cluster.local"
             port: { number: 8081 }          # Service port (→ pod :8080)
