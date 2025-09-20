@@ -438,12 +438,12 @@ function _vault_upsert_pki_role() {
    local args=()
    if [[ -n "$allowed" ]]; then
       args+=("allowed_domains=${allowed}")
-      [[ "$allowed == *","* ]] || [[ "$allowed" == *"*"* ]] || args+=("allow_subdomains=true")
+      [[ "$allowed" == *","* ]] || [[ "$allowed" == *"*"* ]] || args+=("allow_subdomains=true")
    else
       args+=("allow_any_name=true")
    fi
-   args+=("enforce_hostnames=${enforce}")
-   args+=("max_ttl=${role_ttl}")
+   args+=("enforce_hostnames=${enforce_hostnames}")
+   args+=("max_ttl=${ttl}")
 
    _vault_exec "$ns" \
       "vault write $path/roles/$role ${args[*]}" "$release" || \
