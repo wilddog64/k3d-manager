@@ -162,28 +162,23 @@ function _deploy_jenkins() {
       --namespace "$ns" \
       -f "$JENKINS_CONFIG_DIR/values.yaml"
 
-   # Ensure Istio resources are of the expected kind to avoid name collisions
-   if ! grep -q '^kind: VirtualService' "$JENKINS_CONFIG_DIR/virtualservice.yaml"; then
-      echo "virtualservice.yaml is not a VirtualService" >&2
-      return 1
+   local gw_yaml="$JENKINS_CONFIG_DIR/gateway.yaml"
+   if [[ ! -r "$gw_yaml" ]]; then
+      _err "Gateway YAML file not found: $gw_yaml"
    fi
+   _kubectl apply -n istio-system -f "$gw_yaml"
 
-   if ! grep -q '^kind: DestinationRule' "$JENKINS_CONFIG_DIR/destinationrule.yaml"; then
-      echo "destinationrule.yaml is not a DestinationRule" >&2
-      return 1
+   local vs_yaml="$JENKINS_CONFIG_DIR/virtualservice.yaml"
+   if [[ ! -r "$vs_yaml" ]]; then
+      _err "VirtualService YAML file not found: $vs_yaml"
    fi
+   _kubectl apply -n "$ns" -f "$vs_yaml"
 
-   gw_yaml=$(_kubectl apply -n istio-system --dry-run=client \
-      -f "$JENKINS_CONFIG_DIR/gateway.yaml")
-   printf '%s\n' "$gw_yaml" | _kubectl apply -n istio-system -f -
-
-   vs_yaml=$(_kubectl apply -n "$ns" --dry-run=client \
-      -f "$JENKINS_CONFIG_DIR/virtualservice.yaml")
-   printf '%s\n' "$vs_yaml" | _kubectl apply -n "$ns" -f -
-
-   dr_yaml=$(_kubectl apply -n "$ns" --dry-run=client \
-      -f "$JENKINS_CONFIG_DIR/destinationrule.yaml")
-   printf '%s\n' "$dr_yaml" | _kubectl apply -n "$ns" -f -
+   local dr_yaml="$JENKINS_CONFIG_DIR/destinationrule.yaml"
+   if [[ ! -r "$dr_yaml" ]]; then
+      _err "DestinationRule YAML file not found: $dr_yaml"
+   fi
+   _kubectl apply -n "$ns" -f "$dr_yaml"
 }
 
 function _wait_for_jenkins_ready() {
