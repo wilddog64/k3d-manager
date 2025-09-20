@@ -510,15 +510,23 @@ function _try_load_plugin() {
 }
 
 function _sha256_12() {
-   local s="$1" line hash
+   local line hash payload
+   local -a cmd
 
    if _command_exist shasum; then
-      line=$(_run_command -- shasum -a 256 <<<"$s")
+      cmd=(shasum -a 256)
    elif _command_exist sha256sum; then
-      line=$(_run_command <<<"$s")
+      cmd=(sha256sum)
    else
       echo "No SHA256 command found" >&2
       exit -1
+   fi
+
+   if [[ $# -gt 0 ]]; then
+      payload="$1"
+      line=$(printf %s "$payload" | _run_command -- "${cmd[@]}")
+   else
+      line=$(_run_command -- "${cmd[@]}")
    fi
 
    hash="${line%% *}"
