@@ -404,7 +404,7 @@ function _vault_enable_pki() {
 function _vault_pki_config_urls() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local path="${3:-${VAULT_PKI_PATH:-pki}}"
-   local host="{$release}.${ns}.svc"
+   local host="${release}.${ns}.svc"
    local base="http://${host}:8200"
 
    _vault_exec "$ns" \
