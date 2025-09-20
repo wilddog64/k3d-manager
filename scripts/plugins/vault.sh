@@ -18,6 +18,9 @@ fi
 # shellcheck disable=SC1090
 source "$ESO_PLUGIN"
 
+command -v _info >/dev/null 2>&1 || _info() { printf '%s\n' "$*" >&2; }
+command -v _warn >/dev/null 2>&1 || _warn() { printf '%s\n' "$*" >&2; }
+
 function _vault_ns_ensure() {
    ns="${1:-$VAULT_NS_DEFAULT}"
 
@@ -66,7 +69,7 @@ function deploy_vault() {
       return 0
    fi
 
-   VAULT_VARS="$PLUGIN_DIRS/etc/vault/vars.sh"
+   VAULT_VARS="$SCRIPT_DIR/etc/vault/vars.sh"
    if [[ -f "$VAULT_VARS" ]]; then
       # shellcheck disable=SC1090
       source "$VAULT_VARS"
@@ -462,12 +465,38 @@ function _vault_issue_pki_tls_secret() {
 
    # Extract leaf cert, key, and CA chain
    local cert=$(printf '%s' "$json" | jq -r '.data.certificate')
-   local key=$(printf '%s' "$json" | jq -r '.data.private_key)
+   local key=$(printf '%s' "$json" | jq -r '.data.private_key')
    local ca=$(printf '%s' "$json" | jq -r '.data.issuing_ca')
 
    if [[ -z "$cert" || -z "$key" || -z "$ca" ]]; then
       _err "[vault] failed to issue certificate from role $role at $path"
    fi
+
+   local manifest
+   manifest="$(mktemp -t vault-pki-secret.XXXXXX)"
+   trap "_cleanup_on_success '$manifest'" EXIT TERM
+
+   {
+      printf 'apiVersion: v1\n'
+      printf 'kind: Secret\n'
+      printf 'metadata:\n'
+      printf '  name: %s\n' "$secret_name"
+      printf '  namespace: %s\n' "$secret_ns"
+      printf 'type: kubernetes.io/tls\n'
+      printf 'stringData:\n'
+      printf '  tls.crt: |\n'
+      printf '%s\n' "$cert" | sed 's/^/    /'
+      printf '  tls.key: |\n'
+      printf '%s\n' "$key" | sed 's/^/    /'
+      printf '  ca.crt: |\n'
+      printf '%s\n' "$ca" | sed 's/^/    /'
+   } >"$manifest"
+
+   _kubectl apply -f "$manifest" || \
+      _err "[vault] failed to apply TLS secret manifest ${secret_ns}/${secret_name}"
+
+   _cleanup_on_success "$manifest"
+   trap - EXIT TERM
 }
 
 # Verifies PKI mount and role exist; call _err to exit on failure.
@@ -491,17 +520,17 @@ function _vault_setup_pki() {
    local ca_cn="${4:-${VAULT_PKI_CN:-dev.local.me}}"
    local allowd="${5:-${VAULT_PKI_ALLOWED:-}}"
    local role_ttl="${6:-${VAULT_PKI_ROLE_TTL:-720h}}"
-   local role="${7:-${VAULT_PKI_ROLE:-jenkins-tls}}
+   local role="${7:-${VAULT_PKI_ROLE:-jenkins-tls}}"
 
    if [[ "${VAULT_ENABLE_PKI:-0}" != 1 ]]; then
       _info "[vault] PKI setup disabled (VAULT_ENABLE_PKI=0), skipping"
       return 0
    fi
 
-   _vault_pki_enable "$ns" "$release" "$path"
+   _vault_enable_pki "$ns" "$release" "$path"
    _vault_pki_config_urls "$ns" "$release" "$path"
    _vault_ensure_pki_root_ca "$ns" "$release" "$path" "$ca_cn" "$VAULT_PKI_MAX_TTL"
-   _vault_upsert_pki_role "$ns" "$release" "$path" "$role
+   _vault_upsert_pki_role "$ns" "$release" "$path" "$role" "$role_ttl" "$allowd"
 
 }
 
@@ -515,7 +544,7 @@ function _vault_pki_issue_tls_secret() {
 
    if [[ "${VAULT_PKI_ISSUE_SECRET:-0}" -eq 0 ]]; then
       _info "[vault] PKI issue secret disabled (VAULT_PKI_ISSUE_SECRET=0), skipping"
- you see my code return 0
+      return 0
    fi
 
    _is_vault_pki_ready "$ns" "$release" "$path"
