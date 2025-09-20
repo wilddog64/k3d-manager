@@ -173,19 +173,34 @@ function _deploy_jenkins() {
    if [[ ! -r "$gw_yaml" ]]; then
       _err "Gateway YAML file not found: $gw_yaml"
    fi
-   _kubectl apply -n istio-system -f "$gw_yaml"
+   if ! _kubectl apply -n istio-system --dry-run=client -f "$gw_yaml"; then
+      return $?
+   fi
+   if ! _kubectl apply -n istio-system -f - < "$gw_yaml"; then
+      return $?
+   fi
 
    local vs_yaml="$JENKINS_CONFIG_DIR/virtualservice.yaml"
    if [[ ! -r "$vs_yaml" ]]; then
       _err "VirtualService YAML file not found: $vs_yaml"
    fi
-   _kubectl apply -n "$ns" -f "$vs_yaml"
+   if ! _kubectl apply -n "$ns" --dry-run=client -f "$vs_yaml"; then
+      return $?
+   fi
+   if ! _kubectl apply -n "$ns" -f - < "$vs_yaml"; then
+      return $?
+   fi
 
    local dr_yaml="$JENKINS_CONFIG_DIR/destinationrule.yaml"
    if [[ ! -r "$dr_yaml" ]]; then
       _err "DestinationRule YAML file not found: $dr_yaml"
    fi
-   _kubectl apply -n "$ns" -f "$dr_yaml"
+   if ! _kubectl apply -n "$ns" --dry-run=client -f "$dr_yaml"; then
+      return $?
+   fi
+   if ! _kubectl apply -n "$ns" -f - < "$dr_yaml"; then
+      return $?
+   fi
 }
 
 function _wait_for_jenkins_ready() {
