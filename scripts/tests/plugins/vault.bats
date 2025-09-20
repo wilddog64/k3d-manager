@@ -270,6 +270,47 @@ EOF
   done
 }
 
+@test "_vault_enable_pki skips enabling when mount exists" {
+  VAULT_LOGIN_CALLED=0
+  VAULT_EXEC_LOG="$BATS_TEST_TMPDIR/vault_exec.log"
+  JQ_ARGS_LOG="$BATS_TEST_TMPDIR/jq_args.log"
+  : >"$VAULT_EXEC_LOG"
+  : >"$JQ_ARGS_LOG"
+
+  jq() {
+    printf '%s\n' "$@" >"$JQ_ARGS_LOG"
+    cat >/dev/null
+    return 0
+  }
+
+  _vault_login() { VAULT_LOGIN_CALLED=1; }
+  _vault_exec() {
+    local ns="$1" cmd="$2" release="$3"
+    printf '%s\n' "$cmd" >>"$VAULT_EXEC_LOG"
+    if [[ "$cmd" == "vault secrets list -format=json" ]]; then
+      printf '{"pki/":{"type":"pki"}}\n'
+    fi
+    return 0
+  }
+
+  export -f jq
+  export -f _vault_login
+  export -f _vault_exec
+
+  _vault_enable_pki custom-ns custom-release custom-path
+  status=$?
+
+  [ "$status" -eq 0 ]
+  [ "$VAULT_LOGIN_CALLED" -eq 0 ]
+  mapfile -t exec_log <"$VAULT_EXEC_LOG"
+  local expected_enable="vault secrets enable -path=custom-path pki"
+  local expected_tune="vault secrets tune -max-lease-ttl=${VAULT_PKI_MAX_TTL:-87600h} custom-path"
+  [[ "${exec_log[*]}" != *"${expected_enable}"* ]]
+  [[ "${exec_log[*]}" == *"${expected_tune}"* ]]
+  mapfile -t jq_args <"$JQ_ARGS_LOG"
+  [[ "${jq_args[*]}" == "-e --arg PATH custom-path/ has(\$PATH) and .[\$PATH].type == \"pki\"" ]]
+}
+
 @test "_vault_pki_issue_tls_secret forwards overrides to secret issuance" {
   : >"$KUBECTL_LOG"
 

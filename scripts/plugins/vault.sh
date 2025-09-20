@@ -385,7 +385,8 @@ HCL
 
 function _is_vault_pki_mounted() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}" path="${3:-pki}"
-   _vault_exec "$ns" "vault secrets list -format=json" "$release" | jq -e --arg PATH "${path}/" '.[] | select(.type=="pki" and .path==$PATH)' >/dev/null 2>&1
+   _vault_exec "$ns" "vault secrets list -format=json" "$release" |
+      jq -e --arg PATH "${path}/" 'has($PATH) and .[$PATH].type == "pki"' >/dev/null 2>&1
 }
 
 function _vault_enable_pki() {
@@ -394,7 +395,8 @@ function _vault_enable_pki() {
 
    if ! _is_vault_pki_mounted "$ns" "$release" "$path"; then
       _vault_login "$ns" "$release"
-      _vault_exec "$ns" "vault secrets enable -path=$path pki" "$release"
+      _vault_exec "$ns" "vault secrets enable -path=$path pki" "$release" || \
+         _err "[vault] failed to enable pki at $path"
    fi
 
    _vault_exec "$ns" \
