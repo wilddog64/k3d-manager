@@ -64,8 +64,6 @@ function _create_jenkins_pv_pvc() {
       cluster_name="$detected_cluster_name"
    fi
 
-   _k3d node edit "${cluster_name}-agent-0" --volume-add "${JENKINS_HOME_PATH}:${JENKINS_HOME_IN_CLUSTER}"
-
    jenkins_pv_template="$(dirname "$SOURCE")/etc/jenkins/jenkins-home-pv.yaml.tmpl"
    if [[ ! -r "$jenkins_pv_template" ]]; then
       echo "Jenkins PV template file not found: $jenkins_pv_template"
