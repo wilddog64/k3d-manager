@@ -135,6 +135,42 @@ setup_vault_bootstrap_stubs() {
   [[ "$output" == *"Usage: deploy_vault"* ]]
 }
 
+@test "deploy_vault loads optional config when vars file exists" {
+  local stub_root="${BATS_TEST_TMPDIR}/vault-config"
+  mkdir -p "${stub_root}/etc/vault"
+  cat <<'EOF' >"${stub_root}/etc/vault/vars.sh"
+export TEST_VAULT_OPTIONAL="from-config"
+EOF
+
+  SCRIPT_DIR="$stub_root"
+
+  deploy_eso() { return 0; }
+  _vault_ns_ensure() { return 0; }
+  _vault_repo_setup() { return 0; }
+  _deploy_vault_ha() { return 0; }
+  _vault_bootstrap_ha() { return 0; }
+  _enable_kv2_k8s_auth() { return 0; }
+
+  export -f deploy_eso
+  export -f _vault_ns_ensure
+  export -f _vault_repo_setup
+  export -f _deploy_vault_ha
+  export -f _vault_bootstrap_ha
+  export -f _enable_kv2_k8s_auth
+
+  WARN_CALLED=0
+  WARN_MESSAGE=""
+  _warn() { WARN_CALLED=1; WARN_MESSAGE="$*"; }
+  export -f _warn
+
+  deploy_vault dev
+
+  [ "$?" -eq 0 ]
+  [ "${TEST_VAULT_OPTIONAL:-}" = "from-config" ]
+  [ "$WARN_CALLED" -eq 0 ]
+  [ -z "$WARN_MESSAGE" ]
+}
+
 @test "Namespace setup" {
   KUBECTL_EXIT_CODES=(1 0)
   run _vault_ns_ensure test-ns
