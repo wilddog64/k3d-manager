@@ -224,7 +224,7 @@ function _wait_for_jenkins_ready() {
    esac
    local end=$((SECONDS + total_seconds))
 
-   until _kubectl --no-exit -n "$ns" wait --quiet \
+   until _kubectl --no-exit --quiet -n "$ns" wait \
       --for=condition=Ready \
       pod -l app.kubernetes.io/component=jenkins-controller \
       --timeout=5s >/dev/null 2>&1; do
