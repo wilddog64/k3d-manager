@@ -66,6 +66,14 @@ function deploy_vault() {
       return 0
    fi
 
+   VAULT_VARS="$PLUGIN_DIR/etc/vault/vars.sh"
+   if [[ -f "$VAULT_VARS" ]]; then
+      # shellcheck disable=SC1090
+      source "$VAULT_VARS"
+   else
+      _warn "[vault] missing optional config file: $VAULT_VARS"
+   fi
+
    local mode="${1:-}"
    local ns="${2:-$VAULT_NS_DEFAULT}"
    local release="${3:-$VAULT_RELEASE_DEFAULT}"
@@ -85,6 +93,7 @@ function deploy_vault() {
 
    _vault_bootstrap_ha "$ns" "$release"
    _enable_kv2_k8s_auth "$ns" "$release"
+   _vault_setup_pki "$ns" "$release"
 }
 
 function _vault_wait_ready() {
@@ -369,4 +378,150 @@ HCL
       bound_service_account_namespaces="$eso_ns" \
       policies=eso-writer \
       ttl=15m
+}
+
+function _is_vault_pki_mounted() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}" path="${3:-pki}"
+   _vault_exec "$ns" "vault secrets list -format=json" "$release" | jq -e --arg PATH "${path}/" '.[] | select(.type=="pki" and .path==$PATH)' >/dev/null 2>&1
+}
+
+function _vault_enable_pki() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local path="${3:-${VAULT_PKI_PATH:-pki}}"
+
+   if ! _is_vault_pki_mounted "$ns" "$release" "$path"; then
+      _vault_login "$ns" "$release"
+      _vault_exec "$ns" "vault secrets enable -path=$path pki" "$release"
+   fi
+
+   _vault_exec "$ns" \
+      "vault secrets tune -max-lease-ttl=${VAULT_PKI_MAX_TTL:-87600h} $path" "$release"
+}
+
+function _vault_pki_config_urls() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local path="${3:-${VAULT_PKI_PATH:-pki}}"
+   local host="{$release}.${ns}.svc"
+   local base="http://${host}:8200"
+
+   _vault_exec "$ns" \
+      "vault write $path/config/urls \
+        issuing_certificates=\"${base}/v1/${path}/ca\" \
+        crl_distribution_points=\"${base}/v1/${path}/crl\"" "$release" || \
+        _err "[vault] failed to configure pki URLs"
+}
+
+function _vault_ensure_pki_root_ca() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local path="${3:-${VAULT_PKI_PATH:-pki}}"
+   local cn="${4:-${VAULT_PKI_CN:-dev.local.me}}" ttl="${5:-${VAULT_PKI_MAX_TTL:-87600h}}"
+
+   if _vault_exec "$ns" "vault read -format=json $path/cert/ca" "$release" >/dev/null 2>&1; then
+      _info "[vault] root CA already exists at $path, skipping creation"
+      return 0
+   fi
+
+   _vault_exec "$ns" \
+      "vault write -format=json $path/root/generate/internal \
+        common_name=\"$cn\" ttl=\"$ttl\"" "$release" >/dev/null 2>&1 || \
+        _err "[vault] failed to create root CA at $path"
+}
+
+function _vault_upsert_pki_role() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local path="${3:-${VAULT_PKI_PATH:-pki}}"
+   local role="${4:-${VAULT_PKI_ROLE:-jenkins-tls}}"
+   local ttl="${5:-${VAULT_PKI_ROLE_TTL:-720h}}"
+   local allowed="${6:-${VAULT_PKI_ALLOWED:-}}"
+   local enforce_hostnames="${7:-${VAULT_PKI_ENFORCE_HOSTNAMES:-true}}"
+
+   local args=()
+   if [[ -n "$allowed" ]]; then
+      args+=("allowed_domains=${allowed}")
+      [[ "$allowed == *","* ]] || [[ "$allowed" == *"*"* ]] || args+=("allow_subdomains=true")
+   else
+      args+=("allow_any_name=true")
+   fi
+   args+=("enforce_hostnames=${enforce}")
+   args+=("max_ttl=${role_ttl}")
+
+   _vault_exec "$ns" \
+      "vault write $path/roles/$role ${args[*]}" "$release" || \
+      _err "[vault] failed to create/update role $role at $path"
+}
+
+function _vault_issue_pki_tls_secret() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local path="${3:-${VAULT_PKI_PATH:-pki}}"
+   local role="${4:-${VAULT_PKI_ROLE:-jenkins-tls}}"
+   local host="${5:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}}"
+   local secret_ns="${6:-${VAULT_PKI_SECRET_NS:-istio-system}}"
+   local secret_name="${7:-${VAULT_PKI_SECRET_NAME:-jenkins-tls}}"
+
+   local json="$(_vault_exec "$ns" "vault write -format=json ${path}/issue/${role} common_name=\"${host}\" alt_names=\"${host}\" ttl=\"${VAULT_PKI_ROLE_TTL:-720h}\"" "$release")"
+
+   # Extract leaf cert, key, and CA chain
+   local cert=$(printf '%s' "$json" | jq -r '.data.certificate')
+   local key=$(printf '%s' "$json" | jq -r '.data.private_key)
+   local ca=$(printf '%s' "$json" | jq -r '.data.issuing_ca')
+
+   if [[ -z "$cert" || -z "$key" || -z "$ca" ]]; then
+      _err "[vault] failed to issue certificate from role $role at $path"
+   fi
+}
+
+# Verifies PKI mount and role exist; call _err to exit on failure.
+function _is_vault_pki_ready() {
+  local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+  local path="${3:-${VAULT_PKI_PATH:-pki}}" role="${4:-${VAULT_PKI_ROLE:-jenkins-tls}}"
+
+  # mount present?
+  _vault_exec "$ns" "vault secrets list -format=json" "$release" \
+    | jq -e --arg p "${path}/" 'has($p)' >/dev/null 2>&1 \
+    || _err "[vault] PKI mount '${path}/' not found (ns=${ns}, release=${release})"
+
+  # role present?
+  _vault_exec "$ns" "vault list -format=json ${path}/roles" "$release" \
+    | jq -e --arg r "$role" '.[] | select(. == $r)' >/dev/null 2>&1 \
+    || _err "[vault] PKI role '${role}' not found at ${path}/roles"
+}
+function _vault_setup_pki() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local path="${3:-${VAULT_PKI_PATH:-pki}}"
+   local ca_cn="${4:-${VAULT_PKI_CN:-dev.local.me}}"
+   local allowd="${5:-${VAULT_PKI_ALLOWED:-}}"
+   local role_ttl="${6:-${VAULT_PKI_ROLE_TTL:-720h}}"
+   local role="${7:-${VAULT_PKI_ROLE:-jenkins-tls}}
+
+   if [[ "${VAULT_ENABLE_PKI:-0}" != 1 ]]; then
+      _info "[vault] PKI setup disabled (VAULT_ENABLE_PKI=0), skipping"
+      return 0
+   fi
+
+   _vault_pki_enable "$ns" "$release" "$path"
+   _vault_pki_config_urls "$ns" "$release" "$path"
+   _vault_ensure_pki_root_ca "$ns" "$release" "$path" "$ca_cn" "$VAULT_PKI_MAX_TTL"
+   _vault_upsert_pki_role "$ns" "$release" "$path" "$role
+
+}
+
+function _vault_pki_issue_tls_secret() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local path="${3:-${VAULT_PKI_PATH:-pki}}"
+   local role="${4:-${VAULT_PKI_ROLE:-jenkins-tls}}"
+   local host="${5:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}}"
+   local secret_ns="${6:-${VAULT_PKI_SECRET_NS:-istio-system}}"
+   local secret_name="${7:-${VAULT_PKI_SECRET_NAME:-jenkins-tls}}"
+
+   if [[ "${VAULT_PKI_ISSUE_SECRET:-0}" -eq 0 ]]; then
+      _info "[vault] PKI issue secret disabled (VAULT_PKI_ISSUE_SECRET=0), skipping"
+ you see my code return 0
+   fi
+
+   _is_vault_pki_ready "$ns" "$release" "$path"
+
+   _vault_issue_pki_tls_secret "$ns" "$release" "$path" "$role" \
+      "$VAULT_PKI_LEAF_HOST" "$VAULT_PKI_SECRET_NS" "$VAULT_PKI_SECRET_NAME"
+
+   _info "[vault] PKI setup complete (path=$path, role=$role)"
 }
