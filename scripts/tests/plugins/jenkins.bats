@@ -163,6 +163,104 @@ JSON
   grep -q 'create secret tls jenkins-cert' "$KUBECTL_LOG"
 }
 
+@test "_ensure_jenkins_cert EXIT trap survives _deploy_jenkins cleanup" {
+  local helper="${BATS_TEST_DIRNAME}/../test_helpers.bash"
+  local plugin="${BATS_TEST_DIRNAME}/../../plugins/jenkins.sh"
+  local script="$BATS_TEST_TMPDIR/ensure-cert-trap.sh"
+  local mktemp_log="$BATS_TEST_TMPDIR/ensure-cert-mktemp.log"
+
+  : > "$mktemp_log"
+
+  cat <<'EOF' >"$script"
+#!/usr/bin/env bash
+set -eo pipefail
+
+source "$HELPER"
+init_test_env
+source "$PLUGIN"
+export_stubs
+
+mktemp() {
+  local path
+  path=$(command mktemp "$@")
+  echo "$path" >> "$MK_TEMP_LOG"
+  printf '%s\n' "$path"
+}
+export -f mktemp
+
+_cleanup_on_success() {
+  for path in "$@"; do
+    rm -f "$path"
+  done
+}
+export -f _cleanup_on_success
+
+jq() {
+  local _input
+  _input=$(cat)
+  case "$2" in
+    .data.certificate)
+      printf '%s\n' CERT
+      ;;
+    .data.private_key)
+      printf '%s\n' KEY
+      ;;
+    *)
+      if command -v jq >/dev/null 2>&1; then
+        printf '%s' "$_input" | command jq "$@"
+      else
+        return 1
+      fi
+      ;;
+  esac
+}
+export -f jq
+
+_kubectl() {
+  local cmd="$*"
+  echo "$cmd" >> "$KUBECTL_LOG"
+  case "$cmd" in
+    *"get secret jenkins-cert"*)
+      return 1
+      ;;
+    *"vault secrets list"*)
+      return 1
+      ;;
+    *"vault write -format=json pki/issue/jenkins"*)
+      cat <<'JSON'
+{"data":{"certificate":"CERT","private_key":"KEY"}}
+JSON
+      return 0
+      ;;
+  esac
+  return 0
+}
+export -f _kubectl
+
+_vault_issue_pki_tls_secret() { return 0; }
+export -f _vault_issue_pki_tls_secret
+
+_ensure_jenkins_cert test-vault test-release
+_deploy_jenkins sample-ns test-vault test-release
+EOF
+
+  chmod +x "$script"
+  BATS_TEST_DIRNAME="$BATS_TEST_DIRNAME" \
+    BATS_TEST_TMPDIR="$BATS_TEST_TMPDIR" \
+    HELPER="$helper" \
+    PLUGIN="$plugin" \
+    MK_TEMP_LOG="$mktemp_log" \
+    "$script"
+
+  [ -s "$mktemp_log" ]
+  mapfile -t mktemp_paths <"$mktemp_log"
+  (( ${#mktemp_paths[@]} >= 4 ))
+
+  for path in "${mktemp_paths[@]}"; do
+    [[ ! -e "$path" ]]
+  done
+}
+
 @test "_deploy_jenkins calls vault helper with namespace, release, and TLS overrides" {
   VAULT_CALL_LOG="$BATS_TEST_TMPDIR/vault_call.log"
   _vault_issue_pki_tls_secret() {
