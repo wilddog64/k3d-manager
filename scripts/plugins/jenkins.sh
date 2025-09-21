@@ -9,6 +9,29 @@ command -v _no_trace >/dev/null 2>&1 || _no_trace() { "$@"; }
 
 JENKINS_CONFIG_DIR="$SCRIPT_DIR/etc/jenkins"
 
+declare -a _JENKINS_RENDERED_MANIFESTS=()
+
+function _jenkins_register_rendered_manifest() {
+   local manifest="$1"
+   if [[ -n "$manifest" ]]; then
+      _JENKINS_RENDERED_MANIFESTS+=("$manifest")
+   fi
+}
+
+function _jenkins_cleanup_rendered_manifests() {
+   if (( ${#_JENKINS_RENDERED_MANIFESTS[@]} )); then
+      _cleanup_on_success "${_JENKINS_RENDERED_MANIFESTS[@]}"
+      _JENKINS_RENDERED_MANIFESTS=()
+   fi
+   trap - EXIT RETURN
+}
+
+function _jenkins_cleanup_and_return() {
+   local rc="${1:-0}"
+   _jenkins_cleanup_rendered_manifests
+   return "$rc"
+}
+
 function _create_jenkins_namespace() {
    jenkins_namespace="${1:-jenkins}"
    export namespace="${jenkins_namespace}"
@@ -163,6 +186,9 @@ function _deploy_jenkins() {
    local vault_namespace="${2:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${3:-$VAULT_RELEASE_DEFAULT}"
 
+   _JENKINS_RENDERED_MANIFESTS=()
+   trap '_jenkins_cleanup_rendered_manifests' EXIT RETURN
+
    if ! _helm repo list 2>/dev/null | grep -q jenkins; then
      _helm repo add jenkins https://charts.jenkins.io
    fi
@@ -176,9 +202,13 @@ function _deploy_jenkins() {
       _err "Gateway YAML file not found: $gw_yaml"
    fi
    if ! _kubectl apply -n istio-system --dry-run=client -f "$gw_yaml"; then
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
       return $?
    fi
    if ! _kubectl apply -n istio-system -f - < "$gw_yaml"; then
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
       return $?
    fi
 
@@ -196,25 +226,33 @@ function _deploy_jenkins() {
 
    local vs_rendered
    vs_rendered=$(mktemp -t jenkins-virtualservice.XXXXXX.yaml)
+   _jenkins_register_rendered_manifest "$vs_rendered"
    envsubst < "$vs_template" > "$vs_rendered"
 
    local dr_rendered
    dr_rendered=$(mktemp -t jenkins-destinationrule.XXXXXX.yaml)
+   _jenkins_register_rendered_manifest "$dr_rendered"
    envsubst < "$dr_template" > "$dr_rendered"
 
-   trap '_cleanup_on_success "$vs_rendered"; _cleanup_on_success "$dr_rendered"' EXIT RETURN
-
    if ! _kubectl apply -n "$ns" --dry-run=client -f "$vs_rendered"; then
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
       return $?
    fi
    if ! _kubectl apply -n "$ns" -f "$vs_rendered"; then
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
       return $?
    fi
 
    if ! _kubectl apply -n "$ns" --dry-run=client -f "$dr_rendered"; then
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
       return $?
    fi
    if ! _kubectl apply -n "$ns" -f "$dr_rendered"; then
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
       return $?
    fi
 
@@ -224,6 +262,10 @@ function _deploy_jenkins() {
 
    _vault_issue_pki_tls_secret "$vault_namespace" "$vault_release" "" "" \
       "$jenkins_host" "$secret_namespace" "$secret_name"
+
+   local rc=$?
+   _jenkins_cleanup_and_return "$rc"
+   return $?
 }
 
 function _wait_for_jenkins_ready() {
