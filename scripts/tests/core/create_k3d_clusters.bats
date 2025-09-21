@@ -58,5 +58,5 @@ setup() {
   _create_k3d_cluster testcluster
 
   grep -F "volume: \"${SCRIPT_DIR}/storage/jenkins_home:/data/jenkins\"" "$BATS_TMPDIR/cluster.yaml"
-  grep -F 'nodeFilters: ["agent:*"]' "$BATS_TMPDIR/cluster.yaml"
+  grep -F 'nodeFilters: ["agent:*","server:*"]' "$BATS_TMPDIR/cluster.yaml"
 }

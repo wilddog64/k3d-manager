@@ -23,7 +23,7 @@ options:
         nodeFilters: ["server:*"]
 volumes:
   - volume: "${JENKINS_HOME_PATH}:${JENKINS_HOME_IN_CLUSTER}"
-    nodeFilters: ["agent:*"]
+    nodeFilters: ["agent:*","server:*"]
 hostAliases:
   - ip: "${IP}"
     hostnames: ["host.k3d.internal"]
