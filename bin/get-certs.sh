@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-TLS_NS=istio-system              # adjust
-TLS_SECRET=jenkins-cert
+TLS_NS="${VAULT_PKI_SECRET_NS:-istio-system}"              # adjust
+TLS_SECRET="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
 
 kubectl -n "$TLS_NS" get secret "$TLS_SECRET" \
   -o jsonpath='{.data.tls\.crt}' | base64 -d > /tmp/ingress.crt
