@@ -14,6 +14,64 @@ setup() {
   export -f _k3d
 }
 
+@test "Jenkins trap wrapper preserves original script arguments" {
+  local helper="${BATS_TEST_DIRNAME}/../test_helpers.bash"
+  local plugin="${BATS_TEST_DIRNAME}/../../plugins/jenkins.sh"
+  local script="$BATS_TEST_TMPDIR/trap-wrapper.sh"
+  local record="$BATS_TEST_TMPDIR/trap-args.log"
+
+  cat <<'EOF' >"$script"
+#!/usr/bin/env bash
+set -euo pipefail
+
+helper="$HELPER"
+plugin="$PLUGIN"
+record="$RECORD"
+
+source "$helper"
+init_test_env
+source "$plugin"
+export_stubs
+
+: >"$record"
+
+record_trap_args() {
+  {
+    printf 'argc=%s\n' "$#"
+    printf 'args=%s\n' "$*"
+    printf 'first=%s\n' "${1-}"
+  } >>"$record"
+}
+
+trap 'record_trap_args "$@"' EXIT
+
+_jenkins_capture_trap_state EXIT _JENKINS_PREV_EXIT_TRAP_CMD _JENKINS_PREV_EXIT_TRAP_HANDLER
+
+exit_trap_cmd="_jenkins_cleanup_rendered_manifests EXIT"
+if [[ -n "$_JENKINS_PREV_EXIT_TRAP_HANDLER" ]]; then
+  exit_trap_cmd+="; _jenkins_run_saved_trap_literal EXIT ${_JENKINS_PREV_EXIT_TRAP_HANDLER} \"\$@\""
+fi
+trap "$exit_trap_cmd" EXIT
+
+exit 0
+EOF
+
+  chmod +x "$script"
+
+  BATS_TEST_DIRNAME="$BATS_TEST_DIRNAME" \
+    BATS_TEST_TMPDIR="$BATS_TEST_TMPDIR" \
+    HELPER="$helper" \
+    PLUGIN="$plugin" \
+    RECORD="$record" \
+    "$script" arg-one arg-two
+
+  read_lines "$record" trap_lines
+  [ "${trap_lines[0]}" = "argc=2" ]
+  [ "${trap_lines[1]}" = "args=arg-one arg-two" ]
+  [ "${trap_lines[2]}" = "first=arg-one" ]
+  [[ "${trap_lines[*]}" != *"_JENKINS_PREV_EXIT_TRAP_CMD"* ]]
+}
+
 @test "deploy_jenkins -h shows usage" {
   run deploy_jenkins -h
   [ "$status" -eq 0 ]
