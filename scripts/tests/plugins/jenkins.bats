@@ -231,6 +231,33 @@ EOF
   ! grep -q 'password=' "$KUBECTL_LOG"
 }
 
+@test "_create_jenkins_cert_rotator_policy writes role without stdin dash" {
+  _vault_policy_exists() { return 1; }
+  export -f _vault_policy_exists
+
+  run _create_jenkins_cert_rotator_policy vault-ns vault-release custom-pki custom-role secret-ns rotator-sa
+  [ "$status" -eq 0 ]
+
+  read_lines "$KUBECTL_LOG" kubectl_calls
+
+  local role_write_line=""
+  local policy_write_count=0
+  for line in "${kubectl_calls[@]}"; do
+    if [[ "$line" == *"vault write auth/kubernetes/role/jenkins-cert-rotator"* ]]; then
+      role_write_line="$line"
+    fi
+    if [[ "$line" == *"vault policy write jenkins-cert-rotator -"* ]]; then
+      ((policy_write_count += 1))
+    fi
+  done
+
+  [ -n "$role_write_line" ]
+  [[ "$role_write_line" != *"jenkins-cert-rotator -"* ]]
+  [[ "$role_write_line" == *"bound_service_account_names=rotator-sa"* ]]
+  [[ "$role_write_line" == *"policies=jenkins-cert-rotator"* ]]
+  [ "$policy_write_count" -eq 1 ]
+}
+
 @test "_ensure_jenkins_cert sets up PKI and TLS secret" {
   _kubectl() {
     local cmd="$*"
