@@ -128,6 +128,79 @@ The sequence shows a user invoking a plugin function, which loads the plugin and
 | `deploy_jenkins` | `scripts/plugins/jenkins.sh` | Deploy Jenkins |
 | `deploy_vault` | `scripts/plugins/vault.sh` | Deploy HashiCorp Vault |
 
+## Vault PKI setup
+
+The Vault plugin in [`scripts/plugins/vault.sh`](scripts/plugins/vault.sh) automates
+the entire PKI bootstrap that Jenkins and other services need. When you run
+`./scripts/k3d-manager deploy_vault ha`, the plugin installs the Helm chart,
+initialises and unseals the HA cluster, enables the Kubernetes auth method and
+only then evaluates the PKI helpers. Once Vault is healthy, `_vault_setup_pki`
+runs (if `VAULT_ENABLE_PKI=1`) to mount PKI, generate the root CA and
+provision the requested role before `_vault_pki_issue_tls_secret` optionally
+writes a Kubernetes TLS secret.
+
+### Configuration knobs
+
+You can override the defaults by exporting the variables before calling the
+plugin or by editing the helper files under `scripts/etc`.
+
+**`scripts/etc/vault/vars.sh`**
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `VAULT_ENABLE_PKI` | `1` | Toggle the entire PKI bootstrap routine. |
+| `VAULT_PKI_PATH` | `pki` | Mount path for the PKI secrets engine (for example, `pki` vs `pki_int`). |
+| `VAULT_PKI_ROLE` | `jenkins-tls` | Name of the Vault role that will issue leaf certificates. |
+| `VAULT_PKI_CN` | `dev.local.me` | Common name used when generating the root CA. |
+| `VAULT_PKI_MAX_TTL` | `87600h` | Maximum lifetime for the root CA (10 years by default). |
+| `VAULT_PKI_ROLE_TTL` | `720h` | Maximum lifetime for leaf certificates issued by the role. |
+| `VAULT_PKI_ALLOWED` | *(empty)* | Comma-separated list of allowed domains/SANs for the role; an empty value allows any host. |
+| `VAULT_PKI_ENFORCE_HOSTNAMES` | `true` | Whether Vault should enforce hostname validation when issuing leaf certs. |
+
+**`scripts/etc/jenkins/jenkins-vars.sh`**
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `VAULT_PKI_ISSUE_SECRET` | `1` | Immediately mint a TLS secret after PKI is ready. |
+| `VAULT_PKI_SECRET_NS` | `istio-system` | Namespace where the TLS secret will be written. |
+| `VAULT_PKI_SECRET_NAME` | `jenkins-tls` | Name of the Kubernetes `tls` secret to create. |
+| `VAULT_PKI_LEAF_HOST` | `jenkins.dev.local.me` | Common name/SAN for the leaf certificate request. |
+
+### Example workflow
+
+1. Export the desired overrides so the plugin picks them up:
+
+   ```bash
+   export VAULT_ENABLE_PKI=1
+   export VAULT_PKI_PATH=pki_int
+   export VAULT_PKI_CN="dev.local.me"
+   export VAULT_PKI_ALLOWED="jenkins.dev.local.me,*.dev.local.me"
+   export VAULT_PKI_ENFORCE_HOSTNAMES=true
+   export VAULT_PKI_SECRET_NS=istio-system
+   export VAULT_PKI_SECRET_NAME=jenkins-tls
+   export VAULT_PKI_LEAF_HOST=jenkins.dev.local.me
+   ```
+
+2. Deploy Vault in HA mode. The plugin will initialise Vault, configure the PKI
+   mount, generate the CA and, with the issuance toggle enabled, create the TLS
+   secret automatically.
+
+   ```bash
+   ./scripts/k3d-manager deploy_vault ha
+   ```
+
+3. Verify that Vault issued the secret and inspect the resulting certificate:
+
+   ```bash
+   kubectl get secret -n istio-system jenkins-tls -o jsonpath='{.type}'
+   kubectl get secret -n istio-system jenkins-tls -o jsonpath='{.data.tls\.crt}' \
+     | base64 -d \
+     | openssl x509 -noout -subject -issuer
+   ```
+
+   Seeing `kubernetes.io/tls` as the type and the expected subject/issuer
+   confirms the PKI issuer workflow ran successfully.
+
 ## Writing a plugin
 
 Plugins live under `scripts/plugins/` and are sourced only when their function is invoked. Guidelines:
