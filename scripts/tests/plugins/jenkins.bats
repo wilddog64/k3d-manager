@@ -312,21 +312,15 @@ if [[ "\$mode" == success ]]; then
 else
   kubectl_calls=$(wc -l <"\$KUBECTL_LOG")
   [[ "\$kubectl_calls" -lt 6 ]] || exit 1
-fi
-readarray -t cleanup_paths <"$log_file"
-[[ "\${#cleanup_paths[@]}" -ge 2 ]] || exit 1
-mapfile -t unique_paths < <(printf '%s\n' "\${cleanup_paths[@]}" | sort -u)
-vs_found=0
-dr_found=0
-for path in "\${unique_paths[@]}"; do
-  [[ ! -e "\$path" ]] || exit 1
-  case "\$path" in
-    /tmp/jenkins-virtualservice*) vs_found=1 ;;
-    /tmp/jenkins-destinationrule*) dr_found=1 ;;
-  esac
-done
-[[ "\$vs_found" -eq 1 ]] || exit 1
-[[ "\$dr_found" -eq 1 ]] || exit 1
+    fi
+    readarray -t cleanup_paths <"$log_file"
+    [[ "\${#cleanup_paths[@]}" -eq 2 ]] || exit 1
+    mapfile -t unique_paths < <(printf '%s\n' "\${cleanup_paths[@]}" | sort -u)
+    [[ "\${#unique_paths[@]}" -eq 2 ]] || exit 1
+    for path in "\${unique_paths[@]}"; do
+      [[ "\$path" == /tmp/* ]] || exit 1
+      [[ ! -e "\$path" ]] || exit 1
+    done
 EOF
     chmod +x "$script"
     "$script"
