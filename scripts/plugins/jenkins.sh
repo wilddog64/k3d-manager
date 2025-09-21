@@ -556,6 +556,49 @@ function _deploy_jenkins() {
       return $?
    fi
 
+   if [[ "${JENKINS_CERT_ROTATOR_ENABLED:-0}" == "1" ]]; then
+      local rotator_template="$JENKINS_CONFIG_DIR/jenkins-cert-rotator.yaml.tmpl"
+      local rotator_script="$JENKINS_CONFIG_DIR/cert-rotator.sh"
+
+      if [[ ! -r "$rotator_template" ]]; then
+         _err "Jenkins cert rotator template file not found: $rotator_template"
+      fi
+
+      if [[ ! -r "$rotator_script" ]]; then
+         _err "Jenkins cert rotator script not found: $rotator_script"
+      fi
+
+      local rotator_script_b64
+      rotator_script_b64=$(base64 < "$rotator_script" | tr -d '\n')
+
+      if [[ -z "$rotator_script_b64" ]]; then
+         _err "Failed to encode Jenkins cert rotator script"
+      fi
+
+      export JENKINS_CERT_ROTATOR_SCRIPT_B64="$rotator_script_b64"
+
+      if [[ -z "${JENKINS_CERT_ROTATOR_VAULT_ADDR:-}" ]]; then
+         export JENKINS_CERT_ROTATOR_VAULT_ADDR="http://${vault_release}.${vault_namespace}.svc:8200"
+      fi
+
+      local rotator_rendered
+      rotator_rendered=$(mktemp -t jenkins-cert-rotator.XXXXXX.yaml)
+      _jenkins_register_rendered_manifest "$rotator_rendered"
+      envsubst < "$rotator_template" > "$rotator_rendered"
+
+      if ! _kubectl apply --dry-run=client -f "$rotator_rendered"; then
+         local rc=$?
+         _jenkins_cleanup_and_return "$rc"
+         return $?
+      fi
+
+      if ! _kubectl apply -f "$rotator_rendered"; then
+         local rc=$?
+         _jenkins_cleanup_and_return "$rc"
+         return $?
+      fi
+   fi
+
    local jenkins_host="jenkins.dev.local.me"
    local secret_namespace="istio-system"
    local secret_name="jenkins-cert"
