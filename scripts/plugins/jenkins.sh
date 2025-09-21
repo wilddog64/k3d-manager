@@ -10,8 +10,47 @@ command -v _no_trace >/dev/null 2>&1 || _no_trace() { "$@"; }
 JENKINS_CONFIG_DIR="$SCRIPT_DIR/etc/jenkins"
 
 declare -a _JENKINS_RENDERED_MANIFESTS=()
-_JENKINS_PREV_EXIT_TRAP=""
-_JENKINS_PREV_RETURN_TRAP=""
+_JENKINS_PREV_EXIT_TRAP_CMD=""
+_JENKINS_PREV_EXIT_TRAP_HANDLER=""
+_JENKINS_PREV_RETURN_TRAP_CMD=""
+_JENKINS_PREV_RETURN_TRAP_HANDLER=""
+
+function _jenkins_capture_trap_state() {
+   local signal="$1"
+   local cmd_var="$2"
+   local handler_var="$3"
+   local trap_output quoted_handler handler=""
+
+   trap_output=$(trap -p "$signal")
+   if [[ -z "$trap_output" ]]; then
+      printf -v "$cmd_var" '%s' ""
+      printf -v "$handler_var" '%s' ""
+      return
+   fi
+
+   quoted_handler=${trap_output#trap -- }
+   quoted_handler=${quoted_handler% $signal}
+   if [[ -n "$quoted_handler" ]]; then
+      local handler_literal
+      if [[ ${quoted_handler} == "'"*"'" ]]; then
+         handler_literal=${quoted_handler:1:-1}
+         handler_literal=${handler_literal//\'\\\'\'/\'}
+      else
+         handler_literal=$quoted_handler
+      fi
+      local -a handler_args=()
+      eval "handler_args=( ${handler_literal} )"
+      if (( ${#handler_args[@]} )); then
+         local handler_command
+         printf -v handler_command '%q ' "${handler_args[@]}"
+         handler_command=${handler_command% }
+         handler="$handler_command"
+      fi
+   fi
+
+   printf -v "$cmd_var" '%s' "$trap_output"
+   printf -v "$handler_var" '%s' "$handler"
+}
 
 function _jenkins_register_rendered_manifest() {
    local manifest="$1"
@@ -21,30 +60,36 @@ function _jenkins_register_rendered_manifest() {
 }
 
 function _jenkins_cleanup_rendered_manifests() {
+   local trap_source="${1:-EXIT}"
+
    if (( ${#_JENKINS_RENDERED_MANIFESTS[@]} )); then
       _cleanup_on_success "${_JENKINS_RENDERED_MANIFESTS[@]}"
       _JENKINS_RENDERED_MANIFESTS=()
    fi
 
-   if [[ -n "$_JENKINS_PREV_EXIT_TRAP" ]]; then
-      eval "$_JENKINS_PREV_EXIT_TRAP"
+   if [[ -n "$_JENKINS_PREV_EXIT_TRAP_CMD" ]]; then
+      eval "$_JENKINS_PREV_EXIT_TRAP_CMD"
    else
       trap - EXIT
    fi
 
-   if [[ -n "$_JENKINS_PREV_RETURN_TRAP" ]]; then
-      eval "$_JENKINS_PREV_RETURN_TRAP"
+   if [[ -n "$_JENKINS_PREV_RETURN_TRAP_CMD" ]]; then
+      eval "$_JENKINS_PREV_RETURN_TRAP_CMD"
    else
       trap - RETURN
    fi
 
-   _JENKINS_PREV_EXIT_TRAP=""
-   _JENKINS_PREV_RETURN_TRAP=""
+   if [[ "$trap_source" != MANUAL ]]; then
+      _JENKINS_PREV_EXIT_TRAP_CMD=""
+      _JENKINS_PREV_EXIT_TRAP_HANDLER=""
+      _JENKINS_PREV_RETURN_TRAP_CMD=""
+      _JENKINS_PREV_RETURN_TRAP_HANDLER=""
+   fi
 }
 
 function _jenkins_cleanup_and_return() {
    local rc="${1:-0}"
-   _jenkins_cleanup_rendered_manifests
+   _jenkins_cleanup_rendered_manifests MANUAL
    return "$rc"
 }
 
@@ -152,7 +197,9 @@ function _ensure_jenkins_cert() {
    cert_file=$(mktemp -t)
    key_file=$(mktemp -t)
    declare -a CLEANUP_FILES=("$cert_file" "$key_file")
-   trap '_cleanup_on_success "${CLEANUP_FILES[@]}"' EXIT
+   local cleanup_cmd
+   printf -v cleanup_cmd '_cleanup_on_success %q %q' "$cert_file" "$key_file"
+   trap "$cleanup_cmd" EXIT
 
    echo "$json" | jq -r '.data.certificate' > "$cert_file"
    echo "$json" | jq -r '.data.private_key' > "$key_file"
@@ -203,10 +250,20 @@ function _deploy_jenkins() {
    local vault_release="${3:-$VAULT_RELEASE_DEFAULT}"
 
    _JENKINS_RENDERED_MANIFESTS=()
-   _JENKINS_PREV_EXIT_TRAP="$(trap -p EXIT)"
-   _JENKINS_PREV_RETURN_TRAP="$(trap -p RETURN)"
-   trap '_jenkins_cleanup_rendered_manifests' EXIT
-   trap '_jenkins_cleanup_rendered_manifests' RETURN
+   _jenkins_capture_trap_state EXIT _JENKINS_PREV_EXIT_TRAP_CMD _JENKINS_PREV_EXIT_TRAP_HANDLER
+   _jenkins_capture_trap_state RETURN _JENKINS_PREV_RETURN_TRAP_CMD _JENKINS_PREV_RETURN_TRAP_HANDLER
+
+   local exit_trap_cmd="_jenkins_cleanup_rendered_manifests EXIT"
+   if [[ -n "$_JENKINS_PREV_EXIT_TRAP_HANDLER" ]]; then
+      exit_trap_cmd+="; ${_JENKINS_PREV_EXIT_TRAP_HANDLER}"
+   fi
+   trap "$exit_trap_cmd" EXIT
+
+   local return_trap_cmd="_jenkins_cleanup_rendered_manifests RETURN"
+   if [[ -n "$_JENKINS_PREV_RETURN_TRAP_HANDLER" ]]; then
+      return_trap_cmd+="; ${_JENKINS_PREV_RETURN_TRAP_HANDLER}"
+   fi
+   trap "$return_trap_cmd" RETURN
 
    if ! _helm repo list 2>/dev/null | grep -q jenkins; then
      _helm repo add jenkins https://charts.jenkins.io
