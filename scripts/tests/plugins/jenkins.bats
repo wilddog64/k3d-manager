@@ -269,6 +269,72 @@ JSON
   [[ "${kubectl_calls[5]}" == ${expected_dr_apply_prefix}* ]]
 }
 
+@test "_deploy_jenkins cleans up rendered manifests on success and failure" {
+  local helper="${BATS_TEST_DIRNAME}/../test_helpers.bash"
+  local plugin="${BATS_TEST_DIRNAME}/../../plugins/jenkins.sh"
+
+  run_cleanup_check() {
+    local mode="$1"
+    local script="$BATS_TEST_TMPDIR/check-${mode}.sh"
+    local log_file="$BATS_TEST_TMPDIR/cleanup-${mode}.log"
+    cat <<EOF >"$script"
+#!/usr/bin/env bash
+set -eo pipefail
+BATS_TEST_DIRNAME="${BATS_TEST_DIRNAME}"
+BATS_TEST_TMPDIR="${BATS_TEST_TMPDIR}"
+helper="$helper"
+plugin="$plugin"
+mode="$mode"
+log_file="$log_file"
+source "$helper"
+init_test_env
+source "$plugin"
+export_stubs
+_cleanup_on_success() {
+  for path in "\$@"; do
+    echo "\$path" >> "\$log_file"
+    rm -f "\$path"
+  done
+}
+_vault_issue_pki_tls_secret() { :; }
+export -f _cleanup_on_success
+export -f _vault_issue_pki_tls_secret
+: >"$log_file"
+if [[ "\$mode" == failure ]]; then
+  KUBECTL_EXIT_CODES=(0 0 1)
+fi
+set +e
+_deploy_jenkins sample-ns >/dev/null 2>&1
+status=\$?
+set -e
+if [[ "\$mode" == success ]]; then
+  [[ "\$status" -eq 0 ]] || exit 1
+else
+  kubectl_calls=$(wc -l <"\$KUBECTL_LOG")
+  [[ "\$kubectl_calls" -lt 6 ]] || exit 1
+fi
+readarray -t cleanup_paths <"$log_file"
+[[ "\${#cleanup_paths[@]}" -ge 2 ]] || exit 1
+mapfile -t unique_paths < <(printf '%s\n' "\${cleanup_paths[@]}" | sort -u)
+vs_found=0
+dr_found=0
+for path in "\${unique_paths[@]}"; do
+  [[ ! -e "\$path" ]] || exit 1
+  case "\$path" in
+    /tmp/jenkins-virtualservice*) vs_found=1 ;;
+    /tmp/jenkins-destinationrule*) dr_found=1 ;;
+  esac
+done
+[[ "\$vs_found" -eq 1 ]] || exit 1
+[[ "\$dr_found" -eq 1 ]] || exit 1
+EOF
+    chmod +x "$script"
+    "$script"
+  }
+
+  run_cleanup_check success
+  run_cleanup_check failure
+}
 @test "deploy_jenkins renders manifests for namespace" {
   local random_ns="jenkins-${RANDOM}"
   deploy_vault() { :; }
