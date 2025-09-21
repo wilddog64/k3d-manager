@@ -385,7 +385,7 @@ EOF
    envsubst < "$jenkins_pv_template" > "$jenkinsyamfile"
    _kubectl apply -f "$jenkinsyamfile" -n "$jenkins_namespace"
 
-   trap '_cleanup_on_success "$jenkinsyamfile"' EXIT
+   trap '_cleanup_on_success "$jenkinsyamfile"' RETURN
 }
 
 function _ensure_jenkins_cert() {
@@ -419,10 +419,13 @@ function _ensure_jenkins_cert() {
 
    cert_file=$(mktemp -t)
    key_file=$(mktemp -t)
+   trap '_cleanup_on_success "$cert_file" "$key_file"' RETURN
+   trap '_cleanup_on_success "$cert_file" "$key_file"' EXIT
+
    declare -a CLEANUP_FILES=("$cert_file" "$key_file")
    local cleanup_cmd
    printf -v cleanup_cmd '_cleanup_on_success %q %q' "$cert_file" "$key_file"
-   trap "$cleanup_cmd" EXIT
+   trap "$cleanup_cmd" EXIT RETURN
 
    echo "$json" | jq -r '.data.certificate' > "$cert_file"
    echo "$json" | jq -r '.data.private_key' > "$key_file"
@@ -789,7 +792,7 @@ HCL
    fi
 
    _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-      vault write auth/kubernetes/role/jenkins-cert-rotator - \
+      vault write auth/kubernetes/role/jenkins-cert-rotator \
         bound_service_account_names="$rotator_service_account" \
         bound_service_account_namespaces="$secret_namespace" \
         policies="$policy_name" \
