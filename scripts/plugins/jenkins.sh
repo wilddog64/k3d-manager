@@ -118,9 +118,6 @@ function _create_jenkins_namespace() {
 
 function _create_jenkins_pv_pvc() {
    local jenkins_namespace=$1
-   local cluster_name="${2:-$CLUSTER_NAME}"
-   local detected_cluster_list
-   local detected_cluster_name
 
    export JENKINS_HOME_PATH="$SCRIPT_DIR/storage/jenkins_home"
    export JENKINS_HOME_IN_CLUSTER="/data/jenkins"
@@ -136,19 +133,6 @@ function _create_jenkins_pv_pvc() {
       mkdir -p "$JENKINS_HOME_PATH"
    fi
 
-   if [[ -z "$cluster_name" ]]; then
-      if ! detected_cluster_list=$(_k3d cluster list 2>/dev/null); then
-         echo "Unable to detect k3d cluster name; set CLUSTER_NAME or pass the cluster name explicitly." >&2
-         return 1
-      fi
-      detected_cluster_name=$(awk 'NR>1 && NF {print $1; exit}' <<<"$detected_cluster_list")
-      if [[ -z "$detected_cluster_name" ]]; then
-         echo "Unable to detect k3d cluster name; set CLUSTER_NAME or pass the cluster name explicitly." >&2
-         return 1
-      fi
-      cluster_name="$detected_cluster_name"
-   fi
-
    jenkins_pv_template="$(dirname "$SOURCE")/etc/jenkins/jenkins-home-pv.yaml.tmpl"
    if [[ ! -r "$jenkins_pv_template" ]]; then
       echo "Jenkins PV template file not found: $jenkins_pv_template"
@@ -158,9 +142,6 @@ function _create_jenkins_pv_pvc() {
    trap '_cleanup_on_success "$jenkinsyamfile"' EXIT
    envsubst < "$jenkins_pv_template" > "$jenkinsyamfile"
    _kubectl apply -f "$jenkinsyamfile" -n "$jenkins_namespace"
-
-   local agent_node="${cluster_name}-agent-0"
-   _k3d node edit "$agent_node" --volume-add "${JENKINS_HOME_PATH}:${JENKINS_HOME_IN_CLUSTER}"
 
    trap '_cleanup_on_success "$jenkinsyamfile"' EXIT
 }
