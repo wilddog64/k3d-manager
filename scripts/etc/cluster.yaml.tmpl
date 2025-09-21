@@ -21,6 +21,9 @@ options:
     extraArgs:
       - arg: "--disable=traefik"
         nodeFilters: ["server:*"]
+volumes:
+  - volume: "${JENKINS_HOME_PATH}:${JENKINS_HOME_IN_CLUSTER}"
+    nodeFilters: ["agent:*"]
 hostAliases:
   - ip: "${IP}"
     hostnames: ["host.k3d.internal"]
