@@ -464,7 +464,15 @@ function deploy_jenkins() {
    _create_jenkins_namespace "$jenkins_namespace"
    _create_jenkins_pv_pvc "$jenkins_namespace"
    _ensure_jenkins_cert "$vault_namespace" "$vault_release"
+
+   local deploy_rc
    _deploy_jenkins "$jenkins_namespace" "$vault_namespace" "$vault_release"
+   deploy_rc=$?
+   if (( deploy_rc != 0 )); then
+      printf 'ERROR: Jenkins deployment failed; aborting readiness check.\n' >&2
+      return "$deploy_rc"
+   fi
+
    _wait_for_jenkins_ready "$jenkins_namespace"
 }
 
@@ -513,15 +521,19 @@ function _deploy_jenkins() {
    _jenkins_register_rendered_manifest "$gw_rendered"
    envsubst < "$gw_template" > "$gw_rendered"
 
-   if ! _kubectl apply -n istio-system --dry-run=client -f "$gw_rendered"; then
+   if _kubectl apply -n istio-system --dry-run=client -f "$gw_rendered"; then
+      :
+   else
       local rc=$?
       _jenkins_cleanup_and_return "$rc"
-      return $?
+      return "$rc"
    fi
-   if ! _kubectl apply -n istio-system -f "$gw_rendered"; then
+   if _kubectl apply -n istio-system -f "$gw_rendered"; then
+      :
+   else
       local rc=$?
       _jenkins_cleanup_and_return "$rc"
-      return $?
+      return "$rc"
    fi
 
    local vs_template="$JENKINS_CONFIG_DIR/virtualservice.yaml.tmpl"
@@ -546,26 +558,34 @@ function _deploy_jenkins() {
    _jenkins_register_rendered_manifest "$dr_rendered"
    envsubst < "$dr_template" > "$dr_rendered"
 
-   if ! _kubectl apply -n "$ns" --dry-run=client -f "$vs_rendered"; then
+   if _kubectl apply -n "$ns" --dry-run=client -f "$vs_rendered"; then
+      :
+   else
       local rc=$?
       _jenkins_cleanup_and_return "$rc"
-      return $?
+      return "$rc"
    fi
-   if ! _kubectl apply -n "$ns" -f "$vs_rendered"; then
+   if _kubectl apply -n "$ns" -f "$vs_rendered"; then
+      :
+   else
       local rc=$?
       _jenkins_cleanup_and_return "$rc"
-      return $?
+      return "$rc"
    fi
 
-   if ! _kubectl apply -n "$ns" --dry-run=client -f "$dr_rendered"; then
+   if _kubectl apply -n "$ns" --dry-run=client -f "$dr_rendered"; then
+      :
+   else
       local rc=$?
       _jenkins_cleanup_and_return "$rc"
-      return $?
+      return "$rc"
    fi
-   if ! _kubectl apply -n "$ns" -f "$dr_rendered"; then
+   if _kubectl apply -n "$ns" -f "$dr_rendered"; then
+      :
+   else
       local rc=$?
       _jenkins_cleanup_and_return "$rc"
-      return $?
+      return "$rc"
    fi
 
    if [[ "${JENKINS_CERT_ROTATOR_ENABLED:-0}" == "1" ]]; then
@@ -598,16 +618,20 @@ function _deploy_jenkins() {
       _jenkins_register_rendered_manifest "$rotator_rendered"
       envsubst < "$rotator_template" > "$rotator_rendered"
 
-      if ! _kubectl apply --dry-run=client -f "$rotator_rendered"; then
+      if _kubectl apply --dry-run=client -f "$rotator_rendered"; then
+         :
+      else
          local rc=$?
          _jenkins_cleanup_and_return "$rc"
-         return $?
+         return "$rc"
       fi
 
-      if ! _kubectl apply -f "$rotator_rendered"; then
+      if _kubectl apply -f "$rotator_rendered"; then
+         :
+      else
          local rc=$?
          _jenkins_cleanup_and_return "$rc"
-         return $?
+         return "$rc"
       fi
    fi
 
@@ -620,7 +644,7 @@ function _deploy_jenkins() {
 
    local rc=$?
    _jenkins_cleanup_and_return "$rc"
-   return $?
+   return "$rc"
 }
 
 function _wait_for_jenkins_ready() {

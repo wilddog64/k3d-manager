@@ -166,6 +166,19 @@ plugin or by editing the helper files under `scripts/etc`.
 | `VAULT_PKI_SECRET_NAME` | `jenkins-tls` | Name of the Kubernetes `tls` secret to create. |
 | `VAULT_PKI_LEAF_HOST` | `jenkins.dev.local.me` | Common name/SAN for the leaf certificate request. |
 
+### Jenkins deployment prerequisites
+
+The Jenkins plugin renders Istio and workload manifests from templates using
+`envsubst`. Install the `envsubst` utility from the GNU gettext package and make
+sure it is available on your `PATH` before running `./scripts/k3d-manager
+deploy_jenkins`.
+
+| Platform | Installation command |
+| --- | --- |
+| macOS | `brew install gettext` <br/>`brew link --force gettext` |
+| Debian/Ubuntu | `sudo apt install gettext` |
+| Fedora/RHEL/CentOS | `sudo dnf install gettext` |
+
 ### Example workflow
 
 1. Export the desired overrides so the plugin picks them up:

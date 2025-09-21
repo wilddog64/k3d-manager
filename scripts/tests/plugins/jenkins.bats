@@ -416,6 +416,31 @@ EOF
   done
 }
 
+@test "deploy_jenkins aborts readiness wait when deployment fails" {
+  source "${BATS_TEST_DIRNAME}/../../plugins/jenkins.sh"
+  export_stubs
+
+  deploy_vault() { :; }
+  _create_jenkins_admin_vault_policy() { :; }
+  _create_jenkins_vault_ad_policy() { :; }
+  _create_jenkins_cert_rotator_policy() { :; }
+  _create_jenkins_namespace() { :; }
+  _create_jenkins_pv_pvc() { :; }
+  _ensure_jenkins_cert() { :; }
+  _vault_issue_pki_tls_secret() { :; }
+
+  WAIT_LOG="$BATS_TEST_TMPDIR/wait.log"
+  : > "$WAIT_LOG"
+  _wait_for_jenkins_ready() { echo "called" >> "$WAIT_LOG"; }
+
+  KUBECTL_EXIT_CODES=(1)
+
+  run --separate-stderr deploy_jenkins failing-ns
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"ERROR: Jenkins deployment failed; aborting readiness check."* ]]
+  [[ ! -s "$WAIT_LOG" ]]
+}
+
 @test "_wait_for_jenkins_ready waits for controller" {
   KUBECTL_EXIT_CODES=(1 0)
   sleep() { :; }
