@@ -391,9 +391,9 @@ EOF
 function _ensure_jenkins_cert() {
    local vault_namespace="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
-   local k8s_namespace="istio-system"
-   local secret_name="jenkins-cert"
-   local common_name="jenkins.dev.local.me"
+   local k8s_namespace="${VAULT_PKI_SECRET_NS:-istio-system}"
+   local secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
+   local common_name="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
    local pod="${vault_release}-0"
 
    if _kubectl --no-exit -n "$k8s_namespace" \
@@ -497,16 +497,28 @@ function _deploy_jenkins() {
       --namespace "$ns" \
       -f "$JENKINS_CONFIG_DIR/values.yaml"
 
-   local gw_yaml="$JENKINS_CONFIG_DIR/gateway.yaml"
-   if [[ ! -r "$gw_yaml" ]]; then
-      _err "Gateway YAML file not found: $gw_yaml"
+   local vault_pki_secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
+   local vault_pki_leaf_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
+
+   export VAULT_PKI_SECRET_NAME="$vault_pki_secret_name"
+   export VAULT_PKI_LEAF_HOST="$vault_pki_leaf_host"
+
+   local gw_template="$JENKINS_CONFIG_DIR/gateway.yaml"
+   if [[ ! -r "$gw_template" ]]; then
+      _err "Gateway YAML file not found: $gw_template"
    fi
-   if ! _kubectl apply -n istio-system --dry-run=client -f "$gw_yaml"; then
+
+   local gw_rendered
+   gw_rendered=$(mktemp -t jenkins-gateway.XXXXXX.yaml)
+   _jenkins_register_rendered_manifest "$gw_rendered"
+   envsubst < "$gw_template" > "$gw_rendered"
+
+   if ! _kubectl apply -n istio-system --dry-run=client -f "$gw_rendered"; then
       local rc=$?
       _jenkins_cleanup_and_return "$rc"
       return $?
    fi
-   if ! _kubectl apply -n istio-system -f - < "$gw_yaml"; then
+   if ! _kubectl apply -n istio-system -f "$gw_rendered"; then
       local rc=$?
       _jenkins_cleanup_and_return "$rc"
       return $?
@@ -599,9 +611,9 @@ function _deploy_jenkins() {
       fi
    fi
 
-   local jenkins_host="jenkins.dev.local.me"
-   local secret_namespace="istio-system"
-   local secret_name="jenkins-cert"
+   local jenkins_host="$vault_pki_leaf_host"
+   local secret_namespace="${VAULT_PKI_SECRET_NS:-istio-system}"
+   local secret_name="$vault_pki_secret_name"
 
    _vault_issue_pki_tls_secret "$vault_namespace" "$vault_release" "" "" \
       "$jenkins_host" "$secret_namespace" "$secret_name"
