@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 TLS_NS=istio-system              # adjust
 TLS_SECRET=jenkins-cert
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Make sure the Gateway is using the secret you checked
 TLS_SECRET=jenkins-cert
 istioctl -n istio-system proxy-config secret $(kubectl -n istio-system get pod -l app=istio-ingressgateway -o jsonpath='{.items[0].metadata.name}') \

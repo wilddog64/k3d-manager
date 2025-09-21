@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 HOST=jenkins.dev.local.me
 PORT=8443
 IP=127.0.0.1   # or your ingress IP

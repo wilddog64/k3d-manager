@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 # show PVs bound to jenkins-test namespaces
 # kubectl get pv -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.claimRef.namespace}{"\t"}{.status.phase}{"\n"}{end}' \
 # | awk '$2 ~ /^jenkins-test-/{print $1,$2,$3}'

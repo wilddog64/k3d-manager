@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # 1) Generate the pin from the **live** endpoint (leaf cert public key)
 HOST=jenkins.dev.local.me; IP=127.0.0.1; PORT=8443
 PIN=$(
