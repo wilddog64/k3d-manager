@@ -235,7 +235,8 @@ EOF
   _kubectl() {
     local cmd="$*"
     echo "$cmd" >> "$KUBECTL_LOG"
-    if [[ "$cmd" == *"get secret jenkins-cert"* ]]; then
+    local secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
+    if [[ "$cmd" == *"get secret ${secret_name}"* ]]; then
       return 1
     fi
     if [[ "$cmd" == *"vault secrets list"* ]]; then
@@ -256,7 +257,8 @@ JSON
   grep -q 'vault secrets enable pki' "$KUBECTL_LOG"
   grep -q 'vault write pki/roles/jenkins' "$KUBECTL_LOG"
   grep -q 'vault write -format=json pki/issue/jenkins' "$KUBECTL_LOG"
-  grep -q 'create secret tls jenkins-cert' "$KUBECTL_LOG"
+  local secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
+  grep -q "create secret tls ${secret_name}" "$KUBECTL_LOG"
 }
 
 @test "_ensure_jenkins_cert EXIT trap survives _deploy_jenkins cleanup" {
@@ -315,8 +317,9 @@ export -f jq
 _kubectl() {
   local cmd="$*"
   echo "$cmd" >> "$KUBECTL_LOG"
+  local secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
   case "$cmd" in
-    *"get secret jenkins-cert"*)
+    *"get secret ${secret_name}"*)
       return 1
       ;;
     *"vault secrets list"*)
@@ -370,9 +373,12 @@ EOF
   read_lines "$VAULT_CALL_LOG" vault_args
   [ "${vault_args[0]}" = "ci-vault" ]
   [ "${vault_args[1]}" = "ci-release" ]
-  [ "${vault_args[2]}" = "jenkins.dev.local.me" ]
-  [ "${vault_args[3]}" = "istio-system" ]
-  [ "${vault_args[4]}" = "jenkins-cert" ]
+  local leaf_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
+  local secret_ns="${VAULT_PKI_SECRET_NS:-istio-system}"
+  local secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
+  [ "${vault_args[2]}" = "$leaf_host" ]
+  [ "${vault_args[3]}" = "$secret_ns" ]
+  [ "${vault_args[4]}" = "$secret_name" ]
 }
 
 @test "Full deployment" {
@@ -451,14 +457,14 @@ EOF
   run _deploy_jenkins sample-ns
   [ "$status" -eq 0 ]
   read_lines "$KUBECTL_LOG" kubectl_calls
-  expected_gw="apply -n istio-system --dry-run=client -f $SCRIPT_DIR/etc/jenkins/gateway.yaml"
-  expected_gw_apply="apply -n istio-system -f -"
+  expected_gw_prefix="apply -n istio-system --dry-run=client -f /tmp/jenkins-gateway"
+  expected_gw_apply_prefix="apply -n istio-system -f /tmp/jenkins-gateway"
   expected_vs_prefix="apply -n sample-ns --dry-run=client -f /tmp/jenkins-virtualservice"
   expected_vs_apply_prefix="apply -n sample-ns -f /tmp/jenkins-virtualservice"
   expected_dr_prefix="apply -n sample-ns --dry-run=client -f /tmp/jenkins-destinationrule"
   expected_dr_apply_prefix="apply -n sample-ns -f /tmp/jenkins-destinationrule"
-  [ "${kubectl_calls[0]}" = "$expected_gw" ]
-  [ "${kubectl_calls[1]}" = "$expected_gw_apply" ]
+  [[ "${kubectl_calls[0]}" == ${expected_gw_prefix}* ]]
+  [[ "${kubectl_calls[1]}" == ${expected_gw_apply_prefix}* ]]
   [[ "${kubectl_calls[2]}" == ${expected_vs_prefix}* ]]
   [[ "${kubectl_calls[3]}" == ${expected_vs_apply_prefix}* ]]
   [[ "${kubectl_calls[4]}" == ${expected_dr_prefix}* ]]
@@ -510,9 +516,9 @@ else
   [[ "\$kubectl_calls" -lt 6 ]] || exit 1
     fi
     readarray -t cleanup_paths <"$log_file"
-    [[ "\${#cleanup_paths[@]}" -eq 2 ]] || exit 1
+    [[ "\${#cleanup_paths[@]}" -eq 3 ]] || exit 1
     mapfile -t unique_paths < <(printf '%s\n' "\${cleanup_paths[@]}" | sort -u)
-    [[ "\${#unique_paths[@]}" -eq 2 ]] || exit 1
+    [[ "\${#unique_paths[@]}" -eq 3 ]] || exit 1
     for path in "\${unique_paths[@]}"; do
       [[ "\$path" == /tmp/* ]] || exit 1
       [[ ! -e "\$path" ]] || exit 1
