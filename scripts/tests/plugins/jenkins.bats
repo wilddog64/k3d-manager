@@ -94,14 +94,21 @@ EOF
   rm -rf "$jhp"
   CLUSTER_NAME="testcluster"
   export CLUSTER_NAME
+  local mount_check_log="$BATS_TEST_TMPDIR/mount-check.log"
+  : >"$mount_check_log"
+  _jenkins_require_hostpath_mounts() {
+    echo "$1" >"$MOUNT_CHECK_LOG"
+    return 0
+  }
+  export MOUNT_CHECK_LOG="$mount_check_log"
+  export -f _jenkins_require_hostpath_mounts
   run _create_jenkins_pv_pvc test-ns
   [ "$status" -eq 0 ]
   [[ -d "$jhp" ]]
   read_lines "$KUBECTL_LOG" kubectl_calls
   [[ "${kubectl_calls[1]}" == apply* ]]
-  read_lines "$K3D_LOG" k3d_calls
-  expected="node edit ${CLUSTER_NAME}-agent-0 --volume-add ${jhp}:/data/jenkins"
-  [ "${k3d_calls[0]}" = "$expected" ]
+  read_lines "$mount_check_log" mount_calls
+  [ "${mount_calls[0]}" = "$CLUSTER_NAME" ]
 }
 
 @test "PV/PVC setup auto-detects cluster" {
@@ -109,6 +116,14 @@ EOF
   jhp="$SCRIPT_DIR/storage/jenkins_home"
   rm -rf "$jhp"
   unset CLUSTER_NAME
+  local mount_check_log="$BATS_TEST_TMPDIR/mount-check.log"
+  : >"$mount_check_log"
+  _jenkins_require_hostpath_mounts() {
+    echo "$1" >"$MOUNT_CHECK_LOG"
+    return 0
+  }
+  export MOUNT_CHECK_LOG="$mount_check_log"
+  export -f _jenkins_require_hostpath_mounts
   _k3d() {
     local cmd="$*"
     echo "$cmd" >> "$K3D_LOG"
@@ -125,10 +140,33 @@ EOF
   [ "$status" -eq 0 ]
   [[ -d "$jhp" ]]
   read_lines "$K3D_LOG" k3d_calls
-  [ "${#k3d_calls[@]}" -eq 2 ]
+  [ "${#k3d_calls[@]}" -eq 1 ]
   [[ "${k3d_calls[0]}" == *"cluster list"* ]]
-  expected="node edit k3d-auto-agent-0 --volume-add ${jhp}:/data/jenkins"
-  [ "${k3d_calls[1]}" = "$expected" ]
+  read_lines "$mount_check_log" mount_calls
+  [ "${mount_calls[0]}" = "k3d-auto" ]
+}
+
+@test "PV/PVC setup aborts when Jenkins mount missing" {
+  KUBECTL_EXIT_CODES=(1)
+  jhp="$SCRIPT_DIR/storage/jenkins_home"
+  rm -rf "$jhp"
+  CLUSTER_NAME="broken"
+  export CLUSTER_NAME
+  _jenkins_require_hostpath_mounts() {
+    JENKINS_MISSING_HOSTPATH_NODES="broken-agent"
+    return 1
+  }
+  export -f _jenkins_require_hostpath_mounts
+
+  run --separate-stderr _create_jenkins_pv_pvc test-ns
+  [ "$status" -eq 1 ]
+  [[ "$stderr" == *"hostPath mount"* ]]
+  [[ "$stderr" == *"broken-agent"* ]]
+  [[ "$stderr" == *"create_k3d_cluster"* ]]
+  [[ "$stderr" == *"k3d node edit"* ]]
+  read_lines "$KUBECTL_LOG" kubectl_calls
+  [ "${#kubectl_calls[@]}" -eq 1 ]
+  [[ "${kubectl_calls[0]}" == "get pv jenkins-home-pv" ]]
 }
 
 @test "_create_jenkins_admin_vault_policy stores secret without logging password" {
@@ -343,6 +381,7 @@ EOF
   deploy_vault() { echo "deploy_vault:$*" >> "$CALLS_LOG"; }
   _create_jenkins_admin_vault_policy() { echo "_create_jenkins_admin_vault_policy:$*" >> "$CALLS_LOG"; }
   _create_jenkins_vault_ad_policy() { echo "_create_jenkins_vault_ad_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_cert_rotator_policy() { echo "_create_jenkins_cert_rotator_policy:$*" >> "$CALLS_LOG"; }
   _create_jenkins_namespace() { echo "_create_jenkins_namespace:$*" >> "$CALLS_LOG"; }
   _create_jenkins_pv_pvc() { echo "_create_jenkins_pv_pvc:$*" >> "$CALLS_LOG"; }
   _ensure_jenkins_cert() { echo "_ensure_jenkins_cert:$*" >> "$CALLS_LOG"; }
@@ -358,6 +397,7 @@ EOF
     "deploy_vault:ha custom-vault ${release}"
     "_create_jenkins_admin_vault_policy:custom-vault ${release}"
     "_create_jenkins_vault_ad_policy:custom-vault ${release} sample-ns"
+    "_create_jenkins_cert_rotator_policy:custom-vault ${release}"
     "_create_jenkins_namespace:sample-ns"
     "_create_jenkins_pv_pvc:sample-ns"
     "_ensure_jenkins_cert:custom-vault ${release}"
