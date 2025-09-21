@@ -14,6 +14,8 @@ _JENKINS_PREV_EXIT_TRAP_CMD=""
 _JENKINS_PREV_EXIT_TRAP_HANDLER=""
 _JENKINS_PREV_RETURN_TRAP_CMD=""
 _JENKINS_PREV_RETURN_TRAP_HANDLER=""
+JENKINS_MISSING_HOSTPATH_NODES=""
+JENKINS_MOUNT_CHECK_ERROR=""
 
 function _jenkins_capture_trap_state() {
    local signal="$1"
@@ -38,6 +40,8 @@ function _jenkins_capture_trap_state() {
       else
          handler_literal=$quoted_handler
       fi
+      local literal_var="_JENKINS_PREV_${signal}_TRAP_LITERAL"
+      printf -v "$literal_var" '%s' "$handler_literal"
       local -a handler_args=()
       eval "handler_args=( ${handler_literal} )"
       if (( ${#handler_args[@]} )); then
@@ -50,6 +54,82 @@ function _jenkins_capture_trap_state() {
 
    printf -v "$cmd_var" '%s' "$trap_output"
    printf -v "$handler_var" '%s' "$handler"
+}
+
+function _jenkins_run_saved_trap_literal() {
+   local signal="$1"
+   shift || true
+   local handler_literal="${1-}"
+   shift || true
+
+   local literal_var="_JENKINS_PREV_${signal}_TRAP_LITERAL"
+   local handler_var="_JENKINS_PREV_${signal}_TRAP_HANDLER"
+   if [[ -n "${!literal_var:-}" ]]; then
+      handler_literal="${!literal_var}"
+   elif [[ -n "${!handler_var:-}" ]]; then
+      handler_literal="${!handler_var}"
+   fi
+
+   if [[ -z "$handler_literal" ]]; then
+      return 0
+   fi
+
+   local -a trap_args=("$@")
+   local -a saved_tokens=()
+   if [[ -n "${!handler_var:-}" ]]; then
+      eval "saved_tokens=( ${!handler_var} )"
+   fi
+   local skip_count=0
+   if (( ${#saved_tokens[@]} > 1 )); then
+      skip_count=$(( ${#saved_tokens[@]} - 1 ))
+   fi
+   if (( skip_count > 0 )); then
+      if (( ${#trap_args[@]} > skip_count )); then
+         trap_args=("${trap_args[@]:${skip_count}}")
+      else
+         trap_args=()
+      fi
+   else
+      while (( ${#trap_args[@]} )); do
+         case "${trap_args[0]}" in
+            "$signal"|_JENKINS_PREV_*)
+               trap_args=("${trap_args[@]:1}")
+               ;;
+            *)
+               break
+               ;;
+         esac
+      done
+   fi
+   if (( ${#trap_args[@]} )); then
+      local total=${#trap_args[@]}
+      if (( total % 2 == 0 )); then
+         local half=$(( total / 2 ))
+         local duplicate=1
+         local i
+         for (( i=0; i<half; i++ )); do
+            if [[ "${trap_args[i]}" != "${trap_args[i+half]}" ]]; then
+               duplicate=0
+               break
+            fi
+         done
+         if (( duplicate )); then
+            trap_args=("${trap_args[@]:0:half}")
+         fi
+      fi
+      set -- "${trap_args[@]}"
+   else
+      set --
+   fi
+
+   local -a handler_args=()
+   eval "handler_args=( $handler_literal )"
+
+   if (( ${#handler_args[@]} == 0 )); then
+      return 0
+   fi
+
+   "${handler_args[@]}"
 }
 
 function _jenkins_register_rendered_manifest() {
@@ -116,6 +196,148 @@ function _create_jenkins_namespace() {
    trap '_cleanup_on_success "$yamlfile"' RETURN
 }
 
+function _jenkins_detect_cluster_name() {
+   if [[ -n "${CLUSTER_NAME:-}" ]]; then
+      printf '%s\n' "$CLUSTER_NAME"
+      return 0
+   fi
+
+   local list_output
+   if ! list_output=$(_k3d --no-exit --quiet cluster list); then
+      echo "Failed to list k3d clusters. Set CLUSTER_NAME or create a cluster before deploying Jenkins." >&2
+      return 1
+   fi
+
+   local -a clusters=()
+   while IFS= read -r line; do
+      line=${line%$'\r'}
+      [[ -z "$line" ]] && continue
+      [[ "$line" =~ ^[[:space:]]*NAME[[:space:]] ]] && continue
+      read -r -a fields <<<"$line"
+      if (( ${#fields[@]} )); then
+         clusters+=("${fields[0]}")
+      fi
+   done <<<"$list_output"
+
+   case ${#clusters[@]} in
+      0)
+         echo "No k3d clusters found. Create a cluster or export CLUSTER_NAME before deploying Jenkins." >&2
+         return 1
+         ;;
+      1)
+         printf '%s\n' "${clusters[0]}"
+         return 0
+         ;;
+      *)
+         echo "Multiple k3d clusters detected: ${clusters[*]}. Set CLUSTER_NAME to choose the target cluster before deploying Jenkins." >&2
+         return 1
+         ;;
+   esac
+}
+
+function _jenkins_node_has_mount() {
+   local node="$1"
+   local host_path="$2"
+   local cluster_path="$3"
+   local inspect_output
+
+   if ! inspect_output=$(_run_command --soft --quiet -- docker inspect "$node" --format '{{json .Mounts}}'); then
+      return 2
+   fi
+
+   if [[ -z "$inspect_output" || "$inspect_output" == "null" ]]; then
+      return 1
+   fi
+
+   if command -v jq >/dev/null 2>&1; then
+      jq -e --arg src "$host_path" --arg dst "$cluster_path" \
+         'map(select(.Source == $src and .Destination == $dst)) | length > 0' \
+         <<<"$inspect_output" >/dev/null 2>&1
+      local jq_rc=$?
+      case $jq_rc in
+         0) return 0 ;;
+         1) return 1 ;;
+         *) return 2 ;;
+      esac
+   fi
+
+   if [[ "$inspect_output" == *"\"Source\":\"$host_path\""* && \
+         "$inspect_output" == *"\"Destination\":\"$cluster_path\""* ]]; then
+      return 0
+   fi
+
+   return 1
+}
+
+function _jenkins_require_hostpath_mounts() {
+   local cluster="$1"
+   local host_path="$JENKINS_HOME_PATH"
+   local cluster_path="$JENKINS_HOME_IN_CLUSTER"
+   local node_output
+
+   JENKINS_MISSING_HOSTPATH_NODES=""
+   JENKINS_MOUNT_CHECK_ERROR=""
+
+   if ! node_output=$(_k3d --no-exit --quiet node list --cluster "$cluster"); then
+      JENKINS_MOUNT_CHECK_ERROR="Failed to list k3d nodes for cluster $cluster. Ensure the cluster is running."
+      return 1
+   fi
+
+   local -a workload_nodes=()
+   while IFS= read -r line; do
+      line=${line%$'\r'}
+      [[ -z "$line" ]] && continue
+      [[ "$line" =~ ^[[:space:]]*NAME[[:space:]] ]] && continue
+      read -r -a fields <<<"$line"
+      if (( ${#fields[@]} < 3 )); then
+         continue
+      fi
+      local node_name="${fields[0]}"
+      local node_role="${fields[1]}"
+      local node_cluster="${fields[2]}"
+
+      if [[ "$node_cluster" != "$cluster" ]]; then
+         continue
+      fi
+
+      case "$node_role" in
+         server|agent)
+            workload_nodes+=("$node_name")
+            ;;
+      esac
+   done <<<"$node_output"
+
+   if (( ${#workload_nodes[@]} == 0 )); then
+      JENKINS_MOUNT_CHECK_ERROR="No workload nodes found for k3d cluster $cluster."
+      return 1
+   fi
+
+   local -a missing_nodes=()
+   local node rc
+   for node in "${workload_nodes[@]}"; do
+      _jenkins_node_has_mount "$node" "$host_path" "$cluster_path"
+      rc=$?
+      case $rc in
+         0)
+            ;;
+         1)
+            missing_nodes+=("$node")
+            ;;
+         *)
+            JENKINS_MOUNT_CHECK_ERROR="Failed to inspect k3d node $node for Jenkins hostPath mount."
+            return 1
+            ;;
+      esac
+   done
+
+   if (( ${#missing_nodes[@]} )); then
+      JENKINS_MISSING_HOSTPATH_NODES="${missing_nodes[*]}"
+      return 1
+   fi
+
+   return 0
+}
+
 function _create_jenkins_pv_pvc() {
    local jenkins_namespace=$1
 
@@ -131,6 +353,26 @@ function _create_jenkins_pv_pvc() {
    if [[ ! -d "$JENKINS_HOME_PATH" ]]; then
       echo "Creating Jenkins home directory at $JENKINS_HOME_PATH"
       mkdir -p "$JENKINS_HOME_PATH"
+   fi
+
+   local cluster_name
+   if ! cluster_name=$(_jenkins_detect_cluster_name); then
+      return 1
+   fi
+
+   if ! _jenkins_require_hostpath_mounts "$cluster_name"; then
+      local missing_nodes="${JENKINS_MISSING_HOSTPATH_NODES:-}"
+      local mount_error="${JENKINS_MOUNT_CHECK_ERROR:-}"
+
+      if [[ -n "$mount_error" ]]; then
+         echo "$mount_error" >&2
+      else
+         cat >&2 <<EOF
+Jenkins requires the hostPath mount ${JENKINS_HOME_PATH}:${JENKINS_HOME_IN_CLUSTER} on all workload nodes, but these k3d nodes are missing it: ${missing_nodes}.
+Recreate the cluster with './scripts/k3d-manager create_k3d_cluster ${cluster_name}' or patch the nodes (for example: 'k3d node edit <node> --volume-add ${JENKINS_HOME_PATH}:${JENKINS_HOME_IN_CLUSTER}') before deploying Jenkins.
+EOF
+      fi
+      return 1
    fi
 
    jenkins_pv_template="$(dirname "$SOURCE")/etc/jenkins/jenkins-home-pv.yaml.tmpl"
