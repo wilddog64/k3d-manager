@@ -1,102 +1,102 @@
-+apiVersion: v1
-+kind: ConfigMap
-+metadata:
-+  name: ${JENKINS_CERT_ROTATOR_NAME}
-+  namespace: ${JENKINS_NAMESPACE}
-+binaryData:
-+  cert-rotator.sh: ${JENKINS_CERT_ROTATOR_SCRIPT_B64}
-+---
-+apiVersion: v1
-+kind: ServiceAccount
-+metadata:
-+  name: ${JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT}
-+  namespace: ${JENKINS_NAMESPACE}
-+---
-+apiVersion: rbac.authorization.k8s.io/v1
-+kind: Role
-+metadata:
-+  name: ${JENKINS_CERT_ROTATOR_NAME}
-+  namespace: ${VAULT_PKI_SECRET_NS}
-+rules:
-+  - apiGroups: [""]
-+    resources: ["secrets"]
-+    resourceNames:
-+      - ${VAULT_PKI_SECRET_NAME}
-+    verbs: ["get", "create", "patch"]
-+---
-+apiVersion: rbac.authorization.k8s.io/v1
-+kind: RoleBinding
-+metadata:
-+  name: ${JENKINS_CERT_ROTATOR_NAME}
-+  namespace: ${VAULT_PKI_SECRET_NS}
-+subjects:
-+  - kind: ServiceAccount
-+    name: ${JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT}
-+    namespace: ${JENKINS_NAMESPACE}
-+roleRef:
-+  apiGroup: rbac.authorization.k8s.io
-+  kind: Role
-+  name: ${JENKINS_CERT_ROTATOR_NAME}
-+---
-+apiVersion: batch/v1
-+kind: CronJob
-+metadata:
-+  name: ${JENKINS_CERT_ROTATOR_NAME}
-+  namespace: ${JENKINS_NAMESPACE}
-+spec:
-+  schedule: "${JENKINS_CERT_ROTATOR_SCHEDULE}"
-+  concurrencyPolicy: Forbid
-+  successfulJobsHistoryLimit: 1
-+  failedJobsHistoryLimit: 1
-+  jobTemplate:
-+    spec:
-+      template:
-+        spec:
-+          serviceAccountName: ${JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT}
-+          restartPolicy: OnFailure
-+          containers:
-+            - name: cert-rotator
-+              image: ${JENKINS_CERT_ROTATOR_IMAGE}
-+              imagePullPolicy: IfNotPresent
-+              command:
-+                - /bin/bash
-+                - -c
-+                - |
-+                  set -euo pipefail
-+                  /opt/jenkins-cert-rotator/cert-rotator.sh
-+              env:
-+                - name: VAULT_ADDR
-+                  value: "${JENKINS_CERT_ROTATOR_VAULT_ADDR}"
-+                - name: VAULT_PKI_PATH
-+                  value: "${VAULT_PKI_PATH:-pki}"
-+                - name: VAULT_PKI_ROLE
-+                  value: "${VAULT_PKI_ROLE}"
-+                - name: VAULT_PKI_ROLE_TTL
-+                  value: "${VAULT_PKI_ROLE_TTL:-}"
-+                - name: VAULT_PKI_SECRET_NS
-+                  value: "${VAULT_PKI_SECRET_NS}"
-+                - name: VAULT_PKI_SECRET_NAME
-+                  value: "${VAULT_PKI_SECRET_NAME}"
-+                - name: VAULT_PKI_LEAF_HOST
-+                  value: "${VAULT_PKI_LEAF_HOST}"
-+                - name: VAULT_NAMESPACE
-+                  value: "${VAULT_NAMESPACE:-}"
-+                - name: VAULT_SKIP_VERIFY
-+                  value: "${VAULT_SKIP_VERIFY:-}"
-+                - name: VAULT_CACERT
-+                  value: "${VAULT_CACERT:-}"
-+                - name: JENKINS_CERT_ROTATOR_RENEW_BEFORE
-+                  value: "${JENKINS_CERT_ROTATOR_RENEW_BEFORE}"
-+                - name: JENKINS_CERT_ROTATOR_VAULT_ROLE
-+                  value: "${JENKINS_CERT_ROTATOR_VAULT_ROLE}"
-+                - name: JENKINS_CERT_ROTATOR_ALT_NAMES
-+                  value: "${JENKINS_CERT_ROTATOR_ALT_NAMES:-}"
-+              volumeMounts:
-+                - name: rotator-script
-+                  mountPath: /opt/jenkins-cert-rotator
-+                  readOnly: true
-+          volumes:
-+            - name: rotator-script
-+              configMap:
-+                name: ${JENKINS_CERT_ROTATOR_NAME}
-+                defaultMode: 0550
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${JENKINS_CERT_ROTATOR_NAME}
+  namespace: ${JENKINS_NAMESPACE}
+binaryData:
+  cert-rotator.sh: ${JENKINS_CERT_ROTATOR_SCRIPT_B64}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ${JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT}
+  namespace: ${JENKINS_NAMESPACE}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ${JENKINS_CERT_ROTATOR_NAME}
+  namespace: ${VAULT_PKI_SECRET_NS}
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - ${VAULT_PKI_SECRET_NAME}
+    verbs: ["get", "create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ${JENKINS_CERT_ROTATOR_NAME}
+  namespace: ${VAULT_PKI_SECRET_NS}
+subjects:
+  - kind: ServiceAccount
+    name: ${JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT}
+    namespace: ${JENKINS_NAMESPACE}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ${JENKINS_CERT_ROTATOR_NAME}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: ${JENKINS_CERT_ROTATOR_NAME}
+  namespace: ${JENKINS_NAMESPACE}
+spec:
+  schedule: "${JENKINS_CERT_ROTATOR_SCHEDULE}"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: ${JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT}
+          restartPolicy: OnFailure
+          containers:
+            - name: cert-rotator
+              image: ${JENKINS_CERT_ROTATOR_IMAGE}
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/bash
+                - -c
+                - |
+                  set -euo pipefail
+                  /opt/jenkins-cert-rotator/cert-rotator.sh
+              env:
+                - name: VAULT_ADDR
+                  value: "${JENKINS_CERT_ROTATOR_VAULT_ADDR}"
+                - name: VAULT_PKI_PATH
+                  value: "${VAULT_PKI_PATH:-pki}"
+                - name: VAULT_PKI_ROLE
+                  value: "${VAULT_PKI_ROLE}"
+                - name: VAULT_PKI_ROLE_TTL
+                  value: "${VAULT_PKI_ROLE_TTL:-}"
+                - name: VAULT_PKI_SECRET_NS
+                  value: "${VAULT_PKI_SECRET_NS}"
+                - name: VAULT_PKI_SECRET_NAME
+                  value: "${VAULT_PKI_SECRET_NAME}"
+                - name: VAULT_PKI_LEAF_HOST
+                  value: "${VAULT_PKI_LEAF_HOST}"
+                - name: VAULT_NAMESPACE
+                  value: "${VAULT_NAMESPACE:-}"
+                - name: VAULT_SKIP_VERIFY
+                  value: "${VAULT_SKIP_VERIFY:-}"
+                - name: VAULT_CACERT
+                  value: "${VAULT_CACERT:-}"
+                - name: JENKINS_CERT_ROTATOR_RENEW_BEFORE
+                  value: "${JENKINS_CERT_ROTATOR_RENEW_BEFORE}"
+                - name: JENKINS_CERT_ROTATOR_VAULT_ROLE
+                  value: "${JENKINS_CERT_ROTATOR_VAULT_ROLE}"
+                - name: JENKINS_CERT_ROTATOR_ALT_NAMES
+                  value: "${JENKINS_CERT_ROTATOR_ALT_NAMES:-}"
+              volumeMounts:
+                - name: rotator-script
+                  mountPath: /opt/jenkins-cert-rotator
+                  readOnly: true
+          volumes:
+            - name: rotator-script
+              configMap:
+                name: ${JENKINS_CERT_ROTATOR_NAME}
+                defaultMode: 0550
