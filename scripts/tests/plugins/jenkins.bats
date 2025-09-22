@@ -326,6 +326,27 @@ create_self_signed_cert() {
     -subj "/CN=test.local" -set_serial "$serial_hex" >/dev/null 2>&1
 }
 
+format_serial_hex_pairs() {
+  local raw="${1//:/}"
+  raw=${raw//[[:space:]]/}
+  raw=${raw^^}
+
+  if (( ${#raw} % 2 == 1 )); then
+    raw="0${raw}"
+  fi
+
+  local formatted=""
+  local i len=${#raw}
+  for (( i = 0; i < len; i += 2 )); do
+    if (( i > 0 )); then
+      formatted+=':'
+    fi
+    formatted+="${raw:i:2}"
+  done
+
+  printf '%s' "$formatted"
+}
+
 @test "cert rotator revokes superseded certificate" {
   local cert_file="$BATS_TEST_TMPDIR/existing.crt"
   local key_file="$BATS_TEST_TMPDIR/existing.key"
