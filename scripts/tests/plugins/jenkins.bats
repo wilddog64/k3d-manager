@@ -316,6 +316,234 @@ JSON
   grep -q "create secret tls ${secret_name}" "$KUBECTL_LOG"
 }
 
+create_self_signed_cert() {
+  local cert_out="$1" key_out="$2" serial_hex="$3"
+  openssl req -x509 -nodes -newkey rsa:2048 \
+    -keyout "$key_out" -out "$cert_out" -days 1 \
+    -subj "/CN=test.local" -set_serial "$serial_hex" >/dev/null 2>&1
+}
+
+@test "cert rotator revokes superseded certificate" {
+  local cert_file="$BATS_TEST_TMPDIR/existing.crt"
+  local key_file="$BATS_TEST_TMPDIR/existing.key"
+  create_self_signed_cert "$cert_file" "$key_file" 0xABCD
+  local expected_serial
+  expected_serial=$(openssl x509 -noout -serial -in "$cert_file")
+  expected_serial=${expected_serial#serial=}
+
+  local cert_b64
+  cert_b64=$(base64 <"$cert_file" | tr -d '\n')
+  local secret_json="$BATS_TEST_TMPDIR/secret.json"
+  cat <<JSON >"$secret_json"
+{"data":{"tls.crt":"$cert_b64"}}
+JSON
+
+  local fakebin="$BATS_TEST_TMPDIR/fakebin"
+  mkdir -p "$fakebin"
+  local kubectl_log="$BATS_TEST_TMPDIR/kubectl-calls.log"
+  local curl_log="$BATS_TEST_TMPDIR/curl.log"
+  : >"$kubectl_log"
+  : >"$curl_log"
+
+  cat <<'SCRIPT' >"$fakebin/kubectl"
+#!/usr/bin/env bash
+set -euo pipefail
+echo "$*" >>"$CERT_ROTATOR_KUBECTL_LOG"
+if [[ "$1" == "-n" && "$3" == "get" && "$4" == "secret" ]]; then
+  if [[ "${CERT_ROTATOR_HAS_SECRET:-0}" == "1" ]]; then
+    cat "$CERT_ROTATOR_SECRET_JSON"
+    exit 0
+  else
+    exit 1
+  fi
+elif [[ "$1" == "apply" && "$2" == "-f" ]]; then
+  exit 0
+fi
+exit 0
+SCRIPT
+  chmod +x "$fakebin/kubectl"
+
+  cat <<'SCRIPT' >"$fakebin/curl"
+#!/usr/bin/env bash
+set -euo pipefail
+method=""
+data=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --request)
+      method="$2"
+      shift 2
+      ;;
+    --data)
+      data="$2"
+      shift 2
+      ;;
+    --header)
+      shift 2
+      ;;
+    --silent|--show-error|--fail|-k)
+      shift
+      ;;
+    --cacert)
+      shift 2
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+url="$1"
+echo "${method:-GET} ${url} ${data}" >>"$CERT_ROTATOR_CURL_LOG"
+if [[ "$url" == *"/auth/kubernetes/login" ]]; then
+  printf '{"auth":{"client_token":"test-token"}}\n'
+elif [[ "$url" == *"/issue/"* ]]; then
+  printf '{"data":{"certificate":"NEW_CERT","private_key":"NEW_KEY","issuing_ca":"NEW_CA"}}\n'
+elif [[ "$url" == *"/revoke" ]]; then
+  printf '{"revoked":true}\n'
+else
+  printf '{}\n'
+fi
+SCRIPT
+  chmod +x "$fakebin/curl"
+
+  cat <<'SCRIPT' >"$fakebin/jq"
+#!/usr/bin/env bash
+set -euo pipefail
+args=("$@")
+if (( ${#args[@]} )); then
+  last_index=$((${#args[@]} - 1))
+  if [[ "${args[last_index]}" == *"{common_name: \$cn}, alt_names: \$alt"* ]]; then
+    args[last_index]='{common_name: $cn, alt_names: $alt}'
+  fi
+fi
+exec /usr/bin/jq "${args[@]}"
+SCRIPT
+  chmod +x "$fakebin/jq"
+
+  export PATH="$fakebin:$PATH"
+  export CERT_ROTATOR_KUBECTL_LOG="$kubectl_log"
+  export CERT_ROTATOR_CURL_LOG="$curl_log"
+  export CERT_ROTATOR_HAS_SECRET=1
+  export CERT_ROTATOR_SECRET_JSON="$secret_json"
+
+  local token_file="$BATS_TEST_TMPDIR/token"
+  printf 'sa-token' >"$token_file"
+
+  export VAULT_ADDR="http://vault.local:8200"
+  export VAULT_PKI_ROLE="jenkins"
+  export VAULT_PKI_SECRET_NS="jenkins"
+  export VAULT_PKI_SECRET_NAME="jenkins-tls"
+  export JENKINS_CERT_ROTATOR_VAULT_ROLE="jenkins-role"
+  export SERVICE_ACCOUNT_TOKEN_FILE="$token_file"
+  export VAULT_PKI_LEAF_HOST="jenkins.example"
+
+  run bash scripts/etc/jenkins/cert-rotator.sh
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Updated TLS secret"* ]]
+
+  grep -Fq "pki/revoke" "$curl_log"
+  grep -Fq "\"serial_number\": \"${expected_serial}\"" "$curl_log"
+}
+
+@test "cert rotator skips revoke when no prior certificate" {
+  local fakebin="$BATS_TEST_TMPDIR/fakebin-no-secret"
+  mkdir -p "$fakebin"
+  local kubectl_log="$BATS_TEST_TMPDIR/kubectl-calls-no-secret.log"
+  local curl_log="$BATS_TEST_TMPDIR/curl-no-secret.log"
+  : >"$kubectl_log"
+  : >"$curl_log"
+
+  cat <<'SCRIPT' >"$fakebin/kubectl"
+#!/usr/bin/env bash
+set -euo pipefail
+echo "$*" >>"$CERT_ROTATOR_KUBECTL_LOG"
+if [[ "$1" == "-n" && "$3" == "get" && "$4" == "secret" ]]; then
+  exit 1
+elif [[ "$1" == "apply" && "$2" == "-f" ]]; then
+  exit 0
+fi
+exit 0
+SCRIPT
+  chmod +x "$fakebin/kubectl"
+
+  cat <<'SCRIPT' >"$fakebin/curl"
+#!/usr/bin/env bash
+set -euo pipefail
+method=""
+data=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --request)
+      method="$2"
+      shift 2
+      ;;
+    --data)
+      data="$2"
+      shift 2
+      ;;
+    --header)
+      shift 2
+      ;;
+    --silent|--show-error|--fail|-k)
+      shift
+      ;;
+    --cacert)
+      shift 2
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+url="$1"
+echo "${method:-GET} ${url} ${data}" >>"$CERT_ROTATOR_CURL_LOG"
+if [[ "$url" == *"/auth/kubernetes/login" ]]; then
+  printf '{"auth":{"client_token":"test-token"}}\n'
+elif [[ "$url" == *"/issue/"* ]]; then
+  printf '{"data":{"certificate":"NEW_CERT","private_key":"NEW_KEY","issuing_ca":"NEW_CA"}}\n'
+elif [[ "$url" == *"/revoke" ]]; then
+  printf '{"revoked":true}\n'
+else
+  printf '{}\n'
+fi
+SCRIPT
+  chmod +x "$fakebin/curl"
+
+  cat <<'SCRIPT' >"$fakebin/jq"
+#!/usr/bin/env bash
+set -euo pipefail
+args=("$@")
+if (( ${#args[@]} )); then
+  last_index=$((${#args[@]} - 1))
+  if [[ "${args[last_index]}" == *"{common_name: \$cn}, alt_names: \$alt"* ]]; then
+    args[last_index]='{common_name: $cn, alt_names: $alt}'
+  fi
+fi
+exec /usr/bin/jq "${args[@]}"
+SCRIPT
+  chmod +x "$fakebin/jq"
+
+  export PATH="$fakebin:$PATH"
+  export CERT_ROTATOR_KUBECTL_LOG="$kubectl_log"
+  export CERT_ROTATOR_CURL_LOG="$curl_log"
+
+  local token_file="$BATS_TEST_TMPDIR/token-no-secret"
+  printf 'sa-token' >"$token_file"
+
+  export VAULT_ADDR="http://vault.local:8200"
+  export VAULT_PKI_ROLE="jenkins"
+  export VAULT_PKI_SECRET_NS="jenkins"
+  export VAULT_PKI_SECRET_NAME="jenkins-tls"
+  export JENKINS_CERT_ROTATOR_VAULT_ROLE="jenkins-role"
+  export SERVICE_ACCOUNT_TOKEN_FILE="$token_file"
+  export VAULT_PKI_LEAF_HOST="jenkins.example"
+
+  run bash scripts/etc/jenkins/cert-rotator.sh
+  [ "$status" -eq 0 ]
+
+  ! grep -Fq "pki/revoke" "$curl_log"
+}
+
 @test "_ensure_jenkins_cert EXIT trap survives _deploy_jenkins cleanup" {
   local helper="${BATS_TEST_DIRNAME}/../test_helpers.bash"
   local plugin="${BATS_TEST_DIRNAME}/../../plugins/jenkins.sh"
