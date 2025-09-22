@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+# shellcheck disable=SC1091
+source "${SCRIPT_ROOT}/lib/vault_pki.sh"
+
 log() {
    local level="${1:-INFO}"
    shift || true
@@ -230,12 +234,13 @@ main() {
 
    local tmpdir
    tmpdir=$(mktemp -d)
-   trap 'rm -rf "$tmpdir"' EXIT
+   trap 'if [[ -n "${tmpdir:-}" ]]; then rm -rf "$tmpdir"; fi' EXIT
 
    local secret_ns="$VAULT_PKI_SECRET_NS"
    local secret_name="$VAULT_PKI_SECRET_NAME"
    local cert_file="" should_issue=0
 
+   local previous_serial=""
    if cert_file=$(load_secret_certificate "$secret_ns" "$secret_name" "$tmpdir"); then
       local remaining
       remaining=$(seconds_until_expiry "$cert_file") || should_issue=1
@@ -248,6 +253,9 @@ main() {
          fi
       else
          log WARN "Unable to determine remaining lifetime; rotating"
+      fi
+      if ! previous_serial=$(extract_certificate_serial "$cert_file"); then
+         previous_serial=""
       fi
    else
       should_issue=1
@@ -304,6 +312,11 @@ main() {
    fi
 
    apply_secret "$secret_ns" "$secret_name" "$cert" "$key" "$ca_bundle"
+   if [[ -n "$previous_serial" ]]; then
+      if ! revoke_certificate_serial "$previous_serial" "${VAULT_PKI_PATH:-pki}"; then
+         log WARN "Failed to revoke previous certificate serial $previous_serial"
+      fi
+   fi
    log INFO "Updated TLS secret ${secret_ns}/${secret_name}"
 }
 
