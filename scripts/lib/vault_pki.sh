@@ -5,7 +5,7 @@
 # Extract the serial number from a PEM encoded certificate file.
 # Outputs the serial as an uppercase hex string without the leading
 # "serial=" prefix. Returns non-zero when the serial cannot be parsed.
-extract_certificate_serial() {
+function extract_certificate_serial() {
    local cert_file="$1"
    if [[ -z "$cert_file" || ! -s "$cert_file" ]]; then
       return 1
@@ -26,7 +26,7 @@ extract_certificate_serial() {
 # argument can supply a handler function used to perform the API call; it must
 # accept the signature: <method> <path> <json-payload> [extra args...].
 # Additional arguments are forwarded to the handler.
-revoke_certificate_serial() {
+function revoke_certificate_serial() {
    local serial="$1"
    local path="${2:-${VAULT_PKI_PATH:-pki}}"
    local handler="${3:-vault_api_request}"

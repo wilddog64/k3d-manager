@@ -5,13 +5,13 @@ SCRIPT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 # shellcheck disable=SC1091
 source "${SCRIPT_ROOT}/lib/vault_pki.sh"
 
-log() {
+function log() {
    local level="${1:-INFO}"
    shift || true
    printf '[%(%Y-%m-%dT%H:%M:%SZ)T] [%s] %s\n' -1 "$level" "$*" >&2
 }
 
-require_env() {
+function require_env() {
    local name
    for name in "$@"; do
       if [[ -z "${!name:-}" ]]; then
@@ -21,7 +21,7 @@ require_env() {
    done
 }
 
-require_cmd() {
+function require_cmd() {
    local cmd
    for cmd in "$@"; do
       if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -31,13 +31,13 @@ require_cmd() {
    done
 }
 
-join_by() {
+function join_by() {
    local IFS="$1"
    shift
    echo "$*"
 }
 
-load_secret_certificate() {
+function load_secret_certificate() {
    local ns="$1" name="$2" tmpdir="$3"
    local secret_json cert_b64 cert_file
 
@@ -62,7 +62,7 @@ load_secret_certificate() {
    return 0
 }
 
-seconds_until_expiry() {
+function seconds_until_expiry() {
    local cert_file="$1" now expiry expiry_epoch
    expiry=$(openssl x509 -enddate -noout -in "$cert_file" 2>/dev/null)
    expiry=${expiry#notAfter=}
@@ -78,14 +78,14 @@ seconds_until_expiry() {
    echo $(( expiry_epoch - now ))
 }
 
-extract_common_name() {
+function extract_common_name() {
    local cert_file="$1" cn
    cn=$(openssl x509 -noout -subject -nameopt RFC2253 -in "$cert_file" 2>/dev/null)
    cn=${cn#subject=CN=}
    printf '%s' "$cn"
 }
 
-extract_dns_sans() {
+function extract_dns_sans() {
    local cert_file="$1"
    local -a sans=()
    local line entry
@@ -104,7 +104,7 @@ extract_dns_sans() {
    fi
 }
 
-vault_api_request() {
+function vault_api_request() {
    local method="$1" path="$2" data="${3:-}"
    local url token_header namespace_header
 
@@ -135,7 +135,7 @@ vault_api_request() {
    curl "${args[@]}" "$url"
 }
 
-vault_login() {
+function vault_login() {
    local auth_path="${VAULT_K8S_AUTH_PATH:-auth/kubernetes/login}"
    if [[ "$auth_path" != */login ]]; then
       auth_path="${auth_path%/}/login"
@@ -166,21 +166,15 @@ vault_login() {
    fi
 }
 
-mint_certificate() {
+function mint_certificate() {
    local cn="$1" alt_names="$2"
-   local payload_expr='{common_name: $cn}'
-   local -a payload_args=(--arg cn "$cn")
 
-   if [[ -n "$alt_names" ]]; then
-      payload_expr+=', alt_names: $alt'
-      payload_args+=(--arg alt "$alt_names")
-   fi
-
-   if [[ -n "${VAULT_PKI_ROLE_TTL:-}" ]]; then
-      payload_expr+=', ttl: $ttl'
-      payload_args+=(--arg ttl "$VAULT_PKI_ROLE_TTL")
-   fi
-
+   local ttl_arg="${VAULT_PKI_ROLE_TTL:-}"
+   payload=$(jq -n --arg cn "$cn" --arg alt "$alt_names" --arg ttl "$ttl_arg" '
+   {common_name: $cn}
+   | if ($alt | length) > 0 then .alt_names = $alt else . end
+   | if ($ttl | length) > 0 then .ttl = $ttl else . end
+   ')
    local payload
    payload=$(jq -n "${payload_args[@]}" "$payload_expr")
 
@@ -196,7 +190,7 @@ mint_certificate() {
    printf '%s' "$response"
 }
 
-apply_secret() {
+function apply_secret() {
    local ns="$1" name="$2" cert="$3" key="$4" ca_bundle="$5"
    local tmpfile
    tmpfile=$(mktemp)
@@ -222,7 +216,7 @@ EOF
    rm -f "$tmpfile"
 }
 
-main() {
+function main() {
    require_env VAULT_ADDR VAULT_PKI_ROLE VAULT_PKI_SECRET_NS VAULT_PKI_SECRET_NAME JENKINS_CERT_ROTATOR_VAULT_ROLE
    require_cmd kubectl curl jq openssl base64 date
 
@@ -232,8 +226,7 @@ main() {
       exit 1
    fi
 
-   local tmpdir
-   tmpdir=$(mktemp -d)
+   local tmpdir=$(mktemp -d)
    trap 'if [[ -n "${tmpdir:-}" ]]; then rm -rf "$tmpdir"; fi' EXIT
 
    local secret_ns="$VAULT_PKI_SECRET_NS"
@@ -318,6 +311,57 @@ main() {
       fi
    fi
    log INFO "Updated TLS secret ${secret_ns}/${secret_name}"
+}
+
+function normalize_serial() {
+   local raw="${1:-}"
+   [[ -n "$raw" ]] || return 1
+
+   raw=${raw//:/}
+   raw=${raw//[[:space:]]/}
+   raw=${raw^^}
+
+   [[ -n "$raw" ]] || return 1
+
+   local formatted=""
+   local i=0 len=${#raw}
+   while (( i < len )); do
+      if (( i > 0 )); then
+         formatted+=':'
+      fi
+      if (( i + 2 <= len )); then
+         formatted+="${raw:i:2}"
+      else
+         formatted+="${raw:i:1}"
+      fi
+      (( i += 2 ))
+   done
+
+   printf '%s' "$formatted"
+}
+
+function revoke_certificate_serial() {
+   local serial="$1"
+   [[ -n "$serial" ]] || return 1
+
+   local revoke_path="${VAULT_PKI_PATH:-pki}"
+   revoke_path="${revoke_path%/}/revoke"
+
+   local payload
+   payload=$(jq -n --arg serial "$serial" '{serial_number: $serial}')
+
+   if vault_api_request POST "$revoke_path" "$payload" >/dev/null; then
+      return 0
+   fi
+
+   return 1
+}
+
+function extract_certificate_serial() {
+   local cert_file="$1" raw
+   raw=$(openssl x509 -noout -serial -in "$cert_file" 2>/dev/null) || return 1
+   raw=${raw#serial=}
+   normalize_serial "$raw"
 }
 
 main "$@"

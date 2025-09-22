@@ -22,6 +22,8 @@ VAULT_PKI_HELPERS="$SCRIPT_DIR/lib/vault_pki.sh"
 if [[ -f "$VAULT_PKI_HELPERS" ]]; then
    # shellcheck disable=SC1090
    source "$VAULT_PKI_HELPERS"
+else
+   _warn "[vault] missing optional helper file: $VAULT_PKI_LIB" >&2
 fi
 
 command -v _info >/dev/null 2>&1 || _info() { printf '%s\n' "$*" >&2; }
