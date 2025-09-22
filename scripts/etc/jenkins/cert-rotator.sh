@@ -184,13 +184,12 @@ function mint_certificate() {
    local cn="$1" alt_names="$2"
 
    local ttl_arg="${VAULT_PKI_ROLE_TTL:-}"
+   local payload
    payload=$(jq -n --arg cn "$cn" --arg alt "$alt_names" --arg ttl "$ttl_arg" '
    {common_name: $cn}
    | if ($alt | length) > 0 then .alt_names = $alt else . end
    | if ($ttl | length) > 0 then .ttl = $ttl else . end
    ')
-   local payload
-   payload=$(jq -n "${payload_args[@]}" "$payload_expr")
 
    local issue_path="${VAULT_PKI_PATH:-pki}"
    issue_path="${issue_path%/}/issue/${VAULT_PKI_ROLE}"
