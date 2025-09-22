@@ -354,7 +354,10 @@ format_serial_hex_pairs() {
   local expected_serial
   expected_serial=$(openssl x509 -noout -serial -in "$cert_file")
   expected_serial=${expected_serial#serial=}
-  expected_serial=$(printf '%s\n' "$expected_serial" | sed 's/../&:/g; s/:$//')
+  expected_serial=${expected_serial//:/}
+  expected_serial=${expected_serial//[[:space:]]/}
+  expected_serial=${expected_serial^^}
+  expected_serial=$(printf '%s' "$expected_serial" | sed 's/../&:/g; s/:$//')
 
   local cert_b64
   cert_b64=$(base64 <"$cert_file" | tr -d '\n')
@@ -796,12 +799,91 @@ EOF
   expected_vs_apply_prefix="apply -n sample-ns -f /tmp/jenkins-virtualservice"
   expected_dr_prefix="apply -n sample-ns --dry-run=client -f /tmp/jenkins-destinationrule"
   expected_dr_apply_prefix="apply -n sample-ns -f /tmp/jenkins-destinationrule"
+  expected_rotator_prefix="apply --dry-run=client -f /tmp/jenkins-cert-rotator"
+  expected_rotator_apply_prefix="apply -f /tmp/jenkins-cert-rotator"
   [[ "${kubectl_calls[0]}" == ${expected_gw_prefix}* ]]
   [[ "${kubectl_calls[1]}" == ${expected_gw_apply_prefix}* ]]
   [[ "${kubectl_calls[2]}" == ${expected_vs_prefix}* ]]
   [[ "${kubectl_calls[3]}" == ${expected_vs_apply_prefix}* ]]
   [[ "${kubectl_calls[4]}" == ${expected_dr_prefix}* ]]
   [[ "${kubectl_calls[5]}" == ${expected_dr_apply_prefix}* ]]
+  [[ "${kubectl_calls[6]}" == ${expected_rotator_prefix}*  ]]
+  [[ "${kubectl_calls[7]}" == ${expected_rotator_apply_prefix}*  ]]
+}
+
+@test "_deploy_jenkins renders cert rotator manifest with defaults" {
+  unset JENKINS_CERT_ROTATOR_ENABLED
+  unset JENKINS_CERT_ROTATOR_NAME
+  unset JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT
+  unset JENKINS_CERT_ROTATOR_SCHEDULE
+
+  ROTATOR_CAPTURE_DIR="$BATS_TEST_TMPDIR/rotator-manifests"
+  mkdir -p "$ROTATOR_CAPTURE_DIR"
+
+  _kubectl() {
+    local original=("$@")
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo)
+          shift
+          ;;
+        --)
+          shift
+          original=("$@")
+          break
+          ;;
+        *)
+          shift
+          ;;
+      esac
+    done
+
+    printf '%s\n' "${original[*]}" >> "$KUBECTL_LOG"
+
+    local dry_run=0 file=""
+    for ((i=0; i<${#original[@]}; i++)); do
+      case "${original[$i]}" in
+        --dry-run=client)
+          dry_run=1
+          ;;
+        -f)
+          if (( i + 1 < ${#original[@]} )); then
+            file="${original[$((i + 1))]}"
+          fi
+          ;;
+      esac
+    done
+
+    if (( dry_run )) && [[ -n "$file" ]]; then
+      local dest="$ROTATOR_CAPTURE_DIR/$(basename "$file")"
+      cp "$file" "$dest"
+    fi
+
+    local rc=0
+    if ((${#KUBECTL_EXIT_CODES[@]})); then
+      rc=${KUBECTL_EXIT_CODES[0]}
+      KUBECTL_EXIT_CODES=("${KUBECTL_EXIT_CODES[@]:1}")
+    fi
+
+    return "$rc"
+  }
+
+  export -f _kubectl
+
+  _vault_issue_pki_tls_secret() { :; }
+  export -f _vault_issue_pki_tls_secret
+
+  run _deploy_jenkins sample-ns
+  [ "$status" -eq 0 ]
+
+  local rotator_file
+  rotator_file=$(find "$ROTATOR_CAPTURE_DIR" -maxdepth 1 -type f -name 'jenkins-cert-rotator*' -print -quit)
+  [[ -n "$rotator_file" ]]
+  [[ -s "$rotator_file" ]]
+  grep -q 'kind: CronJob' "$rotator_file"
+  grep -q 'name: jenkins-cert-rotator' "$rotator_file"
+  grep -Fq 'schedule: "0 */12 * * *"' "$rotator_file"
+  grep -q 'serviceAccountName: jenkins-cert-rotator' "$rotator_file"
 }
 
 @test "_deploy_jenkins cleans up rendered manifests on success and failure" {
