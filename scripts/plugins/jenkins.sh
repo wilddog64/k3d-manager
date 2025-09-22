@@ -591,6 +591,12 @@ function _deploy_jenkins() {
       return "$rc"
    fi
 
+   local jenkins_vars_file="$JENKINS_CONFIG_DIR/jenkins-vars.sh"
+   if [[ -r "$jenkins_vars_file" ]]; then
+      # shellcheck disable=SC1090
+      source "$jenkins_vars_file"
+   fi
+
    if [[ "${JENKINS_CERT_ROTATOR_ENABLED:-0}" == "1" ]]; then
       local rotator_template="$JENKINS_CONFIG_DIR/jenkins-cert-rotator.yaml.tmpl"
       local rotator_script="$JENKINS_CONFIG_DIR/cert-rotator.sh"
