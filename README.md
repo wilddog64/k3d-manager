@@ -214,6 +214,10 @@ deploy_jenkins`.
    Seeing `kubernetes.io/tls` as the type and the expected subject/issuer
    confirms the PKI issuer workflow ran successfully.
 
+   The Jenkins certificate rotator automatically revokes the superseded
+   certificate in Vault after it applies a new Kubernetes TLS secret, ensuring
+   that stale leaf certificates cannot be reused.
+
 ## Writing a plugin
 
 Plugins live under `scripts/plugins/` and are sourced only when their function is invoked. Guidelines:
