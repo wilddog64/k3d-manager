@@ -2,9 +2,42 @@
 # shellcheck shell=bash
 # Helper functions for working with Vault PKI certificates.
 
+# Normalize a hexadecimal serial string into colon-separated hex pairs.
+# Accepts raw serials with or without colons and returns the normalized
+# representation in uppercase. When the serial has an odd number of hex
+# digits, it is left-padded with a zero so that all pairs contain two
+# characters.
+function _vault_normalize_serial_hex_pairs() {
+   local raw="${1:-}"
+
+   raw=${raw//:/}
+   raw=${raw//[[:space:]]/}
+   raw=${raw^^}
+
+   if [[ -z "$raw" ]]; then
+      return 1
+   fi
+
+   if (( ${#raw} % 2 == 1 )); then
+      raw="0${raw}"
+   fi
+
+   local formatted=""
+   local i len=${#raw}
+   for (( i = 0; i < len; i += 2 )); do
+      if (( i > 0 )); then
+         formatted+=':'
+      fi
+      formatted+="${raw:i:2}"
+   done
+
+   printf '%s' "$formatted"
+}
+
 # Extract the serial number from a PEM encoded certificate file.
-# Outputs the serial as an uppercase hex string without the leading
-# "serial=" prefix. Returns non-zero when the serial cannot be parsed.
+# Outputs the serial as an uppercase hex string formatted as
+# colon-separated pairs. Returns non-zero when the serial cannot be
+# parsed.
 function extract_certificate_serial() {
    local cert_file="$1"
    if [[ -z "$cert_file" || ! -s "$cert_file" ]]; then
@@ -17,8 +50,11 @@ function extract_certificate_serial() {
    fi
 
    serial=${serial#serial=}
-   serial=${serial^^}
-   printf '%s' "$serial"
+   local normalized
+   if ! normalized=$(_vault_normalize_serial_hex_pairs "$serial"); then
+      return 1
+   fi
+   printf '%s' "$normalized"
 }
 
 # Revoke a certificate in Vault given its serial number. The second argument
