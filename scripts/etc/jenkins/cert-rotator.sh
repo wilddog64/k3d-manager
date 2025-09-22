@@ -1,9 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-# shellcheck disable=SC1091
-source "${SCRIPT_ROOT}/lib/vault_pki.sh"
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+SCRIPT_ROOT=$(cd "${SCRIPT_DIR}/../.." && pwd)
+
+VAULT_PKI_LIB="${SCRIPT_ROOT}/lib/vault_pki.sh"
+if [[ ! -r "$VAULT_PKI_LIB" ]]; then
+   if [[ -r "${SCRIPT_DIR}/vault_pki.sh" ]]; then
+      VAULT_PKI_LIB="${SCRIPT_DIR}/vault_pki.sh"
+   elif [[ -r "${SCRIPT_DIR}/lib/vault_pki.sh" ]]; then
+      VAULT_PKI_LIB="${SCRIPT_DIR}/lib/vault_pki.sh"
+   else
+      printf 'Vault PKI helper not found relative to %s\n' "${BASH_SOURCE[0]}" >&2
+      exit 1
+   fi
+fi
+
+# shellcheck disable=SC1090
+source "$VAULT_PKI_LIB"
 
 function log() {
    local level="${1:-INFO}"
