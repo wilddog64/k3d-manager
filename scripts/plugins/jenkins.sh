@@ -600,6 +600,7 @@ function _deploy_jenkins() {
    if [[ "${JENKINS_CERT_ROTATOR_ENABLED:-0}" == "1" ]]; then
       local rotator_template="$JENKINS_CONFIG_DIR/jenkins-cert-rotator.yaml.tmpl"
       local rotator_script="$JENKINS_CONFIG_DIR/cert-rotator.sh"
+      local rotator_lib="$SCRIPT_DIR/lib/vault_pki.sh"
 
       if [[ ! -r "$rotator_template" ]]; then
          _err "Jenkins cert rotator template file not found: $rotator_template"
@@ -609,14 +610,25 @@ function _deploy_jenkins() {
          _err "Jenkins cert rotator script not found: $rotator_script"
       fi
 
-      local rotator_script_b64
+      if [[ ! -r "$rotator_lib" ]]; then
+         _err "Jenkins cert rotator Vault PKI helper not found: $rotator_lib"
+      fi
+
+      local rotator_script_b64 rotator_lib_b64
       rotator_script_b64=$(base64 < "$rotator_script" | tr -d '\n')
 
       if [[ -z "$rotator_script_b64" ]]; then
          _err "Failed to encode Jenkins cert rotator script"
       fi
 
+      rotator_lib_b64=$(base64 < "$rotator_lib" | tr -d '\n')
+
+      if [[ -z "$rotator_lib_b64" ]]; then
+         _err "Failed to encode Jenkins cert rotator Vault PKI helper"
+      fi
+
       export JENKINS_CERT_ROTATOR_SCRIPT_B64="$rotator_script_b64"
+      export JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64="$rotator_lib_b64"
 
       if [[ -z "${JENKINS_CERT_ROTATOR_VAULT_ADDR:-}" ]]; then
          export JENKINS_CERT_ROTATOR_VAULT_ADDR="http://${vault_release}.${vault_namespace}.svc:8200"
