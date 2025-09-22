@@ -323,18 +323,17 @@ function normalize_serial() {
 
    [[ -n "$raw" ]] || return 1
 
+   if (( ${#raw} % 2 == 1 )); then
+      raw="0${raw}"
+   fi
+
    local formatted=""
-   local i=0 len=${#raw}
-   while (( i < len )); do
+   local i len=${#raw}
+   for (( i = 0; i < len; i += 2 )); do
       if (( i > 0 )); then
          formatted+=':'
       fi
-      if (( i + 2 <= len )); then
-         formatted+="${raw:i:2}"
-      else
-         formatted+="${raw:i:1}"
-      fi
-      (( i += 2 ))
+      formatted+="${raw:i:2}"
    done
 
    printf '%s' "$formatted"
