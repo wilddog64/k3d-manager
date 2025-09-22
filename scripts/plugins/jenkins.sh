@@ -278,7 +278,7 @@ function _jenkins_require_hostpath_mounts() {
    JENKINS_MISSING_HOSTPATH_NODES=""
    JENKINS_MOUNT_CHECK_ERROR=""
 
-   if ! node_output=$(_k3d --no-exit --quiet node list --cluster "$cluster"); then
+   if ! node_output=$(_k3d --no-exit --quiet node list); then
       JENKINS_MOUNT_CHECK_ERROR="Failed to list k3d nodes for cluster $cluster. Ensure the cluster is running."
       return 1
    fi

@@ -111,6 +111,34 @@ EOF
   [ "${mount_calls[0]}" = "$CLUSTER_NAME" ]
 }
 
+@test "_jenkins_require_hostpath_mounts omits cluster flag when listing nodes" {
+  : >"$K3D_LOG"
+  local cluster="testcluster"
+  _k3d() {
+    local cmd="$*"
+    echo "$cmd" >> "$K3D_LOG"
+    if [[ "$cmd" == *"node list"* ]]; then
+      cat <<'EOF'
+NAME   ROLE    CLUSTER   STATUS
+k3d-testcluster-server-0   server  testcluster   running
+k3d-testcluster-agent-0    agent   testcluster   running
+k3d-other-server-0         server  other        running
+EOF
+    fi
+  }
+  _jenkins_node_has_mount() { return 0; }
+  export -f _k3d
+  export -f _jenkins_node_has_mount
+
+  run _jenkins_require_hostpath_mounts "$cluster"
+  [ "$status" -eq 0 ]
+
+  read_lines "$K3D_LOG" k3d_calls
+  [ "${#k3d_calls[@]}" -ge 1 ]
+  [[ "${k3d_calls[0]}" == *"node list"* ]]
+  [[ "${k3d_calls[0]}" != *"--cluster"* ]]
+}
+
 @test "PV/PVC setup auto-detects cluster" {
   KUBECTL_EXIT_CODES=(1 0)
   jhp="$SCRIPT_DIR/storage/jenkins_home"
