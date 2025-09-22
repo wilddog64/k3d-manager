@@ -894,7 +894,8 @@ EOF
     local mode="$1"
     local script="$BATS_TEST_TMPDIR/check-${mode}.sh"
     local log_file="$BATS_TEST_TMPDIR/cleanup-${mode}.log"
-    cat <<EOF >"$script"
+    {
+      cat <<EOF
 #!/usr/bin/env bash
 set -eo pipefail
 BATS_TEST_DIRNAME="${BATS_TEST_DIRNAME}"
@@ -903,42 +904,53 @@ helper="$helper"
 plugin="$plugin"
 mode="$mode"
 log_file="$log_file"
+EOF
+      cat <<'EOF'
 source "$helper"
 init_test_env
 source "$plugin"
 export_stubs
 _cleanup_on_success() {
-  for path in "\$@"; do
-    echo "\$path" >> "\$log_file"
-    rm -f "\$path"
+  for path in "$@"; do
+    echo "$path" >> "$log_file"
+    rm -f "$path"
   done
 }
 _vault_issue_pki_tls_secret() { :; }
 export -f _cleanup_on_success
 export -f _vault_issue_pki_tls_secret
 : >"$log_file"
-if [[ "\$mode" == failure ]]; then
+if [[ "$mode" == failure ]]; then
   KUBECTL_EXIT_CODES=(0 0 1)
 fi
 set +e
 _deploy_jenkins sample-ns >/dev/null 2>&1
-status=\$?
+status=$?
 set -e
-if [[ "\$mode" == success ]]; then
-  [[ "\$status" -eq 0 ]] || exit 1
+if [[ "$mode" == success ]]; then
+  [[ "$status" -eq 0 ]] || exit 1
 else
-  kubectl_calls=$(wc -l <"\$KUBECTL_LOG")
-  [[ "\$kubectl_calls" -lt 6 ]] || exit 1
-    fi
-    readarray -t cleanup_paths <"$log_file"
-    [[ "\${#cleanup_paths[@]}" -eq 3 ]] || exit 1
-    mapfile -t unique_paths < <(printf '%s\n' "\${cleanup_paths[@]}" | sort -u)
-    [[ "\${#unique_paths[@]}" -eq 3 ]] || exit 1
-    for path in "\${unique_paths[@]}"; do
-      [[ "\$path" == /tmp/* ]] || exit 1
-      [[ ! -e "\$path" ]] || exit 1
-    done
+  kubectl_calls=$(wc -l <"$KUBECTL_LOG")
+  [[ "$kubectl_calls" -lt 6 ]] || exit 1
+fi
+readarray -t cleanup_paths <"$log_file"
+expected_count=3
+for path in "${cleanup_paths[@]}"; do
+  if [[ "$path" == *jenkins-cert-rotator* ]]; then
+    expected_count=4
+    break
+  fi
+done
+[[ "${#cleanup_paths[@]}" -eq "$expected_count" ]] || exit 1
+mapfile -t unique_paths < <(printf '%s\n' "${cleanup_paths[@]}" | sort -u)
+[[ "${#unique_paths[@]}" -eq "$expected_count" ]] || exit 1
+for path in "${unique_paths[@]}"; do
+  [[ "$path" == /tmp/* ]] || exit 1
+  [[ ! -e "$path" ]] || exit 1
+done
 EOF
+    } >"$script"
+
     chmod +x "$script"
     "$script"
   }
