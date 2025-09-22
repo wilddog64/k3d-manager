@@ -463,7 +463,7 @@ function deploy_jenkins() {
    deploy_vault ha "$vault_namespace" "$vault_release"
    _create_jenkins_admin_vault_policy "$vault_namespace" "$vault_release"
    _create_jenkins_vault_ad_policy "$vault_namespace" "$vault_release" "$jenkins_namespace"
-   _create_jenkins_cert_rotator_policy "$vault_namespace" "$vault_release"
+   _create_jenkins_cert_rotator_policy "$vault_namespace" "$vault_release" "" "" "$jenkins_namespace"
    _create_jenkins_namespace "$jenkins_namespace"
    _create_jenkins_pv_pvc "$jenkins_namespace"
    _ensure_jenkins_cert "$vault_namespace" "$vault_release"
@@ -768,7 +768,7 @@ function _create_jenkins_cert_rotator_policy() {
    local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
    local pki_path="${3:-${VAULT_PKI_PATH:-pki}}"
    local pki_role="${4:-${VAULT_PKI_ROLE:-jenkins-tls}}"
-   local secret_namespace="${5:-${VAULT_PKI_SECRET_NS:-istio-system}}"
+   local jenkins_namespace="${5:-jenkins}"
    local rotator_service_account="${6:-jenkins-cert-rotator}"
    local policy_name="jenkins-cert-rotator"
    local pod="${vault_release}-0"
@@ -794,7 +794,7 @@ HCL
    _kubectl -n "$vault_namespace" exec -i "$pod" -- \
       vault write auth/kubernetes/role/jenkins-cert-rotator \
         bound_service_account_names="$rotator_service_account" \
-        bound_service_account_namespaces="$secret_namespace" \
+        bound_service_account_namespaces="$jenkins_namespace" \
         policies="$policy_name" \
         ttl=24h
 }

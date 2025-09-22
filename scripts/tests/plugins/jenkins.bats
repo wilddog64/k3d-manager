@@ -263,7 +263,8 @@ EOF
   _vault_policy_exists() { return 1; }
   export -f _vault_policy_exists
 
-  run _create_jenkins_cert_rotator_policy vault-ns vault-release custom-pki custom-role secret-ns rotator-sa
+  VAULT_PKI_SECRET_NS="secret-ns" \
+    run _create_jenkins_cert_rotator_policy vault-ns vault-release custom-pki custom-role jenkins-ns rotator-sa
   [ "$status" -eq 0 ]
 
   read_lines "$KUBECTL_LOG" kubectl_calls
@@ -282,6 +283,8 @@ EOF
   [ -n "$role_write_line" ]
   [[ "$role_write_line" != *"jenkins-cert-rotator -"* ]]
   [[ "$role_write_line" == *"bound_service_account_names=rotator-sa"* ]]
+  [[ "$role_write_line" == *"bound_service_account_namespaces=jenkins-ns"* ]]
+  [[ "$role_write_line" != *"secret-ns"* ]]
   [[ "$role_write_line" == *"policies=jenkins-cert-rotator"* ]]
   [ "$policy_write_count" -eq 1 ]
 }
@@ -330,6 +333,7 @@ create_self_signed_cert() {
   local expected_serial
   expected_serial=$(openssl x509 -noout -serial -in "$cert_file")
   expected_serial=${expected_serial#serial=}
+  expected_serial=$(printf '%s\n' "$expected_serial" | sed 's/../&:/g; s/:$//')
 
   local cert_b64
   cert_b64=$(base64 <"$cert_file" | tr -d '\n')
@@ -686,7 +690,7 @@ EOF
     "deploy_vault:ha custom-vault ${release}"
     "_create_jenkins_admin_vault_policy:custom-vault ${release}"
     "_create_jenkins_vault_ad_policy:custom-vault ${release} sample-ns"
-    "_create_jenkins_cert_rotator_policy:custom-vault ${release}"
+    "_create_jenkins_cert_rotator_policy:custom-vault ${release}   sample-ns"
     "_create_jenkins_namespace:sample-ns"
     "_create_jenkins_pv_pvc:sample-ns"
     "_ensure_jenkins_cert:custom-vault ${release}"
