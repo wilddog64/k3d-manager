@@ -369,7 +369,7 @@ function _create_jenkins_pv_pvc() {
       else
          cat >&2 <<EOF
 Jenkins requires the hostPath mount ${JENKINS_HOME_PATH}:${JENKINS_HOME_IN_CLUSTER} on all workload nodes, but these k3d nodes are missing it: ${missing_nodes}.
-Recreate the cluster with './scripts/k3d-manager create_k3d_cluster ${cluster_name}' or patch the nodes (for example: 'k3d node edit <node> --volume-add ${JENKINS_HOME_PATH}:${JENKINS_HOME_IN_CLUSTER}') before deploying Jenkins.
+Update your k3d cluster configuration so every node includes this mount, then recreate the cluster with './scripts/k3d-manager create_k3d_cluster ${cluster_name}' before deploying Jenkins.
 EOF
       fi
       return 1

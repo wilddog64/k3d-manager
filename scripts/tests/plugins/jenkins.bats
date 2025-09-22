@@ -190,8 +190,8 @@ EOF
   [ "$status" -eq 1 ]
   [[ "$stderr" == *"hostPath mount"* ]]
   [[ "$stderr" == *"broken-agent"* ]]
+  [[ "$stderr" == *"Update your k3d cluster configuration"* ]]
   [[ "$stderr" == *"create_k3d_cluster"* ]]
-  [[ "$stderr" == *"k3d node edit"* ]]
   read_lines "$KUBECTL_LOG" kubectl_calls
   [ "${#kubectl_calls[@]}" -eq 1 ]
   [[ "${kubectl_calls[0]}" == "get pv jenkins-home-pv" ]]
