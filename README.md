@@ -1,6 +1,6 @@
 # k3d-manager
 
-Utility scripts for creating and managing a local [k3d](https://k3d.io/) Kubernetes cluster with Istio and related tools.  The main entry point is `./scripts/k3d-manager`, which dispatches functions defined in the core libraries and lazily loads plugin files on demand.
+Utility scripts for creating and managing a local development Kubernetes cluster with Istio and related tools.  The main entry point is `./scripts/k3d-manager`, which dispatches functions defined in the core libraries and lazily loads plugin files on demand.  k3d remains the default provider on macOS, and other platforms can select their backend by exporting `CLUSTER_PROVIDER`.
 
 ## Usage
 
@@ -14,15 +14,15 @@ Running the script without arguments prints a short help message.  When you call
 Example:
 
 ```bash
-./scripts/k3d-manager create_k3d_cluster mycluster             # default 8000/8443
-./scripts/k3d-manager create_k3d_cluster second 9090 9443      # custom ports
+./scripts/k3d-manager create_cluster mycluster                 # default 8000/8443
+./scripts/k3d-manager create_cluster second 9090 9443          # custom ports
 ./scripts/k3d-manager hello
 ```
 
 Use `-h` or `--help` with any command to see a brief usage message:
 
 ```bash
-./scripts/k3d-manager create_k3d_cluster -h
+./scripts/k3d-manager create_cluster -h
 ./scripts/k3d-manager deploy_vault -h
 ```
 
@@ -30,8 +30,14 @@ You can run multiple clusters at once by giving each a unique name and
 port mapping:
 
 ```bash
-./scripts/k3d-manager create_k3d_cluster alpha
-./scripts/k3d-manager create_k3d_cluster beta 8001 8444
+./scripts/k3d-manager create_cluster alpha
+./scripts/k3d-manager create_cluster beta 8001 8444
+```
+
+Set `CLUSTER_PROVIDER` to select a different backend module:
+
+```bash
+CLUSTER_PROVIDER=k3d ./scripts/k3d-manager deploy_cluster
 ```
 
 ### Colima resource configuration (macOS)
@@ -110,9 +116,9 @@ The sequence shows a user invoking a plugin function, which loads the plugin and
 
 | Function | Location | Description |
 | --- | --- | --- |
-| `destroy_k3d_cluster` | `scripts/lib/core.sh` | Delete a k3d cluster |
-| `create_k3d_cluster` | `scripts/lib/core.sh` | Create a k3d cluster |
-| `deploy_k3d_cluster` | `scripts/lib/core.sh` | Create and configure a cluster |
+| `destroy_cluster` | `scripts/lib/core.sh` | Delete the active provider's cluster |
+| `create_cluster` | `scripts/lib/core.sh` | Create a cluster for the active provider |
+| `deploy_cluster` | `scripts/lib/core.sh` | Create and configure a cluster (Istio, etc.) |
 | `test_istio` | `scripts/lib/test.sh` | Run Istio validation tests |
 | `test_nfs_connectivity` | `scripts/lib/test.sh` | Check network connectivity to NFS |
 | `test_nfs_direct` | `scripts/lib/test.sh` | Directly mount NFS for troubleshooting |
