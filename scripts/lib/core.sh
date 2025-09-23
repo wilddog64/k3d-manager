@@ -374,7 +374,157 @@ function create_k3s_cluster() {
 }
 
 function deploy_cluster() {
-   _cluster_provider_call deploy_cluster "$@"
+  _cluster_provider_call deploy_cluster "$@"
+   local force_k3s=0 provider_cli="" show_help=0
+   local -a positional=()
+
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         -f|--force-k3s)
+            force_k3s=1
+            shift
+            ;;
+         --provider)
+            provider_cli="${2:-}"
+            shift 2
+            ;;
+         --provider=*)
+            provider_cli="${1#*=}"
+            shift
+            ;;
+         -h|--help)
+            show_help=1
+            shift
+            ;;
+         --)
+            shift
+            while [[ $# -gt 0 ]]; do
+               positional+=("$1")
+               shift
+            done
+            break
+            ;;
+         *)
+            positional+=("$1")
+            shift
+            ;;
+      esac
+   done
+
+   if (( show_help )); then
+      cat <<'EOF'
+Usage: deploy_cluster [options] [cluster_name]
+
+Options:
+  -f, --force-k3s     Skip the provider prompt and deploy using k3s.
+  --provider <name>   Explicitly set the provider (k3d or k3s).
+  -h, --help          Show this help message.
+EOF
+      return 0
+   fi
+
+   local platform="" platform_msg=""
+   if _is_mac; then
+      platform="mac"
+      platform_msg="Detected macOS environment."
+   elif _is_wsl; then
+      platform="wsl"
+      platform_msg="Detected Windows Subsystem for Linux environment."
+   elif _is_debian_family; then
+      platform="debian"
+      platform_msg="Detected Debian-based Linux environment."
+   elif _is_redhat_family; then
+      platform="redhat"
+      platform_msg="Detected Red Hat-based Linux environment."
+   elif _is_linux; then
+      platform="linux"
+      platform_msg="Detected generic Linux environment."
+   else
+      _err "Unsupported platform: $(uname -s)."
+   fi
+
+   if [[ -n "$platform_msg" ]]; then
+      _info "$platform_msg"
+   fi
+
+   local provider=""
+   if [[ -n "$provider_cli" ]]; then
+      provider="$provider_cli"
+   elif (( force_k3s )); then
+      provider="k3s"
+   else
+      local env_override="${CLUSTER_PROVIDER:-${K3D_MANAGER_PROVIDER:-${K3DMGR_PROVIDER:-${K3D_MANAGER_CLUSTER_PROVIDER:-}}}}"
+      if [[ -n "$env_override" ]]; then
+         provider="$env_override"
+      fi
+   fi
+
+   provider="$(printf '%s' "$provider" | tr '[:upper:]' '[:lower:]')"
+
+   if [[ "$platform" == "mac" && "$provider" == "k3s" ]]; then
+      _err "k3s is not supported on macOS; please use k3d instead."
+   fi
+
+   if [[ -z "$provider" ]]; then
+      if [[ "$platform" == "mac" ]]; then
+         provider="k3d"
+      else
+         local has_tty=0
+         if [[ -t 0 && -t 1 ]]; then
+            has_tty=1
+         fi
+
+         if (( has_tty )); then
+            local choice=""
+            while true; do
+               printf 'Select cluster provider [k3d/k3s] (default: k3d): '
+               IFS= read -r choice || choice=""
+               choice="$(printf '%s' "$choice" | tr '[:upper:]' '[:lower:]')"
+               if [[ -z "$choice" ]]; then
+                  provider="k3d"
+                  break
+               fi
+               case "$choice" in
+                  k3d|k3s)
+                     provider="$choice"
+                     break
+                     ;;
+                  *)
+                     _warn "Unsupported selection '$choice'. Please choose k3d or k3s."
+                     ;;
+               esac
+            done
+         else
+            provider="k3d"
+            _info "Non-interactive session detected; defaulting to k3d provider."
+         fi
+      fi
+   fi
+
+   if [[ "$platform" == "mac" && "$provider" == "k3s" ]]; then
+      _err "k3s is not supported on macOS; please use k3d instead."
+   fi
+
+   case "$provider" in
+      k3d|k3s)
+         ;;
+      "")
+         _err "Failed to determine cluster provider."
+         ;;
+      *)
+         _err "Unsupported cluster provider: $provider"
+         ;;
+   esac
+
+   export CLUSTER_PROVIDER="$provider"
+   export K3D_MANAGER_PROVIDER="$provider"
+   export K3D_MANAGER_CLUSTER_PROVIDER="$provider"
+   if declare -f cluster_provider_set_active >/dev/null 2>&1; then
+      cluster_provider_set_active "$provider"
+   fi
+
+   _info "Using cluster provider: $provider"
+   _cluster_provider_call deploy_cluster "${positional[@]}"
 }
 
 function deploy_k3d_cluster() {
