@@ -368,6 +368,13 @@ deploy_jenkins`.
    certificate in Vault after it applies a new Kubernetes TLS secret, ensuring
    that stale leaf certificates cannot be reused.
 
+   By default, the CronJob pulls `docker.io/bitnami/kubectl:1.30.2`. Update the
+   `JENKINS_CERT_ROTATOR_IMAGE` variable (either in the environment or in
+   `scripts/etc/jenkins/jenkins-vars.sh`) before deploying if your registries
+   differ. Bitnami's revisioned `-rN` tags are short-lived, so mirroring or
+   pinning to the plain version tag in another registry can help avoid future
+   image rot.
+
    If the deployment notices the rotator pods are stuck with image pull errors
    (`ErrImagePull` or `ImagePullBackOff`), it emits a warning advising you to
    set `JENKINS_CERT_ROTATOR_IMAGE` or update
