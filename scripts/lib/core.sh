@@ -82,6 +82,163 @@ function _k3s_cluster_exists() {
    _k3s_set_defaults
    [[ -f "$K3S_SERVICE_FILE" ]] && return 0 || return 1
 }
+
+function _install_k3s() {
+   if _command_exist k3s ; then
+      _info "k3s already installed, skipping"
+      return 0
+   fi
+
+   _k3s_set_defaults
+
+   if _is_mac ; then
+      local arch asset tmpfile dest
+      arch="$(uname -m)"
+      case "$arch" in
+         arm64|aarch64)
+            asset="k3s-darwin-arm64"
+            ;;
+         x86_64|amd64)
+            asset="k3s-darwin-amd64"
+            ;;
+         *)
+            _err "Unsupported macOS architecture for k3s: $arch"
+            ;;
+      esac
+
+      tmpfile="$(mktemp)"
+      dest="${K3S_INSTALL_DIR}/k3s"
+
+      _info "Downloading k3s binary for macOS ($arch)"
+      _curl -fsSL "https://github.com/k3s-io/k3s/releases/latest/download/${asset}" -o "$tmpfile"
+
+      _ensure_path_exists "$K3S_INSTALL_DIR"
+
+      if [[ -w "$K3S_INSTALL_DIR" ]]; then
+         mv "$tmpfile" "$dest"
+      else
+         _run_command --prefer-sudo -- mv "$tmpfile" "$dest"
+      fi
+
+      if [[ -w "$dest" ]]; then
+         chmod 0755 "$dest"
+      else
+         _run_command --prefer-sudo -- chmod 0755 "$dest"
+      fi
+
+      _info "Installed k3s binary at $dest"
+      return 0
+   fi
+
+   if _is_debian_family || _is_redhat_family || _is_wsl ; then
+      local installer
+      installer="$(mktemp)"
+      _info "Fetching k3s installer script"
+      _curl -fsSL https://get.k3s.io -o "$installer"
+
+      _info "Running k3s installer"
+      _run_command --prefer-sudo -- env INSTALL_K3S_EXEC="server --write-kubeconfig-mode 0644" \
+         sh "$installer"
+
+      rm -f "$installer"
+
+      if _command_exist systemctl ; then
+         _run_command --prefer-sudo -- systemctl enable "$K3S_SERVICE_NAME"
+      fi
+
+      return 0
+   fi
+
+   _err "Unsupported platform for k3s installation"
+}
+
+function _teardown_k3s_cluster() {
+   _k3s_set_defaults
+
+   if _is_mac ; then
+      local dest="${K3S_INSTALL_DIR}/k3s"
+      if [[ -f "$dest" ]]; then
+         if [[ -w "$dest" ]]; then
+            rm -f "$dest"
+         else
+            _run_command --prefer-sudo -- rm -f "$dest"
+         fi
+         _info "Removed k3s binary at $dest"
+      fi
+      return 0
+   fi
+
+   if [[ -x "/usr/local/bin/k3s-uninstall.sh" ]]; then
+      _run_command --prefer-sudo -- /usr/local/bin/k3s-uninstall.sh
+      return 0
+   fi
+
+   if [[ -x "/usr/local/bin/k3s-killall.sh" ]]; then
+      _run_command --prefer-sudo -- /usr/local/bin/k3s-killall.sh
+      return 0
+   fi
+
+   if _k3s_cluster_exists && _command_exist systemctl ; then
+      _run_command --prefer-sudo -- systemctl stop "$K3S_SERVICE_NAME"
+      _run_command --prefer-sudo -- systemctl disable "$K3S_SERVICE_NAME"
+   fi
+}
+
+function _deploy_k3s_cluster() {
+   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+      echo "Usage: deploy_k3s_cluster [cluster_name=k3s-cluster]"
+      return 0
+   fi
+
+   local cluster_name="${1:-k3s-cluster}"
+   export CLUSTER_NAME="$cluster_name"
+
+   if _is_mac ; then
+      _warn "k3s server deployment is not supported natively on macOS. Installed binaries only."
+      return 0
+   fi
+
+   _install_k3s
+   _k3s_set_defaults
+
+   if _command_exist systemctl ; then
+      _run_command --prefer-sudo -- systemctl start "$K3S_SERVICE_NAME"
+   else
+      _info "systemctl not available; assuming k3s installer handled service startup"
+   fi
+
+   local kubeconfig_src="$K3S_KUBECONFIG_PATH"
+   local timeout=60
+   while (( timeout > 0 )); do
+      if [[ -r "$kubeconfig_src" ]]; then
+         break
+      fi
+      sleep 2
+      timeout=$((timeout - 2))
+   done
+
+   if [[ ! -r "$kubeconfig_src" ]]; then
+      _err "Timed out waiting for k3s kubeconfig at $kubeconfig_src"
+   fi
+
+   local dest_kubeconfig="${KUBECONFIG:-$HOME/.kube/config}"
+   _ensure_path_exists "$(dirname "$dest_kubeconfig")"
+
+   if [[ -w "$dest_kubeconfig" || ! -e "$dest_kubeconfig" ]]; then
+      cp "$kubeconfig_src" "$dest_kubeconfig"
+   else
+      _run_command --prefer-sudo -- cp "$kubeconfig_src" "$dest_kubeconfig"
+   fi
+
+   if ! _is_wsl; then
+      _run_command --prefer-sudo -- chown "$(id -u):$(id -g)" "$dest_kubeconfig" 2>/dev/null || true
+   fi
+   chmod 0600 "$dest_kubeconfig" 2>/dev/null || true
+
+   export KUBECONFIG="$dest_kubeconfig"
+
+   _info "k3s cluster '$CLUSTER_NAME' is ready"
+}
 function _install_docker() {
    if _is_mac; then
       _install_mac_docker
@@ -188,6 +345,10 @@ function destroy_k3d_cluster() {
    destroy_cluster "$@"
 }
 
+function destroy_k3s_cluster() {
+   destroy_cluster "$@"
+}
+
 function _create_cluster() {
    _cluster_provider_call create_cluster "$@"
 }
@@ -204,10 +365,22 @@ function create_k3d_cluster() {
    create_cluster "$@"
 }
 
+function _create_k3s_cluster() {
+   _create_cluster "$@"
+}
+
+function create_k3s_cluster() {
+   create_cluster "$@"
+}
+
 function deploy_cluster() {
    _cluster_provider_call deploy_cluster "$@"
 }
 
 function deploy_k3d_cluster() {
+   deploy_cluster "$@"
+}
+
+function deploy_k3s_cluster() {
    deploy_cluster "$@"
 }
