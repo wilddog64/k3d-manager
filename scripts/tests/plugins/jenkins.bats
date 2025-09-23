@@ -310,13 +310,47 @@ JSON
   }
   export -f _kubectl
 
+  export VAULT_PKI_LEAF_HOST="jenkins.192.168.0.1.sslip.io"
+  unset VAULT_PKI_ALLOWED
+
   run _ensure_jenkins_cert vault
   [ "$status" -eq 0 ]
   grep -q 'vault secrets enable pki' "$KUBECTL_LOG"
-  grep -q 'vault write pki/roles/jenkins' "$KUBECTL_LOG"
+  grep -Fq 'vault write pki/roles/jenkins allowed_domains=sslip.io allow_subdomains=true max_ttl=72h' "$KUBECTL_LOG"
   grep -q 'vault write -format=json pki/issue/jenkins' "$KUBECTL_LOG"
   local secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
   grep -q "create secret tls ${secret_name}" "$KUBECTL_LOG"
+}
+
+@test "_ensure_jenkins_cert honors VAULT_PKI_ALLOWED for wildcard domains" {
+  _kubectl() {
+    local cmd="$*"
+    echo "$cmd" >> "$KUBECTL_LOG"
+    local secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
+    if [[ "$cmd" == *"get secret ${secret_name}"* ]]; then
+      return 1
+    fi
+    if [[ "$cmd" == *"vault secrets list"* ]]; then
+      return 1
+    fi
+    if [[ "$cmd" == *"vault write -format=json pki/issue/jenkins"* ]]; then
+      cat <<'JSON'
+{"data":{"certificate":"CERT","private_key":"KEY"}}
+JSON
+      return 0
+    fi
+    return 0
+  }
+  export -f _kubectl
+
+  export VAULT_PKI_ALLOWED="jenkins.dev.local.me,*.dev.local.me"
+
+  run _ensure_jenkins_cert vault
+  [ "$status" -eq 0 ]
+  grep -Fq 'allowed_domains=jenkins.dev.local.me,*.dev.local.me' "$KUBECTL_LOG"
+  grep -Fq 'max_ttl=72h' "$KUBECTL_LOG"
+  ! grep -q 'allow_subdomains=' "$KUBECTL_LOG"
+  unset VAULT_PKI_ALLOWED
 }
 
 create_self_signed_cert() {
@@ -1013,6 +1047,8 @@ EOF
   }
   export -f _kubectl
 
+  export VAULT_PKI_LEAF_HOST="jenkins.127.0.0.1.nip.io"
+
   run deploy_jenkins "$random_ns"
   [ "$status" -eq 0 ]
 
@@ -1024,6 +1060,8 @@ EOF
   [[ -n "$vs_file" ]]
   [[ -n "$dr_file" ]]
   grep -q "namespace: \"$random_ns\"" "$vs_file"
+  grep -q '  hosts:' "$vs_file"
+  grep -q '    - jenkins.127.0.0.1.nip.io' "$vs_file"
   grep -q "jenkins.$random_ns.svc.cluster.local" "$vs_file"
   grep -q "namespace: \"$random_ns\"" "$dr_file"
   grep -q "jenkins.$random_ns.svc.cluster.local" "$dr_file"
