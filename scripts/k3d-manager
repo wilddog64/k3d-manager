@@ -43,7 +43,19 @@ source "${SCRIPT_DIR}/lib/cluster_provider.sh"
 source "${SCRIPT_DIR}/lib/test.sh"
 source "${SCRIPT_DIR}/lib/core.sh"
 
-_ensure_cluster_provider
+if [[ -n "${CLUSTER_PROVIDER:-}" ]]; then
+    export K3D_MANAGER_PROVIDER="${K3D_MANAGER_PROVIDER:-$CLUSTER_PROVIDER}"
+    export K3D_MANAGER_CLUSTER_PROVIDER="${K3D_MANAGER_CLUSTER_PROVIDER:-$CLUSTER_PROVIDER}"
+    if declare -f cluster_provider_set_active >/dev/null 2>&1; then
+        cluster_provider_set_active "$(printf '%s' "$CLUSTER_PROVIDER" | tr '[:upper:]' '[:lower:]')"
+    fi
+elif [[ -n "${K3D_MANAGER_PROVIDER:-}" ]]; then
+    export CLUSTER_PROVIDER="$K3D_MANAGER_PROVIDER"
+    export K3D_MANAGER_CLUSTER_PROVIDER="${K3D_MANAGER_CLUSTER_PROVIDER:-$K3D_MANAGER_PROVIDER}"
+    if declare -f cluster_provider_set_active >/dev/null 2>&1; then
+        cluster_provider_set_active "$(printf '%s' "$K3D_MANAGER_PROVIDER" | tr '[:upper:]' '[:lower:]')"
+    fi
+fi
 
 function _usage() {
     local test_suites
