@@ -39,6 +39,40 @@ Set `CLUSTER_PROVIDER` to select a different backend module:
 ```bash
 CLUSTER_PROVIDER=k3d ./scripts/k3d-manager deploy_cluster
 ```
+## Using k3s clusters
+
+The helper scripts in this repository provision and manage k3d environments out of
+the box. They do not install or upgrade [k3s](https://k3s.io/) for you, so users
+who prefer running against a remote or bare-metal k3s control plane must prepare
+that cluster independently before invoking any plugins.
+
+### Required environment for Jenkins and CLI integrations
+
+The Jenkins plugin and the shell helpers discover non-k3d clusters through a few
+environment variables and binaries:
+
+* `CLUSTER_PROVIDER` (preferred) or `K3D_MANAGER_PROVIDER` / `K3DMGR_PROVIDER`
+  must be exported with the value `k3s` so the dispatcher selects the k3s
+  backend.
+* `KUBECONFIG` has to point at the kubeconfig file for your k3s control plane.
+  Copy `/etc/rancher/k3s/k3s.yaml` from the server to a location Jenkins can read
+  and update the cluster server hostname if necessary.
+* The `k3s` CLI must be available on the PATH when you run k3s-specific helpers
+  so health checks and log collection can call it.
+
+### Minimal workflow for existing k3s control planes
+
+1. Install k3s on the target host by following the
+   [official quick-start instructions](https://docs.k3s.io/quick-start) (for
+   example `curl -sfL https://get.k3s.io | sh -s - server --disable traefik`).
+2. Copy the kubeconfig (`/etc/rancher/k3s/k3s.yaml`) to the machine where you run
+   k3d-manager and set `KUBECONFIG` to its path. Adjust the API server address in
+   the kubeconfig if you access the control plane remotely.
+3. Export `CLUSTER_PROVIDER=k3s` (or one of the supported aliases) and ensure the
+   `k3s` binary is installed locally.
+4. Run `./scripts/k3d-manager status` or another helper function to verify the
+   CLI can talk to the external control plane.
+
 ## k3s backend (bare-metal installations)
 
 Some teams run the same manifests against a remote [k3s](https://k3s.io/) cluster
