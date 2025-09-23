@@ -208,7 +208,7 @@ graph TD
   PLUG --> HELM[helm]
   PLUG --> KUB[kubectl]
   PLUG --> JPLUG[plugins/jenkins.sh]
-  JPLUG --> ROTATOR[Jenkins cert rotator CronJob(docker.io/google/cloud-sdk:slim)]
+  JPLUG --> ROTATOR["Jenkins cert rotator CronJob<br/>(docker.io/google/cloud-sdk:slim)"]
   JPLUG -->|ESO/Vault manifests| ESO
   ROTATOR -->|refresh TLS secret| JENKINS[Jenkins StatefulSet]
   ROTATOR --> ESO
