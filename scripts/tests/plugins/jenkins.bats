@@ -12,6 +12,8 @@ setup() {
   _k3d() { echo "$*" >> "$K3D_LOG"; }
   export K3D_LOG
   export -f _k3d
+  MINIMAL_JQ_HELPER="${BATS_TEST_DIRNAME}/minimal_jq.py"
+  export MINIMAL_JQ_HELPER
 }
 
 @test "Jenkins trap wrapper preserves original script arguments" {
