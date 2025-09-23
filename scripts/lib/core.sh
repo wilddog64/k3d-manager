@@ -374,7 +374,6 @@ function create_k3s_cluster() {
 }
 
 function deploy_cluster() {
-  _cluster_provider_call deploy_cluster "$@"
    local force_k3s=0 provider_cli="" show_help=0
    local -a positional=()
 
