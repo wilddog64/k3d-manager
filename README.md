@@ -207,12 +207,19 @@ graph TD
   KM --|_try_load_plugin(func)|--> PLUG[plugins/*.sh]
   PLUG --> HELM[helm]
   PLUG --> KUB[kubectl]
+  PLUG --> JPLUG[plugins/jenkins.sh]
+  JPLUG --> ROTATOR[Jenkins cert rotator CronJob\n(docker.io/bitnami/kubectl:1.30.2)]
+  JPLUG -->|ESO/Vault manifests| ESO
+  ROTATOR -->|refresh TLS secret| JENKINS[Jenkins StatefulSet]
+  ROTATOR --> ESO
   CORE --> HELM
   CORE --> KUB
   subgraph Cluster
      K3D[k3d/k3s API] --> K8S[Kubernetes]
      ISTIO[Istio] --> K8S
      ESO[External Secrets Operator] --> K8S
+     JENKINS --> K8S
+     ROTATOR --> K8S
   end
   HELM --> K3D
   KUB --> K3D
@@ -221,34 +228,44 @@ graph TD
      VAULT[HashiCorp Vault]
      AZ[Azure Key Vault]
      BWD[Bitwarden]
-     JNK[Jenkins]
   end
   ESO <-- sync/reads --> VAULT
   ESO <-- sync/reads --> AZ
   ESO <-- sync/reads --> BWD
+  ROTATOR -->|requests leaf certs| VAULT
 ```
 
-This diagram outlines how the CLI dispatches to core libraries and loads plugins on demand, which then use Helm and kubectl to manage the cluster.
+This refreshed diagram highlights how the CLI dispatches to core libraries, loads plugins on demand, and—through the Jenkins plugin—renders the External Secrets Operator integration and the certificate-rotator CronJob that runs `docker.io/bitnami/kubectl:1.30.2` to keep Vault-backed TLS material current for the Jenkins workload.
 
 ```mermaid
 sequenceDiagram
   participant U as user
   participant KM as k3d-manager
   participant SYS as _try_load_plugin / wrappers
-  participant P as plugin fn
-  participant K as kubectl/helm
-  participant C as k3d cluster
+  participant J as deploy_jenkins plugin
+  participant T as Jenkins & rotator templates
+  participant K as kubectl/helm wrappers
+  participant C as k3d/k3s cluster
+  participant R as cert rotator CronJob
+  participant ESO as External Secrets Operator
+  participant V as Vault
 
-  U->>KM: ./k3d-manager deploy_vault
-  KM->>SYS: _try_load_plugin("deploy_vault")
-  SYS->>P: source plugins/vault.sh
-  SYS->>P: call deploy_vault
-  P->>K: _helm install ... / _kubectl apply ...
-  K->>C: apply charts/manifests
-  Note over KM: public functions dispatch into plugins\nprivate helpers start with "_" and are not invokable
+  U->>KM: ./k3d-manager deploy_jenkins
+  KM->>SYS: _try_load_plugin("deploy_jenkins")
+  SYS->>J: source plugins/jenkins.sh
+  SYS->>J: call deploy_jenkins
+  J->>T: load manifests (workload + rotator CronJob)
+  J->>K: _helm install Jenkins\n_kubectl apply rotator (pinned image)
+  Note right of K: CronJob image pinned to docker.io/bitnami/kubectl:1.30.2
+  K->>C: apply StatefulSet, services, ESO bindings & CronJob
+  C->>R: schedule jenkins-cert-rotator
+  R->>ESO: read Vault token secret
+  R->>V: request leaf certificate
+  R->>C: kubectl apply TLS secret & restart pods
+  Note over R,V: Rotator keeps Vault and cluster secrets in sync
 ```
 
-The sequence shows a user invoking a plugin function, which loads the plugin and applies resources to the cluster.
+The sequence now traces the `deploy_jenkins` flow: k3d-manager sources the Jenkins plugin, renders the workload and rotator manifests, applies them with the pinned kubectl image, and shows the CronJob fetching Vault-issued certificates through ESO before refreshing the Kubernetes secret.
 
 ## Public functions
 
