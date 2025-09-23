@@ -2,6 +2,93 @@ function _command_exist() {
     command -v "$1" &> /dev/null
 }
 
+__CLUSTER_PROVIDER_MODULES_LOADED=""
+
+function _default_cluster_provider() {
+    if _is_mac 2>/dev/null; then
+        echo "k3d"
+        return 0
+    fi
+
+    if [[ -n "${DEFAULT_CLUSTER_PROVIDER:-}" ]]; then
+        echo "$DEFAULT_CLUSTER_PROVIDER"
+        return 0
+    fi
+
+    echo "k3d"
+}
+
+function _cluster_provider_module_path() {
+    local provider="$1"
+    echo "${SCRIPT_DIR}/lib/providers/${provider}.sh"
+}
+
+function _cluster_provider_module_loaded() {
+    local provider="$1"
+    [[ ":${__CLUSTER_PROVIDER_MODULES_LOADED}:" == *":${provider}:"* ]]
+}
+
+function _cluster_provider_mark_loaded() {
+    local provider="$1"
+    if [[ -z "${__CLUSTER_PROVIDER_MODULES_LOADED}" ]]; then
+        __CLUSTER_PROVIDER_MODULES_LOADED="$provider"
+    else
+        __CLUSTER_PROVIDER_MODULES_LOADED+=":${provider}"
+    fi
+}
+
+function _ensure_cluster_provider() {
+    local provider="${CLUSTER_PROVIDER:-}"
+
+    if [[ -z "$provider" && -n "${K3D_MANAGER_CLUSTER_PROVIDER:-}" ]]; then
+        provider="$K3D_MANAGER_CLUSTER_PROVIDER"
+    fi
+
+    if [[ -z "$provider" ]]; then
+        provider="$(_default_cluster_provider)"
+    fi
+
+    if [[ -z "$provider" ]]; then
+        echo "No cluster provider configured. Set CLUSTER_PROVIDER to continue." >&2
+        exit 1
+    fi
+
+    export CLUSTER_PROVIDER="$provider"
+
+    if _cluster_provider_module_loaded "$provider"; then
+        return 0
+    fi
+
+    local module
+    module="$(_cluster_provider_module_path "$provider")"
+
+    if [[ ! -r "$module" ]]; then
+        echo "Cluster provider module not found: $provider" >&2
+        exit 1
+    fi
+
+    # shellcheck source=/dev/null
+    source "$module"
+    _cluster_provider_mark_loaded "$provider"
+}
+
+function _cluster_provider_call() {
+    local action="$1"
+    shift
+
+    _ensure_cluster_provider
+
+    local provider="$CLUSTER_PROVIDER"
+    local func="_provider_${provider}_${action}"
+
+    if ! declare -f "$func" >/dev/null 2>&1; then
+        echo "Cluster provider '$provider' does not implement action '$action'" >&2
+        exit 1
+    fi
+
+    "$func" "$@"
+}
+
 # _run_command [--quiet] [--prefer-sudo|--require-sudo] [--probe '<subcmd>'] -- <prog> [args...]
 # - --quiet         : suppress wrapper error message (still returns real exit code)
 # - --prefer-sudo   : use sudo -n if available, otherwise run as user
@@ -343,27 +430,19 @@ function _install_redhat_docker() {
 }
 
 function _k3d_cluster_exist() {
-   local cluster_name=$1
+   _cluster_provider_call cluster_exists "$@"
+}
 
-   if _run_command --no-exit -- k3d cluster list "$cluster_name" >/dev/null 2>&1 ; then
-      return 0
-   else
-      return 1
-   fi
+function __create_cluster() {
+   _cluster_provider_call apply_cluster_config "$@"
 }
 
 function __create_k3d_cluster() {
-   cluster_yaml=$1
-
-   if _is_mac ; then
-     _run_command --quiet -- k3d cluster create --config "${cluster_yaml}"
-   elif _is_linux ; then
-     _run_command k3d cluster create --config "${cluster_yaml}"
-   fi
+   __create_cluster "$@"
 }
 
 function _list_k3d_cluster() {
-   _run_command --quiet -- k3d cluster list
+   _cluster_provider_call list_clusters "$@"
 }
 
 function _kubectl() {
@@ -457,17 +536,7 @@ function _ip() {
 }
 
 function _k3d() {
-   local pre=()
-   while [[ $# -gt 0 ]]; do
-      case "$1" in
-         --quiet|--prefer-sudo|--require-sudo|--no-exit) pre+=("$1");
-            shift;;
-         --) shift;
-            break;;
-         *)  break;;
-      esac
-   done
-   _run_command "${pre[@]}" -- k3d "$@"
+   _cluster_provider_call exec "$@"
 }
 
 function _load_plugin_function() {
