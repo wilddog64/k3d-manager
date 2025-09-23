@@ -1,0 +1,19 @@
+[Unit]
+Description=Lightweight Kubernetes
+Documentation=https://k3s.io
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=${K3S_INSTALL_DIR}/k3s server --config ${K3S_CONFIG_FILE}
+KillMode=process
+Delegate=yes
+Restart=on-failure
+TimeoutStartSec=0
+LimitNOFILE=1048576
+LimitNPROC=infinity
+LimitCORE=infinity
+
+[Install]
+WantedBy=multi-user.target

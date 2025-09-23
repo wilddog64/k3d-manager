@@ -39,6 +39,7 @@ PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 
 # load our library functions
 source "${SCRIPT_DIR}/lib/system.sh"
+source "${SCRIPT_DIR}/lib/cluster_provider.sh"
 source "${SCRIPT_DIR}/lib/test.sh"
 source "${SCRIPT_DIR}/lib/core.sh"
 
