@@ -915,6 +915,23 @@ EOF
   [[ "${kubectl_calls[7]}" == ${expected_rotator_apply_prefix}*  ]]
 }
 
+@test "_deploy_jenkins skips repo add when local chart provided" {
+  export JENKINS_HELM_CHART_REF="$BATS_TEST_TMPDIR/jenkins-chart.tgz"
+  export JENKINS_HELM_REPO_URL=""
+
+  run _deploy_jenkins sample-ns
+  [ "$status" -eq 0 ]
+
+  read_lines "$HELM_LOG" helm_calls
+  [ "${#helm_calls[@]}" -eq 1 ]
+  local expected="upgrade --install jenkins ${JENKINS_HELM_CHART_REF} --namespace sample-ns -f $JENKINS_CONFIG_DIR/values.yaml"
+  [ "${helm_calls[0]}" = "$expected" ]
+  for call in "${helm_calls[@]}"; do
+    [[ "$call" != repo\ add* ]]
+    [[ "$call" != repo\ update* ]]
+  done
+}
+
 @test "_deploy_jenkins renders cert rotator manifest with defaults" {
   unset JENKINS_CERT_ROTATOR_ENABLED
   unset JENKINS_CERT_ROTATOR_NAME
