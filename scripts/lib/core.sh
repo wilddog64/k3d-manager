@@ -11,26 +11,6 @@ function _install_docker() {
    fi
 }
 
-function _install_k3d() {
-   export K3D_INSTALL_DIR="${1:-/usr/local/bin}"
-   export INSTALL_DIR="$K3D_INSTALL_DIR"
-
-   _install_docker
-   _install_helm
-   if _is_mac; then
-      _install_istioctl $HOME/.local/bin
-   else
-      _install_istioctl
-   fi
-
-   if ! _command_exist k3d ; then
-      echo k3d does not exist, install it
-      _curl -f -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | INSTALL_DIR="$K3D_INSTALL_DIR" bash
-   else
-      echo k3d installed already
-   fi
-}
-
 function _install_istioctl() {
    install_dir="${1:-/usr/local/bin}"
 
@@ -69,119 +49,11 @@ function _install_istioctl() {
 
 }
 
-function destroy_k3d_cluster() {
-   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-      echo "Usage: destroy_k3d_cluster <cluster_name>"
-      return 0
-   fi
-
-   local cluster_name=$1
-
-   if [[ -z "$cluster_name" ]]; then
-      echo "Cluster name is required"
-      exit 1
-   fi
-
-   if ! _k3d_cluster_exist "$cluster_name"; then
-      _info "Cluster $cluster_name does not exist, skip"
-      return 0
-   fi
-
-   _info "Deleting k3d cluster: $cluster_name"
-   _k3d cluster delete "$cluster_name"
-}
-
-function _create_k3d_cluster() {
-   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-      echo "Usage: create_k3d_cluster <cluster_name> [http_port=8000] [https_port=8443]"
-      return 0
-   fi
-
-   local cluster_name=$1
-   local http_port="${2:-8000}"
-   local https_port="${3:-8443}"
-
-   export CLUSTER_NAME="$cluster_name"
-   export HTTP_PORT="$http_port"
-   export HTTPS_PORT="$https_port"
-
-   if [[ -z "$cluster_name" ]]; then
-      echo "Cluster name is required"
-      exit 1
-   fi
-
-   export CLUSTER_NAME="$cluster_name"
-
-   if [[ -n "$http_port" ]]; then
-      export HTTP_PORT="$http_port"
-   fi
-
-   if [[ -n "$https_port" ]]; then
-      export HTTPS_PORT="$https_port"
-   fi
-
-   cluster_template="$(dirname "$SOURCE")/etc/cluster.yaml.tmpl"
-   cluster_var="$(dirname "$SOURCE")/etc/cluster_var.sh"
-
-   if [[ ! -r "$cluster_template" ]]; then
-      echo "Cluster template file not found: $cluster_template"
-      exit 1
-   fi
-
-   if [[ ! -r "$cluster_var" ]]; then
-      echo "Cluster variable file not found: $cluster_var"
-      exit 1
-   fi
-
-   source "$cluster_var"
-
-   yamlfile=$(mktemp -t)
-   envsubst < "$cluster_template" > "$yamlfile"
-
-   trap '_cleanup_on_success "$yamlfile"' RETURN
-
-   if _list_k3d_cluster | grep -q "$cluster_name"; then
-      echo "Cluster $cluster_name already exists, skip"
-      return 0
-   fi
-
-   __create_k3d_cluster "$yamlfile"
-}
-
 function _cleanup_on_success() {
    local file_to_cleanup=$1
    echo "Cleaning up temporary files... : $file_to_cleanup :"
    rm -rf "$file_to_cleanup"
 }
-
-function _configure_k3d_cluster_istio() {
-   cluster_name=$1
-
-   istio_yaml_template="$(dirname "$SOURCE")/etc/istio-operator.yaml.tmpl"
-   istio_var="$(dirname "$SOURCE")/etc/istio_var.sh"
-
-   if [[ ! -r "$istio_yaml_template" ]]; then
-      echo "Istio template file not found: $istio_yaml_template"
-      exit 1
-   fi
-
-   if [[ ! -r "$istio_var" ]]; then
-      echo "Istio variable file not found: $istio_var"
-      exit 1
-   fi
-
-   source "$istio_var"
-   isito_yamlfile=$(mktemp -t)
-   envsubst < "$istio_yaml_template" > "$isito_yamlfile"
-
-   _install_istioctl
-   _istioctl x precheck
-   _istioctl install -y -f "$isito_yamlfile"
-   _kubectl label ns default istio-injection=enabled --overwrite
-
-   trap '_cleanup_on_success "$isito_yamlfile"' EXIT
-}
-
 
 function _install_smb_csi_driver() {
    if _is_mac ; then
@@ -220,23 +92,38 @@ function _create_nfs_share() {
    fi
 }
 
+function _install_k3d() {
+   _cluster_provider_call install "$@"
+}
+
+function destroy_cluster() {
+   _cluster_provider_call destroy_cluster "$@"
+}
+
+function destroy_k3d_cluster() {
+   destroy_cluster "$@"
+}
+
+function _create_cluster() {
+   _cluster_provider_call create_cluster "$@"
+}
+
+function create_cluster() {
+   _create_cluster "$@"
+}
+
+function _create_k3d_cluster() {
+   _create_cluster "$@"
+}
+
+function create_k3d_cluster() {
+   create_cluster "$@"
+}
+
+function deploy_cluster() {
+   _cluster_provider_call deploy_cluster "$@"
+}
+
 function deploy_k3d_cluster() {
-   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-      echo "Usage: deploy_k3d_cluster [cluster_name=k3d-cluster]"
-      return 0
-   fi
-
-   local cluster_name="${1:-k3d-cluster}"
-
-   if _is_mac; then
-      _install_k3d $HOME/.local/bin
-   else
-      _install_k3d /usr/local/bin
-   fi
-
-   if ! _k3d_cluster_exist "$cluster_name" ; then
-      _create_k3d_cluster "$cluster_name"
-   fi
-   _configure_k3d_cluster_istio "$cluster_name"
-   # _install_smb_csi_driver
+   deploy_cluster "$@"
 }
