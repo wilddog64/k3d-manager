@@ -235,7 +235,7 @@ graph TD
   ROTATOR -->|requests leaf certs| VAULT
 ```
 
-This refreshed diagram highlights how the CLI dispatches to core libraries, loads plugins on demand, and—through the Jenkins plugin—renders the External Secrets Operator integration and the certificate-rotator CronJob that runs `docker.io/bitnami/kubectl:1.30.2` to keep Vault-backed TLS material current for the Jenkins workload.
+This refreshed diagram highlights how the CLI dispatches to core libraries, loads plugins on demand, and—through the Jenkins plugin—renders the External Secrets Operator integration and the certificate-rotator CronJob that runs Google's published Cloud SDK image (`docker.io/google/cloud-sdk:slim`) to keep Vault-backed TLS material current for the Jenkins workload.
 
 ```mermaid
 sequenceDiagram
@@ -256,7 +256,7 @@ sequenceDiagram
   SYS->>J: call deploy_jenkins
   J->>T: load manifests (workload + rotator CronJob)
   J->>K: _helm install Jenkins\n_kubectl apply rotator (pinned image)
-  Note right of K: CronJob image pinned to docker.io/bitnami/kubectl:1.30.2
+  Note right of K: CronJob image pinned to docker.io/google/cloud-sdk:slim
   K->>C: apply StatefulSet, services, ESO bindings & CronJob
   C->>R: schedule jenkins-cert-rotator
   R->>ESO: read Vault token secret
@@ -265,7 +265,7 @@ sequenceDiagram
   Note over R,V: Rotator keeps Vault and cluster secrets in sync
 ```
 
-The sequence now traces the `deploy_jenkins` flow: k3d-manager sources the Jenkins plugin, renders the workload and rotator manifests, applies them with the pinned kubectl image, and shows the CronJob fetching Vault-issued certificates through ESO before refreshing the Kubernetes secret.
+The sequence now traces the `deploy_jenkins` flow: k3d-manager sources the Jenkins plugin, renders the workload and rotator manifests, applies them with the pinned Google Cloud SDK-based kubectl image, and shows the CronJob fetching Vault-issued certificates through ESO before refreshing the Kubernetes secret.
 
 ## Public functions
 
@@ -385,12 +385,13 @@ deploy_jenkins`.
    certificate in Vault after it applies a new Kubernetes TLS secret, ensuring
    that stale leaf certificates cannot be reused.
 
-   By default, the CronJob pulls `docker.io/bitnami/kubectl:1.30.2`. Update the
+   By default, the CronJob pulls `docker.io/google/cloud-sdk:slim`, the
+   Google-maintained Cloud SDK image that bundles `kubectl`. Update the
    `JENKINS_CERT_ROTATOR_IMAGE` variable (either in the environment or in
    `scripts/etc/jenkins/jenkins-vars.sh`) before deploying if your registries
-   differ. Bitnami's revisioned `-rN` tags are short-lived, so mirroring or
-   pinning to the plain version tag in another registry can help avoid future
-   image rot.
+   differ. Google publishes the image across its registries and Docker Hub, so
+   mirror it or pin to a digest in your own registry if you need stronger
+   controls over image rotation.
 
    If the deployment notices the rotator pods are stuck with image pull errors
    (`ErrImagePull` or `ImagePullBackOff`), it emits a warning advising you to
