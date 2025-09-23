@@ -42,10 +42,14 @@ source "${SCRIPT_DIR}/lib/system.sh"
 source "${SCRIPT_DIR}/lib/test.sh"
 source "${SCRIPT_DIR}/lib/core.sh"
 
+_ensure_cluster_provider
+
 function _usage() {
     local test_suites
     test_suites=$(find "${SCRIPT_DIR}/tests" -type f -name '*.bats' \
         -exec basename {} .bats \; | sort | paste -sd '|' -)
+
+    local provider="${CLUSTER_PROVIDER:-$(_default_cluster_provider)}"
 
     cat <<EOF
 Usage: ./k3d-manager <function> [args]
@@ -54,6 +58,10 @@ Available core functions:
 $(declare -F | awk '{print $3}' | grep -v '^_' | sort | sed 's/^/  /')
 
 Plugin functions are loaded on demand from scripts/plugins.
+
+Cluster provider:
+  Current: ${provider}
+  Override by exporting CLUSTER_PROVIDER (macOS defaults to k3d).
 
 Subcommands:
   test all|${test_suites}   Run BATS tests
