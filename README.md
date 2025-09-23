@@ -346,6 +346,40 @@ deploy_jenkins`.
 | Debian/Ubuntu | `sudo apt install gettext` |
 | Fedora/RHEL/CentOS | `sudo dnf install gettext` |
 
+#### Disconnected clusters and preloaded charts
+
+Air-gapped environments can still deploy the Jenkins and External Secrets
+Operator stacks by downloading the Helm charts ahead of time and pointing the
+plugins at the local files. From a workstation with network access:
+
+```bash
+mkdir -p ~/k3d-manager-charts
+helm pull external-secrets/external-secrets \
+  --repo https://charts.external-secrets.io \
+  --destination ~/k3d-manager-charts
+helm pull jenkins/jenkins \
+  --repo https://charts.jenkins.io \
+  --destination ~/k3d-manager-charts
+```
+
+Copy the resulting `.tgz` archives to a location the disconnected operators can
+read, then export the overrides before running `deploy_eso` or
+`deploy_jenkins`:
+
+```bash
+export ESO_HELM_CHART_REF=/opt/charts/external-secrets-<version>.tgz
+export ESO_HELM_REPO_URL=
+export JENKINS_HELM_CHART_REF=/opt/charts/jenkins-<version>.tgz
+export JENKINS_HELM_REPO_URL=
+```
+
+When the chart reference resolves to a local path—or when the repo URL is empty
+or also points at local storage—the plugins skip `_helm repo add` and
+`_helm repo update`, allowing the deployment to proceed without reaching the
+public repositories. Operators that mirror the charts internally can instead set
+`ESO_HELM_REPO_URL` or `JENKINS_HELM_REPO_URL` to their mirror and adjust
+`ESO_HELM_CHART_REF`/`JENKINS_HELM_CHART_REF` accordingly.
+
 ### Example workflow
 
 1. Export the desired overrides so the plugin picks them up:
