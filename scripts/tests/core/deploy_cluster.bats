@@ -12,6 +12,13 @@ setup() {
 
   source "${BATS_TEST_DIRNAME}/../../lib/providers/k3s.sh"
 
+  _is_mac() { return 1; }
+  _is_wsl() { return 1; }
+  _is_debian_family() { return 1; }
+  _is_redhat_family() { return 1; }
+  _is_linux() { return 0; }
+  export -f _is_mac _is_wsl _is_debian_family _is_redhat_family _is_linux
+
   _provider_k3s_deploy_cluster() {
     printf '%s\n' "$@" > "$BATS_TMPDIR/provider_args"
     printf '%s\n' "${CLUSTER_PROVIDER:-}" > "$BATS_TMPDIR/provider_env"
