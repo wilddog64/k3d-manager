@@ -39,6 +39,58 @@ Set `CLUSTER_PROVIDER` to select a different backend module:
 ```bash
 CLUSTER_PROVIDER=k3d ./scripts/k3d-manager deploy_cluster
 ```
+## k3s backend (bare-metal installations)
+
+Some teams run the same manifests against a remote [k3s](https://k3s.io/) cluster
+instead of the local k3d environment. The helper functions in this repository do
+not provision k3s for you, but they work as soon as your `kubectl` context points
+at an existing k3s API server. Make sure the host satisfies the following
+expectations before running any plugins against it:
+
+### Required services
+
+* Linux with `systemd` so the installer can register `k3s.service` (server) and
+  optional `k3s-agent.service` units. Enable the service at boot and verify it
+  is active with `sudo systemctl status k3s` before applying workloads.
+* `containerd` ships with k3s and is started by the `k3s` unit; no separate
+  Docker or Colima layer is involved.
+
+### Container runtime ports
+
+* Open the Kubernetes API (`6443/tcp`) so your workstation can reach the
+  cluster.
+* Allow kubelet and metrics traffic (`10250/tcp`) when you rely on `kubectl
+  logs`, `exec`, or the test helpers that scrape node metrics.
+* Keep the default flannel VXLAN overlay port (`8472/udp`) and NodePort range
+  (`30000-32767/tcp`) accessible between nodes if you deploy multiple agents.
+* If you enable the embedded registry, expose the registry port (`5000/tcp`) so
+  image pushes from the CI scripts succeed.
+
+### Host storage paths
+
+* Persistent volume data is stored under `/var/lib/rancher/k3s/storage`.
+* Container images and runtime metadata live under
+  `/var/lib/rancher/k3s/agent/containerd/`.
+* The Jenkins plugin still expects a writable host path that is available on all
+  nodes. Either reuse the default `${JENKINS_HOME_PATH}` export from
+  `scripts/etc/cluster_var.sh` or bind it to a directory under
+  `/var/lib/rancher/k3s/storage`.
+
+### Setup differences compared with k3d
+
+* k3d provisions everything inside Docker. The supplied scripts create and
+  delete clusters automatically, so the only prerequisites are Docker (or
+  Colima) and the `k3d` CLI. By contrast, a k3s backend requires root access to
+  a host where you install k3s yourself, usually with
+  `curl -sfL https://get.k3s.io | sh -` and the `--disable traefik` flag to
+  mirror the k3d template.
+* k3d exposes ports through the k3d load balancer (for example HTTP/HTTPS
+  mapping set in `scripts/etc/cluster.yaml.tmpl`). With k3s there is no Docker
+  network layer; ensure those ports are opened directly in the host firewall.
+* k3d automatically writes credentials to your default kubeconfig. For k3s you
+  must copy `/etc/rancher/k3s/k3s.yaml` to your workstation (or export
+  `KUBECONFIG` to point at it) so the manager script can talk to the remote
+  cluster.
 
 ### Colima resource configuration (macOS)
 
