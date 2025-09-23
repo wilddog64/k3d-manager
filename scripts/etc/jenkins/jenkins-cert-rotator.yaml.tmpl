@@ -64,6 +64,18 @@ spec:
                 - -c
                 - |
                   set -euo pipefail
+                  missing=()
+                  for bin in jq curl openssl; do
+                    if ! command -v "$bin" >/dev/null 2>&1; then
+                      missing+=("$bin")
+                    fi
+                  done
+                  if (( ${#missing[@]} )); then
+                    apt-get update -qq
+                    DEBIAN_FRONTEND=noninteractive apt-get install -qqy --no-install-recommends "${missing[@]}"
+                    apt-get clean
+                    rm -rf /var/lib/apt/lists/*
+                  fi
                   /opt/jenkins-cert-rotator/cert-rotator.sh
               env:
                 - name: VAULT_ADDR
