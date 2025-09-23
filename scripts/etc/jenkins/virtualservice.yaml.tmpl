@@ -8,7 +8,7 @@ spec:
   gateways:
     - istio-system/jenkins-gw
   hosts:
-    - jenkins.dev.local.me
+${JENKINS_VIRTUALSERVICE_HOSTS_YAML}
   http:
     - match:
         - uri: { prefix: "/" }

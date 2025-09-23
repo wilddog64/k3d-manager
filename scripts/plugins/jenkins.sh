@@ -410,8 +410,38 @@ function _ensure_jenkins_cert() {
          vault write pki/root/generate/internal common_name="dev.local.me" ttl=87600h
    fi
 
+   local allowed_domains_input="${VAULT_PKI_ALLOWED:-}"
+   allowed_domains_input="${allowed_domains_input//[[:space:]]/}"
+   local allowed_domains="" allow_subdomains_opt=""
+   if [[ -n "$allowed_domains_input" ]]; then
+      allowed_domains="$allowed_domains_input"
+      if [[ "$allowed_domains" != *","* && "$allowed_domains" != *"*"* ]]; then
+         allow_subdomains_opt="allow_subdomains=true"
+      fi
+   else
+      local host_no_wildcard="$common_name"
+      if [[ "$host_no_wildcard" == \*.* ]]; then
+         host_no_wildcard="${host_no_wildcard#*.}"
+      fi
+      if [[ "$host_no_wildcard" =~ \.(nip\.io|sslip\.io)$ ]]; then
+         allowed_domains="${BASH_REMATCH[1]}"
+         allow_subdomains_opt="allow_subdomains=true"
+      elif [[ "$host_no_wildcard" == *.*.* ]]; then
+         allowed_domains="${host_no_wildcard#*.}"
+         allow_subdomains_opt="allow_subdomains=true"
+      else
+         allowed_domains="$host_no_wildcard"
+      fi
+   fi
+
+   local -a _jenkins_role_args=("allowed_domains=${allowed_domains}")
+   if [[ -n "$allow_subdomains_opt" ]]; then
+      _jenkins_role_args+=("$allow_subdomains_opt")
+   fi
+   _jenkins_role_args+=("max_ttl=72h")
+
    _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-      vault write pki/roles/jenkins allowed_domains=dev.local.me allow_subdomains=true max_ttl=72h
+      vault write pki/roles/jenkins "${_jenkins_role_args[@]}"
 
    local json cert_file key_file
    json=$(_kubectl -n "$vault_namespace" exec -i "$pod" -- \
@@ -550,6 +580,25 @@ function _deploy_jenkins() {
    fi
 
    export JENKINS_NAMESPACE="$ns"
+
+   local vs_hosts_input="${JENKINS_VIRTUALSERVICE_HOSTS:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}}"
+   local -a vs_hosts_lines=()
+   local -a _vs_hosts_split=()
+   IFS=',' read -r -a _vs_hosts_split <<<"$vs_hosts_input"
+   local _vs_host trimmed
+   for _vs_host in "${_vs_hosts_split[@]}"; do
+      trimmed="${_vs_host#${_vs_host%%[![:space:]]*}}"
+      trimmed="${trimmed%${trimmed##*[![:space:]]}}"
+      if [[ -n "$trimmed" ]]; then
+         vs_hosts_lines+=("    - ${trimmed}")
+      fi
+   done
+   if (( ${#vs_hosts_lines[@]} == 0 )); then
+      vs_hosts_lines=("    - jenkins.dev.local.me")
+   fi
+   local JENKINS_VIRTUALSERVICE_HOSTS_YAML
+   printf -v JENKINS_VIRTUALSERVICE_HOSTS_YAML '%s\n' "${vs_hosts_lines[@]}"
+   export JENKINS_VIRTUALSERVICE_HOSTS_YAML
 
    local vs_rendered
    vs_rendered=$(mktemp -t jenkins-virtualservice.XXXXXX.yaml)
