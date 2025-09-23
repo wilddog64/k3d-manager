@@ -368,6 +368,12 @@ deploy_jenkins`.
    certificate in Vault after it applies a new Kubernetes TLS secret, ensuring
    that stale leaf certificates cannot be reused.
 
+   If the deployment notices the rotator pods are stuck with image pull errors
+   (`ErrImagePull` or `ImagePullBackOff`), it emits a warning advising you to
+   set `JENKINS_CERT_ROTATOR_IMAGE` or update
+   `scripts/etc/jenkins/jenkins-vars.sh` so the CronJob uses an image from a
+   registry the cluster can reach.
+
 ## Writing a plugin
 
 Plugins live under `scripts/plugins/` and are sourced only when their function is invoked. Guidelines:

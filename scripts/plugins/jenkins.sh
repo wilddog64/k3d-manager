@@ -480,6 +480,58 @@ function _deploy_jenkins_image() {
    fi
 }
 
+function _jenkins_warn_on_cert_rotator_pull_failure() {
+   local ns="$1"
+
+   if [[ -z "${ns:-}" ]]; then
+      return 0
+   fi
+
+   if ! command -v jq >/dev/null 2>&1; then
+      return 0
+   fi
+
+   local pods_json=""
+   if ! pods_json=$(_kubectl --no-exit --quiet -n "$ns" get pods -l job-name -o json 2>/dev/null); then
+      return 0
+   fi
+
+   if [[ -z "$pods_json" ]]; then
+      return 0
+   fi
+
+   local job_prefix="${JENKINS_CERT_ROTATOR_NAME:-jenkins-cert-rotator}"
+   local failure_fields
+   failure_fields=$(printf '%s\n' "$pods_json" | jq -r --arg prefix "$job_prefix" '
+      [ .items[]
+        | select(.metadata.labels["job-name"]? | startswith($prefix))
+        | ( .status.containerStatuses[]?, .status.initContainerStatuses[]? )
+        | select(.state.waiting.reason? | ( . == "ErrImagePull" or . == "ImagePullBackOff"))
+        | {reason: (.state.waiting.reason // ""), message: (.state.waiting.message // "")}
+      ] | if length > 0 then (.[0].reason + "\t" + .[0].message) else "" end
+   ')
+
+   if [[ -n "$failure_fields" ]]; then
+      local failure_reason="" failure_message="" failure_details=""
+      local IFS=$'\t'
+      read -r failure_reason failure_message <<< "$failure_fields"
+      if [[ -n "$failure_reason" ]]; then
+         failure_details="$failure_reason"
+      fi
+      if [[ -n "$failure_message" ]]; then
+         if [[ -n "$failure_details" ]]; then
+            failure_details+="; $failure_message"
+         else
+            failure_details="$failure_message"
+         fi
+      fi
+      if [[ -z "$failure_details" ]]; then
+         failure_details="image pull failure"
+      fi
+      _warn "Jenkins cert rotator pods are failing to pull their image (${failure_details}). Set JENKINS_CERT_ROTATOR_IMAGE or edit scripts/etc/jenkins/jenkins-vars.sh to point at an accessible registry."
+   fi
+}
+
 function deploy_jenkins() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
       echo "Usage: deploy_jenkins [namespace=jenkins] [vault-namespace=${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}] [vault-release=${VAULT_RELEASE_DEFAULT}]"
@@ -697,7 +749,7 @@ function _deploy_jenkins() {
       fi
 
       if _kubectl apply -f "$rotator_rendered"; then
-         :
+         _jenkins_warn_on_cert_rotator_pull_failure "$ns"
       else
          local rc=$?
          _jenkins_cleanup_and_return "$rc"

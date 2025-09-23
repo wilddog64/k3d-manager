@@ -353,6 +353,76 @@ JSON
   unset VAULT_PKI_ALLOWED
 }
 
+@test "_jenkins_warn_on_cert_rotator_pull_failure highlights image pull issues" {
+  local warn_log="$BATS_TEST_TMPDIR/warn.log"
+  : >"$warn_log"
+  _warn() {
+    echo "$*" >> "$WARN_LOG"
+  }
+  export WARN_LOG="$warn_log"
+  export -f _warn
+
+  local pods_json='{
+    "items": [
+      {
+        "metadata": {
+          "labels": {
+            "job-name": "jenkins-cert-rotator-123456"
+          }
+        },
+        "status": {
+          "containerStatuses": [
+            {
+              "state": {
+                "waiting": {
+                  "reason": "ImagePullBackOff",
+                  "message": "Back-off pulling image \"registry.example.com/rotator:latest\""
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }'
+
+  _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo)
+          shift
+          ;;
+        -n)
+          shift 2
+          ;;
+        --)
+          shift
+          break
+          ;;
+        *)
+          break
+          ;;
+      esac
+    done
+    local cmd="$*"
+    echo "$cmd" >> "$KUBECTL_LOG"
+    if [[ "$cmd" == "get pods -l job-name -o json" ]]; then
+      printf '%s\n' "$PODS_JSON"
+    fi
+    return 0
+  }
+  export PODS_JSON="$pods_json"
+  export -f _kubectl
+
+  run _jenkins_warn_on_cert_rotator_pull_failure jenkins
+  [ "$status" -eq 0 ]
+  read_lines "$WARN_LOG" warn_lines
+  [ "${#warn_lines[@]}" -eq 1 ]
+  [[ "${warn_lines[0]}" == *"ImagePullBackOff"* ]]
+  [[ "${warn_lines[0]}" == *"JENKINS_CERT_ROTATOR_IMAGE"* ]]
+  [[ "${warn_lines[0]}" == *"scripts/etc/jenkins/jenkins-vars.sh"* ]]
+}
+
 create_self_signed_cert() {
   local cert_out="$1" key_out="$2" serial_hex="$3"
   openssl req -x509 -nodes -newkey rsa:2048 \
