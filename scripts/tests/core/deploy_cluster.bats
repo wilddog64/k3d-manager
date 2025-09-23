@@ -8,6 +8,7 @@ setup() {
 
   source "${BATS_TEST_DIRNAME}/../../lib/system.sh"
   source "${BATS_TEST_DIRNAME}/../../lib/core.sh"
+  export -f deploy_cluster
 
   source "${BATS_TEST_DIRNAME}/../../lib/providers/k3s.sh"
 
