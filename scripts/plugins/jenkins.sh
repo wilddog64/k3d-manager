@@ -566,6 +566,23 @@ function _deploy_jenkins() {
    local vault_namespace="${2:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${3:-$VAULT_RELEASE_DEFAULT}"
 
+   local helm_repo_url_default="https://charts.jenkins.io"
+   local helm_repo_url="${JENKINS_HELM_REPO_URL:-$helm_repo_url_default}"
+   local helm_chart_ref_default="jenkins/jenkins"
+   local helm_chart_ref="${JENKINS_HELM_CHART_REF:-$helm_chart_ref_default}"
+
+   local skip_repo_ops=0
+   case "$helm_chart_ref" in
+      /*|./*|../*|file://*)
+         skip_repo_ops=1
+         ;;
+   esac
+   case "$helm_repo_url" in
+      ""|/*|./*|../*|file://*)
+         skip_repo_ops=1
+         ;;
+   esac
+
    _JENKINS_RENDERED_MANIFESTS=()
    _jenkins_capture_trap_state EXIT _JENKINS_PREV_EXIT_TRAP_CMD _JENKINS_PREV_EXIT_TRAP_HANDLER
    _jenkins_capture_trap_state RETURN _JENKINS_PREV_RETURN_TRAP_CMD _JENKINS_PREV_RETURN_TRAP_HANDLER
@@ -582,11 +599,13 @@ function _deploy_jenkins() {
    fi
    trap "$return_trap_cmd" RETURN
 
-   if ! _helm repo list 2>/dev/null | grep -q jenkins; then
-     _helm repo add jenkins https://charts.jenkins.io
+   if (( ! skip_repo_ops )); then
+     if ! _helm repo list 2>/dev/null | grep -q jenkins; then
+       _helm repo add jenkins "$helm_repo_url"
+     fi
+     _helm repo update
    fi
-   _helm repo update
-   _helm upgrade --install jenkins jenkins/jenkins \
+   _helm upgrade --install jenkins "$helm_chart_ref" \
       --namespace "$ns" \
       -f "$JENKINS_CONFIG_DIR/values.yaml"
 
