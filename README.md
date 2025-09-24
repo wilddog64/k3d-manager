@@ -501,6 +501,7 @@ using your system package manager when needed:
 
 ```bash
 ./scripts/k3d-manager test all            # run all suites
+./scripts/k3d-manager test core           # run the core suite
 ./scripts/k3d-manager test plugins        # run the plugins suite
 ./scripts/k3d-manager test lib            # run the lib suite
 ```
