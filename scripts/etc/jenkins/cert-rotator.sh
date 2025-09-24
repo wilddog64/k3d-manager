@@ -159,7 +159,6 @@ function load_secret_certificate() {
    local ns="$1" name="$2" tmpdir="$3"
    local secret_json cert_b64 cert_file
 
-   if ! secret_json=$(kubectl -n "$ns" get secret "$name" -o json 2>/dev/null); then
    if ! secret_json=$("$KUBECTL_CMD" -n "$ns" get secret "$name" -o json 2>/dev/null); then
       log WARN "Secret ${ns}/${name} not found; a new certificate will be issued"
       return 1
