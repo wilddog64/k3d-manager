@@ -47,6 +47,69 @@ function require_cmd() {
    done
 }
 
+function expand_search_entry() {
+   local raw="${1:-}"
+
+   if [[ -z "$raw" ]]; then
+      return 1
+   fi
+
+   raw=${raw//\$\{HOME\}/$HOME}
+   raw=${raw//\$HOME/$HOME}
+
+   if [[ "$raw" == "~" ]]; then
+      raw="$HOME"
+   elif [[ "${raw:0:2}" == "~/" ]]; then
+      raw="$HOME/${raw:2}"
+   fi
+
+   printf '%s' "$raw"
+}
+
+function discover_kubectl() {
+   local candidate
+
+   if candidate=$(command -v kubectl 2>/dev/null); then
+      printf '%s' "$candidate"
+      return 0
+   fi
+
+   local -a search_entries=()
+   if [[ -n "${JENKINS_CERT_ROTATOR_KUBECTL_PATHS:-}" ]]; then
+      IFS=':' read -r -a search_entries <<< "${JENKINS_CERT_ROTATOR_KUBECTL_PATHS}"
+   else
+      search_entries=(
+         "$HOME/google-cloud-sdk/bin"
+         /google-cloud-sdk/bin
+         /usr/local/google-cloud-sdk/bin
+         /usr/lib/google-cloud-sdk/bin
+      )
+   fi
+
+   local entry expanded path
+   for entry in "${search_entries[@]}"; do
+      if [[ -z "$entry" ]]; then
+         continue
+      fi
+
+      if ! expanded=$(expand_search_entry "$entry"); then
+         continue
+      fi
+
+      if [[ -d "$expanded" ]]; then
+         path="$expanded/kubectl"
+      else
+         path="$expanded"
+      fi
+      if [[ -x "$path" ]]; then
+         printf '%s' "$path"
+         return 0
+      fi
+   done
+
+   return 1
+}
+
 function discover_kubectl() {
    local candidate
 
@@ -91,10 +154,12 @@ function join_by() {
    echo "$*"
 }
 
+
 function load_secret_certificate() {
    local ns="$1" name="$2" tmpdir="$3"
    local secret_json cert_b64 cert_file
 
+   if ! secret_json=$(kubectl -n "$ns" get secret "$name" -o json 2>/dev/null); then
    if ! secret_json=$("$KUBECTL_CMD" -n "$ns" get secret "$name" -o json 2>/dev/null); then
       log WARN "Secret ${ns}/${name} not found; a new certificate will be issued"
       return 1
