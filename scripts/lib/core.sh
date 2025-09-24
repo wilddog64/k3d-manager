@@ -291,9 +291,12 @@ function _install_istioctl() {
 }
 
 function _cleanup_on_success() {
-   local file_to_cleanup=$1
-   echo "Cleaning up temporary files... : $file_to_cleanup :"
-   rm -rf "$file_to_cleanup"
+   local path
+   for path in "$@"; do
+      [[ -n "$path" ]] || continue
+      echo "Cleaning up temporary files... : $path :"
+      rm -rf -- "$path"
+   done
 }
 
 function _install_smb_csi_driver() {
