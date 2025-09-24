@@ -4,6 +4,9 @@ function init_test_env() {
   export SCRIPT_DIR="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
   export PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 
+  # shellcheck disable=SC1090
+  source "${SCRIPT_DIR}/lib/core.sh"
+
   KUBECTL_EXIT_CODES=()
   HELM_EXIT_CODES=()
   RUN_EXIT_CODES=()

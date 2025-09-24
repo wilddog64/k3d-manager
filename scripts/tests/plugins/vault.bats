@@ -5,6 +5,8 @@ setup() {
   SOURCE="${BATS_TEST_DIRNAME}/../../k3d-manager"
   SCRIPT_DIR="${BATS_TEST_DIRNAME}/../.."
   PLUGINS_DIR="${SCRIPT_DIR}/plugins"
+  # shellcheck disable=SC1090
+  source "${SCRIPT_DIR}/lib/core.sh"
   source "${BATS_TEST_DIRNAME}/../../plugins/vault.sh"
 
   KUBECTL_LOG="$BATS_TEST_TMPDIR/kubectl.log"

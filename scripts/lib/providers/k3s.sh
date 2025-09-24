@@ -77,7 +77,7 @@ function _provider_k3s_configure_istio() {
    _istioctl install -y -f "$istio_yamlfile"
    _kubectl label ns default istio-injection=enabled --overwrite
 
-   trap '_cleanup_on_success "$istio_yamlfile"' EXIT
+   trap "$(_cleanup_trap_command "$istio_yamlfile")" EXIT
 }
 
 function _provider_k3s_deploy_cluster() {

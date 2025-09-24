@@ -291,6 +291,9 @@ function _install_istioctl() {
 }
 
 function _cleanup_on_success() {
+   local file_to_cleanup=$1
+   echo "Cleaning up temporary files... : $file_to_cleanup :"
+   rm -rf "$file_to_cleanup"
    local path
    for path in "$@"; do
       [[ -n "$path" ]] || continue
@@ -299,6 +302,16 @@ function _cleanup_on_success() {
    done
 }
 
+function _cleanup_trap_command() {
+   local cmd="_cleanup_on_success" path
+
+   for path in "$@"; do
+      [[ -n "$path" ]] || continue
+      printf -v cmd '%s %q' "$cmd" "$path"
+   done
+
+   printf '%s' "$cmd"
+}
 function _install_smb_csi_driver() {
    if _is_mac ; then
       echo "warning: SMB CSI driver is not supported on macOS"
