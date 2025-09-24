@@ -154,7 +154,105 @@ function join_by() {
    echo "$*"
 }
 
+function expand_kubectl_entry() {
+   local raw="${1:-}"
 
+   if [[ -z "$raw" ]]; then
+      return 1
+   fi
+
+   raw=${raw//\$\{HOME\}/$HOME}
+   raw=${raw//\$HOME/$HOME}
+
+   if [[ "$raw" == "~" ]]; then
+      raw="$HOME"
+   elif [[ "${raw:0:2}" == "~/" ]]; then
+      raw="$HOME/${raw:2}"
+   fi
+
+   printf '%s' "$raw"
+}
+
+function resolve_kubectl_entry() {
+   local entry="${1:-}"
+   local expanded=""
+
+   if [[ -z "$entry" ]]; then
+      return 1
+   fi
+
+   if expanded=$(expand_kubectl_entry "$entry" 2>/dev/null); then
+      entry="$expanded"
+   fi
+
+   if [[ -d "$entry" ]]; then
+      local trimmed="${entry%/}"
+      if [[ -x "${trimmed}/kubectl" ]]; then
+         printf '%s' "${trimmed}/kubectl"
+         return 0
+      fi
+      if [[ -x "${trimmed}/bin/kubectl" ]]; then
+         printf '%s' "${trimmed}/bin/kubectl"
+         return 0
+      fi
+      return 1
+   fi
+
+   if [[ -x "$entry" ]]; then
+      printf '%s' "$entry"
+      return 0
+   fi
+
+   if command -v "$entry" >/dev/null 2>&1; then
+      command -v "$entry"
+      return 0
+   fi
+
+   return 1
+}
+
+function discover_kubectl() {
+   local resolved=""
+
+   if [[ -n "${JENKINS_CERT_ROTATOR_KUBECTL_BIN:-}" ]]; then
+      if resolved=$(resolve_kubectl_entry "$JENKINS_CERT_ROTATOR_KUBECTL_BIN" 2>/dev/null); then
+         printf '%s' "$resolved"
+         return 0
+      fi
+      log ERROR "JENKINS_CERT_ROTATOR_KUBECTL_BIN is set to '${JENKINS_CERT_ROTATOR_KUBECTL_BIN}' but kubectl was not found"
+      return 1
+   fi
+
+   if resolved=$(resolve_kubectl_entry kubectl 2>/dev/null); then
+      printf '%s' "$resolved"
+      return 0
+   fi
+
+   local -a search_entries=()
+   if [[ -n "${JENKINS_CERT_ROTATOR_KUBECTL_PATHS:-}" ]]; then
+      IFS=':' read -r -a search_entries <<<"${JENKINS_CERT_ROTATOR_KUBECTL_PATHS}"
+   else
+      search_entries=(
+         "$HOME/google-cloud-sdk/bin"
+         /google-cloud-sdk/bin
+         /usr/local/google-cloud-sdk/bin
+         /usr/lib/google-cloud-sdk/bin
+      )
+   fi
+
+   local entry
+   for entry in "${search_entries[@]}"; do
+      if [[ -z "$entry" ]]; then
+         continue
+      fi
+      if resolved=$(resolve_kubectl_entry "$entry" 2>/dev/null); then
+         printf '%s' "$resolved"
+         return 0
+      fi
+   done
+
+   return 1
+}
 function load_secret_certificate() {
    local ns="$1" name="$2" tmpdir="$3"
    local secret_json cert_b64 cert_file
