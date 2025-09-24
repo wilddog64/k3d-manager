@@ -50,6 +50,36 @@ function _provider_k3s_destroy_cluster() {
    _teardown_k3s_cluster "$@"
 }
 
+function _provider_k3s_configure_istio() {
+   local cluster_name=$1
+
+   local istio_yaml_template="${SCRIPT_DIR}/etc/istio-operator.yaml.tmpl"
+   local istio_var="${SCRIPT_DIR}/etc/istio_var.sh"
+
+   if [[ ! -r "$istio_yaml_template" ]]; then
+      echo "Istio template file not found: $istio_yaml_template"
+      exit 1
+   fi
+
+   if [[ ! -r "$istio_var" ]]; then
+      echo "Istio variable file not found: $istio_var"
+      exit 1
+   fi
+
+   # shellcheck disable=SC1090
+   source "$istio_var"
+   local istio_yamlfile
+   istio_yamlfile=$(mktemp -t)
+   envsubst < "$istio_yaml_template" > "$istio_yamlfile"
+
+   _install_istioctl
+   _istioctl x precheck
+   _istioctl install -y -f "$istio_yamlfile"
+   _kubectl label ns default istio-injection=enabled --overwrite
+
+   trap '_cleanup_on_success "$istio_yamlfile"' EXIT
+}
+
 function _provider_k3s_deploy_cluster() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
       echo "Usage: deploy_cluster [cluster_name=k3s-cluster]"
@@ -60,4 +90,5 @@ function _provider_k3s_deploy_cluster() {
 
    _provider_k3s_install
    _deploy_k3s_cluster "$cluster_name"
+   _provider_k3s_configure_istio "$cluster_name"
 }
