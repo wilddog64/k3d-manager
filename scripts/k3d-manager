@@ -61,6 +61,12 @@ function _usage() {
     local test_suites
     test_suites=$(find "${SCRIPT_DIR}/tests" -type f -name '*.bats' \
         -exec basename {} .bats \; | sort | paste -sd '|' -)
+    local base_suites="all|lib|core|plugins"
+    if [[ -n "${test_suites}" ]]; then
+        test_suites="${base_suites}|${test_suites}"
+    else
+        test_suites="${base_suites}"
+    fi
 
     local provider="${CLUSTER_PROVIDER:-$(_default_cluster_provider)}"
 
@@ -77,7 +83,7 @@ Cluster provider:
   Override by exporting CLUSTER_PROVIDER (macOS defaults to k3d).
 
 Subcommands:
-  test all|${test_suites}   Run BATS tests
+  test ${test_suites}   Run BATS tests
 EOF
 }
 
@@ -86,8 +92,14 @@ function test() {
         local test_suites
         test_suites=$(find "${SCRIPT_DIR}/tests" -type f -name '*.bats' \
             -exec basename {} .bats \; | sort | paste -sd '|' -)
+        local base_suites="all|lib|core|plugins"
+        if [[ -n "${test_suites}" ]]; then
+            test_suites="${base_suites}|${test_suites}"
+        else
+            test_suites="${base_suites}"
+        fi
         cat <<EOF
-Usage: test all|${test_suites}
+Usage: test ${test_suites}
 Run BATS tests
 EOF
         return 0
@@ -104,6 +116,22 @@ EOF
 
     if [[ "$suite" == "all" ]]; then
         bats "${tests[@]}"
+        return
+    fi
+
+    if [[ "$suite" == "lib" || "$suite" == "core" || "$suite" == "plugins" ]]; then
+        local -a suite_tests=()
+        local dir="${SCRIPT_DIR}/tests/${suite}"
+        while IFS= read -r test_file; do
+            suite_tests+=("$test_file")
+        done < <(find "$dir" -maxdepth 1 -type f -name '*.bats' | sort)
+
+        if [[ ${#suite_tests[@]} -eq 0 ]]; then
+            echo "No test suites found in '$suite'." >&2
+            return 1
+        fi
+
+        bats "${suite_tests[@]}"
         return
     fi
 

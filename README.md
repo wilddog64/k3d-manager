@@ -419,6 +419,10 @@ public repositories. Operators that mirror the charts internally can instead set
    certificate in Vault after it applies a new Kubernetes TLS secret, ensuring
    that stale leaf certificates cannot be reused.
 
+   Re-running `./scripts/k3d-manager deploy_jenkins` on existing clusters now
+   refreshes the Vault policy if the `revoke` capability is missing so the
+   CronJob can successfully retire old certificates after each rotation.
+
    By default, the CronJob pulls `docker.io/google/cloud-sdk:slim`, the
    Google-maintained Cloud SDK image that bundles `kubectl`. Update the
    `JENKINS_CERT_ROTATOR_IMAGE` variable (either in the environment or in

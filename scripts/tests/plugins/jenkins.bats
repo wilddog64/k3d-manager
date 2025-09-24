@@ -265,6 +265,34 @@ EOF
   _vault_policy_exists() { return 1; }
   export -f _vault_policy_exists
 
+  local policy_capture="$BATS_TEST_TMPDIR/jenkins-cert-rotator.hcl"
+  : >"$policy_capture"
+
+  _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+
+    local cmd="$*"
+    echo "$cmd" >> "$KUBECTL_LOG"
+
+    if [[ "$cmd" == *"vault policy write jenkins-cert-rotator -"* ]]; then
+      cat >>"$policy_capture"
+      return 0
+    fi
+
+    if [[ -p /dev/stdin ]]; then
+      cat >/dev/null
+    fi
+
+    return 0
+  }
+  export -f _kubectl
+
   VAULT_PKI_SECRET_NS="secret-ns" \
     run _create_jenkins_cert_rotator_policy vault-ns vault-release custom-pki custom-role jenkins-ns rotator-sa
   [ "$status" -eq 0 ]
@@ -289,6 +317,78 @@ EOF
   [[ "$role_write_line" != *"secret-ns"* ]]
   [[ "$role_write_line" == *"policies=jenkins-cert-rotator"* ]]
   [ "$policy_write_count" -eq 1 ]
+  grep -q 'path "custom-pki/revoke"' "$policy_capture"
+}
+
+@test "_create_jenkins_cert_rotator_policy refreshes policy missing revoke grant" {
+  _vault_policy_exists() { return 0; }
+  export -f _vault_policy_exists
+
+  local policy_capture="$BATS_TEST_TMPDIR/jenkins-cert-rotator-refresh.hcl"
+  : >"$policy_capture"
+
+  _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+
+    local cmd="$*"
+    echo "$cmd" >> "$KUBECTL_LOG"
+
+    if [[ "$cmd" == *"vault policy read jenkins-cert-rotator"* ]]; then
+      cat <<'HCL'
+path "custom-pki/issue/custom-role" {
+  capabilities = ["update"]
+}
+path "custom-pki/roles/custom-role" {
+  capabilities = ["read"]
+}
+path "custom-pki/cert/ca" {
+  capabilities = ["read"]
+}
+path "custom-pki/ca/pem" {
+  capabilities = ["read"]
+}
+HCL
+      return 0
+    fi
+
+    if [[ "$cmd" == *"vault policy write jenkins-cert-rotator -"* ]]; then
+      cat >>"$policy_capture"
+      return 0
+    fi
+
+    if [[ -p /dev/stdin ]]; then
+      cat >/dev/null
+    fi
+
+    return 0
+  }
+  export -f _kubectl
+
+  run _create_jenkins_cert_rotator_policy vault-ns vault-release custom-pki custom-role jenkins-ns rotator-sa
+  [ "$status" -eq 0 ]
+
+  read_lines "$KUBECTL_LOG" kubectl_calls
+
+  local policy_write_count=0
+  local policy_read_count=0
+  for line in "${kubectl_calls[@]}"; do
+    if [[ "$line" == *"vault policy write jenkins-cert-rotator -"* ]]; then
+      ((policy_write_count += 1))
+    fi
+    if [[ "$line" == *"vault policy read jenkins-cert-rotator"* ]]; then
+      ((policy_read_count += 1))
+    fi
+  done
+
+  [ "$policy_write_count" -eq 1 ]
+  [ "$policy_read_count" -eq 1 ]
+  grep -q 'path "custom-pki/revoke"' "$policy_capture"
 }
 
 @test "_ensure_jenkins_cert sets up PKI and TLS secret" {

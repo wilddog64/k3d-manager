@@ -911,10 +911,25 @@ function _create_jenkins_cert_rotator_policy() {
    local policy_name="jenkins-cert-rotator"
    local pod="${vault_release}-0"
 
-   if ! _vault_policy_exists "$vault_namespace" "$vault_release" "$policy_name"; then
+   local ensure_policy=1
+
+   if _vault_policy_exists "$vault_namespace" "$vault_release" "$policy_name"; then
+      local current_policy=""
+      current_policy=$(_kubectl -n "$vault_namespace" exec -i "$pod" -- \
+         vault policy read "$policy_name" 2>/dev/null || true)
+
+      if [[ "$current_policy" == *"path \"${pki_path}/revoke\""* ]]; then
+         ensure_policy=0
+      fi
+   fi
+
+   if (( ensure_policy )); then
       cat <<HCL | _kubectl -n "$vault_namespace" exec -i "$pod" -- \
          vault policy write "$policy_name" -
 path "${pki_path}/issue/${pki_role}" {
+   capabilities = ["update"]
+}
+path "${pki_path}/revoke" {
    capabilities = ["update"]
 }
 path "${pki_path}/roles/${pki_role}" {
