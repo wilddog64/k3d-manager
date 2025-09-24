@@ -19,6 +19,8 @@ fi
 # shellcheck disable=SC1090
 source "$VAULT_PKI_LIB"
 
+KUBECTL_CMD=""
+
 function log() {
    local level="${1:-INFO}"
    shift || true
@@ -45,6 +47,44 @@ function require_cmd() {
    done
 }
 
+function discover_kubectl() {
+   local candidate
+
+   if candidate=$(command -v kubectl 2>/dev/null); then
+      printf '%s' "$candidate"
+      return 0
+   fi
+
+   local -a search_entries=()
+   if [[ -n "${JENKINS_CERT_ROTATOR_KUBECTL_PATHS:-}" ]]; then
+      IFS=':' read -r -a search_entries <<< "${JENKINS_CERT_ROTATOR_KUBECTL_PATHS}"
+   else
+      search_entries=(
+         /google-cloud-sdk/bin
+         /usr/local/google-cloud-sdk/bin
+         /usr/lib/google-cloud-sdk/bin
+      )
+   fi
+
+   local entry path
+   for entry in "${search_entries[@]}"; do
+      if [[ -z "$entry" ]]; then
+         continue
+      fi
+      if [[ -d "$entry" ]]; then
+         path="$entry/kubectl"
+      else
+         path="$entry"
+      fi
+      if [[ -x "$path" ]]; then
+         printf '%s' "$path"
+         return 0
+      fi
+   done
+
+   return 1
+}
+
 function join_by() {
    local IFS="$1"
    shift
@@ -55,7 +95,7 @@ function load_secret_certificate() {
    local ns="$1" name="$2" tmpdir="$3"
    local secret_json cert_b64 cert_file
 
-   if ! secret_json=$(kubectl -n "$ns" get secret "$name" -o json 2>/dev/null); then
+   if ! secret_json=$("$KUBECTL_CMD" -n "$ns" get secret "$name" -o json 2>/dev/null); then
       log WARN "Secret ${ns}/${name} not found; a new certificate will be issued"
       return 1
    fi
@@ -225,13 +265,26 @@ $(printf '%s\n' "$key" | sed 's/^/    /')
   ca.crt: |
 $(printf '%s\n' "$ca_bundle" | sed 's/^/    /')
 EOF
-   kubectl apply -f "$tmpfile"
+   "$KUBECTL_CMD" apply -f "$tmpfile"
    rm -f "$tmpfile"
 }
 
 function main() {
    require_env VAULT_ADDR VAULT_PKI_ROLE VAULT_PKI_SECRET_NS VAULT_PKI_SECRET_NAME JENKINS_CERT_ROTATOR_VAULT_ROLE
-   require_cmd kubectl curl jq openssl base64 date
+
+   if [[ -n "${JENKINS_CERT_ROTATOR_KUBECTL_BIN:-}" ]]; then
+      if [[ -x "${JENKINS_CERT_ROTATOR_KUBECTL_BIN}" ]]; then
+         KUBECTL_CMD="${JENKINS_CERT_ROTATOR_KUBECTL_BIN}"
+      else
+         log ERROR "JENKINS_CERT_ROTATOR_KUBECTL_BIN is set to '${JENKINS_CERT_ROTATOR_KUBECTL_BIN}' but is not executable"
+         exit 1
+      fi
+   elif ! KUBECTL_CMD=$(discover_kubectl); then
+      log ERROR "Required command 'kubectl' not found in PATH. Set JENKINS_CERT_ROTATOR_KUBECTL_BIN or adjust JENKINS_CERT_ROTATOR_KUBECTL_PATHS"
+      exit 1
+   fi
+
+   require_cmd curl jq openssl base64 date
 
    local renew_before="${JENKINS_CERT_ROTATOR_RENEW_BEFORE:-432000}"
    if ! [[ "$renew_before" =~ ^[0-9]+$ ]]; then
