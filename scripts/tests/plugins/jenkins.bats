@@ -268,6 +268,46 @@ EOF
   local policy_capture="$BATS_TEST_TMPDIR/jenkins-cert-rotator.hcl"
   : >"$policy_capture"
 
+ _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo)
+          shift
+          ;;
+        --)
+          shift
+          break
+          ;;
+        -n)
+          shift 2
+          ;;
+        *)
+          break
+          ;;
+      esac
+    done
+
+    local cmd="$*"
+    local stdin_payload=""
+    if [[ ! -t 0 ]]; then
+      stdin_payload=$(cat)
+    fi
+
+    echo "$cmd" >>"$KUBECTL_LOG"
+
+    if [[ "$cmd" == *"vault policy write jenkins-cert-rotator -"* && -n "$stdin_payload" ]]; then
+      printf '%s\n' "$stdin_payload" >"$POLICY_CAPTURE"
+    fi
+
+    local rc=0
+    if ((${#KUBECTL_EXIT_CODES[@]})); then
+      rc=${KUBECTL_EXIT_CODES[0]}
+      KUBECTL_EXIT_CODES=("${KUBECTL_EXIT_CODES[@]:1}")
+    fi
+    return "$rc"
+  }
+  export POLICY_CAPTURE="$policy_capture"
+  export -f _kubectl
   _kubectl() {
     while [[ $# -gt 0 ]]; do
       case "$1" in
@@ -317,6 +357,12 @@ EOF
   [[ "$role_write_line" != *"secret-ns"* ]]
   [[ "$role_write_line" == *"policies=jenkins-cert-rotator"* ]]
   [ "$policy_write_count" -eq 1 ]
+
+  local policy_text
+  policy_text=$(cat "$policy_capture")
+  [[ "$policy_text" == *"path \"custom-pki/issue/custom-role\""*  ]]
+  [[ "$policy_text" == *"path \"custom-pki/revoke\""*  ]]
+  [[ "$policy_text" == *"capabilities = [\"update\"]"*  ]]
   grep -q 'path "custom-pki/revoke"' "$policy_capture"
 }
 
