@@ -80,6 +80,39 @@ EOF
   [[ "$output" == *"Usage: deploy_jenkins"* ]]
 }
 
+@test "_jenkins_configure_leaf_host_defaults keeps existing override" {
+  export VAULT_PKI_LEAF_HOST="custom.example"
+  _jenkins_configure_leaf_host_defaults
+  [ "$VAULT_PKI_LEAF_HOST" = "custom.example" ]
+}
+
+@test "_jenkins_configure_leaf_host_defaults picks sslip host for WSL k3s" {
+  _is_wsl() { return 0; }
+  export -f _is_wsl
+  : >"$KUBECTL_LOG"
+  unset VAULT_PKI_LEAF_HOST
+  export CLUSTER_PROVIDER="k3s"
+  export JENKINS_WSL_NODE_IP="198.51.100.27"
+
+  _jenkins_configure_leaf_host_defaults
+
+  [ "$VAULT_PKI_LEAF_HOST" = "jenkins.198.51.100.27.sslip.io" ]
+  unset JENKINS_WSL_NODE_IP
+  unset -f _is_wsl
+  unset CLUSTER_PROVIDER
+}
+
+@test "_jenkins_configure_leaf_host_defaults leaves unset when not on WSL" {
+  unset VAULT_PKI_LEAF_HOST
+  export CLUSTER_PROVIDER="k3s"
+
+  _jenkins_configure_leaf_host_defaults
+
+  [ -z "${VAULT_PKI_LEAF_HOST:-}" ]
+  unset CLUSTER_PROVIDER
+}
+
+
 @test "Namespace creation" {
   KUBECTL_EXIT_CODES=(1 0)
   run _create_jenkins_namespace test-ns

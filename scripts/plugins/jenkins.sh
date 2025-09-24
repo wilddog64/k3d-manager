@@ -528,6 +528,76 @@ function _jenkins_warn_on_cert_rotator_pull_failure() {
    fi
 }
 
+function _jenkins_running_on_wsl() {
+   if declare -f _is_wsl >/dev/null 2>&1; then
+      _is_wsl
+      return $?
+   fi
+
+   return 1
+}
+
+function _jenkins_provider_is_k3s() {
+   if declare -f cluster_provider_is >/dev/null 2>&1; then
+      if cluster_provider_is k3s; then
+         return 0
+      fi
+      return 1
+   fi
+
+   local provider="${CLUSTER_PROVIDER:-${K3D_MANAGER_PROVIDER:-${K3DMGR_PROVIDER:-${K3D_MANAGER_CLUSTER_PROVIDER:-}}}}"
+   provider="$(printf '%s' "$provider" | tr '[:upper:]' '[:lower:]')"
+   [[ "$provider" == "k3s" ]]
+}
+
+function _jenkins_detect_node_ip() {
+   if ! declare -f _kubectl >/dev/null 2>&1; then
+      return 1
+   fi
+
+   local override="${JENKINS_WSL_NODE_IP:-}"
+   override="${override//$'\r'/}"
+   override="${override//$'\n'/}"
+   override="${override## }"
+   override="${override%% }"
+   if [[ "$override" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+      printf '%s\n' "$override"
+      return 0
+   fi
+
+   local node_ip=""
+   node_ip=$(_kubectl --no-exit --quiet get nodes -o \
+      jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
+   node_ip="${node_ip//$'\r'/}"
+   node_ip="${node_ip//$'\n'/}"
+   node_ip="${node_ip## }"
+   node_ip="${node_ip%% }"
+
+   if [[ "$node_ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+      printf '%s\n' "$node_ip"
+      return 0
+   fi
+
+   return 1
+}
+
+function _jenkins_configure_leaf_host_defaults() {
+   if [[ -n "${VAULT_PKI_LEAF_HOST:-}" ]]; then
+      return 0
+   fi
+
+   if _jenkins_provider_is_k3s && _jenkins_running_on_wsl; then
+      local node_ip=""
+      if node_ip=$(_jenkins_detect_node_ip); then
+         export VAULT_PKI_LEAF_HOST="jenkins.${node_ip}.sslip.io"
+         return 0
+      fi
+   fi
+
+   return 0
+}
+
+
 function deploy_jenkins() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
       echo "Usage: deploy_jenkins [namespace=jenkins] [vault-namespace=${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}] [vault-release=${VAULT_RELEASE_DEFAULT}]"
@@ -537,6 +607,8 @@ function deploy_jenkins() {
    local jenkins_namespace="${1:-jenkins}"
    local vault_namespace="${2:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${3:-$VAULT_RELEASE_DEFAULT}"
+
+   _jenkins_configure_leaf_host_defaults
 
    deploy_vault ha "$vault_namespace" "$vault_release"
    _create_jenkins_admin_vault_policy "$vault_namespace" "$vault_release"
