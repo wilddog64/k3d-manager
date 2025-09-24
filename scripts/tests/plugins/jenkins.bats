@@ -725,6 +725,125 @@ SCRIPT
   grep -Fq "\"serial_number\": \"${expected_serial}\"" "$curl_log"
 }
 
+@test "cert rotator locates kubectl via fallback search paths" {
+  local cert_file="$BATS_TEST_TMPDIR/fallback.crt"
+  local key_file="$BATS_TEST_TMPDIR/fallback.key"
+  create_self_signed_cert "$cert_file" "$key_file" 0xBEEF
+
+  local cert_b64
+  cert_b64=$(base64 <"$cert_file" | tr -d '\n')
+  local secret_json="$BATS_TEST_TMPDIR/fallback-secret.json"
+  cat <<JSON >"$secret_json"
+{"data":{"tls.crt":"$cert_b64"}}
+JSON
+
+  local fallback_dir="$BATS_TEST_TMPDIR/cloud-sdk/bin"
+  mkdir -p "$fallback_dir"
+  local kubectl_log="$BATS_TEST_TMPDIR/fallback-kubectl.log"
+  : >"$kubectl_log"
+
+  cat <<'SCRIPT' >"$fallback_dir/kubectl"
+#!/usr/bin/env bash
+set -euo pipefail
+echo "$*" >>"$CERT_ROTATOR_KUBECTL_LOG"
+if [[ "$1" == "-n" && "$3" == "get" && "$4" == "secret" ]]; then
+  if [[ "${CERT_ROTATOR_HAS_SECRET:-0}" == "1" ]]; then
+    cat "$CERT_ROTATOR_SECRET_JSON"
+    exit 0
+  else
+    exit 1
+  fi
+elif [[ "$1" == "apply" && "$2" == "-f" ]]; then
+  exit 0
+fi
+exit 0
+SCRIPT
+  chmod +x "$fallback_dir/kubectl"
+
+  local fakebin="$BATS_TEST_TMPDIR/fallback-fakebin"
+  mkdir -p "$fakebin"
+  local curl_log="$BATS_TEST_TMPDIR/fallback-curl.log"
+  : >"$curl_log"
+
+  cat <<'SCRIPT' >"$fakebin/curl"
+#!/usr/bin/env bash
+set -euo pipefail
+method=""
+data=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --request)
+      method="$2"
+      shift 2
+      ;;
+    --data)
+      data="$2"
+      shift 2
+      ;;
+    --header)
+      shift 2
+      ;;
+    --silent|--show-error|--fail|-k)
+      shift
+      ;;
+    --cacert)
+      shift 2
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+url="$1"
+echo "${method:-GET} ${url} ${data}" >>"$CERT_ROTATOR_CURL_LOG"
+if [[ "$url" == *"/auth/kubernetes/login" ]]; then
+  printf '{"auth":{"client_token":"test-token"}}\n'
+elif [[ "$url" == *"/issue/"* ]]; then
+  printf '{"data":{"certificate":"FALLBACK_CERT","private_key":"FALLBACK_KEY","issuing_ca":"FALLBACK_CA"}}\n'
+else
+  printf '{}\n'
+fi
+SCRIPT
+  chmod +x "$fakebin/curl"
+
+  cat <<'SCRIPT' >"$fakebin/jq"
+#!/usr/bin/env bash
+set -euo pipefail
+exec /usr/bin/jq "$@"
+SCRIPT
+  chmod +x "$fakebin/jq"
+
+  export PATH="$fakebin:/usr/bin:/bin"
+  ! command -v kubectl >/dev/null 2>&1
+
+  export CERT_ROTATOR_KUBECTL_LOG="$kubectl_log"
+  export CERT_ROTATOR_CURL_LOG="$curl_log"
+  export CERT_ROTATOR_HAS_SECRET=1
+  export CERT_ROTATOR_SECRET_JSON="$secret_json"
+
+  local token_file="$BATS_TEST_TMPDIR/fallback-token"
+  printf 'fallback-token' >"$token_file"
+
+  export VAULT_ADDR="http://vault.example:8200"
+  export VAULT_PKI_ROLE="jenkins"
+  export VAULT_PKI_SECRET_NS="jenkins"
+  export VAULT_PKI_SECRET_NAME="jenkins-tls"
+  export JENKINS_CERT_ROTATOR_VAULT_ROLE="jenkins-role"
+  export SERVICE_ACCOUNT_TOKEN_FILE="$token_file"
+  export VAULT_PKI_LEAF_HOST="fallback.example"
+  export JENKINS_CERT_ROTATOR_KUBECTL_PATHS="$fallback_dir"
+
+  run bash scripts/etc/jenkins/cert-rotator.sh
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Updated TLS secret"* ]]
+  [[ "$output" != *"Required command 'kubectl'"* ]]
+
+  read_lines "$kubectl_log" kubectl_calls
+  [ "${#kubectl_calls[@]}" -ge 2 ]
+  [[ "${kubectl_calls[0]}" == "-n jenkins get secret jenkins-tls -o json" ]]
+  printf '%s\n' "${kubectl_calls[@]}" | grep -Fq 'apply -f '
+}
+
 @test "cert rotator skips revoke when no prior certificate" {
   local fakebin="$BATS_TEST_TMPDIR/fakebin-no-secret"
   mkdir -p "$fakebin"
