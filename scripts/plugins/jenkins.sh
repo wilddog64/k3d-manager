@@ -181,9 +181,9 @@ function _create_jenkins_namespace() {
       echo "Jenkins namespace template file not found: $jenkins_namespace_template"
       exit 1
    fi
-   yamlfile=$(mktemp -t)
-   trap "$(_cleanup_trap_command "$yamlfile")" EXIT
-   # shellcheck disable=SC
+   yamlfile=$(mktemp -t jenkins-namespace.XXXXXX.yaml)
+   trap '$(_cleanup_trap_command "$yamlfile")' EXIT
+   # shellcheck disable=SC2086
    envsubst < "$jenkins_namespace_template" > "$yamlfile"
 
    if _kubectl --no-exit get namespace "$jenkins_namespace" >/dev/null 2>&1; then
@@ -193,7 +193,7 @@ function _create_jenkins_namespace() {
       echo "Namespace $jenkins_namespace created"
    fi
 
-   trap "$(_cleanup_trap_command "$yamlfile")" RETURN
+   trap '$(_cleanup_trap_command "$yamlfile")' RETURN
 }
 
 function _jenkins_detect_cluster_name() {
@@ -380,12 +380,12 @@ EOF
       echo "Jenkins PV template file not found: $jenkins_pv_template"
       exit 1
    fi
-   jenkinsyamfile=$(mktemp -t)
-   trap "$(_cleanup_trap_command "$jenkinsyamfile")" EXIT
+   jenkinsyamfile=$(mktemp -t jenkins-home-pv.XXXXXX.yaml)
+   trap '$(_cleanup_trap_command "$jenkinsyamfile")' EXIT
    envsubst < "$jenkins_pv_template" > "$jenkinsyamfile"
    _kubectl apply -f "$jenkinsyamfile" -n "$jenkins_namespace"
 
-   trap "$(_cleanup_trap_command "$jenkinsyamfile")" RETURN
+   trap '$(_cleanup_trap_command "$jenkinsyamfile")' RETURN
 }
 
 function _ensure_jenkins_cert() {
@@ -447,11 +447,11 @@ function _ensure_jenkins_cert() {
    json=$(_kubectl -n "$vault_namespace" exec -i "$pod" -- \
       vault write -format=json pki/issue/jenkins common_name="$common_name" ttl=72h)
 
-   cert_file=$(mktemp -t)
-   key_file=$(mktemp -t)
+   cert_file=$(mktemp -t jenkins-cert.XXXXXX.pem)
+   key_file=$(mktemp -t jenkins-key.XXXXXX.pem)
 
-   trap "$(_cleanup_trap_command "$cert_file" "$key_file")" RETURN
-   trap "$(_cleanup_trap_command "$cert_file" "$key_file")" EXIT
+   trap '$(_cleanup_trap_command "$cert_file" "$key_file")' RETURN
+   trap '$(_cleanup_trap_command "$cert_file" "$key_file")' EXIT
 
    echo "$json" | jq -r '.data.certificate' > "$cert_file"
    echo "$json" | jq -r '.data.private_key' > "$key_file"

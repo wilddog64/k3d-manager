@@ -84,7 +84,7 @@ function _provider_k3d_configure_istio() {
    # shellcheck disable=SC1090
    source "$istio_var"
    local istio_yamlfile
-   istio_yamlfile=$(mktemp -t)
+   istio_yamlfile=$(mktemp -t k3d-istio-operator.XXXXXX.yaml)
    envsubst < "$istio_yaml_template" > "$istio_yamlfile"
 
    _install_istioctl
@@ -92,7 +92,7 @@ function _provider_k3d_configure_istio() {
    _istioctl install -y -f "$istio_yamlfile"
    _kubectl label ns default istio-injection=enabled --overwrite
 
-   trap "$(_cleanup_trap_command "$istio_yamlfile")" EXIT
+   trap '$(_cleanup_trap_command "$istio_yamlfile")' EXIT
 }
 
 function _provider_k3d_create_cluster() {
@@ -131,10 +131,10 @@ function _provider_k3d_create_cluster() {
    source "$cluster_var"
 
    local yamlfile
-   yamlfile=$(mktemp -t)
+   yamlfile=$(mktemp -t k3d-cluster.XXXXXX.yaml)
    envsubst < "$cluster_template" > "$yamlfile"
 
-   trap "$(_cleanup_trap_command "$yamlfile")" RETURN
+   trap '$(_cleanup_trap_command "$yamlfile")' RETURN
 
    if _provider_k3d_list_clusters | grep -q "$cluster_name"; then
       echo "Cluster $cluster_name already exists, skip"

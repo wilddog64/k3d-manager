@@ -45,7 +45,7 @@ function _vault_repo_setup() {
 function _deploy_vault_ha() {
    local ns="${1:-$VAULT_NS_DEFAULT}"
    local release="${2:-$VAULT_RELEASE_DEFAULT}"
-   local f="$(mktemp -t)"
+   local f="$(mktemp -t vault-ha-vaules.XXXXXX.yaml)"
 
    sc="${VAULT_SC:-local-path}"
    cat >"$f" <<YAML
@@ -68,7 +68,7 @@ YAML
    args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$f")
    [[ -n "$version" ]] && args+=("--version" "$version")
    _helm "${args[@]}"
-   trap "$(_cleanup_trap_command "$f")" EXIT TERM
+   trap '$(_cleanup_trap_command "$f")' EXIT TERM
 }
 
 function deploy_vault() {
@@ -143,8 +143,8 @@ function _vault_bootstrap_ha() {
       return 0
   fi
 
-  local jsonfile="$(mktemp -t)";
-  trap "$(_cleanup_trap_command "$jsonfile")" EXIT TERM
+  local jsonfile="$(mktemp -t vault-init.XXXXXX.json)";
+  trap '$(_cleanup_trap_command "$jsonfile")' EXIT TERM
   _kubectl wait -n "$ns" --for=condition=Podscheduled pod/"$leader" --timeout=120s
   local vault_state=$(_kubectl --no-exit -n "$ns" get pod "$leader" -o jsonpath='{.status.phase}')
   end_time=$((SECONDS + 120))
@@ -521,7 +521,7 @@ function _vault_issue_pki_tls_secret() {
 
    local manifest
    manifest="$(mktemp -t vault-pki-secret.XXXXXX)"
-   trap "$(_cleanup_trap_command "$manifest")" EXIT TERM
+   trap '$(_cleanup_trap_command "$manifest")' EXIT TERM
 
    {
       printf 'apiVersion: v1\n'

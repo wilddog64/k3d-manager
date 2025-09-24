@@ -69,7 +69,7 @@ function _provider_k3s_configure_istio() {
    # shellcheck disable=SC1090
    source "$istio_var"
    local istio_yamlfile
-   istio_yamlfile=$(mktemp -t)
+   istio_yamlfile=$(mktemp -t k3s-istio-operator.XXXXXX.yaml)
    envsubst < "$istio_yaml_template" > "$istio_yamlfile"
 
    _install_istioctl
@@ -77,7 +77,7 @@ function _provider_k3s_configure_istio() {
    _istioctl install -y -f "$istio_yamlfile"
    _kubectl label ns default istio-injection=enabled --overwrite
 
-   trap "$(_cleanup_trap_command "$istio_yamlfile")" EXIT
+   trap '$(_cleanup_trap_command "$istio_yamlfile")' EXIT
 }
 
 function _provider_k3s_deploy_cluster() {
