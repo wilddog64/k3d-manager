@@ -875,6 +875,7 @@ SCRIPT
   [ "${#kubectl_calls[@]}" -ge 2 ]
   [[ "${kubectl_calls[0]}" == "-n jenkins get secret jenkins-tls -o json" ]]
   printf '%s\n' "${kubectl_calls[@]}" | grep -Fq 'apply -f '
+  unset CERT_ROTATOR_KUBECTL_LOG CERT_ROTATOR_CURL_LOG CERT_ROTATOR_HAS_SECRET CERT_ROTATOR_SECRET_JSON
 }
 
 @test "cert rotator skips revoke when no prior certificate" {
