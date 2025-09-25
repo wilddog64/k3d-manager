@@ -61,27 +61,23 @@ probes:
   startupProbe:
     httpGet:
       path: /login
-      port: http
-    initialDelaySeconds: 90
-    periodSeconds: 5
-    timeoutSeconds: 5
-    failureThreshold: 60
-  readinessProbe:
-    httpGet:
-      path: /login
-      port: http
-    initialDelaySeconds: 90
-    periodSeconds: 5
-    timeoutSeconds: 5
-    failureThreshold: 120
-  livenessProbe:
-    httpGet:
-      path: /login
-      port: http
-    initialDelaySeconds: 90
-    periodSeconds: 5
-    timeoutSeconds: 5
-    failureThreshold:
+    port: 8080
+  initialDelaySeconds: 90
+  periodSeconds: 5
+readinessProbe:
+  httpGet:
+    path: /login
+    port: 8080
+  initialDelaySeconds: 90
+  periodSeconds: 5
+  failureThreshold: 120
+livenessProbe:
+  httpGet:
+    path: /login
+    port: 8080
+  initialDelaySeconds: 90
+  periodSeconds: 5
+  failureThreshold: 60
   JCasC:
     configScripts:
       01-security: |
