@@ -8,7 +8,7 @@ spec:
   gateways:
     - istio-system/jenkins-gw
   hosts:
-    - jenkins.dev.local.me
+    - jenkins.dev.k3d.internal
   http:
     - match:
         - uri: { prefix: "/" }

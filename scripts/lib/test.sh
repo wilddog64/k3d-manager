@@ -460,15 +460,15 @@ function test_jenkins() {
 
     # Confirm TLS termination and fetch the Jenkins landing page
     if ! CURL_MAX_TIME="$curl_max_time" \
-       _curl --insecure -v --resolve jenkins.dev.local.me:8443:127.0.0.1 \
-        https://jenkins.dev.local.me:8443/ 2>&1 | grep -q 'subject: CN=jenkins.dev.local.me'; then
+       _curl --insecure -v --resolve jenkins.dev.k3d.internal:8443:127.0.0.1 \
+        https://jenkins.k3d.internal:8443/ 2>&1 | grep -q 'subject: CN=jenkins.k3d.internal'; then
         echo "TLS certificate not issued by Vault" >&2
         return 1
     fi
 
     if ! CURL_MAX_TIME="$curl_max_time" \
-       _curl --insecure --resolve jenkins.dev.local.me:8443:127.0.0.1 \
-        https://jenkins.dev.local.me:8443/login | grep -q Jenkins; then
+       _curl --insecure --resolve jenkins.k3d.internal:8443:127.0.0.1 \
+        https://jenkins.k3d.internal:8443/login | grep -q Jenkins; then
         echo "Unable to reach Jenkins landing page" >&2
         return 1
     fi

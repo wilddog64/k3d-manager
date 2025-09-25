@@ -332,7 +332,7 @@ EOF
   read_lines "$VAULT_CALL_LOG" vault_args
   [ "${vault_args[0]}" = "ci-vault" ]
   [ "${vault_args[1]}" = "ci-release" ]
-  [ "${vault_args[2]}" = "jenkins.dev.local.me" ]
+  [ "${vault_args[2]}" = "jenkins.dev.k3d.internal" ]
   [ "${vault_args[3]}" = "istio-system" ]
   [ "${vault_args[4]}" = "jenkins-cert" ]
 }

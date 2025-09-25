@@ -151,7 +151,7 @@ plugin or by editing the helper files under `scripts/etc`.
 | `VAULT_ENABLE_PKI` | `1` | Toggle the entire PKI bootstrap routine. |
 | `VAULT_PKI_PATH` | `pki` | Mount path for the PKI secrets engine (for example, `pki` vs `pki_int`). |
 | `VAULT_PKI_ROLE` | `jenkins-tls` | Name of the Vault role that will issue leaf certificates. |
-| `VAULT_PKI_CN` | `dev.local.me` | Common name used when generating the root CA. |
+| `VAULT_PKI_CN` | `dev.k3d.internal` | Common name used when generating the root CA. |
 | `VAULT_PKI_MAX_TTL` | `87600h` | Maximum lifetime for the root CA (10 years by default). |
 | `VAULT_PKI_ROLE_TTL` | `720h` | Maximum lifetime for leaf certificates issued by the role. |
 | `VAULT_PKI_ALLOWED` | *(empty)* | Comma-separated list of allowed domains/SANs for the role; an empty value allows any host. |
@@ -164,7 +164,7 @@ plugin or by editing the helper files under `scripts/etc`.
 | `VAULT_PKI_ISSUE_SECRET` | `1` | Immediately mint a TLS secret after PKI is ready. |
 | `VAULT_PKI_SECRET_NS` | `istio-system` | Namespace where the TLS secret will be written. |
 | `VAULT_PKI_SECRET_NAME` | `jenkins-tls` | Name of the Kubernetes `tls` secret to create. |
-| `VAULT_PKI_LEAF_HOST` | `jenkins.dev.local.me` | Common name/SAN for the leaf certificate request. |
+| `VAULT_PKI_LEAF_HOST` | `jenkins.dev.k3d.internal` | Common name/SAN for the leaf certificate request. |
 
 ### Example workflow
 
@@ -173,12 +173,12 @@ plugin or by editing the helper files under `scripts/etc`.
    ```bash
    export VAULT_ENABLE_PKI=1
    export VAULT_PKI_PATH=pki_int
-   export VAULT_PKI_CN="dev.local.me"
-   export VAULT_PKI_ALLOWED="jenkins.dev.local.me,*.dev.local.me"
+   export VAULT_PKI_CN="dev.k3d.internal"
+   export VAULT_PKI_ALLOWED="jenkins.dev.k3d.internal,*.dev.k3d.internal"
    export VAULT_PKI_ENFORCE_HOSTNAMES=true
    export VAULT_PKI_SECRET_NS=istio-system
    export VAULT_PKI_SECRET_NAME=jenkins-tls
-   export VAULT_PKI_LEAF_HOST=jenkins.dev.local.me
+   export VAULT_PKI_LEAF_HOST=jenkins.dev.k3d.internal
    ```
 
 2. Deploy Vault in HA mode. The plugin will initialise Vault, configure the PKI

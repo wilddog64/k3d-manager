@@ -151,7 +151,7 @@ function _ensure_jenkins_cert() {
    local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
    local k8s_namespace="istio-system"
    local secret_name="jenkins-cert"
-   local common_name="jenkins.dev.local.me"
+   local common_name="jenkins.dev.k3d.internal"
    local pod="${vault_release}-0"
 
    if _kubectl --no-exit -n "$k8s_namespace" \
@@ -165,11 +165,11 @@ function _ensure_jenkins_cert() {
       _kubectl -n "$vault_namespace" exec -i "$pod" -- vault secrets enable pki
       _kubectl -n "$vault_namespace" exec -i "$pod" -- vault secrets tune -max-lease-ttl=87600h pki
       _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-         vault write pki/root/generate/internal common_name="dev.local.me" ttl=87600h
+         vault write pki/root/generate/internal common_name="dev.k3d.internal" ttl=87600h
    fi
 
    _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-      vault write pki/roles/jenkins allowed_domains=dev.local.me allow_subdomains=true max_ttl=72h
+      vault write pki/roles/jenkins allowed_domains=dev.k3d.internal allow_subdomains=true max_ttl=72h
 
    local json cert_file key_file
    json=$(_kubectl -n "$vault_namespace" exec -i "$pod" -- \
@@ -313,7 +313,7 @@ function _deploy_jenkins() {
       return $?
    fi
 
-   local jenkins_host="jenkins.dev.local.me"
+   local jenkins_host="jenkins.dev.k3d.internal"
    local secret_namespace="istio-system"
    local secret_name="jenkins-cert"
 

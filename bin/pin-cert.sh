@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 1) Generate the pin from the **live** endpoint (leaf cert public key)
-HOST=jenkins.dev.local.me; IP=127.0.0.1; PORT=8443
+HOST=jenkins.dev.k3d.internal; IP=127.0.0.1; PORT=8443
 PIN=$(
   openssl s_client -servername "$HOST" -connect "$IP:$PORT" </dev/null 2>/dev/null \
   | openssl x509 -pubkey -noout \

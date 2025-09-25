@@ -183,12 +183,12 @@ _curl() {
     return 0
   fi
 
-  if [[ "$url" == "https://jenkins.dev.local.me:8443/" ]]; then
-    printf '%s' 'subject: CN=jenkins.dev.local.me'
+  if [[ "$url" == "https://jenkins.dev.k3d.internal:8443/" ]]; then
+    printf '%s' 'subject: CN=jenkins.dev.k3d.internal'
     return 0
   fi
 
-  if [[ "$url" == "https://jenkins.dev.local.me:8443/login" ]]; then
+  if [[ "$url" == "https://jenkins.dev.k3d.internal:8443/login" ]]; then
     printf '%s' 'Jenkins'
     return 0
   fi

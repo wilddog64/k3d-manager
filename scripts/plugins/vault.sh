@@ -424,7 +424,7 @@ function _vault_pki_config_urls() {
 function _vault_ensure_pki_root_ca() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local path="${3:-${VAULT_PKI_PATH:-pki}}"
-   local cn="${4:-${VAULT_PKI_CN:-dev.local.me}}" ttl="${5:-${VAULT_PKI_MAX_TTL:-87600h}}"
+   local cn="${4:-${VAULT_PKI_CN:-dev.k3d.internal}}" ttl="${5:-${VAULT_PKI_MAX_TTL:-87600h}}"
 
    if _vault_exec "$ns" "vault read -format=json $path/cert/ca" "$release" >/dev/null 2>&1; then
       _info "[vault] root CA already exists at $path, skipping creation"
@@ -464,7 +464,7 @@ function _vault_issue_pki_tls_secret() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local path="${3:-${VAULT_PKI_PATH:-pki}}"
    local role="${4:-${VAULT_PKI_ROLE:-jenkins-tls}}"
-   local host="${5:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}}"
+   local host="${5:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.k3d.internal}}"
    local secret_ns="${6:-${VAULT_PKI_SECRET_NS:-istio-system}}"
    local secret_name="${7:-${VAULT_PKI_SECRET_NAME:-jenkins-tls}}"
 
@@ -524,7 +524,7 @@ function _is_vault_pki_ready() {
 function _vault_setup_pki() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local path="${3:-${VAULT_PKI_PATH:-pki}}"
-   local ca_cn="${4:-${VAULT_PKI_CN:-dev.local.me}}"
+   local ca_cn="${4:-${VAULT_PKI_CN:-dev.k3d.internal}}"
    local allowd="${5:-${VAULT_PKI_ALLOWED:-}}"
    local role_ttl="${6:-${VAULT_PKI_ROLE_TTL:-720h}}"
    local role="${7:-${VAULT_PKI_ROLE:-jenkins-tls}}"
@@ -545,7 +545,7 @@ function _vault_pki_issue_tls_secret() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local path="${3:-${VAULT_PKI_PATH:-pki}}"
    local role="${4:-${VAULT_PKI_ROLE:-jenkins-tls}}"
-   local host="${5:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}}"
+   local host="${5:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.k3d.internal}}"
    local secret_ns="${6:-${VAULT_PKI_SECRET_NS:-istio-system}}"
    local secret_name="${7:-${VAULT_PKI_SECRET_NAME:-jenkins-tls}}"
 
