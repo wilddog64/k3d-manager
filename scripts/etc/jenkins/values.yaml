@@ -56,25 +56,32 @@ controller:
   targetPort: 8080
   containerPort: 8080
   servicePortName: http
+healthProbes: true
+probes:
   startupProbe:
-    tcpSocket:
-      port: 8080
+    httpGet:
+      path: /login
+      port: http
     initialDelaySeconds: 90
     periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 60
   readinessProbe:
     httpGet:
       path: /login
-      port: 8080
+      port: http
     initialDelaySeconds: 90
     periodSeconds: 5
-    failureThreshold: 120s
+    timeoutSeconds: 5
+    failureThreshold: 120
   livenessProbe:
     httpGet:
       path: /login
-      port: 8080
+      port: http
     initialDelaySeconds: 90
     periodSeconds: 5
-    failureThreshold: 60
+    timeoutSeconds: 5
+    failureThreshold:
   JCasC:
     configScripts:
       01-security: |
