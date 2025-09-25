@@ -95,16 +95,6 @@ if [ -d "$WORKDIR/.git" ]; then
   date -Is         > "$WORKDIR/.codex_last_sync"     || true
 fi
 
-# ---------------------------------------
-# 3) kubectl (stable) — installed once
-# ---------------------------------------
-if ! command -v kubectl >/dev/null 2>&1; then
-  KVER="$(curl -fsSL https://dl.k8s.io/release/stable.txt)"
-  curl -fsSLo /tmp/kubectl "https://dl.k8s.io/release/${KVER}/bin/linux/amd64/kubectl"
-  sudo install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
-  rm -f /tmp/kubectl
-fi
-
 # Success marker
 echo "OK" > "$HOME/CODEX_SETUP_OK" || true
 echo "== CODEx SSH setup end: $(date -Is) =="
