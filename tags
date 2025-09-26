@@ -430,10 +430,10 @@ apply_secret	scripts/etc/jenkins/cert-rotator.sh	/^function apply_secret() {$/;"
 cert rotator revokes superseded certificate	scripts/tests/plugins/jenkins.bats	/^@test "cert rotator revokes superseded certificate" {$/;"	t
 cert rotator skips revoke when no prior certificate	scripts/tests/plugins/jenkins.bats	/^@test "cert rotator skips revoke when no prior certificate" {$/;"	t
 cluster template mounts Jenkins home directory	scripts/tests/core/create_k3d_clusters.bats	/^@test "cluster template mounts Jenkins home directory" {$/;"	t
-cluster_provider_get_active	scripts/lib/cluster_provider.sh	/^function cluster_provider_get_active() {$/;"	f
-cluster_provider_is	scripts/lib/cluster_provider.sh	/^function cluster_provider_is() {$/;"	f
-cluster_provider_reset_active	scripts/lib/cluster_provider.sh	/^function cluster_provider_reset_active() {$/;"	f
-cluster_provider_set_active	scripts/lib/cluster_provider.sh	/^function cluster_provider_set_active() {$/;"	f
+_cluster_provider_get_active	scripts/lib/cluster_provider.sh	/^function _cluster_provider_get_active() {$/;"	f
+_cluster_provider_is	scripts/lib/cluster_provider.sh	/^function _cluster_provider_is() {$/;"	f
+_cluster_provider_reset_active	scripts/lib/cluster_provider.sh	/^function _cluster_provider_reset_active() {$/;"	f
+_cluster_provider_set_active	scripts/lib/cluster_provider.sh	/^function _cluster_provider_set_active() {$/;"	f
 config_bws_eso	scripts/plugins/bitwarden.sh	/^function config_bws_eso() {$/;"	f
 create_az_sp	scripts/plugins/azure.sh	/^function create_az_sp() {$/;"	f
 create_cluster	scripts/lib/core.sh	/^function create_cluster() {$/;"	f
@@ -471,8 +471,8 @@ eso_akv	scripts/plugins/azure.sh	/^function eso_akv() {$/;"	f
 eso_example_by_uuid	scripts/plugins/bitwarden.sh	/^function eso_example_by_uuid() {$/;"	f
 export_stubs	scripts/tests/test_helpers.bash	/^function export_stubs() {$/;"	f
 extract_certificate_serial	scratch/extract_serial.sh	/^extract_certificate_serial() {$/;"	f
-extract_certificate_serial	scripts/etc/jenkins/cert-rotator.sh	/^function extract_certificate_serial() {$/;"	f
-extract_certificate_serial	scripts/lib/vault_pki.sh	/^function extract_certificate_serial() {$/;"	f
+_vault_pki_extract_certificate_serial	scripts/etc/jenkins/cert-rotator.sh	/^function _vault_pki_extract_certificate_serial() {$/;"	f
+_vault_pki_extract_certificate_serial	scripts/lib/vault_pki.sh	/^function _vault_pki_extract_certificate_serial() {$/;"	f
 extract_common_name	scripts/etc/jenkins/cert-rotator.sh	/^function extract_common_name() {$/;"	f
 extract_dns_sans	scripts/etc/jenkins/cert-rotator.sh	/^function extract_dns_sans() {$/;"	f
 fakecmd	scripts/tests/lib/run_command.bats	/^  fakecmd() {$/;"	f
@@ -503,8 +503,8 @@ read_lines reads file into array	scripts/tests/lib/read_lines.bats	/^@test "read
 require_cmd	scripts/etc/jenkins/cert-rotator.sh	/^function require_cmd() {$/;"	f
 require_env	scripts/etc/jenkins/cert-rotator.sh	/^function require_env() {$/;"	f
 revoke_certificate_serial	scratch/revoke.sh	/^revoke_certificate_serial() {$/;"	f
-revoke_certificate_serial	scripts/etc/jenkins/cert-rotator.sh	/^function revoke_certificate_serial() {$/;"	f
-revoke_certificate_serial	scripts/lib/vault_pki.sh	/^function revoke_certificate_serial() {$/;"	f
+_vault_pki_revoke_certificate_serial	scripts/etc/jenkins/cert-rotator.sh	/^function _vault_pki_revoke_certificate_serial() {$/;"	f
+_vault_pki_revoke_certificate_serial	scripts/lib/vault_pki.sh	/^function _vault_pki_revoke_certificate_serial() {$/;"	f
 run_cleanup_check	scripts/tests/plugins/jenkins.bats	/^  run_cleanup_check() {$/;"	f
 seconds_until_expiry	scripts/etc/jenkins/cert-rotator.sh	/^function seconds_until_expiry() {$/;"	f
 setup	scripts/tests/core/create_k3d_clusters.bats	/^setup() {$/;"	f
