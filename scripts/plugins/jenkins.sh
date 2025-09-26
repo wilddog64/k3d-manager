@@ -622,15 +622,37 @@ function deploy_jenkins() {
    _create_jenkins_pv_pvc "$jenkins_namespace"
    _ensure_jenkins_cert "$vault_namespace" "$vault_release"
 
-   local deploy_rc
-   _deploy_jenkins "$jenkins_namespace" "$vault_namespace" "$vault_release"
-   deploy_rc=$?
-   if (( deploy_rc != 0 )); then
-      printf 'ERROR: Jenkins deployment failed; aborting readiness check.\n' >&2
-      return "$deploy_rc"
+   local max_attempts="${JENKINS_DEPLOY_RETRIES:-3}"
+   if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || (( max_attempts < 1 )); then
+      max_attempts=3
    fi
 
-   _wait_for_jenkins_ready "$jenkins_namespace"
+   local attempt deploy_rc wait_rc selector
+   selector='app.kubernetes.io/component=jenkins-controller'
+
+   for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+      _deploy_jenkins "$jenkins_namespace" "$vault_namespace" "$vault_release"
+      deploy_rc=$?
+
+      wait_rc=0
+      if (( deploy_rc == 0 )); then
+         if _wait_for_jenkins_ready "$jenkins_namespace"; then
+            return 0
+         fi
+         wait_rc=$?
+      else
+         wait_rc=$deploy_rc
+      fi
+
+      if (( attempt >= max_attempts )); then
+         printf 'ERROR: Jenkins deployment failed after %d attempt(s).\n' "$attempt" >&2
+         return "$wait_rc"
+      fi
+
+      _warn "Jenkins deployment attempt ${attempt} failed (rc=${wait_rc}); retrying..."
+      _kubectl --no-exit --quiet -n "$jenkins_namespace" delete pod -l "$selector" --ignore-not-found >/dev/null 2>&1 || true
+      sleep 10
+   done
 }
 
 function _deploy_jenkins() {
