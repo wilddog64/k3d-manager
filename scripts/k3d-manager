@@ -39,13 +39,143 @@ PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 
 # load our library functions
 source "${SCRIPT_DIR}/lib/system.sh"
+source "${SCRIPT_DIR}/lib/cluster_provider.sh"
 source "${SCRIPT_DIR}/lib/test.sh"
 source "${SCRIPT_DIR}/lib/core.sh"
 
+if [[ -n "${CLUSTER_PROVIDER:-}" ]]; then
+    export K3D_MANAGER_PROVIDER="${K3D_MANAGER_PROVIDER:-$CLUSTER_PROVIDER}"
+    export K3D_MANAGER_CLUSTER_PROVIDER="${K3D_MANAGER_CLUSTER_PROVIDER:-$CLUSTER_PROVIDER}"
+    if declare -f _cluster_provider_set_active >/dev/null 2>&1; then
+        _cluster_provider_set_active "$(printf '%s' "$CLUSTER_PROVIDER" | tr '[:upper:]' '[:lower:]')"
+    fi
+elif [[ -n "${K3D_MANAGER_PROVIDER:-}" ]]; then
+    export CLUSTER_PROVIDER="$K3D_MANAGER_PROVIDER"
+    export K3D_MANAGER_CLUSTER_PROVIDER="${K3D_MANAGER_CLUSTER_PROVIDER:-$K3D_MANAGER_PROVIDER}"
+    if declare -f _cluster_provider_set_active >/dev/null 2>&1; then
+        _cluster_provider_set_active "$(printf '%s' "$K3D_MANAGER_PROVIDER" | tr '[:upper:]' '[:lower:]')"
+    fi
+fi
+
+function __k3d_manager_join() {
+    local separator="$1"
+    shift || true
+
+    local joined=""
+    local token
+    for token in "$@"; do
+        if [[ -n "$joined" ]]; then
+            joined+="$separator"
+        fi
+        joined+="$token"
+    done
+
+    printf '%s' "$joined"
+}
+
+function __k3d_manager_discover_tests() {
+    local tests_var="$1"
+    local names_var="$2"
+    local suites_var="${3:-}"
+
+    eval "$tests_var=()"
+    eval "$names_var=()"
+    if [[ -n "$suites_var" ]]; then
+        eval "$suites_var=()"
+    fi
+
+    local tests_root="${SCRIPT_DIR}/tests"
+    if [[ ! -d "$tests_root" ]]; then
+        return 0
+    fi
+
+    local -a search_dirs=("$tests_root")
+    while IFS= read -r dir; do
+        search_dirs+=("$dir")
+    done < <(find "$tests_root" -mindepth 1 -maxdepth 1 -type d | sort)
+
+    local tests_count=0
+    local -a suite_labels=()
+    local test_file
+    local test_name
+    local suite_name
+    local seen
+    while IFS= read -r test_file; do
+        if [[ -z "$test_file" ]]; then
+            continue
+        fi
+        eval "$tests_var+=(\"${test_file}\")"
+        tests_count=$((tests_count + 1))
+        test_name="$(basename "$test_file" .bats)"
+        eval "$names_var+=(\"${test_name}\")"
+        suite_name="$(basename "$(dirname "$test_file")")"
+        if [[ "$suite_name" == "tests" ]]; then
+            continue
+        fi
+        seen=0
+        for dir in "${suite_labels[@]}"; do
+            if [[ "$dir" == "$suite_name" ]]; then
+                seen=1
+                break
+            fi
+        done
+        if [[ $seen -eq 0 ]]; then
+            suite_labels+=("$suite_name")
+        fi
+    done < <(find "${search_dirs[@]}" -maxdepth 1 -type f -name '*.bats' | sort)
+
+    if [[ -n "$suites_var" && $tests_count -gt 0 ]]; then
+        eval "$suites_var+=(\"all\")"
+        if [[ ${#suite_labels[@]} -gt 0 ]]; then
+            while IFS= read -r suite_name; do
+                eval "$suites_var+=(\"${suite_name}\")"
+            done < <(printf '%s\n' "${suite_labels[@]}" | sort)
+        fi
+    fi
+
+    return 0
+}
 function _usage() {
-    local test_suites
-    test_suites=$(find "${SCRIPT_DIR}/tests" -type f -name '*.bats' \
-        -exec basename {} .bats \; | sort | paste -sd '|' -)
+    local base_suites="all|lib|core|plugins"
+    if [[ -n "${test_suites}" ]]; then
+        test_suites="${base_suites}|${test_suites}"
+    else
+        test_suites="${base_suites}"
+    fi
+
+    local provider="${CLUSTER_PROVIDER:-$(_default_cluster_provider)}"
+
+    local -a __tests=()
+    local -a __test_names=()
+    local -a __suite_names=()
+    __k3d_manager_discover_tests __tests __test_names __suite_names
+
+    local provider="${CLUSTER_PROVIDER:-$(_default_cluster_provider)}"
+
+    local test_synopsis="suite|test-name"
+    if [[ ${#__suite_names[@]} -gt 0 || ${#__test_names[@]} -gt 0 ]]; then
+        local -a synopsis_tokens=()
+        if [[ ${#__suite_names[@]} -gt 0 ]]; then
+            synopsis_tokens+=("${__suite_names[@]}")
+        fi
+        if [[ ${#__test_names[@]} -gt 0 ]]; then
+            synopsis_tokens+=("${__test_names[@]}")
+        fi
+        local joined_synopsis="$( __k3d_manager_join '|' "${synopsis_tokens[@]}" )"
+        if [[ -n "$joined_synopsis" ]]; then
+            test_synopsis="$joined_synopsis"
+        fi
+    fi
+
+    local suites_summary=""
+    if [[ ${#__suite_names[@]} -gt 0 ]]; then
+        suites_summary="$( __k3d_manager_join ', ' "${__suite_names[@]}" )"
+    fi
+
+    local tests_summary=""
+    if [[ ${#__test_names[@]} -gt 0 ]]; then
+        tests_summary="$( __k3d_manager_join ', ' "${__test_names[@]}" )"
+    fi
 
     cat <<EOF
 Usage: ./k3d-manager <function> [args]
@@ -55,8 +185,12 @@ $(declare -F | awk '{print $3}' | grep -v '^_' | sort | sed 's/^/  /')
 
 Plugin functions are loaded on demand from scripts/plugins.
 
+Cluster provider:
+  Current: ${provider}
+  Override by exporting CLUSTER_PROVIDER (macOS defaults to k3d).
+
 Subcommands:
-  test all|${test_suites}   Run BATS tests
+  test ${test_suites}   Run BATS tests
 EOF
 }
 
@@ -65,8 +199,14 @@ function test() {
         local test_suites
         test_suites=$(find "${SCRIPT_DIR}/tests" -type f -name '*.bats' \
             -exec basename {} .bats \; | sort | paste -sd '|' -)
+        local base_suites="all|lib|core|plugins"
+        if [[ -n "${test_suites}" ]]; then
+            test_suites="${base_suites}|${test_suites}"
+        else
+            test_suites="${base_suites}"
+        fi
         cat <<EOF
-Usage: test all|${test_suites}
+Usage: test ${test_suites}
 Run BATS tests
 EOF
         return 0
@@ -83,6 +223,22 @@ EOF
 
     if [[ "$suite" == "all" ]]; then
         bats "${tests[@]}"
+        return
+    fi
+
+    if [[ "$suite" == "lib" || "$suite" == "core" || "$suite" == "plugins" ]]; then
+        local -a suite_tests=()
+        local dir="${SCRIPT_DIR}/tests/${suite}"
+        while IFS= read -r test_file; do
+            suite_tests+=("$test_file")
+        done < <(find "$dir" -maxdepth 1 -type f -name '*.bats' | sort)
+
+        if [[ ${#suite_tests[@]} -eq 0 ]]; then
+            echo "No test suites found in '$suite'." >&2
+            return 1
+        fi
+
+        bats "${suite_tests[@]}"
         return
     fi
 

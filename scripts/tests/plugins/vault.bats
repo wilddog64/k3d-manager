@@ -5,6 +5,8 @@ setup() {
   SOURCE="${BATS_TEST_DIRNAME}/../../k3d-manager"
   SCRIPT_DIR="${BATS_TEST_DIRNAME}/../.."
   PLUGINS_DIR="${SCRIPT_DIR}/plugins"
+  # shellcheck disable=SC1090
+  source "${SCRIPT_DIR}/lib/core.sh"
   source "${BATS_TEST_DIRNAME}/../../plugins/vault.sh"
 
   KUBECTL_LOG="$BATS_TEST_TMPDIR/kubectl.log"
@@ -54,9 +56,14 @@ setup() {
     CALLS+=("deploy_eso")
   }
 
+  _err() { echo "$*" >&2; return 1; }
+  _cleanup_on_success() { :; }
+
   export -f _kubectl
   export -f _helm
   export -f deploy_eso
+  export -f _err
+  export -f _cleanup_on_success
 }
 
 kubectl_run_output_fixture() {
@@ -310,7 +317,7 @@ EOF
   local calls
   calls=$(cat "$KUBECTL_CALL_FILE")
   [ "$calls" -eq 3 ]
-  mapfile -t WARN_MESSAGES <"$WARN_LOG"
+  read_lines "$WARN_LOG" WARN_MESSAGES
   [ "${#WARN_MESSAGES[@]}" -eq 2 ]
   [[ "${WARN_MESSAGES[0]}" == *"attempt 1/3"* ]]
   [[ "${WARN_MESSAGES[1]}" == *"attempt 2/3"* ]]
@@ -353,7 +360,7 @@ EOF
   local calls
   calls=$(cat "$KUBECTL_CALL_FILE")
   [ "$calls" -eq 3 ]
-  mapfile -t WARN_MESSAGES <"$WARN_LOG"
+  read_lines "$WARN_LOG" WARN_MESSAGES
   [ "${#WARN_MESSAGES[@]}" -eq 2 ]
   [[ "${WARN_MESSAGES[0]}" == *"attempt 1/3"* ]]
   [[ "${WARN_MESSAGES[1]}" == *"attempt 2/3"* ]]
@@ -391,12 +398,12 @@ EOF
 
   [ "$status" -eq 0 ]
   [ "$VAULT_LOGIN_CALLED" -eq 0 ]
-  mapfile -t exec_log <"$VAULT_EXEC_LOG"
+  read_lines "$VAULT_EXEC_LOG" exec_log
   local expected_enable="vault secrets enable -path=custom-path pki"
   local expected_tune="vault secrets tune -max-lease-ttl=${VAULT_PKI_MAX_TTL:-87600h} custom-path"
   [[ "${exec_log[*]}" != *"${expected_enable}"* ]]
   [[ "${exec_log[*]}" == *"${expected_tune}"* ]]
-  mapfile -t jq_args <"$JQ_ARGS_LOG"
+  read_lines "$JQ_ARGS_LOG" jq_args
   [[ "${jq_args[*]}" == "-e --arg PATH custom-path/ has(\$PATH) and .[\$PATH].type == \"pki\"" ]]
 }
 
@@ -430,6 +437,101 @@ EOF
 
   read_lines "$KUBECTL_LOG" kubectl_calls
   [ "${kubectl_calls[0]}" = "-n custom-ns echo vault_issue_called" ]
+}
+
+@test "_vault_issue_pki_tls_secret revokes existing certificate" {
+  local cert_file="$BATS_TEST_TMPDIR/existing.crt"
+  local key_file="$BATS_TEST_TMPDIR/existing.key"
+  openssl req -x509 -nodes -newkey rsa:2048 \
+    -keyout "$key_file" -out "$cert_file" -days 1 \
+    -subj "/CN=jenkins.example" -set_serial 0xBCDA >/dev/null 2>&1
+  local expected_serial
+  expected_serial=$(_vault_pki_extract_certificate_serial "$cert_file")
+
+  local cert_b64
+  cert_b64=$(base64 <"$cert_file" | tr -d '\n')
+  local secret_json="$BATS_TEST_TMPDIR/secret.json"
+  cat <<JSON >"$secret_json"
+{"data":{"tls.crt":"$cert_b64"}}
+JSON
+
+  local kube_log="$BATS_TEST_TMPDIR/kubectl-existing.log"
+  local vault_log="$BATS_TEST_TMPDIR/vault-existing.log"
+  : >"$kube_log"
+  : >"$vault_log"
+
+  _kubectl() {
+    echo "$*" >>"$KUBE_LOG"
+    if [[ "$1" == "-n" && "$3" == "get" && "$4" == "secret" ]]; then
+      cat "$SECRET_JSON_PATH"
+      return 0
+    elif [[ "$1" == "apply" && "$2" == "-f" ]]; then
+      return 0
+    fi
+    return 0
+  }
+
+  _vault_exec() {
+    local cmd="$2"
+    echo "$cmd" >>"$VAULT_LOG"
+    if [[ "$cmd" == "vault write -format=json pki/issue/jenkins"* ]]; then
+      printf '{"data":{"certificate":"NEW_CERT","private_key":"NEW_KEY","issuing_ca":"NEW_CA"}}\n'
+    fi
+    return 0
+  }
+
+  export -f _kubectl
+  export -f _vault_exec
+
+  KUBE_LOG="$kube_log"
+  VAULT_LOG="$vault_log"
+  SECRET_JSON_PATH="$secret_json"
+  export KUBE_LOG VAULT_LOG SECRET_JSON_PATH
+
+  _vault_issue_pki_tls_secret
+
+  read_lines "$vault_log" vault_calls
+  local revoke_cmd="vault write pki/revoke serial_number=${expected_serial}"
+  [[ "${vault_calls[*]}" == *"${revoke_cmd}"* ]]
+}
+
+@test "_vault_issue_pki_tls_secret skips revoke when secret missing" {
+  local kube_log="$BATS_TEST_TMPDIR/kubectl-missing.log"
+  local vault_log="$BATS_TEST_TMPDIR/vault-missing.log"
+  : >"$kube_log"
+  : >"$vault_log"
+
+  _kubectl() {
+    echo "$*" >>"$KUBE_LOG"
+    if [[ "$1" == "-n" && "$3" == "get" && "$4" == "secret" ]]; then
+      return 1
+    elif [[ "$1" == "apply" && "$2" == "-f" ]]; then
+      return 0
+    fi
+    return 0
+  }
+
+  _vault_exec() {
+    local cmd="$2"
+    echo "$cmd" >>"$VAULT_LOG"
+    if [[ "$cmd" == "vault write -format=json pki/issue/jenkins"* ]]; then
+      printf '{"data":{"certificate":"NEW_CERT","private_key":"NEW_KEY","issuing_ca":"NEW_CA"}}\n'
+    fi
+    return 0
+  }
+
+  export -f _kubectl
+  export -f _vault_exec
+
+  KUBE_LOG="$kube_log"
+  VAULT_LOG="$vault_log"
+  export KUBE_LOG VAULT_LOG
+
+  _vault_issue_pki_tls_secret
+
+  read_lines "$vault_log" vault_calls
+  local revoke_cmd="vault write pki/revoke serial_number="
+  [[ "${vault_calls[*]}" != *"${revoke_cmd}"* ]]
 }
 
 @test "Full deployment" {

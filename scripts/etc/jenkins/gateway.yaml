@@ -13,6 +13,6 @@ spec:
       protocol: HTTPS
     tls:
       mode: SIMPLE
-      credentialName: jenkins-cert
+      credentialName: ${VAULT_PKI_SECRET_NAME}
     hosts:
-    - jenkins.dev.local.me
+    - ${VAULT_PKI_LEAF_HOST}

@@ -18,6 +18,14 @@ fi
 # shellcheck disable=SC1090
 source "$ESO_PLUGIN"
 
+VAULT_PKI_HELPERS="$SCRIPT_DIR/lib/vault_pki.sh"
+if [[ -f "$VAULT_PKI_HELPERS" ]]; then
+   # shellcheck disable=SC1090
+   source "$VAULT_PKI_HELPERS"
+else
+   _warn "[vault] missing optional helper file: $VAULT_PKI_LIB" >&2
+fi
+
 command -v _info >/dev/null 2>&1 || _info() { printf '%s\n' "$*" >&2; }
 command -v _warn >/dev/null 2>&1 || _warn() { printf '%s\n' "$*" >&2; }
 
@@ -37,7 +45,7 @@ function _vault_repo_setup() {
 function _deploy_vault_ha() {
    local ns="${1:-$VAULT_NS_DEFAULT}"
    local release="${2:-$VAULT_RELEASE_DEFAULT}"
-   local f="$(mktemp -t)"
+   local f="$(mktemp -t vault-ha-vaules.XXXXXX.yaml)"
 
    sc="${VAULT_SC:-local-path}"
    cat >"$f" <<YAML
@@ -60,7 +68,7 @@ YAML
    args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$f")
    [[ -n "$version" ]] && args+=("--version" "$version")
    _helm "${args[@]}"
-   trap '_cleanup_on_success "$f"' EXIT TERM
+   trap '$(_cleanup_trap_command "$f")' EXIT TERM
 }
 
 function deploy_vault() {
@@ -135,8 +143,8 @@ function _vault_bootstrap_ha() {
       return 0
   fi
 
-  local jsonfile="$(mktemp -t)";
-  trap '_cleanup_on_success "$jsonfile"' EXIT TERM
+  local jsonfile="$(mktemp -t vault-init.XXXXXX.json)";
+  trap '$(_cleanup_trap_command "$jsonfile")' EXIT TERM
   _kubectl wait -n "$ns" --for=condition=Podscheduled pod/"$leader" --timeout=120s
   local vault_state=$(_kubectl --no-exit -n "$ns" get pod "$leader" -o jsonpath='{.status.phase}')
   end_time=$((SECONDS + 120))
@@ -460,6 +468,22 @@ function _vault_upsert_pki_role() {
       _err "[vault] failed to create/update role $role at $path"
 }
 
+function _vault_post_revoke_request() {
+   local method="$1" path="$2" payload="$3" ns="$4" release="$5"
+
+   if [[ "$method" != "POST" ]]; then
+      return 1
+   fi
+
+   local serial
+   serial=$(printf '%s' "$payload" | jq -r '.serial_number // empty') || return 1
+   if [[ -z "$serial" ]]; then
+      return 1
+   fi
+
+   _vault_exec "$ns" "vault write ${path} serial_number=${serial}" "$release"
+}
+
 function _vault_issue_pki_tls_secret() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local path="${3:-${VAULT_PKI_PATH:-pki}}"
@@ -467,6 +491,22 @@ function _vault_issue_pki_tls_secret() {
    local host="${5:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.k3d.internal}}"
    local secret_ns="${6:-${VAULT_PKI_SECRET_NS:-istio-system}}"
    local secret_name="${7:-${VAULT_PKI_SECRET_NAME:-jenkins-tls}}"
+
+   local existing_serial="" existing_cert_file=""
+   local secret_json cert_b64
+   if secret_json=$(_kubectl -n "$secret_ns" get secret "$secret_name" -o json 2>/dev/null); then
+      cert_b64=$(printf '%s' "$secret_json" | jq -r '.data["tls.crt"] // empty')
+      if [[ -n "$cert_b64" ]]; then
+         existing_cert_file=$(mktemp -t vault-existing-cert.XXXXXX)
+         if printf '%s' "$cert_b64" | base64 -d >"$existing_cert_file" 2>/dev/null; then
+            if ! existing_serial=$(_vault_pki_extract_certificate_serial "$existing_cert_file"); then
+               existing_serial=""
+            fi
+         else
+            existing_cert_file=""
+         fi
+      fi
+   fi
 
    local json="$(_vault_exec "$ns" "vault write -format=json ${path}/issue/${role} common_name=\"${host}\" alt_names=\"${host}\" ttl=\"${VAULT_PKI_ROLE_TTL:-720h}\"" "$release")"
 
@@ -481,7 +521,7 @@ function _vault_issue_pki_tls_secret() {
 
    local manifest
    manifest="$(mktemp -t vault-pki-secret.XXXXXX)"
-   trap "_cleanup_on_success '$manifest'" EXIT TERM
+   trap '$(_cleanup_trap_command "$manifest")' EXIT TERM
 
    {
       printf 'apiVersion: v1\n'
@@ -503,7 +543,16 @@ function _vault_issue_pki_tls_secret() {
       _err "[vault] failed to apply TLS secret manifest ${secret_ns}/${secret_name}"
 
    _cleanup_on_success "$manifest"
+   if [[ -n "$existing_cert_file" ]]; then
+      _cleanup_on_success "$existing_cert_file"
+   fi
    trap - EXIT TERM
+
+   if [[ -n "$existing_serial" ]]; then
+      if ! _vault_pki_revoke_certificate_serial "$existing_serial" "$path" _vault_post_revoke_request "$ns" "$release"; then
+         _warn "[vault] failed to revoke previous certificate serial $existing_serial"
+      fi
+   fi
 }
 
 # Verifies PKI mount and role exist; call _err to exit on failure.

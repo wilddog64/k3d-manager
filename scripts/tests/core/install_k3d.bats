@@ -4,6 +4,8 @@ load '../test_helpers.bash'
 
 setup() {
   init_test_env
+  export CLUSTER_PROVIDER=k3d
+  source "${BATS_TEST_DIRNAME}/../../lib/system.sh"
   source "${BATS_TEST_DIRNAME}/../../lib/core.sh"
 }
 

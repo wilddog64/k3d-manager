@@ -57,3 +57,19 @@ setup() {
   read_lines "$KUBECTL_LOG" kubectl_calls
   [ "${kubectl_calls[0]}" = "-n sample-ns rollout status deploy/external-secrets --timeout=120s" ]
 }
+
+@test "Local ESO chart skips repo add" {
+  RUN_EXIT_CODES=(1)
+  export ESO_HELM_CHART_REF="$BATS_TEST_TMPDIR/external-secrets-override.tgz"
+  export ESO_HELM_REPO_URL=""
+  run deploy_eso airgap-ns
+  [ "$status" -eq 0 ]
+  read_lines "$HELM_LOG" helm_calls
+  [ "${#helm_calls[@]}" -eq 1 ]
+  local expected="upgrade --install -n airgap-ns external-secrets ${ESO_HELM_CHART_REF} --create-namespace --set installCRDs=true"
+  [ "${helm_calls[0]}" = "$expected" ]
+  for call in "${helm_calls[@]}"; do
+    [[ "$call" != repo\ add* ]]
+    [[ "$call" != repo\ update* ]]
+  done
+}

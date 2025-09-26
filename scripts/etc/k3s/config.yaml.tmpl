@@ -1,0 +1,15 @@
+write-kubeconfig: "${K3S_KUBECONFIG_PATH}"
+write-kubeconfig-mode: "644"
+cluster-init: true
+data-dir: "${K3S_DATA_DIR}"
+node-name: "${CLUSTER_NAME}"
+node-ip: "${IP}"
+advertise-address: "${IP}"
+tls-san:
+  - "${IP}"
+  - "127.0.0.1"
+  - "host.k3d.internal"
+service-node-port-range: "80-32767"
+disable:
+  - traefik
+default-local-storage-path: "${K3S_LOCAL_STORAGE}"
