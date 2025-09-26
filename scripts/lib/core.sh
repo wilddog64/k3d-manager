@@ -414,12 +414,27 @@ function _install_istioctl() {
 
 function _cleanup_on_success() {
    local file_to_cleanup=$1
-   _info "Cleaning up temporary files... : $file_to_cleanup :"
-   rm -rf "$file_to_cleanup"
+   local logger="_info"
+   if ! declare -f _info >/dev/null 2>&1; then
+      logger=""
+   fi
+
+   if [[ -n "$file_to_cleanup" ]]; then
+      if [[ -n "$logger" ]]; then
+         "$logger" "Cleaning up temporary files... : $file_to_cleanup :"
+      else
+         printf 'INFO: Cleaning up temporary files... : %s :\n' "$file_to_cleanup" >&2
+      fi
+      rm -rf "$file_to_cleanup"
+   fi
    local path
    for path in "$@"; do
       [[ -n "$path" ]] || continue
-      _info "Cleaning up temporary files... : $path :"
+      if [[ -n "$logger" ]]; then
+         "$logger" "Cleaning up temporary files... : $path :"
+      else
+         printf 'INFO: Cleaning up temporary files... : %s :\n' "$path" >&2
+      fi
       rm -rf -- "$path"
    done
 }
@@ -656,8 +671,8 @@ EOF
    export CLUSTER_PROVIDER="$provider"
    export K3D_MANAGER_PROVIDER="$provider"
    export K3D_MANAGER_CLUSTER_PROVIDER="$provider"
-   if declare -f cluster_provider_set_active >/dev/null 2>&1; then
-      cluster_provider_set_active "$provider"
+   if declare -f _cluster_provider_set_active >/dev/null 2>&1; then
+      _cluster_provider_set_active "$provider"
    fi
 
    _info "Using cluster provider: $provider"
