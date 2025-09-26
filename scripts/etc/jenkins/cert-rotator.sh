@@ -508,19 +508,11 @@ function _vault_pki_revoke_certificate_serial() {
    return 1
 }
 
-function revoke_certificate_serial() {
-   _vault_pki_revoke_certificate_serial "$@"
-}
-
 function _vault_pki_extract_certificate_serial() {
    local cert_file="$1" raw
    raw=$(openssl x509 -noout -serial -in "$cert_file" 2>/dev/null) || return 1
    raw=${raw#serial=}
    normalize_serial "$raw"
-}
-
-function extract_certificate_serial() {
-   _vault_pki_extract_certificate_serial "$@"
 }
 
 main "$@"
