@@ -1,0 +1,19 @@
+controller:
+  persistence:
+    enabled: false
+  installPlugins: []
+  JCasC:
+    configScripts:
+      01-security: |
+        jenkins:
+          securityRealm:
+            local:
+              allowsSignup: false
+              users:
+                - id: "${JENKINS_ADMIN_USER}"
+                  password: "${JENKINS_ADMIN_PASS}"
+          authorizationStrategy:
+            projectMatrix:
+              permissions:
+                - "Overall/Read:jenkins-admin"
+                - "Overall/Administer:jenkins-admin"

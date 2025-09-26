@@ -677,9 +677,14 @@ function _deploy_jenkins() {
      fi
      _helm repo update
    fi
+   local values_file="${JENKINS_VALUES_FILE:-$JENKINS_CONFIG_DIR/values.yaml}"
+   if [[ ! -r "$values_file" ]]; then
+      _err "Jenkins values file not found: $values_file"
+   fi
+
    _helm upgrade --install jenkins "$helm_chart_ref" \
       --namespace "$ns" \
-      -f "$JENKINS_CONFIG_DIR/values.yaml"
+      -f "$values_file"
 
    local vault_pki_secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
    local vault_pki_leaf_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"

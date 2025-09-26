@@ -430,7 +430,31 @@ function test_jenkins() {
     # Verify the Jenkins pod mounts the expected PVC
     local pvc
     pvc=$(_kubectl get pod jenkins-0 -n "$JENKINS_NS" -o jsonpath='{..persistentVolumeClaim.claimName}')
-    if [[ "$pvc" != "jenkins-home" ]]; then
+
+    if [[ -z "$pvc" ]]; then
+        echo "Unable to determine Jenkins PVC claim" >&2
+        return 1
+    fi
+
+    local -a acceptable_pvcs
+    if [[ -n "${JENKINS_EXPECTED_PVC:-}" ]]; then
+        acceptable_pvcs=("$JENKINS_EXPECTED_PVC")
+    else
+        acceptable_pvcs=("jenkins-home" "jenkins")
+    fi
+
+    local matched=0
+    local claim expected
+    for claim in $pvc; do
+        for expected in "${acceptable_pvcs[@]}"; do
+            if [[ -n "$expected" && "$claim" == "$expected" ]]; then
+                matched=1
+                break 2
+            fi
+        done
+    done
+
+    if (( ! matched )); then
         echo "Unexpected PVC: $pvc" >&2
         return 1
     fi
@@ -451,7 +475,7 @@ function test_jenkins() {
         return 1
     fi
 
-    _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 >/tmp/jenkins-test-pf.log 2>&1 &
+    _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 8443:8443 >/tmp/jenkins-test-pf.log 2>&1 &
     pf_pid=$!
     PF_PIDS+=("$pf_pid")
     if ! _wait_for_port_forward "$pf_pid"; then
@@ -485,13 +509,6 @@ function test_jenkins() {
     fi
 
     # Authenticate to Jenkins using the admin secret
-    _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 &
-    pf_pid=$!
-    PF_PIDS+=("$pf_pid")
-    if ! _wait_for_port_forward "$pf_pid"; then
-        return 1
-    fi
-
     local admin_user admin_pass auth_status
     admin_user=$(_kubectl -n "$JENKINS_NS" get secret jenkins-admin -o jsonpath='{.data.username}' | base64 -d)
     admin_pass=$(_kubectl -n "$JENKINS_NS" get secret jenkins-admin -o jsonpath='{.data.password}' | base64 -d)
