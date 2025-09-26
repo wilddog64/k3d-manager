@@ -31,6 +31,14 @@ setup() {
   export -f _provider_k3s_deploy_cluster
 
   _cluster_provider_mark_loaded k3s
+
+  envsubst() {
+    python3 -c 'import os, re, sys
+data = sys.stdin.read()
+pattern = re.compile(r"\$\{([A-Za-z0-9_]+)\}")
+sys.stdout.write(pattern.sub(lambda match: os.environ.get(match.group(1), ""), data))'
+  }
+  export -f envsubst
 }
 
 @test "deploy_cluster with explicit provider passes cluster name" {
@@ -40,7 +48,10 @@ setup() {
   [[ -f "$BATS_TMPDIR/provider_args" ]]
   [[ -f "$BATS_TMPDIR/provider_env" ]]
 
-  mapfile -t args < "$BATS_TMPDIR/provider_args"
+  args=()
+  while IFS= read -r line; do
+    args+=("$line")
+  done < "$BATS_TMPDIR/provider_args"
   [ "${#args[@]}" -eq 1 ]
   [ "${args[0]}" = "foo" ]
 
@@ -62,13 +73,19 @@ setup() {
 
   orig_provider_k3s_deploy_cluster foo
 
-  read_lines "$istio_log" istio_lines
+  istio_lines=()
+  while IFS= read -r line; do
+    istio_lines+=("$line")
+  done < "$istio_log"
   [ "${#istio_lines[@]}" -ge 3 ]
   [ "${istio_lines[0]}" = "install_istioctl" ]
   [[ "${istio_lines[1]}" = "istioctl x precheck" ]]
   [[ "${istio_lines[2]}" =~ ^istioctl\ install\ -y\ -f\  ]]
 
-  read_lines "$KUBECTL_LOG" kubectl_lines
+  kubectl_lines=()
+  while IFS= read -r line; do
+    kubectl_lines+=("$line")
+  done < "$KUBECTL_LOG"
   [ "${#kubectl_lines[@]}" -ge 1 ]
   local last_index=$(( ${#kubectl_lines[@]} - 1 ))
   [ "${kubectl_lines[$last_index]}" = "label ns default istio-injection=enabled --overwrite" ]
