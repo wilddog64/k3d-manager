@@ -331,7 +331,7 @@ function mint_certificate() {
 function apply_secret() {
    local ns="$1" name="$2" cert="$3" key="$4" ca_bundle="$5"
    local tmpfile
-   tmpfile=$(mktemp)
+   tmpfile=$(mktemp -t jenkins-secret.XXXXXX)
    cat >"$tmpfile" <<EOF
 apiVersion: v1
 kind: Secret
@@ -377,7 +377,7 @@ function main() {
       exit 1
    fi
 
-   local tmpdir=$(mktemp -d)
+   local tmpdir=$(mktemp -d -t jenkins-rotator.XXXXXX)
    trap 'if [[ -n "${tmpdir:-}" ]]; then rm -rf "$tmpdir"; fi' EXIT
 
    local secret_ns="$VAULT_PKI_SECRET_NS"

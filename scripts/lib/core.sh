@@ -156,7 +156,7 @@ function _k3s_render_template() {
    fi
 
    local tmp
-   tmp="$(mktemp)"
+   tmp="$(mktemp -t k3s-istio-template.XXXXXX)"
    envsubst <"$template" >"$tmp"
    _k3s_stage_file "$tmp" "$destination" "$mode"
 }
@@ -213,7 +213,7 @@ function _install_k3s() {
             ;;
       esac
 
-      tmpfile="$(mktemp)"
+      tmpfile="$(mktemp -t k3s-darwin-download.XXXXXX)"
       dest="${K3S_INSTALL_DIR}/k3s"
 
       _info "Downloading k3s binary for macOS ($arch)"
@@ -254,7 +254,7 @@ function _install_k3s() {
    fi
 
    local installer
-   installer="$(mktemp)"
+   installer="$(mktemp -t k3s-installer.XXXXXX)"
    _info "Fetching k3s installer script"
    _curl -fsSL https://get.k3s.io -o "$installer"
 
@@ -393,7 +393,7 @@ function _install_istioctl() {
 
    if  ! _command_exist istioctl ; then
       echo installing istioctl
-      tmp_script=$(mktemp)
+      tmp_script=$(mktemp -t istioctl-fetch.XXXXXX)
       trap 'rm -rf /tmp/istio-*' EXIT TERM
       pushd /tmp
       curl -f -s https://raw.githubusercontent.com/istio/istio/master/release/downloadIstioCandidate.sh -o "$tmp_script"

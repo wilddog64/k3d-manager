@@ -9,8 +9,8 @@ setup() {
 
 @test "_cleanup_on_success removes every provided path" {
   local tmp_dir tmp_file extra
-  tmp_dir=$(mktemp -d)
-  tmp_file=$(mktemp)
+  tmp_dir=$(mktemp -d -t cleanup-dir.XXXXXX)
+  tmp_file=$(mktemp -t cleanup-file.XXXXXX)
   extra=""
 
   [[ -d "$tmp_dir" ]]

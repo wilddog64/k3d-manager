@@ -363,7 +363,7 @@ function test_jenkins() {
         vault_release="vault"
     fi
     local vault_pod="${vault_release}-0"
-    local AUTH_FILE="$(mktemp)"
+    local AUTH_FILE="$(mktemp -t jenkins-auth.XXXXXX)"
     local pf_pid
     local jenkins_statefulset="statefulset/jenkins"
     local curl_max_time="${CURL_MAX_TIME:-30}"
