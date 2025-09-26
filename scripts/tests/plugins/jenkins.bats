@@ -963,7 +963,7 @@ create_self_signed_cert() {
 format_serial_hex_pairs() {
   local raw="${1//:/}"
   raw=${raw//[[:space:]]/}
-  raw=${raw^^}
+  raw=$(printf '%s' "$raw" | tr '[:lower:]' '[:upper:]')
 
   if (( ${#raw} % 2 == 1 )); then
     raw="0${raw}"
@@ -990,7 +990,7 @@ format_serial_hex_pairs() {
   expected_serial=${expected_serial#serial=}
   expected_serial=${expected_serial//:/}
   expected_serial=${expected_serial//[[:space:]]/}
-  expected_serial=${expected_serial^^}
+  expected_serial=$(printf '%s' "$expected_serial" | tr '[:lower:]' '[:upper:]')
   expected_serial=$(printf '%s' "$expected_serial" | sed 's/../&:/g; s/:$//')
 
   local cert_b64
@@ -1297,7 +1297,7 @@ EOF
     "$script"
 
   [ -s "$mktemp_log" ]
-  mapfile -t mktemp_paths <"$mktemp_log"
+  read_lines "$mktemp_log" mktemp_paths
   (( ${#mktemp_paths[@]} >= 4 ))
 
   for path in "${mktemp_paths[@]}"; do
@@ -1584,7 +1584,10 @@ else
   kubectl_calls=$(wc -l <"$KUBECTL_LOG")
   [[ "$kubectl_calls" -lt 6 ]] || exit 1
 fi
-readarray -t cleanup_paths <"$log_file"
+  cleanup_paths=()
+  while IFS= read -r line; do
+    cleanup_paths+=("$line")
+  done <"$log_file"
 expected_count=3
 for path in "${cleanup_paths[@]}"; do
   if [[ "$path" == *jenkins-cert-rotator* ]]; then
@@ -1593,7 +1596,10 @@ for path in "${cleanup_paths[@]}"; do
   fi
 done
 [[ "${#cleanup_paths[@]}" -eq "$expected_count" ]] || exit 1
-mapfile -t unique_paths < <(printf '%s\n' "${cleanup_paths[@]}" | sort -u)
+  unique_paths=()
+  while IFS= read -r line; do
+    unique_paths+=("$line")
+  done < <(printf '%s\n' "${cleanup_paths[@]}" | sort -u)
 [[ "${#unique_paths[@]}" -eq "$expected_count" ]] || exit 1
 for path in "${unique_paths[@]}"; do
   [[ "$path" == /tmp/* ]] || exit 1
