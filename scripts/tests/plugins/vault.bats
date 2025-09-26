@@ -446,7 +446,7 @@ EOF
     -keyout "$key_file" -out "$cert_file" -days 1 \
     -subj "/CN=jenkins.example" -set_serial 0xBCDA >/dev/null 2>&1
   local expected_serial
-  expected_serial=$(extract_certificate_serial "$cert_file")
+  expected_serial=$(_vault_pki_extract_certificate_serial "$cert_file")
 
   local cert_b64
   cert_b64=$(base64 <"$cert_file" | tr -d '\n')
