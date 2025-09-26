@@ -398,7 +398,7 @@ function main() {
       else
          log WARN "Unable to determine remaining lifetime; rotating"
       fi
-      if ! previous_serial=$(extract_certificate_serial "$cert_file"); then
+      if ! previous_serial=$(_vault_pki_extract_certificate_serial "$cert_file"); then
          previous_serial=""
       fi
    else
@@ -457,7 +457,7 @@ function main() {
 
    apply_secret "$secret_ns" "$secret_name" "$cert" "$key" "$ca_bundle"
    if [[ -n "$previous_serial" ]]; then
-      if ! revoke_certificate_serial "$previous_serial" "${VAULT_PKI_PATH:-pki}"; then
+      if ! _vault_pki_revoke_certificate_serial "$previous_serial" "${VAULT_PKI_PATH:-pki}"; then
          log WARN "Failed to revoke previous certificate serial $previous_serial"
       fi
    fi
@@ -491,7 +491,7 @@ function normalize_serial() {
    printf '%s' "$formatted"
 }
 
-function revoke_certificate_serial() {
+function _vault_pki_revoke_certificate_serial() {
    local serial="$1"
    [[ -n "$serial" ]] || return 1
 
@@ -508,7 +508,7 @@ function revoke_certificate_serial() {
    return 1
 }
 
-function extract_certificate_serial() {
+function _vault_pki_extract_certificate_serial() {
    local cert_file="$1" raw
    raw=$(openssl x509 -noout -serial -in "$cert_file" 2>/dev/null) || return 1
    raw=${raw#serial=}
