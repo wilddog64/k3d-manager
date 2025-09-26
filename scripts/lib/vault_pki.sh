@@ -38,7 +38,7 @@ function _vault_normalize_serial_hex_pairs() {
 # Outputs the serial as an uppercase hex string formatted as
 # colon-separated pairs. Returns non-zero when the serial cannot be
 # parsed.
-function extract_certificate_serial() {
+function _vault_pki_extract_certificate_serial() {
    local cert_file="$1"
    if [[ -z "$cert_file" || ! -s "$cert_file" ]]; then
       return 1
@@ -62,7 +62,7 @@ function extract_certificate_serial() {
 # argument can supply a handler function used to perform the API call; it must
 # accept the signature: <method> <path> <json-payload> [extra args...].
 # Additional arguments are forwarded to the handler.
-function revoke_certificate_serial() {
+function _vault_pki_revoke_certificate_serial() {
    local serial="$1"
    local path="${2:-${VAULT_PKI_PATH:-pki}}"
    local handler="${3:-vault_api_request}"
