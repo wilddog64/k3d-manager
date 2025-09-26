@@ -100,12 +100,15 @@ function read_lines() {
   if (( BASH_VERSINFO[0] >= 4 )); then
     mapfile -t "$array_name" < "$file"
   else
-    local line i=0
+    local line i=0 quoted
     unset "$array_name"
+    [[ -r "$file" ]] || return 0
     while IFS= read -r line; do
-      # Use printf -v to safely append to the target array without eval
-      printf -v "$array_name[i++]" '%s' "$line"
+      printf -v quoted '%q' "$line"
+      eval "$array_name[$i]=$quoted"
+      (( i++ ))
     done < "$file"
+    return 0
   fi
 }
 
