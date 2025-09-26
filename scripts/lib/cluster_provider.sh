@@ -10,13 +10,21 @@
 # cache.
 CLUSTER_PROVIDER_ACTIVE="${CLUSTER_PROVIDER_ACTIVE:-}"
 
-function _cluster_provider_set_active() {
+function cluster_provider_set_active() {
     local provider="${1:-}"
     CLUSTER_PROVIDER_ACTIVE="$provider"
 }
 
-function _cluster_provider_reset_active() {
+function _cluster_provider_set_active() {
+    cluster_provider_set_active "$@"
+}
+
+function cluster_provider_reset_active() {
     CLUSTER_PROVIDER_ACTIVE=""
+}
+
+function _cluster_provider_reset_active() {
+    cluster_provider_reset_active "$@"
 }
 
 function _cluster_provider_guess_default() {
@@ -45,7 +53,7 @@ function _cluster_provider_guess_default() {
     printf 'unknown\n'
 }
 
-function _cluster_provider_get_active() {
+function cluster_provider_get_active() {
     if [[ -n "${CLUSTER_PROVIDER_ACTIVE:-}" ]]; then
         printf '%s\n' "$CLUSTER_PROVIDER_ACTIVE"
         return 0
@@ -57,9 +65,17 @@ function _cluster_provider_get_active() {
     printf '%s\n' "$provider"
 }
 
-function _cluster_provider_is() {
+function _cluster_provider_get_active() {
+    cluster_provider_get_active "$@"
+}
+
+function cluster_provider_is() {
     local expected="${1:-}"
     local provider
-    provider=$(_cluster_provider_get_active) || return 1
+    provider=$(cluster_provider_get_active) || return 1
     [[ "$provider" == "$expected" ]]
+}
+
+function _cluster_provider_is() {
+    cluster_provider_is "$@"
 }
