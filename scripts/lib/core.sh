@@ -78,20 +78,127 @@ function _k3s_set_defaults() {
    export K3S_LOCAL_STORAGE="${K3S_LOCAL_STORAGE:-${JENKINS_HOME_PATH:-${SCRIPT_DIR}/storage/jenkins_home}}"
 }
 
+function _k3s_template_path() {
+   local name="${1:-}"
+   printf '%s/%s' "$(_k3s_asset_dir)" "$name"
+}
+
+function _k3s_detect_ip() {
+   local override="${K3S_NODE_IP:-${NODE_IP:-}}"
+   if [[ -n "$override" ]]; then
+      printf '%s\n' "$override"
+      return 0
+   fi
+
+   if declare -f _ip >/dev/null 2>&1; then
+      local detected
+      detected=$(_ip 2>/dev/null || true)
+      detected="${detected//$'\r'/}"
+      detected="${detected//$'\n'/}"
+      detected="${detected## }"
+      detected="${detected%% }"
+      if [[ -n "$detected" ]]; then
+         printf '%s\n' "$detected"
+         return 0
+      fi
+   fi
+
+   printf '127.0.0.1\n'
+}
+
+function _k3s_stage_file() {
+   local src="$1"
+   local dest="$2"
+   local mode="${3:-0644}"
+
+   if [[ -z "$src" || -z "$dest" ]]; then
+      [[ -n "$src" ]] && rm -f "$src"
+      return 1
+   fi
+
+   local dir
+   dir="$(dirname "$dest")"
+   _ensure_path_exists "$dir"
+
+   if [[ -f "$dest" ]] && cmp -s "$src" "$dest" 2>/dev/null; then
+      rm -f "$src"
+      return 0
+   fi
+
+   if command -v install >/dev/null 2>&1; then
+      if install -m "$mode" "$src" "$dest" 2>/dev/null; then
+         rm -f "$src"
+         return 0
+      fi
+      _run_command --prefer-sudo -- install -m "$mode" "$src" "$dest"
+      rm -f "$src"
+      return 0
+   fi
+
+   if cp "$src" "$dest" 2>/dev/null; then
+      chmod "$mode" "$dest" 2>/dev/null || _run_command --prefer-sudo -- chmod "$mode" "$dest"
+      rm -f "$src"
+      return 0
+   fi
+
+   _run_command --prefer-sudo -- cp "$src" "$dest"
+   _run_command --prefer-sudo -- chmod "$mode" "$dest"
+   rm -f "$src"
+}
+
+function _k3s_render_template() {
+   local template="$1"
+   local destination="$2"
+   local mode="${3:-0644}"
+
+   if [[ ! -r "$template" ]]; then
+      return 0
+   fi
+
+   local tmp
+   tmp="$(mktemp)"
+   envsubst <"$template" >"$tmp"
+   _k3s_stage_file "$tmp" "$destination" "$mode"
+}
+
+function _k3s_prepare_assets() {
+   _ensure_path_exists "$K3S_CONFIG_DIR"
+   _ensure_path_exists "$K3S_MANIFEST_DIR"
+   _ensure_path_exists "$K3S_LOCAL_STORAGE"
+
+   local ip saved_ip
+   ip="$(_k3s_detect_ip)"
+   saved_ip="${IP:-}"
+   export IP="$ip"
+
+   _k3s_render_template "$(_k3s_template_path config.yaml.tmpl)" "$K3S_CONFIG_FILE"
+   _k3s_render_template "$(_k3s_template_path local-path-storage.yaml.tmpl)" \
+      "${K3S_MANIFEST_DIR}/local-path-storage.yaml"
+
+   if [[ -n "$saved_ip" ]]; then
+      export IP="$saved_ip"
+   else
+      unset IP
+   fi
+}
+
 function _k3s_cluster_exists() {
    _k3s_set_defaults
    [[ -f "$K3S_SERVICE_FILE" ]] && return 0 || return 1
 }
 
 function _install_k3s() {
-   if _command_exist k3s ; then
-      _info "k3s already installed, skipping"
-      return 0
-   fi
+   local cluster_name="${1:-${CLUSTER_NAME:-k3s-cluster}}"
 
    _k3s_set_defaults
+   export CLUSTER_NAME="$cluster_name"
 
    if _is_mac ; then
+      if _command_exist k3s ; then
+         _info "k3s already installed, skipping"
+         return 0
+      fi
+
       local arch asset tmpfile dest
       arch="$(uname -m)"
       case "$arch" in
@@ -130,26 +237,41 @@ function _install_k3s() {
       return 0
    fi
 
-   if _is_debian_family || _is_redhat_family || _is_wsl ; then
-      local installer
-      installer="$(mktemp)"
-      _info "Fetching k3s installer script"
-      _curl -fsSL https://get.k3s.io -o "$installer"
-
-      _info "Running k3s installer"
-      _run_command --prefer-sudo -- env INSTALL_K3S_EXEC="server --write-kubeconfig-mode 0644" \
-         sh "$installer"
-
-      rm -f "$installer"
-
-      if _command_exist systemctl ; then
-         _run_command --prefer-sudo -- systemctl enable "$K3S_SERVICE_NAME"
+   if ! _is_debian_family && ! _is_redhat_family && ! _is_wsl ; then
+      if _command_exist k3s ; then
+         _info "k3s already installed, skipping installer"
+         return 0
       fi
 
+      _err "Unsupported platform for k3s installation"
+   fi
+
+   _k3s_prepare_assets
+
+   if _command_exist k3s ; then
+      _info "k3s already installed, skipping installer"
       return 0
    fi
 
-   _err "Unsupported platform for k3s installation"
+   local installer
+   installer="$(mktemp)"
+   _info "Fetching k3s installer script"
+   _curl -fsSL https://get.k3s.io -o "$installer"
+
+   local install_exec="server --write-kubeconfig-mode 0644"
+   if [[ -f "$K3S_CONFIG_FILE" ]]; then
+      install_exec+=" --config ${K3S_CONFIG_FILE}"
+   fi
+
+   _info "Running k3s installer"
+   _run_command --prefer-sudo -- env INSTALL_K3S_EXEC="$install_exec" \
+      sh "$installer"
+
+   rm -f "$installer"
+
+   if _command_exist systemctl ; then
+      _run_command --prefer-sudo -- systemctl enable "$K3S_SERVICE_NAME"
+   fi
 }
 
 function _teardown_k3s_cluster() {
@@ -198,7 +320,7 @@ function _deploy_k3s_cluster() {
       return 0
    fi
 
-   _install_k3s
+   _install_k3s "$cluster_name"
    _k3s_set_defaults
 
    if _command_exist systemctl ; then
