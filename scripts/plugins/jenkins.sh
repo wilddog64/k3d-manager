@@ -35,8 +35,12 @@ function _jenkins_capture_trap_state() {
    if [[ -n "$quoted_handler" ]]; then
       local handler_literal
       if [[ ${quoted_handler} == "'"*"'" ]]; then
-         handler_literal=${quoted_handler:1:-1}
-         handler_literal=${handler_literal//\'\\\'\'/\'}
+         if (( ${#quoted_handler} >= 2 )); then
+            handler_literal=${quoted_handler:1:${#quoted_handler}-2}
+            handler_literal=${handler_literal//\'\\\'\'/\'}
+         else
+            handler_literal=""
+         fi
       else
          handler_literal=$quoted_handler
       fi
