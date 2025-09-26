@@ -542,8 +542,8 @@ function _jenkins_running_on_wsl() {
 }
 
 function _jenkins_provider_is_k3s() {
-   if declare -f cluster_provider_is >/dev/null 2>&1; then
-      if cluster_provider_is k3s; then
+   if declare -f _cluster_provider_is >/dev/null 2>&1; then
+      if _cluster_provider_is k3s; then
          return 0
       fi
       return 1
