@@ -317,7 +317,7 @@ EOF
   local calls
   calls=$(cat "$KUBECTL_CALL_FILE")
   [ "$calls" -eq 3 ]
-  mapfile -t WARN_MESSAGES <"$WARN_LOG"
+  read_lines "$WARN_LOG" WARN_MESSAGES
   [ "${#WARN_MESSAGES[@]}" -eq 2 ]
   [[ "${WARN_MESSAGES[0]}" == *"attempt 1/3"* ]]
   [[ "${WARN_MESSAGES[1]}" == *"attempt 2/3"* ]]
@@ -360,7 +360,7 @@ EOF
   local calls
   calls=$(cat "$KUBECTL_CALL_FILE")
   [ "$calls" -eq 3 ]
-  mapfile -t WARN_MESSAGES <"$WARN_LOG"
+  read_lines "$WARN_LOG" WARN_MESSAGES
   [ "${#WARN_MESSAGES[@]}" -eq 2 ]
   [[ "${WARN_MESSAGES[0]}" == *"attempt 1/3"* ]]
   [[ "${WARN_MESSAGES[1]}" == *"attempt 2/3"* ]]
@@ -398,12 +398,12 @@ EOF
 
   [ "$status" -eq 0 ]
   [ "$VAULT_LOGIN_CALLED" -eq 0 ]
-  mapfile -t exec_log <"$VAULT_EXEC_LOG"
+  read_lines "$VAULT_EXEC_LOG" exec_log
   local expected_enable="vault secrets enable -path=custom-path pki"
   local expected_tune="vault secrets tune -max-lease-ttl=${VAULT_PKI_MAX_TTL:-87600h} custom-path"
   [[ "${exec_log[*]}" != *"${expected_enable}"* ]]
   [[ "${exec_log[*]}" == *"${expected_tune}"* ]]
-  mapfile -t jq_args <"$JQ_ARGS_LOG"
+  read_lines "$JQ_ARGS_LOG" jq_args
   [[ "${jq_args[*]}" == "-e --arg PATH custom-path/ has(\$PATH) and .[\$PATH].type == \"pki\"" ]]
 }
 
