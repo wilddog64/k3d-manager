@@ -458,17 +458,18 @@ function test_jenkins() {
          return 1
     fi
 
+    local tls_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.k3d.internal}"
     # Confirm TLS termination and fetch the Jenkins landing page
     if ! CURL_MAX_TIME="$curl_max_time" \
-       _curl --insecure -v --resolve jenkins.dev.k3d.internal:8443:127.0.0.1 \
-        https://jenkins.k3d.internal:8443/ 2>&1 | grep -q 'subject: CN=jenkins.k3d.internal'; then
+       _curl --insecure -v --resolve "${tls_host}:8443:127.0.0.1" \
+        "https://${tls_host}:8443/" 2>&1 | grep -q "subject: CN=${tls_host}"; then
         echo "TLS certificate not issued by Vault" >&2
         return 1
     fi
 
     if ! CURL_MAX_TIME="$curl_max_time" \
-       _curl --insecure --resolve jenkins.k3d.internal:8443:127.0.0.1 \
-        https://jenkins.k3d.internal:8443/login | grep -q Jenkins; then
+       _curl --insecure --resolve "${tls_host}:8443:127.0.0.1" \
+        "https://${tls_host}:8443/login" | grep -q Jenkins; then
         echo "Unable to reach Jenkins landing page" >&2
         return 1
     fi
