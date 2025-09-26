@@ -12,7 +12,7 @@ function _vault_normalize_serial_hex_pairs() {
 
    raw=${raw//:/}
    raw=${raw//[[:space:]]/}
-   raw=${raw^^}
+   raw=$(printf '%s' "$raw" | tr '[:lower:]' '[:upper:]')
 
    if [[ -z "$raw" ]]; then
       return 1
