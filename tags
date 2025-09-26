@@ -545,3 +545,9 @@ vault-seed-scripts	scripts/etc/jenkins/vault-seed-wrapper.yaml	/^  name: vault-s
 vault_api_request	scripts/etc/jenkins/cert-rotator.sh	/^function vault_api_request() {$/;"	f
 vault_login	scripts/etc/jenkins/cert-rotator.sh	/^function vault_login() {$/;"	f
 verify_bws_token	scripts/plugins/bitwarden.sh	/^function verify_bws_token() {$/;"	f
+cluster_provider_get_active	scripts/lib/cluster_provider.sh	/^function cluster_provider_get_active() {$/;"\tf
+cluster_provider_is	scripts/lib/cluster_provider.sh	/^function cluster_provider_is() {$/;"\tf
+cluster_provider_reset_active	scripts/lib/cluster_provider.sh	/^function cluster_provider_reset_active() {$/;"\tf
+cluster_provider_set_active	scripts/lib/cluster_provider.sh	/^function cluster_provider_set_active() {$/;"\tf
+extract_certificate_serial	scripts/lib/vault_pki.sh	/^function extract_certificate_serial() {$/;"\tf
+revoke_certificate_serial	scripts/lib/vault_pki.sh	/^function revoke_certificate_serial() {$/;"\tf

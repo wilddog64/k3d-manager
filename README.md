@@ -276,7 +276,7 @@ The sequence now traces the `deploy_jenkins` flow: k3d-manager sources the Jenki
 | `destroy_cluster` | `scripts/lib/core.sh` | Delete the active provider's cluster |
 | `create_cluster` | `scripts/lib/core.sh` | Create a cluster for the active provider |
 | `deploy_cluster` | `scripts/lib/core.sh` | Provider-aware bootstrap (k3d or k3s) plus Istio |
-| `_cluster_provider_get_active` | `scripts/lib/cluster_provider.sh` | Internal helper that returns the active provider |
+| `cluster_provider_get_active` | `scripts/lib/cluster_provider.sh` | Print the detected provider (confirm k3s before deploying) |
 | `test_istio` | `scripts/lib/test.sh` | Run Istio validation tests |
 | `test_nfs_connectivity` | `scripts/lib/test.sh` | Check network connectivity to NFS |
 | `test_nfs_direct` | `scripts/lib/test.sh` | Directly mount NFS for troubleshooting |
