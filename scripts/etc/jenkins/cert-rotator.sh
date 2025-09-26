@@ -24,7 +24,12 @@ KUBECTL_CMD=""
 function log() {
    local level="${1:-INFO}"
    shift || true
-   printf '[%(%Y-%m-%dT%H:%M:%SZ)T] [%s] %s\n' -1 "$level" "$*" >&2
+   local message="$*"
+   if ! printf '[%(%Y-%m-%dT%H:%M:%SZ)T] [%s] %s\n' -1 "$level" "$message" 2>/dev/null >&2; then
+      local ts
+      ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+      printf '[%s] [%s] %s\n' "$ts" "$level" "$message" >&2
+   fi
 }
 
 function require_env() {
@@ -353,10 +358,10 @@ function main() {
    require_env VAULT_ADDR VAULT_PKI_ROLE VAULT_PKI_SECRET_NS VAULT_PKI_SECRET_NAME JENKINS_CERT_ROTATOR_VAULT_ROLE
 
    if [[ -n "${JENKINS_CERT_ROTATOR_KUBECTL_BIN:-}" ]]; then
-      if [[ -x "${JENKINS_CERT_ROTATOR_KUBECTL_BIN}" ]]; then
-         KUBECTL_CMD="${JENKINS_CERT_ROTATOR_KUBECTL_BIN}"
+      if KUBECTL_CMD=$(resolve_kubectl_entry "${JENKINS_CERT_ROTATOR_KUBECTL_BIN}" 2>/dev/null); then
+         :
       else
-         log ERROR "JENKINS_CERT_ROTATOR_KUBECTL_BIN is set to '${JENKINS_CERT_ROTATOR_KUBECTL_BIN}' but is not executable"
+         log ERROR "JENKINS_CERT_ROTATOR_KUBECTL_BIN is set to '${JENKINS_CERT_ROTATOR_KUBECTL_BIN}' but kubectl was not found"
          exit 1
       fi
    elif ! KUBECTL_CMD=$(discover_kubectl); then
@@ -457,6 +462,7 @@ function main() {
       fi
    fi
    log INFO "Updated TLS secret ${secret_ns}/${secret_name}"
+   printf 'Updated TLS secret %s/%s\n' "$secret_ns" "$secret_name"
 }
 
 function normalize_serial() {
@@ -465,7 +471,7 @@ function normalize_serial() {
 
    raw=${raw//:/}
    raw=${raw//[[:space:]]/}
-   raw=${raw^^}
+   raw=$(printf '%s' "$raw" | tr '[:lower:]' '[:upper:]')
 
    [[ -n "$raw" ]] || return 1
 
