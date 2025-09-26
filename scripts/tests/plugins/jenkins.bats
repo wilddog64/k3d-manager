@@ -1379,10 +1379,12 @@ EOF
   _wait_for_jenkins_ready() { echo "called" >> "$WAIT_LOG"; }
 
   KUBECTL_EXIT_CODES=(1)
+  export JENKINS_DEPLOY_RETRIES=1
 
   run --separate-stderr deploy_jenkins failing-ns
+  unset JENKINS_DEPLOY_RETRIES
   [ "$status" -eq 1 ]
-  [[ "$stderr" == *"ERROR: Jenkins deployment failed; aborting readiness check."* ]]
+  [[ "$stderr" == *"Jenkins deployment failed"* ]]
   [[ ! -s "$WAIT_LOG" ]]
 }
 
