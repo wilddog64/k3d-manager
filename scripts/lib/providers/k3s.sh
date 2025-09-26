@@ -39,7 +39,7 @@ function _provider_k3s_apply_cluster_config() {
 }
 
 function _provider_k3s_install() {
-   _install_k3s
+   _install_k3s "$@"
 }
 
 function _provider_k3s_create_cluster() {
@@ -88,7 +88,9 @@ function _provider_k3s_deploy_cluster() {
 
    local cluster_name="${1:-k3s-cluster}"
 
-   _provider_k3s_install
+   export CLUSTER_NAME="$cluster_name"
+
+   _provider_k3s_install "$cluster_name"
    _deploy_k3s_cluster "$cluster_name"
    _provider_k3s_configure_istio "$cluster_name"
 }
