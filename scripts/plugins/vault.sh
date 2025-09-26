@@ -499,7 +499,7 @@ function _vault_issue_pki_tls_secret() {
       if [[ -n "$cert_b64" ]]; then
          existing_cert_file=$(mktemp -t vault-existing-cert.XXXXXX)
          if printf '%s' "$cert_b64" | base64 -d >"$existing_cert_file" 2>/dev/null; then
-            if ! existing_serial=$(extract_certificate_serial "$existing_cert_file"); then
+            if ! existing_serial=$(_vault_pki_extract_certificate_serial "$existing_cert_file"); then
                existing_serial=""
             fi
          else
@@ -549,7 +549,7 @@ function _vault_issue_pki_tls_secret() {
    trap - EXIT TERM
 
    if [[ -n "$existing_serial" ]]; then
-      if ! revoke_certificate_serial "$existing_serial" "$path" _vault_post_revoke_request "$ns" "$release"; then
+      if ! _vault_pki_revoke_certificate_serial "$existing_serial" "$path" _vault_post_revoke_request "$ns" "$release"; then
          _warn "[vault] failed to revoke previous certificate serial $existing_serial"
       fi
    fi
