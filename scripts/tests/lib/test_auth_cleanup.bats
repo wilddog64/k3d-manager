@@ -183,12 +183,13 @@ _curl() {
     return 0
   fi
 
-  if [[ "$url" == "https://jenkins.dev.k3d.internal:8443/" ]]; then
-    printf '%s' 'subject: CN=jenkins.dev.k3d.internal'
+  local leaf_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.k3d.internal}"
+  if [[ "$url" == "https://${leaf_host}:8443/" ]]; then
+    printf '%s' "subject: CN=${leaf_host}"
     return 0
   fi
 
-  if [[ "$url" == "https://jenkins.dev.k3d.internal:8443/login" ]]; then
+  if [[ "$url" == "https://${leaf_host}:8443/login" ]]; then
     printf '%s' 'Jenkins'
     return 0
   fi
