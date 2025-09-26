@@ -57,6 +57,10 @@ function _vault_pki_extract_certificate_serial() {
    printf '%s' "$normalized"
 }
 
+function extract_certificate_serial() {
+   _vault_pki_extract_certificate_serial "$@"
+}
+
 # Revoke a certificate in Vault given its serial number. The second argument
 # optionally overrides the PKI path (defaults to VAULT_PKI_PATH). The third
 # argument can supply a handler function used to perform the API call; it must
@@ -80,4 +84,8 @@ function _vault_pki_revoke_certificate_serial() {
    else
       "$handler" POST "$revoke_path" "$payload"
    fi
+}
+
+function revoke_certificate_serial() {
+   _vault_pki_revoke_certificate_serial "$@"
 }
