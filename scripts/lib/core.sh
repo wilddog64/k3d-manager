@@ -284,9 +284,15 @@ function _install_k3s() {
    _info "Fetching k3s installer script"
    _curl -fsSL https://get.k3s.io -o "$installer"
 
-   local install_exec="server --write-kubeconfig-mode 0644"
-   if [[ -f "$K3S_CONFIG_FILE" ]]; then
-      install_exec+=" --config ${K3S_CONFIG_FILE}"
+   local install_exec
+   if [[ -n "${INSTALL_K3S_EXEC:-}" ]]; then
+      install_exec="${INSTALL_K3S_EXEC}"
+   else
+      install_exec="server --write-kubeconfig-mode 0644"
+      if [[ -f "$K3S_CONFIG_FILE" ]]; then
+         install_exec+=" --config ${K3S_CONFIG_FILE}"
+      fi
+      export INSTALL_K3S_EXEC="$install_exec"
    fi
 
    _info "Running k3s installer"
@@ -298,7 +304,7 @@ function _install_k3s() {
    if _systemd_available ; then
       _run_command --prefer-sudo -- systemctl enable "$K3S_SERVICE_NAME"
    else
-      _info "systemd not available; skipping enable for $K3S_SERVICE_NAME"
+      _warn "systemd not available; skipping enable for $K3S_SERVICE_NAME"
    fi
 }
 
@@ -333,9 +339,51 @@ function _teardown_k3s_cluster() {
          _run_command --prefer-sudo -- systemctl stop "$K3S_SERVICE_NAME"
          _run_command --prefer-sudo -- systemctl disable "$K3S_SERVICE_NAME"
       else
-         _info "systemd not available; skipping service shutdown for $K3S_SERVICE_NAME"
+         _warn "systemd not available; skipping service shutdown for $K3S_SERVICE_NAME"
       fi
    fi
+}
+
+function _start_k3s_service() {
+   local -a server_args
+
+   if [[ -n "${INSTALL_K3S_EXEC:-}" ]]; then
+      read -r -a server_args <<<"${INSTALL_K3S_EXEC}"
+   else
+      server_args=(server --write-kubeconfig-mode 0644)
+      if [[ -f "$K3S_CONFIG_FILE" ]]; then
+         server_args+=(--config "$K3S_CONFIG_FILE")
+      fi
+   fi
+
+   if _systemd_available ; then
+      _run_command --prefer-sudo -- systemctl start "$K3S_SERVICE_NAME"
+      return 0
+   fi
+
+   _warn "systemd not available; starting k3s server in background"
+
+   if command -v pgrep >/dev/null 2>&1; then
+      if pgrep -x k3s >/dev/null 2>&1; then
+         _info "k3s already running; skipping manual start"
+         return 0
+      fi
+   fi
+
+   local manual_cmd
+   manual_cmd="$(printf '%q ' k3s "${server_args[@]}")"
+   manual_cmd="${manual_cmd% }"
+
+   local log_file="${K3S_DATA_DIR}/k3s-no-systemd.log"
+   _ensure_path_exists "$(dirname "$log_file")"
+
+   local log_escaped
+   log_escaped="$(printf '%q' "$log_file")"
+
+   local start_cmd
+   start_cmd="nohup ${manual_cmd} >> ${log_escaped} 2>&1 &"
+
+   _run_command --prefer-sudo -- sh -c "$start_cmd"
 }
 
 function _deploy_k3s_cluster() {
@@ -355,11 +403,7 @@ function _deploy_k3s_cluster() {
    _install_k3s "$cluster_name"
    _k3s_set_defaults
 
-   if _systemd_available ; then
-      _run_command --prefer-sudo -- systemctl start "$K3S_SERVICE_NAME"
-   else
-      _info "systemd not available; assuming k3s installer handled service startup"
-   fi
+   _start_k3s_service
 
    local kubeconfig_src="$K3S_KUBECONFIG_PATH"
    local timeout=60
