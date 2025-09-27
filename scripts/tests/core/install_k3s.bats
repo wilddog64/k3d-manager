@@ -15,6 +15,49 @@ setup() {
   stub_run_command
 }
 
+@test "_start_k3s_service falls back to manual start without systemd" {
+  unset -f _systemd_available
+  _systemd_available() { return 1; }
+  export -f _systemd_available
+
+  export K3S_DATA_DIR="$BATS_TEST_TMPDIR/data"
+  export K3S_CONFIG_FILE="$BATS_TEST_TMPDIR/etc/config.yaml"
+  mkdir -p "$(dirname "$K3S_CONFIG_FILE")"
+  printf 'token: test' > "$K3S_CONFIG_FILE"
+
+  : > "$RUN_LOG"
+
+  _run_command() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--soft|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --probe) shift 2 ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+    echo "$*" >> "$RUN_LOG"
+    return 0
+  }
+  export -f _run_command
+
+  _k3s_set_defaults
+
+  run _start_k3s_service
+  [ "$status" -eq 0 ]
+
+  read_lines "$RUN_LOG" run_calls
+  expected="sh -c nohup k3s server --write-kubeconfig-mode 0644 --config ${K3S_CONFIG_FILE} >> ${K3S_DATA_DIR}/k3s-no-systemd.log 2>&1 &"
+  [ "${run_calls[0]}" = "$expected" ]
+
+  unset -f _run_command
+  stub_run_command
+
+  unset -f _systemd_available
+  _systemd_available() { return 0; }
+  export -f _systemd_available
+}
+
 @test "_ensure_path_exists uses sudo when available" {
   local parent="$BATS_TEST_TMPDIR/protected"
   local target="$parent/needs-sudo"
