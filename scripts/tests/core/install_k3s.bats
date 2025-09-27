@@ -53,6 +53,37 @@ setup() {
   [ -d "$target" ]
 
   chmod 755 "$parent"
+  unset -f _run_command
+  stub_run_command
+}
+
+@test "_ensure_path_exists retries with sudo when passwordless fails" {
+  local parent="$BATS_TEST_TMPDIR/protected-interactive"
+  local target="$parent/needs-sudo"
+  mkdir -p "$parent"
+  chmod 000 "$parent"
+
+  RUN_EXIT_CODES=(1)
+
+  sudo_calls_log="$BATS_TEST_TMPDIR/sudo.log"
+  : > "$sudo_calls_log"
+
+  sudo() {
+    echo "$*" >> "$sudo_calls_log"
+    chmod 755 "$parent"
+    command mkdir -p "$target"
+    return 0
+  }
+  export -f sudo
+
+  _ensure_path_exists "$target"
+
+  [ -d "$target" ]
+  grep -q '^mkdir -p ' "$sudo_calls_log"
+
+  chmod 755 "$parent"
+  unset -f sudo
+  RUN_EXIT_CODES=()
 }
 
 @test "_ensure_path_exists fails when sudo unavailable" {
@@ -64,10 +95,14 @@ setup() {
   _sudo_available() { return 1; }
   export -f _sudo_available
 
+  RUN_EXIT_CODES=(1)
+
   run -127 _ensure_path_exists "$target"
-  [[ "$output" == *"Cannot create directory '$target'. Create it manually or configure passwordless sudo access."* ]]
+  [[ "$output" == *"Cannot create directory '$target'. Create it manually, configure sudo, or set K3S_CONFIG_DIR to a writable path."* ]]
 
   chmod 755 "$parent"
+  unset -f _sudo_available
+  RUN_EXIT_CODES=()
 }
 
 @test "_install_k3s renders config and manifest" {
