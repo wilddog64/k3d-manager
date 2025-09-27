@@ -25,14 +25,33 @@ function _ensure_path_exists() {
       return 0
    fi
 
-   if declare -f _sudo_available >/dev/null 2>&1 && _sudo_available; then
-      if _run_command --quiet --soft --prefer-sudo -- mkdir -p "$dir"; then
-         return 0
-      fi
-      _err "Failed to create directory '$dir' using sudo"
+   if _run_command --quiet --soft --prefer-sudo -- mkdir -p "$dir"; then
+      return 0
    fi
 
-   _err "Cannot create directory '$dir'. Create it manually or configure passwordless sudo access."
+   local sudo_checked=0
+   local sudo_available=0
+
+   if declare -f _sudo_available >/dev/null 2>&1; then
+      sudo_checked=1
+      if _sudo_available && command -v sudo >/dev/null 2>&1; then
+         sudo_available=1
+      fi
+   elif command -v sudo >/dev/null 2>&1; then
+      sudo_available=1
+   fi
+
+   if (( sudo_available )); then
+      if sudo mkdir -p "$dir"; then
+         return 0
+      fi
+
+      if (( sudo_checked )); then
+         _err "Failed to create directory '$dir' using sudo"
+      fi
+   fi
+
+   _err "Cannot create directory '$dir'. Create it manually, configure sudo, or set K3S_CONFIG_DIR to a writable path."
 }
 
 function _ensure_port_available() {
