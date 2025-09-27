@@ -10,6 +10,8 @@ setup() {
 
   source "${BATS_TEST_DIRNAME}/../../lib/system.sh"
   source "${BATS_TEST_DIRNAME}/../../lib/core.sh"
+  _systemd_available() { return 0; }
+  export -f _systemd_available
   stub_run_command
 }
 

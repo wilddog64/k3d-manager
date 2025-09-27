@@ -25,6 +25,9 @@ function init_test_env() {
   stub_kubectl
   stub_helm
   stub_run_command
+
+  _systemd_available() { return 0; }
+  export -f _systemd_available
 }
 
 # Define kubectl stub that logs commands and uses scripted exit codes
