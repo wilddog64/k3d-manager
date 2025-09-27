@@ -1,5 +1,7 @@
 #!/usr/bin/env bats
 
+bats_require_minimum_version 1.5.0
+
 load '../test_helpers.bash'
 
 setup() {
@@ -9,6 +11,63 @@ setup() {
   source "${BATS_TEST_DIRNAME}/../../lib/system.sh"
   source "${BATS_TEST_DIRNAME}/../../lib/core.sh"
   stub_run_command
+}
+
+@test "_ensure_path_exists uses sudo when available" {
+  local parent="$BATS_TEST_TMPDIR/protected"
+  local target="$parent/needs-sudo"
+  mkdir -p "$parent"
+  chmod 000 "$parent"
+
+  : > "$RUN_LOG"
+
+  TARGET_DIR="$target"
+  PROTECTED_PARENT="$parent"
+  export TARGET_DIR PROTECTED_PARENT
+
+  _sudo_available() { return 0; }
+  export -f _sudo_available
+
+  _run_command() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--soft|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --probe) shift 2 ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+    echo "$*" >> "$RUN_LOG"
+    if [[ "$1" == "mkdir" && "$2" == "-p" ]]; then
+      chmod 755 "$PROTECTED_PARENT"
+      command mkdir -p "$TARGET_DIR"
+    fi
+    return 0
+  }
+  export -f _run_command
+
+  _ensure_path_exists "$target"
+
+  read_lines "$RUN_LOG" run_calls
+  [ "${run_calls[0]}" = "mkdir -p $target" ]
+  [ -d "$target" ]
+
+  chmod 755 "$parent"
+}
+
+@test "_ensure_path_exists fails when sudo unavailable" {
+  local parent="$BATS_TEST_TMPDIR/protected-no-sudo"
+  local target="$parent/needs-sudo"
+  mkdir -p "$parent"
+  chmod 000 "$parent"
+
+  _sudo_available() { return 1; }
+  export -f _sudo_available
+
+  run -127 _ensure_path_exists "$target"
+  [[ "$output" == *"Cannot create directory '$target'. Create it manually or configure passwordless sudo access."* ]]
+
+  chmod 755 "$parent"
 }
 
 @test "_install_k3s renders config and manifest" {

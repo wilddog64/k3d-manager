@@ -25,7 +25,14 @@ function _ensure_path_exists() {
       return 0
    fi
 
-   _run_command --prefer-sudo -- mkdir -p "$dir"
+   if declare -f _sudo_available >/dev/null 2>&1 && _sudo_available; then
+      if _run_command --quiet --soft --prefer-sudo -- mkdir -p "$dir"; then
+         return 0
+      fi
+      _err "Failed to create directory '$dir' using sudo"
+   fi
+
+   _err "Cannot create directory '$dir'. Create it manually or configure passwordless sudo access."
 }
 
 function _ensure_port_available() {
