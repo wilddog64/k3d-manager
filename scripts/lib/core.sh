@@ -295,8 +295,10 @@ function _install_k3s() {
 
    rm -f "$installer"
 
-   if _command_exist systemctl ; then
+   if _systemd_available ; then
       _run_command --prefer-sudo -- systemctl enable "$K3S_SERVICE_NAME"
+   else
+      _info "systemd not available; skipping enable for $K3S_SERVICE_NAME"
    fi
 }
 
@@ -326,9 +328,13 @@ function _teardown_k3s_cluster() {
       return 0
    fi
 
-   if _k3s_cluster_exists && _command_exist systemctl ; then
-      _run_command --prefer-sudo -- systemctl stop "$K3S_SERVICE_NAME"
-      _run_command --prefer-sudo -- systemctl disable "$K3S_SERVICE_NAME"
+   if _k3s_cluster_exists; then
+      if _systemd_available ; then
+         _run_command --prefer-sudo -- systemctl stop "$K3S_SERVICE_NAME"
+         _run_command --prefer-sudo -- systemctl disable "$K3S_SERVICE_NAME"
+      else
+         _info "systemd not available; skipping service shutdown for $K3S_SERVICE_NAME"
+      fi
    fi
 }
 
@@ -349,10 +355,10 @@ function _deploy_k3s_cluster() {
    _install_k3s "$cluster_name"
    _k3s_set_defaults
 
-   if _command_exist systemctl ; then
+   if _systemd_available ; then
       _run_command --prefer-sudo -- systemctl start "$K3S_SERVICE_NAME"
    else
-      _info "systemctl not available; assuming k3s installer handled service startup"
+      _info "systemd not available; assuming k3s installer handled service startup"
    fi
 
    local kubeconfig_src="$K3S_KUBECONFIG_PATH"

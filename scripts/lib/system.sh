@@ -404,9 +404,13 @@ function _install_debian_docker() {
   _run_command -- sudo apt-get update
   # Install Docker
   _run_command -- sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-  # Start and enable Docker
-  _run_command -- sudo systemctl start docker
-  _run_command -- sudo systemctl enable docker
+  # Start and enable Docker when systemd is available
+  if _systemd_available ; then
+     _run_command -- sudo systemctl start docker
+     _run_command -- sudo systemctl enable docker
+  else
+     _warn "systemd not available; skipping docker service activation"
+  fi
   # Add current user to docker group
   _run_command -- sudo usermod -aG docker $USER
   echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
@@ -421,9 +425,13 @@ function _install_redhat_docker() {
      --from-repofile https://download.docker.com/linux/fedora/docker-ce.repo
   # Install Docker
   _run_command -- sudo dnf install -y docker-ce docker-ce-cli containerd.io
-  # Start and enable Docker
-  _run_command  -- sudo systemctl start docker
-  _run_command  -- sudo systemctl enable docker
+  # Start and enable Docker when systemd is available
+  if _systemd_available ; then
+     _run_command  -- sudo systemctl start docker
+     _run_command  -- sudo systemctl enable docker
+  else
+     _warn "systemd not available; skipping docker service activation"
+  fi
   # Add current user to docker group
   _run_command  -- sudo usermod -aG docker "$USER"
   echo "Docker instsudo alled successfully. You may need to log out and back in for group changes to take effect."
@@ -679,6 +687,21 @@ function _sudo_available() {
    fi
 
    sudo -n true >/dev/null 2>&1
+}
+
+function _systemd_available() {
+   if ! command -v systemctl >/dev/null 2>&1; then
+      return 1
+   fi
+
+   if [[ -d /run/systemd/system ]]; then
+      return 0
+   fi
+
+   local init_comm
+   init_comm="$(ps -p 1 -o comm= 2>/dev/null || true)"
+   init_comm="${init_comm//[[:space:]]/}"
+   [[ "$init_comm" == systemd ]]
 }
 
 function _install_bats_from_source() {
