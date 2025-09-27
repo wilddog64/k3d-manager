@@ -29,25 +29,21 @@ function _ensure_path_exists() {
       return 0
    fi
 
-   local sudo_checked=0
-   local sudo_available=0
+   if command -v sudo >/dev/null 2>&1; then
+      local sudo_checked=0
 
-   if declare -f _sudo_available >/dev/null 2>&1; then
-      sudo_checked=1
-      if _sudo_available && command -v sudo >/dev/null 2>&1; then
-         sudo_available=1
+      if declare -f _sudo_available >/dev/null 2>&1; then
+         sudo_checked=1
+         if _sudo_available; then
+            if sudo mkdir -p "$dir"; then
+               return 0
+            fi
+            _err "Failed to create directory '$dir' using sudo"
+         fi
       fi
-   elif command -v sudo >/dev/null 2>&1; then
-      sudo_available=1
-   fi
 
-   if (( sudo_available )); then
       if sudo mkdir -p "$dir"; then
          return 0
-      fi
-
-      if (( sudo_checked )); then
-         _err "Failed to create directory '$dir' using sudo"
       fi
    fi
 
@@ -375,22 +371,7 @@ function _start_k3s_service() {
    manual_cmd="${manual_cmd% }"
 
    local log_file="${K3S_DATA_DIR}/k3s-no-systemd.log"
-
-   local have_priv=0
-   local use_sudo_runner=0
-
-   if (( EUID == 0 )); then
-      have_priv=1
-   elif declare -f _sudo_available >/dev/null 2>&1 && _sudo_available; then
-      have_priv=1
-      use_sudo_runner=1
-   fi
-
-   if (( ! have_priv )); then
-      local instruction
-      instruction="nohup ${manual_cmd} >> ${log_file} 2>&1 &"
-      _err "systemd not available and passwordless sudo is required. Run manually as root: ${instruction}"
-   fi
+   export K3S_NO_SYSTEMD_LOG="$log_file"
 
    _ensure_path_exists "$(dirname "$log_file")"
 
@@ -400,11 +381,38 @@ function _start_k3s_service() {
    local start_cmd
    start_cmd="nohup ${manual_cmd} >> ${log_escaped} 2>&1 &"
 
-   if (( use_sudo_runner )); then
-      _run_command --prefer-sudo -- sh -c "$start_cmd"
-   else
+   if (( EUID == 0 )); then
       _run_command -- sh -c "$start_cmd"
+      return 0
    fi
+
+   local tried_non_interactive=0
+   if declare -f _sudo_available >/dev/null 2>&1 && _sudo_available; then
+      tried_non_interactive=1
+      if _run_command --prefer-sudo -- sh -c "$start_cmd"; then
+         return 0
+      fi
+   fi
+
+   if command -v sudo >/dev/null 2>&1; then
+      if sudo sh -c "$start_cmd"; then
+         return 0
+      fi
+   fi
+
+   if (( ! tried_non_interactive )); then
+      local instruction
+      instruction="nohup ${manual_cmd} >> ${log_file} 2>&1 &"
+      _err "systemd not available and sudo access is required to start k3s automatically. Run manually as root: ${instruction}"
+   fi
+
+   if _run_command --soft -- sh -c "$start_cmd"; then
+      return 0
+   fi
+
+   local instruction
+   instruction="nohup ${manual_cmd} >> ${log_file} 2>&1 &"
+   _err "systemd not available and automatic elevation failed. Run manually as root: ${instruction}"
 }
 
 function _deploy_k3s_cluster() {
@@ -428,17 +436,43 @@ function _deploy_k3s_cluster() {
 
    local kubeconfig_src="$K3S_KUBECONFIG_PATH"
    local timeout=60
+   local kubeconfig_ready=1
    while (( timeout > 0 )); do
       if [[ -r "$kubeconfig_src" ]]; then
+         kubeconfig_ready=0
          break
       fi
+
+      if _run_command --soft --quiet --prefer-sudo -- test -r "$kubeconfig_src"; then
+         kubeconfig_ready=0
+         break
+      fi
+
       sleep 2
       timeout=$((timeout - 2))
    done
 
-   if [[ ! -r "$kubeconfig_src" ]]; then
+   if (( kubeconfig_ready != 0 )); then
+      if [[ -n "${K3S_NO_SYSTEMD_LOG:-}" ]]; then
+         local log_output=""
+         if [[ -r "$K3S_NO_SYSTEMD_LOG" ]]; then
+            log_output="$(tail -n 20 "$K3S_NO_SYSTEMD_LOG" 2>/dev/null || true)"
+         else
+            log_output="$(_run_command --soft --quiet --prefer-sudo -- tail -n 20 "$K3S_NO_SYSTEMD_LOG" 2>/dev/null || true)"
+         fi
+
+         if [[ -n "$log_output" ]]; then
+            _warn "Recent k3s log output:"
+            while IFS= read -r line; do
+               [[ -n "$line" ]] && _warn "  $line"
+            done <<< "$log_output"
+         fi
+      fi
+
       _err "Timed out waiting for k3s kubeconfig at $kubeconfig_src"
    fi
+
+   unset K3S_NO_SYSTEMD_LOG
 
    local dest_kubeconfig="${KUBECONFIG:-$HOME/.kube/config}"
    _ensure_path_exists "$(dirname "$dest_kubeconfig")"
