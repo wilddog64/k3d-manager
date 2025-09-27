@@ -19,6 +19,8 @@ setup() {
   unset -f _systemd_available
   _systemd_available() { return 1; }
   export -f _systemd_available
+  _sudo_available() { return 0; }
+  export -f _sudo_available
 
   export K3S_DATA_DIR="$BATS_TEST_TMPDIR/data"
   export K3S_CONFIG_FILE="$BATS_TEST_TMPDIR/etc/config.yaml"
@@ -47,8 +49,9 @@ setup() {
   [ "$status" -eq 0 ]
 
   read_lines "$RUN_LOG" run_calls
+  local idx=$(( ${#run_calls[@]} - 1 ))
   expected="sh -c nohup k3s server --write-kubeconfig-mode 0644 --config ${K3S_CONFIG_FILE} >> ${K3S_DATA_DIR}/k3s-no-systemd.log 2>&1 &"
-  [ "${run_calls[0]}" = "$expected" ]
+  [ "${run_calls[$idx]}" = "$expected" ]
 
   unset -f _run_command
   stub_run_command
@@ -56,6 +59,8 @@ setup() {
   unset -f _systemd_available
   _systemd_available() { return 0; }
   export -f _systemd_available
+
+  unset -f _sudo_available
 }
 
 @test "_ensure_path_exists uses sudo when available" {

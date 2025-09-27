@@ -375,6 +375,23 @@ function _start_k3s_service() {
    manual_cmd="${manual_cmd% }"
 
    local log_file="${K3S_DATA_DIR}/k3s-no-systemd.log"
+
+   local have_priv=0
+   local use_sudo_runner=0
+
+   if (( EUID == 0 )); then
+      have_priv=1
+   elif declare -f _sudo_available >/dev/null 2>&1 && _sudo_available; then
+      have_priv=1
+      use_sudo_runner=1
+   fi
+
+   if (( ! have_priv )); then
+      local instruction
+      instruction="nohup ${manual_cmd} >> ${log_file} 2>&1 &"
+      _err "systemd not available and passwordless sudo is required. Run manually as root: ${instruction}"
+   fi
+
    _ensure_path_exists "$(dirname "$log_file")"
 
    local log_escaped
@@ -383,7 +400,11 @@ function _start_k3s_service() {
    local start_cmd
    start_cmd="nohup ${manual_cmd} >> ${log_escaped} 2>&1 &"
 
-   _run_command --prefer-sudo -- sh -c "$start_cmd"
+   if (( use_sudo_runner )); then
+      _run_command --prefer-sudo -- sh -c "$start_cmd"
+   else
+      _run_command -- sh -c "$start_cmd"
+   fi
 }
 
 function _deploy_k3s_cluster() {
