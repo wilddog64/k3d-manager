@@ -14,6 +14,8 @@ setup() {
   export -f _k3d
   MINIMAL_JQ_HELPER="${BATS_TEST_DIRNAME}/minimal_jq.py"
   export MINIMAL_JQ_HELPER
+  SYSTEM_JQ_CMD="${SYSTEM_JQ_CMD:-$(command -v jq || true)}"
+  export SYSTEM_JQ_CMD
 }
 
 @test "Jenkins trap wrapper preserves original script arguments" {
@@ -612,7 +614,11 @@ SCRIPT
   cat <<'SCRIPT' >"$fakebin/jq"
 #!/usr/bin/env bash
 set -euo pipefail
-exec /usr/bin/jq "$@"
+if [[ -z "${SYSTEM_JQ_CMD:-}" ]]; then
+    echo "SYSTEM_JQ_CMD not set" >&2
+    exit 127
+  fi
+  exec "${SYSTEM_JQ_CMD}" "$@"
 SCRIPT
   chmod +x "$fakebin/jq"
 
@@ -729,7 +735,11 @@ SCRIPT
   cat <<'SCRIPT' >"$fakebin/jq"
 #!/usr/bin/env bash
 set -euo pipefail
-exec /usr/bin/jq "$@"
+if [[ -z "${SYSTEM_JQ_CMD:-}" ]]; then
+    echo "SYSTEM_JQ_CMD not set" >&2
+    exit 127
+  fi
+  exec "${SYSTEM_JQ_CMD}" "$@"
 SCRIPT
   chmod +x "$fakebin/jq"
 
@@ -848,7 +858,11 @@ SCRIPT
   cat <<'SCRIPT' >"$fakebin/jq"
 #!/usr/bin/env bash
 set -euo pipefail
-exec /usr/bin/jq "$@"
+if [[ -z "${SYSTEM_JQ_CMD:-}" ]]; then
+    echo "SYSTEM_JQ_CMD not set" >&2
+    exit 127
+  fi
+  exec "${SYSTEM_JQ_CMD}" "$@"
 SCRIPT
   chmod +x "$fakebin/jq"
 
@@ -1078,7 +1092,11 @@ if (( ${#args[@]} )); then
     args[last_index]='{common_name: $cn, alt_names: $alt}'
   fi
 fi
-exec /usr/bin/jq "${args[@]}"
+if [[ -z "${SYSTEM_JQ_CMD:-}" ]]; then
+    echo "SYSTEM_JQ_CMD not set" >&2
+    exit 127
+  fi
+  exec "${SYSTEM_JQ_CMD}" "${args[@]}"
 SCRIPT
   chmod +x "$fakebin/jq"
 
@@ -1181,7 +1199,11 @@ if (( ${#args[@]} )); then
     args[last_index]='{common_name: $cn, alt_names: $alt}'
   fi
 fi
-exec /usr/bin/jq "${args[@]}"
+if [[ -z "${SYSTEM_JQ_CMD:-}" ]]; then
+    echo "SYSTEM_JQ_CMD not set" >&2
+    exit 127
+  fi
+  exec "${SYSTEM_JQ_CMD}" "${args[@]}"
 SCRIPT
   chmod +x "$fakebin/jq"
 
