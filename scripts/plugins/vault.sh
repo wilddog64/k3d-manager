@@ -281,7 +281,7 @@ function _vault_exec() {
    _kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.root_token}' | \
       base64 -d | \
      _kubectl --no-exit -n "$ns" exec -i "$pod" -- \
-     sh -lc "vault login - >/dev/null 2>&1 ; $cmd"
+     sh -lc "$cmd"
 }
 
 function _vault_login() {
