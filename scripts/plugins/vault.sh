@@ -42,6 +42,32 @@ function _vault_repo_setup() {
    _helm repo update >/dev/null 2>&1
 }
 
+function _mount_vault_immediate_sc() {
+   local sc="${1:-local-path-immediate}"
+
+   if _kubectl --no-exit get sc "$sc" >/dev/null 2>&1 ; then
+      local mode=$(_kubectl --no-exit get sc "$sc" -o jsonpath='{.volumeBinding.mode}' 2>/dev/null)
+      local prov=$(_kubectl --no-exit get sc "$sc" -o jsonpath='{.provisioner}' 2>/dev/null)
+      if [[ "$mode" == "Immediate" ]] && [[ "$prov" == "rancher.io/local-path"  ]]; then
+         if ! _kubectl --no-exit get sc local-path-immediate >/dev/null 2>&1; then
+            cat <<YAML | _kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: "$sc"
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: rancher.io/local-path
+volumeBindingMode: Immediate
+reclaimPolicy: Reclaim
+allowVolumeExpansion: true
+YAML
+         fi
+         sc="local-path-immediate"
+      fi
+   fi
+}
+
 function _deploy_vault_ha() {
    local ns="${1:-$VAULT_NS_DEFAULT}"
    local release="${2:-$VAULT_RELEASE_DEFAULT}"
@@ -64,7 +90,7 @@ injector:
 csi:
   enabled: false
 YAML
-
+   _vault_mount_immediate_sc "$sc"
    args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$f")
    [[ -n "$version" ]] && args+=("--version" "$version")
    _helm "${args[@]}"
