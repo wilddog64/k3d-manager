@@ -272,16 +272,22 @@ function _is_vault_health() {
 }
 
 function _vault_exec() {
-   local ns="${1:-$VAULT_NS_DEFAULT}" cmd="${2:-sh}" release="${3:-$VAULT_RELEASE_DEFAULT}"
-   local pod="${release}-0"
+
+  local kflags=()
+  while [[ "${1:-}" == "--no-exit" ]]  || \
+     [[ "${1:-}" == "--prefer-sudo" ]] || \
+     [[ "${1:-}" == "--require-sudo" ]]; do
+     kflags+=("$1")
+     shift
+  done
+
+  local ns="${1:-$VAULT_NS_DEFAULT}" cmd="${2:-sh}" release="${3:-$VAULT_RELEASE_DEFAULT}"
+  local pod="${release}-0"
 
   # this long pipe to check policy exist seems to be complicated but is to
   # prevent vault login output to leak to user and hide sensitive info from being
   # shown in the xtrace when that is turned on
-   _kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.root_token}' | \
-      base64 -d | \
-     _kubectl --no-exit -n "$ns" exec -i "$pod" -- \
-     sh -lc "$cmd"
+  _kubectl "${kflags[@]}" -n "$ns" exec -i "$pod" -- sh -lc "$cmd"
 }
 
 function _vault_login() {
