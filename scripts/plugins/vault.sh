@@ -145,7 +145,7 @@ function _vault_bootstrap_ha() {
 
   local jsonfile="$(mktemp -t vault-init.XXXXXX.json)";
   trap '$(_cleanup_trap_command "$jsonfile")' EXIT TERM
-  _kubectl wait -n "$ns" --for=condition=Podscheduled pod/"$leader" --timeout=120s
+  _kubectl wait -n "$ns" --for=condition=PodScheduled pod/"$leader" --timeout=120s
   local vault_state=$(_kubectl --no-exit -n "$ns" get pod "$leader" -o jsonpath='{.status.phase}')
   end_time=$((SECONDS + 120))
   current_time=$SECONDS
