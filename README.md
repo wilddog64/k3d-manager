@@ -505,6 +505,11 @@ using your system package manager when needed:
 ./scripts/k3d-manager test core           # run the core suite
 ./scripts/k3d-manager test plugins        # run the plugins suite
 ./scripts/k3d-manager test lib            # run the lib suite
+./scripts/k3d-manager test install_k3d    # run a single .bats file
+./scripts/k3d-manager test install_k3d --case "_install_k3d exports INSTALL_DIR"
+                                          # run one test case
+./scripts/k3d-manager test -v install_k3d --case "_install_k3d exports INSTALL_DIR"
+                                          # verbose output for the same case
 ```
 
 Test subcommands are discovered automatically by scanning `scripts/tests` for `.bats` files.
