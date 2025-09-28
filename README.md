@@ -510,6 +510,7 @@ using your system package manager when needed:
                                           # run one test case
 ./scripts/k3d-manager test -v install_k3d --case "_install_k3d exports INSTALL_DIR"
                                           # verbose output for the same case
+# failing runs keep logs in scratch/test-logs/<suite>/<case-hash>/<timestamp>.log (artifacts alongside the log)
 ```
 
 Test subcommands are discovered automatically by scanning `scripts/tests` for `.bats` files.
