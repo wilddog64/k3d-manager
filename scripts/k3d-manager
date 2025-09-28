@@ -198,6 +198,30 @@ function __k3d_manager_escape_regex_literal() {
     printf '%s' "$1" | sed -e 's/[].[^$*+?(){}|\\]/\\&/g' -e 's/\//\\\//g'
 }
 
+function __k3d_manager_slugify() {
+    local value="$1"
+    local max_len="${2:-24}"
+    if [[ -z "$value" ]]; then
+        printf 'entry'
+        return
+    fi
+    local sanitized
+    sanitized=$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')
+    sanitized=$(printf '%s' "$sanitized" | tr -c '[:alnum:]' '-')
+    sanitized=$(printf '%s' "$sanitized" | sed -E 's/-+/-/g; s/^-//; s/-$//')
+    if [[ -z "$sanitized" ]]; then
+        sanitized='entry'
+    fi
+    if [[ ${#sanitized} -gt $max_len ]]; then
+        sanitized="${sanitized:0:$max_len}"
+        sanitized="${sanitized%-}"
+        if [[ -z "$sanitized" ]]; then
+            sanitized='entry'
+        fi
+    fi
+    printf '%s' "$sanitized"
+}
+
 function __k3d_manager_print_test_usage() {
     local -a __tests=()
     local -a __test_names=()
@@ -381,7 +405,86 @@ function test() {
         return 1
     fi
 
-    bats "${bats_args[@]}" "${selected_tests[@]}"
+    local repo_root
+    repo_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
+    local log_root="${repo_root}/scratch/test-logs"
+    local base_dir=""
+    local artifacts_dir=""
+    local log_file=""
+    local ran_with_logging=0
+    local status
+
+    if mkdir -p "$log_root" 2>/dev/null; then
+        local timestamp
+        timestamp="$(date +%Y%m%d-%H%M%S)"
+        local suite_slug
+        suite_slug="$( __k3d_manager_slugify "$suite_spec" 12 )"
+        base_dir="${log_root}/${suite_slug}"
+        if [[ -n "$case_name" ]]; then
+            local case_slug
+            case_slug="$( __k3d_manager_slugify "$case_name" 6 )"
+            if [[ -z "$case_slug" ]]; then
+                case_slug='case'
+            fi
+            local case_hash
+            case_hash=$(printf '%s' "$case_name" | sha256sum | cut -c1-4)
+            base_dir+="/${case_slug}-${case_hash}"
+        fi
+
+        if mkdir -p "$base_dir" 2>/dev/null; then
+            artifacts_dir="${base_dir}/${timestamp}"
+            if mkdir -p "$artifacts_dir" 2>/dev/null; then
+                bats_args+=(--gather-test-outputs-in "$artifacts_dir")
+            else
+                artifacts_dir=""
+            fi
+
+            log_file="${base_dir}/${timestamp}.log"
+            if : > "$log_file" 2>/dev/null; then
+                bats "${bats_args[@]}" "${selected_tests[@]}" 2>&1 | tee "$log_file"
+                status=${PIPESTATUS[0]}
+                ran_with_logging=1
+            else
+                log_file=""
+            fi
+        else
+            base_dir=""
+        fi
+    fi
+
+    if (( ran_with_logging == 0 )); then
+        bats "${bats_args[@]}" "${selected_tests[@]}"
+        status=$?
+    fi
+
+    if [[ $status -ne 0 ]]; then
+        if [[ -n "$log_file" ]]; then
+            local rel_log_file="$log_file"
+            rel_log_file="${rel_log_file#${repo_root}/}"
+            printf 'Test log saved to %s\n' "$rel_log_file" >&2
+        else
+            echo "Test log unavailable (failed to create log file)." >&2
+        fi
+        if [[ -n "$artifacts_dir" ]]; then
+            local rel_artifacts_dir="$artifacts_dir"
+            rel_artifacts_dir="${rel_artifacts_dir#${repo_root}/}"
+            printf 'Collected artifacts in %s\n' "$rel_artifacts_dir" >&2
+        fi
+    else
+        if [[ -n "$log_file" ]]; then
+            rm -f "$log_file" 2>/dev/null || true
+        fi
+        if [[ -n "$artifacts_dir" ]]; then
+            rm -rf "$artifacts_dir" 2>/dev/null || true
+            local prune_dir="$artifacts_dir"
+            while [[ "$prune_dir" != "$log_root" ]]; do
+                prune_dir="$(dirname "$prune_dir")"
+                rmdir "$prune_dir" 2>/dev/null || break
+            done
+        fi
+    fi
+
+    return $status
 }
 
 ## -- main --
