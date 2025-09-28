@@ -190,68 +190,198 @@ Cluster provider:
   Override by exporting CLUSTER_PROVIDER (macOS defaults to k3d).
 
 Subcommands:
-  test ${test_suites}   Run BATS tests
+  test [options] ${test_suites}   Run BATS tests (see "test --help")
+EOF
+}
+
+function __k3d_manager_escape_regex_literal() {
+    printf '%s' "$1" | sed -e 's/[].[^$*+?(){}|\\]/\\&/g' -e 's/\//\\\//g'
+}
+
+function __k3d_manager_print_test_usage() {
+    local -a __tests=()
+    local -a __test_names=()
+    local -a __suite_names=()
+    __k3d_manager_discover_tests __tests __test_names __suite_names
+
+    local base_suites="all|lib|core|plugins"
+    local suites_synopsis="$base_suites"
+    if [[ ${#__suite_names[@]} -gt 0 ]]; then
+        local -a extra_suites=()
+        local suite_name
+        for suite_name in "${__suite_names[@]}"; do
+            case "$suite_name" in
+                all|lib|core|plugins|tests)
+                    continue
+                    ;;
+            esac
+            extra_suites+=("$suite_name")
+        done
+        if [[ ${#extra_suites[@]} -gt 0 ]]; then
+            suites_synopsis="${base_suites}|$( __k3d_manager_join '|' "${extra_suites[@]}" )"
+        fi
+    fi
+
+    local tests_summary="(none)"
+    if [[ ${#__test_names[@]} -gt 0 ]]; then
+        tests_summary="$( __k3d_manager_join ', ' "${__test_names[@]}" )"
+    fi
+
+    cat <<EOF
+Usage: test [-v|--verbose] [--case <name>] <suite|test|suite::case>
+
+Run repository BATS tests. Suites may be one of: ${suites_synopsis}
+Individual tests use the .bats filename without extension.
+
+Options:
+  -v, --verbose          Show output from passing tests
+      --case <name>      Run a single test case (literal match)
+
+Examples:
+  test all
+  test core
+  test install_k3d
+  test install_k3d --case "_install_k3d exports INSTALL_DIR"
+  test install_k3d::"_install_k3d exports INSTALL_DIR"
+
+Available tests: ${tests_summary}
 EOF
 }
 
 function test() {
-    if [[ "$1" == "-h" || "$1" == "--help" || -z "$1" ]]; then
-        local test_suites
-        test_suites=$(find "${SCRIPT_DIR}/tests" -type f -name '*.bats' \
-            -exec basename {} .bats \; | sort | paste -sd '|' -)
-        local base_suites="all|lib|core|plugins"
-        if [[ -n "${test_suites}" ]]; then
-            test_suites="${base_suites}|${test_suites}"
-        else
-            test_suites="${base_suites}"
+    local verbose=0
+    local case_name=""
+    local -a positional=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -h|--help)
+                __k3d_manager_print_test_usage
+                return 0
+                ;;
+            -v|--verbose)
+                verbose=1
+                shift
+                continue
+                ;;
+            --case)
+                shift
+                if [[ -z "${1:-}" ]]; then
+                    echo "Missing value for --case." >&2
+                    return 1
+                fi
+                case_name="$1"
+                shift
+                continue
+                ;;
+            --)
+                shift
+                positional+=("$@")
+                break
+                ;;
+            -*)
+                echo "Unknown option: $1" >&2
+                return 1
+                ;;
+            *)
+                positional+=("$1")
+                shift
+                continue
+                ;;
+        esac
+    done
+
+    if [[ ${#positional[@]} -eq 0 ]]; then
+        __k3d_manager_print_test_usage >&2
+        return 1
+    fi
+
+    if [[ ${#positional[@]} -gt 1 ]]; then
+        echo "Only one suite or test may be specified." >&2
+        return 1
+    fi
+
+    local suite_spec="${positional[0]}"
+    if [[ "$suite_spec" == *"::"* ]]; then
+        local inline_case="${suite_spec#*::}"
+        suite_spec="${suite_spec%%::*}"
+        if [[ -z "$inline_case" ]]; then
+            echo "Missing test case name in '${positional[0]}'." >&2
+            return 1
         fi
-        cat <<EOF
-Usage: test ${test_suites}
-Run BATS tests
-EOF
-        return 0
+        if [[ -z "$case_name" ]]; then
+            case_name="$inline_case"
+        fi
     fi
 
     _ensure_bats
-    local suite="$1"
-    local search_dirs=("${SCRIPT_DIR}/tests/lib" "${SCRIPT_DIR}/tests/core" "${SCRIPT_DIR}/tests/plugins")
+
+    local tests_root="${SCRIPT_DIR}/tests"
+    local -a search_dirs=("${tests_root}/lib" "${tests_root}/core" "${tests_root}/plugins")
     local -a tests=()
-    # Populate array without mapfile for compatibility with Bash 3
     while IFS= read -r test_file; do
         tests+=("$test_file")
     done < <(find "${search_dirs[@]}" -maxdepth 1 -type f -name '*.bats' | sort)
 
-    if [[ "$suite" == "all" ]]; then
-        bats "${tests[@]}"
-        return
+    local -a bats_args=()
+    if (( verbose )); then
+        bats_args+=(--show-output-of-passing-tests --print-output-on-failure)
     fi
 
-    if [[ "$suite" == "lib" || "$suite" == "core" || "$suite" == "plugins" ]]; then
-        local -a suite_tests=()
-        local dir="${SCRIPT_DIR}/tests/${suite}"
-        while IFS= read -r test_file; do
-            suite_tests+=("$test_file")
-        done < <(find "$dir" -maxdepth 1 -type f -name '*.bats' | sort)
+    if [[ -n "$case_name" ]]; then
+        local escaped_case
+        escaped_case="$( __k3d_manager_escape_regex_literal "$case_name" )"
+        bats_args+=(--filter "^${escaped_case}$")
+    fi
 
-        if [[ ${#suite_tests[@]} -eq 0 ]]; then
-            echo "No test suites found in '$suite'." >&2
+    local -a selected_tests=()
+
+    if [[ "$suite_spec" == "all" ]]; then
+        selected_tests=("${tests[@]}")
+    elif [[ "$suite_spec" == "lib" || "$suite_spec" == "core" || "$suite_spec" == "plugins" ]]; then
+        local dir="${tests_root}/${suite_spec}"
+        while IFS= read -r test_file; do
+            selected_tests+=("$test_file")
+        done < <(find "$dir" -maxdepth 1 -type f -name '*.bats' | sort)
+        if [[ ${#selected_tests[@]} -eq 0 ]]; then
+            echo "No test suites found in '$suite_spec'." >&2
             return 1
         fi
-
-        bats "${suite_tests[@]}"
-        return
+    else
+        local match_found=0
+        local test_file
+        for test_file in "${tests[@]}"; do
+            local rel_with_ext
+            rel_with_ext="${test_file#${tests_root}/}"
+            local rel_without_ext
+            rel_without_ext="${rel_with_ext%.bats}"
+            local basename_no_ext
+            basename_no_ext="${test_file##*/}"
+            basename_no_ext="${basename_no_ext%.bats}"
+            if [[ "$basename_no_ext" == "$suite_spec" \
+               || "$rel_without_ext" == "$suite_spec" \
+               || "$rel_with_ext" == "$suite_spec" \
+               || "$test_file" == "$suite_spec" ]]; then
+                selected_tests=("$test_file")
+                match_found=1
+                break
+            fi
+        done
+        if [[ $match_found -eq 0 ]]; then
+            echo "No test suite matching '$suite_spec'. Available suites:" >&2
+            for test_file in "${tests[@]}"; do
+                printf '  %s\n' "${test_file#${tests_root}/}" | sed 's/\.bats$//' >&2
+            done
+            return 1
+        fi
     fi
 
-    for test_file in "${tests[@]}"; do
-        if [[ "$(basename "$test_file" .bats)" == "$suite" ]]; then
-            bats "$test_file"
-            return
-        fi
-    done
+    if [[ ${#selected_tests[@]} -eq 0 ]]; then
+        echo "No test suites found." >&2
+        return 1
+    fi
 
-    echo "No test suite matching '$suite'. Available suites:" >&2
-    printf '  %s\n' "${tests[@]##*/}" | sed 's/\.bats$//' >&2
-    return 1
+    bats "${bats_args[@]}" "${selected_tests[@]}"
 }
 
 ## -- main --
