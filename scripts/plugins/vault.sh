@@ -514,7 +514,7 @@ function _vault_post_revoke_request() {
 
    local mount="${path%/revoke}" serial_plain="${serial//:/}"
    if ! _vault_exec --no-exit "$ns" "vault read -format=json ${mount}/cert/${serial_plain}" >/dev/null 2>&1; then
-      _err "[vault] certificate with serial_number $serial not found at $mount/cert/"
+      _warn "[vault] certificate with serial_number $serial not found at $mount/cert/"
    fi
    _vault_exec "$ns" "VAULT_HTTP_DEBUG=\${VAULT_HTTP_DEBUG:-1} vault write ${path} serial_number=${serial}" "$release"
 }
