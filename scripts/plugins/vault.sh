@@ -507,13 +507,16 @@ function _vault_post_revoke_request() {
       return 1
    fi
 
-   local serial
-   serial=$(printf '%s' "$payload" | jq -r '.serial_number // empty') || return 1
+   local serial=$(printf '%s' "$payload" | jq -r '.serial_number // empty')
    if [[ -z "$serial" ]]; then
-      return 1
+      _err "[vault] missing serial_number in payload"
    fi
 
-   _vault_exec "$ns" "vault write ${path} serial_number=${serial}" "$release"
+   local mount="${path%/revoke}" serial_plain="${serial//:/}"
+   if ! _vault_exec --no-exit "$ns" "vault read -format=json ${mount}/cert/${serial_plain}" >/dev/null 2>&1; then
+      _err "[vault] certificate with serial_number $serial not found at $mount/cert/"
+   fi
+   _vault_exec "$ns" "VAULT_HTTP_DEBUG=\${VAULT_HTTP_DEBUG:-1} vault write ${path} serial_number=${serial}" "$release"
 }
 
 function _vault_issue_pki_tls_secret() {
