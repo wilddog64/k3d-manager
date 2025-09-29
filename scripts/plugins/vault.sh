@@ -430,7 +430,7 @@ HCL
 
 function _is_vault_pki_mounted() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}" path="${3:-pki}"
-   _vault_exec "$ns" "vault secrets list -format=json" "$release" |
+   _vault_exec --no-exit "$ns" "vault secrets list -format=json" "$release" |
       jq -e --arg PATH "${path}/" 'has($PATH) and .[$PATH].type == "pki"' >/dev/null 2>&1
 }
 
@@ -466,7 +466,7 @@ function _vault_ensure_pki_root_ca() {
    local path="${3:-${VAULT_PKI_PATH:-pki}}"
    local cn="${4:-${VAULT_PKI_CN:-dev.k3d.internal}}" ttl="${5:-${VAULT_PKI_MAX_TTL:-87600h}}"
 
-   if _vault_exec "$ns" "vault read -format=json $path/cert/ca" "$release" >/dev/null 2>&1; then
+   if _vault_exec --no-exit "$ns" "vault read -format=json $path/cert/ca" "$release" >/dev/null 2>&1; then
       _info "[vault] root CA already exists at $path, skipping creation"
       return 0
    fi
