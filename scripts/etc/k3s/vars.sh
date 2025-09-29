@@ -1,0 +1,10 @@
+export K3S_INSTALL_DIR="${K3S_INSTALL_DIR:-/usr/local/bin}"
+export K3S_DATA_DIR="${K3S_DATA_DIR:-/var/lib/rancher/k3s}"
+export K3S_CONFIG_DIR="${K3S_CONFIG_DIR:-/etc/rancher/k3s}"
+export K3S_CONFIG_FILE="${K3S_CONFIG_FILE:-${K3S_CONFIG_DIR}/config.yaml}"
+export K3S_KUBECONFIG_PATH="${K3S_KUBECONFIG_PATH:-${K3S_CONFIG_DIR}/k3s.yaml}"
+export K3S_SERVICE_NAME="${K3S_SERVICE_NAME:-k3s}"
+export K3S_SERVICE_FILE="${K3S_SERVICE_FILE:-/etc/systemd/system/${K3S_SERVICE_NAME}.service}"
+export K3S_MANIFEST_DIR="${K3S_MANIFEST_DIR:-${K3S_DATA_DIR}/server/manifests}"
+export K3S_LOCAL_STORAGE="${K3S_LOCAL_STORAGE:-${JENKINS_HOME_PATH:-${SCRIPT_DIR}/storage/jenkins_home}}"
+

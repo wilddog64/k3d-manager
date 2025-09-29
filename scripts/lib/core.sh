@@ -88,18 +88,6 @@ function _k3s_asset_dir() {
    printf '%s/etc/k3s' "$(dirname "$SOURCE")"
 }
 
-function _k3s_set_defaults() {
-   export K3S_INSTALL_DIR="${K3S_INSTALL_DIR:-/usr/local/bin}"
-   export K3S_DATA_DIR="${K3S_DATA_DIR:-/var/lib/rancher/k3s}"
-   export K3S_CONFIG_DIR="${K3S_CONFIG_DIR:-/etc/rancher/k3s}"
-   export K3S_CONFIG_FILE="${K3S_CONFIG_FILE:-${K3S_CONFIG_DIR}/config.yaml}"
-   export K3S_KUBECONFIG_PATH="${K3S_KUBECONFIG_PATH:-${K3S_CONFIG_DIR}/k3s.yaml}"
-   export K3S_SERVICE_NAME="${K3S_SERVICE_NAME:-k3s}"
-   export K3S_SERVICE_FILE="${K3S_SERVICE_FILE:-/etc/systemd/system/${K3S_SERVICE_NAME}.service}"
-   export K3S_MANIFEST_DIR="${K3S_MANIFEST_DIR:-${K3S_DATA_DIR}/server/manifests}"
-   export K3S_LOCAL_STORAGE="${K3S_LOCAL_STORAGE:-${JENKINS_HOME_PATH:-${SCRIPT_DIR}/storage/jenkins_home}}"
-}
-
 function _k3s_template_path() {
    local name="${1:-}"
    printf '%s/%s' "$(_k3s_asset_dir)" "$name"
@@ -205,14 +193,12 @@ function _k3s_prepare_assets() {
 }
 
 function _k3s_cluster_exists() {
-   _k3s_set_defaults
    [[ -f "$K3S_SERVICE_FILE" ]] && return 0 || return 1
 }
 
 function _install_k3s() {
    local cluster_name="${1:-${CLUSTER_NAME:-k3s-cluster}}"
 
-   _k3s_set_defaults
    export CLUSTER_NAME="$cluster_name"
 
    if _is_mac ; then
@@ -305,8 +291,6 @@ function _install_k3s() {
 }
 
 function _teardown_k3s_cluster() {
-   _k3s_set_defaults
-
    if _is_mac ; then
       local dest="${K3S_INSTALL_DIR}/k3s"
       if [[ -f "$dest" ]]; then
@@ -430,7 +414,6 @@ function _deploy_k3s_cluster() {
    fi
 
    _install_k3s "$cluster_name"
-   _k3s_set_defaults
 
    _start_k3s_service
 
