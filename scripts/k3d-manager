@@ -194,7 +194,7 @@ Subcommands:
 EOF
 }
 
-function __k3d_manager_escape_regex_literal() {
+function __escape_regex_literal() {
     printf '%s' "$1" | sed -e 's/[].[^$*+?(){}|\\]/\\&/g' -e 's/\//\\\//g'
 }
 
@@ -354,7 +354,7 @@ function test() {
 
     if [[ -n "$case_name" ]]; then
         local escaped_case
-        escaped_case="$( __k3d_manager_escape_regex_literal "$case_name" )"
+        escaped_case="$( __escape_regex_literal "$case_name" )"
         bats_args+=(--filter "^${escaped_case}$")
     fi
 
