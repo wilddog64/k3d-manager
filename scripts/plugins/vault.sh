@@ -90,7 +90,7 @@ injector:
 csi:
   enabled: false
 YAML
-   _vault_mount_immediate_sc "$sc"
+   _mount_vault_immediate_sc "$sc"
    args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$f")
    [[ -n "$version" ]] && args+=("--version" "$version")
    _helm "${args[@]}"
