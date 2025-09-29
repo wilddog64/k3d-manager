@@ -198,7 +198,7 @@ function __k3d_manager_escape_regex_literal() {
     printf '%s' "$1" | sed -e 's/[].[^$*+?(){}|\\]/\\&/g' -e 's/\//\\\//g'
 }
 
-function __k3d_manager_slugify() {
+function __slugify() {
     local value="$1"
     local max_len="${2:-24}"
     if [[ -z "$value" ]]; then
@@ -418,11 +418,11 @@ function test() {
         local timestamp
         timestamp="$(date +%Y%m%d-%H%M%S)"
         local suite_slug
-        suite_slug="$( __k3d_manager_slugify "$suite_spec" 12 )"
+        suite_slug="$( __slugify "$suite_spec" 12 )"
         base_dir="${log_root}/${suite_slug}"
         if [[ -n "$case_name" ]]; then
             local case_slug
-            case_slug="$( __k3d_manager_slugify "$case_name" 6 )"
+            case_slug="$( __slugify "$case_name" 6 )"
             if [[ -z "$case_slug" ]]; then
                 case_slug='case'
             fi
