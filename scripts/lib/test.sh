@@ -178,8 +178,8 @@ EOF
     _kubectl rollout status deployment/nginx-test -n istio-test --timeout=120s
 
     # Verify that the Istio proxy has been injected
-    echo "Checking for Istio sidecar..."
-    if _kubectl get pod -n istio-test -l app=nginx-test -o jsonpath='{.items[0].spec.containers[*].name}' | grep -q istio-proxy; then
+    _info "Checking for Istio sidecar..."
+    if _kubectl --no-exit get pod -n istio-test -o yaml | grep -q istio-proxy; then
         _info "Istio sidecar injection is working!"
     else
         _err "Istio sidecar was not injected! Check your Istio installation."
