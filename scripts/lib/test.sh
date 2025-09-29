@@ -180,10 +180,9 @@ EOF
     # Verify that the Istio proxy has been injected
     echo "Checking for Istio sidecar..."
     if _kubectl get pod -n istio-test -l app=nginx-test -o jsonpath='{.items[0].spec.containers[*].name}' | grep -q istio-proxy; then
-        echo "Istio sidecar injection is working!"
+        _info "Istio sidecar injection is working!"
     else
-        echo "Istio sidecar was not injected! Check your Istio installation."
-        return 1
+        _err "Istio sidecar was not injected! Check your Istio installation."
     fi
 
     # Test direct access first (bypassing Istio)
@@ -235,19 +234,17 @@ spec:
 EOF
 
     # Verify Gateway creation
-    if _kubectl get gateway -n istio-test test-gateway; then
-        echo "Istio Gateway created successfully"
+    if _kubectl --no-exit get gateway -n istio-test test-gateway; then
+        _info "Istio Gateway created successfully"
     else
-        echo "Failed to create Istio Gateway"
-        return 1
+        _err "Failed to create Istio Gateway"
     fi
 
     # Verify VirtualService creation
-    if _kubectl get virtualservice -n istio-test test-vs; then
-        echo "Istio VirtualService created successfully"
+    if _kubectl --no-exit get virtualservice -n istio-test test-vs; then
+        _info "Istio VirtualService created successfully"
     else
-        echo "Failed to create Istio VirtualService"
-        return 1
+        _err "Failed to create Istio VirtualService"
     fi
 
     # Test through Istio gateway
