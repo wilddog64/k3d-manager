@@ -222,7 +222,7 @@ function __k3d_manager_slugify() {
     printf '%s' "$sanitized"
 }
 
-function __k3d_manager_print_test_usage() {
+function __print_test_usage() {
     local -a __tests=()
     local -a __test_names=()
     local -a __suite_names=()
@@ -280,7 +280,7 @@ function test() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -h|--help)
-                __k3d_manager_print_test_usage
+                __print_test_usage
                 return 0
                 ;;
             -v|--verbose)
@@ -316,7 +316,7 @@ function test() {
     done
 
     if [[ ${#positional[@]} -eq 0 ]]; then
-        __k3d_manager_print_test_usage >&2
+        __print_test_usage >&2
         return 1
     fi
 
