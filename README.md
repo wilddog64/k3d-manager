@@ -330,6 +330,8 @@ plugin or by editing the helper files under `scripts/etc`.
 | `VAULT_PKI_LEAF_HOST` | `jenkins.dev.local.me` | Common name/SAN for the leaf certificate request (also used as the default VirtualService host). |
 | `JENKINS_VIRTUALSERVICE_HOSTS` | *(empty)* | Optional comma-separated list of hosts to render into the Istio `VirtualService`; defaults to `VAULT_PKI_LEAF_HOST`. |
 
+The rendered Istio VirtualService now sets `X-Forwarded-Proto` and `X-Forwarded-Port` headers so Jenkins generates HTTPS links when requests traverse the shared Istio ingress gateway. If you supply a custom `virtualservice.yaml.tmpl`, keep those headers and ensure the destination port stays aligned with the Helm chart's `controller.servicePort` (default `8081`).
+
 > **Note:** When `VAULT_PKI_ALLOWED` is not provided, the Jenkins plugin derives the Vault role's `allowed_domains` from
 > `VAULT_PKI_LEAF_HOST`. Domains under `nip.io` and `sslip.io` are automatically permitted so dynamic DNS entries continue
 > to validate without manual configuration.
