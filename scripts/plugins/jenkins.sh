@@ -361,7 +361,7 @@ function _create_jenkins_pv_pvc() {
 
    local cluster_name
    if ! cluster_name=$(_jenkins_detect_cluster_name); then
-      return 1
+      _err "[ERROR] Failed to detect k3d cluster name. Set CLUSTER_NAME or create a cluster before deploying Jenkins." >&2
    fi
 
    if ! _jenkins_require_hostpath_mounts "$cluster_name"; then
