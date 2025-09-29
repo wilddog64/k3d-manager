@@ -57,7 +57,7 @@ elif [[ -n "${K3D_MANAGER_PROVIDER:-}" ]]; then
     fi
 fi
 
-function __k3d_manager_join() {
+function ___join_lines() {
     local separator="$1"
     shift || true
 
@@ -135,6 +135,7 @@ function __discover_tests() {
 
     return 0
 }
+
 function _usage() {
     local base_suites="all|lib|core|plugins"
     if [[ -n "${test_suites}" ]]; then
@@ -161,7 +162,7 @@ function _usage() {
         if [[ ${#__test_names[@]} -gt 0 ]]; then
             synopsis_tokens+=("${__test_names[@]}")
         fi
-        local joined_synopsis="$( __k3d_manager_join '|' "${synopsis_tokens[@]}" )"
+        local joined_synopsis="$( ___join_lines '|' "${synopsis_tokens[@]}" )"
         if [[ -n "$joined_synopsis" ]]; then
             test_synopsis="$joined_synopsis"
         fi
@@ -169,12 +170,12 @@ function _usage() {
 
     local suites_summary=""
     if [[ ${#__suite_names[@]} -gt 0 ]]; then
-        suites_summary="$( __k3d_manager_join ', ' "${__suite_names[@]}" )"
+        suites_summary="$( ___join_lines ', ' "${__suite_names[@]}" )"
     fi
 
     local tests_summary=""
     if [[ ${#__test_names[@]} -gt 0 ]]; then
-        tests_summary="$( __k3d_manager_join ', ' "${__test_names[@]}" )"
+        tests_summary="$( ___join_lines ', ' "${__test_names[@]}" )"
     fi
 
     cat <<EOF
@@ -242,13 +243,13 @@ function __print_test_usage() {
             extra_suites+=("$suite_name")
         done
         if [[ ${#extra_suites[@]} -gt 0 ]]; then
-            suites_synopsis="${base_suites}|$( __k3d_manager_join '|' "${extra_suites[@]}" )"
+            suites_synopsis="${base_suites}|$( ___join_lines '|' "${extra_suites[@]}" )"
         fi
     fi
 
     local tests_summary="(none)"
     if [[ ${#__test_names[@]} -gt 0 ]]; then
-        tests_summary="$( __k3d_manager_join ', ' "${__test_names[@]}" )"
+        tests_summary="$( ___join_lines ', ' "${__test_names[@]}" )"
     fi
 
     cat <<EOF
