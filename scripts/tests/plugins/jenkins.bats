@@ -1442,8 +1442,19 @@ EOF
   unset JENKINS_READY_TIMEOUT
 }
 
-@test "VirtualService references Jenkins gateway" {
-  run grep -q 'istio-system/jenkins-gw' "$SCRIPT_DIR/etc/jenkins/virtualservice.yaml.tmpl"
+@test "VirtualService template configures Jenkins gateway and reverse proxy headers" {
+  local template="$SCRIPT_DIR/etc/jenkins/virtualservice.yaml.tmpl"
+
+  run grep -q 'istio-system/jenkins-gw' "$template"
+  [ "$status" -eq 0 ]
+
+  run grep -q 'X-Forwarded-Proto: "https"' "$template"
+  [ "$status" -eq 0 ]
+
+  run grep -q 'X-Forwarded-Port: "443"' "$template"
+  [ "$status" -eq 0 ]
+
+  run grep -q 'number: 8081' "$template"
   [ "$status" -eq 0 ]
 }
 
