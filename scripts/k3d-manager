@@ -73,7 +73,7 @@ function __k3d_manager_join() {
     printf '%s' "$joined"
 }
 
-function __k3d_manager_discover_tests() {
+function __discover_tests() {
     local tests_var="$1"
     local names_var="$2"
     local suites_var="${3:-}"
@@ -148,7 +148,7 @@ function _usage() {
     local -a __tests=()
     local -a __test_names=()
     local -a __suite_names=()
-    __k3d_manager_discover_tests __tests __test_names __suite_names
+    __discover_tests __tests __test_names __suite_names
 
     local provider="${CLUSTER_PROVIDER:-$(_default_cluster_provider)}"
 
@@ -226,7 +226,7 @@ function __k3d_manager_print_test_usage() {
     local -a __tests=()
     local -a __test_names=()
     local -a __suite_names=()
-    __k3d_manager_discover_tests __tests __test_names __suite_names
+    __discover_tests __tests __test_names __suite_names
 
     local base_suites="all|lib|core|plugins"
     local suites_synopsis="$base_suites"
