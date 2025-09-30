@@ -82,8 +82,7 @@ function _cluster_provider_call() {
     local func="_provider_${provider}_${action}"
 
     if ! declare -f "$func" >/dev/null 2>&1; then
-        echo "Cluster provider '$provider' does not implement action '$action'" >&2
-        exit 1
+        _err "Cluster provider '$provider' does not implement action '$action'"
     fi
 
     "$func" "$@"

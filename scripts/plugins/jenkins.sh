@@ -208,8 +208,7 @@ function _jenkins_detect_cluster_name() {
 
    local list_output
    if ! list_output=$(_k3d --no-exit --quiet cluster list); then
-      echo "Failed to list k3d clusters. Set CLUSTER_NAME or create a cluster before deploying Jenkins." >&2
-      return 1
+      _err "Failed to list k3d clusters. Set CLUSTER_NAME or create a cluster before deploying Jenkins." >&2
    fi
 
    local -a clusters=()
