@@ -279,7 +279,7 @@ function _jenkins_require_hostpath_mounts() {
    JENKINS_MISSING_HOSTPATH_NODES=""
    JENKINS_MOUNT_CHECK_ERROR=""
 
-   if ! node_output=$(_k3d --no-exit --quiet node list); then
+   if ! node_output=$(_kubectl --no-exit --quiet get nodes); then
       JENKINS_MOUNT_CHECK_ERROR="Failed to list k3d nodes for cluster $cluster. Ensure the cluster is running."
       return 1
    fi
@@ -356,8 +356,8 @@ function _create_jenkins_pv_pvc() {
       mkdir -p "$JENKINS_HOME_PATH"
    fi
 
-   local cluster_name="$($CLUSTER_NAME:-_detect_cluster_name)"
-   if -z "$cluster_name"; then
+   local cluster_name="${CLUSTER_NAME:-$(_detect_cluster_name)}"
+   if [[ -z "$cluster_name" ]]; then
       _err "_create_jenkins_pv_pvc: Failed to detect cluster name. Set CLUSTER_NAME or create a cluster before deploying Jenkins."
    fi
 
