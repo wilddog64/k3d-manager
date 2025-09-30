@@ -31,7 +31,7 @@ function _jenkins_capture_trap_state() {
    fi
 
    quoted_handler=${trap_output#trap -- }
-   quoted_handler=${quoted_handler% $signal}
+   quoted_handler="${quoted_handler% "$signal"}"
    if [[ -n "$quoted_handler" ]]; then
       local handler_literal
       if [[ ${quoted_handler} == "'"*"'" ]]; then
@@ -681,13 +681,13 @@ function _deploy_jenkins() {
    if [[ -n "$_JENKINS_PREV_EXIT_TRAP_HANDLER" ]]; then
       exit_trap_cmd+="; ${_JENKINS_PREV_EXIT_TRAP_HANDLER}"
    fi
-   trap "$exit_trap_cmd" EXIT
+   trap '$exit_trap_cmd' EXIT
 
    local return_trap_cmd="_jenkins_cleanup_rendered_manifests RETURN"
    if [[ -n "$_JENKINS_PREV_RETURN_TRAP_HANDLER" ]]; then
       return_trap_cmd+="; ${_JENKINS_PREV_RETURN_TRAP_HANDLER}"
    fi
-   trap "$return_trap_cmd" RETURN
+   trap '$return_trap_cmd' RETURN
 
    if (( ! skip_repo_ops )); then
      if ! _helm repo list 2>/dev/null | grep -q jenkins; then
