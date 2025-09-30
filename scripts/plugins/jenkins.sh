@@ -966,8 +966,7 @@ function _create_jenkins_vault_ad_policy() {
    local pod="${vault_release}-0"
 
    if ! _vault_policy_exists "$vault_namespace" "$vault_release" "jenkins-jcasc-read"; then
-      _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-         vault policy write jenkins-jcasc-read <<'HCL'
+      _kubectl -n "$vault_namespace" exec -i "$pod" -- sh -lc 'vault policy write jenkins-jcasc-read -' <<'HCL'
 path "secret/data/jenkins/ad-ldap"     { capabilities = ["read"] }
 path "secret/data/jenkins/ad-adreader" { capabilities = ["read"] }
 HCL
@@ -981,8 +980,7 @@ HCL
    fi
 
    if ! _vault_policy_exists "$vault_namespace" "$vault_release" "jenkins-jcasc-write"; then
-      _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-         vault policy write jenkins-jcasc-write <<'HCL'
+      _kubectl -n "$vault_namespace" exec -i "$pod" -- sh -lc 'vault policy write jenkins-jcasc-write -' <<'HCL'
 path "secret/data/jenkins/ad-ldap"     { capabilities = ["create", "update"] }
 path "secret/data/jenkins/ad-adreader" { capabilities = ["create", "update"] }
 HCL
