@@ -303,9 +303,10 @@ function _vault_login() {
 function _vault_policy_exists() {
   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}" name="${3:-eso-reader}"
 
-  if _vault_exec "$ns" "vault policy list" "$release" | grep -q "^${name}\$"; then
+  if _vault_exec --no-exit "$ns" "vault policy list" "$release" | grep -q "^${name}\$"; then
      return 0
   fi
+
   return 1
 }
 
