@@ -753,8 +753,8 @@ function _deploy_jenkins() {
    IFS=',' read -r -a _vs_hosts_split <<<"$vs_hosts_input"
    local _vs_host trimmed
    for _vs_host in "${_vs_hosts_split[@]}"; do
-      trimmed="${_vs_host#${_vs_host%%[![:space:]]*}}"
-      trimmed="${trimmed%${trimmed##*[![:space:]]}}"
+      trimmed="${_vs_host#"${_vs_host%%[![:space:]]*}"}"
+      trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
       if [[ -n "$trimmed" ]]; then
          vs_hosts_lines+=("    - ${trimmed}")
       fi
