@@ -208,7 +208,7 @@ function _jenkins_detect_cluster_name() {
 
    local list_output
    if ! list_output=$(_k3d --no-exit --quiet cluster list); then
-      _err "Failed to list k3d clusters. Set CLUSTER_NAME or create a cluster before deploying Jenkins." >&2
+      _err "Failed to list k3d clusters. Set CLUSTER_NAME or create a cluster before deploying Jenkins."
    fi
 
    local -a clusters=()
@@ -224,16 +224,14 @@ function _jenkins_detect_cluster_name() {
 
    case ${#clusters[@]} in
       0)
-         echo "No k3d clusters found. Create a cluster or export CLUSTER_NAME before deploying Jenkins." >&2
-         return 1
+         _err "_jenkins_detect_cluster_name: No k3d clusters found. Create a cluster or export CLUSTER_NAME before deploying Jenkins."
          ;;
       1)
          printf '%s\n' "${clusters[0]}"
          return 0
          ;;
       *)
-         echo "Multiple k3d clusters detected: ${clusters[*]}. Set CLUSTER_NAME to choose the target cluster before deploying Jenkins." >&2
-         return 1
+         _err "Multiple k3d clusters detected: ${clusters[*]}. Set CLUSTER_NAME to choose the target cluster before deploying Jenkins."
          ;;
    esac
 }
@@ -360,22 +358,19 @@ function _create_jenkins_pv_pvc() {
 
    local cluster_name
    if ! cluster_name=$(_jenkins_detect_cluster_name); then
-      _err "[ERROR] Failed to detect k3d cluster name. Set CLUSTER_NAME or create a cluster before deploying Jenkins." >&2
+      _err "_create_jenkins_pv_pvc: Failed to detect k3d cluster name. Set CLUSTER_NAME or create a cluster before deploying Jenkins."
    fi
 
    if ! _jenkins_require_hostpath_mounts "$cluster_name"; then
-      local missing_nodes="${JENKINS_MISSING_HOSTPATH_NODES:-}"
+      local pvc_missing_nodes="${JENKINS_MISSING_HOSTPATH_NODES:-}"
       local mount_error="${JENKINS_MOUNT_CHECK_ERROR:-}"
 
       if [[ -n "$mount_error" ]]; then
-         echo "$mount_error" >&2
-      else
-         cat >&2 <<EOF
-Jenkins requires the hostPath mount ${JENKINS_HOME_PATH}:${JENKINS_HOME_IN_CLUSTER} on all workload nodes, but these k3d nodes are missing it: ${missing_nodes}.
+         _err <<-EOF
+Jenkins requires the hostPath mount ${JENKINS_HOME_PATH}:${JENKINS_HOME_IN_CLUSTER} on all workload nodes, but these k3d nodes are missing it: ${pvc_missing_nodes}.
 Update your cluster configuration so every node includes this mount, then recreate the cluster with './scripts/k3d-manager create_cluster ${cluster_name}' (set CLUSTER_PROVIDER if needed) before deploying Jenkins.
 EOF
       fi
-      return 1
    fi
 
    jenkins_pv_template="$(dirname "$SOURCE")/etc/jenkins/jenkins-home-pv.yaml.tmpl"
