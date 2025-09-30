@@ -94,6 +94,7 @@ function _provider_k3s_deploy_cluster() {
    fi
 
    local cluster_name="${1:-k3s-cluster}"
+   cluster_name="k3s-${cluster_name}"
 
    export CLUSTER_NAME="$cluster_name"
 
