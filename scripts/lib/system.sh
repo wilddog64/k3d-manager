@@ -866,8 +866,8 @@ function _detect_cluster_name() {
    if [[ -z "$cluster_info" ]]; then
       _err "Cannot detect cluster name: no nodes found"
    fi
-   local cluster_ready=$(echo $cluster_info | awk '{print $2}')
-   local cluster_name=$(echo $cluster_info | awk '{print $1}')
+   local cluster_ready=$(echo "$cluster_info" | awk '{print $2}')
+   local cluster_name=$(echo "$cluster_info" | awk '{print $1}')
 
    if [[ "$cluster_ready" != "Ready" ]]; then
       _err "Cluster node is not ready: $cluster_info"
