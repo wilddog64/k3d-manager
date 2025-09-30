@@ -271,7 +271,14 @@ function _cleanup_istio_test_namespace() {
     _info "Cleaning up Istio test namespace..."
     _info "warning: port forwarding will not remove if process failed"
     for pid in "${PF_PIDS[@]}"; do
-       kill "$pid" 2>/dev/null || true
+       _info "killing $pid"
+       _run_command -- kill "$pid"
+       if _run_command --no-exit --quiet -- ps aux | grep '[k]ubectl'; then
+          _run_command ps aux | \
+             grep -E '[k]ubectl' | \
+             awk '{print $2}' | \
+             xargs kill
+       fi
     done
     _kubectl delete namespace istio-test --ignore-not-found
 }
