@@ -861,13 +861,20 @@ function _failfast_off() {
 
 function _detect_cluster_name() {
    # shellcheck disable=SC2155
-   local cluster_info="$(_kubectl --quiet -- get nodes -o name | tail -1)"
+   local cluster_info="$(_kubectl --quiet -- get nodes | tail -1)"
 
    if [[ -z "$cluster_info" ]]; then
       _err "Cannot detect cluster name: no nodes found"
    fi
-   cluster_info="${cluster_info#*/}"
-   _info "Detected cluster name: $cluster_info"
+   local cluster_ready=$(echo $cluster_info | awk '{print $2}')
+   local cluster_name=$(echo $cluster_info | awk '{print $1}')
+
+   if [[ "$cluster_ready" != "Ready" ]]; then
+      _err "Cluster node is not ready: $cluster_info"
+   fi
+   _info "Detected cluster name: $cluster_name"
+
+   printf '%s' "$cluster_name"
 }
 
 # ---------- tiny log helpers (no parentheses, no single-quote apostrophes) ----------

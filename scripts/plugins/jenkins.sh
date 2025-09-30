@@ -200,41 +200,41 @@ function _create_jenkins_namespace() {
    trap '$(_cleanup_trap_command "$yamlfile")' RETURN
 }
 
-function _jenkins_detect_cluster_name() {
-   if [[ -n "${CLUSTER_NAME:-}" ]]; then
-      printf '%s\n' "$CLUSTER_NAME"
-      return 0
-   fi
-
-   local list_output
-   if ! list_output=$(_k3d --no-exit --quiet cluster list); then
-      _err "Failed to list k3d clusters. Set CLUSTER_NAME or create a cluster before deploying Jenkins."
-   fi
-
-   local -a clusters=()
-   while IFS= read -r line; do
-      line=${line%$'\r'}
-      [[ -z "$line" ]] && continue
-      [[ "$line" =~ ^[[:space:]]*NAME[[:space:]] ]] && continue
-      read -r -a fields <<<"$line"
-      if (( ${#fields[@]} )); then
-         clusters+=("${fields[0]}")
-      fi
-   done <<<"$list_output"
-
-   case ${#clusters[@]} in
-      0)
-         _err "_jenkins_detect_cluster_name: No k3d clusters found. Create a cluster or export CLUSTER_NAME before deploying Jenkins."
-         ;;
-      1)
-         printf '%s\n' "${clusters[0]}"
-         return 0
-         ;;
-      *)
-         _err "Multiple k3d clusters detected: ${clusters[*]}. Set CLUSTER_NAME to choose the target cluster before deploying Jenkins."
-         ;;
-   esac
-}
+# function _jenkins_detect_cluster_name() {
+#    if [[ -n "${CLUSTER_NAME:-}" ]]; then
+#       printf '%s\n' "$CLUSTER_NAME"
+#       return 0
+#    fi
+#
+#    local list_output=$(_detect_cluster_name)
+#    if -z "$list_output"; then
+#       _err "Failed to list k3d clusters. Set CLUSTER_NAME or create a cluster before deploying Jenkins."
+#    fi
+#
+#    local -a clusters=()
+#    while IFS= read -r line; do
+#       line=${line%$'\r'}
+#       [[ -z "$line" ]] && continue
+#       [[ "$line" =~ ^[[:space:]]*NAME[[:space:]] ]] && continue
+#       read -r -a fields <<<"$line"
+#       if (( ${#fields[@]} )); then
+#          clusters+=("${fields[0]}")
+#       fi
+#    done <<<"$list_output"
+#
+#    case ${#clusters[@]} in
+#       0)
+#          _err "_jenkins_detect_cluster_name: No k3d clusters found. Create a cluster or export CLUSTER_NAME before deploying Jenkins."
+#          ;;
+#       1)
+#          printf '%s\n' "${clusters[0]}"
+#          return 0
+#          ;;
+#       *)
+#          _err "Multiple k3d clusters detected: ${clusters[*]}. Set CLUSTER_NAME to choose the target cluster before deploying Jenkins."
+#          ;;
+#    esac
+# }
 
 function _jenkins_node_has_mount() {
    local node="$1"
@@ -356,9 +356,9 @@ function _create_jenkins_pv_pvc() {
       mkdir -p "$JENKINS_HOME_PATH"
    fi
 
-   local cluster_name
-   if ! cluster_name=$(_jenkins_detect_cluster_name); then
-      _err "_create_jenkins_pv_pvc: Failed to detect k3d cluster name. Set CLUSTER_NAME or create a cluster before deploying Jenkins."
+   local cluster_name="$($CLUSTER_NAME:-_detect_cluster_name)"
+   if -z "$cluster_name"; then
+      _err "_create_jenkins_pv_pvc: Failed to detect cluster name. Set CLUSTER_NAME or create a cluster before deploying Jenkins."
    fi
 
    if ! _jenkins_require_hostpath_mounts "$cluster_name"; then
