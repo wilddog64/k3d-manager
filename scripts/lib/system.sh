@@ -859,6 +859,17 @@ function _failfast_off() {
   set +Eeuo pipefail
 }
 
+function _detect_cluster_name() {
+   # shellcheck disable=SC2155
+   local cluster_info="$(_kubectl --quiet -- get nodes -o name | tail -1)"
+
+   if [[ -z "$cluster_info" ]]; then
+      _err "Cannot detect cluster name: no nodes found"
+   fi
+   cluster_info="${cluster_info#*/}"
+   _info "Detected cluster name: $cluster_info"
+}
+
 # ---------- tiny log helpers (no parentheses, no single-quote apostrophes) ----------
 function _info() { printf 'INFO: %s\n' "$*" >&2; }
 function _warn() { printf 'WARN: %s\n' "$*" >&2; }
