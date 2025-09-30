@@ -462,9 +462,11 @@ function _ensure_jenkins_cert() {
 function _deploy_jenkins_image() {
    local ns="${1:-jenkins}"
 
+   # shellcheck disable=SC2155
    local jenkins_admin_sha="$(_bw_lookup_secret "jenkins-admin" "jenkins" | _sha256_12 )"
    local jenkins_admin_passwd_sha="$(_bw_lookup_secret "jenkins-admin-password" "jenkins" \
       | _sha256_12 )"
+   # shellcheck disable=SC2155
    local k3d_jenkins_admin_sha=$(_kubectl -n "$ns" get secret jenkins-admin -o jsonpath='{.data.username}' | base64 --decode | _sha256_12)
 
    if ! _is_same_token "$jenkins_admin_sha" "$k3d_jenkins_admin_sha"; then
