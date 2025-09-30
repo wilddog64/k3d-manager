@@ -221,7 +221,7 @@ function _install_k3s() {
             ;;
       esac
 
-      tmpfile="$(mktemp -t k3s-darwin-download.XXXXXX)"
+      tmpfile="$(mktemp -t k3s-download.XXXXXX)"
       dest="${K3S_INSTALL_DIR}/k3s"
 
       _info "Downloading k3s binary for macOS ($arch)"
