@@ -5,7 +5,7 @@ K3S_VARS="$SCRIPT_DIR/etc/k3s/vars.sh"
 if [[ ! -r "$K3S_VARS" ]]; then
    _err "k3s vars file not found: $K3S_VARS"
 fi
-source $K3S_VARS
+source "$K3S_VARS"
 
 function _provider_k3s_exec() {
    local pre=()
