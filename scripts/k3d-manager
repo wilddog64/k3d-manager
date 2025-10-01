@@ -38,6 +38,7 @@ SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 
 # load our library functions
+source "${SCRIPT_DIR}/lib/provider.sh"
 source "${SCRIPT_DIR}/lib/system.sh"
 source "${SCRIPT_DIR}/lib/cluster_provider.sh"
 source "${SCRIPT_DIR}/lib/test.sh"
