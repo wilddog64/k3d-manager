@@ -1,5 +1,6 @@
 controller:
   podAnnotations:
+    sidecar.istio.io/inject: "true"
     sidecar.istio.io/rewriteAppHTTPProbers: "true"
     proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
   image:
