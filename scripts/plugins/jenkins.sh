@@ -13,14 +13,14 @@ JENKINS_VARS_FILE="$JENKINS_CONFIG_DIR/vars.sh"
 if [[ ! -r "$JENKINS_VARS_FILE" ]]; then
    _err "Jenkins vars file not found: $JENKINS_VARS_FILE"
 fi
-# shellcheck disable=SC1090
-source "$JENKINS_VARS_FILE"
 
 declare -a _JENKINS_RENDERED_MANIFESTS=()
 _JENKINS_PREV_EXIT_TRAP_CMD=""
 _JENKINS_PREV_EXIT_TRAP_HANDLER=""
 _JENKINS_PREV_RETURN_TRAP_CMD=""
 _JENKINS_PREV_RETURN_TRAP_HANDLER=""
+JENKINS_MISSING_HOSTPATH_NODES=""
+JENKINS_MOUNT_CHECK_ERROR=""
 
 function _jenkins_capture_trap_state() {
    local signal="$1"
@@ -287,7 +287,6 @@ function _ensure_jenkins_cert() {
    trap '$(_cleanup_trap_command "$cert_file" "$key_file")' EXIT
 
    echo "$json" | jq -r '.data.certificate' > "$cert_file"
-   echo "$json" | jq -r '.data.ca_chain[]?' >> "$cert_file"
    echo "$json" | jq -r '.data.private_key' > "$key_file"
 
    _kubectl -n "$k8s_namespace" create secret tls "$secret_name" \
@@ -571,8 +570,6 @@ function _deploy_jenkins() {
       return "$rc"
    fi
 
-   JENKINS_NAMESPACE="${ns:-${JENKINS_NAMESPACE}}"
-   :"${JENKINS_NAMESPACE:?JENKINKS_NAMESPACE not set}"
    local vs_template="$JENKINS_CONFIG_DIR/virtualservice.yaml.tmpl"
    if [[ ! -r "$vs_template" ]]; then
       _err "VirtualService template file not found: $vs_template"
@@ -582,6 +579,8 @@ function _deploy_jenkins() {
    if [[ ! -r "$dr_template" ]]; then
       _err "DestinationRule template file not found: $dr_template"
    fi
+
+   export JENKINS_NAMESPACE="$ns"
 
    local vs_hosts_input="${JENKINS_VIRTUALSERVICE_HOSTS:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}}"
    local -a vs_hosts_lines=()
