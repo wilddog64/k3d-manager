@@ -1,3 +1,7 @@
+
+v1.0.0 / 2025-10-01
+==================
+
 # Changes - k3d-manager: dated 2024-06-26
 d509293 k3d-manager: release notes
 598c4e6 test: cover Jenkins VirtualService headers
