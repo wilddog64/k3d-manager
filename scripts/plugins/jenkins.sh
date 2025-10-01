@@ -8,6 +8,11 @@ fi
 command -v _no_trace >/dev/null 2>&1 || _no_trace() { "$@"; }
 
 JENKINS_CONFIG_DIR="$SCRIPT_DIR/etc/jenkins"
+JENKINS_VARS_FILE="$JENKINS_CONFIG_DIR/vars.sh"
+
+if [[ ! -r "$JENKINS_VARS_FILE" ]]; then
+   _err "Jenkins vars file not found: $JENKINS_VARS_FILE"
+fi
 
 declare -a _JENKINS_RENDERED_MANIFESTS=()
 _JENKINS_PREV_EXIT_TRAP_CMD=""
@@ -634,12 +639,6 @@ function _deploy_jenkins() {
       local rc=$?
       _jenkins_cleanup_and_return "$rc"
       return "$rc"
-   fi
-
-   local jenkins_vars_file="$JENKINS_CONFIG_DIR/jenkins-vars.sh"
-   if [[ -r "$jenkins_vars_file" ]]; then
-      # shellcheck disable=SC1090
-      source "$jenkins_vars_file"
    fi
 
    if [[ "${JENKINS_CERT_ROTATOR_ENABLED:-0}" == "1" ]]; then
