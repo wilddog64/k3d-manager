@@ -88,13 +88,13 @@ function config_bws_eso() {
   local ca_b64="$(_kubectl -n "$ns" get secret bitwarden-tls-certs -o jsonpath='{.data.tls\\.crt}')"
 
   # Render SecretStore from template and apply
-  local yamlfile="$(mktemp)"  # mktemp -t creates a file *and* returns a path; plain mktemp is fine here
+  local yamlfile="$(mktemp -t bws-eso-XXXXXX.yaml)"  # mktemp -t creates a file *and* returns a path; plain mktemp is fine here
   local bws_tmpl="${SCRIPT_DIR}/etc/bitwarden/bws-eso.yaml.tmpl"
-  trap '_cleanup_on_success "'"$yamlfile"'"' EXIT INT TERM  # avoid RETURN to prevent multiple triggers
+  trap '$(_cleanup_trap_command "$yamlfile")' EXIT INT TERM  # avoid RETURN to prevent multiple triggers
 
   if [[ ! -f "${bws_tmpl}" ]]; then
       echo "Template file ${bws_tmpl} not found!" >&2
-      exit -1
+      exit 127
   fi
   envsubst < "$bws_tmpl" > "$yamlfile"
 

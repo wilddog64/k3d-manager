@@ -2,8 +2,8 @@
 export VAULT_ENABLE_PKI="${VAULT_ENABLE_PKI:-1}"         # 1 to enable PKI bootstrap
 export VAULT_PKI_PATH="${VAULT_PKI_PATH:-pki}"           # mount path (e.g. pki or pki_int)
 export VAULT_PKI_ROLE="${VAULT_PKI_ROLE:-jenkins-tls}"   # role name to create/update
-export VAULT_PKI_CN="${VAULT_PKI_CN:-dev.local.me}"      # root CA CN (for root mode)
+export VAULT_PKI_CN="${VAULT_PKI_CN:-dev.k3d.internal}"      # root CA CN (for root mode)
 export VAULT_PKI_MAX_TTL="${VAULT_PKI_MAX_TTL:-87600h}"  # CA max TTL (10y)
 export VAULT_PKI_ROLE_TTL="${VAULT_PKI_ROLE_TTL:-720h}"  # leaf max TTL
-export VAULT_PKI_ALLOWED="${VAULT_PKI_ALLOWED:-}"        # comma list (e.g. jenkins.dev.local.me,*.svc)
+export VAULT_PKI_ALLOWED="${VAULT_PKI_ALLOWED:-}"        # comma list (e.g. jenkins.dev.k3d.internal,*.svc)
 export VAULT_PKI_ENFORCE_HOSTNAMES="${VAULT_PKI_ENFORCE_HOSTNAMES:-true}"  # true/false

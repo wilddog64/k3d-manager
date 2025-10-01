@@ -4,6 +4,9 @@ function init_test_env() {
   export SCRIPT_DIR="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
   export PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 
+  # shellcheck disable=SC1090
+  source "${SCRIPT_DIR}/lib/core.sh"
+
   KUBECTL_EXIT_CODES=()
   HELM_EXIT_CODES=()
   RUN_EXIT_CODES=()
@@ -22,6 +25,9 @@ function init_test_env() {
   stub_kubectl
   stub_helm
   stub_run_command
+
+  _systemd_available() { return 0; }
+  export -f _systemd_available
 }
 
 # Define kubectl stub that logs commands and uses scripted exit codes
@@ -97,12 +103,15 @@ function read_lines() {
   if (( BASH_VERSINFO[0] >= 4 )); then
     mapfile -t "$array_name" < "$file"
   else
-    local line i=0
+    local line i=0 quoted
     unset "$array_name"
+    [[ -r "$file" ]] || return 0
     while IFS= read -r line; do
-      # Use printf -v to safely append to the target array without eval
-      printf -v "$array_name[i++]" '%s' "$line"
+      printf -v quoted '%q' "$line"
+      eval "$array_name[$i]=$quoted"
+      (( i++ ))
     done < "$file"
+    return 0
   fi
 }
 

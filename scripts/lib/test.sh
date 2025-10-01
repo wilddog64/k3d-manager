@@ -178,12 +178,11 @@ EOF
     _kubectl rollout status deployment/nginx-test -n istio-test --timeout=120s
 
     # Verify that the Istio proxy has been injected
-    echo "Checking for Istio sidecar..."
-    if _kubectl get pod -n istio-test -l app=nginx-test -o jsonpath='{.items[0].spec.containers[*].name}' | grep -q istio-proxy; then
-        echo "Istio sidecar injection is working!"
+    _info "Checking for Istio sidecar..."
+    if _kubectl --no-exit get pod -n istio-test -o yaml | grep -q istio-proxy; then
+        _info "Istio sidecar injection is working!"
     else
-        echo "Istio sidecar was not injected! Check your Istio installation."
-        return 1
+        _err "Istio sidecar was not injected! Check your Istio installation."
     fi
 
     # Test direct access first (bypassing Istio)
@@ -235,49 +234,51 @@ spec:
 EOF
 
     # Verify Gateway creation
-    if _kubectl get gateway -n istio-test test-gateway; then
-        echo "Istio Gateway created successfully"
+    if _kubectl --no-exit get gateway -n istio-test test-gateway; then
+        _info "Istio Gateway created successfully"
     else
-        echo "Failed to create Istio Gateway"
-        return 1
+        _err "Failed to create Istio Gateway"
     fi
 
     # Verify VirtualService creation
-    if _kubectl get virtualservice -n istio-test test-vs; then
-        echo "Istio VirtualService created successfully"
+    if _kubectl --no-exit get virtualservice -n istio-test test-vs; then
+        _info "Istio VirtualService created successfully"
     else
-        echo "Failed to create Istio VirtualService"
-        return 1
+        _err "Failed to create Istio VirtualService"
     fi
 
     # Test through Istio gateway
-    echo "Testing through Istio gateway..."
+    _info "Testing through Istio gateway..."
     _kubectl port-forward -n istio-system svc/istio-ingressgateway 8085:80 &
     PF_PIDS+=($!)
     sleep 15
 
-    echo "Making request through Istio Gateway..."
+    _info "Making request through Istio Gateway..."
     if _curl -s localhost:8085 | grep -q "Welcome to nginx"; then
-        echo "Request through Istio Gateway successful!"
-        echo "ISTIO IS WORKING CORRECTLY!"
+        _info "Request through Istio Gateway successful!"
+        _info "ISTIO IS WORKING CORRECTLY!"
     else
-        echo "Failed to access through Istio Gateway"
-        echo "Detailed response:"
-        return 1
+        _err "Failed to access through Istio Gateway"
     fi
 
-    echo "For a more complete test, you could try accessing the Istio ingress gateway's external IP:"
+    _info "For a more complete test, you could try accessing the Istio ingress gateway's external IP:"
     _kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-    echo ""
     trap '_cleanup_istio_test_namespace' EXIT TERM
 }
 
 function _cleanup_istio_test_namespace() {
 
-    echo "Cleaning up Istio test namespace..."
-    echo "warning: port forwarding will not remove if process failed"
+    _info "Cleaning up Istio test namespace..."
+    _info "warning: port forwarding will not remove if process failed"
     for pid in "${PF_PIDS[@]}"; do
-       kill "$pid" 2>/dev/null || true
+       _info "killing $pid"
+       _run_command -- kill "$pid"
+       if _run_command --no-exit --quiet -- ps aux | grep '[k]ubectl'; then
+          _run_command ps aux | \
+             grep -E '[k]ubectl' | \
+             awk '{print $2}' | \
+             xargs kill
+       fi
     done
     _kubectl delete namespace istio-test --ignore-not-found
 }
@@ -293,16 +294,15 @@ function _wait_for_port_forward() {
         sleep "$interval"
         elapsed=$((elapsed + interval))
         if (( elapsed >= timeout )); then
-            echo "Port-forward to Jenkins did not become ready" >&2
             kill "$pid" 2>/dev/null || true
-            return 1
+            _err "Port-forward to Jenkins did not become ready" >&2
         fi
     done
 }
 
 
 function test_jenkins() {
-    echo "Testing Jenkins deployment..."
+    _info "Testing Jenkins deployment..."
     JENKINS_NS_GENERATED=0
     if [[ -z "${JENKINS_NS:-}" ]]; then
         JENKINS_NS="jenkins-test-$(date +%s)-$RANDOM"
@@ -363,7 +363,7 @@ function test_jenkins() {
         vault_release="vault"
     fi
     local vault_pod="${vault_release}-0"
-    local AUTH_FILE="$(mktemp)"
+    local AUTH_FILE="$(mktemp -t jenkins-auth.XXXXXX)"
     local pf_pid
     local jenkins_statefulset="statefulset/jenkins"
     local curl_max_time="${CURL_MAX_TIME:-30}"
@@ -380,8 +380,8 @@ function test_jenkins() {
     fi
 
     if ! declare -F deploy_jenkins >/dev/null || ! declare -F _wait_for_jenkins_ready >/dev/null; then
-        echo "Required Jenkins helpers (deploy_jenkins/_wait_for_jenkins_ready) are unavailable." >&2
-        echo "Ensure scripts/plugins/jenkins.sh is sourced before running test_jenkins." >&2
+        _info "Required Jenkins helpers (deploy_jenkins/_wait_for_jenkins_ready) are unavailable." >&2
+        _info "Ensure scripts/plugins/jenkins.sh is sourced before running test_jenkins." >&2
         return 1
     fi
 
@@ -402,75 +402,89 @@ function test_jenkins() {
         if deploy_jenkins "$JENKINS_NS" "$VAULT_NS" "$vault_release"; then
             if ! _kubectl --no-exit -n "$JENKINS_NS" \
                get "$jenkins_statefulset" >/dev/null 2>&1; then
-                echo "Jenkins statefulset not found in namespace '$JENKINS_NS' after deployment." >&2
-                return 1
+                _err "Jenkins statefulset not found in namespace '$JENKINS_NS' after deployment." >&2
             fi
             _wait_for_jenkins_ready "${wait_for_ready_args[@]}"
         else
-            echo "Failed to deploy Jenkins in namespace '$JENKINS_NS'." >&2
-            return 1
+            _err "Failed to deploy Jenkins in namespace '$JENKINS_NS'." >&2
         fi
 
         if ! _kubectl --no-exit -n "$JENKINS_NS" \
            get "$jenkins_statefulset" >/dev/null 2>&1; then
-            echo "Jenkins statefulset not found in existing namespace '$JENKINS_NS'; attempting redeploy." >&2
+            _err "Jenkins statefulset not found in existing namespace '$JENKINS_NS'; attempting redeploy." >&2
         fi
     fi
 
     if deploy_jenkins "$JENKINS_NS" "$VAULT_NS" "$vault_release"; then
         if ! _kubectl --no-exit -n "$JENKINS_NS" get "$jenkins_statefulset" >/dev/null 2>&1; then
-            echo "Jenkins statefulset not found in namespace '$JENKINS_NS' after deployment." >&2
-            return 1
+            _err "Jenkins statefulset not found in namespace '$JENKINS_NS' after deployment." >&2
         fi
         _wait_for_jenkins_ready "${wait_for_ready_args[@]}"
     else
-        echo "Failed to deploy Jenkins in namespace '$JENKINS_NS'." >&2
-        return 1
+        _err "Failed to deploy Jenkins in namespace '$JENKINS_NS'." >&2
     fi
     # Verify the Jenkins pod mounts the expected PVC
     local pvc
     pvc=$(_kubectl get pod jenkins-0 -n "$JENKINS_NS" -o jsonpath='{..persistentVolumeClaim.claimName}')
-    if [[ "$pvc" != "jenkins-home" ]]; then
-        echo "Unexpected PVC: $pvc" >&2
-        return 1
+
+    if [[ -z "$pvc" ]]; then
+        _err "Unable to determine Jenkins PVC claim" >&2
+    fi
+
+    local -a acceptable_pvcs
+    if [[ -n "${JENKINS_EXPECTED_PVC:-}" ]]; then
+        acceptable_pvcs=("$JENKINS_EXPECTED_PVC")
+    else
+        acceptable_pvcs=("jenkins-home" "jenkins")
+    fi
+
+    local matched=0
+    local claim expected
+    for claim in $pvc; do
+        for expected in "${acceptable_pvcs[@]}"; do
+            if [[ -n "$expected" && "$claim" == "$expected" ]]; then
+                matched=1
+                break 2
+            fi
+        done
+    done
+
+    if (( ! matched )); then
+        _err "Unexpected PVC: $pvc" >&2
     fi
 
     # Ensure Istio routing resources exist
     if ! _kubectl --no-exit get gateway jenkins-gw -n istio-system >/dev/null 2>&1; then
-        echo "Jenkins Istio Gateway 'jenkins-gw' not found in namespace 'istio-system'." >&2
-        return 1
+        _err "Jenkins Istio Gateway 'jenkins-gw' not found in namespace 'istio-system'." >&2
     fi
 
     if ! _kubectl --no-exit get virtualservice jenkins -n "$JENKINS_NS" >/dev/null 2>&1; then
-        echo "Jenkins VirtualService 'jenkins' not found in namespace '$JENKINS_NS'." >&2
-        return 1
+        _err "Jenkins VirtualService 'jenkins' not found in namespace '$JENKINS_NS'." >&2
     fi
 
     if ! _kubectl --no-exit get destinationrule jenkins -n "$JENKINS_NS" >/dev/null 2>&1; then
-        echo "Jenkins DestinationRule 'jenkins' not found in namespace '$JENKINS_NS'." >&2
-        return 1
+        _err "Jenkins DestinationRule 'jenkins' not found in namespace '$JENKINS_NS'." >&2
     fi
 
-    _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 >/tmp/jenkins-test-pf.log 2>&1 &
+    _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 8443:8443 >/tmp/jenkins-test-pf.log 2>&1 &
     pf_pid=$!
     PF_PIDS+=("$pf_pid")
     if ! _wait_for_port_forward "$pf_pid"; then
          return 1
     fi
 
+    local tls_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.k3d.internal}"
     # Confirm TLS termination and fetch the Jenkins landing page
     if ! CURL_MAX_TIME="$curl_max_time" \
-       _curl --insecure -v --resolve jenkins.dev.local.me:8443:127.0.0.1 \
-        https://jenkins.dev.local.me:8443/ 2>&1 | grep -q 'subject: CN=jenkins.dev.local.me'; then
-        echo "TLS certificate not issued by Vault" >&2
-        return 1
+       _curl --insecure -v --resolve "${tls_host}:8443:127.0.0.1" \
+        "https://${tls_host}:8443/" 2>&1 | grep -q "subject: CN=${tls_host}"; then
+        _err "TLS certificate not issued by Vault" >&2
     fi
 
     if ! CURL_MAX_TIME="$curl_max_time" \
-       _curl --insecure --resolve jenkins.dev.local.me:8443:127.0.0.1 \
-        https://jenkins.dev.local.me:8443/login | grep -q Jenkins; then
-        echo "Unable to reach Jenkins landing page" >&2
-        return 1
+       _curl --insecure --resolve "${tls_host}:8443:127.0.0.1" \
+        "https://${tls_host}:8443/login" | grep -q Jenkins; then
+        _err "Unable to reach Jenkins landing page" >&2
     fi
 
     # Verify required Vault policies are installed
@@ -479,33 +493,24 @@ function test_jenkins() {
     if ! echo "$policies" | grep -q jenkins-admin || \
        ! echo "$policies" | grep -q jenkins-jcasc-read || \
        ! echo "$policies" | grep -q jenkins-jcasc-write; then
-        echo "Required Vault policies missing" >&2
-        return 1
+        _err "Required Vault policies missing" >&2
     fi
 
     # Authenticate to Jenkins using the admin secret
-    _kubectl -n "$JENKINS_NS" port-forward svc/jenkins 8080:8080 &
-    pf_pid=$!
-    PF_PIDS+=("$pf_pid")
-    if ! _wait_for_port_forward "$pf_pid"; then
-        return 1
-    fi
-
     local admin_user admin_pass auth_status
     admin_user=$(_kubectl -n "$JENKINS_NS" get secret jenkins-admin -o jsonpath='{.data.username}' | base64 -d)
     admin_pass=$(_kubectl -n "$JENKINS_NS" get secret jenkins-admin -o jsonpath='{.data.password}' | base64 -d)
     auth_status=$(CURL_MAX_TIME="$curl_max_time" \
        _curl -u "$admin_user:$admin_pass" -s -o "$AUTH_FILE" -w '%{http_code}' http://127.0.0.1:8080/whoAmI/api/json)
     if [[ "$auth_status" != "200" ]] || ! grep -q '"authenticated":true' "$AUTH_FILE"; then
-        echo "Jenkins authentication failed" >&2
-        return 1
+        _err "Jenkins authentication failed" >&2
     fi
 }
 
 function _cleanup_jenkins_test() {
-    echo "Cleaning up Jenkins test resources..."
+    _info "Cleaning up Jenkins test resources..."
     for pid in "${PF_PIDS[@]}"; do
-        kill "$pid" 2>/dev/null || true
+        _run_commnd -- kill "$pid" 2>/dev/null || true
     done
     local namespace_to_delete="${CREATED_JENKINS_NS:-$JENKINS_NS}"
     if [[ -n "$namespace_to_delete" && ( "${JENKINS_NS_GENERATED:-0}" -eq 1 || "${CREATED_JENKINS:-0}" -eq 1 ) ]]; then
@@ -527,23 +532,23 @@ function _cleanup_jenkins_test() {
 }
 
 function test_nfs_connectivity() {
-  echo "Testing basic connectivity to NFS server..."
+  _info "Testing basic connectivity to NFS server..."
 
   # Create a pod with networking tools
   _kubectl run nfs-connectivity-test --image=nicolaka/netshoot --rm -it --restart=Never -- bash -c "
-    echo 'Attempting to reach NFS port on host...'
+    _info 'Attempting to reach NFS port on host...'
     nc -zv host.k3d.internal 2049
-    echo 'DNS lookup for host...'
+    _info 'DNS lookup for host...'
     nslookup host.k3d.internal
-    echo 'Tracing route to host...'
+    _info 'Tracing route to host...'
     traceroute host.k3d.internal
-    echo 'Testing rpcinfo...'
-    rpcinfo -p host.k3d.internal 2>/dev/null || echo 'RPC failed'
+    _info 'Testing rpcinfo...'
+    rpcinfo -p host.k3d.internal 2>/dev/null || _err 'RPC failed'
   "
 }
 
 function test_eso() {
-  echo "Testing External Secrets Operator with Vault..."
+  _info "Testing External Secrets Operator with Vault..."
 
   local vault_ns="vault"
   local vault_release="${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}"
@@ -560,7 +565,7 @@ function test_eso() {
 
   if ! _kubectl --no-exit get ns "$vault_ns" >/dev/null 2>&1 || \
      ! _kubectl --no-exit -n "$vault_ns" get secret vault-root >/dev/null 2>&1; then
-    echo "Vault not detected; deploying..."
+    _info "Vault not detected; deploying..."
     "${SCRIPT_DIR}/k3d-manager" deploy_vault ha "$vault_ns" "$vault_release"
     vault_started=1
   fi
@@ -569,11 +574,11 @@ function test_eso() {
 
   trap "_cleanup_eso_test '$vault_ns' '$vault_release' '$vault_secret_path' '$root_token' '$es_ns' '$es_name' '$store_name' '$vault_started'" EXIT TERM
 
-  echo "Creating secret in Vault..."
+  _info "Creating secret in Vault..."
   _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
     sh -c "VAULT_TOKEN='$root_token' vault kv put secret/$vault_secret_path $secret_key='$secret_val'"
 
-  echo "Creating ClusterSecretStore..."
+  _info "Creating ClusterSecretStore..."
   cat <<EOF | _kubectl apply -f -
 apiVersion: external-secrets.io/v1beta1
 kind: ClusterSecretStore
@@ -593,7 +598,7 @@ spec:
         insecureSkipVerify: true
 EOF
 
-  echo "Creating ExternalSecret..."
+  _info "Creating ExternalSecret..."
   cat <<EOF | _kubectl apply -f -
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -614,20 +619,19 @@ spec:
       property: ${secret_key}
 EOF
 
-  echo "Waiting for ExternalSecret to be synced..."
+  _info "Waiting for ExternalSecret to be synced..."
   _kubectl -n "$es_ns" wait --for=condition=Ready externalsecret/${es_name} --timeout=120s
 
   local synced
   synced=$(_kubectl -n "$es_ns" get secret "$es_name" -o jsonpath='{.data.${secret_key}}' | base64 -d)
 
   if [[ "$synced" == "$secret_val" ]]; then
-    echo "ESO synced secret successfully."
+    _info "ESO synced secret successfully."
   else
-    echo "Secret value mismatch: expected '$secret_val', got '$synced'"
-    return 1
+    _err "Secret value mismatch: expected '$secret_val', got '$synced'"
   fi
 
-  echo "ESO test completed successfully."
+  _info "ESO test completed successfully."
 }
 
 function _cleanup_eso_test() {
@@ -654,7 +658,7 @@ function _cleanup_eso_test() {
 }
 
 function test_vault() {
-  echo "Testing Vault deployment and Kubernetes auth..."
+  _info "Testing Vault deployment and Kubernetes auth..."
   local vault_ns="vault"
   local vault_release="${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}"
   local vault_pod="${vault_release}-0"
@@ -710,7 +714,7 @@ POD
   local secret
   secret=$(_kubectl -n "$test_ns" exec vault-read -- cat /tmp/secret)
   if [[ "$secret" != "success" ]]; then
-    echo "Failed to read secret via pod"
+    _info "Failed to read secret via pod"
     return 1
   fi
 
@@ -724,11 +728,10 @@ POD
   value=$(_kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
     sh -c "VAULT_TOKEN=$vault_token vault kv get -field=message secret/eso/test")
   if [[ "$value" != "success" ]]; then
-    echo "Kubernetes auth token exchange failed"
-    return 1
+    _err "Kubernetes auth token exchange failed"
   fi
 
-  echo "Vault test succeeded"
+  _info "Vault test succeeded"
 }
 
 function _cleanup_vault_test() {

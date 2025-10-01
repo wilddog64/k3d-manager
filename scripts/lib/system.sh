@@ -2,6 +2,92 @@ function _command_exist() {
     command -v "$1" &> /dev/null
 }
 
+__CLUSTER_PROVIDER_MODULES_LOADED=""
+
+function _default_cluster_provider() {
+    if _is_mac 2>/dev/null; then
+        echo "k3d"
+        return 0
+    fi
+
+    if [[ -n "${DEFAULT_CLUSTER_PROVIDER:-}" ]]; then
+        echo "$DEFAULT_CLUSTER_PROVIDER"
+        return 0
+    fi
+
+    echo "k3d"
+}
+
+function _cluster_provider_module_path() {
+    local provider="$1"
+    echo "${SCRIPT_DIR}/lib/providers/${provider}.sh"
+}
+
+function _cluster_provider_module_loaded() {
+    local provider="$1"
+    [[ ":${__CLUSTER_PROVIDER_MODULES_LOADED}:" == *":${provider}:"* ]]
+}
+
+function _cluster_provider_mark_loaded() {
+    local provider="$1"
+    if [[ -z "${__CLUSTER_PROVIDER_MODULES_LOADED}" ]]; then
+        __CLUSTER_PROVIDER_MODULES_LOADED="$provider"
+    else
+        __CLUSTER_PROVIDER_MODULES_LOADED+=":${provider}"
+    fi
+}
+
+function _ensure_cluster_provider() {
+    local provider="${CLUSTER_PROVIDER:-}"
+
+    if [[ -z "$provider" && -n "${K3D_MANAGER_CLUSTER_PROVIDER:-}" ]]; then
+        provider="$K3D_MANAGER_CLUSTER_PROVIDER"
+    fi
+
+    if [[ -z "$provider" ]]; then
+        provider="$(_default_cluster_provider)"
+    fi
+
+    if [[ -z "$provider" ]]; then
+        echo "No cluster provider configured. Set CLUSTER_PROVIDER to continue." >&2
+        exit 1
+    fi
+
+    export CLUSTER_PROVIDER="$provider"
+
+    if _cluster_provider_module_loaded "$provider"; then
+        return 0
+    fi
+
+    local module
+    module="$(_cluster_provider_module_path "$provider")"
+
+    if [[ ! -r "$module" ]]; then
+        echo "Cluster provider module not found: $provider" >&2
+        exit 1
+    fi
+
+    # shellcheck source=/dev/null
+    source "$module"
+    _cluster_provider_mark_loaded "$provider"
+}
+
+function _cluster_provider_call() {
+    local action="$1"
+    shift
+
+    _ensure_cluster_provider
+
+    local provider="$CLUSTER_PROVIDER"
+    local func="_provider_${provider}_${action}"
+
+    if ! declare -f "$func" >/dev/null 2>&1; then
+        _err "Cluster provider '$provider' does not implement action '$action'"
+    fi
+
+    "$func" "$@"
+}
+
 # _run_command [--quiet] [--prefer-sudo|--require-sudo] [--probe '<subcmd>'] -- <prog> [args...]
 # - --quiet         : suppress wrapper error message (still returns real exit code)
 # - --prefer-sudo   : use sudo -n if available, otherwise run as user
@@ -317,9 +403,13 @@ function _install_debian_docker() {
   _run_command -- sudo apt-get update
   # Install Docker
   _run_command -- sudo apt-get install -y docker-ce docker-ce-cli containerd.io
-  # Start and enable Docker
-  _run_command -- sudo systemctl start docker
-  _run_command -- sudo systemctl enable docker
+  # Start and enable Docker when systemd is available
+  if _systemd_available ; then
+     _run_command -- sudo systemctl start docker
+     _run_command -- sudo systemctl enable docker
+  else
+     _warn "systemd not available; skipping docker service activation"
+  fi
   # Add current user to docker group
   _run_command -- sudo usermod -aG docker $USER
   echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
@@ -334,36 +424,32 @@ function _install_redhat_docker() {
      --from-repofile https://download.docker.com/linux/fedora/docker-ce.repo
   # Install Docker
   _run_command -- sudo dnf install -y docker-ce docker-ce-cli containerd.io
-  # Start and enable Docker
-  _run_command  -- sudo systemctl start docker
-  _run_command  -- sudo systemctl enable docker
+  # Start and enable Docker when systemd is available
+  if _systemd_available ; then
+     _run_command  -- sudo systemctl start docker
+     _run_command  -- sudo systemctl enable docker
+  else
+     _warn "systemd not available; skipping docker service activation"
+  fi
   # Add current user to docker group
   _run_command  -- sudo usermod -aG docker "$USER"
   echo "Docker instsudo alled successfully. You may need to log out and back in for group changes to take effect."
 }
 
 function _k3d_cluster_exist() {
-   local cluster_name=$1
+   _cluster_provider_call cluster_exists "$@"
+}
 
-   if _run_command --no-exit -- k3d cluster list "$cluster_name" >/dev/null 2>&1 ; then
-      return 0
-   else
-      return 1
-   fi
+function __create_cluster() {
+   _cluster_provider_call apply_cluster_config "$@"
 }
 
 function __create_k3d_cluster() {
-   cluster_yaml=$1
-
-   if _is_mac ; then
-     _run_command --quiet -- k3d cluster create --config "${cluster_yaml}"
-   elif _is_linux ; then
-     _run_command k3d cluster create --config "${cluster_yaml}"
-   fi
+   __create_cluster "$@"
 }
 
 function _list_k3d_cluster() {
-   _run_command --quiet -- k3d cluster list
+   _cluster_provider_call list_clusters "$@"
 }
 
 function _kubectl() {
@@ -457,17 +543,7 @@ function _ip() {
 }
 
 function _k3d() {
-   local pre=()
-   while [[ $# -gt 0 ]]; do
-      case "$1" in
-         --quiet|--prefer-sudo|--require-sudo|--no-exit) pre+=("$1");
-            shift;;
-         --) shift;
-            break;;
-         *)  break;;
-      esac
-   done
-   _run_command "${pre[@]}" -- k3d "$@"
+   _cluster_provider_call exec "$@"
 }
 
 function _load_plugin_function() {
@@ -550,29 +626,182 @@ function _is_same_token() {
    fi
 }
 
-function _ensure_bats() {
-   if _command_exist bats ; then
+function _version_ge() {
+   local lhs_str="$1"
+   local rhs_str="$2"
+   local IFS=.
+   local -a lhs rhs
+
+   read -r -a lhs <<< "$lhs_str"
+   read -r -a rhs <<< "$rhs_str"
+
+   local len=${#lhs[@]}
+   if (( ${#rhs[@]} > len )); then
+      len=${#rhs[@]}
+   fi
+
+   for ((i=0; i<len; ++i)); do
+      local l=${lhs[i]:-0}
+      local r=${rhs[i]:-0}
+      if ((10#$l > 10#$r)); then
+         return 0
+      elif ((10#$l < 10#$r)); then
+         return 1
+      fi
+   done
+
+   return 0
+}
+
+function _bats_version() {
+   if ! _command_exist bats ; then
+      return 1
+   fi
+
+   local version
+   version="$(bats --version 2>/dev/null | awk '{print $2}')"
+   if [[ -n "$version" ]]; then
+      printf '%s\n' "$version"
       return 0
    fi
 
-   if _command_exist brew ; then
-      _run_command -- brew install bats-core
-   elif _command_exist apt-get ; then
-      _run_command -- sudo apt-get update
-      _run_command -- sudo apt-get install -y bats
-   elif _command_exist dnf ; then
-      _run_command -- sudo dnf install -y bats
-   elif _command_exist yum ; then
-      _run_command -- sudo yum install -y bats
-   elif _command_exist microdnf ; then
-      _run_command -- sudo microdnf install -y bats
-   else
-      echo "Cannot install bats: no known package manager found" >&2
-      exit 127
+   return 1
+}
+
+function _bats_meets_requirement() {
+   local required="$1"
+   local current
+
+   current="$(_bats_version 2>/dev/null)" || return 1
+   if [[ -z "$current" ]]; then
+      return 1
    fi
 
-   command -v bats >/dev/null 2>&1
+   _version_ge "$current" "$required"
 }
+
+function _sudo_available() {
+   if ! command -v sudo >/dev/null 2>&1; then
+      return 1
+   fi
+
+   sudo -n true >/dev/null 2>&1
+}
+
+function _systemd_available() {
+   if ! command -v systemctl >/dev/null 2>&1; then
+      return 1
+   fi
+
+   if [[ -d /run/systemd/system ]]; then
+      return 0
+   fi
+
+   local init_comm
+   init_comm="$(ps -p 1 -o comm= 2>/dev/null || true)"
+   init_comm="${init_comm//[[:space:]]/}"
+   [[ "$init_comm" == systemd ]]
+}
+
+function _install_bats_from_source() {
+   local version="${1:-1.10.0}"
+   local url="https://github.com/bats-core/bats-core/releases/download/v${version}/bats-core-${version}.tar.gz"
+   local tmp_dir
+
+   tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t bats-core)"
+   if [[ -z "$tmp_dir" ]]; then
+      echo "Failed to create temporary directory for bats install" >&2
+      return 1
+   fi
+
+   if ! _command_exist curl || ! _command_exist tar ; then
+      echo "Cannot install bats from source: curl and tar are required" >&2
+      rm -rf "$tmp_dir"
+      return 1
+   fi
+
+   echo "Installing bats ${version} from source..." >&2
+   if ! _run_command -- curl -fsSL "$url" -o "${tmp_dir}/bats-core.tar.gz"; then
+      rm -rf "$tmp_dir"
+      return 1
+   fi
+
+   if ! tar -xzf "${tmp_dir}/bats-core.tar.gz" -C "$tmp_dir"; then
+      rm -rf "$tmp_dir"
+      return 1
+   fi
+
+   local src_dir="${tmp_dir}/bats-core-${version}"
+   if [[ ! -d "$src_dir" ]]; then
+      rm -rf "$tmp_dir"
+      return 1
+   fi
+
+   local prefix="${HOME}/.local"
+   mkdir -p "$prefix"
+
+   if _run_command -- bash "$src_dir/install.sh" "$prefix"; then
+      rm -rf "$tmp_dir"
+      return 0
+   fi
+
+   if _sudo_available; then
+      if _run_command --prefer-sudo -- bash "$src_dir/install.sh" /usr/local; then
+         rm -rf "$tmp_dir"
+         return 0
+      fi
+   fi
+
+   echo "Cannot install bats: write access to ${prefix} or sudo is required" >&2
+   rm -rf "$tmp_dir"
+   return 1
+}
+
+function _ensure_bats() {
+   local required="1.5.0"
+
+   if _bats_meets_requirement "$required"; then
+      return 0
+   fi
+
+   local pkg_attempted=0
+
+   if _command_exist brew ; then
+      _run_command -- brew install bats-core
+      pkg_attempted=1
+   elif _command_exist apt-get && _sudo_available; then
+      _run_command --prefer-sudo -- apt-get update
+      _run_command --prefer-sudo -- apt-get install -y bats
+      pkg_attempted=1
+   elif _command_exist dnf && _sudo_available; then
+      _run_command --prefer-sudo -- dnf install -y bats
+      pkg_attempted=1
+   elif _command_exist yum && _sudo_available; then
+      _run_command --prefer-sudo -- yum install -y bats
+      pkg_attempted=1
+   elif _command_exist microdnf && _sudo_available; then
+      _run_command --prefer-sudo -- microdnf install -y bats
+      pkg_attempted=1
+   fi
+
+   if _bats_meets_requirement "$required"; then
+      return 0
+   fi
+
+   local target_version="${BATS_PREFERRED_VERSION:-1.10.0}"
+   if _install_bats_from_source "$target_version" && _bats_meets_requirement "$required"; then
+      return 0
+   fi
+
+   if (( pkg_attempted == 0 )); then
+      echo "Cannot install bats >= ${required}: no suitable package manager or sudo access available." >&2
+   else
+      echo "Cannot install bats >= ${required}. Please install it manually." >&2
+   fi
+
+   exit 127
+}
+
 
 function _ensure_cargo() {
    if _command_exist cargo ; then
@@ -628,6 +857,24 @@ function _failfast_on() {
 function _failfast_off() {
   trap - ERR
   set +Eeuo pipefail
+}
+
+function _detect_cluster_name() {
+   # shellcheck disable=SC2155
+   local cluster_info="$(_kubectl --quiet -- get nodes | tail -1)"
+
+   if [[ -z "$cluster_info" ]]; then
+      _err "Cannot detect cluster name: no nodes found"
+   fi
+   local cluster_ready=$(echo "$cluster_info" | awk '{print $2}')
+   local cluster_name=$(echo "$cluster_info" | awk '{print $1}')
+
+   if [[ "$cluster_ready" != "Ready" ]]; then
+      _err "Cluster node is not ready: $cluster_info"
+   fi
+   _info "Detected cluster name: $cluster_name"
+
+   printf '%s' "$cluster_name"
 }
 
 # ---------- tiny log helpers (no parentheses, no single-quote apostrophes) ----------

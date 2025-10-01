@@ -132,7 +132,7 @@ _kubectl() {
     return 0
   elif [[ "$cmd" == get\ destinationrule\ jenkins\ -n\ * ]]; then
     return 0
-  elif [[ "$cmd" == "-n jenkins port-forward svc/jenkins 8080:8080" ]]; then
+  elif [[ "$cmd" == "-n jenkins port-forward svc/jenkins 8080:8080 8443:8443" ]]; then
     sleep 0.01
     return 0
   elif [[ "$cmd" == "-n ${expected_vault_ns} exec ${expected_pod} -- vault policy list" ]]; then
@@ -183,12 +183,13 @@ _curl() {
     return 0
   fi
 
-  if [[ "$url" == "https://jenkins.dev.local.me:8443/" ]]; then
-    printf '%s' 'subject: CN=jenkins.dev.local.me'
+  local leaf_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.k3d.internal}"
+  if [[ "$url" == "https://${leaf_host}:8443/" ]]; then
+    printf '%s' "subject: CN=${leaf_host}"
     return 0
   fi
 
-  if [[ "$url" == "https://jenkins.dev.local.me:8443/login" ]]; then
+  if [[ "$url" == "https://${leaf_host}:8443/login" ]]; then
     printf '%s' 'Jenkins'
     return 0
   fi
@@ -201,7 +202,11 @@ SCRIPT
 
   chmod +x "$script"
 
-  run env PROJECT_ROOT="$PROJECT_ROOT" CLEANUP_LOG="$cleanup_log" AUTH_PATH_LOG="$auth_path_log" DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" "$script"
+  run env PROJECT_ROOT="$PROJECT_ROOT" \
+    JENKINS_VALUES_FILE="$PROJECT_ROOT/scripts/etc/jenkins/values-test.yaml" \
+    CLEANUP_LOG="$cleanup_log" AUTH_PATH_LOG="$auth_path_log" \
+    DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
+    "$script"
   [ "$status" -eq 0 ]
 
   [ -f "$cleanup_log" ]

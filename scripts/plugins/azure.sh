@@ -81,8 +81,8 @@ function _create_azure_eso_store() {
    local ns="${NS:-azure-external-secrets}"
 
    # shellcheck disable=SC2155
-   local yamlfile="$(mktemp -t)"
-   trap '_cleanup_on_success "'"$yamlfile"'"' EXIT INT TERM
+   local yamlfile="$(mktemp -t azure-eso-ks.XXXXXX.yaml)"
+   trap '$(_cleanup_trap_command "$yamlfile")' EXIT INT TERM
 
    azure_config_template="${SCRIPT_DIR}/etc/azure/azure-eso.yaml.tmpl"
    if [[ ! -f "${azure_config_template}" ]]; then
@@ -166,8 +166,8 @@ function _apply_clustersecretstore() {
    local ns="${NS:-external-secrets}"
 
    # shellcheck disable=SC2155
-   local yamlfile="$(mktemp -t)"
-   trap '_cleanup_on_success "'"$yamlfile"'"' EXIT INT TERM
+   local yamlfile="$(mktemp -t azure-clusters-secret-store-.XXXXXX.yaml)"
+   trap '$(_cleanup_trap_command "$yamlfile")' EXIT INT TERM
    local yamltempl="${SCRIPT_DIR}/etc/azure/azure-eso.yaml.tmpl"
    if [[ ! -f "${yamltempl}" ]]; then
       echo "Azure eso template file ${yamltempl} not found!" >&2

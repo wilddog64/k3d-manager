@@ -18,6 +18,14 @@ fi
 # shellcheck disable=SC1090
 source "$ESO_PLUGIN"
 
+VAULT_PKI_HELPERS="$SCRIPT_DIR/lib/vault_pki.sh"
+if [[ -f "$VAULT_PKI_HELPERS" ]]; then
+   # shellcheck disable=SC1090
+   source "$VAULT_PKI_HELPERS"
+else
+   _warn "[vault] missing optional helper file: $VAULT_PKI_LIB" >&2
+fi
+
 command -v _info >/dev/null 2>&1 || _info() { printf '%s\n' "$*" >&2; }
 command -v _warn >/dev/null 2>&1 || _warn() { printf '%s\n' "$*" >&2; }
 
@@ -34,10 +42,36 @@ function _vault_repo_setup() {
    _helm repo update >/dev/null 2>&1
 }
 
+function _mount_vault_immediate_sc() {
+   local sc="${1:-local-path-immediate}"
+
+   if _kubectl --no-exit get sc "$sc" >/dev/null 2>&1 ; then
+      local mode=$(_kubectl --no-exit get sc "$sc" -o jsonpath='{.volumeBinding.mode}' 2>/dev/null)
+      local prov=$(_kubectl --no-exit get sc "$sc" -o jsonpath='{.provisioner}' 2>/dev/null)
+      if [[ "$mode" == "Immediate" ]] && [[ "$prov" == "rancher.io/local-path"  ]]; then
+         if ! _kubectl --no-exit get sc local-path-immediate >/dev/null 2>&1; then
+            cat <<YAML | _kubectl apply -f -
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: "$sc"
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+provisioner: rancher.io/local-path
+volumeBindingMode: Immediate
+reclaimPolicy: Reclaim
+allowVolumeExpansion: true
+YAML
+         fi
+         sc="local-path-immediate"
+      fi
+   fi
+}
+
 function _deploy_vault_ha() {
    local ns="${1:-$VAULT_NS_DEFAULT}"
    local release="${2:-$VAULT_RELEASE_DEFAULT}"
-   local f="$(mktemp -t)"
+   local f="$(mktemp -t vault-ha-vaules.XXXXXX.yaml)"
 
    sc="${VAULT_SC:-local-path}"
    cat >"$f" <<YAML
@@ -56,11 +90,11 @@ injector:
 csi:
   enabled: false
 YAML
-
+   _mount_vault_immediate_sc "$sc"
    args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$f")
    [[ -n "$version" ]] && args+=("--version" "$version")
    _helm "${args[@]}"
-   trap '_cleanup_on_success "$f"' EXIT TERM
+   trap '$(_cleanup_trap_command "$f")' EXIT TERM
 }
 
 function deploy_vault() {
@@ -135,9 +169,9 @@ function _vault_bootstrap_ha() {
       return 0
   fi
 
-  local jsonfile="$(mktemp -t)";
-  trap '_cleanup_on_success "$jsonfile"' EXIT TERM
-  _kubectl wait -n "$ns" --for=condition=Podscheduled pod/"$leader" --timeout=120s
+  local jsonfile="$(mktemp -t vault-init.XXXXXX.json)";
+  trap '$(_cleanup_trap_command "$jsonfile")' EXIT TERM
+  _kubectl wait -n "$ns" --for=condition=PodScheduled pod/"$leader" --timeout=120s
   local vault_state=$(_kubectl --no-exit -n "$ns" get pod "$leader" -o jsonpath='{.status.phase}')
   end_time=$((SECONDS + 120))
   current_time=$SECONDS
@@ -238,16 +272,22 @@ function _is_vault_health() {
 }
 
 function _vault_exec() {
-   local ns="${1:-$VAULT_NS_DEFAULT}" cmd="${2:-sh}" release="${3:-$VAULT_RELEASE_DEFAULT}"
-   local pod="${release}-0"
+
+  local kflags=()
+  while [[ "${1:-}" == "--no-exit" ]]  || \
+     [[ "${1:-}" == "--prefer-sudo" ]] || \
+     [[ "${1:-}" == "--require-sudo" ]]; do
+     kflags+=("$1")
+     shift
+  done
+
+  local ns="${1:-$VAULT_NS_DEFAULT}" cmd="${2:-sh}" release="${3:-$VAULT_RELEASE_DEFAULT}"
+  local pod="${release}-0"
 
   # this long pipe to check policy exist seems to be complicated but is to
   # prevent vault login output to leak to user and hide sensitive info from being
   # shown in the xtrace when that is turned on
-   _kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.root_token}' | \
-      base64 -d | \
-     _kubectl --no-exit -n "$ns" exec -i "$pod" -- \
-     sh -lc "vault login - >/dev/null 2>&1 ; $cmd"
+  _kubectl "${kflags[@]}" -n "$ns" exec -i "$pod" -- sh -lc "$cmd"
 }
 
 function _vault_login() {
@@ -263,9 +303,10 @@ function _vault_login() {
 function _vault_policy_exists() {
   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}" name="${3:-eso-reader}"
 
-  if _vault_exec "$ns" "vault policy list" "$release" | grep -q "^${name}\$"; then
+  if _vault_exec --no-exit "$ns" "vault policy list" "$release" | grep -q "^${name}\$"; then
      return 0
   fi
+
   return 1
 }
 
@@ -390,7 +431,7 @@ HCL
 
 function _is_vault_pki_mounted() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}" path="${3:-pki}"
-   _vault_exec "$ns" "vault secrets list -format=json" "$release" |
+   _vault_exec --no-exit "$ns" "vault secrets list -format=json" "$release" |
       jq -e --arg PATH "${path}/" 'has($PATH) and .[$PATH].type == "pki"' >/dev/null 2>&1
 }
 
@@ -424,9 +465,9 @@ function _vault_pki_config_urls() {
 function _vault_ensure_pki_root_ca() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local path="${3:-${VAULT_PKI_PATH:-pki}}"
-   local cn="${4:-${VAULT_PKI_CN:-dev.local.me}}" ttl="${5:-${VAULT_PKI_MAX_TTL:-87600h}}"
+   local cn="${4:-${VAULT_PKI_CN:-dev.k3d.internal}}" ttl="${5:-${VAULT_PKI_MAX_TTL:-87600h}}"
 
-   if _vault_exec "$ns" "vault read -format=json $path/cert/ca" "$release" >/dev/null 2>&1; then
+   if _vault_exec --no-exit "$ns" "vault read -format=json $path/cert/ca" "$release" >/dev/null 2>&1; then
       _info "[vault] root CA already exists at $path, skipping creation"
       return 0
    fi
@@ -460,13 +501,48 @@ function _vault_upsert_pki_role() {
       _err "[vault] failed to create/update role $role at $path"
 }
 
+function _vault_post_revoke_request() {
+   local method="$1" path="$2" payload="$3" ns="$4" release="$5"
+
+   if [[ "$method" != "POST" ]]; then
+      return 1
+   fi
+
+   local serial=$(printf '%s' "$payload" | jq -r '.serial_number // empty')
+   if [[ -z "$serial" ]]; then
+      _err "[vault] missing serial_number in payload"
+   fi
+
+   local mount="${path%/revoke}" serial_plain="${serial//:/}"
+   if ! _vault_exec --no-exit "$ns" "vault read -format=json ${mount}/cert/${serial_plain}" >/dev/null 2>&1; then
+      _warn "[vault] certificate with serial_number $serial not found at $mount/cert/"
+   fi
+   _vault_exec "$ns" "VAULT_HTTP_DEBUG=\${VAULT_HTTP_DEBUG:-1} vault write ${path} serial_number=${serial}" "$release"
+}
+
 function _vault_issue_pki_tls_secret() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local path="${3:-${VAULT_PKI_PATH:-pki}}"
    local role="${4:-${VAULT_PKI_ROLE:-jenkins-tls}}"
-   local host="${5:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}}"
+   local host="${5:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.k3d.internal}}"
    local secret_ns="${6:-${VAULT_PKI_SECRET_NS:-istio-system}}"
    local secret_name="${7:-${VAULT_PKI_SECRET_NAME:-jenkins-tls}}"
+
+   local existing_serial="" existing_cert_file=""
+   local secret_json cert_b64
+   if secret_json=$(_kubectl -n "$secret_ns" get secret "$secret_name" -o json 2>/dev/null); then
+      cert_b64=$(printf '%s' "$secret_json" | jq -r '.data["tls.crt"] // empty')
+      if [[ -n "$cert_b64" ]]; then
+         existing_cert_file=$(mktemp -t vault-existing-cert.XXXXXX)
+         if printf '%s' "$cert_b64" | base64 -d >"$existing_cert_file" 2>/dev/null; then
+            if ! existing_serial=$(_vault_pki_extract_certificate_serial "$existing_cert_file"); then
+               existing_serial=""
+            fi
+         else
+            existing_cert_file=""
+         fi
+      fi
+   fi
 
    local json="$(_vault_exec "$ns" "vault write -format=json ${path}/issue/${role} common_name=\"${host}\" alt_names=\"${host}\" ttl=\"${VAULT_PKI_ROLE_TTL:-720h}\"" "$release")"
 
@@ -481,7 +557,7 @@ function _vault_issue_pki_tls_secret() {
 
    local manifest
    manifest="$(mktemp -t vault-pki-secret.XXXXXX)"
-   trap "_cleanup_on_success '$manifest'" EXIT TERM
+   trap '$(_cleanup_trap_command "$manifest")' EXIT TERM
 
    {
       printf 'apiVersion: v1\n'
@@ -503,7 +579,16 @@ function _vault_issue_pki_tls_secret() {
       _err "[vault] failed to apply TLS secret manifest ${secret_ns}/${secret_name}"
 
    _cleanup_on_success "$manifest"
+   if [[ -n "$existing_cert_file" ]]; then
+      _cleanup_on_success "$existing_cert_file"
+   fi
    trap - EXIT TERM
+
+   if [[ -n "$existing_serial" ]]; then
+      if ! _vault_pki_revoke_certificate_serial "$existing_serial" "$path" _vault_post_revoke_request "$ns" "$release"; then
+         _warn "[vault] failed to revoke previous certificate serial $existing_serial"
+      fi
+   fi
 }
 
 # Verifies PKI mount and role exist; call _err to exit on failure.
@@ -524,7 +609,7 @@ function _is_vault_pki_ready() {
 function _vault_setup_pki() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local path="${3:-${VAULT_PKI_PATH:-pki}}"
-   local ca_cn="${4:-${VAULT_PKI_CN:-dev.local.me}}"
+   local ca_cn="${4:-${VAULT_PKI_CN:-dev.k3d.internal}}"
    local allowd="${5:-${VAULT_PKI_ALLOWED:-}}"
    local role_ttl="${6:-${VAULT_PKI_ROLE_TTL:-720h}}"
    local role="${7:-${VAULT_PKI_ROLE:-jenkins-tls}}"
@@ -545,7 +630,7 @@ function _vault_pki_issue_tls_secret() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local path="${3:-${VAULT_PKI_PATH:-pki}}"
    local role="${4:-${VAULT_PKI_ROLE:-jenkins-tls}}"
-   local host="${5:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}}"
+   local host="${5:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.k3d.internal}}"
    local secret_ns="${6:-${VAULT_PKI_SECRET_NS:-istio-system}}"
    local secret_name="${7:-${VAULT_PKI_SECRET_NAME:-jenkins-tls}}"
 

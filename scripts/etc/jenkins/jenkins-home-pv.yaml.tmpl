@@ -1,23 +1,45 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-path-retain
+provisioner: rancher.io/local-path
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: jenkins-home-pv
 spec:
+  storageClassName: local-path-retain        # <-- match the PVC
+  persistentVolumeReclaimPolicy: Retain
   capacity:
     storage: 50Gi
-  accessModes:
-    - ReadWriteOnce
+  accessModes: ["ReadWriteOnce"]
+  volumeMode: Filesystem
   hostPath:
     path: "${JENKINS_HOME_IN_CLUSTER:-/data/jenkins}"
+    type: DirectoryOrCreate
+  # (optional) pin to a node:
+  # nodeAffinity:
+  #   required:
+  #     nodeSelectorTerms:
+  #     - matchExpressions:
+  #       - key: kubernetes.io/hostname
+  #         operator: In
+  #         values: ["k3s-automation"]
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: jenkins-home
+  namespace: jenkins
 spec:
-  accessModes:
-    - ReadWriteOnce
+  storageClassName: local-path-retain
+  volumeName: jenkins-home-pv                # <-- binds to that PV
+  accessModes: ["ReadWriteOnce"]
+  volumeMode: Filesystem
   resources:
     requests:
       storage: 50Gi
-  volumeName: jenkins-home-pv
+
