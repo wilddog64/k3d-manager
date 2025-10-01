@@ -1,4 +1,7 @@
 controller:
+  sidecars:
+    configAutoReload:
+      enabled: true
   podAnnotations:
     sidecar.istio.io/inject: "true"
     sidecar.istio.io/rewriteAppHTTPProbers: "true"
@@ -38,51 +41,71 @@ controller:
     - name: JENKINS_ADMIN_USER
       value: "jenkins-admin"
     - name: JENKINS_ADMIN_PASS
-      valueFrom: { secretKeyRef: { name: jenkins, key: jenkins-admin-password } }
+      valueFrom:
+        secretKeyRef:
+          name: jenkins
+          key: jenkins-admin-password
     - name: JAVA_OPTS
       value: "-Djenkins.install.runSetupWizard=false"
     - name: JENKINS_OPTS
       value: "--httpPort=8080 --httpListenAddress=0.0.0.0"
+
   serviceAccount:
     create: true
     name: jenkins-admin
+
   podSecurityContext:
     fsGroup: 1000
     runAsUser: 1000
+
   persistence:
     enabled: true
     existingClaim: jenkins-home
+
   serviceType: ClusterIP
   servicePort: 8081
   targetPort: 8080
   containerPort: 8080
   servicePortName: http
-healthProbes: true
-probes:
-  startupProbe:
-    httpGet:
-      path: /login
-    port: 8080
-  initialDelaySeconds: 90
-  periodSeconds: 5
-readinessProbe:
-  httpGet:
-    path: /login
-    port: 8080
-  initialDelaySeconds: 90
-  periodSeconds: 5
-  failureThreshold: 120
-livenessProbe:
-  httpGet:
-    path: /login
-    port: 8080
-  initialDelaySeconds: 90
-  periodSeconds: 5
-  failureThreshold: 60
+
+  healthProbes: true
+  probes:
+    startupProbe:
+      httpGet:
+        path: /login
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 90
+      periodSeconds: 5
+      failureThreshold: 180
+    readinessProbe:
+      httpGet:
+        path: /login
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 90
+      periodSeconds: 5
+      failureThreshold: 120
+    livenessProbe:
+      httpGet:
+        path: /login
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 90
+      periodSeconds: 5
+      failureThreshold: 60
   JCasC:
+    defaultConfig: false
     configScripts:
-      01-security: |
+      00-location.yaml: |
+        unclassified:
+          location:
+            url: "https://jenkins.dev.local.me/"      # trailing slash required
+            adminAddress: "jenkins-admin@me.com"
+      01-security.yaml: |
         jenkins:
+          disabledAdministrativeMonitors:
+            - "jenkins.security.ReverseProxySetupMonitor"
           securityRealm:
             local:
               allowsSignup: false
@@ -94,4 +117,5 @@ livenessProbe:
               permissions:
                 - "Overall/Read:jenkins-admin"
                 - "Overall/Administer:jenkins-admin"
-
+  # Optional but keeps env consistent with JCasC Location
+  jenkinsUrl: "https://jenkins.dev.local.me/"
