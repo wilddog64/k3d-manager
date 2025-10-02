@@ -36,39 +36,11 @@ port mapping:
 ./scripts/k3d-manager create_cluster beta 8001 8444
 ```
 
-`deploy_cluster` accepts `--provider <name>` to override discovery and `-f/--force-k3s` to skip the confirmation prompt when you know you want the k3s backend. The helper lowercases the provider name and exports `CLUSTER_PROVIDER`, `K3D_MANAGER_PROVIDER`, and `K3D_MANAGER_CLUSTER_PROVIDER` so downstream scripts observe the same choice.
-
 Set `CLUSTER_PROVIDER` to select a different backend module:
 
 ```bash
 CLUSTER_PROVIDER=k3d ./scripts/k3d-manager deploy_cluster
 ```
-
-When no CLI flag or environment override is present, the dispatcher falls back to an interactive selector (defaulting to k3d) or silently chooses k3d in non-interactive sessions. macOS always resolves to k3d, while Linux and WSL hosts can opt into k3s.
-
-## Provider interface
-
-### Selecting the active provider
-
-`scripts/lib/cluster_provider.sh` exposes `_cluster_provider_get_active` and `_cluster_provider_is` so plugins can branch on the current backend without reimplementing discovery. Both functions cache the detected provider in `CLUSTER_PROVIDER_ACTIVE`; call `_cluster_provider_reset_active` (or `_cluster_provider_set_active <name>`) in tests when you need to force a different value. The resolver honours, in order, `CLUSTER_PROVIDER`, `K3D_MANAGER_PROVIDER`, `K3DMGR_PROVIDER`, and `K3D_MANAGER_CLUSTER_PROVIDER` before probing the host for an installed CLI.
-
-### Provider modules and actions
-
-`scripts/lib/provider.sh` loads provider modules on demand and routes `_cluster_provider_call <action> ...` to the matching implementation. Each provider lives in `scripts/lib/providers/<name>.sh` and must export functions named `_provider_<name>_<action>` that follow the semantics below. New providers can stub actions they do not support, but the function must still exist so the dispatcher returns a helpful message instead of failing at runtime.
-
-| Action | Called from | Purpose |
-| --- | --- | --- |
-| `install` | `deploy_cluster` | Ensure CLIs or host prerequisites exist before cluster creation. |
-| `cluster_exists` | `_k3d_cluster_exist` | Return success when the named cluster is already present. |
-| `apply_cluster_config` | `__create_cluster` | Apply a rendered cluster configuration (k3d uses it to consume YAML templates). |
-| `list_clusters` | `_list_k3d_cluster` | Emit a concise cluster listing for troubleshooting. |
-| `create_cluster` | `create_cluster` | Create the cluster if it is missing—typically wraps `apply_cluster_config`. |
-| `destroy_cluster` | `destroy_cluster` | Tear down the cluster referenced by name. |
-| `deploy_cluster` | `deploy_cluster` | End-to-end bootstrap that installs dependencies, creates the cluster, and wires Istio. |
-| `exec` | `_k3d` | Run the provider's CLI with `_run_command` wrappers (used for helpers like `_provider_k3d_exec`). |
-
-Providers can expose additional private helpers (for example `_provider_k3d_configure_istio`) that their `deploy_cluster` routine reuses. When you need to talk to the active backend from plugins or other helpers, prefer `_cluster_provider_call` instead of calling `_provider_<name>_*` directly—this keeps custom providers compatible with the existing workflows.
-
 ## Using k3s clusters
 
 The helper scripts in this repository now understand a `k3s` provider in addition
@@ -232,33 +204,25 @@ graph TD
   KM --> SYS[lib/system.sh]
   KM --> CORE[lib/core.sh]
   KM --> TEST[lib/test.sh]
-  KM --|_cluster_provider_set_active|--> CP[lib/cluster_provider.sh]
   KM --|_try_load_plugin(func)|--> PLUG[plugins/*.sh]
-  CP --|_cluster_provider_get_active|--> PR[lib/provider.sh]
-  CORE --|_cluster_provider_call|--> PR
-  PLUG --> CP
-  PLUG --> PR
-  PR -->|source| MOD{Provider modules}
-  MOD --> K3DMOD[scripts/lib/providers/k3d.sh]
-  MOD --> K3SMOD[scripts/lib/providers/k3s.sh]
-  PR --> HELM[helm]
-  PR --> KUB[kubectl]
-  PLUG --> HELM
-  PLUG --> KUB
+  PLUG --> HELM[helm]
+  PLUG --> KUB[kubectl]
   PLUG --> JPLUG[plugins/jenkins.sh]
   JPLUG --> ROTATOR["Jenkins cert rotator CronJob<br/>(docker.io/google/cloud-sdk:slim)"]
   JPLUG -->|ESO/Vault manifests| ESO
   ROTATOR -->|refresh TLS secret| JENKINS[Jenkins StatefulSet]
   ROTATOR --> ESO
+  CORE --> HELM
+  CORE --> KUB
   subgraph Cluster
-     K3API[k3d/k3s API] --> K8S[Kubernetes]
+     K3D[k3d/k3s API] --> K8S[Kubernetes]
      ISTIO[Istio] --> K8S
      ESO[External Secrets Operator] --> K8S
      JENKINS --> K8S
      ROTATOR --> K8S
   end
-  HELM --> K3API
-  KUB --> K3API
+  HELM --> K3D
+  KUB --> K3D
 
   subgraph Providers
      VAULT[HashiCorp Vault]
@@ -271,17 +235,14 @@ graph TD
   ROTATOR -->|requests leaf certs| VAULT
 ```
 
-This refreshed diagram highlights how the CLI dispatches to core libraries, resolves the active provider before routing through `lib/provider.sh`, loads plugins on demand, and—through the Jenkins plugin—renders the External Secrets Operator integration and the certificate-rotator CronJob that runs Google's published Cloud SDK image (`docker.io/google/cloud-sdk:slim`) to keep Vault-backed TLS material current for the Jenkins workload.
+This refreshed diagram highlights how the CLI dispatches to core libraries, loads plugins on demand, and—through the Jenkins plugin—renders the External Secrets Operator integration and the certificate-rotator CronJob that runs Google's published Cloud SDK image (`docker.io/google/cloud-sdk:slim`) to keep Vault-backed TLS material current for the Jenkins workload.
 
 ```mermaid
 sequenceDiagram
   participant U as user
   participant KM as k3d-manager
-  participant CP as cluster_provider.sh
-  participant PR as provider.sh
   participant SYS as _try_load_plugin / wrappers
   participant J as deploy_jenkins plugin
-  participant MOD as provider module (k3d/k3s)
   participant T as Jenkins & rotator templates
   participant K as kubectl/helm wrappers
   participant C as k3d/k3s cluster
@@ -290,25 +251,11 @@ sequenceDiagram
   participant V as Vault
 
   U->>KM: ./k3d-manager deploy_jenkins
-  KM->>CP: _cluster_provider_get_active
-  CP->>PR: resolve + cache active provider
-  PR-->>CP: active provider (k3d/k3s)
-  CP-->>KM: provider name
   KM->>SYS: _try_load_plugin("deploy_jenkins")
   SYS->>J: source plugins/jenkins.sh
   SYS->>J: call deploy_jenkins
-  J->>CP: _cluster_provider_is k3s?
-  CP-->>J: boolean result
-  J->>PR: _cluster_provider_call exec -- kubectl config current-context
-  PR->>MOD: _provider_<name>_exec
-  alt provider == k3d
-    MOD->>K: k3d cluster list / exec
-  else provider == k3s
-    MOD->>K: k3s kubectl wrapper
-  end
   J->>T: load manifests (workload + rotator CronJob)
-  J->>K: _helm install Jenkins
-  J->>K: _kubectl apply rotator (pinned image)
+  J->>K: _helm install Jenkins\n_kubectl apply rotator (pinned image)
   Note right of K: CronJob image pinned to docker.io/google/cloud-sdk:slim
   K->>C: apply StatefulSet, services, ESO bindings & CronJob
   C->>R: schedule jenkins-cert-rotator
@@ -318,7 +265,7 @@ sequenceDiagram
   Note over R,V: Rotator keeps Vault and cluster secrets in sync
 ```
 
-The sequence now traces the `deploy_jenkins` flow: k3d-manager determines the active provider, sources the Jenkins plugin, renders the workload and rotator manifests, applies them with the pinned Google Cloud SDK-based kubectl image, and shows the CronJob fetching Vault-issued certificates through ESO before refreshing the Kubernetes secret.
+The sequence now traces the `deploy_jenkins` flow: k3d-manager sources the Jenkins plugin, renders the workload and rotator manifests, applies them with the pinned Google Cloud SDK-based kubectl image, and shows the CronJob fetching Vault-issued certificates through ESO before refreshing the Kubernetes secret.
 
 > **Upgrade note:** rerun `./scripts/k3d-manager deploy_jenkins` after pulling this update so the helper refreshes the `jenkins-cert-rotator` Vault policy with the new `pki/revoke` permission. Without the refreshed policy the CronJob cannot call Vault's revoke endpoint and may leave superseded certificates active.
 
