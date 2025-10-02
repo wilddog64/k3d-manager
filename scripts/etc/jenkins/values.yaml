@@ -103,7 +103,7 @@ controller:
             url: "https://jenkins.dev.local.me/"      # trailing slash required
             adminAddress: "jenkins-admin@me.com"
           hashicorpVault:
-            configurations:
+            configuration:
               vaultUrl: https://vault.vault.svc:8200
               failOnError: true
               timeout: 30
