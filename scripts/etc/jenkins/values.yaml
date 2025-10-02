@@ -97,12 +97,18 @@ controller:
   JCasC:
     defaultConfig: false
     configScripts:
-      00-location.yaml: |
+      00-location: |
         unclassified:
           location:
             url: "https://jenkins.dev.local.me/"      # trailing slash required
             adminAddress: "jenkins-admin@me.com"
-      01-security.yaml: |
+      01-security: |
+        configuration:
+          disableChildPolciesOverride: false
+          engineVersion: 2
+          skipSslVerification: true
+          vaultName: vault
+          vaultUrl: https://vault.vault.svc:8200
         jenkins:
           disabledAdministrativeMonitors:
             - "jenkins.security.ReverseProxySetupMonitor"
