@@ -1,4 +1,4 @@
-export NAMESPACE_SPACE="jenkins"
+export JENKINS_NAMESPACE="jenkins"
 export JENKINS_HOME_PATH="$SCRIPT_DIR/storage/jenkins_home"
 
 # Optional: immediately mint a cert to a K8s tls secret via Istio
