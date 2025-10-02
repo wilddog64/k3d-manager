@@ -13,6 +13,8 @@ JENKINS_VARS_FILE="$JENKINS_CONFIG_DIR/vars.sh"
 if [[ ! -r "$JENKINS_VARS_FILE" ]]; then
    _err "Jenkins vars file not found: $JENKINS_VARS_FILE"
 fi
+# shellcheck disable=SC1090
+source "$JENKINS_VARS_FILE"
 
 declare -a _JENKINS_RENDERED_MANIFESTS=()
 _JENKINS_PREV_EXIT_TRAP_CMD=""
@@ -569,6 +571,8 @@ function _deploy_jenkins() {
       return "$rc"
    fi
 
+   JENKINS_NAMESPACE="${ns:-${JENKINS_NAMESPACE}}"
+   :"${JENKINS_NAMESPACE:?JENKINKS_NAMESPACE not set}"
    local vs_template="$JENKINS_CONFIG_DIR/virtualservice.yaml.tmpl"
    if [[ ! -r "$vs_template" ]]; then
       _err "VirtualService template file not found: $vs_template"
@@ -578,8 +582,6 @@ function _deploy_jenkins() {
    if [[ ! -r "$dr_template" ]]; then
       _err "DestinationRule template file not found: $dr_template"
    fi
-
-   export JENKINS_NAMESPACE="$ns"
 
    local vs_hosts_input="${JENKINS_VIRTUALSERVICE_HOSTS:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}}"
    local -a vs_hosts_lines=()
