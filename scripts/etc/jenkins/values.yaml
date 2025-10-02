@@ -102,10 +102,9 @@ controller:
           location:
             url: "https://jenkins.dev.local.me/"      # trailing slash required
             adminAddress: "jenkins-admin@me.com"
-          hasicorpVault:
+          hashicorpVault:
             configurations:
               vaultUrl: https://vault.vault.svc:8200
-              engineVersion: 24skipSslVerify: true
               failOnError: true
               timeout: 30
               retry: 3
