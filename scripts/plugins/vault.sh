@@ -59,7 +59,7 @@ metadata:
     storageclass.kubernetes.io/is-default-class: "false"
 provisioner: rancher.io/local-path
 volumeBindingMode: Immediate
-reclaimPolicy: Reclaim
+reclaimPolicy: Retain
 allowVolumeExpansion: true
 YAML
          fi
