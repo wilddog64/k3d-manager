@@ -287,6 +287,7 @@ function _ensure_jenkins_cert() {
    trap '$(_cleanup_trap_command "$cert_file" "$key_file")' EXIT
 
    echo "$json" | jq -r '.data.certificate' > "$cert_file"
+   echo "$json" | jq -r '.data.ca_chain[]?' >> "$cert_file"
    echo "$json" | jq -r '.data.private_key' > "$key_file"
 
    _kubectl -n "$k8s_namespace" create secret tls "$secret_name" \
