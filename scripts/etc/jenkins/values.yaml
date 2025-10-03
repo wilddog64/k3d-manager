@@ -102,35 +102,8 @@ controller:
           location:
             url: "https://jenkins.dev.local.me/"      # trailing slash required
             adminAddress: "jenkins-admin@me.com"
-          # hasicorpVault:
-          #   configurations:
-          #     vaultUrl: https://vault.vault.svc:8200
-          #     engineVersion: 2
-          #     skipSslVerify: true
-          #     failOnError: true
-          #     timeout: 30
-          #     retry: 3
-          #     authentication: "kubernetes"
-          #     kubernetes:
-          #       role: "jenkins-jcasc-reader"
-          #       mountPath: "auth/kubernetes"
-          #       path: "kubernetes"
       01-security.yaml: |
         jenkins:
-          # securityRealm:
-          #   activeDirectory:
-          #     domain:
-          #       - name: "ppe.costcotravel.com"
-          #         bindName: "${vault:secret/jenkins/ad-ldap#bindName}"
-          #         bindPassword: "${vault:secret/jenkins#bindPassword}"
-          #         servers: "10.36.224.11:3268, 10.36.224.12:3268"
-          #       - name: "pacific.costcotravel.com"
-          #         bindName: "${vault:secret/jenkins/adreader#bindName}"
-          #         bindPassword: "${vault:secret/jenkins/adreader#bindPassword}"
-          #         servers: "10.1.1.11:3268, 10.1.1.12:3268"
-          #     groupLookupStrategy: AUTO
-          #     removeIrrelevantGroups: false
-          #     startTls: true
           slaveAgentPort: 5551
           disabledAdministrativeMonitors:
             - "jenkins.security.ReverseProxySetupMonitor"
@@ -142,8 +115,13 @@ controller:
                   password: "${JENKINS_ADMIN_PASS}"
           authorizationStrategy:
             projectMatrix:
-              permissions:
-                - "Overall/Read:jenkins-admin"
-                - "Overall/Administer:jenkins-admin"
+              entries:
+               - user:
+                 name: jenkins-admin
+                 permissions
+                 - "Overall/Read:jenkins-admin"
+                 - "Overall/Administer:jenkins-admin"
+          numExecutors: 0
+          disableRememberMe: true
   # Optional but keeps env consistent with JCasC Location
   jenkinsUrl: "https://jenkins.dev.local.me/"
