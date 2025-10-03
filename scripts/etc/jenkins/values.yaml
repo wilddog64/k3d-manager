@@ -6,6 +6,19 @@ controller:
     sidecar.istio.io/inject: "true"
     sidecar.istio.io/rewriteAppHTTPProbers: "true"
     proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
+    vault.hashicorp.com/agent-inject: "true"
+    vault.hashicorp.com/role: "jenkins"
+    vault.hashicorp.com/agent-pre-populate-only: "true"
+    vault.hashicorp.com/agent-inject-secret-ad-ldap-bind-password: "secret/data/jenkins/ad-ldap"
+    vault.hashicorp.com/agent-inject-template-ad-ldap-bind-password: |-
+      {{ "{{" }}- with secret "secret/data/jenkins/ad-ldap" -{{ "}}" }}
+      {{ "{{" }}- .Data.data.password -{{ "}}" }}
+      {{ "{{" }}- end -{{ "}}" }}
+    vault.hashicorp.com/agent-inject-secret-ad-ldap-bind-username: "secret/data/jenkins/ad-ldap"
+    vault.hashicorp.com/agent-inject-template-ad-ldap-bind-username: |-
+      {{ "{{" }}- with secret "secret/data/jenkins/ad-ldap" -{{ "}}" }}
+      {{ "{{" }}- .Data.data.username -{{ "}}" }}
+      {{ "{{" }}- end -{{ "}}" }}
   image:
     registry: docker.io
     repository: jenkins/jenkins
@@ -112,3 +125,22 @@ controller:
                 - "Overall/Read:${JENKINS_ADMIN_USER}"
                 - "Overall/Administer:${JENKINS_ADMIN_USER}"
                 - "Overall/Read:it devops"
+                - "Overall/Administer:it devops"
+          securityRealm:
+            activeDirectory:
+              bindPassword: "${file:/vault/secrets/ad-ldap-bind-password}"
+              cache:
+                size: 50
+                ttl: 3600
+              customDomain: true
+              domains:
+                - bindName: "${file:/vault/secrets/ad-ldap-bind-username}"
+                  bindPassword: "${file:/vault/secrets/ad-ldap-bind-password}"
+                  name: "pacific.costcotravel.com"
+                  tlsConfiguration: "TRUST_ALL_CERTIFICATES"
+              groupLookupStrategy: "TOKENGROUPS"
+              internalUsersDatabase:
+                jenkinsInternalUser: "jenkins-admin"
+              removeIrrelevantGroups: false
+              requireTLS: true
+              startTls: true
