@@ -74,6 +74,13 @@ function _deploy_vault_ha() {
    local f="$(mktemp -t vault-ha-vaules.XXXXXX.yaml)"
 
    sc="${VAULT_SC:-local-path}"
+   local enable_injector="false"
+   case "${VAULT_ENABLE_INJECTOR:-false}" in
+      1|true|TRUE|True|yes|YES)
+         enable_injector="true"
+         ;;
+   esac
+
    cat >"$f" <<YAML
 server:
   ha:
@@ -86,7 +93,9 @@ server:
     size: 1Gi
     storageClass: "${sc}"
 injector:
-  enabled: false
+  enabled: ${enable_injector}
+  metrics:
+    enabled: false
 csi:
   enabled: false
 YAML
@@ -95,6 +104,42 @@ YAML
    [[ -n "$version" ]] && args+=("--version" "$version")
    _helm "${args[@]}"
    trap '$(_cleanup_trap_command "$f")' EXIT TERM
+}
+
+function _vault_has_injector() {
+   local ns="${1:-$VAULT_NS_DEFAULT}"
+   _kubectl --no-exit -n "$ns" get deploy/vault-agent-injector >/dev/null 2>&1
+}
+
+function _ensure_vault_agent_injector() {
+   local ns="${1:-$VAULT_NS_DEFAULT}"
+   local release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local enable="${3:-1}"
+
+   case "$enable" in
+      1|true|TRUE|True|yes|YES)
+         ;;
+      *)
+         return 0
+         ;;
+   esac
+
+   if _vault_has_injector "$ns" "$release"; then
+      return 0
+   fi
+
+   _vault_repo_setup
+
+   local version="${VAULT_CHART_VERSION:-}"
+   local -a args=(upgrade --install "$release" hashicorp/vault -n "$ns" --reuse-values --wait \
+                  --set injector.enabled=true --set injector.metrics.enabled=false)
+   [[ -n "$version" ]] && args+=(--version "$version")
+
+   _helm "${args[@]}"
+
+   if ! _kubectl --no-exit -n "$ns" rollout status deployment/vault-agent-injector --timeout=180s >/dev/null 2>&1; then
+      _err "[vault] vault-agent-injector failed to reach Ready state"
+   fi
 }
 
 function deploy_vault() {
@@ -127,6 +172,7 @@ function deploy_vault() {
    _vault_repo_setup
 
    _deploy_vault_ha "$ns" "$release"
+   _ensure_vault_agent_injector "$ns" "$release" "${VAULT_ENABLE_INJECTOR:-false}"
 
    _vault_bootstrap_ha "$ns" "$release"
    _enable_kv2_k8s_auth "$ns" "$release"
@@ -273,21 +319,31 @@ function _is_vault_health() {
 
 function _vault_exec() {
 
-  local kflags=()
+  local kflags=() quiet=0
   while [[ "${1:-}" == "--no-exit" ]]  || \
      [[ "${1:-}" == "--prefer-sudo" ]] || \
-     [[ "${1:-}" == "--require-sudo" ]]; do
-     kflags+=("$1")
+     [[ "${1:-}" == "--require-sudo" ]] || \
+     [[ "${1:-}" == "--quiet" ]]; do
+     case "$1" in
+        --quiet)
+           quiet=1
+           ;;
+        *)
+           kflags+=("$1")
+           ;;
+     esac
      shift
   done
 
   local ns="${1:-$VAULT_NS_DEFAULT}" cmd="${2:-sh}" release="${3:-$VAULT_RELEASE_DEFAULT}"
   local pod="${release}-0"
+  local -a kubectl_args=("${kflags[@]}")
+  (( quiet )) && kubectl_args+=(--quiet)
 
   # this long pipe to check policy exist seems to be complicated but is to
   # prevent vault login output to leak to user and hide sensitive info from being
   # shown in the xtrace when that is turned on
-  _kubectl "${kflags[@]}" -n "$ns" exec -i "$pod" -- sh -lc "$cmd"
+  _kubectl "${kubectl_args[@]}" -n "$ns" exec -i "$pod" -- sh -lc "$cmd"
 }
 
 function _vault_login() {
@@ -517,7 +573,34 @@ function _vault_post_revoke_request() {
    if ! _vault_exec --no-exit "$ns" "vault read -format=json ${mount}/cert/${serial_plain}" >/dev/null 2>&1; then
       _warn "[vault] certificate with serial_number $serial not found at $mount/cert/"
    fi
-   _vault_exec "$ns" "VAULT_HTTP_DEBUG=\${VAULT_HTTP_DEBUG:-1} vault write ${path} serial_number=${serial}" "$release"
+   local root_b64 root_token
+   root_b64=$(_kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null || true)
+   if [[ -z "$root_b64" ]]; then
+      _err "[vault] vault-root secret not found in namespace '$ns'"
+   fi
+
+   root_token=$(printf '%s' "$root_b64" | base64 -d)
+   if [[ -z "$root_token" ]]; then
+      _err "[vault] vault root token is empty"
+   fi
+
+   local revoke_cmd revoke_out revoke_force_path revoke_force_cmd revoke_force_out
+   revoke_cmd=$(printf 'VAULT_HTTP_DEBUG=${VAULT_HTTP_DEBUG:-1} VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=%q vault write %s serial_number=%q' "$root_token" "$path" "$serial")
+   if ! revoke_out=$(_vault_exec --no-exit --quiet "$ns" "$revoke_cmd" "$release" 2>&1); then
+      if [[ "$revoke_out" == *"not found"* ]]; then
+         local revoke_force_path="${mount}/revoke-force"
+         local revoke_force_cmd
+         revoke_force_cmd=$(printf 'VAULT_HTTP_DEBUG=${VAULT_HTTP_DEBUG:-1} VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=%q vault write %s serial_number=%q' "$root_token" "$revoke_force_path" "$serial")
+         if ! revoke_force_out=$(_vault_exec --no-exit --quiet "$ns" "$revoke_force_cmd" "$release" 2>&1); then
+            _warn "[vault] failed to revoke certificate serial $serial via revoke-force: ${revoke_force_out:-<no output>}"
+            return 1
+         fi
+         _info "[vault] serial $serial not found at ${mount}/cert, used revoke-force"
+         return 0
+      fi
+      _warn "[vault] failed to revoke certificate serial $serial: ${revoke_out:-<no output>}"
+      return 1
+   fi
 }
 
 function _vault_issue_pki_tls_secret() {
