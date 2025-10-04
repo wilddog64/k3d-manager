@@ -60,6 +60,8 @@ function _provider_k3s_destroy_cluster() {
 function _provider_k3s_configure_istio() {
    local cluster_name=$1
 
+   _ensure_envsubst
+
    local istio_yaml_template="${SCRIPT_DIR}/etc/istio-operator.yaml.tmpl"
    local istio_var="${SCRIPT_DIR}/etc/istio_var.sh"
 

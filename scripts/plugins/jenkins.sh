@@ -16,6 +16,9 @@ fi
 # shellcheck disable=SC1090
 source "$JENKINS_VARS_FILE"
 
+_ensure_envsubst
+_ensure_jq
+
 # Capture cert rotator defaults so unset overrides can fall back gracefully later.
 JENKINS_CERT_ROTATOR_ENABLED_DEFAULT="${JENKINS_CERT_ROTATOR_ENABLED:-1}"
 JENKINS_CERT_ROTATOR_NAME_DEFAULT="${JENKINS_CERT_ROTATOR_NAME:-jenkins-cert-rotator}"

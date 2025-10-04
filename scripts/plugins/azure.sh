@@ -6,6 +6,8 @@ if [[ -r "${az_eso_vars}" ]]; then
    source "${az_eso_vars}"
 fi
 
+_ensure_jq
+
 function _ensure_azure_cli() {
    if _command_exist az ; then
       return 0
@@ -96,6 +98,8 @@ function _create_azure_eso_store() {
       exit 127
    fi
    source "${azure_vars}"
+
+   _ensure_envsubst
 
    _kubectl create namespace "$ns" 2>/dev/null
    _kubectl apply -n "$ns" -f <(envsubst < "$azure_config_template") --dry-run=client | _kubectl apply -n "$ns" -f -

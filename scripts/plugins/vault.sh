@@ -18,6 +18,8 @@ fi
 # shellcheck disable=SC1090
 source "$ESO_PLUGIN"
 
+_ensure_jq
+
 VAULT_PKI_HELPERS="$SCRIPT_DIR/lib/vault_pki.sh"
 if [[ -f "$VAULT_PKI_HELPERS" ]]; then
    # shellcheck disable=SC1090

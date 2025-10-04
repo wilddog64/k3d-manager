@@ -96,6 +96,7 @@ function config_bws_eso() {
       echo "Template file ${bws_tmpl} not found!" >&2
       exit 127
   fi
+  _ensure_envsubst
   envsubst < "$bws_tmpl" > "$yamlfile"
 
   # Build and apply SecretStore

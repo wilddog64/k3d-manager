@@ -125,6 +125,72 @@ function _secret_tool() {
    _run_command --quiet -- secret-tool "$@"
 }
 
+function _ensure_jq() {
+   _command_exist jq && return 0
+
+   if _is_mac; then
+      _run_command --quiet -- brew install jq
+      return
+   fi
+
+   if _is_debian_family; then
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y jq
+      return
+   fi
+
+   if _is_redhat_family; then
+      if _command_exist dnf; then
+         _run_command --prefer-sudo -- dnf install -y jq
+      else
+         _run_command --prefer-sudo -- yum install -y jq
+      fi
+      return
+   fi
+
+   if _is_wsl && _command_exist apt-get; then
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y jq
+      return
+   fi
+
+   _err "Package manager not found to install jq"
+}
+
+function _ensure_envsubst() {
+   if command -v envsubst >/dev/null 2>&1; then
+      return 0
+   fi
+
+   if _is_mac; then
+      _run_command --quiet -- brew install gettext
+      return
+   fi
+
+   if _is_debian_family; then
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y gettext-base
+      return
+   fi
+
+   if _is_redhat_family; then
+      if _command_exist dnf; then
+         _run_command --prefer-sudo -- dnf install -y gettext
+      else
+         _run_command --prefer-sudo -- yum install -y gettext
+      fi
+      return
+   fi
+
+   if _is_wsl && _command_exist apt-get; then
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y gettext-base
+      return
+   fi
+
+   _err "Package manager not found to install envsubst"
+}
+
 # macOS only
 function _security() {
    _run_command --quiet -- security "$@"

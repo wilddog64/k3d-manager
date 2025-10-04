@@ -20,6 +20,8 @@ setup() {
   export MINIMAL_JQ_HELPER
   SYSTEM_JQ_CMD="${SYSTEM_JQ_CMD:-$(command -v jq || true)}"
   export SYSTEM_JQ_CMD
+  _vault_issue_pki_tls_secret() { :; }
+  export -f _vault_issue_pki_tls_secret
 }
 
 @test "Jenkins trap wrapper preserves original script arguments" {
