@@ -7,7 +7,7 @@ controller:
     sidecar.istio.io/rewriteAppHTTPProbers: "true"
     proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
     vault.hashicorp.com/agent-inject: "true"
-    vault.hashicorp.com/role: "jenkins"
+    vault.hashicorp.com/role: "jenkins-jcasc-reader"
     vault.hashicorp.com/agent-pre-populate-only: "true"
     vault.hashicorp.com/agent-inject-secret-ad-ldap-bind-password: "secret/data/jenkins/ad-ldap"
     vault.hashicorp.com/agent-inject-template-ad-ldap-bind-password: |-
@@ -65,7 +65,7 @@ controller:
 
   serviceAccount:
     create: true
-    name: jenkins-admin
+    name: jenkins
 
   podSecurityContext:
     fsGroup: 1000
@@ -124,8 +124,8 @@ controller:
               permissions:
                 - "Overall/Read:${JENKINS_ADMIN_USER}"
                 - "Overall/Administer:${JENKINS_ADMIN_USER}"
-                - "Overall/Read:it devops"
-                - "Overall/Administer:it devops"
+                - "Overall/Read:group:it devops"
+                - "Overall/Administer:group:it devops"
           securityRealm:
             activeDirectory:
               bindPassword: "${file:/vault/secrets/ad-ldap-bind-password}"
