@@ -16,6 +16,16 @@ fi
 # shellcheck disable=SC1090
 source "$JENKINS_VARS_FILE"
 
+# Capture cert rotator defaults so unset overrides can fall back gracefully later.
+JENKINS_CERT_ROTATOR_ENABLED_DEFAULT="${JENKINS_CERT_ROTATOR_ENABLED:-1}"
+JENKINS_CERT_ROTATOR_NAME_DEFAULT="${JENKINS_CERT_ROTATOR_NAME:-jenkins-cert-rotator}"
+JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT_DEFAULT="${JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT:-jenkins-cert-rotator}"
+JENKINS_CERT_ROTATOR_SCHEDULE_DEFAULT="${JENKINS_CERT_ROTATOR_SCHEDULE:-0 */12 * * *}"
+JENKINS_CERT_ROTATOR_IMAGE_DEFAULT="${JENKINS_CERT_ROTATOR_IMAGE:-docker.io/google/cloud-sdk:slim}"
+JENKINS_CERT_ROTATOR_VAULT_ROLE_DEFAULT="${JENKINS_CERT_ROTATOR_VAULT_ROLE:-jenkins-cert-rotator}"
+JENKINS_CERT_ROTATOR_RENEW_BEFORE_DEFAULT="${JENKINS_CERT_ROTATOR_RENEW_BEFORE:-432000}"
+JENKINS_CERT_ROTATOR_ALT_NAMES_DEFAULT="${JENKINS_CERT_ROTATOR_ALT_NAMES:-}"
+
 declare -a _JENKINS_RENDERED_MANIFESTS=()
 _JENKINS_PREV_EXIT_TRAP_CMD=""
 _JENKINS_PREV_EXIT_TRAP_HANDLER=""
@@ -182,6 +192,105 @@ function _jenkins_cleanup_and_return() {
    return "$rc"
 }
 
+function _jenkins_detect_cluster_name() {
+   if [[ -n "${CLUSTER_NAME:-}" ]]; then
+      printf '%s\n' "$CLUSTER_NAME"
+      return 0
+   fi
+
+   local output
+   if ! output=$(_k3d cluster list 2>/dev/null); then
+      return 1
+   fi
+
+   local line trimmed
+   while IFS= read -r line; do
+      trimmed="${line#${line%%[![:space:]]*}}"
+      if [[ -z "$trimmed" ]]; then
+         continue
+      fi
+      if [[ "$trimmed" == NAME* ]]; then
+         continue
+      fi
+      local -a fields
+      read -r -a fields <<< "$trimmed"
+      if (( ${#fields[@]} )); then
+         printf '%s\n' "${fields[0]}"
+         return 0
+      fi
+   done <<< "$output"
+
+   return 1
+}
+
+function _jenkins_node_has_mount() {
+   local node="$1"
+   local host_path="${JENKINS_HOME_PATH:-${SCRIPT_DIR}/storage/jenkins_home}"
+
+   if [[ -z "$node" || -z "$host_path" ]]; then
+      return 1
+   fi
+
+   local inspect
+   if ! inspect=$(_run_command --quiet -- docker inspect "$node" 2>/dev/null); then
+      return 1
+   fi
+
+   if command -v jq >/dev/null 2>&1; then
+      if printf '%s\n' "$inspect" | jq -e --arg src "$host_path" '.[0].Mounts[]? | select(.Source == $src)' >/dev/null 2>&1; then
+         return 0
+      fi
+   elif printf '%s\n' "$inspect" | grep -F "\"$host_path\"" >/dev/null 2>&1; then
+      return 0
+   fi
+
+   return 1
+}
+
+function _jenkins_require_hostpath_mounts() {
+   local cluster="$1"
+
+   if [[ -z "$cluster" ]]; then
+      return 0
+   fi
+
+   local output
+   if ! output=$(_k3d node list 2>/dev/null); then
+      return 0
+   fi
+
+   local line trimmed
+   local -a missing=()
+   while IFS= read -r line; do
+      trimmed="${line#${line%%[![:space:]]*}}"
+      if [[ -z "$trimmed" ]]; then
+         continue
+      fi
+      if [[ "$trimmed" == NAME* ]]; then
+         continue
+      fi
+      local -a fields
+      read -r -a fields <<< "$trimmed"
+      if (( ${#fields[@]} < 3 )); then
+         continue
+      fi
+      local node_name="${fields[0]}"
+      local node_cluster="${fields[2]}"
+      if [[ "$node_cluster" == "$cluster" ]]; then
+         if ! _jenkins_node_has_mount "$node_name"; then
+            missing+=("$node_name")
+         fi
+      fi
+   done <<< "$output"
+
+   if (( ${#missing[@]} )); then
+      JENKINS_MISSING_HOSTPATH_NODES="${missing[*]}"
+      return 1
+   fi
+
+   return 0
+}
+
 function _create_jenkins_namespace() {
    jenkins_namespace="${1:-jenkins}"
    export namespace="${jenkins_namespace}"
@@ -207,6 +316,32 @@ function _create_jenkins_namespace() {
 
 function _create_jenkins_pv_pvc() {
    local jenkins_namespace=$1
+
+   local host_path="${JENKINS_HOME_PATH:-${SCRIPT_DIR}/storage/jenkins_home}"
+   if [[ -n "$host_path" ]]; then
+      mkdir -p "$host_path"
+   fi
+
+   if _kubectl --no-exit get pv jenkins-home-pv >/dev/null 2>&1; then
+      return 0
+   fi
+
+   local cluster="${CLUSTER_NAME:-}"
+   if [[ -z "$cluster" ]]; then
+      if cluster=$(_jenkins_detect_cluster_name 2>/dev/null); then
+         CLUSTER_NAME="$cluster"
+      else
+         cluster=""
+      fi
+   fi
+
+   if [[ -n "$cluster" ]]; then
+      if ! _jenkins_require_hostpath_mounts "$cluster"; then
+         local missing="${JENKINS_MISSING_HOSTPATH_NODES:-unknown}"
+         printf 'Missing hostPath mount for Jenkins home on node(s): %s. Update your cluster configuration or rerun create_cluster.\n' "$missing" >&2
+         return 1
+      fi
+   fi
 
    jenkins_pv_template="$(dirname "$SOURCE")/etc/jenkins/jenkins-home-pv.yaml.tmpl"
    if [[ ! -r "$jenkins_pv_template" ]]; then
@@ -446,8 +581,28 @@ function deploy_jenkins() {
 
    _jenkins_configure_leaf_host_defaults
 
-   deploy_vault ha "$vault_namespace" "$vault_release"
-   _ensure_vault_agent_injector "$vault_namespace" "$vault_release" "${JENKINS_ENABLE_VAULT_AGENT_INJECTOR:-1}"
+   local injector_request="${JENKINS_ENABLE_VAULT_AGENT_INJECTOR:-1}"
+   local injector_setting=""
+   case "$injector_request" in
+      1|true|TRUE|True|yes|YES)
+         injector_setting=true
+         ;;
+      0|false|FALSE|False|no|NO)
+         injector_setting=false
+         ;;
+      "")
+         injector_setting=""
+         ;;
+      *)
+         injector_setting="$injector_request"
+         ;;
+   esac
+
+   if [[ -n "$injector_setting" ]]; then
+      VAULT_ENABLE_INJECTOR="$injector_setting" deploy_vault ha "$vault_namespace" "$vault_release"
+   else
+      deploy_vault ha "$vault_namespace" "$vault_release"
+   fi
    _create_jenkins_admin_vault_policy "$vault_namespace" "$vault_release"
    _create_jenkins_vault_ad_policy "$vault_namespace" "$vault_release" "$jenkins_namespace"
    _create_jenkins_cert_rotator_policy "$vault_namespace" "$vault_release" "" "" "$jenkins_namespace"
@@ -518,13 +673,13 @@ function _deploy_jenkins() {
    if [[ -n "$_JENKINS_PREV_EXIT_TRAP_HANDLER" ]]; then
       exit_trap_cmd+="; ${_JENKINS_PREV_EXIT_TRAP_HANDLER}"
    fi
-   trap '$exit_trap_cmd' EXIT
+   trap "$exit_trap_cmd" EXIT
 
    local return_trap_cmd="_jenkins_cleanup_rendered_manifests RETURN"
    if [[ -n "$_JENKINS_PREV_RETURN_TRAP_HANDLER" ]]; then
       return_trap_cmd+="; ${_JENKINS_PREV_RETURN_TRAP_HANDLER}"
    fi
-   trap '$return_trap_cmd' RETURN
+   trap "$return_trap_cmd" RETURN
 
    if (( ! skip_repo_ops )); then
      if ! _helm repo list 2>/dev/null | grep -q jenkins; then
@@ -573,7 +728,7 @@ function _deploy_jenkins() {
    fi
 
    JENKINS_NAMESPACE="${ns:-${JENKINS_NAMESPACE}}"
-   :"${JENKINS_NAMESPACE:?JENKINKS_NAMESPACE not set}"
+   : "${JENKINS_NAMESPACE:?JENKINS_NAMESPACE not set}"
    local vs_template="$JENKINS_CONFIG_DIR/virtualservice.yaml.tmpl"
    if [[ ! -r "$vs_template" ]]; then
       _err "VirtualService template file not found: $vs_template"
@@ -598,6 +753,20 @@ function _deploy_jenkins() {
    done
    if (( ${#vs_hosts_lines[@]} == 0 )); then
       vs_hosts_lines=("    - jenkins.dev.local.me")
+   fi
+
+   if [[ -n "${vault_pki_leaf_host:-}" ]]; then
+      local host_entry="    - ${vault_pki_leaf_host}"
+      local found_leaf=0
+      for existing in "${vs_hosts_lines[@]}"; do
+         if [[ "$existing" == "$host_entry" ]]; then
+            found_leaf=1
+            break
+         fi
+      done
+      if (( ! found_leaf )); then
+         vs_hosts_lines+=("$host_entry")
+      fi
    fi
    local JENKINS_VIRTUALSERVICE_HOSTS_YAML
    printf -v JENKINS_VIRTUALSERVICE_HOSTS_YAML '%s\n' "${vs_hosts_lines[@]}"
@@ -643,7 +812,26 @@ function _deploy_jenkins() {
       return "$rc"
    fi
 
-   if [[ "${JENKINS_CERT_ROTATOR_ENABLED:-0}" == "1" ]]; then
+   local rotator_enabled="${JENKINS_CERT_ROTATOR_ENABLED:-1}"
+
+   if [[ "$rotator_enabled" == "1" ]]; then
+      export JENKINS_CERT_ROTATOR_ENABLED="$rotator_enabled"
+
+      local rotator_name="${JENKINS_CERT_ROTATOR_NAME:-${JENKINS_CERT_ROTATOR_NAME_DEFAULT:-jenkins-cert-rotator}}"
+      local rotator_sa="${JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT:-${JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT_DEFAULT:-jenkins-cert-rotator}}"
+      local rotator_schedule="${JENKINS_CERT_ROTATOR_SCHEDULE:-${JENKINS_CERT_ROTATOR_SCHEDULE_DEFAULT:-0 */12 * * *}}"
+      local rotator_image="${JENKINS_CERT_ROTATOR_IMAGE:-${JENKINS_CERT_ROTATOR_IMAGE_DEFAULT:-docker.io/google/cloud-sdk:slim}}"
+      local rotator_vault_role="${JENKINS_CERT_ROTATOR_VAULT_ROLE:-${JENKINS_CERT_ROTATOR_VAULT_ROLE_DEFAULT:-jenkins-cert-rotator}}"
+      local rotator_renew_before="${JENKINS_CERT_ROTATOR_RENEW_BEFORE:-${JENKINS_CERT_ROTATOR_RENEW_BEFORE_DEFAULT:-432000}}"
+      local rotator_alt_names="${JENKINS_CERT_ROTATOR_ALT_NAMES:-${JENKINS_CERT_ROTATOR_ALT_NAMES_DEFAULT:-}}"
+
+      export JENKINS_CERT_ROTATOR_NAME="$rotator_name"
+      export JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT="$rotator_sa"
+      export JENKINS_CERT_ROTATOR_SCHEDULE="$rotator_schedule"
+      export JENKINS_CERT_ROTATOR_IMAGE="$rotator_image"
+      export JENKINS_CERT_ROTATOR_VAULT_ROLE="$rotator_vault_role"
+      export JENKINS_CERT_ROTATOR_RENEW_BEFORE="$rotator_renew_before"
+      export JENKINS_CERT_ROTATOR_ALT_NAMES="$rotator_alt_names"
       local rotator_template="$JENKINS_CONFIG_DIR/jenkins-cert-rotator.yaml.tmpl"
       local rotator_script="$JENKINS_CONFIG_DIR/cert-rotator.sh"
       local rotator_lib="$SCRIPT_DIR/lib/vault_pki.sh"
