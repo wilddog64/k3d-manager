@@ -46,6 +46,7 @@ controller:
     - pipeline-utility-steps
     - plain-credentials
     - plugin-util-api
+    - powershell
     - script-security
     - ssh-credentials
     - ssh-slaves
@@ -62,6 +63,10 @@ controller:
       value: "-Djenkins.install.runSetupWizard=false"
     - name: JENKINS_OPTS
       value: "--httpPort=8080 --httpListenAddress=0.0.0.0"
+    - name: JENKINS_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
 
   serviceAccount:
     create: true
@@ -126,8 +131,6 @@ controller:
                 - "Overall/Administer:${JENKINS_ADMIN_USER}"
                 - "Overall/Read:it devops"
                 - "Overall/Administer:it devops"
-                - "Overall/Read:it devops"
-                - "Overall/Administer:it devops"
           securityRealm:
             activeDirectory:
               bindPassword: "${file:/vault/secrets/ad-ldap-bind-password}"
@@ -146,3 +149,62 @@ controller:
               removeIrrelevantGroups: false
               requireTLS: true
               startTls: true
+      02-kubernetes-agents: |
+        jenkins:
+          clouds:
+            - kubernetes:
+                name: "in-cluster"
+                namespace: "${JENKINS_NAMESPACE}"
+                serverUrl: "https://kubernetes.default.svc"
+                skipTlsVerify: true
+                jenkinsUrl: "http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8080"
+                connectTimeout: "5"
+                readTimeout: "15"
+                maxRequestsPerHostStr: "32"
+                containerCapStr: "10"
+                templates:
+                  - name: "linux-build-agent"
+                    label: "linux-build-agent"
+                    nodeUsageMode: NORMAL
+                    idleMinutes: 5
+                    serviceAccount: "jenkins"
+                    containers:
+                      - name: "jnlp"
+                        image: "jenkins/inbound-agent:alpine-jdk17"
+                        args: "${computer.jnlpmac} ${computer.name}"
+                        resourceRequestCpu: "100m"
+                        resourceRequestMemory: "256Mi"
+                        resourceLimitCpu: "500m"
+                        resourceLimitMemory: "512Mi"
+                        workingDir: "/home/jenkins/agent"
+                        ttyEnabled: false
+                    workspaceVolume:
+                      emptyDirWorkspaceVolume:
+                        memory: false
+                  - name: "powershell-build-agent"
+                    label: "powershell-build-agent"
+                    nodeUsageMode: NORMAL
+                    idleMinutes: 5
+                    serviceAccount: "jenkins"
+                    containers:
+                      - name: "jnlp"
+                        image: "jenkins/inbound-agent:alpine-jdk17"
+                        args: "${computer.jnlpmac} ${computer.name}"
+                        resourceRequestCpu: "100m"
+                        resourceRequestMemory: "512Mi"
+                        resourceLimitCpu: "750m"
+                        resourceLimitMemory: "1Gi"
+                        workingDir: "/home/jenkins/agent"
+                        ttyEnabled: false
+                      - name: "pwsh"
+                        image: "mcr.microsoft.com/powershell:lts-debian-11"
+                        command: "/bin/sh -c"
+                        args: "while true; do sleep 3600; done"
+                        ttyEnabled: true
+                        workingDir: "/workspace"
+                    workspaceVolume:
+                      emptyDirWorkspaceVolume:
+                        memory: false
+      03-disable-master-executor: |
+        jenkins:
+          numExecutors: 0
