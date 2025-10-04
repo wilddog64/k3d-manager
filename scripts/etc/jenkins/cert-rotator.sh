@@ -146,22 +146,32 @@ function discover_kubectl() {
       return 1
    fi
 
+   local -a search_entries=()
+   if [[ -n "${JENKINS_CERT_ROTATOR_KUBECTL_PATHS:-}" ]]; then
+      IFS=':' read -r -a search_entries <<<"${JENKINS_CERT_ROTATOR_KUBECTL_PATHS}"
+      local entry
+      for entry in "${search_entries[@]}"; do
+         if [[ -z "$entry" ]]; then
+            continue
+         fi
+         if resolved=$(resolve_kubectl_entry "$entry" 2>/dev/null); then
+            printf '%s' "$resolved"
+            return 0
+         fi
+      done
+   fi
+
    if resolved=$(resolve_kubectl_entry kubectl 2>/dev/null); then
       printf '%s' "$resolved"
       return 0
    fi
 
-   local -a search_entries=()
-   if [[ -n "${JENKINS_CERT_ROTATOR_KUBECTL_PATHS:-}" ]]; then
-      IFS=':' read -r -a search_entries <<<"${JENKINS_CERT_ROTATOR_KUBECTL_PATHS}"
-   else
-      search_entries=(
-         "$HOME/google-cloud-sdk/bin"
-         /google-cloud-sdk/bin
-         /usr/local/google-cloud-sdk/bin
-         /usr/lib/google-cloud-sdk/bin
-      )
-   fi
+   search_entries=(
+      "$HOME/google-cloud-sdk/bin"
+      /google-cloud-sdk/bin
+      /usr/local/google-cloud-sdk/bin
+      /usr/lib/google-cloud-sdk/bin
+   )
 
    local entry
    for entry in "${search_entries[@]}"; do
