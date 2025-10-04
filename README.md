@@ -41,6 +41,15 @@ Set `CLUSTER_PROVIDER` to select a different backend module:
 ```bash
 CLUSTER_PROVIDER=k3d ./scripts/k3d-manager deploy_cluster
 ```
+
+### Custom providers
+
+The provider loader can source additional modules from `scripts/lib/providers/`.
+Create a file named `scripts/lib/providers/<name>.sh`, implement the
+`_provider_<name>_*` functions you need, and export
+`CLUSTER_PROVIDER=<name>` before calling `./scripts/k3d-manager`.  See
+[`docs/cluster-providers.md`](docs/cluster-providers.md) for the full API surface
+and a minimal skeleton module.
 ## Using k3s clusters
 
 The helper scripts in this repository now understand a `k3s` provider in addition
