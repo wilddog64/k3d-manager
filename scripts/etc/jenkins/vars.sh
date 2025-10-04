@@ -1,5 +1,7 @@
 export JENKINS_NAMESPACE="jenkins"
 export JENKINS_HOME_PATH="$SCRIPT_DIR/storage/jenkins_home"
+export VAULT_ENABLE_INJECTOR="${VAULT_ENABLE_INJECTOR:-true}"
+export JENKINS_ENABLE_VAULT_AGENT_INJECTOR="${JENKINS_ENABLE_VAULT_AGENT_INJECTOR:-1}"
 
 # Optional: immediately mint a cert to a K8s tls secret via Istio
 export VAULT_PKI_ISSUE_SECRET="${VAULT_PKI_ISSUE_SECRET:-1}"   # 1 to emit a tls Secret
