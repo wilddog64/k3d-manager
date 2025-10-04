@@ -79,13 +79,13 @@ spec:
                   /opt/jenkins-cert-rotator/cert-rotator.sh
               env:
                 - name: VAULT_ADDR
-                  value: "${JENKINS_CERT_ROTATOR_VAULT_ADDR}"
+                  value: "${VAULT_ADDR}"
                 - name: VAULT_PKI_PATH
-                  value: "${VAULT_PKI_PATH:-pki}"
+                  value: "${VAULT_PKI_PATH}"
                 - name: VAULT_PKI_ROLE
                   value: "${VAULT_PKI_ROLE}"
                 - name: VAULT_PKI_ROLE_TTL
-                  value: "${VAULT_PKI_ROLE_TTL:-}"
+                  value: "${VAULT_PKI_ROLE_TTL}"
                 - name: VAULT_PKI_SECRET_NS
                   value: "${VAULT_PKI_SECRET_NS}"
                 - name: VAULT_PKI_SECRET_NAME
@@ -93,17 +93,17 @@ spec:
                 - name: VAULT_PKI_LEAF_HOST
                   value: "${VAULT_PKI_LEAF_HOST}"
                 - name: VAULT_NAMESPACE
-                  value: "${VAULT_NAMESPACE:-}"
+                  value: "${VAULT_NAMESPACE}"
                 - name: VAULT_SKIP_VERIFY
-                  value: "${VAULT_SKIP_VERIFY:-}"
+                  value: "${VAULT_SKIP_VERIFY}"
                 - name: VAULT_CACERT
-                  value: "${VAULT_CACERT:-}"
+                  value: "${VAULT_CACERT}"
                 - name: JENKINS_CERT_ROTATOR_RENEW_BEFORE
                   value: "${JENKINS_CERT_ROTATOR_RENEW_BEFORE}"
                 - name: JENKINS_CERT_ROTATOR_VAULT_ROLE
                   value: "${JENKINS_CERT_ROTATOR_VAULT_ROLE}"
                 - name: JENKINS_CERT_ROTATOR_ALT_NAMES
-                  value: "${JENKINS_CERT_ROTATOR_ALT_NAMES:-}"
+                  value: "${JENKINS_CERT_ROTATOR_ALT_NAMES}"
               volumeMounts:
                 - name: rotator-script
                   mountPath: /opt/jenkins-cert-rotator
