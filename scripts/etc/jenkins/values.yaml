@@ -126,6 +126,8 @@ controller:
                 - "Overall/Administer:${JENKINS_ADMIN_USER}"
                 - "Overall/Read:group:it devops"
                 - "Overall/Administer:group:it devops"
+                - "Overall/Read:it devops"
+                - "Overall/Administer:it devops"
           securityRealm:
             activeDirectory:
               bindPassword: "${file:/vault/secrets/ad-ldap-bind-password}"
