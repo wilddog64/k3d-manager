@@ -447,6 +447,7 @@ function deploy_jenkins() {
    _jenkins_configure_leaf_host_defaults
 
    deploy_vault ha "$vault_namespace" "$vault_release"
+   _ensure_vault_agent_injector "$vault_namespace" "$vault_release" "${JENKINS_ENABLE_VAULT_AGENT_INJECTOR:-1}"
    _create_jenkins_admin_vault_policy "$vault_namespace" "$vault_release"
    _create_jenkins_vault_ad_policy "$vault_namespace" "$vault_release" "$jenkins_namespace"
    _create_jenkins_cert_rotator_policy "$vault_namespace" "$vault_release" "" "" "$jenkins_namespace"
