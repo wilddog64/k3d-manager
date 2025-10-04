@@ -349,6 +349,24 @@ deploy_jenkins`.
 | Debian/Ubuntu | `sudo apt install gettext` |
 | Fedora/RHEL/CentOS | `sudo dnf install gettext` |
 
+### Dynamic build agents
+
+`deploy_jenkins` now seeds two Kubernetes pod templates via Jenkins
+Configuration-as-Code. Each template is marked `EXCLUSIVE`, so jobs must request
+the matching label:
+
+- `linux-build-agent` uses the controller-configured JNLP image
+  (`jenkins/inbound-agent:latest`) and provides a plain Linux workspace for
+  traditional builds.
+- `powershell-build-agent` relies on the same auto-injected JNLP container but
+  adds a `pwsh` sidecar (`mcr.microsoft.com/powershell:lts-debian-11`) for
+  PowerShell-heavy pipelines.
+
+Both templates run under the `jenkins` service account, derive the namespace via
+the downward API, and keep the controller free of build work (the Helm values
+set `numExecutors` to `0`). Target either agent with `agent { label '...' }` in
+your Jenkinsfile to launch ephemeral pods inside the cluster.
+
 #### Disconnected clusters and preloaded charts
 
 Air-gapped environments can still deploy the Jenkins and External Secrets
