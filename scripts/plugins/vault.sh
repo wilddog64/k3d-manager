@@ -204,19 +204,6 @@ function _vault_bootstrap_ha() {
       _err "[vault] not deployed in ns=$ns release=$release" >&2
   fi
 
-  if  _run_command --no-exit -- \
-     kubectl --no-exit exec -n "$ns" -it "$leader" -- vault status >/dev/null 2>&1; then
-      echo "[vault] already initialized"
-      return 0
-  fi
-
-  # check if vault sealed or not
-  if _run_command --no-exit -- \
-     kubectl exec -n "$ns" -it "$leader" -- vault status 2>&1 | grep -q 'unseal'; then
-      _warn "[vault] already initialized (sealed), skipping init"
-      return 0
-  fi
-
   local jsonfile="$(mktemp -t vault-init.XXXXXX.json)";
   trap '$(_cleanup_trap_command "$jsonfile")' EXIT TERM
   _kubectl wait -n "$ns" --for=condition=PodScheduled pod/"$leader" --timeout=120s
@@ -232,10 +219,30 @@ function _vault_bootstrap_ha() {
       fi
   done
   local vault_init=$(_kubectl --no-exit -n "$ns" exec -i "$leader" -- vault status -format json | jq -r '.initialized')
+  local status_json=$(_kubectl --no-exit -n "$ns" exec -i "$leader" -- \
+     vault status -format json 2>/dev/null || true)
+  local vault_sealed=$(printf '%s' "$status_json" | jq -r '.sealed')
+
+  _xv_off
   if [[ "$vault_init" == "true" ]]; then
-     _warn "[vault] already initialized, skipping init"
+     if [[ "$vault_sealed" == "true" ]]; then
+        local unseal_key="$(_kubectl -n "$ns" get secret vault-unseal-o jsonpath='{.data.unseal_key}')"
+        if [[ -z "$unseal_key" ]]; then
+           _err "[vault] vault-root secret not found in namespace '$ns'"
+        fi
+
+        for pod in $(_kubectl -n "$ns" get pod -o name); do
+           pod="${pod#pod/}"
+           printf '%s' "$unseal_key" | base64 -d | _kubectl -n "$ns" exec -i "$pod" -- \
+              sh -lc "vault operator unseal /dev/stdin" >/dev/null 2>&1
+           _info "[vault] unsealed $pod"
+        done
+     else
+        _warn "[vault] already initialized, skipping init"
+     fi
      return 0
   fi
+  _xv_on
   _kubectl -n "$ns" exec -it "$leader" -- \
      sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json' \
      > "$jsonfile"
