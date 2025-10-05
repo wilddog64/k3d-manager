@@ -175,7 +175,6 @@ controller:
                     containers:
                       - name: "jnlp"
                         image: "jenkins/inbound-agent:alpine:latest"
-                        args: "${computer.jnlpmac} ${computer.name}"
                         resourceRequestCpu: "100m"
                         resourceRequestMemory: "256Mi"
                         resourceLimitCpu: "500m"
@@ -196,7 +195,6 @@ controller:
                     containers:
                       - name: "jnlp"
                         image: "jenkins/inbound-agent:alpine:latest"
-                        args: "${computer.jnlpmac} ${computer.name}"
                         resourceRequestCpu: "100m"
                         resourceRequestMemory: "512Mi"
                         resourceLimitCpu: "750m"
@@ -205,7 +203,6 @@ controller:
                         runAsGroup: 1000
                         workingDir: "/home/jenkins/agent"
                         ttyEnabled: true
-                        allowPrivilegeEscalation: false
                       - name: "pwsh"
                         image: "mcr.microsoft.com/powershell:lts-debian-11"
                         command: "sleep"
