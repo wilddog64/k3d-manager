@@ -179,12 +179,10 @@ controller:
                         resourceRequestMemory: "256Mi"
                         resourceLimitCpu: "500m"
                         resourceLimitMemory: "512Mi"
+                        runAsUser: 1000
+                        runAsGroup: 1000
                         workingDir: "/home/jenkins/agent"
                         ttyEnabled: true
-                        securityContext:
-                          runAsUser: 1000
-                          runAsGroup: 1000
-                          allowPrivilegeEscalation: false
                     workspaceVolume:
                       emptyDirWorkspaceVolume:
                         memory: false
@@ -202,12 +200,11 @@ controller:
                         resourceRequestMemory: "512Mi"
                         resourceLimitCpu: "750m"
                         resourceLimitMemory: "1Gi"
+                        runAsUser: 1000
+                        runAsGroup: 1000
                         workingDir: "/home/jenkins/agent"
                         ttyEnabled: true
-                        securityContext:
-                          runAsUser: 1000
-                          runAsGroup: 1000
-                          allowPrivilegeEscalation: false
+                        allowPrivilegeEscalation: false
                       - name: "pwsh"
                         image: "mcr.microsoft.com/powershell:lts-debian-11"
                         command: "sleep"
