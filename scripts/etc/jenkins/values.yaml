@@ -147,7 +147,7 @@ controller:
                   tlsConfiguration: "TRUST_ALL_CERTIFICATES"
               groupLookupStrategy: "TOKENGROUPS"
               internalUsersDatabase:
-                jenkinsInternalUser: "jenkins-admin"
+                jenkinsInternalUser: "${JENKINS_ADMIN_USER}"
               removeIrrelevantGroups: false
               requireTLS: true
               startTls: true
@@ -170,16 +170,21 @@ controller:
                     nodeUsageMode: NORMAL
                     idleMinutes: 5
                     serviceAccount: "jenkins"
+                    agentInjection: true
                     containers:
                       - name: "jnlp"
-                        image: "jenkins/inbound-agent:alpine-jdk17"
+                        image: "jenkins/inbound-agent:alpine:latest"
                         args: "${computer.jnlpmac} ${computer.name}"
                         resourceRequestCpu: "100m"
                         resourceRequestMemory: "256Mi"
                         resourceLimitCpu: "500m"
                         resourceLimitMemory: "512Mi"
                         workingDir: "/home/jenkins/agent"
-                        ttyEnabled: false
+                        ttyEnabled: true
+                        securityContext:
+                          runAsUser: 1000
+                          runAsGroup: 1000
+                          allowPrivilegeEscalation: false
                     workspaceVolume:
                       emptyDirWorkspaceVolume:
                         memory: false
@@ -188,20 +193,25 @@ controller:
                     nodeUsageMode: NORMAL
                     idleMinutes: 5
                     serviceAccount: "jenkins"
+                    agentInjection: true
                     containers:
                       - name: "jnlp"
-                        image: "jenkins/inbound-agent:alpine-jdk17"
+                        image: "jenkins/inbound-agent:alpine:latest"
                         args: "${computer.jnlpmac} ${computer.name}"
                         resourceRequestCpu: "100m"
                         resourceRequestMemory: "512Mi"
                         resourceLimitCpu: "750m"
                         resourceLimitMemory: "1Gi"
                         workingDir: "/home/jenkins/agent"
-                        ttyEnabled: false
+                        ttyEnabled: true
+                        securityContext:
+                          runAsUser: 1000
+                          runAsGroup: 1000
+                          allowPrivilegeEscalation: false
                       - name: "pwsh"
                         image: "mcr.microsoft.com/powershell:lts-debian-11"
-                        command: "/bin/sh -c"
-                        args: "while true; do sleep 3600; done"
+                        command: "sleep"
+                        args: "99d"
                         ttyEnabled: true
                         workingDir: "/workspace"
                     workspaceVolume:
