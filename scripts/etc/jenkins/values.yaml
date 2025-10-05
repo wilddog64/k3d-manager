@@ -131,6 +131,7 @@ controller:
                 - "Overall/Administer:${JENKINS_ADMIN_USER}"
                 - "Overall/Read:it devops"
                 - "Overall/Administer:it devops"
+                - "Overall/Read:authenticated"
                 - "Overall/Administer:group:it devops"
                 - "Overall/Read:group:it devops"
           securityRealm:
