@@ -223,7 +223,6 @@ function _vault_bootstrap_ha() {
      vault status -format json 2>/dev/null || true)
   local vault_sealed=$(printf '%s' "$status_json" | jq -r '.sealed')
 
-  _xv_off
   if [[ "$vault_init" == "true" ]]; then
      if [[ "$vault_sealed" == "true" ]]; then
         local unseal_key="$(_kubectl -n "$ns" get secret vault-unseal-o jsonpath='{.data.unseal_key}')"
@@ -242,7 +241,7 @@ function _vault_bootstrap_ha() {
      fi
      return 0
   fi
-  _xv_on
+
   _kubectl -n "$ns" exec -it "$leader" -- \
      sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json' \
      > "$jsonfile"
