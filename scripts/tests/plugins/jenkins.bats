@@ -7,6 +7,10 @@ setup() {
   init_test_env
   source "${BATS_TEST_DIRNAME}/../../plugins/jenkins.sh"
   export_stubs
+  export JENKINS_HOME_PATH="${BATS_TEST_TMPDIR}/jenkins_home"
+  mkdir -p "$JENKINS_HOME_PATH"
+  export KUBECONFIG="${BATS_TEST_TMPDIR}/kubeconfig"
+  : > "$KUBECONFIG"
   K3D_LOG="$BATS_TEST_TMPDIR/k3d.log"
   : > "$K3D_LOG"
   _k3d() { echo "$*" >> "$K3D_LOG"; }
@@ -16,6 +20,8 @@ setup() {
   export MINIMAL_JQ_HELPER
   SYSTEM_JQ_CMD="${SYSTEM_JQ_CMD:-$(command -v jq || true)}"
   export SYSTEM_JQ_CMD
+  _vault_issue_pki_tls_secret() { :; }
+  export -f _vault_issue_pki_tls_secret
 }
 
 @test "Jenkins trap wrapper preserves original script arguments" {
@@ -120,9 +126,10 @@ EOF
 
 @test "PV/PVC setup" {
   KUBECTL_EXIT_CODES=(1 0)
-  jhp="$SCRIPT_DIR/storage/jenkins_home"
+  jhp="$JENKINS_HOME_PATH"
   echo "JENKINS_HOME_PATH=$jhp"
   rm -rf "$jhp"
+  mkdir -p "$jhp"
   CLUSTER_NAME="testcluster"
   export CLUSTER_NAME
   local mount_check_log="$BATS_TEST_TMPDIR/mount-check.log"
@@ -172,8 +179,9 @@ EOF
 
 @test "PV/PVC setup auto-detects cluster" {
   KUBECTL_EXIT_CODES=(1 0)
-  jhp="$SCRIPT_DIR/storage/jenkins_home"
+  jhp="$JENKINS_HOME_PATH"
   rm -rf "$jhp"
+  mkdir -p "$jhp"
   unset CLUSTER_NAME
   local mount_check_log="$BATS_TEST_TMPDIR/mount-check.log"
   : >"$mount_check_log"
@@ -207,8 +215,9 @@ EOF
 
 @test "PV/PVC setup aborts when Jenkins mount missing" {
   KUBECTL_EXIT_CODES=(1)
-  jhp="$SCRIPT_DIR/storage/jenkins_home"
+  jhp="$JENKINS_HOME_PATH"
   rm -rf "$jhp"
+  mkdir -p "$jhp"
   CLUSTER_NAME="broken"
   export CLUSTER_NAME
   _jenkins_require_hostpath_mounts() {

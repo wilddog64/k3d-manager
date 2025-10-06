@@ -125,6 +125,72 @@ function _secret_tool() {
    _run_command --quiet -- secret-tool "$@"
 }
 
+function _ensure_jq() {
+   _command_exist jq && return 0
+
+   if _is_mac; then
+      _run_command --quiet -- brew install jq
+      return
+   fi
+
+   if _is_debian_family; then
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y jq
+      return
+   fi
+
+   if _is_redhat_family; then
+      if _command_exist dnf; then
+         _run_command --prefer-sudo -- dnf install -y jq
+      else
+         _run_command --prefer-sudo -- yum install -y jq
+      fi
+      return
+   fi
+
+   if _is_wsl && _command_exist apt-get; then
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y jq
+      return
+   fi
+
+   _err "Package manager not found to install jq"
+}
+
+function _ensure_envsubst() {
+   if command -v envsubst >/dev/null 2>&1; then
+      return 0
+   fi
+
+   if _is_mac; then
+      _run_command --quiet -- brew install gettext
+      return
+   fi
+
+   if _is_debian_family; then
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y gettext-base
+      return
+   fi
+
+   if _is_redhat_family; then
+      if _command_exist dnf; then
+         _run_command --prefer-sudo -- dnf install -y gettext
+      else
+         _run_command --prefer-sudo -- yum install -y gettext
+      fi
+      return
+   fi
+
+   if _is_wsl && _command_exist apt-get; then
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y gettext-base
+      return
+   fi
+
+   _err "Package manager not found to install envsubst"
+}
+
 # macOS only
 function _security() {
    _run_command --quiet -- security "$@"
@@ -803,3 +869,99 @@ function _no_trace() {
   (( wasx )) && set -x
   return $rc
 }
+
+# Validate that all variables referenced in templates are set & non-empty,
+# using values/defaults from a given vars file. Avoid double-sourcing by
+# marking each env file as loaded via a unique path-based marker variable.
+#
+# Usage:
+#   validate_variables /path/to/vars.sh /path/to/template1 [template2 ...] [--allow-empty VAR]...
+#
+# In vars.sh you may also define:
+#   export ALLOW_EMPTY_VARS=(VAR1 VAR2)
+#
+function validate_variables() {
+  local vars_file templates=() extra_allow=()
+
+  # --- parse args ---
+  if (($# == 0)); then
+    echo "ERROR: _validate_variables requires at least a vars file" >&2
+    return 1
+  fi
+  vars_file=$1; shift
+  while (($#)); do
+    case "$1" in
+      --allow-empty)
+        shift
+        [[ $# -gt 0 ]] || { echo "ERROR: --allow-empty needs a var name" >&2; return 1; }
+        extra_allow+=("$1"); shift
+        ;;
+      *)
+        templates+=("$1"); shift
+        ;;
+    esac
+  done
+
+  [[ -r "$vars_file" ]] || { echo "ERROR: vars file not readable: $vars_file" >&2; return 1; }
+  ((${#templates[@]})) || { echo "ERROR: no templates provided to validate" >&2; return 1; }
+
+  # --- compute absolute path + a unique marker var for this env file ---
+  local abs_dir abs_vars_file marker
+  abs_dir="$(cd "$(dirname "$vars_file")" && pwd)"
+  abs_vars_file="$abs_dir/$(basename "$vars_file")"
+  marker="_ENV_LOADED_${abs_vars_file//[^A-Za-z0-9_]/_}"
+  marker="${marker^^}"  # uppercase
+
+  # --- source vars.sh only once per env file ---
+  if [[ -z "${!marker-}" ]]; then
+    # shellcheck disable=SC1090
+    source "$abs_vars_file"
+    printf -v "$marker" '1'
+    export "$marker"
+  fi
+
+  # --- collect allow-empty list: from env file + extra arguments ---
+  local -a allow_empty=()
+  if declare -p ALLOW_EMPTY_VARS >/dev/null 2>&1; then
+    # shellcheck disable=SC2154
+    allow_empty+=("${ALLOW_EMPTY_VARS[@]}")
+  fi
+  if ((${#extra_allow[@]})); then
+    allow_empty+=("${extra_allow[@]}")
+  fi
+
+  _is_allowed_empty() {
+    local v=$1 x
+    for x in "${allow_empty[@]}"; do [[ "$v" == "$x" ]] && return 0; done
+    return 1
+  }
+
+  # --- extract vars from templates: $VAR, ${VAR}, ${VAR:-...} ---
+  local -a template_vars=() tmp out t
+  for t in "${templates[@]}"; do
+    [[ -r "$t" ]] || { echo "ERROR: template not readable: $t" >&2; return 1; }
+    while IFS= read -r out; do
+      template_vars+=("$out")
+    done < <(
+      grep -oE '\$\{[A-Za-z_][A-Za-z0-9_]*(?::-[^}]*)?\}|\$[A-Za-z_][A-Za-z0-9_]*' "$t" |
+      sed -E 's/^\$\{([A-Za-z_][A-Za-z0-9_]*)[:}].*/\1/; s/^\$([A-Za-z_][A-Za-z0-9_]*).*/\1/' |
+      sort -u
+    )
+  done
+
+  # --- validate: must be set & non-empty unless allowed empty ---
+  local -a missing=() v
+  for v in "${template_vars[@]}"; do
+    _is_allowed_empty "$v" && continue
+    # use ${!v-} so unset → empty, safe with `set -u`
+    [[ -n "${!v-}" ]] || missing+=("$v")
+  done
+
+  if ((${#missing[@]})); then
+    echo "ERROR: missing required variables: ${missing[*]}" >&2
+    echo "Hint: define them in $abs_vars_file or add to ALLOW_EMPTY_VARS/--allow-empty." >&2
+    return 1
+  fi
+  return 0
+}
+

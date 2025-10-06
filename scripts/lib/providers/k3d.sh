@@ -68,6 +68,8 @@ function _provider_k3d_install() {
 function _provider_k3d_configure_istio() {
    local cluster_name=$1
 
+   _ensure_envsubst
+
    local istio_yaml_template="${SCRIPT_DIR}/etc/istio-operator.yaml.tmpl"
    local istio_var="${SCRIPT_DIR}/etc/istio_var.sh"
 
@@ -104,6 +106,8 @@ function _provider_k3d_create_cluster() {
    local cluster_name=$1
    local http_port="${2:-8000}"
    local https_port="${3:-8443}"
+
+   _ensure_envsubst
 
    export CLUSTER_NAME="$cluster_name"
    export HTTP_PORT="$http_port"

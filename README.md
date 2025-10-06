@@ -41,6 +41,15 @@ Set `CLUSTER_PROVIDER` to select a different backend module:
 ```bash
 CLUSTER_PROVIDER=k3d ./scripts/k3d-manager deploy_cluster
 ```
+
+### Custom providers
+
+The provider loader can source additional modules from `scripts/lib/providers/`.
+Create a file named `scripts/lib/providers/<name>.sh`, implement the
+`_provider_<name>_*` functions you need, and export
+`CLUSTER_PROVIDER=<name>` before calling `./scripts/k3d-manager`.  See
+[`docs/cluster-providers.md`](docs/cluster-providers.md) for the full API surface
+and a minimal skeleton module.
 ## Using k3s clusters
 
 The helper scripts in this repository now understand a `k3s` provider in addition
@@ -204,7 +213,9 @@ graph TD
   KM --> SYS[lib/system.sh]
   KM --> CORE[lib/core.sh]
   KM --> TEST[lib/test.sh]
+  KM --> PROVIDER[lib/provider.sh]
   KM --|_try_load_plugin(func)|--> PLUG[plugins/*.sh]
+  PROVIDER --> PROVMOD[scripts/lib/providers/*.sh]
   PLUG --> HELM[helm]
   PLUG --> KUB[kubectl]
   PLUG --> JPLUG[plugins/jenkins.sh]
@@ -214,15 +225,16 @@ graph TD
   ROTATOR --> ESO
   CORE --> HELM
   CORE --> KUB
+  PROVMOD --> API[k3d/k3s CLI]
   subgraph Cluster
-     K3D[k3d/k3s API] --> K8S[Kubernetes]
+     API --> K8S[Kubernetes]
      ISTIO[Istio] --> K8S
      ESO[External Secrets Operator] --> K8S
      JENKINS --> K8S
      ROTATOR --> K8S
   end
-  HELM --> K3D
-  KUB --> K3D
+  HELM --> API
+  KUB --> API
 
   subgraph Providers
      VAULT[HashiCorp Vault]
@@ -243,9 +255,11 @@ sequenceDiagram
   participant KM as k3d-manager
   participant SYS as _try_load_plugin / wrappers
   participant J as deploy_jenkins plugin
+  participant P as provider loader
+  participant M as provider module
   participant T as Jenkins & rotator templates
   participant K as kubectl/helm wrappers
-  participant C as k3d/k3s cluster
+  participant C as cluster API
   participant R as cert rotator CronJob
   participant ESO as External Secrets Operator
   participant V as Vault
@@ -254,6 +268,11 @@ sequenceDiagram
   KM->>SYS: _try_load_plugin("deploy_jenkins")
   SYS->>J: source plugins/jenkins.sh
   SYS->>J: call deploy_jenkins
+  J->>P: _cluster_provider_call(...)
+  P->>M: ensure provider module loaded
+  M->>C: k3d/k3s CLI command
+  M-->>P: cluster info / status
+  P-->>J: provider response
   J->>T: load manifests (workload + rotator CronJob)
   J->>K: _helm install Jenkins\n_kubectl apply rotator (pinned image)
   Note right of K: CronJob image pinned to docker.io/google/cloud-sdk:slim
@@ -265,7 +284,7 @@ sequenceDiagram
   Note over R,V: Rotator keeps Vault and cluster secrets in sync
 ```
 
-The sequence now traces the `deploy_jenkins` flow: k3d-manager sources the Jenkins plugin, renders the workload and rotator manifests, applies them with the pinned Google Cloud SDK-based kubectl image, and shows the CronJob fetching Vault-issued certificates through ESO before refreshing the Kubernetes secret.
+The sequence now traces the `deploy_jenkins` flow: k3d-manager sources the Jenkins plugin, asks the provider loader to dispatch cluster-specific checks, renders the workload and rotator manifests, applies them with the pinned Google Cloud SDK-based kubectl image, and shows the CronJob fetching Vault-issued certificates through ESO before refreshing the Kubernetes secret.
 
 > **Upgrade note:** rerun `./scripts/k3d-manager deploy_jenkins` after pulling this update so the helper refreshes the `jenkins-cert-rotator` Vault policy with the new `pki/revoke` permission. Without the refreshed policy the CronJob cannot call Vault's revoke endpoint and may leave superseded certificates active.
 
@@ -348,6 +367,24 @@ deploy_jenkins`.
 | macOS | `brew install gettext` <br/>`brew link --force gettext` |
 | Debian/Ubuntu | `sudo apt install gettext` |
 | Fedora/RHEL/CentOS | `sudo dnf install gettext` |
+
+### Dynamic build agents
+
+`deploy_jenkins` now seeds two Kubernetes pod templates via Jenkins
+Configuration-as-Code. Each template is marked `EXCLUSIVE`, so jobs must request
+the matching label:
+
+- `linux-build-agent` uses the controller-configured JNLP image
+  (`jenkins/inbound-agent:latest`) and provides a plain Linux workspace for
+  traditional builds.
+- `powershell-build-agent` relies on the same auto-injected JNLP container but
+  adds a `pwsh` sidecar (`mcr.microsoft.com/powershell:lts-debian-11`) for
+  PowerShell-heavy pipelines.
+
+Both templates run under the `jenkins` service account, derive the namespace via
+the downward API, and keep the controller free of build work (the Helm values
+set `numExecutors` to `0`). Target either agent with `agent { label '...' }` in
+your Jenkinsfile to launch ephemeral pods inside the cluster.
 
 #### Disconnected clusters and preloaded charts
 

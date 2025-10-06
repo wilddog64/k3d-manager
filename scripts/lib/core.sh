@@ -161,6 +161,8 @@ function _k3s_render_template() {
    local destination="$2"
    local mode="${3:-0644}"
 
+   _ensure_envsubst
+
    if [[ ! -r "$template" ]]; then
       return 0
    fi
