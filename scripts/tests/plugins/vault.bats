@@ -6,6 +6,12 @@ setup() {
   SCRIPT_DIR="${BATS_TEST_DIRNAME}/../.."
   PLUGINS_DIR="${SCRIPT_DIR}/plugins"
   # shellcheck disable=SC1090
+  source "${SCRIPT_DIR}/lib/provider.sh"
+  # shellcheck disable=SC1090
+  source "${SCRIPT_DIR}/lib/cluster_provider.sh"
+  # shellcheck disable=SC1090
+  source "${SCRIPT_DIR}/lib/system.sh"
+  # shellcheck disable=SC1090
   source "${SCRIPT_DIR}/lib/core.sh"
   source "${BATS_TEST_DIRNAME}/../../plugins/vault.sh"
 
@@ -106,7 +112,7 @@ setup_vault_bootstrap_stubs() {
     local cmd="$*"
     echo "$cmd" >>"$KUBECTL_LOG"
     case "$cmd" in
-      "wait -n ${TEST_NS} --for=condition=Podscheduled ${TEST_POD_RESOURCE} --timeout=120s")
+      "wait -n ${TEST_NS} --for=condition=PodScheduled ${TEST_POD_RESOURCE} --timeout=120s")
         return 0 ;;
       "-n ${TEST_NS} get pod ${TEST_POD} -o jsonpath={.status.phase}")
         echo "Running"
@@ -461,6 +467,13 @@ JSON
   : >"$vault_log"
 
   _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
     echo "$*" >>"$KUBE_LOG"
     if [[ "$1" == "-n" && "$3" == "get" && "$4" == "secret" ]]; then
       cat "$SECRET_JSON_PATH"
@@ -472,6 +485,9 @@ JSON
   }
 
   _vault_exec() {
+    while [[ "$1" == --no-exit || "$1" == --prefer-sudo || "$1" == --require-sudo || "$1" == --quiet ]]; do
+      shift
+    done
     local cmd="$2"
     echo "$cmd" >>"$VAULT_LOG"
     if [[ "$cmd" == "vault write -format=json pki/issue/jenkins"* ]]; then
@@ -502,6 +518,13 @@ JSON
   : >"$vault_log"
 
   _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
     echo "$*" >>"$KUBE_LOG"
     if [[ "$1" == "-n" && "$3" == "get" && "$4" == "secret" ]]; then
       return 1
@@ -512,6 +535,9 @@ JSON
   }
 
   _vault_exec() {
+    while [[ "$1" == --no-exit || "$1" == --prefer-sudo || "$1" == --require-sudo || "$1" == --quiet ]]; do
+      shift
+    done
     local cmd="$2"
     echo "$cmd" >>"$VAULT_LOG"
     if [[ "$cmd" == "vault write -format=json pki/issue/jenkins"* ]]; then
@@ -590,7 +616,7 @@ JSON
     local cmd="$*"
     echo "$cmd" >>"$KUBECTL_LOG"
     case "$cmd" in
-      "wait -n ${TEST_NS} --for=condition=Podscheduled ${TEST_POD_RESOURCE} --timeout=120s")
+      "wait -n ${TEST_NS} --for=condition=PodScheduled ${TEST_POD_RESOURCE} --timeout=120s")
         return 0 ;;
       "-n ${TEST_NS} get pod ${TEST_POD} -o jsonpath={.status.phase}")
         echo "Running"
@@ -618,7 +644,7 @@ JSON
   [ "$status" -eq 0 ]
 
   read_lines "$KUBECTL_LOG" kubectl_calls
-  expected_wait="wait -n ${TEST_NS} --for=condition=Podscheduled ${TEST_POD_RESOURCE} --timeout=120s"
+  expected_wait="wait -n ${TEST_NS} --for=condition=PodScheduled ${TEST_POD_RESOURCE} --timeout=120s"
   expected_get="-n ${TEST_NS} get pod ${TEST_POD} -o jsonpath={.status.phase}"
   expected_status="-n ${TEST_NS} exec -i ${TEST_POD} -- vault status -format json"
   expected_init="-n ${TEST_NS} exec -it ${TEST_POD} -- sh -lc vault operator init -key-shares=1 -key-threshold=1 -format=json"
