@@ -19,9 +19,19 @@ set -euo pipefail
 
 : "${PROJECT_ROOT:?}"
 export PLUGINS_DIR="${PROJECT_ROOT}/scripts/plugins"
+export SCRIPT_DIR="${PROJECT_ROOT}/scripts"
+export SOURCE="${SCRIPT_DIR}/k3d-manager"
+
+# shellcheck disable=SC1090
+source "${SCRIPT_DIR}/lib/provider.sh"
+# shellcheck disable=SC1090
+source "${SCRIPT_DIR}/lib/cluster_provider.sh"
+# shellcheck disable=SC1090
+source "${SCRIPT_DIR}/lib/system.sh"
+
 source_test_lib() {
   # shellcheck source=../../lib/test.sh
-  source "${PROJECT_ROOT}/scripts/lib/test.sh"
+  source "${SCRIPT_DIR}/lib/test.sh"
 }
 
 source_test_lib
