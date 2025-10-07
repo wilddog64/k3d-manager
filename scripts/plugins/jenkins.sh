@@ -16,6 +16,28 @@ fi
 # shellcheck disable=SC1090
 source "$JENKINS_VARS_FILE"
 
+function _jenkins_ensure_cert_rotator_sources() {
+   local traced=0
+   if [[ $- == *x* ]]; then
+      traced=1
+      set +x
+   fi
+
+   if [[ -z "${JENKINS_CERT_ROTATOR_SCRIPT_B64:-}" ]]; then
+      JENKINS_CERT_ROTATOR_SCRIPT_B64="$(base64 < "${JENKINS_CONFIG_DIR}/cert-rotator.sh" | tr -d '\n')"
+   fi
+
+   if [[ -z "${JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64:-}" ]]; then
+      JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64="$(base64 < "${SCRIPT_DIR}/lib/vault_pki.sh" | tr -d '\n')"
+   fi
+
+   if (( traced )); then
+      set -x
+   fi
+}
+
+_jenkins_ensure_cert_rotator_sources
+
 _ensure_envsubst
 _ensure_jq
 

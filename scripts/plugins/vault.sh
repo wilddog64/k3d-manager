@@ -28,6 +28,8 @@ else
    _warn "[vault] missing optional helper file: $VAULT_PKI_LIB" >&2
 fi
 
+: "${VAULT_TLS_SECRET_TEMPLATE:=${SCRIPT_DIR}/etc/vault/jenkins-tls-secret.yaml.tmpl}"
+
 command -v _info >/dev/null 2>&1 || _info() { printf '%s\n' "$*" >&2; }
 command -v _warn >/dev/null 2>&1 || _warn() { printf '%s\n' "$*" >&2; }
 
@@ -225,17 +227,23 @@ function _vault_bootstrap_ha() {
 
   if [[ "$vault_init" == "true" ]]; then
      if [[ "$vault_sealed" == "true" ]]; then
-        local unseal_key="$(_kubectl -n "$ns" get secret vault-unseal-o jsonpath='{.data.unseal_key}')"
-        if [[ -z "$unseal_key" ]]; then
-           _err "[vault] vault-root secret not found in namespace '$ns'"
+        local unseal_key=""
+        if _kubectl --no-exit -n "$ns" get secret vault-root >/dev/null 2>&1; then
+           unseal_key=$(_kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.unseal_key}' 2>/dev/null || true)
         fi
 
-        for pod in $(_kubectl -n "$ns" get pod -o name); do
-           pod="${pod#pod/}"
-           printf '%s' "$unseal_key" | base64 -d | _kubectl -n "$ns" exec -i "$pod" -- \
-              sh -lc "vault operator unseal /dev/stdin" >/dev/null 2>&1
-           _info "[vault] unsealed $pod"
-        done
+        if [[ -z "$unseal_key" ]]; then
+           _err "[vault] vault-root secret missing unseal_key in namespace '$ns'"
+        fi
+
+        if [[ -n "$unseal_key" ]]; then
+           for pod in $(_kubectl -n "$ns" get pod -o name); do
+              pod="${pod#pod/}"
+              printf '%s' "$unseal_key" | base64 -d | _kubectl -n "$ns" exec -i "$pod" -- \
+                 sh -lc "vault operator unseal /dev/stdin" >/dev/null 2>&1
+              _info "[vault] unsealed $pod"
+           done
+        fi
      else
         _warn "[vault] already initialized, skipping init"
      fi
@@ -248,8 +256,24 @@ function _vault_bootstrap_ha() {
 
   local root_token=$(jq -r '.root_token' "$jsonfile")
   local unseal_key=$(jq -r '.unseal_keys_b64[0]' "$jsonfile")
-  _no_trace _kubectl -n "$ns" create secret generic vault-root \
-     --from-literal=root_token="$root_token"
+
+  local secret_manifest="$(mktemp -t vault-root-secret.XXXXXX.yaml)"
+  trap '$(_cleanup_trap_command "$secret_manifest")' RETURN
+
+  _no_trace cat >"$secret_manifest" <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-root
+  namespace: ${ns}
+type: Opaque
+stringData:
+  root_token: ${root_token}
+  unseal_key: ${unseal_key}
+EOF
+
+  _no_trace _kubectl -n "$ns" apply -f "$secret_manifest"
+
   # unseal all pods
   for pod in $(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/name=vault,app.kubernetes.io/instance=${release}" -o name); do
      pod="${pod#pod/}"
@@ -619,10 +643,20 @@ function _vault_issue_pki_tls_secret() {
    local secret_ns="${6:-${VAULT_PKI_SECRET_NS:-istio-system}}"
    local secret_name="${7:-${VAULT_PKI_SECRET_NAME:-jenkins-tls}}"
 
-   local existing_serial="" existing_cert_file=""
-   local secret_json cert_b64
-   if secret_json=$(_kubectl -n "$secret_ns" get secret "$secret_name" -o json 2>/dev/null); then
-      cert_b64=$(printf '%s' "$secret_json" | jq -r '.data["tls.crt"] // empty')
+   local traced=0
+   manifest="$(mktemp -t vault-pki-secret.XXXXXX.yaml)"
+   trap '$(_cleanup_trap_command "$manifest")' EXIT TERM
+
+   if [[ $- == *x* ]]; then
+      traced=1
+      set +x
+   fi
+
+   local existing_serial="" existing_cert_file="" secret_json_file=""
+   secret_json_file="$(mktemp -t vault-existing-secret.XXXXXX.json)"
+   if _kubectl -n "$secret_ns" get secret "$secret_name" -o json >"$secret_json_file" 2>/dev/null; then
+      local cert_b64
+      cert_b64=$(jq -r '.data["tls.crt"] // empty' <"$secret_json_file")
       if [[ -n "$cert_b64" ]]; then
          existing_cert_file=$(mktemp -t vault-existing-cert.XXXXXX)
          if printf '%s' "$cert_b64" | base64 -d >"$existing_cert_file" 2>/dev/null; then
@@ -635,43 +669,83 @@ function _vault_issue_pki_tls_secret() {
       fi
    fi
 
-   local json="$(_vault_exec "$ns" "vault write -format=json ${path}/issue/${role} common_name=\"${host}\" alt_names=\"${host}\" ttl=\"${VAULT_PKI_ROLE_TTL:-720h}\"" "$release")"
+   local json
+   json=$(_vault_exec "$ns" "vault write -format=json ${path}/issue/${role} common_name=\"${host}\" alt_names=\"${host}\" ttl=\"${VAULT_PKI_ROLE_TTL:-720h}\"" "$release")
 
    # Extract leaf cert, key, and CA chain
-   local cert=$(printf '%s' "$json" | jq -r '.data.certificate')
-   local key=$(printf '%s' "$json" | jq -r '.data.private_key')
-   local ca=$(printf '%s' "$json" | jq -r '.data.issuing_ca')
+   local cert key ca
+   cert=$(jq -r '.data.certificate' <<<"$json")
+   key=$(jq -r '.data.private_key' <<<"$json")
+   ca=$(jq -r '.data.issuing_ca' <<<"$json")
 
    if [[ -z "$cert" || -z "$key" || -z "$ca" ]]; then
       _err "[vault] failed to issue certificate from role $role at $path"
    fi
 
-   local manifest
-   manifest="$(mktemp -t vault-pki-secret.XXXXXX)"
-   trap '$(_cleanup_trap_command "$manifest")' EXIT TERM
+   local prev_secret_ns_set prev_secret_name_set prev_cert_set prev_key_set prev_ca_set
+   prev_secret_ns_set=$([[ -n "${VAULT_TLS_SECRET_NS+x}" ]] && echo 1 || echo 0)
+   prev_secret_name_set=$([[ -n "${VAULT_TLS_SECRET_NAME+x}" ]] && echo 1 || echo 0)
+   prev_cert_set=$([[ -n "${VAULT_TLS_CERT+x}" ]] && echo 1 || echo 0)
+   prev_key_set=$([[ -n "${VAULT_TLS_KEY+x}" ]] && echo 1 || echo 0)
+   prev_ca_set=$([[ -n "${VAULT_TLS_CA+x}" ]] && echo 1 || echo 0)
 
-   {
-      printf 'apiVersion: v1\n'
-      printf 'kind: Secret\n'
-      printf 'metadata:\n'
-      printf '  name: %s\n' "$secret_name"
-      printf '  namespace: %s\n' "$secret_ns"
-      printf 'type: kubernetes.io/tls\n'
-      printf 'stringData:\n'
-      printf '  tls.crt: |\n'
-      printf '%s\n' "$cert" | sed 's/^/    /'
-      printf '  tls.key: |\n'
-      printf '%s\n' "$key" | sed 's/^/    /'
-      printf '  ca.crt: |\n'
-      printf '%s\n' "$ca" | sed 's/^/    /'
-   } >"$manifest"
+   local prev_secret_ns prev_secret_name prev_cert prev_key prev_ca
+   prev_secret_ns="${VAULT_TLS_SECRET_NS:-}"
+   prev_secret_name="${VAULT_TLS_SECRET_NAME:-}"
+   prev_cert="${VAULT_TLS_CERT:-}"
+   prev_key="${VAULT_TLS_KEY:-}"
+   prev_ca="${VAULT_TLS_CA:-}"
+
+   export VAULT_TLS_SECRET_NS="$secret_ns"
+   export VAULT_TLS_SECRET_NAME="$secret_name"
+   export VAULT_TLS_CERT="$(printf '%s\n' "$cert" | sed 's/^/    /')"
+   export VAULT_TLS_KEY="$(printf '%s\n' "$key" | sed 's/^/    /')"
+   export VAULT_TLS_CA="$(printf '%s\n' "$ca" | sed 's/^/    /')"
+
+   umask 077
+   envsubst < "${VAULT_TLS_SECRET_TEMPLATE}" >"$manifest"
 
    _kubectl apply -f "$manifest" || \
       _err "[vault] failed to apply TLS secret manifest ${secret_ns}/${secret_name}"
 
    _cleanup_on_success "$manifest"
+   _cleanup_on_success "$secret_json_file"
    if [[ -n "$existing_cert_file" ]]; then
       _cleanup_on_success "$existing_cert_file"
+   fi
+
+   if (( prev_secret_ns_set )); then
+      export VAULT_TLS_SECRET_NS="$prev_secret_ns"
+   else
+      unset VAULT_TLS_SECRET_NS
+   fi
+
+   if (( prev_secret_name_set )); then
+      export VAULT_TLS_SECRET_NAME="$prev_secret_name"
+   else
+      unset VAULT_TLS_SECRET_NAME
+   fi
+
+   if (( prev_cert_set )); then
+      export VAULT_TLS_CERT="$prev_cert"
+   else
+      unset VAULT_TLS_CERT
+   fi
+
+   if (( prev_key_set )); then
+      export VAULT_TLS_KEY="$prev_key"
+   else
+      unset VAULT_TLS_KEY
+   fi
+
+   if (( prev_ca_set )); then
+      export VAULT_TLS_CA="$prev_ca"
+   else
+      unset VAULT_TLS_CA
+   fi
+
+   if (( traced )); then
+      set -x
    fi
    trap - EXIT TERM
 

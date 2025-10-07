@@ -20,8 +20,10 @@ export JENKINS_CERT_ROTATOR_IMAGE="${JENKINS_CERT_ROTATOR_IMAGE:-docker.io/googl
 export JENKINS_CERT_ROTATOR_VAULT_ROLE="${JENKINS_CERT_ROTATOR_VAULT_ROLE:-jenkins-cert-rotator}"
 export JENKINS_CERT_ROTATOR_ALT_NAMES="jenkins.dev.local.me,jenkins.dev.k3d.internal"
 export JENKINS_VIRTUALSERVICE_HOSTS="${JENKINS_CERT_ROTATOR_ALT_NAMES}"
-export JENKINS_CERT_ROTATOR_SCRIPT_B64="$(base64 < "${SCRIPT_DIR}/etc/jenkins/cert-rotator.sh" | tr -d '\n')"
-export JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64="$(base64 < "${SCRIPT_DIR}/lib/vault_pki.sh" | tr -d '\n')"
+# Lazily encode cert-rotator bits to avoid logging sensitive content when
+# tracing is enabled. The plugin calls helpers to hydrate these when needed.
+export JENKINS_CERT_ROTATOR_SCRIPT_B64="${JENKINS_CERT_ROTATOR_SCRIPT_B64:-}"
+export JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64="${JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64:-}"
 
 # Vault PKI config
 export VAULT_ADDR="https://vault.vault.svc.cluster.local:8200"

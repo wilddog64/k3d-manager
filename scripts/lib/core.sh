@@ -1,4 +1,29 @@
 
+function _k3s_set_defaults() {
+   if [[ -n "${K3S_DEFAULTS_INITIALIZED:-}" ]]; then
+      return 0
+   fi
+
+   _ensure_cluster_provider
+
+   if [[ "${CLUSTER_PROVIDER:-}" != "k3s" ]]; then
+      # Another provider is active; nothing to seed.
+      K3S_DEFAULTS_INITIALIZED=1
+      return 0
+   fi
+
+   local vars_file="${SCRIPT_DIR}/etc/k3s/vars.sh"
+
+   if [[ ! -r "$vars_file" ]]; then
+      _err "k3s vars file not found: $vars_file"
+   fi
+
+   # shellcheck disable=SC1090
+   source "$vars_file"
+
+   K3S_DEFAULTS_INITIALIZED=1
+}
+
 function _cluster_provider() {
    local provider="${K3D_MANAGER_PROVIDER:-${K3DMGR_PROVIDER:-${CLUSTER_PROVIDER:-k3d}}}"
    provider="$(printf '%s' "$provider" | tr '[:upper:]' '[:lower:]')"

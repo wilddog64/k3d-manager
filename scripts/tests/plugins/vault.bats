@@ -6,6 +6,12 @@ setup() {
   SCRIPT_DIR="${BATS_TEST_DIRNAME}/../.."
   PLUGINS_DIR="${SCRIPT_DIR}/plugins"
   # shellcheck disable=SC1090
+  source "${SCRIPT_DIR}/lib/provider.sh"
+  # shellcheck disable=SC1090
+  source "${SCRIPT_DIR}/lib/cluster_provider.sh"
+  # shellcheck disable=SC1090
+  source "${SCRIPT_DIR}/lib/system.sh"
+  # shellcheck disable=SC1090
   source "${SCRIPT_DIR}/lib/core.sh"
   source "${BATS_TEST_DIRNAME}/../../plugins/vault.sh"
 
@@ -106,7 +112,7 @@ setup_vault_bootstrap_stubs() {
     local cmd="$*"
     echo "$cmd" >>"$KUBECTL_LOG"
     case "$cmd" in
-      "wait -n ${TEST_NS} --for=condition=Podscheduled ${TEST_POD_RESOURCE} --timeout=120s")
+      "wait -n ${TEST_NS} --for=condition=PodScheduled ${TEST_POD_RESOURCE} --timeout=120s")
         return 0 ;;
       "-n ${TEST_NS} get pod ${TEST_POD} -o jsonpath={.status.phase}")
         echo "Running"
@@ -461,6 +467,13 @@ JSON
   : >"$vault_log"
 
   _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
     echo "$*" >>"$KUBE_LOG"
     if [[ "$1" == "-n" && "$3" == "get" && "$4" == "secret" ]]; then
       cat "$SECRET_JSON_PATH"
@@ -472,6 +485,9 @@ JSON
   }
 
   _vault_exec() {
+    while [[ "$1" == --no-exit || "$1" == --prefer-sudo || "$1" == --require-sudo || "$1" == --quiet ]]; do
+      shift
+    done
     local cmd="$2"
     echo "$cmd" >>"$VAULT_LOG"
     if [[ "$cmd" == "vault write -format=json pki/issue/jenkins"* ]]; then
@@ -489,6 +505,8 @@ JSON
   export KUBE_LOG VAULT_LOG SECRET_JSON_PATH
 
   _vault_issue_pki_tls_secret
+  local status=$?
+  [ "$status" -eq 0 ]
 
   read_lines "$vault_log" vault_calls
   local revoke_cmd="vault write pki/revoke serial_number=${expected_serial}"
@@ -502,6 +520,13 @@ JSON
   : >"$vault_log"
 
   _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
     echo "$*" >>"$KUBE_LOG"
     if [[ "$1" == "-n" && "$3" == "get" && "$4" == "secret" ]]; then
       return 1
@@ -512,6 +537,9 @@ JSON
   }
 
   _vault_exec() {
+    while [[ "$1" == --no-exit || "$1" == --prefer-sudo || "$1" == --require-sudo || "$1" == --quiet ]]; do
+      shift
+    done
     local cmd="$2"
     echo "$cmd" >>"$VAULT_LOG"
     if [[ "$cmd" == "vault write -format=json pki/issue/jenkins"* ]]; then
@@ -532,6 +560,186 @@ JSON
   read_lines "$vault_log" vault_calls
   local revoke_cmd="vault write pki/revoke serial_number="
   [[ "${vault_calls[*]}" != *"${revoke_cmd}"* ]]
+}
+
+@test "_vault_issue_pki_tls_secret renders manifest via envsubst" {
+  local template="$BATS_TEST_TMPDIR/secret.tmpl"
+  cat <<'EOF' >"$template"
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${VAULT_TLS_SECRET_NAME}
+  namespace: ${VAULT_TLS_SECRET_NS}
+type: kubernetes.io/tls
+stringData:
+  tls.crt: |
+${VAULT_TLS_CERT}
+  tls.key: |
+${VAULT_TLS_KEY}
+  ca.crt: |
+${VAULT_TLS_CA}
+EOF
+
+  local prev_template="${VAULT_TLS_SECRET_TEMPLATE:-}"
+  local template_was_set=$([[ -n "${VAULT_TLS_SECRET_TEMPLATE+x}" ]] && echo 1 || echo 0)
+  export VAULT_TLS_SECRET_TEMPLATE="$template"
+
+  local manifest_capture="$BATS_TEST_TMPDIR/rendered.yaml"
+  local kubectl_apply_path="$BATS_TEST_TMPDIR/kubectl-apply-path.txt"
+  local cert_capture="$BATS_TEST_TMPDIR/cert.log"
+  local json_capture="$BATS_TEST_TMPDIR/json.log"
+
+  local original_envsubst=""
+  if declare -f envsubst >/dev/null 2>&1; then
+    original_envsubst="$(declare -f envsubst)"
+  fi
+  envsubst() {
+    printf '%s\n' "$VAULT_TLS_CERT" >"$cert_capture"
+    command envsubst "$@"
+  }
+  export -f envsubst
+
+  local original_kubectl
+  original_kubectl="$(declare -f _kubectl)"
+  _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo)
+          shift
+          ;;
+        --)
+          shift
+          break
+          ;;
+        *)
+          break
+          ;;
+      esac
+    done
+
+    if [[ "$1" == "-n" && "$3" == "get" && "$4" == "secret" ]]; then
+      return 1
+    elif [[ "$1" == "apply" && "$2" == "-f" ]]; then
+      printf '%s\n' "$3" >"$kubectl_apply_path"
+      cat "$3" >"$manifest_capture"
+      return 0
+    fi
+
+    return 0
+  }
+  export -f _kubectl
+
+  local original_vault_exec
+  original_vault_exec="$(declare -f _vault_exec)"
+  _vault_exec() {
+    while [[ "$1" == --no-exit || "$1" == --prefer-sudo || "$1" == --require-sudo || "$1" == --quiet ]]; do
+      shift
+    done
+    printf '{"data":{"certificate":"-----BEGIN CERT-----\\nCERTDATA\\n-----END CERT-----\\n","private_key":"-----BEGIN KEY-----\\nKEYDATA\\n-----END KEY-----\\n","issuing_ca":"-----BEGIN CA-----\\nCADATA\\n-----END CA-----\\n"}}\n' | tee "$json_capture"
+  }
+  export -f _vault_exec
+
+  local prev_secret_ns="${VAULT_PKI_SECRET_NS:-}"
+  local prev_secret_name="${VAULT_PKI_SECRET_NAME:-}"
+  export VAULT_PKI_SECRET_NS="custom-ns"
+  export VAULT_PKI_SECRET_NAME="custom-name"
+
+  run _vault_issue_pki_tls_secret
+  [ "$status" -eq 0 ]
+  [ -s "$kubectl_apply_path" ]
+  [ -f "$manifest_capture" ]
+  grep -F 'CERTDATA' "$cert_capture"
+  grep -F 'name: custom-name' "$manifest_capture"
+  grep -F 'namespace: custom-ns' "$manifest_capture"
+  grep -F '    -----BEGIN CERT-----' "$manifest_capture"
+  grep -F '    -----BEGIN KEY-----' "$manifest_capture"
+  grep -F '    -----BEGIN CA-----' "$manifest_capture"
+
+  if (( template_was_set )); then
+    export VAULT_TLS_SECRET_TEMPLATE="$prev_template"
+  else
+    unset VAULT_TLS_SECRET_TEMPLATE
+  fi
+
+  if [[ -n "$prev_secret_ns" ]]; then
+    export VAULT_PKI_SECRET_NS="$prev_secret_ns"
+  else
+    unset VAULT_PKI_SECRET_NS
+  fi
+
+  if [[ -n "$prev_secret_name" ]]; then
+    export VAULT_PKI_SECRET_NAME="$prev_secret_name"
+  else
+    unset VAULT_PKI_SECRET_NAME
+  fi
+
+  if [[ -n "$original_envsubst" ]]; then
+    eval "$original_envsubst"
+    export -f envsubst
+  else
+    unset -f envsubst
+  fi
+
+  eval "$original_kubectl"
+  export -f _kubectl
+  eval "$original_vault_exec"
+  export -f _vault_exec
+}
+
+@test "_vault_bootstrap_ha stores unseal key secret" {
+  local kube_log="$BATS_TEST_TMPDIR/kubectl-bootstrap.log"
+  local manifest_capture="$BATS_TEST_TMPDIR/vault-root-secret.yaml"
+  : >"$kube_log"
+
+  local original_kubectl
+  original_kubectl="$(declare -f _kubectl)"
+  _kubectl() {
+    local cmd="$*"
+    echo "$cmd" >>"$kube_log"
+    case "$cmd" in
+      "wait -n test-ns --for=condition=PodScheduled pod/test-release-0 --timeout=120s")
+        return 0 ;;
+      "--no-exit -n test-ns get pod test-release-0 -o jsonpath={.status.phase}")
+        echo "Running"
+        return 0 ;;
+      "--no-exit -n test-ns exec -i test-release-0 -- vault status -format json")
+        echo '{"initialized": false}'
+        return 0 ;;
+      "--no-exit -n test-ns exec -i test-release-0 -- vault status -format json 2>/dev/null || true")
+        echo '{"sealed": true}'
+        return 0 ;;
+      "-n test-ns exec -it test-release-0 -- sh -lc vault operator init -key-shares=1 -key-threshold=1 -format=json")
+        printf '{"root_token":"ROOT","unseal_keys_b64":["UNSEAL"]}\n'
+        return 0 ;;
+      "--no-exit -n test-ns get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=test-release -o name")
+        echo "pod/test-release-0"
+        return 0 ;;
+      "-n test-ns exec -i test-release-0 -- sh -lc vault operator unseal UNSEAL")
+        return 0 ;;
+      '--no-exit -n test-ns run vault-health-'*)
+        echo 'VAULT_HTTP_STATUS:200'
+        return 0 ;;
+      "-n test-ns apply -f "*)
+        local path=${cmd##*-f }
+        cat "$path" >"$manifest_capture"
+        return 0 ;;
+      *)
+        return 0 ;;
+    esac
+  }
+  export -f _kubectl
+
+  run _vault_bootstrap_ha test-ns test-release
+  if [[ "$status" -ne 0 ]]; then
+    printf 'kubectl log:\n%s\n' "$(cat "$kube_log")" >&2
+  fi
+  [ "$status" -eq 0 ]
+  [ -f "$manifest_capture" ]
+  grep -F 'root_token: ROOT' "$manifest_capture"
+  grep -F 'unseal_key: UNSEAL' "$manifest_capture"
+
+  eval "$original_kubectl"
+  export -f _kubectl
 }
 
 @test "Full deployment" {
@@ -590,7 +798,7 @@ JSON
     local cmd="$*"
     echo "$cmd" >>"$KUBECTL_LOG"
     case "$cmd" in
-      "wait -n ${TEST_NS} --for=condition=Podscheduled ${TEST_POD_RESOURCE} --timeout=120s")
+      "wait -n ${TEST_NS} --for=condition=PodScheduled ${TEST_POD_RESOURCE} --timeout=120s")
         return 0 ;;
       "-n ${TEST_NS} get pod ${TEST_POD} -o jsonpath={.status.phase}")
         echo "Running"
@@ -618,7 +826,7 @@ JSON
   [ "$status" -eq 0 ]
 
   read_lines "$KUBECTL_LOG" kubectl_calls
-  expected_wait="wait -n ${TEST_NS} --for=condition=Podscheduled ${TEST_POD_RESOURCE} --timeout=120s"
+  expected_wait="wait -n ${TEST_NS} --for=condition=PodScheduled ${TEST_POD_RESOURCE} --timeout=120s"
   expected_get="-n ${TEST_NS} get pod ${TEST_POD} -o jsonpath={.status.phase}"
   expected_status="-n ${TEST_NS} exec -i ${TEST_POD} -- vault status -format json"
   expected_init="-n ${TEST_NS} exec -it ${TEST_POD} -- sh -lc vault operator init -key-shares=1 -key-threshold=1 -format=json"
