@@ -3,12 +3,12 @@
 bats_require_minimum_version 1.5.0
 
 setup() {
+  export JENKINS_HOME_PATH="${BATS_TEST_TMPDIR}/jenkins_home"
+  mkdir -p "$JENKINS_HOME_PATH"
   source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   init_test_env
   source "${BATS_TEST_DIRNAME}/../../plugins/jenkins.sh"
   export_stubs
-  export JENKINS_HOME_PATH="${BATS_TEST_TMPDIR}/jenkins_home"
-  mkdir -p "$JENKINS_HOME_PATH"
   export KUBECONFIG="${BATS_TEST_TMPDIR}/kubeconfig"
   : > "$KUBECONFIG"
   K3D_LOG="$BATS_TEST_TMPDIR/k3d.log"
