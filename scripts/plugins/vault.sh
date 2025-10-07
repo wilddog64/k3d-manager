@@ -227,17 +227,23 @@ function _vault_bootstrap_ha() {
 
   if [[ "$vault_init" == "true" ]]; then
      if [[ "$vault_sealed" == "true" ]]; then
-        local unseal_key="$(_kubectl -n "$ns" get secret vault-unseal-o jsonpath='{.data.unseal_key}')"
-        if [[ -z "$unseal_key" ]]; then
-           _err "[vault] vault-root secret not found in namespace '$ns'"
+        local unseal_key=""
+        if _kubectl --no-exit -n "$ns" get secret vault-root >/dev/null 2>&1; then
+           unseal_key=$(_kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.unseal_key}' 2>/dev/null || true)
         fi
 
-        for pod in $(_kubectl -n "$ns" get pod -o name); do
-           pod="${pod#pod/}"
-           printf '%s' "$unseal_key" | base64 -d | _kubectl -n "$ns" exec -i "$pod" -- \
-              sh -lc "vault operator unseal /dev/stdin" >/dev/null 2>&1
-           _info "[vault] unsealed $pod"
-        done
+        if [[ -z "$unseal_key" ]]; then
+           _err "[vault] vault-root secret missing unseal_key in namespace '$ns'"
+        fi
+
+        if [[ -n "$unseal_key" ]]; then
+           for pod in $(_kubectl -n "$ns" get pod -o name); do
+              pod="${pod#pod/}"
+              printf '%s' "$unseal_key" | base64 -d | _kubectl -n "$ns" exec -i "$pod" -- \
+                 sh -lc "vault operator unseal /dev/stdin" >/dev/null 2>&1
+              _info "[vault] unsealed $pod"
+           done
+        fi
      else
         _warn "[vault] already initialized, skipping init"
      fi
@@ -250,8 +256,24 @@ function _vault_bootstrap_ha() {
 
   local root_token=$(jq -r '.root_token' "$jsonfile")
   local unseal_key=$(jq -r '.unseal_keys_b64[0]' "$jsonfile")
-  _no_trace _kubectl -n "$ns" create secret generic vault-root \
-     --from-literal=root_token="$root_token"
+
+  local secret_manifest="$(mktemp -t vault-root-secret.XXXXXX.yaml)"
+  trap '$(_cleanup_trap_command "$secret_manifest")' RETURN
+
+  _no_trace cat >"$secret_manifest" <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-root
+  namespace: ${ns}
+type: Opaque
+stringData:
+  root_token: ${root_token}
+  unseal_key: ${unseal_key}
+EOF
+
+  _no_trace _kubectl -n "$ns" apply -f "$secret_manifest"
+
   # unseal all pods
   for pod in $(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/name=vault,app.kubernetes.io/instance=${release}" -o name); do
      pod="${pod#pod/}"

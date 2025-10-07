@@ -686,6 +686,62 @@ EOF
   export -f _vault_exec
 }
 
+@test "_vault_bootstrap_ha stores unseal key secret" {
+  local kube_log="$BATS_TEST_TMPDIR/kubectl-bootstrap.log"
+  local manifest_capture="$BATS_TEST_TMPDIR/vault-root-secret.yaml"
+  : >"$kube_log"
+
+  local original_kubectl
+  original_kubectl="$(declare -f _kubectl)"
+  _kubectl() {
+    local cmd="$*"
+    echo "$cmd" >>"$kube_log"
+    case "$cmd" in
+      "wait -n test-ns --for=condition=PodScheduled pod/test-release-0 --timeout=120s")
+        return 0 ;;
+      "--no-exit -n test-ns get pod test-release-0 -o jsonpath={.status.phase}")
+        echo "Running"
+        return 0 ;;
+      "--no-exit -n test-ns exec -i test-release-0 -- vault status -format json")
+        echo '{"initialized": false}'
+        return 0 ;;
+      "--no-exit -n test-ns exec -i test-release-0 -- vault status -format json 2>/dev/null || true")
+        echo '{"sealed": true}'
+        return 0 ;;
+      "-n test-ns exec -it test-release-0 -- sh -lc vault operator init -key-shares=1 -key-threshold=1 -format=json")
+        printf '{"root_token":"ROOT","unseal_keys_b64":["UNSEAL"]}\n'
+        return 0 ;;
+      "--no-exit -n test-ns get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=test-release -o name")
+        echo "pod/test-release-0"
+        return 0 ;;
+      "-n test-ns exec -i test-release-0 -- sh -lc vault operator unseal UNSEAL")
+        return 0 ;;
+      '--no-exit -n test-ns run vault-health-'*)
+        echo 'VAULT_HTTP_STATUS:200'
+        return 0 ;;
+      "-n test-ns apply -f "*)
+        local path=${cmd##*-f }
+        cat "$path" >"$manifest_capture"
+        return 0 ;;
+      *)
+        return 0 ;;
+    esac
+  }
+  export -f _kubectl
+
+  run _vault_bootstrap_ha test-ns test-release
+  if [[ "$status" -ne 0 ]]; then
+    printf 'kubectl log:\n%s\n' "$(cat "$kube_log")" >&2
+  fi
+  [ "$status" -eq 0 ]
+  [ -f "$manifest_capture" ]
+  grep -F 'root_token: ROOT' "$manifest_capture"
+  grep -F 'unseal_key: UNSEAL' "$manifest_capture"
+
+  eval "$original_kubectl"
+  export -f _kubectl
+}
+
 @test "Full deployment" {
   _vault_ns_ensure() { CALLS+=("_vault_ns_ensure"); }
   _vault_repo_setup() { CALLS+=("_vault_repo_setup"); }
