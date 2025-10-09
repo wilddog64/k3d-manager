@@ -818,6 +818,7 @@ EOF
 
    _info "Using cluster provider: $provider"
    _cluster_provider_call deploy_cluster "${positional[@]}"
+   test_istio
 }
 
 function deploy_k3d_cluster() {
