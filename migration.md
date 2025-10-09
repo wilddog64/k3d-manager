@@ -9,17 +9,17 @@ then expanding once the platform and agents are verified stable.
 
 ---
 
-## 🎯 Objectives
+## Objectives
 
-- Deploy modern Jenkins on k3s with full LTS support and SMB CSI persistence  
-- Validate new platform with 1–2 Windows pilot agents (vSphere)  
-- Import initial jobs that require no credentials  
-- Gradually migrate credentials and dependent jobs  
-- Maintain rollback capability to legacy Jenkins at every step  
+- Deploy modern Jenkins on k3s with full LTS support and SMB CSI persistence
+- Validate new platform with 1–2 Windows pilot agents (vSphere)
+- Import initial jobs that require no credentials
+- Gradually migrate credentials and dependent jobs
+- Maintain rollback capability to legacy Jenkins at every step
 
 ---
 
-## 📘 Phases
+## Phases
 
 | Phase | Description |
 |--------|--------------|
@@ -30,7 +30,7 @@ then expanding once the platform and agents are verified stable.
 
 ---
 
-## 🧩 Environment Summary
+## Environment Summary
 
 | Component | Description |
 |------------|-------------|
@@ -42,26 +42,15 @@ then expanding once the platform and agents are verified stable.
 
 ---
 
-## 🔁 Rollback Policy
+## Rollback Policy
 
-- The **legacy Jenkins** remains available in read-only mode until migration completes  
-- Each phase is reversible — simply disable migrated jobs on the new controller  
+- The **legacy Jenkins** remains available in read-only mode until migration completes
+- Each phase is reversible — simply disable migrated jobs on the new controller
 - Always back up:
   - `credentials.xml`
   - `secrets/master.key`
   - `secrets/hudson.util.Secret`
-  - SMB PVC snapshots or replicated data  
-
----
-
-## 📞 Contacts
-
-| Area | Contact |
-|-------|----------|
-| DevOps / Jenkins Platform | _Team / Owner_ |
-| SMB Storage Administration | _Team / Owner_ |
-| vSphere Infrastructure | _Team / Owner_ |
-| Security / Credential Management | _Team / Owner_ |
+  - SMB PVC snapshots or replicated data
 
 ---
 
