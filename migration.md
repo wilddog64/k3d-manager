@@ -7,6 +7,9 @@ The migration is designed to minimize downtime and risk by following
 a phased rollout approach — starting with jobs that **do not use credentials**,
 then expanding once the platform and agents are verified stable.
 
+Note: There are some unknown parts, which is `configure environments` and `configure environment properties` jobs. These two contains a lot of unkown customzation by javascript and maybe java that need to have further deeper investigation.
+
+
 ---
 
 ## Objectives
