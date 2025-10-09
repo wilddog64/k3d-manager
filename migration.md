@@ -1,6 +1,6 @@
 # Jenkins Upgrade & Migration (Legacy → k3s Jenkins 2.516.3)
 
-This repository documents the plan for migrating from the legacy Jenkins controller
+This documents the plan for migrating from the legacy Jenkins controller
 to the new **k3s-based Jenkins 2.516.3 LTS** deployment.
 
 The migration is designed to minimize downtime and risk by following
@@ -44,7 +44,7 @@ then expanding once the platform and agents are verified stable.
 
 ## Rollback Policy
 
-- The **legacy Jenkins** remains available in read-only mode until migration completes
+- The **legacy Jenkins** remains available until migration completes
 - Each phase is reversible — simply disable migrated jobs on the new controller
 - Always back up:
   - `credentials.xml`

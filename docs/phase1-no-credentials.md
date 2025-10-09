@@ -8,17 +8,8 @@ using a small set of **no-credential** jobs.
 
 ## 1️⃣ Deploy Jenkins on k3s
 
-Install via Helm:
+Install via k3d-manager:
+
 ```bash
-helm upgrade --install jenkins jenkins/jenkins \
-  -n jenkins \
-  --create-namespace \
-  --set controller.tag=2.516.3-lts-jdk17 \
-  --set controller.serviceType=ClusterIP \
-  --set controller.ingress.enabled=true \
-  --set controller.ingress.hostName=jenkins.dev.local.me \
-  --set controller.persistence.storageClass=smb-jenkins \
-  --set controller.resources.requests.cpu=1 \
-  --set controller.resources.requests.memory=4Gi \
-  --set controller.resources.limits.cpu=4 \
-  --set controller.resources.limits.memory=16Gi
+k3d-manager deploy_cluster automation
+```
