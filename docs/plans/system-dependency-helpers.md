@@ -36,7 +36,7 @@ Ensure every external CLI used by `k3d-manager` has a corresponding `_ensure_*` 
 | `helm` | `_helm`, Jenkins/Vault deployers | ✅ `_ensure_helm` | Automates install before invoking Helm |
 | `istioctl` | `_istioctl`, Istio workflows | ✅ `_ensure_istioctl` | Installs via existing helper before use |
 | `curl` | `_curl`, install helpers | ✅ `_ensure_curl` | Installs via platform package manager or guides manual setup |
-| `lpass` | `_sync_lastpass_ad` | ⚠️ none | At least detect and suggest install command by platform |
+| `lpass` | `_sync_lastpass_ad` | ✅ `_ensure_lpass` | Installs LastPass CLI or guides manual setup |
 | `secret-tool` | `_secret_tool` | ✅ `_ensure_secret_tool` | Uses distro package managers |
 | `jq` | `_sync_lastpass_ad`, templating | ✅ `_ensure_jq` | Already covers common distros |
 | `envsubst` | rendering templates | ✅ `_ensure_envsubst` | |
