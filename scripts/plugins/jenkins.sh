@@ -16,6 +16,38 @@ fi
 # shellcheck disable=SC1090
 source "$JENKINS_VARS_FILE"
 
+function _jenkins_encode_file_base64() {
+   local file="$1"
+   local label="${2:-$file}"
+
+   if [[ ! -r "$file" ]]; then
+      _err "File not found while encoding for base64: $file"
+   fi
+
+   local traced=0
+   if [[ $- == *x* ]]; then
+      traced=1
+      set +x
+   fi
+
+   local encoded rc
+   encoded=$(base64 < "$file" | tr -d '\n')
+   rc=$?
+
+   if (( rc != 0 )) || [[ -z "$encoded" ]]; then
+      if (( traced )); then
+         set -x
+      fi
+      _err "Failed to encode $label"
+   fi
+
+   printf '%s' "$encoded"
+
+   if (( traced )); then
+      set -x
+   fi
+}
+
 function _jenkins_ensure_cert_rotator_sources() {
    local traced=0
    if [[ $- == *x* ]]; then
@@ -24,11 +56,11 @@ function _jenkins_ensure_cert_rotator_sources() {
    fi
 
    if [[ -z "${JENKINS_CERT_ROTATOR_SCRIPT_B64:-}" ]]; then
-      JENKINS_CERT_ROTATOR_SCRIPT_B64="$(base64 < "${JENKINS_CONFIG_DIR}/cert-rotator.sh" | tr -d '\n')"
+      JENKINS_CERT_ROTATOR_SCRIPT_B64="$(_jenkins_encode_file_base64 "${JENKINS_CONFIG_DIR}/cert-rotator.sh" "Jenkins cert rotator script")"
    fi
 
    if [[ -z "${JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64:-}" ]]; then
-      JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64="$(base64 < "${SCRIPT_DIR}/lib/vault_pki.sh" | tr -d '\n')"
+      JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64="$(_jenkins_encode_file_base64 "${SCRIPT_DIR}/lib/vault_pki.sh" "Jenkins cert rotator Vault PKI helper")"
    fi
 
    if (( traced )); then
@@ -912,17 +944,15 @@ function _deploy_jenkins() {
          _err "Jenkins cert rotator Vault PKI helper not found: $rotator_lib"
       fi
 
-      local rotator_script_b64 rotator_lib_b64
-      rotator_script_b64=$(base64 < "$rotator_script" | tr -d '\n')
-
-      if [[ -z "$rotator_script_b64" ]]; then
-         _err "Failed to encode Jenkins cert rotator script"
+      local rotator_script_b64 rotator_lib_b64 traced=0
+      if [[ $- == *x* ]]; then
+         traced=1
+         set +x
       fi
-
-      rotator_lib_b64=$(base64 < "$rotator_lib" | tr -d '\n')
-
-      if [[ -z "$rotator_lib_b64" ]]; then
-         _err "Failed to encode Jenkins cert rotator Vault PKI helper"
+      rotator_script_b64="$(_jenkins_encode_file_base64 "$rotator_script" "Jenkins cert rotator script")"
+      rotator_lib_b64="$(_jenkins_encode_file_base64 "$rotator_lib" "Jenkins cert rotator Vault PKI helper")"
+      if (( traced )); then
+         set -x
       fi
 
       export JENKINS_CERT_ROTATOR_SCRIPT_B64="$rotator_script_b64"
