@@ -23,8 +23,8 @@ Ensure every external CLI used by `k3d-manager` has a corresponding `_ensure_*` 
 
 ## Status
 - Item 1: completed
-- Item 2: pending
-- Item 3: pending
+- Item 2: completed
+- Item 3: in progress
 - Item 4: pending
 - Item 5: pending
 
@@ -35,7 +35,7 @@ Ensure every external CLI used by `k3d-manager` has a corresponding `_ensure_*` 
 | `kubectl` | `_kubectl`, cluster helpers | ✅ `_install_kubernetes_cli` invoked automatically | Handles macOS, Debian, RedHat, WSL |
 | `helm` | `_helm`, Jenkins/Vault deployers | ✅ `_ensure_helm` | Automates install before invoking Helm |
 | `istioctl` | `_istioctl`, Istio workflows | ✅ `_ensure_istioctl` | Installs via existing helper before use |
-| `curl` | `_curl`, install helpers | ⚠️ none | Consider bootstrap via package manager or clearer guidance |
+| `curl` | `_curl`, install helpers | ✅ `_ensure_curl` | Installs via platform package manager or guides manual setup |
 | `lpass` | `_sync_lastpass_ad` | ⚠️ none | At least detect and suggest install command by platform |
 | `secret-tool` | `_secret_tool` | ✅ `_ensure_secret_tool` | Uses distro package managers |
 | `jq` | `_sync_lastpass_ad`, templating | ✅ `_ensure_jq` | Already covers common distros |
