@@ -225,16 +225,30 @@ function _sync_lastpass_ad() {
    fi
 
    local username="CN=svcADReader,OU=Service Accounts,OU=UsersOU,DC=pacific,DC=costcotravel,DC=com"
-   local payload
+   local payload payload_file
    if ! payload=$(jq -n --arg username "$username" --arg password "$lp_pass" '{username:$username,password:$password}'); then
       printf 'ERROR: Failed to build Vault payload for Jenkins AD secret.\n' >&2
       return 1
    fi
 
-   if ! printf '%s' "$payload" | _kubectl --quiet -n vault exec vault-0 -i -- sh -c 'cat >/tmp/jenkins-ad.json && vault kv put secret/jenkins/ad-ldap @/tmp/jenkins-ad.json && rm -f /tmp/jenkins-ad.json'; then
+   if ! payload_file=$(mktemp "${TMPDIR:-/tmp}/jenkins-ad-payload.XXXXXX"); then
+      printf 'ERROR: Failed to create temporary file for Jenkins AD payload.\n' >&2
+      return 1
+   fi
+   _cleanup_register "$payload_file"
+
+   if ! printf '%s' "$payload" >"$payload_file"; then
+      rm -f "$payload_file"
+      printf 'ERROR: Failed to write Jenkins AD payload to temporary file.\n' >&2
+      return 1
+   fi
+
+   if ! _kubectl --quiet -n vault exec vault-0 -i -- sh -c 'cat >/tmp/jenkins-ad.json && vault kv put secret/jenkins/ad-ldap @/tmp/jenkins-ad.json && rm -f /tmp/jenkins-ad.json' <"$payload_file"; then
+      rm -f "$payload_file"
       printf 'ERROR: Failed to write Jenkins AD credentials to Vault.\n' >&2
       return 1
    fi
+   rm -f "$payload_file"
 
    local vault_json vault_pass
    if ! vault_json=$(_kubectl --quiet -n vault exec vault-0 -i -- vault kv get -format=json secret/jenkins/ad-ldap); then
