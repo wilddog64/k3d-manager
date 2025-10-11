@@ -225,9 +225,13 @@ function _sync_lastpass_ad() {
    fi
 
    local username="CN=svcADReader,OU=Service Accounts,OU=UsersOU,DC=pacific,DC=costcotravel,DC=com"
-   if ! _kubectl --quiet -n vault exec vault-0 -i -- vault kv put secret/jenkins/ad-ldap \
-      username="$username" \
-      password="$lp_pass"; then
+   local payload
+   if ! payload=$(jq -n --arg username "$username" --arg password "$lp_pass" '{username:$username,password:$password}'); then
+      printf 'ERROR: Failed to build Vault payload for Jenkins AD secret.\n' >&2
+      return 1
+   fi
+
+   if ! printf '%s' "$payload" | _kubectl --quiet -n vault exec vault-0 -i -- sh -c 'cat >/tmp/jenkins-ad.json && vault kv put secret/jenkins/ad-ldap @/tmp/jenkins-ad.json && rm -f /tmp/jenkins-ad.json'; then
       printf 'ERROR: Failed to write Jenkins AD credentials to Vault.\n' >&2
       return 1
    fi
