@@ -37,13 +37,13 @@ The rendered Istio VirtualService now sets `X-Forwarded-Proto` and `X-Forwarded-
 
 ### Jenkins deployment prerequisites
 
-The Jenkins plugin renders Istio and workload manifests from templates using `envsubst`. Install the `envsubst` utility from the GNU gettext package and make sure it is available on your `PATH` before running `./scripts/k3d-manager deploy_jenkins`.
+The Jenkins plugin renders Istio and workload manifests from templates using `envsubst`. Before running `./scripts/k3d-manager deploy_jenkins`, ensure the GNU gettext package (for `envsubst`) and the LastPass CLI (`lpass`) are installed and on your `PATH`. The helper will attempt to install both automatically via Homebrew/apt/dnf when they are missing; if that fails (for example, due to missing sudo or offline hosts) use the manual commands below.
 
 | Platform | Installation command |
 | --- | --- |
-| macOS | `brew install gettext` <br/>`brew link --force gettext` |
-| Debian/Ubuntu | `sudo apt install gettext` |
-| Fedora/RHEL/CentOS | `sudo dnf install gettext` |
+| macOS | `brew install gettext lastpass-cli` <br/>`brew link --force gettext` |
+| Debian/Ubuntu | `sudo apt install gettext-base lastpass-cli` |
+| Fedora/RHEL/CentOS | `sudo dnf install gettext lastpass-cli` |
 
 ### LastPass-backed Active Directory credentials
 

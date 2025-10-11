@@ -4,7 +4,7 @@ Lightweight tooling for creating and operating a local Kubernetes environment wi
 
 ## Quick start
 
-1. Install prerequisites: Docker or Colima, the [`k3d`](https://k3d.io/) CLI (or another supported provider), `kubectl`, `helm`, and GNU `envsubst`.
+1. Ensure prerequisites are available: Docker (or Colima), the [`k3d`](https://k3d.io/) CLI, `kubectl`, `helm`, GNU `envsubst`, and the LastPass CLI if you plan to sync Jenkins credentials. `./scripts/k3d-manager` will attempt to install any missing tools automatically via Homebrew/apt/dnf when possible; install them manually if you are in a locked-down environment.
 2. Clone this repository and `cd` into it.
 3. Provision a cluster: `./scripts/k3d-manager create_cluster dev`.
 4. Bootstrap Vault: `./scripts/k3d-manager deploy_vault ha`.
@@ -41,6 +41,10 @@ Use `./scripts/k3d-manager <command> -h` for command-specific flags. Custom prov
 
 The Jenkins helper now supports in-place upgrades: pass `--live-update` to run a Helm upgrade against an existing release while the script still waits for the controller pod to become Ready. Skip automatic LastPass syncing with `--no-sync-from-lastpass` if credentials are already in Vault.
 
+### Dependency bootstrap
+
+Most commands call `_ensure_*` helpers before using external CLIs. When a tool such as `curl`, `helm`, `istioctl`, `docker`, `k3d`, `jq`, `envsubst`, or `lpass` is missing, `k3d-manager` will install it through the detected package manager or emit guidance if installation is not possible (for example, no sudo or network access). Watch the output for warnings if an automatic install fails and follow the provided manual instructions.
+
 ## Documentation map
 
 - [`docs/k3s-guide.md`](docs/k3s-guide.md) — running against native k3s environments and bare-metal clusters.
@@ -56,7 +60,7 @@ Run BATS suites before sending changes:
 ```bash
 ./scripts/tests/run.sh
 # or a narrower scope
-bats scripts/tests/lib
+bats scripts/tests/system
 bats scripts/tests/plugins/jenkins.bats
 ```
 

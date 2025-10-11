@@ -157,6 +157,181 @@ function _ensure_jq() {
    _err "Package manager not found to install jq"
 }
 
+function _ensure_curl() {
+   if _command_exist curl; then
+      return 0
+   fi
+
+   if _is_mac; then
+      if _command_exist brew; then
+         _run_command --quiet -- brew install curl
+      else
+         _warn "Homebrew not available; install curl from https://curl.se/download.html"
+         return 1
+      fi
+   elif _is_debian_family; then
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y curl
+   elif _is_redhat_family; then
+      local pkg_manager=
+      if _command_exist dnf; then
+         pkg_manager="dnf"
+      elif _command_exist yum; then
+         pkg_manager="yum"
+      else
+         _warn "Cannot determine package manager to install curl on this Red Hat based system."
+         return 1
+      fi
+      _run_command --prefer-sudo -- "$pkg_manager" install -y curl
+   elif _is_wsl; then
+      if _command_exist apt-get; then
+         _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+         _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y curl
+      else
+         local wsl_pkg=
+         if _command_exist dnf; then
+            wsl_pkg="dnf"
+         elif _command_exist yum; then
+            wsl_pkg="yum"
+         fi
+         if [[ -n "$wsl_pkg" ]]; then
+            _run_command --prefer-sudo -- "$wsl_pkg" install -y curl
+         else
+            _warn "Unable to determine package manager for curl installation under WSL."
+            return 1
+         fi
+      fi
+   else
+      _warn "Unsupported platform for automatic curl installation."
+      return 1
+   fi
+
+   if _command_exist curl; then
+      return 0
+   fi
+
+   _warn "curl installation attempted but curl binary still missing."
+   return 1
+}
+
+function _ensure_lpass() {
+   local lpass_cmd="${1:-lpass}"
+
+    if _command_exist "$lpass_cmd"; then
+       return 0
+    fi
+
+    local installed_cmd="lpass"
+    if [[ "$lpass_cmd" != "$installed_cmd" ]] && _command_exist "$installed_cmd"; then
+       return 0
+    fi
+
+    if _is_mac; then
+       if _command_exist brew; then
+          _run_command --quiet -- brew install lastpass-cli
+       else
+          _warn "Homebrew not available; install LastPass CLI from https://github.com/lastpass/lastpass-cli"
+          return 1
+       fi
+    elif _is_debian_family; then
+       _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+       _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y lastpass-cli
+    elif _is_redhat_family; then
+       local pkg_manager=
+       if _command_exist dnf; then
+          pkg_manager="dnf"
+       elif _command_exist yum; then
+          pkg_manager="yum"
+       else
+          _warn "Cannot determine package manager to install LastPass CLI on this Red Hat based system."
+          return 1
+       fi
+       if ! _run_command --prefer-sudo -- "$pkg_manager" install -y lastpass-cli; then
+          _warn "LastPass CLI not available via $pkg_manager; install manually from https://github.com/lastpass/lastpass-cli"
+          return 1
+       fi
+    elif _is_wsl; then
+       if _command_exist apt-get; then
+          _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+          _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y lastpass-cli
+       else
+          local wsl_pkg=
+          if _command_exist dnf; then
+             wsl_pkg="dnf"
+          elif _command_exist yum; then
+             wsl_pkg="yum"
+          fi
+          if [[ -n "$wsl_pkg" ]]; then
+             if ! _run_command --prefer-sudo -- "$wsl_pkg" install -y lastpass-cli; then
+                _warn "LastPass CLI not available via $wsl_pkg; install manually from https://github.com/lastpass/lastpass-cli"
+                return 1
+             fi
+          else
+             _warn "Unable to determine package manager for LastPass CLI installation under WSL."
+             return 1
+          fi
+       fi
+    else
+       _warn "Unsupported platform for automatic LastPass CLI installation."
+       return 1
+    fi
+
+    if _command_exist "$lpass_cmd" || _command_exist "$installed_cmd"; then
+       return 0
+    fi
+
+   _warn "LastPass CLI installation attempted but binary still missing."
+   return 1
+}
+
+function _ensure_docker() {
+   if _command_exist docker; then
+      return 0
+   fi
+
+   if declare -f _install_docker >/dev/null 2>&1; then
+      if ! _install_docker; then
+         _warn "Docker installation helper failed; install manually from https://docs.docker.com/engine/install/."
+         return 1
+      fi
+   else
+      _warn "Docker install helper not available; install manually from https://docs.docker.com/engine/install/."
+      return 1
+   fi
+
+   if _command_exist docker; then
+      return 0
+   fi
+
+   _warn "Docker installation attempted but docker binary still missing."
+   return 1
+}
+
+function _ensure_k3d() {
+   if _command_exist k3d; then
+      return 0
+   fi
+
+   local install_dir="${1:-}"
+   if declare -f _install_k3d >/dev/null 2>&1; then
+      if [[ -n "$install_dir" ]]; then
+         _install_k3d "$install_dir"
+      else
+         _install_k3d
+      fi
+   else
+      _warn "k3d install helper not available; install manually from https://k3d.io/#installation."
+      return 1
+   fi
+
+   if _command_exist k3d; then
+      return 0
+   fi
+
+   _warn "k3d installation attempted but binary still missing."
+   return 1
+}
+
 function _ensure_envsubst() {
    if command -v envsubst >/dev/null 2>&1; then
       return 0
@@ -193,8 +368,12 @@ function _ensure_envsubst() {
 
 function _sync_lastpass_ad() {
    local lpass_cmd="${LPASS_CMD:-lpass}"
-   if ! command -v "$lpass_cmd" >/dev/null 2>&1; then
-      printf 'ERROR: LastPass CLI not found (looked for %s)\n' "$lpass_cmd" >&2
+   if ! _ensure_lpass "$lpass_cmd"; then
+      printf 'ERROR: LastPass CLI not found (looked for %s); run bin/sync-lastpass-ad.sh to validate manual workflow.\n' "$lpass_cmd" >&2
+      return 1
+   fi
+   if ! command -v "$lpass_cmd" >/dev/null 2>&1 && ! command -v lpass >/dev/null 2>&1; then
+      printf 'ERROR: LastPass CLI still missing after attempted install (looked for %s)\n' "$lpass_cmd" >&2
       return 1
    fi
 
@@ -363,27 +542,83 @@ function _install_debian_helm() {
    _run_command sudo apt-get update
    _run_command sudo apt-get install -y helm
 
+   return 0
 }
 
 function _install_helm() {
   if _command_exist helm; then
-    echo helm already installed, skip
     return 0
   fi
 
   if _is_mac; then
-    _install_mac_helm
-  elif _is_redhat_family ; then
-    _install_redhat_helm
-  elif _is_debian_family ; then
+    if _command_exist brew; then
+      _install_mac_helm
+    else
+      _warn "Homebrew not available; install Helm manually from https://helm.sh/docs/intro/install/"
+      return 1
+    fi
+  elif _is_redhat_family; then
+    if _command_exist dnf; then
+      _install_redhat_helm
+    elif _command_exist yum; then
+      _run_command -- sudo yum install -y helm
+    else
+      _warn "No supported package manager found to install Helm on this system."
+      return 1
+    fi
+  elif _is_debian_family; then
     _install_debian_helm
-  elif _is_wsl ; then
-    if grep "debian" /etc/os-release &> /dev/null; then
+  elif _is_wsl; then
+    if _command_exist apt-get; then
       _install_debian_helm
-    elif grep "redhat" /etc/os-release &> /dev/null; then
-       _install_redhat_helm
+    elif _command_exist dnf || _command_exist yum; then
+      _install_redhat_helm
+    else
+      _warn "Unable to determine package manager for Helm installation under WSL."
+      return 1
+    fi
+  else
+    _warn "Unsupported platform for automatic Helm installation."
+    return 1
+  fi
+
+  if _command_exist helm; then
+    return 0
+  fi
+
+  _warn "Helm installation attempted but helm binary still missing."
+  return 1
+}
+
+function _ensure_helm() {
+  if _command_exist helm; then
+    return 0
+  fi
+
+  if _install_helm; then
+    return 0
+  fi
+
+  _err "Unable to install helm automatically; visit https://helm.sh/docs/intro/install/ for manual steps."
+}
+
+function _ensure_istioctl() {
+  if _command_exist istioctl; then
+    return 0
+  fi
+
+  if declare -f _install_istioctl >/dev/null 2>&1; then
+    if _install_istioctl; then
+      :
     fi
   fi
+
+  if _command_exist istioctl; then
+    return 0
+  fi
+
+  _warn "istioctl not available; install manually via https://istio.io/latest/docs/setup/getting-started/#download."
+  return 1
 }
 
 function _is_linux() {
@@ -539,9 +774,8 @@ function _kubectl() {
 }
 
 function _istioctl() {
-   if ! _command_exist istioctl ; then
-      echo "istioctl is not installed. Please install it first."
-      exit 1
+   if ! _ensure_istioctl; then
+      _err "istioctl is not installed. Please install it first."
    fi
 
    _run_command --quiet -- istioctl "$@"
@@ -562,6 +796,8 @@ function _helm() {
     esac
   done
 
+  _ensure_helm
+
   # If you keep global flags, splice them in *before* user args:
   if [[ -n "${HELM_GLOBAL_ARGS:-}" ]]; then
     _run_command "${pre[@]}" --probe 'version --short' -- helm ${HELM_GLOBAL_ARGS} "$@"
@@ -571,9 +807,8 @@ function _helm() {
 }
 
 function _curl() {
-   if ! _command_exist curl ; then
-      echo "curl is not installed. Please install it first."
-      exit 1
+   if ! _ensure_curl; then
+      _err "curl is required but could not be installed automatically."
    fi
 
    local curl_max_time="${CURL_MAX_TIME:-30}"

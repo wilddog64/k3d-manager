@@ -283,7 +283,7 @@ function test() {
     _ensure_bats
 
     local tests_root="${SCRIPT_DIR}/tests"
-    local -a search_dirs=("${tests_root}/lib" "${tests_root}/core" "${tests_root}/plugins")
+    local -a search_dirs=("${tests_root}/system" "${tests_root}/core" "${tests_root}/plugins")
     local -a tests=()
     while IFS= read -r test_file; do
         tests+=("$test_file")
@@ -304,7 +304,7 @@ function test() {
 
     if [[ "$suite_spec" == "all" ]]; then
         selected_tests=("${tests[@]}")
-    elif [[ "$suite_spec" == "lib" || "$suite_spec" == "core" || "$suite_spec" == "plugins" ]]; then
+    elif [[ "$suite_spec" == "system" || "$suite_spec" == "core" || "$suite_spec" == "plugins" ]]; then
         local dir="${tests_root}/${suite_spec}"
         while IFS= read -r test_file; do
             selected_tests+=("$test_file")

@@ -7,7 +7,9 @@ setup() {
   source "${BATS_TEST_DIRNAME}/../../lib/system.sh"
   init_test_env
   _ensure_jq() { return 0; }
+  _ensure_lpass() { return 0; }
   export -f _ensure_jq
+  export -f _ensure_lpass
 }
 
 _stub_kubectl_for_sync() {
