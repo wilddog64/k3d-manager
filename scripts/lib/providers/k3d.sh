@@ -1,6 +1,10 @@
 # shellcheck shell=bash
 
 function _provider_k3d_exec() {
+   if ! _ensure_k3d; then
+      _err "k3d CLI is required; install manually from https://k3d.io/#installation."
+   fi
+
    local pre=()
    while [[ $# -gt 0 ]]; do
       case "$1" in
@@ -49,8 +53,8 @@ function _provider_k3d_install() {
    export K3D_INSTALL_DIR="${1:-/usr/local/bin}"
    export INSTALL_DIR="$K3D_INSTALL_DIR"
 
-   _install_docker
-   _install_helm
+   _ensure_docker
+   _ensure_helm
    if _is_mac; then
       _install_istioctl "$HOME/.local/bin"
    else

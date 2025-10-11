@@ -280,8 +280,56 @@ function _ensure_lpass() {
        return 0
     fi
 
-    _warn "LastPass CLI installation attempted but binary still missing."
-    return 1
+   _warn "LastPass CLI installation attempted but binary still missing."
+   return 1
+}
+
+function _ensure_docker() {
+   if _command_exist docker; then
+      return 0
+   fi
+
+   if declare -f _install_docker >/dev/null 2>&1; then
+      if ! _install_docker; then
+         _warn "Docker installation helper failed; install manually from https://docs.docker.com/engine/install/."
+         return 1
+      fi
+   else
+      _warn "Docker install helper not available; install manually from https://docs.docker.com/engine/install/."
+      return 1
+   fi
+
+   if _command_exist docker; then
+      return 0
+   fi
+
+   _warn "Docker installation attempted but docker binary still missing."
+   return 1
+}
+
+function _ensure_k3d() {
+   if _command_exist k3d; then
+      return 0
+   fi
+
+   local install_dir="${1:-}"
+   if declare -f _install_k3d >/dev/null 2>&1; then
+      if [[ -n "$install_dir" ]]; then
+         _install_k3d "$install_dir"
+      else
+         _install_k3d
+      fi
+   else
+      _warn "k3d install helper not available; install manually from https://k3d.io/#installation."
+      return 1
+   fi
+
+   if _command_exist k3d; then
+      return 0
+   fi
+
+   _warn "k3d installation attempted but binary still missing."
+   return 1
 }
 
 function _ensure_envsubst() {

@@ -42,8 +42,8 @@ Ensure every external CLI used by `k3d-manager` has a corresponding `_ensure_*` 
 | `envsubst` | rendering templates | ✅ `_ensure_envsubst` | |
 | `bats` | test harness (`_ensure_bats`) | ✅ | Ensures minimum version |
 | `cargo` | developer tooling (`_ensure_cargo`) | ✅ | |
-| `docker`/`colima` | install helpers | ⚠️ manual invocation only | Evaluate whether to auto-install or keep on-demand |
-| `k3d` | provider abstraction | ⚠️ relies on user install | Need to decide on ensure strategy |
+| `docker`/`colima` | install helpers | ✅ `_ensure_docker` | Bootstraps via existing install helpers or warns for manual steps |
+| `k3d` | provider abstraction | ✅ `_ensure_k3d` | Invokes provider install helper when missing |
 
 ### Install strategy (draft)
 
