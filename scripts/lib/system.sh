@@ -363,27 +363,64 @@ function _install_debian_helm() {
    _run_command sudo apt-get update
    _run_command sudo apt-get install -y helm
 
+   return 0
 }
 
 function _install_helm() {
   if _command_exist helm; then
-    echo helm already installed, skip
     return 0
   fi
 
   if _is_mac; then
-    _install_mac_helm
-  elif _is_redhat_family ; then
-    _install_redhat_helm
-  elif _is_debian_family ; then
-    _install_debian_helm
-  elif _is_wsl ; then
-    if grep "debian" /etc/os-release &> /dev/null; then
-      _install_debian_helm
-    elif grep "redhat" /etc/os-release &> /dev/null; then
-       _install_redhat_helm
+    if _command_exist brew; then
+      _install_mac_helm
+    else
+      _warn "Homebrew not available; install Helm manually from https://helm.sh/docs/intro/install/"
+      return 1
     fi
+  elif _is_redhat_family; then
+    if _command_exist dnf; then
+      _install_redhat_helm
+    elif _command_exist yum; then
+      _run_command -- sudo yum install -y helm
+    else
+      _warn "No supported package manager found to install Helm on this system."
+      return 1
+    fi
+  elif _is_debian_family; then
+    _install_debian_helm
+  elif _is_wsl; then
+    if _command_exist apt-get; then
+      _install_debian_helm
+    elif _command_exist dnf || _command_exist yum; then
+      _install_redhat_helm
+    else
+      _warn "Unable to determine package manager for Helm installation under WSL."
+      return 1
+    fi
+  else
+    _warn "Unsupported platform for automatic Helm installation."
+    return 1
   fi
+
+  if _command_exist helm; then
+    return 0
+  fi
+
+  _warn "Helm installation attempted but helm binary still missing."
+  return 1
+}
+
+function _ensure_helm() {
+  if _command_exist helm; then
+    return 0
+  fi
+
+  if _install_helm; then
+    return 0
+  fi
+
+  _err "Unable to install helm automatically; visit https://helm.sh/docs/intro/install/ for manual steps."
 }
 
 function _is_linux() {
@@ -561,6 +598,8 @@ function _helm() {
       *)  break;;
     esac
   done
+
+  _ensure_helm
 
   # If you keep global flags, splice them in *before* user args:
   if [[ -n "${HELM_GLOBAL_ARGS:-}" ]]; then
