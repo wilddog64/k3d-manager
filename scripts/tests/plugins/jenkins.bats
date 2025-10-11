@@ -22,6 +22,13 @@ setup() {
   export SYSTEM_JQ_CMD
   _vault_issue_pki_tls_secret() { :; }
   export -f _vault_issue_pki_tls_secret
+  _sync_lastpass_ad() {
+    if [[ -n "${SYNC_LASTPASS_AD_LOG:-}" ]]; then
+      echo "_sync_lastpass_ad" >> "$SYNC_LASTPASS_AD_LOG"
+    fi
+    return "${SYNC_LASTPASS_AD_RC:-0}"
+  }
+  export -f _sync_lastpass_ad
 }
 
 @test "Jenkins trap wrapper preserves original script arguments" {
@@ -86,6 +93,67 @@ EOF
   run deploy_jenkins -h
   [ "$status" -eq 0 ]
   [[ "$output" == *"Usage: deploy_jenkins"* ]]
+}
+
+@test "deploy_jenkins syncs LastPass credentials by default" {
+  SYNC_LASTPASS_AD_LOG="$BATS_TEST_TMPDIR/lastpass.log"
+  : >"$SYNC_LASTPASS_AD_LOG"
+  deploy_vault() { :; }
+  _create_jenkins_admin_vault_policy() { :; }
+  _create_jenkins_vault_ad_policy() { :; }
+  _create_jenkins_cert_rotator_policy() { :; }
+  _create_jenkins_namespace() { :; }
+  _create_jenkins_pv_pvc() { :; }
+  _ensure_jenkins_cert() { :; }
+  _deploy_jenkins() { :; }
+  _wait_for_jenkins_ready() { :; }
+
+  run deploy_jenkins
+  [ "$status" -eq 0 ]
+  read_lines "$SYNC_LASTPASS_AD_LOG" sync_calls
+  [ "${#sync_calls[@]}" -eq 1 ]
+  [ "${sync_calls[0]}" = "_sync_lastpass_ad" ]
+}
+
+@test "deploy_jenkins skips LastPass sync when disabled" {
+  SYNC_LASTPASS_AD_LOG="$BATS_TEST_TMPDIR/lastpass.log"
+  : >"$SYNC_LASTPASS_AD_LOG"
+  deploy_vault() { :; }
+  _create_jenkins_admin_vault_policy() { :; }
+  _create_jenkins_vault_ad_policy() { :; }
+  _create_jenkins_cert_rotator_policy() { :; }
+  _create_jenkins_namespace() { :; }
+  _create_jenkins_pv_pvc() { :; }
+  _ensure_jenkins_cert() { :; }
+  _deploy_jenkins() { :; }
+  _wait_for_jenkins_ready() { :; }
+
+  run deploy_jenkins --no-sync-from-lastpass
+  [ "$status" -eq 0 ]
+  read_lines "$SYNC_LASTPASS_AD_LOG" sync_calls
+  [ "${#sync_calls[@]}" -eq 0 ]
+}
+
+@test "deploy_jenkins surfaces LastPass sync failure" {
+  SYNC_LASTPASS_AD_LOG="$BATS_TEST_TMPDIR/lastpass.log"
+  : >"$SYNC_LASTPASS_AD_LOG"
+  SYNC_LASTPASS_AD_RC=5
+  deploy_vault() { :; }
+  _create_jenkins_admin_vault_policy() { :; }
+  _create_jenkins_vault_ad_policy() { :; }
+  _create_jenkins_cert_rotator_policy() { :; }
+  _create_jenkins_namespace() { :; }
+  _create_jenkins_pv_pvc() { :; }
+  _ensure_jenkins_cert() { :; }
+  _deploy_jenkins() { :; }
+  _wait_for_jenkins_ready() { :; }
+
+  run deploy_jenkins
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"LastPass AD sync failed"* ]]
+  [[ "$output" == *"bin/sync-lastpass-ad.sh"* ]]
+  read_lines "$SYNC_LASTPASS_AD_LOG" sync_calls
+  [ "${#sync_calls[@]}" -eq 1 ]
 }
 
 @test "_jenkins_configure_leaf_host_defaults picks sslip host for WSL k3s" {
@@ -1360,6 +1428,7 @@ EOF
 @test "Full deployment" {
   CALLS_LOG="$BATS_TEST_TMPDIR/calls.log"
   : > "$CALLS_LOG"
+  SYNC_LASTPASS_AD_LOG="$CALLS_LOG"
   deploy_vault() { echo "deploy_vault:$*" >> "$CALLS_LOG"; }
   _create_jenkins_admin_vault_policy() { echo "_create_jenkins_admin_vault_policy:$*" >> "$CALLS_LOG"; }
   _create_jenkins_vault_ad_policy() { echo "_create_jenkins_vault_ad_policy:$*" >> "$CALLS_LOG"; }
@@ -1383,6 +1452,7 @@ EOF
     "_create_jenkins_namespace:sample-ns"
     "_create_jenkins_pv_pvc:sample-ns"
     "_ensure_jenkins_cert:custom-vault ${release}"
+    "_sync_lastpass_ad"
     "_deploy_jenkins:sample-ns custom-vault ${release}"
     "_wait_for_jenkins_ready:sample-ns"
   )
