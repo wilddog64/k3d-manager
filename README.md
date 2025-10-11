@@ -34,10 +34,12 @@ Lightweight tooling for creating and operating a local Kubernetes environment wi
 | `delete_cluster <name>` | Remove the cluster and associated resources. |
 | `deploy_cluster [-f]` | Provider-aware bootstrap that installs Istio and supporting add-ons. |
 | `deploy_vault ha` | Install HashiCorp Vault (HA) and configure PKI helpers. |
-| `deploy_jenkins [--no-sync-from-lastpass]` | Render and install Jenkins, seeding Vault with AD credentials by default. |
+| `deploy_jenkins [--live-update] [--no-sync-from-lastpass]` | Render and install (or upgrade) Jenkins, seeding Vault with AD credentials by default unless disabled. |
 | `deploy_eso` | Deploy External Secrets Operator. |
 
 Use `./scripts/k3d-manager <command> -h` for command-specific flags. Custom providers can be added under `scripts/lib/providers/`; see [`docs/cluster-providers.md`](docs/cluster-providers.md).
+
+The Jenkins helper now supports in-place upgrades: pass `--live-update` to run a Helm upgrade against an existing release while the script still waits for the controller pod to become Ready. Skip automatic LastPass syncing with `--no-sync-from-lastpass` if credentials are already in Vault.
 
 ## Documentation map
 

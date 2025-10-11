@@ -9,6 +9,14 @@ setup() {
   source "${BATS_TEST_DIRNAME}/../../lib/system.sh"
   source "${BATS_TEST_DIRNAME}/../../lib/core.sh"
   export -f deploy_cluster
+  TEST_ISTIO_LOG="$BATS_TMPDIR/test_istio.log"
+  : > "$TEST_ISTIO_LOG"
+  test_istio() {
+    printf 'test_istio\n' >> "$TEST_ISTIO_LOG"
+    return 0
+  }
+  export TEST_ISTIO_LOG
+  export -f test_istio
 
   source "${BATS_TEST_DIRNAME}/../../lib/providers/k3s.sh"
   eval "$(declare -f _provider_k3s_deploy_cluster | sed '1s/_provider_k3s_deploy_cluster/orig_provider_k3s_deploy_cluster/')"
@@ -89,4 +97,13 @@ sys.stdout.write(pattern.sub(lambda match: os.environ.get(match.group(1), ""), d
   [ "${#kubectl_lines[@]}" -ge 1 ]
   local last_index=$(( ${#kubectl_lines[@]} - 1 ))
   [ "${kubectl_lines[$last_index]}" = "label ns default istio-injection=enabled --overwrite" ]
+}
+
+@test "deploy_cluster runs Istio smoke test after provider deploy" {
+  run deploy_cluster --provider k3s demo
+
+  [ "$status" -eq 0 ]
+  [[ -s "$TEST_ISTIO_LOG" ]]
+  read -r istio_call < "$TEST_ISTIO_LOG"
+  [ "$istio_call" = "test_istio" ]
 }

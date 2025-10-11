@@ -16,6 +16,38 @@ fi
 # shellcheck disable=SC1090
 source "$JENKINS_VARS_FILE"
 
+function _jenkins_encode_file_base64() {
+   local file="$1"
+   local label="${2:-$file}"
+
+   if [[ ! -r "$file" ]]; then
+      _err "File not found while encoding for base64: $file"
+   fi
+
+   local traced=0
+   if [[ $- == *x* ]]; then
+      traced=1
+      set +x
+   fi
+
+   local encoded rc
+   encoded=$(base64 < "$file" | tr -d '\n')
+   rc=$?
+
+   if (( rc != 0 )) || [[ -z "$encoded" ]]; then
+      if (( traced )); then
+         set -x
+      fi
+      _err "Failed to encode $label"
+   fi
+
+   printf '%s' "$encoded"
+
+   if (( traced )); then
+      set -x
+   fi
+}
+
 function _jenkins_ensure_cert_rotator_sources() {
    local traced=0
    if [[ $- == *x* ]]; then
@@ -24,11 +56,11 @@ function _jenkins_ensure_cert_rotator_sources() {
    fi
 
    if [[ -z "${JENKINS_CERT_ROTATOR_SCRIPT_B64:-}" ]]; then
-      JENKINS_CERT_ROTATOR_SCRIPT_B64="$(base64 < "${JENKINS_CONFIG_DIR}/cert-rotator.sh" | tr -d '\n')"
+      JENKINS_CERT_ROTATOR_SCRIPT_B64="$(_jenkins_encode_file_base64 "${JENKINS_CONFIG_DIR}/cert-rotator.sh" "Jenkins cert rotator script")"
    fi
 
    if [[ -z "${JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64:-}" ]]; then
-      JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64="$(base64 < "${SCRIPT_DIR}/lib/vault_pki.sh" | tr -d '\n')"
+      JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64="$(_jenkins_encode_file_base64 "${SCRIPT_DIR}/lib/vault_pki.sh" "Jenkins cert rotator Vault PKI helper")"
    fi
 
    if (( traced )); then
@@ -593,9 +625,33 @@ function _jenkins_configure_leaf_host_defaults() {
    return 0
 }
 
+function _jenkins_collect_controller_uids() {
+   local ns="$1"
+   local out_var="$2"
+
+   local raw=""
+   if ! raw=$(_kubectl --no-exit --quiet -n "$ns" \
+      get pod -l app.kubernetes.io/component=jenkins-controller \
+      -o jsonpath='{range .items[*]}{.metadata.name}:{.metadata.uid}{"\n"}{end}' 2>/dev/null); then
+      raw=""
+   fi
+
+   eval "$out_var=()"
+   local line index=0
+   while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      eval "$out_var[$index]=\"\$line\""
+      (( index++ ))
+   done <<<"$raw"
+
+   return 0
+}
+
 
 function deploy_jenkins() {
    local sync_lastpass=1
+   local sync_lastpass_explicit=0
+   local live_update=0
    local show_help=0
    local -a positional=()
 
@@ -607,10 +663,16 @@ function deploy_jenkins() {
             ;;
          --sync-from-lastpass)
             sync_lastpass=1
+            sync_lastpass_explicit=1
             shift
             ;;
          --no-sync-from-lastpass)
             sync_lastpass=0
+            sync_lastpass_explicit=1
+            shift
+            ;;
+         --live-update)
+            live_update=1
             shift
             ;;
          --)
@@ -626,7 +688,7 @@ function deploy_jenkins() {
    done
 
    if (( show_help )); then
-      echo "Usage: deploy_jenkins [--sync-from-lastpass|--no-sync-from-lastpass] [namespace=jenkins] [vault-namespace=${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}] [vault-release=${VAULT_RELEASE_DEFAULT}]"
+      echo "Usage: deploy_jenkins [--sync-from-lastpass|--no-sync-from-lastpass] [--live-update] [namespace=jenkins] [vault-namespace=${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}] [vault-release=${VAULT_RELEASE_DEFAULT}]"
       return 0
    fi
 
@@ -635,6 +697,10 @@ function deploy_jenkins() {
    local jenkins_namespace="${1:-jenkins}"
    local vault_namespace="${2:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${3:-$VAULT_RELEASE_DEFAULT}"
+
+    if (( live_update )) && (( ! sync_lastpass_explicit )); then
+      sync_lastpass=0
+    fi
 
    _jenkins_configure_leaf_host_defaults
 
@@ -655,17 +721,24 @@ function deploy_jenkins() {
          ;;
    esac
 
-   if [[ -n "$injector_setting" ]]; then
-      VAULT_ENABLE_INJECTOR="$injector_setting" deploy_vault ha "$vault_namespace" "$vault_release"
+   if (( live_update )); then
+      if !_kubectl --quiet get namespace "$jenkins_namespace" >/dev/null 2>&1; then
+         _err "Live update requested, but namespace '$jenkins_namespace' not found."
+      fi
+      _info "Live update mode enabled; skipping Jenkins bootstrap routines."
    else
-      deploy_vault ha "$vault_namespace" "$vault_release"
+      if [[ -n "$injector_setting" ]]; then
+         VAULT_ENABLE_INJECTOR="$injector_setting" deploy_vault ha "$vault_namespace" "$vault_release"
+      else
+         deploy_vault ha "$vault_namespace" "$vault_release"
+      fi
+      _create_jenkins_admin_vault_policy "$vault_namespace" "$vault_release"
+      _create_jenkins_vault_ad_policy "$vault_namespace" "$vault_release" "$jenkins_namespace"
+      _create_jenkins_cert_rotator_policy "$vault_namespace" "$vault_release" "" "" "$jenkins_namespace"
+      _create_jenkins_namespace "$jenkins_namespace"
+      _create_jenkins_pv_pvc "$jenkins_namespace"
+      _ensure_jenkins_cert "$vault_namespace" "$vault_release"
    fi
-   _create_jenkins_admin_vault_policy "$vault_namespace" "$vault_release"
-   _create_jenkins_vault_ad_policy "$vault_namespace" "$vault_release" "$jenkins_namespace"
-   _create_jenkins_cert_rotator_policy "$vault_namespace" "$vault_release" "" "" "$jenkins_namespace"
-   _create_jenkins_namespace "$jenkins_namespace"
-   _create_jenkins_pv_pvc "$jenkins_namespace"
-   _ensure_jenkins_cert "$vault_namespace" "$vault_release"
 
    if (( sync_lastpass )); then
       if ! _sync_lastpass_ad; then
@@ -683,12 +756,22 @@ function deploy_jenkins() {
    selector='app.kubernetes.io/component=jenkins-controller'
 
    for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+      local -a wait_args=("$jenkins_namespace")
+      local -a previous_pods=()
+      if (( live_update )); then
+         _jenkins_collect_controller_uids "$jenkins_namespace" previous_pods
+         if (( ${#previous_pods[@]} )); then
+            wait_args+=("--expect-rollout")
+            wait_args+=("${previous_pods[@]}")
+         fi
+      fi
+
       _deploy_jenkins "$jenkins_namespace" "$vault_namespace" "$vault_release"
       deploy_rc=$?
 
       wait_rc=0
       if (( deploy_rc == 0 )); then
-         if _wait_for_jenkins_ready "$jenkins_namespace"; then
+         if _wait_for_jenkins_ready "${wait_args[@]}"; then
             return 0
          fi
          wait_rc=$?
@@ -912,17 +995,15 @@ function _deploy_jenkins() {
          _err "Jenkins cert rotator Vault PKI helper not found: $rotator_lib"
       fi
 
-      local rotator_script_b64 rotator_lib_b64
-      rotator_script_b64=$(base64 < "$rotator_script" | tr -d '\n')
-
-      if [[ -z "$rotator_script_b64" ]]; then
-         _err "Failed to encode Jenkins cert rotator script"
+      local rotator_script_b64 rotator_lib_b64 traced=0
+      if [[ $- == *x* ]]; then
+         traced=1
+         set +x
       fi
-
-      rotator_lib_b64=$(base64 < "$rotator_lib" | tr -d '\n')
-
-      if [[ -z "$rotator_lib_b64" ]]; then
-         _err "Failed to encode Jenkins cert rotator Vault PKI helper"
+      rotator_script_b64="$(_jenkins_encode_file_base64 "$rotator_script" "Jenkins cert rotator script")"
+      rotator_lib_b64="$(_jenkins_encode_file_base64 "$rotator_lib" "Jenkins cert rotator Vault PKI helper")"
+      if (( traced )); then
+         set -x
       fi
 
       export JENKINS_CERT_ROTATOR_SCRIPT_B64="$rotator_script_b64"
@@ -968,16 +1049,39 @@ function _deploy_jenkins() {
 
 function _wait_for_jenkins_ready() {
    local ns="$1"
-   local timeout_arg="${2:-}"
-   local timeout
+   shift || true
 
-   if [[ -n "$timeout_arg" ]]; then
-      timeout="$timeout_arg"
-   elif [[ -n "${JENKINS_READY_TIMEOUT:-}" ]]; then
-      timeout="$JENKINS_READY_TIMEOUT"
-   else
-      timeout="5m"
-   fi
+   local timeout="${JENKINS_READY_TIMEOUT:-5m}"
+   local expect_rollout=0
+   local -a old_pods=()
+
+   while (( $# )); do
+      case "$1" in
+         --timeout)
+            if (( $# < 2 )); then
+               _err "Missing value for --timeout in _wait_for_jenkins_ready"
+            fi
+            timeout="$2"
+            shift 2
+            ;;
+         --timeout=*)
+            timeout="${1#--timeout=}"
+            shift
+            ;;
+         --expect-rollout)
+            expect_rollout=1
+            shift
+            while (( $# )) && [[ "$1" != --* ]]; do
+               old_pods+=("$1")
+               shift
+            done
+            ;;
+         *)
+            timeout="$1"
+            shift
+            ;;
+      esac
+   done
 
    local total_seconds
    case "$timeout" in
@@ -994,10 +1098,46 @@ function _wait_for_jenkins_ready() {
       echo "Waiting for Jenkins controller pod to be ready..."
       if (( SECONDS >= end )); then
          echo "Timed out waiting for Jenkins controller pod to be ready" >&2
+         _kubectl --no-exit --quiet -n "$ns" get pod -l app.kubernetes.io/component=jenkins-controller >&2 || true
+         _kubectl --no-exit --quiet -n "$ns" describe pod -l app.kubernetes.io/component=jenkins-controller >&2 || true
          return 1
       fi
       sleep 5
    done
+
+   if (( expect_rollout )); then
+      local -A old_uid_map=()
+      local entry uid
+      for entry in "${old_pods[@]}"; do
+         uid="${entry#*:}"
+         [[ -z "$uid" ]] && continue
+         old_uid_map["$uid"]=1
+      done
+
+      local -a current_pods=()
+      _jenkins_collect_controller_uids "$ns" current_pods
+
+      if (( ${#current_pods[@]} )); then
+         local -a new_pods=()
+         local name
+         for entry in "${current_pods[@]}"; do
+            uid="${entry#*:}"
+            name="${entry%%:*}"
+            if [[ -z "${old_uid_map[$uid]:-}" ]]; then
+               new_pods+=("$name")
+            fi
+         done
+         if (( ${#new_pods[@]} )); then
+            _info "Detected Jenkins controller pod update: ${new_pods[*]}"
+         else
+            _info "Jenkins controller pod is ready; no rollout detected."
+         fi
+      else
+         _warn "Jenkins controller pods not found when verifying rollout state."
+      fi
+   fi
+
+   return 0
 }
 
 function _create_jenkins_admin_vault_policy() {

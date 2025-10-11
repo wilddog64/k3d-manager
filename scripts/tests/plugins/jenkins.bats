@@ -156,6 +156,79 @@ EOF
   [ "${#sync_calls[@]}" -eq 1 ]
 }
 
+@test "deploy_jenkins --live-update skips LastPass sync by default" {
+  SYNC_LASTPASS_AD_LOG="$BATS_TEST_TMPDIR/lastpass.log"
+  : >"$SYNC_LASTPASS_AD_LOG"
+  _deploy_jenkins() { :; }
+  _wait_for_jenkins_ready() { :; }
+  export -f _deploy_jenkins
+  export -f _wait_for_jenkins_ready
+
+  run deploy_jenkins --live-update
+  [ "$status" -eq 0 ]
+  read_lines "$SYNC_LASTPASS_AD_LOG" sync_calls
+  [ "${#sync_calls[@]}" -eq 0 ]
+}
+
+@test "deploy_jenkins --live-update passes existing pods to readiness wait" {
+  SYNC_LASTPASS_AD_LOG="$BATS_TEST_TMPDIR/lastpass.log"
+  : >"$SYNC_LASTPASS_AD_LOG"
+  local wait_log="$BATS_TEST_TMPDIR/wait.log"
+  : >"$wait_log"
+
+  _deploy_jenkins() { :; }
+  export -f _deploy_jenkins
+
+  _wait_for_jenkins_ready() {
+    printf '%s\n' "$*" >>"$wait_log"
+    return 0
+  }
+  export -f _wait_for_jenkins_ready
+
+  JENKINS_POD_LIST_CALLS=0
+  _kubectl() {
+    local raw="$*"
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo)
+          shift
+          ;;
+        --)
+          shift
+          break
+          ;;
+        *)
+          break
+          ;;
+      esac
+    done
+    echo "$*" >>"$KUBECTL_LOG"
+
+    if [[ "$raw" == *"get namespace jenkins"* ]]; then
+      return 0
+    fi
+
+    if [[ "$raw" == *"get pod -l app.kubernetes.io/component=jenkins-controller"* ]]; then
+      ((JENKINS_POD_LIST_CALLS++))
+      if (( JENKINS_POD_LIST_CALLS == 1 )); then
+        printf 'jenkins-0:old-uid\n'
+      else
+        printf 'jenkins-0:new-uid\n'
+      fi
+    fi
+    return 0
+  }
+  export -f _kubectl
+
+  run deploy_jenkins --live-update
+  [ "$status" -eq 0 ]
+  read_lines "$wait_log" wait_args
+  [ "${#wait_args[@]}" -eq 1 ]
+  [[ "${wait_args[0]}" == "jenkins --expect-rollout jenkins-0:old-uid" ]]
+  read_lines "$SYNC_LASTPASS_AD_LOG" sync_calls
+  [ "${#sync_calls[@]}" -eq 0 ]
+}
+
 @test "_jenkins_configure_leaf_host_defaults picks sslip host for WSL k3s" {
   _is_wsl() { return 0; }
   export -f _is_wsl
@@ -1517,7 +1590,12 @@ EOF
   [ "$status" -eq 1 ]
   [[ "$stderr" == *"Timed out waiting for Jenkins controller pod to be ready"* ]]
   read_lines "$KUBECTL_LOG" kubectl_calls
-  [ "${#kubectl_calls[@]}" -eq 2 ]
+  [ "${#kubectl_calls[@]}" -eq 4 ]
+  expected="-n test-ns wait --for=condition=Ready pod -l app.kubernetes.io/component=jenkins-controller --timeout=5s"
+  [ "${kubectl_calls[0]}" = "$expected" ]
+  [ "${kubectl_calls[1]}" = "$expected" ]
+  [ "${kubectl_calls[2]}" = "-n test-ns get pod -l app.kubernetes.io/component=jenkins-controller" ]
+  [ "${kubectl_calls[3]}" = "-n test-ns describe pod -l app.kubernetes.io/component=jenkins-controller" ]
   unset JENKINS_READY_TIMEOUT
 }
 
