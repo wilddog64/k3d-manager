@@ -214,6 +214,76 @@ function _ensure_curl() {
    return 1
 }
 
+function _ensure_lpass() {
+   local lpass_cmd="${1:-lpass}"
+
+    if _command_exist "$lpass_cmd"; then
+       return 0
+    fi
+
+    local installed_cmd="lpass"
+    if [[ "$lpass_cmd" != "$installed_cmd" ]] && _command_exist "$installed_cmd"; then
+       return 0
+    fi
+
+    if _is_mac; then
+       if _command_exist brew; then
+          _run_command --quiet -- brew install lastpass-cli
+       else
+          _warn "Homebrew not available; install LastPass CLI from https://github.com/lastpass/lastpass-cli"
+          return 1
+       fi
+    elif _is_debian_family; then
+       _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+       _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y lastpass-cli
+    elif _is_redhat_family; then
+       local pkg_manager=
+       if _command_exist dnf; then
+          pkg_manager="dnf"
+       elif _command_exist yum; then
+          pkg_manager="yum"
+       else
+          _warn "Cannot determine package manager to install LastPass CLI on this Red Hat based system."
+          return 1
+       fi
+       if ! _run_command --prefer-sudo -- "$pkg_manager" install -y lastpass-cli; then
+          _warn "LastPass CLI not available via $pkg_manager; install manually from https://github.com/lastpass/lastpass-cli"
+          return 1
+       fi
+    elif _is_wsl; then
+       if _command_exist apt-get; then
+          _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+          _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y lastpass-cli
+       else
+          local wsl_pkg=
+          if _command_exist dnf; then
+             wsl_pkg="dnf"
+          elif _command_exist yum; then
+             wsl_pkg="yum"
+          fi
+          if [[ -n "$wsl_pkg" ]]; then
+             if ! _run_command --prefer-sudo -- "$wsl_pkg" install -y lastpass-cli; then
+                _warn "LastPass CLI not available via $wsl_pkg; install manually from https://github.com/lastpass/lastpass-cli"
+                return 1
+             fi
+          else
+             _warn "Unable to determine package manager for LastPass CLI installation under WSL."
+             return 1
+          fi
+       fi
+    else
+       _warn "Unsupported platform for automatic LastPass CLI installation."
+       return 1
+    fi
+
+    if _command_exist "$lpass_cmd" || _command_exist "$installed_cmd"; then
+       return 0
+    fi
+
+    _warn "LastPass CLI installation attempted but binary still missing."
+    return 1
+}
+
 function _ensure_envsubst() {
    if command -v envsubst >/dev/null 2>&1; then
       return 0
@@ -250,8 +320,12 @@ function _ensure_envsubst() {
 
 function _sync_lastpass_ad() {
    local lpass_cmd="${LPASS_CMD:-lpass}"
-   if ! command -v "$lpass_cmd" >/dev/null 2>&1; then
-      printf 'ERROR: LastPass CLI not found (looked for %s)\n' "$lpass_cmd" >&2
+   if ! _ensure_lpass "$lpass_cmd"; then
+      printf 'ERROR: LastPass CLI not found (looked for %s); run bin/sync-lastpass-ad.sh to validate manual workflow.\n' "$lpass_cmd" >&2
+      return 1
+   fi
+   if ! command -v "$lpass_cmd" >/dev/null 2>&1 && ! command -v lpass >/dev/null 2>&1; then
+      printf 'ERROR: LastPass CLI still missing after attempted install (looked for %s)\n' "$lpass_cmd" >&2
       return 1
    fi
 
