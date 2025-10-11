@@ -30,6 +30,7 @@ controller:
     - credentials
     - git
     - hashicorp-vault-plugin
+    - jobConfigHistory
     - job-dsl
     - kubernetes
     - matrix-auth
