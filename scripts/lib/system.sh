@@ -157,6 +157,63 @@ function _ensure_jq() {
    _err "Package manager not found to install jq"
 }
 
+function _ensure_curl() {
+   if _command_exist curl; then
+      return 0
+   fi
+
+   if _is_mac; then
+      if _command_exist brew; then
+         _run_command --quiet -- brew install curl
+      else
+         _warn "Homebrew not available; install curl from https://curl.se/download.html"
+         return 1
+      fi
+   elif _is_debian_family; then
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y curl
+   elif _is_redhat_family; then
+      local pkg_manager=
+      if _command_exist dnf; then
+         pkg_manager="dnf"
+      elif _command_exist yum; then
+         pkg_manager="yum"
+      else
+         _warn "Cannot determine package manager to install curl on this Red Hat based system."
+         return 1
+      fi
+      _run_command --prefer-sudo -- "$pkg_manager" install -y curl
+   elif _is_wsl; then
+      if _command_exist apt-get; then
+         _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+         _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y curl
+      else
+         local wsl_pkg=
+         if _command_exist dnf; then
+            wsl_pkg="dnf"
+         elif _command_exist yum; then
+            wsl_pkg="yum"
+         fi
+         if [[ -n "$wsl_pkg" ]]; then
+            _run_command --prefer-sudo -- "$wsl_pkg" install -y curl
+         else
+            _warn "Unable to determine package manager for curl installation under WSL."
+            return 1
+         fi
+      fi
+   else
+      _warn "Unsupported platform for automatic curl installation."
+      return 1
+   fi
+
+   if _command_exist curl; then
+      return 0
+   fi
+
+   _warn "curl installation attempted but curl binary still missing."
+   return 1
+}
+
 function _ensure_envsubst() {
    if command -v envsubst >/dev/null 2>&1; then
       return 0
@@ -628,9 +685,8 @@ function _helm() {
 }
 
 function _curl() {
-   if ! _command_exist curl ; then
-      echo "curl is not installed. Please install it first."
-      exit 1
+   if ! _ensure_curl; then
+      _err "curl is required but could not be installed automatically."
    fi
 
    local curl_max_time="${CURL_MAX_TIME:-30}"
