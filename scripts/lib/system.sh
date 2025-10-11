@@ -423,6 +423,25 @@ function _ensure_helm() {
   _err "Unable to install helm automatically; visit https://helm.sh/docs/intro/install/ for manual steps."
 }
 
+function _ensure_istioctl() {
+  if _command_exist istioctl; then
+    return 0
+  fi
+
+  if declare -f _install_istioctl >/dev/null 2>&1; then
+    if _install_istioctl; then
+      :
+    fi
+  fi
+
+  if _command_exist istioctl; then
+    return 0
+  fi
+
+  _warn "istioctl not available; install manually via https://istio.io/latest/docs/setup/getting-started/#download."
+  return 1
+}
+
 function _is_linux() {
    if [[ "$(uname -s)" == "Linux" ]]; then
       return 0
@@ -576,9 +595,8 @@ function _kubectl() {
 }
 
 function _istioctl() {
-   if ! _command_exist istioctl ; then
-      echo "istioctl is not installed. Please install it first."
-      exit 1
+   if ! _ensure_istioctl; then
+      _err "istioctl is not installed. Please install it first."
    fi
 
    _run_command --quiet -- istioctl "$@"
