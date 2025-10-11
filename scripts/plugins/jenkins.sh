@@ -595,10 +595,42 @@ function _jenkins_configure_leaf_host_defaults() {
 
 
 function deploy_jenkins() {
-   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-      echo "Usage: deploy_jenkins [namespace=jenkins] [vault-namespace=${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}] [vault-release=${VAULT_RELEASE_DEFAULT}]"
+   local sync_lastpass=1
+   local show_help=0
+   local -a positional=()
+
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         -h|--help)
+            show_help=1
+            shift
+            ;;
+         --sync-from-lastpass)
+            sync_lastpass=1
+            shift
+            ;;
+         --no-sync-from-lastpass)
+            sync_lastpass=0
+            shift
+            ;;
+         --)
+            shift
+            positional+=("$@")
+            break
+            ;;
+         *)
+            positional+=("$1")
+            shift
+            ;;
+      esac
+   done
+
+   if (( show_help )); then
+      echo "Usage: deploy_jenkins [--sync-from-lastpass|--no-sync-from-lastpass] [namespace=jenkins] [vault-namespace=${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}] [vault-release=${VAULT_RELEASE_DEFAULT}]"
       return 0
    fi
+
+   set -- "${positional[@]}"
 
    local jenkins_namespace="${1:-jenkins}"
    local vault_namespace="${2:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
@@ -634,6 +666,13 @@ function deploy_jenkins() {
    _create_jenkins_namespace "$jenkins_namespace"
    _create_jenkins_pv_pvc "$jenkins_namespace"
    _ensure_jenkins_cert "$vault_namespace" "$vault_release"
+
+   if (( sync_lastpass )); then
+      if ! _sync_lastpass_ad; then
+         printf 'ERROR: LastPass AD sync failed; run bin/sync-lastpass-ad.sh to populate Vault before retrying.\n' >&2
+         return 1
+      fi
+   fi
 
    local max_attempts="${JENKINS_DEPLOY_RETRIES:-3}"
    if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || (( max_attempts < 1 )); then
