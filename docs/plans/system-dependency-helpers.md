@@ -24,9 +24,9 @@ Ensure every external CLI used by `k3d-manager` has a corresponding `_ensure_*` 
 ## Status
 - Item 1: completed
 - Item 2: completed
-- Item 3: in progress
-- Item 4: pending
-- Item 5: pending
+- Item 3: completed
+- Item 4: completed
+- Item 5: completed
 
 ### Dependency inventory (WIP)
 
