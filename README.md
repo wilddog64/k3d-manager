@@ -60,7 +60,7 @@ Run BATS suites before sending changes:
 ```bash
 ./scripts/tests/run.sh
 # or a narrower scope
-bats scripts/tests/lib
+bats scripts/tests/system
 bats scripts/tests/plugins/jenkins.bats
 ```
 
