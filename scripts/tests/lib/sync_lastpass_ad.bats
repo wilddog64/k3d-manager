@@ -13,7 +13,8 @@ setup() {
 _stub_kubectl_for_sync() {
   SYNC_KUBECTL_LOG="$1"
   SYNC_KUBECTL_PASS="$2"
-  export SYNC_KUBECTL_LOG SYNC_KUBECTL_PASS
+  SYNC_KUBECTL_PAYLOAD="$3"
+  export SYNC_KUBECTL_LOG SYNC_KUBECTL_PASS SYNC_KUBECTL_PAYLOAD
   _kubectl() {
     while [[ $# -gt 0 ]]; do
       case "$1" in
@@ -32,6 +33,14 @@ _stub_kubectl_for_sync() {
     local cmd="$*"
     if [[ -n "${SYNC_KUBECTL_LOG:-}" ]]; then
       printf '%s\n' "$cmd" >> "$SYNC_KUBECTL_LOG"
+    fi
+    if [[ "$cmd" == "-n vault exec vault-0 -i -- sh -c cat >/tmp/jenkins-ad.json && vault kv put secret/jenkins/ad-ldap @/tmp/jenkins-ad.json && rm -f /tmp/jenkins-ad.json" ]]; then
+      if [[ -n "${SYNC_KUBECTL_PAYLOAD:-}" ]]; then
+        cat >"$SYNC_KUBECTL_PAYLOAD"
+      else
+        cat >/dev/null
+      fi
+      return 0
     fi
     if [[ "$cmd" == "-n vault exec vault-0 -i -- vault kv get -format=json secret/jenkins/ad-ldap" ]]; then
       printf '{"data":{"data":{"password":"%s"}}}' "$SYNC_KUBECTL_PASS"
@@ -75,7 +84,8 @@ EOF
 @test "_sync_lastpass_ad writes secret and verifies digest" {
   local kubectl_log="$BATS_TEST_TMPDIR/kubectl.log"
   : >"$kubectl_log"
-  _stub_kubectl_for_sync "$kubectl_log" "SuperSecret"
+  local payload_file="$BATS_TEST_TMPDIR/payload.json"
+  _stub_kubectl_for_sync "$kubectl_log" "SuperSecret" "$payload_file"
 
   local lpass_stub="$BATS_TEST_TMPDIR/lpass-success"
   make_lpass_stub "$lpass_stub" "SuperSecret"
@@ -88,15 +98,27 @@ EOF
 
   read_lines "$kubectl_log" kubectl_cmds
   [ "${#kubectl_cmds[@]}" -eq 2 ]
-  [[ "${kubectl_cmds[0]}" == *"vault kv put secret/jenkins/ad-ldap"* ]]
-  [[ "${kubectl_cmds[0]}" == *"password=SuperSecret"* ]]
+  [ "${kubectl_cmds[0]}" = "-n vault exec vault-0 -i -- sh -c cat >/tmp/jenkins-ad.json && vault kv put secret/jenkins/ad-ldap @/tmp/jenkins-ad.json && rm -f /tmp/jenkins-ad.json" ]
   [ "${kubectl_cmds[1]}" = "-n vault exec vault-0 -i -- vault kv get -format=json secret/jenkins/ad-ldap" ]
+
+  run env PAYLOAD_FILE="$payload_file" python3 - <<'PY'
+import json, os
+path = os.environ["PAYLOAD_FILE"]
+with open(path, "r", encoding="utf-8") as fh:
+    data = json.load(fh)
+print(data["password"])
+print(data["username"])
+PY
+  [ "$status" -eq 0 ]
+  [ "${lines[0]}" = "SuperSecret" ]
+  [[ "${lines[1]}" == CN=svcADReader,* ]]
 }
 
 @test "_sync_lastpass_ad fails when Vault password mismatch" {
   local kubectl_log="$BATS_TEST_TMPDIR/kubectl.log"
   : >"$kubectl_log"
-  _stub_kubectl_for_sync "$kubectl_log" "Different"
+  local payload_file="$BATS_TEST_TMPDIR/payload.json"
+  _stub_kubectl_for_sync "$kubectl_log" "Different" "$payload_file"
 
   local lpass_stub="$BATS_TEST_TMPDIR/lpass-fail"
   make_lpass_stub "$lpass_stub" "Mismatch"
@@ -109,6 +131,6 @@ EOF
 
   read_lines "$kubectl_log" kubectl_cmds
   [ "${#kubectl_cmds[@]}" -eq 2 ]
-  [[ "${kubectl_cmds[0]}" == *"password=Mismatch"* ]]
+  [ "${kubectl_cmds[0]}" = "-n vault exec vault-0 -i -- sh -c cat >/tmp/jenkins-ad.json && vault kv put secret/jenkins/ad-ldap @/tmp/jenkins-ad.json && rm -f /tmp/jenkins-ad.json" ]
   [ "${kubectl_cmds[1]}" = "-n vault exec vault-0 -i -- vault kv get -format=json secret/jenkins/ad-ldap" ]
 }
