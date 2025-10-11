@@ -368,6 +368,12 @@ deploy_jenkins`.
 | Debian/Ubuntu | `sudo apt install gettext` |
 | Fedora/RHEL/CentOS | `sudo dnf install gettext` |
 
+#### LastPass-backed Active Directory credentials
+
+`deploy_jenkins` seeds the Vault secret `secret/jenkins/ad-ldap` before Helm runs. By default it pulls the bind DN and password from the PACIFIC LastPass entry for `svcADReader` using the local LastPass CLI, so make sure `lpass` is installed, on your `PATH`, and already authenticated (`lpass status`). The helper writes the credentials to Vault over `kubectl exec` without echoing them to the terminal.
+
+If the sync step fails, rerun `bin/sync-lastpass-ad.sh` to populate the secret manually and then invoke `deploy_jenkins` again. Operators can opt out of the automatic sync with `deploy_jenkins --no-sync-from-lastpass` when testing or working against a fixture vault.
+
 ### Dynamic build agents
 
 `deploy_jenkins` now seeds two Kubernetes pod templates via Jenkins
