@@ -191,6 +191,74 @@ function _ensure_envsubst() {
    _err "Package manager not found to install envsubst"
 }
 
+function _sync_lastpass_ad() {
+   local lpass_cmd="${LPASS_CMD:-lpass}"
+   if ! command -v "$lpass_cmd" >/dev/null 2>&1; then
+      printf 'ERROR: LastPass CLI not found (looked for %s)\n' "$lpass_cmd" >&2
+      return 1
+   fi
+
+   _ensure_jq
+
+   local entry_listing entry_line entry_id lp_pass
+   if ! entry_listing=$("$lpass_cmd" ls 2>/dev/null); then
+      printf 'ERROR: lpass ls failed; ensure LastPass CLI is logged in.\n' >&2
+      return 1
+   fi
+
+   entry_line=$(printf '%s\n' "$entry_listing" | grep -i svcADReader | grep PACIFIC | head -n1 || true)
+   if [[ -z "$entry_line" ]]; then
+      printf 'ERROR: Unable to locate LastPass entry for svcADReader in PACIFIC vault.\n' >&2
+      return 1
+   fi
+
+   if [[ "$entry_line" =~ id:[[:space:]]*([0-9]+) ]]; then
+      entry_id="${BASH_REMATCH[1]}"
+   else
+      printf 'ERROR: Failed to parse LastPass entry id from: %s\n' "$entry_line" >&2
+      return 1
+   fi
+
+   if ! lp_pass=$("$lpass_cmd" show --id "$entry_id" --pass 2>/dev/null); then
+      printf 'ERROR: Failed to retrieve LastPass password for entry id %s.\n' "$entry_id" >&2
+      return 1
+   fi
+
+   local username="CN=svcADReader,OU=Service Accounts,OU=UsersOU,DC=pacific,DC=costcotravel,DC=com"
+   if ! _kubectl --quiet -n vault exec vault-0 -i -- vault kv put secret/jenkins/ad-ldap \
+      username="$username" \
+      password="$lp_pass"; then
+      printf 'ERROR: Failed to write Jenkins AD credentials to Vault.\n' >&2
+      return 1
+   fi
+
+   local vault_json vault_pass
+   if ! vault_json=$(_kubectl --quiet -n vault exec vault-0 -i -- vault kv get -format=json secret/jenkins/ad-ldap); then
+      printf 'ERROR: Failed to read Jenkins AD credentials from Vault for verification.\n' >&2
+      return 1
+   fi
+
+   vault_pass=$(printf '%s' "$vault_json" | jq -r '.data.data.password')
+   if [[ -z "$vault_pass" || "$vault_pass" == "null" ]]; then
+      printf 'ERROR: Vault returned an empty password for secret/jenkins/ad-ldap.\n' >&2
+      return 1
+   fi
+
+   if [[ "$lp_pass" != "$vault_pass" ]]; then
+      local lp_sha vault_sha
+      lp_sha=$(printf '%s' "$lp_pass" | sha256sum | awk '{print $1}')
+      vault_sha=$(printf '%s' "$vault_pass" | sha256sum | awk '{print $1}')
+      printf 'Vault credential mismatch\n' >&2
+      printf 'LastPass SHA256: %s\n' "$lp_sha" >&2
+      printf 'Vault    SHA256: %s\n' "$vault_sha" >&2
+      return 1
+   fi
+
+   local lp_sha
+   lp_sha=$(printf '%s' "$lp_pass" | sha256sum | awk '{print $1}')
+   printf 'Vault credential matches LastPass (SHA256 %s)\n' "$lp_sha"
+}
+
 # macOS only
 function _security() {
    _run_command --quiet -- security "$@"
@@ -964,4 +1032,3 @@ function validate_variables() {
   fi
   return 0
 }
-
