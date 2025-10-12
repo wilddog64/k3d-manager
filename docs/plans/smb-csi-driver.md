@@ -19,6 +19,10 @@
    - Add a `StorageClass` manifest geared for the single-node k3s lab (e.g., `csi.storage.k8s.io/provisioner: smb.csi.k8s.io`, default reclaim policy) and wire it through the helper.
    - Document how to override share/endpoint parameters for future multi-node clusters without changing code.
    - Support multiple credential sources: environment variables exported via smartcd, LastPass, and (once available) Vault; add helpers that can read from these providers without persisting secrets to disk. Plan for both domain and local SMB accounts by accepting separate Vault paths (e.g., `secret/fileshares/smb` vs `secret/fileshares/smb-local`) and a selector flag/env to choose the appropriate secret.
+   - Vault integration sub-plan:
+     1. Extend `_ensure_smb_secret` to read `SMB_VAULT_PATH` / `SMB_LOCAL_VAULT_PATH` (or `SMB_CREDENTIAL_SOURCE`) and fetch credentials via `kubectl exec vault-0 -- vault kv get -format=json …`, with environment-variable fallback.
+     2. Add BATS coverage mocking the Vault response (success, missing fields, failure) to ensure the helper handles both domain and local secrets.
+     3. Document the Vault workflow and manual verification steps (write secret, run `deploy_cluster`, check secret, optional smoke test).
 
 5. **Testing and validation**
    - Add BATS coverage for `_ensure_cifs_utils`, the new secret/storage-class helpers, and success/failure paths of `_install_smb_csi_driver` (mocking `helm`/`kubectl`).
