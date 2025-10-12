@@ -31,3 +31,4 @@
 6. **Documentation refresh**
    - Update README and `docs/` deployment guides with SMB CSI instructions tailored to the single-node k3s environment, including prerequisite commands for Debian/Ubuntu and RHEL/Fedora, plus cleanup steps.
    - Note future work for k3d/multi-node support so this plan remains the base for broader adoption.
+   - Add a standalone `k3d-manager install_smb_csi` (or similar) command so operators can install or refresh the SMB driver/secrets without re-running full `deploy_cluster`, while keeping `--enable-cifs/--no-cifs` wiring in place for bootstrap scenarios.
