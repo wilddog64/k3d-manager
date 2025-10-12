@@ -630,6 +630,285 @@ function _install_smb_csi_driver() {
    fi
 }
 
+function _smb_encode_b64() {
+   local value="$1"
+   printf '%s' "$value" | base64 | tr -d '\r\n'
+}
+
+function _ensure_smb_secret() {
+   local name="${SMB_SECRET_NAME:-smb-credentials}"
+   local namespace="${SMB_SECRET_NAMESPACE:-kube-system}"
+   local username="${SMB_USERNAME:-}"
+   local password="${SMB_PASSWORD:-}"
+   local domain="${SMB_DOMAIN:-}"
+
+   if [[ -z "$username" || -z "$password" ]]; then
+      _warn "SMB_USERNAME/SMB_PASSWORD not set; skipping SMB secret creation."
+      return 1
+   fi
+
+   if ! _command_exist base64; then
+      _warn "base64 command not found; cannot build SMB secret manifest."
+      return 1
+   fi
+
+   local username_b64 password_b64 domain_b64
+   username_b64=$(_smb_encode_b64 "$username")
+   password_b64=$(_smb_encode_b64 "$password")
+   if [[ -n "$domain" ]]; then
+      domain_b64=$(_smb_encode_b64 "$domain")
+   fi
+
+   local tmp
+   tmp=$(mktemp -t smb-secret.XXXXXX.yaml)
+   _cleanup_register "$tmp"
+
+   {
+      printf 'apiVersion: v1\n'
+      printf 'kind: Secret\n'
+      printf 'metadata:\n'
+      printf '  name: %s\n' "$name"
+      printf '  namespace: %s\n' "$namespace"
+      printf '  labels:\n'
+      printf '    app.kubernetes.io/name: smb-csi\n'
+      printf '    app.kubernetes.io/component: credentials\n'
+      printf 'type: Opaque\n'
+      printf 'data:\n'
+      printf '  username: %s\n' "$username_b64"
+      printf '  password: %s\n' "$password_b64"
+      if [[ -n "$domain_b64" ]]; then
+         printf '  domain: %s\n' "$domain_b64"
+      fi
+   } >"$tmp"
+
+   if ! _kubectl apply -f "$tmp"; then
+      _warn "Failed to apply SMB credentials secret manifest."
+      rm -f "$tmp"
+      return 1
+   fi
+
+   rm -f "$tmp"
+   return 0
+}
+
+function _ensure_smb_storage_class() {
+   local name="${SMB_STORAGE_CLASS_NAME:-smb-csi}"
+   local secret_name="${SMB_SECRET_NAME:-smb-credentials}"
+   local secret_namespace="${SMB_SECRET_NAMESPACE:-kube-system}"
+   local source="${SMB_SOURCE:-}"
+   local server="${SMB_SERVER:-}"
+   local share="${SMB_SHARE:-}"
+   local subdir="${SMB_SUBDIR:-}"
+
+   if [[ -z "$source" ]]; then
+      if [[ -n "$server" && -n "$share" ]]; then
+         source="//${server%/}/${share#/}"
+      else
+         _warn "SMB_SOURCE (or SMB_SERVER/SMB_SHARE) not set; skipping SMB StorageClass creation."
+         return 1
+      fi
+   fi
+
+   if [[ -n "$subdir" ]]; then
+      source="${source%/}/${subdir#/}"
+   fi
+
+   local reclaim="${SMB_STORAGE_RECLAIM_POLICY:-Retain}"
+   local allow_expansion="${SMB_ALLOW_EXPANSION:-true}"
+   local dir_mode="${SMB_DIR_MODE:-0777}"
+   local file_mode="${SMB_FILE_MODE:-0777}"
+   local cache_mode="${SMB_CACHE_MODE:-strict}"
+   local default_class="${SMB_DEFAULT_STORAGE_CLASS:-}"
+
+   local tmp
+   tmp=$(mktemp -t smb-storageclass.XXXXXX.yaml)
+   _cleanup_register "$tmp"
+
+   {
+      printf 'apiVersion: storage.k8s.io/v1\n'
+      printf 'kind: StorageClass\n'
+      printf 'metadata:\n'
+      printf '  name: %s\n' "$name"
+      if [[ "$default_class" =~ ^([Tt]rue|1|[Yy]es)$ ]]; then
+         printf '  annotations:\n'
+         printf '    storageclass.kubernetes.io/is-default-class: "true"\n'
+      fi
+      printf 'provisioner: smb.csi.k8s.io\n'
+      printf 'parameters:\n'
+      printf '  source: %s\n' "$source"
+      printf '  csi.storage.k8s.io/node-stage-secret-name: %s\n' "$secret_name"
+      printf '  csi.storage.k8s.io/node-stage-secret-namespace: %s\n' "$secret_namespace"
+      printf '  csi.storage.k8s.io/node-publish-secret-name: %s\n' "$secret_name"
+      printf '  csi.storage.k8s.io/node-publish-secret-namespace: %s\n' "$secret_namespace"
+      printf '  csi.storage.k8s.io/provisioner-secret-name: %s\n' "$secret_name"
+      printf '  csi.storage.k8s.io/provisioner-secret-namespace: %s\n' "$secret_namespace"
+      printf 'reclaimPolicy: %s\n' "$reclaim"
+      printf 'allowVolumeExpansion: %s\n' "$allow_expansion"
+      printf 'volumeBindingMode: Immediate\n'
+      printf 'mountOptions:\n'
+      printf '  - dir_mode=%s\n' "$dir_mode"
+      printf '  - file_mode=%s\n' "$file_mode"
+      printf '  - cache=%s\n' "$cache_mode"
+      printf '  - nosharesock\n'
+      if [[ -n "${SMB_MOUNT_OPTIONS:-}" ]]; then
+         local opt
+         IFS=',' read -r -a __smb_opts <<<"${SMB_MOUNT_OPTIONS}"
+         for opt in "${__smb_opts[@]}"; do
+            opt="${opt//[$'\t\r\n ']/}"
+            [[ -n "$opt" ]] && printf '  - %s\n' "$opt"
+         done
+         unset __smb_opts
+      fi
+   } >"$tmp"
+
+   if ! _kubectl apply -f "$tmp"; then
+      _warn "Failed to apply SMB StorageClass manifest."
+      rm -f "$tmp"
+      return 1
+   fi
+
+   rm -f "$tmp"
+   return 0
+}
+
+function _configure_smb_support() {
+   if [[ "${K3D_ENABLE_CIFS:-0}" != "1" ]]; then
+      _info "Skipping SMB CSI configuration (disabled)."
+      return 0
+   fi
+
+   local had_issue=0
+
+   if ! _install_smb_csi_driver; then
+      _warn "SMB CSI driver installation failed; skipping secret and StorageClass configuration."
+      return 1
+   fi
+
+   if ! _ensure_smb_secret; then
+      _warn "SMB credentials secret not configured; SMB volumes will require manual setup."
+      had_issue=1
+   fi
+
+   if ! _ensure_smb_storage_class; then
+      _warn "SMB StorageClass not configured; SMB volumes will require manual setup."
+      had_issue=1
+   fi
+
+   return "$had_issue"
+}
+
+function test_cifs() {
+   local prereq_status="${1:-0}"
+
+   if [[ "${K3D_ENABLE_CIFS:-0}" != "1" ]]; then
+      _info "Skipping SMB smoke test (CIFS disabled)."
+      return 0
+   fi
+
+   if (( prereq_status != 0 )); then
+      _warn "Skipping SMB smoke test because SMB setup reported issues."
+      return 0
+   fi
+
+   local storage_class="${SMB_STORAGE_CLASS_NAME:-smb-csi}"
+   if ! _kubectl --quiet get storageclass "$storage_class" >/dev/null 2>&1; then
+      _warn "SMB smoke test skipped: StorageClass '${storage_class}' not found."
+      return 0
+   fi
+
+   if [[ -z "${SMB_SMOKE_TEST:-}" ]]; then
+      _info "Skipping SMB smoke test (set SMB_SMOKE_TEST=1 to run)."
+      return 0
+   fi
+
+   local namespace="${SMB_SMOKE_NAMESPACE:-default}"
+   local pvc_name="${SMB_SMOKE_CLAIM_NAME:-smb-smoke}"
+   local pod_name="${SMB_SMOKE_POD_NAME:-smb-smoke}"
+   local storage_request="${SMB_SMOKE_STORAGE_REQUEST:-1Gi}"
+   local smoke_timeout="${SMB_SMOKE_TIMEOUT:-120s}"
+   local smoke_image="${SMB_SMOKE_IMAGE:-busybox:1.36}"
+   local outcome="failure"
+   local manifest
+   manifest=$(mktemp -t smb-smoke.XXXXXX.yaml)
+   _cleanup_register "$manifest"
+
+   {
+      printf 'apiVersion: v1\n'
+      printf 'kind: PersistentVolumeClaim\n'
+      printf 'metadata:\n'
+      printf '  name: %s\n' "$pvc_name"
+      printf '  namespace: %s\n' "$namespace"
+      printf 'spec:\n'
+      printf '  accessModes:\n'
+      printf '    - ReadWriteMany\n'
+      printf '  resources:\n'
+      printf '    requests:\n'
+      printf '      storage: %s\n' "$storage_request"
+      printf '  storageClassName: %s\n' "$storage_class"
+      printf '---\n'
+      printf 'apiVersion: v1\n'
+      printf 'kind: Pod\n'
+      printf 'metadata:\n'
+      printf '  name: %s\n' "$pod_name"
+      printf '  namespace: %s\n' "$namespace"
+      printf 'spec:\n'
+      printf '  restartPolicy: Never\n'
+      printf '  containers:\n'
+      printf '    - name: smoke\n'
+      printf '      image: %s\n' "$smoke_image"
+      printf '      command:\n'
+      printf '        - sh\n'
+      printf '        - -c\n'
+      printf '        - |\n'
+      printf '          set -e\n'
+      printf '          ls /mnt/smb\n'
+      printf '          touch /mnt/smb/.cifs-smoke\n'
+      printf '      volumeMounts:\n'
+      printf '        - name: smb\n'
+      printf '          mountPath: /mnt/smb\n'
+      printf '  volumes:\n'
+      printf '    - name: smb\n'
+      printf '      persistentVolumeClaim:\n'
+      printf '        claimName: %s\n' "$pvc_name"
+   } >"$manifest"
+
+   local smoke_expect="${SMB_SMOKE_EXPECT:-success}"
+
+   if ! _kubectl apply -f "$manifest"; then
+      _warn "Failed to apply SMB smoke test manifest."
+      _kubectl delete -f "$manifest" --ignore-not-found >/dev/null 2>&1 || true
+      rm -f "$manifest"
+      return 0
+   fi
+
+   if _kubectl --quiet -n "$namespace" wait pvc/"$pvc_name" --for=condition=Bound --timeout="$smoke_timeout" >/dev/null 2>&1 \
+      && _kubectl --quiet -n "$namespace" wait pod/"$pod_name" --for=condition=Ready --timeout="$smoke_timeout" >/dev/null 2>&1; then
+      outcome="success"
+   else
+      outcome="failure"
+   fi
+
+   if [[ "$outcome" == "failure" ]]; then
+      _warn "SMB smoke test pod did not become Ready; check pod logs for details."
+   else
+      _info "SMB smoke test pod became Ready using storage class '${storage_class}'."
+   fi
+
+   if [[ "$smoke_expect" == "failure" ]]; then
+      if [[ "$outcome" == "failure" ]]; then
+         _info "SMB smoke test failure matches expected outcome."
+      else
+         _warn "SMB smoke test succeeded but failure was expected."
+      fi
+   elif [[ "$outcome" == "failure" ]]; then
+      _warn "SMB smoke test failed; verify SMB share availability or rerun with SMB_SMOKE_EXPECT=failure."
+   fi
+
+   _kubectl delete -f "$manifest" --ignore-not-found --wait=false >/dev/null 2>&1 || true
+   rm -f "$manifest"
+   return 0
+}
+
 function _create_nfs_share() {
 
    if grep -q "k3d-nfs" /etc/exports ; then
@@ -857,7 +1136,13 @@ EOF
 
    _info "Using cluster provider: $provider"
    _cluster_provider_call deploy_cluster "${positional[@]}"
+   local __smb_prereq_status=0
+   if ! _configure_smb_support; then
+      __smb_prereq_status=1
+   fi
+
    test_istio
+   test_cifs "$__smb_prereq_status"
 }
 
 function deploy_k3d_cluster() {

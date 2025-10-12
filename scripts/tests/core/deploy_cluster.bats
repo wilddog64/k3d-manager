@@ -18,6 +18,24 @@ setup() {
   export TEST_ISTIO_LOG
   export -f test_istio
 
+  TEST_CIFS_LOG="$BATS_TMPDIR/test_cifs.log"
+  : > "$TEST_CIFS_LOG"
+  test_cifs() {
+    printf '%s\n' "${1:-}" >>"$TEST_CIFS_LOG"
+    return 0
+  }
+  export TEST_CIFS_LOG
+  export -f test_cifs
+
+  CIFS_SETUP_LOG="$BATS_TMPDIR/cifs_setup.log"
+  : > "$CIFS_SETUP_LOG"
+  _configure_smb_support() {
+    printf 'configure_smb_support %s\n' "${K3D_ENABLE_CIFS:-}" >>"$CIFS_SETUP_LOG"
+    return 0
+  }
+  export CIFS_SETUP_LOG
+  export -f _configure_smb_support
+
   source "${BATS_TEST_DIRNAME}/../../lib/providers/k3s.sh"
   eval "$(declare -f _provider_k3s_deploy_cluster | sed '1s/_provider_k3s_deploy_cluster/orig_provider_k3s_deploy_cluster/')"
 
