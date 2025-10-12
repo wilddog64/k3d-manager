@@ -32,7 +32,7 @@ Lightweight tooling for creating and operating a local Kubernetes environment wi
 | --- | --- |
 | `create_cluster <name> [http-port https-port]` | Create a k3d cluster with optional custom ports. |
 | `delete_cluster <name>` | Remove the cluster and associated resources. |
-| `deploy_cluster [-f]` | Provider-aware bootstrap that installs Istio and supporting add-ons. |
+| `deploy_cluster [-f] [--no-cifs]` | Provider-aware bootstrap that installs Istio and supporting add-ons; installs the SMB CSI driver unless `--no-cifs` is passed. |
 | `deploy_vault ha` | Install HashiCorp Vault (HA) and configure PKI helpers. |
 | `deploy_jenkins [--live-update] [--no-sync-from-lastpass]` | Render and install (or upgrade) Jenkins, seeding Vault with AD credentials by default unless disabled. |
 | `deploy_eso` | Deploy External Secrets Operator. |
@@ -40,6 +40,10 @@ Lightweight tooling for creating and operating a local Kubernetes environment wi
 Use `./scripts/k3d-manager <command> -h` for command-specific flags. Custom providers can be added under `scripts/lib/providers/`; see [`docs/cluster-providers.md`](docs/cluster-providers.md).
 
 The Jenkins helper now supports in-place upgrades: pass `--live-update` to run a Helm upgrade against an existing release while the script still waits for the controller pod to become Ready. Skip automatic LastPass syncing with `--no-sync-from-lastpass` if credentials are already in Vault.
+
+### SMB storage support
+
+`deploy_cluster` installs the upstream SMB CSI driver when CIFS support is enabled (default). Export `SMB_USERNAME`, `SMB_PASSWORD`, and share details such as `SMB_SOURCE` (or `SMB_SERVER`/`SMB_SHARE`) before running the command, or pass `--no-cifs` to manage the driver manually. Optional smoke tests can be enabled with `SMB_SMOKE_TEST=1`. See [`docs/storage/smb-csi.md`](docs/storage/smb-csi.md) for full setup and troubleshooting guidance, including WSL2↔Windows validation steps.
 
 ### Dependency bootstrap
 
@@ -49,6 +53,7 @@ Most commands call `_ensure_*` helpers before using external CLIs. When a tool s
 
 - [`docs/k3s-guide.md`](docs/k3s-guide.md) — running against native k3s environments and bare-metal clusters.
 - [`docs/jenkins-deployment.md`](docs/jenkins-deployment.md) — Jenkins templates, Vault PKI, LastPass integration, and air-gapped guidance.
+- [`docs/storage-guides/smb-csi.md`](docs/storage-guides/smb-csi.md) — SMB CSI driver prerequisites, credential sourcing, and smoke testing.
 - [`docs/cluster-providers.md`](docs/cluster-providers.md) — authoring additional provider modules.
 - [`docs/phase1-no-credentials.md`](docs/phase1-no-credentials.md) → [`docs/phase4-storage-smb.md`](docs/phase4-storage-smb.md) — project milestones and historical notes.
 - [`docs/readme-refactor-plan.md`](docs/readme-refactor-plan.md) — current plan for this documentation split.
