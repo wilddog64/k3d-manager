@@ -284,6 +284,46 @@ function _ensure_lpass() {
    return 1
 }
 
+function _ensure_cifs_utils() {
+   if _command_exist mount.cifs; then
+      return 0
+   fi
+
+   if _is_mac; then
+      _warn "Automatic cifs-utils install not supported on macOS; install via Homebrew or macports."
+      return 1
+   fi
+
+   if _is_debian_family || (_is_wsl && _command_exist apt-get); then
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get update -y
+      _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y cifs-utils
+   elif _is_redhat_family || (_is_wsl && (_command_exist dnf || _command_exist yum)); then
+      local pkg_manager=
+      if _command_exist dnf; then
+         pkg_manager="dnf"
+      elif _command_exist yum; then
+         pkg_manager="yum"
+      fi
+
+      if [[ -n "$pkg_manager" ]]; then
+         _run_command --prefer-sudo -- "$pkg_manager" install -y cifs-utils
+      else
+         _warn "Cannot determine package manager to install cifs-utils on this system."
+         return 1
+      fi
+   else
+      _warn "Unsupported platform for automatic cifs-utils installation."
+      return 1
+   fi
+
+   if _command_exist mount.cifs; then
+      return 0
+   fi
+
+   _warn "cifs-utils installation attempted but mount.cifs still missing."
+   return 1
+}
+
 function _ensure_docker() {
    if _command_exist docker; then
       return 0

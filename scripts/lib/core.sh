@@ -592,10 +592,13 @@ function _cleanup_trap_command() {
 }
 function _install_smb_csi_driver() {
    if _is_mac ; then
-      echo "warning: SMB CSI driver is not supported on macOS"
-      exit 0
+      _warn "SMB CSI driver is not supported on macOS"
+      return 0
    fi
-   _install_helm
+   _ensure_helm
+   if ! _ensure_cifs_utils; then
+      return 1
+   fi
    _helm repo add smb-csi-driver https://kubernetes-sigs.github.io/smb-csi-driver
    _helm repo update
    _helm upgrade --install smb-csi-driver smb-csi-driver/smb-csi-driver \
