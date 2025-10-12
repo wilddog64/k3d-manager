@@ -696,7 +696,7 @@ function create_k3s_cluster() {
 }
 
 function deploy_cluster() {
-   local force_k3s=0 provider_cli="" show_help=0
+   local force_k3s=0 provider_cli="" show_help=0 enable_cifs=1
    local -a positional=()
 
    while [[ $# -gt 0 ]]; do
@@ -711,6 +711,14 @@ function deploy_cluster() {
             ;;
          --provider=*)
             provider_cli="${1#*=}"
+            shift
+            ;;
+         --enable-cifs)
+            enable_cifs=1
+            shift
+            ;;
+         --no-cifs)
+            enable_cifs=0
             shift
             ;;
          -h|--help)
@@ -739,6 +747,8 @@ Usage: deploy_cluster [options] [cluster_name]
 Options:
   -f, --force-k3s     Skip the provider prompt and deploy using k3s.
   --provider <name>   Explicitly set the provider (k3d or k3s).
+  --enable-cifs       Install the SMB CSI driver during deploy (default).
+  --no-cifs           Skip SMB CSI driver installation.
   -h, --help          Show this help message.
 EOF
       return 0
@@ -843,6 +853,7 @@ EOF
    if declare -f _cluster_provider_set_active >/dev/null 2>&1; then
       _cluster_provider_set_active "$provider"
    fi
+   export K3D_ENABLE_CIFS="$enable_cifs"
 
    _info "Using cluster provider: $provider"
    _cluster_provider_call deploy_cluster "${positional[@]}"

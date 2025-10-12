@@ -34,6 +34,7 @@ setup() {
   _provider_k3s_deploy_cluster() {
     printf '%s\n' "$@" > "$BATS_TMPDIR/provider_args"
     printf '%s\n' "${CLUSTER_PROVIDER:-}" > "$BATS_TMPDIR/provider_env"
+    printf '%s\n' "${K3D_ENABLE_CIFS:-}" > "$BATS_TMPDIR/provider_cifs"
     return 0
   }
   export -f _provider_k3s_deploy_cluster
@@ -55,6 +56,7 @@ sys.stdout.write(pattern.sub(lambda match: os.environ.get(match.group(1), ""), d
   [ "$status" -eq 0 ]
   [[ -f "$BATS_TMPDIR/provider_args" ]]
   [[ -f "$BATS_TMPDIR/provider_env" ]]
+  [[ -f "$BATS_TMPDIR/provider_cifs" ]]
 
   args=()
   while IFS= read -r line; do
@@ -65,6 +67,18 @@ sys.stdout.write(pattern.sub(lambda match: os.environ.get(match.group(1), ""), d
 
   read -r provider_env < "$BATS_TMPDIR/provider_env"
   [ "$provider_env" = "k3s" ]
+
+  read -r cifs_env < "$BATS_TMPDIR/provider_cifs"
+  [ "$cifs_env" = "1" ]
+}
+
+@test "deploy_cluster passes --no-cifs toggle" {
+  run deploy_cluster --provider k3s --no-cifs foo
+
+  [ "$status" -eq 0 ]
+  [[ -f "$BATS_TMPDIR/provider_cifs" ]]
+  read -r cifs_env < "$BATS_TMPDIR/provider_cifs"
+  [ "$cifs_env" = "0" ]
 }
 
 @test "k3s deploy cluster configures istio" {
