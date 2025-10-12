@@ -635,15 +635,97 @@ function _smb_encode_b64() {
    printf '%s' "$value" | base64 | tr -d '\r\n'
 }
 
+function _smb_fetch_vault_credentials() {
+   local path="$1"
+   local namespace="${SMB_VAULT_NAMESPACE:-vault}"
+
+   if [[ -z "$path" ]]; then
+      return 1
+   fi
+
+   if ! _ensure_jq; then
+      _warn "jq is required to parse Vault SMB credentials."
+      return 1
+   fi
+
+   local json
+   if ! json=$(_kubectl --quiet -n "$namespace" exec vault-0 -i -- vault kv get -format=json "$path"); then
+      _warn "Failed to read SMB credentials from Vault path '$path'."
+      return 1
+   fi
+
+   local fields
+   if ! fields=$(printf '%s' "$json" | jq -r '[.data.data.username // "", .data.data.password // "", (.data.data.domain // .data.data.workgroup // "")] | @tsv'); then
+      _warn "Unable to parse SMB credentials from Vault path '$path'."
+      return 1
+   fi
+
+   local username password domain
+   IFS=$'\t' read -r username password domain <<<"$fields"
+   if [[ -z "$username" || -z "$password" ]]; then
+      _warn "Vault path '$path' is missing required SMB username or password values."
+      return 1
+   fi
+
+   printf '%s\n%s\n%s\n' "$username" "$password" "$domain"
+}
+
 function _ensure_smb_secret() {
    local name="${SMB_SECRET_NAME:-smb-credentials}"
    local namespace="${SMB_SECRET_NAMESPACE:-kube-system}"
    local username="${SMB_USERNAME:-}"
    local password="${SMB_PASSWORD:-}"
    local domain="${SMB_DOMAIN:-}"
+   local credential_source="${SMB_CREDENTIAL_SOURCE:-}"
+   local vault_path=""
+
+   if [[ -z "$credential_source" && -n "${SMB_VAULT_PATH:-}" ]]; then
+      credential_source="vault"
+   fi
+
+   case "$credential_source" in
+      vault|vault-domain)
+         vault_path="${SMB_VAULT_PATH:-}"
+         if [[ -z "$vault_path" ]]; then
+            _warn "SMB_VAULT_PATH not set; falling back to environment variables."
+            credential_source="env"
+         fi
+         ;;
+      vault-local|local)
+         if [[ -n "${SMB_LOCAL_VAULT_PATH:-}" ]]; then
+            vault_path="$SMB_LOCAL_VAULT_PATH"
+         elif [[ -n "${SMB_VAULT_PATH:-}" ]]; then
+            vault_path="$SMB_VAULT_PATH"
+         else
+            _warn "SMB_LOCAL_VAULT_PATH not set; falling back to environment variables."
+            credential_source="env"
+         fi
+         ;;
+      env|"")
+         credential_source="env"
+         ;;
+      *)
+         _warn "Unknown SMB_CREDENTIAL_SOURCE '$credential_source'; defaulting to environment variables."
+         credential_source="env"
+         ;;
+   esac
+
+   if [[ -n "$vault_path" ]]; then
+      local vault_data
+      if vault_data=$(_smb_fetch_vault_credentials "$vault_path"); then
+         IFS=$'\n' read -r username password domain <<<"$vault_data"
+      else
+         _warn "Falling back to SMB_USERNAME/SMB_PASSWORD environment variables."
+         credential_source="env"
+      fi
+   fi
 
    if [[ -z "$username" || -z "$password" ]]; then
-      _warn "SMB_USERNAME/SMB_PASSWORD not set; skipping SMB secret creation."
+      if [[ -n "$vault_path" && "$credential_source" != "env" ]]; then
+         _warn "SMB credentials unavailable from Vault path '$vault_path'; skipping SMB secret creation."
+      else
+         _warn "SMB_USERNAME/SMB_PASSWORD not set; skipping SMB secret creation."
+      fi
       return 1
    fi
 
