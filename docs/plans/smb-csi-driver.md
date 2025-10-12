@@ -12,6 +12,7 @@
 3. **Complete the driver installer**
    - Extend `_install_smb_csi_driver` to add the upstream Helm repo idempotently, install/upgrade the chart into a dedicated namespace (e.g., `kube-system`), and apply k3s-friendly settings (disable Windows daemonset, tolerate/control-plane scheduling).
    - Make the helper create or update the CSI `CSIDriver` object when Helm skips it, and surface clear status messages.
+   - Add `deploy_cluster` switches (default `--enable-cifs`, opt-out `--no-cifs`) so the installer runs automatically on new clusters unless explicitly disabled.
 
 4. **Provision secrets and storage classes**
    - Introduce a helper or template for creating the SMB credentials `Secret` (username, password, optional domain/workgroup) sourced from env vars or flags without logging secrets.
