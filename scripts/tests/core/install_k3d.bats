@@ -10,8 +10,17 @@ setup() {
 }
 
 @test "_install_k3d exports INSTALL_DIR" {
-  _command_exist() { return 1; }
-  _install_docker() { :; }
+  DOCKER_INSTALLED=0
+  _command_exist() {
+    if [[ "$1" == "docker" ]]; then
+      if (( DOCKER_INSTALLED )); then
+        return 0
+      fi
+      return 1
+    fi
+    return 1
+  }
+  _install_docker() { DOCKER_INSTALLED=1; }
   _install_helm() { :; }
   _install_istioctl() { :; }
   _is_mac() { return 1; }

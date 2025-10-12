@@ -597,12 +597,37 @@ function _install_smb_csi_driver() {
    fi
    _ensure_helm
    if ! _ensure_cifs_utils; then
+      _warn "cifs-utils installation failed; install it manually before enabling SMB CSI."
       return 1
    fi
-   _helm repo add smb-csi-driver https://kubernetes-sigs.github.io/smb-csi-driver
-   _helm repo update
-   _helm upgrade --install smb-csi-driver smb-csi-driver/smb-csi-driver \
-      --namespace kube-system
+
+   local repo_name="smb-csi-driver"
+   local repo_url="https://kubernetes-sigs.github.io/smb-csi-driver"
+   local release="smb-csi-driver"
+   local namespace="kube-system"
+   local values_file="${SCRIPT_DIR}/etc/k3s/smb-csi-driver-values.yaml"
+   local csidriver_manifest="${SCRIPT_DIR}/etc/k3s/smb-csi-driver-csidriver.yaml"
+
+   if [[ ! -r "$values_file" ]]; then
+      _err "SMB CSI driver values file not found: $values_file"
+   fi
+
+   if [[ ! -r "$csidriver_manifest" ]]; then
+      _err "SMB CSI driver CSIDriver manifest not found: $csidriver_manifest"
+   fi
+
+   _helm repo add --force-update "$repo_name" "$repo_url"
+   _helm repo update "$repo_name"
+   _helm upgrade --install "$release" "$repo_name/$release" \
+      --namespace "$namespace" \
+      --create-namespace \
+      --wait \
+      --timeout 5m \
+      --values "$values_file"
+
+   if ! _kubectl --quiet get csidriver smb.csi.k8s.io >/dev/null 2>&1; then
+      _kubectl apply -f "$csidriver_manifest"
+   fi
 }
 
 function _create_nfs_share() {
