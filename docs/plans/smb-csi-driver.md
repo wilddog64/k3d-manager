@@ -18,6 +18,7 @@
    - Introduce a helper or template for creating the SMB credentials `Secret` (username, password, optional domain/workgroup) sourced from env vars or flags without logging secrets.
    - Add a `StorageClass` manifest geared for the single-node k3s lab (e.g., `csi.storage.k8s.io/provisioner: smb.csi.k8s.io`, default reclaim policy) and wire it through the helper.
    - Document how to override share/endpoint parameters for future multi-node clusters without changing code.
+   - Support multiple credential sources: environment variables exported via smartcd, LastPass, and (once available) Vault; add helpers that can read from these providers without persisting secrets to disk.
 
 5. **Testing and validation**
    - Add BATS coverage for `_ensure_cifs_utils`, the new secret/storage-class helpers, and success/failure paths of `_install_smb_csi_driver` (mocking `helm`/`kubectl`).
