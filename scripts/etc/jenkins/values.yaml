@@ -100,9 +100,9 @@ controller:
       00-location.yaml: |
         unclassified:
           location:
-            url: "https://jenkins.dev.local.me/"      # trailing slash required
+            url: "https://${VAULT_PKI_LEAF_HOST}/"      # trailing slash required
             adminAddress: "jenkins-admin@me.com"
-      01-security.yaml: |
+      01-security: |
         jenkins:
           disabledAdministrativeMonitors:
             - "jenkins.security.ReverseProxySetupMonitor"
@@ -118,4 +118,4 @@ controller:
                 - "Overall/Read:jenkins-admin"
                 - "Overall/Administer:jenkins-admin"
   # Optional but keeps env consistent with JCasC Location
-  jenkinsUrl: "https://jenkins.dev.local.me/"
+  jenkinsUrl: "https://${VAULT_PKI_LEAF_HOST}/"
