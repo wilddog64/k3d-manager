@@ -800,3 +800,7 @@ function deploy_k3d_cluster() {
 function deploy_k3s_cluster() {
    deploy_cluster "$@"
 }
+
+function deploy_ldap() {
+   _try_load_plugin deploy_ldap "$@"
+}

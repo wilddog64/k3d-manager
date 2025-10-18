@@ -1,100 +1,86 @@
-# AGENTS.md
+# AGENTS.md (Codex CLI)
 
-## Codex Workspace Sync over SSH (TL;DR)
-- Paste the **Setup Script** below into: **Project → Environment → Code execution → Setup scripts**.
-- After the first start, open the file tree and copy the key from **`~/GITHUB_SSH_KEY.pub`** into GitHub:  
-  **GitHub → Settings → SSH and GPG keys → New SSH key → Paste → Save**.
-- Then **Stop → Start** the workspace once to let it clone/update via SSH.
-- To sync later (when terminal works): `cd ~/k3d-manager && git pull --ff-only`.
-- Tools installed: **git**, **openssh-client**, **curl**, **jq**, **kubectl**.
-- Verify files in the tree after start:  
-  `~/_codex_setup.log`, `~/GITHUB_SSH_KEY.pub`, `~/k3d-manager/.codex_head_commit`, `~/k3d-manager/.codex_last_sync`, `~/CODEX_SETUP_OK`.
+Purpose: a tiny, one‑page guide for asking Codex CLI for small, safe, repo‑aligned changes. No special slash commands required.
 
----
+## Principles
 
-## Setup Script (paste into: Project → Environment → Code execution → Setup scripts)
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
+* Smallest viable change. Prefer patches over rewrites.
+* Keep existing style (indentation, quoting, filenames, paths).
+* Never invent secrets; use `${PLACEHOLDER}`.
+* LF newlines only; no CRLF.
+* Shell blocks: no inline comments unless asked.
 
-# Log everything (visible in the file tree)
-exec > >(tee -a "$HOME/_codex_setup.log") 2>&1 || true
-echo "== CODEx SSH setup start: $(date -Is) =="
+## What to Provide
 
-# ---------------------------------------
-# 0) Base packages (idempotent installs)
-# ---------------------------------------
-sudo apt-get update -y
-sudo apt-get install -y --no-install-recommends git openssh-client curl jq ca-certificates
+1. **Goal** (1–2 lines): what must work after the change.
+2. **Single file/lines allowed** (e.g., `scripts/plugins/jenkins.sh:160-210`).
+3. **Minimal evidence**: short error excerpt or failing test output.
+4. **Repo context**: list a few relevant files (not whole repo).
 
-# ---------------------------------------
-# 1) SSH key + config (force GitHub over 443)
-# ---------------------------------------
-mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
-KEY="$HOME/.ssh/id_ed25519"
-EMAIL="${EMAIL:-codex-$(hostname)-$(date +%Y%m%d)@local}"
+## Patch Request Template
 
-if [ ! -f "$KEY" ]; then
-  ssh-keygen -t ed25519 -C "$EMAIL" -f "$KEY" -N ""
-fi
+```
+Task: Fix <short issue>.
+Constraints:
+- Edit only <path:line-range>.
+- Keep style; do not refactor.
+- No comments in shell blocks.
+- Use ${VARS} for unknowns.
+Output format: unified diff from repo root.
+Evidence:
+<3–6 lines of log or test failure>
+```
 
-# SSH config to bypass blocked port 22 (use GitHub's SSH on 443)
-cat > "$HOME/.ssh/config" <<'EOF'
-Host github.com
-  HostName ssh.github.com
-  Port 443
-  User git
-  IdentityFile ~/.ssh/id_ed25519
-  IdentitiesOnly yes
-EOF
-chmod 600 "$HOME/.ssh/config"
+## Alternate Output (exact block)
 
-# Known hosts (avoid interactive prompts)
-ssh-keyscan -p 443 ssh.github.com 2>/dev/null >> "$HOME/.ssh/known_hosts" || true
-ssh-keyscan github.com 2>/dev/null >> "$HOME/.ssh/known_hosts" || true
-chmod 600 "$HOME/.ssh/known_hosts" || true
+```
+Return only the full replacement for <function or YAML block>.
+No diff headers or commentary. LF newlines only.
+```
 
-# Make the public key easy to find/copy in the file tree
-cp -f "$KEY.pub" "$HOME/GITHUB_SSH_KEY.pub" || true
+## Good Prompts (copy/paste)
 
-# Smoke test (will succeed only after you add the key to GitHub)
-ssh -T -p 443 -o StrictHostKeyChecking=accept-new git@ssh.github.com || true
+* **Tiny shell fix**: “Quote variables and handle errors for the function at `scripts/plugins/vault.sh:120-170`. Output unified diff. No other edits.”
+* **YAML micro‑diff**: “Adjust JCasC group mapping in `scripts/etc/jenkins/jcasc/jenkins.yaml` without adding plugins. Output a minimal diff touching only that block.”
+* **Istio runbook (read‑only first)**: “Provide 5 diagnostic commands to trace `404` at ingress for Jenkins from LB→Gateway→VS→DR→Pod. No changes unless a check fails.”
 
-# ---------------------------------------
-# 2) Clone or update repository via SSH
-# ---------------------------------------
-REPO_SSH="git@github.com:wilddog64/k3d-manager.git"
-WORKDIR="$HOME/k3d-manager"
+## Context Hygiene
 
-cd "$HOME"
-if [ ! -d "$WORKDIR/.git" ]; then
-  echo "[clone] $REPO_SSH"
-  if ! git clone "$REPO_SSH" "$WORKDIR"; then
-    echo "[warn] SSH auth failed. Add the key from ~/GITHUB_SSH_KEY.pub to GitHub, then Stop→Start the workspace."
-    echo "NEED_SSH_KEY" > "$HOME/SSH_NEEDS_SETUP"
-    # Still exit 0 so the workspace finishes starting
-  fi
-fi
+* Prefer exact line ranges over full files for large sources.
+* Replace screenshots with typed commands + short outputs.
+* Keep one problem per session.
+* Summarize long threads before continuing (short bullet recap).
 
-if [ -d "$WORKDIR/.git" ]; then
-  cd "$WORKDIR"
+## Safety Defaults for Shell
 
-  # Git hygiene for containers
-  git config --global --add safe.directory "$WORKDIR" || true
-  git config --global fetch.prune true || true
-  git config --global pull.ff only || true
+When you must add a function:
 
-  # Ensure SSH remote and update main
-  git remote set-url origin "$REPO_SSH" || true
-  git fetch origin main --prune || true
-  git switch -C main --track origin/main 2>/dev/null || git switch main || true
-  git pull --ff-only || true
+```
+set -Eeuo pipefail
+trap 'rc=$?; echo "error:$rc" >&2' ERR
+TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
+```
 
-  # Verification markers
-  git rev-parse HEAD > "$WORKDIR/.codex_head_commit" || true
-  date -Is         > "$WORKDIR/.codex_last_sync"     || true
-fi
+Use only if the surrounding file already follows this style.
 
-# Success marker
-echo "OK" > "$HOME/CODEX_SETUP_OK" || true
-echo "== CODEx SSH setup end: $(date -Is) =="
+## Git Recipes (minimal)
+
+```
+# See what changed vs upstream
+git fetch --all --tags --prune
+git diff --stat upstream/main..HEAD
+
+# Create a clean worktree to test a patch
+git worktree add ../wt-fix HEAD
+
+# Cherry-pick one commit but only for a path (then test)
+git cherry-pick -n <sha> -- scripts/plugins/jenkins.sh || git cherry-pick --abort
+```
+
+## House Rules (apply to every answer)
+
+1. Smallest patch; no unsolicited refactors.
+2. Preserve style and file layout.
+3. State required tools explicitly when introducing new ones.
+4. Use placeholders for secrets/hosts.
+5. Keep explanations to ≤3 bullets when requested.

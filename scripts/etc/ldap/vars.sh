@@ -1,0 +1,47 @@
+export LDAP_NAMESPACE="${LDAP_NAMESPACE:-directory}"
+
+export LDAP_PORT="${LDAP_PORT:-389}"
+export LDAP_TLS="${LDAP_TLS:-636}"
+
+export LDAP_REQ_CPU="${LDAP_REQ_CPU:-100m}"
+export LDAP_REQ_MEM="${LDAP_REQ_MEM:-256Mi}"
+export LDAP_LIMIT_MEM="${LDAP_LIMIT_MEM:-512Mi}"
+
+export LDAP_DC_PRIMARY="${LDAP_DC_PRIMARY:-home}"
+export LDAP_DC_SECONDARY="${LDAP_DC_SECONDARY:-org}"
+export LDAP_BASE_DN="${LDAP_BASE_DN:-dc=${LDAP_DC_PRIMARY},dc=${LDAP_DC_SECONDARY}}"
+export LDAP_GROUP_OU="${LDAP_GROUP_OU:-ou=groups}"
+export LDAP_SERVICE_OU="${LDAP_SERVICE_OU:-ou=service}"
+export LDAP_ORG_NAME="${LDAP_ORG_NAME:-Home Org}"
+
+export LDAP_USERDN="${LDAP_USERDN:-${LDAP_SERVICE_OU},${LDAP_BASE_DN}}"
+export LDAP_GROUPDN="${LDAP_GROUPDN:-${LDAP_GROUP_OU},${LDAP_BASE_DN}}"
+
+export LDAP_HOST="${LDAP_HOST:-openldap.${LDAP_NAMESPACE}.svc.cluster.local}"
+export LDAP_URL="${LDAP_URL:-ldap://${LDAP_HOST}:${LDAP_PORT}}"
+
+export LDAP_BINDDN="${LDAP_BINDDN:-cn=ldap-admin,${LDAP_BASE_DN}}"
+export LDAP_BINDPASS="${LDAP_BINDPASS:-}"
+
+export LDAP_APP_ROLE="${LDAP_APP_ROLE:-ldap-reader}"
+export LDAP_VAULT_PATH="${LDAP_VAULT_PATH:-ldap-ops}"
+
+export LDAP_JENKINS_GROUP="${LDAP_JENKINS_GROUP:-jenkins-admins}"
+export LDAP_JENKINS_USER="${LDAP_JENKINS_USER:-jenkins-bootstrap}"
+export LDAP_JENKINS_USER_CN="${LDAP_JENKINS_USER_CN:-Jenkins Bootstrap}"
+export LDAP_JENKINS_USER_SN="${LDAP_JENKINS_USER_SN:-Bootstrap}"
+
+export LDAP_RELEASE="${LDAP_RELEASE:-openldap}"
+export LDAP_HELM_REPO_NAME="${LDAP_HELM_REPO_NAME:-bitnami}"
+export LDAP_HELM_REPO_URL="${LDAP_HELM_REPO_URL:-https://charts.bitnami.com/bitnami}"
+export LDAP_HELM_CHART_REF="${LDAP_HELM_CHART_REF:-bitnami/openldap}"
+export LDAP_HELM_CHART_VERSION="${LDAP_HELM_CHART_VERSION:-}"
+
+export LDAP_ESO_SERVICE_ACCOUNT="${LDAP_ESO_SERVICE_ACCOUNT:-eso-ldap-sa}"
+export LDAP_ESO_SECRETSTORE="${LDAP_ESO_SECRETSTORE:-vault-kv-store}"
+export LDAP_ESO_ROLE="${LDAP_ESO_ROLE:-eso-ldap-directory}"
+export LDAP_ADMIN_SECRET_NAME="${LDAP_ADMIN_SECRET_NAME:-openldap-admin}"
+export LDAP_ADMIN_VAULT_PATH="${LDAP_ADMIN_VAULT_PATH:-ldap/openldap-admin}"
+export LDAP_ADMIN_PASSWORD_KEY="${LDAP_ADMIN_PASSWORD_KEY:-LDAP_ADMIN_PASSWORD}"
+export LDAP_CONFIG_PASSWORD_KEY="${LDAP_CONFIG_PASSWORD_KEY:-LDAP_CONFIG_PASSWORD}"
+export LDAP_ESO_API_VERSION="${LDAP_ESO_API_VERSION:-external-secrets.io/v1}"

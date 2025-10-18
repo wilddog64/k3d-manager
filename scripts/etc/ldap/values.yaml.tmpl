@@ -1,0 +1,72 @@
+# --- OpenLDAP core auth/bootstrap ---
+auth:
+  enabled: true
+  adminUser: admin
+  adminPassword: "change-me"      # or use auth.existingSecret (below)
+  configPassword: "change-me"
+  rfc2307bis: true
+  customLdifFiles:
+    00-base.ldif: |
+      dn: ${LDAP_BASE_DN}
+      objectClass: top
+      objectClass: dcObject
+      objectClass: organization
+      o: ${LDAP_ORG_NAME}
+      dc: ${LDAP_DC_PRIMARY}
+
+      dn: ou=people,${LDAP_BASE_DN}
+      objectClass: organizationalUnit
+      ou: people
+
+      dn: ${LDAP_GROUP_OU},${LDAP_BASE_DN}
+      objectClass: organizationalUnit
+      ou: groups
+
+      dn: ${LDAP_SERVICE_OU},${LDAP_BASE_DN}
+      objectClass: organizationalUnit
+      ou: service
+
+    10-jenkins.ldif: |
+      dn: cn=${LDAP_JENKINS_GROUP},${LDAP_GROUPDN}
+      objectClass: groupOfNames
+      cn: ${LDAP_JENKINS_GROUP}
+      description: Jenkins administrators
+      member: uid=${LDAP_JENKINS_USER},${LDAP_USERDN}
+
+      dn: uid=${LDAP_JENKINS_USER},${LDAP_USERDN}
+      objectClass: inetOrgPerson
+      objectClass: organizationalPerson
+      objectClass: person
+      cn: ${LDAP_JENKINS_USER_CN}
+      sn: ${LDAP_JENKINS_USER_SN}
+      uid: ${LDAP_JENKINS_USER}
+
+# If you prefer to source passwords from a Secret (or ESO/Vault), comment the three
+# fields above and uncomment this block, then create that Secret yourself:
+#  existingSecret: openldap-auth
+#  existingSecretPasswordKey: LDAP_ADMIN_PASSWORD
+#  existingSecretConfigPasswordKey: LDAP_CONFIG_PASSWORD
+
+# --- Persistence (keep your directory after pod restarts) ---
+persistence:
+  enabled: true
+  storageClass: local-path     # k3s default
+  size: 2Gi
+
+# --- Service (ClusterIP inside cluster) ---
+service:
+  ports:
+    ldap: "${LDAP_PORT}"
+    tls: "${LDAP_TLS}"
+
+# --- Keep LDAP off the mesh (we’ll front it with a TCP Gateway) ---
+podAnnotations:
+  sidecar.istio.io/inject: "false"
+
+# --- Resources (tweak as needed) ---
+resources:
+  requests:
+    cpu: "${LDAP_REQ_CPU}"
+    memory: "${LDAP_REQ_MEM}"
+  limits:
+    memory: "${LDAP_LIMIT_MEM}"

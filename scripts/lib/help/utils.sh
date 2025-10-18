@@ -125,7 +125,9 @@ Usage: ./k3d-manager <function> [args]
 Available core functions:
 $(declare -F | awk '{print $3}' | grep -v '^_' | sort | sed 's/^/  /')
 
-Plugin functions are loaded on demand from scripts/plugins.
+EOF
+
+    cat <<EOF
 
 Cluster provider:
   Current: ${provider}
