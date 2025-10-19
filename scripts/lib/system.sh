@@ -424,6 +424,82 @@ function _load_registry_credentials() {
    return 0
 }
 
+function _secret_store_data() {
+   local service="${1:?service name required}"
+   local key="${2:?entry key required}"
+   local data="${3:-}"
+   local label="${4:-${service} ${key}}"
+   local type="${5:-note}"
+
+   if _is_mac; then
+      local rc=0
+      _no_trace bash -c 'security delete-generic-password -s "$1" -a "$2" >/dev/null 2>&1 || true' _ "$service" "$key"
+      if ! _no_trace bash -c 'security add-generic-password -s "$1" -a "$2" -w "$3" >/dev/null' _ "$service" "$key" "$data"; then
+         rc=$?
+      fi
+      return "$rc"
+   fi
+
+   if _secret_tool_ready; then
+      local tmp rc=0 store_output=""
+      tmp=$(mktemp -t secret-data.XXXXXX) || return 1
+      if ! _write_sensitive_file "$tmp" "$data"; then
+         _remove_sensitive_file "$tmp"
+         return 1
+      fi
+      _no_trace bash -c 'secret-tool clear service "$1" name "$2" type "$3" >/dev/null 2>&1 || true' _ "$service" "$key" "$type"
+      store_output=$(_no_trace bash -c 'secret-tool store --label "$1" service "$2" name "$3" type "$4" < "$5"' _ "$label" "$service" "$key" "$type" "$tmp" 2>&1)
+      rc=$?
+      _remove_sensitive_file "$tmp"
+      if (( rc != 0 )) || [[ -n "$store_output" ]]; then
+         _warn "[secret] unable to store data for ${service}/${key}: ${store_output:-unknown error}"
+         return ${rc:-1}
+      fi
+      return 0
+   fi
+
+   _warn "[secret] secure storage unavailable; install secret-tool or run on macOS"
+   return 1
+}
+
+function _secret_load_data() {
+   local service="${1:?service name required}"
+   local key="${2:?entry key required}"
+   local type="${3:-note}"
+   local value=""
+
+   if _is_mac; then
+      value=$(_no_trace bash -c 'security find-generic-password -s "$1" -a "$2" -w' _ "$service" "$key" 2>/dev/null || true)
+   elif _command_exist secret-tool; then
+      value=$(_no_trace bash -c 'secret-tool lookup service "$1" name "$2" type "$3"' _ "$service" "$key" "$type" 2>/dev/null || true)
+   fi
+
+   if [[ -z "$value" ]]; then
+      return 1
+   fi
+
+   printf '%s' "$value"
+   return 0
+}
+
+function _secret_clear_data() {
+   local service="${1:?service name required}"
+   local key="${2:?entry key required}"
+   local type="${3:-note}"
+
+   if _is_mac; then
+      _no_trace bash -c 'security delete-generic-password -s "$1" -a "$2" >/dev/null 2>&1 || true' _ "$service" "$key"
+      return 0
+   fi
+
+   if _command_exist secret-tool; then
+      _no_trace bash -c 'secret-tool clear service "$1" name "$2" type "$3" >/dev/null 2>&1 || true' _ "$service" "$key" "$type"
+      return 0
+   fi
+
+   return 1
+}
+
 function _install_debian_kubernetes_client() {
    if _command_exist kubectl ; then
       echo "kubectl already installed, skipping"
