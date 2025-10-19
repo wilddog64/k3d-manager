@@ -151,6 +151,279 @@ function _security() {
    _run_command --quiet -- security "$@"
 }
 
+function _set_sensitive_var() {
+   local name="${1:?variable name required}"
+   local value="${2:-}"
+   local wasx=0
+   case $- in *x*) wasx=1; set +x;; esac
+   printf -v "$name" '%s' "$value"
+   (( wasx )) && set -x
+}
+
+function _write_sensitive_file() {
+   local path="${1:?path required}"
+   local data="${2:-}"
+   local wasx=0
+   local old_umask
+   case $- in *x*) wasx=1; set +x;; esac
+   old_umask=$(umask)
+   umask 077
+   printf '%s' "$data" > "$path"
+   local rc=$?
+   if (( rc == 0 )); then
+      chmod 600 "$path" 2>/dev/null || true
+   fi
+   umask "$old_umask"
+   (( wasx )) && set -x
+   return "$rc"
+}
+
+function _remove_sensitive_file() {
+   local path="${1:-}"
+   local wasx=0
+   if [[ -z "$path" ]]; then
+      return 0
+   fi
+   case $- in *x*) wasx=1; set +x;; esac
+   rm -f -- "$path"
+   (( wasx )) && set -x
+}
+
+function _decode_hex_blob() {
+   local blob="${1:-}"
+   local wasx=0
+   case $- in *x*) wasx=1; set +x;; esac
+   if [[ -n "$blob" && "$blob" =~ ^[0-9a-fA-F]+$ && $(( ${#blob} % 2 )) -eq 0 ]]; then
+      local decoded=""
+      decoded=$(python3 - "$blob" <<'PY'
+import binascii
+import sys
+try:
+    sys.stdout.write(binascii.unhexlify(sys.argv[1]).decode("utf-8"))
+except Exception:
+    sys.stdout.write(sys.argv[1])
+PY
+      )
+      (( wasx )) && set -x
+      printf '%s' "$decoded"
+      return 0
+   fi
+   (( wasx )) && set -x
+   printf '%s' "$blob"
+}
+
+function _json_escape() {
+   local value="${1:-}"
+   value="${value//\\/\\\\}"
+   value="${value//\"/\\\"}"
+   printf '%s' "$value"
+}
+
+function _write_registry_config() {
+   local host="${1:?registry host required}"
+   local username="${2:?username required}"
+   local password="${3:?password required}"
+   local destination="${4:?destination required}"
+
+   local auth=""
+   auth=$(printf '%s:%s' "$username" "$password" | base64 | tr -d $'\r\n')
+
+   local esc_user esc_pass
+   esc_user=$(_json_escape "$username")
+   esc_pass=$(_json_escape "$password")
+
+   local config=""
+   config=$'{\n  "auths": {\n'
+   printf -v config '%s    "%s": {\n      "username": "%s",\n      "password": "%s",\n      "auth": "%s"\n    }' \
+      "$config" "$host" "$esc_user" "$esc_pass" "$auth"
+
+   if [[ "$host" == "registry-1.docker.io" ]]; then
+      printf -v config '%s,\n    "%s": {\n      "username": "%s",\n      "password": "%s",\n      "auth": "%s"\n    }\n' \
+         "$config" "https://index.docker.io/v1/" "$esc_user" "$esc_pass" "$auth"
+   else
+      config+=$'\n'
+   fi
+
+   config+=$'  }\n}\n'
+
+   _write_sensitive_file "$destination" "$config"
+}
+
+function _build_credential_blob() {
+   local username="${1:?username required}"
+   local password="${2:?password required}"
+   local blob=""
+   local wasx=0
+   case $- in *x*) wasx=1; set +x;; esac
+   printf -v blob 'username=%s\npassword=%s\n' "$username" "$password"
+   (( wasx )) && set -x
+   printf '%s' "$blob"
+}
+
+function _parse_credential_blob() {
+   local blob="${1:-}"
+   local username_var="${2:?username variable required}"
+   local password_var="${3:?password variable required}"
+   local username=""
+   local password=""
+   local line key value
+
+   if [[ -z "$blob" ]]; then
+      return 1
+   fi
+
+   while IFS='=' read -r key value; do
+      case "$key" in
+         username) username="$value" ;;
+         password) password="$value" ;;
+      esac
+   done <<<"$blob"
+
+   if [[ -z "$username" || -z "$password" ]]; then
+      return 1
+   fi
+
+   _set_sensitive_var "$username_var" "$username"
+   _set_sensitive_var "$password_var" "$password"
+   return 0
+}
+
+function _oci_registry_host() {
+   local ref="${1:-}"
+   if [[ "$ref" == oci://* ]]; then
+      ref="${ref#oci://}"
+      printf '%s\n' "${ref%%/*}"
+      return 0
+   fi
+   return 1
+}
+
+function _secret_tool_ready() {
+   if _command_exist secret-tool; then
+      return 0
+   fi
+
+   if _is_linux; then
+      if _ensure_secret_tool >/dev/null 2>&1; then
+         return 0
+      fi
+   fi
+
+   return 1
+}
+
+function _store_registry_credentials() {
+   local context="${1:?context required}"
+   local host="${2:?registry host required}"
+   local username="${3:?username required}"
+   local password="${4:?password required}"
+   local blob=""
+   local blob_file=""
+
+   blob=$(_build_credential_blob "$username" "$password") || return 1
+   blob_file=$(mktemp -t registry-cred.XXXXXX) || return 1
+   _write_sensitive_file "$blob_file" "$blob"
+
+   if _is_mac; then
+      local service="${context}:${host}"
+      local account="${context}"
+      local rc=0
+      _no_trace bash -c 'security delete-generic-password -s "$1" >/dev/null 2>&1 || true' _ "$service" >/dev/null 2>&1
+      if ! _no_trace bash -c 'security add-generic-password -s "$1" -a "$2" -w "$3" >/dev/null' _ "$service" "$account" "$blob"; then
+         rc=$?
+      fi
+      _remove_sensitive_file "$blob_file"
+      return $rc
+   fi
+
+   if _secret_tool_ready; then
+      local label="${context} registry ${host}"
+      local rc=0
+      _no_trace bash -c 'secret-tool clear service "$1" registry "$2" type "$3" >/dev/null 2>&1 || true' _ "$context" "$host" "helm-oci" >/dev/null 2>&1
+      local store_output=""
+      store_output=$(_no_trace bash -c 'secret-tool store --label "$1" service "$2" registry "$3" type "$4" < "$5"' _ "$label" "$context" "$host" "helm-oci" "$blob_file" 2>&1)
+      local store_rc=$?
+      if (( store_rc != 0 )) || [[ -n "$store_output" ]]; then
+         rc=${store_rc:-1}
+         if [[ -z "$store_output" ]]; then
+            store_output="unable to persist credentials via secret-tool"
+         fi
+         _warn "[${context}] secret-tool store failed for ${host}: ${store_output}"
+      fi
+      _remove_sensitive_file "$blob_file"
+      if (( rc == 0 )); then
+         return 0
+      fi
+   fi
+
+   _remove_sensitive_file "$blob_file"
+   _warn "[${context}] unable to persist OCI credentials securely; re-supply --username/--password on next run"
+   return 1
+}
+
+function _registry_login() {
+   local host="${1:?registry host required}"
+   local username="${2:-}"
+   local password="${3:-}"
+   local registry_config="${4:-}"
+   local pass_file=""
+
+   if [[ -z "$username" || -z "$password" ]]; then
+      return 1
+   fi
+
+   pass_file=$(mktemp -t helm-pass.XXXXXX) || return 1
+   if ! _write_sensitive_file "$pass_file" "$password"; then
+      _remove_sensitive_file "$pass_file"
+      return 1
+   fi
+
+   local login_output=""
+   local login_rc=0
+   if [[ -n "$registry_config" ]]; then
+      login_output=$(_no_trace bash -c 'HELM_REGISTRY_CONFIG="$4" helm registry login "$1" --username "$2" --password-stdin < "$3"' _ "$host" "$username" "$pass_file" "$registry_config" 2>&1) || login_rc=$?
+   else
+      login_output=$(_no_trace bash -c 'helm registry login "$1" --username "$2" --password-stdin < "$3"' _ "$host" "$username" "$pass_file" 2>&1) || login_rc=$?
+   fi
+   _remove_sensitive_file "$pass_file"
+
+   if (( login_rc != 0 )); then
+      if [[ -n "$login_output" ]]; then
+         _warn "[helm] registry login failed for ${host}: ${login_output}"
+      else
+         _warn "[helm] registry login failed for ${host}; ensure credentials are valid."
+      fi
+      return 1
+   fi
+
+   _info "[helm] authenticated OCI registry ${host}"
+   return 0
+}
+
+function _load_registry_credentials() {
+   local context="${1:?context required}"
+   local host="${2:?registry host required}"
+   local username_var="${3:?username variable required}"
+   local password_var="${4:?password variable required}"
+   local blob=""
+
+   if _is_mac; then
+      local service="${context}:${host}"
+      blob=$(_no_trace bash -c 'security find-generic-password -s "$1" -w' _ "$service" 2>/dev/null || true)
+   elif _command_exist secret-tool; then
+      blob=$(_no_trace bash -c 'secret-tool lookup service "$1" registry "$2" type "$3"' _ "$context" "$host" "helm-oci" 2>/dev/null || true)
+   fi
+
+   if [[ -z "$blob" ]]; then
+      return 1
+   fi
+
+   blob=$(_decode_hex_blob "$blob")
+
+   _parse_credential_blob "$blob" "$username_var" "$password_var" || return 1
+   return 0
+}
+
 function _install_debian_kubernetes_client() {
    if _command_exist kubectl ; then
       echo "kubectl already installed, skipping"
@@ -833,7 +1106,10 @@ function _detect_cluster_name() {
 # ---------- tiny log helpers (no parentheses, no single-quote apostrophes) ----------
 function _info() { printf 'INFO: %s\n' "$*" >&2; }
 function _warn() { printf 'WARN: %s\n' "$*" >&2; }
-function _err() { printf 'ERROR: %s\n' "$*" >&2; exit 127; }
+function _err() {
+   printf 'ERROR: %s\n' "$*" >&2
+   return 1 2>/dev/null || exit 1
+}
 
 function _no_trace() {
   local wasx=0
