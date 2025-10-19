@@ -1,69 +1,56 @@
-# --- OpenLDAP core auth/bootstrap ---
-auth:
-  enabled: true
-  adminUser: admin
-  adminPassword: "change-me"      # or use auth.existingSecret (below)
-  configPassword: "change-me"
-  rfc2307bis: true
-  customLdifFiles:
-    00-base.ldif: |
-      dn: ${LDAP_BASE_DN}
-      objectClass: top
-      objectClass: dcObject
-      objectClass: organization
-      o: ${LDAP_ORG_NAME}
-      dc: ${LDAP_DC_PRIMARY}
+# --- OpenLDAP chart defaults (johanneskastl-openldap-bitnami) ---
 
-      dn: ou=people,${LDAP_BASE_DN}
-      objectClass: organizationalUnit
-      ou: people
+replicaCount: 1
 
-      dn: ${LDAP_GROUP_OU},${LDAP_BASE_DN}
-      objectClass: organizationalUnit
-      ou: groups
+image:
+  repository: "${LDAP_IMAGE_REPOSITORY}"
+  pullPolicy: "${LDAP_IMAGE_PULL_POLICY}"
+  tag: "${LDAP_IMAGE_TAG}"
 
-      dn: ${LDAP_SERVICE_OU},${LDAP_BASE_DN}
-      objectClass: organizationalUnit
-      ou: service
+# Populated in item 2 via ESO → Secret injection (must include LDAP_*)
+envFrom: []
 
-    10-jenkins.ldif: |
-      dn: cn=${LDAP_JENKINS_GROUP},${LDAP_GROUPDN}
-      objectClass: groupOfNames
-      cn: ${LDAP_JENKINS_GROUP}
-      description: Jenkins administrators
-      member: uid=${LDAP_JENKINS_USER},${LDAP_USERDN}
+# Skip Bitnami's sample tree only when a custom LDIF secret is mounted
+skip_default_tree_generation: false
 
-      dn: uid=${LDAP_JENKINS_USER},${LDAP_USERDN}
-      objectClass: inetOrgPerson
-      objectClass: organizationalPerson
-      objectClass: person
-      cn: ${LDAP_JENKINS_USER_CN}
-      sn: ${LDAP_JENKINS_USER_SN}
-      uid: ${LDAP_JENKINS_USER}
+mount_ldif_secret:
+  enabled: false
+  secretName: ""
 
-# If you prefer to source passwords from a Secret (or ESO/Vault), comment the three
-# fields above and uncomment this block, then create that Secret yourself:
-#  existingSecret: openldap-auth
-#  existingSecretPasswordKey: LDAP_ADMIN_PASSWORD
-#  existingSecretConfigPasswordKey: LDAP_CONFIG_PASSWORD
+tls_enabled: true
 
-# --- Persistence (keep your directory after pod restarts) ---
-persistence:
-  enabled: true
-  storageClass: local-path     # k3s default
-  size: 2Gi
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
 
-# --- Service (ClusterIP inside cluster) ---
 service:
+  type: "ClusterIP"
   ports:
-    ldap: "${LDAP_PORT}"
-    tls: "${LDAP_TLS}"
+    ldap-tcp:
+      enabled: true
+      port: ${LDAP_PORT}
+      protocol: TCP
+      targetPort: 1389
+    ldap-udp:
+      enabled: false
+      port: ${LDAP_PORT}
+      protocol: UDP
+      targetPort: 1389
+    ldaps-tcp:
+      enabled: true
+      port: ${LDAP_TLS}
+      protocol: TCP
+      targetPort: 1636
+    ldaps-udp:
+      enabled: false
+      port: ${LDAP_TLS}
+      protocol: UDP
+      targetPort: 1636
 
-# --- Keep LDAP off the mesh (we’ll front it with a TCP Gateway) ---
 podAnnotations:
   sidecar.istio.io/inject: "false"
 
-# --- Resources (tweak as needed) ---
 resources:
   requests:
     cpu: "${LDAP_REQ_CPU}"
