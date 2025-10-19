@@ -17,7 +17,7 @@ spec:
       version: v2
       auth:
         kubernetes:
-          mountPath: auth/kubernetes
+          mountPath: kubernetes
           role: ${LDAP_ESO_ROLE}
           serviceAccountRef:
             name: ${LDAP_ESO_SERVICE_ACCOUNT}
