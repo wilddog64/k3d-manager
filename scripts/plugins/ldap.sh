@@ -184,6 +184,56 @@ function _ldap_apply_eso_resources() {
    return "$apply_rc"
 }
 
+function _ldap_seed_admin_secret() {
+   local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
+   local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
+   local mount="${LDAP_VAULT_KV_MOUNT:-secret}"
+   local vault_path="${LDAP_ADMIN_VAULT_PATH:-ldap/openldap-admin}"
+   local username_key="${LDAP_ADMIN_USERNAME_KEY:-LDAP_ADMIN_USERNAME}"
+   local password_key="${LDAP_ADMIN_PASSWORD_KEY:-LDAP_ADMIN_PASSWORD}"
+   local config_key="${LDAP_CONFIG_PASSWORD_KEY:-LDAP_CONFIG_PASSWORD}"
+   local username="${LDAP_ADMIN_USERNAME:-ldap-admin}"
+
+   local full_path="${mount}/${vault_path}"
+
+   if _vault_exec --no-exit "$vault_ns" "vault kv get ${full_path}" "$vault_release" >/dev/null 2>&1; then
+      _info "[ldap] Vault secret ${full_path} already exists; skipping seed"
+      return 0
+   fi
+
+   if ! _vault_exec --no-exit "$vault_ns" "vault status >/dev/null 2>&1" "$vault_release"; then
+      _err "[ldap] Vault instance ${vault_ns}/${vault_release} unavailable or sealed; unseal before deploy"
+   fi
+
+   local admin_password=""
+   local config_password=""
+   admin_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
+   if [[ -z "$admin_password" ]]; then
+      _err "[ldap] failed to generate admin password"
+      return 1
+   fi
+
+   config_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
+   if [[ -z "$config_password" ]]; then
+      _err "[ldap] failed to generate config password"
+      return 1
+   fi
+
+   local cmd payload
+   cmd="vault kv put ${full_path} @-"
+
+   printf -v payload '{ "%s": "%s", "%s": "%s", "%s": "%s" }' \
+      "$username_key" "$username" "$password_key" "$admin_password" "$config_key" "$config_password"
+
+   if _vault_exec --no-exit "$vault_ns" "$cmd" "$vault_release" <<<"$payload"; then
+      _info "[ldap] seeded Vault secret ${full_path}"
+      return 0
+   fi
+
+   _err "[ldap] unable to seed Vault admin secret ${full_path}"
+   return 1
+}
+
 function _ldap_wait_for_secret() {
    local ns="${1:-$LDAP_NAMESPACE}"
    local secret="${2:-$LDAP_ADMIN_SECRET_NAME}"
@@ -193,7 +243,6 @@ function _ldap_wait_for_secret() {
 
    if [[ -z "$secret" ]]; then
       _err "[ldap] secret name required for wait"
-      return 1
    fi
 
    _info "[ldap] waiting for secret ${ns}/${secret}"
@@ -207,7 +256,6 @@ function _ldap_wait_for_secret() {
    done
 
    _err "[ldap] timed out waiting for secret ${ns}/${secret}"
-   return 1
 }
 
 function _ldap_deploy_chart() {
@@ -455,6 +503,10 @@ EOF
    export LDAP_RELEASE="$release"
 
    deploy_eso
+
+   if ! _ldap_seed_admin_secret; then
+      return 1
+   fi
 
    _ldap_ensure_namespace "$namespace" || return 1
 
