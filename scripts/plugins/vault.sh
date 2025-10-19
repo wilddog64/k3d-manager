@@ -612,6 +612,80 @@ HCL
       ttl=15m
 }
 
+function _vault_configure_secret_reader_role() {
+  local ns="${1:-$VAULT_NS_DEFAULT}"
+  local release="${2:-$VAULT_RELEASE_DEFAULT}"
+  local service_account="${3:-external-secrets}"
+  local service_namespace="${4:-external-secrets}"
+  local mount="${5:-secret}"
+  local secret_prefix="${6:-ldap}"
+  local role="${7:-eso-ldap-directory}"
+  local policy="${8:-${role}}"
+  local pod="${release}-0"
+
+  if [[ -z "$secret_prefix" ]]; then
+     _err "[vault] secret prefix required for role configuration"
+  fi
+
+  _vault_login "$ns" "$release"
+
+  local mount_path="${mount%/}"
+  local mount_json=""
+  mount_json=$(_vault_exec --no-exit "$ns" "vault secrets list -format=json" "$release" 2>/dev/null || true)
+  if [[ -z "$mount_json" ]] || ! printf '%s' "$mount_json" | jq -e --arg PATH "${mount_path}/" 'has($PATH)' >/dev/null 2>&1; then
+     _vault_exec "$ns" "vault secrets enable -path=${mount_path} kv-v2" "$release" || \
+        _err "[vault] failed to enable kv engine at ${mount_path}"
+  fi
+
+  local auth_json=""
+  auth_json=$(_vault_exec --no-exit "$ns" "vault auth list -format=json" "$release" 2>/dev/null || true)
+  if [[ -z "$auth_json" ]] || ! printf '%s' "$auth_json" | jq -e --arg PATH "kubernetes/" 'has($PATH)' >/dev/null 2>&1; then
+     _vault_exec "$ns" "vault auth enable kubernetes" "$release" || \
+        _err "[vault] failed to enable kubernetes auth method"
+  fi
+
+  cat <<'SH' | _no_trace _kubectl -n "$ns" exec -i "$pod" -- sh -
+set -e
+vault write auth/kubernetes/config \
+  token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+  kubernetes_host="https://kubernetes.default.svc:443" \
+  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+SH
+
+  local prefix_trimmed="${secret_prefix#/}"
+  prefix_trimmed="${prefix_trimmed%/}"
+
+  local policy_hcl
+
+  printf -v policy_hcl '%s\n' \
+    "path \"${mount_path}/data/${prefix_trimmed}\"       { capabilities = [\"read\"] }" \
+    "path \"${mount_path}/data/${prefix_trimmed}/*\"     { capabilities = [\"read\"] }" \
+    "path \"${mount_path}/metadata/${prefix_trimmed}\"   { capabilities = [\"read\", \"list\"] }" \
+    "path \"${mount_path}/metadata/${prefix_trimmed}/*\" { capabilities = [\"read\", \"list\"] }"
+
+  local parent_prefix="${prefix_trimmed%/*}"
+  while [[ -n "$parent_prefix" && "$parent_prefix" != "$prefix_trimmed" ]]; do
+    policy_hcl=$(printf '%s\npath "%s/metadata/%s"   { capabilities = ["read", "list"] }\npath "%s/metadata/%s/*" { capabilities = ["read", "list"] }\n' \
+      "$policy_hcl" "$mount_path" "$parent_prefix" "$mount_path" "$parent_prefix")
+
+    local next_parent="${parent_prefix%/*}"
+    if [[ "$next_parent" == "$parent_prefix" ]]; then
+      break
+    fi
+    parent_prefix="$next_parent"
+  done
+
+  printf '%s\n' "$policy_hcl" | _no_trace _kubectl -n "$ns" exec -i "$pod" -- \
+    vault policy write "${policy}" -
+
+  local token_audience="${K8S_TOKEN_AUDIENCE:-https://kubernetes.default.svc.cluster.local}"
+  local role_cmd=""
+  printf -v role_cmd 'vault write "auth/kubernetes/role/%s" bound_service_account_names="%s" bound_service_account_namespaces="%s" policies="%s" ttl=1h token_audiences="%s"' \
+     "$role" "$service_account" "$service_namespace" "$policy" "$token_audience"
+
+  _vault_exec "$ns" "$role_cmd" "$release"
+}
+
 function _is_vault_pki_mounted() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}" path="${3:-pki}"
    _vault_exec --no-exit "$ns" "vault secrets list -format=json" "$release" |
