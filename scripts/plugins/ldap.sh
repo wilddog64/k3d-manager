@@ -176,10 +176,37 @@ function _ldap_apply_eso_resources() {
    _info "[ldap] using ESO API version ${api_version}"
    export LDAP_ESO_API_VERSION="$api_version"
    rendered=$(_ldap_render_template "$tmpl" "ldap-eso") || return 1
-   if _kubectl apply -f "$rendered"; then
-      _cleanup_on_success "$rendered"
-      return 0
+   local apply_rc=0
+   if ! _kubectl apply -f "$rendered"; then
+      apply_rc=$?
    fi
+   _cleanup_on_success "$rendered"
+   return "$apply_rc"
+}
+
+function _ldap_wait_for_secret() {
+   local ns="${1:-$LDAP_NAMESPACE}"
+   local secret="${2:-$LDAP_ADMIN_SECRET_NAME}"
+   local timeout="${3:-60}"
+   local interval=3
+   local elapsed=0
+
+   if [[ -z "$secret" ]]; then
+      _err "[ldap] secret name required for wait"
+      return 1
+   fi
+
+   _info "[ldap] waiting for secret ${ns}/${secret}"
+   while (( elapsed < timeout )); do
+      if _kubectl --no-exit -n "$ns" get secret "$secret" >/dev/null 2>&1; then
+         _info "[ldap] secret ${ns}/${secret} available"
+         return 0
+      fi
+      sleep "$interval"
+      elapsed=$(( elapsed + interval ))
+   done
+
+   _err "[ldap] timed out waiting for secret ${ns}/${secret}"
    return 1
 }
 
@@ -283,11 +310,12 @@ function _ldap_deploy_chart() {
       args+=("--version" "$version")
    fi
 
-   if _helm "${args[@]}"; then
-      _cleanup_on_success "$values_rendered"
-      return 0
+   local helm_rc=0
+   if ! _helm "${args[@]}"; then
+      helm_rc=$?
    fi
-   return 1
+   _cleanup_on_success "$values_rendered"
+   return "$helm_rc"
 }
 
 function deploy_ldap() {
@@ -299,18 +327,84 @@ function deploy_ldap() {
    case $- in
       *x*)
          restore_trace=1
-         set +x
          ;;
    esac
 
    while [[ $# -gt 0 ]]; do
       case "$1" in
          -h|--help)
+            cat <<EOF
+Usage: deploy_ldap [options] [namespace] [release] [chart-version]
+
+Options:
+  --namespace <ns>         Kubernetes namespace (default: ${LDAP_NAMESPACE})
+  --release <name>         Helm release name (default: ${LDAP_RELEASE})
+  --chart-version <ver>    Helm chart version (default: ${LDAP_HELM_CHART_VERSION:-<auto>})
+  -h, --help               Show this help message
+
+Positional overrides (kept for backwards compatibility):
+  namespace                Equivalent to --namespace <ns>
+  release                  Equivalent to --release <name>
+  chart-version            Equivalent to --chart-version <ver>
+EOF
             if (( restore_trace )); then
                set -x
             fi
-            echo "Usage: deploy_ldap [namespace=${LDAP_NAMESPACE}] [release=${LDAP_RELEASE}] [chart-version=${LDAP_HELM_CHART_VERSION:-<auto>}]"
             return 0
+            ;;
+         --namespace)
+            if [[ -z "${2:-}" ]]; then
+               _err "[ldap] --namespace flag requires an argument"
+               return 1
+            fi
+            namespace="$2"
+            shift 2
+            continue
+            ;;
+         --namespace=*)
+            namespace="${1#*=}"
+            if [[ -z "$namespace" ]]; then
+               _err "[ldap] --namespace flag requires a non-empty argument"
+               return 1
+            fi
+            shift
+            continue
+            ;;
+         --release)
+            if [[ -z "${2:-}" ]]; then
+               _err "[ldap] --release flag requires an argument"
+               return 1
+            fi
+            release="$2"
+            shift 2
+            continue
+            ;;
+         --release=*)
+            release="${1#*=}"
+            if [[ -z "$release" ]]; then
+               _err "[ldap] --release flag requires a non-empty argument"
+               return 1
+            fi
+            shift
+            continue
+            ;;
+         --chart-version)
+            if [[ -z "${2:-}" ]]; then
+               _err "[ldap] --chart-version flag requires an argument"
+               return 1
+            fi
+            chart_version="$2"
+            shift 2
+            continue
+            ;;
+         --chart-version=*)
+            chart_version="${1#*=}"
+            if [[ -z "$chart_version" ]]; then
+               _err "[ldap] --chart-version flag requires a non-empty argument"
+               return 1
+            fi
+            shift
+            continue
             ;;
          --)
             shift
@@ -348,6 +442,10 @@ function deploy_ldap() {
       chart_version="${LDAP_HELM_CHART_VERSION:-}"
    fi
 
+   if (( restore_trace )); then
+      set -x
+   fi
+
    if [[ -z "$namespace" ]]; then
       _err "[ldap] namespace is required"
       return 1
@@ -365,13 +463,14 @@ function deploy_ldap() {
       return 1
    fi
 
+   if ! _ldap_wait_for_secret "$namespace" "${LDAP_ADMIN_SECRET_NAME}"; then
+      _err "[ldap] Vault-sourced secret ${LDAP_ADMIN_SECRET_NAME} not available"
+      return 1
+   fi
+
    local deploy_rc=0
    if ! _ldap_deploy_chart "$namespace" "$release" "$chart_version"; then
       deploy_rc=$?
-   fi
-
-   if (( restore_trace )); then
-      set -x
    fi
 
    return "$deploy_rc"

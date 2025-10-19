@@ -7,8 +7,10 @@ image:
   pullPolicy: "${LDAP_IMAGE_PULL_POLICY}"
   tag: "${LDAP_IMAGE_TAG}"
 
-# Populated in item 2 via ESO → Secret injection (must include LDAP_*)
-envFrom: []
+# Populated by ESO -> Secret (Vault-sourced credentials)
+envFrom:
+  - secretRef:
+      name: "${LDAP_ADMIN_SECRET_NAME}"
 
 # Skip Bitnami's sample tree only when a custom LDIF secret is mounted
 skip_default_tree_generation: false
