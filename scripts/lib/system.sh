@@ -93,6 +93,27 @@ function _run_command() {
   return 0
 }
 
+function _args_have_sensitive_flag() {
+  local arg
+  local expect_secret=0
+
+  for arg in "$@"; do
+    if (( expect_secret )); then
+      return 0
+    fi
+    case "$arg" in
+      --password|--token|--username)
+        expect_secret=1
+        ;;
+      --password=*|--token=*|--username=*)
+        return 0
+        ;;
+    esac
+  done
+
+  return 1
+}
+
 _ensure_secret_tool() {
   _command_exist secret-tool && return 0
   _is_linux || return 1
@@ -464,6 +485,16 @@ function _load_plugin_function() {
   local func="${1:?usage: _load_plugin_function <function> [args...]}"
   shift
   local plugin
+  local restore_trace=0
+
+  if [[ $- == *x* ]]; then
+    set +x
+    if _args_have_sensitive_flag "$@"; then
+      restore_trace=1
+    else
+      set -x
+    fi
+  fi
 
   shopt -s nullglob
   trap 'shopt -u nullglob' RETURN
@@ -473,11 +504,19 @@ function _load_plugin_function() {
       # shellcheck source=/dev/null
       source "$plugin"
       if [[ "$(type -t -- "$func")" == "function" ]]; then
-        "$func" "$@"
-        return $?
+        local rc=0
+        "$func" "$@" || rc=$?
+        if (( restore_trace )); then
+          set -x
+        fi
+        return "$rc"
       fi
     fi
   done
+
+  if (( restore_trace )); then
+    set -x
+  fi
 
   echo "Error: Function '$func' not found in plugins" >&2
   return 1
