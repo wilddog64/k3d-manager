@@ -18,12 +18,15 @@
    - Define an `ExternalSecret` that reads `${LDAP_ADMIN_VAULT_PATH}` and writes the admin/config passwords into a Kubernetes secret consumed via `envFrom`.
    - Optionally sync bootstrap LDIF content from Vault into a second secret and enable `mount_ldif_secret`.
 3. **Plugin Enhancements**
-   - Ensure `deploy_ldap` applies the ESO manifest, waits for Vault-backed secrets, and then runs the Helm upgrade.
+   - Ensure `deploy_ldap` applies the ESO manifest, seeds/waits for Vault-backed secrets, and then runs the Helm upgrade.
    - Keep generic credential helpers in `scripts/lib/system.sh` for future OCI/private registry use.
 4. **Integration Touchpoints**
    - Confirm Jenkins/Vault consumers still reference the new secret names.
    - Verify ESO role/serviceaccount configuration aligns with Vault auth.
-5. **Validation & Rollout Notes**
+5. **Post-Reboot Unseal Flow**
+   - Capture Vault unseal shards locally via the shared secret helpers (Keychain/secret-tool) and provide a helper script to replay them.
+   - Document the manual reboot recovery workflow and earmark the interface for a future cloud KMS auto-unseal.
+6. **Validation & Rollout Notes**
    - Run `helm upgrade --install ... --dry-run` (or k3d smoke test) to confirm templates render.
    - Document how to pivot between Vault-managed secrets and static overrides if needed later.
 
