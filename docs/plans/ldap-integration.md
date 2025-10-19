@@ -11,23 +11,21 @@
 - House rules in `AGENTS.md` updated for guidance.
 
 ## Plan of Action
-1. **Context Review**
-   - Compare LDAP artifacts against existing plugin patterns (Vault, Jenkins).
-   - Identify gaps (naming, environment variables, secrets handling).
-2. **Script Refinement**
-   - Finalize `scripts/plugins/ldap.sh` with deployment, upgrade, and validation steps consistent with other plugins.
-   - Fix typos, ensure idempotency, add safety defaults only if consistent with file.
-3. **Template Alignment**
-   - Update LDAP Helm values and ESO manifests to use placeholders, correct URLs, and follow existing naming standards.
-   - Cross-check namespace/service details with repo defaults.
-   - Add base LDIF entries for initial Jenkins group and user.
+1. **Refit Helm Values**
+   - Update `scripts/etc/ldap/values.yaml.tmpl` to match the `openldap-bitnami` schema (service port maps, envFrom, LDIF mounts).
+   - Introduce placeholders for ESO-synced secrets instead of inline `auth.*` blocks.
+2. **Vault-Sourced Secrets**
+   - Define an `ExternalSecret` that reads `${LDAP_ADMIN_VAULT_PATH}` and writes the admin/config passwords into a Kubernetes secret consumed via `envFrom`.
+   - Optionally sync bootstrap LDIF content from Vault into a second secret and enable `mount_ldif_secret`.
+3. **Plugin Enhancements**
+   - Ensure `deploy_ldap` applies the ESO manifest, waits for Vault-backed secrets, and then runs the Helm upgrade.
+   - Keep generic credential helpers in `scripts/lib/system.sh` for future OCI/private registry use.
 4. **Integration Touchpoints**
-   - Ensure Jenkins/Vault changes reference LDAP values correctly.
-   - Wire Vault-generated credentials into a Kubernetes secret in the `jenkins` namespace for Jenkins logins.
-   - Verify shared variables (`vars.sh`) are exported and consumed properly.
-5. **Validation & Documentation**
-   - Outline manual/automated checks (lint, shellcheck, helm template) runnable without network.
-   - Draft follow-up notes for user testing (no commits per request).
+   - Confirm Jenkins/Vault consumers still reference the new secret names.
+   - Verify ESO role/serviceaccount configuration aligns with Vault auth.
+5. **Validation & Rollout Notes**
+   - Run `helm upgrade --install ... --dry-run` (or k3d smoke test) to confirm templates render.
+   - Document how to pivot between Vault-managed secrets and static overrides if needed later.
 
 ## Deliverables
 - Updated scripts/templates ready for manual testing.
