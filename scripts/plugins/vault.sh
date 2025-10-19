@@ -42,6 +42,146 @@ function _vault_repo_setup() {
    _helm repo update >/dev/null 2>&1
 }
 
+function cache_vault_unseal_keys() {
+   local cluster_ns="${VAULT_NS_DEFAULT:-vault}"
+   local cluster_release="${VAULT_RELEASE_DEFAULT:-vault}"
+   local service="k3d-manager-vault-unseal"
+   local type="vault-unseal"
+   local -a keys=()
+
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         -h|--help)
+            cat <<EOF
+Usage: cache_vault_unseal_keys [--namespace <ns>] [--release <name>] [--cluster <ns/release>] [key1 key2 ...]
+
+Provide unseal keys as arguments (in order) or via stdin (one key per line).
+Defaults: namespace=${cluster_ns}, release=${cluster_release}
+EOF
+            return 0
+            ;;
+         --namespace)
+            if [[ -z "${2:-}" ]]; then
+               _err "[vault] --namespace flag requires an argument"
+            fi
+            cluster_ns="$2"
+            shift 2
+            continue
+            ;;
+         --namespace=*)
+            cluster_ns="${1#*=}"
+            if [[ -z "$cluster_ns" ]]; then
+               _err "[vault] --namespace flag requires a non-empty argument"
+            fi
+            shift
+            continue
+            ;;
+         --release)
+            if [[ -z "${2:-}" ]]; then
+               _err "[vault] --release flag requires an argument"
+            fi
+            cluster_release="$2"
+            shift 2
+            continue
+            ;;
+         --release=*)
+            cluster_release="${1#*=}"
+            if [[ -z "$cluster_release" ]]; then
+               _err "[vault] --release flag requires a non-empty argument"
+            fi
+            shift
+            continue
+            ;;
+         --cluster)
+            if [[ -z "${2:-}" ]]; then
+               _err "[vault] --cluster flag requires an argument"
+            fi
+            local cluster_arg="$2"
+            shift 2
+            if [[ "$cluster_arg" == */* ]]; then
+               cluster_ns="${cluster_arg%%/*}"
+               cluster_release="${cluster_arg##*/}"
+            else
+               cluster_release="$cluster_arg"
+            fi
+            continue
+            ;;
+         --cluster=*)
+            local cluster_arg="${1#*=}"
+            shift
+            if [[ "$cluster_arg" == */* ]]; then
+               cluster_ns="${cluster_arg%%/*}"
+               cluster_release="${cluster_arg##*/}"
+            else
+               cluster_release="$cluster_arg"
+            fi
+            continue
+            ;;
+         --)
+            shift
+            break
+            ;;
+         -*)
+            _err "[vault] unknown option: $1"
+            ;;
+         *)
+            keys+=("$1")
+            shift
+            continue
+            ;;
+      esac
+   done
+
+   while [[ $# -gt 0 ]]; do
+      keys+=("$1")
+      shift
+   done
+
+   if (( ${#keys[@]} == 0 )) && [[ ! -t 0 ]]; then
+      local line
+      while IFS= read -r line; do
+         line=${line%$'\r'}
+         [[ -z "$line" ]] && continue
+         keys+=("$line")
+      done
+   fi
+
+   if (( ${#keys[@]} == 0 )); then
+      _err "[vault] provide unseal keys via arguments or stdin"
+   fi
+
+   local cluster="${cluster_ns}/${cluster_release}"
+
+   local previous_count
+   if previous_count=$(_secret_load_data "$service" "${cluster}:count" "$type" 2>/dev/null); then
+      previous_count=${previous_count%$'\r'}
+      if [[ "$previous_count" =~ ^[0-9]+$ ]]; then
+         local i
+         for (( i=1; i<=previous_count; i++ )); do
+            _secret_clear_data "$service" "${cluster}:shard${i}" "$type" >/dev/null 2>&1 || true
+         done
+      fi
+      _secret_clear_data "$service" "${cluster}:count" "$type" >/dev/null 2>&1 || true
+   fi
+
+   local count=${#keys[@]}
+   local idx
+   for (( idx=0; idx<count; idx++ )); do
+      local shard="${keys[$idx]}"
+      shard=${shard%$'\r'}
+      if [[ -z "$shard" ]]; then
+         _err "[vault] unseal shard $((idx+1)) is empty"
+      fi
+      local shard_key="${cluster}:shard$((idx+1))"
+      _secret_store_data "$service" "$shard_key" "$shard" "Vault unseal shard $((idx+1))" "$type" || \
+         _err "[vault] unable to store unseal shard $((idx+1))"
+   done
+
+   _secret_store_data "$service" "${cluster}:count" "$count" "Vault unseal shard count" "$type" || \
+      _err "[vault] unable to persist unseal shard count"
+
+   _info "[vault] cached ${count} unseal shard(s) for cluster ${cluster}"
+}
 function _mount_vault_immediate_sc() {
    local sc="${1:-local-path-immediate}"
 
@@ -192,15 +332,58 @@ function _vault_bootstrap_ha() {
      sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json' \
      > "$jsonfile"
 
-  local root_token=$(jq -r '.root_token' "$jsonfile")
-  local unseal_key=$(jq -r '.unseal_keys_b64[0]' "$jsonfile")
+  local root_token
+  local key_shares
+  local key_threshold
+  local -a unseal_keys=()
+  root_token=$(jq -r '.root_token' "$jsonfile")
+  key_shares=$(jq -r '.key_shares' "$jsonfile")
+  key_threshold=$(jq -r '.key_threshold' "$jsonfile")
+  while IFS= read -r shard; do
+     shard=${shard%$'\r'}
+     [[ -z "$shard" ]] && continue
+     unseal_keys+=("$shard")
+  done < <(jq -r '.unseal_keys_b64[]' "$jsonfile")
+
+  if (( ${#unseal_keys[@]} == 0 )); then
+     _err "[vault] no unseal keys returned during init"
+  fi
+
+  if [[ ! "$key_shares" =~ ^[0-9]+$ || key_shares -le 0 ]]; then
+     key_shares=${#unseal_keys[@]}
+  fi
+  if [[ ! "$key_threshold" =~ ^[0-9]+$ || key_threshold -le 0 ]]; then
+     key_threshold=1
+  fi
+  local threshold=$key_threshold
+  if (( threshold > ${#unseal_keys[@]} )); then
+     threshold=${#unseal_keys[@]}
+  fi
+
+  _kubectl --no-exit -n "$ns" delete secret vault-root >/dev/null 2>&1 || true
   _no_trace _kubectl -n "$ns" create secret generic vault-root \
      --from-literal=root_token="$root_token"
+
+  local -a shard_literals=(
+     "--from-literal=key-shares=${key_shares}"
+     "--from-literal=key-threshold=${key_threshold}"
+  )
+  local shard_idx
+  for (( shard_idx=0; shard_idx<${#unseal_keys[@]}; shard_idx++ )); do
+     shard_literals+=("--from-literal=shard-$((shard_idx+1))=${unseal_keys[$shard_idx]}")
+  done
+  _kubectl --no-exit -n "$ns" delete secret vault-unseal >/dev/null 2>&1 || true
+  _no_trace _kubectl -n "$ns" create secret generic vault-unseal "${shard_literals[@]}"
+
+  local i shard
   # unseal all pods
   for pod in $(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/name=vault,app.kubernetes.io/instance=${release}" -o name); do
      pod="${pod#pod/}"
-     _no_trace _kubectl -n "$ns" exec -i "$pod" -- \
-        sh -lc "vault operator unseal $unseal_key" >/dev/null 2>&1
+     for (( i=0; i<threshold; i++ )); do
+        shard="${unseal_keys[$i]}"
+        _no_trace _kubectl -n "$ns" exec -i "$pod" -- \
+           sh -lc "vault operator unseal $shard" >/dev/null 2>&1
+     done
      _info "[vault] unsealed $pod"
   done
 
