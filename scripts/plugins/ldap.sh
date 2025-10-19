@@ -219,13 +219,14 @@ function _ldap_seed_admin_secret() {
       return 1
    fi
 
-   local cmd payload
-   cmd="vault kv put ${full_path} @-"
-
+   local script payload
    printf -v payload '{ "%s": "%s", "%s": "%s", "%s": "%s" }' \
       "$username_key" "$username" "$password_key" "$admin_password" "$config_key" "$config_password"
 
-   if _vault_exec --no-exit "$vault_ns" "$cmd" "$vault_release" <<<"$payload"; then
+   printf -v script "cat <<'EOF' | vault kv put %s -\n%s\nEOF" \
+      "$full_path" "$payload"
+
+   if _vault_exec --no-exit "$vault_ns" "$script" "$vault_release"; then
       _info "[ldap] seeded Vault secret ${full_path}"
       return 0
    fi
@@ -505,6 +506,20 @@ EOF
    deploy_eso
 
    if ! _ldap_seed_admin_secret; then
+      return 1
+   fi
+
+   local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
+   local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
+   if ! _vault_configure_secret_reader_role \
+         "$vault_ns" \
+         "$vault_release" \
+         "$LDAP_ESO_SERVICE_ACCOUNT" \
+         "$namespace" \
+         "$LDAP_VAULT_KV_MOUNT" \
+         "$LDAP_ADMIN_VAULT_PATH" \
+         "$LDAP_ESO_ROLE"; then
+      _err "[ldap] failed to configure Vault role ${LDAP_ESO_ROLE} for namespace ${namespace}"
       return 1
    fi
 
