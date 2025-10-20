@@ -566,5 +566,18 @@ EOF
       deploy_rc=$?
    fi
 
+   if (( deploy_rc == 0 )); then
+      local smoke_script="${SCRIPT_DIR}/tests/test-openldap.sh"
+      local service_name="${LDAP_SERVICE_NAME:-${release}-openldap-bitnami}"
+      local smoke_port="${LDAP_SMOKE_PORT:-3389}"
+      if [[ -x "$smoke_script" ]]; then
+         if ! "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN"; then
+            _warn "[ldap] smoke test failed; inspect output above"
+         fi
+      else
+         _warn "[ldap] smoke test helper missing at ${smoke_script}; skipping verification"
+      fi
+   fi
+
    return "$deploy_rc"
 }

@@ -3,16 +3,29 @@ set -euo pipefail
 
 namespace="${1:-directory}"
 release="${2:-openldap}"
-service="${3:-openldap-openldap-bitnami}"
+service="${3:-${release}-openldap-bitnami}"
 local_port="${4:-3389}"
 
-echo "Fetching admin credentials from $namespace/openldap-admin"
+if ! command -v kubectl >/dev/null 2>&1; then
+  echo "kubectl is required for this smoke test" >&2
+  exit 1
+fi
+
+if ! command -v ldapsearch >/dev/null 2>&1; then
+  cat <<'EOF' >&2
+ldapsearch is required for this smoke test.
+Install the ldap-utils package (e.g. apt-get install ldap-utils or brew install openldap).
+EOF
+  exit 1
+fi
+
+echo "Fetching admin credentials from ${namespace}/openldap-admin"
 LDAP_USER=$(kubectl -n "$namespace" get secret openldap-admin -o jsonpath='{.data.LDAP_ADMIN_USERNAME}' | base64 -d | tr -d '\n')
 LDAP_PASS=$(kubectl -n "$namespace" get secret openldap-admin -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' | base64 -d | tr -d '\n')
 BASE_DN_INPUT="${5:-}"
 
-echo "Port-forwarding $namespace/$service to localhost:$local_port"
-kubectl -n "$namespace" port-forward "svc/$service" "$local_port":389 >/tmp/ldap-portforward.log 2>&1 &
+echo "Port-forwarding ${namespace}/${service} to localhost:${local_port}"
+kubectl -n "$namespace" port-forward "svc/$service" "${local_port}:389" >/tmp/ldap-portforward.log 2>&1 &
 PF_PID=$!
 sleep 3
 
@@ -22,7 +35,10 @@ if ! kill -0 "$PF_PID" >/dev/null 2>&1; then
   exit 1
 fi
 
-trap 'kill $PF_PID >/dev/null 2>&1 || true' EXIT
+cleanup() {
+  kill "$PF_PID" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
 
 BASE_DN="$BASE_DN_INPUT"
 
