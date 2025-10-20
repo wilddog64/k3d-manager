@@ -363,6 +363,28 @@ function _ldap_deploy_chart() {
    if ! _helm "${args[@]}"; then
       helm_rc=$?
    fi
+
+   if (( helm_rc == 0 )); then
+      if [[ -f "$values_rendered" ]]; then
+         local cm_yaml
+         cm_yaml=$(cat <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openldap-values
+  namespace: $ns
+data:
+  values.yaml: |
+$(sed 's/^/    /' "$values_rendered")
+EOF
+)
+         printf '%s\n' "$cm_yaml" | _kubectl apply -f - >/dev/null 2>&1 || \
+            _warn "[ldap] unable to persist rendered values in ConfigMap openldap-values"
+      else
+         _warn "[ldap] rendered values file missing; skipping ConfigMap update"
+      fi
+   fi
+
    _cleanup_on_success "$values_rendered"
    return "$helm_rc"
 }
@@ -505,12 +527,16 @@ EOF
 
    deploy_eso
 
+   local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
+   local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
+   if ! _vault_replay_cached_unseal "$vault_ns" "$vault_release"; then
+      _warn "[ldap] unable to auto-unseal Vault ${vault_ns}/${vault_release}; continuing"
+   fi
+
    if ! _ldap_seed_admin_secret; then
       return 1
    fi
 
-   local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
-   local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
    if ! _vault_configure_secret_reader_role \
          "$vault_ns" \
          "$vault_release" \
