@@ -42,112 +42,17 @@ function _vault_repo_setup() {
    _helm repo update >/dev/null 2>&1
 }
 
-function cache_vault_unseal_keys() {
-   local cluster_ns="${VAULT_NS_DEFAULT:-vault}"
-   local cluster_release="${VAULT_RELEASE_DEFAULT:-vault}"
+function _vault_cache_unseal_keys() {
+   local cluster_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+   local cluster_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
+   shift 2 || true
+   local -a keys=("$@")
    local service="k3d-manager-vault-unseal"
    local type="vault-unseal"
-   local -a keys=()
-
-   while [[ $# -gt 0 ]]; do
-      case "$1" in
-         -h|--help)
-            cat <<EOF
-Usage: cache_vault_unseal_keys [--namespace <ns>] [--release <name>] [--cluster <ns/release>] [key1 key2 ...]
-
-Provide unseal keys as arguments (in order) or via stdin (one key per line).
-Defaults: namespace=${cluster_ns}, release=${cluster_release}
-EOF
-            return 0
-            ;;
-         --namespace)
-            if [[ -z "${2:-}" ]]; then
-               _err "[vault] --namespace flag requires an argument"
-            fi
-            cluster_ns="$2"
-            shift 2
-            continue
-            ;;
-         --namespace=*)
-            cluster_ns="${1#*=}"
-            if [[ -z "$cluster_ns" ]]; then
-               _err "[vault] --namespace flag requires a non-empty argument"
-            fi
-            shift
-            continue
-            ;;
-         --release)
-            if [[ -z "${2:-}" ]]; then
-               _err "[vault] --release flag requires an argument"
-            fi
-            cluster_release="$2"
-            shift 2
-            continue
-            ;;
-         --release=*)
-            cluster_release="${1#*=}"
-            if [[ -z "$cluster_release" ]]; then
-               _err "[vault] --release flag requires a non-empty argument"
-            fi
-            shift
-            continue
-            ;;
-         --cluster)
-            if [[ -z "${2:-}" ]]; then
-               _err "[vault] --cluster flag requires an argument"
-            fi
-            local cluster_arg="$2"
-            shift 2
-            if [[ "$cluster_arg" == */* ]]; then
-               cluster_ns="${cluster_arg%%/*}"
-               cluster_release="${cluster_arg##*/}"
-            else
-               cluster_release="$cluster_arg"
-            fi
-            continue
-            ;;
-         --cluster=*)
-            local cluster_arg="${1#*=}"
-            shift
-            if [[ "$cluster_arg" == */* ]]; then
-               cluster_ns="${cluster_arg%%/*}"
-               cluster_release="${cluster_arg##*/}"
-            else
-               cluster_release="$cluster_arg"
-            fi
-            continue
-            ;;
-         --)
-            shift
-            break
-            ;;
-         -*)
-            _err "[vault] unknown option: $1"
-            ;;
-         *)
-            keys+=("$1")
-            shift
-            continue
-            ;;
-      esac
-   done
-
-   while [[ $# -gt 0 ]]; do
-      keys+=("$1")
-      shift
-   done
-
-   if (( ${#keys[@]} == 0 )) && [[ ! -t 0 ]]; then
-      local line
-      while IFS= read -r line; do
-         line=${line%$'\r'}
-         [[ -z "$line" ]] && continue
-         keys+=("$line")
-      done
-   fi
 
    if (( ${#keys[@]} == 0 )); then
-      _err "[vault] provide unseal keys via arguments or stdin"
+      _warn "[vault] no unseal keys provided for caching (${cluster_ns}/${cluster_release})"
+      return 1
    fi
 
    local cluster="${cluster_ns}/${cluster_release}"
@@ -164,23 +69,235 @@ EOF
       _secret_clear_data "$service" "${cluster}:count" "$type" >/dev/null 2>&1 || true
    fi
 
-   local count=${#keys[@]}
+   local count=0
    local idx
-   for (( idx=0; idx<count; idx++ )); do
+   for (( idx=0; idx<${#keys[@]}; idx++ )); do
       local shard="${keys[$idx]}"
       shard=${shard%$'\r'}
       if [[ -z "$shard" ]]; then
-         _err "[vault] unseal shard $((idx+1)) is empty"
+         _warn "[vault] unseal shard $((idx+1)) is empty; skipping cache entry"
+         continue
       fi
-      local shard_key="${cluster}:shard$((idx+1))"
-      _secret_store_data "$service" "$shard_key" "$shard" "Vault unseal shard $((idx+1))" "$type" || \
-         _err "[vault] unable to store unseal shard $((idx+1))"
+      local shard_pos=$((count + 1))
+      local shard_key="${cluster}:shard${shard_pos}"
+      if ! _secret_store_data "$service" "$shard_key" "$shard" "Vault unseal shard ${shard_pos}" "$type"; then
+         _warn "[vault] unable to store unseal shard ${shard_pos} for ${cluster}"
+         continue
+      fi
+      ((count++))
    done
 
-   _secret_store_data "$service" "${cluster}:count" "$count" "Vault unseal shard count" "$type" || \
-      _err "[vault] unable to persist unseal shard count"
+   if (( count == 0 )); then
+      _warn "[vault] no unseal shards cached for ${cluster}"
+      return 1
+   fi
+
+   if ! _secret_store_data "$service" "${cluster}:count" "$count" "Vault unseal shard count" "$type"; then
+      _warn "[vault] unable to persist unseal shard count for ${cluster}"
+      return 1
+   fi
 
    _info "[vault] cached ${count} unseal shard(s) for cluster ${cluster}"
+   return 0
+}
+
+function _vault_collect_unseal_shards_from_secret() {
+   local cluster_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+   local secret_json=""
+
+   secret_json=$(_kubectl --no-exit -n "$cluster_ns" get secret vault-unseal -o json 2>/dev/null || true)
+   if [[ -z "$secret_json" ]]; then
+      return 1
+   fi
+
+   local -a shards=()
+   while IFS= read -r encoded; do
+      [[ -z "$encoded" || "$encoded" == "null" ]] && continue
+      local decoded
+      decoded=$(printf '%s' "$encoded" | base64 -d 2>/dev/null || true)
+      [[ -z "$decoded" ]] && continue
+      shards+=("$decoded")
+   done < <(printf '%s' "$secret_json" | jq -r '.data | to_entries | sort_by(.key)[] | select(.key|startswith("shard-")) | .value // ""' 2>/dev/null)
+
+    if (( ${#shards[@]} == 0 )); then
+      return 1
+   fi
+
+   printf '%s\n' "${shards[@]}"
+}
+
+function _vault_cache_unseal_from_secret() {
+   local cluster_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+   local cluster_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
+   local -a shards=()
+
+   if ! mapfile -t shards < <(_vault_collect_unseal_shards_from_secret "$cluster_ns"); then
+      _warn "[vault] secret vault-unseal not found in ${cluster_ns}; unable to cache shards"
+      return 1
+   fi
+
+   if (( ${#shards[@]} == 0 )); then
+      _warn "[vault] vault-unseal secret in ${cluster_ns} lacks shard data"
+      return 1
+   fi
+
+   _vault_cache_unseal_keys "$cluster_ns" "$cluster_release" "${shards[@]}" >/dev/null 2>&1 || true
+   return 0
+}
+
+function _vault_parse_sealed_from_status() {
+   local status="${1:-}"
+   local sealed=""
+
+   sealed=$(printf '%s' "$status" | jq -r '.sealed // empty' 2>/dev/null || true)
+   if [[ -n "$sealed" ]]; then
+      printf '%s' "$sealed"
+      return 0
+   fi
+
+   if printf '%s\n' "$status" | grep -Eq 'Sealed[[:space:]]+false'; then
+      printf 'false'
+      return 0
+   fi
+
+   if printf '%s\n' "$status" | grep -Eq 'Sealed[[:space:]]+true'; then
+      printf 'true'
+      return 0
+   fi
+
+   return 1
+}
+
+function _vault_replay_cached_unseal() {
+   local cluster_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+   local cluster_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
+   local clear_after="${3:-0}"
+   case "${clear_after,,}" in
+      1|true|yes) clear_after=1 ;;
+      0|false|no|"") clear_after=0 ;;
+      *) clear_after=0 ;;
+   esac
+   local service="k3d-manager-vault-unseal"
+   local type="vault-unseal"
+   local cluster="${cluster_ns}/${cluster_release}"
+   local count cached_ok=1
+   local -a shards=()
+
+   count=$(_secret_load_data "$service" "${cluster}:count" "$type" 2>/dev/null || true)
+   count=${count%$'\r'}
+   if [[ "$count" =~ ^[0-9]+$ ]] && (( count > 0 )); then
+      local idx
+      for (( idx=1; idx<=count; idx++ )); do
+         local shard=""
+         shard=$(_secret_load_data "$service" "${cluster}:shard${idx}" "$type" 2>/dev/null || true)
+         shard=${shard%$'\r'}
+         if [[ -z "$shard" ]]; then
+            cached_ok=0
+            break
+         fi
+         shards+=("$shard")
+      done
+      if (( ! cached_ok )); then
+         shards=()
+      fi
+   else
+      cached_ok=0
+   fi
+
+   if (( ${#shards[@]} == 0 )); then
+      _warn "[vault] cached shards unavailable for ${cluster}; attempting vault-unseal secret"
+      if ! mapfile -t shards < <(_vault_collect_unseal_shards_from_secret "$cluster_ns"); then
+         _warn "[vault] unable to read shards from vault-unseal secret in ${cluster_ns}; manual unseal required"
+         return 1
+      fi
+      if (( ${#shards[@]} == 0 )); then
+         _warn "[vault] vault-unseal secret lacks shard data; manual unseal required"
+         return 1
+      fi
+      _vault_cache_unseal_keys "$cluster_ns" "$cluster_release" "${shards[@]}" >/dev/null 2>&1 || true
+      count=${#shards[@]}
+      shard_count=$count
+   fi
+
+   local pod="${cluster_release}-0"
+   if ! _kubectl --no-exit -n "$cluster_ns" get pod "$pod" >/dev/null 2>&1; then
+      _warn "[vault] pod ${pod} not found in namespace ${cluster_ns}; skipping auto-unseal"
+      return 1
+   fi
+
+   local status_json=""
+   status_json=$(_vault_exec --no-exit "$cluster_ns" "vault status -format=json" "$cluster_release" 2>/dev/null || true)
+   if [[ -z "$status_json" ]]; then
+      _warn "[vault] unable to query status for ${cluster}; skipping auto-unseal"
+      return 1
+   fi
+
+   local sealed=""
+   sealed=$(printf '%s' "$status_json" | jq -r '.sealed // empty' 2>/dev/null || true)
+   if [[ "$sealed" == "false" ]]; then
+      _info "[vault] instance ${cluster} already unsealed"
+      return 0
+   fi
+
+   local threshold=""
+   threshold=$(printf '%s' "$status_json" | jq -r '.t // empty' 2>/dev/null || true)
+   if [[ -n "$threshold" ]] && (( count < threshold )); then
+      _warn "[vault] only ${count} shard(s) cached, but cluster reports threshold ${threshold}"
+   fi
+
+   _info "[vault] applying ${count} cached unseal shard(s) to ${cluster}"
+   local shard_count=$count
+
+   local shard="" unsealed=0
+   for shard in "${shards[@]}"; do
+      local unseal_output=""
+      if ! unseal_output=$(_no_trace _kubectl -n "$cluster_ns" exec -i "$pod" -- vault operator unseal "$shard" 2>&1); then
+         _warn "[vault] unseal command failed while applying cached shards"
+         return 1
+      fi
+
+      if sealed=$(_vault_parse_sealed_from_status "$unseal_output" 2>/dev/null || true); then
+         :
+      else
+         status_json=$(_vault_exec --no-exit "$cluster_ns" "vault status -format=json" "$cluster_release" 2>/dev/null || true)
+         sealed=$(_vault_parse_sealed_from_status "$status_json" 2>/dev/null || true)
+      fi
+
+      if [[ "$sealed" == "false" ]]; then
+         unsealed=1
+         _info "[vault] vault ${cluster} is now unsealed"
+         if (( clear_after == 1 )); then
+            _secret_clear_data "$service" "${cluster}:count" "$type" >/dev/null 2>&1 || true
+            local j
+            for (( j=1; j<=shard_count; j++ )); do
+               _secret_clear_data "$service" "${cluster}:shard${j}" "$type" >/dev/null 2>&1 || true
+            done
+            _info "[vault] cleared cached unseal shards for ${cluster}"
+         fi
+         return 0
+      fi
+      sleep 1
+   done
+
+   if (( unsealed == 0 )); then
+      status_json=$(_vault_exec --no-exit "$cluster_ns" "vault status -format=json" "$cluster_release" 2>/dev/null || true)
+      sealed=$(_vault_parse_sealed_from_status "$status_json" 2>/dev/null || true)
+   fi
+   if [[ "$sealed" == "false" ]]; then
+      _info "[vault] vault ${cluster} is now unsealed"
+      if (( clear_after == 1 )); then
+         _secret_clear_data "$service" "${cluster}:count" "$type" >/dev/null 2>&1 || true
+         local j
+         for (( j=1; j<=shard_count; j++ )); do
+            _secret_clear_data "$service" "${cluster}:shard${j}" "$type" >/dev/null 2>&1 || true
+         done
+         _info "[vault] cleared cached unseal shards for ${cluster}"
+      fi
+      return 0
+   fi
+
+   _warn "[vault] ${cluster} remains sealed after applying cached shards; manual intervention required"
+   return 1
 }
 function _mount_vault_immediate_sc() {
    local sc="${1:-local-path-immediate}"
@@ -211,6 +328,7 @@ YAML
 function _deploy_vault_ha() {
    local ns="${1:-$VAULT_NS_DEFAULT}"
    local release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local chart_version="${3:-$VAULT_CHART_VERSION}"
    local f="$(mktemp -t vault-ha-vaules.XXXXXX.yaml)"
 
    sc="${VAULT_SC:-local-path}"
@@ -231,15 +349,26 @@ csi:
   enabled: false
 YAML
    _mount_vault_immediate_sc "$sc"
-   args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$f")
-   [[ -n "$version" ]] && args+=("--version" "$version")
+   local -a args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$f")
+   [[ -n "$chart_version" ]] && args+=("--version" "$chart_version")
    _helm "${args[@]}"
    trap '$(_cleanup_trap_command "$f")' EXIT TERM
 }
 
 function deploy_vault() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-      echo "Usage: deploy_vault <dev|ha> [namespace=${VAULT_NS_DEFAULT}] [release=${VAULT_RELEASE_DEFAULT}] [chart-version=${VAULT_CHART_VERSION}]"
+      cat <<EOF
+Usage:
+  deploy_vault [options] <dev|ha>
+  deploy_vault --re-unseal [options]
+
+Options:
+  --namespace <ns>       Vault namespace (default: ${VAULT_NS_DEFAULT})
+  --release <name>       Helm release name (default: ${VAULT_RELEASE_DEFAULT})
+  --chart-version <ver>  Vault chart version (default: ${VAULT_CHART_VERSION})
+  --re-unseal            Replay cached unseal shards and exit
+  -h, --help             Show this message
+EOF
       return 0
    fi
 
@@ -251,13 +380,141 @@ function deploy_vault() {
       _warn "[vault] missing optional config file: $VAULT_VARS"
    fi
 
-   local mode="${1:-}"
-   local ns="${2:-$VAULT_NS_DEFAULT}"
-   local release="${3:-$VAULT_RELEASE_DEFAULT}"
-   local version="${4:-$VAULT_CHART_VERSION}"  # optional
+   local re_unseal=0
+   local ns="$VAULT_NS_DEFAULT"
+   local release="$VAULT_RELEASE_DEFAULT"
+   local version="$VAULT_CHART_VERSION"
+   local ns_set=0 release_set=0 version_set=0
+   local -a positional=()
+
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         --namespace)
+            if [[ -z "${2:-}" ]]; then
+               _err "[vault] --namespace flag requires an argument"
+            fi
+            ns="$2"
+            ns_set=1
+            shift 2
+            continue
+            ;;
+         --namespace=*)
+            ns="${1#*=}"
+            if [[ -z "$ns" ]]; then
+               _err "[vault] --namespace flag requires a non-empty argument"
+            fi
+            ns_set=1
+            shift
+            continue
+            ;;
+         --release)
+            if [[ -z "${2:-}" ]]; then
+               _err "[vault] --release flag requires an argument"
+            fi
+            release="$2"
+            release_set=1
+            shift 2
+            continue
+            ;;
+         --release=*)
+            release="${1#*=}"
+            if [[ -z "$release" ]]; then
+               _err "[vault] --release flag requires a non-empty argument"
+            fi
+            release_set=1
+            shift
+            continue
+            ;;
+         --chart-version)
+            if [[ -z "${2:-}" ]]; then
+               _err "[vault] --chart-version flag requires an argument"
+            fi
+            version="$2"
+            version_set=1
+            shift 2
+            continue
+            ;;
+         --chart-version=*)
+            version="${1#*=}"
+            if [[ -z "$version" ]]; then
+               _err "[vault] --chart-version flag requires a non-empty argument"
+            fi
+            version_set=1
+            shift
+            continue
+            ;;
+         --re-unseal)
+            re_unseal=1
+            shift
+            continue
+            ;;
+         --re-unseal=*)
+            case "${1#*=}" in
+               1|true|yes|TRUE|YES) re_unseal=1 ;;
+               0|false|no|FALSE|NO|"") re_unseal=0 ;;
+               *) _err "[vault] --re-unseal expects yes/no" ;;
+            esac
+            shift
+            continue
+            ;;
+         --)
+            shift
+            while [[ $# -gt 0 ]]; do
+               positional+=("$1")
+               shift
+            done
+            break
+            ;;
+         -h|--help)
+            cat <<EOF
+Usage:
+  deploy_vault [options] <dev|ha>
+  deploy_vault --re-unseal [options]
+
+Options:
+  --namespace <ns>       Vault namespace (default: ${VAULT_NS_DEFAULT})
+  --release <name>       Helm release name (default: ${VAULT_RELEASE_DEFAULT})
+  --chart-version <ver>  Vault chart version (default: ${VAULT_CHART_VERSION})
+  --re-unseal            Replay cached unseal shards and exit
+  -h, --help             Show this message
+EOF
+            return 0
+            ;;
+         -*)
+            _err "[vault] unknown option: $1"
+            ;;
+         *)
+            positional+=("$1")
+            shift
+            continue
+            ;;
+      esac
+   done
+
+   local mode=""
+   if (( ${#positional[@]} > 0 )); then
+      mode="${positional[0]}"
+      if (( ${#positional[@]} > 1 )) && (( ns_set == 0 )); then
+         ns="${positional[1]}"
+      fi
+      if (( ${#positional[@]} > 2 )) && (( release_set == 0 )); then
+         release="${positional[2]}"
+      fi
+      if (( ${#positional[@]} > 3 )) && (( version_set == 0 )); then
+         version="${positional[3]}"
+      fi
+      if (( ${#positional[@]} > 4 )); then
+         _err "[vault] too many positional arguments"
+      fi
+   fi
+
+   if (( re_unseal )) && [[ -z "$mode" ]]; then
+      _vault_replay_cached_unseal "$ns" "$release"
+      return $?
+   fi
 
    if [[ "$mode" != "dev" && "$mode" != "ha" ]]; then
-      echo "[vault] usage: deploy_vault <dev|ha> [<ns> [<release> [<chart-version>]]]" >&2
+      echo "[vault] usage: deploy_vault [options] <dev|ha>" >&2
       return 1
    fi
 
@@ -266,11 +523,18 @@ function deploy_vault() {
    _vault_ns_ensure "$ns"
    _vault_repo_setup
 
-   _deploy_vault_ha "$ns" "$release"
+   _deploy_vault_ha "$ns" "$release" "$version"
 
    _vault_bootstrap_ha "$ns" "$release"
    _enable_kv2_k8s_auth "$ns" "$release"
    _vault_setup_pki "$ns" "$release"
+
+   if (( re_unseal )); then
+      _vault_replay_cached_unseal "$ns" "$release"
+      return $?
+   fi
+
+   return 0
 }
 
 function _vault_wait_ready() {
@@ -298,13 +562,15 @@ function _vault_bootstrap_ha() {
 
   if  _run_command --no-exit -- \
      kubectl --no-exit exec -n "$ns" -it "$leader" -- vault status >/dev/null 2>&1; then
-      echo "[vault] already initialized"
+      _vault_cache_unseal_from_secret "$ns" "$release" >/dev/null 2>&1 || true
+      _info "[vault] already initialized"
       return 0
   fi
 
   # check if vault sealed or not
   if _run_command --no-exit -- \
      kubectl exec -n "$ns" -it "$leader" -- vault status 2>&1 | grep -q 'unseal'; then
+      _vault_cache_unseal_from_secret "$ns" "$release" >/dev/null 2>&1 || true
       _warn "[vault] already initialized (sealed), skipping init"
       return 0
   fi
@@ -374,6 +640,8 @@ function _vault_bootstrap_ha() {
   done
   _kubectl --no-exit -n "$ns" delete secret vault-unseal >/dev/null 2>&1 || true
   _no_trace _kubectl -n "$ns" create secret generic vault-unseal "${shard_literals[@]}"
+
+  _vault_cache_unseal_keys "$ns" "$release" "${unseal_keys[@]}"
 
   local i shard
   # unseal all pods
