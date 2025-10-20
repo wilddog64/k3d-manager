@@ -389,6 +389,63 @@ EOF
    return "$helm_rc"
 }
 
+function _ldap_sync_admin_password() {
+   local ns="${1:-$LDAP_NAMESPACE}"
+   local release="${2:-$LDAP_RELEASE}"
+   local secret="${LDAP_ADMIN_SECRET_NAME:-openldap-admin}"
+   local admin_key="${LDAP_ADMIN_PASSWORD_KEY:-LDAP_ADMIN_PASSWORD}"
+   local config_key="${LDAP_CONFIG_PASSWORD_KEY:-LDAP_CONFIG_PASSWORD}"
+   local admin_user="${LDAP_ADMIN_USERNAME:-ldap-admin}"
+   local base_dn="${LDAP_BASE_DN:-dc=${LDAP_DC_PRIMARY:-home},dc=${LDAP_DC_SECONDARY:-org}}"
+   local admin_dn="${LDAP_BINDDN:-cn=${admin_user},${base_dn}}"
+   local admin_pass=""
+   local config_pass=""
+   local pod=""
+
+   admin_pass=$(_no_trace _kubectl --no-exit -n "$ns" get secret "$secret" -o jsonpath="{.data.${admin_key}}" 2>/dev/null || true)
+   if [[ -z "$admin_pass" ]]; then
+      _warn "[ldap] unable to read ${admin_key} from secret ${ns}/${secret}; skipping admin password sync"
+      return 1
+   fi
+   admin_pass=$(_no_trace bash -c 'printf %s "$1" | base64 -d 2>/dev/null | tr -d "\n"' _ "$admin_pass")
+   if [[ -z "$admin_pass" ]]; then
+      _warn "[ldap] decoded admin password empty; skipping admin password sync"
+      return 1
+   fi
+
+   config_pass=$(_no_trace _kubectl --no-exit -n "$ns" get secret "$secret" -o jsonpath="{.data.${config_key}}" 2>/dev/null || true)
+   if [[ -z "$config_pass" ]]; then
+      _warn "[ldap] unable to read ${config_key} from secret ${ns}/${secret}; skipping admin password sync"
+      return 1
+   fi
+   config_pass=$(_no_trace bash -c 'printf %s "$1" | base64 -d 2>/dev/null | tr -d "\n"' _ "$config_pass")
+   if [[ -z "$config_pass" ]]; then
+      _warn "[ldap] decoded config password empty; skipping admin password sync"
+      return 1
+   fi
+
+   pod=$(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/instance=${release},app.kubernetes.io/name=openldap-bitnami" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+   if [[ -z "$pod" ]]; then
+      _warn "[ldap] unable to locate pod for release ${release} in namespace ${ns}; skipping admin password sync"
+      return 1
+   fi
+
+   local sync_cmd='
+set -euo pipefail
+LDAPTLS_REQCERT=never ldappasswd -H ldap://127.0.0.1:1389 \
+  -D "cn=config" -w "$CONFIG_PASS" \
+  "$ADMIN_DN" -s "$ADMIN_PASS" >/dev/null
+'
+
+   if _no_trace _kubectl -n "$ns" exec "$pod" -- env ADMIN_DN="$admin_dn" ADMIN_PASS="$admin_pass" CONFIG_PASS="$config_pass" bash -lc "$sync_cmd"; then
+      _info "[ldap] reconciled admin password for ${admin_dn}"
+      return 0
+   fi
+
+   _warn "[ldap] unable to reconcile admin password for ${admin_dn}"
+   return 1
+}
+
 function deploy_ldap() {
    local restore_trace=0
    local namespace=""
@@ -571,6 +628,10 @@ EOF
       if ! _kubectl --no-exit -n "$namespace" rollout status "deployment/${deploy_name}" --timeout=180s; then
          _warn "[ldap] deployment ${namespace}/${deploy_name} not ready; skipping smoke test"
          return "$deploy_rc"
+      fi
+
+      if ! _ldap_sync_admin_password "$namespace" "$release"; then
+         _warn "[ldap] admin password sync failed; continuing with smoke test"
       fi
 
       local smoke_script="${SCRIPT_DIR}/tests/test-openldap.sh"
