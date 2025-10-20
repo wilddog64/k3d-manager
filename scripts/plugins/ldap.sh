@@ -430,14 +430,26 @@ function _ldap_sync_admin_password() {
       return 1
    fi
 
-   local sync_cmd='
+   local sync_cmd
+   read -r -d '' sync_cmd <<'EOS'
 set -euo pipefail
-LDAPTLS_REQCERT=never ldappasswd -H ldap://127.0.0.1:1389 \
-  -D "cn=config" -w "$CONFIG_PASS" \
-  "$ADMIN_DN" -s "$ADMIN_PASS" >/dev/null
-'
+export PATH="/opt/bitnami/openldap/bin:$PATH"
+if command -v ldappasswd >/dev/null 2>&1; then
+  LDAPTLS_REQCERT=never ldappasswd -H ldap://127.0.0.1:1389 \
+    -D "cn=config" -w "$CONFIG_PASS" \
+    "$ADMIN_DN" -s "$ADMIN_PASS" >/dev/null
+else
+  LDAPTLS_REQCERT=never ldapmodify -x -H ldap://127.0.0.1:1389 \
+    -D "cn=config" -w "$CONFIG_PASS" <<EOF
+dn: ${ADMIN_DN}
+changetype: modify
+replace: userPassword
+userPassword: ${ADMIN_PASS}
+EOF
+fi
+EOS
 
-   if _no_trace _kubectl -n "$ns" exec "$pod" -- env ADMIN_DN="$admin_dn" ADMIN_PASS="$admin_pass" CONFIG_PASS="$config_pass" bash -lc "$sync_cmd"; then
+   if _no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- env ADMIN_DN="$admin_dn" ADMIN_PASS="$admin_pass" CONFIG_PASS="$config_pass" bash -lc "$sync_cmd"; then
       _info "[ldap] reconciled admin password for ${admin_dn}"
       return 0
    fi
