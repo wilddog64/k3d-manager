@@ -567,6 +567,12 @@ EOF
    fi
 
    if (( deploy_rc == 0 )); then
+      local deploy_name="${release}-openldap-bitnami"
+      if ! _kubectl --no-exit -n "$namespace" rollout status "deployment/${deploy_name}" --timeout=180s; then
+         _warn "[ldap] deployment ${namespace}/${deploy_name} not ready; skipping smoke test"
+         return "$deploy_rc"
+      fi
+
       local smoke_script="${SCRIPT_DIR}/tests/test-openldap.sh"
       local service_name="${LDAP_SERVICE_NAME:-${release}-openldap-bitnami}"
       local smoke_port="${LDAP_SMOKE_PORT:-3389}"
