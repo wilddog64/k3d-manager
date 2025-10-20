@@ -19,9 +19,20 @@ EOF
   exit 1
 fi
 
-echo "Fetching admin credentials from ${namespace}/openldap-admin"
-LDAP_USER=$(kubectl -n "$namespace" get secret openldap-admin -o jsonpath='{.data.LDAP_ADMIN_USERNAME}' | base64 -d | tr -d '\n')
-LDAP_PASS=$(kubectl -n "$namespace" get secret openldap-admin -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' | base64 -d | tr -d '\n')
+fetch_credentials() {
+  LDAP_USER=$(kubectl -n "$namespace" get secret openldap-admin -o jsonpath='{.data.LDAP_ADMIN_USERNAME}' | base64 -d | tr -d '\n' || true)
+  LDAP_PASS=$(kubectl -n "$namespace" get secret openldap-admin -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' | base64 -d | tr -d '\n' || true)
+  if [[ -z "$LDAP_USER" || -z "$LDAP_PASS" ]]; then
+    return 1
+  fi
+  return 0
+}
+
+if ! fetch_credentials; then
+  echo "Unable to read admin credentials from ${namespace}/openldap-admin" >&2
+  exit 1
+fi
+
 BASE_DN_INPUT="${5:-}"
 
 echo "Port-forwarding ${namespace}/${service} to localhost:${local_port}"
@@ -42,37 +53,69 @@ trap cleanup EXIT
 
 BASE_DN="$BASE_DN_INPUT"
 
-if [[ -z "$BASE_DN" ]]; then
-  BASE_DN=$(kubectl -n "$namespace" get secret openldap-admin -o jsonpath='{.data.LDAP_BASE_DN}' 2>/dev/null | base64 -d | tr -d '\n' || true)
-fi
+discover_base_dn() {
+  local detected=""
+  detected=$(kubectl -n "$namespace" get secret openldap-admin -o jsonpath='{.data.LDAP_BASE_DN}' 2>/dev/null | base64 -d | tr -d '\n' || true)
+  if [[ -n "$detected" ]]; then
+    printf '%s' "$detected"
+    return 0
+  fi
 
-if [[ -z "$BASE_DN" ]]; then
   pod_name=$(kubectl -n "$namespace" get pods -l app.kubernetes.io/instance="$release" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
   if [[ -n "$pod_name" ]]; then
-    BASE_DN=$(kubectl -n "$namespace" exec "$pod_name" -c openldap-bitnami -- printenv LDAP_ROOT 2>/dev/null | tr -d '\r\n' || true)
-    if [[ -z "$BASE_DN" ]]; then
-      BASE_DN=$(kubectl -n "$namespace" exec "$pod_name" -c openldap-bitnami -- printenv LDAP_BASE_DN 2>/dev/null | tr -d '\r\n' || true)
+    detected=$(kubectl -n "$namespace" exec "$pod_name" -c openldap-bitnami -- printenv LDAP_ROOT 2>/dev/null | tr -d '\r\n' || true)
+    if [[ -z "$detected" ]]; then
+      detected=$(kubectl -n "$namespace" exec "$pod_name" -c openldap-bitnami -- printenv LDAP_BASE_DN 2>/dev/null | tr -d '\r\n' || true)
     fi
   fi
-fi
+  if [[ -n "$detected" ]]; then
+    printf '%s' "$detected"
+    return 0
+  fi
 
-if [[ -z "$BASE_DN" ]]; then
-  BASE_DN=$(LDAPTLS_REQCERT=never ldapsearch -x \
+  detected=$(LDAPTLS_REQCERT=never ldapsearch -x \
     -H "ldap://127.0.0.1:$local_port" \
     -s base -b "" namingContexts 2>/dev/null | awk '/^namingContexts:/{print $2; exit}' || true)
+  if [[ -n "$detected" ]]; then
+    printf '%s' "$detected"
+    return 0
+  fi
+
+  return 1
+}
+
+if [[ -z "$BASE_DN_INPUT" ]]; then
+  BASE_DN=$(discover_base_dn || true)
+else
+  BASE_DN="$BASE_DN_INPUT"
 fi
 
 BASE_DN=${BASE_DN:-"dc=home,dc=org"}
 
-BIND_DN="$LDAP_USER"
-if [[ "$BIND_DN" != *"="* ]]; then
-  BIND_DN="cn=${LDAP_USER},${BASE_DN}"
+success=0
+for attempt in {1..5}; do
+  if (( attempt > 1 )); then
+    sleep 5
+    fetch_credentials || true
+  fi
+
+  BIND_DN="$LDAP_USER"
+  if [[ "$BIND_DN" != *"="* ]]; then
+    BIND_DN="cn=${LDAP_USER},${BASE_DN}"
+  fi
+
+  echo "Attempt ${attempt}: using base DN ${BASE_DN} and bind DN ${BIND_DN}"
+
+  if LDAPTLS_REQCERT=never ldapsearch -x \
+        -H "ldap://127.0.0.1:$local_port" \
+        -D "$BIND_DN" -w "$LDAP_PASS" \
+        -b "$BASE_DN" | head; then
+    success=1
+    break
+  fi
+done
+
+if (( ! success )); then
+  echo "ldapsearch failed after multiple attempts" >&2
+  exit 1
 fi
-
-echo "Using base DN: $BASE_DN"
-echo "Using bind DN: $BIND_DN"
-
-LDAPTLS_REQCERT=never ldapsearch -x \
-  -H "ldap://127.0.0.1:$local_port" \
-  -D "$BIND_DN" -w "$LDAP_PASS" \
-  -b "$BASE_DN" | head
