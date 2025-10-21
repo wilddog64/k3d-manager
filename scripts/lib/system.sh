@@ -1184,7 +1184,7 @@ function _info() { printf 'INFO: %s\n' "$*" >&2; }
 function _warn() { printf 'WARN: %s\n' "$*" >&2; }
 function _err() {
    printf 'ERROR: %s\n' "$*" >&2
-   return 1 2>/dev/null || exit 1
+   exit 1
 }
 
 function _no_trace() {

@@ -359,7 +359,7 @@ function deploy_vault() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
       cat <<EOF
 Usage:
-  deploy_vault [options] <dev|ha>
+  deploy_vault [options]
   deploy_vault --re-unseal [options]
 
 Options:
@@ -465,21 +465,6 @@ EOF
             done
             break
             ;;
-         -h|--help)
-            cat <<EOF
-Usage:
-  deploy_vault [options] <dev|ha>
-  deploy_vault --re-unseal [options]
-
-Options:
-  --namespace <ns>       Vault namespace (default: ${VAULT_NS_DEFAULT})
-  --release <name>       Helm release name (default: ${VAULT_RELEASE_DEFAULT})
-  --chart-version <ver>  Vault chart version (default: ${VAULT_CHART_VERSION})
-  --re-unseal            Replay cached unseal shards and exit
-  -h, --help             Show this message
-EOF
-            return 0
-            ;;
          -*)
             _err "[vault] unknown option: $1"
             ;;
@@ -513,9 +498,20 @@ EOF
       return $?
    fi
 
-   if [[ "$mode" != "dev" && "$mode" != "ha" ]]; then
-      echo "[vault] usage: deploy_vault [options] <dev|ha>" >&2
-      return 1
+   if [[ -n "$mode" ]]; then
+      case "$mode" in
+         ha)
+            _warn "[vault] positional 'ha' is deprecated; deploy_vault always provisions HA"
+            ;;
+         dev)
+            _err "[vault] dev mode is no longer supported; Vault deploys in HA by default"
+            return 1
+            ;;
+         *)
+            _err "[vault] unknown positional argument: ${mode}"
+            return 1
+            ;;
+      esac
    fi
 
    deploy_eso
