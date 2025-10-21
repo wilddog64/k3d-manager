@@ -358,9 +358,8 @@ YAML
 function deploy_vault() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
       cat <<EOF
-Usage:
-  deploy_vault [options]
-  deploy_vault --re-unseal [options]
+Usage: deploy_vault [options]
+       deploy_vault --re-unseal [options]
 
 Options:
   --namespace <ns>       Vault namespace (default: ${VAULT_NS_DEFAULT})
@@ -477,41 +476,48 @@ EOF
    done
 
    local mode=""
-   if (( ${#positional[@]} > 0 )); then
-      mode="${positional[0]}"
-      if (( ${#positional[@]} > 1 )) && (( ns_set == 0 )); then
-         ns="${positional[1]}"
-      fi
-      if (( ${#positional[@]} > 2 )) && (( release_set == 0 )); then
-         release="${positional[2]}"
-      fi
-      if (( ${#positional[@]} > 3 )) && (( version_set == 0 )); then
-         version="${positional[3]}"
-      fi
-      if (( ${#positional[@]} > 4 )); then
-         _err "[vault] too many positional arguments"
-      fi
+   local positional_count="${#positional[@]}"
+   local idx=0
+
+   if (( positional_count > 0 )); then
+      case "${positional[0]}" in
+         ha)
+            mode="ha"
+            idx=1
+            ;;
+         dev)
+            _err "[vault] dev mode is no longer supported; Vault deploys in HA by default"
+            ;;
+      esac
    fi
+
+   for (( ; idx < positional_count; idx++ )); do
+      local value="${positional[idx]}"
+      if (( ns_set == 0 )); then
+         ns="$value"
+         ns_set=1
+         continue
+      fi
+      if (( release_set == 0 )); then
+         release="$value"
+         release_set=1
+         continue
+      fi
+      if (( version_set == 0 )); then
+         version="$value"
+         version_set=1
+         continue
+      fi
+      _err "[vault] too many positional arguments"
+   done
 
    if (( re_unseal )) && [[ -z "$mode" ]]; then
       _vault_replay_cached_unseal "$ns" "$release"
       return $?
    fi
 
-   if [[ -n "$mode" ]]; then
-      case "$mode" in
-         ha)
-            _warn "[vault] positional 'ha' is deprecated; deploy_vault always provisions HA"
-            ;;
-         dev)
-            _err "[vault] dev mode is no longer supported; Vault deploys in HA by default"
-            return 1
-            ;;
-         *)
-            _err "[vault] unknown positional argument: ${mode}"
-            return 1
-            ;;
-      esac
+   if [[ "$mode" == "ha" ]]; then
+      _warn "[vault] positional 'ha' is deprecated; deploy_vault always provisions HA"
    fi
 
    deploy_eso

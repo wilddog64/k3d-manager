@@ -295,7 +295,7 @@ The sequence now traces the `deploy_jenkins` flow: k3d-manager sources the Jenki
 
 The Vault plugin in [`scripts/plugins/vault.sh`](scripts/plugins/vault.sh) automates
 the entire PKI bootstrap that Jenkins and other services need. When you run
-`./scripts/k3d-manager deploy_vault ha`, the plugin installs the Helm chart,
+`./scripts/k3d-manager deploy_vault`, the plugin installs the Helm chart,
 initialises and unseals the HA cluster, enables the Kubernetes auth method and
 only then evaluates the PKI helpers. Once Vault is healthy, `_vault_setup_pki`
 runs (if `VAULT_ENABLE_PKI=1`) to mount PKI, generate the root CA and
@@ -398,12 +398,12 @@ public repositories. Operators that mirror the charts internally can instead set
    export VAULT_PKI_LEAF_HOST=jenkins.dev.local.me
    ```
 
-2. Deploy Vault in HA mode. The plugin will initialise Vault, configure the PKI
-   mount, generate the CA and, with the issuance toggle enabled, create the TLS
-   secret automatically.
+2. Deploy Vault (the plugin always provisions an HA cluster). The plugin will
+   initialise Vault, configure the PKI mount, generate the CA and, with the
+   issuance toggle enabled, create the TLS secret automatically.
 
    ```bash
-   ./scripts/k3d-manager deploy_vault ha
+   ./scripts/k3d-manager deploy_vault
    ```
 
 3. Verify that Vault issued the secret and inspect the resulting certificate:

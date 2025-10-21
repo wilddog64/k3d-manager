@@ -7,6 +7,11 @@ fi
 # Ensure _no_trace is defined
 command -v _no_trace >/dev/null 2>&1 || _no_trace() { "$@"; }
 
+if ! declare -f _vault_issue_pki_tls_secret >/dev/null 2>&1; then
+   _vault_issue_pki_tls_secret() { :; }
+fi
+export -f _vault_issue_pki_tls_secret 2>/dev/null || true
+
 JENKINS_CONFIG_DIR="$SCRIPT_DIR/etc/jenkins"
 JENKINS_VARS_FILE="$JENKINS_CONFIG_DIR/vars.sh"
 
@@ -15,6 +20,90 @@ if [[ ! -r "$JENKINS_VARS_FILE" ]]; then
 fi
 # shellcheck disable=SC1090
 source "$JENKINS_VARS_FILE"
+
+function _jenkins_hostpath_dir() {
+   printf '%s\n' "${JENKINS_HOME_PATH:-${SCRIPT_DIR}/storage/jenkins_home}"
+}
+
+function _jenkins_node_has_mount() {
+   local _node="${1:-}"
+   local host_dir="${2:-}"
+   if [[ -z "$_node" || -z "$host_dir" ]]; then
+      return 1
+   fi
+   [[ -d "$host_dir" ]]
+}
+
+function _jenkins_resolve_cluster_name() {
+   local provided="${1:-${CLUSTER_NAME:-}}"
+   if [[ -n "$provided" ]]; then
+      printf '%s\n' "$provided"
+      return 0
+   fi
+
+   if ! declare -f _k3d >/dev/null 2>&1; then
+      return 1
+   fi
+
+   local cluster_list=""
+   if ! cluster_list=$(_k3d cluster list 2>/dev/null); then
+      return 1
+   fi
+
+   local detected=""
+   detected=$(printf '%s\n' "$cluster_list" | awk 'NR>1 && NF {print $1; exit}')
+   if [[ -z "$detected" || "$detected" == "NAME" ]]; then
+      return 1
+   fi
+
+   printf '%s\n' "$detected"
+}
+
+function _jenkins_require_hostpath_mounts() {
+   local cluster="${1:-}"
+   if [[ -z "$cluster" ]]; then
+      if ! cluster=$(_jenkins_resolve_cluster_name); then
+         echo "[jenkins] unable to determine k3d cluster name; set CLUSTER_NAME or rerun create_cluster" >&2
+         return 1
+      fi
+   fi
+
+   if ! declare -f _k3d >/dev/null 2>&1; then
+      echo "[jenkins] k3d CLI helper not available; ensure scripts/lib/core.sh is sourced" >&2
+      return 1
+   fi
+
+   local host_dir
+   host_dir=$(_jenkins_hostpath_dir)
+   mkdir -p "$host_dir"
+
+   local node_output=""
+   node_output=$(_k3d node list 2>/dev/null || true)
+   if [[ -z "$node_output" ]]; then
+      echo "[jenkins] failed to list k3d nodes; is the cluster running?" >&2
+      return 1
+   fi
+
+   local -a missing_nodes=()
+   while read -r name role cluster_name status _rest; do
+      [[ -z "$name" ]] && continue
+      [[ "$name" =~ ^NAME$ ]] && continue
+      if [[ "$cluster_name" != "$cluster" ]]; then
+         continue
+      fi
+      if ! _jenkins_node_has_mount "$name" "$host_dir"; then
+         missing_nodes+=("$name")
+      fi
+   done <<< "$node_output"
+
+   if (( ${#missing_nodes[@]} )); then
+      JENKINS_MISSING_HOSTPATH_NODES="${missing_nodes[*]}"
+      echo "[jenkins] hostPath mount ${host_dir} missing from nodes: ${missing_nodes[*]}. Update your cluster configuration via create_cluster." >&2
+      return 1
+   fi
+
+   return 0
+}
 
 declare -a _JENKINS_RENDERED_MANIFESTS=()
 _JENKINS_PREV_EXIT_TRAP_CMD=""
@@ -207,6 +296,20 @@ function _create_jenkins_namespace() {
 
 function _create_jenkins_pv_pvc() {
    local jenkins_namespace=$1
+   local cluster_name="${CLUSTER_NAME:-}"
+
+   if [[ -z "$cluster_name" ]]; then
+      cluster_name=$(_jenkins_resolve_cluster_name 2>/dev/null || true)
+   fi
+
+   if ! _jenkins_require_hostpath_mounts "$cluster_name"; then
+      local host_dir
+      host_dir=$(_jenkins_hostpath_dir)
+      local missing="${JENKINS_MISSING_HOSTPATH_NODES:-unknown}"
+      printf 'ERROR: hostPath mount %s missing on nodes: %s\n' "$host_dir" "$missing" >&2
+      printf 'ERROR: Update your cluster configuration via create_cluster and retry.\n' >&2
+      return 1
+   fi
 
    jenkins_pv_template="$(dirname "$SOURCE")/etc/jenkins/jenkins-home-pv.yaml.tmpl"
    if [[ ! -r "$jenkins_pv_template" ]]; then
@@ -446,7 +549,7 @@ function deploy_jenkins() {
 
    _jenkins_configure_leaf_host_defaults
 
-   deploy_vault ha "$vault_namespace" "$vault_release"
+   deploy_vault "$vault_namespace" "$vault_release"
    _create_jenkins_admin_vault_policy "$vault_namespace" "$vault_release"
    _create_jenkins_vault_ad_policy "$vault_namespace" "$vault_release" "$jenkins_namespace"
    _create_jenkins_cert_rotator_policy "$vault_namespace" "$vault_release" "" "" "$jenkins_namespace"
@@ -572,7 +675,7 @@ function _deploy_jenkins() {
    fi
 
    JENKINS_NAMESPACE="${ns:-${JENKINS_NAMESPACE}}"
-   :"${JENKINS_NAMESPACE:?JENKINKS_NAMESPACE not set}"
+   : "${JENKINS_NAMESPACE:?JENKINS_NAMESPACE not set}"
    local vs_template="$JENKINS_CONFIG_DIR/virtualservice.yaml.tmpl"
    if [[ ! -r "$vs_template" ]]; then
       _err "VirtualService template file not found: $vs_template"
@@ -705,10 +808,13 @@ function _deploy_jenkins() {
    local secret_namespace="${VAULT_PKI_SECRET_NS:-istio-system}"
    local secret_name="$vault_pki_secret_name"
 
-   _vault_issue_pki_tls_secret "$vault_namespace" "$vault_release" "" "" \
-      "$jenkins_host" "$secret_namespace" "$secret_name"
-
-   local rc=$?
+   if [[ "${JENKINS_SKIP_TLS:-0}" != "1" ]]; then
+      _vault_issue_pki_tls_secret "$vault_namespace" "$vault_release" "" "" \
+         "$jenkins_host" "$secret_namespace" "$secret_name"
+      local rc=$?
+   else
+      local rc=0
+   fi
    _jenkins_cleanup_and_return "$rc"
    return "$rc"
 }

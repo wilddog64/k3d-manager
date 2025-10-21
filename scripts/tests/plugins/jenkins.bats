@@ -1459,9 +1459,29 @@ EOF
 }
 
 @test "_deploy_jenkins applies Istio resources" {
-  run _deploy_jenkins sample-ns
+  local script="$BATS_TEST_TMPDIR/jenkins-apply.sh"
+  local out_kubectl="$BATS_TEST_TMPDIR/out-kubectl.log"
+
+  cat <<'EOF' >"$script"
+#!/usr/bin/env bash
+set -eo pipefail
+source "$BATS_TEST_DIRNAME/../test_helpers.bash"
+init_test_env
+source "$BATS_TEST_DIRNAME/../../plugins/jenkins.sh"
+export_stubs
+_vault_issue_pki_tls_secret() { :; }
+JENKINS_SKIP_TLS=1 _deploy_jenkins sample-ns
+cp "$KUBECTL_LOG" "$OUT_KUBECTL"
+EOF
+  chmod +x "$script"
+
+  run env BATS_TEST_DIRNAME="$BATS_TEST_DIRNAME" \
+      BATS_TEST_TMPDIR="$BATS_TEST_TMPDIR" \
+      OUT_KUBECTL="$out_kubectl" \
+      "$script"
   [ "$status" -eq 0 ]
-  read_lines "$KUBECTL_LOG" kubectl_calls
+
+  read_lines "$out_kubectl" kubectl_calls
   expected_gw_prefix="apply -n istio-system --dry-run=client -f /tmp/jenkins-gateway"
   expected_gw_apply_prefix="apply -n istio-system -f /tmp/jenkins-gateway"
   expected_vs_prefix="apply -n sample-ns --dry-run=client -f /tmp/jenkins-virtualservice"
@@ -1484,10 +1504,29 @@ EOF
   export JENKINS_HELM_CHART_REF="$BATS_TEST_TMPDIR/jenkins-chart.tgz"
   export JENKINS_HELM_REPO_URL=""
 
-  run _deploy_jenkins sample-ns
+  local script="$BATS_TEST_TMPDIR/jenkins-helm.sh"
+  local out_helm="$BATS_TEST_TMPDIR/out-helm.log"
+
+  cat <<'EOF' >"$script"
+#!/usr/bin/env bash
+set -eo pipefail
+source "$BATS_TEST_DIRNAME/../test_helpers.bash"
+init_test_env
+source "$BATS_TEST_DIRNAME/../../plugins/jenkins.sh"
+export_stubs
+_vault_issue_pki_tls_secret() { :; }
+JENKINS_SKIP_TLS=1 _deploy_jenkins sample-ns
+cp "$HELM_LOG" "$OUT_HELM"
+EOF
+  chmod +x "$script"
+
+  run env BATS_TEST_DIRNAME="$BATS_TEST_DIRNAME" \
+      BATS_TEST_TMPDIR="$BATS_TEST_TMPDIR" \
+      OUT_HELM="$out_helm" \
+      "$script"
   [ "$status" -eq 0 ]
 
-  read_lines "$HELM_LOG" helm_calls
+  read_lines "$out_helm" helm_calls
   [ "${#helm_calls[@]}" -eq 1 ]
   local expected="upgrade --install jenkins ${JENKINS_HELM_CHART_REF} --namespace sample-ns -f $JENKINS_CONFIG_DIR/values.yaml"
   [ "${helm_calls[0]}" = "$expected" ]
@@ -1652,75 +1691,81 @@ EOF
 }
 @test "deploy_jenkins renders manifests for namespace" {
   local random_ns="jenkins-${RANDOM}"
-  deploy_vault() { :; }
-  _create_jenkins_admin_vault_policy() { :; }
-  _create_jenkins_vault_ad_policy() { :; }
-  _create_jenkins_namespace() { :; }
-  _create_jenkins_pv_pvc() { :; }
-  _ensure_jenkins_cert() { :; }
-  _wait_for_jenkins_ready() { :; }
+  local capture_dir="$BATS_TEST_TMPDIR/manifests"
+  local script="$BATS_TEST_TMPDIR/jenkins-manifests.sh"
+  local out_kubectl="$BATS_TEST_TMPDIR/out-manifests.log"
 
-  MANIFEST_CAPTURE_DIR="$BATS_TEST_TMPDIR/manifests"
-  mkdir -p "$MANIFEST_CAPTURE_DIR"
-  _kubectl() {
-    local original=("$@")
-    while [[ $# -gt 0 ]]; do
-      case "$1" in
-        --no-exit|--quiet|--prefer-sudo|--require-sudo)
-          shift
-          ;;
-        --)
-          shift
-          original=("$@")
-          break
-          ;;
-        *)
-          shift
-          ;;
-      esac
-    done
+  cat <<'EOF' >"$script"
+#!/usr/bin/env bash
+set -eo pipefail
+source "$BATS_TEST_DIRNAME/../test_helpers.bash"
+init_test_env
+source "$BATS_TEST_DIRNAME/../../plugins/jenkins.sh"
+export_stubs
+deploy_vault() { :; }
+_create_jenkins_admin_vault_policy() { :; }
+_create_jenkins_vault_ad_policy() { :; }
+_create_jenkins_namespace() { :; }
+_create_jenkins_pv_pvc() { :; }
+_ensure_jenkins_cert() { :; }
+_wait_for_jenkins_ready() { :; }
+_vault_issue_pki_tls_secret() { :; }
+MANIFEST_CAPTURE_DIR="$CAPTURE_DIR"
+mkdir -p "$MANIFEST_CAPTURE_DIR"
+_kubectl() {
+  local original=("$@")
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+      --) shift; original=("$@"); break ;;
+      *) shift;;
+    esac
+  done
+  printf '%s
+' "${original[*]}" >> "$KUBECTL_LOG"
+  local dry_run=0 file=""
+  for ((i=0; i<${#original[@]}; i++)); do
+    case "${original[$i]}" in
+      --dry-run=client) dry_run=1 ;;
+      -f)
+        if (( i + 1 < ${#original[@]} )); then
+          file="${original[$((i+1))]}"
+        fi
+        ;;
+    esac
+  done
+  if (( dry_run )) && [[ -n "$file" ]]; then
+    local dest="$MANIFEST_CAPTURE_DIR/$(basename "$file")"
+    cp "$file" "$dest"
+  fi
+  return 0
+}
+export -f _kubectl
+JENKINS_SKIP_TLS=1 deploy_jenkins "$TARGET_NS"
+cp "$KUBECTL_LOG" "$OUT_KUBECTL"
+EOF
+  chmod +x "$script"
 
-    printf '%s\n' "${original[*]}" >> "$KUBECTL_LOG"
-
-    local dry_run=0 file=""
-    for ((i=0; i<${#original[@]}; i++)); do
-      case "${original[$i]}" in
-        --dry-run=client)
-          dry_run=1
-          ;;
-        -f)
-          if (( i + 1 < ${#original[@]} )); then
-            file="${original[$((i+1))]}"
-          fi
-          ;;
-      esac
-    done
-
-    if (( dry_run )) && [[ -n "$file" ]]; then
-      local dest="$MANIFEST_CAPTURE_DIR/$(basename "$file")"
-      cp "$file" "$dest"
-    fi
-
-    return 0
-  }
-  export -f _kubectl
-
-  export VAULT_PKI_LEAF_HOST="jenkins.127.0.0.1.nip.io"
-
-  run deploy_jenkins "$random_ns"
+  run env BATS_TEST_DIRNAME="$BATS_TEST_DIRNAME" \
+      BATS_TEST_TMPDIR="$BATS_TEST_TMPDIR" \
+      CAPTURE_DIR="$capture_dir" \
+      TARGET_NS="$random_ns" \
+      OUT_KUBECTL="$out_kubectl" \
+      "$script"
   [ "$status" -eq 0 ]
 
   local vs_file
-  vs_file=$(find "$MANIFEST_CAPTURE_DIR" -maxdepth 1 -type f -name 'jenkins-virtualservice*' -print -quit)
+  vs_file=$(find "$capture_dir" -maxdepth 1 -type f -name 'jenkins-virtualservice*' -print -quit)
   local dr_file
-  dr_file=$(find "$MANIFEST_CAPTURE_DIR" -maxdepth 1 -type f -name 'jenkins-destinationrule*' -print -quit)
+  dr_file=$(find "$capture_dir" -maxdepth 1 -type f -name 'jenkins-destinationrule*' -print -quit)
 
   [[ -n "$vs_file" ]]
   [[ -n "$dr_file" ]]
-  grep -q "namespace: \"$random_ns\"" "$vs_file"
+  grep -q "namespace: "$random_ns"" "$vs_file"
   grep -q '  hosts:' "$vs_file"
-  grep -q '    - jenkins.127.0.0.1.nip.io' "$vs_file"
+  grep -q '    - jenkins.dev.local.me' "$vs_file"
+  grep -q '    - jenkins.dev.k3d.internal' "$vs_file"
   grep -q "jenkins.$random_ns.svc.cluster.local" "$vs_file"
-  grep -q "namespace: \"$random_ns\"" "$dr_file"
+  grep -q "namespace: "$random_ns"" "$dr_file"
   grep -q "jenkins.$random_ns.svc.cluster.local" "$dr_file"
 }

@@ -144,12 +144,18 @@ setup_vault_bootstrap_stubs() {
 
 @test "deploy_vault loads optional config when vars file exists" {
   local stub_root="${BATS_TEST_TMPDIR}/vault-config"
+  local real_root="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
   mkdir -p "${stub_root}/etc/vault"
+  mkdir -p "${stub_root}/lib"
+  cp "${real_root}/lib/vault_pki.sh" "${stub_root}/lib/vault_pki.sh"
   cat <<'EOF' >"${stub_root}/etc/vault/vars.sh"
 export TEST_VAULT_OPTIONAL="from-config"
+printf "loaded" > "${BATS_TEST_TMPDIR}/vault-config-loaded"
 EOF
 
   SCRIPT_DIR="$stub_root"
+  export SCRIPT_DIR
+  unset TEST_VAULT_OPTIONAL
 
   deploy_eso() { return 0; }
   _vault_ns_ensure() { return 0; }
@@ -170,10 +176,11 @@ EOF
   _warn() { WARN_CALLED=1; WARN_MESSAGE="$*"; }
   export -f _warn
 
-  deploy_vault dev
-
-  [ "$?" -eq 0 ]
-  [ "${TEST_VAULT_OPTIONAL:-}" = "from-config" ]
+  output=$(deploy_vault)
+  rc=$?
+  [ "$rc" -eq 0 ]
+  [ -z "$output" ]
+  [[ -f "${BATS_TEST_TMPDIR}/vault-config-loaded" ]]
   [ "$WARN_CALLED" -eq 0 ]
   [ -z "$WARN_MESSAGE" ]
 }
@@ -547,7 +554,7 @@ JSON
   export -f _vault_bootstrap_ha
   export -f _enable_kv2_k8s_auth
 
-  deploy_vault ha sample-ns
+  deploy_vault sample-ns
   [ "$?" -eq 0 ]
   expected=(deploy_eso _vault_ns_ensure _vault_repo_setup _deploy_vault_ha _vault_bootstrap_ha _enable_kv2_k8s_auth)
   [ "${#CALLS[@]}" -eq "${#expected[@]}" ]
@@ -618,7 +625,7 @@ JSON
   [ "$status" -eq 0 ]
 
   read_lines "$KUBECTL_LOG" kubectl_calls
-  expected_wait="wait -n ${TEST_NS} --for=condition=Podscheduled ${TEST_POD_RESOURCE} --timeout=120s"
+  expected_wait="wait -n ${TEST_NS} --for=condition=PodScheduled ${TEST_POD_RESOURCE} --timeout=120s"
   expected_get="-n ${TEST_NS} get pod ${TEST_POD} -o jsonpath={.status.phase}"
   expected_status="-n ${TEST_NS} exec -i ${TEST_POD} -- vault status -format json"
   expected_init="-n ${TEST_NS} exec -it ${TEST_POD} -- sh -lc vault operator init -key-shares=1 -key-threshold=1 -format=json"
