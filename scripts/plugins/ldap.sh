@@ -398,6 +398,7 @@ function _ldap_sync_admin_password() {
    local admin_user="${LDAP_ADMIN_USERNAME:-ldap-admin}"
    local base_dn="${LDAP_BASE_DN:-dc=${LDAP_DC_PRIMARY:-home},dc=${LDAP_DC_SECONDARY:-org}}"
    local admin_dn="${LDAP_BINDDN:-cn=${admin_user},${base_dn}}"
+    local config_dn_override="${LDAP_CONFIG_ADMIN_DN:-}"
    local admin_pass=""
    local config_pass=""
    local pod=""
@@ -434,13 +435,18 @@ function _ldap_sync_admin_password() {
    read -r -d '' sync_cmd <<'EOS' || true
 set -euo pipefail
 export PATH="/opt/bitnami/openldap/bin:$PATH"
+CONFIG_DN_VAR="${CONFIG_DN_OVERRIDE:-}"
+if [[ -z "$CONFIG_DN_VAR" ]]; then
+  CONFIG_DN_VAR="$(printenv LDAP_CONFIG_ADMIN_DN 2>/dev/null || true)"
+fi
+CONFIG_DN_VAR=${CONFIG_DN_VAR:-cn=admin,cn=config}
 if command -v ldappasswd >/dev/null 2>&1; then
   LDAPTLS_REQCERT=never ldappasswd -H ldap://127.0.0.1:1389 \
-    -D "cn=config" -w "$CONFIG_PASS" \
+    -D "$CONFIG_DN_VAR" -w "$CONFIG_PASS" \
     "$ADMIN_DN" -s "$ADMIN_PASS"
 else
   LDAPTLS_REQCERT=never ldapmodify -x -H ldap://127.0.0.1:1389 \
-    -D "cn=config" -w "$CONFIG_PASS" <<EOF
+    -D "$CONFIG_DN_VAR" -w "$CONFIG_PASS" <<EOF
 dn: $ADMIN_DN
 changetype: modify
 replace: userPassword
@@ -454,7 +460,7 @@ EOS
       return 1
    fi
 
-   if printf '%s\n' "$sync_cmd" | _no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- env ADMIN_DN="$admin_dn" ADMIN_PASS="$admin_pass" CONFIG_PASS="$config_pass" bash -s; then
+   if printf '%s\n' "$sync_cmd" | _no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- env ADMIN_DN="$admin_dn" ADMIN_PASS="$admin_pass" CONFIG_PASS="$config_pass" CONFIG_DN_OVERRIDE="${config_dn_override}" bash -s; then
       _info "[ldap] reconciled admin password for ${admin_dn}"
       return 0
    fi
