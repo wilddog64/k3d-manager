@@ -617,12 +617,14 @@ function _vault_bootstrap_ha() {
      _err "[vault] no unseal keys returned during init"
   fi
 
-  if [[ ! "$key_shares" =~ ^[0-9]+$ || key_shares -le 0 ]]; then
+  if [[ ! "$key_shares" =~ ^[0-9]+$ || $key_shares -le 0 ]]; then
      key_shares=${#unseal_keys[@]}
   fi
-  if [[ ! "$key_threshold" =~ ^[0-9]+$ || key_threshold -le 0 ]]; then
+
+  if [[ ! "$key_threshold" =~ ^[0-9]+$ || $key_threshold -le 0 ]]; then
      key_threshold=1
   fi
+
   local threshold=$key_threshold
   if (( threshold > ${#unseal_keys[@]} )); then
      threshold=${#unseal_keys[@]}
