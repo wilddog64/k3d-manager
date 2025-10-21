@@ -22,6 +22,8 @@ fi
 fetch_credentials() {
   LDAP_USER=$(kubectl -n "$namespace" get secret openldap-admin -o jsonpath='{.data.LDAP_ADMIN_USERNAME}' | base64 -d | tr -d '\n' || true)
   LDAP_PASS=$(kubectl -n "$namespace" get secret openldap-admin -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' | base64 -d | tr -d '\n' || true)
+  LDAP_CONFIG_PASS=$(kubectl -n "$namespace" get secret openldap-admin -o jsonpath='{.data.LDAP_CONFIG_PASSWORD}' 2>/dev/null | base64 -d | tr -d '\n' || true)
+  LDAP_BIND_DN_SECRET=$(kubectl -n "$namespace" get secret openldap-admin -o jsonpath='{.data.LDAP_BINDDN}' 2>/dev/null | base64 -d | tr -d '\n' || true)
   if [[ -z "$LDAP_USER" || -z "$LDAP_PASS" ]]; then
     return 1
   fi
@@ -92,6 +94,42 @@ fi
 
 BASE_DN=${BASE_DN:-"dc=home,dc=org"}
 
+discover_bind_dn() {
+  local candidate="$1"
+  if [[ -n "${LDAP_BINDDN:-}" ]]; then
+    printf '%s' "$LDAP_BINDDN"
+    return 0
+  fi
+  if [[ -n "$LDAP_BIND_DN_SECRET" ]]; then
+    printf '%s' "$LDAP_BIND_DN_SECRET"
+    return 0
+  fi
+  if [[ "$candidate" == *"="* ]]; then
+    printf '%s' "$candidate"
+    return 0
+  fi
+
+  local config_dn="${LDAP_CONFIG_ADMIN_DN:-cn=admin,cn=config}"
+  if [[ -n "$LDAP_CONFIG_PASS" ]]; then
+    local query="(|(cn=${candidate})(uid=${candidate}))"
+    local search_output
+    if search_output=$(LDAPTLS_REQCERT=never ldapsearch -x \
+        -H "ldap://127.0.0.1:$local_port" \
+        -D "$config_dn" -w "$LDAP_CONFIG_PASS" \
+        -b "$BASE_DN" "$query" dn 2>/dev/null || true); then
+      local found_dn
+      found_dn=$(printf '%s\n' "$search_output" | awk 'tolower($1)=="dn:" {sub(/^dn:[[:space:]]*/,""); print; exit}')
+      if [[ -n "$found_dn" ]]; then
+        printf '%s' "$found_dn"
+        return 0
+      fi
+    fi
+  fi
+
+  printf 'cn=%s,%s' "$candidate" "$BASE_DN"
+  return 0
+}
+
 success=0
 for attempt in {1..5}; do
   if (( attempt > 1 )); then
@@ -99,10 +137,7 @@ for attempt in {1..5}; do
     fetch_credentials || true
   fi
 
-  BIND_DN="$LDAP_USER"
-  if [[ "$BIND_DN" != *"="* ]]; then
-    BIND_DN="cn=${LDAP_USER},${BASE_DN}"
-  fi
+  BIND_DN=$(discover_bind_dn "$LDAP_USER")
 
   echo "Attempt ${attempt}: using base DN ${BASE_DN} and bind DN ${BIND_DN}"
 

@@ -440,19 +440,39 @@ if [[ -z "$CONFIG_DN_VAR" ]]; then
   CONFIG_DN_VAR="$(printenv LDAP_CONFIG_ADMIN_DN 2>/dev/null || true)"
 fi
 CONFIG_DN_VAR=${CONFIG_DN_VAR:-cn=admin,cn=config}
+ADMIN_CN_VAR="${ADMIN_CN_OVERRIDE:-}"
+if [[ -z "$ADMIN_CN_VAR" ]]; then
+  ADMIN_CN_VAR="$(printenv LDAP_ADMIN_USERNAME 2>/dev/null || true)"
+fi
+ADMIN_CN_VAR=${ADMIN_CN_VAR:-ldap-admin}
+ADMIN_DN_VAR="$ADMIN_DN"
+SEARCH_DN=$(LDAPTLS_REQCERT=never ldapsearch -x -H ldap://127.0.0.1:1389 \
+  -D "$CONFIG_DN_VAR" -w "$CONFIG_PASS" \
+  -b "$BASE_DN" "(cn=${ADMIN_CN_VAR})" dn 2>/dev/null | awk 'tolower($1)=="dn:" {sub(/^dn:[[:space:]]*/,""); print; exit}')
+if [[ -n "$SEARCH_DN" ]]; then
+  ADMIN_DN_VAR="$SEARCH_DN"
+fi
 if command -v ldappasswd >/dev/null 2>&1; then
-  LDAPTLS_REQCERT=never ldappasswd -H ldap://127.0.0.1:1389 \
+  LDAPTLS_REQCERT=never ldappasswd -x -H ldap://127.0.0.1:1389 \
     -D "$CONFIG_DN_VAR" -w "$CONFIG_PASS" \
-    "$ADMIN_DN" -s "$ADMIN_PASS"
+    "$ADMIN_DN_VAR" -s "$ADMIN_PASS"
 else
   LDAPTLS_REQCERT=never ldapmodify -x -H ldap://127.0.0.1:1389 \
     -D "$CONFIG_DN_VAR" -w "$CONFIG_PASS" <<EOF
-dn: $ADMIN_DN
+dn: $ADMIN_DN_VAR
 changetype: modify
 replace: userPassword
 userPassword: $ADMIN_PASS
 EOF
 fi
+
+if ! LDAPTLS_REQCERT=never ldapwhoami -x -H ldap://127.0.0.1:1389 \
+  -D "$ADMIN_DN_VAR" -w "$ADMIN_PASS" >/dev/null 2>&1; then
+  printf 'VERIFY_FAIL:%s\n' "$ADMIN_DN_VAR"
+  exit 2
+fi
+
+printf 'SYNC_OK:%s\n' "$ADMIN_DN_VAR"
 EOS
 
    if [[ -z "$sync_cmd" ]]; then
@@ -460,13 +480,26 @@ EOS
       return 1
    fi
 
-   if printf '%s\n' "$sync_cmd" | _no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- env ADMIN_DN="$admin_dn" ADMIN_PASS="$admin_pass" CONFIG_PASS="$config_pass" CONFIG_DN_OVERRIDE="${config_dn_override}" bash -s; then
-      _info "[ldap] reconciled admin password for ${admin_dn}"
-      return 0
+   local sync_output=""
+   if ! sync_output=$(printf '%s\n' "$sync_cmd" | _no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- env ADMIN_DN="$admin_dn" ADMIN_PASS="$admin_pass" CONFIG_PASS="$config_pass" CONFIG_DN_OVERRIDE="${config_dn_override}" ADMIN_CN_OVERRIDE="$admin_user" BASE_DN="$base_dn" bash -s 2>&1); then
+      sync_output=${sync_output//$'\r'/}
+      if [[ "$sync_output" == *VERIFY_FAIL:* ]]; then
+         local verified_dn="${sync_output##*VERIFY_FAIL:}"
+         _warn "[ldap] unable to verify admin password for ${verified_dn}"
+      else
+         _warn "[ldap] unable to reconcile admin password (${sync_output})"
+      fi
+      return 1
    fi
 
-   _warn "[ldap] unable to reconcile admin password for ${admin_dn}"
-   return 1
+   sync_output=${sync_output//$'\r'/}
+   local reconciled_dn="$admin_dn"
+   if [[ "$sync_output" == SYNC_OK:* ]]; then
+      reconciled_dn="${sync_output#SYNC_OK:}"
+   fi
+   export LDAP_BINDDN="$reconciled_dn"
+   _info "[ldap] reconciled admin password for ${reconciled_dn}"
+   return 0
 }
 
 function deploy_ldap() {
@@ -657,7 +690,7 @@ EOF
          _warn "[ldap] admin password sync failed; continuing with smoke test"
       fi
 
-      local smoke_script="${SCRIPT_DIR}/tests/test-openldap.sh"
+      local smoke_script="${SCRIPT_DIR}/tests/plugins/openldap.sh"
       local service_name="${LDAP_SERVICE_NAME:-${release}-openldap-bitnami}"
       local smoke_port="${LDAP_SMOKE_PORT:-3389}"
       if [[ -x "$smoke_script" ]]; then
