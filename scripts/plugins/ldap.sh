@@ -210,13 +210,11 @@ function _ldap_seed_admin_secret() {
    admin_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
    if [[ -z "$admin_password" ]]; then
       _err "[ldap] failed to generate admin password"
-      return 1
    fi
 
    config_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
    if [[ -z "$config_password" ]]; then
       _err "[ldap] failed to generate config password"
-      return 1
    fi
 
    local script payload
@@ -232,7 +230,6 @@ function _ldap_seed_admin_secret() {
    fi
 
    _err "[ldap] unable to seed Vault admin secret ${full_path}"
-   return 1
 }
 
 function _ldap_wait_for_secret() {
