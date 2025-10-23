@@ -261,7 +261,7 @@ function _jenkins_node_has_mount() {
       return 1
    fi
 
-   if command -v jq >/dev/null 2>&1; then
+   if command_exists jq; then
       if printf '%s\n' "$inspect" | jq -e --arg src "$host_path" '.[0].Mounts[]? | select(.Source == $src)' >/dev/null 2>&1; then
          return 0
       fi
