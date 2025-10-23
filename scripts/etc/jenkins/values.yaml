@@ -174,7 +174,7 @@ controller:
                     agentInjection: true
                     containers:
                       - name: "jnlp"
-                        image: "jenkins/inbound-agent:alpine:latest"
+                        image: "jenkins/inbound-agent:latest"
                         resourceRequestCpu: "100m"
                         resourceRequestMemory: "256Mi"
                         resourceLimitCpu: "500m"
