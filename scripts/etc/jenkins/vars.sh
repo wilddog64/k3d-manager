@@ -34,7 +34,7 @@ export VAULT_NAMESPACE=""
 export VAULT_SKIP_VERIFY="true"  # true if using TLS between Vault and Jenkins
 export VAULT_CACERT="/etc/ssl/certs/vault-ca.pem"
 
-# roator specific
+# rotator specific
 export VAULT_PKI_SECRET_NS="istio-system"
 export VAULT_PKI_PATH="${VAULT_PKI_PATH:-pki}"
 export VAULT_PKI_ROLE="${VAULT_PKI_ROLE:-jenkins-tls}"
