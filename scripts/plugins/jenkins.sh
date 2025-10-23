@@ -363,8 +363,7 @@ function _create_jenkins_pv_pvc() {
    if [[ -n "$cluster" ]]; then
       if ! _jenkins_require_hostpath_mounts "$cluster"; then
          local missing="${JENKINS_MISSING_HOSTPATH_NODES:-unknown}"
-         printf 'Missing hostPath mount for Jenkins home on node(s): %s. Update your cluster configuration or rerun create_cluster.\n' "$missing" >&2
-         return 1
+         _err 'Missing hostPath mount for Jenkins home on node(s): %s. Update your cluster configuration or rerun create_cluster.\n' "$missing"
       fi
    fi
 
@@ -476,20 +475,20 @@ function _jenkins_warn_on_cert_rotator_pull_failure() {
    local ns="$1"
 
    if [[ -z "${ns:-}" ]]; then
-      return 0
+      _err "namespace, ns is required variable"
    fi
 
-   if ! command -v jq >/dev/null 2>&1; then
-      return 0
+   if ! command_exist jq >/dev/null 2>&1; then
+      _err "unable to find jq, abort script"
    fi
 
    local pods_json=""
    if ! pods_json=$(_kubectl --no-exit --quiet -n "$ns" get pods -l job-name -o json 2>/dev/null); then
-      return 0
+      _err "unable to retrieve pod joso:"
    fi
 
    if [[ -z "$pods_json" ]]; then
-      return 0
+      _err "pod does not exist!"
    fi
 
    local job_prefix="${JENKINS_CERT_ROTATOR_NAME:-jenkins-cert-rotator}"
