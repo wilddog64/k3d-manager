@@ -399,7 +399,7 @@ function _ensure_jenkins_cert() {
       _kubectl -n "$vault_namespace" exec -i "$pod" -- vault secrets enable pki
       _kubectl -n "$vault_namespace" exec -i "$pod" -- vault secrets tune -max-lease-ttl=87600h pki
       _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-         vault write pki/root/generate/internal common_name="dev.local.me" ttl=87600h
+         vault write pki/root/generate/internal common_name="${common_name}" ttl=87600h
    fi
 
    local allowed_domains_input="${VAULT_PKI_ALLOWED:-}"
