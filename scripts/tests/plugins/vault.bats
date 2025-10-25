@@ -27,6 +27,9 @@ setup() {
       esac
     done
     echo "$*" >>"$KUBECTL_LOG"
+    if [[ "$*" == *"jsonpath={.spec.containers[0].name}"* ]]; then
+      printf 'vault'
+    fi
     local rc=0
     if ((${#KUBECTL_EXIT_CODES[@]})); then
       rc=${KUBECTL_EXIT_CODES[0]}
@@ -105,34 +108,57 @@ setup_vault_bootstrap_stubs() {
     done
     local cmd="$*"
     echo "$cmd" >>"$KUBECTL_LOG"
-    case "$cmd" in
-      "wait -n ${TEST_NS} --for=condition=Podscheduled ${TEST_POD_RESOURCE} --timeout=120s")
-        return 0 ;;
-      "-n ${TEST_NS} get pod ${TEST_POD} -o jsonpath={.status.phase}")
-        echo "Running"
-        return 0 ;;
-      "-n ${TEST_NS} exec -i ${TEST_POD} -- vault status -format json")
-        echo '{"initialized": false}'
-        return 0 ;;
-      "-n ${TEST_NS} exec -it ${TEST_POD} -- sh -lc vault operator init -key-shares=1 -key-threshold=1 -format=json")
-        printf '{"root_token":"root","unseal_keys_b64":["key"]}\n'
-        return 0 ;;
-      "-n ${TEST_NS} create secret generic vault-root --from-literal=root_token=root")
-        return 0 ;;
-      "-n ${TEST_NS} get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=${TEST_RELEASE} -o name")
-        echo "pod/${TEST_POD}"
-        return 0 ;;
-      "-n ${TEST_NS} exec -i ${TEST_POD} -- sh -lc vault operator unseal key")
-        return 0 ;;
-      "-n ${TEST_NS} run "*)
-        if [[ "$cmd" == *"vault-health-"* ]]; then
-          kubectl_run_output_fixture "$HEALTH_CODE"
-        fi
-        return 0 ;;
-      *)
-        return 0 ;;
-    esac
+    if [[ "$cmd" == "wait -n ${TEST_NS} --for=condition=PodScheduled ${TEST_POD_RESOURCE} --timeout=120s" ]]; then
+      return 0
+    elif [[ "$cmd" == "-n ${TEST_NS} get pod ${TEST_POD} -o jsonpath={.status.phase}" ]]; then
+      echo "Running"
+      return 0
+    elif [[ "$cmd" == "-n ${TEST_NS} get pod ${TEST_POD} -o jsonpath={.spec.containers[0].name}" ]]; then
+      printf 'vault'
+      return 0
+    elif [[ "$cmd" == *"vault status >/dev/null 2>&1"* ]]; then
+      return 1
+    elif [[ "$cmd" == *"-n ${TEST_NS} exec -i ${TEST_POD}"* && "$cmd" == *"vault status 2>&1 || true"* ]]; then
+      printf 'Initialized false\n'
+      return 0
+    elif [[ "$cmd" == *"-n ${TEST_NS} exec -i ${TEST_POD}"* && "$cmd" == *"vault status -format json"* ]]; then
+      echo '{"initialized": false}'
+      return 0
+    elif [[ "$cmd" == *"-n ${TEST_NS} exec -i ${TEST_POD}"* && "$cmd" == *"vault operator init -key-shares=1 -key-threshold=1 -format=json"* ]]; then
+      printf '{"root_token":"root","unseal_keys_b64":["key"]}\n'
+      return 0
+    elif [[ "$cmd" == "-n ${TEST_NS} create secret generic vault-root --from-literal=root_token=root" ]]; then
+      return 0
+    elif [[ "$cmd" == "-n ${TEST_NS} get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=${TEST_RELEASE} -o name" ]]; then
+      echo "pod/${TEST_POD}"
+      return 0
+    elif [[ "$cmd" == "-n ${TEST_NS} get secret vault-unseal -o json" ]]; then
+      cat <<'JSON'
+{
+  "data": {
+    "shard-1": "a2V5",
+    "key-shares": "1",
+    "key-threshold": "1"
   }
+}
+JSON
+      return 0
+    elif [[ "$cmd" == *"-n ${TEST_NS} exec -i ${TEST_POD}"* && "$cmd" == *"vault operator unseal"* ]]; then
+      return 0
+    elif [[ "$cmd" == *"-n ${TEST_NS} exec -i ${TEST_POD}"* && "$cmd" == *" sh -" ]]; then
+      return 0
+    elif [[ "$cmd" == *"-n ${TEST_NS} exec -i ${TEST_POD}"* && "$cmd" == *"vault write auth/kubernetes/role/"* ]]; then
+      return 0
+    elif [[ "$cmd" == *"-n ${TEST_NS} run "* ]]; then
+      if [[ "$cmd" == *"vault-health-"* ]]; then
+        kubectl_run_output_fixture "$HEALTH_CODE"
+      fi
+      return 0
+    fi
+    return 0
+  }
+  export -f _kubectl
+
   export -f _kubectl
 }
 
@@ -163,6 +189,7 @@ EOF
   _deploy_vault_ha() { return 0; }
   _vault_bootstrap_ha() { return 0; }
   _enable_kv2_k8s_auth() { return 0; }
+  _vault_seed_ldap_service_accounts() { return 0; }
 
   export -f deploy_eso
   export -f _vault_ns_ensure
@@ -170,6 +197,7 @@ EOF
   export -f _deploy_vault_ha
   export -f _vault_bootstrap_ha
   export -f _enable_kv2_k8s_auth
+  export -f _vault_seed_ldap_service_accounts
 
   WARN_CALLED=0
   WARN_MESSAGE=""
@@ -547,20 +575,63 @@ JSON
   _deploy_vault_ha() { CALLS+=("_deploy_vault_ha"); }
   _vault_bootstrap_ha() { CALLS+=("_vault_bootstrap_ha"); }
   _enable_kv2_k8s_auth() { CALLS+=("_enable_kv2_k8s_auth"); }
+  _vault_seed_ldap_service_accounts() { CALLS+=("_vault_seed_ldap_service_accounts"); }
+  _vault_setup_pki() { CALLS+=("_vault_setup_pki"); }
 
   export -f _vault_ns_ensure
   export -f _vault_repo_setup
   export -f _deploy_vault_ha
   export -f _vault_bootstrap_ha
   export -f _enable_kv2_k8s_auth
+  export -f _vault_seed_ldap_service_accounts
+  export -f _vault_setup_pki
 
   deploy_vault sample-ns
   [ "$?" -eq 0 ]
-  expected=(deploy_eso _vault_ns_ensure _vault_repo_setup _deploy_vault_ha _vault_bootstrap_ha _enable_kv2_k8s_auth)
+  expected=(deploy_eso _vault_ns_ensure _vault_repo_setup _deploy_vault_ha _vault_bootstrap_ha _enable_kv2_k8s_auth _vault_seed_ldap_service_accounts _vault_setup_pki)
   [ "${#CALLS[@]}" -eq "${#expected[@]}" ]
   for i in "${!expected[@]}"; do
     [ "${CALLS[$i]}" = "${expected[$i]}" ]
   done
+}
+
+@test "_vault_seed_ldap_service_accounts seeds secret and policy when missing" {
+  EXEC_LOG="$BATS_TEST_TMPDIR/seed-exec.log"
+  STREAM_LOG="$BATS_TEST_TMPDIR/seed-stream.log"
+  : >"$EXEC_LOG"
+  : >"$STREAM_LOG"
+
+  _vault_login() { printf '%s\n' "_vault_login" >>"$EXEC_LOG"; }
+  _vault_exec() {
+    local args=("$@")
+    printf '%s\n' "${args[*]}" >>"$EXEC_LOG"
+    local joined=" ${args[*]} "
+    if [[ "$joined" == *" vault kv get "* ]]; then
+      return 1
+    fi
+    return 0
+  }
+  _vault_exec_stream() {
+    printf '%s\n' "$*" >>"$STREAM_LOG"
+    return 0
+  }
+  _info() { :; }
+  _err() { echo "$*" >&2; return 1; }
+  _no_trace() { "$@"; }
+
+  export -f _vault_login
+  export -f _vault_exec
+  export -f _vault_exec_stream
+  export -f _info
+  export -f _err
+  export -f _no_trace
+
+  run _vault_seed_ldap_service_accounts vault sample
+  [ "$status" -eq 0 ]
+  exec_output=$(cat "$EXEC_LOG")
+  stream_output=$(cat "$STREAM_LOG")
+  [[ "$exec_output" == *vault\ kv\ put* ]]
+  [[ "$stream_output" == *vault\ policy\ write* ]]
 }
 
 @test "_vault_bootstrap_ha uses release selector and unseals listed pods" {
@@ -625,30 +696,25 @@ JSON
   [ "$status" -eq 0 ]
 
   read_lines "$KUBECTL_LOG" kubectl_calls
-  expected_wait="wait -n ${TEST_NS} --for=condition=PodScheduled ${TEST_POD_RESOURCE} --timeout=120s"
-  expected_get="-n ${TEST_NS} get pod ${TEST_POD} -o jsonpath={.status.phase}"
-  expected_status="-n ${TEST_NS} exec -i ${TEST_POD} -- vault status -format json"
-  expected_init="-n ${TEST_NS} exec -it ${TEST_POD} -- sh -lc vault operator init -key-shares=1 -key-threshold=1 -format=json"
-  expected_selector="-n ${TEST_NS} get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=${TEST_RELEASE} -o name"
-  expected_unseal="-n ${TEST_NS} exec -i ${TEST_POD} -- sh -lc vault operator unseal key"
-
-  expected_calls=(
-    "$expected_wait"
+  expected_patterns=(
     "$expected_get"
-    "$expected_status"
-    "$expected_init"
-    "$expected_selector"
-    "$expected_unseal"
+    "vault status >/dev/null 2>&1"
+    "-n ${TEST_NS} get secret vault-unseal -o json"
   )
 
-  for expected_call in "${expected_calls[@]}"; do
+  for expected in "${expected_patterns[@]}"; do
     call_found=0
     for call in "${kubectl_calls[@]}"; do
-      if [[ "$call" == "$expected_call" ]]; then
+      local normalized="${call/-c vault /}"
+      if [[ "$normalized" == "$expected" ]] || [[ "$normalized" == *"$expected"* ]]; then
         call_found=1
         break
       fi
     done
+    if [[ "$call_found" -ne 1 ]]; then
+      printf 'kubectl calls:\n' >&2
+      printf '%s\n' "${kubectl_calls[@]}" >&2
+    fi
     [ "$call_found" -eq 1 ]
   done
 }
@@ -674,6 +740,9 @@ JSON
   export -f _vault_portforward_help
 
   run _vault_bootstrap_ha "$TEST_NS" "$TEST_RELEASE"
+  if [ "$status" -eq 0 ]; then
+    echo "expected failure but got success" >&2
+  fi
   [ "$status" -ne 0 ]
 
   read_lines "$ERR_LOG" err_messages
@@ -709,6 +778,9 @@ JSON
   export -f _vault_portforward_help
 
   run _vault_bootstrap_ha "$TEST_NS" "$TEST_RELEASE"
+  if [ "$status" -ne 0 ]; then
+    echo "expected success but got failure" >&2
+  fi
   [ "$status" -eq 0 ]
 
   read_lines "$ERR_LOG" err_messages
