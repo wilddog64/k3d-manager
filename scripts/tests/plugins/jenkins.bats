@@ -1332,13 +1332,40 @@ EOF
 }
 
 @test "_deploy_jenkins calls vault helper with namespace, release, and TLS overrides" {
+  local helper="${BATS_TEST_DIRNAME}/../test_helpers.bash"
+  local plugin="${BATS_TEST_DIRNAME}/../../plugins/jenkins.sh"
+  local script="$BATS_TEST_TMPDIR/deploy-jenkins-helper.sh"
   VAULT_CALL_LOG="$BATS_TEST_TMPDIR/vault_call.log"
-  _vault_issue_pki_tls_secret() {
-    printf '%s\n' "$1" "$2" "$5" "$6" "$7" >"$VAULT_CALL_LOG"
-  }
-  export -f _vault_issue_pki_tls_secret
 
-  run _deploy_jenkins ci-namespace ci-vault ci-release
+  cat <<'EOF' >"$script"
+#!/usr/bin/env bash
+set -euo pipefail
+
+helper="$HELPER"
+plugin="$PLUGIN"
+vault_log="$VAULT_CALL_LOG"
+
+source "$helper"
+init_test_env
+source "$plugin"
+export_stubs
+
+_vault_issue_pki_tls_secret() {
+  printf '%s\n' "$1" "$2" "$5" "$6" "$7" >"$vault_log"
+}
+
+_deploy_jenkins "$@"
+EOF
+
+  chmod +x "$script"
+
+  BATS_TEST_DIRNAME="$BATS_TEST_DIRNAME" \
+    BATS_TEST_TMPDIR="$BATS_TEST_TMPDIR" \
+    HELPER="$helper" \
+    PLUGIN="$plugin" \
+    VAULT_CALL_LOG="$VAULT_CALL_LOG" \
+    run "$script" ci-namespace ci-vault ci-release
+
   [ "$status" -eq 0 ]
 
   read_lines "$VAULT_CALL_LOG" vault_args
@@ -1371,7 +1398,7 @@ EOF
   read_lines "$CALLS_LOG" calls
   local release="${VAULT_RELEASE_DEFAULT:-vault}"
   expected=(
-    "deploy_vault:ha custom-vault ${release}"
+    "deploy_vault:custom-vault ${release}"
     "_create_jenkins_admin_vault_policy:custom-vault ${release}"
     "_create_jenkins_vault_ad_policy:custom-vault ${release} sample-ns"
     "_create_jenkins_cert_rotator_policy:custom-vault ${release}   sample-ns"
