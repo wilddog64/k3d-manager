@@ -1614,68 +1614,95 @@ EOF
   unset JENKINS_CERT_ROTATOR_NAME
   unset JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT
   unset JENKINS_CERT_ROTATOR_SCHEDULE
+  local helper="${BATS_TEST_DIRNAME}/../test_helpers.bash"
+  local plugin="${BATS_TEST_DIRNAME}/../../plugins/jenkins.sh"
+  local script="$BATS_TEST_TMPDIR/jenkins-rotator-defaults.sh"
+  local out_kubectl="$BATS_TEST_TMPDIR/rotator-kubectl.log"
+  local capture_dir="$BATS_TEST_TMPDIR/rotator-manifests"
+  mkdir -p "$capture_dir"
 
-  ROTATOR_CAPTURE_DIR="$BATS_TEST_TMPDIR/rotator-manifests"
-  mkdir -p "$ROTATOR_CAPTURE_DIR"
+  cat <<'EOF' >"$script"
+#!/usr/bin/env bash
+set -euo pipefail
 
-  _kubectl() {
-    local original=("$@")
-    while [[ $# -gt 0 ]]; do
-      case "$1" in
-        --no-exit|--quiet|--prefer-sudo|--require-sudo)
-          shift
-          ;;
-        --)
-          shift
-          original=("$@")
-          break
-          ;;
-        *)
-          shift
-          ;;
-      esac
-    done
+helper="$HELPER"
+plugin="$PLUGIN"
+capture_dir="$ROTATOR_CAPTURE_DIR"
+out_kubectl="$OUT_KUBECTL"
 
-    printf '%s\n' "${original[*]}" >> "$KUBECTL_LOG"
+source "$helper"
+init_test_env
+source "$plugin"
+export_stubs
 
-    local dry_run=0 file=""
-    for ((i=0; i<${#original[@]}; i++)); do
-      case "${original[$i]}" in
-        --dry-run=client)
-          dry_run=1
-          ;;
-        -f)
-          if (( i + 1 < ${#original[@]} )); then
-            file="${original[$((i + 1))]}"
-          fi
-          ;;
-      esac
-    done
-
-    if (( dry_run )) && [[ -n "$file" ]]; then
-      local dest="$ROTATOR_CAPTURE_DIR/$(basename "$file")"
-      cp "$file" "$dest"
+_kubectl() {
+  local args=("$@")
+  local filtered=()
+  local passthrough=0
+  for arg in "${args[@]}"; do
+    if (( passthrough )); then
+      filtered+=("$arg")
+      continue
     fi
+    case "$arg" in
+      --no-exit|--quiet|--prefer-sudo|--require-sudo)
+        ;;
+      --)
+        passthrough=1
+        ;;
+      *)
+        filtered+=("$arg")
+        ;;
+    esac
+  done
 
-    local rc=0
-    if ((${#KUBECTL_EXIT_CODES[@]})); then
-      rc=${KUBECTL_EXIT_CODES[0]}
-      KUBECTL_EXIT_CODES=("${KUBECTL_EXIT_CODES[@]:1}")
-    fi
+  printf '%s\n' "${filtered[*]}" >> "$KUBECTL_LOG"
 
-    return "$rc"
-  }
+  local dry_run=0 file=""
+  for ((i=0; i<${#filtered[@]}; i++)); do
+    case "${filtered[$i]}" in
+      --dry-run=client)
+        dry_run=1
+        ;;
+      -f)
+        if (( i + 1 < ${#filtered[@]} )); then
+          file="${filtered[$((i + 1))]}"
+        fi
+        ;;
+    esac
+  done
 
-  export -f _kubectl
+  if (( dry_run )) && [[ -n "$file" ]]; then
+    cp "$file" "$capture_dir/$(basename "$file")"
+  fi
 
-  _vault_issue_pki_tls_secret() { :; }
-  export -f _vault_issue_pki_tls_secret
+  local rc=0
+  if ((${#KUBECTL_EXIT_CODES[@]})); then
+    rc=${KUBECTL_EXIT_CODES[0]}
+    KUBECTL_EXIT_CODES=("${KUBECTL_EXIT_CODES[@]:1}")
+  fi
+  return "$rc"
+}
 
-  run _deploy_jenkins sample-ns
+_vault_issue_pki_tls_secret() { :; }
+
+JENKINS_SKIP_TLS=1 _deploy_jenkins sample-ns
+cp "$KUBECTL_LOG" "$out_kubectl"
+EOF
+
+  chmod +x "$script"
+
+  run env BATS_TEST_DIRNAME="$BATS_TEST_DIRNAME" \
+      BATS_TEST_TMPDIR="$BATS_TEST_TMPDIR" \
+      HELPER="$helper" \
+      PLUGIN="$plugin" \
+      OUT_KUBECTL="$out_kubectl" \
+      ROTATOR_CAPTURE_DIR="$capture_dir" \
+      "$script"
   [ "$status" -eq 0 ]
 
   local rotator_file
-  rotator_file=$(find "$ROTATOR_CAPTURE_DIR" -maxdepth 1 -type f -name 'jenkins-cert-rotator*' -print -quit)
+  rotator_file=$(find "$capture_dir" -maxdepth 1 -type f -name 'jenkins-cert-rotator*' -print -quit)
   [[ -n "$rotator_file" ]]
   [[ -s "$rotator_file" ]]
   grep -q 'kind: CronJob' "$rotator_file"
