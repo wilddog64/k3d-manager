@@ -1852,6 +1852,10 @@ EOF
       TARGET_NS="$random_ns" \
       OUT_KUBECTL="$out_kubectl" \
       "$script"
+  if [ "$status" -ne 0 ]; then
+    echo "$output" >&2
+    cat "$out_kubectl" >&2 || true
+  fi
   [ "$status" -eq 0 ]
 
   local vs_file
