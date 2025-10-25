@@ -858,14 +858,24 @@ function _vault_login() {
       _err "[vault] root token secret vault-root missing in ${ns}"
    fi
 
-   token=$(_no_trace bash -c 'printf %s "$1" | base64 -d 2>/dev/null' _ "$token_b64")
-   if [[ -z "$token" ]]; then
-      _err "[vault] unable to decode root token from secret vault-root"
-   fi
+  token=$(_no_trace bash -c 'printf %s "$1" | base64 -d 2>/dev/null' _ "$token_b64")
+  if [[ -z "$token" ]]; then
+     _err "[vault] unable to decode root token from secret vault-root"
+  fi
+  token=${token//$'\r'/}
+  token=${token//$'\n'/}
+  if [[ -z "$token" ]]; then
+      _err "[vault] decoded root token is empty for namespace ${ns}"
+  fi
 
-   if ! printf '%s' "$token" | _no_trace _vault_exec_stream --no-exit "$ns" "$release" -- sh -lc "vault login - >/dev/null 2>&1"; then
-      _err "[vault] failed to login to ${release} in namespace ${ns}"
-   fi
+  local login_rc=0
+  local login_output=""
+  login_output=$(_no_trace _vault_exec_stream --no-exit "$ns" "$release" -- env VAULT_TOKEN="$token" vault token lookup -format=json 2>&1) || login_rc=$?
+  if (( login_rc != 0 )); then
+      login_output=${login_output//$'\n'/ }
+      login_output=${login_output//$'\r'/ }
+      _err "[vault] failed to login to ${release} in namespace ${ns}: ${login_output:-unknown error}"
+  fi
 }
 
 function _vault_policy_exists() {
