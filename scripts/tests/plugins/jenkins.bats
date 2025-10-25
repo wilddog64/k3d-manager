@@ -1431,11 +1431,53 @@ EOF
   : > "$WAIT_LOG"
   _wait_for_jenkins_ready() { echo "called" >> "$WAIT_LOG"; }
 
-  KUBECTL_EXIT_CODES=(1)
-  export JENKINS_DEPLOY_RETRIES=1
+  local helper="${BATS_TEST_DIRNAME}/../test_helpers.bash"
+  local plugin="${BATS_TEST_DIRNAME}/../../plugins/jenkins.sh"
+  local script="$BATS_TEST_TMPDIR/deploy-jenkins-fail.sh"
 
-  run --separate-stderr deploy_jenkins failing-ns
-  unset JENKINS_DEPLOY_RETRIES
+  cat <<'EOF' >"$script"
+#!/usr/bin/env bash
+set -euo pipefail
+
+helper="$HELPER"
+plugin="$PLUGIN"
+wait_log="$WAIT_LOG"
+
+source "$helper"
+init_test_env
+source "$plugin"
+export_stubs
+
+deploy_vault() { :; }
+_create_jenkins_admin_vault_policy() { :; }
+_create_jenkins_vault_ad_policy() { :; }
+_create_jenkins_cert_rotator_policy() { :; }
+_create_jenkins_namespace() { :; }
+_create_jenkins_pv_pvc() { :; }
+_ensure_jenkins_cert() { :; }
+_vault_issue_pki_tls_secret() { :; }
+
+_wait_for_jenkins_ready() { echo "called" >> "$wait_log"; }
+
+KUBECTL_EXIT_CODES=(1)
+
+set +e
+set +u
+JENKINS_DEPLOY_RETRIES=1 deploy_jenkins "$@"
+rc=$?
+set -e
+set -u
+exit "$rc"
+EOF
+
+  chmod +x "$script"
+
+  BATS_TEST_DIRNAME="$BATS_TEST_DIRNAME" \
+    BATS_TEST_TMPDIR="$BATS_TEST_TMPDIR" \
+    HELPER="$helper" \
+    PLUGIN="$plugin" \
+    WAIT_LOG="$WAIT_LOG" \
+    run --separate-stderr "$script" failing-ns
   [ "$status" -eq 1 ]
   [[ "$stderr" == *"Jenkins deployment failed"* ]]
   [[ ! -s "$WAIT_LOG" ]]
