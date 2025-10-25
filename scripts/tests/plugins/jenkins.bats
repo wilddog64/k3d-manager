@@ -1861,11 +1861,11 @@ EOF
 
   [[ -n "$vs_file" ]]
   [[ -n "$dr_file" ]]
-  grep -q "namespace: "$random_ns"" "$vs_file"
+  grep -Eq "namespace: \"?$random_ns\"?" "$vs_file"
   grep -q '  hosts:' "$vs_file"
   grep -q '    - jenkins.dev.local.me' "$vs_file"
   grep -q '    - jenkins.dev.k3d.internal' "$vs_file"
   grep -q "jenkins.$random_ns.svc.cluster.local" "$vs_file"
-  grep -q "namespace: "$random_ns"" "$dr_file"
+  grep -Eq "namespace: \"?$random_ns\"?" "$dr_file"
   grep -q "jenkins.$random_ns.svc.cluster.local" "$dr_file"
 }
