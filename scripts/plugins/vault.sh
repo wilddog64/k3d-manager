@@ -29,6 +29,127 @@ fi
 command -v _info >/dev/null 2>&1 || _info() { printf '%s\n' "$*" >&2; }
 command -v _warn >/dev/null 2>&1 || _warn() { printf '%s\n' "$*" >&2; }
 
+declare -Ag _VAULT_CONTAINER_CACHE=()
+
+function __vault_exec_kubectl() {
+   local use_container="${1:-0}" ns="${2:-$VAULT_NS_DEFAULT}" release="${3:-$VAULT_RELEASE_DEFAULT}"
+   shift 3
+   local -a cmd_args=("$@")
+   local output rc
+   output=$(_kubectl "${cmd_args[@]}" 2>&1)
+   rc=$?
+   if (( use_container )) && (( rc != 0 )) && [[ "$output" == *"container not found"* ]]; then
+      local -a fallback=()
+      local skip_next=0 past_double_dash=0 removed=0
+      for arg in "${cmd_args[@]}"; do
+         if (( skip_next )); then
+            skip_next=0
+            continue
+         fi
+         if (( !past_double_dash )) && [[ "$arg" == "--" ]]; then
+            past_double_dash=1
+         fi
+         if (( !past_double_dash )) && [[ "$arg" == "-c" ]] && (( !removed )); then
+            skip_next=1
+            removed=1
+            continue
+         fi
+         fallback+=("$arg")
+      done
+      output=$(_kubectl "${fallback[@]}" 2>&1)
+      rc=$?
+      if (( rc == 0 )); then
+         _VAULT_CONTAINER_CACHE["${ns}/${release}"]=""
+      fi
+   fi
+   printf '%s' "$output"
+   return $rc
+}
+
+function _vault_container_name() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local key="${ns}/${release}"
+
+   if [[ "${VAULT_CONTAINER_NAME_OVERRIDE+x}" == x ]]; then
+      local override="${VAULT_CONTAINER_NAME_OVERRIDE}"
+      _VAULT_CONTAINER_CACHE["${key}"]="$override"
+      printf '%s\n' "$override"
+      return 0
+   fi
+
+   if [[ -n "${_VAULT_CONTAINER_CACHE[$key]:-}" ]]; then
+      printf '%s\n' "${_VAULT_CONTAINER_CACHE[$key]}"
+      return 0
+   fi
+
+   local pod="${release}-0"
+   local name=""
+   name=$(_kubectl --no-exit -n "$ns" get pod "$pod" -o jsonpath='{.spec.containers[0].name}' 2>/dev/null || true)
+   if [[ -z "$name" ]]; then
+      name="vault"
+   fi
+   _VAULT_CONTAINER_CACHE[$key]="$name"
+   printf '%s\n' "$name"
+}
+
+function _vault_exec_stream() {
+   local kflags=()
+   local pod_override=""
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         --no-exit|--prefer-sudo|--require-sudo)
+            kflags+=("$1")
+            shift
+            ;;
+         --pod)
+            pod_override="${2:-}"
+            shift 2
+            ;;
+         --pod=*)
+            pod_override="${1#*=}"
+            shift
+            ;;
+         *)
+            break
+            ;;
+      esac
+   done
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   shift 2
+   local pod="${pod_override:-${release}-0}"
+   local container
+   container=$(_vault_container_name "$ns" "$release")
+   local -a args=("${kflags[@]}" -n "$ns" exec -i "$pod")
+   local use_container=0
+   if [[ -n "$container" ]]; then
+      args+=(-c "$container")
+      use_container=1
+   fi
+   __vault_exec_kubectl "$use_container" "$ns" "$release" "${args[@]}" "$@"
+}
+
+function _vault_exec() {
+  local kflags=()
+  while [[ "${1:-}" == "--no-exit" ]]  || \
+     [[ "${1:-}" == "--prefer-sudo" ]] || \
+     [[ "${1:-}" == "--require-sudo" ]]; do
+     kflags+=("$1")
+     shift
+  done
+
+  local ns="${1:-$VAULT_NS_DEFAULT}" cmd="${2:-sh}" release="${3:-$VAULT_RELEASE_DEFAULT}"
+  local pod="${release}-0"
+  local container
+  container=$(_vault_container_name "$ns" "$release")
+  local -a exec_args=("${kflags[@]}" -n "$ns" exec -i "$pod")
+  local use_container=0
+  if [[ -n "$container" ]]; then
+     exec_args+=(-c "$container")
+     use_container=1
+  fi
+
+  __vault_exec_kubectl "$use_container" "$ns" "$release" "${exec_args[@]}" -- sh -lc "$cmd"
+}
 function _vault_ns_ensure() {
    ns="${1:-$VAULT_NS_DEFAULT}"
 
@@ -251,7 +372,7 @@ function _vault_replay_cached_unseal() {
    local shard="" unsealed=0
    for shard in "${shards[@]}"; do
       local unseal_output=""
-      if ! unseal_output=$(_no_trace _kubectl -n "$cluster_ns" exec -i "$pod" -- vault operator unseal "$shard" 2>&1); then
+      if ! unseal_output=$(_no_trace _vault_exec_stream --no-exit --pod "$pod" "$cluster_ns" "$cluster_release" -- vault operator unseal "$shard" 2>&1); then
          _warn "[vault] unseal command failed while applying cached shards"
          return 1
       fi
@@ -529,6 +650,7 @@ EOF
 
    _vault_bootstrap_ha "$ns" "$release"
    _enable_kv2_k8s_auth "$ns" "$release"
+   _vault_seed_ldap_service_accounts "$ns" "$release"
    _vault_setup_pki "$ns" "$release"
 
    if (( re_unseal )); then
@@ -562,16 +684,16 @@ function _vault_bootstrap_ha() {
       _err "[vault] not deployed in ns=$ns release=$release" >&2
   fi
 
-  if  _run_command --no-exit -- \
-     kubectl --no-exit exec -n "$ns" -it "$leader" -- vault status >/dev/null 2>&1; then
+  if _vault_exec --no-exit "$ns" "vault status >/dev/null 2>&1" "$release"; then
       _vault_cache_unseal_from_secret "$ns" "$release" >/dev/null 2>&1 || true
       _info "[vault] already initialized"
       return 0
   fi
 
   # check if vault sealed or not
-  if _run_command --no-exit -- \
-     kubectl exec -n "$ns" -it "$leader" -- vault status 2>&1 | grep -q 'unseal'; then
+  local status_output=""
+  status_output=$(_vault_exec --no-exit "$ns" "vault status 2>&1 || true" "$release")
+  if printf '%s' "$status_output" | grep -q 'unseal'; then
       _vault_cache_unseal_from_secret "$ns" "$release" >/dev/null 2>&1 || true
       _warn "[vault] already initialized (sealed), skipping init"
       return 0
@@ -591,14 +713,15 @@ function _vault_bootstrap_ha() {
          _err "[vault] timeout waiting for $leader to be Running (current=$vault_state)"
       fi
   done
-  local vault_init=$(_kubectl --no-exit -n "$ns" exec -i "$leader" -- vault status -format json | jq -r '.initialized')
+  local vault_init=""
+  vault_init=$(_vault_exec --no-exit "$ns" "vault status -format json" "$release" | jq -r '.initialized')
   if [[ "$vault_init" == "true" ]]; then
      _warn "[vault] already initialized, skipping init"
      return 0
   fi
-  _kubectl -n "$ns" exec -it "$leader" -- \
-     sh -lc 'vault operator init -key-shares=1 -key-threshold=1 -format=json' \
-     > "$jsonfile"
+  if ! _vault_exec "$ns" "vault operator init -key-shares=1 -key-threshold=1 -format=json" "$release" >"$jsonfile"; then
+     _err "[vault] failed to execute vault operator init"
+  fi
 
   local root_token
   local key_shares
@@ -653,8 +776,8 @@ function _vault_bootstrap_ha() {
      pod="${pod#pod/}"
      for (( i=0; i<threshold; i++ )); do
         shard="${unseal_keys[$i]}"
-        _no_trace _kubectl -n "$ns" exec -i "$pod" -- \
-           sh -lc "vault operator unseal $shard" >/dev/null 2>&1
+        _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+           sh -lc "vault operator unseal $shard" >/dev/null 2>&1 || true
      done
      _info "[vault] unsealed $pod"
   done
@@ -726,33 +849,23 @@ function _is_vault_health() {
   return 1
 }
 
-function _vault_exec() {
-
-  local kflags=()
-  while [[ "${1:-}" == "--no-exit" ]]  || \
-     [[ "${1:-}" == "--prefer-sudo" ]] || \
-     [[ "${1:-}" == "--require-sudo" ]]; do
-     kflags+=("$1")
-     shift
-  done
-
-  local ns="${1:-$VAULT_NS_DEFAULT}" cmd="${2:-sh}" release="${3:-$VAULT_RELEASE_DEFAULT}"
-  local pod="${release}-0"
-
-  # this long pipe to check policy exist seems to be complicated but is to
-  # prevent vault login output to leak to user and hide sensitive info from being
-  # shown in the xtrace when that is turned on
-  _kubectl "${kflags[@]}" -n "$ns" exec -i "$pod" -- sh -lc "$cmd"
-}
-
 function _vault_login() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
-   local pod="${release}-0"
+   local token_b64 token=""
 
-   _kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.root_token}' | \
-      base64 -d | \
-     _kubectl --no-exit -n "$ns" exec -i "$pod" -- \
-     sh -lc "vault login - >/dev/null 2>&1"
+   token_b64=$(_no_trace _kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null || true)
+   if [[ -z "$token_b64" ]]; then
+      _err "[vault] root token secret vault-root missing in ${ns}"
+   fi
+
+   token=$(_no_trace bash -c 'printf %s "$1" | base64 -d 2>/dev/null' _ "$token_b64")
+   if [[ -z "$token" ]]; then
+      _err "[vault] unable to decode root token from secret vault-root"
+   fi
+
+   if ! printf '%s' "$token" | _no_trace _vault_exec_stream --no-exit "$ns" "$release" -- sh -lc "vault login - >/dev/null 2>&1"; then
+      _err "[vault] failed to login to ${release} in namespace ${ns}"
+   fi
 }
 
 function _vault_policy_exists() {
@@ -790,7 +903,7 @@ function _vault_set_eso_reader() {
 
   _vault_login "$ns" "$release"
   # kubernetes auth so no token stored in k8s
-  cat <<'SH' | _no_trace _kubectl -n "$ns" exec -i "$pod" -- \
+  cat <<'SH' | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
     sh -
 set -e
 vault secrets enable -path=secret kv-v2 || true
@@ -803,7 +916,7 @@ vault write auth/kubernetes/config \
 SH
 
   # create a policy -- eso-reader
-  cat <<'HCL' | _kubectl -n "$ns" exec -i "$pod" -- \
+  cat <<'HCL' | _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
     vault policy write eso-reader -
      # file: eso-reader.hcl
      # read any keys under eso/*
@@ -814,7 +927,7 @@ SH
 HCL
 
   # map ESO service account to the policy
-  _kubectl -n "$ns" exec -i "$pod" -- \
+  _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
     vault write auth/kubernetes/role/eso-reader \
       bound_service_account_names="$eso_sa" \
       bound_service_account_namespaces="$eso_ns" \
@@ -835,7 +948,7 @@ function _vault_set_eso_writer() {
   fi
 
   # create a policy -- eso-writer
-  cat <<'HCL' | _kubectl -n "$ns" exec -i "$pod" -- sh - \
+  cat <<'HCL' | _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- sh - \
     vault policy write eso-writer
      # file: eso-writer.hcl
      path "secret/data/eso/*"      { capabilities = ["create","update","read"] }
@@ -844,7 +957,7 @@ function _vault_set_eso_writer() {
 HCL
 
   # map ESO service account to the policy
-  _kubectl -n "$ns" exec -i "$pod" -- \
+  _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
     sh - \
     vault write auth/kubernetes/role/eso-writer \
       bound_service_account_names="$eso_sa" \
@@ -867,7 +980,7 @@ function _vault_set_eso_init_jenkins_writer() {
 
   # create a policy -- eso-writer
   _vault_login "$ns" "$release"
-  cat <<'HCL' | _no_trace _kubectl -n "$ns" exec -i "$pod" -- \
+  cat <<'HCL' | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
     vault policy write eso-init-jenkins-writer -
      # file: eso-writer.hcl
      path "secret/data/eso/jenkins-admin"     { capabilities = ["create","update","read"] }
@@ -876,7 +989,7 @@ function _vault_set_eso_init_jenkins_writer() {
 HCL
 
   # map ESO service account to the policy
-  _kubectl -n "$ns" exec -i "$pod" -- \
+  _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
     vault write auth/kubernetes/role/eso-writer \
       bound_service_account_names="$eso_sa" \
       bound_service_account_namespaces="$eso_ns" \
@@ -916,7 +1029,7 @@ function _vault_configure_secret_reader_role() {
         _err "[vault] failed to enable kubernetes auth method"
   fi
 
-  cat <<'SH' | _no_trace _kubectl -n "$ns" exec -i "$pod" -- sh -
+  cat <<'SH' | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- sh -
 set -e
 vault write auth/kubernetes/config \
   token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
@@ -947,8 +1060,10 @@ SH
     parent_prefix="$next_parent"
   done
 
-  printf '%s\n' "$policy_hcl" | _no_trace _kubectl -n "$ns" exec -i "$pod" -- \
-    vault policy write "${policy}" -
+  if ! printf '%s\n' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+    vault policy write "${policy}" -; then
+     _err "[vault] failed to apply policy ${policy}"
+  fi
 
   local token_audience="${K8S_TOKEN_AUDIENCE:-https://kubernetes.default.svc.cluster.local}"
   local role_cmd=""
@@ -956,6 +1071,109 @@ SH
      "$role" "$service_account" "$service_namespace" "$policy" "$token_audience"
 
   _vault_exec "$ns" "$role_cmd" "$release"
+}
+
+function _vault_seed_ldap_service_accounts() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local mount="${LDAP_VAULT_KV_MOUNT:-secret}"
+   local secret_path="${LDAP_JENKINS_SERVICE_ACCOUNT_VAULT_PATH:-ldap/service-accounts/jenkins-admin}"
+   local username="${LDAP_JENKINS_SERVICE_ACCOUNT_USERNAME:-jenkins-admin}"
+   local group_cn="${LDAP_JENKINS_SERVICE_ACCOUNT_GROUP:-it develop}"
+   local username_key="${LDAP_JENKINS_SERVICE_ACCOUNT_USERNAME_KEY:-username}"
+   local password_key="${LDAP_JENKINS_SERVICE_ACCOUNT_PASSWORD_KEY:-password}"
+   local group_key="${LDAP_JENKINS_SERVICE_ACCOUNT_GROUP_KEY:-group_cn}"
+   local policy="${LDAP_JENKINS_SERVICE_ACCOUNT_POLICY:-jenkins-ldap-service-account}"
+   local description="${LDAP_JENKINS_SERVICE_ACCOUNT_DESCRIPTION:-Jenkins LDAP service account}"
+
+   local mount_trim="${mount%/}"
+   local secret_trim="${secret_path#/}"
+   secret_trim="${secret_trim%/}"
+
+   if [[ -z "$mount_trim" ]]; then
+      _err "[vault] KV mount required for LDAP service account seed"
+   fi
+
+   if [[ -z "$secret_trim" ]]; then
+      _err "[vault] LDAP service account path required"
+   fi
+
+   if [[ -z "$policy" ]]; then
+      _err "[vault] LDAP service account policy name required"
+   fi
+
+   local full_path="${mount_trim}/${secret_trim}"
+   local pod="${release}-0"
+
+   _vault_login "$ns" "$release"
+
+   local check_cmd=""
+   printf -v check_cmd 'vault kv get -format=json %q >/dev/null 2>&1' "$full_path"
+
+   local secret_exists=0
+   if _vault_exec --no-exit "$ns" "$check_cmd" "$release" >/dev/null 2>&1; then
+      secret_exists=1
+   fi
+
+   if (( !secret_exists )); then
+      local password=""
+      password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"' 2>/dev/null || true)
+      if [[ -z "$password" ]]; then
+         _err "[vault] failed to generate password for ${full_path}"
+      fi
+
+      local write_cmd=""
+      if [[ -n "$description" ]]; then
+         printf -v write_cmd 'vault kv put %q %s=%q %s=%q %s=%q description=%q' \
+            "$full_path" "$username_key" "$username" "$password_key" "$password" "$group_key" "$group_cn" "$description"
+      else
+         printf -v write_cmd 'vault kv put %q %s=%q %s=%q %s=%q' \
+            "$full_path" "$username_key" "$username" "$password_key" "$password" "$group_key" "$group_cn"
+      fi
+
+      if ! _no_trace _vault_exec "$ns" "$write_cmd" "$release"; then
+         _err "[vault] failed to seed service account secret at ${full_path}"
+      fi
+      _info "[vault] seeded LDAP service account secret ${full_path}"
+   else
+      _info "[vault] service account secret ${full_path} already present; skipping seed"
+   fi
+
+   local data_path="${mount_trim}/data/${secret_trim}"
+   local metadata_path="${mount_trim}/metadata/${secret_trim}"
+   local policy_hcl
+
+   policy_hcl=$(cat <<EOF
+path "${data_path}" {
+  capabilities = ["read"]
+}
+path "${metadata_path}" {
+  capabilities = ["read", "list"]
+}
+EOF
+)
+
+   local parent="${secret_trim%/*}"
+   while [[ -n "$parent" && "$parent" != "$secret_trim" ]]; do
+      local parent_metadata="${mount_trim}/metadata/${parent}"
+      if [[ "$parent_metadata" != "$metadata_path" ]]; then
+         policy_hcl+=$'\n'
+         policy_hcl+=$(cat <<EOF
+path "${parent_metadata}" {
+  capabilities = ["read", "list"]
+}
+EOF
+)
+      fi
+      if [[ "$parent" == "${parent%/*}" ]]; then
+         break
+      fi
+      parent="${parent%/*}"
+   done
+
+   if ! printf '%s\n' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- vault policy write "$policy" -; then
+      _err "[vault] failed to write policy ${policy}"
+   fi
+   _info "[vault] ensured policy ${policy} for ${data_path}"
 }
 
 function _is_vault_pki_mounted() {
