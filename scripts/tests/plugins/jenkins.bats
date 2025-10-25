@@ -120,8 +120,8 @@ EOF
 
 @test "PV/PVC setup" {
   KUBECTL_EXIT_CODES=(1 0)
-  jhp="$SCRIPT_DIR/storage/jenkins_home"
-  echo "JENKINS_HOME_PATH=$jhp"
+  local jhp="$BATS_TEST_TMPDIR/jenkins_home"
+  export JENKINS_HOME_PATH="$jhp"
   rm -rf "$jhp"
   CLUSTER_NAME="testcluster"
   export CLUSTER_NAME
@@ -129,6 +129,7 @@ EOF
   : >"$mount_check_log"
   _jenkins_require_hostpath_mounts() {
     echo "$1" >"$MOUNT_CHECK_LOG"
+    mkdir -p "$JENKINS_HOME_PATH"
     return 0
   }
   export MOUNT_CHECK_LOG="$mount_check_log"
@@ -137,7 +138,8 @@ EOF
   [ "$status" -eq 0 ]
   [[ -d "$jhp" ]]
   read_lines "$KUBECTL_LOG" kubectl_calls
-  [[ "${kubectl_calls[1]}" == apply* ]]
+  [ "${#kubectl_calls[@]}" -eq 1 ]
+  [[ "${kubectl_calls[0]}" == apply* ]]
   read_lines "$mount_check_log" mount_calls
   [ "${mount_calls[0]}" = "$CLUSTER_NAME" ]
 }
@@ -172,13 +174,15 @@ EOF
 
 @test "PV/PVC setup auto-detects cluster" {
   KUBECTL_EXIT_CODES=(1 0)
-  jhp="$SCRIPT_DIR/storage/jenkins_home"
+  local jhp="$BATS_TEST_TMPDIR/jenkins_home"
+  export JENKINS_HOME_PATH="$jhp"
   rm -rf "$jhp"
   unset CLUSTER_NAME
   local mount_check_log="$BATS_TEST_TMPDIR/mount-check.log"
   : >"$mount_check_log"
   _jenkins_require_hostpath_mounts() {
     echo "$1" >"$MOUNT_CHECK_LOG"
+    mkdir -p "$JENKINS_HOME_PATH"
     return 0
   }
   export MOUNT_CHECK_LOG="$mount_check_log"
@@ -207,7 +211,8 @@ EOF
 
 @test "PV/PVC setup aborts when Jenkins mount missing" {
   KUBECTL_EXIT_CODES=(1)
-  jhp="$SCRIPT_DIR/storage/jenkins_home"
+  local jhp="$BATS_TEST_TMPDIR/jenkins_home"
+  export JENKINS_HOME_PATH="$jhp"
   rm -rf "$jhp"
   CLUSTER_NAME="broken"
   export CLUSTER_NAME
