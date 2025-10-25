@@ -229,8 +229,7 @@ EOF
   [[ "$stderr" == *"Update your cluster configuration"* ]]
   [[ "$stderr" == *"create_cluster"* ]]
   read_lines "$KUBECTL_LOG" kubectl_calls
-  [ "${#kubectl_calls[@]}" -eq 1 ]
-  [[ "${kubectl_calls[0]}" == "get pv jenkins-home-pv" ]]
+  [ "${#kubectl_calls[@]}" -eq 0 ]
 }
 
 @test "_create_jenkins_admin_vault_policy stores secret without logging password" {
