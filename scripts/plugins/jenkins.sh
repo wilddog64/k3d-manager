@@ -61,27 +61,31 @@ function _jenkins_resolve_cluster_name() {
 
 function _jenkins_require_hostpath_mounts() {
    local cluster="${1:-}"
+   local host_dir
+   JENKINS_MISSING_HOSTPATH_NODES=""
+
+   host_dir=$(_jenkins_hostpath_dir)
+   mkdir -p "$host_dir"
+
    if [[ -z "$cluster" ]]; then
-      if ! cluster=$(_jenkins_resolve_cluster_name); then
-         echo "[jenkins] unable to determine k3d cluster name; set CLUSTER_NAME or rerun create_cluster" >&2
-         return 1
+      if cluster=$(_jenkins_resolve_cluster_name); then
+         :
+      else
+         _warn "[jenkins] unable to determine k3d cluster name; skipping hostPath mount validation"
+         return 0
       fi
    fi
 
    if ! declare -f _k3d >/dev/null 2>&1; then
-      echo "[jenkins] k3d CLI helper not available; ensure scripts/lib/core.sh is sourced" >&2
-      return 1
+      _warn "[jenkins] k3d CLI helper not available; skipping hostPath mount validation"
+      return 0
    fi
-
-   local host_dir
-   host_dir=$(_jenkins_hostpath_dir)
-   mkdir -p "$host_dir"
 
    local node_output=""
    node_output=$(_k3d node list 2>/dev/null || true)
    if [[ -z "$node_output" ]]; then
-      echo "[jenkins] failed to list k3d nodes; is the cluster running?" >&2
-      return 1
+      _warn "[jenkins] unable to list k3d nodes; skipping hostPath mount validation"
+      return 0
    fi
 
    local -a missing_nodes=()
@@ -467,6 +471,39 @@ function _jenkins_warn_on_cert_rotator_pull_failure() {
    fi
 }
 
+function _jenkins_adopt_admin_secret() {
+   local ns="${1:-jenkins}"
+   local secret="${2:-jenkins}"
+   local release="${3:-jenkins}"
+   local managed_by=""
+   local rel_name=""
+   local rel_ns=""
+
+   if ! _kubectl --no-exit -n "$ns" get secret "$secret" >/dev/null 2>&1; then
+      return 1
+   fi
+
+   managed_by=$(_kubectl --no-exit -n "$ns" get secret "$secret" -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}' 2>/dev/null || true)
+   rel_name=$(_kubectl --no-exit -n "$ns" get secret "$secret" -o jsonpath='{.metadata.annotations.meta\.helm\.sh/release-name}' 2>/dev/null || true)
+   rel_ns=$(_kubectl --no-exit -n "$ns" get secret "$secret" -o jsonpath='{.metadata.annotations.meta\.helm\.sh/release-namespace}' 2>/dev/null || true)
+
+   if [[ "$managed_by" == "Helm" && "$rel_name" == "$release" && "$rel_ns" == "$ns" ]]; then
+      return 0
+   fi
+
+   if ! _kubectl -n "$ns" label secret "$secret" app.kubernetes.io/managed-by=Helm --overwrite; then
+      return 1
+   fi
+   if ! _kubectl -n "$ns" annotate secret "$secret" meta.helm.sh/release-name="$release" --overwrite; then
+      return 1
+   fi
+   if ! _kubectl -n "$ns" annotate secret "$secret" meta.helm.sh/release-namespace="$ns" --overwrite; then
+      return 1
+   fi
+
+   return 0
+}
+
 function _jenkins_running_on_wsl() {
    if declare -f _is_wsl >/dev/null 2>&1; then
       _is_wsl
@@ -599,6 +636,7 @@ function _deploy_jenkins() {
    local helm_repo_url="${JENKINS_HELM_REPO_URL:-$helm_repo_url_default}"
    local helm_chart_ref_default="jenkins/jenkins"
    local helm_chart_ref="${JENKINS_HELM_CHART_REF:-$helm_chart_ref_default}"
+   local admin_secret="${JENKINS_ADMIN_SECRET_NAME:-jenkins}"
 
    local skip_repo_ops=0
    case "$helm_chart_ref" in
@@ -639,9 +677,22 @@ function _deploy_jenkins() {
       _err "Jenkins values file not found: $values_file"
    fi
 
-   _helm upgrade --install jenkins "$helm_chart_ref" \
-      --namespace "$ns" \
-      -f "$values_file"
+   local -a helm_args=(upgrade --install jenkins "$helm_chart_ref" --namespace "$ns" -f "$values_file")
+
+   local helm_rc=0
+   if ! _helm "${helm_args[@]}"; then
+      helm_rc=$?
+      if _jenkins_adopt_admin_secret "$ns" "$admin_secret" "jenkins"; then
+         if _helm "${helm_args[@]}"; then
+            helm_rc=0
+         fi
+      fi
+   fi
+
+   if (( helm_rc != 0 )); then
+      _jenkins_cleanup_and_return "$helm_rc"
+      return "$helm_rc"
+   fi
 
    local vault_pki_secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
    local vault_pki_leaf_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"

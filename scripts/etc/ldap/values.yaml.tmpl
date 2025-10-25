@@ -7,6 +7,10 @@ image:
   pullPolicy: "${LDAP_IMAGE_PULL_POLICY}"
   tag: "${LDAP_IMAGE_TAG}"
 
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
 # Populated by ESO -> Secret (Vault-sourced credentials)
 envFrom:
   - secretRef:
@@ -17,9 +21,12 @@ skip_default_tree_generation: false
 
 mount_ldif_secret:
   enabled: false
-  secretName: ""
+  secretName: "${LDAP_LDIF_SECRET_NAME}"
 
 tls_enabled: true
+
+tls_certificates_from_secret:
+  enabled: false
 
 serviceAccount:
   create: true
@@ -50,8 +57,32 @@ service:
       protocol: UDP
       targetPort: 1636
 
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: "chart-example.local"
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
 podAnnotations:
   sidecar.istio.io/inject: "false"
+
+podSecurityContext:
+  fsGroup: 1001
+
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - NET_BIND_SERVICE
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1001
 
 resources:
   requests:
@@ -59,3 +90,9 @@ resources:
     memory: "${LDAP_REQ_MEM}"
   limits:
     memory: "${LDAP_LIMIT_MEM}"
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
