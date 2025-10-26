@@ -39,3 +39,12 @@ spec:
       remoteRef: { key: ${LDAP_ADMIN_VAULT_PATH}, property: ${LDAP_ADMIN_PASSWORD_KEY} }
     - secretKey: LDAP_CONFIG_PASSWORD
       remoteRef: { key: ${LDAP_ADMIN_VAULT_PATH}, property: ${LDAP_CONFIG_PASSWORD_KEY} }
+    - secretKey: LDAP_BASE_DN
+      remoteRef: { key: ${LDAP_ADMIN_VAULT_PATH}, property: LDAP_BASE_DN }
+    - secretKey: LDAP_ROOT
+      remoteRef: { key: ${LDAP_ADMIN_VAULT_PATH}, property: LDAP_ROOT }
+    - secretKey: LDAP_DOMAIN
+      remoteRef: { key: ${LDAP_ADMIN_VAULT_PATH}, property: LDAP_DOMAIN }
+    - secretKey: LDAP_ORG_NAME
+      remoteRef: { key: ${LDAP_ADMIN_VAULT_PATH}, property: LDAP_ORG_NAME }
+${LDAP_LDIF_EXTERNALSECRET_YAML}

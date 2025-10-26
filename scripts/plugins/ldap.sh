@@ -171,10 +171,51 @@ function _ldap_apply_eso_resources() {
    local rendered
    local api_version
    local default_version="${LDAP_ESO_API_VERSION:-external-secrets.io/v1}"
+   local ldif_block=""
 
    api_version=$(_ldap_detect_eso_api_version) || api_version="$default_version"
    _info "[ldap] using ESO API version ${api_version}"
    export LDAP_ESO_API_VERSION="$api_version"
+
+   if [[ "${LDAP_LDIF_ENABLED:-false}" == "true" && -n "${LDAP_LDIF_VAULT_PATH:-}" ]]; then
+      local ldif_name="${LDAP_LDIF_SECRET_NAME}"
+      local ldif_refresh="${LDAP_LDIF_REFRESH_INTERVAL}"
+      local ldif_secret_key="${LDAP_LDIF_SECRET_KEY}"
+      local ldif_vault_path="${LDAP_LDIF_VAULT_PATH}"
+      local ldif_content_key="${LDAP_LDIF_CONTENT_KEY}"
+      local ldif_remote_property="${LDAP_LDIF_REMOTE_PROPERTY:-content}"
+      local ldif_namespace="${LDAP_NAMESPACE}"
+      local ldif_store="${LDAP_ESO_SECRETSTORE}"
+
+      ldif_block=$(cat <<EOF
+---
+apiVersion: ${api_version}
+kind: ExternalSecret
+metadata:
+  name: ${ldif_name}
+  namespace: ${ldif_namespace}
+spec:
+  refreshInterval: ${ldif_refresh}
+  secretStoreRef:
+    name: ${ldif_store}
+    kind: SecretStore
+  target:
+    name: ${ldif_name}
+    creationPolicy: Owner
+    template:
+      type: Opaque
+  data:
+    - secretKey: ${ldif_secret_key}
+      remoteRef:
+        key: ${ldif_vault_path}
+        property: ${ldif_remote_property}
+EOF
+)
+   else
+      ldif_block=""
+   fi
+   export LDAP_LDIF_EXTERNALSECRET_YAML="$ldif_block"
+
    rendered=$(_ldap_render_template "$tmpl" "ldap-eso") || return 1
    local apply_rc=0
    if ! _kubectl apply -f "$rendered"; then
@@ -193,34 +234,86 @@ function _ldap_seed_admin_secret() {
    local password_key="${LDAP_ADMIN_PASSWORD_KEY:-LDAP_ADMIN_PASSWORD}"
    local config_key="${LDAP_CONFIG_PASSWORD_KEY:-LDAP_CONFIG_PASSWORD}"
    local username="${LDAP_ADMIN_USERNAME:-ldap-admin}"
+   local base_dn="${LDAP_BASE_DN:-dc=${LDAP_DC_PRIMARY:-home},dc=${LDAP_DC_SECONDARY:-org}}"
 
    local full_path="${mount}/${vault_path}"
-
-   if _vault_exec --no-exit "$vault_ns" "vault kv get ${full_path}" "$vault_release" >/dev/null 2>&1; then
-      _info "[ldap] Vault secret ${full_path} already exists; skipping seed"
-      return 0
-   fi
+   local existing_json=""
 
    if ! _vault_exec --no-exit "$vault_ns" "vault status >/dev/null 2>&1" "$vault_release"; then
       _err "[ldap] Vault instance ${vault_ns}/${vault_release} unavailable or sealed; unseal before deploy"
    fi
 
+   if existing_json=$(_vault_exec --no-exit "$vault_ns" "vault kv get -format=json ${full_path}" "$vault_release" 2>/dev/null); then
+      existing_json=${existing_json//$'\r'/}
+   else
+      existing_json=""
+   fi
+
    local admin_password=""
    local config_password=""
-   admin_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
+   local existing_username=""
+
+   if [[ -n "$existing_json" ]]; then
+      existing_username=$(printf '%s' "$existing_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get(sys.argv[1],""))' "$username_key" 2>/dev/null || true)
+      admin_password=$(printf '%s' "$existing_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get(sys.argv[1],""))' "$password_key" 2>/dev/null || true)
+      config_password=$(printf '%s' "$existing_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get(sys.argv[1],""))' "$config_key" 2>/dev/null || true)
+   fi
+
+   local username="${existing_username:-$username}"
+
    if [[ -z "$admin_password" ]]; then
-      _err "[ldap] failed to generate admin password"
+      admin_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
+      if [[ -z "$admin_password" ]]; then
+         _err "[ldap] failed to generate admin password"
+      fi
    fi
 
-   config_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
    if [[ -z "$config_password" ]]; then
-      _err "[ldap] failed to generate config password"
+      config_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
+      if [[ -z "$config_password" ]]; then
+         _err "[ldap] failed to generate config password"
+      fi
    fi
 
-   local script payload
-   printf -v payload '{ "%s": "%s", "%s": "%s", "%s": "%s" }' \
-      "$username_key" "$username" "$password_key" "$admin_password" "$config_key" "$config_password"
+   local domain="${LDAP_DOMAIN}"
+   local root_dn="${LDAP_ROOT}"
+   local bind_dn="${LDAP_BINDDN}"
+   local base_dn_key="${LDAP_BASE_DN_KEY:-LDAP_BASE_DN}"
+   local bind_dn_key="${LDAP_BIND_DN_KEY:-LDAP_BINDDN}"
+   local domain_key="${LDAP_DOMAIN_KEY:-LDAP_DOMAIN}"
+   local root_key="${LDAP_ROOT_KEY:-LDAP_ROOT}"
+   local org_key="${LDAP_ORG_NAME_KEY:-LDAP_ORG_NAME}"
 
+   local payload=""
+   payload=$(USERNAME_KEY="$username_key" USERNAME="$username" \
+      ADMIN_PASS_KEY="$password_key" ADMIN_PASS="$admin_password" \
+      CONFIG_PASS_KEY="$config_key" CONFIG_PASS="$config_password" \
+      BASE_DN_KEY="$base_dn_key" BASE_DN="$base_dn" \
+      BIND_DN_KEY="$bind_dn_key" BIND_DN="$bind_dn" \
+      DOMAIN_KEY="$domain_key" LDAP_DOMAIN_VALUE="$domain" \
+      ROOT_KEY="$root_key" ROOT_DN="$root_dn" \
+      ORG_KEY="$org_key" ORG_NAME="$LDAP_ORG_NAME" \
+      python3 <<'PY'
+import json, os
+data = {
+    os.environ['USERNAME_KEY']: os.environ['USERNAME'],
+    os.environ['ADMIN_PASS_KEY']: os.environ['ADMIN_PASS'],
+    os.environ['CONFIG_PASS_KEY']: os.environ['CONFIG_PASS'],
+    os.environ['BASE_DN_KEY']: os.environ['BASE_DN'],
+    os.environ['BIND_DN_KEY']: os.environ['BIND_DN'],
+    os.environ['DOMAIN_KEY']: os.environ['LDAP_DOMAIN_VALUE'],
+    os.environ['ROOT_KEY']: os.environ['ROOT_DN'],
+   os.environ['ORG_KEY']: os.environ['ORG_NAME'],
+}
+print(json.dumps(data))
+PY
+)
+
+   if [[ -z "$payload" ]]; then
+      _err "[ldap] failed to serialize Vault admin payload"
+   fi
+
+   local script
    printf -v script "cat <<'EOF' | vault kv put %s -\n%s\nEOF" \
       "$full_path" "$payload"
 
@@ -230,6 +323,70 @@ function _ldap_seed_admin_secret() {
    fi
 
    _err "[ldap] unable to seed Vault admin secret ${full_path}"
+}
+
+function _ldap_seed_ldif_secret() {
+   if [[ "${LDAP_LDIF_ENABLED:-false}" != "true" ]]; then
+      return 0
+   fi
+
+   if [[ -z "${LDAP_LDIF_VAULT_PATH:-}" ]]; then
+      _warn "[ldap] LDIF sync enabled but LDAP_LDIF_VAULT_PATH is empty; skipping seed"
+      return 0
+   fi
+
+   local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
+   local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
+   local mount="${LDAP_VAULT_KV_MOUNT:-secret}"
+   local vault_path="${LDAP_LDIF_VAULT_PATH}"
+   local content_key="${LDAP_LDIF_CONTENT_KEY:-content}"
+   local full_path="${mount}/${vault_path}"
+
+   if _vault_exec --no-exit "$vault_ns" "vault kv get ${full_path}" "$vault_release" >/dev/null 2>&1; then
+      _info "[ldap] refreshing Vault LDIF ${full_path}"
+   else
+      _info "[ldap] seeding Vault LDIF ${full_path}"
+   fi
+
+   local base_dn="${LDAP_BASE_DN}"
+   local org_name="${LDAP_ORG_NAME}"
+   local dc_primary="${LDAP_DC_PRIMARY}"
+   local group_ou="${LDAP_GROUP_OU}"
+   local service_ou="${LDAP_SERVICE_OU}"
+   local group_ou_value="${group_ou#*=}"
+   local service_ou_value="${service_ou#*=}"
+
+   local ldif_content
+   ldif_content=$(cat <<EOF
+dn: ${base_dn}
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: ${org_name}
+dc: ${dc_primary}
+
+dn: ${group_ou},${base_dn}
+objectClass: top
+objectClass: organizationalUnit
+ou: ${group_ou_value}
+
+dn: ${service_ou},${base_dn}
+objectClass: top
+objectClass: organizationalUnit
+ou: ${service_ou_value}
+EOF
+)
+
+   local script
+   printf -v script "cat <<'EOF_LDIF_SEED' | vault kv put %s %s=-\n%s\nEOF_LDIF_SEED" \
+      "$full_path" "$content_key" "$ldif_content"
+
+   if _vault_exec --no-exit "$vault_ns" "$script" "$vault_release"; then
+      _info "[ldap] seeded Vault LDIF ${full_path}"
+      return 0
+   fi
+
+   _err "[ldap] unable to seed Vault LDIF ${full_path}"
 }
 
 function _ldap_wait_for_secret() {
@@ -647,13 +804,17 @@ EOF
       return 1
    fi
 
+   if ! _ldap_seed_ldif_secret; then
+      return 1
+   fi
+
    if ! _vault_configure_secret_reader_role \
          "$vault_ns" \
          "$vault_release" \
          "$LDAP_ESO_SERVICE_ACCOUNT" \
          "$namespace" \
          "$LDAP_VAULT_KV_MOUNT" \
-         "$LDAP_ADMIN_VAULT_PATH" \
+         "$LDAP_VAULT_POLICY_PREFIX" \
          "$LDAP_ESO_ROLE"; then
       _err "[ldap] failed to configure Vault role ${LDAP_ESO_ROLE} for namespace ${namespace}"
       return 1
@@ -669,6 +830,13 @@ EOF
    if ! _ldap_wait_for_secret "$namespace" "${LDAP_ADMIN_SECRET_NAME}"; then
       _err "[ldap] Vault-sourced secret ${LDAP_ADMIN_SECRET_NAME} not available"
       return 1
+   fi
+
+   if [[ "${LDAP_LDIF_ENABLED:-false}" == "true" && -n "${LDAP_LDIF_VAULT_PATH:-}" ]]; then
+      if ! _ldap_wait_for_secret "$namespace" "${LDAP_LDIF_SECRET_NAME}"; then
+         _err "[ldap] Vault-sourced LDIF secret ${LDAP_LDIF_SECRET_NAME} not available"
+         return 1
+      fi
    fi
 
    local deploy_rc=0
@@ -691,9 +859,11 @@ EOF
       local service_name="${LDAP_SERVICE_NAME:-${release}-openldap-bitnami}"
       local smoke_port="${LDAP_SMOKE_PORT:-3389}"
       if [[ -x "$smoke_script" ]]; then
-         if ! "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN"; then
+         "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN" || \
             _warn "[ldap] smoke test failed; inspect output above"
-         fi
+      elif [[ -r "$smoke_script" ]]; then
+         bash "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN" || \
+            _warn "[ldap] smoke test failed; inspect output above"
       else
          _warn "[ldap] smoke test helper missing at ${smoke_script}; skipping verification"
       fi

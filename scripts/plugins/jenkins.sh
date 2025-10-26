@@ -115,6 +115,72 @@ _JENKINS_PREV_EXIT_TRAP_HANDLER=""
 _JENKINS_PREV_RETURN_TRAP_CMD=""
 _JENKINS_PREV_RETURN_TRAP_HANDLER=""
 
+function _jenkins_render_template() {
+   local template="${1:?template path required}"
+   local prefix="${2:-jenkins}"
+
+   if [[ ! -r "$template" ]]; then
+      _err "[jenkins] template not found: $template"
+      return 1
+   fi
+
+   local rendered
+   rendered=$(mktemp -t "${prefix}.XXXXXX.yaml") || return 1
+
+   if ! envsubst < "$template" > "$rendered"; then
+      rm -f "$rendered"
+      return 1
+   fi
+
+   printf '%s\n' "$rendered"
+}
+
+function _jenkins_apply_eso_resources() {
+   local ns="${1:-$JENKINS_NAMESPACE}"
+   local tmpl="$JENKINS_CONFIG_DIR/eso.yaml"
+   local rendered
+   local apply_rc=0
+
+   if [[ ! -r "$tmpl" ]]; then
+      _err "[jenkins] ESO template not found: $tmpl"
+      return 1
+   fi
+
+   export JENKINS_ESO_API_VERSION="${JENKINS_ESO_API_VERSION:-external-secrets.io/v1}"
+   rendered=$(_jenkins_render_template "$tmpl" "jenkins-eso") || return 1
+
+   if ! _kubectl apply -f "$rendered"; then
+      apply_rc=$?
+   fi
+   _cleanup_on_success "$rendered"
+   return "$apply_rc"
+}
+
+function _jenkins_wait_for_secret() {
+   local ns="${1:-$JENKINS_NAMESPACE}"
+   local secret="${2:-$JENKINS_ADMIN_SECRET_NAME}"
+   local timeout="${3:-60}"
+   local interval=3
+   local elapsed=0
+
+   if [[ -z "$secret" ]]; then
+      _err "[jenkins] secret name required for wait"
+      return 1
+   fi
+
+   _info "[jenkins] waiting for secret ${ns}/${secret}"
+   while (( elapsed < timeout )); do
+      if _kubectl --no-exit -n "$ns" get secret "$secret" >/dev/null 2>&1; then
+         _info "[jenkins] secret ${ns}/${secret} available"
+         return 0
+      fi
+      sleep "$interval"
+      elapsed=$(( elapsed + interval ))
+   done
+
+   _err "[jenkins] timed out waiting for secret ${ns}/${secret}"
+}
+
 function _jenkins_capture_trap_state() {
    local signal="$1"
    local cmd_var="$2"
@@ -586,11 +652,31 @@ function deploy_jenkins() {
 
    _jenkins_configure_leaf_host_defaults
 
+   deploy_eso
    deploy_vault "$vault_namespace" "$vault_release"
    _create_jenkins_admin_vault_policy "$vault_namespace" "$vault_release"
    _create_jenkins_vault_ad_policy "$vault_namespace" "$vault_release" "$jenkins_namespace"
    _create_jenkins_cert_rotator_policy "$vault_namespace" "$vault_release" "" "" "$jenkins_namespace"
    _create_jenkins_namespace "$jenkins_namespace"
+   if ! _vault_configure_secret_reader_role \
+         "$vault_namespace" \
+         "$vault_release" \
+         "$JENKINS_ESO_SERVICE_ACCOUNT" \
+         "$jenkins_namespace" \
+         "$JENKINS_VAULT_KV_MOUNT" \
+         "$JENKINS_ADMIN_VAULT_PATH" \
+         "$JENKINS_ESO_ROLE"; then
+      _err "[jenkins] failed to configure Vault role ${JENKINS_ESO_ROLE} for namespace ${jenkins_namespace}"
+      return 1
+   fi
+   if ! _jenkins_apply_eso_resources "$jenkins_namespace"; then
+      _err "[jenkins] failed to apply ESO manifests for namespace ${jenkins_namespace}"
+      return 1
+   fi
+   if ! _jenkins_wait_for_secret "$jenkins_namespace" "$JENKINS_ADMIN_SECRET_NAME"; then
+      _err "[jenkins] Vault-sourced secret ${JENKINS_ADMIN_SECRET_NAME} not available"
+      return 1
+   fi
    _create_jenkins_pv_pvc "$jenkins_namespace"
    _ensure_jenkins_cert "$vault_namespace" "$vault_release"
 
@@ -682,9 +768,11 @@ function _deploy_jenkins() {
    local helm_rc=0
    if ! _helm "${helm_args[@]}"; then
       helm_rc=$?
-      if _jenkins_adopt_admin_secret "$ns" "$admin_secret" "jenkins"; then
-         if _helm "${helm_args[@]}"; then
-            helm_rc=0
+      if [[ "$admin_secret" == "jenkins" ]]; then
+         if _jenkins_adopt_admin_secret "$ns" "$admin_secret" "jenkins"; then
+            if _helm "${helm_args[@]}"; then
+               helm_rc=0
+            fi
          fi
       fi
    fi
@@ -909,27 +997,37 @@ function _create_jenkins_admin_vault_policy() {
    local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
    local pod="${vault_release}-0"
 
+   local policy_exists=0
    if _vault_policy_exists "$vault_namespace" "$vault_release" "jenkins-admin"; then
-      _info "Vault policy jenkins-admin already exists, skip"
-      return 0
+      policy_exists=1
    fi
 
-   # create policy once (idempotent)
-   cat <<'HCL' | tee jenkins-admin.hcl | _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-      vault write sys/policies/password/jenkins-admin policy=-
+   if (( ! policy_exists )); then
+      cat <<'HCL' | tee jenkins-admin.hcl | _kubectl -n "$vault_namespace" exec -i "$pod" -- \
+         vault write sys/policies/password/jenkins-admin policy=-
 length = 24
 rule "charset" { charset = "abcdefghijklmnopqrstuvwxyz" }
 rule "charset" { charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" }
 rule "charset" { charset = "0123456789" }
 rule "charset" { charset = "!@#$%^&*()-_=+[]{};:,.?" }
 HCL
+      rm -f jenkins-admin.hcl
+   fi
 
-   cat <<'SCRIPT' | _no_trace _kubectl -n "$vault_namespace" exec -i "$pod" -- sh -
+   local mount_path="${JENKINS_VAULT_KV_MOUNT:-secret}"
+   local secret_path="${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin}"
+   if _vault_exec --no-exit "$vault_namespace" "vault kv get ${mount_path}/${secret_path}" "$vault_release" >/dev/null 2>&1; then
+      _info "[jenkins] Vault secret ${mount_path}/${secret_path} already exists; skipping seed"
+      return 0
+   fi
+
+   local secret_mount_cmd="vault kv put ${mount_path}/${secret_path}"
+   cat <<SCRIPT | _no_trace _kubectl -n "$vault_namespace" exec -i "$pod" -- sh -
       set -euo pipefail
+      jenkins_admin_pass=
       jenkins_admin_pass=$(vault read -field=password sys/policies/password/jenkins-admin/generate)
-      vault kv put secret/eso/jenkins-admin username=jenkins-admin password="$jenkins_admin_pass"
+      ${secret_mount_cmd} username=jenkins-admin password="$jenkins_admin_pass"
 SCRIPT
-   rm -f jenkins-admin.hcl
 }
 
 function _sync_vault_jenkins_admin() {

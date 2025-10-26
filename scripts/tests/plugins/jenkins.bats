@@ -1382,11 +1382,15 @@ EOF
 @test "Full deployment" {
   CALLS_LOG="$BATS_TEST_TMPDIR/calls.log"
   : > "$CALLS_LOG"
+  deploy_eso() { echo "deploy_eso:$*" >> "$CALLS_LOG"; }
   deploy_vault() { echo "deploy_vault:$*" >> "$CALLS_LOG"; }
   _create_jenkins_admin_vault_policy() { echo "_create_jenkins_admin_vault_policy:$*" >> "$CALLS_LOG"; }
   _create_jenkins_vault_ad_policy() { echo "_create_jenkins_vault_ad_policy:$*" >> "$CALLS_LOG"; }
   _create_jenkins_cert_rotator_policy() { echo "_create_jenkins_cert_rotator_policy:$*" >> "$CALLS_LOG"; }
   _create_jenkins_namespace() { echo "_create_jenkins_namespace:$*" >> "$CALLS_LOG"; }
+  _vault_configure_secret_reader_role() { echo "_vault_configure_secret_reader_role:$*" >> "$CALLS_LOG"; }
+  _jenkins_apply_eso_resources() { echo "_jenkins_apply_eso_resources:$*" >> "$CALLS_LOG"; }
+  _jenkins_wait_for_secret() { echo "_jenkins_wait_for_secret:$*" >> "$CALLS_LOG"; }
   _create_jenkins_pv_pvc() { echo "_create_jenkins_pv_pvc:$*" >> "$CALLS_LOG"; }
   _ensure_jenkins_cert() { echo "_ensure_jenkins_cert:$*" >> "$CALLS_LOG"; }
   _deploy_jenkins() { echo "_deploy_jenkins:$*" >> "$CALLS_LOG"; }
@@ -1398,11 +1402,15 @@ EOF
   read_lines "$CALLS_LOG" calls
   local release="${VAULT_RELEASE_DEFAULT:-vault}"
   expected=(
+    "deploy_eso:"
     "deploy_vault:custom-vault ${release}"
     "_create_jenkins_admin_vault_policy:custom-vault ${release}"
     "_create_jenkins_vault_ad_policy:custom-vault ${release} sample-ns"
     "_create_jenkins_cert_rotator_policy:custom-vault ${release}   sample-ns"
     "_create_jenkins_namespace:sample-ns"
+    "_vault_configure_secret_reader_role:custom-vault ${release} ${JENKINS_ESO_SERVICE_ACCOUNT:-eso-jenkins-sa} sample-ns ${JENKINS_VAULT_KV_MOUNT:-secret} ${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin} ${JENKINS_ESO_ROLE:-eso-jenkins-admin}"
+    "_jenkins_apply_eso_resources:sample-ns"
+    "_jenkins_wait_for_secret:sample-ns ${JENKINS_ADMIN_SECRET_NAME:-jenkins}"
     "_create_jenkins_pv_pvc:sample-ns"
     "_ensure_jenkins_cert:custom-vault ${release}"
     "_deploy_jenkins:sample-ns custom-vault ${release}"
@@ -1419,10 +1427,14 @@ EOF
   export_stubs
 
   deploy_vault() { :; }
+  deploy_eso() { :; }
   _create_jenkins_admin_vault_policy() { :; }
   _create_jenkins_vault_ad_policy() { :; }
   _create_jenkins_cert_rotator_policy() { :; }
   _create_jenkins_namespace() { :; }
+  _vault_configure_secret_reader_role() { :; }
+  _jenkins_apply_eso_resources() { :; }
+  _jenkins_wait_for_secret() { :; }
   _create_jenkins_pv_pvc() { :; }
   _ensure_jenkins_cert() { :; }
   _vault_issue_pki_tls_secret() { :; }
@@ -1449,10 +1461,14 @@ source "$plugin"
 export_stubs
 
 deploy_vault() { :; }
+deploy_eso() { :; }
 _create_jenkins_admin_vault_policy() { :; }
 _create_jenkins_vault_ad_policy() { :; }
 _create_jenkins_cert_rotator_policy() { :; }
 _create_jenkins_namespace() { :; }
+_vault_configure_secret_reader_role() { :; }
+_jenkins_apply_eso_resources() { :; }
+_jenkins_wait_for_secret() { :; }
 _create_jenkins_pv_pvc() { :; }
 _ensure_jenkins_cert() { :; }
 _vault_issue_pki_tls_secret() { :; }
@@ -1803,9 +1819,14 @@ init_test_env
 source "$BATS_TEST_DIRNAME/../../plugins/jenkins.sh"
 export_stubs
 deploy_vault() { :; }
+deploy_eso() { :; }
 _create_jenkins_admin_vault_policy() { :; }
 _create_jenkins_vault_ad_policy() { :; }
+_create_jenkins_cert_rotator_policy() { :; }
 _create_jenkins_namespace() { :; }
+_vault_configure_secret_reader_role() { :; }
+_jenkins_apply_eso_resources() { :; }
+_jenkins_wait_for_secret() { :; }
 _create_jenkins_pv_pvc() { :; }
 _ensure_jenkins_cert() { :; }
 _wait_for_jenkins_ready() { :; }

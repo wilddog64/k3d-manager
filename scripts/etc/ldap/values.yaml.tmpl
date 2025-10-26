@@ -15,12 +15,23 @@ fullnameOverride: ""
 envFrom:
   - secretRef:
       name: "${LDAP_ADMIN_SECRET_NAME}"
+extraEnv:
+  - name: LDAP_ROOT
+    value: "${LDAP_ROOT}"
+  - name: LDAP_DOMAIN
+    value: "${LDAP_DOMAIN}"
+  - name: LDAP_BASE_DN
+    value: "${LDAP_BASE_DN}"
+  - name: LDAP_ORG_NAME
+    value: "${LDAP_ORG_NAME}"
+  - name: LDAP_ADMIN_USERNAME
+    value: "${LDAP_ADMIN_USERNAME}"
 
 # Skip Bitnami's sample tree only when a custom LDIF secret is mounted
-skip_default_tree_generation: false
+skip_default_tree_generation: ${LDAP_SKIP_DEFAULT_TREE}
 
 mount_ldif_secret:
-  enabled: false
+  enabled: ${LDAP_LDIF_ENABLED}
   secretName: "${LDAP_LDIF_SECRET_NAME}"
 
 tls_enabled: true

@@ -43,7 +43,7 @@ controller:
     - name: JENKINS_ADMIN_PASS
       valueFrom:
         secretKeyRef:
-          name: jenkins
+          name: jenkins-admin
           key: jenkins-admin-password
     - name: JAVA_OPTS
       value: "-Djenkins.install.runSetupWizard=false"
@@ -53,6 +53,12 @@ controller:
   serviceAccount:
     create: true
     name: jenkins-admin
+
+  admin:
+    createSecret: false
+    existingSecret: jenkins-admin
+    userKey: jenkins-admin-user
+    passwordKey: jenkins-admin-password
 
   podSecurityContext:
     fsGroup: 1000
