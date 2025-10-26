@@ -12,13 +12,13 @@
 - `_create_jenkins_admin_vault_policy` seeds `secret/eso/jenkins-admin`, but no ExternalSecret currently syncs that credential into Jenkins.
 
 ## Plan of Action
-1. **Refit Helm Values**
+1. **Refit Helm Values** — ✅ completed (2025-10-26)
    - Update `scripts/etc/ldap/values.yaml.tmpl` to match the `openldap-bitnami` schema (service port maps, envFrom, LDIF mounts).
    - Introduce placeholders for ESO-synced secrets instead of inline `auth.*` blocks.
-2. **Vault-Sourced Secrets**
+2. **Vault-Sourced Secrets** — ✅ completed (2025-10-26)
    - Define an `ExternalSecret` that reads `${LDAP_ADMIN_VAULT_PATH}` and writes the admin/config passwords into a Kubernetes secret consumed via `envFrom`.
    - Optionally sync bootstrap LDIF content from Vault into a second secret and enable `mount_ldif_secret`.
-3. **Plugin Enhancements**
+3. **Plugin Enhancements** — ✅ completed (2025-10-26)
    - Ensure `deploy_ldap` applies the ESO manifest, seeds/waits for Vault-backed secrets, and then runs the Helm upgrade.
    - Keep generic credential helpers in `scripts/lib/system.sh` for future OCI/private registry use.
    - Extend `deploy_jenkins` so it applies a Jenkins-specific `ExternalSecret` (templated under `scripts/etc/jenkins/`) that maps `secret/eso/jenkins-admin` into the existing `jenkins-admin` Kubernetes secret before running the Helm upgrade; wait for the secret to populate.
@@ -26,6 +26,7 @@
    - Confirm Jenkins/Vault consumers still reference the new secret names.
    - Verify ESO role/serviceaccount configuration aligns with Vault auth.
    - Maintain the current `scripts/etc/jenkins/values.yaml` wiring (`JENKINS_ADMIN_USER/PASS`) so only the secret source changes.
+   - Document verification steps (see README “Verification quickstart”).
 5. **Post-Reboot Unseal Flow**
    - Capture Vault unseal shards locally via the shared secret helpers (Keychain/secret-tool) and provide a helper script to replay them.
    - Document the manual reboot recovery workflow and earmark the interface for a future cloud KMS auto-unseal.

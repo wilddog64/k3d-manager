@@ -41,6 +41,28 @@ Set `CLUSTER_PROVIDER` to select a different backend module:
 ```bash
 CLUSTER_PROVIDER=k3d ./scripts/k3d-manager deploy_cluster
 ```
+
+## Verification quickstart
+
+Once the core add-ons are deployed you can run these spot checks to confirm ESO-backed secrets are in use:
+
+```bash
+# LDAP administrator bind (uses secret/openldap-admin)
+scripts/tests/plugins/openldap.sh            # or rerun scripts/k3d-manager deploy_ldap
+
+# Jenkins credentials (uses secret/eso/jenkins-admin -> secret/jenkins-admin)
+kubectl -n jenkins get secret jenkins-admin \
+  -o jsonpath='{.data.jenkins-admin-password}' | base64 -d
+
+# Optional: verify via Jenkins API inside the controller pod
+POD=$(kubectl -n jenkins get pod -l app.kubernetes.io/component=jenkins-controller \
+      -o jsonpath='{.items[0].metadata.name}')
+PASS=$(kubectl -n jenkins get secret jenkins-admin -o jsonpath='{.data.jenkins-admin-password}' | base64 -d)
+kubectl -n jenkins exec "$POD" -c jenkins -- \
+  curl -fsS -u "jenkins-admin:$PASS" http://localhost:8080/user/jenkins-admin/api/json
+```
+
+The first command exercises the OpenLDAP deployment (the helper prints a warning if `ldapsearch` is missing); the second returns the Vault-synchronised Jenkins admin password which you can use to sign in via the UI. The final command shows an HTTP 200 when authentication succeeds.
 ## Using k3s clusters
 
 The helper scripts in this repository now understand a `k3s` provider in addition
