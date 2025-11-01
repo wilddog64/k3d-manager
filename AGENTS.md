@@ -9,6 +9,7 @@ Purpose: a tiny, one‑page guide for asking Codex CLI for small, safe, repo‑a
 * Never invent secrets; use `${PLACEHOLDER}`.
 * LF newlines only; no CRLF.
 * Shell blocks: no inline comments unless asked.
+* Please use plain text instead of icon for status check or anything that required status
 
 ## What to Provide
 
