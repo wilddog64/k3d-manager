@@ -51,18 +51,6 @@ No diff headers or commentary. LF newlines only.
 * Keep one problem per session.
 * Summarize long threads before continuing (short bullet recap).
 
-## Safety Defaults for Shell
-
-When you must add a function:
-
-```
-set -Eeuo pipefail
-trap 'rc=$?; echo "error:$rc" >&2' ERR
-TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
-```
-
-Use only if the surrounding file already follows this style.
-
 ## Git Recipes (minimal)
 
 ```
@@ -76,7 +64,6 @@ git worktree add ../wt-fix HEAD
 # Cherry-pick one commit but only for a path (then test)
 git cherry-pick -n <sha> -- scripts/plugins/jenkins.sh || git cherry-pick --abort
 ```
-
 ## House Rules (apply to every answer)
 
 1. Smallest patch; no unsolicited refactors.
