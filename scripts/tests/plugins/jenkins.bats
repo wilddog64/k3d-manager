@@ -236,6 +236,10 @@ EOF
   _vault_policy_exists() { return 1; }
   _kubectl() {
     local cmd="$*"
+    if [[ "$cmd" == *"vault kv get"* ]]; then
+      echo "$cmd" >> "$KUBECTL_LOG"
+      return 1
+    fi
     if [[ "$cmd" == *"vault read -field=password sys/policies/password/jenkins-admin/generate"* ]]; then
       echo "$cmd" >> "$KUBECTL_LOG"
       echo "s3cr3t"
@@ -1408,9 +1412,10 @@ EOF
     "_create_jenkins_vault_ad_policy:custom-vault ${release} sample-ns"
     "_create_jenkins_cert_rotator_policy:custom-vault ${release}   sample-ns"
     "_create_jenkins_namespace:sample-ns"
-    "_vault_configure_secret_reader_role:custom-vault ${release} ${JENKINS_ESO_SERVICE_ACCOUNT:-eso-jenkins-sa} sample-ns ${JENKINS_VAULT_KV_MOUNT:-secret} ${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin} ${JENKINS_ESO_ROLE:-eso-jenkins-admin}"
+    "_vault_configure_secret_reader_role:custom-vault ${release} ${JENKINS_ESO_SERVICE_ACCOUNT:-eso-jenkins-sa} sample-ns ${JENKINS_VAULT_KV_MOUNT:-secret} ${JENKINS_VAULT_POLICY_PREFIX:-eso/jenkins-admin,ldap/openldap-admin} ${JENKINS_ESO_ROLE:-eso-jenkins-admin}"
     "_jenkins_apply_eso_resources:sample-ns"
-    "_jenkins_wait_for_secret:sample-ns ${JENKINS_ADMIN_SECRET_NAME:-jenkins}"
+    "_jenkins_wait_for_secret:sample-ns ${JENKINS_ADMIN_SECRET_NAME:-jenkins-admin}"
+    "_jenkins_wait_for_secret:sample-ns ${JENKINS_LDAP_SECRET_NAME:-jenkins-ldap-config}"
     "_create_jenkins_pv_pvc:sample-ns"
     "_ensure_jenkins_cert:custom-vault ${release}"
     "_deploy_jenkins:sample-ns custom-vault ${release}"

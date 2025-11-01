@@ -298,12 +298,12 @@ import json, os
 data = {
     os.environ['USERNAME_KEY']: os.environ['USERNAME'],
     os.environ['ADMIN_PASS_KEY']: os.environ['ADMIN_PASS'],
-    os.environ['CONFIG_PASS_KEY']: os.environ['CONFIG_PASS'],
-    os.environ['BASE_DN_KEY']: os.environ['BASE_DN'],
-    os.environ['BIND_DN_KEY']: os.environ['BIND_DN'],
-    os.environ['DOMAIN_KEY']: os.environ['LDAP_DOMAIN_VALUE'],
-    os.environ['ROOT_KEY']: os.environ['ROOT_DN'],
-   os.environ['ORG_KEY']: os.environ['ORG_NAME'],
+   os.environ['CONFIG_PASS_KEY']: os.environ['CONFIG_PASS'],
+   os.environ['BASE_DN_KEY']: os.environ['BASE_DN'],
+   os.environ['BIND_DN_KEY']: os.environ['BIND_DN'],
+   os.environ['DOMAIN_KEY']: os.environ['LDAP_DOMAIN_VALUE'],
+   os.environ['ROOT_KEY']: os.environ['ROOT_DN'],
+    os.environ['ORG_KEY']: os.environ['ORG_NAME'],
 }
 print(json.dumps(data))
 PY
@@ -312,6 +312,14 @@ PY
    if [[ -z "$payload" ]]; then
       _err "[ldap] failed to serialize Vault admin payload"
    fi
+
+   export LDAP_VAULT_ADMIN_PASSWORD="$admin_password"
+   export LDAP_VAULT_CONFIG_PASSWORD="$config_password"
+   export LDAP_VAULT_ADMIN_USERNAME="$username"
+   export LDAP_VAULT_BASE_DN="$base_dn"
+   export LDAP_VAULT_DOMAIN="$domain"
+   export LDAP_VAULT_ROOT_DN="$root_dn"
+   export LDAP_VAULT_ORG_NAME="$org_name_value"
 
    local script
    printf -v script "cat <<'EOF' | vault kv put %s -\n%s\nEOF" \
@@ -348,13 +356,26 @@ function _ldap_seed_ldif_secret() {
       _info "[ldap] seeding Vault LDIF ${full_path}"
    fi
 
-   local base_dn="${LDAP_BASE_DN}"
-   local org_name="${LDAP_ORG_NAME}"
+   local base_dn="${LDAP_VAULT_BASE_DN:-${LDAP_BASE_DN}}"
+   local org_name="${LDAP_VAULT_ORG_NAME:-${LDAP_ORG_NAME}}"
    local dc_primary="${LDAP_DC_PRIMARY}"
    local group_ou="${LDAP_GROUP_OU}"
    local service_ou="${LDAP_SERVICE_OU}"
    local group_ou_value="${group_ou#*=}"
    local service_ou_value="${service_ou#*=}"
+   local jenkins_user_dn="uid=jenkins-admin,${service_ou},${base_dn}"
+   local jenkins_password=""
+
+   local jenkins_secret_json=""
+   jenkins_secret_json=$(_vault_exec --no-exit "$vault_ns" "vault kv get -format=json ${mount}/${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin}" "$vault_release" 2>/dev/null || true)
+   if [[ -n "$jenkins_secret_json" ]]; then
+      jenkins_password=$(printf '%s' "$jenkins_secret_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get("password",""))' 2>/dev/null || true)
+   fi
+
+   local group_members="member: ${LDAP_BINDDN}"
+   if [[ -n "$jenkins_password" ]]; then
+      group_members+=$'\n'"member: ${jenkins_user_dn}"
+   fi
 
    local ldif_content
    ldif_content=$(cat <<EOF
@@ -374,8 +395,29 @@ dn: ${service_ou},${base_dn}
 objectClass: top
 objectClass: organizationalUnit
 ou: ${service_ou_value}
+
+dn: cn=jenkins-admins,${group_ou},${base_dn}
+objectClass: top
+objectClass: groupOfNames
+cn: jenkins-admins
+${group_members}
 EOF
 )
+
+   if [[ -n "$jenkins_password" ]]; then
+      ldif_content+=$'\n'
+      ldif_content+=$(cat <<EOF
+dn: ${jenkins_user_dn}
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+cn: Jenkins Admin
+sn: Admin
+uid: jenkins-admin
+userPassword: ${jenkins_password}
+EOF
+)
+   fi
 
    local script
    printf -v script "cat <<'EOF_LDIF_SEED' | vault kv put %s %s=-\n%s\nEOF_LDIF_SEED" \

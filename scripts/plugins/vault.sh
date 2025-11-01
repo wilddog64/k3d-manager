@@ -30,40 +30,66 @@ command -v _info >/dev/null 2>&1 || _info() { printf '%s\n' "$*" >&2; }
 command -v _warn >/dev/null 2>&1 || _warn() { printf '%s\n' "$*" >&2; }
 
 declare -Ag _VAULT_CONTAINER_CACHE=()
+declare -Ag _VAULT_SESSION_TOKENS=()
 
 function __vault_exec_kubectl() {
    local use_container="${1:-0}" ns="${2:-$VAULT_NS_DEFAULT}" release="${3:-$VAULT_RELEASE_DEFAULT}"
    shift 3
    local -a cmd_args=("$@")
    local output rc
-   output=$(_kubectl "${cmd_args[@]}" 2>&1)
-   rc=$?
-   if (( use_container )) && (( rc != 0 )) && [[ "$output" == *"container not found"* ]]; then
-      local -a fallback=()
-      local skip_next=0 past_double_dash=0 removed=0
-      for arg in "${cmd_args[@]}"; do
-         if (( skip_next )); then
-            skip_next=0
-            continue
-         fi
-         if (( !past_double_dash )) && [[ "$arg" == "--" ]]; then
-            past_double_dash=1
-         fi
-         if (( !past_double_dash )) && [[ "$arg" == "-c" ]] && (( !removed )); then
-            skip_next=1
-            removed=1
-            continue
-         fi
-         fallback+=("$arg")
-      done
-      output=$(_kubectl "${fallback[@]}" 2>&1)
+   local retries=0
+   local max_retries=5
+   local container_removed=0
+
+   while :; do
+      output=$(_kubectl "${cmd_args[@]}" 2>&1)
       rc=$?
       if (( rc == 0 )); then
-         _VAULT_CONTAINER_CACHE["${ns}/${release}"]=""
+         if (( container_removed )); then
+            _VAULT_CONTAINER_CACHE["${ns}/${release}"]=""
+         fi
+         printf '%s' "$output"
+         return 0
       fi
-   fi
-   printf '%s' "$output"
-   return $rc
+
+      if [[ "$output" == *"container not found"* ]]; then
+         if (( use_container )) && (( !container_removed )); then
+            local -a fallback=()
+            local skip_next=0 past_double_dash=0 removed=0
+            for arg in "${cmd_args[@]}"; do
+               if (( skip_next )); then
+                  skip_next=0
+                  continue
+               fi
+               if (( !past_double_dash )) && [[ "$arg" == "--" ]]; then
+                  past_double_dash=1
+               fi
+               if (( !past_double_dash )) && [[ "$arg" == "-c" ]] && (( !removed )); then
+                  skip_next=1
+                  removed=1
+                  continue
+               fi
+               fallback+=("$arg")
+            done
+            cmd_args=("${fallback[@]}")
+            use_container=0
+            container_removed=1
+            _VAULT_CONTAINER_CACHE["${ns}/${release}"]=""
+            retries=$((retries + 1))
+            sleep 2
+            continue
+         fi
+
+         if (( retries < max_retries )); then
+            retries=$((retries + 1))
+            sleep 2
+            continue
+         fi
+      fi
+
+      printf '%s' "$output"
+      return $rc
+   done
 }
 
 function _vault_container_name() {
@@ -85,11 +111,14 @@ function _vault_container_name() {
    local pod="${release}-0"
    local name=""
    name=$(_kubectl --no-exit -n "$ns" get pod "$pod" -o jsonpath='{.spec.containers[0].name}' 2>/dev/null || true)
-   if [[ -z "$name" ]]; then
-      name="vault"
+   if [[ -n "$name" ]]; then
+      _VAULT_CONTAINER_CACHE[$key]="$name"
+      printf '%s\n' "$name"
+      return 0
    fi
-   _VAULT_CONTAINER_CACHE[$key]="$name"
-   printf '%s\n' "$name"
+
+   _VAULT_CONTAINER_CACHE[$key]=""
+   printf '\n'
 }
 
 function _vault_exec_stream() {
@@ -119,13 +148,38 @@ function _vault_exec_stream() {
    local pod="${pod_override:-${release}-0}"
    local container
    container=$(_vault_container_name "$ns" "$release")
-   local -a args=("${kflags[@]}" -n "$ns" exec -i "$pod")
+   local -a args=("${kflags[@]}" --quiet -n "$ns" exec -i "$pod")
    local use_container=0
    if [[ -n "$container" ]]; then
       args+=(-c "$container")
       use_container=1
    fi
-   __vault_exec_kubectl "$use_container" "$ns" "$release" "${args[@]}" "$@"
+   local key="${ns}/${release}"
+   local session_token="${_VAULT_SESSION_TOKENS[$key]:-}"
+   if [[ -n "$session_token" ]]; then
+      local -a cmd_args=()
+      local inserted=0
+      if (( $# == 0 )); then
+         cmd_args+=("env" "VAULT_TOKEN=$session_token")
+      else
+         while [[ $# -gt 0 ]]; do
+            local arg="$1"
+            shift
+            if (( !inserted )) && [[ "$arg" == "--" ]]; then
+               cmd_args+=("$arg" "env" "VAULT_TOKEN=$session_token")
+               inserted=1
+               continue
+            fi
+            cmd_args+=("$arg")
+         done
+         if (( !inserted )); then
+            cmd_args=("env" "VAULT_TOKEN=$session_token" "${cmd_args[@]}")
+         fi
+      fi
+      __vault_exec_kubectl "$use_container" "$ns" "$release" "${args[@]}" "${cmd_args[@]}"
+   else
+      __vault_exec_kubectl "$use_container" "$ns" "$release" "${args[@]}" "$@"
+   fi
 }
 
 function _vault_exec() {
@@ -141,14 +195,21 @@ function _vault_exec() {
   local pod="${release}-0"
   local container
   container=$(_vault_container_name "$ns" "$release")
-  local -a exec_args=("${kflags[@]}" -n "$ns" exec -i "$pod")
+  local -a exec_args=("${kflags[@]}" --quiet -n "$ns" exec -i "$pod")
   local use_container=0
   if [[ -n "$container" ]]; then
      exec_args+=(-c "$container")
      use_container=1
   fi
 
-  __vault_exec_kubectl "$use_container" "$ns" "$release" "${exec_args[@]}" -- sh -lc "$cmd"
+  local key="${ns}/${release}"
+  local session_token="${_VAULT_SESSION_TOKENS[$key]:-}"
+  local shell_cmd="$cmd"
+  if [[ -n "$session_token" ]]; then
+     printf -v shell_cmd 'VAULT_TOKEN=%q %s' "$session_token" "$cmd"
+  fi
+
+  __vault_exec_kubectl "$use_container" "$ns" "$release" "${exec_args[@]}" -- sh -lc "$shell_cmd"
 }
 function _vault_ns_ensure() {
    ns="${1:-$VAULT_NS_DEFAULT}"
@@ -303,6 +364,7 @@ function _vault_replay_cached_unseal() {
    local cluster="${cluster_ns}/${cluster_release}"
    local count cached_ok=1
    local -a shards=()
+   local shard_count=0
 
    count=$(_secret_load_data "$service" "${cluster}:count" "$type" 2>/dev/null || true)
    count=${count%$'\r'}
@@ -329,11 +391,11 @@ function _vault_replay_cached_unseal() {
       _warn "[vault] cached shards unavailable for ${cluster}; attempting vault-unseal secret"
       if ! mapfile -t shards < <(_vault_collect_unseal_shards_from_secret "$cluster_ns"); then
          _warn "[vault] unable to read shards from vault-unseal secret in ${cluster_ns}; manual unseal required"
-         return 1
+         return 43
       fi
       if (( ${#shards[@]} == 0 )); then
          _warn "[vault] vault-unseal secret lacks shard data; manual unseal required"
-         return 1
+         return 43
       fi
       _vault_cache_unseal_keys "$cluster_ns" "$cluster_release" "${shards[@]}" >/dev/null 2>&1 || true
       count=${#shards[@]}
@@ -369,20 +431,23 @@ function _vault_replay_cached_unseal() {
    _info "[vault] applying ${count} cached unseal shard(s) to ${cluster}"
    local shard_count=$count
 
-   local shard="" unsealed=0
+   local shard="" unsealed=0 invalid_key=0
    for shard in "${shards[@]}"; do
       local unseal_output=""
-      if ! unseal_output=$(_no_trace _vault_exec_stream --no-exit --pod "$pod" "$cluster_ns" "$cluster_release" -- vault operator unseal "$shard" 2>&1); then
-         _warn "[vault] unseal command failed while applying cached shards"
-         return 1
+      local unseal_rc=0
+      unseal_output=$(_no_trace _vault_exec_stream --no-exit --pod "$pod" "$cluster_ns" "$cluster_release" -- vault operator unseal "$shard" 2>&1) || unseal_rc=$?
+      if (( unseal_rc != 0 )); then
+         _warn "[vault] unseal command returned rc=${unseal_rc}; output:"
+         printf '%s\n' "$unseal_output" >&2
       fi
 
-      if sealed=$(_vault_parse_sealed_from_status "$unseal_output" 2>/dev/null || true); then
-         :
-      else
-         status_json=$(_vault_exec --no-exit "$cluster_ns" "vault status -format=json" "$cluster_release" 2>/dev/null || true)
-         sealed=$(_vault_parse_sealed_from_status "$status_json" 2>/dev/null || true)
+      if [[ "$unseal_output" == *"invalid key"* ]] || [[ "$unseal_output" == *"failed to decrypt keys from storage"* ]]; then
+         invalid_key=1
+         _warn "[vault] detected stale cached shard for ${cluster}; will regenerate"
       fi
+
+      status_json=$(_vault_exec --no-exit "$cluster_ns" "vault status -format=json" "$cluster_release" 2>/dev/null || true)
+      sealed=$(_vault_parse_sealed_from_status "$status_json" 2>/dev/null || true)
 
       if [[ "$sealed" == "false" ]]; then
          unsealed=1
@@ -418,6 +483,9 @@ function _vault_replay_cached_unseal() {
    fi
 
    _warn "[vault] ${cluster} remains sealed after applying cached shards; manual intervention required"
+   if (( invalid_key )); then
+      return 42
+   fi
    return 1
 }
 function _mount_vault_immediate_sc() {
@@ -444,6 +512,118 @@ YAML
          sc="local-path-immediate"
       fi
    fi
+}
+
+function _vault_resolve_data_path() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local default_pvc="data-${release}-0"
+   local pvc_name=""
+   local deadline=$((SECONDS + 60))
+
+   while (( SECONDS < deadline )); do
+      pvc_name=$(_kubectl --no-exit -n "$ns" get pvc "$default_pvc" -o jsonpath='{.metadata.name}' 2>/dev/null || true)
+      if [[ -n "$pvc_name" ]]; then
+         break
+      fi
+      pvc_name=$(_kubectl --no-exit -n "$ns" get pvc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null | grep -E "^data-${release}-[0-9]+$" | head -n1 || true)
+      if [[ -n "$pvc_name" ]]; then
+         break
+      fi
+      sleep 2
+   done
+
+   if [[ -z "$pvc_name" ]]; then
+      return 0
+   fi
+
+   local pv_name=""
+   pv_name=$(_kubectl --no-exit -n "$ns" get pvc "$pvc_name" -o jsonpath='{.spec.volumeName}' 2>/dev/null || true)
+   if [[ -z "$pv_name" ]]; then
+      return 0
+   fi
+
+   local host_path=""
+   host_path=$(_kubectl --no-exit get pv "$pv_name" -o jsonpath='{.spec.local.path}' 2>/dev/null || true)
+   if [[ -z "$host_path" ]]; then
+      return 0
+   fi
+
+   printf '%s' "$host_path"
+}
+
+function _vault_ensure_data_path() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local host_path
+   host_path=$(_vault_resolve_data_path "$ns" "$release")
+   if [[ -z "$host_path" ]]; then
+      return 0
+   fi
+
+   if [[ ! -d "$host_path" ]]; then
+      _info "[vault] creating data directory: $host_path"
+      _run_command --prefer-sudo -- mkdir -p "$host_path"
+   fi
+}
+
+function _vault_reset_data_path() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local host_path backup_path timestamp
+   host_path=$(_vault_resolve_data_path "$ns" "$release")
+   if [[ -z "$host_path" ]]; then
+      _warn "[vault] unable to determine data path for $ns/$release"
+      return 1
+   fi
+
+   if [[ ! -d "$host_path" ]]; then
+      return 0
+   fi
+
+   if [[ "$host_path" != *"vault_data-"* ]]; then
+      _warn "[vault] refusing to reset unexpected data path: $host_path"
+      return 1
+   fi
+
+   timestamp=$(date +%s)
+   backup_path="${host_path}.backup.${timestamp}"
+   _info "[vault] backing up existing data directory to $backup_path"
+   if ! _run_command --soft --prefer-sudo -- mv "$host_path" "$backup_path"; then
+      _warn "[vault] failed to backup existing data directory"
+      return 1
+   fi
+
+   if ! _run_command --soft --prefer-sudo -- mkdir -p "$host_path"; then
+      _warn "[vault] failed to recreate data directory: $host_path"
+      return 1
+   fi
+   return 0
+}
+
+function _vault_restart_pod() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local pod="${release}-0"
+   _kubectl --no-exit -n "$ns" delete pod "$pod" --ignore-not-found=true >/dev/null 2>&1 || true
+}
+
+function _vault_purge_unseal_cache() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local service="k3d-manager-vault-unseal"
+   local type="vault-unseal"
+   local cluster="${ns}/${release}"
+   local count
+
+   count=$(_secret_load_data "$service" "${cluster}:count" "$type" 2>/dev/null || true)
+   count=${count%$'\r'}
+   if [[ "$count" =~ ^[0-9]+$ ]] && (( count > 0 )); then
+      local idx
+      for (( idx=1; idx<=count; idx++ )); do
+         _secret_clear_data "$service" "${cluster}:shard${idx}" "$type" >/dev/null 2>&1 || true
+      done
+      _secret_clear_data "$service" "${cluster}:count" "$type" >/dev/null 2>&1 || true
+   fi
+
+   _kubectl --no-exit -n "$ns" delete secret vault-unseal >/dev/null 2>&1 || true
+   _kubectl --no-exit -n "$ns" delete secret vault-root >/dev/null 2>&1 || true
+   unset _VAULT_SESSION_TOKENS["$cluster"]
 }
 
 function _deploy_vault_ha() {
@@ -473,6 +653,8 @@ YAML
    local -a args=(upgrade --install "$release" hashicorp/vault -n "$ns" -f "$f")
    [[ -n "$chart_version" ]] && args+=("--version" "$chart_version")
    _helm "${args[@]}"
+
+   _vault_ensure_data_path "$ns" "$release"
    trap '$(_cleanup_trap_command "$f")' EXIT TERM
 }
 
@@ -680,114 +862,98 @@ function _is_vault_deployed() {
 function _vault_bootstrap_ha() {
   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
   local leader="${release}-0"
+  _info "[vault] bootstrap sequence starting for ${ns}/${release}"
   if ! _is_vault_deployed "$ns" "$release"; then
       _err "[vault] not deployed in ns=$ns release=$release" >&2
   fi
 
-  if _vault_exec --no-exit "$ns" "vault status >/dev/null 2>&1" "$release"; then
-      _vault_cache_unseal_from_secret "$ns" "$release" >/dev/null 2>&1 || true
-      _info "[vault] already initialized"
-      return 0
-  fi
-
-  # check if vault sealed or not
   local status_output=""
-  status_output=$(_vault_exec --no-exit "$ns" "vault status 2>&1 || true" "$release")
-  if printf '%s' "$status_output" | grep -q 'unseal'; then
-      _vault_cache_unseal_from_secret "$ns" "$release" >/dev/null 2>&1 || true
-      _warn "[vault] already initialized (sealed), skipping init"
-      return 0
+  local sealed_state=""
+  local init_state=""
+  local jsonfile=""
+
+  status_output=$(_vault_exec --no-exit "$ns" "vault status -format=json 2>/dev/null || vault status 2>&1 || true" "$release")
+  sealed_state=$(_vault_parse_sealed_from_status "$status_output" 2>/dev/null || true)
+  init_state=$(printf '%s' "$status_output" | jq -r '.initialized // empty' 2>/dev/null || true)
+
+  local root_secret_present=0
+  if _kubectl --no-exit -n "$ns" get secret vault-root >/dev/null 2>&1; then
+     root_secret_present=1
   fi
 
-  local jsonfile="$(mktemp -t vault-init.XXXXXX.json)";
-  trap '$(_cleanup_trap_command "$jsonfile")' EXIT TERM
-  _kubectl wait -n "$ns" --for=condition=PodScheduled pod/"$leader" --timeout=120s
-  local vault_state=$(_kubectl --no-exit -n "$ns" get pod "$leader" -o jsonpath='{.status.phase}')
-  end_time=$((SECONDS + 120))
-  current_time=$SECONDS
-  while [[ "$vault_state" != "Running" ]]; do
-      echo "[vault] waiting for $leader to be Running (current=$vault_state)"
-      sleep 2
-      vault_state=$(_kubectl --no-exit -n "$ns" get pod "$leader" -o jsonpath='{.status.phase}')
-      if (( current_time >= end_time )); then
-         _err "[vault] timeout waiting for $leader to be Running (current=$vault_state)"
+   if [[ "${init_state,,}" == "true" ]]; then
+      if [[ "${sealed_state,,}" == "true" ]]; then
+         _vault_cache_unseal_from_secret "$ns" "$release" >/dev/null 2>&1 || true
+         local replay_rc
+         _vault_replay_cached_unseal "$ns" "$release" 1
+         replay_rc=$?
+         _info "[vault] cached unseal replay exit=${replay_rc}"
+         if (( replay_rc == 0 )); then
+            _vault_login "$ns" "$release"
+            _info "[vault] already initialized; applied cached unseal shards"
+            return 0
+         fi
+         if (( replay_rc == 42 || replay_rc == 43 )); then
+            if (( replay_rc == 42 )); then
+               _warn "[vault] cached unseal shards rejected; resetting data directory and re-initializing"
+            else
+               _warn "[vault] cached unseal shards missing; resetting data directory and re-initializing"
+            fi
+            _vault_purge_unseal_cache "$ns" "$release"
+            if ! _vault_reset_data_path "$ns" "$release"; then
+               _warn "[vault] failed to reset data directory; manual intervention required"
+               return 1
+            fi
+            _vault_restart_pod "$ns" "$release"
+            jsonfile=$(_vault_operator_init "$ns" "$release")
+            if [[ -z "$jsonfile" || ! -f "$jsonfile" ]]; then
+               _cleanup_on_success "$jsonfile"
+               _err "[vault] operator init did not produce artifacts"
+            fi
+            trap '$(_cleanup_trap_command "$jsonfile")' EXIT TERM
+            _vault_process_init_artifacts "$ns" "$release" "$jsonfile"
+            trap - EXIT TERM
+            _vault_clear_init_json "$jsonfile"
+            _info "[vault] vault data directory reset and cluster re-initialized"
+            return 0
+         fi
+         _warn "[vault] already initialized (sealed) but automatic unseal failed; manual intervention required"
+         return 1
       fi
-  done
-  local vault_init=""
-  vault_init=$(_vault_exec --no-exit "$ns" "vault status -format json" "$release" | jq -r '.initialized')
-  if [[ "$vault_init" == "true" ]]; then
-     _warn "[vault] already initialized, skipping init"
-     return 0
+      if (( !root_secret_present )); then
+         _warn "[vault] root token secret missing; resetting data directory and re-initializing"
+         _vault_purge_unseal_cache "$ns" "$release"
+         if ! _vault_reset_data_path "$ns" "$release"; then
+            _warn "[vault] failed to reset data directory; manual intervention required"
+            return 1
+         fi
+         _vault_restart_pod "$ns" "$release"
+         jsonfile=$(_vault_operator_init "$ns" "$release")
+         if [[ -z "$jsonfile" || ! -f "$jsonfile" ]]; then
+            _cleanup_on_success "$jsonfile"
+            _err "[vault] operator init did not produce artifacts"
+         fi
+         trap '$(_cleanup_trap_command "$jsonfile")' EXIT TERM
+         _vault_process_init_artifacts "$ns" "$release" "$jsonfile"
+         trap - EXIT TERM
+         _vault_clear_init_json "$jsonfile"
+         _info "[vault] vault data directory reset and cluster re-initialized"
+         return 0
+      fi
+      _vault_login "$ns" "$release"
+      _info "[vault] already initialized and unsealed"
+      return 0
+   fi
+
+  jsonfile=$(_vault_operator_init "$ns" "$release")
+  if [[ -z "$jsonfile" || ! -f "$jsonfile" ]]; then
+     _cleanup_on_success "$jsonfile"
+     _err "[vault] operator init did not produce artifacts"
   fi
-  if ! _vault_exec "$ns" "vault operator init -key-shares=1 -key-threshold=1 -format=json" "$release" >"$jsonfile"; then
-     _err "[vault] failed to execute vault operator init"
-  fi
-
-  local root_token
-  local key_shares
-  local key_threshold
-  local -a unseal_keys=()
-  root_token=$(jq -r '.root_token' "$jsonfile")
-  key_shares=$(jq -r '.key_shares' "$jsonfile")
-  key_threshold=$(jq -r '.key_threshold' "$jsonfile")
-  while IFS= read -r shard; do
-     shard=${shard%$'\r'}
-     [[ -z "$shard" ]] && continue
-     unseal_keys+=("$shard")
-  done < <(jq -r '.unseal_keys_b64[]' "$jsonfile")
-
-  if (( ${#unseal_keys[@]} == 0 )); then
-     _err "[vault] no unseal keys returned during init"
-  fi
-
-  if [[ ! "$key_shares" =~ ^[0-9]+$ || $key_shares -le 0 ]]; then
-     key_shares=${#unseal_keys[@]}
-  fi
-
-  if [[ ! "$key_threshold" =~ ^[0-9]+$ || $key_threshold -le 0 ]]; then
-     key_threshold=1
-  fi
-
-  local threshold=$key_threshold
-  if (( threshold > ${#unseal_keys[@]} )); then
-     threshold=${#unseal_keys[@]}
-  fi
-
-  _kubectl --no-exit -n "$ns" delete secret vault-root >/dev/null 2>&1 || true
-  _no_trace _kubectl -n "$ns" create secret generic vault-root \
-     --from-literal=root_token="$root_token"
-
-  local -a shard_literals=(
-     "--from-literal=key-shares=${key_shares}"
-     "--from-literal=key-threshold=${key_threshold}"
-  )
-  local shard_idx
-  for (( shard_idx=0; shard_idx<${#unseal_keys[@]}; shard_idx++ )); do
-     shard_literals+=("--from-literal=shard-$((shard_idx+1))=${unseal_keys[$shard_idx]}")
-  done
-  _kubectl --no-exit -n "$ns" delete secret vault-unseal >/dev/null 2>&1 || true
-  _no_trace _kubectl -n "$ns" create secret generic vault-unseal "${shard_literals[@]}"
-
-  _vault_cache_unseal_keys "$ns" "$release" "${unseal_keys[@]}"
-
-  local i shard
-  # unseal all pods
-  for pod in $(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/name=vault,app.kubernetes.io/instance=${release}" -o name); do
-     pod="${pod#pod/}"
-     for (( i=0; i<threshold; i++ )); do
-        shard="${unseal_keys[$i]}"
-        _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
-           sh -lc "vault operator unseal $shard" >/dev/null 2>&1 || true
-     done
-     _info "[vault] unsealed $pod"
-  done
-
-  if ! _is_vault_health "$ns" "$release" ; then
-     _err "[vault] vault not healthy after init/unseal"
-  else
-     _info "[vault] vault is ready to serve"
-     _vault_portforward_help "$ns" "$release"
-  fi
+  trap '$(_cleanup_trap_command "$jsonfile")' EXIT TERM
+  _vault_process_init_artifacts "$ns" "$release" "$jsonfile"
+  trap - EXIT TERM
+  _vault_clear_init_json "$jsonfile"
 }
 
 function _vault_portforward_help() {
@@ -806,6 +972,126 @@ Then:
   # For HA mode, use stored secret:
   export VAULT_TOKEN="\$(_kubectl -n ${ns} get secret vault-root -o jsonpath='{.data.root_token}' | base64 -d)"
 EOF
+}
+
+function _vault_operator_init() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local leader="${release}-0"
+   local jsonfile
+
+   jsonfile=$(mktemp -t vault-init.XXXXXX.json)
+
+   local pod_deadline=$((SECONDS + 180))
+   while (( SECONDS < pod_deadline )); do
+      if _kubectl --no-exit -n "$ns" get pod "$leader" >/dev/null 2>&1; then
+         break
+      fi
+      sleep 2
+   done
+   if (( SECONDS >= pod_deadline )); then
+      _cleanup_on_success "$jsonfile"
+      _err "[vault] pod $leader did not appear within timeout"
+   fi
+
+   local vault_state=""
+   local end_time=$((SECONDS + 240))
+   while (( SECONDS < end_time )); do
+      vault_state=$(_kubectl --no-exit -n "$ns" get pod "$leader" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+      if [[ "$vault_state" == "Running" ]]; then
+         break
+      fi
+      _info "[vault] waiting for $leader to be Running (current=${vault_state:-unknown})"
+      sleep 3
+   done
+   if [[ "$vault_state" != "Running" ]]; then
+      _cleanup_on_success "$jsonfile"
+      _err "[vault] timeout waiting for $leader to be Running (last=${vault_state:-unknown})"
+   fi
+
+   if ! _vault_exec "$ns" "vault operator init -key-shares=1 -key-threshold=1 -format=json" "$release" >"$jsonfile"; then
+      _cleanup_on_success "$jsonfile"
+      _err "[vault] failed to execute vault operator init"
+   fi
+
+   printf '%s\n' "$jsonfile"
+}
+
+function _vault_process_init_artifacts() {
+   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}" jsonfile="${3:?json file required}"
+
+   local root_token
+   local key_shares
+   local key_threshold
+   local -a unseal_keys=()
+
+   root_token=$(jq -r '.root_token' "$jsonfile")
+   key_shares=$(jq -r '.key_shares' "$jsonfile")
+   key_threshold=$(jq -r '.key_threshold' "$jsonfile")
+   while IFS= read -r shard; do
+      shard=${shard%$'\r'}
+      [[ -z "$shard" ]] && continue
+      unseal_keys+=("$shard")
+   done < <(jq -r '.unseal_keys_b64[]' "$jsonfile")
+
+   if (( ${#unseal_keys[@]} == 0 )); then
+      _err "[vault] no unseal keys returned during init"
+   fi
+
+   if [[ ! "$key_shares" =~ ^[0-9]+$ || $key_shares -le 0 ]]; then
+      key_shares=${#unseal_keys[@]}
+   fi
+
+   if [[ ! "$key_threshold" =~ ^[0-9]+$ || $key_threshold -le 0 ]]; then
+      key_threshold=1
+   fi
+
+   local threshold=$key_threshold
+   if (( threshold > ${#unseal_keys[@]} )); then
+      threshold=${#unseal_keys[@]}
+   fi
+
+   _kubectl --no-exit -n "$ns" delete secret vault-root >/dev/null 2>&1 || true
+   _no_trace _kubectl -n "$ns" create secret generic vault-root \
+      --from-literal=root_token="$root_token"
+
+   local -a shard_literals=(
+      "--from-literal=key-shares=${key_shares}"
+      "--from-literal=key-threshold=${key_threshold}"
+   )
+   local shard_idx
+   for (( shard_idx=0; shard_idx<${#unseal_keys[@]}; shard_idx++ )); do
+      shard_literals+=("--from-literal=shard-$((shard_idx+1))=${unseal_keys[$shard_idx]}")
+   done
+   _kubectl --no-exit -n "$ns" delete secret vault-unseal >/dev/null 2>&1 || true
+   _no_trace _kubectl -n "$ns" create secret generic vault-unseal "${shard_literals[@]}"
+
+  _vault_cache_unseal_keys "$ns" "$release" "${unseal_keys[@]}"
+
+  local i shard
+  for pod in $(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/name=vault,app.kubernetes.io/instance=${release}" -o name); do
+      pod="${pod#pod/}"
+      for (( i=0; i<threshold; i++ )); do
+         shard="${unseal_keys[$i]}"
+         _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+            sh -lc "vault operator unseal $shard" >/dev/null 2>&1 || true
+      done
+      _info "[vault] unsealed $pod"
+   done
+
+  if ! _is_vault_health "$ns" "$release" ; then
+     _err "[vault] vault not healthy after init/unseal"
+  else
+     _info "[vault] vault is ready to serve"
+     _vault_portforward_help "$ns" "$release"
+  fi
+
+  _vault_login "$ns" "$release"
+}
+
+function _vault_clear_init_json() {
+   local jsonfile="${1:-}"
+   [[ -z "$jsonfile" ]] && return 0
+   _cleanup_on_success "$jsonfile"
 }
 
 function _is_vault_health() {
@@ -876,6 +1162,8 @@ function _vault_login() {
       login_output=${login_output//$'\r'/ }
       _err "[vault] failed to login to ${release} in namespace ${ns}: ${login_output:-unknown error}"
   fi
+
+  _VAULT_SESSION_TOKENS["${ns}/${release}"]="$token"
 }
 
 function _vault_policy_exists() {
@@ -1027,7 +1315,7 @@ function _vault_configure_secret_reader_role() {
   local mount_path="${mount%/}"
   local mount_json=""
   mount_json=$(_vault_exec --no-exit "$ns" "vault secrets list -format=json" "$release" 2>/dev/null || true)
-  if [[ -z "$mount_json" ]] || ! printf '%s' "$mount_json" | jq -e --arg PATH "${mount_path}/" 'has($PATH)' >/dev/null 2>&1; then
+  if [[ -z "$mount_json" ]] || ! printf '%s' "$mount_json" | jq -e --arg PATH "${mount_path}/" 'has($PATH)' >/dev/null 2)&1; then
      _vault_exec "$ns" "vault secrets enable -path=${mount_path} kv-v2" "$release" || \
         _err "[vault] failed to enable kv engine at ${mount_path}"
   fi
@@ -1051,7 +1339,6 @@ SH
   prefix_trimmed="${prefix_trimmed%/}"
 
   local policy_hcl
-
   printf -v policy_hcl '%s\n' \
     "path \"${mount_path}/data/${prefix_trimmed}\"       { capabilities = [\"read\"] }" \
     "path \"${mount_path}/data/${prefix_trimmed}/*\"     { capabilities = [\"read\"] }" \

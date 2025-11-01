@@ -46,3 +46,32 @@ spec:
       remoteRef:
         key: ${JENKINS_ADMIN_VAULT_PATH}
         property: ${JENKINS_ADMIN_PASSWORD_KEY}
+---
+apiVersion: ${JENKINS_ESO_API_VERSION}
+kind: ExternalSecret
+metadata:
+  name: ${JENKINS_LDAP_SECRET_NAME}
+  namespace: ${JENKINS_NAMESPACE}
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: ${JENKINS_ESO_SECRETSTORE}
+    kind: SecretStore
+  target:
+    name: ${JENKINS_LDAP_SECRET_NAME}
+    creationPolicy: Owner
+    template:
+      type: Opaque
+  data:
+    - secretKey: LDAP_BIND_DN
+      remoteRef:
+        key: ${JENKINS_LDAP_VAULT_PATH}
+        property: ${JENKINS_LDAP_BINDDN_KEY}
+    - secretKey: LDAP_BIND_PASSWORD
+      remoteRef:
+        key: ${JENKINS_LDAP_VAULT_PATH}
+        property: ${JENKINS_LDAP_PASSWORD_KEY}
+    - secretKey: LDAP_BASE_DN
+      remoteRef:
+        key: ${JENKINS_LDAP_VAULT_PATH}
+        property: ${JENKINS_LDAP_BASE_DN_KEY}

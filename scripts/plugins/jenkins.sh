@@ -664,7 +664,7 @@ function deploy_jenkins() {
          "$JENKINS_ESO_SERVICE_ACCOUNT" \
          "$jenkins_namespace" \
          "$JENKINS_VAULT_KV_MOUNT" \
-         "$JENKINS_ADMIN_VAULT_PATH" \
+         "$JENKINS_VAULT_POLICY_PREFIX" \
          "$JENKINS_ESO_ROLE"; then
       _err "[jenkins] failed to configure Vault role ${JENKINS_ESO_ROLE} for namespace ${jenkins_namespace}"
       return 1
@@ -675,6 +675,10 @@ function deploy_jenkins() {
    fi
    if ! _jenkins_wait_for_secret "$jenkins_namespace" "$JENKINS_ADMIN_SECRET_NAME"; then
       _err "[jenkins] Vault-sourced secret ${JENKINS_ADMIN_SECRET_NAME} not available"
+      return 1
+   fi
+   if ! _jenkins_wait_for_secret "$jenkins_namespace" "$JENKINS_LDAP_SECRET_NAME"; then
+      _err "[jenkins] Vault-sourced secret ${JENKINS_LDAP_SECRET_NAME} not available"
       return 1
    fi
    _create_jenkins_pv_pvc "$jenkins_namespace"
