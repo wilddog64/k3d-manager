@@ -1301,12 +1301,18 @@ function _vault_configure_secret_reader_role() {
   local service_account="${3:-external-secrets}"
   local service_namespace="${4:-external-secrets}"
   local mount="${5:-secret}"
-  local secret_prefix="${6:-ldap}"
+  local secret_prefix_arg="${6:-ldap}"
   local role="${7:-eso-ldap-directory}"
   local policy="${8:-${role}}"
   local pod="${release}-0"
 
-  if [[ -z "$secret_prefix" ]]; then
+  local sanitized_prefixes="${secret_prefix_arg//,/ }"
+  local -a secret_prefixes=()
+  if [[ -n "$sanitized_prefixes" ]]; then
+     read -r -a secret_prefixes <<< "$sanitized_prefixes"
+  fi
+
+  if (( ${#secret_prefixes[@]} == 0 )); then
      _err "[vault] secret prefix required for role configuration"
   fi
 
@@ -1315,7 +1321,7 @@ function _vault_configure_secret_reader_role() {
   local mount_path="${mount%/}"
   local mount_json=""
   mount_json=$(_vault_exec --no-exit "$ns" "vault secrets list -format=json" "$release" 2>/dev/null || true)
-  if [[ -z "$mount_json" ]] || ! printf '%s' "$mount_json" | jq -e --arg PATH "${mount_path}/" 'has($PATH)' >/dev/null 2)&1; then
+  if [[ -z "$mount_json" ]] || ! printf '%s' "$mount_json" | jq -e --arg PATH "${mount_path}/" 'has($PATH)' >/dev/null 2>&1; then
      _vault_exec "$ns" "vault secrets enable -path=${mount_path} kv-v2" "$release" || \
         _err "[vault] failed to enable kv engine at ${mount_path}"
   fi
@@ -1335,27 +1341,64 @@ vault write auth/kubernetes/config \
   kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 SH
 
-  local prefix_trimmed="${secret_prefix#/}"
-  prefix_trimmed="${prefix_trimmed%/}"
+  local policy_hcl=""
+  local prefixes_added=0
+  local -a metadata_paths=()
 
-  local policy_hcl
-  printf -v policy_hcl '%s\n' \
-    "path \"${mount_path}/data/${prefix_trimmed}\"       { capabilities = [\"read\"] }" \
-    "path \"${mount_path}/data/${prefix_trimmed}/*\"     { capabilities = [\"read\"] }" \
-    "path \"${mount_path}/metadata/${prefix_trimmed}\"   { capabilities = [\"read\", \"list\"] }" \
-    "path \"${mount_path}/metadata/${prefix_trimmed}/*\" { capabilities = [\"read\", \"list\"] }"
+  local prefix
+  for prefix in "${secret_prefixes[@]}"; do
+    local prefix_trimmed="${prefix#/}"
+    prefix_trimmed="${prefix_trimmed%/}"
 
-  local parent_prefix="${prefix_trimmed%/*}"
-  while [[ -n "$parent_prefix" && "$parent_prefix" != "$prefix_trimmed" ]]; do
-    policy_hcl=$(printf '%s\npath "%s/metadata/%s"   { capabilities = ["read", "list"] }\npath "%s/metadata/%s/*" { capabilities = ["read", "list"] }\n' \
-      "$policy_hcl" "$mount_path" "$parent_prefix" "$mount_path" "$parent_prefix")
-
-    local next_parent="${parent_prefix%/*}"
-    if [[ "$next_parent" == "$parent_prefix" ]]; then
-      break
+    if [[ -z "$prefix_trimmed" ]]; then
+      continue
     fi
-    parent_prefix="$next_parent"
+
+    local data_block
+    printf -v data_block '%s\n%s\n%s\n%s' \
+      "path \"${mount_path}/data/${prefix_trimmed}\"       { capabilities = [\"read\"] }" \
+      "path \"${mount_path}/data/${prefix_trimmed}/*\"     { capabilities = [\"read\"] }" \
+      "path \"${mount_path}/metadata/${prefix_trimmed}\"   { capabilities = [\"read\", \"list\"] }" \
+      "path \"${mount_path}/metadata/${prefix_trimmed}/*\" { capabilities = [\"read\", \"list\"] }"
+
+    if (( prefixes_added )); then
+      policy_hcl+=$'\n'
+    fi
+    policy_hcl+="$data_block"
+    prefixes_added=1
+
+    local parent_prefix="${prefix_trimmed%/*}"
+    while [[ -n "$parent_prefix" && "$parent_prefix" != "$prefix_trimmed" ]]; do
+      local skip_parent=0
+      local seen_prefix
+      for seen_prefix in "${metadata_paths[@]}"; do
+        if [[ "$seen_prefix" == "$parent_prefix" ]]; then
+          skip_parent=1
+          break
+        fi
+      done
+
+      if (( ! skip_parent )); then
+        metadata_paths+=("$parent_prefix")
+        policy_hcl+=$'\n'
+        local metadata_block
+        printf -v metadata_block '%s\n%s' \
+          "path \"${mount_path}/metadata/${parent_prefix}\"   { capabilities = [\"read\", \"list\"] }" \
+          "path \"${mount_path}/metadata/${parent_prefix}/*\" { capabilities = [\"read\", \"list\"] }"
+        policy_hcl+="$metadata_block"
+      fi
+
+      local next_parent="${parent_prefix%/*}"
+      if [[ "$next_parent" == "$parent_prefix" ]]; then
+        break
+      fi
+      parent_prefix="$next_parent"
+    done
   done
+
+  if (( ! prefixes_added )); then
+     _err "[vault] secret prefix required for role configuration"
+  fi
 
   if ! printf '%s\n' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
     vault policy write "${policy}" -; then
