@@ -658,13 +658,57 @@ function deploy_jenkins() {
    _create_jenkins_vault_ad_policy "$vault_namespace" "$vault_release" "$jenkins_namespace"
    _create_jenkins_cert_rotator_policy "$vault_namespace" "$vault_release" "" "" "$jenkins_namespace"
    _create_jenkins_namespace "$jenkins_namespace"
+   local -a _jenkins_secret_prefixes=()
+   if [[ -n "${JENKINS_VAULT_POLICY_PREFIX:-}" ]]; then
+      local _configured_prefixes="${JENKINS_VAULT_POLICY_PREFIX//,/ }"
+      local -a _configured_array=()
+      read -r -a _configured_array <<< "$_configured_prefixes"
+      _jenkins_secret_prefixes+=("${_configured_array[@]}")
+   fi
+
+   local -a _jenkins_secret_paths=(
+      "${JENKINS_ADMIN_VAULT_PATH:-}"
+      "${JENKINS_LDAP_VAULT_PATH:-}"
+   )
+
+   local prefix
+   for prefix in "${_jenkins_secret_paths[@]}"; do
+      [[ -z "$prefix" ]] && continue
+      _jenkins_secret_prefixes+=("$prefix")
+   done
+
+   local -a _jenkins_unique_prefixes=()
+   for prefix in "${_jenkins_secret_prefixes[@]}"; do
+      [[ -z "$prefix" ]] && continue
+      local trimmed="${prefix#/}"
+      trimmed="${trimmed%/}"
+      [[ -z "$trimmed" ]] && continue
+      local seen=0 existing
+      for existing in "${_jenkins_unique_prefixes[@]}"; do
+         if [[ "$existing" == "$trimmed" ]]; then
+            seen=1
+            break
+         fi
+      done
+      (( seen )) && continue
+      _jenkins_unique_prefixes+=("$trimmed")
+   done
+
+   local _jenkins_prefix_arg=""
+   for prefix in "${_jenkins_unique_prefixes[@]}"; do
+      if [[ -n "$_jenkins_prefix_arg" ]]; then
+         _jenkins_prefix_arg+=","
+      fi
+      _jenkins_prefix_arg+="$prefix"
+   done
+
    if ! _vault_configure_secret_reader_role \
          "$vault_namespace" \
          "$vault_release" \
          "$JENKINS_ESO_SERVICE_ACCOUNT" \
          "$jenkins_namespace" \
          "$JENKINS_VAULT_KV_MOUNT" \
-         "$JENKINS_VAULT_POLICY_PREFIX" \
+         "$_jenkins_prefix_arg" \
          "$JENKINS_ESO_ROLE"; then
       _err "[jenkins] failed to configure Vault role ${JENKINS_ESO_ROLE} for namespace ${jenkins_namespace}"
       return 1
