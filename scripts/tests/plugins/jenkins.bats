@@ -1405,6 +1405,43 @@ EOF
 
   read_lines "$CALLS_LOG" calls
   local release="${VAULT_RELEASE_DEFAULT:-vault}"
+  local -a expected_prefix_sources=()
+  if [[ -n "${JENKINS_VAULT_POLICY_PREFIX:-}" ]]; then
+    local _configured="${JENKINS_VAULT_POLICY_PREFIX//,/ }"
+    local -a _configured_array=()
+    read -r -a _configured_array <<< "$_configured"
+    expected_prefix_sources+=("${_configured_array[@]}")
+  fi
+  expected_prefix_sources+=(
+    "${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin}"
+    "${JENKINS_LDAP_VAULT_PATH:-ldap/openldap-admin}"
+  )
+
+  local -a expected_unique_prefixes=()
+  for prefix in "${expected_prefix_sources[@]}"; do
+    [[ -z "$prefix" ]] && continue
+    local trimmed="${prefix#/}"
+    trimmed="${trimmed%/}"
+    [[ -z "$trimmed" ]] && continue
+    local seen=0 existing
+    for existing in "${expected_unique_prefixes[@]}"; do
+      if [[ "$existing" == "$trimmed" ]]; then
+        seen=1
+        break
+      fi
+    done
+    (( seen )) && continue
+    expected_unique_prefixes+=("$trimmed")
+  done
+
+  local expected_prefix_arg=""
+  for prefix in "${expected_unique_prefixes[@]}"; do
+    if [[ -n "$expected_prefix_arg" ]]; then
+      expected_prefix_arg+=","
+    fi
+    expected_prefix_arg+="$prefix"
+  done
+
   expected=(
     "deploy_eso:"
     "deploy_vault:custom-vault ${release}"
@@ -1412,7 +1449,7 @@ EOF
     "_create_jenkins_vault_ad_policy:custom-vault ${release} sample-ns"
     "_create_jenkins_cert_rotator_policy:custom-vault ${release}   sample-ns"
     "_create_jenkins_namespace:sample-ns"
-    "_vault_configure_secret_reader_role:custom-vault ${release} ${JENKINS_ESO_SERVICE_ACCOUNT:-eso-jenkins-sa} sample-ns ${JENKINS_VAULT_KV_MOUNT:-secret} ${JENKINS_VAULT_POLICY_PREFIX:-eso/jenkins-admin,ldap/openldap-admin} ${JENKINS_ESO_ROLE:-eso-jenkins-admin}"
+    "_vault_configure_secret_reader_role:custom-vault ${release} ${JENKINS_ESO_SERVICE_ACCOUNT:-eso-jenkins-sa} sample-ns ${JENKINS_VAULT_KV_MOUNT:-secret} ${expected_prefix_arg} ${JENKINS_ESO_ROLE:-eso-jenkins-admin}"
     "_jenkins_apply_eso_resources:sample-ns"
     "_jenkins_wait_for_secret:sample-ns ${JENKINS_ADMIN_SECRET_NAME:-jenkins-admin}"
     "_jenkins_wait_for_secret:sample-ns ${JENKINS_LDAP_SECRET_NAME:-jenkins-ldap-config}"
@@ -1425,6 +1462,10 @@ EOF
   for i in "${!expected[@]}"; do
     [ "${calls[$i]}" = "${expected[$i]}" ]
   done
+
+  local configure_call="${calls[6]}"
+  [[ "$configure_call" == *"${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin}"* ]]
+  [[ "$configure_call" == *"${JENKINS_LDAP_VAULT_PATH:-ldap/openldap-admin}"* ]]
 }
 
 @test "deploy_jenkins aborts readiness wait when deployment fails" {
@@ -1439,7 +1480,9 @@ EOF
   _create_jenkins_namespace() { :; }
   _vault_configure_secret_reader_role() { :; }
   _jenkins_apply_eso_resources() { :; }
-  _jenkins_wait_for_secret() { :; }
+  SECRET_WAIT_LOG="$BATS_TEST_TMPDIR/secret-waits.log"
+  : > "$SECRET_WAIT_LOG"
+  _jenkins_wait_for_secret() { echo "$*" >> "$SECRET_WAIT_LOG"; }
   _create_jenkins_pv_pvc() { :; }
   _ensure_jenkins_cert() { :; }
   _vault_issue_pki_tls_secret() { :; }
@@ -1473,7 +1516,7 @@ _create_jenkins_cert_rotator_policy() { :; }
 _create_jenkins_namespace() { :; }
 _vault_configure_secret_reader_role() { :; }
 _jenkins_apply_eso_resources() { :; }
-_jenkins_wait_for_secret() { :; }
+_jenkins_wait_for_secret() { echo "$*" >> "$SECRET_WAIT_LOG"; }
 _create_jenkins_pv_pvc() { :; }
 _ensure_jenkins_cert() { :; }
 _vault_issue_pki_tls_secret() { :; }
@@ -1498,10 +1541,14 @@ EOF
     HELPER="$helper" \
     PLUGIN="$plugin" \
     WAIT_LOG="$WAIT_LOG" \
+    SECRET_WAIT_LOG="$SECRET_WAIT_LOG" \
     run --separate-stderr "$script" failing-ns
   [ "$status" -eq 1 ]
   [[ "$stderr" == *"Jenkins deployment failed"* ]]
   [[ ! -s "$WAIT_LOG" ]]
+  read_lines "$SECRET_WAIT_LOG" waited_secrets
+  [[ "${waited_secrets[*]}" == *"${JENKINS_ADMIN_SECRET_NAME:-jenkins-admin}"* ]]
+  [[ "${waited_secrets[*]}" == *"${JENKINS_LDAP_SECRET_NAME:-jenkins-ldap-config}"* ]]
 }
 
 @test "_wait_for_jenkins_ready waits for controller" {
@@ -1816,6 +1863,9 @@ EOF
   local script="$BATS_TEST_TMPDIR/jenkins-manifests.sh"
   local out_kubectl="$BATS_TEST_TMPDIR/out-manifests.log"
 
+  SECRET_WAIT_LOG="$BATS_TEST_TMPDIR/manifest-secret-waits.log"
+  : > "$SECRET_WAIT_LOG"
+
   cat <<'EOF' >"$script"
 #!/usr/bin/env bash
 set -eo pipefail
@@ -1831,7 +1881,7 @@ _create_jenkins_cert_rotator_policy() { :; }
 _create_jenkins_namespace() { :; }
 _vault_configure_secret_reader_role() { :; }
 _jenkins_apply_eso_resources() { :; }
-_jenkins_wait_for_secret() { :; }
+_jenkins_wait_for_secret() { echo "$*" >> "$SECRET_WAIT_LOG"; }
 _create_jenkins_pv_pvc() { :; }
 _ensure_jenkins_cert() { :; }
 _wait_for_jenkins_ready() { :; }
@@ -1877,6 +1927,7 @@ EOF
       CAPTURE_DIR="$capture_dir" \
       TARGET_NS="$random_ns" \
       OUT_KUBECTL="$out_kubectl" \
+      SECRET_WAIT_LOG="$SECRET_WAIT_LOG" \
       "$script"
   if [ "$status" -ne 0 ]; then
     echo "$output" >&2
@@ -1898,4 +1949,7 @@ EOF
   grep -q "jenkins.$random_ns.svc.cluster.local" "$vs_file"
   grep -Eq "namespace: \"?$random_ns\"?" "$dr_file"
   grep -q "jenkins.$random_ns.svc.cluster.local" "$dr_file"
+  read_lines "$SECRET_WAIT_LOG" manifest_waits
+  [[ "${manifest_waits[*]}" == *"${JENKINS_ADMIN_SECRET_NAME:-jenkins-admin}"* ]]
+  [[ "${manifest_waits[*]}" == *"${JENKINS_LDAP_SECRET_NAME:-jenkins-ldap-config}"* ]]
 }
