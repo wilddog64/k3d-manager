@@ -1,6 +1,10 @@
 export JENKINS_NAMESPACE="jenkins"
 export JENKINS_HOME_PATH="$SCRIPT_DIR/storage/jenkins_home"
 
+# Deployment Feature Flags
+export JENKINS_LDAP_ENABLED="${JENKINS_LDAP_ENABLED:-0}"    # 0 = disabled by default, use --enable-ldap to deploy
+export JENKINS_VAULT_ENABLED="${JENKINS_VAULT_ENABLED:-0}"  # 0 = disabled by default, use --enable-vault to deploy
+
 # Optional: immediately mint a cert to a K8s tls secret via Istio
 export VAULT_PKI_ISSUE_SECRET="${VAULT_PKI_ISSUE_SECRET:-1}"   # 1 to emit a tls Secret
 export VAULT_PKI_SECRET_NS="${VAULT_PKI_SECRET_NS:-istio-system}"

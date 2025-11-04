@@ -139,6 +139,7 @@ function _jenkins_apply_eso_resources() {
    local ns="${1:-$JENKINS_NAMESPACE}"
    local tmpl="$JENKINS_CONFIG_DIR/eso.yaml"
    local rendered
+   local final_manifest
    local apply_rc=0
 
    if [[ ! -r "$tmpl" ]]; then
@@ -148,6 +149,52 @@ function _jenkins_apply_eso_resources() {
 
    export JENKINS_ESO_API_VERSION="${JENKINS_ESO_API_VERSION:-external-secrets.io/v1}"
    rendered=$(_jenkins_render_template "$tmpl" "jenkins-eso") || return 1
+
+   # If LDAP is disabled, remove the jenkins-ldap-config ExternalSecret from the manifest
+   if (( ! JENKINS_LDAP_ENABLED )); then
+      final_manifest=$(mktemp -t "jenkins-eso-filtered.XXXXXX.yaml") || {
+         _cleanup_on_success "$rendered"
+         return 1
+      }
+
+      # Filter out the LDAP ExternalSecret section
+      # This uses awk to remove the YAML document containing the LDAP secret
+      awk -v ldap_secret="$JENKINS_LDAP_SECRET_NAME" '
+         BEGIN { in_doc=0; in_ldap=0; doc_buffer=""; line_count=0 }
+         /^---$/ {
+            # End of previous document - print if not LDAP
+            if (in_doc && !in_ldap && doc_buffer != "") {
+               print doc_buffer
+            }
+            # Start new document
+            in_doc=1
+            in_ldap=0
+            doc_buffer="---"
+            line_count=0
+            next
+         }
+         in_doc {
+            line_count++
+            doc_buffer = doc_buffer "\n" $0
+            # Check if this document is the LDAP ExternalSecret
+            if (!in_ldap && /^  name: / && $0 ~ ldap_secret) {
+               in_ldap=1
+            }
+         }
+         !in_doc {
+            print
+         }
+         END {
+            # Print last document if not LDAP
+            if (in_doc && !in_ldap && doc_buffer != "") {
+               print doc_buffer
+            }
+         }
+      ' "$rendered" > "$final_manifest"
+
+      _cleanup_on_success "$rendered"
+      rendered="$final_manifest"
+   fi
 
    if ! _kubectl apply -f "$rendered"; then
       apply_rc=$?
@@ -639,21 +686,198 @@ function _jenkins_configure_leaf_host_defaults() {
    return 0
 }
 
+function _deploy_jenkins_ldap() {
+   local vault_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+   local vault_release="${2:-${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}}"
+   local ldap_ns="${LDAP_NAMESPACE:-directory}"
+   local ldap_release="${LDAP_RELEASE:-openldap}"
 
-function deploy_jenkins() {
-   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-      echo "Usage: deploy_jenkins [namespace=jenkins] [vault-namespace=${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}] [vault-release=${VAULT_RELEASE_DEFAULT}]"
-      return 0
+   _info "[jenkins] deploying LDAP integration to ${ldap_ns}/${ldap_release}"
+
+   # Source LDAP plugin if not already loaded
+   if ! declare -f deploy_ldap >/dev/null 2>&1; then
+      local ldap_plugin="$PLUGINS_DIR/ldap.sh"
+      if [[ ! -r "$ldap_plugin" ]]; then
+         _err "[jenkins] LDAP plugin not found at ${ldap_plugin}"
+      fi
+      # shellcheck disable=SC1090
+      source "$ldap_plugin"
    fi
 
-   local jenkins_namespace="${1:-jenkins}"
-   local vault_namespace="${2:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
-   local vault_release="${3:-$VAULT_RELEASE_DEFAULT}"
+   # Deploy LDAP directory
+   if ! deploy_ldap "$ldap_ns" "$ldap_release"; then
+      _err "[jenkins] LDAP deployment failed"
+   fi
+
+   # Seed Jenkins service account in Vault LDAP
+   if declare -f _vault_seed_ldap_service_accounts >/dev/null 2>&1; then
+      _info "[jenkins] seeding Jenkins LDAP service account in Vault"
+      _vault_seed_ldap_service_accounts "$vault_ns" "$vault_release"
+   else
+      _warn "[jenkins] _vault_seed_ldap_service_accounts not available; skipping service account seed"
+   fi
+}
+
+function deploy_jenkins() {
+   local jenkins_namespace=""
+   local vault_namespace=""
+   local vault_release=""
+   local enable_ldap="${JENKINS_LDAP_ENABLED:-1}"
+   local enable_vault="${JENKINS_VAULT_ENABLED:-1}"
+   local restore_trace=0
+
+   case $- in
+      *x*) restore_trace=1 ;;
+   esac
+
+   # Parse arguments
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         -h|--help)
+            cat <<EOF
+Usage: deploy_jenkins [options] [namespace] [vault-namespace] [vault-release]
+
+Options:
+  --namespace <ns>           Jenkins namespace (default: jenkins)
+  --vault-namespace <ns>     Vault namespace (default: ${VAULT_NS_DEFAULT:-vault})
+  --vault-release <name>     Vault release name (default: ${VAULT_RELEASE_DEFAULT:-vault})
+  --enable-ldap              Deploy LDAP integration (default: disabled)
+  --disable-ldap             Skip LDAP deployment
+  --enable-vault             Deploy Vault (default: disabled)
+  --disable-vault            Skip Vault deployment (use existing)
+  -h, --help                 Show this help message
+
+Feature Flags (environment variables):
+  JENKINS_LDAP_ENABLED=0|1   Enable LDAP auto-deployment (default: 0)
+  JENKINS_VAULT_ENABLED=0|1  Enable Vault auto-deployment (default: 0)
+
+Examples:
+  # Minimal deployment (Jenkins only, no LDAP, no Vault)
+  deploy_jenkins
+
+  # Full deployment with all integrations
+  deploy_jenkins --enable-ldap --enable-vault
+
+  # Deploy with LDAP integration only
+  deploy_jenkins --enable-ldap
+
+  # Deploy with Vault integration only
+  deploy_jenkins --enable-vault
+
+  # Deploy to custom namespace with full stack
+  deploy_jenkins --namespace jenkins-prod --enable-ldap --enable-vault
+
+Positional arguments (backwards compatible):
+  deploy_jenkins [namespace] [vault-namespace] [vault-release]
+EOF
+            if (( restore_trace )); then set -x; fi
+            return 0
+            ;;
+         --namespace)
+            [[ -z "${2:-}" ]] && _err "[jenkins] --namespace requires an argument"
+            jenkins_namespace="$2"
+            shift 2
+            ;;
+         --namespace=*)
+            jenkins_namespace="${1#*=}"
+            [[ -z "$jenkins_namespace" ]] && _err "[jenkins] --namespace requires a value"
+            shift
+            ;;
+         --vault-namespace)
+            [[ -z "${2:-}" ]] && _err "[jenkins] --vault-namespace requires an argument"
+            vault_namespace="$2"
+            shift 2
+            ;;
+         --vault-namespace=*)
+            vault_namespace="${1#*=}"
+            [[ -z "$vault_namespace" ]] && _err "[jenkins] --vault-namespace requires a value"
+            shift
+            ;;
+         --vault-release)
+            [[ -z "${2:-}" ]] && _err "[jenkins] --vault-release requires an argument"
+            vault_release="$2"
+            shift 2
+            ;;
+         --vault-release=*)
+            vault_release="${1#*=}"
+            [[ -z "$vault_release" ]] && _err "[jenkins] --vault-release requires a value"
+            shift
+            ;;
+         --enable-ldap)
+            enable_ldap=1
+            shift
+            ;;
+         --disable-ldap)
+            enable_ldap=0
+            shift
+            ;;
+         --enable-vault)
+            enable_vault=1
+            shift
+            ;;
+         --disable-vault)
+            enable_vault=0
+            shift
+            ;;
+         --)
+            shift
+            break
+            ;;
+         -*)
+            _err "[jenkins] unknown option: $1"
+            ;;
+         *)
+            # Positional arguments (backwards compatibility)
+            if [[ -z "$jenkins_namespace" ]]; then
+               jenkins_namespace="$1"
+            elif [[ -z "$vault_namespace" ]]; then
+               vault_namespace="$1"
+            elif [[ -z "$vault_release" ]]; then
+               vault_release="$1"
+            else
+               _err "[jenkins] unexpected argument: $1"
+            fi
+            shift
+            ;;
+      esac
+   done
+
+   # Apply defaults
+   jenkins_namespace="${jenkins_namespace:-jenkins}"
+   vault_namespace="${vault_namespace:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+   vault_release="${vault_release:-${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}}"
+
+   # Export enable flags so downstream functions can check them
+   export JENKINS_LDAP_ENABLED="$enable_ldap"
+   export JENKINS_VAULT_ENABLED="$enable_vault"
+
+   if (( restore_trace )); then set -x; fi
+
+   _info "[jenkins] deploying to namespace: ${jenkins_namespace}"
+   _info "[jenkins] LDAP integration: $( (( enable_ldap )) && echo "enabled" || echo "disabled" )"
+   _info "[jenkins] Vault deployment: $( (( enable_vault )) && echo "enabled" || echo "disabled" )"
 
    _jenkins_configure_leaf_host_defaults
 
-   deploy_eso
-   deploy_vault "$vault_namespace" "$vault_release"
+   # Deploy ESO only if Vault is enabled (ESO requires Vault as backend)
+   if (( enable_vault )); then
+      deploy_eso
+   fi
+
+   # Deploy Vault if enabled
+   if (( enable_vault )); then
+      _info "[jenkins] deploying Vault to ${vault_namespace}/${vault_release}"
+      deploy_vault "$vault_namespace" "$vault_release"
+   else
+      _info "[jenkins] skipping Vault deployment (using existing instance)"
+   fi
+
+   # Deploy LDAP if enabled
+   if (( enable_ldap )); then
+      _deploy_jenkins_ldap "$vault_namespace" "$vault_release"
+   else
+      _info "[jenkins] skipping LDAP deployment"
+   fi
    _create_jenkins_admin_vault_policy "$vault_namespace" "$vault_release"
    _create_jenkins_vault_ad_policy "$vault_namespace" "$vault_release" "$jenkins_namespace"
    _create_jenkins_cert_rotator_policy "$vault_namespace" "$vault_release" "" "" "$jenkins_namespace"
@@ -721,9 +945,12 @@ function deploy_jenkins() {
       _err "[jenkins] Vault-sourced secret ${JENKINS_ADMIN_SECRET_NAME} not available"
       return 1
    fi
-   if ! _jenkins_wait_for_secret "$jenkins_namespace" "$JENKINS_LDAP_SECRET_NAME"; then
-      _err "[jenkins] Vault-sourced secret ${JENKINS_LDAP_SECRET_NAME} not available"
-      return 1
+   # Only wait for LDAP secret if LDAP is enabled
+   if (( JENKINS_LDAP_ENABLED )); then
+      if ! _jenkins_wait_for_secret "$jenkins_namespace" "$JENKINS_LDAP_SECRET_NAME"; then
+         _err "[jenkins] Vault-sourced secret ${JENKINS_LDAP_SECRET_NAME} not available"
+         return 1
+      fi
    fi
    _create_jenkins_pv_pvc "$jenkins_namespace"
    _ensure_jenkins_cert "$vault_namespace" "$vault_release"
@@ -1043,7 +1270,6 @@ function _wait_for_jenkins_ready() {
 function _create_jenkins_admin_vault_policy() {
    local vault_namespace="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
-   local pod="${vault_release}-0"
 
    local policy_exists=0
    if _vault_policy_exists "$vault_namespace" "$vault_release" "jenkins-admin"; then
@@ -1051,14 +1277,17 @@ function _create_jenkins_admin_vault_policy() {
    fi
 
    if (( ! policy_exists )); then
-      cat <<'HCL' | tee jenkins-admin.hcl | _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-         vault write sys/policies/password/jenkins-admin policy=-
+      local policy_content
+      policy_content=$(cat <<'HCL'
 length = 24
 rule "charset" { charset = "abcdefghijklmnopqrstuvwxyz" }
 rule "charset" { charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" }
 rule "charset" { charset = "0123456789" }
 rule "charset" { charset = "!@#$%^&*()-_=+[]{};:,.?" }
 HCL
+)
+      echo "$policy_content" | tee jenkins-admin.hcl | \
+         _vault_exec "$vault_namespace" "vault write sys/policies/password/jenkins-admin policy=-" "$vault_release"
       rm -f jenkins-admin.hcl
    fi
 
@@ -1069,61 +1298,63 @@ HCL
       return 0
    fi
 
-   local secret_mount_cmd="vault kv put ${mount_path}/${secret_path}"
-   cat <<SCRIPT | _no_trace _kubectl -n "$vault_namespace" exec -i "$pod" -- sh -
-      set -euo pipefail
-      jenkins_admin_pass=
-      jenkins_admin_pass=$(vault read -field=password sys/policies/password/jenkins-admin/generate)
-      ${secret_mount_cmd} username=jenkins-admin password="$jenkins_admin_pass"
+   local script_content
+   script_content=$(cat <<SCRIPT
+set -euo pipefail
+jenkins_admin_pass=\$(vault read -field=password sys/policies/password/jenkins-admin/generate)
+vault kv put ${mount_path}/${secret_path} username=jenkins-admin password="\$jenkins_admin_pass"
 SCRIPT
+)
+   echo "$script_content" | _no_trace _vault_exec "$vault_namespace" "sh -" "$vault_release"
 }
 
 function _sync_vault_jenkins_admin() {
    local vault_namespace="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
    local jenkins_namespace="${3:-jenkins}"
-   local pod="${vault_release}-0"
-   _kubectl -n "$vault_namespace" exec -i "$pod" -- vault write -field=password \
-      sys/policies/password/jenkins-admin/generate
 
-   _kubectl -n "$vault_namespace" exec -i "$pod" -- sh - \
-      vault kv put secret/eso/jenkins-admin \
-      username=jenkins-admin password="$(_kubectl -n "$vault_namespace" exec -i "$pod" -- \
-      vault read -field=password sys/policies/password/jenkins-admin/generate)"
+   _vault_exec "$vault_namespace" "vault write -field=password sys/policies/password/jenkins-admin/generate" "$vault_release"
+
+   local script_content
+   script_content=$(cat <<'SCRIPT'
+jenkins_admin_pass=$(vault read -field=password sys/policies/password/jenkins-admin/generate)
+vault kv put secret/eso/jenkins-admin username=jenkins-admin password="$jenkins_admin_pass"
+SCRIPT
+)
+   echo "$script_content" | _vault_exec "$vault_namespace" "sh -" "$vault_release"
 }
 
 function _create_jenkins_vault_ad_policy() {
    local vault_namespace="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
    local jenkins_namespace="${3:-jenkins}"
-   local pod="${vault_release}-0"
 
    if ! _vault_policy_exists "$vault_namespace" "$vault_release" "jenkins-jcasc-read"; then
-      _kubectl -n "$vault_namespace" exec -i "$pod" -- sh -lc 'vault policy write jenkins-jcasc-read -' <<'HCL'
+      local read_policy
+      read_policy=$(cat <<'HCL'
 path "secret/data/jenkins/ad-ldap"     { capabilities = ["read"] }
 path "secret/data/jenkins/ad-adreader" { capabilities = ["read"] }
 HCL
+)
+      echo "$read_policy" | _vault_exec "$vault_namespace" "vault policy write jenkins-jcasc-read -" "$vault_release"
 
-      _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-         vault write auth/kubernetes/role/jenkins-jcasc-reader \
-           bound_service_account_names=jenkins \
-           bound_service_account_namespaces="$jenkins_namespace" \
-           policies=jenkins-jcasc-read \
-           ttl=30m
+      _vault_exec "$vault_namespace" \
+         "vault write auth/kubernetes/role/jenkins-jcasc-reader bound_service_account_names=jenkins bound_service_account_namespaces=$jenkins_namespace policies=jenkins-jcasc-read ttl=30m" \
+         "$vault_release"
    fi
 
    if ! _vault_policy_exists "$vault_namespace" "$vault_release" "jenkins-jcasc-write"; then
-      _kubectl -n "$vault_namespace" exec -i "$pod" -- sh -lc 'vault policy write jenkins-jcasc-write -' <<'HCL'
+      local write_policy
+      write_policy=$(cat <<'HCL'
 path "secret/data/jenkins/ad-ldap"     { capabilities = ["create", "update"] }
 path "secret/data/jenkins/ad-adreader" { capabilities = ["create", "update"] }
 HCL
+)
+      echo "$write_policy" | _vault_exec "$vault_namespace" "vault policy write jenkins-jcasc-write -" "$vault_release"
 
-      _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-         vault write auth/kubernetes/role/jenkins-jcasc-writer \
-           bound_service_account_names=jenkins \
-           bound_service_account_namespaces="$jenkins_namespace" \
-           policies=jenkins-jcasc-write \
-           ttl=15m
+      _vault_exec "$vault_namespace" \
+         "vault write auth/kubernetes/role/jenkins-jcasc-writer bound_service_account_names=jenkins bound_service_account_namespaces=$jenkins_namespace policies=jenkins-jcasc-write ttl=15m" \
+         "$vault_release"
    fi
 }
 
@@ -1135,14 +1366,13 @@ function _create_jenkins_cert_rotator_policy() {
    local jenkins_namespace="${5:-jenkins}"
    local rotator_service_account="${6:-jenkins-cert-rotator}"
    local policy_name="jenkins-cert-rotator"
-   local pod="${vault_release}-0"
 
    local ensure_policy=1
 
    if _vault_policy_exists "$vault_namespace" "$vault_release" "$policy_name"; then
       local current_policy=""
-      current_policy=$(_kubectl -n "$vault_namespace" exec -i "$pod" -- \
-         vault policy read "$policy_name" 2>/dev/null || true)
+      current_policy=$(_vault_exec --no-exit "$vault_namespace" \
+         "vault policy read $policy_name" "$vault_release" 2>/dev/null || true)
 
       if [[ "$current_policy" == *"path \"${pki_path}/revoke\""* ]]; then
          ensure_policy=0
@@ -1150,8 +1380,8 @@ function _create_jenkins_cert_rotator_policy() {
    fi
 
    if (( ensure_policy )); then
-      cat <<HCL | _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-         vault policy write "$policy_name" -
+      local policy_content
+      policy_content=$(cat <<HCL
 path "${pki_path}/issue/${pki_role}" {
    capabilities = ["update"]
 }
@@ -1168,12 +1398,11 @@ path "${pki_path}/ca/pem" {
    capabilities = ["read"]
 }
 HCL
+)
+      echo "$policy_content" | _vault_exec "$vault_namespace" "vault policy write $policy_name -" "$vault_release"
    fi
 
-   _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-      vault write auth/kubernetes/role/jenkins-cert-rotator \
-        bound_service_account_names="$rotator_service_account" \
-        bound_service_account_namespaces="$jenkins_namespace" \
-        policies="$policy_name" \
-        ttl=24h
+   _vault_exec "$vault_namespace" \
+      "vault write auth/kubernetes/role/jenkins-cert-rotator bound_service_account_names=$rotator_service_account bound_service_account_namespaces=$jenkins_namespace policies=$policy_name ttl=24h" \
+      "$vault_release"
 }
