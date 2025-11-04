@@ -7,6 +7,8 @@ function init_test_env() {
   # shellcheck disable=SC1090
   source "${SCRIPT_DIR}/lib/system.sh"
   # shellcheck disable=SC1090
+  source "${SCRIPT_DIR}/lib/provider.sh"
+  # shellcheck disable=SC1090
   source "${SCRIPT_DIR}/lib/core.sh"
 
   KUBECTL_EXIT_CODES=()
