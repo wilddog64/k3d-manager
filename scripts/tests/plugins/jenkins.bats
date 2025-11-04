@@ -280,22 +280,34 @@ EOF
 @test "_create_jenkins_vault_ad_policy creates policies" {
   _vault_policy_exists() { return 1; }
   _vault_policy() { return 1; }
-  _kubectl() {
-    echo "$*" >> "$KUBECTL_LOG"
+
+  local VAULT_EXEC_LOG="$BATS_TEST_TMPDIR/vault-exec-ad-policy.log"
+  : >"$VAULT_EXEC_LOG"
+  export VAULT_EXEC_LOG
+
+  _vault_exec() {
+    local ns="$1"
+    local cmd="$2"
+    local release="$3"
+    echo "$cmd" >> "$VAULT_EXEC_LOG"
+    if [[ -p /dev/stdin ]]; then
+      cat >/dev/null
+    fi
     return 0
   }
+
   export -f _vault_policy_exists
   export -f _vault_policy
-  export -f _kubectl
+  export -f _vault_exec
 
   run _create_jenkins_vault_ad_policy vault jenkins
   [ "$status" -eq 0 ]
-  grep -q 'vault policy write jenkins-jcasc-read' "$KUBECTL_LOG"
-  grep -q 'vault write auth/kubernetes/role/jenkins-jcasc-reader' "$KUBECTL_LOG"
-  grep -q 'vault policy write jenkins-jcasc-write' "$KUBECTL_LOG"
-  grep -q 'vault write auth/kubernetes/role/jenkins-jcasc-writer' "$KUBECTL_LOG"
-  ! grep -q 'vault kv put' "$KUBECTL_LOG"
-  ! grep -q 'password=' "$KUBECTL_LOG"
+  grep -q 'vault policy write jenkins-jcasc-read' "$VAULT_EXEC_LOG"
+  grep -q 'vault write auth/kubernetes/role/jenkins-jcasc-reader' "$VAULT_EXEC_LOG"
+  grep -q 'vault policy write jenkins-jcasc-write' "$VAULT_EXEC_LOG"
+  grep -q 'vault write auth/kubernetes/role/jenkins-jcasc-writer' "$VAULT_EXEC_LOG"
+  ! grep -q 'vault kv put' "$VAULT_EXEC_LOG"
+  ! grep -q 'password=' "$VAULT_EXEC_LOG"
 }
 
 @test "_create_jenkins_cert_rotator_policy writes role without stdin dash" {
@@ -305,57 +317,21 @@ EOF
   local policy_capture="$BATS_TEST_TMPDIR/jenkins-cert-rotator.hcl"
   : >"$policy_capture"
 
- _kubectl() {
-    while [[ $# -gt 0 ]]; do
-      case "$1" in
-        --no-exit|--quiet|--prefer-sudo|--require-sudo)
-          shift
-          ;;
-        --)
-          shift
-          break
-          ;;
-        -n)
-          shift 2
-          ;;
-        *)
-          break
-          ;;
-      esac
-    done
+  local VAULT_EXEC_LOG="$BATS_TEST_TMPDIR/vault-exec-commands.log"
+  : >"$VAULT_EXEC_LOG"
+  export VAULT_EXEC_LOG
 
-    local cmd="$*"
-    local stdin_payload=""
-    if [[ ! -t 0 ]]; then
-      stdin_payload=$(cat)
+  _vault_exec() {
+    # Skip --no-exit flag if present
+    if [[ "$1" == "--no-exit" ]]; then
+      shift
     fi
 
-    echo "$cmd" >>"$KUBECTL_LOG"
+    local ns="$1"
+    local cmd="$2"
+    local release="$3"
 
-    if [[ "$cmd" == *"vault policy write jenkins-cert-rotator -"* && -n "$stdin_payload" ]]; then
-      printf '%s\n' "$stdin_payload" >"$POLICY_CAPTURE"
-    fi
-
-    local rc=0
-    if ((${#KUBECTL_EXIT_CODES[@]})); then
-      rc=${KUBECTL_EXIT_CODES[0]}
-      KUBECTL_EXIT_CODES=("${KUBECTL_EXIT_CODES[@]:1}")
-    fi
-    return "$rc"
-  }
-  export POLICY_CAPTURE="$policy_capture"
-  export -f _kubectl
-  _kubectl() {
-    while [[ $# -gt 0 ]]; do
-      case "$1" in
-        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
-        --) shift; break ;;
-        *) break ;;
-      esac
-    done
-
-    local cmd="$*"
-    echo "$cmd" >> "$KUBECTL_LOG"
+    echo "$cmd" >> "$VAULT_EXEC_LOG"
 
     if [[ "$cmd" == *"vault policy write jenkins-cert-rotator -"* ]]; then
       cat >>"$policy_capture"
@@ -368,17 +344,18 @@ EOF
 
     return 0
   }
-  export -f _kubectl
+  export POLICY_CAPTURE="$policy_capture"
+  export -f _vault_exec
 
   VAULT_PKI_SECRET_NS="secret-ns" \
     run _create_jenkins_cert_rotator_policy vault-ns vault-release custom-pki custom-role jenkins-ns rotator-sa
   [ "$status" -eq 0 ]
 
-  read_lines "$KUBECTL_LOG" kubectl_calls
+  read_lines "$VAULT_EXEC_LOG" vault_calls
 
   local role_write_line=""
   local policy_write_count=0
-  for line in "${kubectl_calls[@]}"; do
+  for line in "${vault_calls[@]}"; do
     if [[ "$line" == *"vault write auth/kubernetes/role/jenkins-cert-rotator"* ]]; then
       role_write_line="$line"
     fi
@@ -410,17 +387,21 @@ EOF
   local policy_capture="$BATS_TEST_TMPDIR/jenkins-cert-rotator-refresh.hcl"
   : >"$policy_capture"
 
-  _kubectl() {
-    while [[ $# -gt 0 ]]; do
-      case "$1" in
-        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
-        --) shift; break ;;
-        *) break ;;
-      esac
-    done
+  local VAULT_EXEC_LOG="$BATS_TEST_TMPDIR/vault-exec-commands.log"
+  : >"$VAULT_EXEC_LOG"
+  export VAULT_EXEC_LOG
 
-    local cmd="$*"
-    echo "$cmd" >> "$KUBECTL_LOG"
+  _vault_exec() {
+    # Skip --no-exit flag if present
+    if [[ "$1" == "--no-exit" ]]; then
+      shift
+    fi
+
+    local ns="$1"
+    local cmd="$2"
+    local release="$3"
+
+    echo "$cmd" >> "$VAULT_EXEC_LOG"
 
     if [[ "$cmd" == *"vault policy read jenkins-cert-rotator"* ]]; then
       cat <<'HCL'
@@ -451,16 +432,16 @@ HCL
 
     return 0
   }
-  export -f _kubectl
+  export -f _vault_exec
 
   run _create_jenkins_cert_rotator_policy vault-ns vault-release custom-pki custom-role jenkins-ns rotator-sa
   [ "$status" -eq 0 ]
 
-  read_lines "$KUBECTL_LOG" kubectl_calls
+  read_lines "$VAULT_EXEC_LOG" vault_calls
 
   local policy_write_count=0
   local policy_read_count=0
-  for line in "${kubectl_calls[@]}"; do
+  for line in "${vault_calls[@]}"; do
     if [[ "$line" == *"vault policy write jenkins-cert-rotator -"* ]]; then
       ((policy_write_count += 1))
     fi
@@ -1383,11 +1364,13 @@ EOF
   [ "${vault_args[4]}" = "$secret_name" ]
 }
 
-@test "Full deployment" {
+@test "Full deployment with --enable-vault --enable-ldap" {
   CALLS_LOG="$BATS_TEST_TMPDIR/calls.log"
   : > "$CALLS_LOG"
   deploy_eso() { echo "deploy_eso:$*" >> "$CALLS_LOG"; }
   deploy_vault() { echo "deploy_vault:$*" >> "$CALLS_LOG"; }
+  deploy_ldap() { echo "deploy_ldap:$*" >> "$CALLS_LOG"; }
+  _vault_seed_ldap_service_accounts() { echo "_vault_seed_ldap_service_accounts:$*" >> "$CALLS_LOG"; }
   _create_jenkins_admin_vault_policy() { echo "_create_jenkins_admin_vault_policy:$*" >> "$CALLS_LOG"; }
   _create_jenkins_vault_ad_policy() { echo "_create_jenkins_vault_ad_policy:$*" >> "$CALLS_LOG"; }
   _create_jenkins_cert_rotator_policy() { echo "_create_jenkins_cert_rotator_policy:$*" >> "$CALLS_LOG"; }
@@ -1400,7 +1383,7 @@ EOF
   _deploy_jenkins() { echo "_deploy_jenkins:$*" >> "$CALLS_LOG"; }
   _wait_for_jenkins_ready() { echo "_wait_for_jenkins_ready:$*" >> "$CALLS_LOG"; }
 
-  run deploy_jenkins sample-ns custom-vault
+  run deploy_jenkins --enable-vault --enable-ldap sample-ns custom-vault
   [ "$status" -eq 0 ]
 
   read_lines "$CALLS_LOG" calls
@@ -1445,6 +1428,8 @@ EOF
   expected=(
     "deploy_eso:"
     "deploy_vault:custom-vault ${release}"
+    "deploy_ldap:${LDAP_NAMESPACE:-directory} ${LDAP_RELEASE:-openldap}"
+    "_vault_seed_ldap_service_accounts:custom-vault ${release}"
     "_create_jenkins_admin_vault_policy:custom-vault ${release}"
     "_create_jenkins_vault_ad_policy:custom-vault ${release} sample-ns"
     "_create_jenkins_cert_rotator_policy:custom-vault ${release}   sample-ns"
@@ -1463,9 +1448,180 @@ EOF
     [ "${calls[$i]}" = "${expected[$i]}" ]
   done
 
-  local configure_call="${calls[6]}"
+  local configure_call="${calls[8]}"
   [[ "$configure_call" == *"${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin}"* ]]
   [[ "$configure_call" == *"${JENKINS_LDAP_VAULT_PATH:-ldap/openldap-admin}"* ]]
+}
+
+@test "deploy_jenkins without flags deploys minimal Jenkins (no Vault, no LDAP)" {
+  CALLS_LOG="$BATS_TEST_TMPDIR/calls-default.log"
+  : > "$CALLS_LOG"
+  deploy_eso() { echo "deploy_eso:$*" >> "$CALLS_LOG"; }
+  deploy_vault() { echo "deploy_vault:$*" >> "$CALLS_LOG"; }
+  deploy_ldap() { echo "deploy_ldap:$*" >> "$CALLS_LOG"; }
+  _vault_seed_ldap_service_accounts() { echo "_vault_seed_ldap_service_accounts:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_admin_vault_policy() { echo "_create_jenkins_admin_vault_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_vault_ad_policy() { echo "_create_jenkins_vault_ad_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_cert_rotator_policy() { echo "_create_jenkins_cert_rotator_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_namespace() { echo "_create_jenkins_namespace:$*" >> "$CALLS_LOG"; }
+  _vault_configure_secret_reader_role() { echo "_vault_configure_secret_reader_role:$*" >> "$CALLS_LOG"; }
+  _jenkins_apply_eso_resources() { echo "_jenkins_apply_eso_resources:$*" >> "$CALLS_LOG"; }
+  _jenkins_wait_for_secret() { echo "_jenkins_wait_for_secret:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_pv_pvc() { echo "_create_jenkins_pv_pvc:$*" >> "$CALLS_LOG"; }
+  _ensure_jenkins_cert() { echo "_ensure_jenkins_cert:$*" >> "$CALLS_LOG"; }
+  _deploy_jenkins() { echo "_deploy_jenkins:$*" >> "$CALLS_LOG"; }
+  _wait_for_jenkins_ready() { echo "_wait_for_jenkins_ready:$*" >> "$CALLS_LOG"; }
+
+  run deploy_jenkins
+  [ "$status" -eq 0 ]
+
+  read_lines "$CALLS_LOG" calls
+
+  # ESO, Vault, and LDAP should NOT be called (disabled by default)
+  for call in "${calls[@]}"; do
+    [[ "$call" != "deploy_eso:"* ]]
+    [[ "$call" != "deploy_vault:"* ]]
+    [[ "$call" != "deploy_ldap:"* ]]
+    [[ "$call" != "_vault_seed_ldap_service_accounts:"* ]]
+  done
+
+  # Jenkins core deployment should still happen
+  local jenkins_found=0
+  for call in "${calls[@]}"; do
+    if [[ "$call" == "_deploy_jenkins:"* ]]; then
+      jenkins_found=1
+      break
+    fi
+  done
+  [ "$jenkins_found" -eq 1 ]
+}
+
+@test "deploy_jenkins --enable-ldap without Vault deploys LDAP only" {
+  CALLS_LOG="$BATS_TEST_TMPDIR/calls-ldap-only.log"
+  : > "$CALLS_LOG"
+  deploy_eso() { echo "deploy_eso:$*" >> "$CALLS_LOG"; }
+  deploy_vault() { echo "deploy_vault:$*" >> "$CALLS_LOG"; }
+  deploy_ldap() { echo "deploy_ldap:$*" >> "$CALLS_LOG"; }
+  _vault_seed_ldap_service_accounts() { echo "_vault_seed_ldap_service_accounts:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_admin_vault_policy() { echo "_create_jenkins_admin_vault_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_vault_ad_policy() { echo "_create_jenkins_vault_ad_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_cert_rotator_policy() { echo "_create_jenkins_cert_rotator_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_namespace() { echo "_create_jenkins_namespace:$*" >> "$CALLS_LOG"; }
+  _vault_configure_secret_reader_role() { echo "_vault_configure_secret_reader_role:$*" >> "$CALLS_LOG"; }
+  _jenkins_apply_eso_resources() { echo "_jenkins_apply_eso_resources:$*" >> "$CALLS_LOG"; }
+  _jenkins_wait_for_secret() { echo "_jenkins_wait_for_secret:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_pv_pvc() { echo "_create_jenkins_pv_pvc:$*" >> "$CALLS_LOG"; }
+  _ensure_jenkins_cert() { echo "_ensure_jenkins_cert:$*" >> "$CALLS_LOG"; }
+  _deploy_jenkins() { echo "_deploy_jenkins:$*" >> "$CALLS_LOG"; }
+  _wait_for_jenkins_ready() { echo "_wait_for_jenkins_ready:$*" >> "$CALLS_LOG"; }
+
+  run deploy_jenkins --enable-ldap
+  [ "$status" -eq 0 ]
+
+  read_lines "$CALLS_LOG" calls
+
+  # ESO and Vault should NOT be called (Vault disabled by default)
+  for call in "${calls[@]}"; do
+    [[ "$call" != "deploy_eso:"* ]]
+    [[ "$call" != "deploy_vault:"* ]]
+  done
+
+  # LDAP should be called (explicitly enabled)
+  local ldap_found=0
+  for call in "${calls[@]}"; do
+    if [[ "$call" == "deploy_ldap:"* ]]; then
+      ldap_found=1
+      break
+    fi
+  done
+  [ "$ldap_found" -eq 1 ]
+}
+
+@test "deploy_jenkins --enable-vault without LDAP deploys Vault only" {
+  CALLS_LOG="$BATS_TEST_TMPDIR/calls-vault-only.log"
+  : > "$CALLS_LOG"
+  deploy_eso() { echo "deploy_eso:$*" >> "$CALLS_LOG"; }
+  deploy_vault() { echo "deploy_vault:$*" >> "$CALLS_LOG"; }
+  deploy_ldap() { echo "deploy_ldap:$*" >> "$CALLS_LOG"; }
+  _vault_seed_ldap_service_accounts() { echo "_vault_seed_ldap_service_accounts:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_admin_vault_policy() { echo "_create_jenkins_admin_vault_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_vault_ad_policy() { echo "_create_jenkins_vault_ad_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_cert_rotator_policy() { echo "_create_jenkins_cert_rotator_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_namespace() { echo "_create_jenkins_namespace:$*" >> "$CALLS_LOG"; }
+  _vault_configure_secret_reader_role() { echo "_vault_configure_secret_reader_role:$*" >> "$CALLS_LOG"; }
+  _jenkins_apply_eso_resources() { echo "_jenkins_apply_eso_resources:$*" >> "$CALLS_LOG"; }
+  _jenkins_wait_for_secret() { echo "_jenkins_wait_for_secret:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_pv_pvc() { echo "_create_jenkins_pv_pvc:$*" >> "$CALLS_LOG"; }
+  _ensure_jenkins_cert() { echo "_ensure_jenkins_cert:$*" >> "$CALLS_LOG"; }
+  _deploy_jenkins() { echo "_deploy_jenkins:$*" >> "$CALLS_LOG"; }
+  _wait_for_jenkins_ready() { echo "_wait_for_jenkins_ready:$*" >> "$CALLS_LOG"; }
+
+  run deploy_jenkins --enable-vault
+  [ "$status" -eq 0 ]
+
+  read_lines "$CALLS_LOG" calls
+
+  # ESO and Vault SHOULD be called (explicitly enabled)
+  local eso_found=0 vault_found=0
+  for call in "${calls[@]}"; do
+    [[ "$call" == "deploy_eso:"* ]] && eso_found=1
+    [[ "$call" == "deploy_vault:"* ]] && vault_found=1
+  done
+  [ "$eso_found" -eq 1 ]
+  [ "$vault_found" -eq 1 ]
+
+  # LDAP should NOT be called (disabled by default)
+  for call in "${calls[@]}"; do
+    [[ "$call" != "deploy_ldap:"* ]]
+  done
+
+  # LDAP service accounts should NOT be seeded
+  for call in "${calls[@]}"; do
+    [[ "$call" != "_vault_seed_ldap_service_accounts:"* ]]
+  done
+}
+
+@test "deploy_jenkins --disable-vault --disable-ldap skips all integrations" {
+  CALLS_LOG="$BATS_TEST_TMPDIR/calls-minimal.log"
+  : > "$CALLS_LOG"
+  deploy_eso() { echo "deploy_eso:$*" >> "$CALLS_LOG"; }
+  deploy_vault() { echo "deploy_vault:$*" >> "$CALLS_LOG"; }
+  deploy_ldap() { echo "deploy_ldap:$*" >> "$CALLS_LOG"; }
+  _vault_seed_ldap_service_accounts() { echo "_vault_seed_ldap_service_accounts:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_admin_vault_policy() { echo "_create_jenkins_admin_vault_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_vault_ad_policy() { echo "_create_jenkins_vault_ad_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_cert_rotator_policy() { echo "_create_jenkins_cert_rotator_policy:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_namespace() { echo "_create_jenkins_namespace:$*" >> "$CALLS_LOG"; }
+  _vault_configure_secret_reader_role() { echo "_vault_configure_secret_reader_role:$*" >> "$CALLS_LOG"; }
+  _jenkins_apply_eso_resources() { echo "_jenkins_apply_eso_resources:$*" >> "$CALLS_LOG"; }
+  _jenkins_wait_for_secret() { echo "_jenkins_wait_for_secret:$*" >> "$CALLS_LOG"; }
+  _create_jenkins_pv_pvc() { echo "_create_jenkins_pv_pvc:$*" >> "$CALLS_LOG"; }
+  _ensure_jenkins_cert() { echo "_ensure_jenkins_cert:$*" >> "$CALLS_LOG"; }
+  _deploy_jenkins() { echo "_deploy_jenkins:$*" >> "$CALLS_LOG"; }
+  _wait_for_jenkins_ready() { echo "_wait_for_jenkins_ready:$*" >> "$CALLS_LOG"; }
+
+  run deploy_jenkins --disable-vault --disable-ldap
+  [ "$status" -eq 0 ]
+
+  read_lines "$CALLS_LOG" calls
+
+  # ESO, Vault, and LDAP should NOT be called
+  for call in "${calls[@]}"; do
+    [[ "$call" != "deploy_eso:"* ]]
+    [[ "$call" != "deploy_vault:"* ]]
+    [[ "$call" != "deploy_ldap:"* ]]
+    [[ "$call" != "_vault_seed_ldap_service_accounts:"* ]]
+  done
+
+  # Jenkins core deployment should still happen
+  local jenkins_found=0
+  for call in "${calls[@]}"; do
+    if [[ "$call" == "_deploy_jenkins:"* ]]; then
+      jenkins_found=1
+      break
+    fi
+  done
+  [ "$jenkins_found" -eq 1 ]
 }
 
 @test "deploy_jenkins aborts readiness wait when deployment fails" {
@@ -1474,6 +1630,8 @@ EOF
 
   deploy_vault() { :; }
   deploy_eso() { :; }
+  deploy_ldap() { :; }
+  _vault_seed_ldap_service_accounts() { :; }
   _create_jenkins_admin_vault_policy() { :; }
   _create_jenkins_vault_ad_policy() { :; }
   _create_jenkins_cert_rotator_policy() { :; }
@@ -1510,6 +1668,8 @@ export_stubs
 
 deploy_vault() { :; }
 deploy_eso() { :; }
+deploy_ldap() { :; }
+_vault_seed_ldap_service_accounts() { :; }
 _create_jenkins_admin_vault_policy() { :; }
 _create_jenkins_vault_ad_policy() { :; }
 _create_jenkins_cert_rotator_policy() { :; }
@@ -1548,7 +1708,8 @@ EOF
   [[ ! -s "$WAIT_LOG" ]]
   read_lines "$SECRET_WAIT_LOG" waited_secrets
   [[ "${waited_secrets[*]}" == *"${JENKINS_ADMIN_SECRET_NAME:-jenkins-admin}"* ]]
-  [[ "${waited_secrets[*]}" == *"${JENKINS_LDAP_SECRET_NAME:-jenkins-ldap-config}"* ]]
+  # LDAP secret should NOT be waited for when LDAP is disabled (default)
+  [[ "${waited_secrets[*]}" != *"${JENKINS_LDAP_SECRET_NAME:-jenkins-ldap-config}"* ]]
 }
 
 @test "_wait_for_jenkins_ready waits for controller" {
@@ -1875,6 +2036,8 @@ source "$BATS_TEST_DIRNAME/../../plugins/jenkins.sh"
 export_stubs
 deploy_vault() { :; }
 deploy_eso() { :; }
+deploy_ldap() { :; }
+_vault_seed_ldap_service_accounts() { :; }
 _create_jenkins_admin_vault_policy() { :; }
 _create_jenkins_vault_ad_policy() { :; }
 _create_jenkins_cert_rotator_policy() { :; }
@@ -1951,5 +2114,106 @@ EOF
   grep -q "jenkins.$random_ns.svc.cluster.local" "$dr_file"
   read_lines "$SECRET_WAIT_LOG" manifest_waits
   [[ "${manifest_waits[*]}" == *"${JENKINS_ADMIN_SECRET_NAME:-jenkins-admin}"* ]]
-  [[ "${manifest_waits[*]}" == *"${JENKINS_LDAP_SECRET_NAME:-jenkins-ldap-config}"* ]]
+  # LDAP secret should NOT be waited for when LDAP is disabled (default)
+  [[ "${manifest_waits[*]}" != *"${JENKINS_LDAP_SECRET_NAME:-jenkins-ldap-config}"* ]]
+}
+
+@test "_jenkins_apply_eso_resources filters LDAP ExternalSecret when LDAP disabled" {
+  export JENKINS_CONFIG_DIR="${SCRIPT_DIR}/etc/jenkins"
+  export JENKINS_NAMESPACE="jenkins"
+  export JENKINS_ESO_SERVICE_ACCOUNT="eso-jenkins-sa"
+  export JENKINS_ESO_SECRETSTORE="vault-kv-store"
+  export VAULT_ENDPOINT="http://vault.vault.svc:8200"
+  export JENKINS_VAULT_KV_MOUNT="secret"
+  export JENKINS_ESO_ROLE="eso-jenkins-admin"
+  export JENKINS_ADMIN_SECRET_NAME="jenkins-admin"
+  export JENKINS_ADMIN_K8S_USER_KEY="jenkins-admin-user"
+  export JENKINS_ADMIN_VAULT_PATH="eso/jenkins-admin"
+  export JENKINS_ADMIN_USERNAME_KEY="username"
+  export JENKINS_ADMIN_K8S_PASS_KEY="jenkins-admin-password"
+  export JENKINS_ADMIN_PASSWORD_KEY="password"
+  export JENKINS_LDAP_SECRET_NAME="jenkins-ldap-config"
+  export JENKINS_LDAP_VAULT_PATH="ldap/service-accounts/jenkins-admin"
+  export JENKINS_LDAP_BINDDN_KEY="bind_dn"
+  export JENKINS_LDAP_PASSWORD_KEY="password"
+  export JENKINS_LDAP_BASE_DN_KEY="base_dn"
+  export JENKINS_LDAP_ENABLED=0
+
+  local KUBECTL_LOG="$BATS_TEST_TMPDIR/kubectl-eso-filter.log"
+  : >"$KUBECTL_LOG"
+  export KUBECTL_LOG
+
+  _kubectl() {
+    local cmd="$*"
+    echo "$cmd" >> "$KUBECTL_LOG"
+    if [[ "$cmd" == "apply -f "* ]]; then
+      local manifest_file="${cmd#apply -f }"
+      # Verify LDAP ExternalSecret is NOT in the manifest
+      if grep -q "name: jenkins-ldap-config" "$manifest_file"; then
+        echo "ERROR: LDAP ExternalSecret found in manifest when LDAP disabled" >&2
+        return 1
+      fi
+      # Verify jenkins-admin ExternalSecret IS in the manifest
+      if ! grep -q "name: jenkins-admin" "$manifest_file"; then
+        echo "ERROR: jenkins-admin ExternalSecret not found in manifest" >&2
+        return 1
+      fi
+      return 0
+    fi
+    return 0
+  }
+  export -f _kubectl
+
+  run _jenkins_apply_eso_resources "$JENKINS_NAMESPACE"
+  [ "$status" -eq 0 ]
+}
+
+@test "_jenkins_apply_eso_resources includes LDAP ExternalSecret when LDAP enabled" {
+  export JENKINS_CONFIG_DIR="${SCRIPT_DIR}/etc/jenkins"
+  export JENKINS_NAMESPACE="jenkins"
+  export JENKINS_ESO_SERVICE_ACCOUNT="eso-jenkins-sa"
+  export JENKINS_ESO_SECRETSTORE="vault-kv-store"
+  export VAULT_ENDPOINT="http://vault.vault.svc:8200"
+  export JENKINS_VAULT_KV_MOUNT="secret"
+  export JENKINS_ESO_ROLE="eso-jenkins-admin"
+  export JENKINS_ADMIN_SECRET_NAME="jenkins-admin"
+  export JENKINS_ADMIN_K8S_USER_KEY="jenkins-admin-user"
+  export JENKINS_ADMIN_VAULT_PATH="eso/jenkins-admin"
+  export JENKINS_ADMIN_USERNAME_KEY="username"
+  export JENKINS_ADMIN_K8S_PASS_KEY="jenkins-admin-password"
+  export JENKINS_ADMIN_PASSWORD_KEY="password"
+  export JENKINS_LDAP_SECRET_NAME="jenkins-ldap-config"
+  export JENKINS_LDAP_VAULT_PATH="ldap/service-accounts/jenkins-admin"
+  export JENKINS_LDAP_BINDDN_KEY="bind_dn"
+  export JENKINS_LDAP_PASSWORD_KEY="password"
+  export JENKINS_LDAP_BASE_DN_KEY="base_dn"
+  export JENKINS_LDAP_ENABLED=1
+
+  local KUBECTL_LOG="$BATS_TEST_TMPDIR/kubectl-eso-include.log"
+  : >"$KUBECTL_LOG"
+  export KUBECTL_LOG
+
+  _kubectl() {
+    local cmd="$*"
+    echo "$cmd" >> "$KUBECTL_LOG"
+    if [[ "$cmd" == "apply -f "* ]]; then
+      local manifest_file="${cmd#apply -f }"
+      # Verify LDAP ExternalSecret IS in the manifest
+      if ! grep -q "name: jenkins-ldap-config" "$manifest_file"; then
+        echo "ERROR: LDAP ExternalSecret not found in manifest when LDAP enabled" >&2
+        return 1
+      fi
+      # Verify jenkins-admin ExternalSecret IS in the manifest
+      if ! grep -q "name: jenkins-admin" "$manifest_file"; then
+        echo "ERROR: jenkins-admin ExternalSecret not found in manifest" >&2
+        return 1
+      fi
+      return 0
+    fi
+    return 0
+  }
+  export -f _kubectl
+
+  run _jenkins_apply_eso_resources "$JENKINS_NAMESPACE"
+  [ "$status" -eq 0 ]
 }
