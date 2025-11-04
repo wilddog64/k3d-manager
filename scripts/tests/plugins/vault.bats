@@ -697,9 +697,9 @@ JSON
 
   read_lines "$KUBECTL_LOG" kubectl_calls
   expected_patterns=(
-    "$expected_get"
-    "vault status >/dev/null 2>&1"
-    "-n ${TEST_NS} get secret vault-unseal -o json"
+    "-n ${TEST_NS} get pod ${TEST_POD}"
+    "vault operator init"
+    "-n ${TEST_NS} get pod -l app.kubernetes.io/name=vault,app.kubernetes.io/instance=${TEST_RELEASE}"
   )
 
   for expected in "${expected_patterns[@]}"; do
@@ -729,7 +729,7 @@ JSON
   : >"$INFO_LOG"
   : >"$PORT_LOG"
 
-  _err() { printf '%s\n' "$*" >>"$ERR_LOG"; return 1; }
+  _err() { printf '%s\n' "$*" >>"$ERR_LOG"; exit 1; }
   _info() { printf '%s\n' "$*" >>"$INFO_LOG"; }
   _is_vault_health() { _info "return code: 503"; return 1; }
   _vault_portforward_help() { echo called >>"$PORT_LOG"; }
@@ -769,13 +769,15 @@ JSON
 
   _info() { printf '%s\n' "$*" >>"$INFO_LOG"; }
   _is_vault_health() { _info "return code: 200"; return 0; }
-  _err() { printf '%s\n' "$*" >>"$ERR_LOG"; return 1; }
+  _err() { printf '%s\n' "$*" >>"$ERR_LOG"; exit 1; }
   _vault_portforward_help() { echo called >>"$PORT_LOG"; }
+  _vault_login() { _info "_vault_login called"; }
 
   export -f _info
   export -f _is_vault_health
   export -f _err
   export -f _vault_portforward_help
+  export -f _vault_login
 
   run _vault_bootstrap_ha "$TEST_NS" "$TEST_RELEASE"
   if [ "$status" -ne 0 ]; then
