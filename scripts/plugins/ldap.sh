@@ -834,12 +834,31 @@ EOF
    export LDAP_NAMESPACE="$namespace"
    export LDAP_RELEASE="$release"
 
-   deploy_eso
+   # ESO deployment managed by Jenkins plugin; skip redundant call
+   # deploy_eso
 
    local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
    local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
-   if ! _vault_replay_cached_unseal "$vault_ns" "$vault_release"; then
-      _warn "[ldap] unable to auto-unseal Vault ${vault_ns}/${vault_release}; continuing"
+
+   # Check if Vault is sealed before attempting unseal
+   if _vault_is_sealed "$vault_ns" "$vault_release"; then
+      # Vault is sealed - attempt to unseal it
+      _info "[ldap] Vault ${vault_ns}/${vault_release} is sealed; attempting to unseal"
+      if ! _vault_replay_cached_unseal "$vault_ns" "$vault_release"; then
+         _err "[ldap] Vault ${vault_ns}/${vault_release} is sealed and cannot be unsealed; LDAP deployment requires accessible Vault"
+      fi
+   else
+      local seal_check_rc=$?
+      if (( seal_check_rc == 1 )); then
+         # Vault is unsealed - continue normally
+         _info "[ldap] Vault ${vault_ns}/${vault_release} is already unsealed"
+      elif (( seal_check_rc == 2 )); then
+         # Cannot determine seal status - attempt unseal anyway as fallback
+         _warn "[ldap] Unable to determine Vault seal status; attempting unseal as fallback"
+         if ! _vault_replay_cached_unseal "$vault_ns" "$vault_release"; then
+            _err "[ldap] Cannot access Vault ${vault_ns}/${vault_release}; LDAP deployment requires accessible Vault"
+         fi
+      fi
    fi
 
    if ! _ldap_seed_admin_secret; then

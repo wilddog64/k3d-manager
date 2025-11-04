@@ -350,6 +350,33 @@ function _vault_parse_sealed_from_status() {
    return 1
 }
 
+function _vault_is_sealed() {
+   local cluster_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+   local cluster_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
+
+   local status_json=""
+   status_json=$(_vault_exec --no-exit "$cluster_ns" "vault status -format=json" "$cluster_release" 2>/dev/null || true)
+
+   if [[ -z "$status_json" ]]; then
+      # Cannot determine status - return "unknown" via exit code 2
+      return 2
+   fi
+
+   local sealed=""
+   sealed=$(_vault_parse_sealed_from_status "$status_json" 2>/dev/null || true)
+
+   if [[ "$sealed" == "true" ]]; then
+      # Vault is sealed
+      return 0
+   elif [[ "$sealed" == "false" ]]; then
+      # Vault is unsealed
+      return 1
+   else
+      # Cannot determine status
+      return 2
+   fi
+}
+
 function _vault_replay_cached_unseal() {
    local cluster_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local cluster_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"

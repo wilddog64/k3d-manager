@@ -800,3 +800,60 @@ JSON
   done
   [ "$ready_found" -eq 1 ]
 }
+
+@test "_vault_is_sealed returns 0 when Vault is sealed" {
+  TEST_NS="vault-test"
+  TEST_RELEASE="vault"
+
+  _vault_exec() {
+    # Skip flags and return sealed status
+    while [[ "$1" == --* ]]; do shift; done
+    echo '{"sealed": true}'
+  }
+  _vault_parse_sealed_from_status() {
+    echo "true"
+  }
+  export -f _vault_exec
+  export -f _vault_parse_sealed_from_status
+
+  if _vault_is_sealed "$TEST_NS" "$TEST_RELEASE"; then
+    # Function returned 0 (true/sealed)
+    :
+  else
+    fail "Expected _vault_is_sealed to return 0 (sealed) but it didn't"
+  fi
+}
+
+@test "_vault_is_sealed returns 1 when Vault is unsealed" {
+  TEST_NS="vault-test"
+  TEST_RELEASE="vault"
+
+  _vault_exec() {
+    # Skip flags and return unsealed status
+    while [[ "$1" == --* ]]; do shift; done
+    echo '{"sealed": false}'
+  }
+  _vault_parse_sealed_from_status() {
+    echo "false"
+  }
+  export -f _vault_exec
+  export -f _vault_parse_sealed_from_status
+
+  run _vault_is_sealed "$TEST_NS" "$TEST_RELEASE"
+  [ "$status" -eq 1 ]  # Should return 1 for unsealed
+}
+
+@test "_vault_is_sealed returns 2 when status cannot be determined" {
+  TEST_NS="vault-test"
+  TEST_RELEASE="vault"
+
+  _vault_exec() {
+    # Skip flags and return empty (simulating connection failure)
+    while [[ "$1" == --* ]]; do shift; done
+    echo ""
+  }
+  export -f _vault_exec
+
+  run _vault_is_sealed "$TEST_NS" "$TEST_RELEASE"
+  [ "$status" -eq 2 ]  # Returns 2 when unknown
+}
