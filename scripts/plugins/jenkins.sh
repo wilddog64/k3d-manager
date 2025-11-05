@@ -1355,6 +1355,8 @@ function _create_jenkins_admin_vault_policy() {
    local vault_namespace="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
 
+   _vault_login "$vault_namespace" "$vault_release"
+
    local policy_exists=0
    if _vault_policy_exists "$vault_namespace" "$vault_release" "jenkins-admin"; then
       policy_exists=1
@@ -1413,6 +1415,8 @@ function _create_jenkins_vault_ad_policy() {
    local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
    local jenkins_namespace="${3:-jenkins}"
 
+   _vault_login "$vault_namespace" "$vault_release"
+
    if ! _vault_policy_exists "$vault_namespace" "$vault_release" "jenkins-jcasc-read"; then
       local read_policy
       read_policy=$(cat <<'HCL'
@@ -1450,6 +1454,8 @@ function _create_jenkins_cert_rotator_policy() {
    local jenkins_namespace="${5:-jenkins}"
    local rotator_service_account="${6:-jenkins-cert-rotator}"
    local policy_name="jenkins-cert-rotator"
+
+   _vault_login "$vault_namespace" "$vault_release"
 
    local ensure_policy=1
 
