@@ -447,7 +447,6 @@ function _ensure_jenkins_cert() {
    local k8s_namespace="${VAULT_PKI_SECRET_NS:-istio-system}"
    local secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
    local common_name="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
-   local pod="${vault_release}-0"
 
    if _kubectl --no-exit -n "$k8s_namespace" \
       get secret "$secret_name" >/dev/null 2>&1; then
@@ -455,12 +454,11 @@ function _ensure_jenkins_cert() {
       return 0
    fi
 
-   if ! _kubectl --no-exit -n "$vault_namespace" exec -i "$pod" -- \
-      sh -c 'vault secrets list | grep -q "^pki/"'; then
-      _kubectl -n "$vault_namespace" exec -i "$pod" -- vault secrets enable pki
-      _kubectl -n "$vault_namespace" exec -i "$pod" -- vault secrets tune -max-lease-ttl=87600h pki
-      _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-         vault write pki/root/generate/internal common_name="dev.local.me" ttl=87600h
+   # Check if PKI secrets engine is enabled using authenticated vault_exec
+   if ! _vault_exec --no-exit "$vault_namespace" "vault secrets list" "$vault_release" 2>/dev/null | grep -q "^pki/"; then
+      _vault_exec "$vault_namespace" "vault secrets enable pki" "$vault_release"
+      _vault_exec "$vault_namespace" "vault secrets tune -max-lease-ttl=87600h pki" "$vault_release"
+      _vault_exec "$vault_namespace" "vault write pki/root/generate/internal common_name=dev.local.me ttl=87600h" "$vault_release"
    fi
 
    local allowed_domains_input="${VAULT_PKI_ALLOWED:-}"
@@ -493,12 +491,15 @@ function _ensure_jenkins_cert() {
    fi
    _jenkins_role_args+=("max_ttl=72h")
 
-   _kubectl -n "$vault_namespace" exec -i "$pod" -- \
-      vault write pki/roles/jenkins "${_jenkins_role_args[@]}"
+   # Build vault write command with all arguments
+   local role_cmd="vault write pki/roles/jenkins"
+   for arg in "${_jenkins_role_args[@]}"; do
+      role_cmd+=" $arg"
+   done
+   _vault_exec "$vault_namespace" "$role_cmd" "$vault_release"
 
    local json cert_file key_file
-   json=$(_kubectl -n "$vault_namespace" exec -i "$pod" -- \
-      vault write -format=json pki/issue/jenkins common_name="$common_name" ttl=72h)
+   json=$(_vault_exec "$vault_namespace" "vault write -format=json pki/issue/jenkins common_name=$common_name ttl=72h" "$vault_release")
 
    cert_file=$(mktemp -t jenkins-cert.XXXXXX.pem)
    key_file=$(mktemp -t jenkins-key.XXXXXX.pem)
@@ -1036,6 +1037,89 @@ function _deploy_jenkins() {
    local values_file="${JENKINS_VALUES_FILE:-$JENKINS_CONFIG_DIR/values.yaml}"
    if [[ ! -r "$values_file" ]]; then
       _err "Jenkins values file not found: $values_file"
+   fi
+
+   # If LDAP is disabled, create a temporary values file without LDAP env vars
+   if (( ! JENKINS_LDAP_ENABLED )); then
+      local temp_values
+      temp_values=$(mktemp -t jenkins-values.XXXXXX.yaml)
+      _jenkins_register_rendered_manifest "$temp_values"
+
+      # Remove LDAP-related environment variables and JCasC security realm using awk
+      # This removes:
+      # 1. LDAP env var blocks (name + value/valueFrom) from containerEnv
+      # 2. LDAP securityRealm block from JCasC configScripts
+      awk '
+      BEGIN {
+         skip_depth = 0
+         current_indent = 0
+         ldap_indent = 0
+         in_jcasc_security = 0
+         skip_security_realm = 0
+         security_realm_indent = 0
+      }
+
+      # Track when we are in the 01-security JCasC config
+      /^[[:space:]]*01-security:/ {
+         in_jcasc_security = 1
+      }
+
+      # End of 01-security section (next config or end of JCasC)
+      in_jcasc_security && /^[[:space:]]*[0-9][0-9]-/ && !/01-security/ {
+         in_jcasc_security = 0
+      }
+
+      # When in JCasC security config, detect LDAP securityRealm block
+      in_jcasc_security && /^[[:space:]]*securityRealm:/ {
+         match($0, /^[[:space:]]*/)
+         security_realm_indent = RLENGTH
+         skip_security_realm = 1
+         next
+      }
+
+      # Skip entire securityRealm block (including nested ldap config)
+      skip_security_realm {
+         match($0, /^[[:space:]]*/)
+         current_indent = RLENGTH
+
+         # Stop skipping when we hit a sibling key at same or less indent as securityRealm
+         if (current_indent <= security_realm_indent && $0 ~ /^[[:space:]]*[a-zA-Z]+:/) {
+            skip_security_realm = 0
+         }
+
+         if (skip_security_realm) next
+      }
+
+      # When we find an LDAP env var, mark its indent level and start skipping
+      /^[[:space:]]*- name: LDAP_/ {
+         match($0, /^[[:space:]]*/)
+         ldap_indent = RLENGTH
+         skip_depth = 1
+         next
+      }
+
+      # If skipping env var, check indent to know when the LDAP block ends
+      skip_depth > 0 {
+         match($0, /^[[:space:]]*/)
+         current_indent = RLENGTH
+
+         # If we hit another "- name:" at the same level, stop skipping
+         if ($0 ~ /^[[:space:]]*- name:/ && current_indent == ldap_indent) {
+            skip_depth = 0
+         }
+         # If we hit a line with less or equal indent that is not a continuation, stop skipping
+         else if (current_indent <= ldap_indent && $0 !~ /^[[:space:]]*[a-zA-Z]+:/ && $0 !~ /^[[:space:]]*key:/) {
+            skip_depth = 0
+         }
+
+         if (skip_depth > 0) next
+      }
+
+      # Print non-skipped lines
+      { print }
+      ' "$values_file" > "$temp_values"
+
+      values_file="$temp_values"
    fi
 
    local -a helm_args=(upgrade --install jenkins "$helm_chart_ref" --namespace "$ns" -f "$values_file")

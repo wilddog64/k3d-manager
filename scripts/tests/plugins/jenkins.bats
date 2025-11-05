@@ -456,14 +456,22 @@ HCL
 }
 
 @test "_ensure_jenkins_cert sets up PKI and TLS secret" {
-  _kubectl() {
-    local cmd="$*"
-    echo "$cmd" >> "$KUBECTL_LOG"
-    local secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
-    if [[ "$cmd" == *"get secret ${secret_name}"* ]]; then
-      return 1
+  local VAULT_EXEC_LOG="$BATS_TEST_TMPDIR/vault-exec-cert.log"
+  : >"$VAULT_EXEC_LOG"
+  export VAULT_EXEC_LOG
+
+  _vault_exec() {
+    # Skip --no-exit flag if present
+    if [[ "$1" == "--no-exit" ]]; then
+      shift
     fi
-    if [[ "$cmd" == *"vault secrets list"* ]]; then
+    local ns="$1"
+    local cmd="$2"
+    local release="$3"
+    echo "$cmd" >> "$VAULT_EXEC_LOG"
+
+    if [[ "$cmd" == "vault secrets list" ]]; then
+      # Return empty to simulate PKI not enabled
       return 1
     fi
     if [[ "$cmd" == *"vault write -format=json pki/issue/jenkins"* ]]; then
@@ -471,6 +479,17 @@ HCL
 {"data":{"certificate":"CERT","private_key":"KEY"}}
 JSON
       return 0
+    fi
+    return 0
+  }
+  export -f _vault_exec
+
+  _kubectl() {
+    local cmd="$*"
+    echo "$cmd" >> "$KUBECTL_LOG"
+    local secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
+    if [[ "$cmd" == *"get secret ${secret_name}"* ]]; then
+      return 1
     fi
     return 0
   }
@@ -481,22 +500,30 @@ JSON
 
   run _ensure_jenkins_cert vault
   [ "$status" -eq 0 ]
-  grep -q 'vault secrets enable pki' "$KUBECTL_LOG"
-  grep -Fq 'vault write pki/roles/jenkins allowed_domains=sslip.io allow_subdomains=true max_ttl=72h' "$KUBECTL_LOG"
-  grep -q 'vault write -format=json pki/issue/jenkins' "$KUBECTL_LOG"
+  grep -q 'vault secrets enable pki' "$VAULT_EXEC_LOG"
+  grep -Fq 'vault write pki/roles/jenkins allowed_domains=sslip.io allow_subdomains=true max_ttl=72h' "$VAULT_EXEC_LOG"
+  grep -q 'vault write -format=json pki/issue/jenkins' "$VAULT_EXEC_LOG"
   local secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
   grep -q "create secret tls ${secret_name}" "$KUBECTL_LOG"
 }
 
 @test "_ensure_jenkins_cert honors VAULT_PKI_ALLOWED for wildcard domains" {
-  _kubectl() {
-    local cmd="$*"
-    echo "$cmd" >> "$KUBECTL_LOG"
-    local secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
-    if [[ "$cmd" == *"get secret ${secret_name}"* ]]; then
-      return 1
+  local VAULT_EXEC_LOG="$BATS_TEST_TMPDIR/vault-exec-wildcard.log"
+  : >"$VAULT_EXEC_LOG"
+  export VAULT_EXEC_LOG
+
+  _vault_exec() {
+    # Skip --no-exit flag if present
+    if [[ "$1" == "--no-exit" ]]; then
+      shift
     fi
-    if [[ "$cmd" == *"vault secrets list"* ]]; then
+    local ns="$1"
+    local cmd="$2"
+    local release="$3"
+    echo "$cmd" >> "$VAULT_EXEC_LOG"
+
+    if [[ "$cmd" == "vault secrets list" ]]; then
+      # Return empty to simulate PKI not enabled
       return 1
     fi
     if [[ "$cmd" == *"vault write -format=json pki/issue/jenkins"* ]]; then
@@ -507,15 +534,26 @@ JSON
     fi
     return 0
   }
+  export -f _vault_exec
+
+  _kubectl() {
+    local cmd="$*"
+    echo "$cmd" >> "$KUBECTL_LOG"
+    local secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
+    if [[ "$cmd" == *"get secret ${secret_name}"* ]]; then
+      return 1
+    fi
+    return 0
+  }
   export -f _kubectl
 
   export VAULT_PKI_ALLOWED="jenkins.dev.local.me,*.dev.local.me"
 
   run _ensure_jenkins_cert vault
   [ "$status" -eq 0 ]
-  grep -Fq 'allowed_domains=jenkins.dev.local.me,*.dev.local.me' "$KUBECTL_LOG"
-  grep -Fq 'max_ttl=72h' "$KUBECTL_LOG"
-  ! grep -q 'allow_subdomains=' "$KUBECTL_LOG"
+  grep -Fq 'allowed_domains=jenkins.dev.local.me,*.dev.local.me' "$VAULT_EXEC_LOG"
+  grep -Fq 'max_ttl=72h' "$VAULT_EXEC_LOG"
+  ! grep -q 'allow_subdomains=' "$VAULT_EXEC_LOG"
   unset VAULT_PKI_ALLOWED
 }
 
