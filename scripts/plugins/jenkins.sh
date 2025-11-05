@@ -13,6 +13,15 @@ if [[ -n "${SCRIPT_DIR:-}" ]]; then
    fi
 fi
 
+# Source directory service abstraction (optional, for new abstraction layer)
+if [[ -n "${SCRIPT_DIR:-}" ]]; then
+   DIRECTORY_SERVICE_LIB="$SCRIPT_DIR/lib/directory_service.sh"
+   if [[ -r "$DIRECTORY_SERVICE_LIB" ]]; then
+      # shellcheck disable=SC1090
+      source "$DIRECTORY_SERVICE_LIB"
+   fi
+fi
+
 # Ensure _no_trace is defined
 command -v _no_trace >/dev/null 2>&1 || _no_trace() { "$@"; }
 
@@ -704,27 +713,41 @@ function _deploy_jenkins_ldap() {
 
    _info "[jenkins] deploying LDAP integration to ${ldap_ns}/${ldap_release}"
 
-   # Source LDAP plugin if not already loaded
-   if ! declare -f deploy_ldap >/dev/null 2>&1; then
-      local ldap_plugin="$PLUGINS_DIR/ldap.sh"
-      if [[ ! -r "$ldap_plugin" ]]; then
-         _err "[jenkins] LDAP plugin not found at ${ldap_plugin}"
+   # Use directory service interface if available, otherwise fallback to direct LDAP calls
+   if declare -f dirservice_init >/dev/null 2>&1; then
+      # New directory service interface
+      _info "[jenkins] using directory service abstraction"
+      export DIRECTORY_SERVICE_PROVIDER="${DIRECTORY_SERVICE_PROVIDER:-openldap}"
+
+      if ! dirservice_init "$ldap_ns" "$ldap_release" "$vault_ns" "$vault_release"; then
+         _err "[jenkins] directory service initialization failed"
       fi
-      # shellcheck disable=SC1090
-      source "$ldap_plugin"
-   fi
-
-   # Deploy LDAP directory
-   if ! deploy_ldap "$ldap_ns" "$ldap_release"; then
-      _err "[jenkins] LDAP deployment failed"
-   fi
-
-   # Seed Jenkins service account in Vault LDAP
-   if declare -f _vault_seed_ldap_service_accounts >/dev/null 2>&1; then
-      _info "[jenkins] seeding Jenkins LDAP service account in Vault"
-      _vault_seed_ldap_service_accounts "$vault_ns" "$vault_release"
    else
-      _warn "[jenkins] _vault_seed_ldap_service_accounts not available; skipping service account seed"
+      # Fallback to direct LDAP plugin (backward compatibility)
+      _info "[jenkins] using legacy LDAP plugin"
+
+      # Source LDAP plugin if not already loaded
+      if ! declare -f deploy_ldap >/dev/null 2>&1; then
+         local ldap_plugin="$PLUGINS_DIR/ldap.sh"
+         if [[ ! -r "$ldap_plugin" ]]; then
+            _err "[jenkins] LDAP plugin not found at ${ldap_plugin}"
+         fi
+         # shellcheck disable=SC1090
+         source "$ldap_plugin"
+      fi
+
+      # Deploy LDAP directory
+      if ! deploy_ldap "$ldap_ns" "$ldap_release"; then
+         _err "[jenkins] LDAP deployment failed"
+      fi
+
+      # Seed Jenkins service account in Vault LDAP
+      if declare -f _vault_seed_ldap_service_accounts >/dev/null 2>&1; then
+         _info "[jenkins] seeding Jenkins LDAP service account in Vault"
+         _vault_seed_ldap_service_accounts "$vault_ns" "$vault_release"
+      else
+         _warn "[jenkins] _vault_seed_ldap_service_accounts not available; skipping service account seed"
+      fi
    fi
 }
 
@@ -1453,8 +1476,10 @@ HCL
       jenkins_admin_pass=$(_vault_exec "$vault_namespace" \
          "vault read -field=password sys/policies/password/jenkins-admin/generate" "$vault_release")
 
+      # Note: secret_backend_put handles password masking internally
       if ! secret_backend_put "$secret_path" username=jenkins-admin password="$jenkins_admin_pass"; then
-         _err "[jenkins] failed to seed admin secret at $secret_path"
+         # Error already logged by secret_backend_put with password masked
+         return 1
       fi
    else
       # Fallback to direct Vault commands (for backward compatibility)

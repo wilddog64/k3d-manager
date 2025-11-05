@@ -59,12 +59,20 @@ function _secret_backend_vault_put() {
    done
 
    local full_path="${mount}/${path}"
-   local cmd="vault kv put ${full_path}"
+
+   # Build command with proper quoting to handle special characters
+   # Use printf %q to properly quote each argument
+   local cmd="vault kv put"
+   cmd+=" $(printf '%q' "$full_path")"
    for arg in "${kv_args[@]}"; do
-      cmd+=" $arg"
+      cmd+=" $(printf '%q' "$arg")"
    done
 
-   if ! _no_trace _vault_exec "$ns" "$cmd" "$release"; then
+   # Execute with trace disabled and suppress command echo on error
+   if ! _no_trace _vault_exec "$ns" "$cmd" "$release" 2>&1 | grep -v "vault kv put"; then
+      # Mask the path to avoid leaking secret names in errors
+      local safe_path="${path%%/*}/***"
+      _err "[secret_backend:vault] failed to write secret at ${safe_path} (check Vault logs for details)"
       return 1
    fi
 
