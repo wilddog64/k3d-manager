@@ -1868,8 +1868,10 @@ EOF
 
   read_lines "$out_helm" helm_calls
   [ "${#helm_calls[@]}" -eq 1 ]
-  local expected="upgrade --install jenkins ${JENKINS_HELM_CHART_REF} --namespace sample-ns -f $JENKINS_CONFIG_DIR/values.yaml"
-  [ "${helm_calls[0]}" = "$expected" ]
+  # Check that helm upgrade was called with the chart ref and namespace
+  # The values file may be original or a temp file (when LDAP filtering is active)
+  [[ "${helm_calls[0]}" == upgrade\ --install\ jenkins\ ${JENKINS_HELM_CHART_REF}\ --namespace\ sample-ns\ -f\ * ]]
+  # Ensure no repo operations were called
   for call in "${helm_calls[@]}"; do
     [[ "$call" != repo\ add* ]]
     [[ "$call" != repo\ update* ]]
@@ -2029,10 +2031,10 @@ fi
   while IFS= read -r line; do
     cleanup_paths+=("$line")
   done <"$log_file"
-expected_count=3
+expected_count=4
 for path in "${cleanup_paths[@]}"; do
   if [[ "$path" == *jenkins-cert-rotator* ]]; then
-    expected_count=4
+    expected_count=5
     break
   fi
 done
