@@ -234,6 +234,24 @@ EOF
 
 @test "_create_jenkins_admin_vault_policy stores secret without logging password" {
   _vault_policy_exists() { return 1; }
+  _vault_login() { echo "_vault_login" >> "$KUBECTL_LOG"; return 0; }
+  export -f _vault_login
+
+  # Mock secret backend functions
+  secret_backend_init() { echo "secret_backend_init" >> "$KUBECTL_LOG"; return 0; }
+  secret_backend_exists() { echo "secret_backend_exists $*" >> "$KUBECTL_LOG"; return 1; }
+  secret_backend_put() {
+    local args="$*"
+    if [[ "$args" == *password=* ]]; then
+      args="${args%%password=*}password=***"
+    fi
+    echo "secret_backend_put $args" >> "$KUBECTL_LOG"
+    return 0
+  }
+  export -f secret_backend_init
+  export -f secret_backend_exists
+  export -f secret_backend_put
+
   _kubectl() {
     local cmd="$*"
     if [[ "$cmd" == *"vault kv get"* ]]; then
@@ -253,24 +271,29 @@ EOF
   }
   export -f _vault_policy_exists
   export -f _kubectl
-  _no_trace() {
-    local cmd="$*"
-    local script
-    script=$(cat)
-    if [[ "$script" == *password=* ]]; then
-      script="${script/password=*/password=***}"
+
+  _vault_exec() {
+    local ns="$1" cmd="$2" release="$3"
+    echo "_vault_exec $cmd" >> "$KUBECTL_LOG"
+    if [[ "$cmd" == *"vault read -field=password sys/policies/password/jenkins-admin/generate"* ]]; then
+      echo "s3cr3t"
+      return 0
     fi
-    echo "$cmd" >> "$KUBECTL_LOG"
-    echo "$script" >> "$KUBECTL_LOG"
-    echo "$script" | _kubectl "$@"
+    return 0
+  }
+  export -f _vault_exec
+
+  _no_trace() {
+    _vault_exec "$@"
   }
   export -f _no_trace
+
   _cleanup_on_success() { rm -f "$1"; }
   export -f _cleanup_on_success
 
   run _create_jenkins_admin_vault_policy vault
   [ "$status" -eq 0 ]
-  grep -q 'vault kv put secret/eso/jenkins-admin' "$KUBECTL_LOG"
+  grep -q 'secret_backend_put' "$KUBECTL_LOG"
   grep -q 'username=jenkins-admin' "$KUBECTL_LOG"
   grep -Fq 'password=***' "$KUBECTL_LOG"
   ! grep -q 's3cr3t' "$KUBECTL_LOG"
@@ -280,6 +303,8 @@ EOF
 @test "_create_jenkins_vault_ad_policy creates policies" {
   _vault_policy_exists() { return 1; }
   _vault_policy() { return 1; }
+  _vault_login() { return 0; }
+  export -f _vault_login
 
   local VAULT_EXEC_LOG="$BATS_TEST_TMPDIR/vault-exec-ad-policy.log"
   : >"$VAULT_EXEC_LOG"
@@ -312,7 +337,9 @@ EOF
 
 @test "_create_jenkins_cert_rotator_policy writes role without stdin dash" {
   _vault_policy_exists() { return 1; }
+  _vault_login() { return 0; }
   export -f _vault_policy_exists
+  export -f _vault_login
 
   local policy_capture="$BATS_TEST_TMPDIR/jenkins-cert-rotator.hcl"
   : >"$policy_capture"
@@ -382,7 +409,9 @@ EOF
 
 @test "_create_jenkins_cert_rotator_policy refreshes policy missing revoke grant" {
   _vault_policy_exists() { return 0; }
+  _vault_login() { return 0; }
   export -f _vault_policy_exists
+  export -f _vault_login
 
   local policy_capture="$BATS_TEST_TMPDIR/jenkins-cert-rotator-refresh.hcl"
   : >"$policy_capture"

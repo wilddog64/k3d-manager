@@ -4,6 +4,15 @@ if [[ -r "$VAULT_PLUGIN" ]]; then
    source "$VAULT_PLUGIN"
 fi
 
+# Source secret backend abstraction (optional, for new abstraction layer)
+if [[ -n "${SCRIPT_DIR:-}" ]]; then
+   SECRET_BACKEND_LIB="$SCRIPT_DIR/lib/secret_backend.sh"
+   if [[ -r "$SECRET_BACKEND_LIB" ]]; then
+      # shellcheck disable=SC1090
+      source "$SECRET_BACKEND_LIB"
+   fi
+fi
+
 # Ensure _no_trace is defined
 command -v _no_trace >/dev/null 2>&1 || _no_trace() { "$@"; }
 
@@ -1379,19 +1388,44 @@ HCL
 
    local mount_path="${JENKINS_VAULT_KV_MOUNT:-secret}"
    local secret_path="${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin}"
-   if _vault_exec --no-exit "$vault_namespace" "vault kv get ${mount_path}/${secret_path}" "$vault_release" >/dev/null 2>&1; then
-      _info "[jenkins] Vault secret ${mount_path}/${secret_path} already exists; skipping seed"
-      return 0
-   fi
 
-   local script_content
-   script_content=$(cat <<SCRIPT
+   # Use secret backend interface if available, otherwise fallback to direct Vault commands
+   if declare -f secret_backend_init >/dev/null 2>&1; then
+      # New secret backend interface
+      export VAULT_SECRET_BACKEND_NS="$vault_namespace"
+      export VAULT_SECRET_BACKEND_RELEASE="$vault_release"
+      export VAULT_SECRET_BACKEND_MOUNT="$mount_path"
+
+      secret_backend_init
+
+      if secret_backend_exists "$secret_path"; then
+         _info "[jenkins] Secret ${secret_path} already exists; skipping seed"
+         return 0
+      fi
+
+      local jenkins_admin_pass
+      jenkins_admin_pass=$(_vault_exec "$vault_namespace" \
+         "vault read -field=password sys/policies/password/jenkins-admin/generate" "$vault_release")
+
+      if ! secret_backend_put "$secret_path" username=jenkins-admin password="$jenkins_admin_pass"; then
+         _err "[jenkins] failed to seed admin secret at $secret_path"
+      fi
+   else
+      # Fallback to direct Vault commands (for backward compatibility)
+      if _vault_exec --no-exit "$vault_namespace" "vault kv get ${mount_path}/${secret_path}" "$vault_release" >/dev/null 2>&1; then
+         _info "[jenkins] Vault secret ${mount_path}/${secret_path} already exists; skipping seed"
+         return 0
+      fi
+
+      local script_content
+      script_content=$(cat <<SCRIPT
 set -euo pipefail
 jenkins_admin_pass=\$(vault read -field=password sys/policies/password/jenkins-admin/generate)
 vault kv put ${mount_path}/${secret_path} username=jenkins-admin password="\$jenkins_admin_pass"
 SCRIPT
 )
-   echo "$script_content" | _no_trace _vault_exec "$vault_namespace" "sh -" "$vault_release"
+      echo "$script_content" | _no_trace _vault_exec "$vault_namespace" "sh -" "$vault_release"
+   fi
 }
 
 function _sync_vault_jenkins_admin() {
