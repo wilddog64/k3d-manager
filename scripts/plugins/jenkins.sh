@@ -735,10 +735,56 @@ function deploy_jenkins() {
    local enable_ldap="${JENKINS_LDAP_ENABLED:-1}"
    local enable_vault="${JENKINS_VAULT_ENABLED:-1}"
    local restore_trace=0
+   local arg_count=$#
 
    case $- in
       *x*) restore_trace=1 ;;
    esac
+
+   # Show help if no arguments provided
+   if [[ $arg_count -eq 0 ]]; then
+      cat <<EOF
+Usage: deploy_jenkins [options] [namespace] [vault-namespace] [vault-release]
+
+Options:
+  --namespace <ns>           Jenkins namespace (default: jenkins)
+  --vault-namespace <ns>     Vault namespace (default: ${VAULT_NS_DEFAULT:-vault})
+  --vault-release <name>     Vault release name (default: ${VAULT_RELEASE_DEFAULT:-vault})
+  --enable-ldap              Deploy LDAP integration (default: disabled)
+  --disable-ldap             Skip LDAP deployment
+  --enable-vault             Deploy Vault (default: disabled)
+  --disable-vault            Skip Vault deployment (use existing)
+  -h, --help                 Show this help message
+
+Feature Flags (environment variables):
+  JENKINS_LDAP_ENABLED=0|1   Enable LDAP auto-deployment (default: 0)
+  JENKINS_VAULT_ENABLED=0|1  Enable Vault auto-deployment (default: 0)
+
+Examples:
+  # Show this help message
+  deploy_jenkins
+
+  # Minimal deployment (Jenkins only, no LDAP, no Vault)
+  deploy_jenkins --disable-ldap --disable-vault
+
+  # Full deployment with all integrations
+  deploy_jenkins --enable-ldap --enable-vault
+
+  # Deploy with LDAP integration only
+  deploy_jenkins --enable-ldap
+
+  # Deploy with Vault integration only
+  deploy_jenkins --enable-vault
+
+  # Deploy to custom namespace with full stack
+  deploy_jenkins --namespace jenkins-prod --enable-ldap --enable-vault
+
+Positional arguments (backwards compatible):
+  deploy_jenkins [namespace] [vault-namespace] [vault-release]
+EOF
+      if (( restore_trace )); then set -x; fi
+      return 0
+   fi
 
    # Parse arguments
    while [[ $# -gt 0 ]]; do

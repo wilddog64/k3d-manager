@@ -1520,7 +1520,19 @@ EOF
   [[ "$configure_call" == *"${JENKINS_LDAP_VAULT_PATH:-ldap/openldap-admin}"* ]]
 }
 
-@test "deploy_jenkins without flags deploys minimal Jenkins (no Vault, no LDAP)" {
+@test "deploy_jenkins without arguments shows help message" {
+  run deploy_jenkins
+  [ "$status" -eq 0 ]
+
+  # Check that help message is displayed
+  [[ "$output" == *"Usage: deploy_jenkins"* ]]
+  [[ "$output" == *"Options:"* ]]
+  [[ "$output" == *"--enable-ldap"* ]]
+  [[ "$output" == *"--enable-vault"* ]]
+  [[ "$output" == *"Examples:"* ]]
+}
+
+@test "deploy_jenkins with --disable flags deploys minimal Jenkins (no Vault, no LDAP)" {
   CALLS_LOG="$BATS_TEST_TMPDIR/calls-default.log"
   : > "$CALLS_LOG"
   deploy_eso() { echo "deploy_eso:$*" >> "$CALLS_LOG"; }
@@ -1539,12 +1551,12 @@ EOF
   _deploy_jenkins() { echo "_deploy_jenkins:$*" >> "$CALLS_LOG"; }
   _wait_for_jenkins_ready() { echo "_wait_for_jenkins_ready:$*" >> "$CALLS_LOG"; }
 
-  run deploy_jenkins
+  run deploy_jenkins --disable-ldap --disable-vault
   [ "$status" -eq 0 ]
 
   read_lines "$CALLS_LOG" calls
 
-  # ESO, Vault, and LDAP should NOT be called (disabled by default)
+  # ESO, Vault, and LDAP should NOT be called (explicitly disabled)
   for call in "${calls[@]}"; do
     [[ "$call" != "deploy_eso:"* ]]
     [[ "$call" != "deploy_vault:"* ]]
