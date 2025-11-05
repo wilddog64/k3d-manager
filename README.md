@@ -250,11 +250,9 @@ graph TD
   subgraph Providers
      VAULT[HashiCorp Vault]
      AZ[Azure Key Vault]
-     BWD[Bitwarden]
   end
   ESO <-- sync/reads --> VAULT
   ESO <-- sync/reads --> AZ
-  ESO <-- sync/reads --> BWD
   ROTATOR -->|requests leaf certs| VAULT
 ```
 
@@ -305,10 +303,6 @@ The sequence now traces the `deploy_jenkins` flow: k3d-manager sources the Jenki
 | `create_az_sp` | `scripts/plugins/azure.sh` | Create an Azure service principal |
 | `deploy_azure_eso` | `scripts/plugins/azure.sh` | Deploy Azure ESO resources |
 | `eso_akv` | `scripts/plugins/azure.sh` | Manage Azure Key Vault ESO integration |
-| `ensure_bws_secret` | `scripts/plugins/bitwarden.sh` | Ensure Bitwarden secret exists |
-| `config_bws_eso` | `scripts/plugins/bitwarden.sh` | Configure Bitwarden ESO |
-| `eso_example_by_uuid` | `scripts/plugins/bitwarden.sh` | Example ESO lookup by UUID |
-| `verify_bws_token` | `scripts/plugins/bitwarden.sh` | Verify Bitwarden session token |
 | `deploy_eso` | `scripts/plugins/eso.sh` | Deploy External Secrets Operator |
 | `hello` | `scripts/plugins/hello.sh` | Example plugin |
 | `deploy_jenkins` | `scripts/plugins/jenkins.sh` | Deploy Jenkins |

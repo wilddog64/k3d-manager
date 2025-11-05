@@ -911,23 +911,6 @@ function _sha256_12() {
    printf %s "${hash:0:12}"
 }
 
-function _is_same_token() {
-   local token1="$1"
-   local token2="$2"
-
-   if [[ -z "$token1" ]] && [[ -z "$token2" ]]; then
-      echo "One or both tokens are empty" >&2
-      exit -1
-   fi
-
-   if [[ "$token1" == "$token2" ]]; then
-      echo "Bitwarden token in k3d matches local token."
-      return 1
-   else
-      return 0
-   fi
-}
-
 function _version_ge() {
    local lhs_str="$1"
    local rhs_str="$2"

@@ -76,7 +76,7 @@ CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f  # non-interactive
 - `jenkins.sh` - Jenkins deployment with Vault-issued TLS, cert rotation, LDAP auth
 - `ldap.sh` - OpenLDAP deployment with Vault LDAP secrets engine integration
 - `eso.sh` - External Secrets Operator deployment and SecretStore configuration
-- `azure.sh`, `bitwarden.sh` - Additional ESO provider integrations
+- `azure.sh` - Azure Key Vault ESO provider integration
 
 **Configuration:** `scripts/etc/` - Templates and variables:
 - `cluster_var.sh` - Cluster defaults (ports, paths)

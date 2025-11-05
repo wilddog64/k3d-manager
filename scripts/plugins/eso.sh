@@ -1,7 +1,7 @@
 # scripts/plugins/external-secrets.sh
-# External Secrets Operator + Bitwarden Secrets Manager plugin for k3d-manager
+# External Secrets Operator plugin for k3d-manager
 
-# Install ESO and enable the Bitwarden SDK server dependency
+# Install ESO (External Secrets Operator)
 function deploy_eso() {
   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     echo "Usage: deploy_eso [namespace=external-secrets] [release=external-secrets]"
