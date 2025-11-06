@@ -399,13 +399,26 @@ function _ldap_seed_ldif_secret() {
       jenkins_password=$(printf '%s' "$jenkins_secret_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get("password",""))' 2>/dev/null || true)
    fi
 
-   local group_members="member: ${LDAP_BINDDN}"
-   if [[ -n "$jenkins_password" ]]; then
-      group_members+=$'\n'"member: ${jenkins_user_dn}"
-   fi
-
    local ldif_content
-   ldif_content=$(cat <<EOF
+
+   # Check if custom LDIF file path is provided
+   if [[ -n "${LDAP_LDIF_FILE:-}" && -f "${LDAP_LDIF_FILE}" ]]; then
+      _info "[ldap] loading custom LDIF from file: ${LDAP_LDIF_FILE}"
+      ldif_content=$(cat "${LDAP_LDIF_FILE}")
+
+      # Validate LDIF has content
+      if [[ -z "$ldif_content" ]]; then
+         _err "[ldap] custom LDIF file is empty: ${LDAP_LDIF_FILE}"
+         return 1
+      fi
+   else
+      # Generate default LDIF content (existing behavior)
+      local group_members="member: ${LDAP_BINDDN}"
+      if [[ -n "$jenkins_password" ]]; then
+         group_members+=$'\n'"member: ${jenkins_user_dn}"
+      fi
+
+      ldif_content=$(cat <<EOF
 dn: ${base_dn}
 objectClass: top
 objectClass: dcObject
@@ -431,9 +444,9 @@ ${group_members}
 EOF
 )
 
-   if [[ -n "$jenkins_password" ]]; then
-      ldif_content+=$'\n'
-      ldif_content+=$(cat <<EOF
+      if [[ -n "$jenkins_password" ]]; then
+         ldif_content+=$'\n'
+         ldif_content+=$(cat <<EOF
 dn: ${jenkins_user_dn}
 objectClass: inetOrgPerson
 objectClass: organizationalPerson
@@ -444,6 +457,7 @@ uid: jenkins-admin
 userPassword: ${jenkins_password}
 EOF
 )
+      fi
    fi
 
    # Use secret backend abstraction to avoid UI endpoint issues
