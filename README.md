@@ -209,6 +209,22 @@ The macOS Docker setup uses [Colima](https://github.com/abiosoft/colima). Config
 - `COLIMA_MEMORY` (default `8`) – memory in GiB
 - `COLIMA_DISK` (default `20`) – disk size in GiB
 
+## Documentation
+
+Detailed design documents and architecture guides are available in the `docs/` directory:
+
+### Architecture
+- **[Configuration-Driven Design](docs/architecture/configuration-driven-design.md)** - Core design principle enabling pluggable providers
+
+### Planning Documents
+- **[Directory Service Interface](docs/plans/directory-service-interface.md)** - Pluggable authentication (OpenLDAP, Active Directory, Azure AD)
+- **[Active Directory Integration](docs/plans/active-directory-integration.md)** - Enterprise AD authentication implementation plan
+- **[Secret Backend Interface](docs/plans/secret-backend-interface.md)** - Multi-backend secret management (Vault, Azure Key Vault, etc.)
+
+### Developer Guides
+- **[CLAUDE.md](CLAUDE.md)** - Project overview and development guidelines for Claude Code
+- **[AGENTS.md](AGENTS.md)** - Code style principles and contribution guidelines
+
 ## Directory layout
 
 ```
@@ -217,6 +233,9 @@ scripts/
   lib/               # core functionality
   plugins/           # optional features loaded on demand
   etc/               # templates and configs
+docs/
+  architecture/      # architecture and design documents
+  plans/             # feature planning and specifications
 ```
 
 ## How it fits together
