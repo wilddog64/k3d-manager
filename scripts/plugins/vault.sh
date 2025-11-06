@@ -331,8 +331,9 @@ function _vault_parse_sealed_from_status() {
    local status="${1:-}"
    local sealed=""
 
-   sealed=$(printf '%s' "$status" | jq -r '.sealed // empty' 2>/dev/null || true)
-   if [[ -n "$sealed" ]]; then
+   # Note: Don't use '// empty' with boolean fields - false is a valid value!
+   sealed=$(printf '%s' "$status" | jq -r '.sealed' 2>/dev/null || true)
+   if [[ -n "$sealed" ]] && [[ "$sealed" != "null" ]]; then
       printf '%s' "$sealed"
       return 0
    fi

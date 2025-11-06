@@ -8,10 +8,12 @@ else
    source "$LDAP_VARS_FILE"
 fi
 
-VAULT_PLUGIN="$PLUGINS_DIR/vault.sh"
-if [[ ! -r "$VAULT_PLUGIN" ]]; then
-   _err "[ldap] missing required plugin: $VAULT_PLUGIN"
-else
+# Source Vault plugin if not already loaded
+if ! declare -f deploy_vault >/dev/null 2>&1; then
+   VAULT_PLUGIN="$PLUGINS_DIR/vault.sh"
+   if [[ ! -r "$VAULT_PLUGIN" ]]; then
+      _err "[ldap] missing required plugin: $VAULT_PLUGIN"
+   fi
    # shellcheck disable=SC1090
    source "$VAULT_PLUGIN"
 fi
@@ -243,9 +245,13 @@ function _ldap_seed_admin_secret() {
       _err "[ldap] Vault instance ${vault_ns}/${vault_release} unavailable or sealed; unseal before deploy"
    fi
 
-   if existing_json=$(_vault_exec --no-exit "$vault_ns" "vault kv get -format=json ${full_path}" "$vault_release" 2>/dev/null); then
-      existing_json=${existing_json//$'\r'/}
-   else
+   # Note: vault kv get -format=json may produce 403 errors on /sys/internal/ui/ endpoints
+   # These are harmless - they just mean we can't get UI metadata, but we can still read/write the secret
+   # Redirect both stdout and stderr, then check if we got valid JSON
+   existing_json=$(_vault_exec --no-exit "$vault_ns" "vault kv get -format=json ${full_path}" "$vault_release" 2>&1 || true)
+   existing_json=${existing_json//$'\r'/}
+   # If output contains "Error making API request" or doesn't start with {, it's not valid JSON
+   if [[ "$existing_json" == *"Error making API request"* ]] || [[ "$existing_json" != "{"* ]]; then
       existing_json=""
    fi
 
@@ -321,13 +327,34 @@ PY
    export LDAP_VAULT_ROOT_DN="$root_dn"
    export LDAP_VAULT_ORG_NAME="$org_name_value"
 
-   local script
-   printf -v script "cat <<'EOF' | vault kv put %s -\n%s\nEOF" \
-      "$full_path" "$payload"
+   # Use secret backend abstraction instead of direct vault commands to avoid UI endpoint issues
+   if declare -f secret_backend_put >/dev/null 2>&1; then
+      export VAULT_SECRET_BACKEND_NS="$vault_ns"
+      export VAULT_SECRET_BACKEND_RELEASE="$vault_release"
+      export VAULT_SECRET_BACKEND_MOUNT="${mount}"
 
-   if _vault_exec --no-exit "$vault_ns" "$script" "$vault_release"; then
-      _info "[ldap] seeded Vault secret ${full_path}"
-      return 0
+      if secret_backend_put "$vault_path" \
+         "${username_key}=${username}" \
+         "${password_key}=${admin_password}" \
+         "${config_key}=${config_password}" \
+         "${base_dn_key}=${base_dn}" \
+         "${bind_dn_key}=${bind_dn}" \
+         "${domain_key}=${domain}" \
+         "${root_key}=${root_dn}" \
+         "${org_key}=${LDAP_ORG_NAME}"; then
+         _info "[ldap] seeded Vault secret ${full_path}"
+         return 0
+      fi
+   else
+      # Fallback to direct vault command
+      local script
+      printf -v script "cat <<'EOF' | vault kv put %s -\n%s\nEOF" \
+         "$full_path" "$payload"
+
+      if _vault_exec --no-exit "$vault_ns" "$script" "$vault_release"; then
+         _info "[ldap] seeded Vault secret ${full_path}"
+         return 0
+      fi
    fi
 
    _err "[ldap] unable to seed Vault admin secret ${full_path}"
@@ -419,13 +446,26 @@ EOF
 )
    fi
 
-   local script
-   printf -v script "cat <<'EOF_LDIF_SEED' | vault kv put %s %s=-\n%s\nEOF_LDIF_SEED" \
-      "$full_path" "$content_key" "$ldif_content"
+   # Use secret backend abstraction to avoid UI endpoint issues
+   if declare -f secret_backend_put >/dev/null 2>&1; then
+      export VAULT_SECRET_BACKEND_NS="$vault_ns"
+      export VAULT_SECRET_BACKEND_RELEASE="$vault_release"
+      export VAULT_SECRET_BACKEND_MOUNT="${mount}"
 
-   if _vault_exec --no-exit "$vault_ns" "$script" "$vault_release"; then
-      _info "[ldap] seeded Vault LDIF ${full_path}"
-      return 0
+      if secret_backend_put "$vault_path" "${content_key}=${ldif_content}"; then
+         _info "[ldap] seeded Vault LDIF ${full_path}"
+         return 0
+      fi
+   else
+      # Fallback to direct vault command
+      local script
+      printf -v script "cat <<'EOF_LDIF_SEED' | vault kv put %s %s=-\n%s\nEOF_LDIF_SEED" \
+         "$full_path" "$content_key" "$ldif_content"
+
+      if _vault_exec --no-exit "$vault_ns" "$script" "$vault_release"; then
+         _info "[ldap] seeded Vault LDIF ${full_path}"
+         return 0
+      fi
    fi
 
    _err "[ldap] unable to seed Vault LDIF ${full_path}"
@@ -839,6 +879,9 @@ EOF
 
    local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
    local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
+
+   # Login to Vault to ensure we have a session token
+   _vault_login "$vault_ns" "$vault_release"
 
    # Check if Vault is sealed before attempting unseal
    if _vault_is_sealed "$vault_ns" "$vault_release"; then

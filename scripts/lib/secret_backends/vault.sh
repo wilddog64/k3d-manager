@@ -7,15 +7,14 @@ VAULT_SECRET_BACKEND_NS="${VAULT_SECRET_BACKEND_NS:-${VAULT_NS:-${VAULT_NS_DEFAU
 VAULT_SECRET_BACKEND_RELEASE="${VAULT_SECRET_BACKEND_RELEASE:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
 VAULT_SECRET_BACKEND_MOUNT="${VAULT_SECRET_BACKEND_MOUNT:-${VAULT_KV_MOUNT:-secret}}"
 
-# Ensure Vault helpers are available
-if ! declare -f _vault_exec >/dev/null 2>&1; then
+# Source Vault plugin if not already loaded
+if ! declare -f deploy_vault >/dev/null 2>&1; then
    VAULT_PLUGIN="${PLUGINS_DIR:-${SCRIPT_DIR}/plugins}/vault.sh"
-   if [[ -r "$VAULT_PLUGIN" ]]; then
-      # shellcheck disable=SC1090
-      source "$VAULT_PLUGIN"
-   else
+   if [[ ! -r "$VAULT_PLUGIN" ]]; then
       _err "[secret_backend:vault] vault plugin not available at $VAULT_PLUGIN"
    fi
+   # shellcheck disable=SC1090
+   source "$VAULT_PLUGIN"
 fi
 
 function _secret_backend_vault_init() {
