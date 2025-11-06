@@ -1,0 +1,115 @@
+# Active Directory-compatible LDAP schema for testing
+# This LDIF creates an OpenLDAP structure that mimics Active Directory
+# allowing us to test the Jenkins Active Directory plugin without a real AD
+
+# Base DN (AD-style with uppercase DC)
+dn: DC=corp,DC=example,DC=com
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: Corp Example
+dc: corp
+
+# Service Accounts OU (AD-style uppercase)
+dn: OU=ServiceAccounts,DC=corp,DC=example,DC=com
+objectClass: top
+objectClass: organizationalUnit
+ou: ServiceAccounts
+
+# Users OU (AD-style uppercase)
+dn: OU=Users,DC=corp,DC=example,DC=com
+objectClass: top
+objectClass: organizationalUnit
+ou: Users
+
+# Groups OU (AD-style uppercase)
+dn: OU=Groups,DC=corp,DC=example,DC=com
+objectClass: top
+objectClass: organizationalUnit
+ou: Groups
+
+# Jenkins Service Account (AD-style CN + sAMAccountName)
+dn: CN=Jenkins Service,OU=ServiceAccounts,DC=corp,DC=example,DC=com
+objectClass: top
+objectClass: person
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+cn: Jenkins Service
+sn: Service
+givenName: Jenkins
+displayName: Jenkins Service Account
+sAMAccountName: jenkins-svc
+userPrincipalName: jenkins-svc@corp.example.com
+mail: jenkins-svc@corp.example.com
+userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g1gLQy
+
+# Test User: Alice Admin (AD-style)
+dn: CN=Alice Admin,OU=Users,DC=corp,DC=example,DC=com
+objectClass: top
+objectClass: person
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+cn: Alice Admin
+sn: Admin
+givenName: Alice
+displayName: Alice Admin
+sAMAccountName: alice
+userPrincipalName: alice@corp.example.com
+mail: alice@corp.example.com
+userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g1gLQy
+
+# Test User: Bob Developer (AD-style)
+dn: CN=Bob Developer,OU=Users,DC=corp,DC=example,DC=com
+objectClass: top
+objectClass: person
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+cn: Bob Developer
+sn: Developer
+givenName: Bob
+displayName: Bob Developer
+sAMAccountName: bob
+userPrincipalName: bob@corp.example.com
+mail: bob@corp.example.com
+userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g1gLQy
+
+# Test User: Charlie User (AD-style, no admin rights)
+dn: CN=Charlie User,OU=Users,DC=corp,DC=example,DC=com
+objectClass: top
+objectClass: person
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+cn: Charlie User
+sn: User
+givenName: Charlie
+displayName: Charlie User
+sAMAccountName: charlie
+userPrincipalName: charlie@corp.example.com
+mail: charlie@corp.example.com
+userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g1gLQy
+
+# Jenkins Admins Group (AD-style)
+dn: CN=Jenkins Admins,OU=Groups,DC=corp,DC=example,DC=com
+objectClass: top
+objectClass: groupOfNames
+cn: Jenkins Admins
+description: Jenkins Administrators
+member: CN=Jenkins Service,OU=ServiceAccounts,DC=corp,DC=example,DC=com
+member: CN=Alice Admin,OU=Users,DC=corp,DC=example,DC=com
+
+# IT Developers Group (AD-style, includes Jenkins Admins as nested group)
+dn: CN=IT Developers,OU=Groups,DC=corp,DC=example,DC=com
+objectClass: top
+objectClass: groupOfNames
+cn: IT Developers
+description: IT Development Team
+member: CN=Jenkins Admins,OU=Groups,DC=corp,DC=example,DC=com
+member: CN=Bob Developer,OU=Users,DC=corp,DC=example,DC=com
+
+# IT Users Group (AD-style, for read-only access)
+dn: CN=IT Users,OU=Groups,DC=corp,DC=example,DC=com
+objectClass: top
+objectClass: groupOfNames
+cn: IT Users
+description: IT Users with read access
+member: CN=Charlie User,OU=Users,DC=corp,DC=example,DC=com
