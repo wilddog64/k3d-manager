@@ -85,10 +85,10 @@ function deploy_jenkins() {
 ### 2. Zero Code Changes for New Providers
 
 Adding a new directory service provider requires:
-- ✅ Create new provider file: `scripts/lib/dirservices/newprovider.sh`
-- ✅ Implement provider interface functions
-- ✅ Add configuration variables
-- ❌ **NO changes to Jenkins plugin or other consumers**
+- Create new provider file: `scripts/lib/dirservices/newprovider.sh`
+- Implement provider interface functions
+- Add configuration variables
+- **NO changes to Jenkins plugin or other consumers**
 
 Example - Adding Azure AD:
 ```bash
@@ -320,18 +320,18 @@ function deploy_jenkins() {
 ## Data vs Code
 
 ### Configuration Data Controls:
-- ✅ Deploy or connect
-- ✅ Where to deploy (namespace, release)
-- ✅ How to connect (servers, ports, SSL)
-- ✅ What credentials to use
-- ✅ Which Jenkins plugin to configure
-- ✅ How to validate (local vs remote)
+- Deploy or connect
+- Where to deploy (namespace, release)
+- How to connect (servers, ports, SSL)
+- What credentials to use
+- Which Jenkins plugin to configure
+- How to validate (local vs remote)
 
 ### Code Provides:
-- ✅ Common interface (abstraction layer)
-- ✅ Provider-specific implementation
-- ✅ Error handling and validation
-- ✅ Integration with other systems
+- Common interface (abstraction layer)
+- Provider-specific implementation
+- Error handling and validation
+- Integration with other systems
 
 ## Summary
 
