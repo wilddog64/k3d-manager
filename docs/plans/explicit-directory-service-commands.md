@@ -23,7 +23,9 @@ This is error-prone and confusing. Users can easily create configuration mismatc
 
 #### New Command: `deploy_ad`
 
-Deploys OpenLDAP configured with Active Directory-compatible schema for testing.
+**Purpose**: Convenience command for deploying OpenLDAP with Active Directory-compatible schema **for local testing only**.
+
+**Important**: This command does NOT deploy real Active Directory. It deploys OpenLDAP configured with AD-like schema to validate schema structure, users, and groups before deploying to production AD.
 
 ```bash
 ./scripts/k3d-manager deploy_ad [namespace] [release]
@@ -31,7 +33,6 @@ Deploys OpenLDAP configured with Active Directory-compatible schema for testing.
 Options:
   --namespace <ns>       Namespace for AD directory (default: directory)
   --release <name>       Helm release name (default: openldap)
-  --test-mode            Use OpenLDAP with AD schema (default: true for now)
   -h, --help             Show help message
 
 Examples:
@@ -43,14 +44,22 @@ Examples:
 ```
 
 **What it does:**
-1. Sets `DIRECTORY_SERVICE_PROVIDER=activedirectory`
-2. Sets `DIRECTORY_SERVICE_TEST_MODE=true`
-3. Auto-configures:
+1. Auto-configures AD schema environment variables:
    - `LDAP_LDIF_FILE="${SCRIPT_DIR}/scripts/etc/ldap/bootstrap-ad-schema.ldif"`
    - `LDAP_BASE_DN="DC=corp,DC=example,DC=com"`
    - `LDAP_BINDDN="cn=admin,DC=corp,DC=example,DC=com"`
    - `LDAP_DOMAIN="corp.example.com"`
-4. Calls `deploy_ldap` with provider-specific configuration
+2. Calls `deploy_ldap` with AD schema configuration
+3. Runs **fail-fast smoke test** to validate deployment
+4. Prints next steps for Jenkins integration
+
+**Smoke Test** (runs automatically):
+- ✅ OpenLDAP pod is ready
+- ✅ Base DN is `DC=corp,DC=example,DC=com`
+- ✅ Admin credentials work
+- ✅ AD-style OUs exist (Users, Groups, ServiceAccounts)
+- ✅ At least one test user exists
+- **Exits with error if any check fails** (fail-fast)
 
 #### Existing Command: `deploy_ldap`
 
@@ -83,12 +92,19 @@ Options:
   -h, --help             Show help message
 
 Examples:
-  # Jenkins with OpenLDAP authentication
+  # Scenario 1: Jenkins with standard OpenLDAP authentication
   ./scripts/k3d-manager deploy_ldap
   ./scripts/k3d-manager deploy_jenkins --enable-ldap --enable-vault
 
-  # Jenkins with Active Directory authentication
+  # Scenario 2: Test AD schema locally (uses LDAP plugin with AD-like data)
   ./scripts/k3d-manager deploy_ad
+  ./scripts/k3d-manager deploy_jenkins --enable-ldap --enable-vault
+
+  # Scenario 3: Production Active Directory (uses AD plugin, no deployment)
+  export AD_DOMAIN=corp.example.com
+  export AD_SERVERS=dc1.corp.example.com
+  export AD_BIND_DN="CN=svc-jenkins,OU=ServiceAccounts,DC=corp,DC=example,DC=com"
+  export AD_BIND_PASSWORD="..."
   ./scripts/k3d-manager deploy_jenkins --enable-ad --enable-vault
 
   # ERROR: Cannot specify both
@@ -102,6 +118,63 @@ if [[ "$enable_ldap" == "1" && "$enable_ad" == "1" ]]; then
    _err "[jenkins] Cannot enable both --enable-ldap and --enable-ad"
 fi
 ```
+
+### Testing Strategy
+
+#### What Can Be Tested Locally
+
+**With `deploy_ad` + `--enable-ldap`:**
+- ✅ AD schema structure (DC-based DNs, OUs)
+- ✅ User/group creation with AD attributes
+- ✅ LDAP queries and searches
+- ✅ Authentication with test users
+- ✅ Group membership resolution
+- ✅ Jenkins LDAP plugin integration
+
+**Limitations:**
+- ❌ Cannot test Jenkins AD plugin without real AD
+- ❌ Cannot test Kerberos/NTLM authentication
+- ❌ Cannot test tokenGroups attribute (AD-specific)
+- ❌ Cannot test Windows SSO integration
+
+#### What Requires Real AD
+
+**With `--enable-ad` only:**
+- Requires corporate Active Directory infrastructure
+- Tests Jenkins Active Directory plugin
+- Validates production AD integration
+- Full Windows authentication support
+
+#### Testing Matrix
+
+| Scenario | Command | Plugin Used | Backend | Local Test? |
+|----------|---------|-------------|---------|-------------|
+| Standard LDAP | `deploy_ldap` + `--enable-ldap` | LDAP | OpenLDAP | ✅ Yes |
+| AD Schema Test | `deploy_ad` + `--enable-ldap` | LDAP | OpenLDAP | ✅ Yes |
+| Production AD | (none) + `--enable-ad` | AD | Real AD | ❌ No |
+
+#### Fail-Fast Smoke Testing
+
+`deploy_ad` includes automatic smoke tests that **fail fast** on errors:
+
+**Smoke Test Checks:**
+1. OpenLDAP pod is ready
+2. Base DN matches `DC=corp,DC=example,DC=com`
+3. Admin credentials authenticate successfully
+4. Required OUs exist (Users, Groups, ServiceAccounts)
+5. At least one test user is present
+
+**Behavior:**
+- Runs automatically after deployment
+- Exits with error code 1 if any check fails
+- Prints troubleshooting steps on failure
+- Fast execution (<10 seconds)
+
+**Why Fail-Fast:**
+- Catches configuration mismatches immediately
+- Prevents cascading failures in Jenkins deployment
+- Provides clear feedback for debugging
+- Ensures reliable integration tests
 
 ### Implementation Details
 
