@@ -737,8 +737,14 @@ function _deploy_jenkins_ldap() {
       fi
 
       # Deploy LDAP directory
-      if ! deploy_ldap "$ldap_ns" "$ldap_release"; then
-         _err "[jenkins] LDAP deployment failed"
+      if [[ "$enable_vault" == "1" ]]; then
+         if ! deploy_ldap --namespace "$ldap_ns" --release "$ldap_release" --enable-vault; then
+            _err "[jenkins] LDAP deployment failed"
+         fi
+      else
+         if ! deploy_ldap --namespace "$ldap_ns" --release "$ldap_release"; then
+            _err "[jenkins] LDAP deployment failed"
+         fi
       fi
 
       # Seed Jenkins service account in Vault LDAP

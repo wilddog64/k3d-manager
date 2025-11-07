@@ -758,12 +758,48 @@ function deploy_ldap() {
    local release=""
    local chart_version=""
    local enable_vault=0
+   local arg_count=$#
 
    case $- in
       *x*)
          restore_trace=1
          ;;
    esac
+
+   # Show help if no arguments provided
+   if [[ $arg_count -eq 0 ]]; then
+      cat <<EOF
+Usage: deploy_ldap [options] [namespace] [release] [chart-version]
+
+Deploy OpenLDAP with Vault integration.
+
+Options:
+  --namespace <ns>         Kubernetes namespace (default: ${LDAP_NAMESPACE:-directory})
+  --release <name>         Helm release name (default: ${LDAP_RELEASE:-openldap})
+  --chart-version <ver>    Helm chart version (default: ${LDAP_HELM_CHART_VERSION:-<auto>})
+  --enable-vault           Deploy Vault and ESO if not already deployed
+  -h, --help               Show this help message
+
+Examples:
+  # Show this help message
+  deploy_ldap
+
+  # Deploy with automatic Vault setup
+  deploy_ldap --enable-vault
+
+  # Deploy to custom namespace
+  deploy_ldap --namespace my-ldap --enable-vault
+
+Positional arguments (backwards compatible):
+  deploy_ldap [namespace] [release] [chart-version]
+
+Prerequisites:
+  - Vault must be deployed (use --enable-vault or deploy_vault first)
+  - ESO must be deployed (automatically deployed with --enable-vault)
+EOF
+      if (( restore_trace )); then set -x; fi
+      return 0
+   fi
 
    while [[ $# -gt 0 ]]; do
       case "$1" in
@@ -1028,9 +1064,51 @@ EOF
 # and runs fail-fast smoke tests
 function deploy_ad() {
    local restore_trace=0
+   local arg_count=$#
    if [[ "$-" =~ x ]]; then
       set +x
       restore_trace=1
+   fi
+
+   # Show help if no arguments provided
+   if [[ $arg_count -eq 0 ]]; then
+      cat <<'EOF'
+Usage: deploy_ad [options] [namespace] [release]
+
+Deploy OpenLDAP with Active Directory-compatible schema for LOCAL TESTING.
+
+IMPORTANT: This does NOT deploy real Active Directory. It deploys OpenLDAP
+configured with AD-like schema to validate schema structure, users, and
+groups before deploying to production AD.
+
+Options:
+  --namespace <ns>   Namespace (default: directory)
+  --release <name>   Release name (default: openldap)
+  --enable-vault     Deploy Vault and ESO if not already deployed
+  -h, --help         Show this help
+
+Examples:
+  # Show this help message
+  deploy_ad
+
+  # Deploy with automatic Vault setup
+  deploy_ad --enable-vault
+
+  # Deploy to custom namespace
+  deploy_ad --namespace ad-test --enable-vault
+
+  # Next steps after deployment
+  deploy_jenkins --enable-ldap --enable-vault
+
+Note: Use --enable-ldap (not --enable-ad) for testing with deploy_ad.
+      The --enable-ad flag is for production Active Directory only.
+
+Prerequisites:
+  - Vault must be deployed (use --enable-vault or deploy_vault first)
+  - ESO must be deployed (automatically deployed with --enable-vault)
+EOF
+      if (( restore_trace )); then set -x; fi
+      return 0
    fi
 
    # Parse arguments
@@ -1133,8 +1211,14 @@ EOF
    export LDAP_DOMAIN="corp.example.com"
    export LDAP_ROOT="DC=corp,DC=example,DC=com"
 
+   # AD-specific DN paths for users and groups
+   export LDAP_USERDN="OU=ServiceAccounts,DC=corp,DC=example,DC=com"
+   export LDAP_GROUPDN="OU=Groups,DC=corp,DC=example,DC=com"
+
    _info "[ad] using AD schema: ${LDAP_LDIF_FILE}"
    _info "[ad] base DN: ${LDAP_BASE_DN}"
+   _info "[ad] user DN: ${LDAP_USERDN}"
+   _info "[ad] group DN: ${LDAP_GROUPDN}"
 
    # Deploy prerequisites if requested
    if [[ "$enable_vault" == "1" ]]; then
