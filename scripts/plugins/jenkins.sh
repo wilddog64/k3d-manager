@@ -757,11 +757,50 @@ function _deploy_jenkins_ldap() {
    fi
 }
 
+function _deploy_jenkins_ad() {
+   local vault_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+   local vault_release="${2:-${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}}"
+   local ad_ns="${LDAP_NAMESPACE:-directory}"
+   local ad_release="${LDAP_RELEASE:-openldap}"
+
+   _info "[jenkins] deploying AD schema testing (OpenLDAP with AD schema) to ${ad_ns}/${ad_release}"
+
+   # Source LDAP plugin if not already loaded
+   if ! declare -f deploy_ad >/dev/null 2>&1; then
+      local ldap_plugin="$PLUGINS_DIR/ldap.sh"
+      if [[ ! -r "$ldap_plugin" ]]; then
+         _err "[jenkins] LDAP plugin not found at ${ldap_plugin}"
+      fi
+      # shellcheck disable=SC1090
+      source "$ldap_plugin"
+   fi
+
+   # Deploy OpenLDAP with AD schema
+   if [[ "$enable_vault" == "1" ]]; then
+      if ! deploy_ad --namespace "$ad_ns" --release "$ad_release" --enable-vault; then
+         _err "[jenkins] AD schema deployment failed"
+      fi
+   else
+      if ! deploy_ad --namespace "$ad_ns" --release "$ad_release"; then
+         _err "[jenkins] AD schema deployment failed"
+      fi
+   fi
+
+   # Seed Jenkins service account in Vault LDAP
+   if declare -f _vault_seed_ldap_service_accounts >/dev/null 2>&1; then
+      _info "[jenkins] seeding Jenkins AD service account in Vault"
+      _vault_seed_ldap_service_accounts "$vault_ns" "$vault_release"
+   else
+      _warn "[jenkins] _vault_seed_ldap_service_accounts not available; skipping service account seed"
+   fi
+}
+
 function deploy_jenkins() {
    local jenkins_namespace=""
    local vault_namespace=""
    local vault_release=""
-   local enable_ldap="${JENKINS_LDAP_ENABLED:-1}"
+   local enable_ldap="${JENKINS_LDAP_ENABLED:-0}"
+   local enable_ad="${JENKINS_AD_ENABLED:-0}"
    local enable_vault="${JENKINS_VAULT_ENABLED:-1}"
    local restore_trace=0
    local arg_count=$#
@@ -779,34 +818,36 @@ Options:
   --namespace <ns>           Jenkins namespace (default: jenkins)
   --vault-namespace <ns>     Vault namespace (default: ${VAULT_NS_DEFAULT:-vault})
   --vault-release <name>     Vault release name (default: ${VAULT_RELEASE_DEFAULT:-vault})
-  --enable-ldap              Deploy LDAP integration (default: disabled)
-  --disable-ldap             Skip LDAP deployment
+  --enable-ldap              Deploy standard LDAP integration (default: disabled)
+  --enable-ad                Deploy AD schema testing (OpenLDAP with AD schema) (default: disabled)
+  --disable-ldap             Skip directory service deployment
   --enable-vault             Deploy Vault (default: disabled)
   --disable-vault            Skip Vault deployment (use existing)
   -h, --help                 Show this help message
 
 Feature Flags (environment variables):
   JENKINS_LDAP_ENABLED=0|1   Enable LDAP auto-deployment (default: 0)
+  JENKINS_AD_ENABLED=0|1     Enable AD testing auto-deployment (default: 0)
   JENKINS_VAULT_ENABLED=0|1  Enable Vault auto-deployment (default: 0)
 
 Examples:
   # Show this help message
   deploy_jenkins
 
-  # Minimal deployment (Jenkins only, no LDAP, no Vault)
+  # Minimal deployment (Jenkins only, no directory service, no Vault)
   deploy_jenkins --disable-ldap --disable-vault
 
-  # Full deployment with all integrations
+  # Standard LDAP integration
   deploy_jenkins --enable-ldap --enable-vault
 
-  # Deploy with LDAP integration only
-  deploy_jenkins --enable-ldap
+  # AD schema testing (local OpenLDAP with AD schema)
+  deploy_jenkins --enable-ad --enable-vault
 
   # Deploy with Vault integration only
   deploy_jenkins --enable-vault
 
-  # Deploy to custom namespace with full stack
-  deploy_jenkins --namespace jenkins-prod --enable-ldap --enable-vault
+  # Deploy to custom namespace with AD testing
+  deploy_jenkins --namespace jenkins-prod --enable-ad --enable-vault
 
 Positional arguments (backwards compatible):
   deploy_jenkins [namespace] [vault-namespace] [vault-release]
@@ -826,31 +867,33 @@ Options:
   --namespace <ns>           Jenkins namespace (default: jenkins)
   --vault-namespace <ns>     Vault namespace (default: ${VAULT_NS_DEFAULT:-vault})
   --vault-release <name>     Vault release name (default: ${VAULT_RELEASE_DEFAULT:-vault})
-  --enable-ldap              Deploy LDAP integration (default: disabled)
-  --disable-ldap             Skip LDAP deployment
+  --enable-ldap              Deploy standard LDAP integration (default: disabled)
+  --enable-ad                Deploy AD schema testing (OpenLDAP with AD schema) (default: disabled)
+  --disable-ldap             Skip directory service deployment
   --enable-vault             Deploy Vault (default: disabled)
   --disable-vault            Skip Vault deployment (use existing)
   -h, --help                 Show this help message
 
 Feature Flags (environment variables):
   JENKINS_LDAP_ENABLED=0|1   Enable LDAP auto-deployment (default: 0)
+  JENKINS_AD_ENABLED=0|1     Enable AD testing auto-deployment (default: 0)
   JENKINS_VAULT_ENABLED=0|1  Enable Vault auto-deployment (default: 0)
 
 Examples:
-  # Minimal deployment (Jenkins only, no LDAP, no Vault)
+  # Minimal deployment (Jenkins only, no directory service, no Vault)
   deploy_jenkins
 
-  # Full deployment with all integrations
+  # Standard LDAP integration
   deploy_jenkins --enable-ldap --enable-vault
 
-  # Deploy with LDAP integration only
-  deploy_jenkins --enable-ldap
+  # AD schema testing (local OpenLDAP with AD schema)
+  deploy_jenkins --enable-ad --enable-vault
 
   # Deploy with Vault integration only
   deploy_jenkins --enable-vault
 
-  # Deploy to custom namespace with full stack
-  deploy_jenkins --namespace jenkins-prod --enable-ldap --enable-vault
+  # Deploy to custom namespace with AD testing
+  deploy_jenkins --namespace jenkins-prod --enable-ad --enable-vault
 
 Positional arguments (backwards compatible):
   deploy_jenkins [namespace] [vault-namespace] [vault-release]
@@ -892,8 +935,13 @@ EOF
             enable_ldap=1
             shift
             ;;
+         --enable-ad)
+            enable_ad=1
+            shift
+            ;;
          --disable-ldap)
             enable_ldap=0
+            enable_ad=0
             shift
             ;;
          --enable-vault)
@@ -932,14 +980,20 @@ EOF
    vault_namespace="${vault_namespace:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    vault_release="${vault_release:-${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}}"
 
+   # Mutual exclusivity check: --enable-ldap and --enable-ad cannot both be set
+   if (( enable_ldap && enable_ad )); then
+      _err "[jenkins] --enable-ldap and --enable-ad are mutually exclusive (use one or the other)"
+   fi
+
    # Export enable flags so downstream functions can check them
    export JENKINS_LDAP_ENABLED="$enable_ldap"
+   export JENKINS_AD_ENABLED="$enable_ad"
    export JENKINS_VAULT_ENABLED="$enable_vault"
 
    if (( restore_trace )); then set -x; fi
 
    _info "[jenkins] deploying to namespace: ${jenkins_namespace}"
-   _info "[jenkins] LDAP integration: $( (( enable_ldap )) && echo "enabled" || echo "disabled" )"
+   _info "[jenkins] directory service: $( (( enable_ldap )) && echo "standard LDAP" || (( enable_ad )) && echo "AD schema testing" || echo "none" )"
    _info "[jenkins] Vault deployment: $( (( enable_vault )) && echo "enabled" || echo "disabled" )"
 
    _jenkins_configure_leaf_host_defaults
@@ -957,11 +1011,15 @@ EOF
       _info "[jenkins] skipping Vault deployment (using existing instance)"
    fi
 
-   # Deploy LDAP if enabled
-   if (( enable_ldap )); then
+   # Deploy directory service based on mode
+   if (( enable_ad )); then
+      # Deploy AD schema testing (OpenLDAP with AD schema)
+      _deploy_jenkins_ad "$vault_namespace" "$vault_release"
+   elif (( enable_ldap )); then
+      # Deploy standard LDAP
       _deploy_jenkins_ldap "$vault_namespace" "$vault_release"
    else
-      _info "[jenkins] skipping LDAP deployment"
+      _info "[jenkins] skipping directory service deployment"
    fi
    _create_jenkins_admin_vault_policy "$vault_namespace" "$vault_release"
    _create_jenkins_vault_ad_policy "$vault_namespace" "$vault_release" "$jenkins_namespace"
