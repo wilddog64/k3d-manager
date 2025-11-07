@@ -757,6 +757,7 @@ function deploy_ldap() {
    local namespace=""
    local release=""
    local chart_version=""
+   local enable_vault=0
 
    case $- in
       *x*)
@@ -774,17 +775,28 @@ Options:
   --namespace <ns>         Kubernetes namespace (default: ${LDAP_NAMESPACE})
   --release <name>         Helm release name (default: ${LDAP_RELEASE})
   --chart-version <ver>    Helm chart version (default: ${LDAP_HELM_CHART_VERSION:-<auto>})
+  --enable-vault           Deploy Vault and ESO if not already deployed
   -h, --help               Show this help message
 
 Positional overrides (kept for backwards compatibility):
   namespace                Equivalent to --namespace <ns>
   release                  Equivalent to --release <name>
   chart-version            Equivalent to --chart-version <ver>
+
+Examples:
+  deploy_ldap                           # Deploy with defaults
+  deploy_ldap --enable-vault            # Deploy with automatic Vault setup
+  deploy_ldap --namespace my-ns         # Deploy to custom namespace
 EOF
             if (( restore_trace )); then
                set -x
             fi
             return 0
+            ;;
+         --enable-vault)
+            enable_vault=1
+            shift
+            continue
             ;;
          --namespace)
             if [[ -z "${2:-}" ]]; then
@@ -888,8 +900,29 @@ EOF
    export LDAP_NAMESPACE="$namespace"
    export LDAP_RELEASE="$release"
 
-   # ESO deployment managed by Jenkins plugin; skip redundant call
-   # deploy_eso
+   # Deploy prerequisites if requested
+   if [[ "$enable_vault" == "1" ]]; then
+      _info "[ldap] deploying prerequisites (--enable-vault specified)"
+
+      # Deploy ESO first (required for Vault secret syncing)
+      if ! deploy_eso; then
+         _err "[ldap] ESO deployment failed"
+         return 1
+      fi
+
+      # Wait for ESO webhook to be ready
+      _info "[ldap] waiting for ESO webhook to be ready..."
+      if ! kubectl wait --for=condition=available deployment/external-secrets-webhook -n external-secrets --timeout=60s; then
+         _err "[ldap] ESO webhook did not become ready"
+         return 1
+      fi
+
+      # Deploy Vault
+      if ! deploy_vault; then
+         _err "[ldap] Vault deployment failed"
+         return 1
+      fi
+   fi
 
    local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
    local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
@@ -1138,9 +1171,9 @@ EOF
 
    local namespace="${LDAP_NAMESPACE:-directory}"
    local release="${LDAP_RELEASE:-openldap}"
-   local service_name="${release}-${LDAP_IMAGE_REPOSITORY##*/}"
-   local smoke_port=3389
-   local smoke_script="${SCRIPT_DIR}/tests/plugins/openldap.sh"
+   local service_name="${LDAP_SERVICE_NAME:-${release}-openldap-bitnami}"
+   local smoke_port="${LDAP_SMOKE_PORT:-3389}"
+   local smoke_script="${SCRIPT_DIR}/scripts/tests/plugins/openldap.sh"
 
    if [[ -x "$smoke_script" ]]; then
       if ! "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN"; then
