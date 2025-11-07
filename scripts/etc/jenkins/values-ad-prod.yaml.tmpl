@@ -1,0 +1,172 @@
+controller:
+  sidecars:
+    configAutoReload:
+      enabled: true
+  podAnnotations:
+    sidecar.istio.io/inject: "true"
+    sidecar.istio.io/rewriteAppHTTPProbers: "true"
+    proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
+    vault.hashicorp.com/agent-inject: "true"
+    vault.hashicorp.com/role: "jenkins-ad-reader"
+    vault.hashicorp.com/agent-pre-populate-only: "true"
+    vault.hashicorp.com/agent-inject-secret-ad-bind-user: "${AD_VAULT_PATH}"
+    vault.hashicorp.com/agent-inject-template-ad-bind-user: |-
+      {{ "{{" }}- with secret "${AD_VAULT_PATH}" -{{ "}}" }}
+      {{ "{{" }}- .Data.data.${AD_USERNAME_KEY} -{{ "}}" }}
+      {{ "{{" }}- end -{{ "}}" }}
+    vault.hashicorp.com/agent-inject-secret-ad-bind-password: "${AD_VAULT_PATH}"
+    vault.hashicorp.com/agent-inject-template-ad-bind-password: |-
+      {{ "{{" }}- with secret "${AD_VAULT_PATH}" -{{ "}}" }}
+      {{ "{{" }}- .Data.data.${AD_PASSWORD_KEY} -{{ "}}" }}
+      {{ "{{" }}- end -{{ "}}" }}
+  image:
+    registry: docker.io
+    repository: jenkins/jenkins
+    tag: lts
+    pullPolicy: IfNotPresent
+  installPlugins:
+    - active-directory
+    - configuration-as-code
+    - credentials
+    - git
+    - hashicorp-vault-plugin
+    - job-dsl
+    - kubernetes
+    - matrix-auth
+    - matrix-project
+    - metrics
+    - mina-sshd-api-common
+    - mina-sshd-api-core
+    - okhttp-api
+    - parameterized-trigger
+    - workflow-aggregator
+    - workflow-multibranch
+    - pipeline-build-step
+    - pipeline-stage-view
+    - pipeline-utility-steps
+    - plain-credentials
+    - plugin-util-api
+    - script-security
+    - ssh-credentials
+    - ssh-slaves
+    - sshd
+  containerEnv:
+    - name: JENKINS_ADMIN_USER
+      value: "jenkins-admin"
+    - name: JENKINS_ADMIN_PASS
+      valueFrom:
+        secretKeyRef:
+          name: jenkins-admin
+          key: jenkins-admin-password
+    - name: JAVA_OPTS
+      value: "-Djenkins.install.runSetupWizard=false"
+    - name: JENKINS_OPTS
+      value: "--httpPort=8080 --httpListenAddress=0.0.0.0"
+    - name: AD_DOMAIN
+      value: "${AD_DOMAIN}"
+    - name: AD_SERVER
+      value: "${AD_SERVER}"
+    - name: AD_SITE
+      value: "${AD_SITE}"
+    - name: POD_NAME
+      valueFrom:
+        fieldRef:
+          apiVersion: v1
+          fieldPath: metadata.name
+    - name: JENKINS_SLAVE_AGENT_PORT
+      value: "50000"
+    - name: CASC_JENKINS_CONFIG
+      value: "/var/jenkins_home/casc_configs"
+
+  serviceAccount:
+    create: true
+    name: jenkins-admin
+
+  admin:
+    createSecret: false
+    existingSecret: jenkins-admin
+    userKey: jenkins-admin-user
+    passwordKey: jenkins-admin-password
+
+  podSecurityContext:
+    fsGroup: 1000
+    runAsUser: 1000
+
+  persistence:
+    enabled: true
+    existingClaim: jenkins-home
+
+  serviceType: ClusterIP
+  servicePort: 8081
+  targetPort: 8080
+  containerPort: 8080
+  servicePortName: http
+
+  healthProbes: true
+  probes:
+    startupProbe:
+      httpGet:
+        path: /login
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 90
+      periodSeconds: 5
+      failureThreshold: 180
+    readinessProbe:
+      httpGet:
+        path: /login
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 90
+      periodSeconds: 5
+      failureThreshold: 120
+    livenessProbe:
+      httpGet:
+        path: /login
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 90
+      periodSeconds: 5
+      failureThreshold: 60
+  JCasC:
+    defaultConfig: false
+    configScripts:
+      00-location.yaml: |
+        unclassified:
+          location:
+            url: "https://${VAULT_PKI_LEAF_HOST}/"      # trailing slash required
+            adminAddress: "jenkins-admin@me.com"
+      01-security: |
+        jenkins:
+          disabledAdministrativeMonitors:
+            - "jenkins.security.ReverseProxySetupMonitor"
+          securityRealm:
+            activeDirectory:
+              bindPassword: "$${file:/vault/secrets/ad-bind-password}"
+              cache:
+                size: ${AD_CACHE_SIZE}
+                ttl: ${AD_CACHE_TTL}
+              customDomain: ${AD_CUSTOM_DOMAIN}
+              domains:
+                - bindName: "$${file:/vault/secrets/ad-bind-user}"
+                  bindPassword: "$${file:/vault/secrets/ad-bind-password}"
+                  name: "${AD_DOMAIN}"
+                  servers: "${AD_SERVER}"
+                  site: "${AD_SITE}"
+                  tlsConfiguration: "${AD_TLS_CONFIG}"
+              groupLookupStrategy: "${AD_GROUP_LOOKUP_STRATEGY}"
+              internalUsersDatabase:
+                jenkinsInternalUser: "jenkins-admin"
+              removeIrrelevantGroups: ${AD_REMOVE_IRRELEVANT_GROUPS}
+              requireTLS: ${AD_REQUIRE_TLS}
+              startTls: ${AD_START_TLS}
+          authorizationStrategy:
+            projectMatrix:
+              entries:
+                - group:
+                    name: "${AD_ADMIN_GROUP}"
+                    permissions:
+                      - "Overall/Read"
+                      - "Overall/Administer"
+  # Optional but keeps env consistent with JCasC Location
+  jenkinsUrl: "https://${VAULT_PKI_LEAF_HOST}/"
