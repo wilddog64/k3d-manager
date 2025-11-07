@@ -989,3 +989,205 @@ EOF
 
    return "$deploy_rc"
 }
+
+# Deploy OpenLDAP with Active Directory-compatible schema for testing
+# This is a convenience wrapper that auto-configures AD schema settings
+# and runs fail-fast smoke tests
+function deploy_ad() {
+   local restore_trace=0
+   if [[ "$-" =~ x ]]; then
+      set +x
+      restore_trace=1
+   fi
+
+   # Parse arguments
+   local show_help=0
+   local enable_vault=0
+   local namespace_arg=""
+   local release_arg=""
+   local ldap_args=()
+
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         -h|--help)
+            show_help=1
+            break
+            ;;
+         --enable-vault)
+            enable_vault=1
+            shift
+            ;;
+         --namespace)
+            namespace_arg="$2"
+            ldap_args+=("$1" "$2")
+            shift 2
+            ;;
+         --namespace=*)
+            namespace_arg="${1#*=}"
+            ldap_args+=("$1")
+            shift
+            ;;
+         --release)
+            release_arg="$2"
+            ldap_args+=("$1" "$2")
+            shift 2
+            ;;
+         --release=*)
+            release_arg="${1#*=}"
+            ldap_args+=("$1")
+            shift
+            ;;
+         *)
+            # Positional args - pass through to deploy_ldap
+            ldap_args+=("$1")
+            if [[ -z "$namespace_arg" ]]; then
+               namespace_arg="$1"
+            elif [[ -z "$release_arg" ]]; then
+               release_arg="$1"
+            fi
+            shift
+            ;;
+      esac
+   done
+
+   if [[ "$show_help" == "1" ]]; then
+      cat <<'EOF'
+Usage: deploy_ad [options] [namespace] [release]
+
+Deploy OpenLDAP with Active Directory-compatible schema for LOCAL TESTING.
+
+IMPORTANT: This does NOT deploy real Active Directory. It deploys OpenLDAP
+configured with AD-like schema to validate schema structure, users, and
+groups before deploying to production AD.
+
+Options:
+  --namespace <ns>   Namespace (default: directory)
+  --release <name>   Release name (default: openldap)
+  --enable-vault     Deploy Vault if not already deployed
+  -h, --help         Show this help
+
+Examples:
+  # Deploy OpenLDAP with AD schema (requires Vault already deployed)
+  deploy_ad
+
+  # Deploy with Vault auto-deployment
+  deploy_ad --enable-vault
+
+  # Deploy to custom namespace
+  deploy_ad --namespace ad-test --enable-vault
+
+  # Next steps after deployment
+  deploy_jenkins --enable-ldap --enable-vault
+
+Note: Use --enable-ldap (not --enable-ad) for testing with deploy_ad.
+      The --enable-ad flag is for production Active Directory only.
+
+Prerequisites:
+  - Vault must be deployed (use --enable-vault or deploy_vault first)
+  - ESO must be deployed (deploy_eso)
+EOF
+      if (( restore_trace )); then set +x; fi
+      return 0
+   fi
+
+   _info "[ad] deploying OpenLDAP with Active Directory-compatible schema"
+   _info "[ad] this is for testing AD schema structure, not production AD"
+
+   # Auto-configure AD schema environment variables
+   export LDAP_LDIF_FILE="${SCRIPT_DIR}/scripts/etc/ldap/bootstrap-ad-schema.ldif"
+   export LDAP_BASE_DN="DC=corp,DC=example,DC=com"
+   export LDAP_BINDDN="cn=admin,DC=corp,DC=example,DC=com"
+   export LDAP_DOMAIN="corp.example.com"
+   export LDAP_ROOT="DC=corp,DC=example,DC=com"
+
+   _info "[ad] using AD schema: ${LDAP_LDIF_FILE}"
+   _info "[ad] base DN: ${LDAP_BASE_DN}"
+
+   # Deploy prerequisites if requested
+   if [[ "$enable_vault" == "1" ]]; then
+      _info "[ad] deploying prerequisites (--enable-vault specified)"
+
+      # Deploy ESO first (required for Vault secret syncing)
+      if ! deploy_eso; then
+         _err "[ad] ESO deployment failed"
+         return 1
+      fi
+
+      # Wait for ESO webhook to be ready
+      _info "[ad] waiting for ESO webhook to be ready..."
+      if ! kubectl wait --for=condition=available deployment/external-secrets-webhook -n external-secrets --timeout=60s; then
+         _err "[ad] ESO webhook did not become ready"
+         return 1
+      fi
+
+      # Deploy Vault
+      if ! deploy_vault; then
+         _err "[ad] Vault deployment failed"
+         return 1
+      fi
+   fi
+
+   # Call deploy_ldap with AD schema configuration
+   if ! deploy_ldap "${ldap_args[@]}"; then
+      _err "[ad] OpenLDAP deployment failed"
+      return 1
+   fi
+
+   # Run fail-fast smoke test
+   _info "[ad] running fail-fast smoke test..."
+
+   local namespace="${LDAP_NAMESPACE:-directory}"
+   local release="${LDAP_RELEASE:-openldap}"
+   local service_name="${release}-${LDAP_IMAGE_REPOSITORY##*/}"
+   local smoke_port=3389
+   local smoke_script="${SCRIPT_DIR}/tests/plugins/openldap.sh"
+
+   if [[ -x "$smoke_script" ]]; then
+      if ! "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN"; then
+         _err "[ad] smoke test failed - deployment verification failed"
+         cat <<EOF
+
+❌ OpenLDAP deployed but smoke test FAILED
+
+Troubleshooting:
+  1. Check pod logs: kubectl logs -n ${namespace} -l app.kubernetes.io/name=openldap-bitnami
+  2. Check base DN: kubectl get secret openldap-admin -n ${namespace} -o jsonpath='{.data.LDAP_BASE_DN}' | base64 -d
+  3. Manual test: kubectl exec -n ${namespace} \$(kubectl get pods -n ${namespace} -l app.kubernetes.io/name=openldap-bitnami -o jsonpath='{.items[0].metadata.name}') -- ldapsearch -x -b "DC=corp,DC=example,DC=com"
+
+EOF
+         return 1
+      fi
+   elif [[ -r "$smoke_script" ]]; then
+      if ! bash "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN"; then
+         _err "[ad] smoke test failed - deployment verification failed"
+         return 1
+      fi
+   else
+      _warn "[ad] smoke test script not found at ${smoke_script}; skipping verification"
+   fi
+
+   # Success message
+   cat <<EOF
+
+✅ OpenLDAP with AD schema deployed successfully
+
+Base DN: ${LDAP_BASE_DN}
+Schema: Active Directory-compatible
+Namespace: ${namespace}
+Release: ${release}
+
+Next steps:
+  # Deploy Jenkins with LDAP authentication (uses LDAP plugin)
+  ./scripts/k3d-manager deploy_jenkins --enable-ldap --enable-vault
+
+  # Test login with AD-style users
+  # alice@corp.example.com / AlicePass123!
+  # bob@corp.example.com / BobPass456!
+
+Note: This deployment uses OpenLDAP with AD schema for testing.
+      For production AD, use --enable-ad flag instead of --enable-ldap.
+EOF
+
+   if (( restore_trace )); then set +x; fi
+   return 0
+}
