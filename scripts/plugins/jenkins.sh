@@ -1176,9 +1176,40 @@ function _deploy_jenkins() {
      fi
      _helm repo update
    fi
-   local values_file="${JENKINS_VALUES_FILE:-$JENKINS_CONFIG_DIR/values.yaml}"
-   if [[ ! -r "$values_file" ]]; then
-      _err "Jenkins values file not found: $values_file"
+
+   # Template selection based on authentication mode
+   local template_file auth_mode
+   if (( enable_ad )); then
+      template_file="$JENKINS_CONFIG_DIR/values-ad-test.yaml.tmpl"
+      auth_mode="ad-testing"
+      _info "[jenkins] using AD schema testing template: values-ad-test.yaml.tmpl"
+   elif (( enable_ldap )); then
+      template_file="$JENKINS_CONFIG_DIR/values-ldap.yaml.tmpl"
+      auth_mode="standard-ldap"
+      _info "[jenkins] using standard LDAP template: values-ldap.yaml.tmpl"
+   else
+      # No directory service - use default values.yaml
+      template_file="$JENKINS_CONFIG_DIR/values.yaml"
+      auth_mode="none"
+      _info "[jenkins] using default template (no directory service): values.yaml"
+   fi
+
+   # Process template with envsubst if it's a .tmpl file
+   local values_file
+   if [[ "$template_file" == *.tmpl ]]; then
+      if [[ ! -r "$template_file" ]]; then
+         _err "[jenkins] template file not found: $template_file"
+      fi
+      values_file=$(mktemp -t jenkins-values.XXXXXX.yaml)
+      _jenkins_register_rendered_manifest "$values_file"
+      _info "[jenkins] processing template with envsubst: $template_file"
+      envsubst < "$template_file" > "$values_file"
+   else
+      # Use file directly (no template processing)
+      values_file="${JENKINS_VALUES_FILE:-$template_file}"
+      if [[ ! -r "$values_file" ]]; then
+         _err "Jenkins values file not found: $values_file"
+      fi
    fi
 
    # If LDAP is disabled, create a temporary values file without LDAP env vars
@@ -1469,7 +1500,7 @@ function _wait_for_jenkins_ready() {
    elif [[ -n "${JENKINS_READY_TIMEOUT:-}" ]]; then
       timeout="$JENKINS_READY_TIMEOUT"
    else
-      timeout="5m"
+      timeout="10m"
    fi
 
    local total_seconds
@@ -1479,18 +1510,57 @@ function _wait_for_jenkins_ready() {
       *) total_seconds=$timeout ;;
    esac
    local end=$((SECONDS + total_seconds))
+   local wait_count=0
+   local last_status=""
 
+   # First check if pod exists
+   local pod_exists=0
+   local pod_check_timeout=$((SECONDS + 60))
+   while (( SECONDS < pod_check_timeout )); do
+      if _kubectl --no-exit --quiet -n "$ns" get pod -l app.kubernetes.io/component=jenkins-controller >/dev/null 2>&1; then
+         pod_exists=1
+         break
+      fi
+      echo "Waiting for Jenkins controller pod to be created..."
+      sleep 3
+   done
+
+   if (( ! pod_exists )); then
+      echo "Jenkins controller pod was not created within 60 seconds" >&2
+      return 1
+   fi
+
+   # Wait for pod to be ready with progress updates
    until _kubectl --no-exit --quiet -n "$ns" wait \
       --for=condition=Ready \
       pod -l app.kubernetes.io/component=jenkins-controller \
-      --timeout=5s >/dev/null 2>&1; do
-      echo "Waiting for Jenkins controller pod to be ready..."
+      --timeout=10s >/dev/null 2>&1; do
+
+      wait_count=$((wait_count + 1))
+
+      # Get current pod status for informative message
+      local current_status
+      current_status=$(_kubectl --no-exit --quiet -n "$ns" get pod -l app.kubernetes.io/component=jenkins-controller \
+         -o jsonpath='{.items[0].status.containerStatuses[*].ready}' 2>/dev/null || echo "unknown")
+
+      # Only print message if status changed or every 12 iterations (1 minute)
+      if [[ "$current_status" != "$last_status" ]] || (( wait_count % 12 == 0 )); then
+         local elapsed=$((SECONDS - (end - total_seconds)))
+         echo "Waiting for Jenkins controller pod to be ready... (${elapsed}s elapsed, status: ${current_status})"
+         last_status="$current_status"
+      fi
+
       if (( SECONDS >= end )); then
-         echo "Timed out waiting for Jenkins controller pod to be ready" >&2
+         echo "Timed out after ${total_seconds}s waiting for Jenkins controller pod to be ready" >&2
+         echo "Last known status: ${current_status}" >&2
+         _kubectl -n "$ns" get pod -l app.kubernetes.io/component=jenkins-controller >&2 || true
+         _kubectl -n "$ns" describe pod -l app.kubernetes.io/component=jenkins-controller >&2 || true
          return 1
       fi
       sleep 5
    done
+
+   echo "Jenkins controller pod is ready"
 }
 
 function _create_jenkins_admin_vault_policy() {
