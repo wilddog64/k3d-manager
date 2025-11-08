@@ -795,13 +795,83 @@ function _deploy_jenkins_ad() {
    fi
 }
 
+function _validate_ad_connectivity() {
+   local ad_domain="${1:?AD domain required}"
+   local ad_server="${2:-}"
+   local require_tls="${3:-true}"
+
+   _info "[jenkins] validating Active Directory connectivity..."
+
+   # Determine which host to test
+   local test_host="$ad_domain"
+   if [[ -n "$ad_server" ]]; then
+      # If AD_SERVER is set, use the first one (comma-separated list)
+      test_host="${ad_server%%,*}"
+      test_host="${test_host// /}"  # trim whitespace
+   fi
+
+   # Test DNS resolution
+   _info "[jenkins] checking DNS resolution for: $test_host"
+   if ! host "$test_host" >/dev/null 2>&1 && ! nslookup "$test_host" >/dev/null 2>&1 && ! getent hosts "$test_host" >/dev/null 2>&1; then
+      _err "[jenkins] AD server '$test_host' cannot be resolved via DNS. Please check AD_DOMAIN or AD_SERVER configuration."
+   fi
+   _info "[jenkins] DNS resolution successful for $test_host"
+
+   # Determine LDAP port based on TLS requirement
+   local ldap_port
+   if [[ "$require_tls" == "true" ]]; then
+      ldap_port=636  # LDAPS
+      _info "[jenkins] testing LDAPS connectivity on port 636..."
+   else
+      ldap_port=389  # LDAP
+      _info "[jenkins] testing LDAP connectivity on port 389..."
+   fi
+
+   # Test port connectivity using timeout and nc/telnet/bash
+   local connection_test_result=1
+   if command -v nc >/dev/null 2>&1; then
+      # Use netcat if available
+      if timeout 5 nc -z "$test_host" "$ldap_port" 2>/dev/null; then
+         connection_test_result=0
+      fi
+   elif command -v timeout >/dev/null 2>&1 && [[ -e /dev/tcp ]]; then
+      # Use bash TCP redirection with timeout
+      if timeout 5 bash -c "cat < /dev/null > /dev/tcp/$test_host/$ldap_port" 2>/dev/null; then
+         connection_test_result=0
+      fi
+   else
+      # Fallback: just warn that we can't test connectivity
+      _warn "[jenkins] cannot test port connectivity (nc or timeout not available), skipping port check"
+      return 0
+   fi
+
+   if (( connection_test_result != 0 )); then
+      printf '\n' >&2
+      printf 'ERROR: [jenkins] Cannot connect to AD server '\''%s'\'' on port %s\n' "$test_host" "$ldap_port" >&2
+      printf 'ERROR: \n' >&2
+      printf 'ERROR: Please verify:\n' >&2
+      printf 'ERROR:   1. AD server is running and accessible from this host\n' >&2
+      printf 'ERROR:   2. Firewall allows connections to port %s\n' "$ldap_port" >&2
+      printf 'ERROR:   3. AD_DOMAIN='\''%s'\'' or AD_SERVER='\''%s'\'' is correct\n' "$ad_domain" "${ad_server:-<not set>}" >&2
+      printf 'ERROR: \n' >&2
+      printf 'ERROR: To skip this validation for testing, use: --skip-ad-validation\n' >&2
+      printf '\n' >&2
+      _err "[jenkins] AD connectivity validation failed. Deployment aborted."
+   fi
+
+   _info "[jenkins] Active Directory connectivity validated successfully"
+   return 0
+}
+
 function deploy_jenkins() {
    local jenkins_namespace=""
    local vault_namespace=""
    local vault_release=""
    local enable_ldap="${JENKINS_LDAP_ENABLED:-0}"
    local enable_ad="${JENKINS_AD_ENABLED:-0}"
+   local enable_ad_prod="${JENKINS_AD_PROD_ENABLED:-0}"
    local enable_vault="${JENKINS_VAULT_ENABLED:-1}"
+   local skip_ad_validation="${JENKINS_SKIP_AD_VALIDATION:-0}"
    local restore_trace=0
    local arg_count=$#
 
@@ -820,15 +890,29 @@ Options:
   --vault-release <name>     Vault release name (default: ${VAULT_RELEASE_DEFAULT:-vault})
   --enable-ldap              Deploy standard LDAP integration (default: disabled)
   --enable-ad                Deploy AD schema testing (OpenLDAP with AD schema) (default: disabled)
+  --enable-ad-prod           Deploy production Active Directory integration (default: disabled)
+  --skip-ad-validation       Skip Active Directory connectivity validation (for testing)
   --disable-ldap             Skip directory service deployment
   --enable-vault             Deploy Vault (default: disabled)
   --disable-vault            Skip Vault deployment (use existing)
   -h, --help                 Show this help message
 
 Feature Flags (environment variables):
-  JENKINS_LDAP_ENABLED=0|1   Enable LDAP auto-deployment (default: 0)
-  JENKINS_AD_ENABLED=0|1     Enable AD testing auto-deployment (default: 0)
-  JENKINS_VAULT_ENABLED=0|1  Enable Vault auto-deployment (default: 0)
+  JENKINS_LDAP_ENABLED=0|1       Enable LDAP auto-deployment (default: 0)
+  JENKINS_AD_ENABLED=0|1         Enable AD testing auto-deployment (default: 0)
+  JENKINS_AD_PROD_ENABLED=0|1    Enable production AD auto-deployment (default: 0)
+  JENKINS_VAULT_ENABLED=0|1      Enable Vault auto-deployment (default: 0)
+
+Active Directory Production Setup:
+  When using --enable-ad-prod, configure these environment variables:
+    AD_DOMAIN       Domain name (e.g., corp.example.com)
+    AD_SERVER       DC servers (optional, comma-separated)
+    AD_VAULT_PATH   Vault path for AD credentials (default: secret/data/jenkins/ad-credentials)
+
+  Store credentials in Vault before deployment:
+    vault kv put secret/jenkins/ad-credentials \\
+      username="svc-jenkins@corp.example.com" \\
+      password="..."
 
 Examples:
   # Show this help message
@@ -842,6 +926,10 @@ Examples:
 
   # AD schema testing (local OpenLDAP with AD schema)
   deploy_jenkins --enable-ad --enable-vault
+
+  # Production Active Directory integration
+  export AD_DOMAIN="corp.example.com"
+  deploy_jenkins --enable-ad-prod --enable-vault
 
   # Deploy with Vault integration only
   deploy_jenkins --enable-vault
@@ -869,15 +957,29 @@ Options:
   --vault-release <name>     Vault release name (default: ${VAULT_RELEASE_DEFAULT:-vault})
   --enable-ldap              Deploy standard LDAP integration (default: disabled)
   --enable-ad                Deploy AD schema testing (OpenLDAP with AD schema) (default: disabled)
+  --enable-ad-prod           Deploy production Active Directory integration (default: disabled)
+  --skip-ad-validation       Skip Active Directory connectivity validation (for testing)
   --disable-ldap             Skip directory service deployment
   --enable-vault             Deploy Vault (default: disabled)
   --disable-vault            Skip Vault deployment (use existing)
   -h, --help                 Show this help message
 
 Feature Flags (environment variables):
-  JENKINS_LDAP_ENABLED=0|1   Enable LDAP auto-deployment (default: 0)
-  JENKINS_AD_ENABLED=0|1     Enable AD testing auto-deployment (default: 0)
-  JENKINS_VAULT_ENABLED=0|1  Enable Vault auto-deployment (default: 0)
+  JENKINS_LDAP_ENABLED=0|1       Enable LDAP auto-deployment (default: 0)
+  JENKINS_AD_ENABLED=0|1         Enable AD testing auto-deployment (default: 0)
+  JENKINS_AD_PROD_ENABLED=0|1    Enable production AD auto-deployment (default: 0)
+  JENKINS_VAULT_ENABLED=0|1      Enable Vault auto-deployment (default: 0)
+
+Active Directory Production Setup:
+  When using --enable-ad-prod, configure these environment variables:
+    AD_DOMAIN       Domain name (e.g., corp.example.com)
+    AD_SERVER       DC servers (optional, comma-separated)
+    AD_VAULT_PATH   Vault path for AD credentials (default: secret/data/jenkins/ad-credentials)
+
+  Store credentials in Vault before deployment:
+    vault kv put secret/jenkins/ad-credentials \\
+      username="svc-jenkins@corp.example.com" \\
+      password="..."
 
 Examples:
   # Minimal deployment (Jenkins only, no directory service, no Vault)
@@ -888,6 +990,10 @@ Examples:
 
   # AD schema testing (local OpenLDAP with AD schema)
   deploy_jenkins --enable-ad --enable-vault
+
+  # Production Active Directory integration
+  export AD_DOMAIN="corp.example.com"
+  deploy_jenkins --enable-ad-prod --enable-vault
 
   # Deploy with Vault integration only
   deploy_jenkins --enable-vault
@@ -939,9 +1045,18 @@ EOF
             enable_ad=1
             shift
             ;;
+         --enable-ad-prod)
+            enable_ad_prod=1
+            shift
+            ;;
+         --skip-ad-validation)
+            skip_ad_validation=1
+            shift
+            ;;
          --disable-ldap)
             enable_ldap=0
             enable_ad=0
+            enable_ad_prod=0
             shift
             ;;
          --enable-vault)
@@ -980,20 +1095,22 @@ EOF
    vault_namespace="${vault_namespace:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    vault_release="${vault_release:-${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}}"
 
-   # Mutual exclusivity check: --enable-ldap and --enable-ad cannot both be set
-   if (( enable_ldap && enable_ad )); then
-      _err "[jenkins] --enable-ldap and --enable-ad are mutually exclusive (use one or the other)"
+   # Mutual exclusivity check: only one directory service mode can be enabled
+   local mode_count=$(( enable_ldap + enable_ad + enable_ad_prod ))
+   if (( mode_count > 1 )); then
+      _err "[jenkins] --enable-ldap, --enable-ad, and --enable-ad-prod are mutually exclusive (use only one)"
    fi
 
    # Export enable flags so downstream functions can check them
    export JENKINS_LDAP_ENABLED="$enable_ldap"
    export JENKINS_AD_ENABLED="$enable_ad"
+   export JENKINS_AD_PROD_ENABLED="$enable_ad_prod"
    export JENKINS_VAULT_ENABLED="$enable_vault"
 
    if (( restore_trace )); then set -x; fi
 
    _info "[jenkins] deploying to namespace: ${jenkins_namespace}"
-   _info "[jenkins] directory service: $( (( enable_ldap )) && echo "standard LDAP" || (( enable_ad )) && echo "AD schema testing" || echo "none" )"
+   _info "[jenkins] directory service: $( (( enable_ldap )) && echo "standard LDAP" || (( enable_ad )) && echo "AD schema testing" || (( enable_ad_prod )) && echo "production Active Directory" || echo "none" )"
    _info "[jenkins] Vault deployment: $( (( enable_vault )) && echo "enabled" || echo "disabled" )"
 
    _jenkins_configure_leaf_host_defaults
@@ -1179,7 +1296,33 @@ function _deploy_jenkins() {
 
    # Template selection based on authentication mode
    local template_file auth_mode
-   if (( enable_ad )); then
+   if (( enable_ad_prod )); then
+      # Production Active Directory - source AD variables and use AD prod template
+      local ad_vars_file="$JENKINS_CONFIG_DIR/ad-vars.sh"
+      if [[ -r "$ad_vars_file" ]]; then
+         _info "[jenkins] sourcing AD configuration: $ad_vars_file"
+         source "$ad_vars_file"
+      else
+         _warn "[jenkins] AD variables file not found: $ad_vars_file (using environment defaults)"
+      fi
+
+      # Validate required AD variables
+      if [[ -z "${AD_DOMAIN:-}" ]]; then
+         _err "[jenkins] AD_DOMAIN must be set for production AD (e.g., export AD_DOMAIN=\"corp.example.com\")"
+      fi
+
+      # Validate AD connectivity unless validation is skipped
+      if (( ! skip_ad_validation )); then
+         _validate_ad_connectivity "$AD_DOMAIN" "${AD_SERVER:-}" "${AD_REQUIRE_TLS:-true}"
+      else
+         _warn "[jenkins] AD connectivity validation skipped (--skip-ad-validation)"
+      fi
+
+      template_file="$JENKINS_CONFIG_DIR/values-ad-prod.yaml.tmpl"
+      auth_mode="production-ad"
+      _info "[jenkins] using production Active Directory template: values-ad-prod.yaml.tmpl"
+      _info "[jenkins] AD domain: ${AD_DOMAIN}"
+   elif (( enable_ad )); then
       template_file="$JENKINS_CONFIG_DIR/values-ad-test.yaml.tmpl"
       auth_mode="ad-testing"
       _info "[jenkins] using AD schema testing template: values-ad-test.yaml.tmpl"
