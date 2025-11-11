@@ -325,6 +325,40 @@ function test_jenkins_smoke() {
 }
 ```
 
+#### 5.3 Post-Deployment Integration (Recommended)
+**Automatically run smoke test after Jenkins deployment for immediate feedback**
+
+**Implementation in `scripts/plugins/jenkins.sh` (at end of `deploy_jenkins` function):**
+```bash
+# Determine auth mode based on deployment flags
+local smoke_test_mode="default"
+if [[ "${JENKINS_LDAP_ENABLED:-0}" == "1" ]] || [[ "${JENKINS_AD_ENABLED:-0}" == "1" ]]; then
+  smoke_test_mode="ldap"
+elif [[ "${JENKINS_AD_PROD_ENABLED:-0}" == "1" ]]; then
+  smoke_test_mode="ad"
+fi
+
+# Run smoke test
+echo ""
+echo "=========================================="
+echo "Running Post-Deployment Smoke Test"
+echo "=========================================="
+if "${SCRIPT_DIR}/../bin/smoke-test-jenkins.sh" jenkins jenkins.dev.local.me 443 "$smoke_test_mode"; then
+  echo ""
+  echo "✅ Jenkins deployment verified successfully"
+else
+  echo ""
+  echo "⚠️  Jenkins deployed but smoke test failed - please review"
+  echo "    Run manually: ./bin/smoke-test-jenkins.sh"
+fi
+```
+
+**Benefits:**
+- Immediate feedback on deployment success/failure
+- Catches SSL certificate issues right away
+- Validates authentication configuration matches deployment flags
+- No extra commands needed - fully automatic
+
 ### 6. Implementation Phases
 
 **Phase 1: Core SSL Testing (30 min)**
@@ -337,7 +371,7 @@ function test_jenkins_smoke() {
 - Verify credential extraction from K8s secrets
 - Test login via Jenkins API
 
-**Phase 3: LDAP/AD Auth Testing (30 min)**
+**Phase 3: LDAP/AD Auth Testing (30 min)** - IN PROGRESS
 - Implement LDAP authentication test (reuse test-openldap.sh patterns)
 - Implement AD authentication test
 - Handle missing credentials gracefully
@@ -347,7 +381,20 @@ function test_jenkins_smoke() {
 - Optional: Add bats integration test
 - Document usage in README.md
 
-**Total Estimated Time:** ~2 hours
+**Phase 5: Deploy Integration (30 min)** - PLANNED
+- Auto-detect auth mode from deployment flags
+- Add smoke test to end of `deploy_jenkins` function
+- Provide clear success/failure feedback
+- Allow opt-out with environment variable
+
+**Status Update (2025-11-11):**
+- ✅ Phase 1: Complete (commit e30c46b)
+- ✅ Phase 2: Complete (commit e30c46b)
+- 🔄 Phase 3: In Progress
+- ⏳ Phase 4: Planned
+- ⏳ Phase 5: Planned (post-deployment integration)
+
+**Total Estimated Time:** ~2.5 hours
 
 ### 7. Success Criteria
 
