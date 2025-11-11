@@ -64,6 +64,59 @@ kubectl -n jenkins exec "$POD" -c jenkins -- \
 ```
 
 The first command exercises the OpenLDAP deployment (the helper prints a warning if `ldapsearch` is missing); the second returns the Vault-synchronised LDAP administrator password that Jenkins now consumes via the LDAP plugin. The final command shows an HTTP 200 when authentication succeeds.
+
+## Jenkins Authentication Modes
+
+Jenkins can be deployed with different authentication backends depending on your environment:
+
+### Default Mode (No Directory Service)
+
+```bash
+./scripts/k3d-manager deploy_jenkins --enable-vault
+```
+
+Uses Jenkins built-in authentication with credentials stored in Vault via External Secrets Operator.
+
+### Active Directory Testing Mode
+
+```bash
+./scripts/k3d-manager deploy_jenkins --enable-ad --enable-vault
+```
+
+Deploys OpenLDAP with Active Directory schema for local development and testing. This mode:
+- Uses the `ldap` plugin with AD-compatible schema
+- Configures OpenLDAP with `msPerson` and `msOrganizationalUnit` object classes
+- Stores LDAP credentials in Vault
+- Ideal for testing AD integration before deploying to production
+
+### Production Active Directory Integration
+
+```bash
+# Configure AD connection
+export AD_DOMAIN="corp.example.com"
+export AD_SERVER="dc1.corp.example.com,dc2.corp.example.com"  # optional
+
+./scripts/k3d-manager deploy_jenkins --enable-ad-prod --enable-vault
+```
+
+Connects Jenkins to a production Active Directory server. This mode:
+- Uses the `active-directory` plugin
+- Validates AD connectivity (DNS resolution and LDAPS port 636) before deployment
+- Stores AD service account credentials in Vault
+- Requires network access to the AD domain controllers
+
+Configuration file: `scripts/etc/jenkins/ad-vars.sh`
+
+#### Skip Validation (for testing)
+
+To bypass the pre-flight connectivity check:
+
+```bash
+./scripts/k3d-manager deploy_jenkins --enable-ad-prod --enable-vault --skip-ad-validation
+```
+
+**Note:** The three directory service modes (`--enable-ldap`, `--enable-ad`, `--enable-ad-prod`) are mutually exclusive. Choose one based on your environment.
+
 ## Using k3s clusters
 
 The helper scripts in this repository now understand a `k3s` provider in addition

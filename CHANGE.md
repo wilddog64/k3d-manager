@@ -1,4 +1,29 @@
-# Changes - k3d-manager: dated 2024-06-26
+# Changes - k3d-manager
+
+## Active Directory Integration - dated 2025-11-10
+
+bda2bf3 k3d-manager::tests::jenkins: add Active Directory integration tests
+b25f0a8 k3d-manager::plugins::jenkins: add production AD support with connectivity validation
+32676f3 k3d-manager::jenkins: improve deployment reliability and observability
+517edd7 k3d-manager::plugins::jenkins: add --enable-ad flag for AD schema testing
+182d972 k3d-manager: add Jenkins authentication mode templates
+ef1ef14 k3d-manager: improve deployment command consistency and AD DN configuration
+
+### Features Added
+- **Active Directory Testing Mode** (`--enable-ad`): Deploy OpenLDAP with AD schema for local testing
+- **Production AD Integration** (`--enable-ad-prod`): Connect to production Active Directory servers
+- **Pre-flight Validation**: Automatic DNS and LDAPS connectivity checks before deployment
+- **Validation Bypass**: `--skip-ad-validation` flag for testing environments
+- **Template-based Authentication**: Three distinct modes (default, AD testing, production AD)
+- **Comprehensive Testing**: 8 new bats tests covering flag validation and mutual exclusivity
+
+### Documentation
+- Added Jenkins Authentication Modes section to README.md
+- Updated CLAUDE.md with AD integration configuration details
+- Documented all three authentication modes with usage examples
+
+## Previous Releases - dated 2024-06-26
+
 d509293 k3d-manager: release notes
 598c4e6 test: cover Jenkins VirtualService headers
 b89c02c docs: note Jenkins reverse proxy headers
