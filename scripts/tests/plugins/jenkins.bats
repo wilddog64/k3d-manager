@@ -2298,3 +2298,77 @@ EOF
   run _jenkins_apply_eso_resources "$JENKINS_NAMESPACE"
   [ "$status" -eq 0 ]
 }
+
+# ============================================================================
+# Active Directory Integration Tests
+# ============================================================================
+
+@test "deploy_jenkins help shows --enable-ad flag" {
+  run deploy_jenkins -h
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--enable-ad"* ]]
+  [[ "$output" == *"AD schema testing"* ]]
+}
+
+@test "deploy_jenkins help shows --enable-ad-prod flag" {
+  run deploy_jenkins -h
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--enable-ad-prod"* ]]
+  [[ "$output" == *"production Active Directory"* ]]
+}
+
+@test "deploy_jenkins help shows --skip-ad-validation flag" {
+  run deploy_jenkins -h
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--skip-ad-validation"* ]]
+  [[ "$output" == *"Skip Active Directory connectivity validation"* ]]
+}
+
+@test "deploy_jenkins help documents AD production setup" {
+  run deploy_jenkins -h
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Active Directory Production Setup"* ]]
+  [[ "$output" == *"AD_DOMAIN"* ]]
+  [[ "$output" == *"AD_SERVER"* ]]
+  [[ "$output" == *"AD_VAULT_PATH"* ]]
+}
+
+@test "--enable-ldap and --enable-ad are mutually exclusive" {
+  _helm() { :; }
+  _kubectl() { :; }
+  export -f _helm _kubectl
+
+  run deploy_jenkins --enable-ldap --enable-ad --enable-vault
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "--enable-ldap and --enable-ad-prod are mutually exclusive" {
+  _helm() { :; }
+  _kubectl() { :; }
+  export -f _helm _kubectl
+
+  run deploy_jenkins --enable-ldap --enable-ad-prod --enable-vault
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "--enable-ad and --enable-ad-prod are mutually exclusive" {
+  _helm() { :; }
+  _kubectl() { :; }
+  export -f _helm _kubectl
+
+  run deploy_jenkins --enable-ad --enable-ad-prod --enable-vault
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
+
+@test "all three directory service modes are mutually exclusive" {
+  _helm() { :; }
+  _kubectl() { :; }
+  export -f _helm _kubectl
+
+  run deploy_jenkins --enable-ldap --enable-ad --enable-ad-prod --enable-vault
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"mutually exclusive"* ]]
+}
