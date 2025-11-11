@@ -283,6 +283,165 @@ test_login_default_auth() {
   fi
 }
 
+test_login_ldap() {
+  log_info "Testing LDAP authentication..."
+
+  if [[ -z "$IP" ]]; then
+    log_fail "IP address not available (run connectivity test first)"
+    return 1
+  fi
+
+  # Get LDAP credentials from K8s secret
+  local ldap_user ldap_pass
+  ldap_user=$(kubectl -n directory get secret openldap-admin \
+    -o jsonpath='{.data.LDAP_ADMIN_USERNAME}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+  ldap_pass=$(kubectl -n directory get secret openldap-admin \
+    -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+
+  if [[ -z "$ldap_user" ]] || [[ -z "$ldap_pass" ]]; then
+    log_skip "LDAP credentials not found (directory namespace may not be deployed)"
+    return 0
+  fi
+
+  # Verify LDAP connectivity and check for users
+  verbose "Testing LDAP server connectivity..."
+  local pf_pid
+  kubectl -n directory port-forward svc/openldap-openldap-bitnami 3389:389 \
+    >/tmp/ldap-pf-$$.log 2>&1 &
+  pf_pid=$!
+
+  # Add to cleanup
+  trap "kill $pf_pid 2>/dev/null || true; rm -f /tmp/ldap-pf-$$.log; rm -f \"$TEMP_CERT\"" EXIT
+
+  sleep 2
+
+  if ! LDAPTLS_REQCERT=never ldapsearch -x \
+       -H "ldap://127.0.0.1:3389" \
+       -D "cn=$ldap_user,dc=home,dc=org" \
+       -w "$ldap_pass" \
+       -b "dc=home,dc=org" -LLL >/dev/null 2>&1; then
+    log_fail "LDAP server unreachable"
+    kill $pf_pid 2>/dev/null || true
+    return 1
+  fi
+
+  verbose "LDAP server connectivity: OK"
+
+  # Check if any users exist in the directory
+  local user_count search_result
+  search_result=$(LDAPTLS_REQCERT=never ldapsearch -x \
+    -H "ldap://127.0.0.1:3389" \
+    -D "cn=$ldap_user,dc=home,dc=org" \
+    -w "$ldap_pass" \
+    -b "dc=home,dc=org" \
+    "(objectClass=person)" dn 2>/dev/null || echo "")
+
+  user_count=$(echo "$search_result" | grep -c "^dn:" || echo "0")
+  user_count=$(echo "$user_count" | tr -d '\n')
+
+  verbose "Found $user_count users in LDAP directory"
+
+  if [[ "$user_count" -eq 0 ]]; then
+    log_skip "No users found in LDAP directory (use --enable-ad for test users)"
+    kill $pf_pid 2>/dev/null || true
+    return 0
+  fi
+
+  # Try to find a test user (alice, bob, jenkins-svc from AD schema)
+  local test_user test_pass
+  test_user=""
+  test_pass="test1234"  # Default password from bootstrap-ad-schema.ldif
+
+  for user in alice bob jenkins-svc; do
+    if LDAPTLS_REQCERT=never ldapsearch -x \
+         -H "ldap://127.0.0.1:3389" \
+         -D "cn=$ldap_user,dc=home,dc=org" \
+         -w "$ldap_pass" \
+         -b "dc=home,dc=org" \
+         "(sAMAccountName=$user)" dn 2>/dev/null | grep -q "^dn:"; then
+      test_user="$user"
+      verbose "Found test user: $test_user"
+      break
+    fi
+  done
+
+  kill $pf_pid 2>/dev/null || true
+
+  if [[ -z "$test_user" ]]; then
+    log_skip "No known test users found in LDAP (alice, bob, jenkins-svc)"
+    return 0
+  fi
+
+  verbose "Using LDAP test user: $test_user"
+
+  # Test Jenkins login with LDAP credentials
+  local http_code response
+  response=$(curl -sk --max-time 10 \
+    --resolve "$HOST:$PORT:$IP" \
+    -u "$test_user:$test_pass" \
+    -w "\n%{http_code}" \
+    "https://$HOST:$PORT/api/json" 2>/dev/null || echo "")
+
+  http_code=$(echo "$response" | tail -1)
+  verbose "HTTP response code: $http_code"
+
+  if [[ "$http_code" == "200" ]]; then
+    log_pass "LDAP authentication successful (HTTP $http_code)"
+    return 0
+  else
+    log_fail "LDAP authentication failed (HTTP $http_code)"
+    if [[ "$VERBOSE" == "1" ]]; then
+      echo "$response" | head -20
+    fi
+    return 1
+  fi
+}
+
+test_login_ad() {
+  log_info "Testing Active Directory authentication..."
+
+  if [[ -z "$IP" ]]; then
+    log_fail "IP address not available (run connectivity test first)"
+    return 1
+  fi
+
+  # Get AD credentials from Vault via K8s secret
+  local ad_user ad_pass
+  ad_user=$(kubectl -n "$NAMESPACE" get secret ad-service-account \
+    -o jsonpath='{.data.username}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+  ad_pass=$(kubectl -n "$NAMESPACE" get secret ad-service-account \
+    -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+
+  if [[ -z "$ad_user" ]] || [[ -z "$ad_pass" ]]; then
+    log_skip "AD credentials not found (production AD mode may not be configured)"
+    return 0
+  fi
+
+  verbose "Using AD user: $ad_user"
+
+  # Test Jenkins login with AD credentials
+  local http_code response
+  response=$(curl -sk --max-time 10 \
+    --resolve "$HOST:$PORT:$IP" \
+    -u "$ad_user:$ad_pass" \
+    -w "\n%{http_code}" \
+    "https://$HOST:$PORT/api/json" 2>/dev/null || echo "")
+
+  http_code=$(echo "$response" | tail -1)
+  verbose "HTTP response code: $http_code"
+
+  if [[ "$http_code" == "200" ]]; then
+    log_pass "AD authentication successful (HTTP $http_code)"
+    return 0
+  else
+    log_fail "AD authentication failed (HTTP $http_code)"
+    if [[ "$VERBOSE" == "1" ]]; then
+      echo "$response" | head -20
+    fi
+    return 1
+  fi
+}
+
 # ============================================================================
 # Main Function
 # ============================================================================
@@ -315,8 +474,11 @@ main() {
     default)
       test_login_default_auth || true
       ;;
-    ldap|ad)
-      log_skip "LDAP/AD authentication (Phase 3 - not yet implemented)"
+    ldap)
+      test_login_ldap || true
+      ;;
+    ad)
+      test_login_ad || true
       ;;
     *)
       log_warn "Unknown auth mode: $AUTH_MODE (defaulting to default auth test)"
