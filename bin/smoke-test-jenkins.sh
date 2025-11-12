@@ -3,6 +3,16 @@ set -euo pipefail
 
 # Jenkins Smoke Test - SSL/TLS and Authentication Validation
 # Usage: smoke-test-jenkins.sh [namespace] [host] [port] [auth_mode]
+#
+# Environment Variables:
+#   VERBOSE=1              - Enable verbose/debug output
+#   AD_TEST_USER=username  - AD username for production AD testing
+#   AD_TEST_PASS=password  - AD password for production AD testing
+#
+# Examples:
+#   ./smoke-test-jenkins.sh                                    # Default auth
+#   ./smoke-test-jenkins.sh jenkins jenkins.dev.local.me 443 ldap  # LDAP auth
+#   AD_TEST_USER=john.doe AD_TEST_PASS=secret ./smoke-test-jenkins.sh jenkins jenkins.example.com 443 ad
 
 # Parameters
 NAMESPACE="${1:-jenkins}"
@@ -440,19 +450,50 @@ test_login_ad() {
     return 1
   fi
 
-  # Get AD credentials from Vault via K8s secret
+  # Detect deployment type: mock AD vs production AD
+  local deployment_type
+  if kubectl get namespace directory &>/dev/null; then
+    # Directory namespace exists - but are we testing local or external Jenkins?
+    local local_jenkins_host
+    local_jenkins_host=$(kubectl -n istio-system get vs jenkins -o jsonpath='{.spec.hosts[0]}' 2>/dev/null || echo "")
+
+    # Check if target host matches local Jenkins deployment
+    if [[ "$HOST" == "$local_jenkins_host" ]] || [[ "$HOST" == "jenkins.dev.local.me" ]]; then
+      deployment_type="mock AD"
+      log_info "Detected mock AD deployment (test environment)"
+    else
+      deployment_type="production AD"
+      log_info "Detected production AD deployment (external directory)"
+      verbose "Testing external host '$HOST' (local Jenkins is at '$local_jenkins_host')"
+    fi
+  else
+    deployment_type="production AD"
+    log_info "Detected production AD deployment (external directory)"
+  fi
+
+  # Get AD credentials: prioritize env vars, then K8s secret
   local ad_user ad_pass
-  ad_user=$(kubectl -n "$NAMESPACE" get secret ad-service-account \
-    -o jsonpath='{.data.username}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
-  ad_pass=$(kubectl -n "$NAMESPACE" get secret ad-service-account \
-    -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+  ad_user="${AD_TEST_USER:-}"
+  ad_pass="${AD_TEST_PASS:-}"
+
+  # If env vars not provided, try to get from K8s secret
+  if [[ -z "$ad_user" ]] || [[ -z "$ad_pass" ]]; then
+    ad_user=$(kubectl -n "$NAMESPACE" get secret ad-service-account \
+      -o jsonpath='{.data.username}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+    ad_pass=$(kubectl -n "$NAMESPACE" get secret ad-service-account \
+      -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+  fi
 
   if [[ -z "$ad_user" ]] || [[ -z "$ad_pass" ]]; then
-    log_skip "AD credentials not found (production AD mode may not be configured)"
+    log_skip "AD credentials not found"
+    if [[ "$deployment_type" == "production AD" ]]; then
+      verbose "For production AD testing, set AD_TEST_USER and AD_TEST_PASS environment variables"
+      verbose "Example: AD_TEST_USER=\"john.doe\" AD_TEST_PASS=\"secret\" $0"
+    fi
     return 0
   fi
 
-  verbose "Using AD user: $ad_user"
+  log_info "Testing authentication with AD user: $ad_user"
 
   # Test Jenkins login with AD credentials
   local http_code response
@@ -466,13 +507,17 @@ test_login_ad() {
   verbose "HTTP response code: $http_code"
 
   if [[ "$http_code" == "200" ]]; then
-    log_pass "AD authentication successful (HTTP $http_code)"
+    log_pass "Authentication successful with $deployment_type user '$ad_user' (HTTP $http_code)"
     return 0
   else
-    log_fail "AD authentication failed (HTTP $http_code)"
+    log_fail "Authentication failed with $deployment_type user '$ad_user' (HTTP $http_code)"
     if [[ "$VERBOSE" == "1" ]]; then
       echo "$response" | head -20
     fi
+    verbose "This may indicate:"
+    verbose "  - Jenkins AD configuration not enabled or misconfigured"
+    verbose "  - AD user credentials incorrect"
+    verbose "  - AD group membership issues"
     return 1
   fi
 }
