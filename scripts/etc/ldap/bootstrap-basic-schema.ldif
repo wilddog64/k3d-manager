@@ -3,8 +3,33 @@
 # Structure: dc=home,dc=org (matches current LDAP deployment)
 # Password for all users: test1234 (SSHA hash)
 #
-# Note: OUs (ou=users, ou=groups) are created by the deploy_ldap script
-# This LDIF only adds test users and groups
+# This LDIF includes the complete base DN structure (base DN + OUs) plus test users and groups
+# When using a custom LDIF file, skip_default_tree_generation is set to true, so we must
+# define the entire directory structure here.
+
+# Base DN
+dn: dc=home,dc=org
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: Home Org
+dc: home
+
+# Organizational Units
+dn: ou=users,dc=home,dc=org
+objectClass: top
+objectClass: organizationalUnit
+ou: users
+
+dn: ou=groups,dc=home,dc=org
+objectClass: top
+objectClass: organizationalUnit
+ou: groups
+
+dn: ou=service,dc=home,dc=org
+objectClass: top
+objectClass: organizationalUnit
+ou: service
 
 # Test Users
 # User 1: chengkai.liang (Admin - matches baseline branch IT DevOps group)
