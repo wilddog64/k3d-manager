@@ -232,7 +232,7 @@ test_login_default_auth() {
     return 1
   fi
 
-  verbose "Using admin user: $admin_user"
+  log_info "Testing authentication with Jenkins admin user: $admin_user"
 
   # First try: Get crumb for CSRF protection
   local crumb crumb_field
@@ -272,13 +272,17 @@ test_login_default_auth() {
   verbose "HTTP response code: $http_code"
 
   if [[ "$http_code" == "200" ]]; then
-    log_pass "Default authentication successful (HTTP $http_code)"
+    log_pass "Authentication successful with admin user '$admin_user' (HTTP $http_code)"
     return 0
   else
-    log_fail "Default authentication failed (HTTP $http_code)"
+    log_fail "Authentication failed with admin user '$admin_user' (HTTP $http_code)"
     if [[ "$VERBOSE" == "1" ]]; then
       echo "$response" | head -20
     fi
+    verbose "This may indicate:"
+    verbose "  - Jenkins admin password incorrect or changed"
+    verbose "  - Jenkins not fully initialized"
+    verbose "  - CSRF protection or security realm misconfiguration"
     return 1
   fi
 }
@@ -350,11 +354,13 @@ test_login_ldap() {
   # Try to find a test user
   # Basic LDAP users: chengkai.liang, jenkins-admin, test-user (from bootstrap-basic-schema.ldif)
   # AD users: alice, bob, jenkins-svc (from bootstrap-ad-schema.ldif)
-  local test_user test_pass
+  local test_user test_pass directory_type
   test_user=""
   test_pass="test1234"  # Default password for all test users
+  directory_type=""
 
   # First try basic LDAP users (using cn attribute)
+  log_info "Searching for basic LDAP test users..."
   for user in chengkai.liang jenkins-admin test-user; do
     if LDAPTLS_REQCERT=never ldapsearch -x \
          -H "ldap://127.0.0.1:3389" \
@@ -363,6 +369,7 @@ test_login_ldap() {
          -b "dc=home,dc=org" \
          "(cn=$user)" dn 2>/dev/null | grep -q "^dn:"; then
       test_user="$user"
+      directory_type="basic LDAP"
       verbose "Found basic LDAP test user: $test_user"
       break
     fi
@@ -370,6 +377,7 @@ test_login_ldap() {
 
   # If no basic LDAP users found, try AD users (using sAMAccountName attribute)
   if [[ -z "$test_user" ]]; then
+    log_info "No basic LDAP users found, searching for AD test users..."
     for user in alice bob jenkins-svc; do
       if LDAPTLS_REQCERT=never ldapsearch -x \
            -H "ldap://127.0.0.1:3389" \
@@ -378,6 +386,7 @@ test_login_ldap() {
            -b "dc=home,dc=org" \
            "(sAMAccountName=$user)" dn 2>/dev/null | grep -q "^dn:"; then
         test_user="$user"
+        directory_type="Active Directory"
         verbose "Found AD test user: $test_user"
         break
       fi
@@ -387,11 +396,14 @@ test_login_ldap() {
   kill $pf_pid 2>/dev/null || true
 
   if [[ -z "$test_user" ]]; then
-    log_skip "No known test users found in LDAP (chengkai.liang, jenkins-admin, test-user, alice, bob, jenkins-svc)"
+    log_skip "No known test users found in LDAP directory"
+    verbose "Expected users - Basic LDAP: chengkai.liang, jenkins-admin, test-user"
+    verbose "Expected users - Active Directory: alice, bob, jenkins-svc"
     return 0
   fi
 
-  verbose "Using LDAP test user: $test_user"
+  log_info "Detected directory type: $directory_type"
+  log_info "Testing authentication with user: $test_user"
 
   # Test Jenkins login with LDAP credentials
   local http_code response
@@ -405,13 +417,17 @@ test_login_ldap() {
   verbose "HTTP response code: $http_code"
 
   if [[ "$http_code" == "200" ]]; then
-    log_pass "LDAP authentication successful (HTTP $http_code)"
+    log_pass "Authentication successful with $directory_type user '$test_user' (HTTP $http_code)"
     return 0
   else
-    log_fail "LDAP authentication failed (HTTP $http_code)"
+    log_fail "Authentication failed with $directory_type user '$test_user' (HTTP $http_code)"
     if [[ "$VERBOSE" == "1" ]]; then
       echo "$response" | head -20
     fi
+    verbose "This may indicate:"
+    verbose "  - Jenkins LDAP configuration not enabled"
+    verbose "  - Password hash mismatch in bootstrap LDIF"
+    verbose "  - LDAP bind DN format mismatch"
     return 1
   fi
 }
