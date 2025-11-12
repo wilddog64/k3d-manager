@@ -347,28 +347,47 @@ test_login_ldap() {
     return 0
   fi
 
-  # Try to find a test user (alice, bob, jenkins-svc from AD schema)
+  # Try to find a test user
+  # Basic LDAP users: chengkai.liang, jenkins-admin, test-user (from bootstrap-basic-schema.ldif)
+  # AD users: alice, bob, jenkins-svc (from bootstrap-ad-schema.ldif)
   local test_user test_pass
   test_user=""
-  test_pass="test1234"  # Default password from bootstrap-ad-schema.ldif
+  test_pass="test1234"  # Default password for all test users
 
-  for user in alice bob jenkins-svc; do
+  # First try basic LDAP users (using cn attribute)
+  for user in chengkai.liang jenkins-admin test-user; do
     if LDAPTLS_REQCERT=never ldapsearch -x \
          -H "ldap://127.0.0.1:3389" \
          -D "cn=$ldap_user,dc=home,dc=org" \
          -w "$ldap_pass" \
          -b "dc=home,dc=org" \
-         "(sAMAccountName=$user)" dn 2>/dev/null | grep -q "^dn:"; then
+         "(cn=$user)" dn 2>/dev/null | grep -q "^dn:"; then
       test_user="$user"
-      verbose "Found test user: $test_user"
+      verbose "Found basic LDAP test user: $test_user"
       break
     fi
   done
 
+  # If no basic LDAP users found, try AD users (using sAMAccountName attribute)
+  if [[ -z "$test_user" ]]; then
+    for user in alice bob jenkins-svc; do
+      if LDAPTLS_REQCERT=never ldapsearch -x \
+           -H "ldap://127.0.0.1:3389" \
+           -D "cn=$ldap_user,dc=home,dc=org" \
+           -w "$ldap_pass" \
+           -b "dc=home,dc=org" \
+           "(sAMAccountName=$user)" dn 2>/dev/null | grep -q "^dn:"; then
+        test_user="$user"
+        verbose "Found AD test user: $test_user"
+        break
+      fi
+    done
+  fi
+
   kill $pf_pid 2>/dev/null || true
 
   if [[ -z "$test_user" ]]; then
-    log_skip "No known test users found in LDAP (alice, bob, jenkins-svc)"
+    log_skip "No known test users found in LDAP (chengkai.liang, jenkins-admin, test-user, alice, bob, jenkins-svc)"
     return 0
   fi
 
