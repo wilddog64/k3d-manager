@@ -863,6 +863,58 @@ function _validate_ad_connectivity() {
    return 0
 }
 
+function _jenkins_run_smoke_test() {
+   local namespace="${1:-jenkins}"
+   local enable_ldap="${2:-0}"
+   local enable_ad="${3:-0}"
+   local enable_ad_prod="${4:-0}"
+
+   # Skip smoke test in BATS test environment
+   if [[ -n "${BATS_TEST_DIRNAME:-}" ]] || [[ -n "${BATS_TEST_TMPDIR:-}" ]]; then
+      return 0
+   fi
+
+   # Find smoke test script
+   local smoke_script="${SCRIPT_DIR}/../bin/smoke-test-jenkins.sh"
+   if [[ ! -x "$smoke_script" ]]; then
+      if [[ -r "$smoke_script" ]]; then
+         _warn "[jenkins] smoke test script not executable: ${smoke_script}"
+         return 0
+      else
+         _warn "[jenkins] smoke test script missing: ${smoke_script}"
+         return 0
+      fi
+   fi
+
+   # Auto-detect auth mode from deployment flags
+   local auth_mode="default"
+   if (( enable_ad_prod )); then
+      auth_mode="ad"  # production AD
+   elif (( enable_ad )); then
+      auth_mode="ad"  # AD schema testing (mock AD)
+   elif (( enable_ldap )); then
+      auth_mode="ldap"
+   fi
+
+   # Get Jenkins hostname from VirtualService
+   local jenkins_host
+   jenkins_host=$(kubectl -n istio-system get vs jenkins -o jsonpath='{.spec.hosts[0]}' 2>/dev/null || echo "")
+   if [[ -z "$jenkins_host" ]]; then
+      jenkins_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
+      _warn "[jenkins] could not detect Jenkins hostname from VirtualService, using default: ${jenkins_host}"
+   fi
+
+   _info "[jenkins] running smoke test (namespace=${namespace}, host=${jenkins_host}, auth_mode=${auth_mode})"
+
+   # Run smoke test
+   if "$smoke_script" "$namespace" "$jenkins_host" 443 "$auth_mode"; then
+      _info "[jenkins] smoke test passed"
+      return 0
+   else
+      return 1
+   fi
+}
+
 function deploy_jenkins() {
    local jenkins_namespace=""
    local vault_namespace=""
@@ -1230,6 +1282,9 @@ EOF
       wait_rc=0
       if (( deploy_rc == 0 )); then
          if _wait_for_jenkins_ready "$jenkins_namespace"; then
+            # Run smoke test after successful deployment
+            _jenkins_run_smoke_test "$jenkins_namespace" "$enable_ldap" "$enable_ad" "$enable_ad_prod" || \
+               _warn "[jenkins] smoke test failed; inspect output above"
             return 0
          fi
          wait_rc=$?
@@ -1335,6 +1390,22 @@ function _deploy_jenkins() {
       template_file="$JENKINS_CONFIG_DIR/values.yaml"
       auth_mode="none"
       _info "[jenkins] using default template (no directory service): values.yaml"
+   fi
+
+   # Retrieve LDAP bind password from K8s secret if LDAP is enabled
+   if (( enable_ldap || enable_ad || enable_ad_prod )); then
+      if kubectl -n "$jenkins_namespace" get secret jenkins-ldap-config >/dev/null 2>&1; then
+         LDAP_BIND_PASSWORD=$(kubectl -n "$jenkins_namespace" get secret jenkins-ldap-config \
+            -o jsonpath='{.data.LDAP_BIND_PASSWORD}' 2>/dev/null | base64 -d || echo "")
+         export LDAP_BIND_PASSWORD
+         if [[ -n "$LDAP_BIND_PASSWORD" ]]; then
+            _info "[jenkins] retrieved LDAP bind password from secret jenkins-ldap-config"
+         else
+            _warn "[jenkins] LDAP bind password is empty in secret jenkins-ldap-config"
+         fi
+      else
+         _warn "[jenkins] secret jenkins-ldap-config not found; LDAP authentication may fail"
+      fi
    fi
 
    # Process template with envsubst if it's a .tmpl file
