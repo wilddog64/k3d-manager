@@ -278,6 +278,9 @@ Detailed design documents and architecture guides are available in the `docs/` d
 - **[CLAUDE.md](CLAUDE.md)** - Project overview and development guidelines for Claude Code
 - **[AGENTS.md](AGENTS.md)** - Code style principles and contribution guidelines
 
+### How-To Guides
+- **[Configuring SSL Trust for jenkins-cli](docs/howto/jenkins-cli-ssl-trust.md)** - Configure Java truststore to validate Vault-issued certificates
+
 ## Directory layout
 
 ```
@@ -289,6 +292,7 @@ scripts/
 docs/
   architecture/      # architecture and design documents
   plans/             # feature planning and specifications
+  howto/             # user guides and how-to documentation
 ```
 
 ## How it fits together
