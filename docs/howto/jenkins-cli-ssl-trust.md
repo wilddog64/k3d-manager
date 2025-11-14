@@ -256,39 +256,64 @@ java -Djavax.net.ssl.trustStore=/path/to/custom-truststore \
 
 ## Automation Script
 
-For automated setups, here's a complete script:
+A utility script is provided in `bin/setup-jenkins-cli-ssl.sh` that automates this process:
 
 ```bash
-#!/usr/bin/env bash
-set -euo pipefail
+# Show help and usage
+./bin/setup-jenkins-cli-ssl.sh --help
 
-# Extract Vault CA certificate
-kubectl -n vault exec vault-0 -- vault read -field=certificate pki/cert/ca > vault-ca.crt
+# Run with defaults
+./bin/setup-jenkins-cli-ssl.sh
 
-# Find Java home
-JAVA_HOME=$(java -XshowSettings:properties -version 2>&1 | grep "java.home" | awk '{print $3}')
-CACERTS="${JAVA_HOME}/lib/security/cacerts"
+# Using command-line options
+./bin/setup-jenkins-cli-ssl.sh --namespace vault --pod vault-0
 
-# Delete existing certificate if present (ignore errors)
-keytool -delete -cacerts -storepass changeit -alias vault-k3d-ca 2>/dev/null || true
+# Preview operations (dry-run mode)
+./bin/setup-jenkins-cli-ssl.sh --dry-run
 
-# Import new certificate
-keytool -importcert \
-  -cacerts \
-  -storepass changeit \
-  -alias vault-k3d-ca \
-  -file vault-ca.crt \
-  -noprompt
+# Quiet mode for automation
+./bin/setup-jenkins-cli-ssl.sh --quiet
 
-echo "Vault CA certificate imported successfully to ${CACERTS}"
+# Custom PKI path and certificate alias
+./bin/setup-jenkins-cli-ssl.sh --pki-path pki_int --alias my-vault-ca
 
-# Verify
-keytool -list -cacerts -storepass changeit -alias vault-k3d-ca -v
+# Combine multiple options
+./bin/setup-jenkins-cli-ssl.sh -n vault -p vault-0 -k pki -a vault-ca -d
 
-# Clean up
-rm -f vault-ca.crt
-
-echo "Setup complete. jenkins-cli can now be used without -noCertificateCheck"
+# Using positional parameters (backward compatible)
+./bin/setup-jenkins-cli-ssl.sh vault vault-0
 ```
 
-Save this as `scripts/setup-jenkins-cli-ssl.sh` and run it after deploying Jenkins with Vault PKI.
+**Command-line options:**
+- `-h, --help` - Show help message
+- `-n, --namespace NAME` - Vault namespace (default: vault)
+- `-p, --pod NAME` - Vault pod name (default: vault-0)
+- `-k, --pki-path PATH` - Vault PKI mount path (default: pki)
+- `-a, --alias ALIAS` - Certificate alias in truststore (default: vault-k3d-ca)
+- `-w, --password PASS` - Java cacerts password (default: changeit)
+- `-d, --dry-run` - Preview operations without making changes
+- `-q, --quiet` - Suppress informational output
+- `-v, --verbose` - Enable verbose output
+
+The script features:
+- Automatic Java home detection with fallback logic
+- Vault pod accessibility verification
+- CA certificate extraction from Vault PKI
+- Interactive confirmation for existing certificates
+- Comprehensive error handling and prerequisites validation
+- Dry-run mode for previewing operations
+- Support for custom Vault namespaces and PKI paths
+- Both long and short command-line options
+- Backward compatible with positional parameters
+
+**Environment variables** (can be used instead of command-line options):
+- `JAVA_HOME` - Override Java installation path
+- `VAULT_NAMESPACE` - Vault namespace
+- `VAULT_POD` - Vault pod name
+- `VAULT_PKI_PATH` - PKI mount path
+- `CACERTS_PASSWORD` - Truststore password
+- `CACERTS_ALIAS` - Certificate alias
+- `DRY_RUN` - Preview mode (0 or 1)
+- `QUIET` - Suppress output (0 or 1)
+
+**Note:** You may need elevated privileges to modify the system Java truststore. If permission errors occur, run with `sudo` and ensure `JAVA_HOME` is correctly set.
