@@ -20,9 +20,9 @@ export LDAP_ORG_NAME="${LDAP_ORG_NAME:-Home Org}"
 export LDAP_USERDN="${LDAP_USERDN:-${LDAP_SERVICE_OU},${LDAP_BASE_DN}}"
 export LDAP_GROUPDN="${LDAP_GROUPDN:-${LDAP_GROUP_OU},${LDAP_BASE_DN}}"
 
-# Jenkins LDAP search bases (absolute DNs including base DN)
-export LDAP_USER_SEARCH_BASE="${LDAP_USER_SEARCH_BASE:-${LDAP_USER_OU},${LDAP_BASE_DN}}"
-export LDAP_GROUP_SEARCH_BASE="${LDAP_GROUP_SEARCH_BASE:-${LDAP_GROUP_OU},${LDAP_BASE_DN}}"
+# Jenkins LDAP search bases (relative to rootDN when rootDN is specified)
+export LDAP_USER_SEARCH_BASE="${LDAP_USER_SEARCH_BASE:-${LDAP_USER_OU}}"
+export LDAP_GROUP_SEARCH_BASE="${LDAP_GROUP_SEARCH_BASE:-${LDAP_GROUP_OU}}"
 
 export LDAP_BIND_DN="${LDAP_BIND_DN:-cn=ldap-admin,${LDAP_BASE_DN}}"
 export LDAP_BIND_PASSWORD="${LDAP_BIND_PASSWORD:-}"

@@ -147,8 +147,8 @@ controller:
                 - server: "${LDAP_URL}"
                   rootDN: "${LDAP_BASE_DN}"
                   userSearch: "(cn={0})"
-                  groupSearchBase: "${LDAP_GROUP_SEARCH_BASE}"
                   userSearchBase: "${LDAP_USER_SEARCH_BASE}"
+                  groupSearchBase: "${LDAP_GROUP_SEARCH_BASE}"
                   managerDN: "${LDAP_BIND_DN}"
                   managerPasswordSecret: "${LDAP_BIND_PASSWORD}"
                   inhibitInferRootDN: false
