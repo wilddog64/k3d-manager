@@ -639,6 +639,126 @@ EOF
    return "$helm_rc"
 }
 
+function _ldap_import_ldif() {
+   local ns="${1:-$LDAP_NAMESPACE}"
+   local release="${2:-$LDAP_RELEASE}"
+   local ldif_secret="${LDAP_LDIF_SECRET_NAME:-openldap-bitnami-ldif-import}"
+   local ldif_mount_path="${LDAP_LDIF_MOUNT_PATH:-/ldif_import/bootstrap.ldif}"
+   local admin_secret="${LDAP_ADMIN_SECRET_NAME:-openldap-admin}"
+   local admin_key="${LDAP_ADMIN_PASSWORD_KEY:-LDAP_ADMIN_PASSWORD}"
+   local admin_user="${LDAP_ADMIN_USERNAME:-ldap-admin}"
+   local base_dn="${LDAP_BASE_DN:-dc=${LDAP_DC_PRIMARY:-home},dc=${LDAP_DC_SECONDARY:-org}}"
+   local admin_dn="cn=${admin_user},${base_dn}"
+   local deploy_name="${release}-openldap-bitnami"
+   local ldap_port="1389"
+
+   # Skip if LDIF import is not enabled
+   if [[ "${LDAP_LDIF_ENABLED:-false}" != "true" ]]; then
+      _info "[ldap] LDIF import disabled (LDAP_LDIF_ENABLED=${LDAP_LDIF_ENABLED:-false})"
+      return 0
+   fi
+
+   # Check if LDIF secret exists
+   if ! _kubectl --no-exit -n "$ns" get secret "$ldif_secret" >/dev/null 2>&1; then
+      _info "[ldap] LDIF secret ${ns}/${ldif_secret} not found; skipping LDIF import"
+      return 0
+   fi
+
+   # Get admin password
+   local admin_pass=""
+   admin_pass=$(_no_trace _kubectl --no-exit -n "$ns" get secret "$admin_secret" -o jsonpath="{.data.${admin_key}}" 2>/dev/null || true)
+   if [[ -z "$admin_pass" ]]; then
+      _warn "[ldap] unable to read ${admin_key} from secret ${ns}/${admin_secret}; skipping LDIF import"
+      return 1
+   fi
+   admin_pass=$(_no_trace bash -c 'printf %s "$1" | base64 -d 2>/dev/null | tr -d "\n"' _ "$admin_pass")
+   if [[ -z "$admin_pass" ]]; then
+      _warn "[ldap] decoded admin password empty; skipping LDIF import"
+      return 1
+   fi
+
+   # Get pod name
+   local pod=""
+   pod=$(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/name=openldap-bitnami,app.kubernetes.io/instance=${release}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+   if [[ -z "$pod" ]]; then
+      _warn "[ldap] no OpenLDAP pod found for release ${ns}/${release}; skipping LDIF import"
+      return 1
+   fi
+
+   # Check if LDIF file exists in pod
+   if ! _kubectl --no-exit -n "$ns" exec "$pod" -- test -f "$ldif_mount_path" >/dev/null 2>&1; then
+      _info "[ldap] LDIF file not found at ${ldif_mount_path} in pod; skipping LDIF import"
+      return 0
+   fi
+
+   # Check if entries already exist (idempotency check)
+   _info "[ldap] checking if LDIF entries already exist..."
+   local search_result=""
+   search_result=$(_no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- \
+      ldapsearch -x -H "ldap://localhost:${ldap_port}" \
+      -D "$admin_dn" -w "$admin_pass" \
+      -b "$base_dn" -LLL dn 2>/dev/null | grep -c "^dn:" || echo "0")
+
+   # If more than just the base DN exists, assume LDIF is already imported
+   if [[ "$search_result" -gt 1 ]]; then
+      _info "[ldap] LDIF entries already exist (found $search_result entries); skipping import"
+   else
+      _info "[ldap] importing LDIF from ${ldif_mount_path}..."
+
+      # Import LDIF with -c flag to continue on errors (base DN may already exist)
+      local import_output=""
+      if import_output=$(_no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- \
+         ldapadd -c -x -H "ldap://localhost:${ldap_port}" \
+         -D "$admin_dn" -w "$admin_pass" \
+         -f "$ldif_mount_path" 2>&1); then
+         _info "[ldap] LDIF import completed successfully"
+      else
+         # Check if it's just "Already exists" errors (exit code 68)
+         if echo "$import_output" | grep -q "Already exists"; then
+            _info "[ldap] LDIF import completed (some entries already existed)"
+         else
+            _warn "[ldap] LDIF import encountered errors:"
+            echo "$import_output" | head -10
+            return 1
+         fi
+      fi
+
+      # Verify import by checking entry count
+      search_result=$(_no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- \
+         ldapsearch -x -H "ldap://localhost:${ldap_port}" \
+         -D "$admin_dn" -w "$admin_pass" \
+         -b "$base_dn" -LLL dn 2>/dev/null | grep -c "^dn:" || echo "0")
+
+      _info "[ldap] LDIF import verification: found $search_result entries in directory"
+   fi
+
+   # Reset passwords for test users to ensure they work correctly
+   # The SSHA hashes in the LDIF may not work properly, so reset them
+   _info "[ldap] resetting test user passwords..."
+   local test_users=("chengkai.liang" "jenkins-admin" "test-user")
+   local test_password="test1234"
+   local user_ou="ou=users"
+
+   for user in "${test_users[@]}"; do
+      local user_dn="cn=${user},${user_ou},${base_dn}"
+      # Check if user exists first
+      if _kubectl --no-exit -n "$ns" exec "$pod" -- \
+         ldapsearch -x -H "ldap://localhost:${ldap_port}" \
+         -D "$admin_dn" -w "$admin_pass" \
+         -b "$user_dn" -LLL dn 2>/dev/null | grep -q "^dn:"; then
+         # Reset password
+         _info "[ldap] resetting password for $user_dn"
+         _no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- \
+            ldappasswd -x -H "ldap://localhost:${ldap_port}" \
+            -D "$admin_dn" -w "$admin_pass" \
+            -s "$test_password" "$user_dn" >/dev/null 2>&1 || \
+            _warn "[ldap] failed to reset password for $user_dn"
+      fi
+   done
+
+   return 0
+}
+
 function _ldap_sync_admin_password() {
    local ns="${1:-$LDAP_NAMESPACE}"
    local release="${2:-$LDAP_RELEASE}"
@@ -1040,6 +1160,10 @@ EOF
 
       if ! _ldap_sync_admin_password "$namespace" "$release"; then
          _warn "[ldap] admin password sync failed; continuing with smoke test"
+      fi
+
+      if ! _ldap_import_ldif "$namespace" "$release"; then
+         _warn "[ldap] LDIF import failed; continuing with smoke test"
       fi
 
       local smoke_script="${SCRIPT_DIR}/tests/plugins/openldap.sh"
