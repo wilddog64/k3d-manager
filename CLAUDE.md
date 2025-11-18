@@ -8,6 +8,55 @@ k3d-manager is a modular Bash-based utility for managing local Kubernetes develo
 
 **Main entry point:** `./scripts/k3d-manager <function> [args]`
 
+## Current Work in Progress (2025-11-17)
+
+**Status:** Testing certificate rotation functionality (Priority 1 task)
+
+**Branch:** `ldap-develop`
+
+**What's Complete:**
+- ✅ Active Directory provider implementation (all functions)
+- ✅ Automated tests for AD provider (36 tests, 100% passing)
+- ✅ Documentation updates (CLAUDE.md, testing guides)
+- ✅ Certificate rotation test plan created
+
+**Current Task:** Certificate Rotation Validation
+- **Location:** `docs/tests/certificate-rotation-validation.md`
+- **Status:** Ready to execute on Ubuntu/k3s
+- **Effort:** ~15 minutes active testing
+
+**Test Configuration Created:**
+```bash
+# File: /tmp/cert-rotation-test.env
+export VAULT_PKI_ROLE_TTL="10m"                    # 10-min cert lifetime for testing
+export JENKINS_CERT_ROTATOR_RENEW_BEFORE="300"     # Renew at 5 min remaining
+export JENKINS_CERT_ROTATOR_SCHEDULE="*/2 * * * *" # Check every 2 minutes
+export JENKINS_CERT_ROTATOR_ENABLED="1"
+```
+
+**Next Steps (on Ubuntu with k3s):**
+1. Deploy k3s cluster: `CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f`
+2. Load test config: `source /tmp/cert-rotation-test.env`
+3. Deploy Jenkins: `./scripts/k3d-manager deploy_jenkins --enable-vault`
+4. Follow test plan: `docs/tests/certificate-rotation-validation.md`
+5. Document results
+
+**Why This Matters:**
+- Certificate rotation code EXISTS but has NEVER been tested
+- Unknown if auto-rotation actually works in production
+- High impact if broken (service outages from expired certs)
+- Must validate before considering AD work "complete"
+
+**Remaining After This:**
+- End-to-end AD integration test
+- Documentation completion (cert rotation guide, Mac AD setup)
+- Optional: monitoring recommendations, additional tests
+
+**Reference Documents:**
+- Test plan: `docs/tests/certificate-rotation-validation.md`
+- Prioritized tasks: `docs/plans/remaining-tasks-priority.md`
+- Recent commits: `cf89579`, `6ab4af1`, `850fa9c`
+
 ## Development Commands
 
 ### Cluster Management
