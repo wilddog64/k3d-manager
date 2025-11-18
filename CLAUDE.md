@@ -32,11 +32,24 @@ CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f  # non-interactive
 # Deploy Vault (includes automatic PKI setup and ESO integration)
 ./scripts/k3d-manager deploy_vault
 
-# Deploy Jenkins (includes Vault PKI, ESO secrets, LDAP integration)
+# Deploy Jenkins (includes Vault PKI, ESO secrets, directory service integration)
 ./scripts/k3d-manager deploy_jenkins
 
-# Deploy OpenLDAP (ESO-integrated)
+# Deploy Jenkins with standard LDAP integration
+./scripts/k3d-manager deploy_jenkins --enable-ldap --enable-vault
+
+# Deploy Jenkins with AD schema testing (OpenLDAP with AD-compatible schema)
+./scripts/k3d-manager deploy_jenkins --enable-ad --enable-vault
+
+# Deploy Jenkins with production Active Directory integration
+AD_DOMAIN=corp.example.com \
+  ./scripts/k3d-manager deploy_jenkins --enable-ad-prod --enable-vault
+
+# Deploy OpenLDAP (ESO-integrated, standard schema)
 ./scripts/k3d-manager deploy_ldap
+
+# Deploy OpenLDAP with AD-compatible schema (for testing AD integration)
+./scripts/k3d-manager deploy_ad --enable-vault
 ```
 
 ### Testing
@@ -70,6 +83,7 @@ CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f  # non-interactive
 - `cluster_provider.sh` - Provider abstraction layer
 - `providers/k3d.sh`, `providers/k3s.sh` - Provider-specific implementations
 - `vault_pki.sh` - Vault PKI certificate management helpers
+- `dirservices/openldap.sh`, `dirservices/activedirectory.sh` - Directory service provider implementations
 
 **Plugins:** `scripts/plugins/` - Lazy-loaded feature modules:
 - `vault.sh` - HashiCorp Vault deployment, initialization, PKI setup, ESO integration
@@ -82,7 +96,10 @@ CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f  # non-interactive
 - `cluster_var.sh` - Cluster defaults (ports, paths)
 - `vault/vars.sh` - Vault configuration (PKI settings, paths, TTLs)
 - `jenkins/vars.sh` - Jenkins configuration (VirtualService hosts, TLS settings)
+- `jenkins/ad-vars.sh` - Active Directory configuration for production AD integration
 - `ldap/vars.sh` - LDAP connection parameters
+- `ldap/bootstrap-ad-schema.ldif` - AD-compatible LDAP schema for testing
+- `ad/vars.sh` - Active Directory provider configuration
 - `*.yaml.tmpl` - Kubernetes manifest templates (processed with `envsubst`)
 
 ### Key Integration Patterns
@@ -105,6 +122,17 @@ CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f  # non-interactive
 - Provider-specific implementations in `scripts/lib/providers/`
 - k3d: Docker-based, automatic credential management, port mapping via load balancer
 - k3s: systemd-based, manual kubeconfig setup, direct host networking
+
+**Directory Service Abstraction:**
+- `DIRECTORY_SERVICE_PROVIDER` environment variable selects authentication backend (openldap/activedirectory)
+- Provider-specific implementations in `scripts/lib/dirservices/`
+- OpenLDAP: In-cluster deployment, standard LDAP schema, simple bind authentication
+- Active Directory: External/remote connection, AD-specific schema, supports TOKENGROUPS optimization
+- Common interface: `_dirservice_*_init()`, `_dirservice_*_generate_jcasc()`, `_dirservice_*_validate_config()`
+- Jenkins deployment modes:
+  - `--enable-ldap`: Standard LDAP (OpenLDAP with simple schema)
+  - `--enable-ad`: AD testing mode (OpenLDAP with AD-compatible schema)
+  - `--enable-ad-prod`: Production AD (connects to external Active Directory)
 
 ## Plugin Development
 
@@ -165,6 +193,17 @@ _run_command --quiet -- command_that_might_fail
 - `JENKINS_VIRTUALSERVICE_HOSTS` - Comma-separated Istio VirtualService hosts
 - `JENKINS_CERT_ROTATOR_IMAGE` - CronJob image (default: docker.io/google/cloud-sdk:slim)
 - `JENKINS_HOME_PATH` - Host path for Jenkins storage (default: `${SCRIPT_DIR}/storage/jenkins_home`)
+
+**Active Directory (Production):**
+- `AD_DOMAIN` - AD domain name (e.g., corp.example.com)
+- `AD_SERVER` - Comma-separated AD server list (optional, auto-discovered if empty)
+- `AD_SITE` - AD site name (optional)
+- `AD_REQUIRE_TLS` - Require TLS connection (default: true)
+- `AD_TLS_CONFIG` - TLS configuration mode (default: TRUST_ALL_CERTIFICATES)
+- `AD_ADMIN_GROUP` - AD group for Jenkins admin access (default: Domain Admins)
+- `AD_GROUP_LOOKUP_STRATEGY` - Group lookup strategy: RECURSIVE, TOKENGROUPS, or CHAIN (default: RECURSIVE)
+- `AD_VAULT_PATH` - Vault path for AD credentials (default: secret/data/jenkins/ad-credentials)
+- `AD_TEST_MODE` - Bypass connectivity checks for testing (default: 0)
 
 **k3s-specific:**
 - `K3S_KUBECONFIG_PATH` - Path to k3s kubeconfig (default: /etc/rancher/k3s/k3s.yaml)
@@ -231,3 +270,17 @@ When making changes to this codebase:
 - Verify Vault is unsealed: `./scripts/k3d-manager deploy_vault`
 - Check SecretStore status: `kubectl get secretstore -A`
 - Validate Vault policies allow secret reads
+
+**Active Directory connectivity issues:**
+- Verify AD_DOMAIN is set: `echo $AD_DOMAIN`
+- Test DNS resolution: `nslookup $AD_DOMAIN` or `host $AD_DOMAIN`
+- Test LDAP port connectivity: `nc -zv $AD_DOMAIN 636` (LDAPS) or `nc -zv $AD_DOMAIN 389` (LDAP)
+- Check VPN connection if using corporate AD
+- Use `--skip-ad-validation` flag for testing without AD connectivity
+- Enable test mode: `export AD_TEST_MODE=1` to bypass validation
+
+**AD schema testing (OpenLDAP):**
+- Verify LDIF loaded: `kubectl exec -n directory <pod> -- ldapsearch -x -b "DC=corp,DC=example,DC=com" -LLL dn`
+- Check AD-style structure: DNs should use uppercase OU, CN, DC components
+- Test authentication: Users should authenticate with sAMAccountName (e.g., "alice")
+- See `docs/tests/active-directory-testing-instructions.md` for comprehensive testing guide
