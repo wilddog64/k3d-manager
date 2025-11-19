@@ -1667,10 +1667,21 @@ function _deploy_jenkins() {
          export JENKINS_CERT_ROTATOR_VAULT_ADDR="http://${vault_release}.${vault_namespace}.svc:8200"
       fi
 
+      # Ensure all template variables are exported with defaults for envsubst
+      # envsubst doesn't understand bash ${VAR:-default} syntax, so we must set defaults explicitly
+      export VAULT_PKI_PATH="${VAULT_PKI_PATH:-pki}"
+      export VAULT_PKI_ROLE_TTL="${VAULT_PKI_ROLE_TTL:-}"
+      export VAULT_NAMESPACE="${VAULT_NAMESPACE:-}"
+      export VAULT_SKIP_VERIFY="${VAULT_SKIP_VERIFY:-}"
+      export VAULT_CACERT="${VAULT_CACERT:-}"
+      export JENKINS_CERT_ROTATOR_ALT_NAMES="${JENKINS_CERT_ROTATOR_ALT_NAMES:-}"
+
       local rotator_rendered
       rotator_rendered=$(mktemp -t jenkins-cert-rotator.XXXXXX.yaml)
       _jenkins_register_rendered_manifest "$rotator_rendered"
-      envsubst < "$rotator_template" > "$rotator_rendered"
+      # Use variable whitelist to prevent envsubst from expanding shell variables in inline scripts
+      local envsubst_vars='$JENKINS_CERT_ROTATOR_NAME $JENKINS_NAMESPACE $JENKINS_CERT_ROTATOR_SCRIPT_B64 $JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64 $JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT $VAULT_PKI_SECRET_NS $VAULT_PKI_SECRET_NAME $JENKINS_CERT_ROTATOR_SCHEDULE $JENKINS_CERT_ROTATOR_IMAGE $JENKINS_CERT_ROTATOR_VAULT_ADDR $VAULT_PKI_PATH $VAULT_PKI_ROLE $VAULT_PKI_ROLE_TTL $VAULT_PKI_LEAF_HOST $VAULT_NAMESPACE $VAULT_SKIP_VERIFY $VAULT_CACERT $JENKINS_CERT_ROTATOR_RENEW_BEFORE $JENKINS_CERT_ROTATOR_VAULT_ROLE $JENKINS_CERT_ROTATOR_ALT_NAMES'
+      envsubst "$envsubst_vars" < "$rotator_template" > "$rotator_rendered"
 
       if _kubectl apply --dry-run=client -f "$rotator_rendered"; then
          :
@@ -1908,6 +1919,8 @@ function _create_jenkins_cert_rotator_policy() {
    local rotator_service_account="${6:-jenkins-cert-rotator}"
    local policy_name="jenkins-cert-rotator"
 
+   _info "[jenkins] configuring Vault cert-rotator policy and role"
+
    _vault_login "$vault_namespace" "$vault_release"
 
    local ensure_policy=1
@@ -1923,8 +1936,9 @@ function _create_jenkins_cert_rotator_policy() {
    fi
 
    if (( ensure_policy )); then
-      local policy_content
-      policy_content=$(cat <<HCL
+      local policy_file
+      policy_file=$(mktemp -t jenkins-cert-rotator-policy.XXXXXX.hcl)
+      cat > "$policy_file" <<HCL
 path "${pki_path}/issue/${pki_role}" {
    capabilities = ["update"]
 }
@@ -1941,8 +1955,16 @@ path "${pki_path}/ca/pem" {
    capabilities = ["read"]
 }
 HCL
-)
-      echo "$policy_content" | _vault_exec "$vault_namespace" "vault policy write $policy_name -" "$vault_release"
+
+      # Copy policy file to vault pod and apply it
+      local vault_pod="${vault_release}-0"
+      _kubectl cp "$policy_file" "${vault_namespace}/${vault_pod}:/tmp/jenkins-cert-rotator-policy.hcl" 2>/dev/null || \
+         _err "Failed to copy policy file to Vault pod"
+
+      _vault_exec "$vault_namespace" "vault policy write $policy_name /tmp/jenkins-cert-rotator-policy.hcl" "$vault_release" || \
+         _err "Failed to create Vault policy $policy_name"
+
+      rm -f "$policy_file"
    fi
 
    _vault_exec "$vault_namespace" \
