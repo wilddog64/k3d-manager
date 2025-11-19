@@ -38,6 +38,10 @@ controller:
     - ssh-credentials
     - ssh-slaves
     - sshd
+  # Use Helm chart's built-in javaOpts and jenkinsOpts instead of containerEnv
+  javaOpts: "-Djenkins.install.runSetupWizard=false"
+  jenkinsOpts: "--httpPort=8080 --httpListenAddress=0.0.0.0"
+
   containerEnv:
     - name: JENKINS_ADMIN_USER
       value: "jenkins-admin"
@@ -46,10 +50,6 @@ controller:
         secretKeyRef:
           name: jenkins-admin
           key: jenkins-admin-password
-    - name: JAVA_OPTS
-      value: "-Djenkins.install.runSetupWizard=false"
-    - name: JENKINS_OPTS
-      value: "--httpPort=8080 --httpListenAddress=0.0.0.0"
     - name: LDAP_URL
       value: "ldap://openldap-openldap-bitnami.directory.svc.cluster.local:389"
     - name: LDAP_GROUP_SEARCH_BASE
@@ -71,15 +71,6 @@ controller:
         secretKeyRef:
           name: jenkins-ldap-config
           key: LDAP_BIND_PASSWORD
-    - name: POD_NAME
-      valueFrom:
-        fieldRef:
-          apiVersion: v1
-          fieldPath: metadata.name
-    - name: JENKINS_SLAVE_AGENT_PORT
-      value: "50000"
-    - name: CASC_JENKINS_CONFIG
-      value: "/var/jenkins_home/casc_configs"
 
   serviceAccount:
     create: true
