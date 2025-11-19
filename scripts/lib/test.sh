@@ -740,3 +740,341 @@ function _cleanup_vault_test() {
   _kubectl delete clusterrolebinding vault-server-binding
   # _helm uninstall vault -n vault-test 2>/dev/null || true
 }
+function test_cert_rotation() {
+  echo "==================================================================="
+  echo "  Jenkins Certificate Rotation Integration Test"
+  echo "==================================================================="
+  echo ""
+
+  trap '_cleanup_cert_rotation_test' EXIT TERM
+
+  local test_mode="${1:-manual}"  # manual|fast|auto
+
+  # 1. Verify prerequisites
+  _info "Checking prerequisites..."
+
+  if ! _kubectl get namespace jenkins >/dev/null 2>&1; then
+    _err "Jenkins namespace not found. Please deploy Jenkins first:"
+    _err "  ./scripts/k3d-manager deploy_jenkins --enable-vault --enable-ldap"
+    return 1
+  fi
+
+  if ! _kubectl get statefulset jenkins -n jenkins >/dev/null 2>&1; then
+    _err "Jenkins StatefulSet not found. Please deploy Jenkins with Vault:"
+    _err "  ./scripts/k3d-manager deploy_jenkins --enable-vault --enable-ldap"
+    return 1
+  fi
+
+  if ! _kubectl get cronjob jenkins-cert-rotator -n jenkins >/dev/null 2>&1; then
+    _err "Certificate rotator CronJob not found."
+    _err "Jenkins must be deployed with --enable-vault and cert rotation enabled"
+    return 1
+  fi
+
+  if ! _kubectl get secret jenkins-tls -n istio-system >/dev/null 2>&1; then
+    _err "Jenkins TLS secret not found in istio-system namespace"
+    return 1
+  fi
+
+  _info "✅ All prerequisites met"
+  echo ""
+
+  # 2. Display current configuration
+  _info "Current Configuration:"
+  local schedule
+  schedule=$(_kubectl get cronjob jenkins-cert-rotator -n jenkins -o jsonpath='{.spec.schedule}')
+  _info "  CronJob schedule: $schedule"
+
+  local image
+  image=$(_kubectl get cronjob jenkins-cert-rotator -n jenkins \
+    -o jsonpath='{.spec.jobTemplate.spec.template.spec.containers[0].image}')
+  _info "  Rotator image: $image"
+
+  echo ""
+  _info "Test mode: ${test_mode}"
+  echo ""
+
+  # 3. Capture initial certificate
+  _info "Capturing initial certificate details..."
+  local initial_serial
+  initial_serial=$(_kubectl get secret jenkins-tls -n istio-system \
+    -o jsonpath='{.data.tls\.crt}' | base64 -d | \
+    openssl x509 -noout -serial | cut -d= -f2)
+
+  if [[ -z "$initial_serial" ]]; then
+    _err "Failed to capture initial certificate serial"
+    return 1
+  fi
+
+  _info "Initial certificate serial: $initial_serial"
+
+  # Get expiry time
+  local expiry_date
+  expiry_date=$(_kubectl get secret jenkins-tls -n istio-system \
+    -o jsonpath='{.data.tls\.crt}' | base64 -d | \
+    openssl x509 -noout -enddate | cut -d= -f2)
+  _info "Certificate expires: $expiry_date"
+  echo ""
+
+  # 4. Test rotation based on mode
+  case "$test_mode" in
+    fast)
+      _info "Fast mode: Deleting certificate secret to trigger rotation..."
+      _kubectl delete secret jenkins-tls -n istio-system
+      _info "Waiting 2.5 minutes for CronJob to detect and recreate certificate..."
+      _info "(CronJob runs every 2 minutes, adding buffer for processing)"
+      sleep 150
+      ;;
+
+    manual)
+      _info "Manual mode: Triggering rotation job manually..."
+
+      # Clean up any previous test jobs
+      _kubectl delete job test-cert-rotation -n jenkins 2>/dev/null || true
+      sleep 2
+
+      _kubectl create job test-cert-rotation --from=cronjob/jenkins-cert-rotator -n jenkins
+      _info "Waiting for manual rotation job to complete..."
+
+      if _kubectl wait --for=condition=complete --timeout=3m job/test-cert-rotation -n jenkins 2>/dev/null; then
+        _info "Rotation job completed successfully"
+      else
+        _err "Rotation job failed or timed out"
+        _info "Job logs:"
+        _kubectl logs -n jenkins job/test-cert-rotation --tail=50
+        return 1
+      fi
+
+      _info "Rotation job logs:"
+      _kubectl logs -n jenkins job/test-cert-rotation
+      ;;
+
+    auto)
+      _info "Auto mode: Waiting for automatic rotation..."
+      _info "Monitoring certificate serial for changes (checking every 30 seconds)..."
+      _info "Note: This requires certificate to be within renewal threshold"
+      echo ""
+
+      local waited=0
+      local max_wait=600  # 10 minutes
+      while (( waited < max_wait )); do
+        # Check if rotation has occurred
+        local current_serial
+        current_serial=$(_kubectl get secret jenkins-tls -n istio-system \
+          -o jsonpath='{.data.tls\.crt}' 2>/dev/null | base64 -d | \
+          openssl x509 -noout -serial 2>/dev/null | cut -d= -f2 || echo "")
+
+        if [[ -n "$current_serial" ]] && [[ "$current_serial" != "$initial_serial" ]]; then
+          echo ""
+          _info "Certificate rotation detected after ${waited} seconds!"
+          break
+        fi
+
+        echo -n "."
+        sleep 30
+        waited=$((waited + 30))
+      done
+      echo ""
+
+      if (( waited >= max_wait )); then
+        _err "Timeout waiting for automatic certificate rotation"
+        _err "Check if certificate is within renewal threshold and CronJob is running"
+        return 1
+      fi
+      ;;
+
+    *)
+      _err "Invalid test mode: $test_mode"
+      _err "Valid modes: manual (default), fast, auto"
+      return 1
+      ;;
+  esac
+
+  # 5. Verify rotation occurred
+  _info "Verifying certificate rotation..."
+  sleep 5  # Brief pause to ensure secret is updated
+
+  local new_serial
+  new_serial=$(_kubectl get secret jenkins-tls -n istio-system \
+    -o jsonpath='{.data.tls\.crt}' | base64 -d | \
+    openssl x509 -noout -serial | cut -d= -f2)
+
+  if [[ -z "$new_serial" ]]; then
+    _err "Failed to retrieve new certificate"
+    return 1
+  fi
+
+  _info "New certificate serial: $new_serial"
+
+  if [[ "$new_serial" == "$initial_serial" ]]; then
+    _err "Certificate was NOT rotated (serial unchanged)"
+    return 1
+  fi
+
+  _info "✅ Certificate rotation successful!"
+
+  # 6. Check new certificate details
+  local new_expiry
+  new_expiry=$(_kubectl get secret jenkins-tls -n istio-system \
+    -o jsonpath='{.data.tls\.crt}' | base64 -d | \
+    openssl x509 -noout -enddate | cut -d= -f2)
+  _info "New certificate expires: $new_expiry"
+
+  # 7. Verify old certificate was revoked in Vault (optional)
+  _info "Checking if old certificate was revoked in Vault..."
+  local vault_pod
+  vault_pod=$(_kubectl get pod -n vault -l app.kubernetes.io/name=vault \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+  if [[ -n "$vault_pod" ]]; then
+    # Normalize serial (remove colons, uppercase)
+    local normalized_serial
+    normalized_serial=$(echo "$initial_serial" | tr -d ':' | tr '[:lower:]' '[:upper:]')
+
+    if _kubectl exec -n vault "$vault_pod" -- \
+      vault list pki/certs/revoked 2>/dev/null | grep -qi "$normalized_serial"; then
+      _info "✅ Old certificate was revoked in Vault"
+    else
+      _info "⚠️  Old certificate revocation not confirmed (may not be critical)"
+    fi
+  else
+    _info "⚠️  Vault pod not found, skipping revocation check"
+  fi
+
+  # 8. Verify Jenkins is still accessible
+  _info "Verifying Jenkins is still accessible..."
+  local jenkins_pod
+  jenkins_pod=$(_kubectl get pod -n jenkins -l app.kubernetes.io/name=jenkins \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+  if [[ -z "$jenkins_pod" ]]; then
+    _err "Jenkins pod not found"
+    return 1
+  fi
+
+  if _kubectl get pod -n jenkins "$jenkins_pod" -o jsonpath='{.status.phase}' | grep -q "Running"; then
+    _info "✅ Jenkins is running"
+  else
+    _err "Jenkins pod is not in Running state"
+    return 1
+  fi
+
+  echo ""
+  echo "==================================================================="
+  echo "  ✅ Certificate Rotation Test PASSED"
+  echo "==================================================================="
+  echo ""
+  echo "Summary:"
+  echo "  Initial cert serial:  $initial_serial"
+  echo "  New cert serial:      $new_serial"
+  echo "  Rotation occurred:    YES"
+  echo "  Jenkins accessible:   YES"
+  echo "  Test mode:            $test_mode"
+  echo ""
+
+  return 0
+}
+
+function _cleanup_cert_rotation_test() {
+  # Clean up test job if it exists
+  _kubectl delete job test-cert-rotation -n jenkins 2>/dev/null || true
+  _info "Certificate rotation test cleanup complete"
+}
+
+function test_jenkins_smoke() {
+  echo "==================================================================="
+  echo "  Jenkins Smoke Test (with readiness wait)"
+  echo "==================================================================="
+  echo ""
+
+  local namespace="${1:-jenkins}"
+  local host="${2:-jenkins.dev.local.me}"
+  local port="${3:-443}"
+  local auth_mode="${4:-default}"
+
+  # 1. Verify Jenkins is deployed
+  _info "Checking Jenkins deployment..."
+
+  if ! _kubectl get namespace "$namespace" >/dev/null 2>&1; then
+    _err "Jenkins namespace '$namespace' not found"
+    return 1
+  fi
+
+  if ! _kubectl get statefulset jenkins -n "$namespace" >/dev/null 2>&1; then
+    _err "Jenkins StatefulSet not found in namespace '$namespace'"
+    return 1
+  fi
+
+  # 2. Wait for Jenkins to be fully ready
+  _info "Waiting for Jenkins to be fully initialized..."
+
+  # Get ingress IP
+  local ip
+  ip=$(_kubectl get -n istio-system service istio-ingressgateway \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+
+  if [[ -z "$ip" ]]; then
+    _err "Could not get istio-ingressgateway IP"
+    return 1
+  fi
+
+  _info "Using ingress IP: $ip"
+
+  # Wait for Jenkins API to be ready (with retry)
+  local max_attempts=30
+  local attempt=0
+  local ready=0
+
+  while (( attempt < max_attempts )); do
+    # Check if Jenkins API responds (200 or 403 means ready)
+    local http_code
+    http_code=$(curl -sk --max-time 5 \
+      --resolve "$host:$port:$ip" \
+      -w "%{http_code}" -o /dev/null \
+      "https://$host:$port/api/json" 2>/dev/null || echo "000")
+
+    if [[ "$http_code" == "200" ]] || [[ "$http_code" == "403" ]]; then
+      _info "Jenkins API is ready (HTTP $http_code)"
+      ready=1
+      break
+    fi
+
+    echo -n "."
+    sleep 2
+    attempt=$((attempt + 1))
+  done
+  echo ""
+
+  if (( ready == 0 )); then
+    _err "Jenkins did not become ready within $((max_attempts * 2)) seconds"
+    _info "Last HTTP response: $http_code"
+    return 1
+  fi
+
+  # 3. Find smoke test script
+  local smoke_script="${SCRIPT_DIR}/../bin/smoke-test-jenkins.sh"
+  if [[ ! -x "$smoke_script" ]]; then
+    if [[ -r "$smoke_script" ]]; then
+      chmod +x "$smoke_script"
+    else
+      _err "Smoke test script not found: $smoke_script"
+      return 1
+    fi
+  fi
+
+  # 4. Run smoke test
+  _info "Running Jenkins smoke test..."
+  echo ""
+
+  if "$smoke_script" "$namespace" "$host" "$port" "$auth_mode"; then
+    echo ""
+    _info "✅ Jenkins smoke test passed"
+    return 0
+  else
+    local exit_code=$?
+    echo ""
+    _warn "Jenkins smoke test had failures (exit code: $exit_code)"
+    _info "Note: Some failures may be expected during initialization"
+    return "$exit_code"
+  fi
+}
