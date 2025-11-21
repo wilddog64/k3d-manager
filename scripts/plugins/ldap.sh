@@ -920,6 +920,42 @@ EOS
    return 0
 }
 
+function _ldap_deploy_password_rotator() {
+   local ns="${1:?Namespace required}"
+   local template="${SCRIPT_DIR}/etc/ldap/ldap-password-rotator.yaml.tmpl"
+   local vault_ns="${VAULT_NS:-vault}"
+
+   _info "[ldap] deploying password rotation CronJob"
+
+   if [[ ! -f "$template" ]]; then
+      _warn "[ldap] password rotator template not found: $template"
+      return 1
+   fi
+
+   # Export required variables for envsubst
+   export LDAP_NAMESPACE="$ns"
+   export VAULT_NAMESPACE="$vault_ns"
+   export LDAP_PASSWORD_ROTATOR_IMAGE="${LDAP_PASSWORD_ROTATOR_IMAGE}"
+   export LDAP_PASSWORD_ROTATION_SCHEDULE="${LDAP_PASSWORD_ROTATION_SCHEDULE}"
+   export LDAP_POD_LABEL="${LDAP_POD_LABEL}"
+   export LDAP_PORT="${LDAP_PASSWORD_ROTATION_PORT:-1389}"
+   export LDAP_BASE_DN="${LDAP_BASE_DN}"
+   export LDAP_ADMIN_DN="${LDAP_BIND_DN}"
+   export LDAP_USER_OU="${LDAP_USER_OU}"
+   export VAULT_ADDR="${VAULT_ADDR:-http://vault.vault.svc:8200}"
+   export VAULT_ROOT_TOKEN_SECRET="${VAULT_ROOT_TOKEN_SECRET:-vault-root}"
+   export VAULT_ROOT_TOKEN_KEY="${VAULT_ROOT_TOKEN_KEY:-root_token}"
+   export USERS_TO_ROTATE="${LDAP_USERS_TO_ROTATE}"
+
+   if envsubst < "$template" | _kubectl apply -f - >/dev/null 2>&1; then
+      _info "[ldap] password rotator deployed (schedule: ${LDAP_PASSWORD_ROTATION_SCHEDULE})"
+      return 0
+   else
+      _warn "[ldap] failed to deploy password rotator"
+      return 1
+   fi
+}
+
 function deploy_ldap() {
    local restore_trace=0
    local namespace=""
@@ -1212,6 +1248,12 @@ EOF
 
       if ! _ldap_import_ldif "$namespace" "$release"; then
          _warn "[ldap] LDIF import failed; continuing with smoke test"
+      fi
+
+      if (( LDAP_PASSWORD_ROTATOR_ENABLED )); then
+         if ! _ldap_deploy_password_rotator "$namespace"; then
+            _warn "[ldap] password rotator deployment failed"
+         fi
       fi
 
       local smoke_script="${SCRIPT_DIR}/tests/plugins/openldap.sh"
