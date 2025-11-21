@@ -923,6 +923,7 @@ function deploy_jenkins() {
    local enable_ad="${JENKINS_AD_ENABLED:-0}"
    local enable_ad_prod="${JENKINS_AD_PROD_ENABLED:-0}"
    local enable_vault="${JENKINS_VAULT_ENABLED:-1}"
+   local enable_mfa="${JENKINS_MFA_ENABLED:-1}"
    local skip_ad_validation="${JENKINS_SKIP_AD_VALIDATION:-0}"
    local restore_trace=0
    local arg_count=$#
@@ -947,6 +948,7 @@ Options:
   --disable-ldap             Skip directory service deployment
   --enable-vault             Deploy Vault (default: disabled)
   --disable-vault            Skip Vault deployment (use existing)
+  --disable-mfa              Disable TOTP/MFA plugin (enabled by default)
   -h, --help                 Show this help message
 
 Feature Flags (environment variables):
@@ -1014,6 +1016,7 @@ Options:
   --disable-ldap             Skip directory service deployment
   --enable-vault             Deploy Vault (default: disabled)
   --disable-vault            Skip Vault deployment (use existing)
+  --disable-mfa              Disable TOTP/MFA plugin (enabled by default)
   -h, --help                 Show this help message
 
 Feature Flags (environment variables):
@@ -1117,6 +1120,10 @@ EOF
             ;;
          --disable-vault)
             enable_vault=0
+            shift
+            ;;
+         --disable-mfa)
+            enable_mfa=0
             shift
             ;;
          --)
@@ -1443,6 +1450,12 @@ function _deploy_jenkins() {
       printf -v LDAP_BIND_DN_FILE_REF '%s' '${file:/vault/secrets/ldap-bind-dn}'
       printf -v LDAP_BIND_PASSWORD_FILE_REF '%s' '${file:/vault/secrets/ldap-bind-password}'
       export LDAP_BIND_DN_FILE_REF LDAP_BIND_PASSWORD_FILE_REF
+      # MFA plugin - enabled by default, use --disable-mfa to exclude
+      if (( enable_mfa )); then
+         export JENKINS_MFA_PLUGIN="- miniorange-two-factor"
+      else
+         export JENKINS_MFA_PLUGIN=""
+      fi
       _info "[jenkins] processing template with envsubst: $template_file"
       envsubst < "$template_file" > "$values_file"
    else
