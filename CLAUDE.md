@@ -43,26 +43,34 @@ k3d-manager is a modular Bash-based utility for managing local Kubernetes develo
 
 **Next Steps:**
 
-Priority 1 (Production Readiness):
-- End-to-end LDAP authentication testing
-- Production Active Directory integration testing (requires corporate VPN)
-- LDAP auth test failure investigation (test user 'chengkai.liang' - HTTP 401)
+Priority 1 (Security Enhancement):
+- TOTP/MFA implementation via miniOrange plugin (`--enable-mfa` flag)
+- Plan: `docs/plans/jenkins-totp-mfa.md`
 
-Priority 2 (Documentation):
+Priority 2 (Production Readiness):
+- Production Active Directory integration testing (requires corporate VPN)
+
+Priority 3 (Documentation):
 - Mac AD setup guide
 - Monitoring/alerting recommendations
 - Operational runbooks
 
-Priority 3 (Optional Enhancements):
+Priority 4 (Optional Enhancements):
 - Additional test coverage
 - Performance optimization
 - Multi-environment validation
 
+**Recently Completed:**
+- ✅ End-to-end LDAP authentication testing (4/4 tests passed)
+- ✅ LDAP auth investigation resolved (password was `test1234`, correct smoke test: `./bin/smoke-test-jenkins.sh jenkins jenkins.dev.local.me 443 ldap`)
+
 **Reference Documents:**
+- LDAP auth test results: `docs/tests/ldap-auth-test-results-2025-11-20.md`
 - Cert rotation results: `docs/tests/cert-rotation-test-results-2025-11-19.md`
 - Vault sidecar: `docs/implementations/vault-sidecar-implementation.md`
+- TOTP/MFA plan: `docs/plans/jenkins-totp-mfa.md`
 - AD integration status: `docs/ad-integration-status.md`
-- Recent commits: `bcc0d55`, `d8a7fc1`, `6697087`, `a13dffe`
+- Recent commits: `908ab8d`, `4ee53fc`, `bcc0d55`, `d8a7fc1`
 
 ## Development Commands
 
