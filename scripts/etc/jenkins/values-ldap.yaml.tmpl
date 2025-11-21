@@ -6,6 +6,19 @@ controller:
     sidecar.istio.io/inject: "true"
     sidecar.istio.io/rewriteAppHTTPProbers: "true"
     proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
+    vault.hashicorp.com/agent-inject: "true"
+    vault.hashicorp.com/role: "jenkins-ldap-reader"
+    vault.hashicorp.com/agent-pre-populate-only: "true"
+    vault.hashicorp.com/agent-inject-secret-ldap-bind-dn: "secret/data/ldap/openldap-admin"
+    vault.hashicorp.com/agent-inject-template-ldap-bind-dn: |-
+      {{ "{{" }}- with secret "secret/data/ldap/openldap-admin" -{{ "}}" }}
+      {{ "{{" }}- .Data.data.LDAP_BIND_DN -{{ "}}" }}
+      {{ "{{" }}- end -{{ "}}" }}
+    vault.hashicorp.com/agent-inject-secret-ldap-bind-password: "secret/data/ldap/openldap-admin"
+    vault.hashicorp.com/agent-inject-template-ldap-bind-password: |-
+      {{ "{{" }}- with secret "secret/data/ldap/openldap-admin" -{{ "}}" }}
+      {{ "{{" }}- .Data.data.LDAP_ADMIN_PASSWORD -{{ "}}" }}
+      {{ "{{" }}- end -{{ "}}" }}
   image:
     registry: docker.io
     repository: jenkins/jenkins
@@ -140,8 +153,8 @@ controller:
                   userSearch: "(cn={0})"
                   userSearchBase: "${LDAP_USER_SEARCH_BASE}"
                   groupSearchBase: "${LDAP_GROUP_SEARCH_BASE}"
-                  managerDN: "${LDAP_BIND_DN}"
-                  managerPasswordSecret: "${LDAP_BIND_PASSWORD}"
+                  managerDN: '${LDAP_BIND_DN_FILE_REF}'
+                  managerPasswordSecret: '${LDAP_BIND_PASSWORD_FILE_REF}'
                   inhibitInferRootDN: false
                   displayNameAttributeName: "cn"
                   mailAddressAttributeName: "mail"
