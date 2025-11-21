@@ -51,6 +51,7 @@ controller:
     - ssh-credentials
     - ssh-slaves
     - sshd
+    ${JENKINS_MFA_PLUGIN}
   # Use Helm chart's built-in javaOpts and jenkinsOpts instead of containerEnv
   javaOpts: "-Djenkins.install.runSetupWizard=false"
   jenkinsOpts: "--httpPort=8080 --httpListenAddress=0.0.0.0"
