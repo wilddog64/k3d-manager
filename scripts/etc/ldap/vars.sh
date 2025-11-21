@@ -93,3 +93,11 @@ export LDAP_ADMIN_VAULT_PATH="${LDAP_ADMIN_VAULT_PATH:-ldap/openldap-admin}"
 export LDAP_ADMIN_PASSWORD_KEY="${LDAP_ADMIN_PASSWORD_KEY:-LDAP_ADMIN_PASSWORD}"
 export LDAP_CONFIG_PASSWORD_KEY="${LDAP_CONFIG_PASSWORD_KEY:-LDAP_CONFIG_PASSWORD}"
 export LDAP_ESO_API_VERSION="${LDAP_ESO_API_VERSION:-external-secrets.io/v1}"
+
+# LDAP Password Rotation Configuration
+export LDAP_PASSWORD_ROTATOR_ENABLED="${LDAP_PASSWORD_ROTATOR_ENABLED:-1}"
+export LDAP_PASSWORD_ROTATOR_IMAGE="${LDAP_PASSWORD_ROTATOR_IMAGE:-docker.io/bitnami/kubectl:latest}"
+export LDAP_PASSWORD_ROTATION_SCHEDULE="${LDAP_PASSWORD_ROTATION_SCHEDULE:-0 0 1 * *}"  # Monthly: 1st day of month at midnight
+export LDAP_PASSWORD_ROTATION_PORT="${LDAP_PASSWORD_ROTATION_PORT:-1389}"  # Internal LDAP port
+export LDAP_USERS_TO_ROTATE="${LDAP_USERS_TO_ROTATE:-chengkai.liang,jenkins-admin,test-user}"
+export LDAP_POD_LABEL="${LDAP_POD_LABEL:-app.kubernetes.io/name=openldap-bitnami}"
