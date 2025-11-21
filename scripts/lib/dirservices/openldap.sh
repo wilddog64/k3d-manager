@@ -71,17 +71,20 @@ function _dirservice_openldap_generate_jcasc() {
    _info "[dirservice:openldap] generating JCasC security realm config"
 
    # Generate LDAP security realm configuration
-   # This matches the current values.yaml format
-   cat > "$output_file" <<'EOF'
+   # Uses Vault Agent sidecar to inject credentials as files
+   # Format: ${file:/vault/secrets/filename}
+   # This allows Jenkins to read the password dynamically from Vault-managed files
+   # K8s secret (ESO-synced) serves as backup if Vault agent fails
+   cat > "$output_file" <<EOF
 securityRealm:
   ldap:
     configurations:
-      - server: "${LDAP_URL}"
-        rootDN: "${LDAP_BASE_DN}"
-        groupSearchBase: "${LDAP_GROUP_SEARCH_BASE}"
-        userSearchBase: "${LDAP_USER_SEARCH_BASE}"
-        managerDN: "${LDAP_BIND_DN}"
-        managerPasswordSecret: "${LDAP_BIND_PASSWORD}"
+      - server: "\${LDAP_URL}"
+        rootDN: "\${LDAP_BASE_DN}"
+        groupSearchBase: "\${LDAP_GROUP_SEARCH_BASE}"
+        userSearchBase: "\${LDAP_USER_SEARCH_BASE}"
+        managerDN: "\${file:/vault/secrets/ldap-bind-dn}"
+        managerPasswordSecret: "\${file:/vault/secrets/ldap-bind-password}"
 EOF
 
    return 0

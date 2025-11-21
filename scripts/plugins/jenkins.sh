@@ -1192,6 +1192,7 @@ EOF
    fi
    _create_jenkins_admin_vault_policy "$vault_namespace" "$vault_release"
    _create_jenkins_vault_ad_policy "$vault_namespace" "$vault_release" "$jenkins_namespace"
+   _create_jenkins_vault_ldap_reader_role "$vault_namespace" "$vault_release" "$jenkins_namespace"
    _create_jenkins_cert_rotator_policy "$vault_namespace" "$vault_release" "" "" "$jenkins_namespace"
    _create_jenkins_namespace "$jenkins_namespace"
    local -a _jenkins_secret_prefixes=()
@@ -1378,10 +1379,42 @@ function _deploy_jenkins() {
       _info "[jenkins] using production Active Directory template: values-ad-prod.yaml.tmpl"
       _info "[jenkins] AD domain: ${AD_DOMAIN}"
    elif (( enable_ad )); then
+      # AD schema testing - source LDAP variables with AD-specific overrides
+      local ad_test_vars_file="$SCRIPT_DIR/etc/ad/vars.sh"
+      local ldap_vars_file="$SCRIPT_DIR/etc/ldap/vars.sh"
+
+      if [[ -r "$ldap_vars_file" ]]; then
+         _info "[jenkins] sourcing LDAP configuration: $ldap_vars_file"
+         source "$ldap_vars_file"
+      fi
+
+      if [[ -r "$ad_test_vars_file" ]]; then
+         _info "[jenkins] sourcing AD test configuration: $ad_test_vars_file"
+         source "$ad_test_vars_file"
+      fi
+
+      # Set AD-specific LDAP variables
+      export LDAP_URL="${LDAP_URL:-ldap://openldap-openldap-bitnami.directory.svc:1389}"
+      export LDAP_BASE_DN="${LDAP_BASE_DN:-DC=corp,DC=example,DC=com}"
+      export LDAP_BIND_DN="${LDAP_BIND_DN:-cn=admin,DC=corp,DC=example,DC=com}"
+      export LDAP_USER_SEARCH_BASE="${LDAP_USER_SEARCH_BASE:-OU=Users,DC=corp,DC=example,DC=com}"
+      export LDAP_GROUP_SEARCH_BASE="${LDAP_GROUP_SEARCH_BASE:-OU=Groups,DC=corp,DC=example,DC=com}"
+
       template_file="$JENKINS_CONFIG_DIR/values-ad-test.yaml.tmpl"
       auth_mode="ad-testing"
       _info "[jenkins] using AD schema testing template: values-ad-test.yaml.tmpl"
    elif (( enable_ldap )); then
+      # Standard LDAP - source LDAP variables
+      local ldap_vars_file="$SCRIPT_DIR/etc/ldap/vars.sh"
+
+      if [[ -r "$ldap_vars_file" ]]; then
+         _info "[jenkins] sourcing LDAP configuration: $ldap_vars_file"
+         source "$ldap_vars_file"
+      fi
+
+      # Set LDAP connection variables
+      export LDAP_URL="${LDAP_URL:-ldap://openldap-openldap-bitnami.directory.svc:1389}"
+
       template_file="$JENKINS_CONFIG_DIR/values-ldap.yaml.tmpl"
       auth_mode="standard-ldap"
       _info "[jenkins] using standard LDAP template: values-ldap.yaml.tmpl"
@@ -1392,21 +1425,10 @@ function _deploy_jenkins() {
       _info "[jenkins] using default template (no directory service): values.yaml"
    fi
 
-   # Retrieve LDAP bind password from K8s secret if LDAP is enabled
-   if (( enable_ldap || enable_ad || enable_ad_prod )); then
-      if kubectl -n "$jenkins_namespace" get secret jenkins-ldap-config >/dev/null 2>&1; then
-         LDAP_BIND_PASSWORD=$(kubectl -n "$jenkins_namespace" get secret jenkins-ldap-config \
-            -o jsonpath='{.data.LDAP_BIND_PASSWORD}' 2>/dev/null | base64 -d || echo "")
-         export LDAP_BIND_PASSWORD
-         if [[ -n "$LDAP_BIND_PASSWORD" ]]; then
-            _info "[jenkins] retrieved LDAP bind password from secret jenkins-ldap-config"
-         else
-            _warn "[jenkins] LDAP bind password is empty in secret jenkins-ldap-config"
-         fi
-      else
-         _warn "[jenkins] secret jenkins-ldap-config not found; LDAP authentication may fail"
-      fi
-   fi
+   # NOTE: LDAP bind password is now provided via Vault agent sidecar
+   # The password is injected as files at runtime: /vault/secrets/ldap-bind-password
+   # K8s secret jenkins-ldap-config still exists as a backup mechanism managed by ESO
+   # No need to export password as environment variable (security improvement)
 
    # Process template with envsubst if it's a .tmpl file
    local values_file
@@ -1416,6 +1438,11 @@ function _deploy_jenkins() {
       fi
       values_file=$(mktemp -t jenkins-values.XXXXXX.yaml)
       _jenkins_register_rendered_manifest "$values_file"
+      # Export file reference variables for Vault agent sidecar
+      # Use printf to avoid shell expansion of ${...} syntax
+      printf -v LDAP_BIND_DN_FILE_REF '%s' '${file:/vault/secrets/ldap-bind-dn}'
+      printf -v LDAP_BIND_PASSWORD_FILE_REF '%s' '${file:/vault/secrets/ldap-bind-password}'
+      export LDAP_BIND_DN_FILE_REF LDAP_BIND_PASSWORD_FILE_REF
       _info "[jenkins] processing template with envsubst: $template_file"
       envsubst < "$template_file" > "$values_file"
    else
@@ -1872,6 +1899,36 @@ vault kv put secret/eso/jenkins-admin username=jenkins-admin password="$jenkins_
 SCRIPT
 )
    echo "$script_content" | _vault_exec "$vault_namespace" "sh -" "$vault_release"
+}
+
+function _create_jenkins_vault_ldap_reader_role() {
+   local vault_namespace="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+   local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local jenkins_namespace="${3:-jenkins}"
+   local role_name="jenkins-ldap-reader"
+   local policy_name="jenkins-ldap-reader"
+
+   _info "[jenkins] configuring Vault LDAP reader policy and role for vault-agent sidecar"
+
+   _vault_login "$vault_namespace" "$vault_release"
+
+   # Create policy if it doesn't exist
+   if ! _vault_policy_exists "$vault_namespace" "$vault_release" "$policy_name"; then
+      local ldap_read_policy
+      ldap_read_policy=$(cat <<'HCL'
+path "secret/data/ldap/openldap-admin" {
+  capabilities = ["read"]
+}
+HCL
+)
+      echo "$ldap_read_policy" | _vault_exec "$vault_namespace" "vault policy write $policy_name -" "$vault_release" || \
+         _err "Failed to create Vault policy $policy_name"
+   fi
+
+   # Create or update Kubernetes auth role
+   _vault_exec "$vault_namespace" \
+      "vault write auth/kubernetes/role/$role_name bound_service_account_names=jenkins bound_service_account_namespaces=$jenkins_namespace policies=$policy_name ttl=1h" \
+      "$vault_release"
 }
 
 function _create_jenkins_vault_ad_policy() {
