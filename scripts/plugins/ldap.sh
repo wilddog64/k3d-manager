@@ -735,12 +735,13 @@ function _ldap_import_ldif() {
       _info "[ldap] LDIF import verification: found $search_result entries in directory"
    fi
 
-   # Reset passwords for test users to ensure they work correctly
+   # Reset passwords for test users with unique passwords stored in Vault
    # The SSHA hashes in the LDIF may not work properly, so reset them
-   _info "[ldap] resetting test user passwords..."
+   _info "[ldap] resetting test user passwords with unique passwords..."
    local test_users=("chengkai.liang" "jenkins-admin" "test-user")
-   local test_password="test1234"
    local user_ou="ou=users"
+   local vault_ns="${VAULT_NS:-vault}"
+   local vault_pod="vault-0"
 
    for user in "${test_users[@]}"; do
       local user_dn="cn=${user},${user_ou},${base_dn}"
@@ -749,17 +750,61 @@ function _ldap_import_ldif() {
          ldapsearch -x -H "ldap://localhost:${ldap_port}" \
          -D "$admin_dn" -w "$admin_pass" \
          -b "$user_dn" -LLL dn 2>/dev/null | grep -q "^dn:"; then
-         # Reset password
-         _info "[ldap] resetting password for $user_dn"
+
+         # Check if password already exists in Vault
+         local vault_path="ldap/users/${user}"
+         local existing_pass
+         existing_pass=$(_no_trace _vault_exec "$vault_ns" "vault kv get -field=password secret/$vault_path" 2>/dev/null) || existing_pass=""
+
+         local user_password
+         if [[ -n "$existing_pass" ]]; then
+            # Use existing password from Vault
+            user_password="$existing_pass"
+            _info "[ldap] using existing password from Vault for $user"
+         else
+            # Generate new unique password (20 chars, alphanumeric + special)
+            user_password=$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)
+            _info "[ldap] generated new password for $user"
+
+            # Store in Vault using _vault_exec for proper authentication
+            local put_cmd
+            printf -v put_cmd 'vault kv put secret/%s username=%q password=%q dn=%q' \
+               "$vault_path" "$user" "$user_password" "$user_dn"
+            if _no_trace _vault_exec "$vault_ns" "$put_cmd" >/dev/null 2>&1; then
+               _info "[ldap] stored password in Vault: secret/$vault_path"
+            else
+               _warn "[ldap] failed to store password in Vault for $user"
+            fi
+         fi
+
+         # Reset password in LDAP
+         _info "[ldap] setting password for $user_dn"
          _no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- \
             ldappasswd -x -H "ldap://localhost:${ldap_port}" \
             -D "$admin_dn" -w "$admin_pass" \
-            -s "$test_password" "$user_dn" >/dev/null 2>&1 || \
-            _warn "[ldap] failed to reset password for $user_dn"
+            -s "$user_password" "$user_dn" >/dev/null 2>&1 || \
+            _warn "[ldap] failed to set password for $user_dn"
       fi
    done
 
    return 0
+}
+
+# Get LDAP user password from Vault
+# Usage: ldap_get_user_password <username>
+# Example: ldap_get_user_password chengkai.liang
+function ldap_get_user_password() {
+   local username="${1:?Username required}"
+   local vault_ns="${VAULT_NS:-vault}"
+   local vault_path="ldap/users/${username}"
+
+   local password
+   password=$(_no_trace _vault_exec "$vault_ns" "vault kv get -field=password secret/$vault_path" 2>/dev/null) || {
+      echo "Error: Password not found for user '$username' in Vault" >&2
+      return 1
+   }
+
+   echo "$password"
 }
 
 function _ldap_sync_admin_password() {
