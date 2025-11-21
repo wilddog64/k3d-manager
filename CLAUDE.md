@@ -44,7 +44,7 @@ k3d-manager is a modular Bash-based utility for managing local Kubernetes develo
 **Next Steps:**
 
 Priority 1 (Security Enhancement):
-- TOTP/MFA implementation via miniOrange plugin (`--enable-mfa` flag)
+- TOTP/MFA implementation via miniOrange plugin (enabled by default, `--disable-mfa` to opt out)
 - Plan: `docs/plans/jenkins-totp-mfa.md`
 
 Priority 2 (Production Readiness):

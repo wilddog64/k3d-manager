@@ -70,15 +70,20 @@ controller:
 
 ## Deployment Flag
 
-Add `--enable-mfa` flag to deploy_jenkins:
+MFA enabled by default, with `--disable-mfa` flag to opt out:
 
 ```bash
-./scripts/k3d-manager deploy_jenkins --enable-ldap --enable-vault --enable-mfa
+# Default: MFA enabled
+./scripts/k3d-manager deploy_jenkins --enable-ldap --enable-vault
+
+# Explicitly disable MFA (not recommended)
+./scripts/k3d-manager deploy_jenkins --enable-ldap --enable-vault --disable-mfa
 ```
 
 **Environment Variables:**
 ```bash
-export JENKINS_MFA_ENABLED="${JENKINS_MFA_ENABLED:-0}"
+# MFA enabled by default (1), set to 0 to disable
+export JENKINS_MFA_ENABLED="${JENKINS_MFA_ENABLED:-1}"
 ```
 
 ---
