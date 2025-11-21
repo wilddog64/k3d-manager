@@ -2,13 +2,8 @@
 # This LDIF creates an OpenLDAP structure that mimics Active Directory
 # allowing us to test the Jenkins Active Directory plugin without a real AD
 
-# Base DN (AD-style with uppercase DC)
-dn: DC=corp,DC=example,DC=com
-objectClass: top
-objectClass: dcObject
-objectClass: organization
-o: Corp Example
-dc: corp
+# Note: Base DN (DC=corp,DC=example,DC=com) is created automatically by OpenLDAP
+# from the LDAP_ROOT configuration, so we skip it here to avoid "no global superior knowledge" errors
 
 # Service Accounts OU (AD-style uppercase)
 dn: OU=ServiceAccounts,DC=corp,DC=example,DC=com
