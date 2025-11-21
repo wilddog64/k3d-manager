@@ -8,54 +8,61 @@ k3d-manager is a modular Bash-based utility for managing local Kubernetes develo
 
 **Main entry point:** `./scripts/k3d-manager <function> [args]`
 
-## Current Work in Progress (2025-11-17)
+## Current Work in Progress (2025-11-20)
 
-**Status:** Testing certificate rotation functionality (Priority 1 task)
+**Status:** Core infrastructure complete - Ready for production testing
 
 **Branch:** `ldap-develop`
 
 **What's Complete:**
 - ✅ Active Directory provider implementation (all functions)
 - ✅ Automated tests for AD provider (36 tests, 100% passing)
-- ✅ Documentation updates (CLAUDE.md, testing guides)
-- ✅ Certificate rotation test plan created
+- ✅ Certificate rotation (tested on ARM64, 8/8 test cases passed)
+- ✅ Vault agent sidecar for LDAP password injection
+- ✅ LDIF import error handling improvements
+- ✅ Comprehensive documentation (implementations, testing, guides)
 
-**Current Task:** Certificate Rotation Validation
-- **Location:** `docs/tests/certificate-rotation-validation.md`
-- **Status:** Ready to execute on Ubuntu/k3s
-- **Effort:** ~15 minutes active testing
+**Recent Major Features (Nov 17-20):**
 
-**Test Configuration Created:**
-```bash
-# File: /tmp/cert-rotation-test.env
-export VAULT_PKI_ROLE_TTL="10m"                    # 10-min cert lifetime for testing
-export JENKINS_CERT_ROTATOR_RENEW_BEFORE="300"     # Renew at 5 min remaining
-export JENKINS_CERT_ROTATOR_SCHEDULE="*/2 * * * *" # Check every 2 minutes
-export JENKINS_CERT_ROTATOR_ENABLED="1"
-```
+1. **Certificate Rotation** - Full automation working
+   - Tested: 2025-11-19 on ARM64 k3s
+   - Results: `docs/tests/cert-rotation-test-results-2025-11-19.md`
+   - Status: Production-ready on both ARM64 and AMD64
+   - Fixed: ARM64 compatibility, envsubst issues, Vault auth
 
-**Next Steps (on Ubuntu with k3s):**
-1. Deploy k3s cluster: `CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f`
-2. Load test config: `source /tmp/cert-rotation-test.env`
-3. Deploy Jenkins: `./scripts/k3d-manager deploy_jenkins --enable-vault`
-4. Follow test plan: `docs/tests/certificate-rotation-validation.md`
-5. Document results
+2. **Vault Agent Sidecar** - Runtime credential injection
+   - Implementation: `docs/implementations/vault-sidecar-implementation.md`
+   - Eliminates hardcoded passwords in ConfigMaps
+   - Enables password rotation without redeployment
+   - Status: Tested and working
 
-**Why This Matters:**
-- Certificate rotation code EXISTS but has NEVER been tested
-- Unknown if auto-rotation actually works in production
-- High impact if broken (service outages from expired certs)
-- Must validate before considering AD work "complete"
+3. **LDIF Import Fixes** - Resolved OpenLDAP bootstrap errors
+   - Fixed "no global superior knowledge" errors
+   - Improved error handling for AD schema testing
+   - Status: Committed
 
-**Remaining After This:**
-- End-to-end AD integration test
-- Documentation completion (cert rotation guide, Mac AD setup)
-- Optional: monitoring recommendations, additional tests
+**Next Steps:**
+
+Priority 1 (Production Readiness):
+- End-to-end LDAP authentication testing
+- Production Active Directory integration testing (requires corporate VPN)
+- LDAP auth test failure investigation (test user 'chengkai.liang' - HTTP 401)
+
+Priority 2 (Documentation):
+- Mac AD setup guide
+- Monitoring/alerting recommendations
+- Operational runbooks
+
+Priority 3 (Optional Enhancements):
+- Additional test coverage
+- Performance optimization
+- Multi-environment validation
 
 **Reference Documents:**
-- Test plan: `docs/tests/certificate-rotation-validation.md`
-- Prioritized tasks: `docs/plans/remaining-tasks-priority.md`
-- Recent commits: `cf89579`, `6ab4af1`, `850fa9c`
+- Cert rotation results: `docs/tests/cert-rotation-test-results-2025-11-19.md`
+- Vault sidecar: `docs/implementations/vault-sidecar-implementation.md`
+- AD integration status: `docs/ad-integration-status.md`
+- Recent commits: `bcc0d55`, `d8a7fc1`, `6697087`, `a13dffe`
 
 ## Development Commands
 
