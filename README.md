@@ -117,6 +117,62 @@ To bypass the pre-flight connectivity check:
 
 **Note:** The three directory service modes (`--enable-ldap`, `--enable-ad`, `--enable-ad-prod`) are mutually exclusive. Choose one based on your environment.
 
+## Vault Agent Sidecar for LDAP Credentials
+
+Jenkins uses Vault agent sidecar injection to securely manage LDAP bind credentials at runtime, eliminating hardcoded passwords in ConfigMaps and enabling rotation without redeployment.
+
+### How It Works
+
+When Jenkins is deployed with `--enable-vault`, the Vault agent injector automatically:
+
+1. **Injects an init container** (`vault-agent-init`) that authenticates to Vault using the Jenkins service account
+2. **Fetches LDAP credentials** from Vault's KV store (`secret/data/ldap/openldap-admin`)
+3. **Writes credentials as files** to `/vault/secrets/` in a shared memory volume
+4. **Jenkins reads credentials** using JCasC's `${file:...}` syntax at startup
+
+### Benefits
+
+- **No passwords in ConfigMaps** - Credentials never baked into configuration at deployment time
+- **Easier password rotation** - Update Vault, restart Jenkins pod (no redeployment needed)
+- **Ephemeral storage** - Secrets stored in memory-backed volume, cleared on pod termination
+- **Backup mechanism** - K8s secrets (managed by ESO) remain available as fallback
+
+### Password Rotation Procedure
+
+```bash
+# 1. Update password in Vault
+kubectl exec -n vault vault-0 -- vault kv put secret/ldap/openldap-admin \
+  LDAP_BIND_DN="cn=ldap-admin,dc=home,dc=org" \
+  LDAP_ADMIN_PASSWORD="new-password-here"
+
+# 2. Update LDAP server (if applicable)
+./scripts/k3d-manager deploy_ldap
+
+# 3. Restart Jenkins pod to fetch new credentials
+kubectl delete pod -n jenkins jenkins-0
+```
+
+The new Jenkins pod automatically fetches fresh credentials from Vault via the sidecar.
+
+### Technical Details
+
+**Implementation:** `docs/implementations/vault-sidecar-implementation.md`
+
+**Key Components:**
+- Vault Kubernetes auth role: `jenkins-ldap-reader`
+- Vault policy: Read access to `secret/data/ldap/openldap-admin`
+- Pod annotations: `vault.hashicorp.com/agent-inject: "true"`
+- JCasC configuration: `managerPasswordSecret: '${file:/vault/secrets/ldap-bind-password}'`
+
+**Verification:**
+```bash
+# Check vault-agent-init was injected
+kubectl get pod -n jenkins jenkins-0 -o jsonpath='{.spec.initContainers[*].name}'
+
+# Verify secret files exist
+kubectl exec -n jenkins jenkins-0 -- ls -la /vault/secrets/
+```
+
 ## Using k3s clusters
 
 The helper scripts in this repository now understand a `k3s` provider in addition
@@ -277,6 +333,9 @@ Detailed design documents and architecture guides are available in the `docs/` d
 ### Developer Guides
 - **[CLAUDE.md](CLAUDE.md)** - Project overview and development guidelines for Claude Code
 - **[AGENTS.md](AGENTS.md)** - Code style principles and contribution guidelines
+
+### Implementation Documentation
+- **[Vault Agent Sidecar Implementation](docs/implementations/vault-sidecar-implementation.md)** - LDAP password injection via Vault agent sidecar
 
 ### How-To Guides
 - **[Configuring SSL Trust for jenkins-cli](docs/howto/jenkins-cli-ssl-trust.md)** - Configure Java truststore to validate Vault-issued certificates
