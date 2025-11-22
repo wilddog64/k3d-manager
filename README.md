@@ -320,25 +320,63 @@ The macOS Docker setup uses [Colima](https://github.com/abiosoft/colima). Config
 
 ## Documentation
 
-Detailed design documents and architecture guides are available in the `docs/` directory:
+Detailed design, planning, and troubleshooting references live under `docs/`. Use the categorized list below to navigate directly to the file you need.
 
 ### Architecture
-- **[Configuration-Driven Design](docs/architecture/configuration-driven-design.md)** - Core design principle enabling pluggable providers
+- **[Configuration-Driven Design](docs/architecture/configuration-driven-design.md)** - Core design principle that keeps providers pluggable
+- **[Jenkins Authentication Analysis](docs/architecture/JENKINS_AUTHENTICATION_ANALYSIS.md)** - Survey of supported Jenkins auth backends and trade-offs
 
 ### Planning Documents
-- **[Directory Service Interface](docs/plans/directory-service-interface.md)** - Pluggable authentication (OpenLDAP, Active Directory, Azure AD)
-- **[Active Directory Integration](docs/plans/active-directory-integration.md)** - Enterprise AD authentication implementation plan
-- **[Secret Backend Interface](docs/plans/secret-backend-interface.md)** - Multi-backend secret management (Vault, Azure Key Vault, etc.)
+- **[Directory Service Interface](docs/plans/directory-service-interface.md)** - Shared contract for OpenLDAP, AD, and Azure AD implementations
+- **[Active Directory Integration](docs/plans/active-directory-integration.md)** - Plan for wiring Jenkins to enterprise AD
+- **[Active Directory Testing Strategy](docs/plans/active-directory-testing-strategy.md)** - Test matrix for validating AD scenarios locally
+- **[Explicit Directory Service Commands](docs/plans/explicit-directory-service-commands.md)** - CLI roadmap for directory-focused helpers
+- **[LDAP Integration](docs/plans/ldap-integration.md)** - Tasks required to harden the LDAP stack
+- **[LDAP + Jenkins Integration](docs/plans/ldap-jenkins-integration.md)** - Jenkins-facing LDAP wiring plan
+- **[Jenkins Authentication Analysis](docs/plans/jenkins-authentication-analysis.md)** - Gap assessment to reach production-ready auth
+- **[Jenkins K8s Agents & SMB CSI](docs/plans/jenkins-k8s-agents-and-smb-csi.md)** - Persistent storage + agent topology plan
+- **[Jenkins Security Enhancements](docs/plans/jenkins-security-enhancements.md)** - Follow-up items to raise Jenkins posture
+- **[Jenkins Smoke Test Implementation](docs/plans/jenkins-smoke-test-implementation.md)** - Automated validation coverage proposal
+- **[Jenkins TOTP MFA](docs/plans/jenkins-totp-mfa.md)** - Phased rollout for time-based MFA
+- **[Remaining Tasks Priority](docs/plans/remaining-tasks-priority.md)** - Backlog ordering for near-term milestones
+- **[Secret Backend Interface](docs/plans/secret-backend-interface.md)** - Multi-backend secret management abstraction
+- **[Vault Resilience](docs/plans/vault-resilience.md)** - Hardening plan for Vault HA + recovery paths
 
 ### Developer Guides
 - **[CLAUDE.md](CLAUDE.md)** - Project overview and development guidelines for Claude Code
-- **[AGENTS.md](AGENTS.md)** - Code style principles and contribution guidelines
+- **[AGENTS.md](AGENTS.md)** - Code style principles and contribution guidelines specific to Codex agents
 
 ### Implementation Documentation
 - **[Vault Agent Sidecar Implementation](docs/implementations/vault-sidecar-implementation.md)** - LDAP password injection via Vault agent sidecar
 
 ### How-To Guides
 - **[Configuring SSL Trust for jenkins-cli](docs/howto/jenkins-cli-ssl-trust.md)** - Configure Java truststore to validate Vault-issued certificates
+- **[LDAP Bulk User Import](docs/howto/ldap-bulk-user-import.md)** - Steps for loading fixture users into the directory
+- **[LDAP Password Rotation](docs/howto/ldap-password-rotation.md)** - Manual rotation workflow for bind credentials
+- **[Jenkins K8s Agents Testing](docs/howto/jenkins-k8s-agents-testing.md)** - Smoke tests for dynamically provisioned Jenkins agents
+
+### Examples
+- **[LDAP Users CSV](docs/examples/ldap-users-example.csv)** - Fixture dataset for directory import tests
+
+### Issue Logs
+- **[ESO SecretStore Not Ready](docs/issues/2025-10-19-eso-secretstore-not-ready.md)** - Timeline and fix for ESO readiness
+- **[LDAP Bind DN Mismatch](docs/issues/2025-10-20-ldap-bind-dn-mismatch.md)** - Debug notes on LDAP DN drift
+- **[Jenkins Pod Readiness Timeout](docs/issues/2025-11-07-jenkins-pod-readiness-timeout.md)** - Investigation into slow pod startups
+- **[LDAP Empty Directory (No Users)](docs/issues/2025-11-11-ldap-empty-directory-no-users.md)** - RCA for missing seeded users
+- **[LDAP Password envsubst Issue](docs/issues/2025-11-21-ldap-password-envsubst-issue.md)** - Shell templating bug report
+- **[Cert Rotation Fixes](docs/issues/2025-11-21-cert-rotation-fixes.md)** - Follow-up changes after cert rotation incidents
+
+### Test Guides & Results
+- **[Active Directory Testing Instructions](docs/tests/active-directory-testing-instructions.md)** - End-to-end AD verification steps
+- **[Certificate Rotation Validation](docs/tests/certificate-rotation-validation.md)** - Checklist for TLS rotation drills
+- **[LDAP Password Rotation Test Guide](docs/tests/ldap-password-rotation-test-guide.md)** - Repeatable validation process
+- **[LDAP Password Rotation Test Results 2025-11-21](docs/tests/ldap-password-rotation-test-results-2025-11-21.md)** - Latest rotation outcomes
+- **[LDAP Auth Test Results 2025-11-20](docs/tests/ldap-auth-test-results-2025-11-20.md)** - Current LDAP auth health
+- **[Cert Rotation Test Results 2025-11-17](docs/tests/cert-rotation-test-results-2025-11-17.md)** - Historical TLS rotation run
+- **[Cert Rotation Test Results 2025-11-19](docs/tests/cert-rotation-test-results-2025-11-19.md)** - Follow-up TLS rotation run
+
+### Status Tracking
+- **[AD Integration Status](docs/ad-integration-status.md)** - Rolling status board for AD feature parity
 
 ## Directory layout
 
