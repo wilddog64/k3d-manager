@@ -1740,6 +1740,41 @@ function _deploy_jenkins() {
       fi
    fi
 
+   # Deploy Jenkins agent RBAC and service for Kubernetes pod-based agents
+   _info "[jenkins] Deploying Jenkins agent RBAC and service..."
+   local agent_rbac_template="$JENKINS_CONFIG_DIR/agent-rbac.yaml.tmpl"
+   local agent_service_template="$JENKINS_CONFIG_DIR/agent-service.yaml.tmpl"
+
+   if [[ -r "$agent_rbac_template" ]]; then
+      local agent_rbac_rendered
+      agent_rbac_rendered=$(mktemp -t jenkins-agent-rbac.XXXXXX.yaml)
+      _jenkins_register_rendered_manifest "$agent_rbac_rendered"
+      envsubst < "$agent_rbac_template" > "$agent_rbac_rendered"
+
+      if _kubectl apply -f "$agent_rbac_rendered"; then
+         _info "[jenkins] ✓ Agent RBAC configured"
+      else
+         _warn "[jenkins] Failed to deploy agent RBAC (non-fatal)"
+      fi
+   else
+      _info "[jenkins] Agent RBAC template not found (skipping)"
+   fi
+
+   if [[ -r "$agent_service_template" ]]; then
+      local agent_service_rendered
+      agent_service_rendered=$(mktemp -t jenkins-agent-service.XXXXXX.yaml)
+      _jenkins_register_rendered_manifest "$agent_service_rendered"
+      envsubst < "$agent_service_template" > "$agent_service_rendered"
+
+      if _kubectl apply -f "$agent_service_rendered"; then
+         _info "[jenkins] ✓ Agent service deployed (JNLP port 50000)"
+      else
+         _warn "[jenkins] Failed to deploy agent service (non-fatal)"
+      fi
+   else
+      _info "[jenkins] Agent service template not found (skipping)"
+   fi
+
    local jenkins_host="$vault_pki_leaf_host"
    local secret_namespace="${VAULT_PKI_SECRET_NS:-istio-system}"
    local secret_name="$vault_pki_secret_name"
