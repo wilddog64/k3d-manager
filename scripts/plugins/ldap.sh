@@ -942,12 +942,17 @@ function _ldap_deploy_password_rotator() {
    export LDAP_BASE_DN="${LDAP_BASE_DN}"
    export LDAP_ADMIN_DN="${LDAP_BIND_DN}"
    export LDAP_USER_OU="${LDAP_USER_OU}"
-   export VAULT_ADDR="${VAULT_ADDR:-http://vault.vault.svc:8200}"
+   # Force internal Vault address for rotation job (ignore external VAULT_ADDR from environment)
+   export VAULT_ADDR="http://vault.vault.svc:8200"
    export VAULT_ROOT_TOKEN_SECRET="${VAULT_ROOT_TOKEN_SECRET:-vault-root}"
    export VAULT_ROOT_TOKEN_KEY="${VAULT_ROOT_TOKEN_KEY:-root_token}"
    export USERS_TO_ROTATE="${LDAP_USERS_TO_ROTATE}"
 
-   if envsubst < "$template" | _kubectl apply -f - >/dev/null 2>&1; then
+   # Use envsubst with explicit variable list to avoid substituting shell variables in the script
+   # Only substitute these template variables, leave all other $ alone
+   local envsubst_vars='$LDAP_NAMESPACE $VAULT_NAMESPACE $LDAP_PASSWORD_ROTATOR_IMAGE $LDAP_PASSWORD_ROTATION_SCHEDULE $LDAP_POD_LABEL $LDAP_PORT $LDAP_BASE_DN $LDAP_ADMIN_DN $LDAP_USER_OU $VAULT_ADDR $VAULT_ROOT_TOKEN_SECRET $VAULT_ROOT_TOKEN_KEY $USERS_TO_ROTATE'
+
+   if envsubst "$envsubst_vars" < "$template" | _kubectl apply -f - >/dev/null 2>&1; then
       _info "[ldap] password rotator deployed (schedule: ${LDAP_PASSWORD_ROTATION_SCHEDULE})"
       return 0
    else
