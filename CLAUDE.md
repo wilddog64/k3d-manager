@@ -8,9 +8,9 @@ k3d-manager is a modular Bash-based utility for managing local Kubernetes develo
 
 **Main entry point:** `./scripts/k3d-manager <function> [args]`
 
-## Current Work in Progress (2025-11-20)
+## Current Work in Progress (2025-11-21)
 
-**Status:** Core infrastructure complete - Ready for production testing
+**Status:** Core infrastructure complete - Implementing Jenkins Kubernetes agents
 
 **Branch:** `ldap-develop`
 
@@ -20,57 +20,88 @@ k3d-manager is a modular Bash-based utility for managing local Kubernetes develo
 - ✅ Certificate rotation (tested on ARM64, 8/8 test cases passed)
 - ✅ Vault agent sidecar for LDAP password injection
 - ✅ LDIF import error handling improvements
+- ✅ LDAP password rotation CronJob with SHA256 hashing
+- ✅ LDAP bulk import tool (CSV → LDIF)
+- ✅ Enhanced MFA/Duo Push documentation
 - ✅ Comprehensive documentation (implementations, testing, guides)
 
-**Recent Major Features (Nov 17-20):**
+**Recent Major Features (Nov 21):**
 
-1. **Certificate Rotation** - Full automation working
-   - Tested: 2025-11-19 on ARM64 k3s
-   - Results: `docs/tests/cert-rotation-test-results-2025-11-19.md`
-   - Status: Production-ready on both ARM64 and AMD64
-   - Fixed: ARM64 compatibility, envsubst issues, Vault auth
+1. **LDAP Password Rotation** - Automated password rotation
+   - Implementation: `scripts/etc/ldap/ldap-password-rotator.yaml.tmpl`
+   - SHA256 password hashing for secure logging
+   - Dual updates (LDAP + Vault)
+   - Monthly rotation schedule (configurable)
+   - Password retrieval tool: `bin/get-ldap-password.sh`
+   - Docs: `docs/howto/ldap-password-rotation.md`
+   - Test results: `docs/tests/ldap-password-rotation-test-results-2025-11-21.md`
 
-2. **Vault Agent Sidecar** - Runtime credential injection
-   - Implementation: `docs/implementations/vault-sidecar-implementation.md`
-   - Eliminates hardcoded passwords in ConfigMaps
-   - Enables password rotation without redeployment
-   - Status: Tested and working
+2. **LDAP Bulk Import** - CSV to LDIF conversion and import
+   - Tool: `bin/ldap-bulk-import.sh`
+   - Supports both standard LDAP and AD-compatible schemas
+   - Automatic group creation and membership management
+   - SSHA password hash generation
+   - Direct import into OpenLDAP cluster
+   - Example CSV: `docs/examples/ldap-users-example.csv`
+   - Docs: `docs/howto/ldap-bulk-user-import.md`
 
-3. **LDIF Import Fixes** - Resolved OpenLDAP bootstrap errors
-   - Fixed "no global superior knowledge" errors
-   - Improved error handling for AD schema testing
-   - Status: Committed
+3. **Enhanced MFA Documentation** - Duo Push setup guide
+   - Clarified free vs. premium 2FA methods
+   - Detailed Duo Push configuration for Enterprise users
+   - Cost analysis (miniORange + Duo Security pricing)
+   - Free TOTP alternative with comparison
+   - Vault integration via ExternalSecret
+   - Docs: `docs/plans/jenkins-totp-mfa.md`
+
+**Current Task (Nov 21):**
+
+**Jenkins Kubernetes Agents + SMB CSI** (6-8 hours estimated)
+- Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
+- Linux agent pod template configuration
+- Windows Nano agent support (if available)
+- SMB CSI driver for shared storage
+- Test jobs for validation
 
 **Next Steps:**
 
-Priority 1 (Security Enhancement):
-- TOTP/MFA implementation via miniOrange plugin (enabled by default, `--disable-mfa` to opt out)
+Priority 1 (Infrastructure - IN PROGRESS):
+- ✅ Plan created: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
+- 🔄 Configure Kubernetes plugin for Jenkins agents
+- 🔄 Deploy Linux agent pod template
+- 🔄 Deploy SMB CSI driver (optional)
+- 🔄 Create test jobs for validation
+
+Priority 2 (Security Enhancement):
+- TOTP/MFA implementation via miniOrange plugin (plan complete)
 - Plan: `docs/plans/jenkins-totp-mfa.md`
 
-Priority 2 (Production Readiness):
+Priority 3 (Production Readiness):
 - Production Active Directory integration testing (requires corporate VPN)
+- Jenkins cert rotation operational guide
 
-Priority 3 (Documentation):
+Priority 4 (Documentation):
 - Mac AD setup guide
 - Monitoring/alerting recommendations
 - Operational runbooks
 
-Priority 4 (Optional Enhancements):
-- Additional test coverage
-- Performance optimization
-- Multi-environment validation
-
 **Recently Completed:**
+- ✅ LDAP password rotation CronJob (2025-11-21)
+- ✅ LDAP bulk import tool (2025-11-21)
+- ✅ Enhanced MFA/Duo Push documentation (2025-11-21)
 - ✅ End-to-end LDAP authentication testing (4/4 tests passed)
-- ✅ LDAP auth investigation resolved (password was `test1234`, correct smoke test: `./bin/smoke-test-jenkins.sh jenkins jenkins.dev.local.me 443 ldap`)
+- ✅ Certificate rotation validation (8/8 test cases passed)
 
 **Reference Documents:**
+- K8s agents plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
+- LDAP password rotation: `docs/howto/ldap-password-rotation.md`
+- LDAP bulk import: `docs/howto/ldap-bulk-user-import.md`
+- Password rotation results: `docs/tests/ldap-password-rotation-test-results-2025-11-21.md`
+- TOTP/MFA plan: `docs/plans/jenkins-totp-mfa.md`
 - LDAP auth test results: `docs/tests/ldap-auth-test-results-2025-11-20.md`
 - Cert rotation results: `docs/tests/cert-rotation-test-results-2025-11-19.md`
 - Vault sidecar: `docs/implementations/vault-sidecar-implementation.md`
-- TOTP/MFA plan: `docs/plans/jenkins-totp-mfa.md`
 - AD integration status: `docs/ad-integration-status.md`
-- Recent commits: `908ab8d`, `4ee53fc`, `bcc0d55`, `d8a7fc1`
+- Recent commits: `97ae642`, `7899d64`, `3ea722f`, `3ebd4ed`, `da96dbe`
 
 ## Development Commands
 
