@@ -168,5 +168,84 @@ controller:
                     permissions:
                       - "Overall/Read"
                       - "Overall/Administer"
+      02-kubernetes-agents: |
+        jenkins:
+          clouds:
+            - kubernetes:
+                name: "kubernetes"
+                serverUrl: "https://kubernetes.default"
+                namespace: "${JENKINS_NAMESPACE}"
+                jenkinsUrl: "http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8080"
+                jenkinsTunnel: "jenkins-agent.${JENKINS_NAMESPACE}.svc.cluster.local:50000"
+                containerCapStr: "10"
+                maxRequestsPerHostStr: "32"
+                retentionTimeout: 5
+                connectTimeout: 10
+                readTimeout: 20
+                templates:
+                  - name: "linux-agent"
+                    label: "linux kubectl maven gradle"
+                    nodeUsageMode: "NORMAL"
+                    containers:
+                      - name: "jnlp"
+                        image: "jenkins/inbound-agent:latest-alpine"
+                        alwaysPullImage: false
+                        workingDir: "/home/jenkins/agent"
+                        command: ""
+                        args: ""
+                        ttyEnabled: true
+                        resourceRequestCpu: "500m"
+                        resourceRequestMemory: "512Mi"
+                        resourceLimitCpu: "1000m"
+                        resourceLimitMemory: "1Gi"
+                    yaml: |
+                      apiVersion: v1
+                      kind: Pod
+                      metadata:
+                        labels:
+                          jenkins-agent: "linux"
+                      spec:
+                        serviceAccountName: jenkins-admin
+                        securityContext:
+                          fsGroup: 1000
+                  - name: "kaniko-agent"
+                    label: "kaniko docker-build"
+                    nodeUsageMode: "NORMAL"
+                    containers:
+                      - name: "jnlp"
+                        image: "jenkins/inbound-agent:latest-alpine"
+                        alwaysPullImage: false
+                        workingDir: "/home/jenkins/agent"
+                        command: ""
+                        args: ""
+                        ttyEnabled: true
+                        resourceRequestCpu: "500m"
+                        resourceRequestMemory: "512Mi"
+                        resourceLimitCpu: "1000m"
+                        resourceLimitMemory: "1Gi"
+                      - name: "kaniko"
+                        image: "gcr.io/kaniko-project/executor:debug"
+                        alwaysPullImage: false
+                        workingDir: "/home/jenkins/agent"
+                        command: "/busybox/cat"
+                        ttyEnabled: true
+                        resourceRequestCpu: "500m"
+                        resourceRequestMemory: "1Gi"
+                        resourceLimitCpu: "2000m"
+                        resourceLimitMemory: "2Gi"
+                    volumes:
+                      - emptyDirVolume:
+                          memory: false
+                          mountPath: "/kaniko/.docker"
+                    yaml: |
+                      apiVersion: v1
+                      kind: Pod
+                      metadata:
+                        labels:
+                          jenkins-agent: "kaniko"
+                      spec:
+                        serviceAccountName: jenkins-admin
+                        securityContext:
+                          fsGroup: 1000
   # Optional but keeps env consistent with JCasC Location
   jenkinsUrl: "https://${VAULT_PKI_LEAF_HOST}/"
