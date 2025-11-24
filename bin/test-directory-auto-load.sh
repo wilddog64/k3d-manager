@@ -16,21 +16,21 @@ echo ""
 echo "1. Cleaning up existing LDAP deployment..."
 kubectl delete namespace directory 2>/dev/null || echo "   No existing directory namespace"
 sleep 3
-echo "   ✅ Cleanup complete"
+echo "Cleanup complete"
 echo ""
 
 # Step 2: Deploy LDAP with --enable-vault
 echo "2. Deploying LDAP with Vault integration..."
 ./scripts/k3d-manager deploy_ldap --enable-vault > /tmp/test-directory-deploy.log 2>&1
-echo "   ✅ Deployment complete"
+echo "Deployment complete"
 echo ""
 
 # Step 3: Wait for pod to be ready
 echo "3. Waiting for LDAP pod to be ready..."
 kubectl -n directory wait --for=condition=ready pod -l app.kubernetes.io/name=openldap-bitnami --timeout=120s
 LDAP_POD=$(kubectl -n directory get pod -l app.kubernetes.io/name=openldap-bitnami -o jsonpath='{.items[0].metadata.name}')
-echo "   Pod: $LDAP_POD"
-echo "   ✅ Pod ready"
+echo "Pod: $LDAP_POD"
+echo "Pod ready"
 echo ""
 
 # Step 4: Get admin password (disable tracing to protect credentials)
@@ -50,9 +50,9 @@ ENTRIES=$(kubectl -n directory exec "$LDAP_POD" -- ldapsearch -x -H ldap://127.0
 
 echo "   Total entries found: $ENTRIES"
 if [ "$ENTRIES" -eq 10 ]; then
-  echo "   ✅ Correct number of entries (expected: 10)"
+  echo "Correct number of entries (expected: 10)"
 else
-  echo "   ❌ FAILED: Expected 10 entries, found $ENTRIES"
+  echo "FAILED: Expected 10 entries, found $ENTRIES"
   exit 1
 fi
 echo ""
@@ -66,9 +66,9 @@ for user in chengkai.liang jenkins-admin test-user; do
     -w "$LDAP_PASS" \
     -b "dc=home,dc=org" \
     "(cn=$user)" dn 2>/dev/null | grep -q "^dn: cn=$user"; then
-    echo "   ✅ User found: $user"
+    echo "User found: $user"
   else
-    echo "   ❌ FAILED: User not found: $user"
+    echo "FAILED: User not found: $user"
     exit 1
   fi
 done
@@ -84,9 +84,9 @@ for group in jenkins-admins it-devops developers; do
     -w "$LDAP_PASS" \
     -b "dc=home,dc=org" \
     "(cn=$group)" dn 2>/dev/null | grep -q "^dn: cn=$group"; then
-    echo "   ✅ Group found: $group"
+    echo "Group found: $group"
   else
-    echo "   ❌ FAILED: Group not found: $group"
+    echo "FAILED: Group not found: $group"
     exit 1
   fi
 done
@@ -96,14 +96,14 @@ echo ""
 # Step 8: Verify Vault secret exists
 echo "7. Verifying Vault LDIF secret..."
 if grep -q "seeded Vault LDIF secret/ldap/bootstrap" /tmp/test-directory-deploy.log; then
-  echo "   ✅ Bootstrap LDIF seeded to Vault"
+  echo "Bootstrap LDIF seeded to Vault"
 else
-  echo "   ⚠️  WARNING: Could not verify Vault seeding from logs"
+  echo "WARNING: Could not verify Vault seeding from logs"
 fi
 echo ""
 
 echo "=========================================="
-echo "Test Result: ✅ PASSED"
+echo "Test Result: PASSED"
 echo "=========================================="
 echo ""
 echo "Summary:"
