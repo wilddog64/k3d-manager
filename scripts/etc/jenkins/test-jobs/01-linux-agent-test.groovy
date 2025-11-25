@@ -61,10 +61,10 @@ pipeline {
             sh 'rm -f test-file.txt'
         }
         success {
-            echo '✅ Linux agent test PASSED'
+            echo 'Linux agent test PASSED'
         }
         failure {
-            echo '❌ Linux agent test FAILED'
+            echo 'Linux agent test FAILED'
         }
     }
 }
