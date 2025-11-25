@@ -1775,6 +1775,25 @@ function _deploy_jenkins() {
       _info "[jenkins] Agent service template not found (skipping)"
    fi
 
+   # Deploy Job DSL ConfigMap for automated job creation
+   _info "[jenkins] Deploying Job DSL ConfigMap..."
+   local job_dsl_configmap_template="$JENKINS_CONFIG_DIR/job-dsl-configmap.yaml.tmpl"
+
+   if [[ -r "$job_dsl_configmap_template" ]]; then
+      local job_dsl_configmap_rendered
+      job_dsl_configmap_rendered=$(mktemp -t jenkins-job-dsl-configmap.XXXXXX.yaml)
+      _jenkins_register_rendered_manifest "$job_dsl_configmap_rendered"
+      envsubst < "$job_dsl_configmap_template" > "$job_dsl_configmap_rendered"
+
+      if _kubectl apply -f "$job_dsl_configmap_rendered"; then
+         _info "[jenkins] ✓ Job DSL ConfigMap deployed (seed job will auto-create jobs)"
+      else
+         _warn "[jenkins] Failed to deploy Job DSL ConfigMap (non-fatal)"
+      fi
+   else
+      _info "[jenkins] Job DSL ConfigMap template not found (skipping)"
+   fi
+
    local jenkins_host="$vault_pki_leaf_host"
    local secret_namespace="${VAULT_PKI_SECRET_NS:-istio-system}"
    local secret_name="$vault_pki_secret_name"
