@@ -249,5 +249,61 @@ controller:
                         serviceAccountName: jenkins-admin
                         securityContext:
                           fsGroup: 1000
-  # Optional but keeps env consistent with JCasC Location
-  jenkinsUrl: "https://${VAULT_PKI_LEAF_HOST}/"
+      03-job-dsl-seed: |
+        jobs:
+          - script: >
+              freeStyleProject('seed-job') {
+                displayName('Job DSL Seed Job')
+                description('Master seed job that processes all Job DSL scripts from ConfigMap to create Jenkins jobs automatically')
+
+                steps {
+                  dsl {
+                    external('seed-job.groovy')
+                    removeAction('DISABLE')
+                    removeViewAction('IGNORE')
+                    lookupStrategy('SEED_JOB')
+                    additionalClasspath('/var/jenkins_config/job-dsl')
+                  }
+                }
+
+                triggers {
+                  cron('@daily')
+                }
+
+                logRotator {
+                  numToKeep(10)
+                  daysToKeep(30)
+                }
+              }
+
+  # Volume mounts for Job DSL scripts from ConfigMap
+  additionalExistingSecrets:
+    - name: job-dsl-scripts
+      keyName: dummy
+
+  # Mount Job DSL ConfigMap
+  customInitContainers:
+    - name: copy-job-dsl-scripts
+      image: busybox:latest
+      command:
+        - sh
+        - -c
+        - |
+          mkdir -p /var/jenkins_config/job-dsl/simple
+          cp /tmp/job-dsl/* /var/jenkins_config/job-dsl/ 2>/dev/null || true
+          cp /tmp/job-dsl/simple/* /var/jenkins_config/job-dsl/simple/ 2>/dev/null || true
+          ls -la /var/jenkins_config/job-dsl/
+      volumeMounts:
+        - name: job-dsl-scripts-volume
+          mountPath: /tmp/job-dsl
+        - name: jenkins-home
+          mountPath: /var/jenkins_config
+
+  # Add volume for Job DSL ConfigMap
+  additionalVolumes:
+    - name: job-dsl-scripts-volume
+      configMap:
+        name: jenkins-job-dsl
+
+# Optional but keeps env consistent with JCasC Location
+jenkinsUrl: "https://${VAULT_PKI_LEAF_HOST}/"
