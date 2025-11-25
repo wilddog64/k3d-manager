@@ -3,9 +3,7 @@ controller:
     configAutoReload:
       enabled: true
   podAnnotations:
-    sidecar.istio.io/inject: "true"
-    sidecar.istio.io/rewriteAppHTTPProbers: "true"
-    proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
+    sidecar.istio.io/inject: "false"
     vault.hashicorp.com/agent-inject: "true"
     vault.hashicorp.com/role: "jenkins-ldap-reader"
     vault.hashicorp.com/agent-pre-populate-only: "true"
@@ -175,7 +173,7 @@ controller:
                 name: "kubernetes"
                 serverUrl: "https://kubernetes.default"
                 namespace: "${JENKINS_NAMESPACE}"
-                jenkinsUrl: "http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8080"
+                jenkinsUrl: "http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8081"
                 jenkinsTunnel: "jenkins-agent.${JENKINS_NAMESPACE}.svc.cluster.local:50000"
                 containerCapStr: "10"
                 maxRequestsPerHostStr: "32"
@@ -184,11 +182,11 @@ controller:
                 readTimeout: 20
                 templates:
                   - name: "linux-agent"
-                    label: "linux kubectl maven gradle"
+                    label: "linux-agent"
                     nodeUsageMode: "NORMAL"
                     containers:
                       - name: "jnlp"
-                        image: "jenkins/inbound-agent:latest-alpine"
+                        image: "jenkins/inbound-agent:latest"
                         alwaysPullImage: false
                         workingDir: "/home/jenkins/agent"
                         command: ""
@@ -204,16 +202,18 @@ controller:
                       metadata:
                         labels:
                           jenkins-agent: "linux"
+                        annotations:
+                          sidecar.istio.io/inject: "false"
                       spec:
                         serviceAccountName: jenkins-admin
                         securityContext:
                           fsGroup: 1000
                   - name: "kaniko-agent"
-                    label: "kaniko docker-build"
+                    label: "kaniko-agent"
                     nodeUsageMode: "NORMAL"
                     containers:
                       - name: "jnlp"
-                        image: "jenkins/inbound-agent:latest-alpine"
+                        image: "jenkins/inbound-agent:latest"
                         alwaysPullImage: false
                         workingDir: "/home/jenkins/agent"
                         command: ""
@@ -243,6 +243,8 @@ controller:
                       metadata:
                         labels:
                           jenkins-agent: "kaniko"
+                        annotations:
+                          sidecar.istio.io/inject: "false"
                       spec:
                         serviceAccountName: jenkins-admin
                         securityContext:
