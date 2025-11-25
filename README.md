@@ -335,6 +335,7 @@ Detailed design, planning, and troubleshooting references live under `docs/`. Us
 - **[LDAP + Jenkins Integration](docs/plans/ldap-jenkins-integration.md)** - Jenkins-facing LDAP wiring plan
 - **[Jenkins Authentication Analysis](docs/plans/jenkins-authentication-analysis.md)** - Gap assessment to reach production-ready auth
 - **[Jenkins K8s Agents & SMB CSI](docs/plans/jenkins-k8s-agents-and-smb-csi.md)** - Persistent storage + agent topology plan
+- **[SMB CSI Mac Integration](docs/plans/smb-csi-mac-integration.md)** - SMB CSI driver setup using Mac as SMB server
 - **[Jenkins Security Enhancements](docs/plans/jenkins-security-enhancements.md)** - Follow-up items to raise Jenkins posture
 - **[Jenkins Smoke Test Implementation](docs/plans/jenkins-smoke-test-implementation.md)** - Automated validation coverage proposal
 - **[Jenkins TOTP MFA](docs/plans/jenkins-totp-mfa.md)** - Phased rollout for time-based MFA
