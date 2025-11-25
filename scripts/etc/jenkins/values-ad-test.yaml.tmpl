@@ -136,9 +136,8 @@ controller:
         - sh
         - -c
         - |
-          mkdir -p /var/jenkins_config/job-dsl/simple
           cp /tmp/job-dsl/* /var/jenkins_config/job-dsl/ 2>/dev/null || true
-          cp /tmp/job-dsl/simple/* /var/jenkins_config/job-dsl/simple/ 2>/dev/null || true
+          cp /tmp/job-dsl/* /var/jenkins_config/job-dsl/ 2>/dev/null || true
           ls -la /var/jenkins_config/job-dsl/
       volumeMounts:
         - name: job-dsl-scripts-volume
@@ -352,9 +351,8 @@ controller:
         - sh
         - -c
         - |
-          mkdir -p /var/jenkins_config/job-dsl/simple
           cp /tmp/job-dsl/* /var/jenkins_config/job-dsl/ 2>/dev/null || true
-          cp /tmp/job-dsl/simple/* /var/jenkins_config/job-dsl/simple/ 2>/dev/null || true
+          cp /tmp/job-dsl/* /var/jenkins_config/job-dsl/ 2>/dev/null || true
           ls -la /var/jenkins_config/job-dsl/
       volumeMounts:
         - name: job-dsl-scripts-volume

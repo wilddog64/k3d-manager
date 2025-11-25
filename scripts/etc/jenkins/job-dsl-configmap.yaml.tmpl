@@ -22,8 +22,8 @@ data:
     // Process all DSL scripts in the job-dsl directory
     // The ConfigMap will be mounted at /var/jenkins_config/job-dsl/
     def dslScripts = [
-        'simple/01-linux-agent-test.groovy',
-        'simple/02-kaniko-agent-test.groovy'
+        'simple-01-linux-agent-test.groovy',
+        'simple-02-kaniko-agent-test.groovy'
     ]
 
     dslScripts.each { scriptPath ->
@@ -39,7 +39,7 @@ data:
     println "Seed job completed successfully"
 
   # Simple job DSL scripts
-  simple/01-linux-agent-test.groovy: |
+  simple-01-linux-agent-test.groovy: |
     // Job DSL script for linux-agent test job
     // This job validates that Kubernetes linux-agent pods can be provisioned and execute basic commands
 
@@ -135,7 +135,7 @@ data:
         }
     }
 
-  simple/02-kaniko-agent-test.groovy: |
+  simple-02-kaniko-agent-test.groovy: |
     // Job DSL script for kaniko-agent test job
     // This job validates that Kubernetes kaniko-agent pods can build container images without Docker daemon
 
