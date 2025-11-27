@@ -1345,6 +1345,7 @@ EOF
             ;;
          --enable-vault)
             enable_vault=1
+            ldap_args+=("$1")
             shift
             ;;
          --namespace)
@@ -1424,7 +1425,7 @@ EOF
    _info "[ad] this is for testing AD schema structure, not production AD"
 
    # Auto-configure AD schema environment variables
-   export LDAP_LDIF_FILE="${SCRIPT_DIR}/scripts/etc/ldap/bootstrap-ad-schema.ldif"
+   export LDAP_LDIF_FILE="${SCRIPT_DIR}/etc/ldap/bootstrap-ad-schema.ldif"
    export LDAP_BASE_DN="DC=corp,DC=example,DC=com"
    export LDAP_BINDDN="cn=admin,DC=corp,DC=example,DC=com"
    export LDAP_DOMAIN="corp.example.com"
