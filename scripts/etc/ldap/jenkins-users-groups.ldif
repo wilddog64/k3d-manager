@@ -1,0 +1,71 @@
+# Jenkins Users and Groups Bootstrap LDIF
+# This file creates users and groups for Jenkins LDAP authentication
+
+# Create jenkins-admins group
+dn: cn=jenkins-admins,ou=groups,dc=home,dc=org
+objectClass: groupOfNames
+cn: jenkins-admins
+description: Jenkins Administrators - Full access to all Jenkins features
+member: cn=admin,ou=users,dc=home,dc=org
+
+# Create jenkins-developers group
+dn: cn=jenkins-developers,ou=groups,dc=home,dc=org
+objectClass: groupOfNames
+cn: jenkins-developers
+description: Jenkins Developers - Can create, delete, and manage pipelines
+member: cn=developer,ou=users,dc=home,dc=org
+
+# Create jenkins-testers group
+dn: cn=jenkins-testers,ou=groups,dc=home,dc=org
+objectClass: groupOfNames
+cn: jenkins-testers
+description: Jenkins Testers - Can only execute pipelines
+member: cn=tester,ou=users,dc=home,dc=org
+
+# Create admin user
+dn: cn=admin,ou=users,dc=home,dc=org
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+cn: admin
+sn: Administrator
+uid: admin
+uidNumber: 10001
+gidNumber: 10001
+homeDirectory: /home/admin
+loginShell: /bin/bash
+userPassword: {SSHA}admin123
+mail: admin@home.org
+displayName: Jenkins Administrator
+
+# Create developer user
+dn: cn=developer,ou=users,dc=home,dc=org
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+cn: developer
+sn: Developer
+uid: developer
+uidNumber: 10002
+gidNumber: 10002
+homeDirectory: /home/developer
+loginShell: /bin/bash
+userPassword: {SSHA}dev123
+mail: developer@home.org
+displayName: Jenkins Developer
+
+# Create tester user
+dn: cn=tester,ou=users,dc=home,dc=org
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: shadowAccount
+cn: tester
+sn: Tester
+uid: tester
+uidNumber: 10003
+gidNumber: 10003
+homeDirectory: /home/tester
+loginShell: /bin/bash
+userPassword: {SSHA}test123
+mail: tester@home.org
+displayName: Jenkins Tester

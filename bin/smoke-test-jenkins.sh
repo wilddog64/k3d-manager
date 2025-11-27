@@ -14,6 +14,14 @@ set -euo pipefail
 #   ./smoke-test-jenkins.sh jenkins jenkins.dev.local.me 443 ldap  # LDAP auth
 #   AD_TEST_USER=john.doe AD_TEST_PASS=secret ./smoke-test-jenkins.sh jenkins jenkins.example.com 443 ad
 
+# Source vault plugin for _vault_exec helper
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -f "${SCRIPT_DIR}/../scripts/plugins/vault.sh" ]]; then
+  # Source system.sh first for _kubectl helper
+  source "${SCRIPT_DIR}/../scripts/lib/system.sh" 2>/dev/null || true
+  source "${SCRIPT_DIR}/../scripts/plugins/vault.sh" 2>/dev/null || true
+fi
+
 # Parameters
 NAMESPACE="${1:-jenkins}"
 HOST="${2:-jenkins.dev.local.me}"
@@ -366,7 +374,7 @@ test_login_ldap() {
   # AD users: alice, bob, jenkins-svc (from bootstrap-ad-schema.ldif)
   local test_user test_pass directory_type
   test_user=""
-  test_pass="test1234"  # Default password for all test users
+  test_pass=""
   directory_type=""
 
   # First try basic LDAP users (using cn attribute)
@@ -413,6 +421,36 @@ test_login_ldap() {
   fi
 
   log_info "Detected directory type: $directory_type"
+
+  # Retrieve password from Vault for basic LDAP users
+  # (AD users use the default "test1234" password from LDIF)
+  if [[ "$directory_type" == "basic LDAP" ]]; then
+    verbose "Retrieving password from Vault for user: $test_user"
+    local vault_path="ldap/users/${test_user}"
+
+    # Check if _vault_exec is available
+    if type _vault_exec &>/dev/null; then
+      # Use _vault_exec helper function
+      test_pass=$(_vault_exec --no-exit vault kv get -field=password "secret/$vault_path" 2>/dev/null) || test_pass=""
+    else
+      # Fallback: try direct kubectl exec (less reliable)
+      verbose "Warning: _vault_exec not available, using fallback method"
+      test_pass=$(kubectl exec -n vault vault-0 -- sh -c \
+        'vault kv get -field=password "secret/'"$vault_path"'"' 2>/dev/null) || test_pass=""
+    fi
+
+    if [[ -z "$test_pass" ]]; then
+      log_skip "Unable to retrieve password from Vault for user: $test_user"
+      verbose "Vault path: secret/$vault_path"
+      verbose "This may indicate Vault is not configured or user password not set"
+      return 0
+    fi
+    verbose "Successfully retrieved password from Vault"
+  else
+    # AD users use the default password from LDIF
+    test_pass="test1234"
+  fi
+
   log_info "Testing authentication with user: $test_user"
 
   # Test Jenkins login with LDAP credentials

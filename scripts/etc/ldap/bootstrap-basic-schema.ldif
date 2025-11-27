@@ -46,7 +46,7 @@ uidNumber: 10001
 gidNumber: 10000
 homeDirectory: /home/chengkai.liang
 mail: chengkai.liang@home.org
-userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g1gLQy
+userPassword: {SSHA}Fvoa1XMaBL4y9QP0E6KcYYQUO901vjJg
 
 # User 2: jenkins-admin (Service Account)
 dn: cn=jenkins-admin,ou=users,dc=home,dc=org
@@ -62,7 +62,7 @@ uidNumber: 10002
 gidNumber: 10000
 homeDirectory: /home/jenkins-admin
 mail: jenkins-admin@home.org
-userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g1gLQy
+userPassword: {SSHA}Fvoa1XMaBL4y9QP0E6KcYYQUO901vjJg
 
 # User 3: test-user (Regular User)
 dn: cn=test-user,ou=users,dc=home,dc=org
@@ -78,7 +78,7 @@ uidNumber: 10003
 gidNumber: 10000
 homeDirectory: /home/test-user
 mail: test-user@home.org
-userPassword: {SSHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g1gLQy
+userPassword: {SSHA}Fvoa1XMaBL4y9QP0E6KcYYQUO901vjJg
 
 # Groups
 # Group 1: jenkins-admins (Jenkins Administrators)
