@@ -117,6 +117,15 @@ To bypass the pre-flight connectivity check:
 
 **Note:** The three directory service modes (`--enable-ldap`, `--enable-ad`, `--enable-ad-prod`) are mutually exclusive. Choose one based on your environment.
 
+### Automated Job Creation with Job DSL
+
+Jenkins deployments include an automatic seed job that pulls Job DSL scripts from a GitHub repository. The seed job:
+- Automatically creates and updates Jenkins jobs from code
+- Polls your repository every 15 minutes for changes
+- Processes all `.groovy` files in the `jobs/` directory structure
+
+For setup instructions and examples, see **[Jenkins Job DSL Setup Guide](docs/jenkins-job-dsl-setup.md)**.
+
 ## Vault Agent Sidecar for LDAP Credentials
 
 Jenkins uses Vault agent sidecar injection to securely manage LDAP bind credentials at runtime, eliminating hardcoded passwords in ConfigMaps and enabling rotation without redeployment.
