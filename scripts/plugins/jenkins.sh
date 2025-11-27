@@ -1432,10 +1432,28 @@ function _deploy_jenkins() {
       _info "[jenkins] using default template (no directory service): values.yaml"
    fi
 
-   # NOTE: LDAP bind password is now provided via Vault agent sidecar
-   # The password is injected as files at runtime: /vault/secrets/ldap-bind-password
-   # K8s secret jenkins-ldap-config still exists as a backup mechanism managed by ESO
-   # No need to export password as environment variable (security improvement)
+   # Export LDAP credentials from Kubernetes secret for envsubst template processing
+   # The jenkins-ldap-config secret is created by ESO from Vault
+   # We need to read it and export as env vars for envsubst to work
+   if [[ "$auth_mode" == "standard-ldap" || "$auth_mode" == "ad-prod" || "$auth_mode" == "ad-test" ]]; then
+      _info "[jenkins] retrieving LDAP credentials from Kubernetes secret for template processing"
+      # Check if secret exists
+      if _kubectl --no-exit get secret jenkins-ldap-config -n jenkins >/dev/null 2>&1; then
+         # Export credentials for envsubst
+         export LDAP_BASE_DN
+         export LDAP_BIND_DN
+         export LDAP_BIND_PASSWORD
+         LDAP_BASE_DN=$(_kubectl get secret jenkins-ldap-config -n jenkins -o jsonpath='{.data.LDAP_BASE_DN}' 2>/dev/null | base64 -d)
+         LDAP_BIND_DN=$(_kubectl get secret jenkins-ldap-config -n jenkins -o jsonpath='{.data.LDAP_BIND_DN}' 2>/dev/null | base64 -d)
+         LDAP_BIND_PASSWORD=$(_kubectl get secret jenkins-ldap-config -n jenkins -o jsonpath='{.data.LDAP_BIND_PASSWORD}' 2>/dev/null | base64 -d)
+
+         if [[ -z "$LDAP_BIND_PASSWORD" ]]; then
+            _warn "[jenkins] LDAP_BIND_PASSWORD is empty in jenkins-ldap-config secret"
+         fi
+      else
+         _warn "[jenkins] jenkins-ldap-config secret not found, LDAP variables will be empty"
+      fi
+   fi
 
    # Process template with envsubst if it's a .tmpl file
    local values_file
@@ -1760,20 +1778,10 @@ function _deploy_jenkins() {
       _info "[jenkins] Agent RBAC template not found (skipping)"
    fi
 
-   if [[ -r "$agent_service_template" ]]; then
-      local agent_service_rendered
-      agent_service_rendered=$(mktemp -t jenkins-agent-service.XXXXXX.yaml)
-      _jenkins_register_rendered_manifest "$agent_service_rendered"
-      envsubst < "$agent_service_template" > "$agent_service_rendered"
-
-      if _kubectl apply -f "$agent_service_rendered"; then
-         _info "[jenkins] ✓ Agent service deployed (JNLP port 50000)"
-      else
-         _warn "[jenkins] Failed to deploy agent service (non-fatal)"
-      fi
-   else
-      _info "[jenkins] Agent service template not found (skipping)"
-   fi
+   # NOTE: Agent service is now automatically created by Helm chart when JCasC
+   # Kubernetes cloud configuration is present. Manual deployment removed to avoid conflicts.
+   # The Helm chart creates: jenkins-agent service on port 50000 (JNLP)
+   _info "[jenkins] Agent service will be created automatically by Helm chart"
 
    # Deploy Job DSL ConfigMap for automated job creation
    _info "[jenkins] Deploying Job DSL ConfigMap..."

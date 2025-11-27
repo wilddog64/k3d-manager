@@ -9,14 +9,14 @@ folder('Tests') {
 }
 
 // Process all DSL scripts in the job-dsl directory
-// The ConfigMap will be mounted at /var/jenkins_config/job-dsl/
+// The ConfigMap is mounted directly at /var/jenkins_dsl
 def dslScripts = [
     'simple-01-linux-agent-test.groovy',
     'simple-02-kaniko-agent-test.groovy'
 ]
 
 dslScripts.each { scriptName ->
-    def scriptFile = new File("/var/jenkins_config/job-dsl/${scriptName}")
+    def scriptFile = new File("/var/jenkins_dsl/${scriptName}")
     if (scriptFile.exists()) {
         println "Processing DSL script: ${scriptName}"
         evaluate(scriptFile.text)

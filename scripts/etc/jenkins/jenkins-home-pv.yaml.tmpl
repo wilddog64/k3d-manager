@@ -7,39 +7,14 @@ reclaimPolicy: Retain
 volumeBindingMode: WaitForFirstConsumer
 ---
 apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: jenkins-home-pv
-spec:
-  storageClassName: local-path-retain        # <-- match the PVC
-  persistentVolumeReclaimPolicy: Retain
-  capacity:
-    storage: 50Gi
-  accessModes: ["ReadWriteOnce"]
-  volumeMode: Filesystem
-  hostPath:
-    path: "${JENKINS_HOME_IN_CLUSTER:-/data/jenkins}"
-    type: DirectoryOrCreate
-  # (optional) pin to a node:
-  # nodeAffinity:
-  #   required:
-  #     nodeSelectorTerms:
-  #     - matchExpressions:
-  #       - key: kubernetes.io/hostname
-  #         operator: In
-  #         values: ["k3s-automation"]
----
-apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: jenkins-home
   namespace: jenkins
 spec:
   storageClassName: local-path-retain
-  volumeName: jenkins-home-pv                # <-- binds to that PV
   accessModes: ["ReadWriteOnce"]
   volumeMode: Filesystem
   resources:
     requests:
       storage: 50Gi
-
