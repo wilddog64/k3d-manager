@@ -95,69 +95,7 @@ controller:
 
   podSecurityContext:
     fsGroup: 1000
-
-      03-job-dsl-seed: |
-        jobs:
-          - script: >
-              freeStyleProject('seed-job') {
-                displayName('Job DSL Seed Job')
-                description('Master seed job that processes all Job DSL scripts from ConfigMap to create Jenkins jobs automatically')
-
-                steps {
-                  dsl {
-                    external('seed-job.groovy')
-                    removeAction('DISABLE')
-                    removeViewAction('IGNORE')
-                    lookupStrategy('SEED_JOB')
-                    additionalClasspath('/var/jenkins_config/job-dsl')
-                  }
-                }
-
-                triggers {
-                  cron('@daily')
-                }
-
-                logRotator {
-                  numToKeep(10)
-                  daysToKeep(30)
-                }
-              }
-
-  # Volume mounts for Job DSL scripts from ConfigMap
-  additionalExistingSecrets:
-    - name: job-dsl-scripts
-      keyName: dummy
-
-  # Mount Job DSL ConfigMap
-  customInitContainers:
-    - name: copy-job-dsl-scripts
-      image: busybox:latest
-      command:
-        - sh
-        - -c
-        - |
-          cp /tmp/job-dsl/* /var/jenkins_config/job-dsl/ 2>/dev/null || true
-          cp /tmp/job-dsl/* /var/jenkins_config/job-dsl/ 2>/dev/null || true
-          ls -la /var/jenkins_config/job-dsl/
-      volumeMounts:
-        - name: job-dsl-scripts-volume
-          mountPath: /tmp/job-dsl
-        - name: jenkins-home
-          mountPath: /var/jenkins_config
-
-  # Add volume for Job DSL ConfigMap
-  additionalVolumes:
-    - name: job-dsl-scripts-volume
-      configMap:
-        name: jenkins-job-dsl
-
-
-# Optional but keeps env consistent with JCasC Location
     runAsUser: 1000
-
-  persistence:
-    enabled: true
-    existingClaim: jenkins-home
 
   serviceType: ClusterIP
   servicePort: 8081
@@ -208,8 +146,8 @@ controller:
                   rootDN: "${LDAP_BASE_DN}"
                   groupSearchBase: "${LDAP_GROUP_SEARCH_BASE}"
                   userSearchBase: "${LDAP_USER_SEARCH_BASE}"
-                  managerDN: "$${file:/vault/secrets/ldap-bind-dn}"
-                  managerPasswordSecret: "$${file:/vault/secrets/ldap-bind-password}"
+                  managerDN: "${LDAP_BIND_DN}"
+                  managerPasswordSecret: "${LDAP_BIND_PASSWORD}"
                   inhibitInferRootDN: false
                   displayNameAttributeName: "cn"
                   mailAddressAttributeName: "mail"
@@ -324,7 +262,7 @@ controller:
                     removeAction('DISABLE')
                     removeViewAction('IGNORE')
                     lookupStrategy('SEED_JOB')
-                    additionalClasspath('/var/jenkins_config/job-dsl')
+                    additionalClasspath('/var/jenkins_home/job-dsl')
                   }
                 }
 
@@ -338,34 +276,34 @@ controller:
                 }
               }
 
-  # Volume mounts for Job DSL scripts from ConfigMap
-  additionalExistingSecrets:
-    - name: job-dsl-scripts
-      keyName: dummy
-
-  # Mount Job DSL ConfigMap
+  # Mount Job DSL ConfigMap via init container
   customInitContainers:
     - name: copy-job-dsl-scripts
       image: busybox:latest
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
       command:
         - sh
         - -c
         - |
-          cp /tmp/job-dsl/* /var/jenkins_config/job-dsl/ 2>/dev/null || true
-          cp /tmp/job-dsl/* /var/jenkins_config/job-dsl/ 2>/dev/null || true
-          ls -la /var/jenkins_config/job-dsl/
+          mkdir -p /var/jenkins_home/job-dsl
+          cp /tmp/job-dsl/* /var/jenkins_home/job-dsl/ 2>/dev/null || true
+          ls -la /var/jenkins_home/job-dsl/
       volumeMounts:
         - name: job-dsl-scripts-volume
           mountPath: /tmp/job-dsl
         - name: jenkins-home
-          mountPath: /var/jenkins_config
+          mountPath: /var/jenkins_home
 
-  # Add volume for Job DSL ConfigMap
-  additionalVolumes:
+  # Optional but keeps env consistent with JCasC Location
+  jenkinsUrl: "https://${VAULT_PKI_LEAF_HOST}/"
+
+# Persistence configuration (root level, not under controller)
+persistence:
+  enabled: true
+  existingClaim: jenkins-home
+  volumes:
     - name: job-dsl-scripts-volume
       configMap:
         name: jenkins-job-dsl
-
-
-# Optional but keeps env consistent with JCasC Location
-  jenkinsUrl: "https://${VAULT_PKI_LEAF_HOST}/"
