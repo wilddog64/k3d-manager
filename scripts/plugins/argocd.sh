@@ -101,9 +101,64 @@ EOF
       _info "[argocd] Existing release found; will upgrade"
    fi
 
-   # Phase 1 implementation: Basic deployment placeholder
-   _info "[argocd] Phase 1: Core Argo CD deployment"
-   _warn "[argocd] Implementation in progress - basic scaffold created"
+   # Determine if we should skip Helm repo operations
+   local skip_repo_ops=0
+   case "$ARGOCD_HELM_CHART_REF" in
+      /*|./*|../*|file://*)
+         skip_repo_ops=1
+         ;;
+   esac
+   case "$ARGOCD_HELM_REPO_URL" in
+      ""|/*|./*|../*|file://*)
+         skip_repo_ops=1
+         ;;
+   esac
+
+   # Add Helm repository if not using local chart
+   if (( ! skip_repo_ops )); then
+      _info "[argocd] Adding Helm repository: $ARGOCD_HELM_REPO_NAME"
+      _helm repo add "$ARGOCD_HELM_REPO_NAME" "$ARGOCD_HELM_REPO_URL"
+      _helm repo update >/dev/null 2>&1
+   fi
+
+   # Prepare basic Helm values
+   _info "[argocd] Installing Argo CD via Helm"
+   local -a helm_args=(
+      --create-namespace
+      --set "server.insecure=true"
+      --set "server.service.type=ClusterIP"
+   )
+
+   # Add version if specified
+   if [[ -n "${ARGOCD_HELM_CHART_VERSION:-}" ]]; then
+      helm_args+=(--version "$ARGOCD_HELM_CHART_VERSION")
+   fi
+
+   # Install or upgrade Argo CD
+   _helm upgrade --install \
+      -n "$ARGOCD_NAMESPACE" \
+      "$ARGOCD_HELM_RELEASE" \
+      "$ARGOCD_HELM_CHART_REF" \
+      "${helm_args[@]}"
+
+   # Wait for server deployment to be ready
+   _info "[argocd] Waiting for Argo CD server to be ready..."
+   if ! _kubectl -n "$ARGOCD_NAMESPACE" wait --for=condition=available --timeout=180s deployment/argocd-server 2>/dev/null; then
+      _warn "[argocd] Timeout waiting for argocd-server deployment; check status manually"
+   fi
+
+   # Wait for other core deployments
+   if ! _kubectl -n "$ARGOCD_NAMESPACE" wait --for=condition=available --timeout=120s deployment/argocd-repo-server 2>/dev/null; then
+      _warn "[argocd] Timeout waiting for argocd-repo-server deployment"
+   fi
+
+   _info "[argocd] Argo CD deployed successfully"
+   _info "[argocd] Namespace: $ARGOCD_NAMESPACE"
+   _info "[argocd] Server: argocd-server.$ARGOCD_NAMESPACE.svc.cluster.local"
+
+   # TODO: LDAP/Dex integration (enable_ldap=$enable_ldap)
+   # TODO: Vault/ESO integration (enable_vault=$enable_vault)
+   # TODO: Istio VirtualService (skip_istio=$skip_istio)
 
    return 0
 }
