@@ -121,17 +121,29 @@ EOF
       _helm repo update >/dev/null 2>&1
    fi
 
-   # Prepare basic Helm values
+   # Prepare Helm values
    _info "[argocd] Installing Argo CD via Helm"
    local -a helm_args=(
       --create-namespace
-      --set "server.insecure=true"
-      --set "server.service.type=ClusterIP"
    )
 
    # Add version if specified
    if [[ -n "${ARGOCD_HELM_CHART_VERSION:-}" ]]; then
       helm_args+=(--version "$ARGOCD_HELM_CHART_VERSION")
+   fi
+
+   # Use values template if LDAP is enabled, otherwise use basic settings
+   local values_file=""
+   if (( enable_ldap )); then
+      _info "[argocd] Configuring LDAP/Dex authentication"
+      values_file="/tmp/argocd-values-${RANDOM}.yaml"
+      envsubst < "$ARGOCD_CONFIG_DIR/values.yaml.tmpl" > "$values_file"
+      helm_args+=(--values "$values_file")
+   else
+      helm_args+=(
+         --set "server.insecure=true"
+         --set "server.service.type=ClusterIP"
+      )
    fi
 
    # Install or upgrade Argo CD
@@ -140,6 +152,11 @@ EOF
       "$ARGOCD_HELM_RELEASE" \
       "$ARGOCD_HELM_CHART_REF" \
       "${helm_args[@]}"
+
+   # Clean up temporary values file
+   if [[ -n "$values_file" && -f "$values_file" ]]; then
+      rm -f "$values_file"
+   fi
 
    # Wait for server deployment to be ready
    _info "[argocd] Waiting for Argo CD server to be ready..."
@@ -156,9 +173,47 @@ EOF
    _info "[argocd] Namespace: $ARGOCD_NAMESPACE"
    _info "[argocd] Server: argocd-server.$ARGOCD_NAMESPACE.svc.cluster.local"
 
-   # TODO: LDAP/Dex integration (enable_ldap=$enable_ldap)
-   # TODO: Vault/ESO integration (enable_vault=$enable_vault)
-   # TODO: Istio VirtualService (skip_istio=$skip_istio)
+   # Configure Vault/ESO integration for credentials
+   if (( enable_vault )); then
+      _info "[argocd] Configuring Vault/ESO integration"
+
+      # Deploy LDAP bind password secret if LDAP is enabled
+      if (( enable_ldap )); then
+         _info "[argocd] Creating LDAP bind password ExternalSecret"
+         envsubst < "$ARGOCD_CONFIG_DIR/externalsecret-ldap.yaml.tmpl" | _kubectl apply -f - >/dev/null
+
+         # Wait for LDAP secret to sync
+         if ! _kubectl -n "$ARGOCD_NAMESPACE" wait --for=condition=Ready --timeout=60s externalsecret/"$ARGOCD_LDAP_SECRET_NAME" 2>/dev/null; then
+            _warn "[argocd] Timeout waiting for LDAP ExternalSecret; check ESO status"
+         fi
+      fi
+
+      # Deploy admin credentials secret
+      _info "[argocd] Creating admin credentials ExternalSecret"
+      envsubst < "$ARGOCD_CONFIG_DIR/externalsecret-admin.yaml.tmpl" | _kubectl apply -f - >/dev/null
+
+      # Wait for admin secret to sync
+      if ! _kubectl -n "$ARGOCD_NAMESPACE" wait --for=condition=Ready --timeout=60s externalsecret/"$ARGOCD_ADMIN_SECRET_NAME" 2>/dev/null; then
+         _warn "[argocd] Timeout waiting for admin ExternalSecret; check ESO status"
+      fi
+
+      _info "[argocd] Vault/ESO integration configured"
+   fi
+
+   # Deploy Istio VirtualService for UI access
+   if (( ! skip_istio )); then
+      _info "[argocd] Creating Istio VirtualService"
+      envsubst < "$ARGOCD_CONFIG_DIR/virtualservice.yaml.tmpl" | _kubectl apply -f - >/dev/null
+      _info "[argocd] Argo CD UI accessible at: https://$ARGOCD_VIRTUALSERVICE_HOST"
+   fi
+
+   # Print next steps
+   _info "[argocd] Deployment complete!"
+   if (( enable_vault )); then
+      _info "[argocd] Retrieve admin password: kubectl -n $ARGOCD_NAMESPACE get secret $ARGOCD_ADMIN_SECRET_NAME -o jsonpath='{.data.password}' | base64 -d"
+   else
+      _info "[argocd] Retrieve initial admin password: kubectl -n $ARGOCD_NAMESPACE get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d"
+   fi
 
    return 0
 }
