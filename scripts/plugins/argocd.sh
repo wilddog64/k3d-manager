@@ -137,7 +137,9 @@ EOF
    if (( enable_ldap )); then
       _info "[argocd] Configuring LDAP/Dex authentication"
       values_file="/tmp/argocd-values-${RANDOM}.yaml"
-      envsubst < "$ARGOCD_CONFIG_DIR/values.yaml.tmpl" > "$values_file"
+      # Use envsubst with variable whitelist to preserve $dex references in Dex config
+      envsubst '$ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_USER_SEARCH_FILTER $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_LDAP_GROUP_SEARCH_FILTER $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS' \
+         < "$ARGOCD_CONFIG_DIR/values.yaml.tmpl" > "$values_file"
       helm_args+=(--values "$values_file")
    else
       helm_args+=(

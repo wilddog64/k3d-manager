@@ -43,7 +43,7 @@ configs:
   rbac:
     policy.default: ${ARGOCD_RBAC_DEFAULT_POLICY}
     policy.csv: |
-      g, ${ARGOCD_RBAC_ADMIN_GROUP}, role:admin
+      g,${ARGOCD_RBAC_ADMIN_GROUP},role:admin
 
 server:
   replicas: ${ARGOCD_SERVER_REPLICAS}
