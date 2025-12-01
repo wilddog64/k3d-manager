@@ -18,6 +18,8 @@ CACERTS_PASSWORD="${CACERTS_PASSWORD:-$DEFAULT_CACERTS_PASSWORD}"
 CACERTS_ALIAS="${CACERTS_ALIAS:-$DEFAULT_CACERTS_ALIAS}"
 QUIET="${QUIET:-0}"
 DRY_RUN="${DRY_RUN:-0}"
+EXPORT_ONLY="${EXPORT_ONLY:-0}"
+EXPORT_PATH="${EXPORT_PATH:-}"
 
 # Show usage
 usage() {
@@ -33,6 +35,7 @@ OPTIONS:
   -k, --pki-path PATH      Vault PKI mount path (default: $DEFAULT_VAULT_PKI_PATH)
   -a, --alias ALIAS        Certificate alias in truststore (default: $DEFAULT_CACERTS_ALIAS)
   -w, --password PASS      Java cacerts password (default: $DEFAULT_CACERTS_PASSWORD)
+  -e, --export [PATH]      Export certificate only (default: ./vault-ca.crt)
   -d, --dry-run            Preview operations without making changes
   -q, --quiet              Suppress informational output
   -v, --verbose            Enable verbose output
@@ -47,6 +50,8 @@ ENVIRONMENT VARIABLES:
   CACERTS_ALIAS            Certificate alias
   QUIET                    Suppress informational output (0 or 1)
   DRY_RUN                  Preview mode (0 or 1)
+  EXPORT_ONLY              Export certificate only (0 or 1)
+  EXPORT_PATH              Path to export certificate
 
 EXAMPLES:
   # Use defaults
@@ -66,6 +71,12 @@ EXAMPLES:
 
   # Custom PKI path and alias
   $(basename "$0") -k pki_int -a my-vault-ca
+
+  # Export certificate only (default path: ./vault-ca.crt)
+  $(basename "$0") --export
+
+  # Export certificate to custom path
+  $(basename "$0") --export /tmp/my-ca.crt
 
 EOF
   exit 0
@@ -99,6 +110,16 @@ parse_args() {
       -w|--password)
         CACERTS_PASSWORD="$2"
         shift 2
+        ;;
+      -e|--export)
+        EXPORT_ONLY=1
+        if [[ $# -gt 1 ]] && [[ ! "$2" =~ ^- ]]; then
+          EXPORT_PATH="$2"
+          shift 2
+        else
+          EXPORT_PATH="./vault-ca.crt"
+          shift
+        fi
         ;;
       -d|--dry-run)
         DRY_RUN=1
@@ -145,7 +166,9 @@ TEMP_CERT="/tmp/vault-ca-$$.crt"
 
 # Cleanup function
 cleanup() {
-  rm -f "$TEMP_CERT"
+  if [[ "$EXPORT_ONLY" != "1" ]]; then
+    rm -f "$TEMP_CERT"
+  fi
 }
 trap cleanup EXIT
 
@@ -180,12 +203,14 @@ validate_prerequisites() {
     missing_deps+=("kubectl")
   fi
 
-  if ! command_exists java; then
-    missing_deps+=("java")
-  fi
+  if [[ "$EXPORT_ONLY" != "1" ]]; then
+    if ! command_exists java; then
+      missing_deps+=("java")
+    fi
 
-  if ! command_exists keytool; then
-    missing_deps+=("keytool")
+    if ! command_exists keytool; then
+      missing_deps+=("keytool")
+    fi
   fi
 
   if [ ${#missing_deps[@]} -gt 0 ]; then
@@ -294,6 +319,36 @@ extract_vault_ca() {
   return 0
 }
 
+# Export certificate to file
+export_certificate() {
+  local export_file="$1"
+
+  log_info "Exporting certificate to: $export_file"
+
+  if [[ "$DRY_RUN" == "1" ]]; then
+    log_info "[DRY RUN] Would export certificate to: $export_file"
+    return 0
+  fi
+
+  if ! cp "$TEMP_CERT" "$export_file"; then
+    log_error "Failed to export certificate to: $export_file"
+    return 1
+  fi
+
+  chmod 644 "$export_file"
+  log_success "Certificate exported to: $export_file"
+
+  # Show certificate details
+  if [[ "$QUIET" != "1" ]]; then
+    echo
+    log_info "Certificate details:"
+    openssl x509 -in "$export_file" -text -noout 2>/dev/null | grep -E "(Subject:|Issuer:|Not Before|Not After)" || \
+      keytool -printcert -file "$export_file" 2>/dev/null | grep -E "(Owner|Issuer|Valid)" || true
+  fi
+
+  return 0
+}
+
 # Check if certificate already exists in truststore
 check_cert_exists() {
   local cacerts_path="$1"
@@ -395,12 +450,20 @@ main() {
   parse_args "$@"
 
   echo "=================================================="
-  echo "Jenkins CLI SSL Trust Setup"
+  if [[ "$EXPORT_ONLY" == "1" ]]; then
+    echo "Vault CA Certificate Export"
+  else
+    echo "Jenkins CLI SSL Trust Setup"
+  fi
   echo "=================================================="
   echo "Vault Namespace: $VAULT_NAMESPACE"
   echo "Vault Pod:       $VAULT_POD"
   echo "PKI Path:        $VAULT_PKI_PATH"
-  echo "Cert Alias:      $CACERTS_ALIAS"
+  if [[ "$EXPORT_ONLY" == "1" ]]; then
+    echo "Export Path:     $EXPORT_PATH"
+  else
+    echo "Cert Alias:      $CACERTS_ALIAS"
+  fi
   if [[ "$DRY_RUN" == "1" ]]; then
     echo -e "${YELLOW}DRY RUN MODE - No changes will be made${NC}"
   fi
@@ -417,6 +480,32 @@ main() {
     return 1
   fi
 
+  # Extract Vault CA certificate
+  if ! extract_vault_ca; then
+    return 1
+  fi
+
+  # Export mode - just export the certificate and exit
+  if [[ "$EXPORT_ONLY" == "1" ]]; then
+    if ! export_certificate "$EXPORT_PATH"; then
+      return 1
+    fi
+
+    echo
+    echo "=================================================="
+    log_success "Certificate export complete!"
+    echo "=================================================="
+    echo
+    echo "Certificate saved to: $EXPORT_PATH"
+    echo
+    echo "You can use this certificate to:"
+    echo "  - Configure system trust stores"
+    echo "  - Add to browser certificate stores"
+    echo "  - Import into other Java keystores"
+    echo "  - Use with curl: curl --cacert $EXPORT_PATH https://..."
+    return 0
+  fi
+
   # Check Jenkins deployment (warning only, not fatal)
   check_jenkins_deployment || true
 
@@ -429,11 +518,6 @@ main() {
   # Get cacerts path
   local cacerts_path
   if ! cacerts_path=$(get_cacerts_path "$java_home"); then
-    return 1
-  fi
-
-  # Extract Vault CA certificate
-  if ! extract_vault_ca; then
     return 1
   fi
 
