@@ -449,21 +449,50 @@ main() {
   # Parse command-line arguments
   parse_args "$@"
 
-  echo "=================================================="
+  # Export mode - delegate to unified setup-vault-ca.sh script
   if [[ "$EXPORT_ONLY" == "1" ]]; then
-    echo "Vault CA Certificate Export"
-  else
-    echo "Jenkins CLI SSL Trust Setup"
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local vault_ca_script="$script_dir/setup-vault-ca.sh"
+
+    if [[ ! -f "$vault_ca_script" ]]; then
+      log_error "Unified script not found: $vault_ca_script"
+      log_error "Falling back to built-in export functionality"
+    else
+      # Build arguments for unified script
+      local unified_args=("--service" "jenkins")
+
+      if [[ -n "$VAULT_NAMESPACE" ]]; then
+        unified_args+=("--namespace" "$VAULT_NAMESPACE")
+      fi
+      if [[ -n "$VAULT_POD" ]]; then
+        unified_args+=("--pod" "$VAULT_POD")
+      fi
+      if [[ -n "$VAULT_PKI_PATH" ]]; then
+        unified_args+=("--pki-path" "$VAULT_PKI_PATH")
+      fi
+      if [[ -n "$EXPORT_PATH" ]]; then
+        unified_args+=("--output" "$EXPORT_PATH")
+      fi
+      if [[ "$DRY_RUN" == "1" ]]; then
+        unified_args+=("--dry-run")
+      fi
+      if [[ "$QUIET" == "1" ]]; then
+        unified_args+=("--quiet")
+      fi
+
+      # Call unified script
+      exec "$vault_ca_script" "${unified_args[@]}"
+    fi
   fi
+
+  # Java truststore import mode
+  echo "=================================================="
+  echo "Jenkins CLI SSL Trust Setup"
   echo "=================================================="
   echo "Vault Namespace: $VAULT_NAMESPACE"
   echo "Vault Pod:       $VAULT_POD"
   echo "PKI Path:        $VAULT_PKI_PATH"
-  if [[ "$EXPORT_ONLY" == "1" ]]; then
-    echo "Export Path:     $EXPORT_PATH"
-  else
-    echo "Cert Alias:      $CACERTS_ALIAS"
-  fi
+  echo "Cert Alias:      $CACERTS_ALIAS"
   if [[ "$DRY_RUN" == "1" ]]; then
     echo -e "${YELLOW}DRY RUN MODE - No changes will be made${NC}"
   fi
@@ -483,27 +512,6 @@ main() {
   # Extract Vault CA certificate
   if ! extract_vault_ca; then
     return 1
-  fi
-
-  # Export mode - just export the certificate and exit
-  if [[ "$EXPORT_ONLY" == "1" ]]; then
-    if ! export_certificate "$EXPORT_PATH"; then
-      return 1
-    fi
-
-    echo
-    echo "=================================================="
-    log_success "Certificate export complete!"
-    echo "=================================================="
-    echo
-    echo "Certificate saved to: $EXPORT_PATH"
-    echo
-    echo "You can use this certificate to:"
-    echo "  - Configure system trust stores"
-    echo "  - Add to browser certificate stores"
-    echo "  - Import into other Java keystores"
-    echo "  - Use with curl: curl --cacert $EXPORT_PATH https://..."
-    return 0
   fi
 
   # Check Jenkins deployment (warning only, not fatal)

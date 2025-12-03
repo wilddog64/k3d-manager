@@ -137,8 +137,8 @@ EOF
    if (( enable_ldap )); then
       _info "[argocd] Configuring LDAP/Dex authentication"
       values_file="/tmp/argocd-values-${RANDOM}.yaml"
-      # Use envsubst with variable whitelist to preserve $dex references in Dex config
-      envsubst '$ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_USER_SEARCH_FILTER $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_LDAP_GROUP_SEARCH_FILTER $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS' \
+      # Use envsubst with variable whitelist to preserve $dex references and LDAP filter placeholders
+      envsubst '$ARGOCD_VIRTUALSERVICE_HOST $ARGOCD_SERVER_INSECURE $ARGOCD_LDAP_HOST $ARGOCD_LDAP_PORT $ARGOCD_LDAP_BIND_DN $ARGOCD_LDAP_USER_SEARCH_BASE $ARGOCD_LDAP_BASE_DN $ARGOCD_LDAP_GROUP_SEARCH_BASE $ARGOCD_RBAC_DEFAULT_POLICY $ARGOCD_RBAC_ADMIN_GROUP $ARGOCD_SERVER_REPLICAS $ARGOCD_REPO_SERVER_REPLICAS $ARGOCD_APPLICATIONSET_REPLICAS' \
          < "$ARGOCD_CONFIG_DIR/values.yaml.tmpl" > "$values_file"
       helm_args+=(--values "$values_file")
    else
@@ -149,11 +149,21 @@ EOF
    fi
 
    # Install or upgrade Argo CD
-   _helm upgrade --install \
-      -n "$ARGOCD_NAMESPACE" \
-      "$ARGOCD_HELM_RELEASE" \
-      "$ARGOCD_HELM_CHART_REF" \
-      "${helm_args[@]}"
+   # Use --reset-values for upgrades to avoid conflicts with previous installation
+   if (( release_exists )); then
+      _info "[argocd] Upgrading existing release with new configuration"
+      _helm upgrade --install --reset-values \
+         -n "$ARGOCD_NAMESPACE" \
+         "$ARGOCD_HELM_RELEASE" \
+         "$ARGOCD_HELM_CHART_REF" \
+         "${helm_args[@]}"
+   else
+      _helm upgrade --install \
+         -n "$ARGOCD_NAMESPACE" \
+         "$ARGOCD_HELM_RELEASE" \
+         "$ARGOCD_HELM_CHART_REF" \
+         "${helm_args[@]}"
+   fi
 
    # Clean up temporary values file
    if [[ -n "$values_file" && -f "$values_file" ]]; then

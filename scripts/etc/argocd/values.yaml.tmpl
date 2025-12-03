@@ -26,7 +26,7 @@ configs:
 
             userSearch:
               baseDN: ${ARGOCD_LDAP_USER_SEARCH_BASE},${ARGOCD_LDAP_BASE_DN}
-              filter: ${ARGOCD_LDAP_USER_SEARCH_FILTER}
+              filter: "(cn={0})"
               username: cn
               idAttr: cn
               emailAttr: mail
@@ -34,7 +34,7 @@ configs:
 
             groupSearch:
               baseDN: ${ARGOCD_LDAP_GROUP_SEARCH_BASE},${ARGOCD_LDAP_BASE_DN}
-              filter: ${ARGOCD_LDAP_GROUP_SEARCH_FILTER}
+              filter: "(|(memberUid={1})(member={0})(uniqueMember={0}))"
               userMatchers:
                 - userAttr: DN
                   groupAttr: member
@@ -43,7 +43,7 @@ configs:
   rbac:
     policy.default: ${ARGOCD_RBAC_DEFAULT_POLICY}
     policy.csv: |
-      g,${ARGOCD_RBAC_ADMIN_GROUP},role:admin
+      g, "${ARGOCD_RBAC_ADMIN_GROUP}", role:admin
 
 server:
   replicas: ${ARGOCD_SERVER_REPLICAS}
