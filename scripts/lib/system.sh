@@ -11,8 +11,15 @@ function _command_exist() {
 #
 # Returns the command's real exit code; prints a helpful error unless --quiet.
 function _run_command() {
-  local quiet=0 prefer_sudo=0 require_sudo=0 probe= soft=0
+  local quiet=0 prefer_sudo=0 require_sudo=0 interactive_sudo=0 probe= soft=0
   local -a probe_args=()
+
+  # Auto-detect interactive mode: use interactive sudo if in a TTY and not explicitly disabled
+  # Can be overridden with K3DMGR_NONINTERACTIVE=1 environment variable
+  local auto_interactive=0
+  if [[ -t 0 ]] && [[ "${K3DMGR_NONINTERACTIVE:-0}" != "1" ]]; then
+    auto_interactive=1
+  fi
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -20,11 +27,17 @@ function _run_command() {
       --quiet)        quiet=1; shift;;
       --prefer-sudo)  prefer_sudo=1; shift;;
       --require-sudo) require_sudo=1; shift;;
+      --interactive-sudo) interactive_sudo=1; prefer_sudo=1; shift;;
       --probe)        probe="$2"; shift 2;;
       --)             shift; break;;
       *)              break;;
     esac
   done
+
+  # If --prefer-sudo is set and we're in auto-interactive mode, enable interactive sudo
+  if (( prefer_sudo )) && (( auto_interactive )) && (( interactive_sudo == 0 )); then
+    interactive_sudo=1
+  fi
 
   local prog="${1:?usage: _run_command [opts] -- <prog> [args...]}"
   shift
@@ -42,29 +55,40 @@ function _run_command() {
     read -r -a probe_args <<< "$probe"
   fi
 
-  # Decide runner: user vs sudo -n
+  # Decide runner: user vs sudo -n vs sudo (interactive)
   local runner
+  local sudo_flags=()
+  if (( interactive_sudo == 0 )); then
+    sudo_flags=(-n)  # Non-interactive sudo
+  fi
+
   if (( require_sudo )); then
-    if sudo -n true >/dev/null 2>&1; then
-      runner=(sudo -n "$prog")
+    if (( interactive_sudo )) || sudo -n true >/dev/null 2>&1; then
+      runner=(sudo "${sudo_flags[@]}" "$prog")
     else
       (( quiet )) || echo "sudo non-interactive not available" >&2
       exit 127
     fi
   else
     if (( ${#probe_args[@]} )); then
-      # Try user first; if probe fails, try sudo -n
+      # Try user first; if probe fails, try sudo
       if "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
         runner=("$prog")
+      elif (( interactive_sudo )) && sudo "${sudo_flags[@]}" "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
+        runner=(sudo "${sudo_flags[@]}" "$prog")
       elif sudo -n "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
         runner=(sudo -n "$prog")
+      elif (( prefer_sudo )) && ((interactive_sudo)) ; then
+        runner=(sudo "${sudo_flags[@]}" "$prog")
       elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
         runner=(sudo -n "$prog")
       else
         runner=("$prog")
       fi
     else
-      if (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
+      if (( prefer_sudo )) && (( interactive_sudo )); then
+        runner=(sudo "${sudo_flags[@]}" "$prog")
+      elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
         runner=(sudo -n "$prog")
       else
         runner=("$prog")

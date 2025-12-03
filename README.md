@@ -220,6 +220,36 @@ same workflow non-interactively in CI.
   `/var/lib/rancher/k3s/storage` and for the embedded containerd runtime under
   `/var/lib/rancher/k3s/agent/containerd/`.
 
+### Ingress Port Forwarding (k3s only)
+
+The k3s provider automatically sets up ingress port forwarding during `deploy_cluster` to expose services on standard HTTPS port 443. This forwards external traffic to the Istio IngressGateway NodePort, enabling multiple services (Jenkins, ArgoCD, etc.) to share port 443 via SNI-based routing.
+
+**Note:** The script auto-detects k3s when installed, so `CLUSTER_PROVIDER=k3s` is optional (only needed if both k3d and k3s are installed).
+
+**Automatic Setup:**
+```bash
+./scripts/k3d-manager deploy_cluster
+# Automatically configures systemd service: k3s-ingress-forward (k3s only)
+```
+
+**Manual Management:**
+```bash
+# Setup/update ingress forwarding
+./scripts/k3d-manager setup_ingress_forward
+
+# Check status
+./scripts/k3d-manager status_ingress_forward
+
+# Remove forwarding
+./scripts/k3d-manager remove_ingress_forward
+```
+
+**Lifecycle Management:**
+- Ingress forwarding is automatically cleaned up when destroying the cluster
+- The systemd service is stopped, disabled, and removed during `destroy_cluster`
+
+The forwarding uses `socat` to forward port 443 to the Istio IngressGateway NodePort. Istio handles SNI-based routing to different services based on hostname. For detailed architecture and troubleshooting, see **[Ingress Port Forwarding Documentation](docs/architecture/ingress-port-forwarding.md)**.
+
 ### Required environment for Jenkins and CLI integrations
 
 The Jenkins plugin and the shell helpers discover non-k3d clusters through a few
