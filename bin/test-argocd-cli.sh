@@ -24,7 +24,7 @@ echo -e "${GREEN}=== Testing Argo CD CLI ===${NC}\n"
 
 # Get LDAP credentials
 echo -e "${YELLOW}1. Getting LDAP credentials...${NC}"
-LDAP_PASS=$(kubectl -n directory get secret openldap-env -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' 2>/dev/null | base64 -d)
+LDAP_PASS=$(kubectl -n directory get secret openldap-admin -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' 2>/dev/null | base64 -d)
 if [[ -z "$LDAP_PASS" ]]; then
     echo -e "${RED}Error: Could not retrieve LDAP password${NC}"
     exit 1
