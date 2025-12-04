@@ -390,6 +390,7 @@ Detailed design, planning, and troubleshooting references live under `docs/`. Us
 - **[Vault Agent Sidecar Implementation](docs/implementations/vault-sidecar-implementation.md)** - LDAP password injection via Vault agent sidecar
 
 ### How-To Guides
+- **[Argo CD Setup Guide](docs/argocd-setup.md)** - Complete deployment guide for Argo CD with LDAP/Vault integration
 - **[Configuring SSL Trust for jenkins-cli](docs/howto/jenkins-cli-ssl-trust.md)** - Configure Java truststore to validate Vault-issued certificates
 - **[LDAP Bulk User Import](docs/howto/ldap-bulk-user-import.md)** - Steps for loading fixture users into the directory
 - **[LDAP Password Rotation](docs/howto/ldap-password-rotation.md)** - Manual rotation workflow for bind credentials

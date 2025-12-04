@@ -16,6 +16,13 @@ if [[ -r "$ESO_PLUGIN" ]]; then
    source "$ESO_PLUGIN"
 fi
 
+# Load Vault configuration variables for VAULT_ENDPOINT
+VAULT_VARS_FILE="$SCRIPT_DIR/etc/vault/vars.sh"
+if [[ -r "$VAULT_VARS_FILE" ]]; then
+   # shellcheck disable=SC1090
+   source "$VAULT_VARS_FILE"
+fi
+
 # Load Argo CD configuration variables
 ARGOCD_CONFIG_DIR="$SCRIPT_DIR/etc/argocd"
 ARGOCD_VARS_FILE="$ARGOCD_CONFIG_DIR/vars.sh"
@@ -189,6 +196,14 @@ EOF
    if (( enable_vault )); then
       _info "[argocd] Configuring Vault/ESO integration"
 
+      # Setup Vault policies and SecretStore first
+      _info "[argocd] Creating SecretStore and ServiceAccount"
+      _argocd_setup_vault_policies
+      envsubst < "$ARGOCD_CONFIG_DIR/secretstore.yaml.tmpl" | _kubectl apply -f - >/dev/null
+
+      # Wait for SecretStore to be ready
+      sleep 2
+
       # Deploy LDAP bind password secret if LDAP is enabled
       if (( enable_ldap )); then
          _info "[argocd] Creating LDAP bind password ExternalSecret"
@@ -243,4 +258,44 @@ function _argocd_check_dependencies() {
    fi
 
    return 0
+}
+
+function _argocd_setup_vault_policies() {
+   local ns="${VAULT_NS_DEFAULT:-vault}"
+   local release="${VAULT_RELEASE_DEFAULT:-vault}"
+   local pod="${release}-0"
+   local eso_sa="${ARGOCD_ESO_SERVICE_ACCOUNT}"
+   local eso_ns="${ARGOCD_NAMESPACE}"
+   local policy_name="${ARGOCD_ESO_ROLE}"
+
+   # Check if policy already exists
+   if _vault_policy_exists "$ns" "$release" "$policy_name"; then
+      _info "[argocd] Vault policy '$policy_name' already exists, skipping setup"
+      return 0
+   fi
+
+   _info "[argocd] Creating Vault policy and Kubernetes role for ESO"
+   _vault_login "$ns" "$release"
+
+   # Create policy for ArgoCD ESO access
+   cat <<'HCL' | _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+     vault policy write "${ARGOCD_ESO_ROLE}" -
+     # ArgoCD ESO policy - read LDAP admin credentials and ArgoCD admin password
+     path "secret/data/ldap/*"      { capabilities = ["read"] }
+     path "secret/metadata/ldap"    { capabilities = ["list"] }
+     path "secret/metadata/ldap/*"  { capabilities = ["read","list"] }
+     path "secret/data/argocd/*"    { capabilities = ["read"] }
+     path "secret/metadata/argocd"  { capabilities = ["list"] }
+     path "secret/metadata/argocd/*" { capabilities = ["read","list"] }
+HCL
+
+   # Map ArgoCD ESO service account to the policy
+   _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+     vault write "auth/kubernetes/role/${policy_name}" \
+       "bound_service_account_names=${eso_sa}" \
+       "bound_service_account_namespaces=${eso_ns}" \
+       "policies=${policy_name}" \
+       ttl=1h
+
+   _info "[argocd] Vault policy and Kubernetes role created successfully"
 }
