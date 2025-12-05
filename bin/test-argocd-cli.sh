@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # bin/test-argocd-cli.sh
 # Test script for Argo CD CLI functionality with LDAP authentication
+#
+# This script runs tests in-cluster to avoid kubectl port-forward issues.
+# See docs/argocd-cli-port-forward-issue.md for details.
 
 set -e
 
@@ -10,20 +13,20 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Ensure argocd is in PATH
-export PATH="$HOME/bin:$PATH"
-
-# Check if argocd CLI is installed
-if ! command -v argocd &> /dev/null; then
-    echo -e "${RED}Error: argocd CLI not found${NC}"
-    echo "Please run: curl -sSL -o ~/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-arm64 && chmod +x ~/bin/argocd"
-    exit 1
-fi
-
 echo -e "${GREEN}=== Testing Argo CD CLI ===${NC}\n"
 
-# Get LDAP credentials
-echo -e "${YELLOW}1. Getting LDAP credentials...${NC}"
+# Get credentials
+echo -e "${YELLOW}1. Getting credentials...${NC}"
+
+# Get Argo CD admin password
+ADMIN_PASS=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' 2>/dev/null | base64 -d)
+if [[ -z "$ADMIN_PASS" ]]; then
+    echo -e "${RED}Error: Could not retrieve Argo CD admin password${NC}"
+    exit 1
+fi
+echo -e "${GREEN}   ✓ Retrieved Argo CD admin password${NC}"
+
+# Get LDAP password (for LDAP users like alice)
 LDAP_PASS=$(kubectl -n directory get secret openldap-admin -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' 2>/dev/null | base64 -d)
 if [[ -z "$LDAP_PASS" ]]; then
     echo -e "${RED}Error: Could not retrieve LDAP password${NC}"
@@ -31,32 +34,29 @@ if [[ -z "$LDAP_PASS" ]]; then
 fi
 echo -e "${GREEN}   ✓ Retrieved LDAP password${NC}\n"
 
-# Start port-forward
-echo -e "${YELLOW}2. Starting port-forward to Argo CD server...${NC}"
-kubectl port-forward svc/argocd-server -n argocd 8080:443 >/dev/null 2>&1 &
-PF_PID=$!
-sleep 3
-echo -e "${GREEN}   ✓ Port-forward active (PID: $PF_PID)${NC}\n"
+# Create test script as ConfigMap
+echo -e "${YELLOW}2. Creating in-cluster test script...${NC}"
+cat <<'EOF_SCRIPT' | kubectl create configmap argocd-cli-test-script -n argocd --from-file=test.sh=/dev/stdin --dry-run=client -o yaml | kubectl apply -f -
+#!/bin/bash
+set -e
 
-# Cleanup function
-cleanup() {
-    echo -e "\n${YELLOW}Cleaning up...${NC}"
-    if [[ -n "$PF_PID" ]]; then
-        kill $PF_PID 2>/dev/null || true
-        echo -e "${GREEN}   ✓ Stopped port-forward${NC}"
-    fi
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
-    # Delete test app if it exists
-    argocd app delete guestbook --yes 2>/dev/null || true
-}
-trap cleanup EXIT
+ARGOCD_SERVER="argocd-server.argocd.svc.cluster.local:80"
 
 # Login as admin
 echo -e "${YELLOW}3. Logging in as admin user...${NC}"
-if argocd login localhost:8080 --insecure --username admin --password "$LDAP_PASS" 2>&1 | grep -q "Logged in"; then
+echo "Server: $ARGOCD_SERVER"
+echo "Attempting login..."
+yes | argocd login "$ARGOCD_SERVER" --insecure --username admin --password "$ADMIN_PASS" 2>&1 | tee /tmp/login-output.txt
+if grep -qi "logged in successfully" /tmp/login-output.txt; then
     echo -e "${GREEN}   ✓ Successfully logged in as admin${NC}\n"
 else
-    echo -e "${RED}   ✗ Login failed${NC}\n"
+    echo -e "${RED}   ✗ Login failed. Output above.${NC}\n"
     exit 1
 fi
 
@@ -87,15 +87,47 @@ echo -e "${GREEN}   ✓ Found $APP_COUNT applications${NC}\n"
 
 # Create test application
 echo -e "${YELLOW}7. Creating test application (guestbook)...${NC}"
-if argocd app create guestbook \
+# Delete if exists
+argocd app delete guestbook --yes 2>/dev/null || true
+sleep 2
+
+# Try creating with validation first (normal behavior)
+argocd app create guestbook \
   --repo https://github.com/argoproj/argocd-example-apps.git \
   --path guestbook \
   --dest-server https://kubernetes.default.svc \
   --dest-namespace default \
-  --sync-policy none 2>&1 | grep -q "application.*created"; then
-    echo -e "${GREEN}   ✓ Application created${NC}\n"
+  --sync-policy none 2>&1 | tee /tmp/create-output.txt
+CREATE_EXIT=$?
+
+if [[ $CREATE_EXIT -eq 0 ]] && grep -qi "application.*created" /tmp/create-output.txt; then
+    echo -e "${GREEN}   ✓ Application created (with validation)${NC}\n"
+elif grep -qi "timeout\|network\|dial\|dns" /tmp/create-output.txt; then
+    # Network issue - try without validation
+    echo -e "${YELLOW}   ⚠ Repository validation timed out (network issue)${NC}"
+    echo "   Retrying without validation..."
+    argocd app create guestbook \
+      --repo https://github.com/argoproj/argocd-example-apps.git \
+      --path guestbook \
+      --dest-server https://kubernetes.default.svc \
+      --dest-namespace default \
+      --sync-policy none \
+      --validate=false 2>&1 | tee /tmp/create-output2.txt
+
+    if grep -qi "application.*created" /tmp/create-output2.txt; then
+        echo -e "${GREEN}   ✓ Application created (without validation)${NC}\n"
+    else
+        echo -e "${RED}   ✗ Failed to create application${NC}"
+        cat /tmp/create-output2.txt | sed 's/^/     /'
+        echo ""
+        exit 1
+    fi
 else
-    echo -e "${YELLOW}   ⚠ Application may already exist${NC}\n"
+    echo -e "${RED}   ✗ Failed to create application${NC}"
+    echo "   Error details:"
+    cat /tmp/create-output.txt | sed 's/^/     /'
+    echo ""
+    exit 1
 fi
 
 # Get app status
@@ -127,7 +159,7 @@ echo -e "${GREEN}   ✓ RBAC check complete${NC}\n"
 
 # Test readonly user (alice)
 echo -e "${YELLOW}12. Testing readonly user (alice)...${NC}"
-if argocd login localhost:8080 --insecure --username alice --password "$LDAP_PASS" 2>&1 | grep -q "Logged in"; then
+if yes | argocd login "$ARGOCD_SERVER" --insecure --username alice --password "$LDAP_PASS" 2>&1 | grep -qi "logged in successfully"; then
     echo -e "${GREEN}   ✓ Alice logged in successfully${NC}"
 
     # Alice should be able to list apps
@@ -149,7 +181,7 @@ if argocd login localhost:8080 --insecure --username alice --password "$LDAP_PAS
     fi
 
     # Login back as admin for cleanup
-    argocd login localhost:8080 --insecure --username admin --password "$LDAP_PASS" >/dev/null 2>&1
+    yes | argocd login "$ARGOCD_SERVER" --insecure --username admin --password "$ADMIN_PASS" >/dev/null 2>&1
 else
     echo -e "${YELLOW}   ⚠ Could not test alice user${NC}\n"
 fi
@@ -173,8 +205,89 @@ echo "  • LDAP authentication: ✓"
 echo "  • Cluster connectivity: ✓"
 echo "  • Application management: ✓"
 echo "  • RBAC controls: ✓"
+EOF_SCRIPT
+
+echo -e "${GREEN}   ✓ Test script created${NC}\n"
+
+# Create and run test pod
+echo -e "${YELLOW}3. Deploying test pod in cluster...${NC}"
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: argocd-cli-test
+  namespace: argocd
+spec:
+  restartPolicy: Never
+  serviceAccountName: default
+  containers:
+  - name: test
+    image: argoproj/argocd:latest
+    command:
+    - /bin/bash
+    - /test-script/test.sh
+    env:
+    - name: ADMIN_PASS
+      value: "$ADMIN_PASS"
+    - name: LDAP_PASS
+      value: "$LDAP_PASS"
+    volumeMounts:
+    - name: test-script
+      mountPath: /test-script
+  volumes:
+  - name: test-script
+    configMap:
+      name: argocd-cli-test-script
+      defaultMode: 0755
+EOF
+
+echo -e "${GREEN}   ✓ Test pod deployed${NC}\n"
+
+# Wait for pod to start pulling image
+echo -e "${YELLOW}4. Waiting for test pod to start...${NC}"
+sleep 5
+
+# Stream logs (will wait for container to start)
+echo -e "${YELLOW}5. Running tests (streaming output)...${NC}\n"
+kubectl logs -f argocd-cli-test -n argocd 2>&1 || echo "(Pod may have completed before log streaming started)"
+
+# Wait for pod to complete
 echo ""
-echo "To access Argo CD UI, run:"
-echo "  kubectl port-forward svc/argocd-server -n argocd 8081:80 &"
-echo "  Open: http://localhost:8081"
-echo "  Login: admin / <LDAP password>"
+echo -e "${YELLOW}6. Waiting for test completion...${NC}"
+for i in {1..60}; do
+    POD_PHASE=$(kubectl get pod argocd-cli-test -n argocd -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
+    if [[ "$POD_PHASE" == "Succeeded" || "$POD_PHASE" == "Failed" || "$POD_PHASE" == "NotFound" ]]; then
+        echo "   Pod phase: $POD_PHASE"
+        break
+    fi
+    sleep 2
+done
+
+# Get final logs if we missed them
+kubectl logs argocd-cli-test -n argocd 2>/dev/null || true
+
+# Check exit code
+echo ""
+echo -e "${YELLOW}7. Checking test results...${NC}"
+
+POD_STATUS=$(kubectl get pod argocd-cli-test -n argocd -o jsonpath='{.status.phase}' 2>/dev/null)
+EXIT_CODE=$(kubectl get pod argocd-cli-test -n argocd -o jsonpath='{.status.containerStatuses[0].state.terminated.exitCode}' 2>/dev/null)
+
+echo -e "   Pod status: ${POD_STATUS}"
+echo -e "   Exit code: ${EXIT_CODE}"
+
+# Cleanup
+echo ""
+echo -e "${YELLOW}8. Cleaning up...${NC}"
+kubectl delete pod argocd-cli-test -n argocd --wait=false 2>/dev/null || true
+kubectl delete configmap argocd-cli-test-script -n argocd 2>/dev/null || true
+echo -e "${GREEN}   ✓ Cleanup complete${NC}\n"
+
+# Final result
+if [[ "$EXIT_CODE" == "0" ]]; then
+    echo -e "${GREEN}=== All Tests Passed ===${NC}\n"
+    exit 0
+else
+    echo -e "${RED}=== Tests Failed ===${NC}\n"
+    exit 1
+fi
