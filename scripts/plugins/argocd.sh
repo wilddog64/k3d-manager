@@ -51,10 +51,13 @@ Usage: deploy_argocd [options]
 Deploy Argo CD GitOps platform with LDAP authentication and Istio ingress.
 
 Options:
-   --enable-ldap       Enable LDAP authentication via Dex
-   --enable-vault      Enable Vault integration for admin credentials
-   --skip-istio        Skip Istio VirtualService creation
-   -h, --help          Show this help message
+   --enable-ldap            Enable LDAP authentication via Dex
+   --enable-vault           Enable Vault integration for admin credentials
+   --skip-istio             Skip Istio VirtualService creation
+   --bootstrap              Deploy AppProjects and ApplicationSets for GitOps
+   --skip-applicationsets   Skip ApplicationSet deployment (requires --bootstrap)
+   --skip-appproject        Skip AppProject deployment (requires --bootstrap)
+   -h, --help               Show this help message
 
 Environment Variables:
    ARGOCD_NAMESPACE              Namespace for Argo CD (default: argocd)
@@ -68,6 +71,12 @@ Examples:
    # With LDAP and Vault integration
    ./scripts/k3d-manager deploy_argocd --enable-ldap --enable-vault
 
+   # With GitOps bootstrap (AppProjects + ApplicationSets)
+   ./scripts/k3d-manager deploy_argocd --enable-ldap --enable-vault --bootstrap
+
+   # Bootstrap with only AppProject (no ApplicationSets)
+   ./scripts/k3d-manager deploy_argocd --bootstrap --skip-applicationsets
+
 EOF
       return 0
    fi
@@ -75,6 +84,9 @@ EOF
    local enable_ldap=0
    local enable_vault=0
    local skip_istio=0
+   local enable_bootstrap=0
+   local skip_applicationsets=0
+   local skip_appproject=0
 
    while [[ $# -gt 0 ]]; do
       case "$1" in
@@ -88,6 +100,18 @@ EOF
             ;;
          --skip-istio)
             skip_istio=1
+            shift
+            ;;
+         --bootstrap)
+            enable_bootstrap=1
+            shift
+            ;;
+         --skip-applicationsets)
+            skip_applicationsets=1
+            shift
+            ;;
+         --skip-appproject)
+            skip_appproject=1
             shift
             ;;
          *)
@@ -234,6 +258,26 @@ EOF
       _info "[argocd] Argo CD UI accessible at: https://$ARGOCD_VIRTUALSERVICE_HOST"
    fi
 
+   # Deploy GitOps bootstrap if requested
+   if (( enable_bootstrap )); then
+      _info "[argocd] Deploying GitOps bootstrap resources"
+
+      # Deploy AppProject
+      if (( ! skip_appproject )); then
+         _argocd_deploy_appproject
+      fi
+
+      # Deploy ApplicationSets
+      if (( ! skip_applicationsets )); then
+         _argocd_deploy_applicationsets
+      fi
+
+      _info "[argocd] Bootstrap deployment complete!"
+      _info "[argocd] View AppProjects: kubectl -n $ARGOCD_NAMESPACE get appproject"
+      _info "[argocd] View ApplicationSets: kubectl -n $ARGOCD_NAMESPACE get applicationset"
+      _info "[argocd] View Applications: kubectl -n $ARGOCD_NAMESPACE get application"
+   fi
+
    # Print next steps
    _info "[argocd] Deployment complete!"
    if (( enable_vault )); then
@@ -298,4 +342,149 @@ HCL
        ttl=1h
 
    _info "[argocd] Vault policy and Kubernetes role created successfully"
+}
+
+function deploy_argocd_bootstrap() {
+   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+      cat <<EOF
+Usage: deploy_argocd_bootstrap [options]
+
+Deploy ArgoCD AppProjects and ApplicationSets for GitOps foundation.
+
+This function deploys:
+  - AppProject definitions for platform services
+  - Sample ApplicationSet manifests demonstrating different generators:
+    * List generator (multi-namespace deployment)
+    * Cluster generator (multi-cluster deployment)
+    * Git generator (automatic discovery from repository)
+
+Options:
+   --skip-applicationsets   Skip ApplicationSet deployment (AppProject only)
+   --skip-appproject        Skip AppProject deployment (ApplicationSets only)
+   -h, --help               Show this help message
+
+Environment Variables:
+   ARGOCD_NAMESPACE         Namespace for Argo CD (default: argocd)
+   ARGOCD_CONFIG_DIR        Path to ArgoCD configuration directory
+
+Examples:
+   # Deploy everything (AppProjects + ApplicationSets)
+   ./scripts/k3d-manager deploy_argocd_bootstrap
+
+   # Deploy only AppProject
+   ./scripts/k3d-manager deploy_argocd_bootstrap --skip-applicationsets
+
+   # Deploy only ApplicationSets
+   ./scripts/k3d-manager deploy_argocd_bootstrap --skip-appproject
+
+EOF
+      return 0
+   fi
+
+   local skip_applicationsets=0
+   local skip_appproject=0
+
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         --skip-applicationsets)
+            skip_applicationsets=1
+            shift
+            ;;
+         --skip-appproject)
+            skip_appproject=1
+            shift
+            ;;
+         *)
+            _err "[argocd] Unknown option: $1"
+            return 1
+            ;;
+      esac
+   done
+
+   _info "[argocd] Starting ArgoCD bootstrap deployment"
+
+   # Verify ArgoCD is running
+   if ! _kubectl get ns "$ARGOCD_NAMESPACE" >/dev/null 2>&1; then
+      _err "[argocd] ArgoCD namespace not found. Deploy ArgoCD first with: deploy_argocd"
+      return 1
+   fi
+
+   if ! _kubectl -n "$ARGOCD_NAMESPACE" get deployment argocd-server >/dev/null 2>&1; then
+      _err "[argocd] ArgoCD server deployment not found. Deploy ArgoCD first with: deploy_argocd"
+      return 1
+   fi
+
+   # Deploy AppProject
+   if (( ! skip_appproject )); then
+      _argocd_deploy_appproject
+   fi
+
+   # Deploy ApplicationSets
+   if (( ! skip_applicationsets )); then
+      _argocd_deploy_applicationsets
+   fi
+
+   _info "[argocd] Bootstrap deployment complete!"
+   _info "[argocd] View AppProjects: kubectl -n $ARGOCD_NAMESPACE get appproject"
+   _info "[argocd] View ApplicationSets: kubectl -n $ARGOCD_NAMESPACE get applicationset"
+   _info "[argocd] View Applications: kubectl -n $ARGOCD_NAMESPACE get application"
+
+   return 0
+}
+
+function _argocd_deploy_appproject() {
+   _info "[argocd] Deploying platform AppProject"
+
+   local appproject_file="$ARGOCD_CONFIG_DIR/projects/platform.yaml"
+
+   if [[ ! -f "$appproject_file" ]]; then
+      _err "[argocd] AppProject file not found: $appproject_file"
+      return 1
+   fi
+
+   _kubectl apply -f "$appproject_file" >/dev/null
+
+   _info "[argocd] AppProject deployed: platform"
+   return 0
+}
+
+function _argocd_deploy_applicationsets() {
+   _info "[argocd] Deploying sample ApplicationSets"
+
+   local appsets_dir="$ARGOCD_CONFIG_DIR/applicationsets"
+
+   if [[ ! -d "$appsets_dir" ]]; then
+      _err "[argocd] ApplicationSets directory not found: $appsets_dir"
+      return 1
+   fi
+
+   # Find all ApplicationSet YAML files
+   local -a appset_files=()
+   while IFS= read -r -d '' file; do
+      appset_files+=("$file")
+   done < <(find "$appsets_dir" -maxdepth 1 -type f -name '*.yaml' -print0 2>/dev/null)
+
+   if (( ${#appset_files[@]} == 0 )); then
+      _warn "[argocd] No ApplicationSet files found in: $appsets_dir"
+      return 0
+   fi
+
+   _info "[argocd] Found ${#appset_files[@]} ApplicationSet file(s)"
+
+   # Deploy each ApplicationSet
+   local deployed_count=0
+   for file in "${appset_files[@]}"; do
+      local filename
+      filename=$(basename "$file")
+      _info "[argocd] Deploying ApplicationSet: $filename"
+
+      if _kubectl apply -f "$file" >/dev/null 2>&1; then
+         ((deployed_count++))
+      else
+         _warn "[argocd] Failed to deploy ApplicationSet: $filename"
+      fi
+   done
+
+   _info "[argocd] Successfully deployed $deployed_count/${#appset_files[@]} ApplicationSet(s)"
+   return 0
 }
