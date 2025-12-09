@@ -8,14 +8,16 @@ k3d-manager is a modular Bash-based utility for managing local Kubernetes develo
 
 **Main entry point:** `./scripts/k3d-manager <function> [args]`
 
-## Current Work in Progress (2025-12-01)
+## Current Work in Progress (2025-12-09)
 
-**Status:** Argo CD Phase 1 implementation complete - Adding tests and documentation
+**Status:** Argo CD Phase 3 ApplicationSet Bootstrap complete
 
 **Branch:** `feature/argocd`
 
 **What's Complete:**
 - ✅ Argo CD Phase 1 core deployment (Nov 28, 2025)
+- ✅ Argo CD Phase 2 Argo Rollouts integration (Dec 8, 2025)
+- ✅ Argo CD Phase 3 ApplicationSet Bootstrap (Dec 9, 2025)
 - ✅ Active Directory provider implementation (all functions)
 - ✅ Automated tests for AD provider (36 tests, 100% passing)
 - ✅ Certificate rotation (tested on ARM64, 8/8 test cases passed)
@@ -26,9 +28,20 @@ k3d-manager is a modular Bash-based utility for managing local Kubernetes develo
 - ✅ Enhanced MFA/Duo Push documentation
 - ✅ Comprehensive documentation (implementations, testing, guides)
 
-**Recent Major Features (Nov 28):**
+**Recent Major Features (Dec 9):**
 
-1. **Argo CD GitOps Platform** - Phase 1 Implementation
+1. **Argo CD ApplicationSet Bootstrap** - Phase 3 Implementation
+   - Added `--bootstrap` flag to `deploy_argocd` command
+   - AppProject for platform services (scripts/etc/argocd/projects/platform.yaml)
+   - Sample ApplicationSets demonstrating three generator patterns:
+     * List generator: demo-rollout.yaml (multi-namespace)
+     * Cluster generator: platform-helm.yaml (multi-cluster Helm)
+     * Git generator: services-git.yaml (automatic service discovery)
+   - Helper functions: `_argocd_deploy_appproject`, `_argocd_deploy_applicationsets`
+   - Command: `./scripts/k3d-manager deploy_argocd --bootstrap`
+   - Commit: `c27216a`
+
+2. **Argo CD GitOps Platform** - Phase 1 Implementation (Nov 28)
    - Plugin: `scripts/plugins/argocd.sh`
    - Helm-based deployment with official Argo CD chart
    - LDAP/Dex authentication integration (reuses OpenLDAP)
@@ -78,11 +91,14 @@ k3d-manager is a modular Bash-based utility for managing local Kubernetes develo
 
 **Next Steps:**
 
-Priority 1 (GitOps - IN PROGRESS):
+Priority 1 (GitOps - COMPLETE, Enhancement Phase):
 - ✅ Argo CD Phase 1 core deployment (Helm, LDAP, Vault, Istio)
-- 🔄 Complete Phase 1: Unit tests and documentation
-- Plan Phase 2: Argo Rollouts installation (2-3 hours)
-- Plan Phase 3: ApplicationSet bootstrap (6-8 hours)
+- ✅ Argo CD Phase 2 Argo Rollouts integration
+- ✅ Argo CD Phase 3 ApplicationSet bootstrap
+- 🔄 Enhancement: Add application deployment flags to deploy_argocd
+  * `--app <name>` for deploying Applications from external repos
+  * `--applicationset <name>` for deploying ApplicationSets from external repos
+  * `--repo <url> --path <path> --namespace <ns>` for repo configuration
 - Future: Service migration to GitOps (Vault, ESO, Jenkins)
 
 Priority 2 (Infrastructure):
@@ -193,6 +209,21 @@ AD_DOMAIN=corp.example.com \
 
 # Deploy Argo CD with LDAP and Vault integration
 ./scripts/k3d-manager deploy_argocd --enable-ldap --enable-vault
+
+# Bootstrap platform infrastructure (AppProjects + ApplicationSets)
+./scripts/k3d-manager deploy_argocd --bootstrap
+
+# Deploy Application from external repository (PLANNED)
+./scripts/k3d-manager deploy_argocd --app shopping-cart-frontend \
+  --repo https://github.com/your-org/shopping-cart \
+  --path apps/frontend/k8s \
+  --namespace shopping-cart
+
+# Deploy ApplicationSet from external repository (PLANNED)
+./scripts/k3d-manager deploy_argocd --applicationset shopping-cart-services \
+  --repo https://github.com/your-org/shopping-cart \
+  --path argocd/applicationsets/services.yaml \
+  --project shopping-cart
 ```
 
 ### Testing
@@ -281,6 +312,22 @@ AD_DOMAIN=corp.example.com \
   - `--enable-ldap`: Standard LDAP (OpenLDAP with simple schema)
   - `--enable-ad`: AD testing mode (OpenLDAP with AD-compatible schema)
   - `--enable-ad-prod`: Production AD (connects to external Active Directory)
+
+**GitOps Repository Strategy:**
+- **k3d-manager repository** (this repo): Infrastructure and platform services
+  - Platform components: Vault, Jenkins, OpenLDAP, External Secrets Operator, Argo CD
+  - Bootstrap resources: AppProjects, ApplicationSets for platform services
+  - Deployment tooling and scripts
+  - Configuration templates and variables
+- **Application repositories** (separate repos): Application code and manifests
+  - Application-specific Kubernetes manifests (Deployments, Services, ConfigMaps, etc.)
+  - Application-specific Argo CD Applications and ApplicationSets
+  - Application code, tests, and CI/CD configuration
+- **Unified deployment interface** (PLANNED): k3d-manager provides commands to deploy from external repos
+  - `--app <name>` deploys Argo CD Application from external repository
+  - `--applicationset <name>` deploys ApplicationSet from external repository
+  - `--repo <url> --path <path> --namespace <ns>` specifies repository configuration
+  - Enables GitOps workflows without mixing infrastructure and application concerns
 
 ## Plugin Development
 
