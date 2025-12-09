@@ -329,3 +329,46 @@ setup() {
   done
   [ "$wait_count" -ge 3 ]  # At least: server, repo-server, admin externalsecret, ldap externalsecret
 }
+
+@test "deploy_argocd -h shows bootstrap options" {
+  run deploy_argocd -h
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--bootstrap"* ]]
+  [[ "$output" == *"--skip-applicationsets"* ]]
+  [[ "$output" == *"--skip-appproject"* ]]
+  [[ "$output" == *"Deploy AppProjects and ApplicationSets for GitOps"* ]]
+}
+
+@test "_argocd_deploy_appproject fails when AppProject file missing" {
+  rm -f "$ARGOCD_CONFIG_DIR/projects/platform.yaml"
+
+  run _argocd_deploy_appproject
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"AppProject file not found"* ]]
+}
+
+@test "_argocd_deploy_applicationsets warns when no ApplicationSet files found" {
+  mkdir -p "$ARGOCD_CONFIG_DIR/applicationsets"
+  rm -f "$ARGOCD_CONFIG_DIR/applicationsets"/*.yaml
+
+  run _argocd_deploy_applicationsets
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"No ApplicationSet files found"* ]]
+}
+
+@test "_argocd_deploy_applicationsets reports deployment count" {
+  mkdir -p "$ARGOCD_CONFIG_DIR/applicationsets"
+  for i in {1..3}; do
+    cat > "$ARGOCD_CONFIG_DIR/applicationsets/test-${i}.yaml" <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: test-${i}
+EOF
+  done
+
+  run _argocd_deploy_applicationsets
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Found 3 ApplicationSet file(s)"* ]]
+  [[ "$output" == *"Successfully deployed 3/3 ApplicationSet(s)"* ]]
+}

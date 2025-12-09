@@ -1,0 +1,14 @@
+---
+# Simple test ConfigMap to verify ApplicationSets are working
+# This will be deployed by the demo-rollout ApplicationSet
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-test
+  labels:
+    app: argocd-test
+    deployed-by: applicationset
+data:
+  message: "Hello from Argo CD ApplicationSet!"
+  timestamp: "2025-12-08"
+  generator: "list"
