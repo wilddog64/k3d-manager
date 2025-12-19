@@ -8,16 +8,13 @@ k3d-manager is a modular Bash-based utility for managing local Kubernetes develo
 
 **Main entry point:** `./scripts/k3d-manager <function> [args]`
 
-## Current Work in Progress (2025-12-09)
+## Current Work in Progress (2025-11-24)
 
-**Status:** Argo CD Phase 3 ApplicationSet Bootstrap complete
+**Status:** Jenkins Kubernetes agents implemented - Planning SMB CSI integration
 
-**Branch:** `feature/argocd`
+**Branch:** `ldap-develop`
 
 **What's Complete:**
-- ✅ Argo CD Phase 1 core deployment (Nov 28, 2025)
-- ✅ Argo CD Phase 2 Argo Rollouts integration (Dec 8, 2025)
-- ✅ Argo CD Phase 3 ApplicationSet Bootstrap (Dec 9, 2025)
 - ✅ Active Directory provider implementation (all functions)
 - ✅ Automated tests for AD provider (36 tests, 100% passing)
 - ✅ Certificate rotation (tested on ARM64, 8/8 test cases passed)
@@ -28,31 +25,7 @@ k3d-manager is a modular Bash-based utility for managing local Kubernetes develo
 - ✅ Enhanced MFA/Duo Push documentation
 - ✅ Comprehensive documentation (implementations, testing, guides)
 
-**Recent Major Features (Dec 9):**
-
-1. **Argo CD ApplicationSet Bootstrap** - Phase 3 Implementation
-   - Added `--bootstrap` flag to `deploy_argocd` command
-   - AppProject for platform services (scripts/etc/argocd/projects/platform.yaml)
-   - Sample ApplicationSets demonstrating three generator patterns:
-     * List generator: demo-rollout.yaml (multi-namespace)
-     * Cluster generator: platform-helm.yaml (multi-cluster Helm)
-     * Git generator: services-git.yaml (automatic service discovery)
-   - Helper functions: `_argocd_deploy_appproject`, `_argocd_deploy_applicationsets`
-   - Command: `./scripts/k3d-manager deploy_argocd --bootstrap`
-   - Commit: `c27216a`
-
-2. **Argo CD GitOps Platform** - Phase 1 Implementation (Nov 28)
-   - Plugin: `scripts/plugins/argocd.sh`
-   - Helm-based deployment with official Argo CD chart
-   - LDAP/Dex authentication integration (reuses OpenLDAP)
-   - Vault/ESO credential management for admin password
-   - Istio ingress with VirtualService at `argocd.dev.local.me`
-   - RBAC policy configuration with admin group mapping
-   - Command: `./scripts/k3d-manager deploy_argocd --enable-ldap --enable-vault`
-   - Implementation plan: `docs/plans/argocd-implementation-plan.md`
-   - Commits: `3bd8d64`, `beb9abb`, `7b95e09`, `a7d89a8`
-
-**Previous Major Features (Nov 21):**
+**Recent Major Features (Nov 21):**
 
 1. **LDAP Password Rotation** - Automated password rotation
    - Implementation: `scripts/etc/ldap/ldap-password-rotator.yaml.tmpl`
@@ -80,44 +53,38 @@ k3d-manager is a modular Bash-based utility for managing local Kubernetes develo
    - Vault integration via ExternalSecret
    - Docs: `docs/plans/jenkins-totp-mfa.md`
 
-**Current Task (Dec 1):**
+**Current Task (Nov 21):**
 
-**Argo CD Phase 1 - Tests and Documentation** (2-3 hours estimated)
-- Status: Core deployment complete (85%)
-- 🔄 Add unit tests: `scripts/tests/plugins/argocd.bats`
-- 🔄 Create setup documentation: `docs/argocd-setup.md`
-- Test end-to-end deployment workflow
-- Validate LDAP authentication and Vault integration
+**Jenkins Kubernetes Agents + SMB CSI** (6-8 hours estimated)
+- Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
+- Linux agent pod template configuration
+- Windows Nano agent support (if available)
+- SMB CSI driver for shared storage
+- Test jobs for validation
 
 **Next Steps:**
 
-Priority 1 (GitOps - COMPLETE, Enhancement Phase):
-- ✅ Argo CD Phase 1 core deployment (Helm, LDAP, Vault, Istio)
-- ✅ Argo CD Phase 2 Argo Rollouts integration
-- ✅ Argo CD Phase 3 ApplicationSet bootstrap
-- 🔄 Enhancement: Add application deployment flags to deploy_argocd
-  * `--app <name>` for deploying Applications from external repos
-  * `--applicationset <name>` for deploying ApplicationSets from external repos
-  * `--repo <url> --path <path> --namespace <ns>` for repo configuration
-- Future: Service migration to GitOps (Vault, ESO, Jenkins)
+Priority 1 (Infrastructure - IN PROGRESS):
+- ✅ Plan created: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
+- 🔄 Configure Kubernetes plugin for Jenkins agents
+- 🔄 Deploy Linux agent pod template
+- 🔄 Deploy SMB CSI driver (optional)
+- 🔄 Create test jobs for validation
 
-Priority 2 (Infrastructure):
-- Jenkins Kubernetes agents implementation
-- Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
-- SMB CSI driver for shared storage (optional)
-
-Priority 3 (Security Enhancement):
+Priority 2 (Security Enhancement):
 - TOTP/MFA implementation via miniOrange plugin (plan complete)
 - Plan: `docs/plans/jenkins-totp-mfa.md`
 
-Priority 4 (Production Readiness):
+Priority 3 (Production Readiness):
 - Production Active Directory integration testing (requires corporate VPN)
 - Jenkins cert rotation operational guide
+
+Priority 4 (Documentation):
 - Mac AD setup guide
 - Monitoring/alerting recommendations
+- Operational runbooks
 
 **Recently Completed:**
-- ✅ Argo CD Phase 1 core deployment (2025-11-28)
 - ✅ LDAP password rotation CronJob (2025-11-21)
 - ✅ LDAP bulk import tool (2025-11-21)
 - ✅ Enhanced MFA/Duo Push documentation (2025-11-21)
@@ -125,17 +92,16 @@ Priority 4 (Production Readiness):
 - ✅ Certificate rotation validation (8/8 test cases passed)
 
 **Reference Documents:**
-- ArgoCD implementation plan: `docs/plans/argocd-implementation-plan.md`
 - K8s agents plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
-- TOTP/MFA plan: `docs/plans/jenkins-totp-mfa.md`
 - LDAP password rotation: `docs/howto/ldap-password-rotation.md`
 - LDAP bulk import: `docs/howto/ldap-bulk-user-import.md`
 - Password rotation results: `docs/tests/ldap-password-rotation-test-results-2025-11-21.md`
+- TOTP/MFA plan: `docs/plans/jenkins-totp-mfa.md`
 - LDAP auth test results: `docs/tests/ldap-auth-test-results-2025-11-20.md`
 - Cert rotation results: `docs/tests/cert-rotation-test-results-2025-11-19.md`
 - Vault sidecar: `docs/implementations/vault-sidecar-implementation.md`
 - AD integration status: `docs/ad-integration-status.md`
-- Recent ArgoCD commits: `3bd8d64`, `beb9abb`, `7b95e09`, `a7d89a8`
+- Recent commits: `97ae642`, `7899d64`, `3ea722f`, `3ebd4ed`, `da96dbe`
 
 ## Development Commands
 
@@ -148,33 +114,9 @@ Priority 4 (Production Readiness):
 # Deploy with k3s provider (Linux with systemd)
 CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster
 CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f  # non-interactive
-# Note: k3s automatically sets up ingress port forwarding (port 443 → Istio)
 
 # Destroy cluster
 ./scripts/k3d-manager destroy_cluster
-```
-
-### Ingress Port Forwarding (k3s only)
-```bash
-# Setup ingress forwarding (automatically runs during deploy_cluster)
-# Forwards external port 443 to Istio IngressGateway NodePort
-# Note: CLUSTER_PROVIDER auto-detects k3s if installed
-./scripts/k3d-manager setup_ingress_forward
-
-# Check forwarding status
-./scripts/k3d-manager status_ingress_forward
-
-# Remove forwarding
-./scripts/k3d-manager remove_ingress_forward
-
-# Disable auto-setup during deploy_cluster
-K3S_INGRESS_FORWARD_ENABLED=0 ./scripts/k3d-manager deploy_cluster
-
-# Optional: Explicitly set provider if both k3d and k3s are installed
-CLUSTER_PROVIDER=k3s ./scripts/k3d-manager setup_ingress_forward
-
-# Note: Ingress forwarding is automatically cleaned up when destroying the cluster
-./scripts/k3d-manager destroy_cluster  # Removes systemd service automatically
 ```
 
 ### Service Deployment
@@ -203,27 +145,6 @@ AD_DOMAIN=corp.example.com \
 
 # Deploy OpenLDAP with AD-compatible schema (for testing AD integration)
 ./scripts/k3d-manager deploy_ad --enable-vault
-
-# Deploy Argo CD (GitOps platform)
-./scripts/k3d-manager deploy_argocd
-
-# Deploy Argo CD with LDAP and Vault integration
-./scripts/k3d-manager deploy_argocd --enable-ldap --enable-vault
-
-# Bootstrap platform infrastructure (AppProjects + ApplicationSets)
-./scripts/k3d-manager deploy_argocd --bootstrap
-
-# Deploy Application from external repository (PLANNED)
-./scripts/k3d-manager deploy_argocd --app shopping-cart-frontend \
-  --repo https://github.com/your-org/shopping-cart \
-  --path apps/frontend/k8s \
-  --namespace shopping-cart
-
-# Deploy ApplicationSet from external repository (PLANNED)
-./scripts/k3d-manager deploy_argocd --applicationset shopping-cart-services \
-  --repo https://github.com/your-org/shopping-cart \
-  --path argocd/applicationsets/services.yaml \
-  --project shopping-cart
 ```
 
 ### Testing
@@ -264,7 +185,6 @@ AD_DOMAIN=corp.example.com \
 - `jenkins.sh` - Jenkins deployment with Vault-issued TLS, cert rotation, LDAP auth
 - `ldap.sh` - OpenLDAP deployment with Vault LDAP secrets engine integration
 - `eso.sh` - External Secrets Operator deployment and SecretStore configuration
-- `argocd.sh` - Argo CD GitOps platform with LDAP/Dex auth, Vault/ESO integration, Istio ingress
 - `azure.sh` - Azure Key Vault ESO provider integration
 
 **Configuration:** `scripts/etc/` - Templates and variables:
@@ -275,10 +195,6 @@ AD_DOMAIN=corp.example.com \
 - `ldap/vars.sh` - LDAP connection parameters
 - `ldap/bootstrap-ad-schema.ldif` - AD-compatible LDAP schema for testing
 - `ad/vars.sh` - Active Directory provider configuration
-- `argocd/vars.sh` - Argo CD configuration (LDAP, Vault paths, RBAC settings)
-- `argocd/values.yaml.tmpl` - Helm values with Dex LDAP connector
-- `argocd/virtualservice.yaml.tmpl` - Istio ingress configuration
-- `argocd/externalsecret-*.yaml.tmpl` - ExternalSecret templates for credentials
 - `*.yaml.tmpl` - Kubernetes manifest templates (processed with `envsubst`)
 
 ### Key Integration Patterns
@@ -312,22 +228,6 @@ AD_DOMAIN=corp.example.com \
   - `--enable-ldap`: Standard LDAP (OpenLDAP with simple schema)
   - `--enable-ad`: AD testing mode (OpenLDAP with AD-compatible schema)
   - `--enable-ad-prod`: Production AD (connects to external Active Directory)
-
-**GitOps Repository Strategy:**
-- **k3d-manager repository** (this repo): Infrastructure and platform services
-  - Platform components: Vault, Jenkins, OpenLDAP, External Secrets Operator, Argo CD
-  - Bootstrap resources: AppProjects, ApplicationSets for platform services
-  - Deployment tooling and scripts
-  - Configuration templates and variables
-- **Application repositories** (separate repos): Application code and manifests
-  - Application-specific Kubernetes manifests (Deployments, Services, ConfigMaps, etc.)
-  - Application-specific Argo CD Applications and ApplicationSets
-  - Application code, tests, and CI/CD configuration
-- **Unified deployment interface** (PLANNED): k3d-manager provides commands to deploy from external repos
-  - `--app <name>` deploys Argo CD Application from external repository
-  - `--applicationset <name>` deploys ApplicationSet from external repository
-  - `--repo <url> --path <path> --namespace <ns>` specifies repository configuration
-  - Enables GitOps workflows without mixing infrastructure and application concerns
 
 ## Plugin Development
 
@@ -404,9 +304,6 @@ _run_command --quiet -- command_that_might_fail
 - `K3S_KUBECONFIG_PATH` - Path to k3s kubeconfig (default: /etc/rancher/k3s/k3s.yaml)
 - `K3S_NODE_IP` / `NODE_IP` - Override detected node IP
 - `K3S_CONFIG_DIR` - k3s configuration directory (default: /etc/rancher/k3s)
-- `K3S_INGRESS_FORWARD_ENABLED` - Auto-setup ingress forwarding on deploy (default: 1)
-- `K3S_INGRESS_FORWARD_HTTPS_PORT` - External HTTPS port for forwarding (default: 443)
-- `K3S_INGRESS_SERVICE_NAME` - systemd service name (default: k3s-ingress-forward)
 
 **Air-gapped deployments:**
 - `ESO_HELM_CHART_REF` - Local ESO chart path
