@@ -1,0 +1,59 @@
+---
+# RBAC for Jenkins to manage dynamic Kubernetes agent pods
+# This allows Jenkins controller to create, monitor, and delete agent pods
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-agent-manager
+  namespace: ${JENKINS_NAMESPACE}
+rules:
+  # Pod management - create, delete, monitor agent pods
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # Pod exec - allow Jenkins to execute commands in agent pods
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # Pod logs - read agent pod logs for debugging
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list", "watch"]
+
+  # Secrets - read secrets for agent configuration
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+
+  # ConfigMaps - read configmaps for agent configuration
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+
+  # PersistentVolumeClaims - manage workspace volumes
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+
+  # Events - read events for monitoring
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-agent-manager
+  namespace: ${JENKINS_NAMESPACE}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: jenkins-agent-manager
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-admin
+    namespace: ${JENKINS_NAMESPACE}

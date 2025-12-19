@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Namespace
+metadata: { name: ${LDAP_NAMESPACE} }
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: { name: ${LDAP_ESO_SERVICE_ACCOUNT}, namespace: ${LDAP_NAMESPACE} }
+---
+apiVersion: ${LDAP_ESO_API_VERSION}
+kind: SecretStore
+metadata: { name: ${LDAP_ESO_SECRETSTORE}, namespace: ${LDAP_NAMESPACE} }
+spec:
+  provider:
+    vault:
+      server: "${VAULT_ENDPOINT}"
+      path: ${LDAP_VAULT_KV_MOUNT}              # your KV v2 mount
+      version: v2
+      auth:
+        kubernetes:
+          mountPath: kubernetes
+          role: ${LDAP_ESO_ROLE}
+          serviceAccountRef:
+            name: ${LDAP_ESO_SERVICE_ACCOUNT}
+---
+apiVersion: ${LDAP_ESO_API_VERSION}
+kind: ExternalSecret
+metadata: { name: ${LDAP_ADMIN_SECRET_NAME}, namespace: ${LDAP_NAMESPACE} }
+spec:
+  refreshInterval: 1h
+  secretStoreRef: { name: ${LDAP_ESO_SECRETSTORE}, kind: SecretStore }
+  target:
+    name: ${LDAP_ADMIN_SECRET_NAME}        # <- Secret created for the chart
+    creationPolicy: Owner
+    template: { type: Opaque }
+  data:
+    - secretKey: LDAP_ADMIN_USERNAME
+      remoteRef: { key: ${LDAP_ADMIN_VAULT_PATH}, property: ${LDAP_ADMIN_USERNAME_KEY} }
+    - secretKey: LDAP_ADMIN_PASSWORD
+      remoteRef: { key: ${LDAP_ADMIN_VAULT_PATH}, property: ${LDAP_ADMIN_PASSWORD_KEY} }
+    - secretKey: LDAP_CONFIG_PASSWORD
+      remoteRef: { key: ${LDAP_ADMIN_VAULT_PATH}, property: ${LDAP_CONFIG_PASSWORD_KEY} }
+    - secretKey: LDAP_BASE_DN
+      remoteRef: { key: ${LDAP_ADMIN_VAULT_PATH}, property: LDAP_BASE_DN }
+    - secretKey: LDAP_ROOT
+      remoteRef: { key: ${LDAP_ADMIN_VAULT_PATH}, property: LDAP_ROOT }
+    - secretKey: LDAP_DOMAIN
+      remoteRef: { key: ${LDAP_ADMIN_VAULT_PATH}, property: LDAP_DOMAIN }
+    - secretKey: LDAP_ORG_NAME
+      remoteRef: { key: ${LDAP_ADMIN_VAULT_PATH}, property: LDAP_ORG_NAME }
+${LDAP_LDIF_EXTERNALSECRET_YAML}

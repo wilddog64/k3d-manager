@@ -1,6 +1,18 @@
 
 function _cluster_provider() {
-   local provider="${K3D_MANAGER_PROVIDER:-${K3DMGR_PROVIDER:-${CLUSTER_PROVIDER:-k3d}}}"
+   local provider="${K3D_MANAGER_PROVIDER:-${K3DMGR_PROVIDER:-${CLUSTER_PROVIDER:-}}}"
+
+   # If no provider set, auto-detect based on available binaries
+   if [[ -z "$provider" ]]; then
+      if command -v k3d >/dev/null 2>&1; then
+         provider="k3d"
+      elif command -v k3s >/dev/null 2>&1; then
+         provider="k3s"
+      else
+         provider="k3d"  # Default fallback
+      fi
+   fi
+
    provider="$(printf '%s' "$provider" | tr '[:upper:]' '[:lower:]')"
 
    case "$provider" in
@@ -799,4 +811,24 @@ function deploy_k3d_cluster() {
 
 function deploy_k3s_cluster() {
    deploy_cluster "$@"
+}
+
+function deploy_ldap() {
+   _try_load_plugin deploy_ldap "$@"
+}
+
+function expose_ingress() {
+   _cluster_provider_call expose_ingress "$@"
+}
+
+function setup_ingress_forward() {
+   expose_ingress setup
+}
+
+function status_ingress_forward() {
+   expose_ingress status
+}
+
+function remove_ingress_forward() {
+   expose_ingress remove
 }

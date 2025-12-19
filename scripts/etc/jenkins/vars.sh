@@ -1,6 +1,10 @@
 export JENKINS_NAMESPACE="jenkins"
 export JENKINS_HOME_PATH="$SCRIPT_DIR/storage/jenkins_home"
 
+# Deployment Feature Flags
+export JENKINS_LDAP_ENABLED="${JENKINS_LDAP_ENABLED:-0}"    # 0 = disabled by default, use --enable-ldap to deploy
+export JENKINS_VAULT_ENABLED="${JENKINS_VAULT_ENABLED:-0}"  # 0 = disabled by default, use --enable-vault to deploy
+
 # Optional: immediately mint a cert to a K8s tls secret via Istio
 export VAULT_PKI_ISSUE_SECRET="${VAULT_PKI_ISSUE_SECRET:-1}"   # 1 to emit a tls Secret
 export VAULT_PKI_SECRET_NS="${VAULT_PKI_SECRET_NS:-istio-system}"
@@ -14,7 +18,32 @@ export JENKINS_CERT_ROTATOR_SCHEDULE="${JENKINS_CERT_ROTATOR_SCHEDULE:-0 */12 * 
 export JENKINS_CERT_ROTATOR_RENEW_BEFORE="${JENKINS_CERT_ROTATOR_RENEW_BEFORE:-432000}"
 export JENKINS_CERT_ROTATOR_NAME="${JENKINS_CERT_ROTATOR_NAME:-jenkins-cert-rotator}"
 export JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT="${JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT:-jenkins-cert-rotator}"
-export JENKINS_CERT_ROTATOR_IMAGE="${JENKINS_CERT_ROTATOR_IMAGE:-docker.io/google/cloud-sdk:slim}"
+# Use Alpine which is lightweight, multi-arch (ARM64/x86_64), and has apk for installing tools
+export JENKINS_CERT_ROTATOR_IMAGE="${JENKINS_CERT_ROTATOR_IMAGE:-docker.io/alpine:latest}"
 export JENKINS_CERT_ROTATOR_VAULT_ROLE="${JENKINS_CERT_ROTATOR_VAULT_ROLE:-jenkins-cert-rotator}"
 export JENKINS_CERT_ROTATOR_ALT_NAMES="jenkins.dev.local.me,jenkins.dev.k3d.internal"
 export JENKINS_VIRTUALSERVICE_HOSTS="${JENKINS_CERT_ROTATOR_ALT_NAMES}"
+
+export JENKINS_ESO_SERVICE_ACCOUNT="${JENKINS_ESO_SERVICE_ACCOUNT:-eso-jenkins-sa}"
+export JENKINS_ESO_SECRETSTORE="${JENKINS_ESO_SECRETSTORE:-vault-kv-store}"
+export JENKINS_ESO_ROLE="${JENKINS_ESO_ROLE:-eso-jenkins-admin}"
+export JENKINS_ESO_API_VERSION="${JENKINS_ESO_API_VERSION:-external-secrets.io/v1}"
+export JENKINS_VAULT_KV_MOUNT="${JENKINS_VAULT_KV_MOUNT:-secret}"
+export JENKINS_ADMIN_SECRET_NAME="${JENKINS_ADMIN_SECRET_NAME:-jenkins-admin}"
+export JENKINS_ADMIN_VAULT_PATH="${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin}"
+export JENKINS_ADMIN_USERNAME_KEY="${JENKINS_ADMIN_USERNAME_KEY:-username}"
+export JENKINS_ADMIN_PASSWORD_KEY="${JENKINS_ADMIN_PASSWORD_KEY:-password}"
+export JENKINS_ADMIN_K8S_USER_KEY="${JENKINS_ADMIN_K8S_USER_KEY:-jenkins-admin-user}"
+export JENKINS_ADMIN_K8S_PASS_KEY="${JENKINS_ADMIN_K8S_PASS_KEY:-jenkins-admin-password}"
+export JENKINS_VAULT_POLICY_PREFIX="${JENKINS_VAULT_POLICY_PREFIX:-eso/jenkins-admin,ldap/openldap-admin}"
+
+export JENKINS_LDAP_SECRET_NAME="${JENKINS_LDAP_SECRET_NAME:-jenkins-ldap-config}"
+export JENKINS_LDAP_VAULT_PATH="${JENKINS_LDAP_VAULT_PATH:-ldap/openldap-admin}"
+export JENKINS_LDAP_BINDDN_KEY="${JENKINS_LDAP_BINDDN_KEY:-LDAP_BIND_DN}"
+export JENKINS_LDAP_PASSWORD_KEY="${JENKINS_LDAP_PASSWORD_KEY:-LDAP_ADMIN_PASSWORD}"
+export JENKINS_LDAP_BASE_DN_KEY="${JENKINS_LDAP_BASE_DN_KEY:-LDAP_BASE_DN}"
+export JENKINS_LDAP_GROUP_SEARCH_BASE="${JENKINS_LDAP_GROUP_SEARCH_BASE:-ou=groups}"
+export JENKINS_LDAP_USER_SEARCH_BASE="${JENKINS_LDAP_USER_SEARCH_BASE:-ou=service}"
+export JENKINS_LDAP_HOST="${JENKINS_LDAP_HOST:-openldap.directory.svc.cluster.local}"
+export JENKINS_LDAP_PORT="${JENKINS_LDAP_PORT:-389}"
+export JENKINS_LDAP_URL="${JENKINS_LDAP_URL:-ldap://${JENKINS_LDAP_HOST}:${JENKINS_LDAP_PORT}}"

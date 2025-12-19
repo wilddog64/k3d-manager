@@ -68,9 +68,25 @@ fi
 function_name=$1
 shift  # Remove the function name from the arguments
 
-if [[ "$(type -t "$function_name")" == "function" ]]; then
-    # Call the function with remaining arguments
-    $function_name "$@"
-else
-    _try_load_plugin "$function_name" "$@"
+secret_trace_guard=0
+if [[ $- == *x* ]]; then
+    set +x
+    if _args_have_sensitive_flag "$@"; then
+        secret_trace_guard=1
+    else
+        set -x
+    fi
 fi
+
+exit_code=0
+if [[ "$(type -t "$function_name")" == "function" ]]; then
+    $function_name "$@" || exit_code=$?
+else
+    _try_load_plugin "$function_name" "$@" || exit_code=$?
+fi
+
+if (( secret_trace_guard )); then
+    set -x
+fi
+
+exit "$exit_code"

@@ -41,6 +41,147 @@ Set `CLUSTER_PROVIDER` to select a different backend module:
 ```bash
 CLUSTER_PROVIDER=k3d ./scripts/k3d-manager deploy_cluster
 ```
+
+## Verification quickstart
+
+Once the core add-ons are deployed you can run these spot checks to confirm ESO-backed secrets are in use:
+
+```bash
+# LDAP administrator bind (uses secret/openldap-admin)
+scripts/tests/plugins/openldap.sh            # or rerun scripts/k3d-manager deploy_ldap
+
+# Jenkins credentials (uses Vault/ESO; Jenkins authenticates via LDAP)
+kubectl -n directory get secret openldap-admin \
+  -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' | base64 -d
+
+# Optional: verify via Jenkins API inside the controller pod using the LDAP admin account
+POD=$(kubectl -n jenkins get pod -l app.kubernetes.io/component=jenkins-controller \
+      -o jsonpath='{.items[0].metadata.name}')
+PASS=$(kubectl -n directory get secret openldap-admin \
+       -o jsonpath='{.data.LDAP_ADMIN_PASSWORD}' | base64 -d)
+kubectl -n jenkins exec "$POD" -c jenkins -- \
+  curl -fsS -u "ldap-admin:$PASS" http://localhost:8080/user/ldap-admin/api/json
+```
+
+The first command exercises the OpenLDAP deployment (the helper prints a warning if `ldapsearch` is missing); the second returns the Vault-synchronised LDAP administrator password that Jenkins now consumes via the LDAP plugin. The final command shows an HTTP 200 when authentication succeeds.
+
+## Jenkins Authentication Modes
+
+Jenkins can be deployed with different authentication backends depending on your environment:
+
+### Default Mode (No Directory Service)
+
+```bash
+./scripts/k3d-manager deploy_jenkins --enable-vault
+```
+
+Uses Jenkins built-in authentication with credentials stored in Vault via External Secrets Operator.
+
+### Active Directory Testing Mode
+
+```bash
+./scripts/k3d-manager deploy_jenkins --enable-ad --enable-vault
+```
+
+Deploys OpenLDAP with Active Directory schema for local development and testing. This mode:
+- Uses the `ldap` plugin with AD-compatible schema
+- Configures OpenLDAP with `msPerson` and `msOrganizationalUnit` object classes
+- Stores LDAP credentials in Vault
+- Ideal for testing AD integration before deploying to production
+
+### Production Active Directory Integration
+
+```bash
+# Configure AD connection
+export AD_DOMAIN="corp.example.com"
+export AD_SERVER="dc1.corp.example.com,dc2.corp.example.com"  # optional
+
+./scripts/k3d-manager deploy_jenkins --enable-ad-prod --enable-vault
+```
+
+Connects Jenkins to a production Active Directory server. This mode:
+- Uses the `active-directory` plugin
+- Validates AD connectivity (DNS resolution and LDAPS port 636) before deployment
+- Stores AD service account credentials in Vault
+- Requires network access to the AD domain controllers
+
+Configuration file: `scripts/etc/jenkins/ad-vars.sh`
+
+#### Skip Validation (for testing)
+
+To bypass the pre-flight connectivity check:
+
+```bash
+./scripts/k3d-manager deploy_jenkins --enable-ad-prod --enable-vault --skip-ad-validation
+```
+
+**Note:** The three directory service modes (`--enable-ldap`, `--enable-ad`, `--enable-ad-prod`) are mutually exclusive. Choose one based on your environment.
+
+### Automated Job Creation with Job DSL
+
+Jenkins deployments include an automatic seed job that pulls Job DSL scripts from a GitHub repository. The seed job:
+- Automatically creates and updates Jenkins jobs from code
+- Polls your repository every 15 minutes for changes
+- Processes all `.groovy` files in the `jobs/` directory structure
+
+For setup instructions and examples, see **[Jenkins Job DSL Setup Guide](docs/jenkins-job-dsl-setup.md)**.
+
+## Vault Agent Sidecar for LDAP Credentials
+
+Jenkins uses Vault agent sidecar injection to securely manage LDAP bind credentials at runtime, eliminating hardcoded passwords in ConfigMaps and enabling rotation without redeployment.
+
+### How It Works
+
+When Jenkins is deployed with `--enable-vault`, the Vault agent injector automatically:
+
+1. **Injects an init container** (`vault-agent-init`) that authenticates to Vault using the Jenkins service account
+2. **Fetches LDAP credentials** from Vault's KV store (`secret/data/ldap/openldap-admin`)
+3. **Writes credentials as files** to `/vault/secrets/` in a shared memory volume
+4. **Jenkins reads credentials** using JCasC's `${file:...}` syntax at startup
+
+### Benefits
+
+- **No passwords in ConfigMaps** - Credentials never baked into configuration at deployment time
+- **Easier password rotation** - Update Vault, restart Jenkins pod (no redeployment needed)
+- **Ephemeral storage** - Secrets stored in memory-backed volume, cleared on pod termination
+- **Backup mechanism** - K8s secrets (managed by ESO) remain available as fallback
+
+### Password Rotation Procedure
+
+```bash
+# 1. Update password in Vault
+kubectl exec -n vault vault-0 -- vault kv put secret/ldap/openldap-admin \
+  LDAP_BIND_DN="cn=ldap-admin,dc=home,dc=org" \
+  LDAP_ADMIN_PASSWORD="new-password-here"
+
+# 2. Update LDAP server (if applicable)
+./scripts/k3d-manager deploy_ldap
+
+# 3. Restart Jenkins pod to fetch new credentials
+kubectl delete pod -n jenkins jenkins-0
+```
+
+The new Jenkins pod automatically fetches fresh credentials from Vault via the sidecar.
+
+### Technical Details
+
+**Implementation:** `docs/implementations/vault-sidecar-implementation.md`
+
+**Key Components:**
+- Vault Kubernetes auth role: `jenkins-ldap-reader`
+- Vault policy: Read access to `secret/data/ldap/openldap-admin`
+- Pod annotations: `vault.hashicorp.com/agent-inject: "true"`
+- JCasC configuration: `managerPasswordSecret: '${file:/vault/secrets/ldap-bind-password}'`
+
+**Verification:**
+```bash
+# Check vault-agent-init was injected
+kubectl get pod -n jenkins jenkins-0 -o jsonpath='{.spec.initContainers[*].name}'
+
+# Verify secret files exist
+kubectl exec -n jenkins jenkins-0 -- ls -la /vault/secrets/
+```
+
 ## Using k3s clusters
 
 The helper scripts in this repository now understand a `k3s` provider in addition
@@ -78,6 +219,36 @@ same workflow non-interactively in CI.
 * Writable storage for persistent volumes under
   `/var/lib/rancher/k3s/storage` and for the embedded containerd runtime under
   `/var/lib/rancher/k3s/agent/containerd/`.
+
+### Ingress Port Forwarding (k3s only)
+
+The k3s provider automatically sets up ingress port forwarding during `deploy_cluster` to expose services on standard HTTPS port 443. This forwards external traffic to the Istio IngressGateway NodePort, enabling multiple services (Jenkins, ArgoCD, etc.) to share port 443 via SNI-based routing.
+
+**Note:** The script auto-detects k3s when installed, so `CLUSTER_PROVIDER=k3s` is optional (only needed if both k3d and k3s are installed).
+
+**Automatic Setup:**
+```bash
+./scripts/k3d-manager deploy_cluster
+# Automatically configures systemd service: k3s-ingress-forward (k3s only)
+```
+
+**Manual Management:**
+```bash
+# Setup/update ingress forwarding
+./scripts/k3d-manager setup_ingress_forward
+
+# Check status
+./scripts/k3d-manager status_ingress_forward
+
+# Remove forwarding
+./scripts/k3d-manager remove_ingress_forward
+```
+
+**Lifecycle Management:**
+- Ingress forwarding is automatically cleaned up when destroying the cluster
+- The systemd service is stopped, disabled, and removed during `destroy_cluster`
+
+The forwarding uses `socat` to forward port 443 to the Istio IngressGateway NodePort. Istio handles SNI-based routing to different services based on hostname. For detailed architecture and troubleshooting, see **[Ingress Port Forwarding Documentation](docs/architecture/ingress-port-forwarding.md)**.
 
 ### Required environment for Jenkins and CLI integrations
 
@@ -186,6 +357,68 @@ The macOS Docker setup uses [Colima](https://github.com/abiosoft/colima). Config
 - `COLIMA_MEMORY` (default `8`) – memory in GiB
 - `COLIMA_DISK` (default `20`) – disk size in GiB
 
+## Documentation
+
+Detailed design, planning, and troubleshooting references live under `docs/`. Use the categorized list below to navigate directly to the file you need.
+
+### Architecture
+- **[Configuration-Driven Design](docs/architecture/configuration-driven-design.md)** - Core design principle that keeps providers pluggable
+- **[Jenkins Authentication Analysis](docs/architecture/JENKINS_AUTHENTICATION_ANALYSIS.md)** - Survey of supported Jenkins auth backends and trade-offs
+
+### Planning Documents
+- **[Directory Service Interface](docs/plans/directory-service-interface.md)** - Shared contract for OpenLDAP, AD, and Azure AD implementations
+- **[Active Directory Integration](docs/plans/active-directory-integration.md)** - Plan for wiring Jenkins to enterprise AD
+- **[Active Directory Testing Strategy](docs/plans/active-directory-testing-strategy.md)** - Test matrix for validating AD scenarios locally
+- **[Explicit Directory Service Commands](docs/plans/explicit-directory-service-commands.md)** - CLI roadmap for directory-focused helpers
+- **[LDAP Integration](docs/plans/ldap-integration.md)** - Tasks required to harden the LDAP stack
+- **[LDAP + Jenkins Integration](docs/plans/ldap-jenkins-integration.md)** - Jenkins-facing LDAP wiring plan
+- **[Jenkins Authentication Analysis](docs/plans/jenkins-authentication-analysis.md)** - Gap assessment to reach production-ready auth
+- **[Jenkins K8s Agents & SMB CSI](docs/plans/jenkins-k8s-agents-and-smb-csi.md)** - Persistent storage + agent topology plan
+- **[SMB CSI Mac Integration](docs/plans/smb-csi-mac-integration.md)** - SMB CSI driver setup using Mac as SMB server
+- **[Jenkins Security Enhancements](docs/plans/jenkins-security-enhancements.md)** - Follow-up items to raise Jenkins posture
+- **[Jenkins Smoke Test Implementation](docs/plans/jenkins-smoke-test-implementation.md)** - Automated validation coverage proposal
+- **[Jenkins TOTP MFA](docs/plans/jenkins-totp-mfa.md)** - Phased rollout for time-based MFA
+- **[Remaining Tasks Priority](docs/plans/remaining-tasks-priority.md)** - Backlog ordering for near-term milestones
+- **[Secret Backend Interface](docs/plans/secret-backend-interface.md)** - Multi-backend secret management abstraction
+- **[Vault Resilience](docs/plans/vault-resilience.md)** - Hardening plan for Vault HA + recovery paths
+
+### Developer Guides
+- **[CLAUDE.md](CLAUDE.md)** - Project overview and development guidelines for Claude Code
+- **[AGENTS.md](AGENTS.md)** - Code style principles and contribution guidelines specific to Codex agents
+
+### Implementation Documentation
+- **[Vault Agent Sidecar Implementation](docs/implementations/vault-sidecar-implementation.md)** - LDAP password injection via Vault agent sidecar
+
+### How-To Guides
+- **[Argo CD Setup Guide](docs/argocd-setup.md)** - Complete deployment guide for Argo CD with LDAP/Vault integration
+- **[Configuring SSL Trust for jenkins-cli](docs/howto/jenkins-cli-ssl-trust.md)** - Configure Java truststore to validate Vault-issued certificates
+- **[LDAP Bulk User Import](docs/howto/ldap-bulk-user-import.md)** - Steps for loading fixture users into the directory
+- **[LDAP Password Rotation](docs/howto/ldap-password-rotation.md)** - Manual rotation workflow for bind credentials
+- **[Jenkins K8s Agents Testing](docs/howto/jenkins-k8s-agents-testing.md)** - Smoke tests for dynamically provisioned Jenkins agents
+
+### Examples
+- **[LDAP Users CSV](docs/examples/ldap-users-example.csv)** - Fixture dataset for directory import tests
+
+### Issue Logs
+- **[ESO SecretStore Not Ready](docs/issues/2025-10-19-eso-secretstore-not-ready.md)** - Timeline and fix for ESO readiness
+- **[LDAP Bind DN Mismatch](docs/issues/2025-10-20-ldap-bind-dn-mismatch.md)** - Debug notes on LDAP DN drift
+- **[Jenkins Pod Readiness Timeout](docs/issues/2025-11-07-jenkins-pod-readiness-timeout.md)** - Investigation into slow pod startups
+- **[LDAP Empty Directory (No Users)](docs/issues/2025-11-11-ldap-empty-directory-no-users.md)** - RCA for missing seeded users
+- **[LDAP Password envsubst Issue](docs/issues/2025-11-21-ldap-password-envsubst-issue.md)** - Shell templating bug report
+- **[Cert Rotation Fixes](docs/issues/2025-11-21-cert-rotation-fixes.md)** - Follow-up changes after cert rotation incidents
+
+### Test Guides & Results
+- **[Active Directory Testing Instructions](docs/tests/active-directory-testing-instructions.md)** - End-to-end AD verification steps
+- **[Certificate Rotation Validation](docs/tests/certificate-rotation-validation.md)** - Checklist for TLS rotation drills
+- **[LDAP Password Rotation Test Guide](docs/tests/ldap-password-rotation-test-guide.md)** - Repeatable validation process
+- **[LDAP Password Rotation Test Results 2025-11-21](docs/tests/ldap-password-rotation-test-results-2025-11-21.md)** - Latest rotation outcomes
+- **[LDAP Auth Test Results 2025-11-20](docs/tests/ldap-auth-test-results-2025-11-20.md)** - Current LDAP auth health
+- **[Cert Rotation Test Results 2025-11-17](docs/tests/cert-rotation-test-results-2025-11-17.md)** - Historical TLS rotation run
+- **[Cert Rotation Test Results 2025-11-19](docs/tests/cert-rotation-test-results-2025-11-19.md)** - Follow-up TLS rotation run
+
+### Status Tracking
+- **[AD Integration Status](docs/ad-integration-status.md)** - Rolling status board for AD feature parity
+
 ## Directory layout
 
 ```
@@ -194,6 +427,10 @@ scripts/
   lib/               # core functionality
   plugins/           # optional features loaded on demand
   etc/               # templates and configs
+docs/
+  architecture/      # architecture and design documents
+  plans/             # feature planning and specifications
+  howto/             # user guides and how-to documentation
 ```
 
 ## How it fits together
@@ -227,11 +464,9 @@ graph TD
   subgraph Providers
      VAULT[HashiCorp Vault]
      AZ[Azure Key Vault]
-     BWD[Bitwarden]
   end
   ESO <-- sync/reads --> VAULT
   ESO <-- sync/reads --> AZ
-  ESO <-- sync/reads --> BWD
   ROTATOR -->|requests leaf certs| VAULT
 ```
 
@@ -282,10 +517,6 @@ The sequence now traces the `deploy_jenkins` flow: k3d-manager sources the Jenki
 | `create_az_sp` | `scripts/plugins/azure.sh` | Create an Azure service principal |
 | `deploy_azure_eso` | `scripts/plugins/azure.sh` | Deploy Azure ESO resources |
 | `eso_akv` | `scripts/plugins/azure.sh` | Manage Azure Key Vault ESO integration |
-| `ensure_bws_secret` | `scripts/plugins/bitwarden.sh` | Ensure Bitwarden secret exists |
-| `config_bws_eso` | `scripts/plugins/bitwarden.sh` | Configure Bitwarden ESO |
-| `eso_example_by_uuid` | `scripts/plugins/bitwarden.sh` | Example ESO lookup by UUID |
-| `verify_bws_token` | `scripts/plugins/bitwarden.sh` | Verify Bitwarden session token |
 | `deploy_eso` | `scripts/plugins/eso.sh` | Deploy External Secrets Operator |
 | `hello` | `scripts/plugins/hello.sh` | Example plugin |
 | `deploy_jenkins` | `scripts/plugins/jenkins.sh` | Deploy Jenkins |
@@ -295,7 +526,7 @@ The sequence now traces the `deploy_jenkins` flow: k3d-manager sources the Jenki
 
 The Vault plugin in [`scripts/plugins/vault.sh`](scripts/plugins/vault.sh) automates
 the entire PKI bootstrap that Jenkins and other services need. When you run
-`./scripts/k3d-manager deploy_vault ha`, the plugin installs the Helm chart,
+`./scripts/k3d-manager deploy_vault`, the plugin installs the Helm chart,
 initialises and unseals the HA cluster, enables the Kubernetes auth method and
 only then evaluates the PKI helpers. Once Vault is healthy, `_vault_setup_pki`
 runs (if `VAULT_ENABLE_PKI=1`) to mount PKI, generate the root CA and
@@ -398,12 +629,12 @@ public repositories. Operators that mirror the charts internally can instead set
    export VAULT_PKI_LEAF_HOST=jenkins.dev.local.me
    ```
 
-2. Deploy Vault in HA mode. The plugin will initialise Vault, configure the PKI
-   mount, generate the CA and, with the issuance toggle enabled, create the TLS
-   secret automatically.
+2. Deploy Vault (the plugin always provisions an HA cluster). The plugin will
+   initialise Vault, configure the PKI mount, generate the CA and, with the
+   issuance toggle enabled, create the TLS secret automatically.
 
    ```bash
-   ./scripts/k3d-manager deploy_vault ha
+   ./scripts/k3d-manager deploy_vault
    ```
 
 3. Verify that Vault issued the secret and inspect the resulting certificate:

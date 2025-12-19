@@ -19,11 +19,16 @@ metadata:
   name: ${JENKINS_CERT_ROTATOR_NAME}
   namespace: ${VAULT_PKI_SECRET_NS}
 rules:
+  # Create permission cannot use resourceNames (resource doesn't exist yet)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+  # Get/patch permissions scoped to specific secret
   - apiGroups: [""]
     resources: ["secrets"]
     resourceNames:
       - ${VAULT_PKI_SECRET_NAME}
-    verbs: ["get", "create", "patch"]
+    verbs: ["get", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -60,32 +65,38 @@ spec:
               image: ${JENKINS_CERT_ROTATOR_IMAGE}
               imagePullPolicy: IfNotPresent
               command:
-                - /bin/bash
+                - /bin/sh
                 - -c
                 - |
-                  set -euo pipefail
-                  missing=()
-                  for bin in jq curl openssl; do
+                  set -e
+                  # Install missing tools if needed (for Alpine-based images)
+                  if ! command -v apk >/dev/null 2>&1; then
+                    echo "ERROR: This image requires apk package manager" >&2
+                    exit 1
+                  fi
+
+                  echo "Installing required tools..."
+                  apk add --no-cache bash curl jq openssl kubectl >/dev/null 2>&1 || true
+
+                  # Verify required tools are available
+                  for bin in bash jq curl openssl kubectl; do
                     if ! command -v "$bin" >/dev/null 2>&1; then
-                      missing+=("$bin")
+                      echo "ERROR: Required tool '$bin' not found" >&2
+                      exit 1
                     fi
                   done
-                  if (( ${#missing[@]} )); then
-                    apt-get update -qq
-                    DEBIAN_FRONTEND=noninteractive apt-get install -qqy --no-install-recommends "${missing[@]}"
-                    apt-get clean
-                    rm -rf /var/lib/apt/lists/*
-                  fi
-                  /opt/jenkins-cert-rotator/cert-rotator.sh
+
+                  # Run cert rotation script
+                  /bin/bash /opt/jenkins-cert-rotator/cert-rotator.sh
               env:
                 - name: VAULT_ADDR
                   value: "${JENKINS_CERT_ROTATOR_VAULT_ADDR}"
                 - name: VAULT_PKI_PATH
-                  value: "${VAULT_PKI_PATH:-pki}"
+                  value: "${VAULT_PKI_PATH}"
                 - name: VAULT_PKI_ROLE
                   value: "${VAULT_PKI_ROLE}"
                 - name: VAULT_PKI_ROLE_TTL
-                  value: "${VAULT_PKI_ROLE_TTL:-}"
+                  value: "${VAULT_PKI_ROLE_TTL}"
                 - name: VAULT_PKI_SECRET_NS
                   value: "${VAULT_PKI_SECRET_NS}"
                 - name: VAULT_PKI_SECRET_NAME
@@ -93,17 +104,17 @@ spec:
                 - name: VAULT_PKI_LEAF_HOST
                   value: "${VAULT_PKI_LEAF_HOST}"
                 - name: VAULT_NAMESPACE
-                  value: "${VAULT_NAMESPACE:-}"
+                  value: "${VAULT_NAMESPACE}"
                 - name: VAULT_SKIP_VERIFY
-                  value: "${VAULT_SKIP_VERIFY:-}"
+                  value: "${VAULT_SKIP_VERIFY}"
                 - name: VAULT_CACERT
-                  value: "${VAULT_CACERT:-}"
+                  value: "${VAULT_CACERT}"
                 - name: JENKINS_CERT_ROTATOR_RENEW_BEFORE
                   value: "${JENKINS_CERT_ROTATOR_RENEW_BEFORE}"
                 - name: JENKINS_CERT_ROTATOR_VAULT_ROLE
                   value: "${JENKINS_CERT_ROTATOR_VAULT_ROLE}"
                 - name: JENKINS_CERT_ROTATOR_ALT_NAMES
-                  value: "${JENKINS_CERT_ROTATOR_ALT_NAMES:-}"
+                  value: "${JENKINS_CERT_ROTATOR_ALT_NAMES}"
               volumeMounts:
                 - name: rotator-script
                   mountPath: /opt/jenkins-cert-rotator

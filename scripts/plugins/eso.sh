@@ -1,7 +1,7 @@
 # scripts/plugins/external-secrets.sh
-# External Secrets Operator + Bitwarden Secrets Manager plugin for k3d-manager
+# External Secrets Operator plugin for k3d-manager
 
-# Install ESO and enable the Bitwarden SDK server dependency
+# Install ESO (External Secrets Operator)
 function deploy_eso() {
   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     echo "Usage: deploy_eso [namespace=external-secrets] [release=external-secrets]"
@@ -15,6 +15,21 @@ function deploy_eso() {
   local helm_chart_ref_default="external-secrets/external-secrets"
   local helm_chart_ref="${ESO_HELM_CHART_REF:-$helm_chart_ref_default}"
 
+  local -a required_crds=(
+    secretstores.external-secrets.io
+    externalsecrets.external-secrets.io
+    clustersecretstores.external-secrets.io
+  )
+
+  local -a missing_crds=()
+  local crd
+  for crd in "${required_crds[@]}"; do
+    if ! _kubectl --no-exit get crd "$crd" >/dev/null 2>&1; then
+      missing_crds+=("$crd")
+    fi
+  done
+
+  local release_exists=0
   local skip_repo_ops=0
   case "$helm_chart_ref" in
     /*|./*|../*|file://*)
@@ -28,8 +43,16 @@ function deploy_eso() {
   esac
 
   if _run_command --no-exit -- helm -n "$ns" status "$release" > /dev/null 2>&1 ; then
+      release_exists=1
+  fi
+
+  if (( release_exists )) && (( ${#missing_crds[@]} == 0 )); then
       echo "ESO already installed in namespace $ns"
       return 0
+  fi
+
+  if (( release_exists )) && (( ${#missing_crds[@]} > 0 )); then
+      _warn "ESO release '$release' is present but required CRDs are missing; reapplying chart installation."
   fi
 
   # _kubectl --no-exit --quiet get ns "$ns" >/dev/null 2>&1 || _kubectl create ns "$ns"
@@ -43,8 +66,25 @@ function deploy_eso() {
       --create-namespace \
       --set installCRDs=true
 
+  for crd in "${required_crds[@]}"; do
+    local observed=0
+    for ((attempt=0; attempt<12; attempt++)); do
+      if _kubectl --no-exit get crd "$crd" >/dev/null 2>&1; then
+        observed=1
+        break
+      fi
+      sleep 5
+    done
+    if (( ! observed )); then
+      _warn "CRD ${crd} not detected after 60 seconds; verify the ESO installation if issues persist."
+      continue
+    fi
+    if ! _kubectl --no-exit wait --for=condition=Established --timeout=120s "crd/${crd}" >/dev/null 2>&1; then
+      _warn "Timed out waiting for CRD ${crd} to become ready; verify the ESO installation if issues persist."
+    fi
+  done
+
   # Wait for controllers and the SDK server
   _kubectl -n "$ns" rollout status deploy/external-secrets --timeout=120s
   echo "ESO installed namespace $ns"
 }
-

@@ -11,7 +11,14 @@ function _default_cluster_provider() {
         return 0
     fi
 
-    echo "k3d"
+    # Auto-detect based on available binaries
+    if command -v k3d >/dev/null 2>&1; then
+        echo "k3d"
+    elif command -v k3s >/dev/null 2>&1; then
+        echo "k3s"
+    else
+        echo "k3d"  # Final fallback
+    fi
 }
 
 function _cluster_provider_module_path() {
