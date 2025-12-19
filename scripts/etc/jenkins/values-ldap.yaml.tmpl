@@ -1,0 +1,270 @@
+controller:
+  sidecars:
+    configAutoReload:
+      enabled: true
+  podAnnotations:
+    sidecar.istio.io/inject: "false"
+  image:
+    registry: docker.io
+    repository: jenkins/jenkins
+    tag: lts
+    pullPolicy: IfNotPresent
+  installPlugins:
+    - active-directory
+    - ldap
+    - configuration-as-code
+    - credentials
+    - git
+    - hashicorp-vault-plugin
+    - job-dsl
+    - kubernetes
+    - matrix-auth
+    - matrix-project
+    - metrics
+    - mina-sshd-api-common
+    - mina-sshd-api-core
+    - okhttp-api
+    - parameterized-trigger
+    - workflow-aggregator
+    - workflow-multibranch
+    - pipeline-build-step
+    - pipeline-stage-view
+    - pipeline-utility-steps
+    - plain-credentials
+    - plugin-util-api
+    - script-security
+    - ssh-credentials
+    - ssh-slaves
+    - sshd
+    ${JENKINS_MFA_PLUGIN}
+  # Use Helm chart's built-in javaOpts and jenkinsOpts instead of containerEnv
+  javaOpts: "-Djenkins.install.runSetupWizard=false"
+  jenkinsOpts: "--httpPort=8080 --httpListenAddress=0.0.0.0"
+
+  containerEnv:
+    - name: JENKINS_ADMIN_USER
+      value: "jenkins-admin"
+    - name: JENKINS_ADMIN_PASS
+      valueFrom:
+        secretKeyRef:
+          name: jenkins-admin
+          key: jenkins-admin-password
+    - name: LDAP_URL
+      value: "ldap://openldap-openldap-bitnami.directory.svc.cluster.local:389"
+    - name: LDAP_GROUP_SEARCH_BASE
+      value: "ou=groups"
+    - name: LDAP_USER_SEARCH_BASE
+      value: "ou=users"
+    - name: LDAP_BASE_DN
+      valueFrom:
+        secretKeyRef:
+          name: jenkins-ldap-config
+          key: LDAP_BASE_DN
+    - name: LDAP_BIND_DN
+      valueFrom:
+        secretKeyRef:
+          name: jenkins-ldap-config
+          key: LDAP_BIND_DN
+    - name: LDAP_BIND_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: jenkins-ldap-config
+          key: LDAP_BIND_PASSWORD
+
+  serviceAccount:
+    create: true
+    name: jenkins-admin
+
+  admin:
+    createSecret: false
+    existingSecret: jenkins-admin
+    userKey: jenkins-admin-user
+    passwordKey: jenkins-admin-password
+
+  podSecurityContext:
+    fsGroup: 1000
+    runAsUser: 1000
+
+  serviceType: ClusterIP
+  servicePort: 8081
+  targetPort: 8080
+  containerPort: 8080
+  servicePortName: http
+
+  healthProbes: true
+  probes:
+    startupProbe:
+      httpGet:
+        path: /login
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 90
+      periodSeconds: 5
+      failureThreshold: 180
+    readinessProbe:
+      httpGet:
+        path: /login
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 90
+      periodSeconds: 5
+      failureThreshold: 120
+    livenessProbe:
+      httpGet:
+        path: /login
+        port: 8080
+        scheme: HTTP
+      initialDelaySeconds: 90
+      periodSeconds: 5
+      failureThreshold: 60
+  JCasC:
+    defaultConfig: false
+    configScripts:
+      00-location.yaml: |
+        unclassified:
+          location:
+            url: "https://${VAULT_PKI_LEAF_HOST}/"      # trailing slash required
+            adminAddress: "jenkins-admin@me.com"
+      01-security: |
+        jenkins:
+          securityRealm:
+            ldap:
+              configurations:
+                - server: "${LDAP_URL}"
+                  rootDN: "${LDAP_BASE_DN}"
+                  userSearch: "(cn={0})"
+                  userSearchBase: "${LDAP_USER_SEARCH_BASE}"
+                  groupSearchBase: "${LDAP_GROUP_SEARCH_BASE}"
+                  managerDN: "${LDAP_BIND_DN}"
+                  managerPasswordSecret: "${LDAP_BIND_PASSWORD}"
+                  inhibitInferRootDN: false
+                  displayNameAttributeName: "cn"
+                  mailAddressAttributeName: "mail"
+              disableMailAddressResolver: false
+          authorizationStrategy:
+            projectMatrix:
+              entries:
+                - group:
+                    name: "jenkins-admins"
+                    permissions:
+                      - "Overall/Read"
+                      - "Overall/Administer"
+      02-kubernetes-agents: |
+        jenkins:
+          clouds:
+            - kubernetes:
+                name: "kubernetes"
+                serverUrl: "https://kubernetes.default"
+                namespace: "${JENKINS_NAMESPACE}"
+                jenkinsUrl: "http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8081"
+                jenkinsTunnel: "jenkins-agent.${JENKINS_NAMESPACE}.svc.cluster.local:50000"
+                containerCapStr: "10"
+                maxRequestsPerHostStr: "32"
+                retentionTimeout: 5
+                connectTimeout: 10
+                readTimeout: 20
+                templates:
+                  - name: "linux-agent"
+                    label: "linux-agent"
+                    nodeUsageMode: "NORMAL"
+                    containers:
+                      - name: "jnlp"
+                        image: "jenkins/inbound-agent:latest"
+                        alwaysPullImage: false
+                        workingDir: "/home/jenkins/agent"
+                        command: ""
+                        args: ""
+                        ttyEnabled: true
+                        resourceRequestCpu: "500m"
+                        resourceRequestMemory: "512Mi"
+                        resourceLimitCpu: "1000m"
+                        resourceLimitMemory: "1Gi"
+                    yaml: |
+                      apiVersion: v1
+                      kind: Pod
+                      metadata:
+                        labels:
+                          jenkins-agent: "linux"
+                        annotations:
+                          sidecar.istio.io/inject: "false"
+                      spec:
+                        serviceAccountName: jenkins-admin
+                        securityContext:
+                          fsGroup: 1000
+                  - name: "kaniko-agent"
+                    label: "kaniko-agent"
+                    nodeUsageMode: "NORMAL"
+                    containers:
+                      - name: "jnlp"
+                        image: "jenkins/inbound-agent:latest"
+                        alwaysPullImage: false
+                        workingDir: "/home/jenkins/agent"
+                        command: ""
+                        args: ""
+                        ttyEnabled: true
+                        resourceRequestCpu: "500m"
+                        resourceRequestMemory: "512Mi"
+                        resourceLimitCpu: "1000m"
+                        resourceLimitMemory: "1Gi"
+                      - name: "kaniko"
+                        image: "gcr.io/kaniko-project/executor:debug"
+                        alwaysPullImage: false
+                        workingDir: "/home/jenkins/agent"
+                        command: "/busybox/cat"
+                        ttyEnabled: true
+                        resourceRequestCpu: "500m"
+                        resourceRequestMemory: "1Gi"
+                        resourceLimitCpu: "2000m"
+                        resourceLimitMemory: "2Gi"
+                    volumes:
+                      - emptyDirVolume:
+                          memory: false
+                          mountPath: "/kaniko/.docker"
+                    yaml: |
+                      apiVersion: v1
+                      kind: Pod
+                      metadata:
+                        labels:
+                          jenkins-agent: "kaniko"
+                        annotations:
+                          sidecar.istio.io/inject: "false"
+                      spec:
+                        serviceAccountName: jenkins-admin
+                        securityContext:
+                          fsGroup: 1000
+      03-job-dsl-seed: |
+        jobs:
+          - script: >
+              freeStyleJob('seed-job') {
+                displayName('Seed Job')
+                description('Processes Job DSL scripts from GitHub repository')
+                scm {
+                  git {
+                    remote {
+                      url('https://github.com/your-org/jenkins-job-dsl.git')
+                      credentials('')
+                    }
+                    branch('*/main')
+                  }
+                }
+                triggers {
+                  scm('H/15 * * * *')
+                }
+                steps {
+                  dsl {
+                    external('jobs/**/*.groovy')
+                    removeAction('DELETE')
+                    removeViewAction('DELETE')
+                    lookupStrategy('SEED_JOB')
+                  }
+                }
+              }
+
+  # Optional but keeps env consistent with JCasC Location
+  jenkinsUrl: "https://${VAULT_PKI_LEAF_HOST}/"
+
+# Persistence configuration (root level, not under controller)
+persistence:
+  enabled: true
+  existingClaim: jenkins-home
+  storageClass: local-path-retain

@@ -186,3 +186,12 @@ function _provider_k3d_deploy_cluster() {
    fi
    _provider_k3d_configure_istio "$cluster_name"
 }
+
+function _provider_k3d_expose_ingress() {
+   _info "k3d provider uses Docker port mapping for ingress exposure"
+   _info "No additional configuration needed - ports are exposed during cluster creation"
+   _info ""
+   _info "To modify port mappings, update your cluster configuration and recreate:"
+   _info "  ./scripts/k3d-manager destroy_cluster"
+   _info "  ./scripts/k3d-manager create_cluster"
+}

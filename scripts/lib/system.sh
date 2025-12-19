@@ -11,8 +11,15 @@ function _command_exist() {
 #
 # Returns the command's real exit code; prints a helpful error unless --quiet.
 function _run_command() {
-  local quiet=0 prefer_sudo=0 require_sudo=0 probe= soft=0
+  local quiet=0 prefer_sudo=0 require_sudo=0 interactive_sudo=0 probe= soft=0
   local -a probe_args=()
+
+  # Auto-detect interactive mode: use interactive sudo if in a TTY and not explicitly disabled
+  # Can be overridden with K3DMGR_NONINTERACTIVE=1 environment variable
+  local auto_interactive=0
+  if [[ -t 0 ]] && [[ "${K3DMGR_NONINTERACTIVE:-0}" != "1" ]]; then
+    auto_interactive=1
+  fi
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -20,11 +27,17 @@ function _run_command() {
       --quiet)        quiet=1; shift;;
       --prefer-sudo)  prefer_sudo=1; shift;;
       --require-sudo) require_sudo=1; shift;;
+      --interactive-sudo) interactive_sudo=1; prefer_sudo=1; shift;;
       --probe)        probe="$2"; shift 2;;
       --)             shift; break;;
       *)              break;;
     esac
   done
+
+  # If --prefer-sudo is set and we're in auto-interactive mode, enable interactive sudo
+  if (( prefer_sudo )) && (( auto_interactive )) && (( interactive_sudo == 0 )); then
+    interactive_sudo=1
+  fi
 
   local prog="${1:?usage: _run_command [opts] -- <prog> [args...]}"
   shift
@@ -42,29 +55,40 @@ function _run_command() {
     read -r -a probe_args <<< "$probe"
   fi
 
-  # Decide runner: user vs sudo -n
+  # Decide runner: user vs sudo -n vs sudo (interactive)
   local runner
+  local sudo_flags=()
+  if (( interactive_sudo == 0 )); then
+    sudo_flags=(-n)  # Non-interactive sudo
+  fi
+
   if (( require_sudo )); then
-    if sudo -n true >/dev/null 2>&1; then
-      runner=(sudo -n "$prog")
+    if (( interactive_sudo )) || sudo -n true >/dev/null 2>&1; then
+      runner=(sudo "${sudo_flags[@]}" "$prog")
     else
       (( quiet )) || echo "sudo non-interactive not available" >&2
       exit 127
     fi
   else
     if (( ${#probe_args[@]} )); then
-      # Try user first; if probe fails, try sudo -n
+      # Try user first; if probe fails, try sudo
       if "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
         runner=("$prog")
+      elif (( interactive_sudo )) && sudo "${sudo_flags[@]}" "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
+        runner=(sudo "${sudo_flags[@]}" "$prog")
       elif sudo -n "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
         runner=(sudo -n "$prog")
+      elif (( prefer_sudo )) && ((interactive_sudo)) ; then
+        runner=(sudo "${sudo_flags[@]}" "$prog")
       elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
         runner=(sudo -n "$prog")
       else
         runner=("$prog")
       fi
     else
-      if (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
+      if (( prefer_sudo )) && (( interactive_sudo )); then
+        runner=(sudo "${sudo_flags[@]}" "$prog")
+      elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
         runner=(sudo -n "$prog")
       else
         runner=("$prog")
@@ -91,6 +115,27 @@ function _run_command() {
   fi
 
   return 0
+}
+
+function _args_have_sensitive_flag() {
+  local arg
+  local expect_secret=0
+
+  for arg in "$@"; do
+    if (( expect_secret )); then
+      return 0
+    fi
+    case "$arg" in
+      --password|--token|--username)
+        expect_secret=1
+        ;;
+      --password=*|--token=*|--username=*)
+        return 0
+        ;;
+    esac
+  done
+
+  return 1
 }
 
 _ensure_secret_tool() {
@@ -128,6 +173,355 @@ function _secret_tool() {
 # macOS only
 function _security() {
    _run_command --quiet -- security "$@"
+}
+
+function _set_sensitive_var() {
+   local name="${1:?variable name required}"
+   local value="${2:-}"
+   local wasx=0
+   case $- in *x*) wasx=1; set +x;; esac
+   printf -v "$name" '%s' "$value"
+   (( wasx )) && set -x
+}
+
+function _write_sensitive_file() {
+   local path="${1:?path required}"
+   local data="${2:-}"
+   local wasx=0
+   local old_umask
+   case $- in *x*) wasx=1; set +x;; esac
+   old_umask=$(umask)
+   umask 077
+   printf '%s' "$data" > "$path"
+   local rc=$?
+   if (( rc == 0 )); then
+      chmod 600 "$path" 2>/dev/null || true
+   fi
+   umask "$old_umask"
+   (( wasx )) && set -x
+   return "$rc"
+}
+
+function _remove_sensitive_file() {
+   local path="${1:-}"
+   local wasx=0
+   if [[ -z "$path" ]]; then
+      return 0
+   fi
+   case $- in *x*) wasx=1; set +x;; esac
+   rm -f -- "$path"
+   (( wasx )) && set -x
+}
+
+function _decode_hex_blob() {
+   local blob="${1:-}"
+   local wasx=0
+   case $- in *x*) wasx=1; set +x;; esac
+   if [[ -n "$blob" && "$blob" =~ ^[0-9a-fA-F]+$ && $(( ${#blob} % 2 )) -eq 0 ]]; then
+      local decoded=""
+      decoded=$(python3 - "$blob" <<'PY'
+import binascii
+import sys
+try:
+    sys.stdout.write(binascii.unhexlify(sys.argv[1]).decode("utf-8"))
+except Exception:
+    sys.stdout.write(sys.argv[1])
+PY
+      )
+      (( wasx )) && set -x
+      printf '%s' "$decoded"
+      return 0
+   fi
+   (( wasx )) && set -x
+   printf '%s' "$blob"
+}
+
+function _json_escape() {
+   local value="${1:-}"
+   value="${value//\\/\\\\}"
+   value="${value//\"/\\\"}"
+   printf '%s' "$value"
+}
+
+function _write_registry_config() {
+   local host="${1:?registry host required}"
+   local username="${2:?username required}"
+   local password="${3:?password required}"
+   local destination="${4:?destination required}"
+
+   local auth=""
+   auth=$(printf '%s:%s' "$username" "$password" | base64 | tr -d $'\r\n')
+
+   local esc_user esc_pass
+   esc_user=$(_json_escape "$username")
+   esc_pass=$(_json_escape "$password")
+
+   local config=""
+   config=$'{\n  "auths": {\n'
+   printf -v config '%s    "%s": {\n      "username": "%s",\n      "password": "%s",\n      "auth": "%s"\n    }' \
+      "$config" "$host" "$esc_user" "$esc_pass" "$auth"
+
+   if [[ "$host" == "registry-1.docker.io" ]]; then
+      printf -v config '%s,\n    "%s": {\n      "username": "%s",\n      "password": "%s",\n      "auth": "%s"\n    }\n' \
+         "$config" "https://index.docker.io/v1/" "$esc_user" "$esc_pass" "$auth"
+   else
+      config+=$'\n'
+   fi
+
+   config+=$'  }\n}\n'
+
+   _write_sensitive_file "$destination" "$config"
+}
+
+function _build_credential_blob() {
+   local username="${1:?username required}"
+   local password="${2:?password required}"
+   local blob=""
+   local wasx=0
+   case $- in *x*) wasx=1; set +x;; esac
+   printf -v blob 'username=%s\npassword=%s\n' "$username" "$password"
+   (( wasx )) && set -x
+   printf '%s' "$blob"
+}
+
+function _parse_credential_blob() {
+   local blob="${1:-}"
+   local username_var="${2:?username variable required}"
+   local password_var="${3:?password variable required}"
+   local username=""
+   local password=""
+   local line key value
+
+   if [[ -z "$blob" ]]; then
+      return 1
+   fi
+
+   while IFS='=' read -r key value; do
+      case "$key" in
+         username) username="$value" ;;
+         password) password="$value" ;;
+      esac
+   done <<<"$blob"
+
+   if [[ -z "$username" || -z "$password" ]]; then
+      return 1
+   fi
+
+   _set_sensitive_var "$username_var" "$username"
+   _set_sensitive_var "$password_var" "$password"
+   return 0
+}
+
+function _oci_registry_host() {
+   local ref="${1:-}"
+   if [[ "$ref" == oci://* ]]; then
+      ref="${ref#oci://}"
+      printf '%s\n' "${ref%%/*}"
+      return 0
+   fi
+   return 1
+}
+
+function _secret_tool_ready() {
+   if _command_exist secret-tool; then
+      return 0
+   fi
+
+   if _is_linux; then
+      if _ensure_secret_tool >/dev/null 2>&1; then
+         return 0
+      fi
+   fi
+
+   return 1
+}
+
+function _store_registry_credentials() {
+   local context="${1:?context required}"
+   local host="${2:?registry host required}"
+   local username="${3:?username required}"
+   local password="${4:?password required}"
+   local blob=""
+   local blob_file=""
+
+   blob=$(_build_credential_blob "$username" "$password") || return 1
+   blob_file=$(mktemp -t registry-cred.XXXXXX) || return 1
+   _write_sensitive_file "$blob_file" "$blob"
+
+   if _is_mac; then
+      local service="${context}:${host}"
+      local account="${context}"
+      local rc=0
+      _no_trace bash -c 'security delete-generic-password -s "$1" >/dev/null 2>&1 || true' _ "$service" >/dev/null 2>&1
+      if ! _no_trace bash -c 'security add-generic-password -s "$1" -a "$2" -w "$3" >/dev/null' _ "$service" "$account" "$blob"; then
+         rc=$?
+      fi
+      _remove_sensitive_file "$blob_file"
+      return $rc
+   fi
+
+   if _secret_tool_ready; then
+      local label="${context} registry ${host}"
+      local rc=0
+      _no_trace bash -c 'secret-tool clear service "$1" registry "$2" type "$3" >/dev/null 2>&1 || true' _ "$context" "$host" "helm-oci" >/dev/null 2>&1
+      local store_output=""
+      store_output=$(_no_trace bash -c 'secret-tool store --label "$1" service "$2" registry "$3" type "$4" < "$5"' _ "$label" "$context" "$host" "helm-oci" "$blob_file" 2>&1)
+      local store_rc=$?
+      if (( store_rc != 0 )) || [[ -n "$store_output" ]]; then
+         rc=${store_rc:-1}
+         if [[ -z "$store_output" ]]; then
+            store_output="unable to persist credentials via secret-tool"
+         fi
+         _warn "[${context}] secret-tool store failed for ${host}: ${store_output}"
+      fi
+      _remove_sensitive_file "$blob_file"
+      if (( rc == 0 )); then
+         return 0
+      fi
+   fi
+
+   _remove_sensitive_file "$blob_file"
+   _warn "[${context}] unable to persist OCI credentials securely; re-supply --username/--password on next run"
+   return 1
+}
+
+function _registry_login() {
+   local host="${1:?registry host required}"
+   local username="${2:-}"
+   local password="${3:-}"
+   local registry_config="${4:-}"
+   local pass_file=""
+
+   if [[ -z "$username" || -z "$password" ]]; then
+      return 1
+   fi
+
+   pass_file=$(mktemp -t helm-pass.XXXXXX) || return 1
+   if ! _write_sensitive_file "$pass_file" "$password"; then
+      _remove_sensitive_file "$pass_file"
+      return 1
+   fi
+
+   local login_output=""
+   local login_rc=0
+   if [[ -n "$registry_config" ]]; then
+      login_output=$(_no_trace bash -c 'HELM_REGISTRY_CONFIG="$4" helm registry login "$1" --username "$2" --password-stdin < "$3"' _ "$host" "$username" "$pass_file" "$registry_config" 2>&1) || login_rc=$?
+   else
+      login_output=$(_no_trace bash -c 'helm registry login "$1" --username "$2" --password-stdin < "$3"' _ "$host" "$username" "$pass_file" 2>&1) || login_rc=$?
+   fi
+   _remove_sensitive_file "$pass_file"
+
+   if (( login_rc != 0 )); then
+      if [[ -n "$login_output" ]]; then
+         _warn "[helm] registry login failed for ${host}: ${login_output}"
+      else
+         _warn "[helm] registry login failed for ${host}; ensure credentials are valid."
+      fi
+      return 1
+   fi
+
+   _info "[helm] authenticated OCI registry ${host}"
+   return 0
+}
+
+function _load_registry_credentials() {
+   local context="${1:?context required}"
+   local host="${2:?registry host required}"
+   local username_var="${3:?username variable required}"
+   local password_var="${4:?password variable required}"
+   local blob=""
+
+   if _is_mac; then
+      local service="${context}:${host}"
+      blob=$(_no_trace bash -c 'security find-generic-password -s "$1" -w' _ "$service" 2>/dev/null || true)
+   elif _command_exist secret-tool; then
+      blob=$(_no_trace bash -c 'secret-tool lookup service "$1" registry "$2" type "$3"' _ "$context" "$host" "helm-oci" 2>/dev/null || true)
+   fi
+
+   if [[ -z "$blob" ]]; then
+      return 1
+   fi
+
+   blob=$(_decode_hex_blob "$blob")
+
+   _parse_credential_blob "$blob" "$username_var" "$password_var" || return 1
+   return 0
+}
+
+function _secret_store_data() {
+   local service="${1:?service name required}"
+   local key="${2:?entry key required}"
+   local data="${3:-}"
+   local label="${4:-${service} ${key}}"
+   local type="${5:-note}"
+
+   if _is_mac; then
+      local rc=0
+      _no_trace bash -c 'security delete-generic-password -s "$1" -a "$2" >/dev/null 2>&1 || true' _ "$service" "$key"
+      if ! _no_trace bash -c 'security add-generic-password -s "$1" -a "$2" -w "$3" >/dev/null' _ "$service" "$key" "$data"; then
+         rc=$?
+      fi
+      return "$rc"
+   fi
+
+   if _secret_tool_ready; then
+      local tmp rc=0 store_output=""
+      tmp=$(mktemp -t secret-data.XXXXXX) || return 1
+      if ! _write_sensitive_file "$tmp" "$data"; then
+         _remove_sensitive_file "$tmp"
+         return 1
+      fi
+      _no_trace bash -c 'secret-tool clear service "$1" name "$2" type "$3" >/dev/null 2>&1 || true' _ "$service" "$key" "$type"
+      store_output=$(_no_trace bash -c 'secret-tool store --label "$1" service "$2" name "$3" type "$4" < "$5"' _ "$label" "$service" "$key" "$type" "$tmp" 2>&1)
+      rc=$?
+      _remove_sensitive_file "$tmp"
+      if (( rc != 0 )) || [[ -n "$store_output" ]]; then
+         _warn "[secret] unable to store data for ${service}/${key}: ${store_output:-unknown error}"
+         return ${rc:-1}
+      fi
+      return 0
+   fi
+
+   _warn "[secret] secure storage unavailable; install secret-tool or run on macOS"
+   return 1
+}
+
+function _secret_load_data() {
+   local service="${1:?service name required}"
+   local key="${2:?entry key required}"
+   local type="${3:-note}"
+   local value=""
+
+   if _is_mac; then
+      value=$(_no_trace bash -c 'security find-generic-password -s "$1" -a "$2" -w' _ "$service" "$key" 2>/dev/null || true)
+   elif _command_exist secret-tool; then
+      value=$(_no_trace bash -c 'secret-tool lookup service "$1" name "$2" type "$3"' _ "$service" "$key" "$type" 2>/dev/null || true)
+   fi
+
+   if [[ -z "$value" ]]; then
+      return 1
+   fi
+
+   printf '%s' "$value"
+   return 0
+}
+
+function _secret_clear_data() {
+   local service="${1:?service name required}"
+   local key="${2:?entry key required}"
+   local type="${3:-note}"
+
+   if _is_mac; then
+      _no_trace bash -c 'security delete-generic-password -s "$1" -a "$2" >/dev/null 2>&1 || true' _ "$service" "$key"
+      return 0
+   fi
+
+   if _command_exist secret-tool; then
+      _no_trace bash -c 'secret-tool clear service "$1" name "$2" type "$3" >/dev/null 2>&1 || true' _ "$service" "$key" "$type"
+      return 0
+   fi
+
+   return 1
 }
 
 function _install_debian_kubernetes_client() {
@@ -464,6 +858,16 @@ function _load_plugin_function() {
   local func="${1:?usage: _load_plugin_function <function> [args...]}"
   shift
   local plugin
+  local restore_trace=0
+
+  if [[ $- == *x* ]]; then
+    set +x
+    if _args_have_sensitive_flag "$@"; then
+      restore_trace=1
+    else
+      set -x
+    fi
+  fi
 
   shopt -s nullglob
   trap 'shopt -u nullglob' RETURN
@@ -473,11 +877,19 @@ function _load_plugin_function() {
       # shellcheck source=/dev/null
       source "$plugin"
       if [[ "$(type -t -- "$func")" == "function" ]]; then
-        "$func" "$@"
-        return $?
+        local rc=0
+        "$func" "$@" || rc=$?
+        if (( restore_trace )); then
+          set -x
+        fi
+        return "$rc"
       fi
     fi
   done
+
+  if (( restore_trace )); then
+    set -x
+  fi
 
   echo "Error: Function '$func' not found in plugins" >&2
   return 1
@@ -521,23 +933,6 @@ function _sha256_12() {
 
    hash="${line%% *}"
    printf %s "${hash:0:12}"
-}
-
-function _is_same_token() {
-   local token1="$1"
-   local token2="$2"
-
-   if [[ -z "$token1" ]] && [[ -z "$token2" ]]; then
-      echo "One or both tokens are empty" >&2
-      exit -1
-   fi
-
-   if [[ "$token1" == "$token2" ]]; then
-      echo "Bitwarden token in k3d matches local token."
-      return 1
-   else
-      return 0
-   fi
 }
 
 function _version_ge() {
@@ -794,7 +1189,10 @@ function _detect_cluster_name() {
 # ---------- tiny log helpers (no parentheses, no single-quote apostrophes) ----------
 function _info() { printf 'INFO: %s\n' "$*" >&2; }
 function _warn() { printf 'WARN: %s\n' "$*" >&2; }
-function _err() { printf 'ERROR: %s\n' "$*" >&2; exit 127; }
+function _err() {
+   printf 'ERROR: %s\n' "$*" >&2
+   exit 1
+}
 
 function _no_trace() {
   local wasx=0

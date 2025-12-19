@@ -41,7 +41,11 @@ setup() {
   read_lines "$RUN_LOG" run_calls
   [ "${run_calls[0]}" = "helm -n test-ns status test-release" ]
   [ ! -s "$HELM_LOG" ]
-  [ ! -s "$KUBECTL_LOG" ]
+  read_lines "$KUBECTL_LOG" kubectl_calls
+  [ "${#kubectl_calls[@]}" -eq 3 ]
+  [ "${kubectl_calls[0]}" = "get crd secretstores.external-secrets.io" ]
+  [ "${kubectl_calls[1]}" = "get crd externalsecrets.external-secrets.io" ]
+  [ "${kubectl_calls[2]}" = "get crd clustersecretstores.external-secrets.io" ]
 }
 
 @test "Fresh install" {
@@ -55,7 +59,14 @@ setup() {
   [ "${helm_calls[1]}" = "repo update" ]
   [[ "${helm_calls[2]}" == upgrade\ --install\ -n\ sample-ns\ external-secrets\ external-secrets/external-secrets\ --create-namespace\ --set\ installCRDs=true ]]
   read_lines "$KUBECTL_LOG" kubectl_calls
-  [ "${kubectl_calls[0]}" = "-n sample-ns rollout status deploy/external-secrets --timeout=120s" ]
+  local rollout_found=0
+  for cmd in "${kubectl_calls[@]}"; do
+    if [[ "$cmd" = "-n sample-ns rollout status deploy/external-secrets --timeout=120s" ]]; then
+      rollout_found=1
+      break
+    fi
+  done
+  [ "$rollout_found" -eq 1 ]
 }
 
 @test "Local ESO chart skips repo add" {

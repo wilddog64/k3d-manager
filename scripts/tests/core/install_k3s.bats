@@ -49,8 +49,6 @@ setup() {
   }
   export -f _run_command
 
-  _k3s_set_defaults
-
   run _start_k3s_service
   [ "$status" -eq 0 ]
 
@@ -163,7 +161,7 @@ setup() {
 
   RUN_EXIT_CODES=(1)
 
-  run -127 _ensure_path_exists "$target"
+  run -1 _ensure_path_exists "$target"
   [[ "$output" == *"Cannot create directory '$target'. Create it manually, configure sudo, or set K3S_CONFIG_DIR to a writable path."* ]]
 
   chmod 755 "$parent"

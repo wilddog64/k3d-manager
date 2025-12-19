@@ -1,0 +1,105 @@
+# Basic LDAP Schema Bootstrap - Test Users and Groups
+# This LDIF creates a basic LDAP structure for testing Jenkins authentication
+# Structure: dc=home,dc=org (matches current LDAP deployment)
+# Password for all users: test1234 (SSHA hash)
+#
+# This LDIF includes the complete base DN structure (base DN + OUs) plus test users and groups
+# When using a custom LDIF file, skip_default_tree_generation is set to true, so we must
+# define the entire directory structure here.
+
+# Base DN
+dn: dc=home,dc=org
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: Home Org
+dc: home
+
+# Organizational Units
+dn: ou=users,dc=home,dc=org
+objectClass: top
+objectClass: organizationalUnit
+ou: users
+
+dn: ou=groups,dc=home,dc=org
+objectClass: top
+objectClass: organizationalUnit
+ou: groups
+
+dn: ou=service,dc=home,dc=org
+objectClass: top
+objectClass: organizationalUnit
+ou: service
+
+# Test Users
+# User 1: chengkai.liang (Admin - matches baseline branch IT DevOps group)
+dn: cn=chengkai.liang,ou=users,dc=home,dc=org
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
+cn: chengkai.liang
+sn: Liang
+givenName: Chengkai
+displayName: Chengkai Liang
+uid: chengkai.liang
+uidNumber: 10001
+gidNumber: 10000
+homeDirectory: /home/chengkai.liang
+mail: chengkai.liang@home.org
+userPassword: {SSHA}Fvoa1XMaBL4y9QP0E6KcYYQUO901vjJg
+
+# User 2: jenkins-admin (Service Account)
+dn: cn=jenkins-admin,ou=users,dc=home,dc=org
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
+cn: jenkins-admin
+sn: Admin
+givenName: Jenkins
+displayName: Jenkins Administrator
+uid: jenkins-admin
+uidNumber: 10002
+gidNumber: 10000
+homeDirectory: /home/jenkins-admin
+mail: jenkins-admin@home.org
+userPassword: {SSHA}Fvoa1XMaBL4y9QP0E6KcYYQUO901vjJg
+
+# User 3: test-user (Regular User)
+dn: cn=test-user,ou=users,dc=home,dc=org
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
+cn: test-user
+sn: User
+givenName: Test
+displayName: Test User
+uid: test-user
+uidNumber: 10003
+gidNumber: 10000
+homeDirectory: /home/test-user
+mail: test-user@home.org
+userPassword: {SSHA}Fvoa1XMaBL4y9QP0E6KcYYQUO901vjJg
+
+# Groups
+# Group 1: jenkins-admins (Jenkins Administrators)
+dn: cn=jenkins-admins,ou=groups,dc=home,dc=org
+objectClass: groupOfNames
+cn: jenkins-admins
+description: Jenkins Administrators Group
+member: cn=chengkai.liang,ou=users,dc=home,dc=org
+member: cn=jenkins-admin,ou=users,dc=home,dc=org
+
+# Group 2: it-devops (IT DevOps Team - matches baseline branch)
+dn: cn=it-devops,ou=groups,dc=home,dc=org
+objectClass: groupOfNames
+cn: it-devops
+description: IT DevOps Team (baseline branch alignment)
+member: cn=chengkai.liang,ou=users,dc=home,dc=org
+member: cn=jenkins-admin,ou=users,dc=home,dc=org
+
+# Group 3: developers (Development Team)
+dn: cn=developers,ou=groups,dc=home,dc=org
+objectClass: groupOfNames
+cn: developers
+description: Development Team
+member: cn=test-user,ou=users,dc=home,dc=org

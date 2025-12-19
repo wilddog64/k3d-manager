@@ -1,0 +1,6 @@
+username,givenName,surname,email,uidNumber,gidNumber,groups
+john.doe,John,Doe,john.doe@home.org,10100,10000,"developers,admins"
+jane.smith,Jane,Smith,jane.smith@home.org,10101,10000,developers
+bob.wilson,Bob,Wilson,bob.wilson@home.org,10102,10000,"developers,qa-team"
+alice.johnson,Alice,Johnson,alice.johnson@home.org,10103,10000,admins
+charlie.brown,Charlie,Brown,charlie.brown@home.org,10104,10000,qa-team

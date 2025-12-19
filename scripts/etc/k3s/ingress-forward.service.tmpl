@@ -1,0 +1,19 @@
+[Unit]
+Description=k3s Ingress Gateway HTTPS Port Forwarding
+Documentation=https://github.com/k3d-io/k3d
+After=network-online.target k3s.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Restart=always
+RestartSec=3
+TimeoutStartSec=0
+
+# Forward external HTTPS port to Istio IngressGateway HTTPS NodePort
+# Istio handles SNI-based routing to different services (Jenkins, ArgoCD, etc.)
+ExecStart=${SOCAT_PATH} TCP-LISTEN:${HTTPS_PORT},fork,reuseaddr TCP:${INGRESS_TARGET_IP}:${INGRESS_TARGET_HTTPS_PORT}
+
+[Install]
+WantedBy=multi-user.target

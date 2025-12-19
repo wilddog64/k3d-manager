@@ -1,0 +1,65 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"argoproj.io/v1alpha1","kind":"ApplicationSet","metadata":{"annotations":{},"labels":{"app-type":"demo","managed-by":"k3d-manager"},"name":"demo-rollout","namespace":"argocd"},"spec":{"generators":[{"list":{"elements":[{"environment":"dev","namespace":"default"},{"environment":"staging","namespace":"staging"}]}}],"goTemplate":true,"goTemplateOptions":["missingkey=error"],"template":{"metadata":{"labels":{"environment":"{{.environment}}"},"name":"rollout-demo-{{.namespace}}"},"spec":{"destination":{"namespace":"{{.namespace}}","server":"https://kubernetes.default.svc"},"project":"platform","source":{"directory":{"include":"sample-rollout.yaml"},"path":"scripts/etc/argocd","repoURL":"https://github.com/your-org/k3d-manager","targetRevision":"HEAD"},"syncPolicy":{"automated":{"prune":true,"selfHeal":true},"syncOptions":["CreateNamespace=true"]}}}}}
+  creationTimestamp: "2025-12-09T02:06:23Z"
+  generation: 1
+  labels:
+    app-type: demo
+    managed-by: k3d-manager
+  name: demo-rollout
+  namespace: argocd
+  resourceVersion: "1841316"
+  uid: ec994515-3a55-445e-a16f-f17c72e220f4
+spec:
+  generators:
+  - list:
+      elements:
+      - environment: dev
+        namespace: default
+      - environment: staging
+        namespace: staging
+  goTemplate: true
+  goTemplateOptions:
+  - missingkey=error
+  template:
+    metadata:
+      labels:
+        environment: '{{.environment}}'
+      name: rollout-demo-{{.namespace}}
+    spec:
+      destination:
+        namespace: '{{.namespace}}'
+        server: https://kubernetes.default.svc
+      project: platform
+      source:
+        directory:
+          include: sample-rollout.yaml
+        path: scripts/etc/argocd
+        repoURL: https://github.com/your-org/k3d-manager
+        targetRevision: HEAD
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+status:
+  conditions:
+  - lastTransitionTime: "2025-12-09T02:06:23Z"
+    message: All applications have been generated successfully
+    reason: ApplicationSetUpToDate
+    status: "False"
+    type: ErrorOccurred
+  - lastTransitionTime: "2025-12-09T02:06:23Z"
+    message: Successfully generated parameters for all Applications
+    reason: ParametersGenerated
+    status: "True"
+    type: ParametersGenerated
+  - lastTransitionTime: "2025-12-09T02:06:23Z"
+    message: All applications have been generated successfully
+    reason: ApplicationSetUpToDate
+    status: "True"
+    type: ResourcesUpToDate

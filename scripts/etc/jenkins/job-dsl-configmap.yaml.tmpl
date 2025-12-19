@@ -1,0 +1,262 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jenkins-job-dsl
+  namespace: ${JENKINS_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: jenkins
+    app.kubernetes.io/component: job-dsl
+data:
+  # Seed job - master script that processes all other DSL scripts
+  seed-job.groovy: |
+    // Master Seed Job DSL Script
+    // This script creates a "Tests" folder and processes all job DSL scripts in the simple/ directory
+    // It serves as the bootstrap for all automated job creation
+
+    // Create Tests folder for organizing test jobs
+    folder('Tests') {
+        displayName('Test Jobs')
+        description('Automated test jobs for validating Jenkins Kubernetes agents and functionality')
+    }
+
+    // Process all DSL scripts in the job-dsl directory
+    // The ConfigMap will be mounted at /var/jenkins_config/job-dsl/
+    def dslScripts = [
+        'simple-01-linux-agent-test.groovy',
+        'simple-02-kaniko-agent-test.groovy'
+    ]
+
+    dslScripts.each { scriptPath ->
+        def scriptFile = new File("/var/jenkins_config/job-dsl/$${scriptPath}")
+        if (scriptFile.exists()) {
+            println "Processing DSL script: $${scriptPath}"
+            evaluate(scriptFile.text)
+        } else {
+            println "WARNING: DSL script not found: $${scriptPath}"
+        }
+    }
+
+    println "Seed job completed successfully"
+
+  # Simple job DSL scripts
+  simple-01-linux-agent-test.groovy: |
+    // Job DSL script for linux-agent test job
+    // This job validates that Kubernetes linux-agent pods can be provisioned and execute basic commands
+
+    pipelineJob('Tests/linux-agent-test') {
+        description('Test Kubernetes linux-agent functionality - validates agent provisioning, kubectl, and basic tools')
+
+        definition {
+            cps {
+                script('''
+    pipeline {
+        agent {
+            label 'linux-agent'
+        }
+
+        stages {
+            stage('Environment Info') {
+                steps {
+                    echo '=== System Information ==='
+                    sh 'uname -a'
+                    sh 'cat /etc/os-release || true'
+                    echo ''
+
+                    echo '=== User and Permissions ==='
+                    sh 'whoami'
+                    sh 'id'
+                    echo ''
+                }
+            }
+
+            stage('Tool Versions') {
+                steps {
+                    echo '=== Installed Tools ==='
+                    sh 'kubectl version --client || echo "kubectl not installed"'
+                    sh 'git --version || echo "git not installed"'
+                    sh 'java -version || echo "java not installed"'
+                    sh 'curl --version || echo "curl not installed"'
+                    echo ''
+                }
+            }
+
+            stage('Network Connectivity') {
+                steps {
+                    echo '=== Network Tests ==='
+                    sh 'hostname'
+                    sh 'hostname -i || true'
+                    sh 'curl -s https://api.github.com/zen || echo "External connectivity test failed"'
+                    echo ''
+                }
+            }
+
+            stage('Workspace Access') {
+                steps {
+                    echo '=== Workspace Tests ==='
+                    sh 'pwd'
+                    sh 'ls -la'
+                    sh 'echo "Test file content" > test-file.txt'
+                    sh 'cat test-file.txt'
+                    sh 'rm test-file.txt'
+                    echo ''
+                }
+            }
+
+            stage('Kubernetes Access') {
+                steps {
+                    echo '=== Kubernetes API Access ==='
+                    sh 'kubectl get nodes || echo "Cannot access Kubernetes API (expected if RBAC not configured)"'
+                    sh 'kubectl get pods -n jenkins || echo "Cannot list Jenkins pods"'
+                    echo ''
+                }
+            }
+        }
+
+        post {
+            success {
+                echo '✓ Linux agent test completed successfully'
+            }
+            failure {
+                echo '✗ Linux agent test failed'
+            }
+            always {
+                echo "Build completed at $${new Date()}"
+            }
+        }
+    }
+                '''.stripIndent())
+                sandbox(true)
+            }
+        }
+
+        logRotator {
+            numToKeep(10)
+            daysToKeep(30)
+        }
+    }
+
+  simple-02-kaniko-agent-test.groovy: |
+    // Job DSL script for kaniko-agent test job
+    // This job validates that Kubernetes kaniko-agent pods can build container images without Docker daemon
+
+    pipelineJob('Tests/kaniko-agent-test') {
+        description('Test Kubernetes kaniko-agent functionality - validates rootless container image building with Kaniko')
+
+        definition {
+            cps {
+                script('''
+    pipeline {
+        agent {
+            label 'kaniko-agent'
+        }
+
+        stages {
+            stage('Environment Info') {
+                steps {
+                    echo '=== Agent Information ==='
+                    container('jnlp') {
+                        sh 'uname -a'
+                        sh 'whoami'
+                        sh 'pwd'
+                    }
+                    echo ''
+                }
+            }
+
+            stage('Kaniko Availability') {
+                steps {
+                    echo '=== Kaniko Container Check ==='
+                    container('kaniko') {
+                        sh 'echo "Kaniko container is available"'
+                        sh 'ls -la /kaniko/ || true'
+                        sh 'cat /etc/os-release || true'
+                    }
+                    echo ''
+                }
+            }
+
+            stage('Create Test Dockerfile') {
+                steps {
+                    echo '=== Creating Test Dockerfile ==='
+                    container('jnlp') {
+                        sh """
+    cat > Dockerfile << 'DOCKERFILE_EOF'
+    FROM alpine:3.18
+    RUN apk add --no-cache curl
+    RUN echo "Build timestamp: $$(date)" > /build-info.txt
+    CMD ["cat", "/build-info.txt"]
+    DOCKERFILE_EOF
+    """
+                        sh 'cat Dockerfile'
+                    }
+                    echo ''
+                }
+            }
+
+            stage('Build Image with Kaniko') {
+                steps {
+                    echo '=== Building Container Image ==='
+                    container('kaniko') {
+                        sh """
+                            /kaniko/executor \\
+                                --context=$${WORKSPACE} \\
+                                --dockerfile=$${WORKSPACE}/Dockerfile \\
+                                --no-push \\
+                                --tar-path=$${WORKSPACE}/image.tar \\
+                                --destination=test-image:$${BUILD_NUMBER} \\
+                                --verbosity=info
+                        """
+                    }
+                    echo ''
+                }
+            }
+
+            stage('Verify Build Artifacts') {
+                steps {
+                    echo '=== Verifying Build Output ==='
+                    container('jnlp') {
+                        sh 'ls -lh image.tar'
+                        sh 'file image.tar || echo "file command not available"'
+                        sh 'du -h image.tar'
+                    }
+                    echo ''
+                }
+            }
+
+            stage('Cleanup') {
+                steps {
+                    echo '=== Cleaning Up ==='
+                    container('jnlp') {
+                        sh 'rm -f Dockerfile image.tar'
+                        sh 'ls -la'
+                    }
+                    echo ''
+                }
+            }
+        }
+
+        post {
+            success {
+                echo '✓ Kaniko agent test completed successfully'
+                echo '  - Kaniko container accessible'
+                echo '  - Image build successful (rootless, no Docker daemon)'
+                echo '  - Build artifacts verified'
+            }
+            failure {
+                echo '✗ Kaniko agent test failed'
+            }
+            always {
+                echo "Build completed at $${new Date()}"
+            }
+        }
+    }
+                '''.stripIndent())
+                sandbox(true)
+            }
+        }
+
+        logRotator {
+            numToKeep(10)
+            daysToKeep(30)
+        }
+    }
