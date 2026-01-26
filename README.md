@@ -406,6 +406,7 @@ Detailed design, planning, and troubleshooting references live under `docs/`. Us
 - **[LDAP Empty Directory (No Users)](docs/issues/2025-11-11-ldap-empty-directory-no-users.md)** - RCA for missing seeded users
 - **[LDAP Password envsubst Issue](docs/issues/2025-11-21-ldap-password-envsubst-issue.md)** - Shell templating bug report
 - **[Cert Rotation Fixes](docs/issues/2025-11-21-cert-rotation-fixes.md)** - Follow-up changes after cert rotation incidents
+- **[k3s Clock Skew Cluster Instability](docs/issues/2026-01-26-k3s-clock-skew-cluster-instability.md)** - System clock drift causing certificate failures and cluster rebuild
 
 ### Test Guides & Results
 - **[Active Directory Testing Instructions](docs/tests/active-directory-testing-instructions.md)** - End-to-end AD verification steps
