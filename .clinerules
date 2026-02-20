@@ -177,15 +177,26 @@ CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f
 ./scripts/k3d-manager deploy_eso
 ./scripts/k3d-manager deploy_vault
 ./scripts/k3d-manager deploy_ldap
+./scripts/k3d-manager deploy_ad           # Deploy OpenLDAP with AD schema (local AD testing)
 ./scripts/k3d-manager deploy_jenkins --enable-vault
 ./scripts/k3d-manager deploy_jenkins --enable-ldap --enable-vault
 ./scripts/k3d-manager deploy_jenkins --enable-ad --enable-vault
 AD_DOMAIN=corp.example.com ./scripts/k3d-manager deploy_jenkins --enable-ad-prod --enable-vault
 
+# Jenkins deployment modes – working vs broken
+# WORKING:  deploy_jenkins --enable-vault
+# WORKING:  deploy_jenkins --enable-vault --enable-ldap
+# WORKING:  deploy_jenkins --enable-vault --enable-ad
+# BROKEN:   deploy_jenkins (no vault) – policy creation always runs; jenkins-admin secret missing
+# BROKEN:   deploy_jenkins --enable-ldap (without --enable-vault) – LDAP requires Vault for secrets
+
 # Tests
 ./scripts/k3d-manager test all
 ./scripts/k3d-manager test core
 ./scripts/k3d-manager test install_k3d --case "test case name"
+
+# Smoke test (manual – bin/smoke-test-jenkins.sh, Phases 1-3 complete)
+./bin/smoke-test-jenkins.sh               # SSL + auth smoke tests against live Jenkins
 
 # Debug
 ENABLE_TRACE=1 ./scripts/k3d-manager <command>
@@ -258,6 +269,21 @@ kubectl get secret jenkins-tls -n istio-system \
 
 ---
 
+## Vault Resilience
+
+Vault seals itself on every pod/node restart. Recovery helpers:
+
+```bash
+./scripts/k3d-manager reunseal_vault    # Retrieve shards from Keychain/libsecret and unseal
+```
+
+- Unseal shards are stored in macOS Keychain (or Linux `libsecret`) during initial Vault init.
+- `reunseal_vault` automates shard retrieval and the unseal sequence.
+- Any service depending on Vault (Jenkins, ESO, LDAP auth) will be unhealthy until Vault is unsealed.
+- After node reboot, always run `reunseal_vault` before attempting other `deploy_*` commands.
+
+---
+
 ## Known Issues & Gotchas
 
 | Issue | Root Cause | Fix |
@@ -265,7 +291,7 @@ kubectl get secret jenkins-tls -n istio-system \
 | ESO SecretStore NotReady | `mountPath: auth/kubernetes` (wrong path) | Use `mountPath: kubernetes` in ESO YAML |
 | LDAP bind DN mismatch | Bootstrap LDIF uses different base DN than `LDAP_BASE_DN` | Keep both consistent |
 | Jenkins pod readiness timeout | Vault Agent init container slow or Vault sealed | Check `kubectl exec -n vault vault-0 -- vault status` |
-| Empty LDAP directory | `LDAP_LDIF_PATH` not set before `deploy_ldap` | Export `LDAP_LDIF_PATH` before deploying |
+| Empty LDAP directory | Basic `--enable-ldap` deploys with no users; `bootstrap-basic-schema.ldif` not yet created | Use `deploy_ad` for OpenLDAP+AD-schema with pre-seeded users; or set `LDAP_LDIF_PATH` to a custom LDIF |
 | Cert rotator image pull failure | `google/cloud-sdk:slim` unreachable | Set `JENKINS_CERT_ROTATOR_IMAGE` to accessible registry |
 
 ---
