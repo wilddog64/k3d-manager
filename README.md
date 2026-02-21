@@ -332,6 +332,9 @@ The macOS Docker setup uses [Colima](https://github.com/abiosoft/colima). Config
 Detailed design, planning, and troubleshooting references live under `docs/`. Use the categorized list below to navigate directly to the file you need.
 
 ### Architecture
+
+![k3d-manager Framework](docs/architecture/k3d-framework.png)
+
 - **[Configuration-Driven Design](docs/architecture/configuration-driven-design.md)** - Core design principle that keeps providers pluggable
 - **[Jenkins Authentication Analysis](docs/architecture/JENKINS_AUTHENTICATION_ANALYSIS.md)** - Survey of supported Jenkins auth backends and trade-offs
 
