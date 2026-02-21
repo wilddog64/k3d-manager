@@ -2,8 +2,10 @@
 
 ## Overall Status
 
-Branch `ldap-develop` is in the **final validation phase** of the AD integration
-milestone. Core code is complete; remaining work is testing and documentation.
+Branch `ldap-develop` has completed a major test-strategy overhaul (2026-02-20):
+mock-heavy BATS suites were retired and E2E smoke testing is now the primary
+integration confidence path. Current focus is Jenkins k8s agents/SMB CSI and
+continued end-to-end validation for auth/deploy modes.
 
 ---
 
@@ -17,6 +19,8 @@ milestone. Core code is complete; remaining work is testing and documentation.
 - [x] k3s provider implementation (systemd-based, Linux)
 - [x] Bats test framework integration (auto-install via `_ensure_bats`)
 - [x] Test log hierarchy (`scratch/test-logs/<suite>/<case-hash>/<timestamp>.log`)
+- [x] Test strategy overhaul: removed brittle mock-heavy BATS suites
+- [x] Added `test smoke` E2E subcommand in `scripts/lib/help/utils.sh`
 
 ### Vault & Secrets
 - [x] Vault deployment via Helm with auto-init and unseal
@@ -30,8 +34,9 @@ milestone. Core code is complete; remaining work is testing and documentation.
 - [x] Jenkins deployment via Helm with Vault-issued TLS cert
 - [x] ExternalSecret resources for Jenkins credentials via ESO
 - [x] Jenkins cert rotation CronJob (`jenkins-cert-rotator`) — code complete
+- [x] Jenkins cert rotation auth/template fixes (`envsubst` default handling)
 - [x] JCasC authorization in flat `permissions:` format (matrix-auth plugin safe)
-- [x] `bin/smoke-test-jenkins.sh` Phases 1–3 (SSL + basic auth)
+- [x] `bin/smoke-test-jenkins.sh` integrated into `test smoke` workflow
 
 ### Directory Services
 - [x] Directory service provider abstraction (interface contract defined)
@@ -52,32 +57,36 @@ milestone. Core code is complete; remaining work is testing and documentation.
 - [x] `docs/tests/certificate-rotation-validation.md` (test plan ready)
 - [x] `docs/tests/active-directory-testing-instructions.md`
 - [x] `docs/plans/` — full set of interface and integration design docs
-- [x] `docs/issues/` — three resolved issues documented
+- [x] `docs/issues/` updated with operational issues through 2026-02-20
 
 ---
 
 ## What Is Pending ⏳
 
-### Priority 1 (Must complete before merge to main)
+### Priority 1 (Current implementation focus)
 
-- [ ] **Certificate Rotation Validation** — run full test plan on Ubuntu/k3s
-  - Test plan: `docs/tests/certificate-rotation-validation.md`
-  - 8 test cases: deploy → wait → trigger → verify rotation → verify revocation → continuity
-  - Short-TTL config (10m cert, 5m threshold, 2min CronJob)
-  - Status: READY TO EXECUTE. Requires Ubuntu/k3s environment.
+- [ ] **Jenkins Kubernetes agents + SMB CSI**
+  - Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
+  - Goal: reliable dynamic agents and storage-backed workload validation.
+
+### Priority 2 (Validation)
 
 - [ ] **End-to-End AD Integration Test** — validate both AD modes
   - `--enable-ad` (OpenLDAP + AD schema): deploy, login as alice/bob/charlie, verify group mapping
   - `--enable-ad-prod` (real AD): requires access to AD environment
   - Guide: `docs/tests/active-directory-testing-instructions.md`
 
-### Priority 2 (Documentation — complete before or shortly after merge)
+- [ ] **Broaden smoke coverage for deploy/auth combinations**
+  - Continue live-cluster validation via `test smoke`.
+  - Include key Jenkins/Vault/LDAP/AD flag paths.
+
+### Priority 3 (Documentation — complete before or shortly after merge)
 
 - [ ] `docs/guides/certificate-rotation.md` — operator guide for cert rotation
 - [ ] `docs/guides/mac-ad-setup.md` — macOS AD connectivity setup
 - [ ] `docs/guides/ad-connectivity-troubleshooting.md` — AD debugging guide
 
-### Priority 3 (Nice-to-have / future)
+### Priority 4 (Nice-to-have / future)
 
 - [ ] `bootstrap-basic-schema.ldif` for standard LDAP with pre-seeded users
 - [ ] `--keep-test-users` flag for `deploy_ldap`
@@ -97,7 +106,8 @@ milestone. Core code is complete; remaining work is testing and documentation.
 | `deploy_jenkins` (no vault) broken | OPEN | Policy creation always runs; jenkins-admin secret missing |
 | `--enable-ldap` without `--enable-vault` broken | OPEN | LDAP secrets require Vault |
 | Basic LDAP deploys empty directory | OPEN | No bootstrap LDIF yet; use `deploy_ad` as workaround |
-| Cert rotation untested in live cluster | OPEN | Priority 1 blocker |
+| LDAP password JCasC/envsubst interpolation | OPEN | `$${...}` escape attempt not yet confirmed working |
+| `test_cert_rotation` via dispatcher | OPEN | Manual cert rotation works; dispatcher flow still unreliable/hangs |
 | ESO SecretStore `mountPath` wrong | FIXED | Must be `kubernetes` not `auth/kubernetes` |
 | LDAP bind DN mismatch | FIXED | Keep `LDAP_BASE_DN` consistent with LDIF base DN |
 | Jenkins pod readiness timeout | FIXED | 10m timeout + pod existence check |

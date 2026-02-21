@@ -101,6 +101,32 @@ DEBUG=1 ./scripts/k3d-manager <command>           # bash -x mode
 `_args_have_sensitive_flag` auto-disables trace for commands with
 `--password`, `--token`, or `--username` to avoid credential leaks.
 
+## Testing (Current, Post-Overhaul)
+
+- Unit testing now emphasizes pure-logic BATS coverage only.
+- Mock-heavy orchestration suites were removed due to drift; integration confidence is
+  driven by live-cluster smoke tests.
+
+Current BATS files in repo:
+- `scripts/tests/core/install_k3s.bats`
+- `scripts/tests/lib/cleanup_on_success.bats`
+- `scripts/tests/lib/dirservices_activedirectory.bats`
+- `scripts/tests/lib/ensure_bats.bats`
+- `scripts/tests/lib/install_kubernetes_cli.bats`
+- `scripts/tests/lib/read_lines.bats`
+- `scripts/tests/lib/run_command.bats`
+- `scripts/tests/lib/sha256_12.bats`
+- `scripts/tests/lib/test_auth_cleanup.bats`
+- `scripts/tests/plugins/eso.bats`
+- `scripts/tests/plugins/vault.bats`
+
+Smoke test entrypoint:
+
+```bash
+./scripts/k3d-manager test smoke
+./scripts/k3d-manager test smoke jenkins
+```
+
 ## ESO Critical Fix (Known)
 
 ESO SecretStore `mountPath` must be `kubernetes` (not `auth/kubernetes`).

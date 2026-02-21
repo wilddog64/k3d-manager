@@ -5,14 +5,23 @@
 This is the active development branch for Active Directory integration and certificate
 rotation. It has NOT been merged to `main` yet.
 
-## Session Objective (as of 2026-02-19)
+## Session Objective (as of 2026-02-20)
 
-- Build comprehensive `.clinerules` from docs/ (DONE – see `.clinerules`).
-- Create memory bank for cross-agent continuity (THIS SESSION).
+- Keep memory bank aligned with `CLAUDE.md`, `docs/issues/`, and current code behavior.
+- Capture the test strategy overhaul and current post-overhaul priorities.
 
 ## What Has Been Built on `ldap-develop`
 
 ### Completed Features
+- **Test strategy overhaul** (2026-02-20)
+  - Removed mock-heavy, high-drift BATS suites:
+    - `scripts/tests/plugins/jenkins.bats`
+    - `scripts/tests/core/create_k3d_clusters.bats`
+    - `scripts/tests/core/deploy_cluster.bats`
+    - `scripts/tests/core/install_k3d.bats`
+  - Added `test smoke` E2E subcommand in `scripts/lib/help/utils.sh`.
+  - Current unit-test set is focused on pure logic and deterministic behavior.
+
 - **Active Directory provider** (`scripts/lib/dirservices/activedirectory.sh`)
   - All interface functions implemented.
   - 36 automated Bats tests, 100% passing.
@@ -33,13 +42,14 @@ rotation. It has NOT been merged to `main` yet.
   - JCasC generation via `_dirservice_*_generate_jcasc` interface.
 
 - **Certificate rotation CronJob** (`jenkins-cert-rotator`)
-  - Code is in place; triggers Vault PKI renewal, updates K8s secret, revokes old cert.
-  - CronJob image: `docker.io/google/cloud-sdk:slim`.
-  - **Status: NEVER VALIDATED IN A LIVE CLUSTER.**
+  - Triggers Vault PKI renewal, updates K8s secret, revokes old cert.
+  - CronJob image configurable via `JENKINS_CERT_ROTATOR_IMAGE`.
+  - Rotation auth/template issue fixed (`envsubst` default-value pitfall).
+  - Certificate rotation validated with short TTL and manual job runs.
 
 - **Jenkins smoke test** (`bin/smoke-test-jenkins.sh`)
-  - Phases 1–3 complete (SSL validation + basic auth).
-  - Phases 4–5 (auth flow testing, LDAP-specific) planned.
+  - SSL/auth smoke coverage exists.
+  - Routed into `test smoke` flow as part of E2E strategy.
 
 - **Secret backend abstraction** (`scripts/lib/secret_backend.sh`)
   - `SECRET_BACKEND` env var selects implementation.
@@ -47,26 +57,19 @@ rotation. It has NOT been merged to `main` yet.
   - Azure backend: partial (plugin exists, not fully wired).
   - AWS/GCP: planned.
 
-## Open Blockers / Active Decisions
+## Current Priorities / Active Decisions
 
-### BLOCKER: Cert Rotation Never Validated
-- **Risk**: Cert rotation code exists but is untested. If broken, Jenkins TLS certs
-  expire silently after 30 days.
-- **Required action**: Run cert rotation test plan on Ubuntu/k3s with short TTLs.
-  See `docs/tests/certificate-rotation-validation.md`.
-- **Test config**:
-  ```bash
-  export VAULT_PKI_ROLE_TTL="10m"
-  export JENKINS_CERT_ROTATOR_RENEW_BEFORE="300"
-  export JENKINS_CERT_ROTATOR_SCHEDULE="*/2 * * * *"
-  export JENKINS_CERT_ROTATOR_ENABLED="1"
-  ```
-- **Manual trigger**: `kubectl create job manual-rotation --from=cronjob/jenkins-cert-rotator -n jenkins`
+### Priority 1: Jenkins Kubernetes agents and SMB CSI integration
+- Next feature track after test overhaul completion.
+- Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`.
 
-### PENDING: E2E AD Integration Test
-- `--enable-ad` (OpenLDAP+AD-schema) path not yet validated end-to-end.
-- `--enable-ad-prod` requires external AD — validate when AD environment is available.
-- Test users documented in `docs/tests/active-directory-testing-instructions.md`.
+### Priority 2: Expand and operationalize E2E smoke coverage
+- Validate deployment flag combinations in live-cluster workflow.
+- Continue to treat pure-logic BATS as fast regression checks.
+
+### Priority 3: AD end-to-end validation depth
+- `--enable-ad` path has provider-level/unit coverage; continue end-to-end scenario validation.
+- `--enable-ad-prod` requires external AD (VPN/corporate environment dependent).
 
 ### OPEN ISSUE: Basic LDAP Deploys Empty Directory
 - `deploy_ldap` (standard schema) creates an empty directory with no users.
@@ -81,6 +84,10 @@ rotation. It has NOT been merged to `main` yet.
 - Also: `deploy_jenkins --enable-ldap` without `--enable-vault` is broken for the same
   reason (LDAP credentials are pulled from Vault).
 
+### OPEN INVESTIGATION: LDAP password/JCasC secret interpolation
+- Issue documented in `docs/issues/2025-11-21-ldap-password-envsubst-issue.md`.
+- Current fix attempt (`$${...}` escaping) did not yet produce confirmed working dynamic password refresh behavior.
+
 ### PENDING: Documentation
 - `docs/guides/certificate-rotation.md` — not yet created.
 - `docs/guides/mac-ad-setup.md` — not yet created.
@@ -88,10 +95,11 @@ rotation. It has NOT been merged to `main` yet.
 
 ## Merge Criteria for `ldap-develop` → `main`
 
-1. Cert rotation validation passes on Ubuntu/k3s (Priority 1).
-2. End-to-end AD test passes with at least `--enable-ad` mode (Priority 1).
-3. All existing Bats tests continue to pass (currently 36/36 on AD provider).
+1. E2E smoke workflow is stable for baseline and key auth/deploy combinations.
+2. End-to-end AD testing passes in at least `--enable-ad` mode.
+3. Pure-logic BATS suites stay green after each change.
 4. No regressions on `deploy_jenkins --enable-vault` baseline path.
+5. Open known-broken paths are either fixed or explicitly documented with guardrails.
 
 ## Operational Notes
 
@@ -101,3 +109,6 @@ rotation. It has NOT been merged to `main` yet.
   `docs/issues/2025-10-19-eso-secretstore-not-ready.md`.
 - **LDAP bind DN mismatch**: Keep `LDAP_BASE_DN` in sync with base DN used in LDIF
   bootstrap files. See `docs/issues/2025-10-20-ldap-bind-dn-mismatch.md`.
+- **Jenkins readiness timeout behavior**: `_wait_for_jenkins_ready` now uses a longer default timeout,
+  pod-existence precheck, and richer timeout diagnostics. See
+  `docs/issues/2025-11-07-jenkins-pod-readiness-timeout.md`.

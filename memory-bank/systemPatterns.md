@@ -80,8 +80,9 @@ deploy_jenkins
                  └─► Rolling restart of Jenkins pods
 ```
 
-**Critical note**: Cert rotation code exists but has **never been validated** in a
-live cluster. Validation is Priority 1 on `ldap-develop`.
+Cert rotation has been validated via short-TTL/manual-job workflows (see
+`docs/issues/2025-11-21-cert-rotation-fixes.md` and cert rotation test result docs).
+The remaining gap is improving/validating dispatcher-driven cert-rotation test UX.
 
 ## 6) Jenkins Deployment Modes
 
@@ -154,3 +155,19 @@ Every public function must be safe to run more than once. Implement checks like:
 
 `activeContext.md` must capture **what changed AND why decisions were made**.
 `progress.md` must maintain pending TODOs to prevent session-handoff loss.
+
+## 12) Test Strategy Pattern (Post-Overhaul)
+
+- Avoid mock-heavy orchestration tests that assert internal call sequences.
+- Keep BATS for pure logic (deterministic, offline checks).
+- Use live-cluster E2E smoke tests for integration confidence.
+
+Smoke entrypoint:
+
+```bash
+./scripts/k3d-manager test smoke
+./scripts/k3d-manager test smoke jenkins
+```
+
+Implemented in `scripts/lib/help/utils.sh`; runs available scripts in `bin/` and skips
+missing/non-executable ones.
