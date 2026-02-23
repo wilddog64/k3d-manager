@@ -101,6 +101,40 @@ rotation. It has NOT been merged to `main` yet.
 4. No regressions on `deploy_jenkins --enable-vault` baseline path.
 5. Open known-broken paths are either fixed or explicitly documented with guardrails.
 
+## Branch Protection — Applied 2026-02-22
+
+Branch protection is now enabled on `wilddog64/k3d-manager@main`:
+- 1 required PR approval before merge
+- Dismiss stale reviews on new commits
+- Enforce admins — no bypass
+- No force pushes, no branch deletion
+- **No required status checks yet** — CI workflow not designed
+
+When CI is ready, update protection via provision-tomcat's `bin/enforce-branch-protection`:
+```bash
+GITHUB_REPO=k3d-manager GITHUB_OWNER=wilddog64 \
+REQUIRED_STATUS_CHECK=<job-name> \
+/path/to/provision-tomcat/bin/enforce-branch-protection
+```
+
+## CI Workflow — Decided, Not Yet Implemented
+
+Plan: `docs/plans/ci-workflow.md`
+
+**Decision:** Local-first mandate remains primary discipline. CI is a final gate, not a development loop.
+
+**Staged approach:**
+- **Stage 1** — Lightweight gate (no cluster): `shellcheck`, `bash -n`, lib unit BATS
+- **Stage 2** — Integration gate (pre-built cluster, self-hosted Mac runner): `test_vault`, `test_eso`, `test_istio` on PR only
+- **Stage 3** — Destructive/heavy tests: `test_cert_rotation`, `test_jenkins` via `workflow_dispatch` only
+
+**Pre-built cluster model:** cluster is a persistent fixture on the Mac runner. CI runs test functions against it — no cluster create/destroy per run. Heavy setup cost is paid once.
+
+**Not yet done:**
+- Self-hosted runner not set up on Mac
+- No `.github/workflows/` directory yet
+- CI design parked until runner decision is final
+
 ## Operational Notes
 
 - **Always run `reunseal_vault`** after any cluster restart before attempting other
