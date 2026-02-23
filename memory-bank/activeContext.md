@@ -124,11 +124,15 @@ Plan: `docs/plans/ci-workflow.md`
 **Decision:** Local-first mandate remains primary discipline. CI is a final gate, not a development loop.
 
 **Staged approach:**
-- **Stage 1** — Lightweight gate (no cluster): `shellcheck`, `bash -n`, lib unit BATS
-- **Stage 2** — Integration gate (pre-built cluster, self-hosted Mac runner): `test_vault`, `test_eso`, `test_istio` on PR only
+- **Stage 1** — Lightweight gate (no cluster): `shellcheck`, `bash -n`, `yamllint` (workflow files only, not `.yaml.tmpl`), lib unit BATS
+- **Stage 2** — Integration gate (pre-built cluster, self-hosted Mac runner):
+  - **Stage 2.0:** Cluster health check (verify pods Ready, Istio, Vault unsealed)
+  - **Stage 2.1:** Integration tests (`test_vault`, `test_eso`, `test_istio`) on PR only
 - **Stage 3** — Destructive/heavy tests: `test_cert_rotation`, `test_jenkins` via `workflow_dispatch` only
 
 **Pre-built cluster model:** cluster is a persistent fixture on the Mac runner. CI runs test functions against it — no cluster create/destroy per run. Heavy setup cost is paid once.
+
+**Prerequisite:** Refactor `scripts/lib/test.sh` for namespace isolation across all integration tests to prevent state collision.
 
 **Not yet done:**
 - Self-hosted runner not set up on Mac
