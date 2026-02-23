@@ -94,9 +94,12 @@ continued end-to-end validation for auth/deploy modes.
 
 - [ ] **CI workflow implementation**
   - Plan: `docs/plans/ci-workflow.md`
-  - Stage 1: shellcheck + bash -n + lib unit BATS (no cluster)
-  - Stage 2: integration tests against pre-built cluster (self-hosted Mac runner)
-  - Stage 3: destructive tests via `workflow_dispatch` only
+  - **Stage 1:** shellcheck + bash -n + yamllint (workflow files only) + lib unit BATS (no cluster)
+  - **Stage 2:** integration tests against pre-built cluster (self-hosted Mac runner)
+    - **Stage 2.0:** Cluster health check (verify Vault unseal, Istio, ESO pods)
+    - **Stage 2.1:** Integration suite (Vault, ESO, Istio)
+  - **Stage 3:** destructive tests via `workflow_dispatch` only
+  - **Prerequisite:** Refactor `scripts/lib/test.sh` for namespace isolation across all tests.
   - **Blocked on:** self-hosted runner setup decision
 
 ### Priority 4 (Nice-to-have / future)
