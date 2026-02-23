@@ -78,7 +78,7 @@ function __discover_tests() {
 }
 
 function _usage() {
-    local base_suites="all|lib|core|plugins"
+    local base_suites="all|lib|core|plugins|smoke"
     if [[ -n "${test_suites}" ]]; then
         test_suites="${base_suites}|${test_suites}"
     else
@@ -172,7 +172,7 @@ function __print_test_usage() {
     local -a __suite_names=()
     __discover_tests __tests __test_names __suite_names
 
-    local base_suites="all|lib|core|plugins"
+    local base_suites="all|lib|core|plugins|smoke"
     local suites_synopsis="$base_suites"
     if [[ ${#__suite_names[@]} -gt 0 ]]; then
         local -a extra_suites=()
@@ -208,6 +208,8 @@ Options:
 Examples:
   test all
   test core
+  test smoke                  # E2E smoke tests against live k3s cluster
+  test smoke jenkins          # Smoke tests scoped to jenkins namespace
   test install_k3d
   test install_k3d --case "_install_k3d exports INSTALL_DIR"
   test install_k3d::"_install_k3d exports INSTALL_DIR"
@@ -264,7 +266,7 @@ function test() {
         return 1
     fi
 
-    if [[ ${#positional[@]} -gt 1 ]]; then
+    if [[ ${#positional[@]} -gt 1 && "${positional[0]}" != "smoke" ]]; then
         echo "Only one suite or test may be specified." >&2
         return 1
     fi
@@ -280,6 +282,33 @@ function test() {
         if [[ -z "$case_name" ]]; then
             case_name="$inline_case"
         fi
+    fi
+
+    if [[ "$suite_spec" == "smoke" ]]; then
+        local repo_root
+        repo_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
+        local bin_dir="${repo_root}/bin"
+        local smoke_namespace="${positional[1]:-}"
+        local smoke_rc=0
+        local -a smoke_scripts=(
+            "smoke-test-jenkins.sh"
+            "test-openldap.sh"
+            "test-argocd-cli.sh"
+            "test-directory-auto-load.sh"
+        )
+        for script in "${smoke_scripts[@]}"; do
+            local script_path="${bin_dir}/${script}"
+            if [[ ! -x "$script_path" ]]; then
+                continue
+            fi
+            printf '\n==> Running %s\n' "$script"
+            if [[ -n "$smoke_namespace" ]]; then
+                "$script_path" "$smoke_namespace" || smoke_rc=$?
+            else
+                "$script_path" || smoke_rc=$?
+            fi
+        done
+        return $smoke_rc
     fi
 
     _ensure_bats
