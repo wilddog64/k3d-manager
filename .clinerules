@@ -322,3 +322,74 @@ Priority tasks as of 2026-02-19:
    `docs/guides/mac-ad-setup.md`, `docs/guides/ad-connectivity-troubleshooting.md`.
 
 Branch merges to `main` after Priority 1 + 2 complete and all tests pass.
+
+---
+
+## Multi-Agent Collaboration Protocol (2026-02-22)
+
+This project uses a three-agent loop for complex implementation tasks:
+**Gemini reviews → Codex implements → Claude audits**.
+
+### Role Assignments
+
+| Agent | Role | Strengths |
+|---|---|---|
+| Gemini | Reviewer / Researcher | Large context window; good at reading docs and spotting gaps |
+| Codex | Implementer | Follows well-defined specs; strong at code generation |
+| Claude | Auditor / Memory-bank keeper | Recovers collapsed sessions; updates memory-bank |
+
+### Gemini as Reviewer
+
+- **Front-load research before any implementation.** Ask Gemini to review:
+  - The relevant `docs/plans/` document
+  - `memory-bank/activeContext.md` and `memory-bank/progress.md`
+  - Any `docs/issues/` entries related to the feature
+- **JCasC-specific**: always ask Gemini to verify syntax before Codex writes any
+  JCasC YAML. JCasC plugin version sensitivity causes silent misconfiguration.
+  - Known trap: `projectMatrix` format changed between plugin versions.
+    Current working format uses `entries:` with `group:` and `user:` objects.
+  - Known trap: Vault agent `${file:/vault/secrets/...}` references must be
+    protected from `envsubst` expansion using `printf -v VAR '%s' '${file:...}'`.
+- Gemini reviews are advisory. If Gemini's suggestion conflicts with
+  `systemPatterns.md` or an established pattern in `.clinerules`, the
+  conflict must be surfaced and resolved before Codex starts — not silently
+  accepted.
+
+### Codex as Implementer
+
+- **Read memory-bank before touching any code:**
+  - `memory-bank/activeContext.md` — current branch state and known broken paths
+  - `memory-bank/progress.md` — what is complete and what is pending
+  - Relevant `docs/issues/` file for the feature being implemented
+- **Strengths:** well-scoped tasks with clear acceptance criteria.
+  Codex performs well when given a concrete spec (e.g. a `docs/plans/` doc).
+- **Weaknesses:** diagnosis and iteration. If Codex gets stuck or starts
+  generating commits without visible progress, stop the session. Do not let
+  Codex iterate blindly — bring Claude in to audit.
+- **Counter-argue rule:** if Gemini's review conflicts with patterns in
+  `.clinerules` or `docs/plans/`, Codex must push back with reasoning.
+  Do not accept a reviewer suggestion just because it comes from Gemini.
+  Raise the conflict explicitly.
+
+### Local-First Mandate (enforced from session 1)
+
+- All changes must be verified locally before any push or PR.
+- No "push to test on GitHub" habit. CI is a final gate, not a development loop.
+- Codex must run `bash -n scripts/...` and `shellcheck` on any changed file
+  before committing.
+- If a live cluster is needed for validation, use the pre-built local cluster.
+  Do not assume CI will catch what local testing skips.
+
+### Collapse Recovery Protocol
+
+When Gemini or Codex shows signs of hallucination (generating commits without
+real progress, repeating the same fix, contradicting its own earlier output):
+
+1. **Stop the session immediately.** Do not let it continue iterating.
+2. **Bring Claude in to audit:**
+   - Read the actual diffs (`git diff`, `git log -p`)
+   - Compare against `memory-bank/progress.md` — what was actually completed?
+3. **Rebuild memory-bank from scratch** if context is stale or contradictory.
+4. **Restart the agent with clean context** and the updated memory-bank.
+
+The memory-bank exists precisely for this recovery path. Keep it current.
