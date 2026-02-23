@@ -86,6 +86,19 @@ continued end-to-end validation for auth/deploy modes.
 - [ ] `docs/guides/mac-ad-setup.md` — macOS AD connectivity setup
 - [ ] `docs/guides/ad-connectivity-troubleshooting.md` — AD debugging guide
 
+### Priority 3.5 (CI / Repository hygiene)
+
+- [x] **Branch protection enabled on `main`** (2026-02-22)
+  - 1 PR approval required, stale review dismissal, enforce admins
+  - No required status checks yet — pending CI design
+
+- [ ] **CI workflow implementation**
+  - Plan: `docs/plans/ci-workflow.md`
+  - Stage 1: shellcheck + bash -n + lib unit BATS (no cluster)
+  - Stage 2: integration tests against pre-built cluster (self-hosted Mac runner)
+  - Stage 3: destructive tests via `workflow_dispatch` only
+  - **Blocked on:** self-hosted runner setup decision
+
 ### Priority 4 (Nice-to-have / future)
 
 - [ ] `bootstrap-basic-schema.ldif` for standard LDAP with pre-seeded users
@@ -96,6 +109,8 @@ continued end-to-end validation for auth/deploy modes.
 - [ ] AWS / GCP secret backends (planned in `SECRET_BACKEND` abstraction)
 - [ ] Monitoring recommendations (Prometheus alerts for cert expiry)
 - [ ] Additional automated Bats tests for Jenkins and ESO plugins
+- [ ] **Argo CD implementation** — Phase 1 design complete in `docs/plans/argocd-implementation-plan.md`
+      Core deployment + LDAP/Dex + Vault/ESO + Istio integration (~4-6 hours for Phase 1)
 
 ---
 
