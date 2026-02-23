@@ -51,7 +51,7 @@ Design a pluggable interface for directory services to support OpenLDAP, Active 
       domains:
         - bindName: "${file:/vault/secrets/ad-ldap-bind-username}"
           bindPassword: "${file:/vault/secrets/ad-ldap-bind-password}"
-          name: "pacific.costcotravel.com"
+          name: "corp.example.com"
           tlsConfiguration: "TRUST_ALL_CERTIFICATES"
       groupLookupStrategy: "TOKENGROUPS"
       internalUsersDatabase:
@@ -66,7 +66,7 @@ Design a pluggable interface for directory services to support OpenLDAP, Active 
 | **JCasC Plugin** | `ldap` | `activeDirectory` |
 | **Credential Injection** | Environment variables | Vault Agent file mounts |
 | **Secret Path** | `secret/ldap/service-accounts/jenkins-admin` | `secret/jenkins/ad-ldap` |
-| **Domain Spec** | Generic LDAP URL | Windows domain (pacific.costcotravel.com) |
+| **Domain Spec** | Generic LDAP URL | Windows domain (corp.example.com) |
 | **TLS** | Optional | Required (`requireTLS: true`) |
 | **Group Lookup** | Standard LDAP search | TOKENGROUPS (AD-specific) |
 | **Fallback Admin** | None (implicit) | Explicit `internalUsersDatabase` |
@@ -777,7 +777,7 @@ export AZURE_TENANT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 Based on examination of baseline branch AD implementation:
 
-1. **Hardcoded Domain**: `pacific.costcotravel.com` hardcoded in values.yaml
+1. **Hardcoded Domain**: `corp.example.com` hardcoded in values.yaml
 2. **Manual Credential Sync**: `bin/sync-lastpass-ad.sh` requires LastPass
 3. **No Validation**: Missing AD connectivity checks before deployment
 4. **TLS Trust All**: `TRUST_ALL_CERTIFICATES` is insecure for production

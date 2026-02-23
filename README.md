@@ -220,36 +220,6 @@ same workflow non-interactively in CI.
   `/var/lib/rancher/k3s/storage` and for the embedded containerd runtime under
   `/var/lib/rancher/k3s/agent/containerd/`.
 
-### Ingress Port Forwarding (k3s only)
-
-The k3s provider automatically sets up ingress port forwarding during `deploy_cluster` to expose services on standard HTTPS port 443. This forwards external traffic to the Istio IngressGateway NodePort, enabling multiple services (Jenkins, ArgoCD, etc.) to share port 443 via SNI-based routing.
-
-**Note:** The script auto-detects k3s when installed, so `CLUSTER_PROVIDER=k3s` is optional (only needed if both k3d and k3s are installed).
-
-**Automatic Setup:**
-```bash
-./scripts/k3d-manager deploy_cluster
-# Automatically configures systemd service: k3s-ingress-forward (k3s only)
-```
-
-**Manual Management:**
-```bash
-# Setup/update ingress forwarding
-./scripts/k3d-manager setup_ingress_forward
-
-# Check status
-./scripts/k3d-manager status_ingress_forward
-
-# Remove forwarding
-./scripts/k3d-manager remove_ingress_forward
-```
-
-**Lifecycle Management:**
-- Ingress forwarding is automatically cleaned up when destroying the cluster
-- The systemd service is stopped, disabled, and removed during `destroy_cluster`
-
-The forwarding uses `socat` to forward port 443 to the Istio IngressGateway NodePort. Istio handles SNI-based routing to different services based on hostname. For detailed architecture and troubleshooting, see **[Ingress Port Forwarding Documentation](docs/architecture/ingress-port-forwarding.md)**.
-
 ### Required environment for Jenkins and CLI integrations
 
 The Jenkins plugin and the shell helpers discover non-k3d clusters through a few
@@ -362,6 +332,9 @@ The macOS Docker setup uses [Colima](https://github.com/abiosoft/colima). Config
 Detailed design, planning, and troubleshooting references live under `docs/`. Use the categorized list below to navigate directly to the file you need.
 
 ### Architecture
+
+![k3d-manager Framework](docs/architecture/k3d-framework.png)
+
 - **[Configuration-Driven Design](docs/architecture/configuration-driven-design.md)** - Core design principle that keeps providers pluggable
 - **[Jenkins Authentication Analysis](docs/architecture/JENKINS_AUTHENTICATION_ANALYSIS.md)** - Survey of supported Jenkins auth backends and trade-offs
 
@@ -390,7 +363,6 @@ Detailed design, planning, and troubleshooting references live under `docs/`. Us
 - **[Vault Agent Sidecar Implementation](docs/implementations/vault-sidecar-implementation.md)** - LDAP password injection via Vault agent sidecar
 
 ### How-To Guides
-- **[Argo CD Setup Guide](docs/argocd-setup.md)** - Complete deployment guide for Argo CD with LDAP/Vault integration
 - **[Configuring SSL Trust for jenkins-cli](docs/howto/jenkins-cli-ssl-trust.md)** - Configure Java truststore to validate Vault-issued certificates
 - **[LDAP Bulk User Import](docs/howto/ldap-bulk-user-import.md)** - Steps for loading fixture users into the directory
 - **[LDAP Password Rotation](docs/howto/ldap-password-rotation.md)** - Manual rotation workflow for bind credentials
@@ -406,7 +378,6 @@ Detailed design, planning, and troubleshooting references live under `docs/`. Us
 - **[LDAP Empty Directory (No Users)](docs/issues/2025-11-11-ldap-empty-directory-no-users.md)** - RCA for missing seeded users
 - **[LDAP Password envsubst Issue](docs/issues/2025-11-21-ldap-password-envsubst-issue.md)** - Shell templating bug report
 - **[Cert Rotation Fixes](docs/issues/2025-11-21-cert-rotation-fixes.md)** - Follow-up changes after cert rotation incidents
-- **[k3s Clock Skew Cluster Instability](docs/issues/2026-01-26-k3s-clock-skew-cluster-instability.md)** - System clock drift causing certificate failures and cluster rebuild
 
 ### Test Guides & Results
 - **[Active Directory Testing Instructions](docs/tests/active-directory-testing-instructions.md)** - End-to-end AD verification steps

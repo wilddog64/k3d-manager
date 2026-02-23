@@ -1,0 +1,405 @@
+# k3d-manager – Cline Rules
+# Generated from docs/ and CLAUDE.md – 2026-02-19
+
+## Project Overview
+
+k3d-manager is a modular Bash utility for managing local Kubernetes development clusters
+with integrated service deployments: Istio, Vault, Jenkins, OpenLDAP, and External Secrets
+Operator (ESO). It uses a dispatcher pattern with lazy plugin loading.
+
+Main entry point: `./scripts/k3d-manager <function> [args]`
+
+---
+
+## Architecture
+
+### Layer Map
+
+```
+scripts/k3d-manager          ← dispatcher / entry point
+scripts/lib/                 ← core libraries (always sourced)
+  system.sh                  ← _run_command, package helpers
+  core.sh                    ← cluster lifecycle
+  test.sh                    ← Bats test framework integration
+  cluster_provider.sh        ← provider abstraction (k3d / k3s)
+  providers/k3d.sh           ← k3d implementation
+  providers/k3s.sh           ← k3s implementation
+  vault_pki.sh               ← Vault PKI cert helpers
+  dirservices/openldap.sh    ← OpenLDAP directory provider
+  dirservices/activedirectory.sh ← AD directory provider
+scripts/plugins/             ← lazy-loaded feature modules
+  vault.sh, jenkins.sh, ldap.sh, eso.sh, azure.sh
+scripts/etc/                 ← config templates & defaults
+  cluster_var.sh, vault/vars.sh, jenkins/vars.sh, ad/vars.sh, ldap/vars.sh
+  *.yaml.tmpl                ← envsubst-processed Kubernetes manifests
+```
+
+### Core Design Patterns
+
+1. **Configuration-driven / Strategy pattern** – `CLUSTER_PROVIDER`,
+   `DIRECTORY_SERVICE_PROVIDER`, and `SECRET_BACKEND` environment variables select
+   the active provider. Consumer code calls a generic interface; the abstraction layer
+   dispatches to the provider-specific implementation. Adding a new provider requires
+   only one new file—no changes to consumers.
+
+2. **Dispatcher + lazy loading** – plugins are sourced only when their public functions
+   are invoked, keeping startup fast.
+
+3. **ESO flow** – Vault enables K8s auth → ESO creates SecretStore → service plugins
+   create ExternalSecret resources → ESO syncs Vault secrets → Kubernetes secrets.
+
+4. **Jenkins cert rotation** – Vault PKI issues the initial TLS cert; a CronJob
+   (`jenkins-cert-rotator`) periodically checks expiry, mints a new cert, updates the
+   K8s secret, revokes the old cert in Vault, and restarts pods.
+
+---
+
+## Code Style Rules
+
+- **Shell only** – all scripts are `#!/usr/bin/env bash`.
+- **LF line endings** – no CRLF anywhere.
+- **Public functions**: no leading underscore (e.g. `deploy_jenkins`).
+- **Private functions**: prefix with `_` (e.g. `_create_jenkins_tls_secret`).
+- **Wrapper helpers**: use `_run_command`, `_kubectl`, `_helm`, `_curl` instead of
+  calling binaries directly.
+- **Idempotent functions** – every function must be safe to run more than once.
+- **No side effects at source time** – plugins must not execute anything when sourced.
+- **No inline comments** unless explicitly requested.
+- **No hardcoded secrets** – use `${PLACEHOLDER}` variables; store secrets in Vault.
+- **Minimal patches** – prefer small, targeted changes; no opportunistic refactoring.
+- **No backwards-compat shims** – delete dead code rather than commenting it out.
+- **`_run_command` usage**:
+  - `--prefer-sudo` – sudo when available, fall back to current user
+  - `--require-sudo` – fail if sudo unavailable
+  - `--probe 'subcommand'` – probe to decide if sudo is needed
+  - `--quiet` – suppress stderr (still propagates exit code)
+
+Plugin skeleton:
+```bash
+#!/usr/bin/env bash
+# scripts/plugins/mytool.sh
+
+function mytool_do_something() {
+  _kubectl apply -f my.yaml
+}
+
+function _mytool_helper() {
+  :
+}
+```
+
+---
+
+## Provider Interfaces
+
+### Directory Service (`DIRECTORY_SERVICE_PROVIDER`)
+
+All providers in `scripts/lib/dirservices/<provider>.sh` must implement:
+
+| Function | Purpose |
+|---|---|
+| `_dirservice_<p>_init` | Deploy (OpenLDAP) or validate connectivity (AD) |
+| `_dirservice_<p>_generate_jcasc` | Emit Jenkins JCasC `securityRealm` YAML |
+| `_dirservice_<p>_validate_config` | Check reachability / credentials |
+| `_dirservice_<p>_create_credentials` | Store service-account creds in Vault |
+| `_dirservice_<p>_get_groups` | Query group membership for a user |
+
+Supported values: `openldap` (default), `activedirectory`
+Future: `azuread`, `okta`
+
+### Cluster Provider (`CLUSTER_PROVIDER`)
+
+Providers in `scripts/lib/providers/<provider>.sh`.
+Supported values: `k3d` (macOS default), `k3s` (Linux/systemd)
+
+### Secret Backend (`SECRET_BACKEND`)
+
+Providers in `scripts/plugins/<backend>.sh`.
+Supported values: `vault` (default), `azure` (partial), `aws`/`gcp` (planned)
+
+Each backend must implement: `<backend>_init`, `<backend>_create_secret`,
+`<backend>_create_secret_store`, `<backend>_create_external_secret`,
+`<backend>_wait_for_secret`.
+
+---
+
+## Key Configuration Variables
+
+### Cluster
+| Variable | Default | Notes |
+|---|---|---|
+| `CLUSTER_PROVIDER` | `k3d` | Also `K3D_MANAGER_PROVIDER`, `K3DMGR_PROVIDER` |
+| `K3S_KUBECONFIG_PATH` | `/etc/rancher/k3s/k3s.yaml` | k3s only |
+| `K3S_NODE_IP` / `NODE_IP` | auto-detected | k3s only |
+
+### Vault PKI
+| Variable | Default | Notes |
+|---|---|---|
+| `VAULT_ENABLE_PKI` | `1` | Enable PKI bootstrap |
+| `VAULT_PKI_PATH` | `pki` | Mount path |
+| `VAULT_PKI_CN` | `dev.local.me` | Root CA CN |
+| `VAULT_PKI_ROLE` | `jenkins-tls` | Issuing role |
+| `VAULT_PKI_MAX_TTL` | `87600h` | Root CA lifetime |
+| `VAULT_PKI_ROLE_TTL` | `720h` | Leaf cert lifetime |
+
+### Jenkins
+| Variable | Default | Notes |
+|---|---|---|
+| `VAULT_PKI_LEAF_HOST` | `jenkins.dev.local.me` | Jenkins cert CN |
+| `JENKINS_CERT_ROTATOR_IMAGE` | `docker.io/google/cloud-sdk:slim` | CronJob image |
+| `JENKINS_CERT_ROTATOR_SCHEDULE` | `0 */12 * * *` | Rotation check schedule |
+| `JENKINS_CERT_ROTATOR_RENEW_BEFORE` | `432000` | Renew when ≤5 days remain |
+| `JENKINS_HOME_PATH` | `${SCRIPT_DIR}/storage/jenkins_home` | Host path for storage |
+
+### Active Directory
+| Variable | Default | Notes |
+|---|---|---|
+| `AD_DOMAIN` | (required) | e.g. `corp.example.com` |
+| `AD_SERVER` | auto-discovered | Comma-separated DCs |
+| `AD_REQUIRE_TLS` | `true` | |
+| `AD_TLS_CONFIG` | `TRUST_ALL_CERTIFICATES` | Dev default |
+| `AD_GROUP_LOOKUP_STRATEGY` | `RECURSIVE` | `TOKENGROUPS` is faster for real AD |
+| `AD_VAULT_PATH` | `secret/data/jenkins/ad-credentials` | |
+| `AD_TEST_MODE` | `0` | Set `1` to bypass connectivity checks |
+
+---
+
+## Common Commands
+
+```bash
+# Cluster
+./scripts/k3d-manager create_cluster [name] [http_port] [https_port]
+./scripts/k3d-manager deploy_cluster
+CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f
+./scripts/k3d-manager destroy_cluster
+
+# Services
+./scripts/k3d-manager deploy_eso
+./scripts/k3d-manager deploy_vault
+./scripts/k3d-manager deploy_ldap
+./scripts/k3d-manager deploy_ad           # Deploy OpenLDAP with AD schema (local AD testing)
+./scripts/k3d-manager deploy_jenkins --enable-vault
+./scripts/k3d-manager deploy_jenkins --enable-ldap --enable-vault
+./scripts/k3d-manager deploy_jenkins --enable-ad --enable-vault
+AD_DOMAIN=corp.example.com ./scripts/k3d-manager deploy_jenkins --enable-ad-prod --enable-vault
+
+# Jenkins deployment modes – working vs broken
+# WORKING:  deploy_jenkins --enable-vault
+# WORKING:  deploy_jenkins --enable-vault --enable-ldap
+# WORKING:  deploy_jenkins --enable-vault --enable-ad
+# BROKEN:   deploy_jenkins (no vault) – policy creation always runs; jenkins-admin secret missing
+# BROKEN:   deploy_jenkins --enable-ldap (without --enable-vault) – LDAP requires Vault for secrets
+
+# Tests
+./scripts/k3d-manager test all
+./scripts/k3d-manager test core
+./scripts/k3d-manager test install_k3d --case "test case name"
+
+# Smoke test (manual – bin/smoke-test-jenkins.sh, Phases 1-3 complete)
+./bin/smoke-test-jenkins.sh               # SSL + auth smoke tests against live Jenkins
+
+# Debug
+ENABLE_TRACE=1 ./scripts/k3d-manager <command>
+DEBUG=1 ./scripts/k3d-manager <command>
+```
+
+---
+
+## Testing Infrastructure
+
+- Framework: **Bats** (auto-installed via `_ensure_bats` in `scripts/lib/system.sh`)
+- Test files: `scripts/tests/{core,lib,plugins}/*.bats`
+- Helpers: `scripts/tests/test_helpers.bash`
+- Logs: `scratch/test-logs/<suite>/<case-hash>/<timestamp>.log`
+- Run a single case: `./scripts/k3d-manager test <suite> --case "<name>"`
+- Verbose: add `-v`
+
+---
+
+## JCasC Authorization Strategy
+
+Use the flat `permissions:` format (not nested `entries:`):
+
+```yaml
+authorizationStrategy:
+  projectMatrix:
+    permissions:
+      - "Overall/Read:authenticated"
+      - "Overall/Administer:user:admin"
+      - "Overall/Administer:group:Jenkins Admins"
+```
+
+Use `user:` and `group:` prefixes explicitly. This avoids ambiguity with the
+matrix-auth plugin parser.
+
+---
+
+## Active Directory Notes
+
+- AD is **never deployed** – it is always an external service.
+- `_dirservice_activedirectory_init` validates connectivity; it does not deploy.
+- Use `TOKENGROUPS` for efficient nested-group resolution with real AD.
+- With OpenLDAP (AD-schema testing), use `RECURSIVE` group lookup.
+- Test users in `scripts/etc/ldap/bootstrap-ad-schema.ldif`: `alice` (admin),
+  `bob` (developer), `charlie` (read-only). All use password `password`.
+- Service account DN: `CN=Jenkins Service,OU=ServiceAccounts,DC=corp,DC=example,DC=com`
+
+---
+
+## Certificate Rotation Testing (Short-TTL Config)
+
+```bash
+export VAULT_PKI_ROLE_TTL="10m"
+export JENKINS_CERT_ROTATOR_RENEW_BEFORE="300"
+export JENKINS_CERT_ROTATOR_SCHEDULE="*/2 * * * *"
+export JENKINS_CERT_ROTATOR_ENABLED="1"
+```
+
+Trigger manually:
+```bash
+kubectl create job manual-rotation --from=cronjob/jenkins-cert-rotator -n jenkins
+kubectl logs -n jenkins job/manual-rotation -f
+```
+
+Verify rotation:
+```bash
+kubectl get secret jenkins-tls -n istio-system \
+  -o jsonpath='{.data.tls\.crt}' | base64 -d | openssl x509 -noout -serial -dates
+```
+
+---
+
+## Vault Resilience
+
+Vault seals itself on every pod/node restart. Recovery helpers:
+
+```bash
+./scripts/k3d-manager reunseal_vault    # Retrieve shards from Keychain/libsecret and unseal
+```
+
+- Unseal shards are stored in macOS Keychain (or Linux `libsecret`) during initial Vault init.
+- `reunseal_vault` automates shard retrieval and the unseal sequence.
+- Any service depending on Vault (Jenkins, ESO, LDAP auth) will be unhealthy until Vault is unsealed.
+- After node reboot, always run `reunseal_vault` before attempting other `deploy_*` commands.
+
+---
+
+## Known Issues & Gotchas
+
+| Issue | Root Cause | Fix |
+|---|---|---|
+| ESO SecretStore NotReady | `mountPath: auth/kubernetes` (wrong path) | Use `mountPath: kubernetes` in ESO YAML |
+| LDAP bind DN mismatch | Bootstrap LDIF uses different base DN than `LDAP_BASE_DN` | Keep both consistent |
+| Jenkins pod readiness timeout | Vault Agent init container slow or Vault sealed | Check `kubectl exec -n vault vault-0 -- vault status` |
+| Empty LDAP directory | Basic `--enable-ldap` deploys with no users; `bootstrap-basic-schema.ldif` not yet created | Use `deploy_ad` for OpenLDAP+AD-schema with pre-seeded users; or set `LDAP_LDIF_PATH` to a custom LDIF |
+| Cert rotator image pull failure | `google/cloud-sdk:slim` unreachable | Set `JENKINS_CERT_ROTATOR_IMAGE` to accessible registry |
+
+---
+
+## Security Rules
+
+- Never commit secrets or credentials to git.
+- Use `${PLACEHOLDER}` variables in all templates.
+- `_run_command` probes sudo safely; never call `sudo` directly.
+- `_args_have_sensitive_flag` auto-disables trace for commands with
+  `--password`, `--token`, `--username`.
+- Default TLS config is `TRUST_ALL_CERTIFICATES` for dev only; document
+  production requirement for proper CA validation.
+- Vault PKI auto-revokes old certs after rotation.
+
+---
+
+## Work in Progress (branch: ldap-develop)
+
+Priority tasks as of 2026-02-19:
+
+1. **Certificate Rotation Validation** – test plan at
+   `docs/tests/certificate-rotation-validation.md`. Deploy with short TTLs and
+   validate the full rotation → revocation → continuity cycle on Ubuntu/k3s.
+2. **End-to-End AD Integration Testing** – validate both `--enable-ad` (OpenLDAP
+   with AD schema) and `--enable-ad-prod` (real AD) modes.
+3. **Documentation** – `docs/guides/certificate-rotation.md`,
+   `docs/guides/mac-ad-setup.md`, `docs/guides/ad-connectivity-troubleshooting.md`.
+
+Branch merges to `main` after Priority 1 + 2 complete and all tests pass.
+
+---
+
+## Multi-Agent Collaboration Protocol (2026-02-22)
+
+This project uses a three-agent loop for complex implementation tasks:
+**Gemini reviews → Codex implements → Claude audits**.
+
+### Role Assignments
+
+| Agent | Role | Strengths |
+|---|---|---|
+| Gemini | Reviewer / Researcher | Large context window; good at reading docs and spotting gaps |
+| Codex | Implementer | Follows well-defined specs; strong at code generation |
+| Claude | Auditor / Memory-bank keeper | Recovers collapsed sessions; updates memory-bank |
+
+### Gemini as Reviewer
+
+- **Front-load research before any implementation.** Ask Gemini to review:
+  - The relevant `docs/plans/` document
+  - `memory-bank/activeContext.md` and `memory-bank/progress.md`
+  - Any `docs/issues/` entries related to the feature
+- **JCasC-specific**: always ask Gemini to verify syntax before Codex writes any
+  JCasC YAML. JCasC plugin version sensitivity causes silent misconfiguration.
+  - Known trap: `projectMatrix` format changed between plugin versions.
+    Current working format uses `entries:` with `group:` and `user:` objects.
+  - Known trap: Vault agent `${file:/vault/secrets/...}` references must be
+    protected from `envsubst` expansion using `printf -v VAR '%s' '${file:...}'`.
+- Gemini reviews are advisory. If Gemini's suggestion conflicts with
+  `systemPatterns.md` or an established pattern in `.clinerules`, the
+  conflict must be surfaced and resolved before Codex starts — not silently
+  accepted.
+
+### Codex as Implementer
+
+- **Read memory-bank before touching any code:**
+  - `memory-bank/activeContext.md` — current branch state and known broken paths
+  - `memory-bank/progress.md` — what is complete and what is pending
+  - Relevant `docs/issues/` file for the feature being implemented
+- **Strengths:** well-scoped tasks with clear acceptance criteria.
+  Codex performs well when given a concrete spec (e.g. a `docs/plans/` doc).
+- **Weaknesses:** diagnosis and iteration. If Codex gets stuck or starts
+  generating commits without visible progress, stop the session. Do not let
+  Codex iterate blindly — bring Claude in to audit.
+- **Counter-argue rule:** if Gemini's review conflicts with patterns in
+  `.clinerules` or `docs/plans/`, Codex must push back with reasoning.
+  Do not accept a reviewer suggestion just because it comes from Gemini.
+  Raise the conflict explicitly.
+
+### Local-First Mandate (enforced from session 1)
+
+- All changes must be verified locally before any push or PR.
+- No "push to test on GitHub" habit. CI is a final gate, not a development loop.
+- Codex must run `bash -n scripts/...` and `shellcheck` on any changed file
+  before committing.
+- If a live cluster is needed for validation, use the pre-built local cluster.
+  Do not assume CI will catch what local testing skips.
+
+### Secret Handling Rule (2026-02-22)
+
+- **Never output or commit secrets:** Agents must NEVER print the result of
+  `get-ldap-password.sh`, `get-certs.sh`, or any Vault secret retrieval command to the terminal
+  or include them in commit messages, even in "debug" or "verbose" modes.
+- **Redaction by default:** If a script must be run to verify a secret exists, pipe the output
+  to `grep` or `wc -l` to confirm presence without exposing the value.
+- **Trace protection:** Remember that `_run_command` auto-disables trace for sensitive flags;
+  ensure any new sensitive flags are added to `_args_have_sensitive_flag` in `scripts/lib/system.sh`.
+
+### Collapse Recovery Protocol
+
+When Gemini or Codex shows signs of hallucination (generating commits without
+real progress, repeating the same fix, contradicting its own earlier output):
+
+1. **Stop the session immediately.** Do not let it continue iterating.
+2. **Bring Claude in to audit:**
+   - Read the actual diffs (`git diff`, `git log -p`)
+   - Compare against `memory-bank/progress.md` — what was actually completed?
+3. **Rebuild memory-bank from scratch** if context is stale or contradictory.
+4. **Restart the agent with clean context** and the updated memory-bank.
+
+The memory-bank exists precisely for this recovery path. Keep it current.
