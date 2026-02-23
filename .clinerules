@@ -380,6 +380,16 @@ This project uses a three-agent loop for complex implementation tasks:
 - If a live cluster is needed for validation, use the pre-built local cluster.
   Do not assume CI will catch what local testing skips.
 
+### Secret Handling Rule (2026-02-22)
+
+- **Never output or commit secrets:** Agents must NEVER print the result of
+  `get-ldap-password.sh`, `get-certs.sh`, or any Vault secret retrieval command to the terminal
+  or include them in commit messages, even in "debug" or "verbose" modes.
+- **Redaction by default:** If a script must be run to verify a secret exists, pipe the output
+  to `grep` or `wc -l` to confirm presence without exposing the value.
+- **Trace protection:** Remember that `_run_command` auto-disables trace for sensitive flags;
+  ensure any new sensitive flags are added to `_args_have_sensitive_flag` in `scripts/lib/system.sh`.
+
 ### Collapse Recovery Protocol
 
 When Gemini or Codex shows signs of hallucination (generating commits without
