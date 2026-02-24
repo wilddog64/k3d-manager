@@ -1,3 +1,4 @@
+# Supported CLUSTER_PROVIDER values: `orbstack` (macOS auto-detect), `k3d`, `k3s`
 export IP=$(ip -4 route get 8.8.8.8 | perl -nle 'print $1 if /src (.*) uid/')
 
 # Default ports for cluster load balancer

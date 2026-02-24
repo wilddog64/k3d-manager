@@ -23,6 +23,7 @@ scripts/lib/                 ← core libraries (always sourced)
   test.sh                    ← Bats test framework integration
   cluster_provider.sh        ← provider abstraction (k3d / k3s)
   providers/k3d.sh           ← k3d implementation
+  providers/orbstack.sh      ← OrbStack runtime (delegates to k3d)
   providers/k3s.sh           ← k3s implementation
   vault_pki.sh               ← Vault PKI cert helpers
   dirservices/openldap.sh    ← OpenLDAP directory provider
@@ -110,7 +111,7 @@ Future: `azuread`, `okta`
 ### Cluster Provider (`CLUSTER_PROVIDER`)
 
 Providers in `scripts/lib/providers/<provider>.sh`.
-Supported values: `k3d` (macOS default), `k3s` (Linux/systemd)
+Supported values: `orbstack` (auto-detected when OrbStack is running on macOS), `k3d` (Docker), `k3s` (Linux/systemd)
 
 ### Secret Backend (`SECRET_BACKEND`)
 

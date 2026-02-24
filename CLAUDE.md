@@ -162,7 +162,7 @@ AD_DOMAIN=corp.example.com \
 - `core.sh` - Cluster lifecycle operations (create/destroy/deploy)
 - `test.sh` - Test framework integration (Bats)
 - `cluster_provider.sh` - Provider abstraction layer
-- `providers/k3d.sh`, `providers/k3s.sh` - Provider-specific implementations
+- `providers/k3d.sh`, `providers/orbstack.sh`, `providers/k3s.sh` - Provider-specific implementations
 - `vault_pki.sh` - Vault PKI certificate management helpers
 - `dirservices/openldap.sh`, `dirservices/activedirectory.sh` - Directory service provider implementations
 
@@ -198,7 +198,7 @@ AD_DOMAIN=corp.example.com \
 - Controlled by `VAULT_PKI_*` variables in `scripts/etc/vault/vars.sh` and `scripts/etc/jenkins/vars.sh`
 
 **Provider Abstraction:**
-- `CLUSTER_PROVIDER` environment variable selects backend (k3d/k3s)
+- `CLUSTER_PROVIDER` environment variable selects backend (`orbstack`, `k3d`, or `k3s`). OrbStack is detected automatically when its daemon is running on macOS; otherwise the helper falls back to k3d unless one of the provider variables is exported.
 - `_cluster_provider()` returns active provider
 - Provider-specific implementations in `scripts/lib/providers/`
 - k3d: Docker-based, automatic credential management, port mapping via load balancer
@@ -259,7 +259,7 @@ _run_command --quiet -- command_that_might_fail
 ## Important Configuration Variables
 
 **Cluster Provider:**
-- `CLUSTER_PROVIDER` / `K3D_MANAGER_PROVIDER` / `K3DMGR_PROVIDER` - Select backend (k3d/k3s)
+- `CLUSTER_PROVIDER` / `K3D_MANAGER_PROVIDER` / `K3DMGR_PROVIDER` - Select backend (`orbstack`, `k3d`, or `k3s`)
 
 **Vault PKI:**
 - `VAULT_ENABLE_PKI` - Enable PKI bootstrap (default: 1)

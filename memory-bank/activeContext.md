@@ -57,6 +57,11 @@ rotation. It has NOT been merged to `main` yet.
   - Azure backend: partial (plugin exists, not fully wired).
   - AWS/GCP: planned.
 
+- **OrbStack provider support** (Phases 1 & 2 complete — 2026-02-24)
+  - `CLUSTER_PROVIDER=orbstack` delegates all k3d operations to OrbStack's Docker runtime.
+  - Auto-detects OrbStack on macOS via `orb status`; falls back to `k3d` when not running.
+  - No Docker Desktop/Colima installation attempts when using OrbStack.
+
 ## Current Priorities / Active Decisions
 
 ### Priority 1: Jenkins Kubernetes agents and SMB CSI integration
@@ -71,14 +76,11 @@ rotation. It has NOT been merged to `main` yet.
 - `--enable-ad` path has provider-level/unit coverage; continue end-to-end scenario validation.
 - `--enable-ad-prod` requires external AD (VPN/corporate environment dependent).
 
-### Priority 4: OrbStack provider (new, 2026-02-24)
+### Priority 4: OrbStack provider (updated 2026-02-24)
 - Plan: `docs/plans/orbstack-provider.md`
-- Three phases:
-  - **Phase 1**: OrbStack as k3d runtime (`CLUSTER_PROVIDER=orbstack`) — thin wrapper, 1-2 hours
-  - **Phase 2**: Auto-detection — OrbStack picked automatically when active — 1 hour
-  - **Phase 3**: OrbStack native Kubernetes provider — no k3d overhead — half day
-- Phases 1+2 are a good Codex task — well-scoped, clear acceptance criteria, no risk to existing providers.
-- Requires macOS with OrbStack installed for local validation.
+- **Phase 1 + 2 implemented** — new `orbstack` provider wraps k3d with OrbStack context handling and macOS auto-detection chooses it when `orb` is running. Manual override: `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster`.
+- **Phase 3 (next)**: OrbStack native Kubernetes provider — eliminates k3d entirely (estimated half day, still pending).
+- Requires macOS with OrbStack installed for validation.
 
 ### PENDING: GitGuardian False Positive Fix
 - Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*` in `scripts/etc/ldap/vars.sh`

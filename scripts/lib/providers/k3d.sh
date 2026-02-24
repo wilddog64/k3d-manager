@@ -49,7 +49,11 @@ function _provider_k3d_install() {
    export K3D_INSTALL_DIR="${1:-/usr/local/bin}"
    export INSTALL_DIR="$K3D_INSTALL_DIR"
 
-   _install_docker
+   local skip_docker="${SKIP_DOCKER_SETUP:-0}"
+
+   if [[ "$skip_docker" != "1" ]]; then
+      _install_docker
+   fi
    _install_helm
    if _is_mac; then
       _install_istioctl "$HOME/.local/bin"

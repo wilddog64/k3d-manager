@@ -1,8 +1,8 @@
 # OrbStack Provider Plan
 
 **Date:** 2026-02-24
-**Status:** Planned, not yet implemented
-**Branch:** TBD (new feature branch from `main`)
+**Status:** Phase 1 + 2 implemented (2026-02-24); Phase 3 pending
+**Branch:** TBD (new feature branch from `main` for Phase 3)
 
 ---
 
@@ -27,7 +27,7 @@ faster than running k3d on top of Docker.
 
 ---
 
-## Phase 1 — OrbStack as k3d Runtime
+## Phase 1 — OrbStack as k3d Runtime *(status: complete)*
 
 **Effort:** Low (1-2 hours)
 **Value:** Covers the majority of OrbStack users who already use k3d
@@ -84,7 +84,7 @@ CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster
 
 ---
 
-## Phase 2 — OrbStack Runtime Auto-Detection
+## Phase 2 — OrbStack Runtime Auto-Detection *(status: complete)*
 
 **Effort:** Low (1 hour)
 **Value:** Zero-config experience — no need to set `CLUSTER_PROVIDER` manually
@@ -175,15 +175,15 @@ CLUSTER_PROVIDER=orbstack-k8s ./scripts/k3d-manager deploy_cluster
 
 ## Implementation Sequence
 
-1. [ ] Create `scripts/lib/providers/orbstack.sh` — Phase 1 implementation
+1. [x] Create `scripts/lib/providers/orbstack.sh` — Phase 1 implementation
 2. [ ] Validate Phase 1 locally on macOS with OrbStack installed
-3. [ ] Update `scripts/lib/cluster_provider.sh` — Phase 2 auto-detection
+3. [x] Update `scripts/lib/cluster_provider.sh` — Phase 2 auto-detection
 4. [ ] Validate Phase 2 auto-detection with OrbStack running vs. Docker Desktop
-5. [ ] Update `scripts/etc/cluster_var.sh` — document `orbstack` and `orbstack-k8s` as valid values
-6. [ ] Update `.clinerules` and `CLAUDE.md` with new provider values
+5. [x] Update `scripts/etc/cluster_var.sh` — document `orbstack` and `orbstack-k8s` as valid values
+6. [x] Update `.clinerules` and `CLAUDE.md` with new provider values
 7. [ ] Create `scripts/lib/providers/orbstack-k8s.sh` — Phase 3 implementation
 8. [ ] Validate Phase 3 against OrbStack native Kubernetes
-9. [ ] Update `memory-bank/progress.md` as each phase completes
+9. [x] Update `memory-bank/progress.md` as each phase completes
 
 ---
 
