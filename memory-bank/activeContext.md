@@ -71,6 +71,20 @@ rotation. It has NOT been merged to `main` yet.
 - `--enable-ad` path has provider-level/unit coverage; continue end-to-end scenario validation.
 - `--enable-ad-prod` requires external AD (VPN/corporate environment dependent).
 
+### Priority 4: OrbStack provider (new, 2026-02-24)
+- Plan: `docs/plans/orbstack-provider.md`
+- Three phases:
+  - **Phase 1**: OrbStack as k3d runtime (`CLUSTER_PROVIDER=orbstack`) — thin wrapper, 1-2 hours
+  - **Phase 2**: Auto-detection — OrbStack picked automatically when active — 1 hour
+  - **Phase 3**: OrbStack native Kubernetes provider — no k3d overhead — half day
+- Phases 1+2 are a good Codex task — well-scoped, clear acceptance criteria, no risk to existing providers.
+- Requires macOS with OrbStack installed for local validation.
+
+### PENDING: GitGuardian False Positive Fix
+- Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*` in `scripts/etc/ldap/vars.sh`
+- Also update any referencing scripts
+- See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
+
 ### OPEN ISSUE: Basic LDAP Deploys Empty Directory
 - `deploy_ldap` (standard schema) creates an empty directory with no users.
 - `bootstrap-basic-schema.ldif` is planned but not yet created.
@@ -150,3 +164,8 @@ Plan: `docs/plans/ci-workflow.md`
 - **Jenkins readiness timeout behavior**: `_wait_for_jenkins_ready` now uses a longer default timeout,
   pod-existence precheck, and richer timeout diagnostics. See
   `docs/issues/2025-11-07-jenkins-pod-readiness-timeout.md`.
+- **GitGuardian false positive** (2026-02-23): `LDAP_PASSWORD_ROTATOR_IMAGE` in
+  `scripts/etc/ldap/vars.sh` triggered GitGuardian's generic password detector — variable
+  name contains "PASSWORD", value is a Docker image. No real secret exposed. Pending fix:
+  rename to `LDAP_ROTATOR_IMAGE` (and related vars). See
+  `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`.

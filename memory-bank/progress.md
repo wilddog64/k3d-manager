@@ -114,6 +114,14 @@ continued end-to-end validation for auth/deploy modes.
 - [ ] Additional automated Bats tests for Jenkins and ESO plugins
 - [ ] **Argo CD implementation** — Phase 1 design complete in `docs/plans/argocd-implementation-plan.md`
       Core deployment + LDAP/Dex + Vault/ESO + Istio integration (~4-6 hours for Phase 1)
+- [ ] **OrbStack provider** — Plan: `docs/plans/orbstack-provider.md`
+  - Phase 1: OrbStack as k3d runtime (`CLUSTER_PROVIDER=orbstack`) — 1-2 hours
+  - Phase 2: Auto-detection — OrbStack picked automatically when active — 1 hour
+  - Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
+  - **Good Codex task:** Phases 1+2 are well-scoped with clear acceptance criteria
+- [ ] **Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*`** — fix GitGuardian false positive
+  - See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
+  - Affects: `scripts/etc/ldap/vars.sh` and any referencing scripts
 
 ---
 
@@ -129,3 +137,4 @@ continued end-to-end validation for auth/deploy modes.
 | ESO SecretStore `mountPath` wrong | FIXED | Must be `kubernetes` not `auth/kubernetes` |
 | LDAP bind DN mismatch | FIXED | Keep `LDAP_BASE_DN` consistent with LDIF base DN |
 | Jenkins pod readiness timeout | FIXED | 10m timeout + pod existence check |
+| GitGuardian false positive: `LDAP_PASSWORD_ROTATOR_IMAGE` | FALSE POSITIVE | Variable name contains "PASSWORD", value is a Docker image. Fix: rename to `LDAP_ROTATOR_IMAGE`. See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md` |
