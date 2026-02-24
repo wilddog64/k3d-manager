@@ -76,6 +76,7 @@ follow the pattern `_install_<target>` and live in `scripts/lib/system.sh` or
 | `_install_debian_docker` | Docker via `apt-get` |
 | `_install_redhat_docker` | Docker via `dnf` |
 | `_install_bats_from_source` | Bats test framework from source |
+| `_install_orbstack` | macOS-only helper: installs OrbStack via Homebrew, launches GUI, waits for `orb status` |
 
 **`scripts/lib/core.sh`** — cluster and service tooling:
 | Function | Purpose |
@@ -90,9 +91,10 @@ follow the pattern `_install_<target>` and live in `scripts/lib/system.sh` or
 already installed before attempting to install. Use `_run_command` for all package
 manager calls. Never call `brew`, `apt-get`, `dnf` directly.
 
-**OrbStack:** No `_install_orbstack` function exists yet. OrbStack requires a one-time
-GUI setup after `brew install --cask orbstack` — it cannot be fully automated. On CI
-runners (`m2-air`) OrbStack must be pre-installed manually.
+**OrbStack:** `_install_orbstack` installs via `brew install orbstack`, launches
+OrbStack.app, and waits for `orb status` to report healthy. Users still must
+complete the one-time GUI prompts. CI runners (`m2-air`) require OrbStack to be
+pre-installed manually.
 
 ---
 

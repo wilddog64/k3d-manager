@@ -123,6 +123,7 @@ continued end-to-end validation for auth/deploy modes.
 - [ ] **OrbStack provider** — Plan: `docs/plans/orbstack-provider.md`
   - [x] Phase 1: OrbStack as k3d runtime (`CLUSTER_PROVIDER=orbstack`) — implemented 2026-02-24
   - [x] Phase 2: Auto-detection — OrbStack picked automatically when active
+  - [x] **m4 local validation** — Phase 1+2 verified on `m4` Mac (2026-02-24)
   - [ ] **m2-air validation** — full stack test required before Phase 1+2 considered production-ready
     - Prerequisite: OrbStack installed on `m2-air`
     - Sequence: `create_cluster` → `deploy_vault ha` → `deploy_eso` → `deploy_istio`

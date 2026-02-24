@@ -147,8 +147,8 @@ runs. CI has no human interaction — OrbStack cannot be installed or set up by 
 
 ```bash
 # On m2-air — do this once, manually
-brew install --cask orbstack
-# Open OrbStack.app and complete GUI setup
+brew install orbstack
+# Open OrbStack.app and complete GUI onboarding
 orb status   # must return healthy before proceeding
 ```
 
@@ -169,8 +169,9 @@ Vault must be unsealed before any test run (`reunseal_vault`).
 
 **Note:** OrbStack is a CI runner prerequisite, not a developer prerequisite. Local
 dev machines can use Docker Desktop, Colima, or OrbStack — `CLUSTER_PROVIDER` selects
-the right runtime. The `_install_orbstack` helper assists local dev onboarding but
-cannot be used in CI.
+the right runtime. `_install_orbstack` (macOS-only) installs via Homebrew, launches
+OrbStack.app, and waits for `orb status` to succeed, but CI still requires OrbStack
+to be pre-installed manually.
 
 ---
 
