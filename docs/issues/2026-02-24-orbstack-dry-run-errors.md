@@ -1,7 +1,7 @@
 # OrbStack Provider Dry-Run Errors
 
 **Date:** 2026-02-24
-**Status:** Documented
+**Status:** ✅ Fixed (2026-02-24)
 
 ## Description
 
@@ -50,3 +50,13 @@ The `--dry-run` flag is currently broken for `create_cluster` when passed as the
 
 1. Ensure OrbStack is running.
 2. Run `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster --dry-run`.
+
+## Fix
+
+- `scripts/lib/core.sh` now parses `--dry-run` (and `-n`) inside `create_cluster`, resolves the active provider, prints the provider/argument summary, and exits without invoking k3d/OrbStack operations.
+- `scripts/lib/providers/k3d.sh` protects the `grep` check with `grep -q -- "$cluster_name"` so names that begin with a dash are treated as data instead of options.
+
+## Verification
+
+- `./scripts/k3d-manager create_cluster --dry-run` now returns 0 and prints the auto-detected provider instead of failing through `grep`.
+- `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster --dry-run` logs `create_cluster dry-run: provider=orbstack` (once OrbStack is running) without attempting to create the cluster. This provides the provider-detection signal described in `docs/plans/orbstack-provider.md`.
