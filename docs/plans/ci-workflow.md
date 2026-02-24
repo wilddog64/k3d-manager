@@ -168,12 +168,12 @@ Once Stage 2 is stable, add integration job as a required check as well.
 
 ## Implementation Sequence
 
-1. [ ] Decide on self-hosted runner — install GitHub Actions runner on Mac
-2. [ ] Create `.github/actions/setup/action.yml` — install bats, shellcheck, yamllint
-3. [ ] Create `.github/workflows/ci.yml` — Stage 1 jobs (shellcheck + bash-n + yamllint on workflows + unit BATS)
+1. [x] Decide on self-hosted runner — install GitHub Actions runner on Mac (runner: m2-air, online)
+2. [x] Create `.github/actions/setup/action.yml` — install bats, shellcheck, yamllint
+3. [x] Create `.github/workflows/ci.yml` — Stage 1 jobs (shellcheck + bash-n + yamllint on workflows + unit BATS)
 4. [ ] **Refactor `test.sh` for namespace isolation across all integration tests**
-5. [ ] Verify Stage 1 passes on current codebase
-6. [ ] Update branch protection to require Stage 1 check
+5. [x] Verify Stage 1 passes on current codebase
+6. [x] Update branch protection to require Stage 1 check
 7. [ ] Pre-build cluster on Mac runner
 8. [ ] Create `check_cluster_health.sh` script for Stage 2.0
 9. [ ] Add Stage 2 jobs to `ci.yml` — PR-only, integration tests
