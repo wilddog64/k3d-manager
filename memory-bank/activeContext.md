@@ -86,6 +86,8 @@ rotation. It has NOT been merged to `main` yet.
   3. Full stack: `create_cluster` → `deploy_vault ha` → `deploy_eso` → `deploy_istio`
   4. Confirm Docker context is OrbStack, not default/colima
   - See `docs/plans/orbstack-provider.md` m4 Local Validation section
+  - **Agent instruction:** Run tests and document failures only. Do NOT fix code.
+    All issues found must be written to `docs/issues/` for Claude/Codex to review.
 - **PENDING: m2-air validation** — only after m4 passes. Pre-builds the Stage 2 CI cluster fixture.
 - **OrbStack installer helper** — `_install_orbstack` (macOS only) installs via `brew install orbstack`, launches OrbStack.app, and waits for `orb status` to pass so scripts can continue. Users still need to complete GUI onboarding when prompted. CI runners (`m2-air`) require OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
 
