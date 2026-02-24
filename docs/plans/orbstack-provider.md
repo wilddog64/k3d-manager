@@ -187,6 +187,44 @@ CLUSTER_PROVIDER=orbstack-k8s ./scripts/k3d-manager deploy_cluster
 
 ---
 
+## m2-air Validation (Prerequisite for Stage 2 CI)
+
+Before Phase 1+2 can be considered production-ready, the full stack must be validated
+on the `m2-air` self-hosted runner which is also the Stage 2 CI machine.
+
+**Why m2-air first, not m4-air:**
+- `m2-air` is the registered GitHub Actions self-hosted runner
+- Stage 2 CI requires a pre-built persistent cluster on the runner
+- OrbStack provider is untested against a real cluster — syntax passing ≠ working
+- Validate on `m2-air` before assuming it works on any other machine
+
+**Prerequisites:**
+- OrbStack installed and running on `m2-air`
+- `orb status` returns healthy
+
+**Validation sequence:**
+```bash
+CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster
+./scripts/k3d-manager deploy_vault ha
+./scripts/k3d-manager deploy_eso
+./scripts/k3d-manager deploy_istio
+./scripts/k3d-manager reunseal_vault
+```
+
+**Success criteria:**
+- Cluster created using OrbStack Docker context (not Docker Desktop/Colima)
+- Vault HA deployed and unsealed
+- ESO SecretStore status `Ready`
+- Istio ingress reachable
+- All core pods `Running`
+
+**If validation passes:**
+- `m2-air` becomes the Stage 2 CI runner with a known-good persistent cluster
+- Update `memory-bank/activeContext.md` to reflect cluster is pre-built and ready
+- Proceed to implement Stage 2 CI workflow
+
+---
+
 ## Reference
 
 - Existing k3d provider: `scripts/lib/providers/k3d.sh`
