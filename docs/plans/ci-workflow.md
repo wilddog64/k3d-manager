@@ -134,20 +134,43 @@ review prompt — project conventions are already documented there.
 
 ## Pre-Built Cluster Setup
 
-The Mac runner maintains a persistent k3d cluster. Cluster is rebuilt manually when:
+The Mac runner (`m2-air`) maintains a persistent k3d cluster backed by OrbStack.
+Cluster is rebuilt manually when:
 - k3d or Helm chart versions are bumped
 - Major architecture changes affect core components
 - Cluster state becomes unreliable
 
-**Minimum cluster state for Stage 2:**
+### Runner Prerequisites (one-time manual setup)
+
+OrbStack must be pre-installed and configured on `m2-air` before any Stage 2 CI job
+runs. CI has no human interaction — OrbStack cannot be installed or set up by CI.
+
 ```bash
-./scripts/k3d-manager create_cluster
+# On m2-air — do this once, manually
+brew install --cask orbstack
+# Open OrbStack.app and complete GUI setup
+orb status   # must return healthy before proceeding
+```
+
+All other tooling (`kubectl`, `helm`, `k3d`, `bats`, `shellcheck`) is installed by
+the Stage 1 setup action and does not require manual pre-installation.
+
+### Minimum Cluster State for Stage 2
+
+```bash
+CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster
 ./scripts/k3d-manager deploy_vault ha
 ./scripts/k3d-manager deploy_eso
 ./scripts/k3d-manager deploy_istio
+./scripts/k3d-manager reunseal_vault
 ```
 
 Vault must be unsealed before any test run (`reunseal_vault`).
+
+**Note:** OrbStack is a CI runner prerequisite, not a developer prerequisite. Local
+dev machines can use Docker Desktop, Colima, or OrbStack — `CLUSTER_PROVIDER` selects
+the right runtime. The `_install_orbstack` helper assists local dev onboarding but
+cannot be used in CI.
 
 ---
 

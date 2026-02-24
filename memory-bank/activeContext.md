@@ -84,6 +84,7 @@ rotation. It has NOT been merged to `main` yet.
   - Requires OrbStack installed on `m2-air`
   - Validation: `create_cluster` → `deploy_vault ha` → `deploy_eso` → `deploy_istio`
   - If passes: `m2-air` becomes the pre-built Stage 2 CI cluster fixture
+- **PENDING: OrbStack installer helper** — For local dev onboarding only. Installs OrbStack via `brew install --cask orbstack` then prompts user to open the app for one-time GUI setup. Cannot be used in CI (no human interaction). `m2-air` requires OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
 
 ### PENDING: GitGuardian False Positive Fix
 - Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*` in `scripts/etc/ldap/vars.sh`
