@@ -1,0 +1,53 @@
+---
+name: CI
+
+"on":
+  push:
+    branches:
+      - '**'
+    paths-ignore:
+      - 'docs/**'
+      - 'memory-bank/**'
+      - '**/*.md'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup
+
+      - name: Run shellcheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(
+            find scripts -type f \( -name '*.sh' -o -name 'k3d-manager' \) \
+              -exec awk 'FNR==1 && /^#!.*bash/ {print FILENAME}' {} +
+          )
+          shellcheck -S error "${files[@]}"
+
+      - name: Run bash syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          find scripts -type f \( -name '*.sh' -o -name 'k3d-manager' \) \
+            -print0 |
+          while IFS= read -r -d '' file; do
+            bash -n "$file"
+          done
+
+      - name: Run yamllint on workflow files
+        shell: bash
+        run: |
+          set -euo pipefail
+          yamllint .github/workflows/*.yml
+
+      - name: Run lib unit BATS
+        shell: bash
+        run: |
+          set -euo pipefail
+          bats scripts/tests/lib
