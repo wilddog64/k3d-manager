@@ -10,7 +10,13 @@ fi
 
 function _provider_orbstack__ensure_runtime() {
    if ! _orbstack_detect; then
-      _err "OrbStack CLI not found or OrbStack is not running. Install OrbStack and ensure 'orb status' reports it is running."
+      if declare -f _install_orbstack >/dev/null 2>&1; then
+         _install_orbstack
+      fi
+   fi
+
+   if ! _orbstack_detect; then
+      _err "OrbStack CLI not found or OrbStack is not running. Install OrbStack, complete the GUI setup, and ensure 'orb status' reports it is running."
    fi
 
    _provider_orbstack__set_docker_context
