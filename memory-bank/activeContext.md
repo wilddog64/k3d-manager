@@ -131,7 +131,7 @@ REQUIRED_STATUS_CHECK=<job-name> \
 /path/to/provision-tomcat/bin/enforce-branch-protection
 ```
 
-## CI Workflow — Decided, Not Yet Implemented
+## CI Workflow — Stage 1 Implemented (2026-02-23)
 
 Plan: `docs/plans/ci-workflow.md`
 
@@ -148,10 +148,19 @@ Plan: `docs/plans/ci-workflow.md`
 
 **Prerequisite:** Refactor `scripts/lib/test.sh` for namespace isolation across all integration tests to prevent state collision.
 
-**Not yet done:**
+**Implemented now (Stage 1):**
+- Added `.github/workflows/ci.yml` and `.github/actions/setup/action.yml`.
+- Added `.shellcheckrc` baseline with `disable=SC2148`.
+- Scoped shellcheck in CI to files with a Bash shebang.
+- Local Stage 1 verification succeeded for:
+  - shebang-scoped `shellcheck -S error`
+  - `bash -n` on scripts
+  - `yamllint .github/workflows/*.yml`
+  - `bats scripts/tests/lib`
+
+**Still not done:**
 - Self-hosted runner not set up on Mac
-- No `.github/workflows/` directory yet
-- CI design parked until runner decision is final
+- Stage 2/3 CI workflows not implemented yet
 
 ## Operational Notes
 
