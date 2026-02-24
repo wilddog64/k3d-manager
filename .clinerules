@@ -55,6 +55,47 @@ scripts/etc/                 ← config templates & defaults
 
 ---
 
+## Install Function Catalogue
+
+Before writing a new install helper, check if one already exists. All install functions
+follow the pattern `_install_<target>` and live in `scripts/lib/system.sh` or
+`scripts/lib/core.sh`.
+
+**`scripts/lib/system.sh`** — system-level tooling:
+| Function | Purpose |
+|---|---|
+| `_install_kubernetes_cli` | Install `kubectl` (RedHat / Debian / macOS brew) |
+| `_install_redhat_kubernetes_client` | `kubectl` via `dnf` |
+| `_install_debian_kubernetes_client` | `kubectl` via `apt-get` |
+| `_install_helm` | Install `helm` (dispatches by OS) |
+| `_install_mac_helm` | `helm` via `brew` |
+| `_install_redhat_helm` | `helm` via `dnf` |
+| `_install_debian_helm` | `helm` via `apt-get` |
+| `_install_mac_docker` | Docker via Colima on macOS |
+| `_install_colima` | Install Colima (macOS Docker runtime) |
+| `_install_debian_docker` | Docker via `apt-get` |
+| `_install_redhat_docker` | Docker via `dnf` |
+| `_install_bats_from_source` | Bats test framework from source |
+
+**`scripts/lib/core.sh`** — cluster and service tooling:
+| Function | Purpose |
+|---|---|
+| `_install_k3d` | Install k3d binary |
+| `_install_k3s` | Install k3s (systemd service, Linux only) |
+| `_install_docker` | Dispatch Docker install by OS |
+| `_install_istioctl` | Install `istioctl` |
+| `_install_smb_csi_driver` | Install SMB CSI driver via Helm |
+
+**Convention:** Each `_install_*` function must be idempotent — check if the tool is
+already installed before attempting to install. Use `_run_command` for all package
+manager calls. Never call `brew`, `apt-get`, `dnf` directly.
+
+**OrbStack:** No `_install_orbstack` function exists yet. OrbStack requires a one-time
+GUI setup after `brew install --cask orbstack` — it cannot be fully automated. On CI
+runners (`m2-air`) OrbStack must be pre-installed manually.
+
+---
+
 ## Code Style Rules
 
 - **Shell only** – all scripts are `#!/usr/bin/env bash`.
