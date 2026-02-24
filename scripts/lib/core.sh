@@ -4,7 +4,7 @@ function _cluster_provider() {
    provider="$(printf '%s' "$provider" | tr '[:upper:]' '[:lower:]')"
 
    case "$provider" in
-      k3d|k3s)
+      k3d|orbstack|k3s)
          printf '%s' "$provider"
          ;;
       *)

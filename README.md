@@ -1,6 +1,6 @@
 # k3d-manager
 
-Utility scripts for creating and managing a local development Kubernetes cluster with Istio and related tools.  The main entry point is `./scripts/k3d-manager`, which dispatches functions defined in the core libraries and lazily loads plugin files on demand.  k3d remains the default provider on macOS, and other platforms can select their backend by exporting `CLUSTER_PROVIDER`.
+Utility scripts for creating and managing a local development Kubernetes cluster with Istio and related tools.  The main entry point is `./scripts/k3d-manager`, which dispatches functions defined in the core libraries and lazily loads plugin files on demand.  When OrbStack is running on macOS the dispatcher auto-selects the `orbstack` provider so k3d talks to OrbStack's Docker runtime; otherwise k3d remains the default and other platforms can select their backend by exporting `CLUSTER_PROVIDER`.
 
 ## Usage
 
@@ -36,11 +36,15 @@ port mapping:
 ./scripts/k3d-manager create_cluster beta 8001 8444
 ```
 
-Set `CLUSTER_PROVIDER` to select a different backend module:
+Set `CLUSTER_PROVIDER` to select a different backend module (`orbstack`, `k3d`, or `k3s`). When unset on macOS, the helper automatically picks `orbstack` if OrbStack is running and falls back to `k3d` otherwise.
 
 ```bash
 CLUSTER_PROVIDER=k3d ./scripts/k3d-manager deploy_cluster
 ```
+
+## OrbStack on macOS
+
+OrbStack is detected automatically when its `orb` daemon is running locally. You can also force the provider with `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster`. The helper sets `DOCKER_CONTEXT` to OrbStack's Docker context before invoking any k3d commands so cluster lifecycle operations target OrbStack's runtime without extra manual steps.
 
 ## Verification quickstart
 

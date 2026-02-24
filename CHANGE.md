@@ -1,5 +1,13 @@
 # Changes - k3d-manager
 
+## OrbStack Provider Support - dated 2026-02-24
+
+- Added `scripts/lib/providers/orbstack.sh` to run all k3d lifecycle operations against OrbStack's Docker runtime without touching Colima/Docker Desktop installers.
+- Cluster provider auto-detection now prefers OrbStack on macOS when the `orb` daemon is running, falling back to the previous `k3d` default otherwise.
+- Documentation (`README.md`, `CLAUDE.md`, `.clinerules`, memory bank) updated to list `orbstack` as a supported `CLUSTER_PROVIDER` value and describe the new behavior.
+- Plan `docs/plans/orbstack-provider.md` reflects Phase 1 + 2 completion; Phase 3 (native OrbStack Kubernetes) remains pending.
+
+
 ## Active Directory Integration - dated 2025-11-10
 
 bda2bf3 k3d-manager::tests::jenkins: add Active Directory integration tests

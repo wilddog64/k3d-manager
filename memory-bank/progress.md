@@ -121,10 +121,10 @@ continued end-to-end validation for auth/deploy modes.
 - [ ] **Argo CD implementation** — Phase 1 design complete in `docs/plans/argocd-implementation-plan.md`
       Core deployment + LDAP/Dex + Vault/ESO + Istio integration (~4-6 hours for Phase 1)
 - [ ] **OrbStack provider** — Plan: `docs/plans/orbstack-provider.md`
-  - Phase 1: OrbStack as k3d runtime (`CLUSTER_PROVIDER=orbstack`) — 1-2 hours
-  - Phase 2: Auto-detection — OrbStack picked automatically when active — 1 hour
-  - Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
-  - **Good Codex task:** Phases 1+2 are well-scoped with clear acceptance criteria
+  - [x] Phase 1: OrbStack as k3d runtime (`CLUSTER_PROVIDER=orbstack`) — implemented 2026-02-24
+  - [x] Phase 2: Auto-detection — OrbStack picked automatically when active
+  - [ ] Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
+  - **Good Codex task:** Phase 3 remains and is well-scoped with clear acceptance criteria
 - [ ] **Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*`** — fix GitGuardian false positive
   - See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
   - Affects: `scripts/etc/ldap/vars.sh` and any referencing scripts
