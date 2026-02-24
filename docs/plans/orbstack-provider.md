@@ -230,7 +230,8 @@ docker context show
 - Proceed to m2-air validation
 
 **If m4 validation fails:**
-- Fix on `ldap-develop`, re-run unit tests, re-validate before touching m2-air
+- **Document the issue only** — write a new file under `docs/issues/YYYY-MM-DD-orbstack-<description>.md`
+- Do NOT fix code during the validation run — fixes are handled by Claude/Codex in a separate session
 - Do not push broken OrbStack provider to origin
 
 ---
