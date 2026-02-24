@@ -1,7 +1,7 @@
 # OrbStack Provider Unsupported in `deploy_cluster`
 
 **Date:** 2026-02-24
-**Status:** Documented
+**Status:** ✅ Fixed (2026-02-24)
 
 ## Description
 
@@ -37,3 +37,13 @@ In `scripts/lib/core.sh`, the `deploy_cluster` function has a hardcoded `case` s
 
 1. Set `CLUSTER_PROVIDER=orbstack`.
 2. Run `./scripts/k3d-manager deploy_cluster`.
+
+## Fix
+
+- Extended the provider allow-list in `scripts/lib/core.sh` so `deploy_cluster` accepts `orbstack` alongside `k3d` and `k3s`.
+- Environment variables `CLUSTER_PROVIDER`, `K3D_MANAGER_PROVIDER`, and `K3D_MANAGER_CLUSTER_PROVIDER` now reach `_provider_orbstack_deploy_cluster` instead of failing the guard clause.
+
+## Verification
+
+- With `CLUSTER_PROVIDER=orbstack`, invoking `./scripts/k3d-manager deploy_cluster` now proceeds to the OrbStack provider (it will only stop if OrbStack itself needs installation/GUI activation).
+- `./scripts/k3d-manager test lib` passes, confirming the guard change doesn’t regress existing providers.

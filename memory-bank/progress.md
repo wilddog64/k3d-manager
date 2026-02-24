@@ -147,5 +147,5 @@ continued end-to-end validation for auth/deploy modes.
 | LDAP bind DN mismatch | FIXED | Keep `LDAP_BASE_DN` consistent with LDIF base DN |
 | Jenkins pod readiness timeout | FIXED | 10m timeout + pod existence check |
 | GitGuardian false positive: `LDAP_PASSWORD_ROTATOR_IMAGE` | FALSE POSITIVE | Variable name contains "PASSWORD", value is a Docker image. Fix: rename to `LDAP_ROTATOR_IMAGE`. See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md` |
-| OrbStack: `deploy_cluster` unsupported provider | OPEN | `core.sh` case statement only has `k3d\|k3s` — add `orbstack`. See `docs/issues/2026-02-24-orbstack-unsupported-provider-in-core.md` |
-| OrbStack: `--dry-run` flag broken in `create_cluster` | OPEN | `--dry-run` treated as cluster name, passed to grep without `--`. See `docs/issues/2026-02-24-orbstack-dry-run-errors.md` |
+| OrbStack: `deploy_cluster` unsupported provider | FIXED | Added `orbstack` to the provider guard in `scripts/lib/core.sh`. See `docs/issues/2026-02-24-orbstack-unsupported-provider-in-core.md`. |
+| OrbStack: `--dry-run` flag broken in `create_cluster` | FIXED | `create_cluster` now parses `--dry-run` and the k3d provider uses `grep -q --` to avoid option parsing. See `docs/issues/2026-02-24-orbstack-dry-run-errors.md`. |
