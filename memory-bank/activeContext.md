@@ -80,11 +80,14 @@ rotation. It has NOT been merged to `main` yet.
 - Plan: `docs/plans/orbstack-provider.md`
 - **Phase 1 + 2 implemented** — new `orbstack` provider wraps k3d with OrbStack context handling and macOS auto-detection chooses it when `orb` is running. Manual override: `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster`.
 - **Phase 3 (next)**: OrbStack native Kubernetes provider — eliminates k3d entirely (estimated half day, still pending).
-- **PENDING: m2-air validation** — Phase 1+2 code is complete but untested against a real cluster. Must validate full stack on `m2-air` (the Stage 2 CI runner) before considering it production-ready:
-  - Requires OrbStack installed on `m2-air`
-  - Validation: `create_cluster` → `deploy_vault ha` → `deploy_eso` → `deploy_istio`
-  - If passes: `m2-air` becomes the pre-built Stage 2 CI cluster fixture
-- **PENDING: OrbStack installer helper** — For local dev onboarding only. Installs OrbStack via `brew install --cask orbstack` then prompts user to open the app for one-time GUI setup. Cannot be used in CI (no human interaction). `m2-air` requires OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
+- **PENDING: m4 local validation first** — validate Phase 1+2 on `m4` before touching `m2-air`:
+  1. `./scripts/k3d-manager test lib` — confirm 53/53 still pass
+  2. Auto-detection check — `CLUSTER_PROVIDER` unset + OrbStack running should select `orbstack`
+  3. Full stack: `create_cluster` → `deploy_vault ha` → `deploy_eso` → `deploy_istio`
+  4. Confirm Docker context is OrbStack, not default/colima
+  - See `docs/plans/orbstack-provider.md` m4 Local Validation section
+- **PENDING: m2-air validation** — only after m4 passes. Pre-builds the Stage 2 CI cluster fixture.
+- **OrbStack installer helper** — `_install_orbstack` (macOS only) installs via `brew install orbstack`, launches OrbStack.app, and waits for `orb status` to pass so scripts can continue. Users still need to complete GUI onboarding when prompted. CI runners (`m2-air`) require OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
 
 ### PENDING: GitGuardian False Positive Fix
 - Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*` in `scripts/etc/ldap/vars.sh`
