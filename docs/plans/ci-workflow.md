@@ -81,6 +81,40 @@ cleanup traps in `scripts/lib/test.sh`. No shared state left behind between runs
 
 ---
 
+## Stage 2.5 — AI Code Review (future, PR only)
+
+**Triggers:** pull request to `main` — runs after Stage 1 passes
+
+**Purpose:** Domain-specific review that `shellcheck` cannot do — enforce project
+conventions and interface contracts automatically on every PR.
+
+**Approach:** GitHub Actions step using OpenAI API (gpt-4o-mini for cost efficiency),
+analyzing only changed files in the diff. The `.clinerules` file serves as the
+review prompt — project conventions are already documented there.
+
+**What to check (shell-specific, not covered by shellcheck):**
+- New provider files implement all required interface functions
+  (`_cluster_provider_create`, `_cluster_provider_destroy`, `_cluster_provider_get_kubeconfig`, etc.)
+- New plugins do not execute anything at source time (no side effects on `source`)
+- New sensitive flags are added to `_args_have_sensitive_flag` in `scripts/lib/system.sh`
+- Public functions use no leading underscore; private functions always use `_` prefix
+- `_run_command` is used instead of calling `kubectl`, `helm`, `sudo` directly
+
+**Cost controls (same as standard practice):**
+- Skip files >50KB
+- Analyze diff only, not full file content
+- Batch with rate-limiting delays
+- Only trigger on `.sh` file changes
+
+**Not a replacement for:**
+- `shellcheck` — still runs in Stage 1 for syntax and style
+- Human review — AI review is advisory, not a merge gate (at least initially)
+
+**Implementation:** Not yet designed. Reference:
+[AI-Powered Code Review with GitHub Actions](https://dev.to/paul_robertson_e844997d2b/ai-powered-code-review-automate-pull-request-analysis-with-github-actions-j90)
+
+---
+
 ## Stage 3 — Destructive / Heavy Tests (manual trigger only)
 
 **Triggers:** `workflow_dispatch` only — never automatic
