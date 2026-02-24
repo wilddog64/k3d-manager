@@ -187,6 +187,54 @@ CLUSTER_PROVIDER=orbstack-k8s ./scripts/k3d-manager deploy_cluster
 
 ---
 
+## m4 Local Validation (Do This Before m2-air)
+
+Validate Phase 1+2 on the local `m4` development machine first. This catches any
+code issues before touching the CI runner.
+
+**Prerequisites:**
+- OrbStack installed on `m4` (`brew install --cask orbstack` + open app once)
+- `orb status` returns healthy
+- k3d-manager checked out on `ldap-develop`
+
+**Step 1 — Unit tests still green:**
+```bash
+./scripts/k3d-manager test lib
+```
+Expected: 53/53 passing.
+
+**Step 2 — Auto-detection check:**
+```bash
+# With OrbStack running, CLUSTER_PROVIDER unset
+./scripts/k3d-manager create_cluster --dry-run 2>&1 | grep provider
+# Expected: provider = orbstack
+```
+
+**Step 3 — Full stack validation:**
+```bash
+CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster
+./scripts/k3d-manager deploy_vault ha
+./scripts/k3d-manager deploy_eso
+./scripts/k3d-manager deploy_istio
+./scripts/k3d-manager reunseal_vault
+```
+
+**Step 4 — Verify OrbStack context was used:**
+```bash
+docker context show
+# Expected: orbstack (not default or colima)
+```
+
+**If m4 validation passes:**
+- Mark steps 2 and 4 in Implementation Sequence as done
+- Proceed to m2-air validation
+
+**If m4 validation fails:**
+- Fix on `ldap-develop`, re-run unit tests, re-validate before touching m2-air
+- Do not push broken OrbStack provider to origin
+
+---
+
 ## m2-air Validation (Prerequisite for Stage 2 CI)
 
 Before Phase 1+2 can be considered production-ready, the full stack must be validated
