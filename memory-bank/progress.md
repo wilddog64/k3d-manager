@@ -123,8 +123,11 @@ continued end-to-end validation for auth/deploy modes.
 - [ ] **OrbStack provider** — Plan: `docs/plans/orbstack-provider.md`
   - [x] Phase 1: OrbStack as k3d runtime (`CLUSTER_PROVIDER=orbstack`) — implemented 2026-02-24
   - [x] Phase 2: Auto-detection — OrbStack picked automatically when active
+  - [ ] **m2-air validation** — full stack test required before Phase 1+2 considered production-ready
+    - Prerequisite: OrbStack installed on `m2-air`
+    - Sequence: `create_cluster` → `deploy_vault ha` → `deploy_eso` → `deploy_istio`
+    - If passes: `m2-air` cluster becomes Stage 2 CI fixture
   - [ ] Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
-  - **Good Codex task:** Phase 3 remains and is well-scoped with clear acceptance criteria
 - [ ] **Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*`** — fix GitGuardian false positive
   - See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
   - Affects: `scripts/etc/ldap/vars.sh` and any referencing scripts

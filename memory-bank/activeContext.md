@@ -80,7 +80,10 @@ rotation. It has NOT been merged to `main` yet.
 - Plan: `docs/plans/orbstack-provider.md`
 - **Phase 1 + 2 implemented** — new `orbstack` provider wraps k3d with OrbStack context handling and macOS auto-detection chooses it when `orb` is running. Manual override: `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster`.
 - **Phase 3 (next)**: OrbStack native Kubernetes provider — eliminates k3d entirely (estimated half day, still pending).
-- Requires macOS with OrbStack installed for validation.
+- **PENDING: m2-air validation** — Phase 1+2 code is complete but untested against a real cluster. Must validate full stack on `m2-air` (the Stage 2 CI runner) before considering it production-ready:
+  - Requires OrbStack installed on `m2-air`
+  - Validation: `create_cluster` → `deploy_vault ha` → `deploy_eso` → `deploy_istio`
+  - If passes: `m2-air` becomes the pre-built Stage 2 CI cluster fixture
 
 ### PENDING: GitGuardian False Positive Fix
 - Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*` in `scripts/etc/ldap/vars.sh`
