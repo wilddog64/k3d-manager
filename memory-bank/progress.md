@@ -88,24 +88,25 @@ continued end-to-end validation for auth/deploy modes.
 
 ### Priority 3.5 (CI / Repository hygiene)
 
-- [x] **Branch protection enabled on `main`** (2026-02-22)
+- [x] **Branch protection enabled on `main`** (2026-02-22, updated 2026-02-24)
   - 1 PR approval required, stale review dismissal, enforce admins
-  - No required status checks yet — pending CI design
+  - `lint` job now required as status check (added 2026-02-24)
+
+- [x] **Self-hosted runner installed** (2026-02-24)
+  - Runner: `m2-air` (macOS, ARM64) — online on `wilddog64/k3d-manager`
 
 - [ ] **CI workflow implementation**
   - Plan: `docs/plans/ci-workflow.md`
   - **Stage 1:** shellcheck + bash -n + yamllint (workflow files only) + lib unit BATS (no cluster)
-    - Status: **Implemented (2026-02-23)**
+    - Status: **Implemented and green (2026-02-23)**
     - Added: `.github/workflows/ci.yml`, `.github/actions/setup/action.yml`, `.shellcheckrc`
     - Shellcheck baseline: `disable=SC2148`
     - Shellcheck scope: files with Bash shebang only
-    - Local verification: shebang-scoped shellcheck, bash -n, yamllint workflows, lib BATS
   - **Stage 2:** integration tests against pre-built cluster (self-hosted Mac runner)
     - **Stage 2.0:** Cluster health check (verify Vault unseal, Istio, ESO pods)
     - **Stage 2.1:** Integration suite (Vault, ESO, Istio)
   - **Stage 3:** destructive tests via `workflow_dispatch` only
   - **Prerequisite:** Refactor `scripts/lib/test.sh` for namespace isolation across all tests.
-  - **Blocked on:** self-hosted runner setup decision
 
 ### Priority 4 (Nice-to-have / future)
 

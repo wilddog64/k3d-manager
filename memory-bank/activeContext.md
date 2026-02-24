@@ -158,9 +158,13 @@ Plan: `docs/plans/ci-workflow.md`
   - `yamllint .github/workflows/*.yml`
   - `bats scripts/tests/lib`
 
+**Self-hosted runner:** `m2-air` (macOS, ARM64) — online and registered on `wilddog64/k3d-manager`.
+
+**Branch protection:** `main` now requires `lint` job to pass before merge (updated 2026-02-24).
+
 **Still not done:**
-- Self-hosted runner not set up on Mac
 - Stage 2/3 CI workflows not implemented yet
+- Namespace isolation refactor in `scripts/lib/test.sh` (prerequisite for Stage 2)
 
 ## Operational Notes
 
