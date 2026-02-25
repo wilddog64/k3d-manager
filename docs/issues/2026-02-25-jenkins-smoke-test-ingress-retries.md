@@ -27,15 +27,26 @@ The smoke script (`bin/smoke-test-jenkins.sh`) remains a pure, standalone test t
 
 ### Implementation steps for Codex
 
-1. In `_jenkins_run_smoke_test`, after obtaining the ingress IP, check if it is a
-   private/VM-only range (`172.16.0.0/12`, `10.0.0.0/8`, `192.168.0.0/16`).
+1. In `_jenkins_run_smoke_test`, after obtaining the ingress IP, check if it falls in
+   any RFC-1918 private range using this bash pattern:
+   ```bash
+   [[ "$ip" =~ ^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.) ]]
+   ```
+   This covers all three RFC-1918 blocks (`10.0.0.0/8`, `172.16.0.0/12`,
+   `192.168.0.0/16`). `127.0.0.1` should be treated as "already local" — skip
+   port-forward entirely if the IP is loopback.
 2. If `_is_mac` **and** the IP is in a private range:
-   - Start `kubectl port-forward -n jenkins svc/jenkins 8443:443` in the background.
-   - Record its PID for cleanup.
-   - Wait up to ~5 seconds for the port to become available (`curl -sk --max-time 1 https://127.0.0.1:8443` or `nc -z 127.0.0.1 8443`).
-   - Call the smoke script with `127.0.0.1` and port `8443` instead of the ingress IP.
-   - Kill the port-forward PID in a `trap` or explicit cleanup after the smoke script returns.
-3. On Linux/CI the ingress IP is routable, so the existing path is unchanged.
+   - Register a `trap` for `EXIT`/`INT`/`TERM` **before** starting the port-forward,
+     so the PID is always killed even if the smoke script errors or hangs.
+   - Start `kubectl port-forward -n jenkins svc/jenkins 8443:443` in the background;
+     record its PID immediately.
+   - Wait up to ~5 seconds for the port to become available via
+     `nc -z 127.0.0.1 8443` (lightweight; avoids TLS handshake during readiness poll).
+   - Call the smoke script with host `127.0.0.1` and port `8443`. Pass
+     `--resolve jenkins.dev.local.me:443:127.0.0.1` (or equivalent) so curl sends the
+     correct SNI — the TLS cert is issued for `jenkins.dev.local.me`, not `127.0.0.1`.
+   - After the smoke script returns, kill the port-forward PID and remove the trap.
+3. On Linux/CI the ingress IP is publicly routable, so the existing path is unchanged.
 4. Add `JENKINS_SMOKE_URL` as an escape-hatch override only — if set, skip the IP lookup
    entirely and pass the user-supplied URL straight through. This is for CI or unusual
    topologies, not the default path.
@@ -51,12 +62,16 @@ The smoke script (`bin/smoke-test-jenkins.sh`) remains a pure, standalone test t
 
 ### Risk
 
-- **Medium.** Background port-forward management in shell requires careful `trap`-based
-  cleanup to avoid orphaned processes. Must be tested for the case where the smoke test
-  itself hangs or errors out.
-- Smoke test must use `-k`/`--insecure` or supply the Vault-issued CA cert when hitting
-  `127.0.0.1:8443` (TLS SNI will still send the correct hostname via `--resolve` or
-  `-H Host:`).
+- **Medium.** The `trap` must be registered *before* the port-forward starts so the PID
+  is always captured. Test specifically: (a) smoke script exits 0, (b) smoke script exits
+  non-zero, (c) smoke script hangs and is killed externally. In all three cases the
+  port-forward process must not remain in `ps`.
+- SNI mismatch: curl hitting `127.0.0.1:8443` will fail TLS verification unless
+  `--resolve jenkins.dev.local.me:443:127.0.0.1` is passed so the handshake uses the
+  correct hostname. Do not use `-k`/`--insecure` as a shortcut — it masks real cert
+  problems.
+- RFC-1918 regex must cover all three blocks. The pattern
+  `^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)` is correct and has been reviewed.
 
 ## Verification
 
