@@ -22,14 +22,17 @@
    - Confirm the helper still runs for Linux/WSL.
    - Add a concise comment noting that local-path provisioner inside OrbStack handles
      the directory.
-2. **Jenkins none-auth templating** (`scripts/plugins/jenkins.sh`)
-   - Review the `awk` filter that removes LDAP config; ensure it only strips the
-     LDAP-specific YAML sections instead of nuking the entire `securityRealm` block.
-   - Provide an explicit default JCasC snippet for local auth (set
-     `chart-admin-username`/`password` or preserve the existing config) so Helm has
-     concrete values.
-   - Ensure `VAULT_PKI_LEAF_HOST` (and related env vars) are exported before
-     rendering JCasC even when no directory service is configured.
+   - **Validation note:** run `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault ha`
+     immediately after this change (before Jenkins work) to lock in the fix.
+2. **Jenkins none-auth templating** (`scripts/plugins/jenkins.sh`) — **HIGH RISK**
+   - Isolate the LDAP stanza removal so the default `securityRealm` block is left
+     untouched when no directory service is enabled (e.g., use awk/sed to delete
+     only the LDAP-specific YAML anchors).
+   - Ensure `VAULT_PKI_LEAF_HOST` and related vars are exported before the template
+     render so the location URL survives even in none-auth mode.
+   - Smoke test both `deploy_jenkins --enable-vault` and
+     `deploy_jenkins --enable-vault --enable-ldap` before committing; abort if
+     LDAP regression is observed.
 3. **Validation + docs**
    - Re-run:
      ```bash
