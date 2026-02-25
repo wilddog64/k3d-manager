@@ -90,14 +90,14 @@ rotation. It has NOT been merged to `main` yet.
     - `deploy_vault` fails on macOS during `_vault_ensure_data_path` due to host-side `mkdir -p` attempt on VM-only paths (see `docs/issues/2026-02-24-macos-vault-local-path-creation-failure.md`).
     - `deploy_jenkins --enable-vault` (no directory service) fails its smoke test due to unresolved JCasC variables (see `docs/issues/2026-02-24-jenkins-none-auth-mode-smoke-test-failure.md`).
 - **Immediate Fix Plan (2026-02-24):** See `docs/plans/orbstack-macos-validation-fix-plan.md`
-  1. Patch `_vault_ensure_data_path` — skip `mkdir -p` on macOS (low risk, surgical).
-     Execute first and verify `deploy_vault` solo before touching Jenkins logic.
-  2. Fix Jenkins `none`-auth JCasC templating — **HIGH RISK**, `awk` change affects
-     all auth modes. Approach: isolate the LDAP stanza removal so the default
-     `securityRealm` stays intact, explicitly export `VAULT_PKI_LEAF_HOST` before
-     rendering, and smoke test both `--enable-vault` (none) and
-     `--enable-vault --enable-ldap` before committing.
-  3. Re-run m4 validation once both fixes land; only then proceed to `m2-air`.
+  1. `_vault_ensure_data_path` macOS guard merged + validated via
+     `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault ha`.
+  2. Jenkins `none`-auth templating rebuilt — `scripts/plugins/jenkins.sh` now keeps a
+     local security realm, injects `VAULT_PKI_LEAF_HOST` into the controller env, and
+     replaces the matrix permissions list. LDAP/AD smoke tests still pending but
+     baseline deploy succeeds.
+  3. m4 validation rerun confirms Vault + Jenkins deploy end-to-end; only the optional
+     ingress-based smoke test remains flaky because macOS cannot reach the Istio LB IP.
 - **PENDING: m2-air validation** — only after m4 provider passes (integration issues documented). Pre-builds the Stage 2 CI cluster fixture.
 - **OrbStack installer helper** — `_install_orbstack` (macOS only) installs via `brew install orbstack`, launches OrbStack.app, and waits for `orb status` to pass so scripts can continue. Users still need to complete GUI onboarding when prompted. CI runners (`m2-air`) require OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
 

@@ -1490,78 +1490,134 @@ function _deploy_jenkins() {
       temp_values=$(mktemp -t jenkins-values.XXXXXX.yaml)
       _jenkins_register_rendered_manifest "$temp_values"
 
-      # Remove LDAP-related environment variables and JCasC security realm using awk
-      # This removes:
-      # 1. LDAP env var blocks (name + value/valueFrom) from containerEnv
-      # 2. LDAP securityRealm block from JCasC configScripts
-      awk '
+      local vault_leaf_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
+      export VAULT_PKI_LEAF_HOST="$vault_leaf_host"
+
+      awk -v leaf_host="$vault_leaf_host" '
+      function indent(n) {
+         if (n <= 0) {
+            return ""
+         }
+         return sprintf("%*s", n, "")
+      }
+
       BEGIN {
          skip_depth = 0
-         current_indent = 0
          ldap_indent = 0
          in_jcasc_security = 0
          skip_security_realm = 0
          security_realm_indent = 0
+         inserted_local_realm = 0
+         skip_authz_block = 0
+         auth_block_indent = 0
+         in_env_block = 0
+         env_block_indent = 0
+         inserted_leaf_env = 0
       }
 
-      # Track when we are in the 01-security JCasC config
       /^[[:space:]]*01-security:/ {
          in_jcasc_security = 1
       }
 
-      # End of 01-security section (next config or end of JCasC)
       in_jcasc_security && /^[[:space:]]*[0-9][0-9]-/ && !/01-security/ {
          in_jcasc_security = 0
       }
 
-      # When in JCasC security config, detect LDAP securityRealm block
       in_jcasc_security && /^[[:space:]]*securityRealm:/ {
-         match($0, /^[[:space:]]*/)
+         match($0, /^[[:space:]]*/ )
          security_realm_indent = RLENGTH
+         indent_str = substr($0, 1, security_realm_indent)
+         if (!inserted_local_realm) {
+            print indent_str "securityRealm:"
+            print indent_str "  local:"
+            print indent_str "    allowsSignup: false"
+            print indent_str "    users:"
+            print indent_str "      - id: \"${JENKINS_ADMIN_USER}\""
+            print indent_str "        password: \"${JENKINS_ADMIN_PASS}\""
+            inserted_local_realm = 1
+         }
          skip_security_realm = 1
          next
       }
 
-      # Skip entire securityRealm block (including nested ldap config)
       skip_security_realm {
-         match($0, /^[[:space:]]*/)
+         match($0, /^[[:space:]]*/ )
          current_indent = RLENGTH
-
-         # Stop skipping when we hit a sibling key at same or less indent as securityRealm
          if (current_indent <= security_realm_indent && $0 ~ /^[[:space:]]*[a-zA-Z]+:/) {
             skip_security_realm = 0
          }
-
          if (skip_security_realm) next
       }
 
-      # When we find an LDAP env var, mark its indent level and start skipping
+      in_jcasc_security && /^[[:space:]]*authorizationStrategy:/ {
+         match($0, /^[[:space:]]*/ )
+         auth_block_indent = RLENGTH
+         indent_str = substr($0, 1, auth_block_indent)
+         print indent_str "authorizationStrategy:"
+         print indent_str "  projectMatrix:"
+         print indent_str "    permissions:"
+         print indent_str "      - \"Overall/Read:authenticated\""
+         print indent_str "      - \"Overall/Read:${JENKINS_ADMIN_USER}\""
+         print indent_str "      - \"Overall/Administer:${JENKINS_ADMIN_USER}\""
+         skip_authz_block = 1
+         next
+      }
+
+      skip_authz_block {
+         match($0, /^[[:space:]]*/ )
+         current_indent = RLENGTH
+         if (current_indent <= auth_block_indent && $0 ~ /^[[:space:]]*([a-zA-Z#])/) {
+            skip_authz_block = 0
+         }
+         if (skip_authz_block) next
+      }
+
+      /^[[:space:]]*containerEnv:/ {
+         match($0, /^[[:space:]]*/ )
+         env_block_indent = RLENGTH
+         in_env_block = 1
+         inserted_leaf_env = 0
+      }
+
       /^[[:space:]]*- name: LDAP_/ {
-         match($0, /^[[:space:]]*/)
+         match($0, /^[[:space:]]*/ )
          ldap_indent = RLENGTH
          skip_depth = 1
          next
       }
 
-      # If skipping env var, check indent to know when the LDAP block ends
       skip_depth > 0 {
-         match($0, /^[[:space:]]*/)
+         match($0, /^[[:space:]]*/ )
          current_indent = RLENGTH
-
-         # If we hit another "- name:" at the same level, stop skipping
          if ($0 ~ /^[[:space:]]*- name:/ && current_indent == ldap_indent) {
             skip_depth = 0
-         }
-         # If we hit a line with less or equal indent that is not a continuation, stop skipping
-         else if (current_indent <= ldap_indent && $0 !~ /^[[:space:]]*[a-zA-Z]+:/ && $0 !~ /^[[:space:]]*key:/) {
+         } else if (current_indent <= ldap_indent && $0 !~ /^[[:space:]]*[a-zA-Z]+:/ && $0 !~ /^[[:space:]]*key:/) {
             skip_depth = 0
          }
-
          if (skip_depth > 0) next
       }
 
-      # Print non-skipped lines
-      { print }
+      {
+         if (in_env_block && !inserted_leaf_env) {
+            match($0, /^[[:space:]]*/ )
+            current_indent = RLENGTH
+            if (current_indent <= env_block_indent && $0 ~ /^[[:space:]]*([a-zA-Z#])/ && $0 !~ /^[[:space:]]*containerEnv:/) {
+               print indent(env_block_indent + 2) "- name: VAULT_PKI_LEAF_HOST"
+               print indent(env_block_indent + 4) "value: \"" leaf_host "\""
+               inserted_leaf_env = 1
+               in_env_block = 0
+            }
+         }
+
+         print
+      }
+
+      END {
+         if (in_env_block && !inserted_leaf_env) {
+            print indent(env_block_indent + 2) "- name: VAULT_PKI_LEAF_HOST"
+            print indent(env_block_indent + 4) "value: \"" leaf_host "\""
+         }
+      }
       ' "$values_file" > "$temp_values"
 
       values_file="$temp_values"
@@ -2099,7 +2155,7 @@ HCL
       rm -f "$policy_file"
    fi
 
-   _vault_exec "$vault_namespace" \
+      _vault_exec "$vault_namespace" \
       "vault write auth/kubernetes/role/jenkins-cert-rotator bound_service_account_names=$rotator_service_account bound_service_account_namespaces=$jenkins_namespace policies=$policy_name ttl=24h" \
       "$vault_release"
 }
