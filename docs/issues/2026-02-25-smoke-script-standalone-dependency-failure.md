@@ -1,7 +1,7 @@
 # Smoke Script Fails Due to Unbound Variables and Incorrect Paths
 
 **Date:** 2026-02-25
-**Status:** Open (Regressed/Incomplete Fix)
+**Status:** Fixed
 
 ## Description
 
@@ -50,12 +50,16 @@ bash -x ./bin/smoke-test-jenkins.sh
 ```
 Observe exit immediately after `source ...vault.sh`.
 
-## Proposed Fix (Research Only)
+## Resolution (2026-02-25)
 
-1.  **Export Variables**: `scripts/k3d-manager` should `export SCRIPT_DIR` and `export PLUGINS_DIR` so they are available to all sub-scripts and sourced plugins.
-2.  **Robust Pathing**: `scripts/plugins/vault.sh` should check for `PLUGINS_DIR` and `SCRIPT_DIR` more robustly or use relative paths that are resolved against its own location if possible.
-3.  **Smoke Script Fix**: `bin/smoke-test-jenkins.sh` should define `PLUGINS_DIR` before sourcing `vault.sh` if it wants to be semi-standalone.
-
-## Resolution
-
-Pending directive.
+- `bin/smoke-test-jenkins.sh` now derives the repo root from its own directory,
+  resets `SCRIPT_DIR` to `${REPO_ROOT}/scripts`, and sets `PLUGINS_DIR` to
+  `${SCRIPT_DIR}/plugins` before sourcing any helpers. This mirrors the environment that
+  `scripts/k3d-manager` would normally provide and keeps `_vault_exec` accessible when
+  the smoke helper runs outside the deployer.
+- Because `SCRIPT_DIR` points at the real `scripts/` directory again, `vault.sh` finds
+  its `lib/vault_pki.sh` helper without extra exports, and the `_kubectl` declaration is
+  now available before the guard executes.
+- Verification: `bash -x ./bin/smoke-test-jenkins.sh` progresses past the sourcing
+  phase (no nounset errors) and now runs until it hits real cluster interactions. The
+  WARN in `deploy_jenkins --enable-vault` disappears once the mac smoke tunnel succeeds.

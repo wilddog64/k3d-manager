@@ -910,7 +910,7 @@ function _jenkins_run_smoke_test() {
 
    # Get Jenkins hostname from VirtualService
    local jenkins_host
-   jenkins_host=$(kubectl -n istio-system get vs jenkins -o jsonpath='{.spec.hosts[0]}' 2>/dev/null || echo "")
+   jenkins_host=$(kubectl -n "$namespace" get vs jenkins -o jsonpath='{.spec.hosts[0]}' 2>/dev/null || echo "")
    if [[ -z "$jenkins_host" ]]; then
       jenkins_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
       _warn "[jenkins] could not detect Jenkins hostname from VirtualService, using default: ${jenkins_host}"
