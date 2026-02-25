@@ -80,12 +80,15 @@ rotation. It has NOT been merged to `main` yet.
 - Plan: `docs/plans/orbstack-provider.md`
 - **Phase 1 + 2 implemented** — new `orbstack` provider wraps k3d with OrbStack context handling and macOS auto-detection chooses it when `orb` is running. Manual override: `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster`.
 - **Phase 3 (next)**: OrbStack native Kubernetes provider — eliminates k3d entirely (estimated half day, still pending).
-- **COMPLETE: m4 local validation** — Phase 1+2 verified on M4 Mac (2026-02-24).
-  - `_install_orbstack` successfully installed and initialized OrbStack via Homebrew.
-  - Auto-detection correctly selects `orbstack` provider when running.
-  - `create_cluster --dry-run` and `deploy_cluster` fixes verified (grep and guard clause issues resolved).
-  - Docker context confirmed as `orbstack`.
-- **PENDING: m2-air validation** — only after m4 passes. Pre-builds the Stage 2 CI cluster fixture.
+- **IN PROGRESS: m4 local validation** — Phase 1+2 provider checks complete (2026-02-24):
+  - Auto-detection, `create_cluster`, `deploy_cluster`, Docker context all verified
+  - **NEXT:** Service integration tests against running cluster:
+    - `deploy_vault ha` → `test_vault`
+    - `deploy_eso` → `test_eso`
+    - `deploy_istio` → `test_istio`
+  - Cluster still running on `m4` — Gemini to continue validation
+  - Document any failures in `docs/issues/`, no code fixes
+- **PENDING: m2-air validation** — only after m4 full stack passes. Pre-builds the Stage 2 CI cluster fixture.
 - **OrbStack installer helper** — `_install_orbstack` (macOS only) installs via `brew install orbstack`, launches OrbStack.app, and waits for `orb status` to pass so scripts can continue. Users still need to complete GUI onboarding when prompted. CI runners (`m2-air`) require OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
 
 ### PENDING: GitGuardian False Positive Fix
