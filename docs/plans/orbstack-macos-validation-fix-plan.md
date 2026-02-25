@@ -16,33 +16,25 @@
    confirm the fixes before touching `m2-air`.
 
 ## Work Items (Order Matters)
-1. **Vault macOS guard** (`scripts/plugins/vault.sh`)
-   - Update `_vault_ensure_data_path` so `_is_mac` short-circuits the `mkdir -p`
-     call used for Linux hosts.
-   - Confirm the helper still runs for Linux/WSL.
-   - Add a concise comment noting that local-path provisioner inside OrbStack handles
-     the directory.
-   - **Validation note:** run `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault ha`
-     immediately after this change (before Jenkins work) to lock in the fix.
-2. **Jenkins none-auth templating** (`scripts/plugins/jenkins.sh`) — **HIGH RISK**
-   - Isolate the LDAP stanza removal so the default `securityRealm` block is left
-     untouched when no directory service is enabled (e.g., use awk/sed to delete
-     only the LDAP-specific YAML anchors).
-   - Ensure `VAULT_PKI_LEAF_HOST` and related vars are exported before the template
-     render so the location URL survives even in none-auth mode.
-   - Smoke test both `deploy_jenkins --enable-vault` and
-     `deploy_jenkins --enable-vault --enable-ldap` before committing; abort if
-     LDAP regression is observed.
-3. **Validation + docs**
+1. **Vault macOS guard** (`scripts/plugins/vault.sh`) ✅
+   - `_vault_ensure_data_path` now short-circuits on `_is_mac`; validation via
+     `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault ha` passed.
+2. **Jenkins none-auth templating** (`scripts/plugins/jenkins.sh`) — **HIGH RISK** ✅
+   - LDAP removal now rebuilds the security realm with a local user, injects the
+     matrix permissions list, and adds an explicit `VAULT_PKI_LEAF_HOST` env var for
+     Helm values.
+   - `deploy_jenkins --enable-vault` succeeds on macOS. LDAP/AD templates untouched
+     (still need smoke coverage when time allows).
+3. **Validation + docs** — IN PROGRESS
    - Re-run:
      ```bash
      PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test lib
      CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault ha
      CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault
      ```
-   - Capture Jenkins smoke result; ensure Vault deploy no longer errors out on mkdir.
-   - Update `docs/issues/` entries (close or move to "Fixed"), `memory-bank/` status,
-     and `docs/plans/orbstack-provider.md` validation checklist.
+   - Capture Jenkins smoke result (currently blocked by Istio ingress IP on macOS).
+   - Update `docs/issues/` entries (done), `memory-bank/` status (done), and
+     `docs/plans/orbstack-provider.md` validation checklist.
 
 ## Risks / Mitigations
 

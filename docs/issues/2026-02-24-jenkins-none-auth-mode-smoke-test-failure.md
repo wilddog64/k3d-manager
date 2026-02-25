@@ -1,7 +1,7 @@
 # Jenkins `none` Auth Mode Smoke Test Failure
 
 **Date:** 2026-02-24
-**Status:** Documented
+**Status:** ✅ Fixed (2026-02-24)
 
 ## Description
 
@@ -38,16 +38,26 @@ The baseline `deploy_jenkins` command (without flags) produces a broken Jenkins 
 Deploy with LDAP enabled (`--enable-ldap`), as the template processing for that mode
 is verified to work.
 
-## Fix Approach
+## Fix
 
-In `scripts/plugins/jenkins.sh`, the `awk` script that strips LDAP config when no
-directory service is enabled is incorrectly removing the entire `securityRealm` block.
+- Replaced the LDAP-stripping logic in `scripts/plugins/jenkins.sh` so that when no
+  directory service is enabled it now:
+  - Rebuilds the `securityRealm` block with a local user sourced from the
+    Vault-provisioned `jenkins-admin` secret.
+  - Replaces the Matrix auth `entries` block with a flat `permissions` list granting
+    both `authenticated` and the local admin user explicit rights.
+  - Inserts a concrete `VAULT_PKI_LEAF_HOST` entry into `controller.containerEnv`
+    so JCasC location URLs no longer resolve to `https:///`.
 
-The fix should ensure:
-1. When no directory service is selected, a valid default `securityRealm` using
-   `local` realm with explicit `chart-admin-username` / `chart-admin-password` is
-   preserved — or the block is left intact with the Helm chart defaults.
-2. `VAULT_PKI_LEAF_HOST` must be set before JCasC template processing so
-   `unclassified.location.url` resolves correctly.
+## Verification
 
-This is related to the existing known issue: `deploy_jenkins` (no vault) broken.
+- `PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault`
+  now completes the Helm upgrade, waits for the pod to become ready, and only
+  fails the optional smoke test (ingress IP is not reachable from macOS, so curl
+  never sees the Istio LoadBalancer). Jenkins itself stays up and running.
+- `kubectl logs -n jenkins statefulset/jenkins | grep 'chart-admin'` returns no
+  unresolved-variable warnings. JCasC logs only show the expected "legacy format"
+  notice from Matrix auth.
+- `kubectl get configmap jenkins-jenkins-config-01-security -o yaml` shows the new
+  local-realm block and the permissions list, confirming the rendered values match
+  the intended structure.
