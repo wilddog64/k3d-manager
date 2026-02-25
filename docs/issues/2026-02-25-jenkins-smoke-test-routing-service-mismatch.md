@@ -1,7 +1,7 @@
 # Jenkins Smoke Test Routing Failure on macOS
 
 **Date:** 2026-02-24
-**Status:** Documented (Failure)
+**Status:** Fixed
 
 ## Description
 
@@ -44,25 +44,17 @@ While the smoke test routing failed, the following fixes were successfully verif
 2.  Run `./scripts/k3d-manager deploy_jenkins --enable-vault`.
 3.  Observe smoke test failure due to port-forwarding to wrong service/port.
 
-## Fix (for Codex — surgical, one line)
+## Fix
 
-In `_jenkins_run_smoke_test` (`scripts/plugins/jenkins.sh`), change the port-forward
-target from `svc/jenkins` in the `jenkins` namespace to `svc/istio-ingressgateway` in
-`istio-system`:
+- `_jenkins_run_smoke_test` now targets `istio-system/svc/istio-ingressgateway` for the
+  macOS tunnel, so TLS terminates at the expected Istio listener (`scripts/plugins/jenkins.sh`).
+- The info log now prints the namespace/service being forwarded, which makes troubleshooting
+  mismatches easier.
+- No other behavior changed: `JENKINS_SMOKE_IP_OVERRIDE=127.0.0.1` is still exported for the
+  smoke script, Linux flows still hit the ingress IP directly, and the trap-based cleanup
+  remained untouched.
 
-```bash
-# Wrong — jenkins service has no port 443
-kubectl -n "$namespace" port-forward svc/jenkins "${pf_port}:443"
+## Verification
 
-# Correct — Istio ingress gateway terminates TLS on 443
-kubectl -n istio-system port-forward svc/istio-ingressgateway "${pf_port}:443"
-```
-
-Everything else stays the same:
-- `JENKINS_SMOKE_IP_OVERRIDE=127.0.0.1` ✅
-- `RESOLVE_ARGS=(--resolve jenkins.dev.local.me:${pf_port}:127.0.0.1)` for correct SNI ✅
-- Trap-based cleanup ✅
-- `nc -z 127.0.0.1 ${pf_port}` readiness poll ✅
-
-After the fix, re-run `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault`
-on m4 and confirm smoke test completes without WARN.
+- Pending: rerun `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault`
+  on m4 to capture a successful smoke-test log.

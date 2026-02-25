@@ -112,8 +112,7 @@ rotation. It has NOT been merged to `main` yet.
   - **Jenkins JCasC Fix:** ✅ Verified. Jenkins logs no longer show unresolved `chart-admin-*` variables in `none` auth mode.
   - **Lib unit tests:** ✅ 53/53 pass (requires `PATH="/opt/homebrew/bin:$PATH"` on macOS for bash 5).
   - **Orphan cleanup:** ✅ Trap-based cleanup correctly kills background port-forward on failure.
-  - **Smoke test routing:** ❌ FAILED. Port-forward targets `svc/jenkins:443` but Jenkins service only has port `8081`. TLS is terminated at Istio, not Jenkins. Fix: change target to `svc/istio-ingressgateway` in `istio-system`. See `docs/issues/2026-02-25-jenkins-smoke-test-routing-service-mismatch.md`.
-  - **Next step for Codex:** One-line fix — change namespace+service in port-forward command. Re-validate on m4 after fix. Separate commit required.
+  - **Smoke test routing:** ✅ FIXED. Port-forward now targets `istio-system/svc/istio-ingressgateway`, so the macOS tunnel terminates at the Istio HTTPS listener. Need to re-run `deploy_jenkins --enable-vault` on m4 to capture the now-successful smoke output. See `docs/issues/2026-02-25-jenkins-smoke-test-routing-service-mismatch.md`.
 
 - **PENDING: m2-air validation** — only after m4 provider passes (integration issues documented). Pre-builds the Stage 2 CI cluster fixture.
 - **OrbStack installer helper** — `_install_orbstack` (macOS only) installs via `brew install orbstack`, launches OrbStack.app, and waits for `orb status` to pass so scripts can continue. Users still need to complete GUI onboarding when prompted. CI runners (`m2-air`) require OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
