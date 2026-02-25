@@ -191,77 +191,96 @@ Plan: `docs/plans/ci-workflow.md`
 
 **Prerequisite:** Refactor `scripts/lib/test.sh` for namespace isolation across all integration tests to prevent state collision.
 
-**Implemented now (Stage 1):**
-- Added `.github/workflows/ci.yml` and `.github/actions/setup/action.yml`.
-- Added `.shellcheckrc` baseline with `disable=SC2148`.
-- Scoped shellcheck in CI to files with a Bash shebang.
-- Local Stage 1 verification succeeded for:
-  - shebang-scoped `shellcheck -S error`
-  - `bash -n` on scripts
-  - `yamllint .github/workflows/*.yml`
-  - `bats scripts/tests/lib`
-- **2026-02-25:** Workflow now triggers on `pull_request` (base `main`) as well as `push`,
-  so Stage 1 linting always runs for PRs even when the latest commits are docs-only. See
-  `docs/issues/2026-02-25-ci-workflow-pr-trigger-missing.md`.
-- **2026-02-25 (later):** Stage 1 workflow limited to `pull_request` events (PR opened only)
-  and skips forked repos via `if: head.repo == github.repository`, so only in-repo PR
-  creation triggers lint.
+**Implemented (Stage 1):**
+- `.github/workflows/ci.yml` and `.github/actions/setup/action.yml` added.
+- `.shellcheckrc` baseline with `disable=SC2148`.
+- Shellcheck scoped to files with a Bash shebang.
+- Local Stage 1 passes: shellcheck, bash -n, yamllint, 53 lib unit BATS.
+- PR #2 (`ldap-develop` → `main`) is open. Stage 1 lint job runs when the PR is opened.
 
 **Self-hosted runner:** `m2-air` (macOS, ARM64) — online and registered on `wilddog64/k3d-manager`.
 - **Architecture label issue:** Runner registered with system label `X64` (likely installed under Rosetta 2). Custom `ARM64` label added via API as mitigation. CI workflow files must use `runs-on: [self-hosted, macOS, ARM64]`. Permanent fix: re-register runner natively. See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 
-**Branch protection:** `main` now requires `lint` job to pass before merge (updated 2026-02-24).
+**Branch protection:** `main` requires `lint` job to pass before merge (updated 2026-02-24).
 
 **Still not done:**
-- Stage 2/3 CI workflows not implemented yet
-- Namespace isolation refactor in `scripts/lib/test.sh` (prerequisite for Stage 2)
-- Stage 2 prep/automation tracked in `docs/plans/m2-air-stage2-validation.md` — follow
-  that plan to keep the m2-air runner healthy and to script the Stage 2 job once
-  namespace isolation lands.
+- Stage 2/3 CI workflows not implemented yet.
+- Namespace isolation refactor in `scripts/lib/test.sh` (prerequisite for Stage 2).
+- Stage 2 prep/automation tracked in `docs/plans/m2-air-stage2-validation.md`.
 
-## PR Creation Instructions for Codex
+---
 
-The `ldap-develop` branch is 30+ commits ahead of `origin/ldap-develop` and has not
-been pushed yet. To trigger Stage 1 CI:
+## CI Next Steps for Codex (2026-02-25)
 
-### Step 1 — Push the branch
-```bash
-git push origin ldap-develop
-```
+**Context:** PR #2 is open. Stage 1 lint job exists. Stage 2 (deployment/integration) workflow
+does NOT exist yet. Two tasks need to happen in order.
 
-### Step 2 — Create PR via GitHub CLI
-```bash
-gh pr create \
-  --base main \
-  --head ldap-develop \
-  --title "OrbStack provider Phase 1+2, Stage 1 CI, AD integration, cert rotation" \
-  --body "$(cat <<'EOF'
-## Summary
-- OrbStack provider (Phase 1+2): CLUSTER_PROVIDER=orbstack wraps k3d with OrbStack context; auto-detection on macOS
-- macOS smoke test routing: port-forward through istio-ingressgateway with RFC-1918 detection and trap cleanup
-- Jenkins none-auth JCasC fix: local security realm preserved when no directory service enabled
-- Vault macOS mkdir fix: skip host-side PV directory creation on macOS
-- Active Directory provider: full implementation with 36 BATS tests
-- Jenkins cert rotation CronJob: complete
-- Stage 1 CI: shellcheck, bash -n, yamllint, lib unit BATS (green)
-- Self-hosted runner m2-air registered
+### Task A — Fix Stage 1 trigger ✅ (2026-02-25)
 
-## What CI will run
-- Stage 1 (lint job): shellcheck + bash -n + yamllint + 53 lib unit BATS — runs automatically
-- Stage 2: NOT yet — m2-air cluster not pre-built yet
+- `.github/workflows/ci.yml` now uses `pull_request: types: [opened, synchronize, reopened]`
+  so lint reruns on every commit push or PR reopen (still limited to in-repo PRs via the
+  job-level `if`). Nothing further to do here.
 
-## Notes
-- Branch protection requires `lint` job to pass before merge
-- 1 PR approval required before merge
-- Do NOT merge until Stage 1 is green and PR is approved
-EOF
-)"
-```
+### Task B — Implement Stage 2 workflow (requires namespace isolation first)
 
-### What to watch for
-- `lint` job on GitHub Actions must go green — check at `https://github.com/wilddog64/k3d-manager/actions`
-- If any shellcheck or BATS failure appears, report it — do not push fixes directly to `main`
-- Stage 2 will not run yet — `m2-air` cluster pre-build is a separate step after PR is approved
+**Stage 2 must NOT be added to ci.yml until `scripts/lib/test.sh` is refactored for
+namespace isolation.** Without it, parallel test runs will collide on shared namespaces.
+
+**Prerequisite — namespace isolation refactor:**
+- All integration test functions (`test_vault`, `test_eso`, `test_istio`) must use
+  ephemeral randomly named namespaces (similar to `test_jenkins` which already uses
+  `JENKINS_NS_GENERATED`).
+- See `docs/plans/ci-workflow.md` — "Namespace Isolation Strategy" section.
+
+**After namespace isolation is done, implement Stage 2 in this order:**
+
+1. **Create `scripts/ci/check_cluster_health.sh`** — bash script that exits non-zero if:
+   - Any pod in `istio-system`, `vault`, or `external-secrets` is not `Running`/`Ready`
+   - `vault status` shows `Sealed: true`
+   This is the Stage 2.0 health gate.
+
+2. **Add `stage2` job to `.github/workflows/ci.yml`:**
+   ```yaml
+   stage2:
+     needs: lint
+     if: ${{ github.event_name == 'pull_request' &&
+             github.event.pull_request.head.repo.full_name == github.repository }}
+     runs-on: [self-hosted, macOS, ARM64]
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v4
+       - name: Cluster health check
+         run: bash scripts/ci/check_cluster_health.sh
+       - name: Run integration tests
+         env:
+           CLUSTER_PROVIDER: orbstack
+         run: |
+           set -euo pipefail
+           ./scripts/k3d-manager test_vault
+           ./scripts/k3d-manager test_eso
+           ./scripts/k3d-manager test_istio
+   ```
+
+3. **After Stage 2 runs green on a PR**, update branch protection to require the
+   `stage2` job in addition to `lint`. Use provision-tomcat's
+   `bin/enforce-branch-protection` script.
+
+**Design constraints (do not violate):**
+- Stage 2 runs on `pull_request` only — never on `push`.
+- Stage 2 uses `runs-on: [self-hosted, macOS, ARM64]` — the m2-air runner.
+- `test_jenkins` and `test_cert_rotation` are NOT in Stage 2 — too destructive for
+  shared cluster. They belong in a separate `workflow_dispatch` workflow (Stage 3).
+- Do not add `workflow_dispatch` for Stage 3 until Stage 2 is stable.
+
+Full design: `docs/plans/ci-workflow.md`
+Validation sequence for m2-air: `docs/plans/m2-air-stage2-validation.md`
+
+### Summary of order
+1. Fix trigger (`synchronize` + `reopened`) → push → verify lint re-runs on new commits
+2. Refactor `scripts/lib/test.sh` for namespace isolation
+3. Write `scripts/ci/check_cluster_health.sh`
+4. Add Stage 2 job to `ci.yml`
+5. Update branch protection to require Stage 2
 
 ## Operational Notes
 
