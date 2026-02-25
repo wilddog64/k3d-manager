@@ -96,14 +96,17 @@ rotation. It has NOT been merged to `main` yet.
      local security realm, injects `VAULT_PKI_LEAF_HOST` into the controller env, and
      replaces the matrix permissions list. LDAP/AD smoke tests still pending but
      baseline deploy succeeds.
-  3. Smoke-test routing fix plan:
-     - `_jenkins_run_smoke_test` (not the smoke script) will detect macOS plus a private
-       ingress IP, start a background `kubectl port-forward -n jenkins svc/jenkins 8443:443`,
-       wait for the port, run the smoke script against `https://127.0.0.1:8443` (ensuring
-       SNI via `--resolve`/`Host`), then tear down the port-forward via `trap`.
-     - Add `JENKINS_SMOKE_URL` only as a CI override. Linux behavior untouched.
-     - Risk: medium — must prove background PID cleanup even if the smoke script fails.
-     - Work tracked in `docs/issues/2026-02-25-jenkins-smoke-test-ingress-retries.md`.
+  3. Smoke-test routing fix plan (Codex to implement, separate commit):
+     - `_jenkins_run_smoke_test` (not the smoke script) detects macOS + RFC-1918 ingress
+       IP (`^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)`) and spins up a background
+       `kubectl port-forward -n jenkins svc/jenkins 8443:443`.
+     - `trap` registered *before* port-forward starts — PID cleanup fires on EXIT/INT/TERM
+       even if the smoke script errors or hangs.
+     - Smoke script called with `127.0.0.1:8443` + `--resolve jenkins.dev.local.me:443:127.0.0.1`
+       to preserve correct TLS SNI. Do not use `-k`/`--insecure`.
+     - `JENKINS_SMOKE_URL` as CI escape-hatch only. Linux path completely unchanged.
+     - Risk: medium — trap-before-start ordering and three exit scenarios (pass/fail/hang)
+       must be verified. See `docs/issues/2026-02-25-jenkins-smoke-test-ingress-retries.md`.
 - **PENDING: m2-air validation** — only after m4 provider passes (integration issues documented). Pre-builds the Stage 2 CI cluster fixture.
 - **OrbStack installer helper** — `_install_orbstack` (macOS only) installs via `brew install orbstack`, launches OrbStack.app, and waits for `orb status` to pass so scripts can continue. Users still need to complete GUI onboarding when prompted. CI runners (`m2-air`) require OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
 
