@@ -96,8 +96,9 @@ rotation. It has NOT been merged to `main` yet.
      local security realm, injects `VAULT_PKI_LEAF_HOST` into the controller env, and
      replaces the matrix permissions list. LDAP/AD smoke tests still pending but
      baseline deploy succeeds.
-  3. m4 validation rerun confirms Vault + Jenkins deploy end-to-end; only the optional
-     ingress-based smoke test remains flaky because macOS cannot reach the Istio LB IP.
+  3. m4 validation rerun confirms Vault + Jenkins deploy end-to-end; the remaining gap
+     is the smoke test curl failing to reach the Istio LB IP on macOS. Tracked in
+     `docs/issues/2026-02-25-jenkins-smoke-test-ingress-retries.md` with mitigation plan.
 - **PENDING: m2-air validation** — only after m4 provider passes (integration issues documented). Pre-builds the Stage 2 CI cluster fixture.
 - **OrbStack installer helper** — `_install_orbstack` (macOS only) installs via `brew install orbstack`, launches OrbStack.app, and waits for `orb status` to pass so scripts can continue. Users still need to complete GUI onboarding when prompted. CI runners (`m2-air`) require OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
 
