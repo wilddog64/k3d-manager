@@ -124,10 +124,13 @@ continued end-to-end validation for auth/deploy modes.
   - [x] Phase 1: OrbStack as k3d runtime (`CLUSTER_PROVIDER=orbstack`) — implemented 2026-02-24
   - [x] Phase 2: Auto-detection — OrbStack picked automatically when active
   - [x] **m4 local validation** — Phase 1+2 verified on `m4` Mac (2026-02-24)
+    - Auto-detection and provider fixes verified.
+    - Full-stack tests documented two integration issues (`deploy_vault` path creation and `deploy_jenkins` none-auth smoke test).
   - [ ] **m2-air validation** — full stack test required before Phase 1+2 considered production-ready
     - Prerequisite: OrbStack installed on `m2-air`
     - Sequence: `create_cluster` → `deploy_vault ha` → `deploy_eso` → `deploy_istio`
     - If passes: `m2-air` cluster becomes Stage 2 CI fixture
+  - [ ] Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
   - [ ] Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
 - [ ] **Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*`** — fix GitGuardian false positive
   - See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
@@ -150,3 +153,5 @@ continued end-to-end validation for auth/deploy modes.
 | GitGuardian false positive: `LDAP_PASSWORD_ROTATOR_IMAGE` | FALSE POSITIVE | Variable name contains "PASSWORD", value is a Docker image. Fix: rename to `LDAP_ROTATOR_IMAGE`. See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md` |
 | OrbStack: `deploy_cluster` unsupported provider | FIXED | Added `orbstack` to the provider guard in `scripts/lib/core.sh`. See `docs/issues/2026-02-24-orbstack-unsupported-provider-in-core.md`. |
 | OrbStack: `--dry-run` flag broken in `create_cluster` | FIXED | `create_cluster` now parses `--dry-run` and the k3d provider uses `grep -q --` to avoid option parsing. See `docs/issues/2026-02-24-orbstack-dry-run-errors.md`. |
+| `deploy_vault` fails on macOS — host path mkdir | OPEN | `_vault_ensure_data_path` tries `mkdir -p` on VM-internal path. macOS-specific. See `docs/issues/2026-02-24-macos-vault-local-path-creation-failure.md` |
+| Jenkins `none` auth mode smoke test failure | OPEN | `awk` strips `securityRealm` block incorrectly; `chart-admin-username` unresolved. Workaround: use `--enable-ldap`. See `docs/issues/2026-02-24-jenkins-none-auth-mode-smoke-test-failure.md` |

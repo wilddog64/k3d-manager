@@ -80,20 +80,16 @@ rotation. It has NOT been merged to `main` yet.
 - Plan: `docs/plans/orbstack-provider.md`
 - **Phase 1 + 2 implemented** — new `orbstack` provider wraps k3d with OrbStack context handling and macOS auto-detection chooses it when `orb` is running. Manual override: `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster`.
 - **Phase 3 (next)**: OrbStack native Kubernetes provider — eliminates k3d entirely (estimated half day, still pending).
-- **IN PROGRESS: m4 local validation** — Phase 1+2 provider checks complete (2026-02-24):
-  - Auto-detection, `create_cluster`, `deploy_cluster`, Docker context all verified
-  - **NEXT:** Service integration tests against running cluster:
-    - `deploy_istio` → `test_istio` (Istio is always manual — no parent calls it)
-    - `deploy_jenkins --enable-vault` → automatically calls `deploy_eso` then `deploy_vault`
-    - `test_vault`, `test_eso` (run manually after deploy_jenkins completes)
-  - **Design note:** `test_*` functions are diagnostic/debugging tools — NOT wired to
-    run automatically after `deploy_*`. Too heavy for normal workflow. Run explicitly
-    during validation or when debugging a suspected failure.
-  - **Dependency chain:** `deploy_vault` always calls `deploy_eso`. `deploy_jenkins
-    --enable-vault` calls `deploy_eso` then `deploy_vault`. `deploy_istio` is standalone.
-  - Cluster still running on `m4` — Gemini to continue validation
-  - Document any failures in `docs/issues/`, no code fixes
-- **PENDING: m2-air validation** — only after m4 full stack passes. Pre-builds the Stage 2 CI cluster fixture.
+- **COMPLETE: m4 local validation** — Phase 1+2 provider verified on M4 Mac (2026-02-24).
+  - `_install_orbstack` successfully installed and initialized OrbStack via Homebrew.
+  - Auto-detection correctly selects `orbstack` provider when running.
+  - `create_cluster --dry-run` and `deploy_cluster` fixes verified (grep and guard clause issues resolved).
+  - Docker context confirmed as `orbstack`.
+  - **Full-Stack Integration Results:**
+    - `deploy_istio` (via `deploy_cluster`) successful; all Istio pods Running.
+    - `deploy_vault` fails on macOS during `_vault_ensure_data_path` due to host-side `mkdir -p` attempt on VM-only paths (see `docs/issues/2026-02-24-macos-vault-local-path-creation-failure.md`).
+    - `deploy_jenkins --enable-vault` (no directory service) fails its smoke test due to unresolved JCasC variables (see `docs/issues/2026-02-24-jenkins-none-auth-mode-smoke-test-failure.md`).
+- **PENDING: m2-air validation** — only after m4 provider passes (integration issues documented). Pre-builds the Stage 2 CI cluster fixture.
 - **OrbStack installer helper** — `_install_orbstack` (macOS only) installs via `brew install orbstack`, launches OrbStack.app, and waits for `orb status` to pass so scripts can continue. Users still need to complete GUI onboarding when prompted. CI runners (`m2-air`) require OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
 
 ### PENDING: GitGuardian False Positive Fix
