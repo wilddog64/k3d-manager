@@ -32,7 +32,9 @@
      CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault ha
      CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault
      ```
-   - Capture Jenkins smoke result (currently blocked by Istio ingress IP on macOS).
+   - Jenkins smoke test routing fix merged (mac-only port-forward path +
+     `JENKINS_SMOKE_URL`/`JENKINS_SMOKE_IP_OVERRIDE` overrides). Need to rerun the
+     validation sequence above to capture the now-passing smoke output.
    - Update `docs/issues/` entries (done), `memory-bank/` status (done), and
      `docs/plans/orbstack-provider.md` validation checklist.
 
