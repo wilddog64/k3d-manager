@@ -212,6 +212,9 @@ Plan: `docs/plans/ci-workflow.md`
 **Still not done:**
 - Stage 2/3 CI workflows not implemented yet
 - Namespace isolation refactor in `scripts/lib/test.sh` (prerequisite for Stage 2)
+- Stage 2 prep/automation tracked in `docs/plans/m2-air-stage2-validation.md` — follow
+  that plan to keep the m2-air runner healthy and to script the Stage 2 job once
+  namespace isolation lands.
 
 ## PR Creation Instructions for Codex
 
