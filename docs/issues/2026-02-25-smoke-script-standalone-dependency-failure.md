@@ -1,83 +1,61 @@
-# Smoke Script Fails When Run in Isolation
+# Smoke Script Fails Due to Unbound Variables and Incorrect Paths
 
 **Date:** 2026-02-25
-**Status:** Open
+**Status:** Open (Regressed/Incomplete Fix)
 
 ## Description
 
-`bin/smoke-test-jenkins.sh` exits early when invoked directly (outside the
-`deploy_jenkins` flow) because it cannot find its library dependencies
-(`scripts/lib/system.sh`, `scripts/plugins/vault.sh`, etc.).
+The Jenkins smoke test script (`bin/smoke-test-jenkins.sh`) and its dependency `scripts/plugins/vault.sh` fail due to environment mismatches and unbound variables when invoked via the standard `deploy_jenkins` flow or standalone.
 
-Gemini observed this when attempting to run the script standalone for validation:
+### 1. Unbound `PLUGINS_DIR` in `vault.sh`
+When `bin/smoke-test-jenkins.sh` is sourced by `deploy_jenkins`, it attempts to source `scripts/plugins/vault.sh`. However, `vault.sh` contains the following line:
 
 ```bash
-bash -x ./bin/smoke-test-jenkins.sh jenkins jenkins.dev.local.me 8443 default
+ESO_PLUGIN="$PLUGINS_DIR/eso.sh"
 ```
 
-The script sources these files relative to `SCRIPT_DIR` at startup:
+Because `scripts/k3d-manager` does not `export PLUGINS_DIR`, and `bin/smoke-test-jenkins.sh` does not define it, the script crashes immediately if `set -u` (nounset) is active (which it is in `smoke-test-jenkins.sh` via `set -euo pipefail`).
+
+### 2. Silent Failure due to Redirection
+The smoke script uses:
 ```bash
-source "${SCRIPT_DIR}/../scripts/lib/system.sh" 2>/dev/null || true
 source "${SCRIPT_DIR}/../scripts/plugins/vault.sh" 2>/dev/null || true
 ```
+This masks the "unbound variable" error, but because `source` is executed in the same shell, the `set -e` in `smoke-test-jenkins.sh` causes the entire script to exit with code 1 immediately upon the failure of the `source` command, before it can even reach the `|| true` or the `_kubectl` guard.
 
-The `|| true` means missing sources are silently swallowed, but downstream
-functions (`_vault_exec`, `_kubectl`, etc.) are undefined, causing early exit
-when they are called.
+### 3. `SCRIPT_DIR` Mismatch
+In `scripts/plugins/vault.sh`, `VAULT_PKI_HELPERS` is defined as:
+```bash
+VAULT_PKI_HELPERS="$SCRIPT_DIR/lib/vault_pki.sh"
+```
+When sourced from `bin/smoke-test-jenkins.sh`, `SCRIPT_DIR` is `/.../bin`. However, the `lib` directory is under `/.../scripts/lib`. This causes `vault.sh` to fail to find its own helpers when sourced from the `bin/` directory.
 
 ## Impact
 
-- Standalone validation of the smoke script is unreliable — failures may be
-  caused by missing dependencies rather than real smoke test issues.
-- Agents (Gemini, CI) that try to run the script directly will get misleading
-  results or silent failures.
+- `deploy_jenkins` always reports `WARN: [jenkins] smoke test failed; inspect output above` on macOS/OrbStack.
+- The smoke test never actually executes its logic because it crashes during the library initialization phase.
+- Standalone runs of `bin/smoke-test-jenkins.sh` fail silently even if `_kubectl` is present in the environment.
 
-## Correct Invocation
+## Verification of Failure
 
-The smoke script must be invoked through the deployer, which sources the full
-library before calling `_jenkins_run_smoke_test`:
-
+Run:
 ```bash
 CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault
 ```
+Observe the warning at the end.
 
-This ensures all library functions are available in the shell environment before
-the smoke script is called.
-
-## Fix Options for Codex
-
-**Option 1 (preferred):** Add a self-sufficiency guard at the top of
-`bin/smoke-test-jenkins.sh` that detects missing dependencies and prints a
-clear error with the correct invocation hint, rather than silently failing
-mid-run:
-
+Run standalone trace:
 ```bash
-if ! declare -f _kubectl >/dev/null 2>&1; then
-  echo "ERROR: smoke-test-jenkins.sh must be run via deploy_jenkins, not directly." >&2
-  echo "       Use: CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault" >&2
-  exit 1
-fi
+bash -x ./bin/smoke-test-jenkins.sh
 ```
+Observe exit immediately after `source ...vault.sh`.
 
-**Option 2:** Make the script fully self-sourcing by sourcing the library
-unconditionally (remove `|| true`) and exiting with a clear error if the
-source fails. Higher risk — changes startup behavior.
+## Proposed Fix (Research Only)
 
-Option 1 is preferred: fail fast and loud with a helpful message rather than
-silently degrading.
+1.  **Export Variables**: `scripts/k3d-manager` should `export SCRIPT_DIR` and `export PLUGINS_DIR` so they are available to all sub-scripts and sourced plugins.
+2.  **Robust Pathing**: `scripts/plugins/vault.sh` should check for `PLUGINS_DIR` and `SCRIPT_DIR` more robustly or use relative paths that are resolved against its own location if possible.
+3.  **Smoke Script Fix**: `bin/smoke-test-jenkins.sh` should define `PLUGINS_DIR` before sourcing `vault.sh` if it wants to be semi-standalone.
 
-## Verification
+## Resolution
 
-After fix: running `bin/smoke-test-jenkins.sh` directly should immediately print
-the error and hint rather than silently failing partway through.
-
-## Resolution (2026-02-25)
-
-- Adopted **Option 1**: the script now checks for `_kubectl` immediately after the
-  optional sources and exits with the guidance above when it is not present. This keeps
-  the smoke helper dependent on the deployer environment while making standalone runs
-  fail fast and self-documenting.
-- Manual verification: running `./bin/smoke-test-jenkins.sh` from a fresh shell now
-  prints the error/usage hint and exits non-zero before any smoke logic executes.
-- No change to orchestrated runs (`deploy_jenkins`, `test_jenkins_smoke`) because the
-  guard already finds `_kubectl` in those shells.
+Pending directive.
