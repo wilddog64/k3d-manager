@@ -9,6 +9,13 @@ name: CI
       - 'docs/**'
       - 'memory-bank/**'
       - '**/*.md'
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - 'docs/**'
+      - 'memory-bank/**'
+      - '**/*.md'
 
 jobs:
   lint:

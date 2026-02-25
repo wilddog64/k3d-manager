@@ -200,6 +200,9 @@ Plan: `docs/plans/ci-workflow.md`
   - `bash -n` on scripts
   - `yamllint .github/workflows/*.yml`
   - `bats scripts/tests/lib`
+- **2026-02-25:** Workflow now triggers on `pull_request` (base `main`) as well as `push`,
+  so Stage 1 linting always runs for PRs even when the latest commits are docs-only. See
+  `docs/issues/2026-02-25-ci-workflow-pr-trigger-missing.md`.
 
 **Self-hosted runner:** `m2-air` (macOS, ARM64) — online and registered on `wilddog64/k3d-manager`.
 - **Architecture label issue:** Runner registered with system label `X64` (likely installed under Rosetta 2). Custom `ARM64` label added via API as mitigation. CI workflow files must use `runs-on: [self-hosted, macOS, ARM64]`. Permanent fix: re-register runner natively. See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
