@@ -83,9 +83,14 @@ rotation. It has NOT been merged to `main` yet.
 - **IN PROGRESS: m4 local validation** — Phase 1+2 provider checks complete (2026-02-24):
   - Auto-detection, `create_cluster`, `deploy_cluster`, Docker context all verified
   - **NEXT:** Service integration tests against running cluster:
-    - `deploy_vault ha` → `test_vault`
-    - `deploy_eso` → `test_eso`
-    - `deploy_istio` → `test_istio`
+    - `deploy_istio` → `test_istio` (Istio is always manual — no parent calls it)
+    - `deploy_jenkins --enable-vault` → automatically calls `deploy_eso` then `deploy_vault`
+    - `test_vault`, `test_eso` (run manually after deploy_jenkins completes)
+  - **Design note:** `test_*` functions are diagnostic/debugging tools — NOT wired to
+    run automatically after `deploy_*`. Too heavy for normal workflow. Run explicitly
+    during validation or when debugging a suspected failure.
+  - **Dependency chain:** `deploy_vault` always calls `deploy_eso`. `deploy_jenkins
+    --enable-vault` calls `deploy_eso` then `deploy_vault`. `deploy_istio` is standalone.
   - Cluster still running on `m4` — Gemini to continue validation
   - Document any failures in `docs/issues/`, no code fixes
 - **PENDING: m2-air validation** — only after m4 full stack passes. Pre-builds the Stage 2 CI cluster fixture.
