@@ -89,6 +89,12 @@ rotation. It has NOT been merged to `main` yet.
     - `deploy_istio` (via `deploy_cluster`) successful; all Istio pods Running.
     - `deploy_vault` fails on macOS during `_vault_ensure_data_path` due to host-side `mkdir -p` attempt on VM-only paths (see `docs/issues/2026-02-24-macos-vault-local-path-creation-failure.md`).
     - `deploy_jenkins --enable-vault` (no directory service) fails its smoke test due to unresolved JCasC variables (see `docs/issues/2026-02-24-jenkins-none-auth-mode-smoke-test-failure.md`).
+- **Immediate Fix Plan (2026-02-24):** See `docs/plans/orbstack-macos-validation-fix-plan.md`
+  1. Patch `_vault_ensure_data_path` — skip `mkdir -p` on macOS (low risk, surgical)
+  2. Fix Jenkins `none`-auth JCasC templating — **HIGH RISK**, `awk` change affects
+     all auth modes. Must smoke test `--enable-ldap` after fix. Vault and Jenkins
+     fixes must be in separate commits.
+  3. Re-run m4 validation once both fixes land; only then proceed to `m2-air`.
 - **PENDING: m2-air validation** — only after m4 provider passes (integration issues documented). Pre-builds the Stage 2 CI cluster fixture.
 - **OrbStack installer helper** — `_install_orbstack` (macOS only) installs via `brew install orbstack`, launches OrbStack.app, and waits for `orb status` to pass so scripts can continue. Users still need to complete GUI onboarding when prompted. CI runners (`m2-air`) require OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
 
