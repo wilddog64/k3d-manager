@@ -209,6 +209,50 @@ Plan: `docs/plans/ci-workflow.md`
 - Stage 2/3 CI workflows not implemented yet
 - Namespace isolation refactor in `scripts/lib/test.sh` (prerequisite for Stage 2)
 
+## PR Creation Instructions for Codex
+
+The `ldap-develop` branch is 30+ commits ahead of `origin/ldap-develop` and has not
+been pushed yet. To trigger Stage 1 CI:
+
+### Step 1 — Push the branch
+```bash
+git push origin ldap-develop
+```
+
+### Step 2 — Create PR via GitHub CLI
+```bash
+gh pr create \
+  --base main \
+  --head ldap-develop \
+  --title "OrbStack provider Phase 1+2, Stage 1 CI, AD integration, cert rotation" \
+  --body "$(cat <<'EOF'
+## Summary
+- OrbStack provider (Phase 1+2): CLUSTER_PROVIDER=orbstack wraps k3d with OrbStack context; auto-detection on macOS
+- macOS smoke test routing: port-forward through istio-ingressgateway with RFC-1918 detection and trap cleanup
+- Jenkins none-auth JCasC fix: local security realm preserved when no directory service enabled
+- Vault macOS mkdir fix: skip host-side PV directory creation on macOS
+- Active Directory provider: full implementation with 36 BATS tests
+- Jenkins cert rotation CronJob: complete
+- Stage 1 CI: shellcheck, bash -n, yamllint, lib unit BATS (green)
+- Self-hosted runner m2-air registered
+
+## What CI will run
+- Stage 1 (lint job): shellcheck + bash -n + yamllint + 53 lib unit BATS — runs automatically
+- Stage 2: NOT yet — m2-air cluster not pre-built yet
+
+## Notes
+- Branch protection requires `lint` job to pass before merge
+- 1 PR approval required before merge
+- Do NOT merge until Stage 1 is green and PR is approved
+EOF
+)"
+```
+
+### What to watch for
+- `lint` job on GitHub Actions must go green — check at `https://github.com/wilddog64/k3d-manager/actions`
+- If any shellcheck or BATS failure appears, report it — do not push fixes directly to `main`
+- Stage 2 will not run yet — `m2-air` cluster pre-build is a separate step after PR is approved
+
 ## Operational Notes
 
 - **Always run `reunseal_vault`** after any cluster restart before attempting other
