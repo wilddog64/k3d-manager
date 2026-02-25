@@ -15,11 +15,14 @@ set -euo pipefail
 #   AD_TEST_USER=john.doe AD_TEST_PASS=secret ./smoke-test-jenkins.sh jenkins jenkins.example.com 443 ad
 
 # Source vault plugin for _vault_exec helper
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "${SCRIPT_DIR}/../scripts/plugins/vault.sh" ]]; then
+SMOKE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SMOKE_SCRIPT_DIR}/.." && pwd)"
+SCRIPT_DIR="${REPO_ROOT}/scripts"
+PLUGINS_DIR="${PLUGINS_DIR:-${SCRIPT_DIR}/plugins}"
+if [[ -f "${SCRIPT_DIR}/plugins/vault.sh" ]]; then
   # Source system.sh first for _kubectl helper
-  source "${SCRIPT_DIR}/../scripts/lib/system.sh" 2>/dev/null || true
-  source "${SCRIPT_DIR}/../scripts/plugins/vault.sh" 2>/dev/null || true
+  source "${SCRIPT_DIR}/lib/system.sh" 2>/dev/null || true
+  source "${SCRIPT_DIR}/plugins/vault.sh" 2>/dev/null || true
 fi
 
 if ! declare -f _kubectl >/dev/null 2>&1; then

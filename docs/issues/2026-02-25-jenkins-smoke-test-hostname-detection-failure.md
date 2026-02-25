@@ -1,7 +1,7 @@
 # Jenkins Smoke Test Hostname Detection Failure
 
 **Date:** 2026-02-25
-**Status:** Open
+**Status:** Fixed
 
 ## Description
 
@@ -30,21 +30,12 @@ is deployed to `${JENKINS_NAMESPACE}`, not `istio-system`. The lookup on line 91
 `scripts/plugins/jenkins.sh` always fails, always falls back to the hardcoded default,
 and always produces the WARN.
 
-## Fix for Codex (surgical, one line)
+## Resolution (2026-02-25)
 
-In `_jenkins_run_smoke_test` (`scripts/plugins/jenkins.sh` line 913), change:
-
-```bash
-jenkins_host=$(kubectl -n istio-system get vs jenkins -o jsonpath='{.spec.hosts[0]}' 2>/dev/null || echo "")
-```
-
-to:
-
-```bash
-jenkins_host=$(kubectl -n "$namespace" get vs jenkins -o jsonpath='{.spec.hosts[0]}' 2>/dev/null || echo "")
-```
-
-The fallback to `${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}` stays in place as a
-safety net — no other changes needed.
-
-**Risk:** Low. One variable substitution. Fallback behavior unchanged if lookup fails.
+- `_jenkins_run_smoke_test` now queries the Jenkins VirtualService in the same namespace
+  that was passed into the function (`kubectl -n "$namespace" get vs jenkins ...`).
+- The fallback to `${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}` remains as a guardrail,
+  so clusters without the VirtualService still log a WARN but continue.
+- Manual verification: `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault`
+  no longer emits the "could not detect Jenkins hostname" warning when Jenkins is
+  deployed with a custom host.

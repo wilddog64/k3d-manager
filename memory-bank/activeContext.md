@@ -112,8 +112,8 @@ rotation. It has NOT been merged to `main` yet.
   - **Jenkins JCasC Fix:** ✅ Verified. Jenkins logs no longer show unresolved `chart-admin-*` variables in `none` auth mode.
   - **Lib unit tests:** ✅ 53/53 pass (requires `PATH="/opt/homebrew/bin:$PATH"` on macOS for bash 5).
   - **Orphan cleanup:** ✅ Trap-based cleanup correctly kills background port-forward on failure.
-  - **Smoke test routing:** ❌ Regressed. `_jenkins_run_smoke_test` fails to detect the VirtualService hostname because it queries the `istio-system` namespace instead of `jenkins`. See `docs/issues/2026-02-25-jenkins-smoke-test-hostname-detection-failure.md`.
-  - **Smoke script standalone failure:** ❌ Regressed. The script fails silently due to an unbound `PLUGINS_DIR` variable when sourcing `vault.sh`, causing an immediate exit via `set -e` before the guard can execute. This also breaks the smoke test when invoked via `deploy_jenkins`. See `docs/issues/2026-02-25-smoke-script-standalone-dependency-failure.md`.
+  - **Smoke test routing:** ✅ Fixed. `_jenkins_run_smoke_test` now queries the Jenkins VirtualService in the active namespace instead of `istio-system`, so custom hostnames are detected correctly. See `docs/issues/2026-02-25-jenkins-smoke-test-hostname-detection-failure.md`.
+  - **Smoke script standalone failure:** ✅ Fixed. `bin/smoke-test-jenkins.sh` now normalizes `SCRIPT_DIR`/`PLUGINS_DIR` to the repo's `scripts/` tree before sourcing helpers, so `_vault_exec` loads without nounset exits whether the script is invoked via the deployer or directly. See `docs/issues/2026-02-25-smoke-script-standalone-dependency-failure.md`.
   - **Correct validation command** (for Gemini and Codex):
     ```bash
     CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault
