@@ -1,7 +1,7 @@
 # macOS Vault Local-Path Creation Failure
 
 **Date:** 2026-02-24
-**Status:** Documented
+**Status:** ✅ Fixed (2026-02-24)
 
 ## Description
 
@@ -38,18 +38,15 @@ On macOS, `local-path` provisioner manages directories inside the VM; the host-s
 1. Run on a macOS machine with OrbStack or Docker Desktop.
 2. Run `./scripts/k3d-manager deploy_vault`.
 
-## Fix Approach
+## Fix
 
-In `scripts/plugins/vault.sh`, `_vault_ensure_data_path` should skip the `mkdir -p`
-call when running on macOS. The `local-path` provisioner manages the directory inside
-the VM automatically — host-side creation is not needed and not possible.
+- `_vault_ensure_data_path` in `scripts/plugins/vault.sh` now returns early when
+  `_is_mac` is true, so macOS hosts no longer attempt to create VM-only paths like
+  `/var/lib/rancher/...`. Linux/WSL behavior is unchanged.
 
-```bash
-# Guard: skip mkdir on macOS — local-path provisioner handles it inside the VM
-if ! _is_mac; then
-  _run_command --prefer-sudo -- mkdir -p "$host_path"
-fi
-```
+## Verification
 
-Alternatively, remove `_vault_ensure_data_path` entirely for k3d/OrbStack providers
-since `local-path` provisioner creates PV directories on demand.
+- `PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault ha`
+  completes on m4 without the previous permission error.
+- Vault bootstrap logs show the standard init/unseal detection and PKI setup with
+  no warnings about host path creation.
