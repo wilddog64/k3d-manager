@@ -86,6 +86,11 @@ if [[ -f "${SCRIPT_DIR}/plugins/jenkins.sh" ]]; then
   source "${SCRIPT_DIR}/plugins/jenkins.sh"
 fi
 
+_test_lib_random_name() {
+  local prefix="${1:-k3d-test}"
+  printf '%s-%s-%s' "$prefix" "$(date +%s)" "$RANDOM"
+}
+
 if [[ -z "${TEST_LIB_VAULT_NS_DEFAULT_PLUGIN_VALUE:-}" \
       && "${TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN}" != "1" ]]; then
   TEST_LIB_VAULT_NS_DEFAULT_PLUGIN_VALUE="${VAULT_NS_DEFAULT:-}"
@@ -123,31 +128,32 @@ EOF
 
 function test_istio() {
     echo "Testing Istio installation and functionality..."
-    trap '_cleanup_istio_test_namespace' EXIT TERM
+    local test_ns="${ISTIO_TEST_NAMESPACE:-$(_test_lib_random_name 'istio-test')}"
     PF_PIDS=()
+    trap "_cleanup_istio_test_namespace '$test_ns'" EXIT TERM
 
     # 1. Create a very simple test deployment and service
 
     # Deploy a minimal nginx pod
-    _kubectl apply -f - -n istio-test <<EOF
+    _kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
   labels:
     istio-injection: enabled
-    kubernetes.io/metadata.name: istio-test
-  name: istio-test
+    kubernetes.io/metadata.name: ${test_ns}
+  name: ${test_ns}
 spec:
   finalizers:
   - kubernetes
 status:
   phase: Active
 ---
-apiVersion: apps/v1
+apiVersion: v1
 kind: Deployment
 metadata:
   name: nginx-test
-  namespace: istio-test
+  namespace: ${test_ns}
 spec:
   replicas: 1
   selector:
@@ -166,7 +172,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: nginx-test
-  namespace: istio-test
+  namespace: ${test_ns}
 spec:
   ports:
   - port: 80
@@ -175,7 +181,7 @@ spec:
 EOF
 
     # Wait for deployment
-    _kubectl rollout status deployment/nginx-test -n istio-test --timeout=120s
+    _kubectl rollout status deployment/nginx-test -n "$test_ns" --timeout=120s
 
     # Verify that the Istio proxy has been injected
     _info "Checking for Istio sidecar..."
@@ -187,7 +193,7 @@ EOF
 
     # Test direct access first (bypassing Istio)
     echo "Testing direct pod access..."
-    _kubectl port-forward -n istio-test svc/nginx-test 8888:80 &
+    _kubectl port-forward -n "$test_ns" svc/nginx-test 8888:80 &
     PF_PIDS+=($!)
     sleep 3
     if _curl -s localhost:8888 | grep -q "Welcome to nginx"; then
@@ -241,7 +247,7 @@ EOF
     fi
 
     # Verify VirtualService creation
-    if _kubectl --no-exit get virtualservice -n istio-test test-vs; then
+    if _kubectl --no-exit get virtualservice -n "$test_ns" test-vs; then
         _info "Istio VirtualService created successfully"
     else
         _err "Failed to create Istio VirtualService"
@@ -263,10 +269,10 @@ EOF
 
     _info "For a more complete test, you could try accessing the Istio ingress gateway's external IP:"
     _kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
-    trap '_cleanup_istio_test_namespace' EXIT TERM
 }
 
 function _cleanup_istio_test_namespace() {
+    local test_ns="${1:-istio-test}"
 
     _info "Cleaning up Istio test namespace..."
     _info "warning: port forwarding will not remove if process failed"
@@ -280,7 +286,7 @@ function _cleanup_istio_test_namespace() {
              xargs kill
        fi
     done
-    _kubectl delete namespace istio-test --ignore-not-found
+    _kubectl delete namespace "$test_ns" --ignore-not-found
 }
 
 function _wait_for_port_forward() {
@@ -553,9 +559,9 @@ function test_eso() {
   local vault_ns="vault"
   local vault_release="${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}"
   local vault_pod="${vault_release}-0"
-  local store_name="vault-test"
-  local es_name="eso-test"
-  local es_ns="default"
+  local store_name="${ESO_TEST_STORE:-$(_test_lib_random_name 'vault-store')}"
+  local es_name="${ESO_TEST_SECRET:-$(_test_lib_random_name 'eso-test')}"
+  local es_ns="${ESO_TEST_NAMESPACE:-$(_test_lib_random_name 'eso-ns')}"
   local vault_secret_path="eso/test"
   local secret_key="magic"
   local secret_val="swordfish"
@@ -577,6 +583,8 @@ function test_eso() {
   _info "Creating secret in Vault..."
   _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
     sh -c "VAULT_TOKEN='$root_token' vault kv put secret/$vault_secret_path $secret_key='$secret_val'"
+
+  _kubectl create namespace "$es_ns" >/dev/null 2>&1 || true
 
   _info "Creating ClusterSecretStore..."
   cat <<EOF | _kubectl apply -f -
@@ -655,6 +663,8 @@ function _cleanup_eso_test() {
   if [[ "$vault_started" -eq 1 ]]; then
     "${SCRIPT_DIR}/k3d-manager" undeploy_vault "$vault_ns" >/dev/null 2>&1 || true
   fi
+
+  _kubectl delete namespace "$es_ns" --ignore-not-found >/dev/null 2>&1
 }
 
 function test_vault() {
@@ -662,10 +672,10 @@ function test_vault() {
   local vault_ns="vault"
   local vault_release="${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}"
   local vault_pod="${vault_release}-0"
-  local test_ns="vault-test"
-  local sa="vault-test-sa"
+  local test_ns="${VAULT_TEST_NAMESPACE:-$(_test_lib_random_name 'vault-test')}"
+  local sa="${VAULT_TEST_SERVICE_ACCOUNT:-${test_ns}-sa}"
 
-  trap '_cleanup_vault_test' EXIT TERM
+  trap "_cleanup_vault_test '$test_ns'" EXIT TERM
 
   # Deploy Vault in HA mode
   "${SCRIPT_DIR}/k3d-manager" deploy_vault ha "$test_ns" "$vault_release"
@@ -735,9 +745,10 @@ POD
 }
 
 function _cleanup_vault_test() {
+  local test_ns="${1:-vault-test}"
   echo "Cleaning up Vault test resources..."
-  _kubectl delete namespace vault-test --ignore-not-found
-  _kubectl delete clusterrolebinding vault-server-binding
+  _kubectl delete namespace "$test_ns" --ignore-not-found
+  _kubectl delete clusterrolebinding vault-server-binding --ignore-not-found
   # _helm uninstall vault -n vault-test 2>/dev/null || true
 }
 function test_cert_rotation() {

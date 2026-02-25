@@ -205,7 +205,6 @@ Plan: `docs/plans/ci-workflow.md`
 
 **Still not done:**
 - Stage 2/3 CI workflows not implemented yet.
-- Namespace isolation refactor in `scripts/lib/test.sh` (prerequisite for Stage 2).
 - Stage 2 prep/automation tracked in `docs/plans/m2-air-stage2-validation.md`.
 
 ---
@@ -220,17 +219,18 @@ does NOT exist yet. Two tasks need to happen in order.
 - `.github/workflows/ci.yml` now uses `pull_request: types: [opened, synchronize, reopened]`
   so lint reruns on every commit push or PR reopen (still limited to in-repo PRs via the
   job-level `if`). Nothing further to do here.
+- **Next action:** push a no-op change (e.g., README touch) to PR #2 to confirm the
+  updated trigger fires the lint job; monitor `gh run list` right after the push.
 
 ### Task B — Implement Stage 2 workflow (requires namespace isolation first)
 
 **Stage 2 must NOT be added to ci.yml until `scripts/lib/test.sh` is refactored for
 namespace isolation.** Without it, parallel test runs will collide on shared namespaces.
 
-**Prerequisite — namespace isolation refactor:**
-- All integration test functions (`test_vault`, `test_eso`, `test_istio`) must use
-  ephemeral randomly named namespaces (similar to `test_jenkins` which already uses
-  `JENKINS_NS_GENERATED`).
-- See `docs/plans/ci-workflow.md` — "Namespace Isolation Strategy" section.
+**Prerequisite — namespace isolation refactor (✅ 2026-02-25):**
+- `test_vault`, `test_eso`, and `test_istio` now each generate ephemeral namespaces and
+  cleanup traps inside `scripts/lib/test.sh`, so they no longer collide when multiple
+  Stage 2 jobs run. Follows the strategy documented in `docs/plans/ci-workflow.md`.
 
 **After namespace isolation is done, implement Stage 2 in this order:**
 
