@@ -88,3 +88,19 @@ Perform these steps sequentially on `m2-air` whenever Stage 2 needs to be (re)qu
 - Documented manual run on m2 shows all commands succeed.
 - Stage 2 job defined in workflow and runs green for PR #2.
 - Memory bank reflects Stage 2 readiness and links to this plan.
+
+## Workflow Hardening Checklist
+To keep both Stage 1 and the upcoming Stage 2 jobs safe:
+1. **Minimum token scope** — workflows set `permissions: contents: read` so GITHUB_TOKEN
+   cannot push or manage secrets.
+2. **Concurrency guard** — `concurrency: ci-${{ github.workflow }}-${{ github.ref }}` with
+   `cancel-in-progress: true` ensures duplicate pushes cancel older runs, freeing the
+   m2 runner.
+3. **Pinned actions** — continue pinning marketplace actions to tags (`actions/checkout@v4`)
+   or SHAs when available; avoid floating `@main`.
+4. **Secrets isolation** — Stage 2 job will only read required secrets via
+   `env:` entries scoped to the job; never echo Vault tokens in logs.
+5. **Runner safeguards** — Stage 2 job must check OrbStack/kube health up front so
+   it fails fast without mutating state.
+
+Revisit this list whenever we add new workflows or jobs.
