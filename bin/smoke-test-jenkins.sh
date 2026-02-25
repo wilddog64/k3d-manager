@@ -22,6 +22,12 @@ if [[ -f "${SCRIPT_DIR}/../scripts/plugins/vault.sh" ]]; then
   source "${SCRIPT_DIR}/../scripts/plugins/vault.sh" 2>/dev/null || true
 fi
 
+if ! declare -f _kubectl >/dev/null 2>&1; then
+  echo "ERROR: smoke-test-jenkins.sh must be run via deploy_jenkins (k3d-manager)." >&2
+  echo "       Use: CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault" >&2
+  exit 1
+fi
+
 # Parameters
 NAMESPACE="${1:-jenkins}"
 HOST="${2:-jenkins.dev.local.me}"

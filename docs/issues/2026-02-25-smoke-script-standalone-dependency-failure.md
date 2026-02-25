@@ -70,3 +70,14 @@ silently degrading.
 
 After fix: running `bin/smoke-test-jenkins.sh` directly should immediately print
 the error and hint rather than silently failing partway through.
+
+## Resolution (2026-02-25)
+
+- Adopted **Option 1**: the script now checks for `_kubectl` immediately after the
+  optional sources and exits with the guidance above when it is not present. This keeps
+  the smoke helper dependent on the deployer environment while making standalone runs
+  fail fast and self-documenting.
+- Manual verification: running `./bin/smoke-test-jenkins.sh` from a fresh shell now
+  prints the error/usage hint and exits non-zero before any smoke logic executes.
+- No change to orchestrated runs (`deploy_jenkins`, `test_jenkins_smoke`) because the
+  guard already finds `_kubectl` in those shells.
