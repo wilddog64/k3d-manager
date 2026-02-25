@@ -107,37 +107,13 @@ rotation. It has NOT been merged to `main` yet.
        `JENKINS_SMOKE_URL` (full URL override for CI or remote topologies). When no
        override is present, Linux behavior is unchanged.
      - doc reference: `docs/issues/2026-02-25-jenkins-smoke-test-ingress-retries.md`.
-- **Gemini validation instructions (smoke-test routing fix — run on m4):**
-  Gemini's role is test-and-document only — no code changes.
-  Run the following sequence in order; document results in `docs/issues/` and
-  `memory-bank/` but do not attempt to fix failures:
-  ```bash
-  # 1. Confirm lib unit tests still pass
-  PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test lib
-
-  # 2. Full deploy sequence (Vault must be unsealed first if cluster already exists)
-  CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault ha
-  CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault
-  ```
-  **What to observe and record:**
-  - `deploy_jenkins` must complete without any WARN about smoke test failure.
-  - Confirm `kubectl port-forward` is NOT left running after deploy completes:
-    `ps aux | grep port-forward` — no jenkins port-forward process should remain.
-  - Confirm Jenkins pod is Running: `kubectl get pods -n jenkins`.
-  - Confirm smoke test log shows `[PASS]` lines (not `[FAIL]`).
-
-  **Three exit scenarios to verify (in addition to the happy path above):**
-  1. **Smoke fails:** temporarily break connectivity (e.g., wrong namespace) and confirm
-     port-forward is still cleaned up — no orphan in `ps aux | grep port-forward`.
-  2. **Port-forward fails to start:** confirm error is logged to stderr and deploy exits
-     with a non-zero warning (not a silent hang).
-  3. **Happy path with `--enable-ldap`:** run
-     `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault --enable-ldap`
-     and confirm LDAP path still works (no regression from the port-forward changes).
-
-  If all pass: update `docs/issues/2026-02-25-jenkins-smoke-test-ingress-retries.md`
-  Verification section and mark `memory-bank/progress.md` row as FIXED.
-  If any fail: document in a new `docs/issues/` file and do not mark as fixed.
+- **COMPLETE: m4 bug fix validation (2026-02-25)**
+  - **Vault macOS fix:** ✅ Verified. `deploy_vault` succeeds without host-side `mkdir` errors.
+  - **Jenkins JCasC Fix:** ✅ Verified. Jenkins logs no longer show unresolved `chart-admin-*` variables in `none` auth mode.
+  - **Lib unit tests:** ✅ 53/53 pass (requires `PATH="/opt/homebrew/bin:$PATH"` on macOS for bash 5).
+  - **Orphan cleanup:** ✅ Trap-based cleanup correctly kills background port-forward on failure.
+  - **Smoke test routing:** ❌ FAILED. Port-forward targets `svc/jenkins:443` but Jenkins service only has port `8081`. TLS is terminated at Istio, not Jenkins. Fix: change target to `svc/istio-ingressgateway` in `istio-system`. See `docs/issues/2026-02-25-jenkins-smoke-test-routing-service-mismatch.md`.
+  - **Next step for Codex:** One-line fix — change namespace+service in port-forward command. Re-validate on m4 after fix. Separate commit required.
 
 - **PENDING: m2-air validation** — only after m4 provider passes (integration issues documented). Pre-builds the Stage 2 CI cluster fixture.
 - **OrbStack installer helper** — `_install_orbstack` (macOS only) installs via `brew install orbstack`, launches OrbStack.app, and waits for `orb status` to pass so scripts can continue. Users still need to complete GUI onboarding when prompted. CI runners (`m2-air`) require OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
