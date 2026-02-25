@@ -211,19 +211,28 @@ Expected: 53/53 passing.
 ```
 
 **Step 3 — Full stack deployment:**
+
+Note on dependency chain:
+- `deploy_istio` is standalone — no other deploy calls it automatically
+- `deploy_jenkins --enable-vault` automatically calls `deploy_eso` then `deploy_vault`
+- `deploy_vault` always calls `deploy_eso` as a prerequisite
+
 ```bash
 CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster
-./scripts/k3d-manager deploy_vault ha
-./scripts/k3d-manager deploy_eso
 ./scripts/k3d-manager deploy_istio
+./scripts/k3d-manager deploy_jenkins --enable-vault   # pulls in ESO + Vault automatically
 ./scripts/k3d-manager reunseal_vault
 ```
 
 **Step 4 — Service integration tests:**
+
+`test_*` functions are diagnostic tools — NOT wired to run automatically after
+`deploy_*`. They are heavy and run explicitly for validation or debugging only.
+
 ```bash
+./scripts/k3d-manager test_istio
 ./scripts/k3d-manager test_vault
 ./scripts/k3d-manager test_eso
-./scripts/k3d-manager test_istio
 ```
 
 Expected: all three pass — Vault HA auth, ESO SecretStore Ready, Istio sidecar
