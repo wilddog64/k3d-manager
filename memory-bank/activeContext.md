@@ -279,7 +279,7 @@ Validation sequence for m2-air: `docs/plans/m2-air-stage2-validation.md`
 1. ✅ Fix trigger (`synchronize` + `reopened`)
 2. ✅ Refactor `scripts/lib/test.sh` for namespace isolation
 3. ✅ Fix `test_istio` regression (apiVersion restored)
-4. Write `scripts/ci/check_cluster_health.sh`
+4. ✅ Write `scripts/ci/check_cluster_health.sh`
 5. Add Stage 2 job to `ci.yml`
 6. Update branch protection to require Stage 2
 
@@ -298,6 +298,11 @@ again. Verified with `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test 
 
 After the fix, update `memory-bank/activeContext.md` — mark Task C as ✅ and note
 that the namespace isolation refactor is fully correct and unblocks Stage 2 build.
+
+### Task D — Implement Stage 2.0 health probe ✅ (2026-02-25)
+- `scripts/ci/check_cluster_health.sh` now validates Istio ingress rollout, Vault
+  StatefulSet readiness, ESO pods, and Vault unseal status. Verified locally with
+  `PATH="/opt/homebrew/bin:$PATH" ./scripts/ci/check_cluster_health.sh`.
 
 ## Operational Notes
 

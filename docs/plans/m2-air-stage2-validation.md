@@ -43,14 +43,14 @@ Perform these steps sequentially on `m2-air` whenever Stage 2 needs to be (re)qu
    - Record kubeconfig path and keep cluster running between CI jobs.
 
 3. **Stage 2.0 health probe**
-   - Script to write (`scripts/ci/check_cluster_health.sh` — TBD) should verify:
-     - Istio ingress Deployment and Service Ready
-     - Vault StatefulSet pods Ready, `vault status` == `Initialized true, Sealed false`
-     - ESO pods Ready
-   - Until the script exists, run manual commands:
+   - Script implemented at `scripts/ci/check_cluster_health.sh` (bash). It verifies:
+     - Istio ingress Deployment rollout (`deployment/istio-ingressgateway`)
+     - Vault StatefulSet Ready replicas match desired count
+     - ESO namespace pods Ready
+     - `vault status` reports `Initialized true` and `Sealed false`
+   - Run manually (or via Stage 2 job):
      ```bash
-     kubectl get pods -A
-     kubectl -n vault exec -i vault-0 -- vault status
+     PATH="/opt/homebrew/bin:$PATH" ./scripts/ci/check_cluster_health.sh
      ```
 
 4. **Stage 2.1 integration tests**
