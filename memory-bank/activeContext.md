@@ -202,6 +202,7 @@ Plan: `docs/plans/ci-workflow.md`
   - `bats scripts/tests/lib`
 
 **Self-hosted runner:** `m2-air` (macOS, ARM64) — online and registered on `wilddog64/k3d-manager`.
+- **Architecture label issue:** Runner registered with system label `X64` (likely installed under Rosetta 2). Custom `ARM64` label added via API as mitigation. CI workflow files must use `runs-on: [self-hosted, macOS, ARM64]`. Permanent fix: re-register runner natively. See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 
 **Branch protection:** `main` now requires `lint` job to pass before merge (updated 2026-02-24).
 
