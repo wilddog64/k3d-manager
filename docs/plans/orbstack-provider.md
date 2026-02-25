@@ -210,7 +210,7 @@ Expected: 53/53 passing.
 # Expected: provider = orbstack
 ```
 
-**Step 3 — Full stack validation:**
+**Step 3 — Full stack deployment:**
 ```bash
 CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster
 ./scripts/k3d-manager deploy_vault ha
@@ -219,11 +219,24 @@ CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster
 ./scripts/k3d-manager reunseal_vault
 ```
 
-**Step 4 — Verify OrbStack context was used:**
+**Step 4 — Service integration tests:**
+```bash
+./scripts/k3d-manager test_vault
+./scripts/k3d-manager test_eso
+./scripts/k3d-manager test_istio
+```
+
+Expected: all three pass — Vault HA auth, ESO SecretStore Ready, Istio sidecar
+injection + Gateway + VirtualService routing verified.
+
+**Step 5 — Verify OrbStack context was used:**
 ```bash
 docker context show
 # Expected: orbstack (not default or colima)
 ```
+
+**Agent instruction:** Run tests and document failures only. Do NOT fix code.
+Write issues to `docs/issues/YYYY-MM-DD-orbstack-<description>.md`.
 
 **If m4 validation passes:**
 - Mark steps 2 and 4 in Implementation Sequence as done
