@@ -276,11 +276,28 @@ Full design: `docs/plans/ci-workflow.md`
 Validation sequence for m2-air: `docs/plans/m2-air-stage2-validation.md`
 
 ### Summary of order
-1. Fix trigger (`synchronize` + `reopened`) → push → verify lint re-runs on new commits
-2. Refactor `scripts/lib/test.sh` for namespace isolation
-3. Write `scripts/ci/check_cluster_health.sh`
-4. Add Stage 2 job to `ci.yml`
-5. Update branch protection to require Stage 2
+1. ✅ Fix trigger (`synchronize` + `reopened`)
+2. ✅ Refactor `scripts/lib/test.sh` for namespace isolation
+3. ✅ Fix `test_istio` regression (apiVersion restored)
+4. Write `scripts/ci/check_cluster_health.sh`
+5. Add Stage 2 job to `ci.yml`
+6. Update branch protection to require Stage 2
+
+---
+
+### Task C — Fix `test_istio` apiVersion regression ✅ (2026-02-25)
+
+**File:** `scripts/lib/test.sh`
+**Location:** Inside the heredoc in `test_istio()`, after the `---` separator that
+follows the Namespace manifest.
+
+**Fix:** Deployment block inside the `test_istio()` heredoc now uses `apiVersion: apps/v1`
+again. Verified with `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test lib`.
+
+**Commit message:** `fix: restore apps/v1 apiVersion for Deployment in test_istio`
+
+After the fix, update `memory-bank/activeContext.md` — mark Task C as ✅ and note
+that the namespace isolation refactor is fully correct and unblocks Stage 2 build.
 
 ## Operational Notes
 
