@@ -112,7 +112,13 @@ rotation. It has NOT been merged to `main` yet.
   - **Jenkins JCasC Fix:** ✅ Verified. Jenkins logs no longer show unresolved `chart-admin-*` variables in `none` auth mode.
   - **Lib unit tests:** ✅ 53/53 pass (requires `PATH="/opt/homebrew/bin:$PATH"` on macOS for bash 5).
   - **Orphan cleanup:** ✅ Trap-based cleanup correctly kills background port-forward on failure.
-  - **Smoke test routing:** ✅ FIXED. Port-forward now targets `istio-system/svc/istio-ingressgateway`, so the macOS tunnel terminates at the Istio HTTPS listener. Need to re-run `deploy_jenkins --enable-vault` on m4 to capture the now-successful smoke output. See `docs/issues/2026-02-25-jenkins-smoke-test-routing-service-mismatch.md`.
+  - **Smoke test routing:** ✅ Code fix merged (`istio-system/svc/istio-ingressgateway`). Validation still pending — see below.
+  - **Smoke script standalone failure (new):** Gemini attempted to run `bin/smoke-test-jenkins.sh` directly and hit silent dependency failures — library functions (`_kubectl`, `_vault_exec`) are undefined outside the deployer context. The `|| true` on source calls swallows errors silently. Fix: add a fast-fail guard at the top of the script that detects missing dependencies and prints the correct invocation hint. See `docs/issues/2026-02-25-smoke-script-standalone-dependency-failure.md`.
+  - **Correct validation command** (for Gemini and Codex):
+    ```bash
+    CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault
+    ```
+    Never invoke `bin/smoke-test-jenkins.sh` directly — it must run through the deployer.
 
 - **PENDING: m2-air validation** — only after m4 provider passes (integration issues documented). Pre-builds the Stage 2 CI cluster fixture.
 - **OrbStack installer helper** — `_install_orbstack` (macOS only) installs via `brew install orbstack`, launches OrbStack.app, and waits for `orb status` to pass so scripts can continue. Users still need to complete GUI onboarding when prompted. CI runners (`m2-air`) require OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
