@@ -1,7 +1,7 @@
 # Jenkins Smoke Test Still Fails on macOS (Istio LB IP Unreachable)
 
 **Date:** 2026-02-25
-**Status:** Documented
+**Status:** Partially fixed — service target mismatch found (see `docs/issues/2026-02-25-jenkins-smoke-test-routing-service-mismatch.md`)
 
 ## Description
 
@@ -72,6 +72,27 @@ The smoke script (`bin/smoke-test-jenkins.sh`) remains a pure, standalone test t
   problems.
 - RFC-1918 regex must cover all three blocks. The pattern
   `^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)` is correct and has been reviewed.
+
+## Resolution
+
+- `_jenkins_run_smoke_test` (`scripts/plugins/jenkins.sh`) now captures the Istio ingress
+  IP, detects RFC-1918 addresses on macOS, and brings up
+  `kubectl -n <ns> port-forward svc/jenkins 8443:443` when required.
+  - The cleanup trap is registered before `kubectl` starts so the background port-forward
+    PID is always killed on EXIT/INT/TERM. On failure, the port-forward log is preserved
+    and printed to stderr for debugging.
+  - The smoke script is invoked against `127.0.0.1:8443` with
+    `JENKINS_SMOKE_IP_OVERRIDE=127.0.0.1`, so curl keeps the Jenkins SNI while the TLS
+    socket terminates locally.
+- `bin/smoke-test-jenkins.sh` honors two overrides:
+  - `JENKINS_SMOKE_IP_OVERRIDE` skips the ingress IP lookup entirely (used by the
+    port-forward path and for custom topologies) and is plumbed through all curl/openssl
+    calls via a shared `RESOLVE_ARGS` array.
+  - `JENKINS_SMOKE_URL` allows CI or remote clusters to specify the full URL; when set,
+    the script parses the host/port, skips the K8s IP lookup, and falls back to standard
+    DNS resolution if needed.
+- Linux/CI behavior is unchanged: when no overrides are present, the script still reads
+  the ingress IP directly via `kubectl` and talks to it over the host network.
 
 ## Verification
 
