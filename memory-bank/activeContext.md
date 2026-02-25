@@ -2,321 +2,215 @@
 
 ## Current Branch: `ldap-develop`
 
-This is the active development branch for Active Directory integration and certificate
-rotation. It has NOT been merged to `main` yet.
+Active development branch for Active Directory integration, certificate rotation,
+OrbStack provider, and Stage 2 CI. **Not yet merged to `main`.**
 
-## Session Objective (as of 2026-02-20)
+## Current Focus (as of 2026-02-25)
 
-- Keep memory bank aligned with `CLAUDE.md`, `docs/issues/`, and current code behavior.
-- Capture the test strategy overhaul and current post-overhaul priorities.
+Complete Stage 2 CI workflow and prepare `ldap-develop` for merge to `main`.
+- Stage 1 lint: ✅ green on PR #2
+- Stage 2 job: next task for Codex (see below)
+- m2-air cluster pre-build: pending — run `./bin/setup-mac-ci-runner.sh` on m2-air when ready
+
+---
 
 ## What Has Been Built on `ldap-develop`
 
 ### Completed Features
+
 - **Test strategy overhaul** (2026-02-20)
-  - Removed mock-heavy, high-drift BATS suites:
-    - `scripts/tests/plugins/jenkins.bats`
-    - `scripts/tests/core/create_k3d_clusters.bats`
-    - `scripts/tests/core/deploy_cluster.bats`
-    - `scripts/tests/core/install_k3d.bats`
-  - Added `test smoke` E2E subcommand in `scripts/lib/help/utils.sh`.
-  - Current unit-test set is focused on pure logic and deterministic behavior.
+  - Removed mock-heavy, high-drift BATS suites (jenkins.bats, create_k3d_clusters.bats, etc.)
+  - Added `test smoke` E2E subcommand. Unit BATS now covers pure logic only.
 
 - **Active Directory provider** (`scripts/lib/dirservices/activedirectory.sh`)
-  - All interface functions implemented.
-  - 36 automated Bats tests, 100% passing.
-  - Validates connectivity (DNS + LDAP port), never deploys.
-  - `TOKENGROUPS` strategy for efficient nested group resolution.
-  - `AD_TEST_MODE=1` for offline unit testing.
+  - All interface functions implemented. 36 BATS tests, 100% passing.
+  - `TOKENGROUPS` strategy for nested group resolution. `AD_TEST_MODE=1` for offline testing.
 
 - **OpenLDAP AD-schema variant** (`deploy_ad` command)
-  - Deploys OpenLDAP with `bootstrap-ad-schema.ldif`.
-  - Pre-seeded with `alice` (admin), `bob` (developer), `charlie` (read-only).
-  - All test users: password = `password`.
-  - Used as a local stand-in for real AD during integration testing.
+  - Pre-seeded with `alice` (admin), `bob` (developer), `charlie` (read-only). Password: `password`.
+  - Used as local stand-in for real AD during integration testing.
 
 - **Jenkins directory service integration**
-  - `--enable-ad` flag: uses OpenLDAP+AD-schema.
-  - `--enable-ad-prod` flag: uses real AD (requires `AD_DOMAIN`).
-  - `--enable-ldap` flag: uses standard OpenLDAP schema.
+  - `--enable-ad`, `--enable-ad-prod`, `--enable-ldap` flags implemented.
   - JCasC generation via `_dirservice_*_generate_jcasc` interface.
 
 - **Certificate rotation CronJob** (`jenkins-cert-rotator`)
   - Triggers Vault PKI renewal, updates K8s secret, revokes old cert.
-  - CronJob image configurable via `JENKINS_CERT_ROTATOR_IMAGE`.
-  - Rotation auth/template issue fixed (`envsubst` default-value pitfall).
-  - Certificate rotation validated with short TTL and manual job runs.
+  - `JENKINS_CERT_ROTATOR_IMAGE` configurable. Validated with short TTL.
 
 - **Jenkins smoke test** (`bin/smoke-test-jenkins.sh`)
-  - SSL/auth smoke coverage exists.
-  - Routed into `test smoke` flow as part of E2E strategy.
+  - SSL/auth smoke coverage. Routed into `test smoke` E2E flow.
+  - macOS port-forward path: tunnels through `svc/istio-ingressgateway` in `istio-system`.
+  - `JENKINS_SMOKE_IP_OVERRIDE` and `JENKINS_SMOKE_URL` env var overrides supported.
+  - **Correct validation command:** `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault`
+  - Never invoke `bin/smoke-test-jenkins.sh` directly — must run through the deployer.
 
 - **Secret backend abstraction** (`scripts/lib/secret_backend.sh`)
-  - `SECRET_BACKEND` env var selects implementation.
-  - Vault backend: complete.
-  - Azure backend: partial (plugin exists, not fully wired).
-  - AWS/GCP: planned.
+  - Vault backend: complete. Azure: partial. AWS/GCP: planned.
 
-- **OrbStack provider support** (Phases 1 & 2 complete — 2026-02-24)
-  - `CLUSTER_PROVIDER=orbstack` delegates all k3d operations to OrbStack's Docker runtime.
-  - Auto-detects OrbStack on macOS via `orb status`; falls back to `k3d` when not running.
-  - No Docker Desktop/Colima installation attempts when using OrbStack.
+- **OrbStack provider** (Phases 1 & 2 — 2026-02-24)
+  - `CLUSTER_PROVIDER=orbstack` wraps k3d with OrbStack Docker context.
+  - Auto-detects OrbStack on macOS via `orb status`; falls back to `k3d`.
+  - **m4 validation:** ✅ complete — all integration issues resolved (see `docs/issues/`).
+  - **m2-air validation:** pending — required before Phase 1+2 considered production-ready.
+  - **Phase 3** (OrbStack native Kubernetes, no k3d): not yet started.
+
+- **Stage 1 CI** (2026-02-23)
+  - `.github/workflows/ci.yml`: shellcheck (shebang-scoped), bash -n, yamllint, 53 lib unit BATS.
+  - Triggers on PR open/update/reopen to `main` (in-repo only).
+  - `scripts/ci/check_cluster_health.sh`: Stage 2.0 health gate (Istio, Vault, ESO).
+  - Namespace isolation in `scripts/lib/test.sh`: `test_vault`, `test_eso`, `test_istio`
+    use ephemeral random namespaces and parameterized cleanup traps.
+
+---
 
 ## Current Priorities / Active Decisions
 
-### Priority 1: Jenkins Kubernetes agents and SMB CSI integration
-- Next feature track after test overhaul completion.
-- Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`.
+### Priority 1: Finish Stage 2 CI (current task)
+- Add `stage2` job to `.github/workflows/ci.yml` — see **Next Step for Codex** below.
+- Pre-build cluster on m2-air once Stage 2 job exists: `./bin/setup-mac-ci-runner.sh`
 
-### Priority 2: Expand and operationalize E2E smoke coverage
-- Validate deployment flag combinations in live-cluster workflow.
-- Continue to treat pure-logic BATS as fast regression checks.
+### Priority 2: Jenkins Kubernetes agents and SMB CSI integration
+- Next feature track after CI is stable.
+- Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
 
-### Priority 3: AD end-to-end validation depth
-- `--enable-ad` path has provider-level/unit coverage; continue end-to-end scenario validation.
-- `--enable-ad-prod` requires external AD (VPN/corporate environment dependent).
-
-### Priority 4: OrbStack provider (updated 2026-02-24)
-- Plan: `docs/plans/orbstack-provider.md`
-- **Phase 1 + 2 implemented** — new `orbstack` provider wraps k3d with OrbStack context handling and macOS auto-detection chooses it when `orb` is running. Manual override: `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster`.
-- **Phase 3 (next)**: OrbStack native Kubernetes provider — eliminates k3d entirely (estimated half day, still pending).
-- **COMPLETE: m4 local validation** — Phase 1+2 provider verified on M4 Mac (2026-02-24).
-  - `_install_orbstack` successfully installed and initialized OrbStack via Homebrew.
-  - Auto-detection correctly selects `orbstack` provider when running.
-  - `create_cluster --dry-run` and `deploy_cluster` fixes verified (grep and guard clause issues resolved).
-  - Docker context confirmed as `orbstack`.
-  - **Full-Stack Integration Results:**
-    - `deploy_istio` (via `deploy_cluster`) successful; all Istio pods Running.
-    - `deploy_vault` fails on macOS during `_vault_ensure_data_path` due to host-side `mkdir -p` attempt on VM-only paths (see `docs/issues/2026-02-24-macos-vault-local-path-creation-failure.md`).
-    - `deploy_jenkins --enable-vault` (no directory service) fails its smoke test due to unresolved JCasC variables (see `docs/issues/2026-02-24-jenkins-none-auth-mode-smoke-test-failure.md`).
-- **Immediate Fix Plan (2026-02-24):** See `docs/plans/orbstack-macos-validation-fix-plan.md`
-  1. `_vault_ensure_data_path` macOS guard merged + validated via
-     `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault ha`.
-  2. Jenkins `none`-auth templating rebuilt — `scripts/plugins/jenkins.sh` now keeps a
-     local security realm, injects `VAULT_PKI_LEAF_HOST` into the controller env, and
-     replaces the matrix permissions list. LDAP/AD smoke tests still pending but
-     baseline deploy succeeds.
-  3. Smoke-test routing fix **implemented 2026-02-25**:
-     - `_jenkins_run_smoke_test` now detects macOS + RFC-1918 ingress IPs, launches a
-       background `kubectl port-forward -n <ns> svc/jenkins 8443:443`, and exports
-       `JENKINS_SMOKE_IP_OVERRIDE=127.0.0.1` so the smoke script talks to the local port
-       with the correct SNI. Exit traps ensure the port-forward PID is killed even when
-       the smoke script fails or is interrupted.
-     - `bin/smoke-test-jenkins.sh` respects both
-       `JENKINS_SMOKE_IP_OVERRIDE` (skip ingress IP lookup / reuse provided IP) and
-       `JENKINS_SMOKE_URL` (full URL override for CI or remote topologies). When no
-       override is present, Linux behavior is unchanged.
-     - doc reference: `docs/issues/2026-02-25-jenkins-smoke-test-ingress-retries.md`.
-- **COMPLETE: m4 bug fix validation (2026-02-25)**
-  - **Vault macOS fix:** ✅ Verified. `deploy_vault` succeeds without host-side `mkdir` errors.
-  - **Jenkins JCasC Fix:** ✅ Verified. Jenkins logs no longer show unresolved `chart-admin-*` variables in `none` auth mode.
-  - **Lib unit tests:** ✅ 53/53 pass (requires `PATH="/opt/homebrew/bin:$PATH"` on macOS for bash 5).
-  - **Orphan cleanup:** ✅ Trap-based cleanup correctly kills background port-forward on failure.
-  - **Smoke test routing:** ✅ Fixed. `_jenkins_run_smoke_test` now queries the Jenkins VirtualService in the active namespace instead of `istio-system`, so custom hostnames are detected correctly. See `docs/issues/2026-02-25-jenkins-smoke-test-hostname-detection-failure.md`.
-  - **Smoke script standalone failure:** ✅ Fixed. `bin/smoke-test-jenkins.sh` now normalizes `SCRIPT_DIR`/`PLUGINS_DIR` to the repo's `scripts/` tree before sourcing helpers, so `_vault_exec` loads without nounset exits whether the script is invoked via the deployer or directly. See `docs/issues/2026-02-25-smoke-script-standalone-dependency-failure.md`.
-  - **Correct validation command** (for Gemini and Codex):
-    ```bash
-    CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault
-    ```
-    Never invoke `bin/smoke-test-jenkins.sh` directly — it must run through the deployer.
-
-- **PENDING: m2-air validation** — only after m4 provider passes (integration issues documented). Pre-builds the Stage 2 CI cluster fixture.
-- **OrbStack installer helper** — `_install_orbstack` (macOS only) installs via `brew install orbstack`, launches OrbStack.app, and waits for `orb status` to pass so scripts can continue. Users still need to complete GUI onboarding when prompted. CI runners (`m2-air`) require OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
+### Priority 3: AD end-to-end validation
+- `--enable-ad` mode: provider-level unit coverage done; end-to-end scenario pending.
+- `--enable-ad-prod`: requires external AD (VPN/corporate environment).
 
 ### PENDING: GitGuardian False Positive Fix
 - Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*` in `scripts/etc/ldap/vars.sh`
-- Also update any referencing scripts
 - See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
 
 ### OPEN ISSUE: Basic LDAP Deploys Empty Directory
 - `deploy_ldap` (standard schema) creates an empty directory with no users.
-- `bootstrap-basic-schema.ldif` is planned but not yet created.
-- Planned test users: `chengkai.liang`, `jenkins-admin`, `test-user` (all password: `test1234`).
-- `--keep-test-users` flag planned for future.
-- **Workaround**: Use `deploy_ad` (AD schema) which comes pre-seeded with test users.
+- `bootstrap-basic-schema.ldif` not yet created.
+- **Workaround**: use `deploy_ad` (pre-seeded with test users).
 
 ### KNOWN BROKEN: `deploy_jenkins` Without `--enable-vault`
-- Vault policy creation always runs during Jenkins deploy; `jenkins-admin` Vault secret
-  is expected but absent when Vault is not deployed.
-- Also: `deploy_jenkins --enable-ldap` without `--enable-vault` is broken for the same
-  reason (LDAP credentials are pulled from Vault).
+- Vault policy creation always runs; `jenkins-admin` Vault secret absent without Vault.
+- Same issue for `deploy_jenkins --enable-ldap` without `--enable-vault`.
 
 ### OPEN INVESTIGATION: LDAP password/JCasC secret interpolation
-- Issue documented in `docs/issues/2025-11-21-ldap-password-envsubst-issue.md`.
-- Current fix attempt (`$${...}` escaping) did not yet produce confirmed working dynamic password refresh behavior.
+- `$${...}` escaping fix not yet confirmed working.
+- See `docs/issues/2025-11-21-ldap-password-envsubst-issue.md`
 
 ### PENDING: Documentation
 - `docs/guides/certificate-rotation.md` — not yet created.
 - `docs/guides/mac-ad-setup.md` — not yet created.
 - `docs/guides/ad-connectivity-troubleshooting.md` — not yet created.
 
+---
+
 ## Merge Criteria for `ldap-develop` → `main`
 
-1. E2E smoke workflow is stable for baseline and key auth/deploy combinations.
-2. End-to-end AD testing passes in at least `--enable-ad` mode.
+1. Stage 2 CI runs green on PR #2.
+2. End-to-end AD testing passes in `--enable-ad` mode.
 3. Pure-logic BATS suites stay green after each change.
 4. No regressions on `deploy_jenkins --enable-vault` baseline path.
 5. Open known-broken paths are either fixed or explicitly documented with guardrails.
 
-## Branch Protection — Applied 2026-02-22
+---
 
-Branch protection is now enabled on `wilddog64/k3d-manager@main`:
-- 1 required PR approval before merge
-- Dismiss stale reviews on new commits
-- Enforce admins — no bypass
+## Branch Protection (as of 2026-02-24)
+
+Enabled on `wilddog64/k3d-manager@main`:
+- 1 required PR approval, stale review dismissal, enforce admins
 - No force pushes, no branch deletion
-- **No required status checks yet** — CI workflow not designed
+- **Required status check:** `lint` job (Stage 1)
+- **After Stage 2 is green:** add `stage2` as a required check (see Codex instructions below)
 
-When CI is ready, update protection via provision-tomcat's `bin/enforce-branch-protection`:
-```bash
-GITHUB_REPO=k3d-manager GITHUB_OWNER=wilddog64 \
-REQUIRED_STATUS_CHECK=<job-name> \
-/path/to/provision-tomcat/bin/enforce-branch-protection
-```
+---
 
-## CI Workflow — Stage 1 Implemented (2026-02-23)
+## CI Workflow Status (2026-02-25)
 
 Plan: `docs/plans/ci-workflow.md`
 
-**Decision:** Local-first mandate remains primary discipline. CI is a final gate, not a development loop.
+**Architecture:**
+- **Stage 1** — ubuntu-latest: shellcheck, bash -n, yamllint, 53 lib BATS. No cluster needed.
+- **Stage 2** — m2-air (self-hosted, macOS ARM64): health check + integration tests. PR only.
+- **Stage 3** — `workflow_dispatch` only: test_jenkins, test_cert_rotation. Not yet created.
 
-**Staged approach:**
-- **Stage 1** — Lightweight gate (no cluster): `shellcheck`, `bash -n`, `yamllint` (workflow files only, not `.yaml.tmpl`), lib unit BATS
-- **Stage 2** — Integration gate (pre-built cluster, self-hosted Mac runner):
-  - **Stage 2.0:** Cluster health check (verify pods Ready, Istio, Vault unsealed)
-  - **Stage 2.1:** Integration tests (`test_vault`, `test_eso`, `test_istio`) on PR only
-- **Stage 3** — Destructive/heavy tests: `test_cert_rotation`, `test_jenkins` via `workflow_dispatch` only
+**Self-hosted runner:** `m2-air` online. Custom `ARM64` label added (system label is `X64` due
+to Rosetta 2 install). Workflow must use `runs-on: [self-hosted, macOS, ARM64]`.
+See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 
-**Pre-built cluster model:** cluster is a persistent fixture on the Mac runner. CI runs test functions against it — no cluster create/destroy per run. Heavy setup cost is paid once.
+**Completed tasks:**
+1. ✅ Stage 1 trigger: `types: [opened, synchronize, reopened]`
+2. ✅ Namespace isolation: `test_vault`, `test_eso`, `test_istio` use ephemeral namespaces
+3. ✅ `test_istio` `apps/v1` regression fixed
+4. ✅ `scripts/ci/check_cluster_health.sh` written and syntax-verified
 
-**Prerequisite:** Refactor `scripts/lib/test.sh` for namespace isolation across all integration tests to prevent state collision.
-
-**Implemented (Stage 1):**
-- `.github/workflows/ci.yml` and `.github/actions/setup/action.yml` added.
-- `.shellcheckrc` baseline with `disable=SC2148`.
-- Shellcheck scoped to files with a Bash shebang.
-- Local Stage 1 passes: shellcheck, bash -n, yamllint, 53 lib unit BATS.
-- PR #2 (`ldap-develop` → `main`) is open. Stage 1 lint job runs when the PR is opened.
-
-**Self-hosted runner:** `m2-air` (macOS, ARM64) — online and registered on `wilddog64/k3d-manager`.
-- **Architecture label issue:** Runner registered with system label `X64` (likely installed under Rosetta 2). Custom `ARM64` label added via API as mitigation. CI workflow files must use `runs-on: [self-hosted, macOS, ARM64]`. Permanent fix: re-register runner natively. See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
-
-**Branch protection:** `main` requires `lint` job to pass before merge (updated 2026-02-24).
-
-**Still not done:**
-- Stage 2/3 CI workflows not implemented yet.
-- Stage 2 prep/automation tracked in `docs/plans/m2-air-stage2-validation.md`.
+**Remaining:**
+5. Add `stage2` job to `ci.yml` **(next — see below)**
+6. Update branch protection to require `stage2`
 
 ---
 
-## CI Next Steps for Codex (2026-02-25)
+## Next Step for Codex — Add Stage 2 Job to ci.yml
 
-**Context:** PR #2 is open. Stage 1 lint job exists. Stage 2 (deployment/integration) workflow
-does NOT exist yet. Two tasks need to happen in order.
+**All prerequisites are complete. This is the only remaining CI implementation task.**
 
-### Task A — Fix Stage 1 trigger ✅ (2026-02-25)
+Add this job to `.github/workflows/ci.yml`, after the closing line of the `lint` job:
 
-- `.github/workflows/ci.yml` now uses `pull_request: types: [opened, synchronize, reopened]`
-  so lint reruns on every commit push or PR reopen (still limited to in-repo PRs via the
-  job-level `if`). Nothing further to do here.
-- **Next action:** push a no-op change (e.g., README touch) to PR #2 to confirm the
-  updated trigger fires the lint job; monitor `gh run list` right after the push.
+```yaml
+  stage2:
+    needs: lint
+    if: ${{ github.event_name == 'pull_request' &&
+            github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: [self-hosted, macOS, ARM64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-### Task B — Implement Stage 2 workflow (requires namespace isolation first)
+      - name: Cluster health check
+        run: bash scripts/ci/check_cluster_health.sh
 
-**Stage 2 must NOT be added to ci.yml until `scripts/lib/test.sh` is refactored for
-namespace isolation.** Without it, parallel test runs will collide on shared namespaces.
+      - name: Run integration tests
+        env:
+          CLUSTER_PROVIDER: orbstack
+        run: |
+          set -euo pipefail
+          ./scripts/k3d-manager test_vault
+          ./scripts/k3d-manager test_eso
+          ./scripts/k3d-manager test_istio
+```
 
-**Prerequisite — namespace isolation refactor (✅ 2026-02-25):**
-- `test_vault`, `test_eso`, and `test_istio` now each generate ephemeral namespaces and
-  cleanup traps inside `scripts/lib/test.sh`, so they no longer collide when multiple
-  Stage 2 jobs run. Follows the strategy documented in `docs/plans/ci-workflow.md`.
+**After adding the job:**
+1. Run `yamllint .github/workflows/ci.yml` locally — must pass before committing.
+2. Push to `ldap-develop`. Stage 1 lint will re-run on PR #2.
+3. Monitor `gh run list` — Stage 2 will queue on m2-air after Stage 1 passes.
+4. If Stage 2 goes green, report back — Claude will update branch protection.
+5. Update `memory-bank/activeContext.md` — mark step 5 ✅ in the Completed tasks list.
 
-**After namespace isolation is done, implement Stage 2 in this order:**
+**Design constraints — do not violate:**
+- `stage2` must declare `needs: lint` — never runs without Stage 1 passing first.
+- `runs-on: [self-hosted, macOS, ARM64]` — never `ubuntu-latest`.
+- `test_jenkins` and `test_cert_rotation` are NOT in Stage 2 — too destructive. Stage 3 only.
+- Do not create a `workflow_dispatch` Stage 3 workflow until Stage 2 is stable.
 
-1. **Create `scripts/ci/check_cluster_health.sh`** — bash script that exits non-zero if:
-   - Any pod in `istio-system`, `vault`, or `external-secrets` is not `Running`/`Ready`
-   - `vault status` shows `Sealed: true`
-   This is the Stage 2.0 health gate.
-
-2. **Add `stage2` job to `.github/workflows/ci.yml`:**
-   ```yaml
-   stage2:
-     needs: lint
-     if: ${{ github.event_name == 'pull_request' &&
-             github.event.pull_request.head.repo.full_name == github.repository }}
-     runs-on: [self-hosted, macOS, ARM64]
-     steps:
-       - name: Checkout
-         uses: actions/checkout@v4
-       - name: Cluster health check
-         run: bash scripts/ci/check_cluster_health.sh
-       - name: Run integration tests
-         env:
-           CLUSTER_PROVIDER: orbstack
-         run: |
-           set -euo pipefail
-           ./scripts/k3d-manager test_vault
-           ./scripts/k3d-manager test_eso
-           ./scripts/k3d-manager test_istio
-   ```
-
-3. **After Stage 2 runs green on a PR**, update branch protection to require the
-   `stage2` job in addition to `lint`. Use provision-tomcat's
-   `bin/enforce-branch-protection` script.
-
-**Design constraints (do not violate):**
-- Stage 2 runs on `pull_request` only — never on `push`.
-- Stage 2 uses `runs-on: [self-hosted, macOS, ARM64]` — the m2-air runner.
-- `test_jenkins` and `test_cert_rotation` are NOT in Stage 2 — too destructive for
-  shared cluster. They belong in a separate `workflow_dispatch` workflow (Stage 3).
-- Do not add `workflow_dispatch` for Stage 3 until Stage 2 is stable.
+**Step 6 — after Stage 2 goes green** (Claude will handle, not Codex):
+```bash
+GITHUB_REPO=k3d-manager GITHUB_OWNER=wilddog64 \
+REQUIRED_STATUS_CHECK=stage2 \
+/path/to/provision-tomcat/bin/enforce-branch-protection
+```
 
 Full design: `docs/plans/ci-workflow.md`
-Validation sequence for m2-air: `docs/plans/m2-air-stage2-validation.md`
-
-### Summary of order
-1. ✅ Fix trigger (`synchronize` + `reopened`)
-2. ✅ Refactor `scripts/lib/test.sh` for namespace isolation
-3. ✅ Fix `test_istio` regression (apiVersion restored)
-4. ✅ Write `scripts/ci/check_cluster_health.sh`
-5. Add Stage 2 job to `ci.yml`
-6. Update branch protection to require Stage 2
+m2-air cluster setup: `./bin/setup-mac-ci-runner.sh` (handles OrbStack, cluster create, Istio/Vault/ESO, health check)
+m2-air validation sequence: `docs/plans/m2-air-stage2-validation.md`
 
 ---
-
-### Task C — Fix `test_istio` apiVersion regression ✅ (2026-02-25)
-
-**File:** `scripts/lib/test.sh`
-**Location:** Inside the heredoc in `test_istio()`, after the `---` separator that
-follows the Namespace manifest.
-
-**Fix:** Deployment block inside the `test_istio()` heredoc now uses `apiVersion: apps/v1`
-again. Verified with `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test lib`.
-
-**Commit message:** `fix: restore apps/v1 apiVersion for Deployment in test_istio`
-
-After the fix, update `memory-bank/activeContext.md` — mark Task C as ✅ and note
-that the namespace isolation refactor is fully correct and unblocks Stage 2 build.
-
-### Task D — Implement Stage 2.0 health probe ✅ (2026-02-25)
-- `scripts/ci/check_cluster_health.sh` now validates Istio ingress rollout, Vault
-  StatefulSet readiness, ESO pods, and Vault unseal status. Verified locally with
-  `PATH="/opt/homebrew/bin:$PATH" ./scripts/ci/check_cluster_health.sh`.
 
 ## Operational Notes
 
-- **Always run `reunseal_vault`** after any cluster restart before attempting other
-  service deployments. Vault seals on pod/node restart.
-- **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`). See
-  `docs/issues/2025-10-19-eso-secretstore-not-ready.md`.
-- **LDAP bind DN mismatch**: Keep `LDAP_BASE_DN` in sync with base DN used in LDIF
-  bootstrap files. See `docs/issues/2025-10-20-ldap-bind-dn-mismatch.md`.
-- **Jenkins readiness timeout behavior**: `_wait_for_jenkins_ready` now uses a longer default timeout,
-  pod-existence precheck, and richer timeout diagnostics. See
-  `docs/issues/2025-11-07-jenkins-pod-readiness-timeout.md`.
-- **GitGuardian false positive** (2026-02-23): `LDAP_PASSWORD_ROTATOR_IMAGE` in
-  `scripts/etc/ldap/vars.sh` triggered GitGuardian's generic password detector — variable
-  name contains "PASSWORD", value is a Docker image. No real secret exposed. Pending fix:
-  rename to `LDAP_ROTATOR_IMAGE` (and related vars). See
-  `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`.
+- **Always run `reunseal_vault`** after any cluster restart before other deployments.
+- **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`).
+  See `docs/issues/2025-10-19-eso-secretstore-not-ready.md`.
+- **LDAP bind DN mismatch**: keep `LDAP_BASE_DN` in sync with LDIF bootstrap base DN.
+  See `docs/issues/2025-10-20-ldap-bind-dn-mismatch.md`.
+- **Jenkins readiness timeout**: `_wait_for_jenkins_ready` uses longer timeout + pod-existence
+  precheck. See `docs/issues/2025-11-07-jenkins-pod-readiness-timeout.md`.
+- **GitGuardian false positive**: `LDAP_PASSWORD_ROTATOR_IMAGE` in `scripts/etc/ldap/vars.sh`
+  triggered detector — variable name has "PASSWORD", value is a Docker image. No real secret.
+  Pending rename to `LDAP_ROTATOR_IMAGE`. See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`.

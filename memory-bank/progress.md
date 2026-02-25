@@ -103,10 +103,10 @@ continued end-to-end validation for auth/deploy modes.
     - Shellcheck baseline: `disable=SC2148`
     - Shellcheck scope: files with Bash shebang only
   - **Stage 2:** integration tests against pre-built cluster (self-hosted Mac runner)
-    - **Stage 2.0:** Cluster health check (verify Vault unseal, Istio, ESO pods)
-    - **Stage 2.1:** Integration suite (Vault, ESO, Istio)
-  - **Stage 3:** destructive tests via `workflow_dispatch` only
-  - **Prerequisite:** Refactor `scripts/lib/test.sh` for namespace isolation across all tests.
+    - **Stage 2.0:** `scripts/ci/check_cluster_health.sh` — implemented ✅
+    - **Stage 2.1:** `test_vault`, `test_eso`, `test_istio` — namespace isolation done ✅
+    - **Next:** add `stage2` job to `ci.yml` (see `memory-bank/activeContext.md`)
+  - **Stage 3:** destructive tests via `workflow_dispatch` only — not yet created
 
 ### Priority 4 (Nice-to-have / future)
 
@@ -130,7 +130,6 @@ continued end-to-end validation for auth/deploy modes.
     - Prerequisite: OrbStack installed on `m2-air`
     - Sequence: `create_cluster` → `deploy_vault ha` → `deploy_eso` → `deploy_istio`
     - If passes: `m2-air` cluster becomes Stage 2 CI fixture
-  - [ ] Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
   - [ ] Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
 - [ ] **Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*`** — fix GitGuardian false positive
   - See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
