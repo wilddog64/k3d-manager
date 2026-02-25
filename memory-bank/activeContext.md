@@ -96,17 +96,49 @@ rotation. It has NOT been merged to `main` yet.
      local security realm, injects `VAULT_PKI_LEAF_HOST` into the controller env, and
      replaces the matrix permissions list. LDAP/AD smoke tests still pending but
      baseline deploy succeeds.
-  3. Smoke-test routing fix plan (Codex to implement, separate commit):
-     - `_jenkins_run_smoke_test` (not the smoke script) detects macOS + RFC-1918 ingress
-       IP (`^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)`) and spins up a background
-       `kubectl port-forward -n jenkins svc/jenkins 8443:443`.
-     - `trap` registered *before* port-forward starts — PID cleanup fires on EXIT/INT/TERM
-       even if the smoke script errors or hangs.
-     - Smoke script called with `127.0.0.1:8443` + `--resolve jenkins.dev.local.me:443:127.0.0.1`
-       to preserve correct TLS SNI. Do not use `-k`/`--insecure`.
-     - `JENKINS_SMOKE_URL` as CI escape-hatch only. Linux path completely unchanged.
-     - Risk: medium — trap-before-start ordering and three exit scenarios (pass/fail/hang)
-       must be verified. See `docs/issues/2026-02-25-jenkins-smoke-test-ingress-retries.md`.
+  3. Smoke-test routing fix **implemented 2026-02-25**:
+     - `_jenkins_run_smoke_test` now detects macOS + RFC-1918 ingress IPs, launches a
+       background `kubectl port-forward -n <ns> svc/jenkins 8443:443`, and exports
+       `JENKINS_SMOKE_IP_OVERRIDE=127.0.0.1` so the smoke script talks to the local port
+       with the correct SNI. Exit traps ensure the port-forward PID is killed even when
+       the smoke script fails or is interrupted.
+     - `bin/smoke-test-jenkins.sh` respects both
+       `JENKINS_SMOKE_IP_OVERRIDE` (skip ingress IP lookup / reuse provided IP) and
+       `JENKINS_SMOKE_URL` (full URL override for CI or remote topologies). When no
+       override is present, Linux behavior is unchanged.
+     - doc reference: `docs/issues/2026-02-25-jenkins-smoke-test-ingress-retries.md`.
+- **Gemini validation instructions (smoke-test routing fix — run on m4):**
+  Gemini's role is test-and-document only — no code changes.
+  Run the following sequence in order; document results in `docs/issues/` and
+  `memory-bank/` but do not attempt to fix failures:
+  ```bash
+  # 1. Confirm lib unit tests still pass
+  PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test lib
+
+  # 2. Full deploy sequence (Vault must be unsealed first if cluster already exists)
+  CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault ha
+  CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault
+  ```
+  **What to observe and record:**
+  - `deploy_jenkins` must complete without any WARN about smoke test failure.
+  - Confirm `kubectl port-forward` is NOT left running after deploy completes:
+    `ps aux | grep port-forward` — no jenkins port-forward process should remain.
+  - Confirm Jenkins pod is Running: `kubectl get pods -n jenkins`.
+  - Confirm smoke test log shows `[PASS]` lines (not `[FAIL]`).
+
+  **Three exit scenarios to verify (in addition to the happy path above):**
+  1. **Smoke fails:** temporarily break connectivity (e.g., wrong namespace) and confirm
+     port-forward is still cleaned up — no orphan in `ps aux | grep port-forward`.
+  2. **Port-forward fails to start:** confirm error is logged to stderr and deploy exits
+     with a non-zero warning (not a silent hang).
+  3. **Happy path with `--enable-ldap`:** run
+     `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault --enable-ldap`
+     and confirm LDAP path still works (no regression from the port-forward changes).
+
+  If all pass: update `docs/issues/2026-02-25-jenkins-smoke-test-ingress-retries.md`
+  Verification section and mark `memory-bank/progress.md` row as FIXED.
+  If any fail: document in a new `docs/issues/` file and do not mark as fixed.
+
 - **PENDING: m2-air validation** — only after m4 provider passes (integration issues documented). Pre-builds the Stage 2 CI cluster fixture.
 - **OrbStack installer helper** — `_install_orbstack` (macOS only) installs via `brew install orbstack`, launches OrbStack.app, and waits for `orb status` to pass so scripts can continue. Users still need to complete GUI onboarding when prompted. CI runners (`m2-air`) require OrbStack pre-installed manually — see `docs/plans/ci-workflow.md` Pre-Built Cluster Setup section.
 
