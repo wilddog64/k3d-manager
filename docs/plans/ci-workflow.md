@@ -74,6 +74,7 @@ cleanup traps in `scripts/lib/test.sh`. No shared state left behind between runs
 **Namespace Isolation Strategy:**
 - All integration tests MUST be refactored to use ephemeral, randomly named namespaces (similar to `test_jenkins` using `JENKINS_NS_GENERATED`).
 - This prevents cross-test state collision and is a prerequisite for parallelizing Stage 2.
+- **Status (2026-02-25):** Done. `test_vault`, `test_eso`, and `test_istio` now generate unique namespaces via `_test_lib_random_name` in `scripts/lib/test.sh` and register parameterized cleanup traps so resources never collide between runs.
 
 **Not included in Stage 2 (too destructive for shared cluster):**
 - `test_jenkins` — deploys/tears down Jenkins; use `workflow_dispatch`
@@ -195,7 +196,7 @@ Once Stage 2 is stable, add integration job as a required check as well.
 1. [x] Decide on self-hosted runner — install GitHub Actions runner on Mac (runner: m2-air, online)
 2. [x] Create `.github/actions/setup/action.yml` — install bats, shellcheck, yamllint
 3. [x] Create `.github/workflows/ci.yml` — Stage 1 jobs (shellcheck + bash-n + yamllint on workflows + unit BATS)
-4. [ ] **Refactor `test.sh` for namespace isolation across all integration tests**
+4. [x] **Refactor `test.sh` for namespace isolation across all integration tests** (namespaces randomized via `_test_lib_random_name`)
 5. [x] Verify Stage 1 passes on current codebase
 6. [x] Update branch protection to require Stage 1 check
 7. [ ] Pre-build cluster on Mac runner
