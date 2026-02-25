@@ -113,7 +113,7 @@ rotation. It has NOT been merged to `main` yet.
   - **Lib unit tests:** ✅ 53/53 pass (requires `PATH="/opt/homebrew/bin:$PATH"` on macOS for bash 5).
   - **Orphan cleanup:** ✅ Trap-based cleanup correctly kills background port-forward on failure.
   - **Smoke test routing:** ✅ Code fix merged (`istio-system/svc/istio-ingressgateway`). Validation still pending — see below.
-  - **Smoke script standalone failure (new):** Gemini attempted to run `bin/smoke-test-jenkins.sh` directly and hit silent dependency failures — library functions (`_kubectl`, `_vault_exec`) are undefined outside the deployer context. The `|| true` on source calls swallows errors silently. Fix: add a fast-fail guard at the top of the script that detects missing dependencies and prints the correct invocation hint. See `docs/issues/2026-02-25-smoke-script-standalone-dependency-failure.md`.
+  - **Smoke script standalone failure:** ✅ Guard now enforces deployer invocation. `bin/smoke-test-jenkins.sh` checks for `_kubectl` after sourcing attempts and exits with a clear "run via deploy_jenkins" hint if the helper is not defined, preventing silent dependency errors. See `docs/issues/2026-02-25-smoke-script-standalone-dependency-failure.md` for details.
   - **Correct validation command** (for Gemini and Codex):
     ```bash
     CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault
