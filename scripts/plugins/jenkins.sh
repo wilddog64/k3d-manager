@@ -942,6 +942,8 @@ function _jenkins_run_smoke_test() {
 
    local smoke_port=443
    local pf_port=8443
+   local pf_namespace="istio-system"
+   local pf_service="istio-ingressgateway"
    local -a smoke_cmd
    local smoke_rc=0
 
@@ -953,7 +955,7 @@ function _jenkins_run_smoke_test() {
    _info "[jenkins] running smoke test (namespace=${namespace}, host=${jenkins_host}, auth_mode=${auth_mode})"
 
    if (( use_port_forward )); then
-      _info "[jenkins] ingress IP ${ingress_ip} is private; using kubectl port-forward to 127.0.0.1:${pf_port}"
+      _info "[jenkins] ingress IP ${ingress_ip} is private; using kubectl port-forward to ${pf_namespace}/${pf_service} -> 127.0.0.1:${pf_port}"
       (
          local pf_pid=""
          local port_forward_log=""
@@ -974,7 +976,7 @@ function _jenkins_run_smoke_test() {
          if [[ -z "$log_target" ]]; then
             log_target="/dev/null"
          fi
-         kubectl -n "$namespace" port-forward svc/jenkins "${pf_port}:443" >"$log_target" 2>&1 &
+         kubectl -n "$pf_namespace" port-forward "svc/${pf_service}" "${pf_port}:443" >"$log_target" 2>&1 &
          pf_pid=$!
 
          local ready=0
