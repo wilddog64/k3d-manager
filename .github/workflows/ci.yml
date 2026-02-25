@@ -2,14 +2,8 @@
 name: CI
 
 "on":
-  push:
-    branches:
-      - '**'
-    paths-ignore:
-      - 'docs/**'
-      - 'memory-bank/**'
-      - '**/*.md'
   pull_request:
+    types: [opened, reopened, synchronize]
     branches:
       - main
     paths-ignore:
@@ -26,6 +20,7 @@ concurrency:
 
 jobs:
   lint:
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

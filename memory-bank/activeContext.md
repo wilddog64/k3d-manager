@@ -203,6 +203,8 @@ Plan: `docs/plans/ci-workflow.md`
 - **2026-02-25:** Workflow now triggers on `pull_request` (base `main`) as well as `push`,
   so Stage 1 linting always runs for PRs even when the latest commits are docs-only. See
   `docs/issues/2026-02-25-ci-workflow-pr-trigger-missing.md`.
+- **2026-02-25 (later):** Stage 1 workflow limited to `pull_request` events only and skips
+  forked repos via `if: head.repo == github.repository` so only in-repo PRs trigger lint.
 
 **Self-hosted runner:** `m2-air` (macOS, ARM64) — online and registered on `wilddog64/k3d-manager`.
 - **Architecture label issue:** Runner registered with system label `X64` (likely installed under Rosetta 2). Custom `ARM64` label added via API as mitigation. CI workflow files must use `runs-on: [self-hosted, macOS, ARM64]`. Permanent fix: re-register runner natively. See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
