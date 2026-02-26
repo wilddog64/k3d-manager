@@ -29,6 +29,21 @@ Provide a single-command developer experience for:
 - Multi-node HA setups.
 - Any cloud provisioning beyond the Azure ESO backend plugin.
 
+## Why This Stack (Component Origin Story)
+
+Each component exists because of a real gap, reasoned through sequentially — not from a design doc:
+
+- **Jenkins** → needed a CI/CD target that mirrors enterprise reality
+- **Credentials problem** → Jenkins needs passwords; where to store them safely?
+  - Tried **BitWarden** first (already used personally) — `eso_config_bitwarden` was actually implemented
+  - Considered **LastPass** (used at work via `lastpass-cli`) — not suitable for automation
+  - Landed on **Vault** — proper secret store for programmatic access
+- **ESO** → Vault doesn't inject secrets into pods natively; ESO bridges Vault → Kubernetes secrets
+- **Istio** → needed real service mesh to validate enterprise-like networking locally
+- **LDAP/AD** → enterprises authenticate against directory services; needed local testing without a real AD
+
+The `SECRET_BACKEND` abstraction exists because backends were *actually swapped* during development — the commit history shows BitWarden and Azure ESO plugins built before Vault became the primary backend. Git log is the lab notebook.
+
 ## Primary Users
 
 Solo developer / small team validating Kubernetes service integration locally before
