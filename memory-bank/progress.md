@@ -128,7 +128,7 @@ continued end-to-end validation for auth/deploy modes.
     - Full-stack tests documented two integration issues (`deploy_vault` path creation and `deploy_jenkins` none-auth smoke test).
   - [ ] **m2-air validation** — full stack test required before Phase 1+2 considered production-ready
     - Prerequisite: OrbStack installed on `m2-air`
-    - Sequence: `create_cluster` → `deploy_vault ha` → `deploy_eso` → `deploy_istio`
+    - Sequence: `create_cluster` → `deploy_vault` → `reunseal_vault` (ESO included in deploy_vault; Istio included in create_cluster)
     - If passes: `m2-air` cluster becomes Stage 2 CI fixture
   - [ ] Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
 - [ ] **Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*`** — fix GitGuardian false positive
@@ -165,7 +165,7 @@ continued end-to-end validation for auth/deploy modes.
 | GitGuardian false positive: `LDAP_PASSWORD_ROTATOR_IMAGE` | FALSE POSITIVE | Variable name contains "PASSWORD", value is a Docker image. Fix: rename to `LDAP_ROTATOR_IMAGE`. See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md` |
 | OrbStack: `deploy_cluster` unsupported provider | FIXED | Added `orbstack` to the provider guard in `scripts/lib/core.sh`. See `docs/issues/2026-02-24-orbstack-unsupported-provider-in-core.md`. |
 | OrbStack: `--dry-run` flag broken in `create_cluster` | FIXED | `create_cluster` now parses `--dry-run` and the k3d provider uses `grep -q --` to avoid option parsing. See `docs/issues/2026-02-24-orbstack-dry-run-errors.md`. |
-| `deploy_vault` fails on macOS — host path mkdir | FIXED | `_vault_ensure_data_path` now skips host `mkdir` on macOS; validation via `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault ha`. See `docs/issues/2026-02-24-macos-vault-local-path-creation-failure.md`. |
+| `deploy_vault` fails on macOS — host path mkdir | FIXED | `_vault_ensure_data_path` now skips host `mkdir` on macOS; validation via `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault`. See `docs/issues/2026-02-24-macos-vault-local-path-creation-failure.md`. |
 | Jenkins `none` auth mode smoke test failure | FIXED | Local realm + matrix permissions rebuilt via `scripts/plugins/jenkins.sh` awk patch. Jenkins deploy succeeds; issue documented in `docs/issues/2026-02-24-jenkins-none-auth-mode-smoke-test-failure.md`. |
 | Jenkins smoke test fails on macOS — Istio LB IP unreachable | FIXED | `_jenkins_run_smoke_test` now tunnels through `istio-system/svc/istio-ingressgateway` so the fallback hits a real HTTPS listener; rest of the RFC-1918 detection + trap cleanup stays unchanged. See `docs/issues/2026-02-25-jenkins-smoke-test-routing-service-mismatch.md`. |
 | Smoke script silent failure (unbound PLUGINS_DIR) | FIXED | `bin/smoke-test-jenkins.sh` normalized paths to allow standalone and orchestrated library sourcing. |

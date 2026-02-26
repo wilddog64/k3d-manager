@@ -276,7 +276,7 @@ on the `m2-air` self-hosted runner which is also the Stage 2 CI machine.
 **Validation sequence:**
 ```bash
 CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster
-./scripts/k3d-manager deploy_vault ha
+./scripts/k3d-manager deploy_vault
 ./scripts/k3d-manager deploy_eso
 ./scripts/k3d-manager deploy_istio
 ./scripts/k3d-manager reunseal_vault

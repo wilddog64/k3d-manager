@@ -91,7 +91,7 @@ if [[ "${SKIP_VAULT:-0}" == "1" ]]; then
   _info "SKIP_VAULT=1 — skipping Vault deploy."
 else
   _info "Deploying Vault (HA mode)..."
-  CLUSTER_PROVIDER="$CLUSTER_PROVIDER" "$K3D_MANAGER" deploy_vault ha
+  CLUSTER_PROVIDER="$CLUSTER_PROVIDER" "$K3D_MANAGER" deploy_vault
   _ok "Vault deployed."
 fi
 
