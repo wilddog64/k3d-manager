@@ -159,6 +159,7 @@ continued end-to-end validation for auth/deploy modes.
 | Basic LDAP deploys empty directory | OPEN | No bootstrap LDIF yet; use `deploy_ad` as workaround |
 | LDAP password JCasC/envsubst interpolation | OPEN | `$${...}` escape attempt not yet confirmed working |
 | `test_cert_rotation` via dispatcher | OPEN | Manual cert rotation works; dispatcher flow still unreliable/hangs |
+| `test_vault` fails — ClusterRoleBinding conflict | OPEN | `test_vault` tries to deploy a second Vault release into a random namespace; `vault-server-binding` is cluster-scoped and owned by existing `vault` release. Cleanup deletes it, corrupting live Vault. Fix: refactor to test against existing deployment like `test_eso` does. See `docs/issues/2026-02-26-test-vault-clusterrolebinding-conflict.md` |
 | ESO SecretStore `mountPath` wrong | FIXED | Must be `kubernetes` not `auth/kubernetes` |
 | LDAP bind DN mismatch | FIXED | Keep `LDAP_BASE_DN` consistent with LDIF base DN |
 | Jenkins pod readiness timeout | FIXED | 10m timeout + pod existence check |
