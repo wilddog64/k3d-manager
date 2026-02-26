@@ -135,6 +135,19 @@ continued end-to-end validation for auth/deploy modes.
   - See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
   - Affects: `scripts/etc/ldap/vars.sh` and any referencing scripts
 
+- [ ] **AI-powered code review via GitHub Actions**
+  - Automate PR analysis using a cost-optimized model (Claude Haiku or GPT-4o-mini — ~20x cheaper than GPT-4o)
+  - Inspired by: https://dev.to/paul_robertson_e844997d2b/ai-powered-code-review-automate-pull-request-analysis-with-github-actions-j90
+  - Key capabilities to implement:
+    - Smart filtering: skip generated files, files >50KB, vendored paths
+    - Differential analysis: review only changed lines, not entire files
+    - Inline PR comments via GitHub API (not just summary)
+    - Severity-based output (blocker / warning / suggestion)
+  - Builds on existing workflow: Copilot already opens sub-PRs with real code changes
+  - Formalize the counter-argue protocol already in `.clinerules` as a required review gate
+  - Consider: model-diff validation step (compare Claude vs GPT-4o disagreements on same diff)
+    - Reference: https://dev.to/lakshmisravyavedantham/i-built-a-tool-that-shows-exactly-where-gpt-4-and-claude-disagree-the-results-were-surprising-2n65
+
 ---
 
 ## Known Bugs / Gaps
