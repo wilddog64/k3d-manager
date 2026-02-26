@@ -572,7 +572,7 @@ function test_eso() {
   if ! _kubectl --no-exit get ns "$vault_ns" >/dev/null 2>&1 || \
      ! _kubectl --no-exit -n "$vault_ns" get secret vault-root >/dev/null 2>&1; then
     _info "Vault not detected; deploying..."
-    "${SCRIPT_DIR}/k3d-manager" deploy_vault ha "$vault_ns" "$vault_release"
+    "${SCRIPT_DIR}/k3d-manager" deploy_vault "$vault_ns" "$vault_release"
     vault_started=1
   fi
 
@@ -678,7 +678,7 @@ function test_vault() {
   trap "_cleanup_vault_test '$test_ns'" EXIT TERM
 
   # Deploy Vault in HA mode
-  "${SCRIPT_DIR}/k3d-manager" deploy_vault ha "$test_ns" "$vault_release"
+  "${SCRIPT_DIR}/k3d-manager" deploy_vault "$test_ns" "$vault_release"
 
   # Prepare test namespace and service account
   _kubectl create namespace "$test_ns"

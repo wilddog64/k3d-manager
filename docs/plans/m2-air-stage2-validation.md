@@ -36,7 +36,7 @@ Perform these steps sequentially on `m2-air` whenever Stage 2 needs to be (re)qu
    ```bash
    CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster
    CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_istio
-   CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault ha
+   CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault
    CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_eso
    CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager reunseal_vault
    ```

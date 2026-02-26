@@ -160,7 +160,7 @@ the Stage 1 setup action and does not require manual pre-installation.
 
 ```bash
 CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster
-./scripts/k3d-manager deploy_vault ha
+./scripts/k3d-manager deploy_vault
 ./scripts/k3d-manager deploy_eso
 ./scripts/k3d-manager deploy_istio
 ./scripts/k3d-manager reunseal_vault
