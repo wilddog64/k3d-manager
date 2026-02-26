@@ -5,12 +5,13 @@
 Active development branch for Active Directory integration, certificate rotation,
 OrbStack provider, and Stage 2 CI. **Not yet merged to `main`.**
 
-## Current Focus (as of 2026-02-25)
+## Current Focus (as of 2026-02-26)
 
 Complete Stage 2 CI workflow and prepare `ldap-develop` for merge to `main`.
 - Stage 1 lint: ✅ green on PR #2
-- Stage 2 job: next task for Codex (see below)
-- m2-air cluster pre-build: pending — run `./bin/setup-mac-ci-runner.sh` on m2-air when ready
+- m2-air cluster: ✅ OrbStack installed, `test_istio` passing
+- **Blocker: `test_vault` broken** — must be fixed before Stage 2 job is added to `ci.yml`
+- Stage 2 job: blocked on `test_vault` fix (see below)
 
 ---
 
@@ -140,16 +141,45 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 2. ✅ Namespace isolation: `test_vault`, `test_eso`, `test_istio` use ephemeral namespaces
 3. ✅ `test_istio` `apps/v1` regression fixed
 4. ✅ `scripts/ci/check_cluster_health.sh` written and syntax-verified
+5. ✅ m2-air: OrbStack installed, cluster up, `test_istio` passing (2026-02-26)
 
 **Remaining:**
-5. Add `stage2` job to `ci.yml` **(next — see below)**
-6. Update branch protection to require `stage2`
+6. 🔴 Fix `test_vault` ClusterRoleBinding conflict (Codex) → validate on m2-air (Gemini)
+7. Add `stage2` job to `ci.yml` (Codex, after step 6)
+8. Update branch protection to require `stage2`
 
 ---
 
-## Next Step for Codex — Add Stage 2 Job to ci.yml
+## Next Step for Codex — Fix test_vault (BLOCKER)
 
-**All prerequisites are complete. This is the only remaining CI implementation task.**
+**This must be fixed before Stage 2 job is added to ci.yml.**
+
+Issue: `docs/issues/2026-02-26-test-vault-clusterrolebinding-conflict.md`
+
+`test_vault` (in `scripts/lib/test.sh` ~line 670) calls `deploy_vault "$test_ns" "$vault_release"`
+where `$test_ns` is a random namespace. This tries to install a second Vault Helm release, which
+conflicts with the cluster-scoped `vault-server-binding` ClusterRoleBinding already owned by the
+existing `vault` release. The cleanup trap then deletes `vault-server-binding`, corrupting the
+live Vault deployment.
+
+**Required fix:**
+- Remove the `deploy_vault` call from `test_vault` entirely
+- Use `vault_ns="vault"` (the existing deployment) — same pattern as `test_eso`
+- Add a pre-check: if Vault is not running in the `vault` namespace, print an error and exit
+- Cleanup should only remove test-specific resources (test namespace, Vault role, seeded secret)
+- Never touch the Vault Helm release or `vault-server-binding` in cleanup
+
+**Reference:** `test_eso` (line 556) already follows the correct pattern — check if Vault
+is running, use the existing instance, clean up only what the test created.
+
+**After fix:** Gemini to validate on m2-air by running `./scripts/k3d-manager test_vault`
+against the existing cluster (Vault already deployed via `deploy_vault`).
+
+---
+
+## Next Step for Codex — Add Stage 2 Job to ci.yml (after test_vault fix)
+
+**All prerequisites are complete once test_vault is fixed.**
 
 Add this job to `.github/workflows/ci.yml`, after the closing line of the `lint` job:
 
