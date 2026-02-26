@@ -358,11 +358,50 @@ When making changes to this codebase:
 
 ## Security Notes
 
-- `_run_command` handles sudo probing and permission escalation safely
-- `_args_have_sensitive_flag` detects sensitive CLI arguments to disable trace
-- Trace output auto-disables for commands with `--password`, `--token`, `--username` flags
-- PKI certificates auto-rotate; old certs are revoked in Vault after rotation
-- External Secrets Operator syncs credentials from Vault without exposing them in git
+### OWASP-Aligned Rules for Agents
+
+These rules apply whenever adding or modifying code. Treat violations as bugs — catch before commit.
+
+**Shell Injection (OWASP A03)**
+- Always double-quote variable expansions in bash: `"$var"`, never bare `$var` in command arguments.
+- Never pass external or user-supplied input to `eval`.
+- Use `--` to separate options from arguments in CLI calls where arguments may contain hyphens.
+- Variables expanded via `envsubst` in `*.yaml.tmpl` files must not contain shell metacharacters — validate before substitution.
+
+**Least Privilege (OWASP A01)**
+- New Vault policies must grant only the minimum required paths (`read` unless `write` is explicitly needed).
+- New Kubernetes ServiceAccounts must not use `cluster-admin`. Use namespace-scoped Role + RoleBinding.
+- New ClusterRoles must be justified — prefer namespace-scoped resources.
+- GitHub Actions workflows must use `permissions: contents: read` unless elevated access is explicitly required.
+
+**Cryptographic Failures (OWASP A02)**
+- `AD_TLS_CONFIG=TRUST_ALL_CERTIFICATES` and `insecureSkipVerify: true` are dev-only patterns.
+  Never introduce them in new production config paths — document the dev-only constraint when adding.
+- Vault PKI leaf cert TTL must stay short (≤720h). Do not increase `VAULT_PKI_ROLE_TTL` without justification.
+- Never add `--insecure` or `-k` to scripts that may run against production endpoints.
+- New TLS-consuming code must use proper CA validation outside local dev contexts.
+
+**Secret Hygiene (OWASP A02 — extends existing rule)**
+- Vault tokens must never appear in script arguments visible in shell history or CI logs. Use env vars or stdin.
+- New sensitive CLI flags must be registered in `_args_have_sensitive_flag` in `scripts/lib/system.sh`.
+- Test credentials (`alice/password`, etc.) are dev-only — never reference them in production config paths.
+- No secrets in `kubectl exec` command strings that appear in logs.
+
+**Security Misconfiguration (OWASP A05)**
+- Every new deployed service must use its own namespace — never the `default` namespace.
+- `set -euo pipefail` is mandatory on all new bash scripts.
+- New Helm chart installations must pin chart versions explicitly — no floating `latest`.
+
+**Supply Chain Integrity (OWASP A08)**
+- GitHub Actions steps must pin to a version tag (`@v4`) — never `@main` or `@latest`.
+- New container image references in `*.yaml.tmpl` files must use a pinned tag, not `latest`.
+
+### Existing Protections (do not remove or weaken)
+- `_run_command` handles sudo probing and permission escalation safely.
+- `_args_have_sensitive_flag` detects sensitive CLI arguments to disable trace.
+- Trace output auto-disables for commands with `--password`, `--token`, `--username` flags.
+- PKI certificates auto-rotate; old certs are revoked in Vault after rotation.
+- External Secrets Operator syncs credentials from Vault without exposing them in git.
 
 ## Common Troubleshooting
 

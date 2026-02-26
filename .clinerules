@@ -342,13 +342,41 @@ Vault seals itself on every pod/node restart. Recovery helpers:
 
 ## Security Rules
 
+Full OWASP-aligned rules are in `CLAUDE.md` → Security Notes. Key checklist:
+
+**Shell / Injection (A03)**
+- Always double-quote bash variable expansions: `"$var"` not `$var`.
+- Never use `eval` with external input.
+- Use `--` separator in CLI calls where arguments may contain hyphens.
+
+**Least Privilege (A01)**
+- New Vault policies: `read`-only unless `write` is explicitly required.
+- New ServiceAccounts: namespace-scoped Role/RoleBinding, never `cluster-admin`.
+- GitHub Actions workflows: `permissions: contents: read` as baseline.
+
+**Cryptographic / TLS (A02)**
+- `TRUST_ALL_CERTIFICATES` and `insecureSkipVerify: true` are dev-only — document it.
+- Never add `--insecure` / `-k` to production-path scripts.
+- Vault PKI leaf TTL ≤720h. Do not raise without justification.
+
+**Secrets (A02)**
 - Never commit secrets or credentials to git.
-- Use `${PLACEHOLDER}` variables in all templates.
+- Use `${PLACEHOLDER}` variables in all templates; store secrets in Vault.
+- New sensitive CLI flags → register in `_args_have_sensitive_flag` in `system.sh`.
 - `_run_command` probes sudo safely; never call `sudo` directly.
-- `_args_have_sensitive_flag` auto-disables trace for commands with
-  `--password`, `--token`, `--username`.
-- Default TLS config is `TRUST_ALL_CERTIFICATES` for dev only; document
-  production requirement for proper CA validation.
+- Vault tokens via env vars or stdin — never in CLI arguments.
+
+**Misconfiguration (A05)**
+- New services must use their own namespace — never `default`.
+- `set -euo pipefail` mandatory on all new bash scripts.
+- Helm installs must pin chart versions — no `latest`.
+
+**Supply Chain (A08)**
+- GitHub Actions: pin to version tags (`@v4`), never `@main` or `@latest`.
+- Container images in `*.yaml.tmpl`: pinned tags only, never `latest`.
+
+**Existing protections — do not remove:**
+- `_args_have_sensitive_flag` auto-disables trace for `--password`, `--token`, `--username`.
 - Vault PKI auto-revokes old certs after rotation.
 
 ---
