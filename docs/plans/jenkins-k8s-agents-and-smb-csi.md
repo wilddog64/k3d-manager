@@ -647,13 +647,18 @@ kubectl get svc -n jenkins jenkins-agent
   - Document Windows setup for hybrid clusters
   - Use external Windows CI/CD if needed
 
-### Risk 2: SMB Server Not Available
-- **Impact:** Medium (can't test SMB CSI)
-- **Probability:** Medium
-- **Mitigation:**
-  - Use Samba server in Docker container
-  - Or skip SMB CSI initially
-  - Use NFS as alternative
+### Risk 2: SMB CSI Not Mountable on macOS (k3d/OrbStack)
+- **Impact:** High (SMB CSI validation blocked on macOS dev machines)
+- **Probability:** High (affects all macOS developers)
+- **Root cause:** SMB CSI node plugin calls `mount.cifs` inside k3d node containers.
+  Standard `rancher/k3s` images do not include `cifs-utils`, and the Docker Desktop /
+  OrbStack Linux VM kernel may not expose the `cifs` module to containers.
+- **Mitigation:** See `docs/plans/smb-csi-macos-workaround.md` for three options:
+  1. NFS CSI swap (recommended for local dev — NFS works out of the box on k3d nodes)
+  2. Custom k3d node image with `cifs-utils` pre-installed
+  3. Production validation on Linux only via k3s provider
+- **SMB server availability:** Separate from the kernel issue. For either workaround,
+  use an in-cluster Samba container (`servercontainers/samba`) as the SMB/NFS server.
 
 ### Risk 3: Agent Pod Resource Exhaustion
 - **Impact:** Medium (cluster slowdown)
