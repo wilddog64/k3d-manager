@@ -15,6 +15,7 @@ Complete Stage 2 CI workflow and prepare `ldap-develop` for merge to `main`.
 
 ### Session Notes (2026-02-27)
 - Codex re-synced docs + memory-bank; applied the remaining `test_eso` fixes (apiVersion, HTTP server, jsonpath quoting) and revalidated locally with `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_eso` ✅.
+- Codex fixed `test_istio` namespace references so the randomized `$test_ns` is used everywhere and validated locally via `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_istio` ✅.
 - Gemini validated Jenkins smoke test fixes (VirtualService hostname detection, standalone script path normalization) — confirmed FIXED as documented. However, Gemini still has not run `test_vault`, `test_eso`, `test_istio` on m2-air after the latest fixes; Step 8 remains pending.
 
 ---
@@ -151,9 +152,7 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 7. ✅ Stage 2 job added to `.github/workflows/ci.yml` (2026-02-26)
 
 **Remaining:**
-8. 🔴 **Blocked on Codex fix** — `test_istio` hardcoded namespace (see Next Step for Codex below)
-   - 2026-02-27: `test_vault` passed ✅; `test_eso` passed ✅; `test_istio` failed 🔴 — sidecar check and Gateway/VirtualService apply use hardcoded `-n istio-test` instead of `"$test_ns"`.
-   - After Codex fixes: Gemini to re-run `test_istio` → `test_vault` on m2-air (`test_eso` already confirmed green).
+8. Gemini: re-run `test_eso`, `test_istio`, `test_vault` on m2-air (Stage 2 Step 8) now that all fixes are merged; capture outputs per instructions, then update this file.
 9. Claude: update branch protection to require `stage2` (after step 8 green)
 
 ---
@@ -164,12 +163,13 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 
 ---
 
-## Update — `test_istio` failure (2026-02-27)
+## Update — `test_istio` hardcoded namespace (2026-02-27)
 
-- Status: 🔴 Failed. `scripts/lib/test.sh:test_istio` failed during sidecar verification. The test correctly deployed to a dynamic namespace (e.g., `istio-test-12345`), but the check for `istio-proxy` was hardcoded to `-n istio-test`.
-- Evidence: Multiple hardcoded references to `istio-test` found in `scripts/lib/test.sh` (lines 178, 191, 194, 203).
-- Impact: Stage 2 CI validation is still blocked.
-- Action: Documented in `docs/issues/2026-02-27-test-istio-hardcoded-namespace.md`. Fix requires replacing `istio-test` with `"$test_ns"`.
+- Status: ✅ Fixed. `scripts/lib/test.sh:test_istio` now uses the generated `$test_ns` for all
+  resources (sidecar check, gateway/virtualservice applies, and lookups). Validated locally via
+  `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_istio`.
+- Docs: `docs/issues/2026-02-27-test-istio-hardcoded-namespace.md` updated with the fix details.
+- Action: Gemini must rerun `./scripts/k3d-manager test_istio` on m2-air during Stage 2 Step 8.
 
 ---
 
