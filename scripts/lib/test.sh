@@ -629,7 +629,7 @@ EOF
   _kubectl -n "$es_ns" wait --for=condition=Ready externalsecret/${es_name} --timeout=120s
 
   local synced
-  synced=$(_kubectl -n "$es_ns" get secret "$es_name" -o jsonpath='{.data.${secret_key}}' | base64 -d)
+  synced=$(_kubectl -n "$es_ns" get secret "$es_name" -o jsonpath="{.data.${secret_key}}" | base64 -d)
 
   if [[ "$synced" == "$secret_val" ]]; then
     _info "ESO synced secret successfully."

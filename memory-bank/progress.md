@@ -162,7 +162,7 @@ continued end-to-end validation for auth/deploy modes.
 | `test_vault` fails — ClusterRoleBinding conflict | FIXED | 2026-02-26: test now reuses the existing `vault` namespace/release, validates readiness up front, and only cleans up the test namespace, Vault role, and seeded secret. See `docs/issues/2026-02-26-test-vault-clusterrolebinding-conflict.md`. |
 | `test_eso` fails — ClusterSecretStore API version mismatch | FIXED | 2026-02-27: `v1beta1` → `v1` in `scripts/lib/test.sh` line 591. Detected on m2-air by Gemini. See `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md`. |
 | `test_eso` fails — `insecureSkipVerify` removed in ESO v1 | FIXED | 2026-02-27: Vault uses HTTP internally; switched server URL to `http://` and removed `tls` block. See `docs/issues/2026-02-27-test-eso-v1-schema-incompatibility.md`. |
-| `test_eso` fails — jsonpath single-quote interpolation | OPEN | Line 634: `jsonpath='{.data.${secret_key}}'` — single quotes prevent `${secret_key}` expansion. Fix: change to double quotes. Codex to implement. See `docs/issues/2026-02-27-test-eso-jsonpath-interpolation-failure.md`. |
+| `test_eso` fails — jsonpath single-quote interpolation | FIXED | 2026-02-27: switched to double quotes so `${secret_key}` expands before `kubectl` runs. Locally validated via `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_eso`. See `docs/issues/2026-02-27-test-eso-jsonpath-interpolation-failure.md`. |
 | ESO SecretStore `mountPath` wrong | FIXED | Must be `kubernetes` not `auth/kubernetes` |
 | LDAP bind DN mismatch | FIXED | Keep `LDAP_BASE_DN` consistent with LDIF base DN |
 | Jenkins pod readiness timeout | FIXED | 10m timeout + pod existence check |
