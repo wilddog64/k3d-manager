@@ -588,7 +588,7 @@ function test_eso() {
 
   _info "Creating ClusterSecretStore..."
   cat <<EOF | _kubectl apply -f -
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore
 metadata:
   name: ${store_name}

@@ -152,7 +152,16 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 
 **Remaining:**
 8. 🔴 Gemini: validate `test_vault` + full Stage 2 on m2-air (see instructions below)
+   - 2026-02-27: `test_vault` passed ✅; `test_eso` failed 🔴 due to API version mismatch (`v1beta1` vs `v1`). `test_istio` skipped.
 9. Claude: update branch protection to require `stage2` (after step 8 green)
+
+---
+
+## Update — `test_eso` fix (2026-02-27)
+
+- Status: ✅ Fixed. `scripts/lib/test.sh` line 591 updated: `external-secrets.io/v1beta1` → `external-secrets.io/v1` for `ClusterSecretStore`. `ExternalSecret` was already on `v1`.
+- Detected by Gemini on m2-air validation run.
+- See `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md`.
 
 ---
 
@@ -197,17 +206,16 @@ kubectl get pods -n vault
 CLUSTER_PROVIDER=orbstack ~/src/gitrepo/personal/k3d-manager/scripts/k3d-manager reunseal_vault
 ```
 
-### Step 1 — Run test_vault (REQUIRED)
+### Step 1 — Pull latest fixes
 
 ```bash
 cd ~/src/gitrepo/personal/k3d-manager
-PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_vault
-echo "test_vault exit code: $?"
+git pull
 ```
 
-**Report the full terminal output and exit code.**
+**Report the latest commit hash: `git log --oneline -1`**
 
-### Step 2 — Run test_eso (REQUIRED, only if Step 1 passed)
+### Step 2 — Run test_eso (previously failed, now fixed)
 
 ```bash
 PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_eso
@@ -221,6 +229,15 @@ echo "test_eso exit code: $?"
 ```bash
 PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_istio
 echo "test_istio exit code: $?"
+```
+
+**Report the full terminal output and exit code.**
+
+### Step 4 — Run test_vault (re-confirm, only if Step 3 passed)
+
+```bash
+PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_vault
+echo "test_vault exit code: $?"
 ```
 
 **Report the full terminal output and exit code.**
@@ -250,7 +267,7 @@ echo "test_istio exit code: $?"
   dispatcher uses Homebrew bash. `yamllint .github/workflows/ci.yml` was run locally after editing.
 - Action items:
   1. Gemini: validate the updated `test_vault` against the standing m2-air cluster, then rerun the
-     Stage 2 workflow via PR #2 to ensure green.
+     Stage 2 workflow via PR #2 to ensure green. (2026-02-27: test_vault ✅, test_eso 🔴)
   2. Claude: once Stage 2 is proven green, update branch protection to require the `stage2` check
      (Step 8 in the list above).
 - Reference materials remain the same: `docs/plans/ci-workflow.md`,
