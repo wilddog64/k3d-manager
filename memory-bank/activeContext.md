@@ -262,7 +262,7 @@ echo "deploy_smb_csi --help exit code: $?"
 ### Reporting results
 
 **If both pass (exit code 0, warning/help text visible):**
-- Update this file: mark SMB CSI Phase 1 ✅ validated on m2-air with date
+- Update this file: mark SMB CSI Phase 1 ✅ validated on m2-air (2026-02-27)
 - Commit and push with message: `memory-bank: SMB CSI Phase 1 skip guard validated on m2-air`
 - Do NOT make any code changes
 
