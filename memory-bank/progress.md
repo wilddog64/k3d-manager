@@ -160,6 +160,7 @@ continued end-to-end validation for auth/deploy modes.
 | LDAP password JCasC/envsubst interpolation | OPEN | `$${...}` escape attempt not yet confirmed working |
 | `test_cert_rotation` via dispatcher | OPEN | Manual cert rotation works; dispatcher flow still unreliable/hangs |
 | `test_vault` fails — ClusterRoleBinding conflict | FIXED | 2026-02-26: test now reuses the existing `vault` namespace/release, validates readiness up front, and only cleans up the test namespace, Vault role, and seeded secret. See `docs/issues/2026-02-26-test-vault-clusterrolebinding-conflict.md`. |
+| `test_eso` fails — ClusterSecretStore API version mismatch | FIXED | 2026-02-27: `v1beta1` → `v1` in `scripts/lib/test.sh` line 591. Detected on m2-air by Gemini. See `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md`. |
 | ESO SecretStore `mountPath` wrong | FIXED | Must be `kubernetes` not `auth/kubernetes` |
 | LDAP bind DN mismatch | FIXED | Keep `LDAP_BASE_DN` consistent with LDIF base DN |
 | Jenkins pod readiness timeout | FIXED | 10m timeout + pod existence check |
@@ -169,5 +170,5 @@ continued end-to-end validation for auth/deploy modes.
 | `deploy_vault` fails on macOS — host path mkdir | FIXED | `_vault_ensure_data_path` now skips host `mkdir` on macOS; validation via `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault`. See `docs/issues/2026-02-24-macos-vault-local-path-creation-failure.md`. |
 | Jenkins `none` auth mode smoke test failure | FIXED | Local realm + matrix permissions rebuilt via `scripts/plugins/jenkins.sh` awk patch. Jenkins deploy succeeds; issue documented in `docs/issues/2026-02-24-jenkins-none-auth-mode-smoke-test-failure.md`. |
 | Jenkins smoke test fails on macOS — Istio LB IP unreachable | FIXED | `_jenkins_run_smoke_test` now tunnels through `istio-system/svc/istio-ingressgateway` so the fallback hits a real HTTPS listener; rest of the RFC-1918 detection + trap cleanup stays unchanged. See `docs/issues/2026-02-25-jenkins-smoke-test-routing-service-mismatch.md`. |
-| Smoke script silent failure (unbound PLUGINS_DIR) | FIXED | `bin/smoke-test-jenkins.sh` normalized paths to allow standalone and orchestrated library sourcing. |
-| Jenkins VirtualService hostname detection fails | FIXED | `_jenkins_run_smoke_test` namespace query fixed; custom hostnames now auto-detected. |
+| Smoke script silent failure (unbound PLUGINS_DIR) | FIXED | Verified (2026-02-26): `bin/smoke-test-jenkins.sh` normalized paths to allow standalone and orchestrated library sourcing. |
+| Jenkins VirtualService hostname detection fails | FIXED | Verified (2026-02-26): `_jenkins_run_smoke_test` namespace query fixed; custom hostnames now auto-detected. |
