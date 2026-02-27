@@ -146,10 +146,44 @@ Plan: `docs/plans/ldap-rotator-rename.md`
 
 ---
 
-## Next Step for Gemini — Validation Complete ✅
+## Next Step for Gemini — Validate test_vault Hard-Fail Cleanup
 
 **Branch:** `fix/vault-auth-delegator`
-**Result:** Success. Vault K8s auth is fully functional. The `system:auth-delegator` role is correctly bound to the vault SA via the Helm-managed `vault-server-binding`.
+**Goal:** Confirm that `test_vault` passes cleanly end-to-end with the reverted hard-fail
+(no `WARNING: vault-read pod` line in output) and that the vault-read pod's projected SA
+token auth succeeds now that `system:auth-delegator` is in `deploy_vault`.
+
+**Pre-requisites:**
+- Cluster running with `deploy_vault` applied from the current branch
+- Vault unsealed (`reunseal_vault` if cluster was restarted)
+- `kubectl get clusterrolebinding vault-auth-delegator -o yaml` shows `system:auth-delegator`
+
+**Validation steps:**
+
+```bash
+# Step 0 — confirm you are on the right branch with latest code
+hostname
+git -C ~/src/gitrepo/personal/k3d-manager pull
+git -C ~/src/gitrepo/personal/k3d-manager log --oneline -5
+# Expect: f899ee3 or later at HEAD on fix/vault-auth-delegator
+
+# Step 1 — confirm auth-delegator binding exists
+kubectl get clusterrolebinding vault-auth-delegator -o yaml | grep -A2 "roleRef:\|subjects:"
+
+# Step 2 — run test_vault
+PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault
+
+# Expected output must contain:
+#   INFO: Vault test succeeded
+# Expected output must NOT contain:
+#   WARNING: vault-read pod projected SA token auth failed
+```
+
+**After validation — update memory-bank:**
+- Replace this "Next Step for Gemini" section with a "Validation Complete ✅" block
+- Include the full `test_vault` output as evidence
+- Update `memory-bank/progress.md`: mark `[ ] test_vault cleanup` as `[x]`
+- Do NOT mark complete until `test_vault` output is captured and pasted here
 
 ---
 
