@@ -744,8 +744,21 @@ spec:
 POD
 
   _kubectl wait --for=condition=Ready pod/vault-read -n "$test_ns" --timeout=120s
-  local secret
-  secret=$(_kubectl -n "$test_ns" exec vault-read -- cat /tmp/secret)
+
+  # Pod is Ready as soon as the container starts (no readiness probe), but the
+  # vault auth + kv-get commands inside the pod need time to complete and write
+  # /tmp/secret. Retry for up to 30s rather than reading immediately.
+  local secret=""
+  local retries=0
+  while [[ $retries -lt 15 ]]; do
+    secret=$(_kubectl -n "$test_ns" exec vault-read -- cat /tmp/secret 2>/dev/null || true)
+    if [[ -n "$secret" ]]; then
+      break
+    fi
+    sleep 2
+    retries=$((retries + 1))
+  done
+
   if [[ "$secret" != "$secret_val" ]]; then
     _info "Failed to read secret via pod"
     return 1
