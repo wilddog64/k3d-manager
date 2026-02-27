@@ -9,7 +9,7 @@
 **v0.1.0 shipped ✅** — PR #2 merged, tagged, released.
 
 Next task: `test_vault` hard-fail cleanup — ✅ validated via `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault` (2026-02-27).
-Branch: `fix/vault-auth-delegator` (merged back to main).
+Branch: `fix/vault-auth-delegator` (open — PR pending).
 
 - Stage 2 CI: ✅ fully green (`test_vault`, `test_eso`, `test_istio` on m2-air)
 - PR #2 merged to `main` at 2026-02-27T20:09:45Z
