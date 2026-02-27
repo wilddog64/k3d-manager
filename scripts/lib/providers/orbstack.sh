@@ -23,15 +23,15 @@ function _provider_orbstack__ensure_runtime() {
 }
 
 function _provider_orbstack__set_docker_context() {
-   if [[ -n "${DOCKER_CONTEXT:-}" ]]; then
+   local orbstack_context
+   orbstack_context=$(_orbstack_find_docker_context 2>/dev/null || true)
+
+   if [[ -n "${DOCKER_CONTEXT:-}" && "${DOCKER_CONTEXT}" == "${orbstack_context}" ]]; then
       return 0
    fi
 
-   local context
-   context=$(_orbstack_find_docker_context 2>/dev/null || true)
-
-   if [[ -n "$context" ]]; then
-      export DOCKER_CONTEXT="$context"
+   if [[ -n "$orbstack_context" ]]; then
+      export DOCKER_CONTEXT="$orbstack_context"
    fi
 }
 
