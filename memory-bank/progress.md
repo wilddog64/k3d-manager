@@ -56,6 +56,8 @@ Next: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` (Priority
 - [x] `docs/tests/active-directory-testing-instructions.md`
 - [x] `docs/plans/` — full set of interface and integration design docs
 - [x] `docs/issues/` updated with operational issues through 2026-02-20
+- [x] Vault Kubernetes auth now always grants `system:auth-delegator` to the Vault service account
+  (`scripts/plugins/vault.sh` + docs/issues/2026-02-27-vault-missing-auth-delegator-clusterrolebinding.md)
 
 ---
 

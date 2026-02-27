@@ -8,8 +8,9 @@
 
 **v0.1.0 shipped ✅** — PR #2 merged, tagged, released.
 
-Next task: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` so new clusters
-get it automatically (currently applied manually to m2-air).
+Next task: (DONE 2026-02-27) add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` so new
+clusters get it automatically. See `docs/issues/2026-02-27-vault-missing-auth-delegator-clusterrolebinding.md`.
+Follow-up work: automate SMB CSI Phase 2 (NFS swap) + port-forward helpers for Jenkins validation.
 
 - Stage 2 CI: ✅ fully green (`test_vault`, `test_eso`, `test_istio` on m2-air)
 - PR #2 merged to `main` at 2026-02-27T20:09:45Z
@@ -24,6 +25,8 @@ get it automatically (currently applied manually to m2-air).
 - Jenkins k8s agents fully fixed by Codex — SA mismatch, admin credential placeholders, crumb issuer, port alignment
 - Jenkins admin password zsh glob issue: always wrap `-u user:pass` in quotes. See `docs/issues/2026-02-27-jenkins-admin-password-zsh-glob.md`
 - Smoke test TLS race fixed: retry logic added in `bin/smoke-test-jenkins.sh`
+- Vault install now auto-creates the `system:auth-delegator` ClusterRoleBinding for the Vault service account,
+  unblocking Kubernetes auth on fresh clusters (docs/issues/2026-02-27-vault-missing-auth-delegator-clusterrolebinding.md).
 
 ---
 
