@@ -39,3 +39,37 @@ install wires the binding automatically.
 ## Follow-up
 
 - Consider adding an explicit check in `test_vault` to assert the ClusterRoleBinding exists before running auth tests.
+
+## Validation
+
+`PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault` — 2026-02-27 (macOS/OrbStack)
+```
+running under bash version 5.3.9(1)-release
+INFO: Testing Vault deployment and Kubernetes auth...
+INFO: Preparing test namespace 'vault-test-1772229457-8663' and service account 'vault-test-1772229457-8663-sa'...
+INFO: Refreshing Vault Kubernetes auth backend (TokenReview mode)...
+Success! Data written to: auth/kubernetes/config
+INFO: Creating temporary Vault role for service account...
+WARNING! The following warnings were returned from Vault:
+
+  * Role vault-test-1772229457-8663-sa does not have an audience. In Vault
+  v1.21+, specifying an audience on roles will be required.
+
+INFO: Seeding test secret at secret/eso/vault-secret-1772229457-8947...
+================ Secret Path ================
+secret/data/eso/vault-secret-1772229457-8947
+
+======= Metadata =======
+Key                Value
+---                -----
+created_time       2026-02-27T21:57:38.534174013Z
+custom_metadata    <nil>
+deletion_time      n/a
+destroyed          false
+version            1
+pod/vault-read created
+pod/vault-read condition met
+INFO: Vault test succeeded
+Cleaning up Vault test resources...
+```
+
