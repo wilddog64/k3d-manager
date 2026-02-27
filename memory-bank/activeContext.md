@@ -152,16 +152,16 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 
 **Remaining:**
 8. 🔴 Gemini: validate `test_vault` + full Stage 2 on m2-air (see instructions below)
-   - 2026-02-27: `test_vault` passed ✅; `test_eso` failed 🔴 due to API version mismatch (`v1beta1` vs `v1`). `test_istio` skipped.
+   - 2026-02-27: `test_vault` passed ✅; `test_eso` failed 🔴 twice. First due to `v1beta1` mismatch (fixed by user), then due to `v1` schema error: `unknown field "spec.provider.vault.tls.insecureSkipVerify"`. `test_istio` skipped.
 9. Claude: update branch protection to require `stage2` (after step 8 green)
 
 ---
 
 ## Update — `test_eso` fix (2026-02-27)
 
-- Status: ✅ Fixed. `scripts/lib/test.sh` line 591 updated: `external-secrets.io/v1beta1` → `external-secrets.io/v1` for `ClusterSecretStore`. `ExternalSecret` was already on `v1`.
-- Detected by Gemini on m2-air validation run.
-- See `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md`.
+- Fix 1: ✅ `v1beta1` → `v1` for `ClusterSecretStore` apiVersion.
+- Fix 2: ✅ Removed `tls.insecureSkipVerify` block — Vault is deployed on HTTP internally (`http://vault.vault.svc:8200`); test was incorrectly using `https://`. Switched server URL to `http://` and dropped the `tls` block.
+- See `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md` and `docs/issues/2026-02-27-test-eso-v1-schema-incompatibility.md`.
 
 ---
 
@@ -211,11 +211,12 @@ CLUSTER_PROVIDER=orbstack ~/src/gitrepo/personal/k3d-manager/scripts/k3d-manager
 ```bash
 cd ~/src/gitrepo/personal/k3d-manager
 git pull
+git log --oneline -3
 ```
 
-**Report the latest commit hash: `git log --oneline -1`**
+**Report the output of `git log --oneline -3`.**
 
-### Step 2 — Run test_eso (previously failed, now fixed)
+### Step 2 — Run test_eso (two fixes applied, retry now)
 
 ```bash
 PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_eso
