@@ -211,7 +211,8 @@ Cleaning up Vault test resources...
 ## Release Strategy
 
 - **v0.1.0** ✅ — released 2026-02-27
-- **v0.2.0** — `system:auth-delegator` fix + AD e2e validation complete
+- **v0.2.0** — `system:auth-delegator` fix + `test_vault` hard-fail cleanup (AD e2e decoupled — blocked on external VPN/AD)
+- **v0.3.0** — AD e2e validation complete
 - **v1.0.0** — production-hardened, all known-broken paths resolved
 
 ---
