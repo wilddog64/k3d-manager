@@ -706,14 +706,21 @@ function test_vault() {
   _kubectl create namespace "$test_ns" >/dev/null 2>&1 || true
   _kubectl create sa "$sa" -n "$test_ns" >/dev/null 2>&1 || true
 
-  # Refresh the k8s auth backend config with the current vault pod SA token.
-  # Projected SA tokens rotate every ~24h; if the stored token_reviewer_jwt
-  # has expired, auth/kubernetes/login returns 403. Re-running vault write
-  # auth/kubernetes/config updates it with the current token from the pod.
-  _info "Refreshing Vault Kubernetes auth backend with current SA token..."
+  # Refresh the k8s auth backend config with the current vault pod SA token
+  # and force TokenReview mode (disable_local_ca_jwt=true).
+  #
+  # Background: the default disable_local_ca_jwt=false uses OIDC discovery to
+  # validate JWTs locally. On OrbStack/k3s the OIDC discovery or JWKS endpoint
+  # may not be reachable from the vault pod, causing 403 on auth/kubernetes/login.
+  # Forcing TokenReview mode (disable_local_ca_jwt=true) uses the vault pod's
+  # own SA token (token_reviewer_jwt) to call the k8s TokenReview API, which is
+  # always available inside the cluster.  Projected SA tokens rotate every ~24h
+  # so we also refresh token_reviewer_jwt with the pod's current token.
+  _info "Refreshing Vault Kubernetes auth backend (TokenReview mode)..."
   _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
     sh -c "VAULT_TOKEN='$root_token' vault write auth/kubernetes/config \
       token_reviewer_jwt=\"\$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" \
+      disable_local_ca_jwt=true \
       kubernetes_host=\"https://kubernetes.default.svc:443\" \
       kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
