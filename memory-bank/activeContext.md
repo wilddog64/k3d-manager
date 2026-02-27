@@ -77,20 +77,17 @@ OrbStack provider, and Stage 2 CI. **Not yet merged to `main`.**
 
 ## Current Priorities / Active Decisions
 
-### Priority 1: Jenkins Kubernetes agents (current task — Codex, IN PROGRESS)
+### Priority 1: Jenkins Kubernetes agents (Codex complete — ready for Gemini validation)
 - Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
 - Scope: Linux agents only. Windows agents and SMB CSI volume mounts deferred.
 - **Completed this session (2026-02-27):**
   - `jenkinsUrl` port corrected `8081` → `8080` across all three value templates
   - Agent labels simplified `linux-agent`/`kaniko-agent` → `linux`/`kaniko` in templates + job DSL
   - Smoke test TLS retry logic added (`bin/smoke-test-jenkins.sh`)
+  - `values.yaml` → `values-default.yaml.tmpl`: envsubst now runs for default path, `${JENKINS_NAMESPACE}` expands correctly
+  - `scripts/plugins/jenkins.sh` wired to route default path through envsubst (line 1552)
   - Blocking issue documented: `docs/issues/2026-02-27-jenkins-k8s-agent-cloud-not-applied.md`
-- **Paused — next task for Codex:**
-  - Fix `${JENKINS_NAMESPACE}` not being expanded in default deploy path
-  - **Root cause:** `values.yaml` is not a `.tmpl` — envsubst never runs for `--enable-vault` only path
-  - **Fix:** rename `scripts/etc/jenkins/values.yaml` → `values-default.yaml.tmpl`, wire through envsubst same as LDAP/AD templates, ensure `JENKINS_NAMESPACE` is exported before rendering
-  - **Verify:** `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault` → agent pods spawn in jenkins namespace
-  - Reference: `docs/issues/2026-02-27-jenkins-k8s-agent-cloud-not-applied.md`
+- **Status:** code complete — hand off to Gemini for smoke validation
 
 ### Priority 2: Open PR and release v0.1.0
 - Once Jenkins agents land and CI is green: open PR `ldap-develop` → `main`
@@ -287,6 +284,71 @@ volume mounts) and skip Windows agent template entirely.
 - Update `memory-bank/activeContext.md` with session notes and what was done
 - Update `memory-bank/progress.md` — mark Jenkins agents complete
 - Commit and push, then hand off to Gemini for smoke validation
+
+---
+
+## Next Step for Gemini — Validate Jenkins Kubernetes Agents
+
+**Goal:** confirm `deploy_jenkins --enable-vault` spawns agent pods and the linux-agent-test job completes.
+
+**RULES — mandatory before updating memory-bank:**
+1. Run every command. Do not skip any.
+2. Copy the FULL terminal output — not a summary, not a paraphrase.
+3. Include exit codes from every `echo "... exit code: $?"` line.
+4. `hostname` output is mandatory — proves you are on m4-air and not fabricating results.
+5. If a command fails, stop and report the exact error. Do not guess or infer.
+
+### Step 0 — Prove you are on m4-air with latest code
+
+```bash
+hostname
+git -C ~/src/gitrepo/personal/k3d-manager log --oneline -3
+```
+
+### Step 1 — Deploy Jenkins with Vault
+
+```bash
+cd ~/src/gitrepo/personal/k3d-manager
+CLUSTER_PROVIDER=orbstack PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_jenkins --enable-vault
+echo "deploy_jenkins exit code: $?"
+```
+
+**Expected:** deploys without error.
+
+### Step 2 — Verify agent RBAC and service exist
+
+```bash
+kubectl -n jenkins get role,rolebinding | grep agent
+kubectl -n jenkins get svc jenkins-agent
+echo "svc exit code: $?"
+```
+
+**Expected:** Role + RoleBinding for jenkins-admin; ClusterIP service on port 50000.
+
+### Step 3 — Verify Kubernetes cloud configured in Jenkins
+
+```bash
+kubectl -n jenkins exec -it $(kubectl -n jenkins get pod -l app.kubernetes.io/name=jenkins -o name | head -1) -- \
+  curl -s http://localhost:8080/manage/cloud/ | grep -o 'kubernetes[^<]*' | head -5
+```
+
+**Expected:** kubernetes cloud visible.
+
+### Step 4 — Trigger linux-agent-test job and confirm pod spawns
+
+```bash
+# Trigger via Jenkins CLI or UI — confirm a pod appears in jenkins namespace
+kubectl -n jenkins get pods -w --timeout=120s | grep agent
+```
+
+**Expected:** agent pod spawns, runs, terminates cleanly.
+
+### Reporting results
+
+**If all pass:** update this file with evidence (full terminal output), mark Jenkins agents ✅ complete in `memory-bank/progress.md`, commit:
+`memory-bank: Jenkins k8s agents validated on m4-air — with evidence`
+
+**If any step fails:** stop, create `docs/issues/YYYY-MM-DD-<slug>.md`, update this file, commit and push. Do NOT mark anything complete.
 
 ---
 
