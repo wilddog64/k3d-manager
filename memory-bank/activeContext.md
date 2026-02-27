@@ -2,490 +2,150 @@
 
 ## Current Branch: `ldap-develop`
 
-Active development branch for Active Directory integration, certificate rotation,
-OrbStack provider, and Stage 2 CI. **Not yet merged to `main`.**
+Active development branch. **Not yet merged to `main`.**
 
 ## Current Focus (as of 2026-02-27)
 
 **Jenkins Kubernetes agents** — last hard requirement before PR to `main`.
-- Stage 2 CI: ✅ fully green, branch protection updated (Steps 1–9 complete)
-- SMB CSI Phase 1 skip guard: ✅ implemented and validated on m4-air
-- **Current blocker:** Jenkins k8s agents not yet implemented
+- Stage 2 CI: ✅ fully green (`test_vault`, `test_eso`, `test_istio` on m2-air)
+- SMB CSI Phase 1 skip guard: ✅ validated on m4-air
+- **Current blocker:** `${JENKINS_NAMESPACE}` not expanding in deployed ConfigMap — agents don't launch
 - After agents land: open PR `ldap-develop` → `main`, merge, tag `v0.1.0`
 
 ### Session Notes (2026-02-27)
-- Stage 2 CI complete: `test_vault` ✅ `test_eso` ✅ `test_istio` ✅ on m2-air
-- `stage2` added as required status check on `main` branch protection
-- SMB CSI Phase 1 skip guard implemented by Codex; validated by Gemini on m4-air
-- Jenkins Kubernetes agent templates updated (8080 `jenkinsUrl`, `linux`/`kaniko` labels). Jenkins redeploy works, BUT default template still embeds `${JENKINS_NAMESPACE}` literally so the cloud resolves to `jenkins..svc` and no agents launch (see `docs/issues/2026-02-27-jenkins-k8s-agent-cloud-not-applied.md`).
-- Jenkins smoke test TLS failure (port-forward race) reproduced; retry logic added so TLS connectivity/cert extraction wait for `kubectl port-forward` readiness (docs/issues/2026-02-27-jenkins-smoke-test-tls-race.md).
-- Release strategy documented: v0.1.0 on CI green post-merge; AD e2e deferred to follow-on branch
-- `@copilot` counter-argue rule added to `.clinerules`
+- Stage 2 CI complete; `stage2` required status check added to branch protection
+- SMB CSI Phase 1 skip guard: Codex implemented, Gemini validated on m4-air
+- Jenkins agent templates: port `8081`→`8080`, labels `linux-agent`→`linux`, `kaniko-agent`→`kaniko`
+- `values.yaml` → `values-default.yaml.tmpl`, envsubst wired in `jenkins.sh` line 1552
+- **Still broken:** `${JENKINS_NAMESPACE}` still literal in ConfigMap after redeploy — envsubst not expanding
+- Jenkins admin password zsh glob issue: always wrap `-u user:pass` in quotes. See `docs/issues/2026-02-27-jenkins-admin-password-zsh-glob.md`
+- Smoke test TLS race fixed: retry logic added in `bin/smoke-test-jenkins.sh`
 
 ---
 
-## What Has Been Built on `ldap-develop`
+## Current Priorities
 
-### Completed Features
+### Priority 1: Jenkins Kubernetes agents (BLOCKED — Codex debugging)
 
-- **Test strategy overhaul** (2026-02-20)
-  - Removed mock-heavy, high-drift BATS suites (jenkins.bats, create_k3d_clusters.bats, etc.)
-  - Added `test smoke` E2E subcommand. Unit BATS now covers pure logic only.
+**Symptom:** `${JENKINS_NAMESPACE}` is still literal in the deployed ConfigMap:
+```
+jenkinsUrl: "http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8080"
+```
+Agents queue indefinitely with "Jenkins doesn't have label 'linux'".
 
-- **Active Directory provider** (`scripts/lib/dirservices/activedirectory.sh`)
-  - All interface functions implemented. 36 BATS tests, 100% passing.
-  - `TOKENGROUPS` strategy for nested group resolution. `AD_TEST_MODE=1` for offline testing.
+**Root cause under investigation:**
+- `JENKINS_NAMESPACE` exported at `jenkins.sh:1277`
+- envsubst runs at `jenkins.sh:1600`
+- awk pass reads `$values_file` → `$temp_values` at line 1743; `values_file` reassigned to `$temp_values`
+- ConfigMap still shows literal — either JENKINS_NAMESPACE not in env at envsubst call, or awk reintroduces it
 
-- **OpenLDAP AD-schema variant** (`deploy_ad` command)
-  - Pre-seeded with `alice` (admin), `bob` (developer), `charlie` (read-only). Password: `password`.
-  - Used as local stand-in for real AD during integration testing.
+**Next task for Codex — 3-step diagnostic (keep session short and focused):**
 
-- **Jenkins directory service integration**
-  - `--enable-ad`, `--enable-ad-prod`, `--enable-ldap` flags implemented.
-  - JCasC generation via `_dirservice_*_generate_jcasc` interface.
-
-- **Certificate rotation CronJob** (`jenkins-cert-rotator`)
-  - Triggers Vault PKI renewal, updates K8s secret, revokes old cert.
-  - `JENKINS_CERT_ROTATOR_IMAGE` configurable. Validated with short TTL.
-
-- **Jenkins smoke test** (`bin/smoke-test-jenkins.sh`)
-  - SSL/auth smoke coverage. Routed into `test smoke` E2E flow.
-  - macOS port-forward path: tunnels through `svc/istio-ingressgateway` in `istio-system`.
-  - `_jenkins_run_smoke_test` namespace query fixed: custom hostnames now auto-detected ✅.
-  - `bin/smoke-test-jenkins.sh` path normalization: standalone invocation supported ✅.
-  - **Validation command:** `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault`
-  - Standalone testing: `bash -x ./bin/smoke-test-jenkins.sh <args>` supported.
-
-- **Secret backend abstraction** (`scripts/lib/secret_backend.sh`)
-  - Vault backend: complete. Azure: partial. AWS/GCP: planned.
-
-- **OrbStack provider** (Phases 1 & 2 — 2026-02-24)
-  - `CLUSTER_PROVIDER=orbstack` wraps k3d with OrbStack Docker context.
-  - Auto-detects OrbStack on macOS via `orb status`; falls back to `k3d`.
-  - **m4 validation:** ✅ complete — all integration issues resolved (see `docs/issues/`).
-  - **m2-air validation:** ⚠️ still pending — Gemini reviewed docs but did not run test_vault/test_eso/test_istio on m2-air as required.
-  - **Phase 3** (OrbStack native Kubernetes, no k3d): not yet started.
-
-- **Stage 1 CI** (2026-02-23)
-  - `.github/workflows/ci.yml`: shellcheck (shebang-scoped), bash -n, yamllint, 53 lib unit BATS.
-  - Triggers on PR open/update/reopen to `main` (in-repo only).
-  - `scripts/ci/check_cluster_health.sh`: Stage 2.0 health gate (Istio, Vault, ESO).
-  - Namespace isolation in `scripts/lib/test.sh`: `test_vault`, `test_eso`, `test_istio`
-    use ephemeral random namespaces and parameterized cleanup traps.
-
----
-
-## Current Priorities / Active Decisions
-
-### Priority 1: Jenkins Kubernetes agents (STILL BLOCKED — Codex debugging)
-- Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
-- Scope: Linux agents only. Windows agents and SMB CSI volume mounts deferred.
-- **Completed this session (2026-02-27):**
-  - `jenkinsUrl` port corrected `8081` → `8080` across all three value templates
-  - Agent labels simplified `linux-agent`/`kaniko-agent` → `linux`/`kaniko` in templates + job DSL
-  - Smoke test TLS retry logic added (`bin/smoke-test-jenkins.sh`)
-  - `values.yaml` → `values-default.yaml.tmpl`: wired into envsubst path in `jenkins.sh` line 1552
-  - Blocking issue documented: `docs/issues/2026-02-27-jenkins-k8s-agent-cloud-not-applied.md`
-- **Still broken:** `${JENKINS_NAMESPACE}` is still literal in the deployed ConfigMap after redeploy.
-  Evidence from Codex (post-fix):
-  ```
-  kubectl -n jenkins get configmap jenkins-jenkins-config-02-kubernetes-agents.yaml \
-    -o jsonpath='{.data.*}' | grep jenkinsUrl
-  # shows: jenkinsUrl: "http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8080"
-  ```
-- **Root cause under investigation:** `JENKINS_NAMESPACE` is exported at line 1277 and envsubst
-  runs at line 1600. But the ConfigMap still shows the literal placeholder. Two possible causes:
-  1. `JENKINS_NAMESPACE` is not actually in the environment seen by envsubst at line 1600
-  2. envsubst runs correctly but the awk pass (lines 1618–1743) reintroduces the placeholder
-
-### Next task for Codex — debug envsubst expansion
-
-**Step 1 — Confirm envsubst sees JENKINS_NAMESPACE:**
+Step 1 — test envsubst standalone:
 ```bash
 export JENKINS_NAMESPACE=jenkins
 envsubst < scripts/etc/jenkins/values-default.yaml.tmpl | grep -A3 "02-kubernetes-agents"
 ```
-- If expanded → envsubst works standalone; bug is in the deploy_jenkins call flow (JENKINS_NAMESPACE not exported at runtime)
-- If still literal → envsubst is not treating `${JENKINS_NAMESPACE}` as a variable (unusual — investigate template syntax)
+- Expanded → envsubst works; bug is in deploy_jenkins call scope
+- Still literal → template syntax issue
 
-**Step 2 — Check whether JENKINS_NAMESPACE is exported when envsubst runs inside deploy_jenkins:**
-
-Add a temporary debug line just before line 1600:
+Step 2 — add debug line before `jenkins.sh:1600`:
 ```bash
 _info "[jenkins] DEBUG JENKINS_NAMESPACE=${JENKINS_NAMESPACE}"
 ```
-Redeploy and check output. If empty or missing → the export at line 1277 is not persisting to this code path.
+Redeploy and check. If empty/missing → export at line 1277 not persisting.
 
-**Step 3 — Check awk output:**
+Step 3 — if Step 2 shows JENKINS_NAMESPACE is set but still not expanding, check awk output:
 ```bash
-# After envsubst renders to $values_file, check the intermediate file:
-# Add before line 1743: _info "[jenkins] DEBUG rendered values: $(grep JENKINS_NAMESPACE "$values_file")"
+# Add before line 1743:
+_info "[jenkins] DEBUG rendered: $(grep JENKINS_NAMESPACE "$values_file")"
 ```
 
-**Fix options (once root cause confirmed):**
-- If JENKINS_NAMESPACE is not exported: ensure `export JENKINS_NAMESPACE` is called in the
-  same function scope before the envsubst line — or pass it explicitly: `JENKINS_NAMESPACE="$ns" envsubst < ...`
-- If awk reintroduces it: scope the awk output through a second envsubst pass
+**Fix (once root cause confirmed):**
+- If not exported at call site: add `JENKINS_NAMESPACE="$ns" envsubst < ...` at line 1600
+- If awk reintroduces: pipe `$temp_values` through a second envsubst pass
+
+**Acceptance criteria:**
+- `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault` completes
+- ConfigMap shows expanded namespace (e.g. `jenkins.jenkins.svc.cluster.local`)
+- linux-agent-test job spawns pod and completes
+
+**Memory-bank update rule:** Do NOT mark ✅ until agent pod actually spawns. Paste evidence.
 
 ### Priority 2: Open PR and release v0.1.0
 - Once Jenkins agents land and CI is green: open PR `ldap-develop` → `main`
 - After merge + CI green on `main`: `gh release create v0.1.0 --generate-notes`
 
 ### Priority 3: AD end-to-end validation
-- `--enable-ad` mode: provider-level unit coverage done; end-to-end scenario pending.
-- `--enable-ad-prod`: requires external AD (VPN/corporate environment).
-
-### PENDING: GitGuardian False Positive Fix
-- Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*` in `scripts/etc/ldap/vars.sh`
-- See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
-
-### OPEN ISSUE: Basic LDAP Deploys Empty Directory
-- `deploy_ldap` (standard schema) creates an empty directory with no users.
-- `bootstrap-basic-schema.ldif` not yet created.
-- **Workaround**: use `deploy_ad` (pre-seeded with test users).
-
-### KNOWN BROKEN: `deploy_jenkins` Without `--enable-vault`
-- Vault policy creation always runs; `jenkins-admin` Vault secret absent without Vault.
-- Same issue for `deploy_jenkins --enable-ldap` without `--enable-vault`.
-
-### OPEN INVESTIGATION: LDAP password/JCasC secret interpolation
-- `$${...}` escaping fix not yet confirmed working.
-- See `docs/issues/2025-11-21-ldap-password-envsubst-issue.md`
-
-### PENDING: Documentation
-- `docs/guides/certificate-rotation.md` — not yet created.
-- `docs/guides/mac-ad-setup.md` — not yet created.
-- `docs/guides/ad-connectivity-troubleshooting.md` — not yet created.
-
----
-
-## Merge Criteria for `ldap-develop` → `main`
-
-1. ✅ Stage 2 CI runs green on PR #2.
-2. ~~End-to-end AD testing~~ → **moved to follow-on branch** (requires external AD /
-   VPN; infrastructure-gated, not code-gated).
-3. ✅ Pure-logic BATS suites stay green after each change.
-4. ✅ No regressions on `deploy_jenkins --enable-vault` baseline path.
-5. ✅ Open known-broken paths are either fixed or explicitly documented with guardrails.
-6. **Jenkins Kubernetes agents working** (Linux agents at minimum, SMB CSI Phase 1 skip
-   guard in place) — **hard requirement before PR**.
-
-## Release Strategy
-
-- **Version:** `v0.1.0` — first meaningful milestone (OrbStack, AD, cert rotation,
-  Stage 2 CI, Jenkins k8s agents)
-- **Trigger:** immediately after Stage 2 CI goes green on `main` post-merge
-- **Mechanism:** `gh release create v0.1.0 --generate-notes` — auto-changelog from
-  commit history; review and trim before publishing
-- **Next releases:** `v0.2.0` when AD e2e validation completes; `v1.0.0` when
-  production-hardened (docs complete, all known-broken paths resolved)
-
----
-
-## Branch Protection (as of 2026-02-24)
-
-Enabled on `wilddog64/k3d-manager@main`:
-- 1 required PR approval, stale review dismissal, enforce admins
-- No force pushes, no branch deletion
-- **Required status checks:** `lint` (Stage 1) and `stage2` (Stage 2) — both required as of 2026-02-27
-
----
-
-## CI Workflow Status (2026-02-25)
-
-Plan: `docs/plans/ci-workflow.md`
-
-**Architecture:**
-- **Stage 1** — ubuntu-latest: shellcheck, bash -n, yamllint, 53 lib BATS. No cluster needed.
-- **Stage 2** — m2-air (self-hosted, macOS ARM64): health check + integration tests. PR only.
-- **Stage 3** — `workflow_dispatch` only: test_jenkins, test_cert_rotation. Not yet created.
-
-**Self-hosted runner:** `m2-air` online. Custom `ARM64` label added (system label is `X64` due
-to Rosetta 2 install). Workflow must use `runs-on: [self-hosted, macOS, ARM64]`.
-See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
-
-**Completed tasks:**
-1. ✅ Stage 1 trigger: `types: [opened, synchronize, reopened]`
-2. ✅ Namespace isolation: `test_vault`, `test_eso`, `test_istio` use ephemeral namespaces
-3. ✅ `test_istio` `apps/v1` regression fixed
-4. ✅ `scripts/ci/check_cluster_health.sh` written and syntax-verified
-5. ✅ m2-air: OrbStack installed, cluster up, `test_istio` passing (2026-02-26)
-6. ✅ `test_vault` refactored to reuse existing Vault deployment (2026-02-26)
-7. ✅ Stage 2 job added to `.github/workflows/ci.yml` (2026-02-26)
-
-**Completed:**
-8. ✅ Gemini: re-run `test_eso`, `test_istio`, `test_vault` on m2-air (Stage 2 Step 8) — 2026-02-27: all tests passed green.
-9. ✅ Claude: `stage2` added as required status check on `main` (2026-02-27). Both `lint` and `stage2` now required for merge.
-
----
-
-## Update — `test_eso` fix (2026-02-27)
-
-- Status: ✅ Passed. `scripts/lib/test.sh` updated to use `v1` API, HTTP for Vault, and double quotes for `jsonpath` expansion. All E2E steps for ESO verification are now green on m2-air.
-
----
-
-## Update — `test_istio` hardcoded namespace (2026-02-27)
-
-- Status: ✅ Fixed. `scripts/lib/test.sh:test_istio` now uses the generated `$test_ns` for all
-  resources (sidecar check, gateway/virtualservice applies, and lookups). Validated locally via
-  `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_istio`.
-- Docs: `docs/issues/2026-02-27-test-istio-hardcoded-namespace.md` updated with the fix details.
-- Action: Gemini must rerun `./scripts/k3d-manager test_istio` on m2-air during Stage 2 Step 8.
-
----
-
-## Update — SMB CSI skip guard (2026-02-27)
-
-- Status: ✅ Completed. Added `scripts/plugins/smb-csi.sh` with the `deploy_smb_csi` entry point.
-  On macOS the command emits a warning and returns success (Phase 1 skip guard). On Linux it
-  installs the upstream SMB CSI Helm chart using configurable `SMB_CSI_RELEASE`/namespace.
-- Validation: `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_smb_csi` now prints the
-  skip warning instead of exiting the dispatcher.
-- Next: implement Option 1 (NFS swap) when macOS ReadWriteMany validation is required.
-
----
-
-## Update — Jenkins smoke test TLS retry (2026-02-27)
-
-- Status: ✅ Completed. `bin/smoke-test-jenkins.sh` now retries the TLS handshake and certificate
-  extraction steps to account for `kubectl port-forward` startup latency on macOS. Documented in
-  `docs/issues/2026-02-27-jenkins-smoke-test-tls-race.md`.
-- Validation: `CLUSTER_PROVIDER=orbstack PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_jenkins --enable-vault`
-  now reports PASS for all SSL/TLS checks when the smoke test uses the port-forward path.
-
----
-
-## Update — `test_vault` refactor (2026-02-26)
-
-- Status: ✅ Completed. `scripts/lib/test.sh:test_vault` now reuses the standing `vault`
-  namespace/release, validates the namespace, StatefulSet, pod, and `vault-root` secret exist
-  before running, seeds a random `secret/<path>` entry, and cleans up only the test namespace,
-  temporary Vault role, and seeded secret.
-- No Helm install or ClusterRoleBinding deletion occurs anymore, eliminating the
-  `vault-server-binding` ownership conflict.
-- Validation: `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault` now succeeds on the
-  local cluster; mac hosts must prefer Homebrew bash (>=5) so associative arrays load properly.
-- Action: Gemini still needs to rerun `./scripts/k3d-manager test_vault` on the m2-air cluster to
-  confirm the fix on the shared environment before Stage 2 is enforced.
-
----
-
-## Update — `test_eso` fixes (2026-02-27)
-
-- Status: ✅ Completed and validated on m2-air by Gemini (2026-02-27). `scripts/lib/test.sh:test_eso`
-  now targets the `external-secrets.io/v1` CRDs, points at Vault's internal HTTP endpoint (no TLS
-  block needed), and uses double-quoted `jsonpath` expressions so `${secret_key}` expands before
-  invoking `kubectl`.
-
----
-
-## Next Step for Codex — Jenkins Kubernetes Agents (Linux only)
-
-**Read first:** `docs/plans/jenkins-k8s-agents-and-smb-csi.md` — full spec with YAML
-templates, env vars, and file list. Implement Part 1 only (agents). Skip Part 2 (SMB CSI
-volume mounts) and skip Windows agent template entirely.
-
-### Scope
-
-| Task | File | Notes |
-|---|---|---|
-| RBAC | `scripts/etc/jenkins/agent-rbac.yaml.tmpl` | Role + RoleBinding for `jenkins-admin` |
-| JCasC Kubernetes cloud | `scripts/etc/jenkins/values-ldap.yaml.tmpl` | Add `02-kubernetes-agents` config script; Linux agent template only |
-| JCasC — AD/prod variants | `scripts/etc/jenkins/values-ad-test.yaml.tmpl`, `values-ad-prod.yaml.tmpl` | Same kubernetes cloud block |
-| Agent service | `scripts/etc/jenkins/agent-service.yaml.tmpl` | ClusterIP, port 50000 JNLP |
-| Wire into deploy | `scripts/plugins/jenkins.sh` | Apply RBAC + agent service in `deploy_jenkins()` |
-| Linux test job | `scripts/etc/jenkins/test-jobs/linux-agent-test.groovy` | `uname -a`, `cat /etc/os-release`, `kubectl version --client` |
-
-### Constraints
-
-- **No Windows agent template** — k3d does not support Windows containers
-- **No SMB CSI volume mounts** in pod templates — Phase 2 NFS swap not implemented yet
-- **No Docker-in-Docker** unless explicitly needed — keep agent template minimal first
-- `jenkinsUrl` must use internal cluster DNS: `http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8080`
-- `jenkinsTunnel` must use: `jenkins-agent.${JENKINS_NAMESPACE}.svc.cluster.local:50000`
-- Agent service selector must match the Jenkins Helm chart labels (verify against existing service)
-
-### Acceptance criteria
-
-- `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault` completes without error
-- RBAC Role + RoleBinding exist in the jenkins namespace
-- Agent ClusterIP service exists on port 50000
-- Jenkins JCasC shows `kubernetes` cloud configured (visible in Manage Jenkins → Clouds)
-- Triggering the linux-agent-test job spawns a pod in the jenkins namespace and completes
-
-### After implementing
-
-- Run `bash -n` and `shellcheck` on every changed `.sh` file
-- Run `yamllint` on any changed `.yaml`/`.tmpl` file
-- Validate locally: `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault`
-- Update `memory-bank/activeContext.md` with session notes and what was done
-- Update `memory-bank/progress.md` — mark Jenkins agents complete
-- Commit and push, then hand off to Gemini for smoke validation
+- Deferred to follow-on branch (requires external AD/VPN)
 
 ---
 
 ## Next Step for Gemini — Validate Jenkins Kubernetes Agents
 
-**Goal:** confirm `deploy_jenkins --enable-vault` spawns agent pods and the linux-agent-test job completes.
+**Wait for Codex to fix the envsubst issue first.** Once Codex marks agents ✅ with evidence, run:
 
-**RULES — mandatory before updating memory-bank:**
-1. Run every command. Do not skip any.
-2. Copy the FULL terminal output — not a summary, not a paraphrase.
-3. Include exit codes from every `echo "... exit code: $?"` line.
-4. `hostname` output is mandatory — proves you are on m4-air and not fabricating results.
-5. If a command fails, stop and report the exact error. Do not guess or infer.
-
-### Step 0 — Prove you are on m4-air with latest code
+**RULES:** Full terminal output required. `hostname` mandatory. No summaries.
 
 ```bash
+# Step 0 — prove you are on m4-air with latest code
 hostname
 git -C ~/src/gitrepo/personal/k3d-manager log --oneline -3
-```
 
-### Step 1 — Deploy Jenkins with Vault
+# Step 1 — deploy
+CLUSTER_PROVIDER=orbstack PATH="/opt/homebrew/bin:$PATH" \
+  ./scripts/k3d-manager deploy_jenkins --enable-vault
+echo "exit: $?"
 
-```bash
-cd ~/src/gitrepo/personal/k3d-manager
-CLUSTER_PROVIDER=orbstack PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_jenkins --enable-vault
-echo "deploy_jenkins exit code: $?"
-```
+# Step 2 — verify ConfigMap has expanded namespace
+kubectl -n jenkins get configmap jenkins-jenkins-config-02-kubernetes-agents.yaml \
+  -o jsonpath='{.data.*}' | grep jenkinsUrl
 
-**Expected:** deploys without error.
-
-### Step 2 — Verify agent RBAC and service exist
-
-```bash
+# Step 3 — verify RBAC + agent service
 kubectl -n jenkins get role,rolebinding | grep agent
 kubectl -n jenkins get svc jenkins-agent
-echo "svc exit code: $?"
-```
 
-**Expected:** Role + RoleBinding for jenkins-admin; ClusterIP service on port 50000.
-
-### Step 3 — Verify Kubernetes cloud configured in Jenkins
-
-```bash
-kubectl -n jenkins exec -it $(kubectl -n jenkins get pod -l app.kubernetes.io/name=jenkins -o name | head -1) -- \
-  curl -s http://localhost:8080/manage/cloud/ | grep -o 'kubernetes[^<]*' | head -5
-```
-
-**Expected:** kubernetes cloud visible.
-
-### Step 4 — Trigger linux-agent-test job and confirm pod spawns
-
-```bash
-# Trigger via Jenkins CLI or UI — confirm a pod appears in jenkins namespace
+# Step 4 — trigger linux-agent-test, watch for pod
 kubectl -n jenkins get pods -w --timeout=120s | grep agent
 ```
 
-**Expected:** agent pod spawns, runs, terminates cleanly.
-
-### Reporting results
-
-**If all pass:** update this file with evidence (full terminal output), mark Jenkins agents ✅ complete in `memory-bank/progress.md`, commit:
-`memory-bank: Jenkins k8s agents validated on m4-air — with evidence`
-
-**If any step fails:** stop, create `docs/issues/YYYY-MM-DD-<slug>.md`, update this file, commit and push. Do NOT mark anything complete.
+If all pass: mark Jenkins agents ✅ in progress.md, commit with evidence.
+If any fail: create `docs/issues/YYYY-MM-DD-<slug>.md`, report, do NOT mark complete.
 
 ---
 
-## Next Step for Gemini — Validate SMB CSI Phase 1 skip guard on m2-air (REDO REQUIRED)
+## Codex Session Guidelines (added 2026-02-27)
 
-**⚠️ Previous attempt rejected.** The last memory-bank update contained no terminal output,
-no exit codes, and no `hostname` proof. Updating the file without running the commands is
-NOT validation. You must redo this task from scratch following the steps below exactly.
-
-**RULES — read before starting:**
-1. Run every command. Do not skip any.
-2. Copy the FULL terminal output into the memory-bank update — not a summary, not a paraphrase.
-3. Include the exact exit code from each `echo "... exit code: $?"` line.
-4. `hostname` output is mandatory — it proves you are on m2-air and not fabricating results.
-5. If you cannot run a command, stop and report why. Do not guess or infer the result.
+- **Keep sessions short and focused** — one task per session. Codex has no auto-compaction;
+  long sessions lose earlier context and produce degraded output without warning.
+- **Start every session with:** `Read memory-bank/activeContext.md and .clinerules`
+- **Commit after each working step** — a fresh session can resume from git, not from memory
+- **Do not update memory-bank until the fix is confirmed working** — write what happened,
+  not what you plan to do. See Memory-Bank Update Rule in `.clinerules`.
 
 ---
 
-### Step 0 — Prove you are on m2-air with latest code
+## Merge Criteria for `ldap-develop` → `main`
 
-```bash
-hostname
-git -C ~/src/gitrepo/personal/k3d-manager log --oneline -3
-```
+1. ✅ Stage 2 CI green on PR #2
+2. ✅ Pure-logic BATS suites green
+3. ✅ No regressions on `deploy_jenkins --enable-vault` baseline
+4. ✅ Known-broken paths documented with guardrails
+5. **Jenkins Kubernetes agents working** — hard requirement, NOT yet met
 
-**Paste the exact output of both commands into your memory-bank update.**
+## Release Strategy
 
-### Step 1 — Verify skip guard fires on macOS
-
-```bash
-cd ~/src/gitrepo/personal/k3d-manager
-PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_smb_csi
-echo "deploy_smb_csi exit code: $?"
-```
-
-**Expected:** warning line containing "SMB CSI" and "macOS", exit code 0.
-**Paste the full terminal output and exit code into your memory-bank update.**
-
-### Step 2 — Verify --help works
-
-```bash
-PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_smb_csi --help
-echo "deploy_smb_csi --help exit code: $?"
-```
-
-**Expected:** usage text mentioning macOS limitation and NFS swap plan, exit code 0.
-**Paste the full terminal output and exit code into your memory-bank update.**
-
-### Reporting results
-
-**If all pass:** add an "Evidence" subsection to this file with the pasted output,
-mark Phase 1 validated (2026-02-27) ✅, and commit with message:
-`memory-bank: SMB CSI Phase 1 validated on m2-air — with evidence`
-
-**Evidence (run on m4-air — acceptable for this test; skip guard is macOS-generic):**
-```bash
-$ hostname
-m4-air.local
-
-$ git log --oneline -3
-db1696a (HEAD -> ldap-develop, origin/ldap-develop) memory-bank: reject Gemini's unverified SMB CSI validation, require redo
-b89d01d memory-bank: SMB CSI Phase 1 skip guard validated on m2-air
-2c04a49 memory-bank: update Gemini instructions — validate SMB CSI Phase 1 skip guard
-
-$ PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_smb_csi
-running under bash version 5.3.9(1)-release
-WARN: [smb-csi] SMB CSI is not supported on macOS; skipping deploy. Use Linux/k3s for validation or follow the NFS swap plan.
-deploy_smb_csi exit code: 0
-
-$ PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_smb_csi --help
-running under bash version 5.3.9(1)-release
-Usage: deploy_smb_csi
-
-Deploy the SMB CSI driver on supported platforms. On macOS (k3d/OrbStack) the
-command logs a warning and exits successfully because SMB mounts require the
-cifs kernel module, which is unavailable. Use a Linux/k3s cluster to validate
-SMB CSI or implement the macOS NFS swap described in docs/plans/smb-csi-macos-workaround.md.
-deploy_smb_csi --help exit code: 0
-```
-
-**If either fails:** stop, create `docs/issues/YYYY-MM-DD-<slug>.md` with exact error,
-update this file, commit and push. Do NOT mark anything complete.
+- **v0.1.0** — trigger: Stage 2 CI green on `main` post-merge
+- `gh release create v0.1.0 --generate-notes` — review before publishing
+- **v0.2.0** — AD e2e validation complete
+- **v1.0.0** — production-hardened, all known-broken paths resolved
 
 ---
 
-## Update — Stage 2 job added (2026-02-26)
+## Branch Protection (as of 2026-02-27)
 
-- Status: ✅ Completed. `.github/workflows/ci.yml` now defines the `stage2` job that depends on
-  `lint`, runs only for in-repo pull requests, targets `[self-hosted, macOS, ARM64]`, checks
-  cluster health, then executes `test_vault`, `test_eso`, and `test_istio` with
-  `CLUSTER_PROVIDER=orbstack`. The integration step exports `PATH="/opt/homebrew/bin:$PATH"` so the
-  dispatcher uses Homebrew bash. `yamllint .github/workflows/ci.yml` was run locally after editing.
-- Action items:
-  1. Gemini: validate the updated `test_vault` against the standing m2-air cluster, then rerun the
-     Stage 2 workflow via PR #2 to ensure green. (2026-02-27: Step 8 complete ✅ — all tests passed green on m2-air)
-  2. Claude: once Stage 2 is proven green, update branch protection to require the `stage2` check
-     (Step 8 in the list above).
-- Reference materials remain the same: `docs/plans/ci-workflow.md`,
-  `docs/plans/m2-air-stage2-validation.md`, and `./bin/setup-mac-ci-runner.sh` for runner prep.
+- 1 required PR approval, stale review dismissal, enforce admins
+- Required status checks: `lint` (Stage 1) and `stage2` (Stage 2)
 
 ---
 
@@ -493,39 +153,7 @@ update this file, commit and push. Do NOT mark anything complete.
 
 - **Always run `reunseal_vault`** after any cluster restart before other deployments.
 - **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`).
-  See `docs/issues/2025-10-19-eso-secretstore-not-ready.md`.
-- **LDAP bind DN mismatch**: keep `LDAP_BASE_DN` in sync with LDIF bootstrap base DN.
-  See `docs/issues/2025-10-20-ldap-bind-dn-mismatch.md`.
-- **Jenkins readiness timeout**: `_wait_for_jenkins_ready` uses longer timeout + pod-existence
-  precheck. See `docs/issues/2025-11-07-jenkins-pod-readiness-timeout.md`.
-- **GitGuardian false positive**: `LDAP_PASSWORD_ROTATOR_IMAGE` in `scripts/etc/ldap/vars.sh`
-  triggered detector — variable name has "PASSWORD", value is a Docker image. No real secret.
-  Pending rename to `LDAP_ROTATOR_IMAGE`. See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`.
-
-### Evidence — SMB CSI Phase 1 validation (2026-02-27)
-```
-$ hostname
-m4-air.local
-
-$ git -C ~/src/gitrepo/personal/k3d-manager log --oneline -3
-cce15a4 memory-bank: Jenkins k8s agents Codex instructions; update current focus
-233efc6 memory-bank: correct hostname in SMB CSI Phase 1 evidence — m4-air not m2-air
-0992d2e memory-bank: SMB CSI Phase 1 validated on m2-air — with evidence
-
-$ PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_smb_csi
-running under bash version 5.3.9(1)-release
-WARN: [smb-csi] SMB CSI is not supported on macOS; skipping deploy. Use Linux/k3s for validation or follow the NFS swap plan.
-$ echo "deploy_smb_csi exit code: $?"
-deploy_smb_csi exit code: 0
-
-$ PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_smb_csi --help
-running under bash version 5.3.9(1)-release
-Usage: deploy_smb_csi
-
-Deploy the SMB CSI driver on supported platforms. On macOS (k3d/OrbStack) the
-command logs a warning and exits successfully because SMB mounts require the
-cifs kernel module, which is unavailable. Use a Linux/k3s cluster to validate
-SMB CSI or implement the macOS NFS swap described in docs/plans/smb-csi-macos-workaround.md.
-$ echo "deploy_smb_csi --help exit code: $?"
-deploy_smb_csi --help exit code: 0
-```
+- **LDAP bind DN**: keep `LDAP_BASE_DN` in sync with LDIF bootstrap base DN.
+- **Jenkins admin password**: contains special chars — always quote `-u "user:$pass"` or use kubectl to fetch. See `docs/issues/2026-02-27-jenkins-admin-password-zsh-glob.md`.
+- **GitGuardian false positive**: `LDAP_PASSWORD_ROTATOR_IMAGE` — pending rename to `LDAP_ROTATOR_IMAGE`.
+- **SMB CSI Phase 1 evidence**: validated on m4-air 2026-02-27. See evidence block in git history (commit `01f9d77`).
