@@ -152,7 +152,7 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 7. ✅ Stage 2 job added to `.github/workflows/ci.yml` (2026-02-26)
 
 **Remaining:**
-8. Gemini: re-run `test_eso`, `test_istio`, `test_vault` on m2-air (Stage 2 Step 8) now that all fixes are merged; capture outputs per instructions, then update this file.
+8. ✅ Gemini: re-run `test_eso`, `test_istio`, `test_vault` on m2-air (Stage 2 Step 8) — 2026-02-27: all tests passed green.
 9. Claude: update branch protection to require `stage2` (after step 8 green)
 
 ---
@@ -309,7 +309,7 @@ echo "test_vault exit code: $?"
   dispatcher uses Homebrew bash. `yamllint .github/workflows/ci.yml` was run locally after editing.
 - Action items:
   1. Gemini: validate the updated `test_vault` against the standing m2-air cluster, then rerun the
-     Stage 2 workflow via PR #2 to ensure green. (2026-02-27: test_vault ✅, test_eso 🔴)
+     Stage 2 workflow via PR #2 to ensure green. (2026-02-27: Step 8 complete ✅ — all tests passed green on m2-air)
   2. Claude: once Stage 2 is proven green, update branch protection to require the `stage2` check
      (Step 8 in the list above).
 - Reference materials remain the same: `docs/plans/ci-workflow.md`,
