@@ -151,8 +151,9 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 7. ✅ Stage 2 job added to `.github/workflows/ci.yml` (2026-02-26)
 
 **Remaining:**
-8. 🔴 Gemini: validate `test_vault` + full Stage 2 on m2-air (see instructions below)
-   - 2026-02-27: `test_vault` passed ✅; `test_eso` failed 🔴 twice. First due to `v1beta1` mismatch (fixed by user), then due to `v1` schema error: `unknown field "spec.provider.vault.tls.insecureSkipVerify"`. `test_istio` skipped.
+8. 🔴 **Blocked on Codex fix** — `test_eso` jsonpath interpolation bug (see Next Step for Codex below)
+   - 2026-02-27: `test_vault` passed ✅; `test_eso` failed 🔴. `ClusterSecretStore` creation succeeded (using `v1` + `http`), but the test failed on secret verification due to a `jsonpath` interpolation bug (single quotes on `${secret_key}`). `test_istio` skipped.
+   - After Codex fixes: Gemini to re-run `test_eso` → `test_istio` → `test_vault` on m2-air.
 9. Claude: update branch protection to require `stage2` (after step 8 green)
 
 ---
@@ -161,7 +162,8 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 
 - Fix 1: ✅ `v1beta1` → `v1` for `ClusterSecretStore` apiVersion.
 - Fix 2: ✅ Removed `tls.insecureSkipVerify` block — Vault is deployed on HTTP internally (`http://vault.vault.svc:8200`); test was incorrectly using `https://`. Switched server URL to `http://` and dropped the `tls` block.
-- See `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md` and `docs/issues/2026-02-27-test-eso-v1-schema-incompatibility.md`.
+- New Blocker: 🔴 Secret verification failed due to `jsonpath` interpolation bug. `jsonpath='{.data.${secret_key}}'` uses single quotes, preventing expansion.
+- See `docs/issues/2026-02-27-test-eso-jsonpath-interpolation-failure.md`.
 
 ---
 
@@ -180,7 +182,29 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 
 ---
 
-## Next Step for Gemini — Validate on m2-air
+## Next Step for Codex — Fix jsonpath interpolation in `test_eso`
+
+**File:** `scripts/lib/test.sh`, line 634
+
+**Change:** single quotes → double quotes around the jsonpath argument so `${secret_key}` is expanded by the shell before kubectl receives it.
+
+```bash
+# Before (broken — single quotes prevent variable expansion):
+synced=$(_kubectl -n "$es_ns" get secret "$es_name" -o jsonpath='{.data.${secret_key}}' | base64 -d)
+
+# After (fixed — double quotes allow shell to expand ${secret_key}):
+synced=$(_kubectl -n "$es_ns" get secret "$es_name" -o jsonpath="{.data.${secret_key}}" | base64 -d)
+```
+
+**Context:** `secret_key` is a local variable set earlier in `test_eso`. The single-quoted jsonpath string is passed verbatim to `kubectl`, which sees the literal `${secret_key}` and rejects it as an invalid jsonpath expression (`U+007B '{'`).
+
+**After fixing:** commit, push, then hand off to Gemini for re-validation on m2-air.
+
+**Reference:** `docs/issues/2026-02-27-test-eso-jsonpath-interpolation-failure.md`
+
+---
+
+## Next Step for Gemini — Re-validate on m2-air (after Codex fix)
 
 **IMPORTANT: This task requires running shell commands on m2-air and reporting actual output.
 Do NOT read documentation, review code, or summarize fixes. Execute the commands below,
