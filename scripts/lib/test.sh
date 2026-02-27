@@ -706,12 +706,14 @@ function test_vault() {
   _kubectl create namespace "$test_ns" >/dev/null 2>&1 || true
   _kubectl create sa "$sa" -n "$test_ns" >/dev/null 2>&1 || true
 
-  _info "Creating temporary Vault role for service account..."
+  local token_audience="${K8S_TOKEN_AUDIENCE:-https://kubernetes.default.svc.cluster.local}"
+  _info "Creating temporary Vault role for service account (audience: $token_audience)..."
   _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
     sh -c "VAULT_TOKEN='$root_token' vault write auth/kubernetes/role/$sa \\
       bound_service_account_names=\"$sa\" \\
       bound_service_account_namespaces=\"$test_ns\" \\
       policies=eso-reader \\
+      token_audiences=\"$token_audience\" \\
       ttl=1h"
 
   _info "Seeding test secret at secret/${vault_secret_path}..."
@@ -760,6 +762,8 @@ POD
   done
 
   if [[ "$secret" != "$secret_val" ]]; then
+    _info "vault-read pod logs (vault auth error details):"
+    _kubectl -n "$test_ns" logs vault-read 2>/dev/null || true
     _info "Failed to read secret via pod"
     return 1
   fi
