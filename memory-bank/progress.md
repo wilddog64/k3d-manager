@@ -71,11 +71,11 @@ continued end-to-end validation for auth/deploy modes.
   - **macOS SMB CSI limitation:** `cifs` kernel module unavailable in k3d/OrbStack node
     containers — SMB CSI cannot mount volumes on macOS.
   - **macOS implementation order** (`docs/plans/smb-csi-macos-workaround.md`):
-    - Phase 1 — **Skip guard** (start here): `uname` check in `deploy_smb_csi`; warn and
-      return early on macOS. Unblocks Jenkins agent work with zero extra infra.
-    - Phase 2 — **NFS CSI swap** (when local shared storage needed): in-cluster NFS server
+    - [x] Phase 1 — **Skip guard** (2026-02-27): `deploy_smb_csi` logs a warning + no-ops on macOS,
+      preventing accidental installs while Linux validation remains available.
+    - [ ] Phase 2 — **NFS CSI swap** (when local shared storage needed): in-cluster NFS server
       + NFS CSI driver; StorageClass named `smb` backed by NFS — Jenkins manifests unchanged.
-    - Phase 3 — **Custom k3d node image** (experimental, OrbStack only): `rancher/k3s` +
+    - [ ] Phase 3 — **Custom k3d node image** (experimental, OrbStack only): `rancher/k3s` +
       `cifs-utils`; attempt real SMB CSI on OrbStack. Document result. Skip on Docker Desktop.
   - **Linux/production:** native SMB CSI — no workaround. All SMB CSI validation must run
     on Linux (k3s provider or GitHub Actions Linux runner) before merge.

@@ -565,14 +565,19 @@ function _cleanup_trap_command() {
 }
 function _install_smb_csi_driver() {
    if _is_mac ; then
-      echo "warning: SMB CSI driver is not supported on macOS"
-      exit 0
+      _warn "[smb-csi] SMB CSI driver is not supported on macOS; skipping. Use Linux/k3s to validate."
+      return 0
    fi
+
+   local release="${SMB_CSI_RELEASE:-smb-csi-driver}"
+   local namespace="${SMB_CSI_NAMESPACE:-kube-system}"
+   local chart_repo="https://kubernetes-sigs.github.io/smb-csi-driver"
+
    _install_helm
-   _helm repo add smb-csi-driver https://kubernetes-sigs.github.io/smb-csi-driver
+   _helm repo add smb-csi-driver "$chart_repo"
    _helm repo update
-   _helm upgrade --install smb-csi-driver smb-csi-driver/smb-csi-driver \
-      --namespace kube-system
+   _helm upgrade --install "$release" smb-csi-driver/smb-csi-driver \
+      --namespace "$namespace" --create-namespace
 }
 
 function _create_nfs_share() {
