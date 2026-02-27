@@ -1,0 +1,70 @@
+# Argo CD Helm values template with LDAP/Dex authentication
+# Environment variables are substituted using envsubst during deployment
+
+global:
+  domain: ${ARGOCD_VIRTUALSERVICE_HOST}
+
+configs:
+  params:
+    server.insecure: ${ARGOCD_SERVER_INSECURE}
+
+  cm:
+    url: https://${ARGOCD_VIRTUALSERVICE_HOST}
+
+    dex.config: |
+      connectors:
+        - type: ldap
+          id: ldap
+          name: LDAP
+          config:
+            host: ${ARGOCD_LDAP_HOST}:${ARGOCD_LDAP_PORT}
+            insecureNoSSL: true
+            insecureSkipVerify: true
+
+            bindDN: ${ARGOCD_LDAP_BIND_DN}
+            bindPW: $dex.ldap.bindPW
+
+            userSearch:
+              baseDN: ${ARGOCD_LDAP_USER_SEARCH_BASE},${ARGOCD_LDAP_BASE_DN}
+              filter: "(cn={0})"
+              username: cn
+              idAttr: cn
+              emailAttr: mail
+              nameAttr: cn
+
+            groupSearch:
+              baseDN: ${ARGOCD_LDAP_GROUP_SEARCH_BASE},${ARGOCD_LDAP_BASE_DN}
+              filter: "(|(memberUid={1})(member={0})(uniqueMember={0}))"
+              userMatchers:
+                - userAttr: DN
+                  groupAttr: member
+              nameAttr: cn
+
+  rbac:
+    policy.default: ${ARGOCD_RBAC_DEFAULT_POLICY}
+    policy.csv: |
+      g, "${ARGOCD_RBAC_ADMIN_GROUP}", role:admin
+
+server:
+  replicas: ${ARGOCD_SERVER_REPLICAS}
+
+  service:
+    type: ClusterIP
+
+  ingress:
+    enabled: false
+
+  extraArgs:
+    - --insecure
+
+repoServer:
+  replicas: ${ARGOCD_REPO_SERVER_REPLICAS}
+
+controller:
+  replicas: 1
+
+applicationSet:
+  replicas: ${ARGOCD_APPLICATIONSET_REPLICAS}
+
+dex:
+  enabled: true
