@@ -6,10 +6,6 @@ name: CI
     types: [opened, synchronize, reopened]
     branches:
       - main
-    paths-ignore:
-      - 'docs/**'
-      - 'memory-bank/**'
-      - '**/*.md'
 
 permissions:
   contents: read
