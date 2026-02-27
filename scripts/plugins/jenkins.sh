@@ -1596,8 +1596,18 @@ function _deploy_jenkins() {
       else
          export JENKINS_MFA_PLUGIN=""
       fi
+      # Preserve admin credential placeholders so envsubst doesn't blank them
+      if [[ -z "${JENKINS_ADMIN_USER:-}" ]]; then
+         printf -v JENKINS_ADMIN_USER '%s' '${JENKINS_ADMIN_USER}'
+      fi
+      if [[ -z "${JENKINS_ADMIN_PASS:-}" ]]; then
+         printf -v JENKINS_ADMIN_PASS '%s' '${JENKINS_ADMIN_PASS}'
+      fi
+      export JENKINS_ADMIN_USER JENKINS_ADMIN_PASS
       _info "[jenkins] processing template with envsubst: $template_file"
       envsubst < "$template_file" > "$values_file"
+      _info "[jenkins] DEBUG rendered values (JENKINS_NAMESPACE) -> $(grep -n 'jenkins\.\${' "$values_file" || true)"
+      _info "[jenkins] DEBUG rendered values snippet: $(grep -n 'jenkins\.' "$values_file" | head -n 3)"
    else
       # Use file directly (no template processing)
       values_file="${JENKINS_VALUES_FILE:-$template_file}"

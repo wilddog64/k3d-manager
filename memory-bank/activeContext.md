@@ -25,52 +25,26 @@ Active development branch. **Not yet merged to `main`.**
 
 ## Current Priorities
 
-### Priority 1: Jenkins Kubernetes agents (BLOCKED — Codex debugging)
+### Priority 1: Jenkins Kubernetes agents (VALIDATED — SMB CSI still pending)
 
-**Symptom:** `${JENKINS_NAMESPACE}` is still literal in the deployed ConfigMap:
-```
-jenkinsUrl: "http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8080"
-```
-Agents queue indefinitely with "Jenkins doesn't have label 'linux'".
+**Status:** Linux/kaniko agent validation complete. SMB CSI work continues separately (macOS skip guard still active).
 
-**Root cause under investigation:**
-- `JENKINS_NAMESPACE` exported at `jenkins.sh:1277`
-- envsubst runs at `jenkins.sh:1600`
-- awk pass reads `$values_file` → `$temp_values` at line 1743; `values_file` reassigned to `$temp_values`
-- ConfigMap still shows literal — either JENKINS_NAMESPACE not in env at envsubst call, or awk reintroduces it
+**What changed on 2026-02-27:**
+- ServiceAccount mismatch resolved (`docs/issues/2026-02-27-jenkins-k8s-agent-serviceaccount-mismatch.md`).
+- JCasC admin placeholders preserved so envsubst runs for all templates (`docs/issues/2026-02-27-jenkins-jcasc-admin-credentials-empty.md`).
+- Crumb issuer regression fixed + scripts updated (`docs/issues/2026-02-27-jenkins-crumb-issuer-xpath-forbidden.md`).
+- Controller Service/VirtualService ports aligned to 8080 so agents can connect (`docs/issues/2026-02-27-jenkins-service-port-mismatch.md`).
+- ConfigMap now renders concrete namespaces (`kubectl get configmap jenkins-jenkins-config-02-kubernetes-agents.yaml | grep jenkinsUrl`).
+- E2E proof:
+  - `CLUSTER_PROVIDER=orbstack PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_jenkins --enable-vault` — smoke test 4/4 passes.
+  - `PATH="/opt/homebrew/bin:$PATH" JENKINS_URL="http://127.0.0.1:8083" ./bin/run-k8s-agent-tests.sh` — both linux + kaniko jobs trigger and finish.
+  - `timeout 120 kubectl -n jenkins get pods -w | grep agent` shows pods progressing Pending → Running → Completed.
+  - `curl -sk -u jenkins-admin:*** http://127.0.0.1:8083/job/01-linux-agent-test/lastBuild/api/json | jq '.result'` → `"SUCCESS"` (same for kaniko).
 
-**Next task for Codex — 3-step diagnostic (keep session short and focused):**
+**Next steps:**
+- Automate the port-forward workflow (helper script) so Jenkins smoke + agent tests can run outside `deploy_jenkins` without manual tunnels.
+- Continue SMB CSI Phase 2 (NFS-based swap) per `docs/plans/smb-csi-macos-workaround.md`.
 
-Step 1 — test envsubst standalone:
-```bash
-export JENKINS_NAMESPACE=jenkins
-envsubst < scripts/etc/jenkins/values-default.yaml.tmpl | grep -A3 "02-kubernetes-agents"
-```
-- Expanded → envsubst works; bug is in deploy_jenkins call scope
-- Still literal → template syntax issue
-
-Step 2 — add debug line before `jenkins.sh:1600`:
-```bash
-_info "[jenkins] DEBUG JENKINS_NAMESPACE=${JENKINS_NAMESPACE}"
-```
-Redeploy and check. If empty/missing → export at line 1277 not persisting.
-
-Step 3 — if Step 2 shows JENKINS_NAMESPACE is set but still not expanding, check awk output:
-```bash
-# Add before line 1743:
-_info "[jenkins] DEBUG rendered: $(grep JENKINS_NAMESPACE "$values_file")"
-```
-
-**Fix (once root cause confirmed):**
-- If not exported at call site: add `JENKINS_NAMESPACE="$ns" envsubst < ...` at line 1600
-- If awk reintroduces: pipe `$temp_values` through a second envsubst pass
-
-**Acceptance criteria:**
-- `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault` completes
-- ConfigMap shows expanded namespace (e.g. `jenkins.jenkins.svc.cluster.local`)
-- linux-agent-test job spawns pod and completes
-
-**Memory-bank update rule:** Do NOT mark ✅ until agent pod actually spawns. Paste evidence.
 
 ### Priority 2: Open PR and release v0.1.0
 - Once Jenkins agents land and CI is green: open PR `ldap-develop` → `main`
@@ -81,9 +55,9 @@ _info "[jenkins] DEBUG rendered: $(grep JENKINS_NAMESPACE "$values_file")"
 
 ---
 
-## Next Step for Gemini — Validate Jenkins Kubernetes Agents
+## Next Step for Gemini — Capture Jenkins agent evidence, then tackle SMB CSI
 
-**Wait for Codex to fix the envsubst issue first.** Once Codex marks agents ✅ with evidence, run:
+**Now that Codex has the agents green locally, please re-run the flow on m4-air and paste the transcripts so we can close the loop.** Once evidence is landed, pivot to SMB CSI Phase 2.
 
 **RULES:** Full terminal output required. `hostname` mandatory. No summaries.
 
@@ -109,7 +83,7 @@ kubectl -n jenkins get svc jenkins-agent
 kubectl -n jenkins get pods -w --timeout=120s | grep agent
 ```
 
-If all pass: mark Jenkins agents ✅ in progress.md, commit with evidence.
+If all pass: add an "Evidence" subsection here + in `progress.md` and mark Jenkins agents ✅.
 If any fail: create `docs/issues/YYYY-MM-DD-<slug>.md`, report, do NOT mark complete.
 
 ---
@@ -131,7 +105,7 @@ If any fail: create `docs/issues/YYYY-MM-DD-<slug>.md`, report, do NOT mark comp
 2. ✅ Pure-logic BATS suites green
 3. ✅ No regressions on `deploy_jenkins --enable-vault` baseline
 4. ✅ Known-broken paths documented with guardrails
-5. **Jenkins Kubernetes agents working** — hard requirement, NOT yet met
+5. ✅ Jenkins Kubernetes agents working — linux/kaniko validation succeeded (2026-02-27); SMB CSI still pending separately
 
 ## Release Strategy
 
