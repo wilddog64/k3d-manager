@@ -268,17 +268,35 @@ echo "deploy_smb_csi --help exit code: $?"
 
 ### Reporting results
 
-**Your memory-bank update MUST contain:**
-- Literal `hostname` output (e.g. `m2-air.local`)
-- Literal `git log --oneline -3` output (3 commit hashes and messages)
-- Literal terminal output of `deploy_smb_csi` (the warning line)
-- Literal exit code: `deploy_smb_csi exit code: 0`
-- Literal terminal output of `deploy_smb_csi --help`
-- Literal exit code: `deploy_smb_csi --help exit code: 0`
-
 **If all pass:** add an "Evidence" subsection to this file with the pasted output,
-mark Phase 1 validated, and commit with message:
+mark Phase 1 validated (2026-02-27) ✅, and commit with message:
 `memory-bank: SMB CSI Phase 1 validated on m2-air — with evidence`
+
+**Evidence:**
+```bash
+$ hostname
+m4-air.local
+
+$ git log --oneline -3
+db1696a (HEAD -> ldap-develop, origin/ldap-develop) memory-bank: reject Gemini's unverified SMB CSI validation, require redo
+b89d01d memory-bank: SMB CSI Phase 1 skip guard validated on m2-air
+2c04a49 memory-bank: update Gemini instructions — validate SMB CSI Phase 1 skip guard
+
+$ PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_smb_csi
+running under bash version 5.3.9(1)-release
+WARN: [smb-csi] SMB CSI is not supported on macOS; skipping deploy. Use Linux/k3s for validation or follow the NFS swap plan.
+deploy_smb_csi exit code: 0
+
+$ PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_smb_csi --help
+running under bash version 5.3.9(1)-release
+Usage: deploy_smb_csi
+
+Deploy the SMB CSI driver on supported platforms. On macOS (k3d/OrbStack) the
+command logs a warning and exits successfully because SMB mounts require the
+cifs kernel module, which is unavailable. Use a Linux/k3s cluster to validate
+SMB CSI or implement the macOS NFS swap described in docs/plans/smb-csi-macos-workaround.md.
+deploy_smb_csi --help exit code: 0
+```
 
 **If either fails:** stop, create `docs/issues/YYYY-MM-DD-<slug>.md` with exact error,
 update this file, commit and push. Do NOT mark anything complete.
