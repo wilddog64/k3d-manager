@@ -8,9 +8,8 @@
 
 **v0.1.0 shipped ✅** — PR #2 merged, tagged, released.
 
-Next task: (DONE 2026-02-27) add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` so new
-clusters get it automatically. See `docs/issues/2026-02-27-vault-missing-auth-delegator-clusterrolebinding.md`.
-Follow-up work: automate SMB CSI Phase 2 (NFS swap) + port-forward helpers for Jenkins validation.
+Next task: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` — **code complete, pending Gemini validation**.
+Branch: `fix/vault-auth-delegator`. See Gemini instructions below.
 
 - Stage 2 CI: ✅ fully green (`test_vault`, `test_eso`, `test_istio` on m2-air)
 - PR #2 merged to `main` at 2026-02-27T20:09:45Z
@@ -25,8 +24,7 @@ Follow-up work: automate SMB CSI Phase 2 (NFS swap) + port-forward helpers for J
 - Jenkins k8s agents fully fixed by Codex — SA mismatch, admin credential placeholders, crumb issuer, port alignment
 - Jenkins admin password zsh glob issue: always wrap `-u user:pass` in quotes. See `docs/issues/2026-02-27-jenkins-admin-password-zsh-glob.md`
 - Smoke test TLS race fixed: retry logic added in `bin/smoke-test-jenkins.sh`
-- Vault install now auto-creates the `system:auth-delegator` ClusterRoleBinding for the Vault service account,
-  unblocking Kubernetes auth on fresh clusters (docs/issues/2026-02-27-vault-missing-auth-delegator-clusterrolebinding.md).
+- Vault: `system:auth-delegator` ClusterRoleBinding added to both k8s auth setup paths in `vault.sh` — **pending Gemini validation**.
 
 ---
 
@@ -179,10 +177,52 @@ Do NOT update memory-bank — that is done separately after validation.
 
 ---
 
-## Next Step for Gemini — Validation Complete ✅
+## Next Step for Gemini — Validate `system:auth-delegator` fix
 
-Codex fixed all four root causes and committed the changes (`822fe54` on `ldap-develop`).
-Gemini successfully validated the full flow on m4-air. Output evidence is documented under Priority 1.
+**Branch:** `fix/vault-auth-delegator` (latest commit: `2330b4d`)
+**What Codex changed:** `scripts/plugins/vault.sh` — added `_kubectl create clusterrolebinding vault-auth-delegator` in both k8s auth setup paths so `deploy_vault` always grants the vault SA `system:auth-delegator`.
+
+**Validation steps (run on m2-air or any machine with a running cluster):**
+
+```bash
+# Step 0 — prove you are on the right machine with latest code
+$ hostname
+$ git -C ~/src/gitrepo/personal/k3d-manager fetch origin fix/vault-auth-delegator
+$ git -C ~/src/gitrepo/personal/k3d-manager checkout fix/vault-auth-delegator
+$ git -C ~/src/gitrepo/personal/k3d-manager log --oneline -3
+
+# Step 1 — delete the manually-created binding so we test the code path
+$ kubectl delete clusterrolebinding vault-auth-delegator --ignore-not-found
+
+# Step 2 — confirm it is gone
+$ kubectl get clusterrolebinding vault-auth-delegator 2>&1
+
+# Step 3 — re-run deploy_vault (Vault is already deployed; this re-applies auth config)
+$ CLUSTER_PROVIDER=orbstack PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_vault
+
+# Step 4 — confirm the ClusterRoleBinding was auto-created
+$ kubectl get clusterrolebinding vault-auth-delegator -o yaml | grep -A5 subjects
+
+# Step 5 — confirm vault k8s auth works end-to-end
+$ ROOT=$(kubectl -n vault get secret vault-root -o jsonpath='{.data.root_token}' | base64 -d)
+$ kubectl create namespace vault-gemini-test 2>/dev/null || true
+$ kubectl create sa gemini-test-sa -n vault-gemini-test 2>/dev/null || true
+$ kubectl -n vault exec -i vault-0 -- sh -c "VAULT_TOKEN='$ROOT' vault write auth/kubernetes/role/gemini-test-sa \
+    bound_service_account_names=gemini-test-sa \
+    bound_service_account_namespaces=vault-gemini-test \
+    policies=eso-reader ttl=1h"
+$ JWT=$(kubectl create token gemini-test-sa -n vault-gemini-test)
+$ kubectl -n vault exec -i vault-0 -- vault write auth/kubernetes/login role=gemini-test-sa jwt=$JWT
+
+# Expected: vault token returned with policies=["default","eso-reader"]
+
+# Step 6 — cleanup
+$ kubectl delete namespace vault-gemini-test --ignore-not-found
+```
+
+**Pass criteria:** Step 4 shows the ClusterRoleBinding with `serviceaccount: vault/vault`. Step 5 returns a vault token (not 403).
+
+**After validation:** Update this section with evidence and mark Priority 1 ✅ in progress.md.
 
 ---
 
