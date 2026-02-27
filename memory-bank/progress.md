@@ -2,10 +2,8 @@
 
 ## Overall Status
 
-Branch `ldap-develop` has completed a major test-strategy overhaul (2026-02-20):
-mock-heavy BATS suites were retired and E2E smoke testing is now the primary
-integration confidence path. Current focus is Jenkins k8s agents/SMB CSI and
-continued end-to-end validation for auth/deploy modes.
+`ldap-develop` merged to `main` via PR #2 (2026-02-27). **v0.1.0 released.**
+Next: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` (Priority 1 in activeContext.md).
 
 ---
 
@@ -58,6 +56,7 @@ continued end-to-end validation for auth/deploy modes.
 - [x] `docs/tests/active-directory-testing-instructions.md`
 - [x] `docs/plans/` — full set of interface and integration design docs
 - [x] `docs/issues/` updated with operational issues through 2026-02-20
+- [x] Vault: `system:auth-delegator` ClusterRoleBinding in `deploy_vault` — code complete and validated via `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault` (2026-02-27).
 
 ---
 
@@ -150,9 +149,15 @@ continued end-to-end validation for auth/deploy modes.
     - **Step 8 (Stage 2) results:** `test_eso` ✅, `test_istio` ✅, `test_vault` ✅
     - Status: `m2-air` cluster is now a verified Stage 2 CI fixture.
   - [ ] Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
-- [ ] **Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*`** — fix GitGuardian false positive
+- [x] **Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*`** — fix GitGuardian false positive
+  - Code renamed in `scripts/` as of 2026-02-23. Docs/memory-bank cleanup pending.
+  - Plan: `docs/plans/ldap-rotator-rename.md`
   - See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
-  - Affects: `scripts/etc/ldap/vars.sh` and any referencing scripts
+
+- [x] **`test_vault` cleanup** — revert non-fatal pod test workaround to hard-fail
+  - Workaround at `scripts/lib/test.sh` lines 780–793 was added when `system:auth-delegator` was missing.
+  - ClusterRoleBinding is now in `deploy_vault` — workaround reverted and validated (2026-02-27).
+  - Plan: `docs/plans/test-vault-cleanup.md`
 
 - [ ] **AI-powered code review via GitHub Actions**
   - Automate PR analysis using a cost-optimized model (Claude Haiku or GPT-4o-mini — ~20x cheaper than GPT-4o)
@@ -179,6 +184,7 @@ continued end-to-end validation for auth/deploy modes.
 | LDAP password JCasC/envsubst interpolation | OPEN | `$${...}` escape attempt not yet confirmed working |
 | `test_cert_rotation` via dispatcher | OPEN | Manual cert rotation works; dispatcher flow still unreliable/hangs |
 | `test_vault` fails — ClusterRoleBinding conflict | FIXED | 2026-02-26: test now reuses the existing `vault` namespace/release, validates readiness up front, and only cleans up the test namespace, Vault role, and seeded secret. See `docs/issues/2026-02-26-test-vault-clusterrolebinding-conflict.md`. |
+| Vault: missing `system:auth-delegator` binding | FIXED | 2026-02-27: `deploy_vault` now ensures the binding exists. Validated on m4-air by Gemini. See `docs/issues/2026-02-27-vault-auth-delegator-helm-managed.md`. |
 | `test_eso` fails — ClusterSecretStore API version mismatch | FIXED | 2026-02-27: `v1beta1` → `v1` in `scripts/lib/test.sh` line 591. Detected on m2-air by Gemini. See `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md`. |
 | `test_eso` fails — `insecureSkipVerify` removed in ESO v1 | FIXED | 2026-02-27: Vault uses HTTP internally; switched server URL to `http://` and removed `tls` block. See `docs/issues/2026-02-27-test-eso-v1-schema-incompatibility.md`. |
 | `test_eso` fails — jsonpath single-quote interpolation | FIXED | 2026-02-27: switched to double quotes so `${secret_key}` expands before `kubectl` runs. Validated on m2-air by Gemini. See `docs/issues/2026-02-27-test-eso-jsonpath-interpolation-failure.md`. |
@@ -187,6 +193,7 @@ continued end-to-end validation for auth/deploy modes.
 | LDAP bind DN mismatch | FIXED | Keep `LDAP_BASE_DN` consistent with LDIF base DN |
 | Jenkins pod readiness timeout | FIXED | 10m timeout + pod existence check |
 | GitGuardian false positive: `LDAP_PASSWORD_ROTATOR_IMAGE` | FALSE POSITIVE | Variable name contains "PASSWORD", value is a Docker image. Fix: rename to `LDAP_ROTATOR_IMAGE`. See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md` |
+| Vault `system:auth-delegator` missing from `deploy_vault` | FIXED | `deploy_vault` now applies the binding automatically; `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault` (2026-02-27) succeeds cleanly. |
 | OrbStack: `deploy_cluster` unsupported provider | FIXED | Added `orbstack` to the provider guard in `scripts/lib/core.sh`. See `docs/issues/2026-02-24-orbstack-unsupported-provider-in-core.md`. |
 | OrbStack: `--dry-run` flag broken in `create_cluster` | FIXED | `create_cluster` now parses `--dry-run` and the k3d provider uses `grep -q --` to avoid option parsing. See `docs/issues/2026-02-24-orbstack-dry-run-errors.md`. |
 | `deploy_vault` fails on macOS — host path mkdir | FIXED | `_vault_ensure_data_path` now skips host `mkdir` on macOS; validation via `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault`. See `docs/issues/2026-02-24-macos-vault-local-path-creation-failure.md`. |

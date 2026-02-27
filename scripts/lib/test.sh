@@ -778,18 +778,9 @@ POD
   done
 
   if [[ "$secret" != "$secret_val" ]]; then
-    # Projected SA token auth failed from the vault-read pod. This is a known
-    # limitation on OrbStack/k3s where Vault can't validate projected SA tokens
-    # (either TokenReview RBAC is missing or strict audience validation applies).
-    # Log diagnostics and fall through to the kubectl-create-token auth test,
-    # which is the authoritative k8s auth validation for this cluster.
-    _info "WARNING: vault-read pod projected SA token auth failed (known OrbStack/k3s limitation)"
-    _info "Vault k8s auth config (for diagnosis):"
-    _kubectl -n "$vault_ns" exec "$vault_pod" -- \
-      sh -c "VAULT_TOKEN='$root_token' vault read auth/kubernetes/config" 2>/dev/null || true
     _info "vault-read pod logs:"
     _kubectl -n "$test_ns" logs vault-read 2>/dev/null || true
-    _info "Continuing with kubectl-create-token auth test as authoritative validation..."
+    _err "Projected SA token auth via vault-read pod failed"
   fi
 
   # Kubernetes auth token exchange (authoritative validation)
