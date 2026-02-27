@@ -272,7 +272,7 @@ echo "deploy_smb_csi --help exit code: $?"
 mark Phase 1 validated (2026-02-27) ✅, and commit with message:
 `memory-bank: SMB CSI Phase 1 validated on m2-air — with evidence`
 
-**Evidence:**
+**Evidence (run on m4-air — acceptable for this test; skip guard is macOS-generic):**
 ```bash
 $ hostname
 m4-air.local
