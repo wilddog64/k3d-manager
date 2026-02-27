@@ -469,6 +469,22 @@ This project uses a three-agent loop for complex implementation tasks:
   memory-bank update, and NOT push the branch. The human must restart the session
   with full access before the commit lands.
 
+### Memory-Bank Update Rule (added 2026-02-27)
+
+**Applies to ALL agents (Codex, Gemini, Claude).**
+
+- **Do not update memory-bank to claim work is done until the work is actually done.**
+  Updating `memory-bank/activeContext.md` or `memory-bank/progress.md` with a completed
+  status before the fix is confirmed working is the same failure mode as Gemini claiming
+  tests passed without running them. It misleads every agent that reads the file next.
+- **The memory-bank is a source of truth, not a to-do list.** Write what happened, not
+  what you intend to do. Use "IN PROGRESS" or "PAUSED" status if work is incomplete.
+- **Evidence required for any ✅ mark:**
+  - Codex: paste the relevant command output (e.g. `deploy_jenkins` exit 0, pod running)
+  - Gemini: paste full terminal output including `hostname`
+  - Claude: cite the commit hash or line number that confirms the change
+- **Memory-bank updates without evidence will be rejected and redone.**
+
 ### Secret Handling Rule (2026-02-22)
 
 - **Never output or commit secrets:** Agents must NEVER print the result of
