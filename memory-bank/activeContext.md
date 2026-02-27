@@ -221,106 +221,57 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 
 ---
 
-## Next Step for Codex — Fix `test_istio` hardcoded namespace
-
-**File:** `scripts/lib/test.sh`
-
-**Problem:** The `test_istio` function generates a random namespace via `_test_lib_random_name 'istio-test'` and stores it in `$test_ns`, but several lines inside the function still reference the literal string `istio-test`:
-
-| Line | Hardcoded reference |
-|---|---|
-| 188 | `_kubectl --no-exit get pod -n istio-test -o yaml` |
-| 207 | `_kubectl apply -f - -n istio-test` |
-| 212 | `namespace: istio-test` (inside heredoc) |
-| 228 | `namespace: istio-test` (inside heredoc) |
-| 243 | `_kubectl --no-exit get gateway -n istio-test test-gateway` |
-
-**Also check line 275:** a second function (cleanup or teardown) has `local test_ns="${1:-istio-test}"` — confirm whether this default needs to be updated or if the caller always passes `$test_ns` explicitly.
-
-**Fix:** Replace each hardcoded `istio-test` (except the `_test_lib_random_name` prefix on line 131) with `"$test_ns"`. Heredoc namespace fields need to use the variable via the outer scope or switch to a non-heredoc apply.
-
-**After fixing:** commit, push, then hand off to Gemini.
-
-**Reference:** `docs/issues/2026-02-27-test-istio-hardcoded-namespace.md`
-
----
-
-## Next Step for Gemini — Re-validate on m2-air (after Codex fix)
+## Next Step for Gemini — Validate SMB CSI Phase 1 skip guard on m2-air
 
 **IMPORTANT: This task requires running shell commands on m2-air and reporting actual output.
 Do NOT read documentation, review code, or summarize fixes. Execute the commands below,
 capture their exit codes and output, and report exactly what happened.**
 
-### Step 0 — Verify prerequisites (run each command, report output)
+### Step 0 — Verify you are on m2-air with latest code
 
 ```bash
-# Are you on m2-air?
 hostname
-
-# Is the repo on ldap-develop with latest changes?
 git -C ~/src/gitrepo/personal/k3d-manager branch
 git -C ~/src/gitrepo/personal/k3d-manager pull
-
-# Is OrbStack running?
-orb status
-
-# Is Vault running and unsealed?
-kubectl get pods -n vault
-
-# If vault-0 shows Running but sealed, unseal it:
-CLUSTER_PROVIDER=orbstack ~/src/gitrepo/personal/k3d-manager/scripts/k3d-manager reunseal_vault
+git -C ~/src/gitrepo/personal/k3d-manager log --oneline -3
 ```
 
-### Step 1 — Pull latest fixes
+**Report `hostname` output and `git log --oneline -3` output.**
+
+### Step 1 — Verify skip guard fires on macOS
 
 ```bash
 cd ~/src/gitrepo/personal/k3d-manager
-git pull
-git log --oneline -3
+PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_smb_csi
+echo "deploy_smb_csi exit code: $?"
 ```
 
-**Report the output of `git log --oneline -3`.**
-
-### Step 2 — Run test_eso (two fixes applied, retry now)
-
-```bash
-PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_eso
-echo "test_eso exit code: $?"
-```
-
+**Expected:** a warning line containing "SMB CSI" and "macOS" and exit code 0.
 **Report the full terminal output and exit code.**
 
-### Step 3 — Run test_istio (REQUIRED, only if Step 2 passed)
+### Step 2 — Verify --help works
 
 ```bash
-PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_istio
-echo "test_istio exit code: $?"
+PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_smb_csi --help
+echo "deploy_smb_csi --help exit code: $?"
 ```
 
-**Report the full terminal output and exit code.**
-
-### Step 4 — Run test_vault (re-confirm, only if Step 3 passed)
-
-```bash
-PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_vault
-echo "test_vault exit code: $?"
-```
-
+**Expected:** usage text mentioning macOS limitation and NFS swap plan, exit code 0.
 **Report the full terminal output and exit code.**
 
 ### Reporting results
 
-**If all three pass (exit code 0):**
-- Update this file: mark step 8 ✅ with date and actual output summary
-- Commit and push with message: `memory-bank: step 8 complete — test_vault/eso/istio green on m2-air`
-- Do NOT update branch protection — that is Claude's job (step 9)
+**If both pass (exit code 0, warning/help text visible):**
+- Update this file: mark SMB CSI Phase 1 ✅ validated on m2-air with date
+- Commit and push with message: `memory-bank: SMB CSI Phase 1 skip guard validated on m2-air`
+- Do NOT make any code changes
 
-**If any test fails:**
-- Stop immediately, do not run further tests
-- Document the exact error output in `docs/issues/YYYY-MM-DD-<slug>.md`
+**If either fails:**
+- Stop immediately
+- Create `docs/issues/YYYY-MM-DD-<slug>.md` with exact error output
 - Update this file with findings
 - Commit and push the issue doc
-- Do NOT mark any step as complete
+- Do NOT mark anything complete
 
 ---
 
