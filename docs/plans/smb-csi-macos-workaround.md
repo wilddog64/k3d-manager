@@ -170,7 +170,8 @@ validation is needed locally.
 | Production / Linux CI validation | Native SMB CSI — no workaround needed |
 
 **Suggested implementation order:**
-1. Start with Option 3 (skip guard) — unblocks Jenkins agent work immediately
+1. ✅ (2026-02-27) Implement Option 3 skip guard — `deploy_smb_csi` now logs a warning and returns
+   success on macOS so Jenkins agent work can proceed without crashing the dispatcher.
 2. Add Option 1 (NFS CSI swap) when a developer needs local `ReadWriteMany` storage
 3. Attempt Option 2 on OrbStack opportunistically; document result
 

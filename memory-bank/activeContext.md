@@ -16,6 +16,7 @@ Complete Stage 2 CI workflow and prepare `ldap-develop` for merge to `main`.
 ### Session Notes (2026-02-27)
 - Codex re-synced docs + memory-bank; applied the remaining `test_eso` fixes (apiVersion, HTTP server, jsonpath quoting) and revalidated locally with `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_eso` ✅.
 - Codex fixed `test_istio` namespace references so the randomized `$test_ns` is used everywhere and validated locally via `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_istio` ✅.
+- Codex implemented the SMB CSI Phase 1 skip guard: `./scripts/k3d-manager deploy_smb_csi` now logs a warning and no-ops on macOS, unblocking Jenkins agent work while keeping Linux validation available.
 - Gemini validated Jenkins smoke test fixes (VirtualService hostname detection, standalone script path normalization) — confirmed FIXED as documented. However, Gemini still has not run `test_vault`, `test_eso`, `test_istio` on m2-air after the latest fixes; Step 8 remains pending.
 
 ---
@@ -182,6 +183,17 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
   `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_istio`.
 - Docs: `docs/issues/2026-02-27-test-istio-hardcoded-namespace.md` updated with the fix details.
 - Action: Gemini must rerun `./scripts/k3d-manager test_istio` on m2-air during Stage 2 Step 8.
+
+---
+
+## Update — SMB CSI skip guard (2026-02-27)
+
+- Status: ✅ Completed. Added `scripts/plugins/smb-csi.sh` with the `deploy_smb_csi` entry point.
+  On macOS the command emits a warning and returns success (Phase 1 skip guard). On Linux it
+  installs the upstream SMB CSI Helm chart using configurable `SMB_CSI_RELEASE`/namespace.
+- Validation: `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_smb_csi` now prints the
+  skip warning instead of exiting the dispatcher.
+- Next: implement Option 1 (NFS swap) when macOS ReadWriteMany validation is required.
 
 ---
 
