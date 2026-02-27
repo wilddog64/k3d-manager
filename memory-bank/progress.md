@@ -154,9 +154,9 @@ Next: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` (Priority
   - Plan: `docs/plans/ldap-rotator-rename.md`
   - See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
 
-- [ ] **`test_vault` cleanup** — revert non-fatal pod test workaround to hard-fail
+- [x] **`test_vault` cleanup** — revert non-fatal pod test workaround to hard-fail
   - Workaround at `scripts/lib/test.sh` lines 780–793 was added when `system:auth-delegator` was missing.
-  - ClusterRoleBinding is now in `deploy_vault` — workaround should be reverted.
+  - ClusterRoleBinding is now in `deploy_vault` — workaround reverted and validated (2026-02-27).
   - Plan: `docs/plans/test-vault-cleanup.md`
 
 - [ ] **AI-powered code review via GitHub Actions**
