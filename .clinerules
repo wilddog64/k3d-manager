@@ -462,6 +462,25 @@ This project uses a three-agent loop for complex implementation tasks:
 - **Trace protection:** Remember that `_run_command` auto-disables trace for sensitive flags;
   ensure any new sensitive flags are added to `_args_have_sensitive_flag` in `scripts/lib/system.sh`.
 
+### Fix Assignment Rule
+
+When a bug or test failure is identified, assign the fix as follows:
+
+| Fix type | Who fixes |
+|---|---|
+| Single-line string swap with no ambiguity (typo, version string) | Claude — fix directly, no agent needed |
+| Requires codebase reasoning (why is this wrong, what is the correct value, cross-file lookup) | Codex — provide documented spec, let Codex implement |
+| Validation / test execution on a specific environment | Gemini — run exact commands, report output and exit codes |
+
+**Examples:**
+- API version `v1beta1` → `v1` (string swap, obvious) → Claude fixes directly
+- `insecureSkipVerify` removal requiring lookup in `vars.sh` to confirm HTTP vs HTTPS → Codex
+- Running `test_vault`, `test_eso`, `test_istio` on m2-air → Gemini
+
+**Gemini validation rule:** Gemini must execute commands and report actual terminal output and exit codes. Reading documentation or reviewing code is NOT validation. If Gemini reports "validation complete" without showing command output, the task is not done.
+
+---
+
 ### Collapse Recovery Protocol
 
 When Gemini or Codex shows signs of hallucination (generating commits without
