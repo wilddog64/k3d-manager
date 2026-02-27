@@ -1,0 +1,76 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"argoproj.io/v1alpha1","kind":"ApplicationSet","metadata":{"annotations":{},"labels":{"app-type":"platform","managed-by":"k3d-manager"},"name":"platform-helm","namespace":"argocd"},"spec":{"generators":[{"clusters":{"selector":{"matchLabels":{"environment":"dev"}},"values":{"revision":"HEAD"}}}],"goTemplate":true,"goTemplateOptions":["missingkey=error"],"template":{"metadata":{"labels":{"cluster":"{{.name}}","environment":"{{.metadata.labels.environment}}"},"name":"{{.name}}-platform"},"spec":{"destination":{"namespace":"argocd","server":"{{.server}}"},"ignoreDifferences":[{"group":"apps","jsonPointers":["/spec/replicas"],"kind":"Deployment"}],"project":"platform","source":{"chart":"argo-cd","helm":{"parameters":[{"name":"server.replicas","value":"2"},{"name":"repoServer.replicas","value":"2"}],"releaseName":"argocd-{{.name}}"},"repoURL":"https://argoproj.github.io/argo-helm","targetRevision":"{{.values.revision}}"},"syncPolicy":{"automated":{"prune":false,"selfHeal":true},"syncOptions":["CreateNamespace=true"]}}}}}
+  creationTimestamp: "2025-12-09T02:06:23Z"
+  generation: 1
+  labels:
+    app-type: platform
+    managed-by: k3d-manager
+  name: platform-helm
+  namespace: argocd
+  resourceVersion: "1841308"
+  uid: 986e5f3c-3db2-4b6d-854b-eee03d6cb133
+spec:
+  generators:
+  - clusters:
+      selector:
+        matchLabels:
+          environment: dev
+      values:
+        revision: HEAD
+  goTemplate: true
+  goTemplateOptions:
+  - missingkey=error
+  template:
+    metadata:
+      labels:
+        cluster: '{{.name}}'
+        environment: '{{.metadata.labels.environment}}'
+      name: '{{.name}}-platform'
+    spec:
+      destination:
+        namespace: argocd
+        server: '{{.server}}'
+      ignoreDifferences:
+      - group: apps
+        jsonPointers:
+        - /spec/replicas
+        kind: Deployment
+      project: platform
+      source:
+        chart: argo-cd
+        helm:
+          parameters:
+          - name: server.replicas
+            value: "2"
+          - name: repoServer.replicas
+            value: "2"
+          releaseName: argocd-{{.name}}
+        repoURL: https://argoproj.github.io/argo-helm
+        targetRevision: '{{.values.revision}}'
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+status:
+  conditions:
+  - lastTransitionTime: "2025-12-09T02:06:23Z"
+    message: All applications have been generated successfully
+    reason: ApplicationSetUpToDate
+    status: "False"
+    type: ErrorOccurred
+  - lastTransitionTime: "2025-12-09T02:06:23Z"
+    message: Successfully generated parameters for all Applications
+    reason: ParametersGenerated
+    status: "True"
+    type: ParametersGenerated
+  - lastTransitionTime: "2025-12-09T02:06:23Z"
+    message: All applications have been generated successfully
+    reason: ApplicationSetUpToDate
+    status: "True"
+    type: ResourcesUpToDate

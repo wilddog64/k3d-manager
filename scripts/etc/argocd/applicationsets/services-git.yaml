@@ -1,0 +1,75 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"argoproj.io/v1alpha1","kind":"ApplicationSet","metadata":{"annotations":{},"labels":{"app-type":"services","managed-by":"k3d-manager"},"name":"services-git","namespace":"argocd"},"spec":{"generators":[{"git":{"directories":[{"path":"services/*"}],"repoURL":"https://github.com/your-org/k3d-manager","revision":"HEAD"}}],"goTemplate":true,"goTemplateOptions":["missingkey=error"],"template":{"metadata":{"labels":{"app-type":"service","discovered-from":"git"},"name":"{{.path.basename}}"},"spec":{"destination":{"namespace":"{{.path.basename}}","server":"https://kubernetes.default.svc"},"project":"platform","source":{"path":"{{.path.path}}","repoURL":"https://github.com/your-org/k3d-manager","targetRevision":"HEAD"},"syncPolicy":{"automated":{"prune":true,"selfHeal":true},"syncOptions":["CreateNamespace=true"]}}}}}
+  creationTimestamp: "2025-12-09T02:17:28Z"
+  generation: 1
+  labels:
+    app-type: services
+    managed-by: k3d-manager
+  name: services-git
+  namespace: argocd
+  resourceVersion: "1964776"
+  uid: 090eca65-283b-415c-a739-2868cebde74e
+spec:
+  generators:
+  - git:
+      directories:
+      - path: services/*
+      repoURL: https://github.com/your-org/k3d-manager
+      revision: HEAD
+  goTemplate: true
+  goTemplateOptions:
+  - missingkey=error
+  template:
+    metadata:
+      labels:
+        app-type: service
+        discovered-from: git
+      name: '{{.path.basename}}'
+    spec:
+      destination:
+        namespace: '{{.path.basename}}'
+        server: https://kubernetes.default.svc
+      project: platform
+      source:
+        path: '{{.path.path}}'
+        repoURL: https://github.com/your-org/k3d-manager
+        targetRevision: HEAD
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+status:
+  conditions:
+  - lastTransitionTime: "2025-12-09T11:44:42Z"
+    message: 'error generating params from git: error getting directories from repo:
+      error retrieving Git Directories: rpc error: code = Internal desc = unable to
+      resolve git revision : failed to list refs: Get "https://github.com/your-org/k3d-manager/info/refs?service=git-upload-pack":
+      dial tcp: lookup github.com on 10.43.0.10:53: read tcp 10.42.0.62:56372->10.43.0.10:53:
+      i/o timeout'
+    reason: ApplicationGenerationFromParamsError
+    status: "True"
+    type: ErrorOccurred
+  - lastTransitionTime: "2025-12-09T11:44:42Z"
+    message: 'error generating params from git: error getting directories from repo:
+      error retrieving Git Directories: rpc error: code = Internal desc = unable to
+      resolve git revision : failed to list refs: Get "https://github.com/your-org/k3d-manager/info/refs?service=git-upload-pack":
+      dial tcp: lookup github.com on 10.43.0.10:53: read tcp 10.42.0.62:56372->10.43.0.10:53:
+      i/o timeout'
+    reason: ErrorOccurred
+    status: "False"
+    type: ParametersGenerated
+  - lastTransitionTime: "2025-12-09T11:44:42Z"
+    message: 'error generating params from git: error getting directories from repo:
+      error retrieving Git Directories: rpc error: code = Internal desc = unable to
+      resolve git revision : failed to list refs: Get "https://github.com/your-org/k3d-manager/info/refs?service=git-upload-pack":
+      dial tcp: lookup github.com on 10.43.0.10:53: read tcp 10.42.0.62:56372->10.43.0.10:53:
+      i/o timeout'
+    reason: ErrorOccurred
+    status: "False"
+    type: ResourcesUpToDate
