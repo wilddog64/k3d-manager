@@ -149,9 +149,15 @@ Next: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` (Priority
     - **Step 8 (Stage 2) results:** `test_eso` ✅, `test_istio` ✅, `test_vault` ✅
     - Status: `m2-air` cluster is now a verified Stage 2 CI fixture.
   - [ ] Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
-- [ ] **Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*`** — fix GitGuardian false positive
+- [x] **Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*`** — fix GitGuardian false positive
+  - Code renamed in `scripts/` as of 2026-02-23. Docs/memory-bank cleanup pending.
+  - Plan: `docs/plans/ldap-rotator-rename.md`
   - See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
-  - Affects: `scripts/etc/ldap/vars.sh` and any referencing scripts
+
+- [ ] **`test_vault` cleanup** — revert non-fatal pod test workaround to hard-fail
+  - Workaround at `scripts/lib/test.sh` lines 780–793 was added when `system:auth-delegator` was missing.
+  - ClusterRoleBinding is now in `deploy_vault` — workaround should be reverted.
+  - Plan: `docs/plans/test-vault-cleanup.md`
 
 - [ ] **AI-powered code review via GitHub Actions**
   - Automate PR analysis using a cost-optimized model (Claude Haiku or GPT-4o-mini — ~20x cheaper than GPT-4o)

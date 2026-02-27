@@ -121,7 +121,27 @@ $ curl -sk -u "jenkins-admin:${JENKINS_PASS}" http://127.0.0.1:8083/job/02-kanik
 - Found that the Vault Helm chart manages this binding as `vault-server-binding`. The manual fix previously applied used a different name (`vault-auth-delegator`). The automation in `vault.sh` provides an additional safety net.
 - Documented in `docs/issues/2026-02-27-vault-auth-delegator-helm-managed.md`.
 
-### Priority 2: AD end-to-end validation
+### Priority 2: `test_vault` cleanup — revert non-fatal workaround
+
+**Status:** Pending Codex implementation + Gemini validation.
+
+**What to do:** `scripts/lib/test.sh` lines 780–793 contain a non-fatal warning block
+added when the vault SA lacked `system:auth-delegator`. Now that `deploy_vault` adds the
+ClusterRoleBinding, revert the warning to a hard-fail `_err`.
+
+Plan: `docs/plans/test-vault-cleanup.md`
+
+### Priority 3: LDAP rotator rename — docs cleanup
+
+**Status:** Code already renamed in `scripts/`. Docs/memory-bank cleanup pending.
+
+**What to do:** Update `memory-bank/progress.md`, `memory-bank/activeContext.md`, and
+`docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md` to reflect
+the rename is complete. No code changes needed.
+
+Plan: `docs/plans/ldap-rotator-rename.md`
+
+### Priority 4: AD end-to-end validation
 - Deferred to follow-on branch (requires external AD/VPN)
 
 ---
@@ -170,5 +190,5 @@ $ curl -sk -u "jenkins-admin:${JENKINS_PASS}" http://127.0.0.1:8083/job/02-kanik
 - **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`).
 - **LDAP bind DN**: keep `LDAP_BASE_DN` in sync with LDIF bootstrap base DN.
 - **Jenkins admin password**: contains special chars — always quote `-u "user:$pass"` or use kubectl to fetch. See `docs/issues/2026-02-27-jenkins-admin-password-zsh-glob.md`.
-- **GitGuardian false positive**: `LDAP_PASSWORD_ROTATOR_IMAGE` — pending rename to `LDAP_ROTATOR_IMAGE`.
+- **GitGuardian false positive resolved**: `LDAP_PASSWORD_ROTATOR_IMAGE` already renamed to `LDAP_ROTATOR_IMAGE` in all scripts. Docs/memory-bank cleanup pending — see `docs/plans/ldap-rotator-rename.md`.
 - **SMB CSI Phase 1 evidence**: validated on m4-air 2026-02-27. See evidence block in git history (commit `01f9d77`).
