@@ -111,11 +111,24 @@ Complete Stage 2 CI workflow and prepare `ldap-develop` for merge to `main`.
 
 ## Merge Criteria for `ldap-develop` → `main`
 
-1. Stage 2 CI runs green on PR #2.
-2. End-to-end AD testing passes in `--enable-ad` mode.
-3. Pure-logic BATS suites stay green after each change.
-4. No regressions on `deploy_jenkins --enable-vault` baseline path.
-5. Open known-broken paths are either fixed or explicitly documented with guardrails.
+1. ✅ Stage 2 CI runs green on PR #2.
+2. ~~End-to-end AD testing~~ → **moved to follow-on branch** (requires external AD /
+   VPN; infrastructure-gated, not code-gated).
+3. ✅ Pure-logic BATS suites stay green after each change.
+4. ✅ No regressions on `deploy_jenkins --enable-vault` baseline path.
+5. ✅ Open known-broken paths are either fixed or explicitly documented with guardrails.
+6. **Jenkins Kubernetes agents working** (Linux agents at minimum, SMB CSI Phase 1 skip
+   guard in place) — **hard requirement before PR**.
+
+## Release Strategy
+
+- **Version:** `v0.1.0` — first meaningful milestone (OrbStack, AD, cert rotation,
+  Stage 2 CI, Jenkins k8s agents)
+- **Trigger:** immediately after Stage 2 CI goes green on `main` post-merge
+- **Mechanism:** `gh release create v0.1.0 --generate-notes` — auto-changelog from
+  commit history; review and trim before publishing
+- **Next releases:** `v0.2.0` when AD e2e validation completes; `v1.0.0` when
+  production-hardened (docs complete, all known-broken paths resolved)
 
 ---
 
