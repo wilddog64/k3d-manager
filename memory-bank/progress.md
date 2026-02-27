@@ -105,7 +105,7 @@ continued end-to-end validation for auth/deploy modes.
   - **Stage 2:** integration tests against pre-built cluster (self-hosted Mac runner)
     - **Stage 2.0:** `scripts/ci/check_cluster_health.sh` — implemented ✅
     - **Stage 2.1:** `test_vault`, `test_eso`, `test_istio` — namespace isolation done ✅
-    - **Next:** add `stage2` job to `ci.yml` (see `memory-bank/activeContext.md`)
+    - **Stage 2.2:** `stage2` job added to `.github/workflows/ci.yml` (2026-02-26) — awaiting m2-air validation + required status check update
   - **Stage 3:** destructive tests via `workflow_dispatch` only — not yet created
 
 ### Priority 4 (Nice-to-have / future)
@@ -159,7 +159,7 @@ continued end-to-end validation for auth/deploy modes.
 | Basic LDAP deploys empty directory | OPEN | No bootstrap LDIF yet; use `deploy_ad` as workaround |
 | LDAP password JCasC/envsubst interpolation | OPEN | `$${...}` escape attempt not yet confirmed working |
 | `test_cert_rotation` via dispatcher | OPEN | Manual cert rotation works; dispatcher flow still unreliable/hangs |
-| `test_vault` fails — ClusterRoleBinding conflict | OPEN | `test_vault` tries to deploy a second Vault release into a random namespace; `vault-server-binding` is cluster-scoped and owned by existing `vault` release. Cleanup deletes it, corrupting live Vault. Fix: refactor to test against existing deployment like `test_eso` does. See `docs/issues/2026-02-26-test-vault-clusterrolebinding-conflict.md` |
+| `test_vault` fails — ClusterRoleBinding conflict | FIXED | 2026-02-26: test now reuses the existing `vault` namespace/release, validates readiness up front, and only cleans up the test namespace, Vault role, and seeded secret. See `docs/issues/2026-02-26-test-vault-clusterrolebinding-conflict.md`. |
 | ESO SecretStore `mountPath` wrong | FIXED | Must be `kubernetes` not `auth/kubernetes` |
 | LDAP bind DN mismatch | FIXED | Keep `LDAP_BASE_DN` consistent with LDIF base DN |
 | Jenkins pod readiness timeout | FIXED | 10m timeout + pod existence check |

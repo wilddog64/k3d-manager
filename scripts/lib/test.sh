@@ -674,27 +674,51 @@ function test_vault() {
   local vault_pod="${vault_release}-0"
   local test_ns="${VAULT_TEST_NAMESPACE:-$(_test_lib_random_name 'vault-test')}"
   local sa="${VAULT_TEST_SERVICE_ACCOUNT:-${test_ns}-sa}"
+  local vault_secret_suffix="${VAULT_TEST_SECRET_SUFFIX:-$(_test_lib_random_name 'vault-secret')}"
+  local vault_secret_path="eso/${vault_secret_suffix}"
+  local secret_key="message"
+  local secret_val="success"
 
-  trap "_cleanup_vault_test '$test_ns'" EXIT TERM
+  if ! _kubectl --no-exit get ns "$vault_ns" >/dev/null 2>&1; then
+    _err "Vault namespace '$vault_ns' not found. Deploy Vault before running test_vault."
+    return 1
+  fi
 
-  # Deploy Vault in HA mode
-  "${SCRIPT_DIR}/k3d-manager" deploy_vault "$test_ns" "$vault_release"
+  if ! _kubectl --no-exit -n "$vault_ns" get sts "$vault_release" >/dev/null 2>&1; then
+    _err "Vault release '$vault_release' not detected in namespace '$vault_ns'."
+    return 1
+  fi
 
-  # Prepare test namespace and service account
-  _kubectl create namespace "$test_ns"
-  _kubectl create sa "$sa" -n "$test_ns"
+  if ! _kubectl --no-exit -n "$vault_ns" get pod "$vault_pod" >/dev/null 2>&1; then
+    _err "Vault pod '$vault_pod' is not running; ensure Vault is healthy before testing."
+    return 1
+  fi
 
-  # Bind service account to Vault role
+  if ! _kubectl --no-exit -n "$vault_ns" get secret vault-root >/dev/null 2>&1; then
+    _err "Vault root token secret missing in namespace '$vault_ns'."
+    return 1
+  fi
+
+  local root_token
+  root_token=$(_kubectl -n "$vault_ns" get secret vault-root -o jsonpath='{.data.root_token}' | base64 -d)
+
+  trap "_cleanup_vault_test '$vault_ns' '$vault_release' '$vault_secret_path' '$root_token' '$test_ns' '$sa'" EXIT TERM
+
+  _info "Preparing test namespace '$test_ns' and service account '$sa'..."
+  _kubectl create namespace "$test_ns" >/dev/null 2>&1 || true
+  _kubectl create sa "$sa" -n "$test_ns" >/dev/null 2>&1 || true
+
+  _info "Creating temporary Vault role for service account..."
   _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
-    vault write auth/kubernetes/role/$sa \
-      bound_service_account_names="$sa" \
-      bound_service_account_namespaces="$test_ns" \
-      policies=eso-reader \
-      ttl=1h
+    sh -c "VAULT_TOKEN='$root_token' vault write auth/kubernetes/role/$sa \\
+      bound_service_account_names=\"$sa\" \\
+      bound_service_account_namespaces=\"$test_ns\" \\
+      policies=eso-reader \\
+      ttl=1h"
 
-  # Seed a test secret
+  _info "Seeding test secret at secret/${vault_secret_path}..."
   _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
-    vault kv put secret/eso/test message=success
+    sh -c "VAULT_TOKEN='$root_token' vault kv put secret/${vault_secret_path} ${secret_key}=${secret_val}"
 
   # Launch pod to read secret
   cat <<POD | _kubectl apply -f -
@@ -715,15 +739,16 @@ spec:
     - sh
     - -c
     - |
-      vault login -method=kubernetes role=$sa >/tmp/token
-      vault kv get -field=message secret/eso/test > /tmp/secret
+      vault write -field=token auth/kubernetes/login role=$sa \\
+        jwt="\$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" >/tmp/token
+      VAULT_TOKEN="\$(cat /tmp/token)" vault kv get -field=${secret_key} secret/${vault_secret_path} > /tmp/secret
       sleep 3600
 POD
 
   _kubectl wait --for=condition=Ready pod/vault-read -n "$test_ns" --timeout=120s
   local secret
   secret=$(_kubectl -n "$test_ns" exec vault-read -- cat /tmp/secret)
-  if [[ "$secret" != "success" ]]; then
+  if [[ "$secret" != "$secret_val" ]]; then
     _info "Failed to read secret via pod"
     return 1
   fi
@@ -736,8 +761,8 @@ POD
     sh -c "vault write -field=token auth/kubernetes/login role=$sa jwt=$sa_jwt")
   local value
   value=$(_kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
-    sh -c "VAULT_TOKEN=$vault_token vault kv get -field=message secret/eso/test")
-  if [[ "$value" != "success" ]]; then
+    sh -c "VAULT_TOKEN=$vault_token vault kv get -field=${secret_key} secret/${vault_secret_path}")
+  if [[ "$value" != "$secret_val" ]]; then
     _err "Kubernetes auth token exchange failed"
   fi
 
@@ -745,11 +770,23 @@ POD
 }
 
 function _cleanup_vault_test() {
-  local test_ns="${1:-vault-test}"
+  local vault_ns="$1"
+  local vault_release="${2:-$VAULT_RELEASE_DEFAULT}"
+  local vault_secret_path="$3"
+  local root_token="$4"
+  local test_ns="${5:-vault-test}"
+  local sa="$6"
+  local vault_pod="${vault_release}-0"
   echo "Cleaning up Vault test resources..."
-  _kubectl delete namespace "$test_ns" --ignore-not-found
-  _kubectl delete clusterrolebinding vault-server-binding --ignore-not-found
-  # _helm uninstall vault -n vault-test 2>/dev/null || true
+  _kubectl delete namespace "$test_ns" --ignore-not-found >/dev/null 2>&1
+  if [[ -n "$vault_secret_path" ]]; then
+    _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
+      sh -c "VAULT_TOKEN='$root_token' vault kv delete secret/${vault_secret_path}" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "$sa" ]]; then
+    _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
+      sh -c "VAULT_TOKEN='$root_token' vault delete auth/kubernetes/role/$sa" >/dev/null 2>&1 || true
+  fi
 }
 function test_cert_rotation() {
   echo "==================================================================="

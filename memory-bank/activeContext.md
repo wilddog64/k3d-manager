@@ -13,6 +13,9 @@ Complete Stage 2 CI workflow and prepare `ldap-develop` for merge to `main`.
 - **Blocker: `test_vault` broken** — must be fixed before Stage 2 job is added to `ci.yml`
 - Stage 2 job: blocked on `test_vault` fix (see below)
 
+### Session Notes (2026-02-26)
+- Codex synced context by re-reading memory-bank + docs/issues; ready to implement the `test_vault` fix and add the Stage 2 CI job once approved.
+
 ---
 
 ## What Has Been Built on `ldap-develop`
@@ -142,93 +145,78 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 3. ✅ `test_istio` `apps/v1` regression fixed
 4. ✅ `scripts/ci/check_cluster_health.sh` written and syntax-verified
 5. ✅ m2-air: OrbStack installed, cluster up, `test_istio` passing (2026-02-26)
+6. ✅ `test_vault` refactored to reuse existing Vault deployment (2026-02-26)
+7. ✅ Stage 2 job added to `.github/workflows/ci.yml` (2026-02-26)
 
 **Remaining:**
-6. 🔴 Fix `test_vault` ClusterRoleBinding conflict (Codex) → validate on m2-air (Gemini)
-7. Add `stage2` job to `ci.yml` (Codex, after step 6)
-8. Update branch protection to require `stage2`
+8. 🔴 Gemini: validate `test_vault` + full Stage 2 on m2-air (see instructions below)
+9. Claude: update branch protection to require `stage2` (after step 8 green)
 
 ---
 
-## Next Step for Codex — Fix test_vault (BLOCKER)
+## Update — `test_vault` refactor (2026-02-26)
 
-**This must be fixed before Stage 2 job is added to ci.yml.**
-
-Issue: `docs/issues/2026-02-26-test-vault-clusterrolebinding-conflict.md`
-
-`test_vault` (in `scripts/lib/test.sh` ~line 670) calls `deploy_vault "$test_ns" "$vault_release"`
-where `$test_ns` is a random namespace. This tries to install a second Vault Helm release, which
-conflicts with the cluster-scoped `vault-server-binding` ClusterRoleBinding already owned by the
-existing `vault` release. The cleanup trap then deletes `vault-server-binding`, corrupting the
-live Vault deployment.
-
-**Required fix:**
-- Remove the `deploy_vault` call from `test_vault` entirely
-- Use `vault_ns="vault"` (the existing deployment) — same pattern as `test_eso`
-- Add a pre-check: if Vault is not running in the `vault` namespace, print an error and exit
-- Cleanup should only remove test-specific resources (test namespace, Vault role, seeded secret)
-- Never touch the Vault Helm release or `vault-server-binding` in cleanup
-
-**Reference:** `test_eso` (line 556) already follows the correct pattern — check if Vault
-is running, use the existing instance, clean up only what the test created.
-
-**After fix:** Gemini to validate on m2-air by running `./scripts/k3d-manager test_vault`
-against the existing cluster (Vault already deployed via `deploy_vault`).
+- Status: ✅ Completed. `scripts/lib/test.sh:test_vault` now reuses the standing `vault`
+  namespace/release, validates the namespace, StatefulSet, pod, and `vault-root` secret exist
+  before running, seeds a random `secret/<path>` entry, and cleans up only the test namespace,
+  temporary Vault role, and seeded secret.
+- No Helm install or ClusterRoleBinding deletion occurs anymore, eliminating the
+  `vault-server-binding` ownership conflict.
+- Validation: `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault` now succeeds on the
+  local cluster; mac hosts must prefer Homebrew bash (>=5) so associative arrays load properly.
+- Action: Gemini still needs to rerun `./scripts/k3d-manager test_vault` on the m2-air cluster to
+  confirm the fix on the shared environment before Stage 2 is enforced.
 
 ---
 
-## Next Step for Codex — Add Stage 2 Job to ci.yml (after test_vault fix)
+## Next Step for Gemini — Validate on m2-air
 
-**All prerequisites are complete once test_vault is fixed.**
+**Prerequisites (verify before running):**
+- m2-air has the latest `ldap-develop` branch pulled: `git pull`
+- OrbStack is running: `orb status`
+- Cluster is up with Vault deployed: `kubectl get pods -n vault` should show `vault-0` Running
+- If Vault is sealed: `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager reunseal_vault`
 
-Add this job to `.github/workflows/ci.yml`, after the closing line of the `lint` job:
+**Validation sequence — run in order, stop on first failure:**
 
-```yaml
-  stage2:
-    needs: lint
-    if: ${{ github.event_name == 'pull_request' &&
-            github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: [self-hosted, macOS, ARM64]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Cluster health check
-        run: bash scripts/ci/check_cluster_health.sh
-
-      - name: Run integration tests
-        env:
-          CLUSTER_PROVIDER: orbstack
-        run: |
-          set -euo pipefail
-          ./scripts/k3d-manager test_vault
-          ./scripts/k3d-manager test_eso
-          ./scripts/k3d-manager test_istio
-```
-
-**After adding the job:**
-1. Run `yamllint .github/workflows/ci.yml` locally — must pass before committing.
-2. Push to `ldap-develop`. Stage 1 lint will re-run on PR #2.
-3. Monitor `gh run list` — Stage 2 will queue on m2-air after Stage 1 passes.
-4. If Stage 2 goes green, report back — Claude will update branch protection.
-5. Update `memory-bank/activeContext.md` — mark step 5 ✅ in the Completed tasks list.
-
-**Design constraints — do not violate:**
-- `stage2` must declare `needs: lint` — never runs without Stage 1 passing first.
-- `runs-on: [self-hosted, macOS, ARM64]` — never `ubuntu-latest`.
-- `test_jenkins` and `test_cert_rotation` are NOT in Stage 2 — too destructive. Stage 3 only.
-- Do not create a `workflow_dispatch` Stage 3 workflow until Stage 2 is stable.
-
-**Step 6 — after Stage 2 goes green** (Claude will handle, not Codex):
 ```bash
-GITHUB_REPO=k3d-manager GITHUB_OWNER=wilddog64 \
-REQUIRED_STATUS_CHECK=stage2 \
-/path/to/provision-tomcat/bin/enforce-branch-protection
+# 1. Pull latest changes (includes test_vault fix + Stage 2 ci.yml)
+git pull
+
+# 2. Validate test_vault fix
+PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_vault
+
+# 3. Validate test_eso
+PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_eso
+
+# 4. Validate test_istio (already passed, but re-confirm)
+PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_istio
 ```
 
-Full design: `docs/plans/ci-workflow.md`
-m2-air cluster setup: `./bin/setup-mac-ci-runner.sh` (handles OrbStack, cluster create, Istio/Vault/ESO, health check)
-m2-air validation sequence: `docs/plans/m2-air-stage2-validation.md`
+**Expected outcome:** all three pass with no errors.
+
+**If test_vault fails:** document the error in `docs/issues/` following existing conventions,
+update `memory-bank/activeContext.md` with findings, do NOT push broken code.
+
+**If all pass:** update `memory-bank/activeContext.md` — mark step 8 ✅ with results,
+then report back to Claude to update branch protection (step 9).
+
+---
+
+## Update — Stage 2 job added (2026-02-26)
+
+- Status: ✅ Completed. `.github/workflows/ci.yml` now defines the `stage2` job that depends on
+  `lint`, runs only for in-repo pull requests, targets `[self-hosted, macOS, ARM64]`, checks
+  cluster health, then executes `test_vault`, `test_eso`, and `test_istio` with
+  `CLUSTER_PROVIDER=orbstack`. The integration step exports `PATH="/opt/homebrew/bin:$PATH"` so the
+  dispatcher uses Homebrew bash. `yamllint .github/workflows/ci.yml` was run locally after editing.
+- Action items:
+  1. Gemini: validate the updated `test_vault` against the standing m2-air cluster, then rerun the
+     Stage 2 workflow via PR #2 to ensure green.
+  2. Claude: once Stage 2 is proven green, update branch protection to require the `stage2` check
+     (Step 8 in the list above).
+- Reference materials remain the same: `docs/plans/ci-workflow.md`,
+  `docs/plans/m2-air-stage2-validation.md`, and `./bin/setup-mac-ci-runner.sh` for runner prep.
 
 ---
 
