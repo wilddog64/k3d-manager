@@ -173,35 +173,71 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 
 ## Next Step for Gemini — Validate on m2-air
 
-**Prerequisites (verify before running):**
-- m2-air has the latest `ldap-develop` branch pulled: `git pull`
-- OrbStack is running: `orb status`
-- Cluster is up with Vault deployed: `kubectl get pods -n vault` should show `vault-0` Running
-- If Vault is sealed: `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager reunseal_vault`
+**IMPORTANT: This task requires running shell commands on m2-air and reporting actual output.
+Do NOT read documentation, review code, or summarize fixes. Execute the commands below,
+capture their exit codes and output, and report exactly what happened.**
 
-**Validation sequence — run in order, stop on first failure:**
+### Step 0 — Verify prerequisites (run each command, report output)
 
 ```bash
-# 1. Pull latest changes (includes test_vault fix + Stage 2 ci.yml)
-git pull
+# Are you on m2-air?
+hostname
 
-# 2. Validate test_vault fix
-PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_vault
+# Is the repo on ldap-develop with latest changes?
+git -C ~/src/gitrepo/personal/k3d-manager branch
+git -C ~/src/gitrepo/personal/k3d-manager pull
 
-# 3. Validate test_eso
-PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_eso
+# Is OrbStack running?
+orb status
 
-# 4. Validate test_istio (already passed, but re-confirm)
-PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_istio
+# Is Vault running and unsealed?
+kubectl get pods -n vault
+
+# If vault-0 shows Running but sealed, unseal it:
+CLUSTER_PROVIDER=orbstack ~/src/gitrepo/personal/k3d-manager/scripts/k3d-manager reunseal_vault
 ```
 
-**Expected outcome:** all three pass with no errors.
+### Step 1 — Run test_vault (REQUIRED)
 
-**If test_vault fails:** document the error in `docs/issues/` following existing conventions,
-update `memory-bank/activeContext.md` with findings, do NOT push broken code.
+```bash
+cd ~/src/gitrepo/personal/k3d-manager
+PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_vault
+echo "test_vault exit code: $?"
+```
 
-**If all pass:** update `memory-bank/activeContext.md` — mark step 8 ✅ with results,
-then report back to Claude to update branch protection (step 9).
+**Report the full terminal output and exit code.**
+
+### Step 2 — Run test_eso (REQUIRED, only if Step 1 passed)
+
+```bash
+PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_eso
+echo "test_eso exit code: $?"
+```
+
+**Report the full terminal output and exit code.**
+
+### Step 3 — Run test_istio (REQUIRED, only if Step 2 passed)
+
+```bash
+PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_istio
+echo "test_istio exit code: $?"
+```
+
+**Report the full terminal output and exit code.**
+
+### Reporting results
+
+**If all three pass (exit code 0):**
+- Update this file: mark step 8 ✅ with date and actual output summary
+- Commit and push with message: `memory-bank: step 8 complete — test_vault/eso/istio green on m2-air`
+- Do NOT update branch protection — that is Claude's job (step 9)
+
+**If any test fails:**
+- Stop immediately, do not run further tests
+- Document the exact error output in `docs/issues/YYYY-MM-DD-<slug>.md`
+- Update this file with findings
+- Commit and push the issue doc
+- Do NOT mark any step as complete
 
 ---
 
