@@ -2,6 +2,8 @@
 
 Utility scripts for creating and managing a local development Kubernetes cluster with Istio and related tools.  The main entry point is `./scripts/k3d-manager`, which dispatches functions defined in the core libraries and lazily loads plugin files on demand.  When OrbStack is running on macOS the dispatcher auto-selects the `orbstack` provider so k3d talks to OrbStack's Docker runtime; otherwise k3d remains the default and other platforms can select their backend by exporting `CLUSTER_PROVIDER`.
 
+![Three AI agents — Codex, Gemini, and Claude — working simultaneously on k3d-manager](docs/assets/multi-agents.png)
+
 ## Usage
 
 ```bash
