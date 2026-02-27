@@ -10,12 +10,12 @@ OrbStack provider, and Stage 2 CI. **Not yet merged to `main`.**
 Complete Stage 2 CI workflow and prepare `ldap-develop` for merge to `main`.
 - Stage 1 lint: ✅ green on PR #2
 - m2-air cluster: ✅ OrbStack installed, `test_istio` passing
-- **Blocker: `test_vault` broken** — must be fixed before Stage 2 job is added to `ci.yml`
-- Stage 2 job: blocked on `test_vault` fix (see below)
+- **Blocker:** Stage 2 still pending Gemini validation; `test_vault` ✅ and `test_eso` now green locally, but m2-air rerun + branch protection update outstanding (Steps 8–9).
+- Stage 2 job: ✅ merged; awaiting green run before enabling required check
 
-### Session Notes (2026-02-26)
-- Codex synced context by re-reading memory-bank + docs/issues; ready to implement the `test_vault` fix and add the Stage 2 CI job once approved.
-- Gemini validated Jenkins smoke test fixes (VirtualService hostname detection, standalone script path normalization) — confirmed FIXED as documented. However, Gemini did NOT run `test_vault`, `test_eso`, `test_istio` on m2-air as instructed. Step 8 remains pending.
+### Session Notes (2026-02-27)
+- Codex re-synced docs + memory-bank; applied the remaining `test_eso` fixes (apiVersion, HTTP server, jsonpath quoting) and revalidated locally with `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_eso` ✅.
+- Gemini validated Jenkins smoke test fixes (VirtualService hostname detection, standalone script path normalization) — confirmed FIXED as documented. However, Gemini still has not run `test_vault`, `test_eso`, `test_istio` on m2-air after the latest fixes; Step 8 remains pending.
 
 ---
 
@@ -182,29 +182,17 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 
 ---
 
-## Next Step for Codex — Fix jsonpath interpolation in `test_eso`
+## Update — `test_eso` fixes (2026-02-27)
 
-**File:** `scripts/lib/test.sh`, line 634
-
-**Change:** single quotes → double quotes around the jsonpath argument so `${secret_key}` is expanded by the shell before kubectl receives it.
-
-```bash
-# Before (broken — single quotes prevent variable expansion):
-synced=$(_kubectl -n "$es_ns" get secret "$es_name" -o jsonpath='{.data.${secret_key}}' | base64 -d)
-
-# After (fixed — double quotes allow shell to expand ${secret_key}):
-synced=$(_kubectl -n "$es_ns" get secret "$es_name" -o jsonpath="{.data.${secret_key}}" | base64 -d)
-```
-
-**Context:** `secret_key` is a local variable set earlier in `test_eso`. The single-quoted jsonpath string is passed verbatim to `kubectl`, which sees the literal `${secret_key}` and rejects it as an invalid jsonpath expression (`U+007B '{'`).
-
-**After fixing:** commit, push, then hand off to Gemini for re-validation on m2-air.
-
-**Reference:** `docs/issues/2026-02-27-test-eso-jsonpath-interpolation-failure.md`
+- Status: ✅ Completed. `scripts/lib/test.sh:test_eso` now targets the `external-secrets.io/v1`
+  CRDs, points at Vault's internal HTTP endpoint (no TLS block needed), and uses double-quoted
+  `jsonpath` expressions so `${secret_key}` expands before invoking `kubectl`.
+- Validation: `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_eso` passes locally.
+- Action: Gemini must rerun `./scripts/k3d-manager test_eso` on m2-air as part of Stage 2 Step 8.
 
 ---
 
-## Next Step for Gemini — Re-validate on m2-air (after Codex fix)
+## Next Step for Gemini — Re-validate on m2-air
 
 **IMPORTANT: This task requires running shell commands on m2-air and reporting actual output.
 Do NOT read documentation, review code, or summarize fixes. Execute the commands below,
