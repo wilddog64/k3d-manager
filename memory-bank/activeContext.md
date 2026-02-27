@@ -5,19 +5,20 @@
 Active development branch for Active Directory integration, certificate rotation,
 OrbStack provider, and Stage 2 CI. **Not yet merged to `main`.**
 
-## Current Focus (as of 2026-02-26)
+## Current Focus (as of 2026-02-27)
 
-Complete Stage 2 CI workflow and prepare `ldap-develop` for merge to `main`.
-- Stage 1 lint: ✅ green on PR #2
-- m2-air cluster: ✅ OrbStack installed, `test_istio` passing
-- **Blocker:** Stage 2 still pending Gemini validation; `test_vault` ✅ and `test_eso` now green locally, but m2-air rerun + branch protection update outstanding (Steps 8–9).
-- Stage 2 job: ✅ merged; awaiting green run before enabling required check
+**Jenkins Kubernetes agents** — last hard requirement before PR to `main`.
+- Stage 2 CI: ✅ fully green, branch protection updated (Steps 1–9 complete)
+- SMB CSI Phase 1 skip guard: ✅ implemented and validated on m4-air
+- **Current blocker:** Jenkins k8s agents not yet implemented
+- After agents land: open PR `ldap-develop` → `main`, merge, tag `v0.1.0`
 
 ### Session Notes (2026-02-27)
-- Codex re-synced docs + memory-bank; applied the remaining `test_eso` fixes (apiVersion, HTTP server, jsonpath quoting) and revalidated locally with `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_eso` ✅.
-- Codex fixed `test_istio` namespace references so the randomized `$test_ns` is used everywhere and validated locally via `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_istio` ✅.
-- Codex implemented the SMB CSI Phase 1 skip guard: `./scripts/k3d-manager deploy_smb_csi` now logs a warning and no-ops on macOS, unblocking Jenkins agent work while keeping Linux validation available.
-- Gemini validated Jenkins smoke test fixes (VirtualService hostname detection, standalone script path normalization) — confirmed FIXED as documented. However, Gemini still has not run `test_vault`, `test_eso`, `test_istio` on m2-air after the latest fixes; Step 8 remains pending.
+- Stage 2 CI complete: `test_vault` ✅ `test_eso` ✅ `test_istio` ✅ on m2-air
+- `stage2` added as required status check on `main` branch protection
+- SMB CSI Phase 1 skip guard implemented by Codex; validated by Gemini on m4-air
+- Release strategy documented: v0.1.0 on CI green post-merge; AD e2e deferred to follow-on branch
+- `@copilot` counter-argue rule added to `.clinerules`
 
 ---
 
@@ -74,13 +75,14 @@ Complete Stage 2 CI workflow and prepare `ldap-develop` for merge to `main`.
 
 ## Current Priorities / Active Decisions
 
-### Priority 1: Finish Stage 2 CI (current task)
-- Add `stage2` job to `.github/workflows/ci.yml` — see **Next Step for Codex** below.
-- Pre-build cluster on m2-air once Stage 2 job exists: `./bin/setup-mac-ci-runner.sh`
-
-### Priority 2: Jenkins Kubernetes agents and SMB CSI integration
-- Next feature track after CI is stable.
+### Priority 1: Jenkins Kubernetes agents (current task — Codex)
 - Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
+- Scope: Linux agents only. Windows agents and SMB CSI volume mounts deferred.
+- See **Next Step for Codex** section below.
+
+### Priority 2: Open PR and release v0.1.0
+- Once Jenkins agents land and CI is green: open PR `ldap-develop` → `main`
+- After merge + CI green on `main`: `gh release create v0.1.0 --generate-notes`
 
 ### Priority 3: AD end-to-end validation
 - `--enable-ad` mode: provider-level unit coverage done; end-to-end scenario pending.
@@ -218,6 +220,51 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
   now targets the `external-secrets.io/v1` CRDs, points at Vault's internal HTTP endpoint (no TLS
   block needed), and uses double-quoted `jsonpath` expressions so `${secret_key}` expands before
   invoking `kubectl`.
+
+---
+
+## Next Step for Codex — Jenkins Kubernetes Agents (Linux only)
+
+**Read first:** `docs/plans/jenkins-k8s-agents-and-smb-csi.md` — full spec with YAML
+templates, env vars, and file list. Implement Part 1 only (agents). Skip Part 2 (SMB CSI
+volume mounts) and skip Windows agent template entirely.
+
+### Scope
+
+| Task | File | Notes |
+|---|---|---|
+| RBAC | `scripts/etc/jenkins/agent-rbac.yaml.tmpl` | Role + RoleBinding for `jenkins-admin` |
+| JCasC Kubernetes cloud | `scripts/etc/jenkins/values-ldap.yaml.tmpl` | Add `02-kubernetes-agents` config script; Linux agent template only |
+| JCasC — AD/prod variants | `scripts/etc/jenkins/values-ad-test.yaml.tmpl`, `values-ad-prod.yaml.tmpl` | Same kubernetes cloud block |
+| Agent service | `scripts/etc/jenkins/agent-service.yaml.tmpl` | ClusterIP, port 50000 JNLP |
+| Wire into deploy | `scripts/plugins/jenkins.sh` | Apply RBAC + agent service in `deploy_jenkins()` |
+| Linux test job | `scripts/etc/jenkins/test-jobs/linux-agent-test.groovy` | `uname -a`, `cat /etc/os-release`, `kubectl version --client` |
+
+### Constraints
+
+- **No Windows agent template** — k3d does not support Windows containers
+- **No SMB CSI volume mounts** in pod templates — Phase 2 NFS swap not implemented yet
+- **No Docker-in-Docker** unless explicitly needed — keep agent template minimal first
+- `jenkinsUrl` must use internal cluster DNS: `http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8080`
+- `jenkinsTunnel` must use: `jenkins-agent.${JENKINS_NAMESPACE}.svc.cluster.local:50000`
+- Agent service selector must match the Jenkins Helm chart labels (verify against existing service)
+
+### Acceptance criteria
+
+- `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault` completes without error
+- RBAC Role + RoleBinding exist in the jenkins namespace
+- Agent ClusterIP service exists on port 50000
+- Jenkins JCasC shows `kubernetes` cloud configured (visible in Manage Jenkins → Clouds)
+- Triggering the linux-agent-test job spawns a pod in the jenkins namespace and completes
+
+### After implementing
+
+- Run `bash -n` and `shellcheck` on every changed `.sh` file
+- Run `yamllint` on any changed `.yaml`/`.tmpl` file
+- Validate locally: `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault`
+- Update `memory-bank/activeContext.md` with session notes and what was done
+- Update `memory-bank/progress.md` — mark Jenkins agents complete
+- Commit and push, then hand off to Gemini for smoke validation
 
 ---
 
