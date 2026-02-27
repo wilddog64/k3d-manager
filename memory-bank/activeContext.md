@@ -6,18 +6,18 @@ Active development branch. **Not yet merged to `main`.**
 
 ## Current Focus (as of 2026-02-27)
 
-**Jenkins Kubernetes agents** — last hard requirement before PR to `main`.
+**Jenkins Kubernetes agents** — Codex fix committed (`822fe54`). Waiting for Gemini validation on m4-air.
 - Stage 2 CI: ✅ fully green (`test_vault`, `test_eso`, `test_istio` on m2-air)
 - SMB CSI Phase 1 skip guard: ✅ validated on m4-air
-- **Current blocker:** `${JENKINS_NAMESPACE}` not expanding in deployed ConfigMap — agents don't launch
-- After agents land: open PR `ldap-develop` → `main`, merge, tag `v0.1.0`
+- Jenkins k8s agents: ✅ fixed by Codex (local evidence) — **pending Gemini validation on m4-air**
+- After Gemini evidence landed: open PR `ldap-develop` → `main`, merge, tag `v0.1.0`
 
 ### Session Notes (2026-02-27)
 - Stage 2 CI complete; `stage2` required status check added to branch protection
 - SMB CSI Phase 1 skip guard: Codex implemented, Gemini validated on m4-air
 - Jenkins agent templates: port `8081`→`8080`, labels `linux-agent`→`linux`, `kaniko-agent`→`kaniko`
 - `values.yaml` → `values-default.yaml.tmpl`, envsubst wired in `jenkins.sh` line 1552
-- **Still broken:** `${JENKINS_NAMESPACE}` still literal in ConfigMap after redeploy — envsubst not expanding
+- Jenkins k8s agents fully fixed by Codex — SA mismatch, admin credential placeholders, crumb issuer, port alignment
 - Jenkins admin password zsh glob issue: always wrap `-u user:pass` in quotes. See `docs/issues/2026-02-27-jenkins-admin-password-zsh-glob.md`
 - Smoke test TLS race fixed: retry logic added in `bin/smoke-test-jenkins.sh`
 
@@ -55,36 +55,55 @@ Active development branch. **Not yet merged to `main`.**
 
 ---
 
-## Next Step for Gemini — Capture Jenkins agent evidence, then tackle SMB CSI
+## Next Step for Gemini — Validate Jenkins agents on m4-air
 
-**Now that Codex has the agents green locally, please re-run the flow on m4-air and paste the transcripts so we can close the loop.** Once evidence is landed, pivot to SMB CSI Phase 2.
+Codex fixed all four root causes and committed the changes (`822fe54` on `ldap-develop`).
+Your job: pull latest, run the full flow on m4-air, paste **complete terminal output**.
 
-**RULES:** Full terminal output required. `hostname` mandatory. No summaries.
+**RULES (non-negotiable):**
+- `hostname` must appear in your output — proves you are on the right machine
+- Full terminal output only — no summaries, no paraphrasing
+- Do not mark anything ✅ until you have run it and have the output in front of you
+- If any step fails: create `docs/issues/YYYY-MM-DD-<slug>.md`, report, stop
 
 ```bash
 # Step 0 — prove you are on m4-air with latest code
 hostname
-git -C ~/src/gitrepo/personal/k3d-manager log --oneline -3
+git -C ~/src/gitrepo/personal/k3d-manager pull
+git -C ~/src/gitrepo/personal/k3d-manager log --oneline -5
 
-# Step 1 — deploy
+# Step 1 — deploy Jenkins with Vault
+cd ~/src/gitrepo/personal/k3d-manager
 CLUSTER_PROVIDER=orbstack PATH="/opt/homebrew/bin:$PATH" \
   ./scripts/k3d-manager deploy_jenkins --enable-vault
-echo "exit: $?"
+echo "deploy exit: $?"
 
-# Step 2 — verify ConfigMap has expanded namespace
+# Step 2 — verify ConfigMap has concrete namespace (not literal ${JENKINS_NAMESPACE})
 kubectl -n jenkins get configmap jenkins-jenkins-config-02-kubernetes-agents.yaml \
   -o jsonpath='{.data.*}' | grep jenkinsUrl
 
-# Step 3 — verify RBAC + agent service
+# Step 3 — verify RBAC and agent service exist
 kubectl -n jenkins get role,rolebinding | grep agent
 kubectl -n jenkins get svc jenkins-agent
 
-# Step 4 — trigger linux-agent-test, watch for pod
-kubectl -n jenkins get pods -w --timeout=120s | grep agent
+# Step 4 — run the agent test suite
+PATH="/opt/homebrew/bin:$PATH" JENKINS_URL="http://127.0.0.1:8083" \
+  ./bin/run-k8s-agent-tests.sh
+echo "agent tests exit: $?"
+
+# Step 5 — confirm both jobs SUCCESS via API
+JENKINS_PASS=$(kubectl -n jenkins get secret jenkins -o jsonpath='{.data.jenkins-admin-password}' | base64 -d)
+curl -sk -u "jenkins-admin:${JENKINS_PASS}" \
+  http://127.0.0.1:8083/job/01-linux-agent-test/lastBuild/api/json | jq '.result'
+curl -sk -u "jenkins-admin:${JENKINS_PASS}" \
+  http://127.0.0.1:8083/job/02-kaniko-agent-test/lastBuild/api/json | jq '.result'
 ```
 
-If all pass: add an "Evidence" subsection here + in `progress.md` and mark Jenkins agents ✅.
-If any fail: create `docs/issues/YYYY-MM-DD-<slug>.md`, report, do NOT mark complete.
+**If all pass:** add an "Evidence (Gemini — m4-air)" subsection under Priority 1 here
+and in `progress.md`, then mark Jenkins agents ✅. Open PR `ldap-develop` → `main`.
+
+**If any step fails:** create `docs/issues/YYYY-MM-DD-<slug>.md` with full output,
+report back, do NOT mark complete.
 
 ---
 
