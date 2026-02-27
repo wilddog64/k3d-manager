@@ -1247,6 +1247,11 @@ vault write auth/kubernetes/config \
   kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 SH
 
+  _kubectl create clusterrolebinding vault-auth-delegator \
+    --clusterrole=system:auth-delegator \
+    --serviceaccount="${ns}:${release}" \
+    --dry-run=client -o yaml | _kubectl apply -f -
+
   # create a policy -- eso-reader
   cat <<'HCL' | _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
     vault policy write eso-reader -
@@ -1374,6 +1379,11 @@ vault write auth/kubernetes/config \
   kubernetes_host="https://kubernetes.default.svc:443" \
   kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 SH
+
+  _kubectl create clusterrolebinding vault-auth-delegator \
+    --clusterrole=system:auth-delegator \
+    --serviceaccount="${ns}:${release}" \
+    --dry-run=client -o yaml | _kubectl apply -f -
 
   local policy_hcl=""
   local prefixes_added=0

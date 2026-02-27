@@ -1,26 +1,30 @@
 # Active Context – k3d-manager
 
-## Current Branch: `ldap-develop`
+## Current Branch: `main` (as of 2026-02-27)
 
-Active development branch. **Not yet merged to `main`.**
+`ldap-develop` merged to `main` via PR #2. **v0.1.0 released.**
 
 ## Current Focus (as of 2026-02-27)
 
-**Jenkins Kubernetes agents** — ✅ Gemini validated on m4-air. All E2E tests passing.
+**v0.1.0 shipped ✅** — PR #2 merged, tagged, released.
+
+Next task: `test_vault` hard-fail cleanup — ✅ validated via `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault` (2026-02-27).
+Branch: `fix/vault-auth-delegator` (open — PR pending).
+
 - Stage 2 CI: ✅ fully green (`test_vault`, `test_eso`, `test_istio` on m2-air)
-- SMB CSI Phase 1 skip guard: ✅ validated on m4-air
-- Jenkins k8s agents: ✅ fixed by Codex, Gemini validated (m4-air)
-- After Gemini evidence landed: open PR `ldap-develop` → `main`, merge, tag `v0.1.0`
+- PR #2 merged to `main` at 2026-02-27T20:09:45Z
+- v0.1.0 released: https://github.com/wilddog64/k3d-manager/releases/tag/v0.1.0
 
 ### Session Notes (2026-02-27)
 - Stage 2 CI complete; `stage2` required status check added to branch protection
 - SMB CSI Phase 1 skip guard: Codex implemented, Gemini validated on m4-air
-- Jenkins k8s agents: ✅ Gemini validated on m4-air. Evidence added below.
+- Jenkins k8s agents: ✅ Gemini validated on m4-air.
 - Jenkins agent templates: port `8081`→`8080`, labels `linux-agent`→`linux`, `kaniko-agent`→`kaniko`
 - `values.yaml` → `values-default.yaml.tmpl`, envsubst wired in `jenkins.sh` line 1552
 - Jenkins k8s agents fully fixed by Codex — SA mismatch, admin credential placeholders, crumb issuer, port alignment
 - Jenkins admin password zsh glob issue: always wrap `-u user:pass` in quotes. See `docs/issues/2026-02-27-jenkins-admin-password-zsh-glob.md`
 - Smoke test TLS race fixed: retry logic added in `bin/smoke-test-jenkins.sh`
+- Vault: `system:auth-delegator` ClusterRoleBinding added to both k8s auth setup paths in `vault.sh` — ✅ Gemini validated on m4-air. `test_vault` now hard-fails immediately if the vault-read pod cannot auth (validated via `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault`).
 
 ---
 
@@ -100,19 +104,91 @@ $ curl -sk -u "jenkins-admin:${JENKINS_PASS}" http://127.0.0.1:8083/job/02-kanik
 ```
 
 
-### Priority 2: Open PR and release v0.1.0
-- Once Jenkins agents land and CI is green: open PR `ldap-develop` → `main`
-- After merge + CI green on `main`: `gh release create v0.1.0 --generate-notes`
+### Priority 1: Add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` (VALIDATED ✅)
 
-### Priority 3: AD end-to-end validation
+**Status:** Validated on m4-air. Vault correctly has `system:auth-delegator` via the Helm-managed `vault-server-binding` ClusterRoleBinding.
+
+**What changed on 2026-02-27:**
+- `scripts/plugins/vault.sh` updated to include an idempotent `kubectl apply` for `vault-auth-delegator`.
+- E2E proof (Gemini m4-air):
+  - `kubectl delete clusterrolebinding vault-auth-delegator --ignore-not-found` ✅
+  - `deploy_vault` re-run successfully.
+  - `kubectl get clusterrolebinding -o json | jq -r '.items[] | select(.subjects[]? | .name=="vault" and .namespace=="vault") | .metadata.name'`
+    - Result: `vault-server-binding`
+  - `kubectl get clusterrolebinding vault-server-binding -o yaml | grep system:auth-delegator` ✅
+  - E2E Vault K8s login: `vault write auth/kubernetes/login role=gemini-test-sa jwt=$JWT`
+    - Result: SUCCESS (returned token with `["default" "eso-reader"]` policies).
+- Found that the Vault Helm chart manages this binding as `vault-server-binding`. The manual fix previously applied used a different name (`vault-auth-delegator`). The automation in `vault.sh` provides an additional safety net.
+- Documented in `docs/issues/2026-02-27-vault-auth-delegator-helm-managed.md`.
+
+### Priority 2: `test_vault` cleanup — revert non-fatal workaround (VALIDATED ✅)
+
+**Status:** Validated on m4-air. `test_vault` now hard-fails if pod auth fails, and the test passes cleanly end-to-end.
+
+**What changed on 2026-02-27:**
+- `scripts/lib/test.sh` reverted to `_err` (hard-fail) for the `vault-read` pod authentication check.
+- E2E proof (Gemini m4-air):
+  - `test_vault` output contains `INFO: Vault test succeeded`.
+  - Output does NOT contain the previous workaround warning.
+  - See evidence block below.
+
+### Priority 3: LDAP rotator rename — docs cleanup
+
+**Status:** Code already renamed in `scripts/`. Docs/memory-bank cleanup pending.
+
+**What to do:** Update `memory-bank/progress.md`, `memory-bank/activeContext.md`, and
+`docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md` to reflect
+the rename is complete. No code changes needed.
+
+Plan: `docs/plans/ldap-rotator-rename.md`
+
+### Priority 4: AD end-to-end validation
 - Deferred to follow-on branch (requires external AD/VPN)
 
 ---
 
 ## Next Step for Gemini — Validation Complete ✅
 
-Codex fixed all four root causes and committed the changes (`822fe54` on `ldap-develop`).
-Gemini successfully validated the full flow on m4-air. Output evidence is documented under Priority 1.
+**Branch:** `fix/vault-auth-delegator`
+**Result:** Success. `test_vault` passed cleanly end-to-end. The `vault-read` pod successfully authenticated using its projected SA token, confirming that the hard-fail logic is now safely active and `system:auth-delegator` is working as expected.
+
+**Evidence:**
+```bash
+$ hostname
+m4-air.local
+
+$ git -C ~/src/gitrepo/personal/k3d-manager log --oneline -1
+422ec47 (HEAD -> fix/vault-auth-delegator) memory-bank: add Gemini validation instructions for test_vault hard-fail
+
+$ PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_vault
+running under bash version 5.3.9(1)-release
+INFO: Testing Vault deployment and Kubernetes auth...
+INFO: Preparing test namespace 'vault-test-1772230133-31001' and service account 'vault-test-1772230133-31001-sa'...
+INFO: Refreshing Vault Kubernetes auth backend (TokenReview mode)...
+Success! Data written to: auth/kubernetes/config
+INFO: Creating temporary Vault role for service account...
+WARNING! The following warnings were returned from Vault:
+
+  * Role vault-test-1772230133-31001-sa does not have an audience. In Vault
+  v1.21+, specifying an audience on roles will be required.
+
+INFO: Seeding test secret at secret/eso/vault-secret-1772230133-27424...
+================ Secret Path ================
+secret/data/eso/vault-secret-1772230133-27424
+
+======= Metadata =======
+Key                Value
+---                -----
+created_time       2026-02-27T22:08:54.417929486Z
+custom_metadata    <nil>
+deletion_time      n/a
+destroyed          false
+version            1
+pod/vault-read created
+pod/vault-read condition met
+INFO: Vault test succeeded
+Cleaning up Vault test resources...
+```
 
 ---
 
@@ -127,19 +203,16 @@ Gemini successfully validated the full flow on m4-air. Output evidence is docume
 
 ---
 
-## Merge Criteria for `ldap-develop` → `main`
+## Merge History
 
-1. ✅ Stage 2 CI green on PR #2
-2. ✅ Pure-logic BATS suites green
-3. ✅ No regressions on `deploy_jenkins --enable-vault` baseline
-4. ✅ Known-broken paths documented with guardrails
-5. ✅ Jenkins Kubernetes agents working — linux/kaniko validation succeeded (2026-02-27); SMB CSI still pending separately
+- **v0.1.0** — `ldap-develop` → `main` merged 2026-02-27T20:09:45Z via PR #2
+  - Release: https://github.com/wilddog64/k3d-manager/releases/tag/v0.1.0
 
 ## Release Strategy
 
-- **v0.1.0** — trigger: Stage 2 CI green on `main` post-merge
-- `gh release create v0.1.0 --generate-notes` — review before publishing
-- **v0.2.0** — AD e2e validation complete
+- **v0.1.0** ✅ — released 2026-02-27
+- **v0.2.0** — `system:auth-delegator` fix + `test_vault` hard-fail cleanup (AD e2e decoupled — blocked on external VPN/AD)
+- **v0.3.0** — AD e2e validation complete
 - **v1.0.0** — production-hardened, all known-broken paths resolved
 
 ---
@@ -157,5 +230,5 @@ Gemini successfully validated the full flow on m4-air. Output evidence is docume
 - **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`).
 - **LDAP bind DN**: keep `LDAP_BASE_DN` in sync with LDIF bootstrap base DN.
 - **Jenkins admin password**: contains special chars — always quote `-u "user:$pass"` or use kubectl to fetch. See `docs/issues/2026-02-27-jenkins-admin-password-zsh-glob.md`.
-- **GitGuardian false positive**: `LDAP_PASSWORD_ROTATOR_IMAGE` — pending rename to `LDAP_ROTATOR_IMAGE`.
+- **GitGuardian false positive resolved**: `LDAP_PASSWORD_ROTATOR_IMAGE` already renamed to `LDAP_ROTATOR_IMAGE` in all scripts. Docs/memory-bank cleanup pending — see `docs/plans/ldap-rotator-rename.md`.
 - **SMB CSI Phase 1 evidence**: validated on m4-air 2026-02-27. See evidence block in git history (commit `01f9d77`).
