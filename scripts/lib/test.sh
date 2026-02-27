@@ -706,14 +706,23 @@ function test_vault() {
   _kubectl create namespace "$test_ns" >/dev/null 2>&1 || true
   _kubectl create sa "$sa" -n "$test_ns" >/dev/null 2>&1 || true
 
-  local token_audience="${K8S_TOKEN_AUDIENCE:-https://kubernetes.default.svc.cluster.local}"
-  _info "Creating temporary Vault role for service account (audience: $token_audience)..."
+  # Refresh the k8s auth backend config with the current vault pod SA token.
+  # Projected SA tokens rotate every ~24h; if the stored token_reviewer_jwt
+  # has expired, auth/kubernetes/login returns 403. Re-running vault write
+  # auth/kubernetes/config updates it with the current token from the pod.
+  _info "Refreshing Vault Kubernetes auth backend with current SA token..."
+  _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
+    sh -c "VAULT_TOKEN='$root_token' vault write auth/kubernetes/config \
+      token_reviewer_jwt=\"\$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)\" \
+      kubernetes_host=\"https://kubernetes.default.svc:443\" \
+      kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+
+  _info "Creating temporary Vault role for service account..."
   _kubectl -n "$vault_ns" exec -i "$vault_pod" -- \
     sh -c "VAULT_TOKEN='$root_token' vault write auth/kubernetes/role/$sa \\
       bound_service_account_names=\"$sa\" \\
       bound_service_account_namespaces=\"$test_ns\" \\
       policies=eso-reader \\
-      token_audiences=\"$token_audience\" \\
       ttl=1h"
 
   _info "Seeding test secret at secret/${vault_secret_path}..."
@@ -762,6 +771,9 @@ POD
   done
 
   if [[ "$secret" != "$secret_val" ]]; then
+    _info "Vault k8s auth config (for diagnosis):"
+    _kubectl -n "$vault_ns" exec "$vault_pod" -- \
+      sh -c "VAULT_TOKEN='$root_token' vault read auth/kubernetes/config" 2>/dev/null || true
     _info "vault-read pod logs (vault auth error details):"
     _kubectl -n "$test_ns" logs vault-read 2>/dev/null || true
     _info "Failed to read secret via pod"
