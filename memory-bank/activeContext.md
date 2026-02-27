@@ -221,22 +221,29 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 
 ---
 
-## Next Step for Gemini — Validate SMB CSI Phase 1 skip guard on m2-air
+## Next Step for Gemini — Validate SMB CSI Phase 1 skip guard on m2-air (REDO REQUIRED)
 
-**IMPORTANT: This task requires running shell commands on m2-air and reporting actual output.
-Do NOT read documentation, review code, or summarize fixes. Execute the commands below,
-capture their exit codes and output, and report exactly what happened.**
+**⚠️ Previous attempt rejected.** The last memory-bank update contained no terminal output,
+no exit codes, and no `hostname` proof. Updating the file without running the commands is
+NOT validation. You must redo this task from scratch following the steps below exactly.
 
-### Step 0 — Verify you are on m2-air with latest code
+**RULES — read before starting:**
+1. Run every command. Do not skip any.
+2. Copy the FULL terminal output into the memory-bank update — not a summary, not a paraphrase.
+3. Include the exact exit code from each `echo "... exit code: $?"` line.
+4. `hostname` output is mandatory — it proves you are on m2-air and not fabricating results.
+5. If you cannot run a command, stop and report why. Do not guess or infer the result.
+
+---
+
+### Step 0 — Prove you are on m2-air with latest code
 
 ```bash
 hostname
-git -C ~/src/gitrepo/personal/k3d-manager branch
-git -C ~/src/gitrepo/personal/k3d-manager pull
 git -C ~/src/gitrepo/personal/k3d-manager log --oneline -3
 ```
 
-**Report `hostname` output and `git log --oneline -3` output.**
+**Paste the exact output of both commands into your memory-bank update.**
 
 ### Step 1 — Verify skip guard fires on macOS
 
@@ -246,8 +253,8 @@ PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager d
 echo "deploy_smb_csi exit code: $?"
 ```
 
-**Expected:** a warning line containing "SMB CSI" and "macOS" and exit code 0.
-**Report the full terminal output and exit code.**
+**Expected:** warning line containing "SMB CSI" and "macOS", exit code 0.
+**Paste the full terminal output and exit code into your memory-bank update.**
 
 ### Step 2 — Verify --help works
 
@@ -257,21 +264,24 @@ echo "deploy_smb_csi --help exit code: $?"
 ```
 
 **Expected:** usage text mentioning macOS limitation and NFS swap plan, exit code 0.
-**Report the full terminal output and exit code.**
+**Paste the full terminal output and exit code into your memory-bank update.**
 
 ### Reporting results
 
-**If both pass (exit code 0, warning/help text visible):**
-- Update this file: mark SMB CSI Phase 1 ✅ validated on m2-air (2026-02-27)
-- Commit and push with message: `memory-bank: SMB CSI Phase 1 skip guard validated on m2-air`
-- Do NOT make any code changes
+**Your memory-bank update MUST contain:**
+- Literal `hostname` output (e.g. `m2-air.local`)
+- Literal `git log --oneline -3` output (3 commit hashes and messages)
+- Literal terminal output of `deploy_smb_csi` (the warning line)
+- Literal exit code: `deploy_smb_csi exit code: 0`
+- Literal terminal output of `deploy_smb_csi --help`
+- Literal exit code: `deploy_smb_csi --help exit code: 0`
 
-**If either fails:**
-- Stop immediately
-- Create `docs/issues/YYYY-MM-DD-<slug>.md` with exact error output
-- Update this file with findings
-- Commit and push the issue doc
-- Do NOT mark anything complete
+**If all pass:** add an "Evidence" subsection to this file with the pasted output,
+mark Phase 1 validated, and commit with message:
+`memory-bank: SMB CSI Phase 1 validated on m2-air — with evidence`
+
+**If either fails:** stop, create `docs/issues/YYYY-MM-DD-<slug>.md` with exact error,
+update this file, commit and push. Do NOT mark anything complete.
 
 ---
 
