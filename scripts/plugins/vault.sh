@@ -587,6 +587,12 @@ function _vault_ensure_data_path() {
       return 0
    fi
 
+   # local-path PV directories live inside the OrbStack/Docker VM on macOS.
+   # Skipping host mkdir avoids permission errors like /var/lib/rancher.
+   if _is_mac; then
+      return 0
+   fi
+
    if [[ ! -d "$host_path" ]]; then
       _info "[vault] creating data directory: $host_path"
       _run_command --prefer-sudo -- mkdir -p "$host_path"

@@ -1,7 +1,7 @@
 // Job DSL script for linux-agent test job
 // This job validates that Kubernetes linux-agent pods can be provisioned and execute basic commands
 
-pipelineJob('Tests/linux-agent-test') {
+    pipelineJob('Tests/linux-agent-test') {
     description('Test Kubernetes linux-agent functionality - validates agent provisioning, kubectl, and basic tools')
 
     definition {
@@ -9,7 +9,7 @@ pipelineJob('Tests/linux-agent-test') {
             script('''
 pipeline {
     agent {
-        label 'linux-agent'
+        label 'linux'
     }
 
     stages {

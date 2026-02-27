@@ -691,6 +691,55 @@ function _install_mac_docker() {
    # fi
 }
 
+function _orbstack_cli_ready() {
+   if ! _command_exist orb; then
+      return 1
+   fi
+
+   if _run_command --quiet --no-exit -- orb status >/dev/null 2>&1; then
+      return 0
+   fi
+
+   return 1
+}
+
+function _install_orbstack() {
+   if ! _is_mac; then
+      _err "_install_orbstack is only supported on macOS"
+   fi
+
+   if _orbstack_cli_ready; then
+      return 0
+   fi
+
+   if ! _command_exist brew; then
+      _err "Homebrew is required to install OrbStack (missing 'brew'). Install Homebrew first."
+   fi
+
+   if ! _command_exist orb; then
+      _info "Installing OrbStack via Homebrew"
+      _run_command -- brew install orbstack
+   else
+      _warn "OrbStack CLI detected but daemon not running. Launching OrbStack.app to prompt for setup."
+   fi
+
+   if command -v open >/dev/null 2>&1; then
+      _run_command --no-exit -- open -g -a OrbStack >/dev/null 2>&1 || true
+   fi
+
+   _info "Waiting for OrbStack to finish one-time GUI setup. Complete prompts in OrbStack.app if it opened."
+   local attempts=20
+   while (( attempts-- > 0 )); do
+      if _orbstack_cli_ready; then
+         _info "OrbStack CLI is running."
+         return 0
+      fi
+      sleep 3
+   done
+
+   _err "OrbStack is installed but not initialized. Open OrbStack.app, complete onboarding, then rerun your command."
+}
+
 function _install_debian_docker() {
   echo "Installing Docker on Debian/Ubuntu system..."
   # Update apt

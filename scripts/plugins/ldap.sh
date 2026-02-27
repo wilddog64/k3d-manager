@@ -935,10 +935,10 @@ function _ldap_deploy_password_rotator() {
    # Export required variables for envsubst
    export LDAP_NAMESPACE="$ns"
    export VAULT_NAMESPACE="$vault_ns"
-   export LDAP_PASSWORD_ROTATOR_IMAGE="${LDAP_PASSWORD_ROTATOR_IMAGE}"
-   export LDAP_PASSWORD_ROTATION_SCHEDULE="${LDAP_PASSWORD_ROTATION_SCHEDULE}"
+   export LDAP_ROTATOR_IMAGE="${LDAP_ROTATOR_IMAGE}"
+   export LDAP_ROTATION_SCHEDULE="${LDAP_ROTATION_SCHEDULE}"
    export LDAP_POD_LABEL="${LDAP_POD_LABEL}"
-   export LDAP_PORT="${LDAP_PASSWORD_ROTATION_PORT:-1389}"
+   export LDAP_PORT="${LDAP_ROTATION_PORT:-1389}"
    export LDAP_BASE_DN="${LDAP_BASE_DN}"
    export LDAP_ADMIN_DN="${LDAP_BIND_DN}"
    export LDAP_USER_OU="${LDAP_USER_OU}"
@@ -950,10 +950,10 @@ function _ldap_deploy_password_rotator() {
 
    # Use envsubst with explicit variable list to avoid substituting shell variables in the script
    # Only substitute these template variables, leave all other $ alone
-   local envsubst_vars='$LDAP_NAMESPACE $VAULT_NAMESPACE $LDAP_PASSWORD_ROTATOR_IMAGE $LDAP_PASSWORD_ROTATION_SCHEDULE $LDAP_POD_LABEL $LDAP_PORT $LDAP_BASE_DN $LDAP_ADMIN_DN $LDAP_USER_OU $VAULT_ADDR $VAULT_ROOT_TOKEN_SECRET $VAULT_ROOT_TOKEN_KEY $USERS_TO_ROTATE'
+   local envsubst_vars='$LDAP_NAMESPACE $VAULT_NAMESPACE $LDAP_ROTATOR_IMAGE $LDAP_ROTATION_SCHEDULE $LDAP_POD_LABEL $LDAP_PORT $LDAP_BASE_DN $LDAP_ADMIN_DN $LDAP_USER_OU $VAULT_ADDR $VAULT_ROOT_TOKEN_SECRET $VAULT_ROOT_TOKEN_KEY $USERS_TO_ROTATE'
 
    if envsubst "$envsubst_vars" < "$template" | _kubectl apply -f - >/dev/null 2>&1; then
-      _info "[ldap] password rotator deployed (schedule: ${LDAP_PASSWORD_ROTATION_SCHEDULE})"
+      _info "[ldap] password rotator deployed (schedule: ${LDAP_ROTATION_SCHEDULE})"
       return 0
    else
       _warn "[ldap] failed to deploy password rotator"
@@ -1255,7 +1255,7 @@ EOF
          _warn "[ldap] LDIF import failed; continuing with smoke test"
       fi
 
-      if (( LDAP_PASSWORD_ROTATOR_ENABLED )); then
+      if (( LDAP_ROTATOR_ENABLED )); then
          if ! _ldap_deploy_password_rotator "$namespace"; then
             _warn "[ldap] password rotator deployment failed"
          fi

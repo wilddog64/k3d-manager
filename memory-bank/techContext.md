@@ -73,6 +73,7 @@
 | `scripts/lib/core.sh` | Cluster lifecycle: create/deploy/destroy |
 | `scripts/lib/cluster_provider.sh` | Provider abstraction |
 | `scripts/lib/providers/k3d.sh` | k3d implementation |
+| `scripts/lib/providers/orbstack.sh` | OrbStack runtime wrapper around k3d |
 | `scripts/lib/providers/k3s.sh` | k3s implementation |
 | `scripts/lib/vault_pki.sh` | Vault PKI cert helpers |
 | `scripts/lib/directory_service.sh` | Directory service abstraction |

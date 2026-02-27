@@ -25,16 +25,16 @@ Configure rotation behavior before deployment:
 
 ```bash
 # Schedule (cron format)
-export LDAP_PASSWORD_ROTATION_SCHEDULE="0 0 1 * *"  # Monthly (default)
+export LDAP_ROTATION_SCHEDULE="0 0 1 * *"  # Monthly (default)
 
 # Users to rotate (comma-separated)
 export LDAP_USERS_TO_ROTATE="user1,user2,user3"
 
 # Container image
-export LDAP_PASSWORD_ROTATOR_IMAGE="docker.io/bitnami/kubectl:latest"
+export LDAP_ROTATOR_IMAGE="docker.io/bitnami/kubectl:latest"
 
 # LDAP port (internal)
-export LDAP_PASSWORD_ROTATION_PORT="1389"
+export LDAP_ROTATION_PORT="1389"
 ```
 
 ### Common Schedules
@@ -185,7 +185,7 @@ kubectl get cronjob -n directory ldap-password-rotator
 Set before deployment:
 
 ```bash
-export LDAP_PASSWORD_ROTATOR_ENABLED=0
+export LDAP_ROTATOR_ENABLED=0
 ./scripts/k3d-manager deploy_ldap --enable-vault
 ```
 

@@ -17,18 +17,40 @@ echo "Jenkins URL: $JENKINS_URL"
 echo "Credentials: ${JENKINS_USER}:***"
 echo ""
 
-# Get Jenkins crumb for CSRF protection
 echo "Getting Jenkins crumb..."
-CRUMB=$(curl -s -u "${JENKINS_USER}:${JENKINS_PASS}" \
-    "${JENKINS_URL}/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)" \
-    --insecure)
+COOKIE_JAR=$(mktemp -t jenkins-create-jobs.XXXXXX)
+trap 'rm -f "$COOKIE_JAR"' EXIT
 
-if [ -z "$CRUMB" ]; then
+CRUMB_JSON=$(curl -s -u "${JENKINS_USER}:${JENKINS_PASS}" \
+    -c "$COOKIE_JAR" \
+    "${JENKINS_URL}/crumbIssuer/api/json" \
+    --insecure 2>/dev/null || true)
+
+CRUMB_FIELD=""
+CRUMB_VALUE=""
+if [[ -n "$CRUMB_JSON" ]] && command -v python3 >/dev/null 2>&1; then
+    if CRUMB_PAIR=$(CRUMB_JSON="$CRUMB_JSON" python3 -c 'import json, os, sys
+payload = os.environ.get("CRUMB_JSON", "")
+try:
+    data = json.loads(payload)
+    field = data.get("crumbRequestField", "")
+    crumb = data.get("crumb", "")
+    sys.stdout.write(f"{field}\t{crumb}")
+except Exception:
+    pass' 2>/dev/null); then
+        IFS=$'\t' read -r CRUMB_FIELD CRUMB_VALUE <<<"${CRUMB_PAIR}" || true
+    fi
+fi
+
+CRUMB_HEADER_ARGS=()
+if [[ -n "$CRUMB_FIELD" ]] && [[ -n "$CRUMB_VALUE" ]]; then
+    CRUMB_HEADER_ARGS=(-H "$CRUMB_FIELD: $CRUMB_VALUE")
+fi
+
+if [[ -z "$CRUMB_FIELD" ]] || [[ -z "$CRUMB_VALUE" ]]; then
     echo "Warning: Could not get Jenkins crumb, trying without it..."
-    CRUMB_HEADER=""
 else
-    echo "Got crumb: ${CRUMB%%:*}"
-    CRUMB_HEADER="-H $CRUMB"
+    echo "Got crumb: $CRUMB_FIELD"
 fi
 echo ""
 
@@ -55,7 +77,8 @@ EOF
     # Try to create the job
     response=$(curl -X POST -s -w "\n%{http_code}" \
         -u "${JENKINS_USER}:${JENKINS_PASS}" \
-        ${CRUMB_HEADER} \
+        -b "$COOKIE_JAR" \
+        "${CRUMB_HEADER_ARGS[@]}" \
         -H "Content-Type: application/xml" \
         --data-binary "@/tmp/${job_name}.xml" \
         "${JENKINS_URL}/createItem?name=${job_name}" \
@@ -70,7 +93,8 @@ EOF
         echo "  - Job already exists, updating..."
         update_response=$(curl -X POST -s -w "\n%{http_code}" \
             -u "${JENKINS_USER}:${JENKINS_PASS}" \
-            ${CRUMB_HEADER} \
+            -b "$COOKIE_JAR" \
+            "${CRUMB_HEADER_ARGS[@]}" \
             -H "Content-Type: application/xml" \
             --data-binary "@/tmp/${job_name}.xml" \
             "${JENKINS_URL}/job/${job_name}/config.xml" \

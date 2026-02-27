@@ -1,0 +1,82 @@
+---
+name: CI
+
+"on":
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    if: >-
+      ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup
+
+      - name: Run shellcheck
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(
+            find scripts -type f \( -name '*.sh' -o -name 'k3d-manager' \) \
+              -exec awk 'FNR==1 && /^#!.*bash/ {print FILENAME}' {} +
+          )
+          shellcheck -S error "${files[@]}"
+
+      - name: Run bash syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          find scripts -type f \( -name '*.sh' -o -name 'k3d-manager' \) \
+            -print0 |
+          while IFS= read -r -d '' file; do
+            bash -n "$file"
+          done
+
+      - name: Run yamllint on workflow files
+        shell: bash
+        run: |
+          set -euo pipefail
+          yamllint .github/workflows/*.yml
+
+      - name: Run lib unit BATS
+        shell: bash
+        run: |
+          set -euo pipefail
+          bats scripts/tests/lib
+
+  stage2:
+    needs: lint
+    if: >-
+      ${{ github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: [self-hosted, macOS, ARM64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cluster health check
+        run: bash scripts/ci/check_cluster_health.sh
+
+      - name: Run integration tests
+        env:
+          CLUSTER_PROVIDER: orbstack
+        run: |
+          set -euo pipefail
+          export PATH="/opt/homebrew/bin:$PATH"
+          ./scripts/k3d-manager test_vault
+          ./scripts/k3d-manager test_eso
+          ./scripts/k3d-manager test_istio

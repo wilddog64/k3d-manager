@@ -85,7 +85,7 @@ controller:
 
   serviceAccount:
     create: true
-    name: jenkins-admin
+    name: jenkins
 
   admin:
     createSecret: false
@@ -98,7 +98,7 @@ controller:
     runAsUser: 1000
 
   serviceType: ClusterIP
-  servicePort: 8081
+  servicePort: 8080
   targetPort: 8080
   containerPort: 8080
   servicePortName: http
@@ -165,14 +165,14 @@ controller:
                     permissions:
                       - "Overall/Read"
                       - "Overall/Administer"
-      02-kubernetes-agents: |
+      02-kubernetes-agents.yaml: |
         jenkins:
           clouds:
             - kubernetes:
                 name: "kubernetes"
                 serverUrl: "https://kubernetes.default"
                 namespace: "${JENKINS_NAMESPACE}"
-                jenkinsUrl: "http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8081"
+                jenkinsUrl: "http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8080"
                 jenkinsTunnel: "jenkins-agent.${JENKINS_NAMESPACE}.svc.cluster.local:50000"
                 containerCapStr: "10"
                 maxRequestsPerHostStr: "32"
@@ -181,7 +181,7 @@ controller:
                 readTimeout: 20
                 templates:
                   - name: "linux-agent"
-                    label: "linux-agent"
+                    label: "linux"
                     nodeUsageMode: "NORMAL"
                     containers:
                       - name: "jnlp"
@@ -204,11 +204,11 @@ controller:
                         annotations:
                           sidecar.istio.io/inject: "false"
                       spec:
-                        serviceAccountName: jenkins-admin
+                        serviceAccountName: jenkins
                         securityContext:
                           fsGroup: 1000
                   - name: "kaniko-agent"
-                    label: "kaniko-agent"
+                    label: "kaniko"
                     nodeUsageMode: "NORMAL"
                     containers:
                       - name: "jnlp"
@@ -245,7 +245,7 @@ controller:
                         annotations:
                           sidecar.istio.io/inject: "false"
                       spec:
-                        serviceAccountName: jenkins-admin
+                        serviceAccountName: jenkins
                         securityContext:
                           fsGroup: 1000
 

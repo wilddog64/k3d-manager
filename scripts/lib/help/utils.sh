@@ -131,7 +131,7 @@ EOF
 
 Cluster provider:
   Current: ${provider}
-  Override by exporting CLUSTER_PROVIDER (macOS defaults to k3d).
+  Override by exporting CLUSTER_PROVIDER (macOS auto-detects OrbStack when running, otherwise defaults to k3d).
 
 Subcommands:
   test [options] ${test_suites}   Run BATS tests (see "test --help")
@@ -406,11 +406,7 @@ function test() {
 
         if mkdir -p "$base_dir" 2>/dev/null; then
             artifacts_dir="${base_dir}/${timestamp}"
-            if mkdir -p "$artifacts_dir" 2>/dev/null; then
-                bats_args+=(--gather-test-outputs-in "$artifacts_dir")
-            else
-                artifacts_dir=""
-            fi
+            bats_args+=(--gather-test-outputs-in "$artifacts_dir")
 
             log_file="${base_dir}/${timestamp}.log"
             if : > "$log_file" 2>/dev/null; then

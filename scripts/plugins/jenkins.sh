@@ -863,11 +863,23 @@ function _validate_ad_connectivity() {
    return 0
 }
 
+function _jenkins_ip_is_private() {
+   local candidate="${1:-}"
+   [[ "$candidate" =~ ^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.) ]]
+}
+
+function _jenkins_ip_is_loopback() {
+   local candidate="${1:-}"
+   [[ "$candidate" =~ ^127\. ]]
+}
+
 function _jenkins_run_smoke_test() {
    local namespace="${1:-jenkins}"
    local enable_ldap="${2:-0}"
    local enable_ad="${3:-0}"
    local enable_ad_prod="${4:-0}"
+   local smoke_url_override="${JENKINS_SMOKE_URL:-}"
+   local user_ip_override="${JENKINS_SMOKE_IP_OVERRIDE:-}"
 
    # Skip smoke test in BATS test environment
    if [[ -n "${BATS_TEST_DIRNAME:-}" ]] || [[ -n "${BATS_TEST_TMPDIR:-}" ]]; then
@@ -898,21 +910,129 @@ function _jenkins_run_smoke_test() {
 
    # Get Jenkins hostname from VirtualService
    local jenkins_host
-   jenkins_host=$(kubectl -n istio-system get vs jenkins -o jsonpath='{.spec.hosts[0]}' 2>/dev/null || echo "")
+   jenkins_host=$(kubectl -n "$namespace" get vs jenkins -o jsonpath='{.spec.hosts[0]}' 2>/dev/null || echo "")
    if [[ -z "$jenkins_host" ]]; then
       jenkins_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
       _warn "[jenkins] could not detect Jenkins hostname from VirtualService, using default: ${jenkins_host}"
    fi
 
+   local ingress_ip=""
+   if [[ -z "$smoke_url_override" && -z "$user_ip_override" ]]; then
+      ingress_ip=$(kubectl -n istio-system get svc istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+      if [[ -z "$ingress_ip" ]]; then
+         _warn "[jenkins] could not detect ingress IP; relying on smoke script lookup"
+      fi
+   fi
+
+   local use_port_forward=0
+   if [[ -z "$smoke_url_override" && -z "$user_ip_override" && -n "$ingress_ip" ]]; then
+      if _is_mac && _jenkins_ip_is_private "$ingress_ip" && ! _jenkins_ip_is_loopback "$ingress_ip"; then
+         use_port_forward=1
+      fi
+   fi
+
+   local -a smoke_env=()
+   if [[ -z "$user_ip_override" ]]; then
+      if (( use_port_forward )); then
+         smoke_env=("JENKINS_SMOKE_IP_OVERRIDE=127.0.0.1")
+      elif [[ -n "$ingress_ip" ]]; then
+         smoke_env=("JENKINS_SMOKE_IP_OVERRIDE=$ingress_ip")
+      fi
+   fi
+
+   local smoke_port=443
+   local pf_port=8443
+   local pf_namespace="istio-system"
+   local pf_service="istio-ingressgateway"
+   local -a smoke_cmd
+   local smoke_rc=0
+
+   if (( use_port_forward )); then
+      smoke_port=$pf_port
+   fi
+   smoke_cmd=("$smoke_script" "$namespace" "$jenkins_host" "$smoke_port" "$auth_mode")
+
    _info "[jenkins] running smoke test (namespace=${namespace}, host=${jenkins_host}, auth_mode=${auth_mode})"
 
-   # Run smoke test
-   if "$smoke_script" "$namespace" "$jenkins_host" 443 "$auth_mode"; then
+   if (( use_port_forward )); then
+      _info "[jenkins] ingress IP ${ingress_ip} is private; using kubectl port-forward to ${pf_namespace}/${pf_service} -> 127.0.0.1:${pf_port}"
+      (
+         local pf_pid=""
+         local port_forward_log=""
+         port_forward_log=$(mktemp -t jenkins-port-forward.XXXXXX.log 2>/dev/null || printf '')
+         local preserve_log=0
+         cleanup_pf() {
+            if [[ -n "$pf_pid" ]]; then
+               kill "$pf_pid" 2>/dev/null || true
+               wait "$pf_pid" 2>/dev/null || true
+            fi
+            if (( ! preserve_log )) && [[ -n "$port_forward_log" ]]; then
+               rm -f "$port_forward_log"
+            fi
+         }
+         trap cleanup_pf EXIT INT TERM
+
+         local log_target="$port_forward_log"
+         if [[ -z "$log_target" ]]; then
+            log_target="/dev/null"
+         fi
+         kubectl -n "$pf_namespace" port-forward "svc/${pf_service}" "${pf_port}:443" >"$log_target" 2>&1 &
+         pf_pid=$!
+
+         local ready=0
+         if command -v nc >/dev/null 2>&1; then
+            local attempt
+            for (( attempt=0; attempt<10; attempt++ )); do
+               if ! kill -0 "$pf_pid" 2>/dev/null; then
+                  break
+               fi
+               if nc -z 127.0.0.1 "$pf_port" >/dev/null 2>&1; then
+                  ready=1
+                  break
+               fi
+               sleep 0.5
+            done
+         else
+            _warn "[jenkins] nc not found; waiting 5 seconds for port-forward readiness"
+            sleep 5
+            if kill -0 "$pf_pid" 2>/dev/null; then
+               ready=1
+            fi
+         fi
+
+         if (( ! ready )); then
+            preserve_log=1
+            if [[ -n "$port_forward_log" ]]; then
+               echo "ERROR: [jenkins] kubectl port-forward failed to become ready (see $port_forward_log)" >&2
+               cat "$port_forward_log" >&2 || true
+            else
+               echo "ERROR: [jenkins] kubectl port-forward failed to become ready" >&2
+            fi
+            exit 1
+         fi
+
+         if (( ${#smoke_env[@]} )); then
+            env "${smoke_env[@]}" "${smoke_cmd[@]}"
+         else
+            "${smoke_cmd[@]}"
+         fi
+      )
+      smoke_rc=$?
+   else
+      if (( ${#smoke_env[@]} )); then
+         env "${smoke_env[@]}" "${smoke_cmd[@]}"
+      else
+         "${smoke_cmd[@]}"
+      fi
+      smoke_rc=$?
+   fi
+
+   if (( smoke_rc == 0 )); then
       _info "[jenkins] smoke test passed"
       return 0
-   else
-      return 1
    fi
+
+   return 1
 }
 
 function deploy_jenkins() {
@@ -1153,6 +1273,8 @@ EOF
    jenkins_namespace="${jenkins_namespace:-jenkins}"
    vault_namespace="${vault_namespace:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    vault_release="${vault_release:-${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}}"
+
+   export JENKINS_NAMESPACE="$jenkins_namespace"
 
    # Mutual exclusivity check: only one directory service mode can be enabled
    local mode_count=$(( enable_ldap + enable_ad + enable_ad_prod ))
@@ -1426,10 +1548,10 @@ function _deploy_jenkins() {
       auth_mode="standard-ldap"
       _info "[jenkins] using standard LDAP template: values-ldap.yaml.tmpl"
    else
-      # No directory service - use default values.yaml
-      template_file="$JENKINS_CONFIG_DIR/values.yaml"
+      # No directory service - use default template
+      template_file="$JENKINS_CONFIG_DIR/values-default.yaml.tmpl"
       auth_mode="none"
-      _info "[jenkins] using default template (no directory service): values.yaml"
+      _info "[jenkins] using default template (no directory service): values-default.yaml.tmpl"
    fi
 
    # Export LDAP credentials from Kubernetes secret for envsubst template processing
@@ -1474,8 +1596,18 @@ function _deploy_jenkins() {
       else
          export JENKINS_MFA_PLUGIN=""
       fi
+      # Preserve admin credential placeholders so envsubst doesn't blank them
+      if [[ -z "${JENKINS_ADMIN_USER:-}" ]]; then
+         printf -v JENKINS_ADMIN_USER '%s' '${JENKINS_ADMIN_USER}'
+      fi
+      if [[ -z "${JENKINS_ADMIN_PASS:-}" ]]; then
+         printf -v JENKINS_ADMIN_PASS '%s' '${JENKINS_ADMIN_PASS}'
+      fi
+      export JENKINS_ADMIN_USER JENKINS_ADMIN_PASS
       _info "[jenkins] processing template with envsubst: $template_file"
       envsubst < "$template_file" > "$values_file"
+      _info "[jenkins] DEBUG rendered values (JENKINS_NAMESPACE) -> $(grep -n 'jenkins\.\${' "$values_file" || true)"
+      _info "[jenkins] DEBUG rendered values snippet: $(grep -n 'jenkins\.' "$values_file" | head -n 3)"
    else
       # Use file directly (no template processing)
       values_file="${JENKINS_VALUES_FILE:-$template_file}"
@@ -1490,78 +1622,134 @@ function _deploy_jenkins() {
       temp_values=$(mktemp -t jenkins-values.XXXXXX.yaml)
       _jenkins_register_rendered_manifest "$temp_values"
 
-      # Remove LDAP-related environment variables and JCasC security realm using awk
-      # This removes:
-      # 1. LDAP env var blocks (name + value/valueFrom) from containerEnv
-      # 2. LDAP securityRealm block from JCasC configScripts
-      awk '
+      local vault_leaf_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
+      export VAULT_PKI_LEAF_HOST="$vault_leaf_host"
+
+      awk -v leaf_host="$vault_leaf_host" '
+      function indent(n) {
+         if (n <= 0) {
+            return ""
+         }
+         return sprintf("%*s", n, "")
+      }
+
       BEGIN {
          skip_depth = 0
-         current_indent = 0
          ldap_indent = 0
          in_jcasc_security = 0
          skip_security_realm = 0
          security_realm_indent = 0
+         inserted_local_realm = 0
+         skip_authz_block = 0
+         auth_block_indent = 0
+         in_env_block = 0
+         env_block_indent = 0
+         inserted_leaf_env = 0
       }
 
-      # Track when we are in the 01-security JCasC config
       /^[[:space:]]*01-security:/ {
          in_jcasc_security = 1
       }
 
-      # End of 01-security section (next config or end of JCasC)
       in_jcasc_security && /^[[:space:]]*[0-9][0-9]-/ && !/01-security/ {
          in_jcasc_security = 0
       }
 
-      # When in JCasC security config, detect LDAP securityRealm block
       in_jcasc_security && /^[[:space:]]*securityRealm:/ {
-         match($0, /^[[:space:]]*/)
+         match($0, /^[[:space:]]*/ )
          security_realm_indent = RLENGTH
+         indent_str = substr($0, 1, security_realm_indent)
+         if (!inserted_local_realm) {
+            print indent_str "securityRealm:"
+            print indent_str "  local:"
+            print indent_str "    allowsSignup: false"
+            print indent_str "    users:"
+            print indent_str "      - id: \"${JENKINS_ADMIN_USER}\""
+            print indent_str "        password: \"${JENKINS_ADMIN_PASS}\""
+            inserted_local_realm = 1
+         }
          skip_security_realm = 1
          next
       }
 
-      # Skip entire securityRealm block (including nested ldap config)
       skip_security_realm {
-         match($0, /^[[:space:]]*/)
+         match($0, /^[[:space:]]*/ )
          current_indent = RLENGTH
-
-         # Stop skipping when we hit a sibling key at same or less indent as securityRealm
          if (current_indent <= security_realm_indent && $0 ~ /^[[:space:]]*[a-zA-Z]+:/) {
             skip_security_realm = 0
          }
-
          if (skip_security_realm) next
       }
 
-      # When we find an LDAP env var, mark its indent level and start skipping
+      in_jcasc_security && /^[[:space:]]*authorizationStrategy:/ {
+         match($0, /^[[:space:]]*/ )
+         auth_block_indent = RLENGTH
+         indent_str = substr($0, 1, auth_block_indent)
+         print indent_str "authorizationStrategy:"
+         print indent_str "  projectMatrix:"
+         print indent_str "    permissions:"
+         print indent_str "      - \"Overall/Read:authenticated\""
+         print indent_str "      - \"Overall/Read:${JENKINS_ADMIN_USER}\""
+         print indent_str "      - \"Overall/Administer:${JENKINS_ADMIN_USER}\""
+         skip_authz_block = 1
+         next
+      }
+
+      skip_authz_block {
+         match($0, /^[[:space:]]*/ )
+         current_indent = RLENGTH
+         if (current_indent <= auth_block_indent && $0 ~ /^[[:space:]]*([a-zA-Z#])/) {
+            skip_authz_block = 0
+         }
+         if (skip_authz_block) next
+      }
+
+      /^[[:space:]]*containerEnv:/ {
+         match($0, /^[[:space:]]*/ )
+         env_block_indent = RLENGTH
+         in_env_block = 1
+         inserted_leaf_env = 0
+      }
+
       /^[[:space:]]*- name: LDAP_/ {
-         match($0, /^[[:space:]]*/)
+         match($0, /^[[:space:]]*/ )
          ldap_indent = RLENGTH
          skip_depth = 1
          next
       }
 
-      # If skipping env var, check indent to know when the LDAP block ends
       skip_depth > 0 {
-         match($0, /^[[:space:]]*/)
+         match($0, /^[[:space:]]*/ )
          current_indent = RLENGTH
-
-         # If we hit another "- name:" at the same level, stop skipping
          if ($0 ~ /^[[:space:]]*- name:/ && current_indent == ldap_indent) {
             skip_depth = 0
-         }
-         # If we hit a line with less or equal indent that is not a continuation, stop skipping
-         else if (current_indent <= ldap_indent && $0 !~ /^[[:space:]]*[a-zA-Z]+:/ && $0 !~ /^[[:space:]]*key:/) {
+         } else if (current_indent <= ldap_indent && $0 !~ /^[[:space:]]*[a-zA-Z]+:/ && $0 !~ /^[[:space:]]*key:/) {
             skip_depth = 0
          }
-
          if (skip_depth > 0) next
       }
 
-      # Print non-skipped lines
-      { print }
+      {
+         if (in_env_block && !inserted_leaf_env) {
+            match($0, /^[[:space:]]*/ )
+            current_indent = RLENGTH
+            if (current_indent <= env_block_indent && $0 ~ /^[[:space:]]*([a-zA-Z#])/ && $0 !~ /^[[:space:]]*containerEnv:/) {
+               print indent(env_block_indent + 2) "- name: VAULT_PKI_LEAF_HOST"
+               print indent(env_block_indent + 4) "value: \"" leaf_host "\""
+               inserted_leaf_env = 1
+               in_env_block = 0
+            }
+         }
+
+         print
+      }
+
+      END {
+         if (in_env_block && !inserted_leaf_env) {
+            print indent(env_block_indent + 2) "- name: VAULT_PKI_LEAF_HOST"
+            print indent(env_block_indent + 4) "value: \"" leaf_host "\""
+         }
+      }
       ' "$values_file" > "$temp_values"
 
       values_file="$temp_values"
@@ -2099,7 +2287,7 @@ HCL
       rm -f "$policy_file"
    fi
 
-   _vault_exec "$vault_namespace" \
+      _vault_exec "$vault_namespace" \
       "vault write auth/kubernetes/role/jenkins-cert-rotator bound_service_account_names=$rotator_service_account bound_service_account_namespaces=$jenkins_namespace policies=$policy_name ttl=24h" \
       "$vault_release"
 }
