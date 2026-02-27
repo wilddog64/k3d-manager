@@ -15,6 +15,7 @@ Complete Stage 2 CI workflow and prepare `ldap-develop` for merge to `main`.
 
 ### Session Notes (2026-02-26)
 - Codex synced context by re-reading memory-bank + docs/issues; ready to implement the `test_vault` fix and add the Stage 2 CI job once approved.
+- Gemini validated Jenkins smoke test fixes (VirtualService hostname detection, standalone script path normalization) — confirmed FIXED as documented. However, Gemini did NOT run `test_vault`, `test_eso`, `test_istio` on m2-air as instructed. Step 8 remains pending.
 
 ---
 
@@ -45,9 +46,10 @@ Complete Stage 2 CI workflow and prepare `ldap-develop` for merge to `main`.
 - **Jenkins smoke test** (`bin/smoke-test-jenkins.sh`)
   - SSL/auth smoke coverage. Routed into `test smoke` E2E flow.
   - macOS port-forward path: tunnels through `svc/istio-ingressgateway` in `istio-system`.
-  - `JENKINS_SMOKE_IP_OVERRIDE` and `JENKINS_SMOKE_URL` env var overrides supported.
-  - **Correct validation command:** `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault`
-  - Never invoke `bin/smoke-test-jenkins.sh` directly — must run through the deployer.
+  - `_jenkins_run_smoke_test` namespace query fixed: custom hostnames now auto-detected ✅.
+  - `bin/smoke-test-jenkins.sh` path normalization: standalone invocation supported ✅.
+  - **Validation command:** `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault`
+  - Standalone testing: `bash -x ./bin/smoke-test-jenkins.sh <args>` supported.
 
 - **Secret backend abstraction** (`scripts/lib/secret_backend.sh`)
   - Vault backend: complete. Azure: partial. AWS/GCP: planned.
@@ -56,7 +58,7 @@ Complete Stage 2 CI workflow and prepare `ldap-develop` for merge to `main`.
   - `CLUSTER_PROVIDER=orbstack` wraps k3d with OrbStack Docker context.
   - Auto-detects OrbStack on macOS via `orb status`; falls back to `k3d`.
   - **m4 validation:** ✅ complete — all integration issues resolved (see `docs/issues/`).
-  - **m2-air validation:** pending — required before Phase 1+2 considered production-ready.
+  - **m2-air validation:** ⚠️ still pending — Gemini reviewed docs but did not run test_vault/test_eso/test_istio on m2-air as required.
   - **Phase 3** (OrbStack native Kubernetes, no k3d): not yet started.
 
 - **Stage 1 CI** (2026-02-23)
