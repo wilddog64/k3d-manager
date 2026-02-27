@@ -124,8 +124,7 @@ Complete Stage 2 CI workflow and prepare `ldap-develop` for merge to `main`.
 Enabled on `wilddog64/k3d-manager@main`:
 - 1 required PR approval, stale review dismissal, enforce admins
 - No force pushes, no branch deletion
-- **Required status check:** `lint` job (Stage 1)
-- **After Stage 2 is green:** add `stage2` as a required check (see Codex instructions below)
+- **Required status checks:** `lint` (Stage 1) and `stage2` (Stage 2) — both required as of 2026-02-27
 
 ---
 
@@ -151,9 +150,9 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 6. ✅ `test_vault` refactored to reuse existing Vault deployment (2026-02-26)
 7. ✅ Stage 2 job added to `.github/workflows/ci.yml` (2026-02-26)
 
-**Remaining:**
+**Completed:**
 8. ✅ Gemini: re-run `test_eso`, `test_istio`, `test_vault` on m2-air (Stage 2 Step 8) — 2026-02-27: all tests passed green.
-9. Claude: update branch protection to require `stage2` (after step 8 green)
+9. ✅ Claude: `stage2` added as required status check on `main` (2026-02-27). Both `lint` and `stage2` now required for merge.
 
 ---
 
