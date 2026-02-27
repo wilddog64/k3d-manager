@@ -15,11 +15,32 @@ JENKINS_PASS=$(kubectl get secret -n "$JENKINS_NAMESPACE" jenkins-admin -o jsonp
 
 # Get Jenkins crumb for CSRF protection
 echo "Getting Jenkins crumb..."
-CRUMB=$(curl -s -u "${JENKINS_USER}:${JENKINS_PASS}" \
-    "${JENKINS_URL}/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)" \
-    --insecure 2>/dev/null)
+COOKIE_JAR=$(mktemp -t jenkins-crumb.XXXXXX)
+trap 'rm -f "$COOKIE_JAR"' EXIT
 
-if [ -z "$CRUMB" ] || [[ "$CRUMB" == *"401"* ]] || [[ "$CRUMB" == *"html"* ]]; then
+CRUMB_JSON=$(curl -s -u "${JENKINS_USER}:${JENKINS_PASS}" \
+    -c "$COOKIE_JAR" \
+    "${JENKINS_URL}/crumbIssuer/api/json" \
+    --insecure 2>/dev/null || true)
+
+CRUMB_PAIR=""
+if [[ -n "$CRUMB_JSON" ]] && command -v python3 >/dev/null 2>&1; then
+    if ! CRUMB_PAIR=$(CRUMB_JSON="$CRUMB_JSON" python3 -c 'import json, os, sys
+payload = os.environ.get("CRUMB_JSON", "")
+try:
+    data = json.loads(payload)
+    field = data.get("crumbRequestField", "")
+    crumb = data.get("crumb", "")
+    sys.stdout.write(f"{field}\t{crumb}")
+except Exception:
+    pass' 2>/dev/null); then
+        CRUMB_PAIR=""
+    fi
+fi
+
+IFS=$'\t' read -r CRUMB_FIELD CRUMB_VALUE <<<"${CRUMB_PAIR}" || true
+
+if [[ -z "$CRUMB_FIELD" ]] || [[ -z "$CRUMB_VALUE" ]]; then
     echo "Warning: Could not get Jenkins crumb (LDAP auth issue)"
     echo "You'll need to trigger builds manually through the UI or use an API token"
     echo ""
@@ -32,9 +53,6 @@ if [ -z "$CRUMB" ] || [[ "$CRUMB" == *"401"* ]] || [[ "$CRUMB" == *"html"* ]]; t
     exit 1
 fi
 
-CRUMB_FIELD="${CRUMB%%:*}"
-CRUMB_VALUE="${CRUMB##*:}"
-
 echo "Got crumb: $CRUMB_FIELD"
 echo ""
 
@@ -44,6 +62,7 @@ for job in "01-linux-agent-test" "02-kaniko-agent-test"; do
 
     response=$(curl -X POST -s -w "\n%{http_code}" \
         -u "${JENKINS_USER}:${JENKINS_PASS}" \
+        -b "$COOKIE_JAR" \
         -H "$CRUMB_FIELD: $CRUMB_VALUE" \
         "${JENKINS_URL}/job/${job}/build" \
         --insecure 2>&1)

@@ -74,7 +74,7 @@ controller:
 
   serviceAccount:
     create: true
-    name: jenkins-admin
+    name: jenkins
 
   admin:
     createSecret: false
@@ -91,7 +91,7 @@ controller:
     existingClaim: jenkins-home
 
   serviceType: ClusterIP
-  servicePort: 8081
+  servicePort: 8080
   targetPort: 8080
   containerPort: 8080
   servicePortName: http
@@ -183,7 +183,7 @@ controller:
                         annotations:
                           sidecar.istio.io/inject: "false"
                       spec:
-                        serviceAccountName: jenkins-admin
+                        serviceAccountName: jenkins
                         securityContext:
                           fsGroup: 1000
                   - name: "kaniko-agent"

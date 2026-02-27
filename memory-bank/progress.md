@@ -68,6 +68,13 @@ continued end-to-end validation for auth/deploy modes.
 - [ ] **Jenkins Kubernetes agents + SMB CSI**
   - Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
   - Goal: reliable dynamic agents and storage-backed workload validation.
+  - **Status (2026-02-27):** Linux + kaniko agent validation succeeded on macOS/OrbStack.
+    - `CLUSTER_PROVIDER=orbstack PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_jenkins --enable-vault`
+      → smoke test 4/4 pass (TLS + admin auth).
+    - `PATH="/opt/homebrew/bin:$PATH" JENKINS_URL="http://127.0.0.1:8083" ./bin/run-k8s-agent-tests.sh`
+      → linux + kaniko jobs triggered, pods observed via `timeout 120 kubectl -n jenkins get pods -w | grep agent`, REST API
+      shows `"result":"SUCCESS"`.
+    - Remaining scope: SMB CSI Phase 2 (NFS swap) + Phase 3 investigation on OrbStack.
   - **macOS SMB CSI limitation:** `cifs` kernel module unavailable in k3d/OrbStack node
     containers — SMB CSI cannot mount volumes on macOS.
   - **macOS implementation order** (`docs/plans/smb-csi-macos-workaround.md`):
