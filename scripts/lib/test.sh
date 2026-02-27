@@ -595,15 +595,13 @@ metadata:
 spec:
   provider:
     vault:
-      server: "https://vault.${vault_ns}.svc:8200"
+      server: "http://vault.${vault_ns}.svc:8200"
       path: "secret"
       version: "v2"
       auth:
         kubernetes:
           mountPath: "kubernetes"
           role: "eso-reader"
-      tls:
-        insecureSkipVerify: true
 EOF
 
   _info "Creating ExternalSecret..."
