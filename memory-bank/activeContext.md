@@ -379,3 +379,31 @@ update this file, commit and push. Do NOT mark anything complete.
 - **GitGuardian false positive**: `LDAP_PASSWORD_ROTATOR_IMAGE` in `scripts/etc/ldap/vars.sh`
   triggered detector — variable name has "PASSWORD", value is a Docker image. No real secret.
   Pending rename to `LDAP_ROTATOR_IMAGE`. See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`.
+
+### Evidence — SMB CSI Phase 1 validation (2026-02-27)
+```
+$ hostname
+m4-air.local
+
+$ git -C ~/src/gitrepo/personal/k3d-manager log --oneline -3
+cce15a4 memory-bank: Jenkins k8s agents Codex instructions; update current focus
+233efc6 memory-bank: correct hostname in SMB CSI Phase 1 evidence — m4-air not m2-air
+0992d2e memory-bank: SMB CSI Phase 1 validated on m2-air — with evidence
+
+$ PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_smb_csi
+running under bash version 5.3.9(1)-release
+WARN: [smb-csi] SMB CSI is not supported on macOS; skipping deploy. Use Linux/k3s for validation or follow the NFS swap plan.
+$ echo "deploy_smb_csi exit code: $?"
+deploy_smb_csi exit code: 0
+
+$ PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_smb_csi --help
+running under bash version 5.3.9(1)-release
+Usage: deploy_smb_csi
+
+Deploy the SMB CSI driver on supported platforms. On macOS (k3d/OrbStack) the
+command logs a warning and exits successfully because SMB mounts require the
+cifs kernel module, which is unavailable. Use a Linux/k3s cluster to validate
+SMB CSI or implement the macOS NFS swap described in docs/plans/smb-csi-macos-workaround.md.
+$ echo "deploy_smb_csi --help exit code: $?"
+deploy_smb_csi --help exit code: 0
+```
