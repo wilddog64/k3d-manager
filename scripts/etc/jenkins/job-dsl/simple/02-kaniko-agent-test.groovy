@@ -9,7 +9,7 @@ pipelineJob('Tests/kaniko-agent-test') {
             script('''
 pipeline {
     agent {
-        label 'kaniko-agent'
+        label 'kaniko'
     }
 
     stages {

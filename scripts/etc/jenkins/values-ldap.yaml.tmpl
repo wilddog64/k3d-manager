@@ -156,7 +156,7 @@ controller:
                 name: "kubernetes"
                 serverUrl: "https://kubernetes.default"
                 namespace: "${JENKINS_NAMESPACE}"
-                jenkinsUrl: "http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8081"
+                jenkinsUrl: "http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8080"
                 jenkinsTunnel: "jenkins-agent.${JENKINS_NAMESPACE}.svc.cluster.local:50000"
                 containerCapStr: "10"
                 maxRequestsPerHostStr: "32"
@@ -165,7 +165,7 @@ controller:
                 readTimeout: 20
                 templates:
                   - name: "linux-agent"
-                    label: "linux-agent"
+                    label: "linux"
                     nodeUsageMode: "NORMAL"
                     containers:
                       - name: "jnlp"
@@ -192,7 +192,7 @@ controller:
                         securityContext:
                           fsGroup: 1000
                   - name: "kaniko-agent"
-                    label: "kaniko-agent"
+                    label: "kaniko"
                     nodeUsageMode: "NORMAL"
                     containers:
                       - name: "jnlp"
