@@ -105,7 +105,7 @@ continued end-to-end validation for auth/deploy modes.
   - **Stage 2:** integration tests against pre-built cluster (self-hosted Mac runner)
     - **Stage 2.0:** `scripts/ci/check_cluster_health.sh` — implemented ✅
     - **Stage 2.1:** `test_vault`, `test_eso`, `test_istio` — namespace isolation done ✅
-    - **Stage 2.2:** `stage2` job added to `.github/workflows/ci.yml` (2026-02-26) — awaiting m2-air validation + required status check update
+    - **Stage 2.2:** `stage2` job added to `.github/workflows/ci.yml` (2026-02-26) — m2-air validation complete green (2026-02-27) ✅
   - **Stage 3:** destructive tests via `workflow_dispatch` only — not yet created
 
 ### Priority 4 (Nice-to-have / future)
@@ -126,10 +126,10 @@ continued end-to-end validation for auth/deploy modes.
   - [x] **m4 local validation** — Phase 1+2 verified on `m4` Mac (2026-02-24)
     - Auto-detection and provider fixes verified.
     - Full-stack tests documented two integration issues (`deploy_vault` path creation and `deploy_jenkins` none-auth smoke test).
-  - [ ] **m2-air validation** — full stack test required before Phase 1+2 considered production-ready
-    - Prerequisite: OrbStack installed on `m2-air`
+  - [x] **m2-air validation** — full stack test complete green (2026-02-27)
     - Sequence: `create_cluster` → `deploy_vault` → `reunseal_vault` (ESO included in deploy_vault; Istio included in create_cluster)
-    - If passes: `m2-air` cluster becomes Stage 2 CI fixture
+    - **Step 8 (Stage 2) results:** `test_eso` ✅, `test_istio` ✅, `test_vault` ✅
+    - Status: `m2-air` cluster is now a verified Stage 2 CI fixture.
   - [ ] Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
 - [ ] **Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*`** — fix GitGuardian false positive
   - See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
