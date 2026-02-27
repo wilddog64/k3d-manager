@@ -8,8 +8,8 @@
 
 **v0.1.0 shipped ✅** — PR #2 merged, tagged, released.
 
-Next task: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` — ✅ Gemini validated on m4-air.
-Branch: `fix/vault-auth-delegator`.
+Next task: `test_vault` hard-fail cleanup — ✅ validated via `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault` (2026-02-27).
+Branch: `fix/vault-auth-delegator` (merged back to main).
 
 - Stage 2 CI: ✅ fully green (`test_vault`, `test_eso`, `test_istio` on m2-air)
 - PR #2 merged to `main` at 2026-02-27T20:09:45Z
@@ -24,7 +24,7 @@ Branch: `fix/vault-auth-delegator`.
 - Jenkins k8s agents fully fixed by Codex — SA mismatch, admin credential placeholders, crumb issuer, port alignment
 - Jenkins admin password zsh glob issue: always wrap `-u user:pass` in quotes. See `docs/issues/2026-02-27-jenkins-admin-password-zsh-glob.md`
 - Smoke test TLS race fixed: retry logic added in `bin/smoke-test-jenkins.sh`
-- Vault: `system:auth-delegator` ClusterRoleBinding added to both k8s auth setup paths in `vault.sh` — ✅ Gemini validated on m4-air. Evidence added below.
+- Vault: `system:auth-delegator` ClusterRoleBinding added to both k8s auth setup paths in `vault.sh` — ✅ Gemini validated on m4-air. `test_vault` now hard-fails immediately if the vault-read pod cannot auth (validated via `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault`).
 
 ---
 
