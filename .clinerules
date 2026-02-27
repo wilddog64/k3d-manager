@@ -454,6 +454,21 @@ This project uses a three-agent loop for complex implementation tasks:
 - If a live cluster is needed for validation, use the pre-built local cluster.
   Do not assume CI will catch what local testing skips.
 
+### Codex Shell Access Requirement (added 2026-02-27)
+
+- **Codex must be started with shell ("full") access for all implementation tasks.**
+  Sessions started without shell access can only write files — they cannot run
+  `bash -n`, `shellcheck`, or any validation command. Write-only sessions are
+  NOT acceptable for implementation work; Codex will push untested code.
+- **You have shell access. Use it.** Before committing any changed script:
+  1. `bash -n <file>` — syntax check
+  2. `shellcheck <file>` — lint
+  3. Run the relevant unit test or smoke command if the change touches runtime logic.
+- If Codex discovers mid-session that shell access is unavailable (commands fail
+  silently or with permission errors), it must stop, note the limitation in the
+  memory-bank update, and NOT push the branch. The human must restart the session
+  with full access before the commit lands.
+
 ### Secret Handling Rule (2026-02-22)
 
 - **Never output or commit secrets:** Agents must NEVER print the result of
