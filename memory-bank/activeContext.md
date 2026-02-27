@@ -1,16 +1,19 @@
 # Active Context – k3d-manager
 
-## Current Branch: `ldap-develop`
+## Current Branch: `main` (as of 2026-02-27)
 
-Active development branch. **Not yet merged to `main`.**
+`ldap-develop` merged to `main` via PR #2. **v0.1.0 released.**
 
 ## Current Focus (as of 2026-02-27)
 
-**Jenkins Kubernetes agents** — ✅ Gemini validated on m4-air. All E2E tests passing.
+**v0.1.0 shipped ✅** — PR #2 merged, tagged, released.
+
+Next task: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` so new clusters
+get it automatically (currently applied manually to m2-air).
+
 - Stage 2 CI: ✅ fully green (`test_vault`, `test_eso`, `test_istio` on m2-air)
-- SMB CSI Phase 1 skip guard: ✅ validated on m4-air
-- Jenkins k8s agents: ✅ fixed by Codex, Gemini validated (m4-air)
-- After Gemini evidence landed: open PR `ldap-develop` → `main`, merge, tag `v0.1.0`
+- PR #2 merged to `main` at 2026-02-27T20:09:45Z
+- v0.1.0 released: https://github.com/wilddog64/k3d-manager/releases/tag/v0.1.0
 
 ### Session Notes (2026-02-27)
 - Stage 2 CI complete; `stage2` required status check added to branch protection
@@ -100,11 +103,75 @@ $ curl -sk -u "jenkins-admin:${JENKINS_PASS}" http://127.0.0.1:8083/job/02-kanik
 ```
 
 
-### Priority 2: Open PR and release v0.1.0
-- Once Jenkins agents land and CI is green: open PR `ldap-develop` → `main`
-- After merge + CI green on `main`: `gh release create v0.1.0 --generate-notes`
+### Priority 1: Add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` ← NEXT
 
-### Priority 3: AD end-to-end validation
+**Root cause discovered (2026-02-27):** Stage 2 CI `test_vault` was failing with
+`403 permission denied` from `auth/kubernetes/login`. Root cause: the vault SA in the
+`vault` namespace had no `system:auth-delegator` ClusterRoleBinding, so Vault could not
+call the k8s TokenReview API to validate SA tokens.
+
+**Temporary fix applied to m2-air cluster:**
+```bash
+kubectl create clusterrolebinding vault-auth-delegator \
+  --clusterrole=system:auth-delegator \
+  --serviceaccount=vault:vault
+```
+This is NOT in the code — new clusters will have the same problem.
+
+**Permanent fix required in `scripts/plugins/vault.sh`:**
+
+In the function that sets up the k8s auth backend (around line 1242 — look for
+`vault auth enable kubernetes`), add a `kubectl create clusterrolebinding` call
+immediately after the namespace/release are known and before `vault write auth/kubernetes/config`.
+
+The ClusterRoleBinding should be idempotent (`|| true` or `--dry-run=client` check):
+```bash
+kubectl create clusterrolebinding vault-auth-delegator \
+  --clusterrole=system:auth-delegator \
+  --serviceaccount="${ns}:${release}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+Where `$ns` is the vault namespace (default: `vault`) and `$release` is the vault SA name
+(default: `vault` — the Helm chart creates a SA named after the release).
+
+**File:** `scripts/plugins/vault.sh`
+**Function to find:** `_vault_set_n_reader` (or `_enable_kv2_k8s_auth` / look for
+`vault auth enable kubernetes` at line ~1242 and ~1366)
+**Issue doc to create:** `docs/issues/2026-02-27-vault-missing-auth-delegator-clusterrolebinding.md`
+
+**Codex instructions (start a fresh session):**
+```
+Read memory-bank/activeContext.md and .clinerules
+
+Task: Add system:auth-delegator ClusterRoleBinding for the vault SA to deploy_vault.
+
+Context:
+- Vault k8s auth backend requires the vault pod's SA to have system:auth-delegator
+  so it can call the k8s TokenReview API. Without it, auth/kubernetes/login returns 403.
+- Root cause found during Stage 2 CI debugging on m2-air (2026-02-27).
+- Temporary fix was applied manually to the m2-air cluster.
+
+What to implement:
+1. In scripts/plugins/vault.sh, find the k8s auth setup section (search for
+   "vault auth enable kubernetes" — appears near line 1242 and line 1366).
+2. In BOTH locations where vault auth enable kubernetes runs, add a kubectl apply
+   immediately after enabling the auth method that creates (or updates) the
+   ClusterRoleBinding:
+     kubectl create clusterrolebinding vault-auth-delegator \
+       --clusterrole=system:auth-delegator \
+       --serviceaccount="${vault_ns}:${vault_release}" \
+       --dry-run=client -o yaml | kubectl apply -f -
+   Use the correct variable names for the namespace and service account name
+   (the Helm chart creates a SA named after the release, default "vault" in ns "vault").
+3. Create docs/issues/2026-02-27-vault-missing-auth-delegator-clusterrolebinding.md
+   documenting the root cause, the symptom (403 on auth/kubernetes/login in test_vault),
+   and the fix.
+4. Commit with message: "vault: add system:auth-delegator ClusterRoleBinding for k8s auth"
+
+Do NOT update memory-bank — that is done separately after validation.
+```
+
+### Priority 2: AD end-to-end validation
 - Deferred to follow-on branch (requires external AD/VPN)
 
 ---
@@ -127,19 +194,15 @@ Gemini successfully validated the full flow on m4-air. Output evidence is docume
 
 ---
 
-## Merge Criteria for `ldap-develop` → `main`
+## Merge History
 
-1. ✅ Stage 2 CI green on PR #2
-2. ✅ Pure-logic BATS suites green
-3. ✅ No regressions on `deploy_jenkins --enable-vault` baseline
-4. ✅ Known-broken paths documented with guardrails
-5. ✅ Jenkins Kubernetes agents working — linux/kaniko validation succeeded (2026-02-27); SMB CSI still pending separately
+- **v0.1.0** — `ldap-develop` → `main` merged 2026-02-27T20:09:45Z via PR #2
+  - Release: https://github.com/wilddog64/k3d-manager/releases/tag/v0.1.0
 
 ## Release Strategy
 
-- **v0.1.0** — trigger: Stage 2 CI green on `main` post-merge
-- `gh release create v0.1.0 --generate-notes` — review before publishing
-- **v0.2.0** — AD e2e validation complete
+- **v0.1.0** ✅ — released 2026-02-27
+- **v0.2.0** — `system:auth-delegator` fix + AD e2e validation complete
 - **v1.0.0** — production-hardened, all known-broken paths resolved
 
 ---
