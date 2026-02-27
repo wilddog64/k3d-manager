@@ -154,14 +154,24 @@ test_ssl_connectivity() {
 
   local connect_target="${IP:-$HOST}"
 
-  # Test TLS handshake
-  if openssl s_client -servername "$HOST" -connect "$connect_target:$PORT" \
-       </dev/null 2>/dev/null | grep -q "CONNECTED"; then
-    verbose "TLS connection established successfully"
-  else
+  local max_attempts=5
+  local attempt
+  local connected=0
+  for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+    if openssl s_client -servername "$HOST" -connect "$connect_target:$PORT" \
+         </dev/null 2>/dev/null | grep -q "CONNECTED"; then
+      connected=1
+      break
+    fi
+    verbose "TLS connection attempt ${attempt}/${max_attempts} failed; retrying..."
+    sleep 1
+  done
+
+  if (( ! connected )); then
     log_fail "TLS connection failed"
     return 1
   fi
+  verbose "TLS connection established successfully"
 
   # Check verification status (informational only, self-signed certs expected)
   local verify_output
@@ -188,17 +198,23 @@ test_ssl_certificate_validity() {
     return 1
   fi
 
-  # Extract live certificate
-  if ! openssl s_client -showcerts -servername "$HOST" -connect "$connect_target:$PORT" \
-       </dev/null 2>/dev/null \
-       | sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/p' \
-       | head -n 100 > "$TEMP_CERT"; then
-    log_fail "Failed to extract certificate"
-    return 1
-  fi
+  local max_attempts=5
+  local attempt
+  local extracted=0
+  for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+    if openssl s_client -showcerts -servername "$HOST" -connect "$connect_target:$PORT" \
+         </dev/null 2>/dev/null \
+         | sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/p' \
+         | head -n 100 > "$TEMP_CERT" && [[ -s "$TEMP_CERT" ]]; then
+      extracted=1
+      break
+    fi
+    verbose "Certificate extraction attempt ${attempt}/${max_attempts} failed; retrying..."
+    sleep 1
+  done
 
-  if [[ ! -s "$TEMP_CERT" ]]; then
-    log_fail "Certificate file is empty"
+  if (( ! extracted )); then
+    log_fail "Failed to extract certificate"
     return 1
   fi
 

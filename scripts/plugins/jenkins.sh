@@ -1274,6 +1274,8 @@ EOF
    vault_namespace="${vault_namespace:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    vault_release="${vault_release:-${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}}"
 
+   export JENKINS_NAMESPACE="$jenkins_namespace"
+
    # Mutual exclusivity check: only one directory service mode can be enabled
    local mode_count=$(( enable_ldap + enable_ad + enable_ad_prod ))
    if (( mode_count > 1 )); then
@@ -1546,10 +1548,10 @@ function _deploy_jenkins() {
       auth_mode="standard-ldap"
       _info "[jenkins] using standard LDAP template: values-ldap.yaml.tmpl"
    else
-      # No directory service - use default values.yaml
-      template_file="$JENKINS_CONFIG_DIR/values.yaml"
+      # No directory service - use default template
+      template_file="$JENKINS_CONFIG_DIR/values-default.yaml.tmpl"
       auth_mode="none"
-      _info "[jenkins] using default template (no directory service): values.yaml"
+      _info "[jenkins] using default template (no directory service): values-default.yaml.tmpl"
    fi
 
    # Export LDAP credentials from Kubernetes secret for envsubst template processing

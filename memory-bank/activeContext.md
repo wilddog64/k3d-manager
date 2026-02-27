@@ -17,6 +17,8 @@ OrbStack provider, and Stage 2 CI. **Not yet merged to `main`.**
 - Stage 2 CI complete: `test_vault` ✅ `test_eso` ✅ `test_istio` ✅ on m2-air
 - `stage2` added as required status check on `main` branch protection
 - SMB CSI Phase 1 skip guard implemented by Codex; validated by Gemini on m4-air
+- Jenkins Kubernetes agent templates updated (8080 `jenkinsUrl`, `linux`/`kaniko` labels). Jenkins redeploy works, BUT default template still embeds `${JENKINS_NAMESPACE}` literally so the cloud resolves to `jenkins..svc` and no agents launch (see `docs/issues/2026-02-27-jenkins-k8s-agent-cloud-not-applied.md`).
+- Jenkins smoke test TLS failure (port-forward race) reproduced; retry logic added so TLS connectivity/cert extraction wait for `kubectl port-forward` readiness (docs/issues/2026-02-27-jenkins-smoke-test-tls-race.md).
 - Release strategy documented: v0.1.0 on CI green post-merge; AD e2e deferred to follow-on branch
 - `@copilot` counter-argue rule added to `.clinerules`
 
@@ -75,10 +77,20 @@ OrbStack provider, and Stage 2 CI. **Not yet merged to `main`.**
 
 ## Current Priorities / Active Decisions
 
-### Priority 1: Jenkins Kubernetes agents (current task — Codex)
+### Priority 1: Jenkins Kubernetes agents (current task — Codex, IN PROGRESS)
 - Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
 - Scope: Linux agents only. Windows agents and SMB CSI volume mounts deferred.
-- See **Next Step for Codex** section below.
+- **Completed this session (2026-02-27):**
+  - `jenkinsUrl` port corrected `8081` → `8080` across all three value templates
+  - Agent labels simplified `linux-agent`/`kaniko-agent` → `linux`/`kaniko` in templates + job DSL
+  - Smoke test TLS retry logic added (`bin/smoke-test-jenkins.sh`)
+  - Blocking issue documented: `docs/issues/2026-02-27-jenkins-k8s-agent-cloud-not-applied.md`
+- **Paused — next task for Codex:**
+  - Fix `${JENKINS_NAMESPACE}` not being expanded in default deploy path
+  - **Root cause:** `values.yaml` is not a `.tmpl` — envsubst never runs for `--enable-vault` only path
+  - **Fix:** rename `scripts/etc/jenkins/values.yaml` → `values-default.yaml.tmpl`, wire through envsubst same as LDAP/AD templates, ensure `JENKINS_NAMESPACE` is exported before rendering
+  - **Verify:** `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault` → agent pods spawn in jenkins namespace
+  - Reference: `docs/issues/2026-02-27-jenkins-k8s-agent-cloud-not-applied.md`
 
 ### Priority 2: Open PR and release v0.1.0
 - Once Jenkins agents land and CI is green: open PR `ldap-develop` → `main`
@@ -196,6 +208,16 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 - Validation: `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_smb_csi` now prints the
   skip warning instead of exiting the dispatcher.
 - Next: implement Option 1 (NFS swap) when macOS ReadWriteMany validation is required.
+
+---
+
+## Update — Jenkins smoke test TLS retry (2026-02-27)
+
+- Status: ✅ Completed. `bin/smoke-test-jenkins.sh` now retries the TLS handshake and certificate
+  extraction steps to account for `kubectl port-forward` startup latency on macOS. Documented in
+  `docs/issues/2026-02-27-jenkins-smoke-test-tls-race.md`.
+- Validation: `CLUSTER_PROVIDER=orbstack PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_jenkins --enable-vault`
+  now reports PASS for all SSL/TLS checks when the smoke test uses the port-forward path.
 
 ---
 
