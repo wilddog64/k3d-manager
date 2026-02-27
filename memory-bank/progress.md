@@ -178,6 +178,7 @@ Next: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` (Priority
 | LDAP password JCasC/envsubst interpolation | OPEN | `$${...}` escape attempt not yet confirmed working |
 | `test_cert_rotation` via dispatcher | OPEN | Manual cert rotation works; dispatcher flow still unreliable/hangs |
 | `test_vault` fails — ClusterRoleBinding conflict | FIXED | 2026-02-26: test now reuses the existing `vault` namespace/release, validates readiness up front, and only cleans up the test namespace, Vault role, and seeded secret. See `docs/issues/2026-02-26-test-vault-clusterrolebinding-conflict.md`. |
+| Vault: missing `system:auth-delegator` binding | FIXED | 2026-02-27: `deploy_vault` now ensures the binding exists. Validated on m4-air by Gemini. See `docs/issues/2026-02-27-vault-auth-delegator-helm-managed.md`. |
 | `test_eso` fails — ClusterSecretStore API version mismatch | FIXED | 2026-02-27: `v1beta1` → `v1` in `scripts/lib/test.sh` line 591. Detected on m2-air by Gemini. See `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md`. |
 | `test_eso` fails — `insecureSkipVerify` removed in ESO v1 | FIXED | 2026-02-27: Vault uses HTTP internally; switched server URL to `http://` and removed `tls` block. See `docs/issues/2026-02-27-test-eso-v1-schema-incompatibility.md`. |
 | `test_eso` fails — jsonpath single-quote interpolation | FIXED | 2026-02-27: switched to double quotes so `${secret_key}` expands before `kubectl` runs. Validated on m2-air by Gemini. See `docs/issues/2026-02-27-test-eso-jsonpath-interpolation-failure.md`. |
