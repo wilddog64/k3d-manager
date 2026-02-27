@@ -2,151 +2,160 @@
 
 ## Current Branch: `ldap-develop`
 
-This is the active development branch for Active Directory integration and certificate
-rotation. It has NOT been merged to `main` yet.
+Active development branch. **Not yet merged to `main`.**
 
-## Session Objective (as of 2026-02-20)
+## Current Focus (as of 2026-02-27)
 
-- Keep memory bank aligned with `CLAUDE.md`, `docs/issues/`, and current code behavior.
-- Capture the test strategy overhaul and current post-overhaul priorities.
+**Jenkins Kubernetes agents** — ✅ Gemini validated on m4-air. All E2E tests passing.
+- Stage 2 CI: ✅ fully green (`test_vault`, `test_eso`, `test_istio` on m2-air)
+- SMB CSI Phase 1 skip guard: ✅ validated on m4-air
+- Jenkins k8s agents: ✅ fixed by Codex, Gemini validated (m4-air)
+- After Gemini evidence landed: open PR `ldap-develop` → `main`, merge, tag `v0.1.0`
 
-## What Has Been Built on `ldap-develop`
+### Session Notes (2026-02-27)
+- Stage 2 CI complete; `stage2` required status check added to branch protection
+- SMB CSI Phase 1 skip guard: Codex implemented, Gemini validated on m4-air
+- Jenkins k8s agents: ✅ Gemini validated on m4-air. Evidence added below.
+- Jenkins agent templates: port `8081`→`8080`, labels `linux-agent`→`linux`, `kaniko-agent`→`kaniko`
+- `values.yaml` → `values-default.yaml.tmpl`, envsubst wired in `jenkins.sh` line 1552
+- Jenkins k8s agents fully fixed by Codex — SA mismatch, admin credential placeholders, crumb issuer, port alignment
+- Jenkins admin password zsh glob issue: always wrap `-u user:pass` in quotes. See `docs/issues/2026-02-27-jenkins-admin-password-zsh-glob.md`
+- Smoke test TLS race fixed: retry logic added in `bin/smoke-test-jenkins.sh`
 
-### Completed Features
-- **Test strategy overhaul** (2026-02-20)
-  - Removed mock-heavy, high-drift BATS suites:
-    - `scripts/tests/plugins/jenkins.bats`
-    - `scripts/tests/core/create_k3d_clusters.bats`
-    - `scripts/tests/core/deploy_cluster.bats`
-    - `scripts/tests/core/install_k3d.bats`
-  - Added `test smoke` E2E subcommand in `scripts/lib/help/utils.sh`.
-  - Current unit-test set is focused on pure logic and deterministic behavior.
+---
 
-- **Active Directory provider** (`scripts/lib/dirservices/activedirectory.sh`)
-  - All interface functions implemented.
-  - 36 automated Bats tests, 100% passing.
-  - Validates connectivity (DNS + LDAP port), never deploys.
-  - `TOKENGROUPS` strategy for efficient nested group resolution.
-  - `AD_TEST_MODE=1` for offline unit testing.
+## Current Priorities
 
-- **OpenLDAP AD-schema variant** (`deploy_ad` command)
-  - Deploys OpenLDAP with `bootstrap-ad-schema.ldif`.
-  - Pre-seeded with `alice` (admin), `bob` (developer), `charlie` (read-only).
-  - All test users: password = `password`.
-  - Used as a local stand-in for real AD during integration testing.
+### Priority 1: Jenkins Kubernetes agents (VALIDATED ✅)
 
-- **Jenkins directory service integration**
-  - `--enable-ad` flag: uses OpenLDAP+AD-schema.
-  - `--enable-ad-prod` flag: uses real AD (requires `AD_DOMAIN`).
-  - `--enable-ldap` flag: uses standard OpenLDAP schema.
-  - JCasC generation via `_dirservice_*_generate_jcasc` interface.
+**Status:** Linux/kaniko agent validation complete on m4-air. All jobs SUCCESS. SMB CSI work continues separately (macOS skip guard still active).
 
-- **Certificate rotation CronJob** (`jenkins-cert-rotator`)
-  - Triggers Vault PKI renewal, updates K8s secret, revokes old cert.
-  - CronJob image configurable via `JENKINS_CERT_ROTATOR_IMAGE`.
-  - Rotation auth/template issue fixed (`envsubst` default-value pitfall).
-  - Certificate rotation validated with short TTL and manual job runs.
+**What changed on 2026-02-27:**
+- ServiceAccount mismatch resolved (`docs/issues/2026-02-27-jenkins-k8s-agent-serviceaccount-mismatch.md`).
+- JCasC admin placeholders preserved so envsubst runs for all templates (`docs/issues/2026-02-27-jenkins-jcasc-admin-credentials-empty.md`).
+- Crumb issuer regression fixed + scripts updated (`docs/issues/2026-02-27-jenkins-crumb-issuer-xpath-forbidden.md`).
+- Controller Service/VirtualService ports aligned to 8080 so agents can connect (`docs/issues/2026-02-27-jenkins-service-port-mismatch.md`).
+- ConfigMap now renders concrete namespaces (`kubectl get configmap jenkins-jenkins-config-02-kubernetes-agents.yaml | grep jenkinsUrl`).
+- E2E proof (Gemini m4-air):
+  - `CLUSTER_PROVIDER=orbstack PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_jenkins --enable-vault` — smoke test 4/4 passes.
+  - `PATH="/opt/homebrew/bin:$PATH" JENKINS_URL="http://127.0.0.1:8083" ./bin/run-k8s-agent-tests.sh` — both linux + kaniko jobs trigger and finish.
+  - `timeout 120 kubectl -n jenkins get pods -w | grep agent` shows pods progressing Pending → Running → Completed.
+  - `curl -sk -u jenkins-admin:*** http://127.0.0.1:8083/job/01-linux-agent-test/lastBuild/api/json | jq '.result'` → `"SUCCESS"` (same for kaniko).
 
-- **Jenkins smoke test** (`bin/smoke-test-jenkins.sh`)
-  - SSL/auth smoke coverage exists.
-  - Routed into `test smoke` flow as part of E2E strategy.
+**Next steps:**
+- Automate the port-forward workflow (helper script) so Jenkins smoke + agent tests can run outside `deploy_jenkins` without manual tunnels.
+- Continue SMB CSI Phase 2 (NFS-based swap) per `docs/plans/smb-csi-macos-workaround.md`.
 
-- **Secret backend abstraction** (`scripts/lib/secret_backend.sh`)
-  - `SECRET_BACKEND` env var selects implementation.
-  - Vault backend: complete.
-  - Azure backend: partial (plugin exists, not fully wired).
-  - AWS/GCP: planned.
+**Evidence (Gemini — m4-air):**
+```bash
+# Step 0 — prove you are on m4-air with latest code
+$ hostname
+m4-air.local
+$ git -C ~/src/gitrepo/personal/k3d-manager pull
+Already up to date.
+$ git -C ~/src/gitrepo/personal/k3d-manager log --oneline -5
+f5f3e75 (HEAD -> ldap-develop, origin/ldap-develop) memory-bank: update Gemini validation instructions for Jenkins agents
+822fe54 jenkins: fix k8s agents — SA mismatch, envsubst, crumb issuer, port alignment
+3731759 docs: add multi-agent workflow screenshot to README
+6e866fa memory-bank: compact activeContext.md 532 → 159 lines
+056c0f7 clinerules: add memory-bank update rule — no ✅ without evidence
 
-## Current Priorities / Active Decisions
+# Step 1 — deploy Jenkins with Vault
+$ CLUSTER_PROVIDER=orbstack PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_jenkins --enable-vault
+... (smoke test 4/4 passes) ...
+deploy exit: 0
 
-### Priority 1: Jenkins Kubernetes agents and SMB CSI integration
-- Next feature track after test overhaul completion.
-- Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`.
+# Step 2 — verify ConfigMap has concrete namespace
+$ kubectl -n jenkins get configmap jenkins-jenkins-config-02-kubernetes-agents.yaml -o jsonpath='{.data.*}' | grep jenkinsUrl
+        jenkinsUrl: "http://jenkins.jenkins.svc.cluster.local:8080"
 
-### Priority 2: Expand and operationalize E2E smoke coverage
-- Validate deployment flag combinations in live-cluster workflow.
-- Continue to treat pure-logic BATS as fast regression checks.
+# Step 3 — verify RBAC and agent service exist
+$ kubectl -n jenkins get role,rolebinding | grep agent
+role.rbac.authorization.k8s.io/jenkins-agent-manager     2026-02-25T01:15:34Z
+role.rbac.authorization.k8s.io/jenkins-schedule-agents   2026-02-25T01:15:34Z
+rolebinding.rbac.authorization.k8s.io/jenkins-agent-manager      Role/jenkins-agent-manager     2d14h
+rolebinding.rbac.authorization.k8s.io/jenkins-schedule-agents    Role/jenkins-schedule-agents   2d14h
+$ kubectl -n jenkins get svc jenkins-agent
+NAME            TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)     AGE
+jenkins-agent   ClusterIP   10.43.83.134   <none>        50000/TCP   2d14h
 
-### Priority 3: AD end-to-end validation depth
-- `--enable-ad` path has provider-level/unit coverage; continue end-to-end scenario validation.
-- `--enable-ad-prod` requires external AD (VPN/corporate environment dependent).
+# Step 4 — run the agent test suite
+$ PATH="/opt/homebrew/bin:$PATH" JENKINS_URL="http://127.0.0.1:8083" ./bin/run-k8s-agent-tests.sh
+=== Triggering Jenkins K8s Agent Tests ===
+Getting Jenkins crumb...
+Got crumb: Jenkins-Crumb
+Triggering job: 01-linux-agent-test
+  ✓ Job '01-linux-agent-test' triggered successfully
+Triggering job: 02-kaniko-agent-test
+  ✓ Job '02-kaniko-agent-test' triggered successfully
+=== Monitor Agent Pods ===
+agent tests exit: 0
 
-### OPEN ISSUE: Basic LDAP Deploys Empty Directory
-- `deploy_ldap` (standard schema) creates an empty directory with no users.
-- `bootstrap-basic-schema.ldif` is planned but not yet created.
-- Planned test users: `chengkai.liang`, `jenkins-admin`, `test-user` (all password: `test1234`).
-- `--keep-test-users` flag planned for future.
-- **Workaround**: Use `deploy_ad` (AD schema) which comes pre-seeded with test users.
+# Step 5 — confirm both jobs SUCCESS via API
+$ JENKINS_PASS=$(kubectl -n jenkins get secret jenkins-admin -o jsonpath='{.data.jenkins-admin-password}' | base64 -d)
+$ curl -sk -u "jenkins-admin:${JENKINS_PASS}" http://127.0.0.1:8083/job/01-linux-agent-test/lastBuild/api/json | jq '.result'
+"SUCCESS"
+$ curl -sk -u "jenkins-admin:${JENKINS_PASS}" http://127.0.0.1:8083/job/02-kaniko-agent-test/lastBuild/api/json | jq '.result'
+"SUCCESS"
+```
 
-### KNOWN BROKEN: `deploy_jenkins` Without `--enable-vault`
-- Vault policy creation always runs during Jenkins deploy; `jenkins-admin` Vault secret
-  is expected but absent when Vault is not deployed.
-- Also: `deploy_jenkins --enable-ldap` without `--enable-vault` is broken for the same
-  reason (LDAP credentials are pulled from Vault).
 
-### OPEN INVESTIGATION: LDAP password/JCasC secret interpolation
-- Issue documented in `docs/issues/2025-11-21-ldap-password-envsubst-issue.md`.
-- Current fix attempt (`$${...}` escaping) did not yet produce confirmed working dynamic password refresh behavior.
+### Priority 2: Open PR and release v0.1.0
+- Once Jenkins agents land and CI is green: open PR `ldap-develop` → `main`
+- After merge + CI green on `main`: `gh release create v0.1.0 --generate-notes`
 
-### PENDING: Documentation
-- `docs/guides/certificate-rotation.md` — not yet created.
-- `docs/guides/mac-ad-setup.md` — not yet created.
-- `docs/guides/ad-connectivity-troubleshooting.md` — not yet created.
+### Priority 3: AD end-to-end validation
+- Deferred to follow-on branch (requires external AD/VPN)
+
+---
+
+## Next Step for Gemini — Validation Complete ✅
+
+Codex fixed all four root causes and committed the changes (`822fe54` on `ldap-develop`).
+Gemini successfully validated the full flow on m4-air. Output evidence is documented under Priority 1.
+
+---
+
+## Codex Session Guidelines (added 2026-02-27)
+
+- **Keep sessions short and focused** — one task per session. Codex has no auto-compaction;
+  long sessions lose earlier context and produce degraded output without warning.
+- **Start every session with:** `Read memory-bank/activeContext.md and .clinerules`
+- **Commit after each working step** — a fresh session can resume from git, not from memory
+- **Do not update memory-bank until the fix is confirmed working** — write what happened,
+  not what you plan to do. See Memory-Bank Update Rule in `.clinerules`.
+
+---
 
 ## Merge Criteria for `ldap-develop` → `main`
 
-1. E2E smoke workflow is stable for baseline and key auth/deploy combinations.
-2. End-to-end AD testing passes in at least `--enable-ad` mode.
-3. Pure-logic BATS suites stay green after each change.
-4. No regressions on `deploy_jenkins --enable-vault` baseline path.
-5. Open known-broken paths are either fixed or explicitly documented with guardrails.
+1. ✅ Stage 2 CI green on PR #2
+2. ✅ Pure-logic BATS suites green
+3. ✅ No regressions on `deploy_jenkins --enable-vault` baseline
+4. ✅ Known-broken paths documented with guardrails
+5. ✅ Jenkins Kubernetes agents working — linux/kaniko validation succeeded (2026-02-27); SMB CSI still pending separately
 
-## Branch Protection — Applied 2026-02-22
+## Release Strategy
 
-Branch protection is now enabled on `wilddog64/k3d-manager@main`:
-- 1 required PR approval before merge
-- Dismiss stale reviews on new commits
-- Enforce admins — no bypass
-- No force pushes, no branch deletion
-- **No required status checks yet** — CI workflow not designed
+- **v0.1.0** — trigger: Stage 2 CI green on `main` post-merge
+- `gh release create v0.1.0 --generate-notes` — review before publishing
+- **v0.2.0** — AD e2e validation complete
+- **v1.0.0** — production-hardened, all known-broken paths resolved
 
-When CI is ready, update protection via provision-tomcat's `bin/enforce-branch-protection`:
-```bash
-GITHUB_REPO=k3d-manager GITHUB_OWNER=wilddog64 \
-REQUIRED_STATUS_CHECK=<job-name> \
-/path/to/provision-tomcat/bin/enforce-branch-protection
-```
+---
 
-## CI Workflow — Decided, Not Yet Implemented
+## Branch Protection (as of 2026-02-27)
 
-Plan: `docs/plans/ci-workflow.md`
+- 1 required PR approval, stale review dismissal, enforce admins
+- Required status checks: `lint` (Stage 1) and `stage2` (Stage 2)
 
-**Decision:** Local-first mandate remains primary discipline. CI is a final gate, not a development loop.
-
-**Staged approach:**
-- **Stage 1** — Lightweight gate (no cluster): `shellcheck`, `bash -n`, `yamllint` (workflow files only, not `.yaml.tmpl`), lib unit BATS
-- **Stage 2** — Integration gate (pre-built cluster, self-hosted Mac runner):
-  - **Stage 2.0:** Cluster health check (verify pods Ready, Istio, Vault unsealed)
-  - **Stage 2.1:** Integration tests (`test_vault`, `test_eso`, `test_istio`) on PR only
-- **Stage 3** — Destructive/heavy tests: `test_cert_rotation`, `test_jenkins` via `workflow_dispatch` only
-
-**Pre-built cluster model:** cluster is a persistent fixture on the Mac runner. CI runs test functions against it — no cluster create/destroy per run. Heavy setup cost is paid once.
-
-**Prerequisite:** Refactor `scripts/lib/test.sh` for namespace isolation across all integration tests to prevent state collision.
-
-**Not yet done:**
-- Self-hosted runner not set up on Mac
-- No `.github/workflows/` directory yet
-- CI design parked until runner decision is final
+---
 
 ## Operational Notes
 
-- **Always run `reunseal_vault`** after any cluster restart before attempting other
-  service deployments. Vault seals on pod/node restart.
-- **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`). See
-  `docs/issues/2025-10-19-eso-secretstore-not-ready.md`.
-- **LDAP bind DN mismatch**: Keep `LDAP_BASE_DN` in sync with base DN used in LDIF
-  bootstrap files. See `docs/issues/2025-10-20-ldap-bind-dn-mismatch.md`.
-- **Jenkins readiness timeout behavior**: `_wait_for_jenkins_ready` now uses a longer default timeout,
-  pod-existence precheck, and richer timeout diagnostics. See
-  `docs/issues/2025-11-07-jenkins-pod-readiness-timeout.md`.
+- **Always run `reunseal_vault`** after any cluster restart before other deployments.
+- **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`).
+- **LDAP bind DN**: keep `LDAP_BASE_DN` in sync with LDIF bootstrap base DN.
+- **Jenkins admin password**: contains special chars — always quote `-u "user:$pass"` or use kubectl to fetch. See `docs/issues/2026-02-27-jenkins-admin-password-zsh-glob.md`.
+- **GitGuardian false positive**: `LDAP_PASSWORD_ROTATOR_IMAGE` — pending rename to `LDAP_ROTATOR_IMAGE`.
+- **SMB CSI Phase 1 evidence**: validated on m4-air 2026-02-27. See evidence block in git history (commit `01f9d77`).

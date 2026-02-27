@@ -1,24 +1,8 @@
 __CLUSTER_PROVIDER_MODULES_LOADED=""
 
 function _default_cluster_provider() {
-    if _is_mac 2>/dev/null; then
-        echo "k3d"
-        return 0
-    fi
-
-    if [[ -n "${DEFAULT_CLUSTER_PROVIDER:-}" ]]; then
-        echo "$DEFAULT_CLUSTER_PROVIDER"
-        return 0
-    fi
-
-    # Auto-detect based on available binaries
-    if command -v k3d >/dev/null 2>&1; then
-        echo "k3d"
-    elif command -v k3s >/dev/null 2>&1; then
-        echo "k3s"
-    else
-        echo "k3d"  # Final fallback
-    fi
+    local provider="${DEFAULT_CLUSTER_PROVIDER:-}"
+    _cluster_provider_guess_default "$provider"
 }
 
 function _cluster_provider_module_path() {

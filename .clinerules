@@ -23,6 +23,7 @@ scripts/lib/                 ← core libraries (always sourced)
   test.sh                    ← Bats test framework integration
   cluster_provider.sh        ← provider abstraction (k3d / k3s)
   providers/k3d.sh           ← k3d implementation
+  providers/orbstack.sh      ← OrbStack runtime (delegates to k3d)
   providers/k3s.sh           ← k3s implementation
   vault_pki.sh               ← Vault PKI cert helpers
   dirservices/openldap.sh    ← OpenLDAP directory provider
@@ -51,6 +52,49 @@ scripts/etc/                 ← config templates & defaults
 4. **Jenkins cert rotation** – Vault PKI issues the initial TLS cert; a CronJob
    (`jenkins-cert-rotator`) periodically checks expiry, mints a new cert, updates the
    K8s secret, revokes the old cert in Vault, and restarts pods.
+
+---
+
+## Install Function Catalogue
+
+Before writing a new install helper, check if one already exists. All install functions
+follow the pattern `_install_<target>` and live in `scripts/lib/system.sh` or
+`scripts/lib/core.sh`.
+
+**`scripts/lib/system.sh`** — system-level tooling:
+| Function | Purpose |
+|---|---|
+| `_install_kubernetes_cli` | Install `kubectl` (RedHat / Debian / macOS brew) |
+| `_install_redhat_kubernetes_client` | `kubectl` via `dnf` |
+| `_install_debian_kubernetes_client` | `kubectl` via `apt-get` |
+| `_install_helm` | Install `helm` (dispatches by OS) |
+| `_install_mac_helm` | `helm` via `brew` |
+| `_install_redhat_helm` | `helm` via `dnf` |
+| `_install_debian_helm` | `helm` via `apt-get` |
+| `_install_mac_docker` | Docker via Colima on macOS |
+| `_install_colima` | Install Colima (macOS Docker runtime) |
+| `_install_debian_docker` | Docker via `apt-get` |
+| `_install_redhat_docker` | Docker via `dnf` |
+| `_install_bats_from_source` | Bats test framework from source |
+| `_install_orbstack` | macOS-only helper: installs OrbStack via Homebrew, launches GUI, waits for `orb status` |
+
+**`scripts/lib/core.sh`** — cluster and service tooling:
+| Function | Purpose |
+|---|---|
+| `_install_k3d` | Install k3d binary |
+| `_install_k3s` | Install k3s (systemd service, Linux only) |
+| `_install_docker` | Dispatch Docker install by OS |
+| `_install_istioctl` | Install `istioctl` |
+| `_install_smb_csi_driver` | Install SMB CSI driver via Helm |
+
+**Convention:** Each `_install_*` function must be idempotent — check if the tool is
+already installed before attempting to install. Use `_run_command` for all package
+manager calls. Never call `brew`, `apt-get`, `dnf` directly.
+
+**OrbStack:** `_install_orbstack` installs via `brew install orbstack`, launches
+OrbStack.app, and waits for `orb status` to report healthy. Users still must
+complete the one-time GUI prompts. CI runners (`m2-air`) require OrbStack to be
+pre-installed manually.
 
 ---
 
@@ -110,7 +154,7 @@ Future: `azuread`, `okta`
 ### Cluster Provider (`CLUSTER_PROVIDER`)
 
 Providers in `scripts/lib/providers/<provider>.sh`.
-Supported values: `k3d` (macOS default), `k3s` (Linux/systemd)
+Supported values: `orbstack` (auto-detected when OrbStack is running on macOS), `k3d` (Docker), `k3s` (Linux/systemd)
 
 ### Secret Backend (`SECRET_BACKEND`)
 
@@ -298,13 +342,41 @@ Vault seals itself on every pod/node restart. Recovery helpers:
 
 ## Security Rules
 
+Full OWASP-aligned rules are in `CLAUDE.md` → Security Notes. Key checklist:
+
+**Shell / Injection (A03)**
+- Always double-quote bash variable expansions: `"$var"` not `$var`.
+- Never use `eval` with external input.
+- Use `--` separator in CLI calls where arguments may contain hyphens.
+
+**Least Privilege (A01)**
+- New Vault policies: `read`-only unless `write` is explicitly required.
+- New ServiceAccounts: namespace-scoped Role/RoleBinding, never `cluster-admin`.
+- GitHub Actions workflows: `permissions: contents: read` as baseline.
+
+**Cryptographic / TLS (A02)**
+- `TRUST_ALL_CERTIFICATES` and `insecureSkipVerify: true` are dev-only — document it.
+- Never add `--insecure` / `-k` to production-path scripts.
+- Vault PKI leaf TTL ≤720h. Do not raise without justification.
+
+**Secrets (A02)**
 - Never commit secrets or credentials to git.
-- Use `${PLACEHOLDER}` variables in all templates.
+- Use `${PLACEHOLDER}` variables in all templates; store secrets in Vault.
+- New sensitive CLI flags → register in `_args_have_sensitive_flag` in `system.sh`.
 - `_run_command` probes sudo safely; never call `sudo` directly.
-- `_args_have_sensitive_flag` auto-disables trace for commands with
-  `--password`, `--token`, `--username`.
-- Default TLS config is `TRUST_ALL_CERTIFICATES` for dev only; document
-  production requirement for proper CA validation.
+- Vault tokens via env vars or stdin — never in CLI arguments.
+
+**Misconfiguration (A05)**
+- New services must use their own namespace — never `default`.
+- `set -euo pipefail` mandatory on all new bash scripts.
+- Helm installs must pin chart versions — no `latest`.
+
+**Supply Chain (A08)**
+- GitHub Actions: pin to version tags (`@v4`), never `@main` or `@latest`.
+- Container images in `*.yaml.tmpl`: pinned tags only, never `latest`.
+
+**Existing protections — do not remove:**
+- `_args_have_sensitive_flag` auto-disables trace for `--password`, `--token`, `--username`.
 - Vault PKI auto-revokes old certs after rotation.
 
 ---
@@ -366,10 +438,12 @@ This project uses a three-agent loop for complex implementation tasks:
 - **Weaknesses:** diagnosis and iteration. If Codex gets stuck or starts
   generating commits without visible progress, stop the session. Do not let
   Codex iterate blindly — bring Claude in to audit.
-- **Counter-argue rule:** if Gemini's review conflicts with patterns in
-  `.clinerules` or `docs/plans/`, Codex must push back with reasoning.
-  Do not accept a reviewer suggestion just because it comes from Gemini.
-  Raise the conflict explicitly.
+- **Counter-argue rule (@copilot PR reviews):** GitHub Copilot (`@copilot`) automatically
+  reviews PRs and posts inline comments. Codex must NOT blindly accept Copilot suggestions.
+  If a Copilot comment conflicts with patterns in `.clinerules`, `docs/plans/`, or the
+  established architecture, Codex must push back with reasoning and raise the conflict
+  explicitly — tag Claude to arbitrate if needed. Accepting a suggestion just because
+  it comes from `@copilot` is not acceptable.
 
 ### Local-First Mandate (enforced from session 1)
 
@@ -380,6 +454,37 @@ This project uses a three-agent loop for complex implementation tasks:
 - If a live cluster is needed for validation, use the pre-built local cluster.
   Do not assume CI will catch what local testing skips.
 
+### Codex Shell Access Requirement (added 2026-02-27)
+
+- **Codex must be started with shell ("full") access for all implementation tasks.**
+  Sessions started without shell access can only write files — they cannot run
+  `bash -n`, `shellcheck`, or any validation command. Write-only sessions are
+  NOT acceptable for implementation work; Codex will push untested code.
+- **You have shell access. Use it.** Before committing any changed script:
+  1. `bash -n <file>` — syntax check
+  2. `shellcheck <file>` — lint
+  3. Run the relevant unit test or smoke command if the change touches runtime logic.
+- If Codex discovers mid-session that shell access is unavailable (commands fail
+  silently or with permission errors), it must stop, note the limitation in the
+  memory-bank update, and NOT push the branch. The human must restart the session
+  with full access before the commit lands.
+
+### Memory-Bank Update Rule (added 2026-02-27)
+
+**Applies to ALL agents (Codex, Gemini, Claude).**
+
+- **Do not update memory-bank to claim work is done until the work is actually done.**
+  Updating `memory-bank/activeContext.md` or `memory-bank/progress.md` with a completed
+  status before the fix is confirmed working is the same failure mode as Gemini claiming
+  tests passed without running them. It misleads every agent that reads the file next.
+- **The memory-bank is a source of truth, not a to-do list.** Write what happened, not
+  what you intend to do. Use "IN PROGRESS" or "PAUSED" status if work is incomplete.
+- **Evidence required for any ✅ mark:**
+  - Codex: paste the relevant command output (e.g. `deploy_jenkins` exit 0, pod running)
+  - Gemini: paste full terminal output including `hostname`
+  - Claude: cite the commit hash or line number that confirms the change
+- **Memory-bank updates without evidence will be rejected and redone.**
+
 ### Secret Handling Rule (2026-02-22)
 
 - **Never output or commit secrets:** Agents must NEVER print the result of
@@ -389,6 +494,40 @@ This project uses a three-agent loop for complex implementation tasks:
   to `grep` or `wc -l` to confirm presence without exposing the value.
 - **Trace protection:** Remember that `_run_command` auto-disables trace for sensitive flags;
   ensure any new sensitive flags are added to `_args_have_sensitive_flag` in `scripts/lib/system.sh`.
+
+### Fix Assignment Rule
+
+When a bug or test failure is identified, assign the fix as follows:
+
+| Fix type | Who fixes |
+|---|---|
+| Single-line string swap with no ambiguity (typo, version string) | Claude — fix directly, no agent needed |
+| Requires codebase reasoning (why is this wrong, what is the correct value, cross-file lookup) | Codex — provide documented spec, let Codex implement |
+| Validation / test execution on a specific environment | Gemini — run exact commands, report output and exit codes |
+
+**Examples:**
+- API version `v1beta1` → `v1` (string swap, obvious) → Claude fixes directly
+- `insecureSkipVerify` removal requiring lookup in `vars.sh` to confirm HTTP vs HTTPS → Codex
+- Running `test_vault`, `test_eso`, `test_istio` on m2-air → Gemini
+
+**Gemini validation rule:** Gemini must execute commands and report actual terminal output and exit codes. Reading documentation or reviewing code is NOT validation. If Gemini reports "validation complete" without showing command output, the task is not done.
+
+---
+
+### Release Strategy
+
+- **First release:** `v0.1.0` — triggered immediately after Stage 2 CI goes green on
+  `main` following the `ldap-develop` merge.
+- **Mechanism:** `gh release create v0.1.0 --generate-notes` — auto-changelog from
+  commit history; human review and trim before publishing.
+- **Merge gate:** PR to `main` requires Jenkins k8s agents complete (Linux agents +
+  SMB CSI Phase 1 skip guard) in addition to Stage 2 CI green. AD e2e validation is
+  deferred to a follow-on branch — it is infrastructure-gated (requires external AD/VPN).
+- **Subsequent releases:** `v0.2.0` when AD e2e passes; `v1.0.0` when production-hardened.
+- **No auto-release on merge** — release is a deliberate manual step immediately after
+  CI confirms green on `main`.
+
+---
 
 ### Collapse Recovery Protocol
 

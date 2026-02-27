@@ -15,11 +15,20 @@ set -euo pipefail
 #   AD_TEST_USER=john.doe AD_TEST_PASS=secret ./smoke-test-jenkins.sh jenkins jenkins.example.com 443 ad
 
 # Source vault plugin for _vault_exec helper
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [[ -f "${SCRIPT_DIR}/../scripts/plugins/vault.sh" ]]; then
+SMOKE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SMOKE_SCRIPT_DIR}/.." && pwd)"
+SCRIPT_DIR="${REPO_ROOT}/scripts"
+PLUGINS_DIR="${PLUGINS_DIR:-${SCRIPT_DIR}/plugins}"
+if [[ -f "${SCRIPT_DIR}/plugins/vault.sh" ]]; then
   # Source system.sh first for _kubectl helper
-  source "${SCRIPT_DIR}/../scripts/lib/system.sh" 2>/dev/null || true
-  source "${SCRIPT_DIR}/../scripts/plugins/vault.sh" 2>/dev/null || true
+  source "${SCRIPT_DIR}/lib/system.sh" 2>/dev/null || true
+  source "${SCRIPT_DIR}/plugins/vault.sh" 2>/dev/null || true
+fi
+
+if ! declare -f _kubectl >/dev/null 2>&1; then
+  echo "ERROR: smoke-test-jenkins.sh must be run via deploy_jenkins (k3d-manager)." >&2
+  echo "       Use: CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_jenkins --enable-vault" >&2
+  exit 1
 fi
 
 # Parameters
@@ -28,6 +37,8 @@ HOST="${2:-jenkins.dev.local.me}"
 PORT="${3:-443}"
 AUTH_MODE="${4:-default}"  # default|ldap|ad
 VERBOSE="${VERBOSE:-0}"
+SMOKE_URL="${JENKINS_SMOKE_URL:-}"
+SMOKE_IP_OVERRIDE="${JENKINS_SMOKE_IP_OVERRIDE:-}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -43,6 +54,10 @@ TESTS_SKIPPED=0
 
 # Shared variables
 IP=""
+if [[ -n "$SMOKE_IP_OVERRIDE" ]]; then
+  IP="$SMOKE_IP_OVERRIDE"
+fi
+declare -a RESOLVE_ARGS=()
 TEMP_CERT="/tmp/jenkins-smoke-$$.crt"
 
 # Cleanup function
@@ -81,6 +96,36 @@ verbose() {
   fi
 }
 
+apply_smoke_url_override() {
+  if [[ -z "$SMOKE_URL" ]]; then
+    return 0
+  fi
+
+  local override_target="$SMOKE_URL"
+  if [[ "$override_target" == *"://"* ]]; then
+    override_target="${override_target#*://}"
+  fi
+  override_target="${override_target%%/*}"
+
+  local override_host="$override_target"
+  local override_port=""
+  if [[ "$override_target" == *:* ]]; then
+    override_host="${override_target%%:*}"
+    override_port="${override_target##*:}"
+  fi
+
+  if [[ -z "$override_host" ]]; then
+    log_warn "JENKINS_SMOKE_URL set but host could not be parsed: $SMOKE_URL"
+    return 1
+  fi
+
+  HOST="$override_host"
+  if [[ -n "$override_port" ]]; then
+    PORT="$override_port"
+  fi
+  return 0
+}
+
 # ============================================================================
 # SSL/TLS Testing Functions
 # ============================================================================
@@ -88,29 +133,49 @@ verbose() {
 test_ssl_connectivity() {
   log_info "Testing HTTPS connectivity to $HOST:$PORT..."
 
-  # Get istio-ingressgateway IP
-  IP=$(kubectl get -n istio-system service istio-ingressgateway \
-    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
-
   if [[ -z "$IP" ]]; then
-    log_fail "Could not get istio-ingressgateway IP"
-    return 1
+    if [[ -z "$SMOKE_URL" ]]; then
+      IP=$(kubectl get -n istio-system service istio-ingressgateway \
+        -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+      if [[ -z "$IP" ]]; then
+        log_fail "Could not get istio-ingressgateway IP"
+        return 1
+      fi
+    fi
   fi
 
-  verbose "Using ingress IP: $IP"
-
-  # Test TLS handshake
-  if openssl s_client -servername "$HOST" -connect "$IP:$PORT" \
-       </dev/null 2>/dev/null | grep -q "CONNECTED"; then
-    verbose "TLS connection established successfully"
+  if [[ -n "$IP" ]]; then
+    RESOLVE_ARGS=(--resolve "$HOST:$PORT:$IP")
+    verbose "Using ingress IP: $IP"
   else
+    RESOLVE_ARGS=()
+    verbose "Ingress IP override not provided; relying on DNS"
+  fi
+
+  local connect_target="${IP:-$HOST}"
+
+  local max_attempts=5
+  local attempt
+  local connected=0
+  for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+    if openssl s_client -servername "$HOST" -connect "$connect_target:$PORT" \
+         </dev/null 2>/dev/null | grep -q "CONNECTED"; then
+      connected=1
+      break
+    fi
+    verbose "TLS connection attempt ${attempt}/${max_attempts} failed; retrying..."
+    sleep 1
+  done
+
+  if (( ! connected )); then
     log_fail "TLS connection failed"
     return 1
   fi
+  verbose "TLS connection established successfully"
 
   # Check verification status (informational only, self-signed certs expected)
   local verify_output
-  verify_output=$(openssl s_client -servername "$HOST" -connect "$IP:$PORT" \
+  verify_output=$(openssl s_client -servername "$HOST" -connect "$connect_target:$PORT" \
     </dev/null 2>&1 | grep "Verify return code" || echo "")
 
   if [[ "$verify_output" =~ "Verify return code: 0" ]]; then
@@ -127,22 +192,29 @@ test_ssl_connectivity() {
 test_ssl_certificate_validity() {
   log_info "Validating certificate properties..."
 
-  if [[ -z "$IP" ]]; then
-    log_fail "IP address not available (run connectivity test first)"
+  local connect_target="${IP:-$HOST}"
+  if [[ -z "$connect_target" ]]; then
+    log_fail "Unable to determine certificate endpoint"
     return 1
   fi
 
-  # Extract live certificate
-  if ! openssl s_client -showcerts -servername "$HOST" -connect "$IP:$PORT" \
-       </dev/null 2>/dev/null \
-       | sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/p' \
-       | head -n 100 > "$TEMP_CERT"; then
+  local max_attempts=5
+  local attempt
+  local extracted=0
+  for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+    if openssl s_client -showcerts -servername "$HOST" -connect "$connect_target:$PORT" \
+         </dev/null 2>/dev/null \
+         | sed -n '/BEGIN CERTIFICATE/,/END CERTIFICATE/p' \
+         | head -n 100 > "$TEMP_CERT" && [[ -s "$TEMP_CERT" ]]; then
+      extracted=1
+      break
+    fi
+    verbose "Certificate extraction attempt ${attempt}/${max_attempts} failed; retrying..."
+    sleep 1
+  done
+
+  if (( ! extracted )); then
     log_fail "Failed to extract certificate"
-    return 1
-  fi
-
-  if [[ ! -s "$TEMP_CERT" ]]; then
-    log_fail "Certificate file is empty"
     return 1
   fi
 
@@ -187,14 +259,15 @@ test_ssl_certificate_validity() {
 test_ssl_pinning() {
   log_info "Testing certificate pinning..."
 
-  if [[ -z "$IP" ]]; then
+  if [[ -z "$IP" && -z "$SMOKE_URL" ]]; then
     log_fail "IP address not available (run connectivity test first)"
     return 1
   fi
 
+  local connect_target="${IP:-$HOST}"
   # Generate pin from live endpoint
   local pin
-  pin=$(openssl s_client -servername "$HOST" -connect "$IP:$PORT" \
+  pin=$(openssl s_client -servername "$HOST" -connect "$connect_target:$PORT" \
     </dev/null 2>/dev/null \
     | openssl x509 -pubkey -noout \
     | openssl pkey -pubin -outform DER \
@@ -210,7 +283,7 @@ test_ssl_pinning() {
   # Verify curl with pinning succeeds
   local http_code
   http_code=$(curl -sk --max-time 10 \
-    --resolve "$HOST:$PORT:$IP" \
+    "${RESOLVE_ARGS[@]}" \
     --pinnedpubkey "sha256//$pin" \
     -w "%{http_code}" -o /dev/null \
     "https://$HOST:$PORT/login" 2>/dev/null || echo "000")
@@ -233,7 +306,7 @@ test_ssl_pinning() {
 test_login_default_auth() {
   log_info "Testing default authentication..."
 
-  if [[ -z "$IP" ]]; then
+  if [[ -z "$IP" && -z "$SMOKE_URL" ]]; then
     log_fail "IP address not available (run connectivity test first)"
     return 1
   fi
@@ -255,7 +328,7 @@ test_login_default_auth() {
   # First try: Get crumb for CSRF protection
   local crumb crumb_field
   crumb=$(curl -sk --max-time 10 \
-    --resolve "$HOST:$PORT:$IP" \
+    "${RESOLVE_ARGS[@]}" \
     -u "$admin_user:$admin_pass" \
     "https://$HOST:$PORT/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)" 2>/dev/null || echo "")
 
@@ -273,14 +346,14 @@ test_login_default_auth() {
   local http_code response
   if [[ -n "$crumb_header" ]]; then
     response=$(curl -sk --max-time 10 \
-      --resolve "$HOST:$PORT:$IP" \
+      "${RESOLVE_ARGS[@]}" \
       -u "$admin_user:$admin_pass" \
       -H "$crumb_header" \
       -w "\n%{http_code}" \
       "https://$HOST:$PORT/api/json" 2>/dev/null || echo "")
   else
     response=$(curl -sk --max-time 10 \
-      --resolve "$HOST:$PORT:$IP" \
+      "${RESOLVE_ARGS[@]}" \
       -u "$admin_user:$admin_pass" \
       -w "\n%{http_code}" \
       "https://$HOST:$PORT/api/json" 2>/dev/null || echo "")
@@ -308,7 +381,7 @@ test_login_default_auth() {
 test_login_ldap() {
   log_info "Testing LDAP authentication..."
 
-  if [[ -z "$IP" ]]; then
+  if [[ -z "$IP" && -z "$SMOKE_URL" ]]; then
     log_fail "IP address not available (run connectivity test first)"
     return 1
   fi
@@ -456,7 +529,7 @@ test_login_ldap() {
   # Test Jenkins login with LDAP credentials
   local http_code response
   response=$(curl -sk --max-time 10 \
-    --resolve "$HOST:$PORT:$IP" \
+    "${RESOLVE_ARGS[@]}" \
     -u "$test_user:$test_pass" \
     -w "\n%{http_code}" \
     "https://$HOST:$PORT/api/json" 2>/dev/null || echo "")
@@ -483,7 +556,7 @@ test_login_ldap() {
 test_login_ad() {
   log_info "Testing Active Directory authentication..."
 
-  if [[ -z "$IP" ]]; then
+  if [[ -z "$IP" && -z "$SMOKE_URL" ]]; then
     log_fail "IP address not available (run connectivity test first)"
     return 1
   fi
@@ -536,7 +609,7 @@ test_login_ad() {
   # Test Jenkins login with AD credentials
   local http_code response
   response=$(curl -sk --max-time 10 \
-    --resolve "$HOST:$PORT:$IP" \
+    "${RESOLVE_ARGS[@]}" \
     -u "$ad_user:$ad_pass" \
     -w "\n%{http_code}" \
     "https://$HOST:$PORT/api/json" 2>/dev/null || echo "")
@@ -565,6 +638,8 @@ test_login_ad() {
 # ============================================================================
 
 main() {
+  apply_smoke_url_override || true
+
   echo "=========================================="
   echo "Jenkins Smoke Test"
   echo "=========================================="
@@ -574,6 +649,13 @@ main() {
   echo "Auth Mode:  $AUTH_MODE"
   echo "=========================================="
   echo
+
+  if [[ -n "$SMOKE_URL" ]]; then
+    log_info "JENKINS_SMOKE_URL override active: $SMOKE_URL"
+  fi
+  if [[ -n "$SMOKE_IP_OVERRIDE" ]]; then
+    log_info "JENKINS_SMOKE_IP_OVERRIDE active: $SMOKE_IP_OVERRIDE"
+  fi
 
   # Phase 1: SSL/TLS Testing
   echo "=== SSL/TLS Tests ==="

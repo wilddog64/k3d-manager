@@ -49,7 +49,11 @@ function _provider_k3d_install() {
    export K3D_INSTALL_DIR="${1:-/usr/local/bin}"
    export INSTALL_DIR="$K3D_INSTALL_DIR"
 
-   _install_docker
+   local skip_docker="${SKIP_DOCKER_SETUP:-0}"
+
+   if [[ "$skip_docker" != "1" ]]; then
+      _install_docker
+   fi
    _install_helm
    if _is_mac; then
       _install_istioctl "$HOME/.local/bin"
@@ -136,7 +140,7 @@ function _provider_k3d_create_cluster() {
 
    trap '$(_cleanup_trap_command "$yamlfile")' RETURN
 
-   if _provider_k3d_list_clusters | grep -q "$cluster_name"; then
+   if _provider_k3d_list_clusters | grep -q -- "$cluster_name"; then
       echo "Cluster $cluster_name already exists, skip"
       return 0
    fi

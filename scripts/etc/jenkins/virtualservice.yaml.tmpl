@@ -23,5 +23,4 @@ ${JENKINS_VIRTUALSERVICE_HOSTS_YAML}
     - destination:
         host: "jenkins.${JENKINS_NAMESPACE}.svc.cluster.local"
         port:
-          number: 8081   # <-- this must match your Service's port that targets pod:8080
-
+          number: 8080   # <-- this must match your Service's port that targets pod:8080

@@ -10,6 +10,38 @@
 # cache.
 CLUSTER_PROVIDER_ACTIVE="${CLUSTER_PROVIDER_ACTIVE:-}"
 
+function _orbstack_cli_available() {
+    command -v orb >/dev/null 2>&1
+}
+
+function _orbstack_detect() {
+    if ! _is_mac 2>/dev/null; then
+        return 1
+    fi
+
+    if ! _orbstack_cli_available; then
+        return 1
+    fi
+
+    orb status >/dev/null 2>&1
+}
+
+function _orbstack_find_docker_context() {
+    if ! command -v docker >/dev/null 2>&1; then
+        return 1
+    fi
+
+    local context
+    context=$(docker context ls --format '{{.Name}}\t{{.Description}}' 2>/dev/null \
+        | awk 'tolower($0) ~ /orbstack/ {print $1; exit}')
+
+    if [[ -z "$context" ]]; then
+        return 1
+    fi
+
+    printf '%s\n' "$context"
+}
+
 function _cluster_provider_set_active() {
     local provider="${1:-}"
     CLUSTER_PROVIDER_ACTIVE="$provider"
@@ -24,6 +56,11 @@ function _cluster_provider_guess_default() {
 
     if [[ -n "$provider" ]]; then
         printf '%s\n' "$provider"
+        return 0
+    fi
+
+    if _orbstack_detect; then
+        printf 'orbstack\n'
         return 0
     fi
 
@@ -42,7 +79,7 @@ function _cluster_provider_guess_default() {
         return 0
     fi
 
-    printf 'unknown\n'
+    printf 'k3d\n'
 }
 
 function _cluster_provider_get_active() {

@@ -65,9 +65,28 @@ continued end-to-end validation for auth/deploy modes.
 
 ### Priority 1 (Current implementation focus)
 
-- [ ] **Jenkins Kubernetes agents + SMB CSI**
+  - [x] **Jenkins Kubernetes agents + SMB CSI**
   - Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
   - Goal: reliable dynamic agents and storage-backed workload validation.
+  - **Status (2026-02-27):** Linux + kaniko agent validation succeeded on macOS/OrbStack.
+    - `CLUSTER_PROVIDER=orbstack PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager deploy_jenkins --enable-vault`
+      → smoke test 4/4 pass (TLS + admin auth).
+    - `PATH="/opt/homebrew/bin:$PATH" JENKINS_URL="http://127.0.0.1:8083" ./bin/run-k8s-agent-tests.sh`
+      → linux + kaniko jobs triggered, pods observed via `timeout 120 kubectl -n jenkins get pods -w | grep agent`, REST API
+      shows `"result":"SUCCESS"`.
+    - **Validated on m4-air by Gemini (2026-02-27) with evidence.**
+    - Remaining scope: SMB CSI Phase 2 (NFS swap) + Phase 3 investigation on OrbStack.
+  - **macOS SMB CSI limitation:** `cifs` kernel module unavailable in k3d/OrbStack node
+    containers — SMB CSI cannot mount volumes on macOS.
+  - **macOS implementation order** (`docs/plans/smb-csi-macos-workaround.md`):
+    - [x] Phase 1 — **Skip guard** (2026-02-27): `deploy_smb_csi` logs a warning + no-ops on macOS,
+      preventing accidental installs while Linux validation remains available. **Validated on m4-air by Gemini (2026-02-27) with evidence** (skip guard is macOS-generic — any Mac is sufficient for this check).
+    - [ ] Phase 2 — **NFS CSI swap** (when local shared storage needed): in-cluster NFS server
+      + NFS CSI driver; StorageClass named `smb` backed by NFS — Jenkins manifests unchanged.
+    - [ ] Phase 3 — **Custom k3d node image** (experimental, OrbStack only): `rancher/k3s` +
+      `cifs-utils`; attempt real SMB CSI on OrbStack. Document result. Skip on Docker Desktop.
+  - **Linux/production:** native SMB CSI — no workaround. All SMB CSI validation must run
+    on Linux (k3s provider or GitHub Actions Linux runner) before merge.
 
 ### Priority 2 (Validation)
 
@@ -88,19 +107,25 @@ continued end-to-end validation for auth/deploy modes.
 
 ### Priority 3.5 (CI / Repository hygiene)
 
-- [x] **Branch protection enabled on `main`** (2026-02-22)
+- [x] **Branch protection enabled on `main`** (2026-02-22, updated 2026-02-24)
   - 1 PR approval required, stale review dismissal, enforce admins
-  - No required status checks yet — pending CI design
+  - `lint` job now required as status check (added 2026-02-24)
+
+- [x] **Self-hosted runner installed** (2026-02-24)
+  - Runner: `m2-air` (macOS, ARM64) — online on `wilddog64/k3d-manager`
 
 - [ ] **CI workflow implementation**
   - Plan: `docs/plans/ci-workflow.md`
   - **Stage 1:** shellcheck + bash -n + yamllint (workflow files only) + lib unit BATS (no cluster)
+    - Status: **Implemented and green (2026-02-23)**
+    - Added: `.github/workflows/ci.yml`, `.github/actions/setup/action.yml`, `.shellcheckrc`
+    - Shellcheck baseline: `disable=SC2148`
+    - Shellcheck scope: files with Bash shebang only
   - **Stage 2:** integration tests against pre-built cluster (self-hosted Mac runner)
-    - **Stage 2.0:** Cluster health check (verify Vault unseal, Istio, ESO pods)
-    - **Stage 2.1:** Integration suite (Vault, ESO, Istio)
-  - **Stage 3:** destructive tests via `workflow_dispatch` only
-  - **Prerequisite:** Refactor `scripts/lib/test.sh` for namespace isolation across all tests.
-  - **Blocked on:** self-hosted runner setup decision
+    - **Stage 2.0:** `scripts/ci/check_cluster_health.sh` — implemented ✅
+    - **Stage 2.1:** `test_vault`, `test_eso`, `test_istio` — namespace isolation done ✅
+    - **Stage 2.2:** `stage2` job added to `.github/workflows/ci.yml` (2026-02-26) — m2-air validation complete green (2026-02-27) ✅
+  - **Stage 3:** destructive tests via `workflow_dispatch` only — not yet created
 
 ### Priority 4 (Nice-to-have / future)
 
@@ -114,6 +139,33 @@ continued end-to-end validation for auth/deploy modes.
 - [ ] Additional automated Bats tests for Jenkins and ESO plugins
 - [ ] **Argo CD implementation** — Phase 1 design complete in `docs/plans/argocd-implementation-plan.md`
       Core deployment + LDAP/Dex + Vault/ESO + Istio integration (~4-6 hours for Phase 1)
+- [ ] **OrbStack provider** — Plan: `docs/plans/orbstack-provider.md`
+  - [x] Phase 1: OrbStack as k3d runtime (`CLUSTER_PROVIDER=orbstack`) — implemented 2026-02-24
+  - [x] Phase 2: Auto-detection — OrbStack picked automatically when active
+  - [x] **m4 local validation** — Phase 1+2 verified on `m4` Mac (2026-02-24)
+    - Auto-detection and provider fixes verified.
+    - Full-stack tests documented two integration issues (`deploy_vault` path creation and `deploy_jenkins` none-auth smoke test).
+  - [x] **m2-air validation** — full stack test complete green (2026-02-27)
+    - Sequence: `create_cluster` → `deploy_vault` → `reunseal_vault` (ESO included in deploy_vault; Istio included in create_cluster)
+    - **Step 8 (Stage 2) results:** `test_eso` ✅, `test_istio` ✅, `test_vault` ✅
+    - Status: `m2-air` cluster is now a verified Stage 2 CI fixture.
+  - [ ] Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
+- [ ] **Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*`** — fix GitGuardian false positive
+  - See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
+  - Affects: `scripts/etc/ldap/vars.sh` and any referencing scripts
+
+- [ ] **AI-powered code review via GitHub Actions**
+  - Automate PR analysis using a cost-optimized model (Claude Haiku or GPT-4o-mini — ~20x cheaper than GPT-4o)
+  - Inspired by: https://dev.to/paul_robertson_e844997d2b/ai-powered-code-review-automate-pull-request-analysis-with-github-actions-j90
+  - Key capabilities to implement:
+    - Smart filtering: skip generated files, files >50KB, vendored paths
+    - Differential analysis: review only changed lines, not entire files
+    - Inline PR comments via GitHub API (not just summary)
+    - Severity-based output (blocker / warning / suggestion)
+  - Builds on existing workflow: Copilot already opens sub-PRs with real code changes
+  - Formalize the counter-argue protocol already in `.clinerules` as a required review gate
+  - Consider: model-diff validation step (compare Claude vs GPT-4o disagreements on same diff)
+    - Reference: https://dev.to/lakshmisravyavedantham/i-built-a-tool-that-shows-exactly-where-gpt-4-and-claude-disagree-the-results-were-surprising-2n65
 
 ---
 
@@ -126,6 +178,19 @@ continued end-to-end validation for auth/deploy modes.
 | Basic LDAP deploys empty directory | OPEN | No bootstrap LDIF yet; use `deploy_ad` as workaround |
 | LDAP password JCasC/envsubst interpolation | OPEN | `$${...}` escape attempt not yet confirmed working |
 | `test_cert_rotation` via dispatcher | OPEN | Manual cert rotation works; dispatcher flow still unreliable/hangs |
+| `test_vault` fails — ClusterRoleBinding conflict | FIXED | 2026-02-26: test now reuses the existing `vault` namespace/release, validates readiness up front, and only cleans up the test namespace, Vault role, and seeded secret. See `docs/issues/2026-02-26-test-vault-clusterrolebinding-conflict.md`. |
+| `test_eso` fails — ClusterSecretStore API version mismatch | FIXED | 2026-02-27: `v1beta1` → `v1` in `scripts/lib/test.sh` line 591. Detected on m2-air by Gemini. See `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md`. |
+| `test_eso` fails — `insecureSkipVerify` removed in ESO v1 | FIXED | 2026-02-27: Vault uses HTTP internally; switched server URL to `http://` and removed `tls` block. See `docs/issues/2026-02-27-test-eso-v1-schema-incompatibility.md`. |
+| `test_eso` fails — jsonpath single-quote interpolation | FIXED | 2026-02-27: switched to double quotes so `${secret_key}` expands before `kubectl` runs. Validated on m2-air by Gemini. See `docs/issues/2026-02-27-test-eso-jsonpath-interpolation-failure.md`. |
+| `test_istio` fails — hardcoded namespace `istio-test` | FIXED | 2026-02-27: all references now use `$test_ns`; validated via `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_istio`. See `docs/issues/2026-02-27-test-istio-hardcoded-namespace.md`. |
 | ESO SecretStore `mountPath` wrong | FIXED | Must be `kubernetes` not `auth/kubernetes` |
 | LDAP bind DN mismatch | FIXED | Keep `LDAP_BASE_DN` consistent with LDIF base DN |
 | Jenkins pod readiness timeout | FIXED | 10m timeout + pod existence check |
+| GitGuardian false positive: `LDAP_PASSWORD_ROTATOR_IMAGE` | FALSE POSITIVE | Variable name contains "PASSWORD", value is a Docker image. Fix: rename to `LDAP_ROTATOR_IMAGE`. See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md` |
+| OrbStack: `deploy_cluster` unsupported provider | FIXED | Added `orbstack` to the provider guard in `scripts/lib/core.sh`. See `docs/issues/2026-02-24-orbstack-unsupported-provider-in-core.md`. |
+| OrbStack: `--dry-run` flag broken in `create_cluster` | FIXED | `create_cluster` now parses `--dry-run` and the k3d provider uses `grep -q --` to avoid option parsing. See `docs/issues/2026-02-24-orbstack-dry-run-errors.md`. |
+| `deploy_vault` fails on macOS — host path mkdir | FIXED | `_vault_ensure_data_path` now skips host `mkdir` on macOS; validation via `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault`. See `docs/issues/2026-02-24-macos-vault-local-path-creation-failure.md`. |
+| Jenkins `none` auth mode smoke test failure | FIXED | Local realm + matrix permissions rebuilt via `scripts/plugins/jenkins.sh` awk patch. Jenkins deploy succeeds; issue documented in `docs/issues/2026-02-24-jenkins-none-auth-mode-smoke-test-failure.md`. |
+| Jenkins smoke test fails on macOS — Istio LB IP unreachable | FIXED | `_jenkins_run_smoke_test` now tunnels through `istio-system/svc/istio-ingressgateway` so the fallback hits a real HTTPS listener; rest of the RFC-1918 detection + trap cleanup stays unchanged. See `docs/issues/2026-02-25-jenkins-smoke-test-routing-service-mismatch.md`. |
+| Smoke script silent failure (unbound PLUGINS_DIR) | FIXED | Verified (2026-02-26): `bin/smoke-test-jenkins.sh` normalized paths to allow standalone and orchestrated library sourcing. |
+| Jenkins VirtualService hostname detection fails | FIXED | Verified (2026-02-26): `_jenkins_run_smoke_test` namespace query fixed; custom hostnames now auto-detected. |

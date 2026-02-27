@@ -13,7 +13,7 @@ Three environment variables select the active implementation at runtime:
 
 | Variable | Selects | Default |
 |---|---|---|
-| `CLUSTER_PROVIDER` | Cluster backend | `k3d` (macOS) |
+| `CLUSTER_PROVIDER` | Cluster backend | Auto-detects OrbStack on macOS when running, otherwise `k3d` |
 | `DIRECTORY_SERVICE_PROVIDER` | Auth backend | `openldap` |
 | `SECRET_BACKEND` | Secret backend | `vault` |
 
@@ -49,8 +49,8 @@ All backends in `scripts/lib/secret_backends/<backend>.sh` must implement:
 Supported: `vault` (complete). Planned: `azure`, `aws`, `gcp`.
 
 ### Cluster Provider (`CLUSTER_PROVIDER`)
-Providers in `scripts/lib/providers/<provider>.sh`.
-Supported: `k3d` (macOS/Docker), `k3s` (Linux/systemd).
+Providers live under `scripts/lib/providers/<provider>.sh`.
+Supported: `orbstack` (macOS, auto-detected when `orb` is running), `k3d` (Docker runtime), `k3s` (Linux/systemd).
 
 ## 4) ESO Secret Flow
 

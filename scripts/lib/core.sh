@@ -16,7 +16,7 @@ function _cluster_provider() {
    provider="$(printf '%s' "$provider" | tr '[:upper:]' '[:lower:]')"
 
    case "$provider" in
-      k3d|k3s)
+      k3d|orbstack|k3s)
          printf '%s' "$provider"
          ;;
       *)
@@ -577,14 +577,19 @@ function _cleanup_trap_command() {
 }
 function _install_smb_csi_driver() {
    if _is_mac ; then
-      echo "warning: SMB CSI driver is not supported on macOS"
-      exit 0
+      _warn "[smb-csi] SMB CSI driver is not supported on macOS; skipping. Use Linux/k3s to validate."
+      return 0
    fi
+
+   local release="${SMB_CSI_RELEASE:-smb-csi-driver}"
+   local namespace="${SMB_CSI_NAMESPACE:-kube-system}"
+   local chart_repo="https://kubernetes-sigs.github.io/smb-csi-driver"
+
    _install_helm
-   _helm repo add smb-csi-driver https://kubernetes-sigs.github.io/smb-csi-driver
+   _helm repo add smb-csi-driver "$chart_repo"
    _helm repo update
-   _helm upgrade --install smb-csi-driver smb-csi-driver/smb-csi-driver \
-      --namespace kube-system
+   _helm upgrade --install "$release" smb-csi-driver/smb-csi-driver \
+      --namespace "$namespace" --create-namespace
 }
 
 function _create_nfs_share() {
@@ -633,7 +638,60 @@ function _create_cluster() {
 }
 
 function create_cluster() {
-   _create_cluster "$@"
+   local dry_run=0 show_help=0
+   local -a positional=()
+
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         --dry-run|-n)
+            dry_run=1
+            shift
+            ;;
+         -h|--help)
+            show_help=1
+            shift
+            ;;
+         --)
+            shift
+            while [[ $# -gt 0 ]]; do
+               positional+=("$1")
+               shift
+            done
+            break
+            ;;
+         *)
+            positional+=("$1")
+            shift
+            ;;
+      esac
+   done
+
+   if (( show_help )); then
+      cat <<'EOF'
+Usage: create_cluster [cluster_name] [http_port=8000] [https_port=8443]
+
+Options:
+  --dry-run            Resolve provider, print intent, and exit.
+  -h, --help           Show this help message.
+EOF
+      return 0
+   fi
+
+   if (( dry_run )); then
+      local provider args_desc="defaults"
+      if ! provider=$(_cluster_provider_get_active); then
+         _err "Failed to resolve cluster provider for create_cluster dry-run."
+      fi
+
+      if (( ${#positional[@]} )); then
+         args_desc="${positional[*]}"
+      fi
+
+      _info "create_cluster dry-run: provider=${provider}; args=${args_desc}"
+      return 0
+   fi
+
+   _create_cluster "${positional[@]}"
 }
 
 function _create_k3d_cluster() {
@@ -784,7 +842,7 @@ EOF
    fi
 
    case "$provider" in
-      k3d|k3s)
+      k3d|orbstack|k3s)
          ;;
       "")
          _err "Failed to determine cluster provider."

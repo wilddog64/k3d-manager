@@ -74,10 +74,45 @@ cleanup traps in `scripts/lib/test.sh`. No shared state left behind between runs
 **Namespace Isolation Strategy:**
 - All integration tests MUST be refactored to use ephemeral, randomly named namespaces (similar to `test_jenkins` using `JENKINS_NS_GENERATED`).
 - This prevents cross-test state collision and is a prerequisite for parallelizing Stage 2.
+- **Status (2026-02-25):** Done. `test_vault`, `test_eso`, and `test_istio` now generate unique namespaces via `_test_lib_random_name` in `scripts/lib/test.sh` and register parameterized cleanup traps so resources never collide between runs.
 
 **Not included in Stage 2 (too destructive for shared cluster):**
 - `test_jenkins` — deploys/tears down Jenkins; use `workflow_dispatch`
 - `test_cert_rotation` — mutates TLS secret; use `workflow_dispatch`
+
+---
+
+## Stage 2.5 — AI Code Review (future, PR only)
+
+**Triggers:** pull request to `main` — runs after Stage 1 passes
+
+**Purpose:** Domain-specific review that `shellcheck` cannot do — enforce project
+conventions and interface contracts automatically on every PR.
+
+**Approach:** GitHub Actions step using OpenAI API (gpt-4o-mini for cost efficiency),
+analyzing only changed files in the diff. The `.clinerules` file serves as the
+review prompt — project conventions are already documented there.
+
+**What to check (shell-specific, not covered by shellcheck):**
+- New provider files implement all required interface functions
+  (`_cluster_provider_create`, `_cluster_provider_destroy`, `_cluster_provider_get_kubeconfig`, etc.)
+- New plugins do not execute anything at source time (no side effects on `source`)
+- New sensitive flags are added to `_args_have_sensitive_flag` in `scripts/lib/system.sh`
+- Public functions use no leading underscore; private functions always use `_` prefix
+- `_run_command` is used instead of calling `kubectl`, `helm`, `sudo` directly
+
+**Cost controls (same as standard practice):**
+- Skip files >50KB
+- Analyze diff only, not full file content
+- Batch with rate-limiting delays
+- Only trigger on `.sh` file changes
+
+**Not a replacement for:**
+- `shellcheck` — still runs in Stage 1 for syntax and style
+- Human review — AI review is advisory, not a merge gate (at least initially)
+
+**Implementation:** Not yet designed. Reference:
+[AI-Powered Code Review with GitHub Actions](https://dev.to/paul_robertson_e844997d2b/ai-powered-code-review-automate-pull-request-analysis-with-github-actions-j90)
 
 ---
 
@@ -100,20 +135,44 @@ cleanup traps in `scripts/lib/test.sh`. No shared state left behind between runs
 
 ## Pre-Built Cluster Setup
 
-The Mac runner maintains a persistent k3d cluster. Cluster is rebuilt manually when:
+The Mac runner (`m2-air`) maintains a persistent k3d cluster backed by OrbStack.
+Cluster is rebuilt manually when:
 - k3d or Helm chart versions are bumped
 - Major architecture changes affect core components
 - Cluster state becomes unreliable
 
-**Minimum cluster state for Stage 2:**
+### Runner Prerequisites (one-time manual setup)
+
+OrbStack must be pre-installed and configured on `m2-air` before any Stage 2 CI job
+runs. CI has no human interaction — OrbStack cannot be installed or set up by CI.
+
 ```bash
-./scripts/k3d-manager create_cluster
-./scripts/k3d-manager deploy_vault ha
+# On m2-air — do this once, manually
+brew install orbstack
+# Open OrbStack.app and complete GUI onboarding
+orb status   # must return healthy before proceeding
+```
+
+All other tooling (`kubectl`, `helm`, `k3d`, `bats`, `shellcheck`) is installed by
+the Stage 1 setup action and does not require manual pre-installation.
+
+### Minimum Cluster State for Stage 2
+
+```bash
+CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager create_cluster
+./scripts/k3d-manager deploy_vault
 ./scripts/k3d-manager deploy_eso
 ./scripts/k3d-manager deploy_istio
+./scripts/k3d-manager reunseal_vault
 ```
 
 Vault must be unsealed before any test run (`reunseal_vault`).
+
+**Note:** OrbStack is a CI runner prerequisite, not a developer prerequisite. Local
+dev machines can use Docker Desktop, Colima, or OrbStack — `CLUSTER_PROVIDER` selects
+the right runtime. `_install_orbstack` (macOS-only) installs via Homebrew, launches
+OrbStack.app, and waits for `orb status` to succeed, but CI still requires OrbStack
+to be pre-installed manually.
 
 ---
 
@@ -134,12 +193,12 @@ Once Stage 2 is stable, add integration job as a required check as well.
 
 ## Implementation Sequence
 
-1. [ ] Decide on self-hosted runner — install GitHub Actions runner on Mac
-2. [ ] Create `.github/actions/setup/action.yml` — install bats, shellcheck, yamllint
-3. [ ] Create `.github/workflows/ci.yml` — Stage 1 jobs (shellcheck + bash-n + yamllint on workflows + unit BATS)
-4. [ ] **Refactor `test.sh` for namespace isolation across all integration tests**
-5. [ ] Verify Stage 1 passes on current codebase
-6. [ ] Update branch protection to require Stage 1 check
+1. [x] Decide on self-hosted runner — install GitHub Actions runner on Mac (runner: m2-air, online)
+2. [x] Create `.github/actions/setup/action.yml` — install bats, shellcheck, yamllint
+3. [x] Create `.github/workflows/ci.yml` — Stage 1 jobs (shellcheck + bash-n + yamllint on workflows + unit BATS)
+4. [x] **Refactor `test.sh` for namespace isolation across all integration tests** (namespaces randomized via `_test_lib_random_name`)
+5. [x] Verify Stage 1 passes on current codebase
+6. [x] Update branch protection to require Stage 1 check
 7. [ ] Pre-build cluster on Mac runner
 8. [ ] Create `check_cluster_health.sh` script for Stage 2.0
 9. [ ] Add Stage 2 jobs to `ci.yml` — PR-only, integration tests
