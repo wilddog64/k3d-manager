@@ -2,10 +2,8 @@
 
 ## Overall Status
 
-Branch `ldap-develop` has completed a major test-strategy overhaul (2026-02-20):
-mock-heavy BATS suites were retired and E2E smoke testing is now the primary
-integration confidence path. Current focus is Jenkins k8s agents/SMB CSI and
-continued end-to-end validation for auth/deploy modes.
+`ldap-develop` merged to `main` via PR #2 (2026-02-27). **v0.1.0 released.**
+Next: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` (Priority 1 in activeContext.md).
 
 ---
 
@@ -187,6 +185,7 @@ continued end-to-end validation for auth/deploy modes.
 | LDAP bind DN mismatch | FIXED | Keep `LDAP_BASE_DN` consistent with LDIF base DN |
 | Jenkins pod readiness timeout | FIXED | 10m timeout + pod existence check |
 | GitGuardian false positive: `LDAP_PASSWORD_ROTATOR_IMAGE` | FALSE POSITIVE | Variable name contains "PASSWORD", value is a Docker image. Fix: rename to `LDAP_ROTATOR_IMAGE`. See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md` |
+| Vault `system:auth-delegator` missing from `deploy_vault` | OPEN | Vault SA needs `system:auth-delegator` ClusterRoleBinding to call k8s TokenReview API. Without it, `auth/kubernetes/login` returns 403. Applied manually to m2-air. Fix: add to `scripts/plugins/vault.sh` k8s auth setup. See activeContext.md Priority 1. |
 | OrbStack: `deploy_cluster` unsupported provider | FIXED | Added `orbstack` to the provider guard in `scripts/lib/core.sh`. See `docs/issues/2026-02-24-orbstack-unsupported-provider-in-core.md`. |
 | OrbStack: `--dry-run` flag broken in `create_cluster` | FIXED | `create_cluster` now parses `--dry-run` and the k3d provider uses `grep -q --` to avoid option parsing. See `docs/issues/2026-02-24-orbstack-dry-run-errors.md`. |
 | `deploy_vault` fails on macOS — host path mkdir | FIXED | `_vault_ensure_data_path` now skips host `mkdir` on macOS; validation via `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_vault`. See `docs/issues/2026-02-24-macos-vault-local-path-creation-failure.md`. |
