@@ -438,10 +438,12 @@ This project uses a three-agent loop for complex implementation tasks:
 - **Weaknesses:** diagnosis and iteration. If Codex gets stuck or starts
   generating commits without visible progress, stop the session. Do not let
   Codex iterate blindly — bring Claude in to audit.
-- **Counter-argue rule:** if Gemini's review conflicts with patterns in
-  `.clinerules` or `docs/plans/`, Codex must push back with reasoning.
-  Do not accept a reviewer suggestion just because it comes from Gemini.
-  Raise the conflict explicitly.
+- **Counter-argue rule (@copilot PR reviews):** GitHub Copilot (`@copilot`) automatically
+  reviews PRs and posts inline comments. Codex must NOT blindly accept Copilot suggestions.
+  If a Copilot comment conflicts with patterns in `.clinerules`, `docs/plans/`, or the
+  established architecture, Codex must push back with reasoning and raise the conflict
+  explicitly — tag Claude to arbitrate if needed. Accepting a suggestion just because
+  it comes from `@copilot` is not acceptable.
 
 ### Local-First Mandate (enforced from session 1)
 
@@ -478,6 +480,21 @@ When a bug or test failure is identified, assign the fix as follows:
 - Running `test_vault`, `test_eso`, `test_istio` on m2-air → Gemini
 
 **Gemini validation rule:** Gemini must execute commands and report actual terminal output and exit codes. Reading documentation or reviewing code is NOT validation. If Gemini reports "validation complete" without showing command output, the task is not done.
+
+---
+
+### Release Strategy
+
+- **First release:** `v0.1.0` — triggered immediately after Stage 2 CI goes green on
+  `main` following the `ldap-develop` merge.
+- **Mechanism:** `gh release create v0.1.0 --generate-notes` — auto-changelog from
+  commit history; human review and trim before publishing.
+- **Merge gate:** PR to `main` requires Jenkins k8s agents complete (Linux agents +
+  SMB CSI Phase 1 skip guard) in addition to Stage 2 CI green. AD e2e validation is
+  deferred to a follow-on branch — it is infrastructure-gated (requires external AD/VPN).
+- **Subsequent releases:** `v0.2.0` when AD e2e passes; `v1.0.0` when production-hardened.
+- **No auto-release on merge** — release is a deliberate manual step immediately after
+  CI confirms green on `main`.
 
 ---
 
