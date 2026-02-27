@@ -77,17 +77,55 @@ OrbStack provider, and Stage 2 CI. **Not yet merged to `main`.**
 
 ## Current Priorities / Active Decisions
 
-### Priority 1: Jenkins Kubernetes agents (Codex complete — ready for Gemini validation)
+### Priority 1: Jenkins Kubernetes agents (STILL BLOCKED — Codex debugging)
 - Plan: `docs/plans/jenkins-k8s-agents-and-smb-csi.md`
 - Scope: Linux agents only. Windows agents and SMB CSI volume mounts deferred.
 - **Completed this session (2026-02-27):**
   - `jenkinsUrl` port corrected `8081` → `8080` across all three value templates
   - Agent labels simplified `linux-agent`/`kaniko-agent` → `linux`/`kaniko` in templates + job DSL
   - Smoke test TLS retry logic added (`bin/smoke-test-jenkins.sh`)
-  - `values.yaml` → `values-default.yaml.tmpl`: envsubst now runs for default path, `${JENKINS_NAMESPACE}` expands correctly
-  - `scripts/plugins/jenkins.sh` wired to route default path through envsubst (line 1552)
+  - `values.yaml` → `values-default.yaml.tmpl`: wired into envsubst path in `jenkins.sh` line 1552
   - Blocking issue documented: `docs/issues/2026-02-27-jenkins-k8s-agent-cloud-not-applied.md`
-- **Status:** code complete — hand off to Gemini for smoke validation
+- **Still broken:** `${JENKINS_NAMESPACE}` is still literal in the deployed ConfigMap after redeploy.
+  Evidence from Codex (post-fix):
+  ```
+  kubectl -n jenkins get configmap jenkins-jenkins-config-02-kubernetes-agents.yaml \
+    -o jsonpath='{.data.*}' | grep jenkinsUrl
+  # shows: jenkinsUrl: "http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8080"
+  ```
+- **Root cause under investigation:** `JENKINS_NAMESPACE` is exported at line 1277 and envsubst
+  runs at line 1600. But the ConfigMap still shows the literal placeholder. Two possible causes:
+  1. `JENKINS_NAMESPACE` is not actually in the environment seen by envsubst at line 1600
+  2. envsubst runs correctly but the awk pass (lines 1618–1743) reintroduces the placeholder
+
+### Next task for Codex — debug envsubst expansion
+
+**Step 1 — Confirm envsubst sees JENKINS_NAMESPACE:**
+```bash
+export JENKINS_NAMESPACE=jenkins
+envsubst < scripts/etc/jenkins/values-default.yaml.tmpl | grep -A3 "02-kubernetes-agents"
+```
+- If expanded → envsubst works standalone; bug is in the deploy_jenkins call flow (JENKINS_NAMESPACE not exported at runtime)
+- If still literal → envsubst is not treating `${JENKINS_NAMESPACE}` as a variable (unusual — investigate template syntax)
+
+**Step 2 — Check whether JENKINS_NAMESPACE is exported when envsubst runs inside deploy_jenkins:**
+
+Add a temporary debug line just before line 1600:
+```bash
+_info "[jenkins] DEBUG JENKINS_NAMESPACE=${JENKINS_NAMESPACE}"
+```
+Redeploy and check output. If empty or missing → the export at line 1277 is not persisting to this code path.
+
+**Step 3 — Check awk output:**
+```bash
+# After envsubst renders to $values_file, check the intermediate file:
+# Add before line 1743: _info "[jenkins] DEBUG rendered values: $(grep JENKINS_NAMESPACE "$values_file")"
+```
+
+**Fix options (once root cause confirmed):**
+- If JENKINS_NAMESPACE is not exported: ensure `export JENKINS_NAMESPACE` is called in the
+  same function scope before the envsubst line — or pass it explicitly: `JENKINS_NAMESPACE="$ns" envsubst < ...`
+- If awk reintroduces it: scope the awk output through a second envsubst pass
 
 ### Priority 2: Open PR and release v0.1.0
 - Once Jenkins agents land and CI is green: open PR `ldap-develop` → `main`
