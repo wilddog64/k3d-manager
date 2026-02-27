@@ -151,19 +151,25 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 7. ✅ Stage 2 job added to `.github/workflows/ci.yml` (2026-02-26)
 
 **Remaining:**
-8. 🔴 **Blocked on Codex fix** — `test_eso` jsonpath interpolation bug (see Next Step for Codex below)
-   - 2026-02-27: `test_vault` passed ✅; `test_eso` failed 🔴. `ClusterSecretStore` creation succeeded (using `v1` + `http`), but the test failed on secret verification due to a `jsonpath` interpolation bug (single quotes on `${secret_key}`). `test_istio` skipped.
-   - After Codex fixes: Gemini to re-run `test_eso` → `test_istio` → `test_vault` on m2-air.
+8. 🔴 **Blocked on Codex fix** — `test_istio` hardcoded namespace (see Next Step for Codex below)
+   - 2026-02-27: `test_vault` passed ✅; `test_eso` passed ✅; `test_istio` failed 🔴 — sidecar check and Gateway/VirtualService apply use hardcoded `-n istio-test` instead of `"$test_ns"`.
+   - After Codex fixes: Gemini to re-run `test_istio` → `test_vault` on m2-air (`test_eso` already confirmed green).
 9. Claude: update branch protection to require `stage2` (after step 8 green)
 
 ---
 
 ## Update — `test_eso` fix (2026-02-27)
 
-- Fix 1: ✅ `v1beta1` → `v1` for `ClusterSecretStore` apiVersion.
-- Fix 2: ✅ Removed `tls.insecureSkipVerify` block — Vault is deployed on HTTP internally (`http://vault.vault.svc:8200`); test was incorrectly using `https://`. Switched server URL to `http://` and dropped the `tls` block.
-- New Blocker: 🔴 Secret verification failed due to `jsonpath` interpolation bug. `jsonpath='{.data.${secret_key}}'` uses single quotes, preventing expansion.
-- See `docs/issues/2026-02-27-test-eso-jsonpath-interpolation-failure.md`.
+- Status: ✅ Passed. `scripts/lib/test.sh` updated to use `v1` API, HTTP for Vault, and double quotes for `jsonpath` expansion. All E2E steps for ESO verification are now green on m2-air.
+
+---
+
+## Update — `test_istio` failure (2026-02-27)
+
+- Status: 🔴 Failed. `scripts/lib/test.sh:test_istio` failed during sidecar verification. The test correctly deployed to a dynamic namespace (e.g., `istio-test-12345`), but the check for `istio-proxy` was hardcoded to `-n istio-test`.
+- Evidence: Multiple hardcoded references to `istio-test` found in `scripts/lib/test.sh` (lines 178, 191, 194, 203).
+- Impact: Stage 2 CI validation is still blocked.
+- Action: Documented in `docs/issues/2026-02-27-test-istio-hardcoded-namespace.md`. Fix requires replacing `istio-test` with `"$test_ns"`.
 
 ---
 
@@ -184,15 +190,38 @@ See `docs/issues/2026-02-25-m2-air-runner-wrong-architecture-label.md`.
 
 ## Update — `test_eso` fixes (2026-02-27)
 
-- Status: ✅ Completed. `scripts/lib/test.sh:test_eso` now targets the `external-secrets.io/v1`
-  CRDs, points at Vault's internal HTTP endpoint (no TLS block needed), and uses double-quoted
-  `jsonpath` expressions so `${secret_key}` expands before invoking `kubectl`.
-- Validation: `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_eso` passes locally.
-- Action: Gemini must rerun `./scripts/k3d-manager test_eso` on m2-air as part of Stage 2 Step 8.
+- Status: ✅ Completed and validated on m2-air by Gemini (2026-02-27). `scripts/lib/test.sh:test_eso`
+  now targets the `external-secrets.io/v1` CRDs, points at Vault's internal HTTP endpoint (no TLS
+  block needed), and uses double-quoted `jsonpath` expressions so `${secret_key}` expands before
+  invoking `kubectl`.
 
 ---
 
-## Next Step for Gemini — Re-validate on m2-air
+## Next Step for Codex — Fix `test_istio` hardcoded namespace
+
+**File:** `scripts/lib/test.sh`
+
+**Problem:** The `test_istio` function generates a random namespace via `_test_lib_random_name 'istio-test'` and stores it in `$test_ns`, but several lines inside the function still reference the literal string `istio-test`:
+
+| Line | Hardcoded reference |
+|---|---|
+| 188 | `_kubectl --no-exit get pod -n istio-test -o yaml` |
+| 207 | `_kubectl apply -f - -n istio-test` |
+| 212 | `namespace: istio-test` (inside heredoc) |
+| 228 | `namespace: istio-test` (inside heredoc) |
+| 243 | `_kubectl --no-exit get gateway -n istio-test test-gateway` |
+
+**Also check line 275:** a second function (cleanup or teardown) has `local test_ns="${1:-istio-test}"` — confirm whether this default needs to be updated or if the caller always passes `$test_ns` explicitly.
+
+**Fix:** Replace each hardcoded `istio-test` (except the `_test_lib_random_name` prefix on line 131) with `"$test_ns"`. Heredoc namespace fields need to use the variable via the outer scope or switch to a non-heredoc apply.
+
+**After fixing:** commit, push, then hand off to Gemini.
+
+**Reference:** `docs/issues/2026-02-27-test-istio-hardcoded-namespace.md`
+
+---
+
+## Next Step for Gemini — Re-validate on m2-air (after Codex fix)
 
 **IMPORTANT: This task requires running shell commands on m2-air and reporting actual output.
 Do NOT read documentation, review code, or summarize fixes. Execute the commands below,
