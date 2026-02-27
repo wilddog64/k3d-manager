@@ -72,7 +72,7 @@ continued end-to-end validation for auth/deploy modes.
     containers — SMB CSI cannot mount volumes on macOS.
   - **macOS implementation order** (`docs/plans/smb-csi-macos-workaround.md`):
     - [x] Phase 1 — **Skip guard** (2026-02-27): `deploy_smb_csi` logs a warning + no-ops on macOS,
-      preventing accidental installs while Linux validation remains available.
+      preventing accidental installs while Linux validation remains available. **Validated on m2-air by Gemini (2026-02-27).**
     - [ ] Phase 2 — **NFS CSI swap** (when local shared storage needed): in-cluster NFS server
       + NFS CSI driver; StorageClass named `smb` backed by NFS — Jenkins manifests unchanged.
     - [ ] Phase 3 — **Custom k3d node image** (experimental, OrbStack only): `rancher/k3s` +
