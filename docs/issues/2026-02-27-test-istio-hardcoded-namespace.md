@@ -39,8 +39,10 @@ There are several other occurrences of hardcoded `istio-test` in the same functi
 
 **Note:** Line 275 contains a second function with `local test_ns="${1:-istio-test}"`. This default may also need updating depending on whether the caller always passes `$test_ns` explicitly.
 
-## Resolution Plan
-Replace all hardcoded `istio-test` namespace references (lines 188, 207, 212, 228, 243) with `"$test_ns"` within the `test_istio` function in `scripts/lib/test.sh`. Investigate line 275 to determine if the cleanup/teardown default also needs to be updated.
+## Resolution (2026-02-27)
+- Updated `scripts/lib/test.sh:test_istio` so every manifest apply, resource check, and sidecar verification uses the dynamically generated `$test_ns`. Both the Gateway and VirtualService now inherit the same namespace instead of `istio-test`.
+- Cleanup helper `_cleanup_istio_test_namespace` continues to accept the namespace via the trap (callers always pass `$test_ns`).
+- Validated locally via `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_istio` — sidecar detection succeeds and the gateway route test reaches nginx through Istio.
 
 ## Evidence
 The test output showed:

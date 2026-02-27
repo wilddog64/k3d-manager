@@ -185,7 +185,7 @@ EOF
 
     # Verify that the Istio proxy has been injected
     _info "Checking for Istio sidecar..."
-    if _kubectl --no-exit get pod -n istio-test -o yaml | grep -q istio-proxy; then
+    if _kubectl --no-exit get pod -n "$test_ns" -o yaml | grep -q istio-proxy; then
         _info "Istio sidecar injection is working!"
     else
         _err "Istio sidecar was not injected! Check your Istio installation."
@@ -204,12 +204,12 @@ EOF
     fi
 
     # Create Istio Gateway and VirtualService
-    _kubectl apply -f - -n istio-test <<EOF
+    _kubectl apply -f - -n "$test_ns" <<EOF
 apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
   name: test-gateway
-  namespace: istio-test
+  namespace: ${test_ns}
 spec:
   selector:
     istio: ingressgateway
@@ -225,7 +225,7 @@ apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
   name: test-vs
-  namespace: istio-test
+  namespace: ${test_ns}
 spec:
   hosts:
   - "*"
@@ -240,7 +240,7 @@ spec:
 EOF
 
     # Verify Gateway creation
-    if _kubectl --no-exit get gateway -n istio-test test-gateway; then
+    if _kubectl --no-exit get gateway -n "$test_ns" test-gateway; then
         _info "Istio Gateway created successfully"
     else
         _err "Failed to create Istio Gateway"

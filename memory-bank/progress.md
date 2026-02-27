@@ -163,7 +163,7 @@ continued end-to-end validation for auth/deploy modes.
 | `test_eso` fails — ClusterSecretStore API version mismatch | FIXED | 2026-02-27: `v1beta1` → `v1` in `scripts/lib/test.sh` line 591. Detected on m2-air by Gemini. See `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md`. |
 | `test_eso` fails — `insecureSkipVerify` removed in ESO v1 | FIXED | 2026-02-27: Vault uses HTTP internally; switched server URL to `http://` and removed `tls` block. See `docs/issues/2026-02-27-test-eso-v1-schema-incompatibility.md`. |
 | `test_eso` fails — jsonpath single-quote interpolation | FIXED | 2026-02-27: switched to double quotes so `${secret_key}` expands before `kubectl` runs. Validated on m2-air by Gemini. See `docs/issues/2026-02-27-test-eso-jsonpath-interpolation-failure.md`. |
-| `test_istio` fails — hardcoded namespace `istio-test` | OPEN | Lines 188, 207, 212, 228, 243 use literal `-n istio-test` instead of `"$test_ns"`. Also check line 275 (cleanup default). Codex to fix. See `docs/issues/2026-02-27-test-istio-hardcoded-namespace.md`. |
+| `test_istio` fails — hardcoded namespace `istio-test` | FIXED | 2026-02-27: all references now use `$test_ns`; validated via `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_istio`. See `docs/issues/2026-02-27-test-istio-hardcoded-namespace.md`. |
 | ESO SecretStore `mountPath` wrong | FIXED | Must be `kubernetes` not `auth/kubernetes` |
 | LDAP bind DN mismatch | FIXED | Keep `LDAP_BASE_DN` consistent with LDIF base DN |
 | Jenkins pod readiness timeout | FIXED | 10m timeout + pod existence check |
