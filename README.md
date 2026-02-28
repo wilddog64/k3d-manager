@@ -397,6 +397,13 @@ Detailed design, planning, and troubleshooting references live under `docs/`. Us
 ### Status Tracking
 - **[AD Integration Status](docs/ad-integration-status.md)** - Rolling status board for AD feature parity
 
+## Releases
+
+| Version | Date | Highlights |
+|---|---|---|
+| [v0.2.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.2.0) | 2026-02-27 | OrbStack validated (M4+M2), Vault auth-delegator fix, Jenkins k8s agents, Stage 2 CI green |
+| [v0.1.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.1.0) | 2026-02-27 | Initial release — k3d, k3s, OrbStack providers; Vault PKI; Jenkins; ESO; LDAP/AD |
+
 ## Directory layout
 
 ```

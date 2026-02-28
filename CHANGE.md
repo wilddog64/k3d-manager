@@ -1,5 +1,27 @@
 # Changes - k3d-manager
 
+## v0.2.0 - dated 2026-02-27
+
+### OrbStack Provider
+- Added `scripts/lib/providers/orbstack.sh` — k3d lifecycle operations via OrbStack's Docker runtime
+- Auto-detection on macOS: prefers OrbStack when `orb` daemon is running, falls back to k3d
+- Validated on M4 and M2 Macs — full stack (cluster, Vault, Jenkins, Istio, smoke tests) green
+- Stage 2 CI now runs on OrbStack (m2-air self-hosted runner)
+
+### Vault
+- `deploy_vault` now ensures `system:auth-delegator` ClusterRoleBinding exists (idempotent)
+- `test_vault` reverted to hard-fail on pod auth failure — workaround removed
+
+### Jenkins
+- Fixed Kubernetes agents: ServiceAccount mismatch, envsubst placeholders, crumb issuer, port alignment (8080)
+- SMB CSI Phase 1: `deploy_smb_csi` no-ops with warning on macOS (cifs module unavailable)
+
+### Housekeeping
+- Renamed `LDAP_PASSWORD_ROTATOR_IMAGE` → `LDAP_ROTATOR_IMAGE` (GitGuardian false positive fix)
+- Stage 2 CI (`test_vault`, `test_eso`, `test_istio`) green on m2-air
+
+---
+
 ## OrbStack Provider Support - dated 2026-02-24
 
 - Added `scripts/lib/providers/orbstack.sh` to run all k3d lifecycle operations against OrbStack's Docker runtime without touching Colima/Docker Desktop installers.
