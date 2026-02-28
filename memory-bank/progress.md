@@ -136,6 +136,14 @@ Next: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` (Priority
 - [ ] AWS / GCP secret backends (planned in `SECRET_BACKEND` abstraction)
 - [ ] Monitoring recommendations (Prometheus alerts for cert expiry)
 - [ ] Additional automated Bats tests for Jenkins and ESO plugins
+- [ ] **Homebrew formula** — package k3d-manager for `brew install`
+  - Single formula covers macOS (Apple Silicon + Intel) and Linux (via Linuxbrew)
+  - No compiled binary — formula just installs shell scripts to the right place
+  - Prerequisites already in place: proper git tags (v0.1.0, v0.2.0), public repo
+  - Install story: `brew tap wilddog64/k3d-manager && brew install k3d-manager`
+  - Dramatically lowers adoption barrier and strengthens HN Show HN submission
+  - Steps: create `homebrew-k3d-manager` tap repo, write formula, test on macOS + Linux
+
 - [ ] **Argo CD implementation** — Phase 1 design complete in `docs/plans/argocd-implementation-plan.md`
       Core deployment + LDAP/Dex + Vault/ESO + Istio integration (~4-6 hours for Phase 1)
 - [ ] **OrbStack provider** — Plan: `docs/plans/orbstack-provider.md`
