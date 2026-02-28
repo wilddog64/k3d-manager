@@ -549,6 +549,18 @@ When a bug or test failure is identified, assign the fix as follows:
 
 ---
 
+### Context Compaction Recovery Rule
+
+After a context compaction (compact command), do not rely solely on the compaction summary.
+Re-read the following before continuing:
+- `memory-bank/activeContext.md` — current branch, open decisions, known broken paths
+- `memory-bank/progress.md` — what is complete and what is pending
+- `.clinerules` — project rules and agent protocols
+
+The compaction summary may omit details. The memory-bank is the authoritative source.
+
+---
+
 ### Memory-Bank Cleanup Rule
 
 Trigger cleanup when either condition is met:
