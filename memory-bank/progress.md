@@ -126,7 +126,22 @@ Next: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` (Priority
     - **Stage 2.2:** `stage2` job added to `.github/workflows/ci.yml` (2026-02-26) — m2-air validation complete green (2026-02-27) ✅
   - **Stage 3:** destructive tests via `workflow_dispatch` only — not yet created
 
-### Cloud (planned — blocked on local two-cluster; three-track strategy)
+### Two-Cluster (in progress — both clusters now live)
+
+**Infra cluster — k3d on OrbStack (k3d-k3d-test-orbstack-exists):**
+- [x] Vault ✅, ESO ✅, Jenkins ✅, OpenLDAP ✅, Istio ✅ — healthy
+- [ ] ArgoCD — not yet deployed
+
+**App cluster — Ubuntu k3s (10.211.55.14):**
+- [x] Fresh redeploy ✅ 2026-02-28 — k3s v1.34.4+k3s1, Istio ✅
+- [x] SSH agent forwarding fixed (stale ControlMaster issue resolved)
+- [ ] k3d-manager app-cluster mode — **Codex implements** (`feature/two-cluster-infra`)
+- [ ] ESO deploy (remote Vault addr: `https://<mac-ip>:8200`) — **Claude deploys** after Codex
+- [ ] shopping-cart-data (PostgreSQL, Redis, RabbitMQ) — **Claude deploys**
+- [ ] shopping-cart-apps (basket, order, payment, catalog, frontend) — **Claude deploys**
+- [ ] observability (Prometheus + Grafana, app-side) — **Claude deploys**
+
+### Cloud (planned — blocked on two-cluster implementation; three-track strategy)
 
 **Track 0 — one-node EKS (develop EKS provider — do first):**
 - [ ] `scripts/lib/providers/eks.sh` — EKS provider (eksctl create/destroy, kubeconfig, node wait)
