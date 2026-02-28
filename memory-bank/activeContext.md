@@ -49,11 +49,37 @@ If git auth fails: old ControlMaster may be stale — run `ssh -O exit ubuntu` t
 
 ## Open Items
 
-### Two-Cluster Refactor (k3d-manager code)
-- Branch: `feature/two-cluster-infra` (k3d-manager), `refactor/namespace-redesign` (shopping-cart-infra)
-- Plan doc: `docs/plans/two-cluster-infra.md`
-- **Codex implements:** app-cluster mode — ESO pointed at remote Vault, deploy only data + apps on Ubuntu
-- **Claude deploys:** once Codex lands the feature branch
+### Two-Cluster Refactor — Codex Task (branch: `feature/two-cluster-infra`)
+
+Full spec: `docs/plans/two-cluster-infra.md` — Codex reads this before starting.
+
+**Summary of what Codex must implement:**
+
+1. **Namespace renames** (change defaults, keep env var overrides working):
+   - `vault` → `secrets` (vault.sh: `VAULT_NS_DEFAULT`, `eso_ns` defaults)
+   - `external-secrets` → `secrets` (vault.sh eso_ns params)
+   - `jenkins` → `cicd` (`scripts/etc/jenkins/vars.sh`)
+   - `directory` → `identity` (`scripts/etc/ldap/vars.sh`, `ldap-password-rotator.sh`)
+   - `argocd` → `cicd` (`scripts/etc/argocd/vars.sh`)
+
+2. **Fix hardcoded namespace strings** in:
+   - `scripts/lib/test.sh` — `-n jenkins`, `-n vault`
+   - `scripts/ci/check_cluster_health.sh` — `namespace="${1:-vault}"`
+   - `scripts/tests/run-cert-rotation-test.sh` — `-n jenkins`
+   - `scripts/lib/dirservices/openldap.sh` — `namespace="${1:-directory}"`
+
+3. **New `CLUSTER_ROLE` env var** (`infra` | `app`) in dispatcher:
+   - `infra` (default): full stack — Vault, ESO, Jenkins, ArgoCD, LDAP, Istio
+   - `app`: ESO only (remote Vault) + shopping-cart manifests; skip infra plugins
+
+4. **Remote Vault ESO** (`REMOTE_VAULT_ADDR`):
+   - New `_eso_configure_remote_vault` function in `scripts/plugins/eso.sh`
+   - SecretStore template uses `REMOTE_VAULT_ADDR` + `kubernetes-app` auth mount
+   - Vault auth mount setup script for infra cluster
+
+**Must not break:** single-cluster mode, existing CLI flags, env var overrides, CI tests.
+
+**Claude deploys** once Codex lands: destroy infra cluster → redeploy with new namespaces → deploy app layer on Ubuntu.
 
 ### Known Broken Paths (all pre-existing)
 | Path | Root Cause |
