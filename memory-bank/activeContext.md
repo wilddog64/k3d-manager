@@ -9,26 +9,51 @@
 
 ## Current Focus (as of 2026-02-28)
 
-- Ubuntu k3s cluster redeploy pending (33-day-old cluster, Jenkins in Unknown state)
-- Two-cluster refactor planned: branch `feature/two-cluster-infra` (plan: `docs/plans/two-cluster-infra.md`)
+- **Two-cluster is live** — infra on k3d (OrbStack), app on Ubuntu k3s (fresh redeploy ✅)
+- Two-cluster refactor (k3d-manager code): `feature/two-cluster-infra` — Codex implements, Claude deploys
 - shopping-cart CI/CD pipeline design in progress (see shopping-cart-infra memory-bank)
 
 ---
 
+## Cluster State (as of 2026-02-28)
+
+### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-test-orbstack-exists`)
+| Component | Status | Age |
+|---|---|---|
+| Vault | ✅ Running | 3d21h |
+| ESO | ✅ Running | 3d21h |
+| Jenkins | ✅ Running | 34h |
+| OpenLDAP | ✅ Running | 3d19h |
+| Istio | ✅ Running | 3d22h |
+| ArgoCD | ❌ Not deployed | — |
+
+Context `k3d-automation` is dead (old cluster, port gone — ignore).
+
+### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`, host: 10.211.55.14)
+| Component | Status | Notes |
+|---|---|---|
+| k3s node | ✅ Ready | Fresh redeploy 2026-02-28, v1.34.4+k3s1 |
+| Istio | ✅ Running | IngressGateway + istiod |
+| ESO | ❌ Not deployed | Needs remote Vault addr |
+| shopping-cart-data | ❌ Not deployed | PostgreSQL, Redis, RabbitMQ |
+| shopping-cart-apps | ❌ Not deployed | basket, order, payment, catalog, frontend |
+| observability | ❌ Not deployed | — |
+
+**SSH note:** `SSH_AUTH_SOCK` is forwarded (ForwardAgent yes in config).
+If git auth fails: old ControlMaster may be stale — run `ssh -O exit ubuntu` then reconnect.
+
+### Deployment Ownership
+- **Claude** owns app cluster deployment
+- Blocked on: Codex implementing app-cluster mode in k3d-manager (`feature/two-cluster-infra`)
+- Remote Vault addr for Ubuntu ESO: `https://10.211.55.3:8200` (Mac OrbStack IP — verify before deploy)
+
 ## Open Items
 
-### Ubuntu Cluster Redeploy
-- Current state: vault-0 Running (survived 2 restarts — reboot unseal confirmed working), jenkins-0 Unknown (pre-existing broken path)
-- Plan: delete k3s cluster → redeploy clean → deploy_argocd → shopping-cart apps
-- Gate: user approval required before cluster delete
-- Self-hosted GitHub runner on Ubuntu needed for: Jenkins connectivity + e2e tests post-deploy
-
-### Two-Cluster Refactor
+### Two-Cluster Refactor (k3d-manager code)
 - Branch: `feature/two-cluster-infra` (k3d-manager), `refactor/namespace-redesign` (shopping-cart-infra)
 - Plan doc: `docs/plans/two-cluster-infra.md`
-- infra cluster: OrbStack (m2-air) — Vault, ESO, Jenkins, ArgoCD, observability
-- app cluster: k3s (Ubuntu/Parallels) — shopping-cart apps, data layer, app observability
-- Prerequisites: Ubuntu cluster redeploy first
+- **Codex implements:** app-cluster mode — ESO pointed at remote Vault, deploy only data + apps on Ubuntu
+- **Claude deploys:** once Codex lands the feature branch
 
 ### Known Broken Paths (all pre-existing)
 | Path | Root Cause |
@@ -84,6 +109,7 @@
 - **SMB CSI on macOS**: `cifs` kernel module unavailable in k3d/OrbStack — skip guard active
 - **GitGuardian false positive resolved**: `LDAP_ROTATOR_IMAGE` (renamed from `LDAP_PASSWORD_ROTATOR_IMAGE` 2026-02-23)
 - **Vault reboot unseal**: `_secret_store_data`/`_secret_load_data` are dual-path — macOS Keychain + Linux libsecret. k8s `vault-unseal` secret is the fallback for headless Ubuntu sessions
+- **Ubuntu SSH agent forwarding**: `ForwardAgent yes` is set in `~/.ssh/config`. If `SSH_AUTH_SOCK` is empty on Ubuntu (git auth fails), kill stale ControlMaster: `ssh -O exit ubuntu` then reconnect. Root cause: ControlMaster reuses old socket without agent forwarding.
 
 ---
 
