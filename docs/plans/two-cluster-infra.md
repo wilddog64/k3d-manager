@@ -157,6 +157,32 @@ Update any ESO Helm values or namespace references in:
 
 ---
 
+## Agent Workflow
+
+```
+Codex
+  └── implements all items in "Codex Implementation Spec" above
+  └── commits to branch: feature/two-cluster-infra
+  └── does NOT open a PR
+
+Gemini
+  └── reviews Codex's implementation against this spec
+  └── runs: shellcheck, CI tests (test_vault, test_eso, test_istio) with new namespace defaults
+  └── verifies single-cluster mode still works
+  └── posts review findings
+
+Claude
+  └── reads Gemini's review
+  └── opens PR: feature/two-cluster-infra → main
+  └── deploys after PR merge:
+        destroy infra cluster → redeploy with new namespaces → deploy app layer on Ubuntu
+
+Owner
+  └── approves PR
+```
+
+---
+
 ## Key Decisions
 
 - `istio-system` stays — Istio hardcodes this namespace
