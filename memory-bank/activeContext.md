@@ -79,7 +79,12 @@ Full spec: `docs/plans/two-cluster-infra.md` — Codex reads this before startin
 
 **Must not break:** single-cluster mode, existing CLI flags, env var overrides, CI tests.
 
-**Claude deploys** once Codex lands: destroy infra cluster → redeploy with new namespaces → deploy app layer on Ubuntu.
+**Agent workflow:**
+1. Codex implements + commits to `feature/two-cluster-infra` (does NOT open PR)
+2. Gemini reviews + runs tests (shellcheck, test_vault, test_eso, test_istio, single-cluster regression)
+3. Claude opens PR after Gemini approves
+4. Owner approves PR
+5. Claude deploys: destroy infra cluster → redeploy with new namespaces → deploy app layer on Ubuntu
 
 ### Known Broken Paths (all pre-existing)
 | Path | Root Cause |
