@@ -1,6 +1,21 @@
 # Active Context – k3d-manager
 
-## Current Branch: `main` (as of 2026-02-28)
+## ⚠️ Codex Orientation — Read Before Starting
+
+**Active branch for Codex: `feature/two-cluster-infra`**
+
+Common mistakes to avoid:
+- `fix/vault-auth-delegator` — **DONE and closed**. `system:auth-delegator` was fixed and validated 2026-02-27. Do not touch this branch.
+- SMB CSI — **deferred (P4)**. Not current priority. Do not work on this.
+- Jenkins port-forward helper — **does not exist** in any plan. Not a task.
+
+**Your only task:** implement the two-cluster namespace refactor.
+Full spec: `docs/plans/two-cluster-infra.md` — read this first, implement exactly what is listed.
+Do NOT open a PR. Gemini reviews your work, Claude opens the PR.
+
+---
+
+## Current Branch: `feature/two-cluster-infra` (as of 2026-02-28)
 
 **v0.2.0 released** — OrbStack validated (M4 + M2), Vault reboot unseal confirmed, Jenkins k8s agents working.
 **v0.2.1 released** — docs-only: CHANGE.md versioned entries + README Releases table.
