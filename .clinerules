@@ -549,6 +549,27 @@ When a bug or test failure is identified, assign the fix as follows:
 
 ---
 
+### Memory-Bank Cleanup Rule
+
+Trigger cleanup when either condition is met:
+1. **Per release** — clean up after each GitHub release is tagged
+2. **Size-based** — clean up when `activeContext.md` exceeds 200 lines
+
+**What to clean:**
+- Move completed items from `activeContext.md` to `progress.md` (mark ✅)
+- Remove evidence blocks older than 2 releases from `activeContext.md`
+- Keep `progress.md` as the permanent record — never delete completed items there
+- Update `## Current Focus` to reflect post-release state
+- Remove stale branch references (merged branches, closed PRs)
+
+**What to keep:**
+- All open/pending items
+- Operational notes and gotchas
+- Known bugs that are still open
+- Current branch and release strategy
+
+---
+
 ### Collapse Recovery Protocol
 
 When Gemini or Codex shows signs of hallucination (generating commits without
