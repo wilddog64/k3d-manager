@@ -3,7 +3,10 @@
 ## Overall Status
 
 `ldap-develop` merged to `main` via PR #2 (2026-02-27). **v0.1.0 released.**
-Next: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` (Priority 1 in activeContext.md).
+
+**`fix/vault-auth-delegator` — COMPLETE ✅ (2026-02-27)**
+`system:auth-delegator` ClusterRoleBinding added to `deploy_vault`, validated by Gemini on m2-air.
+Branch is stale — do not revisit. See `docs/issues/2026-02-27-vault-auth-delegator-helm-managed.md`.
 
 ---
 
@@ -161,6 +164,14 @@ Next: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` (Priority
 - [ ] Single-cluster eksctl config (t3.medium, 2 nodes, namespace split)
 - [ ] Vault KMS auto-unseal (`VAULT_UNSEAL_MODE=kms`) — only if KMS confirmed
 - Plan: `docs/plans/cloud-architecture.md`
+
+### Deferred / P4 (NOT current priority — do not pick up without explicit instruction)
+
+- [ ] SMB CSI Phase 2 (NFS CSI swap) — `docs/plans/smb-csi-macos-workaround.md`
+- [ ] SMB CSI Phase 3 (custom k3d node image, OrbStack only)
+- [ ] Jenkins port-forward helper — **not in any plan; do not invent this task**
+- [ ] AD end-to-end validation — requires external AD/VPN
+- [ ] OrbStack Phase 3: native Kubernetes provider
 
 ### Priority 4 (Nice-to-have / future)
 
