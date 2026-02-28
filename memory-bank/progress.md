@@ -126,6 +126,27 @@ Next: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` (Priority
     - **Stage 2.2:** `stage2` job added to `.github/workflows/ci.yml` (2026-02-26) — m2-air validation complete green (2026-02-27) ✅
   - **Stage 3:** destructive tests via `workflow_dispatch` only — not yet created
 
+### Cloud (planned — blocked on local two-cluster; three-track strategy)
+
+**Track 0 — one-node EKS (develop EKS provider — do first):**
+- [ ] `scripts/lib/providers/eks.sh` — EKS provider (eksctl create/destroy, kubeconfig, node wait)
+- [ ] `scripts/etc/eks/cluster.yaml.tmpl` — 1-node t3.medium, OIDC conditional
+- [ ] EBS CSI addon install (`_eks_install_storage_driver`)
+- [ ] Validate: `CLUSTER_PROVIDER=eks deploy_cluster` → Vault + ESO + Istio on 1-node EKS
+- [ ] Gate: success → Track B unlocked; IAM failure → document and stop
+
+**Track A — k3s on EC2 (start after local two-cluster done):**
+- [ ] Terraform module `terraform/aws/track-a/` — VPC + 2× t3.medium EC2 + EBS + SG
+- [ ] `K3S_DNS_MODE=nip.io` in VirtualService templates
+- [ ] SSM Parameter Store shard backend in `_secret_store_data` / `_secret_load_data`
+- [ ] Validate full stack on EC2: `CLUSTER_PROVIDER=k3s deploy_cluster`
+
+**Track B — EKS full stack (blocked on Track 0 success + ACG verification):**
+- [ ] Run pre-verification checklist on ACG sandbox (EKS / KMS / RDS / ElastiCache)
+- [ ] Single-cluster eksctl config (t3.medium, 2 nodes, namespace split)
+- [ ] Vault KMS auto-unseal (`VAULT_UNSEAL_MODE=kms`) — only if KMS confirmed
+- Plan: `docs/plans/cloud-architecture.md`
+
 ### Priority 4 (Nice-to-have / future)
 
 - [ ] `bootstrap-basic-schema.ldif` for standard LDAP with pre-seeded users
