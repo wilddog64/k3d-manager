@@ -147,6 +147,27 @@ Plan: `docs/plans/ldap-rotator-rename.md`
 
 ---
 
+## Next Step for Codex — LDAP Rotator Rename Docs Cleanup
+
+**Branch:** `fix/ldap-rotator-rename`
+**Goal:** Docs-only cleanup — no code changes. The rename is already done in `scripts/`.
+
+**What to do:** Follow `docs/plans/ldap-rotator-rename.md` exactly:
+
+1. `memory-bank/progress.md` — add note to the `[x]` rename item: `(code renamed 2026-02-23; docs cleaned up 2026-02-27)`
+2. `memory-bank/activeContext.md` — Operational Notes: update "pending rename to `LDAP_ROTATOR_IMAGE`" to reflect rename is complete
+3. `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md` — change status to `FIXED — Renamed to LDAP_ROTATOR_IMAGE (2026-02-27)`; add "Done" note under Resolution
+
+**Verify before committing:**
+```bash
+grep -r "LDAP_PASSWORD_ROTATOR" scripts/
+# Must return no output
+```
+
+**Do NOT update memory-bank with ✅ until grep confirms no old names in scripts/.**
+
+---
+
 ## Next Step for Gemini — Validation Complete ✅
 
 **Branch:** `fix/vault-auth-delegator`
