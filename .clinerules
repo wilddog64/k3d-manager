@@ -514,18 +514,38 @@ When a bug or test failure is identified, assign the fix as follows:
 
 ---
 
-### Release Strategy
+### Release Process
 
-- **First release:** `v0.1.0` — triggered immediately after Stage 2 CI goes green on
-  `main` following the `ldap-develop` merge.
-- **Mechanism:** `gh release create v0.1.0 --generate-notes` — auto-changelog from
-  commit history; human review and trim before publishing.
-- **Merge gate:** PR to `main` requires Jenkins k8s agents complete (Linux agents +
-  SMB CSI Phase 1 skip guard) in addition to Stage 2 CI green. AD e2e validation is
-  deferred to a follow-on branch — it is infrastructure-gated (requires external AD/VPN).
-- **Subsequent releases:** `v0.2.0` when AD e2e passes; `v1.0.0` when production-hardened.
-- **No auto-release on merge** — release is a deliberate manual step immediately after
-  CI confirms green on `main`.
+**PR workflow:**
+- All changes go through a feature branch and PR to `main`
+- Branch naming: `fix/<topic>`, `feature/<topic>`, `docs/<topic>`
+- PR requires: lint + stage2 CI green
+- Approval: admin can bypass approval requirement (enforce_admins disabled)
+- Tag `@copilot` in PR body for automated review (must be enabled in repo settings)
+
+**CHANGE.md:**
+- Update before creating the release PR
+- Add a versioned section: `## vX.Y.Z - dated YYYY-MM-DD`
+- Group changes under relevant component headers (e.g. OrbStack, Vault, Jenkins, Housekeeping)
+- Do not edit previous version entries
+
+**Tagging and release:**
+- After PR merges to `main`, create tag and GitHub release manually:
+  ```bash
+  gh release create vX.Y.Z --repo wilddog64/k3d-manager --title "vX.Y.Z" --notes "..."
+  ```
+- Release notes mirror the CHANGE.md entry for that version
+- No auto-release on merge — release is a deliberate manual step
+
+**Version strategy:**
+- `v0.x.y` — active development, breaking changes allowed
+- Patch (`y`) — docs, fixes, housekeeping
+- Minor (`x`) — new features or validated provider support
+- `v1.0.0` — production-hardened, all known-broken paths resolved
+
+**README Releases table:**
+- Keep `## Releases` table in README.md updated with each release
+- Format: `| [vX.Y.Z](release-url) | YYYY-MM-DD | one-line summary |`
 
 ---
 
