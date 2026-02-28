@@ -150,8 +150,7 @@ Next: add `system:auth-delegator` ClusterRoleBinding to `deploy_vault` (Priority
     - Status: `m2-air` cluster is now a verified Stage 2 CI fixture.
   - [ ] Phase 3: OrbStack native Kubernetes provider (no k3d overhead) — half day
 - [x] **Rename `LDAP_PASSWORD_ROTATOR_*` → `LDAP_ROTATOR_*`** — fix GitGuardian false positive
-  - Code renamed in `scripts/` as of 2026-02-23. Docs/memory-bank cleanup pending.
-  - Plan: `docs/plans/ldap-rotator-rename.md`
+  - Code renamed in `scripts/` as of 2026-02-23; docs cleaned up 2026-02-27.
   - See `docs/issues/2026-02-23-gitguardian-false-positive-ldap-rotator-image.md`
 
 - [x] **`test_vault` cleanup** — revert non-fatal pod test workaround to hard-fail

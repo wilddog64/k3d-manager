@@ -1,7 +1,7 @@
 # GitGuardian False Positive: LDAP_PASSWORD_ROTATOR_IMAGE
 
 **Date:** 2026-02-23
-**Status:** False Positive — No real secret exposed
+**Status:** FIXED — Renamed to `LDAP_ROTATOR_IMAGE` (2026-02-27)
 **GitGuardian Incident:** [#22639636](https://dashboard.gitguardian.com/workspace/359778/incidents/22639636)
 **Flagged Commit:** `625ef0e3cc002a99a3d8b40e2e29e8396db2001f`
 **Flagged File:** `scripts/etc/ldap/vars.sh`, line 99
@@ -54,6 +54,10 @@ related variables:
 
 **Alternative:** Add a `.gitguardian.yml` ignore rule for this variable pattern if renaming
 is not desirable.
+
+**Done (2026-02-27):** All variables renamed in `scripts/` — `LDAP_ROTATOR_IMAGE`,
+`LDAP_ROTATOR_ENABLED`, `LDAP_ROTATION_SCHEDULE`, `LDAP_ROTATION_PORT`. Verified:
+`grep -r "LDAP_PASSWORD_ROTATOR" scripts/` returns no output.
 
 ## Prevention
 
