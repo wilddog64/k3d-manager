@@ -4,9 +4,9 @@
 
 `ldap-develop` merged to `main` via PR #2 (2026-02-27). **v0.1.0 released.**
 
-**Two-Cluster Namespace Refactor — READY FOR PR ✅ (2026-03-01)**
-Namespace renames, CLUSTER_ROLE gating, and remote Vault ESO support implemented by Codex.
-Verified by Gemini: shellcheck clean, ESO API v1 fixed, regression tests green on m4-air.
+**ArgoCD Phase 1 — READY FOR PR ✅ (2026-03-02)**
+Manifests cleaned, namespace parameterization implemented, and Vault admin secret seeding added by Codex.
+Verified by Gemini: shellcheck clean, bats suite (6/6 pass), and sanity checks on all modified templates.
 
 ---
 
@@ -40,6 +40,9 @@ Verified by Gemini: shellcheck clean, ESO API v1 fixed, regression tests green o
 - [x] JCasC authorization in flat `permissions:` format (matrix-auth plugin safe)
 - [x] `bin/smoke-test-jenkins.sh` integrated into `test smoke` workflow
 - [x] Jenkins `cicd` namespace fix — template now honors `$JENKINS_NAMESPACE` and `deploy_jenkins` respects env var override. **VERIFIED 2026-03-02.**
+
+### ArgoCD
+- [x] ArgoCD Phase 1 — Manifest cleanup, namespace substitution (`platform.yaml.tmpl`), Vault admin secret seeding, and new test suite. **VERIFIED 2026-03-02.**
 
 ### Directory Services
 - [x] Directory service provider abstraction (interface contract defined)
@@ -78,45 +81,11 @@ Verified by Gemini: shellcheck clean, ESO API v1 fixed, regression tests green o
   - [x] OpenLDAP → `identity` ns
   - [x] Istio → `istio-system`
   - [x] Jenkins → `cicd` ns — **DEPLOYED 2026-03-01** (v0.3.1, smoke test passed)
-  - [ ] ArgoCD → `cicd` ns — **IN PROGRESS** (`feature/argocd-phase1`)
+  - [ ] ArgoCD → `cicd` ns — **READY FOR PR** (`feature/argocd-phase1`)
   - [ ] Keycloak → `identity` ns (no deploy command yet)
 - [ ] Configure Vault `kubernetes-app` auth mount for Ubuntu app cluster
 - [ ] ESO deploy on App cluster (remote Vault addr: `https://<mac-ip>:8200`)
 - [ ] shopping-cart-data / apps deployment on Ubuntu
-
----
-
-## What Is Pending ⏳ (continued)
-
-### Priority 2 (ArgoCD Phase 1)
-
-- [ ] `scripts/etc/argocd/projects/platform.yaml` → rename to `.tmpl`, fix namespaces, strip server metadata
-- [ ] `scripts/etc/argocd/applicationsets/` — fix `argocd` ns → `cicd`, `your-org` → `wilddog64`, strip server metadata
-- [ ] `scripts/plugins/argocd.sh` — `_argocd_deploy_appproject` update for template, add `_argocd_seed_vault_admin_secret`
-- [ ] `scripts/tests/plugins/argocd.bats` — new test suite
-- [ ] shellcheck `argocd.sh` clean
-
-**Codex task:** `docs/plans/argocd-phase1-codex-task.md` on branch `feature/argocd-phase1`
-
----
-
-## LinkedIn Article Series (k3d-manager)
-
-Write articles as milestones are reached. Each post builds on the last.
-
-| Part | Status | Topic | Trigger |
-|---|---|---|---|
-| Part 1 | ✅ Live (1,554 impr., 875 members reached) | Contrarian origin — "Everyone told me to use a real tool" | — |
-| Part 2 | ✅ Live (tracking, 3AM handicap) | Architecture emerged, wasn't designed | — |
-| Part 3 | Pending | Two-cluster problem — why single cluster isn't enough | After PR #8 merged + infra redeployed |
-| Part 4 | Pending | Multi-agent workflow — Codex/Gemini/Claude, what actually happened | After two-cluster stable |
-| Part 5 | Pending | Taking it to AWS — what changes, what stays identical | After Track A (k3s on EC2) working |
-| Part 6 | Pending | Shopping cart runs end-to-end | After full stack deployed |
-
-**Notes:**
-- Part 4 (multi-agent) has the broadest reach potential — not just Kubernetes audience
-- Schedule posts 7–9 AM Tuesday–Thursday (avoid 3 AM repeats)
-- Each part should link back to the previous — compounds impressions on older posts
 
 ---
 
@@ -134,10 +103,10 @@ Write articles as milestones are reached. Each post builds on the last.
 | `deploy_vault` ignores `VAULT_NS` env var | FIXED | 2026-03-02: `ns` in `deploy_vault` now initializes from `${VAULT_NS:-$VAULT_NS_DEFAULT}` (commit `4c1a407`). |
 | `_cleanup_cert_rotation_test` uses out-of-scope `jenkins_ns` | FIXED | 2026-03-02: `_cleanup_cert_rotation_test` now references `${JENKINS_NAMESPACE:-cicd}` directly so the EXIT trap no longer errors under `set -u`. |
 | `deploy_eso` remote SecretStore uses wrong namespace | FIXED | 2026-03-02: `_eso_configure_remote_vault` now receives `${ns}` when no override is set; verified via `bats scripts/tests/plugins/eso.bats`. |
-| ArgoCD bootstrap manifests still target legacy namespaces | FIXED | 2026-03-02: Converted AppProject/ApplicationSets to clean manifests (`docs/issues/2026-03-01-argocd-stale-manifests.md`); `_argocd_deploy_appproject` now renders via envsubst. |
-| ArgoCD Vault admin secret missing by default | FIXED | 2026-03-02: Added `_argocd_seed_vault_admin_secret` so `deploy_argocd --enable-vault` seeds `${ARGOCD_VAULT_KV_MOUNT}/${ARGOCD_ADMIN_VAULT_PATH}`. See `docs/issues/2026-03-01-argocd-missing-vault-admin-secret.md`. |
+| ArgoCD bootstrap manifests still target legacy namespaces | FIXED | 2026-03-02: AppProject/ApplicationSets cleaned. **2026-03-03:** ApplicationSets now render via envsubst with `${ARGOCD_NAMESPACE}` metadata. See `docs/issues/2026-03-01-argocd-stale-manifests.md`. |
+| ArgoCD Vault admin secret missing by default | FIXED | 2026-03-02: `_argocd_seed_vault_admin_secret` seeds `${ARGOCD_VAULT_KV_MOUNT}/${ARGOCD_ADMIN_VAULT_PATH}`. **2026-03-03:** Vault write failures now surface via `_err`. See `docs/issues/2026-03-01-argocd-missing-vault-admin-secret.md`. |
 | `CLUSTER_NAME=automation` env var ignored during `deploy_cluster` | OPEN | 2026-03-01: Cluster created as `k3d-cluster` instead of `automation`. See `docs/issues/2026-03-01-cluster-name-env-var-not-respected.md`. |
-| `jenkins-home-pv.yaml.tmpl` has `namespace: jenkins` hardcoded | FIXED | 2026-03-02: Template now uses `$JENKINS_NAMESPACE` and `_create_jenkins_pv_pvc` exports it before `envsubst`; verified via `bats scripts/tests/lib/test_auth_cleanup.bats` (pass) + `shellcheck scripts/plugins/jenkins.sh` (clean). **VERIFIED 2026-03-02.** |
-| `deploy_jenkins` ignores `JENKINS_NAMESPACE` env var | FIXED | 2026-03-02: Default now falls back to `${JENKINS_NAMESPACE:-jenkins}` before literal; same verification steps as above. **VERIFIED 2026-03-02.** |
+| `jenkins-home-pv.yaml.tmpl` has `namespace: jenkins` hardcoded | FIXED | 2026-03-02: Template now uses `$JENKINS_NAMESPACE` and `_create_jenkins_pv_pvc` exports it before `envsubst`. **VERIFIED 2026-03-02.** |
+| `deploy_jenkins` ignores `JENKINS_NAMESPACE` env var | FIXED | 2026-03-02: Default now falls back to `${JENKINS_NAMESPACE:-jenkins}` before literal. **VERIFIED 2026-03-02.** |
 | No `scripts/tests/plugins/jenkins.bats` suite | BACKLOG | Jenkins plugin has no dedicated bats suite. `test_auth_cleanup.bats` covers auth flow. Full plugin suite (flag parsing, namespace resolution, mutual exclusivity) is a future improvement — not a gate for current work. |
-| ArgoCD manifests use stale namespace names and server metadata | IN PROGRESS | `projects/platform.yaml` and `applicationsets/*.yaml` were live cluster dumps using old v0.2.x namespaces. Fix on `feature/argocd-phase1`. |
+| ArgoCD manifests use stale namespace names and server metadata | FIXED | 2026-03-02: Manifests cleaned and parameterized. **VERIFIED 2026-03-02.** |
