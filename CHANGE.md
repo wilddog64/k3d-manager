@@ -1,5 +1,48 @@
 # Changes - k3d-manager
 
+## v0.4.0 - dated 2026-03-02
+
+### ArgoCD Phase 1 — Core Deployment
+
+- `deploy_argocd [--enable-ldap] [--enable-vault] [--bootstrap]` now fully wired for
+  the `cicd` namespace (v0.3.0 default)
+- `deploy_argocd_bootstrap [--skip-applicationsets] [--skip-appproject]` applies
+  AppProject and ApplicationSet resources to the running ArgoCD instance
+
+### Bug Fixes
+
+- `scripts/etc/argocd/projects/platform.yaml` → `platform.yaml.tmpl`
+  - Converted live cluster dump to clean declarative template
+  - Namespace field parameterised as `${ARGOCD_NAMESPACE}` (rendered via `envsubst`)
+  - Destinations updated to v0.3.0 names: `secrets`, `cicd`, `identity`
+  - Stale Kubernetes server metadata (`uid`, `resourceVersion`, `creationTimestamp`) removed
+- `scripts/etc/argocd/applicationsets/{platform-helm,services-git,demo-rollout}.yaml`
+  - Same metadata cleanup applied to all three files
+  - `namespace: argocd` → `cicd` in metadata and template destinations
+  - GitHub org placeholder `your-org` → `wilddog64`
+- `_argocd_deploy_appproject` — renders `platform.yaml.tmpl` via
+  `envsubst '$ARGOCD_NAMESPACE'` before `kubectl apply`
+- `_argocd_seed_vault_admin_secret` — new helper; seeds a random 24-char password at
+  `${ARGOCD_VAULT_KV_MOUNT}/${ARGOCD_ADMIN_VAULT_PATH}` in Vault on first deploy so
+  the ESO ExternalSecret can sync it immediately
+
+### Tests
+
+- `scripts/tests/plugins/argocd.bats` — new suite, 6 cases:
+  - `deploy_argocd --help` exits 0 with usage text
+  - `deploy_argocd` skips when `CLUSTER_ROLE=app`
+  - `deploy_argocd_bootstrap --help` exits 0
+  - `deploy_argocd_bootstrap --skip-applicationsets --skip-appproject` no-ops cleanly
+  - `_argocd_deploy_appproject` fails with clear error when template is missing
+  - `ARGOCD_NAMESPACE` defaults to `cicd`
+
+### Verification
+
+- `shellcheck scripts/plugins/argocd.sh` clean
+- `bats scripts/tests/plugins/argocd.bats` 6/6 passed (verified by Gemini 2026-03-02)
+
+---
+
 ## v0.3.1 - dated 2026-03-01
 
 ### Bug Fixes
