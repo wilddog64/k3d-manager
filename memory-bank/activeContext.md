@@ -7,20 +7,59 @@
 
 ---
 
-## ✅ Codex — Latest Updates (2026-03-02)
+## ⚠️ Gemini — Verification Needed (2026-03-02)
 
-- **P1 cleanup trap fixed:** `_cleanup_cert_rotation_test` now references
-  `${JENKINS_NAMESPACE:-cicd}` directly, so the EXIT trap no longer reads the
-  out-of-scope `jenkins_ns` local. (File: `scripts/lib/test.sh` lines 1058–1063)
-- **P2 remote SecretStore fix:** `deploy_eso` now passes the resolved `$ns`
-  argument into `_eso_configure_remote_vault` when
-  `ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE` is unset, so remote Vault
-  configurations with custom namespaces point at the right service account.
-  (File: `scripts/plugins/eso.sh` lines 97–103)
-- **Tests:** `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/eso.bats`
-  ✅ — ensures the ESO plugin regressions stay covered.
+**Branch:** `feature/two-cluster-infra`
+**Commit to verify:** `9041193` ("Fix cert rotation cleanup and remote ESO namespace")
+**PR:** https://github.com/wilddog64/k3d-manager/pull/8 — lint ✅, stage2 ❌ (no runner, pre-existing)
 
-No further Codex tasks are pending on PR #8 as of this update.
+Codex made two fixes. Please verify both are correct and report back.
+
+---
+
+### Fix A — `scripts/lib/test.sh` line 1062
+
+**What changed:**
+```bash
+# Before:
+  _kubectl delete job test-cert-rotation -n "${jenkins_ns}" 2>/dev/null || true
+# After:
+  _kubectl delete job test-cert-rotation -n "${JENKINS_NAMESPACE:-cicd}" 2>/dev/null || true
+```
+
+**Verify:**
+1. `shellcheck -S warning scripts/lib/test.sh` — must be clean
+2. Confirm `_cleanup_cert_rotation_test` no longer references any local variable
+   from the calling function — search for `jenkins_ns` in the function body,
+   expect zero hits
+3. Confirm the fallback `cicd` matches the default in the calling function
+   (`local jenkins_ns="${JENKINS_NAMESPACE:-cicd}"` at line 832)
+
+---
+
+### Fix B — `scripts/plugins/eso.sh` line 101
+
+**What changed:**
+```bash
+# Before:
+      "${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ESO_NAMESPACE:-secrets}}"
+# After:
+      "${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ns}}"
+```
+
+**Verify:**
+1. `shellcheck -S warning scripts/plugins/eso.sh` — must be clean
+2. Confirm `$ns` is in scope at the call site — it is defined on line 16:
+   `local ns="${1:-${ESO_NAMESPACE:-secrets}}"`
+3. Run bats plugin tests:
+   `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/eso.bats`
+   All cases must pass
+4. Confirm the `REMOTE_VAULT_ADDR` block (lines 97–102) looks correct end-to-end
+
+---
+
+**Report back:** shellcheck results, bats pass/fail, and whether both fixes
+look logically correct. If anything is wrong, write a Codex fix spec.
 
 ---
 
