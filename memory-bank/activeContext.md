@@ -207,7 +207,7 @@ $ git diff HEAD^ HEAD
 - [x] Keycloak image registry investigation (Gemini) ✅ — `bitnamilegacy` confirmed multi-arch
 - [x] Gemini applies `bitnamilegacy` fix to `values.yaml.tmpl` ✅ — commit `e1e306e`
 - [x] Claude verifies: live deploy + `test_keycloak` ✅ — both passed (2026-03-01)
-- [ ] PR for `fix/keycloak-image-fix-task` — pending owner go-ahead
+- [x] PR #14 merged → `fix/keycloak-image-fix-task` ✅ — Keycloak image fix + smoke test + kill cleanup
 - [ ] `configure_vault_app_auth` — `feature/app-cluster-deploy` (Codex)
 - [ ] App layer deploy on Ubuntu (Gemini — SSH interactive)
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
