@@ -1,5 +1,39 @@
 # Changes - k3d-manager
 
+## v0.3.0 - dated 2026-03-02
+
+### Two-Cluster Architecture
+
+- Added `CLUSTER_ROLE=infra|app` dispatcher gating — `app` mode skips Vault/Jenkins/LDAP/ArgoCD
+- Cross-cluster SecretStore: `_eso_configure_remote_vault()` in `scripts/plugins/eso.sh`
+- New env vars: `REMOTE_VAULT_ADDR`, `REMOTE_VAULT_K8S_MOUNT`, `REMOTE_VAULT_K8S_ROLE`
+- `VAULT_ENDPOINT` now dynamic: `http://vault.${VAULT_NS}.svc:8200`
+
+### Namespace Renames (new defaults, env var overrides preserved)
+
+| Old | New | Override var |
+|-----|-----|--------------|
+| `vault` + `external-secrets` | `secrets` | `VAULT_NS`, `ESO_NAMESPACE` |
+| `jenkins` | `cicd` | `JENKINS_NAMESPACE` |
+| `directory` | `identity` | `LDAP_NAMESPACE` |
+| `argocd` | `cicd` | `ARGOCD_NAMESPACE` |
+
+### Bug Fixes
+
+- `deploy_vault` now respects `VAULT_NS` env var (`ns` initialises from `${VAULT_NS:-$VAULT_NS_DEFAULT}`)
+- `_cleanup_cert_rotation_test` EXIT trap fixed — no longer references out-of-scope local `jenkins_ns`; uses `${JENKINS_NAMESPACE:-cicd}` directly
+- `deploy_eso` remote SecretStore now passes `$ns` to `_eso_configure_remote_vault` instead of `${ESO_NAMESPACE:-secrets}`
+- All hardcoded `-n jenkins` / `-n vault` namespace strings replaced with env var refs in `test.sh`, `check_cluster_health.sh`, `run-cert-rotation-test.sh`, `openldap.sh`
+- `ARGOCD_LDAP_HOST` and `JENKINS_LDAP_HOST` updated to `identity` namespace
+
+### Tests
+
+- `test_auth_cleanup.bats` regression fixed — sub-calls restored to main baseline (only first call pins `VAULT_NS=vault`)
+- ESO plugin bats suite: 4/4 passing
+- shellcheck clean across all modified scripts
+
+---
+
 ## v0.2.0 - dated 2026-02-27
 
 ### OrbStack Provider
