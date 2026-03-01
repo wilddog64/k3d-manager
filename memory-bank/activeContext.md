@@ -11,6 +11,21 @@
 Phase 1: Wire up ArgoCD for `cicd` namespace. Plugin + templates already exist;
 Codex needs to fix stale cluster-dump manifests and add Vault secret seeding.
 
+**2026-03-02 Update:**
+- `projects/platform.yaml` converted to `platform.yaml.tmpl` with
+  `${ARGOCD_NAMESPACE}` substitution. `_argocd_deploy_appproject` now renders via
+  `envsubst` before applying.
+- `applicationsets/{platform-helm,services-git,demo-rollout}.yaml` cleaned of
+  cluster metadata, set to the new `cicd` namespace, and repo URLs updated to
+  `wilddog64/k3d-manager`.
+- Added `_argocd_seed_vault_admin_secret` so Vault always contains the
+  `${ARGOCD_VAULT_KV_MOUNT}/${ARGOCD_ADMIN_VAULT_PATH}` entry when
+  `--enable-vault` is used.
+- New `scripts/tests/plugins/argocd.bats` suite covers help text, namespace
+  defaults, CLUSTER_ROLE guard, skip logic, and missing-template errors.
+- Tests: `shellcheck scripts/plugins/argocd.sh`,
+  `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/argocd.bats` ✅
+
 **Codex task spec:** `docs/plans/argocd-phase1-codex-task.md`
 
 ---
