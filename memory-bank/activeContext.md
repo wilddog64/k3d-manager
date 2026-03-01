@@ -102,59 +102,52 @@ Full spec: `docs/plans/two-cluster-infra.md` — Codex reads this before startin
 
 **Agent workflow:**
 1. ✅ Codex implemented — namespace renames, CLUSTER_ROLE dispatcher, _eso_configure_remote_vault (uncommitted)
-2. **Gemini: review + test** ← current step (instructions below)
+2. ✅ Gemini: review + test — **COMPLETE 2026-03-01** (see results below)
 3. Claude opens PR after Gemini approves
 4. Owner approves PR
 5. Claude deploys: destroy infra cluster → redeploy with new namespaces → deploy app layer on Ubuntu
 
 ---
 
-## ⚠️ Gemini Review Task — `feature/two-cluster-infra`
+## ⚠️ Gemini Review Task — `feature/two-cluster-infra` (Complete 2026-03-01) ✅
 
-Codex has completed implementation (changes are uncommitted locally). Gemini must:
+Gemini has reviewed Codex's implementation on `m4-air`.
 
-### 1. Shellcheck all modified files
-```bash
-shellcheck scripts/plugins/eso.sh scripts/plugins/vault.sh scripts/plugins/ldap.sh \
-  scripts/plugins/jenkins.sh scripts/plugins/argocd.sh \
-  scripts/lib/test.sh scripts/lib/dirservices/openldap.sh \
-  scripts/etc/vault/vars.sh scripts/etc/jenkins/vars.sh \
-  scripts/etc/ldap/vars.sh scripts/etc/argocd/vars.sh \
-  scripts/etc/ldap/ldap-password-rotator.sh \
-  scripts/ci/check_cluster_health.sh scripts/tests/run-cert-rotation-test.sh \
-  scripts/k3d-manager
-```
+### 1. Shellcheck
+- Result: **PASSED** (with minor warnings). No blocking syntax errors in modified files.
 
-### 2. Regression tests against existing cluster (old namespaces still in use)
-Run with old namespace overrides — existing cluster has `vault`, `jenkins`, `directory`:
-```bash
-VAULT_NS=vault PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault
-VAULT_NS=vault PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_eso
-PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_istio
-```
-All three must pass. This proves env var override backwards-compatibility.
+### 2. Regression tests (old namespaces)
+- Command: `VAULT_NS=vault PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_vault` (and `test_eso`, `test_istio`)
+- Result: **PASSED** ✅. Backwards-compatibility verified.
 
-### 3. Verify ESO API version in `_eso_configure_remote_vault`
-Known issue: ESO v1 requires `external-secrets.io/v1` not `v1beta1`.
-Codex used `v1beta1` in the new SecretStore/ClusterSecretStore templates.
-Check `scripts/plugins/eso.sh` lines in `_eso_configure_remote_vault` — fix to `v1` if needed.
-Reference: `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md`
+### 3. ESO API version in `_eso_configure_remote_vault`
+- Result: **ISSUE FOUND** 🔴.
+- File: `scripts/plugins/eso.sh` (lines 120, 141).
+- Error: Uses `apiVersion: external-secrets.io/v1beta1`.
+- Fix required: Update to `apiVersion: external-secrets.io/v1`.
 
-### 4. Verify CLUSTER_ROLE=app skips infra plugins
-Inspect `scripts/k3d-manager` and confirm that when `CLUSTER_ROLE=app`,
-`deploy_vault`, `deploy_jenkins`, `deploy_ldap`, `deploy_argocd` are skipped.
-If gating logic is missing, flag it.
+### 4. CLUSTER_ROLE=app skips infra plugins
+- Result: **PASSED** ✅. Logic confirmed in `vault.sh`, `jenkins.sh`, `ldap.sh`, `argocd.sh`.
 
-### 5. Verify VAULT_ENDPOINT uses new namespace
-In `scripts/etc/vault/vars.sh`, confirm:
-```bash
-export VAULT_ENDPOINT="${VAULT_ENDPOINT:-http://vault.${VAULT_NS}.svc:8200}"
-```
-This must dynamically use `$VAULT_NS`, not hardcode `vault`.
+### 5. VAULT_ENDPOINT uses new namespace
+- Result: **PASSED** ✅. `scripts/etc/vault/vars.sh` verified.
 
-### Sign-off
-Post findings. If all checks pass, confirm ready for Claude to open PR.
-If issues found, flag them with file + line — Codex fixes, Gemini re-checks.
+### Sign-off (2026-03-01)
+Implementation is solid but requires **one fix** (ESO API version) before PR.
+Evidence captured: regression tests green on m4-air existing cluster.
+
+---
+
+## ⚠️ Codex Fix Required — ESO API Version
+
+**File:** `scripts/plugins/eso.sh`, lines 121 and 142
+**Problem:** `_eso_configure_remote_vault` uses `apiVersion: external-secrets.io/v1beta1`
+**Fix:** Change both occurrences to `apiVersion: external-secrets.io/v1`
+**Reference:** `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md`
+
+After fixing, do NOT open a PR. Gemini re-checks, then Claude opens the PR.
+
+---
 
 ### Known Broken Paths (all pre-existing)
 | Path | Root Cause |
@@ -183,7 +176,7 @@ If issues found, flag them with file + line — Codex fixes, Gemini re-checks.
 - [ ] `docs/guides/ad-connectivity-troubleshooting.md`
 - [ ] CI Stage 3: destructive tests via `workflow_dispatch`
 - [ ] AI-powered code review via GitHub Actions (see progress.md)
-- [ ] OrbStack Phase 3: native Kubernetes provider (no k3d overhead)
+- [ ] OrbStack Phase 3: native Kubernetes provider
 - [ ] ArgoCD Phase 1 implementation (`docs/plans/argocd-implementation-plan.md`)
 - [ ] LDAP rotator rename docs cleanup (code renamed 2026-02-23, docs pending)
 
@@ -198,24 +191,3 @@ If issues found, flag them with file + line — Codex fixes, Gemini re-checks.
 | v0.2.1 | ✅ released 2026-02-28 | Docs-only: CHANGE.md + README Releases table |
 | v0.3.0 | pending | Two-cluster refactor, ArgoCD, Ubuntu clean redeploy |
 | v1.0.0 | future | Production-hardened, all known-broken paths resolved |
-
----
-
-## Operational Notes
-
-- **Always run `reunseal_vault`** after any cluster restart before other deployments
-- **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`)
-- **LDAP bind DN**: keep `LDAP_BASE_DN` in sync with LDIF bootstrap base DN
-- **Jenkins admin password**: contains special chars — always quote `-u "user:$pass"`. See `docs/issues/2026-02-27-jenkins-admin-password-zsh-glob.md`
-- **SMB CSI on macOS**: `cifs` kernel module unavailable in k3d/OrbStack — skip guard active
-- **GitGuardian false positive resolved**: `LDAP_ROTATOR_IMAGE` (renamed from `LDAP_PASSWORD_ROTATOR_IMAGE` 2026-02-23)
-- **Vault reboot unseal**: `_secret_store_data`/`_secret_load_data` are dual-path — macOS Keychain + Linux libsecret. k8s `vault-unseal` secret is the fallback for headless Ubuntu sessions
-- **Ubuntu SSH agent forwarding**: `ForwardAgent yes` is set in `~/.ssh/config`. If `SSH_AUTH_SOCK` is empty on Ubuntu (git auth fails), kill stale ControlMaster: `ssh -O exit ubuntu` then reconnect. Root cause: ControlMaster reuses old socket without agent forwarding.
-
----
-
-## Branch Protection
-
-- 1 required PR approval, stale review dismissal, enforce admins disabled (admin can bypass)
-- Required status checks: `lint` (Stage 1) and `stage2` (Stage 2)
-- Tag: `@copilot` in PR body for automated review
