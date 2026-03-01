@@ -1,15 +1,63 @@
 # Active Context – k3d-manager
 
-## Current Branch: `feature/argocd-phase1` (as of 2026-03-01)
+## Current Branch: `feature/infra-cluster-complete` (as of 2026-03-01)
 
-**v0.3.1 merged** — Jenkins `cicd` namespace fix.
+**v0.4.0 merged** — ArgoCD Phase 1 complete. ArgoCD deployed live to infra cluster.
 
 ---
 
 ## Current Focus
 
-Phase 1: Wire up ArgoCD for `cicd` namespace. Plugin + templates already exist;
-Codex needs to fix stale cluster-dump manifests and add Vault secret seeding.
+v0.5.0: Complete infra cluster layer.
+
+**Part A (owner action):** Run `deploy_argocd --enable-ldap --enable-vault --bootstrap`
+against live cluster and verify pods Running in `cicd` ns.
+
+**Part B (Codex):** Implement `deploy_keycloak` plugin from scratch.
+Spec: `docs/plans/infra-cluster-complete-codex-task.md`
+
+**2026-03-03 Update:**
+- Added `scripts/plugins/keycloak.sh` with `deploy_keycloak`, Vault/ESO helpers,
+  and realm config management.
+- Created full template set under `scripts/etc/keycloak/` (values, secretstore,
+  ExternalSecrets, realm JSON, VirtualService, vars file).
+- New `scripts/tests/plugins/keycloak.bats` (6 cases) validates help text,
+  namespace defaults, CLUSTER_ROLE guard, flag errors, and helper availability.
+- Tests run: `shellcheck scripts/plugins/keycloak.sh`,
+  `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats` ✅
+
+---
+
+## Codex Task — Keycloak Plugin (Active)
+
+**Branch:** `feature/infra-cluster-complete`
+**Spec:** `docs/plans/infra-cluster-complete-codex-task.md`
+**Status:** Pending Codex implementation
+
+### Files to Create
+
+| File | Purpose |
+|---|---|
+| `scripts/plugins/keycloak.sh` | `deploy_keycloak` + helpers |
+| `scripts/etc/keycloak/vars.sh` | Config variables |
+| `scripts/etc/keycloak/values.yaml.tmpl` | Bitnami Helm values |
+| `scripts/etc/keycloak/secretstore.yaml.tmpl` | ESO SecretStore |
+| `scripts/etc/keycloak/externalsecret-admin.yaml.tmpl` | Admin password ESO |
+| `scripts/etc/keycloak/externalsecret-ldap.yaml.tmpl` | LDAP bind password ESO |
+| `scripts/etc/keycloak/realm-config.json.tmpl` | Realm JSON with LDAP federation |
+| `scripts/etc/keycloak/virtualservice.yaml.tmpl` | Istio VirtualService |
+| `scripts/tests/plugins/keycloak.bats` | Bats suite (min 6 cases) |
+
+### Verification Codex must run
+
+```bash
+shellcheck scripts/plugins/keycloak.sh
+PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats
+```
+
+---
+
+## ArgoCD History
 
 **2026-03-02 Update:**
 - `projects/platform.yaml` converted to `platform.yaml.tmpl` with
@@ -148,8 +196,8 @@ Both must pass before committing. Codex to push to `feature/argocd-phase1`.
 | OpenLDAP | ✅ Running | `identity` ns |
 | Istio | ✅ Running | `istio-system` |
 | Jenkins | ✅ Running | `cicd` ns — smoke test passed (v0.3.1) |
-| ArgoCD | ❌ Not deployed | Awaiting Phase 1 PR merge |
-| Keycloak | ❌ Not deployed | no `deploy_keycloak` command yet |
+| ArgoCD | ✅ Running | `cicd` ns — deployed (v0.4.0) |
+| Keycloak | ❌ Not deployed | `deploy_keycloak` pending Codex (`feature/infra-cluster-complete`) |
 
 ### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`)
 | Component | Status | Notes |
@@ -216,16 +264,18 @@ Implements `configure_vault_app_auth` command for Ubuntu k3s ESO setup.
 | v0.2.1 | ✅ released 2026-02-28 | Docs-only: CHANGE.md + README Releases table |
 | v0.3.0 | ✅ merged 2026-03-01 | Two-cluster refactor, namespace renames, CLUSTER_ROLE, remote Vault ESO |
 | v0.3.1 | ✅ merged 2026-03-01 | Jenkins `cicd` namespace fix — PV template + env var override |
-| v0.4.0 | future | ArgoCD Phase 1 |
+| v0.4.0 | ✅ merged 2026-03-02 | ArgoCD Phase 1 |
+| v0.5.0 | future | Keycloak plugin (Bitnami), infra cluster complete |
+| v0.6.0 | future | Keycloak provider interface (Bitnami + Operator) |
 
 ---
 
-## Open Items (post v0.3.1)
+## Open Items (post v0.4.0)
 
-- [ ] ArgoCD Phase 1 — `feature/argocd-phase1` (Codex)
+- [ ] ArgoCD live deploy — owner runs `deploy_argocd --enable-ldap --enable-vault --bootstrap` (Part A)
+- [ ] Keycloak plugin — `feature/infra-cluster-complete` (Codex — Part B)
 - [ ] App layer deploy on Ubuntu (Gemini — SSH interactive)
 - [ ] `configure_vault_app_auth` — `feature/app-cluster-deploy` (Codex)
-- [ ] Keycloak deploy (no command yet)
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
 - [ ] `scripts/tests/plugins/jenkins.bats` — backlog
 
