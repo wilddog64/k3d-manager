@@ -230,6 +230,7 @@ EOF
       _info "[argocd] Creating SecretStore and ServiceAccount"
       _argocd_setup_vault_policies
       envsubst < "$ARGOCD_CONFIG_DIR/secretstore.yaml.tmpl" | _kubectl apply -f - >/dev/null
+      _argocd_seed_vault_admin_secret
 
       # Wait for SecretStore to be ready
       sleep 2
@@ -308,6 +309,29 @@ function _argocd_check_dependencies() {
    fi
 
    return 0
+}
+
+function _argocd_seed_vault_admin_secret() {
+   local ns="${VAULT_NS_DEFAULT:-vault}"
+   local release="${VAULT_RELEASE_DEFAULT:-vault}"
+   local pod="${release}-0"
+   local secret_path="${ARGOCD_VAULT_KV_MOUNT}/${ARGOCD_ADMIN_VAULT_PATH}"
+
+   if _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+         vault kv get -format=json "$secret_path" >/dev/null 2>&1; then
+      _info "[argocd] Vault admin secret already exists at ${secret_path}, skipping"
+      return 0
+   fi
+
+   _info "[argocd] Seeding ArgoCD admin password in Vault"
+   local password
+   password=$(LC_ALL=C tr -dc 'A-Za-z0-9!@#%^&*' </dev/urandom | head -c 24)
+
+   _vault_login "$ns" "$release"
+   _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+      vault kv put "$secret_path" "${ARGOCD_ADMIN_PASSWORD_KEY}=${password}"
+
+   _info "[argocd] ArgoCD admin password seeded. Retrieve via Kubernetes secret after ESO sync"
 }
 
 function _argocd_setup_vault_policies() {
@@ -445,14 +469,19 @@ EOF
 function _argocd_deploy_appproject() {
    _info "[argocd] Deploying platform AppProject"
 
-   local appproject_file="$ARGOCD_CONFIG_DIR/projects/platform.yaml"
+   local appproject_tmpl="$ARGOCD_CONFIG_DIR/projects/platform.yaml.tmpl"
 
-   if [[ ! -f "$appproject_file" ]]; then
-      _err "[argocd] AppProject file not found: $appproject_file"
+   if [[ ! -f "$appproject_tmpl" ]]; then
+      _err "[argocd] AppProject file not found: $appproject_tmpl"
       return 1
    fi
 
-   _kubectl apply -f "$appproject_file" >/dev/null
+   local rendered
+   rendered=$(mktemp -t argocd-appproject.XXXXXX.yaml)
+   trap '$(_cleanup_trap_command "$rendered")' EXIT
+   envsubst '$ARGOCD_NAMESPACE' < "$appproject_tmpl" > "$rendered"
+   _kubectl apply -f "$rendered" >/dev/null
+   trap '$(_cleanup_trap_command "$rendered")' RETURN
 
    _info "[argocd] AppProject deployed: platform"
    return 0
