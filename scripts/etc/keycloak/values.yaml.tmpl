@@ -6,7 +6,8 @@ auth:
   existingSecret: ${KEYCLOAK_ADMIN_SECRET_NAME}
   passwordSecretKey: ${KEYCLOAK_ADMIN_PASSWORD_KEY}
 image:
-  registry: public.ecr.aws
+  registry: docker.io
+  repository: bitnamilegacy/keycloak
 proxyAddressForwarding: true
 service:
   type: ClusterIP
@@ -15,7 +16,8 @@ service:
 keycloakConfigCli:
   enabled: ${KEYCLOAK_CONFIG_CLI_ENABLED}
   image:
-    registry: public.ecr.aws
+    registry: docker.io
+    repository: bitnamilegacy/keycloak-config-cli
   existingConfigmap: keycloak-realm-config
   podAnnotations:
     sidecar.istio.io/inject: "false"
@@ -33,4 +35,5 @@ podAnnotations:
   sidecar.istio.io/inject: "true"
 postgresql:
   image:
-    registry: public.ecr.aws
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
