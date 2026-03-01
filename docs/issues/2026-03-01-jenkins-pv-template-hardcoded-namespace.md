@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-01
 **Reported:** Observed during infra cluster rebuild (post v0.3.0 merge)
-**Status:** OPEN
+**Status:** FIXED — template now uses `$JENKINS_NAMESPACE` and `_create_jenkins_pv_pvc` exports it before `envsubst`
 **Severity:** P2
 **Type:** Bug — hardcoded namespace breaks `--namespace` override
 
@@ -72,7 +72,23 @@ This is a separate (related) bug — see companion issue.
   namespace: $JENKINS_NAMESPACE
 ```
 
-Also ensure `JENKINS_NAMESPACE` is exported before `envsubst` is called in `_create_jenkins_pv_pvc`.
+**File:** `scripts/plugins/jenkins.sh` (`_create_jenkins_pv_pvc`)
+
+```bash
+  export JENKINS_NAMESPACE="$jenkins_namespace"
+  envsubst < "$jenkins_pv_template" > "$jenkinsyamfile"
+```
+
+By exporting the namespace before `envsubst`, the template substitution now picks up the namespace selected via flag/env var.
+
+---
+
+## Resolution & Verification (2026-03-02)
+
+- Updated the PV template and `_create_jenkins_pv_pvc` export as described above so the rendered YAML always matches the target namespace.
+- Ran `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/lib/test_auth_cleanup.bats` ✅ to ensure Jenkins helper behavior remains intact.
+- Attempted `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/jenkins.bats`, but the test file does not exist in `scripts/tests/plugins/`; no plugin-specific suite was run.
+- `shellcheck scripts/plugins/jenkins.sh` ✅
 
 ---
 

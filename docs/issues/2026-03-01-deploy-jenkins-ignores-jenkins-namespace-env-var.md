@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-01
 **Reported:** Observed during infra cluster rebuild (post v0.3.0 merge)
-**Status:** OPEN
+**Status:** FIXED — `deploy_jenkins` now falls back to `${JENKINS_NAMESPACE}` before defaulting to `jenkins`
 **Severity:** P3
 **Type:** Bug — env var override silently ignored
 
@@ -43,6 +43,14 @@ jenkins_namespace="${jenkins_namespace:-jenkins}"
 # After:
 jenkins_namespace="${jenkins_namespace:-${JENKINS_NAMESPACE:-jenkins}}"
 ```
+
+---
+
+## Resolution & Verification (2026-03-02)
+
+- Applied the fallback change above so env var overrides behave like other plugins.
+- Same verification steps as the companion PV template bug: `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/lib/test_auth_cleanup.bats` ✅ and `shellcheck scripts/plugins/jenkins.sh` ✅.
+- `bats scripts/tests/plugins/jenkins.bats` was attempted but skipped because the repository does not contain that test file.
 
 ---
 
