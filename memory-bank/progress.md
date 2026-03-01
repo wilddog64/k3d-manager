@@ -4,9 +4,11 @@
 
 `ldap-develop` merged to `main` via PR #2 (2026-02-27). **v0.1.0 released.**
 
-**ArgoCD Phase 1 — READY FOR PR ✅ (2026-03-02)**
-Manifests cleaned, namespace parameterization implemented, and Vault admin secret seeding added by Codex.
-Verified by Gemini: shellcheck clean, bats suite (6/6 pass), and sanity checks on all modified templates.
+**ArgoCD Phase 1 — MERGED ✅ (v0.4.0, 2026-03-02)**
+Deployed live to infra cluster. ArgoCD running in `cicd` ns.
+
+**Keycloak — PENDING ⏳ (v0.5.0)**
+Branch `feature/infra-cluster-complete`. Codex task spec at `docs/plans/infra-cluster-complete-codex-task.md`.
 
 ---
 
@@ -43,6 +45,11 @@ Verified by Gemini: shellcheck clean, bats suite (6/6 pass), and sanity checks o
 
 ### ArgoCD
 - [x] ArgoCD Phase 1 — Manifest cleanup, namespace substitution (`platform.yaml.tmpl`), Vault admin secret seeding, and new test suite. **VERIFIED 2026-03-02.**
+- [x] ArgoCD live deploy — running in `cicd` ns on infra cluster. **DEPLOYED (v0.4.0).**
+
+### Keycloak
+- [ ] `deploy_keycloak` plugin (Bitnami) — `feature/infra-cluster-complete` (Codex) — **v0.5.0**
+- [ ] Keycloak provider interface (Bitnami + Operator) — **v0.6.0** — spec in `docs/plans/infra-cluster-complete-codex-task.md`
 
 ### Directory Services
 - [x] Directory service provider abstraction (interface contract defined)
@@ -81,8 +88,8 @@ Verified by Gemini: shellcheck clean, bats suite (6/6 pass), and sanity checks o
   - [x] OpenLDAP → `identity` ns
   - [x] Istio → `istio-system`
   - [x] Jenkins → `cicd` ns — **DEPLOYED 2026-03-01** (v0.3.1, smoke test passed)
-  - [ ] ArgoCD → `cicd` ns — **READY FOR PR** (`feature/argocd-phase1`)
-  - [ ] Keycloak → `identity` ns (no deploy command yet)
+  - [x] ArgoCD → `cicd` ns — **DEPLOYED** (v0.4.0)
+  - [ ] Keycloak → `identity` ns — **PENDING** (`feature/infra-cluster-complete`, Codex)
 - [ ] Configure Vault `kubernetes-app` auth mount for Ubuntu app cluster
 - [ ] ESO deploy on App cluster (remote Vault addr: `https://<mac-ip>:8200`)
 - [ ] shopping-cart-data / apps deployment on Ubuntu
@@ -105,7 +112,10 @@ Verified by Gemini: shellcheck clean, bats suite (6/6 pass), and sanity checks o
 | `deploy_eso` remote SecretStore uses wrong namespace | FIXED | 2026-03-02: `_eso_configure_remote_vault` now receives `${ns}` when no override is set; verified via `bats scripts/tests/plugins/eso.bats`. |
 | ArgoCD bootstrap manifests still target legacy namespaces | FIXED | 2026-03-02: AppProject/ApplicationSets cleaned. **2026-03-03:** ApplicationSets now render via envsubst with `${ARGOCD_NAMESPACE}` metadata. See `docs/issues/2026-03-01-argocd-stale-manifests.md`. |
 | ArgoCD Vault admin secret missing by default | FIXED | 2026-03-02: `_argocd_seed_vault_admin_secret` seeds `${ARGOCD_VAULT_KV_MOUNT}/${ARGOCD_ADMIN_VAULT_PATH}`. **2026-03-03:** Vault write failures now surface via `_err`. See `docs/issues/2026-03-01-argocd-missing-vault-admin-secret.md`. |
+| Keycloak plugin missing | FIXED | 2026-03-03: `deploy_keycloak` plugin added with Vault/LDAP integrations and Bats coverage. See `docs/plans/infra-cluster-complete-codex-task.md`. |
+| Istio sidecar blocks Keycloak config job | FIXED | 2026-03-03: `keycloakConfigCli.podAnnotations.sidecar.istio.io/inject: "false"` baked into `values.yaml.tmpl`. See `docs/issues/2026-03-01-istio-sidecar-blocks-helm-pre-install-jobs.md`. |
 | `CLUSTER_NAME=automation` env var ignored during `deploy_cluster` | OPEN | 2026-03-01: Cluster created as `k3d-cluster` instead of `automation`. See `docs/issues/2026-03-01-cluster-name-env-var-not-respected.md`. |
+| Istio sidecar injection blocks Helm pre-install Jobs | OPEN (P2) | 2026-03-01: `argocd-redis-secret-init` job hung; workaround: `pilot-agent request POST 'quitquitquit'`. Keycloak fix: add `sidecar.istio.io/inject: "false"` to `keycloakConfigCli.podAnnotations` in values template. See `docs/issues/2026-03-01-istio-sidecar-blocks-helm-pre-install-jobs.md`. |
 | `jenkins-home-pv.yaml.tmpl` has `namespace: jenkins` hardcoded | FIXED | 2026-03-02: Template now uses `$JENKINS_NAMESPACE` and `_create_jenkins_pv_pvc` exports it before `envsubst`. **VERIFIED 2026-03-02.** |
 | `deploy_jenkins` ignores `JENKINS_NAMESPACE` env var | FIXED | 2026-03-02: Default now falls back to `${JENKINS_NAMESPACE:-jenkins}` before literal. **VERIFIED 2026-03-02.** |
 | No `scripts/tests/plugins/jenkins.bats` suite | BACKLOG | Jenkins plugin has no dedicated bats suite. `test_auth_cleanup.bats` covers auth flow. Full plugin suite (flag parsing, namespace resolution, mutual exclusivity) is a future improvement — not a gate for current work. |

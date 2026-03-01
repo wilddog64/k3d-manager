@@ -1,0 +1,32 @@
+{
+  "realm": "${KEYCLOAK_REALM_NAME}",
+  "displayName": "${KEYCLOAK_REALM_DISPLAY_NAME}",
+  "enabled": true,
+  "registrationAllowed": false,
+  "loginTheme": "keycloak",
+  "userFederationProviders": [
+    {
+      "displayName": "ldap",
+      "providerName": "ldap",
+      "priority": 0,
+      "config": {
+        "enabled": "true",
+        "kerberosRealm": "",
+        "debug": "false",
+        "vendor": "other",
+        "usernameLDAPAttribute": "uid",
+        "rdnLDAPAttribute": "uid",
+        "uuidLDAPAttribute": "entryUUID",
+        "connectionUrl": "ldap://${KEYCLOAK_LDAP_HOST}:${KEYCLOAK_LDAP_PORT}",
+        "usersDn": "${KEYCLOAK_LDAP_SEARCH_BASE}",
+        "searchScope": "1",
+        "useTruststoreSpi": "ldapsOnly",
+        "authType": "simple",
+        "bindDn": "${KEYCLOAK_LDAP_BINDDN_KEY}",
+        "bindCredential": "${KEYCLOAK_LDAP_PASSWORD_KEY}",
+        "importEnabled": "true",
+        "cachePolicy": "DEFAULT"
+      }
+    }
+  ]
+}
