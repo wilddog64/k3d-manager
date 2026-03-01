@@ -77,6 +77,26 @@ Verified by Gemini: shellcheck clean, ESO API v1 fixed, regression tests green o
 
 ---
 
+## LinkedIn Article Series (k3d-manager)
+
+Write articles as milestones are reached. Each post builds on the last.
+
+| Part | Status | Topic | Trigger |
+|---|---|---|---|
+| Part 1 | ✅ Live (1,332 impr.) | Contrarian origin — "Everyone told me to use a real tool" | — |
+| Part 2 | ✅ Live (~30 impr., 3AM handicap) | Architecture emerged, wasn't designed | — |
+| Part 3 | Pending | Two-cluster problem — why single cluster isn't enough | After PR #8 merged + infra redeployed |
+| Part 4 | Pending | Multi-agent workflow — Codex/Gemini/Claude, what actually happened | After two-cluster stable |
+| Part 5 | Pending | Taking it to AWS — what changes, what stays identical | After Track A (k3s on EC2) working |
+| Part 6 | Pending | Shopping cart runs end-to-end | After full stack deployed |
+
+**Notes:**
+- Part 4 (multi-agent) has the broadest reach potential — not just Kubernetes audience
+- Schedule posts 7–9 AM Tuesday–Thursday (avoid 3 AM repeats)
+- Each part should link back to the previous — compounds impressions on older posts
+
+---
+
 ## Known Bugs / Gaps
 
 | Item | Status | Notes |
