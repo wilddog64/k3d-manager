@@ -83,8 +83,8 @@ Write articles as milestones are reached. Each post builds on the last.
 
 | Part | Status | Topic | Trigger |
 |---|---|---|---|
-| Part 1 | ✅ Live (1,332 impr.) | Contrarian origin — "Everyone told me to use a real tool" | — |
-| Part 2 | ✅ Live (~30 impr., 3AM handicap) | Architecture emerged, wasn't designed | — |
+| Part 1 | ✅ Live (1,554 impr., 875 members reached) | Contrarian origin — "Everyone told me to use a real tool" | — |
+| Part 2 | ✅ Live (tracking, 3AM handicap) | Architecture emerged, wasn't designed | — |
 | Part 3 | Pending | Two-cluster problem — why single cluster isn't enough | After PR #8 merged + infra redeployed |
 | Part 4 | Pending | Multi-agent workflow — Codex/Gemini/Claude, what actually happened | After two-cluster stable |
 | Part 5 | Pending | Taking it to AWS — what changes, what stays identical | After Track A (k3s on EC2) working |
