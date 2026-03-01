@@ -155,11 +155,64 @@ postgresql:
 
 ---
 
+## Gemini Verification Task — `fix/keycloak-image-fix-task`
+
+**Status:** Pending Gemini
+**Branch:** `fix/keycloak-image-fix-task`
+
+Codex reports all checks passing but ran inside a sandbox. Gemini must
+independently verify on the live cluster before Claude opens the PR.
+
+**Your task ends at Step 4. Do not open a PR. Do not make code changes.
+Update this section with results and wait for Claude.**
+
+### Steps
+
+**Step 1 — Static checks:**
+```bash
+logfile="scratch/logs/gemini-verify-$(date +%Y%m%d-%H%M%S).log"
+mkdir -p scratch/logs
+{ shellcheck scripts/plugins/keycloak.sh && \
+  PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats; } \
+  2>&1 | tee "$logfile"
+```
+Both must pass. Report exact bats count and any shellcheck warnings.
+
+**Step 2 — Confirm cluster is healthy before deploy:**
+```bash
+kubectl -n identity get pods
+kubectl -n secrets get pods
+```
+Vault must be Running and unsealed. If not, run `./scripts/k3d-manager reunseal_vault` first.
+
+**Step 3 — Live deploy:**
+```bash
+logfile="scratch/logs/deploy_keycloak-$(date +%Y%m%d-%H%M%S).log"
+mkdir -p scratch/logs
+CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_keycloak --enable-vault --enable-ldap \
+  2>&1 | tee "$logfile"
+```
+Confirm: `keycloak-0` Running, `keycloak-postgresql-0` Running, config-cli Job completed, Helm exits 0.
+
+**Step 4 — Smoke test:**
+```bash
+logfile="scratch/logs/test_keycloak-$(date +%Y%m%d-%H%M%S).log"
+mkdir -p scratch/logs
+PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_keycloak \
+  2>&1 | tee "$logfile"
+```
+All checks must pass. Report exact output.
+
+**Update this section with PASS/FAIL for each step and the log file paths.**
+
+---
+
 ## Open Items
 
 - [x] Owner merges PR #13 → v0.5.0 ✅
 - [x] Keycloak image registry investigation (Gemini — `fix/keycloak-image-fix-task`) ✅ — `bitnamilegacy` on Docker Hub confirmed multi-arch
 - [x] Keycloak live deploy — `./scripts/k3d-manager deploy_keycloak --enable-ldap --enable-vault` + `./scripts/k3d-manager test_keycloak` executed with unsandboxed access; Helm release + ExternalSecrets verified on infra cluster.
+- [ ] Gemini verification of `fix/keycloak-image-fix-task` — pending
 - [ ] `configure_vault_app_auth` — `feature/app-cluster-deploy` (Codex)
 - [ ] App layer deploy on Ubuntu (Gemini — SSH interactive)
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
