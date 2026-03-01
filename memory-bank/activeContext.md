@@ -10,13 +10,15 @@
 
 v0.5.0: Complete infra cluster layer.
 
-**Part A (owner action):** Run `deploy_argocd --enable-ldap --enable-vault --bootstrap`
-against live cluster and verify pods Running in `cicd` ns.
+**Part A (owner action):** ✅ DONE — ArgoCD deployed live, all 7 pods `2/2 Running`,
+ExternalSecrets synced.
 
-**Part B (Codex):** Implement `deploy_keycloak` plugin from scratch.
-Spec: `docs/plans/infra-cluster-complete-codex-task.md`
+**Part B (Codex):** ✅ DONE — `deploy_keycloak` plugin committed (`7cc0ca9`).
 
-**2026-03-03 Update:**
+**Part C (Gemini):** Verify Keycloak plugin — shellcheck + bats + confirm 7 suspected
+issues found by Claude. Spec: `docs/plans/keycloak-gemini-verification.md`
+
+**2026-03-03 Update (Codex):**
 - Added `scripts/plugins/keycloak.sh` with `deploy_keycloak`, Vault/ESO helpers,
   and realm config management.
 - Created full template set under `scripts/etc/keycloak/` (values, secretstore,
@@ -26,23 +28,57 @@ Spec: `docs/plans/infra-cluster-complete-codex-task.md`
 - Tests run: `shellcheck scripts/plugins/keycloak.sh`,
   `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats` ✅
 
+**2026-03-01 Update (Claude review):**
+- Claude reviewed all Keycloak files — 7 issues found (3 P1, 2 P2, 1 P3, 1 minor).
+- Gemini verification spec written to `docs/plans/keycloak-gemini-verification.md`.
+- Gemini to confirm issues and write Codex fix spec before PR.
+
 ---
 
-## Codex Task — Keycloak Plugin (Active)
+## Gemini Task — Keycloak Plugin Verification (Active)
 
 **Branch:** `feature/infra-cluster-complete`
-**Spec:** `docs/plans/infra-cluster-complete-codex-task.md`
-**Status:** Pending Codex implementation
+**Spec:** `docs/plans/keycloak-gemini-verification.md`
+**Status:** Pending Gemini verification
 
-### Files to Create
+### Your Tasks
 
-| File | Purpose |
-|---|---|
-| `scripts/plugins/keycloak.sh` | `deploy_keycloak` + helpers |
-| `scripts/etc/keycloak/vars.sh` | Config variables |
-| `scripts/etc/keycloak/values.yaml.tmpl` | Bitnami Helm values |
-| `scripts/etc/keycloak/secretstore.yaml.tmpl` | ESO SecretStore |
-| `scripts/etc/keycloak/externalsecret-admin.yaml.tmpl` | Admin password ESO |
+1. Run mechanical checks:
+```bash
+shellcheck scripts/plugins/keycloak.sh
+PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats
+```
+
+2. Confirm or deny each of the 7 suspected issues in the spec.
+
+3. Write exact before/after Codex fix diffs for all confirmed issues.
+
+4. Update `docs/plans/keycloak-gemini-verification.md` with findings and sign off.
+
+### Suspected Issues Summary
+
+| # | Severity | File | Issue |
+|---|---|---|---|
+| 1 | P1 | `keycloak.sh:108` | `_keycloak_apply_realm_configmap` called unconditionally (should be inside `--enable-ldap`) |
+| 2 | P1 | `keycloak.sh` header | Missing `VAULT_VARS_FILE` source — `VAULT_ENDPOINT` will be empty |
+| 3 | P1 | `realm-config.json.tmpl:25-26` | `bindDn`/`bindCredential` set to secret key NAMES, not values |
+| 4 | P1 | `realm-config.json.tmpl:7` | `userFederationProviders` is deprecated Keycloak <17 format |
+| 5 | P2 | `values.yaml.tmpl:29-33` | `KEYCLOAK_USER` mapped to password secretKeyRef, not username |
+| 6 | P2 | `values.yaml.tmpl:10-19` | `KEYCLOAK_IMPORT` env var conflicts with `keycloakConfigCli` |
+| 7 | Minor | `virtualservice.yaml.tmpl:5,10` | Namespace and gateway hardcoded, not parameterized |
+
+### Do NOT
+
+- Fix code yourself
+- Open a PR
+- Push commits (Codex pushes after fixes)
+
+---
+
+## Codex Task — Keycloak Plugin (COMPLETE ✅)
+
+**Commit:** `7cc0ca9`
+**Files created:**
 | `scripts/etc/keycloak/externalsecret-ldap.yaml.tmpl` | LDAP bind password ESO |
 | `scripts/etc/keycloak/realm-config.json.tmpl` | Realm JSON with LDAP federation |
 | `scripts/etc/keycloak/virtualservice.yaml.tmpl` | Istio VirtualService |
