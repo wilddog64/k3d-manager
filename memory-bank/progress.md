@@ -30,6 +30,7 @@ Branch is stale — do not revisit. See `docs/issues/2026-02-27-vault-auth-deleg
 - [x] ESO deployment + SecretStore wiring to Vault
 - [x] `reunseal_vault` helper (Keychain/libsecret shard retrieval)
 - [x] Secret backend abstraction (`SECRET_BACKEND` env var, `vault` backend complete)
+- [x] Two-cluster groundwork: namespace defaults (secrets/identity/cicd), `CLUSTER_ROLE` env var, and remote Vault ESO helper (`feature/two-cluster-infra`)
 
 ### Jenkins
 - [x] Jenkins deployment via Helm with Vault-issued TLS cert
