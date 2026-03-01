@@ -92,48 +92,45 @@ v0.5.0: Keycloak plugin — **PR #13 open**, all fixes applied, awaiting owner m
 **Branch:** `fix/keycloak-image-fix-task`
 **Status:** Pending Codex
 
-### Issue — P1: `bitnami/keycloak:26.3.3-debian-12-r0` not found on Docker Hub
+### Issue — P1: Bitnami images no longer published on Docker Hub
 
 Live deploy failed with `ImagePullBackOff` on all 3 pods (keycloak-0,
-keycloak-postgresql-0, keycloak-keycloak-config-cli). The latest
-`bitnami/keycloak` Helm chart resolves to image tag `26.3.3-debian-12-r0`
-which does not exist on `docker.io`.
+keycloak-postgresql-0, keycloak-keycloak-config-cli). Root cause: Bitnami
+stopped publishing images to Docker Hub (free tier) in late 2024. **Pinning
+a chart version will not fix this** — `docker.io/bitnami/keycloak:<any-tag>`
+returns "no such manifest" regardless of version.
+
+The free alternative is **GitHub Container Registry**:
+`ghcr.io/bitnami/keycloak` — images are published there.
 
 ### Fix
 
-**File:** `scripts/etc/keycloak/vars.sh`
+**File:** `scripts/etc/keycloak/values.yaml.tmpl`
 
-Find the last known-good Bitnami Keycloak Helm chart version where the image
-is actually published on Docker Hub:
+Override the image registry for all 3 images to `ghcr.io`:
 
-```bash
-helm repo update
-helm search repo bitnami/keycloak --versions | head -20
+```yaml
+image:
+  registry: ghcr.io
+
+keycloakConfigCli:
+  image:
+    registry: ghcr.io
+
+postgresql:
+  image:
+    registry: ghcr.io
 ```
 
-Pick the most recent chart version whose app version image tag exists. Then
-pin it in `vars.sh`:
+**Before doing this, Codex must verify the images exist on ghcr.io:**
 
 ```bash
-# Before:
-: "${KEYCLOAK_HELM_CHART_VERSION:=}"   # empty = latest
-
-# After (example — use actual verified version):
-: "${KEYCLOAK_HELM_CHART_VERSION:=24.4.x}"  # last chart with published image
+docker manifest inspect ghcr.io/bitnami/keycloak:latest
+docker manifest inspect ghcr.io/bitnami/postgresql:latest
 ```
 
-And pass the version in `keycloak.sh` helm upgrade call:
-
-```bash
-# Before:
-_helm upgrade --install -n "$KEYCLOAK_NAMESPACE" "$KEYCLOAK_HELM_RELEASE" "$KEYCLOAK_HELM_CHART_REF" --values "$values_file"
-
-# After:
-local chart_version_flag=()
-[[ -n "$KEYCLOAK_HELM_CHART_VERSION" ]] && chart_version_flag=(--version "$KEYCLOAK_HELM_CHART_VERSION")
-_helm upgrade --install -n "$KEYCLOAK_NAMESPACE" "$KEYCLOAK_HELM_RELEASE" "$KEYCLOAK_HELM_CHART_REF" \
-   "${chart_version_flag[@]}" --values "$values_file"
-```
+If `ghcr.io` does not have the images, check `helm show values bitnami/keycloak`
+for the chart's recommended registry override.
 
 ### Also add: `test_keycloak` smoke test
 
