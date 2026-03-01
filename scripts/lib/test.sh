@@ -1059,7 +1059,7 @@ function test_cert_rotation() {
 
 function _cleanup_cert_rotation_test() {
   # Clean up test job if it exists
-  _kubectl delete job test-cert-rotation -n "${jenkins_ns}" 2>/dev/null || true
+  _kubectl delete job test-cert-rotation -n "${JENKINS_NAMESPACE:-cicd}" 2>/dev/null || true
   _info "Certificate rotation test cleanup complete"
 }
 

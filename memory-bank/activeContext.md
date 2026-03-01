@@ -7,60 +7,20 @@
 
 ---
 
-## ⚠️ Codex — TWO Tasks (read this first)
+## ✅ Codex — Latest Updates (2026-03-02)
 
-**Branch:** `feature/two-cluster-infra`
-**PR open:** https://github.com/wilddog64/k3d-manager/pull/8 — lint PASSING, 2 review comments unresolved
+- **P1 cleanup trap fixed:** `_cleanup_cert_rotation_test` now references
+  `${JENKINS_NAMESPACE:-cicd}` directly, so the EXIT trap no longer reads the
+  out-of-scope `jenkins_ns` local. (File: `scripts/lib/test.sh` lines 1058–1063)
+- **P2 remote SecretStore fix:** `deploy_eso` now passes the resolved `$ns`
+  argument into `_eso_configure_remote_vault` when
+  `ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE` is unset, so remote Vault
+  configurations with custom namespaces point at the right service account.
+  (File: `scripts/plugins/eso.sh` lines 97–103)
+- **Tests:** `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/eso.bats`
+  ✅ — ensures the ESO plugin regressions stay covered.
 
-Fix both issues below, commit, push to `feature/two-cluster-infra`. Do NOT touch any other files.
-
----
-
-### Task A — P1: `_cleanup_cert_rotation_test` uses out-of-scope `jenkins_ns`
-
-**File:** `scripts/lib/test.sh`
-
-**Problem:** `_cleanup_cert_rotation_test()` (line 1060) references `${jenkins_ns}`, but
-`jenkins_ns` is a `local` variable in the calling function `test_cert_rotation`. When
-the EXIT trap fires, `jenkins_ns` is out of scope — under `set -u` this is an
-unbound-variable error and cleanup fails.
-
-**Fix:** In `_cleanup_cert_rotation_test`, replace `"${jenkins_ns}"` with
-`"${JENKINS_NAMESPACE:-cicd}"` — the same expression used to define `jenkins_ns`
-in the calling function.
-
-**Exact change:**
-```
-# Before (line 1062):
-  _kubectl delete job test-cert-rotation -n "${jenkins_ns}" 2>/dev/null || true
-
-# After:
-  _kubectl delete job test-cert-rotation -n "${JENKINS_NAMESPACE:-cicd}" 2>/dev/null || true
-```
-
----
-
-### Task B — P2: `deploy_eso` passes wrong namespace to remote SecretStore
-
-**File:** `scripts/plugins/eso.sh`
-
-**Problem:** When `REMOTE_VAULT_ADDR` is set, `deploy_eso` calls
-`_eso_configure_remote_vault` passing `${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ESO_NAMESPACE:-secrets}}`
-as the service-account namespace (line 101). This ignores the actual `$ns` arg that
-`deploy_eso` was called with. If `deploy_eso custom-ns` is called without exporting
-`ESO_NAMESPACE`, the SecretStore points at `secrets` instead of `custom-ns`.
-
-**Fix:** Replace `${ESO_NAMESPACE:-secrets}` with `$ns` in the fallback so the
-installed namespace is used when `ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE` is not set.
-
-**Exact change:**
-```
-# Before (line 101):
-      "${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ESO_NAMESPACE:-secrets}}"
-
-# After:
-      "${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ns}}"
-```
+No further Codex tasks are pending on PR #8 as of this update.
 
 ---
 

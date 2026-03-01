@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-02
 **Reported:** Codex bot review comment on PR #8
-**Status:** OPEN — fix assigned to Codex
+**Status:** FIXED — `_cleanup_cert_rotation_test` now reads `${JENKINS_NAMESPACE:-cicd}` directly
 **Severity:** P1
 **Type:** Bug — unbound variable under `set -u`, cleanup silently fails
 
@@ -65,6 +65,17 @@ in the calling function.
 ```
 
 No other changes needed.
+
+---
+
+## Resolution & Verification (2026-03-02)
+
+- Patched `scripts/lib/test.sh` so the cleanup trap always references
+  `${JENKINS_NAMESPACE:-cicd}`, eliminating the out-of-scope variable and keeping
+  behavior consistent with the main function.
+- Re-sourced `_cleanup_cert_rotation_test` indirectly by running
+  `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/eso.bats` for sanity;
+  no Jenkins-specific automated test exists for this helper.
 
 ---
 

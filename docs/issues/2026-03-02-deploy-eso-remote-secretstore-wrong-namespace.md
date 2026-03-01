@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-02
 **Reported:** Codex bot review comment on PR #8
-**Status:** OPEN — fix assigned to Codex
+**Status:** FIXED — `_eso_configure_remote_vault` now receives the caller namespace
 **Severity:** P2
 **Type:** Bug — namespace mismatch in cross-cluster SecretStore configuration
 
@@ -59,6 +59,19 @@ namespace is used when `ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE` is not explicitly 
 ```
 
 No other changes needed.
+
+---
+
+## Resolution & Verification (2026-03-02)
+
+- Updated `scripts/plugins/eso.sh` to pass the resolved `ns` argument to
+  `_eso_configure_remote_vault` whenever the remote namespace override is left
+  unset, so ESO installs in custom namespaces wire the SecretStore to the
+  correct service account.
+- Re-ran the plugin unit tests via
+  `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/eso.bats` — all cases
+  (usage, skip, fresh install, and airgapped chart) passed, confirming no
+  regressions in the helm/namespace flow.
 
 ---
 
