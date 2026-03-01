@@ -106,3 +106,5 @@ Write articles as milestones are reached. Each post builds on the last.
 | `test_istio` fails — hardcoded namespace `istio-test` | FIXED | 2026-02-27: all references now use `$test_ns`. |
 | Vault `system:auth-delegator` missing from `deploy_vault` | FIXED | 2026-02-27: Idempotent binding added to `vault.sh`. |
 | shellcheck warnings in refactored code | FIXED | 2026-03-01: All warnings resolved or suppressed with reason (verified by Gemini). |
+| GitGuardian: 1 internal secret incident (2026-02-28) | OPEN | No real secrets — likely IPs in docs. Mark false positive in dashboard. See `docs/issues/2026-02-28-gitguardian-internal-ip-addresses-in-docs.md`. |
+| `test_auth_cleanup.bats` regression | OPEN | `PATH="/opt/homebrew/bin:$PATH" source scripts/lib/system.sh && export -f _info _warn _err _no_trace && bats scripts/tests/lib/test_auth_cleanup.bats` fails at `[[ "$output" == "user-default" ]]` because `_kubectl` mock now sees `VAULT_RELEASE=vault` and never exercises the default-derivation paths (needs follow-up). |
