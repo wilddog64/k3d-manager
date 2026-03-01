@@ -1,5 +1,21 @@
 # Changes - k3d-manager
 
+## v0.3.1 - dated 2026-03-01
+
+### Bug Fixes
+
+- `deploy_jenkins --namespace cicd` no longer fails with namespace mismatch error
+  - `scripts/etc/jenkins/jenkins-home-pv.yaml.tmpl`: `namespace: $JENKINS_NAMESPACE` (was hardcoded `jenkins`)
+  - `_create_jenkins_pv_pvc`: exports `JENKINS_NAMESPACE` before calling `envsubst` so template substitution takes effect
+  - `deploy_jenkins` line 1281: falls back to `${JENKINS_NAMESPACE:-jenkins}` so env var override works without `--namespace` flag
+
+### Verification
+
+- `shellcheck scripts/plugins/jenkins.sh` clean
+- `bats scripts/tests/lib/test_auth_cleanup.bats` 1/1 passed
+
+---
+
 ## v0.3.0 - dated 2026-03-02
 
 ### Two-Cluster Architecture
