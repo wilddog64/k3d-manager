@@ -76,7 +76,7 @@ Verified by Gemini: shellcheck clean, ESO API v1 fixed, regression tests green o
   - [x] Vault + ESO → `secrets` ns
   - [x] OpenLDAP → `identity` ns
   - [x] Istio → `istio-system`
-  - [ ] Jenkins → `cicd` ns (blocked: P2 PV template bug — needs Codex fix)
+  - [ ] Jenkins → `cicd` ns (fix done by Codex on `fix/jenkins-cicd-namespace` — pending Gemini verify + PR merge)
   - [ ] ArgoCD → `cicd` ns (no deploy command yet)
   - [ ] Keycloak → `identity` ns (no deploy command yet)
 - [ ] Configure Vault `kubernetes-app` auth mount for Ubuntu app cluster
@@ -122,3 +122,4 @@ Write articles as milestones are reached. Each post builds on the last.
 | `CLUSTER_NAME=automation` env var ignored during `deploy_cluster` | OPEN | 2026-03-01: Cluster created as `k3d-cluster` instead of `automation`. See `docs/issues/2026-03-01-cluster-name-env-var-not-respected.md`. |
 | `jenkins-home-pv.yaml.tmpl` has `namespace: jenkins` hardcoded | FIXED | 2026-03-02: Template now uses `$JENKINS_NAMESPACE` and `_create_jenkins_pv_pvc` exports it before `envsubst`; verified via `bats scripts/tests/lib/test_auth_cleanup.bats` (pass) + `shellcheck scripts/plugins/jenkins.sh`. Jenkins plugin suite not available in repo (command fails). |
 | `deploy_jenkins` ignores `JENKINS_NAMESPACE` env var | FIXED | 2026-03-02: Default now falls back to `${JENKINS_NAMESPACE:-jenkins}` before literal; same verification steps as above. |
+| No `scripts/tests/plugins/jenkins.bats` suite | BACKLOG | Jenkins plugin has no dedicated bats suite. `test_auth_cleanup.bats` covers auth flow. Full plugin suite (flag parsing, namespace resolution, mutual exclusivity) is a future improvement — not a gate for current work. |

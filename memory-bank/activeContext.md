@@ -22,61 +22,32 @@
 
 ---
 
-## Codex Task — Jenkins `cicd` Namespace Fix
+## Gemini Verification Task — Jenkins `cicd` Namespace Fix
 
 **Branch:** `fix/jenkins-cicd-namespace`
-**Plan:** `docs/plans/jenkins-cicd-namespace-fix.md`
-**Issues:** `docs/issues/2026-03-01-jenkins-pv-template-hardcoded-namespace.md` (P2)
-           `docs/issues/2026-03-01-deploy-jenkins-ignores-jenkins-namespace-env-var.md` (P3)
+**Status:** Codex complete ✅ — awaiting Gemini code sign-off
 
-### Exact changes required (3 total)
+### What Codex implemented (2026-03-02)
 
-**Change 1 — `scripts/etc/jenkins/jenkins-home-pv.yaml.tmpl` line 13:**
-```yaml
-# Before:
-  namespace: jenkins
-# After:
-  namespace: $JENKINS_NAMESPACE
-```
+1. `scripts/etc/jenkins/jenkins-home-pv.yaml.tmpl` — `namespace: $JENKINS_NAMESPACE` (was hardcoded `jenkins`)
+2. `scripts/plugins/jenkins.sh` `_create_jenkins_pv_pvc` — exports `JENKINS_NAMESPACE` before `envsubst`
+3. `scripts/plugins/jenkins.sh` line 1281 — fallback to `${JENKINS_NAMESPACE:-jenkins}`
 
-**Change 2 — `scripts/plugins/jenkins.sh` inside `_create_jenkins_pv_pvc` (~line 456):**
-Add `export JENKINS_NAMESPACE="$jenkins_namespace"` immediately before the `envsubst` call:
-```bash
-   # BEFORE envsubst line:
-   export JENKINS_NAMESPACE="$jenkins_namespace"
-   envsubst < "$jenkins_pv_template" > "$jenkinsyamfile"
-```
+Codex verified: `bats scripts/tests/lib/test_auth_cleanup.bats` ✅, `shellcheck scripts/plugins/jenkins.sh` ✅
+Note: `scripts/tests/plugins/jenkins.bats` does not exist — no Jenkins plugin suite in repo (backlog item, not a gate).
 
-**Change 3 — `scripts/plugins/jenkins.sh` line 1281:**
-```bash
-# Before:
-jenkins_namespace="${jenkins_namespace:-jenkins}"
-# After:
-jenkins_namespace="${jenkins_namespace:-${JENKINS_NAMESPACE:-jenkins}}"
-```
+### What Gemini must verify
 
-### What NOT to change
+1. Confirm the 3 changes are correct and complete on branch `fix/jenkins-cicd-namespace`
+2. Run `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/lib/test_auth_cleanup.bats` — must pass
+3. Run `shellcheck scripts/plugins/jenkins.sh` — must be clean
+4. Confirm no regression in existing tests
+5. Post sign-off to memory-bank: replace this task block with verification result
 
-- `vault-seed-wrapper.yaml` — not auto-deployed, skip it
-- No new bats tests needed — run existing tests to verify no regression
+### After Gemini sign-off
 
-### After implementing, run:
-```bash
-PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/jenkins.bats
-PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/lib/test_auth_cleanup.bats
-shellcheck scripts/plugins/jenkins.sh
-```
-
-### Commit message:
-```
-fix(jenkins): allow deploy_jenkins to target any namespace
-
-- jenkins-home-pv.yaml.tmpl: use $JENKINS_NAMESPACE instead of hardcoded "jenkins"
-- _create_jenkins_pv_pvc: export JENKINS_NAMESPACE before envsubst
-- deploy_jenkins line 1281: fall back to $JENKINS_NAMESPACE env var
-
-Fixes: deploy_jenkins --namespace cicd failing with namespace mismatch error.
-```
+Claude opens PR: `fix/jenkins-cicd-namespace` → `main`
+After merge: Claude deploys `deploy_jenkins --namespace cicd --enable-ldap --enable-vault` on infra cluster
 
 ---
 
