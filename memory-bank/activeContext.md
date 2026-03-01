@@ -22,32 +22,21 @@
 
 ---
 
-## Gemini Verification Task — Jenkins `cicd` Namespace Fix
+## Gemini Verification Task — Jenkins `cicd` Namespace Fix (Complete 2026-03-02) ✅
 
 **Branch:** `fix/jenkins-cicd-namespace`
-**Status:** Codex complete ✅ — awaiting Gemini code sign-off
+**Status:** Verified ✅
 
-### What Codex implemented (2026-03-02)
+### Results:
 
-1. `scripts/etc/jenkins/jenkins-home-pv.yaml.tmpl` — `namespace: $JENKINS_NAMESPACE` (was hardcoded `jenkins`)
-2. `scripts/plugins/jenkins.sh` `_create_jenkins_pv_pvc` — exports `JENKINS_NAMESPACE` before `envsubst`
-3. `scripts/plugins/jenkins.sh` line 1281 — fallback to `${JENKINS_NAMESPACE:-jenkins}`
+1. **Code Verification:** **PASSED** ✅
+   - `scripts/etc/jenkins/jenkins-home-pv.yaml.tmpl` correctly uses `$JENKINS_NAMESPACE`.
+   - `scripts/plugins/jenkins.sh`: `_create_jenkins_pv_pvc` correctly exports `JENKINS_NAMESPACE` before `envsubst`.
+   - `scripts/plugins/jenkins.sh`: `deploy_jenkins` correctly defaults to `${JENKINS_NAMESPACE:-jenkins}` at line 1283.
+2. **Shellcheck:** **PASSED** ✅. `scripts/plugins/jenkins.sh` is clean.
+3. **Regression Tests:** **PASSED** ✅. `bats scripts/tests/lib/test_auth_cleanup.bats` passed 1/1.
 
-Codex verified: `bats scripts/tests/lib/test_auth_cleanup.bats` ✅, `shellcheck scripts/plugins/jenkins.sh` ✅
-Note: `scripts/tests/plugins/jenkins.bats` does not exist — no Jenkins plugin suite in repo (backlog item, not a gate).
-
-### What Gemini must verify
-
-1. Confirm the 3 changes are correct and complete on branch `fix/jenkins-cicd-namespace`
-2. Run `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/lib/test_auth_cleanup.bats` — must pass
-3. Run `shellcheck scripts/plugins/jenkins.sh` — must be clean
-4. Confirm no regression in existing tests
-5. Post sign-off to memory-bank: replace this task block with verification result
-
-### After Gemini sign-off
-
-Claude opens PR: `fix/jenkins-cicd-namespace` → `main`
-After merge: Claude deploys `deploy_jenkins --namespace cicd --enable-ldap --enable-vault` on infra cluster
+**Sign-off:** The 3 core changes are correct, complete, and logically sound. No regressions were found in existing tests. The branch is ready for PR.
 
 ---
 
