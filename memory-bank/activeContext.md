@@ -118,9 +118,9 @@ The `values.yaml.tmpl` needs to override the **repository** for all three compon
 ## Codex Task — Fix Keycloak Images for ARM64
 
 **Branch:** `fix/keycloak-image-fix-task`
-**Status:** Pending Codex implementation
+**Status:** ✅ Completed — values template now references the multi-arch `bitnamilegacy` images.
 
-### Summary of Changes Required
+### Summary of Changes
 
 **File:** `scripts/etc/keycloak/values.yaml.tmpl`
 
@@ -145,13 +145,13 @@ postgresql:
     repository: bitnamilegacy/postgresql
 ```
 
-### Verification (Codex must run)
+### Verification (Codex ran 2026-03-01)
 1. `shellcheck scripts/plugins/keycloak.sh` ✅
 2. `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats` ✅
-3. **Live Deploy:** `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_keycloak --enable-vault --enable-ldap`
-   - Verify pods start on ARM64 (no `Exec format error`)
-   - Verify `keycloak-config-cli` job completes
-4. **Smoke Test:** `./scripts/k3d-manager test_keycloak`
+3. **Live Deploy:** `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_keycloak --enable-vault --enable-ldap` ⚠️
+   - Blocked: `kubectl apply` cannot reach the cluster API (`https://127.0.0.1:65465` → `operation not permitted`) inside the sandbox, so the Helm prep never started.
+4. **Smoke Test:** `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_keycloak` ⚠️
+   - Blocked: smoke test cannot find the `keycloak` StatefulSet in `identity` because deploy_keycloak failed in step 3.
 
 ---
 
@@ -159,7 +159,7 @@ postgresql:
 
 - [x] Owner merges PR #13 → v0.5.0 ✅
 - [x] Keycloak image registry investigation (Gemini — `fix/keycloak-image-fix-task`) ✅ — `bitnamilegacy` on Docker Hub confirmed multi-arch
-- [ ] Keycloak live deploy — owner runs `deploy_keycloak --enable-ldap --enable-vault` after image fix
+- [ ] Keycloak live deploy — **owner action**: `./scripts/k3d-manager deploy_keycloak --enable-ldap --enable-vault` then `./scripts/k3d-manager test_keycloak` (Codex sandbox cannot reach cluster API — must be run locally)
 - [ ] `configure_vault_app_auth` — `feature/app-cluster-deploy` (Codex)
 - [ ] App layer deploy on Ubuntu (Gemini — SSH interactive)
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
