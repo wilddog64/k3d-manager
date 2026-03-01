@@ -122,12 +122,17 @@ HELP
    local values_file
    values_file=$(mktemp -t keycloak-values.XXXXXX.yaml)
    trap '$(_cleanup_trap_command "$values_file")' EXIT
-   KEYCLOAK_CONFIG_CLI_ENABLED="$config_cli_enabled"
+   KEYCLOAK_CONFIG_CLI_ENABLED="$config_cli_enabled" \
    envsubst '$KEYCLOAK_ADMIN_USERNAME $KEYCLOAK_ADMIN_SECRET_NAME $KEYCLOAK_ADMIN_PASSWORD_KEY $KEYCLOAK_NAMESPACE $KEYCLOAK_SERVICE_PORT $KEYCLOAK_VIRTUALSERVICE_HOST $KEYCLOAK_CONFIG_CLI_ENABLED' \
       < "$KEYCLOAK_CONFIG_DIR/values.yaml.tmpl" > "$values_file"
 
    _info "[keycloak] Installing/Upgrading Helm release"
-   _helm upgrade --install -n "$KEYCLOAK_NAMESPACE" "$KEYCLOAK_HELM_RELEASE" "$KEYCLOAK_HELM_CHART_REF" --values "$values_file"
+   local -a helm_version_args=()
+   if [[ -n "${KEYCLOAK_HELM_CHART_VERSION:-}" ]]; then
+      helm_version_args=(--version "$KEYCLOAK_HELM_CHART_VERSION")
+   fi
+   _helm upgrade --install -n "$KEYCLOAK_NAMESPACE" "$KEYCLOAK_HELM_RELEASE" "$KEYCLOAK_HELM_CHART_REF" \
+      "${helm_version_args[@]}" --values "$values_file"
 
    if ! _kubectl -n "$KEYCLOAK_NAMESPACE" rollout status statefulset/keycloak --timeout=300s 2>/dev/null; then
       _warn "[keycloak] Timeout waiting for Keycloak StatefulSet"
@@ -250,4 +255,50 @@ data:
   realm-config.json: |
 $(sed 's/^/    /' "$rendered")
 REALM
+}
+
+function test_keycloak() {
+   local ns="${KEYCLOAK_NAMESPACE:-identity}"
+   local service_port="${KEYCLOAK_SERVICE_PORT:-8080}"
+
+   _info "[keycloak] Running smoke test in namespace '$ns'"
+
+   if ! _kubectl --no-exit -n "$ns" get statefulset keycloak >/dev/null 2>&1; then
+      _err "[keycloak] StatefulSet 'keycloak' not found in namespace '$ns'"
+   fi
+
+   if ! _kubectl -n "$ns" wait --for=condition=Ready --timeout=300s pod/keycloak-0 >/dev/null 2>&1; then
+      _err "[keycloak] Pod keycloak-0 is not Ready"
+   fi
+
+   local admin_secret
+   admin_secret=$(_kubectl --no-exit -n "$ns" get secret "$KEYCLOAK_ADMIN_SECRET_NAME" -o jsonpath="{.data.${KEYCLOAK_ADMIN_PASSWORD_KEY}}" 2>/dev/null || true)
+   if [[ -z "$admin_secret" ]]; then
+      _err "[keycloak] Secret '$KEYCLOAK_ADMIN_SECRET_NAME' missing key '${KEYCLOAK_ADMIN_PASSWORD_KEY}'"
+   fi
+
+   local es
+   for es in "$KEYCLOAK_ADMIN_SECRET_NAME" "$KEYCLOAK_LDAP_SECRET_NAME"; do
+      if ! _kubectl --no-exit -n "$ns" get externalsecret "$es" >/dev/null 2>&1; then
+         _err "[keycloak] ExternalSecret '$es' not found in namespace '$ns'"
+      fi
+      if ! _kubectl -n "$ns" wait --for=condition=Ready --timeout=60s externalsecret/"$es" 2>/dev/null; then
+         _err "[keycloak] ExternalSecret '$es' not Ready"
+      fi
+   done
+
+   local marker="KEYCLOAK_HTTP_STATUS"
+   local curl_cmd="curl -s -o /dev/null -w '${marker}:%{http_code}' http://keycloak.${ns}.svc.cluster.local:${service_port}/realms/master"
+   local output
+   output=$(_kubectl --no-exit -n "$ns" run "keycloak-http-$RANDOM$RANDOM" --rm -i --restart=Never \
+      --image=curlimages/curl:8.10.1 --command -- sh -c "$curl_cmd" 2>&1 || true)
+   output=${output//$'\r'/}
+   local status_line
+   status_line=$(printf '%s\n' "$output" | grep -Eo "${marker}:[0-9]{3}" | tail -n1)
+   local http_code="${status_line##*:}"
+   if [[ -z "$status_line" || "$http_code" != "200" ]]; then
+      _err "[keycloak] HTTP check failed; response code: ${http_code:-unknown}"
+   fi
+
+   _info "[keycloak] Smoke test passed"
 }

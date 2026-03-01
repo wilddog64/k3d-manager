@@ -1,7 +1,12 @@
+global:
+  security:
+    allowInsecureImages: true
 auth:
   adminUser: ${KEYCLOAK_ADMIN_USERNAME}
   existingSecret: ${KEYCLOAK_ADMIN_SECRET_NAME}
   passwordSecretKey: ${KEYCLOAK_ADMIN_PASSWORD_KEY}
+image:
+  registry: public.ecr.aws
 proxyAddressForwarding: true
 service:
   type: ClusterIP
@@ -9,6 +14,8 @@ service:
     http: ${KEYCLOAK_SERVICE_PORT}
 keycloakConfigCli:
   enabled: ${KEYCLOAK_CONFIG_CLI_ENABLED}
+  image:
+    registry: public.ecr.aws
   existingConfigmap: keycloak-realm-config
   podAnnotations:
     sidecar.istio.io/inject: "false"
@@ -24,3 +31,6 @@ keycloakConfigCli:
           key: ${KEYCLOAK_ADMIN_PASSWORD_KEY}
 podAnnotations:
   sidecar.istio.io/inject: "true"
+postgresql:
+  image:
+    registry: public.ecr.aws
