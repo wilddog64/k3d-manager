@@ -203,6 +203,7 @@ SCRIPT
   chmod +x "$script"
 
   run env PROJECT_ROOT="$PROJECT_ROOT" \
+    VAULT_NS=vault VAULT_RELEASE=vault \
     JENKINS_VALUES_FILE="$PROJECT_ROOT/scripts/etc/jenkins/values-test.yaml" \
     CLEANUP_LOG="$cleanup_log" AUTH_PATH_LOG="$auth_path_log" \
     DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
@@ -225,7 +226,7 @@ SCRIPT
 
   : >"$deploy_log"
   : >"$deploy_ns_log"
-  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" VAULT_RELEASE="explicit-release" "$script"
+  run env PROJECT_ROOT="$PROJECT_ROOT" VAULT_NS=vault VAULT_RELEASE=vault DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" VAULT_RELEASE="explicit-release" "$script"
   [ "$status" -eq 0 ]
   run tail -n 1 "$deploy_log"
   [ "$status" -eq 0 ]
@@ -233,7 +234,7 @@ SCRIPT
 
   : >"$deploy_log"
   : >"$deploy_ns_log"
-  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" VAULT_RELEASE_DEFAULT="user-default" VAULT_NS_DEFAULT="vault-from-default" "$script"
+  run env PROJECT_ROOT="$PROJECT_ROOT" VAULT_NS=vault VAULT_RELEASE=vault DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" VAULT_RELEASE_DEFAULT="user-default" VAULT_NS_DEFAULT="vault-from-default" "$script"
   [ "$status" -eq 0 ]
   run tail -n 1 "$deploy_log"
   [ "$status" -eq 0 ]
@@ -241,7 +242,7 @@ SCRIPT
 
   : >"$deploy_log"
   : >"$deploy_ns_log"
-  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" VAULT_NS_DEFAULT="vault-derived" "$script"
+  run env PROJECT_ROOT="$PROJECT_ROOT" VAULT_NS=vault VAULT_RELEASE=vault DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" VAULT_NS_DEFAULT="vault-derived" "$script"
   [ "$status" -eq 0 ]
   run tail -n 1 "$deploy_log"
   [ "$status" -eq 0 ]
@@ -249,7 +250,7 @@ SCRIPT
 
   : >"$deploy_log"
   : >"$deploy_ns_log"
-  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
+  run env PROJECT_ROOT="$PROJECT_ROOT" VAULT_NS=vault VAULT_RELEASE=vault DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
     TEST_LIB_VAULT_RELEASE_DEFAULT_DEFINED_BEFORE_PLUGIN=0 \
     TEST_LIB_VAULT_NS_DEFAULT_DEFINED_BEFORE_PLUGIN=1 \
     TEST_LIB_VAULT_RELEASE_DEFAULT_PLUGIN_VALUE="vault" \
@@ -264,7 +265,7 @@ SCRIPT
 
   : >"$deploy_log"
   : >"$deploy_ns_log"
-  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
+  run env PROJECT_ROOT="$PROJECT_ROOT" VAULT_NS=vault VAULT_RELEASE=vault DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
     TEST_LIB_RE_SOURCE_AFTER_OVERRIDE=1 \
     VAULT_NS_DEFAULT_OVERRIDE="resourced-ns" \
     VAULT_RELEASE_DEFAULT_OVERRIDE="resourced-release" \
@@ -276,7 +277,7 @@ SCRIPT
 
   : >"$deploy_log"
   : >"$deploy_ns_log"
-  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
+  run env PROJECT_ROOT="$PROJECT_ROOT" VAULT_NS=vault VAULT_RELEASE=vault DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
     TEST_LIB_RE_SOURCE_AFTER_OVERRIDE=1 \
     VAULT_NS_DEFAULT_OVERRIDE="resourced-ns-only" \
     "$script"
@@ -287,7 +288,7 @@ SCRIPT
 
   : >"$deploy_log"
   : >"$deploy_ns_log"
-  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
+  run env PROJECT_ROOT="$PROJECT_ROOT" VAULT_NS=vault VAULT_RELEASE=vault DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
     TEST_LIB_RESOURCE_WITH_EXPORTS=1 \
     VAULT_NS_DEFAULT_EXPORT="exported-ns" \
     VAULT_RELEASE_DEFAULT_EXPORT="exported-release" \
@@ -299,7 +300,7 @@ SCRIPT
 
   : >"$deploy_log"
   : >"$deploy_ns_log"
-  run env PROJECT_ROOT="$PROJECT_ROOT" DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
+  run env PROJECT_ROOT="$PROJECT_ROOT" VAULT_NS=vault VAULT_RELEASE=vault DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
     TEST_LIB_EXPORT_AFTER_LOAD=1 \
     VAULT_NS_DEFAULT_POST_LOAD="post-load-ns" \
     VAULT_RELEASE_DEFAULT_POST_LOAD="post-load-release" \
