@@ -147,6 +147,7 @@
 | v0.2.0 | ✅ released 2026-02-27 | OrbStack, Vault reboot unseal, Jenkins k8s agents |
 | v0.2.1 | ✅ released 2026-02-28 | Docs-only: CHANGE.md + README Releases table |
 | v0.3.0 | ✅ merged 2026-03-01 | Two-cluster refactor, namespace renames, CLUSTER_ROLE, remote Vault ESO |
+| v0.3.1 | 🔄 PR #10 open | Jenkins `cicd` namespace fix — PV template + env var override |
 | v1.0.0 | future | Production-hardened, all known-broken paths resolved |
 
 ---
