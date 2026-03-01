@@ -7,8 +7,8 @@
 **ArgoCD Phase 1 — MERGED ✅ (v0.4.0, 2026-03-02)**
 Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 
-**Keycloak — VERIFIED ✅ (2026-03-02)**
-Branch `feature/infra-cluster-complete`. Gemini verified shellcheck, bats (6/6), and confirmed 7/7 issues found by Claude. Codex fix spec documented in `docs/plans/keycloak-gemini-verification.md`.
+**Keycloak — PR #13 OPEN 🔄 (v0.5.0)**
+Branch `feature/infra-cluster-complete`. All fixes applied (envsubst whitelist, non-Vault admin secret, config CLI flag, shared SecretStore, YAML password quoting). CI green. Awaiting owner merge.
 
 ---
 
@@ -89,7 +89,7 @@ Branch `feature/infra-cluster-complete`. Gemini verified shellcheck, bats (6/6),
   - [x] Istio → `istio-system`
   - [x] Jenkins → `cicd` ns — **DEPLOYED 2026-03-01** (v0.3.1, smoke test passed)
   - [x] ArgoCD → `cicd` ns — **DEPLOYED** (v0.4.0)
-  - [ ] Keycloak → `identity` ns — **IN PROGRESS** (`feature/infra-cluster-complete`, Codex)
+  - [~] Keycloak → `identity` ns — **PR #13 open**, live deploy post-merge
 - [ ] Configure Vault `kubernetes-app` auth mount for Ubuntu app cluster
 - [ ] ESO deploy on App cluster (remote Vault addr: `https://<mac-ip>:8200`)
 - [ ] shopping-cart-data / apps deployment on Ubuntu
