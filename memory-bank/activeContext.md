@@ -77,6 +77,12 @@ Full spec: `docs/plans/two-cluster-infra.md` — Codex reads this before startin
    - `directory` → `identity` (`scripts/etc/ldap/vars.sh`, `ldap-password-rotator.sh`)
    - `argocd` → `cicd` (`scripts/etc/argocd/vars.sh`)
 
+**Status 2026-02-28:** Namespace defaults updated (secrets/identity/cicd), `deploy_eso` installs into secrets with remote Vault helper, new `CLUSTER_ROLE` env var (infra/app) gates infra plugins, and tests were re-run:
+- `VAULT_NS=vault PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault`
+- `VAULT_NS=vault PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_eso`
+- `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_istio`
+
+
 2. **Fix hardcoded namespace strings** in:
    - `scripts/lib/test.sh` — `-n jenkins`, `-n vault`
    - `scripts/ci/check_cluster_health.sh` — `namespace="${1:-vault}"`
@@ -95,11 +101,60 @@ Full spec: `docs/plans/two-cluster-infra.md` — Codex reads this before startin
 **Must not break:** single-cluster mode, existing CLI flags, env var overrides, CI tests.
 
 **Agent workflow:**
-1. Codex implements + commits to `feature/two-cluster-infra` (does NOT open PR)
-2. Gemini reviews + runs tests (shellcheck, test_vault, test_eso, test_istio, single-cluster regression)
+1. ✅ Codex implemented — namespace renames, CLUSTER_ROLE dispatcher, _eso_configure_remote_vault (uncommitted)
+2. **Gemini: review + test** ← current step (instructions below)
 3. Claude opens PR after Gemini approves
 4. Owner approves PR
 5. Claude deploys: destroy infra cluster → redeploy with new namespaces → deploy app layer on Ubuntu
+
+---
+
+## ⚠️ Gemini Review Task — `feature/two-cluster-infra`
+
+Codex has completed implementation (changes are uncommitted locally). Gemini must:
+
+### 1. Shellcheck all modified files
+```bash
+shellcheck scripts/plugins/eso.sh scripts/plugins/vault.sh scripts/plugins/ldap.sh \
+  scripts/plugins/jenkins.sh scripts/plugins/argocd.sh \
+  scripts/lib/test.sh scripts/lib/dirservices/openldap.sh \
+  scripts/etc/vault/vars.sh scripts/etc/jenkins/vars.sh \
+  scripts/etc/ldap/vars.sh scripts/etc/argocd/vars.sh \
+  scripts/etc/ldap/ldap-password-rotator.sh \
+  scripts/ci/check_cluster_health.sh scripts/tests/run-cert-rotation-test.sh \
+  scripts/k3d-manager
+```
+
+### 2. Regression tests against existing cluster (old namespaces still in use)
+Run with old namespace overrides — existing cluster has `vault`, `jenkins`, `directory`:
+```bash
+VAULT_NS=vault PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault
+VAULT_NS=vault PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_eso
+PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_istio
+```
+All three must pass. This proves env var override backwards-compatibility.
+
+### 3. Verify ESO API version in `_eso_configure_remote_vault`
+Known issue: ESO v1 requires `external-secrets.io/v1` not `v1beta1`.
+Codex used `v1beta1` in the new SecretStore/ClusterSecretStore templates.
+Check `scripts/plugins/eso.sh` lines in `_eso_configure_remote_vault` — fix to `v1` if needed.
+Reference: `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md`
+
+### 4. Verify CLUSTER_ROLE=app skips infra plugins
+Inspect `scripts/k3d-manager` and confirm that when `CLUSTER_ROLE=app`,
+`deploy_vault`, `deploy_jenkins`, `deploy_ldap`, `deploy_argocd` are skipped.
+If gating logic is missing, flag it.
+
+### 5. Verify VAULT_ENDPOINT uses new namespace
+In `scripts/etc/vault/vars.sh`, confirm:
+```bash
+export VAULT_ENDPOINT="${VAULT_ENDPOINT:-http://vault.${VAULT_NS}.svc:8200}"
+```
+This must dynamically use `$VAULT_NS`, not hardcode `vault`.
+
+### Sign-off
+Post findings. If all checks pass, confirm ready for Claude to open PR.
+If issues found, flag them with file + line — Codex fixes, Gemini re-checks.
 
 ### Known Broken Paths (all pre-existing)
 | Path | Root Cause |
