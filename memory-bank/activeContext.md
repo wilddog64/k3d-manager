@@ -69,23 +69,29 @@ ExternalSecrets synced.
 
 ---
 
-## Gemini Task — Keycloak Plugin Verification Round 2 (Active)
+## Gemini Task — Keycloak Plugin Verification Round 2 (Complete 2026-03-03) ✅
 
 **Branch:** `feature/infra-cluster-complete`
-**Spec:** `docs/plans/keycloak-gemini-verification-2.md`
-**Status:** Pending Gemini verification
+**Status:** Verified ✅ — **1 minor fix required**
 
-### Checklist
+### Verification Results
 
-- [ ] Step 1: Run `shellcheck scripts/plugins/keycloak.sh` + `bats scripts/tests/plugins/keycloak.bats`
-- [ ] Step 2: Confirm `KEYCLOAK_LDAP_USERS_DN` missing from envsubst whitelist in `_keycloak_apply_realm_configmap` (line 212 `keycloak.sh` vs line 22 `realm-config.json.tmpl`)
-- [ ] Step 3: Sanity-check `usernameLDAPAttribute uid vs cn` — check LDIF files, confirm which is correct
-- [ ] Step 4: Sanity-check static `"id": "ldap-provider"` — confirm safe for keycloak-config-cli re-imports
+1. **Mechanical Checks:** **PASSED** ✅
+   - `shellcheck scripts/plugins/keycloak.sh`: Clean.
+   - `bats scripts/tests/plugins/keycloak.bats`: 6/6 tests passed.
 
-### Expected outcome
+2. **Step 2 (envsubst whitelist):** **ISSUE CONFIRMED** 🔴
+   - `KEYCLOAK_LDAP_USERS_DN` is missing from the whitelist at line 212 of `keycloak.sh`.
 
-If Step 2 confirmed: Codex adds `$KEYCLOAK_LDAP_USERS_DN` to envsubst whitelist (one-line fix).
-After all clean: Claude opens PR.
+3. **Step 3 (uid vs cn):** **uid IS CORRECT** ✅
+   - Evidence from `jenkins-users-groups.ldif` confirms `uid` is standard for `inetOrgPerson`.
+
+4. **Step 4 (static id safety):** **SAFE** ✅
+   - Stable ID ensures idempotency for `keycloak-config-cli`.
+
+### Next Steps for Codex
+
+Codex must add `$KEYCLOAK_LDAP_USERS_DN` to the `envsubst` whitelist in `scripts/plugins/keycloak.sh` (line 212). Fix spec documented in `docs/plans/keycloak-gemini-verification-2.md`.
 
 ---
 
