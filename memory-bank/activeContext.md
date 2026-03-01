@@ -7,6 +7,63 @@
 
 ---
 
+## ⚠️ Codex — TWO Tasks (read this first)
+
+**Branch:** `feature/two-cluster-infra`
+**PR open:** https://github.com/wilddog64/k3d-manager/pull/8 — lint PASSING, 2 review comments unresolved
+
+Fix both issues below, commit, push to `feature/two-cluster-infra`. Do NOT touch any other files.
+
+---
+
+### Task A — P1: `_cleanup_cert_rotation_test` uses out-of-scope `jenkins_ns`
+
+**File:** `scripts/lib/test.sh`
+
+**Problem:** `_cleanup_cert_rotation_test()` (line 1060) references `${jenkins_ns}`, but
+`jenkins_ns` is a `local` variable in the calling function `test_cert_rotation`. When
+the EXIT trap fires, `jenkins_ns` is out of scope — under `set -u` this is an
+unbound-variable error and cleanup fails.
+
+**Fix:** In `_cleanup_cert_rotation_test`, replace `"${jenkins_ns}"` with
+`"${JENKINS_NAMESPACE:-cicd}"` — the same expression used to define `jenkins_ns`
+in the calling function.
+
+**Exact change:**
+```
+# Before (line 1062):
+  _kubectl delete job test-cert-rotation -n "${jenkins_ns}" 2>/dev/null || true
+
+# After:
+  _kubectl delete job test-cert-rotation -n "${JENKINS_NAMESPACE:-cicd}" 2>/dev/null || true
+```
+
+---
+
+### Task B — P2: `deploy_eso` passes wrong namespace to remote SecretStore
+
+**File:** `scripts/plugins/eso.sh`
+
+**Problem:** When `REMOTE_VAULT_ADDR` is set, `deploy_eso` calls
+`_eso_configure_remote_vault` passing `${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ESO_NAMESPACE:-secrets}}`
+as the service-account namespace (line 101). This ignores the actual `$ns` arg that
+`deploy_eso` was called with. If `deploy_eso custom-ns` is called without exporting
+`ESO_NAMESPACE`, the SecretStore points at `secrets` instead of `custom-ns`.
+
+**Fix:** Replace `${ESO_NAMESPACE:-secrets}` with `$ns` in the fallback so the
+installed namespace is used when `ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE` is not set.
+
+**Exact change:**
+```
+# Before (line 101):
+      "${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ESO_NAMESPACE:-secrets}}"
+
+# After:
+      "${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ns}}"
+```
+
+---
+
 ## ✅ test_auth_cleanup.bats — FIXED (2026-03-02)
 
 **PR #8:** `lint` CI is now **PASSING** (commit `4ab40ad`).
