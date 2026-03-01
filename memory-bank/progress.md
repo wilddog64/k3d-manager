@@ -108,3 +108,6 @@ Write articles as milestones are reached. Each post builds on the last.
 | shellcheck warnings in refactored code | FIXED | 2026-03-01: All warnings resolved or suppressed with reason (verified by Gemini). |
 | GitGuardian: 1 internal secret incident (2026-02-28) | OPEN | No real secrets — likely IPs in docs. Mark false positive in dashboard. See `docs/issues/2026-02-28-gitguardian-internal-ip-addresses-in-docs.md`. |
 | `test_auth_cleanup.bats` regression | FIXED | 2026-03-02: Codex had added `VAULT_NS=vault VAULT_RELEASE=vault` to all sub-calls. Claude removed them from all 7 sub-calls (only first call keeps `VAULT_NS=vault`). Lint CI now passing on PR #8 (commit `4ab40ad`). |
+| `deploy_vault` ignores `VAULT_NS` env var | FIXED | 2026-03-02: `ns` in `deploy_vault` now initializes from `${VAULT_NS:-$VAULT_NS_DEFAULT}` (commit `4c1a407`). |
+| `_cleanup_cert_rotation_test` uses out-of-scope `jenkins_ns` | OPEN | P1: `jenkins_ns` is local in calling fn, unbound under `set -u` when EXIT trap fires. Fix: use `${JENKINS_NAMESPACE:-cicd}` directly in cleanup fn. Codex task in activeContext.md. |
+| `deploy_eso` remote SecretStore uses wrong namespace | OPEN | P2: passes `${ESO_NAMESPACE:-secrets}` instead of `$ns` to `_eso_configure_remote_vault`. Fix: use `${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ns}}`. Codex task in activeContext.md. |
