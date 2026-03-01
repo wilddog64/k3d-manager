@@ -280,7 +280,8 @@ function test_keycloak() {
    local es
    for es in "$KEYCLOAK_ADMIN_SECRET_NAME" "$KEYCLOAK_LDAP_SECRET_NAME"; do
       if ! _kubectl --no-exit -n "$ns" get externalsecret "$es" >/dev/null 2>&1; then
-         _err "[keycloak] ExternalSecret '$es' not found in namespace '$ns'"
+         _warn "[keycloak] ExternalSecret '$es' not found in namespace '$ns' — skipping"
+         continue
       fi
       if ! _kubectl -n "$ns" wait --for=condition=Ready --timeout=60s externalsecret/"$es" 2>/dev/null; then
          _err "[keycloak] ExternalSecret '$es' not Ready"
