@@ -71,20 +71,49 @@ ExternalSecrets synced.
 
 ---
 
-## Codex Fix Task — PR #13 Copilot Review (Active)
+## Codex Fix Task — PR #13 Copilot Review (COMPLETE ✅)
 
 **Branch:** `feature/infra-cluster-complete`
 **Spec:** `docs/plans/keycloak-pr13-codex-fixes.md`
-**Status:** Pending Codex implementation
+**Commit:** `f0e5f44`
+**Status:** All 3 fixes applied (shellcheck PASS, bats 6/6)
+
+---
+
+## Codex Fix Task — YAML Password Quoting (Active)
+
+**Branch:** `feature/infra-cluster-complete`
+**Status:** Pending Codex fix
 **PR:** https://github.com/wilddog64/k3d-manager/pull/13
 
-### Fixes Required (3 across 2 files)
+### Issue — P2: Unquoted password value in `_keycloak_ensure_admin_secret` heredoc
 
-| Fix | Severity | File | Change |
-|---|---|---|---|
-| 1 | P1 | `keycloak.sh` | When `--enable-vault` not set, create `keycloak-admin-secret` directly via `kubectl` so `auth.existingSecret` is always satisfied |
-| 2 | P1 | `keycloak.sh` + `values.yaml.tmpl` | Add `$KEYCLOAK_CONFIG_CLI_ENABLED` variable; set `false` by default, `true` only when `--enable-ldap` is active |
-| 3 | P2 | `keycloak.sh` | Hoist SecretStore + Vault policy creation to run when `enable_vault || enable_ldap`; keep only ExternalSecret-admin inside `enable_vault` |
+**File:** `scripts/plugins/keycloak.sh` — `_keycloak_ensure_admin_secret` function
+
+The password is generated with charset `A-Za-z0-9!@#%^&*` and written into a YAML
+heredoc as an unquoted plain scalar:
+
+```yaml
+stringData:
+  ${KEYCLOAK_ADMIN_PASSWORD_KEY}: ${password}
+```
+
+YAML plain scalars cannot start with `!`, `#`, `%`, `&`, or `*` — all present in the
+charset. If the generated password starts with any of these (~9% probability), kubectl
+rejects the YAML with a parse error. This is an intermittent silent failure on
+non-Vault deploys.
+
+### Fix — One line change
+
+**File:** `scripts/plugins/keycloak.sh` line 193
+
+```bash
+# Before:
+  ${KEYCLOAK_ADMIN_PASSWORD_KEY}: ${password}
+
+# After:
+  ${KEYCLOAK_ADMIN_PASSWORD_KEY}: "${password}"
+```
 
 ### Verification
 
@@ -92,6 +121,8 @@ ExternalSecrets synced.
 shellcheck scripts/plugins/keycloak.sh
 PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats
 ```
+
+Both must pass. Push to `feature/infra-cluster-complete` — PR #13 picks up automatically.
 
 Push to `feature/infra-cluster-complete` — PR #13 picks up automatically.
 
