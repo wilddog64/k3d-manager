@@ -30,6 +30,72 @@ Codex needs to fix stale cluster-dump manifests and add Vault secret seeding.
 
 ---
 
+## Gemini Verification Task — ArgoCD Phase 1 (Pending)
+
+**Branch:** `feature/argocd-phase1`
+**Commit to verify:** `aed5e68` (feat(argocd): clean manifests and seed admin secret)
+**Status:** Awaiting Gemini verification
+
+### What Codex changed (Gemini must verify each item)
+
+1. **`scripts/etc/argocd/projects/platform.yaml.tmpl`** (new file, old `.yaml` deleted)
+   - Namespace field is `${ARGOCD_NAMESPACE}` (not hardcoded `argocd`)
+   - Destinations: `secrets`, `cicd`, `identity`, `istio-system`, `default` — no old names
+
+2. **`scripts/etc/argocd/applicationsets/{platform-helm,services-git,demo-rollout}.yaml`**
+   - No Kubernetes server metadata (`resourceVersion`, `uid`, `creationTimestamp`, `status`)
+   - `namespace: cicd` (not `argocd`)
+   - GitHub org `wilddog64/k3d-manager` (not `your-org`)
+
+3. **`scripts/plugins/argocd.sh` — `_argocd_deploy_appproject`**
+   - Uses `envsubst '$ARGOCD_NAMESPACE' < "$appproject_tmpl" | _kubectl apply -f -`
+   - Falls back correctly when template is missing
+
+4. **`scripts/plugins/argocd.sh` — `_argocd_seed_vault_admin_secret`**
+   - Checks whether secret path exists before writing
+   - Called inside `deploy_argocd --enable-vault` BEFORE `externalsecret-admin` is applied
+
+5. **`scripts/tests/plugins/argocd.bats`** — new suite, 6 tests
+
+### Verification commands Gemini must run
+
+```bash
+# On branch feature/argocd-phase1
+git checkout feature/argocd-phase1
+
+# 1. Shellcheck
+shellcheck scripts/plugins/argocd.sh
+
+# 2. Bats suite
+PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/argocd.bats
+
+# 3. Sanity checks
+grep 'ARGOCD_NAMESPACE' scripts/etc/argocd/vars.sh | head -1
+# Expected: export ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-cicd}"
+
+grep 'namespace:' scripts/etc/argocd/projects/platform.yaml.tmpl
+# Expected: namespace: ${ARGOCD_NAMESPACE}
+
+grep 'namespace:' scripts/etc/argocd/applicationsets/platform-helm.yaml
+# Expected: namespace: cicd (in metadata AND template destination)
+
+grep 'wilddog64' scripts/etc/argocd/applicationsets/services-git.yaml
+# Expected: 2 occurrences (generator repoURL + template source repoURL)
+```
+
+### Known minor issue (Gemini to assess)
+
+`_argocd_deploy_appproject` sets both `trap ... EXIT` (line 481) and `trap ... RETURN`
+(line 484). Other plugins use only `EXIT`. The RETURN trap is redundant but harmless.
+Gemini to decide: fix before PR or accept as-is?
+
+### Expected sign-off
+
+Gemini to update this block with PASS/FAIL for each item and overall verdict.
+If any item FAILS, Gemini to write a Codex fix spec in this block before handing back.
+
+---
+
 ## Cluster State (as of 2026-03-01)
 
 ### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-cluster`)
