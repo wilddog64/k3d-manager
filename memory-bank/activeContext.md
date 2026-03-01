@@ -15,8 +15,9 @@ ExternalSecrets synced.
 
 **Part B (Codex):** ✅ DONE — `deploy_keycloak` plugin committed (`7cc0ca9`).
 
-**Part C (Gemini):** Verify Keycloak plugin — shellcheck + bats + confirm 7 suspected
-issues found by Claude. Spec: `docs/plans/keycloak-gemini-verification.md`
+**Part C (Gemini):** ✅ DONE — 7/7 issues confirmed. shellcheck PASS. bats 6/6.
+
+**Part D (Codex):** Apply 7 fixes. Spec: `docs/plans/keycloak-codex-fixes.md`
 
 **2026-03-03 Update (Codex):**
 - Added `scripts/plugins/keycloak.sh` with `deploy_keycloak`, Vault/ESO helpers,
@@ -35,43 +36,54 @@ issues found by Claude. Spec: `docs/plans/keycloak-gemini-verification.md`
 
 ---
 
-## Gemini Task — Keycloak Plugin Verification (Active)
+## Gemini Task — Keycloak Plugin Verification (Complete 2026-03-02) ✅
 
 **Branch:** `feature/infra-cluster-complete`
-**Spec:** `docs/plans/keycloak-gemini-verification.md`
-**Status:** Pending Gemini verification
+**Status:** Verified ✅ — **All 7 suspected issues CONFIRMED**
 
-### Your Tasks
+### Verification Results
 
-1. Run mechanical checks:
+1. **Mechanical Checks:** **PASSED** ✅
+   - `shellcheck scripts/plugins/keycloak.sh`: Clean.
+   - `bats scripts/tests/plugins/keycloak.bats`: 6/6 tests passed.
+
+2. **Issue Confirmation:** **ALL CONFIRMED** 🔴
+   - Issue 1: `_keycloak_apply_realm_configmap` is indeed called unconditionally.
+   - Issue 2: `VAULT_VARS_FILE` is missing from the header.
+   - Issue 3: `realm-config.json.tmpl` uses key names (`LDAP_BIND_DN`) instead of actual values.
+   - Issue 4: Uses legacy `userFederationProviders` (deprecated since KC 17).
+   - Issue 5: `KEYCLOAK_USER` mapped to the password secret key.
+   - Issue 6: `KEYCLOAK_IMPORT` conflicts with `keycloakConfigCli`.
+   - Issue 7: VirtualService has hardcoded namespace and gateway.
+
+---
+
+## Codex Fix Task — Keycloak Plugin (Active)
+
+**Branch:** `feature/infra-cluster-complete`
+**Spec:** `docs/plans/keycloak-codex-fixes.md`
+**Status:** Pending Codex implementation
+
+### Fixes Required (7 across 5 files)
+
+| Fix | File | Change |
+|---|---|---|
+| 1 | `keycloak.sh` | Add `VAULT_VARS_FILE` source to header |
+| 2 | `keycloak.sh` | Move `_keycloak_apply_realm_configmap` inside `enable_ldap` block |
+| 3 | `keycloak.sh` | Update `_keycloak_apply_realm_configmap` to read LDAP password from K8s secret |
+| 4 | `vars.sh` | Add `KEYCLOAK_LDAP_BIND_DN`, `KEYCLOAK_LDAP_USERS_DN`, `KEYCLOAK_VIRTUALSERVICE_GATEWAY` |
+| 5 | `realm-config.json.tmpl` | Rewrite to modern Keycloak 17+ `components` format |
+| 6 | `values.yaml.tmpl` | Remove legacy `KEYCLOAK_IMPORT`; fix `KEYCLOAK_USER` to literal username |
+| 7 | `virtualservice.yaml.tmpl` | Parameterize namespace (`${KEYCLOAK_NAMESPACE}`) and gateway |
+
+### Verification
+
 ```bash
 shellcheck scripts/plugins/keycloak.sh
 PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats
 ```
 
-2. Confirm or deny each of the 7 suspected issues in the spec.
-
-3. Write exact before/after Codex fix diffs for all confirmed issues.
-
-4. Update `docs/plans/keycloak-gemini-verification.md` with findings and sign off.
-
-### Suspected Issues Summary
-
-| # | Severity | File | Issue |
-|---|---|---|---|
-| 1 | P1 | `keycloak.sh:108` | `_keycloak_apply_realm_configmap` called unconditionally (should be inside `--enable-ldap`) |
-| 2 | P1 | `keycloak.sh` header | Missing `VAULT_VARS_FILE` source — `VAULT_ENDPOINT` will be empty |
-| 3 | P1 | `realm-config.json.tmpl:25-26` | `bindDn`/`bindCredential` set to secret key NAMES, not values |
-| 4 | P1 | `realm-config.json.tmpl:7` | `userFederationProviders` is deprecated Keycloak <17 format |
-| 5 | P2 | `values.yaml.tmpl:29-33` | `KEYCLOAK_USER` mapped to password secretKeyRef, not username |
-| 6 | P2 | `values.yaml.tmpl:10-19` | `KEYCLOAK_IMPORT` env var conflicts with `keycloakConfigCli` |
-| 7 | Minor | `virtualservice.yaml.tmpl:5,10` | Namespace and gateway hardcoded, not parameterized |
-
-### Do NOT
-
-- Fix code yourself
-- Open a PR
-- Push commits (Codex pushes after fixes)
+Both must pass. Do not open a PR — Claude opens after fixes.
 
 ---
 
