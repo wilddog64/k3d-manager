@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 # scripts/lib/dirservices/openldap.sh
 # OpenLDAP directory service provider implementation
 
@@ -6,7 +7,7 @@
 # Args: namespace, release, [vault_ns, vault_release]
 # Returns: 0 on success
 function _dirservice_openldap_init() {
-   local namespace="${1:-${LDAP_NAMESPACE:-directory}}"
+   local namespace="${1:-${LDAP_NAMESPACE:-identity}}"
    local release="${2:-${LDAP_RELEASE:-openldap}}"
    local vault_ns="${3:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    local vault_release="${4:-${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}}"
@@ -103,7 +104,7 @@ function _dirservice_openldap_generate_env_vars() {
    # This matches the current values.yaml format
    cat > "$output_file" <<EOF
 - name: LDAP_URL
-  value: "ldap://openldap.directory.svc.cluster.local:389"
+  value: "ldap://openldap.identity.svc.cluster.local:389"
 - name: LDAP_BASE_DN
   valueFrom:
     secretKeyRef:
@@ -219,9 +220,9 @@ function _dirservice_openldap_config() {
    cat <<EOF
 Provider: OpenLDAP
 Type: Self-hosted LDAP directory
-Namespace: ${LDAP_NAMESPACE:-directory}
+Namespace: ${LDAP_NAMESPACE:-identity}
 Release: ${LDAP_RELEASE:-openldap}
-URL: ${LDAP_URL:-ldap://openldap.directory.svc.cluster.local:389}
+URL: ${LDAP_URL:-ldap://openldap.identity.svc.cluster.local:389}
 Base DN: ${LDAP_BASEDN:-dc=example,dc=org}
 EOF
    return 0

@@ -1,7 +1,7 @@
 # Argo CD configuration variables
 
 # Namespace and Helm configuration
-export ARGOCD_NAMESPACE="argocd"
+export ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-cicd}"
 export ARGOCD_HELM_RELEASE="argocd"
 export ARGOCD_HELM_REPO_NAME="argo"
 export ARGOCD_HELM_REPO_URL="https://argoproj.github.io/argo-helm"
@@ -17,7 +17,7 @@ export ARGOCD_VIRTUALSERVICE_HOST="${ARGOCD_VIRTUALSERVICE_HOST:-argocd.dev.loca
 export ARGOCD_VIRTUALSERVICE_GATEWAY="${ARGOCD_VIRTUALSERVICE_GATEWAY:-istio-system/default-gateway}"
 
 # LDAP/Dex configuration (for LDAP authentication)
-export ARGOCD_LDAP_HOST="${ARGOCD_LDAP_HOST:-openldap-openldap-bitnami.directory.svc.cluster.local}"
+export ARGOCD_LDAP_HOST="${ARGOCD_LDAP_HOST:-openldap-openldap-bitnami.identity.svc.cluster.local}"
 export ARGOCD_LDAP_PORT="${ARGOCD_LDAP_PORT:-389}"
 export ARGOCD_LDAP_BASE_DN="${ARGOCD_LDAP_BASE_DN:-dc=home,dc=org}"
 export ARGOCD_LDAP_BIND_DN="${ARGOCD_LDAP_BIND_DN:-cn=ldap-admin,dc=home,dc=org}"

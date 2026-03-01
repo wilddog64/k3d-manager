@@ -135,6 +135,9 @@ Cluster provider:
 
 Subcommands:
   test [options] ${test_suites}   Run BATS tests (see "test --help")
+
+Environment variables:
+  CLUSTER_ROLE=infra|app   Select deployment profile (default: infra)
 EOF
 }
 

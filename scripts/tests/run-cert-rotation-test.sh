@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC1091
 # Quick-start script for certificate rotation testing on Ubuntu/k3s
 # Usage: ./scripts/tests/run-cert-rotation-test.sh
 
@@ -6,6 +7,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+JENKINS_NAMESPACE="${JENKINS_NAMESPACE:-cicd}"
+VAULT_NAMESPACE="${VAULT_NAMESPACE:-secrets}"
 
 echo "==================================================================="
 echo "Certificate Rotation Validation Test - Quick Start"
@@ -121,7 +124,7 @@ echo "==================================================================="
 echo "Step 5: Verifying CronJob deployment"
 echo "==================================================================="
 
-kubectl get cronjob jenkins-cert-rotator -n jenkins
+kubectl get cronjob jenkins-cert-rotator -n "${JENKINS_NAMESPACE}"
 
 echo ""
 echo "✅ CronJob deployed with schedule: */2 * * * *"
@@ -132,17 +135,17 @@ echo "==================================================================="
 echo "Step 6: Running manual rotation test"
 echo "==================================================================="
 
-kubectl create job manual-cert-test --from=cronjob/jenkins-cert-rotator -n jenkins
+kubectl create job manual-cert-test --from=cronjob/jenkins-cert-rotator -n "${JENKINS_NAMESPACE}"
 
 echo ""
 echo "Waiting for job to complete..."
 sleep 5
 
-kubectl logs -n jenkins job/manual-cert-test -f 2>/dev/null || true
+kubectl logs -n "${JENKINS_NAMESPACE}" job/manual-cert-test -f 2>/dev/null || true
 
 echo ""
 echo "Job status:"
-kubectl get job manual-cert-test -n jenkins
+kubectl get job manual-cert-test -n "${JENKINS_NAMESPACE}"
 
 echo ""
 echo "✅ Manual test completed"
@@ -165,13 +168,13 @@ echo ""
 echo "To monitor rotation, run these commands in separate terminals:"
 echo ""
 echo "Terminal 1 - Watch CronJob executions:"
-echo "  watch -n 10 'kubectl get jobs -n jenkins --sort-by=.metadata.creationTimestamp | tail -5'"
+echo "  watch -n 10 'kubectl get jobs -n ${JENKINS_NAMESPACE} --sort-by=.metadata.creationTimestamp | tail -5'"
 echo ""
 echo "Terminal 2 - Watch for new rotation job:"
-echo "  kubectl get jobs -n jenkins -w"
+echo "  kubectl get jobs -n ${JENKINS_NAMESPACE} -w"
 echo ""
 echo "When a new job appears (after ~6 minutes), check its logs:"
-echo "  kubectl logs -n jenkins job/jenkins-cert-rotator-<timestamp> -f"
+echo "  kubectl logs -n ${JENKINS_NAMESPACE} job/jenkins-cert-rotator-<timestamp> -f"
 echo ""
 echo "Expected log output when rotation occurs:"
 echo "  [INFO] Certificate expires in XXs (threshold 300s); rotating"
@@ -202,7 +205,7 @@ fi
 OLD_SERIAL_NORM=$(echo $INITIAL_SERIAL | tr -d ':' | tr '[:lower:]' '[:upper:]')
 echo ""
 echo "Checking Vault for revoked certificate..."
-kubectl exec -n vault vault-0 -- vault list pki/certs/revoked | grep -i "$OLD_SERIAL_NORM" \
+kubectl exec -n "${VAULT_NAMESPACE}" vault-0 -- vault list pki/certs/revoked | grep -i "$OLD_SERIAL_NORM" \
   && echo "✅ Old certificate revoked in Vault" \
   || echo "⚠️  Old certificate not found in revoked list"
 VERIFY_SCRIPT

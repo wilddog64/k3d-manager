@@ -1,4 +1,4 @@
-export LDAP_NAMESPACE="${LDAP_NAMESPACE:-directory}"
+export LDAP_NAMESPACE="${LDAP_NAMESPACE:-identity}"
 
 export LDAP_PORT="${LDAP_PORT:-389}"
 export LDAP_TLS="${LDAP_TLS:-636}"
