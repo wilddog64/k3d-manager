@@ -17,7 +17,9 @@ ExternalSecrets synced.
 
 **Part C (Gemini):** ✅ DONE — 7/7 issues confirmed. shellcheck PASS. bats 6/6.
 
-**Part D (Codex):** Apply 7 fixes. Spec: `docs/plans/keycloak-codex-fixes.md`
+**Part D (Codex):** ✅ DONE — 7 fixes applied (commit `03fca04`).
+
+**Part E (Gemini):** Pending Gemini round 2. Spec: `docs/plans/keycloak-gemini-verification-2.md`
 
 **2026-03-03 Update (Codex):**
 - Added `scripts/plugins/keycloak.sh` with `deploy_keycloak`, Vault/ESO helpers,
@@ -58,32 +60,32 @@ ExternalSecrets synced.
 
 ---
 
-## Codex Fix Task — Keycloak Plugin (Active)
+## Codex Fix Task — Keycloak Plugin (COMPLETE ✅)
 
 **Branch:** `feature/infra-cluster-complete`
 **Spec:** `docs/plans/keycloak-codex-fixes.md`
-**Status:** Pending Codex implementation
+**Commit:** `03fca04`
+**Status:** All 7 fixes applied and verified (shellcheck PASS, bats 6/6)
 
-### Fixes Required (7 across 5 files)
+---
 
-| Fix | File | Change |
-|---|---|---|
-| 1 | `keycloak.sh` | Add `VAULT_VARS_FILE` source to header |
-| 2 | `keycloak.sh` | Move `_keycloak_apply_realm_configmap` inside `enable_ldap` block |
-| 3 | `keycloak.sh` | Update `_keycloak_apply_realm_configmap` to read LDAP password from K8s secret |
-| 4 | `vars.sh` | Add `KEYCLOAK_LDAP_BIND_DN`, `KEYCLOAK_LDAP_USERS_DN`, `KEYCLOAK_VIRTUALSERVICE_GATEWAY` |
-| 5 | `realm-config.json.tmpl` | Rewrite to modern Keycloak 17+ `components` format |
-| 6 | `values.yaml.tmpl` | Remove legacy `KEYCLOAK_IMPORT`; fix `KEYCLOAK_USER` to literal username |
-| 7 | `virtualservice.yaml.tmpl` | Parameterize namespace (`${KEYCLOAK_NAMESPACE}`) and gateway |
+## Gemini Task — Keycloak Plugin Verification Round 2 (Active)
 
-### Verification
+**Branch:** `feature/infra-cluster-complete`
+**Spec:** `docs/plans/keycloak-gemini-verification-2.md`
+**Status:** Pending Gemini verification
 
-```bash
-shellcheck scripts/plugins/keycloak.sh
-PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats
-```
+### Checklist
 
-Both must pass. Do not open a PR — Claude opens after fixes.
+- [ ] Step 1: Run `shellcheck scripts/plugins/keycloak.sh` + `bats scripts/tests/plugins/keycloak.bats`
+- [ ] Step 2: Confirm `KEYCLOAK_LDAP_USERS_DN` missing from envsubst whitelist in `_keycloak_apply_realm_configmap` (line 212 `keycloak.sh` vs line 22 `realm-config.json.tmpl`)
+- [ ] Step 3: Sanity-check `usernameLDAPAttribute uid vs cn` — check LDIF files, confirm which is correct
+- [ ] Step 4: Sanity-check static `"id": "ldap-provider"` — confirm safe for keycloak-config-cli re-imports
+
+### Expected outcome
+
+If Step 2 confirmed: Codex adds `$KEYCLOAK_LDAP_USERS_DN` to envsubst whitelist (one-line fix).
+After all clean: Claude opens PR.
 
 ---
 
