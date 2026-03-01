@@ -190,7 +190,7 @@ metadata:
   namespace: ${KEYCLOAK_NAMESPACE}
 type: Opaque
 stringData:
-  ${KEYCLOAK_ADMIN_PASSWORD_KEY}: ${password}
+  ${KEYCLOAK_ADMIN_PASSWORD_KEY}: "${password}"
 EOF
 }
 
