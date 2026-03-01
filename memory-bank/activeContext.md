@@ -87,113 +87,76 @@ v0.5.0: Keycloak plugin — **PR #13 open**, all fixes applied, awaiting owner m
 
 ---
 
-## Codex Fix Task — Keycloak Image Pull Failure (Round 2)
+## Gemini Task — Keycloak Image Registry Investigation
 
 **Branch:** `fix/keycloak-image-fix-task`
-**Status:** Pending Codex
+**Status:** Pending Gemini
+**Assigned:** Gemini (interactive, can run commands locally)
 
 ### Background — What Was Tried
 
-- **Round 1:** `docker.io/bitnami/keycloak` → "no such manifest" — Bitnami stopped
-  publishing to Docker Hub entirely.
-- **Round 2 (Codex, 2026-03-04):** Switched to `public.ecr.aws/bitnami/*`. Manifests
-  exist there but are `linux/amd64` only. k3d on Apple Silicon (`linux/arm64`) cannot
-  pull them. Deploy still fails with `ImagePullBackOff`. **Codex committed despite the
-  live deploy failing — this violated the task spec and must not happen again.**
+| Round | Registry | Result |
+|---|---|---|
+| 1 | `docker.io/bitnami/*` | "no such manifest" — Bitnami abandoned Docker Hub |
+| 2 (Codex) | `public.ecr.aws/bitnami/*` | Manifests exist but **amd64-only** — fails on Apple Silicon |
+| 3 (Codex) | `ghcr.io/bitnami/*` | "manifest unknown" — GHCR tags not found |
 
-### Issue
+### Problem
 
-The cluster runs on Apple Silicon (arm64). The image registry must provide
-**multi-arch manifests** (arm64 + amd64). `public.ecr.aws/bitnami/*` is amd64-only.
+The cluster runs on Apple Silicon (`linux/arm64`). We need a registry that
+publishes **multi-arch** (arm64 + amd64) Bitnami Keycloak images. Three registries
+have been exhausted without success.
 
-### Fix
+### Gemini Investigation Steps
 
-**File:** `scripts/etc/keycloak/values.yaml.tmpl`
-
-Replace the three `registry: public.ecr.aws` stanzas with `registry: ghcr.io`:
-
-```yaml
-image:
-  registry: ghcr.io
-
-keycloakConfigCli:
-  image:
-    registry: ghcr.io
-
-postgresql:
-  image:
-    registry: ghcr.io
-```
-
-`ghcr.io/bitnami/*` images are multi-arch (arm64 + amd64) and are the canonical
-replacement for Docker Hub.
-
-### Verification — Codex MUST follow these steps exactly, in order
-
-**Step 1 — Confirm arm64 support before touching any code:**
+**Step 1 — Let the chart reveal its own registry:**
 
 ```bash
-docker manifest inspect ghcr.io/bitnami/keycloak:latest | grep -i arm64
-docker manifest inspect ghcr.io/bitnami/postgresql:latest | grep -i arm64
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+helm show values bitnami/keycloak | grep -A3 -E "^\s*(image|registry):"
 ```
 
-Both commands must print at least one `linux/arm64` entry. If either returns no
-arm64 entry or fails — **STOP. Do not change any code. Update this section with
-the exact output and wait for Claude to diagnose.**
+The chart's default values will show exactly which registry Bitnami currently
+ships images to. Record the output here.
 
-**Step 2 — Apply the fix:**
-
-Change the three `registry:` lines in `scripts/etc/keycloak/values.yaml.tmpl`
-from `public.ecr.aws` to `ghcr.io`.
-
-**Step 3 — Static checks:**
+**Step 2 — Verify arm64 support on whatever registry Step 1 reveals:**
 
 ```bash
-shellcheck scripts/plugins/keycloak.sh
-PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats
+docker manifest inspect <registry>/<repo>/keycloak:<tag> | python3 -m json.tool | grep -A2 '"architecture"'
 ```
 
-Both must pass. If either fails — **STOP. Do not proceed to live deploy.**
+Confirm at least one entry shows `"architecture": "arm64"`. Record the full
+manifest platform list.
 
-**Step 4 — Live deploy (mandatory gate):**
+**Step 3 — Check the chart's `global.imageRegistry` override mechanism:**
 
 ```bash
-./scripts/k3d-manager deploy_keycloak --enable-ldap --enable-vault
+helm show values bitnami/keycloak | grep -A5 "global:"
 ```
 
-Required outcomes:
-- `keycloak-0` reaches `Running` (no `ImagePullBackOff`)
-- `keycloak-postgresql-0` reaches `Running`
-- `keycloak-keycloak-config-cli` Job completes (exit 0)
-- Helm install exits 0
+Some Bitnami charts support a single `global.imageRegistry` override that applies
+to all sub-charts (keycloak + postgresql + configCli). If available, prefer this
+over three separate `registry:` stanzas.
 
-**If the deploy fails for any reason — STOP. Do not commit. Update this section
-with the exact error output and wait for Claude to diagnose. Do not rationalise a
-partial fix as "ready for other architectures" or similar.**
+**Step 4 — Write the fix spec**
 
-**Step 5 — Smoke test:**
+Once the correct registry and override mechanism are confirmed, update this section
+with:
+- The registry name and sample tag
+- The exact YAML change needed in `values.yaml.tmpl`
+- Confirmation that arm64 manifests are present
 
-```bash
-./scripts/k3d-manager test_keycloak
-```
-
-All checks must pass.
-
-**Step 6 — Commit only after Steps 1–5 all pass:**
-
-```bash
-git add scripts/etc/keycloak/values.yaml.tmpl memory-bank/
-git commit -m "fix(keycloak): switch image registry to ghcr.io for arm64 support"
-```
-
-Update this section with the actual output of Steps 1–5 in the commit message.
+Then write a Codex task block (replacing this Gemini task) with the verified fix
+and the standard 5-step verification gates (shellcheck → bats → live deploy →
+smoke test → commit).
 
 ---
 
 ## Open Items
 
 - [x] Owner merges PR #13 → v0.5.0 ✅
-- [ ] Keycloak image pin fix + `test_keycloak` smoke test (Codex — `fix/keycloak-image-pin`)
+- [ ] Keycloak image registry investigation (Gemini — `fix/keycloak-image-fix-task`)
 - [ ] Keycloak live deploy — owner runs `deploy_keycloak --enable-ldap --enable-vault` after image fix
 - [ ] `configure_vault_app_auth` — `feature/app-cluster-deploy` (Codex)
 - [ ] App layer deploy on Ubuntu (Gemini — SSH interactive)
