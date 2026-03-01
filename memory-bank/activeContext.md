@@ -182,3 +182,34 @@ Context `k3d-automation` is dead (old cluster, port gone — ignore).
 - 1 required PR approval, stale review dismissal, enforce admins disabled
 - Required status checks: `lint` (Stage 1) and `stage2` (Stage 2)
 - Tag: `@copilot` in PR body for automated review
+
+---
+
+## Agent Workflow (canonical)
+
+```
+Claude
+  └── monitors CI / reviews Gemini reports for accuracy
+  └── opens PR on owner go-ahead
+  └── when CI fails: identifies root cause → writes bug report → hands to Gemini
+  └── does NOT write fix instructions directly to Codex
+
+Gemini
+  └── receives bug report from Claude
+  └── verifies root cause is correct (runs tests locally)
+  └── writes Codex instructions with exact fix spec
+  └── updates memory-bank with Codex task block
+
+Codex
+  └── reads memory-bank Codex task block (written by Gemini)
+  └── implements fix, commits, pushes
+  └── does NOT open PRs
+
+Owner
+  └── approves PR
+```
+
+**Lesson learned (2026-03-01):** Claude wrote Codex fix instructions directly,
+which caused Codex to apply an over-broad fix (VAULT_RELEASE=vault on all calls
+instead of just the first). Bug reports should always go through Gemini for
+verification before Codex gets a fix spec.
