@@ -89,7 +89,7 @@ v0.5.0: Keycloak plugin — **PR #13 open**, all fixes applied, awaiting owner m
 
 ## Codex Fix Task — Keycloak Image Pull Failure (Active)
 
-**Branch:** new branch off `main` — e.g. `fix/keycloak-image-pin`
+**Branch:** `fix/keycloak-image-fix-task`
 **Status:** Pending Codex
 
 ### Issue — P1: `bitnami/keycloak:26.3.3-debian-12-r0` not found on Docker Hub
