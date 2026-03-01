@@ -87,10 +87,80 @@ v0.5.0: Keycloak plugin — **PR #13 open**, all fixes applied, awaiting owner m
 
 ---
 
+## Codex Fix Task — Keycloak Image Pull Failure (Active)
+
+**Branch:** new branch off `main` — e.g. `fix/keycloak-image-pin`
+**Status:** Pending Codex
+
+### Issue — P1: `bitnami/keycloak:26.3.3-debian-12-r0` not found on Docker Hub
+
+Live deploy failed with `ImagePullBackOff` on all 3 pods (keycloak-0,
+keycloak-postgresql-0, keycloak-keycloak-config-cli). The latest
+`bitnami/keycloak` Helm chart resolves to image tag `26.3.3-debian-12-r0`
+which does not exist on `docker.io`.
+
+### Fix
+
+**File:** `scripts/etc/keycloak/vars.sh`
+
+Find the last known-good Bitnami Keycloak Helm chart version where the image
+is actually published on Docker Hub:
+
+```bash
+helm repo update
+helm search repo bitnami/keycloak --versions | head -20
+```
+
+Pick the most recent chart version whose app version image tag exists. Then
+pin it in `vars.sh`:
+
+```bash
+# Before:
+: "${KEYCLOAK_HELM_CHART_VERSION:=}"   # empty = latest
+
+# After (example — use actual verified version):
+: "${KEYCLOAK_HELM_CHART_VERSION:=24.4.x}"  # last chart with published image
+```
+
+And pass the version in `keycloak.sh` helm upgrade call:
+
+```bash
+# Before:
+_helm upgrade --install -n "$KEYCLOAK_NAMESPACE" "$KEYCLOAK_HELM_RELEASE" "$KEYCLOAK_HELM_CHART_REF" --values "$values_file"
+
+# After:
+local chart_version_flag=()
+[[ -n "$KEYCLOAK_HELM_CHART_VERSION" ]] && chart_version_flag=(--version "$KEYCLOAK_HELM_CHART_VERSION")
+_helm upgrade --install -n "$KEYCLOAK_NAMESPACE" "$KEYCLOAK_HELM_RELEASE" "$KEYCLOAK_HELM_CHART_REF" \
+   "${chart_version_flag[@]}" --values "$values_file"
+```
+
+### Also add: `test_keycloak` smoke test
+
+No end-to-end smoke test exists for Keycloak. Add `test_keycloak` command
+(modelled after `test_vault`/`test_eso`) to `scripts/plugins/keycloak.sh`:
+
+Minimum checks:
+1. `keycloak-0` pod is `2/2 Running` (with Istio sidecar)
+2. `keycloak-admin-secret` exists and has a non-empty password key
+3. HTTP 200 from `http://keycloak.identity.svc.cluster.local:8080/realms/master`
+   (via `kubectl exec` in a curl pod or via port-forward)
+4. ExternalSecrets `keycloak-admin-secret` + `keycloak-ldap-secret` are `Ready`
+
+### Verification
+
+```bash
+shellcheck scripts/plugins/keycloak.sh
+PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats
+```
+
+---
+
 ## Open Items
 
-- [ ] Owner merges PR #13 → v0.5.0
-- [ ] Keycloak live deploy — owner runs `deploy_keycloak --enable-ldap --enable-vault` post-merge
+- [x] Owner merges PR #13 → v0.5.0 ✅
+- [ ] Keycloak image pin fix + `test_keycloak` smoke test (Codex — `fix/keycloak-image-pin`)
+- [ ] Keycloak live deploy — owner runs `deploy_keycloak --enable-ldap --enable-vault` after image fix
 - [ ] `configure_vault_app_auth` — `feature/app-cluster-deploy` (Codex)
 - [ ] App layer deploy on Ubuntu (Gemini — SSH interactive)
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
