@@ -328,8 +328,13 @@ function _argocd_seed_vault_admin_secret() {
    password=$(LC_ALL=C tr -dc 'A-Za-z0-9!@#%^&*' </dev/urandom | head -c 24)
 
    _vault_login "$ns" "$release"
+   local rc=0
    _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
-      vault kv put "$secret_path" "${ARGOCD_ADMIN_PASSWORD_KEY}=${password}"
+      vault kv put "$secret_path" "${ARGOCD_ADMIN_PASSWORD_KEY}=${password}" || rc=$?
+   if (( rc != 0 )); then
+      _err "[argocd] Failed to seed ArgoCD admin password in Vault (exit code $rc). Check Vault status and authentication."
+      return "$rc"
+   fi
 
    _info "[argocd] ArgoCD admin password seeded. Retrieve via Kubernetes secret after ESO sync"
 }
@@ -517,7 +522,7 @@ function _argocd_deploy_applicationsets() {
       filename=$(basename "$file")
       _info "[argocd] Deploying ApplicationSet: $filename"
 
-      if _kubectl apply -f "$file" >/dev/null 2>&1; then
+      if envsubst '$ARGOCD_NAMESPACE' < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
          ((deployed_count++))
       else
          _warn "[argocd] Failed to deploy ApplicationSet: $filename"

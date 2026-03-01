@@ -26,6 +26,13 @@ Codex needs to fix stale cluster-dump manifests and add Vault secret seeding.
 - Tests: `shellcheck scripts/plugins/argocd.sh`,
   `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/argocd.bats` ✅
 
+**2026-03-03 Review Fixes:**
+- `_argocd_seed_vault_admin_secret` now checks the exit code of `vault kv put`
+  and fails fast if Vault writes do not succeed.
+- All ApplicationSet manifests parameterize `metadata.namespace` via
+  `${ARGOCD_NAMESPACE}` and `_argocd_deploy_applicationsets` renders them with
+  `envsubst` before applying.
+
 **Codex task spec:** `docs/plans/argocd-phase1-codex-task.md`
 
 ---

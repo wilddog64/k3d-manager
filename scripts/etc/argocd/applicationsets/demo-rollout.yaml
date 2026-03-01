@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
   name: demo-rollout
-  namespace: cicd
+  namespace: ${ARGOCD_NAMESPACE}
   labels:
     managed-by: k3d-manager
     app-type: demo
