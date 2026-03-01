@@ -7,57 +7,17 @@
 
 ---
 
-## ⚠️ Codex — ONE Task (read this first)
+## ✅ test_auth_cleanup.bats — FIXED (2026-03-02)
 
-**Branch:** `feature/two-cluster-infra`
-**PR open:** https://github.com/wilddog64/k3d-manager/pull/8 — `lint` CI is FAILING
+**PR #8:** `lint` CI is now **PASSING** (commit `4ab40ad`).
 
-**PREVIOUS FIX WAS WRONG — you must unstage and redo.**
+Root cause: Codex added `VAULT_NS=vault VAULT_RELEASE=vault` to ALL sub-calls.
+`VAULT_RELEASE=vault` pinned vault_release via derivation branch-1, breaking
+assertions like "user-default", "vault-derived", etc.
 
-Your staged change added `VAULT_NS=vault VAULT_RELEASE=vault` to ALL `run env`
-calls. `VAULT_RELEASE=vault` on the sub-calls (lines 237, 245, 264, 268, 280,
-291, 303) BREAKS their assertions — those calls test vault_release derivation
-from `VAULT_RELEASE_DEFAULT`/`VAULT_NS_DEFAULT` and expect outputs like
-"user-default", "vault-derived", "resourced-release", etc. Pinning
-`VAULT_RELEASE=vault` overrides that logic.
-
-**Correct fix — SURGICAL:**
-
-Change ONLY the FIRST `run env` call in test 53 (around line 205). Add
-`VAULT_NS=vault` (and NOTHING ELSE — no VAULT_RELEASE). Leave ALL other
-`run env` calls exactly as they are on main.
-
-```bash
-run env PROJECT_ROOT="$PROJECT_ROOT" \
-  VAULT_NS=vault \
-  JENKINS_VALUES_FILE="$PROJECT_ROOT/scripts/etc/jenkins/values-test.yaml" \
-  CLEANUP_LOG="$cleanup_log" AUTH_PATH_LOG="$auth_path_log" \
-  DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
-  "$script"
-```
-
-**Why this is enough:**
-- First call: `VAULT_NS=vault` sets vault_ns_from_default=0, vault_release
-  falls through to `else vault_release="vault"` — mock matches `vault-0`,
-  policies returned, no `_err`, exit 0 ✓
-- Sub-calls: they already set explicit `VAULT_NS_DEFAULT` or
-  `VAULT_RELEASE_DEFAULT` in their env — these override vault.sh's new "secrets"
-  default. Behavior is identical to main. Do NOT touch them.
-
-**Steps:**
-1. `git restore --staged scripts/tests/lib/test_auth_cleanup.bats` (unstage)
-2. Make the surgical one-line change above (VAULT_NS=vault on first call only)
-3. Commit + push to `feature/two-cluster-infra`
-
-Claude monitors CI after push.
-**Do NOT touch any other files.**
-
-**2026-03-02 Status:** After landing the VAULT_NS-only change, the suite still fails
-locally: `PATH="/opt/homebrew/bin:$PATH" source scripts/lib/system.sh && export -f _info _warn _err _no_trace && bats scripts/tests/lib/test_auth_cleanup.bats`
-stops at line 241 (`[[ "$output" == "user-default" ]]`). The helper script now
-captures `VAULT_RELEASE=vault`, so the mocked deploy log prints `vault` even when
-`VAULT_RELEASE_DEFAULT="user-default"` is set. Follow-up work is required to let
-the derivation assertions run without the explicit `VAULT_RELEASE` override.
+Fix applied by Claude: removed `VAULT_NS=vault VAULT_RELEASE=vault` from all
+7 sub-calls. Only the first `run env` call (line 205) keeps `VAULT_NS=vault`
+to satisfy the `VAULT_NS_DEFAULT=secrets` change in vault.sh.
 
 ---
 
