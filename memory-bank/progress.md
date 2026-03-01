@@ -73,16 +73,30 @@ Verified by Gemini: shellcheck clean, ESO API v1 fixed, regression tests green o
 - [x] k3d-manager app-cluster mode refactor — **VERIFIED 2026-03-01**
 - [x] PR merge to `main` — **MERGED 2026-03-01** (v0.3.0)
 - [x] Destroy old infra cluster (`test-orbstack-exists`)
-- [~] Redeploy infra cluster with new namespaces — **PARTIAL** (Jenkins fix verified, awaiting PR merge)
+- [~] Redeploy infra cluster with new namespaces — **PARTIAL** (ArgoCD + Keycloak pending)
   - [x] Vault + ESO → `secrets` ns
   - [x] OpenLDAP → `identity` ns
   - [x] Istio → `istio-system`
   - [x] Jenkins → `cicd` ns — **DEPLOYED 2026-03-01** (v0.3.1, smoke test passed)
-  - [ ] ArgoCD → `cicd` ns (no deploy command yet)
+  - [ ] ArgoCD → `cicd` ns — **IN PROGRESS** (`feature/argocd-phase1`)
   - [ ] Keycloak → `identity` ns (no deploy command yet)
 - [ ] Configure Vault `kubernetes-app` auth mount for Ubuntu app cluster
 - [ ] ESO deploy on App cluster (remote Vault addr: `https://<mac-ip>:8200`)
 - [ ] shopping-cart-data / apps deployment on Ubuntu
+
+---
+
+## What Is Pending ⏳ (continued)
+
+### Priority 2 (ArgoCD Phase 1)
+
+- [ ] `scripts/etc/argocd/projects/platform.yaml` → rename to `.tmpl`, fix namespaces, strip server metadata
+- [ ] `scripts/etc/argocd/applicationsets/` — fix `argocd` ns → `cicd`, `your-org` → `wilddog64`, strip server metadata
+- [ ] `scripts/plugins/argocd.sh` — `_argocd_deploy_appproject` update for template, add `_argocd_seed_vault_admin_secret`
+- [ ] `scripts/tests/plugins/argocd.bats` — new test suite
+- [ ] shellcheck `argocd.sh` clean
+
+**Codex task:** `docs/plans/argocd-phase1-codex-task.md` on branch `feature/argocd-phase1`
 
 ---
 
@@ -124,3 +138,4 @@ Write articles as milestones are reached. Each post builds on the last.
 | `jenkins-home-pv.yaml.tmpl` has `namespace: jenkins` hardcoded | FIXED | 2026-03-02: Template now uses `$JENKINS_NAMESPACE` and `_create_jenkins_pv_pvc` exports it before `envsubst`; verified via `bats scripts/tests/lib/test_auth_cleanup.bats` (pass) + `shellcheck scripts/plugins/jenkins.sh` (clean). **VERIFIED 2026-03-02.** |
 | `deploy_jenkins` ignores `JENKINS_NAMESPACE` env var | FIXED | 2026-03-02: Default now falls back to `${JENKINS_NAMESPACE:-jenkins}` before literal; same verification steps as above. **VERIFIED 2026-03-02.** |
 | No `scripts/tests/plugins/jenkins.bats` suite | BACKLOG | Jenkins plugin has no dedicated bats suite. `test_auth_cleanup.bats` covers auth flow. Full plugin suite (flag parsing, namespace resolution, mutual exclusivity) is a future improvement — not a gate for current work. |
+| ArgoCD manifests use stale namespace names and server metadata | IN PROGRESS | `projects/platform.yaml` and `applicationsets/*.yaml` were live cluster dumps using old v0.2.x namespaces. Fix on `feature/argocd-phase1`. |
