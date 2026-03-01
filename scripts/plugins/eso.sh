@@ -98,7 +98,7 @@ function deploy_eso() {
     _info "[eso] Configuring remote Vault SecretStore"
     _eso_configure_remote_vault "${ESO_REMOTE_SECRETSTORE_NAME:-remote-vault-store}" \
       "${ESO_REMOTE_SERVICE_ACCOUNT:-external-secrets}" \
-      "${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ESO_NAMESPACE:-secrets}}"
+      "${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ns}}"
   fi
 }
 
