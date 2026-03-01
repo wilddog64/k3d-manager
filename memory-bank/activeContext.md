@@ -148,10 +148,10 @@ postgresql:
 ### Verification (Codex ran 2026-03-01)
 1. `shellcheck scripts/plugins/keycloak.sh` ✅
 2. `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats` ✅
-3. **Live Deploy:** `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_keycloak --enable-vault --enable-ldap` ⚠️
-   - Blocked: `kubectl apply` cannot reach the cluster API (`https://127.0.0.1:65465` → `operation not permitted`) inside the sandbox, so the Helm prep never started.
-4. **Smoke Test:** `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_keycloak` ⚠️
-   - Blocked: smoke test cannot find the `keycloak` StatefulSet in `identity` because deploy_keycloak failed in step 3.
+3. **Live Deploy:** `CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_keycloak --enable-vault --enable-ldap` ✅
+   - Result: Helm release `keycloak` installed/updated (Revision 2) with `docker.io/bitnamilegacy/*` images; VirtualService applied and UI reachable at `https://keycloak.dev.local.me`.
+4. **Smoke Test:** `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_keycloak` ✅
+   - Result: `keycloak-admin-secret` and `keycloak-ldap-secret` ExternalSecrets reported `condition met`; smoke test finished without errors.
 
 ---
 
@@ -159,7 +159,7 @@ postgresql:
 
 - [x] Owner merges PR #13 → v0.5.0 ✅
 - [x] Keycloak image registry investigation (Gemini — `fix/keycloak-image-fix-task`) ✅ — `bitnamilegacy` on Docker Hub confirmed multi-arch
-- [ ] Keycloak live deploy — **owner action**: `./scripts/k3d-manager deploy_keycloak --enable-ldap --enable-vault` then `./scripts/k3d-manager test_keycloak` (Codex sandbox cannot reach cluster API — must be run locally)
+- [x] Keycloak live deploy — `./scripts/k3d-manager deploy_keycloak --enable-ldap --enable-vault` + `./scripts/k3d-manager test_keycloak` executed with unsandboxed access; Helm release + ExternalSecrets verified on infra cluster.
 - [ ] `configure_vault_app_auth` — `feature/app-cluster-deploy` (Codex)
 - [ ] App layer deploy on Ubuntu (Gemini — SSH interactive)
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
@@ -169,6 +169,7 @@ postgresql:
 
 ## Operational Notes
 
+- **Pipe all command output to `scratch/logs/<cmd>-<timestamp>.log`** — `mkdir -p scratch/logs && ./scripts/k3d-manager <cmd> 2>&1 | tee scratch/logs/<cmd>-$(date +%Y%m%d-%H%M%S).log` — print log path before starting
 - **Always run `reunseal_vault`** after any cluster restart before other deployments
 - **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`)
 - **LDAP bind DN**: keep `LDAP_BASE_DN` in sync with LDIF bootstrap base DN

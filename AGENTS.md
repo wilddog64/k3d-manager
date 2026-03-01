@@ -72,3 +72,11 @@ git cherry-pick -n <sha> -- scripts/plugins/jenkins.sh || git cherry-pick --abor
 3. State required tools explicitly when introducing new ones.
 4. Use placeholders for secrets/hosts.
 5. Keep explanations to ≤3 bullets when requested.
+6. **Pipe all command output to a log file** under `scratch/logs/<command>-<timestamp>.log`
+   so the owner can monitor progress. Example:
+   ```bash
+   logfile="scratch/logs/deploy_keycloak-$(date +%Y%m%d-%H%M%S).log"
+   mkdir -p scratch/logs
+   ./scripts/k3d-manager deploy_keycloak --enable-vault --enable-ldap 2>&1 | tee "$logfile"
+   ```
+   Always print the log path before starting the command.
