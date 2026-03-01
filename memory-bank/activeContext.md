@@ -69,6 +69,32 @@ ExternalSecrets synced.
 
 ---
 
+## Codex Fix Task — PR #13 Copilot Review (Active)
+
+**Branch:** `feature/infra-cluster-complete`
+**Spec:** `docs/plans/keycloak-pr13-codex-fixes.md`
+**Status:** Pending Codex implementation
+**PR:** https://github.com/wilddog64/k3d-manager/pull/13
+
+### Fixes Required (3 across 2 files)
+
+| Fix | Severity | File | Change |
+|---|---|---|---|
+| 1 | P1 | `keycloak.sh` | When `--enable-vault` not set, create `keycloak-admin-secret` directly via `kubectl` so `auth.existingSecret` is always satisfied |
+| 2 | P1 | `keycloak.sh` + `values.yaml.tmpl` | Add `$KEYCLOAK_CONFIG_CLI_ENABLED` variable; set `false` by default, `true` only when `--enable-ldap` is active |
+| 3 | P2 | `keycloak.sh` | Hoist SecretStore + Vault policy creation to run when `enable_vault || enable_ldap`; keep only ExternalSecret-admin inside `enable_vault` |
+
+### Verification
+
+```bash
+shellcheck scripts/plugins/keycloak.sh
+PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats
+```
+
+Push to `feature/infra-cluster-complete` — PR #13 picks up automatically.
+
+---
+
 ## Gemini Task — Keycloak Plugin Verification Round 2 (Complete 2026-03-03) ✅
 
 **Branch:** `feature/infra-cluster-complete`
