@@ -280,7 +280,7 @@ function _cleanup_istio_test_namespace() {
     _info "warning: port forwarding will not remove if process failed"
     for pid in "${PF_PIDS[@]}"; do
        _info "killing $pid"
-       _run_command -- kill "$pid"
+       _run_command --no-exit -- kill "$pid"
        if _run_command --no-exit --quiet -- ps aux | grep '[k]ubectl'; then
           _run_command ps aux | \
              grep -E '[k]ubectl' | \
