@@ -19,9 +19,9 @@ ExternalSecrets synced.
 
 **Part D (Codex):** ✅ DONE — 7 fixes applied (commit `03fca04`).
 
-**Part E (Gemini/Codex loop):**
 - Round 2 confirmed missing `$KEYCLOAK_LDAP_USERS_DN` whitelist entry. Codex added it and reran tests (`shellcheck`, `bats scripts/tests/plugins/keycloak.bats`).
-- PR #13 follow-ups (current): create admin secret when `--enable-vault` is off, gate config CLI via `$KEYCLOAK_CONFIG_CLI_ENABLED`, and share SecretStore/Vault setup for both Vault and LDAP paths. All implemented and re-tested.
+- PR #13 follow-ups: non-Vault admin secret, config CLI flag, shared SecretStore/Vault setup.
+- **2026-03-04:** Added YAML quoting for generated admin password in `_keycloak_ensure_admin_secret` so special characters no longer break kubectl.
 
 **2026-03-03 Update (Codex):**
 - Added `scripts/plugins/keycloak.sh` with `deploy_keycloak`, Vault/ESO helpers,
