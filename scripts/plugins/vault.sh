@@ -723,7 +723,7 @@ EOF
    fi
 
    local re_unseal=0
-   local ns="$VAULT_NS_DEFAULT"
+   local ns="${VAULT_NS:-$VAULT_NS_DEFAULT}"
    local release="$VAULT_RELEASE_DEFAULT"
    local version="$VAULT_CHART_VERSION"
    local ns_set=0 release_set=0 version_set=0
