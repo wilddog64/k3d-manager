@@ -7,11 +7,52 @@
 
 ---
 
+## ⚠️ Codex — ONE Task (read this first)
+
+**Branch:** `feature/two-cluster-infra`
+**PR open:** https://github.com/wilddog64/k3d-manager/pull/8 — `lint` CI is FAILING
+
+**Fix ONLY this file:**
+`scripts/tests/lib/test_auth_cleanup.bats` — test 53 "test_jenkins trap removes auth file"
+
+**Root cause (do NOT guess — this is exact):**
+
+`VAULT_NS_DEFAULT` changed `vault` → `secrets` in vault.sh. Inside `test_jenkins`, when
+`VAULT_NS` is unset, it falls through to `VAULT_NS_DEFAULT` ("secrets") and sets
+`vault_release = VAULT_NS = "secrets"` → `vault_pod = "secrets-0"`.
+
+The `_kubectl` mock in the test independently computes `expected_pod` from
+`VAULT_RELEASE_DEFAULT` ("vault") → `expected_pod = "vault-0"`.
+
+Mismatch: test calls `exec secrets-0` but mock matches `exec vault-0` only.
+→ mock returns empty → `policies=""` → `_err` called → `_err` undefined → exit 127.
+
+**The fix:**
+In `test_auth_cleanup.bats`, around line 205, add `VAULT_NS=vault VAULT_RELEASE=vault`
+to the `run env ...` call so the test is isolated from the changed default:
+
+```bash
+run env PROJECT_ROOT="$PROJECT_ROOT" \
+  VAULT_NS=vault VAULT_RELEASE=vault \
+  JENKINS_VALUES_FILE="$PROJECT_ROOT/scripts/etc/jenkins/values-test.yaml" \
+  CLEANUP_LOG="$cleanup_log" AUTH_PATH_LOG="$auth_path_log" \
+  DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
+  "$script"
+```
+
+Apply the same fix to ALL subsequent `run env ...` invocations of `"$script"` in
+the same test that don't already set `VAULT_RELEASE` explicitly (to keep them
+consistent). Check the full test for other `run env` calls.
+
+**After fixing:** commit to `feature/two-cluster-infra`, push. Claude monitors CI.
+**Do NOT touch any other files.**
+
+---
+
 ## Current Focus (as of 2026-03-01)
 
 - **Two-cluster refactor COMPLETE** — namespace renames + CLUSTER_ROLE + remote Vault ESO
-- Gemini signed off 2026-03-01 — shellcheck clean, regression tests green, ESO API v1 fixed
-- **PR ready** — Claude opens on owner go-ahead
+- PR #8 open — lint failing (test_auth_cleanup regression, see above — Codex fix pending)
 - After merge: destroy infra cluster → redeploy with new namespaces → deploy app layer on Ubuntu
 
 ---
