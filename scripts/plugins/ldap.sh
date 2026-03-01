@@ -1,3 +1,5 @@
+# shellcheck disable=SC1090,SC2034,SC2016,SC2154,SC2153
+
 LDAP_CONFIG_DIR="$SCRIPT_DIR/etc/ldap"
 LDAP_VARS_FILE="$LDAP_CONFIG_DIR/vars.sh"
 
@@ -1010,6 +1012,12 @@ EOF
       return 0
    fi
 
+   if [[ "${CLUSTER_ROLE:-infra}" == "app" ]]; then
+      _info "[ldap] CLUSTER_ROLE=app — skipping deploy_ldap"
+      if (( restore_trace )); then set -x; fi
+      return 0
+   fi
+
    while [[ $# -gt 0 ]]; do
       case "$1" in
          -h|--help)
@@ -1157,7 +1165,7 @@ EOF
 
       # Wait for ESO webhook to be ready
       _info "[ldap] waiting for ESO webhook to be ready..."
-      if ! kubectl wait --for=condition=available deployment/external-secrets-webhook -n external-secrets --timeout=60s; then
+      if ! kubectl wait --for=condition=available deployment/external-secrets-webhook -n "${ESO_NAMESPACE:-secrets}" --timeout=60s; then
          _err "[ldap] ESO webhook did not become ready"
          return 1
       fi
@@ -1452,7 +1460,7 @@ EOF
 
       # Wait for ESO webhook to be ready
       _info "[ad] waiting for ESO webhook to be ready..."
-      if ! kubectl wait --for=condition=available deployment/external-secrets-webhook -n external-secrets --timeout=60s; then
+      if ! kubectl wait --for=condition=available deployment/external-secrets-webhook -n "${ESO_NAMESPACE:-secrets}" --timeout=60s; then
          _err "[ad] ESO webhook did not become ready"
          return 1
       fi

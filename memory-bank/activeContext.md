@@ -1,46 +1,33 @@
 # Active Context – k3d-manager
 
-## ⚠️ Codex Orientation — Read Before Starting
+## Current Branch: `feature/two-cluster-infra` (as of 2026-03-01)
 
-**Active branch for Codex: `feature/two-cluster-infra`**
-
-Common mistakes to avoid:
-- `fix/vault-auth-delegator` — **DONE and closed**. `system:auth-delegator` was fixed and validated 2026-02-27. Do not touch this branch.
-- SMB CSI — **deferred (P4)**. Not current priority. Do not work on this.
-- Jenkins port-forward helper — **does not exist** in any plan. Not a task.
-
-**Your only task:** implement the two-cluster namespace refactor.
-Full spec: `docs/plans/two-cluster-infra.md` — read this first, implement exactly what is listed.
-Do NOT open a PR. Gemini reviews your work, Claude opens the PR.
+**v0.2.1 released** — OrbStack validated, Vault reboot unseal, Jenkins k8s agents, docs.
+**v0.3.0 pending** — Two-cluster refactor (this branch) ready for PR.
 
 ---
 
-## Current Branch: `feature/two-cluster-infra` (as of 2026-02-28)
+## Current Focus (as of 2026-03-01)
 
-**v0.2.0 released** — OrbStack validated (M4 + M2), Vault reboot unseal confirmed, Jenkins k8s agents working.
-**v0.2.1 released** — docs-only: CHANGE.md versioned entries + README Releases table.
-
----
-
-## Current Focus (as of 2026-02-28)
-
-- **Two-cluster is live** — infra on k3d (OrbStack), app on Ubuntu k3s (fresh redeploy ✅)
-- Two-cluster refactor (k3d-manager code): `feature/two-cluster-infra` — Codex implements, Claude deploys
-- shopping-cart CI/CD pipeline design in progress (see shopping-cart-infra memory-bank)
+- **Two-cluster refactor COMPLETE** — namespace renames + CLUSTER_ROLE + remote Vault ESO
+- Gemini signed off 2026-03-01 — shellcheck clean, regression tests green, ESO API v1 fixed
+- **PR ready** — Claude opens on owner go-ahead
+- After merge: destroy infra cluster → redeploy with new namespaces → deploy app layer on Ubuntu
 
 ---
 
-## Cluster State (as of 2026-02-28)
+## Cluster State (as of 2026-03-01)
 
 ### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-test-orbstack-exists`)
-| Component | Status | Age |
+| Component | Status | Notes |
 |---|---|---|
-| Vault | ✅ Running | 3d21h |
-| ESO | ✅ Running | 3d21h |
-| Jenkins | ✅ Running | 34h |
-| OpenLDAP | ✅ Running | 3d19h |
-| Istio | ✅ Running | 3d22h |
-| ArgoCD | ❌ Not deployed | — |
+| Vault | ✅ Running | 4d — will be redeployed to `secrets` ns after PR merge |
+| ESO | ✅ Running | 4d — will move to `secrets` ns |
+| Jenkins | ✅ Running | — will move to `cicd` ns |
+| OpenLDAP | ✅ Running | — will move to `identity` ns |
+| Istio | ✅ Running | stays `istio-system` |
+| ArgoCD | ❌ Not deployed | add during infra redeploy |
+| Keycloak | ❌ Not deployed | add during infra redeploy |
 
 Context `k3d-automation` is dead (old cluster, port gone — ignore).
 
@@ -49,158 +36,73 @@ Context `k3d-automation` is dead (old cluster, port gone — ignore).
 |---|---|---|
 | k3s node | ✅ Ready | Fresh redeploy 2026-02-28, v1.34.4+k3s1 |
 | Istio | ✅ Running | IngressGateway + istiod |
-| ESO | ❌ Not deployed | Needs remote Vault addr |
-| shopping-cart-data | ❌ Not deployed | PostgreSQL, Redis, RabbitMQ |
-| shopping-cart-apps | ❌ Not deployed | basket, order, payment, catalog, frontend |
-| observability | ❌ Not deployed | — |
+| ESO | ❌ Pending | Deploy after PR merge with `REMOTE_VAULT_ADDR` |
+| shopping-cart-data | ❌ Pending | PostgreSQL, Redis, RabbitMQ |
+| shopping-cart-apps | ❌ Pending | basket, order, payment, catalog, frontend |
+| observability | ❌ Pending | Prometheus + Grafana |
 
-**SSH note:** `SSH_AUTH_SOCK` is forwarded (ForwardAgent yes in config).
-If git auth fails: old ControlMaster may be stale — run `ssh -O exit ubuntu` then reconnect.
-
-### Deployment Ownership
-- **Claude** owns app cluster deployment
-- Blocked on: Codex implementing app-cluster mode in k3d-manager (`feature/two-cluster-infra`)
-- Remote Vault addr for Ubuntu ESO: `https://10.211.55.3:8200` (Mac OrbStack IP — verify before deploy)
-
-## Open Items
-
-### Two-Cluster Refactor — Codex Task (branch: `feature/two-cluster-infra`)
-
-Full spec: `docs/plans/two-cluster-infra.md` — Codex reads this before starting.
-
-**Summary of what Codex must implement:**
-
-1. **Namespace renames** (change defaults, keep env var overrides working):
-   - `vault` → `secrets` (vault.sh: `VAULT_NS_DEFAULT`, `eso_ns` defaults)
-   - `external-secrets` → `secrets` (vault.sh eso_ns params)
-   - `jenkins` → `cicd` (`scripts/etc/jenkins/vars.sh`)
-   - `directory` → `identity` (`scripts/etc/ldap/vars.sh`, `ldap-password-rotator.sh`)
-   - `argocd` → `cicd` (`scripts/etc/argocd/vars.sh`)
-
-**Status 2026-02-28:** Namespace defaults updated (secrets/identity/cicd), `deploy_eso` installs into secrets with remote Vault helper, new `CLUSTER_ROLE` env var (infra/app) gates infra plugins, and tests were re-run:
-- `VAULT_NS=vault PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_vault`
-- `VAULT_NS=vault PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_eso`
-- `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_istio`
-
-
-2. **Fix hardcoded namespace strings** in:
-   - `scripts/lib/test.sh` — `-n jenkins`, `-n vault`
-   - `scripts/ci/check_cluster_health.sh` — `namespace="${1:-vault}"`
-   - `scripts/tests/run-cert-rotation-test.sh` — `-n jenkins`
-   - `scripts/lib/dirservices/openldap.sh` — `namespace="${1:-directory}"`
-
-3. **New `CLUSTER_ROLE` env var** (`infra` | `app`) in dispatcher:
-   - `infra` (default): full stack — Vault, ESO, Jenkins, ArgoCD, LDAP, Istio
-   - `app`: ESO only (remote Vault) + shopping-cart manifests; skip infra plugins
-
-4. **Remote Vault ESO** (`REMOTE_VAULT_ADDR`):
-   - New `_eso_configure_remote_vault` function in `scripts/plugins/eso.sh`
-   - SecretStore template uses `REMOTE_VAULT_ADDR` + `kubernetes-app` auth mount
-   - Vault auth mount setup script for infra cluster
-
-**Must not break:** single-cluster mode, existing CLI flags, env var overrides, CI tests.
-
-**Agent workflow:**
-1. ✅ Codex implemented — namespace renames, CLUSTER_ROLE dispatcher, _eso_configure_remote_vault (uncommitted)
-2. ✅ Gemini: review + test — **COMPLETE 2026-03-01** (see results below)
-3. Claude opens PR after Gemini approves
-4. Owner approves PR
-5. Claude deploys: destroy infra cluster → redeploy with new namespaces → deploy app layer on Ubuntu
+**SSH note:** `ForwardAgent yes` in `~/.ssh/config`. If git auth fails: `ssh -O exit ubuntu` to kill stale ControlMaster.
 
 ---
 
-## ⚠️ Gemini Review Task — `feature/two-cluster-infra` (Complete 2026-03-01) ✅
+## What Changed in This PR (feature/two-cluster-infra)
 
-Gemini has reviewed Codex's implementation on `m4-air`.
+### Namespace renames (new defaults, env var overrides preserved)
+| Old | New | Var |
+|---|---|---|
+| `vault` + `external-secrets` | `secrets` | `VAULT_NS`, `ESO_NAMESPACE` |
+| `jenkins` | `cicd` | `JENKINS_NAMESPACE` |
+| `directory` | `identity` | `LDAP_NAMESPACE` |
+| `argocd` | `cicd` | `ARGOCD_NAMESPACE` |
 
-### 1. Shellcheck
-- Result: **PASSED** (with minor warnings). No blocking syntax errors in modified files.
+### New capabilities
+- `CLUSTER_ROLE=infra|app` in dispatcher — `app` skips Vault/Jenkins/LDAP/ArgoCD
+- `_eso_configure_remote_vault` in `scripts/plugins/eso.sh` — cross-cluster SecretStore
+- `REMOTE_VAULT_ADDR` + `REMOTE_VAULT_K8S_MOUNT` + `REMOTE_VAULT_K8S_ROLE` env vars
+- `VAULT_ENDPOINT` now dynamic: `http://vault.${VAULT_NS}.svc:8200`
+- `ARGOCD_LDAP_HOST` + `JENKINS_LDAP_HOST` updated to `identity` namespace
 
-### 2. Regression tests (old namespaces)
-- Command: `VAULT_NS=vault PATH="/opt/homebrew/bin:$PATH" CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_vault` (and `test_eso`, `test_istio`)
-- Result: **PASSED** ✅. Backwards-compatibility verified.
-
-### 3. ESO API version in `_eso_configure_remote_vault`
-- Result: **ISSUE FOUND** 🔴.
-- File: `scripts/plugins/eso.sh` (lines 120, 141).
-- Error: Uses `apiVersion: external-secrets.io/v1beta1`.
-- Fix required: Update to `apiVersion: external-secrets.io/v1`.
-
-### 4. CLUSTER_ROLE=app skips infra plugins
-- Result: **PASSED** ✅. Logic confirmed in `vault.sh`, `jenkins.sh`, `ldap.sh`, `argocd.sh`.
-
-### 5. VAULT_ENDPOINT uses new namespace
-- Result: **PASSED** ✅. `scripts/etc/vault/vars.sh` verified.
-
-### Sign-off (2026-03-01)
-Implementation is solid but requires **one fix** (ESO API version) before PR.
-Evidence captured: regression tests green on m4-air existing cluster.
+### Hardcoded namespace strings fixed
+- `scripts/lib/test.sh` — `-n jenkins`, `-n vault` → env var refs
+- `scripts/ci/check_cluster_health.sh` — `namespace="${1:-vault}"` → `${VAULT_NS:-secrets}`
+- `scripts/tests/run-cert-rotation-test.sh` — `-n jenkins` → env var
+- `scripts/lib/dirservices/openldap.sh` — `directory` default → `identity`
 
 ---
 
-## ⚠️ Codex Fix Required (2026-03-01)
+## Post-Merge Deployment Plan (Claude executes)
 
-Branch: `feature/two-cluster-infra`
-Gemini reviewed and found **two issues** to fix. Do NOT open a PR after fixing — Gemini re-checks, then Claude opens the PR.
-
-### Fix 1 — ESO API version (blocking)
-**File:** `scripts/plugins/eso.sh`, lines 121 and 142
-**Problem:** `_eso_configure_remote_vault` uses `apiVersion: external-secrets.io/v1beta1`
-**Fix:** Change both occurrences to `apiVersion: external-secrets.io/v1`
-**Reference:** `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md`
-
-### Fix 2 — shellcheck warnings (non-blocking but clean up in same pass)
-**Files:** any modified file that produced shellcheck warnings during Gemini's review
-**Fix:** resolve all shellcheck warnings in the modified files
-Run locally to find them:
-```bash
-shellcheck scripts/plugins/eso.sh scripts/plugins/vault.sh scripts/plugins/ldap.sh \
-  scripts/plugins/jenkins.sh scripts/plugins/argocd.sh \
-  scripts/lib/test.sh scripts/lib/dirservices/openldap.sh \
-  scripts/etc/vault/vars.sh scripts/etc/jenkins/vars.sh \
-  scripts/etc/ldap/vars.sh scripts/etc/argocd/vars.sh \
-  scripts/etc/ldap/ldap-password-rotator.sh \
-  scripts/ci/check_cluster_health.sh scripts/tests/run-cert-rotation-test.sh \
-  scripts/k3d-manager
+```
+1. Destroy infra cluster (k3d-k3d-test-orbstack-exists)
+2. Redeploy: CLUSTER_NAME=automation CLUSTER_ROLE=infra
+   → secrets/   (Vault + ESO)
+   → identity/  (OpenLDAP + Keycloak)
+   → cicd/      (Jenkins + ArgoCD)
+   → istio-system/
+3. Configure Vault kubernetes-app auth mount for app cluster
+4. Deploy app layer: CLUSTER_ROLE=app REMOTE_VAULT_ADDR=https://10.211.55.3:8200
+   → ESO → shopping-cart-data → shopping-cart-apps
 ```
 
-### After fixing
-- Commit both fixes to `feature/two-cluster-infra`
-- Do NOT open a PR
-- Gemini will re-check, then Claude opens the PR
+---
+
+## Open Items (post-merge)
+
+- [ ] ArgoCD deploy on infra cluster (cicd ns)
+- [ ] Keycloak deploy on infra cluster (identity ns)
+- [ ] App layer deploy on Ubuntu (ESO + data + apps)
+- [ ] Wire ArgoCD to sync app cluster
+- [ ] Cloud Track A: Terraform + k3s on EC2 (blocked on two-cluster done)
+- [ ] Cloud Track 0: one-node EKS provider development
 
 ---
 
-### Known Broken Paths (all pre-existing)
+## Known Broken Paths (all pre-existing)
 | Path | Root Cause |
 |---|---|
 | `deploy_jenkins` (no vault) | Policy creation always runs; jenkins-admin secret missing |
 | `--enable-ldap` without `--enable-vault` | LDAP secrets require Vault |
 | Basic LDAP deploys empty directory | No bootstrap LDIF; use `deploy_ad` as workaround |
-
-### Cloud Architecture (planned — blocked on local two-cluster first)
-- Plan: `docs/plans/cloud-architecture.md`
-- Target: ACG sandbox (flat $200/year) — **three-track strategy** due to confirmed constraints
-- **Track 0 (one-node EKS):** 1 cluster, 1× t3.medium, Vault+ESO+Istio only — proves `CLUSTER_PROVIDER=eks`; gate for Track B
-- **Track A (k3s on EC2):** confirmed feasible — 2× t3.medium, existing k3s provider, nip.io DNS, ~23GB EBS. Start here.
-- **Track B (EKS full stack):** conditional — blocked on Track 0 success + EKS/KMS/RDS verification; single cluster only (5-instance limit)
-- Key ACG constraints: no Route53, max t3.medium, max 5 instances, max 30GB EBS, IAM restricted
-- Vault unseal on cloud: SSM Parameter Store (new backend) or existing k8s secret fallback — KMS only if confirmed
-- DNS on cloud: nip.io (Route53 unavailable on ACG)
-- Blocked on: local two-cluster refactor + Ubuntu redeploy validated first
-
-### Pending Work
-- [ ] SMB CSI Phase 2 (NFS CSI swap) — `docs/plans/smb-csi-macos-workaround.md`
-- [ ] SMB CSI Phase 3 (custom k3d node image, OrbStack only)
-- [ ] AD end-to-end validation (`--enable-ad`, `--enable-ad-prod`) — requires external AD/VPN
-- [ ] `docs/guides/certificate-rotation.md`
-- [ ] `docs/guides/mac-ad-setup.md`
-- [ ] `docs/guides/ad-connectivity-troubleshooting.md`
-- [ ] CI Stage 3: destructive tests via `workflow_dispatch`
-- [ ] AI-powered code review via GitHub Actions (see progress.md)
-- [ ] OrbStack Phase 3: native Kubernetes provider
-- [ ] ArgoCD Phase 1 implementation (`docs/plans/argocd-implementation-plan.md`)
-- [ ] LDAP rotator rename docs cleanup (code renamed 2026-02-23, docs pending)
 
 ---
 
@@ -211,5 +113,26 @@ shellcheck scripts/plugins/eso.sh scripts/plugins/vault.sh scripts/plugins/ldap.
 | v0.1.0 | ✅ released 2026-02-27 | Initial release |
 | v0.2.0 | ✅ released 2026-02-27 | OrbStack, Vault reboot unseal, Jenkins k8s agents |
 | v0.2.1 | ✅ released 2026-02-28 | Docs-only: CHANGE.md + README Releases table |
-| v0.3.0 | pending | Two-cluster refactor, ArgoCD, Ubuntu clean redeploy |
+| v0.3.0 | pending PR | Two-cluster refactor, namespace renames, CLUSTER_ROLE, remote Vault ESO |
 | v1.0.0 | future | Production-hardened, all known-broken paths resolved |
+
+---
+
+## Operational Notes
+
+- **Always run `reunseal_vault`** after any cluster restart before other deployments
+- **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`)
+- **LDAP bind DN**: keep `LDAP_BASE_DN` in sync with LDIF bootstrap base DN
+- **Jenkins admin password**: contains special chars — always quote `-u "user:$pass"`
+- **SMB CSI on macOS**: `cifs` kernel module unavailable — skip guard active
+- **Vault reboot unseal**: dual-path — macOS Keychain + Linux libsecret; k8s `vault-unseal` secret is fallback
+- **Ubuntu SSH agent forwarding**: `ForwardAgent yes` set. Stale socket fix: `ssh -O exit ubuntu`
+- **New namespace defaults**: `secrets`, `identity`, `cicd` — old names still work via env var override
+
+---
+
+## Branch Protection
+
+- 1 required PR approval, stale review dismissal, enforce admins disabled
+- Required status checks: `lint` (Stage 1) and `stage2` (Stage 2)
+- Tag: `@copilot` in PR body for automated review

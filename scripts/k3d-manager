@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034,SC1091
 
 # k3d-manager - K3d Kubernetes cluster setup with Istio and storage configuration
 #
@@ -44,6 +45,18 @@ source "${SCRIPT_DIR}/lib/cluster_provider.sh"
 source "${SCRIPT_DIR}/lib/test.sh"
 source "${SCRIPT_DIR}/lib/core.sh"
 source "${SCRIPT_DIR}/lib/help/utils.sh"
+
+CLUSTER_ROLE="${CLUSTER_ROLE:-infra}"
+CLUSTER_ROLE="$(printf '%s' "$CLUSTER_ROLE" | tr '[:upper:]' '[:lower:]')"
+case "$CLUSTER_ROLE" in
+   infra|app)
+      ;;
+   *)
+      echo "ERROR: unsupported CLUSTER_ROLE '$CLUSTER_ROLE' (expected infra or app)" >&2
+      CLUSTER_ROLE="infra"
+      ;;
+esac
+export CLUSTER_ROLE
 
 if [[ -n "${CLUSTER_PROVIDER:-}" ]]; then
     export K3D_MANAGER_PROVIDER="${K3D_MANAGER_PROVIDER:-$CLUSTER_PROVIDER}"

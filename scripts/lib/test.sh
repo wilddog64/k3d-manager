@@ -1,3 +1,5 @@
+# shellcheck disable=SC1090,SC1091,SC2034,SC2064,SC2086,SC2155
+
 # Ensure SCRIPT_DIR is set when this library is sourced directly.
 if [[ -z "${SCRIPT_DIR:-}" ]]; then
   SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
@@ -556,7 +558,7 @@ function test_nfs_connectivity() {
 function test_eso() {
   _info "Testing External Secrets Operator with Vault..."
 
-  local vault_ns="vault"
+  local vault_ns="${VAULT_NS:-secrets}"
   local vault_release="${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}"
   local vault_pod="${vault_release}-0"
   local store_name="${ESO_TEST_STORE:-$(_test_lib_random_name 'vault-store')}"
@@ -667,7 +669,7 @@ function _cleanup_eso_test() {
 
 function test_vault() {
   _info "Testing Vault deployment and Kubernetes auth..."
-  local vault_ns="vault"
+  local vault_ns="${VAULT_NS:-secrets}"
   local vault_release="${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}"
   local vault_pod="${vault_release}-0"
   local test_ns="${VAULT_TEST_NAMESPACE:-$(_test_lib_random_name 'vault-test')}"
@@ -827,23 +829,25 @@ function test_cert_rotation() {
   trap '_cleanup_cert_rotation_test' EXIT TERM
 
   local test_mode="${1:-manual}"  # manual|fast|auto
+  local jenkins_ns="${JENKINS_NAMESPACE:-cicd}"
+  local vault_ns_default="${VAULT_NS:-secrets}"
 
   # 1. Verify prerequisites
   _info "Checking prerequisites..."
 
-  if ! _kubectl get namespace jenkins >/dev/null 2>&1; then
+  if ! _kubectl get namespace "${jenkins_ns}" >/dev/null 2>&1; then
     _err "Jenkins namespace not found. Please deploy Jenkins first:"
     _err "  ./scripts/k3d-manager deploy_jenkins --enable-vault --enable-ldap"
     return 1
   fi
 
-  if ! _kubectl get statefulset jenkins -n jenkins >/dev/null 2>&1; then
+  if ! _kubectl get statefulset jenkins -n "${jenkins_ns}" >/dev/null 2>&1; then
     _err "Jenkins StatefulSet not found. Please deploy Jenkins with Vault:"
     _err "  ./scripts/k3d-manager deploy_jenkins --enable-vault --enable-ldap"
     return 1
   fi
 
-  if ! _kubectl get cronjob jenkins-cert-rotator -n jenkins >/dev/null 2>&1; then
+  if ! _kubectl get cronjob jenkins-cert-rotator -n "${jenkins_ns}" >/dev/null 2>&1; then
     _err "Certificate rotator CronJob not found."
     _err "Jenkins must be deployed with --enable-vault and cert rotation enabled"
     return 1
@@ -860,11 +864,11 @@ function test_cert_rotation() {
   # 2. Display current configuration
   _info "Current Configuration:"
   local schedule
-  schedule=$(_kubectl get cronjob jenkins-cert-rotator -n jenkins -o jsonpath='{.spec.schedule}')
+  schedule=$(_kubectl get cronjob jenkins-cert-rotator -n "${jenkins_ns}" -o jsonpath='{.spec.schedule}')
   _info "  CronJob schedule: $schedule"
 
   local image
-  image=$(_kubectl get cronjob jenkins-cert-rotator -n jenkins \
+  image=$(_kubectl get cronjob jenkins-cert-rotator -n "${jenkins_ns}" \
     -o jsonpath='{.spec.jobTemplate.spec.template.spec.containers[0].image}')
   _info "  Rotator image: $image"
 
@@ -908,23 +912,23 @@ function test_cert_rotation() {
       _info "Manual mode: Triggering rotation job manually..."
 
       # Clean up any previous test jobs
-      _kubectl delete job test-cert-rotation -n jenkins 2>/dev/null || true
+      _kubectl delete job test-cert-rotation -n "${jenkins_ns}" 2>/dev/null || true
       sleep 2
 
-      _kubectl create job test-cert-rotation --from=cronjob/jenkins-cert-rotator -n jenkins
+      _kubectl create job test-cert-rotation --from=cronjob/jenkins-cert-rotator -n "${jenkins_ns}"
       _info "Waiting for manual rotation job to complete..."
 
-      if _kubectl wait --for=condition=complete --timeout=3m job/test-cert-rotation -n jenkins 2>/dev/null; then
+      if _kubectl wait --for=condition=complete --timeout=3m job/test-cert-rotation -n "${jenkins_ns}" 2>/dev/null; then
         _info "Rotation job completed successfully"
       else
         _err "Rotation job failed or timed out"
         _info "Job logs:"
-        _kubectl logs -n jenkins job/test-cert-rotation --tail=50
+        _kubectl logs -n "${jenkins_ns}" job/test-cert-rotation --tail=50
         return 1
       fi
 
       _info "Rotation job logs:"
-      _kubectl logs -n jenkins job/test-cert-rotation
+      _kubectl logs -n "${jenkins_ns}" job/test-cert-rotation
       ;;
 
     auto)
@@ -1001,7 +1005,7 @@ function test_cert_rotation() {
   # 7. Verify old certificate was revoked in Vault (optional)
   _info "Checking if old certificate was revoked in Vault..."
   local vault_pod
-  vault_pod=$(_kubectl get pod -n vault -l app.kubernetes.io/name=vault \
+  vault_pod=$(_kubectl get pod -n "${vault_ns_default}" -l app.kubernetes.io/name=vault \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
   if [[ -n "$vault_pod" ]]; then
@@ -1009,7 +1013,7 @@ function test_cert_rotation() {
     local normalized_serial
     normalized_serial=$(echo "$initial_serial" | tr -d ':' | tr '[:lower:]' '[:upper:]')
 
-    if _kubectl exec -n vault "$vault_pod" -- \
+    if _kubectl exec -n "${vault_ns_default}" "$vault_pod" -- \
       vault list pki/certs/revoked 2>/dev/null | grep -qi "$normalized_serial"; then
       _info "✅ Old certificate was revoked in Vault"
     else
@@ -1022,7 +1026,7 @@ function test_cert_rotation() {
   # 8. Verify Jenkins is still accessible
   _info "Verifying Jenkins is still accessible..."
   local jenkins_pod
-  jenkins_pod=$(_kubectl get pod -n jenkins -l app.kubernetes.io/name=jenkins \
+  jenkins_pod=$(_kubectl get pod -n "${jenkins_ns}" -l app.kubernetes.io/name=jenkins \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 
   if [[ -z "$jenkins_pod" ]]; then
@@ -1030,7 +1034,7 @@ function test_cert_rotation() {
     return 1
   fi
 
-  if _kubectl get pod -n jenkins "$jenkins_pod" -o jsonpath='{.status.phase}' | grep -q "Running"; then
+  if _kubectl get pod -n "${jenkins_ns}" "$jenkins_pod" -o jsonpath='{.status.phase}' | grep -q "Running"; then
     _info "✅ Jenkins is running"
   else
     _err "Jenkins pod is not in Running state"
@@ -1055,7 +1059,7 @@ function test_cert_rotation() {
 
 function _cleanup_cert_rotation_test() {
   # Clean up test job if it exists
-  _kubectl delete job test-cert-rotation -n jenkins 2>/dev/null || true
+  _kubectl delete job test-cert-rotation -n "${jenkins_ns}" 2>/dev/null || true
   _info "Certificate rotation test cleanup complete"
 }
 

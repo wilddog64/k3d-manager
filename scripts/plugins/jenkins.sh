@@ -1,3 +1,5 @@
+# shellcheck disable=SC1090,SC2034,SC2155,SC2016,SC2329
+
 VAULT_PLUGIN="$PLUGINS_DIR/vault.sh"
 if [[ -r "$VAULT_PLUGIN" ]]; then
    # shellcheck disable=SC1090
@@ -1053,8 +1055,8 @@ function deploy_jenkins() {
    esac
 
    # Show help if no arguments provided
-   if [[ $arg_count -eq 0 ]]; then
-      cat <<EOF
+  if [[ $arg_count -eq 0 ]]; then
+     cat <<EOF
 Usage: deploy_jenkins [options] [namespace] [vault-namespace] [vault-release]
 
 Options:
@@ -1114,6 +1116,12 @@ Examples:
 Positional arguments (backwards compatible):
   deploy_jenkins [namespace] [vault-namespace] [vault-release]
 EOF
+      if (( restore_trace )); then set -x; fi
+      return 0
+   fi
+
+   if [[ "${CLUSTER_ROLE:-infra}" == "app" ]]; then
+      _info "[jenkins] CLUSTER_ROLE=app — skipping deploy_jenkins"
       if (( restore_trace )); then set -x; fi
       return 0
    fi
@@ -1523,7 +1531,7 @@ function _deploy_jenkins() {
       fi
 
       # Set AD-specific LDAP variables
-      export LDAP_URL="${LDAP_URL:-ldap://openldap-openldap-bitnami.directory.svc:1389}"
+      export LDAP_URL="${LDAP_URL:-ldap://openldap-openldap-bitnami.identity.svc:1389}"
       export LDAP_BASE_DN="${LDAP_BASE_DN:-DC=corp,DC=example,DC=com}"
       export LDAP_BIND_DN="${LDAP_BIND_DN:-cn=admin,DC=corp,DC=example,DC=com}"
       export LDAP_USER_SEARCH_BASE="${LDAP_USER_SEARCH_BASE:-OU=Users,DC=corp,DC=example,DC=com}"
@@ -1542,7 +1550,7 @@ function _deploy_jenkins() {
       fi
 
       # Set LDAP connection variables
-      export LDAP_URL="${LDAP_URL:-ldap://openldap-openldap-bitnami.directory.svc:1389}"
+      export LDAP_URL="${LDAP_URL:-ldap://openldap-openldap-bitnami.identity.svc:1389}"
 
       template_file="$JENKINS_CONFIG_DIR/values-ldap.yaml.tmpl"
       auth_mode="standard-ldap"
