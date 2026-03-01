@@ -12,39 +12,44 @@
 **Branch:** `feature/two-cluster-infra`
 **PR open:** https://github.com/wilddog64/k3d-manager/pull/8 — `lint` CI is FAILING
 
-**Fix ONLY this file:**
-`scripts/tests/lib/test_auth_cleanup.bats` — test 53 "test_jenkins trap removes auth file"
+**PREVIOUS FIX WAS WRONG — you must unstage and redo.**
 
-**Root cause (do NOT guess — this is exact):**
+Your staged change added `VAULT_NS=vault VAULT_RELEASE=vault` to ALL `run env`
+calls. `VAULT_RELEASE=vault` on the sub-calls (lines 237, 245, 264, 268, 280,
+291, 303) BREAKS their assertions — those calls test vault_release derivation
+from `VAULT_RELEASE_DEFAULT`/`VAULT_NS_DEFAULT` and expect outputs like
+"user-default", "vault-derived", "resourced-release", etc. Pinning
+`VAULT_RELEASE=vault` overrides that logic.
 
-`VAULT_NS_DEFAULT` changed `vault` → `secrets` in vault.sh. Inside `test_jenkins`, when
-`VAULT_NS` is unset, it falls through to `VAULT_NS_DEFAULT` ("secrets") and sets
-`vault_release = VAULT_NS = "secrets"` → `vault_pod = "secrets-0"`.
+**Correct fix — SURGICAL:**
 
-The `_kubectl` mock in the test independently computes `expected_pod` from
-`VAULT_RELEASE_DEFAULT` ("vault") → `expected_pod = "vault-0"`.
-
-Mismatch: test calls `exec secrets-0` but mock matches `exec vault-0` only.
-→ mock returns empty → `policies=""` → `_err` called → `_err` undefined → exit 127.
-
-**The fix:**
-In `test_auth_cleanup.bats`, around line 205, add `VAULT_NS=vault VAULT_RELEASE=vault`
-to the `run env ...` call so the test is isolated from the changed default:
+Change ONLY the FIRST `run env` call in test 53 (around line 205). Add
+`VAULT_NS=vault` (and NOTHING ELSE — no VAULT_RELEASE). Leave ALL other
+`run env` calls exactly as they are on main.
 
 ```bash
 run env PROJECT_ROOT="$PROJECT_ROOT" \
-  VAULT_NS=vault VAULT_RELEASE=vault \
+  VAULT_NS=vault \
   JENKINS_VALUES_FILE="$PROJECT_ROOT/scripts/etc/jenkins/values-test.yaml" \
   CLEANUP_LOG="$cleanup_log" AUTH_PATH_LOG="$auth_path_log" \
   DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
   "$script"
 ```
 
-Apply the same fix to ALL subsequent `run env ...` invocations of `"$script"` in
-the same test that don't already set `VAULT_RELEASE` explicitly (to keep them
-consistent). Check the full test for other `run env` calls.
+**Why this is enough:**
+- First call: `VAULT_NS=vault` sets vault_ns_from_default=0, vault_release
+  falls through to `else vault_release="vault"` — mock matches `vault-0`,
+  policies returned, no `_err`, exit 0 ✓
+- Sub-calls: they already set explicit `VAULT_NS_DEFAULT` or
+  `VAULT_RELEASE_DEFAULT` in their env — these override vault.sh's new "secrets"
+  default. Behavior is identical to main. Do NOT touch them.
 
-**After fixing:** commit to `feature/two-cluster-infra`, push. Claude monitors CI.
+**Steps:**
+1. `git restore --staged scripts/tests/lib/test_auth_cleanup.bats` (unstage)
+2. Make the surgical one-line change above (VAULT_NS=vault on first call only)
+3. Commit + push to `feature/two-cluster-infra`
+
+Claude monitors CI after push.
 **Do NOT touch any other files.**
 
 ---
