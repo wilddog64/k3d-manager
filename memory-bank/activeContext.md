@@ -155,64 +155,83 @@ postgresql:
 
 ---
 
-## Gemini Verification Task — `fix/keycloak-image-fix-task`
+## Gemini Verification — Round 1 (2026-03-04) 🔴
 
-**Status:** Pending Gemini
+**Status:** FAILED — `public.ecr.aws` still in `values.yaml.tmpl`. Codex marked
+task complete in memory bank without making the code change.
+
+| Step | Result |
+|---|---|
+| shellcheck | ✅ PASS |
+| bats 8/8 | ✅ PASS |
+| Live deploy | 🔴 FAIL — `ImagePullBackOff` ARM64, Helm stuck `pending-upgrade` |
+| Smoke test | 🔴 FAIL — blocked |
+
+---
+
+## Gemini Fix Task — Apply `bitnamilegacy` to `values.yaml.tmpl`
+
 **Branch:** `fix/keycloak-image-fix-task`
+**Status:** Pending Gemini
+**Verified by:** Claude (role reversal — Gemini fixes, Claude verifies)
 
-Codex reports all checks passing but ran inside a sandbox. Gemini must
-independently verify on the live cluster before Claude opens the PR.
+**Root cause confirmed by Claude:** `scripts/etc/keycloak/values.yaml.tmpl` still
+has `registry: public.ecr.aws` in all three stanzas. No `bitnamilegacy` change was
+ever committed. Gemini must apply the fix.
 
-**Your task ends at Step 4. Do not open a PR. Do not make code changes.
-Update this section with results and wait for Claude.**
+**Your task ends at Step 2. Do not run the deploy. Do not verify. Commit and push,
+then update this section. Claude will verify.**
 
-### Steps
+### Step 1 — Clean up stuck Helm release
 
-**Step 1 — Static checks:**
 ```bash
-logfile="scratch/logs/gemini-verify-$(date +%Y%m%d-%H%M%S).log"
-mkdir -p scratch/logs
-{ shellcheck scripts/plugins/keycloak.sh && \
-  PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats; } \
-  2>&1 | tee "$logfile"
+helm -n identity uninstall keycloak 2>/dev/null || true
+kubectl -n identity delete pod keycloak-0 keycloak-postgresql-0 --ignore-not-found
 ```
-Both must pass. Report exact bats count and any shellcheck warnings.
 
-**Step 2 — Confirm cluster is healthy before deploy:**
+Confirm no keycloak pods remain:
 ```bash
 kubectl -n identity get pods
-kubectl -n secrets get pods
 ```
-Vault must be Running and unsealed. If not, run `./scripts/k3d-manager reunseal_vault` first.
 
-**Step 3 — Live deploy:**
+### Step 2 — Apply the fix to `scripts/etc/keycloak/values.yaml.tmpl`
+
+Replace all three `registry: public.ecr.aws` stanzas. The fix needs both
+`registry` and `repository` changed:
+
+```yaml
+image:
+  registry: docker.io
+  repository: bitnamilegacy/keycloak
+
+keycloakConfigCli:
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/keycloak-config-cli
+
+postgresql:
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+```
+
+Then commit and push:
 ```bash
-logfile="scratch/logs/deploy_keycloak-$(date +%Y%m%d-%H%M%S).log"
-mkdir -p scratch/logs
-CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_keycloak --enable-vault --enable-ldap \
-  2>&1 | tee "$logfile"
+git add scripts/etc/keycloak/values.yaml.tmpl
+git commit -m "fix(keycloak): switch to bitnamilegacy for ARM64 support"
+git push origin fix/keycloak-image-fix-task
 ```
-Confirm: `keycloak-0` Running, `keycloak-postgresql-0` Running, config-cli Job completed, Helm exits 0.
 
-**Step 4 — Smoke test:**
-```bash
-logfile="scratch/logs/test_keycloak-$(date +%Y%m%d-%H%M%S).log"
-mkdir -p scratch/logs
-PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test_keycloak \
-  2>&1 | tee "$logfile"
-```
-All checks must pass. Report exact output.
-
-**Update this section with PASS/FAIL for each step and the log file paths.**
+Update this section with the commit SHA. **Stop here. Claude takes over.**
 
 ---
 
 ## Open Items
 
 - [x] Owner merges PR #13 → v0.5.0 ✅
-- [x] Keycloak image registry investigation (Gemini — `fix/keycloak-image-fix-task`) ✅ — `bitnamilegacy` on Docker Hub confirmed multi-arch
-- [x] Keycloak live deploy — `./scripts/k3d-manager deploy_keycloak --enable-ldap --enable-vault` + `./scripts/k3d-manager test_keycloak` executed with unsandboxed access; Helm release + ExternalSecrets verified on infra cluster.
-- [ ] Gemini verification of `fix/keycloak-image-fix-task` — pending
+- [x] Keycloak image registry investigation (Gemini) ✅ — `bitnamilegacy` confirmed multi-arch
+- [ ] Gemini applies `bitnamilegacy` fix to `values.yaml.tmpl` — pending
+- [ ] Claude verifies: live deploy + `test_keycloak` — pending Gemini commit
 - [ ] `configure_vault_app_auth` — `feature/app-cluster-deploy` (Codex)
 - [ ] App layer deploy on Ubuntu (Gemini — SSH interactive)
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
