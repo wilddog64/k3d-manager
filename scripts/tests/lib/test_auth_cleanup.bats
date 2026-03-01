@@ -203,7 +203,7 @@ SCRIPT
   chmod +x "$script"
 
   run env PROJECT_ROOT="$PROJECT_ROOT" \
-    VAULT_NS=vault VAULT_RELEASE=vault \
+    VAULT_NS=vault \\
     JENKINS_VALUES_FILE="$PROJECT_ROOT/scripts/etc/jenkins/values-test.yaml" \
     CLEANUP_LOG="$cleanup_log" AUTH_PATH_LOG="$auth_path_log" \
     DEPLOY_LOG="$deploy_log" DEPLOY_NS_LOG="$deploy_ns_log" \
