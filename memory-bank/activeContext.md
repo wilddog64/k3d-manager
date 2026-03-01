@@ -1,42 +1,17 @@
 # Active Context – k3d-manager
 
-## Current Branch: `fix/jenkins-cicd-namespace` (as of 2026-03-01)
+## Current Branch: `feature/argocd-phase1` (as of 2026-03-01)
 
-**v0.3.0 merged** — Two-cluster refactor, namespace renames, CLUSTER_ROLE, remote Vault ESO.
+**v0.3.1 merged** — Jenkins `cicd` namespace fix.
 
 ---
 
 ## Current Focus
 
-`fix/jenkins-cicd-namespace` branch ensures Jenkins honors the `cicd` namespace.
+Phase 1: Wire up ArgoCD for `cicd` namespace. Plugin + templates already exist;
+Codex needs to fix stale cluster-dump manifests and add Vault secret seeding.
 
-**2026-03-02 Update:**
-- `scripts/etc/jenkins/jenkins-home-pv.yaml.tmpl` now emits `$JENKINS_NAMESPACE`, and
-  `_create_jenkins_pv_pvc` exports the namespace before calling `envsubst`.
-- `deploy_jenkins` defaults to `${JENKINS_NAMESPACE:-jenkins}` when the CLI flag is
-  omitted, so env overrides take effect.
-- Tests: `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/lib/test_auth_cleanup.bats`
-  ✅, `shellcheck scripts/plugins/jenkins.sh` ✅. Attempting
-  `bats scripts/tests/plugins/jenkins.bats` fails because the file does not exist in
-  `scripts/tests/plugins/` (no Jenkins-specific suite yet).
-
----
-
-## Gemini Verification Task — Jenkins `cicd` Namespace Fix (Complete 2026-03-02) ✅
-
-**Branch:** `fix/jenkins-cicd-namespace`
-**Status:** Verified ✅
-
-### Results:
-
-1. **Code Verification:** **PASSED** ✅
-   - `scripts/etc/jenkins/jenkins-home-pv.yaml.tmpl` correctly uses `$JENKINS_NAMESPACE`.
-   - `scripts/plugins/jenkins.sh`: `_create_jenkins_pv_pvc` correctly exports `JENKINS_NAMESPACE` before `envsubst`.
-   - `scripts/plugins/jenkins.sh`: `deploy_jenkins` correctly defaults to `${JENKINS_NAMESPACE:-jenkins}` at line 1283.
-2. **Shellcheck:** **PASSED** ✅. `scripts/plugins/jenkins.sh` is clean.
-3. **Regression Tests:** **PASSED** ✅. `bats scripts/tests/lib/test_auth_cleanup.bats` passed 1/1.
-
-**Sign-off:** The 3 core changes are correct, complete, and logically sound. No regressions were found in existing tests. The branch is ready for PR.
+**Codex task spec:** `docs/plans/argocd-phase1-codex-task.md`
 
 ---
 
@@ -51,91 +26,63 @@
 | ESO | ✅ Running | `secrets` ns |
 | OpenLDAP | ✅ Running | `identity` ns |
 | Istio | ✅ Running | `istio-system` |
-| Jenkins | ✅ Running | `cicd` ns — smoke test passed (v0.3.1 fix) |
-| ArgoCD | ❌ Not deployed | no `deploy_argocd` command yet |
+| Jenkins | ✅ Running | `cicd` ns — smoke test passed (v0.3.1) |
+| ArgoCD | ❌ Not deployed | Awaiting Phase 1 PR merge |
 | Keycloak | ❌ Not deployed | no `deploy_keycloak` command yet |
 
-### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`, host: `<UBUNTU-IP>`)
+### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`)
 | Component | Status | Notes |
 |---|---|---|
-| k3s node | ✅ Ready | Fresh redeploy 2026-02-28, v1.34.4+k3s1 |
+| k3s node | ✅ Ready | v1.34.4+k3s1 |
 | Istio | ✅ Running | IngressGateway + istiod |
-| ESO | ❌ Pending | Deploy after PR merge with `REMOTE_VAULT_ADDR` |
+| ESO | ❌ Pending | Deploy after `configure_vault_app_auth` PR merges |
 | shopping-cart-data | ❌ Pending | PostgreSQL, Redis, RabbitMQ |
 | shopping-cart-apps | ❌ Pending | basket, order, payment, catalog, frontend |
-| observability | ❌ Pending | Prometheus + Grafana |
 
-**SSH note:** `ForwardAgent yes` in `~/.ssh/config`. If git auth fails: `ssh -O exit ubuntu` to kill stale ControlMaster.
-
----
-
-## What Changed in This PR (feature/two-cluster-infra)
-
-### Namespace renames (new defaults, env var overrides preserved)
-| Old | New | Var |
-|---|---|---|
-| `vault` + `external-secrets` | `secrets` | `VAULT_NS`, `ESO_NAMESPACE` |
-| `jenkins` | `cicd` | `JENKINS_NAMESPACE` |
-| `directory` | `identity` | `LDAP_NAMESPACE` |
-| `argocd` | `cicd` | `ARGOCD_NAMESPACE` |
-
-### New capabilities
-- `CLUSTER_ROLE=infra|app` in dispatcher — `app` skips Vault/Jenkins/LDAP/ArgoCD
-- `_eso_configure_remote_vault` in `scripts/plugins/eso.sh` — cross-cluster SecretStore
-- `REMOTE_VAULT_ADDR` + `REMOTE_VAULT_K8S_MOUNT` + `REMOTE_VAULT_K8S_ROLE` env vars
-- `VAULT_ENDPOINT` now dynamic: `http://vault.${VAULT_NS}.svc:8200`
-- `ARGOCD_LDAP_HOST` + `JENKINS_LDAP_HOST` updated to `identity` namespace
-
-### Bug fixes (post-review)
-- `deploy_vault`: `ns` now `${VAULT_NS:-$VAULT_NS_DEFAULT}` — respects `VAULT_NS` override
-- `_cleanup_cert_rotation_test`: uses `${JENKINS_NAMESPACE:-cicd}` directly, not out-of-scope local
-- `deploy_eso` remote SecretStore: passes `$ns` instead of `${ESO_NAMESPACE:-secrets}`
+**SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
 
 ---
 
-## Post-Merge Deployment Plan (Claude executes)
+## Codex Task — ArgoCD Phase 1 (Active)
 
-```
-1. Destroy infra cluster (k3d-k3d-test-orbstack-exists)
-2. Redeploy: CLUSTER_NAME=automation CLUSTER_ROLE=infra
-   → secrets/   (Vault + ESO)
-   → identity/  (OpenLDAP + Keycloak)
-   → cicd/      (Jenkins + ArgoCD)
-   → istio-system/
-3. Configure Vault kubernetes-app auth mount for app cluster
-4. Deploy app layer: CLUSTER_ROLE=app REMOTE_VAULT_ADDR=https://<MAC-IP>:8200
-   → ESO → shopping-cart-data → shopping-cart-apps
-```
+**Branch:** `feature/argocd-phase1`
+**Spec:** `docs/plans/argocd-phase1-codex-task.md`
+**Status:** Pending Codex implementation
 
----
+### Summary of Changes Required
 
-## Open Items (post-merge)
-
-- [ ] ArgoCD deploy on infra cluster (cicd ns)
-- [ ] Keycloak deploy on infra cluster (identity ns)
-- [ ] App layer deploy on Ubuntu (ESO + data + apps)
-- [ ] Wire ArgoCD to sync app cluster
-- [ ] Cloud Track A: Terraform + k3s on EC2 (blocked on two-cluster done)
-- [ ] Cloud Track 0: one-node EKS provider development
-- [ ] GitGuardian dashboard: mark 2026-02-28 incident as false positive (owner action)
-
----
-
-## Known Broken Paths
-
-### Pre-existing
-| Path | Root Cause |
+| File | Change |
 |---|---|
-| `deploy_jenkins` (no vault) | Policy creation always runs; jenkins-admin secret missing |
-| `--enable-ldap` without `--enable-vault` | LDAP secrets require Vault |
-| Basic LDAP deploys empty directory | No bootstrap LDIF; use `deploy_ad` as workaround |
+| `scripts/etc/argocd/projects/platform.yaml` → `platform.yaml.tmpl` | Strip server metadata, fix namespaces (vault→secrets, jenkins→cicd, directory→identity, argocd→cicd), parameterize namespace field |
+| `scripts/etc/argocd/applicationsets/platform-helm.yaml` | Strip server metadata, fix `namespace: argocd` → `cicd` |
+| `scripts/etc/argocd/applicationsets/services-git.yaml` | Strip server metadata, fix `your-org` → `wilddog64`, fix `namespace: argocd` → `cicd` |
+| `scripts/etc/argocd/applicationsets/demo-rollout.yaml` | Strip server metadata, fix `your-org` → `wilddog64`, fix `namespace: argocd` → `cicd` |
+| `scripts/plugins/argocd.sh` — `_argocd_deploy_appproject` | Use `envsubst '$ARGOCD_NAMESPACE'` since file is now `.tmpl` |
+| `scripts/plugins/argocd.sh` — add `_argocd_seed_vault_admin_secret` | Write random password to `secret/argocd/admin` in Vault if not present; call from `deploy_argocd --enable-vault` |
+| `scripts/tests/plugins/argocd.bats` | New — 6 test cases (help, CLUSTER_ROLE=app skip, namespace default, missing template error) |
 
-### New (found during v0.3.0 rebuild — 2026-03-01)
-| Path | Root Cause | Severity | Doc |
-|---|---|---|---|
-| `CLUSTER_NAME=automation` ignored | Cluster created as `k3d-cluster`; env var not picked up in provider | P3 | `docs/issues/2026-03-01-cluster-name-env-var-not-respected.md` |
-| `deploy_jenkins --namespace cicd` fails at PV/PVC | `jenkins-home-pv.yaml.tmpl` has `namespace: jenkins` hardcoded | P2 | `docs/issues/2026-03-01-jenkins-pv-template-hardcoded-namespace.md` |
-| `JENKINS_NAMESPACE=cicd deploy_jenkins` ignored | Line 1281 defaults to `"jenkins"` literal, not `${JENKINS_NAMESPACE:-jenkins}` | P3 | `docs/issues/2026-03-01-deploy-jenkins-ignores-jenkins-namespace-env-var.md` |
+### What is Already Correct (do NOT change)
+- `scripts/plugins/argocd.sh` — `deploy_argocd`, `deploy_argocd_bootstrap`, all other helpers
+- `scripts/etc/argocd/vars.sh` — namespace is `cicd`, LDAP host is `identity` ns ✅
+- `scripts/etc/argocd/values.yaml.tmpl`
+- `scripts/etc/argocd/secretstore.yaml.tmpl`
+- `scripts/etc/argocd/virtualservice.yaml.tmpl`
+- `scripts/etc/argocd/externalsecret-admin.yaml.tmpl`
+- `scripts/etc/argocd/externalsecret-ldap.yaml.tmpl`
+
+### Verification (Codex must run)
+```bash
+shellcheck scripts/plugins/argocd.sh
+PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/argocd.bats
+```
+
+---
+
+## Parallel Branch: `feature/app-cluster-deploy`
+
+Codex task block in `docs/plans/app-cluster-deploy.md`.
+Implements `configure_vault_app_auth` command for Ubuntu k3s ESO setup.
+**Status:** Pending Codex implementation (not the current focus).
 
 ---
 
@@ -148,7 +95,18 @@
 | v0.2.1 | ✅ released 2026-02-28 | Docs-only: CHANGE.md + README Releases table |
 | v0.3.0 | ✅ merged 2026-03-01 | Two-cluster refactor, namespace renames, CLUSTER_ROLE, remote Vault ESO |
 | v0.3.1 | ✅ merged 2026-03-01 | Jenkins `cicd` namespace fix — PV template + env var override |
-| v1.0.0 | future | Production-hardened, all known-broken paths resolved |
+| v0.4.0 | future | ArgoCD Phase 1 |
+
+---
+
+## Open Items (post v0.3.1)
+
+- [ ] ArgoCD Phase 1 — `feature/argocd-phase1` (Codex)
+- [ ] App layer deploy on Ubuntu (Gemini — SSH interactive)
+- [ ] `configure_vault_app_auth` — `feature/app-cluster-deploy` (Codex)
+- [ ] Keycloak deploy (no command yet)
+- [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
+- [ ] `scripts/tests/plugins/jenkins.bats` — backlog
 
 ---
 
@@ -158,18 +116,9 @@
 - **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`)
 - **LDAP bind DN**: keep `LDAP_BASE_DN` in sync with LDIF bootstrap base DN
 - **Jenkins admin password**: contains special chars — always quote `-u "user:$pass"`
-- **SMB CSI on macOS**: `cifs` kernel module unavailable — skip guard active
 - **Vault reboot unseal**: dual-path — macOS Keychain + Linux libsecret; k8s `vault-unseal` secret is fallback
-- **Ubuntu SSH agent forwarding**: `ForwardAgent yes` set. Stale socket fix: `ssh -O exit ubuntu`
 - **New namespace defaults**: `secrets`, `identity`, `cicd` — old names still work via env var override
-
----
-
-## Branch Protection
-
-- 1 required PR approval, stale review dismissal, enforce admins disabled
-- Required status checks: `lint` (Stage 1) and `stage2` (Stage 2)
-- Tag: `@copilot` in PR body for automated review
+- **Branch protection**: `enforce_admins` permanently disabled — owner can self-merge
 
 ---
 
@@ -187,9 +136,10 @@ Gemini
   └── verifies root cause is correct (runs tests locally)
   └── writes Codex instructions with exact fix spec
   └── updates memory-bank with Codex task block
+  └── handles Ubuntu SSH deployment (interactive)
 
 Codex
-  └── reads memory-bank Codex task block (written by Gemini)
+  └── reads memory-bank Codex task block (written by Gemini or Claude for pre-verified tasks)
   └── implements fix, commits, pushes
   └── does NOT open PRs
 
@@ -198,5 +148,7 @@ Owner
 ```
 
 **Lesson learned (2026-03-01):** Claude wrote Codex fix instructions directly,
-which caused Codex to apply an over-broad fix. Bug reports should always go
-through Gemini for verification before Codex gets a fix spec.
+which caused Codex to apply an over-broad fix. Bug reports should go through
+Gemini for verification before Codex gets a fix spec.
+**Exception:** Claude can write Codex task blocks for structural changes (manifest
+cleanup, namespace renames) that don't require live cluster verification.
