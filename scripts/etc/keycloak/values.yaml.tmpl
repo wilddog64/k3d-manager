@@ -8,7 +8,7 @@ service:
   ports:
     http: ${KEYCLOAK_SERVICE_PORT}
 keycloakConfigCli:
-  enabled: true
+  enabled: ${KEYCLOAK_CONFIG_CLI_ENABLED}
   existingConfigmap: keycloak-realm-config
   podAnnotations:
     sidecar.istio.io/inject: "false"

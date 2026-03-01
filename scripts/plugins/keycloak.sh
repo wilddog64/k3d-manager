@@ -75,10 +75,11 @@ HELP
    fi
 
    local enable_ldap=0 enable_vault=0 skip_istio=0
+   local config_cli_enabled="${KEYCLOAK_CONFIG_CLI_ENABLED:-false}"
 
    while [[ $# -gt 0 ]]; do
       case "$1" in
-         --enable-ldap) enable_ldap=1; shift ;;
+         --enable-ldap) enable_ldap=1; config_cli_enabled="true"; shift ;;
          --enable-vault) enable_vault=1; shift ;;
          --skip-istio) skip_istio=1; shift ;;
          *)
@@ -95,14 +96,19 @@ HELP
    _helm repo add "$KEYCLOAK_HELM_REPO_NAME" "$KEYCLOAK_HELM_REPO_URL"
    _helm repo update >/dev/null 2>&1
 
-   if (( enable_vault )); then
-      _keycloak_seed_vault_admin_secret
+   if (( enable_vault || enable_ldap )); then
       _keycloak_setup_vault_policies
       envsubst < "$KEYCLOAK_CONFIG_DIR/secretstore.yaml.tmpl" | _kubectl apply -f - >/dev/null
+   fi
+
+   if (( enable_vault )); then
+      _keycloak_seed_vault_admin_secret
       envsubst < "$KEYCLOAK_CONFIG_DIR/externalsecret-admin.yaml.tmpl" | _kubectl apply -f - >/dev/null
       if ! _kubectl -n "$KEYCLOAK_NAMESPACE" wait --for=condition=Ready --timeout=60s externalsecret/"$KEYCLOAK_ADMIN_SECRET_NAME" 2>/dev/null; then
          _warn "[keycloak] Timeout waiting for admin ExternalSecret"
       fi
+   else
+      _keycloak_ensure_admin_secret
    fi
 
    if (( enable_ldap )); then
@@ -116,7 +122,8 @@ HELP
    local values_file
    values_file=$(mktemp -t keycloak-values.XXXXXX.yaml)
    trap '$(_cleanup_trap_command "$values_file")' EXIT
-   envsubst '$KEYCLOAK_ADMIN_USERNAME $KEYCLOAK_ADMIN_SECRET_NAME $KEYCLOAK_ADMIN_PASSWORD_KEY $KEYCLOAK_NAMESPACE $KEYCLOAK_SERVICE_PORT $KEYCLOAK_VIRTUALSERVICE_HOST' \
+   KEYCLOAK_CONFIG_CLI_ENABLED="$config_cli_enabled"
+   envsubst '$KEYCLOAK_ADMIN_USERNAME $KEYCLOAK_ADMIN_SECRET_NAME $KEYCLOAK_ADMIN_PASSWORD_KEY $KEYCLOAK_NAMESPACE $KEYCLOAK_SERVICE_PORT $KEYCLOAK_VIRTUALSERVICE_HOST $KEYCLOAK_CONFIG_CLI_ENABLED' \
       < "$KEYCLOAK_CONFIG_DIR/values.yaml.tmpl" > "$values_file"
 
    _info "[keycloak] Installing/Upgrading Helm release"
@@ -164,6 +171,27 @@ function _keycloak_seed_vault_admin_secret() {
    fi
 
    _info "[keycloak] Admin password seeded at ${secret_path}"
+}
+
+
+function _keycloak_ensure_admin_secret() {
+   if _kubectl --no-exit -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_ADMIN_SECRET_NAME" >/dev/null 2>&1; then
+      return 0
+   fi
+
+   local password
+   password=$(LC_ALL=C tr -dc 'A-Za-z0-9!@#%^&*' </dev/urandom | head -c 24)
+
+   cat <<EOF | _kubectl apply -f - >/dev/null
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${KEYCLOAK_ADMIN_SECRET_NAME}
+  namespace: ${KEYCLOAK_NAMESPACE}
+type: Opaque
+stringData:
+  ${KEYCLOAK_ADMIN_PASSWORD_KEY}: ${password}
+EOF
 }
 
 function _keycloak_setup_vault_policies() {
