@@ -147,12 +147,32 @@ Minimum checks:
    (via `kubectl exec` in a curl pod or via port-forward)
 4. ExternalSecrets `keycloak-admin-secret` + `keycloak-ldap-secret` are `Ready`
 
-### Verification
+### Verification — Codex MUST run all three steps in order
 
+**Step 1 — Static checks:**
 ```bash
 shellcheck scripts/plugins/keycloak.sh
 PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats
 ```
+
+**Step 2 — Live deploy (required, not optional):**
+```bash
+./scripts/k3d-manager deploy_keycloak --enable-ldap --enable-vault
+```
+
+Codex must confirm:
+- All 3 pods reach Running: `keycloak-0`, `keycloak-postgresql-0`, `keycloak-keycloak-config-cli` (Job completes)
+- No `ImagePullBackOff` — pinned chart version resolves to a real image
+- Helm install exits 0
+
+**Step 3 — End-to-end smoke test:**
+```bash
+./scripts/k3d-manager test_keycloak
+```
+
+All checks in `test_keycloak` must pass before committing. Report exact
+output of all three steps in the commit message or memory bank update.
+Do NOT commit if the live deploy or smoke test fails.
 
 ---
 
