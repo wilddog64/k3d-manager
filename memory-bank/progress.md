@@ -77,7 +77,7 @@ Verified by Gemini: shellcheck clean, ESO API v1 fixed, regression tests green o
   - [x] Vault + ESO → `secrets` ns
   - [x] OpenLDAP → `identity` ns
   - [x] Istio → `istio-system`
-  - [ ] Jenkins → `cicd` ns (fix verified by Gemini on `fix/jenkins-cicd-namespace` 2026-03-02)
+  - [x] Jenkins → `cicd` ns — **DEPLOYED 2026-03-01** (v0.3.1, smoke test passed)
   - [ ] ArgoCD → `cicd` ns (no deploy command yet)
   - [ ] Keycloak → `identity` ns (no deploy command yet)
 - [ ] Configure Vault `kubernetes-app` auth mount for Ubuntu app cluster
