@@ -1,6 +1,6 @@
 # Active Context – k3d-manager
 
-## Current Branch: `main` (as of 2026-03-01)
+## Current Branch: `fix/jenkins-cicd-namespace` (as of 2026-03-01)
 
 **v0.3.0 merged** — Two-cluster refactor, namespace renames, CLUSTER_ROLE, remote Vault ESO.
 
@@ -8,10 +8,66 @@
 
 ## Current Focus
 
-Post-merge infra cluster rebuild in progress. Partial success — 3 of 5 components deployed.
-Two new bugs found and documented during rebuild (see Known Bugs section).
+Fix Jenkins namespace bugs that block `deploy_jenkins --namespace cicd`.
+Two changes in `jenkins.sh`, one in `jenkins-home-pv.yaml.tmpl`.
 
-Next: fix Jenkins PV template bug (P2) → redeploy Jenkins to `cicd` → configure Vault for app cluster → deploy app layer on Ubuntu.
+---
+
+## Codex Task — Jenkins `cicd` Namespace Fix
+
+**Branch:** `fix/jenkins-cicd-namespace`
+**Plan:** `docs/plans/jenkins-cicd-namespace-fix.md`
+**Issues:** `docs/issues/2026-03-01-jenkins-pv-template-hardcoded-namespace.md` (P2)
+           `docs/issues/2026-03-01-deploy-jenkins-ignores-jenkins-namespace-env-var.md` (P3)
+
+### Exact changes required (3 total)
+
+**Change 1 — `scripts/etc/jenkins/jenkins-home-pv.yaml.tmpl` line 13:**
+```yaml
+# Before:
+  namespace: jenkins
+# After:
+  namespace: $JENKINS_NAMESPACE
+```
+
+**Change 2 — `scripts/plugins/jenkins.sh` inside `_create_jenkins_pv_pvc` (~line 456):**
+Add `export JENKINS_NAMESPACE="$jenkins_namespace"` immediately before the `envsubst` call:
+```bash
+   # BEFORE envsubst line:
+   export JENKINS_NAMESPACE="$jenkins_namespace"
+   envsubst < "$jenkins_pv_template" > "$jenkinsyamfile"
+```
+
+**Change 3 — `scripts/plugins/jenkins.sh` line 1281:**
+```bash
+# Before:
+jenkins_namespace="${jenkins_namespace:-jenkins}"
+# After:
+jenkins_namespace="${jenkins_namespace:-${JENKINS_NAMESPACE:-jenkins}}"
+```
+
+### What NOT to change
+
+- `vault-seed-wrapper.yaml` — not auto-deployed, skip it
+- No new bats tests needed — run existing tests to verify no regression
+
+### After implementing, run:
+```bash
+PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/jenkins.bats
+PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/lib/test_auth_cleanup.bats
+shellcheck scripts/plugins/jenkins.sh
+```
+
+### Commit message:
+```
+fix(jenkins): allow deploy_jenkins to target any namespace
+
+- jenkins-home-pv.yaml.tmpl: use $JENKINS_NAMESPACE instead of hardcoded "jenkins"
+- _create_jenkins_pv_pvc: export JENKINS_NAMESPACE before envsubst
+- deploy_jenkins line 1281: fall back to $JENKINS_NAMESPACE env var
+
+Fixes: deploy_jenkins --namespace cicd failing with namespace mismatch error.
+```
 
 ---
 
