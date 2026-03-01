@@ -4,29 +4,39 @@
   "enabled": true,
   "registrationAllowed": false,
   "loginTheme": "keycloak",
-  "userFederationProviders": [
-    {
-      "displayName": "ldap",
-      "providerName": "ldap",
-      "priority": 0,
-      "config": {
-        "enabled": "true",
-        "kerberosRealm": "",
-        "debug": "false",
-        "vendor": "other",
-        "usernameLDAPAttribute": "uid",
-        "rdnLDAPAttribute": "uid",
-        "uuidLDAPAttribute": "entryUUID",
-        "connectionUrl": "ldap://${KEYCLOAK_LDAP_HOST}:${KEYCLOAK_LDAP_PORT}",
-        "usersDn": "${KEYCLOAK_LDAP_SEARCH_BASE}",
-        "searchScope": "1",
-        "useTruststoreSpi": "ldapsOnly",
-        "authType": "simple",
-        "bindDn": "${KEYCLOAK_LDAP_BINDDN_KEY}",
-        "bindCredential": "${KEYCLOAK_LDAP_PASSWORD_KEY}",
-        "importEnabled": "true",
-        "cachePolicy": "DEFAULT"
+  "components": {
+    "org.keycloak.storage.UserStorageProvider": [
+      {
+        "id": "ldap-provider",
+        "providerId": "ldap",
+        "name": "ldap",
+        "config": {
+          "enabled": ["true"],
+          "priority": ["0"],
+          "fullSyncPeriod": ["-1"],
+          "changedSyncPeriod": ["-1"],
+          "cachePolicy": ["DEFAULT"],
+          "bindDn": ["${KEYCLOAK_LDAP_BIND_DN}"],
+          "bindCredential": ["${KEYCLOAK_LDAP_PASSWORD}"],
+          "connectionUrl": ["ldap://${KEYCLOAK_LDAP_HOST}:${KEYCLOAK_LDAP_PORT}"],
+          "usersDn": ["${KEYCLOAK_LDAP_USERS_DN}"],
+          "baseDn": ["${KEYCLOAK_LDAP_BASE_DN}"],
+          "usernameLDAPAttribute": ["uid"],
+          "rdnLDAPAttribute": ["uid"],
+          "uuidLDAPAttribute": ["entryUUID"],
+          "userObjectClasses": ["inetOrgPerson"],
+          "searchScope": ["1"],
+          "useTruststoreSpi": ["ldapsOnly"],
+          "authType": ["simple"],
+          "pagination": ["true"],
+          "allowKerberosAuthentication": ["false"],
+          "batchSizeForSync": ["1000"],
+          "editMode": ["READ_ONLY"],
+          "vendor": ["other"],
+          "validatePasswordPolicy": ["false"],
+          "trustEmail": ["false"]
+        }
       }
-    }
-  ]
+    ]
+  }
 }

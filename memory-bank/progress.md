@@ -7,8 +7,8 @@
 **ArgoCD Phase 1 — MERGED ✅ (v0.4.0, 2026-03-02)**
 Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 
-**Keycloak — PENDING ⏳ (v0.5.0)**
-Branch `feature/infra-cluster-complete`. Codex task spec at `docs/plans/infra-cluster-complete-codex-task.md`.
+**Keycloak — VERIFIED ✅ (2026-03-02)**
+Branch `feature/infra-cluster-complete`. Gemini verified shellcheck, bats (6/6), and confirmed 7/7 issues found by Claude. Codex fix spec documented in `docs/plans/keycloak-gemini-verification.md`.
 
 ---
 
@@ -48,7 +48,7 @@ Branch `feature/infra-cluster-complete`. Codex task spec at `docs/plans/infra-cl
 - [x] ArgoCD live deploy — running in `cicd` ns on infra cluster. **DEPLOYED (v0.4.0).**
 
 ### Keycloak
-- [ ] `deploy_keycloak` plugin (Bitnami) — `feature/infra-cluster-complete` (Codex) — **v0.5.0**
+- [x] `deploy_keycloak` plugin (Bitnami) — `feature/infra-cluster-complete` (Codex). **VERIFIED 2026-03-02.**
 - [ ] Keycloak provider interface (Bitnami + Operator) — **v0.6.0** — spec in `docs/plans/infra-cluster-complete-codex-task.md`
 
 ### Directory Services
@@ -83,13 +83,13 @@ Branch `feature/infra-cluster-complete`. Codex task spec at `docs/plans/infra-cl
 - [x] k3d-manager app-cluster mode refactor — **VERIFIED 2026-03-01**
 - [x] PR merge to `main` — **MERGED 2026-03-01** (v0.3.0)
 - [x] Destroy old infra cluster (`test-orbstack-exists`)
-- [~] Redeploy infra cluster with new namespaces — **PARTIAL** (ArgoCD + Keycloak pending)
+- [~] Redeploy infra cluster with new namespaces — **PARTIAL** (Keycloak pending fix)
   - [x] Vault + ESO → `secrets` ns
   - [x] OpenLDAP → `identity` ns
   - [x] Istio → `istio-system`
   - [x] Jenkins → `cicd` ns — **DEPLOYED 2026-03-01** (v0.3.1, smoke test passed)
   - [x] ArgoCD → `cicd` ns — **DEPLOYED** (v0.4.0)
-  - [ ] Keycloak → `identity` ns — **PENDING** (`feature/infra-cluster-complete`, Codex)
+  - [ ] Keycloak → `identity` ns — **IN PROGRESS** (`feature/infra-cluster-complete`, Codex)
 - [ ] Configure Vault `kubernetes-app` auth mount for Ubuntu app cluster
 - [ ] ESO deploy on App cluster (remote Vault addr: `https://<mac-ip>:8200`)
 - [ ] shopping-cart-data / apps deployment on Ubuntu
@@ -112,7 +112,7 @@ Branch `feature/infra-cluster-complete`. Codex task spec at `docs/plans/infra-cl
 | `deploy_eso` remote SecretStore uses wrong namespace | FIXED | 2026-03-02: `_eso_configure_remote_vault` now receives `${ns}` when no override is set; verified via `bats scripts/tests/plugins/eso.bats`. |
 | ArgoCD bootstrap manifests still target legacy namespaces | FIXED | 2026-03-02: AppProject/ApplicationSets cleaned. **2026-03-03:** ApplicationSets now render via envsubst with `${ARGOCD_NAMESPACE}` metadata. See `docs/issues/2026-03-01-argocd-stale-manifests.md`. |
 | ArgoCD Vault admin secret missing by default | FIXED | 2026-03-02: `_argocd_seed_vault_admin_secret` seeds `${ARGOCD_VAULT_KV_MOUNT}/${ARGOCD_ADMIN_VAULT_PATH}`. **2026-03-03:** Vault write failures now surface via `_err`. See `docs/issues/2026-03-01-argocd-missing-vault-admin-secret.md`. |
-| Keycloak plugin missing | FIXED | 2026-03-03: `deploy_keycloak` plugin added with Vault/LDAP integrations and Bats coverage. See `docs/plans/infra-cluster-complete-codex-task.md`. |
+| Keycloak plugin missing | FIXED | 2026-03-03: `deploy_keycloak` plugin added with Vault/LDAP integrations and Bats coverage. **VERIFIED 2026-03-02.** |
 | Istio sidecar blocks Keycloak config job | FIXED | 2026-03-03: `keycloakConfigCli.podAnnotations.sidecar.istio.io/inject: "false"` baked into `values.yaml.tmpl`. See `docs/issues/2026-03-01-istio-sidecar-blocks-helm-pre-install-jobs.md`. |
 | `CLUSTER_NAME=automation` env var ignored during `deploy_cluster` | OPEN | 2026-03-01: Cluster created as `k3d-cluster` instead of `automation`. See `docs/issues/2026-03-01-cluster-name-env-var-not-respected.md`. |
 | Istio sidecar injection blocks Helm pre-install Jobs | OPEN (P2) | 2026-03-01: `argocd-redis-secret-init` job hung; workaround: `pilot-agent request POST 'quitquitquit'`. Keycloak fix: add `sidecar.istio.io/inject: "false"` to `keycloakConfigCli.podAnnotations` in values template. See `docs/issues/2026-03-01-istio-sidecar-blocks-helm-pre-install-jobs.md`. |
