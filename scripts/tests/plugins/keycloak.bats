@@ -35,3 +35,11 @@ setup() {
 @test "_keycloak_seed_vault_admin_secret function exists" {
   declare -F _keycloak_seed_vault_admin_secret >/dev/null
 }
+
+@test "KEYCLOAK_CONFIG_CLI_ENABLED defaults to false" {
+  [ "$KEYCLOAK_CONFIG_CLI_ENABLED" = "false" ]
+}
+
+@test "test_keycloak function exists" {
+  declare -F test_keycloak >/dev/null
+}
