@@ -1,5 +1,63 @@
 # Changes - k3d-manager
 
+## v0.5.0 - dated 2026-03-03
+
+### Keycloak Plugin — Infra Cluster Complete
+
+- `deploy_keycloak [--enable-ldap] [--enable-vault] [--skip-istio]` — deploys Bitnami
+  Keycloak chart to the `identity` namespace with full ESO/Vault and LDAP federation
+  support
+- `_keycloak_seed_vault_admin_secret` — generates a random 24-char admin password and
+  seeds it at `${KEYCLOAK_VAULT_KV_MOUNT}/${KEYCLOAK_ADMIN_VAULT_PATH}` in Vault on
+  first deploy; skips if secret already exists
+- `_keycloak_setup_vault_policies` — writes Vault policy and Kubernetes auth role for
+  the ESO service account; idempotent
+- `_keycloak_apply_realm_configmap` — renders `realm-config.json.tmpl` via `envsubst`
+  (LDAP bind credential injected from K8s secret), applies as ConfigMap
+  `keycloak-realm-config` consumed by `keycloakConfigCli`
+
+### New Templates (`scripts/etc/keycloak/`)
+
+| File | Purpose |
+|---|---|
+| `vars.sh` | All Keycloak config variables with sane defaults |
+| `values.yaml.tmpl` | Bitnami Helm values — ClusterIP, `keycloakConfigCli` enabled |
+| `secretstore.yaml.tmpl` | ESO SecretStore + ServiceAccount backed by Vault Kubernetes auth |
+| `externalsecret-admin.yaml.tmpl` | Admin password synced from Vault |
+| `externalsecret-ldap.yaml.tmpl` | LDAP bind password synced from existing `ldap/openldap-admin` path |
+| `realm-config.json.tmpl` | Keycloak 17+ `components` format realm JSON with OpenLDAP federation |
+| `virtualservice.yaml.tmpl` | Istio VirtualService — namespace and gateway fully parameterised |
+
+### Bug Fixes
+
+- `realm-config.json.tmpl` — uses modern Keycloak 17+ `components` format (not
+  deprecated `userFederationProviders`)
+- `values.yaml.tmpl` — `keycloakConfigCli.podAnnotations` sets
+  `sidecar.istio.io/inject: "false"` to prevent Istio sidecar blocking Job completion
+  (same root cause as ArgoCD `redis-secret-init` — see
+  `docs/issues/2026-03-01-istio-sidecar-blocks-helm-pre-install-jobs.md`)
+- `_keycloak_apply_realm_configmap` — LDAP credentials read from K8s secret at deploy
+  time and passed via `envsubst` environment, not hardcoded
+- `envsubst` whitelist includes `$KEYCLOAK_LDAP_USERS_DN` so `usersDn` in the realm
+  JSON is correctly substituted
+
+### Tests
+
+- `scripts/tests/plugins/keycloak.bats` — 6 cases:
+  - `deploy_keycloak --help` exits 0 with usage text
+  - `deploy_keycloak` skips when `CLUSTER_ROLE=app`
+  - `KEYCLOAK_NAMESPACE` defaults to `identity`
+  - `KEYCLOAK_HELM_RELEASE` defaults to `keycloak`
+  - `deploy_keycloak` rejects unknown option with exit 1
+  - `_keycloak_seed_vault_admin_secret` is defined as a function
+
+### Verification
+
+- `shellcheck scripts/plugins/keycloak.sh` clean
+- `bats scripts/tests/plugins/keycloak.bats` 6/6 passed (verified by Gemini 2026-03-03)
+
+---
+
 ## v0.4.0 - dated 2026-03-02
 
 ### ArgoCD Phase 1 — Core Deployment
