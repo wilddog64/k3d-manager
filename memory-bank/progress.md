@@ -70,8 +70,16 @@ Verified by Gemini: shellcheck clean, ESO API v1 fixed, regression tests green o
 
 **Two-Cluster Implementation:**
 - [x] k3d-manager app-cluster mode refactor — **VERIFIED 2026-03-01**
-- [ ] PR merge to `main` — **READY FOR CLAUDE**
-- [ ] Destroy infra cluster → redeploy with new namespaces (secrets/identity/cicd)
+- [x] PR merge to `main` — **MERGED 2026-03-01** (v0.3.0)
+- [x] Destroy old infra cluster (`test-orbstack-exists`)
+- [~] Redeploy infra cluster with new namespaces — **PARTIAL** (Jenkins blocked by PV template bug)
+  - [x] Vault + ESO → `secrets` ns
+  - [x] OpenLDAP → `identity` ns
+  - [x] Istio → `istio-system`
+  - [ ] Jenkins → `cicd` ns (blocked: P2 PV template bug — needs Codex fix)
+  - [ ] ArgoCD → `cicd` ns (no deploy command yet)
+  - [ ] Keycloak → `identity` ns (no deploy command yet)
+- [ ] Configure Vault `kubernetes-app` auth mount for Ubuntu app cluster
 - [ ] ESO deploy on App cluster (remote Vault addr: `https://<mac-ip>:8200`)
 - [ ] shopping-cart-data / apps deployment on Ubuntu
 
@@ -111,3 +119,6 @@ Write articles as milestones are reached. Each post builds on the last.
 | `deploy_vault` ignores `VAULT_NS` env var | FIXED | 2026-03-02: `ns` in `deploy_vault` now initializes from `${VAULT_NS:-$VAULT_NS_DEFAULT}` (commit `4c1a407`). |
 | `_cleanup_cert_rotation_test` uses out-of-scope `jenkins_ns` | FIXED | 2026-03-02: `_cleanup_cert_rotation_test` now references `${JENKINS_NAMESPACE:-cicd}` directly so the EXIT trap no longer errors under `set -u`. |
 | `deploy_eso` remote SecretStore uses wrong namespace | FIXED | 2026-03-02: `_eso_configure_remote_vault` now receives `${ns}` when no override is set; verified via `bats scripts/tests/plugins/eso.bats`. |
+| `CLUSTER_NAME=automation` env var ignored during `deploy_cluster` | OPEN | 2026-03-01: Cluster created as `k3d-cluster` instead of `automation`. See `docs/issues/2026-03-01-cluster-name-env-var-not-respected.md`. |
+| `jenkins-home-pv.yaml.tmpl` has `namespace: jenkins` hardcoded | OPEN | 2026-03-01: P2 — blocks `deploy_jenkins --namespace cicd`. See `docs/issues/2026-03-01-jenkins-pv-template-hardcoded-namespace.md`. |
+| `deploy_jenkins` ignores `JENKINS_NAMESPACE` env var | OPEN | 2026-03-01: P3 — line 1281 defaults to `jenkins` literal; use `--namespace cicd` flag instead. See `docs/issues/2026-03-01-deploy-jenkins-ignores-jenkins-namespace-env-var.md`. |

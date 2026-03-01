@@ -1,38 +1,34 @@
 # Active Context – k3d-manager
 
-## Current Branch: `feature/two-cluster-infra` (as of 2026-03-02)
+## Current Branch: `main` (as of 2026-03-01)
 
-**v0.2.1 released** — OrbStack validated, Vault reboot unseal, Jenkins k8s agents, docs.
-**v0.3.0 — PR #8 READY FOR MERGE** — all checks green, Gemini sign-off complete.
+**v0.3.0 merged** — Two-cluster refactor, namespace renames, CLUSTER_ROLE, remote Vault ESO.
 
 ---
 
 ## Current Focus
 
-PR #8 (`feature/two-cluster-infra`) is ready to merge. All 4 code fixes verified:
-- `test_auth_cleanup.bats` sub-calls restored (lint ✅)
-- `deploy_vault` respects `VAULT_NS`
-- `_cleanup_cert_rotation_test` EXIT trap scope fix
-- `deploy_eso` remote SecretStore namespace fix
+Post-merge infra cluster rebuild in progress. Partial success — 3 of 5 components deployed.
+Two new bugs found and documented during rebuild (see Known Bugs section).
 
-After merge: destroy infra cluster → redeploy with new namespaces → deploy app layer on Ubuntu.
+Next: fix Jenkins PV template bug (P2) → redeploy Jenkins to `cicd` → configure Vault for app cluster → deploy app layer on Ubuntu.
 
 ---
 
 ## Cluster State (as of 2026-03-01)
 
-### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-test-orbstack-exists`)
+### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-cluster`)
+**Note:** Cluster name is `k3d-cluster` (CLUSTER_NAME=automation env var ignored — see open bug).
+
 | Component | Status | Notes |
 |---|---|---|
-| Vault | ✅ Running | will be redeployed to `secrets` ns after PR merge |
-| ESO | ✅ Running | will move to `secrets` ns |
-| Jenkins | ✅ Running | will move to `cicd` ns |
-| OpenLDAP | ✅ Running | will move to `identity` ns |
-| Istio | ✅ Running | stays `istio-system` |
-| ArgoCD | ❌ Not deployed | add during infra redeploy |
-| Keycloak | ❌ Not deployed | add during infra redeploy |
-
-Context `k3d-automation` is dead (old cluster, port gone — ignore).
+| Vault | ✅ Running | `secrets` ns, initialized + unsealed |
+| ESO | ✅ Running | `secrets` ns |
+| OpenLDAP | ✅ Running | `identity` ns |
+| Istio | ✅ Running | `istio-system` |
+| Jenkins | ❌ Blocked | PV template has hardcoded `namespace: jenkins` — P2 bug |
+| ArgoCD | ❌ Not deployed | no `deploy_argocd` command yet |
+| Keycloak | ❌ Not deployed | no `deploy_keycloak` command yet |
 
 ### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`, host: `<UBUNTU-IP>`)
 | Component | Status | Notes |
@@ -100,12 +96,21 @@ Context `k3d-automation` is dead (old cluster, port gone — ignore).
 
 ---
 
-## Known Broken Paths (all pre-existing)
+## Known Broken Paths
+
+### Pre-existing
 | Path | Root Cause |
 |---|---|
 | `deploy_jenkins` (no vault) | Policy creation always runs; jenkins-admin secret missing |
 | `--enable-ldap` without `--enable-vault` | LDAP secrets require Vault |
 | Basic LDAP deploys empty directory | No bootstrap LDIF; use `deploy_ad` as workaround |
+
+### New (found during v0.3.0 rebuild — 2026-03-01)
+| Path | Root Cause | Severity | Doc |
+|---|---|---|---|
+| `CLUSTER_NAME=automation` ignored | Cluster created as `k3d-cluster`; env var not picked up in provider | P3 | `docs/issues/2026-03-01-cluster-name-env-var-not-respected.md` |
+| `deploy_jenkins --namespace cicd` fails at PV/PVC | `jenkins-home-pv.yaml.tmpl` has `namespace: jenkins` hardcoded | P2 | `docs/issues/2026-03-01-jenkins-pv-template-hardcoded-namespace.md` |
+| `JENKINS_NAMESPACE=cicd deploy_jenkins` ignored | Line 1281 defaults to `"jenkins"` literal, not `${JENKINS_NAMESPACE:-jenkins}` | P3 | `docs/issues/2026-03-01-deploy-jenkins-ignores-jenkins-namespace-env-var.md` |
 
 ---
 
@@ -116,7 +121,7 @@ Context `k3d-automation` is dead (old cluster, port gone — ignore).
 | v0.1.0 | ✅ released 2026-02-27 | Initial release |
 | v0.2.0 | ✅ released 2026-02-27 | OrbStack, Vault reboot unseal, Jenkins k8s agents |
 | v0.2.1 | ✅ released 2026-02-28 | Docs-only: CHANGE.md + README Releases table |
-| v0.3.0 | ✅ ready to merge | Two-cluster refactor, namespace renames, CLUSTER_ROLE, remote Vault ESO |
+| v0.3.0 | ✅ merged 2026-03-01 | Two-cluster refactor, namespace renames, CLUSTER_ROLE, remote Vault ESO |
 | v1.0.0 | future | Production-hardened, all known-broken paths resolved |
 
 ---
