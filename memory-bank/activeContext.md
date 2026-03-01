@@ -138,14 +138,36 @@ Evidence captured: regression tests green on m4-air existing cluster.
 
 ---
 
-## ⚠️ Codex Fix Required — ESO API Version
+## ⚠️ Codex Fix Required (2026-03-01)
 
+Branch: `feature/two-cluster-infra`
+Gemini reviewed and found **two issues** to fix. Do NOT open a PR after fixing — Gemini re-checks, then Claude opens the PR.
+
+### Fix 1 — ESO API version (blocking)
 **File:** `scripts/plugins/eso.sh`, lines 121 and 142
 **Problem:** `_eso_configure_remote_vault` uses `apiVersion: external-secrets.io/v1beta1`
 **Fix:** Change both occurrences to `apiVersion: external-secrets.io/v1`
 **Reference:** `docs/issues/2026-02-27-test-eso-apiversion-mismatch.md`
 
-After fixing, do NOT open a PR. Gemini re-checks, then Claude opens the PR.
+### Fix 2 — shellcheck warnings (non-blocking but clean up in same pass)
+**Files:** any modified file that produced shellcheck warnings during Gemini's review
+**Fix:** resolve all shellcheck warnings in the modified files
+Run locally to find them:
+```bash
+shellcheck scripts/plugins/eso.sh scripts/plugins/vault.sh scripts/plugins/ldap.sh \
+  scripts/plugins/jenkins.sh scripts/plugins/argocd.sh \
+  scripts/lib/test.sh scripts/lib/dirservices/openldap.sh \
+  scripts/etc/vault/vars.sh scripts/etc/jenkins/vars.sh \
+  scripts/etc/ldap/vars.sh scripts/etc/argocd/vars.sh \
+  scripts/etc/ldap/ldap-password-rotator.sh \
+  scripts/ci/check_cluster_health.sh scripts/tests/run-cert-rotation-test.sh \
+  scripts/k3d-manager
+```
+
+### After fixing
+- Commit both fixes to `feature/two-cluster-infra`
+- Do NOT open a PR
+- Gemini will re-check, then Claude opens the PR
 
 ---
 
