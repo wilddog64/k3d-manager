@@ -7,16 +7,6 @@ service:
   type: ClusterIP
   ports:
     http: ${KEYCLOAK_SERVICE_PORT}
-extraVolumeMounts:
-  - name: realm-config
-    mountPath: /realm
-extraVolumes:
-  - name: realm-config
-    configMap:
-      name: keycloak-realm-config
-extraEnvVars:
-  - name: KEYCLOAK_IMPORT
-    value: /realm/realm-config.json
 keycloakConfigCli:
   enabled: true
   existingConfigmap: keycloak-realm-config
@@ -26,10 +16,7 @@ keycloakConfigCli:
     - name: KEYCLOAK_URL
       value: http://keycloak.${KEYCLOAK_NAMESPACE}.svc.cluster.local:${KEYCLOAK_SERVICE_PORT}
     - name: KEYCLOAK_USER
-      valueFrom:
-        secretKeyRef:
-          name: ${KEYCLOAK_ADMIN_SECRET_NAME}
-          key: ${KEYCLOAK_ADMIN_PASSWORD_KEY}
+      value: ${KEYCLOAK_ADMIN_USERNAME}
     - name: KEYCLOAK_PASSWORD
       valueFrom:
         secretKeyRef:
