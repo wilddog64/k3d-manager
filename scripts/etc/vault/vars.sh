@@ -1,3 +1,6 @@
+# Core namespace defaults
+export VAULT_NS="${VAULT_NS:-secrets}"
+
 # PKI toggles (optional; only used if VAULT_ENABLE_PKI=1)
 export VAULT_ENABLE_PKI="${VAULT_ENABLE_PKI:-1}"         # 1 to enable PKI bootstrap
 export VAULT_PKI_PATH="${VAULT_PKI_PATH:-pki}"           # mount path (e.g. pki or pki_int)
@@ -7,4 +10,4 @@ export VAULT_PKI_MAX_TTL="${VAULT_PKI_MAX_TTL:-87600h}"  # CA max TTL (10y)
 export VAULT_PKI_ROLE_TTL="${VAULT_PKI_ROLE_TTL:-720h}"  # leaf max TTL
 export VAULT_PKI_ALLOWED="${VAULT_PKI_ALLOWED:-}"        # comma list (e.g. jenkins.dev.k3d.internal,*.svc)
 export VAULT_PKI_ENFORCE_HOSTNAMES="${VAULT_PKI_ENFORCE_HOSTNAMES:-true}"  # true/false
-export VAULT_ENDPOINT="${VAULT_ENDPOINT:-http://vault.vault.svc:8200}"
+export VAULT_ENDPOINT="${VAULT_ENDPOINT:-http://vault.${VAULT_NS}.svc:8200}"

@@ -12,6 +12,8 @@ _err() { printf 'ERROR: %s
 ' "$*" >&2; }
 
 : "${KUBECTL:=kubectl}"
+VAULT_HEALTH_NS="${VAULT_NS:-secrets}"
+VAULT_HEALTH_RELEASE="${VAULT_RELEASE:-vault}"
 
 check_rollout() {
   local resource="$1" namespace="$2" timeout="${3:-120s}"
@@ -52,7 +54,7 @@ check_pods_ready() {
 }
 
 check_vault_status() {
-  local namespace="${1:-vault}" pod="${2:-vault-0}"
+  local namespace="${1:-$VAULT_HEALTH_NS}" pod="${2:-${VAULT_HEALTH_RELEASE}-0}"
   _info "Checking Vault status via $namespace/$pod..."
   local status
   if ! status=$($KUBECTL -n "$namespace" exec -i "$pod" -- vault status 2>&1); then
@@ -77,9 +79,9 @@ check_vault_status() {
 
 main() {
   check_rollout deployment/istio-ingressgateway istio-system "180s"
-  check_statefulset_ready vault vault
-  check_pods_ready external-secrets
-  check_vault_status vault vault-0
+  check_statefulset_ready vault "$VAULT_HEALTH_NS"
+  check_pods_ready "$VAULT_HEALTH_NS"
+  check_vault_status "$VAULT_HEALTH_NS" "${VAULT_HEALTH_RELEASE}-0"
   _info "Cluster health check passed"
 }
 

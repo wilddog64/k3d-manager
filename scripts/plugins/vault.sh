@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2155,SC2184,SC2016
 # k3d-manager :: HashiCorp Vault helpers (ESO-friendly)
 # Style: uses command / _kubectl / _helm, no set -e, minimal locals.
 
 # Defaults (override via env or args to the top-levels)
-VAULT_NS_DEFAULT="${VAULT_NS_DEFAULT:-vault}"
+VAULT_NS_DEFAULT="${VAULT_NS_DEFAULT:-secrets}"
 VAULT_RELEASE_DEFAULT="${VAULT_RELEASE_DEFAULT:-vault}"
 VAULT_CHART_VERSION="${VAULT_CHART_VERSION:-0.30.1}"
 VAULT_SC="${VAULT_SC:-local-path}"   # k3d/k3s default
@@ -708,6 +709,11 @@ EOF
       return 0
    fi
 
+   if [[ "${CLUSTER_ROLE:-infra}" == "app" ]]; then
+      _info "[vault] CLUSTER_ROLE=app — skipping deploy_vault"
+      return 0
+   fi
+
    VAULT_VARS="$SCRIPT_DIR/etc/vault/vars.sh"
    if [[ -f "$VAULT_VARS" ]]; then
       # shellcheck disable=SC1090
@@ -1214,7 +1220,7 @@ function _enable_kv2_k8s_auth() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
   local eso_sa="${3:-external-secrets}"
-  local eso_ns="${4:-external-secrets}"
+  local eso_ns="${4:-${ESO_NAMESPACE:-secrets}}"
 
   _vault_set_eso_reader "$ns" "$release" "$eso_sa" "$eso_ns"
   _vault_set_eso_writer "$ns" "$release" "$eso_sa" "$eso_ns"
@@ -1225,7 +1231,7 @@ function _vault_set_eso_reader() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
   local eso_sa="${3:-external-secrets}"
-  local eso_ns="${4:-external-secrets}"
+  local eso_ns="${4:-${ESO_NAMESPACE:-secrets}}"
   local pod="${release}-0"
 
   if _vault_policy_exists "$ns" "$release" "eso-reader"; then
@@ -1276,7 +1282,7 @@ function _vault_set_eso_writer() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
   local eso_sa="${3:-external-secrets}"
-  local eso_ns="${4:-external-secrets}"
+  local eso_ns="${4:-${ESO_NAMESPACE:-secrets}}"
   local pod="${release}-0"
 
   if _vault_policy_exists "$ns" "$release" "eso-writer"; then
@@ -1307,7 +1313,7 @@ function _vault_set_eso_init_jenkins_writer() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
   local eso_sa="${3:-external-secrets}"
-  local eso_ns="${4:-external-secrets}"
+  local eso_ns="${4:-${ESO_NAMESPACE:-secrets}}"
   local pod="${release}-0"
 
   if _vault_policy_exists "$ns" "$release" "eso-init-jenkins-writer"; then
@@ -1337,8 +1343,8 @@ HCL
 function _vault_configure_secret_reader_role() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
-  local service_account="${3:-external-secrets}"
-  local service_namespace="${4:-external-secrets}"
+  local service_account="${3:-secrets}"
+  local service_namespace="${4:-secrets}"
   local mount="${5:-secret}"
   local secret_prefix_arg="${6:-ldap}"
   local role="${7:-eso-ldap-directory}"

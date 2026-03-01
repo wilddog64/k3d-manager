@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2016
 # scripts/plugins/argocd.sh
 # Argo CD GitOps plugin for k3d-manager
 
@@ -78,6 +79,11 @@ Examples:
    ./scripts/k3d-manager deploy_argocd --bootstrap --skip-applicationsets
 
 EOF
+      return 0
+   fi
+
+   if [[ "${CLUSTER_ROLE:-infra}" == "app" ]]; then
+      _info "[argocd] CLUSTER_ROLE=app — skipping deploy_argocd"
       return 0
    fi
 
@@ -345,6 +351,10 @@ HCL
 }
 
 function deploy_argocd_bootstrap() {
+   if [[ "${CLUSTER_ROLE:-infra}" == "app" ]]; then
+      _info "[argocd] CLUSTER_ROLE=app — skipping deploy_argocd_bootstrap"
+      return 0
+   fi
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
       cat <<EOF
 Usage: deploy_argocd_bootstrap [options]

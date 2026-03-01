@@ -1,13 +1,19 @@
+#!/usr/bin/env bash
 # scripts/plugins/external-secrets.sh
 # External Secrets Operator plugin for k3d-manager
+
+# shellcheck disable=SC1091
+
+ESO_NAMESPACE="${ESO_NAMESPACE:-secrets}"
+export ESO_NAMESPACE
 
 # Install ESO (External Secrets Operator)
 function deploy_eso() {
   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    echo "Usage: deploy_eso [namespace=external-secrets] [release=external-secrets]"
+    echo "Usage: deploy_eso [namespace=${ESO_NAMESPACE:-secrets}] [release=external-secrets]"
     return 0
   fi
-  local ns="${1:-external-secrets}"
+  local ns="${1:-${ESO_NAMESPACE:-secrets}}"
   local release="${2:-external-secrets}"
 
   local helm_repo_url_default="https://charts.external-secrets.io"
@@ -87,4 +93,72 @@ function deploy_eso() {
   # Wait for controllers and the SDK server
   _kubectl -n "$ns" rollout status deploy/external-secrets --timeout=120s
   echo "ESO installed namespace $ns"
+
+  if [[ -n "${REMOTE_VAULT_ADDR:-}" ]]; then
+    _info "[eso] Configuring remote Vault SecretStore"
+    _eso_configure_remote_vault "${ESO_REMOTE_SECRETSTORE_NAME:-remote-vault-store}" \
+      "${ESO_REMOTE_SERVICE_ACCOUNT:-external-secrets}" \
+      "${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ESO_NAMESPACE:-secrets}}"
+  fi
+}
+
+function _eso_configure_remote_vault() {
+  local store_name="${1:-remote-vault-store}"
+  local service_account="${2:-external-secrets}"
+  local service_account_ns="${3:-${ESO_NAMESPACE:-secrets}}"
+  local remote_addr="${REMOTE_VAULT_ADDR:-}"
+  local mount_path="${REMOTE_VAULT_K8S_MOUNT:-kubernetes-app}"
+  local vault_role="${REMOTE_VAULT_K8S_ROLE:-eso-app-cluster}"
+  local vault_path="${REMOTE_VAULT_KV_PATH:-secret}"
+  local store_kind="${ESO_REMOTE_SECRETSTORE_KIND:-ClusterSecretStore}"
+
+  if [[ -z "$remote_addr" ]]; then
+    _warn "[eso] REMOTE_VAULT_ADDR not set; skipping remote SecretStore configuration"
+    return 0
+  fi
+
+  if [[ "$store_kind" == "SecretStore" ]]; then
+    local target_namespace="${ESO_REMOTE_SECRETSTORE_NAMESPACE:-shopping-cart-data}"
+    _kubectl create namespace "$target_namespace" --dry-run=client -o yaml | _kubectl apply -f - >/dev/null 2>&1 || true
+    cat <<YAML | _kubectl apply -f -
+apiVersion: external-secrets.io/v1
+kind: SecretStore
+metadata:
+  name: ${store_name}
+  namespace: ${target_namespace}
+spec:
+  provider:
+    vault:
+      server: "${remote_addr}"
+      path: "${vault_path}"
+      version: v2
+      auth:
+        kubernetes:
+          mountPath: "${mount_path}"
+          role: "${vault_role}"
+          serviceAccountRef:
+            name: ${service_account}
+            namespace: ${service_account_ns}
+YAML
+  else
+    cat <<YAML | _kubectl apply -f -
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: ${store_name}
+spec:
+  provider:
+    vault:
+      server: "${remote_addr}"
+      path: "${vault_path}"
+      version: v2
+      auth:
+        kubernetes:
+          mountPath: "${mount_path}"
+          role: "${vault_role}"
+          serviceAccountRef:
+            name: ${service_account}
+            namespace: ${service_account_ns}
+YAML
+  fi
 }
