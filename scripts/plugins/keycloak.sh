@@ -14,6 +14,12 @@ if [[ -r "$ESO_PLUGIN" ]]; then
    source "$ESO_PLUGIN"
 fi
 
+VAULT_VARS_FILE="$SCRIPT_DIR/etc/vault/vars.sh"
+if [[ -r "$VAULT_VARS_FILE" ]]; then
+   # shellcheck disable=SC1090
+   source "$VAULT_VARS_FILE"
+fi
+
 KEYCLOAK_CONFIG_DIR="$SCRIPT_DIR/etc/keycloak"
 KEYCLOAK_VARS_FILE="$KEYCLOAK_CONFIG_DIR/vars.sh"
 if [[ -r "$KEYCLOAK_VARS_FILE" ]]; then
@@ -42,7 +48,8 @@ fi
 : "${KEYCLOAK_LDAP_PASSWORD_KEY:=LDAP_ADMIN_PASSWORD}"
 : "${KEYCLOAK_LDAP_HOST:=openldap-openldap-bitnami.identity.svc.cluster.local}"
 : "${KEYCLOAK_LDAP_PORT:=389}"
-: "${KEYCLOAK_LDAP_SEARCH_BASE:=dc=home,dc=org}"
+: "${KEYCLOAK_LDAP_BASE_DN:=dc=home,dc=org}"
+: "${KEYCLOAK_LDAP_USERS_DN:=ou=users,dc=home,dc=org}"
 : "${KEYCLOAK_REALM_NAME:=home}"
 : "${KEYCLOAK_REALM_DISPLAY_NAME:=Home}"
 
@@ -103,9 +110,8 @@ HELP
       if ! _kubectl -n "$KEYCLOAK_NAMESPACE" wait --for=condition=Ready --timeout=60s externalsecret/"$KEYCLOAK_LDAP_SECRET_NAME" 2>/dev/null; then
          _warn "[keycloak] Timeout waiting for LDAP ExternalSecret"
       fi
+      _keycloak_apply_realm_configmap
    fi
-
-   _keycloak_apply_realm_configmap
 
    local values_file
    values_file=$(mktemp -t keycloak-values.XXXXXX.yaml)
@@ -197,7 +203,13 @@ function _keycloak_apply_realm_configmap() {
    local rendered
    rendered=$(mktemp -t keycloak-realm.XXXXXX.json)
    trap '$(_cleanup_trap_command "$rendered")' RETURN
-   envsubst '$KEYCLOAK_REALM_NAME $KEYCLOAK_REALM_DISPLAY_NAME $KEYCLOAK_LDAP_HOST $KEYCLOAK_LDAP_PORT $KEYCLOAK_LDAP_SEARCH_BASE $KEYCLOAK_LDAP_BINDDN_KEY $KEYCLOAK_LDAP_PASSWORD_KEY' \
+
+   local bind_dn bind_pw
+   bind_dn=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_LDAP_SECRET_NAME" -o jsonpath="{.data.${KEYCLOAK_LDAP_BINDDN_KEY}}" | base64 -d)
+   bind_pw=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_LDAP_SECRET_NAME" -o jsonpath="{.data.${KEYCLOAK_LDAP_PASSWORD_KEY}}" | base64 -d)
+
+   KEYCLOAK_LDAP_BIND_DN="$bind_dn" KEYCLOAK_LDAP_PASSWORD="$bind_pw" \
+      envsubst '$KEYCLOAK_REALM_NAME $KEYCLOAK_REALM_DISPLAY_NAME $KEYCLOAK_LDAP_HOST $KEYCLOAK_LDAP_PORT $KEYCLOAK_LDAP_BASE_DN $KEYCLOAK_LDAP_BIND_DN $KEYCLOAK_LDAP_PASSWORD' \
       < "$KEYCLOAK_CONFIG_DIR/realm-config.json.tmpl" > "$rendered"
 
    cat <<REALM | _kubectl apply -f - >/dev/null
