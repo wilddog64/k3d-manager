@@ -212,6 +212,7 @@ $ git diff HEAD^ HEAD
 - [ ] App layer deploy on Ubuntu (Gemini — SSH interactive)
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
 - [ ] `scripts/tests/plugins/jenkins.bats` — backlog
+- [ ] v0.6.0: rename cluster to `infra` (`k3d-infra-*` nodes) + fix `CLUSTER_NAME` env var ignored in `deploy_cluster` — requires destroy/recreate, schedule after app cluster work
 
 ---
 
