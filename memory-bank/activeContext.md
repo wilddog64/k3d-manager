@@ -8,8 +8,17 @@
 
 ## Current Focus
 
-Fix Jenkins namespace bugs that block `deploy_jenkins --namespace cicd`.
-Two changes in `jenkins.sh`, one in `jenkins-home-pv.yaml.tmpl`.
+`fix/jenkins-cicd-namespace` branch ensures Jenkins honors the `cicd` namespace.
+
+**2026-03-02 Update:**
+- `scripts/etc/jenkins/jenkins-home-pv.yaml.tmpl` now emits `$JENKINS_NAMESPACE`, and
+  `_create_jenkins_pv_pvc` exports the namespace before calling `envsubst`.
+- `deploy_jenkins` defaults to `${JENKINS_NAMESPACE:-jenkins}` when the CLI flag is
+  omitted, so env overrides take effect.
+- Tests: `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/lib/test_auth_cleanup.bats`
+  ✅, `shellcheck scripts/plugins/jenkins.sh` ✅. Attempting
+  `bats scripts/tests/plugins/jenkins.bats` fails because the file does not exist in
+  `scripts/tests/plugins/` (no Jenkins-specific suite yet).
 
 ---
 

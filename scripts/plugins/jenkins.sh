@@ -455,6 +455,7 @@ function _create_jenkins_pv_pvc() {
 
    jenkinsyamfile=$(mktemp -t jenkins-home-pv.XXXXXX.yaml)
    trap '$(_cleanup_trap_command "$jenkinsyamfile")' EXIT
+   export JENKINS_NAMESPACE="$jenkins_namespace"
    envsubst < "$jenkins_pv_template" > "$jenkinsyamfile"
    _kubectl apply -f "$jenkinsyamfile" -n "$jenkins_namespace"
 
@@ -1278,7 +1279,7 @@ EOF
    done
 
    # Apply defaults
-   jenkins_namespace="${jenkins_namespace:-jenkins}"
+   jenkins_namespace="${jenkins_namespace:-${JENKINS_NAMESPACE:-jenkins}}"
    vault_namespace="${vault_namespace:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    vault_release="${vault_release:-${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}}"
 
