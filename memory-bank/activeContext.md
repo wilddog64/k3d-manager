@@ -30,69 +30,102 @@ Codex needs to fix stale cluster-dump manifests and add Vault secret seeding.
 
 ---
 
-## Gemini Verification Task — ArgoCD Phase 1 (Pending)
+## Gemini Verification Task — ArgoCD Phase 1 (Complete 2026-03-02) ✅
 
 **Branch:** `feature/argocd-phase1`
-**Commit to verify:** `aed5e68` (feat(argocd): clean manifests and seed admin secret)
-**Status:** Awaiting Gemini verification
+**Commit verified:** `aed5e68`
+**Status:** Verified ✅
 
-### What Codex changed (Gemini must verify each item)
+### Results:
 
-1. **`scripts/etc/argocd/projects/platform.yaml.tmpl`** (new file, old `.yaml` deleted)
-   - Namespace field is `${ARGOCD_NAMESPACE}` (not hardcoded `argocd`)
-   - Destinations: `secrets`, `cicd`, `identity`, `istio-system`, `default` — no old names
+1. **Code Verification:** **PASSED** ✅
+   - `platform.yaml.tmpl` correctly uses `${ARGOCD_NAMESPACE}` and updated destinations.
+   - ApplicationSet manifests cleaned of metadata and correctly target `cicd` / `wilddog64`.
+   - `_argocd_deploy_appproject` correctly uses `envsubst` with variable whitelist.
+   - `_argocd_seed_vault_admin_secret` correctly seeds random password if missing.
+2. **Shellcheck:** **PASSED** ✅. `scripts/plugins/argocd.sh` is clean.
+3. **Bats Tests:** **PASSED** ✅. `scripts/tests/plugins/argocd.bats` passed 6/6.
+4. **Sanity Checks:** **PASSED** ✅. Verified defaults and strings in all modified manifests.
 
-2. **`scripts/etc/argocd/applicationsets/{platform-helm,services-git,demo-rollout}.yaml`**
-   - No Kubernetes server metadata (`resourceVersion`, `uid`, `creationTimestamp`, `status`)
-   - `namespace: cicd` (not `argocd`)
-   - GitHub org `wilddog64/k3d-manager` (not `your-org`)
+**Notes on minor issue:** The redundant `trap ... RETURN` in `_argocd_deploy_appproject` is harmless and matches patterns found in other recently fixed plugins (like `jenkins.sh`). Accepted as-is to maintain local consistency.
 
-3. **`scripts/plugins/argocd.sh` — `_argocd_deploy_appproject`**
-   - Uses `envsubst '$ARGOCD_NAMESPACE' < "$appproject_tmpl" | _kubectl apply -f -`
-   - Falls back correctly when template is missing
+**Sign-off:** Phase 1 implementation is complete, verified, and logically sound. Ready for PR.
 
-4. **`scripts/plugins/argocd.sh` — `_argocd_seed_vault_admin_secret`**
-   - Checks whether secret path exists before writing
-   - Called inside `deploy_argocd --enable-vault` BEFORE `externalsecret-admin` is applied
+---
 
-5. **`scripts/tests/plugins/argocd.bats`** — new suite, 6 tests
+## Codex Fix Task — PR #11 Copilot Review (Active)
 
-### Verification commands Gemini must run
+**Branch:** `feature/argocd-phase1`
+**Source:** Copilot review on PR #11, commit `5223ecb`
+**Status:** Pending Codex fix
 
+### Fix 1 — P1: Check Vault write exit code in `_argocd_seed_vault_admin_secret`
+
+**File:** `scripts/plugins/argocd.sh`
+
+The `_vault_exec_stream ... vault kv put` call result is currently ignored.
+If it fails (Vault sealed, bad auth, wrong mount), the function logs success
+and `deploy_argocd` continues — leaving the ExternalSecret pointing at a
+non-existent secret path.
+
+**Change:**
 ```bash
-# On branch feature/argocd-phase1
-git checkout feature/argocd-phase1
+# Before (current):
+   _vault_login "$ns" "$release"
+   _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+      vault kv put "$secret_path" "${ARGOCD_ADMIN_PASSWORD_KEY}=${password}"
 
-# 1. Shellcheck
-shellcheck scripts/plugins/argocd.sh
+   _info "[argocd] ArgoCD admin password seeded. Retrieve via Kubernetes secret after ESO sync"
 
-# 2. Bats suite
-PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/argocd.bats
+# After:
+   _vault_login "$ns" "$release"
+   local rc=0
+   _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+      vault kv put "$secret_path" "${ARGOCD_ADMIN_PASSWORD_KEY}=${password}" || rc=$?
+   if (( rc != 0 )); then
+      _err "[argocd] Failed to seed admin password in Vault (exit code $rc). Check Vault status and auth."
+      return "$rc"
+   fi
 
-# 3. Sanity checks
-grep 'ARGOCD_NAMESPACE' scripts/etc/argocd/vars.sh | head -1
-# Expected: export ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-cicd}"
-
-grep 'namespace:' scripts/etc/argocd/projects/platform.yaml.tmpl
-# Expected: namespace: ${ARGOCD_NAMESPACE}
-
-grep 'namespace:' scripts/etc/argocd/applicationsets/platform-helm.yaml
-# Expected: namespace: cicd (in metadata AND template destination)
-
-grep 'wilddog64' scripts/etc/argocd/applicationsets/services-git.yaml
-# Expected: 2 occurrences (generator repoURL + template source repoURL)
+   _info "[argocd] ArgoCD admin password seeded. Retrieve via Kubernetes secret after ESO sync"
 ```
 
-### Known minor issue (Gemini to assess)
+### Fix 2 — P2: Parameterize ApplicationSet `metadata.namespace`
 
-`_argocd_deploy_appproject` sets both `trap ... EXIT` (line 481) and `trap ... RETURN`
-(line 484). Other plugins use only `EXIT`. The RETURN trap is redundant but harmless.
-Gemini to decide: fix before PR or accept as-is?
+**Files:**
+- `scripts/etc/argocd/applicationsets/platform-helm.yaml`
+- `scripts/etc/argocd/applicationsets/services-git.yaml`
+- `scripts/etc/argocd/applicationsets/demo-rollout.yaml`
+- `scripts/plugins/argocd.sh` — `_argocd_deploy_applicationsets`
 
-### Expected sign-off
+The `metadata.namespace: cicd` is hardcoded in all three YAML files.
+When `ARGOCD_NAMESPACE` is overridden, the ApplicationSets land in the
+wrong namespace.
 
-Gemini to update this block with PASS/FAIL for each item and overall verdict.
-If any item FAILS, Gemini to write a Codex fix spec in this block before handing back.
+**Step A — update all three YAML files:**
+Change `namespace: cicd` (in `metadata` only, not in template `destination`)
+to `namespace: ${ARGOCD_NAMESPACE}`.
+
+Note: these files contain Go template syntax (`{{.name}}` etc.) — envsubst
+is safe because it only replaces `$VAR`/`${VAR}` patterns, not `{{...}}`.
+
+**Step B — update `_argocd_deploy_applicationsets` to render via envsubst:**
+```bash
+# Before (current):
+      if _kubectl apply -f "$file" >/dev/null 2>&1; then
+
+# After:
+      if envsubst '$ARGOCD_NAMESPACE' < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
+```
+
+### Verification Codex must run
+
+```bash
+shellcheck scripts/plugins/argocd.sh
+PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/argocd.bats
+```
+
+Both must pass before committing. Codex to push to `feature/argocd-phase1`.
 
 ---
 
