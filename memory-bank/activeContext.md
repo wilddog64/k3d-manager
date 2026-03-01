@@ -52,6 +52,25 @@ run env PROJECT_ROOT="$PROJECT_ROOT" \
 Claude monitors CI after push.
 **Do NOT touch any other files.**
 
+**2026-03-02 Status:** After landing the VAULT_NS-only change, the suite still fails
+locally: `PATH="/opt/homebrew/bin:$PATH" source scripts/lib/system.sh && export -f _info _warn _err _no_trace && bats scripts/tests/lib/test_auth_cleanup.bats`
+stops at line 241 (`[[ "$output" == "user-default" ]]`). The helper script now
+captures `VAULT_RELEASE=vault`, so the mocked deploy log prints `vault` even when
+`VAULT_RELEASE_DEFAULT="user-default"` is set. Follow-up work is required to let
+the derivation assertions run without the explicit `VAULT_RELEASE` override.
+
+---
+
+## ⚠️ Security Notice (2026-02-28)
+
+**GitGuardian: 1 internal secret incident detected (reported 4:27 PM PST)**
+- Full analysis: `docs/issues/2026-02-28-gitguardian-internal-ip-addresses-in-docs.md`
+- **No credentials, tokens, or keys were committed** — severity: LOW
+- Likely trigger: internal IP addresses (`10.211.55.x`) committed in docs/plans and memory-bank,
+  OR example AWS IP `54.210.1.50` in `cloud-architecture.md`
+- **Action required (owner):** Open GitGuardian dashboard → mark incident as false positive
+- Going forward: use `<MAC-IP>`, `<UBUNTU-IP>`, `<NODE-IP>` in docs instead of real IPs
+
 ---
 
 ## Current Focus (as of 2026-03-01)
