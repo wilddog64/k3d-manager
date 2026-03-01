@@ -1,99 +1,21 @@
 # Active Context – k3d-manager
 
-## Current Branch: `feature/two-cluster-infra` (as of 2026-03-01)
+## Current Branch: `feature/two-cluster-infra` (as of 2026-03-02)
 
 **v0.2.1 released** — OrbStack validated, Vault reboot unseal, Jenkins k8s agents, docs.
-**v0.3.0 pending** — Two-cluster refactor (this branch) ready for PR.
+**v0.3.0 — PR #8 READY FOR MERGE** — all checks green, Gemini sign-off complete.
 
 ---
 
-## ⚠️ Gemini — Verification Needed (2026-03-02)
+## Current Focus
 
-**Branch:** `feature/two-cluster-infra`
-**Commit to verify:** `9041193` ("Fix cert rotation cleanup and remote ESO namespace")
-**PR:** https://github.com/wilddog64/k3d-manager/pull/8 — lint ✅, stage2 ❌ (no runner, pre-existing)
+PR #8 (`feature/two-cluster-infra`) is ready to merge. All 4 code fixes verified:
+- `test_auth_cleanup.bats` sub-calls restored (lint ✅)
+- `deploy_vault` respects `VAULT_NS`
+- `_cleanup_cert_rotation_test` EXIT trap scope fix
+- `deploy_eso` remote SecretStore namespace fix
 
-Codex made two fixes. Please verify both are correct and report back.
-
----
-
-### Fix A — `scripts/lib/test.sh` line 1062
-
-**What changed:**
-```bash
-# Before:
-  _kubectl delete job test-cert-rotation -n "${jenkins_ns}" 2>/dev/null || true
-# After:
-  _kubectl delete job test-cert-rotation -n "${JENKINS_NAMESPACE:-cicd}" 2>/dev/null || true
-```
-
-**Verify:**
-1. `shellcheck -S warning scripts/lib/test.sh` — must be clean
-2. Confirm `_cleanup_cert_rotation_test` no longer references any local variable
-   from the calling function — search for `jenkins_ns` in the function body,
-   expect zero hits
-3. Confirm the fallback `cicd` matches the default in the calling function
-   (`local jenkins_ns="${JENKINS_NAMESPACE:-cicd}"` at line 832)
-
----
-
-### Fix B — `scripts/plugins/eso.sh` line 101
-
-**What changed:**
-```bash
-# Before:
-      "${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ESO_NAMESPACE:-secrets}}"
-# After:
-      "${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ns}}"
-```
-
-**Verify:**
-1. `shellcheck -S warning scripts/plugins/eso.sh` — must be clean
-2. Confirm `$ns` is in scope at the call site — it is defined on line 16:
-   `local ns="${1:-${ESO_NAMESPACE:-secrets}}"`
-3. Run bats plugin tests:
-   `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/eso.bats`
-   All cases must pass
-4. Confirm the `REMOTE_VAULT_ADDR` block (lines 97–102) looks correct end-to-end
-
----
-
-**Report back:** shellcheck results, bats pass/fail, and whether both fixes
-look logically correct. If anything is wrong, write a Codex fix spec.
-
----
-
-## ✅ test_auth_cleanup.bats — FIXED (2026-03-02)
-
-**PR #8:** `lint` CI is now **PASSING** (commit `4ab40ad`).
-
-Root cause: Codex added `VAULT_NS=vault VAULT_RELEASE=vault` to ALL sub-calls.
-`VAULT_RELEASE=vault` pinned vault_release via derivation branch-1, breaking
-assertions like "user-default", "vault-derived", etc.
-
-Fix applied by Claude: removed `VAULT_NS=vault VAULT_RELEASE=vault` from all
-7 sub-calls. Only the first `run env` call (line 205) keeps `VAULT_NS=vault`
-to satisfy the `VAULT_NS_DEFAULT=secrets` change in vault.sh.
-
----
-
-## ⚠️ Security Notice (2026-02-28)
-
-**GitGuardian: 1 internal secret incident detected (reported 4:27 PM PST)**
-- Full analysis: `docs/issues/2026-02-28-gitguardian-internal-ip-addresses-in-docs.md`
-- **No credentials, tokens, or keys were committed** — severity: LOW
-- Likely trigger: internal IP addresses (`10.211.55.x`) committed in docs/plans and memory-bank,
-  OR example AWS IP `54.210.1.50` in `cloud-architecture.md`
-- **Action required (owner):** Open GitGuardian dashboard → mark incident as false positive
-- Going forward: use `<MAC-IP>`, `<UBUNTU-IP>`, `<NODE-IP>` in docs instead of real IPs
-
----
-
-## Current Focus (as of 2026-03-01)
-
-- **Two-cluster refactor COMPLETE** — namespace renames + CLUSTER_ROLE + remote Vault ESO
-- PR #8 open — lint failing (test_auth_cleanup regression, see above — Codex fix pending)
-- After merge: destroy infra cluster → redeploy with new namespaces → deploy app layer on Ubuntu
+After merge: destroy infra cluster → redeploy with new namespaces → deploy app layer on Ubuntu.
 
 ---
 
@@ -102,17 +24,17 @@ to satisfy the `VAULT_NS_DEFAULT=secrets` change in vault.sh.
 ### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-test-orbstack-exists`)
 | Component | Status | Notes |
 |---|---|---|
-| Vault | ✅ Running | 4d — will be redeployed to `secrets` ns after PR merge |
-| ESO | ✅ Running | 4d — will move to `secrets` ns |
-| Jenkins | ✅ Running | — will move to `cicd` ns |
-| OpenLDAP | ✅ Running | — will move to `identity` ns |
+| Vault | ✅ Running | will be redeployed to `secrets` ns after PR merge |
+| ESO | ✅ Running | will move to `secrets` ns |
+| Jenkins | ✅ Running | will move to `cicd` ns |
+| OpenLDAP | ✅ Running | will move to `identity` ns |
 | Istio | ✅ Running | stays `istio-system` |
 | ArgoCD | ❌ Not deployed | add during infra redeploy |
 | Keycloak | ❌ Not deployed | add during infra redeploy |
 
 Context `k3d-automation` is dead (old cluster, port gone — ignore).
 
-### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`, host: 10.211.55.14)
+### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`, host: `<UBUNTU-IP>`)
 | Component | Status | Notes |
 |---|---|---|
 | k3s node | ✅ Ready | Fresh redeploy 2026-02-28, v1.34.4+k3s1 |
@@ -143,11 +65,10 @@ Context `k3d-automation` is dead (old cluster, port gone — ignore).
 - `VAULT_ENDPOINT` now dynamic: `http://vault.${VAULT_NS}.svc:8200`
 - `ARGOCD_LDAP_HOST` + `JENKINS_LDAP_HOST` updated to `identity` namespace
 
-### Hardcoded namespace strings fixed
-- `scripts/lib/test.sh` — `-n jenkins`, `-n vault` → env var refs
-- `scripts/ci/check_cluster_health.sh` — `namespace="${1:-vault}"` → `${VAULT_NS:-secrets}`
-- `scripts/tests/run-cert-rotation-test.sh` — `-n jenkins` → env var
-- `scripts/lib/dirservices/openldap.sh` — `directory` default → `identity`
+### Bug fixes (post-review)
+- `deploy_vault`: `ns` now `${VAULT_NS:-$VAULT_NS_DEFAULT}` — respects `VAULT_NS` override
+- `_cleanup_cert_rotation_test`: uses `${JENKINS_NAMESPACE:-cicd}` directly, not out-of-scope local
+- `deploy_eso` remote SecretStore: passes `$ns` instead of `${ESO_NAMESPACE:-secrets}`
 
 ---
 
@@ -161,7 +82,7 @@ Context `k3d-automation` is dead (old cluster, port gone — ignore).
    → cicd/      (Jenkins + ArgoCD)
    → istio-system/
 3. Configure Vault kubernetes-app auth mount for app cluster
-4. Deploy app layer: CLUSTER_ROLE=app REMOTE_VAULT_ADDR=https://10.211.55.3:8200
+4. Deploy app layer: CLUSTER_ROLE=app REMOTE_VAULT_ADDR=https://<MAC-IP>:8200
    → ESO → shopping-cart-data → shopping-cart-apps
 ```
 
@@ -175,6 +96,7 @@ Context `k3d-automation` is dead (old cluster, port gone — ignore).
 - [ ] Wire ArgoCD to sync app cluster
 - [ ] Cloud Track A: Terraform + k3s on EC2 (blocked on two-cluster done)
 - [ ] Cloud Track 0: one-node EKS provider development
+- [ ] GitGuardian dashboard: mark 2026-02-28 incident as false positive (owner action)
 
 ---
 
@@ -194,7 +116,7 @@ Context `k3d-automation` is dead (old cluster, port gone — ignore).
 | v0.1.0 | ✅ released 2026-02-27 | Initial release |
 | v0.2.0 | ✅ released 2026-02-27 | OrbStack, Vault reboot unseal, Jenkins k8s agents |
 | v0.2.1 | ✅ released 2026-02-28 | Docs-only: CHANGE.md + README Releases table |
-| v0.3.0 | pending PR | Two-cluster refactor, namespace renames, CLUSTER_ROLE, remote Vault ESO |
+| v0.3.0 | ✅ ready to merge | Two-cluster refactor, namespace renames, CLUSTER_ROLE, remote Vault ESO |
 | v1.0.0 | future | Production-hardened, all known-broken paths resolved |
 
 ---
@@ -245,6 +167,5 @@ Owner
 ```
 
 **Lesson learned (2026-03-01):** Claude wrote Codex fix instructions directly,
-which caused Codex to apply an over-broad fix (VAULT_RELEASE=vault on all calls
-instead of just the first). Bug reports should always go through Gemini for
-verification before Codex gets a fix spec.
+which caused Codex to apply an over-broad fix. Bug reports should always go
+through Gemini for verification before Codex gets a fix spec.
