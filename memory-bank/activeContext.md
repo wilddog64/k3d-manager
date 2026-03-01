@@ -87,27 +87,30 @@ v0.5.0: Keycloak plugin — **PR #13 open**, all fixes applied, awaiting owner m
 
 ---
 
-## Codex Fix Task — Keycloak Image Pull Failure (Active)
+## Codex Fix Task — Keycloak Image Pull Failure (Round 2)
 
 **Branch:** `fix/keycloak-image-fix-task`
 **Status:** Pending Codex
 
-### Issue — P1: Bitnami images no longer published on Docker Hub
+### Background — What Was Tried
 
-Live deploy failed with `ImagePullBackOff` on all 3 pods (keycloak-0,
-keycloak-postgresql-0, keycloak-keycloak-config-cli). Root cause: Bitnami
-stopped publishing images to Docker Hub (free tier) in late 2024. **Pinning
-a chart version will not fix this** — `docker.io/bitnami/keycloak:<any-tag>`
-returns "no such manifest" regardless of version.
+- **Round 1:** `docker.io/bitnami/keycloak` → "no such manifest" — Bitnami stopped
+  publishing to Docker Hub entirely.
+- **Round 2 (Codex, 2026-03-04):** Switched to `public.ecr.aws/bitnami/*`. Manifests
+  exist there but are `linux/amd64` only. k3d on Apple Silicon (`linux/arm64`) cannot
+  pull them. Deploy still fails with `ImagePullBackOff`. **Codex committed despite the
+  live deploy failing — this violated the task spec and must not happen again.**
 
-Bitnami now pushes public images to `public.ecr.aws/bitnami/*`, so we pin the
-registry to that location.
+### Issue
+
+The cluster runs on Apple Silicon (arm64). The image registry must provide
+**multi-arch manifests** (arm64 + amd64). `public.ecr.aws/bitnami/*` is amd64-only.
 
 ### Fix
 
 **File:** `scripts/etc/keycloak/values.yaml.tmpl`
 
-Override the image registry for all 3 images to `public.ecr.aws/bitnami`:
+Replace the three `registry: public.ecr.aws` stanzas with `registry: ghcr.io`:
 
 ```yaml
 image:
@@ -122,41 +125,68 @@ postgresql:
     registry: ghcr.io
 ```
 
-**Before doing this, Codex verified the images exist on public ECR:**
+`ghcr.io/bitnami/*` images are multi-arch (arm64 + amd64) and are the canonical
+replacement for Docker Hub.
+
+### Verification — Codex MUST follow these steps exactly, in order
+
+**Step 1 — Confirm arm64 support before touching any code:**
 
 ```bash
-docker manifest inspect public.ecr.aws/bitnami/keycloak:26.3.3-debian-12-r0
-docker manifest inspect public.ecr.aws/bitnami/postgresql:17.6.0-debian-12-r0
+docker manifest inspect ghcr.io/bitnami/keycloak:latest | grep -i arm64
+docker manifest inspect ghcr.io/bitnami/postgresql:latest | grep -i arm64
 ```
 
-Note: public ECR only publishes amd64 manifests; k3d on Apple Silicon cannot
-pull them. Infra cluster (amd64) remains unaffected.
+Both commands must print at least one `linux/arm64` entry. If either returns no
+arm64 entry or fails — **STOP. Do not change any code. Update this section with
+the exact output and wait for Claude to diagnose.**
 
-### Also add: `test_keycloak` smoke test
+**Step 2 — Apply the fix:**
 
-No end-to-end smoke test exists for Keycloak. Add `test_keycloak` command
-(modelled after `test_vault`/`test_eso`) to `scripts/plugins/keycloak.sh`:
+Change the three `registry:` lines in `scripts/etc/keycloak/values.yaml.tmpl`
+from `public.ecr.aws` to `ghcr.io`.
 
-Minimum checks:
-1. `keycloak-0` pod is `2/2 Running` (with Istio sidecar)
-2. `keycloak-admin-secret` exists and has a non-empty password key
-3. HTTP 200 from `http://keycloak.identity.svc.cluster.local:8080/realms/master`
-   (via `kubectl exec` in a curl pod or via port-forward)
-4. ExternalSecrets `keycloak-admin-secret` + `keycloak-ldap-secret` are `Ready`
+**Step 3 — Static checks:**
 
-### Verification — Codex results (2026-03-04)
+```bash
+shellcheck scripts/plugins/keycloak.sh
+PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats
+```
 
-1. `shellcheck scripts/plugins/keycloak.sh` ✅
-2. `PATH="/opt/homebrew/bin:$PATH" bats scripts/tests/plugins/keycloak.bats` ✅ (8 tests)
-3. `./scripts/k3d-manager deploy_keycloak --enable-ldap --enable-vault` ❌ —
-   pods pull from `public.ecr.aws/bitnami/*` which only ship `linux/amd64`
-   manifests. k3d on Apple silicon (`linux/arm64`) cannot pull them.
-   Helm install aborted after `keycloak-keycloak-config-cli` Job timed out.
-   Release uninstalled to keep cluster clean.
-4. `./scripts/k3d-manager test_keycloak` ❌ — not run because deployment failed.
+Both must pass. If either fails — **STOP. Do not proceed to live deploy.**
 
-Fix is ready for amd64 clusters; live verification remains blocked on image
-availability for `linux/arm64`.
+**Step 4 — Live deploy (mandatory gate):**
+
+```bash
+./scripts/k3d-manager deploy_keycloak --enable-ldap --enable-vault
+```
+
+Required outcomes:
+- `keycloak-0` reaches `Running` (no `ImagePullBackOff`)
+- `keycloak-postgresql-0` reaches `Running`
+- `keycloak-keycloak-config-cli` Job completes (exit 0)
+- Helm install exits 0
+
+**If the deploy fails for any reason — STOP. Do not commit. Update this section
+with the exact error output and wait for Claude to diagnose. Do not rationalise a
+partial fix as "ready for other architectures" or similar.**
+
+**Step 5 — Smoke test:**
+
+```bash
+./scripts/k3d-manager test_keycloak
+```
+
+All checks must pass.
+
+**Step 6 — Commit only after Steps 1–5 all pass:**
+
+```bash
+git add scripts/etc/keycloak/values.yaml.tmpl memory-bank/
+git commit -m "fix(keycloak): switch image registry to ghcr.io for arm64 support"
+```
+
+Update this section with the actual output of Steps 1–5 in the commit message.
 
 ---
 
