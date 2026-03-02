@@ -57,6 +57,9 @@ spec:
   jobTemplate:
     spec:
       template:
+        metadata:
+          annotations:
+            sidecar.istio.io/inject: "false"
         spec:
           serviceAccountName: ${JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT}
           restartPolicy: OnFailure
