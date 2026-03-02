@@ -1,5 +1,25 @@
 # Changes - k3d-manager
 
+## v0.6.1 - dated 2026-03-02
+
+### Bug Fixes
+
+- **k3d/OrbStack:** `destroy_cluster` now defaults to `k3d-cluster` if no name is provided, matching the behavior of `deploy_cluster`.
+- **LDAP:** `deploy_ldap` now correctly proceeds with default settings when called without arguments, instead of displaying help.
+- **ArgoCD:** Fixed a deployment hang by disabling Istio sidecar injection for the `redis-secret-init` Job via Helm annotations.
+- **Jenkins:** 
+  - Fixed a hardcoded namespace bug where `deploy_jenkins` was only looking for the `jenkins-ldap-config` secret in the `jenkins` namespace instead of the active deployment namespace (e.g., `cicd`).
+  - Disabled Istio sidecar injection for the `jenkins-cert-rotator` CronJob pods to prevent them from hanging in a "NotReady" state after completion.
+
+### Verification
+
+- End-to-end infra cluster rebuild verified on OrbStack (macOS ARM64).
+- All components (Vault, ESO, OpenLDAP, Jenkins, ArgoCD, Keycloak) confirmed healthy in new namespace structure (`secrets`, `identity`, `cicd`).
+- Full test suite passed: `test_vault`, `test_eso`, `test_istio`, `test_keycloak`.
+- Cross-cluster Vault auth verified via `configure_vault_app_auth` with real Ubuntu k3s CA certificate.
+
+---
+
 ## v0.6.0 - dated 2026-03-01
 
 ### App Cluster Vault Auth

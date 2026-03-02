@@ -1569,14 +1569,14 @@ function _deploy_jenkins() {
    if [[ "$auth_mode" == "standard-ldap" || "$auth_mode" == "ad-prod" || "$auth_mode" == "ad-test" ]]; then
       _info "[jenkins] retrieving LDAP credentials from Kubernetes secret for template processing"
       # Check if secret exists
-      if _kubectl --no-exit get secret jenkins-ldap-config -n jenkins >/dev/null 2>&1; then
+      if _kubectl --no-exit get secret jenkins-ldap-config -n "$ns" >/dev/null 2>&1; then
          # Export credentials for envsubst
          export LDAP_BASE_DN
          export LDAP_BIND_DN
          export LDAP_BIND_PASSWORD
-         LDAP_BASE_DN=$(_kubectl get secret jenkins-ldap-config -n jenkins -o jsonpath='{.data.LDAP_BASE_DN}' 2>/dev/null | base64 -d)
-         LDAP_BIND_DN=$(_kubectl get secret jenkins-ldap-config -n jenkins -o jsonpath='{.data.LDAP_BIND_DN}' 2>/dev/null | base64 -d)
-         LDAP_BIND_PASSWORD=$(_kubectl get secret jenkins-ldap-config -n jenkins -o jsonpath='{.data.LDAP_BIND_PASSWORD}' 2>/dev/null | base64 -d)
+         LDAP_BASE_DN=$(_kubectl get secret jenkins-ldap-config -n "$ns" -o jsonpath='{.data.LDAP_BASE_DN}' 2>/dev/null | base64 -d)
+         LDAP_BIND_DN=$(_kubectl get secret jenkins-ldap-config -n "$ns" -o jsonpath='{.data.LDAP_BIND_DN}' 2>/dev/null | base64 -d)
+         LDAP_BIND_PASSWORD=$(_kubectl get secret jenkins-ldap-config -n "$ns" -o jsonpath='{.data.LDAP_BIND_PASSWORD}' 2>/dev/null | base64 -d)
 
          if [[ -z "$LDAP_BIND_PASSWORD" ]]; then
             _warn "[jenkins] LDAP_BIND_PASSWORD is empty in jenkins-ldap-config secret"

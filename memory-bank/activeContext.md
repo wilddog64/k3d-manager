@@ -3,23 +3,26 @@
 ## Current Branch: `feature/app-cluster-deploy` (as of 2026-03-01)
 
 **v0.5.0 merged** — Keycloak plugin complete + ARM64 image fix. Infra cluster fully deployed.
-**v0.6.0 in progress** — `configure_vault_app_auth` implemented. PR #16 open; CI green, Copilot review resolved (4 findings fixed — commit `b9bda33`), awaiting owner merge.
+**v0.6.0 merged** — `configure_vault_app_auth` implemented. PR #16 merged (commit `ab025f6`).
+**v0.6.1 PR open** — end-to-end rebuild fixes and infra verification complete. Copilot review findings resolved (annotation types + plan typos).
 
 ---
 
 ## Current Focus
 
-**v0.6.0: App Cluster Deployment**
+**v0.6.1 Release & App Cluster Deployment**
 
-Steps:
-1. `configure_vault_app_auth` — **DONE** (PR open, awaiting merge)
-2. ESO deploy on Ubuntu app cluster — Gemini SSH (after PR merges)
-3. shopping-cart-data (PostgreSQL, Redis, RabbitMQ) — Gemini SSH
-4. shopping-cart-apps (basket, order, payment, catalog, frontend) — Gemini SSH
+- [x] Create PR for `v0.6.1` (PR #17)
+- [x] Resolve Copilot review comments
+- [ ] Monitor CI process
+- [ ] Tag **@copilot** for final review
+- [ ] ESO deploy on Ubuntu app cluster — Gemini SSH
+- [ ] shopping-cart-data (PostgreSQL, Redis, RabbitMQ) — Gemini SSH
+- [ ] shopping-cart-apps (basket, order, payment, catalog, frontend) — Gemini SSH
 
 ---
 
-## Cluster State (as of 2026-03-01)
+## Cluster State (as of 2026-03-02)
 
 ### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-cluster`)
 
@@ -30,8 +33,8 @@ Steps:
 | OpenLDAP | Running | `identity` ns |
 | Istio | Running | `istio-system` |
 | Jenkins | Running | `cicd` ns |
-| ArgoCD | Running | `cicd` ns (v0.4.0) |
-| Keycloak | Running | `identity` ns (v0.5.0) |
+| ArgoCD | Running | `cicd` ns |
+| Keycloak | Running | `identity` ns |
 
 ### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`)
 
@@ -78,6 +81,12 @@ Steps:
 - **Branch protection**: `enforce_admins` permanently disabled — owner can self-merge
 - **Istio + Jobs**: `sidecar.istio.io/inject: "false"` required on Helm pre-install job pods
 - **Bitnami images**: use `docker.io/bitnamilegacy/*` for ARM64 — `docker.io/bitnami/*` and `public.ecr.aws/bitnami/*` are broken/amd64-only
+
+### Keycloak Known Failure Patterns (deploy_keycloak)
+
+1. **Istio sidecar blocks `keycloak-config-cli` job** — job hangs indefinitely; look for `keycloak-keycloak-config-cli` pod stuck in Running. Already mitigated in `values.yaml.tmpl` via `sidecar.istio.io/inject: "false"` — verify the annotation is present if job hangs again.
+2. **ARM64 image pull failures** — `docker.io/bitnami/*` and `public.ecr.aws/bitnami/*` are amd64-only; `values.yaml.tmpl` must use `docker.io/bitnamilegacy/*` for Keycloak, PostgreSQL, and Keycloak Config CLI.
+3. **Stale PVCs block retry** — a failed deploy leaves `data-keycloak-postgresql-0` PVC in the `identity` namespace; Helm reinstall will hang waiting for PostgreSQL. Delete the PVC before retrying: `kubectl -n identity delete pvc data-keycloak-postgresql-0`.
 
 ---
 
