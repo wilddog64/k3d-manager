@@ -150,16 +150,11 @@ function _provider_k3d_create_cluster() {
 
 function _provider_k3d_destroy_cluster() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-      echo "Usage: destroy_cluster <cluster_name>"
+      echo "Usage: destroy_cluster [cluster_name=k3d-cluster]"
       return 0
    fi
 
-   local cluster_name=$1
-
-   if [[ -z "$cluster_name" ]]; then
-      echo "Cluster name is required"
-      exit 1
-   fi
+   local cluster_name="${1:-k3d-cluster}"
 
    if ! _provider_k3d_cluster_exists "$cluster_name"; then
       _info "Cluster $cluster_name does not exist, skip"
