@@ -977,41 +977,6 @@ function deploy_ldap() {
          ;;
    esac
 
-   # Show help if no arguments provided
-   if [[ $arg_count -eq 0 ]]; then
-      cat <<EOF
-Usage: deploy_ldap [options] [namespace] [release] [chart-version]
-
-Deploy OpenLDAP with Vault integration.
-
-Options:
-  --namespace <ns>         Kubernetes namespace (default: ${LDAP_NAMESPACE:-directory})
-  --release <name>         Helm release name (default: ${LDAP_RELEASE:-openldap})
-  --chart-version <ver>    Helm chart version (default: ${LDAP_HELM_CHART_VERSION:-<auto>})
-  --enable-vault           Deploy Vault and ESO if not already deployed
-  -h, --help               Show this help message
-
-Examples:
-  # Show this help message
-  deploy_ldap
-
-  # Deploy with automatic Vault setup
-  deploy_ldap --enable-vault
-
-  # Deploy to custom namespace
-  deploy_ldap --namespace my-ldap --enable-vault
-
-Positional arguments (backwards compatible):
-  deploy_ldap [namespace] [release] [chart-version]
-
-Prerequisites:
-  - Vault must be deployed (use --enable-vault or deploy_vault first)
-  - ESO must be deployed (automatically deployed with --enable-vault)
-EOF
-      if (( restore_trace )); then set -x; fi
-      return 0
-   fi
-
    if [[ "${CLUSTER_ROLE:-infra}" == "app" ]]; then
       _info "[ldap] CLUSTER_ROLE=app — skipping deploy_ldap"
       if (( restore_trace )); then set -x; fi
