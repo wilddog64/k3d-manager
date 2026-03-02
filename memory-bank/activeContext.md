@@ -3,19 +3,35 @@
 ## Current Branch: `feature/app-cluster-deploy` (as of 2026-03-01)
 
 **v0.5.0 merged** — Keycloak plugin complete + ARM64 image fix. Infra cluster fully deployed.
-**v0.6.0 in progress** — `configure_vault_app_auth` implemented. PR #16 open; CI green, Copilot review resolved (4 findings fixed — commit `b9bda33`), awaiting owner merge.
+**v0.6.0 merged** — `configure_vault_app_auth` implemented. PR #16 merged (commit `ab025f6`).
+**rebuild-infra-0.6.0 in progress** — end-to-end rebuild underway. Gemini task spec at `docs/plans/rebuild-infra-0.6.0-gemini-task.md`.
 
 ---
 
 ## Current Focus
 
-**v0.6.0: App Cluster Deployment**
+**rebuild-infra-0.6.0: End-to-End Rebuild Verification**
+
+Branch: `rebuild-infra-0.6.0` (from `main` @ `ab025f6`)
+Task spec: `docs/plans/rebuild-infra-0.6.0-gemini-task.md`
+Agent: **Gemini** (interactive SSH, live cluster)
 
 Steps:
-1. `configure_vault_app_auth` — **DONE** (PR open, awaiting merge)
-2. ESO deploy on Ubuntu app cluster — Gemini SSH (after PR merges)
-3. shopping-cart-data (PostgreSQL, Redis, RabbitMQ) — Gemini SSH
-4. shopping-cart-apps (basket, order, payment, catalog, frontend) — Gemini SSH
+1. Destroy existing infra cluster — Gemini
+2. deploy_cluster (includes Istio) — Gemini
+3. deploy_vault + test_vault — Gemini
+4. deploy_eso + test_eso — Gemini
+5. deploy_ldap — Gemini
+6. deploy_jenkins — Gemini
+7. deploy_argocd --bootstrap — Gemini
+8. deploy_keycloak + test_keycloak — Gemini
+9. Full test suite (test_vault, test_eso, test_istio, test_keycloak) — Gemini
+10. configure_vault_app_auth (Ubuntu SSH) — Gemini
+
+**After rebuild verified:**
+- ESO deploy on Ubuntu app cluster — Gemini SSH
+- shopping-cart-data (PostgreSQL, Redis, RabbitMQ) — Gemini SSH
+- shopping-cart-apps (basket, order, payment, catalog, frontend) — Gemini SSH
 
 ---
 
