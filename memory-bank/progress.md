@@ -87,11 +87,10 @@ Branch `feature/infra-cluster-complete`. All fixes applied (envsubst whitelist, 
   - [x] Vault + ESO → `secrets` ns
   - [x] OpenLDAP → `identity` ns
   - [x] Istio → `istio-system`
-  - [x] Jenkins → `cicd` ns — **DEPLOYED 2026-03-01** (v0.3.1, smoke test passed)
-  - [x] ArgoCD → `cicd` ns — **DEPLOYED** (v0.4.0)
-  - [~] Keycloak → `identity` ns — **PR #13 open**, live deploy post-merge
-- [ ] Configure Vault `kubernetes-app` auth mount for Ubuntu app cluster
-- [ ] ESO deploy on App cluster (remote Vault addr: `https://<mac-ip>:8200`)
+  - [x] Jenkins → `cicd` ns — **VERIFIED 2026-03-02**
+  - [x] ArgoCD → `cicd` ns — **VERIFIED 2026-03-02**
+  - [x] Keycloak → `identity` ns — **VERIFIED 2026-03-02**
+- [x] Configure Vault `kubernetes-app` auth mount for Ubuntu app cluster — **VERIFIED 2026-03-02**
 - [ ] shopping-cart-data / apps deployment on Ubuntu
 
 ---
