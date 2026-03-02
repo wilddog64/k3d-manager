@@ -1227,6 +1227,59 @@ function _enable_kv2_k8s_auth() {
   _vault_set_eso_init_jenkins_writer "$ns" "$release" "$eso_sa" "$eso_ns"
 }
 
+function configure_vault_app_auth() {
+  local ns="${VAULT_NS:-$VAULT_NS_DEFAULT}"
+  local release="${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}"
+  local app_api_url="${APP_CLUSTER_API_URL:-}"
+  local app_ca_path="${APP_CLUSTER_CA_CERT_PATH:-}"
+  local mount="${APP_K8S_AUTH_MOUNT:-kubernetes-app}"
+  local role="${APP_ESO_VAULT_ROLE:-eso-app-cluster}"
+  local eso_sa="${APP_ESO_SA_NAME:-external-secrets}"
+  local eso_ns="${APP_ESO_SA_NS:-secrets}"
+
+  if [[ -z "$app_api_url" ]]; then
+    _err "[vault] APP_CLUSTER_API_URL is required for configure_vault_app_auth"
+  fi
+
+  if [[ -z "$app_ca_path" ]]; then
+    _err "[vault] APP_CLUSTER_CA_CERT_PATH is required for configure_vault_app_auth"
+  fi
+
+  if [[ ! -f "$app_ca_path" ]]; then
+    _err "[vault] app cluster CA cert file not found at $app_ca_path"
+  fi
+
+  _info "[vault] configuring app cluster auth at mount: ${mount}"
+
+  # Ensure we are logged in
+  _vault_login "$ns" "$release"
+
+  # a. Copy CA cert into vault-0 pod
+  _kubectl -n "$ns" cp "$app_ca_path" "${release}-0:/tmp/app-cluster-ca.crt"
+
+  # b. Enable kubernetes auth mount (idempotent)
+  _vault_exec "$ns" "vault auth enable -path=${mount} kubernetes" "$release" || true
+
+  # c. Configure mount with app cluster API server + CA cert
+  #    Use disable_local_ca_jwt=true — Vault validates JWT locally, no outbound call to Ubuntu API
+  _vault_exec "$ns" "vault write auth/${mount}/config \
+    kubernetes_host=${app_api_url} \
+    kubernetes_ca_cert=@/tmp/app-cluster-ca.crt \
+    disable_local_ca_jwt=true" "$release"
+
+  # d. Ensure eso-reader policy exists
+  _vault_set_eso_reader "$ns" "$release" "$eso_sa" "$eso_ns"
+
+  # e. Create ESO role bound to app cluster ESO service account
+  _vault_exec "$ns" "vault write auth/${mount}/role/${role} \
+    bound_service_account_names=${eso_sa} \
+    bound_service_account_namespaces=${eso_ns} \
+    policies=eso-reader \
+    ttl=1h" "$release"
+
+  _info "[vault] app cluster auth configured successfully"
+}
+
 function _vault_set_eso_reader() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
