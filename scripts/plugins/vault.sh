@@ -1227,6 +1227,73 @@ function _enable_kv2_k8s_auth() {
   _vault_set_eso_init_jenkins_writer "$ns" "$release" "$eso_sa" "$eso_ns"
 }
 
+function configure_vault_app_auth() {
+  local ns="${VAULT_NS:-$VAULT_NS_DEFAULT}"
+  local release="${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}"
+  local app_api_url="${APP_CLUSTER_API_URL:-}"
+  local app_ca_path="${APP_CLUSTER_CA_CERT_PATH:-}"
+  local mount="${APP_K8S_AUTH_MOUNT:-kubernetes-app}"
+  local role="${APP_ESO_VAULT_ROLE:-eso-app-cluster}"
+  local eso_sa="${APP_ESO_SA_NAME:-external-secrets}"
+  local eso_ns="${APP_ESO_SA_NS:-secrets}"
+
+  if [[ -z "$app_api_url" ]]; then
+    _err "[vault] APP_CLUSTER_API_URL is required for configure_vault_app_auth"
+  fi
+
+  if [[ -z "$app_ca_path" ]]; then
+    _err "[vault] APP_CLUSTER_CA_CERT_PATH is required for configure_vault_app_auth"
+  fi
+
+  if [[ ! -f "$app_ca_path" ]]; then
+    _err "[vault] app cluster CA cert file not found at $app_ca_path"
+  fi
+
+  _info "[vault] configuring app cluster auth at mount: ${mount}"
+
+  # Ensure we are logged in
+  _vault_login "$ns" "$release"
+
+  # a. Copy CA cert into vault-0 pod
+  _kubectl -n "$ns" cp "$app_ca_path" "${release}-0:/tmp/app-cluster-ca.crt"
+
+  # b. Enable kubernetes auth mount (idempotent)
+  _vault_exec "$ns" "vault auth enable -path=${mount} kubernetes" "$release" || true
+
+  # c. Configure mount with app cluster API server + CA cert
+  #    Default local JWT validation — Vault verifies JWTs against the provided CA cert
+  #    without calling the Ubuntu k3s TokenReview API (avoids OrbStack networking issues)
+  _vault_exec "$ns" "vault write auth/${mount}/config \
+    kubernetes_host=${app_api_url} \
+    kubernetes_ca_cert=@/tmp/app-cluster-ca.crt" "$release"
+
+  # d. Ensure eso-reader policy exists
+  if ! _vault_policy_exists "$ns" "$release" "eso-reader"; then
+    _info "[vault] creating policy 'eso-reader'"
+    cat <<'HCL' | _vault_exec_stream --no-exit --pod "${release}-0" "$ns" "$release" -- \
+      vault policy write eso-reader -
+       # file: eso-reader.hcl
+       # read any keys under eso/*
+       path "secret/data/eso/*"      { capabilities = ["read"] }
+       path "secret/metadata/eso"    { capabilities = ["list"] }
+       path "secret/metadata/eso/*"  { capabilities = ["read","list"] }
+HCL
+  fi
+
+  # e. Create ESO role bound to app cluster ESO service account
+  local safe_mount_role safe_eso_sa safe_eso_ns
+  printf -v safe_mount_role '%s' "auth/${mount}/role/${role}"
+  printf -v safe_eso_sa '%q' "$eso_sa"
+  printf -v safe_eso_ns '%q' "$eso_ns"
+  _vault_exec "$ns" "vault write ${safe_mount_role} \
+    bound_service_account_names=${safe_eso_sa} \
+    bound_service_account_namespaces=${safe_eso_ns} \
+    policies=eso-reader \
+    ttl=1h" "$release"
+
+  _info "[vault] app cluster auth configured successfully"
+}
+
 function _vault_set_eso_reader() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
