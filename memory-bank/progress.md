@@ -91,8 +91,10 @@ Branch `feature/infra-cluster-complete`. All fixes applied (envsubst whitelist, 
 - [x] `destroy_cluster` default name fix
 - [x] `deploy_ldap` no-args default fix
 - [x] ArgoCD `redis-secret-init` Istio sidecar fix
+- [x] ArgoCD Istio annotation string type fix (Copilot review)
 - [x] Jenkins hardcoded LDAP namespace fix
 - [x] Jenkins `cert-rotator` Istio sidecar fix
+- [x] Task plan `--enable-ldap` typo fix (Copilot review)
 
 ---
 

@@ -92,7 +92,7 @@ CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager test_eso
 ## Step 5 — Deploy OpenLDAP
 
 ```bash
-CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_ldap --enable-ldap
+CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager deploy_ldap
 ```
 
 Verify:

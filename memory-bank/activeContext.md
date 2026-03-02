@@ -4,7 +4,7 @@
 
 **v0.5.0 merged** — Keycloak plugin complete + ARM64 image fix. Infra cluster fully deployed.
 **v0.6.0 merged** — `configure_vault_app_auth` implemented. PR #16 merged (commit `ab025f6`).
-**v0.6.1 PR open** — end-to-end rebuild fixes and infra verification complete.
+**v0.6.1 PR open** — end-to-end rebuild fixes and infra verification complete. Copilot review findings resolved (annotation types + plan typos).
 
 ---
 
@@ -12,7 +12,8 @@
 
 **v0.6.1 Release & App Cluster Deployment**
 
-- [ ] Create PR for `v0.6.1` (release branch: `rebuild-infra-0.6.0`)
+- [x] Create PR for `v0.6.1` (PR #17)
+- [x] Resolve Copilot review comments
 - [ ] Monitor CI process
 - [ ] Tag **@copilot** for final review
 - [ ] ESO deploy on Ubuntu app cluster — Gemini SSH
