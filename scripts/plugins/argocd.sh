@@ -162,6 +162,7 @@ EOF
    _info "[argocd] Installing Argo CD via Helm"
    local -a helm_args=(
       --create-namespace
+      --set "redisSecretInit.podAnnotations.sidecar\.istio\.io/inject=false"
    )
 
    # Add version if specified
