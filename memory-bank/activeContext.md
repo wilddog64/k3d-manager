@@ -4,17 +4,20 @@
 
 **v0.5.0 merged** — Keycloak plugin complete + ARM64 image fix. Infra cluster fully deployed.
 **v0.6.0 merged** — `configure_vault_app_auth` implemented. PR #16 merged (commit `ab025f6`).
-**rebuild-infra-0.6.0 complete** — end-to-end rebuild verified. All components healthy in new namespaces. Gemini task spec at `docs/plans/rebuild-infra-0.6.0-gemini-task.md`.
+**v0.6.1 PR open** — end-to-end rebuild fixes and infra verification complete.
 
 ---
 
 ## Current Focus
 
-**App Cluster Deployment (Next Phase)**
+**v0.6.1 Release & App Cluster Deployment**
 
-- ESO deploy on Ubuntu app cluster — Gemini SSH
-- shopping-cart-data (PostgreSQL, Redis, RabbitMQ) — Gemini SSH
-- shopping-cart-apps (basket, order, payment, catalog, frontend) — Gemini SSH
+- [ ] Create PR for `v0.6.1` (release branch: `rebuild-infra-0.6.0`)
+- [ ] Monitor CI process
+- [ ] Tag **@copilot** for final review
+- [ ] ESO deploy on Ubuntu app cluster — Gemini SSH
+- [ ] shopping-cart-data (PostgreSQL, Redis, RabbitMQ) — Gemini SSH
+- [ ] shopping-cart-apps (basket, order, payment, catalog, frontend) — Gemini SSH
 
 ---
 

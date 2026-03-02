@@ -4,6 +4,9 @@
 
 `ldap-develop` merged to `main` via PR #2 (2026-02-27). **v0.1.0 released.**
 
+**v0.6.1 PR OPEN 🔄 (2026-03-02)**
+Release branch `rebuild-infra-0.6.0`. Critical fixes for ArgoCD/Jenkins Istio hangs, LDAP defaults, and Jenkins namespace bugs discovered during end-to-end infra rebuild.
+
 **ArgoCD Phase 1 — MERGED ✅ (v0.4.0, 2026-03-02)**
 Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 
@@ -83,6 +86,13 @@ Branch `feature/infra-cluster-complete`. All fixes applied (envsubst whitelist, 
   - [x] ArgoCD → `cicd` ns
   - [x] Keycloak → `identity` ns
 - [x] Configure Vault `kubernetes-app` auth mount for Ubuntu app cluster
+
+### Bug Fixes (v0.6.1)
+- [x] `destroy_cluster` default name fix
+- [x] `deploy_ldap` no-args default fix
+- [x] ArgoCD `redis-secret-init` Istio sidecar fix
+- [x] Jenkins hardcoded LDAP namespace fix
+- [x] Jenkins `cert-rotator` Istio sidecar fix
 
 ---
 
