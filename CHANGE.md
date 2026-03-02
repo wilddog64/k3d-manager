@@ -8,9 +8,9 @@
   cluster as a second Kubernetes auth mount (`auth/kubernetes-app/`) in Vault, then
   creates an `eso-app-cluster` role so ESO on the app cluster can authenticate and fetch
   secrets
-- Uses local JWT validation (`disable_local_ca_jwt=true`) — Vault validates ESO's JWT
-  against the app cluster CA cert without requiring network access from the Vault pod to
-  the Ubuntu k3s API (avoids OrbStack networking uncertainty)
+- Uses default local JWT validation — Vault verifies ESO's JWT against the provided app
+  cluster CA cert without calling the Ubuntu k3s TokenReview API (avoids OrbStack
+  networking uncertainty; no `token_reviewer_jwt` needed)
 - Required env vars: `APP_CLUSTER_API_URL`, `APP_CLUSTER_CA_CERT_PATH`
 - Optional env vars with defaults: `APP_K8S_AUTH_MOUNT` (`kubernetes-app`),
   `APP_ESO_VAULT_ROLE` (`eso-app-cluster`), `APP_ESO_SA_NAME` (`external-secrets`),

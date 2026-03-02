@@ -1261,11 +1261,11 @@ function configure_vault_app_auth() {
   _vault_exec "$ns" "vault auth enable -path=${mount} kubernetes" "$release" || true
 
   # c. Configure mount with app cluster API server + CA cert
-  #    Use disable_local_ca_jwt=true — Vault validates JWT locally, no outbound call to Ubuntu API
+  #    Default local JWT validation — Vault verifies JWTs against the provided CA cert
+  #    without calling the Ubuntu k3s TokenReview API (avoids OrbStack networking issues)
   _vault_exec "$ns" "vault write auth/${mount}/config \
     kubernetes_host=${app_api_url} \
-    kubernetes_ca_cert=@/tmp/app-cluster-ca.crt \
-    disable_local_ca_jwt=true" "$release"
+    kubernetes_ca_cert=@/tmp/app-cluster-ca.crt" "$release"
 
   # d. Ensure eso-reader policy exists
   if ! _vault_policy_exists "$ns" "$release" "eso-reader"; then
@@ -1281,9 +1281,13 @@ HCL
   fi
 
   # e. Create ESO role bound to app cluster ESO service account
-  _vault_exec "$ns" "vault write auth/${mount}/role/${role} \
-    bound_service_account_names=${eso_sa} \
-    bound_service_account_namespaces=${eso_ns} \
+  local safe_mount_role safe_eso_sa safe_eso_ns
+  printf -v safe_mount_role '%s' "auth/${mount}/role/${role}"
+  printf -v safe_eso_sa '%q' "$eso_sa"
+  printf -v safe_eso_ns '%q' "$eso_ns"
+  _vault_exec "$ns" "vault write ${safe_mount_role} \
+    bound_service_account_names=${safe_eso_sa} \
+    bound_service_account_namespaces=${safe_eso_ns} \
     policies=eso-reader \
     ttl=1h" "$release"
 

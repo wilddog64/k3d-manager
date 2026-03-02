@@ -137,10 +137,10 @@ setup() {
   # Verify vault auth enable
   grep -q "vault_exec secrets vault auth enable -path=custom-mount kubernetes vault" "$VAULT_EXEC_LOG"
 
-  # Verify vault write config
+  # Verify vault write config (local JWT validation — no disable_local_ca_jwt flag)
   grep -q "vault_exec secrets vault write auth/custom-mount/config" "$VAULT_EXEC_LOG"
   grep -q "kubernetes_host=https://10.211.55.14:6443" "$VAULT_EXEC_LOG"
-  grep -q "disable_local_ca_jwt=true" "$VAULT_EXEC_LOG"
+  grep -q "kubernetes_ca_cert=@/tmp/app-cluster-ca.crt" "$VAULT_EXEC_LOG"
 
   # Verify eso-reader policy ensure
   grep -q "vault_policy_exists secrets vault eso-reader" "$VAULT_EXEC_LOG"
