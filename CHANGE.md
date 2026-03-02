@@ -1,5 +1,46 @@
 # Changes - k3d-manager
 
+## v0.6.0 - dated 2026-03-01
+
+### App Cluster Vault Auth
+
+- `configure_vault_app_auth` — new top-level command that registers the Ubuntu k3s app
+  cluster as a second Kubernetes auth mount (`auth/kubernetes-app/`) in Vault, then
+  creates an `eso-app-cluster` role so ESO on the app cluster can authenticate and fetch
+  secrets
+- Uses local JWT validation (`disable_local_ca_jwt=true`) — Vault validates ESO's JWT
+  against the app cluster CA cert without requiring network access from the Vault pod to
+  the Ubuntu k3s API (avoids OrbStack networking uncertainty)
+- Required env vars: `APP_CLUSTER_API_URL`, `APP_CLUSTER_CA_CERT_PATH`
+- Optional env vars with defaults: `APP_K8S_AUTH_MOUNT` (`kubernetes-app`),
+  `APP_ESO_VAULT_ROLE` (`eso-app-cluster`), `APP_ESO_SA_NAME` (`external-secrets`),
+  `APP_ESO_SA_NS` (`secrets`)
+- Idempotent: safe to re-run; existing mount and policy are detected and skipped
+
+### Bug Fixes
+
+- `configure_vault_app_auth` step (d) — replaced `_vault_set_eso_reader` call with an
+  inline `_vault_policy_exists` check + policy write; prevents `_vault_set_eso_reader`
+  from reconfiguring the infra cluster's `auth/kubernetes` mount and overwriting
+  `auth/kubernetes/role/eso-reader` with app cluster SA values
+
+### Tests
+
+- `scripts/tests/plugins/vault_app_auth.bats` — 5 cases:
+  - exits 1 when `APP_CLUSTER_API_URL` is unset
+  - exits 1 when `APP_CLUSTER_CA_CERT_PATH` is unset
+  - exits 1 when CA cert file is missing
+  - calls vault commands with correct args including `disable_local_ca_jwt=true`
+  - idempotent: second run exits 0
+
+### Verification
+
+- `shellcheck scripts/plugins/vault.sh` clean
+- `bats scripts/tests/plugins/vault_app_auth.bats` 5/5 passed (Gemini 2026-03-01)
+- `test_vault` passed against live infra cluster (Gemini 2026-03-01)
+
+---
+
 ## v0.5.0 - dated 2026-03-03
 
 ### Keycloak Plugin — Infra Cluster Complete
