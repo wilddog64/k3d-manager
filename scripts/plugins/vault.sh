@@ -1268,7 +1268,17 @@ function configure_vault_app_auth() {
     disable_local_ca_jwt=true" "$release"
 
   # d. Ensure eso-reader policy exists
-  _vault_set_eso_reader "$ns" "$release" "$eso_sa" "$eso_ns"
+  if ! _vault_policy_exists "$ns" "$release" "eso-reader"; then
+    _info "[vault] creating policy 'eso-reader'"
+    cat <<'HCL' | _vault_exec_stream --no-exit --pod "${release}-0" "$ns" "$release" -- \
+      vault policy write eso-reader -
+       # file: eso-reader.hcl
+       # read any keys under eso/*
+       path "secret/data/eso/*"      { capabilities = ["read"] }
+       path "secret/metadata/eso"    { capabilities = ["list"] }
+       path "secret/metadata/eso/*"  { capabilities = ["read","list"] }
+HCL
+  fi
 
   # e. Create ESO role bound to app cluster ESO service account
   _vault_exec "$ns" "vault write auth/${mount}/role/${role} \

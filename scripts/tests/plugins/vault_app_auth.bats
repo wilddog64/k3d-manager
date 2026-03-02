@@ -26,8 +26,10 @@ setup() {
 
   KUBECTL_LOG="$BATS_TEST_TMPDIR/kubectl.log"
   VAULT_EXEC_LOG="$BATS_TEST_TMPDIR/vault_exec.log"
+  VAULT_EXEC_STREAM_LOG="$BATS_TEST_TMPDIR/vault_exec_stream.log"
   : >"$KUBECTL_LOG"
   : >"$VAULT_EXEC_LOG"
+  : >"$VAULT_EXEC_STREAM_LOG"
 
   _kubectl() {
     # Skip options
@@ -49,20 +51,39 @@ setup() {
     return 0
   }
 
+  _vault_exec_stream() {
+    local kflags=()
+    local pod_override=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--prefer-sudo|--require-sudo) kflags+=("$1"); shift ;;
+        --pod) pod_override="${2:-}"; shift 2 ;;
+        --pod=*) pod_override="${1#*=}"; shift ;;
+        *) break ;;
+      esac
+    done
+    echo "vault_exec_stream --pod $pod_override $*" >>"$VAULT_EXEC_STREAM_LOG"
+    # Capture stdin if possible (bats 'run' can pipe to this mock)
+    cat >> "$VAULT_EXEC_STREAM_LOG"
+    return 0
+  }
+
   _vault_login() {
     echo "vault_login $*" >>"$VAULT_EXEC_LOG"
     return 0
   }
 
-  _vault_set_eso_reader() {
-    echo "vault_set_eso_reader $*" >>"$VAULT_EXEC_LOG"
-    return 0
+  _vault_policy_exists_val=1
+  _vault_policy_exists() {
+    echo "vault_policy_exists $*" >>"$VAULT_EXEC_LOG"
+    return $_vault_policy_exists_val
   }
 
   export -f _kubectl
   export -f _vault_exec
+  export -f _vault_exec_stream
   export -f _vault_login
-  export -f _vault_set_eso_reader
+  export -f _vault_policy_exists
 
   # Test defaults
   export VAULT_NS_DEFAULT="secrets"
@@ -104,6 +125,9 @@ setup() {
   export APP_ESO_SA_NAME="custom-sa"
   export APP_ESO_SA_NS="custom-ns"
 
+  # Mock policy not existing
+  _vault_policy_exists_val=1
+
   run configure_vault_app_auth
   [ "$status" -eq 0 ]
 
@@ -119,13 +143,30 @@ setup() {
   grep -q "disable_local_ca_jwt=true" "$VAULT_EXEC_LOG"
 
   # Verify eso-reader policy ensure
-  grep -q "vault_set_eso_reader secrets vault custom-sa custom-ns" "$VAULT_EXEC_LOG"
+  grep -q "vault_policy_exists secrets vault eso-reader" "$VAULT_EXEC_LOG"
+  grep -q "vault_exec_stream --pod vault-0 secrets vault -- vault policy write eso-reader -" "$VAULT_EXEC_STREAM_LOG"
+  grep -q "path \"secret/data/eso/\*\"      { capabilities = \[\"read\"\] }" "$VAULT_EXEC_STREAM_LOG"
 
   # Verify vault write role
   grep -q "vault_exec secrets vault write auth/custom-mount/role/custom-role" "$VAULT_EXEC_LOG"
   grep -q "bound_service_account_names=custom-sa" "$VAULT_EXEC_LOG"
   grep -q "bound_service_account_namespaces=custom-ns" "$VAULT_EXEC_LOG"
   grep -q "policies=eso-reader" "$VAULT_EXEC_LOG"
+}
+
+@test "configure_vault_app_auth skips policy creation if it exists" {
+  export APP_CLUSTER_API_URL="https://10.211.55.14:6443"
+  export APP_CLUSTER_CA_CERT_PATH="$BATS_TEST_TMPDIR/app-ca.crt"
+  touch "$APP_CLUSTER_CA_CERT_PATH"
+
+  # Mock policy existing
+  _vault_policy_exists_val=0
+
+  run configure_vault_app_auth
+  [ "$status" -eq 0 ]
+
+  grep -q "vault_policy_exists secrets vault eso-reader" "$VAULT_EXEC_LOG"
+  ! grep -q "vault policy write eso-reader" "$VAULT_EXEC_STREAM_LOG"
 }
 
 @test "configure_vault_app_auth is idempotent" {
