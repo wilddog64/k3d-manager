@@ -3,7 +3,7 @@
 ## Current Branch: `feature/app-cluster-deploy` (as of 2026-03-01)
 
 **v0.5.0 merged** — Keycloak plugin complete + ARM64 image fix. Infra cluster fully deployed.
-**v0.6.0 in progress** — `configure_vault_app_auth` implemented (PR pending).
+**v0.6.0 in progress** — `configure_vault_app_auth` implemented. PR #16 open; CI green, Copilot review resolved (4 findings fixed — commit `b9bda33`), awaiting owner merge.
 
 ---
 
@@ -59,7 +59,7 @@ Steps:
 
 ## Open Items
 
-- [x] `configure_vault_app_auth` — implemented + fixed (Gemini), PR open
+- [x] `configure_vault_app_auth` — implemented + Copilot review resolved (PR #16, CI green, awaiting merge)
 - [ ] ESO deploy on Ubuntu app cluster (Gemini — SSH, after PR merges)
 - [ ] shopping-cart-data / apps deployment on Ubuntu (Gemini — SSH)
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
