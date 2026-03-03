@@ -65,6 +65,7 @@
 | v0.6.0 | PR open | configure_vault_app_auth + vault_app_auth.bats |
 | v0.6.2 | planned | Copilot CLI tool management (`_ensure_node` + `_ensure_copilot_cli`) |
 | v0.7.0 | planned | Keycloak provider interface; depends on v0.6.2 |
+| v1.0.0 | vision | Multi-Agent Platform; see `docs/plans/roadmap-v1.md` |
 
 ---
 
