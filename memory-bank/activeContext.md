@@ -3,22 +3,28 @@
 ## Current Branch: `feature/app-cluster-deploy` (as of 2026-03-01)
 
 **v0.5.0 merged** — Keycloak plugin complete + ARM64 image fix. Infra cluster fully deployed.
-**v0.6.0 merged** — `configure_vault_app_auth` implemented. PR #16 merged (commit `ab025f6`).
-**v0.6.1 PR open** — end-to-end rebuild fixes and infra verification complete. Copilot review findings resolved (annotation types + plan typos).
+**v0.6.1 merged** — infra rebuild bug fixes integrated.
+**v0.6.2 in progress** — adoption of High-Rigor Engineering Protocol for App Cluster deployment.
 
 ---
 
 ## Current Focus
 
-**v0.6.1 Release & App Cluster Deployment**
+**v0.6.2: High-Rigor Protocol & Ubuntu ESO Deployment**
 
-- [x] Create PR for `v0.6.1` (PR #17)
-- [x] Resolve Copilot review comments
-- [ ] Monitor CI process
-- [ ] Tag **@copilot** for final review
-- [ ] ESO deploy on Ubuntu app cluster — Gemini SSH
-- [ ] shopping-cart-data (PostgreSQL, Redis, RabbitMQ) — Gemini SSH
-- [ ] shopping-cart-apps (basket, order, payment, catalog, frontend) — Gemini SSH
+- [ ] **Checkpoint**: Commit current healthy state of `k3d-manager-v0.6.2`.
+- [ ] **Spec-First**: Investigate and define implementation for Ubuntu ESO.
+- [ ] **Verification**: Audit against correctness, maintainability, and scope.
+- [ ] **Final Loop**: Shellcheck + Bats verification.
+
+---
+
+## Engineering Protocol (Activated)
+
+1. **Spec-First**: No code without a structured, approved implementation spec.
+2. **Checkpointing**: Git commit before every surgical operation.
+3. **Audit Phase**: Explicitly verify that no tests were weakened.
+4. **Simplification**: Refactor for minimal logic before final verification.
 
 ---
 
