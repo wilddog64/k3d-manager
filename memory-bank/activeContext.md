@@ -10,10 +10,11 @@
 
 ## Current Focus
 
-**v0.6.2: High-Rigor Protocol & Ubuntu ESO Deployment**
+**v0.6.2: High-Rigor Protocol & Copilot CLI Management**
 
 - [ ] **Checkpoint**: Commit current healthy state of `k3d-manager-v0.6.2`.
-- [ ] **Spec-First**: Investigate and define implementation for Ubuntu ESO.
+- [ ] **Spec-First**: Refine discovery logic for Node.js (Universal Brew + Distro footprints).
+- [ ] **Implementation**: Add `_ensure_node` and `_ensure_copilot_cli` to `system.sh`.
 - [ ] **Verification**: Audit against correctness, maintainability, and scope.
 - [ ] **Final Loop**: Shellcheck + Bats verification.
 
