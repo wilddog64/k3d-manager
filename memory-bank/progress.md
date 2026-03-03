@@ -102,6 +102,13 @@ Branch `feature/infra-cluster-complete`. All fixes applied (envsubst whitelist, 
 
 ### Priority 1 (Current focus)
 
+**v0.6.2 — Copilot CLI Tool Management:**
+- [ ] `_ensure_node()` + `_install_node_from_release()` in `scripts/lib/system.sh`
+- [ ] `_ensure_copilot_cli()` in `scripts/lib/system.sh`
+- [ ] `scripts/tests/lib/ensure_node.bats` (5 cases)
+- [ ] `scripts/tests/lib/ensure_copilot_cli.bats` (2 cases)
+- Plan: `docs/plans/v0.6.2-ensure-copilot-cli.md`
+
 **App Cluster Deployment:**
 - [ ] ESO deploy on App cluster (remote Vault addr: `https://<mac-ip>:8200`)
 - [ ] shopping-cart-data (PostgreSQL, Redis, RabbitMQ) deployment on Ubuntu
