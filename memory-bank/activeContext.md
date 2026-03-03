@@ -56,7 +56,8 @@
 |---|---|---|
 | v0.1.0–v0.5.0 | released | See CHANGE.md |
 | v0.6.0 | PR open | configure_vault_app_auth + vault_app_auth.bats |
-| v0.7.0 | future | Keycloak provider interface; cluster rename to `infra` |
+| v0.6.2 | planned | Copilot CLI tool management (`_ensure_node` + `_ensure_copilot_cli`) |
+| v0.7.0 | planned | Keycloak provider interface; depends on v0.6.2 |
 
 ---
 
@@ -67,6 +68,8 @@
 - [ ] shopping-cart-data / apps deployment on Ubuntu (Gemini — SSH)
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
 - [ ] `scripts/tests/plugins/jenkins.bats` — backlog
+- [ ] v0.6.2: `_ensure_node` + `_ensure_copilot_cli` — plan: `docs/plans/v0.6.2-ensure-copilot-cli.md`
+- [ ] v0.7.0: Keycloak provider interface — plan: `docs/plans/v0.7.0-keycloak-provider-interface.md` (pending)
 - [ ] v0.7.0: rename cluster to `infra` + fix `CLUSTER_NAME` env var
 
 ---
