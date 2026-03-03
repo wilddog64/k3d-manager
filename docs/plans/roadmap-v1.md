@@ -24,16 +24,18 @@ Transform `k3d-manager` from a collection of Bash utility scripts into a self-or
   - Standardize "Template Specs" that can be fed directly to AI for consistent code generation.
 
 ## v0.8.0 — The Multi-Agent Orchestration Foundation
-*Focus: AI as a Teammate (ADK Integration)*
+*Focus: AI as a Teammate (MCP & Orchestration)*
 
-- **Minor Version Change:** Significant expansion of CLI capability via internal agent routing.
+- **Minor Version Change:** Significant expansion of CLI capability via Model Context Protocol (MCP) and agent routing.
 - **Key Features:**
-  - **The Orchestrator:** Introduce a top-level `intent` command (e.g., `./k3d-manager intent "Deploy Shopping Cart"`).
-  - **ADK Integration:** Integrate a lightweight Agent Development Kit (ADK) to manage state and handoffs between sub-agents.
-  - **Role-Based Delegation:**
-    - **Architect Agent:** Maps dependencies and verifies cluster resources.
-    - **Security Agent:** Manages Vault policies and secret lifecycle.
-    - **Test Agent:** Orchestrates parallel BATS execution and reports regressions.
+  - **The MCP Server:** Transform `k3d-manager` into an MCP-compatible server. This allows external agents (Claude, GPT, specialized swarms) to invoke `k3d-manager` functions as "Verified Tools."
+  - **The Orchestrator:** Introduce a top-level `intent` command that parses high-level goals into multi-agent task graphs.
+  - **Role-Based Delegation (The "Crew"):**
+    - **Architect Agent:** Uses MCP to map dependencies and audit cluster state (K8s-native discovery).
+    - **Security Agent:** Specialized in Vault PKI, ESO role lifecycle, and credential auditing.
+    - **SRE Agent:** Monitors "Golden Signals" and health checks via MCP tool calls.
+    - **Test Agent:** Orchestrates BATS suites and validates logic integrity.
+  - **Context Sharing:** Establish a shared "Agentic Memory" (leveraging the Memory Bank) to persist reasoning across agent handoffs.
 
 ## v0.9.0 — The Autonomous SRE (Operator Phase)
 *Focus: AI as an Operator (Active Monitoring & Self-Healing)*
