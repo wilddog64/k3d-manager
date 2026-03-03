@@ -38,19 +38,19 @@ Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 
 ### Priority 1 (Current focus — v0.6.2)
 
-**High-Rigor App Cluster Deployment:**
+**v0.6.2 — Copilot CLI Tool Management:**
 - [ ] Checkpoint: Commit `v0.6.2` baseline
+- [ ] Spec-First: Finalize `_ensure_node` discovery logic (Universal Brew + Distro fallbacks)
+- [ ] Implement `_ensure_node` + `_install_node_from_release` in `scripts/lib/system.sh`
+- [ ] Implement `_ensure_copilot_cli` in `scripts/lib/system.sh`
+- [ ] Verify via `scripts/tests/lib/ensure_node.bats` and `ensure_copilot_cli.bats`
+- [ ] Post-Implementation Rigor: Audit, Simplify, Final Verify
+
+**App Cluster Deployment:**
 - [ ] Spec-First: Ubuntu ESO Deployment Plan
 - [ ] ESO deploy on App cluster (Ubuntu)
 - [ ] shopping-cart-data (PostgreSQL, Redis, RabbitMQ) deployment on Ubuntu
 - [ ] shopping-cart-apps (basket, order, payment, catalog, frontend) deployment on Ubuntu
-
-**v0.6.2 — Copilot CLI Tool Management (BACKLOG):**
-- [ ] `_ensure_node()` + `_install_node_from_release()` in `scripts/lib/system.sh`
-- [ ] `_ensure_copilot_cli()` in `scripts/lib/system.sh`
-- [ ] `scripts/tests/lib/ensure_node.bats` (5 cases)
-- [ ] `scripts/tests/lib/ensure_copilot_cli.bats` (2 cases)
-- Plan: `docs/plans/v0.6.2-ensure-copilot-cli.md`
 
 ---
 
