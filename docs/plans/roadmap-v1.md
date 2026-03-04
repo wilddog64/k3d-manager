@@ -50,6 +50,16 @@ Transform `k3d-manager` from a collection of Bash utility scripts into a self-or
   - **Self-Healing:** System-initiated fixes for known failure patterns (e.g., auto-reunsealing Vault, cleaning stale PVCs, resolving Istio sidecar conflicts).
   - **Cross-Cluster Watcher:** A background process that synchronizes state and secrets between the macOS Infra cluster and Ubuntu App cluster without human triggers.
 
+## v0.10.0 — Autonomous Fleet Provisioning
+*Focus: AI as a Provisioning Engine*
+
+- **Minor Version Change:** Introduction of autonomous, parallel deployment capabilities for large fleets of identical nodes.
+- **Key Features:**
+  - **"Deploy 100 K3s Nodes"**: Implement parallel deployment of identical single-node k3s clusters.
+  - **AI-Assisted Scripting**: Leverage `copilot-cli` to generate robust `parallel`/`xargs` deployment scripts and complex BATS test mocks for SSH/remote execution.
+  - **Scalable Orchestration**: Design fault-tolerant deployment logic for up to 100+ nodes, including per-node error handling and logging.
+  - **Testing Strategy**: Develop sophisticated BATS tests that mock SSH/remote execution to verify orchestration logic without needing physical hardware.
+
 ## v1.0.0 — Production-Ready Agentic Platform
 *Focus: API Stability & Total Autonomy*
 
