@@ -15,7 +15,8 @@
 - [ ] **Checkpoint**: Commit current healthy state of `k3d-manager-v0.6.2`.
 - [ ] **Spec-First**: Refine discovery logic for Node.js (Universal Brew + Distro footprints).
 - [ ] **Protocol Implementation**: Add `_agent_checkpoint` and `_agent_audit` to `scripts/lib/agent_rigor.sh`.
-- [ ] **Tool Implementation**: Add `_ensure_node` and `_ensure_copilot_cli` to `system.sh`.
+- [ ] **AI-Powered Linting**: Implement `_agent_lint` using `copilot-cli` for architectural verification (the "Digital Auditor").
+- [ ] **Tool Implementation**: Add `_ensure_node`, `_ensure_copilot_cli`, and the `_k3d_manager_copilot` wrapper to `system.sh`.
 - [ ] **Verification**: Audit against correctness, maintainability, and scope.
 - [ ] **Final Loop**: Shellcheck + Bats verification.
 
@@ -25,8 +26,9 @@
 
 1. **Spec-First**: No code without a structured, approved implementation spec.
 2. **Checkpointing**: Git commit before every surgical operation.
-3. **Audit Phase**: Explicitly verify that no tests were weakened.
-4. **Simplification**: Refactor for minimal logic before final verification.
+3. **AI-Powered Linting**: Use `copilot-cli` to verify architectural intent (e.g., "Prove the test ran," "Check for price injection") before allowing a commit.
+4. **Audit Phase**: Explicitly verify that no tests were weakened.
+5. **Simplification**: Refactor for minimal logic before final verification.
 
 ---
 

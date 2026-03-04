@@ -40,6 +40,7 @@ Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 
 **v0.6.2 — Agent Rigor Protocol (Local Automation):**
 - [ ] Implement `scripts/lib/agent_rigor.sh` (`_agent_checkpoint`, `_agent_audit`)
+- [ ] Implement `_agent_lint` using `copilot-cli` for architectural verification
 - [ ] Implement `scripts/tests/lib/agent_rigor.bats`
 - [ ] Integrate into `scripts/lib/system.sh`
 - Plan: `docs/plans/v0.6.2-agent-rigor-protocol.md`
