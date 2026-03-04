@@ -61,11 +61,15 @@
 | Version | Status | Notes |
 |---|---|---|
 | v0.1.0–v0.5.0 | released | See CHANGE.md |
-| v0.6.0–v0.6.1 | released | PR #17 merged; infra rebuild verified |
+| v0.6.0 | released | configure_vault_app_auth + vault_app_auth.bats |
+| v0.6.1 | released | PR #17 merged; infra rebuild verified |
 | v0.6.2 | active | Copilot CLI tools + Agent Rigor Protocol |
 | v0.6.3 | planned | lib-foundation extraction via git subtree |
 | v0.7.0 | planned | Keycloak provider interface |
-| v1.0.0 | vision | MCP Multi-Agent Platform; see `docs/plans/roadmap-v1.md` |
+| v0.8.0 | planned | Multi-Agent Orchestration Foundation (MCP) |
+| v0.9.0 | planned | Autonomous SRE (Active Monitoring & Self-Healing) |
+| v0.10.0 | planned | Autonomous Fleet Provisioning (Deploy 100 K3s Nodes) |
+| v1.0.0 | vision | Final release; see `docs/plans/roadmap-v1.md` |
 
 ---
 
