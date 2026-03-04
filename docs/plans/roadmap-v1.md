@@ -13,6 +13,10 @@ Transform `k3d-manager` from a collection of Bash utility scripts into a self-or
   - Implement `_ensure_node` and `_ensure_copilot_cli` system helpers.
   - Establish the "Universal Brew" discovery pattern.
   - Activate the High-Rigor Engineering Protocol (Spec-First + Checkpointing).
+- **v0.6.3 (Planned):** Shared Library Foundation.
+  - Extract `core.sh` and `system.sh` (including Copilot logic) into a discrete `lib-foundation` repository.
+  - Implement **git subtree** integration to share these primitives across `k3d-manager` and `rigor-cli`.
+  - Maintain "Zero-Dependency" for end-users while enabling bi-directional updates for developers.
 
 ## v0.7.0 — The Agent-Assisted Phase
 *Focus: AI as a Code Generator*

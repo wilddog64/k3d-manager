@@ -10,11 +10,12 @@
 
 ## Current Focus
 
-**v0.6.2: High-Rigor Protocol & Copilot CLI Management**
+**v0.6.2: Agent Rigor Protocol & Copilot CLI Management**
 
 - [ ] **Checkpoint**: Commit current healthy state of `k3d-manager-v0.6.2`.
 - [ ] **Spec-First**: Refine discovery logic for Node.js (Universal Brew + Distro footprints).
-- [ ] **Implementation**: Add `_ensure_node` and `_ensure_copilot_cli` to `system.sh`.
+- [ ] **Protocol Implementation**: Add `_agent_checkpoint` and `_agent_audit` to `scripts/lib/agent_rigor.sh`.
+- [ ] **Tool Implementation**: Add `_ensure_node` and `_ensure_copilot_cli` to `system.sh`.
 - [ ] **Verification**: Audit against correctness, maintainability, and scope.
 - [ ] **Final Loop**: Shellcheck + Bats verification.
 
@@ -57,14 +58,13 @@
 
 ---
 
-## Release Strategy
-
 | Version | Status | Notes |
 |---|---|---|
 | v0.1.0–v0.5.0 | released | See CHANGE.md |
-| v0.6.0 | PR open | configure_vault_app_auth + vault_app_auth.bats |
-| v0.6.2 | planned | Copilot CLI tool management (`_ensure_node` + `_ensure_copilot_cli`) |
-| v0.7.0 | planned | Keycloak provider interface; depends on v0.6.2 |
+| v0.6.0–v0.6.1 | released | PR #17 merged; infra rebuild verified |
+| v0.6.2 | active | Copilot CLI tools + Agent Rigor Protocol |
+| v0.6.3 | planned | lib-foundation extraction via git subtree |
+| v0.7.0 | planned | Keycloak provider interface |
 | v1.0.0 | vision | MCP Multi-Agent Platform; see `docs/plans/roadmap-v1.md` |
 
 ---
