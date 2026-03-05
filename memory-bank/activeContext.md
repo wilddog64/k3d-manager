@@ -16,8 +16,11 @@
 - [ ] **Spec-First**: Refine discovery logic for Node.js (Universal Brew + Distro footprints).
 - [ ] **Protocol Implementation**: Add `_agent_checkpoint` to `scripts/lib/agent_rigor.sh`.
 - [ ] **Cleanup**: Remove deprecated Colima provider support (standardizing on OrbStack for macOS).
-- [ ] **Tool Implementation**: Add `_ensure_node`, `_ensure_copilot_cli`, and the `_k3d_manager_copilot` wrapper to `system.sh`.
-- [ ] **Verification**: Multi-layered testing of AI integration (BATS + Smoke).
+- [ ] **Tool Implementation**: Add `_ensure_node`, `_ensure_copilot_cli`, and a minimal `_k3d_manager_copilot` (passthrough wrapper) to `system.sh`.
+    - *Note*: Functions must use generic parameters (strictly following Pattern #13) to ensure v0.6.4 portability.
+- [ ] **Verification**: Multi-layered testing of AI integration:
+    - **Tier 1 (BATS)**: Stubbed unit tests for gating and minimal wrapper logic.
+    - **Tier 2 (Smoke)**: Real-world authentication and query validation (opt-in).
 - [ ] **Final Loop**: Shellcheck + Bats verification.
 
 ---
@@ -65,7 +68,7 @@
 | v0.1.0–v0.5.0 | released | See CHANGE.md |
 | v0.6.0–v0.6.1 | released | PR #17 merged; infra rebuild verified |
 | v0.6.2 | active | AI Tooling (`copilot-cli`) + Checkpointing Protocol |
-| v0.6.3 | planned | Refactoring (De-bloat) + AI-Linting (Digital Auditor) |
+| v0.6.3 | planned | Refactoring (De-bloat) + `rigor-cli` Integration |
 | v0.6.4 | planned | lib-foundation extraction via git subtree |
 | v0.7.0 | planned | Keycloak provider interface |
 | v0.8.0 | planned | Multi-Agent Orchestration Foundation (MCP) |
