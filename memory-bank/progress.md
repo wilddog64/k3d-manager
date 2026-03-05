@@ -47,17 +47,16 @@ Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 - [ ] Post-Implementation Rigor: Audit, Simplify, Final Verify
 - Plan: `docs/plans/v0.6.2-ensure-copilot-cli.md`
 
-**v0.6.3 — Refactoring & The Digital Auditor:**
+**v0.6.3 — Refactoring & External Audit Integration:**
 - [ ] Refactor `core.sh` and `system.sh` to eliminate "Defensive Bloat"
-- [ ] Implement `_agent_lint` using `copilot-cli` for architectural verification
 - [ ] Implement `_agent_audit` (Test weakening check)
+- [ ] Integrate with `rigor-cli` for external architectural linting
 - [ ] Verify via `scripts/tests/lib/agent_rigor.bats`
 
 **v0.6.4 — Shared Library Foundation:**
 - [ ] Create `lib-foundation` repository
 - [ ] Extract `core.sh` and `system.sh` from `k3d-manager`
-- [ ] Implement bi-directional git subtree integration
-- [ ] Verify `rigor-cli` and `k3d-manager` cross-dependency
+- [ ] Implement bi-directional git subtree integration across project ecosystem
 
 **App Cluster Deployment:**
 - [ ] Spec-First: Ubuntu ESO Deployment Plan
