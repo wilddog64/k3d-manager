@@ -9,14 +9,17 @@ Transform `k3d-manager` from a collection of Bash utility scripts into a self-or
 *Focus: Stabilization & AI Plumbing*
 
 - **v0.6.1 (Merged):** Standardize infra cluster structure (`secrets`, `identity`, `cicd` namespaces) and fix Istio sidecar Job hangs.
-- **v0.6.2 (Active):** `copilot-cli` integration.
+- **v0.6.2 (Active):** `copilot-cli` integration & Safety.
   - Implement `_ensure_node` and `_ensure_copilot_cli` system helpers.
-  - Establish the "Universal Brew" discovery pattern.
+  - Implement implicit `K3DM_ENABLE_AI` gating and scoped `_k3d_manager_copilot` wrapper.
   - Activate the High-Rigor Engineering Protocol (Spec-First + Checkpointing).
-- **v0.6.3 (Planned):** Shared Library Foundation.
-  - Extract `core.sh` and `system.sh` (including Copilot logic) into a discrete `lib-foundation` repository.
+- **v0.6.3 (Planned):** Refactoring & The Digital Auditor.
+  - Refactor `core.sh` and `system.sh` to eliminate "Defensive Bloat" (redundant logic).
+  - Implement `_agent_lint` using `copilot-cli` for architectural verification.
+  - Standardize error handling and state management patterns.
+- **v0.6.4 (Planned):** Shared Library Foundation.
+  - Extract `core.sh` and `system.sh` into a discrete `lib-foundation` repository.
   - Implement **git subtree** integration to share these primitives across `k3d-manager` and `rigor-cli`.
-  - Maintain "Zero-Dependency" for end-users while enabling bi-directional updates for developers.
 
 ## v0.7.0 — The Agent-Assisted Phase
 *Focus: AI as a Code Generator*
