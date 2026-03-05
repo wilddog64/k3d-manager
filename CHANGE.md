@@ -1,5 +1,20 @@
 # Changes - k3d-manager
 
+## v0.6.2 — Copilot CLI & Agent Rigor [IN PROGRESS]
+
+### Added
+- **Agent Rigor Protocol**: Implementation of Spec-First investigation, Git Checkpointing, and Post-Implementation Audit loops to ensure deterministic AI behavior.
+- **AI-Powered Linting**: New `_agent_lint` phase using `copilot-cli` as a deterministic gate for architectural verification (e.g., catching price injection or missing event listeners).
+- **Copilot CLI Management**: Scoped `_k3d_manager_copilot` wrapper and automated tool-chain installation (`_ensure_node`, `_ensure_copilot_cli`).
+
+### Changed
+- **macOS Standardisation**: OrbStack is now the officially recommended and default provider for macOS, replacing the unreliable Colima/Docker Desktop path.
+
+### Deprecated / Removed
+- **Colima Provider**: Support for Colima has been dropped due to persistent reliability issues on macOS.
+
+---
+
 ## v0.6.1 - dated 2026-03-02
 
 ### Bug Fixes
