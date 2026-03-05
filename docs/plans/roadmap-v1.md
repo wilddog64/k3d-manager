@@ -75,3 +75,4 @@ Transform `k3d-manager` from a collection of Bash utility scripts into a self-or
 1. **Spec-First:** No new roadmap milestones are implemented without a confirmed investigation and plan.
 2. **Checkpointing:** The repository must remain rollback-safe at every stage of the agentic evolution.
 3. **Bash-Native:** AI orchestration must respect the "Zero-Dependency" (or auto-installing dependency) philosophy of the project.
+4. **Native Agency (No ADKs):** Explicitly reject heavy Agent Development Kits (e.g., LangChain, CrewAI) to keep the tool lightweight, manageable, and sovereign. All orchestration logic must live in the shell or via lean MCP servers.
