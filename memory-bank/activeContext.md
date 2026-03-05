@@ -10,20 +10,14 @@
 
 ## Current Focus
 
-**v0.6.2: Agent Rigor Protocol & Copilot CLI Management**
+**v0.6.2: AI Tooling & Safety Protocol**
 
 - [ ] **Checkpoint**: Commit current healthy state of `k3d-manager-v0.6.2`.
 - [ ] **Spec-First**: Refine discovery logic for Node.js (Universal Brew + Distro footprints).
-- [ ] **Protocol Implementation**: Add `_agent_checkpoint` and `_agent_audit` to `scripts/lib/agent_rigor.sh`.
-- [ ] **AI-Powered Linting**: Implement `_agent_lint` using `copilot-cli` for architectural verification (the "Digital Auditor").
-- [ ] **Cleanup**: 
-    - Remove deprecated Colima provider support (standardizing on OrbStack for macOS).
-    - Refactor `core.sh` and `system.sh` to eliminate "Defensive Bloat" (redundant nested `if/else` blocks).
+- [ ] **Protocol Implementation**: Add `_agent_checkpoint` to `scripts/lib/agent_rigor.sh`.
+- [ ] **Cleanup**: Remove deprecated Colima provider support (standardizing on OrbStack for macOS).
 - [ ] **Tool Implementation**: Add `_ensure_node`, `_ensure_copilot_cli`, and the `_k3d_manager_copilot` wrapper to `system.sh`.
-    - *Note*: Functions must use generic parameters (strictly following Pattern #13) to ensure v0.6.3 portability.
-- [ ] **Verification**: Multi-layered testing of AI integration:
-    - **Tier 1 (BATS)**: Stubbed unit tests for gating, scope enforcement, and fail-safe messaging.
-    - **Tier 2 (Smoke)**: Real-world authentication and query validation (opt-in).
+- [ ] **Verification**: Multi-layered testing of AI integration (BATS + Smoke).
 - [ ] **Final Loop**: Shellcheck + Bats verification.
 
 ---
@@ -69,10 +63,10 @@
 | Version | Status | Notes |
 |---|---|---|
 | v0.1.0–v0.5.0 | released | See CHANGE.md |
-| v0.6.0 | released | configure_vault_app_auth + vault_app_auth.bats |
-| v0.6.1 | released | PR #17 merged; infra rebuild verified |
-| v0.6.2 | active | Copilot CLI tools + Agent Rigor Protocol |
-| v0.6.3 | planned | lib-foundation extraction via git subtree |
+| v0.6.0–v0.6.1 | released | PR #17 merged; infra rebuild verified |
+| v0.6.2 | active | AI Tooling (`copilot-cli`) + Checkpointing Protocol |
+| v0.6.3 | planned | Refactoring (De-bloat) + AI-Linting (Digital Auditor) |
+| v0.6.4 | planned | lib-foundation extraction via git subtree |
 | v0.7.0 | planned | Keycloak provider interface |
 | v0.8.0 | planned | Multi-Agent Orchestration Foundation (MCP) |
 | v0.9.0 | planned | Autonomous SRE (Active Monitoring & Self-Healing) |

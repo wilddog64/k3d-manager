@@ -38,27 +38,22 @@ Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 
 ### Priority 1 (Current focus — v0.6.2)
 
-**v0.6.2 — Agent Rigor Protocol (Local Automation):**
-- [ ] Implement `scripts/lib/agent_rigor.sh` (`_agent_checkpoint`, `_agent_audit`)
-- [ ] Implement `_agent_lint` using `copilot-cli` for architectural verification
-- [ ] Refactor `core.sh` and `system.sh` to eliminate "Defensive Bloat" (redundant nested logic)
-- [ ] Implement `scripts/tests/lib/agent_rigor.bats`
-- [ ] Integrate into `scripts/lib/system.sh`
-- Plan: `docs/plans/v0.6.2-agent-rigor-protocol.md`
-
-**v0.6.2 — Copilot CLI Tool Management:**
-- [ ] Checkpoint: Commit `v0.6.2` baseline
-- [ ] Spec-First: Finalize `_ensure_node` discovery logic (Universal Brew + Distro fallbacks)
+**v0.6.2 — AI Tooling & Safety Protocol:**
+- [ ] Implement `_agent_checkpoint` in `scripts/lib/agent_rigor.sh`
 - [ ] Implement `_ensure_node` + `_install_node_from_release` in `scripts/lib/system.sh`
 - [ ] Implement `_ensure_copilot_cli` in `scripts/lib/system.sh`
+- [ ] Implement `_k3d_manager_copilot` with generic params and implicit gating
 - [ ] Verify via `scripts/tests/lib/ensure_node.bats` and `ensure_copilot_cli.bats`
-- [ ] Multi-layered Verification:
-    - [ ] BATS Unit Tests (Gating, Wrapper Logic, Fail-safe messaging)
-    - [ ] Live Smoke Tests (Auth handshake, Scope enforcement)
 - [ ] Post-Implementation Rigor: Audit, Simplify, Final Verify
 - Plan: `docs/plans/v0.6.2-ensure-copilot-cli.md`
 
-**v0.6.3 — Shared Library Foundation:**
+**v0.6.3 — Refactoring & The Digital Auditor:**
+- [ ] Refactor `core.sh` and `system.sh` to eliminate "Defensive Bloat"
+- [ ] Implement `_agent_lint` using `copilot-cli` for architectural verification
+- [ ] Implement `_agent_audit` (Test weakening check)
+- [ ] Verify via `scripts/tests/lib/agent_rigor.bats`
+
+**v0.6.4 — Shared Library Foundation:**
 - [ ] Create `lib-foundation` repository
 - [ ] Extract `core.sh` and `system.sh` from `k3d-manager`
 - [ ] Implement bi-directional git subtree integration
