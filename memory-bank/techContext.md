@@ -15,12 +15,13 @@
 
 ## Platform Defaults
 
-- **macOS**: `CLUSTER_PROVIDER=k3d` (Docker-based, no root required)
+- **macOS**: `CLUSTER_PROVIDER=orbstack` (Standardized; optimized for performance/stability)
 - **Linux**: `CLUSTER_PROVIDER=k3s` (systemd-based, requires root/sudo for install)
 
 ## Technology Stack
 
 ### Kubernetes Layer
+- **OrbStack**: Recommended macOS runtime; provides optimized network/storage for k3d.
 - **k3d**: Runs k3s inside Docker containers; k3d load balancer handles port mapping.
 - **k3s**: Lightweight Kubernetes; installs via curl script; kubeconfig at
   `/etc/rancher/k3s/k3s.yaml`.
