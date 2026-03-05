@@ -16,7 +16,9 @@
 - [ ] **Spec-First**: Refine discovery logic for Node.js (Universal Brew + Distro footprints).
 - [ ] **Protocol Implementation**: Add `_agent_checkpoint` and `_agent_audit` to `scripts/lib/agent_rigor.sh`.
 - [ ] **AI-Powered Linting**: Implement `_agent_lint` using `copilot-cli` for architectural verification (the "Digital Auditor").
-- [ ] **Cleanup**: Remove deprecated Colima provider support (standardizing on OrbStack for macOS).
+- [ ] **Cleanup**: 
+    - Remove deprecated Colima provider support (standardizing on OrbStack for macOS).
+    - Refactor `core.sh` and `system.sh` to eliminate "Defensive Bloat" (redundant nested `if/else` blocks).
 - [ ] **Tool Implementation**: Add `_ensure_node`, `_ensure_copilot_cli`, and the `_k3d_manager_copilot` wrapper to `system.sh`.
     - *Note*: Functions must use generic parameters (strictly following Pattern #13) to ensure v0.6.3 portability.
 - [ ] **Verification**: Multi-layered testing of AI integration:

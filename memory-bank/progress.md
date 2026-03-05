@@ -41,6 +41,7 @@ Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 **v0.6.2 — Agent Rigor Protocol (Local Automation):**
 - [ ] Implement `scripts/lib/agent_rigor.sh` (`_agent_checkpoint`, `_agent_audit`)
 - [ ] Implement `_agent_lint` using `copilot-cli` for architectural verification
+- [ ] Refactor `core.sh` and `system.sh` to eliminate "Defensive Bloat" (redundant nested logic)
 - [ ] Implement `scripts/tests/lib/agent_rigor.bats`
 - [ ] Integrate into `scripts/lib/system.sh`
 - Plan: `docs/plans/v0.6.2-agent-rigor-protocol.md`
@@ -51,6 +52,9 @@ Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 - [ ] Implement `_ensure_node` + `_install_node_from_release` in `scripts/lib/system.sh`
 - [ ] Implement `_ensure_copilot_cli` in `scripts/lib/system.sh`
 - [ ] Verify via `scripts/tests/lib/ensure_node.bats` and `ensure_copilot_cli.bats`
+- [ ] Multi-layered Verification:
+    - [ ] BATS Unit Tests (Gating, Wrapper Logic, Fail-safe messaging)
+    - [ ] Live Smoke Tests (Auth handshake, Scope enforcement)
 - [ ] Post-Implementation Rigor: Audit, Simplify, Final Verify
 - Plan: `docs/plans/v0.6.2-ensure-copilot-cli.md`
 
