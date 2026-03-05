@@ -18,7 +18,10 @@
 - [ ] **AI-Powered Linting**: Implement `_agent_lint` using `copilot-cli` for architectural verification (the "Digital Auditor").
 - [ ] **Cleanup**: Remove deprecated Colima provider support (standardizing on OrbStack for macOS).
 - [ ] **Tool Implementation**: Add `_ensure_node`, `_ensure_copilot_cli`, and the `_k3d_manager_copilot` wrapper to `system.sh`.
-- [ ] **Verification**: Audit against correctness, maintainability, and scope.
+    - *Note*: Functions must use generic parameters (strictly following Pattern #13) to ensure v0.6.3 portability.
+- [ ] **Verification**: Multi-layered testing of AI integration:
+    - **Tier 1 (BATS)**: Stubbed unit tests for gating, scope enforcement, and fail-safe messaging.
+    - **Tier 2 (Smoke)**: Real-world authentication and query validation (opt-in).
 - [ ] **Final Loop**: Shellcheck + Bats verification.
 
 ---

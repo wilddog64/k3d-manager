@@ -171,3 +171,11 @@ Smoke entrypoint:
 
 Implemented in `scripts/lib/help/utils.sh`; runs available scripts in `bin/` and skips
 missing/non-executable ones.
+
+## 13) Generic Library vs. Application Specifics
+
+- **Principle**: `lib-foundation` (`core.sh`, `system.sh`) must remain application-agnostic.
+- **Implementation**: 
+  - Library functions use generic parameters or internal variables.
+  - Application-specific naming (e.g., `K3DM_*` prefixes) remains in the main dispatcher or application-level wrappers.
+- **Benefit**: Ensures the core library is reusable by any shell application (e.g., `shopping-carts`, `rigor-cli`) without naming collisions.
