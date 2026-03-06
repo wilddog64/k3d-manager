@@ -46,9 +46,11 @@ Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 - [x] Verify via `scripts/tests/lib/ensure_node.bats` and `ensure_copilot_cli.bats`
 - [x] Gemini Phase 1: Audit complete — 4 findings in `docs/issues/2026-03-06-v0.6.2-sdet-audit-findings.md`
 - [x] Codex fix cycle: fix sticky bit, relative PATH, deny-tool placement, mock integrity — task: `docs/plans/v0.6.2-codex-fix-task.md`
-- [ ] Gemini Phase 2: Full BATS suite (`./scripts/k3d-manager test all`) + shellcheck — after Codex fix
-- [ ] Gemini Phase 3: Structured RT-1 through RT-6 audit (PASS/FAIL/N/A) — after Codex fix
-- [ ] Claude: Review report, commit, open PR
+- [x] Gemini Phase 2: Full BATS suite pass + shellcheck (Findings: 115/115 pass with K3DMGR_NONINTERACTIVE=1, shellcheck issues at system.sh:149)
+- [x] Gemini Phase 3: Structured RT-1 through RT-6 audit (Findings: RT-2 FAIL, RT-4 FAIL, RT-3 PARTIAL PASS)
+- [x] Claude: RT-2 fix — vault kv put now passes password via stdin (heredoc + @-) in ldap-password-rotator.sh
+- [x] Claude: RT-4 fix — added shell(git push --force) and shell(rm -rf) to deny-tool guardrails in system.sh
+- [ ] Claude: Open PR
 - Task spec: `docs/plans/v0.6.2-gemini-task.md`
 - Implementation plan: `docs/plans/v0.6.2-ensure-copilot-cli.md`
 
