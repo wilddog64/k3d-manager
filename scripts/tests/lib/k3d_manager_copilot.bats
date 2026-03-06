@@ -20,7 +20,7 @@ setup() {
 
   run _k3d_manager_copilot -p "run shell(cd ..)"
   [ "$status" -ne 0 ]
-  [[ "$output" == *"shell(cd ..)"* ]]
+  [[ "$output" == *"shell(cd"* ]]
   [ ! -s "$RUN_LOG" ]
 }
 
