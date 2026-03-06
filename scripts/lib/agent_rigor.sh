@@ -8,6 +8,13 @@ fi
 function _agent_checkpoint() {
    local label="${1:-operation}"
 
+   if ! declare -f _err >/dev/null 2>&1 || \
+      ! declare -f _info >/dev/null 2>&1 || \
+      ! declare -f _k3dm_repo_root >/dev/null 2>&1; then
+      echo "ERROR: agent_rigor.sh requires system.sh to be sourced first" >&2
+      return 1
+   fi
+
    if ! command -v git >/dev/null 2>&1; then
       _err "_agent_checkpoint requires git"
    fi
