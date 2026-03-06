@@ -1,44 +1,23 @@
 # Active Context – k3d-manager
 
-## Current Branch: `k3d-manager-v0.6.2` (as of 2026-03-06)
+## Current Branch: `k3d-manager-v0.6.3` (as of 2026-03-06)
 
-**v0.6.1 merged** — infra rebuild bug fixes integrated.
-**v0.6.2 in progress** — Copilot CLI integration + security hardening.
+**v0.6.2 SHIPPED** — tag `v0.6.2` pushed, PR #19 merged to `main`.
+**v0.6.3 active** — branch cut from `main`; plan at `docs/plans/v0.6.3-refactor-and-audit.md`.
 
 ---
 
 ## Current Focus
 
-**v0.6.2: Codex Fix Cycle → Gemini Phase 2 + 3**
+**v0.6.3: Refactoring & External Audit Integration**
 
-Codex implementation complete (2026-03-06). Gemini Phase 1 audit complete with 4 findings.
-Codex fix cycle complete (2026-03-06). Gemini Phase 2 and Phase 3 are the active gate.
+Plan: `docs/plans/v0.6.3-refactor-and-audit.md`
 
-**Active sequence:**
-1. ✅ Codex implementation (Batches 1–4)
-2. ✅ Gemini Phase 1 — audit findings filed: `docs/issues/2026-03-06-v0.6.2-sdet-audit-findings.md`
-3. ✅ **Codex fix cycle** — 4 Gemini findings resolved (task: `docs/plans/v0.6.2-codex-fix-task.md`)
-4. ✅ **Gemini Phase 2** — BATS 115/115 pass, shellcheck warning at system.sh:149 (pre-existing SC2145)
-5. ✅ **Gemini Phase 3** — RT-1/3/5/6 PASS, RT-3 PARTIAL; RT-2 FAIL (vault stdin), RT-4 FAIL (deny-tool)
-6. ✅ **Codex RT fix cycle** — RT-2 + RT-4 resolved (`docs/plans/v0.6.2-codex-rt-fix-task.md`)
-7. ✅ **Claude** — PR #19 opened, CI green, GitGuardian clean
-8. ✅ **Codex P1 fix cycle** — rc capture, empty PATH, sticky bit (`docs/plans/v0.6.2-codex-copilot-review-task.md`)
-9. ✅ **Codex re-review fix cycle** — fixes A–I implemented (see `docs/plans/v0.6.2-codex-copilot-review2-task.md`)
-10. ✅ **Gemini** — `safe_path.bats` created and aligned with production fixes — task: `docs/plans/v0.6.2-gemini-safe-path-tests.md`
-11. ✅ **Gemini** — All BATS suites aligned and verified (120/120 pass) — task: `docs/plans/v0.6.2-gemini-test-fix-task.md`
-12. ⏳ **Claude** — final review, merge PR
-
-**Phase 2 definition:** Run `shellcheck scripts/lib/system.sh scripts/etc/ldap/ldap-password-rotator.sh`
-and `./scripts/k3d-manager test all`. Report total/pass/fail counts. Confirm no regressions.
-**Codex status:** local shellcheck + targeted BATS suites completed; Gemini full `test all` already run.
-
-**Phase 3 definition:** Structured security audit — one PASS/FAIL/N/A with justification per check:
-- RT-1: PATH poisoning (`_safe_path` with world-writable + relative path + sticky bit)
-- RT-2: Secret exposure in process listing (`ldap-password-rotator.sh` stdin fix)
-- RT-3: Trace isolation for copilot CLI (`_run_command` + `_args_have_sensitive_flag`)
-- RT-4: Deny-tool guardrails completeness + placement
-- RT-5: AI gating bypass (`K3DM_ENABLE_AI` check + no direct copilot calls)
-- RT-6: Prompt injection surface (no credentials passed to copilot)
+Key objectives:
+1. De-bloat `system.sh` and `core.sh` (split oversized files, remove dead code)
+2. Implement `_agent_audit` (test-weakening detection)
+3. Integrate `rigor-cli` for external architectural linting
+4. BATS suite: `scripts/tests/lib/agent_rigor.bats`
 
 ---
 
@@ -46,19 +25,16 @@ and `./scripts/k3d-manager test all`. Report total/pass/fail counts. Confirm no 
 
 1. **Spec-First**: No code without a structured, approved implementation spec.
 2. **Checkpointing**: Git commit before every surgical operation.
-3. **AI-Powered Linting**: Use `copilot-cli` to verify architectural intent (e.g., "Prove the test ran," "Check for price injection") before allowing a commit.
-4. **Audit Phase**: Explicitly verify that no tests were weakened.
-5. **Simplification**: Refactor for minimal logic before final verification.
+3. **Audit Phase**: Verify no tests weakened after every fix cycle.
+4. **Simplification**: Refactor for minimal logic before final verification.
 
 ## Codex Standing Instructions
 
-These rules apply to every Codex task. Non-compliance is a known failure mode.
-
-- **Report each fix individually.** After completing each fix, state: fix letter, file, line numbers changed, what was changed. Do not batch fixes into a single sentence.
-- **STOP means STOP.** Do not mark a task complete until every listed fix is implemented and verified. Partial delivery with a complete claim is a protocol violation.
-- **Do not update memory-bank.** Claude owns all memory-bank writes. Codex writing memory-bank has caused repeated stale-state bugs.
-- **Do not commit.** Claude reviews and commits after verifying diffs match the spec.
-- **Verification is mandatory.** Run `shellcheck` on every touched file and report the output. Do not assume clean.
+- **Report each fix individually.** State: fix letter, file, line numbers, what changed.
+- **STOP means STOP.** Partial delivery with a complete claim is a protocol violation.
+- **Do not update memory-bank.** Claude owns all memory-bank writes.
+- **Do not commit.** Claude reviews and commits after verifying diffs match spec.
+- **Verification is mandatory.** Run `shellcheck` on every touched file and report output.
 
 ---
 
@@ -82,7 +58,7 @@ These rules apply to every Codex task. Non-compliance is a known failure mode.
 |---|---|---|
 | k3s node | Ready | v1.34.4+k3s1 |
 | Istio | Running | IngressGateway + istiod |
-| ESO | Pending | Deploy after PR merges |
+| ESO | Pending | Deploy after infra work stabilizes |
 | shopping-cart-data | Pending | PostgreSQL, Redis, RabbitMQ |
 | shopping-cart-apps | Pending | basket, order, payment, catalog, frontend |
 
@@ -90,35 +66,32 @@ These rules apply to every Codex task. Non-compliance is a known failure mode.
 
 ---
 
+## Version Roadmap
+
 | Version | Status | Notes |
 |---|---|---|
-| v0.1.0–v0.5.0 | released | See CHANGE.md |
-| v0.6.0–v0.6.1 | released | PR #17 merged; infra rebuild verified |
-| v0.6.2 | active | AI Tooling (`copilot-cli`) + Checkpointing Protocol |
-| v0.6.3 | planned | Refactoring (De-bloat) + `rigor-cli` Integration |
+| v0.1.0–v0.6.1 | released | See CHANGE.md |
+| v0.6.2 | **released** | AI Tooling + Agent Rigor + Security hardening |
+| v0.6.3 | **active** | Refactoring (De-bloat) + `rigor-cli` Integration |
 | v0.6.4 | planned | lib-foundation extraction via git subtree |
 | v0.7.0 | planned | Keycloak provider + App Cluster deployment |
-| v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) for Claude Desktop / Codex / Atlas / Comet |
+| v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) |
 | v1.0.0 | vision | Reassess after v0.7.0; see `docs/plans/roadmap-v1.md` |
 
 ---
 
 ## Open Items
 
-- [x] `configure_vault_app_auth` — implemented + Copilot review resolved (PR #16, CI green, awaiting merge)
-- [ ] ESO deploy on Ubuntu app cluster (Gemini — SSH, after PR merges)
-- [ ] shopping-cart-data / apps deployment on Ubuntu (Gemini — SSH)
+- [ ] ESO deploy on Ubuntu app cluster
+- [ ] shopping-cart-data / apps deployment on Ubuntu
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
 - [ ] `scripts/tests/plugins/jenkins.bats` — backlog
-- [x] v0.6.2: `_ensure_node` + `_ensure_copilot_cli` — implemented by Codex (2026-03-06)
-- [x] v0.6.2: SDET/Red-Team audit findings (RT-1, RT-2, RT-3) — see `docs/issues/2026-03-06-v0.6.2-sdet-audit-findings.md`
-- [x] v0.6.2: Gemini Phase 2 & 3 (Verification + Red-Team Audit) — Results: BATS 115/115 Pass, RT-2/RT-4 FAIL
-- [x] v0.6.2: Codex RT fix cycle — RT-2 + RT-4 (task: `docs/plans/v0.6.2-codex-rt-fix-task.md`)
-- [ ] v0.6.2: Codex Copilot fix cycle — per `docs/plans/v0.6.2-codex-copilot-review-task.md`
-- [ ] v0.6.2: Claude review and merge (PR)
-- [ ] v0.7.0: Keycloak provider interface + App Cluster deployment (ESO, shopping-cart stack)
-- [ ] v0.7.0: rename cluster to `infra` + fix `CLUSTER_NAME` env var
-- [ ] v0.8.0: `k3dm-mcp` — lean MCP server for Claude Desktop, Codex, Atlas, Comet
+- [ ] `CLUSTER_NAME` env var not respected during `deploy_cluster` — see `docs/issues/2026-03-01-cluster-name-env-var-not-respected.md`
+- [ ] v0.6.3: De-bloat `system.sh` / `core.sh`
+- [ ] v0.6.3: `_agent_audit` implementation
+- [ ] v0.6.3: `rigor-cli` integration
+- [ ] v0.7.0: Keycloak provider interface + App Cluster deployment
+- [ ] v0.8.0: `k3dm-mcp` lean MCP server
 
 ---
 
@@ -127,17 +100,16 @@ These rules apply to every Codex task. Non-compliance is a known failure mode.
 - **Pipe all command output to `scratch/logs/<cmd>-<timestamp>.log`** — always print log path before starting
 - **Always run `reunseal_vault`** after any cluster restart before other deployments
 - **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`)
-- **Vault reboot unseal**: dual-path — macOS Keychain + Linux libsecret; k8s `vault-unseal` secret is fallback
 - **New namespace defaults**: `secrets`, `identity`, `cicd` — old names still work via env var override
 - **Branch protection**: `enforce_admins` permanently disabled — owner can self-merge
 - **Istio + Jobs**: `sidecar.istio.io/inject: "false"` required on Helm pre-install job pods
-- **Bitnami images**: use `docker.io/bitnamilegacy/*` for ARM64 — `docker.io/bitnami/*` and `public.ecr.aws/bitnami/*` are broken/amd64-only
+- **Bitnami images**: use `docker.io/bitnamilegacy/*` for ARM64
 
-### Keycloak Known Failure Patterns (deploy_keycloak)
+### Keycloak Known Failure Patterns
 
-1. **Istio sidecar blocks `keycloak-config-cli` job** — job hangs indefinitely; look for `keycloak-keycloak-config-cli` pod stuck in Running. Already mitigated in `values.yaml.tmpl` via `sidecar.istio.io/inject: "false"` — verify the annotation is present if job hangs again.
-2. **ARM64 image pull failures** — `docker.io/bitnami/*` and `public.ecr.aws/bitnami/*` are amd64-only; `values.yaml.tmpl` must use `docker.io/bitnamilegacy/*` for Keycloak, PostgreSQL, and Keycloak Config CLI.
-3. **Stale PVCs block retry** — a failed deploy leaves `data-keycloak-postgresql-0` PVC in the `identity` namespace; Helm reinstall will hang waiting for PostgreSQL. Delete the PVC before retrying: `kubectl -n identity delete pvc data-keycloak-postgresql-0`.
+1. **Istio sidecar blocks `keycloak-config-cli` job** — already mitigated via `sidecar.istio.io/inject: "false"` in `values.yaml.tmpl`.
+2. **ARM64 image pull failures** — `docker.io/bitnami/*` is amd64-only; use `docker.io/bitnamilegacy/*`.
+3. **Stale PVCs block retry** — delete `data-keycloak-postgresql-0` PVC in `identity` ns before retrying.
 
 ---
 
@@ -147,22 +119,22 @@ These rules apply to every Codex task. Non-compliance is a known failure mode.
 Claude
   -- monitors CI / reviews agent reports for accuracy
   -- opens PR on owner go-ahead
-  -- when CI fails: identifies root cause → writes bug report → hands to Gemini
+  -- owns all memory-bank writes
 
 Gemini
-  -- investigates, fixes code, verifies live (shellcheck + bats + cluster)
-  -- handles Ubuntu SSH deployment (interactive)
-  -- may write back stale memory bank — always verify after
+  -- SDET/Red-Team audits, BATS verification, Ubuntu SSH deployment
+  -- may write stale memory-bank — always verify after
 
 Codex
-  -- pure logic fixes with no cluster dependency
-  -- STOP at each verification gate; do not rationalize partial fixes
+  -- pure logic fixes, no cluster dependency
+  -- STOP at each verification gate
 
 Owner
   -- approves and merges PRs
 ```
 
 **Lessons learned:**
-- Gemini ignores hold instructions — accept it, use review as the gate
-- Gemini may write back stale memory bank content — verify file state after every update
+- Gemini ignores hold instructions — use review as the gate
+- Gemini may write stale memory-bank content — verify after every update
 - Codex commit-on-failure is a known failure mode — write explicit STOP guardrails
+- PR sub-branches from Copilot agent (e.g. `copilot/sub-pr-*`) may conflict with branch work — evaluate and close if our implementation is superior

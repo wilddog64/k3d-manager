@@ -109,14 +109,18 @@ DEBUG=1 ./scripts/k3d-manager <command>           # bash -x mode
 - Mock-heavy orchestration suites were removed due to drift; integration confidence is
   driven by live-cluster smoke tests.
 
-Current BATS files in repo:
+Current BATS files in repo (120/120 passing as of v0.6.2):
 - `scripts/tests/core/install_k3s.bats`
 - `scripts/tests/lib/cleanup_on_success.bats`
 - `scripts/tests/lib/dirservices_activedirectory.bats`
 - `scripts/tests/lib/ensure_bats.bats`
+- `scripts/tests/lib/ensure_copilot_cli.bats`
+- `scripts/tests/lib/ensure_node.bats`
 - `scripts/tests/lib/install_kubernetes_cli.bats`
+- `scripts/tests/lib/k3d_manager_copilot.bats`
 - `scripts/tests/lib/read_lines.bats`
 - `scripts/tests/lib/run_command.bats`
+- `scripts/tests/lib/safe_path.bats`
 - `scripts/tests/lib/sha256_12.bats`
 - `scripts/tests/lib/test_auth_cleanup.bats`
 - `scripts/tests/plugins/eso.bats`
