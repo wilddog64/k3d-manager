@@ -1130,15 +1130,6 @@ function _is_world_writable_dir() {
       return 1
    fi
 
-   local perm_value=0
-   if [[ "$perm" =~ ^[0-7]+$ ]]; then
-      perm_value=$((8#$perm))
-   fi
-
-   if (( perm_value & 01000 )); then
-      return 1
-   fi
-
    local other="${perm: -1}"
    case "$other" in
       2|3|6|7) return 0 ;;
@@ -1152,9 +1143,8 @@ function _safe_path() {
    local old_ifs="$IFS"
    IFS=':'
    for entry in $PATH; do
-      [[ -z "$entry" ]] && continue
-      if [[ "$entry" != /* ]]; then
-         unsafe+=("$entry (relative path)")
+      if [[ -z "$entry" || "$entry" != /* ]]; then
+         unsafe+=("${entry:-<empty>} (relative path)")
          continue
       fi
       if _is_world_writable_dir "$entry"; then
@@ -1539,9 +1529,7 @@ function _k3d_manager_copilot() {
    local -a processed_args=("${guard_args[@]}" "${final_args[@]}")
 
    local rc=0
-   if ! _run_command --soft -- copilot "${processed_args[@]}"; then
-      rc=$?
-   fi
+   _run_command --soft -- copilot "${processed_args[@]}" || rc=$?
 
    cd "$prev_pwd" >/dev/null 2>&1 || true
    CDPATH="$prev_cdpath"
