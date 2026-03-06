@@ -21,8 +21,11 @@ Codex fix cycle complete (2026-03-06). Gemini Phase 2 and Phase 3 are the active
 4. ✅ **Gemini Phase 2** — BATS 115/115 pass, shellcheck warning at system.sh:149 (pre-existing SC2145)
 5. ✅ **Gemini Phase 3** — RT-1/3/5/6 PASS, RT-3 PARTIAL; RT-2 FAIL (vault stdin), RT-4 FAIL (deny-tool)
 6. ✅ **Codex RT fix cycle** — RT-2 + RT-4 resolved (`docs/plans/v0.6.2-codex-rt-fix-task.md`)
-7. ⏳ **Claude** — review, commit, open PR
-8. ✅ **Codex P1 fix cycle** — Copilot review issues (rc capture, PATH guard, sticky bit) per `docs/plans/v0.6.2-codex-copilot-review-task.md`
+7. ✅ **Claude** — PR #19 opened, CI green, GitGuardian clean
+8. ✅ **Codex P1 fix cycle** — rc capture, empty PATH, sticky bit (`docs/plans/v0.6.2-codex-copilot-review-task.md`)
+9. ⏳ **Codex re-review fix cycle** — 7 fixes A–I; only Fix B delivered so far — task: `docs/plans/v0.6.2-codex-copilot-review2-task.md`
+10. ⏳ **Gemini** — BATS suite for `_safe_path`/`_is_world_writable_dir` — task: `docs/plans/v0.6.2-gemini-safe-path-tests.md`
+11. ⏳ **Claude** — final review, merge PR
 
 **Phase 2 definition:** Run `shellcheck scripts/lib/system.sh scripts/etc/ldap/ldap-password-rotator.sh`
 and `./scripts/k3d-manager test all`. Report total/pass/fail counts. Confirm no regressions.
@@ -45,6 +48,16 @@ and `./scripts/k3d-manager test all`. Report total/pass/fail counts. Confirm no 
 3. **AI-Powered Linting**: Use `copilot-cli` to verify architectural intent (e.g., "Prove the test ran," "Check for price injection") before allowing a commit.
 4. **Audit Phase**: Explicitly verify that no tests were weakened.
 5. **Simplification**: Refactor for minimal logic before final verification.
+
+## Codex Standing Instructions
+
+These rules apply to every Codex task. Non-compliance is a known failure mode.
+
+- **Report each fix individually.** After completing each fix, state: fix letter, file, line numbers changed, what was changed. Do not batch fixes into a single sentence.
+- **STOP means STOP.** Do not mark a task complete until every listed fix is implemented and verified. Partial delivery with a complete claim is a protocol violation.
+- **Do not update memory-bank.** Claude owns all memory-bank writes. Codex writing memory-bank has caused repeated stale-state bugs.
+- **Do not commit.** Claude reviews and commits after verifying diffs match the spec.
+- **Verification is mandatory.** Run `shellcheck` on every touched file and report the output. Do not assume clean.
 
 ---
 
