@@ -1,16 +1,19 @@
 # Changes - k3d-manager
 
-## v0.6.2 — Copilot CLI & Agent Rigor [IN PROGRESS]
+## v0.6.2 — Copilot CLI & Agent Rigor — dated 2026-03-06
 
 ### Added
-- **Agent Rigor Protocol**: Spec-First investigation, Git Checkpointing (`_agent_checkpoint`), and Post-Implementation Audit loops to ensure deterministic AI agent behavior.
-- **Copilot CLI Management**: Scoped `_k3d_manager_copilot` wrapper with `K3DM_ENABLE_AI` gate, deny-tool guardrails, PATH sanitization, and CDPATH/OLDPWD isolation. Auto-install via `_ensure_copilot_cli` (brew → curl fallback).
-- **Node.js Management**: `_ensure_node` / `_install_node_from_release` — auto-install helpers following `_ensure_bats` pattern (brew → apt-get → dnf → release tarball).
-- **PATH Hardening**: `_safe_path` and `_is_world_writable_dir` guard against PATH poisoning — rejects world-writable directories and relative path entries (including empty components).
-- **BATS Suites**: `ensure_node.bats`, `ensure_copilot_cli.bats`, `k3d_manager_copilot.bats` (115/115 passing).
+- **Agent Rigor Protocol**: `_agent_checkpoint` in `scripts/lib/agent_rigor.sh` — spec-first git checkpointing with dependency guard; requires `system.sh` sourced first.
+- **Copilot CLI Management**: Scoped `_k3d_manager_copilot` wrapper with `K3DM_ENABLE_AI` gate, deny-tool guardrails (8 forbidden shell fragments), PATH sanitization, and CDPATH/OLDPWD isolation. Auto-install via `_ensure_copilot_cli` (brew → curl fallback).
+- **Node.js Management**: `_ensure_node` / `_install_node_from_release` — auto-install helpers following `_ensure_bats` pattern (brew → apt-get/apt → dnf/yum/microdnf → release tarball); all package manager paths gated on `_sudo_available`.
+- **PATH Hardening**: `_safe_path` and `_is_world_writable_dir` guard against PATH poisoning — rejects world-writable directories (sticky-bit exemption removed) and relative/empty path entries. Uses glob-safe `IFS=':' read -r -a` array split.
+- **BATS Suites**: `ensure_node.bats`, `ensure_copilot_cli.bats`, `k3d_manager_copilot.bats`, `safe_path.bats` — 120/120 passing.
 
 ### Security
-- **Secret Injection**: `ldap-password-rotator.sh` now streams vault secrets via stdin (`vault kv put @-`) instead of exposing them as command arguments visible in process listings.
+- **VAULT_TOKEN stdin injection**: `ldap-password-rotator.sh` — token and kv payload piped via stdin into the pod's bash session; extracted with a `while IFS="=" read -r key value` loop inside `bash -c`. Token never appears in `kubectl exec` argument list or `/proc/*/cmdline`.
+- **Sticky-bit exemption removed**: `_is_world_writable_dir` no longer exempts `1777` dirs — sticky bit prevents deletion but not creation of malicious binaries, so world-writable remains world-writable for PATH safety.
+- **Prompt guard hardened**: `_copilot_prompt_guard` checks 8 forbidden fragments: `shell(cd`, `shell(git push --force)`, `shell(git push)`, `shell(rm`, `shell(eval`, `shell(sudo`, `shell(curl`, `shell(wget`.
+- **Exit code fix**: `_k3d_manager_copilot` uses `|| rc=$?` pattern so copilot failure exit codes are correctly propagated.
 
 ---
 
