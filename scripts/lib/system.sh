@@ -1140,21 +1140,22 @@ function _is_world_writable_dir() {
 function _safe_path() {
    local entry
    local -a unsafe=()
-   local old_ifs="$IFS"
-   IFS=':'
-   for entry in $PATH; do
+   local -a path_entries=()
+
+   IFS=':' read -r -a path_entries <<< "${PATH:-}"
+
+   for entry in "${path_entries[@]}"; do
       if [[ -z "$entry" || "$entry" != /* ]]; then
-         unsafe+=("${entry:-<empty>} (relative path entry)")
-         continue
+          unsafe+=("${entry:-<empty>} (relative path entry)")
+          continue
       fi
       if _is_world_writable_dir "$entry"; then
          unsafe+=("$entry (world-writable)")
       fi
    done
-   IFS="$old_ifs"
 
    if ((${#unsafe[@]})); then
-      _err "PATH contains world-writable directories: ${unsafe[*]}"
+      _err "PATH contains unsafe entries (world-writable or relative): ${unsafe[*]}"
    fi
 }
 
@@ -1351,7 +1352,7 @@ function _ensure_node() {
       fi
    fi
 
-   if _is_debian_family && _command_exist apt-get; then
+   if _is_debian_family && _command_exist apt-get && _sudo_available; then
       _run_command --prefer-sudo -- apt-get update
       _run_command --prefer-sudo -- apt-get install -y nodejs npm
       if _command_exist node; then
@@ -1360,11 +1361,11 @@ function _ensure_node() {
    fi
 
    if _is_redhat_family; then
-      if _command_exist dnf; then
+      if _command_exist dnf && _sudo_available; then
          _run_command --prefer-sudo -- dnf install -y nodejs npm
-      elif _command_exist yum; then
+      elif _command_exist yum && _sudo_available; then
          _run_command --prefer-sudo -- yum install -y nodejs npm
-      elif _command_exist microdnf; then
+      elif _command_exist microdnf && _sudo_available; then
          _run_command --prefer-sudo -- microdnf install -y nodejs npm
       fi
 
@@ -1465,14 +1466,23 @@ function _copilot_scope_prompt() {
 
 function _copilot_prompt_guard() {
    local prompt="$1"
+   local -a forbidden=(
+      "shell(git push --force)"
+      "shell(git push)"
+      "shell(cd"
+      "shell(rm"
+      "shell(eval"
+      "shell(sudo"
+      "shell(curl"
+      "shell(wget"
+   )
 
-   if [[ "$prompt" == *"shell(cd"* ]]; then
-      _err "Prompt contains forbidden copilot tool request: shell(cd ..)"
-   fi
-
-   if [[ "$prompt" == *"shell(git push"* ]]; then
-      _err "Prompt contains forbidden copilot tool request: shell(git push)"
-   fi
+   local fragment
+   for fragment in "${forbidden[@]}"; do
+      if [[ "$prompt" == *"$fragment"* ]]; then
+         _err "Prompt contains forbidden copilot fragment: ${fragment}"
+      fi
+   done
 }
 
 function _k3d_manager_copilot() {
@@ -1525,6 +1535,10 @@ function _k3d_manager_copilot() {
       "--deny-tool" "shell(git push)"
       "--deny-tool" "shell(git push --force)"
       "--deny-tool" "shell(rm -rf)"
+      "--deny-tool" "shell(sudo"
+      "--deny-tool" "shell(eval"
+      "--deny-tool" "shell(curl"
+      "--deny-tool" "shell(wget"
    )
    local -a processed_args=("${guard_args[@]}" "${final_args[@]}")
 
