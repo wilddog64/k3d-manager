@@ -80,14 +80,14 @@ update_vault_password() {
     local vault_token="$4"
 
     local vault_path="secret/ldap/users/${username}"
-    local rotated_at
-    rotated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-    kubectl exec -i -n "$VAULT_NAMESPACE" vault-0 -- \
+    kubectl exec -n "$VAULT_NAMESPACE" vault-0 -- \
         env VAULT_TOKEN="$vault_token" VAULT_ADDR="$VAULT_ADDR" \
-        vault kv put "$vault_path" @- >/dev/null 2>&1 <<EOF
-{"username":"${username}","password":"${new_password}","dn":"${user_dn}","rotated_at":"${rotated_at}"}
-EOF
+        vault kv put "$vault_path" \
+        username="$username" \
+        password="$new_password" \
+        dn="$user_dn" \
+        rotated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" >/dev/null 2>&1
 }
 
 # Main rotation logic
