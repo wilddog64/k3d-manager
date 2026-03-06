@@ -18,9 +18,9 @@ Codex fix cycle complete (2026-03-06). Gemini Phase 2 and Phase 3 are the active
 1. ✅ Codex implementation (Batches 1–4)
 2. ✅ Gemini Phase 1 — audit findings filed: `docs/issues/2026-03-06-v0.6.2-sdet-audit-findings.md`
 3. ✅ **Codex fix cycle** — 4 Gemini findings resolved (task: `docs/plans/v0.6.2-codex-fix-task.md`)
-4. ⏳ **Gemini Phase 2** — full BATS suite (`./scripts/k3d-manager test all`) + shellcheck report
-5. ⏳ **Gemini Phase 3** — structured RT-1 through RT-6 audit (PASS/FAIL/N/A per check)
-6. ⏳ **Claude** — review report, commit, open PR
+4. ✅ **Gemini Phase 2** — BATS 115/115 pass, shellcheck warning at system.sh:149 (pre-existing SC2145)
+5. ✅ **Gemini Phase 3** — RT-1/3/5/6 PASS, RT-3 PARTIAL; RT-2 FAIL (vault stdin), RT-4 FAIL (deny-tool)
+6. ✅ **Claude** — RT-2 + RT-4 fixed (2026-03-06); ready for PR
 
 **Phase 2 definition:** Run `shellcheck scripts/lib/system.sh scripts/etc/ldap/ldap-password-rotator.sh`
 and `./scripts/k3d-manager test all`. Report total/pass/fail counts. Confirm no regressions.
@@ -96,7 +96,9 @@ and `./scripts/k3d-manager test all`. Report total/pass/fail counts. Confirm no 
 - [ ] `scripts/tests/plugins/jenkins.bats` — backlog
 - [x] v0.6.2: `_ensure_node` + `_ensure_copilot_cli` — implemented by Codex (2026-03-06)
 - [x] v0.6.2: SDET/Red-Team audit findings (RT-1, RT-2, RT-3) — see `docs/issues/2026-03-06-v0.6.2-sdet-audit-findings.md`
-- [ ] v0.6.2: Gemini Phase 2 & 3 (Verification + Red-Team Audit)
+- [x] v0.6.2: Gemini Phase 2 & 3 (Verification + Red-Team Audit) — Results: BATS 115/115 Pass, RT-2/RT-4 FAIL
+- [x] v0.6.2: Final fix cycle — RT-2 (vault stdin injection) + RT-4 (deny-tool completeness) — Claude 2026-03-06
+- [ ] v0.6.2: Claude review and merge (PR)
 - [ ] v0.7.0: Keycloak provider interface + App Cluster deployment (ESO, shopping-cart stack)
 - [ ] v0.7.0: rename cluster to `infra` + fix `CLUSTER_NAME` env var
 - [ ] v0.8.0: `k3dm-mcp` — lean MCP server for Claude Desktop, Codex, Atlas, Comet
