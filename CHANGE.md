@@ -6,6 +6,7 @@
 - **Agent Rigor Protocol**: Implementation of Spec-First investigation, Git Checkpointing, and Post-Implementation Audit loops to ensure deterministic AI behavior.
 - **AI-Powered Linting**: New `_agent_lint` phase using `copilot-cli` as a deterministic gate for architectural verification (e.g., catching price injection or missing event listeners).
 - **Copilot CLI Management**: Scoped `_k3d_manager_copilot` wrapper and automated tool-chain installation (`_ensure_node`, `_ensure_copilot_cli`).
+- **Scoped Tooling Helpers**: `_agent_checkpoint`, `_safe_path`, `_install_node_from_release`, `_install_copilot_from_release`, and dedicated BATS suites (`ensure_node`, `ensure_copilot_cli`, `k3d_manager_copilot`) keep AI entry points auditable.
 
 ### Changed
 - **macOS Standardisation**: OrbStack is now the officially recommended and default provider for macOS, replacing the unreliable Colima/Docker Desktop path.
