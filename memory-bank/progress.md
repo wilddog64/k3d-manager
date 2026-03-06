@@ -50,7 +50,10 @@ Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 - [x] Gemini Phase 3: Structured RT-1 through RT-6 audit (Findings: RT-2 FAIL, RT-4 FAIL, RT-3 PARTIAL PASS)
 - [x] Codex RT fix cycle: RT-2 (vault stdin injection) + RT-4 (deny-tool completeness) — task: `docs/plans/v0.6.2-codex-rt-fix-task.md`
 - [x] Codex Copilot fix cycle: rc propagation, empty PATH, sticky bit — task: `docs/plans/v0.6.2-codex-copilot-review-task.md`
-- [ ] Claude: Review, commit, open PR
+- [x] Claude: PR #19 opened; CI green; GitGuardian clean; doc fixes (CHANGE.md, techContext.md)
+- [ ] Codex re-review fix cycle (7 fixes A–I): Fix B delivered only — A/C/D/G/H/I pending — task: `docs/plans/v0.6.2-codex-copilot-review2-task.md`
+- [ ] Gemini: BATS suite for `_safe_path`/`_is_world_writable_dir` — task: `docs/plans/v0.6.2-gemini-safe-path-tests.md`
+- [ ] Claude: final review, run BATS, merge PR
 - Task spec: `docs/plans/v0.6.2-gemini-task.md`
 - Implementation plan: `docs/plans/v0.6.2-ensure-copilot-cli.md`
 
