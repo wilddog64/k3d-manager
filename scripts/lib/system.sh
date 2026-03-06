@@ -1140,21 +1140,32 @@ function _is_world_writable_dir() {
 function _safe_path() {
    local entry
    local -a unsafe=()
-   local old_ifs="$IFS"
-   IFS=':'
-   for entry in $PATH; do
+   local has_relative=0
+   local has_world_writable=0
+   local -a path_entries
+   IFS=: read -r -a path_entries <<< "$PATH"
+   for entry in "${path_entries[@]}"; do
       if [[ -z "$entry" || "$entry" != /* ]]; then
          unsafe+=("${entry:-<empty>} (relative path)")
+         has_relative=1
          continue
       fi
       if _is_world_writable_dir "$entry"; then
          unsafe+=("$entry")
+         has_world_writable=1
       fi
    done
-   IFS="$old_ifs"
 
    if ((${#unsafe[@]})); then
-      _err "PATH contains world-writable directories: ${unsafe[*]}"
+      local reason
+      if ((has_relative && has_world_writable)); then
+         reason="contains world-writable directories and relative entries"
+      elif ((has_world_writable)); then
+         reason="contains world-writable directories"
+      else
+         reason="contains relative entries"
+      fi
+      _err "PATH ${reason}: ${unsafe[*]}"
    fi
 }
 
@@ -1465,13 +1476,24 @@ function _copilot_scope_prompt() {
 
 function _copilot_prompt_guard() {
    local prompt="$1"
+   local -a forbidden_tools=()
 
    if [[ "$prompt" == *"shell(cd"* ]]; then
-      _err "Prompt contains forbidden copilot tool request: shell(cd ..)"
+      forbidden_tools+=("shell(cd ..)")
    fi
 
-   if [[ "$prompt" == *"shell(git push"* ]]; then
-      _err "Prompt contains forbidden copilot tool request: shell(git push)"
+   if [[ "$prompt" == *"shell(git push --force"* ]]; then
+      forbidden_tools+=("shell(git push --force)")
+   elif [[ "$prompt" == *"shell(git push"* ]]; then
+      forbidden_tools+=("shell(git push)")
+   fi
+
+   if [[ "$prompt" == *"shell(rm -rf"* ]]; then
+      forbidden_tools+=("shell(rm -rf)")
+   fi
+
+   if ((${#forbidden_tools[@]} > 0)); then
+      _err "Prompt contains forbidden copilot tool request(s): ${forbidden_tools[*]}"
    fi
 }
 

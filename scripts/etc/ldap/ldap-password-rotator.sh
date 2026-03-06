@@ -89,11 +89,12 @@ update_vault_password() {
 EOF
 )
 
-    kubectl exec -i -n "$VAULT_NAMESPACE" vault-0 -- \
-        env VAULT_TOKEN="$vault_token" VAULT_ADDR="$VAULT_ADDR" \
-        vault kv put "$vault_path" @- >/dev/null 2>&1 <<EOF
-$payload
-EOF
+    {
+        printf '%s\n' "$vault_token"
+        printf '%s\n' "$payload"
+    } | kubectl exec -i -n "$VAULT_NAMESPACE" vault-0 -- \
+        sh -c 'read -r _tok && VAULT_TOKEN="$_tok" VAULT_ADDR="$1" vault kv put "$2" @-' \
+        -- "$VAULT_ADDR" "$vault_path" >/dev/null 2>&1
 }
 
 # Main rotation logic
