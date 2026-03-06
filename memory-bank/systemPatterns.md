@@ -172,10 +172,11 @@ Smoke entrypoint:
 Implemented in `scripts/lib/help/utils.sh`; runs available scripts in `bin/` and skips
 missing/non-executable ones.
 
-## 13) Generic Library vs. Application Specifics
+## 14) Red-Team Defensive Patterns
 
-- **Principle**: `lib-foundation` (`core.sh`, `system.sh`) must remain application-agnostic.
-- **Implementation**: 
-  - Library functions use generic parameters or internal variables.
-  - Application-specific naming (e.g., `K3DM_*` prefixes) remains in the main dispatcher or application-level wrappers.
-- **Benefit**: Ensures the core library is reusable by any shell application (e.g., `shopping-carts`, `rigor-cli`) without naming collisions.
+To mitigate the risk of sophisticated side-channel and environment attacks:
+
+- **PATH Sanitization**: Sensitive operations (Vault unseal, credential retrieval) must either use absolute binary paths or explicitly validate the environment's `PATH` integrity before execution.
+- **Context Integrity Guard**: The `memory-bank/` and `docs/plans/` directories are treated as "Instruction Code." Any changes must be audited by a human to prevent "Context Injection" (poisoning the agent's instructions).
+- **Safe Secret Injection**: Favor `stdin` (piping) over command-line arguments for all secret-heavy operations to prevent `/proc` sniffing.
+- **Trace Isolation**: Ensure `ENABLE_TRACE` and `DEBUG` modes are strictly gated by `_args_have_sensitive_flag` across all library functions.
