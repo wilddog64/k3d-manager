@@ -100,7 +100,6 @@ and `./scripts/k3d-manager test all`. Report total/pass/fail counts. Confirm no 
 - [x] v0.6.2: Gemini Phase 2 & 3 (Verification + Red-Team Audit) — Results: BATS 115/115 Pass, RT-2/RT-4 FAIL
 - [x] v0.6.2: Codex RT fix cycle — RT-2 + RT-4 (task: `docs/plans/v0.6.2-codex-rt-fix-task.md`)
 - [ ] v0.6.2: Claude review and merge (PR)
-- [ ] v0.6.2: Claude review and merge (PR)
 - [ ] v0.7.0: Keycloak provider interface + App Cluster deployment (ESO, shopping-cart stack)
 - [ ] v0.7.0: rename cluster to `infra` + fix `CLUSTER_NAME` env var
 - [ ] v0.8.0: `k3dm-mcp` — lean MCP server for Claude Desktop, Codex, Atlas, Comet
