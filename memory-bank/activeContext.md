@@ -22,6 +22,7 @@ Codex fix cycle complete (2026-03-06). Gemini Phase 2 and Phase 3 are the active
 5. ✅ **Gemini Phase 3** — RT-1/3/5/6 PASS, RT-3 PARTIAL; RT-2 FAIL (vault stdin), RT-4 FAIL (deny-tool)
 6. ✅ **Codex RT fix cycle** — RT-2 + RT-4 resolved (`docs/plans/v0.6.2-codex-rt-fix-task.md`)
 7. ⏳ **Claude** — review, commit, open PR
+8. ⏳ **Codex P1 fix cycle** — Copilot review issues (rc capture, PATH guard, sticky bit) per `docs/plans/v0.6.2-codex-copilot-review-task.md`
 
 **Phase 2 definition:** Run `shellcheck scripts/lib/system.sh scripts/etc/ldap/ldap-password-rotator.sh`
 and `./scripts/k3d-manager test all`. Report total/pass/fail counts. Confirm no regressions.
@@ -99,6 +100,7 @@ and `./scripts/k3d-manager test all`. Report total/pass/fail counts. Confirm no 
 - [x] v0.6.2: SDET/Red-Team audit findings (RT-1, RT-2, RT-3) — see `docs/issues/2026-03-06-v0.6.2-sdet-audit-findings.md`
 - [x] v0.6.2: Gemini Phase 2 & 3 (Verification + Red-Team Audit) — Results: BATS 115/115 Pass, RT-2/RT-4 FAIL
 - [x] v0.6.2: Codex RT fix cycle — RT-2 + RT-4 (task: `docs/plans/v0.6.2-codex-rt-fix-task.md`)
+- [ ] v0.6.2: Codex Copilot fix cycle — per `docs/plans/v0.6.2-codex-copilot-review-task.md`
 - [ ] v0.6.2: Claude review and merge (PR)
 - [ ] v0.7.0: Keycloak provider interface + App Cluster deployment (ESO, shopping-cart stack)
 - [ ] v0.7.0: rename cluster to `infra` + fix `CLUSTER_NAME` env var
