@@ -24,8 +24,9 @@ Codex fix cycle complete (2026-03-06). Gemini Phase 2 and Phase 3 are the active
 7. ✅ **Claude** — PR #19 opened, CI green, GitGuardian clean
 8. ✅ **Codex P1 fix cycle** — rc capture, empty PATH, sticky bit (`docs/plans/v0.6.2-codex-copilot-review-task.md`)
 9. ✅ **Codex re-review fix cycle** — fixes A–I implemented (see `docs/plans/v0.6.2-codex-copilot-review2-task.md`)
-10. ⚠️  **Gemini** — `safe_path.bats` created but assertions use old error strings (drift from Fix B/C); `k3d_manager_copilot.bats:23` CI failure NOT fixed — task: `docs/plans/v0.6.2-gemini-test-fix-task.md`
-11. ⏳ **Claude** — final review, run BATS, push, merge PR
+10. ✅ **Gemini** — `safe_path.bats` created and aligned with production fixes — task: `docs/plans/v0.6.2-gemini-safe-path-tests.md`
+11. ✅ **Gemini** — All BATS suites aligned and verified (120/120 pass) — task: `docs/plans/v0.6.2-gemini-test-fix-task.md`
+12. ⏳ **Claude** — final review, merge PR
 
 **Phase 2 definition:** Run `shellcheck scripts/lib/system.sh scripts/etc/ldap/ldap-password-rotator.sh`
 and `./scripts/k3d-manager test all`. Report total/pass/fail counts. Confirm no regressions.
