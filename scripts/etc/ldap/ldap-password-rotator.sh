@@ -85,15 +85,48 @@ update_vault_password() {
 
     local payload
     payload=$(cat <<EOF
-{"username":"${username}","password":"${new_password}","dn":"${user_dn}","rotated_at":"${rotated_at}"}
+token=${vault_token}
+username=${username}
+password=${new_password}
+dn=${user_dn}
+rotated_at=${rotated_at}
 EOF
 )
 
-    kubectl exec -i -n "$VAULT_NAMESPACE" vault-0 -- \
-        env VAULT_TOKEN="$vault_token" VAULT_ADDR="$VAULT_ADDR" \
-        vault kv put "$vault_path" @- >/dev/null 2>&1 <<EOF
-$payload
-EOF
+    if ! printf '%s\n' "$payload" | kubectl exec -i -n "$VAULT_NAMESPACE" vault-0 -- \
+        env VAULT_ADDR="$VAULT_ADDR" TARGET_VAULT_PATH="$vault_path" bash -c "
+set -euo pipefail
+payload=\
+\$(cat)
+VAULT_TOKEN=\"\"
+username=\"\"
+password=\"\"
+dn=\"\"
+rotated_at=\"\"
+while IFS=\"=\" read -r key value; do
+  case \"\$key\" in
+    token) VAULT_TOKEN=\"\$value\" ;;
+    username) username=\"\$value\" ;;
+    password) password=\"\$value\" ;;
+    dn) dn=\"\$value\" ;;
+    rotated_at) rotated_at=\"\$value\" ;;
+  esac
+done <<< \"\$payload\"
+
+if [[ -z \"\$VAULT_TOKEN\" ]]; then
+  echo \"Vault token missing from payload\" >&2
+  exit 1
+fi
+
+export VAULT_TOKEN
+vault kv put \"\$TARGET_VAULT_PATH\" \\
+  username=\"\$username\" \\
+  password=\"\$password\" \\
+  dn=\"\$dn\" \\
+  rotated_at=\"\$rotated_at\" >/dev/null 2>&1
+"; then
+        return 1
+    fi
 }
 
 # Main rotation logic
