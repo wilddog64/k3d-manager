@@ -1530,7 +1530,12 @@ function _k3d_manager_copilot() {
       shift
    done
 
-   local -a guard_args=("--deny-tool" "shell(cd ..)" "--deny-tool" "shell(git push)")
+   local -a guard_args=(
+      "--deny-tool" "shell(cd ..)"
+      "--deny-tool" "shell(git push)"
+      "--deny-tool" "shell(git push --force)"
+      "--deny-tool" "shell(rm -rf)"
+   )
    local -a processed_args=("${guard_args[@]}" "${final_args[@]}")
 
    local rc=0
