@@ -15,7 +15,7 @@
 
 ## Platform Defaults
 
-- **macOS**: `CLUSTER_PROVIDER=orbstack` (Standardized; optimized for performance/stability)
+- **macOS**: OrbStack auto-detected when available (`orb` CLI + daemon running); falls back to k3d. Detection order: orbstack → k3d → k3s → kubeconfig.
 - **Linux**: `CLUSTER_PROVIDER=k3s` (systemd-based, requires root/sudo for install)
 
 ## Technology Stack
