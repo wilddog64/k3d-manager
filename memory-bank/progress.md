@@ -52,8 +52,8 @@ Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 - [x] Codex Copilot fix cycle: rc propagation, empty PATH, sticky bit — task: `docs/plans/v0.6.2-codex-copilot-review-task.md`
 - [x] Claude: PR #19 opened; CI green; GitGuardian clean; doc fixes (CHANGE.md, techContext.md)
 - [x] Codex re-review fix cycle: fixes A–I all delivered — task: `docs/plans/v0.6.2-codex-copilot-review2-task.md`
-- [ ] Gemini: BATS suite for `_safe_path`/`_is_world_writable_dir` — task: `docs/plans/v0.6.2-gemini-safe-path-tests.md`
-- [ ] Claude: commit Codex fixes, push, final review, merge PR
+- [ ] Gemini: fix assertion drift in `safe_path.bats` (Fix B/C message strings) + fix CI failure in `k3d_manager_copilot.bats:23` — task: `docs/plans/v0.6.2-gemini-test-fix-task.md`
+- [ ] Claude: final review, run BATS, push, merge PR
 - Task spec: `docs/plans/v0.6.2-gemini-task.md`
 - Implementation plan: `docs/plans/v0.6.2-ensure-copilot-cli.md`
 
