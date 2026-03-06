@@ -16,7 +16,7 @@ Plans:
 - `docs/plans/v0.6.3-codex-run-command-fix.md` — active Codex task (see below)
 
 Key objectives:
-1. **Fix `_run_command` TTY flakiness** — remove `auto_interactive` block (Codex)
+1. **Fix `_run_command` TTY flakiness** — remove `auto_interactive` block (Codex) ✅ done 2026-03-06
 2. De-bloat `system.sh` and `core.sh` — remove permission cascade anti-patterns (Codex)
 3. Implement `_agent_lint` in `agent_rigor.sh` — digital auditor via copilot-cli (Codex)
 4. BATS suite: `scripts/tests/lib/agent_rigor.bats` (Gemini)
