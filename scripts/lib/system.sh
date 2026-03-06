@@ -1,3 +1,39 @@
+if [[ -z "${SCRIPT_DIR:-}" ]]; then
+    SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
+fi
+
+: "${K3DM_AGENT_RIGOR_LIB_SOURCED:=0}"
+
+function _k3dm_repo_root() {
+   local root=""
+
+   if command -v git >/dev/null 2>&1; then
+      root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+      if [[ -n "$root" ]]; then
+         printf '%s\n' "$root"
+         return 0
+      fi
+   fi
+
+   if [[ -n "${SCRIPT_DIR:-}" ]]; then
+      root="$(cd "${SCRIPT_DIR}/.." >/dev/null 2>&1 && pwd)"
+      printf '%s\n' "$root"
+      return 0
+   fi
+
+   pwd
+}
+
+if [[ "${K3DM_AGENT_RIGOR_LIB_SOURCED}" != "1" ]]; then
+   agent_rigor_lib_path="${SCRIPT_DIR}/lib/agent_rigor.sh"
+   if [[ -r "$agent_rigor_lib_path" ]]; then
+      # shellcheck source=/dev/null
+      source "$agent_rigor_lib_path"
+      K3DM_AGENT_RIGOR_LIB_SOURCED=1
+   fi
+   unset agent_rigor_lib_path
+fi
+
 function _command_exist() {
     command -v "$1" &> /dev/null
 }
@@ -1061,6 +1097,77 @@ function _systemd_available() {
    [[ "$init_comm" == systemd ]]
 }
 
+function _ensure_local_bin_on_path() {
+   local local_bin="${HOME}/.local/bin"
+
+   if [[ ! -d "$local_bin" ]]; then
+      mkdir -p "$local_bin" >/dev/null 2>&1 || true
+   fi
+
+   case ":${PATH}:" in
+      *":${local_bin}:"*) : ;;
+      *) PATH="${local_bin}:${PATH}" ;;
+   esac
+
+   export PATH
+}
+
+function _is_world_writable_dir() {
+   local dir="$1"
+
+   if [[ -z "$dir" || ! -d "$dir" ]]; then
+      return 1
+   fi
+
+   local perm
+   if stat -c '%a' "$dir" >/dev/null 2>&1; then
+      perm="$(stat -c '%a' "$dir" 2>/dev/null || true)"
+   else
+      perm="$(stat -f '%OLp' "$dir" 2>/dev/null || true)"
+   fi
+
+   if [[ -z "$perm" ]]; then
+      return 1
+   fi
+
+   local perm_value=0
+   if [[ "$perm" =~ ^[0-7]+$ ]]; then
+      perm_value=$((8#$perm))
+   fi
+
+   if (( perm_value & 01000 )); then
+      return 1
+   fi
+
+   local other="${perm: -1}"
+   case "$other" in
+      2|3|6|7) return 0 ;;
+      *) return 1 ;;
+   esac
+}
+
+function _safe_path() {
+   local entry
+   local -a unsafe=()
+   local old_ifs="$IFS"
+   IFS=':'
+   for entry in $PATH; do
+      [[ -z "$entry" ]] && continue
+      if [[ "$entry" != /* ]]; then
+         unsafe+=("$entry (relative path)")
+         continue
+      fi
+      if _is_world_writable_dir "$entry"; then
+         unsafe+=("$entry")
+      fi
+   done
+   IFS="$old_ifs"
+
+   if ((${#unsafe[@]})); then
+      _err "PATH contains world-writable directories: ${unsafe[*]}"
+   fi
+}
+
 function _install_bats_from_source() {
    local version="${1:-1.10.0}"
    local url="https://github.com/bats-core/bats-core/releases/download/v${version}/bats-core-${version}.tar.gz"
@@ -1158,6 +1265,284 @@ function _ensure_bats() {
    fi
 
    exit 127
+}
+
+function _install_node_from_release() {
+   local version="${NODE_PREFERRED_VERSION:-20.11.1}"
+   local kernel arch tarball url tmp_dir extracted install_root
+
+   kernel="$(uname -s)"
+   case "$kernel" in
+      Darwin) kernel="darwin" ;;
+      Linux) kernel="linux" ;;
+      *)
+         echo "Cannot install Node.js: unsupported platform '$kernel'" >&2
+         return 1
+         ;;
+   esac
+
+   arch="$(uname -m)"
+   case "$arch" in
+      x86_64|amd64) arch="x64" ;;
+      arm64|aarch64) arch="arm64" ;;
+      *)
+         echo "Cannot install Node.js: unsupported architecture '$arch'" >&2
+         return 1
+         ;;
+   esac
+
+   tarball="node-v${version}-${kernel}-${arch}.tar.gz"
+   url="https://nodejs.org/dist/v${version}/${tarball}"
+
+   tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t node-install)"
+   if [[ -z "$tmp_dir" ]]; then
+      echo "Failed to create temporary directory for Node.js install" >&2
+      return 1
+   fi
+
+   if ! _command_exist curl || ! _command_exist tar; then
+      echo "Cannot install Node.js: curl and tar are required" >&2
+      rm -rf "$tmp_dir"
+      return 1
+   fi
+
+   if ! _run_command -- curl -fsSL "$url" -o "${tmp_dir}/${tarball}"; then
+      rm -rf "$tmp_dir"
+      return 1
+   fi
+
+   if ! tar -xzf "${tmp_dir}/${tarball}" -C "$tmp_dir"; then
+      rm -rf "$tmp_dir"
+      return 1
+   fi
+
+   extracted="${tmp_dir}/node-v${version}-${kernel}-${arch}"
+   if [[ ! -d "$extracted" ]]; then
+      echo "Node.js archive missing expected directory" >&2
+      rm -rf "$tmp_dir"
+      return 1
+   fi
+
+   install_root="${HOME}/.local/node-v${version}-${kernel}-${arch}"
+   rm -rf "$install_root"
+   mkdir -p "${install_root%/*}"
+
+   if ! mv "$extracted" "$install_root"; then
+      rm -rf "$tmp_dir"
+      echo "Failed to move Node.js archive into ${install_root}" >&2
+      return 1
+   fi
+
+   _ensure_local_bin_on_path
+   ln -sf "${install_root}/bin/node" "${HOME}/.local/bin/node"
+   ln -sf "${install_root}/bin/npm" "${HOME}/.local/bin/npm"
+   ln -sf "${install_root}/bin/npx" "${HOME}/.local/bin/npx"
+
+   hash -r 2>/dev/null || true
+   rm -rf "$tmp_dir"
+
+   if _command_exist node; then
+      return 0
+   fi
+
+   echo "Node.js install completed but 'node' is still missing from PATH" >&2
+   return 1
+}
+
+function _ensure_node() {
+   if _command_exist node; then
+      return 0
+   fi
+
+   if _command_exist brew; then
+      _run_command -- brew install node
+      if _command_exist node; then
+         return 0
+      fi
+   fi
+
+   if _is_debian_family && _command_exist apt-get; then
+      _run_command --prefer-sudo -- apt-get update
+      _run_command --prefer-sudo -- apt-get install -y nodejs npm
+      if _command_exist node; then
+         return 0
+      fi
+   fi
+
+   if _is_redhat_family; then
+      if _command_exist dnf; then
+         _run_command --prefer-sudo -- dnf install -y nodejs npm
+      elif _command_exist yum; then
+         _run_command --prefer-sudo -- yum install -y nodejs npm
+      elif _command_exist microdnf; then
+         _run_command --prefer-sudo -- microdnf install -y nodejs npm
+      fi
+
+      if _command_exist node; then
+         return 0
+      fi
+   fi
+
+   if _install_node_from_release; then
+      return 0
+   fi
+
+   _err "Cannot install Node.js: missing package manager and release fallback failed"
+}
+
+function _install_copilot_from_release() {
+   if ! _command_exist curl; then
+      echo "Cannot install Copilot CLI: curl is required" >&2
+      return 1
+   fi
+
+   local version="${COPILOT_CLI_VERSION:-latest}"
+   local tmp_dir script
+
+   tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t copilot-cli)"
+   if [[ -z "$tmp_dir" ]]; then
+      echo "Failed to allocate temporary directory for Copilot CLI install" >&2
+      return 1
+   fi
+
+   script="${tmp_dir}/copilot-install.sh"
+   if ! _run_command -- curl -fsSL https://gh.io/copilot-install -o "$script"; then
+      rm -rf "$tmp_dir"
+      return 1
+   fi
+
+   chmod +x "$script" 2>/dev/null || true
+
+   if ! _run_command -- env VERSION="$version" bash "$script"; then
+      rm -rf "$tmp_dir"
+      return 1
+   fi
+
+   _ensure_local_bin_on_path
+   hash -r 2>/dev/null || true
+   rm -rf "$tmp_dir"
+
+   if _command_exist copilot; then
+      return 0
+   fi
+
+   echo "Copilot CLI install script completed but 'copilot' remains unavailable" >&2
+   return 1
+}
+
+function _copilot_auth_check() {
+   if [[ "${K3DM_ENABLE_AI:-0}" != "1" ]]; then
+      return 0
+   fi
+
+   if _run_command --soft --quiet -- copilot auth status >/dev/null 2>&1; then
+      return 0
+   fi
+
+   _err "Error: AI features enabled, but Copilot CLI authentication failed. Please verify your GitHub Copilot subscription or unset K3DM_ENABLE_AI."
+}
+
+function _ensure_copilot_cli() {
+   if _command_exist copilot; then
+      _copilot_auth_check
+      return 0
+   fi
+
+   if _command_exist brew; then
+      _run_command -- brew install copilot-cli
+      if _command_exist copilot; then
+         _copilot_auth_check
+         return 0
+      fi
+   fi
+
+   if _install_copilot_from_release; then
+      if _command_exist copilot; then
+         _copilot_auth_check
+         return 0
+      fi
+   fi
+
+   _err "Copilot CLI is not installed and automatic installation failed"
+}
+
+function _copilot_scope_prompt() {
+   local user_prompt="$1"
+   local scope="You are a scoped assistant for the k3d-manager repository. Work only within this repo and operate deterministically without attempting shell escapes or network pivots."
+
+   printf '%s\n\n%s\n' "$scope" "$user_prompt"
+}
+
+function _copilot_prompt_guard() {
+   local prompt="$1"
+
+   if [[ "$prompt" == *"shell(cd"* ]]; then
+      _err "Prompt contains forbidden copilot tool request: shell(cd ..)"
+   fi
+
+   if [[ "$prompt" == *"shell(git push"* ]]; then
+      _err "Prompt contains forbidden copilot tool request: shell(git push)"
+   fi
+}
+
+function _k3d_manager_copilot() {
+   if [[ "${K3DM_ENABLE_AI:-0}" != "1" ]]; then
+      _err "Copilot CLI is disabled. Set K3DM_ENABLE_AI=1 to enable AI tooling."
+   fi
+
+   _safe_path
+   _ensure_copilot_cli
+
+   local repo_root
+   repo_root="$(_k3dm_repo_root 2>/dev/null || true)"
+   if [[ -z "$repo_root" ]]; then
+      _err "Unable to determine repository root for Copilot invocation"
+   fi
+
+   local prev_cdpath="${CDPATH-}"
+   local prev_oldpwd="${OLDPWD-}"
+   CDPATH=""
+   OLDPWD=""
+
+   local prev_pwd="$PWD"
+   cd "$repo_root" || _err "Failed to change directory to repository root"
+
+   local -a final_args=()
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         -p|--prompt)
+            if [[ $# -lt 2 ]]; then
+               cd "$prev_pwd" >/dev/null 2>&1 || true
+               CDPATH="$prev_cdpath"
+               OLDPWD="$prev_oldpwd"
+               _err "_k3d_manager_copilot requires a prompt value"
+            fi
+            local scoped
+            scoped="$(_copilot_scope_prompt "$2")"
+            _copilot_prompt_guard "$scoped"
+            final_args+=("$1" "$scoped")
+            shift 2
+            continue
+            ;;
+      esac
+
+      final_args+=("$1")
+      shift
+   done
+
+   local -a guard_args=("--deny-tool" "shell(cd ..)" "--deny-tool" "shell(git push)")
+   local -a processed_args=("${guard_args[@]}" "${final_args[@]}")
+
+   local rc=0
+   if ! _run_command --soft -- copilot "${processed_args[@]}"; then
+      rc=$?
+   fi
+
+   cd "$prev_pwd" >/dev/null 2>&1 || true
+   CDPATH="$prev_cdpath"
+   OLDPWD="$prev_oldpwd"
+
+   return "$rc"
 }
 
 
