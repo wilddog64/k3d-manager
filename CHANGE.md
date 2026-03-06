@@ -3,16 +3,14 @@
 ## v0.6.2 — Copilot CLI & Agent Rigor [IN PROGRESS]
 
 ### Added
-- **Agent Rigor Protocol**: Implementation of Spec-First investigation, Git Checkpointing, and Post-Implementation Audit loops to ensure deterministic AI behavior.
-- **AI-Powered Linting**: New `_agent_lint` phase using `copilot-cli` as a deterministic gate for architectural verification (e.g., catching price injection or missing event listeners).
-- **Copilot CLI Management**: Scoped `_k3d_manager_copilot` wrapper and automated tool-chain installation (`_ensure_node`, `_ensure_copilot_cli`).
-- **Scoped Tooling Helpers**: `_agent_checkpoint`, `_safe_path`, `_install_node_from_release`, `_install_copilot_from_release`, and dedicated BATS suites (`ensure_node`, `ensure_copilot_cli`, `k3d_manager_copilot`) keep AI entry points auditable.
+- **Agent Rigor Protocol**: Spec-First investigation, Git Checkpointing (`_agent_checkpoint`), and Post-Implementation Audit loops to ensure deterministic AI agent behavior.
+- **Copilot CLI Management**: Scoped `_k3d_manager_copilot` wrapper with `K3DM_ENABLE_AI` gate, deny-tool guardrails, PATH sanitization, and CDPATH/OLDPWD isolation. Auto-install via `_ensure_copilot_cli` (brew → curl fallback).
+- **Node.js Management**: `_ensure_node` / `_install_node_from_release` — auto-install helpers following `_ensure_bats` pattern (brew → apt-get → dnf → release tarball).
+- **PATH Hardening**: `_safe_path` and `_is_world_writable_dir` guard against PATH poisoning — rejects world-writable directories and relative path entries (including empty components).
+- **BATS Suites**: `ensure_node.bats`, `ensure_copilot_cli.bats`, `k3d_manager_copilot.bats` (115/115 passing).
 
-### Changed
-- **macOS Standardisation**: OrbStack is now the officially recommended and default provider for macOS, replacing the unreliable Colima/Docker Desktop path.
-
-### Deprecated / Removed
-- **Colima Provider**: Support for Colima has been dropped due to persistent reliability issues on macOS.
+### Security
+- **Secret Injection**: `ldap-password-rotator.sh` now streams vault secrets via stdin (`vault kv put @-`) instead of exposing them as command arguments visible in process listings.
 
 ---
 
