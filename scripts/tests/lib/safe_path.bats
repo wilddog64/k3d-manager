@@ -48,8 +48,11 @@ teardown() {
 }
 
 @test "_safe_path: standard absolute non-writable dirs pass" {
-  # Mocking a clean path
   export PATH="/usr/local/bin:/usr/bin:/bin"
+  # Stub out filesystem check — CI runners may have world-writable /usr/local/bin.
+  # This test validates _safe_path logic (all entries absolute), not real permissions.
+  _is_world_writable_dir() { return 1; }
+  export -f _is_world_writable_dir
 
   run _safe_path
   [ "$status" -eq 0 ]
