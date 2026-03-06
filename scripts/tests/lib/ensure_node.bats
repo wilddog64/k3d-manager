@@ -25,10 +25,10 @@ setup() {
 @test "installs via brew when available" {
   export_stubs
 
-  node_present=0
+  NODE_MOCK_BIN="$BATS_TEST_TMPDIR/node_mock_brew"
   _command_exist() {
     case "$1" in
-      node) [[ "$node_present" -eq 1 ]] ;;
+      node) [[ -f "$NODE_MOCK_BIN" ]] ;;
       brew) return 0 ;;
       *) return 1 ;;
     esac
@@ -37,7 +37,7 @@ setup() {
     local payload="$*"
     printf '%s\n' "$payload" >> "$RUN_LOG"
     if [[ "$payload" == *"brew install node"* ]]; then
-      node_present=1
+      touch "$NODE_MOCK_BIN"
     fi
     return 0
   }
@@ -51,25 +51,26 @@ setup() {
 @test "installs via apt-get on Debian systems" {
   export_stubs
 
-  node_present=0
+  NODE_MOCK_BIN="$BATS_TEST_TMPDIR/node_mock_apt"
   _command_exist() {
     case "$1" in
-      node) [[ "$node_present" -eq 1 ]] ;;
+      node) [[ -f "$NODE_MOCK_BIN" ]] ;;
       apt-get) return 0 ;;
       *) return 1 ;;
     esac
   }
   _is_debian_family() { return 0; }
   _is_redhat_family() { return 1; }
+  _sudo_available() { return 0; }
   _run_command() {
     local payload="$*"
     printf '%s\n' "$payload" >> "$RUN_LOG"
     if [[ "$payload" == *"apt-get install -y nodejs npm"* ]]; then
-      node_present=1
+      touch "$NODE_MOCK_BIN"
     fi
     return 0
   }
-  export -f _command_exist _is_debian_family _run_command
+  export -f _command_exist _is_debian_family _run_command _sudo_available
 
   run _ensure_node
   [ "$status" -eq 0 ]
@@ -80,10 +81,10 @@ setup() {
 @test "installs via dnf on RedHat systems" {
   export_stubs
 
-  node_present=0
+  NODE_MOCK_BIN="$BATS_TEST_TMPDIR/node_mock_dnf"
   _command_exist() {
     case "$1" in
-      node) [[ "$node_present" -eq 1 ]] ;;
+      node) [[ -f "$NODE_MOCK_BIN" ]] ;;
       dnf) return 0 ;;
       apt-get) return 1 ;;
       *) return 1 ;;
@@ -91,15 +92,16 @@ setup() {
   }
   _is_redhat_family() { return 0; }
   _is_debian_family() { return 1; }
+  _sudo_available() { return 0; }
   _run_command() {
     local payload="$*"
     printf '%s\n' "$payload" >> "$RUN_LOG"
     if [[ "$payload" == *"dnf install -y nodejs npm"* ]]; then
-      node_present=1
+      touch "$NODE_MOCK_BIN"
     fi
     return 0
   }
-  export -f _command_exist _is_redhat_family _run_command
+  export -f _command_exist _is_redhat_family _run_command _sudo_available
 
   run _ensure_node
   [ "$status" -eq 0 ]
