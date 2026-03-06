@@ -4,8 +4,8 @@
 
 `ldap-develop` merged to `main` via PR #2 (2026-02-27). **v0.1.0 released.**
 
-**v0.6.2 IN PROGRESS 🔄 (2026-03-02)**
-Implementing High-Rigor Engineering Protocol (Local Automation) and Copilot CLI Tool Management.
+**v0.6.2 IN PROGRESS 🔄 (2026-03-06)**
+Codex implementation complete. Gemini SDET + red-team audit is the active gate before PR.
 
 **v0.6.1 MERGED ✅ (2026-03-02)**
 Critical fixes for ArgoCD/Jenkins Istio hangs, LDAP defaults, and Jenkins namespace bugs.
@@ -39,13 +39,18 @@ Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 ### Priority 1 (Current focus — v0.6.2)
 
 **v0.6.2 — AI Tooling & Safety Protocol:**
-- [ ] Implement `_agent_checkpoint` in `scripts/lib/agent_rigor.sh`
-- [ ] Implement `_ensure_node` + `_install_node_from_release` in `scripts/lib/system.sh`
-- [ ] Implement `_ensure_copilot_cli` in `scripts/lib/system.sh`
-- [ ] Implement `_k3d_manager_copilot` with generic params and implicit gating
-- [ ] Verify via `scripts/tests/lib/ensure_node.bats` and `ensure_copilot_cli.bats`
-- [ ] Post-Implementation Rigor: Audit, Simplify, Final Verify
-- Plan: `docs/plans/v0.6.2-ensure-copilot-cli.md`
+- [x] Implement `_agent_checkpoint` in `scripts/lib/agent_rigor.sh`
+- [x] Implement `_ensure_node` + `_install_node_from_release` in `scripts/lib/system.sh`
+- [x] Implement `_ensure_copilot_cli` in `scripts/lib/system.sh`
+- [x] Implement `_k3d_manager_copilot` with generic params and implicit gating
+- [x] Verify via `scripts/tests/lib/ensure_node.bats` and `ensure_copilot_cli.bats`
+- [x] Gemini Phase 1: Audit complete — 4 findings in `docs/issues/2026-03-06-v0.6.2-sdet-audit-findings.md`
+- [x] Codex fix cycle: fix sticky bit, relative PATH, deny-tool placement, mock integrity — task: `docs/plans/v0.6.2-codex-fix-task.md`
+- [ ] Gemini Phase 2: Full BATS suite (`./scripts/k3d-manager test all`) + shellcheck — after Codex fix
+- [ ] Gemini Phase 3: Structured RT-1 through RT-6 audit (PASS/FAIL/N/A) — after Codex fix
+- [ ] Claude: Review report, commit, open PR
+- Task spec: `docs/plans/v0.6.2-gemini-task.md`
+- Implementation plan: `docs/plans/v0.6.2-ensure-copilot-cli.md`
 
 **v0.6.3 — Refactoring & External Audit Integration:**
 - [ ] Refactor `core.sh` and `system.sh` to eliminate "Defensive Bloat"
@@ -58,11 +63,17 @@ Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 - [ ] Extract `core.sh` and `system.sh` from `k3d-manager`
 - [ ] Implement bi-directional git subtree integration across project ecosystem
 
-**App Cluster Deployment:**
-- [ ] Spec-First: Ubuntu ESO Deployment Plan
+**v0.7.0 — Keycloak + App Cluster Deployment:**
+- [ ] Keycloak provider interface (Bitnami + Operator support)
 - [ ] ESO deploy on App cluster (Ubuntu)
 - [ ] shopping-cart-data (PostgreSQL, Redis, RabbitMQ) deployment on Ubuntu
 - [ ] shopping-cart-apps (basket, order, payment, catalog, frontend) deployment on Ubuntu
+
+**v0.8.0 — MCP Server (`k3dm-mcp`):**
+- [ ] Lean MCP server wrapping `k3d-manager` CLI
+- [ ] Target clients: Claude Desktop, OpenAI Codex, ChatGPT Atlas, Perplexity Comet
+- [ ] Expose core operations as MCP tools (deploy, destroy, test, unseal)
+- [ ] Sovereignty gating for destructive actions
 
 ---
 
