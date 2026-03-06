@@ -29,13 +29,20 @@
 
 ### Priority 1 — v0.6.3 (active)
 
-Plan: `docs/plans/v0.6.3-refactor-and-audit.md`
+Plans: `docs/plans/v0.6.3-refactor-and-audit.md`, `docs/plans/v0.6.3-codex-run-command-fix.md`
 
-- [ ] De-bloat `scripts/lib/system.sh` (split into focused modules)
-- [ ] De-bloat `scripts/lib/core.sh` (extract cluster lifecycle helpers)
-- [ ] Implement `_agent_audit` (test-weakening detection)
-- [ ] Integrate `rigor-cli` for external architectural linting
-- [ ] BATS suite: `scripts/tests/lib/agent_rigor.bats`
+**Who does what:**
+- **Codex**: all production code changes (system.sh, core.sh, agent_rigor.sh)
+- **Gemini**: BATS suite for agent_rigor.bats; verify full suite locally after Codex delivers
+- **Claude**: review diffs, run BATS locally, commit, open PR
+
+- [ ] Remove `auto_interactive` TTY-detection from `_run_command` (Codex — task: `docs/plans/v0.6.3-codex-run-command-fix.md`)
+- [ ] Audit `--prefer-sudo` call sites for implicit interactive-sudo dependency (Codex — same task)
+- [ ] De-bloat `scripts/lib/core.sh` — collapse permission cascade anti-patterns (Codex)
+- [ ] De-bloat `scripts/lib/system.sh` — add `_detect_platform` helper, consolidate OS dispatch (Codex)
+- [ ] Implement `_agent_lint` in `scripts/lib/agent_rigor.sh` (Codex)
+- [ ] BATS suite: `scripts/tests/lib/agent_rigor.bats` (Gemini)
+- [ ] Claude: full BATS run locally, review, commit, PR
 
 ### Priority 2 — v0.6.4
 

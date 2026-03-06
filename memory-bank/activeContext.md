@@ -11,13 +11,16 @@
 
 **v0.6.3: Refactoring & External Audit Integration**
 
-Plan: `docs/plans/v0.6.3-refactor-and-audit.md`
+Plans:
+- `docs/plans/v0.6.3-refactor-and-audit.md` — main refactor plan
+- `docs/plans/v0.6.3-codex-run-command-fix.md` — active Codex task (see below)
 
 Key objectives:
-1. De-bloat `system.sh` and `core.sh` (split oversized files, remove dead code)
-2. Implement `_agent_audit` (test-weakening detection)
-3. Integrate `rigor-cli` for external architectural linting
-4. BATS suite: `scripts/tests/lib/agent_rigor.bats`
+1. **Fix `_run_command` TTY flakiness** — remove `auto_interactive` block (Codex)
+2. De-bloat `system.sh` and `core.sh` — remove permission cascade anti-patterns (Codex)
+3. Implement `_agent_lint` in `agent_rigor.sh` — digital auditor via copilot-cli (Codex)
+4. BATS suite: `scripts/tests/lib/agent_rigor.bats` (Gemini)
+5. Claude: review all diffs, run full BATS suite locally, commit, open PR
 
 ---
 
