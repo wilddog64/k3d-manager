@@ -23,7 +23,7 @@ Codex fix cycle complete (2026-03-06). Gemini Phase 2 and Phase 3 are the active
 6. ✅ **Codex RT fix cycle** — RT-2 + RT-4 resolved (`docs/plans/v0.6.2-codex-rt-fix-task.md`)
 7. ✅ **Claude** — PR #19 opened, CI green, GitGuardian clean
 8. ✅ **Codex P1 fix cycle** — rc capture, empty PATH, sticky bit (`docs/plans/v0.6.2-codex-copilot-review-task.md`)
-9. ⏳ **Codex re-review fix cycle** — 7 fixes A–I; only Fix B delivered so far — task: `docs/plans/v0.6.2-codex-copilot-review2-task.md`
+9. ✅ **Codex re-review fix cycle** — fixes A–I implemented (see `docs/plans/v0.6.2-codex-copilot-review2-task.md`)
 10. ⏳ **Gemini** — BATS suite for `_safe_path`/`_is_world_writable_dir` — task: `docs/plans/v0.6.2-gemini-safe-path-tests.md`
 11. ⏳ **Claude** — final review, merge PR
 
