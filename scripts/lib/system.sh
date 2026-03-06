@@ -50,13 +50,6 @@ function _run_command() {
   local quiet=0 prefer_sudo=0 require_sudo=0 interactive_sudo=0 probe= soft=0
   local -a probe_args=()
 
-  # Auto-detect interactive mode: use interactive sudo if in a TTY and not explicitly disabled
-  # Can be overridden with K3DMGR_NONINTERACTIVE=1 environment variable
-  local auto_interactive=0
-  if [[ -t 0 ]] && [[ "${K3DMGR_NONINTERACTIVE:-0}" != "1" ]]; then
-    auto_interactive=1
-  fi
-
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --no-exit|--soft) soft=1; shift;;
@@ -69,11 +62,6 @@ function _run_command() {
       *)              break;;
     esac
   done
-
-  # If --prefer-sudo is set and we're in auto-interactive mode, enable interactive sudo
-  if (( prefer_sudo )) && (( auto_interactive )) && (( interactive_sudo == 0 )); then
-    interactive_sudo=1
-  fi
 
   local prog="${1:?usage: _run_command [opts] -- <prog> [args...]}"
   shift
