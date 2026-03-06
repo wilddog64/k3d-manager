@@ -17,10 +17,43 @@ Plans:
 
 Key objectives:
 1. **Fix `_run_command` TTY flakiness** — remove `auto_interactive` block (Codex) ✅ done 2026-03-06
-2. De-bloat `system.sh` and `core.sh` — remove permission cascade anti-patterns (Codex)
-3. Implement `_agent_lint` in `agent_rigor.sh` — digital auditor via copilot-cli (Codex)
-4. BATS suite: `scripts/tests/lib/agent_rigor.bats` (Gemini)
-5. Claude: review all diffs, run full BATS suite locally, commit, open PR
+2. **Phase 1 Verification** — BATS 125/125 PASS, E2E Cluster rebuild success (Gemini) ✅ done 2026-03-06
+3. De-bloat `system.sh` and `core.sh` — remove permission cascade anti-patterns (Codex)
+4. Implement `_agent_lint` in `agent_rigor.sh` — digital auditor via copilot-cli (Codex)
+5. BATS suite: `scripts/tests/lib/agent_rigor.bats` (Gemini) ✅ done 2026-03-06
+6. Claude: review all diffs, run full BATS suite locally, commit, open PR
+
+---
+
+## Gemini Pending Actions (must complete before Claude commits)
+
+Three gaps identified by Claude review of Phase 1 verification. Fix all three and
+report results. Do not commit. Do not modify memory-bank.
+
+**Action 1 — Confirm run_command.bats tests 1 and 2 pass locally**
+
+Run:
+```bash
+bats scripts/tests/lib/run_command.bats --tap
+```
+
+Report the full TAP output. Tests 1 (`--prefer-sudo uses sudo when available`) and
+2 (`--prefer-sudo falls back when sudo unavailable`) must show `ok`.
+
+**Action 2 — Report smoke test results individually**
+
+Run each and report PASS/FAIL explicitly:
+```bash
+./scripts/k3d-manager test_vault
+./scripts/k3d-manager test_eso
+./scripts/k3d-manager test_istio
+```
+
+**Action 3 — Confirm agent_rigor.bats working tree change is complete**
+
+The improved `command()` stub fix is in the working tree but not committed.
+Verify `git diff scripts/tests/lib/agent_rigor.bats` shows only the stub
+improvement (no other changes). Report the diff output. Claude will commit it.
 
 ---
 
