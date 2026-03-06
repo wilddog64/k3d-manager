@@ -1,28 +1,38 @@
 # Active Context – k3d-manager
 
-## Current Branch: `feature/app-cluster-deploy` (as of 2026-03-01)
+## Current Branch: `k3d-manager-v0.6.2` (as of 2026-03-06)
 
-**v0.5.0 merged** — Keycloak plugin complete + ARM64 image fix. Infra cluster fully deployed.
 **v0.6.1 merged** — infra rebuild bug fixes integrated.
-**v0.6.2 in progress** — adoption of High-Rigor Engineering Protocol for App Cluster deployment.
+**v0.6.2 in progress** — Copilot CLI integration + security hardening.
 
 ---
 
 ## Current Focus
 
-**v0.6.2: AI Tooling & Safety Protocol**
+**v0.6.2: Codex Fix Cycle → Gemini Phase 2 + 3**
 
-- [ ] **Checkpoint**: Commit current healthy state of `k3d-manager-v0.6.2`.
-- [ ] **Spec-First**: Refine discovery logic for Node.js (Universal Brew + Distro footprints).
-- [ ] **Protocol Implementation**: Add `_agent_checkpoint` to `scripts/lib/agent_rigor.sh`.
-- [ ] **Cleanup**: Remove deprecated Colima provider support (standardizing on OrbStack for macOS).
-- [ ] **Tool Implementation**: Add `_ensure_node`, `_ensure_copilot_cli`, and a minimal `_k3d_manager_copilot` (passthrough wrapper) to `system.sh`.
-    - *Note*: Functions must use generic parameters (strictly following Pattern #13) to ensure v0.6.4 portability.
-- [ ] **Verification**: Multi-layered testing of AI integration:
-    - **Tier 1 (BATS)**: Stubbed unit tests for gating and minimal wrapper logic.
-    - **Tier 2 (Smoke)**: Real-world authentication and query validation (opt-in).
-    - **Tier 3 (Red-Team)**: Audit for PATH-poisoning vulnerabilities and memory-bank injection risks.
-- [ ] **Final Loop**: Shellcheck + Bats verification.
+Codex implementation complete (2026-03-06). Gemini Phase 1 audit complete with 4 findings.
+Codex fix cycle complete (2026-03-06). Gemini Phase 2 and Phase 3 are the active gate.
+
+**Active sequence:**
+1. ✅ Codex implementation (Batches 1–4)
+2. ✅ Gemini Phase 1 — audit findings filed: `docs/issues/2026-03-06-v0.6.2-sdet-audit-findings.md`
+3. ✅ **Codex fix cycle** — 4 Gemini findings resolved (task: `docs/plans/v0.6.2-codex-fix-task.md`)
+4. ⏳ **Gemini Phase 2** — full BATS suite (`./scripts/k3d-manager test all`) + shellcheck report
+5. ⏳ **Gemini Phase 3** — structured RT-1 through RT-6 audit (PASS/FAIL/N/A per check)
+6. ⏳ **Claude** — review report, commit, open PR
+
+**Phase 2 definition:** Run `shellcheck scripts/lib/system.sh scripts/etc/ldap/ldap-password-rotator.sh`
+and `./scripts/k3d-manager test all`. Report total/pass/fail counts. Confirm no regressions.
+**Codex status:** local shellcheck + targeted BATS suites completed; full `test all` pending Gemini.
+
+**Phase 3 definition:** Structured security audit — one PASS/FAIL/N/A with justification per check:
+- RT-1: PATH poisoning (`_safe_path` with world-writable + relative path + sticky bit)
+- RT-2: Secret exposure in process listing (`ldap-password-rotator.sh` stdin fix)
+- RT-3: Trace isolation for copilot CLI (`_run_command` + `_args_have_sensitive_flag`)
+- RT-4: Deny-tool guardrails completeness + placement
+- RT-5: AI gating bypass (`K3DM_ENABLE_AI` check + no direct copilot calls)
+- RT-6: Prompt injection surface (no credentials passed to copilot)
 
 ---
 
@@ -71,11 +81,9 @@
 | v0.6.2 | active | AI Tooling (`copilot-cli`) + Checkpointing Protocol |
 | v0.6.3 | planned | Refactoring (De-bloat) + `rigor-cli` Integration |
 | v0.6.4 | planned | lib-foundation extraction via git subtree |
-| v0.7.0 | planned | Keycloak provider interface |
-| v0.8.0 | planned | Multi-Agent Orchestration Foundation (MCP) |
-| v0.9.0 | planned | Autonomous SRE (Active Monitoring & Self-Healing) |
-| v0.10.0 | planned | Autonomous Fleet Provisioning (Deploy 100 K3s Nodes) |
-| v1.0.0 | vision | Final release; see `docs/plans/roadmap-v1.md` |
+| v0.7.0 | planned | Keycloak provider + App Cluster deployment |
+| v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) for Claude Desktop / Codex / Atlas / Comet |
+| v1.0.0 | vision | Reassess after v0.7.0; see `docs/plans/roadmap-v1.md` |
 
 ---
 
@@ -86,9 +94,12 @@
 - [ ] shopping-cart-data / apps deployment on Ubuntu (Gemini — SSH)
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
 - [ ] `scripts/tests/plugins/jenkins.bats` — backlog
-- [ ] v0.6.2: `_ensure_node` + `_ensure_copilot_cli` — plan: `docs/plans/v0.6.2-ensure-copilot-cli.md`
-- [ ] v0.7.0: Keycloak provider interface — plan: `docs/plans/v0.7.0-keycloak-provider-interface.md` (pending)
+- [x] v0.6.2: `_ensure_node` + `_ensure_copilot_cli` — implemented by Codex (2026-03-06)
+- [x] v0.6.2: SDET/Red-Team audit findings (RT-1, RT-2, RT-3) — see `docs/issues/2026-03-06-v0.6.2-sdet-audit-findings.md`
+- [ ] v0.6.2: Gemini Phase 2 & 3 (Verification + Red-Team Audit)
+- [ ] v0.7.0: Keycloak provider interface + App Cluster deployment (ESO, shopping-cart stack)
 - [ ] v0.7.0: rename cluster to `infra` + fix `CLUSTER_NAME` env var
+- [ ] v0.8.0: `k3dm-mcp` — lean MCP server for Claude Desktop, Codex, Atlas, Comet
 
 ---
 
