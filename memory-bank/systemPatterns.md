@@ -19,7 +19,7 @@ Three environment variables select the active implementation at runtime:
 
 Consumer code calls a generic interface function; the abstraction layer dispatches to the
 provider-specific implementation. Adding a new provider requires a single new file — no
-changes to consumers. This is the Bash equivalent of the Strategy OOP pattern.
+changes to consumers.
 
 ## 3) Provider Interface Contracts
 
@@ -62,9 +62,8 @@ Vault (K8s auth enabled)
                  └─► Service Pod (mounts secret as env or volume)
 ```
 
-Each service plugin is responsible for creating its own ExternalSecret resources.
-Vault policies are created by the `deploy_vault` step and must allow each service's
-service account to read its secrets path.
+Each service plugin creates its own ExternalSecret resources.
+Vault policies must allow each service's service account to read its secrets path.
 
 ## 5) Jenkins Certificate Rotation Pattern
 
@@ -80,10 +79,6 @@ deploy_jenkins
                  └─► Rolling restart of Jenkins pods
 ```
 
-Cert rotation has been validated via short-TTL/manual-job workflows (see
-`docs/issues/2025-11-21-cert-rotation-fixes.md` and cert rotation test result docs).
-The remaining gap is improving/validating dispatcher-driven cert-rotation test UX.
-
 ## 6) Jenkins Deployment Modes
 
 | Command | Status | Notes |
@@ -93,7 +88,6 @@ The remaining gap is improving/validating dispatcher-driven cert-rotation test U
 | `deploy_jenkins --enable-vault --enable-ldap` | WORKING | + OpenLDAP standard schema |
 | `deploy_jenkins --enable-vault --enable-ad` | WORKING | + OpenLDAP with AD schema |
 | `deploy_jenkins --enable-vault --enable-ad-prod` | WORKING* | + real AD (requires `AD_DOMAIN`) |
-| `deploy_jenkins --enable-ldap` (no vault) | **BROKEN** | LDAP requires Vault for secrets |
 
 ## 7) JCasC Authorization Format
 
@@ -108,19 +102,14 @@ authorizationStrategy:
       - "Overall/Administer:group:Jenkins Admins"
 ```
 
-Do NOT use the nested `entries:` format — it causes silent parsing failures with
-the matrix-auth plugin.
+Do NOT use the nested `entries:` format — causes silent parsing failures.
 
 ## 8) Active Directory Integration Pattern
 
 - AD is always an **external service** (never deployed in-cluster).
-- `_dirservice_activedirectory_init` validates connectivity (DNS + LDAP port probe);
-  it does not deploy anything.
-- **Local testing path**: use `deploy_ad` to stand up OpenLDAP with
-  `bootstrap-ad-schema.ldif` (AD-compatible DNs, sAMAccountName attrs). Test users:
-  `alice` (admin), `bob` (developer), `charlie` (read-only). All password: `password`.
-- **Production path**: set `AD_DOMAIN`, use `--enable-ad-prod`. `TOKENGROUPS`
-  strategy is faster for real AD nested group resolution.
+- `_dirservice_activedirectory_init` validates connectivity (DNS + LDAP port probe).
+- **Local testing path**: `deploy_ad` — OpenLDAP with `bootstrap-ad-schema.ldif`. Test users: `alice` (admin), `bob` (developer), `charlie` (read-only). All password: `password`.
+- **Production path**: set `AD_DOMAIN`, use `--enable-ad-prod`. `TOKENGROUPS` strategy is faster for nested group resolution.
 - `AD_TEST_MODE=1` bypasses connectivity checks for unit testing.
 
 ## 9) `_run_command` Privilege Escalation Pattern
@@ -139,7 +128,7 @@ automatically disables `ENABLE_TRACE` for that command.
 
 ## 10) Idempotency Mandate
 
-Every public function must be safe to run more than once. Implement checks like:
+Every public function must be safe to run more than once:
 - "resource already exists" → skip, not error.
 - "helm release already deployed" → upgrade, not re-install.
 - "Vault already initialized" → skip init, read existing unseal keys.
@@ -147,36 +136,36 @@ Every public function must be safe to run more than once. Implement checks like:
 ## 11) Cross-Agent Documentation Pattern
 
 `memory-bank/` is the collaboration substrate across AI agent sessions.
-- `projectbrief.md` – immutable project scope and goals.
-- `techContext.md` – technologies, paths, key files.
-- `systemPatterns.md` – architecture and design decisions.
-- `activeContext.md` – current work, open blockers, decisions in flight.
-- `progress.md` – done / pending tracker; must be updated at session end.
+- `projectbrief.md` — immutable project scope and goals.
+- `techContext.md` — technologies, paths, key files.
+- `systemPatterns.md` — architecture and design decisions.
+- `activeContext.md` — current branch, open items, decisions in flight.
+- `progress.md` — done / pending tracker; update at session end.
 
 `activeContext.md` must capture **what changed AND why decisions were made**.
-`progress.md` must maintain pending TODOs to prevent session-handoff loss.
 
-## 12) Test Strategy Pattern (Post-Overhaul)
+## 12) Test Strategy Pattern
 
 - Avoid mock-heavy orchestration tests that assert internal call sequences.
-- Keep BATS for pure logic (deterministic, offline checks).
+- Keep BATS for pure logic (deterministic, offline, no cluster required).
 - Use live-cluster E2E smoke tests for integration confidence.
-
-Smoke entrypoint:
 
 ```bash
 ./scripts/k3d-manager test smoke
 ./scripts/k3d-manager test smoke jenkins
 ```
 
-Implemented in `scripts/lib/help/utils.sh`; runs available scripts in `bin/` and skips
-missing/non-executable ones.
+## 13) Red-Team Defensive Patterns
 
-## 14) Red-Team Defensive Patterns
+- **PATH Sanitization**: `_safe_path` validates `PATH` before any copilot/agent invocation. Rejects world-writable dirs (sticky-bit is NOT an exemption) and relative/empty entries. Uses glob-safe `IFS=':' read -r -a` array split.
+- **Secret Injection via stdin**: Token + payload piped into pod's bash via stdin; extracted with `while IFS="=" read -r key value` loop. Token never appears in `kubectl exec` args or `/proc/*/cmdline`.
+- **Prompt Guard**: `_copilot_prompt_guard` checks 8 forbidden shell fragments before any copilot invocation.
+- **Trace Isolation**: `ENABLE_TRACE`/`DEBUG` auto-disabled by `_args_have_sensitive_flag` for commands with `--password`, `--token`, `--username`.
+- **AI Gate**: `K3DM_ENABLE_AI=1` must be explicitly set; all copilot invocations route through `_k3d_manager_copilot`.
 
-To mitigate the risk of sophisticated side-channel and environment attacks:
+## 14) Agent Rigor Protocol
 
-- **PATH Sanitization**: Sensitive operations (Vault unseal, credential retrieval) must either use absolute binary paths or explicitly validate the environment's `PATH` integrity before execution.
-- **Context Integrity Guard**: The `memory-bank/` and `docs/plans/` directories are treated as "Instruction Code." Any changes must be audited by a human to prevent "Context Injection" (poisoning the agent's instructions).
-- **Safe Secret Injection**: Favor `stdin` (piping) over command-line arguments for all secret-heavy operations to prevent `/proc` sniffing.
-- **Trace Isolation**: Ensure `ENABLE_TRACE` and `DEBUG` modes are strictly gated by `_args_have_sensitive_flag` across all library functions.
+`scripts/lib/agent_rigor.sh` — requires `system.sh` sourced first (dependency guard via `declare -f _err`).
+
+- `_agent_checkpoint` — commits the current working state with a spec-derived message before any surgical operation. Prevents partial-fix loss.
+- Pattern: spec → checkpoint → implement → verify → Claude review → commit.
