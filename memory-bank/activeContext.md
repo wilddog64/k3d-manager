@@ -21,6 +21,7 @@
 - [ ] **Verification**: Multi-layered testing of AI integration:
     - **Tier 1 (BATS)**: Stubbed unit tests for gating and minimal wrapper logic.
     - **Tier 2 (Smoke)**: Real-world authentication and query validation (opt-in).
+    - **Tier 3 (Red-Team)**: Audit for PATH-poisoning vulnerabilities and memory-bank injection risks.
 - [ ] **Final Loop**: Shellcheck + Bats verification.
 
 ---
