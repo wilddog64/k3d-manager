@@ -1144,11 +1144,11 @@ function _safe_path() {
    IFS=':'
    for entry in $PATH; do
       if [[ -z "$entry" || "$entry" != /* ]]; then
-         unsafe+=("${entry:-<empty>} (relative path)")
+         unsafe+=("${entry:-<empty>} (relative path entry)")
          continue
       fi
       if _is_world_writable_dir "$entry"; then
-         unsafe+=("$entry")
+         unsafe+=("$entry (world-writable)")
       fi
    done
    IFS="$old_ifs"
