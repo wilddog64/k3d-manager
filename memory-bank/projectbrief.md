@@ -35,14 +35,13 @@ Each component exists because of a real gap, reasoned through sequentially — n
 
 - **Jenkins** → needed a CI/CD target that mirrors enterprise reality
 - **Credentials problem** → Jenkins needs passwords; where to store them safely?
-  - Tried **BitWarden** first (already used personally) — `eso_config_bitwarden` was actually implemented
-  - Considered **LastPass** (used at work via `lastpass-cli`) — not suitable for automation
+  - Tried **BitWarden** first — `eso_config_bitwarden` was actually implemented
   - Landed on **Vault** — proper secret store for programmatic access
 - **ESO** → Vault doesn't inject secrets into pods natively; ESO bridges Vault → Kubernetes secrets
 - **Istio** → needed real service mesh to validate enterprise-like networking locally
 - **LDAP/AD** → enterprises authenticate against directory services; needed local testing without a real AD
 
-The `SECRET_BACKEND` abstraction exists because backends were *actually swapped* during development — the commit history shows BitWarden and Azure ESO plugins built before Vault became the primary backend. Git log is the lab notebook.
+The `SECRET_BACKEND` abstraction exists because backends were *actually swapped* during development.
 
 ## Primary Users
 
@@ -60,19 +59,17 @@ k3d-manager/
 │   ├── etc/                 ← config templates & var files
 │   └── tests/               ← Bats test suites
 ├── docs/
-│   ├── plans/               ← design docs (interfaces, integration plans, priorities)
-│   ├── tests/               ← test plans (cert rotation, AD testing instructions)
+│   ├── plans/               ← design docs and task specs
+│   ├── tests/               ← test plans and results
 │   └── issues/              ← post-mortems and resolved bugs
-├── bin/                     ← standalone helper scripts (smoke-test-jenkins.sh)
+├── bin/                     ← standalone helper scripts
 ├── memory-bank/             ← cross-agent documentation substrate
-├── CLAUDE.md                ← authoritative dev guide and current WIP
-├── .clinerules              ← agent rules derived from docs/ (2026-02-19)
+├── CLAUDE.md                ← authoritative dev guide
 └── scratch/                 ← test logs and temp artifacts (gitignored)
 ```
 
 ## Branch Strategy
 
-- `main` – stable, merged state.
-- `ldap-develop` – **active development branch** for AD integration and cert rotation.
-- `ldap-develop` merges to `main` after Priority 1 (cert rotation) + Priority 2 (E2E AD
-  testing) complete and all Bats tests pass.
+- `main` — stable, released state. Protected; owner merges via PR.
+- `k3d-manager-v<X.Y.Z>` — feature branch per milestone; PR back to `main` on completion.
+- Tags: `v<X.Y.Z>` annotated tag on the branch tip commit before merge.
