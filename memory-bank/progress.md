@@ -49,7 +49,7 @@ Deployed live to infra cluster. ArgoCD running in `cicd` ns.
 - [x] Gemini Phase 2: Full BATS suite pass + shellcheck (Findings: 115/115 pass with K3DMGR_NONINTERACTIVE=1, shellcheck issues at system.sh:149)
 - [x] Gemini Phase 3: Structured RT-1 through RT-6 audit (Findings: RT-2 FAIL, RT-4 FAIL, RT-3 PARTIAL PASS)
 - [x] Codex RT fix cycle: RT-2 (vault stdin injection) + RT-4 (deny-tool completeness) — task: `docs/plans/v0.6.2-codex-rt-fix-task.md`
-- [ ] Codex Copilot fix cycle: rc propagation, empty PATH, sticky bit — task: `docs/plans/v0.6.2-codex-copilot-review-task.md`
+- [x] Codex Copilot fix cycle: rc propagation, empty PATH, sticky bit — task: `docs/plans/v0.6.2-codex-copilot-review-task.md`
 - [ ] Claude: Review, commit, open PR
 - Task spec: `docs/plans/v0.6.2-gemini-task.md`
 - Implementation plan: `docs/plans/v0.6.2-ensure-copilot-cli.md`
