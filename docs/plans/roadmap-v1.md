@@ -30,19 +30,15 @@ Transform `k3d-manager` from a collection of Bash utility scripts into a self-or
   - Use `copilot-cli` to autonomously scaffold new plugins and BATS test suites.
   - Standardize "Template Specs" that can be fed directly to AI for consistent code generation.
 
-## v0.8.0 — The Multi-Agent Orchestration Foundation
-*Focus: AI as a Teammate (MCP & Orchestration)*
+## v0.8.0 — The Agentic Interface (MCP Phase)
+*Focus: AI as a Teammate (The MCP Bridge)*
 
-- **Minor Version Change:** Significant expansion of CLI capability via Model Context Protocol (MCP) and agent routing.
+- **Minor Version Change:** Introduction of a discrete interface layer for external AI agents.
 - **Key Features:**
-  - **The MCP Server:** Transform `k3d-manager` into an MCP-compatible server. This allows external agents (Claude, GPT, specialized swarms) to invoke `k3d-manager` functions as "Verified Tools."
-  - **The Orchestrator:** Introduce a top-level `intent` command that parses high-level goals into multi-agent task graphs.
-  - **Role-Based Delegation (The "Crew"):**
-    - **Architect Agent:** Uses MCP to map dependencies and audit cluster state (K8s-native discovery).
-    - **Security Agent:** Specialized in Vault PKI, ESO role lifecycle, and credential auditing.
-    - **SRE Agent:** Monitors "Golden Signals" and health checks via MCP tool calls.
-    - **Test Agent:** Orchestrates BATS suites and validates logic integrity.
-  - **Context Sharing:** Establish a shared "Agentic Memory" (leveraging the Memory Bank) to persist reasoning across agent handoffs.
+  - **k3dm-mcp (Discrete Repository):** Build a standalone Model Context Protocol (MCP) server that acts as a secure translator between external agents (Claude, GPT) and the `k3d-manager` CLI.
+  - **The Tool Bridge:** Expose core `k3d-manager` operations (deploy, unseal, health-check) as "Verified Tools" within the MCP spec.
+  - **Sovereignty Gating:** The MCP server enforces human-in-the-loop (HITL) approval for all destructive actions before they reach the cluster.
+  - **Multi-Repo Orchestration:** Use the MCP bridge to coordinate tasks across the entire ecosystem (`k3d-manager`, `shopping-carts`, `rigor-cli`).
 
 ## v0.9.0 — The Autonomous SRE (Operator Phase)
 *Focus: AI as an Operator (Active Monitoring & Self-Healing)*
