@@ -2,14 +2,14 @@
 
 ## Overall Status
 
-**v0.6.3 SHIPPED** — tag `v0.6.3` pushed, PR #21 merged 2026-03-07.
-**v0.6.4 ACTIVE** — branch `k3d-manager-v0.6.4` cut from main 2026-03-07.
+**v0.6.4 SHIPPED** — tag `v0.6.4` pushed, PR #22 merged 2026-03-07.
+**v0.6.5 ACTIVE** — branch `k3d-manager-v0.6.5` cut from main 2026-03-07.
 
 ---
 
 ## What Is Complete
 
-### Released (v0.1.0 – v0.6.3)
+### Released (v0.1.0 – v0.6.4)
 
 - [x] k3d/OrbStack/k3s cluster provider abstraction
 - [x] Vault PKI, ESO, Istio, Jenkins, OpenLDAP, ArgoCD, Keycloak (infra cluster)
@@ -21,33 +21,34 @@
 - [x] `_k3d_manager_copilot` scoped wrapper (8-fragment deny list, `K3DM_ENABLE_AI` gate)
 - [x] `_safe_path` / `_is_world_writable_dir` PATH poisoning defense
 - [x] VAULT_TOKEN stdin injection in `ldap-password-rotator.sh`
-- [x] Permission cascade elimination in `core.sh` — single `_run_command --prefer-sudo`
-- [x] `_detect_platform` — single source of truth for OS detection in `system.sh`
-- [x] `_run_command` TTY flakiness fix — `auto_interactive` block removed
-- [x] `.github/copilot-instructions.md` — shaped Copilot PR reviews
-- [x] BATS suites: 124/124 passing
+- [x] Permission cascade elimination in `core.sh`
+- [x] `_detect_platform` — single source of truth for OS detection
+- [x] `_run_command` TTY flakiness fix
+- [x] Linux k3s gate — 5-phase teardown/rebuild on Ubuntu 24.04 VM
+- [x] BATS source install 404 fix — 1.10.0 → 1.13.0, archive URL
+- [x] `_agent_audit` hardening — bare sudo detection + kubectl exec credential scan
+- [x] Pre-commit hook — `_agent_audit` wired to every commit
+- [x] Provider contract BATS suite — 30 tests (3 providers × 10 functions)
+- [x] `_provider_orbstack_expose_ingress` missing function added
+- [x] Copilot P1/P2 fixes — `git diff --cached`, diff-based sudo scan, `\b` pattern
+- [x] BATS suite: 154/154 passing
 
 ---
 
 ## What Is Pending
 
-### Priority 1 — v0.6.4 (active)
+### Priority 1 — v0.6.5 (active)
 
-- [x] Linux k3s validation gate — Gemini full 5-phase teardown/rebuild on Ubuntu VM (124/124 BATS pass, Smoke tests PASS)
-- [x] Fix `_install_bats_from_source` default `1.10.0` → `1.11.0` + robust URL (Gemini)
-- [x] `_agent_audit` hardening — bare sudo detection + credential pattern check in `kubectl exec` args (Codex)
-- [x] Pre-commit hook — wire `_agent_audit` to `.git/hooks/pre-commit` (Codex)
-- [x] Contract BATS tests — provider interface enforcement (Gemini) (154/154 pass)
-- [x] Provider contract regression fix — export `SCRIPT_DIR` in BATS `setup()` and add `_provider_orbstack_expose_ingress` delegate (Codex, 30/30 provider_contract)
-- [ ] Create `lib-foundation` repository (owner action)
-- [ ] Extract `core.sh` and `system.sh` via git subtree (Codex)
+- [ ] BATS tests for `_agent_audit` new checks — bare sudo + kubectl exec (Gemini)
+- [ ] Create `lib-foundation` repository (owner)
+- [ ] Extract `core.sh` + `system.sh` via git subtree (Codex — blocked on above)
 
 ### Priority 2 — v0.7.0
 
-- [ ] ESO deploy on Ubuntu app cluster (SSH)
+- [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data (PostgreSQL, Redis, RabbitMQ) on Ubuntu
 - [ ] shopping-cart-apps (basket, order, payment, catalog, frontend) on Ubuntu
-- [ ] Rename infra cluster to `infra`; fix `CLUSTER_NAME` env var
+- [ ] `CLUSTER_NAME` env var respected during `deploy_cluster`
 - [ ] Keycloak provider interface
 
 ### Priority 3 — v0.8.0
@@ -62,7 +63,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| GitGuardian: 1 internal secret incident (2026-02-28) | OPEN | False positive — IPs in docs. Mark in dashboard. |
+| GitGuardian: 1 internal secret incident (2026-02-28) | OPEN | False positive — mark in dashboard. |
 | `CLUSTER_NAME` env var ignored during `deploy_cluster` | OPEN | See `docs/issues/2026-03-01-cluster-name-env-var-not-respected.md`. |
 | `deploy_jenkins` (no flags) broken | OPEN | Use `--enable-vault` as workaround. |
 | No `scripts/tests/plugins/jenkins.bats` suite | BACKLOG | Future work. |
