@@ -13,7 +13,7 @@
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | BATS tests for `_agent_audit` bare sudo + kubectl exec credential scan | Gemini | **active** — spec: `docs/plans/v0.6.5-gemini-agent-audit-bats.md` |
+| 1 | BATS tests for `_agent_audit` bare sudo + kubectl exec credential scan | Gemini | ✅ done — 4 tests, suite 9/9, total 158/158 |
 | 2 | Create `lib-foundation` repository + branch protection + CI | Owner | ✅ done — https://github.com/wilddog64/lib-foundation |
 | 3 | Extract `core.sh` + `system.sh` into lib-foundation | Codex | ✅ done — shellcheck fixed, PR #1 open on lib-foundation, CI green |
 | 4 | Replace awk if-count check with pure bash in `_agent_audit` | Codex | ✅ done — spec: `docs/plans/v0.6.5-codex-awk-bash-rewrite.md` |
@@ -90,40 +90,17 @@ Claude → memory-bank   (instruct: corrections + next task spec)
 Agent reads + acts
 ```
 
-### Completion Report — Codex Task 4 (2026-03-07)
+### Completion Reports (2026-03-07)
 
-```
-Task: awk → pure bash rewrite in _agent_audit
-Status: COMPLETE — commit 6b14539
-Files changed: scripts/lib/agent_rigor.sh (lines 112–132 only)
-Shellcheck: PASS (Claude verified)
-Pre-commit: PASS (no awk error)
-BATS agent_rigor: 5/5 passing (Codex reported — Gemini to re-verify)
-Unexpected findings: none
-```
+**Codex Task 4 — awk → pure bash rewrite in `_agent_audit`:**
+- commit `6b14539` — `agent_rigor.sh` lines 112–132 only
+- shellcheck PASS (Claude verified), no bash 4.0+ features
+- BATS agent_rigor: 5/5 (Codex) → re-verified 9/9 by Gemini
 
----
-
-## Gemini — Active Task
-
-**Task 1: Add BATS tests for `_agent_audit` bare sudo + kubectl exec credential scan**
-
-Spec: `docs/plans/v0.6.5-gemini-agent-audit-bats.md`
-
-Summary:
-- Add 4 new `@test` blocks to `scripts/tests/lib/agent_rigor.bats` after line 97
-- Do NOT modify any existing tests or any `.sh` file
-- Each test uses a real mini git repo in `$BATS_TEST_TMPDIR` — no stubbing `git diff`
-- Tests: bare sudo positive, `_run_command` negative, kubectl exec credential positive, clean diff negative
-- Expected total: 5 existing + 4 new = **9 tests passing**
-
-Verify with clean environment (required before reporting complete):
-```bash
-env -i HOME="$HOME" PATH="$PATH" \
-  ./scripts/k3d-manager test agent_rigor 2>&1 | tail -15
-```
-
-**Push to `origin/k3d-manager-v0.6.5` before updating memory-bank.**
+**Gemini Task 1 — BATS tests for bare sudo + kubectl exec credential scan:**
+- commit `5f04814` — `scripts/tests/lib/agent_rigor.bats` only
+- 4 tests added (ok 6–9), real git repo per test, no git stubs
+- Total suite: 9/9 agent_rigor, 158/158 full BATS (clean env, Ubuntu VM)
 
 **Lessons learned:**
 - Gemini may write stale memory-bank content — Claude reviews every update before writing next task.
