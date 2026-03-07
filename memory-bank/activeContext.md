@@ -1,22 +1,19 @@
 # Active Context – k3d-manager
 
-## Current Branch: `k3d-manager-v0.6.5` (as of 2026-03-07)
+## Current Branch: `k3d-manager-v0.7.0` (as of 2026-03-07)
 
-**v0.6.4 SHIPPED** — tag `v0.6.4` pushed, PR #22 merged. See CHANGE.md.
-**v0.6.5 active** — branch cut from `main`.
+**v0.6.5 SHIPPED** — tag `v0.6.5` pushed, PR #23 merged. See CHANGE.md.
+**v0.7.0 active** — branch cut from `main`.
 
 ---
 
 ## Current Focus
 
-**v0.6.5: BATS audit test coverage + lib-foundation extraction**
+**v0.7.0: Keycloak provider + App Cluster deployment**
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | BATS tests for `_agent_audit` bare sudo + kubectl exec credential scan | Gemini | ✅ done — 4 tests, suite 9/9, total 158/158 |
-| 2 | Create `lib-foundation` repository + branch protection + CI | Owner | ✅ done — https://github.com/wilddog64/lib-foundation |
-| 3 | Extract `core.sh` + `system.sh` into lib-foundation | Codex | ✅ done — shellcheck fixed, PR #1 open on lib-foundation, CI green |
-| 4 | Replace awk if-count check with pure bash in `_agent_audit` | Codex | ✅ done — spec: `docs/plans/v0.6.5-codex-awk-bash-rewrite.md` |
+| — | TBD — awaiting owner direction | — | pending |
 
 ---
 
@@ -37,6 +34,7 @@ Claude
   -- reviews all agent memory-bank writes before writing next task
   -- opens PR on owner go-ahead; routes PR issues back to agents by scope
   -- writes corrective/instructional content to memory-bank
+  -- tags Copilot for code review before every PR
 
 Gemini  (SDET + Red Team)
   -- authors BATS unit tests and test_* integration tests
@@ -90,24 +88,13 @@ Claude → memory-bank   (instruct: corrections + next task spec)
 Agent reads + acts
 ```
 
-### Completion Reports (2026-03-07)
-
-**Codex Task 4 — awk → pure bash rewrite in `_agent_audit`:**
-- commit `6b14539` — `agent_rigor.sh` lines 112–132 only
-- shellcheck PASS (Claude verified), no bash 4.0+ features
-- BATS agent_rigor: 5/5 (Codex) → re-verified 9/9 by Gemini
-
-**Gemini Task 1 — BATS tests for bare sudo + kubectl exec credential scan:**
-- commit `5f04814` — `scripts/tests/lib/agent_rigor.bats` only
-- 4 tests added (ok 6–9), real git repo per test, no git stubs
-- Total suite: 9/9 agent_rigor, 158/158 full BATS (clean env, Ubuntu VM)
-
 **Lessons learned:**
 - Gemini may write stale memory-bank content — Claude reviews every update before writing next task.
 - Gemini expands scope beyond task spec — spec must explicitly state what is forbidden.
 - Gemini ran `git rebase -i` on a shared branch — destructive git ops explicitly forbidden.
 - Gemini over-reports test success with ambient env vars — always verify with `env -i` clean environment.
 - PR sub-branches from Copilot agent may conflict — evaluate and close if our implementation is superior.
+- Claude owns Copilot PR review fixes directly — no need to route small surgical fixes through agents.
 
 ---
 
@@ -142,9 +129,8 @@ Agent reads + acts
 
 | Version | Status | Notes |
 |---|---|---|
-| v0.1.0–v0.6.4 | released | See CHANGE.md |
-| v0.6.5 | **active** | BATS audit coverage + lib-foundation extraction |
-| v0.7.0 | planned | Keycloak provider + App Cluster deployment |
+| v0.1.0–v0.6.5 | released | See CHANGE.md |
+| v0.7.0 | **active** | Keycloak provider + App Cluster deployment |
 | v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) |
 | v1.0.0 | vision | Reassess after v0.7.0 |
 
@@ -152,15 +138,13 @@ Agent reads + acts
 
 ## Open Items
 
-- [x] BATS tests for `_agent_audit` new checks (v0.6.5 — Gemini) — ✅ done
-- [x] Create `lib-foundation` repository (owner) — ✅ done
-- [x] Extract `core.sh` + `system.sh` via git subtree (Codex) — ✅ done, PR #1 open on lib-foundation
 - [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data / apps deployment on Ubuntu
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner)
 - [ ] `CLUSTER_NAME` env var not respected during `deploy_cluster`
 - [ ] v0.7.0: Keycloak provider interface + App Cluster deployment
 - [ ] v0.8.0: `k3dm-mcp` lean MCP server
+- [ ] lib-foundation PR #1 merge → tag v0.1.0 (owner)
 
 ---
 
