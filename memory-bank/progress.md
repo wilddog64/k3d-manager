@@ -38,6 +38,7 @@
 - [x] `_agent_audit` hardening — bare sudo detection + credential pattern check in `kubectl exec` args (Codex)
 - [x] Pre-commit hook — wire `_agent_audit` to `.git/hooks/pre-commit` (Codex)
 - [x] Contract BATS tests — provider interface enforcement (Gemini) (154/154 pass)
+- [x] Provider contract regression fix — export `SCRIPT_DIR` in BATS `setup()` and add `_provider_orbstack_expose_ingress` delegate (Codex, 30/30 provider_contract)
 - [ ] Create `lib-foundation` repository (owner action)
 - [ ] Extract `core.sh` and `system.sh` via git subtree (Codex)
 
