@@ -13,7 +13,8 @@
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| — | TBD — awaiting owner direction | — | pending |
+| 1 | Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var | Codex | **active** — spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md` |
+| 2 | Implement `_resolve_script_dir` in lib-foundation | Codex | **active** — spec in lib-foundation memory-bank, branch `feature/v0.1.1-script-dir-resolver` |
 
 ---
 
