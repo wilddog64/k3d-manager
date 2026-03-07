@@ -1,43 +1,21 @@
 # Active Context – k3d-manager
 
-## Current Branch: `k3d-manager-v0.6.4` (as of 2026-03-07)
+## Current Branch: `k3d-manager-v0.6.5` (as of 2026-03-07)
 
-**v0.6.3 SHIPPED** — tag `v0.6.3` pushed, PR #21 merged. See CHANGE.md.
-**v0.6.4 active** — branch cut from `main`.
+**v0.6.4 SHIPPED** — tag `v0.6.4` pushed, PR #22 merged. See CHANGE.md.
+**v0.6.5 active** — branch cut from `main`.
 
 ---
 
 ## Current Focus
 
-**v0.6.4: Linux k3s Validation + lib-foundation Extraction**
+**v0.6.5: BATS audit test coverage + lib-foundation extraction**
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | Linux k3s validation — 5-phase teardown/rebuild on Ubuntu VM (`CLUSTER_PROVIDER=k3s`) | Gemini | ✅ done |
-| 1a | Fix `_install_bats_from_source` default `1.10.0` → `1.11.0` + re-run Phase 5 | Gemini | ✅ done |
-| 2 | `_agent_audit` hardening — bare sudo detection + credential pattern check | Codex | ✅ done |
-| 3 | Pre-commit hook — wire `_agent_audit` to run on every commit | Codex | ✅ done |
-| 4 | Contract BATS tests — provider interface enforcement | Gemini | ✅ done |
-| 5 | Create `lib-foundation` repository | Owner | pending |
-| 6 | Extract `core.sh` + `system.sh` via git subtree | Codex | pending |
-
-## All Agent Tasks Complete — Pending Owner Action
-
-**Claude review of Codex provider_contract fix — PASS:**
-- `provider_contract.bats` setup(): `SCRIPT_DIR` export added — correct fix ✅
-- `orbstack.sh`: added `_provider_orbstack_expose_ingress` — scope expansion accepted.
-  Contract test revealed genuinely missing function. Codex fixed inline rather than
-  filing another task. Implementation follows correct delegate pattern. ✅
-- Verified: 30/30 in clean `env -i` environment. Full suite 154/154 in normal env.
-
-**v0.6.4 agent tasks — all complete:**
-- Task 1+1a: Linux k3s validation + BATS fix (Gemini) ✅
-- Task 2+3: `_agent_audit` hardening + pre-commit hook (Codex) ✅
-- Task 4: Contract BATS tests 30/30 (Gemini + Codex fix) ✅
-
-**Remaining — owner actions only:**
-- Task 5: Create `lib-foundation` repository
-- Task 6: Extract `core.sh` + `system.sh` via git subtree (Codex — blocked on task 5)
+| 1 | BATS tests for `_agent_audit` bare sudo + kubectl exec credential scan | Gemini | pending |
+| 2 | Create `lib-foundation` repository | Owner | pending |
+| 3 | Extract `core.sh` + `system.sh` via git subtree | Codex | blocked on task 2 |
 
 ---
 
@@ -47,7 +25,7 @@
 2. **Checkpointing**: Git commit before every surgical operation.
 3. **Audit Phase**: Verify no tests weakened after every fix cycle.
 4. **Simplification**: Refactor for minimal logic before final verification.
-5. **Memory-bank compression**: Compress memory-bank at the *start* of the new branch, before the first agent task. Completed release details → single line in "Released" section + CHANGE.md. Reason: end of release the context is still live and needed; start of new branch it is history — compress before any agent loads stale data.
+5. **Memory-bank compression**: Compress memory-bank at the *start* of the new branch, before the first agent task.
 
 ---
 
@@ -79,12 +57,12 @@ Owner
 - Update memory-bank to report completion — this is how you communicate back to Claude.
 - No credentials in task specs or reports — reference env var names only (`$VAULT_ADDR`).
 - Run `shellcheck` on every touched `.sh` file and report output.
-- **NEVER run `git rebase`, `git reset --hard`, or `git push --force` on shared branches.** These rewrite history and break other agents' local copies. Commit forward only.
+- **NEVER run `git rebase`, `git reset --hard`, or `git push --force` on shared branches.**
 - Stay within task spec scope — do not add changes beyond what was specified, even if they seem like improvements. Unsanctioned scope expansion gets reverted.
 
 **Claude awareness — Gemini works on Ubuntu VM:**
-- Gemini commits directly to `k3d-manager-v0.6.4` from the Ubuntu VM repo clone.
-- Always `git pull origin k3d-manager-v0.6.4` before reading or editing any file Gemini may have touched.
+- Gemini commits directly to the active branch from the Ubuntu VM repo clone.
+- Always `git pull origin <branch>` before reading or editing any file Gemini may have touched.
 - Conflicts are possible if Claude and Gemini both push to the same branch concurrently.
 
 **Red Team scope (Gemini):**
@@ -93,12 +71,10 @@ Owner
 - Do NOT modify production code.
 
 **Gemini BATS verification rule:**
-- Always run tests in a clean environment — never in an interactive shell with residual state:
+- Always run tests in a clean environment:
   ```bash
   env -i HOME="$HOME" PATH="$PATH" ./scripts/k3d-manager test <suite> 2>&1 | tail -10
   ```
-- `SCRIPT_DIR`, `CLUSTER_PROVIDER`, and other k3d-manager vars set in your shell make tests
-  pass that would fail in CI or on another machine. Clean env catches this.
 - Never report a test as passing unless it passed in a clean environment.
 
 **Memory-bank flow:**
@@ -111,11 +87,10 @@ Agent reads + acts
 
 **Lessons learned:**
 - Gemini may write stale memory-bank content — Claude reviews every update before writing next task.
-- Gemini expands scope beyond task spec — spec must explicitly state what is forbidden, not just what is required.
-- Gemini ran `git rebase -i` on a shared branch and left it in a conflicted state — destructive git ops now explicitly forbidden in agent rules.
-- Gemini pushed scope-expanded URL change despite "two lines only" spec — accepted this time (tested, 124/124 BATS pass on Ubuntu). Future violations get reverted regardless of outcome.
-- Gemini over-reports test success when shell has residual env vars (`SCRIPT_DIR` etc.) — always verify with `env -i` clean environment. Contract BATS tests reported 30/30 on Ubuntu; actual result 10/30 in clean env.
-- PR sub-branches from Copilot agent (e.g. `copilot/sub-pr-*`) may conflict — evaluate and close if our implementation is superior.
+- Gemini expands scope beyond task spec — spec must explicitly state what is forbidden.
+- Gemini ran `git rebase -i` on a shared branch — destructive git ops explicitly forbidden.
+- Gemini over-reports test success with ambient env vars — always verify with `env -i` clean environment.
+- PR sub-branches from Copilot agent may conflict — evaluate and close if our implementation is superior.
 
 ---
 
@@ -123,25 +98,24 @@ Agent reads + acts
 
 ### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-cluster`)
 
-| Component | Status | Notes |
-|---|---|---|
-| Vault | Running | `secrets` ns, initialized + unsealed |
-| ESO | Running | `secrets` ns |
-| OpenLDAP | Running | `identity` ns |
-| Istio | Running | `istio-system` |
-| Jenkins | Running | `cicd` ns |
-| ArgoCD | Running | `cicd` ns |
-| Keycloak | Running | `identity` ns |
+| Component | Status |
+|---|---|
+| Vault | Running — `secrets` ns, initialized + unsealed |
+| ESO | Running — `secrets` ns |
+| OpenLDAP | Running — `identity` ns |
+| Istio | Running — `istio-system` |
+| Jenkins | Running — `cicd` ns |
+| ArgoCD | Running — `cicd` ns |
+| Keycloak | Running — `identity` ns |
 
 ### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`)
 
-| Component | Status | Notes |
-|---|---|---|
-| k3s node | Ready | v1.34.4+k3s1 |
-| Istio | Running | IngressGateway + istiod |
-| ESO | Pending | Deploy after infra work stabilizes |
-| shopping-cart-data | Pending | PostgreSQL, Redis, RabbitMQ |
-| shopping-cart-apps | Pending | basket, order, payment, catalog, frontend |
+| Component | Status |
+|---|---|
+| k3s node | Ready — v1.34.4+k3s1 |
+| Istio | Running |
+| ESO | Pending |
+| shopping-cart-data / apps | Pending |
 
 **SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
 
@@ -151,8 +125,8 @@ Agent reads + acts
 
 | Version | Status | Notes |
 |---|---|---|
-| v0.1.0–v0.6.3 | released | See CHANGE.md |
-| v0.6.4 | **active** | Linux k3s validation gate + lib-foundation extraction |
+| v0.1.0–v0.6.4 | released | See CHANGE.md |
+| v0.6.5 | **active** | BATS audit coverage + lib-foundation extraction |
 | v0.7.0 | planned | Keycloak provider + App Cluster deployment |
 | v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) |
 | v1.0.0 | vision | Reassess after v0.7.0 |
@@ -161,11 +135,13 @@ Agent reads + acts
 
 ## Open Items
 
+- [ ] BATS tests for `_agent_audit` new checks (v0.6.5 — Gemini)
+- [ ] Create `lib-foundation` repository (owner)
+- [ ] Extract `core.sh` + `system.sh` via git subtree (Codex — blocked on above)
 - [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data / apps deployment on Ubuntu
-- [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
-- [ ] `CLUSTER_NAME` env var not respected during `deploy_cluster` — see `docs/issues/2026-03-01-cluster-name-env-var-not-respected.md`
-- [ ] `scripts/tests/plugins/jenkins.bats` — backlog
+- [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner)
+- [ ] `CLUSTER_NAME` env var not respected during `deploy_cluster`
 - [ ] v0.7.0: Keycloak provider interface + App Cluster deployment
 - [ ] v0.8.0: `k3dm-mcp` lean MCP server
 
@@ -175,13 +151,12 @@ Agent reads + acts
 
 - **Always run `reunseal_vault`** after any cluster restart before other deployments
 - **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`)
-- **New namespace defaults**: `secrets`, `identity`, `cicd`
 - **Branch protection**: `enforce_admins` permanently disabled — owner can self-merge
 - **Istio + Jobs**: `sidecar.istio.io/inject: "false"` required on Helm pre-install job pods
 - **Bitnami images**: use `docker.io/bitnamilegacy/*` for ARM64
 
 ### Keycloak Known Failure Patterns
 
-1. **Istio sidecar blocks `keycloak-config-cli` job** — mitigated via `sidecar.istio.io/inject: "false"` in `values.yaml.tmpl`.
+1. **Istio sidecar blocks `keycloak-config-cli` job** — mitigated via `sidecar.istio.io/inject: "false"`.
 2. **ARM64 image pull failures** — use `docker.io/bitnamilegacy/*`.
 3. **Stale PVCs block retry** — delete `data-keycloak-postgresql-0` PVC in `identity` ns before retrying.
