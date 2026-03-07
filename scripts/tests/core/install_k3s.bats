@@ -45,11 +45,6 @@ setup() {
       esac
     done
     echo "$*" >> "$RUN_LOG"
-    if [[ "$1" == install && "$2" == -m ]]; then
-      command install -m "$3" "$4" "$5"
-    elif [[ "$1" == cp ]]; then
-      command cp "$2" "$3"
-    fi
     return 0
   }
   export -f _run_command
@@ -178,6 +173,31 @@ sys.stdout.write(pattern.sub(lambda match: os.environ.get(match.group(1), ""), d
   }
   export -f _command_exist
 
+  _run_command() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--soft|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --probe) shift 2 ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+    echo "$*" >> "$RUN_LOG"
+    if [[ "$1" == mkdir ]]; then
+      if [[ "$2" == -p ]]; then
+        command mkdir -p "$3"
+      else
+        command mkdir "$2"
+      fi
+    elif [[ "$1" == install && "$2" == -m ]]; then
+      command install -m "$3" "$4" "$5"
+    elif [[ "$1" == cp ]]; then
+      command cp "$2" "$3"
+    fi
+    return 0
+  }
+  export -f _run_command
+
   _ip() { echo 198.51.100.10; }
   export -f _ip
 
@@ -229,4 +249,7 @@ sys.stdout.write(pattern.sub(lambda match: os.environ.get(match.group(1), ""), d
     fi
   done
   [ "$found" -eq 0 ]
+
+  unset -f _run_command
+  stub_run_command
 }
