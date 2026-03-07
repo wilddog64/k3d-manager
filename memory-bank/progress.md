@@ -34,8 +34,7 @@
 ### Priority 1 — v0.6.4 (active)
 
 - [ ] Linux k3s validation gate — Phase 1-4 PASS; Phase 5 BLOCKED by BATS 404 bug
-- [ ] Fix `_install_bats_from_source` default `1.10.0` → `1.11.0` (Codex — spec: `docs/plans/v0.6.4-codex-bats-version-fix.md`)
-- [ ] Re-run Phase 5 BATS suite on Ubuntu after fix (Gemini)
+- [ ] Fix `_install_bats_from_source` default `1.10.0` → `1.11.0` + re-run Phase 5 (Gemini — exception: fix requires Ubuntu to verify)
 - [ ] `_agent_audit` hardening — bare sudo detection + credential pattern check in `kubectl exec` args (Codex)
 - [ ] Pre-commit hook — wire `_agent_audit` to `.git/hooks/pre-commit` (Codex)
 - [ ] Contract BATS tests — provider interface enforcement (Gemini)

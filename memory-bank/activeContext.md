@@ -14,20 +14,20 @@
 | # | Task | Who | Status |
 |---|---|---|---|
 | 1 | Linux k3s validation — 5-phase teardown/rebuild on Ubuntu VM (`CLUSTER_PROVIDER=k3s`) | Gemini | ⚠️ Phase 5 blocked |
-| 1a | Fix `_install_bats_from_source` default version `1.10.0` → `1.11.0` | Codex | ⏳ active |
-| 1b | Re-run Phase 5 BATS suite on Ubuntu after fix | Gemini | pending |
+| 1a | Fix `_install_bats_from_source` default `1.10.0` → `1.11.0` + re-run Phase 5 | Gemini | ⏳ active |
 | 2 | `_agent_audit` hardening — bare sudo detection + credential pattern check | Codex | pending |
 | 3 | Pre-commit hook — wire `_agent_audit` to run on every commit | Codex | pending |
 | 4 | Contract BATS tests — provider interface enforcement | Gemini | pending |
 | 5 | Create `lib-foundation` repository | Owner | pending |
 | 6 | Extract `core.sh` + `system.sh` via git subtree | Codex | pending |
 
-## Codex Next Task — Fix BATS Default Version
+## Gemini Next Task — Fix BATS Default Version + Re-run Phase 5
 
-Task spec: `docs/plans/v0.6.4-codex-bats-version-fix.md`
+Task spec: `docs/plans/v0.6.4-codex-bats-version-fix.md` (originally written for Codex — same spec applies)
 
-**Goal:** Update hardcoded default BATS version from `1.10.0` (invalid tag, 404) to `1.11.0`
-in `scripts/lib/system.sh` — two lines only (`_install_bats_from_source:1209` and `_ensure_bats:1295`).
+**Why Gemini, not Codex:** Fix requires running on Ubuntu to verify BATS installs cleanly.
+Codex has no sudo/cluster access. This is an exception to the Codex-owns-production-code rule —
+the fix is two lines with no logic complexity, safe for Gemini to apply directly.
 
 **Claude review of Gemini Phase 1-5 report — VERIFIED:**
 - Phase 1 destroy_cluster: PASS
@@ -35,13 +35,17 @@ in `scripts/lib/system.sh` — two lines only (`_install_bats_from_source:1209` 
 - Phase 3 deploy_cluster: PASS — full stack deployed
 - Phase 4 smoke tests: PASS — Vault, ESO, Istio
 - Phase 5 BATS: BLOCKED — `_install_bats_from_source` defaults to `1.10.0` (non-existent tag, 404)
-- Gemini report accurate. Fix routed to Codex.
+- Gemini report accurate.
 
 **Protocol note to Gemini:** Self-commit rule applies to issue docs and memory-bank updates too.
-The issue doc (`docs/issues/2026-03-07-bats-source-install-404.md`) and this memory-bank update
-were left unstaged. Commit your own work — every artifact you create.
+The issue doc and memory-bank updates from Phase 5 were left unstaged. Commit every artifact you create.
 
-**After Codex fix is merged:** Gemini re-runs Phase 5 only (`CLUSTER_PROVIDER=k3s ./scripts/k3d-manager test all`) on Ubuntu to confirm BATS installs cleanly and suite passes.
+**Steps:**
+1. Edit `scripts/lib/system.sh` — change both `1.10.0` defaults to `1.11.0` (lines 1209 and 1295)
+2. Run `shellcheck scripts/lib/system.sh` — report output
+3. Self-commit the fix
+4. Re-run Phase 5: `CLUSTER_PROVIDER=k3s ./scripts/k3d-manager test all 2>&1`
+5. Report result + update memory-bank to mark Task 1 complete
 
 ---
 
