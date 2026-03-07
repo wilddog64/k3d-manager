@@ -25,13 +25,50 @@ Key objectives:
 
 ---
 
-## Gemini Pending Actions (Completed)
+## Codex Next Tasks (v0.6.3 Phase 2)
 
-All gaps identified by Claude review of Phase 1 verification are resolved and verified.
+Phase 1 complete and independently verified by Claude: **125/125 BATS passing locally**,
+`run_command.bats` tests 1 & 2 confirmed passing, smoke tests PASS.
 
-1. ✅ **Action 1** — `run_command.bats` tests 1 and 2 PASS locally.
-2. ✅ **Action 2** — Smoke tests (vault, eso, istio) all PASS individually.
-3. ✅ **Action 3** — `agent_rigor.bats` diff verified (stub improvement complete).
+Codex proceeds with Phase 2. Plan: `docs/plans/v0.6.3-refactor-and-audit.md`.
+
+### Standing Rules (apply to every task)
+- Report each fix individually with file and line numbers changed.
+- Run `shellcheck` on every touched file and report output.
+- Do not modify test files (`*.bats`) — Gemini owns those.
+- Do not modify `memory-bank/` — Claude owns memory-bank writes.
+- Do not commit — Claude reviews and commits.
+- STOP after all listed fixes. Do not proceed to the next task without Claude go-ahead.
+
+### Task 1 — De-bloat `scripts/lib/core.sh` (permission cascade anti-patterns)
+
+Targets (see plan for full before/after):
+- `_ensure_path_exists` — collapse 4-attempt mkdir cascade to single `_run_command --prefer-sudo`
+- `_k3s_start_server` — collapse 4-attempt sh cascade to 2-path (root vs non-root)
+- `_setup_kubeconfig` — collapse dual permission checks to single `_run_command --prefer-sudo` per op
+- `_install_k3s` file ops — collapse dual writable-check pattern to direct `_run_command --prefer-sudo`
+
+After all targets done: `shellcheck scripts/lib/core.sh` — report output.
+
+### Task 2 — De-bloat `scripts/lib/system.sh` (OS dispatch consolidation)
+
+Targets (see plan for full before/after):
+- Add `_detect_platform` helper (returns `mac`/`wsl`/`debian`/`redhat`/`linux` or error)
+- `_install_docker` — replace 4-branch inline switch with `_detect_platform` dispatch
+- `deploy_cluster` platform detection — replace 5-branch cascade with `_detect_platform`
+- `_create_nfs_share` — extract `_create_nfs_share_mac` to system.sh, guard in core.sh
+
+After all targets done: `shellcheck scripts/lib/system.sh` — report output.
+
+### Task 3 — Implement `_agent_lint` in `scripts/lib/agent_rigor.sh`
+
+See plan Component 2 for full spec. Key rules enforced:
+- No permission cascades (>1 sudo escalation path for same op)
+- OS dispatch via `_detect_platform` (not raw inline chains)
+- Secret hygiene (no tokens in kubectl exec args)
+- Namespace isolation (no `kubectl apply` without `-n`)
+
+After implementation: `shellcheck scripts/lib/agent_rigor.sh` — report output.
 
 ---
 
