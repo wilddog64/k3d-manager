@@ -21,35 +21,23 @@
 | 5 | Create `lib-foundation` repository | Owner | pending |
 | 6 | Extract `core.sh` + `system.sh` via git subtree | Codex | pending |
 
-## Codex Next Task — Fix provider_contract.bats SCRIPT_DIR dependency
+## All Agent Tasks Complete — Pending Owner Action
 
-**Claude review of Gemini task 4 — BUG FOUND:**
-Gemini's report claimed 30/30 passing on Ubuntu. Local run: 10/30 passing.
-Root cause: `k3s.sh` and `orbstack.sh` source `$SCRIPT_DIR`-dependent files at load time.
-The test `setup()` sets `PROVIDERS_DIR` but not `SCRIPT_DIR`. Tests passed on Ubuntu only
-because `SCRIPT_DIR` was already set in Gemini's shell environment — accidental pass.
+**Claude review of Codex provider_contract fix — PASS:**
+- `provider_contract.bats` setup(): `SCRIPT_DIR` export added — correct fix ✅
+- `orbstack.sh`: added `_provider_orbstack_expose_ingress` — scope expansion accepted.
+  Contract test revealed genuinely missing function. Codex fixed inline rather than
+  filing another task. Implementation follows correct delegate pattern. ✅
+- Verified: 30/30 in clean `env -i` environment. Full suite 154/154 in normal env.
 
-**Fix required in `scripts/tests/lib/provider_contract.bats` — setup() only:**
+**v0.6.4 agent tasks — all complete:**
+- Task 1+1a: Linux k3s validation + BATS fix (Gemini) ✅
+- Task 2+3: `_agent_audit` hardening + pre-commit hook (Codex) ✅
+- Task 4: Contract BATS tests 30/30 (Gemini + Codex fix) ✅
 
-```bash
-setup() {
-  PROVIDERS_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../lib/providers" && pwd)"
-  SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)/scripts"
-  export SCRIPT_DIR
-}
-```
-
-**Change Checklist:**
-- [ ] `scripts/tests/lib/provider_contract.bats` lines 8-10 — add `SCRIPT_DIR` export to `setup()`
-
-**Forbidden:** Any other change. No new tests. No modifications to provider files.
-
-**Verification:** `./scripts/k3d-manager test provider_contract 2>&1 | tail -5` must show 30/30 passing.
-
-**Completed tasks:**
-- Tasks 1, 1a: Linux k3s validation + BATS fix (Gemini): DONE
-- Tasks 2+3: `_agent_audit` hardening + pre-commit hook (Codex): DONE
-- Task 4: Contract BATS tests — 10/30 passing, fix needed (Codex)
+**Remaining — owner actions only:**
+- Task 5: Create `lib-foundation` repository
+- Task 6: Extract `core.sh` + `system.sh` via git subtree (Codex — blocked on task 5)
 
 ---
 
