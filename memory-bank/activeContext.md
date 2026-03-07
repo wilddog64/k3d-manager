@@ -50,7 +50,7 @@ on a real Ubuntu machine before extracting `core.sh`/`system.sh` into `lib-found
 2. **Checkpointing**: Git commit before every surgical operation.
 3. **Audit Phase**: Verify no tests weakened after every fix cycle.
 4. **Simplification**: Refactor for minimal logic before final verification.
-5. **Memory-bank compression**: Compress memory-bank when cutting a new release branch — archive completed release details, keep only active focus + protocol.
+5. **Memory-bank compression**: Compress memory-bank at the *start* of the new branch, before the first agent task. Completed release details → single line in "Released" section + CHANGE.md. Reason: end of release the context is still live and needed; start of new branch it is history — compress before any agent loads stale data.
 
 ---
 
