@@ -13,8 +13,8 @@
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | Linux k3s validation — 5-phase teardown/rebuild on Ubuntu VM (`CLUSTER_PROVIDER=k3s`) | Gemini | ⚠️ Phase 5 blocked |
-| 1a | Fix `_install_bats_from_source` default `1.10.0` → `1.11.0` + re-run Phase 5 | Gemini | ⏳ active |
+| 1 | Linux k3s validation — 5-phase teardown/rebuild on Ubuntu VM (`CLUSTER_PROVIDER=k3s`) | Gemini | ✅ done |
+| 1a | Fix `_install_bats_from_source` default `1.10.0` → `1.11.0` + re-run Phase 5 | Gemini | ✅ done |
 | 2 | `_agent_audit` hardening — bare sudo detection + credential pattern check | Codex | pending |
 | 3 | Pre-commit hook — wire `_agent_audit` to run on every commit | Codex | pending |
 | 4 | Contract BATS tests — provider interface enforcement | Gemini | pending |
