@@ -18,8 +18,8 @@ Plans:
 Key objectives:
 1. **Fix `_run_command` TTY flakiness** — remove `auto_interactive` block (Codex) ✅ done 2026-03-06
 2. **Phase 1 Verification** — BATS 125/125 PASS, E2E Cluster rebuild success (Gemini) ✅ done 2026-03-06
-3. De-bloat `system.sh` and `core.sh` — remove permission cascade anti-patterns (Codex)
-4. Implement `_agent_lint` in `agent_rigor.sh` — digital auditor via copilot-cli (Codex)
+3. De-bloat `system.sh` and `core.sh` — remove permission cascade anti-patterns (Codex) ✅ done 2026-03-06
+4. Implement `_agent_lint` in `agent_rigor.sh` — digital auditor via copilot-cli (Codex) ✅ done 2026-03-06
 5. BATS suite: `scripts/tests/lib/agent_rigor.bats` (Gemini) ✅ done 2026-03-06
 6. Claude: review all diffs, run full BATS suite locally, commit, open PR
 
@@ -86,6 +86,7 @@ After implementation: `shellcheck scripts/lib/agent_rigor.sh` — report output.
 - **Do not update memory-bank.** Claude owns all memory-bank writes.
 - **Do not commit.** Claude reviews and commits after verifying diffs match spec.
 - **Verification is mandatory.** Run `shellcheck` on every touched file and report output.
+- **No credentials in task specs.** Task specs and reports must never contain actual credential values, cluster addresses, kubeconfig paths, or tokens — reference env var names only (e.g. `$VAULT_ADDR`, not the actual URL). Live values stay on the owner's machine.
 
 ---
 
@@ -138,7 +139,8 @@ After implementation: `shellcheck scripts/lib/agent_rigor.sh` — report output.
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner action)
 - [ ] `scripts/tests/plugins/jenkins.bats` — backlog
 - [ ] `CLUSTER_NAME` env var not respected during `deploy_cluster` — see `docs/issues/2026-03-01-cluster-name-env-var-not-respected.md`
-- [ ] v0.6.3: De-bloat `system.sh` / `core.sh`
+- [x] v0.6.3: De-bloat `system.sh` / `core.sh`
+- [x] v0.6.3: `_agent_lint` implementation (Digital Auditor)
 - [ ] v0.6.3: `_agent_audit` implementation
 - [ ] v0.6.3: `rigor-cli` integration
 - [ ] v0.7.0: Keycloak provider interface + App Cluster deployment
