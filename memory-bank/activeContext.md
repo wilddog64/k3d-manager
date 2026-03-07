@@ -14,8 +14,11 @@
 | # | Task | Who | Status |
 |---|---|---|---|
 | 1 | Linux k3s validation — 5-phase teardown/rebuild on Ubuntu VM (`CLUSTER_PROVIDER=k3s`) | Gemini | ⏳ active |
-| 2 | Create `lib-foundation` repository | Owner | pending |
-| 3 | Extract `core.sh` + `system.sh` via git subtree | Codex | pending |
+| 2 | `_agent_audit` hardening — bare sudo detection + credential pattern check | Codex | pending |
+| 3 | Pre-commit hook — wire `_agent_audit` to run on every commit | Codex | pending |
+| 4 | Contract BATS tests — provider interface enforcement | Gemini | pending |
+| 5 | Create `lib-foundation` repository | Owner | pending |
+| 6 | Extract `core.sh` + `system.sh` via git subtree | Codex | pending |
 
 ## Gemini Next Task — Linux k3s Validation
 
