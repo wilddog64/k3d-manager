@@ -406,10 +406,7 @@ function _deploy_k3s_cluster() {
    _ensure_path_exists "$(dirname "$dest_kubeconfig")"
 
    _run_command --prefer-sudo -- cp "$kubeconfig_src" "$dest_kubeconfig"
-
-   if ! _is_wsl; then
-      _run_command --prefer-sudo -- chown "$(id -u):$(id -g)" "$dest_kubeconfig" 2>/dev/null || true
-   fi
+   _run_command --prefer-sudo -- chown "$(id -u):$(id -g)" "$dest_kubeconfig" 2>/dev/null || true
    _run_command --prefer-sudo -- chmod 0600 "$dest_kubeconfig" 2>/dev/null || true
 
    export KUBECONFIG="$dest_kubeconfig"
@@ -424,7 +421,7 @@ function _install_docker() {
       mac)
          _install_mac_docker
          ;;
-      debian|linux|wsl)
+      debian|wsl)
          _install_debian_docker
          ;;
       redhat)

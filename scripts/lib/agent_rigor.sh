@@ -123,9 +123,8 @@ function _agent_audit() {
               if_count=0
               next
             }
-            /\bif\b/ {
-              count=gsub(/\bif\b/, "&")
-              if_count+=count
+            /^[[:space:]]*if[[:space:](]/ {
+              if_count++
             }
             END {
               emit(current_func, if_count)
