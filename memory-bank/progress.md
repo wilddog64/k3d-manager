@@ -35,8 +35,8 @@
 
 - [x] Linux k3s validation gate — Gemini full 5-phase teardown/rebuild on Ubuntu VM (124/124 BATS pass, Smoke tests PASS)
 - [x] Fix `_install_bats_from_source` default `1.10.0` → `1.11.0` + robust URL (Gemini)
-- [ ] `_agent_audit` hardening — bare sudo detection + credential pattern check in `kubectl exec` args (Codex)
-- [ ] Pre-commit hook — wire `_agent_audit` to `.git/hooks/pre-commit` (Codex)
+- [x] `_agent_audit` hardening — bare sudo detection + credential pattern check in `kubectl exec` args (Codex)
+- [x] Pre-commit hook — wire `_agent_audit` to `.git/hooks/pre-commit` (Codex)
 - [ ] Contract BATS tests — provider interface enforcement (Gemini)
 - [ ] Create `lib-foundation` repository (owner action)
 - [ ] Extract `core.sh` and `system.sh` via git subtree (Codex)
