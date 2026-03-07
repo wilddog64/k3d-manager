@@ -104,6 +104,15 @@ Owner
 - Report findings to memory-bank — Claude routes fixes to Codex.
 - Do NOT modify production code.
 
+**Gemini BATS verification rule:**
+- Always run tests in a clean environment — never in an interactive shell with residual state:
+  ```bash
+  env -i HOME="$HOME" PATH="$PATH" ./scripts/k3d-manager test <suite> 2>&1 | tail -10
+  ```
+- `SCRIPT_DIR`, `CLUSTER_PROVIDER`, and other k3d-manager vars set in your shell make tests
+  pass that would fail in CI or on another machine. Clean env catches this.
+- Never report a test as passing unless it passed in a clean environment.
+
 **Memory-bank flow:**
 ```
 Agent  → memory-bank   (report: task complete, what changed, what was unexpected)
@@ -117,6 +126,7 @@ Agent reads + acts
 - Gemini expands scope beyond task spec — spec must explicitly state what is forbidden, not just what is required.
 - Gemini ran `git rebase -i` on a shared branch and left it in a conflicted state — destructive git ops now explicitly forbidden in agent rules.
 - Gemini pushed scope-expanded URL change despite "two lines only" spec — accepted this time (tested, 124/124 BATS pass on Ubuntu). Future violations get reverted regardless of outcome.
+- Gemini over-reports test success when shell has residual env vars (`SCRIPT_DIR` etc.) — always verify with `env -i` clean environment. Contract BATS tests reported 30/30 on Ubuntu; actual result 10/30 in clean env.
 - PR sub-branches from Copilot agent (e.g. `copilot/sub-pr-*`) may conflict — evaluate and close if our implementation is superior.
 
 ---
