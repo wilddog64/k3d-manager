@@ -138,5 +138,29 @@ function _agent_audit() {
       done
    fi
 
+   if [[ -n "$changed_sh" ]]; then
+      local file
+      for file in $changed_sh; do
+         [[ -f "$file" ]] || continue
+         local bare_sudo
+         bare_sudo=$(grep -n '[^_[:alnum:]]sudo[[:space:]]' "$file" 2>/dev/null \
+            | grep -v '_run_command\|#' || true)
+         if [[ -n "$bare_sudo" ]]; then
+            _warn "Agent audit: bare sudo call in $file (use _run_command --prefer-sudo):"
+            _warn "$bare_sudo"
+            status=1
+         fi
+      done
+   fi
+
+   local diff_sh
+   diff_sh="$(git diff -- '*.sh' 2>/dev/null || true)"
+   if [[ -n "$diff_sh" ]]; then
+      if grep -qE '^\+.*kubectl exec.*(-e |--env).*(TOKEN|PASSWORD|SECRET|KEY)' <<<"$diff_sh"; then
+         _warn "Agent audit: credential pattern detected in kubectl exec args — use Vault/ESO instead"
+         status=1
+      fi
+   fi
+
    return "$status"
 }
