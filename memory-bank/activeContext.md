@@ -21,24 +21,35 @@
 | 5 | Create `lib-foundation` repository | Owner | pending |
 | 6 | Extract `core.sh` + `system.sh` via git subtree | Codex | pending |
 
-## Gemini Next Task — Contract BATS Tests
+## Codex Next Task — Fix provider_contract.bats SCRIPT_DIR dependency
 
-Task spec: `docs/plans/v0.6.4-gemini-contract-bats.md`
+**Claude review of Gemini task 4 — BUG FOUND:**
+Gemini's report claimed 30/30 passing on Ubuntu. Local run: 10/30 passing.
+Root cause: `k3s.sh` and `orbstack.sh` source `$SCRIPT_DIR`-dependent files at load time.
+The test `setup()` sets `PROVIDERS_DIR` but not `SCRIPT_DIR`. Tests passed on Ubuntu only
+because `SCRIPT_DIR` was already set in Gemini's shell environment — accidental pass.
 
-**Goal:** Create `scripts/tests/lib/provider_contract.bats` — 30 individual `@test` blocks
-(3 providers × 10 required functions) asserting every provider implements the full interface.
-Pure logic — no cluster, runs on macOS.
+**Fix required in `scripts/tests/lib/provider_contract.bats` — setup() only:**
 
-**Steps:**
-1. Read the full task spec at `docs/plans/v0.6.4-gemini-contract-bats.md`
-2. Create `scripts/tests/lib/provider_contract.bats` — new file only, do NOT modify any existing file
-3. Run `./scripts/k3d-manager test all 2>&1 | tail -10` and confirm all pass
-4. Self-commit the new file
-5. Update memory-bank to report completion with total BATS count
+```bash
+setup() {
+  PROVIDERS_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../lib/providers" && pwd)"
+  SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)/scripts"
+  export SCRIPT_DIR
+}
+```
 
-**Completed by Codex (tasks 2+3):**
-- `_agent_audit` hardening — bare sudo detection + credential pattern check: DONE
-- Pre-commit hook wired to `.git/hooks/pre-commit`: DONE
+**Change Checklist:**
+- [ ] `scripts/tests/lib/provider_contract.bats` lines 8-10 — add `SCRIPT_DIR` export to `setup()`
+
+**Forbidden:** Any other change. No new tests. No modifications to provider files.
+
+**Verification:** `./scripts/k3d-manager test provider_contract 2>&1 | tail -5` must show 30/30 passing.
+
+**Completed tasks:**
+- Tasks 1, 1a: Linux k3s validation + BATS fix (Gemini): DONE
+- Tasks 2+3: `_agent_audit` hardening + pre-commit hook (Codex): DONE
+- Task 4: Contract BATS tests — 10/30 passing, fix needed (Codex)
 
 ---
 
