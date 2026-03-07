@@ -1,5 +1,31 @@
 # Changes - k3d-manager
 
+## v0.6.4 — Linux k3s Validation + Agent Harness Hardening — dated 2026-03-07
+
+### Validation
+- **Linux k3s gate**: Full 5-phase teardown/rebuild verified on Ubuntu 24.04 VM (`CLUSTER_PROVIDER=k3s`). `_detect_platform` correctly returns `debian`. Kubeconfig owner correct after copy. systemd path taken by `_start_k3s_service`. Vault, ESO, Istio, OpenLDAP, Jenkins, ArgoCD, Keycloak all deployed and healthy.
+- **BATS suite**: 154/154 passing (30 new contract tests added).
+
+### Fixed
+- **BATS source install 404** (`scripts/lib/system.sh`): `_install_bats_from_source` and `_ensure_bats` defaulted to `1.10.0` — a non-existent GitHub release tag. Updated to `1.11.0`. GitHub archive URL (`archive/refs/tags/`) used for stability over `releases/download/`.
+- **`_provider_orbstack_expose_ingress` missing** (`scripts/lib/providers/orbstack.sh`): Contract tests revealed `orbstack.sh` was missing the `expose_ingress` interface function. Added delegate following the established pattern.
+
+### Added
+- **`_agent_audit` hardening** (`scripts/lib/agent_rigor.sh`): Two new mechanical checks:
+  - Bare sudo detection — flags direct `sudo` calls bypassing `_run_command --prefer-sudo`
+  - Credential pattern scan — flags secrets passed inline to `kubectl exec` args
+- **Pre-commit hook** (`.git/hooks/pre-commit`): Wires `_agent_audit` to run automatically on every commit. Violations block the commit with a structured error.
+- **Provider contract BATS suite** (`scripts/tests/lib/provider_contract.bats`): 30 tests enforcing that every cluster provider (`k3d`, `k3s`, `orbstack`) implements the full 10-function interface. Fails immediately if a required function is missing.
+
+### Docs / Tooling
+- **CLAUDE.md**: Trimmed 439 → 104 lines — navigation layer only, stale content removed.
+- **AGENTS.md**: Deleted — task spec pattern via memory-bank replaced its purpose.
+- **`docs/plans/task-spec-template.md`**: Mandatory change checklist format for all agent task specs — prevents scope creep.
+- **Roadmap updated** (`docs/plans/roadmap-v1.md`): Architectural boundary (plugin layer is k8s-agnostic), v0.8.0/v0.8.1 observability (OTel + optional Jaeger), agent safety guards, One AI Layer Rule (`K3DM_ENABLE_AI=0` in MCP subprocess), env isolation design constraints.
+- **Branch protection**: `required_linear_history=true` — force-push and rebase-push blocked at remote.
+
+---
+
 ## v0.6.3 — Refactoring & Digital Auditor — dated 2026-03-06
 
 ### Refactoring
