@@ -1628,7 +1628,8 @@ function _ensure_cargo() {
 
 function _add_exit_trap() {
    local handler="$1"
-   local cur="$(trap -p EXIT | sed -E "s/.*'(.+)'/\1/")"
+   local cur
+   cur="$(trap -p EXIT | sed -E "s/.*'(.+)'/\1/")"
 
    if [[ -n "$cur" ]]; then
       trap '"$cur"; "$handler"' EXIT
@@ -1656,14 +1657,16 @@ function _failfast_off() {
 }
 
 function _detect_cluster_name() {
-   # shellcheck disable=SC2155
-   local cluster_info="$(_kubectl --quiet -- get nodes | tail -1)"
+   local cluster_info
+   cluster_info="$(_kubectl --quiet -- get nodes | tail -1)"
 
    if [[ -z "$cluster_info" ]]; then
       _err "Cannot detect cluster name: no nodes found"
    fi
-   local cluster_ready=$(echo "$cluster_info" | awk '{print $2}')
-   local cluster_name=$(echo "$cluster_info" | awk '{print $1}')
+   local cluster_ready
+   cluster_ready=$(echo "$cluster_info" | awk '{print $2}')
+   local cluster_name
+   cluster_name=$(echo "$cluster_info" | awk '{print $1}')
 
    if [[ "$cluster_ready" != "Ready" ]]; then
       _err "Cluster node is not ready: $cluster_info"
