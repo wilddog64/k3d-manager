@@ -40,7 +40,7 @@
 ### Priority 1 — v0.6.5 (active)
 
 - [ ] BATS tests for `_agent_audit` new checks — bare sudo + kubectl exec (Gemini)
-- [x] Create `lib-foundation` repository (owner) — https://github.com/wilddog64/lib-foundation
+- [x] Create `lib-foundation` repository + branch protection + CI (owner) — https://github.com/wilddog64/lib-foundation
 - [ ] Extract `core.sh` + `system.sh` via git subtree (Codex)
 
 ### Priority 2 — v0.7.0
