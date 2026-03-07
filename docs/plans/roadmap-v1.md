@@ -73,6 +73,36 @@ management becomes a real need, it belongs in a separate tool built on
 
 ---
 
+## Architectural Boundary
+
+**k3d-manager does not compete with Terraform, Pulumi, or any cloud provisioner.**
+
+Those tools own infrastructure provisioning — VPCs, node groups, IAM, networking.
+k3d-manager owns what runs *on top of* the cluster — Vault, ESO, Istio, Jenkins, OpenLDAP, ArgoCD.
+
+The handoff point is a kubeconfig:
+```
+Terraform/Pulumi provisions EKS/GKE/AKS  →  outputs kubeconfig
+k3d-manager points at that kubeconfig    →  deploys and configures the service stack
+```
+
+**The plugin layer speaks only Kubernetes primitives** (`kubectl`, `helm`) and has no opinion
+on what is underneath. A plugin works identically against:
+- k3d on a laptop
+- k3s on a Ubuntu VM
+- EKS, GKE, AKS, Rancher, Talos — any cluster with a valid kubeconfig
+
+`CLUSTER_PROVIDER` controls only three things: create, destroy, and get kubeconfig.
+Once those are done — by k3d-manager or by an external provisioner — the provider
+abstraction is finished and the plugins take over.
+
+This boundary is intentional and permanent. k3d-manager's value is **dev/staging environment
+parity**: the same stack definition runs locally, in staging, and can target production-grade
+clusters without modification. That problem is unsolved by Terraform and Pulumi — it is
+k3d-manager's lane.
+
+---
+
 ## Engineering Standards
 1. **Spec-First:** No new roadmap milestones are implemented without a confirmed investigation and plan.
 2. **Checkpointing:** The repository must remain rollback-safe at every stage.
