@@ -20,8 +20,9 @@ Any change not on the checklist is forbidden, even if it seems like an improveme
 2. Do not modify test files unless explicitly listed.
 3. Run `shellcheck` on every touched `.sh` file and report output.
 4. Commit your own work — self-commit is your sign-off.
-5. Update memory-bank to report completion.
-6. **NEVER run `git rebase`, `git reset --hard`, or `git push --force`.**
+5. **Push your branch and confirm CI is green before updating memory-bank.** Use `gh run list --repo <owner>/<repo> --limit 3` to verify. Never report COMPLETE without a green CI run URL.
+6. Update memory-bank to report completion — include the CI run URL.
+7. **NEVER run `git rebase`, `git reset --hard`, or `git push --force`.**
 
 ---
 
@@ -78,6 +79,9 @@ Task: [title]
 Status: COMPLETE / BLOCKED
 Files changed: [list]
 Shellcheck: PASS / [issues found]
+CI run: [URL from gh run list] — PASS / FAIL / not applicable
 Verification: [output]
 Unexpected findings: [anything outside task scope — report, do not fix]
 ```
+
+**Do not set Status: COMPLETE without a green CI run URL. No CI URL = not done.**
