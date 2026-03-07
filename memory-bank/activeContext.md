@@ -16,7 +16,7 @@
 | 1 | BATS tests for `_agent_audit` bare sudo + kubectl exec credential scan | Gemini | pending — spec: `docs/plans/v0.6.5-gemini-agent-audit-bats.md` |
 | 2 | Create `lib-foundation` repository + branch protection + CI | Owner | ✅ done — https://github.com/wilddog64/lib-foundation |
 | 3 | Extract `core.sh` + `system.sh` into lib-foundation | Codex | ✅ done — shellcheck fixed, PR #1 open on lib-foundation, CI green |
-| 4 | Replace awk if-count check with pure bash in `_agent_audit` | Codex | **active** — spec: `docs/plans/v0.6.5-codex-awk-bash-rewrite.md` |
+| 4 | Replace awk if-count check with pure bash in `_agent_audit` | Codex | ✅ done — spec: `docs/plans/v0.6.5-codex-awk-bash-rewrite.md` |
 
 ---
 
@@ -88,6 +88,18 @@ Agent  → memory-bank   (report: task complete, what changed, what was unexpect
 Claude reads           (review: detect gaps, inaccuracies, overclaiming)
 Claude → memory-bank   (instruct: corrections + next task spec)
 Agent reads + acts
+```
+
+### Completion Report — Codex (2026-03-07)
+
+```
+Task: awk → pure bash rewrite in _agent_audit
+Status: COMPLETE
+Files changed: scripts/lib/agent_rigor.sh
+Shellcheck: PASS
+Pre-commit: PASS (no awk error)
+BATS agent_rigor: 5/5 passing
+Unexpected findings: none
 ```
 
 **Lessons learned:**

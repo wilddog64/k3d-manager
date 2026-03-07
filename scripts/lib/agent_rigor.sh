@@ -109,27 +109,25 @@ function _agent_audit() {
       for file in $changed_sh; do
          [[ -f "$file" ]] || continue
          local offenders
-         offenders=$(awk -v max_if="$max_if" '
-            function emit(func,count){
-              if(func != "" && count > max_if){printf "%s:%d\n", func, count}
-            }
-            /^[ \t]*function[ \t]+/ {
-              line=$0
-              gsub(/^[ \t]*function[ \t]+/, "", line)
-              func=line
-              gsub(/\(.*/, "", func)
-              emit(current_func, if_count)
-              current_func=func
-              if_count=0
-              next
-            }
-            /^[[:space:]]*if[[:space:](]/ {
-              if_count++
-            }
-            END {
-              emit(current_func, if_count)
-            }
-         ' "$file")
+         local current_func="" if_count=0 line
+         local offenders_lines=""
+         while IFS= read -r line; do
+            if [[ $line =~ ^[[:space:]]*function[[:space:]]+([A-Za-z0-9_]+) ]]; then
+               if [[ -n "$current_func" && $if_count -gt $max_if ]]; then
+                  offenders_lines+="${current_func}:${if_count}"$'\n'
+               fi
+               current_func="${BASH_REMATCH[1]}"
+               if_count=0
+            elif [[ $line =~ ^[[:space:]]*if[[:space:]\(] ]]; then
+               ((if_count++))
+            fi
+         done < "$file"
+
+         if [[ -n "$current_func" && $if_count -gt $max_if ]]; then
+            offenders_lines+="${current_func}:${if_count}"$'\n'
+         fi
+
+         offenders="${offenders_lines%$'\n'}"
 
          if [[ -n "$offenders" ]]; then
             _warn "Agent audit: $file exceeds if-count threshold in: $offenders"
