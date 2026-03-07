@@ -14,8 +14,8 @@
 | # | Task | Who | Status |
 |---|---|---|---|
 | 1 | BATS tests for `_agent_audit` bare sudo + kubectl exec credential scan | Gemini | pending |
-| 2 | Create `lib-foundation` repository | Owner | pending |
-| 3 | Extract `core.sh` + `system.sh` via git subtree | Codex | blocked on task 2 |
+| 2 | Create `lib-foundation` repository | Owner | ✅ done — https://github.com/wilddog64/lib-foundation |
+| 3 | Extract `core.sh` + `system.sh` via git subtree | Codex | pending |
 
 ---
 
