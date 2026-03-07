@@ -48,3 +48,96 @@ function _agent_checkpoint() {
 
    _err "Checkpoint commit failed; resolve git errors and retry"
 }
+
+function _agent_lint() {
+   if [[ "${K3DM_ENABLE_AI:-0}" != "1" ]]; then
+      return 0
+   fi
+
+   if ! command -v git >/dev/null 2>&1; then
+      _warn "git not available; skipping agent lint"
+      return 0
+   fi
+
+   local staged_files
+   staged_files="$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' 2>/dev/null || true)"
+   if [[ -z "$staged_files" ]]; then
+      return 0
+   fi
+
+   local rules_file="${SCRIPT_DIR}/etc/agent/lint-rules.md"
+   if [[ ! -r "$rules_file" ]]; then
+      _warn "Lint rules file missing; skipping agent lint"
+      return 0
+   fi
+
+   local prompt
+   prompt="Review the following staged shell files for architectural violations.\n\nRules:\n$(cat "$rules_file")\n\nFiles:\n$staged_files"
+
+   _k3d_manager_copilot -p "$prompt"
+}
+
+function _agent_audit() {
+   if ! command -v git >/dev/null 2>&1; then
+      _warn "git not available; skipping agent audit"
+      return 0
+   fi
+
+   local status=0
+   local diff_bats
+   diff_bats="$(git diff -- '*.bats' 2>/dev/null || true)"
+   if [[ -n "$diff_bats" ]]; then
+      if grep -q '^-[[:space:]]*assert_' <<<"$diff_bats"; then
+         _warn "Agent audit: assertions removed from BATS files"
+         status=1
+      fi
+
+      local removed_tests added_tests
+      removed_tests=$(grep -c '^-[[:space:]]*@test ' <<<"$diff_bats" || true)
+      added_tests=$(grep -c '^+[[:space:]]*@test ' <<<"$diff_bats" || true)
+      if (( removed_tests > added_tests )); then
+         _warn "Agent audit: number of @test blocks decreased in BATS files"
+         status=1
+      fi
+   fi
+
+   local changed_sh
+   changed_sh="$(git diff --name-only -- '*.sh' 2>/dev/null || true)"
+   if [[ -n "$changed_sh" ]]; then
+      local max_if="${AGENT_AUDIT_MAX_IF:-8}"
+      local file
+      for file in $changed_sh; do
+         [[ -f "$file" ]] || continue
+         local offenders
+         offenders=$(awk -v max_if="$max_if" '
+            function emit(func,count){
+              if(func != "" && count > max_if){printf "%s:%d\n", func, count}
+            }
+            /^[ \t]*function[ \t]+/ {
+              line=$0
+              gsub(/^[ \t]*function[ \t]+/, "", line)
+              func=line
+              gsub(/\(.*/, "", func)
+              emit(current_func, if_count)
+              current_func=func
+              if_count=0
+              next
+            }
+            /\bif\b/ {
+              count=gsub(/\bif\b/, "&")
+              if_count+=count
+            }
+            END {
+              emit(current_func, if_count)
+            }
+         ' "$file")
+
+         if [[ -n "$offenders" ]]; then
+            _warn "Agent audit: $file exceeds if-count threshold in: $offenders"
+            status=1
+         fi
+      done
+   fi
+
+   return "$status"
+}
