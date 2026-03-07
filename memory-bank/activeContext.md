@@ -21,26 +21,24 @@
 | 5 | Create `lib-foundation` repository | Owner | pending |
 | 6 | Extract `core.sh` + `system.sh` via git subtree | Codex | pending |
 
-## Codex Next Task — _agent_audit Hardening + Pre-commit Hook
-
-Task spec: `docs/plans/v0.6.4-codex-agent-audit-hardening.md`
-
-**Goal:** Add two mechanical checks to `_agent_audit` in `scripts/lib/agent_rigor.sh`:
-1. Bare sudo detection — flag direct `sudo` calls bypassing `_run_command`
-2. Credential pattern in `kubectl exec` args — flag inline secrets
-
-Then create `.git/hooks/pre-commit` to wire `_agent_audit` to every commit.
-Pure logic — no cluster, no sudo, runs on macOS.
-
----
-
 ## Gemini Next Task — Contract BATS Tests
 
 Task spec: `docs/plans/v0.6.4-gemini-contract-bats.md`
 
 **Goal:** Create `scripts/tests/lib/provider_contract.bats` — 30 individual `@test` blocks
 (3 providers × 10 required functions) asserting every provider implements the full interface.
-Pure logic — no cluster, runs on macOS. Create new file only — do NOT modify any existing file.
+Pure logic — no cluster, runs on macOS.
+
+**Steps:**
+1. Read the full task spec at `docs/plans/v0.6.4-gemini-contract-bats.md`
+2. Create `scripts/tests/lib/provider_contract.bats` — new file only, do NOT modify any existing file
+3. Run `./scripts/k3d-manager test all 2>&1 | tail -10` and confirm all pass
+4. Self-commit the new file
+5. Update memory-bank to report completion with total BATS count
+
+**Completed by Codex (tasks 2+3):**
+- `_agent_audit` hardening — bare sudo detection + credential pattern check: DONE
+- Pre-commit hook wired to `.git/hooks/pre-commit`: DONE
 
 ---
 
