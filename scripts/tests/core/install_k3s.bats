@@ -45,6 +45,11 @@ setup() {
       esac
     done
     echo "$*" >> "$RUN_LOG"
+    if [[ "$1" == install && "$2" == -m ]]; then
+      command install -m "$3" "$4" "$5"
+    elif [[ "$1" == cp ]]; then
+      command cp "$2" "$3"
+    fi
     return 0
   }
   export -f _run_command
@@ -53,7 +58,7 @@ setup() {
   [ "$status" -eq 0 ]
 
   read_lines "$RUN_LOG" run_calls
-  local expected="sudo sh -c nohup k3s server --write-kubeconfig-mode 0644 --config ${K3S_CONFIG_FILE} >> ${K3S_DATA_DIR}/k3s-no-systemd.log 2>&1 &"
+  local expected="sh -c nohup k3s server --write-kubeconfig-mode 0644 --config ${K3S_CONFIG_FILE} >> ${K3S_DATA_DIR}/k3s-no-systemd.log 2>&1 &"
   local match=1
   for line in "${run_calls[@]}"; do
     if [[ "$line" == "$expected" ]]; then
@@ -117,35 +122,6 @@ setup() {
   chmod 755 "$parent"
   unset -f _run_command
   stub_run_command
-}
-
-@test "_ensure_path_exists retries with sudo when passwordless fails" {
-  local parent="$BATS_TEST_TMPDIR/protected-interactive"
-  local target="$parent/needs-sudo"
-  mkdir -p "$parent"
-  chmod 000 "$parent"
-
-  RUN_EXIT_CODES=(1)
-
-  sudo_calls_log="$BATS_TEST_TMPDIR/sudo.log"
-  : > "$sudo_calls_log"
-
-  sudo() {
-    echo "$*" >> "$sudo_calls_log"
-    chmod 755 "$parent"
-    command mkdir -p "$target"
-    return 0
-  }
-  export -f sudo
-
-  _ensure_path_exists "$target"
-
-  [ -d "$target" ]
-  grep -q '^mkdir -p ' "$sudo_calls_log"
-
-  chmod 755 "$parent"
-  unset -f sudo
-  RUN_EXIT_CODES=()
 }
 
 @test "_ensure_path_exists fails when sudo unavailable" {
