@@ -93,6 +93,31 @@ desktop client (Claude Desktop, OpenAI Codex, ChatGPT Atlas, Perplexity Comet).
   - These guards complement existing shell-layer protections (`_args_have_sensitive_flag`,
     `_run_command` privilege model, Vault + ESO secret injection). Defense in depth — not a replacement.
 
+- **Testing Strategy:** Two-layer approach — own the regression layer, use MCPSpec as an external audit layer.
+
+  **Layer 1 — Roll our own (BATS-based MCP harness):**
+  We control the server, so we control the test surface. Three files:
+  - `scripts/tests/mcp/harness.sh` — sends JSON-RPC tool calls via stdio, captures responses
+  - `scripts/tests/mcp/audit.sh` — scans tool descriptions for prompt injection patterns,
+    excessive permissions, undocumented side effects
+  - `scripts/tests/mcp/*.bats` — one test suite per exposed tool
+
+  Each BATS test: send a tool call → assert response shape + exit code → assert no credential
+  leak in args. Record-replay via BATS fixtures: capture a tool call + response as a fixture file,
+  replay against new server versions to detect regressions. Run with `env -i` clean environment —
+  same rule as all other BATS suites.
+
+  **Layer 2 — MCPSpec as external audit (not regression):**
+  Run `mcpspec audit` against `k3dm-mcp` as a CI gate for security rule coverage.
+  Use pre-built MCPSpec collections for any third-party MCP servers we consume.
+  Do NOT depend on MCPSpec for core regression coverage — record-replay fragility
+  (timestamps, UUIDs, non-deterministic output) makes it unsuitable as a primary test layer.
+
+  **What we do NOT build:**
+  - Dashboard UI — not worth it for a local dev tool
+  - Quality scoring — vanity metric without reproducible criteria
+  - Active security probing — `_agent_audit` + credential scan in MCP args covers our threat model
+
 ## v0.8.1 — Trace UI (Optional)
 *Focus: Visual observability for local dev — no hard dependencies*
 
