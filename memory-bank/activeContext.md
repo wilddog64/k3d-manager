@@ -21,31 +21,26 @@
 | 5 | Create `lib-foundation` repository | Owner | pending |
 | 6 | Extract `core.sh` + `system.sh` via git subtree | Codex | pending |
 
-## Gemini Next Task — Fix BATS Default Version + Re-run Phase 5
+## Codex Next Task — _agent_audit Hardening + Pre-commit Hook
 
-Task spec: `docs/plans/v0.6.4-codex-bats-version-fix.md` (originally written for Codex — same spec applies)
+Task spec: `docs/plans/v0.6.4-codex-agent-audit-hardening.md`
 
-**Why Gemini, not Codex:** Fix requires running on Ubuntu to verify BATS installs cleanly.
-Codex has no sudo/cluster access. This is an exception to the Codex-owns-production-code rule —
-the fix is two lines with no logic complexity, safe for Gemini to apply directly.
+**Goal:** Add two mechanical checks to `_agent_audit` in `scripts/lib/agent_rigor.sh`:
+1. Bare sudo detection — flag direct `sudo` calls bypassing `_run_command`
+2. Credential pattern in `kubectl exec` args — flag inline secrets
 
-**Claude review of Gemini Phase 1-5 report — VERIFIED:**
-- Phase 1 destroy_cluster: PASS
-- Phase 2 create_cluster: PASS — `_detect_platform` returns `debian` confirmed
-- Phase 3 deploy_cluster: PASS — full stack deployed
-- Phase 4 smoke tests: PASS — Vault, ESO, Istio
-- Phase 5 BATS: BLOCKED — `_install_bats_from_source` defaults to `1.10.0` (non-existent tag, 404)
-- Gemini report accurate.
+Then create `.git/hooks/pre-commit` to wire `_agent_audit` to every commit.
+Pure logic — no cluster, no sudo, runs on macOS.
 
-**Protocol note to Gemini:** Self-commit rule applies to issue docs and memory-bank updates too.
-The issue doc and memory-bank updates from Phase 5 were left unstaged. Commit every artifact you create.
+---
 
-**Steps:**
-1. Edit `scripts/lib/system.sh` — change both `1.10.0` defaults to `1.11.0` (lines 1209 and 1295)
-2. Run `shellcheck scripts/lib/system.sh` — report output
-3. Self-commit the fix
-4. Re-run Phase 5: `CLUSTER_PROVIDER=k3s ./scripts/k3d-manager test all 2>&1`
-5. Report result + update memory-bank to mark Task 1 complete
+## Gemini Next Task — Contract BATS Tests
+
+Task spec: `docs/plans/v0.6.4-gemini-contract-bats.md`
+
+**Goal:** Create `scripts/tests/lib/provider_contract.bats` — 30 individual `@test` blocks
+(3 providers × 10 required functions) asserting every provider implements the full interface.
+Pure logic — no cluster, runs on macOS. Create new file only — do NOT modify any existing file.
 
 ---
 
