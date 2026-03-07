@@ -15,7 +15,8 @@
 |---|---|---|---|
 | 1 | BATS tests for `_agent_audit` bare sudo + kubectl exec credential scan | Gemini | pending — spec: `docs/plans/v0.6.5-gemini-agent-audit-bats.md` |
 | 2 | Create `lib-foundation` repository + branch protection + CI | Owner | ✅ done — https://github.com/wilddog64/lib-foundation |
-| 3 | Extract `core.sh` + `system.sh` into lib-foundation | Codex | ⚠️ blocked — `core.sh` ✅, `system.sh` shellcheck fails (SC2016×14, SC2046, SC2086×2, SC2155×3). See `docs/issues/2026-03-07-lib-foundation-shellcheck-failures.md` |
+| 3 | Extract `core.sh` + `system.sh` into lib-foundation | Codex | ✅ done — shellcheck fixed, PR #1 open on lib-foundation, CI green |
+| 4 | Replace awk if-count check with pure bash in `_agent_audit` | Codex | **active** — spec: `docs/plans/v0.6.5-codex-awk-bash-rewrite.md` |
 
 ---
 
@@ -137,17 +138,11 @@ Agent reads + acts
 
 ---
 
-## Codex Backlog
-
-- [ ] Fix `_agent_audit` awk → pure bash rewrite — spec: `docs/plans/v0.6.5-codex-awk-bash-rewrite.md`, issue: `docs/issues/2026-03-07-agent-audit-awk-macos-compat.md`. Edit only `agent_rigor.sh` lines 112–132. Must be bash 3.2+ compatible — no `declare -A`, no `mapfile`.
-
----
-
 ## Open Items
 
 - [ ] BATS tests for `_agent_audit` new checks (v0.6.5 — Gemini)
-- [ ] Create `lib-foundation` repository (owner)
-- [ ] Extract `core.sh` + `system.sh` via git subtree (Codex — blocked on above)
+- [x] Create `lib-foundation` repository (owner) — ✅ done
+- [x] Extract `core.sh` + `system.sh` via git subtree (Codex) — ✅ done, PR #1 open on lib-foundation
 - [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data / apps deployment on Ubuntu
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner)
