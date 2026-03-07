@@ -26,40 +26,24 @@ Key objectives:
 
 ---
 
-## Gemini Next Task — Phase 2 Rebuild Gate
+## Codex Next Task — Fix install_k3s.bats Regressions
 
-Codex Phase 2 delivered and reviewed by Claude (PASS). The refactored functions
-(`_ensure_path_exists`, `_k3s_start_server`, `_k3s_stage_file`, `_install_k3s`,
-`_install_docker`, `_create_nfs_share`, `deploy_cluster` platform detection) all
-run during a live cluster lifecycle. A full teardown/rebuild is required to validate
-them before PR.
+Phase 2 rebuild PASS. Gemini found 3 test regressions in `install_k3s.bats` caused by
+the de-bloat refactoring. All fixes are test-only.
 
-Task spec: `docs/plans/v0.6.3-gemini-cluster-rebuild.md` — same procedure as Phase 1.
+Task spec: `docs/plans/v0.6.3-codex-install-k3s-bats-fix.md`
 
-**Run all 5 phases:**
-1. `./scripts/k3d-manager destroy_cluster`
-2. `./scripts/k3d-manager create_cluster`
-3. `./scripts/k3d-manager deploy_cluster`
-4. `./scripts/k3d-manager test_vault && ./scripts/k3d-manager test_eso && ./scripts/k3d-manager test_istio`
-5. `./scripts/k3d-manager test all`
+**Fixes:**
+- **Fix A**: Delete `@test "_ensure_path_exists retries with sudo when passwordless fails"` — sudo-retry behavior was removed in de-bloat.
+- **Fix B**: Remove `sudo ` prefix from `expected` string in `_start_k3s_service` test — stub logs `sh -c ...` not `sudo sh -c ...`.
+- **Fix C**: In `_install_k3s renders config and manifest`, update local `_run_command` stub to actually execute `command install -m` / `command cp` so the rendered config file lands on disk for `[ -f ]` assertions.
 
-**Report format (required):**
-```
-Phase 1 — destroy_cluster:  PASS / FAIL
-Phase 2 — create_cluster:   PASS / FAIL
-Phase 3 — deploy_cluster:   PASS / FAIL
-Phase 4 — smoke tests:
-  test_vault:  PASS / FAIL
-  test_eso:    PASS / FAIL
-  test_istio:  PASS / FAIL
-Phase 5 — BATS suite: X/Y passing
-```
-
-**Rules:**
-- Do not modify any production code or test files.
-- Do not modify `memory-bank/` — Claude owns memory-bank writes.
-- Do not commit — Claude reviews and commits.
-- Report each phase individually with full error output on any failure.
+**Rules (as always):**
+- Test files only — no production code changes.
+- Do not update `memory-bank/`. Claude owns all memory-bank writes.
+- Do not commit. Claude reviews and commits.
+- Run `shellcheck` on the changed file and report output.
+- Report each fix individually with file + line numbers.
 
 ---
 
@@ -116,7 +100,7 @@ Phase 5 — BATS suite: X/Y passing
 | v0.1.0–v0.6.1 | released | See CHANGE.md |
 | v0.6.2 | **released** | AI Tooling + Agent Rigor + Security hardening |
 | v0.6.3 | **active** | Refactoring (De-bloat) + `rigor-cli` Integration |
-| v0.6.4 | planned | lib-foundation extraction via git subtree |
+| v0.6.4 | planned | Linux k3s validation gate + lib-foundation extraction via git subtree |
 | v0.7.0 | planned | Keycloak provider + App Cluster deployment |
 | v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) |
 | v1.0.0 | vision | Reassess after v0.7.0; see `docs/plans/roadmap-v1.md` |
