@@ -1,5 +1,26 @@
 # Changes - k3d-manager
 
+## v0.6.3 — Refactoring & Digital Auditor — dated 2026-03-06
+
+### Refactoring
+- **Permission cascade elimination**: Collapsed 7 multi-attempt sudo escalation patterns across `core.sh` into single `_run_command --prefer-sudo` calls (`_ensure_path_exists`, `_k3s_stage_file`, `_install_k3s`, `_start_k3s_service`, `_install_docker`, `_create_nfs_share`, `deploy_cluster`).
+- **`_detect_platform` helper**: New single source of truth for OS detection in `system.sh` — returns `mac`, `wsl`, `debian`, `redhat`, or `linux`. Replaces scattered inline `_is_mac`/`_is_debian_family` dispatch chains in `core.sh`.
+- **`_create_nfs_share_mac` extracted**: Relocated from `core.sh` to `system.sh` with quoting fixes (`"$HOME/k3d-nfs"`). `core.sh` now delegates via a guarded wrapper.
+- **`_run_command` TTY flakiness fixed**: Removed `auto_interactive` block — `[[ -t 0 ]]` TTY detection caused CI vs local behaviour divergence. Privilege escalation now determined solely by flags (`--prefer-sudo`, `--require-sudo`).
+
+### Added
+- **`_agent_lint`** (`scripts/lib/agent_rigor.sh`): Copilot-backed architectural linter. Gated on `K3DM_ENABLE_AI=1`. Reads rules from `scripts/etc/agent/lint-rules.md` and reviews staged `.sh` files for violations before commit.
+- **`_agent_audit`** (`scripts/lib/agent_rigor.sh`): Pure-bash post-implementation rigor check. Detects test weakening (removed assertions, decreased `@test` count), excessive `if`-density per function, and runs `shellcheck` on changed files.
+- **Agent lint rules** (`scripts/etc/agent/lint-rules.md`): 5 architectural rules enforced by `_agent_lint` — no permission cascades, centralised platform detection, secret hygiene, namespace isolation, prompt scope.
+- **BATS suite** (`scripts/tests/lib/agent_rigor.bats`): Tests for `_agent_checkpoint`, `_agent_lint`, and `_agent_audit`.
+
+### Verification
+- BATS suite: 124/124 passing (1 test removed — sudo-retry behaviour intentionally eliminated by permission cascade de-bloat).
+- Full infra cluster teardown/rebuild verified on OrbStack (macOS ARM64): Vault, ESO, Istio, OpenLDAP, Jenkins, ArgoCD, Keycloak all healthy.
+- Individual smoke tests passed: `test_vault`, `test_eso`, `test_istio`.
+
+---
+
 ## v0.6.2 — Copilot CLI & Agent Rigor — dated 2026-03-06
 
 ### Added
