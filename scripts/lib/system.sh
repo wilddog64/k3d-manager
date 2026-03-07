@@ -678,6 +678,35 @@ function _is_wsl() {
    fi
 }
 
+function _detect_platform() {
+   if _is_mac; then
+      printf 'mac\n'
+      return 0
+   fi
+
+   if _is_wsl; then
+      printf 'wsl\n'
+      return 0
+   fi
+
+   if _is_debian_family; then
+      printf 'debian\n'
+      return 0
+   fi
+
+   if _is_redhat_family; then
+      printf 'redhat\n'
+      return 0
+   fi
+
+   if _is_linux; then
+      printf 'linux\n'
+      return 0
+   fi
+
+   _err "Unsupported platform: $(uname -s)"
+}
+
 function _install_colima() {
    if ! _command_exist colima ; then
       echo colima does not exist, install it
@@ -688,9 +717,9 @@ function _install_colima() {
 }
 
 function _install_mac_docker() {
-   local cpu="${1:-${COLIMA_CPU:-4}}"
-   local memory="${2:-${COLIMA_MEMORY:-8}}"
-   local disk="${3:-${COLIMA_DISK:-20}}"
+  local cpu="${1:-${COLIMA_CPU:-4}}"
+  local memory="${2:-${COLIMA_MEMORY:-8}}"
+  local disk="${3:-${COLIMA_DISK:-20}}"
 
    if  ! _command_exist docker && _is_mac ; then
       echo docker does not exist, install it
@@ -713,6 +742,35 @@ function _install_mac_docker() {
    #    echo "export DOCKER_CONTEXT=colima" >> $HOME/.zsh/zshrc
    #    echo "restart your shell to apply the changes"
    # fi
+}
+
+function _create_nfs_share_mac() {
+   local share_path="${1:-${HOME}/k3d-nfs}"
+   _ensure_path_exists "$share_path"
+
+   if grep -q "$share_path" /etc/exports 2>/dev/null; then
+      _info "NFS share already exists at $share_path"
+      return 0
+   fi
+
+   local ip mask prefix network
+   ip=$(ipconfig getifaddr en0 2>/dev/null || true)
+   mask=$(ipconfig getoption en0 subnet_mask 2>/dev/null || true)
+
+   if [[ -z "$ip" || -z "$mask" ]]; then
+      _err "Unable to determine network info for NFS share"
+   fi
+
+   prefix=$(python3 -c "import ipaddress; print(ipaddress.IPv4Network('0.0.0.0/$mask').prefixlen)" 2>/dev/null || true)
+   network=$(python3 -c "import ipaddress; print(ipaddress.IPv4Network('$ip/$prefix', strict=False).network_address)" 2>/dev/null || true)
+
+   local export_line
+   export_line="${share_path} -alldirs -rw -insecure -mapall=$(id -u):$(id -g) -network $network -mask $mask"
+
+   printf '%s\n' "$export_line" | _run_command --prefer-sudo -- tee -a /etc/exports >/dev/null
+   _run_command --prefer-sudo -- nfsd enable
+   _run_command --prefer-sudo -- nfsd restart
+   _run_command --soft -- showmount -e localhost >/dev/null || true
 }
 
 function _orbstack_cli_ready() {
