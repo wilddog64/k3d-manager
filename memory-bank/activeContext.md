@@ -19,56 +19,47 @@ Key objectives:
 1. **Fix `_run_command` TTY flakiness** — remove `auto_interactive` block (Codex) ✅ done 2026-03-06
 2. **Phase 1 Verification** — BATS 125/125 PASS, E2E Cluster rebuild success (Gemini) ✅ done 2026-03-06
 3. De-bloat `system.sh` and `core.sh` — remove permission cascade anti-patterns (Codex) ✅ done 2026-03-06
-4. Implement `_agent_lint` in `agent_rigor.sh` — digital auditor via copilot-cli (Codex) ✅ done 2026-03-06
+4. Implement `_agent_lint` + `_agent_audit` in `agent_rigor.sh` (Codex) ✅ done 2026-03-06 — Claude reviewed: PASS
 5. BATS suite: `scripts/tests/lib/agent_rigor.bats` (Gemini) ✅ done 2026-03-06
-6. Claude: review all diffs, run full BATS suite locally, commit, open PR
+6. **Phase 2 Verification** — teardown/rebuild gate (Gemini) ⏳ active
+7. Claude: final BATS run, commit, open PR
 
 ---
 
-## Codex Next Tasks (v0.6.3 Phase 2)
+## Gemini Next Task — Phase 2 Rebuild Gate
 
-Phase 1 complete and independently verified by Claude: **125/125 BATS passing locally**,
-`run_command.bats` tests 1 & 2 confirmed passing, smoke tests PASS.
+Codex Phase 2 delivered and reviewed by Claude (PASS). The refactored functions
+(`_ensure_path_exists`, `_k3s_start_server`, `_k3s_stage_file`, `_install_k3s`,
+`_install_docker`, `_create_nfs_share`, `deploy_cluster` platform detection) all
+run during a live cluster lifecycle. A full teardown/rebuild is required to validate
+them before PR.
 
-Codex proceeds with Phase 2. Plan: `docs/plans/v0.6.3-refactor-and-audit.md`.
+Task spec: `docs/plans/v0.6.3-gemini-cluster-rebuild.md` — same procedure as Phase 1.
 
-### Standing Rules (apply to every task)
-- Report each fix individually with file and line numbers changed.
-- Run `shellcheck` on every touched file and report output.
-- Do not modify test files (`*.bats`) — Gemini owns those.
+**Run all 5 phases:**
+1. `./scripts/k3d-manager destroy_cluster`
+2. `./scripts/k3d-manager create_cluster`
+3. `./scripts/k3d-manager deploy_cluster`
+4. `./scripts/k3d-manager test_vault && ./scripts/k3d-manager test_eso && ./scripts/k3d-manager test_istio`
+5. `./scripts/k3d-manager test all`
+
+**Report format (required):**
+```
+Phase 1 — destroy_cluster:  PASS / FAIL
+Phase 2 — create_cluster:   PASS / FAIL
+Phase 3 — deploy_cluster:   PASS / FAIL
+Phase 4 — smoke tests:
+  test_vault:  PASS / FAIL
+  test_eso:    PASS / FAIL
+  test_istio:  PASS / FAIL
+Phase 5 — BATS suite: X/Y passing
+```
+
+**Rules:**
+- Do not modify any production code or test files.
 - Do not modify `memory-bank/` — Claude owns memory-bank writes.
 - Do not commit — Claude reviews and commits.
-- STOP after all listed fixes. Do not proceed to the next task without Claude go-ahead.
-
-### Task 1 — De-bloat `scripts/lib/core.sh` (permission cascade anti-patterns)
-
-Targets (see plan for full before/after):
-- `_ensure_path_exists` — collapse 4-attempt mkdir cascade to single `_run_command --prefer-sudo`
-- `_k3s_start_server` — collapse 4-attempt sh cascade to 2-path (root vs non-root)
-- `_setup_kubeconfig` — collapse dual permission checks to single `_run_command --prefer-sudo` per op
-- `_install_k3s` file ops — collapse dual writable-check pattern to direct `_run_command --prefer-sudo`
-
-After all targets done: `shellcheck scripts/lib/core.sh` — report output.
-
-### Task 2 — De-bloat `scripts/lib/system.sh` (OS dispatch consolidation)
-
-Targets (see plan for full before/after):
-- Add `_detect_platform` helper (returns `mac`/`wsl`/`debian`/`redhat`/`linux` or error)
-- `_install_docker` — replace 4-branch inline switch with `_detect_platform` dispatch
-- `deploy_cluster` platform detection — replace 5-branch cascade with `_detect_platform`
-- `_create_nfs_share` — extract `_create_nfs_share_mac` to system.sh, guard in core.sh
-
-After all targets done: `shellcheck scripts/lib/system.sh` — report output.
-
-### Task 3 — Implement `_agent_lint` in `scripts/lib/agent_rigor.sh`
-
-See plan Component 2 for full spec. Key rules enforced:
-- No permission cascades (>1 sudo escalation path for same op)
-- OS dispatch via `_detect_platform` (not raw inline chains)
-- Secret hygiene (no tokens in kubectl exec args)
-- Namespace isolation (no `kubectl apply` without `-n`)
-
-After implementation: `shellcheck scripts/lib/agent_rigor.sh` — report output.
+- Report each phase individually with full error output on any failure.
 
 ---
 
