@@ -112,14 +112,16 @@ function _agent_audit() {
          local current_func="" if_count=0 line
          local offenders_lines=""
          while IFS= read -r line; do
-            if [[ $line =~ ^[[:space:]]*function[[:space:]]+([A-Za-z0-9_]+) ]]; then
+            if [[ $line =~ ^[[:space:]]*function[[:space:]]+ ]]; then
                if [[ -n "$current_func" && $if_count -gt $max_if ]]; then
                   offenders_lines+="${current_func}:${if_count}"$'\n'
                fi
-               current_func="${BASH_REMATCH[1]}"
+               current_func="${line#*function }"
+               current_func="${current_func%%(*}"
+               current_func="${current_func//[[:space:]]/}"
                if_count=0
             elif [[ $line =~ ^[[:space:]]*if[[:space:]\(] ]]; then
-               ((if_count++))
+               ((++if_count))
             fi
          done < "$file"
 
@@ -157,7 +159,7 @@ function _agent_audit() {
    local diff_sh
    diff_sh="$(git diff --cached -- '*.sh' 2>/dev/null || true)"
    if [[ -n "$diff_sh" ]]; then
-      if grep -qE '^\+.*kubectl exec.*(-e |--env).*(TOKEN|PASSWORD|SECRET|KEY)' <<<"$diff_sh"; then
+      if grep -qE '^\+.*kubectl exec.*(TOKEN|PASSWORD|SECRET|KEY)=' <<<"$diff_sh"; then
          _warn "Agent audit: credential pattern detected in kubectl exec args — use Vault/ESO instead"
          status=1
       fi

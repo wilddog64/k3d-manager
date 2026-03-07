@@ -152,7 +152,7 @@ Agent reads + acts
 
 ## Open Items
 
-- [ ] BATS tests for `_agent_audit` new checks (v0.6.5 — Gemini)
+- [x] BATS tests for `_agent_audit` new checks (v0.6.5 — Gemini) — ✅ done
 - [x] Create `lib-foundation` repository (owner) — ✅ done
 - [x] Extract `core.sh` + `system.sh` via git subtree (Codex) — ✅ done, PR #1 open on lib-foundation
 - [ ] ESO deploy on Ubuntu app cluster
