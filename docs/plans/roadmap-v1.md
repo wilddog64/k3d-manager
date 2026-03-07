@@ -60,6 +60,16 @@ desktop client (Claude Desktop, OpenAI Codex, ChatGPT Atlas, Perplexity Comet).
   Each MCP tool call = root span. Each `k3d-manager` subprocess = child span. Output to
   stdout or `/tmp/k3dm.spans`. No external dependencies. Consistent with existing
   `ENABLE_TRACE=1` pattern — off by default, zero overhead when disabled.
+- **One AI Layer Rule:** When k3dm-mcp is the tool being called by an AI agent (Claude Desktop,
+  Codex, etc.), the subprocess env must always set `K3DM_ENABLE_AI=0`. The MCP caller is
+  already the AI reasoning layer — a second AI layer (Copilot CLI) inside the subprocess is
+  redundant, opaque, and a dilution risk.
+  - MCP tool calls must invoke specific deterministic k3d-manager functions, never AI-assisted ones
+  - Structured JSON responses only — no free-form prose that an outer agent must interpret
+  - Audit log per tool call via OTel spans — what was called, what env was set, exit code, output
+  - Violation of this rule means two AI agents are reasoning about the same action with no
+    visibility into each other's logic: error laundering, double confidence, prompt injection risk
+
 - **Environment Isolation:** MCP server must never inherit the parent process environment blindly.
   Each subprocess call to `./scripts/k3d-manager` receives an explicitly constructed env:
   - `SCRIPT_DIR` resolved to an absolute path at server startup
