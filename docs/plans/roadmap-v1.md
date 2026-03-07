@@ -60,6 +60,17 @@ desktop client (Claude Desktop, OpenAI Codex, ChatGPT Atlas, Perplexity Comet).
   Each MCP tool call = root span. Each `k3d-manager` subprocess = child span. Output to
   stdout or `/tmp/k3dm.spans`. No external dependencies. Consistent with existing
   `ENABLE_TRACE=1` pattern — off by default, zero overhead when disabled.
+- **Agent Safety Guards:** Structural controls built into the MCP server, not bolted on externally.
+  - **Loop detection:** Same tool called 3+ times with identical args in a session → block and
+    return structured error. Prevents runaway agent loops and cost spirals.
+  - **Session call limit:** Configurable max tool calls per session (`K3DM_MCP_MAX_CALLS`,
+    default: 20). Destructive tools (`destroy_cluster`, force-redeploy) count double.
+  - **Credential scan:** MCP tool arguments scanned for API key, token, and password patterns
+    before forwarding to `k3d-manager`. Block on match — credentials must come from Vault, not args.
+  - **Fast-fail, no retry:** MCP server never retries a failed tool call automatically. Failure
+    returned to calling agent immediately. The agent decides whether to retry with different args.
+  - These guards complement existing shell-layer protections (`_args_have_sensitive_flag`,
+    `_run_command` privilege model, Vault + ESO secret injection). Defense in depth — not a replacement.
 
 ## v0.8.1 — Trace UI (Optional)
 *Focus: Visual observability for local dev — no hard dependencies*
