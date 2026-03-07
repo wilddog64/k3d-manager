@@ -13,9 +13,31 @@
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | Linux k3s validation — 5-phase teardown/rebuild on Ubuntu VM (`CLUSTER_PROVIDER=k3s`) | Gemini | pending |
+| 1 | Linux k3s validation — 5-phase teardown/rebuild on Ubuntu VM (`CLUSTER_PROVIDER=k3s`) | Gemini | ⏳ active |
 | 2 | Create `lib-foundation` repository | Owner | pending |
 | 3 | Extract `core.sh` + `system.sh` via git subtree | Codex | pending |
+
+## Gemini Next Task — Linux k3s Validation
+
+Task spec: `docs/plans/v0.6.4-gemini-linux-k3s-validation.md`
+
+**Goal:** Validate refactored functions (`_ensure_path_exists`, `_start_k3s_service`,
+`_k3s_stage_file`, `_install_k3s`, `_install_docker`, `_detect_platform`, `deploy_cluster`)
+on a real Ubuntu machine before extracting `core.sh`/`system.sh` into `lib-foundation`.
+
+**Run on Ubuntu VM (`ssh ubuntu`, branch `k3d-manager-v0.6.4`):**
+1. `CLUSTER_PROVIDER=k3s ./scripts/k3d-manager destroy_cluster`
+2. `CLUSTER_PROVIDER=k3s ./scripts/k3d-manager create_cluster`
+3. `CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster`
+4. `CLUSTER_PROVIDER=k3s ./scripts/k3d-manager test_vault && test_eso && test_istio`
+5. `CLUSTER_PROVIDER=k3s ./scripts/k3d-manager test all`
+
+**Watch for:** `_detect_platform` returning `debian`, kubeconfig owner after copy (must not be root), systemd path taken by `_start_k3s_service`.
+
+**Rules:**
+- Do not modify production code or test files.
+- Update memory-bank to report completion.
+- Stop and report immediately on any sudo password prompt.
 
 ---
 
