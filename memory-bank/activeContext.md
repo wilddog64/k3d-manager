@@ -137,6 +137,12 @@ Agent reads + acts
 
 ---
 
+## Codex Backlog (needs task spec)
+
+- [ ] Fix `_agent_audit` awk user-defined function — fails on macOS BSD awk, noisy on every commit. See `docs/issues/2026-03-07-agent-audit-awk-macos-compat.md`. Recommended fix: rewrite without user-defined function (Option A).
+
+---
+
 ## Open Items
 
 - [ ] BATS tests for `_agent_audit` new checks (v0.6.5 — Gemini)
