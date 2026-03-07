@@ -139,7 +139,7 @@ Agent reads + acts
 
 ## Codex Backlog (needs task spec)
 
-- [ ] Fix `_agent_audit` awk user-defined function — fails on macOS BSD awk, noisy on every commit. See `docs/issues/2026-03-07-agent-audit-awk-macos-compat.md`. Recommended fix: rewrite without user-defined function (Option A).
+- [ ] Fix `_agent_audit` awk user-defined function — fails on macOS BSD awk, noisy on every commit. See `docs/issues/2026-03-07-agent-audit-awk-macos-compat.md`. Recommended fix: pure bash `while read` rewrite — no external tool, bash 3.2+ compatible (core must not use bash 4.0+ features).
 
 ---
 
