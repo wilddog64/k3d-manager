@@ -87,6 +87,13 @@ Owner
 - Update memory-bank to report completion — this is how you communicate back to Claude.
 - No credentials in task specs or reports — reference env var names only (`$VAULT_ADDR`).
 - Run `shellcheck` on every touched `.sh` file and report output.
+- **NEVER run `git rebase`, `git reset --hard`, or `git push --force` on shared branches.** These rewrite history and break other agents' local copies. Commit forward only.
+- Stay within task spec scope — do not add changes beyond what was specified, even if they seem like improvements. Unsanctioned scope expansion gets reverted.
+
+**Claude awareness — Gemini works on Ubuntu VM:**
+- Gemini commits directly to `k3d-manager-v0.6.4` from the Ubuntu VM repo clone.
+- Always `git pull origin k3d-manager-v0.6.4` before reading or editing any file Gemini may have touched.
+- Conflicts are possible if Claude and Gemini both push to the same branch concurrently.
 
 **Red Team scope (Gemini):**
 - Test existing controls only: `_copilot_prompt_guard`, `_safe_path`, stdin injection, trace isolation.
@@ -103,6 +110,8 @@ Agent reads + acts
 
 **Lessons learned:**
 - Gemini may write stale memory-bank content — Claude reviews every update before writing next task.
+- Gemini expands scope beyond task spec — spec must explicitly state what is forbidden, not just what is required.
+- Gemini ran `git rebase -i` on a shared branch and left it in a conflicted state — destructive git ops now explicitly forbidden in agent rules.
 - PR sub-branches from Copilot agent (e.g. `copilot/sub-pr-*`) may conflict — evaluate and close if our implementation is superior.
 
 ---
