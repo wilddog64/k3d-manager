@@ -58,6 +58,16 @@ Tick each item as you complete it. Do not add items.
 <verification command>
 ```
 
+**For BATS test tasks — always verify in a clean environment:**
+
+```bash
+# Unset residual shell state before running — catches env-dependent false positives
+env -i HOME="$HOME" PATH="$PATH" ./scripts/k3d-manager test <suite> 2>&1 | tail -10
+```
+
+Never report a test as passing if it was only run in an interactive shell session
+where `SCRIPT_DIR`, `CLUSTER_PROVIDER`, or other k3d-manager env vars may be set.
+
 ---
 
 ## Completion Report (required)
