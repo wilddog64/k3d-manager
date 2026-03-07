@@ -45,7 +45,7 @@ Plans: `docs/plans/v0.6.3-refactor-and-audit.md`, `docs/plans/v0.6.3-codex-run-c
 - [x] BATS suite: `scripts/tests/lib/agent_rigor.bats` (Gemini) ✅
 - [x] Gemini Phase 2: Teardown/Rebuild verification — PASS; found 3 regressions in install_k3s.bats
 - [x] Codex: Fix install_k3s.bats regressions A, B, C (task: `docs/plans/v0.6.3-codex-install-k3s-bats-fix.md`)
-- [ ] Claude: final BATS run locally, review, commit, PR
+- [x] Claude: BATS 124/124 PASS, changelog written, PR open
 
 ### Priority 2 — v0.6.4
 

@@ -27,58 +27,9 @@ Key objectives:
 
 ---
 
-## Codex Next Task — Fix C only (install_k3s.bats)
+## Status — v0.6.3 COMPLETE
 
-Fix A and Fix B were completed correctly. Fix C was applied to the wrong test.
-
-**What went wrong:** The `install`/`cp` execution branch was added to the
-`_start_k3s_service` test's `_run_command` stub. It should be in the
-`_install_k3s renders config and manifest` test, which has no local stub — it uses
-the global `stub_run_command` from `setup()`, which is a no-op.
-
-**Fix C (corrected):**
-
-File: `scripts/tests/core/install_k3s.bats`
-Test: `@test "_install_k3s renders config and manifest"` (currently line 149)
-
-Add a local `_run_command` stub inside this test, before the `_install_k3s mycluster`
-call, that executes real filesystem operations for `mkdir`, `install -m`, and `cp`:
-
-```bash
-_run_command() {
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --no-exit|--soft|--quiet|--prefer-sudo|--require-sudo) shift ;;
-      --probe) shift 2 ;;
-      --) shift; break ;;
-      *) break ;;
-    esac
-  done
-  echo "$*" >> "$RUN_LOG"
-  if [[ "$1" == "mkdir" && "$2" == "-p" ]]; then
-    command mkdir -p "$3"
-  elif [[ "$1" == "install" && "$2" == "-m" ]]; then
-    command install -m "$3" "$4" "$5"
-  elif [[ "$1" == "cp" ]]; then
-    command cp "$2" "$3"
-  fi
-  return 0
-}
-export -f _run_command
-```
-
-Also restore `stub_run_command` at the end of the test (after the assertions) to avoid
-leaking the local stub into subsequent tests.
-
-Also remove the dead `install`/`cp` branch that was incorrectly added to the
-`_start_k3s_service` test stub (lines 48–52 in current file) — it serves no purpose
-there and is misleading.
-
-**Rules:**
-- Test file only — no production code changes.
-- Run `shellcheck scripts/tests/core/install_k3s.bats` and report output.
-- Run `./scripts/k3d-manager test install_k3s 2>&1` and report full TAP output.
-- Commit your changes and update memory-bank to report completion.
+All tasks done. BATS 124/124 passing. PR open — see GitHub for review status.
 
 ---
 
@@ -150,7 +101,7 @@ Agent reads + acts
 |---|---|---|
 | v0.1.0–v0.6.1 | released | See CHANGE.md |
 | v0.6.2 | **released** | AI Tooling + Agent Rigor + Security hardening |
-| v0.6.3 | **active** | Refactoring (De-bloat) + `rigor-cli` Integration |
+| v0.6.3 | **PR open** | Refactoring (De-bloat) + Digital Auditor |
 | v0.6.4 | planned | Linux k3s validation gate + lib-foundation extraction via git subtree |
 | v0.7.0 | planned | Keycloak provider + App Cluster deployment |
 | v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) |
