@@ -138,6 +138,7 @@ Agent reads + acts
 
 ## Open Items
 
+- [ ] Refactor `deploy_cluster` — 12 if-blocks exceeds threshold of 8. Extract `_deploy_cluster_resolve_provider` helper. Also fix duplicate mac+k3s guard. Issue: `docs/issues/2026-03-07-deploy-cluster-if-count-violation.md`
 - [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data / apps deployment on Ubuntu
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner)

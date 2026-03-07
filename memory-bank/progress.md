@@ -58,6 +58,7 @@
 | Item | Status | Notes |
 |---|---|---|
 | GitGuardian: 1 internal secret incident (2026-02-28) | OPEN | False positive — mark in dashboard. |
+| `deploy_cluster` if-count violation (12 > 8) | OPEN | Extract `_deploy_cluster_resolve_provider`. Fix duplicate mac+k3s guard. See `docs/issues/2026-03-07-deploy-cluster-if-count-violation.md`. Target: v0.7.0. |
 | `CLUSTER_NAME` env var ignored during `deploy_cluster` | OPEN | See `docs/issues/2026-03-01-cluster-name-env-var-not-respected.md`. |
 | `deploy_jenkins` (no flags) broken | OPEN | Use `--enable-vault` as workaround. |
 | No `scripts/tests/plugins/jenkins.bats` suite | BACKLOG | Future work. |
