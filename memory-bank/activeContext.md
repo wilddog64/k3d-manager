@@ -112,6 +112,7 @@ Agent reads + acts
 - Gemini may write stale memory-bank content — Claude reviews every update before writing next task.
 - Gemini expands scope beyond task spec — spec must explicitly state what is forbidden, not just what is required.
 - Gemini ran `git rebase -i` on a shared branch and left it in a conflicted state — destructive git ops now explicitly forbidden in agent rules.
+- Gemini pushed scope-expanded URL change despite "two lines only" spec — accepted this time (tested, 124/124 BATS pass on Ubuntu). Future violations get reverted regardless of outcome.
 - PR sub-branches from Copilot agent (e.g. `copilot/sub-pr-*`) may conflict — evaluate and close if our implementation is superior.
 
 ---
