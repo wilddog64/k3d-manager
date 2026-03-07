@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck
+        run: |
+          shfiles=$(find scripts/lib -name '*.sh' 2>/dev/null || true)
+          if [[ -z "$shfiles" ]]; then
+            echo "No .sh files found — skipping (pre-extraction)"
+            exit 0
+          fi
+          echo "$shfiles" | xargs shellcheck
+
+  bats:
+    name: bats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install BATS 1.13.0
+        run: |
+          curl -fsSL \
+            https://github.com/bats-core/bats-core/archive/refs/tags/v1.13.0.tar.gz \
+            | tar -xz -C /tmp
+          sudo /tmp/bats-core-1.13.0/install.sh /usr/local
+
+      - name: Run BATS tests
+        run: |
+          testfiles=$(find scripts/tests/lib -name '*.bats' 2>/dev/null || true)
+          if [[ -z "$testfiles" ]]; then
+            echo "No .bats files found — skipping (pre-extraction)"
+            exit 0
+          fi
+          env -i HOME="$HOME" PATH="$PATH" bats scripts/tests/lib/
