@@ -7,6 +7,8 @@
 # Setup providers directory path
 setup() {
   PROVIDERS_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../lib/providers" && pwd)"
+  SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)/scripts"
+  export SCRIPT_DIR
 }
 
 # --- K3D Provider Contract ---
