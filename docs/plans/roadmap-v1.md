@@ -56,6 +56,23 @@ desktop client (Claude Desktop, OpenAI Codex, ChatGPT Atlas, Perplexity Comet).
 - **Implementation:** Thin MCP server (Node.js or Python) that shells out to
   `./scripts/k3d-manager`. Expected scope: a few hundred lines, single repo or
   subdirectory within `k3d-manager`.
+- **Observability:** Structured OpenTelemetry span output, opt-in via `ENABLE_OTEL=1`.
+  Each MCP tool call = root span. Each `k3d-manager` subprocess = child span. Output to
+  stdout or `/tmp/k3dm.spans`. No external dependencies. Consistent with existing
+  `ENABLE_TRACE=1` pattern — off by default, zero overhead when disabled.
+
+## v0.8.1 — Trace UI
+*Focus: Visual observability for local dev*
+
+- **Key Feature:** Jaeger trace UI as an optional sidecar alongside the MCP server.
+- **Implementation:**
+  - `k3dm-mcp start --with-tracing` spins up a single `jaegertracing/all-in-one` Docker container
+  - v0.8.0 OTLP span output exported to Jaeger — no instrumentation changes required
+  - UI available at `localhost:16686` while MCP server is running
+  - Container tears down with the MCP server
+- **No Grafana:** Jaeger's built-in UI is sufficient for local dev. Grafana/Tempo is
+  a shared-team concern, not a local dev tool concern.
+- **Dependency:** Docker (already required for k3d).
 
 ## v1.0.0 — Reassess After v0.7.0
 *Scope TBD — revisit once v0.7.0 ships*
