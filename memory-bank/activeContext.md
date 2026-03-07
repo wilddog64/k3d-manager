@@ -9,12 +9,41 @@
 
 ## Current Focus
 
-**v0.7.0: Keycloak provider + App Cluster deployment**
+**v0.7.0: lib-foundation subtree integration + cluster validation**
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var | Codex | **active** — spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md` |
-| 2 | Implement `_resolve_script_dir` in lib-foundation | Codex | **active** — spec in lib-foundation memory-bank, branch `feature/v0.1.1-script-dir-resolver` |
+| 1 | Set up git subtree — pull lib-foundation into `scripts/lib/foundation/` | Claude | **active** — see plan below |
+| 2 | Update dispatcher source paths to use subtree | Claude | blocked on Task 1 |
+| 3 | Teardown + rebuild infra cluster (OrbStack, macOS ARM64) | Claude | blocked on Task 2 |
+| 4 | Teardown + rebuild k3s cluster (Ubuntu VM) | Gemini | blocked on Task 3 |
+| 5 | Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var | Codex | pending — spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md` |
+
+---
+
+## lib-foundation Subtree Plan
+
+**Goal:** Pull lib-foundation `main` into `scripts/lib/foundation/` via git subtree.
+Source paths updated to use subtree copy. Old `scripts/lib/core.sh` + `system.sh` kept
+initially — removed in follow-up commit after full cluster rebuild passes.
+
+**Two-step approach (reduces blast radius):**
+
+Step 1 — Subtree setup + source path update (Claude):
+- Add lib-foundation remote: `git remote add lib-foundation <url>`
+- `git subtree add --prefix=scripts/lib/foundation lib-foundation main --squash`
+- Update `scripts/k3d-manager` dispatcher to source from `scripts/lib/foundation/`
+- Keep old `scripts/lib/core.sh` + `system.sh` as fallback
+- shellcheck all touched files — must pass
+
+Step 2 — Full cluster validation:
+- Claude: OrbStack teardown → rebuild → verify Vault, ESO, Istio, OpenLDAP, Jenkins, ArgoCD, Keycloak
+- Gemini: Ubuntu k3s teardown → rebuild → verify same stack on Linux
+- Both must pass before PR
+
+Step 3 — Cleanup (after PR approved):
+- Remove old `scripts/lib/core.sh` + `scripts/lib/system.sh`
+- Commit as follow-up on same branch
 
 ---
 
@@ -139,7 +168,10 @@ Agent reads + acts
 
 ## Open Items
 
-- [ ] Refactor `deploy_cluster` — 12 if-blocks exceeds threshold of 8. Extract `_deploy_cluster_resolve_provider` helper. Also fix duplicate mac+k3s guard. Issue: `docs/issues/2026-03-07-deploy-cluster-if-count-violation.md`
+- [ ] lib-foundation git subtree setup + source path update (Claude — Task 1+2)
+- [ ] OrbStack cluster teardown + rebuild validation (Claude — Task 3)
+- [ ] Ubuntu k3s teardown + rebuild validation (Gemini — Task 4)
+- [ ] Refactor `deploy_cluster` — 12 if-blocks exceeds threshold of 8. Extract `_deploy_cluster_resolve_provider` helper. Also fix duplicate mac+k3s guard. Issue: `docs/issues/2026-03-07-deploy-cluster-if-count-violation.md` (Codex — Task 5, after cluster validation)
 - [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data / apps deployment on Ubuntu
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner)
