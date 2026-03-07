@@ -31,7 +31,9 @@
 - [x] Provider contract BATS suite — 30 tests (3 providers × 10 functions)
 - [x] `_provider_orbstack_expose_ingress` missing function added
 - [x] Copilot P1/P2 fixes — `git diff --cached`, diff-based sudo scan, `\b` pattern
-- [x] BATS suite: 154/154 passing
+- [x] BATS suite: 154/154 passing (v0.6.4)
+- [x] `_agent_audit` awk → pure bash rewrite (bash 3.2+, no macOS BSD awk dependency)
+- [x] BATS tests for `_agent_audit` bare sudo + kubectl exec — 4 new tests, suite 9/9, total 158/158
 
 ---
 
@@ -39,9 +41,9 @@
 
 ### Priority 1 — v0.6.5 (active)
 
-- [ ] BATS tests for `_agent_audit` new checks — bare sudo + kubectl exec (Gemini)
-- [x] Create `lib-foundation` repository + branch protection + CI (owner) — https://github.com/wilddog64/lib-foundation
-- [ ] Extract `core.sh` + `system.sh` via git subtree (Codex)
+- [x] BATS tests for `_agent_audit` new checks — bare sudo + kubectl exec (Gemini) ✅
+- [x] Create `lib-foundation` repository + branch protection + CI (owner) ✅
+- [x] Extract `core.sh` + `system.sh` into lib-foundation (Codex) — PR #1 open, CI green
 
 ### Priority 2 — v0.7.0
 
