@@ -60,6 +60,17 @@ desktop client (Claude Desktop, OpenAI Codex, ChatGPT Atlas, Perplexity Comet).
   Each MCP tool call = root span. Each `k3d-manager` subprocess = child span. Output to
   stdout or `/tmp/k3dm.spans`. No external dependencies. Consistent with existing
   `ENABLE_TRACE=1` pattern — off by default, zero overhead when disabled.
+- **Environment Isolation:** MCP server must never inherit the parent process environment blindly.
+  Each subprocess call to `./scripts/k3d-manager` receives an explicitly constructed env:
+  - `SCRIPT_DIR` resolved to an absolute path at server startup
+  - `PATH`, `HOME` set explicitly — no ambient shell state
+  - `CLUSTER_PROVIDER` and other k3d-manager vars set from MCP server config, not inherited
+  - Per-call env is a fresh copy — no state bleeds between tool calls
+  - Startup validation: required paths (`scripts/k3d-manager`, `scripts/lib/system.sh`) must
+    exist before the server accepts any tool calls — fail fast, not silently mid-call
+  - Integration tests run with `env -i` clean environment — same rule as BATS suites
+  - Rationale: k3d-manager depends on `SCRIPT_DIR` at source time. A polluted or empty
+    inherited env causes silent failures that are hard to debug across MCP clients.
 - **Agent Safety Guards:** Structural controls built into the MCP server, not bolted on externally.
   - **Loop detection:** Same tool called 3+ times with identical args in a session → block and
     return structured error. Prevents runaway agent loops and cost spirals.
