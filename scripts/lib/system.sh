@@ -1207,7 +1207,7 @@ function _safe_path() {
 
 function _install_bats_from_source() {
    local version="${1:-1.11.0}"
-   local url="https://github.com/bats-core/bats-core/releases/download/v${version}/bats-core-${version}.tar.gz"
+   local url="https://github.com/bats-core/bats-core/archive/refs/tags/v${version}.tar.gz"
    local tmp_dir
 
    tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t bats-core)"
