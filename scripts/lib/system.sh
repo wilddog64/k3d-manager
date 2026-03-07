@@ -1290,7 +1290,7 @@ function _ensure_bats() {
       return 0
    fi
 
-   local target_version="${BATS_PREFERRED_VERSION:-1.11.0}"
+   local target_version="${BATS_PREFERRED_VERSION:-1.13.0}"
    if _install_bats_from_source "$target_version" && _bats_meets_requirement "$required"; then
       return 0
    fi
