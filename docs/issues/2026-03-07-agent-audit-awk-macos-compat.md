@@ -99,7 +99,7 @@ Only helps if `gawk` is installed. macOS without Homebrew still fails.
 **Option C — extract to `.awk` file:**
 Adds a file dependency. Not recommended for a single-use internal script.
 
-**Recommendation: Option A** — truly portable, no dependencies, minimal code change.
+**Recommendation: Option A** — truly portable, no external tool dependency, bash 3.2+ compatible, consistent with k3d-manager's bash-native philosophy.
 
 ---
 
@@ -125,10 +125,28 @@ env -i HOME="$HOME" PATH="$PATH" ./scripts/k3d-manager test agent_rigor 2>&1 | t
 
 ---
 
+## Bash Version Requirement
+
+The pre-commit hook sources only `system.sh` + `agent_rigor.sh` — core files
+deliberately kept bash 3.2+ compatible. (`declare -A` associative arrays appear
+only in optional lazy-loaded plugins — not in core.) The fix must also be
+bash 3.2+ compatible.
+
+Pure bash solution uses only:
+- `while IFS= read -r line` — bash 2.0+
+- `[[ "$line" =~ pattern ]]` — bash 3.0+
+- `(( if_count++ ))` — bash 2.0+
+- `${var#pattern}`, `${var%%pattern}` — bash 2.0+
+
+All safe for bash 3.2 (macOS `/bin/bash`) and bash 5.x (Homebrew / Ubuntu).
+
+---
+
 ## Scope
 
 - Edit only `scripts/lib/agent_rigor.sh` lines 112–132 (the awk block inside `_agent_audit`)
-- Replace the entire awk heredoc with the Option A rewrite — no other changes
+- Replace the entire awk heredoc with the pure bash `while read` rewrite
+- Do not use `declare -A`, `mapfile`, or any bash 4.0+ feature
 - Run `shellcheck scripts/lib/agent_rigor.sh` and confirm PASS
 - Verify pre-commit hook no longer prints awk error on a test commit
 - Verify the if-count check still flags functions with > 8 if blocks
