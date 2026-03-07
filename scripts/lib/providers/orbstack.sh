@@ -66,6 +66,11 @@ function _provider_orbstack_configure_istio() {
    _provider_k3d_configure_istio "$@"
 }
 
+function _provider_orbstack_expose_ingress() {
+   _provider_orbstack__ensure_runtime
+   _provider_k3d_expose_ingress "$@"
+}
+
 function _provider_orbstack_create_cluster() {
    _provider_orbstack__ensure_runtime
    _provider_k3d_create_cluster "$@"
