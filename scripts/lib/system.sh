@@ -1206,7 +1206,7 @@ function _safe_path() {
 }
 
 function _install_bats_from_source() {
-   local version="${1:-1.10.0}"
+   local version="${1:-1.11.0}"
    local url="https://github.com/bats-core/bats-core/releases/download/v${version}/bats-core-${version}.tar.gz"
    local tmp_dir
 
@@ -1290,7 +1290,7 @@ function _ensure_bats() {
       return 0
    fi
 
-   local target_version="${BATS_PREFERRED_VERSION:-1.10.0}"
+   local target_version="${BATS_PREFERRED_VERSION:-1.11.0}"
    if _install_bats_from_source "$target_version" && _bats_meets_requirement "$required"; then
       return 0
    fi
