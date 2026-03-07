@@ -95,3 +95,88 @@ setup() {
   run _agent_audit
   [ "$status" -eq 0 ]
 }
+
+@test "_agent_audit: flags bare sudo in unstaged diff" {
+  local repo="$BATS_TEST_TMPDIR/repo_sudo"
+  git init "$repo"
+  git -C "$repo" config user.email "test@test.com"
+  git -C "$repo" config user.name "test"
+  
+  cd "$repo"
+  echo "#!/bin/bash" > test.sh
+  git add test.sh
+  git commit -m "initial"
+  
+  echo "sudo apt-get install -y curl" >> test.sh
+  
+  # Stub _k3dm_repo_root to point to our test repo
+  _k3dm_repo_root() { echo "$repo"; }
+  export -f _k3dm_repo_root
+  
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"bare sudo call"* ]]
+}
+
+@test "_agent_audit: ignores _run_command sudo in diff" {
+  local repo="$BATS_TEST_TMPDIR/repo_run_cmd"
+  git init "$repo"
+  git -C "$repo" config user.email "test@test.com"
+  git -C "$repo" config user.name "test"
+  
+  cd "$repo"
+  echo "#!/bin/bash" > test.sh
+  git add test.sh
+  git commit -m "initial"
+  
+  echo "_run_command --prefer-sudo -- apt-get install -y curl" >> test.sh
+  
+  _k3dm_repo_root() { echo "$repo"; }
+  export -f _k3dm_repo_root
+  
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
+@test "_agent_audit: flags kubectl exec with credential env var in staged diff" {
+  local repo="$BATS_TEST_TMPDIR/repo_cred"
+  git init "$repo"
+  git -C "$repo" config user.email "test@test.com"
+  git -C "$repo" config user.name "test"
+  
+  cd "$repo"
+  echo "#!/bin/bash" > test.sh
+  git add test.sh
+  git commit -m "initial"
+  
+  echo "kubectl exec pod -- -e TOKEN=abc123 env" >> test.sh
+  git add test.sh
+  
+  _k3dm_repo_root() { echo "$repo"; }
+  export -f _k3dm_repo_root
+  
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"credential pattern detected"* ]]
+}
+
+@test "_agent_audit: passes clean staged diff" {
+  local repo="$BATS_TEST_TMPDIR/repo_clean"
+  git init "$repo"
+  git -C "$repo" config user.email "test@test.com"
+  git -C "$repo" config user.name "test"
+  
+  cd "$repo"
+  echo "#!/bin/bash" > test.sh
+  git add test.sh
+  git commit -m "initial"
+  
+  echo "echo hello" >> test.sh
+  git add test.sh
+  
+  _k3dm_repo_root() { echo "$repo"; }
+  export -f _k3dm_repo_root
+  
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
