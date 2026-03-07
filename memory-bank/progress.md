@@ -37,11 +37,12 @@ Plans: `docs/plans/v0.6.3-refactor-and-audit.md`, `docs/plans/v0.6.3-codex-run-c
 - **Claude**: review diffs, run BATS locally, commit, open PR
 
 - [x] Remove `auto_interactive` TTY-detection from `_run_command` (Codex — task: `docs/plans/v0.6.3-codex-run-command-fix.md`)
-- [x] Audit `--prefer-sudo` call sites for implicit interactive-sudo dependency (no callers require auto-promotion)
+- [x] Audit `--prefer-sudo` call sites for implicit interactive-sudo dependency (E2E rebuild verified)
+- [x] Gemini: Verification tasks (BATS pass 125/125, E2E cluster rebuild, individual smoke tests PASS)
 - [ ] De-bloat `scripts/lib/core.sh` — collapse permission cascade anti-patterns (Codex)
 - [ ] De-bloat `scripts/lib/system.sh` — add `_detect_platform` helper, consolidate OS dispatch (Codex)
 - [ ] Implement `_agent_lint` in `scripts/lib/agent_rigor.sh` (Codex)
-- [ ] BATS suite: `scripts/tests/lib/agent_rigor.bats` (Gemini)
+- [x] BATS suite: `scripts/tests/lib/agent_rigor.bats` (Gemini)
 - [ ] Claude: full BATS run locally, review, commit, PR
 
 ### Priority 2 — v0.6.4
