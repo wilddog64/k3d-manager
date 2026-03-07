@@ -61,18 +61,31 @@ desktop client (Claude Desktop, OpenAI Codex, ChatGPT Atlas, Perplexity Comet).
   stdout or `/tmp/k3dm.spans`. No external dependencies. Consistent with existing
   `ENABLE_TRACE=1` pattern — off by default, zero overhead when disabled.
 
-## v0.8.1 — Trace UI
-*Focus: Visual observability for local dev*
+## v0.8.1 — Trace UI (Optional)
+*Focus: Visual observability for local dev — no hard dependencies*
 
-- **Key Feature:** Jaeger trace UI as an optional sidecar alongside the MCP server.
+- **Key Feature:** Jaeger trace UI as an opt-in sidecar. Environments without Docker
+  continue to use v0.8.0 span file output unchanged.
+- **Gating:** `ENABLE_JAEGER=1` — consistent with `ENABLE_OTEL=1` and `ENABLE_TRACE=1`.
+  Off by default. Never required. Never assumed.
 - **Implementation:**
-  - `k3dm-mcp start --with-tracing` spins up a single `jaegertracing/all-in-one` Docker container
+  - `ENABLE_JAEGER=1 k3dm-mcp start` spins up a single `jaegertracing/all-in-one` container
   - v0.8.0 OTLP span output exported to Jaeger — no instrumentation changes required
   - UI available at `localhost:16686` while MCP server is running
   - Container tears down with the MCP server
+- **Capability matrix:**
+
+  | Environment | `ENABLE_OTEL` | `ENABLE_JAEGER` |
+  |---|---|---|
+  | Bare metal k3s, no Docker | spans to file | not available |
+  | Local dev with Docker | spans to file | Jaeger UI |
+  | CI pipeline | spans to stdout | not available |
+  | Air-gapped | spans to file | not available |
+  | External OTLP backend (Tempo, Datadog) | configure OTLP endpoint | not needed |
+
 - **No Grafana:** Jaeger's built-in UI is sufficient for local dev. Grafana/Tempo is
   a shared-team concern, not a local dev tool concern.
-- **Dependency:** Docker (already required for k3d).
+- **Dependency:** Docker — optional. k3s/bare metal environments use span file output only.
 
 ## v1.0.0 — Reassess After v0.7.0
 *Scope TBD — revisit once v0.7.0 ships*
