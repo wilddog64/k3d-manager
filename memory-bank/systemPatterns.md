@@ -144,6 +144,25 @@ Every public function must be safe to run more than once:
 
 `activeContext.md` must capture **what changed AND why decisions were made**.
 
+## 12) Agent Role Boundaries
+
+| Agent | Owns | Never does |
+|---|---|---|
+| **Codex** | Production code, security vulnerability fixes | Cluster ops, test authorship |
+| **Gemini** | BATS test authorship, integration tests, cluster verification, red team | Production code changes |
+| **Claude** | memory-bank instructional writes, PR management, issue routing | Takes action without owner go-ahead |
+
+**Gemini test ownership:**
+- BATS unit tests (`scripts/tests/`) — written after Codex delivers production code
+- Integration tests (`test_vault`, `test_eso`, `test_istio`, etc.) — owned and maintained by Gemini; only Gemini has live cluster access to validate them
+- Red team tests — adversarial, bounded to existing security controls
+
+**Gemini red team scope:**
+- Test `_copilot_prompt_guard`, `_safe_path`, stdin injection, trace isolation
+- Attempt credential leakage via proc/cmdline, PATH poisoning, prompt bypass
+- Report findings as structured report in memory-bank — never modify production code
+- Claude reviews findings and routes fixes to Codex
+
 ## 12) Test Strategy Pattern
 
 - Avoid mock-heavy orchestration tests that assert internal call sequences.
@@ -179,6 +198,24 @@ as a network perimeter crossing. Rules:
 - **Prompt Guard**: `_copilot_prompt_guard` checks 8 forbidden shell fragments before any copilot invocation.
 - **Trace Isolation**: `ENABLE_TRACE`/`DEBUG` auto-disabled by `_args_have_sensitive_flag` for commands with `--password`, `--token`, `--username`.
 - **AI Gate**: `K3DM_ENABLE_AI=1` must be explicitly set; all copilot invocations route through `_k3d_manager_copilot`.
+
+## 15) Agent Commit & Communication Protocol
+
+Agents (Codex, Gemini) **self-commit their own work** as a sign-off. Claude does not
+re-commit on their behalf.
+
+**Memory-bank is the two-way communication channel:**
+- Agents write to memory-bank to report completion — Claude reads this to detect issues.
+- Claude writes to memory-bank to instruct next steps — agents read this to act.
+
+**PR review routing** — after Claude opens a PR, issues are routed by scope:
+- Small/isolated → Claude fixes directly in the branch
+- Logic/test fix → back to Codex via memory-bank task
+- Cluster verification → Gemini via memory-bank task
+
+**Claude's review gate remains**: Claude reads every agent memory-bank update before
+writing the next task. This is where inaccuracies, overclaiming, and stale entries are
+caught — not by blocking agent writes.
 
 ## 14) Agent Rigor Protocol
 
