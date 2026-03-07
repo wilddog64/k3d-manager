@@ -108,11 +108,7 @@ setup() {
   git commit -m "initial"
   
   echo "sudo apt-get install -y curl" >> test.sh
-  
-  # Stub _k3dm_repo_root to point to our test repo
-  _k3dm_repo_root() { echo "$repo"; }
-  export -f _k3dm_repo_root
-  
+
   run _agent_audit
   [ "$status" -ne 0 ]
   [[ "$output" == *"bare sudo call"* ]]
@@ -130,10 +126,7 @@ setup() {
   git commit -m "initial"
   
   echo "_run_command --prefer-sudo -- apt-get install -y curl" >> test.sh
-  
-  _k3dm_repo_root() { echo "$repo"; }
-  export -f _k3dm_repo_root
-  
+
   run _agent_audit
   [ "$status" -eq 0 ]
 }
@@ -149,12 +142,9 @@ setup() {
   git add test.sh
   git commit -m "initial"
   
-  echo "kubectl exec pod -- -e TOKEN=abc123 env" >> test.sh
+  echo "kubectl exec pod -- env TOKEN=abc123 sh" >> test.sh
   git add test.sh
-  
-  _k3dm_repo_root() { echo "$repo"; }
-  export -f _k3dm_repo_root
-  
+
   run _agent_audit
   [ "$status" -ne 0 ]
   [[ "$output" == *"credential pattern detected"* ]]
@@ -173,10 +163,7 @@ setup() {
   
   echo "echo hello" >> test.sh
   git add test.sh
-  
-  _k3dm_repo_root() { echo "$repo"; }
-  export -f _k3dm_repo_root
-  
+
   run _agent_audit
   [ "$status" -eq 0 ]
 }
