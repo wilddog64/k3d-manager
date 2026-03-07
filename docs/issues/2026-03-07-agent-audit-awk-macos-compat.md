@@ -52,33 +52,12 @@ this syntax correctly but is not the system default `awk`.
 
 ## Fix Options
 
-**Option A (preferred) — local gawk detection with transparent fallback:**
+**Option A (preferred) — rewrite without user-defined function (POSIX portable):**
 
-Detect `gawk` (available via Homebrew on macOS, default on most Linux) and use it
-transparently. The awk script stays unchanged — only the interpreter selection changes.
-Add a local `awk_cmd` variable inside `_agent_audit` before the awk call (line 112):
+Inline the `emit()` logic directly. Works on BSD awk, mawk, gawk, and every POSIX awk.
+No dependency on gawk, no Homebrew requirement, no detection logic needed.
 
 ```bash
-local awk_cmd
-awk_cmd="$(command -v gawk || command -v awk)"
-offenders=$("$awk_cmd" -v max_if="$max_if" '
-   function emit(func,count){
-     if(func != "" && count > max_if){printf "%s:%d\n", func, count}
-   }
-   ...
-' "$file")
-```
-
-- macOS + Homebrew: uses `/opt/homebrew/bin/gawk` → works ✅
-- Linux (Ubuntu): uses system `gawk` or `awk` (GNU awk) → works ✅
-- macOS without Homebrew: falls back to BSD awk → same problem, but this is
-  an unsupported config (Homebrew required for k3d, bats, etc.)
-
-**Option B — rewrite without user-defined function:**
-Replace the `emit()` function with inline awk logic. The function only prints
-when count exceeds threshold — this is expressible without a named function:
-
-```awk
 offenders=$(awk -v max_if="$max_if" '
    /^[ \t]*function[ \t]+/ {
      if (current_func != "" && if_count > max_if) {
@@ -100,12 +79,27 @@ offenders=$(awk -v max_if="$max_if" '
 ' "$file")
 ```
 
-**Option C — use `awk` file instead of heredoc:**
-Extract the awk script to `scripts/lib/agent_audit_ifcount.awk` and call
-`awk -v max_if="$max_if" -f scripts/lib/agent_audit_ifcount.awk "$file"`.
-This avoids the heredoc indentation issue but adds a file dependency.
+Works on:
+- macOS BSD awk (no Homebrew) ✅
+- macOS with Homebrew gawk ✅
+- Linux mawk / GNU awk ✅
+- Any POSIX awk ✅
 
-**Recommendation: Option A** — transparent gawk detection, minimal change, awk script unchanged.
+**Option B — gawk detection with fallback:**
+
+```bash
+local awk_cmd
+awk_cmd="$(command -v gawk || command -v awk)"
+offenders=$("$awk_cmd" -v max_if="$max_if" '...' "$file")
+```
+
+Only helps if `gawk` is installed. macOS without Homebrew still fails.
+**Not recommended** — partial fix, hides the real portability gap.
+
+**Option C — extract to `.awk` file:**
+Adds a file dependency. Not recommended for a single-use internal script.
+
+**Recommendation: Option A** — truly portable, no dependencies, minimal code change.
 
 ---
 
@@ -134,7 +128,7 @@ env -i HOME="$HOME" PATH="$PATH" ./scripts/k3d-manager test agent_rigor 2>&1 | t
 ## Scope
 
 - Edit only `scripts/lib/agent_rigor.sh` lines 112–132 (the awk block inside `_agent_audit`)
-- Add `local awk_cmd` + `awk_cmd="$(command -v gawk || command -v awk)"` before the awk call
-- Replace `awk` with `"$awk_cmd"` on the awk invocation line — no other changes
+- Replace the entire awk heredoc with the Option A rewrite — no other changes
 - Run `shellcheck scripts/lib/agent_rigor.sh` and confirm PASS
 - Verify pre-commit hook no longer prints awk error on a test commit
+- Verify the if-count check still flags functions with > 8 if blocks
