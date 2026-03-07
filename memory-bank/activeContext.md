@@ -1,35 +1,21 @@
 # Active Context – k3d-manager
 
-## Current Branch: `k3d-manager-v0.6.3` (as of 2026-03-06)
+## Current Branch: `k3d-manager-v0.6.4` (as of 2026-03-07)
 
 **v0.6.2 SHIPPED** — tag `v0.6.2` pushed, PR #19 merged to `main`.
-**v0.6.3 active** — branch cut from `main`; plan at `docs/plans/v0.6.3-refactor-and-audit.md`.
+**v0.6.3 SHIPPED** — tag `v0.6.3` pushed, PR #21 merged to `main`.
+**v0.6.4 active** — branch cut from `main`.
 
 ---
 
 ## Current Focus
 
-**v0.6.3: Refactoring & External Audit Integration**
-
-Plans:
-- `docs/plans/v0.6.3-refactor-and-audit.md` — main refactor plan
-- `docs/plans/v0.6.3-codex-run-command-fix.md` — active Codex task (see below)
+**v0.6.4: Linux k3s Validation + lib-foundation Extraction**
 
 Key objectives:
-1. **Fix `_run_command` TTY flakiness** — remove `auto_interactive` block (Codex) ✅ done 2026-03-06
-2. **Phase 1 Verification** — BATS 125/125 PASS, E2E Cluster rebuild success (Gemini) ✅ done 2026-03-06
-3. De-bloat `system.sh` and `core.sh` — remove permission cascade anti-patterns (Codex) ✅ done 2026-03-06
-4. Implement `_agent_lint` + `_agent_audit` in `agent_rigor.sh` (Codex) ✅ done 2026-03-06 — Claude reviewed: PASS
-5. BATS suite: `scripts/tests/lib/agent_rigor.bats` (Gemini) ✅ done 2026-03-06
-6. **Phase 2 Verification** — teardown/rebuild gate (Gemini) ⏳ active
-7. **Codex install_k3s.bats fix** — execute manifest staging stub (plan: `docs/plans/v0.6.3-codex-install-k3s-bats-fix.md`) ✅ done 2026-03-06
-8. Claude: final BATS run, commit, open PR
-
----
-
-## Status — v0.6.3 COMPLETE
-
-All tasks done. BATS 124/124 passing. PR open — see GitHub for review status.
+1. **Linux k3s validation gate** — Gemini full 5-phase teardown/rebuild on Ubuntu VM (`CLUSTER_PROVIDER=k3s`) to validate refactored functions under real Linux conditions
+2. **Create `lib-foundation` repository** — owner action
+3. **Extract `core.sh` + `system.sh`** via git subtree (Codex)
 
 ---
 
@@ -101,8 +87,8 @@ Agent reads + acts
 |---|---|---|
 | v0.1.0–v0.6.1 | released | See CHANGE.md |
 | v0.6.2 | **released** | AI Tooling + Agent Rigor + Security hardening |
-| v0.6.3 | **PR open** | Refactoring (De-bloat) + Digital Auditor |
-| v0.6.4 | planned | Linux k3s validation gate + lib-foundation extraction via git subtree |
+| v0.6.3 | **released** | Refactoring (De-bloat) + Digital Auditor |
+| v0.6.4 | **active** | Linux k3s validation gate + lib-foundation extraction via git subtree |
 | v0.7.0 | planned | Keycloak provider + App Cluster deployment |
 | v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) |
 | v1.0.0 | vision | Reassess after v0.7.0; see `docs/plans/roadmap-v1.md` |

@@ -3,7 +3,8 @@
 ## Overall Status
 
 **v0.6.2 SHIPPED** — tag `v0.6.2` pushed, PR #19 merged 2026-03-06.
-**v0.6.3 ACTIVE** — branch `k3d-manager-v0.6.3` cut from main 2026-03-06.
+**v0.6.3 SHIPPED** — tag `v0.6.3` pushed, PR #21 merged 2026-03-07.
+**v0.6.4 ACTIVE** — branch `k3d-manager-v0.6.4` cut from main 2026-03-07.
 
 ---
 
