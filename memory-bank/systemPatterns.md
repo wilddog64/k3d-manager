@@ -155,7 +155,24 @@ Every public function must be safe to run more than once:
 ./scripts/k3d-manager test smoke jenkins
 ```
 
-## 13) Red-Team Defensive Patterns
+## 13) Agent Boundary Security
+
+Every agent handoff (Claude → Codex, Claude → Gemini, memory-bank reads) is treated
+as a network perimeter crossing. Rules:
+
+- **No credentials in task specs or reports.** Actual credential values, cluster
+  addresses, kubeconfig paths, and tokens must never appear in `docs/plans/`,
+  `memory-bank/`, or agent output. Reference env var names only (`$VAULT_ADDR`,
+  `$KUBECONFIG`, etc.). Live values stay on the owner's machine.
+- **memory-bank and docs/plans/ are Instruction Code.** Any agent write to these
+  files must be reviewed by Claude before the next agent reads them — they are a
+  prompt injection surface.
+- **Minimize context to sub-agents.** Task specs include only what the agent needs
+  for the specific task — not full project history, not cluster state, not credentials.
+- **Validate agent output before acting.** Claude reviews every Codex/Gemini diff
+  before commit. `_agent_lint` (when implemented) automates architectural validation.
+
+## 14) Red-Team Defensive Patterns
 
 - **PATH Sanitization**: `_safe_path` validates `PATH` before any copilot/agent invocation. Rejects world-writable dirs (sticky-bit is NOT an exemption) and relative/empty entries. Uses glob-safe `IFS=':' read -r -a` array split.
 - **Secret Injection via stdin**: Token + payload piped into pod's bash via stdin; extracted with `while IFS="=" read -r key value` loop. Token never appears in `kubectl exec` args or `/proc/*/cmdline`.
