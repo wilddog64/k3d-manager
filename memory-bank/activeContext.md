@@ -13,7 +13,7 @@
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | BATS tests for `_agent_audit` bare sudo + kubectl exec credential scan | Gemini | pending |
+| 1 | BATS tests for `_agent_audit` bare sudo + kubectl exec credential scan | Gemini | pending — spec: `docs/plans/v0.6.5-gemini-agent-audit-bats.md` |
 | 2 | Create `lib-foundation` repository + branch protection + CI | Owner | ✅ done — https://github.com/wilddog64/lib-foundation |
 | 3 | Extract `core.sh` + `system.sh` into lib-foundation | Codex | ⚠️ blocked — `core.sh` ✅, `system.sh` shellcheck fails (SC2016×14, SC2046, SC2086×2, SC2155×3). See `docs/issues/2026-03-07-lib-foundation-shellcheck-failures.md` |
 
