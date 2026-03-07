@@ -60,6 +60,10 @@ Owner
 - **NEVER run `git rebase`, `git reset --hard`, or `git push --force` on shared branches.**
 - Stay within task spec scope — do not add changes beyond what was specified, even if they seem like improvements. Unsanctioned scope expansion gets reverted.
 
+**Push rules by agent location:**
+- **Codex (M4 Air, same machine as Claude):** Commit locally + update memory-bank. Claude reviews local commit and handles push + PR.
+- **Gemini (Ubuntu VM):** Must push to remote — Claude cannot see Ubuntu-local commits. Always push before updating memory-bank.
+
 **Claude awareness — Gemini works on Ubuntu VM:**
 - Gemini commits directly to the active branch from the Ubuntu VM repo clone.
 - Always `git pull origin <branch>` before reading or editing any file Gemini may have touched.
