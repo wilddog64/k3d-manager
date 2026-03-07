@@ -15,7 +15,7 @@
 |---|---|---|---|
 | 1 | BATS tests for `_agent_audit` bare sudo + kubectl exec credential scan | Gemini | pending |
 | 2 | Create `lib-foundation` repository + branch protection + CI | Owner | ✅ done — https://github.com/wilddog64/lib-foundation |
-| 3 | Extract `core.sh` + `system.sh` via git subtree | Codex | pending |
+| 3 | Extract `core.sh` + `system.sh` into lib-foundation | Codex | pending — target branch `extract/v0.1.0` on lib-foundation |
 
 ---
 
