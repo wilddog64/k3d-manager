@@ -33,8 +33,8 @@
 
 ### Priority 1 — v0.6.4 (active)
 
-- [ ] Linux k3s validation gate — Phase 1-4 PASS; Phase 5 BLOCKED by BATS 404 bug
-- [ ] Fix `_install_bats_from_source` default `1.10.0` → `1.11.0` + re-run Phase 5 (Gemini — exception: fix requires Ubuntu to verify)
+- [x] Linux k3s validation gate — Gemini full 5-phase teardown/rebuild on Ubuntu VM (124/124 BATS pass, Smoke tests PASS)
+- [x] Fix `_install_bats_from_source` default `1.10.0` → `1.11.0` + robust URL (Gemini)
 - [ ] `_agent_audit` hardening — bare sudo detection + credential pattern check in `kubectl exec` args (Codex)
 - [ ] Pre-commit hook — wire `_agent_audit` to `.git/hooks/pre-commit` (Codex)
 - [ ] Contract BATS tests — provider interface enforcement (Gemini)
@@ -63,6 +63,5 @@
 |---|---|---|
 | GitGuardian: 1 internal secret incident (2026-02-28) | OPEN | False positive — IPs in docs. Mark in dashboard. |
 | `CLUSTER_NAME` env var ignored during `deploy_cluster` | OPEN | See `docs/issues/2026-03-01-cluster-name-env-var-not-respected.md`. |
-| BATS source install 404 on Linux | OPEN | `_install_bats_from_source` defaults to invalid `1.10.0`. See `docs/issues/2026-03-07-bats-source-install-404.md`. |
 | `deploy_jenkins` (no flags) broken | OPEN | Use `--enable-vault` as workaround. |
 | No `scripts/tests/plugins/jenkins.bats` suite | BACKLOG | Future work. |
