@@ -1,5 +1,29 @@
 # Changes - k3d-manager
 
+## v0.6.5 — Agent Rigor Coverage + lib-foundation Extraction — dated 2026-03-07
+
+### Fixed
+- **`_agent_audit` awk portability** (`scripts/lib/agent_rigor.sh`): The if-count-per-function check used a multi-parameter awk user-defined function rejected by macOS BSD awk (20200816), causing a noisy syntax error on every commit. Replaced with a pure bash `while IFS= read -r line` loop — bash 3.0+ compatible, no external tool dependency, identical logic. Issue: `docs/issues/2026-03-07-agent-audit-awk-macos-compat.md`.
+- **SC2155 splits in `system.sh`**: `local var=$(...)` declarations in `_add_exit_trap` and `_detect_cluster_name` split into two-line form for shellcheck compliance.
+
+### Added
+- **BATS coverage for `_agent_audit` new checks** (`scripts/tests/lib/agent_rigor.bats`): 4 new tests for the v0.6.4 bare sudo and kubectl exec credential detections. Each test uses a real mini git repo — no git stubs. Suite: 9/9. Full BATS: 158/158.
+  - `_agent_audit: flags bare sudo in unstaged diff`
+  - `_agent_audit: ignores _run_command sudo in diff`
+  - `_agent_audit: flags kubectl exec with credential env var in staged diff`
+  - `_agent_audit: passes clean staged diff`
+
+### Infrastructure
+- **`lib-foundation` repository created**: https://github.com/wilddog64/lib-foundation — shared Bash foundation library. Branch protection, required CI (shellcheck + BATS 1.13.0), linear history enforced.
+- **`core.sh` + `system.sh` extracted**: Copied to `lib-foundation` branch `extract/v0.1.0`. All shellcheck warnings resolved. PR #1 open on lib-foundation, CI green.
+
+### Verification
+- BATS suite: 158/158 passing (clean `env -i` environment, Ubuntu 24.04 VM).
+- shellcheck: PASS on all touched `.sh` files.
+- Pre-commit hook: no awk error on macOS M-series.
+
+---
+
 ## v0.6.4 — Linux k3s Validation + Agent Harness Hardening — dated 2026-03-07
 
 ### Validation
