@@ -15,7 +15,11 @@ setup() {
   export_stubs
   
   # Stub command to return 1 for git
-  command() { if [[ "$1" == git ]]; then return 1; fi; builtin command "$@"; }
+  command() { 
+    if [[ "$1" == "-v" && "$2" == "git" ]]; then return 1; fi
+    if [[ "$1" == "git" ]]; then return 1; fi
+    builtin command "$@"; 
+  }
   export -f command
   
   run _agent_checkpoint
