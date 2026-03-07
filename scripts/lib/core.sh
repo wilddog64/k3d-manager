@@ -33,30 +33,8 @@ function _ensure_path_exists() {
       return 0
    fi
 
-   if mkdir -p "$dir" 2>/dev/null; then
+   if _run_command --prefer-sudo -- mkdir -p "$dir"; then
       return 0
-   fi
-
-   if _run_command --quiet --soft --prefer-sudo -- mkdir -p "$dir"; then
-      return 0
-   fi
-
-   if command -v sudo >/dev/null 2>&1; then
-      local sudo_checked=0
-
-      if declare -f _sudo_available >/dev/null 2>&1; then
-         sudo_checked=1
-         if _sudo_available; then
-            if sudo mkdir -p "$dir"; then
-               return 0
-            fi
-            _err "Failed to create directory '$dir' using sudo"
-         fi
-      fi
-
-      if sudo mkdir -p "$dir"; then
-         return 0
-      fi
    fi
 
    _err "Cannot create directory '$dir'. Create it manually, configure sudo, or set K3S_CONFIG_DIR to a writable path."
@@ -148,17 +126,7 @@ function _k3s_stage_file() {
    fi
 
    if command -v install >/dev/null 2>&1; then
-      if install -m "$mode" "$src" "$dest" 2>/dev/null; then
-         rm -f "$src"
-         return 0
-      fi
       _run_command --prefer-sudo -- install -m "$mode" "$src" "$dest"
-      rm -f "$src"
-      return 0
-   fi
-
-   if cp "$src" "$dest" 2>/dev/null; then
-      chmod "$mode" "$dest" 2>/dev/null || _run_command --prefer-sudo -- chmod "$mode" "$dest"
       rm -f "$src"
       return 0
    fi
@@ -241,17 +209,8 @@ function _install_k3s() {
 
       _ensure_path_exists "$K3S_INSTALL_DIR"
 
-      if [[ -w "$K3S_INSTALL_DIR" ]]; then
-         mv "$tmpfile" "$dest"
-      else
-         _run_command --prefer-sudo -- mv "$tmpfile" "$dest"
-      fi
-
-      if [[ -w "$dest" ]]; then
-         chmod 0755 "$dest"
-      else
-         _run_command --prefer-sudo -- chmod 0755 "$dest"
-      fi
+      _run_command --prefer-sudo -- mv "$tmpfile" "$dest"
+      _run_command --prefer-sudo -- chmod 0755 "$dest"
 
       _info "Installed k3s binary at $dest"
       return 0
@@ -382,33 +341,13 @@ function _start_k3s_service() {
       return 0
    fi
 
-   local tried_non_interactive=0
-   if declare -f _sudo_available >/dev/null 2>&1 && _sudo_available; then
-      tried_non_interactive=1
-      if _run_command --prefer-sudo -- sh -c "$start_cmd"; then
-         return 0
-      fi
-   fi
-
-   if command -v sudo >/dev/null 2>&1; then
-      if sudo sh -c "$start_cmd"; then
-         return 0
-      fi
-   fi
-
-   if (( ! tried_non_interactive )); then
-      local instruction
-      instruction="nohup ${manual_cmd} >> ${log_file} 2>&1 &"
-      _err "systemd not available and sudo access is required to start k3s automatically. Run manually as root: ${instruction}"
-   fi
-
-   if _run_command --soft -- sh -c "$start_cmd"; then
+   if _run_command --require-sudo -- sh -c "$start_cmd"; then
       return 0
    fi
 
    local instruction
    instruction="nohup ${manual_cmd} >> ${log_file} 2>&1 &"
-   _err "systemd not available and automatic elevation failed. Run manually as root: ${instruction}"
+   _err "systemd not available and sudo access is required to start k3s automatically. Run manually as root: ${instruction}"
 }
 
 function _deploy_k3s_cluster() {
@@ -433,16 +372,10 @@ function _deploy_k3s_cluster() {
    local timeout=60
    local kubeconfig_ready=1
    while (( timeout > 0 )); do
-      if [[ -r "$kubeconfig_src" ]]; then
-         kubeconfig_ready=0
-         break
-      fi
-
       if _run_command --soft --quiet --prefer-sudo -- test -r "$kubeconfig_src"; then
          kubeconfig_ready=0
          break
       fi
-
       sleep 2
       timeout=$((timeout - 2))
    done
@@ -472,32 +405,35 @@ function _deploy_k3s_cluster() {
    local dest_kubeconfig="${KUBECONFIG:-$HOME/.kube/config}"
    _ensure_path_exists "$(dirname "$dest_kubeconfig")"
 
-   if [[ -w "$dest_kubeconfig" || ! -e "$dest_kubeconfig" ]]; then
-      cp "$kubeconfig_src" "$dest_kubeconfig"
-   else
-      _run_command --prefer-sudo -- cp "$kubeconfig_src" "$dest_kubeconfig"
-   fi
+   _run_command --prefer-sudo -- cp "$kubeconfig_src" "$dest_kubeconfig"
 
    if ! _is_wsl; then
       _run_command --prefer-sudo -- chown "$(id -u):$(id -g)" "$dest_kubeconfig" 2>/dev/null || true
    fi
-   chmod 0600 "$dest_kubeconfig" 2>/dev/null || true
+   _run_command --prefer-sudo -- chmod 0600 "$dest_kubeconfig" 2>/dev/null || true
 
    export KUBECONFIG="$dest_kubeconfig"
 
    _info "k3s cluster '$CLUSTER_NAME' is ready"
 }
 function _install_docker() {
-   if _is_mac; then
-      _install_mac_docker
-   elif _is_debian_family; then
-      _install_debian_docker
-   elif _is_redhat_family ; then
-      _install_redhat_docker
-   else
-      echo "Unsupported Linux distribution. Please install Docker manually."
-      exit 1
-   fi
+   local platform
+   platform="$(_detect_platform)"
+
+   case "$platform" in
+      mac)
+         _install_mac_docker
+         ;;
+      debian|linux|wsl)
+         _install_debian_docker
+         ;;
+      redhat)
+         _install_redhat_docker
+         ;;
+      *)
+         _err "Unsupported platform for Docker installation: $platform"
+         ;;
+   esac
 }
 
 function _install_istioctl() {
@@ -593,27 +529,8 @@ function _install_smb_csi_driver() {
 }
 
 function _create_nfs_share() {
-
-   if grep -q "k3d-nfs" /etc/exports ; then
-      echo "NFS share already exists, skip"
-      return 0
-   fi
-
-   if _is_mac ; then
-      echo "Creating NFS share on macOS"
-      mkdir -p $HOME/k3d-nfs
-      if ! grep "$HOME/k3d-nfs" /etc/exports 2>&1 > /dev/null; then
-         ip=$(ipconfig getifaddr en0)
-         mask=$(ipconfig getoption en0 subnet_mask)
-         prefix=$(python3 -c "import ipaddress; print(ipaddress.IPv4Network('0.0.0.0/$mask').prefixlen)")
-         network=$(python3 -c "import ipaddress; print(ipaddress.IPv4Network('$ip/$prefix', strict=False).network_address)")
-         export_line="/Users/$USER/k3d-nfs -alldirs -rw -insecure -mapall=$(id -u):$(id -g) -network $network -mask $mask"
-         echo "$export_line" | \
-            sudo tee -a /etc/exports
-         sudo nfsd enable
-         sudo nfsd restart  # Full restart instead of update
-         showmount -e localhost
-      fi
+   if _is_mac; then
+      _create_nfs_share_mac "$HOME/k3d-nfs"
    fi
 }
 
@@ -760,24 +677,24 @@ EOF
    fi
 
    local platform="" platform_msg=""
-   if _is_mac; then
-      platform="mac"
-      platform_msg="Detected macOS environment."
-   elif _is_wsl; then
-      platform="wsl"
-      platform_msg="Detected Windows Subsystem for Linux environment."
-   elif _is_debian_family; then
-      platform="debian"
-      platform_msg="Detected Debian-based Linux environment."
-   elif _is_redhat_family; then
-      platform="redhat"
-      platform_msg="Detected Red Hat-based Linux environment."
-   elif _is_linux; then
-      platform="linux"
-      platform_msg="Detected generic Linux environment."
-   else
-      _err "Unsupported platform: $(uname -s)."
-   fi
+   platform="$(_detect_platform)"
+   case "$platform" in
+      mac)
+         platform_msg="Detected macOS environment."
+         ;;
+      wsl)
+         platform_msg="Detected Windows Subsystem for Linux environment."
+         ;;
+      debian)
+         platform_msg="Detected Debian-based Linux environment."
+         ;;
+      redhat)
+         platform_msg="Detected Red Hat-based Linux environment."
+         ;;
+      linux)
+         platform_msg="Detected generic Linux environment."
+         ;;
+   esac
 
    if [[ -n "$platform_msg" ]]; then
       _info "$platform_msg"
