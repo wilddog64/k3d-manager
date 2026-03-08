@@ -46,12 +46,15 @@ escalation logic independently testable in BATS.
 
 ## Priority
 
-**Low** — workaround is in place. Address in a future lib-foundation release since
-`_run_command` originates in `scripts/lib/system.sh` which is managed upstream.
-The fix should be applied in lib-foundation first, then subtree-pulled into k3d-manager.
+**Low** — workaround is in place. Fix must be applied in lib-foundation first
+(`_run_command` originates there), then subtree-pulled into k3d-manager.
+
+## Authoritative Issue Doc
+
+`lib-foundation/docs/issues/2026-03-08-run-command-if-count-refactor.md`
 
 ## Related
 
 - `~/.zsh/envrc/k3d-manager.envrc` — `AGENT_AUDIT_MAX_IF=15` workaround
-- `scripts/lib/system.sh` — `_run_command` implementation
+- `scripts/lib/foundation/scripts/lib/system.sh` — subtree copy of `_run_command`
 - lib-foundation open items — "Route bare sudo through `_run_command`" (separate issue)
