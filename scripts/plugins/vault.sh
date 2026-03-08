@@ -1416,6 +1416,7 @@ function _vault_configure_secret_reader_role() {
   local secret_prefix_arg="${6:-ldap}"
   local role="${7:-eso-ldap-directory}"
   local policy="${8:-${role}}"
+  local role_namespaces_override="${9:-}"
   local pod="${release}-0"
 
   local sanitized_prefixes="${secret_prefix_arg//,/ }"
@@ -1524,8 +1525,16 @@ SH
 
   local token_audience="${K8S_TOKEN_AUDIENCE:-https://kubernetes.default.svc.cluster.local}"
   local role_cmd=""
+  local bound_namespaces="$service_namespace"
+
+  if [[ -n "$role_namespaces_override" ]]; then
+     bound_namespaces="$role_namespaces_override"
+  elif [[ "$role" == "eso-ldap-directory" && "$service_namespace" != "identity" ]]; then
+     bound_namespaces="${service_namespace},identity"
+  fi
+
   printf -v role_cmd 'vault write "auth/kubernetes/role/%s" bound_service_account_names="%s" bound_service_account_namespaces="%s" policies="%s" ttl=1h token_audiences="%s"' \
-     "$role" "$service_account" "$service_namespace" "$policy" "$token_audience"
+     "$role" "$service_account" "$bound_namespaces" "$policy" "$token_audience"
 
   _vault_exec "$ns" "$role_cmd" "$release"
 }
