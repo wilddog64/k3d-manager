@@ -62,6 +62,17 @@ Unexpected findings: NONE / [describe — do not fix without a spec]
 Status: COMPLETE / BLOCKED
 ```
 
+## Task 5 Completion Report (Codex)
+
+Task: deploy_cluster refactor + CLUSTER_NAME fix
+Status: COMPLETE
+Files changed: scripts/lib/core.sh
+Shellcheck: PASS (`shellcheck scripts/lib/core.sh`)
+BATS: 158/158 passing (`env -i HOME="$HOME" PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test all`)
+deploy_cluster if-count: 5 (must be ≤ 8)
+CLUSTER_NAME fix: VERIFIED — `_cluster_provider_call` stub receives the env-specified cluster name when no positional name is provided.
+Unexpected findings: BATS run with `/bin/bash` 3.2 fails because `declare -A` is unsupported; prepending `/opt/homebrew/bin` in PATH resolves by using Homebrew bash.
+
 ---
 
 ## Task 4 — Gemini Completion Report
