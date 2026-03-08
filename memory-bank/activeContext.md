@@ -17,8 +17,8 @@
 | 2 | Fix BATS teardown — `k3d-test-orbstack-exists` cluster not cleaned up post-test | Gemini | pending |
 | 3 | ESO deploy on Ubuntu app cluster | Gemini | pending |
 | 4 | shopping-cart-data / apps deployment on Ubuntu | TBD | pending |
-| 5 | lib-foundation v0.2.0 — `agent_rigor.sh` + `ENABLE_AGENT_LINT` (branch already cut) | Claude/Codex | pending |
-| 6 | Update `k3d-manager.envrc` — map `K3DM_ENABLE_AI` → `ENABLE_AGENT_LINT` after lib-foundation v0.2.0 | Claude | pending |
+| 5 | lib-foundation v0.2.0 — `agent_rigor.sh` + `ENABLE_AGENT_LINT` | Claude/Codex | **done** — merged + tagged, subtree synced |
+| 6 | Update `k3d-manager.envrc` — `AGENT_LINT_GATE_VAR`, `AGENT_LINT_AI_FUNC`, `AGENT_AUDIT_MAX_IF=15` | Claude | **done** |
 
 ---
 
@@ -30,8 +30,10 @@
 - [ ] Fix BATS teardown: `k3d-test-orbstack-exists` cluster not cleaned up. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`
 - [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data / apps deployment on Ubuntu
-- [ ] lib-foundation v0.2.0 — `agent_rigor.sh` with `ENABLE_AGENT_LINT` gate (branch: `feat/agent-rigor-v0.2.0`)
-- [ ] Update `~/.zsh/envrc/k3d-manager.envrc` — add `export ENABLE_AGENT_LINT="${K3DM_ENABLE_AI:-0}"` after lib-foundation v0.2.0 merges
+- [x] lib-foundation v0.2.0 — merged, tagged, subtree synced into `scripts/lib/foundation/`
+- [x] `~/.zsh/envrc/k3d-manager.envrc` — `AGENT_LINT_GATE_VAR=K3DM_ENABLE_AI`, `AGENT_LINT_AI_FUNC=_k3d_manager_copilot`, `AGENT_AUDIT_MAX_IF=15`
+- [x] `_agent_audit` smoke-tested: catches bare sudo + if-count, passes clean changes
+- [ ] `_run_command` if-count refactor — 12 if-blocks exceeds threshold; workaround `AGENT_AUDIT_MAX_IF=15`. See `docs/issues/2026-03-08-run-command-if-count-refactor.md`. Fix in lib-foundation first.
 - [ ] lib-foundation: sync deploy_cluster fixes back upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker` through `_run_command`
 - [ ] v0.8.0: `k3dm-mcp` lean MCP server
