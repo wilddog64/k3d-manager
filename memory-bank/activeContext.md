@@ -21,6 +21,56 @@
 
 ---
 
+## Task 6 — Codex Spec: Fix deploy_ldap Vault Role Namespace Binding
+
+**Status: active**
+
+### Background
+
+`deploy_ldap` creates a `vault-kv-store` SecretStore in both the `identity`
+and `directory` namespaces, but the Vault Kubernetes auth role
+`eso-ldap-directory` is only bound to `[directory]`. The `identity`
+SecretStore becomes `InvalidProviderConfig` within minutes of deploy.
+
+Issue: `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md`
+
+### Your task
+
+1. Find where the Vault role `eso-ldap-directory` is written in
+   `scripts/plugins/ldap.sh` — look for `vault write auth/kubernetes/role/eso-ldap-directory`.
+2. Update the `bound_service_account_namespaces` to include both namespaces:
+   ```bash
+   bound_service_account_namespaces=directory,identity
+   ```
+3. Verify no other roles have the same single-namespace problem by scanning
+   `scripts/plugins/` for other `vault write auth/kubernetes/role/` calls.
+4. `shellcheck` every `.sh` file you touch — must pass.
+5. Commit locally — Claude handles push.
+
+### Rules
+
+- Edit only files in `scripts/plugins/` — no other directories.
+- Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
+- Do NOT run a cluster deployment to test — this is a code-only fix.
+- Stay within scope — do not refactor surrounding code.
+
+### Required Completion Report
+
+Update `memory-bank/activeContext.md` with:
+
+```
+## Task 6 Completion Report (Codex)
+
+Files changed: [list]
+Shellcheck: PASS / [issues]
+Role fix: scripts/plugins/ldap.sh line N — bound_service_account_namespaces updated to [directory,identity]
+Other roles scanned: NONE affected / [list any found]
+Unexpected findings: NONE / [describe]
+Status: COMPLETE / BLOCKED
+```
+
+---
+
 ## Task 5 — Codex Spec: deploy_cluster Refactor + CLUSTER_NAME Fix
 
 **Status: active** — both cluster rebuilds passed. Codex is unblocked.
@@ -260,14 +310,13 @@ Rebuilt 2026-03-07 — verified healthy post lib-foundation subtree integration 
 - [x] lib-foundation git subtree setup + source path update (Claude — Task 1+2) — DONE
 - [x] OrbStack cluster teardown + rebuild validation (Claude — Task 3) — DONE
 - [x] Ubuntu k3s teardown + rebuild validation (Gemini — Task 4) — DONE
-- [ ] Refactor `deploy_cluster` — 12 if-blocks exceeds threshold of 8. Extract `_deploy_cluster_resolve_provider` helper. Also fix duplicate mac+k3s guard. Issue: `docs/issues/2026-03-07-deploy-cluster-if-count-violation.md` (Codex — Task 5, **active**)
-- [ ] Fix `deploy_ldap`: Vault role `eso-ldap-directory` must bind both `directory` + `identity` namespaces. Issue: `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md` (Codex)
+- [x] Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var (Codex — Task 5) — DONE commit 24c8adf
+- [ ] Fix `deploy_ldap`: Vault role `eso-ldap-directory` must bind `directory` + `identity` ns (Codex — Task 6, **active**)
 - [ ] Fix BATS test teardown: `k3d-test-orbstack-exists` cluster not cleaned up post-test. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md` (Gemini)
 - [ ] inotify limit in colima VM not persistent — apply via colima lima.yaml or note in ops runbook
 - [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data / apps deployment on Ubuntu
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner)
-- [ ] `CLUSTER_NAME` env var not respected during `deploy_cluster`
 - [ ] v0.7.0: Keycloak provider interface + App Cluster deployment
 - [ ] v0.8.0: `k3dm-mcp` lean MCP server
 - [ ] lib-foundation PR #1 merge → tag v0.1.0 (owner)
