@@ -14,7 +14,7 @@
 | # | Task | Who | Status |
 |---|---|---|---|
 | 1 | `.envrc` → dotfiles symlink + `scripts/hooks/pre-commit` (carried from v0.7.0) | Claude | **done** — commits 108b959, 3dcf7b1 |
-| 2 | Fix BATS teardown — `teardown_file()` fix needed in provider_contract.bats | Codex | pending (Gemini used `teardown()`, fix: → `teardown_file()`) |
+| 2 | Fix BATS teardown — `teardown_file()` fix needed in provider_contract.bats | Codex | **done** — hooks updated + tests pass |
 | 3 | ESO deploy on Ubuntu app cluster | Gemini | ✅ done — 3/3 SecretStores Ready |
 | 4 | shopping-cart-data / apps deployment on Ubuntu | Gemini | 🔄 data layer PASS; apps BLOCKED (ImagePullBackOff + CPU) |
 | 5 | lib-foundation v0.2.0 — `agent_rigor.sh` + `ENABLE_AGENT_LINT` | Claude/Codex | **done** — merged + tagged, subtree synced |
@@ -27,7 +27,14 @@
 - [x] Drop colima support (v0.7.1)
 - [x] `.envrc` → `~/.zsh/envrc/k3d-manager.envrc` symlink + `.gitignore`
 - [x] `scripts/hooks/pre-commit` — tracked hook with `_agent_audit` + `_agent_lint` (gated by `K3DM_ENABLE_AI=1`)
-- [ ] Fix BATS teardown: `teardown()` → `teardown_file()` in `provider_contract.bats` — Codex task: `docs/plans/v0.7.2-codex-teardown-fix.md`
+- [x] Fix BATS teardown: `teardown()` → `teardown_file()` in `provider_contract.bats` — Codex task: `docs/plans/v0.7.2-codex-teardown-fix.md`
+
+## v0.7.2 Task 2 Completion Report (Codex)
+
+- Line changed: `scripts/tests/lib/provider_contract.bats`:14 — `teardown()` → `teardown_file()`
+- Shellcheck: PASS (`shellcheck scripts/tests/lib/provider_contract.bats`)
+- BATS: 30/30 passing (`env -i HOME="$HOME" PATH="$PATH" bats scripts/tests/lib/provider_contract.bats`)
+- Status: COMPLETE
 - [x] ESO deploy on Ubuntu app cluster — 3/3 SecretStores Ready ✅
 - [ ] shopping-cart-data / apps deployment on Ubuntu — data PASS; apps BLOCKED:
   - ImagePullBackOff: `shopping-cart/*:latest` images not in registry accessible from Ubuntu
