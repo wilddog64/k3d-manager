@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR=""
+if command -v git >/dev/null 2>&1; then
+   if repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+      SCRIPT_DIR="${repo_root}/scripts"
+   fi
+fi
+if [[ -z "${SCRIPT_DIR}" ]]; then
+   SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../../scripts" >/dev/null 2>&1 && pwd)"
+fi
+
+if [[ ! -f "${SCRIPT_DIR}/lib/agent_rigor.sh" ]]; then
+   exit 0
+fi
+
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/lib/system.sh"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/lib/agent_rigor.sh"
+
+if ! _agent_audit; then
+   echo "Pre-commit hook: _agent_audit failed — fix violations before committing" >&2
+   exit 1
+fi
+
+gate_var="${AGENT_LINT_GATE_VAR:-ENABLE_AGENT_LINT}"
+if [[ "${!gate_var:-0}" == "1" ]]; then
+   if ! _agent_lint; then
+      echo "Pre-commit hook: _agent_lint failed — fix architectural violations before committing" >&2
+      exit 1
+   fi
+fi
