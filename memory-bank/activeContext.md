@@ -69,14 +69,7 @@ Unexpected findings: NONE / [describe]
 Status: COMPLETE / BLOCKED
 ```
 
-## Task 6 Completion Report (Codex)
-
-Files changed: scripts/plugins/vault.sh
-Shellcheck: PASS (`shellcheck scripts/plugins/vault.sh`)
-Role fix: scripts/plugins/vault.sh:1526-1537 — `_vault_configure_secret_reader_role` now binds `eso-ldap-directory` to `directory,identity` (with optional override support)
-Other roles scanned: Jenkins roles (`scripts/plugins/jenkins.sh`:2202,2223,2237,2300) and Vault ESO roles (`scripts/plugins/vault.sh`:1341,1372,1403) already namespace-scoped — no changes required
-Unexpected findings: NONE
-Status: COMPLETE
+**Task 6 DONE** (commit 51d94c6) — `_vault_configure_secret_reader_role` in `vault.sh` now binds `eso-ldap-directory` to `directory,identity`. Other roles scanned — no issues found.
 
 ---
 
@@ -320,7 +313,7 @@ Rebuilt 2026-03-07 — verified healthy post lib-foundation subtree integration 
 - [x] OrbStack cluster teardown + rebuild validation (Claude — Task 3) — DONE
 - [x] Ubuntu k3s teardown + rebuild validation (Gemini — Task 4) — DONE
 - [x] Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var (Codex — Task 5) — DONE commit 24c8adf
-- [ ] Fix `deploy_ldap`: Vault role `eso-ldap-directory` must bind `directory` + `identity` ns (Codex — Task 6, **active**)
+- [x] Fix `deploy_ldap`: Vault role `eso-ldap-directory` binds `directory` + `identity` ns (Codex — Task 6) — DONE commit 51d94c6
 - [ ] Fix BATS test teardown: `k3d-test-orbstack-exists` cluster not cleaned up post-test. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md` (Gemini)
 - [ ] inotify limit in colima VM not persistent — apply via colima lima.yaml or note in ops runbook
 - [ ] ESO deploy on Ubuntu app cluster
