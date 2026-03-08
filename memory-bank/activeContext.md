@@ -93,6 +93,21 @@
 
 ---
 
+## Core Library Rule
+
+**Never modify `scripts/lib/foundation/` directly.** All changes to core library code
+(new functions, refactors, bug fixes) must originate in lib-foundation and flow in via
+`git subtree pull`:
+
+```
+lib-foundation (fix) → PR → merge → tag → k3d-manager subtree pull
+```
+
+Emergency hotfixes directly in the subtree are allowed only to unblock a release — must
+be filed as an issue in lib-foundation and ported upstream before the next subtree pull.
+
+---
+
 ## Engineering Protocol
 
 1. **Spec-First**: No code without a structured, approved implementation spec.
