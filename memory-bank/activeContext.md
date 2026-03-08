@@ -54,7 +54,7 @@ Edit only `scripts/lib/system.sh` and `scripts/lib/core.sh`. Do NOT edit the fou
 ### Rules
 
 - Edit only `scripts/lib/system.sh`, `scripts/lib/core.sh`, and `README.md`.
-- Do NOT edit `scripts/lib/foundation/` — those are handled separately.
+- Do NOT edit `scripts/lib/foundation/` — the same colima removal will be made in lib-foundation upstream and pulled in via `git subtree pull` by Claude after your commit merges.
 - Do NOT edit any other files.
 - Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
 - `shellcheck scripts/lib/system.sh scripts/lib/core.sh` must exit 0.
