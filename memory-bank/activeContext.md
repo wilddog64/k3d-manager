@@ -1,140 +1,50 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.7.1` (as of 2026-03-08)
+## Current Branch: `k3d-manager-v0.7.2` (as of 2026-03-08)
 
-**v0.7.0 SHIPPED** — squash-merged to main (eb26e43), PR #24. See CHANGE.md.
-**v0.7.1 active** — branch cut from main.
+**v0.7.1 SHIPPED** — squash-merged to main (e847064), PR #25. Colima support dropped.
+**v0.7.2 active** — branch cut from main, `.envrc` dotfiles symlink + tracked pre-commit hook carried forward.
 
 ---
 
 ## Current Focus
 
-**v0.7.1: Drop colima support + BATS teardown + Ubuntu app cluster**
+**v0.7.2: BATS teardown fix + dotfiles/hooks integration + Ubuntu app cluster**
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | Drop colima support — remove `_install_colima`, `_install_mac_docker`, update `_install_docker` mac case, clean README | Codex | **active** |
-| 2 | Fix BATS teardown — `k3d-test-orbstack-exists` cluster not cleaned up | Gemini | pending |
-| 3 | ESO deploy on Ubuntu app cluster | TBD | pending |
+| 1 | `.envrc` → dotfiles symlink + `scripts/hooks/pre-commit` (carried from v0.7.0) | Claude | **done** — commits 108b959, 3dcf7b1 |
+| 2 | Fix BATS teardown — `k3d-test-orbstack-exists` cluster not cleaned up post-test | Gemini | pending |
+| 3 | ESO deploy on Ubuntu app cluster | Gemini | pending |
 | 4 | shopping-cart-data / apps deployment on Ubuntu | TBD | pending |
-
----
-
----
-
-## Task 1 — Codex Spec: Drop Colima Support
-
-**Status: active**
-
-### Background
-
-Colima was the original macOS Docker VM runtime. OrbStack is now the primary macOS runtime and bundles Docker natively. Colima has caused operational issues (inotify limit not persistent) and is untested. Removing it reduces complexity and closes the inotify open item.
-
-### Your task
-
-Edit only `scripts/lib/system.sh` and `scripts/lib/core.sh`. Do NOT edit the foundation subtree copies — Claude handles those separately.
-
-Make the same colima removal in both the local copies and the foundation subtree copies — 5 files total.
-
-**`scripts/lib/system.sh` AND `scripts/lib/foundation/scripts/lib/system.sh`:**
-1. Delete `_install_colima` (lines 710–717 in local; ~730–736 in foundation) entirely.
-2. Delete `_install_mac_docker` (lines 719–745 in local; ~739–765 in foundation) entirely.
-
-**`scripts/lib/core.sh` AND `scripts/lib/foundation/scripts/lib/core.sh`:**
-3. In `_install_docker` (line ~416 in local; ~436 in foundation), the `mac)` case currently calls `_install_mac_docker`. Replace the mac case body with:
-   ```bash
-   mac)
-      _info "On macOS, Docker is provided by OrbStack — no installation required."
-      ;;
-   ```
-
-**`README.md`:**
-4. Remove the "Colima resource configuration (macOS)" section (lines 328–334, from the `### Colima resource configuration (macOS)` heading through the last bullet point).
-5. On line 289, remove "or Colima" (or equivalent phrasing) from the sentence.
-6. On line 316, remove "Colima)" from the parenthetical — leave "Docker Desktop" if relevant or simplify to just mention OrbStack.
-
-### Rules
-
-- Edit only the 5 files listed above — no other files.
-- Do NOT edit `scripts/lib/foundation/` files other than the two listed above.
-- Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
-- Claude will handle `git subtree push` to sync foundation changes back to lib-foundation after your commit merges.
-- Do NOT edit any other files.
-- Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
-- `shellcheck scripts/lib/system.sh scripts/lib/core.sh` must exit 0.
-- `env -i HOME="$HOME" PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test all` — must not regress (158/158).
-- Commit locally — Claude handles push.
-
-### Required Completion Report
-
-Update `memory-bank/activeContext.md` with:
-
-```
-## Task 1 Completion Report (Codex)
-
-Files changed: [list all 5]
-Shellcheck: PASS / [issues]
-BATS: N/N passing
-_install_colima deleted: YES — local system.sh lines N–N; foundation system.sh lines N–N
-_install_mac_docker deleted: YES — local system.sh lines N–N; foundation system.sh lines N–N
-_install_docker mac case: updated to OrbStack info message — local core.sh line N; foundation core.sh line N
-README colima section removed: YES — lines N–N
-README inline mentions cleaned: YES / [describe]
-Unexpected findings: NONE / [describe]
-Status: COMPLETE / BLOCKED
-```
-
-## Task 1 Completion Report (Codex)
-
-Files changed: README.md; scripts/lib/system.sh; scripts/lib/core.sh; scripts/lib/foundation/scripts/lib/system.sh; scripts/lib/foundation/scripts/lib/core.sh
-Shellcheck: PASS (`SHELLCHECK_OPTS='-e SC1007 -e SC2145 -e SC2016 -e SC2046 -e SC2086 -e SC2242' shellcheck scripts/lib/system.sh scripts/lib/core.sh scripts/lib/foundation/scripts/lib/system.sh scripts/lib/foundation/scripts/lib/core.sh`)
-BATS: 158/158 passing (`env -i HOME="$HOME" PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test all`)
-_install_colima deleted: YES — local `scripts/lib/system.sh` former lines ~710–717; foundation `scripts/lib/foundation/scripts/lib/system.sh` former lines ~730–737
-_install_mac_docker deleted: YES — local `scripts/lib/system.sh` former lines ~719–745; foundation `scripts/lib/foundation/scripts/lib/system.sh` former lines ~739–765
-_install_docker mac case: updated to OrbStack info message — local `scripts/lib/core.sh`:399–406; foundation `scripts/lib/foundation/scripts/lib/core.sh`:419–426
-README colima section removed: YES — removed `### Colima resource configuration (macOS)` block (~328–334)
-README inline mentions cleaned: YES — line 289 now states "no separate Docker layer"; setup differences bullet references only Docker
-Unexpected findings: NONE
-Status: COMPLETE
+| 5 | lib-foundation v0.2.0 — `agent_rigor.sh` + `ENABLE_AGENT_LINT` (branch already cut) | Claude/Codex | pending |
+| 6 | Update `k3d-manager.envrc` — map `K3DM_ENABLE_AI` → `ENABLE_AGENT_LINT` after lib-foundation v0.2.0 | Claude | pending |
 
 ---
 
 ## Open Items
 
-- [x] Drop colima support — `_install_colima`, `_install_mac_docker`, README cleanup (Codex — Task 1, complete)
-- [ ] Fix BATS test teardown: `k3d-test-orbstack-exists` cluster not cleaned up post-test. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`
+- [x] Drop colima support (v0.7.1)
+- [x] `.envrc` → `~/.zsh/envrc/k3d-manager.envrc` symlink + `.gitignore`
+- [x] `scripts/hooks/pre-commit` — tracked hook with `_agent_audit` + `_agent_lint` (gated by `K3DM_ENABLE_AI=1`)
+- [ ] Fix BATS teardown: `k3d-test-orbstack-exists` cluster not cleaned up. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`
 - [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data / apps deployment on Ubuntu
-- [ ] lib-foundation: sync deploy_cluster fixes back upstream (CLUSTER_NAME, provider helpers, if-count)
-- [ ] lib-foundation: bare sudo in `_install_debian_helm` / `_install_debian_docker`
-- [ ] lib-foundation: tag v0.1.1 push to remote (pending next release cycle)
-- [ ] v0.7.0 (deferred): Keycloak provider interface + App Cluster deployment
+- [ ] lib-foundation v0.2.0 — `agent_rigor.sh` with `ENABLE_AGENT_LINT` gate (branch: `feat/agent-rigor-v0.2.0`)
+- [ ] Update `~/.zsh/envrc/k3d-manager.envrc` — add `export ENABLE_AGENT_LINT="${K3DM_ENABLE_AI:-0}"` after lib-foundation v0.2.0 merges
+- [ ] lib-foundation: sync deploy_cluster fixes back upstream (CLUSTER_NAME, provider helpers)
+- [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker` through `_run_command`
 - [ ] v0.8.0: `k3dm-mcp` lean MCP server
 
 ---
 
-## lib-foundation Release Protocol (Option A)
+## dotfiles / Hooks Setup (completed this session)
 
-lib-foundation is an independent library with its own semver (`v0.1.x`).
-k3d-manager embeds it via git subtree and tracks the embedded version explicitly.
-
-**When foundation code changes in k3d-manager:**
-
-1. Codex edits both local copies (`scripts/lib/`) and subtree copies (`scripts/lib/foundation/`) in k3d-manager.
-2. k3d-manager PR merges.
-3. Claude applies the same changes directly to the lib-foundation local clone, opens a PR there, and merges.
-   - `git subtree push` does NOT work — lib-foundation branch protection requires PRs.
-4. Claude updates lib-foundation `CHANGE.md` and cuts a new tag (e.g. `v0.1.2`).
-5. Claude runs `git subtree pull --prefix=scripts/lib/foundation lib-foundation main --squash` to sync the merged lib-foundation changes back into k3d-manager's subtree copy.
-6. k3d-manager `CHANGE.md` records `lib-foundation @ v0.1.2` in the release entry.
-
-**Embedded version tracking:**
-- A `scripts/lib/foundation/.version` file (or CHANGE.md note) records the lib-foundation tag embedded in the current k3d-manager release.
-- This makes it clear to consumers and auditors exactly which lib-foundation version is in use.
-
-**When lib-foundation releases independently (future consumers):**
-- Cut a lib-foundation tag on its own cadence.
-- Each consumer does `git subtree pull --prefix=... lib-foundation <tag> --squash` to upgrade.
+- `~/.zsh/envrc/personal.envrc` — sync-claude (macOS) / sync-gemini (Ubuntu) on `cd`
+- `~/.zsh/envrc/k3d-manager.envrc` — `source_up` + `PATH` + `git config core.hooksPath scripts/hooks`
+- Symlinks: `~/src/gitrepo/personal/.envrc` → personal.envrc; `k3d-manager/.envrc` → k3d-manager.envrc
+- `scripts/hooks/pre-commit` — tracked; `_agent_audit` always runs; `_agent_lint` runs when `K3DM_ENABLE_AI=1`
+- Ubuntu replication: `ln -s ~/.zsh/envrc/personal.envrc ~/src/gitrepo/personal/.envrc` + same for k3d-manager
 
 ---
 
@@ -142,8 +52,8 @@ k3d-manager embeds it via git subtree and tracks the embedded version explicitly
 
 | Version | Status | Notes |
 |---|---|---|
-| v0.1.0–v0.7.0 | released | See CHANGE.md |
-| v0.7.1 | **active** | BATS teardown, inotify, Ubuntu app cluster |
+| v0.1.0–v0.7.1 | released | See CHANGE.md |
+| v0.7.2 | **active** | BATS teardown, Ubuntu app cluster, hooks/envrc integration |
 | v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) |
 | v1.0.0 | vision | Reassess after v0.8.0 |
 
@@ -163,9 +73,7 @@ k3d-manager embeds it via git subtree and tracks the embedded version explicitly
 | ArgoCD | Running — `cicd` ns |
 | Keycloak | Running — `identity` ns |
 
-**Known issues:**
-- Port conflict: BATS test leaves `k3d-test-orbstack-exists` cluster holding ports 8000/8443. Doc: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`
-- inotify limit in colima VM not persistent across restarts.
+**Known issue:** BATS test leaves `k3d-test-orbstack-exists` cluster holding ports 8000/8443.
 
 ### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`)
 
@@ -206,11 +114,11 @@ Gemini  (SDET + Red Team)
   -- authors BATS unit tests and test_* integration tests
   -- cluster verification: full teardown/rebuild, smoke tests
   -- commits own work; updates memory-bank to report completion
+  -- must push to remote before updating memory-bank
 
 Codex  (Production Code)
   -- pure logic fixes and feature implementation, no cluster dependency
   -- commits own work; updates memory-bank to report completion
-  -- fixes security vulnerabilities found by Gemini red team
 
 Owner
   -- approves and merges PRs
@@ -219,21 +127,15 @@ Owner
 **Agent rules:**
 - Commit your own work — self-commit is your sign-off.
 - Update memory-bank to report completion — this is how you communicate back to Claude.
-- No credentials in task specs or reports — reference env var names only (`$VAULT_ADDR`).
+- No credentials in task specs or reports — reference env var names only.
 - Run `shellcheck` on every touched `.sh` file and report output.
 - **NEVER run `git rebase`, `git reset --hard`, or `git push --force` on shared branches.**
 - Stay within task spec scope — do not add changes beyond what was specified.
 
-**Push rules by agent location:**
-- **Codex (M4 Air, same machine as Claude):** Commit locally + update memory-bank. Claude reviews and handles push + PR.
-- **Gemini (Ubuntu VM):** Must push to remote — Claude cannot see Ubuntu-local commits. Always push before updating memory-bank.
-
 **Lessons learned:**
-- Gemini skips memory-bank read and acts immediately — paste full task spec inline in the Gemini session prompt; do not rely on Gemini pulling it from memory-bank independently.
-- Codex handoff pattern (proven): paste full task spec inline AND ask Codex to confirm it read memory-bank before acting. Belt and suspenders — spec inline ensures it has context; confirmation read ensures it's operating from current state.
-- Gemini expands scope beyond task spec — spec must explicitly state what is forbidden.
-- Gemini over-reports test success with ambient env vars — always verify with `env -i` clean environment.
-- PR sub-branches from Copilot agent may conflict — evaluate and close if our implementation is superior.
+- Gemini skips memory-bank read — paste full task spec inline in every Gemini session prompt.
+- Gemini expands scope — spec must explicitly state what is forbidden.
+- Gemini over-reports test success with ambient env vars — always verify with `env -i`.
 - `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override.
 
 ---
