@@ -21,6 +21,49 @@
 
 ---
 
+## Task 5 — Codex Spec: deploy_cluster Refactor + CLUSTER_NAME Fix
+
+**Status: active** — both cluster rebuilds passed. Codex is unblocked.
+
+### Your task
+
+Full spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md`
+
+Read it completely before writing any code. Key points:
+
+1. **Edit only `scripts/lib/core.sh`** — no other files.
+2. Extract `_deploy_cluster_prompt_provider` and `_deploy_cluster_resolve_provider` helpers (spec has exact signatures).
+3. Remove duplicate mac+k3s guard (line ~754 is dead code — line ~714 fires first).
+4. Fix `CLUSTER_NAME` env var — investigate `scripts/etc/cluster_var.sh` and provider files.
+5. `deploy_cluster` itself must have ≤ 8 `if` blocks after refactor.
+6. `shellcheck scripts/lib/core.sh` must exit 0.
+7. `env -i HOME="$HOME" PATH="$PATH" ./scripts/k3d-manager test all` — must not regress (158/158).
+
+### Rules
+
+- Do NOT edit any file other than `scripts/lib/core.sh`.
+- Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
+- Commit locally — Claude handles push.
+- bash 3.2+ compatible — no `declare -A`, no `mapfile`.
+
+### Required Completion Report
+
+Update `memory-bank/activeContext.md` with:
+
+```
+## Task 5 Completion Report (Codex)
+
+Files changed: scripts/lib/core.sh
+Shellcheck: PASS / [issues]
+BATS: N/N passing
+deploy_cluster if-count: N (must be ≤ 8)
+CLUSTER_NAME fix: VERIFIED / BLOCKED — [reason]
+Unexpected findings: NONE / [describe — do not fix without a spec]
+Status: COMPLETE / BLOCKED
+```
+
+---
+
 ## Task 4 — Gemini Completion Report
 
 **Status: DONE** (commit 756b863, 2026-03-07)
