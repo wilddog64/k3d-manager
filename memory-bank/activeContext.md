@@ -69,6 +69,15 @@ Unexpected findings: NONE / [describe]
 Status: COMPLETE / BLOCKED
 ```
 
+## Task 6 Completion Report (Codex)
+
+Files changed: scripts/plugins/vault.sh
+Shellcheck: PASS (`shellcheck scripts/plugins/vault.sh`)
+Role fix: scripts/plugins/vault.sh:1526-1537 — `_vault_configure_secret_reader_role` now binds `eso-ldap-directory` to `directory,identity` (with optional override support)
+Other roles scanned: Jenkins roles (`scripts/plugins/jenkins.sh`:2202,2223,2237,2300) and Vault ESO roles (`scripts/plugins/vault.sh`:1341,1372,1403) already namespace-scoped — no changes required
+Unexpected findings: NONE
+Status: COMPLETE
+
 ---
 
 ## Task 5 — Codex Spec: deploy_cluster Refactor + CLUSTER_NAME Fix
