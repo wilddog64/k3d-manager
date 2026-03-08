@@ -121,13 +121,12 @@ k3d-manager embeds it via git subtree and tracks the embedded version explicitly
 **When foundation code changes in k3d-manager:**
 
 1. Codex edits both local copies (`scripts/lib/`) and subtree copies (`scripts/lib/foundation/`) in k3d-manager.
-2. PR merges into k3d-manager.
-3. Claude runs:
-   ```bash
-   git subtree push --prefix=scripts/lib/foundation lib-foundation main
-   ```
+2. k3d-manager PR merges.
+3. Claude applies the same changes directly to the lib-foundation local clone, opens a PR there, and merges.
+   - `git subtree push` does NOT work — lib-foundation branch protection requires PRs.
 4. Claude updates lib-foundation `CHANGE.md` and cuts a new tag (e.g. `v0.1.2`).
-5. k3d-manager `CHANGE.md` records `lib-foundation @ v0.1.2` in the release entry.
+5. Claude runs `git subtree pull --prefix=scripts/lib/foundation lib-foundation main --squash` to sync the merged lib-foundation changes back into k3d-manager's subtree copy.
+6. k3d-manager `CHANGE.md` records `lib-foundation @ v0.1.2` in the release entry.
 
 **Embedded version tracking:**
 - A `scripts/lib/foundation/.version` file (or CHANGE.md note) records the lib-foundation tag embedded in the current k3d-manager release.
