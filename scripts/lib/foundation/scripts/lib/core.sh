@@ -433,7 +433,7 @@ function _install_docker() {
 
    case "$platform" in
       mac)
-         _install_mac_docker
+         _info "On macOS, Docker is provided by OrbStack — no installation required."
          ;;
       debian|wsl)
          _install_debian_docker

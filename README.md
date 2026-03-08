@@ -286,7 +286,7 @@ expectations before running any plugins against it:
   optional `k3s-agent.service` units. Enable the service at boot and verify it
   is active with `sudo systemctl status k3s` before applying workloads.
 * `containerd` ships with k3s and is started by the `k3s` unit; no separate
-  Docker or Colima layer is involved.
+  Docker layer is involved.
 
 ### Container runtime ports
 
@@ -312,8 +312,8 @@ expectations before running any plugins against it:
 ### Setup differences compared with k3d
 
 * k3d provisions everything inside Docker. The supplied scripts create and
-  delete clusters automatically, so the only prerequisites are Docker (or
-  Colima) and the `k3d` CLI. With the k3s provider the same `deploy_cluster`
+  delete clusters automatically, so the only prerequisites are Docker and the
+  `k3d` CLI. With the k3s provider the same `deploy_cluster`
   command can install packages directly on the host—confirm the prompt or use
   `-f` to run unattended, and fall back to the manual steps above when
   auto-install is disabled.
@@ -324,14 +324,6 @@ expectations before running any plugins against it:
   must copy `/etc/rancher/k3s/k3s.yaml` to your workstation (or export
   `KUBECONFIG` to point at it) so the manager script can talk to the remote
   cluster.
-
-### Colima resource configuration (macOS)
-
-The macOS Docker setup uses [Colima](https://github.com/abiosoft/colima). Configure the VM resources through environment variables or by passing positional arguments to the internal `_install_mac_docker` helper:
-
-- `COLIMA_CPU` (default `4`) – number of CPUs
-- `COLIMA_MEMORY` (default `8`) – memory in GiB
-- `COLIMA_DISK` (default `20`) – disk size in GiB
 
 ## Documentation
 

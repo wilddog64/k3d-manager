@@ -727,43 +727,6 @@ function _detect_platform() {
    _err "Unsupported platform: $(uname -s)"
 }
 
-function _install_colima() {
-   if ! _command_exist colima ; then
-      echo colima does not exist, install it
-      _run_command --quiet -- brew install colima
-   else
-      echo colima installed already
-   fi
-}
-
-function _install_mac_docker() {
-  local cpu="${1:-${COLIMA_CPU:-4}}"
-  local memory="${2:-${COLIMA_MEMORY:-8}}"
-  local disk="${3:-${COLIMA_DISK:-20}}"
-
-   if  ! _command_exist docker && _is_mac ; then
-      echo docker does not exist, install it
-      brew install docker
-   else
-      echo docker installed already
-   fi
-
-   if _is_mac; then
-      _install_colima
-      docker context use colima
-      export DOCKER_HOST=unix:///Users/$USER/.colima/docker.sock
-      colima start --cpu "$cpu" --memory "$memory" --disk "$disk"
-   fi
-
-
-   # grep DOKER_HOST $HOME/.zsh/zshrc | wc -l 2>&1 > /dev/null
-   # if $? == 0 ; then
-   #    echo "export DOCKER_HOST=unix:///Users/$USER/.colima/docker.sock" >> $HOME/.zsh/zshrc
-   #    echo "export DOCKER_CONTEXT=colima" >> $HOME/.zsh/zshrc
-   #    echo "restart your shell to apply the changes"
-   # fi
-}
-
 function _create_nfs_share_mac() {
    local share_path="${1:-${HOME}/k3d-nfs}"
    _ensure_path_exists "$share_path"

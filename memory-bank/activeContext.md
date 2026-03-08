@@ -84,11 +84,24 @@ Unexpected findings: NONE / [describe]
 Status: COMPLETE / BLOCKED
 ```
 
+## Task 1 Completion Report (Codex)
+
+Files changed: README.md; scripts/lib/system.sh; scripts/lib/core.sh; scripts/lib/foundation/scripts/lib/system.sh; scripts/lib/foundation/scripts/lib/core.sh
+Shellcheck: PASS (`SHELLCHECK_OPTS='-e SC1007 -e SC2145 -e SC2016 -e SC2046 -e SC2086 -e SC2242' shellcheck scripts/lib/system.sh scripts/lib/core.sh scripts/lib/foundation/scripts/lib/system.sh scripts/lib/foundation/scripts/lib/core.sh`)
+BATS: 158/158 passing (`env -i HOME="$HOME" PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test all`)
+_install_colima deleted: YES — local `scripts/lib/system.sh` former lines ~710–717; foundation `scripts/lib/foundation/scripts/lib/system.sh` former lines ~730–737
+_install_mac_docker deleted: YES — local `scripts/lib/system.sh` former lines ~719–745; foundation `scripts/lib/foundation/scripts/lib/system.sh` former lines ~739–765
+_install_docker mac case: updated to OrbStack info message — local `scripts/lib/core.sh`:399–406; foundation `scripts/lib/foundation/scripts/lib/core.sh`:419–426
+README colima section removed: YES — removed `### Colima resource configuration (macOS)` block (~328–334)
+README inline mentions cleaned: YES — line 289 now states "no separate Docker layer"; setup differences bullet references only Docker
+Unexpected findings: NONE
+Status: COMPLETE
+
 ---
 
 ## Open Items
 
-- [ ] Drop colima support — `_install_colima`, `_install_mac_docker`, README cleanup (Codex — Task 1, active)
+- [x] Drop colima support — `_install_colima`, `_install_mac_docker`, README cleanup (Codex — Task 1, complete)
 - [ ] Fix BATS test teardown: `k3d-test-orbstack-exists` cluster not cleaned up post-test. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`
 - [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data / apps deployment on Ubuntu
