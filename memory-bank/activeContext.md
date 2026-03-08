@@ -34,12 +34,14 @@ Colima was the original macOS Docker VM runtime. OrbStack is now the primary mac
 
 Edit only `scripts/lib/system.sh` and `scripts/lib/core.sh`. Do NOT edit the foundation subtree copies — Claude handles those separately.
 
-**`scripts/lib/system.sh`:**
-1. Delete `_install_colima` (lines 710–717) entirely.
-2. Delete `_install_mac_docker` (lines 719–745) entirely.
+Make the same colima removal in both the local copies and the foundation subtree copies — 5 files total.
 
-**`scripts/lib/core.sh`:**
-3. In `_install_docker` (line ~416), the `mac)` case currently calls `_install_mac_docker`. Replace the mac case body with:
+**`scripts/lib/system.sh` AND `scripts/lib/foundation/scripts/lib/system.sh`:**
+1. Delete `_install_colima` (lines 710–717 in local; ~730–736 in foundation) entirely.
+2. Delete `_install_mac_docker` (lines 719–745 in local; ~739–765 in foundation) entirely.
+
+**`scripts/lib/core.sh` AND `scripts/lib/foundation/scripts/lib/core.sh`:**
+3. In `_install_docker` (line ~416 in local; ~436 in foundation), the `mac)` case currently calls `_install_mac_docker`. Replace the mac case body with:
    ```bash
    mac)
       _info "On macOS, Docker is provided by OrbStack — no installation required."
@@ -53,8 +55,10 @@ Edit only `scripts/lib/system.sh` and `scripts/lib/core.sh`. Do NOT edit the fou
 
 ### Rules
 
-- Edit only `scripts/lib/system.sh`, `scripts/lib/core.sh`, and `README.md`.
-- Do NOT edit `scripts/lib/foundation/` — the same colima removal will be made in lib-foundation upstream and pulled in via `git subtree pull` by Claude after your commit merges.
+- Edit only the 5 files listed above — no other files.
+- Do NOT edit `scripts/lib/foundation/` files other than the two listed above.
+- Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
+- Claude will handle `git subtree push` to sync foundation changes back to lib-foundation after your commit merges.
 - Do NOT edit any other files.
 - Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
 - `shellcheck scripts/lib/system.sh scripts/lib/core.sh` must exit 0.
@@ -68,12 +72,12 @@ Update `memory-bank/activeContext.md` with:
 ```
 ## Task 1 Completion Report (Codex)
 
-Files changed: [list]
+Files changed: [list all 5]
 Shellcheck: PASS / [issues]
 BATS: N/N passing
-_install_colima deleted: YES — system.sh lines N–N
-_install_mac_docker deleted: YES — system.sh lines N–N
-_install_docker mac case: updated to OrbStack info message — core.sh line N
+_install_colima deleted: YES — local system.sh lines N–N; foundation system.sh lines N–N
+_install_mac_docker deleted: YES — local system.sh lines N–N; foundation system.sh lines N–N
+_install_docker mac case: updated to OrbStack info message — local core.sh line N; foundation core.sh line N
 README colima section removed: YES — lines N–N
 README inline mentions cleaned: YES / [describe]
 Unexpected findings: NONE / [describe]
