@@ -43,10 +43,12 @@
 
 ### Priority 2 — lib-foundation
 
-- [ ] v0.2.0 — `agent_rigor.sh` with `ENABLE_AGENT_LINT` gate (branch: `feat/agent-rigor-v0.2.0`)
-- [ ] Update `k3d-manager.envrc` — map `K3DM_ENABLE_AI` → `ENABLE_AGENT_LINT` after v0.2.0 merges
+- [x] v0.2.0 — `agent_rigor.sh` — merged PR #4, tagged, subtree synced into k3d-manager
+- [x] `k3d-manager.envrc` — `AGENT_LINT_GATE_VAR=K3DM_ENABLE_AI`, `AGENT_LINT_AI_FUNC=_k3d_manager_copilot`, `AGENT_AUDIT_MAX_IF=15`
 - [ ] Sync deploy_cluster fixes back into lib-foundation (CLUSTER_NAME, provider helpers)
 - [ ] Route bare sudo in `_install_debian_helm` / `_install_debian_docker` through `_run_command`
+- [ ] `_run_command` if-count refactor (v0.3.0) — see `docs/issues/2026-03-08-run-command-if-count-refactor.md`
+- [ ] Add `.github/copilot-instructions.md` to lib-foundation (v0.2.1 or v0.3.0)
 
 ### Priority 3 — v0.8.0
 
