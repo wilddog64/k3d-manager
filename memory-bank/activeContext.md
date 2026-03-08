@@ -195,6 +195,7 @@ Agent reads + acts
 - Gemini expands scope beyond task spec — spec must explicitly state what is forbidden.
 - Gemini ran `git rebase -i` on a shared branch — destructive git ops explicitly forbidden.
 - Gemini over-reports test success with ambient env vars — always verify with `env -i` clean environment.
+- **Gemini does not read memory-bank before starting** — even when given the same prompt as Codex, Gemini skips the memory-bank read and acts immediately. Codex reliably verifies memory-bank first. Mitigation: paste the full task spec inline in the Gemini session prompt; do not rely on Gemini pulling it from memory-bank independently.
 - PR sub-branches from Copilot agent may conflict — evaluate and close if our implementation is superior.
 - Claude owns Copilot PR review fixes directly — no need to route small surgical fixes through agents.
 
