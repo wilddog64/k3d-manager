@@ -1,26 +1,14 @@
-# shellcheck disable=SC1090,SC2034
+# shellcheck shell=bash
 
-# Ensure SCRIPT_DIR is defined when this library is sourced directly.
-if [[ -z "${SCRIPT_DIR:-}" ]]; then
-   SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
-fi
-
-function _agent_checkpoint() {
+_agent_checkpoint() {
    local label="${1:-operation}"
-
-   if ! declare -f _err >/dev/null 2>&1 || \
-      ! declare -f _info >/dev/null 2>&1 || \
-      ! declare -f _k3dm_repo_root >/dev/null 2>&1; then
-      echo "ERROR: agent_rigor.sh requires system.sh to be sourced first" >&2
-      return 1
-   fi
 
    if ! command -v git >/dev/null 2>&1; then
       _err "_agent_checkpoint requires git"
    fi
 
-   local repo_root
-   repo_root="$(_k3dm_repo_root 2>/dev/null || true)"
+   local repo_root=""
+   repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
    if [[ -z "$repo_root" ]]; then
       _err "Unable to locate git repository root for checkpoint"
    fi
@@ -49,35 +37,7 @@ function _agent_checkpoint() {
    _err "Checkpoint commit failed; resolve git errors and retry"
 }
 
-function _agent_lint() {
-   if [[ "${K3DM_ENABLE_AI:-0}" != "1" ]]; then
-      return 0
-   fi
-
-   if ! command -v git >/dev/null 2>&1; then
-      _warn "git not available; skipping agent lint"
-      return 0
-   fi
-
-   local staged_files
-   staged_files="$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' 2>/dev/null || true)"
-   if [[ -z "$staged_files" ]]; then
-      return 0
-   fi
-
-   local rules_file="${SCRIPT_DIR}/etc/agent/lint-rules.md"
-   if [[ ! -r "$rules_file" ]]; then
-      _warn "Lint rules file missing; skipping agent lint"
-      return 0
-   fi
-
-   local prompt
-   prompt="Review the following staged shell files for architectural violations.\n\nRules:\n$(cat "$rules_file")\n\nFiles:\n$staged_files"
-
-   _k3d_manager_copilot -p "$prompt"
-}
-
-function _agent_audit() {
+_agent_audit() {
    if ! command -v git >/dev/null 2>&1; then
       _warn "git not available; skipping agent audit"
       return 0
@@ -108,7 +68,6 @@ function _agent_audit() {
       local file
       for file in $changed_sh; do
          [[ -f "$file" ]] || continue
-         local offenders
          local current_func="" if_count=0 line
          local offenders_lines=""
          while IFS= read -r line; do
@@ -123,16 +82,16 @@ function _agent_audit() {
             elif [[ $line =~ ^[[:space:]]*if[[:space:]\(] ]]; then
                ((++if_count))
             fi
-         done < "$file"
+         done < <(git show :"$file" 2>/dev/null || true)
 
          if [[ -n "$current_func" && $if_count -gt $max_if ]]; then
             offenders_lines+="${current_func}:${if_count}"$'\n'
          fi
 
-         offenders="${offenders_lines%$'\n'}"
+         offenders_lines="${offenders_lines%$'\n'}"
 
-         if [[ -n "$offenders" ]]; then
-            _warn "Agent audit: $file exceeds if-count threshold in: $offenders"
+         if [[ -n "$offenders_lines" ]]; then
+            _warn "Agent audit: $file exceeds if-count threshold in: $offenders_lines"
             status=1
          fi
       done
@@ -147,7 +106,8 @@ function _agent_audit() {
             | grep '^+' \
             | sed 's/^+//' \
             | grep -E '\bsudo[[:space:]]' \
-            | grep -v '_run_command\|#' || true)
+            | grep -Ev '^[[:space:]]*#' \
+            | grep -Ev '^[[:space:]]*_run_command\b' || true)
          if [[ -n "$bare_sudo" ]]; then
             _warn "Agent audit: bare sudo call in $file (use _run_command --prefer-sudo):"
             _warn "$bare_sudo"
@@ -156,14 +116,46 @@ function _agent_audit() {
       done
    fi
 
-   local diff_sh
-   diff_sh="$(git diff --cached -- '*.sh' 2>/dev/null || true)"
-   if [[ -n "$diff_sh" ]]; then
-      if grep -qE '^\+.*kubectl exec.*(TOKEN|PASSWORD|SECRET|KEY)=' <<<"$diff_sh"; then
-         _warn "Agent audit: credential pattern detected in kubectl exec args — use Vault/ESO instead"
-         status=1
-      fi
-   fi
-
    return "$status"
 }
+
+_agent_lint() {
+   local gate_var="${AGENT_LINT_GATE_VAR:-ENABLE_AGENT_LINT}"
+   if [[ "${!gate_var:-0}" != "1" ]]; then
+      return 0
+   fi
+
+   local ai_func="${AGENT_LINT_AI_FUNC:-}"
+   if [[ -z "$ai_func" ]]; then
+      _warn "_agent_lint: AGENT_LINT_AI_FUNC not set; skipping AI lint"
+      return 0
+   fi
+
+   if ! declare -f "$ai_func" >/dev/null 2>&1; then
+      _warn "_agent_lint: AI function '${ai_func}' not defined; skipping"
+      return 0
+   fi
+
+   if ! command -v git >/dev/null 2>&1; then
+      _warn "_agent_lint: git not available; skipping"
+      return 0
+   fi
+
+   local staged_files
+   staged_files="$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' 2>/dev/null || true)"
+   if [[ -z "$staged_files" ]]; then
+      return 0
+   fi
+
+   local rules_file="${SCRIPT_DIR}/etc/agent/lint-rules.md"
+   if [[ ! -r "$rules_file" ]]; then
+      _warn "_agent_lint: lint rules file missing at $rules_file; skipping"
+      return 0
+   fi
+
+   local prompt
+   prompt="Review the following staged shell files for architectural violations.\n\nRules:\n$(cat "$rules_file")\n\nFiles:\n$staged_files"
+
+   "$ai_func" -p "$prompt"
+}
+

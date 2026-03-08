@@ -17,7 +17,8 @@ if ! _agent_audit; then
    exit 1
 fi
 
-if [[ "${K3DM_ENABLE_AI:-0}" == "1" ]]; then
+gate_var="${AGENT_LINT_GATE_VAR:-ENABLE_AGENT_LINT}"
+if [[ "${!gate_var:-0}" == "1" ]]; then
    if ! _agent_lint; then
       echo "Pre-commit hook: _agent_lint failed — fix architectural violations before committing" >&2
       exit 1
