@@ -15,8 +15,8 @@
 |---|---|---|---|
 | 1 | `.envrc` → dotfiles symlink + `scripts/hooks/pre-commit` (carried from v0.7.0) | Claude | **done** — commits 108b959, 3dcf7b1 |
 | 2 | Fix BATS teardown — `k3d-test-orbstack-exists` cluster not cleaned up post-test | Gemini | pending |
-| 3 | ESO deploy on Ubuntu app cluster | Gemini | pending |
-| 4 | shopping-cart-data / apps deployment on Ubuntu | TBD | pending |
+| 3 | ESO deploy on Ubuntu app cluster | Gemini | ✅ done |
+| 4 | shopping-cart-data / apps deployment on Ubuntu | Gemini | 🔄 data layer PASS; apps BLOCKED |
 | 5 | lib-foundation v0.2.0 — `agent_rigor.sh` + `ENABLE_AGENT_LINT` | Claude/Codex | **done** — merged + tagged, subtree synced |
 | 6 | Update `k3d-manager.envrc` — `AGENT_LINT_GATE_VAR`, `AGENT_LINT_AI_FUNC`, `AGENT_AUDIT_MAX_IF=15` | Claude | **done** |
 
