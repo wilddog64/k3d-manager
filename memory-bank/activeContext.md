@@ -1,65 +1,34 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.7.2` (as of 2026-03-08)
+## Current Branch: `k3d-manager-v0.7.3` (as of 2026-03-08)
 
-**v0.7.1 SHIPPED** — squash-merged to main (e847064), PR #25. Colima support dropped.
-**v0.7.2 active** — branch cut from main, `.envrc` dotfiles symlink + tracked pre-commit hook carried forward.
+**v0.7.2 SHIPPED** — squash-merged to main (4738fd8), PR #26, 2026-03-08.
+**v0.7.3 active** — branch cut from main 2026-03-08.
 
 ---
 
 ## Current Focus
 
-**v0.7.2: BATS teardown fix + dotfiles/hooks integration + Ubuntu app cluster**
+**v0.7.3: Shopping Cart CI/CD + Cluster Rebuild Validation**
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | `.envrc` → dotfiles symlink + `scripts/hooks/pre-commit` (carried from v0.7.0) | Claude | **done** — commits 108b959, 3dcf7b1 |
-| 2 | Fix BATS teardown — `teardown_file()` fix needed in provider_contract.bats | Codex | **done** — hooks updated + tests pass |
-| 3 | ESO deploy on Ubuntu app cluster | Gemini | ✅ done — 3/3 SecretStores Ready |
-| 4 | shopping-cart-data / apps deployment on Ubuntu | Gemini | 🔄 data layer PASS; apps BLOCKED (ImagePullBackOff + CPU) |
-| 5 | lib-foundation v0.2.0 — `agent_rigor.sh` + `ENABLE_AGENT_LINT` | Claude/Codex | **done** — merged + tagged, subtree synced |
-| 6 | Update `k3d-manager.envrc` — `AGENT_LINT_GATE_VAR`, `AGENT_LINT_AI_FUNC`, `AGENT_AUDIT_MAX_IF=15` | Claude | **done** |
-| 7 | Fix 4 failing CI tests in `agent_rigor.bats` (PR #26 lint blocked) | Codex | **active** — spec: `docs/plans/v0.7.2-codex-agent-rigor-fixes.md` |
-| 7 | Fix 4 failing CI tests in `agent_rigor.bats` (PR #26 lint blocked) | Codex | **pending** — spec: `docs/plans/v0.7.2-codex-agent-rigor-fixes.md` |
+| 1 | Cluster rebuild + pre-commit hook smoke test | Gemini | **pending** — spec: `docs/plans/v0.7.3-gemini-rebuild.md` |
+| 2 | Reusable GitHub Actions workflow (build + Trivy + push + kustomize update) | Codex | pending |
+| 3 | Caller workflow in each service repo (5 services) | Codex | pending |
+| 4 | Fix ArgoCD Application CR repoURLs + destination.server | Codex | pending |
+| 5 | `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` | Codex | pending |
+| 6 | End-to-end verification: push → ghcr.io → ArgoCD → pod on Ubuntu | Gemini | pending |
 
 ---
 
 ## Open Items
 
-- [x] Drop colima support (v0.7.1)
-- [x] `.envrc` → `~/.zsh/envrc/k3d-manager.envrc` symlink + `.gitignore`
-- [x] `scripts/hooks/pre-commit` — tracked hook with `_agent_audit` + `_agent_lint` (gated by `K3DM_ENABLE_AI=1`)
-- [x] Fix BATS teardown: `teardown()` → `teardown_file()` in `provider_contract.bats` — Codex task: `docs/plans/v0.7.2-codex-teardown-fix.md`
-- [ ] Fix 4 failing CI tests in `agent_rigor.bats` — Codex task: `docs/plans/v0.7.2-codex-agent-rigor-fixes.md`
-
-## v0.7.2 Task 2 Completion Report (Codex)
-
-- Line changed: `scripts/tests/lib/provider_contract.bats`:14 — `teardown()` → `teardown_file()`
-- Shellcheck: PASS (`shellcheck scripts/tests/lib/provider_contract.bats`)
-- BATS: 30/30 passing (`env -i HOME="$HOME" PATH="$PATH" bats scripts/tests/lib/provider_contract.bats`)
-- Status: COMPLETE
-- [x] ESO deploy on Ubuntu app cluster — 3/3 SecretStores Ready ✅
-- [ ] shopping-cart-data / apps deployment on Ubuntu — data PASS; apps BLOCKED:
-  - ImagePullBackOff: `shopping-cart/*:latest` images not in registry accessible from Ubuntu
-  - CPU: 2-core k3s node at capacity; needs namespace scale-down
-  - Note: shopping-cart-infra repo present on Ubuntu; deploy via `make` in `shopping-cart-infra/`
-- [x] lib-foundation v0.2.0 — merged, tagged, subtree synced into `scripts/lib/foundation/`
-- [x] `~/.zsh/envrc/k3d-manager.envrc` — `AGENT_LINT_GATE_VAR=K3DM_ENABLE_AI`, `AGENT_LINT_AI_FUNC=_k3d_manager_copilot`, `AGENT_AUDIT_MAX_IF=15`
-- [x] `_agent_audit` smoke-tested: catches bare sudo + if-count, passes clean changes
-- [ ] `_run_command` if-count refactor — 12 if-blocks exceeds threshold; workaround `AGENT_AUDIT_MAX_IF=15`. See `docs/issues/2026-03-08-run-command-if-count-refactor.md`. Fix in lib-foundation first.
-- [ ] lib-foundation: sync deploy_cluster fixes back upstream (CLUSTER_NAME, provider helpers)
-- [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker` through `_run_command`
-- [ ] v0.8.0: `k3dm-mcp` lean MCP server
-
----
-
-## dotfiles / Hooks Setup (completed this session)
-
-- `~/.zsh/envrc/personal.envrc` — sync-claude (macOS) / sync-gemini (Ubuntu) on `cd`
-- `~/.zsh/envrc/k3d-manager.envrc` — `source_up` + `PATH` + `git config core.hooksPath scripts/hooks`
-- Symlinks: `~/src/gitrepo/personal/.envrc` → personal.envrc; `k3d-manager/.envrc` → k3d-manager.envrc
-- `scripts/hooks/pre-commit` — tracked; `_agent_audit` always runs; `_agent_lint` runs when `K3DM_ENABLE_AI=1`
-- Ubuntu replication: `ln -s ~/.zsh/envrc/personal.envrc ~/src/gitrepo/personal/.envrc` + same for k3d-manager
+- [ ] Cluster rebuild + v0.7.2 hook validation (Gemini) — spec: `docs/plans/v0.7.3-gemini-rebuild.md`
+- [ ] Shopping cart CI/CD pipeline — full spec: `docs/plans/v0.7.3-shopping-cart-cicd.md`
+- [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
+- [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
+- [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
 
 ---
 
@@ -67,29 +36,26 @@
 
 | Version | Status | Notes |
 |---|---|---|
-| v0.1.0–v0.7.1 | released | See CHANGE.md |
-| v0.7.2 | **active** | BATS teardown, Ubuntu ESO ✅, shopping-cart data ✅, apps blocked |
-| v0.7.3 | planned | Shopping cart CI/CD — GitHub Actions + Trivy + ghcr.io + ArgoCD. Spec: `docs/plans/v0.7.3-shopping-cart-cicd.md` |
+| v0.1.0–v0.7.2 | released | See CHANGE.md |
+| v0.7.3 | **active** | Shopping cart CI/CD + cluster rebuild |
 | v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) |
 | v1.0.0 | vision | Reassess after v0.8.0 |
 
 ---
 
-## Cluster State (as of 2026-03-07)
+## Cluster State (as of 2026-03-08)
 
 ### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-cluster`)
 
 | Component | Status |
 |---|---|
-| Vault | Running — `secrets` ns, initialized + unsealed |
+| Vault | Running — `secrets` ns |
 | ESO | Running — `secrets` ns |
-| OpenLDAP | Running — `identity` ns + `directory` ns |
+| OpenLDAP | Running — `identity` + `directory` ns |
 | Istio | Running — `istio-system` |
 | Jenkins | Running — `cicd` ns |
 | ArgoCD | Running — `cicd` ns |
 | Keycloak | Running — `identity` ns |
-
-**Known issue:** BATS test leaves `k3d-test-orbstack-exists` cluster holding ports 8000/8443.
 
 ### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`)
 
@@ -97,10 +63,9 @@
 |---|---|
 | k3s node | Ready — v1.34.4+k3s1 |
 | Istio | Running |
-| ESO | Running |
+| ESO | Running — 3/3 SecretStores Ready |
 | Vault | Initialized + Unsealed |
 | OpenLDAP | Running — `identity` ns |
-| SecretStores | 3/3 Ready |
 | shopping-cart-data | Running ✅ |
 | shopping-cart-apps | BLOCKED — ImagePullBackOff + CPU capacity |
 
@@ -110,16 +75,8 @@
 
 ## Core Library Rule
 
-**Never modify `scripts/lib/foundation/` directly.** All changes to core library code
-(new functions, refactors, bug fixes) must originate in lib-foundation and flow in via
-`git subtree pull`:
-
-```
-lib-foundation (fix) → PR → merge → tag → k3d-manager subtree pull
-```
-
-Emergency hotfixes directly in the subtree are allowed only to unblock a release — must
-be filed as an issue in lib-foundation and ported upstream before the next subtree pull.
+**Never modify `scripts/lib/foundation/` directly.** Fix in lib-foundation → PR → tag → subtree pull.
+Subtree sync bypass: `K3DM_SUBTREE_SYNC=1 git subtree pull --prefix=scripts/lib/foundation ...`
 
 ---
 
@@ -139,11 +96,9 @@ be filed as an issue in lib-foundation and ported upstream before the next subtr
 Claude
   -- reviews all agent memory-bank writes before writing next task
   -- opens PR on owner go-ahead; routes PR issues back to agents by scope
-  -- writes corrective/instructional content to memory-bank
   -- tags Copilot for code review before every PR
 
 Gemini  (SDET + Red Team)
-  -- authors BATS unit tests and test_* integration tests
   -- cluster verification: full teardown/rebuild, smoke tests
   -- commits own work; updates memory-bank to report completion
   -- must push to remote before updating memory-bank
