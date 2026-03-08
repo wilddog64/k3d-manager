@@ -37,7 +37,11 @@ setup() {
       shift 2
     fi
     case "$1" in
-      rev-parse) return 0 ;;
+      rev-parse)
+        if [[ "$*" == *"--show-toplevel"* ]]; then
+          echo "$BATS_TEST_TMPDIR"
+        fi
+        return 0 ;;
       status) echo ""; return 0 ;;
     esac
     return 1
@@ -59,7 +63,11 @@ setup() {
       shift 2
     fi
     case "$1" in
-      rev-parse) return 0 ;;
+      rev-parse)
+        if [[ "$*" == *"--show-toplevel"* ]]; then
+          echo "$BATS_TEST_TMPDIR"
+        fi
+        return 0 ;;
       status) echo "M file.sh"; return 0 ;;
       add) return 0 ;;
       commit) return 0 ;;
