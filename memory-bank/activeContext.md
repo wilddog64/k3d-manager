@@ -19,6 +19,7 @@
 | 4 | shopping-cart-data / apps deployment on Ubuntu | Gemini | 🔄 data layer PASS; apps BLOCKED (ImagePullBackOff + CPU) |
 | 5 | lib-foundation v0.2.0 — `agent_rigor.sh` + `ENABLE_AGENT_LINT` | Claude/Codex | **done** — merged + tagged, subtree synced |
 | 6 | Update `k3d-manager.envrc` — `AGENT_LINT_GATE_VAR`, `AGENT_LINT_AI_FUNC`, `AGENT_AUDIT_MAX_IF=15` | Claude | **done** |
+| 7 | Fix 4 failing CI tests in `agent_rigor.bats` (PR #26 lint blocked) | Codex | **pending** — spec: `docs/plans/v0.7.2-codex-agent-rigor-fixes.md` |
 
 ---
 
