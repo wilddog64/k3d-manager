@@ -40,10 +40,19 @@ PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 
 # load our library functions
 source "${SCRIPT_DIR}/lib/provider.sh"
-source "${SCRIPT_DIR}/lib/system.sh"
+# lib-foundation subtree — prefer subtree copy; fall back to local for transition
+if [[ -f "${SCRIPT_DIR}/lib/foundation/scripts/lib/system.sh" ]]; then
+   source "${SCRIPT_DIR}/lib/foundation/scripts/lib/system.sh"
+else
+   source "${SCRIPT_DIR}/lib/system.sh"
+fi
 source "${SCRIPT_DIR}/lib/cluster_provider.sh"
 source "${SCRIPT_DIR}/lib/test.sh"
-source "${SCRIPT_DIR}/lib/core.sh"
+if [[ -f "${SCRIPT_DIR}/lib/foundation/scripts/lib/core.sh" ]]; then
+   source "${SCRIPT_DIR}/lib/foundation/scripts/lib/core.sh"
+else
+   source "${SCRIPT_DIR}/lib/core.sh"
+fi
 source "${SCRIPT_DIR}/lib/help/utils.sh"
 
 CLUSTER_ROLE="${CLUSTER_ROLE:-infra}"
