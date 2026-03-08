@@ -1,177 +1,185 @@
-# Active Context – k3d-manager
+# Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.7.0` (as of 2026-03-07)
+## Current Branch: `k3d-manager-v0.7.1` (as of 2026-03-08)
 
-**v0.6.5 SHIPPED** — tag `v0.6.5` pushed, PR #23 merged. See CHANGE.md.
-**v0.7.0 active** — branch cut from `main`.
+**v0.7.0 SHIPPED** — squash-merged to main (eb26e43), PR #24. See CHANGE.md.
+**v0.7.1 active** — branch cut from main.
 
 ---
 
 ## Current Focus
 
-**v0.7.0: lib-foundation subtree integration + cluster validation**
+**v0.7.1: Drop colima support + BATS teardown + Ubuntu app cluster**
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | Set up git subtree — pull lib-foundation into `scripts/lib/foundation/` | Claude | **DONE** — commit b8426d4 |
-| 2 | Update dispatcher source paths to use subtree | Claude | **DONE** — commit 1dc29db |
-| 3 | Teardown + rebuild infra cluster (OrbStack, macOS ARM64) | Claude | **DONE** — all services healthy; 2 issues filed |
-| 4 | Teardown + rebuild k3s cluster (Ubuntu VM) | Gemini | **DONE** — commit 756b863 |
-| 5 | Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var | Codex | **active** — spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md` |
+| 1 | Drop colima support — remove `_install_colima`, `_install_mac_docker`, update `_install_docker` mac case, clean README | Codex | **active** |
+| 2 | Fix BATS teardown — `k3d-test-orbstack-exists` cluster not cleaned up | Gemini | pending |
+| 3 | ESO deploy on Ubuntu app cluster | TBD | pending |
+| 4 | shopping-cart-data / apps deployment on Ubuntu | TBD | pending |
 
 ---
 
-## Task 6 — Codex Spec: Fix deploy_ldap Vault Role Namespace Binding
+---
+
+## Task 1 — Codex Spec: Drop Colima Support
 
 **Status: active**
 
 ### Background
 
-`deploy_ldap` creates a `vault-kv-store` SecretStore in both the `identity`
-and `directory` namespaces, but the Vault Kubernetes auth role
-`eso-ldap-directory` is only bound to `[directory]`. The `identity`
-SecretStore becomes `InvalidProviderConfig` within minutes of deploy.
-
-Issue: `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md`
+Colima was the original macOS Docker VM runtime. OrbStack is now the primary macOS runtime and bundles Docker natively. Colima has caused operational issues (inotify limit not persistent) and is untested. Removing it reduces complexity and closes the inotify open item.
 
 ### Your task
 
-1. Find where the Vault role `eso-ldap-directory` is written in
-   `scripts/plugins/ldap.sh` — look for `vault write auth/kubernetes/role/eso-ldap-directory`.
-2. Update the `bound_service_account_namespaces` to include both namespaces:
+Edit only `scripts/lib/system.sh` and `scripts/lib/core.sh`. Do NOT edit the foundation subtree copies — Claude handles those separately.
+
+Make the same colima removal in both the local copies and the foundation subtree copies — 5 files total.
+
+**`scripts/lib/system.sh` AND `scripts/lib/foundation/scripts/lib/system.sh`:**
+1. Delete `_install_colima` (lines 710–717 in local; ~730–736 in foundation) entirely.
+2. Delete `_install_mac_docker` (lines 719–745 in local; ~739–765 in foundation) entirely.
+
+**`scripts/lib/core.sh` AND `scripts/lib/foundation/scripts/lib/core.sh`:**
+3. In `_install_docker` (line ~416 in local; ~436 in foundation), the `mac)` case currently calls `_install_mac_docker`. Replace the mac case body with:
    ```bash
-   bound_service_account_namespaces=directory,identity
+   mac)
+      _info "On macOS, Docker is provided by OrbStack — no installation required."
+      ;;
    ```
-3. Verify no other roles have the same single-namespace problem by scanning
-   `scripts/plugins/` for other `vault write auth/kubernetes/role/` calls.
-4. `shellcheck` every `.sh` file you touch — must pass.
-5. Commit locally — Claude handles push.
+
+**`README.md`:**
+4. Remove the "Colima resource configuration (macOS)" section (lines 328–334, from the `### Colima resource configuration (macOS)` heading through the last bullet point).
+5. On line 289, remove "or Colima" (or equivalent phrasing) from the sentence.
+6. On line 316, remove "Colima)" from the parenthetical — leave "Docker Desktop" if relevant or simplify to just mention OrbStack.
 
 ### Rules
 
-- Edit only files in `scripts/plugins/` — no other directories.
+- Edit only the 5 files listed above — no other files.
+- Do NOT edit `scripts/lib/foundation/` files other than the two listed above.
 - Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
-- Do NOT run a cluster deployment to test — this is a code-only fix.
-- Stay within scope — do not refactor surrounding code.
+- Claude will handle `git subtree push` to sync foundation changes back to lib-foundation after your commit merges.
+- Do NOT edit any other files.
+- Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
+- `shellcheck scripts/lib/system.sh scripts/lib/core.sh` must exit 0.
+- `env -i HOME="$HOME" PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test all` — must not regress (158/158).
+- Commit locally — Claude handles push.
 
 ### Required Completion Report
 
 Update `memory-bank/activeContext.md` with:
 
 ```
-## Task 6 Completion Report (Codex)
+## Task 1 Completion Report (Codex)
 
-Files changed: [list]
+Files changed: [list all 5]
 Shellcheck: PASS / [issues]
-Role fix: scripts/plugins/ldap.sh line N — bound_service_account_namespaces updated to [directory,identity]
-Other roles scanned: NONE affected / [list any found]
+BATS: N/N passing
+_install_colima deleted: YES — local system.sh lines N–N; foundation system.sh lines N–N
+_install_mac_docker deleted: YES — local system.sh lines N–N; foundation system.sh lines N–N
+_install_docker mac case: updated to OrbStack info message — local core.sh line N; foundation core.sh line N
+README colima section removed: YES — lines N–N
+README inline mentions cleaned: YES / [describe]
 Unexpected findings: NONE / [describe]
 Status: COMPLETE / BLOCKED
 ```
 
-**Task 6 DONE** (commit 51d94c6) — `_vault_configure_secret_reader_role` in `vault.sh` now binds `eso-ldap-directory` to `directory,identity`. Other roles scanned — no issues found.
+## Task 1 Completion Report (Codex)
 
----
-
-## Task 5 — Codex Spec: deploy_cluster Refactor + CLUSTER_NAME Fix
-
-**Status: active** — both cluster rebuilds passed. Codex is unblocked.
-
-### Your task
-
-Full spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md`
-
-Read it completely before writing any code. Key points:
-
-1. **Edit only `scripts/lib/core.sh`** — no other files.
-2. Extract `_deploy_cluster_prompt_provider` and `_deploy_cluster_resolve_provider` helpers (spec has exact signatures).
-3. Remove duplicate mac+k3s guard (line ~754 is dead code — line ~714 fires first).
-4. Fix `CLUSTER_NAME` env var — investigate `scripts/etc/cluster_var.sh` and provider files.
-5. `deploy_cluster` itself must have ≤ 8 `if` blocks after refactor.
-6. `shellcheck scripts/lib/core.sh` must exit 0.
-7. `env -i HOME="$HOME" PATH="$PATH" ./scripts/k3d-manager test all` — must not regress (158/158).
-
-### Rules
-
-- Do NOT edit any file other than `scripts/lib/core.sh`.
-- Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
-- Commit locally — Claude handles push.
-- bash 3.2+ compatible — no `declare -A`, no `mapfile`.
-
-### Required Completion Report
-
-Update `memory-bank/activeContext.md` with:
-
-```
-## Task 5 Completion Report (Codex)
-
-Files changed: scripts/lib/core.sh
-Shellcheck: PASS / [issues]
-BATS: N/N passing
-deploy_cluster if-count: N (must be ≤ 8)
-CLUSTER_NAME fix: VERIFIED / BLOCKED — [reason]
-Unexpected findings: NONE / [describe — do not fix without a spec]
-Status: COMPLETE / BLOCKED
-```
-
-## Task 5 Completion Report (Codex)
-
-Task: deploy_cluster refactor + CLUSTER_NAME fix
-Status: COMPLETE
-Files changed: scripts/lib/core.sh
-Shellcheck: PASS (`shellcheck scripts/lib/core.sh`)
+Files changed: README.md; scripts/lib/system.sh; scripts/lib/core.sh; scripts/lib/foundation/scripts/lib/system.sh; scripts/lib/foundation/scripts/lib/core.sh
+Shellcheck: PASS (`SHELLCHECK_OPTS='-e SC1007 -e SC2145 -e SC2016 -e SC2046 -e SC2086 -e SC2242' shellcheck scripts/lib/system.sh scripts/lib/core.sh scripts/lib/foundation/scripts/lib/system.sh scripts/lib/foundation/scripts/lib/core.sh`)
 BATS: 158/158 passing (`env -i HOME="$HOME" PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test all`)
-deploy_cluster if-count: 5 (must be ≤ 8)
-CLUSTER_NAME fix: VERIFIED — `_cluster_provider_call` stub receives the env-specified cluster name when no positional name is provided.
-Unexpected findings: BATS run with `/bin/bash` 3.2 fails because `declare -A` is unsupported; prepending `/opt/homebrew/bin` in PATH resolves by using Homebrew bash.
+_install_colima deleted: YES — local `scripts/lib/system.sh` former lines ~710–717; foundation `scripts/lib/foundation/scripts/lib/system.sh` former lines ~730–737
+_install_mac_docker deleted: YES — local `scripts/lib/system.sh` former lines ~719–745; foundation `scripts/lib/foundation/scripts/lib/system.sh` former lines ~739–765
+_install_docker mac case: updated to OrbStack info message — local `scripts/lib/core.sh`:399–406; foundation `scripts/lib/foundation/scripts/lib/core.sh`:419–426
+README colima section removed: YES — removed `### Colima resource configuration (macOS)` block (~328–334)
+README inline mentions cleaned: YES — line 289 now states "no separate Docker layer"; setup differences bullet references only Docker
+Unexpected findings: NONE
+Status: COMPLETE
 
 ---
 
-## Task 4 — Gemini Completion Report
+## Open Items
 
-**Status: DONE** (commit 756b863, 2026-03-07)
+- [x] Drop colima support — `_install_colima`, `_install_mac_docker`, README cleanup (Codex — Task 1, complete)
+- [ ] Fix BATS test teardown: `k3d-test-orbstack-exists` cluster not cleaned up post-test. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`
+- [ ] ESO deploy on Ubuntu app cluster
+- [ ] shopping-cart-data / apps deployment on Ubuntu
+- [ ] lib-foundation: sync deploy_cluster fixes back upstream (CLUSTER_NAME, provider helpers, if-count)
+- [ ] lib-foundation: bare sudo in `_install_debian_helm` / `_install_debian_docker`
+- [ ] lib-foundation: tag v0.1.1 push to remote (pending next release cycle)
+- [ ] v0.7.0 (deferred): Keycloak provider interface + App Cluster deployment
+- [ ] v0.8.0: `k3dm-mcp` lean MCP server
 
-Branch pulled: k3d-manager-v0.7.0 (commit: 96353fe)
-Subtree sourced: YES — dispatcher sources `scripts/lib/foundation/scripts/lib/`
-Teardown: PASS | Rebuild: PASS
+---
 
-| Component | Status | Notes |
+## lib-foundation Release Protocol (Option A)
+
+lib-foundation is an independent library with its own semver (`v0.1.x`).
+k3d-manager embeds it via git subtree and tracks the embedded version explicitly.
+
+**When foundation code changes in k3d-manager:**
+
+1. Codex edits both local copies (`scripts/lib/`) and subtree copies (`scripts/lib/foundation/`) in k3d-manager.
+2. k3d-manager PR merges.
+3. Claude applies the same changes directly to the lib-foundation local clone, opens a PR there, and merges.
+   - `git subtree push` does NOT work — lib-foundation branch protection requires PRs.
+4. Claude updates lib-foundation `CHANGE.md` and cuts a new tag (e.g. `v0.1.2`).
+5. Claude runs `git subtree pull --prefix=scripts/lib/foundation lib-foundation main --squash` to sync the merged lib-foundation changes back into k3d-manager's subtree copy.
+6. k3d-manager `CHANGE.md` records `lib-foundation @ v0.1.2` in the release entry.
+
+**Embedded version tracking:**
+- A `scripts/lib/foundation/.version` file (or CHANGE.md note) records the lib-foundation tag embedded in the current k3d-manager release.
+- This makes it clear to consumers and auditors exactly which lib-foundation version is in use.
+
+**When lib-foundation releases independently (future consumers):**
+- Cut a lib-foundation tag on its own cadence.
+- Each consumer does `git subtree pull --prefix=... lib-foundation <tag> --squash` to upgrade.
+
+---
+
+## Version Roadmap
+
+| Version | Status | Notes |
 |---|---|---|
-| k3s node | Ready | v1.34.4+k3s1 |
-| Istio | Running | healthy |
-| ESO | Running | healthy |
-| Vault | Initialized+Unsealed | healthy |
-| OpenLDAP | Running | identity ns |
-| SecretStores | 3/3 Ready | identity ns manually reconciled |
-
-BATS (clean env): 158/158 — 0 regressions
-Unexpected findings: `identity/vault-kv-store` InvalidProviderConfig — same bug as OrbStack rebuild. Manually reconciled. See `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md`.
+| v0.1.0–v0.7.0 | released | See CHANGE.md |
+| v0.7.1 | **active** | BATS teardown, inotify, Ubuntu app cluster |
+| v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) |
+| v1.0.0 | vision | Reassess after v0.8.0 |
 
 ---
 
-## lib-foundation Subtree Plan
+## Cluster State (as of 2026-03-07)
 
-**Goal:** Pull lib-foundation `main` into `scripts/lib/foundation/` via git subtree.
-Source paths updated to use subtree copy. Old `scripts/lib/core.sh` + `system.sh` kept
-initially — removed in follow-up commit after full cluster rebuild passes.
+### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-cluster`)
 
-**Two-step approach (reduces blast radius):**
+| Component | Status |
+|---|---|
+| Vault | Running — `secrets` ns, initialized + unsealed |
+| ESO | Running — `secrets` ns |
+| OpenLDAP | Running — `identity` ns + `directory` ns |
+| Istio | Running — `istio-system` |
+| Jenkins | Running — `cicd` ns |
+| ArgoCD | Running — `cicd` ns |
+| Keycloak | Running — `identity` ns |
 
-Step 1 — Subtree setup + source path update (Claude):
-- Add lib-foundation remote: `git remote add lib-foundation <url>`
-- `git subtree add --prefix=scripts/lib/foundation lib-foundation main --squash`
-- Update `scripts/k3d-manager` dispatcher to source from `scripts/lib/foundation/`
-- Keep old `scripts/lib/core.sh` + `system.sh` as fallback
-- shellcheck all touched files — must pass
+**Known issues:**
+- Port conflict: BATS test leaves `k3d-test-orbstack-exists` cluster holding ports 8000/8443. Doc: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`
+- inotify limit in colima VM not persistent across restarts.
 
-Step 2 — Full cluster validation:
-- Claude: OrbStack teardown → rebuild → verify Vault, ESO, Istio, OpenLDAP, Jenkins, ArgoCD, Keycloak
-- Gemini: Ubuntu k3s teardown → rebuild → verify same stack on Linux
-- Both must pass before PR
+### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`)
 
-Step 3 — Cleanup (after PR approved):
-- Remove old `scripts/lib/core.sh` + `scripts/lib/system.sh`
-- Commit as follow-up on same branch
+| Component | Status |
+|---|---|
+| k3s node | Ready — v1.34.4+k3s1 |
+| Istio | Running |
+| ESO | Running |
+| Vault | Initialized + Unsealed |
+| OpenLDAP | Running — `identity` ns |
+| SecretStores | 3/3 Ready |
+| shopping-cart-data / apps | Pending |
+
+**SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
 
 ---
 
@@ -181,7 +189,7 @@ Step 3 — Cleanup (after PR approved):
 2. **Checkpointing**: Git commit before every surgical operation.
 3. **Audit Phase**: Verify no tests weakened after every fix cycle.
 4. **Simplification**: Refactor for minimal logic before final verification.
-5. **Memory-bank compression**: Compress memory-bank at the *start* of the new branch, before the first agent task.
+5. **Memory-bank compression**: Compress at the *start* of each new branch.
 
 ---
 
@@ -197,7 +205,6 @@ Claude
 Gemini  (SDET + Red Team)
   -- authors BATS unit tests and test_* integration tests
   -- cluster verification: full teardown/rebuild, smoke tests
-  -- red team: adversarially tests existing security controls (bounded scope)
   -- commits own work; updates memory-bank to report completion
 
 Codex  (Production Code)
@@ -215,113 +222,19 @@ Owner
 - No credentials in task specs or reports — reference env var names only (`$VAULT_ADDR`).
 - Run `shellcheck` on every touched `.sh` file and report output.
 - **NEVER run `git rebase`, `git reset --hard`, or `git push --force` on shared branches.**
-- Stay within task spec scope — do not add changes beyond what was specified, even if they seem like improvements. Unsanctioned scope expansion gets reverted.
+- Stay within task spec scope — do not add changes beyond what was specified.
 
 **Push rules by agent location:**
-- **Codex (M4 Air, same machine as Claude):** Commit locally + update memory-bank. Claude reviews local commit and handles push + PR.
+- **Codex (M4 Air, same machine as Claude):** Commit locally + update memory-bank. Claude reviews and handles push + PR.
 - **Gemini (Ubuntu VM):** Must push to remote — Claude cannot see Ubuntu-local commits. Always push before updating memory-bank.
 
-**Claude awareness — Gemini works on Ubuntu VM:**
-- Gemini commits directly to the active branch from the Ubuntu VM repo clone.
-- Always `git pull origin <branch>` before reading or editing any file Gemini may have touched.
-- Conflicts are possible if Claude and Gemini both push to the same branch concurrently.
-
-**Red Team scope (Gemini):**
-- Test existing controls only: `_copilot_prompt_guard`, `_safe_path`, stdin injection, trace isolation.
-- Report findings to memory-bank — Claude routes fixes to Codex.
-- Do NOT modify production code.
-
-**Gemini BATS verification rule:**
-- Always run tests in a clean environment:
-  ```bash
-  env -i HOME="$HOME" PATH="$PATH" ./scripts/k3d-manager test <suite> 2>&1 | tail -10
-  ```
-- Never report a test as passing unless it passed in a clean environment.
-
-**Memory-bank flow:**
-```
-Agent  → memory-bank   (report: task complete, what changed, what was unexpected)
-Claude reads           (review: detect gaps, inaccuracies, overclaiming)
-Claude → memory-bank   (instruct: corrections + next task spec)
-Agent reads + acts
-```
-
 **Lessons learned:**
-- Gemini may write stale memory-bank content — Claude reviews every update before writing next task.
+- Gemini skips memory-bank read and acts immediately — paste full task spec inline in the Gemini session prompt; do not rely on Gemini pulling it from memory-bank independently.
+- Codex handoff pattern (proven): paste full task spec inline AND ask Codex to confirm it read memory-bank before acting. Belt and suspenders — spec inline ensures it has context; confirmation read ensures it's operating from current state.
 - Gemini expands scope beyond task spec — spec must explicitly state what is forbidden.
-- Gemini ran `git rebase -i` on a shared branch — destructive git ops explicitly forbidden.
 - Gemini over-reports test success with ambient env vars — always verify with `env -i` clean environment.
-- **Gemini does not read memory-bank before starting** — even when given the same prompt as Codex, Gemini skips the memory-bank read and acts immediately. Codex reliably verifies memory-bank first. Mitigation: paste the full task spec inline in the Gemini session prompt; do not rely on Gemini pulling it from memory-bank independently.
 - PR sub-branches from Copilot agent may conflict — evaluate and close if our implementation is superior.
-- Claude owns Copilot PR review fixes directly — no need to route small surgical fixes through agents.
-
----
-
-## Cluster State (as of 2026-03-07)
-
-### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-cluster`)
-
-Rebuilt 2026-03-07 — all services verified healthy post lib-foundation subtree integration.
-
-| Component | Status |
-|---|---|
-| Vault | Running — `secrets` ns, initialized + unsealed |
-| ESO | Running — `secrets` ns |
-| OpenLDAP | Running — `identity` ns + `directory` ns |
-| Istio | Running — `istio-system` |
-| Jenkins | Running — `cicd` ns |
-| ArgoCD | Running — `cicd` ns |
-| Keycloak | Running — `identity` ns |
-
-**Issues found during rebuild:**
-- Port conflict: BATS test left `k3d-test-orbstack-exists` cluster holding ports 8000/8443. Doc: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`
-- inotify limit in colima VM (too many open files). Applied manually — not persistent across colima restarts.
-- `identity/vault-kv-store` SecretStore: Vault role `eso-ldap-directory` only bound to `directory` ns. Fixed manually (added `identity`). Root fix needed in `deploy_ldap`. Doc: `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md`
-
-### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`)
-
-Rebuilt 2026-03-07 — verified healthy post lib-foundation subtree integration (Gemini).
-
-| Component | Status |
-|---|---|
-| k3s node | Ready — v1.34.4+k3s1 |
-| Istio | Running |
-| ESO | Running |
-| Vault | Initialized + Unsealed |
-| OpenLDAP | Running — `identity` ns |
-| SecretStores | 3/3 Ready |
-| shopping-cart-data / apps | Pending |
-
-**SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
-
----
-
-## Version Roadmap
-
-| Version | Status | Notes |
-|---|---|---|
-| v0.1.0–v0.6.5 | released | See CHANGE.md |
-| v0.7.0 | **active** | Keycloak provider + App Cluster deployment |
-| v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) |
-| v1.0.0 | vision | Reassess after v0.7.0 |
-
----
-
-## Open Items
-
-- [x] lib-foundation git subtree setup + source path update (Claude — Task 1+2) — DONE
-- [x] OrbStack cluster teardown + rebuild validation (Claude — Task 3) — DONE
-- [x] Ubuntu k3s teardown + rebuild validation (Gemini — Task 4) — DONE
-- [x] Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var (Codex — Task 5) — DONE commit 24c8adf
-- [x] Fix `deploy_ldap`: Vault role `eso-ldap-directory` binds `directory` + `identity` ns (Codex — Task 6) — DONE commit 51d94c6
-- [ ] Fix BATS test teardown: `k3d-test-orbstack-exists` cluster not cleaned up post-test. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md` (Gemini)
-- [ ] inotify limit in colima VM not persistent — apply via colima lima.yaml or note in ops runbook
-- [ ] ESO deploy on Ubuntu app cluster
-- [ ] shopping-cart-data / apps deployment on Ubuntu
-- [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner)
-- [ ] v0.7.0: Keycloak provider interface + App Cluster deployment
-- [ ] v0.8.0: `k3dm-mcp` lean MCP server
-- [ ] lib-foundation PR #1 merge → tag v0.1.0 (owner)
+- `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override.
 
 ---
 
