@@ -37,9 +37,8 @@
 ### Priority 1 — v0.7.2 (active)
 
 - [ ] Fix BATS test teardown — `k3d-test-orbstack-exists` cluster left behind after tests (Gemini)
-- [ ] ESO deploy on Ubuntu app cluster (Gemini)
-- [ ] shopping-cart-data (PostgreSQL, Redis, RabbitMQ) on Ubuntu
-- [ ] shopping-cart-apps (basket, order, payment, catalog, frontend) on Ubuntu
+- [x] ESO deploy on Ubuntu app cluster (Gemini — verified 3/3 SecretStores Ready)
+- [ ] shopping-cart-data / apps deployment on Ubuntu (🔄 Data layer PASS; apps BLOCKED)
 
 ### Priority 2 — lib-foundation
 
@@ -63,5 +62,7 @@
 | Item | Status | Notes |
 |---|---|---|
 | BATS test teardown — `k3d-test-orbstack-exists` | OPEN | Holds ports 8000/8443 on next deploy. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`. Gemini — v0.7.2. |
+| Ubuntu k3s CPU capacity (2 cores) reached | OPEN | Data layer + apps exceeds 2.0 CPU requests. Requires ns scale-down. |
+| Shopping Cart Apps ImagePullBackOff | OPEN | Kustomize manifests reference `shopping-cart/*:latest` images missing on Ubuntu. |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround. |
 | No `scripts/tests/plugins/jenkins.bats` suite | BACKLOG | Future work. |
