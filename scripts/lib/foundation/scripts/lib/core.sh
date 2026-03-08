@@ -765,10 +765,6 @@ EOF
       fi
    fi
 
-   if [[ "$platform" == "mac" && "$provider" == "k3s" ]]; then
-      _err "k3s is not supported on macOS; please use k3d instead."
-   fi
-
    case "$provider" in
       k3d|orbstack|k3s)
          ;;

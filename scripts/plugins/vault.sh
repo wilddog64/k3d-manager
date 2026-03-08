@@ -1529,8 +1529,8 @@ SH
 
   if [[ -n "$role_namespaces_override" ]]; then
      bound_namespaces="$role_namespaces_override"
-  elif [[ "$role" == "eso-ldap-directory" ]]; then
-     bound_namespaces="directory,identity"
+  elif [[ "$role" == "eso-ldap-directory" && "$service_namespace" != "identity" ]]; then
+     bound_namespaces="${service_namespace},identity"
   fi
 
   printf -v role_cmd 'vault write "auth/kubernetes/role/%s" bound_service_account_names="%s" bound_service_account_namespaces="%s" policies="%s" ttl=1h token_audiences="%s"' \

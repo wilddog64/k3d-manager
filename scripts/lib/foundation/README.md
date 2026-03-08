@@ -44,7 +44,7 @@ _run_command --quiet -- command_that_might_fail        # suppress stderr, return
 
 ### `_detect_platform` (system.sh)
 
-Single source of truth for OS detection. Returns: `debian`, `rhel`, `arch`, `darwin`, `unknown`.
+Single source of truth for OS detection. Returns: `mac`, `wsl`, `debian`, `redhat`, `linux`.
 
 ### `_cluster_provider` (core.sh)
 

@@ -23,7 +23,7 @@ _run_command --probe '<subcmd>' -- <cmd>  # probe subcommand to decide privilege
 _run_command --quiet -- <cmd>         # suppress stderr
 ```
 
-**`_detect_platform` (system.sh)** — returns `debian | rhel | arch | darwin | unknown`
+**`_detect_platform` (system.sh)** — returns `mac | wsl | debian | redhat | linux`
 
 **`_cluster_provider` (core.sh)** — reads `CLUSTER_PROVIDER` / `K3D_MANAGER_PROVIDER` / `K3DMGR_PROVIDER`
 

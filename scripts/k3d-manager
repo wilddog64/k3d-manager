@@ -50,9 +50,10 @@ source "${SCRIPT_DIR}/lib/cluster_provider.sh"
 source "${SCRIPT_DIR}/lib/test.sh"
 if [[ -f "${SCRIPT_DIR}/lib/foundation/scripts/lib/core.sh" ]]; then
    source "${SCRIPT_DIR}/lib/foundation/scripts/lib/core.sh"
-else
-   source "${SCRIPT_DIR}/lib/core.sh"
 fi
+# Always source local core.sh — its deploy_cluster and CLUSTER_NAME fixes
+# override any older definitions from the lib-foundation subtree during transition.
+source "${SCRIPT_DIR}/lib/core.sh"
 source "${SCRIPT_DIR}/lib/help/utils.sh"
 
 CLUSTER_ROLE="${CLUSTER_ROLE:-infra}"
