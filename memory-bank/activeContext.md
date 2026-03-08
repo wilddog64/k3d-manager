@@ -13,10 +13,10 @@
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | Set up git subtree — pull lib-foundation into `scripts/lib/foundation/` | Claude | **active** — see plan below |
-| 2 | Update dispatcher source paths to use subtree | Claude | blocked on Task 1 |
-| 3 | Teardown + rebuild infra cluster (OrbStack, macOS ARM64) | Claude | blocked on Task 2 |
-| 4 | Teardown + rebuild k3s cluster (Ubuntu VM) | Gemini | blocked on Task 3 |
+| 1 | Set up git subtree — pull lib-foundation into `scripts/lib/foundation/` | Claude | **DONE** — commit b8426d4 |
+| 2 | Update dispatcher source paths to use subtree | Claude | **DONE** — commit 1dc29db |
+| 3 | Teardown + rebuild infra cluster (OrbStack, macOS ARM64) | Claude | **DONE** — all services healthy; 2 issues filed |
+| 4 | Teardown + rebuild k3s cluster (Ubuntu VM) | Gemini | **active** — unblocked |
 | 5 | Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var | Codex | pending — spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md` |
 
 ---
@@ -132,15 +132,22 @@ Agent reads + acts
 
 ### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-cluster`)
 
+Rebuilt 2026-03-07 — all services verified healthy post lib-foundation subtree integration.
+
 | Component | Status |
 |---|---|
 | Vault | Running — `secrets` ns, initialized + unsealed |
 | ESO | Running — `secrets` ns |
-| OpenLDAP | Running — `identity` ns |
+| OpenLDAP | Running — `identity` ns + `directory` ns |
 | Istio | Running — `istio-system` |
 | Jenkins | Running — `cicd` ns |
 | ArgoCD | Running — `cicd` ns |
 | Keycloak | Running — `identity` ns |
+
+**Issues found during rebuild:**
+- Port conflict: BATS test left `k3d-test-orbstack-exists` cluster holding ports 8000/8443. Doc: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`
+- inotify limit in colima VM (too many open files). Applied manually — not persistent across colima restarts.
+- `identity/vault-kv-store` SecretStore: Vault role `eso-ldap-directory` only bound to `directory` ns. Fixed manually (added `identity`). Root fix needed in `deploy_ldap`. Doc: `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md`
 
 ### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`)
 
@@ -168,10 +175,13 @@ Agent reads + acts
 
 ## Open Items
 
-- [ ] lib-foundation git subtree setup + source path update (Claude — Task 1+2)
-- [ ] OrbStack cluster teardown + rebuild validation (Claude — Task 3)
-- [ ] Ubuntu k3s teardown + rebuild validation (Gemini — Task 4)
+- [x] lib-foundation git subtree setup + source path update (Claude — Task 1+2) — DONE
+- [x] OrbStack cluster teardown + rebuild validation (Claude — Task 3) — DONE
+- [ ] Ubuntu k3s teardown + rebuild validation (Gemini — Task 4) — **active**
 - [ ] Refactor `deploy_cluster` — 12 if-blocks exceeds threshold of 8. Extract `_deploy_cluster_resolve_provider` helper. Also fix duplicate mac+k3s guard. Issue: `docs/issues/2026-03-07-deploy-cluster-if-count-violation.md` (Codex — Task 5, after cluster validation)
+- [ ] Fix `deploy_ldap`: Vault role `eso-ldap-directory` must bind both `directory` + `identity` namespaces. Issue: `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md` (Codex)
+- [ ] Fix BATS test teardown: `k3d-test-orbstack-exists` cluster not cleaned up post-test. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md` (Gemini)
+- [ ] inotify limit in colima VM not persistent — apply via colima lima.yaml or note in ops runbook
 - [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data / apps deployment on Ubuntu
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner)
