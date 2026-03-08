@@ -58,7 +58,8 @@
 | Version | Status | Notes |
 |---|---|---|
 | v0.1.0–v0.7.1 | released | See CHANGE.md |
-| v0.7.2 | **active** | BATS teardown, Ubuntu app cluster, hooks/envrc integration |
+| v0.7.2 | **active** | BATS teardown, Ubuntu ESO ✅, shopping-cart data ✅, apps blocked |
+| v0.7.3 | planned | Shopping cart CI/CD — GitHub Actions + Trivy + ghcr.io + ArgoCD. Spec: `docs/plans/v0.7.3-shopping-cart-cicd.md` |
 | v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) |
 | v1.0.0 | vision | Reassess after v0.8.0 |
 

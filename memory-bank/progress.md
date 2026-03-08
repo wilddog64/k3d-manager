@@ -49,7 +49,16 @@
 - [ ] `_run_command` if-count refactor (v0.3.0) — see `docs/issues/2026-03-08-run-command-if-count-refactor.md`
 - [ ] Add `.github/copilot-instructions.md` to lib-foundation (v0.2.1 or v0.3.0)
 
-### Priority 3 — v0.8.0
+### Priority 3 — v0.7.3 (planned)
+
+- [ ] Reusable GitHub Actions workflow (build + Trivy scan + push ghcr.io + update kustomization)
+- [ ] Caller workflow in each service repo (basket, order, payment, catalog, frontend)
+- [ ] Fix ArgoCD Application CR repoURLs (placeholder → real GitHub URLs)
+- [ ] `register_shopping_cart_apps` in k3d-manager (`scripts/plugins/shopping_cart.sh`)
+- [ ] Gemini: end-to-end verification (push → image in ghcr → ArgoCD → pod on Ubuntu)
+- [ ] Resolve open questions: ArgoCD location, ghcr visibility, CPU capacity
+
+### Priority 4 — v0.8.0
 
 - [ ] `k3dm-mcp` — lean MCP server wrapping k3d-manager CLI
 - [ ] Target clients: Claude Desktop, Codex, Atlas, Comet
