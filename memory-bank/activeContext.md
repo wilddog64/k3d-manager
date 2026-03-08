@@ -16,7 +16,7 @@
 | 1 | Set up git subtree — pull lib-foundation into `scripts/lib/foundation/` | Claude | **DONE** — commit b8426d4 |
 | 2 | Update dispatcher source paths to use subtree | Claude | **DONE** — commit 1dc29db |
 | 3 | Teardown + rebuild infra cluster (OrbStack, macOS ARM64) | Claude | **DONE** — all services healthy; 2 issues filed |
-| 4 | Teardown + rebuild k3s cluster (Ubuntu VM) | Gemini | **needs completion report** — see spec below |
+| 4 | Teardown + rebuild k3s cluster (Ubuntu VM) | Gemini | ✅ done — see spec below |
 | 5 | Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var | Codex | pending — spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md` |
 
 ---
@@ -278,3 +278,39 @@ Rebuilt 2026-03-07 — all services verified healthy post lib-foundation subtree
 1. **Istio sidecar blocks `keycloak-config-cli` job** — mitigated via `sidecar.istio.io/inject: "false"`.
 2. **ARM64 image pull failures** — use `docker.io/bitnamilegacy/*`.
 3. **Stale PVCs block retry** — delete `data-keycloak-postgresql-0` PVC in `identity` ns before retrying.
+## Task 4 Completion Report (Gemini)
+
+Date: 2026-03-07
+Branch pulled: k3d-manager-v0.7.0 (commit: 96353fe)
+
+Subtree sourced: YES — 
+grep foundation scripts/k3d-manager output:
+if [[ -f "/lib/foundation/scripts/lib/system.sh" ]]; then
+   source "/lib/foundation/scripts/lib/system.sh"
+if [[ -f "/lib/foundation/scripts/lib/core.sh" ]]; then
+   source "/lib/foundation/scripts/lib/core.sh"
+
+Teardown: PASS — Clean removal.
+Rebuild: PASS — Full stack rebuild on Ubuntu k3s success.
+
+Services verified:
+| Component | Status | Notes |
+|---|---|---|
+| k3s node | Ready | v1.34.4+k3s1 |
+| Istio | Running | healthy |
+| ESO | Running | healthy |
+| Vault | Initialized+Unsealed | healthy |
+| OpenLDAP | Running | identity ns |
+| SecretStores | 3/3 Ready | identity ns manually reconciled |
+
+BATS (clean env): 158/158 passing — 
+ok 154 _vault_bootstrap_ha errors when vault health check fails
+ok 155 _vault_bootstrap_ha reports ready when health check succeeds
+ok 156 _vault_is_sealed returns 0 when Vault is sealed
+ok 157 _vault_is_sealed returns 1 when Vault is unsealed
+ok 158 _vault_is_sealed returns 2 when status cannot be determined
+
+Regressions: NONE
+Unexpected findings: identity/vault-kv-store InvalidProviderConfig resolved manually. See Issue 2026-03-07.
+
+Status: COMPLETE
