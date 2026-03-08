@@ -1,22 +1,177 @@
 # Active Context – k3d-manager
 
-## Current Branch: `k3d-manager-v0.6.5` (as of 2026-03-07)
+## Current Branch: `k3d-manager-v0.7.0` (as of 2026-03-07)
 
-**v0.6.4 SHIPPED** — tag `v0.6.4` pushed, PR #22 merged. See CHANGE.md.
-**v0.6.5 active** — branch cut from `main`.
+**v0.6.5 SHIPPED** — tag `v0.6.5` pushed, PR #23 merged. See CHANGE.md.
+**v0.7.0 active** — branch cut from `main`.
 
 ---
 
 ## Current Focus
 
-**v0.6.5: BATS audit test coverage + lib-foundation extraction**
+**v0.7.0: lib-foundation subtree integration + cluster validation**
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | BATS tests for `_agent_audit` bare sudo + kubectl exec credential scan | Gemini | ✅ done — 4 tests, suite 9/9, total 158/158 |
-| 2 | Create `lib-foundation` repository + branch protection + CI | Owner | ✅ done — https://github.com/wilddog64/lib-foundation |
-| 3 | Extract `core.sh` + `system.sh` into lib-foundation | Codex | ✅ done — shellcheck fixed, PR #1 open on lib-foundation, CI green |
-| 4 | Replace awk if-count check with pure bash in `_agent_audit` | Codex | ✅ done — spec: `docs/plans/v0.6.5-codex-awk-bash-rewrite.md` |
+| 1 | Set up git subtree — pull lib-foundation into `scripts/lib/foundation/` | Claude | **DONE** — commit b8426d4 |
+| 2 | Update dispatcher source paths to use subtree | Claude | **DONE** — commit 1dc29db |
+| 3 | Teardown + rebuild infra cluster (OrbStack, macOS ARM64) | Claude | **DONE** — all services healthy; 2 issues filed |
+| 4 | Teardown + rebuild k3s cluster (Ubuntu VM) | Gemini | **DONE** — commit 756b863 |
+| 5 | Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var | Codex | **active** — spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md` |
+
+---
+
+## Task 6 — Codex Spec: Fix deploy_ldap Vault Role Namespace Binding
+
+**Status: active**
+
+### Background
+
+`deploy_ldap` creates a `vault-kv-store` SecretStore in both the `identity`
+and `directory` namespaces, but the Vault Kubernetes auth role
+`eso-ldap-directory` is only bound to `[directory]`. The `identity`
+SecretStore becomes `InvalidProviderConfig` within minutes of deploy.
+
+Issue: `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md`
+
+### Your task
+
+1. Find where the Vault role `eso-ldap-directory` is written in
+   `scripts/plugins/ldap.sh` — look for `vault write auth/kubernetes/role/eso-ldap-directory`.
+2. Update the `bound_service_account_namespaces` to include both namespaces:
+   ```bash
+   bound_service_account_namespaces=directory,identity
+   ```
+3. Verify no other roles have the same single-namespace problem by scanning
+   `scripts/plugins/` for other `vault write auth/kubernetes/role/` calls.
+4. `shellcheck` every `.sh` file you touch — must pass.
+5. Commit locally — Claude handles push.
+
+### Rules
+
+- Edit only files in `scripts/plugins/` — no other directories.
+- Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
+- Do NOT run a cluster deployment to test — this is a code-only fix.
+- Stay within scope — do not refactor surrounding code.
+
+### Required Completion Report
+
+Update `memory-bank/activeContext.md` with:
+
+```
+## Task 6 Completion Report (Codex)
+
+Files changed: [list]
+Shellcheck: PASS / [issues]
+Role fix: scripts/plugins/ldap.sh line N — bound_service_account_namespaces updated to [directory,identity]
+Other roles scanned: NONE affected / [list any found]
+Unexpected findings: NONE / [describe]
+Status: COMPLETE / BLOCKED
+```
+
+**Task 6 DONE** (commit 51d94c6) — `_vault_configure_secret_reader_role` in `vault.sh` now binds `eso-ldap-directory` to `directory,identity`. Other roles scanned — no issues found.
+
+---
+
+## Task 5 — Codex Spec: deploy_cluster Refactor + CLUSTER_NAME Fix
+
+**Status: active** — both cluster rebuilds passed. Codex is unblocked.
+
+### Your task
+
+Full spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md`
+
+Read it completely before writing any code. Key points:
+
+1. **Edit only `scripts/lib/core.sh`** — no other files.
+2. Extract `_deploy_cluster_prompt_provider` and `_deploy_cluster_resolve_provider` helpers (spec has exact signatures).
+3. Remove duplicate mac+k3s guard (line ~754 is dead code — line ~714 fires first).
+4. Fix `CLUSTER_NAME` env var — investigate `scripts/etc/cluster_var.sh` and provider files.
+5. `deploy_cluster` itself must have ≤ 8 `if` blocks after refactor.
+6. `shellcheck scripts/lib/core.sh` must exit 0.
+7. `env -i HOME="$HOME" PATH="$PATH" ./scripts/k3d-manager test all` — must not regress (158/158).
+
+### Rules
+
+- Do NOT edit any file other than `scripts/lib/core.sh`.
+- Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
+- Commit locally — Claude handles push.
+- bash 3.2+ compatible — no `declare -A`, no `mapfile`.
+
+### Required Completion Report
+
+Update `memory-bank/activeContext.md` with:
+
+```
+## Task 5 Completion Report (Codex)
+
+Files changed: scripts/lib/core.sh
+Shellcheck: PASS / [issues]
+BATS: N/N passing
+deploy_cluster if-count: N (must be ≤ 8)
+CLUSTER_NAME fix: VERIFIED / BLOCKED — [reason]
+Unexpected findings: NONE / [describe — do not fix without a spec]
+Status: COMPLETE / BLOCKED
+```
+
+## Task 5 Completion Report (Codex)
+
+Task: deploy_cluster refactor + CLUSTER_NAME fix
+Status: COMPLETE
+Files changed: scripts/lib/core.sh
+Shellcheck: PASS (`shellcheck scripts/lib/core.sh`)
+BATS: 158/158 passing (`env -i HOME="$HOME" PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test all`)
+deploy_cluster if-count: 5 (must be ≤ 8)
+CLUSTER_NAME fix: VERIFIED — `_cluster_provider_call` stub receives the env-specified cluster name when no positional name is provided.
+Unexpected findings: BATS run with `/bin/bash` 3.2 fails because `declare -A` is unsupported; prepending `/opt/homebrew/bin` in PATH resolves by using Homebrew bash.
+
+---
+
+## Task 4 — Gemini Completion Report
+
+**Status: DONE** (commit 756b863, 2026-03-07)
+
+Branch pulled: k3d-manager-v0.7.0 (commit: 96353fe)
+Subtree sourced: YES — dispatcher sources `scripts/lib/foundation/scripts/lib/`
+Teardown: PASS | Rebuild: PASS
+
+| Component | Status | Notes |
+|---|---|---|
+| k3s node | Ready | v1.34.4+k3s1 |
+| Istio | Running | healthy |
+| ESO | Running | healthy |
+| Vault | Initialized+Unsealed | healthy |
+| OpenLDAP | Running | identity ns |
+| SecretStores | 3/3 Ready | identity ns manually reconciled |
+
+BATS (clean env): 158/158 — 0 regressions
+Unexpected findings: `identity/vault-kv-store` InvalidProviderConfig — same bug as OrbStack rebuild. Manually reconciled. See `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md`.
+
+---
+
+## lib-foundation Subtree Plan
+
+**Goal:** Pull lib-foundation `main` into `scripts/lib/foundation/` via git subtree.
+Source paths updated to use subtree copy. Old `scripts/lib/core.sh` + `system.sh` kept
+initially — removed in follow-up commit after full cluster rebuild passes.
+
+**Two-step approach (reduces blast radius):**
+
+Step 1 — Subtree setup + source path update (Claude):
+- Add lib-foundation remote: `git remote add lib-foundation <url>`
+- `git subtree add --prefix=scripts/lib/foundation lib-foundation main --squash`
+- Update `scripts/k3d-manager` dispatcher to source from `scripts/lib/foundation/`
+- Keep old `scripts/lib/core.sh` + `system.sh` as fallback
+- shellcheck all touched files — must pass
+
+Step 2 — Full cluster validation:
+- Claude: OrbStack teardown → rebuild → verify Vault, ESO, Istio, OpenLDAP, Jenkins, ArgoCD, Keycloak
+- Gemini: Ubuntu k3s teardown → rebuild → verify same stack on Linux
+- Both must pass before PR
+
+Step 3 — Cleanup (after PR approved):
+- Remove old `scripts/lib/core.sh` + `scripts/lib/system.sh`
+- Commit as follow-up on same branch
 
 ---
 
@@ -37,6 +192,7 @@ Claude
   -- reviews all agent memory-bank writes before writing next task
   -- opens PR on owner go-ahead; routes PR issues back to agents by scope
   -- writes corrective/instructional content to memory-bank
+  -- tags Copilot for code review before every PR
 
 Gemini  (SDET + Red Team)
   -- authors BATS unit tests and test_* integration tests
@@ -90,24 +246,14 @@ Claude → memory-bank   (instruct: corrections + next task spec)
 Agent reads + acts
 ```
 
-### Completion Reports (2026-03-07)
-
-**Codex Task 4 — awk → pure bash rewrite in `_agent_audit`:**
-- commit `6b14539` — `agent_rigor.sh` lines 112–132 only
-- shellcheck PASS (Claude verified), no bash 4.0+ features
-- BATS agent_rigor: 5/5 (Codex) → re-verified 9/9 by Gemini
-
-**Gemini Task 1 — BATS tests for bare sudo + kubectl exec credential scan:**
-- commit `5f04814` — `scripts/tests/lib/agent_rigor.bats` only
-- 4 tests added (ok 6–9), real git repo per test, no git stubs
-- Total suite: 9/9 agent_rigor, 158/158 full BATS (clean env, Ubuntu VM)
-
 **Lessons learned:**
 - Gemini may write stale memory-bank content — Claude reviews every update before writing next task.
 - Gemini expands scope beyond task spec — spec must explicitly state what is forbidden.
 - Gemini ran `git rebase -i` on a shared branch — destructive git ops explicitly forbidden.
 - Gemini over-reports test success with ambient env vars — always verify with `env -i` clean environment.
+- **Gemini does not read memory-bank before starting** — even when given the same prompt as Codex, Gemini skips the memory-bank read and acts immediately. Codex reliably verifies memory-bank first. Mitigation: paste the full task spec inline in the Gemini session prompt; do not rely on Gemini pulling it from memory-bank independently.
 - PR sub-branches from Copilot agent may conflict — evaluate and close if our implementation is superior.
+- Claude owns Copilot PR review fixes directly — no need to route small surgical fixes through agents.
 
 ---
 
@@ -115,23 +261,35 @@ Agent reads + acts
 
 ### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-cluster`)
 
+Rebuilt 2026-03-07 — all services verified healthy post lib-foundation subtree integration.
+
 | Component | Status |
 |---|---|
 | Vault | Running — `secrets` ns, initialized + unsealed |
 | ESO | Running — `secrets` ns |
-| OpenLDAP | Running — `identity` ns |
+| OpenLDAP | Running — `identity` ns + `directory` ns |
 | Istio | Running — `istio-system` |
 | Jenkins | Running — `cicd` ns |
 | ArgoCD | Running — `cicd` ns |
 | Keycloak | Running — `identity` ns |
 
+**Issues found during rebuild:**
+- Port conflict: BATS test left `k3d-test-orbstack-exists` cluster holding ports 8000/8443. Doc: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`
+- inotify limit in colima VM (too many open files). Applied manually — not persistent across colima restarts.
+- `identity/vault-kv-store` SecretStore: Vault role `eso-ldap-directory` only bound to `directory` ns. Fixed manually (added `identity`). Root fix needed in `deploy_ldap`. Doc: `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md`
+
 ### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`)
+
+Rebuilt 2026-03-07 — verified healthy post lib-foundation subtree integration (Gemini).
 
 | Component | Status |
 |---|---|
 | k3s node | Ready — v1.34.4+k3s1 |
 | Istio | Running |
-| ESO | Pending |
+| ESO | Running |
+| Vault | Initialized + Unsealed |
+| OpenLDAP | Running — `identity` ns |
+| SecretStores | 3/3 Ready |
 | shopping-cart-data / apps | Pending |
 
 **SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
@@ -142,9 +300,8 @@ Agent reads + acts
 
 | Version | Status | Notes |
 |---|---|---|
-| v0.1.0–v0.6.4 | released | See CHANGE.md |
-| v0.6.5 | **active** | BATS audit coverage + lib-foundation extraction |
-| v0.7.0 | planned | Keycloak provider + App Cluster deployment |
+| v0.1.0–v0.6.5 | released | See CHANGE.md |
+| v0.7.0 | **active** | Keycloak provider + App Cluster deployment |
 | v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) |
 | v1.0.0 | vision | Reassess after v0.7.0 |
 
@@ -152,15 +309,19 @@ Agent reads + acts
 
 ## Open Items
 
-- [x] BATS tests for `_agent_audit` new checks (v0.6.5 — Gemini) — ✅ done
-- [x] Create `lib-foundation` repository (owner) — ✅ done
-- [x] Extract `core.sh` + `system.sh` via git subtree (Codex) — ✅ done, PR #1 open on lib-foundation
+- [x] lib-foundation git subtree setup + source path update (Claude — Task 1+2) — DONE
+- [x] OrbStack cluster teardown + rebuild validation (Claude — Task 3) — DONE
+- [x] Ubuntu k3s teardown + rebuild validation (Gemini — Task 4) — DONE
+- [x] Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var (Codex — Task 5) — DONE commit 24c8adf
+- [x] Fix `deploy_ldap`: Vault role `eso-ldap-directory` binds `directory` + `identity` ns (Codex — Task 6) — DONE commit 51d94c6
+- [ ] Fix BATS test teardown: `k3d-test-orbstack-exists` cluster not cleaned up post-test. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md` (Gemini)
+- [ ] inotify limit in colima VM not persistent — apply via colima lima.yaml or note in ops runbook
 - [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data / apps deployment on Ubuntu
 - [ ] GitGuardian: mark 2026-02-28 incident as false positive (owner)
-- [ ] `CLUSTER_NAME` env var not respected during `deploy_cluster`
 - [ ] v0.7.0: Keycloak provider interface + App Cluster deployment
 - [ ] v0.8.0: `k3dm-mcp` lean MCP server
+- [ ] lib-foundation PR #1 merge → tag v0.1.0 (owner)
 
 ---
 

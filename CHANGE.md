@@ -1,5 +1,29 @@
 # Changes - k3d-manager
 
+## v0.7.0 — lib-foundation Subtree + deploy_cluster Hardening — dated 2026-03-07
+
+### Added
+- **lib-foundation git subtree** (`scripts/lib/foundation/`): Pulls `lib-foundation` main into the repo via `git subtree add --squash`. Dispatcher sources subtree copies of `core.sh` and `system.sh` first, falling back to local copies during transition.
+- **`_deploy_cluster_prompt_provider`** (`scripts/lib/core.sh`): Extracted helper — prompts user to select a cluster provider interactively.
+- **`_deploy_cluster_resolve_provider`** (`scripts/lib/core.sh`): Extracted helper — resolves provider from env var, positional arg, or interactive prompt.
+
+### Fixed
+- **`deploy_cluster` if-count violation** (`scripts/lib/core.sh`): Refactored from 12 to 5 `if` blocks after extracting provider helpers. Issue: `docs/issues/2026-03-07-deploy-cluster-if-count-violation.md`.
+- **`CLUSTER_NAME` env var ignored** (`scripts/lib/core.sh`): When no positional cluster name is supplied, `deploy_cluster` now reads `$CLUSTER_NAME` from the environment and exports it before calling the provider. Verified via `_cluster_provider_call` stub test.
+- **ESO SecretStore `identity/vault-kv-store` unauthorized** (`scripts/plugins/vault.sh`): `_vault_configure_secret_reader_role` now binds `eso-ldap-directory` to both `directory` and `identity` namespaces. Previously only `directory` was bound, causing `InvalidProviderConfig` within minutes of deploy. Issue: `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md`.
+- **`pushd`/`popd` unguarded in `_install_istioctl`** (`scripts/lib/core.sh`): Added `|| return` guards to both calls.
+
+### Validation
+- OrbStack macOS ARM64: 158/158 BATS, all services Running (Vault, ESO, Istio, OpenLDAP, Jenkins, ArgoCD, Keycloak).
+- Ubuntu k3s Linux: 158/158 BATS, all services Ready.
+
+### Known Issues (deferred to v0.7.x backlog)
+- BATS test teardown: `k3d-test-orbstack-exists` cluster not cleaned up post-test, can block port 8000/8443 on next `deploy_cluster`. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`.
+- colima VM inotify limit not persistent across restarts. Manual fix: `colima ssh -- sudo sysctl -w fs.inotify.max_user_instances=512`.
+- ESO + shopping-cart deployment on Ubuntu app cluster deferred to next milestone.
+
+---
+
 ## v0.6.5 — Agent Rigor Coverage + lib-foundation Extraction — dated 2026-03-07
 
 ### Fixed
