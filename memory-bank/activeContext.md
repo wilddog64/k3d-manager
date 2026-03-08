@@ -218,6 +218,7 @@ Owner
 
 **Lessons learned:**
 - Gemini skips memory-bank read and acts immediately — paste full task spec inline in the Gemini session prompt; do not rely on Gemini pulling it from memory-bank independently.
+- Codex handoff pattern (proven): paste full task spec inline AND ask Codex to confirm it read memory-bank before acting. Belt and suspenders — spec inline ensures it has context; confirmation read ensures it's operating from current state.
 - Gemini expands scope beyond task spec — spec must explicitly state what is forbidden.
 - Gemini over-reports test success with ambient env vars — always verify with `env -i` clean environment.
 - PR sub-branches from Copilot agent may conflict — evaluate and close if our implementation is superior.
