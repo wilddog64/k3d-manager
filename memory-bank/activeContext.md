@@ -16,8 +16,80 @@
 | 1 | Set up git subtree — pull lib-foundation into `scripts/lib/foundation/` | Claude | **DONE** — commit b8426d4 |
 | 2 | Update dispatcher source paths to use subtree | Claude | **DONE** — commit 1dc29db |
 | 3 | Teardown + rebuild infra cluster (OrbStack, macOS ARM64) | Claude | **DONE** — all services healthy; 2 issues filed |
-| 4 | Teardown + rebuild k3s cluster (Ubuntu VM) | Gemini | ✅ done |
+| 4 | Teardown + rebuild k3s cluster (Ubuntu VM) | Gemini | **needs completion report** — see spec below |
 | 5 | Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var | Codex | pending — spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md` |
+
+---
+
+## Task 4 — Gemini Spec: Ubuntu k3s Teardown + Rebuild
+
+**Status:** Completion report required. If you have already done the work,
+report what actually happened. If not, do the work now and report.
+
+### Steps
+
+1. `git pull origin k3d-manager-v0.7.0` — get the subtree commits (b8426d4, 1dc29db)
+2. Confirm dispatcher sources from `scripts/lib/foundation/scripts/lib/`:
+   ```bash
+   grep "foundation" scripts/k3d-manager
+   ```
+3. Teardown k3s cluster:
+   ```bash
+   ./scripts/k3d-manager destroy_cluster
+   ```
+4. Rebuild k3s cluster:
+   ```bash
+   CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f
+   ```
+5. Deploy services and verify each is healthy:
+   - `./scripts/k3d-manager deploy_eso` → check `kubectl get pods -n secrets`
+   - `./scripts/k3d-manager deploy_vault` → check initialized + unsealed
+   - `./scripts/k3d-manager deploy_ldap` → check pod running
+   - `kubectl get secretstore -A` → all must be Ready=True
+6. Run BATS suite in clean environment:
+   ```bash
+   env -i HOME="$HOME" PATH="$PATH" ./scripts/k3d-manager test all 2>&1 | tail -5
+   ```
+7. Check no regressions — count must be ≥ 158 passing, 0 failing.
+
+### Required Completion Report
+
+Copy this template exactly and fill it in. Commit it to `memory-bank/activeContext.md`
+then push before marking done:
+
+```
+## Task 4 Completion Report (Gemini)
+
+Date: YYYY-MM-DD
+Branch pulled: k3d-manager-v0.7.0 (commit: <sha>)
+
+Subtree sourced: YES / NO — [paste output of: grep foundation scripts/k3d-manager]
+Teardown: PASS / FAIL — [brief description]
+Rebuild: PASS / FAIL — [brief description]
+
+Services verified:
+| Component | Status | Notes |
+|---|---|---|
+| k3s node | Ready / NotReady | version |
+| Istio | Running / Pending / Error | |
+| ESO | Running / Pending / Error | |
+| Vault | Initialized+Unsealed / Error | |
+| OpenLDAP | Running / Error | namespace |
+| SecretStores | N/N Ready | |
+
+BATS (clean env): N/N passing — [paste last 5 lines of output]
+Regressions: NONE / [describe]
+Unexpected findings: NONE / [describe — do not fix without a spec]
+
+Status: COMPLETE / BLOCKED — [reason if blocked]
+```
+
+### Rules
+
+- Do NOT fix anything outside this scope. If you find an issue, describe it under "Unexpected findings" and stop.
+- Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
+- Run BATS with `env -i` clean environment — do NOT report ambient-env results.
+- Commit your report and push BEFORE updating the task status to done.
 
 ---
 
@@ -177,7 +249,7 @@ Rebuilt 2026-03-07 — all services verified healthy post lib-foundation subtree
 
 - [x] lib-foundation git subtree setup + source path update (Claude — Task 1+2) — DONE
 - [x] OrbStack cluster teardown + rebuild validation (Claude — Task 3) — DONE
-- [ ] Ubuntu k3s teardown + rebuild validation (Gemini — Task 4) — **active**
+- [ ] Ubuntu k3s teardown + rebuild validation (Gemini — Task 4) — **needs completion report** (see spec in activeContext.md)
 - [ ] Refactor `deploy_cluster` — 12 if-blocks exceeds threshold of 8. Extract `_deploy_cluster_resolve_provider` helper. Also fix duplicate mac+k3s guard. Issue: `docs/issues/2026-03-07-deploy-cluster-if-count-violation.md` (Codex — Task 5, after cluster validation)
 - [ ] Fix `deploy_ldap`: Vault role `eso-ldap-directory` must bind both `directory` + `identity` namespaces. Issue: `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md` (Codex)
 - [ ] Fix BATS test teardown: `k3d-test-orbstack-exists` cluster not cleaned up post-test. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md` (Gemini)
