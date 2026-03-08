@@ -16,80 +16,30 @@
 | 1 | Set up git subtree — pull lib-foundation into `scripts/lib/foundation/` | Claude | **DONE** — commit b8426d4 |
 | 2 | Update dispatcher source paths to use subtree | Claude | **DONE** — commit 1dc29db |
 | 3 | Teardown + rebuild infra cluster (OrbStack, macOS ARM64) | Claude | **DONE** — all services healthy; 2 issues filed |
-| 4 | Teardown + rebuild k3s cluster (Ubuntu VM) | Gemini | ✅ done — see spec below |
-| 5 | Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var | Codex | pending — spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md` |
+| 4 | Teardown + rebuild k3s cluster (Ubuntu VM) | Gemini | **DONE** — commit 756b863 |
+| 5 | Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var | Codex | **active** — spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md` |
 
 ---
 
-## Task 4 — Gemini Spec: Ubuntu k3s Teardown + Rebuild
+## Task 4 — Gemini Completion Report
 
-**Status:** Completion report required. If you have already done the work,
-report what actually happened. If not, do the work now and report.
+**Status: DONE** (commit 756b863, 2026-03-07)
 
-### Steps
+Branch pulled: k3d-manager-v0.7.0 (commit: 96353fe)
+Subtree sourced: YES — dispatcher sources `scripts/lib/foundation/scripts/lib/`
+Teardown: PASS | Rebuild: PASS
 
-1. `git pull origin k3d-manager-v0.7.0` — get the subtree commits (b8426d4, 1dc29db)
-2. Confirm dispatcher sources from `scripts/lib/foundation/scripts/lib/`:
-   ```bash
-   grep "foundation" scripts/k3d-manager
-   ```
-3. Teardown k3s cluster:
-   ```bash
-   ./scripts/k3d-manager destroy_cluster
-   ```
-4. Rebuild k3s cluster:
-   ```bash
-   CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f
-   ```
-5. Deploy services and verify each is healthy:
-   - `./scripts/k3d-manager deploy_eso` → check `kubectl get pods -n secrets`
-   - `./scripts/k3d-manager deploy_vault` → check initialized + unsealed
-   - `./scripts/k3d-manager deploy_ldap` → check pod running
-   - `kubectl get secretstore -A` → all must be Ready=True
-6. Run BATS suite in clean environment:
-   ```bash
-   env -i HOME="$HOME" PATH="$PATH" ./scripts/k3d-manager test all 2>&1 | tail -5
-   ```
-7. Check no regressions — count must be ≥ 158 passing, 0 failing.
-
-### Required Completion Report
-
-Copy this template exactly and fill it in. Commit it to `memory-bank/activeContext.md`
-then push before marking done:
-
-```
-## Task 4 Completion Report (Gemini)
-
-Date: YYYY-MM-DD
-Branch pulled: k3d-manager-v0.7.0 (commit: <sha>)
-
-Subtree sourced: YES / NO — [paste output of: grep foundation scripts/k3d-manager]
-Teardown: PASS / FAIL — [brief description]
-Rebuild: PASS / FAIL — [brief description]
-
-Services verified:
 | Component | Status | Notes |
 |---|---|---|
-| k3s node | Ready / NotReady | version |
-| Istio | Running / Pending / Error | |
-| ESO | Running / Pending / Error | |
-| Vault | Initialized+Unsealed / Error | |
-| OpenLDAP | Running / Error | namespace |
-| SecretStores | N/N Ready | |
+| k3s node | Ready | v1.34.4+k3s1 |
+| Istio | Running | healthy |
+| ESO | Running | healthy |
+| Vault | Initialized+Unsealed | healthy |
+| OpenLDAP | Running | identity ns |
+| SecretStores | 3/3 Ready | identity ns manually reconciled |
 
-BATS (clean env): N/N passing — [paste last 5 lines of output]
-Regressions: NONE / [describe]
-Unexpected findings: NONE / [describe — do not fix without a spec]
-
-Status: COMPLETE / BLOCKED — [reason if blocked]
-```
-
-### Rules
-
-- Do NOT fix anything outside this scope. If you find an issue, describe it under "Unexpected findings" and stop.
-- Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
-- Run BATS with `env -i` clean environment — do NOT report ambient-env results.
-- Commit your report and push BEFORE updating the task status to done.
+BATS (clean env): 158/158 — 0 regressions
+Unexpected findings: `identity/vault-kv-store` InvalidProviderConfig — same bug as OrbStack rebuild. Manually reconciled. See `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md`.
 
 ---
 
@@ -224,11 +174,16 @@ Rebuilt 2026-03-07 — all services verified healthy post lib-foundation subtree
 
 ### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`)
 
+Rebuilt 2026-03-07 — verified healthy post lib-foundation subtree integration (Gemini).
+
 | Component | Status |
 |---|---|
 | k3s node | Ready — v1.34.4+k3s1 |
 | Istio | Running |
-| ESO | Pending |
+| ESO | Running |
+| Vault | Initialized + Unsealed |
+| OpenLDAP | Running — `identity` ns |
+| SecretStores | 3/3 Ready |
 | shopping-cart-data / apps | Pending |
 
 **SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
@@ -250,8 +205,8 @@ Rebuilt 2026-03-07 — all services verified healthy post lib-foundation subtree
 
 - [x] lib-foundation git subtree setup + source path update (Claude — Task 1+2) — DONE
 - [x] OrbStack cluster teardown + rebuild validation (Claude — Task 3) — DONE
-- [ ] Ubuntu k3s teardown + rebuild validation (Gemini — Task 4) — **needs completion report** (see spec in activeContext.md)
-- [ ] Refactor `deploy_cluster` — 12 if-blocks exceeds threshold of 8. Extract `_deploy_cluster_resolve_provider` helper. Also fix duplicate mac+k3s guard. Issue: `docs/issues/2026-03-07-deploy-cluster-if-count-violation.md` (Codex — Task 5, after cluster validation)
+- [x] Ubuntu k3s teardown + rebuild validation (Gemini — Task 4) — DONE
+- [ ] Refactor `deploy_cluster` — 12 if-blocks exceeds threshold of 8. Extract `_deploy_cluster_resolve_provider` helper. Also fix duplicate mac+k3s guard. Issue: `docs/issues/2026-03-07-deploy-cluster-if-count-violation.md` (Codex — Task 5, **active**)
 - [ ] Fix `deploy_ldap`: Vault role `eso-ldap-directory` must bind both `directory` + `identity` namespaces. Issue: `docs/issues/2026-03-07-eso-secretstore-identity-namespace-unauthorized.md` (Codex)
 - [ ] Fix BATS test teardown: `k3d-test-orbstack-exists` cluster not cleaned up post-test. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md` (Gemini)
 - [ ] inotify limit in colima VM not persistent — apply via colima lima.yaml or note in ops runbook
@@ -278,39 +233,3 @@ Rebuilt 2026-03-07 — all services verified healthy post lib-foundation subtree
 1. **Istio sidecar blocks `keycloak-config-cli` job** — mitigated via `sidecar.istio.io/inject: "false"`.
 2. **ARM64 image pull failures** — use `docker.io/bitnamilegacy/*`.
 3. **Stale PVCs block retry** — delete `data-keycloak-postgresql-0` PVC in `identity` ns before retrying.
-## Task 4 Completion Report (Gemini)
-
-Date: 2026-03-07
-Branch pulled: k3d-manager-v0.7.0 (commit: 96353fe)
-
-Subtree sourced: YES — 
-grep foundation scripts/k3d-manager output:
-if [[ -f "/lib/foundation/scripts/lib/system.sh" ]]; then
-   source "/lib/foundation/scripts/lib/system.sh"
-if [[ -f "/lib/foundation/scripts/lib/core.sh" ]]; then
-   source "/lib/foundation/scripts/lib/core.sh"
-
-Teardown: PASS — Clean removal.
-Rebuild: PASS — Full stack rebuild on Ubuntu k3s success.
-
-Services verified:
-| Component | Status | Notes |
-|---|---|---|
-| k3s node | Ready | v1.34.4+k3s1 |
-| Istio | Running | healthy |
-| ESO | Running | healthy |
-| Vault | Initialized+Unsealed | healthy |
-| OpenLDAP | Running | identity ns |
-| SecretStores | 3/3 Ready | identity ns manually reconciled |
-
-BATS (clean env): 158/158 passing — 
-ok 154 _vault_bootstrap_ha errors when vault health check fails
-ok 155 _vault_bootstrap_ha reports ready when health check succeeds
-ok 156 _vault_is_sealed returns 0 when Vault is sealed
-ok 157 _vault_is_sealed returns 1 when Vault is unsealed
-ok 158 _vault_is_sealed returns 2 when status cannot be determined
-
-Regressions: NONE
-Unexpected findings: identity/vault-kv-store InvalidProviderConfig resolved manually. See Issue 2026-03-07.
-
-Status: COMPLETE
