@@ -100,6 +100,32 @@ Status: COMPLETE / BLOCKED
 
 ---
 
+## lib-foundation Release Protocol (Option A)
+
+lib-foundation is an independent library with its own semver (`v0.1.x`).
+k3d-manager embeds it via git subtree and tracks the embedded version explicitly.
+
+**When foundation code changes in k3d-manager:**
+
+1. Codex edits both local copies (`scripts/lib/`) and subtree copies (`scripts/lib/foundation/`) in k3d-manager.
+2. PR merges into k3d-manager.
+3. Claude runs:
+   ```bash
+   git subtree push --prefix=scripts/lib/foundation lib-foundation main
+   ```
+4. Claude updates lib-foundation `CHANGE.md` and cuts a new tag (e.g. `v0.1.2`).
+5. k3d-manager `CHANGE.md` records `lib-foundation @ v0.1.2` in the release entry.
+
+**Embedded version tracking:**
+- A `scripts/lib/foundation/.version` file (or CHANGE.md note) records the lib-foundation tag embedded in the current k3d-manager release.
+- This makes it clear to consumers and auditors exactly which lib-foundation version is in use.
+
+**When lib-foundation releases independently (future consumers):**
+- Cut a lib-foundation tag on its own cadence.
+- Each consumer does `git subtree pull --prefix=... lib-foundation <tag> --squash` to upgrade.
+
+---
+
 ## Version Roadmap
 
 | Version | Status | Notes |
