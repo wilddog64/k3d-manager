@@ -16,7 +16,7 @@
 | 1 | Set up git subtree — pull lib-foundation into `scripts/lib/foundation/` | Claude | **DONE** — commit b8426d4 |
 | 2 | Update dispatcher source paths to use subtree | Claude | **DONE** — commit 1dc29db |
 | 3 | Teardown + rebuild infra cluster (OrbStack, macOS ARM64) | Claude | **DONE** — all services healthy; 2 issues filed |
-| 4 | Teardown + rebuild k3s cluster (Ubuntu VM) | Gemini | **active** — unblocked |
+| 4 | Teardown + rebuild k3s cluster (Ubuntu VM) | Gemini | ✅ done |
 | 5 | Refactor `deploy_cluster` + fix `CLUSTER_NAME` env var | Codex | pending — spec: `docs/plans/v0.7.0-codex-deploy-cluster-refactor.md` |
 
 ---

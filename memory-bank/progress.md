@@ -32,6 +32,7 @@
 - [x] BATS tests for `_agent_audit` bare sudo + kubectl exec — suite 9/9, total 158/158
 - [x] `lib-foundation` repo created — https://github.com/wilddog64/lib-foundation
 - [x] `core.sh` + `system.sh` extracted to lib-foundation (PR #1 open, CI green)
+- [x] Ubuntu k3s validation gate — full 5-phase teardown/rebuild verified (158/158 BATS pass)
 
 ---
 
