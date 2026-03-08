@@ -45,7 +45,7 @@ _agent_audit() {
 
    local status=0
    local diff_bats
-   diff_bats="$(git diff -- '*.bats' 2>/dev/null || true)"
+   diff_bats="$(git diff --cached -- '*.bats' 2>/dev/null || true)"
    if [[ -n "$diff_bats" ]]; then
       if grep -q '^-[[:space:]]*assert_' <<<"$diff_bats"; then
          _warn "Agent audit: assertions removed from BATS files"
@@ -62,7 +62,7 @@ _agent_audit() {
    fi
 
    local changed_sh
-   changed_sh="$(git diff --name-only -- '*.sh' 2>/dev/null || true)"
+   changed_sh="$(git diff --cached --name-only -- '*.sh' 2>/dev/null || true)"
    if [[ -n "$changed_sh" ]]; then
       local max_if="${AGENT_AUDIT_MAX_IF:-8}"
       local file
@@ -102,7 +102,7 @@ _agent_audit() {
       for file in $changed_sh; do
          [[ -f "$file" ]] || continue
          local bare_sudo
-         bare_sudo=$(git diff -- "$file" 2>/dev/null \
+         bare_sudo=$(git diff --cached -- "$file" 2>/dev/null \
             | grep '^+' \
             | sed 's/^+//' \
             | grep -E '\bsudo[[:space:]]' \
