@@ -11,6 +11,11 @@ setup() {
   export SCRIPT_DIR
 }
 
+teardown() {
+  # Clean up any potential leftover test clusters
+  k3d cluster delete "k3d-test-orbstack-exists" 2>/dev/null || true
+}
+
 # --- K3D Provider Contract ---
 
 @test "_provider_k3d_exec is defined" {
