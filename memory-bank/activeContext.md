@@ -14,9 +14,9 @@
 | # | Task | Who | Status |
 |---|---|---|---|
 | 1 | `.envrc` → dotfiles symlink + `scripts/hooks/pre-commit` (carried from v0.7.0) | Claude | **done** — commits 108b959, 3dcf7b1 |
-| 2 | Fix BATS teardown — `k3d-test-orbstack-exists` cluster not cleaned up post-test | Gemini | pending |
-| 3 | ESO deploy on Ubuntu app cluster | Gemini | ✅ done |
-| 4 | shopping-cart-data / apps deployment on Ubuntu | Gemini | 🔄 data layer PASS; apps BLOCKED |
+| 2 | Fix BATS teardown — `teardown_file()` fix needed in provider_contract.bats | Codex | pending (Gemini used `teardown()`, fix: → `teardown_file()`) |
+| 3 | ESO deploy on Ubuntu app cluster | Gemini | ✅ done — 3/3 SecretStores Ready |
+| 4 | shopping-cart-data / apps deployment on Ubuntu | Gemini | 🔄 data layer PASS; apps BLOCKED (ImagePullBackOff + CPU) |
 | 5 | lib-foundation v0.2.0 — `agent_rigor.sh` + `ENABLE_AGENT_LINT` | Claude/Codex | **done** — merged + tagged, subtree synced |
 | 6 | Update `k3d-manager.envrc` — `AGENT_LINT_GATE_VAR`, `AGENT_LINT_AI_FUNC`, `AGENT_AUDIT_MAX_IF=15` | Claude | **done** |
 
@@ -27,9 +27,12 @@
 - [x] Drop colima support (v0.7.1)
 - [x] `.envrc` → `~/.zsh/envrc/k3d-manager.envrc` symlink + `.gitignore`
 - [x] `scripts/hooks/pre-commit` — tracked hook with `_agent_audit` + `_agent_lint` (gated by `K3DM_ENABLE_AI=1`)
-- [ ] Fix BATS teardown: `k3d-test-orbstack-exists` cluster not cleaned up. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`
-- [ ] ESO deploy on Ubuntu app cluster
-- [ ] shopping-cart-data / apps deployment on Ubuntu
+- [ ] Fix BATS teardown: `teardown()` → `teardown_file()` in `provider_contract.bats` — Codex task: `docs/plans/v0.7.2-codex-teardown-fix.md`
+- [x] ESO deploy on Ubuntu app cluster — 3/3 SecretStores Ready ✅
+- [ ] shopping-cart-data / apps deployment on Ubuntu — data PASS; apps BLOCKED:
+  - ImagePullBackOff: `shopping-cart/*:latest` images not in registry accessible from Ubuntu
+  - CPU: 2-core k3s node at capacity; needs namespace scale-down
+  - Note: shopping-cart-infra repo present on Ubuntu; deploy via `make` in `shopping-cart-infra/`
 - [x] lib-foundation v0.2.0 — merged, tagged, subtree synced into `scripts/lib/foundation/`
 - [x] `~/.zsh/envrc/k3d-manager.envrc` — `AGENT_LINT_GATE_VAR=K3DM_ENABLE_AI`, `AGENT_LINT_AI_FUNC=_k3d_manager_copilot`, `AGENT_AUDIT_MAX_IF=15`
 - [x] `_agent_audit` smoke-tested: catches bare sudo + if-count, passes clean changes
@@ -87,7 +90,8 @@
 | Vault | Initialized + Unsealed |
 | OpenLDAP | Running — `identity` ns |
 | SecretStores | 3/3 Ready |
-| shopping-cart-data / apps | Pending |
+| shopping-cart-data | Running ✅ |
+| shopping-cart-apps | BLOCKED — ImagePullBackOff + CPU capacity |
 
 **SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
 
