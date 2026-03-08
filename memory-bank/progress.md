@@ -41,8 +41,8 @@
 
 ### Priority 1 — v0.7.1 (active)
 
+- [ ] Drop colima support — remove `_install_colima`, `_install_mac_docker`, update `_install_docker` mac case, clean README (Codex — Task 1)
 - [ ] Fix BATS test teardown — `k3d-test-orbstack-exists` cluster left behind after tests
-- [ ] inotify limit persistent fix — colima lima.yaml or ops runbook
 - [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data (PostgreSQL, Redis, RabbitMQ) on Ubuntu
 - [ ] shopping-cart-apps (basket, order, payment, catalog, frontend) on Ubuntu
@@ -66,6 +66,6 @@
 | Item | Status | Notes |
 |---|---|---|
 | BATS test teardown — `k3d-test-orbstack-exists` | OPEN | Holds ports 8000/8443 on next deploy. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`. Gemini — v0.7.1. |
-| inotify limit in colima VM | OPEN | Not persistent across restarts. Fix: `colima ssh -- sudo sysctl -w fs.inotify.max_user_instances=512`. |
+| inotify limit in colima VM | CLOSED — colima support being dropped in v0.7.1 | N/A |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround. |
 | No `scripts/tests/plugins/jenkins.bats` suite | BACKLOG | Future work. |

@@ -9,21 +9,83 @@
 
 ## Current Focus
 
-**v0.7.1: BATS test teardown + inotify persistence + Ubuntu app cluster**
+**v0.7.1: Drop colima support + BATS teardown + Ubuntu app cluster**
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | Fix BATS teardown — `k3d-test-orbstack-exists` cluster not cleaned up | Gemini | pending |
-| 2 | inotify limit — make persistent in colima VM or document in ops runbook | Claude | pending |
+| 1 | Drop colima support — remove `_install_colima`, `_install_mac_docker`, update `_install_docker` mac case, clean README | Codex | **active** |
+| 2 | Fix BATS teardown — `k3d-test-orbstack-exists` cluster not cleaned up | Gemini | pending |
 | 3 | ESO deploy on Ubuntu app cluster | TBD | pending |
 | 4 | shopping-cart-data / apps deployment on Ubuntu | TBD | pending |
 
 ---
 
+---
+
+## Task 1 — Codex Spec: Drop Colima Support
+
+**Status: active**
+
+### Background
+
+Colima was the original macOS Docker VM runtime. OrbStack is now the primary macOS runtime and bundles Docker natively. Colima has caused operational issues (inotify limit not persistent) and is untested. Removing it reduces complexity and closes the inotify open item.
+
+### Your task
+
+Edit only `scripts/lib/system.sh` and `scripts/lib/core.sh`. Do NOT edit the foundation subtree copies — Claude handles those separately.
+
+**`scripts/lib/system.sh`:**
+1. Delete `_install_colima` (lines 710–717) entirely.
+2. Delete `_install_mac_docker` (lines 719–745) entirely.
+
+**`scripts/lib/core.sh`:**
+3. In `_install_docker` (line ~416), the `mac)` case currently calls `_install_mac_docker`. Replace the mac case body with:
+   ```bash
+   mac)
+      _info "On macOS, Docker is provided by OrbStack — no installation required."
+      ;;
+   ```
+
+**`README.md`:**
+4. Remove the "Colima resource configuration (macOS)" section (lines 328–334, from the `### Colima resource configuration (macOS)` heading through the last bullet point).
+5. On line 289, remove "or Colima" (or equivalent phrasing) from the sentence.
+6. On line 316, remove "Colima)" from the parenthetical — leave "Docker Desktop" if relevant or simplify to just mention OrbStack.
+
+### Rules
+
+- Edit only `scripts/lib/system.sh`, `scripts/lib/core.sh`, and `README.md`.
+- Do NOT edit `scripts/lib/foundation/` — those are handled separately.
+- Do NOT edit any other files.
+- Do NOT run `git rebase`, `git reset --hard`, or `git push --force`.
+- `shellcheck scripts/lib/system.sh scripts/lib/core.sh` must exit 0.
+- `env -i HOME="$HOME" PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test all` — must not regress (158/158).
+- Commit locally — Claude handles push.
+
+### Required Completion Report
+
+Update `memory-bank/activeContext.md` with:
+
+```
+## Task 1 Completion Report (Codex)
+
+Files changed: [list]
+Shellcheck: PASS / [issues]
+BATS: N/N passing
+_install_colima deleted: YES — system.sh lines N–N
+_install_mac_docker deleted: YES — system.sh lines N–N
+_install_docker mac case: updated to OrbStack info message — core.sh line N
+README colima section removed: YES — lines N–N
+README inline mentions cleaned: YES / [describe]
+Unexpected findings: NONE / [describe]
+Status: COMPLETE / BLOCKED
+```
+
+---
+
 ## Open Items
 
+- [ ] Drop colima support — `_install_colima`, `_install_mac_docker`, README cleanup (Codex — Task 1, active)
 - [ ] Fix BATS test teardown: `k3d-test-orbstack-exists` cluster not cleaned up post-test. Issue: `docs/issues/2026-03-07-k3d-rebuild-port-conflict-test-cluster.md`
-- [ ] inotify limit in colima VM not persistent — apply via colima lima.yaml or note in ops runbook
 - [ ] ESO deploy on Ubuntu app cluster
 - [ ] shopping-cart-data / apps deployment on Ubuntu
 - [ ] lib-foundation: sync deploy_cluster fixes back upstream (CLUSTER_NAME, provider helpers, if-count)
