@@ -11,7 +11,7 @@ setup() {
   export SCRIPT_DIR
 }
 
-teardown() {
+teardown_file() {
   # Clean up any potential leftover test clusters
   k3d cluster delete "k3d-test-orbstack-exists" 2>/dev/null || true
 }
