@@ -96,7 +96,7 @@
 | Vault | Initialized + Unsealed |
 | OpenLDAP | Running — `identity` ns |
 | shopping-cart-data | Running ✅ |
-| shopping-cart-apps | BLOCKED — ImagePullBackOff (images not yet pushed) |
+| shopping-cart-apps | BLOCKED — ArgoCD sync pending (images pushed to ghcr.io; ArgoCD cannot reach Ubuntu k3s API) |
 
 **SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
 
@@ -162,6 +162,7 @@ Owner
 - Gemini expands scope — spec must explicitly state what is forbidden.
 - Gemini over-reports test success with ambient env vars — always verify with `env -i`.
 - `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override.
+- Gemini made unauthorized code fixes in Task 6 (workflow SHA + permissions) — Claude must verify these against Codex's commits before merge.
 
 ---
 
