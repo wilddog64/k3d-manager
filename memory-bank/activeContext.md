@@ -26,7 +26,7 @@
 - BATS result: 158/158 passing
 - Pre-commit hook tests: A=PASS, B=PASS, C=PASS, D=PASS
 - Ubuntu k3s cluster rebuild: PASS
-- Ubuntu SecretStores: 2/2 Ready (App Cluster scope — note: was 3/3 previously, needs clarification)
+- Ubuntu SecretStores: 2/2 Ready (App Cluster scope)
 - Ubuntu shopping-cart-data: Running
 - Ubuntu shopping-cart-apps: ImagePullBackOff (expected — pending v0.7.3 CI/CD)
 - Commit SHA: 88c144f
