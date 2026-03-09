@@ -74,7 +74,7 @@
 |---|---|
 | k3s node | Ready — v1.34.4+k3s1 |
 | Istio | Running |
-| ESO | Running — 2/2 SecretStores Ready (⚠️ was 3/3 — needs clarification) |
+| ESO | Running — 2/2 SecretStores Ready (confirmed post-rebuild) |
 | Vault | Initialized + Unsealed |
 | OpenLDAP | Running — `identity` ns |
 | shopping-cart-data | Running ✅ |
