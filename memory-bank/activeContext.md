@@ -125,6 +125,12 @@ Owner
   -- approves and merges PRs
 ```
 
+**Agent logging convention:**
+- All k3d-manager command output must be redirected to `scratch/logs/<agent>-<task>-<timestamp>.log`
+- Example: `./scripts/k3d-manager deploy_cluster 2>&1 | tee scratch/logs/codex-task5-$(date +%s).log`
+- This allows Claude or Gemini to `tail -f scratch/logs/<file>` to monitor progress or assist if blocked
+- `scratch/` is gitignored — logs never committed
+
 **Agent rules:**
 - Commit your own work — self-commit is your sign-off.
 - Update memory-bank to report completion — this is how you communicate back to Claude.
