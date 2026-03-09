@@ -93,6 +93,29 @@ desktop client (Claude Desktop, OpenAI Codex, ChatGPT Atlas, Perplexity Comet).
   - These guards complement existing shell-layer protections (`_args_have_sensitive_flag`,
     `_run_command` privilege model, Vault + ESO secret injection). Defense in depth — not a replacement.
 
+- **Destructive Operation Controls** *(motivated by real AI+Terraform incident — production DB deleted, snapshots gone, no recovery path)*:
+
+  - **Blast radius classification:** Every exposed MCP tool is tagged `read`, `mutate`, or `destroy`.
+    - `read`: `cluster_status`, `argocd app list` — no confirmation required
+    - `mutate`: `deploy_vault`, `deploy_jenkins`, `deploy_eso` — single confirmation
+    - `destroy`: `destroy_cluster`, force-redeploy — explicit `--confirm` flag required + counts double toward session limit
+    - Classification is enforced in the MCP server, not left to the calling agent
+
+  - **Dry-run gate:** `destroy_cluster` and any `mutate`/`destroy` tool must support a `dry_run: true`
+    input that returns what would happen without executing. Calling agent should always invoke
+    dry-run first and present the plan before requesting actual execution.
+
+  - **Pre-destroy snapshot:** Before any `destroy`-class operation executes, automatically dump
+    current cluster state to `scratch/logs/pre-destroy-snapshot-<timestamp>.log`:
+    - Running namespaces + pod counts
+    - Vault seal status
+    - ArgoCD app sync states
+    - Provides a recovery reference even after the cluster is gone
+
+  - **Independent confirmation per destructive call:** If an agent chains `destroy_cluster` →
+    `deploy_cluster`, each requires its own confirmation. A single approval does not cover a sequence.
+    This prevents an agent from collapsing a multi-step destructive chain into one approved action.
+
 - **Context Architecture — SQLite State Cache:**
   MCP tool responses must never dump raw `kubectl` output into the LLM context. Cluster state
   is pre-aggregated into a local SQLite cache; MCP tools query that cache and return structured
