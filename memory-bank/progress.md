@@ -51,6 +51,10 @@
 
 - [ ] `k3dm-mcp` — lean MCP server wrapping k3d-manager CLI
 - [ ] Expose: deploy, destroy, test, unseal as MCP tools
+- [ ] SQLite state cache — pre-aggregate cluster state, never dump raw kubectl output to LLM
+  - Two-phase: sync (on deploy/destroy/unseal) + query (cluster_status reads SQLite only)
+  - Every response includes `last_synced_at` + `stale: true` flag if beyond `K3DM_MCP_CACHE_TTL`
+  - Full decision: `docs/plans/roadmap-v1.md` → v0.8.0 Context Architecture section
 
 ---
 
