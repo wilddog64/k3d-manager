@@ -162,5 +162,3 @@ spec:
 YAML
   fi
 }
-# comment
-# comment
