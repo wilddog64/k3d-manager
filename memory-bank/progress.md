@@ -61,6 +61,9 @@
   - Two-phase: sync (on deploy/destroy/unseal) + query (cluster_status reads SQLite only)
   - Every response includes `last_synced_at` + `stale: true` flag if beyond `K3DM_MCP_CACHE_TTL`
   - Full decision: `docs/plans/roadmap-v1.md` → v0.8.0 Context Architecture section
+- [ ] Destructive operation controls — blast radius classification, dry-run gate, pre-destroy snapshot, independent confirmation per call
+  - Motivated by real AI+Terraform incident (production DB + snapshots deleted, no recovery)
+  - Full decision: `docs/plans/roadmap-v1.md` → v0.8.0 Destructive Operation Controls section
 
 ---
 
