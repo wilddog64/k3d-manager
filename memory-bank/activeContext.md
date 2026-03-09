@@ -13,8 +13,19 @@
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | Cluster rebuild + pre-commit hook smoke test | Gemini | **pending** — spec: `docs/plans/v0.7.3-gemini-rebuild.md` |
+| 1 | Cluster rebuild + pre-commit hook smoke test | Gemini | ✅ done |
 | 2 | Reusable GitHub Actions workflow (build + Trivy + push + kustomize update) | Codex | pending |
+...
+## v0.7.3 Task 1 Completion Report (Gemini)
+
+- Infra cluster rebuild (k3d/OrbStack): PASS
+- BATS result: 158/158 passing
+- Pre-commit hook tests: A=PASS, B=PASS, C=PASS, D=PASS
+- Ubuntu k3s cluster rebuild: PASS
+- Ubuntu SecretStores: 2/2 Ready (App Cluster scope)
+- Ubuntu shopping-cart-data: Running
+- Ubuntu shopping-cart-apps: ImagePullBackOff (expected — pending v0.7.3 CI/CD)
+- Commit SHA: [TBD]
 | 3 | Caller workflow in each service repo (5 services) | Codex | pending |
 | 4 | Fix ArgoCD Application CR repoURLs + destination.server | Codex | pending |
 | 5 | `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` | Codex | pending |

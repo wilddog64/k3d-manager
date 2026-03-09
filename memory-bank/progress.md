@@ -33,7 +33,7 @@
 
 ### Priority 1 — v0.7.3 (active)
 
-- [ ] Cluster rebuild + pre-commit hook smoke test (Gemini) — `docs/plans/v0.7.3-gemini-rebuild.md`
+- [x] Cluster rebuild + pre-commit hook smoke test (Gemini) — `docs/plans/v0.7.3-gemini-rebuild.md`
 - [ ] Reusable GitHub Actions workflow (build + Trivy + ghcr.io + kustomize update)
 - [ ] Caller workflow in each service repo (basket, order, payment, catalog, frontend)
 - [ ] Fix ArgoCD Application CR repoURLs + destination.server (`10.211.55.14:6443`)
