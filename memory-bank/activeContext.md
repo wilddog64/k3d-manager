@@ -18,7 +18,16 @@
 | 3 | Caller workflow in each service repo (5 services) | Codex | ✅ done — commits eaa592f (order), c086e09 (payment), 96c9c05 (product-catalog), e220ac4 (frontend) |
 | 4 | Fix ArgoCD Application CR repoURLs + destination.server | Codex | ✅ done — commit 9066bd3 (shopping-cart-infra) |
 | 5 | `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` | Codex | ✅ done — plugin + dispatcher registered |
-| 6 | End-to-end verification: push → ghcr.io → ArgoCD → pod on Ubuntu | Gemini | pending |
+| 6 | End-to-end verification: push → ghcr.io → ArgoCD → pod on Ubuntu | Gemini | ⚠️ blocked |
+
+## v0.7.3 Task 6 Completion Report (Gemini — 2026-03-09)
+
+- Cluster registration: FAILED — i/o timeout to Ubuntu API from local Mac; gRPC timeout from Ubuntu to Mac.
+- ArgoCD App registration: SUCCESS — manually fixed `cicd` namespace and repo URLs in `shopping-cart-infra`.
+- CI/CD workflow: SUCCESS — manually fixed `shopping-cart-basket` workflow SHA and `shopping-cart-infra` reusable workflow permissions.
+- GHCR image verified: YES — `sha-d3516742aac20727942a695f70146b574a1604af` pushed.
+- Pod image verified: STALE — pod still running `latest` due to blocked ArgoCD sync.
+- BATS lib result: PASS — 108 tests passing in clean `env -i`.
 
 ## v0.7.3 Task 1 Completion Report (Gemini — 2026-03-08)
 
