@@ -1674,4 +1674,3 @@ function _no_trace() {
   (( wasx )) && set -x
   return $rc
 }
-# test
