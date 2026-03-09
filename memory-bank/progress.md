@@ -38,7 +38,7 @@
 - [ ] Caller workflow in each service repo (basket, order, payment, catalog, frontend)
 - [ ] Fix ArgoCD Application CR repoURLs + destination.server (`10.211.55.14:6443`)
 - [ ] `shopping_cart.sh` — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps`
-- [ ] Gemini: end-to-end verification (push → ghcr → ArgoCD → pod on Ubuntu)
+- [ ] Gemini: end-to-end verification (🔄 CI/CD PASS; ArgoCD sync BLOCKED)
 
 ### Priority 2 — lib-foundation
 
@@ -71,6 +71,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
+| ArgoCD Cluster Registration Timeout | OPEN | Local Mac cannot reach Ubuntu 6443 API via direct or tunnel. Blocks GitOps sync. |
 | Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps exceed capacity. Fix: replicas=1 in ArgoCD manifests (v0.7.3 Task 3). |
 | Shopping Cart Apps ImagePullBackOff | OPEN | Images never pushed — blocked on v0.7.3 CI/CD pipeline. |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround. |
