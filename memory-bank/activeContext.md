@@ -13,29 +13,29 @@
 
 | # | Task | Who | Status |
 |---|---|---|---|
-| 1 | Cluster rebuild + pre-commit hook smoke test | Gemini | ✅ done |
+| 1 | Cluster rebuild + pre-commit hook smoke test | Gemini | ✅ done — commit 88c144f |
 | 2 | Reusable GitHub Actions workflow (build + Trivy + push + kustomize update) | Codex | pending |
-...
-## v0.7.3 Task 1 Completion Report (Gemini)
-
-- Infra cluster rebuild (k3d/OrbStack): PASS
-- BATS result: 158/158 passing
-- Pre-commit hook tests: A=PASS, B=PASS, C=PASS, D=PASS
-- Ubuntu k3s cluster rebuild: PASS
-- Ubuntu SecretStores: 2/2 Ready (App Cluster scope)
-- Ubuntu shopping-cart-data: Running
-- Ubuntu shopping-cart-apps: ImagePullBackOff (expected — pending v0.7.3 CI/CD)
-- Commit SHA: [TBD]
 | 3 | Caller workflow in each service repo (5 services) | Codex | pending |
 | 4 | Fix ArgoCD Application CR repoURLs + destination.server | Codex | pending |
 | 5 | `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` | Codex | pending |
 | 6 | End-to-end verification: push → ghcr.io → ArgoCD → pod on Ubuntu | Gemini | pending |
 
+## v0.7.3 Task 1 Completion Report (Gemini — 2026-03-08)
+
+- Infra cluster rebuild (k3d/OrbStack): PASS
+- BATS result: 158/158 passing
+- Pre-commit hook tests: A=PASS, B=PASS, C=PASS, D=PASS
+- Ubuntu k3s cluster rebuild: PASS
+- Ubuntu SecretStores: 2/2 Ready (App Cluster scope — note: was 3/3 previously, needs clarification)
+- Ubuntu shopping-cart-data: Running
+- Ubuntu shopping-cart-apps: ImagePullBackOff (expected — pending v0.7.3 CI/CD)
+- Commit SHA: 88c144f
+
 ---
 
 ## Open Items
 
-- [ ] Cluster rebuild + v0.7.2 hook validation (Gemini) — spec: `docs/plans/v0.7.3-gemini-rebuild.md`
+- [x] Cluster rebuild + v0.7.2 hook validation (Gemini) — spec: `docs/plans/v0.7.3-gemini-rebuild.md`
 - [ ] Shopping cart CI/CD pipeline — full spec: `docs/plans/v0.7.3-shopping-cart-cicd.md`
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
@@ -54,7 +54,7 @@
 
 ---
 
-## Cluster State (as of 2026-03-08)
+## Cluster State (rebuilt 2026-03-08 — Gemini validated)
 
 ### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-cluster`)
 
@@ -74,11 +74,11 @@
 |---|---|
 | k3s node | Ready — v1.34.4+k3s1 |
 | Istio | Running |
-| ESO | Running — 3/3 SecretStores Ready |
+| ESO | Running — 2/2 SecretStores Ready (⚠️ was 3/3 — needs clarification) |
 | Vault | Initialized + Unsealed |
 | OpenLDAP | Running — `identity` ns |
 | shopping-cart-data | Running ✅ |
-| shopping-cart-apps | BLOCKED — ImagePullBackOff + CPU capacity |
+| shopping-cart-apps | BLOCKED — ImagePullBackOff (images not yet pushed) |
 
 **SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
 
