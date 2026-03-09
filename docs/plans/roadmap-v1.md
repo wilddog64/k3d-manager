@@ -93,6 +93,27 @@ desktop client (Claude Desktop, OpenAI Codex, ChatGPT Atlas, Perplexity Comet).
   - These guards complement existing shell-layer protections (`_args_have_sensitive_flag`,
     `_run_command` privilege model, Vault + ESO secret injection). Defense in depth — not a replacement.
 
+- **Context Architecture — SQLite State Cache:**
+  MCP tool responses must never dump raw `kubectl` output into the LLM context. Cluster state
+  is pre-aggregated into a local SQLite cache; MCP tools query that cache and return structured
+  summaries. This keeps token usage efficient and responses deterministic.
+
+  **Two-phase model:**
+  - **Sync phase:** `k3dm-mcp` runs `kubectl get pods -A`, `argocd app list`, Vault status on
+    demand (triggered by `deploy`, `destroy`, `unseal` tool calls, or explicit `sync_state` tool).
+    Results stored in SQLite: one row per pod/service/component with status + timestamp.
+  - **Query phase:** `cluster_status` and other read tools query SQLite — no live `kubectl` call.
+    Returns aggregated summary: "infra: 7/7 healthy | app: 4/5 healthy (basket: ImagePullBackOff)".
+
+  **SQLite tuning (same as article pattern):** WAL mode, covering indexes on `(namespace, status)`.
+
+  **Staleness signaling:** Every MCP tool response includes `last_synced_at`. If stale beyond a
+  configurable threshold (`K3DM_MCP_CACHE_TTL`, default: 5 minutes), the response includes a
+  `stale: true` flag so the calling agent can decide whether to trigger a sync first.
+
+  **What this prevents:** LLM reasoning over 300 lines of raw pod output, token waste, and
+  confabulation from partial context windows.
+
 - **Testing Strategy:** Two-layer approach — own the regression layer, use MCPSpec as an external audit layer.
 
   **Layer 1 — Roll our own (BATS-based MCP harness):**
