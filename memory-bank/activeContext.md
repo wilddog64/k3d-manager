@@ -117,6 +117,8 @@ Gemini  (SDET + Red Team)
 Codex  (Production Code)
   -- pure logic fixes and feature implementation, no cluster dependency
   -- commits own work; updates memory-bank to report completion
+  -- NO remote SSH work — clone from GitHub, work locally, push to GitHub
+  -- tasks requiring SSH to Ubuntu or any remote machine go to Claude or Gemini
 
 Owner
   -- approves and merges PRs
