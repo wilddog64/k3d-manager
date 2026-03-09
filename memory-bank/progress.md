@@ -47,6 +47,12 @@
 - [ ] Route bare sudo in `_install_debian_helm` / `_install_debian_docker` through `_run_command`
 - [ ] Add `.github/copilot-instructions.md` to lib-foundation
 
+### Priority 2b — Shopping Cart Repo Hygiene (post v0.7.3 or v0.7.4)
+
+- [ ] Branch protection on all shopping-cart repos (`main`): require PR, required status checks (CI must pass), dismiss stale reviews, no force push, no deletion
+  - Automate via `gh api` script — 5+ repos makes manual UI setup impractical
+  - Do after Codex completes v0.7.3 Tasks 2–5 (CI workflows must exist before status checks can be required)
+
 ### Priority 3 — v0.8.0
 
 - [ ] `k3dm-mcp` — lean MCP server wrapping k3d-manager CLI
