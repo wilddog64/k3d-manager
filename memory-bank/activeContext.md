@@ -36,7 +36,7 @@
 ## Open Items
 
 - [x] Cluster rebuild + v0.7.2 hook validation (Gemini) — spec: `docs/plans/v0.7.3-gemini-rebuild.md`
-- [ ] Shopping cart CI/CD pipeline — full spec: `docs/plans/v0.7.3-shopping-cart-cicd.md`
+- [ ] Shopping cart CI/CD pipeline — full spec: `docs/plans/v0.7.3-shopping-cart-cicd.md` (blocked: SSH to `m2-air` fails with hostname resolution error)
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
