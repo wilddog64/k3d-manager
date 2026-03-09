@@ -56,6 +56,14 @@ fi
 source "${SCRIPT_DIR}/lib/core.sh"
 source "${SCRIPT_DIR}/lib/help/utils.sh"
 
+function add_ubuntu_k3s_cluster() {
+    _try_load_plugin add_ubuntu_k3s_cluster "$@"
+}
+
+function register_shopping_cart_apps() {
+    _try_load_plugin register_shopping_cart_apps "$@"
+}
+
 CLUSTER_ROLE="${CLUSTER_ROLE:-infra}"
 CLUSTER_ROLE="$(printf '%s' "$CLUSTER_ROLE" | tr '[:upper:]' '[:lower:]')"
 case "$CLUSTER_ROLE" in

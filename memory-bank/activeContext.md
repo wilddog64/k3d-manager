@@ -14,10 +14,10 @@
 | # | Task | Who | Status |
 |---|---|---|---|
 | 1 | Cluster rebuild + pre-commit hook smoke test | Gemini | ✅ done — commit 88c144f |
-| 2 | Reusable GitHub Actions workflow (build + Trivy + push + kustomize update) | Codex | pending |
-| 3 | Caller workflow in each service repo (5 services) | Codex | pending |
-| 4 | Fix ArgoCD Application CR repoURLs + destination.server | Codex | pending |
-| 5 | `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` | Codex | pending |
+| 2 | Reusable GitHub Actions workflow (build + Trivy + push + kustomize update) | Codex | ✅ done — commit 0a28d10 (shopping-cart-infra) |
+| 3 | Caller workflow in each service repo (5 services) | Codex | ✅ done — commits eaa592f (order), c086e09 (payment), 96c9c05 (product-catalog), e220ac4 (frontend) |
+| 4 | Fix ArgoCD Application CR repoURLs + destination.server | Codex | ✅ done — commit 9066bd3 (shopping-cart-infra) |
+| 5 | `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` | Codex | ✅ done — plugin + dispatcher registered |
 | 6 | End-to-end verification: push → ghcr.io → ArgoCD → pod on Ubuntu | Gemini | pending |
 
 ## v0.7.3 Task 1 Completion Report (Gemini — 2026-03-08)
@@ -31,12 +31,21 @@
 - Ubuntu shopping-cart-apps: ImagePullBackOff (expected — pending v0.7.3 CI/CD)
 - Commit SHA: 88c144f
 
+## v0.7.3 Tasks 2–5 Completion Report (Codex — 2026-03-08)
+
+- Task 2 (reusable workflow): PASS — commit 0a28d10 in shopping-cart-infra
+- Task 3 (caller workflows): PASS — commits eaa592f (order), c086e09 (payment), 96c9c05 (product-catalog), e220ac4 (frontend)
+- Task 3 (frontend Dockerfile pin): PASS — included in commit e220ac4
+- Task 4 (ArgoCD CR fixes): PASS — commit 9066bd3 in shopping-cart-infra
+- Task 5 (shopping_cart.sh): PASS — shellcheck: CLEAN; BATS: 158/158
+- Dispatcher registration: PASS
+
 ---
 
 ## Open Items
 
 - [x] Cluster rebuild + v0.7.2 hook validation (Gemini) — spec: `docs/plans/v0.7.3-gemini-rebuild.md`
-- [ ] Shopping cart CI/CD pipeline — full spec: `docs/plans/v0.7.3-shopping-cart-cicd.md` (blocked: SSH to `m2-air` fails with hostname resolution error)
+- [ ] Shopping cart CI/CD pipeline — full spec: `docs/plans/v0.7.3-shopping-cart-cicd.md` (Task 6 verification pending — Gemini to run end-to-end once CI/CD merges)
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
