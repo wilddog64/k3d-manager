@@ -61,13 +61,21 @@
 
 ### Priority 2c — Shopping Cart E2E Testing (future)
 
-- [ ] **Google Antigravity** — browser agent for UI E2E testing of shopping-cart-frontend
+- [ ] **Google Antigravity — Use Case 1: shopping-cart-frontend E2E testing**
   - Replaces manual Playwright/Selenium — natural language test specs
   - Applicable once frontend is deployed + stable on Ubuntu k3s
   - Use cases: login flow, cart operations, checkout, item catalog browsing
   - Complements BATS suite: BATS covers infra layer, Antigravity covers UI layer
   - Open questions: auth session handling, Vault-managed credentials, reliability at scale
   - Reference: https://dev.to/thamindudev/no-qa-no-problem-replacing-manual-testing-with-google-antigravity-agents-5c7p
+
+- [ ] **Google Antigravity — Use Case 2: ACG sandbox login + credential extraction (v1.0.0)**
+  - ACG has no public API — sandbox access requires web UI login
+  - Antigravity logs into ACG, starts sandbox, extracts AWS/Azure/GCP credentials + expiry time
+  - Passes credentials to k3dm-mcp → k3d-manager deploys full stack against cloud cluster
+  - Full flow: Slack trigger → Antigravity login → k3dm-mcp deploy → Slack confirmation
+  - ACG credentials stored in Vault — never hardcoded
+  - Tracked in roadmap: `docs/plans/roadmap-v1.md` → v1.0.0 section
 
 ### Priority 3 — v0.8.0
 
