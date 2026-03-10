@@ -242,8 +242,26 @@ Manual stack setup per session is wasteful. k3dm-mcp automates the full lifecycl
 
 Cloud credentials handled through Vault — never in config files or CLI args.
 
+**ACG login automation — Google Antigravity:**
+ACG has no public API for sandbox access — everything goes through the web UI.
+Google Antigravity (browser agent) automates the login and credential extraction:
+
+```
+Slack: "Start an AWS sandbox on ACG"
+→ Antigravity: logs into ACG web UI (credentials from Vault)
+→ Antigravity: starts sandbox, extracts AWS credentials + expiry time
+→ k3dm-mcp: receives credentials, sets CLUSTER_PROVIDER=eks
+→ k3d-manager: deploy_cluster against EKS
+→ SQLite: records expiry from Antigravity output
+→ Slack: "AWS sandbox ready. Stack deployed. Expires 4h."
+```
+
+Antigravity handles the messy UI layer. k3dm-mcp handles the structured infra layer.
+Clean handoff: Antigravity outputs credentials → k3dm-mcp consumes them as structured input.
+ACG login credentials stored in Vault — never hardcoded or passed via CLI args.
+
 **Sandbox lifecycle extensions to SQLite state cache:**
-- `sandbox_expiry` column — tracks ACG session expiry
+- `sandbox_expiry` column — populated from Antigravity output
 - `stale: true` flag extended to cover expired sandboxes
 - `sync_state` tool warns when sandbox has < 30min remaining
 
