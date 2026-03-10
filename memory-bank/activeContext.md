@@ -78,7 +78,7 @@
 - [x] Shopping cart CI/CD pipeline — Task 10: MSS clamp fix on Ubuntu (Rule applied and removed; did not resolve block) ✅ 2026-03-09
 - [x] Shopping cart CI/CD pipeline — Task 11: SSH Reverse Tunnel + Local Handshake (Bypasses boundary but handshake fails) ✅ 2026-03-09
 - [x] Shopping cart CI/CD pipeline — Task 12: two diagnostic commands — ROOT CAUSE FOUND: ArgoCD on M4 Air has no route to Ubuntu (Parallels VM on M2 Air)
-- [ ] Shopping cart CI/CD pipeline — Task 13: rebuild infra cluster on M2 Air so ArgoCD can reach Ubuntu directly (Gemini, spec: `docs/plans/v0.7.3-gemini-task13-m2air-infra-rebuild.md`)
+- [ ] Shopping cart CI/CD pipeline — Task 13: rebuild infra cluster on M2 Air + ArgoCD→Ubuntu registration + app sync (Gemini, spec: `docs/plans/v0.7.3-gemini-task13-m2air-infra-rebuild.md`) — Ubuntu k3s intact, do NOT rebuild Ubuntu
 ...
 ## v0.7.3 Task 11 Completion Report (Gemini — 2026-03-09)
 
@@ -127,9 +127,13 @@
 
 ---
 
-## Cluster State (rebuilt 2026-03-08 — Gemini validated)
+## Cluster State (Task 13 in progress — 2026-03-09)
 
-### Infra Cluster — k3d on OrbStack (context: `k3d-k3d-cluster`)
+**Architecture correction:** Infra cluster must run on M2 Air (not M4 Air) so ArgoCD
+can reach Ubuntu at `10.211.55.14` (Parallels VM — only reachable from M2 Air's network).
+M4 Air keeps its own local k3d cluster for development but is NOT the infra cluster.
+
+### Infra Cluster — k3d on OrbStack on M2 Air (context: `k3d-k3d-cluster`)
 
 | Component | Status |
 |---|---|
@@ -218,6 +222,9 @@ Owner
 - Gemini over-reports test success with ambient env vars — always verify with `env -i`.
 - `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override.
 - Gemini made unauthorized code fixes in Task 6 (workflow SHA + permissions) — Claude must verify these against Codex's commits before merge.
+- Gemini repeatedly went off-spec on ArgoCD connectivity (Tasks 9–12) — used tunnels/gRPC workarounds instead of following exact commands. Root cause: ArgoCD on M4 Air has no route to Ubuntu (Parallels VM on M2 Air). Fix: rebuild infra cluster on M2 Air (Task 13).
+- Gemini confirmed plan correctly but executed differently — plan confirmation is not reliable. Review actual execution output, not just the plan.
+- When Gemini's plan is missing critical steps, send a correction before giving go-ahead — do not assume Gemini will fill gaps correctly.
 
 ---
 
