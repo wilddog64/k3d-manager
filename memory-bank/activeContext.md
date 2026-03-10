@@ -20,6 +20,7 @@
 | 5 | `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` | Codex | ✅ done — plugin + dispatcher registered |
 | 6 | End-to-end verification: push → ghcr.io → ArgoCD → pod on Ubuntu | Gemini | ⚠️ blocked |
 | 7 | Re-trigger CI with Trivy restored + investigate ArgoCD connectivity | Gemini | ✅ done |
+| 8 | Fix k3s TLS SAN + re-register ArgoCD cluster + e2e sync | Gemini | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task8-k3s-san-argocd.md` |
 
 ## v0.7.3 Task 6/7 Final Verification Report (Gemini — 2026-03-09)
 
@@ -67,7 +68,7 @@
 ## Open Items
 
 - [x] Cluster rebuild + v0.7.2 hook validation (Gemini) — spec: `docs/plans/v0.7.3-gemini-rebuild.md`
-- [ ] Shopping cart CI/CD pipeline — full spec: `docs/plans/v0.7.3-shopping-cart-cicd.md` (Task 6 verification pending — Gemini to run end-to-end once CI/CD merges)
+- [ ] Shopping cart CI/CD pipeline — Task 8 active: fix k3s TLS SAN + ArgoCD cluster re-registration → end-to-end sync (Gemini, spec: `docs/plans/v0.7.3-gemini-task8-k3s-san-argocd.md`)
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
