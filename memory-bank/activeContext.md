@@ -40,7 +40,7 @@ on M2 Air (Task 13). Ruled out: TLS SAN, iptables/ufw, MTU fragmentation.
 
 - Infra cluster tear-down/redeploy on M2 Air: PASS (k3d cluster rebuilt; Vault/ESO/Istio/ArgoCD/Jenkins/OpenLDAP running; logs under `scratch/logs/codex-task13-*`)
 - Vault automatically re-seeded during `deploy_vault`; namespace health verified (`kubectl get pods -A` clean)
-- Blocked at Task 5 — root cause: `add_ubuntu_k3s_cluster` never implemented kubeconfig export via SSH. Fix assigned as Task 14.
+- Blocked at cluster registration (Task 5+): `argocd cluster add` errors with "context k3s-automation does not exist" despite kubeconfig context creation, and app sync fails with `failed to list refs: authentication required` because the M2 Air cluster lacks credentials for wilddog64 GitHub repos.
 
 ### Task 14 status (Codex — 2026-03-10)
 
