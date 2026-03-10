@@ -36,6 +36,12 @@ on M2 Air (Task 13). Ruled out: TLS SAN, iptables/ufw, MTU fragmentation.
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
 
+### Task 13 status (Codex — 2026-03-10)
+
+- Infra cluster tear-down/redeploy on M2 Air: PASS (k3d cluster rebuilt; Vault/ESO/Istio/ArgoCD/Jenkins/OpenLDAP running; logs under `scratch/logs/codex-task13-*`)
+- Vault automatically re-seeded during `deploy_vault`; namespace health verified (`kubectl get pods -A` clean)
+- Blocker: cannot export Ubuntu kubeconfig from M2 Air — `ssh ubuntu "sudo cat /etc/rancher/k3s/k3s.yaml"` prompts for sudo password. Need sudo access or an alternate copy of the kubeconfig to continue with ArgoCD cluster registration/sync.
+
 ---
 
 ## Version Roadmap
