@@ -24,7 +24,8 @@
 | 9 | ArgoCD gRPC diagnostics — MTU / source IP / iptables | Gemini | ✅ done — root cause: Parallels bridge MTU interference |
 | 10 | MSS clamp fix on Ubuntu + re-register + e2e sync | Gemini | ✅ done — MTU ruled out; i/o timeout persists |
 | 11 | Pod routing diagnostic + static route fix | Gemini | ✅ done — went off-spec (tunnels/gRPC-Web); two critical tests still unrun |
-| 12 | Two commands only: curl from pod + tcpdump | Gemini | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task12-two-commands.md` |
+| 12 | Two commands only: curl from pod + tcpdump | Gemini | ✅ done — root cause: ArgoCD on M4 Air, no route to Ubuntu Parallels VM |
+| 13 | Rebuild infra cluster on M2 Air + ArgoCD→Ubuntu registration | Gemini | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task13-m2air-infra-rebuild.md` |
 
 ## v0.7.3 Task 6/7 Final Verification Report (Gemini — 2026-03-09)
 
@@ -76,7 +77,8 @@
 - [x] Shopping cart CI/CD pipeline — Task 9: ArgoCD gRPC diagnostics (MTU / source IP / iptables) ✅ 2026-03-09
 - [x] Shopping cart CI/CD pipeline — Task 10: MSS clamp fix on Ubuntu (Rule applied and removed; did not resolve block) ✅ 2026-03-09
 - [x] Shopping cart CI/CD pipeline — Task 11: SSH Reverse Tunnel + Local Handshake (Bypasses boundary but handshake fails) ✅ 2026-03-09
-- [ ] Shopping cart CI/CD pipeline — Task 12: two diagnostic commands only — curl from pod + tcpdump (Gemini, spec: `docs/plans/v0.7.3-gemini-task12-two-commands.md`)
+- [x] Shopping cart CI/CD pipeline — Task 12: two diagnostic commands — ROOT CAUSE FOUND: ArgoCD on M4 Air has no route to Ubuntu (Parallels VM on M2 Air)
+- [ ] Shopping cart CI/CD pipeline — Task 13: rebuild infra cluster on M2 Air so ArgoCD can reach Ubuntu directly (Gemini, spec: `docs/plans/v0.7.3-gemini-task13-m2air-infra-rebuild.md`)
 ...
 ## v0.7.3 Task 11 Completion Report (Gemini — 2026-03-09)
 
