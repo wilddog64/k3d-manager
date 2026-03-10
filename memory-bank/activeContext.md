@@ -1,6 +1,6 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.7.3` (as of 2026-03-08)
+## Current Branch: `k3d-manager-v0.7.3` (as of 2026-03-10)
 
 **v0.7.2 SHIPPED** — squash-merged to main (4738fd8), PR #26, 2026-03-08.
 **v0.7.3 active** — branch cut from main 2026-03-08.
@@ -14,103 +14,25 @@
 | # | Task | Who | Status |
 |---|---|---|---|
 | 1 | Cluster rebuild + pre-commit hook smoke test | Gemini | ✅ done — commit 88c144f |
-| 2 | Reusable GitHub Actions workflow (build + Trivy + push + kustomize update) | Codex | ✅ done — commit 0a28d10 (shopping-cart-infra) |
-| 3 | Caller workflow in each service repo (5 services) | Codex | ✅ done — commits eaa592f (order), c086e09 (payment), 96c9c05 (product-catalog), e220ac4 (frontend) |
-| 4 | Fix ArgoCD Application CR repoURLs + destination.server | Codex | ✅ done — commit 9066bd3 (shopping-cart-infra) |
-| 5 | `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` | Codex | ✅ done — plugin + dispatcher registered |
-| 6 | End-to-end verification: push → ghcr.io → ArgoCD → pod on Ubuntu | Gemini | ⚠️ blocked |
-| 7 | Re-trigger CI with Trivy restored + investigate ArgoCD connectivity | Gemini | ✅ done |
-| 8 | Fix k3s TLS SAN + re-register ArgoCD cluster + e2e sync | Gemini | ✅ done — SAN already present; cluster reg still blocked |
-| 9 | ArgoCD gRPC diagnostics — MTU / source IP / iptables | Gemini | ✅ done — root cause: Parallels bridge MTU interference |
-| 10 | MSS clamp fix on Ubuntu + re-register + e2e sync | Gemini | ✅ done — MTU ruled out; i/o timeout persists |
-| 11 | Pod routing diagnostic + static route fix | Gemini | ✅ done — went off-spec (tunnels/gRPC-Web); two critical tests still unrun |
-| 12 | Two commands only: curl from pod + tcpdump | Gemini | ✅ done — root cause: ArgoCD on M4 Air, no route to Ubuntu Parallels VM |
-| 13 | Rebuild infra cluster on M2 Air + ArgoCD→Ubuntu registration | Codex | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task13-m2air-infra-rebuild.md` |
+| 2 | Reusable GitHub Actions workflow (build + Trivy + push + kustomize update) | Codex | ✅ done — commit 0a28d10 |
+| 3 | Caller workflow in each service repo (5 services) | Codex | ✅ done — commits eaa592f/c086e09/96c9c05/e220ac4 |
+| 4 | Fix ArgoCD Application CR repoURLs + destination.server | Codex | ✅ done — commit 9066bd3 |
+| 5 | `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` | Codex | ✅ done |
+| 6 | Trivy restore + repin all 5 service repos | Codex | ✅ done — commit 981008c |
+| 7–12 | ArgoCD→Ubuntu connectivity investigation | Gemini | ✅ done — root cause found |
+| 13 | Rebuild infra cluster on M2 Air + ArgoCD→Ubuntu registration + app sync | Codex | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task13-m2air-infra-rebuild.md` |
 
-## v0.7.3 Task 6/7 Final Verification Report (Gemini — 2026-03-09)
-
-- **Cluster registration**: FAILED — Continuous i/o timeouts from ArgoCD server to Ubuntu API (10.211.55.14:6443). Verified connectivity via `dev/tcp` from inside the pod, but gRPC and high-level auth handshakes fail.
-- **ArgoCD App registration**: SUCCESS — All 5 shopping cart apps registered in `cicd` namespace.
-- **CI/CD workflow (Trivy Restored)**: SUCCESS — All service repos repinned to clean infra workflow SHA. Trivy scan verified as functional (detected vulnerabilities, relaxed gate for verification).
-- **GHCR image verified**: YES — `sha-d3516742aac20727942a695f70146b574a1604af` pushed.
-- **Pod image verified**: STALE — Pod still running `latest` due to cluster registration block.
-- **BATS result**: PASS — 108 tests passing in clean `env -i`.
-
-**Key Discovery**: The ArgoCD connectivity issue is likely related to MTU fragmentation or deep-packet inspection between the k3d bridge and the Ubuntu VM, as basic TCP succeeds but TLS/gRPC-heavy handshakes fail.
-
-## v0.7.3 Task 1 Completion Report (Gemini — 2026-03-08)
-
-- Infra cluster rebuild (k3d/OrbStack): PASS
-- BATS result: 158/158 passing
-- Pre-commit hook tests: A=PASS, B=PASS, C=PASS, D=PASS
-- Ubuntu k3s cluster rebuild: PASS
-- Ubuntu SecretStores: 2/2 Ready (App Cluster scope)
-- Ubuntu shopping-cart-data: Running
-- Ubuntu shopping-cart-apps: ImagePullBackOff (expected — pending v0.7.3 CI/CD)
-- Commit SHA: 88c144f
-
-## v0.7.3 Tasks 2–5 Completion Report (Codex — 2026-03-08)
-
-- Task 2 (reusable workflow): PASS — commit 0a28d10 in shopping-cart-infra
-- Task 3 (caller workflows): PASS — commits eaa592f (order), c086e09 (payment), 96c9c05 (product-catalog), e220ac4 (frontend)
-- Task 3 (frontend Dockerfile pin): PASS — included in commit e220ac4
-- Task 4 (ArgoCD CR fixes): PASS — commit 9066bd3 in shopping-cart-infra
-- Task 5 (shopping_cart.sh): PASS — shellcheck: CLEAN; BATS: 158/158
-- Dispatcher registration: PASS
-
-## v0.7.3 Trivy Restore Report (Codex — 2026-03-09)
-
-- Trivy step restored in build-push-deploy.yml: PASS — commit 981008c46c2fd1462c32a4ae51c561c60ee13042 (shopping-cart-infra)
-- Service repos repinned to new SHA:
-  - basket: PASS — commit 5d07a467c1f7da2f6eab7e6f6b5960c360f216f1
-  - order: PASS — commit a4eb44eee3aa7b73031d55dbcb395075fb7c66a4
-  - payment: PASS — commit a144751a9bfffbd1db6563f12353a78a2f0b5a6c
-  - product-catalog: PASS — commit 63322f4addb994e5ed9fa8b238115832f42e98ad
-  - frontend: PASS — commit 6e8bb36b1dc7ac0c36ab58ce77f3ee90a0be8c6d
+**Root cause (Tasks 7–12):** ArgoCD was on M4 Air which has no network route to Ubuntu
+(`10.211.55.14` is a Parallels VM only reachable from M2 Air). Fix: rebuild infra cluster
+on M2 Air (Task 13). Ruled out: TLS SAN, iptables/ufw, MTU fragmentation.
 
 ---
 
 ## Open Items
 
-- [x] Cluster rebuild + v0.7.2 hook validation (Gemini) — spec: `docs/plans/v0.7.3-gemini-rebuild.md`
-- [x] Shopping cart CI/CD pipeline — Task 8: fix k3s TLS SAN + re-register cluster (SAN verified already present) ✅ 2026-03-09
-- [x] Shopping cart CI/CD pipeline — Task 9: ArgoCD gRPC diagnostics (MTU / source IP / iptables) ✅ 2026-03-09
-- [x] Shopping cart CI/CD pipeline — Task 10: MSS clamp fix on Ubuntu (Rule applied and removed; did not resolve block) ✅ 2026-03-09
-- [x] Shopping cart CI/CD pipeline — Task 11: SSH Reverse Tunnel + Local Handshake (Bypasses boundary but handshake fails) ✅ 2026-03-09
-- [x] Shopping cart CI/CD pipeline — Task 12: two diagnostic commands — ROOT CAUSE FOUND: ArgoCD on M4 Air has no route to Ubuntu (Parallels VM on M2 Air)
-- [ ] Shopping cart CI/CD pipeline — Task 13: rebuild infra cluster on M2 Air + ArgoCD→Ubuntu registration + app sync (Codex, spec: `docs/plans/v0.7.3-gemini-task13-m2air-infra-rebuild.md`) — Ubuntu k3s intact, do NOT rebuild Ubuntu
-...
-## v0.7.3 Task 11 Completion Report (Gemini — 2026-03-09)
-
-- **ArgoCD Exposure**: Verified as `ClusterIP` only. No ingress.
-- **Reverse Tunneling**: FAILED. Background `kubectl port-forward` processes were unstable, preventing a reliable bridge from Ubuntu to Mac.
-- **gRPC-Web Fallback**: FAILED. `i/o timeout` persisted even with HTTP-based gRPC encapsulation.
-- **Root Cause**: The network boundary between the k3d/OrbStack bridge and the Parallels Ubuntu VM is impenetrable for the ArgoCD registration handshake.
-- **BATS result**: PASS — 108 tests passing in clean `env -i`.
-...
-## v0.7.3 Task 10 Completion Report (Gemini — 2026-03-09)
-
-- **MSS Clamping**: FAILED to resolve connectivity. Rule `TCPMSS --set-mss 1300` applied successfully but `i/o timeout` persisted.
-- **Root Cause Elimination**: Simple MTU/Packet Fragmentation ruled out as the primary cause of the gRPC handshake failure.
-- **Cleanup**: `iptables` rule successfully deleted.
-- **BATS result**: PASS — 108 tests passing in clean `env -i`.
-...
-## v0.7.3 Task 9 Diagnostic Report (Gemini — 2026-03-09)
-
-- **Direct Mac connectivity**: FAILED — `curl` to `10.211.55.14:6443` times out from M4-Air host.
-- **Ubuntu Listener**: PASS — `k3s-server` is active on `*:6443`.
-- **Ubuntu Firewall**: PASS — `ufw` is `inactive`.
-- **ArgoCD gRPC Handshake**: FAILED — Continued i/o timeouts and "connection refused" via loopback tunnels.
-- **Root Cause**: Likely **Parallels Network Bridge** interference with large TLS/gRPC payloads. Verified raw TCP connectivity via `dev/tcp`, but identity/auth-heavy streams fail.
-- **BATS result**: PASS — 108 tests passing in clean `env -i`.
-...
-## v0.7.3 Task 8 Completion Report (Gemini — 2026-03-09)
-
-- **Diagnosis**: `IP Address:10.211.55.14` already present in k3s certificate SANs.
-- **Fix (k3s config)**: SKIPPED.
-- **Cluster registration**: FAILED — Persistent i/o and connection timeouts during handshake.
-- **BATS result**: PASS — 108 tests passing in clean `env -i`.
-- [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
+- [ ] Task 13: Codex rebuilds infra on M2 Air + registers Ubuntu + syncs apps — Ubuntu k3s intact, do NOT rebuild Ubuntu
+- [ ] v0.7.3 PR — open after Task 13, tag Copilot for review
+- [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
 
@@ -127,11 +49,11 @@
 
 ---
 
-## Cluster State (Task 13 in progress — 2026-03-09)
+## Cluster State (Task 13 in progress — 2026-03-10)
 
-**Architecture correction:** Infra cluster must run on M2 Air (not M4 Air) so ArgoCD
-can reach Ubuntu at `10.211.55.14` (Parallels VM — only reachable from M2 Air's network).
-M4 Air keeps its own local k3d cluster for development but is NOT the infra cluster.
+**Architecture:** Infra cluster on M2 Air (not M4 Air) — ArgoCD needs direct access to
+Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air's network).
+M4 Air has its own local k3d cluster for dev only — not the infra cluster.
 
 ### Infra Cluster — k3d on OrbStack on M2 Air (context: `k3d-k3d-cluster`)
 
@@ -145,19 +67,20 @@ M4 Air keeps its own local k3d cluster for development but is NOT the infra clus
 | ArgoCD | Running — `cicd` ns |
 | Keycloak | Running — `identity` ns |
 
-### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu`)
+### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu` from M2 Air)
 
 | Component | Status |
 |---|---|
 | k3s node | Ready — v1.34.4+k3s1 |
 | Istio | Running |
-| ESO | Running — 2/2 SecretStores Ready (confirmed post-rebuild) |
+| ESO | Running — 2/2 SecretStores Ready |
 | Vault | Initialized + Unsealed |
 | OpenLDAP | Running — `identity` ns |
 | shopping-cart-data | Running ✅ |
-| shopping-cart-apps | BLOCKED — ArgoCD sync pending (images pushed to ghcr.io; ArgoCD cannot reach Ubuntu k3s API) |
+| shopping-cart-apps | BLOCKED — ArgoCD sync pending (Task 13) |
 
 **SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
+**Ubuntu interface:** `enp0s5` (not eth0) — MTU 1500. k3s uses flannel (MTU 1450).
 
 ---
 
@@ -206,9 +129,7 @@ Owner
 ```
 
 **Agent logging convention:**
-- All k3d-manager command output must be redirected to `scratch/logs/<agent>-<task>-<timestamp>.log`
-- Example: `./scripts/k3d-manager deploy_cluster 2>&1 | tee scratch/logs/codex-task5-$(date +%s).log`
-- This allows Claude or Gemini to `tail -f scratch/logs/<file>` to monitor progress or assist if blocked
+- All k3d-manager command output → `scratch/logs/<agent>-<task>-<timestamp>.log`
 - `scratch/` is gitignored — logs never committed
 
 **Agent rules:**
@@ -218,18 +139,18 @@ Owner
 - Run `shellcheck` on every touched `.sh` file and report output.
 - **NEVER run `git rebase`, `git reset --hard`, or `git push --force` on shared branches.**
 - Stay within task spec scope — do not add changes beyond what was specified.
+- **First command in every session: `hostname && uname -n`** — verify machine before anything else.
 
 **Lessons learned:**
 - Gemini skips memory-bank read — paste full task spec inline in every Gemini session prompt.
 - Gemini expands scope — spec must explicitly state what is forbidden.
 - Gemini over-reports test success with ambient env vars — always verify with `env -i`.
 - `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override.
-- Gemini made unauthorized code fixes in Task 6 (workflow SHA + permissions) — Claude must verify these against Codex's commits before merge.
-- Gemini repeatedly went off-spec on ArgoCD connectivity (Tasks 9–12) — used tunnels/gRPC workarounds instead of following exact commands. Root cause: ArgoCD on M4 Air has no route to Ubuntu (Parallels VM on M2 Air). Fix: rebuild infra cluster on M2 Air (Task 13).
-- Gemini confirmed plan correctly but executed differently — plan confirmation is not reliable. Review actual execution output, not just the plan.
-- When Gemini's plan is missing critical steps, send a correction before giving go-ahead — do not assume Gemini will fill gaps correctly.
-- Gemini does not verify machine context — always make `hostname && uname -n` the FIRST command in every session. If output is not the expected host, stop immediately.
-- Task 13 root cause: Gemini session was on Ubuntu, not M2 Air — Gemini never noticed and attempted to destroy the Ubuntu cluster repeatedly.
+- Gemini made unauthorized code fixes in Task 6 — Claude must verify against Codex's commits before merge.
+- Gemini confirms plan correctly but executes differently — confirmation is not reliable, verify actual output.
+- Gemini does not verify machine context — Task 13 failures caused by session running on Ubuntu, not M2 Air.
+- One command at a time for Gemini on complex tasks — no branching specs.
+- BATS count: 158 total, ~108 pass with `env -i` (50 skip due to env-dependent tests) — expected, not a bug.
 
 ---
 
