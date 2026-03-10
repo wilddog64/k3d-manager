@@ -20,7 +20,8 @@
 | 5 | `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` | Codex | ✅ done — plugin + dispatcher registered |
 | 6 | End-to-end verification: push → ghcr.io → ArgoCD → pod on Ubuntu | Gemini | ⚠️ blocked |
 | 7 | Re-trigger CI with Trivy restored + investigate ArgoCD connectivity | Gemini | ✅ done |
-| 8 | Fix k3s TLS SAN + re-register ArgoCD cluster + e2e sync | Gemini | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task8-k3s-san-argocd.md` |
+| 8 | Fix k3s TLS SAN + re-register ArgoCD cluster + e2e sync | Gemini | ✅ done — SAN already present; cluster reg still blocked |
+| 9 | ArgoCD gRPC diagnostics — MTU / source IP / iptables | Gemini | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task9-argocd-grpc-diag.md` |
 
 ## v0.7.3 Task 6/7 Final Verification Report (Gemini — 2026-03-09)
 
@@ -69,6 +70,7 @@
 
 - [x] Cluster rebuild + v0.7.2 hook validation (Gemini) — spec: `docs/plans/v0.7.3-gemini-rebuild.md`
 - [x] Shopping cart CI/CD pipeline — Task 8: fix k3s TLS SAN + re-register cluster (SAN verified already present) ✅ 2026-03-09
+- [ ] Shopping cart CI/CD pipeline — Task 9: ArgoCD gRPC diagnostics (MTU / source IP / iptables) — spec: `docs/plans/v0.7.3-gemini-task9-argocd-grpc-diag.md`
 ...
 ## v0.7.3 Task 8 Completion Report (Gemini — 2026-03-09)
 
