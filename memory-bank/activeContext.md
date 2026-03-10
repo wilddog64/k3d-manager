@@ -18,7 +18,8 @@
 | 3 | Caller workflow in each service repo (5 services) | Codex | ✅ done — commits eaa592f (order), c086e09 (payment), 96c9c05 (product-catalog), e220ac4 (frontend) |
 | 4 | Fix ArgoCD Application CR repoURLs + destination.server | Codex | ✅ done — commit 9066bd3 (shopping-cart-infra) |
 | 5 | `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` | Codex | ✅ done — plugin + dispatcher registered |
-| 6 | End-to-end verification: push → ghcr.io → ArgoCD → pod on Ubuntu | Gemini | ⚠️ blocked |
+| 6 | End-to-end verification: push → ghcr.io → ArgoCD → pod on Ubuntu | Gemini | ⚠️ blocked — ArgoCD→Ubuntu gRPC timeout |
+| 7 | Re-trigger CI with Trivy restored + investigate ArgoCD connectivity | Gemini | 🔄 assigned |
 
 ## v0.7.3 Task 6 Completion Report (Gemini — 2026-03-09)
 
