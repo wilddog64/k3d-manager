@@ -44,8 +44,9 @@ on M2 Air (Task 13). Ruled out: TLS SAN, iptables/ufw, MTU fragmentation.
 |---|---|---|
 | v0.1.0–v0.7.2 | released | See CHANGE.md |
 | v0.7.3 | **active** | Shopping cart CI/CD + cluster rebuild |
-| v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) |
-| v1.0.0 | vision | Reassess after v0.8.0 |
+| v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) — local clusters |
+| v0.9.0 | planned | Messaging gateway (Slack) — natural language cluster ops |
+| v1.0.0 | vision | Multi-cloud providers (EKS/GKE/AKS) + ACG sandbox lifecycle |
 
 ---
 
