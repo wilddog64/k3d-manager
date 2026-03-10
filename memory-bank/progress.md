@@ -42,6 +42,7 @@
 - [ ] Gemini: end-to-end verification — CI PASS; ArgoCD sync BLOCKED (gRPC transport issues)
 - [x] Gemini: Task 8 — Fix k3s API SAN + re-register cluster (Verified SAN already present)
 - [x] Gemini: Task 9 — ArgoCD gRPC diagnostics (MTU / source IP / iptables) (PASS — root cause identified)
+- [x] Gemini: Task 10 — MSS clamp fix on Ubuntu (PASS — rule applied/removed; block persists)
 - [x] Gemini: Re-trigger CI with Trivy restored + investigate ArgoCD connectivity (PASS)
 
 ### Priority 2 — lib-foundation
