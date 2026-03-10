@@ -34,11 +34,12 @@
 ### Priority 1 — v0.7.3 (active)
 
 - [x] Cluster rebuild + pre-commit hook smoke test (Gemini) — `docs/plans/v0.7.3-gemini-rebuild.md`
-- [ ] Reusable GitHub Actions workflow (build + Trivy + ghcr.io + kustomize update)
-- [ ] Caller workflow in each service repo (basket, order, payment, catalog, frontend)
-- [ ] Fix ArgoCD Application CR repoURLs + destination.server (`10.211.55.14:6443`)
-- [ ] `shopping_cart.sh` — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps`
-- [ ] Gemini: end-to-end verification (🔄 CI/CD PASS; ArgoCD sync BLOCKED)
+- [x] Reusable GitHub Actions workflow (build + Trivy + ghcr.io + kustomize update) — Codex, commit 0a28d10
+- [x] Caller workflow in each service repo (basket, order, payment, catalog, frontend) — Codex, commits eaa592f/c086e09/96c9c05/e220ac4
+- [x] Fix ArgoCD Application CR repoURLs + destination.server (`10.211.55.14:6443`) — Codex, commit 9066bd3
+- [x] `shopping_cart.sh` — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` — Codex, plugin + dispatcher
+- [x] Trivy restore + repin all 5 service repos — Codex, commit 981008c
+- [ ] Gemini: end-to-end verification — CI PASS (transient Trivy install flake on run 22879687170); ArgoCD sync BLOCKED (gRPC timeout, likely missing SAN on k3s API cert)
 - [x] Gemini: Re-trigger CI with Trivy restored + investigate ArgoCD connectivity (PASS)
 
 ### Priority 2 — lib-foundation
