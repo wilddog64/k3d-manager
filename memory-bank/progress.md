@@ -88,6 +88,10 @@
 - [ ] Destructive operation controls — blast radius classification, dry-run gate, pre-destroy snapshot, independent confirmation per call
   - Motivated by real AI+Terraform incident (production DB + snapshots deleted, no recovery)
   - Full decision: `docs/plans/roadmap-v1.md` → v0.8.0 Destructive Operation Controls section
+- [ ] `deploy_cert_manager` plugin — cert-manager + ACME/Let's Encrypt for external-facing certs (SC-081 readiness)
+  - Two-issuer: Vault PKI for internal, cert-manager for external ingress
+  - Provider-aware: ACM (EKS), GCP Certificate Manager (GKE), Key Vault (AKS) in v1.0.0
+  - Full decision: `docs/plans/roadmap-v1.md` → v0.8.x Certificate Management section
 
 ---
 

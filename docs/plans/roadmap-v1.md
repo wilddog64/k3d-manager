@@ -162,6 +162,43 @@ desktop client (Claude Desktop, OpenAI Codex, ChatGPT Atlas, Perplexity Comet).
   - Quality scoring — vanity metric without reproducible criteria
   - Active security probing — `_agent_audit` + credential scan in MCP args covers our threat model
 
+## v0.8.x — Certificate Management (SC-081 Readiness)
+*Focus: Automated TLS cert lifecycle for external-facing services*
+
+**Motivation:** CA/Browser Forum Ballot SC-081 compresses public TLS cert lifetimes to 47 days
+by 2029. Manual renewal at that cadence is not viable. k3d-manager already handles
+cluster-internal certs via Vault PKI — this milestone adds ACME-based auto-renewal for
+external-facing services.
+
+**Two-issuer architecture:**
+- **Vault PKI** — unchanged, handles internal service mesh certs (`*.cluster.local`, Jenkins, ArgoCD TLS). TTL configurable, CA owned by us.
+- **cert-manager + ACME** — new, handles external-facing ingress certs (Let's Encrypt or any ACME provider). cert-manager owns the renewal lifecycle.
+
+**New plugin: `deploy_cert_manager`**
+```bash
+./scripts/k3d-manager deploy_cert_manager                          # install cert-manager + ClusterIssuer (Let's Encrypt staging)
+./scripts/k3d-manager deploy_cert_manager --production             # switch to Let's Encrypt production
+ACME_EMAIL=user@example.com ./scripts/k3d-manager deploy_cert_manager
+```
+
+- Installs cert-manager via Helm (pinned chart version)
+- Configures `ClusterIssuer` for Let's Encrypt ACME (HTTP-01 challenge via Istio ingress)
+- Annotates existing ingress resources to use cert-manager issuer
+- cert-manager owns renewal — no CronJob needed for external certs
+
+**Provider-aware cert management (v1.0.0 extension):**
+When `CLUSTER_PROVIDER=eks|gke|aks`, use cloud-native cert management instead of cert-manager:
+- `eks` → AWS Certificate Manager (ACM) — free, auto-renews for ALB/NLB
+- `gke` → GCP Certificate Manager
+- `aks` → Azure App Gateway + Key Vault certs
+
+`deploy_cert_manager` detects provider and selects the appropriate backend automatically.
+
+**What stays unchanged:** Vault PKI, Jenkins cert rotator CronJob, ESO secret sync — these
+handle the internal layer and are unaffected by SC-081 (not publicly-trusted CAs).
+
+---
+
 ## v0.8.1 — Trace UI (Optional)
 *Focus: Visual observability for local dev — no hard dependencies*
 
