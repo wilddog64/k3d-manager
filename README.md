@@ -1,6 +1,8 @@
 # k3d-manager
 
-Utility scripts for creating and managing a local development Kubernetes cluster with Istio and related tools.  The main entry point is `./scripts/k3d-manager`, which dispatches functions defined in the core libraries and lazily loads plugin files on demand.  When OrbStack is running on macOS the dispatcher auto-selects the `orbstack` provider so k3d talks to OrbStack's Docker runtime; otherwise k3d remains the default and other platforms can select their backend by exporting `CLUSTER_PROVIDER`.
+Modular Bash utility for creating and managing local Kubernetes development clusters. Supports a **two-cluster architecture** — an infra cluster (Vault, ESO, Istio, Jenkins, ArgoCD, OpenLDAP, Keycloak) and an app cluster (Ubuntu k3s) managed via ArgoCD GitOps. The main entry point is `./scripts/k3d-manager`, which dispatches functions defined in the core libraries and lazily loads plugin files on demand. When OrbStack is running on macOS the dispatcher auto-selects the `orbstack` provider; otherwise `k3d` is the default. Linux hosts can use `CLUSTER_PROVIDER=k3s` for bare-metal k3s.
+
+The project includes an **Agent Rigor Protocol** (`_agent_checkpoint`, `_agent_lint`, `_agent_audit`) that enforces spec-first development, architectural linting, and security checks (bare sudo, test weakening, credential patterns) on every commit via a pre-commit hook.
 
 ![Three AI agents — Codex, Gemini, and Claude — working simultaneously on k3d-manager](docs/assets/multi-agents.png)
 
@@ -393,6 +395,14 @@ Detailed design, planning, and troubleshooting references live under `docs/`. Us
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.7.2](https://github.com/wilddog64/k3d-manager/releases/tag/v0.7.2) | 2026-03-08 | dotfiles/hooks integration, lib-foundation v0.2.0 sync, BATS teardown fix, Ubuntu ESO + shopping-cart-data |
+| [v0.7.1](https://github.com/wilddog64/k3d-manager/releases/tag/v0.7.1) | 2026-03-08 | Drop Colima support, memory-bank compression |
+| [v0.7.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.7.0) | 2026-03-07 | lib-foundation subtree at `scripts/lib/foundation/`, `deploy_cluster` refactored 12→5 if-blocks |
+| [v0.6.5](https://github.com/wilddog64/k3d-manager/releases/tag/v0.6.5) | 2026-03-07 | Agent Rigor BATS coverage, lib-foundation repository extracted |
+| [v0.6.4](https://github.com/wilddog64/k3d-manager/releases/tag/v0.6.4) | 2026-03-07 | Linux k3s full validation, `_agent_audit` bare sudo + credential checks, provider contract BATS (30 tests) |
+| [v0.6.3](https://github.com/wilddog64/k3d-manager/releases/tag/v0.6.3) | 2026-03-06 | Permission cascade refactor, `_agent_lint` + `_agent_audit`, `_detect_platform` helper |
+| [v0.6.2](https://github.com/wilddog64/k3d-manager/releases/tag/v0.6.2) | 2026-03-06 | Agent Rigor Protocol, `_k3d_manager_copilot` wrapper, PATH hardening (`_safe_path`) |
+| [v0.2.1](https://github.com/wilddog64/k3d-manager/releases/tag/v0.2.1) | 2026-02-28 | system:auth-delegator fix, test_vault hard-fail cleanup |
 | [v0.2.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.2.0) | 2026-02-27 | OrbStack validated (M4+M2), Vault auth-delegator fix, Jenkins k8s agents, Stage 2 CI green |
 | [v0.1.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.1.0) | 2026-02-27 | Initial release — k3d, k3s, OrbStack providers; Vault PKI; Jenkins; ESO; LDAP/AD |
 
@@ -488,16 +498,35 @@ The sequence now traces the `deploy_jenkins` flow: k3d-manager sources the Jenki
 | `destroy_cluster` | `scripts/lib/core.sh` | Delete the active provider's cluster |
 | `create_cluster` | `scripts/lib/core.sh` | Create a cluster for the active provider |
 | `deploy_cluster` | `scripts/lib/core.sh` | Provider-aware bootstrap (k3d or k3s) plus Istio |
+| `expose_ingress` | `scripts/lib/core.sh` | Expose the cluster ingress externally |
+| `setup_ingress_forward` | `scripts/lib/core.sh` | Set up port-forwarding for the ingress |
+| `status_ingress_forward` | `scripts/lib/core.sh` | Show ingress forward status |
+| `remove_ingress_forward` | `scripts/lib/core.sh` | Tear down ingress port-forwarding |
 | `test_istio` | `scripts/lib/test.sh` | Run Istio validation tests |
+| `test_vault` | `scripts/lib/test.sh` | Run Vault smoke tests |
+| `test_eso` | `scripts/lib/test.sh` | Run ESO smoke tests |
+| `test_jenkins` | `scripts/lib/test.sh` | Run Jenkins smoke tests |
+| `test_jenkins_smoke` | `scripts/lib/test.sh` | Run full Jenkins smoke test suite |
+| `test_keycloak` | `scripts/plugins/keycloak.sh` | Run Keycloak smoke tests |
+| `test_cert_rotation` | `scripts/lib/test.sh` | Validate TLS certificate rotation |
 | `test_nfs_connectivity` | `scripts/lib/test.sh` | Check network connectivity to NFS |
 | `test_nfs_direct` | `scripts/lib/test.sh` | Directly mount NFS for troubleshooting |
 | `create_az_sp` | `scripts/plugins/azure.sh` | Create an Azure service principal |
 | `deploy_azure_eso` | `scripts/plugins/azure.sh` | Deploy Azure ESO resources |
 | `eso_akv` | `scripts/plugins/azure.sh` | Manage Azure Key Vault ESO integration |
 | `deploy_eso` | `scripts/plugins/eso.sh` | Deploy External Secrets Operator |
+| `deploy_argocd` | `scripts/plugins/argocd.sh` | Deploy ArgoCD |
+| `deploy_argocd_bootstrap` | `scripts/plugins/argocd.sh` | Bootstrap ArgoCD with initial apps |
+| `deploy_keycloak` | `scripts/plugins/keycloak.sh` | Deploy Keycloak identity provider |
+| `deploy_ldap` | `scripts/plugins/ldap.sh` | Deploy OpenLDAP directory service |
+| `deploy_ad` | `scripts/plugins/ldap.sh` | Deploy Active Directory schema (local dev) |
+| `deploy_smb_csi` | `scripts/plugins/smb-csi.sh` | Deploy SMB CSI driver |
+| `add_ubuntu_k3s_cluster` | `scripts/plugins/shopping_cart.sh` | Export Ubuntu kubeconfig and register cluster in ArgoCD |
+| `register_shopping_cart_apps` | `scripts/plugins/shopping_cart.sh` | Apply shopping cart ArgoCD Application CRs |
 | `hello` | `scripts/plugins/hello.sh` | Example plugin |
 | `deploy_jenkins` | `scripts/plugins/jenkins.sh` | Deploy Jenkins |
 | `deploy_vault` | `scripts/plugins/vault.sh` | Deploy HashiCorp Vault |
+| `configure_vault_app_auth` | `scripts/plugins/vault.sh` | Register app cluster Kubernetes auth mount in Vault |
 
 ## Vault PKI setup
 
