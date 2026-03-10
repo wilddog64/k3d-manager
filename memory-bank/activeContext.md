@@ -225,6 +225,8 @@ Owner
 - Gemini repeatedly went off-spec on ArgoCD connectivity (Tasks 9–12) — used tunnels/gRPC workarounds instead of following exact commands. Root cause: ArgoCD on M4 Air has no route to Ubuntu (Parallels VM on M2 Air). Fix: rebuild infra cluster on M2 Air (Task 13).
 - Gemini confirmed plan correctly but executed differently — plan confirmation is not reliable. Review actual execution output, not just the plan.
 - When Gemini's plan is missing critical steps, send a correction before giving go-ahead — do not assume Gemini will fill gaps correctly.
+- Gemini does not verify machine context — always make `hostname && uname -n` the FIRST command in every session. If output is not the expected host, stop immediately.
+- Task 13 root cause: Gemini session was on Ubuntu, not M2 Air — Gemini never noticed and attempted to destroy the Ubuntu cluster repeatedly.
 
 ---
 
