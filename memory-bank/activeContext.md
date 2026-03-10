@@ -42,18 +42,13 @@ on M2 Air (Task 13). Ruled out: TLS SAN, iptables/ufw, MTU fragmentation.
 - Vault automatically re-seeded during `deploy_vault`; namespace health verified (`kubectl get pods -A` clean)
 - Blocked at Task 5 — root cause: `add_ubuntu_k3s_cluster` never implemented kubeconfig export via SSH. Fix assigned as Task 14.
 
-### Task 14 (Codex — assigned 2026-03-10)
+### Task 14 status (Codex — 2026-03-10)
 
-Fix `add_ubuntu_k3s_cluster` to auto-export kubeconfig via SSH.
-Spec: `docs/plans/v0.7.3-codex-task14-ubuntu-kubeconfig-export.md`
-
-**Prerequisite (owner runs on Ubuntu before Codex starts Task 14):**
-```bash
-ssh ubuntu "mkdir -p /home/parallels/.kube && \
-  sudo cp /etc/rancher/k3s/k3s.yaml /home/parallels/.kube/k3s.yaml && \
-  sudo chown parallels:parallels /home/parallels/.kube/k3s.yaml && \
-  chmod 600 /home/parallels/.kube/k3s.yaml"
-```
+- vars added to scripts/etc/k3s/vars.sh: PASS
+- add_ubuntu_k3s_cluster rewritten: PASS
+- shellcheck scripts/plugins/shopping_cart.sh: PASS — clean
+- shellcheck scripts/etc/k3s/vars.sh: PASS — clean
+- kubeconfig export dry-run: BLOCKED — `/home/parallels/.kube/k3s.yaml` missing on ubuntu (owner prerequisite not yet applied); ssh export returns `cat: /home/parallels/.kube/k3s.yaml: No such file or directory`
 
 ---
 
