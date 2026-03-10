@@ -188,19 +188,70 @@ desktop client (Claude Desktop, OpenAI Codex, ChatGPT Atlas, Perplexity Comet).
   a shared-team concern, not a local dev tool concern.
 - **Dependency:** Docker — optional. k3s/bare metal environments use span file output only.
 
-## v1.0.0 — Reassess After v0.7.0
-*Scope TBD — revisit once v0.7.0 ships*
+## v0.9.0 — Messaging Gateway
+*Focus: Natural language interface for cluster operations*
 
-Potential directions to evaluate:
-- API stability declaration for the Bash CLI and MCP tool surface.
-- Zero-touch provisioning for new clusters.
-- Formalized Human-in-the-Loop (HITL) protocol for destructive operations.
-- Auto-generated documentation for the full ecosystem.
+**Motivation:** k3dm-mcp (v0.8.0) exposes cluster ops as MCP tools. v0.9.0 adds a
+messaging layer so those tools can be triggered from chat — Slack, Telegram, or any
+channel the team already uses. Builds on OpenClaw's architecture concept but with
+security-first design: Vault for credentials, blast radius classification enforced,
+no raw token storage in config files.
 
-Previous v0.9.0 (Autonomous SRE) and v0.10.0 (Fleet Provisioning) milestones
-were removed — they exceeded the project's scope as a local dev tool. If fleet
-management becomes a real need, it belongs in a separate tool built on
-`lib-foundation`.
+**Key features:**
+- Slack-first channel adapter (webhook receiver → intent parser → k3dm-mcp tool call)
+- Natural language → deterministic MCP tool mapping (no free-form LLM execution)
+- Async notification back to channel: "Deploy complete. Vault unsealed. 7/7 pods healthy."
+- Multi-user awareness — team sees operations in shared channel
+- Security model inherited from v0.8.0: dry-run gate, blast radius, independent confirmation
+
+**What it is NOT:**
+- Not a general-purpose chatbot
+- Not a replacement for the CLI — CLI stays the primary interface
+- Not a multi-tenant platform — personal/team use only
+
+**Implementation:** Thin TypeScript gateway (Node.js). Shells out to k3dm-mcp via
+JSON-RPC stdio. No direct k3d-manager calls — always through the MCP security layer.
+
+---
+
+## v1.0.0 — Multi-Cloud + ACG Sandbox Lifecycle
+*Focus: Same stack definition, any cloud*
+
+**Motivation:** The architectural boundary already supports this — `CLUSTER_PROVIDER`
+abstracts create/destroy/kubeconfig, and plugins speak only Kubernetes primitives.
+Adding EKS/GKE/AKS providers means k3d-manager deploys the same Vault + ESO + Istio +
+ArgoCD stack to any cloud cluster without modification.
+
+**Key use case — A Cloud Guru (ACG) sandbox lifecycle:**
+ACG provides temporary AWS/Azure/GCP sandbox environments (expire after a few hours).
+Manual stack setup per session is wasteful. k3dm-mcp automates the full lifecycle:
+
+```
+"Spin up my standard stack on this AWS sandbox"
+→ CLUSTER_PROVIDER=eks + sandbox credentials from ACG
+→ deploy_cluster: Vault, ESO, Istio, ArgoCD, OpenLDAP
+→ SQLite state: records expiry time from ACG session
+→ Slack: "Stack ready on EKS. Sandbox expires in 4h. Auto-teardown reminder set."
+→ 30min before expiry: "Sandbox expiring soon. Run destroy_cluster to clean up."
+```
+
+**New CLUSTER_PROVIDER values:**
+- `eks` — AWS EKS (kubeconfig via `aws eks update-kubeconfig`)
+- `gke` — Google GKE (kubeconfig via `gcloud container clusters get-credentials`)
+- `aks` — Azure AKS (kubeconfig via `az aks get-credentials`)
+
+Cloud credentials handled through Vault — never in config files or CLI args.
+
+**Sandbox lifecycle extensions to SQLite state cache:**
+- `sandbox_expiry` column — tracks ACG session expiry
+- `stale: true` flag extended to cover expired sandboxes
+- `sync_state` tool warns when sandbox has < 30min remaining
+
+**API stability:** v1.0.0 declares the MCP tool surface stable. Breaking changes
+require a major version bump. Bash CLI compatibility maintained for all existing scripts.
+
+**Engineering standards inherited:** spec-first, no ADKs, bash-native plugins,
+Zero-Dependency philosophy, `env -i` BATS suites for all new providers.
 
 ---
 
