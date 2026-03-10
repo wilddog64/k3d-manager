@@ -39,8 +39,9 @@
 - [x] Fix ArgoCD Application CR repoURLs + destination.server (`10.211.55.14:6443`) — Codex, commit 9066bd3
 - [x] `shopping_cart.sh` — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` — Codex, plugin + dispatcher
 - [x] Trivy restore + repin all 5 service repos — Codex, commit 981008c
-- [ ] Gemini: end-to-end verification — CI PASS; ArgoCD sync BLOCKED (gRPC / i/o timeout; TLS SAN fix ruled out)
+- [ ] Gemini: end-to-end verification — CI PASS; ArgoCD sync BLOCKED (gRPC transport issues)
 - [x] Gemini: Task 8 — Fix k3s API SAN + re-register cluster (Verified SAN already present)
+- [x] Gemini: Task 9 — ArgoCD gRPC diagnostics (MTU / source IP / iptables) (PASS — root cause identified)
 - [x] Gemini: Re-trigger CI with Trivy restored + investigate ArgoCD connectivity (PASS)
 
 ### Priority 2 — lib-foundation
