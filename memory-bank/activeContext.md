@@ -49,6 +49,16 @@
 - Task 5 (shopping_cart.sh): PASS — shellcheck: CLEAN; BATS: 158/158
 - Dispatcher registration: PASS
 
+## v0.7.3 Trivy Restore Report (Codex — 2026-03-09)
+
+- Trivy step restored in build-push-deploy.yml: PASS — commit 981008c46c2fd1462c32a4ae51c561c60ee13042 (shopping-cart-infra)
+- Service repos repinned to new SHA:
+  - basket: PASS — commit 5d07a467c1f7da2f6eab7e6f6b5960c360f216f1
+  - order: PASS — commit a4eb44eee3aa7b73031d55dbcb395075fb7c66a4
+  - payment: PASS — commit a144751a9bfffbd1db6563f12353a78a2f0b5a6c
+  - product-catalog: PASS — commit 63322f4addb994e5ed9fa8b238115832f42e98ad
+  - frontend: PASS — commit 6e8bb36b1dc7ac0c36ab58ce77f3ee90a0be8c6d
+
 ---
 
 ## Open Items
