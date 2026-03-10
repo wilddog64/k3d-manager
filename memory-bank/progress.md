@@ -53,6 +53,16 @@
   - Automate via `gh api` script — 5+ repos makes manual UI setup impractical
   - Do after Codex completes v0.7.3 Tasks 2–5 (CI workflows must exist before status checks can be required)
 
+### Priority 2c — Shopping Cart E2E Testing (future)
+
+- [ ] **Google Antigravity** — browser agent for UI E2E testing of shopping-cart-frontend
+  - Replaces manual Playwright/Selenium — natural language test specs
+  - Applicable once frontend is deployed + stable on Ubuntu k3s
+  - Use cases: login flow, cart operations, checkout, item catalog browsing
+  - Complements BATS suite: BATS covers infra layer, Antigravity covers UI layer
+  - Open questions: auth session handling, Vault-managed credentials, reliability at scale
+  - Reference: https://dev.to/thamindudev/no-qa-no-problem-replacing-manual-testing-with-google-antigravity-agents-5c7p
+
 ### Priority 3 — v0.8.0
 
 - [ ] `k3dm-mcp` — lean MCP server wrapping k3d-manager CLI
