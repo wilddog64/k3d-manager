@@ -40,7 +40,20 @@ on M2 Air (Task 13). Ruled out: TLS SAN, iptables/ufw, MTU fragmentation.
 
 - Infra cluster tear-down/redeploy on M2 Air: PASS (k3d cluster rebuilt; Vault/ESO/Istio/ArgoCD/Jenkins/OpenLDAP running; logs under `scratch/logs/codex-task13-*`)
 - Vault automatically re-seeded during `deploy_vault`; namespace health verified (`kubectl get pods -A` clean)
-- Blocker: cannot export Ubuntu kubeconfig from M2 Air — `ssh ubuntu "sudo cat /etc/rancher/k3s/k3s.yaml"` prompts for sudo password. Need sudo access or an alternate copy of the kubeconfig to continue with ArgoCD cluster registration/sync.
+- Blocked at Task 5 — root cause: `add_ubuntu_k3s_cluster` never implemented kubeconfig export via SSH. Fix assigned as Task 14.
+
+### Task 14 (Codex — assigned 2026-03-10)
+
+Fix `add_ubuntu_k3s_cluster` to auto-export kubeconfig via SSH.
+Spec: `docs/plans/v0.7.3-codex-task14-ubuntu-kubeconfig-export.md`
+
+**Prerequisite (owner runs on Ubuntu before Codex starts Task 14):**
+```bash
+ssh ubuntu "mkdir -p /home/parallels/.kube && \
+  sudo cp /etc/rancher/k3s/k3s.yaml /home/parallels/.kube/k3s.yaml && \
+  sudo chown parallels:parallels /home/parallels/.kube/k3s.yaml && \
+  chmod 600 /home/parallels/.kube/k3s.yaml"
+```
 
 ---
 
