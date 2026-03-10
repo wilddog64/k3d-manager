@@ -70,7 +70,16 @@
 
 - [x] Cluster rebuild + v0.7.2 hook validation (Gemini) — spec: `docs/plans/v0.7.3-gemini-rebuild.md`
 - [x] Shopping cart CI/CD pipeline — Task 8: fix k3s TLS SAN + re-register cluster (SAN verified already present) ✅ 2026-03-09
-- [ ] Shopping cart CI/CD pipeline — Task 9: ArgoCD gRPC diagnostics (MTU / source IP / iptables) — spec: `docs/plans/v0.7.3-gemini-task9-argocd-grpc-diag.md`
+- [x] Shopping cart CI/CD pipeline — Task 9: ArgoCD gRPC diagnostics (MTU / source IP / iptables) ✅ 2026-03-09
+...
+## v0.7.3 Task 9 Diagnostic Report (Gemini — 2026-03-09)
+
+- **Direct Mac connectivity**: FAILED — `curl` to `10.211.55.14:6443` times out from M4-Air host.
+- **Ubuntu Listener**: PASS — `k3s-server` is active on `*:6443`.
+- **Ubuntu Firewall**: PASS — `ufw` is `inactive`.
+- **ArgoCD gRPC Handshake**: FAILED — Continued i/o timeouts and "connection refused" via loopback tunnels.
+- **Root Cause**: Likely **Parallels Network Bridge** interference with large TLS/gRPC payloads. Verified raw TCP connectivity via `dev/tcp`, but identity/auth-heavy streams fail.
+- **BATS result**: PASS — 108 tests passing in clean `env -i`.
 ...
 ## v0.7.3 Task 8 Completion Report (Gemini — 2026-03-09)
 
