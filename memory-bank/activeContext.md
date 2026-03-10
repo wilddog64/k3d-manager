@@ -23,7 +23,8 @@
 | 8 | Fix k3s TLS SAN + re-register ArgoCD cluster + e2e sync | Gemini | ✅ done — SAN already present; cluster reg still blocked |
 | 9 | ArgoCD gRPC diagnostics — MTU / source IP / iptables | Gemini | ✅ done — root cause: Parallels bridge MTU interference |
 | 10 | MSS clamp fix on Ubuntu + re-register + e2e sync | Gemini | ✅ done — MTU ruled out; i/o timeout persists |
-| 11 | Pod routing diagnostic + static route fix | Gemini | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task11-pod-routing-diag.md` |
+| 11 | Pod routing diagnostic + static route fix | Gemini | ✅ done — went off-spec (tunnels/gRPC-Web); two critical tests still unrun |
+| 12 | Two commands only: curl from pod + tcpdump | Gemini | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task12-two-commands.md` |
 
 ## v0.7.3 Task 6/7 Final Verification Report (Gemini — 2026-03-09)
 
@@ -75,6 +76,7 @@
 - [x] Shopping cart CI/CD pipeline — Task 9: ArgoCD gRPC diagnostics (MTU / source IP / iptables) ✅ 2026-03-09
 - [x] Shopping cart CI/CD pipeline — Task 10: MSS clamp fix on Ubuntu (Rule applied and removed; did not resolve block) ✅ 2026-03-09
 - [x] Shopping cart CI/CD pipeline — Task 11: SSH Reverse Tunnel + Local Handshake (Bypasses boundary but handshake fails) ✅ 2026-03-09
+- [ ] Shopping cart CI/CD pipeline — Task 12: two diagnostic commands only — curl from pod + tcpdump (Gemini, spec: `docs/plans/v0.7.3-gemini-task12-two-commands.md`)
 ...
 ## v0.7.3 Task 11 Completion Report (Gemini — 2026-03-09)
 
