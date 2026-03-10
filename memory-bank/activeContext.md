@@ -174,6 +174,18 @@ Owner
 
 ---
 
+## Release Checklist (do after every PR merge to main)
+
+1. Tag the merge commit: `git tag v<X.Y.Z> <commit-sha> && git push origin v<X.Y.Z>`
+2. Create GitHub release: `gh release create v<X.Y.Z> --title "v<X.Y.Z> — <title>" --notes "..."`
+3. Update README.md Releases table on the next feature branch
+4. Verify `gh release list` shows new version as Latest
+
+**Why:** v0.7.0, v0.7.1, v0.7.2 were all merged without releases — discovered 2026-03-10.
+Tags and releases do NOT affect branches or commits — safe to create after the fact.
+
+---
+
 ## Operational Notes
 
 - **Always run `reunseal_vault`** after any cluster restart before other deployments
