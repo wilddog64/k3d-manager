@@ -21,7 +21,8 @@
 | 6 | End-to-end verification: push → ghcr.io → ArgoCD → pod on Ubuntu | Gemini | ⚠️ blocked |
 | 7 | Re-trigger CI with Trivy restored + investigate ArgoCD connectivity | Gemini | ✅ done |
 | 8 | Fix k3s TLS SAN + re-register ArgoCD cluster + e2e sync | Gemini | ✅ done — SAN already present; cluster reg still blocked |
-| 9 | ArgoCD gRPC diagnostics — MTU / source IP / iptables | Gemini | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task9-argocd-grpc-diag.md` |
+| 9 | ArgoCD gRPC diagnostics — MTU / source IP / iptables | Gemini | ✅ done — root cause: Parallels bridge MTU interference |
+| 10 | MSS clamp fix on Ubuntu + re-register + e2e sync | Gemini | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task10-mss-clamp.md` |
 
 ## v0.7.3 Task 6/7 Final Verification Report (Gemini — 2026-03-09)
 
@@ -71,6 +72,7 @@
 - [x] Cluster rebuild + v0.7.2 hook validation (Gemini) — spec: `docs/plans/v0.7.3-gemini-rebuild.md`
 - [x] Shopping cart CI/CD pipeline — Task 8: fix k3s TLS SAN + re-register cluster (SAN verified already present) ✅ 2026-03-09
 - [x] Shopping cart CI/CD pipeline — Task 9: ArgoCD gRPC diagnostics (MTU / source IP / iptables) ✅ 2026-03-09
+- [ ] Shopping cart CI/CD pipeline — Task 10: MSS clamp fix on Ubuntu → ArgoCD registration → e2e sync (Gemini, spec: `docs/plans/v0.7.3-gemini-task10-mss-clamp.md`)
 ...
 ## v0.7.3 Task 9 Diagnostic Report (Gemini — 2026-03-09)
 
