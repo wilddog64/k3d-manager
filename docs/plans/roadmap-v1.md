@@ -35,184 +35,72 @@ desktop client (Claude Desktop, OpenAI Codex, ChatGPT Atlas, Perplexity Comet).
   - Standardize "Template Specs" that can be fed directly to AI for consistent code generation.
   - Deploy ESO on Ubuntu app cluster and shopping-cart stack (PostgreSQL, Redis, RabbitMQ, apps).
 
-## v0.8.0 — MCP Server for Desktop AI Clients
-*Focus: One server, many clients*
+## v0.8.0 — Security Hardening + lib-foundation Backlog
+*Focus: Close open security gaps in k3d-manager before MCP integration*
 
-- **Key Feature:** Build a lean MCP server (`k3dm-mcp`) that wraps the `k3d-manager` CLI,
-  exposing core operations as MCP tools callable from any compatible desktop client.
-- **Supported Clients:**
-  - Claude Desktop (Anthropic) — native MCP support
-  - OpenAI Codex — desktop app, CLI, and VS Code; shares MCP config
-  - ChatGPT Atlas (OpenAI) — AI browser with MCP developer mode
-  - Perplexity Comet — local MCP on macOS
-- **Exposed Tools (initial set):**
-  - `deploy_cluster`, `destroy_cluster`
-  - `deploy_vault`, `unseal_vault`
-  - `deploy_jenkins`, `deploy_ldap`, `deploy_eso`
-  - `test smoke [namespace]`
-  - `test all` (BATS)
-- **Sovereignty Gating:** Destructive actions (destroy, force-redeploy) require
-  human confirmation via the MCP client's approval model.
-- **Implementation:** Thin MCP server (Node.js or Python) that shells out to
-  `./scripts/k3d-manager`. Expected scope: a few hundred lines, single repo or
-  subdirectory within `k3d-manager`.
-- **Observability:** Structured OpenTelemetry span output, opt-in via `ENABLE_OTEL=1`.
-  Each MCP tool call = root span. Each `k3d-manager` subprocess = child span. Output to
-  stdout or `/tmp/k3dm.spans`. No external dependencies. Consistent with existing
-  `ENABLE_TRACE=1` pattern — off by default, zero overhead when disabled.
-- **One AI Layer Rule:** When k3dm-mcp is the tool being called by an AI agent (Claude Desktop,
-  Codex, etc.), the subprocess env must always set `K3DM_ENABLE_AI=0`. The MCP caller is
-  already the AI reasoning layer — a second AI layer (Copilot CLI) inside the subprocess is
-  redundant, opaque, and a dilution risk.
-  - MCP tool calls must invoke specific deterministic k3d-manager functions, never AI-assisted ones
-  - Structured JSON responses only — no free-form prose that an outer agent must interpret
-  - Audit log per tool call via OTel spans — what was called, what env was set, exit code, output
-  - Violation of this rule means two AI agents are reasoning about the same action with no
-    visibility into each other's logic: error laundering, double confidence, prompt injection risk
+### Vault-Managed ArgoCD Deploy Keys
+Empty-passphrase SSH deploy keys stored on disk are insecure and hard to rotate.
+Move all ArgoCD GitHub repo credentials into Vault — ESO syncs them to Kubernetes secrets,
+ArgoCD reads from those secrets. No key files on disk.
 
-- **Environment Isolation:** MCP server must never inherit the parent process environment blindly.
-  Each subprocess call to `./scripts/k3d-manager` receives an explicitly constructed env:
-  - `SCRIPT_DIR` resolved to an absolute path at server startup
-  - `PATH`, `HOME` set explicitly — no ambient shell state
-  - `CLUSTER_PROVIDER` and other k3d-manager vars set from MCP server config, not inherited
-  - Per-call env is a fresh copy — no state bleeds between tool calls
-  - Startup validation: required paths (`scripts/k3d-manager`, `scripts/lib/system.sh`) must
-    exist before the server accepts any tool calls — fail fast, not silently mid-call
-  - Integration tests run with `env -i` clean environment — same rule as BATS suites
-  - Rationale: k3d-manager depends on `SCRIPT_DIR` at source time. A polluted or empty
-    inherited env causes silent failures that are hard to debug across MCP clients.
-- **Agent Safety Guards:** Structural controls built into the MCP server, not bolted on externally.
-  - **Loop detection:** Same tool called 3+ times with identical args in a session → block and
-    return structured error. Prevents runaway agent loops and cost spirals.
-  - **Session call limit:** Configurable max tool calls per session (`K3DM_MCP_MAX_CALLS`,
-    default: 20). Destructive tools (`destroy_cluster`, force-redeploy) count double.
-  - **Credential scan:** MCP tool arguments scanned for API key, token, and password patterns
-    before forwarding to `k3d-manager`. Block on match — credentials must come from Vault, not args.
-  - **Fast-fail, no retry:** MCP server never retries a failed tool call automatically. Failure
-    returned to calling agent immediately. The agent decides whether to retry with different args.
-  - These guards complement existing shell-layer protections (`_args_have_sensitive_flag`,
-    `_run_command` privilege model, Vault + ESO secret injection). Defense in depth — not a replacement.
+- One Vault KV entry per repo: `secret/argocd/deploy-keys/<repo-name>`
+- ESO `ExternalSecret` per repo → syncs to `argocd-repo-<name>` secret in `cicd` ns
+- New Vault policy: `argocd-deploy-key-reader` (read-only on `secret/argocd/deploy-keys/*`)
+- New function: `configure_vault_argocd_repos` in a plugin
+- **Rotation:** `vault kv put secret/argocd/deploy-keys/<repo> private_key=@<new-key>` →
+  ESO syncs → ArgoCD picks up automatically → update GitHub deploy key. One operation.
+- Motivated by: shopping cart deploy keys with empty passphrases discovered during v0.7.3
 
-- **Vault-Managed ArgoCD Deploy Keys:**
-  Empty-passphrase SSH deploy keys stored on disk are insecure and hard to rotate.
-  Move all ArgoCD GitHub repo credentials into Vault — ESO syncs them to Kubernetes secrets,
-  ArgoCD reads from those secrets. No key files on disk.
-
-  - One Vault KV entry per repo: `secret/argocd/deploy-keys/<repo-name>`
-  - ESO `ExternalSecret` per repo → syncs to `argocd-repo-<name>` secret in `cicd` ns
-  - New Vault policy: `argocd-deploy-key-reader` (read-only on `secret/argocd/deploy-keys/*`)
-  - New function: `configure_vault_argocd_repos` in a plugin
-  - **Rotation:** `vault kv put secret/argocd/deploy-keys/<repo> private_key=@<new-key>` →
-    ESO syncs → ArgoCD picks up automatically → update GitHub deploy key. One operation.
-  - Motivated by: shopping cart deploy keys with empty passphrases discovered during v0.7.3
-
-- **Destructive Operation Controls** *(motivated by real AI+Terraform incident — production DB deleted, snapshots gone, no recovery path)*:
-
-  - **Blast radius classification:** Every exposed MCP tool is tagged `read`, `mutate`, or `destroy`.
-    - `read`: `cluster_status`, `argocd app list` — no confirmation required
-    - `mutate`: `deploy_vault`, `deploy_jenkins`, `deploy_eso` — single confirmation
-    - `destroy`: `destroy_cluster`, force-redeploy — explicit `--confirm` flag required + counts double toward session limit
-    - Classification is enforced in the MCP server, not left to the calling agent
-
-  - **Dry-run gate:** `destroy_cluster` and any `mutate`/`destroy` tool must support a `dry_run: true`
-    input that returns what would happen without executing. Calling agent should always invoke
-    dry-run first and present the plan before requesting actual execution.
-
-  - **Pre-destroy snapshot:** Before any `destroy`-class operation executes, automatically dump
-    current cluster state to `scratch/logs/pre-destroy-snapshot-<timestamp>.log`:
-    - Running namespaces + pod counts
-    - Vault seal status
-    - ArgoCD app sync states
-    - Provides a recovery reference even after the cluster is gone
-
-  - **Independent confirmation per destructive call:** If an agent chains `destroy_cluster` →
-    `deploy_cluster`, each requires its own confirmation. A single approval does not cover a sequence.
-    This prevents an agent from collapsing a multi-step destructive chain into one approved action.
-
-- **Context Architecture — SQLite State Cache:**
-  MCP tool responses must never dump raw `kubectl` output into the LLM context. Cluster state
-  is pre-aggregated into a local SQLite cache; MCP tools query that cache and return structured
-  summaries. This keeps token usage efficient and responses deterministic.
-
-  **Two-phase model:**
-  - **Sync phase:** `k3dm-mcp` runs `kubectl get pods -A`, `argocd app list`, Vault status on
-    demand (triggered by `deploy`, `destroy`, `unseal` tool calls, or explicit `sync_state` tool).
-    Results stored in SQLite: one row per pod/service/component with status + timestamp.
-  - **Query phase:** `cluster_status` and other read tools query SQLite — no live `kubectl` call.
-    Returns aggregated summary: "infra: 7/7 healthy | app: 4/5 healthy (basket: ImagePullBackOff)".
-
-  **SQLite tuning (same as article pattern):** WAL mode, covering indexes on `(namespace, status)`.
-
-  **Staleness signaling:** Every MCP tool response includes `last_synced_at`. If stale beyond a
-  configurable threshold (`K3DM_MCP_CACHE_TTL`, default: 5 minutes), the response includes a
-  `stale: true` flag so the calling agent can decide whether to trigger a sync first.
-
-  **What this prevents:** LLM reasoning over 300 lines of raw pod output, token waste, and
-  confabulation from partial context windows.
-
-- **Testing Strategy:** Two-layer approach — own the regression layer, use MCPSpec as an external audit layer.
-
-  **Layer 1 — Roll our own (BATS-based MCP harness):**
-  We control the server, so we control the test surface. Three files:
-  - `scripts/tests/mcp/harness.sh` — sends JSON-RPC tool calls via stdio, captures responses
-  - `scripts/tests/mcp/audit.sh` — scans tool descriptions for prompt injection patterns,
-    excessive permissions, undocumented side effects
-  - `scripts/tests/mcp/*.bats` — one test suite per exposed tool
-
-  Each BATS test: send a tool call → assert response shape + exit code → assert no credential
-  leak in args. Record-replay via BATS fixtures: capture a tool call + response as a fixture file,
-  replay against new server versions to detect regressions. Run with `env -i` clean environment —
-  same rule as all other BATS suites.
-
-  **Layer 2 — MCPSpec as external audit (not regression):**
-  Run `mcpspec audit` against `k3dm-mcp` as a CI gate for security rule coverage.
-  Use pre-built MCPSpec collections for any third-party MCP servers we consume.
-  Do NOT depend on MCPSpec for core regression coverage — record-replay fragility
-  (timestamps, UUIDs, non-deterministic output) makes it unsuitable as a primary test layer.
-
-  **What we do NOT build:**
-  - Dashboard UI — not worth it for a local dev tool
-  - Quality scoring — vanity metric without reproducible criteria
-  - Active security probing — `_agent_audit` + credential scan in MCP args covers our threat model
-
-## v0.8.x — Certificate Management (SC-081 Readiness)
-*Focus: Automated TLS cert lifecycle for external-facing services*
-
-**Motivation:** CA/Browser Forum Ballot SC-081 compresses public TLS cert lifetimes to 47 days
-by 2029. Manual renewal at that cadence is not viable. k3d-manager already handles
-cluster-internal certs via Vault PKI — this milestone adds ACME-based auto-renewal for
-external-facing services.
+### Certificate Management (SC-081 Readiness)
+CA/Browser Forum Ballot SC-081 compresses public TLS cert lifetimes to 47 days by 2029.
+Manual renewal at that cadence is not viable. k3d-manager already handles cluster-internal
+certs via Vault PKI — this adds ACME-based auto-renewal for external-facing services.
 
 **Two-issuer architecture:**
-- **Vault PKI** — unchanged, handles internal service mesh certs (`*.cluster.local`, Jenkins, ArgoCD TLS). TTL configurable, CA owned by us.
-- **cert-manager + ACME** — new, handles external-facing ingress certs (Let's Encrypt or any ACME provider). cert-manager owns the renewal lifecycle.
+- **Vault PKI** — unchanged, handles internal service mesh certs. CA owned by us.
+- **cert-manager + ACME** — new, handles external-facing ingress certs (Let's Encrypt).
 
 **New plugin: `deploy_cert_manager`**
 ```bash
-./scripts/k3d-manager deploy_cert_manager                          # install cert-manager + ClusterIssuer (Let's Encrypt staging)
-./scripts/k3d-manager deploy_cert_manager --production             # switch to Let's Encrypt production
+./scripts/k3d-manager deploy_cert_manager                          # Let's Encrypt staging
+./scripts/k3d-manager deploy_cert_manager --production             # Let's Encrypt production
 ACME_EMAIL=user@example.com ./scripts/k3d-manager deploy_cert_manager
 ```
 
 - Installs cert-manager via Helm (pinned chart version)
-- Configures `ClusterIssuer` for Let's Encrypt ACME (HTTP-01 challenge via Istio ingress)
+- Configures `ClusterIssuer` for Let's Encrypt ACME (HTTP-01 via Istio ingress)
 - Annotates existing ingress resources to use cert-manager issuer
-- cert-manager owns renewal — no CronJob needed for external certs
+- Provider-aware extension in v1.0.0: ACM (EKS), GCP Certificate Manager (GKE), Key Vault (AKS)
 
-**Provider-aware cert management (v1.0.0 extension):**
-When `CLUSTER_PROVIDER=eks|gke|aks`, use cloud-native cert management instead of cert-manager:
-- `eks` → AWS Certificate Manager (ACM) — free, auto-renews for ALB/NLB
-- `gke` → GCP Certificate Manager
-- `aks` → Azure App Gateway + Key Vault certs
+### lib-foundation Backlog
+- `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
+- Sync `deploy_cluster` fixes upstream (CLUSTER_NAME, provider helpers)
+- Route bare sudo in `_install_debian_helm` / `_install_debian_docker` through `_run_command`
+- Add `.github/copilot-instructions.md` to lib-foundation
 
-`deploy_cert_manager` detects provider and selects the appropriate backend automatically.
-
-**What stays unchanged:** Vault PKI, Jenkins cert rotator CronJob, ESO secret sync — these
-handle the internal layer and are unaffected by SC-081 (not publicly-trusted CAs).
+### Shopping Cart Repo Hygiene
+- Branch protection on all 5 shopping-cart repos — automate via `gh api` script
+- Require PR + CI pass + no force push + no deletion on `main`
 
 ---
 
-## v0.8.1 — Trace UI (Optional)
+## k3dm-mcp — Separate Repository (after v0.8.0)
+*Discrete repo: [github.com/wilddog64/k3dm-mcp](https://github.com/wilddog64/k3dm-mcp)*
+
+Lean MCP server wrapping the k3d-manager CLI. Exposes cluster operations as structured MCP
+tools callable from any MCP-compatible AI client. Owns its own memory-bank and roadmap.
+
+**Full scope:** see `k3dm-mcp/docs/plans/roadmap.md`
+
+**Key design decisions carried forward from k3d-manager planning:**
+- One AI Layer Rule: `K3DM_ENABLE_AI=0` always set in subprocess env
+- Explicit subprocess env — no ambient shell state
+- SQLite state cache — never dump raw kubectl output to LLM
+- Blast radius classification, dry-run gate, pre-destroy snapshot
+- Loop detection + session call limit + credential scan on tool args
+- BATS-based MCP test harness (env -i, record-replay fixtures)
+
+## v0.8.1 — Trace UI (Optional, k3dm-mcp)
 *Focus: Visual observability for local dev — no hard dependencies*
 
 - **Key Feature:** Jaeger trace UI as an opt-in sidecar. Environments without Docker

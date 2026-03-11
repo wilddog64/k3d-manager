@@ -37,12 +37,14 @@
 
 ### Priority 1 — v0.8.0 (active)
 
-- [ ] `k3dm-mcp` — lean MCP server wrapping k3d-manager CLI (discrete repo)
-- [ ] Expose: deploy, destroy, test, unseal as MCP tools
-- [ ] SQLite state cache — two-phase sync/query; `last_synced_at` + `stale` flag
-- [ ] Destructive operation controls — blast radius classification, dry-run gate, pre-destroy snapshot
-- [ ] Vault-managed ArgoCD deploy keys — ESO syncs from Vault KV to `cicd` ns; no key files on disk
+- [ ] Vault-managed ArgoCD deploy keys — `configure_vault_argocd_repos`; ESO syncs from Vault KV → `cicd` ns secrets
 - [ ] `deploy_cert_manager` plugin — cert-manager + ACME for external certs (SC-081 readiness)
+- [ ] lib-foundation v0.3.0 — `_run_command` if-count refactor
+- [ ] lib-foundation — sync `deploy_cluster` fixes upstream (CLUSTER_NAME, provider helpers)
+- [ ] lib-foundation — route bare sudo in `_install_debian_helm` / `_install_debian_docker`
+- [ ] Shopping cart branch protection — automate via `gh api` across 5 repos
+
+**k3dm-mcp:** separate repo (`~/src/gitrepo/personal/k3dm-mcp`) — starts after v0.8.0 ships.
 
 ### Priority 2 — lib-foundation backlog
 
