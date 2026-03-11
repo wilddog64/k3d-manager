@@ -93,6 +93,19 @@ desktop client (Claude Desktop, OpenAI Codex, ChatGPT Atlas, Perplexity Comet).
   - These guards complement existing shell-layer protections (`_args_have_sensitive_flag`,
     `_run_command` privilege model, Vault + ESO secret injection). Defense in depth — not a replacement.
 
+- **Vault-Managed ArgoCD Deploy Keys:**
+  Empty-passphrase SSH deploy keys stored on disk are insecure and hard to rotate.
+  Move all ArgoCD GitHub repo credentials into Vault — ESO syncs them to Kubernetes secrets,
+  ArgoCD reads from those secrets. No key files on disk.
+
+  - One Vault KV entry per repo: `secret/argocd/deploy-keys/<repo-name>`
+  - ESO `ExternalSecret` per repo → syncs to `argocd-repo-<name>` secret in `cicd` ns
+  - New Vault policy: `argocd-deploy-key-reader` (read-only on `secret/argocd/deploy-keys/*`)
+  - New function: `configure_vault_argocd_repos` in a plugin
+  - **Rotation:** `vault kv put secret/argocd/deploy-keys/<repo> private_key=@<new-key>` →
+    ESO syncs → ArgoCD picks up automatically → update GitHub deploy key. One operation.
+  - Motivated by: shopping cart deploy keys with empty passphrases discovered during v0.7.3
+
 - **Destructive Operation Controls** *(motivated by real AI+Terraform incident — production DB deleted, snapshots gone, no recovery path)*:
 
   - **Blast radius classification:** Every exposed MCP tool is tagged `read`, `mutate`, or `destroy`.
