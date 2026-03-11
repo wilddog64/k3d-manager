@@ -1,5 +1,36 @@
 # Changes - k3d-manager
 
+## v0.7.3 — Shopping Cart CI/CD + Two-Cluster GitOps — dated 2026-03-10
+
+### Added
+- **Reusable GitHub Actions workflow** (`shopping-cart-infra`): Build + Trivy scan + push to `ghcr.io` + kustomize image update. Used by all 5 shopping cart service repos.
+- **Caller workflows** in all 5 service repos: `basket-service`, `order-service`, `payment-service`, `product-catalog-service`, `frontend-service`.
+- **`shopping_cart.sh` plugin** (`scripts/plugins/shopping_cart.sh`): Two new public functions:
+  - `add_ubuntu_k3s_cluster` — auto-exports Ubuntu k3s kubeconfig via SSH, rewrites server IP, verifies connectivity, registers cluster in ArgoCD
+  - `register_shopping_cart_apps` — applies ArgoCD Application CRs from `shopping-cart-infra`
+- **Ubuntu k3s SSH vars** (`scripts/etc/k3s/vars.sh`): `UBUNTU_K3S_SSH_HOST`, `UBUNTU_K3S_SSH_USER`, `UBUNTU_K3S_EXTERNAL_IP`, `UBUNTU_K3S_REMOTE_KUBECONFIG`, `UBUNTU_K3S_LOCAL_KUBECONFIG` — all overridable via env.
+- **Pre-commit hook** (`scripts/hooks/pre-commit`): Tracked in repo, wires `_agent_lint` + `_agent_audit` to run on every commit.
+- **`.envrc` dotfiles symlink**: Replaced static `.envrc` with symlink to dotfiles repo.
+
+### Fixed
+- **ArgoCD Application CR `repoURLs` + `destination.server`**: Updated to use SSH URLs and correct Ubuntu k3s API (`10.211.55.14:6443`).
+- **`add_ubuntu_k3s_cluster`**: Rewrote from stub (fail-if-missing) to full SSH export + IP rewrite + ArgoCD registration.
+- **BATS teardown**: `teardown_file()` added to `provider_contract.bats` — cleans up `k3d-test-orbstack-exists` cluster after test run.
+- **Trivy restore + repin**: All 5 service repos repinned after transient GitHub rate-limit failure.
+
+### Validation
+- Infra cluster rebuilt on M2 Air: Vault, ESO, Istio, Jenkins, ArgoCD, OpenLDAP, Keycloak — all healthy.
+- Ubuntu k3s app cluster: ESO 2/2 SecretStores Ready, shopping-cart-data Running.
+- ArgoCD→Ubuntu cluster registration: `ubuntu-k3s` Ready at `https://10.211.55.14:6443`.
+- Shopping cart apps: 5/5 registered + synced. `ImagePullBackOff` expected until CI pushes images.
+- BATS: 158/158 passing (M2 Air, Bash 5.0+).
+
+### Known Issues
+- Shopping cart pods in `ImagePullBackOff` — images not yet pushed by CI. Unblocked once service repo CI workflows complete a successful run.
+- ArgoCD deploy keys: per-repo passphrase-free SSH keys. Vault-managed rotation planned for v0.8.0.
+
+---
+
 ## v0.7.0 — lib-foundation Subtree + deploy_cluster Hardening — dated 2026-03-07
 
 ### Added
