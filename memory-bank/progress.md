@@ -103,7 +103,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| ArgoCD Cluster Registration Timeout | OPEN | Local Mac cannot reach Ubuntu 6443 API via direct or tunnel. Blocks GitOps sync. |
+| ArgoCD Cluster Registration Timeout | FIXED v0.7.3 | Root cause: infra cluster was on M4 Air, no route to Ubuntu. Fixed by rebuilding infra on M2 Air. `ubuntu-k3s` registered and apps synced. |
 | Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps exceed capacity. Fix: replicas=1 in ArgoCD manifests (v0.7.3 Task 3). |
 | Shopping Cart Apps ImagePullBackOff | OPEN | Images never pushed — blocked on v0.7.3 CI/CD pipeline. |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround. |
