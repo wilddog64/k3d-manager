@@ -30,25 +30,36 @@ on M2 Air (Task 13). Ruled out: TLS SAN, iptables/ufw, MTU fragmentation.
 
 ## Open Items
 
-- [ ] Task 13: Codex rebuilds infra on M2 Air + registers Ubuntu + syncs apps — Ubuntu k3s intact, do NOT rebuild Ubuntu
-- [ ] v0.7.3 PR — open after Task 13, tag Copilot for review
+- [x] Task 13: Infra cluster rebuilt on M2 Air (Codex) — Tasks 1–4 PASS
+- [x] Task 14: `add_ubuntu_k3s_cluster` rewritten with auto-export (Codex) — PASS
+- [ ] Task 15: ArgoCD GitHub auth + Ubuntu cluster registration + app sync (Gemini) — spec: `docs/plans/v0.7.3-gemini-task15-argocd-registration.md`
+- [ ] v0.7.3 PR — open after Task 15, tag Copilot for review
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
 
-### Task 13 status (Codex — 2026-03-10)
+### Task 13 status (Codex — 2026-03-10) ✅ Tasks 1–4
 
-- Infra cluster tear-down/redeploy on M2 Air: PASS (k3d cluster rebuilt; Vault/ESO/Istio/ArgoCD/Jenkins/OpenLDAP running; logs under `scratch/logs/codex-task13-*`)
-- Vault automatically re-seeded during `deploy_vault`; namespace health verified (`kubectl get pods -A` clean)
-- Blocked at cluster registration (Task 5+): `argocd cluster add` errors with "context k3s-automation does not exist" despite kubeconfig context creation, and app sync fails with `failed to list refs: authentication required` because the M2 Air cluster lacks credentials for wilddog64 GitHub repos.
+- Infra cluster tear-down/redeploy on M2 Air: PASS
+- Vault/ESO/Istio/ArgoCD/Jenkins/OpenLDAP all running, namespace health clean
+- Blocked at Task 5: wrong context name (`k3s-automation` → actual name is `default`) + no GitHub SSH credentials in ArgoCD → handed to Gemini as Task 15
 
-### Task 14 status (Codex — 2026-03-10)
+### Task 14 status (Codex — 2026-03-10) ✅ Code complete
 
-- vars added to scripts/etc/k3s/vars.sh: PASS
-- add_ubuntu_k3s_cluster rewritten: PASS
-- shellcheck scripts/plugins/shopping_cart.sh: PASS — clean
-- shellcheck scripts/etc/k3s/vars.sh: PASS — clean
-- kubeconfig export dry-run: BLOCKED — `/home/parallels/.kube/k3s.yaml` missing on ubuntu (owner prerequisite not yet applied); ssh export returns `cat: /home/parallels/.kube/k3s.yaml: No such file or directory`
+- vars added to `scripts/etc/k3s/vars.sh`: PASS
+- `add_ubuntu_k3s_cluster` rewritten with SSH export: PASS
+- shellcheck `scripts/plugins/shopping_cart.sh`: PASS — clean
+- shellcheck `scripts/etc/k3s/vars.sh`: PASS — clean
+- Dry-run blocked: Ubuntu prerequisite not yet applied (owner must run `sudo cp` on Ubuntu first — Task 15 Task 1)
+
+### Task 15 (Gemini — assigned 2026-03-10)
+
+ArgoCD GitHub SSH auth + Ubuntu cluster registration + shopping cart app sync.
+Spec: `docs/plans/v0.7.3-gemini-task15-argocd-registration.md`
+
+**Known issues to fix:**
+- k3s context name is `default` not `k3s-automation` — use `argocd cluster add default`
+- ArgoCD has no GitHub credentials — add SSH key via `argocd repo add`
 
 ---
 
