@@ -45,7 +45,7 @@
 - [x] Gemini: Task 10 — MSS clamp fix on Ubuntu (PASS — rule applied/removed; block persists)
 - [x] Gemini: Task 11 — SSH Reverse Tunnel + Local Handshake (Ubuntu -> Mac) (PASS — boundary bypassed; handshake fails)
 - [x] Gemini: Re-trigger CI with Trivy restored + investigate ArgoCD connectivity (PASS)
-- [ ] Gemini: Task 15 — ArgoCD GitHub auth + Ubuntu cluster registration + app sync (🛑 BLOCKED: running on M4 Air, route to 10.211.55.14:6443 missing)
+- [x] Gemini: Task 15 — ArgoCD GitHub auth + Ubuntu cluster registration + app sync (PASS — 158 tests)
 
 ### Priority 2 — lib-foundation
 
