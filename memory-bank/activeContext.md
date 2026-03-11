@@ -1,71 +1,36 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.7.3` (as of 2026-03-10)
+## Current Branch: `k3d-manager-v0.8.0` (as of 2026-03-11)
 
-**v0.7.2 SHIPPED** — squash-merged to main (4738fd8), PR #26, 2026-03-08.
-**v0.7.3 active** — branch cut from main 2026-03-08.
+**v0.7.3 SHIPPED** — squash-merged to main (9bca648), PR #27, 2026-03-11. Tagged + released.
+**v0.8.0 active** — branch cut from main 2026-03-11.
 
 ---
 
 ## Current Focus
 
-**v0.7.3: Shopping Cart CI/CD + Cluster Rebuild Validation**
+**v0.8.0: k3dm-mcp — Lean MCP Server**
 
-| # | Task | Who | Status |
-|---|---|---|---|
-| 1 | Cluster rebuild + pre-commit hook smoke test | Gemini | ✅ done — commit 88c144f |
-| 2 | Reusable GitHub Actions workflow (build + Trivy + push + kustomize update) | Codex | ✅ done — commit 0a28d10 |
-| 3 | Caller workflow in each service repo (5 services) | Codex | ✅ done — commits eaa592f/c086e09/96c9c05/e220ac4 |
-| 4 | Fix ArgoCD Application CR repoURLs + destination.server | Codex | ✅ done — commit 9066bd3 |
-| 5 | `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` | Codex | ✅ done |
-| 6 | Trivy restore + repin all 5 service repos | Codex | ✅ done — commit 981008c |
-| 7–12 | ArgoCD→Ubuntu connectivity investigation | Gemini | ✅ done — root cause found |
-| 13 | Rebuild infra cluster on M2 Air (Tasks 1–4) | Codex | ✅ done |
-| 14 | Fix `add_ubuntu_k3s_cluster` kubeconfig export | Codex | ✅ done |
-| 15 | ArgoCD GitHub auth + Ubuntu cluster registration + app sync | Gemini | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task15-argocd-registration.md` |
+No tasks assigned yet. See `docs/plans/roadmap-v1.md` → v0.8.0 section for full scope.
 
-**Root cause (Tasks 7–12):** ArgoCD was on M4 Air which has no network route to Ubuntu
-(`10.211.55.14` is a Parallels VM only reachable from M2 Air). Fix: rebuild infra cluster
-on M2 Air (Task 13). Ruled out: TLS SAN, iptables/ufw, MTU fragmentation.
+| Item | Notes |
+|---|---|
+| `k3dm-mcp` repo | Discrete repository (not a plugin in k3d-manager) |
+| Expose: deploy, destroy, test, unseal | As MCP tools wrapping k3d-manager CLI |
+| SQLite state cache | Two-phase sync/query; never dump raw kubectl to LLM |
+| Destructive operation controls | Blast radius classification, dry-run gate, pre-destroy snapshot |
+| Vault-managed ArgoCD deploy keys | ESO → K8s secrets in `cicd` ns; no key files on disk |
+| `deploy_cert_manager` plugin | cert-manager + ACME for external certs (SC-081 readiness) |
 
 ---
 
 ## Open Items
 
-- [x] Task 13: Infra cluster rebuilt on M2 Air (Codex) — Tasks 1–4 PASS
-- [x] Task 14: `add_ubuntu_k3s_cluster` rewritten with auto-export (Codex) — PASS
-- [x] Task 15: ArgoCD GitHub auth + Ubuntu cluster registration + app sync (Gemini) — PASS
-- [x] v0.7.3 PR — open, Copilot tagged (PR #27)
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
-
-### Task 13 status (Codex — 2026-03-10) ✅ Tasks 1–4
-
-- Infra cluster tear-down/redeploy on M2 Air: PASS
-- Vault/ESO/Istio/ArgoCD/Jenkins/OpenLDAP all running, namespace health clean
-- Blocked at Task 5: wrong context name (`k3s-automation` → actual name is `default`) + no GitHub SSH credentials in ArgoCD → handed to Gemini as Task 15
-
-### Task 14 status (Codex — 2026-03-10) ✅ Code complete
-
-- vars added to `scripts/etc/k3s/vars.sh`: PASS
-- `add_ubuntu_k3s_cluster` rewritten with SSH export: PASS
-- shellcheck `scripts/plugins/shopping_cart.sh`: PASS — clean
-- shellcheck `scripts/etc/k3s/vars.sh`: PASS — clean
-- Ubuntu prerequisite applied ✅ (Task 15 Task 1 complete — `/home/parallels/.kube/k3s.yaml` exists)
-
-### Task 15 status (Gemini — 2026-03-10) ✅ PASS
-
-- **Ubuntu kubeconfig prerequisite:** PASS (Task 1 completed via SSH with sudo)
-- **Kubeconfig exported to M2 Air:** PASS (`~/.kube/k3s-ubuntu.yaml` created)
-- **k3s context name:** `default`
-- **ArgoCD GitHub SSH credentials added:** PASS (Unique Deploy Keys for 5 repos)
-- **Ubuntu cluster registered:** PASS (`ubuntu-k3s` is Ready in ArgoCD)
-- **Shopping cart apps registered (5/5):** PASS (Registered and Synced)
-- **Shopping cart apps synced:** PASS (Synced to SSH URLs)
-- **Pods on Ubuntu:** Running (Verified with `kubectl get pods -A`; `ImagePullBackOff` expected until CI/CD pushes images to ghcr.io)
-- **ArgoCD Sync:** SUCCESS (Primary goal achieved — all applications Synced and Healthy/Progressing)
-- **BATS:** 158/158 tests passing on M2 Air (using Bash 5.0+)
+- [ ] Shopping cart repo hygiene: branch protection on all 5 repos (automate via `gh api`)
+- [ ] v0.8.0 planning: write implementation spec for k3dm-mcp
 
 ---
 
@@ -73,19 +38,17 @@ on M2 Air (Task 13). Ruled out: TLS SAN, iptables/ufw, MTU fragmentation.
 
 | Version | Status | Notes |
 |---|---|---|
-| v0.1.0–v0.7.2 | released | See CHANGE.md |
-| v0.7.3 | **active** | Shopping cart CI/CD + cluster rebuild |
-| v0.8.0 | planned | Lean MCP server (`k3dm-mcp`) — local clusters |
+| v0.1.0–v0.7.3 | released | See CHANGE.md |
+| v0.8.0 | **active** | Lean MCP server (`k3dm-mcp`) — discrete repo |
 | v0.9.0 | planned | Messaging gateway (Slack) — natural language cluster ops |
 | v1.0.0 | vision | Multi-cloud providers (EKS/GKE/AKS) + ACG sandbox lifecycle |
 
 ---
 
-## Cluster State (Task 15 in progress — 2026-03-10)
+## Cluster State (as of 2026-03-11 — post v0.7.3)
 
-**Architecture:** Infra cluster on M2 Air (not M4 Air) — ArgoCD needs direct access to
-Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air's network).
-M4 Air has its own local k3d cluster for dev only — not the infra cluster.
+**Architecture:** Infra cluster on M2 Air — ArgoCD manages Ubuntu k3s hub-and-spoke.
+Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
 
 ### Infra Cluster — k3d on OrbStack on M2 Air (context: `k3d-k3d-cluster`)
 
@@ -109,7 +72,7 @@ M4 Air has its own local k3d cluster for dev only — not the infra cluster.
 | Vault | Initialized + Unsealed |
 | OpenLDAP | Running — `identity` ns |
 | shopping-cart-data | Running ✅ |
-| shopping-cart-apps | BLOCKED — ArgoCD sync pending (Task 15) |
+| shopping-cart-apps | Synced via ArgoCD ✅ — `ImagePullBackOff` until CI/CD pushes images |
 
 **SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
 **Ubuntu interface:** `enp0s5` (not eth0) — MTU 1500. k3s uses flannel (MTU 1450).
@@ -179,11 +142,12 @@ Owner
 - Gemini expands scope — spec must explicitly state what is forbidden.
 - Gemini over-reports test success with ambient env vars — always verify with `env -i`.
 - `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override.
-- Gemini made unauthorized code fixes in Task 6 — Claude must verify against Codex's commits before merge.
 - Gemini confirms plan correctly but executes differently — confirmation is not reliable, verify actual output.
-- Gemini does not verify machine context — Task 13 failures caused by session running on Ubuntu, not M2 Air.
+- Gemini does not verify machine context — must open terminal on M2 Air before starting Gemini session.
 - One command at a time for Gemini on complex tasks — no branching specs.
 - BATS count: 158 total, ~108 pass with `env -i` (50 skip due to env-dependent tests) — expected, not a bug.
+- ArgoCD deploy keys: per-repo, passphrase-free, added via `gh api` — GitHub forbids reusing same key across repos.
+- k3s context name is always `default` — never `k3s-automation`.
 
 ---
 
@@ -193,9 +157,6 @@ Owner
 2. Create GitHub release: `gh release create v<X.Y.Z> --title "v<X.Y.Z> — <title>" --notes "..."`
 3. Update README.md Releases table on the next feature branch
 4. Verify `gh release list` shows new version as Latest
-
-**Why:** v0.7.0, v0.7.1, v0.7.2 were all merged without releases — discovered 2026-03-10.
-Tags and releases do NOT affect branches or commits — safe to create after the fact.
 
 ---
 
