@@ -4,17 +4,25 @@ set -euo pipefail
 function add_ubuntu_k3s_cluster() {
   local ssh_host="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
   local ssh_user="${UBUNTU_K3S_SSH_USER:-parallels}"
-  local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-10.211.55.14}"
+  local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-${ssh_host}}"
   local remote_kubeconfig="${UBUNTU_K3S_REMOTE_KUBECONFIG:-/home/${ssh_user}/.kube/k3s.yaml}"
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
+  local ssh_target="${ssh_user}@${ssh_host}"
 
-  _info "[shopping_cart] Exporting Ubuntu k3s kubeconfig from ${ssh_host}"
+  case "${remote_kubeconfig}" in
+    (*[!A-Za-z0-9_./-]*)
+      _err "[shopping_cart] Unsafe characters in UBUNTU_K3S_REMOTE_KUBECONFIG: ${remote_kubeconfig}"
+      return 1
+      ;;
+  esac
+
+  _info "[shopping_cart] Exporting Ubuntu k3s kubeconfig from ${ssh_target}"
   mkdir -p "$(dirname "${local_kubeconfig}")"
 
 # shellcheck disable=SC2029
-  if ! ssh "${ssh_host}" "cat ${remote_kubeconfig}" 2>/dev/null \
+  if ! ssh "${ssh_target}" "cat ${remote_kubeconfig}" 2>/dev/null \
       | sed "s|127.0.0.1|${external_ip}|g" > "${local_kubeconfig}"; then
-    _err "[shopping_cart] Failed to export kubeconfig from ${ssh_host}:${remote_kubeconfig}"
+    _err "[shopping_cart] Failed to export kubeconfig from ${ssh_target}:${remote_kubeconfig}"
     _err "[shopping_cart] Ensure ${ssh_user} can read ${remote_kubeconfig} on ${ssh_host}"
     return 1
   fi
@@ -26,8 +34,22 @@ function add_ubuntu_k3s_cluster() {
     return 1
   fi
 
-  _info "[shopping_cart] Registering Ubuntu k3s cluster with ArgoCD"
-  KUBECONFIG="${local_kubeconfig}" _run_command -- argocd cluster add k3s-automation \
+  local kube_context
+  if [[ -n "${UBUNTU_K3S_CONTEXT:-}" ]]; then
+    kube_context="${UBUNTU_K3S_CONTEXT}"
+  else
+    if ! kube_context=$(KUBECONFIG="${local_kubeconfig}" kubectl config current-context 2>/dev/null); then
+      _err "[shopping_cart] Failed to determine current context from ${local_kubeconfig}"
+      return 1
+    fi
+    if [[ -z "${kube_context}" ]]; then
+      _err "[shopping_cart] kubeconfig ${local_kubeconfig} has no current-context configured"
+      return 1
+    fi
+  fi
+
+  _info "[shopping_cart] Registering Ubuntu k3s cluster with ArgoCD using context ${kube_context}"
+  KUBECONFIG="${local_kubeconfig}" _run_command -- argocd cluster add "${kube_context}" \
     --name ubuntu-k3s \
     --kubeconfig "${local_kubeconfig}"
 }
