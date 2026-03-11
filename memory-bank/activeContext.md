@@ -34,8 +34,8 @@ on M2 Air (Task 13). Ruled out: TLS SAN, iptables/ufw, MTU fragmentation.
 
 - [x] Task 13: Infra cluster rebuilt on M2 Air (Codex) — Tasks 1–4 PASS
 - [x] Task 14: `add_ubuntu_k3s_cluster` rewritten with auto-export (Codex) — PASS
-- [ ] Task 15: ArgoCD GitHub auth + Ubuntu cluster registration + app sync (Gemini) — spec: `docs/plans/v0.7.3-gemini-task15-argocd-registration.md`
-- [ ] v0.7.3 PR — open after Task 15, tag Copilot for review
+- [x] Task 15: ArgoCD GitHub auth + Ubuntu cluster registration + app sync (Gemini) — PASS
+- [x] v0.7.3 PR — open, Copilot tagged (PR #27)
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
