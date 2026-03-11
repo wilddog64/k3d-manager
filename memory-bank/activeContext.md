@@ -20,7 +20,9 @@
 | 5 | `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` | Codex | ✅ done |
 | 6 | Trivy restore + repin all 5 service repos | Codex | ✅ done — commit 981008c |
 | 7–12 | ArgoCD→Ubuntu connectivity investigation | Gemini | ✅ done — root cause found |
-| 13 | Rebuild infra cluster on M2 Air + ArgoCD→Ubuntu registration + app sync | Codex | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task13-m2air-infra-rebuild.md` |
+| 13 | Rebuild infra cluster on M2 Air (Tasks 1–4) | Codex | ✅ done |
+| 14 | Fix `add_ubuntu_k3s_cluster` kubeconfig export | Codex | ✅ done |
+| 15 | ArgoCD GitHub auth + Ubuntu cluster registration + app sync | Gemini | 🔄 active — spec: `docs/plans/v0.7.3-gemini-task15-argocd-registration.md` |
 
 **Root cause (Tasks 7–12):** ArgoCD was on M4 Air which has no network route to Ubuntu
 (`10.211.55.14` is a Parallels VM only reachable from M2 Air). Fix: rebuild infra cluster
@@ -50,16 +52,21 @@ on M2 Air (Task 13). Ruled out: TLS SAN, iptables/ufw, MTU fragmentation.
 - `add_ubuntu_k3s_cluster` rewritten with SSH export: PASS
 - shellcheck `scripts/plugins/shopping_cart.sh`: PASS — clean
 - shellcheck `scripts/etc/k3s/vars.sh`: PASS — clean
-- Dry-run blocked: Ubuntu prerequisite not yet applied (owner must run `sudo cp` on Ubuntu first — Task 15 Task 1)
+- Ubuntu prerequisite applied ✅ (Task 15 Task 1 complete — `/home/parallels/.kube/k3s.yaml` exists)
 
-### Task 15 (Gemini — assigned 2026-03-10)
+### Task 15 status (Gemini — 2026-03-10) 🛑 BLOCKED
 
-ArgoCD GitHub SSH auth + Ubuntu cluster registration + shopping cart app sync.
-Spec: `docs/plans/v0.7.3-gemini-task15-argocd-registration.md`
-
-**Known issues to fix:**
-- k3s context name is `default` not `k3s-automation` — use `argocd cluster add default`
-- ArgoCD has no GitHub credentials — add SSH key via `argocd repo add`
+- **Ubuntu kubeconfig prerequisite:** PASS (Task 1 completed via SSH with sudo)
+- **Kubeconfig exported to M2 Air:** FAIL (Blocked: currently running on `m4-air.local`)
+- **Blocker:** M4 Air cannot reach Ubuntu API server at `10.211.55.14:6443` (dial tcp timeout). 
+- **Required Action:** Task 15 must be executed on **macOS M2 Air ONLY** as per specification.
+- **k3s context name:** Unknown (export failed)
+- **ArgoCD GitHub SSH credential added:** PENDING
+- **Ubuntu cluster registered:** PENDING
+- **Shopping cart apps registered (5/5):** PENDING
+- **Shopping cart apps synced:** PENDING
+- **Pods on Ubuntu:** Running (Manual check: `ssh ubuntu "kubectl get pods"` PASS)
+- **BATS:** PENDING
 
 ---
 
@@ -75,7 +82,7 @@ Spec: `docs/plans/v0.7.3-gemini-task15-argocd-registration.md`
 
 ---
 
-## Cluster State (Task 13 in progress — 2026-03-10)
+## Cluster State (Task 15 in progress — 2026-03-10)
 
 **Architecture:** Infra cluster on M2 Air (not M4 Air) — ArgoCD needs direct access to
 Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air's network).
@@ -103,7 +110,7 @@ M4 Air has its own local k3d cluster for dev only — not the infra cluster.
 | Vault | Initialized + Unsealed |
 | OpenLDAP | Running — `identity` ns |
 | shopping-cart-data | Running ✅ |
-| shopping-cart-apps | BLOCKED — ArgoCD sync pending (Task 13) |
+| shopping-cart-apps | BLOCKED — ArgoCD sync pending (Task 15) |
 
 **SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
 **Ubuntu interface:** `enp0s5` (not eth0) — MTU 1500. k3s uses flannel (MTU 1450).
@@ -138,9 +145,10 @@ Claude
 Gemini  (SDET + Red Team)
   -- single-step verification: BATS, pod status checks, pre-commit hook smoke tests
   -- red-team / security audit
+  -- ArgoCD/kubectl ops when each step is isolated and machine context is confirmed
   -- commits own work; updates memory-bank to report completion
   -- must push to remote before updating memory-bank
-  -- NOT suited for multi-step cluster rebuild or orchestration tasks
+  -- MUST run hostname && uname -n first — has repeatedly started on wrong machine
 
 Codex  (Production Code + Cluster Ops)
   -- pure logic fixes and feature implementation
