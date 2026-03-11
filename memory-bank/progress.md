@@ -75,11 +75,20 @@ Full details: `docs/issues/2026-03-11-shopping-cart-ci-failures.md`
   - No force push, no branch deletion
   - Script location: `scripts/plugins/shopping_cart.sh` → new function `configure_shopping_cart_branch_protection`
 
+**P4 — Add missing linters after CI is green (copilot-instructions enforcement):**
+- [ ] `shopping-cart-basket` — Add `golangci-lint` + `go vet` to `go-ci.yml` (currently only `go test` runs — no static analysis)
+- [ ] `shopping-cart-order` — Add Checkstyle + OWASP dependency check to `ci.yml` (payment has OWASP, order does not)
+- [ ] `shopping-cart-product-catalog` — Add `ruff check`, `mypy`, `black --check` to `ci.yml` (none of the required linters are currently enforced)
+- [ ] `shopping-cart-payment` — Add Checkstyle/SpotBugs (OWASP already present; mvnw fix is P2 prerequisite)
+- (frontend already enforces ESLint + Prettier + `tsc --noEmit` — no gap once P1 fix applied)
+
 ### Priority 3 — Shopping Cart Hygiene
 
-- [ ] Google Antigravity: shopping-cart-frontend E2E testing (once frontend stable)
-- [ ] Google Antigravity: shopping-cart-frontend E2E testing (once frontend stable)
-- [ ] Google Antigravity: ACG sandbox login + credential extraction (v1.0.0)
+- [ ] Google Antigravity: E2E testing inside cluster (deferred to v0.8.1 — services must be running first)
+  - Prerequisite chain: CI green → images in ghcr.io → ArgoCD syncs → services running → branch protection on → then Antigravity
+  - Design: runs as Kubernetes `Job` in `shopping-cart-testing` namespace; Chrome inside container (`mcr.microsoft.com/playwright`); `--no-sandbox` + `/dev/shm` emptyDir required
+  - M5 Mac mini (Oct 2026): revisit parallel Chrome instances + multi-node tactics when hardware upgrades
+- [ ] Google Antigravity: ACG sandbox login + credential extraction (v1.0.0 concern — not v0.8.x)
 
 ---
 

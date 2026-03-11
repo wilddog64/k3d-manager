@@ -78,9 +78,45 @@ ACME_EMAIL=user@example.com ./scripts/k3d-manager deploy_cert_manager
 - Route bare sudo in `_install_debian_helm` / `_install_debian_docker` through `_run_command`
 - Add `.github/copilot-instructions.md` to lib-foundation
 
-### Shopping Cart Repo Hygiene
-- Branch protection on all 5 shopping-cart repos — automate via `gh api` script
-- Require PR + CI pass + no force push + no deletion on `main`
+### Shopping Cart CI Stabilization + Code Quality Gates
+
+Execution order is fixed — each step unblocks the next:
+
+1. **Fix CI failures (P1 first, P2 second):**
+   - basket + product-catalog: replace custom Trivy install with `aquasecurity/trivy-action@0.30.0` in infra workflow
+   - frontend: remove unused imports + add `"types": ["vite/client"]` to tsconfig
+   - payment: fix `mvnw` init failure
+   - order: publish `rabbitmq-client-java` to GitHub Packages or add CI pre-install step
+
+2. **Add missing linters (after CI is green):**
+   - basket: `golangci-lint` + `go vet`
+   - order: Checkstyle + OWASP dependency check
+   - product-catalog: `ruff check` + `mypy` + `black --check`
+   - payment: Checkstyle/SpotBugs (OWASP already present)
+   - frontend: already enforces ESLint + Prettier + `tsc --noEmit`
+
+3. **Branch protection (after linters pass):**
+   - All 5 repos: require PR, required status checks, no force push, dismiss stale reviews
+   - Automated via `configure_shopping_cart_branch_protection` in `scripts/plugins/shopping_cart.sh`
+
+### Shopping Cart E2E — Antigravity (deferred to v0.8.1)
+
+Antigravity runs as a Kubernetes `Job` inside the cluster — Chrome bundled in container image,
+no browser dependency on dev machines or CI runners.
+
+**Prerequisite chain:** CI green → images in ghcr.io → ArgoCD syncs → services running in cluster →
+branch protection enforced → then Antigravity can test against live services.
+
+**Design:**
+- Namespace: `shopping-cart-testing` (isolated from `shopping-cart-apps`)
+- Image: `mcr.microsoft.com/playwright` (bundles Chrome + all deps)
+- Chrome flags: `--no-sandbox` (required in containers), `/dev/shm` enlarged via `emptyDir` volume
+- Trigger: post-sync ArgoCD hook or manual `antigravity_run` via `shopping_cart.sh` plugin
+- Lab environment: no `ResourceQuota` needed — services are idle during test runs
+
+**Hardware note:** M5 Mac mini (Oct 2026) — revisit parallel Chrome instances and multi-node
+worker pool when hardware upgrades. Current 2-core Ubuntu k3s node is sufficient for
+single-instance sequential test runs.
 
 ---
 
