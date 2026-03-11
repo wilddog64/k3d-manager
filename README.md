@@ -339,25 +339,22 @@ Detailed design, planning, and troubleshooting references live under `docs/`. Us
 - **[Jenkins Authentication Analysis](docs/architecture/JENKINS_AUTHENTICATION_ANALYSIS.md)** - Survey of supported Jenkins auth backends and trade-offs
 
 ### Planning Documents
+- **[Strategic Roadmap v1.0](docs/plans/roadmap-v1.md)** - Full roadmap: v0.8.0 MCP server, v0.9.0 messaging gateway, v1.0.0 multi-cloud
+- **[Two-Cluster Architecture](docs/plans/two-cluster-infra.md)** - Infra cluster (M2 Air) + app cluster (Ubuntu k3s) design
+- **[CI/CD Workflow](docs/plans/ci-workflow.md)** - GitHub Actions reusable workflow for shopping cart services
+- **[Shopping Cart CI/CD](docs/plans/v0.7.3-shopping-cart-cicd.md)** - v0.7.3 shopping cart pipeline implementation plan
+- **[Cloud Architecture](docs/plans/cloud-architecture.md)** - Multi-cloud provider extension design
 - **[Directory Service Interface](docs/plans/directory-service-interface.md)** - Shared contract for OpenLDAP, AD, and Azure AD implementations
 - **[Active Directory Integration](docs/plans/active-directory-integration.md)** - Plan for wiring Jenkins to enterprise AD
 - **[Active Directory Testing Strategy](docs/plans/active-directory-testing-strategy.md)** - Test matrix for validating AD scenarios locally
-- **[Explicit Directory Service Commands](docs/plans/explicit-directory-service-commands.md)** - CLI roadmap for directory-focused helpers
 - **[LDAP Integration](docs/plans/ldap-integration.md)** - Tasks required to harden the LDAP stack
 - **[LDAP + Jenkins Integration](docs/plans/ldap-jenkins-integration.md)** - Jenkins-facing LDAP wiring plan
-- **[Jenkins Authentication Analysis](docs/plans/jenkins-authentication-analysis.md)** - Gap assessment to reach production-ready auth
 - **[Jenkins K8s Agents & SMB CSI](docs/plans/jenkins-k8s-agents-and-smb-csi.md)** - Persistent storage + agent topology plan
-- **[SMB CSI Mac Integration](docs/plans/smb-csi-mac-integration.md)** - SMB CSI driver setup using Mac as SMB server
-- **[Jenkins Security Enhancements](docs/plans/jenkins-security-enhancements.md)** - Follow-up items to raise Jenkins posture
-- **[Jenkins Smoke Test Implementation](docs/plans/jenkins-smoke-test-implementation.md)** - Automated validation coverage proposal
-- **[Jenkins TOTP MFA](docs/plans/jenkins-totp-mfa.md)** - Phased rollout for time-based MFA
-- **[Remaining Tasks Priority](docs/plans/remaining-tasks-priority.md)** - Backlog ordering for near-term milestones
 - **[Secret Backend Interface](docs/plans/secret-backend-interface.md)** - Multi-backend secret management abstraction
 - **[Vault Resilience](docs/plans/vault-resilience.md)** - Hardening plan for Vault HA + recovery paths
 
 ### Developer Guides
 - **[CLAUDE.md](CLAUDE.md)** - Project overview and development guidelines for Claude Code
-- **[AGENTS.md](AGENTS.md)** - Code style principles and contribution guidelines specific to Codex agents
 
 ### Implementation Documentation
 - **[Vault Agent Sidecar Implementation](docs/implementations/vault-sidecar-implementation.md)** - LDAP password injection via Vault agent sidecar
@@ -372,10 +369,14 @@ Detailed design, planning, and troubleshooting references live under `docs/`. Us
 - **[LDAP Users CSV](docs/examples/ldap-users-example.csv)** - Fixture dataset for directory import tests
 
 ### Issue Logs
+- **[ArgoCD Registration Challenges](docs/issues/2026-03-10-task15-argocd-registration-challenges.md)** - Bash 3.2 compat, passphrase keys, deploy key reuse, HTTPS/SSH URL mismatch
+- **[_run_command If-Count Refactor](docs/issues/2026-03-08-run-command-if-count-refactor.md)** - Tracked debt for lib-foundation v0.3.0
+- **[deploy_cluster If-Count Violation](docs/issues/2026-03-07-deploy-cluster-if-count-violation.md)** - Refactored 12→5 if-blocks in v0.7.0
+- **[Agent Audit awk macOS Compat](docs/issues/2026-03-07-agent-audit-awk-macos-compat.md)** - BSD awk rejection of multi-param UDF; replaced with pure bash
+- **[ArgoCD Redis Init Istio Hang](docs/issues/2026-03-01-argocd-redis-init-istio-hang.md)** - Istio sidecar blocks redis-secret-init Job; fixed via annotation
 - **[ESO SecretStore Not Ready](docs/issues/2025-10-19-eso-secretstore-not-ready.md)** - Timeline and fix for ESO readiness
 - **[LDAP Bind DN Mismatch](docs/issues/2025-10-20-ldap-bind-dn-mismatch.md)** - Debug notes on LDAP DN drift
 - **[Jenkins Pod Readiness Timeout](docs/issues/2025-11-07-jenkins-pod-readiness-timeout.md)** - Investigation into slow pod startups
-- **[LDAP Empty Directory (No Users)](docs/issues/2025-11-11-ldap-empty-directory-no-users.md)** - RCA for missing seeded users
 - **[LDAP Password envsubst Issue](docs/issues/2025-11-21-ldap-password-envsubst-issue.md)** - Shell templating bug report
 - **[Cert Rotation Fixes](docs/issues/2025-11-21-cert-rotation-fixes.md)** - Follow-up changes after cert rotation incidents
 
