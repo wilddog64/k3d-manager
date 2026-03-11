@@ -45,6 +45,7 @@
 - [x] Gemini: Task 10 — MSS clamp fix on Ubuntu (PASS — rule applied/removed; block persists)
 - [x] Gemini: Task 11 — SSH Reverse Tunnel + Local Handshake (Ubuntu -> Mac) (PASS — boundary bypassed; handshake fails)
 - [x] Gemini: Re-trigger CI with Trivy restored + investigate ArgoCD connectivity (PASS)
+- [ ] Gemini: Task 15 — ArgoCD GitHub auth + Ubuntu cluster registration + app sync (🛑 BLOCKED: running on M4 Air, route to 10.211.55.14:6443 missing)
 
 ### Priority 2 — lib-foundation
 
@@ -88,6 +89,9 @@
 - [ ] Destructive operation controls — blast radius classification, dry-run gate, pre-destroy snapshot, independent confirmation per call
   - Motivated by real AI+Terraform incident (production DB + snapshots deleted, no recovery)
   - Full decision: `docs/plans/roadmap-v1.md` → v0.8.0 Destructive Operation Controls section
+- [ ] Vault-managed ArgoCD deploy keys — ESO syncs SSH keys from Vault KV to `cicd` ns secrets; ArgoCD reads from K8s secrets; no key files on disk; rotation via single Vault KV update
+  - Motivated by: empty-passphrase deploy keys discovered during v0.7.3
+  - Full decision: `docs/plans/roadmap-v1.md` → v0.8.0 Vault-Managed ArgoCD Deploy Keys section
 - [ ] `deploy_cert_manager` plugin — cert-manager + ACME/Let's Encrypt for external-facing certs (SC-081 readiness)
   - Two-issuer: Vault PKI for internal, cert-manager for external ingress
   - Provider-aware: ACM (EKS), GCP Certificate Manager (GKE), Key Vault (AKS) in v1.0.0
