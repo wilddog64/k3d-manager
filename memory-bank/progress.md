@@ -66,9 +66,18 @@ Full details: `docs/issues/2026-03-11-shopping-cart-ci-failures.md`
 - [ ] `shopping-cart-payment` — Verify `mvnw` + `.mvn/wrapper/maven-wrapper.properties` committed; add `-Dmaven.multiModuleProjectDirectory=.` to CI Maven command if needed
 - [ ] `shopping-cart-order` — Publish `rabbitmq-client-java` to GitHub Packages, or restructure as multi-module Maven project, or add CI step to build+install before order service build
 
+**P3 — Enforce after CI is green (all 5 repos):**
+- [ ] Branch protection on all 5 shopping-cart repos via `gh api` script (must do after CI is green so required status checks have a passing job to reference):
+  - Require PR before merging to `main` (no direct push)
+  - Require status checks to pass: CI build + test job (per-repo job name)
+  - Require branches to be up to date before merging
+  - Dismiss stale reviews on new commits
+  - No force push, no branch deletion
+  - Script location: `scripts/plugins/shopping_cart.sh` → new function `configure_shopping_cart_branch_protection`
+
 ### Priority 3 — Shopping Cart Hygiene
 
-- [ ] Branch protection on all 5 shopping-cart repos — automate via `gh api` script
+- [ ] Google Antigravity: shopping-cart-frontend E2E testing (once frontend stable)
 - [ ] Google Antigravity: shopping-cart-frontend E2E testing (once frontend stable)
 - [ ] Google Antigravity: ACG sandbox login + credential extraction (v1.0.0)
 
