@@ -53,6 +53,19 @@
 - [ ] Route bare sudo in `_install_debian_helm` / `_install_debian_docker` through `_run_command`
 - [ ] Add `.github/copilot-instructions.md` to lib-foundation
 
+### Priority 1b — Shopping Cart CI Stabilization (v0.8.0 milestone)
+
+All 5 service repos have failing CI Publish jobs since 2026-03-09.
+Full details: `docs/issues/2026-03-11-shopping-cart-ci-failures.md`
+
+**P1 — Fix immediately (unblocks 3 of 5 services):**
+- [ ] `shopping-cart-basket` + `shopping-cart-product-catalog` — Replace custom Trivy install script with `aquasecurity/trivy-action@0.30.0` in `shopping-cart-infra/.github/workflows/build-push-deploy.yml`; update pinned commit hash in both caller workflows
+- [ ] `shopping-cart-frontend` — Remove unused imports (Header.tsx, ProtectedRoute.tsx, cartStore.ts); add `"types": ["vite/client"]` to `tsconfig.json`
+
+**P2 — Fix to complete the pipeline:**
+- [ ] `shopping-cart-payment` — Verify `mvnw` + `.mvn/wrapper/maven-wrapper.properties` committed; add `-Dmaven.multiModuleProjectDirectory=.` to CI Maven command if needed
+- [ ] `shopping-cart-order` — Publish `rabbitmq-client-java` to GitHub Packages, or restructure as multi-module Maven project, or add CI step to build+install before order service build
+
 ### Priority 3 — Shopping Cart Hygiene
 
 - [ ] Branch protection on all 5 shopping-cart repos — automate via `gh api` script
@@ -66,7 +79,11 @@
 | Item | Status | Notes |
 |---|---|---|
 | ArgoCD Cluster Registration Timeout | FIXED v0.7.3 | Root cause: infra on M4 Air had no route to Ubuntu. Fixed by rebuilding infra on M2 Air. |
-| Shopping Cart Apps ImagePullBackOff | OPEN | Images not yet pushed — CI/CD pipeline exists but no push trigger yet. |
+| Shopping Cart Apps ImagePullBackOff | OPEN | CI/CD failing — images not being pushed to ghcr.io. Blocked by CI failures below. |
+| Shopping Cart CI — Trivy install failure | OPEN P1 | basket + product-catalog: custom install script fails. Fix: use trivy-action in infra workflow. |
+| Shopping Cart CI — Frontend lint/type errors | OPEN P1 | Unused imports + missing vite/client types. Fix: remove imports, update tsconfig. |
+| Shopping Cart CI — Payment mvnw init | OPEN P2 | Maven wrapper fails to initialize. Fix: verify mvnw committed, set multiModuleProjectDirectory. |
+| Shopping Cart CI — Order missing rabbitmq-client | OPEN P2 | `rabbitmq-client:1.0.0-SNAPSHOT` not in any Maven repo. Fix: publish to GitHub Packages. |
 | Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps may exceed capacity — reduce replicas in ArgoCD manifests. |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround. |
 | BATS teardown `k3d-test-orbstack-exists` | FIXED v0.7.2 | `teardown_file()` in provider_contract.bats. |
