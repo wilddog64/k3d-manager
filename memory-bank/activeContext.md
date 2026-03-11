@@ -9,18 +9,19 @@
 
 ## Current Focus
 
-**v0.8.0: k3dm-mcp — Lean MCP Server**
+**v0.8.0: Security Hardening + lib-foundation Backlog**
 
 No tasks assigned yet. See `docs/plans/roadmap-v1.md` → v0.8.0 section for full scope.
 
 | Item | Notes |
 |---|---|
-| `k3dm-mcp` repo | Discrete repository (not a plugin in k3d-manager) |
-| Expose: deploy, destroy, test, unseal | As MCP tools wrapping k3d-manager CLI |
-| SQLite state cache | Two-phase sync/query; never dump raw kubectl to LLM |
-| Destructive operation controls | Blast radius classification, dry-run gate, pre-destroy snapshot |
-| Vault-managed ArgoCD deploy keys | ESO → K8s secrets in `cicd` ns; no key files on disk |
+| Vault-managed ArgoCD deploy keys | `configure_vault_argocd_repos`; ESO → K8s secrets in `cicd` ns |
 | `deploy_cert_manager` plugin | cert-manager + ACME for external certs (SC-081 readiness) |
+| lib-foundation v0.3.0 | `_run_command` if-count refactor + bare sudo routing |
+| Shopping cart branch protection | Automate via `gh api` across 5 repos |
+
+**k3dm-mcp is a separate repo** — starts after v0.8.0 ships.
+Repo: `~/src/gitrepo/personal/k3dm-mcp` | Roadmap: `k3dm-mcp/docs/plans/roadmap.md`
 
 ---
 
