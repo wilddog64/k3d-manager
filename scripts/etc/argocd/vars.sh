@@ -36,6 +36,10 @@ export ARGOCD_ADMIN_SECRET_NAME="${ARGOCD_ADMIN_SECRET_NAME:-argocd-admin-secret
 export ARGOCD_ADMIN_VAULT_PATH="${ARGOCD_ADMIN_VAULT_PATH:-argocd/admin}"
 export ARGOCD_ADMIN_PASSWORD_KEY="${ARGOCD_ADMIN_PASSWORD_KEY:-password}"
 export ARGOCD_VAULT_POLICY_PREFIX="${ARGOCD_VAULT_POLICY_PREFIX:-argocd/admin}"
+export ARGOCD_DEPLOY_KEY_SECRETSTORE="${ARGOCD_DEPLOY_KEY_SECRETSTORE:-argocd-deploy-key-store}"
+export ARGOCD_DEPLOY_KEY_ESO_SA="${ARGOCD_DEPLOY_KEY_ESO_SA:-eso-argocd-deploy-keys-sa}"
+export ARGOCD_DEPLOY_KEY_VAULT_ROLE="${ARGOCD_DEPLOY_KEY_VAULT_ROLE:-argocd-deploy-key-reader}"
+export ARGOCD_GITHUB_ORG="${ARGOCD_GITHUB_ORG:-wilddog64}"
 
 # LDAP secret (for Dex connector)
 export ARGOCD_LDAP_SECRET_NAME="${ARGOCD_LDAP_SECRET_NAME:-argocd-ldap-secret}"
