@@ -52,6 +52,8 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `create_az_sp` | `scripts/plugins/azure.sh` | Create an Azure service principal |
 | `deploy_azure_eso` | `scripts/plugins/azure.sh` | Deploy Azure ESO resources |
 | `eso_akv` | `scripts/plugins/azure.sh` | Manage Azure Key Vault ESO integration |
+| `configure_vault_argocd_repos` | `scripts/plugins/argocd.sh` | Configure Vault-managed deploy keys for ArgoCD repos |
+| `deploy_cert_manager` | `scripts/plugins/cert-manager.sh` | Install cert-manager and configure ACME ClusterIssuers |
 | `add_ubuntu_k3s_cluster` | `scripts/plugins/shopping_cart.sh` | Export Ubuntu kubeconfig and register cluster in ArgoCD |
 | `register_shopping_cart_apps` | `scripts/plugins/shopping_cart.sh` | Apply shopping cart ArgoCD Application CRs |
 | `hello` | `scripts/plugins/hello.sh` | Example plugin |
