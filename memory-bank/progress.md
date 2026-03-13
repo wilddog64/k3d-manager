@@ -43,6 +43,8 @@
   - Helm v1.20.0 + ACME HTTP-01 via Istio; BATS 10/10; shellcheck clean; all functions ≤ 4 ifs
   - IngressClass `istio` missing on M2 Air (Issue `2026-03-13`) — fixed with manual apply
   - Verify spec: `docs/plans/v0.8.0-gemini-cert-manager-verify.md`
+- [ ] Install tracked pre-commit hook on all machines — spec: `docs/plans/v0.8.0-codex-install-hooks.md`
+  - M4 Air: stale copy (missing subtree guard + `_agent_lint`); M2 Air: not installed; Ubuntu: unknown
 - [ ] lib-foundation v0.3.0 — `_run_command` if-count refactor
 - [ ] lib-foundation — sync `deploy_cluster` fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation — route bare sudo in `_install_debian_helm` / `_install_debian_docker`
