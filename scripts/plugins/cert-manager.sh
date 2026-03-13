@@ -146,13 +146,14 @@ function _cert_manager_apply_issuer() {
 
    local rendered
    rendered=$(mktemp -t cert-manager-issuer.XXXXXX.yaml)
+   # shellcheck disable=SC2064
+   trap "rm -f '$rendered'" RETURN
    envsubst "$whitelist" < "$template" > "$rendered"
    if [[ -n "${CERT_MANAGER_DEBUG_RENDER:-}" ]]; then
       cp "$rendered" "$CERT_MANAGER_DEBUG_RENDER" >/dev/null 2>&1 || true
    fi
    local rc=0
    _kubectl apply -f "$rendered" >/dev/null || rc=$?
-   rm -f "$rendered"
    return "$rc"
 }
 
