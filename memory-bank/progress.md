@@ -39,8 +39,9 @@
 
 - [x] Vault-managed ArgoCD deploy keys — committed `7785033` on `k3d-manager-v0.8.0`
   - `configure_vault_argocd_repos` + 6 helper refactors; BATS 8/8; shellcheck clean; all functions ≤ 8 ifs
-- [x] `deploy_cert_manager` plugin — committed `f4f84e3` on `k3d-manager-v0.8.0`
+- [ ] `deploy_cert_manager` plugin — committed `f4f84e3`; awaiting Gemini live cluster verify
   - Helm v1.20.0 + ACME HTTP-01 via Istio; BATS 10/10; shellcheck clean; all functions ≤ 4 ifs
+  - Verify spec: `docs/plans/v0.8.0-gemini-cert-manager-verify.md`
 - [ ] lib-foundation v0.3.0 — `_run_command` if-count refactor
 - [ ] lib-foundation — sync `deploy_cluster` fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation — route bare sudo in `_install_debian_helm` / `_install_debian_docker`
