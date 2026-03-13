@@ -16,8 +16,8 @@ work is independent and runs after these two are merged.
 
 | Item | Status | Spec | Notes |
 |---|---|---|---|
-| Vault-managed ArgoCD deploy keys | **SPEC READY → Codex** | `docs/plans/v0.8.0-vault-argocd-deploy-keys.md` | New fn `configure_vault_argocd_repos` in `argocd.sh` |
-| `deploy_cert_manager` plugin | **SPEC READY → Codex** | `docs/plans/v0.8.0-cert-manager.md` | Replace stub in `cert-manager.sh`; cert-manager v1.20.0 + ACME |
+| Vault-managed ArgoCD deploy keys | **CODEX DONE — awaiting commit window** | `docs/plans/v0.8.0-codex-if-count-fix.md` | if-count refactor completed, shellcheck clean, BATS 8/8 (`scripts/tests/plugins/argocd_deploy_keys.bats`) |
+| `deploy_cert_manager` plugin | **SPEC READY → Codex** | `docs/plans/v0.8.0-cert-manager.md` | Starts after deploy-keys lands |
 | lib-foundation v0.3.0 | pending | `docs/issues/2026-03-08-run-command-if-count-refactor.md` | `_run_command` if-count refactor + bare sudo routing |
 | Shopping cart branch protection | pending | — | Automate via `gh api` across 5 repos; blocked until CI green |
 
@@ -28,6 +28,7 @@ Repo: `~/src/gitrepo/personal/k3dm-mcp` | Roadmap: `k3dm-mcp/docs/plans/roadmap.
 
 ## Open Items
 
+- [x] **Fix if-count violations in `argocd.sh`** — spec: `docs/plans/v0.8.0-codex-if-count-fix.md`; helpers extracted, shellcheck clean, BATS 8/8, `AGENT_AUDIT_MAX_IF=8` audit ✅ (commit blocked locally by index.lock)
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
