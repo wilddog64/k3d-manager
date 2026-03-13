@@ -16,8 +16,7 @@ the shopping cart pipeline and cleaning up lib-foundation debt.
 
 | Item | Status | Notes |
 |---|---|---|
-| Shopping cart CI — P1 fixes | **in progress** | Frontend PR #1 blocked on ESLint `react-refresh/only-export-components` warnings; product-catalog PR #1 passes CI, awaiting merge |
-| Shopping cart CI — P2 fixes | **in progress** | rabbitmq-client-java ✅ published; payment + order blocked on `packages: read` permission + rabbitmq version mismatch — Round 3 spec at `shopping-cart-infra/docs/plans/ci-stabilization-round3.md` (c5797539) |
+| Shopping cart CI stabilization | **in progress** | Tracked in `wilddog64/shopping-cart-infra` memory-bank. Round 3 spec: `docs/plans/ci-stabilization-round3.md` (c5797539) |
 | Shopping cart linters (P4) | pending | After CI green — golangci-lint, ruff, checkstyle etc |
 | Shopping cart branch protection | pending | After CI green + linters pass |
 | lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
@@ -27,12 +26,7 @@ the shopping cart pipeline and cleaning up lib-foundation debt.
 
 ## Open Items
 
-- [ ] Shopping cart CI — fix Trivy action in `shopping-cart-infra/.github/workflows/build-push-deploy.yml` (P1)
-- [ ] Shopping cart CI — frontend unused imports + tsconfig vite/client types (P1) — PR #1 open, ESLint `react-refresh/only-export-components` warnings block lint job
-- [ ] Shopping cart CI — payment (P2) — Round 3: change rabbitmq version to SNAPSHOT + add GitHub Packages repo + `packages: read` permission — spec: `shopping-cart-infra/docs/plans/ci-stabilization-round3.md` (c5797539)
-- [ ] Shopping cart CI — order (P2) — Round 3: add `packages: read` to build job permissions — spec: `shopping-cart-infra/docs/plans/ci-stabilization-round3.md` (c5797539)
-- [ ] Shopping cart linters — basket: golangci-lint + go vet; order: Checkstyle+OWASP; product-catalog: ruff+mypy+black (P4)
-- [ ] Shopping cart branch protection — all 5 repos via `gh api` (after CI green)
+- [ ] Shopping cart CI stabilization — see `wilddog64/shopping-cart-infra` memory-bank for detailed status
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`

@@ -42,18 +42,9 @@
 
 ### Priority 1 — v0.9.0 (active)
 
-**Shopping Cart CI Stabilization:** (branch `fix/ci-stabilization` on each repo)
-
-- [ ] **P1** — frontend: Remove unused imports (Header.tsx, ProtectedRoute.tsx, cartStore.ts); add `"types": ["vite/client"]` to tsconfig.json — PR https://github.com/wilddog64/shopping-cart-frontend/pull/1 open. Type check + tests pass; lint job fails with `react-refresh/only-export-components` warnings in `src/components/ui/Badge.tsx`, `Button.tsx`, `src/test/test-utils.tsx` (outside scope) — awaiting direction.
-- [ ] **P1** — product-catalog: `apt-get upgrade` in Dockerfile to fix Trivy HIGH/CRITICAL CVEs — PR https://github.com/wilddog64/shopping-cart-product-catalog/pull/1 open. Lint/Test/Build job green; waiting review/merge.
-- [ ] **P2** — payment: Round 3 spec at `shopping-cart-infra/docs/plans/ci-stabilization-round3.md` (c5797539). Fixes: change `rabbitmq-client.version` `1.0.0`→`1.0.0-SNAPSHOT`; add GitHub Packages repo + maven-settings.xml; add `packages: read` permission to build job.
-- [ ] **P2** — order: Round 3 spec at `shopping-cart-infra/docs/plans/ci-stabilization-round3.md` (c5797539). Fix: add `packages: read` permission to build job in ci.yml — GITHUB_TOKEN lacks cross-repo package read without explicit permission.
-- [x] **P2** — rabbitmq-client-java: Publish to GitHub Packages ✅ — PR #1 green, package published.
-- [ ] **P4** — basket: `golangci-lint` + `go vet` to `go-ci.yml`
-- [ ] **P4** — order: Checkstyle + OWASP dependency check to `ci.yml`
-- [ ] **P4** — product-catalog: `ruff check` + `mypy` + `black --check` to `ci.yml`
-- [ ] **P4** — payment: Checkstyle/SpotBugs (OWASP already present; mvnw fix is P2 prerequisite)
-- [ ] **P3** — Branch protection on all 5 repos via `gh api` (must do after CI green)
+**Shopping Cart CI Stabilization:**
+Tracked in `wilddog64/shopping-cart-infra` memory-bank — see `activeContext.md` + `progress.md` there.
+Round 3 spec: `docs/plans/ci-stabilization-round3.md` (commit c5797539).
 
 **lib-foundation Backlog:**
 - [ ] `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
