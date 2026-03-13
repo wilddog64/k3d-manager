@@ -99,24 +99,27 @@ Execution order is fixed — each step unblocks the next:
    - All 5 repos: require PR, required status checks, no force push, dismiss stale reviews
    - Automated via `configure_shopping_cart_branch_protection` in `scripts/plugins/shopping_cart.sh`
 
-### Shopping Cart E2E — Antigravity (deferred to v0.8.1)
+### Shopping Cart E2E — Playwright MCP (deferred to v0.8.1)
 
-Antigravity runs as a Kubernetes `Job` inside the cluster — Chrome bundled in container image,
-no browser dependency on dev machines or CI runners.
+`@playwright/mcp` runs **outside the cluster** on the dev machine. The AI client (Claude,
+Copilot, or Gemini CLI) drives browser automation via MCP tool calls. No Chrome-in-cluster
+needed — simpler, no resource pressure on Ubuntu k3s node.
 
-**Prerequisite chain:** CI green → images in ghcr.io → ArgoCD syncs → services running in cluster →
-branch protection enforced → then Antigravity can test against live services.
+**Prerequisite chain:** CI green → images in ghcr.io → ArgoCD syncs → services running →
+branch protection enforced → then Playwright MCP can test against live services.
 
 **Design:**
-- Namespace: `shopping-cart-testing` (isolated from `shopping-cart-apps`)
-- Image: `mcr.microsoft.com/playwright` (bundles Chrome + all deps)
-- Chrome flags: `--no-sandbox` (required in containers), `/dev/shm` enlarged via `emptyDir` volume
-- Trigger: post-sync ArgoCD hook or manual `antigravity_run` via `shopping_cart.sh` plugin
-- Lab environment: no `ResourceQuota` needed — services are idle during test runs
+- `@playwright/mcp` runs as a local process on dev machine
+- Browser connects to shopping-cart-frontend via `port-forward.sh` or Istio ingress
+- Tests live in `shopping-cart-e2e-tests/` repo (already has Playwright structure + flow specs)
+- Copilot already has Playwright MCP built in — zero extra setup for test generation
+- Trigger: manual via Claude/Copilot MCP session, or CI job that installs + runs Playwright
 
-**Hardware note:** M5 Mac mini (Oct 2026) — revisit parallel Chrome instances and multi-node
-worker pool when hardware upgrades. Current 2-core Ubuntu k3s node is sufficient for
-single-instance sequential test runs.
+**Hardware note:** M5 Mac mini (Oct 2026) — revisit parallel test execution when hardware upgrades.
+
+**Tool boundary:**
+- Playwright MCP → tests apps you own and control
+- Google Antigravity → interacts with third-party UIs you cannot control (ACG sandbox — v1.0.0)
 
 ---
 
@@ -218,7 +221,12 @@ Cloud credentials handled through Vault — never in config files or CLI args.
 
 **ACG login automation — Google Antigravity:**
 ACG has no public API for sandbox access — everything goes through the web UI.
-Google Antigravity (browser agent) automates the login and credential extraction:
+Google Antigravity (browser agent) automates the login and credential extraction.
+
+**Antigravity scope is strictly third-party UI automation** — it does NOT test shopping-cart
+apps. Shopping-cart E2E testing is handled by Playwright MCP (v0.8.1) which runs outside
+the cluster against services you own and control. Antigravity is only used where there is
+no API alternative (ACG web UI, similar third-party portals).
 
 ```
 Slack: "Start an AWS sandbox on ACG"
