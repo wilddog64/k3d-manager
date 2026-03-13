@@ -39,10 +39,11 @@
 
 - [x] Vault-managed ArgoCD deploy keys — committed `7785033` on `k3d-manager-v0.8.0`
   - `configure_vault_argocd_repos` + 6 helper refactors; BATS 8/8; shellcheck clean; all functions ≤ 8 ifs
-- [ ] `deploy_cert_manager` plugin — committed `f4f84e3`; **FAILED live cluster verify (Step 2)**
-  - Helm v1.20.0 + ACME HTTP-01 via Istio; BATS 10/10; shellcheck clean; all functions ≤ 4 ifs
-  - IngressClass `istio` missing on M2 Air — see `docs/issues/2026-03-13-istio-ingressclass-missing-on-m2-air.md`
-  - Verify spec: `docs/plans/v0.8.0-gemini-cert-manager-verify.md`
+- [ ] `deploy_cert_manager` plugin — committed `f4f84e3`; blocked on IngressClass fix
+  - Plugin code correct; Gemini verify failed: `istio` IngressClass missing from cluster
+  - Root cause: `_provider_k3d_configure_istio` never applies IngressClass after `istioctl install`
+  - Fix spec: `docs/plans/v0.8.0-codex-istio-ingressclass.md` → Codex adds `istio-ingressclass.yaml` + one line in k3d.sh
+  - After Codex fix: Gemini re-runs `docs/plans/v0.8.0-gemini-cert-manager-verify.md` (updated with manual apply step)
 - [ ] lib-foundation v0.3.0 — `_run_command` if-count refactor
 - [ ] lib-foundation — sync `deploy_cluster` fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation — route bare sudo in `_install_debian_helm` / `_install_debian_docker`
