@@ -2,14 +2,14 @@
 
 ## Overall Status
 
-**v0.7.3 SHIPPED** — squash-merged to main (9bca648), PR #27, 2026-03-11. Tagged + released.
-**v0.8.0 ACTIVE** — branch `k3d-manager-v0.8.0` cut from main 2026-03-11.
+**v0.8.0 SHIPPED** — squash-merged to main (aaf2aee), PR #28, 2026-03-13. Tagged + released.
+**v0.9.0 ACTIVE** — branch `k3d-manager-v0.9.0` cut from main 2026-03-13.
 
 ---
 
 ## What Is Complete
 
-### Released (v0.1.0 – v0.7.3)
+### Released (v0.1.0 – v0.8.0)
 
 - [x] k3d/OrbStack/k3s cluster provider abstraction
 - [x] Vault PKI, ESO, Istio, Jenkins, OpenLDAP, ArgoCD, Keycloak (infra cluster)
@@ -30,79 +30,42 @@
 - [x] Reusable GitHub Actions CI/CD workflow — build + Trivy + ghcr.io push + kustomize update (v0.7.3)
 - [x] ArgoCD: `ubuntu-k3s` registered, all 5 shopping-cart apps Synced (v0.7.3)
 - [x] Infra cluster rebuilt on M2 Air — ArgoCD→Ubuntu connectivity fixed (v0.7.3)
+- [x] Vault-managed ArgoCD deploy keys — `configure_vault_argocd_repos` + 6 helper refactors; BATS 8/8 (v0.8.0)
+- [x] `deploy_cert_manager` plugin — cert-manager v1.20.0 + ACME HTTP-01 via Istio; BATS 10/10; live cluster verify PASS (v0.8.0)
+- [x] `istio-ingressclass.yaml` — auto-applied by `_provider_k3d_configure_istio`; BATS 4/4 (v0.8.0)
+- [x] `scripts/hooks/install-hooks.sh` — symlink tracked pre-commit hook; M4 Air verified (v0.8.0)
+- [x] `docs/api/functions.md` — full public functions reference added (v0.8.0)
 
 ---
 
 ## What Is Pending
 
-### Priority 1 — v0.8.0 (active)
+### Priority 1 — v0.9.0 (active)
 
-- [x] Vault-managed ArgoCD deploy keys — committed `7785033` on `k3d-manager-v0.8.0`
-  - `configure_vault_argocd_repos` + 6 helper refactors; BATS 8/8; shellcheck clean; all functions ≤ 8 ifs
-- [x] `deploy_cert_manager` plugin — committed `f4f84e3`; **live cluster verify PASS (M2 Air)**
-  - Helm v1.20.0 + ACME HTTP-01 via Istio; BATS 10/10; shellcheck clean; all functions ≤ 4 ifs
-  - IngressClass `istio` missing on M2 Air (Issue `2026-03-13`) — fixed with manual apply
-  - Verify spec: `docs/plans/v0.8.0-gemini-cert-manager-verify.md`
-- [ ] Install tracked pre-commit hook on all machines — spec: `docs/plans/v0.8.0-codex-install-hooks.md`
-  - Commit `09ebb52`: `scripts/hooks/install-hooks.sh` added; M4 Air symlink verified ✅
-  - M2 Air: blocked — SSH key not loaded (`Permission denied (publickey)`); fix: `ssh-add` then re-run
-  - Ubuntu: on wrong branch `k3d-manager-v0.7.3`; fix: `git checkout k3d-manager-v0.8.0 && bash scripts/hooks/install-hooks.sh`
-- [ ] lib-foundation v0.3.0 — `_run_command` if-count refactor
-- [ ] lib-foundation — sync `deploy_cluster` fixes upstream (CLUSTER_NAME, provider helpers)
-- [ ] lib-foundation — route bare sudo in `_install_debian_helm` / `_install_debian_docker`
-- [ ] Shopping cart branch protection — automate via `gh api` across 5 repos
+**Shopping Cart CI Stabilization:**
 
-**k3dm-mcp:** separate repo (`~/src/gitrepo/personal/k3dm-mcp`) — starts after v0.8.0 ships.
+- [ ] **P1** — basket + product-catalog: Replace custom Trivy install with `aquasecurity/trivy-action@0.30.0` in `shopping-cart-infra/.github/workflows/build-push-deploy.yml`
+- [ ] **P1** — frontend: Remove unused imports (Header.tsx, ProtectedRoute.tsx, cartStore.ts); add `"types": ["vite/client"]` to tsconfig.json
+- [ ] **P2** — payment: Verify `mvnw` + `.mvn/wrapper/maven-wrapper.properties` committed; add `-Dmaven.multiModuleProjectDirectory=.` if needed
+- [ ] **P2** — order: Publish `rabbitmq-client-java` to GitHub Packages, or restructure as multi-module Maven project
+- [ ] **P4** — basket: `golangci-lint` + `go vet` to `go-ci.yml`
+- [ ] **P4** — order: Checkstyle + OWASP dependency check to `ci.yml`
+- [ ] **P4** — product-catalog: `ruff check` + `mypy` + `black --check` to `ci.yml`
+- [ ] **P4** — payment: Checkstyle/SpotBugs (OWASP already present; mvnw fix is P2 prerequisite)
+- [ ] **P3** — Branch protection on all 5 repos via `gh api` (must do after CI green)
 
-### Priority 2 — lib-foundation backlog
-
+**lib-foundation Backlog:**
 - [ ] `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
-- [ ] Sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
-- [ ] Route bare sudo in `_install_debian_helm` / `_install_debian_docker` through `_run_command`
+- [ ] Sync `deploy_cluster` fixes upstream (CLUSTER_NAME, provider helpers)
+- [ ] Route bare sudo in `_install_debian_helm` / `_install_debian_docker`
 - [ ] Add `.github/copilot-instructions.md` to lib-foundation
 
-### Priority 1b — Shopping Cart CI Stabilization (v0.8.0 milestone)
+**k3dm-mcp:** separate repo (`~/src/gitrepo/personal/k3dm-mcp`) — active after v0.8.0 ships.
 
-All 5 service repos have failing CI Publish jobs since 2026-03-09.
-Full details: `docs/issues/2026-03-11-shopping-cart-ci-failures.md`
+### Priority 2 — Deferred
 
-**P1 — Fix immediately (unblocks 3 of 5 services):**
-- [ ] `shopping-cart-basket` + `shopping-cart-product-catalog` — Replace custom Trivy install script with `aquasecurity/trivy-action@0.30.0` in `shopping-cart-infra/.github/workflows/build-push-deploy.yml`; update pinned commit hash in both caller workflows
-- [ ] `shopping-cart-frontend` — Remove unused imports (Header.tsx, ProtectedRoute.tsx, cartStore.ts); add `"types": ["vite/client"]` to `tsconfig.json`
-
-**P2 — Fix to complete the pipeline:**
-- [ ] `shopping-cart-payment` — Verify `mvnw` + `.mvn/wrapper/maven-wrapper.properties` committed; add `-Dmaven.multiModuleProjectDirectory=.` to CI Maven command if needed
-- [ ] `shopping-cart-order` — Publish `rabbitmq-client-java` to GitHub Packages, or restructure as multi-module Maven project, or add CI step to build+install before order service build
-
-**P3 — Enforce after CI is green (all 5 repos):**
-- [ ] Branch protection on all 5 shopping-cart repos via `gh api` script (must do after CI is green so required status checks have a passing job to reference):
-  - Require PR before merging to `main` (no direct push)
-  - Require status checks to pass: CI build + test job (per-repo job name)
-  - Require branches to be up to date before merging
-  - Dismiss stale reviews on new commits
-  - No force push, no branch deletion
-  - Script location: `scripts/plugins/shopping_cart.sh` → new function `configure_shopping_cart_branch_protection`
-
-**P4 — Add missing linters after CI is green (copilot-instructions enforcement):**
-- [ ] `shopping-cart-basket` — Add `golangci-lint` + `go vet` to `go-ci.yml` (currently only `go test` runs — no static analysis)
-- [ ] `shopping-cart-order` — Add Checkstyle + OWASP dependency check to `ci.yml` (payment has OWASP, order does not)
-- [ ] `shopping-cart-product-catalog` — Add `ruff check`, `mypy`, `black --check` to `ci.yml` (none of the required linters are currently enforced)
-- [ ] `shopping-cart-payment` — Add Checkstyle/SpotBugs (OWASP already present; mvnw fix is P2 prerequisite)
-- (frontend already enforces ESLint + Prettier + `tsc --noEmit` — no gap once P1 fix applied)
-
-### Priority 3 — Shopping Cart Hygiene
-
-- [ ] **Playwright MCP: E2E testing (deferred to v0.8.1 — services must be running first)**
-  - Prerequisite chain: CI green → images in ghcr.io → ArgoCD syncs → services running → branch protection on → then E2E
-  - Design: `@playwright/mcp` runs on dev machine (outside cluster); browser connects to services via `port-forward.sh` or Istio ingress; driven by Claude/Copilot/Gemini CLI via MCP tool calls
-  - Tests live in `shopping-cart-e2e-tests/` repo (already has Playwright structure + flow specs)
-  - No Chrome-in-cluster needed — simpler, no resource pressure on Ubuntu k3s node
-  - Copilot already has Playwright MCP built in — zero extra setup required
-  - M5 Mac mini (Oct 2026): revisit parallel test execution when hardware upgrades
-- [ ] **Google Antigravity: ACG sandbox login + credential extraction (v1.0.0 — not v0.8.x)**
-  - Scope: third-party UI automation only — ACG has no API, browser is the only way in
-  - Job: login to ACG web UI, start sandbox, extract cloud credentials + expiry time → hand off to k3dm-mcp
-  - Does NOT do shopping-cart testing — Playwright MCP owns that
+- [ ] **Playwright MCP E2E testing (v0.8.1)** — prerequisite: CI green → images in ghcr.io → services running
+- [ ] **Google Antigravity ACG sandbox (v1.0.0)** — login + credential extraction via browser automation
 
 ---
 
@@ -118,4 +81,5 @@ Full details: `docs/issues/2026-03-11-shopping-cart-ci-failures.md`
 | Shopping Cart CI — Order missing rabbitmq-client | OPEN P2 | `rabbitmq-client:1.0.0-SNAPSHOT` not in any Maven repo. Fix: publish to GitHub Packages. |
 | Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps may exceed capacity — reduce replicas in ArgoCD manifests. |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround. |
-| BATS teardown `k3d-test-orbstack-exists` | FIXED v0.7.2 | `teardown_file()` in provider_contract.bats. |
+| M2 Air pre-commit hook | OPEN | SSH key not loaded. Fix: `ssh-add` then re-run `install-hooks.sh`. |
+| Ubuntu pre-commit hook | OPEN | Was on wrong branch. Fix: checkout v0.9.0 + run `install-hooks.sh`. |

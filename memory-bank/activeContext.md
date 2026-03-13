@@ -1,45 +1,43 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.8.0` (as of 2026-03-11)
+## Current Branch: `k3d-manager-v0.9.0` (as of 2026-03-13)
 
-**v0.7.3 SHIPPED** — squash-merged to main (9bca648), PR #27, 2026-03-11. Tagged + released.
-**v0.8.0 active** — branch cut from main 2026-03-11.
+**v0.8.0 SHIPPED** — squash-merged to main (aaf2aee), PR #28, 2026-03-13. Tagged + released.
+**v0.9.0 active** — branch cut from main 2026-03-13.
 
 ---
 
 ## Current Focus
 
-**v0.8.0: Security Hardening + lib-foundation Backlog**
+**v0.9.0: Shopping Cart CI Stabilization + lib-foundation Backlog**
 
-Two k3d-manager tasks are spec-complete and ready for Codex. Shopping cart
-work is independent and runs after these two are merged.
+The k3dm-mcp repo starts independently after v0.8.0. v0.9.0 focuses on unblocking
+the shopping cart pipeline and cleaning up lib-foundation debt.
 
-| Item | Status | Spec | Notes |
-|---|---|---|---|
-| Vault-managed ArgoCD deploy keys | **DONE — committed `7785033`** | `docs/plans/v0.8.0-vault-argocd-deploy-keys.md` | BATS 8/8, shellcheck clean, all fns ≤ 8 ifs |
-| `deploy_cert_manager` plugin | **DONE — verified on M2 Air** | `docs/plans/v0.8.0-gemini-cert-manager-verify.md` | BATS 10/10; live cluster verify PASS with manual IngressClass apply |
-| lib-foundation v0.3.0 | pending | `docs/issues/2026-03-08-run-command-if-count-refactor.md` | `_run_command` if-count refactor + bare sudo routing |
-| Shopping cart branch protection | pending | — | Automate via `gh api` across 5 repos; blocked until CI green |
-
-**k3dm-mcp is a separate repo** — starts after v0.8.0 ships.
-Repo: `~/src/gitrepo/personal/k3dm-mcp` | Roadmap: `k3dm-mcp/docs/plans/roadmap.md`
+| Item | Status | Notes |
+|---|---|---|
+| Shopping cart CI — P1 fixes | pending | basket+product-catalog: Trivy action; frontend: unused imports + tsconfig |
+| Shopping cart CI — P2 fixes | pending | payment: mvnw; order: rabbitmq-client publish |
+| Shopping cart linters (P4) | pending | After CI green — golangci-lint, ruff, checkstyle etc |
+| Shopping cart branch protection | pending | After CI green + linters pass |
+| lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
+| k3dm-mcp planning | pending | Separate repo — `~/src/gitrepo/personal/k3dm-mcp` |
 
 ---
 
 ## Open Items
 
-- [x] **Fix if-count violations in `argocd.sh`** — spec: `docs/plans/v0.8.0-codex-if-count-fix.md`; helpers extracted, shellcheck clean, BATS 8/8, `AGENT_AUDIT_MAX_IF=8` audit ✅ (git add blocked by index.lock)
-- [x] `deploy_cert_manager` plugin — committed `f4f84e3`; BATS 10/10, shellcheck clean, all fns ≤ 4 ifs
-- [x] Install tracked pre-commit hook on all machines — spec: `docs/plans/v0.8.0-codex-install-hooks.md`
-  - Commit `09ebb52` adds `scripts/hooks/install-hooks.sh`; symlink verified on M4 Air (`.git/hooks/pre-commit -> ../../scripts/hooks/pre-commit`)
-  - M2 Air install blocked (SSH git pull fails: `git@github.com: Permission denied (publickey)`; existing repo still lacks script)
-  - Ubuntu repo present; git pull rebased but `scripts/hooks/install-hooks.sh` absent on branch `k3d-manager-v0.7.3` → install skipped; owner follow-up needed
-- [x] Istio ingress fix — committed `587ab88`; `scripts/etc/istio-ingressclass.yaml`, `_provider_k3d_configure_istio` applies it, `shellcheck scripts/lib/providers/k3d.sh`, `bats scripts/tests/lib/istio_ingressclass.bats`, `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh`
+- [ ] Shopping cart CI — fix Trivy action in `shopping-cart-infra/.github/workflows/build-push-deploy.yml` (P1)
+- [ ] Shopping cart CI — frontend unused imports + tsconfig vite/client types (P1)
+- [ ] Shopping cart CI — payment mvnw fix (P2)
+- [ ] Shopping cart CI — order rabbitmq-client publish to GitHub Packages (P2)
+- [ ] Shopping cart linters — basket: golangci-lint + go vet; order: Checkstyle+OWASP; product-catalog: ruff+mypy+black (P4)
+- [ ] Shopping cart branch protection — all 5 repos via `gh api` (after CI green)
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
-- [ ] Shopping cart repo hygiene: branch protection on all 5 repos (automate via `gh api`)
-- [ ] v0.8.0 planning: write implementation spec for k3dm-mcp
+- [ ] M2 Air hook install: `ssh-add` then `ssh m2jump "cd ~/src/gitrepo/personal/k3d-manager && git pull origin k3d-manager-v0.9.0 && bash scripts/hooks/install-hooks.sh"`
+- [ ] Ubuntu hook install: `ssh ubuntu "cd ~/src/gitrepo/personal/k3d-manager && git checkout k3d-manager-v0.9.0 && git pull && bash scripts/hooks/install-hooks.sh"`
 
 ---
 
@@ -47,14 +45,13 @@ Repo: `~/src/gitrepo/personal/k3dm-mcp` | Roadmap: `k3dm-mcp/docs/plans/roadmap.
 
 | Version | Status | Notes |
 |---|---|---|
-| v0.1.0–v0.7.3 | released | See CHANGE.md |
-| v0.8.0 | **active** | Lean MCP server (`k3dm-mcp`) — discrete repo |
-| v0.9.0 | planned | Messaging gateway (Slack) — natural language cluster ops |
+| v0.1.0–v0.8.0 | released | See CHANGE.md |
+| v0.9.0 | **active** | Shopping Cart CI + lib-foundation + k3dm-mcp planning |
 | v1.0.0 | vision | Multi-cloud providers (EKS/GKE/AKS) + ACG sandbox lifecycle |
 
 ---
 
-## Cluster State (as of 2026-03-11 — post v0.7.3)
+## Cluster State (as of 2026-03-13 — post v0.8.0)
 
 **Architecture:** Infra cluster on M2 Air — ArgoCD manages Ubuntu k3s hub-and-spoke.
 Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
@@ -70,6 +67,7 @@ Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
 | Jenkins | Running — `cicd` ns |
 | ArgoCD | Running — `cicd` ns |
 | Keycloak | Running — `identity` ns |
+| cert-manager | Deployed — `cert-manager` ns (v0.8.0) |
 
 ### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu` from M2 Air)
 

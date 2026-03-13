@@ -172,7 +172,7 @@ docs/
 
 | Version | Date | Highlights |
 |---|---|---|
-| v0.8.0 *(pending)* | 2026-03-13 | Vault-managed ArgoCD deploy keys, `deploy_cert_manager` (ACME/Let's Encrypt), `istio` IngressClass, `install-hooks.sh` |
+| [v0.8.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.8.0) | 2026-03-13 | Vault-managed ArgoCD deploy keys, `deploy_cert_manager` (ACME/Let's Encrypt), `istio` IngressClass, `install-hooks.sh` |
 | [v0.7.3](https://github.com/wilddog64/k3d-manager/releases/tag/v0.7.3) | 2026-03-11 | `shopping_cart.sh` plugin, reusable GitHub Actions CI/CD workflow, ArgoCD ubuntu-k3s, infra rebuilt on M2 Air |
 | [v0.7.2](https://github.com/wilddog64/k3d-manager/releases/tag/v0.7.2) | 2026-03-08 | dotfiles/hooks integration, lib-foundation v0.2.0, Ubuntu ESO + shopping-cart-data |
 | [v0.7.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.7.0) | 2026-03-07 | lib-foundation subtree, `deploy_cluster` refactored 12→5 if-blocks |
