@@ -17,7 +17,7 @@ work is independent and runs after these two are merged.
 | Item | Status | Spec | Notes |
 |---|---|---|---|
 | Vault-managed ArgoCD deploy keys | **DONE — committed `7785033`** | `docs/plans/v0.8.0-vault-argocd-deploy-keys.md` | BATS 8/8, shellcheck clean, all fns ≤ 8 ifs |
-| `deploy_cert_manager` plugin | **BLOCKED — Codex fix pending** | `docs/plans/v0.8.0-codex-istio-ingressclass.md` | Plugin correct; root cause: `deploy_istio` missing IngressClass; Gemini re-verify after fix |
+| `deploy_cert_manager` plugin | **awaiting Gemini re-verify** | `docs/plans/v0.8.0-gemini-cert-manager-verify.md` | IngressClass fix landed `587ab88`; Gemini re-runs verify with manual apply step |
 | lib-foundation v0.3.0 | pending | `docs/issues/2026-03-08-run-command-if-count-refactor.md` | `_run_command` if-count refactor + bare sudo routing |
 | Shopping cart branch protection | pending | — | Automate via `gh api` across 5 repos; blocked until CI green |
 
@@ -30,6 +30,7 @@ Repo: `~/src/gitrepo/personal/k3dm-mcp` | Roadmap: `k3dm-mcp/docs/plans/roadmap.
 
 - [x] **Fix if-count violations in `argocd.sh`** — spec: `docs/plans/v0.8.0-codex-if-count-fix.md`; helpers extracted, shellcheck clean, BATS 8/8, `AGENT_AUDIT_MAX_IF=8` audit ✅ (git add blocked by index.lock)
 - [x] `deploy_cert_manager` plugin — committed `f4f84e3`; BATS 10/10, shellcheck clean, all fns ≤ 4 ifs
+- [x] Istio ingress fix — committed `587ab88`; `scripts/etc/istio-ingressclass.yaml`, `_provider_k3d_configure_istio` applies it, `shellcheck scripts/lib/providers/k3d.sh`, `bats scripts/tests/lib/istio_ingressclass.bats`, `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh`
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
