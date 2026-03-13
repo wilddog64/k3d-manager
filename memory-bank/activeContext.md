@@ -17,7 +17,7 @@ work is independent and runs after these two are merged.
 | Item | Status | Spec | Notes |
 |---|---|---|---|
 | Vault-managed ArgoCD deploy keys | **DONE — committed `7785033`** | `docs/plans/v0.8.0-vault-argocd-deploy-keys.md` | BATS 8/8, shellcheck clean, all fns ≤ 8 ifs |
-| `deploy_cert_manager` plugin | **FAILED — Step 2 verify on M2 Air** | `docs/plans/v0.8.0-gemini-cert-manager-verify.md` | BATS 10/10; live cluster verify failed: IngressClass `istio` missing (Issue `2026-03-13`) |
+| `deploy_cert_manager` plugin | **BLOCKED — Codex fix pending** | `docs/plans/v0.8.0-codex-istio-ingressclass.md` | Plugin correct; root cause: `deploy_istio` missing IngressClass; Gemini re-verify after fix |
 | lib-foundation v0.3.0 | pending | `docs/issues/2026-03-08-run-command-if-count-refactor.md` | `_run_command` if-count refactor + bare sudo routing |
 | Shopping cart branch protection | pending | — | Automate via `gh api` across 5 repos; blocked until CI green |
 
