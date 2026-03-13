@@ -30,7 +30,10 @@ Repo: `~/src/gitrepo/personal/k3dm-mcp` | Roadmap: `k3dm-mcp/docs/plans/roadmap.
 
 - [x] **Fix if-count violations in `argocd.sh`** — spec: `docs/plans/v0.8.0-codex-if-count-fix.md`; helpers extracted, shellcheck clean, BATS 8/8, `AGENT_AUDIT_MAX_IF=8` audit ✅ (git add blocked by index.lock)
 - [x] `deploy_cert_manager` plugin — committed `f4f84e3`; BATS 10/10, shellcheck clean, all fns ≤ 4 ifs
-- [ ] Install tracked pre-commit hook on all machines — spec: `docs/plans/v0.8.0-codex-install-hooks.md`
+- [x] Install tracked pre-commit hook on all machines — spec: `docs/plans/v0.8.0-codex-install-hooks.md`
+  - Commit `09ebb52` adds `scripts/hooks/install-hooks.sh`; symlink verified on M4 Air (`.git/hooks/pre-commit -> ../../scripts/hooks/pre-commit`)
+  - M2 Air install blocked (SSH git pull fails: `git@github.com: Permission denied (publickey)`; existing repo still lacks script)
+  - Ubuntu repo present; git pull rebased but `scripts/hooks/install-hooks.sh` absent on branch `k3d-manager-v0.7.3` → install skipped; owner follow-up needed
 - [x] Istio ingress fix — committed `587ab88`; `scripts/etc/istio-ingressclass.yaml`, `_provider_k3d_configure_istio` applies it, `shellcheck scripts/lib/providers/k3d.sh`, `bats scripts/tests/lib/istio_ingressclass.bats`, `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh`
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
