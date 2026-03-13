@@ -38,7 +38,9 @@
 ### Priority 1 — v0.8.0 (active)
 
 - [ ] Vault-managed ArgoCD deploy keys — `configure_vault_argocd_repos`; ESO syncs from Vault KV → `cicd` ns secrets
-- [ ] `deploy_cert_manager` plugin — cert-manager + ACME for external certs (SC-081 readiness)
+  - Spec: `docs/plans/v0.8.0-vault-argocd-deploy-keys.md` ✅ reviewed + ready for Codex
+- [ ] `deploy_cert_manager` plugin — cert-manager v1.20.0 + ACME for external certs (SC-081 readiness)
+  - Spec: `docs/plans/v0.8.0-cert-manager.md` ✅ reviewed + ready for Codex
 - [ ] lib-foundation v0.3.0 — `_run_command` if-count refactor
 - [ ] lib-foundation — sync `deploy_cluster` fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation — route bare sudo in `_install_debian_helm` / `_install_debian_docker`
