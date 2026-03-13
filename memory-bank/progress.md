@@ -44,10 +44,10 @@
 
 **Shopping Cart CI Stabilization:**
 
-- [ ] **P1** — frontend: Remove unused imports (Header.tsx, ProtectedRoute.tsx, cartStore.ts); add `"types": ["vite/client"]` to tsconfig.json — spec: `docs/plans/v0.9.0-codex-shopping-cart-ci-p1p2.md`
-- [ ] **P1** — product-catalog: `apt-get upgrade` in Dockerfile to fix Trivy HIGH/CRITICAL CVEs — spec: `docs/plans/v0.9.0-codex-shopping-cart-ci-p1p2.md`
-- [ ] **P2** — payment: Add `-Dmaven.multiModuleProjectDirectory=.` to `./mvnw` in `ci.yaml` — spec: `docs/plans/v0.9.0-codex-shopping-cart-ci-p1p2.md`
-- [ ] **P2** — order + rabbitmq-client-java: Add GitHub Packages publish job to rabbitmq-client-java; add repository ref in order pom.xml — spec: `docs/plans/v0.9.0-codex-shopping-cart-ci-p1p2.md`
+- [ ] **P1** — frontend: Remove unused imports (Header.tsx, ProtectedRoute.tsx, cartStore.ts); add `"types": ["vite/client"]` to tsconfig.json — spec: `shopping-cart-infra/docs/plans/ci-stabilization.md`
+- [ ] **P1** — product-catalog: `apt-get upgrade` in Dockerfile to fix Trivy HIGH/CRITICAL CVEs — spec: `shopping-cart-infra/docs/plans/ci-stabilization.md`
+- [ ] **P2** — payment: Add `-Dmaven.multiModuleProjectDirectory=.` to `./mvnw` in `ci.yaml` — spec: `shopping-cart-infra/docs/plans/ci-stabilization.md`
+- [ ] **P2** — order + rabbitmq-client-java: Add GitHub Packages publish job to rabbitmq-client-java; add repository ref in order pom.xml — spec: `shopping-cart-infra/docs/plans/ci-stabilization.md`
 - [ ] **P4** — basket: `golangci-lint` + `go vet` to `go-ci.yml`
 - [ ] **P4** — order: Checkstyle + OWASP dependency check to `ci.yml`
 - [ ] **P4** — product-catalog: `ruff check` + `mypy` + `black --check` to `ci.yml`
