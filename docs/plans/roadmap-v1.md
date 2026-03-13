@@ -255,6 +255,45 @@ Zero-Dependency philosophy, `env -i` BATS suites for all new providers.
 
 ---
 
+## v1.1.0 — vcluster Provider
+*Focus: Virtual clusters inside existing clusters — on-demand isolation without new infra*
+
+**Motivation:** vcluster (by Loft Labs) creates fully functional Kubernetes clusters inside
+a namespace of an existing cluster. Pods schedule on the host cluster nodes — no new VMs,
+no new cloud infrastructure. Spin up in seconds, destroy in seconds.
+
+This maps cleanly onto the existing `CLUSTER_PROVIDER` abstraction — vcluster becomes a 5th
+provider alongside k3d, orbstack, k3s, and the v1.0 cloud providers.
+
+```bash
+CLUSTER_PROVIDER=vcluster ./scripts/k3d-manager deploy_cluster   # spin up vcluster in infra cluster
+CLUSTER_PROVIDER=vcluster ./scripts/k3d-manager destroy_cluster  # tear it down
+```
+
+**Use cases this unlocks:**
+- Per-feature isolated test environments — spin up, deploy shopping-cart stack, test, destroy
+- Team isolation — each developer gets their own cluster namespace without VM overhead
+- CI pipelines — ephemeral cluster per pipeline run, no teardown race conditions
+- ACG sandbox efficiency — one real EKS cluster hosts multiple vclusters (v1.0 + v1.1 combined)
+
+**Provider implementation:**
+- New `_provider_vcluster_*` functions in `scripts/lib/cluster_provider.sh`
+- `deploy_cluster`: `vcluster create <name> -n <namespace>` + export kubeconfig
+- `destroy_cluster`: `vcluster delete <name> -n <namespace>` — dry-run gate inherited
+- `VCLUSTER_NAMESPACE` env var — target namespace in host cluster (default: `vclusters`)
+- `VCLUSTER_VERSION` env var — pin chart version explicitly (no floating `latest`)
+- Prerequisite: host cluster must be running (infra cluster or any cloud cluster from v1.0)
+
+**What stays the same:** once `deploy_cluster` hands off a kubeconfig, all plugins
+(Vault, ESO, Istio, Jenkins, ArgoCD) work identically — they speak only Kubernetes primitives.
+
+**BATS coverage:** provider contract suite extended with vcluster-specific cases.
+
+*Note: vcluster team made contact after k3d-manager articles — potential collaboration
+for integration testing and early access to new vcluster features.*
+
+---
+
 ## Architectural Boundary
 
 **k3d-manager does not compete with Terraform, Pulumi, or any cloud provisioner.**
