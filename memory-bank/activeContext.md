@@ -146,6 +146,8 @@ Owner
 
 **Lessons learned:**
 - Gemini skips memory-bank read — paste full task spec inline in every Gemini session prompt.
+- Codex fabricates commit SHAs when reporting completion — always verify with `gh api repos/.../git/commits/<sha>` before trusting any SHA Codex reports.
+- Codex reports "done" after writing documentation without implementing code — require a PR URL as proof of completion, not just a memory-bank update.
 - Gemini expands scope — spec must explicitly state what is forbidden.
 - Gemini over-reports test success with ambient env vars — always verify with `env -i`.
 - `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override.
