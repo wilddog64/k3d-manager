@@ -1,5 +1,27 @@
 # Changes - k3d-manager
 
+## v0.8.0 — Vault ArgoCD Deploy Keys + cert-manager ACME + Istio IngressClass — dated 2026-03-13
+
+### Added
+- **`configure_vault_argocd_repos`** (`scripts/plugins/argocd.sh`): Vault-managed SSH deploy keys for shopping-cart repos. Creates `argocd-deploy-key-reader` Vault policy, dedicated ESO SecretStore + ServiceAccount, and one ExternalSecret per repo syncing from `secret/argocd/deploy-keys/<repo>` into ArgoCD repository secrets. Supports `--seed-vault` and `--dry-run`.
+- **`deploy_cert_manager`** (`scripts/plugins/cert-manager.sh`): cert-manager v1.20.0 via Helm with ACME HTTP-01 challenge support through Istio ingress. Deploys staging ClusterIssuer by default; `--production` for internet-accessible clusters; `--skip-issuer` for Helm-only install. Validates `ACME_EMAIL`, waits for webhook readiness, checks Istio IngressClass before applying issuers.
+- **`istio` IngressClass** (`scripts/etc/istio-ingressclass.yaml`): Applied automatically by `_provider_k3d_configure_istio` after `istioctl install`. Required for cert-manager HTTP-01 challenge routing.
+- **`scripts/hooks/install-hooks.sh`**: Installs all tracked git hooks as symlinks into `.git/hooks/`. Run once per clone to keep hooks in sync with the repo.
+- **New docs**: `docs/api/functions.md`, `docs/api/vault-pki.md`, `docs/guides/jenkins-authentication.md`, `docs/guides/plugin-development.md`, `docs/providers/k3s.md`, `docs/providers/orbstack.md`. README restructured to two-cluster quick start.
+
+### Fixed
+- **`deploy_argocd` if-count**: Extracted `_argocd_helm_deploy_release`, `_argocd_configure_vault_eso`, `_argocd_configure_post_deploy` to bring function under `AGENT_AUDIT_MAX_IF=8` threshold.
+- **`configure_vault_argocd_repos` if-count**: Extracted `_argocd_validate_deploy_key_prereqs`, `_argocd_setup_deploy_key_resources`, `_argocd_apply_repo_deploy_keys`.
+- **`cert-manager.sh` vars path**: Plugin now sources `$SCRIPT_DIR/etc/cert-manager/vars.sh` (was incorrectly `$PLUGINS_DIR`).
+
+### Validation
+- BATS: `argocd_deploy_keys.bats` 8/8; `cert_manager.bats` 10/10; `istio_ingressclass.bats` 4/4 — all `env -i` clean.
+- `deploy_cert_manager` live cluster verify: PASS on M2 Air infra cluster (k3d/OrbStack). cert-manager pods Running, webhook Available, staging ClusterIssuer created.
+- shellcheck: clean on all modified `.sh` files.
+- All functions ≤ 8 if-blocks (`AGENT_AUDIT_MAX_IF=8` audit passing).
+
+---
+
 ## v0.7.3 — Shopping Cart CI/CD + Two-Cluster GitOps — dated 2026-03-10
 
 ### Added
