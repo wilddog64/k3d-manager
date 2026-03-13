@@ -11,14 +11,15 @@
 
 **v0.8.0: Security Hardening + lib-foundation Backlog**
 
-No tasks assigned yet. See `docs/plans/roadmap-v1.md` → v0.8.0 section for full scope.
+Two k3d-manager tasks are spec-complete and ready for Codex. Shopping cart
+work is independent and runs after these two are merged.
 
-| Item | Notes |
-|---|---|
-| Vault-managed ArgoCD deploy keys | `configure_vault_argocd_repos`; ESO → K8s secrets in `cicd` ns |
-| `deploy_cert_manager` plugin | cert-manager + ACME for external certs (SC-081 readiness) |
-| lib-foundation v0.3.0 | `_run_command` if-count refactor + bare sudo routing |
-| Shopping cart branch protection | Automate via `gh api` across 5 repos |
+| Item | Status | Spec | Notes |
+|---|---|---|---|
+| Vault-managed ArgoCD deploy keys | **SPEC READY → Codex** | `docs/plans/v0.8.0-vault-argocd-deploy-keys.md` | New fn `configure_vault_argocd_repos` in `argocd.sh` |
+| `deploy_cert_manager` plugin | **SPEC READY → Codex** | `docs/plans/v0.8.0-cert-manager.md` | Replace stub in `cert-manager.sh`; cert-manager v1.20.0 + ACME |
+| lib-foundation v0.3.0 | pending | `docs/issues/2026-03-08-run-command-if-count-refactor.md` | `_run_command` if-count refactor + bare sudo routing |
+| Shopping cart branch protection | pending | — | Automate via `gh api` across 5 repos; blocked until CI green |
 
 **k3dm-mcp is a separate repo** — starts after v0.8.0 ships.
 Repo: `~/src/gitrepo/personal/k3dm-mcp` | Roadmap: `k3dm-mcp/docs/plans/roadmap.md`
