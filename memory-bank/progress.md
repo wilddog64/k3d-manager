@@ -42,12 +42,12 @@
 
 ### Priority 1 — v0.9.0 (active)
 
-**Shopping Cart CI Stabilization:**
+**Shopping Cart CI Stabilization:** (branch `fix/ci-stabilization` on each repo)
 
-- [ ] **P1** — frontend: Remove unused imports (Header.tsx, ProtectedRoute.tsx, cartStore.ts); add `"types": ["vite/client"]` to tsconfig.json — spec: `shopping-cart-infra/docs/plans/ci-stabilization.md`
-- [ ] **P1** — product-catalog: `apt-get upgrade` in Dockerfile to fix Trivy HIGH/CRITICAL CVEs — spec: `shopping-cart-infra/docs/plans/ci-stabilization.md`
-- [ ] **P2** — payment: Add `-Dmaven.multiModuleProjectDirectory=.` to `./mvnw` in `ci.yaml` — spec: `shopping-cart-infra/docs/plans/ci-stabilization.md`
-- [ ] **P2** — order + rabbitmq-client-java: Add GitHub Packages publish job to rabbitmq-client-java; add repository ref in order pom.xml — spec: `shopping-cart-infra/docs/plans/ci-stabilization.md`
+- [ ] **P1** — frontend: Remove unused imports (Header.tsx, ProtectedRoute.tsx, cartStore.ts); add `"types": ["vite/client"]` to tsconfig.json — PR https://github.com/wilddog64/shopping-cart-frontend/pull/1 open. Type check + tests pass; lint job fails with existing `react-refresh/only-export-components` warnings in `src/components/ui/Badge.tsx`, `Button.tsx`, `src/test/test-utils.tsx` (outside scope) — awaiting direction.
+- [ ] **P1** — product-catalog: `apt-get upgrade` in Dockerfile to fix Trivy HIGH/CRITICAL CVEs — PR https://github.com/wilddog64/shopping-cart-product-catalog/pull/1 open. Lint/Test/Build job green; waiting review/merge.
+- [ ] **P2** — payment: Ensure Maven wrapper sees `-Dmaven.multiModuleProjectDirectory=.` — PR https://github.com/wilddog64/shopping-cart-payment/pull/1 open. `MAVEN_OPTS` now sets the property and wrapper init error resolved; build currently fails earlier because `org.flywaydb:flyway-database-postgresql` is declared without a version (line 68) — follow-up fix required.
+- [ ] **P2** — order + rabbitmq-client-java: Add GitHub Packages publish path — PRs https://github.com/wilddog64/rabbitmq-client-java/pull/1 (publish job + distributionManagement + settings) and https://github.com/wilddog64/shopping-cart-order/pull/1 (repo + settings + workflow) open. Copilot review addressed (publish job now waits for integration tests; Maven step exports `GITHUB_TOKEN`). Order CI still fails because artifact isn’t published until rabbitmq-client-java merges to `main`.
 - [ ] **P4** — basket: `golangci-lint` + `go vet` to `go-ci.yml`
 - [ ] **P4** — order: Checkstyle + OWASP dependency check to `ci.yml`
 - [ ] **P4** — product-catalog: `ruff check` + `mypy` + `black --check` to `ci.yml`
@@ -76,9 +76,9 @@
 | ArgoCD Cluster Registration Timeout | FIXED v0.7.3 | Root cause: infra on M4 Air had no route to Ubuntu. Fixed by rebuilding infra on M2 Air. |
 | Shopping Cart Apps ImagePullBackOff | OPEN | CI/CD failing — images not being pushed to ghcr.io. Blocked by CI failures below. |
 | Shopping Cart CI — Trivy install failure | OPEN P1 | basket + product-catalog: custom install script fails. Fix: use trivy-action in infra workflow. |
-| Shopping Cart CI — Frontend lint/type errors | OPEN P1 | Unused imports + missing vite/client types. Fix: remove imports, update tsconfig. |
-| Shopping Cart CI — Payment mvnw init | OPEN P2 | Maven wrapper fails to initialize. Fix: verify mvnw committed, set multiModuleProjectDirectory. |
-| Shopping Cart CI — Order missing rabbitmq-client | OPEN P2 | `rabbitmq-client:1.0.0-SNAPSHOT` not in any Maven repo. Fix: publish to GitHub Packages. |
+| Shopping Cart CI — Frontend lint/type errors | OPEN P1 | PR #1 removes imports + adds vite/client types; lint now fails on pre-existing `react-refresh/only-export-components` warnings in Badge/Button/test-utils (needs decision). |
+| Shopping Cart CI — Payment mvnw init | OPEN P2 | `MAVEN_OPTS` now sets `-Dmaven.multiModuleProjectDirectory`, wrapper boots, but build stops earlier because `org.flywaydb:flyway-database-postgresql` lacks a version (pom line 68). |
+| Shopping Cart CI — Order missing rabbitmq-client | OPEN P2 | Publish/RPM PRs open; order CI still failing until rabbitmq-client-java PR merges and publishes to GitHub Packages. |
 | Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps may exceed capacity — reduce replicas in ArgoCD manifests. |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround. |
 | M2 Air pre-commit hook | OPEN | SSH key not loaded. Fix: `ssh-add` then re-run `install-hooks.sh`. |

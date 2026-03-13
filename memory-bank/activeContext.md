@@ -16,8 +16,8 @@ the shopping cart pipeline and cleaning up lib-foundation debt.
 
 | Item | Status | Notes |
 |---|---|---|
-| Shopping cart CI — P1 fixes | **spec ready** | Spec: `shopping-cart-infra/docs/plans/ci-stabilization.md` |
-| Shopping cart CI — P2 fixes | **spec ready** | Spec: `shopping-cart-infra/docs/plans/ci-stabilization.md` |
+| Shopping cart CI — P1 fixes | **in progress** | PRs open per spec — frontend #1 failing ESLint warnings, product-catalog #1 green + waiting merge |
+| Shopping cart CI — P2 fixes | **in progress** | PRs open — rabbitmq-client-java #1 (publish job) + order #1 (blocked until package published) + payment #1 (wrapper fix done, Flyway version error pending) |
 | Shopping cart linters (P4) | pending | After CI green — golangci-lint, ruff, checkstyle etc |
 | Shopping cart branch protection | pending | After CI green + linters pass |
 | lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
@@ -28,9 +28,9 @@ the shopping cart pipeline and cleaning up lib-foundation debt.
 ## Open Items
 
 - [ ] Shopping cart CI — fix Trivy action in `shopping-cart-infra/.github/workflows/build-push-deploy.yml` (P1)
-- [ ] Shopping cart CI — frontend unused imports + tsconfig vite/client types (P1)
-- [ ] Shopping cart CI — payment mvnw fix (P2)
-- [ ] Shopping cart CI — order rabbitmq-client publish to GitHub Packages (P2)
+- [ ] Shopping cart CI — frontend unused imports + tsconfig vite/client types (P1) — PR #1 open, ESLint `react-refresh/only-export-components` warnings block lint job
+- [ ] Shopping cart CI — payment mvnw fix (P2) — PR #1 sets `MAVEN_OPTS`; build now fails earlier on `flyway-database-postgresql` missing version
+- [ ] Shopping cart CI — order rabbitmq-client publish to GitHub Packages (P2) — PRs: rabbitmq-client-java #1 (publish job, gated on integration tests) + shopping-cart-order #1 (fails until package published)
 - [ ] Shopping cart linters — basket: golangci-lint + go vet; order: Checkstyle+OWASP; product-catalog: ruff+mypy+black (P4)
 - [ ] Shopping cart branch protection — all 5 repos via `gh api` (after CI green)
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)
