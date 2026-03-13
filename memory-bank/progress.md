@@ -41,6 +41,7 @@
   - `configure_vault_argocd_repos` + 6 helper refactors; BATS 8/8; shellcheck clean; all functions ≤ 8 ifs
 - [x] `deploy_cert_manager` plugin — committed `f4f84e3`; **live cluster verify PASS (M2 Air)**
   - Helm v1.20.0 + ACME HTTP-01 via Istio; BATS 10/10; shellcheck clean; all functions ≤ 4 ifs
+  - IngressClass `istio` missing on M2 Air (Issue `2026-03-13`) — fixed with manual apply
   - Verify spec: `docs/plans/v0.8.0-gemini-cert-manager-verify.md`
 - [ ] lib-foundation v0.3.0 — `_run_command` if-count refactor
 - [ ] lib-foundation — sync `deploy_cluster` fixes upstream (CLUSTER_NAME, provider helpers)
