@@ -17,7 +17,7 @@ the shopping cart pipeline and cleaning up lib-foundation debt.
 | Item | Status | Notes |
 |---|---|---|
 | Shopping cart CI — P1 fixes | **in progress** | Frontend PR #1 blocked on ESLint `react-refresh/only-export-components` warnings; product-catalog PR #1 passes CI, awaiting merge |
-| Shopping cart CI — P2 fixes | **in progress** | rabbitmq-client-java PR #1 updated (publish runs on fix branch, package upload confirmed); payment PR #1 now sets Flyway version but still fails due to missing rabbitmq + PayPal artifacts; order PR #1 rerun after publish but still cannot fetch rabbitmq snapshot |
+| Shopping cart CI — P2 fixes | **in progress** | rabbitmq-client-java ✅ published; payment + order blocked on `packages: read` permission + rabbitmq version mismatch — Round 3 spec at `shopping-cart-infra/docs/plans/ci-stabilization-round3.md` (c5797539) |
 | Shopping cart linters (P4) | pending | After CI green — golangci-lint, ruff, checkstyle etc |
 | Shopping cart branch protection | pending | After CI green + linters pass |
 | lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
@@ -29,8 +29,8 @@ the shopping cart pipeline and cleaning up lib-foundation debt.
 
 - [ ] Shopping cart CI — fix Trivy action in `shopping-cart-infra/.github/workflows/build-push-deploy.yml` (P1)
 - [ ] Shopping cart CI — frontend unused imports + tsconfig vite/client types (P1) — PR #1 open, ESLint `react-refresh/only-export-components` warnings block lint job
-- [ ] Shopping cart CI — payment mvnw fix (P2) — wrapper property fixed; Flyway version added 2026-03-13, now blocked on Maven resolving `com.shoppingcart:rabbitmq-client` + `com.paypal.sdk:checkout-sdk`
-- [ ] Shopping cart CI — order rabbitmq-client publish to GitHub Packages (P2) — publish workflow runs on fix branch and uploads artifact, but shopping-cart-order PR #1 still cannot pull `1.0.0-SNAPSHOT` even with repository snapshots enabled
+- [ ] Shopping cart CI — payment (P2) — Round 3: change rabbitmq version to SNAPSHOT + add GitHub Packages repo + `packages: read` permission — spec: `shopping-cart-infra/docs/plans/ci-stabilization-round3.md` (c5797539)
+- [ ] Shopping cart CI — order (P2) — Round 3: add `packages: read` to build job permissions — spec: `shopping-cart-infra/docs/plans/ci-stabilization-round3.md` (c5797539)
 - [ ] Shopping cart linters — basket: golangci-lint + go vet; order: Checkstyle+OWASP; product-catalog: ruff+mypy+black (P4)
 - [ ] Shopping cart branch protection — all 5 repos via `gh api` (after CI green)
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)

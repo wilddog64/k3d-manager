@@ -46,8 +46,9 @@
 
 - [ ] **P1** — frontend: Remove unused imports (Header.tsx, ProtectedRoute.tsx, cartStore.ts); add `"types": ["vite/client"]` to tsconfig.json — PR https://github.com/wilddog64/shopping-cart-frontend/pull/1 open. Type check + tests pass; lint job fails with `react-refresh/only-export-components` warnings in `src/components/ui/Badge.tsx`, `Button.tsx`, `src/test/test-utils.tsx` (outside scope) — awaiting direction.
 - [ ] **P1** — product-catalog: `apt-get upgrade` in Dockerfile to fix Trivy HIGH/CRITICAL CVEs — PR https://github.com/wilddog64/shopping-cart-product-catalog/pull/1 open. Lint/Test/Build job green; waiting review/merge.
-- [ ] **P2** — payment: Ensure Maven wrapper sees `-Dmaven.multiModuleProjectDirectory=.` — PR https://github.com/wilddog64/shopping-cart-payment/pull/1 open. `MAVEN_OPTS` set and Flyway version added (10.6.0); build now fails because Maven cannot resolve `com.shoppingcart:rabbitmq-client:1.0.0` (not yet published) and `com.paypal.sdk:checkout-sdk:1.14.0` from central.
-- [ ] **P2** — order + rabbitmq-client-java: Add GitHub Packages publish path — PRs https://github.com/wilddog64/rabbitmq-client-java/pull/1 (publish job + distributionManagement + settings) and https://github.com/wilddog64/shopping-cart-order/pull/1 (repo + settings + workflow) open. Publish workflow now runs on `fix/ci-stabilization` pushes and uploads artifacts, but order CI still fails to download `com.shoppingcart:rabbitmq-client:1.0.0-SNAPSHOT` even after enabling snapshots in pom.xml.
+- [ ] **P2** — payment: Round 3 spec at `shopping-cart-infra/docs/plans/ci-stabilization-round3.md` (c5797539). Fixes: change `rabbitmq-client.version` `1.0.0`→`1.0.0-SNAPSHOT`; add GitHub Packages repo + maven-settings.xml; add `packages: read` permission to build job.
+- [ ] **P2** — order: Round 3 spec at `shopping-cart-infra/docs/plans/ci-stabilization-round3.md` (c5797539). Fix: add `packages: read` permission to build job in ci.yml — GITHUB_TOKEN lacks cross-repo package read without explicit permission.
+- [x] **P2** — rabbitmq-client-java: Publish to GitHub Packages ✅ — PR #1 green, package published.
 - [ ] **P4** — basket: `golangci-lint` + `go vet` to `go-ci.yml`
 - [ ] **P4** — order: Checkstyle + OWASP dependency check to `ci.yml`
 - [ ] **P4** — product-catalog: `ruff check` + `mypy` + `black --check` to `ci.yml`
