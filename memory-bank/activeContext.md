@@ -21,7 +21,7 @@ the shopping cart pipeline and cleaning up lib-foundation debt.
 | Shopping cart linters (P4) | pending | After CI green — golangci-lint, ruff, checkstyle etc |
 | Shopping cart branch protection | pending | After CI green + linters pass |
 | lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
-| k3dm-mcp planning | pending | Separate repo — `~/src/gitrepo/personal/k3dm-mcp` |
+| k3dm-mcp planning | **in progress** | Roadmap at `k3dm-mcp/docs/plans/roadmap.md`; log aggregation decision recorded |
 
 ---
 
