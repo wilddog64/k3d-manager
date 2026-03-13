@@ -51,8 +51,6 @@ USAGE
       esac
    done
 
-   _cert_manager_validate_email || return 1
-
    _info "[cert-manager] Installing cert-manager Helm release"
    _cert_manager_helm_install || return 1
 
@@ -66,6 +64,7 @@ USAGE
       return 0
    fi
 
+   _cert_manager_validate_email || return 1
    _cert_manager_configure_issuer_flow "$use_production"
    return 0
 }
@@ -151,8 +150,10 @@ function _cert_manager_apply_issuer() {
    if [[ -n "${CERT_MANAGER_DEBUG_RENDER:-}" ]]; then
       cp "$rendered" "$CERT_MANAGER_DEBUG_RENDER" >/dev/null 2>&1 || true
    fi
-   _kubectl apply -f "$rendered" >/dev/null
+   local rc=0
+   _kubectl apply -f "$rendered" >/dev/null || rc=$?
    rm -f "$rendered"
+   return "$rc"
 }
 
 function _cert_manager_validate_email() {
