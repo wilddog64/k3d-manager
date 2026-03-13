@@ -17,7 +17,7 @@ work is independent and runs after these two are merged.
 | Item | Status | Spec | Notes |
 |---|---|---|---|
 | Vault-managed ArgoCD deploy keys | **DONE — committed `7785033`** | `docs/plans/v0.8.0-vault-argocd-deploy-keys.md` | BATS 8/8, shellcheck clean, all fns ≤ 8 ifs |
-| `deploy_cert_manager` plugin | **CODEx in-progress** | `docs/plans/v0.8.0-cert-manager.md` | Helm deploy + issuers implemented; waiting on git add permission to commit |
+| `deploy_cert_manager` plugin | **DONE — committed `f4f84e3`** | `docs/plans/v0.8.0-cert-manager.md` | BATS 10/10, shellcheck clean, all fns ≤ 4 ifs |
 | lib-foundation v0.3.0 | pending | `docs/issues/2026-03-08-run-command-if-count-refactor.md` | `_run_command` if-count refactor + bare sudo routing |
 | Shopping cart branch protection | pending | — | Automate via `gh api` across 5 repos; blocked until CI green |
 
@@ -29,7 +29,7 @@ Repo: `~/src/gitrepo/personal/k3dm-mcp` | Roadmap: `k3dm-mcp/docs/plans/roadmap.
 ## Open Items
 
 - [x] **Fix if-count violations in `argocd.sh`** — spec: `docs/plans/v0.8.0-codex-if-count-fix.md`; helpers extracted, shellcheck clean, BATS 8/8, `AGENT_AUDIT_MAX_IF=8` audit ✅ (git add blocked by index.lock)
-- [x] `deploy_cert_manager` plugin implementation — Helm install, webhook wait, Istio ingress validation, HTTP Gateway + ClusterIssuer apply; `shellcheck` clean, `bats scripts/tests/plugins/cert_manager.bats` 10/10, `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh` ✅ (git add blocked by index.lock)
+- [x] `deploy_cert_manager` plugin — committed `f4f84e3`; BATS 10/10, shellcheck clean, all fns ≤ 4 ifs
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
