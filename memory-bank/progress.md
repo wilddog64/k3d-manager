@@ -43,8 +43,14 @@
 ### Priority 1 — v0.9.0 (active)
 
 **Shopping Cart CI Stabilization:**
-Tracked in `wilddog64/shopping-cart-infra` memory-bank — see `activeContext.md` + `progress.md` there.
-Round 3 spec: `docs/plans/ci-stabilization-round3.md` (commit c5797539).
+- Status source of truth: `wilddog64/shopping-cart-infra` memory-bank (`activeContext.md` + `progress.md`).
+- Current spec: `docs/plans/ci-stabilization-round3.md` (c5797539).
+- Active PRs (all on `fix/ci-stabilization`):
+  - `rabbitmq-client-java` PR #1 — publish workflow now runs on `fix/ci-stabilization` pushes and uploads artifacts successfully.
+  - `shopping-cart-payment` PR #1 — pom now points to `1.0.0-SNAPSHOT`, adds GitHub Packages repo + `.github/maven-settings.xml`, and workflow build step authenticates with `packages: read`. CI still fails because Maven cannot resolve `com.shoppingcart:rabbitmq-client:1.0.0` (no release yet) and `com.paypal.sdk:checkout-sdk:1.14.0` from central.
+  - `shopping-cart-order` PR #1 — workflow grants `packages: read` and repository snapshots are enabled, but CI still cannot download `com.shoppingcart:rabbitmq-client:1.0.0-SNAPSHOT` from GitHub Packages.
+  - `shopping-cart-frontend` PR #1 — blocked on `react-refresh/only-export-components` lint warnings.
+  - `shopping-cart-product-catalog` PR #1 — CI green, awaiting merge.
 
 **lib-foundation Backlog:**
 - [ ] `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
