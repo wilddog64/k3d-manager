@@ -16,8 +16,8 @@ the shopping cart pipeline and cleaning up lib-foundation debt.
 
 | Item | Status | Notes |
 |---|---|---|
-| Shopping cart CI — P1 fixes | pending | basket+product-catalog: Trivy action; frontend: unused imports + tsconfig |
-| Shopping cart CI — P2 fixes | pending | payment: mvnw; order: rabbitmq-client publish |
+| Shopping cart CI — P1 fixes | **spec ready** | Spec: `docs/plans/v0.9.0-codex-shopping-cart-ci-p1p2.md` |
+| Shopping cart CI — P2 fixes | **spec ready** | Spec: `docs/plans/v0.9.0-codex-shopping-cart-ci-p1p2.md` |
 | Shopping cart linters (P4) | pending | After CI green — golangci-lint, ruff, checkstyle etc |
 | Shopping cart branch protection | pending | After CI green + linters pass |
 | lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
