@@ -39,8 +39,8 @@
 
 - [x] Vault-managed ArgoCD deploy keys — committed `7785033` on `k3d-manager-v0.8.0`
   - `configure_vault_argocd_repos` + 6 helper refactors; BATS 8/8; shellcheck clean; all functions ≤ 8 ifs
-- [ ] `deploy_cert_manager` plugin — cert-manager v1.20.0 + ACME for external certs (SC-081 readiness)
-  - Spec: `docs/plans/v0.8.0-cert-manager.md` ✅ reviewed + ready for Codex
+- [x] `deploy_cert_manager` plugin — Helm install + ACME issuers with Istio HTTP-01 gateway (awaiting git add permission)
+  - Spec: `docs/plans/v0.8.0-cert-manager.md`; artifacts: `shellcheck scripts/plugins/cert-manager.sh`; `env -i HOME="$HOME" PATH="$PATH" bats scripts/tests/plugins/cert_manager.bats` → 10/10; `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh` ✅
 - [ ] lib-foundation v0.3.0 — `_run_command` if-count refactor
 - [ ] lib-foundation — sync `deploy_cluster` fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation — route bare sudo in `_install_debian_helm` / `_install_debian_docker`
