@@ -37,10 +37,8 @@
 
 ### Priority 1 — v0.8.0 (active)
 
-- [x] Vault-managed ArgoCD deploy keys — `configure_vault_argocd_repos` helpers extracted; Vault policy + ESO plumbing ready (awaiting git add permission)
-  - Specs: `docs/plans/v0.8.0-vault-argocd-deploy-keys.md` + `docs/plans/v0.8.0-codex-if-count-fix.md`
-  - Tests: `env -i HOME="$HOME" PATH="/opt/homebrew/bin:$PATH" /opt/homebrew/bin/bats scripts/tests/plugins/argocd_deploy_keys.bats` → 8/8; `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh` ✅
-  - Tooling: `shellcheck scripts/plugins/argocd.sh` clean; git add blocked locally (`.git/index.lock` permission)
+- [x] Vault-managed ArgoCD deploy keys — committed `7785033` on `k3d-manager-v0.8.0`
+  - `configure_vault_argocd_repos` + 6 helper refactors; BATS 8/8; shellcheck clean; all functions ≤ 8 ifs
 - [ ] `deploy_cert_manager` plugin — cert-manager v1.20.0 + ACME for external certs (SC-081 readiness)
   - Spec: `docs/plans/v0.8.0-cert-manager.md` ✅ reviewed + ready for Codex
 - [ ] lib-foundation v0.3.0 — `_run_command` if-count refactor
