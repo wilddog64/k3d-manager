@@ -47,6 +47,10 @@ function stub_kubectl() {
     done
     echo "$*" >> "$KUBECTL_LOG"
 
+    if [[ "$*" == *"vault kv get"* && "$*" == *"secret/argocd/deploy-keys"* ]]; then
+      return 1
+    fi
+
     # Special handling for vault-root secret queries (for Vault integration tests)
     if [[ "$*" == *"get secret vault-root"* && "$*" == *"jsonpath"* ]]; then
       # Return a fake base64-encoded token
