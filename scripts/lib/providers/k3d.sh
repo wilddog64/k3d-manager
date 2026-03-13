@@ -94,6 +94,7 @@ function _provider_k3d_configure_istio() {
    _install_istioctl
    _istioctl x precheck
    _istioctl install -y -f "$istio_yamlfile"
+   _kubectl apply -f "${SCRIPT_DIR}/etc/istio-ingressclass.yaml"
    _kubectl label ns default istio-injection=enabled --overwrite
 
    trap '$(_cleanup_trap_command "$istio_yamlfile")' EXIT
