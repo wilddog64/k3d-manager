@@ -84,11 +84,17 @@ Full details: `docs/issues/2026-03-11-shopping-cart-ci-failures.md`
 
 ### Priority 3 — Shopping Cart Hygiene
 
-- [ ] Google Antigravity: E2E testing inside cluster (deferred to v0.8.1 — services must be running first)
-  - Prerequisite chain: CI green → images in ghcr.io → ArgoCD syncs → services running → branch protection on → then Antigravity
-  - Design: runs as Kubernetes `Job` in `shopping-cart-testing` namespace; Chrome inside container (`mcr.microsoft.com/playwright`); `--no-sandbox` + `/dev/shm` emptyDir required
-  - M5 Mac mini (Oct 2026): revisit parallel Chrome instances + multi-node tactics when hardware upgrades
-- [ ] Google Antigravity: ACG sandbox login + credential extraction (v1.0.0 concern — not v0.8.x)
+- [ ] **Playwright MCP: E2E testing (deferred to v0.8.1 — services must be running first)**
+  - Prerequisite chain: CI green → images in ghcr.io → ArgoCD syncs → services running → branch protection on → then E2E
+  - Design: `@playwright/mcp` runs on dev machine (outside cluster); browser connects to services via `port-forward.sh` or Istio ingress; driven by Claude/Copilot/Gemini CLI via MCP tool calls
+  - Tests live in `shopping-cart-e2e-tests/` repo (already has Playwright structure + flow specs)
+  - No Chrome-in-cluster needed — simpler, no resource pressure on Ubuntu k3s node
+  - Copilot already has Playwright MCP built in — zero extra setup required
+  - M5 Mac mini (Oct 2026): revisit parallel test execution when hardware upgrades
+- [ ] **Google Antigravity: ACG sandbox login + credential extraction (v1.0.0 — not v0.8.x)**
+  - Scope: third-party UI automation only — ACG has no API, browser is the only way in
+  - Job: login to ACG web UI, start sandbox, extract cloud credentials + expiry time → hand off to k3dm-mcp
+  - Does NOT do shopping-cart testing — Playwright MCP owns that
 
 ---
 
