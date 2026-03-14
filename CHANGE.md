@@ -1,30 +1,22 @@
 # Changes - k3d-manager
 
-## v0.9.0 — Shopping Cart CI Stabilization + P4 Linters + v0.1.0 Releases — dated 2026-03-14
+## v0.9.0 — k3dm-mcp Planning + Agent Workflow Lessons + Shopping Cart Orchestration — dated 2026-03-14
 
 ### Added
-- **Shopping Cart CI stabilization** (`wilddog64/shopping-cart-{basket,order,payment,product-catalog,frontend}`): Round 3 CI fixes merged to main on all 5 repos. Branch protection (1 review + CI required) applied to all 5 repos.
-- **P4 linters** — static analysis gates added to all 4 service repos:
-  - `shopping-cart-basket`: `golangci-lint` (Go)
-  - `shopping-cart-product-catalog`: `ruff` + `mypy` (Python)
-  - `shopping-cart-order`: Checkstyle + OWASP Dependency-Check (Java)
-  - `shopping-cart-payment`: Checkstyle + SpotBugs (Java) — `spotbugs-exclude.xml` suppresses Stripe SDK global static write; `EncryptionService` fixed for `DM_DEFAULT_ENCODING`
-- **`CLAUDE.md` Agent Instructions** added to `shopping-cart-order` and `shopping-cart-payment`: persistent rules loaded at every Codex session to prevent silent reversion of intentional decisions (e.g., OWASP `failOnError=false`, Checkstyle thresholds).
-- **v0.1.0 releases** cut on all 6 shopping-cart repos: CHANGELOG, PR, Copilot review, squash-merge, GitHub release.
-- **k3dm-mcp planning**: log aggregation decision recorded; separate repo at `wilddog64/k3dm-mcp`.
-
-### Fixed
-- **OWASP Dependency-Check `failOnError=false`** (`shopping-cart-order/pom.xml`): NVD DEMO_KEY retired in 2023; scan falls back to cached data instead of crashing on 403.
-- **EncryptionService `DM_DEFAULT_ENCODING`** (`shopping-cart-payment`): Explicit `StandardCharsets.UTF_8` in `encrypt`/`decrypt` to satisfy SpotBugs.
+- **k3dm-mcp planning**: Architecture decision recorded — log aggregation via MCP; separate repo at `wilddog64/k3dm-mcp` identified as next milestone post v0.9.0.
+- **vcluster as v1.1.0 provider**: Roadmap updated after Loft Labs platform advocate contact.
 
 ### Documentation
-- `docs/plans/ci-stabilization-round3.md` — Round 3 CI fix spec (squash-merged c5797539 from `shopping-cart-infra`).
-- Agent lessons updated: Codex fabricates commit SHAs, reports "done" without implementing code, silently reverts explicit decisions across session restarts. Three-layer defense: Agent Instructions in CLAUDE.md + inline DO NOT REMOVE comments + memory-bank sections.
+- `docs/plans/ci-stabilization-round3.md` — Round 3 CI fix spec for shopping-cart repos (spec authored here, execution tracked in `wilddog64/shopping-cart-infra`).
+- **Agent workflow lessons** added to `memory-bank/activeContext.md`:
+  - Codex fabricates commit SHAs when reporting completion — always verify with `gh api`.
+  - Codex reports "done" after writing docs without implementing code — require a PR URL as proof.
+  - Codex silently reverts intentional decisions across session restarts — three-layer defense: Agent Instructions in `CLAUDE.md` + inline `DO NOT REMOVE` comments + memory-bank sections.
+- **Memory-bank** updated to reflect orchestration outcomes: CI stabilization, P4 linters, branch protection, and v0.1.0 releases complete across all 6 shopping-cart repos (code changes live in those repos).
 
 ### Validation
-- CI green across all 5 shopping-cart repos.
-- All 6 v0.1.0 GitHub releases published.
-- Copilot code review COMMENTED (no blocking issues) on all 6 release PRs.
+- BATS: no regressions on existing test suites.
+- shellcheck: clean on all `.sh` files touched.
 
 ---
 
