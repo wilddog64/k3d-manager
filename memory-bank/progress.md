@@ -50,7 +50,7 @@
   - `shopping-cart-order` PR #1 — ✅ MERGED to main 2026-03-14
   - `shopping-cart-product-catalog` PR #1 — ✅ MERGED to main 2026-03-14
   - `shopping-cart-payment` PR #1 — ✅ MERGED to main 2026-03-14
-  - `shopping-cart-frontend` PR #1 — 🔴 OPEN. 4 `react-refresh/only-export-components` warnings. Spec ready: `shopping-cart-infra/docs/plans/ci-frontend-lint-fix.md`.
+  - `shopping-cart-frontend` PR #1 — ✅ MERGED to main 2026-03-14. Copilot reviewed — no comments.
 
 **lib-foundation Backlog:**
 - [ ] `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
