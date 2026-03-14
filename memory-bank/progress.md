@@ -57,7 +57,14 @@
   - product-catalog: merged PR #2 (ruff + mypy)
   - order: merged PR #2 (Checkstyle + OWASP)
   - payment: merged PR #2 (Checkstyle + SpotBugs)
-- **Next:** v0.1.0 release branches on all 6 repos
+- **v0.1.0 releases SHIPPED** — all 6 repos tagged + GitHub releases created 2026-03-14:
+  - basket: https://github.com/wilddog64/shopping-cart-basket/releases/tag/v0.1.0
+  - product-catalog: https://github.com/wilddog64/shopping-cart-product-catalog/releases/tag/v0.1.0
+  - order: https://github.com/wilddog64/shopping-cart-order/releases/tag/v0.1.0
+  - payment: https://github.com/wilddog64/shopping-cart-payment/releases/tag/v0.1.0
+  - frontend: https://github.com/wilddog64/shopping-cart-frontend/releases/tag/v0.1.0
+  - infra: https://github.com/wilddog64/shopping-cart-infra/releases/tag/v0.1.0
+- **Next:** k3dm-mcp v0.1.0 implementation
 
 **lib-foundation Backlog:**
 - [ ] `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`

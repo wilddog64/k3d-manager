@@ -16,17 +16,19 @@ the shopping cart pipeline and cleaning up lib-foundation debt.
 
 | Item | Status | Notes |
 |---|---|---|
-| Shopping cart CI stabilization | **in progress** | Tracked in `wilddog64/shopping-cart-infra` memory-bank. Round 3 spec: `docs/plans/ci-stabilization-round3.md` (c5797539) |
-| Shopping cart linters (P4) | pending | After CI green — golangci-lint, ruff, checkstyle etc |
-| Shopping cart branch protection | pending | After CI green + linters pass |
+| Shopping cart CI stabilization | **COMPLETE** | All 5 PRs merged to main 2026-03-14. Branch protection applied. |
+| Shopping cart linters (P4) | **COMPLETE** | All 4 repos merged to main 2026-03-14 |
+| Shopping cart v0.1.0 releases | **COMPLETE** | All 6 repos: CHANGELOG, PR, Copilot review, squash-merge, GitHub release 2026-03-14 |
 | lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
-| k3dm-mcp planning | **in progress** | Roadmap at `k3dm-mcp/docs/plans/roadmap.md`; log aggregation decision recorded |
+| k3dm-mcp v0.1.0 | pending | Separate repo `~/src/gitrepo/personal/k3dm-mcp` — starts now |
 
 ---
 
 ## Open Items
 
-- [ ] Shopping cart CI stabilization — see `wilddog64/shopping-cart-infra` memory-bank for detailed status
+- [x] Shopping cart CI stabilization — all 5 repos merged 2026-03-14
+- [x] Shopping cart P4 linters — all 4 repos merged 2026-03-14
+- [x] Shopping cart v0.1.0 releases — all 6 repos shipped 2026-03-14
 - [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)
 - [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
