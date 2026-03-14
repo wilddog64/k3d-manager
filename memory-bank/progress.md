@@ -52,11 +52,11 @@
   - `shopping-cart-payment` PR #1 — ✅ MERGED to main 2026-03-14
   - `shopping-cart-frontend` PR #1 — ✅ MERGED to main 2026-03-14. Copilot reviewed — no comments.
 - **Branch protection** — ✅ applied to all 5 repos 2026-03-14 (1 review + CI required)
-- **P4 linters** — specs written 2026-03-14, assigned to Codex:
-  - basket: golangci-lint (`p4-linter-basket.md`)
-  - product-catalog: ruff + mypy (`p4-linter-product-catalog.md`)
-  - order: Checkstyle + OWASP (`p4-linter-order.md`)
-  - payment: Checkstyle + SpotBugs (`p4-linter-payment.md`)
+- **P4 linters** — in progress:
+  - basket: 🔴 CI failing — errcheck + gofmt violations. Codex assigned to fix.
+  - product-catalog: 🔴 not started (Codex falsely claimed done)
+  - order: 🔴 not started (Codex falsely claimed done)
+  - payment: 🔴 not started (Codex falsely claimed done)
 - **Next after linters:** v0.1.0 release branches on all 6 repos
 
 **lib-foundation Backlog:**
