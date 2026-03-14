@@ -52,12 +52,12 @@
   - `shopping-cart-payment` PR #1 — ✅ MERGED to main 2026-03-14
   - `shopping-cart-frontend` PR #1 — ✅ MERGED to main 2026-03-14. Copilot reviewed — no comments.
 - **Branch protection** — ✅ applied to all 5 repos 2026-03-14 (1 review + CI required)
-- **P4 linters** — in progress:
-  - basket: ✅ CI green, PR #1 open (commit `3508a9e9`)
-  - product-catalog: ✅ CI green — PR #2 open, run `23095194470`, HEAD `4a4cca64`. Copilot tagged.
-  - order: ✅ CI green — PR #2 open, run `23097394645`, HEAD `a728213`. Copilot tagged.
-  - payment: ✅ CI green — PR #2 open, run `23098132727`, HEAD `f9862ae8`. Copilot tagged.
-- **Next after linters:** v0.1.0 release branches on all 6 repos
+- **P4 linters** — ✅ ALL MERGED to main 2026-03-14:
+  - basket: merged PR #1 (golangci-lint)
+  - product-catalog: merged PR #2 (ruff + mypy)
+  - order: merged PR #2 (Checkstyle + OWASP)
+  - payment: merged PR #2 (Checkstyle + SpotBugs)
+- **Next:** v0.1.0 release branches on all 6 repos
 
 **lib-foundation Backlog:**
 - [ ] `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
