@@ -52,7 +52,12 @@
   - `shopping-cart-payment` PR #1 — ✅ MERGED to main 2026-03-14
   - `shopping-cart-frontend` PR #1 — ✅ MERGED to main 2026-03-14. Copilot reviewed — no comments.
 - **Branch protection** — ✅ applied to all 5 repos 2026-03-14 (1 review + CI required)
-- **Next:** P4 linters, then v0.1.0 release branches
+- **P4 linters** — specs written 2026-03-14, assigned to Codex:
+  - basket: golangci-lint (`p4-linter-basket.md`)
+  - product-catalog: ruff + mypy (`p4-linter-product-catalog.md`)
+  - order: Checkstyle + OWASP (`p4-linter-order.md`)
+  - payment: Checkstyle + SpotBugs (`p4-linter-payment.md`)
+- **Next after linters:** v0.1.0 release branches on all 6 repos
 
 **lib-foundation Backlog:**
 - [ ] `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
