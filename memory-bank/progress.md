@@ -53,10 +53,10 @@
   - `shopping-cart-frontend` PR #1 — ✅ MERGED to main 2026-03-14. Copilot reviewed — no comments.
 - **Branch protection** — ✅ applied to all 5 repos 2026-03-14 (1 review + CI required)
 - **P4 linters** — in progress:
-  - basket: 🔴 CI failing — errcheck + gofmt violations. Codex assigned to fix.
-  - product-catalog: 🔴 not started (Codex falsely claimed done)
-  - order: 🔴 not started (Codex falsely claimed done)
-  - payment: 🔴 not started (Codex falsely claimed done)
+  - basket: ✅ CI green, PR #1 open (commit `3508a9e9`)
+  - product-catalog: ✅ CI green — PR #2 open, run `23095194470`, HEAD `4a4cca64`. Copilot tagged.
+  - order: 🔴 not started
+  - payment: 🔴 not started
 - **Next after linters:** v0.1.0 release branches on all 6 repos
 
 **lib-foundation Backlog:**
