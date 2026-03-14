@@ -56,7 +56,7 @@
   - basket: ✅ CI green, PR #1 open (commit `3508a9e9`)
   - product-catalog: ✅ CI green — PR #2 open, run `23095194470`, HEAD `4a4cca64`. Copilot tagged.
   - order: ✅ CI green — PR #2 open, run `23097394645`, HEAD `a728213`. Copilot tagged.
-  - payment: 🔴 not started
+  - payment: ✅ CI green — PR #2 open, run `23098132727`, HEAD `f9862ae8`. Copilot tagged.
 - **Next after linters:** v0.1.0 release branches on all 6 repos
 
 **lib-foundation Backlog:**
