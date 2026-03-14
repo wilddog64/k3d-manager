@@ -55,7 +55,7 @@
 - **P4 linters** — in progress:
   - basket: ✅ CI green, PR #1 open (commit `3508a9e9`)
   - product-catalog: ✅ CI green — PR #2 open, run `23095194470`, HEAD `4a4cca64`. Copilot tagged.
-  - order: 🔴 not started
+  - order: ✅ CI green — PR #2 open, run `23096069427`, HEAD `c15a965c`. Copilot tagged.
   - payment: 🔴 not started
 - **Next after linters:** v0.1.0 release branches on all 6 repos
 
