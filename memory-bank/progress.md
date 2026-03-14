@@ -51,6 +51,8 @@
   - `shopping-cart-product-catalog` PR #1 — ✅ MERGED to main 2026-03-14
   - `shopping-cart-payment` PR #1 — ✅ MERGED to main 2026-03-14
   - `shopping-cart-frontend` PR #1 — ✅ MERGED to main 2026-03-14. Copilot reviewed — no comments.
+- **Branch protection** — ✅ applied to all 5 repos 2026-03-14 (1 review + CI required)
+- **Next:** P4 linters, then v0.1.0 release branches
 
 **lib-foundation Backlog:**
 - [ ] `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
