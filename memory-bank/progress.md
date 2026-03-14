@@ -46,11 +46,11 @@
 - Status source of truth: `wilddog64/shopping-cart-infra` memory-bank (`activeContext.md` + `progress.md`).
 - Current spec: `docs/plans/ci-stabilization-round3.md` (c5797539).
 - Active PRs (all on `fix/ci-stabilization`):
-  - `rabbitmq-client-java` PR #1 — publish workflow now runs on `fix/ci-stabilization` pushes and uploads artifacts successfully.
-  - `shopping-cart-payment` PR #1 — GH Packages repo + Maven settings in place, testcontainers + stub exceptions added, and CI now reaches integration test compilation. Build currently fails because the legacy `RefundServiceIntegrationTest` calls the old `processRefund` signature (missing `userId` + `correlationId`) and expects a `getRefundsByPaymentId` helper that no longer exists.
-  - `shopping-cart-order` PR #1 — workflow grants `packages: read` and repository snapshots are enabled, but CI still cannot download `com.shoppingcart:rabbitmq-client:1.0.0-SNAPSHOT` from GitHub Packages.
-  - `shopping-cart-frontend` PR #1 — blocked on `react-refresh/only-export-components` lint warnings.
-  - `shopping-cart-product-catalog` PR #1 — CI green, awaiting merge.
+  - `rabbitmq-client-java` PR #1 — ✅ CI green, package published to GitHub Packages.
+  - `shopping-cart-order` PR #1 — ✅ CI green (PACKAGES_TOKEN fix resolved cross-repo auth).
+  - `shopping-cart-product-catalog` PR #1 — ✅ CI green, awaiting merge.
+  - `shopping-cart-payment` PR #1 — OPEN. `processRefund` call sites in `RefundServiceIntegrationTest` use wrong arg count (4 vs required 5). `getRefundsByPaymentId` missing. Assigned to Codex (Round 5, 2026-03-14).
+  - `shopping-cart-frontend` PR #1 — OPEN. Blocked on `react-refresh/only-export-components` lint warnings in Badge/Button/test-utils.
 
 **lib-foundation Backlog:**
 - [ ] `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
