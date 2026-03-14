@@ -1,5 +1,33 @@
 # Changes - k3d-manager
 
+## v0.9.0 — Shopping Cart CI Stabilization + P4 Linters + v0.1.0 Releases — dated 2026-03-14
+
+### Added
+- **Shopping Cart CI stabilization** (`wilddog64/shopping-cart-{basket,order,payment,product-catalog,frontend}`): Round 3 CI fixes merged to main on all 5 repos. Branch protection (1 review + CI required) applied to all 5 repos.
+- **P4 linters** — static analysis gates added to all 4 service repos:
+  - `shopping-cart-basket`: `golangci-lint` (Go)
+  - `shopping-cart-product-catalog`: `ruff` + `mypy` (Python)
+  - `shopping-cart-order`: Checkstyle + OWASP Dependency-Check (Java)
+  - `shopping-cart-payment`: Checkstyle + SpotBugs (Java) — `spotbugs-exclude.xml` suppresses Stripe SDK global static write; `EncryptionService` fixed for `DM_DEFAULT_ENCODING`
+- **`CLAUDE.md` Agent Instructions** added to `shopping-cart-order` and `shopping-cart-payment`: persistent rules loaded at every Codex session to prevent silent reversion of intentional decisions (e.g., OWASP `failOnError=false`, Checkstyle thresholds).
+- **v0.1.0 releases** cut on all 6 shopping-cart repos: CHANGELOG, PR, Copilot review, squash-merge, GitHub release.
+- **k3dm-mcp planning**: log aggregation decision recorded; separate repo at `wilddog64/k3dm-mcp`.
+
+### Fixed
+- **OWASP Dependency-Check `failOnError=false`** (`shopping-cart-order/pom.xml`): NVD DEMO_KEY retired in 2023; scan falls back to cached data instead of crashing on 403.
+- **EncryptionService `DM_DEFAULT_ENCODING`** (`shopping-cart-payment`): Explicit `StandardCharsets.UTF_8` in `encrypt`/`decrypt` to satisfy SpotBugs.
+
+### Documentation
+- `docs/plans/ci-stabilization-round3.md` — Round 3 CI fix spec (squash-merged c5797539 from `shopping-cart-infra`).
+- Agent lessons updated: Codex fabricates commit SHAs, reports "done" without implementing code, silently reverts explicit decisions across session restarts. Three-layer defense: Agent Instructions in CLAUDE.md + inline DO NOT REMOVE comments + memory-bank sections.
+
+### Validation
+- CI green across all 5 shopping-cart repos.
+- All 6 v0.1.0 GitHub releases published.
+- Copilot code review COMMENTED (no blocking issues) on all 6 release PRs.
+
+---
+
 ## v0.8.0 — Vault ArgoCD Deploy Keys + cert-manager ACME + Istio IngressClass — dated 2026-03-13
 
 ### Added
