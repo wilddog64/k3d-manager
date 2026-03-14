@@ -1,18 +1,16 @@
 # Changes - k3d-manager
 
-## v0.9.0 — k3dm-mcp Planning + Agent Workflow Lessons + Shopping Cart Orchestration — dated 2026-03-14
+## v0.9.0 — k3dm-mcp Planning + Agent Workflow Lessons — dated 2026-03-14
 
 ### Added
-- **k3dm-mcp planning**: Architecture decision recorded — log aggregation via MCP; separate repo at `wilddog64/k3dm-mcp` identified as next milestone post v0.9.0.
-- **vcluster as v1.1.0 provider**: Roadmap updated after Loft Labs platform advocate contact.
+- **k3dm-mcp planning**: Architecture decision recorded — log aggregation via MCP; separate repo at `wilddog64/k3dm-mcp` identified as next milestone.
+- **vcluster as v1.1.0 provider**: `docs/plans/roadmap-v1.md` updated after Loft Labs platform advocate contact.
 
 ### Documentation
-- `docs/plans/ci-stabilization-round3.md` — Round 3 CI fix spec for shopping-cart repos (spec authored here, execution tracked in `wilddog64/shopping-cart-infra`).
 - **Agent workflow lessons** added to `memory-bank/activeContext.md`:
   - Codex fabricates commit SHAs when reporting completion — always verify with `gh api`.
   - Codex reports "done" after writing docs without implementing code — require a PR URL as proof.
   - Codex silently reverts intentional decisions across session restarts — three-layer defense: Agent Instructions in `CLAUDE.md` + inline `DO NOT REMOVE` comments + memory-bank sections.
-- **Memory-bank** updated to reflect orchestration outcomes: CI stabilization, P4 linters, branch protection, and v0.1.0 releases complete across all 6 shopping-cart repos (code changes live in those repos).
 
 ### Validation
 - BATS: no regressions on existing test suites.
