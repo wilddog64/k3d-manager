@@ -46,11 +46,11 @@
 - Status source of truth: `wilddog64/shopping-cart-infra` memory-bank (`activeContext.md` + `progress.md`).
 - Current spec: `docs/plans/ci-stabilization-round3.md` (c5797539).
 - Active PRs (all on `fix/ci-stabilization`):
-  - `rabbitmq-client-java` PR #1 — ✅ CI green, package published to GitHub Packages.
-  - `shopping-cart-order` PR #1 — ✅ CI green (PACKAGES_TOKEN fix resolved cross-repo auth).
-  - `shopping-cart-product-catalog` PR #1 — ✅ CI green, awaiting merge.
-  - `shopping-cart-payment` PR #1 — OPEN. `processRefund` call sites in `RefundServiceIntegrationTest` use wrong arg count (4 vs required 5). `getRefundsByPaymentId` missing. Assigned to Codex (Round 5, 2026-03-14).
-  - `shopping-cart-frontend` PR #1 — OPEN. Blocked on `react-refresh/only-export-components` lint warnings in Badge/Button/test-utils.
+  - `rabbitmq-client-java` PR #1 — ✅ MERGED to main 2026-03-14
+  - `shopping-cart-order` PR #1 — ✅ MERGED to main 2026-03-14
+  - `shopping-cart-product-catalog` PR #1 — ✅ MERGED to main 2026-03-14
+  - `shopping-cart-payment` PR #1 — ✅ MERGED to main 2026-03-14
+  - `shopping-cart-frontend` PR #1 — 🔴 OPEN. 4 `react-refresh/only-export-components` warnings. Spec ready: `shopping-cart-infra/docs/plans/ci-frontend-lint-fix.md`.
 
 **lib-foundation Backlog:**
 - [ ] `_run_command` if-count refactor (v0.3.0) — `docs/issues/2026-03-08-run-command-if-count-refactor.md`
