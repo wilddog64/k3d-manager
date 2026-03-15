@@ -53,7 +53,8 @@
 
 - [x] Copilot review process guide — `docs/guides/copilot-review-process.md` + `copilot-review-template.md`
 - [x] README releases table — split to `docs/releases.md` (full history), README shows last 3 + link
-- [ ] Playwright E2E in CI — design spec at `docs/plans/v0.9.2-playwright-e2e-design.md`; pending approval + open questions resolved before Codex task
+- [ ] Reusable vCluster E2E setup workflow — `.github/workflows/vcluster-e2e-setup.yml` in k3d-manager; called by shopping-cart-e2e-tests to provision k3d + vCluster + deploy stack + port-forward + output service URLs
+- [ ] Playwright E2E in CI — design spec at `docs/plans/v0.9.2-playwright-e2e-design.md`; pending: ImagePullBackOff fix in shopping-cart repos before Codex task
 
 ### After v0.9.2 — Cloud Providers then k3dm-mcp
 

@@ -14,8 +14,9 @@
 | Item | Status | Notes |
 |---|---|---|
 | Copilot review process guide | **done** | `docs/guides/copilot-review-process.md` + `copilot-review-template.md` |
-| README releases table update | pending | Add v0.9.1 row |
-| Playwright E2E in CI | pending | `shopping-cart-infra` — primary deliverable |
+| README releases table update | **done** | Split to `docs/releases.md`, README shows last 3 |
+| Reusable vCluster E2E workflow | pending | `.github/workflows/vcluster-e2e-setup.yml` in k3d-manager |
+| Playwright E2E in CI | pending | `shopping-cart-e2e-tests` calls reusable workflow; blocked on ImagePullBackOff fix |
 
 ---
 
