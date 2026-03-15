@@ -53,7 +53,9 @@
 - [x] `AGENTS.md` — agent session rules (read memory-bank, proof of work, no-revert, scope discipline)
 - [x] vCluster plugin spec — `docs/plans/v0.9.1-vcluster-plugin.md` (decisions recorded: v0.32.1, k8s distro, --print kubeconfig, 500m/512Mi limits)
 - [x] Codex task spec — `docs/plans/v0.9.1-vcluster-codex-task.md` (DoD checklist, do-not-do list)
-- [x] vCluster plugin implementation — `scripts/plugins/vcluster.sh` + `scripts/etc/vcluster/values.yaml` + `scripts/tests/plugins/vcluster.bats` — **Codex** (commit `6020fc4c88df520c98d971051a415b1f40fe6edf`, PR pending; `bats scripts/tests/plugins/vcluster.bats` 8/8, `env -i ... bats` 8/8, `shellcheck scripts/plugins/vcluster.sh` clean, `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/plugins/vcluster.sh` PASS)
+- [x] vCluster plugin implementation — `scripts/plugins/vcluster.sh` + `scripts/etc/vcluster/values.yaml` + `scripts/tests/plugins/vcluster.bats` — **Codex** (commit `9be27b7`, BATS 8/8, shellcheck clean, audit PASS)
+- [ ] Gemini smoke test — `vcluster_create` → `vcluster_list` → `vcluster_use` → `vcluster_destroy` on infra cluster
+- [ ] Copilot review comments addressed (PR #31 draft)
 - [ ] Playwright E2E in CI — `shopping-cart-infra` — starts after vCluster plugin ships
 
 ### Next after v0.9.1 — k3dm-mcp v1.0.0

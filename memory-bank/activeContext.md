@@ -13,7 +13,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| vCluster plugin | **implementation delivered — awaiting PR/CI** | `docs/plans/v0.9.1-vcluster-codex-task.md` |
+| vCluster plugin | **PR #31 draft — awaiting Gemini smoke test + Copilot comments addressed** | `docs/plans/v0.9.1-vcluster-codex-task.md` |
 | Playwright E2E in CI | pending | `shopping-cart-infra` — starts after vCluster plugin ships |
 | lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
 
