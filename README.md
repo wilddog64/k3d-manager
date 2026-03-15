@@ -46,10 +46,29 @@ UBUNTU_K3S_SSH_HOST=ubuntu \
 ## Usage
 
 ```bash
-./scripts/k3d-manager                     # show usage and core functions
+./scripts/k3d-manager                     # short summary: categories + function counts
+./scripts/k3d-manager --help              # full function list grouped by category
 ./scripts/k3d-manager <function> [args]   # invoke a core or plugin function
-./scripts/k3d-manager <function> -h       # brief help for any function
 ```
+
+Running without arguments prints a concise overview:
+
+```
+Usage: ./k3d-manager <function> [args]
+
+Categories:
+  Cluster lifecycle      (9 functions)
+  Infrastructure         (5 functions)
+  Secrets                (7 functions)
+  Directory service      (9 functions)
+  Networking             (4 functions)
+  Shopping cart          (2 functions)
+  Testing                (9 functions)
+
+Run ./k3d-manager --help for full function list.
+```
+
+`--help` expands each category with the full function list, cluster provider info, and environment variables.
 
 ```bash
 ./scripts/k3d-manager create_cluster mycluster          # default 8000/8443
