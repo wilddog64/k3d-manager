@@ -1,5 +1,23 @@
 # Changes - k3d-manager
 
+## v0.9.0 — k3dm-mcp Planning + Agent Workflow Lessons — dated 2026-03-14
+
+### Added
+- **k3dm-mcp planning**: Architecture decision recorded — log aggregation via MCP; separate repo at `wilddog64/k3dm-mcp` identified as next milestone.
+- **vcluster as v1.1.0 provider**: `docs/plans/roadmap-v1.md` updated after Loft Labs platform advocate contact.
+
+### Documentation
+- **Agent workflow lessons** added to `memory-bank/activeContext.md`:
+  - Codex fabricates commit SHAs when reporting completion — always verify with `gh api`.
+  - Codex reports "done" after writing docs without implementing code — require a PR URL as proof.
+  - Codex silently reverts intentional decisions across session restarts — three-layer defense: Agent Instructions in `CLAUDE.md` + inline `DO NOT REMOVE` comments + memory-bank sections.
+
+### Validation
+- BATS: no regressions on existing test suites.
+- shellcheck: clean on all `.sh` files touched.
+
+---
+
 ## v0.8.0 — Vault ArgoCD Deploy Keys + cert-manager ACME + Istio IngressClass — dated 2026-03-13
 
 ### Added

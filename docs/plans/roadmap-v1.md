@@ -191,7 +191,52 @@ JSON-RPC stdio. No direct k3d-manager calls — always through the MCP security 
 
 ---
 
-## v1.0.0 — Multi-Cloud + ACG Sandbox Lifecycle
+## v1.0.0 — vCluster Plugin
+*Focus: Tenant clusters on top of existing infra — on-demand isolation without new VMs*
+
+**Motivation:** vCluster (by Loft Labs) creates fully functional virtual Kubernetes clusters
+inside a namespace of an existing host cluster. Pods schedule on the host cluster nodes —
+no new VMs, no new cloud infrastructure. Spin up in seconds, destroy in seconds.
+
+**Why a plugin, not a provider:**
+vCluster is not a standalone runtime — it requires a host cluster to already exist.
+It cannot satisfy the `CLUSTER_PROVIDER` contract (create a cluster from nothing).
+The correct model is a plugin that layered on top of whichever provider is active:
+
+```bash
+# Host cluster already running (orbstack/k3d/k3s)
+./scripts/k3d-manager vcluster_create  my-tenant   # spin up vCluster inside host
+./scripts/k3d-manager vcluster_destroy my-tenant   # tear it down
+./scripts/k3d-manager vcluster_use     my-tenant   # switch kubeconfig to tenant
+./scripts/k3d-manager vcluster_list                # list all tenant clusters
+```
+
+**Use cases this unlocks:**
+- Per-feature isolated test environments — spin up, deploy stack, test, destroy
+- Team isolation — each developer gets their own cluster namespace without VM overhead
+- CI pipelines — ephemeral cluster per pipeline run, no teardown race conditions
+- Prerequisite validation for multi-cloud (v1.1.0) — provider contract proven locally first
+
+**Plugin implementation (`scripts/plugins/vcluster.sh`):**
+- `vcluster_create <name>` — `vcluster create <name> -n <namespace>` + export kubeconfig
+- `vcluster_destroy <name>` — `vcluster delete <name> -n <namespace>` — dry-run gate inherited
+- `vcluster_use <name>` — merge vCluster kubeconfig, switch context
+- `vcluster_list` — list active tenant clusters in host
+- `VCLUSTER_NAMESPACE` env var — target namespace in host (default: `vclusters`)
+- `VCLUSTER_VERSION` env var — pin chart version explicitly, no floating `latest`
+- Prerequisite check: verify host cluster context is active before any operation
+
+**What stays the same:** once `vcluster_use` hands off a kubeconfig, all existing plugins
+(Vault, ESO, Istio, Jenkins, ArgoCD) work identically — they speak only Kubernetes primitives.
+
+**BATS coverage:** new `vcluster.bats` suite; pure logic tests (`env -i` clean).
+
+*Note: vCluster team made contact after k3d-manager articles — potential collaboration
+for integration testing and early access to new vCluster features.*
+
+---
+
+## v1.1.0 — Multi-Cloud + ACG Sandbox Lifecycle
 *Focus: Same stack definition, any cloud*
 
 **Motivation:** The architectural boundary already supports this — `CLUSTER_PROVIDER`
@@ -247,7 +292,7 @@ ACG login credentials stored in Vault — never hardcoded or passed via CLI args
 - `stale: true` flag extended to cover expired sandboxes
 - `sync_state` tool warns when sandbox has < 30min remaining
 
-**API stability:** v1.0.0 declares the MCP tool surface stable. Breaking changes
+**API stability:** v1.1.0 declares the MCP tool surface stable. Breaking changes
 require a major version bump. Bash CLI compatibility maintained for all existing scripts.
 
 **Engineering standards inherited:** spec-first, no ADKs, bash-native plugins,
