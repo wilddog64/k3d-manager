@@ -433,10 +433,7 @@ function _install_docker() {
 
    case "$platform" in
       mac)
-         if ! _command_exist docker; then
-            _err "Docker not found. On macOS, Docker is provided by OrbStack — please install OrbStack and ensure it is running."
-         fi
-         _info "Docker available via OrbStack."
+         _info "On macOS, Docker is provided by OrbStack — no installation required."
          ;;
       debian|wsl)
          _install_debian_docker
@@ -766,6 +763,10 @@ EOF
             _info "Non-interactive session detected; defaulting to k3d provider."
          fi
       fi
+   fi
+
+   if [[ "$platform" == "mac" && "$provider" == "k3s" ]]; then
+      _err "k3s is not supported on macOS; please use k3d instead."
    fi
 
    case "$provider" in

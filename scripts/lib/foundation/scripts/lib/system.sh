@@ -39,6 +39,62 @@ function _command_exist() {
     command -v "$1" &> /dev/null
 }
 
+# _run_command_resolve_sudo <prog> <prefer_sudo> <require_sudo> <interactive_sudo> [probe_args...]
+#
+# Resolves the runner array (plain prog, sudo -n prog, or sudo prog) and stores
+# it in the global _RCRS_RUNNER. Caller must initialize _RCRS_RUNNER before
+# calling and unset it after reading.
+#
+# Returns 127 if --require-sudo is set but sudo is unavailable.
+function _run_command_resolve_sudo() {
+  local prog="$1"
+  local prefer_sudo="$2"
+  local require_sudo="$3"
+  local interactive_sudo="$4"
+  shift 4
+  local -a probe_args=("$@")
+
+  local -a sudo_flags=()
+  if (( interactive_sudo == 0 )); then
+    sudo_flags=(-n)
+  fi
+
+  if (( require_sudo )); then
+    if (( interactive_sudo )) || sudo -n true >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+    else
+      echo "sudo non-interactive not available" >&2
+      return 127
+    fi
+    return 0
+  fi
+
+  if (( ${#probe_args[@]} )); then
+    if "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
+      _RCRS_RUNNER=("$prog")
+    elif (( interactive_sudo )) && sudo "${sudo_flags[@]}" "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+    elif sudo -n "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo -n "$prog")
+    elif (( prefer_sudo && interactive_sudo )); then
+      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+    elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo -n "$prog")
+    else
+      _RCRS_RUNNER=("$prog")
+    fi
+    return 0
+  fi
+
+  if (( prefer_sudo && interactive_sudo )); then
+    _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+  elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
+    _RCRS_RUNNER=(sudo -n "$prog")
+  else
+    _RCRS_RUNNER=("$prog")
+  fi
+}
+
 # _run_command [--quiet] [--prefer-sudo|--require-sudo] [--probe '<subcmd>'] -- <prog> [args...]
 # - --quiet         : suppress wrapper error message (still returns real exit code)
 # - --prefer-sudo   : use sudo -n if available, otherwise run as user
@@ -81,45 +137,30 @@ function _run_command() {
   fi
 
   # Decide runner: user vs sudo -n vs sudo (interactive)
-  local runner
-  local sudo_flags=()
-  if (( interactive_sudo == 0 )); then
-    sudo_flags=(-n)  # Non-interactive sudo
-  fi
-
-  if (( require_sudo )); then
-    if (( interactive_sudo )) || sudo -n true >/dev/null 2>&1; then
-      runner=(sudo "${sudo_flags[@]}" "$prog")
-    else
-      (( quiet )) || echo "sudo non-interactive not available" >&2
-      exit 127
-    fi
+  _RCRS_RUNNER=()
+  if (( quiet )); then
+    _run_command_resolve_sudo "$prog" \
+      "$prefer_sudo" "$require_sudo" "$interactive_sudo" \
+      "${probe_args[@]}" 2>/dev/null || {
+        if (( soft )); then
+          return 127
+        else
+          exit 127
+        fi
+      }
   else
-    if (( ${#probe_args[@]} )); then
-      # Try user first; if probe fails, try sudo
-      if "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=("$prog")
-      elif (( interactive_sudo )) && sudo "${sudo_flags[@]}" "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=(sudo "${sudo_flags[@]}" "$prog")
-      elif sudo -n "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=(sudo -n "$prog")
-      elif (( prefer_sudo )) && ((interactive_sudo)) ; then
-        runner=(sudo "${sudo_flags[@]}" "$prog")
-      elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
-        runner=(sudo -n "$prog")
-      else
-        runner=("$prog")
-      fi
-    else
-      if (( prefer_sudo )) && (( interactive_sudo )); then
-        runner=(sudo "${sudo_flags[@]}" "$prog")
-      elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
-        runner=(sudo -n "$prog")
-      else
-        runner=("$prog")
-      fi
-    fi
+    _run_command_resolve_sudo "$prog" \
+      "$prefer_sudo" "$require_sudo" "$interactive_sudo" \
+      "${probe_args[@]}" || {
+        if (( soft )); then
+          return 127
+        else
+          exit 127
+        fi
+      }
   fi
+  local -a runner=("${_RCRS_RUNNER[@]}")
+  unset _RCRS_RUNNER
 
   # Execute and preserve exit code
   "${runner[@]}" "$@"
@@ -727,6 +768,7 @@ function _detect_platform() {
    _err "Unsupported platform: $(uname -s)"
 }
 
+
 function _create_nfs_share_mac() {
    local share_path="${1:-${HOME}/k3d-nfs}"
    _ensure_path_exists "$share_path"
@@ -855,7 +897,7 @@ function _install_redhat_docker() {
   fi
   # Add current user to docker group
   _run_command  -- sudo usermod -aG docker "$USER"
-  echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
+  echo "Docker instsudo alled successfully. You may need to log out and back in for group changes to take effect."
 }
 
 function _k3d_cluster_exist() {

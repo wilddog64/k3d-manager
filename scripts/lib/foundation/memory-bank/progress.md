@@ -2,7 +2,8 @@
 
 ## Overall Status
 
-**Active** — v0.1.0 shipped; v0.1.1 adds `_resolve_script_dir` helper.
+**v0.2.0 SHIPPED** — `agent_rigor.sh` merged, tag `v0.2.0`. Synced into k3d-manager.
+**v0.3.0 ACTIVE** — `_run_command` if-count refactor. Branch `feat/run-command-refactor-v0.3.0` cut 2026-03-15. Commits `b7b5411` + `c50e294` (PR #5) implement `_run_command_resolve_sudo`, drop if-count <8, add BATS coverage, and swap `local -n` for `_RCRS_RUNNER` via `docs/plans/v0.3.0-run-command-if-count-refactor.md` + `docs/plans/v0.3.0-run-command-bash-compat-fix.md`.
 
 ---
 
@@ -23,11 +24,49 @@
 
 ## What Is Pending
 
-- [ ] Wire lib-foundation subtree back into k3d-manager (`git subtree pull/push`, Codex follow-up)
-- [ ] Integrate lib-foundation as subtree remote back into k3d-manager
+- [x] Wire lib-foundation subtree into k3d-manager — DONE in k3d-manager v0.7.0 (subtree at `scripts/lib/foundation/`)
+- [ ] Sync deploy_cluster improvements back from k3d-manager local core.sh → lib-foundation core.sh (CLUSTER_NAME fix, provider helpers, if-count reduction)
+- [ ] Remove duplicate mac+k3s guard in core.sh `deploy_cluster` (already removed in k3d-manager subtree snapshot; apply upstream)
+- [ ] Route bare sudo in `_install_debian_helm` / `_install_debian_docker` through `_run_command` (Copilot flag — k3d-manager PR #24)
+- [ ] Remote installer script integrity — checksum/signature verification for `_install_k3s`, `_install_istioctl`, `_install_bats_from_source`, `_install_copilot_from_release` (Copilot flag — k3d-manager PR #24; dev-only pattern, low priority)
+- [ ] Drop colima support — delete `_install_colima` + `_install_mac_docker` from `system.sh`; update `_install_docker` mac case in `core.sh`. Sync from k3d-manager v0.7.1 once merged.
 - [ ] Broader BATS coverage for remaining lib functions
 - [ ] Consumer integration: `rigor-cli`
 - [ ] Consumer integration: `shopping-carts`
+
+---
+
+## v0.3.0 — Shell Utility Enhancements
+
+Inspired by analysis of `claude-code-statusline` script (aleksander-dytko/claude-code-statusline).
+Script to download for reference: `https://raw.githubusercontent.com/aleksander-dytko/claude-code-statusline/main/statusline.sh`
+
+### New helpers to add to `system.sh`:
+
+- **`_stat_mtime <file>`** — cross-platform `stat` mtime (GNU vs BSD). Pattern from statusline script:
+  ```bash
+  if stat -c %Y /dev/null >/dev/null 2>&1; then
+      _stat_mtime() { stat -c %Y "$1" 2>/dev/null; }
+  else
+      _stat_mtime() { stat -f %m "$1" 2>/dev/null; }
+  fi
+  ```
+  Detected once at load time, not per-call. Add BATS coverage for both code paths.
+
+- **`_acquire_lock <lock_dir>` / `_release_lock <lock_dir>`** — atomic `mkdir`-based locking with stale lock detection (30s threshold). Pattern from statusline script. Useful for cron jobs, parallel scripts, any script needing mutual exclusion.
+  ```bash
+  # Acquire: mkdir is POSIX-atomic
+  # Stale detection: if lock older than 30s, remove and retry once
+  # Release: rmdir + trap cleanup on INT/TERM/EXIT
+  ```
+  Add BATS coverage: acquire succeeds, second acquire fails, stale lock cleared.
+
+### Refactor of statusline script using lib-foundation:
+
+- Add `_safe_path` at top (PATH poisoning defense for `git`, `curl`, `jq`, `date`, `stat` calls)
+- Replace ad-hoc token logging with `_args_have_sensitive_flag` pattern for curl calls
+- Fix `/tmp` cache dir permissions: `mkdir -m 700` instead of bare `mkdir`
+- Source: download to `scripts/etc/examples/statusline.sh` for reference during refactor
 
 ---
 
