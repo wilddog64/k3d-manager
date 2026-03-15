@@ -15,7 +15,7 @@
 |---|---|---|
 | Copilot review process guide | **done** | `docs/guides/copilot-review-process.md` + `copilot-review-template.md` |
 | README releases table update | **done** | Split to `docs/releases.md`, README shows last 3 |
-| vCluster E2E composite actions | **PR #34 open — Codex fix pending** | mktemp+teardown fixed (`3079f83`). New findings: TAG env + sudo -n + teardown manager check. Task spec: `docs/plans/v0.9.2-vcluster-composite-action-sudo-tag-fix.md` |
+| vCluster E2E composite actions | **PR #34 open — TAG/sudo/manager checks pushed** | mktemp+teardown fixed (`3079f83`); `48217ee` adds `TAG` env + `sudo -n` installer and teardown manager path check per `docs/plans/v0.9.2-vcluster-composite-action-sudo-tag-fix.md`. |
 | Playwright E2E browser tests | pending | `shopping-cart-e2e-tests`; blocked on ImagePullBackOff CI publish jobs completing |
 
 ---
