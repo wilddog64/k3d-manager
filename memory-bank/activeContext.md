@@ -15,7 +15,7 @@
 |---|---|---|
 | Copilot review process guide | **done** | `docs/guides/copilot-review-process.md` + `copilot-review-template.md` |
 | README releases table update | **done** | Split to `docs/releases.md`, README shows last 3 |
-| Reusable vCluster E2E workflow | **PR #33 open (bugfix)** | workflow fix commit `ccb8089b1b688b274e5f41e1cb96fc5bf447cb28`; PR https://github.com/wilddog64/k3d-manager/pull/33 — removes stray teardown cluster create, fixes kubeconfig outputs |
+| vCluster E2E composite actions | **Codex task ready** | PR #33 has 2 P1 Copilot findings; converting reusable workflow to composite actions — task at `docs/plans/v0.9.2-vcluster-e2e-composite-action.md` |
 | Playwright E2E browser tests | pending | `shopping-cart-e2e-tests`; blocked on ImagePullBackOff CI publish jobs completing |
 
 ---
