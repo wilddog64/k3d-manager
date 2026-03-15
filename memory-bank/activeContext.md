@@ -17,7 +17,7 @@
 | CI on PR #31 | **green** | Vault unsealed on M2 Air; latest push `124a2f1` |
 | Two-tier help + `--help` flag | **done** | Commit `0fc68d5` |
 | `function test()` refactor | **done** | Commit `79074e58` — audit PASS, 190 tests pass, verified by Claude |
-| Gemini smoke test | **READY TO ASSIGN** | Spec: `docs/plans/v0.9.1-gemini-smoke-test-task.md` |
+| Gemini smoke test | **FAILED — Step 4** | Spec: `docs/plans/v0.9.1-gemini-smoke-test-task.md` | BATS pass (190), help partially works (vcluster functions missing), `vcluster_create` fails due to selector mismatch (Issue `2026-03-15`) |
 | Playwright E2E in CI | pending | `shopping-cart-infra` — starts after vCluster plugin ships |
 
 ### Gemini next task — READY TO ASSIGN
