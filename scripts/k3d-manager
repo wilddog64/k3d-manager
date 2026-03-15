@@ -64,6 +64,196 @@ function register_shopping_cart_apps() {
     _try_load_plugin register_shopping_cart_apps "$@"
 }
 
+function _test_run_smoke() {
+    local bin_dir="$1"
+    local smoke_namespace="${2:-}"
+    local smoke_rc=0
+    local -a smoke_scripts=(
+        "smoke-test-jenkins.sh"
+        "test-openldap.sh"
+        "test-argocd-cli.sh"
+        "test-directory-auto-load.sh"
+    )
+
+    local script
+    for script in "${smoke_scripts[@]}"; do
+        local script_path="${bin_dir}/${script}"
+        if [[ ! -x "$script_path" ]]; then
+            continue
+        fi
+        printf '\n==> Running %s\n' "$script"
+        if [[ -n "$smoke_namespace" ]]; then
+            "$script_path" "$smoke_namespace" || smoke_rc=$?
+        else
+            "$script_path" || smoke_rc=$?
+        fi
+    done
+
+    return "$smoke_rc"
+}
+
+function _test_select_suite() {
+    local suite_spec="$1"
+    local tests_root="$2"
+    local tests_data="$3"
+    local -a _all_tests=()
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        _all_tests+=("$line")
+    done <<< "$tests_data"$'\n'
+    local -a _selected=()
+
+    case "$suite_spec" in
+        all)
+            _selected=("${_all_tests[@]}")
+            printf '%s\n' "${_selected[@]}"
+            return 0
+            ;;
+        lib|core|plugins)
+            local dir="${tests_root}/${suite_spec}"
+            while IFS= read -r test_file; do
+                _selected+=("$test_file")
+            done < <(find "$dir" -maxdepth 1 -type f -name '*.bats' | sort)
+            if [[ ${#_selected[@]} -eq 0 ]]; then
+                echo "No test suites found in '$suite_spec'." >&2
+                return 1
+            fi
+            printf '%s\n' "${_selected[@]}"
+            return 0
+            ;;
+    esac
+
+    local match_path=""
+    local test_file
+    for test_file in "${_all_tests[@]}"; do
+        local rel_with_ext="${test_file#"${tests_root}"/}"
+        local rel_without_ext="${rel_with_ext%.bats}"
+        local basename_no_ext="${test_file##*/}"
+        basename_no_ext="${basename_no_ext%.bats}"
+        if [[ "$basename_no_ext" == "$suite_spec" \
+           || "$rel_without_ext" == "$suite_spec" \
+           || "$rel_with_ext" == "$suite_spec" \
+           || "$test_file" == "$suite_spec" ]]; then
+            match_path="$test_file"
+            break
+        fi
+    done
+
+    if [[ -n "$match_path" ]]; then
+        _selected=("$match_path")
+        printf '%s\n' "${_selected[@]}"
+        return 0
+    fi
+
+    echo "No test suite matching '$suite_spec'. Available suites:" >&2
+    for test_file in "${_all_tests[@]}"; do
+        printf '  %s\n' "${test_file#"${tests_root}"/}" | sed 's/\.bats$//' >&2
+    done
+    return 1
+}
+
+function _test_execute() {
+    local selected_data="$1"
+    local bats_args_data="$2"
+    local suite_spec="$3"
+    local case_name="$4"
+    local repo_root="$5"
+    local -a _selected=()
+    local -a _bats_args=()
+
+    if [[ -n "$selected_data" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            _selected+=("$line")
+        done <<< "$selected_data"$'\n'
+    fi
+
+    if [[ -n "$bats_args_data" ]]; then
+        while IFS= read -r line; do
+            [[ -z "$line" ]] && continue
+            _bats_args+=("$line")
+        done <<< "$bats_args_data"$'\n'
+    fi
+
+    if [[ ${#_selected[@]} -eq 0 ]]; then
+        echo "No test suites found." >&2
+        return 1
+    fi
+
+    local log_root="${repo_root}/scratch/test-logs"
+    local base_dir=""
+    local artifacts_dir=""
+    local log_file=""
+    local ran_with_logging=0
+    local status=0
+
+    if mkdir -p "$log_root" 2>/dev/null; then
+        local timestamp
+        timestamp="$(date +%Y%m%d-%H%M%S)"
+        local suite_slug
+        suite_slug="$(__slugify "$suite_spec" 12)"
+        base_dir="${log_root}/${suite_slug}"
+        if [[ -n "$case_name" ]]; then
+            local case_slug
+            case_slug="$(__slugify "$case_name" 6)"
+            if [[ -z "$case_slug" ]]; then
+                case_slug='case'
+            fi
+            local case_hash
+            case_hash=$(printf '%s' "$case_name" | sha256sum | cut -c1-4)
+            base_dir+="/${case_slug}-${case_hash}"
+        fi
+
+        if mkdir -p "$base_dir" 2>/dev/null; then
+            artifacts_dir="${base_dir}/${timestamp}"
+            _bats_args+=(--gather-test-outputs-in "$artifacts_dir")
+
+            log_file="${base_dir}/${timestamp}.log"
+            if : > "$log_file" 2>/dev/null; then
+                bats "${_bats_args[@]}" "${_selected[@]}" 2>&1 | tee "$log_file"
+                status=${PIPESTATUS[0]}
+                ran_with_logging=1
+            else
+                log_file=""
+            fi
+        else
+            base_dir=""
+        fi
+    fi
+
+    if (( ran_with_logging == 0 )); then
+        bats "${_bats_args[@]}" "${_selected[@]}"
+        status=$?
+    fi
+
+    if [[ $status -ne 0 ]]; then
+        if [[ -n "$log_file" ]]; then
+            local rel_log_file="${log_file#"${repo_root}"/}"
+            printf 'Test log saved to %s\n' "$rel_log_file" >&2
+        else
+            echo "Test log unavailable (failed to create log file)." >&2
+        fi
+        if [[ -n "$artifacts_dir" ]]; then
+            local rel_artifacts_dir="${artifacts_dir#"${repo_root}"/}"
+            printf 'Collected artifacts in %s\n' "$rel_artifacts_dir" >&2
+        fi
+    else
+        if [[ -n "$log_file" ]]; then
+            rm -f "$log_file" 2>/dev/null || true
+        fi
+        if [[ -n "$artifacts_dir" ]]; then
+            rm -rf "$artifacts_dir" 2>/dev/null || true
+            local prune_dir="$artifacts_dir"
+            while [[ "$prune_dir" != "$log_root" ]]; do
+                prune_dir="$(dirname "$prune_dir")"
+                rmdir "$prune_dir" 2>/dev/null || break
+            done
+        fi
+    fi
+
+    return "$status"
+}
+
 CLUSTER_ROLE="${CLUSTER_ROLE:-infra}"
 CLUSTER_ROLE="$(printf '%s' "$CLUSTER_ROLE" | tr '[:upper:]' '[:lower:]')"
 case "$CLUSTER_ROLE" in
@@ -156,31 +346,14 @@ function test() {
         fi
     fi
 
+    local repo_root
+    repo_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
     if [[ "$suite_spec" == "smoke" ]]; then
-        local repo_root
-        repo_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
         local bin_dir="${repo_root}/bin"
         local smoke_namespace="${positional[1]:-}"
-        local smoke_rc=0
-        local -a smoke_scripts=(
-            "smoke-test-jenkins.sh"
-            "test-openldap.sh"
-            "test-argocd-cli.sh"
-            "test-directory-auto-load.sh"
-        )
-        for script in "${smoke_scripts[@]}"; do
-            local script_path="${bin_dir}/${script}"
-            if [[ ! -x "$script_path" ]]; then
-                continue
-            fi
-            printf '\n==> Running %s\n' "$script"
-            if [[ -n "$smoke_namespace" ]]; then
-                "$script_path" "$smoke_namespace" || smoke_rc=$?
-            else
-                "$script_path" || smoke_rc=$?
-            fi
-        done
-        return $smoke_rc
+        _test_run_smoke "$bin_dir" "$smoke_namespace"
+        return $?
     fi
 
     _ensure_bats
@@ -203,129 +376,28 @@ function test() {
         bats_args+=(--filter "^${escaped_case}$")
     fi
 
-    local -a selected_tests=()
-
-    if [[ "$suite_spec" == "all" ]]; then
-        selected_tests=("${tests[@]}")
-    elif [[ "$suite_spec" == "lib" || "$suite_spec" == "core" || "$suite_spec" == "plugins" ]]; then
-        local dir="${tests_root}/${suite_spec}"
-        while IFS= read -r test_file; do
-            selected_tests+=("$test_file")
-        done < <(find "$dir" -maxdepth 1 -type f -name '*.bats' | sort)
-        if [[ ${#selected_tests[@]} -eq 0 ]]; then
-            echo "No test suites found in '$suite_spec'." >&2
-            return 1
-        fi
-    else
-        local match_found=0
-        local test_file
-        for test_file in "${tests[@]}"; do
-            local rel_with_ext
-            rel_with_ext="${test_file#${tests_root}/}"
-            local rel_without_ext
-            rel_without_ext="${rel_with_ext%.bats}"
-            local basename_no_ext
-            basename_no_ext="${test_file##*/}"
-            basename_no_ext="${basename_no_ext%.bats}"
-            if [[ "$basename_no_ext" == "$suite_spec" \
-               || "$rel_without_ext" == "$suite_spec" \
-               || "$rel_with_ext" == "$suite_spec" \
-               || "$test_file" == "$suite_spec" ]]; then
-                selected_tests=("$test_file")
-                match_found=1
-                break
-            fi
-        done
-        if [[ $match_found -eq 0 ]]; then
-            echo "No test suite matching '$suite_spec'. Available suites:" >&2
-            for test_file in "${tests[@]}"; do
-                printf '  %s\n' "${test_file#${tests_root}/}" | sed 's/\.bats$//' >&2
-            done
-            return 1
-        fi
+    local tests_serialized=""
+    if (( ${#tests[@]} )); then
+        tests_serialized="$(printf '%s\n' "${tests[@]}")"
     fi
 
-    if [[ ${#selected_tests[@]} -eq 0 ]]; then
+    local selected_serialized
+    if ! selected_serialized="$(_test_select_suite "$suite_spec" "$tests_root" "$tests_serialized")"; then
+        return 1
+    fi
+
+    if [[ -z "$selected_serialized" ]]; then
         echo "No test suites found." >&2
         return 1
     fi
 
-    local repo_root
-    repo_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
-    local log_root="${repo_root}/scratch/test-logs"
-    local base_dir=""
-    local artifacts_dir=""
-    local log_file=""
-    local ran_with_logging=0
-    local status
-
-    if mkdir -p "$log_root" 2>/dev/null; then
-        local timestamp
-        timestamp="$(date +%Y%m%d-%H%M%S)"
-        local suite_slug
-        suite_slug="$(__slugify "$suite_spec" 12)"
-        base_dir="${log_root}/${suite_slug}"
-        if [[ -n "$case_name" ]]; then
-            local case_slug
-            case_slug="$(__slugify "$case_name" 6)"
-            if [[ -z "$case_slug" ]]; then
-                case_slug='case'
-            fi
-            local case_hash
-            case_hash=$(printf '%s' "$case_name" | sha256sum | cut -c1-4)
-            base_dir+="/${case_slug}-${case_hash}"
-        fi
-
-        if mkdir -p "$base_dir" 2>/dev/null; then
-            artifacts_dir="${base_dir}/${timestamp}"
-            bats_args+=(--gather-test-outputs-in "$artifacts_dir")
-
-            log_file="${base_dir}/${timestamp}.log"
-            if : > "$log_file" 2>/dev/null; then
-                bats "${bats_args[@]}" "${selected_tests[@]}" 2>&1 | tee "$log_file"
-                status=${PIPESTATUS[0]}
-                ran_with_logging=1
-            else
-                log_file=""
-            fi
-        else
-            base_dir=""
-        fi
+    local bats_serialized=""
+    if (( ${#bats_args[@]} )); then
+        bats_serialized="$(printf '%s\n' "${bats_args[@]}")"
     fi
 
-    if (( ran_with_logging == 0 )); then
-        bats "${bats_args[@]}" "${selected_tests[@]}"
-        status=$?
-    fi
-
-    if [[ $status -ne 0 ]]; then
-        if [[ -n "$log_file" ]]; then
-            local rel_log_file="$log_file"
-            rel_log_file="${rel_log_file#${repo_root}/}"
-            printf 'Test log saved to %s\n' "$rel_log_file" >&2
-        else
-            echo "Test log unavailable (failed to create log file)." >&2
-        fi
-        if [[ -n "$artifacts_dir" ]]; then
-            local rel_artifacts_dir="$artifacts_dir"
-            rel_artifacts_dir="${rel_artifacts_dir#${repo_root}/}"
-            printf 'Collected artifacts in %s\n' "$rel_artifacts_dir" >&2
-        fi
-    else
-        if [[ -n "$log_file" ]]; then
-            rm -f "$log_file" 2>/dev/null || true
-        fi
-        if [[ -n "$artifacts_dir" ]]; then
-            rm -rf "$artifacts_dir" 2>/dev/null || true
-            local prune_dir="$artifacts_dir"
-            while [[ "$prune_dir" != "$log_root" ]]; do
-                prune_dir="$(dirname "$prune_dir")"
-                rmdir "$prune_dir" 2>/dev/null || break
-            done
-        fi
-    fi
-
-    return $status
+    _test_execute "$selected_serialized" "$bats_serialized" "$suite_spec" "$case_name" "$repo_root"
+    return $?
 }
 
 ## -- main --
