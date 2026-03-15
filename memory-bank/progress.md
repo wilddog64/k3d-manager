@@ -53,7 +53,7 @@
 
 ### lib-foundation Backlog
 
-- [ ] `_run_command` if-count refactor (v0.3.0) — **Codex assigned** — spec: `lib-foundation/docs/plans/v0.3.0-run-command-if-count-refactor.md`; extract `_run_command_resolve_sudo`, PR in lib-foundation, then subtree pull here
+- [x] `_run_command` if-count refactor (v0.3.0) — lib-foundation v0.3.0 merged + subtree pulled into k3d-manager-v0.9.3 (commit `3cfbfd5`)
 - [ ] Sync `deploy_cluster` fixes upstream (CLUSTER_NAME, provider helpers)
 - [ ] Route bare sudo in `_install_debian_helm` / `_install_debian_docker`
 - [ ] Add `.github/copilot-instructions.md` to lib-foundation
