@@ -193,8 +193,8 @@ function _vcluster_kubeconfig_path() {
   if [[ -z "$name" ]]; then
     _err "vCluster name required"
   fi
-  if [[ "$name" == */* || "$name" == *..* ]]; then
-    _err "vCluster name must not contain '/' or '..': $name"
+  if [[ ! "$name" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
+    _err "vCluster name must be a valid DNS label (lowercase alphanumeric and hyphens, no leading/trailing hyphen): $name"
   fi
   printf '%s/%s.yaml\n' "$VCLUSTER_KUBECONFIG_DIR" "$name"
 }
