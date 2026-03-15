@@ -53,7 +53,7 @@
 
 - [x] Copilot review process guide — `docs/guides/copilot-review-process.md` + `copilot-review-template.md`
 - [x] README releases table — split to `docs/releases.md` (full history), README shows last 3 + link
-- [ ] Fix ImagePullBackOff — Codex task spec at `docs/plans/v0.9.2-imagepullbackoff-fix.md`; root cause: missing `newName: ghcr.io/wilddog64/<svc>` in kustomization images blocks (product-catalog/order/payment have no images block at all)
+- [ ] Fix ImagePullBackOff — Codex task spec at `shopping-cart-infra/docs/plans/imagepullbackoff-fix.md`; root cause: missing `newName: ghcr.io/wilddog64/<svc>` in kustomization images blocks (product-catalog/order/payment have no images block at all)
 - [ ] Reusable vCluster E2E setup workflow — `.github/workflows/vcluster-e2e-setup.yml` in k3d-manager; called by shopping-cart-e2e-tests
 - [ ] Playwright E2E browser tests — `shopping-cart-e2e-tests`; blocked on ImagePullBackOff fix
 
@@ -84,7 +84,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| Shopping Cart Apps ImagePullBackOff | DIAGNOSED | Root cause: missing `newName: ghcr.io/wilddog64/<svc>` in kustomization; product-catalog/order/payment have no images block. Fix spec: `docs/plans/v0.9.2-imagepullbackoff-fix.md` |
+| Shopping Cart Apps ImagePullBackOff | DIAGNOSED | Root cause: missing `newName: ghcr.io/wilddog64/<svc>` in kustomization; product-catalog/order/payment have no images block. Fix spec: `shopping-cart-infra/docs/plans/imagepullbackoff-fix.md` |
 | Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps may exceed capacity — reduce replicas in ArgoCD manifests |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround |
 | NVD API key missing | OPEN | Register at nvd.nist.gov — add as `NVD_API_KEY` secret to order + payment repos |
