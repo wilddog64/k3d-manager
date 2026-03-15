@@ -123,11 +123,13 @@ branch protection enforced → then Playwright MCP can test against live service
 
 ---
 
-## k3dm-mcp — Separate Repository (after v0.8.0)
+## k3dm-mcp — Separate Repository (v1.4.0 — after all cloud providers ship)
 *Discrete repo: [github.com/wilddog64/k3dm-mcp](https://github.com/wilddog64/k3dm-mcp)*
 
 Lean MCP server wrapping the k3d-manager CLI. Exposes cluster operations as structured MCP
 tools callable from any MCP-compatible AI client. Owns its own memory-bank and roadmap.
+Ships after v1.1.0–v1.3.0 so the full provider surface (local + all three clouds) is
+available from day one.
 
 **Full scope:** see `k3dm-mcp/docs/plans/roadmap.md`
 
@@ -228,32 +230,6 @@ JSON-RPC stdio. No direct k3d-manager calls — always through the MCP security 
 
 ---
 
-## v1.0.0 — k3dm-mcp
-*Focus: MCP server wrapping k3d-manager CLI — AI-driven cluster operations*
-
-**Motivation:** k3d-manager (v0.9.1) has vCluster + full stack ops. k3dm-mcp exposes those
-as structured MCP tools callable from any MCP-compatible AI client (Claude Desktop, Copilot).
-
-**Discrete repo:** [`wilddog64/k3dm-mcp`](https://github.com/wilddog64/k3dm-mcp)
-
-**Key design decisions:**
-- One AI Layer Rule: `K3DM_ENABLE_AI=0` always set in subprocess env
-- Explicit subprocess env — no ambient shell state
-- SQLite state cache — never dump raw kubectl output to LLM
-- Blast radius classification, dry-run gate, pre-destroy snapshot
-- Loop detection + session call limit + credential scan on tool args
-- BATS-based MCP test harness (`env -i`, record-replay fixtures)
-
-**MCP tools exposed (initial set):**
-- `deploy_cluster` / `destroy_cluster`
-- `deploy_vault`, `deploy_eso`, `deploy_argocd`
-- `vcluster_create` / `vcluster_destroy` / `vcluster_use` / `vcluster_list`
-- `sync_state` — cluster health snapshot into SQLite
-
-**Full scope:** see `k3dm-mcp/docs/plans/roadmap.md`
-
----
-
 ## v1.1.0 — AWS EKS Provider + ACG Sandbox Lifecycle
 *Focus: First cloud provider — AWS is the most common ACG sandbox*
 
@@ -331,6 +307,37 @@ changes require a major version bump. Bash CLI compatibility maintained for all 
 
 **Engineering standards inherited:** spec-first, no ADKs, bash-native plugins,
 Zero-Dependency philosophy, `env -i` BATS suites for all new providers.
+
+---
+
+## v1.4.0 — k3dm-mcp
+*Focus: MCP server wrapping k3d-manager CLI — AI-driven cluster operations*
+
+**Prerequisite:** All three cloud providers (v1.1.0–v1.3.0) must ship first.
+k3dm-mcp wraps the complete provider surface — EKS/GKE/AKS operations exposed as
+structured MCP tools alongside local k3d/k3s operations.
+
+**Motivation:** With all providers in place, k3dm-mcp can expose a unified interface
+across every cluster target (local → cloud) from any MCP-compatible AI client
+(Claude Desktop, Copilot, Gemini CLI).
+
+**Discrete repo:** [`wilddog64/k3dm-mcp`](https://github.com/wilddog64/k3dm-mcp)
+
+**Key design decisions:**
+- One AI Layer Rule: `K3DM_ENABLE_AI=0` always set in subprocess env
+- Explicit subprocess env — no ambient shell state
+- SQLite state cache — never dump raw kubectl output to LLM
+- Blast radius classification, dry-run gate, pre-destroy snapshot
+- Loop detection + session call limit + credential scan on tool args
+- BATS-based MCP test harness (`env -i`, record-replay fixtures)
+
+**MCP tools exposed (initial set):**
+- `deploy_cluster` / `destroy_cluster` — works for k3d, k3s, eks, gke, aks
+- `deploy_vault`, `deploy_eso`, `deploy_argocd`
+- `vcluster_create` / `vcluster_destroy` / `vcluster_use` / `vcluster_list`
+- `sync_state` — cluster health snapshot into SQLite
+
+**Full scope:** see `k3dm-mcp/docs/plans/roadmap.md`
 
 ---
 

@@ -55,9 +55,12 @@
 - [x] README releases table — split to `docs/releases.md` (full history), README shows last 3 + link
 - [ ] Playwright E2E in CI — design spec at `docs/plans/v0.9.2-playwright-e2e-design.md`; pending approval + open questions resolved before Codex task
 
-### Next after v0.9.2 — k3dm-mcp v1.0.0
+### After v0.9.2 — Cloud Providers then k3dm-mcp
 
-- Separate repo `~/src/gitrepo/personal/k3dm-mcp`
+- v1.1.0 — EKS provider + ACG sandbox lifecycle
+- v1.2.0 — GKE provider
+- v1.3.0 — AKS provider
+- v1.4.0 — k3dm-mcp (separate repo `~/src/gitrepo/personal/k3dm-mcp`) — after all providers ship
 
 ### lib-foundation Backlog
 
