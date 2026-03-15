@@ -254,64 +254,80 @@ as structured MCP tools callable from any MCP-compatible AI client (Claude Deskt
 
 ---
 
-## v1.1.0 — Multi-Cloud + ACG Sandbox Lifecycle
-*Focus: Same stack definition, any cloud*
+## v1.1.0 — AWS EKS Provider + ACG Sandbox Lifecycle
+*Focus: First cloud provider — AWS is the most common ACG sandbox*
 
 **Motivation:** The architectural boundary already supports this — `CLUSTER_PROVIDER`
 abstracts create/destroy/kubeconfig, and plugins speak only Kubernetes primitives.
-Adding EKS/GKE/AKS providers means k3d-manager deploys the same Vault + ESO + Istio +
-ArgoCD stack to any cloud cluster without modification.
+Adding EKS means k3d-manager deploys the same Vault + ESO + Istio + ArgoCD stack to
+AWS without modification to any plugin.
 
-**Key use case — A Cloud Guru (ACG) sandbox lifecycle:**
-ACG provides temporary AWS/Azure/GCP sandbox environments (expire after a few hours).
-Manual stack setup per session is wasteful. k3dm-mcp automates the full lifecycle:
+**New CLUSTER_PROVIDER value:**
+- `eks` — AWS EKS via `eksctl` (lazy-loaded on first use)
+  - kubeconfig via `aws eks update-kubeconfig`
+  - Single t3.medium node — sufficient for full stack on ACG sandbox
+  - `AWS_SESSION_TOKEN` support for ACG STS credentials
 
+Cloud credentials handled through Vault — never in config files or CLI args.
+
+**Key use case — ACG AWS sandbox lifecycle:**
 ```
 "Spin up my standard stack on this AWS sandbox"
-→ CLUSTER_PROVIDER=eks + sandbox credentials from ACG
+→ CLUSTER_PROVIDER=eks + STS credentials from ACG
 → deploy_cluster: Vault, ESO, Istio, ArgoCD, OpenLDAP
 → SQLite state: records expiry time from ACG session
 → Slack: "Stack ready on EKS. Sandbox expires in 4h. Auto-teardown reminder set."
 → 30min before expiry: "Sandbox expiring soon. Run destroy_cluster to clean up."
 ```
 
-**New CLUSTER_PROVIDER values:**
-- `eks` — AWS EKS (kubeconfig via `aws eks update-kubeconfig`)
-- `gke` — Google GKE (kubeconfig via `gcloud container clusters get-credentials`)
-- `aks` — Azure AKS (kubeconfig via `az aks get-credentials`)
-
-Cloud credentials handled through Vault — never in config files or CLI args.
-
 **ACG login automation — Google Antigravity:**
-ACG has no public API for sandbox access — everything goes through the web UI.
-Google Antigravity (browser agent) automates the login and credential extraction.
-
-**Antigravity scope is strictly third-party UI automation** — it does NOT test shopping-cart
-apps. Shopping-cart E2E testing is handled by Playwright MCP (v0.8.1) which runs outside
-the cluster against services you own and control. Antigravity is only used where there is
-no API alternative (ACG web UI, similar third-party portals).
-
-```
-Slack: "Start an AWS sandbox on ACG"
-→ Antigravity: logs into ACG web UI (credentials from Vault)
-→ Antigravity: starts sandbox, extracts AWS credentials + expiry time
-→ k3dm-mcp: receives credentials, sets CLUSTER_PROVIDER=eks
-→ k3d-manager: deploy_cluster against EKS
-→ SQLite: records expiry from Antigravity output
-→ Slack: "AWS sandbox ready. Stack deployed. Expires 4h."
-```
-
-Antigravity handles the messy UI layer. k3dm-mcp handles the structured infra layer.
-Clean handoff: Antigravity outputs credentials → k3dm-mcp consumes them as structured input.
-ACG login credentials stored in Vault — never hardcoded or passed via CLI args.
+ACG has no public API — everything goes through the web UI.
+Antigravity automates login and STS credential extraction.
+Clean handoff: Antigravity outputs credentials → k3dm-mcp injects into Vault → k3d-manager reads.
 
 **Sandbox lifecycle extensions to SQLite state cache:**
 - `sandbox_expiry` column — populated from Antigravity output
 - `stale: true` flag extended to cover expired sandboxes
 - `sync_state` tool warns when sandbox has < 30min remaining
 
-**API stability:** v1.1.0 declares the MCP tool surface stable. Breaking changes
-require a major version bump. Bash CLI compatibility maintained for all existing scripts.
+**Design spec:** `docs/plans/v1.1.0-multi-cloud-design.md` (EKS + ACG sections)
+
+---
+
+## v1.2.0 — Google GKE Provider
+*Focus: Second cloud provider — GCP ACG sandbox support*
+
+**New CLUSTER_PROVIDER value:**
+- `gke` — Google GKE via `gcloud container clusters` (lazy-loaded on first use)
+  - kubeconfig via `gcloud container clusters get-credentials`
+  - Single e2-standard-2 node — sufficient for full stack
+  - `GOOGLE_CREDENTIALS_JSON` via process substitution — never written to disk
+
+**ACG GCP sandbox:**
+- Service account JSON extracted by Antigravity, injected into Vault
+- `gcloud auth activate-service-account --key-file <(echo $GOOGLE_CREDENTIALS_JSON)`
+
+**Design spec:** `docs/plans/v1.1.0-multi-cloud-design.md` (GKE section — implementation phase 2)
+
+---
+
+## v1.3.0 — Azure AKS Provider
+*Focus: Third cloud provider — Azure ACG sandbox support*
+
+**New CLUSTER_PROVIDER value:**
+- `aks` — Azure AKS via `az aks` (lazy-loaded on first use)
+  - kubeconfig via `az aks get-credentials`
+  - Single Standard_B2s node (Standard_B2ms preferred if quota allows)
+  - Resource group lifecycle: create on deploy, delete on destroy
+  - Service principal auth: `AZ_CLIENT_ID`, `AZ_CLIENT_SECRET`, `AZ_TENANT_ID` from Vault
+
+**ACG Azure sandbox:**
+- Service principal credentials extracted by Antigravity, injected into Vault
+
+**Design spec:** `docs/plans/v1.1.0-multi-cloud-design.md` (AKS section — implementation phase 3)
+
+**API stability:** v1.3.0 declares the full multi-cloud provider surface stable. Breaking
+changes require a major version bump. Bash CLI compatibility maintained for all existing scripts.
 
 **Engineering standards inherited:** spec-first, no ADKs, bash-native plugins,
 Zero-Dependency philosophy, `env -i` BATS suites for all new providers.

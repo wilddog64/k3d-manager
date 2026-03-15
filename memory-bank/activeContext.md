@@ -26,7 +26,9 @@
 | v0.1.0–v0.9.1 | released | See CHANGE.md |
 | v0.9.2 | **active** | Copilot review docs + Playwright E2E in CI |
 | v1.0.0 | planned | k3dm-mcp — MCP server wrapping k3d-manager CLI |
-| v1.1.0 | planned | Multi-cloud providers (EKS/GKE/AKS) + ACG sandbox lifecycle |
+| v1.1.0 | planned | AWS EKS provider + ACG sandbox lifecycle |
+| v1.2.0 | planned | Google GKE provider |
+| v1.3.0 | planned | Azure AKS provider |
 
 ---
 
