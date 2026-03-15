@@ -18,3 +18,11 @@ branch. Fix implemented:
 ## Next Steps
 - Update `shopping-cart-e2e-tests` to consume the new composite actions
 - Close PR #33 after new PR merges (Claude handles PR workflow)
+
+## Third P1 — Composite Action Path Resolution (PR #34)
+
+Copilot flagged a new P1 after the composite actions landed: `./scripts/k3d-manager`
+resolved relative to `$GITHUB_WORKSPACE`. If the caller checks out k3d-manager into
+a subdirectory, the path doesn't exist. Both setup and teardown actions now invoke
+`k3d-manager` via `${{ github.action_path }}/../../../scripts/k3d-manager`, which is
+stable regardless of caller checkout layout.
