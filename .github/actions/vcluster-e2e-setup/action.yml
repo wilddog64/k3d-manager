@@ -54,6 +54,10 @@ runs:
         cluster="e2e-${RUN_ID}"
         k3d cluster create "$cluster" --no-lb --wait
         manager="${{ github.action_path }}"/../../../scripts/k3d-manager
+        if [[ ! -x "$manager" ]]; then
+          echo "Error: k3d-manager not found or not executable at: $manager" >&2
+          exit 1
+        fi
         "$manager" vcluster_install_cli
         "$manager" vcluster_create "$cluster"
         "$manager" vcluster_use "$cluster"
