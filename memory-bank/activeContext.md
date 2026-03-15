@@ -9,15 +9,33 @@
 
 ## Current Focus
 
-**v0.9.1: vCluster Plugin + Playwright E2E in CI**
+**v0.9.1: vCluster Plugin + test() refactor + Gemini smoke test**
 
 | Item | Status | Notes |
 |---|---|---|
-| vCluster plugin | **auto-install helper merged — awaiting CI rerun** | Codex commit `455f703b4ac2f7ed9f360b921484c3d3fce059c6` (see notes) |
+| vCluster plugin + Copilot review | **done** | Commits `68b263c`, `f444c4b` — all 8 Copilot threads resolved |
+| CI on PR #31 | **green** | Vault unsealed on M2 Air; latest push `124a2f1` |
+| Two-tier help + `--help` flag | **done** | Commit `0fc68d5` |
+| `function test()` refactor | **Codex pending** | Spec: `docs/plans/v0.9.1-test-fn-refactor-task.md` |
+| Gemini smoke test | **pending after Codex** | `test all`, `--help`, vcluster on M2 Air |
 | Playwright E2E in CI | pending | `shopping-cart-infra` — starts after vCluster plugin ships |
-| lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
 
-Codex (commit `455f703b4ac2f7ed9f360b921484c3d3fce059c6`, verified via `gh api repos/wilddog64/k3d-manager/git/commits/455f703b4ac2f7ed9f360b921484c3d3fce059c6`) added `_vcluster_install_cli` + env var plumbing. Tests: `bats scripts/tests/plugins/vcluster.bats` 10/10, `env -i PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'cd /Users/cliang/src/gitrepo/personal/k3d-manager && bats scripts/tests/plugins/vcluster.bats'` 10/10, `shellcheck scripts/plugins/vcluster.sh` clean, `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/plugins/vcluster.sh` PASS. Pushed to `k3d-manager-v0.9.1`; CI run `https://github.com/wilddog64/k3d-manager/actions/runs/23101575904` still red (`stage2` fails on cluster health: `StatefulSet vault Ready replicas ... does not match desired 1`). Claude to steer rerun/fix.
+### Codex next task
+Spec: `docs/plans/v0.9.1-test-fn-refactor-task.md`
+
+Split `function test()` in `scripts/k3d-manager` into three helpers:
+- `_test_run_smoke` — smoke suite routing
+- `_test_select_suite` — suite resolution (all / lib|core|plugins / filename)
+- `_test_execute` — BATS execution + log/artifact management
+
+Target: `function test()` ≤ 8 if-blocks. No behaviour change.
+
+After Codex completes, Gemini smoke tests on M2 Air:
+```bash
+./scripts/k3d-manager test all
+./scripts/k3d-manager test --help
+./scripts/k3d-manager --help
+```
 
 ---
 
