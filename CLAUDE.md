@@ -7,6 +7,12 @@ Uses a dispatcher pattern with lazy plugin loading.
 **Current state:** `memory-bank/activeContext.md` and `memory-bank/progress.md`
 **Task specs:** `docs/plans/`
 
+## Claude Session Rules
+
+- **Memory-bank update is mandatory and immediate** — after every completed action (spec written, PR created, agent assigned, merge done, task status changed), update `memory-bank/activeContext.md` and `memory-bank/progress.md` before doing anything else. Do not wait for the user to ask.
+- **PR creation gate** — do NOT create a PR until ALL of these pass: CI green, Copilot review comments addressed, Gemini live smoke test, Claude scope check. Draft PR is acceptable only as an explicit placeholder.
+- **Verify before trust** — never trust a commit SHA, BATS result, or "done" report from any agent without independently verifying via `gh api`, `gh run view`, or `git log`.
+
 ---
 
 ## Layout
