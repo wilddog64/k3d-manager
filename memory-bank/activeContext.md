@@ -150,7 +150,7 @@ Owner
 
 - **Always run `reunseal_vault`** after any cluster restart before other deployments
 - **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`)
-- **Branch protection**: `enforce_admins` permanently disabled — owner can self-merge
+- **Branch protection**: `enforce_admins` always ON. Temporarily disable only to merge, then re-enable immediately. Both `main` and feature branches protected.
 - **Istio + Jobs**: `sidecar.istio.io/inject: "false"` required on Helm pre-install job pods
 - **Bitnami images**: use `docker.io/bitnamilegacy/*` for ARM64
 
