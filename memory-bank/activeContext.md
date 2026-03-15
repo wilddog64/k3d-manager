@@ -13,8 +13,8 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| vCluster plugin | pending | `scripts/plugins/vcluster.sh` — `vcluster_create/destroy/use/list` |
-| Playwright E2E in CI | pending | `shopping-cart-infra` — ephemeral vCluster per PR run |
+| vCluster plugin | **spec complete — ready for Codex** | `docs/plans/v0.9.1-vcluster-codex-task.md` |
+| Playwright E2E in CI | pending | `shopping-cart-infra` — starts after vCluster plugin ships |
 | lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
 
 ---
