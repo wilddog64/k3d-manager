@@ -52,7 +52,7 @@
 ### v0.9.2 — active
 
 - [x] Copilot review process guide — `docs/guides/copilot-review-process.md` + `copilot-review-template.md`
-- [ ] README releases table — add v0.9.1 row
+- [x] README releases table — split to `docs/releases.md` (full history), README shows last 3 + link
 - [ ] Playwright E2E in CI — `shopping-cart-infra`
 
 ### Next after v0.9.2 — k3dm-mcp v1.0.0
