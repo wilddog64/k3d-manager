@@ -4,9 +4,11 @@ set -euo pipefail
 VCLUSTER_NAMESPACE="${VCLUSTER_NAMESPACE:-vclusters}"
 VCLUSTER_VERSION="${VCLUSTER_VERSION:-0.32.1}"
 VCLUSTER_KUBECONFIG_DIR="${VCLUSTER_KUBECONFIG_DIR:-${HOME}/.kube/vclusters}"
+VCLUSTER_INSTALL_DIR="${VCLUSTER_INSTALL_DIR:-/usr/local/bin}"
 export VCLUSTER_NAMESPACE
 export VCLUSTER_VERSION
 export VCLUSTER_KUBECONFIG_DIR
+export VCLUSTER_INSTALL_DIR
 
 function vcluster_create() {
   local name="${1:-}"
@@ -118,9 +120,36 @@ function vcluster_list() {
   _run_command -- vcluster list -n "$VCLUSTER_NAMESPACE"
 }
 
+function _vcluster_install_cli() {
+  if _command_exist vcluster; then
+    _info "vcluster already installed, skipping"
+    return 0
+  fi
+
+  if _is_mac; then
+    _run_command --prefer-sudo -- brew install loft-sh/tap/vcluster
+  else
+    local install_dir="${VCLUSTER_INSTALL_DIR:-/usr/local/bin}"
+    local tmp_file
+    tmp_file="$(mktemp -t vcluster-cli.XXXXXX)"
+    trap '$(_cleanup_trap_command "$tmp_file")' RETURN
+    local url="https://github.com/loft-sh/vcluster/releases/download/v${VCLUSTER_VERSION}/vcluster-linux-amd64"
+    _run_command -- curl -fsSL -o "$tmp_file" "$url"
+    _run_command -- chmod +x "$tmp_file"
+    _run_command --prefer-sudo -- mkdir -p "$install_dir"
+    _run_command --prefer-sudo -- mv "$tmp_file" "${install_dir%/}/vcluster"
+    trap - RETURN
+  fi
+
+  if ! _command_exist vcluster; then
+    _err "vcluster CLI installation failed"
+  fi
+}
+
 function _vcluster_check_prerequisites() {
-  if ! command -v vcluster >/dev/null 2>&1; then
-    _err "vcluster CLI is not installed; see https://github.com/loft-sh/vcluster"
+  if ! _command_exist vcluster; then
+    _info "vcluster CLI not found — installing automatically"
+    _vcluster_install_cli
   fi
   if ! _kubectl --no-exit --quiet cluster-info >/dev/null 2>&1; then
     _err "Host cluster context not available; kubectl cluster-info failed"
