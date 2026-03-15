@@ -50,9 +50,11 @@
 
 ### v0.9.1 — active
 
-- [ ] vCluster plugin — `scripts/plugins/vcluster.sh` (`vcluster_create/destroy/use/list`)
-- [ ] Playwright E2E in CI — `shopping-cart-infra` ephemeral vCluster per PR run
-- [ ] Spec: `docs/plans/v0.9.1-vcluster-plugin.md` (to be written)
+- [x] `AGENTS.md` — agent session rules (read memory-bank, proof of work, no-revert, scope discipline)
+- [x] vCluster plugin spec — `docs/plans/v0.9.1-vcluster-plugin.md` (decisions recorded: v0.32.1, k8s distro, --print kubeconfig, 500m/512Mi limits)
+- [x] Codex task spec — `docs/plans/v0.9.1-vcluster-codex-task.md` (DoD checklist, do-not-do list)
+- [ ] vCluster plugin implementation — `scripts/plugins/vcluster.sh` + `scripts/etc/vcluster/values.yaml` + `scripts/tests/plugins/vcluster.bats` — **assigned to Codex**
+- [ ] Playwright E2E in CI — `shopping-cart-infra` — starts after vCluster plugin ships
 
 ### Next after v0.9.1 — k3dm-mcp v1.0.0
 
