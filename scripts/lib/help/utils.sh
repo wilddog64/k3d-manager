@@ -78,67 +78,90 @@ function __discover_tests() {
 }
 
 function _usage() {
-    local base_suites="all|lib|core|plugins|smoke"
-    if [[ -n "${test_suites}" ]]; then
-        test_suites="${base_suites}|${test_suites}"
-    else
-        test_suites="${base_suites}"
-    fi
+    local verbose="${1:-0}"
 
-    local provider="${CLUSTER_PROVIDER:-$(_default_cluster_provider)}"
+    local -a all_fns=()
+    while IFS= read -r fn; do
+      all_fns+=("$fn")
+    done < <(declare -F | awk '{print $3}' | grep -v '^_' | sort)
 
-    local -a __tests=()
-    local -a __test_names=()
-    local -a __suite_names=()
-    __discover_tests __tests __test_names __suite_names
+    # Build category lists: label, patterns...
+    local -a categories=(
+      "Cluster lifecycle"  "create_* deploy_cluster deploy_k3d_cluster deploy_k3s_cluster destroy_*"
+      "Infrastructure"     "deploy_vault deploy_eso deploy_ldap deploy_jenkins configure_vault_*"
+      "Secrets"            "secret_backend_*"
+      "Directory service"  "dirservice_*"
+      "Networking"         "*ingress*"
+      "vCluster"           "vcluster_*"
+      "Shopping cart"      "add_ubuntu_k3s_cluster register_shopping_cart_apps"
+      "Testing"            "test test_*"
+    )
 
-    local provider="${CLUSTER_PROVIDER:-$(_default_cluster_provider)}"
+    _match_category() {
+      local pats="$1"
+      local -a matches=()
+      local fn pat
+      for fn in "${all_fns[@]}"; do
+        for pat in $pats; do
+          # shellcheck disable=SC2053
+          if [[ "$fn" == $pat ]]; then
+            matches+=("$fn")
+            break
+          fi
+        done
+      done
+      printf '%s\n' "${matches[@]}"
+    }
 
-    local test_synopsis="suite|test-name"
-    if [[ ${#__suite_names[@]} -gt 0 || ${#__test_names[@]} -gt 0 ]]; then
-        local -a synopsis_tokens=()
-        if [[ ${#__suite_names[@]} -gt 0 ]]; then
-            synopsis_tokens+=("${__suite_names[@]}")
+    printf 'Usage: ./k3d-manager <function> [args]\n\n'
+
+    if [[ "$verbose" == "1" ]]; then
+      printf 'Available functions:\n'
+      local i label pats
+      for (( i=0; i<${#categories[@]}; i+=2 )); do
+        label="${categories[$i]}"
+        pats="${categories[$i+1]}"
+        local -a matches=()
+        while IFS= read -r fn; do
+          [[ -n "$fn" ]] && matches+=("$fn")
+        done < <(_match_category "$pats")
+        if [[ ${#matches[@]} -gt 0 ]]; then
+          printf '  %s:\n' "$label"
+          printf '    %s\n' "${matches[@]}"
         fi
-        if [[ ${#__test_names[@]} -gt 0 ]]; then
-            synopsis_tokens+=("${__test_names[@]}")
-        fi
-        local joined_synopsis="$( ___join_lines '|' "${synopsis_tokens[@]}" )"
-        if [[ -n "$joined_synopsis" ]]; then
-            test_synopsis="$joined_synopsis"
-        fi
-    fi
+      done
 
-    local suites_summary=""
-    if [[ ${#__suite_names[@]} -gt 0 ]]; then
-        suites_summary="$( ___join_lines ', ' "${__suite_names[@]}" )"
-    fi
+      local provider="${CLUSTER_PROVIDER:-$(_default_cluster_provider)}"
+      local base_suites="all|lib|core|plugins|smoke"
+      local -a __suite_names=()
+      local -a __tests=() __test_names=()
+      __discover_tests __tests __test_names __suite_names
 
-    local tests_summary=""
-    if [[ ${#__test_names[@]} -gt 0 ]]; then
-        tests_summary="$( ___join_lines ', ' "${__test_names[@]}" )"
-    fi
-
-    cat <<EOF
-Usage: ./k3d-manager <function> [args]
-
-Available core functions:
-$(declare -F | awk '{print $3}' | grep -v '^_' | sort | sed 's/^/  /')
-
-EOF
-
-    cat <<EOF
+      cat <<EOF
 
 Cluster provider:
   Current: ${provider}
-  Override by exporting CLUSTER_PROVIDER (macOS auto-detects OrbStack when running, otherwise defaults to k3d).
+  Override: export CLUSTER_PROVIDER=k3d|orbstack|k3s
 
 Subcommands:
-  test [options] ${test_suites}   Run BATS tests (see "test --help")
+  test [options] ${base_suites}   Run BATS tests (see "test --help")
 
 Environment variables:
   CLUSTER_ROLE=infra|app   Select deployment profile (default: infra)
 EOF
+    else
+      printf 'Categories:\n'
+      local i label pats count
+      for (( i=0; i<${#categories[@]}; i+=2 )); do
+        label="${categories[$i]}"
+        pats="${categories[$i+1]}"
+        count=$(_match_category "$pats" | grep -c .)  || count=0
+        if (( count > 0 )); then
+          printf '  %-22s (%d functions)\n' "$label" "$count"
+        fi
+      done
+      printf '\nRun ./k3d-manager --help for full function list.\n'
+    fi
 }
 
 function __escape_regex_literal() {
@@ -221,240 +244,6 @@ Available tests: ${tests_summary}
 EOF
 }
 
-function test() {
-    local verbose=0
-    local case_name=""
-    local -a positional=()
-
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            -h|--help)
-                __print_test_usage
-                return 0
-                ;;
-            -v|--verbose)
-                verbose=1
-                shift
-                continue
-                ;;
-            --case)
-                shift
-                if [[ -z "${1:-}" ]]; then
-                    echo "Missing value for --case." >&2
-                    return 1
-                fi
-                case_name="$1"
-                shift
-                continue
-                ;;
-            --)
-                shift
-                positional+=("$@")
-                break
-                ;;
-            -*)
-                echo "Unknown option: $1" >&2
-                return 1
-                ;;
-            *)
-                positional+=("$1")
-                shift
-                continue
-                ;;
-        esac
-    done
-
-    if [[ ${#positional[@]} -eq 0 ]]; then
-        __print_test_usage >&2
-        return 1
-    fi
-
-    if [[ ${#positional[@]} -gt 1 && "${positional[0]}" != "smoke" ]]; then
-        echo "Only one suite or test may be specified." >&2
-        return 1
-    fi
-
-    local suite_spec="${positional[0]}"
-    if [[ "$suite_spec" == *"::"* ]]; then
-        local inline_case="${suite_spec#*::}"
-        suite_spec="${suite_spec%%::*}"
-        if [[ -z "$inline_case" ]]; then
-            echo "Missing test case name in '${positional[0]}'." >&2
-            return 1
-        fi
-        if [[ -z "$case_name" ]]; then
-            case_name="$inline_case"
-        fi
-    fi
-
-    if [[ "$suite_spec" == "smoke" ]]; then
-        local repo_root
-        repo_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
-        local bin_dir="${repo_root}/bin"
-        local smoke_namespace="${positional[1]:-}"
-        local smoke_rc=0
-        local -a smoke_scripts=(
-            "smoke-test-jenkins.sh"
-            "test-openldap.sh"
-            "test-argocd-cli.sh"
-            "test-directory-auto-load.sh"
-        )
-        for script in "${smoke_scripts[@]}"; do
-            local script_path="${bin_dir}/${script}"
-            if [[ ! -x "$script_path" ]]; then
-                continue
-            fi
-            printf '\n==> Running %s\n' "$script"
-            if [[ -n "$smoke_namespace" ]]; then
-                "$script_path" "$smoke_namespace" || smoke_rc=$?
-            else
-                "$script_path" || smoke_rc=$?
-            fi
-        done
-        return $smoke_rc
-    fi
-
-    _ensure_bats
-
-    local tests_root="${SCRIPT_DIR}/tests"
-    local -a search_dirs=("${tests_root}/lib" "${tests_root}/core" "${tests_root}/plugins")
-    local -a tests=()
-    while IFS= read -r test_file; do
-        tests+=("$test_file")
-    done < <(find "${search_dirs[@]}" -maxdepth 1 -type f -name '*.bats' | sort)
-
-    local -a bats_args=()
-    if (( verbose )); then
-        bats_args+=(--show-output-of-passing-tests --print-output-on-failure)
-    fi
-
-    if [[ -n "$case_name" ]]; then
-        local escaped_case
-        escaped_case="$( __escape_regex_literal "$case_name" )"
-        bats_args+=(--filter "^${escaped_case}$")
-    fi
-
-    local -a selected_tests=()
-
-    if [[ "$suite_spec" == "all" ]]; then
-        selected_tests=("${tests[@]}")
-    elif [[ "$suite_spec" == "lib" || "$suite_spec" == "core" || "$suite_spec" == "plugins" ]]; then
-        local dir="${tests_root}/${suite_spec}"
-        while IFS= read -r test_file; do
-            selected_tests+=("$test_file")
-        done < <(find "$dir" -maxdepth 1 -type f -name '*.bats' | sort)
-        if [[ ${#selected_tests[@]} -eq 0 ]]; then
-            echo "No test suites found in '$suite_spec'." >&2
-            return 1
-        fi
-    else
-        local match_found=0
-        local test_file
-        for test_file in "${tests[@]}"; do
-            local rel_with_ext
-            rel_with_ext="${test_file#${tests_root}/}"
-            local rel_without_ext
-            rel_without_ext="${rel_with_ext%.bats}"
-            local basename_no_ext
-            basename_no_ext="${test_file##*/}"
-            basename_no_ext="${basename_no_ext%.bats}"
-            if [[ "$basename_no_ext" == "$suite_spec" \
-               || "$rel_without_ext" == "$suite_spec" \
-               || "$rel_with_ext" == "$suite_spec" \
-               || "$test_file" == "$suite_spec" ]]; then
-                selected_tests=("$test_file")
-                match_found=1
-                break
-            fi
-        done
-        if [[ $match_found -eq 0 ]]; then
-            echo "No test suite matching '$suite_spec'. Available suites:" >&2
-            for test_file in "${tests[@]}"; do
-                printf '  %s\n' "${test_file#${tests_root}/}" | sed 's/\.bats$//' >&2
-            done
-            return 1
-        fi
-    fi
-
-    if [[ ${#selected_tests[@]} -eq 0 ]]; then
-        echo "No test suites found." >&2
-        return 1
-    fi
-
-    local repo_root
-    repo_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
-    local log_root="${repo_root}/scratch/test-logs"
-    local base_dir=""
-    local artifacts_dir=""
-    local log_file=""
-    local ran_with_logging=0
-    local status
-
-    if mkdir -p "$log_root" 2>/dev/null; then
-        local timestamp
-        timestamp="$(date +%Y%m%d-%H%M%S)"
-        local suite_slug
-        suite_slug="$( __slugify "$suite_spec" 12 )"
-        base_dir="${log_root}/${suite_slug}"
-        if [[ -n "$case_name" ]]; then
-            local case_slug
-            case_slug="$( __slugify "$case_name" 6 )"
-            if [[ -z "$case_slug" ]]; then
-                case_slug='case'
-            fi
-            local case_hash
-            case_hash=$(printf '%s' "$case_name" | sha256sum | cut -c1-4)
-            base_dir+="/${case_slug}-${case_hash}"
-        fi
-
-        if mkdir -p "$base_dir" 2>/dev/null; then
-            artifacts_dir="${base_dir}/${timestamp}"
-            bats_args+=(--gather-test-outputs-in "$artifacts_dir")
-
-            log_file="${base_dir}/${timestamp}.log"
-            if : > "$log_file" 2>/dev/null; then
-                bats "${bats_args[@]}" "${selected_tests[@]}" 2>&1 | tee "$log_file"
-                status=${PIPESTATUS[0]}
-                ran_with_logging=1
-            else
-                log_file=""
-            fi
-        else
-            base_dir=""
-        fi
-    fi
-
-    if (( ran_with_logging == 0 )); then
-        bats "${bats_args[@]}" "${selected_tests[@]}"
-        status=$?
-    fi
-
-    if [[ $status -ne 0 ]]; then
-        if [[ -n "$log_file" ]]; then
-            local rel_log_file="$log_file"
-            rel_log_file="${rel_log_file#${repo_root}/}"
-            printf 'Test log saved to %s\n' "$rel_log_file" >&2
-        else
-            echo "Test log unavailable (failed to create log file)." >&2
-        fi
-        if [[ -n "$artifacts_dir" ]]; then
-            local rel_artifacts_dir="$artifacts_dir"
-            rel_artifacts_dir="${rel_artifacts_dir#${repo_root}/}"
-            printf 'Collected artifacts in %s\n' "$rel_artifacts_dir" >&2
-        fi
-    else
-        if [[ -n "$log_file" ]]; then
-            rm -f "$log_file" 2>/dev/null || true
-        fi
-        if [[ -n "$artifacts_dir" ]]; then
-            rm -rf "$artifacts_dir" 2>/dev/null || true
-            local prune_dir="$artifacts_dir"
-            while [[ "$prune_dir" != "$log_root" ]]; do
-                prune_dir="$(dirname "$prune_dir")"
-                rmdir "$prune_dir" 2>/dev/null || break
-            done
-        fi
-    fi
-
-    return $status
-}
+# function test() has been moved to scripts/k3d-manager (dispatcher)
+# Reason: CLI entrypoint belongs in the dispatcher, not a utility library.
+# Refactor tracking: docs/plans/v0.9.1-test-fn-refactor-task.md
