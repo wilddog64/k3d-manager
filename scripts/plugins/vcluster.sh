@@ -52,7 +52,7 @@ function vcluster_destroy() {
     return 0
   fi
 
-  _run_command -- vcluster delete "$name" -n "$VCLUSTER_NAMESPACE" --delete-namespace --wait
+  _run_command -- vcluster delete "$name" -n "$VCLUSTER_NAMESPACE" --wait
   if [[ -f "$kubeconfig_path" ]]; then
     _run_command -- rm -f "$kubeconfig_path"
   fi
@@ -94,15 +94,16 @@ function vcluster_use() {
   fi
   _run_command -- mkdir -p "$base_dir"
 
+  local merge_chain="${KUBECONFIG:-$base_config}"
   local merged=""
   if [[ -f "$base_config" ]]; then
     merged="$(
-      _run_command -- env KUBECONFIG="${kubeconfig}:${base_config}" kubectl config view --flatten
+      _run_command -- env KUBECONFIG="${kubeconfig}:${merge_chain}" kubectl config view --flatten
     )"
   else
     merged="$(cat "$kubeconfig")"
   fi
-  printf '%s\n' "$merged" > "$base_config"
+  _write_sensitive_file "$base_config" "$merged"
   export KUBECONFIG="$base_config"
 
   local context
@@ -175,8 +176,7 @@ function _vcluster_export_kubeconfig() {
   kubeconfig="$(_vcluster_kubeconfig_path "$name")"
   local config
   config="$(_run_command -- vcluster connect "$name" -n "$VCLUSTER_NAMESPACE" --print)"
-  printf '%s\n' "$config" > "$kubeconfig"
-  _run_command -- chmod 600 "$kubeconfig"
+  _write_sensitive_file "$kubeconfig" "$config"
   _info "Kubeconfig written to $kubeconfig"
 }
 
@@ -192,6 +192,9 @@ function _vcluster_kubeconfig_path() {
   local name="${1:-}"
   if [[ -z "$name" ]]; then
     _err "vCluster name required"
+  fi
+  if [[ "$name" == */* || "$name" == *..* ]]; then
+    _err "vCluster name must not contain '/' or '..': $name"
   fi
   printf '%s/%s.yaml\n' "$VCLUSTER_KUBECONFIG_DIR" "$name"
 }
@@ -212,7 +215,16 @@ function _vcluster_ensure_exists() {
   if ! list_output="$(_run_command --no-exit --quiet -- vcluster list -n "$VCLUSTER_NAMESPACE")"; then
     _err "vCluster '$name' not found in namespace '$VCLUSTER_NAMESPACE'"
   fi
-  if [[ "$list_output" != *"$name"* ]]; then
+  local found=0 line cluster_name
+  while IFS= read -r line; do
+    [[ "$line" == NAME* ]] && continue
+    read -r cluster_name _ <<< "$line"
+    if [[ "$cluster_name" == "$name" ]]; then
+      found=1
+      break
+    fi
+  done <<< "$list_output"
+  if [[ $found -eq 0 ]]; then
     _err "vCluster '$name' not found in namespace '$VCLUSTER_NAMESPACE'"
   fi
 }
