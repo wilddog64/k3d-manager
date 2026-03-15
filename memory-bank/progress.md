@@ -3,7 +3,8 @@
 ## Overall Status
 
 **v0.8.0 SHIPPED** — squash-merged to main (aaf2aee), PR #28, 2026-03-13. Tagged + released.
-**v0.9.0 SHIPPING** — PR #30 open, CI green. Docs/planning only.
+**v0.9.0 SHIPPED** — squash-merged to main (616d868), PR #30, 2026-03-15. Tagged + released.
+**v0.9.1 ACTIVE** — branch `k3d-manager-v0.9.1` cut from main 2026-03-15.
 
 ---
 
@@ -47,11 +48,13 @@
 
 ## What Is Pending
 
-### v0.9.0 — shipping (PR #30)
+### v0.9.1 — active
 
-- k3dm-mcp planning, roadmap restructure (vCluster → v1.0.0 plugin, multi-cloud → v1.1.0), agent lessons
+- [ ] vCluster plugin — `scripts/plugins/vcluster.sh` (`vcluster_create/destroy/use/list`)
+- [ ] Playwright E2E in CI — `shopping-cart-infra` ephemeral vCluster per PR run
+- [ ] Spec: `docs/plans/v0.9.1-vcluster-plugin.md` (to be written)
 
-### Next — k3dm-mcp v0.1.0
+### Next after v0.9.1 — k3dm-mcp v1.0.0
 
 - Separate repo `~/src/gitrepo/personal/k3dm-mcp`
 
