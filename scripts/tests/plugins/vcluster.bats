@@ -121,3 +121,8 @@ BIN
 @test "VCLUSTER_INSTALL_DIR defaults to /usr/local/bin" {
   [ "$VCLUSTER_INSTALL_DIR" = "/usr/local/bin" ]
 }
+
+@test "vcluster_install_cli is a public function" {
+  run grep -n "^function vcluster_install_cli" "${BATS_TEST_DIRNAME}/../../plugins/vcluster.sh"
+  [ "$status" -eq 0 ]
+}

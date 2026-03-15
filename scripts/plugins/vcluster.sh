@@ -117,6 +117,10 @@ function vcluster_list() {
   _run_command -- vcluster list -n "$VCLUSTER_NAMESPACE"
 }
 
+function vcluster_install_cli() {
+  _vcluster_install_cli
+}
+
 function _vcluster_install_cli() {
   if _command_exist vcluster; then
     _info "vcluster already installed, skipping"
