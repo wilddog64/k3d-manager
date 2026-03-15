@@ -34,11 +34,25 @@ STUB
   source "${BATS_TEST_DIRNAME}/../../plugins/vcluster.sh"
 }
 
-@test "vcluster_create: fails without vcluster binary" {
+@test "vcluster_create: installs CLI when binary missing" {
   rm -f "$VCLUSTER_STUB"
+  _vcluster_install_cli() {
+    cat <<'BIN' > "$VCLUSTER_STUB"
+#!/usr/bin/env bash
+if [[ "$1" == "list" ]]; then
+  echo "NAME   NAMESPACE"
+else
+  exit 0
+fi
+BIN
+    chmod +x "$VCLUSTER_STUB"
+  }
   run vcluster_create demo
-  [ "$status" -ne 0 ]
-  [[ "$output" == *"vcluster CLI is not installed"* ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"vcluster CLI not found"* ]]
+  local -a run_calls
+  read_lines "$RUN_LOG" run_calls
+  [ "${run_calls[0]}" = "vcluster create demo -n vclusters --chart-version 0.32.1 --connect=false -f ${SCRIPT_DIR}/etc/vcluster/values.yaml" ]
 }
 
 @test "vcluster_create: fails without active host context" {
@@ -90,4 +104,20 @@ STUB
 
 @test "VCLUSTER_NAMESPACE defaults to vclusters" {
   [ "$VCLUSTER_NAMESPACE" = "vclusters" ]
+}
+
+@test "_vcluster_install_cli: skips if binary already exists" {
+  _command_exist() {
+    if [[ "$1" == "vcluster" ]]; then
+      return 0
+    fi
+    command -v "$1" >/dev/null 2>&1
+  }
+  run _vcluster_install_cli
+  [ "$status" -eq 0 ]
+  [ ! -s "$RUN_LOG" ]
+}
+
+@test "VCLUSTER_INSTALL_DIR defaults to /usr/local/bin" {
+  [ "$VCLUSTER_INSTALL_DIR" = "/usr/local/bin" ]
 }
