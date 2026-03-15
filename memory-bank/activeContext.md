@@ -15,7 +15,7 @@
 |---|---|---|
 | Copilot review process guide | **done** | `docs/guides/copilot-review-process.md` + `copilot-review-template.md` |
 | README releases table update | **done** | Split to `docs/releases.md`, README shows last 3 |
-| vCluster E2E composite actions | **PR #34 open — curl/input validation fix pushed** | action_path fixed earlier; 05ea15c adds `curl -fsSL` download+execute and `vX.Y.Z` guard for `k3d-version`. Spec: `docs/plans/v0.9.2-vcluster-composite-action-curl-fix.md`. |
+| vCluster E2E composite actions | **PR #34 open — Codex fix pending** | curl+validation fixed (`05ea15c`). New findings: mktemp for installer + teardown dependency check. Task spec: `docs/plans/v0.9.2-vcluster-composite-action-mktemp-fix.md` |
 | Playwright E2E browser tests | pending | `shopping-cart-e2e-tests`; blocked on ImagePullBackOff CI publish jobs completing |
 
 ---
