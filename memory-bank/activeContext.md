@@ -13,11 +13,11 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| vCluster plugin | **blocked — `vcluster` CLI auto-install missing** | Codex task: `docs/plans/v0.9.1-vcluster-install-cli-task.md` |
+| vCluster plugin | **auto-install helper merged — awaiting CI rerun** | Codex commit `455f703b4ac2f7ed9f360b921484c3d3fce059c6` (see notes) |
 | Playwright E2E in CI | pending | `shopping-cart-infra` — starts after vCluster plugin ships |
 | lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
 
-Codex (commit `6020fc4c88df520c98d971051a415b1f40fe6edf`, local) implemented the plugin per spec: `bats scripts/tests/plugins/vcluster.bats` 8/8, `env -i PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'cd /Users/cliang/src/gitrepo/personal/k3d-manager && bats scripts/tests/plugins/vcluster.bats'` 8/8, `shellcheck scripts/plugins/vcluster.sh` clean, `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/plugins/vcluster.sh` PASS. PR + CI still pending (gh api verification blocked in offline sandbox).
+Codex (commit `455f703b4ac2f7ed9f360b921484c3d3fce059c6`, verified via `gh api repos/wilddog64/k3d-manager/git/commits/455f703b4ac2f7ed9f360b921484c3d3fce059c6`) added `_vcluster_install_cli` + env var plumbing. Tests: `bats scripts/tests/plugins/vcluster.bats` 10/10, `env -i PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'cd /Users/cliang/src/gitrepo/personal/k3d-manager && bats scripts/tests/plugins/vcluster.bats'` 10/10, `shellcheck scripts/plugins/vcluster.sh` clean, `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/plugins/vcluster.sh` PASS. Pushed to `k3d-manager-v0.9.1`; CI run `https://github.com/wilddog64/k3d-manager/actions/runs/23101575904` still red (`stage2` fails on cluster health: `StatefulSet vault Ready replicas ... does not match desired 1`). Claude to steer rerun/fix.
 
 ---
 
