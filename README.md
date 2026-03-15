@@ -164,6 +164,8 @@ docs/
 - **[Jenkins Authentication](docs/guides/jenkins-authentication.md)** — Auth modes (built-in / LDAP / AD), Vault sidecar, password rotation
 - **[Plugin Development](docs/guides/plugin-development.md)** — Writing plugins, `_run_command` helper, testing
 - **[Jenkins Job DSL Setup](docs/jenkins-job-dsl-setup.md)** — Seed job + GitHub repo wiring
+- **[Copilot Review Process](docs/guides/copilot-review-process.md)** — When to request, severity levels, handling findings, pre-merge checklist
+- **[Copilot Review Template](docs/guides/copilot-review-template.md)** — Fill-in template for per-PR review records
 
 ### Providers
 - **[OrbStack](docs/providers/orbstack.md)** — macOS auto-detection and manual override
@@ -181,8 +183,10 @@ docs/
 - **[Jenkins K8s Agents Testing](docs/howto/jenkins-k8s-agents-testing.md)**
 
 ### Issue Logs
+- **[vCluster Copilot Review Findings](docs/issues/2026-03-15-vcluster-copilot-review-findings.md)** — 11 findings across 2 rounds (v0.9.1)
+- **[vCluster Smoke Test Failures](docs/issues/2026-03-15-vcluster-smoke-test-failures.md)** — Pod selector mismatch + missing plugin help (v0.9.1)
+- **[test() Function Refactor](docs/issues/2026-03-15-test-function-refactor.md)** — if-count violation + dispatcher move (v0.9.1)
 - **[Shopping Cart CI Failures](docs/issues/2026-03-11-shopping-cart-ci-failures.md)** — P1/P2 CI fixes (v0.8.0)
-- **[ArgoCD Registration Challenges](docs/issues/2026-03-10-task15-argocd-registration-challenges.md)**
 - **[_run_command If-Count Refactor](docs/issues/2026-03-08-run-command-if-count-refactor.md)** — lib-foundation v0.3.0 debt
 
 ---

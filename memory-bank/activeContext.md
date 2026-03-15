@@ -131,12 +131,15 @@ Owner
 
 ---
 
-## Release Checklist (do after every PR merge to main)
+## Release Checklist (do on the next feature branch after every PR merge to main)
 
 1. Tag: `git tag v<X.Y.Z> <sha> && git push origin v<X.Y.Z>`
 2. Release: `gh release create v<X.Y.Z> --title "v<X.Y.Z> — <title>" --notes "..."`
-3. Update README.md Releases table on next feature branch
-4. Verify `gh release list` shows new version as Latest
+3. `docs/releases.md` — add new row at the top
+4. `README.md` Releases table — keep last 3 rows, drop oldest
+5. `README.md` Guides section — add links to any new guide docs
+6. `README.md` Issue Logs section — add links to notable issues/findings from the release
+7. Verify `gh release list` shows new version as Latest
 
 ---
 
