@@ -16,10 +16,15 @@ runs:
         set -euo pipefail
         for cmd in kubectl k3d; do
           if ! command -v "$cmd" &>/dev/null; then
-            echo "Error: $cmd missing; run with the vcluster-e2e-setup job." >&2
+            echo "Error: '$cmd' missing; run with vcluster-e2e-setup job." >&2
             exit 1
           fi
         done
+        manager="${{ github.action_path }}"/../../../scripts/k3d-manager
+        if [[ ! -x "$manager" ]]; then
+          echo "Error: k3d-manager not found or not executable at: $manager" >&2
+          exit 1
+        fi
 
     - name: Teardown vCluster and k3d cluster
       shell: bash
