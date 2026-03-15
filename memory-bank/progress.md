@@ -54,7 +54,7 @@
 - [x] Copilot review process guide — `docs/guides/copilot-review-process.md` + `copilot-review-template.md`
 - [x] README releases table — split to `docs/releases.md` (full history), README shows last 3 + link
 - [ ] Fix ImagePullBackOff — Codex task spec at `shopping-cart-infra/docs/plans/imagepullbackoff-fix.md`; root cause: missing `newName: ghcr.io/wilddog64/<svc>` in kustomization images blocks (product-catalog/order/payment have no images block at all)
-- [ ] Reusable vCluster E2E setup workflow — Codex task spec at `docs/plans/v0.9.2-vcluster-e2e-workflow.md`; two-job design (setup/teardown), outputs base64 kubeconfig to caller
+- [x] Reusable vCluster E2E setup workflow — `.github/workflows/vcluster-e2e-setup.yml`, public `vcluster_install_cli` wrapper + BATS test landed (commit `4d127e6551f7eaf29b0cab5775a1f361f261a58f`, PR https://github.com/wilddog64/k3d-manager/pull/32); tests: `shellcheck scripts/plugins/vcluster.sh`, `env -i PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'cd /Users/cliang/src/gitrepo/personal/k3d-manager && bats scripts/tests/plugins/vcluster.bats'`
 - [ ] Playwright E2E browser tests — `shopping-cart-e2e-tests`; blocked on ImagePullBackOff fix
 
 ### After v0.9.2 — Cloud Providers then k3dm-mcp
