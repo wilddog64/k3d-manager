@@ -26,3 +26,15 @@ resolved relative to `$GITHUB_WORKSPACE`. If the caller checks out k3d-manager i
 a subdirectory, the path doesn't exist. Both setup and teardown actions now invoke
 `k3d-manager` via `${{ github.action_path }}/../../../scripts/k3d-manager`, which is
 stable regardless of caller checkout layout.
+
+## Fourth and Fifth Findings — curl Safety + Input Validation (PR #34)
+
+Two more Copilot findings landed after the action path fix:
+
+1. **curl -s piped to sudo bash** — this hid HTTP errors and executed remote
+   content as root without inspection. Fixed by switching to `curl -fsSL` and
+   downloading to `/tmp/k3d-install.sh` before executing with `sudo bash`.
+2. **k3d-version input unvalidated** — callers could supply `main` or other
+   non-tag values, reintroducing the supply-chain risk from PR #33. Fixed by
+   requiring the input to match `^v[0-9]+\.[0-9]+\.[0-9]+$` before constructing
+   the download URL.
