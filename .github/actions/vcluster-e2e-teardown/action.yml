@@ -16,7 +16,8 @@ runs:
         set -euo pipefail
         for cmd in kubectl k3d; do
           if ! command -v "$cmd" &>/dev/null; then
-            echo "Error: '$cmd' missing; run with vcluster-e2e-setup job." >&2
+            echo "Error: '$cmd' not found." \
+              "This action must run in the same job as vcluster-e2e-setup." >&2
             exit 1
           fi
         done
