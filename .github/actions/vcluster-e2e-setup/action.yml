@@ -1,0 +1,50 @@
+---
+name: vCluster E2E Setup
+description: Provision a k3d cluster with a vCluster for E2E testing
+
+inputs:
+  run-id:
+    description: 'Unique ID for this run (use github.run_id)'
+    required: true
+  vcluster-version:
+    description: 'vCluster chart version'
+    required: false
+    default: '0.32.1'
+  k3d-version:
+    description: 'k3d version to install'
+    required: false
+    default: 'v5.7.4'
+
+outputs:
+  vcluster-name:
+    description: 'Name of the provisioned vCluster'
+    value: ${{ steps.setup.outputs.vcluster-name }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install k3d
+      shell: bash
+      run: |
+        set -euo pipefail
+        base_url="https://raw.githubusercontent.com/k3d-io/k3d"
+        installer="${base_url}/${{ inputs.k3d-version }}/install.sh"
+        curl -s "$installer" | sudo bash
+
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v4
+
+    - name: Setup k3d cluster and vCluster
+      id: setup
+      shell: bash
+      env:
+        RUN_ID: ${{ inputs.run-id }}
+        VCLUSTER_VERSION: ${{ inputs.vcluster-version }}
+      run: |
+        set -euo pipefail
+        cluster="e2e-${RUN_ID}"
+        k3d cluster create "$cluster" --no-lb --wait
+        ./scripts/k3d-manager vcluster_install_cli
+        ./scripts/k3d-manager vcluster_create "$cluster"
+        ./scripts/k3d-manager vcluster_use "$cluster"
+        echo "vcluster-name=$cluster" >> "$GITHUB_OUTPUT"
