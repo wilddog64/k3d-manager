@@ -21,19 +21,15 @@
 | Playwright E2E in CI | pending | `shopping-cart-infra` — starts after vCluster plugin ships |
 
 ### Gemini retry task — READY TO ASSIGN
-Two bugs fixed in commit `45717e8` (pull before running):
-1. `vcluster_create` pod selector corrected: `app=vcluster,release=<name>`
+Spec: `docs/plans/v0.9.1-gemini-smoke-test-task.md` (updated)
+
+Two bugs fixed in commit `45717e8`:
+1. Pod selector corrected: `app=vcluster,release=<name>`
 2. vCluster functions now visible in `./scripts/k3d-manager --help`
 
-Re-run only the failed steps on M2 Air:
-```bash
-git pull origin k3d-manager-v0.9.1
-./scripts/k3d-manager vcluster_create smoke-test
-./scripts/k3d-manager vcluster_list
-./scripts/k3d-manager vcluster_use smoke-test && kubectl config current-context
-./scripts/k3d-manager vcluster_destroy smoke-test
-./scripts/k3d-manager --help   # verify vCluster category now visible
-```
+Steps already passed: `test all` (190), bare help, `test --help`
+Steps to re-run on M2 Air: `--help` vCluster category check, then
+`vcluster_create` → `vcluster_list` → `vcluster_use` → `vcluster_destroy`
 
 ---
 
