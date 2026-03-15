@@ -164,6 +164,8 @@ docs/
 - **[Jenkins Authentication](docs/guides/jenkins-authentication.md)** — Auth modes (built-in / LDAP / AD), Vault sidecar, password rotation
 - **[Plugin Development](docs/guides/plugin-development.md)** — Writing plugins, `_run_command` helper, testing
 - **[Jenkins Job DSL Setup](docs/jenkins-job-dsl-setup.md)** — Seed job + GitHub repo wiring
+- **[Copilot Review Process](docs/guides/copilot-review-process.md)** — When to request, severity levels, handling findings, pre-merge checklist
+- **[Copilot Review Template](docs/guides/copilot-review-template.md)** — Fill-in template for per-PR review records
 
 ### Providers
 - **[OrbStack](docs/providers/orbstack.md)** — macOS auto-detection and manual override
@@ -181,8 +183,10 @@ docs/
 - **[Jenkins K8s Agents Testing](docs/howto/jenkins-k8s-agents-testing.md)**
 
 ### Issue Logs
+- **[vCluster Copilot Review Findings](docs/issues/2026-03-15-vcluster-copilot-review-findings.md)** — 11 findings across 2 rounds (v0.9.1)
+- **[vCluster Smoke Test Failures](docs/issues/2026-03-15-vcluster-smoke-test-failures.md)** — Pod selector mismatch + missing plugin help (v0.9.1)
+- **[test() Function Refactor](docs/issues/2026-03-15-test-function-refactor.md)** — if-count violation + dispatcher move (v0.9.1)
 - **[Shopping Cart CI Failures](docs/issues/2026-03-11-shopping-cart-ci-failures.md)** — P1/P2 CI fixes (v0.8.0)
-- **[ArgoCD Registration Challenges](docs/issues/2026-03-10-task15-argocd-registration-challenges.md)**
 - **[_run_command If-Count Refactor](docs/issues/2026-03-08-run-command-if-count-refactor.md)** — lib-foundation v0.3.0 debt
 
 ---
@@ -191,13 +195,8 @@ docs/
 
 | Version | Date | Highlights |
 |---|---|---|
-| [v0.9.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.0) | 2026-03-14 | k3dm-mcp planning (log aggregation via MCP), vcluster v1.1.0 roadmap entry, agent workflow lessons |
-| [v0.8.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.8.0) | 2026-03-13 | Vault-managed ArgoCD deploy keys, `deploy_cert_manager` (ACME/Let's Encrypt), `istio` IngressClass, `install-hooks.sh` |
-| [v0.7.3](https://github.com/wilddog64/k3d-manager/releases/tag/v0.7.3) | 2026-03-11 | `shopping_cart.sh` plugin, reusable GitHub Actions CI/CD workflow, ArgoCD ubuntu-k3s, infra rebuilt on M2 Air |
-| [v0.7.2](https://github.com/wilddog64/k3d-manager/releases/tag/v0.7.2) | 2026-03-08 | dotfiles/hooks integration, lib-foundation v0.2.0, Ubuntu ESO + shopping-cart-data |
-| [v0.7.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.7.0) | 2026-03-07 | lib-foundation subtree, `deploy_cluster` refactored 12→5 if-blocks |
-| [v0.6.5](https://github.com/wilddog64/k3d-manager/releases/tag/v0.6.5) | 2026-03-07 | Agent Rigor BATS coverage, lib-foundation extracted |
-| [v0.6.4](https://github.com/wilddog64/k3d-manager/releases/tag/v0.6.4) | 2026-03-07 | Linux k3s validation, `_agent_audit`, provider contract BATS (30 tests) |
-| [v0.6.3](https://github.com/wilddog64/k3d-manager/releases/tag/v0.6.3) | 2026-03-06 | `_agent_lint` + `_agent_audit`, permission cascade refactor |
-| [v0.6.2](https://github.com/wilddog64/k3d-manager/releases/tag/v0.6.2) | 2026-03-06 | Agent Rigor Protocol, `_k3d_manager_copilot` wrapper, PATH hardening |
-| [v0.1.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.1.0) | 2026-02-27 | Initial release — k3d/k3s/OrbStack providers, Vault PKI, Jenkins, ESO, LDAP/AD |
+| [v0.9.1](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.1) | 2026-03-15 | vCluster plugin (`create/destroy/use/list`), two-tier `--help`, `function test()` refactor, 11 Copilot findings fixed |
+| [v0.9.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.0) | 2026-03-15 | k3dm-mcp planning, agent workflow lessons, roadmap restructure |
+| [v0.8.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.8.0) | 2026-03-13 | Vault-managed ArgoCD deploy keys, `deploy_cert_manager` (ACME/Let's Encrypt), Istio IngressClass |
+
+[Full release history →](docs/releases.md)

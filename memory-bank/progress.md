@@ -4,7 +4,8 @@
 
 **v0.8.0 SHIPPED** — squash-merged to main (aaf2aee), PR #28, 2026-03-13. Tagged + released.
 **v0.9.0 SHIPPED** — squash-merged to main (616d868), PR #30, 2026-03-15. Tagged + released.
-**v0.9.1 ACTIVE** — branch `k3d-manager-v0.9.1` cut from main 2026-03-15.
+**v0.9.1 SHIPPED** — squash-merged to main (942660e), PR #31, 2026-03-15. Tagged + released.
+**v0.9.2 ACTIVE** — branch `k3d-manager-v0.9.2` cut from main 2026-03-15.
 
 ---
 
@@ -48,27 +49,21 @@
 
 ## What Is Pending
 
-### v0.9.1 — active
+### v0.9.2 — active
 
-- [x] `AGENTS.md` — agent session rules (read memory-bank, proof of work, no-revert, scope discipline)
-- [x] vCluster plugin spec — `docs/plans/v0.9.1-vcluster-plugin.md` (decisions recorded: v0.32.1, k8s distro, --print kubeconfig, 500m/512Mi limits)
-- [x] Codex task spec — `docs/plans/v0.9.1-vcluster-codex-task.md` (DoD checklist, do-not-do list)
-- [x] vCluster plugin implementation — `scripts/plugins/vcluster.sh` + `scripts/etc/vcluster/values.yaml` + `scripts/tests/plugins/vcluster.bats` — **Codex** (commit `9be27b7`, BATS 8/8, shellcheck clean, audit PASS)
-- [x] `_vcluster_install_cli` helper — auto-install vcluster binary — **Codex** (commit `455f703b4ac2f7ed9f360b921484c3d3fce059c6`)
-- [x] Vault unsealed on M2 Air (via HTTP API — `kubectl exec -- vault operator unseal <key>`)
-- [x] CI green on PR #31 — commits `68b263c`, `f444c4b`, `0fc68d5`, `916fa13`
-- [x] Copilot review — all 8 comments addressed + resolved (commits `68b263c`, `f444c4b`)
-- [x] `--help` / `-h` flag — no longer errors; shows full categorized help
-- [x] Two-tier help — bare shows category summary, `--help` shows full list (commit `0fc68d5`)
-- [x] `function test()` moved to dispatcher (unblocks audit; commit `0fc68d5`)
-- [x] Codex refactor spec — `docs/plans/v0.9.1-test-fn-refactor-task.md` (commit `916fa13`)
-- [x] Codex: refactor `function test()` if-count — spec at `docs/plans/v0.9.1-test-fn-refactor-task.md`; commit `79074e58fcc3b1a5410590b94585e8efe2a93a6a` pushed (verified via `gh api`); tests: `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test all`, `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test --help`, `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager --help`; lint: `shellcheck scripts/k3d-manager`; manual audit: `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/k3d-manager`; doc: `docs/issues/2026-03-15-test-function-refactor.md`
-- [x] Gemini smoke test — spec: `docs/plans/v0.9.1-gemini-smoke-test-task.md` — **PASS on RETRY** (M2 Air)
-- [ ] Playwright E2E in CI — `shopping-cart-infra` — starts after vCluster plugin ships
+- [x] Copilot review process guide — `docs/guides/copilot-review-process.md` + `copilot-review-template.md`
+- [x] README releases table — split to `docs/releases.md` (full history), README shows last 3 + link
+- [ ] Fix ImagePullBackOff — Codex task spec at `shopping-cart-infra/docs/plans/imagepullbackoff-fix.md`; root cause: missing `newName: ghcr.io/wilddog64/<svc>` in kustomization images blocks (product-catalog/order/payment have no images block at all)
+- [ ] vCluster E2E composite actions — PR #34 open (`codex/vcluster-composite`). mktemp+teardown fixed (`3079f83`); TAG env + sudo -n + teardown manager check shipped in 48217ee per `docs/plans/v0.9.2-vcluster-composite-action-sudo-tag-fix.md`; awaiting review/QA.
+- [ ] Playwright E2E browser tests — `shopping-cart-e2e-tests`; blocked on ImagePullBackOff fix
+- [ ] vCluster + Playwright MCP demo design — quick demo guide showing full workflow (vcluster_create → deploy stack → port-forward → Claude drives browser via Playwright MCP → Codex implements specs); also article material
 
-### Next after v0.9.1 — k3dm-mcp v1.0.0
+### After v0.9.2 — Cloud Providers then k3dm-mcp
 
-- Separate repo `~/src/gitrepo/personal/k3dm-mcp`
+- v1.1.0 — EKS provider + ACG sandbox lifecycle
+- v1.2.0 — GKE provider
+- v1.3.0 — AKS provider
+- v1.4.0 — k3dm-mcp (separate repo `~/src/gitrepo/personal/k3dm-mcp`) — after all providers ship
 
 ### lib-foundation Backlog
 
@@ -90,7 +85,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| Shopping Cart Apps ImagePullBackOff | OPEN | Images not pushed to ghcr.io — CI stabilization complete but images not yet built |
+| Shopping Cart Apps ImagePullBackOff | DIAGNOSED | Root cause: missing `newName: ghcr.io/wilddog64/<svc>` in kustomization; product-catalog/order/payment have no images block. Fix spec: `shopping-cart-infra/docs/plans/imagepullbackoff-fix.md` |
 | Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps may exceed capacity — reduce replicas in ArgoCD manifests |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround |
 | NVD API key missing | OPEN | Register at nvd.nist.gov — add as `NVD_API_KEY` secret to order + payment repos |
