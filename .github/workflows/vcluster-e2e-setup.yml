@@ -36,8 +36,8 @@ jobs:
   run:
     runs-on: ubuntu-latest
     outputs:
-      kubeconfig: ${{ steps.set-outputs.outputs.kubeconfig }}
-      vcluster-name: ${{ steps.set-outputs.outputs.vcluster-name }}
+      kubeconfig: ${{ steps.setup.outputs.kubeconfig }}
+      vcluster-name: ${{ steps.setup.outputs.vcluster-name }}
     steps:
       - name: Checkout k3d-manager
         uses: actions/checkout@v4
@@ -53,6 +53,7 @@ jobs:
         uses: azure/setup-kubectl@v4
 
       - name: Setup
+        id: setup
         if: inputs.action == 'setup'
         env:
           RUN_ID: ${{ inputs.run-id }}
@@ -77,15 +78,6 @@ jobs:
         run: |
           set -euo pipefail
           cluster="e2e-${RUN_ID}"
-          k3d cluster create "$cluster" --no-lb --wait >/dev/null 2>&1 || true
           kubectl config use-context "k3d-${cluster}" || true
           ./scripts/k3d-manager vcluster_destroy "$cluster" || true
           k3d cluster delete "$cluster" || true
-
-      - name: Set outputs
-        id: set-outputs
-        if: inputs.action == 'setup'
-        run: |
-          set -euo pipefail
-          echo "kubeconfig=${{ steps.run.outputs.kubeconfig || '' }}" >> "$GITHUB_OUTPUT"
-          echo "vcluster-name=${{ steps.run.outputs.vcluster-name || '' }}" >> "$GITHUB_OUTPUT"
