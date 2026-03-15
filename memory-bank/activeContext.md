@@ -15,7 +15,7 @@
 |---|---|---|
 | Copilot review process guide | **done** | `docs/guides/copilot-review-process.md` + `copilot-review-template.md` |
 | README releases table update | **done** | Split to `docs/releases.md`, README shows last 3 |
-| Reusable vCluster E2E workflow | **PR #32 open** | spec at `docs/plans/v0.9.2-vcluster-e2e-workflow.md`; branch `k3d-manager-v0.9.2`, commit `4d127e6551f7eaf29b0cab5775a1f361f261a58f`, PR https://github.com/wilddog64/k3d-manager/pull/32 |
+| Reusable vCluster E2E workflow | **ready for review** | spec at `docs/plans/v0.9.2-vcluster-e2e-workflow.md`; commit `4d127e6551f7eaf29b0cab5775a1f361f261a58f` on branch `k3d-manager-v0.9.2`; PR will be opened by Claude (previous attempt closed per instructions) |
 | Playwright E2E browser tests | pending | `shopping-cart-e2e-tests`; blocked on ImagePullBackOff CI publish jobs completing |
 
 ---
