@@ -54,7 +54,7 @@
 - [x] Copilot review process guide — `docs/guides/copilot-review-process.md` + `copilot-review-template.md`
 - [x] README releases table — split to `docs/releases.md` (full history), README shows last 3 + link
 - [ ] Fix ImagePullBackOff — Codex task spec at `shopping-cart-infra/docs/plans/imagepullbackoff-fix.md`; root cause: missing `newName: ghcr.io/wilddog64/<svc>` in kustomization images blocks (product-catalog/order/payment have no images block at all)
-- [x] Reusable vCluster E2E setup workflow — `.github/workflows/vcluster-e2e-setup.yml`, public `vcluster_install_cli` wrapper + BATS test landed (commit `4d127e6551f7eaf29b0cab5775a1f361f261a58f`, branch `k3d-manager-v0.9.2`); tests: `shellcheck scripts/plugins/vcluster.sh`, `env -i PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'cd /Users/cliang/src/gitrepo/personal/k3d-manager && bats scripts/tests/plugins/vcluster.bats'`; PR will be opened by Claude |
+- [ ] Reusable vCluster E2E setup workflow — commit `4d127e6` landed; shellcheck clean, BATS 11/11; two bugs found in workflow YAML (Bug 1: teardown recreates cluster; Bug 2: output wiring broken — Setup step missing id). Bugfix task spec at `docs/plans/v0.9.2-vcluster-e2e-workflow-bugfix.md` |
 - [ ] Playwright E2E browser tests — `shopping-cart-e2e-tests`; blocked on ImagePullBackOff fix
 
 ### After v0.9.2 — Cloud Providers then k3dm-mcp
