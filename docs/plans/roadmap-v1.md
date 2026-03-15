@@ -165,6 +165,43 @@ tools callable from any MCP-compatible AI client. Owns its own memory-bank and r
   a shared-team concern, not a local dev tool concern.
 - **Dependency:** Docker — optional. k3s/bare metal environments use span file output only.
 
+## v0.9.1 — vCluster Plugin + Playwright E2E in CI
+*Focus: Ephemeral tenant clusters for isolated testing*
+
+**Motivation:** Shopping-cart has no real traffic — the value is fast lifecycle, not scale.
+Spin up a clean vCluster tenant, deploy the full stack, run Playwright E2E tests, tear it down.
+Clean slate every PR run, no shared cluster state pollution.
+
+**Track 1a — vCluster plugin (`scripts/plugins/vcluster.sh`):**
+```bash
+./scripts/k3d-manager vcluster_create  <name>   # spin up tenant cluster inside host
+./scripts/k3d-manager vcluster_destroy <name>   # tear it down
+./scripts/k3d-manager vcluster_use     <name>   # switch kubeconfig to tenant
+./scripts/k3d-manager vcluster_list            # list active tenant clusters
+```
+- `VCLUSTER_NAMESPACE` env var — target namespace in host (default: `vclusters`)
+- `VCLUSTER_VERSION` env var — pin chart version, no floating `latest`
+- Prerequisite check: verify host cluster context is active before any operation
+- dry-run gate inherited from `_run_command`
+- BATS coverage: `scripts/tests/plugins/vcluster.bats` (`env -i` clean)
+
+**Track 1b — Playwright E2E in CI (`shopping-cart-infra`):**
+```
+PR opened on any shopping-cart repo
+→ CI: vcluster_create shopping-cart-e2e
+→ deploy full stack (ESO + shopping-cart-data + apps) into tenant
+→ Playwright runs E2E against tenant services
+→ pass/fail reported to PR
+→ vcluster_destroy shopping-cart-e2e
+```
+- Playwright runs outside the cluster on the CI runner (no Chrome-in-cluster)
+- Tests live in `shopping-cart-e2e-tests/` repo
+- Prerequisite: images in ghcr.io (CI stabilization complete ✅)
+
+**Spec:** `docs/plans/v0.9.1-vcluster-plugin.md`
+
+---
+
 ## v0.9.0 — Messaging Gateway
 *Focus: Natural language interface for cluster operations*
 
@@ -191,48 +228,29 @@ JSON-RPC stdio. No direct k3d-manager calls — always through the MCP security 
 
 ---
 
-## v1.0.0 — vCluster Plugin
-*Focus: Tenant clusters on top of existing infra — on-demand isolation without new VMs*
+## v1.0.0 — k3dm-mcp
+*Focus: MCP server wrapping k3d-manager CLI — AI-driven cluster operations*
 
-**Motivation:** vCluster (by Loft Labs) creates fully functional virtual Kubernetes clusters
-inside a namespace of an existing host cluster. Pods schedule on the host cluster nodes —
-no new VMs, no new cloud infrastructure. Spin up in seconds, destroy in seconds.
+**Motivation:** k3d-manager (v0.9.1) has vCluster + full stack ops. k3dm-mcp exposes those
+as structured MCP tools callable from any MCP-compatible AI client (Claude Desktop, Copilot).
 
-**Why a plugin, not a provider:**
-vCluster is not a standalone runtime — it requires a host cluster to already exist.
-It cannot satisfy the `CLUSTER_PROVIDER` contract (create a cluster from nothing).
-The correct model is a plugin that layered on top of whichever provider is active:
+**Discrete repo:** [`wilddog64/k3dm-mcp`](https://github.com/wilddog64/k3dm-mcp)
 
-```bash
-# Host cluster already running (orbstack/k3d/k3s)
-./scripts/k3d-manager vcluster_create  my-tenant   # spin up vCluster inside host
-./scripts/k3d-manager vcluster_destroy my-tenant   # tear it down
-./scripts/k3d-manager vcluster_use     my-tenant   # switch kubeconfig to tenant
-./scripts/k3d-manager vcluster_list                # list all tenant clusters
-```
+**Key design decisions:**
+- One AI Layer Rule: `K3DM_ENABLE_AI=0` always set in subprocess env
+- Explicit subprocess env — no ambient shell state
+- SQLite state cache — never dump raw kubectl output to LLM
+- Blast radius classification, dry-run gate, pre-destroy snapshot
+- Loop detection + session call limit + credential scan on tool args
+- BATS-based MCP test harness (`env -i`, record-replay fixtures)
 
-**Use cases this unlocks:**
-- Per-feature isolated test environments — spin up, deploy stack, test, destroy
-- Team isolation — each developer gets their own cluster namespace without VM overhead
-- CI pipelines — ephemeral cluster per pipeline run, no teardown race conditions
-- Prerequisite validation for multi-cloud (v1.1.0) — provider contract proven locally first
+**MCP tools exposed (initial set):**
+- `deploy_cluster` / `destroy_cluster`
+- `deploy_vault`, `deploy_eso`, `deploy_argocd`
+- `vcluster_create` / `vcluster_destroy` / `vcluster_use` / `vcluster_list`
+- `sync_state` — cluster health snapshot into SQLite
 
-**Plugin implementation (`scripts/plugins/vcluster.sh`):**
-- `vcluster_create <name>` — `vcluster create <name> -n <namespace>` + export kubeconfig
-- `vcluster_destroy <name>` — `vcluster delete <name> -n <namespace>` — dry-run gate inherited
-- `vcluster_use <name>` — merge vCluster kubeconfig, switch context
-- `vcluster_list` — list active tenant clusters in host
-- `VCLUSTER_NAMESPACE` env var — target namespace in host (default: `vclusters`)
-- `VCLUSTER_VERSION` env var — pin chart version explicitly, no floating `latest`
-- Prerequisite check: verify host cluster context is active before any operation
-
-**What stays the same:** once `vcluster_use` hands off a kubeconfig, all existing plugins
-(Vault, ESO, Istio, Jenkins, ArgoCD) work identically — they speak only Kubernetes primitives.
-
-**BATS coverage:** new `vcluster.bats` suite; pure logic tests (`env -i` clean).
-
-*Note: vCluster team made contact after k3d-manager articles — potential collaboration
-for integration testing and early access to new vCluster features.*
+**Full scope:** see `k3dm-mcp/docs/plans/roadmap.md`
 
 ---
 

@@ -2,20 +2,20 @@
 
 ## Current Branch: `k3d-manager-v0.9.0` (as of 2026-03-14)
 
-**v0.9.0 SHIPPING** — PR #30 open, CI green, pending merge.
+**v0.9.0 SHIPPED** — PR #30 squash-merged (616d868), 2026-03-15. Tagged + released.
+**v0.9.1 active** — branch `k3d-manager-v0.9.1` cut from main 2026-03-15.
 
 ---
 
 ## Current Focus
 
-**Next: k3dm-mcp v0.1.0** — separate repo `~/src/gitrepo/personal/k3dm-mcp`
+**v0.9.1: vCluster Plugin + Playwright E2E in CI**
 
 | Item | Status | Notes |
 |---|---|---|
-| Shopping cart CI + P4 linters + v0.1.0 releases | **COMPLETE** | All work in shopping-cart-* repos. All 6 repos shipped v0.1.0 2026-03-14. |
-| k3d-manager v0.9.0 | **SHIPPING** | Docs/planning only — k3dm-mcp planning, roadmap restructure, agent lessons |
+| vCluster plugin | pending | `scripts/plugins/vcluster.sh` — `vcluster_create/destroy/use/list` |
+| Playwright E2E in CI | pending | `shopping-cart-infra` — ephemeral vCluster per PR run |
 | lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
-| k3dm-mcp v0.1.0 | next | Separate repo `~/src/gitrepo/personal/k3dm-mcp` |
 
 ---
 
@@ -23,9 +23,9 @@
 
 | Version | Status | Notes |
 |---|---|---|
-| v0.1.0–v0.8.0 | released | See CHANGE.md |
-| v0.9.0 | **shipping** | k3dm-mcp planning, roadmap restructure, agent lessons |
-| v1.0.0 | planned | vCluster plugin (`vcluster_create/destroy/use/list`) |
+| v0.1.0–v0.9.0 | released | See CHANGE.md |
+| v0.9.1 | **active** | vCluster plugin + Playwright E2E in CI |
+| v1.0.0 | planned | k3dm-mcp — MCP server wrapping k3d-manager CLI |
 | v1.1.0 | planned | Multi-cloud providers (EKS/GKE/AKS) + ACG sandbox lifecycle |
 
 ---
