@@ -38,7 +38,7 @@ runs:
         trap 'rm -f "$tmp_script"' EXIT
         curl -fsSL "$installer" -o "$tmp_script"
         chmod 600 "$tmp_script"
-        sudo bash "$tmp_script"
+        sudo -n env TAG="$k3d_version" bash "$tmp_script"
 
     - name: Install kubectl
       uses: azure/setup-kubectl@v4
