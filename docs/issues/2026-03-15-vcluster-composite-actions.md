@@ -38,3 +38,14 @@ Two more Copilot findings landed after the action path fix:
    non-tag values, reintroducing the supply-chain risk from PR #33. Fixed by
    requiring the input to match `^v[0-9]+\.[0-9]+\.[0-9]+$` before constructing
    the download URL.
+
+## Sixth and Seventh Findings — mktemp + Teardown Dependency Check (PR #34)
+
+1. **Predictable /tmp path** — `/tmp/k3d-install.sh` lived in a world-writable
+   directory and could be swapped via TOCTOU or symlink attacks. Fixed by using
+   `mktemp /tmp/k3d-install.XXXXXX`, restricting with `chmod 600`, and removing
+   it via a `trap` on EXIT after the installer runs.
+2. **Teardown assumes dependencies** — running teardown standalone emitted
+   `command not found` errors if `kubectl` or `k3d` were absent. Fixed by adding
+   a dependency check step that fails fast with guidance to run in the same job
+   as setup.

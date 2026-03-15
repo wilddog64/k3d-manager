@@ -54,7 +54,7 @@
 - [x] Copilot review process guide — `docs/guides/copilot-review-process.md` + `copilot-review-template.md`
 - [x] README releases table — split to `docs/releases.md` (full history), README shows last 3 + link
 - [ ] Fix ImagePullBackOff — Codex task spec at `shopping-cart-infra/docs/plans/imagepullbackoff-fix.md`; root cause: missing `newName: ghcr.io/wilddog64/<svc>` in kustomization images blocks (product-catalog/order/payment have no images block at all)
-- [ ] vCluster E2E composite actions — PR #34 open (`codex/vcluster-composite`). curl+validation fixed (`05ea15c`). Two new Copilot findings pending Codex fix: mktemp for installer + teardown dependency check. Task spec: `docs/plans/v0.9.2-vcluster-composite-action-mktemp-fix.md`.
+- [ ] vCluster E2E composite actions — PR #34 open (`codex/vcluster-composite`). curl+validation fixed (`05ea15c`); mktemp installer + teardown dependency guard shipped in 3079f83 per `docs/plans/v0.9.2-vcluster-composite-action-mktemp-fix.md`; awaiting review/QA.
 - [ ] Playwright E2E browser tests — `shopping-cart-e2e-tests`; blocked on ImagePullBackOff fix
 - [ ] vCluster + Playwright MCP demo design — quick demo guide showing full workflow (vcluster_create → deploy stack → port-forward → Claude drives browser via Playwright MCP → Codex implements specs); also article material
 
