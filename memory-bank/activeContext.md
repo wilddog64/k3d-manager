@@ -13,7 +13,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| vCluster plugin | **PR #31 draft — awaiting Gemini smoke test + Copilot comments addressed** | `docs/plans/v0.9.1-vcluster-codex-task.md` |
+| vCluster plugin | **FAILED — Smoke test on M2 Air** | `docs/plans/v0.9.1-vcluster-plugin.md` | `vcluster` CLI missing on M2 Air (Issue `2026-03-15`) |
 | Playwright E2E in CI | pending | `shopping-cart-infra` — starts after vCluster plugin ships |
 | lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
 
