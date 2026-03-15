@@ -34,8 +34,11 @@ runs:
         fi
         base_url="https://raw.githubusercontent.com/k3d-io/k3d"
         installer="${base_url}/${k3d_version}/install.sh"
-        curl -fsSL "$installer" -o /tmp/k3d-install.sh
-        sudo bash /tmp/k3d-install.sh
+        tmp_script="$(mktemp /tmp/k3d-install.XXXXXX)"
+        trap 'rm -f "$tmp_script"' EXIT
+        curl -fsSL "$installer" -o "$tmp_script"
+        chmod 600 "$tmp_script"
+        sudo bash "$tmp_script"
 
     - name: Install kubectl
       uses: azure/setup-kubectl@v4
