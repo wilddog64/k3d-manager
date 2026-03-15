@@ -63,7 +63,7 @@
 - [x] `function test()` moved to dispatcher (unblocks audit; commit `0fc68d5`)
 - [x] Codex refactor spec — `docs/plans/v0.9.1-test-fn-refactor-task.md` (commit `916fa13`)
 - [x] Codex: refactor `function test()` if-count — spec at `docs/plans/v0.9.1-test-fn-refactor-task.md`; commit `79074e58fcc3b1a5410590b94585e8efe2a93a6a` pushed (verified via `gh api`); tests: `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test all`, `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test --help`, `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager --help`; lint: `shellcheck scripts/k3d-manager`; manual audit: `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/k3d-manager`; doc: `docs/issues/2026-03-15-test-function-refactor.md`
-- [ ] Gemini smoke test — **RETRY READY** — fixes: commit `45717e8` (selector + plugin help); Gemini to re-run vcluster steps on M2 Air
+- [x] Gemini smoke test — spec: `docs/plans/v0.9.1-gemini-smoke-test-task.md` — **PASS on RETRY** (M2 Air)
 - [ ] Playwright E2E in CI — `shopping-cart-infra` — starts after vCluster plugin ships
 
 ### Next after v0.9.1 — k3dm-mcp v1.0.0

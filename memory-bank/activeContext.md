@@ -1,15 +1,15 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.0` (as of 2026-03-14)
+## Current Branch: `k3d-manager-v0.9.1` (as of 2026-03-15)
 
 **v0.9.0 SHIPPED** — PR #30 squash-merged (616d868), 2026-03-15. Tagged + released.
-**v0.9.1 active** — branch `k3d-manager-v0.9.1` cut from main 2026-03-15.
+**v0.9.1 ACTIVE** — branch `k3d-manager-v0.9.1` cut from main 2026-03-15.
 
 ---
 
 ## Current Focus
 
-**v0.9.1: vCluster Plugin + test() refactor + Gemini smoke test**
+**v0.9.1: vCluster Plugin — Gemini smoke test retry pending**
 
 | Item | Status | Notes |
 |---|---|---|
@@ -17,11 +17,12 @@
 | CI on PR #31 | **green** | Vault unsealed on M2 Air; latest push `124a2f1` |
 | Two-tier help + `--help` flag | **done** | Commit `0fc68d5` |
 | `function test()` refactor | **done** | Commit `79074e58` — audit PASS, 190 tests pass, verified by Claude |
-| Gemini smoke test | **RETRY READY** | Fixes in commit `45717e8`: selector corrected + plugin fns in --help; Gemini to re-run vcluster steps on M2 Air |
+| Gemini smoke test | **DONE — PASS on M2 Air** | Spec: `docs/plans/v0.9.1-gemini-smoke-test-task.md` | vCluster fns visible in help; create/list/use/destroy verified on live cluster |
 | Playwright E2E in CI | pending | `shopping-cart-infra` — starts after vCluster plugin ships |
 
 ### Gemini retry task — READY TO ASSIGN
-Spec: `docs/plans/v0.9.1-gemini-smoke-test-task.md` (updated)
+
+Spec: `docs/plans/v0.9.1-gemini-smoke-test-task.md` (updated after first run)
 
 Two bugs fixed in commit `45717e8`:
 1. Pod selector corrected: `app=vcluster,release=<name>`
@@ -30,6 +31,9 @@ Two bugs fixed in commit `45717e8`:
 Steps already passed: `test all` (190), bare help, `test --help`
 Steps to re-run on M2 Air: `--help` vCluster category check, then
 `vcluster_create` → `vcluster_list` → `vcluster_use` → `vcluster_destroy`
+
+### PR #31 — blocked on Gemini smoke test
+Do NOT promote from draft or merge until Gemini smoke test passes.
 
 ---
 
@@ -44,7 +48,7 @@ Steps to re-run on M2 Air: `--help` vCluster category check, then
 
 ---
 
-## Cluster State (as of 2026-03-14 — post v0.8.0)
+## Cluster State (as of 2026-03-15 — post v0.9.0)
 
 **Architecture:** Infra cluster on M2 Air — ArgoCD manages Ubuntu k3s hub-and-spoke.
 Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
@@ -53,7 +57,7 @@ Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
 
 | Component | Status |
 |---|---|
-| Vault | Running — `secrets` ns |
+| Vault | Running + Unsealed — `secrets` ns |
 | ESO | Running — `secrets` ns |
 | OpenLDAP | Running — `identity` + `directory` ns |
 | Istio | Running — `istio-system` |
@@ -66,13 +70,13 @@ Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
 
 | Component | Status |
 |---|---|
-| k3s node | Ready — v1.34.4+k3s1 |
+| k3s node | Ready |
 | Istio | Running |
 | ESO | Running — 2/2 SecretStores Ready |
 | Vault | Initialized + Unsealed |
 | OpenLDAP | Running — `identity` ns |
-| shopping-cart-data | Running ✅ |
-| shopping-cart-apps | Synced via ArgoCD ✅ — `ImagePullBackOff` until CI/CD pushes images |
+| shopping-cart-data | Running |
+| shopping-cart-apps | Synced via ArgoCD — `ImagePullBackOff` until CI/CD pushes images |
 
 **SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
 **Ubuntu interface:** `enp0s5` (not eth0) — MTU 1500. k3s uses flannel (MTU 1450).
@@ -148,9 +152,11 @@ Owner
 - Gemini confirms plan correctly but executes differently — confirmation is not reliable, verify actual output.
 - Gemini does not verify machine context — must open terminal on M2 Air before starting Gemini session.
 - One command at a time for Gemini on complex tasks — no branching specs.
-- BATS count: 158 total, ~108 pass with `env -i` (50 skip due to env-dependent tests) — expected, not a bug.
+- BATS count: 190 total (after vCluster plugin added), ~108 pass with `env -i` — expected, not a bug.
 - ArgoCD deploy keys: per-repo, passphrase-free, added via `gh api` — GitHub forbids reusing same key across repos.
 - k3s context name is always `default` — never `k3s-automation`.
+- vCluster v0.32.1 pod labels: `app=vcluster,release=<name>` (not `app.kubernetes.io/name` + `instance`).
+- Vault unseal non-interactive: pass key as CLI arg — `kubectl exec -n secrets vault-0 -- vault operator unseal "$KEY"`. Key field: `shard-1` (not `key1`).
 
 ---
 
