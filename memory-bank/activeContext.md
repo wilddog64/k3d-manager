@@ -20,7 +20,7 @@
 | Gemini smoke test | **pending after Codex** | `test all`, `--help`, vcluster on M2 Air |
 | Playwright E2E in CI | pending | `shopping-cart-infra` — starts after vCluster plugin ships |
 
-### Codex next task
+### Codex next task — APPROVED, ready to assign
 Spec: `docs/plans/v0.9.1-test-fn-refactor-task.md`
 
 Split `function test()` in `scripts/k3d-manager` into three helpers:
@@ -29,6 +29,14 @@ Split `function test()` in `scripts/k3d-manager` into three helpers:
 - `_test_execute` — BATS execution + log/artifact management
 
 Target: `function test()` ≤ 8 if-blocks. No behaviour change.
+
+**Audit caveat for Codex:** `scripts/k3d-manager` has no `.sh` extension so the
+pre-commit hook (`git diff --cached -- '*.sh'`) will NOT audit it automatically.
+Codex must run the audit manually:
+```bash
+AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/k3d-manager
+```
+A passing pre-commit hook alone is NOT sufficient — the manual audit must also pass.
 
 After Codex completes, Gemini smoke tests on M2 Air:
 ```bash
