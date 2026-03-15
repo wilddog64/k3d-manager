@@ -13,9 +13,11 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| vCluster plugin | **spec complete — ready for Codex** | `docs/plans/v0.9.1-vcluster-codex-task.md` |
+| vCluster plugin | **implementation delivered — awaiting PR/CI** | `docs/plans/v0.9.1-vcluster-codex-task.md` |
 | Playwright E2E in CI | pending | `shopping-cart-infra` — starts after vCluster plugin ships |
 | lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
+
+Codex (commit `9be27b7e2230d402f6436576f13c7e0ec6c64a97`, local) implemented the plugin per spec: `bats scripts/tests/plugins/vcluster.bats` 8/8, `env -i PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'cd /Users/cliang/src/gitrepo/personal/k3d-manager && bats scripts/tests/plugins/vcluster.bats'` 8/8, `shellcheck scripts/plugins/vcluster.sh` clean, `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/plugins/vcluster.sh` PASS. PR + CI still pending (gh api verification blocked in offline sandbox).
 
 ---
 
