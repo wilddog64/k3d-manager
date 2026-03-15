@@ -18,5 +18,6 @@ runs:
         set -euo pipefail
         cluster="e2e-${RUN_ID}"
         kubectl config use-context "k3d-${cluster}" || true
-        ./scripts/k3d-manager vcluster_destroy "$cluster" || true
+        manager="${{ github.action_path }}"/../../../scripts/k3d-manager
+        "$manager" vcluster_destroy "$cluster" || true
         k3d cluster delete "$cluster" || true

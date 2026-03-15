@@ -44,7 +44,8 @@ runs:
         set -euo pipefail
         cluster="e2e-${RUN_ID}"
         k3d cluster create "$cluster" --no-lb --wait
-        ./scripts/k3d-manager vcluster_install_cli
-        ./scripts/k3d-manager vcluster_create "$cluster"
-        ./scripts/k3d-manager vcluster_use "$cluster"
+        manager="${{ github.action_path }}"/../../../scripts/k3d-manager
+        "$manager" vcluster_install_cli
+        "$manager" vcluster_create "$cluster"
+        "$manager" vcluster_use "$cluster"
         echo "vcluster-name=$cluster" >> "$GITHUB_OUTPUT"
