@@ -4,7 +4,8 @@
 
 **v0.8.0 SHIPPED** — squash-merged to main (aaf2aee), PR #28, 2026-03-13. Tagged + released.
 **v0.9.0 SHIPPED** — squash-merged to main (616d868), PR #30, 2026-03-15. Tagged + released.
-**v0.9.1 ACTIVE** — branch `k3d-manager-v0.9.1` cut from main 2026-03-15.
+**v0.9.1 SHIPPED** — squash-merged to main (942660e), PR #31, 2026-03-15. Tagged + released.
+**v0.9.2 ACTIVE** — branch `k3d-manager-v0.9.2` cut from main 2026-03-15.
 
 ---
 
@@ -48,25 +49,13 @@
 
 ## What Is Pending
 
-### v0.9.1 — active
+### v0.9.2 — active
 
-- [x] `AGENTS.md` — agent session rules (read memory-bank, proof of work, no-revert, scope discipline)
-- [x] vCluster plugin spec — `docs/plans/v0.9.1-vcluster-plugin.md` (decisions recorded: v0.32.1, k8s distro, --print kubeconfig, 500m/512Mi limits)
-- [x] Codex task spec — `docs/plans/v0.9.1-vcluster-codex-task.md` (DoD checklist, do-not-do list)
-- [x] vCluster plugin implementation — `scripts/plugins/vcluster.sh` + `scripts/etc/vcluster/values.yaml` + `scripts/tests/plugins/vcluster.bats` — **Codex** (commit `9be27b7`, BATS 8/8, shellcheck clean, audit PASS)
-- [x] `_vcluster_install_cli` helper — auto-install vcluster binary — **Codex** (commit `455f703b4ac2f7ed9f360b921484c3d3fce059c6`)
-- [x] Vault unsealed on M2 Air (via HTTP API — `kubectl exec -- vault operator unseal <key>`)
-- [x] CI green on PR #31 — commits `68b263c`, `f444c4b`, `0fc68d5`, `916fa13`
-- [x] Copilot review — all 8 comments addressed + resolved (commits `68b263c`, `f444c4b`)
-- [x] `--help` / `-h` flag — no longer errors; shows full categorized help
-- [x] Two-tier help — bare shows category summary, `--help` shows full list (commit `0fc68d5`)
-- [x] `function test()` moved to dispatcher (unblocks audit; commit `0fc68d5`)
-- [x] Codex refactor spec — `docs/plans/v0.9.1-test-fn-refactor-task.md` (commit `916fa13`)
-- [x] Codex: refactor `function test()` if-count — spec at `docs/plans/v0.9.1-test-fn-refactor-task.md`; commit `79074e58fcc3b1a5410590b94585e8efe2a93a6a` pushed (verified via `gh api`); tests: `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test all`, `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test --help`, `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager --help`; lint: `shellcheck scripts/k3d-manager`; manual audit: `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/k3d-manager`; doc: `docs/issues/2026-03-15-test-function-refactor.md`
-- [x] Gemini smoke test — spec: `docs/plans/v0.9.1-gemini-smoke-test-task.md` — **PASS on RETRY** (M2 Air)
-- [ ] Playwright E2E in CI — `shopping-cart-infra` — starts after vCluster plugin ships
+- [x] Copilot review process guide — `docs/guides/copilot-review-process.md` + `copilot-review-template.md`
+- [ ] README releases table — add v0.9.1 row
+- [ ] Playwright E2E in CI — `shopping-cart-infra`
 
-### Next after v0.9.1 — k3dm-mcp v1.0.0
+### Next after v0.9.2 — k3dm-mcp v1.0.0
 
 - Separate repo `~/src/gitrepo/personal/k3dm-mcp`
 
