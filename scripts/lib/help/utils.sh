@@ -83,7 +83,15 @@ function _usage() {
     local -a all_fns=()
     while IFS= read -r fn; do
       all_fns+=("$fn")
-    done < <(declare -F | awk '{print $3}' | grep -v '^_' | sort)
+    done < <(
+      {
+        declare -F | awk '{print $3}' | grep -v '^_'
+        if [[ -d "${PLUGINS_DIR:-}" ]]; then
+          grep -h "^function [a-z]" "${PLUGINS_DIR}"/*.sh 2>/dev/null \
+            | awk '{print $2}' | sed 's/().*//'
+        fi
+      } | sort -u
+    )
 
     # Build category lists: label, patterns...
     local -a categories=(
