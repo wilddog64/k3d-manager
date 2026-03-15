@@ -54,9 +54,16 @@
 - [x] vCluster plugin spec — `docs/plans/v0.9.1-vcluster-plugin.md` (decisions recorded: v0.32.1, k8s distro, --print kubeconfig, 500m/512Mi limits)
 - [x] Codex task spec — `docs/plans/v0.9.1-vcluster-codex-task.md` (DoD checklist, do-not-do list)
 - [x] vCluster plugin implementation — `scripts/plugins/vcluster.sh` + `scripts/etc/vcluster/values.yaml` + `scripts/tests/plugins/vcluster.bats` — **Codex** (commit `9be27b7`, BATS 8/8, shellcheck clean, audit PASS)
-- [x] `_vcluster_install_cli` helper — auto-install vcluster binary (macOS: brew, Linux: GitHub release) — **Codex** (commit `455f703b4ac2f7ed9f360b921484c3d3fce059c6`, verified via `gh api`; tests: `bats scripts/tests/plugins/vcluster.bats` 10/10, `env -i ... bats` 10/10, `shellcheck scripts/plugins/vcluster.sh` clean, `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/plugins/vcluster.sh` PASS; CI run `https://github.com/wilddog64/k3d-manager/actions/runs/23101575904` failing at stage2 due to Vault StatefulSet not Ready — rerun attempted, still red)
-- [ ] Gemini smoke test — retry after `_vcluster_install_cli` ships
-- [ ] Copilot review comments addressed (PR #31 draft)
+- [x] `_vcluster_install_cli` helper — auto-install vcluster binary — **Codex** (commit `455f703b4ac2f7ed9f360b921484c3d3fce059c6`)
+- [x] Vault unsealed on M2 Air (via HTTP API — `kubectl exec -- vault operator unseal <key>`)
+- [x] CI green on PR #31 — commits `68b263c`, `f444c4b`, `0fc68d5`, `916fa13`
+- [x] Copilot review — all 8 comments addressed + resolved (commits `68b263c`, `f444c4b`)
+- [x] `--help` / `-h` flag — no longer errors; shows full categorized help
+- [x] Two-tier help — bare shows category summary, `--help` shows full list (commit `0fc68d5`)
+- [x] `function test()` moved to dispatcher (unblocks audit; commit `0fc68d5`)
+- [x] Codex refactor spec — `docs/plans/v0.9.1-test-fn-refactor-task.md` (commit `916fa13`)
+- [ ] Codex: refactor `function test()` if-count — spec at `docs/plans/v0.9.1-test-fn-refactor-task.md`
+- [ ] Gemini smoke test — `./k3d-manager test all`, `--help`, vcluster_create/destroy/use on M2 Air
 - [ ] Playwright E2E in CI — `shopping-cart-infra` — starts after vCluster plugin ships
 
 ### Next after v0.9.1 — k3dm-mcp v1.0.0
