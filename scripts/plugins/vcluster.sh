@@ -162,7 +162,7 @@ function _vcluster_wait_ready() {
   if [[ -z "$name" ]]; then
     _err "vCluster name required"
   fi
-  local selector="app.kubernetes.io/name=vcluster,app.kubernetes.io/instance=${name}"
+  local selector="app=vcluster,release=${name}"
   _kubectl -n "$VCLUSTER_NAMESPACE" wait --for=condition=Ready --timeout=300s pod -l "$selector"
 }
 
