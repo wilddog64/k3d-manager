@@ -13,7 +13,7 @@ branch. Fix implemented:
 - `yamllint .github/actions/vcluster-e2e-setup/action.yml`
 - `yamllint .github/actions/vcluster-e2e-teardown/action.yml`
 - `shellcheck scripts/plugins/vcluster.sh`
-- `env -i PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'cd /Users/cliang/src/gitrepo/personal/k3d-manager && bats scripts/tests/plugins/vcluster.bats'`
+- `env -i PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'cd "$(git rev-parse --show-toplevel)" && bats scripts/tests/plugins/vcluster.bats'`
 
 ## Next Steps
 - Update `shopping-cart-e2e-tests` to consume the new composite actions
