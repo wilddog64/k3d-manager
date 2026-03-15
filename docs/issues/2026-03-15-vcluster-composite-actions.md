@@ -32,8 +32,9 @@ stable regardless of caller checkout layout.
 Two more Copilot findings landed after the action path fix:
 
 1. **curl -s piped to sudo bash** — this hid HTTP errors and executed remote
-   content as root without inspection. Fixed by switching to `curl -fsSL` and
-   downloading to `/tmp/k3d-install.sh` before executing with `sudo bash`.
+   content as root without inspection. Fixed by switching to `curl -fsSL`,
+   downloading to a unique temp file (`mktemp /tmp/k3d-install.XXXXXX`), and
+   executing that same file with `sudo bash`.
 2. **k3d-version input unvalidated** — callers could supply `main` or other
    non-tag values, reintroducing the supply-chain risk from PR #33. Fixed by
    requiring the input to match `^v[0-9]+\.[0-9]+\.[0-9]+$` before constructing
