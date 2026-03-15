@@ -65,7 +65,7 @@ Categories:
   Shopping cart          (2 functions)
   Testing                (9 functions)
 
-Run ./k3d-manager --help for full function list.
+Run ./scripts/k3d-manager --help for full function list.
 ```
 
 `--help` expands each category with the full function list, cluster provider info, and environment variables.
