@@ -56,6 +56,7 @@
 - [ ] Fix ImagePullBackOff — Codex task spec at `shopping-cart-infra/docs/plans/imagepullbackoff-fix.md`; root cause: missing `newName: ghcr.io/wilddog64/<svc>` in kustomization images blocks (product-catalog/order/payment have no images block at all)
 - [ ] vCluster E2E composite actions — PR #33 has 2 P1 Copilot findings (separate runner + supply chain); redesigning as composite actions. Codex task at `docs/plans/v0.9.2-vcluster-e2e-composite-action.md`
 - [ ] Playwright E2E browser tests — `shopping-cart-e2e-tests`; blocked on ImagePullBackOff fix
+- [ ] vCluster + Playwright MCP demo design — quick demo guide showing full workflow (vcluster_create → deploy stack → port-forward → Claude drives browser via Playwright MCP → Codex implements specs); also article material
 
 ### After v0.9.2 — Cloud Providers then k3dm-mcp
 
