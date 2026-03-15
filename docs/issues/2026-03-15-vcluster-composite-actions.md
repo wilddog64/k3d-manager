@@ -50,3 +50,14 @@ Two more Copilot findings landed after the action path fix:
    `command not found` errors if `kubectl` or `k3d` were absent. Fixed by adding
    a dependency check step that fails fast with guidance to run in the same job
    as setup.
+
+## Eighth, Ninth, and Tenth Findings — TAG env, sudo -n, teardown manager check (PR #34)
+
+1. **k3d-version not forwarded to installer** — installer pins via `TAG=`.
+   Fixed: `sudo -n env TAG="$k3d_version" bash "$tmp_script"`.
+2. **sudo without -n** — could hang on password prompts. Fixed by using
+   `sudo -n` to fail fast.
+3. **Teardown dependency message ambiguous + missing manager check** — error now
+   explicitly references running in the same job as setup and verifies the
+   `${{ github.action_path }}/../../../scripts/k3d-manager` path is executable
+   before teardown runs.
