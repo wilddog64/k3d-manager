@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../../scripts" >/dev/null 2>&1 && pwd)"
+SCRIPT_DIR=""
+if command -v git >/dev/null 2>&1; then
+   if repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+      SCRIPT_DIR="${repo_root}/scripts"
+   fi
+fi
+if [[ -z "${SCRIPT_DIR}" ]]; then
+   SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../../scripts" >/dev/null 2>&1 && pwd)"
+fi
 
 if [[ ! -f "${SCRIPT_DIR}/lib/agent_rigor.sh" ]]; then
    exit 0

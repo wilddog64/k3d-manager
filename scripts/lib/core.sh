@@ -1,4 +1,4 @@
-
+# shellcheck shell=bash
 function _cluster_provider() {
    local provider="${K3D_MANAGER_PROVIDER:-${K3DMGR_PROVIDER:-${CLUSTER_PROVIDER:-}}}"
 
@@ -72,6 +72,20 @@ PY
    if ! _run_command --prefer-sudo -- python3 - "$port" <<<"$script"; then
       _err "Port $port is already in use"
    fi
+}
+
+function _resolve_script_dir() {
+   local src="${BASH_SOURCE[1]}"
+   local dir
+   while [[ -h "$src" ]]; do
+      dir="$(cd -P "$(dirname "$src")" && pwd)"
+      src="$(readlink "$src")"
+      if [[ "$src" != /* ]]; then
+         src="$dir/$src"
+      fi
+   done
+   dir="$(cd -P "$(dirname "$src")" && pwd)"
+   printf '%s\n' "$dir"
 }
 
 function _k3s_asset_dir() {
@@ -419,10 +433,7 @@ function _install_docker() {
 
    case "$platform" in
       mac)
-         if ! _command_exist docker; then
-            _err "Docker not found. On macOS, Docker is provided by OrbStack — please install OrbStack and ensure it is running."
-         fi
-         _info "Docker available via OrbStack."
+         _info "On macOS, Docker is provided by OrbStack — no installation required."
          ;;
       debian|wsl)
          _install_debian_docker
@@ -457,7 +468,7 @@ function _install_istioctl() {
       echo installing istioctl
       tmp_script=$(mktemp -t istioctl-fetch.XXXXXX)
       trap 'rm -rf /tmp/istio-*' EXIT TERM
-      pushd /tmp || return
+      pushd /tmp >/dev/null || return 1
       curl -f -s https://raw.githubusercontent.com/istio/istio/master/release/downloadIstioCandidate.sh -o "$tmp_script"
       istio_bin=$(bash "$tmp_script" | perl -nle 'print $1 if /add the (.*) directory/')
       if [[ -z "$istio_bin" ]]; then
@@ -469,7 +480,7 @@ function _install_istioctl() {
       else
          _run_command --prefer-sudo -- cp -v "$istio_bin/istioctl" "${install_dir}/"
       fi
-      popd || return
+      popd >/dev/null || return 1
    fi
 
 }
@@ -627,58 +638,6 @@ function create_k3s_cluster() {
    create_cluster "$@"
 }
 
-function _deploy_cluster_prompt_provider() {
-   local choice="" provider=""
-   while true; do
-      printf 'Select cluster provider [k3d/k3s] (default: k3d): '
-      IFS= read -r choice || choice=""
-      choice="$(printf '%s' "$choice" | tr '[:upper:]' '[:lower:]')"
-      if [[ -z "$choice" ]]; then
-         provider="k3d"
-         break
-      fi
-      case "$choice" in
-         k3d|k3s)
-            provider="$choice"
-            break
-            ;;
-         *)
-            _warn "Unsupported selection '$choice'. Please choose k3d or k3s."
-            ;;
-      esac
-   done
-   printf '%s' "$provider"
-}
-
-function _deploy_cluster_resolve_provider() {
-   local platform="$1" provider_cli="$2" force_k3s="$3"
-   local provider="" env_override=""
-   env_override="${CLUSTER_PROVIDER:-${K3D_MANAGER_PROVIDER:-${K3DMGR_PROVIDER:-${K3D_MANAGER_CLUSTER_PROVIDER:-}}}}"
-
-   if [[ -n "$provider_cli" ]]; then
-      provider="$provider_cli"
-   elif (( force_k3s )); then
-      provider="k3s"
-   elif [[ -n "$env_override" ]]; then
-      provider="$env_override"
-   fi
-
-   provider="$(printf '%s' "$provider" | tr '[:upper:]' '[:lower:]')"
-
-   if [[ -z "$provider" ]]; then
-      if [[ "$platform" == "mac" ]]; then
-         provider="k3d"
-      elif [[ -t 0 && -t 1 ]]; then
-         provider="$(_deploy_cluster_prompt_provider)"
-      else
-         _info "Non-interactive session detected; defaulting to k3d provider."
-         provider="k3d"
-      fi
-   fi
-
-   printf '%s' "$provider"
-}
-
 function deploy_cluster() {
    local force_k3s=0 provider_cli="" show_help=0
    local -a positional=()
@@ -753,7 +712,58 @@ EOF
    fi
 
    local provider=""
-   provider="$(_deploy_cluster_resolve_provider "$platform" "$provider_cli" "$force_k3s")"
+   if [[ -n "$provider_cli" ]]; then
+      provider="$provider_cli"
+   elif (( force_k3s )); then
+      provider="k3s"
+   else
+      local env_override="${CLUSTER_PROVIDER:-${K3D_MANAGER_PROVIDER:-${K3DMGR_PROVIDER:-${K3D_MANAGER_CLUSTER_PROVIDER:-}}}}"
+      if [[ -n "$env_override" ]]; then
+         provider="$env_override"
+      fi
+   fi
+
+   provider="$(printf '%s' "$provider" | tr '[:upper:]' '[:lower:]')"
+
+   if [[ "$platform" == "mac" && "$provider" == "k3s" ]]; then
+      _err "k3s is not supported on macOS; please use k3d instead."
+   fi
+
+   if [[ -z "$provider" ]]; then
+      if [[ "$platform" == "mac" ]]; then
+         provider="k3d"
+      else
+         local has_tty=0
+         if [[ -t 0 && -t 1 ]]; then
+            has_tty=1
+         fi
+
+         if (( has_tty )); then
+            local choice=""
+            while true; do
+               printf 'Select cluster provider [k3d/k3s] (default: k3d): '
+               IFS= read -r choice || choice=""
+               choice="$(printf '%s' "$choice" | tr '[:upper:]' '[:lower:]')"
+               if [[ -z "$choice" ]]; then
+                  provider="k3d"
+                  break
+               fi
+               case "$choice" in
+                  k3d|k3s)
+                     provider="$choice"
+                     break
+                     ;;
+                  *)
+                     _warn "Unsupported selection '$choice'. Please choose k3d or k3s."
+                     ;;
+               esac
+            done
+         else
+            provider="k3d"
+            _info "Non-interactive session detected; defaulting to k3d provider."
+         fi
+      fi
+   fi
 
    if [[ "$platform" == "mac" && "$provider" == "k3s" ]]; then
       _err "k3s is not supported on macOS; please use k3d instead."
@@ -775,12 +785,6 @@ EOF
    export K3D_MANAGER_CLUSTER_PROVIDER="$provider"
    if declare -f _cluster_provider_set_active >/dev/null 2>&1; then
       _cluster_provider_set_active "$provider"
-   fi
-
-   local cluster_name_value="${positional[0]:-${CLUSTER_NAME:-}}"
-   if [[ -n "$cluster_name_value" ]]; then
-      positional=("$cluster_name_value" "${positional[@]:1}")
-      export CLUSTER_NAME="$cluster_name_value"
    fi
 
    _info "Using cluster provider: $provider"
