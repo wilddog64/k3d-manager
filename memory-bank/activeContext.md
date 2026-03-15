@@ -15,8 +15,8 @@
 |---|---|---|
 | Copilot review process guide | **done** | `docs/guides/copilot-review-process.md` + `copilot-review-template.md` |
 | README releases table update | **done** | Split to `docs/releases.md`, README shows last 3 |
-| Reusable vCluster E2E workflow | pending | `.github/workflows/vcluster-e2e-setup.yml` in k3d-manager |
-| Playwright E2E in CI | pending | `shopping-cart-e2e-tests` calls reusable workflow; blocked on ImagePullBackOff fix |
+| Reusable vCluster E2E workflow | **ready for Codex** | spec at `docs/plans/v0.9.2-vcluster-e2e-workflow.md`; two-job design (setup/teardown) |
+| Playwright E2E browser tests | pending | `shopping-cart-e2e-tests`; blocked on ImagePullBackOff CI publish jobs completing |
 
 ---
 
@@ -25,11 +25,11 @@
 | Version | Status | Notes |
 |---|---|---|
 | v0.1.0–v0.9.1 | released | See CHANGE.md |
-| v0.9.2 | **active** | Copilot review docs + Playwright E2E in CI |
+| v0.9.2 | **active** | Copilot review docs + reusable vCluster E2E workflow + Playwright E2E |
 | v1.1.0 | planned | AWS EKS provider + ACG sandbox lifecycle |
 | v1.2.0 | planned | Google GKE provider |
-| v1.3.0 | planned | Azure AKS provider |
-| v1.4.0 | planned | k3dm-mcp — MCP server wrapping k3d-manager CLI (after all 3 providers) |
+| v1.3.0 | planned | Azure AKS provider (known blocker: AADSTS130507 SP issue) |
+| v1.4.0 | planned | k3dm-mcp — after all 3 cloud providers ship |
 
 ---
 
