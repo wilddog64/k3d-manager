@@ -1,39 +1,21 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.0` (as of 2026-03-13)
+## Current Branch: `k3d-manager-v0.9.0` (as of 2026-03-14)
 
-**v0.8.0 SHIPPED** — squash-merged to main (aaf2aee), PR #28, 2026-03-13. Tagged + released.
-**v0.9.0 active** — branch cut from main 2026-03-13.
+**v0.9.0 SHIPPING** — PR #30 open, CI green, pending merge.
 
 ---
 
 ## Current Focus
 
-**v0.9.0: Shopping Cart CI Stabilization + lib-foundation Backlog**
-
-The k3dm-mcp repo starts independently after v0.8.0. v0.9.0 focuses on unblocking
-the shopping cart pipeline and cleaning up lib-foundation debt.
+**Next: k3dm-mcp v0.1.0** — separate repo `~/src/gitrepo/personal/k3dm-mcp`
 
 | Item | Status | Notes |
 |---|---|---|
-| Shopping cart CI stabilization | **COMPLETE** | All 5 PRs merged to main 2026-03-14. Branch protection applied. |
-| Shopping cart linters (P4) | **COMPLETE** | All 4 repos merged to main 2026-03-14 |
-| Shopping cart v0.1.0 releases | **COMPLETE** | All 6 repos: CHANGELOG, PR, Copilot review, squash-merge, GitHub release 2026-03-14 |
+| Shopping cart CI + P4 linters + v0.1.0 releases | **COMPLETE** | All work in shopping-cart-* repos. All 6 repos shipped v0.1.0 2026-03-14. |
+| k3d-manager v0.9.0 | **SHIPPING** | Docs/planning only — k3dm-mcp planning, roadmap restructure, agent lessons |
 | lib-foundation v0.3.0 | pending | `_run_command` if-count refactor + bare sudo routing |
-| k3dm-mcp v0.1.0 | pending | Separate repo `~/src/gitrepo/personal/k3dm-mcp` — starts now |
-
----
-
-## Open Items
-
-- [x] Shopping cart CI stabilization — all 5 repos merged 2026-03-14
-- [x] Shopping cart P4 linters — all 4 repos merged 2026-03-14
-- [x] Shopping cart v0.1.0 releases — all 6 repos shipped 2026-03-14
-- [ ] lib-foundation: `_run_command` if-count refactor (v0.3.0)
-- [ ] lib-foundation: sync deploy_cluster fixes upstream (CLUSTER_NAME, provider helpers)
-- [ ] lib-foundation: route bare sudo in `_install_debian_helm` / `_install_debian_docker`
-- [ ] M2 Air hook install: `ssh-add` then `ssh m2jump "cd ~/src/gitrepo/personal/k3d-manager && git pull origin k3d-manager-v0.9.0 && bash scripts/hooks/install-hooks.sh"`
-- [ ] Ubuntu hook install: `ssh ubuntu "cd ~/src/gitrepo/personal/k3d-manager && git checkout k3d-manager-v0.9.0 && git pull && bash scripts/hooks/install-hooks.sh"`
+| k3dm-mcp v0.1.0 | next | Separate repo `~/src/gitrepo/personal/k3dm-mcp` |
 
 ---
 
@@ -42,12 +24,13 @@ the shopping cart pipeline and cleaning up lib-foundation debt.
 | Version | Status | Notes |
 |---|---|---|
 | v0.1.0–v0.8.0 | released | See CHANGE.md |
-| v0.9.0 | **active** | Shopping Cart CI + lib-foundation + k3dm-mcp planning |
-| v1.0.0 | vision | Multi-cloud providers (EKS/GKE/AKS) + ACG sandbox lifecycle |
+| v0.9.0 | **shipping** | k3dm-mcp planning, roadmap restructure, agent lessons |
+| v1.0.0 | planned | vCluster plugin (`vcluster_create/destroy/use/list`) |
+| v1.1.0 | planned | Multi-cloud providers (EKS/GKE/AKS) + ACG sandbox lifecycle |
 
 ---
 
-## Cluster State (as of 2026-03-13 — post v0.8.0)
+## Cluster State (as of 2026-03-14 — post v0.8.0)
 
 **Architecture:** Infra cluster on M2 Air — ArgoCD manages Ubuntu k3s hub-and-spoke.
 Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
@@ -105,7 +88,7 @@ Subtree sync bypass: `K3DM_SUBTREE_SYNC=1 git subtree pull --prefix=scripts/lib/
 Claude
   -- reviews all agent memory-bank writes before writing next task
   -- opens PR on owner go-ahead; routes PR issues back to agents by scope
-  -- tags Copilot for code review before every PR
+  -- tags Copilot for code review before every code PR (not doc-only PRs)
 
 Gemini  (SDET + Red Team)
   -- single-step verification: BATS, pod status checks, pre-commit hook smoke tests
@@ -144,6 +127,7 @@ Owner
 - Gemini skips memory-bank read — paste full task spec inline in every Gemini session prompt.
 - Codex fabricates commit SHAs when reporting completion — always verify with `gh api repos/.../git/commits/<sha>` before trusting any SHA Codex reports.
 - Codex reports "done" after writing documentation without implementing code — require a PR URL as proof of completion, not just a memory-bank update.
+- Codex silently reverts intentional decisions across session restarts — three-layer defense: Agent Instructions in `CLAUDE.md` + inline `DO NOT REMOVE` comments + memory-bank sections.
 - Gemini expands scope — spec must explicitly state what is forbidden.
 - Gemini over-reports test success with ambient env vars — always verify with `env -i`.
 - `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override.
