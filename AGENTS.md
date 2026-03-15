@@ -37,10 +37,9 @@ hostname && uname -n
 ```
 Confirm you are on the correct machine before doing anything else.
 
-### 3. Proof of work — PR URL required
+### 3. Proof of work — commit SHA + test results required
 Reporting "done" requires:
-- A real PR URL (e.g. `https://github.com/wilddog64/k3d-manager/pull/31`)
-- CI green on that PR (`gh run list --branch <branch> --limit 1`)
+- A real commit SHA pushed to the remote branch (verify with `git log origin/<branch> --oneline -3`)
 - BATS output showing all tests passing (`bats scripts/tests/...`)
 - `shellcheck` clean on every touched `.sh` file
 - `_agent_audit` passing — all functions ≤ 8 if-blocks
@@ -51,22 +50,27 @@ A memory-bank update alone is NOT proof of completion.
 Every task ends with a real git commit pushed to the remote branch.
 Never report completion without a verifiable commit SHA on the remote.
 
-### 5. Do not revert intentional decisions
+### 5. Do NOT create PRs — that is Claude's job
+Your task ends at: commit + push to branch + update memory-bank.
+Do NOT run `gh pr create`. Do NOT rerun CI jobs (`gh run rerun`).
+If CI fails, read the failure logs (`gh run view <id> --log-failed`), fix the root cause, and push a new commit.
+
+### 6. Do not revert intentional decisions
 Comments marked `# DO NOT REMOVE` or `<!-- DO NOT REMOVE -->` in code must not be deleted.
 Decisions recorded in `memory-bank/` must not be silently reversed.
 If you believe a decision is wrong, report it — do not quietly undo it.
 
-### 6. Stay within spec scope
+### 7. Stay within spec scope
 Do not add features, refactor code, or make improvements beyond what the spec requires.
 Do not modify files outside the scope of the current task.
 If you find a bug outside your scope, report it in the memory-bank — do not fix it silently.
 
-### 7. Never bypass hooks
+### 8. Never bypass hooks
 - Never use `git commit --no-verify`
 - Never use `git push --force` on shared branches
 - Never use `git rebase` or `git reset --hard` on shared branches
 - If a pre-commit hook fails, fix the underlying issue and retry
 
-### 8. Update memory-bank on completion
+### 9. Update memory-bank on completion
 When your task is done, update `memory-bank/activeContext.md` and `memory-bank/progress.md`
 to reflect what you completed. Include the real commit SHA and PR URL.
