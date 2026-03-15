@@ -96,13 +96,9 @@ function vcluster_use() {
 
   local merge_chain="${KUBECONFIG:-$base_config}"
   local merged=""
-  if [[ -f "$base_config" ]]; then
-    merged="$(
-      _run_command -- env KUBECONFIG="${kubeconfig}:${merge_chain}" kubectl config view --flatten
-    )"
-  else
-    merged="$(cat "$kubeconfig")"
-  fi
+  merged="$(
+    _run_command -- env KUBECONFIG="${kubeconfig}:${merge_chain}" kubectl config view --flatten
+  )"
   _write_sensitive_file "$base_config" "$merged"
   export KUBECONFIG="$base_config"
 
@@ -128,13 +124,21 @@ function _vcluster_install_cli() {
   fi
 
   if _is_mac; then
-    _run_command --prefer-sudo -- brew install loft-sh/tap/vcluster
+    _run_command -- brew install loft-sh/tap/vcluster
   else
     local install_dir="${VCLUSTER_INSTALL_DIR:-/usr/local/bin}"
     local tmp_file
     tmp_file="$(mktemp -t vcluster-cli.XXXXXX)"
     trap '$(_cleanup_trap_command "$tmp_file")' RETURN
-    local url="https://github.com/loft-sh/vcluster/releases/download/v${VCLUSTER_VERSION}/vcluster-linux-amd64"
+    local machine_arch
+    machine_arch="$(uname -m)"
+    local dl_arch
+    case "$machine_arch" in
+      x86_64)          dl_arch="amd64" ;;
+      aarch64|arm64)   dl_arch="arm64" ;;
+      *)               _err "Unsupported architecture for vcluster CLI install: $machine_arch" ;;
+    esac
+    local url="https://github.com/loft-sh/vcluster/releases/download/v${VCLUSTER_VERSION}/vcluster-linux-${dl_arch}"
     _run_command -- curl -fsSL -o "$tmp_file" "$url"
     _run_command -- chmod +x "$tmp_file"
     _run_command --prefer-sudo -- mkdir -p "$install_dir"

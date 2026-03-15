@@ -105,7 +105,7 @@ function _usage() {
       "Testing"            "test test_*"
     )
 
-    _match_category() {
+    __usage_match_category() {
       local pats="$1"
       local -a matches=()
       local fn pat
@@ -121,7 +121,7 @@ function _usage() {
       printf '%s\n' "${matches[@]}"
     }
 
-    printf 'Usage: ./k3d-manager <function> [args]\n\n'
+    printf 'Usage: ./scripts/k3d-manager <function> [args]\n\n'
 
     if [[ "$verbose" == "1" ]]; then
       printf 'Available functions:\n'
@@ -132,7 +132,7 @@ function _usage() {
         local -a matches=()
         while IFS= read -r fn; do
           [[ -n "$fn" ]] && matches+=("$fn")
-        done < <(_match_category "$pats")
+        done < <(__usage_match_category "$pats")
         if [[ ${#matches[@]} -gt 0 ]]; then
           printf '  %s:\n' "$label"
           printf '    %s\n' "${matches[@]}"
@@ -163,12 +163,12 @@ EOF
       for (( i=0; i<${#categories[@]}; i+=2 )); do
         label="${categories[$i]}"
         pats="${categories[$i+1]}"
-        count=$(_match_category "$pats" | grep -c .)  || count=0
+        count=$(__usage_match_category "$pats" | grep -c .)  || count=0
         if (( count > 0 )); then
           printf '  %-22s (%d functions)\n' "$label" "$count"
         fi
       done
-      printf '\nRun ./k3d-manager --help for full function list.\n'
+      printf '\nRun ./scripts/k3d-manager --help for full function list.\n'
     fi
 }
 
