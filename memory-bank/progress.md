@@ -53,7 +53,7 @@
 
 - [x] Copilot review process guide — `docs/guides/copilot-review-process.md` + `copilot-review-template.md`
 - [x] README releases table — split to `docs/releases.md` (full history), README shows last 3 + link
-- [ ] Playwright E2E in CI — `shopping-cart-infra`
+- [ ] Playwright E2E in CI — design spec at `docs/plans/v0.9.2-playwright-e2e-design.md`; pending approval + open questions resolved before Codex task
 
 ### Next after v0.9.2 — k3dm-mcp v1.0.0
 
