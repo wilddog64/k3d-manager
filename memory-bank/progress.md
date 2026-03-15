@@ -54,7 +54,7 @@
 - [x] Copilot review process guide — `docs/guides/copilot-review-process.md` + `copilot-review-template.md`
 - [x] README releases table — split to `docs/releases.md` (full history), README shows last 3 + link
 - [ ] Fix ImagePullBackOff — Codex task spec at `shopping-cart-infra/docs/plans/imagepullbackoff-fix.md`; root cause: missing `newName: ghcr.io/wilddog64/<svc>` in kustomization images blocks (product-catalog/order/payment have no images block at all)
-- [ ] vCluster E2E composite actions — PR #33 has 2 P1 Copilot findings (separate runner + supply chain); redesigning as composite actions. Codex task at `docs/plans/v0.9.2-vcluster-e2e-composite-action.md`
+- [x] vCluster E2E composite actions — `.github/workflows/vcluster-e2e-setup.yml` removed; composite actions added at `.github/actions/vcluster-e2e-setup` / `...-teardown` (commit `b221ac13b6d173503bcc41ad2bfa2acdaa59a2fb`, PR https://github.com/wilddog64/k3d-manager/pull/34). Tests: `yamllint .github/actions/vcluster-e2e-setup/action.yml`, `yamllint .github/actions/vcluster-e2e-teardown/action.yml`, `shellcheck scripts/plugins/vcluster.sh`, `env -i PATH="/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'cd /Users/cliang/src/gitrepo/personal/k3d-manager && bats scripts/tests/plugins/vcluster.bats'`.
 - [ ] Playwright E2E browser tests — `shopping-cart-e2e-tests`; blocked on ImagePullBackOff fix
 - [ ] vCluster + Playwright MCP demo design — quick demo guide showing full workflow (vcluster_create → deploy stack → port-forward → Claude drives browser via Playwright MCP → Codex implements specs); also article material
 
