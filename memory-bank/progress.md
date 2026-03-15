@@ -2,16 +2,14 @@
 
 ## Overall Status
 
-**v0.8.0 SHIPPED** — squash-merged to main (aaf2aee), PR #28, 2026-03-13. Tagged + released.
-**v0.9.0 SHIPPED** — squash-merged to main (616d868), PR #30, 2026-03-15. Tagged + released.
-**v0.9.1 SHIPPED** — squash-merged to main (942660e), PR #31, 2026-03-15. Tagged + released.
-**v0.9.2 ACTIVE** — branch `k3d-manager-v0.9.2` cut from main 2026-03-15.
+**v0.9.2 SHIPPED** — squash-merged to main (f0cec06), PR #35, 2026-03-15. Tagged + released.
+**v0.9.3 ACTIVE** — branch cut from main 2026-03-15.
 
 ---
 
 ## What Is Complete
 
-### Released (v0.1.0 – v0.8.0)
+### Released (v0.1.0 – v0.9.2)
 
 - [x] k3d/OrbStack/k3s cluster provider abstraction
 - [x] Vault PKI, ESO, Istio, Jenkins, OpenLDAP, ArgoCD, Keycloak (infra cluster)
@@ -27,43 +25,31 @@
 - [x] `.envrc` → dotfiles symlink, `scripts/hooks/pre-commit` tracked hook (v0.7.2)
 - [x] `_agent_audit` — bare sudo, if-count, BATS removal, kubectl exec credential checks
 - [x] CI: bats pinned to v1.11.0, subtree guard with `K3DM_SUBTREE_SYNC=1` bypass
-- [x] Ubuntu app cluster: ESO SecretStores Ready, shopping-cart-data running
 - [x] `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` (v0.7.3)
 - [x] Reusable GitHub Actions CI/CD workflow — build + Trivy + ghcr.io push + kustomize update (v0.7.3)
 - [x] ArgoCD: `ubuntu-k3s` registered, all 5 shopping-cart apps Synced (v0.7.3)
-- [x] Infra cluster rebuilt on M2 Air — ArgoCD→Ubuntu connectivity fixed (v0.7.3)
-- [x] Vault-managed ArgoCD deploy keys — `configure_vault_argocd_repos` + 6 helper refactors; BATS 8/8 (v0.8.0)
-- [x] `deploy_cert_manager` plugin — cert-manager v1.20.0 + ACME HTTP-01 via Istio; BATS 10/10; live cluster verify PASS (v0.8.0)
-- [x] `istio-ingressclass.yaml` — auto-applied by `_provider_k3d_configure_istio`; BATS 4/4 (v0.8.0)
-- [x] `scripts/hooks/install-hooks.sh` — symlink tracked pre-commit hook; M4 Air verified (v0.8.0)
-- [x] `docs/api/functions.md` — full public functions reference added (v0.8.0)
-
-### Shopping Cart Ecosystem (orchestrated from k3d-manager, code in shopping-cart-* repos)
-
-- [x] CI stabilization — all 5 repos merged to main 2026-03-14
-- [x] Branch protection — applied to all 5 repos 2026-03-14
-- [x] P4 linters — basket (golangci-lint), product-catalog (ruff+mypy), order (Checkstyle+OWASP), payment (Checkstyle+SpotBugs) — all merged 2026-03-14
-- [x] v0.1.0 releases — all 6 repos (basket, product-catalog, order, payment, frontend, infra) — shipped 2026-03-14
+- [x] Vault-managed ArgoCD deploy keys — `configure_vault_argocd_repos` (v0.8.0)
+- [x] `deploy_cert_manager` plugin — cert-manager v1.20.0 + ACME HTTP-01 via Istio (v0.8.0)
+- [x] `docs/api/functions.md` — full public functions reference (v0.8.0)
+- [x] Shopping Cart ecosystem — CI stabilized, branch protection, P4 linters, v0.1.0 releases (2026-03-14)
+- [x] vCluster plugin — `create/destroy/use/list`, Helm values, BATS 8/8 (v0.9.1)
+- [x] Two-tier help — bare summary, `--help` full list (v0.9.1)
+- [x] `function test()` refactor — moved to dispatcher, if-count compliant (v0.9.1)
+- [x] vCluster E2E composite actions — setup + teardown (v0.9.2)
+- [x] 11-finding Copilot hardening — curl safety, mktemp TOCTOU, sudo -n, TAG env, input validation, action_path, teardown deps (v0.9.2)
 
 ---
 
 ## What Is Pending
 
-### v0.9.2 — active
+### v0.9.3 — active
 
-- [x] Copilot review process guide — `docs/guides/copilot-review-process.md` + `copilot-review-template.md`
-- [x] README releases table — split to `docs/releases.md` (full history), README shows last 3 + link
-- [ ] Fix ImagePullBackOff — Codex task spec at `shopping-cart-infra/docs/plans/imagepullbackoff-fix.md`; root cause: missing `newName: ghcr.io/wilddog64/<svc>` in kustomization images blocks (product-catalog/order/payment have no images block at all)
-- [ ] vCluster E2E composite actions — PR #34 open (`codex/vcluster-composite`). mktemp+teardown fixed (`3079f83`); TAG env + sudo -n + teardown manager check shipped in 48217ee per `docs/plans/v0.9.2-vcluster-composite-action-sudo-tag-fix.md`; awaiting review/QA.
-- [ ] Playwright E2E browser tests — `shopping-cart-e2e-tests`; blocked on ImagePullBackOff fix
-- [ ] vCluster + Playwright MCP demo design — quick demo guide showing full workflow (vcluster_create → deploy stack → port-forward → Claude drives browser via Playwright MCP → Codex implements specs); also article material
+- [ ] Next milestone TBD
+- [ ] Playwright E2E in CI — `shopping-cart-infra` — blocked on ImagePullBackOff
 
-### After v0.9.2 — Cloud Providers then k3dm-mcp
+### Next after v0.9.x — k3dm-mcp v1.0.0
 
-- v1.1.0 — EKS provider + ACG sandbox lifecycle
-- v1.2.0 — GKE provider
-- v1.3.0 — AKS provider
-- v1.4.0 — k3dm-mcp (separate repo `~/src/gitrepo/personal/k3dm-mcp`) — after all providers ship
+- Separate repo `~/src/gitrepo/personal/k3dm-mcp`
 
 ### lib-foundation Backlog
 
@@ -74,10 +60,10 @@
 
 ### Deferred
 
-- [ ] Playwright MCP E2E testing (v0.8.1) — prerequisite: images in ghcr.io + services running
-- [ ] Google Antigravity ACG sandbox (v1.1.0) — login + credential extraction via browser automation
+- [ ] Playwright MCP E2E testing — prerequisite: images in ghcr.io + services running
+- [ ] Google Antigravity ACG sandbox (v1.1.0)
 - [ ] M2 Air pre-commit hook — SSH key not loaded; fix: `ssh-add` then re-run `install-hooks.sh`
-- [ ] Ubuntu pre-commit hook — checkout v0.9.0 + run `install-hooks.sh`
+- [ ] Ubuntu pre-commit hook — run `install-hooks.sh`
 
 ---
 
@@ -85,7 +71,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| Shopping Cart Apps ImagePullBackOff | DIAGNOSED | Root cause: missing `newName: ghcr.io/wilddog64/<svc>` in kustomization; product-catalog/order/payment have no images block. Fix spec: `shopping-cart-infra/docs/plans/imagepullbackoff-fix.md` |
-| Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps may exceed capacity — reduce replicas in ArgoCD manifests |
+| Shopping Cart Apps ImagePullBackOff | OPEN | Images not pushed to ghcr.io — CI stabilized but images not yet built |
+| Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps may exceed capacity — reduce replicas |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround |
 | NVD API key missing | OPEN | Register at nvd.nist.gov — add as `NVD_API_KEY` secret to order + payment repos |
