@@ -15,7 +15,7 @@
 |---|---|---|
 | Copilot review process guide | **done** | `docs/guides/copilot-review-process.md` + `copilot-review-template.md` |
 | README releases table update | **done** | Split to `docs/releases.md`, README shows last 3 |
-| vCluster E2E composite actions | **PR #34 open** | `.github/workflows/vcluster-e2e-setup.yml` deleted — replaced with composite actions (`.github/actions/vcluster-e2e-setup` and `...-teardown`), commit `b221ac13b6d173503bcc41ad2bfa2acdaa59a2fb`, PR https://github.com/wilddog64/k3d-manager/pull/34 |
+| vCluster E2E composite actions | **PR #34 open — P1s addressed** | commit `135e37288460280d34f2444b36935c74d2c90e39` (action_path fix) + replies to PR #33 Copilot threads posted with PR #34 link |
 | Playwright E2E browser tests | pending | `shopping-cart-e2e-tests`; blocked on ImagePullBackOff CI publish jobs completing |
 
 ---
