@@ -16,7 +16,7 @@
 | vCluster plugin + Copilot review | **done** | Commits `68b263c`, `f444c4b` — all 8 Copilot threads resolved |
 | CI on PR #31 | **green** | Vault unsealed on M2 Air; latest push `124a2f1` |
 | Two-tier help + `--help` flag | **done** | Commit `0fc68d5` |
-| `function test()` refactor | **Codex pending** | Spec: `docs/plans/v0.9.1-test-fn-refactor-task.md` |
+| `function test()` refactor | **done — awaiting Gemini smoke test** | Spec: `docs/plans/v0.9.1-test-fn-refactor-task.md`, commit `79074e58fcc3b1a5410590b94585e8efe2a93a6a` |
 | Gemini smoke test | **pending after Codex** | `test all`, `--help`, vcluster on M2 Air |
 | Playwright E2E in CI | pending | `shopping-cart-infra` — starts after vCluster plugin ships |
 
@@ -30,13 +30,13 @@ Split `function test()` in `scripts/k3d-manager` into three helpers:
 
 Target: `function test()` ≤ 8 if-blocks. No behaviour change.
 
-**Audit caveat for Codex:** `scripts/k3d-manager` has no `.sh` extension so the
-pre-commit hook (`git diff --cached -- '*.sh'`) will NOT audit it automatically.
-Codex must run the audit manually:
-```bash
-AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/k3d-manager
-```
-A passing pre-commit hook alone is NOT sufficient — the manual audit must also pass.
+Codex completed the refactor: `_test_run_smoke`, `_test_select_suite`, `_test_execute` now own the logic; manual audit command `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/k3d-manager` executed explicitly (dispatcher lacks `.sh` extension). Verification on M4 Air with brew bash:
+- `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test all` (190 tests)
+- `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager test --help`
+- `PATH="/opt/homebrew/bin:$PATH" ./scripts/k3d-manager --help`
+- `shellcheck scripts/k3d-manager`
+- manual audit command above
+Documentation: `docs/issues/2026-03-15-test-function-refactor.md`.
 
 After Codex completes, Gemini smoke tests on M2 Air:
 ```bash
