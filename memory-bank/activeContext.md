@@ -15,7 +15,7 @@
 |---|---|---|
 | Copilot review process guide | **done** | `docs/guides/copilot-review-process.md` + `copilot-review-template.md` |
 | README releases table update | **done** | Split to `docs/releases.md`, README shows last 3 |
-| vCluster E2E composite actions | **PR #34 open — P1s addressed** | commit `135e37288460280d34f2444b36935c74d2c90e39` (action_path fix) + replies to PR #33 Copilot threads posted with PR #34 link |
+| vCluster E2E composite actions | **PR #34 open — Codex fix pending** | action_path fixed, PR #33 threads replied to. New Copilot findings: `curl -fsSL` + `k3d-version` validation. Task spec: `docs/plans/v0.9.2-vcluster-composite-action-curl-fix.md` |
 | Playwright E2E browser tests | pending | `shopping-cart-e2e-tests`; blocked on ImagePullBackOff CI publish jobs completing |
 
 ---
