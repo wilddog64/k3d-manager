@@ -54,7 +54,8 @@
 - [x] vCluster plugin spec — `docs/plans/v0.9.1-vcluster-plugin.md` (decisions recorded: v0.32.1, k8s distro, --print kubeconfig, 500m/512Mi limits)
 - [x] Codex task spec — `docs/plans/v0.9.1-vcluster-codex-task.md` (DoD checklist, do-not-do list)
 - [x] vCluster plugin implementation — `scripts/plugins/vcluster.sh` + `scripts/etc/vcluster/values.yaml` + `scripts/tests/plugins/vcluster.bats` — **Codex** (commit `9be27b7`, BATS 8/8, shellcheck clean, audit PASS)
-- [ ] Gemini smoke test — `vcluster_create` → `vcluster_list` → `vcluster_use` → `vcluster_destroy` on infra cluster — **FAILED** (vcluster CLI missing, Issue `2026-03-15`)
+- [ ] `_vcluster_install_cli` helper — auto-install vcluster binary (macOS: brew, Linux: GitHub release) — **Codex task: `docs/plans/v0.9.1-vcluster-install-cli-task.md`**
+- [ ] Gemini smoke test — retry after `_vcluster_install_cli` ships
 - [ ] Copilot review comments addressed (PR #31 draft)
 - [ ] Playwright E2E in CI — `shopping-cart-infra` — starts after vCluster plugin ships
 
