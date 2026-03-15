@@ -17,18 +17,23 @@
 | CI on PR #31 | **green** | Vault unsealed on M2 Air; latest push `124a2f1` |
 | Two-tier help + `--help` flag | **done** | Commit `0fc68d5` |
 | `function test()` refactor | **done** | Commit `79074e58` — audit PASS, 190 tests pass, verified by Claude |
-| Gemini smoke test | **FAILED — Step 4** | Spec: `docs/plans/v0.9.1-gemini-smoke-test-task.md` | BATS pass (190), help partially works (vcluster functions missing), `vcluster_create` fails due to selector mismatch (Issue `2026-03-15`) |
+| Gemini smoke test | **RETRY READY** | Fixes in commit `45717e8`: selector corrected + plugin fns in --help; Gemini to re-run vcluster steps on M2 Air |
 | Playwright E2E in CI | pending | `shopping-cart-infra` — starts after vCluster plugin ships |
 
-### Gemini next task — READY TO ASSIGN
-Spec: `docs/plans/v0.9.1-gemini-smoke-test-task.md`
+### Gemini retry task — READY TO ASSIGN
+Two bugs fixed in commit `45717e8` (pull before running):
+1. `vcluster_create` pod selector corrected: `app=vcluster,release=<name>`
+2. vCluster functions now visible in `./scripts/k3d-manager --help`
 
-Run on M2 Air (live cluster required):
-1. `./scripts/k3d-manager test all` — verify 190 tests pass
-2. `./scripts/k3d-manager --help` + `test --help` — verify help output
-3. `vcluster_create smoke-test` → `vcluster_list` → `vcluster_use smoke-test` → `vcluster_destroy smoke-test`
-
-Report each step result in memory-bank. Stop and report on first failure.
+Re-run only the failed steps on M2 Air:
+```bash
+git pull origin k3d-manager-v0.9.1
+./scripts/k3d-manager vcluster_create smoke-test
+./scripts/k3d-manager vcluster_list
+./scripts/k3d-manager vcluster_use smoke-test && kubectl config current-context
+./scripts/k3d-manager vcluster_destroy smoke-test
+./scripts/k3d-manager --help   # verify vCluster category now visible
+```
 
 ---
 
