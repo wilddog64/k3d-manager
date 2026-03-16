@@ -30,7 +30,7 @@
 
 - [x] lib-foundation v0.3.2 subtree pull — commit `e4d2eed`
 - [x] TTY fix — `_DCRS_PROVIDER` global in core.sh — commit `04522b5`
-- [ ] **Cluster rebuild smoke test** — assigned to Gemini (`docs/plans/v0.9.3-cluster-rebuild-smoke-test.md`)
+- [x] Cluster rebuild smoke test — **PASS on M2 Air** (`docs/plans/v0.9.3-cluster-rebuild-smoke-test.md`)
 
 ### v0.9.4 — planned
 

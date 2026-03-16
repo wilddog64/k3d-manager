@@ -13,7 +13,7 @@
 |---|---|---|
 | lib-foundation v0.3.2 subtree pull | **done** | commit `e4d2eed` |
 | TTY fix — `_DCRS_PROVIDER` global in core.sh | **done** | commit `04522b5` |
-| Cluster rebuild smoke test | **assigned to Gemini** | spec: `docs/plans/v0.9.3-cluster-rebuild-smoke-test.md` |
+| Cluster rebuild smoke test | **DONE — PASS on M2 Air** | spec: `docs/plans/v0.9.3-cluster-rebuild-smoke-test.md` | Destroy/rebuild verified; all 8 components running; TTY fix verified |
 | v0.9.4 spec | **done** | `docs/plans/v0.9.4-full-stack-health.md` |
 | NVD API key | **done** | set in order + payment repos 2026-03-16 |
 | Milestone brainstorm | **done** | v0.9.4 = full stack health; demo after v0.9.x series |
