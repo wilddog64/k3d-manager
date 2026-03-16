@@ -106,6 +106,9 @@ Owner   — approves and merges PRs
 ## Operational Notes
 
 - **Always run `reunseal_vault`** after any cluster restart
+- **Ubuntu k3s rebuild:** run `sudo rm -rf /etc/rancher /var/lib/rancher /var/lib/kubelet` before reinstalling k3s — `k3s-uninstall.sh` alone leaves stale state
+- **OrbStack→Parallels connectivity:** requires SSH tunnel on M2 Air: `ssh -L 0.0.0.0:6443:localhost:6443 -N ubuntu`. ArgoCD cluster secret uses `https://host.k3d.internal:6443`
+- **Vault auth over tunnel:** use static token with `eso-reader` policy — Kubernetes auth CA validation fails over tunnel
 - **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`)
 - **Branch protection**: `enforce_admins` always ON — disable only to merge, re-enable immediately
 - **Istio + Jobs**: `sidecar.istio.io/inject: "false"` required on Helm pre-install job pods

@@ -61,3 +61,7 @@
 | Shopping Cart Apps ImagePullBackOff | OPEN | Images not pushed to ghcr.io — blocked on v0.9.4 CI trigger |
 | Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps may exceed capacity — reduce replicas |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround |
+| `destroy_k3s_cluster` incomplete cleanup | BACKLOG | `k3s-uninstall.sh` leaves `/var/lib/rancher`, `/etc/rancher`, `/var/lib/kubelet` — causes ghost nodes on reinstall. Fix: add `sudo rm -rf` of those paths to `destroy_k3s_cluster` |
+| OrbStack→Parallels pod connectivity | KNOWN | Pods in infra cluster can't reach Ubuntu VM API server directly. Workaround: `ssh -L 0.0.0.0:6443:localhost:6443 -N ubuntu` on M2 Air host |
+| ArgoCD cluster registration over tunnel | KNOWN | `argocd cluster add` fails; use manual cluster secret pointing to `https://host.k3d.internal:6443` |
+| Vault Kubernetes auth over tunnel | KNOWN | CA cert validation fails over SSH tunnel; use static Vault token with `eso-reader` policy as fallback |
