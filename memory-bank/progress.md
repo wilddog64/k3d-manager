@@ -54,9 +54,9 @@
 ### lib-foundation Backlog
 
 - [x] `_run_command` if-count refactor (v0.3.0) — lib-foundation v0.3.0 merged + subtree pulled into k3d-manager-v0.9.3 (commit `3cfbfd5`)
-- [ ] Sync `deploy_cluster` fixes upstream (CLUSTER_NAME, provider helpers)
-- [ ] Route bare sudo in `_install_debian_helm` / `_install_debian_docker`
-- [ ] Add `.github/copilot-instructions.md` to lib-foundation
+- [x] Route bare sudo in install helpers — lib-foundation v0.3.1 (commit `38a91a8`); subtree pulled into k3d-manager-v0.9.3 (commit `1f8bcc5`)
+- [x] Add `.github/copilot-instructions.md` to lib-foundation — shipped in v0.3.1
+- [ ] Sync `deploy_cluster` fixes upstream to lib-foundation (CLUSTER_NAME, provider helpers, duplicate guard)
 
 ### Deferred
 
