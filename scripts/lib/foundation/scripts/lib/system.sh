@@ -39,6 +39,62 @@ function _command_exist() {
     command -v "$1" &> /dev/null
 }
 
+# _run_command_resolve_sudo <prog> <prefer_sudo> <require_sudo> <interactive_sudo> [probe_args...]
+#
+# Resolves the runner array (plain prog, sudo -n prog, or sudo prog) and stores
+# it in the global _RCRS_RUNNER. Caller must initialize _RCRS_RUNNER before
+# calling and unset it after reading.
+#
+# Returns 127 if --require-sudo is set but sudo is unavailable.
+function _run_command_resolve_sudo() {
+  local prog="$1"
+  local prefer_sudo="$2"
+  local require_sudo="$3"
+  local interactive_sudo="$4"
+  shift 4
+  local -a probe_args=("$@")
+
+  local -a sudo_flags=()
+  if (( interactive_sudo == 0 )); then
+    sudo_flags=(-n)
+  fi
+
+  if (( require_sudo )); then
+    if (( interactive_sudo )) || sudo -n true >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+    else
+      echo "sudo non-interactive not available" >&2
+      return 127
+    fi
+    return 0
+  fi
+
+  if (( ${#probe_args[@]} )); then
+    if "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
+      _RCRS_RUNNER=("$prog")
+    elif (( interactive_sudo )) && sudo "${sudo_flags[@]}" "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+    elif sudo -n "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo -n "$prog")
+    elif (( prefer_sudo && interactive_sudo )); then
+      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+    elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo -n "$prog")
+    else
+      _RCRS_RUNNER=("$prog")
+    fi
+    return 0
+  fi
+
+  if (( prefer_sudo && interactive_sudo )); then
+    _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+  elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
+    _RCRS_RUNNER=(sudo -n "$prog")
+  else
+    _RCRS_RUNNER=("$prog")
+  fi
+}
+
 # _run_command [--quiet] [--prefer-sudo|--require-sudo] [--probe '<subcmd>'] -- <prog> [args...]
 # - --quiet         : suppress wrapper error message (still returns real exit code)
 # - --prefer-sudo   : use sudo -n if available, otherwise run as user
@@ -81,45 +137,30 @@ function _run_command() {
   fi
 
   # Decide runner: user vs sudo -n vs sudo (interactive)
-  local runner
-  local sudo_flags=()
-  if (( interactive_sudo == 0 )); then
-    sudo_flags=(-n)  # Non-interactive sudo
-  fi
-
-  if (( require_sudo )); then
-    if (( interactive_sudo )) || sudo -n true >/dev/null 2>&1; then
-      runner=(sudo "${sudo_flags[@]}" "$prog")
-    else
-      (( quiet )) || echo "sudo non-interactive not available" >&2
-      exit 127
-    fi
+  _RCRS_RUNNER=()
+  if (( quiet )); then
+    _run_command_resolve_sudo "$prog" \
+      "$prefer_sudo" "$require_sudo" "$interactive_sudo" \
+      "${probe_args[@]}" 2>/dev/null || {
+        if (( soft )); then
+          return 127
+        else
+          exit 127
+        fi
+      }
   else
-    if (( ${#probe_args[@]} )); then
-      # Try user first; if probe fails, try sudo
-      if "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=("$prog")
-      elif (( interactive_sudo )) && sudo "${sudo_flags[@]}" "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=(sudo "${sudo_flags[@]}" "$prog")
-      elif sudo -n "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=(sudo -n "$prog")
-      elif (( prefer_sudo )) && ((interactive_sudo)) ; then
-        runner=(sudo "${sudo_flags[@]}" "$prog")
-      elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
-        runner=(sudo -n "$prog")
-      else
-        runner=("$prog")
-      fi
-    else
-      if (( prefer_sudo )) && (( interactive_sudo )); then
-        runner=(sudo "${sudo_flags[@]}" "$prog")
-      elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
-        runner=(sudo -n "$prog")
-      else
-        runner=("$prog")
-      fi
-    fi
+    _run_command_resolve_sudo "$prog" \
+      "$prefer_sudo" "$require_sudo" "$interactive_sudo" \
+      "${probe_args[@]}" || {
+        if (( soft )); then
+          return 127
+        else
+          exit 127
+        fi
+      }
   fi
+  local -a runner=("${_RCRS_RUNNER[@]}")
+  unset _RCRS_RUNNER
 
   # Execute and preserve exit code
   "${runner[@]}" "$@"
@@ -189,7 +230,7 @@ _ensure_secret_tool() {
 
 function _install_redhat_kubernetes_client() {
   if ! _command_exist kubectl; then
-     _run_command -- sudo dnf install -y kubernetes-client
+     _run_command --interactive-sudo -- dnf install -y kubernetes-client
   fi
 }
 
@@ -577,23 +618,23 @@ function _install_debian_kubernetes_client() {
    echo "Installing kubectl on Debian/Ubuntu system..."
 
    # Create the keyrings directory if it doesn't exist
-   _run_command -- sudo mkdir -p /etc/apt/keyrings
+   _run_command --interactive-sudo -- mkdir -p /etc/apt/keyrings
 
    # Download the Kubernetes signing key
    if [[ ! -e "/etc/apt/keyrings/kubernetes-apt-keyring.gpg" ]]; then
       curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key \
-         | _run_command -- sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+         | _run_command --interactive-sudo -- gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
    fi
 
    # Add the Kubernetes apt repository
    echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" | \
-      _run_command -- sudo tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
+      _run_command --interactive-sudo -- tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
 
    # Update apt package index
-   _run_command -- sudo apt-get update -y
+   _run_command --interactive-sudo -- apt-get update -y
 
    # Install kubectl
-   _run_command -- sudo apt-get install -y kubectl
+   _run_command --interactive-sudo -- apt-get install -y kubectl
 
 }
 
@@ -628,26 +669,26 @@ function _install_mac_helm() {
 }
 
 function _install_redhat_helm() {
-  _run_command -- sudo dnf install -y helm
+  _run_command --interactive-sudo -- dnf install -y helm
 }
 
 function _install_debian_helm() {
   # 1) Prereqs
-  _run_command -- sudo apt-get update
-  _run_command -- sudo apt-get install -y curl gpg apt-transport-https
+  _run_command --interactive-sudo -- apt-get update
+  _run_command --interactive-sudo -- apt-get install -y curl gpg apt-transport-https
 
    # 2) Add Helm’s signing key (to /usr/share/keyrings)
    _run_command -- curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | \
       _run_command -- gpg --dearmor | \
-      _run_command -- sudo tee /usr/share/keyrings/helm.gpg >/dev/null
+      _run_command --interactive-sudo -- tee /usr/share/keyrings/helm.gpg >/dev/null
 
    # 3) Add the Helm repo (with signed-by, required on 24.04)
    echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | \
-   sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+   _run_command --interactive-sudo -- tee /etc/apt/sources.list.d/helm-stable-debian.list
 
    # 4) Install
-   _run_command sudo apt-get update
-   _run_command sudo apt-get install -y helm
+   _run_command --interactive-sudo -- apt-get update
+   _run_command --interactive-sudo -- apt-get install -y helm
 
 }
 
@@ -726,6 +767,7 @@ function _detect_platform() {
 
    _err "Unsupported platform: $(uname -s)"
 }
+
 
 function _create_nfs_share_mac() {
    local share_path="${1:-${HOME}/k3d-nfs}"
@@ -808,53 +850,53 @@ function _install_orbstack() {
 function _install_debian_docker() {
   echo "Installing Docker on Debian/Ubuntu system..."
   # Update apt
-  _run_command -- sudo apt-get update
+  _run_command --interactive-sudo -- apt-get update
   # Install dependencies
-  _run_command -- sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+  _run_command --interactive-sudo -- apt-get install -y apt-transport-https ca-certificates curl software-properties-common
   # Add Docker's GPG key
   if [[ ! -e "/usr/share/keyrings/docker-archive-keyring.gpg" ]]; then
      _curl -fsSL https://download.docker.com/linux/"$(lsb_release -is \
         | tr '[:upper:]' '[:lower:]')"/gpg \
-        | sudo gpg --dearmor \
+        | _run_command --interactive-sudo -- gpg --dearmor \
         -o /usr/share/keyrings/docker-archive-keyring.gpg
   fi
   # Add Docker repository
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]') $(lsb_release -cs) stable" | \
-     _run_command -- sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+     _run_command --interactive-sudo -- tee /etc/apt/sources.list.d/docker.list > /dev/null
   # Update package list
-  _run_command -- sudo apt-get update
+  _run_command --interactive-sudo -- apt-get update
   # Install Docker
-  _run_command -- sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+  _run_command --interactive-sudo -- apt-get install -y docker-ce docker-ce-cli containerd.io
   # Start and enable Docker when systemd is available
   if _systemd_available ; then
-     _run_command -- sudo systemctl start docker
-     _run_command -- sudo systemctl enable docker
+     _run_command --interactive-sudo -- systemctl start docker
+     _run_command --interactive-sudo -- systemctl enable docker
   else
      _warn "systemd not available; skipping docker service activation"
   fi
   # Add current user to docker group
-  _run_command -- sudo usermod -aG docker "$USER"
+  _run_command --interactive-sudo -- usermod -aG docker "$USER"
   echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
 }
 
 function _install_redhat_docker() {
   echo "Installing Docker on RHEL/Fedora/CentOS system..."
   # Install required packages
-  _run_command -- sudo dnf install -y dnf-plugins-core
+  _run_command --interactive-sudo -- dnf install -y dnf-plugins-core
   # Add Docker repository
-  _run_command -- sudo dnf config-manager addrepo --overwrite \
+  _run_command --interactive-sudo -- dnf config-manager addrepo --overwrite \
      --from-repofile https://download.docker.com/linux/fedora/docker-ce.repo
   # Install Docker
-  _run_command -- sudo dnf install -y docker-ce docker-ce-cli containerd.io
+  _run_command --interactive-sudo -- dnf install -y docker-ce docker-ce-cli containerd.io
   # Start and enable Docker when systemd is available
   if _systemd_available ; then
-     _run_command  -- sudo systemctl start docker
-     _run_command  -- sudo systemctl enable docker
+     _run_command --interactive-sudo -- systemctl start docker
+     _run_command --interactive-sudo -- systemctl enable docker
   else
      _warn "systemd not available; skipping docker service activation"
   fi
   # Add current user to docker group
-  _run_command  -- sudo usermod -aG docker "$USER"
+  _run_command --interactive-sudo -- usermod -aG docker "$USER"
   echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
 }
 
@@ -1253,7 +1295,7 @@ function _ensure_bats() {
       _run_command -- brew install bats-core
       pkg_attempted=1
    elif _command_exist apt-get && _sudo_available; then
-      _run_command --prefer-sudo -- apt-get update
+      _run_command --interactive-sudo -- apt-get update
       _run_command --prefer-sudo -- apt-get install -y bats
       pkg_attempted=1
    elif _command_exist dnf && _sudo_available; then
@@ -1380,7 +1422,7 @@ function _ensure_node() {
    fi
 
    if _is_debian_family && _command_exist apt-get && _sudo_available; then
-      _run_command --prefer-sudo -- apt-get update
+      _run_command --interactive-sudo -- apt-get update
       _run_command --prefer-sudo -- apt-get install -y nodejs npm
       if _command_exist node; then
          return 0
@@ -1591,16 +1633,15 @@ function _ensure_cargo() {
    fi
 
    if _is_debian_family ; then
-      _run_command -- sudo apt-get update
-      _run_command -- sudo apt-get install -y cargo
+      _run_command --interactive-sudo -- apt-get update
+      _run_command --interactive-sudo -- apt-get install -y cargo
    elif _is_redhat_family ; then
-      _run_command -- sudo dnf install -y cargo
+      _run_command --interactive-sudo -- dnf install -y cargo
    elif _is_wsl && grep -qi "debian" /etc/os-release &> /dev/null; then
-      _run_command -- sudo apt-get update
-      _run_command -- sudo apt-get install -y cargo
+      _run_command --interactive-sudo -- apt-get update
+      _run_command --interactive-sudo -- apt-get install -y cargo
    elif _is_wsl && grep -qi "redhat" /etc/os-release &> /dev/null; then
-      _run_command -- sudo apt-get update
-      _run_command -- sudo apt-get install -y cargo
+      _run_command --interactive-sudo -- dnf install -y cargo
    else
       echo "Cannot install cargo: unsupported OS or missing package manager" >&2
       exit 127

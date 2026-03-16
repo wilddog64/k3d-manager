@@ -1,22 +1,22 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.2` (as of 2026-03-15)
+## Current Branch: `k3d-manager-v0.9.3` (as of 2026-03-16)
 
-**v0.9.1 SHIPPED** — PR #31 squash-merged (942660e), 2026-03-15. Tagged + released.
-**v0.9.2 ACTIVE** — branch `k3d-manager-v0.9.2` cut from main 2026-03-15.
+**v0.9.2 SHIPPED** — PR #35 squash-merged (f0cec06), 2026-03-15. Tagged + released.
+**v0.9.3 ACTIVE** — branch cut from main 2026-03-15.
 
 ---
 
 ## Current Focus
 
-**v0.9.2: Copilot review process docs + Playwright E2E in CI**
-
 | Item | Status | Notes |
 |---|---|---|
-| Copilot review process guide | **done** | `docs/guides/copilot-review-process.md` + `copilot-review-template.md` |
-| README releases table update | **done** | Split to `docs/releases.md`, README shows last 3 |
-| vCluster E2E composite actions | **PR #34 open — TAG/sudo/manager checks pushed** | mktemp+teardown fixed (`3079f83`); `48217ee` adds `TAG` env + `sudo -n` installer and teardown manager path check per `docs/plans/v0.9.2-vcluster-composite-action-sudo-tag-fix.md`. |
-| Playwright E2E browser tests | pending | `shopping-cart-e2e-tests`; blocked on ImagePullBackOff CI publish jobs completing |
+| lib-foundation v0.3.2 subtree pull | **done** | commit `e4d2eed` |
+| TTY fix — `_DCRS_PROVIDER` global in core.sh | **done** | commit `04522b5` |
+| Cluster rebuild smoke test | **DONE — PASS on M2 Air** | spec: `docs/plans/v0.9.3-cluster-rebuild-smoke-test.md` | Destroy/rebuild verified; all 8 components running; TTY fix verified |
+| v0.9.4 spec | **done** | `docs/plans/v0.9.4-full-stack-health.md` |
+| NVD API key | **done** | set in order + payment repos 2026-03-16 |
+| Milestone brainstorm | **done** | v0.9.4 = full stack health; demo after v0.9.x series |
 
 ---
 
@@ -24,21 +24,20 @@
 
 | Version | Status | Notes |
 |---|---|---|
-| v0.1.0–v0.9.1 | released | See CHANGE.md |
-| v0.9.2 | **active** | Copilot review docs + reusable vCluster E2E workflow + Playwright E2E |
-| v1.1.0 | planned | AWS EKS provider + ACG sandbox lifecycle |
-| v1.2.0 | planned | Google GKE provider |
-| v1.3.0 | planned | Azure AKS provider (known blocker: AADSTS130507 SP issue) |
-| v1.4.0 | planned | k3dm-mcp — after all 3 cloud providers ship |
+| v0.1.0–v0.9.2 | released | See README Releases table |
+| v0.9.3 | **active** | TTY fix + lib-foundation v0.3.2 + cluster rebuild smoke test |
+| v0.9.4 | planned | Full stack health — ImagePullBackOff fix + Playwright E2E in CI |
+| v1.0.0 | planned | k3dm-mcp — MCP server wrapping k3d-manager CLI |
+| v1.1.0 | planned | Multi-cloud providers (EKS/GKE/AKS) + ACG sandbox lifecycle |
 
 ---
 
-## Cluster State (as of 2026-03-15 — post v0.9.1)
+## Cluster State (as of 2026-03-15)
 
 **Architecture:** Infra cluster on M2 Air — ArgoCD manages Ubuntu k3s hub-and-spoke.
 Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
 
-### Infra Cluster — k3d on OrbStack on M2 Air (context: `k3d-k3d-cluster`)
+### Infra Cluster — k3d on OrbStack on M2 Air
 
 | Component | Status |
 |---|---|
@@ -49,22 +48,17 @@ Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
 | Jenkins | Running — `cicd` ns |
 | ArgoCD | Running — `cicd` ns |
 | Keycloak | Running — `identity` ns |
-| cert-manager | Deployed — `cert-manager` ns |
+| cert-manager | Running — `cert-manager` ns |
 
-### App Cluster — Ubuntu k3s (SSH: `ssh ubuntu` from M2 Air)
+### App Cluster — Ubuntu k3s
 
 | Component | Status |
 |---|---|
 | k3s node | Ready |
-| Istio | Running |
-| ESO | Running — 2/2 SecretStores Ready |
-| Vault | Initialized + Unsealed |
-| OpenLDAP | Running — `identity` ns |
-| shopping-cart-data | Running |
-| shopping-cart-apps | Synced via ArgoCD — `ImagePullBackOff` until CI/CD pushes images |
+| Istio / ESO / Vault / OpenLDAP | Running |
+| shopping-cart-apps | ArgoCD Synced — `ImagePullBackOff` until images pushed to ghcr.io |
 
-**SSH note:** `ForwardAgent yes` in `~/.ssh/config`. Stale socket fix: `ssh -O exit ubuntu`.
-**Ubuntu interface:** `enp0s5` (not eth0) — MTU 1500. k3s uses flannel (MTU 1450).
+**SSH:** `ForwardAgent yes`. Stale socket fix: `ssh -O exit ubuntu`.
 
 ---
 
@@ -72,6 +66,7 @@ Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
 
 **Never modify `scripts/lib/foundation/` directly.** Fix in lib-foundation → PR → tag → subtree pull.
 Subtree sync bypass: `K3DM_SUBTREE_SYNC=1 git subtree pull --prefix=scripts/lib/foundation ...`
+**lib-foundation is now on v0.3.3** — subtree pull pending after v0.9.3 smoke test.
 
 ---
 
@@ -80,82 +75,41 @@ Subtree sync bypass: `K3DM_SUBTREE_SYNC=1 git subtree pull --prefix=scripts/lib/
 1. **Spec-First**: No code without a structured, approved implementation spec.
 2. **Checkpointing**: Git commit before every surgical operation.
 3. **Audit Phase**: Verify no tests weakened after every fix cycle.
-4. **Simplification**: Refactor for minimal logic before final verification.
-5. **Memory-bank compression**: Compress at the *start* of each new branch.
+4. **Memory-bank compression**: Compress at the *start* of each new branch.
 
 ---
 
 ## Agent Workflow
 
 ```
-Claude
-  -- reviews all agent memory-bank writes before writing next task
-  -- opens PR on owner go-ahead; routes PR issues back to agents by scope
-  -- tags Copilot for code review before every code PR (not doc-only PRs)
-
-Gemini  (SDET + Red Team)
-  -- single-step verification: BATS, pod status checks, pre-commit hook smoke tests
-  -- red-team / security audit
-  -- commits own work; updates memory-bank to report completion
-  -- must push to remote before updating memory-bank
-  -- MUST run hostname && uname -n first — has repeatedly started on wrong machine
-
-Codex  (Production Code + Cluster Ops)
-  -- pure logic fixes and feature implementation
-  -- shopping-cart repo work (preferred: Ubuntu native)
-  -- commits own work; updates memory-bank to report completion
-
-Owner
-  -- approves and merges PRs
+Claude  — specs, PRs, memory-bank, Copilot review management
+Gemini  — cluster verification, BATS, red-team (M2 Air; push before memory-bank update)
+Codex   — pure code, no cluster dependency
+Owner   — approves and merges PRs
 ```
 
-**Agent logging:** All k3d-manager output → `scratch/logs/<agent>-<task>-<timestamp>.log`
+**Agent rules:** commit own work · no credentials in specs · shellcheck every touched .sh · no rebase/reset --hard/push --force · first command: `hostname && uname -n`
 
-**Agent rules:**
-- Commit your own work — self-commit is your sign-off.
-- Update memory-bank to report completion.
-- No credentials in task specs — reference env var names only.
-- Run `shellcheck` on every touched `.sh` file.
-- **NEVER run `git rebase`, `git reset --hard`, or `git push --force` on shared branches.**
-- **First command in every session: `hostname && uname -n`**
-
-**Lessons learned:**
-- Gemini skips memory-bank read — paste full task spec inline in every Gemini session prompt.
-- Codex fabricates commit SHAs — always verify with `gh api repos/.../git/commits/<sha>`.
-- Codex reports "done" after docs without code — require a PR URL as proof.
-- Codex silently reverts intentional decisions — three-layer defense: CLAUDE.md + `DO NOT REMOVE` comments + memory-bank.
-- Gemini expands scope — spec must explicitly state what is forbidden.
-- Gemini over-reports test success with ambient env vars — verify with `env -i`.
-- Gemini does not verify machine context — open terminal on M2 Air before starting.
-- One command at a time for Gemini on complex tasks.
-- BATS count: 190 total; ~108 pass with `env -i` (50 skip env-dependent) — expected.
-- vCluster v0.32.1 pod labels: `app=vcluster,release=<name>`.
-- Vault unseal non-interactive: `kubectl exec -n secrets vault-0 -- vault operator unseal "$KEY"`. Key field: `shard-1`.
+**Lessons:** Gemini skips memory-bank — paste spec inline · Codex fabricates SHAs — verify via `gh api` · Gemini expands scope — state forbidden actions explicitly · Copilot quota hit 2026-03-16 — resets monthly; docs-only PRs can merge without review
 
 ---
 
-## Release Checklist (do on the next feature branch after every PR merge to main)
+## Release Checklist
 
-1. Tag: `git tag v<X.Y.Z> <sha> && git push origin v<X.Y.Z>`
-2. Release: `gh release create v<X.Y.Z> --title "v<X.Y.Z> — <title>" --notes "..."`
-3. `docs/releases.md` — add new row at the top
-4. `README.md` Releases table — keep last 3 rows, drop oldest
-5. `README.md` Guides section — add links to any new guide docs
-6. `README.md` Issue Logs section — add links to notable issues/findings from the release
-7. Verify `gh release list` shows new version as Latest
+1. `git tag v<X.Y.Z> <sha> && git push origin v<X.Y.Z>`
+2. `gh release create v<X.Y.Z> --title "..." --notes "..."`
+3. Update README Releases table on next feature branch
+4. `gh release list` — verify Latest
 
 ---
 
 ## Operational Notes
 
-- **Always run `reunseal_vault`** after any cluster restart before other deployments
+- **Always run `reunseal_vault`** after any cluster restart
+- **Ubuntu k3s rebuild:** run `sudo rm -rf /etc/rancher /var/lib/rancher /var/lib/kubelet` before reinstalling k3s — `k3s-uninstall.sh` alone leaves stale state
+- **OrbStack→Parallels connectivity:** requires SSH tunnel on M2 Air: `ssh -L 0.0.0.0:6443:localhost:6443 -N ubuntu`. ArgoCD cluster secret uses `https://host.k3d.internal:6443`
+- **Vault auth over tunnel:** use static token with `eso-reader` policy — Kubernetes auth CA validation fails over tunnel
 - **ESO SecretStore**: `mountPath` must be `kubernetes` (not `auth/kubernetes`)
-- **Branch protection**: `enforce_admins` always ON. Temporarily disable only to merge, then re-enable immediately. Both `main` and feature branches protected.
+- **Branch protection**: `enforce_admins` always ON — disable only to merge, re-enable immediately
 - **Istio + Jobs**: `sidecar.istio.io/inject: "false"` required on Helm pre-install job pods
 - **Bitnami images**: use `docker.io/bitnamilegacy/*` for ARM64
-
-### Keycloak Known Failure Patterns
-
-1. **Istio sidecar blocks `keycloak-config-cli` job** — mitigated via `sidecar.istio.io/inject: "false"`.
-2. **ARM64 image pull failures** — use `docker.io/bitnamilegacy/*`.
-3. **Stale PVCs block retry** — delete `data-keycloak-postgresql-0` PVC in `identity` ns before retrying.
