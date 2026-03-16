@@ -50,9 +50,19 @@
 - [ ] Milestone brainstorm — 2026-03-17
 - [ ] Playwright E2E in CI — blocked on ImagePullBackOff
 
+### v0.9.4 — planned (cut after v0.9.3 merges)
+
+- [ ] Trigger CI in all 5 shopping-cart repos → images pushed to ghcr.io
+- [ ] NVD API key set in order + payment repos (register at nvd.nist.gov)
+- [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s (Gemini)
+- [ ] Re-enable `shopping-cart-e2e-tests` scheduled run
+- [ ] Playwright E2E green in CI — milestone gate
+- Spec: `docs/plans/v0.9.4-full-stack-health.md`
+
 ### Next after v0.9.x — k3dm-mcp v1.0.0
 
 - Separate repo `~/src/gitrepo/personal/k3dm-mcp`
+- Demo: k3dm-mcp → cluster_status → verify apps Running → Playwright E2E via MCP
 
 ### lib-foundation Backlog
 
@@ -78,4 +88,4 @@
 | Shopping Cart Apps ImagePullBackOff | OPEN | Images not pushed to ghcr.io — CI stabilized but images not yet built |
 | Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps may exceed capacity — reduce replicas |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround |
-| NVD API key missing | OPEN | Register at nvd.nist.gov — add as `NVD_API_KEY` secret to order + payment repos |
+| NVD API key missing | v0.9.4 | Register at nvd.nist.gov — add as `NVD_API_KEY` secret to order + payment repos |

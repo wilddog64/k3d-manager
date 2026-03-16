@@ -29,7 +29,8 @@
 | Version | Status | Notes |
 |---|---|---|
 | v0.1.0–v0.9.2 | released | See README Releases table |
-| v0.9.3 | **active** | TBD — cut 2026-03-15 |
+| v0.9.3 | **active** | TTY fix + lib-foundation v0.3.2 + cluster rebuild smoke test |
+| v0.9.4 | planned | Full stack health — ImagePullBackOff fix + Playwright E2E in CI |
 | v1.0.0 | planned | k3dm-mcp — MCP server wrapping k3d-manager CLI |
 | v1.1.0 | planned | Multi-cloud providers (EKS/GKE/AKS) + ACG sandbox lifecycle |
 
