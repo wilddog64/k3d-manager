@@ -56,7 +56,8 @@
 - [x] `_run_command` if-count refactor (v0.3.0) — lib-foundation v0.3.0 merged + subtree pulled into k3d-manager-v0.9.3 (commit `3cfbfd5`)
 - [x] Route bare sudo in install helpers — lib-foundation v0.3.1 (commit `38a91a8`); subtree pulled into k3d-manager-v0.9.3 (commit `1f8bcc5`)
 - [x] Add `.github/copilot-instructions.md` to lib-foundation — shipped in v0.3.1
-- [ ] Sync `deploy_cluster` fixes upstream to lib-foundation (CLUSTER_NAME, provider helpers, duplicate guard)
+- [x] Sync `deploy_cluster` fixes upstream to lib-foundation — v0.3.2 (helpers extracted, TTY fix, BATS 36); subtree pulled into k3d-manager-v0.9.3 (commit `e4d2eed`)
+- [x] lib-foundation repo flipped public — https://github.com/wilddog64/lib-foundation
 
 ### Deferred
 
