@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# shellcheck shell=bash
+# shellcheck shell=bash disable=SC1091,SC2329
 
 setup() {
   SYSTEM_LIB="${BATS_TEST_DIRNAME}/../../lib/system.sh"
@@ -46,4 +46,22 @@ bats_require_minimum_version 1.5.0
 @test "_run_command: --quiet suppresses error output on missing program" {
   run -127 _run_command --quiet --soft -- __nonexistent_prog_xyz__
   [ -z "$output" ]
+}
+
+@test "_run_command: --interactive-sudo flag is accepted without error" {
+  function sudo() { "$@"; }
+  export -f sudo
+  run _run_command --interactive-sudo --soft -- echo hi
+  [ "$status" -eq 0 ]
+  [ "$output" = "hi" ]
+  unset -f sudo
+}
+
+@test "_run_command: --prefer-sudo flag is accepted without error" {
+  function sudo() { "$@"; }
+  export -f sudo
+  run _run_command --prefer-sudo --soft -- echo hi
+  [ "$status" -eq 0 ]
+  [ "$output" = "hi" ]
+  unset -f sudo
 }

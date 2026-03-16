@@ -37,15 +37,16 @@ git subtree pull --prefix=scripts/lib/foundation \
 Privilege escalation wrapper. Never call `sudo` directly — use this instead.
 
 ```bash
-_run_command --prefer-sudo -- apt-get install -y jq   # sudo if available, else current user
-_run_command --require-sudo -- mkdir /etc/myapp        # fail if sudo unavailable
+_run_command --interactive-sudo -- apt-get install -y jq  # prompt for sudo if needed (install helpers)
+_run_command --prefer-sudo -- some-cmd                     # sudo if available, else current user (non-interactive)
+_run_command --require-sudo -- mkdir /etc/myapp            # fail if sudo unavailable
 _run_command --probe 'config current-context' -- kubectl get nodes  # probe then decide
-_run_command --quiet -- command_that_might_fail        # suppress stderr, return exit code
+_run_command --quiet -- command_that_might_fail            # suppress stderr, return exit code
 ```
 
 ### `_detect_platform` (system.sh)
 
-Single source of truth for OS detection. Returns: `debian`, `rhel`, `arch`, `darwin`, `unknown`.
+Single source of truth for OS detection. Returns: `mac`, `wsl`, `debian`, `redhat`, `linux`.
 
 ### `_cluster_provider` (core.sh)
 
@@ -55,8 +56,9 @@ Returns active provider string (`k3d`, `k3s`, `orbstack`). Controlled by
 ## Development
 
 ```bash
-# Run BATS tests (requires bats ≥ 1.11)
-bats scripts/tests/
+# Run BATS tests (requires bats ≥ 1.11) — always use env -i for clean environment
+env -i PATH="/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" \
+  bash --norc --noprofile -c 'bats scripts/tests/lib/'
 
 # shellcheck
 shellcheck scripts/lib/core.sh scripts/lib/system.sh
@@ -68,7 +70,7 @@ shellcheck scripts/lib/core.sh scripts/lib/system.sh
 - Public functions: no leading underscore
 - Private functions: prefix with `_`
 - Double-quote all variable expansions
-- No bare `sudo` — use `_run_command --prefer-sudo`
+- No bare `sudo` — use `_run_command --interactive-sudo` for install helpers, `--prefer-sudo` for non-interactive contexts
 
 ---
 
@@ -76,7 +78,8 @@ shellcheck scripts/lib/core.sh scripts/lib/system.sh
 
 | Version | Date | Highlights |
 |---|---|---|
-| [v0.3.1](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.1) | 2026-03-15 | Route bare `sudo` in all install helpers through `_run_command --prefer-sudo` (Debian/RedHat: kubectl, helm, docker, cargo) |
+| v0.3.2 | 2026-03-16 | Sync `deploy_cluster` helpers from k3d-manager (`_deploy_cluster_prompt_provider`, `_deploy_cluster_resolve_provider`, `CLUSTER_NAME` propagation, remove duplicate mac+k3s guard); expand BATS to 36 tests |
+| [v0.3.1](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.1) | 2026-03-16 | Route bare `sudo` in install helpers through `_run_command --interactive-sudo`; AGENTS.md, GEMINI.md, CLAUDE.md overhaul; copilot-instructions.md |
 | [v0.3.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.0) | 2026-03-15 | `_run_command` if-count refactor, `_run_command_resolve_sudo` helper, bash 3.2 compat, BATS coverage |
 | [v0.2.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.2.0) | 2026-03-08 | `agent_rigor.sh` — `_agent_checkpoint`, `_agent_audit`, `_agent_lint`, pre-commit hook |
 | [v0.1.2](https://github.com/wilddog64/lib-foundation/releases/tag/v0.1.2) | 2026-03-07 | Drop Colima support |
