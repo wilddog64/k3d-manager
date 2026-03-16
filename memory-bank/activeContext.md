@@ -9,16 +9,18 @@
 
 ## Current Focus
 
-**v0.9.3: Next milestone — TBD**
+**v0.9.3: Cluster rebuild smoke test + milestone brainstorm 2026-03-17**
 
 | Item | Status | Notes |
 |---|---|---|
 | v0.9.2 merge + tag + release | **done** | PR #35 merged, v0.9.2 tagged, GitHub release created |
 | README v0.9.2 entry | **done** | Added to releases table on k3d-manager-v0.9.3 |
 | Branch protection k3d-manager-v0.9.3 | **done** | enforce_admins: true |
-| lib-foundation v0.3.1 subtree pull | **done** | commit `1f8bcc5` on k3d-manager-v0.9.3 |
-| lib-foundation v0.3.2 subtree pull | **done** | commit `e4d2eed` on k3d-manager-v0.9.3 |
-| Playwright E2E in CI | pending | `shopping-cart-infra` — blocked on ImagePullBackOff (images not in ghcr.io) |
+| lib-foundation v0.3.1 subtree pull | **done** | commit `1f8bcc5` |
+| lib-foundation v0.3.2 subtree pull | **done** | commit `e4d2eed` |
+| TTY fix — `_DCRS_PROVIDER` global in core.sh | **done** | commit `04522b5` |
+| Cluster rebuild smoke test | **assigned to Gemini** | spec: `docs/plans/v0.9.3-cluster-rebuild-smoke-test.md` |
+| Playwright E2E in CI | pending | blocked on ImagePullBackOff |
 
 ---
 

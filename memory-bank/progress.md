@@ -44,8 +44,11 @@
 
 ### v0.9.3 — active
 
-- [ ] Next milestone TBD
-- [ ] Playwright E2E in CI — `shopping-cart-infra` — blocked on ImagePullBackOff
+- [x] lib-foundation v0.3.2 subtree pull — commit `e4d2eed`
+- [x] TTY fix — `_DCRS_PROVIDER` global in core.sh — commit `04522b5`
+- [ ] Cluster rebuild smoke test — assigned to Gemini (`docs/plans/v0.9.3-cluster-rebuild-smoke-test.md`)
+- [ ] Milestone brainstorm — 2026-03-17
+- [ ] Playwright E2E in CI — blocked on ImagePullBackOff
 
 ### Next after v0.9.x — k3dm-mcp v1.0.0
 
