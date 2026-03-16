@@ -12,31 +12,15 @@
 ### Released (v0.1.0 – v0.9.2)
 
 - [x] k3d/OrbStack/k3s cluster provider abstraction
-- [x] Vault PKI, ESO, Istio, Jenkins, OpenLDAP, ArgoCD, Keycloak (infra cluster)
+- [x] Vault PKI, ESO, Istio, Jenkins, OpenLDAP, ArgoCD, Keycloak, cert-manager (infra cluster)
 - [x] Two-cluster architecture (`CLUSTER_ROLE=infra|app`)
-- [x] Cross-cluster Vault auth (`configure_vault_app_auth`)
+- [x] Cross-cluster Vault auth, Vault-managed ArgoCD deploy keys
 - [x] Agent Rigor Protocol — `_agent_checkpoint`, `_agent_lint`, `_agent_audit`
-- [x] `_k3d_manager_copilot` scoped wrapper (`K3DM_ENABLE_AI` gate, 8-fragment deny list)
-- [x] `_safe_path` / `_is_world_writable_dir` PATH poisoning defense
-- [x] `lib-foundation` subtree at `scripts/lib/foundation/` (v0.2.0)
-- [x] `deploy_cluster` refactored — 12→5 if-blocks, CLUSTER_NAME fix
-- [x] OrbStack + Ubuntu k3s validation — all services healthy
-- [x] Colima support dropped (v0.7.1)
-- [x] `.envrc` → dotfiles symlink, `scripts/hooks/pre-commit` tracked hook (v0.7.2)
-- [x] `_agent_audit` — bare sudo, if-count, BATS removal, kubectl exec credential checks
-- [x] CI: bats pinned to v1.11.0, subtree guard with `K3DM_SUBTREE_SYNC=1` bypass
-- [x] `shopping_cart.sh` plugin — `add_ubuntu_k3s_cluster` + `register_shopping_cart_apps` (v0.7.3)
-- [x] Reusable GitHub Actions CI/CD workflow — build + Trivy + ghcr.io push + kustomize update (v0.7.3)
-- [x] ArgoCD: `ubuntu-k3s` registered, all 5 shopping-cart apps Synced (v0.7.3)
-- [x] Vault-managed ArgoCD deploy keys — `configure_vault_argocd_repos` (v0.8.0)
-- [x] `deploy_cert_manager` plugin — cert-manager v1.20.0 + ACME HTTP-01 via Istio (v0.8.0)
-- [x] `docs/api/functions.md` — full public functions reference (v0.8.0)
-- [x] Shopping Cart ecosystem — CI stabilized, branch protection, P4 linters, v0.1.0 releases (2026-03-14)
-- [x] vCluster plugin — `create/destroy/use/list`, Helm values, BATS 8/8 (v0.9.1)
-- [x] Two-tier help — bare summary, `--help` full list (v0.9.1)
-- [x] `function test()` refactor — moved to dispatcher, if-count compliant (v0.9.1)
-- [x] vCluster E2E composite actions — setup + teardown (v0.9.2)
-- [x] 11-finding Copilot hardening — curl safety, mktemp TOCTOU, sudo -n, TAG env, input validation, action_path, teardown deps (v0.9.2)
+- [x] `_k3d_manager_copilot` scoped wrapper, `_safe_path` PATH defense
+- [x] `lib-foundation` subtree at `scripts/lib/foundation/`
+- [x] Shopping Cart ecosystem — CI, ArgoCD, 5 apps Synced
+- [x] vCluster plugin + E2E composite actions (v0.9.1–v0.9.2)
+- [x] 11-finding Copilot hardening (v0.9.2)
 
 ---
 
@@ -46,38 +30,27 @@
 
 - [x] lib-foundation v0.3.2 subtree pull — commit `e4d2eed`
 - [x] TTY fix — `_DCRS_PROVIDER` global in core.sh — commit `04522b5`
-- [ ] Cluster rebuild smoke test — assigned to Gemini (`docs/plans/v0.9.3-cluster-rebuild-smoke-test.md`)
-- [ ] Milestone brainstorm — 2026-03-17
-- [ ] Playwright E2E in CI — blocked on ImagePullBackOff
+- [ ] **Cluster rebuild smoke test** — assigned to Gemini (`docs/plans/v0.9.3-cluster-rebuild-smoke-test.md`)
 
-### v0.9.4 — planned (cut after v0.9.3 merges)
+### v0.9.4 — planned
 
 - [ ] Trigger CI in all 5 shopping-cart repos → images pushed to ghcr.io
-- [ ] NVD API key set in order + payment repos (register at nvd.nist.gov)
+- [x] NVD API key set in order + payment repos (2026-03-16)
 - [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s (Gemini)
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run
 - [ ] Playwright E2E green in CI — milestone gate
 - Spec: `docs/plans/v0.9.4-full-stack-health.md`
 
-### Next after v0.9.x — k3dm-mcp v1.0.0
+### After v0.9.x — k3dm-mcp v0.1.0
 
 - Separate repo `~/src/gitrepo/personal/k3dm-mcp`
 - Demo: k3dm-mcp → cluster_status → verify apps Running → Playwright E2E via MCP
 
-### lib-foundation Backlog
-
-- [x] `_run_command` if-count refactor (v0.3.0) — lib-foundation v0.3.0 merged + subtree pulled into k3d-manager-v0.9.3 (commit `3cfbfd5`)
-- [x] Route bare sudo in install helpers — lib-foundation v0.3.1 (commit `38a91a8`); subtree pulled into k3d-manager-v0.9.3 (commit `1f8bcc5`)
-- [x] Add `.github/copilot-instructions.md` to lib-foundation — shipped in v0.3.1
-- [x] Sync `deploy_cluster` fixes upstream to lib-foundation — v0.3.2 (helpers extracted, TTY fix, BATS 36); subtree pulled into k3d-manager-v0.9.3 (commit `e4d2eed`)
-- [x] lib-foundation repo flipped public — https://github.com/wilddog64/lib-foundation
-
 ### Deferred
 
-- [ ] Playwright MCP E2E testing — prerequisite: images in ghcr.io + services running
-- [ ] Google Antigravity ACG sandbox (v1.1.0)
-- [ ] M2 Air pre-commit hook — SSH key not loaded; fix: `ssh-add` then re-run `install-hooks.sh`
-- [ ] Ubuntu pre-commit hook — run `install-hooks.sh`
+- [ ] Playwright MCP E2E — prereq: images in ghcr.io + k3dm-mcp v0.1.0
+- [ ] Google ACG sandbox (v1.1.0)
+- [ ] M2 Air + Ubuntu pre-commit hooks — run `install-hooks.sh`
 
 ---
 
@@ -85,7 +58,6 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| Shopping Cart Apps ImagePullBackOff | OPEN | Images not pushed to ghcr.io — CI stabilized but images not yet built |
+| Shopping Cart Apps ImagePullBackOff | OPEN | Images not pushed to ghcr.io — blocked on v0.9.4 CI trigger |
 | Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps may exceed capacity — reduce replicas |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround |
-| NVD API key missing | v0.9.4 | Register at nvd.nist.gov — add as `NVD_API_KEY` secret to order + payment repos |
