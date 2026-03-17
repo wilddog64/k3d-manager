@@ -21,6 +21,7 @@
 | Docs standardization (product-catalog + order) | **merged** | product-catalog PR #8 (b6ff783) + order PR #8 (b2c1ba8) 2026-03-17 |
 | Docs standardization (payment) | **merged** | payment PR #6 (224d721) 2026-03-17 |
 | Kustomize ghcr newName fix | **merged** | order PR #9 (f19cc0c) + product-catalog PR #9 (22c5405) + payment PR #7 (7ab15c2) 2026-03-17 |
+| Mermaid diagrams + Architecture consistency | **COMPLETE** | All 5 service repos merged 2026-03-17; main synced; stale branches deleted; `docs/next-improvements` created on all 4 |
 | Verify ArgoCD all 5 apps Synced + Healthy | **Blocked** | fix/argocd-image-pull merged (37660a6, infra PR #8); waiting for Gemini to create ghcr-pull-secret + verify |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |
 | Playwright E2E green | **milestone gate** | |
@@ -33,8 +34,11 @@
 |---|---|---|
 | v0.1.0–v0.9.3 | released | See README Releases table |
 | v0.9.4 | **active** | Full stack health — ImagePullBackOff fix + Playwright E2E in CI |
-| v1.0.0 | planned | k3dm-mcp — MCP server wrapping k3d-manager CLI |
-| v1.1.0 | planned | Multi-cloud providers (EKS/GKE/AKS) + ACG sandbox lifecycle |
+| v0.9.5 | planned | Service mesh — Istio full activation (mTLS, AuthzPolicy, Gateway, DestinationRule, ServiceEntry) |
+| v1.1.0 | planned | AWS EKS provider + ACG sandbox lifecycle |
+| v1.2.0 | planned | GKE provider |
+| v1.3.0 | planned | AKS provider |
+| v1.4.0 | planned | k3dm-mcp — MCP server wrapping full provider surface |
 
 ---
 

@@ -238,6 +238,20 @@ JSON-RPC stdio. No direct k3d-manager calls — always through the MCP security 
 
 ---
 
+## v0.9.5 — Service Mesh: Istio Full Activation
+*Focus: Activate the dormant Istio mesh — prerequisite for observability and cloud providers*
+
+- STRICT mTLS mesh-wide via `PeerAuthentication`
+- `AuthorizationPolicy` replacing payment service `NetworkPolicy` (L7 identity-based, not L4 IP-based)
+- Frontend ingress via Istio `Gateway` + `VirtualService`
+- `DestinationRule` load balancing per service (LEAST_CONN for order/payment, ROUND_ROBIN for basket/catalog/frontend)
+- `ServiceEntry` for external payment gateways (Stripe, PayPal)
+- Namespace label fix: `shopping-cart-product-catalog` missing `istio-injection: enabled`
+- **Manifests only** — no k3d-manager shell code changes
+- **Spec:** `docs/plans/v0.9.5-service-mesh.md`
+
+---
+
 ## v1.1.0 — AWS EKS Provider + ACG Sandbox Lifecycle
 *Focus: First cloud provider — AWS is the most common ACG sandbox*
 

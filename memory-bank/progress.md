@@ -59,6 +59,7 @@
 - [x] Kustomize ghcr newName fix — order PR #9 merged (f19cc0c) 2026-03-17
 - [x] Kustomize ghcr newName fix — product-catalog PR #9 merged (22c5405) 2026-03-17
 - [x] Kustomize ghcr newName fix — payment PR #7 merged (7ab15c2) 2026-03-17
+- [x] Mermaid architecture diagrams + consistent Architecture section presentation — all 5 service repos (payment PR #8, product-catalog PR #10, order PR #10, frontend PR #6) merged 2026-03-17; stale branches deleted; main synced; `docs/next-improvements` branches created
 - [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **Blocked (Gemini action needed)**:
   - ~~401 fix: `ghcr-pull-secret` patch~~ — **merged** infra PR #8 (37660a6) 2026-03-17
   - ~~Arch fix: multi-arch builds~~ — **merged** infra PR #7 (a937211) 2026-03-17
@@ -68,6 +69,16 @@
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run
 - [ ] Playwright E2E green in CI — milestone gate
 - Spec: `docs/plans/v0.9.4-full-stack-health.md`
+
+### v0.9.5 — planned (after v0.9.4 ships)
+
+- [ ] `PeerAuthentication` — STRICT mTLS mesh-wide
+- [ ] `AuthorizationPolicy` — replace payment NetworkPolicy with L7 identity policy
+- [ ] `Gateway` + `VirtualService` — frontend ingress via Istio
+- [ ] `DestinationRule` — load balancing per service (LEAST_CONN / ROUND_ROBIN)
+- [ ] `ServiceEntry` — Stripe + PayPal external gateways
+- [ ] Namespace label fix — product-catalog missing `istio-injection: enabled`
+- Spec: `docs/plans/v0.9.5-service-mesh.md`
 
 ### After v0.9.x — k3dm-mcp v0.1.0
 
