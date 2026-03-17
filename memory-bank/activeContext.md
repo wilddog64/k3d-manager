@@ -13,9 +13,12 @@
 |---|---|---|
 | README releases table | **done** | v0.9.3 added — commit `1e3a930` |
 | lib-foundation v0.3.3 subtree pull | **done** | commit `7684266` |
-| shopping-cart CI (4/5) | **done** | order/frontend/basket/product-catalog — images in ghcr.io |
-| shopping-cart-payment CI | **Codex** | fix at `8a77199`; spec: `docs/plans/v0.9.4-codex-shopping-cart-payment-ci.md` |
-| Verify ArgoCD all 5 apps Synced + Healthy | **Gemini** | prereq: payment CI green |
+| shopping-cart CI (5/5) | **done** | all images in ghcr.io; vuln scan added to all 5 repos |
+| Apache 2.0 LICENSE (7 repos) | **done** | all 6 shopping-cart repos + lib-foundation — merged 2026-03-17 |
+| Branch protection standardized | **done** | enforce_admins: true on all 6 shopping-cart repos |
+| Frontend docs | **done** | architecture, api, troubleshooting — PR #4 merged |
+| Mermaid diagrams (order/catalog/basket) | **done** | ASCII → Mermaid |
+| Verify ArgoCD all 5 apps Synced + Healthy | **Gemini** | spec: `docs/plans/v0.9.4-gemini-argocd-verify.md` |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |
 | Playwright E2E green | **milestone gate** | |
 
@@ -113,3 +116,4 @@ Owner   — approves and merges PRs
 - **Branch protection**: `enforce_admins` always ON — disable only to merge, re-enable immediately
 - **Istio + Jobs**: `sidecar.istio.io/inject: "false"` required on Helm pre-install job pods
 - **Bitnami images**: use `docker.io/bitnamilegacy/*` for ARM64
+- **kustomization.yaml update in infra workflow**: step has `continue-on-error: true` — a protected branch push failure won't fail the job. Image is in ghcr.io but kustomization SHA won't be updated automatically; update manually or via ArgoCD image updater after CI green.

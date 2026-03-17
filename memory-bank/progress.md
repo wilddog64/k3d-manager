@@ -37,9 +37,17 @@
 - [x] shopping-cart-product-catalog — CI green, image in ghcr.io
 - [x] shopping-cart-basket — CI green, image in ghcr.io
 - [x] shopping-cart-frontend — CI green, image in ghcr.io
-- [x] shopping-cart-order — CI green, image in ghcr.io
-- [ ] shopping-cart-payment CI — fix at `8a77199` in progress; **Codex task**: `docs/plans/v0.9.4-codex-shopping-cart-payment-ci.md`
-- [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s (Gemini — after payment fixed)
+- [x] shopping-cart-order CI — green, image in ghcr.io — commit `cb663a2`
+- [x] shopping-cart-payment CI — green, image in ghcr.io — commit `0ac292d`; NVD API key fix `14dda79`; docker-build secret fix `0ac292d`
+- [x] Vuln scanning added to all 5 repos — OWASP (Java), pip-audit (Python), npm audit (Node), govulncheck (Go)
+- [x] Apache 2.0 LICENSE added — all 6 shopping-cart repos + lib-foundation (2026-03-17)
+- [x] Branch protection standardized — `enforce_admins: true` on all 6 shopping-cart repos
+- [x] Frontend docs (`docs/architecture`, `docs/api`, `docs/troubleshooting`) — PR #4 merged
+- [x] Mermaid architecture diagrams — order, product-catalog, basket (ASCII → Mermaid)
+- [x] `copilot-instructions.md` added to shopping-cart-infra
+- [x] ArgoCD cluster registration fix — PR #5 in shopping-cart-infra (`feat/argocd-cluster-registration`); Application manifests updated to `host.k3d.internal:6443`; `scripts/register-ubuntu-k3s.sh` added
+- [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **Gemini**: `docs/plans/v0.9.4-gemini-argocd-verify.md`
+- [ ] Deploy key rotation policy — 24h scheduled + on infra main merge; spec in `docs/plans/roadmap-v1.md` v0.8.0 section
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run
 - [ ] Playwright E2E green in CI — milestone gate
 - Spec: `docs/plans/v0.9.4-full-stack-health.md`
@@ -61,7 +69,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| Shopping Cart Apps ImagePullBackOff | PARTIAL | order/frontend/basket/product-catalog images in ghcr.io; payment pending Codex fix |
+| Shopping Cart Apps ImagePullBackOff | PENDING ARGOCD | all 5 images in ghcr.io; Gemini to verify ArgoCD Synced + Healthy |
 | Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps may exceed capacity — reduce replicas |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround |
 | `destroy_k3s_cluster` incomplete cleanup | BACKLOG | `k3s-uninstall.sh` leaves `/var/lib/rancher`, `/etc/rancher`, `/var/lib/kubelet` — causes ghost nodes on reinstall. Fix: add `sudo rm -rf` of those paths to `destroy_k3s_cluster` |

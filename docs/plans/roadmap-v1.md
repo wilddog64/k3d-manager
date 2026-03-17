@@ -47,8 +47,16 @@ ArgoCD reads from those secrets. No key files on disk.
 - ESO `ExternalSecret` per repo → syncs to `argocd-repo-<name>` secret in `cicd` ns
 - New Vault policy: `argocd-deploy-key-reader` (read-only on `secret/argocd/deploy-keys/*`)
 - New function: `configure_vault_argocd_repos` in a plugin
-- **Rotation:** `vault kv put secret/argocd/deploy-keys/<repo> private_key=@<new-key>` →
+- **Rotation mechanism:** `vault kv put secret/argocd/deploy-keys/<repo> private_key=@<new-key>` →
   ESO syncs → ArgoCD picks up automatically → update GitHub deploy key. One operation.
+- **Rotation policy (two-tier):**
+  - Scheduled — every 24h: rotate all 5 deploy keys (cron in `shopping-cart-infra` CI or k3d-manager scheduled task)
+  - On `shopping-cart-infra` main merge: rotate all 5 deploy keys (infra changes are highest-risk event)
+  - On demand: `k3d-manager argocd_rotate_deploy_keys` — manual escape hatch for suspected compromise
+  - Skip: per-PR rotation on app repos (basket, order, etc.) — no infra change, low value
+- **Rationale:** Deploy keys are repo-scoped read-only SSH keys — blast radius is low.
+  24h rotation covers lab hygiene. Infra-merge trigger covers the highest-risk event.
+  Per-PR rotation on app repos would create high Vault churn with negligible security gain.
 - Motivated by: shopping cart deploy keys with empty passphrases discovered during v0.7.3
 
 ### Certificate Management (SC-081 Readiness)
