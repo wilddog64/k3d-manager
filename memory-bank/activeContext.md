@@ -21,7 +21,7 @@
 | ArgoCD cluster registration fix | **PR open** | shopping-cart-infra PR #5; Application manifests → host.k3d.internal:6443; register-ubuntu-k3s.sh added |
 | Jenkins optional | **COMPLETE** | all 3 files gated — commits 08dc1bd + 4b02e16; BATS 2/2; shellcheck PASS |
 | Deploy key rotation policy | **specced** | roadmap-v1.md v0.8.0; implementation pending |
-| Verify ArgoCD all 5 apps Synced + Healthy | **In Progress** | Gemini: 401 Unauthorized (private) + Platform mismatch (amd64 vs arm64) |
+| Verify ArgoCD all 5 apps Synced + Healthy | **Blocked** | 401 fix: `fix/argocd-image-pull` (f1e12b1); arch fix: Codex `fix/multi-arch-ci-builds` — spec: `shopping-cart-infra/docs/issues/2026-03-17-multi-arch-ci-builds.md` |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |
 | Playwright E2E green | **milestone gate** | |
 
