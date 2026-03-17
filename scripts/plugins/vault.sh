@@ -1224,7 +1224,9 @@ function _enable_kv2_k8s_auth() {
 
   _vault_set_eso_reader "$ns" "$release" "$eso_sa" "$eso_ns"
   _vault_set_eso_writer "$ns" "$release" "$eso_sa" "$eso_ns"
-  _vault_set_eso_init_jenkins_writer "$ns" "$release" "$eso_sa" "$eso_ns"
+  if [[ "${ENABLE_JENKINS:-0}" == "1" ]]; then
+    _vault_set_eso_init_jenkins_writer "$ns" "$release" "$eso_sa" "$eso_ns"
+  fi
 }
 
 function configure_vault_app_auth() {
