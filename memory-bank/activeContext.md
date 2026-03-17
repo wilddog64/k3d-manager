@@ -1,9 +1,9 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.3` (as of 2026-03-16)
+## Current Branch: `k3d-manager-v0.9.4` (as of 2026-03-16)
 
-**v0.9.2 SHIPPED** — PR #35 squash-merged (f0cec06), 2026-03-15. Tagged + released.
-**v0.9.3 ACTIVE** — branch cut from main 2026-03-15.
+**v0.9.3 SHIPPED** — PR #36 squash-merged (8046c73), 2026-03-16. Tagged + released.
+**v0.9.4 ACTIVE** — branch cut from main 2026-03-16. First commit: README releases table.
 
 ---
 
@@ -11,12 +11,12 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| lib-foundation v0.3.2 subtree pull | **done** | commit `e4d2eed` |
-| TTY fix — `_DCRS_PROVIDER` global in core.sh | **done** | commit `04522b5` |
-| Cluster rebuild smoke test | **DONE — PASS on M2 Air** | spec: `docs/plans/v0.9.3-cluster-rebuild-smoke-test.md` | Destroy/rebuild verified; all 8 components running; TTY fix verified |
-| v0.9.4 spec | **done** | `docs/plans/v0.9.4-full-stack-health.md` |
-| NVD API key | **done** | set in order + payment repos 2026-03-16 |
-| Milestone brainstorm | **done** | v0.9.4 = full stack health; demo after v0.9.x series |
+| README releases table | **done** | v0.9.3 added — commit `1e3a930` |
+| lib-foundation v0.3.3 subtree pull | **pending** | pull after this memory-bank commit |
+| Trigger CI in 5 shopping-cart repos | **owner action** | see v0.9.4 spec |
+| Verify ArgoCD all 5 apps Synced + Healthy | **Gemini** | prereq: images in ghcr.io |
+| Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |
+| Playwright E2E green | **milestone gate** | |
 
 ---
 
@@ -24,15 +24,14 @@
 
 | Version | Status | Notes |
 |---|---|---|
-| v0.1.0–v0.9.2 | released | See README Releases table |
-| v0.9.3 | **active** | TTY fix + lib-foundation v0.3.2 + cluster rebuild smoke test |
-| v0.9.4 | planned | Full stack health — ImagePullBackOff fix + Playwright E2E in CI |
+| v0.1.0–v0.9.3 | released | See README Releases table |
+| v0.9.4 | **active** | Full stack health — ImagePullBackOff fix + Playwright E2E in CI |
 | v1.0.0 | planned | k3dm-mcp — MCP server wrapping k3d-manager CLI |
 | v1.1.0 | planned | Multi-cloud providers (EKS/GKE/AKS) + ACG sandbox lifecycle |
 
 ---
 
-## Cluster State (as of 2026-03-15)
+## Cluster State (as of 2026-03-16 — Gemini smoke test verified)
 
 **Architecture:** Infra cluster on M2 Air — ArgoCD manages Ubuntu k3s hub-and-spoke.
 Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
@@ -66,7 +65,7 @@ Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
 
 **Never modify `scripts/lib/foundation/` directly.** Fix in lib-foundation → PR → tag → subtree pull.
 Subtree sync bypass: `K3DM_SUBTREE_SYNC=1 git subtree pull --prefix=scripts/lib/foundation ...`
-**lib-foundation is now on v0.3.3** — subtree pull pending after v0.9.3 smoke test.
+**lib-foundation is now on v0.3.3** — subtree pull pending on v0.9.4 branch.
 
 ---
 
