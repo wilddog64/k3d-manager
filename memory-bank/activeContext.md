@@ -12,7 +12,7 @@
 | Item | Status | Notes |
 |---|---|---|
 | README releases table | **done** | v0.9.3 added — commit `1e3a930` |
-| lib-foundation v0.3.3 subtree pull | **pending** | pull after this memory-bank commit |
+| lib-foundation v0.3.3 subtree pull | **done** | commit `7684266` |
 | Trigger CI in 5 shopping-cart repos | **owner action** | see v0.9.4 spec |
 | Verify ArgoCD all 5 apps Synced + Healthy | **Gemini** | prereq: images in ghcr.io |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |
@@ -65,7 +65,7 @@ Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
 
 **Never modify `scripts/lib/foundation/` directly.** Fix in lib-foundation → PR → tag → subtree pull.
 Subtree sync bypass: `K3DM_SUBTREE_SYNC=1 git subtree pull --prefix=scripts/lib/foundation ...`
-**lib-foundation is now on v0.3.3** — subtree pull pending on v0.9.4 branch.
+**lib-foundation is now on v0.3.3** — subtree pulled on v0.9.4 branch (7684266).
 
 ---
 
