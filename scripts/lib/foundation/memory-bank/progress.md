@@ -2,8 +2,8 @@
 
 ## Overall Status
 
-**v0.3.1 SHIPPED** — PR #6 merged (38a91a8), tagged, GitHub release created.
-**feat/v0.3.2 ACTIVE** — branch cut from main 2026-03-16.
+**v0.3.2 SHIPPED** — PR #7 merged (98f6ee0), tagged, GitHub release created. Repo **public**.
+**feat/v0.3.3 ACTIVE** — branch cut from main 2026-03-16.
 
 ---
 
@@ -23,17 +23,26 @@
 - [x] `AGENTS.md`, `GEMINI.md`, `CLAUDE.md` overhaul — agent session rules, bash 3.2 compat, privilege model (v0.3.1)
 - [x] `.github/copilot-instructions.md` — bash 3.2 P1 rules, `--interactive-sudo` pattern, if-count threshold (v0.3.1)
 - [x] README releases table + Contents table (agent_rigor.sh added) (v0.3.1)
+- [x] Tag v0.3.1 + GitHub release created — https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.1
+- [x] Sync `deploy_cluster` helpers from k3d-manager — `_deploy_cluster_prompt_provider`, `_deploy_cluster_resolve_provider`, CLUSTER_NAME propagation, duplicate mac+k3s guard removed (v0.3.2)
+- [x] Fix TTY detection — `_DCRS_PROVIDER` global replaces command substitution (v0.3.2)
+- [x] Expand BATS to 36 tests — `_detect_platform`, `_cluster_provider`, `_deploy_cluster_resolve_provider`, `_run_command` flags (v0.3.2)
+- [x] Tag v0.3.2 + GitHub release created — https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.2
+- [x] Repo flipped to **public**
 
 ---
 
 ## What Is Pending
 
-- [x] Tag v0.3.1 + GitHub release created — https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.1
-- [x] Add v0.3.1 entry to README releases table — commit `2294bf7` on feat/v0.3.2
-- [x] Sync `deploy_cluster` fixes from k3d-manager — commit `0501c7a` adds prompt/resolution helpers, CLUSTER_NAME propagation, and removes duplicate mac+k3s guard per `docs/plans/v0.3.2-sync-deploy-cluster.md`.
-- [x] Expand BATS coverage — commit `5cb8a5a` adds 5 `_detect_platform`, 5 `_deploy_cluster_resolve_provider`, 3 `_cluster_provider`, and 2 `_run_command` flag tests (total now 36) per `docs/plans/v0.3.2-bats-coverage.md`.
+- [x] **k3d-manager subtree pull** — v0.3.2 pulled into k3d-manager-v0.9.3 (commit `e4d2eed`)
 - [ ] Consumer integration: `rigor-cli`, `shopping-carts`
-- [ ] **k3d-manager subtree pull** — pull v0.3.2 into k3d-manager-v0.9.3 after v0.3.2 ships
+  - `rigor-cli` — **separate repo**, lib-foundation as git subtree (same pattern as k3d-manager)
+    - CLI dispatcher: `rigor-cli checkpoint|audit|lint`
+    - Wraps `_agent_checkpoint`, `_agent_audit`, `_agent_lint` as callable commands
+    - Any repo can adopt without sourcing lib-foundation directly
+    - Planned milestone after v0.3.3 ships
+- [ ] **README releases table fix** — split into: first 3 releases in main table, rest in a separate table below (same convention as k3d-manager). Do as first commit on feat/v0.3.3.
+- [x] **API reference** — commit `9b224bb` adds `docs/api/functions.md` documenting system/core/agent_rigor helpers and globals per `docs/plans/v0.3.3-api-reference.md`.
 
 ---
 
@@ -46,3 +55,4 @@
 | Clean env testing | BATS must run with `env -i` — ambient `SCRIPT_DIR` causes false passes |
 | bash 3.2 compat | No `local -n`, no `declare -A`, no `mapfile` in lib code |
 | `--interactive-sudo` for installs | Install helpers use `--interactive-sudo`; `--prefer-sudo` is for non-interactive contexts only |
+| Global temp vars | `_RCRS_RUNNER` (sudo runner), `_DCRS_PROVIDER` (deploy provider) — never use `$()` for functions that check TTY |

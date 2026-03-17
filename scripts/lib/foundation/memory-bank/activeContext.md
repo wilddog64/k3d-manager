@@ -1,9 +1,9 @@
 # Active Context — lib-foundation
 
-## Current State: `feat/v0.3.2` (as of 2026-03-16)
+## Current State: `feat/v0.3.3` (as of 2026-03-16)
 
-**v0.3.1 SHIPPED** — PR #6 merged (38a91a8), tagged, GitHub release created.
-**feat/v0.3.2 ACTIVE** — branch cut from main 2026-03-16.
+**v0.3.2 SHIPPED** — PR #7 merged (98f6ee0), tagged, GitHub release created. Repo is now **public**.
+**feat/v0.3.3 ACTIVE** — branch cut from main 2026-03-16.
 
 ---
 
@@ -22,18 +22,15 @@ Consumed by downstream repos via git subtree pull.
 
 | Version | Status | Notes |
 |---|---|---|
-| v0.1.0–v0.3.1 | released | See README Releases table |
-| v0.3.2 | **active** | cut 2026-03-16 |
+| v0.1.0–v0.3.2 | released | See README Releases table |
+| v0.3.3 | **active** | cut 2026-03-16 |
 
 ---
 
 ## Open Items
 
-- [x] **Tag v0.3.1 + GitHub release** — https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.1
-- [x] **Add v0.3.1 entry to README releases table** — commit `2294bf7` on feat/v0.3.2
-- [x] **Sync deploy_cluster fixes from k3d-manager** — commit `0501c7a` adds `_deploy_cluster_prompt_provider`, `_deploy_cluster_resolve_provider`, CLUSTER_NAME propagation, and removes the duplicate mac+k3s guard per `docs/plans/v0.3.2-sync-deploy-cluster.md`.
-- [x] **Expand BATS coverage** — commit `5cb8a5a` adds 15 tests (platform detection, provider overrides, `_deploy_cluster_resolve_provider`, `_run_command` flags). Total BATS count now 36 per `docs/plans/v0.3.2-bats-coverage.md`.
-- [ ] **k3d-manager subtree pull** — pull v0.3.2 into k3d-manager-v0.9.3 after v0.3.2 ships
+- [x] **API reference doc** — `docs/api/functions.md` merged on feat/v0.3.3 (`9b224bb`)
+- [ ] **k3d-manager subtree pull** — pull v0.3.2 into k3d-manager-v0.9.3
 - [ ] Add `rigor-cli` as consumer
 - [ ] Add `shopping-carts` as consumer
 
@@ -45,6 +42,8 @@ Consumed by downstream repos via git subtree pull.
 - `_detect_platform` → `mac | wsl | debian | redhat | linux`
 - `_cluster_provider` → `k3d | k3s | orbstack`
 - `_resolve_script_dir` → absolute canonical path of calling script's real directory
+- `_DCRS_PROVIDER` — global temp set by `_deploy_cluster_resolve_provider` (no command substitution — preserves TTY)
+- `_RCRS_RUNNER` — global temp set by `_run_command_resolve_sudo`
 
 ---
 
@@ -52,7 +51,7 @@ Consumed by downstream repos via git subtree pull.
 
 | Repo | Integration | Status |
 |---|---|---|
-| `k3d-manager` | git subtree at `scripts/lib/foundation/` | subtree pull to v0.3.1 pending |
+| `k3d-manager` | git subtree at `scripts/lib/foundation/` | subtree pull to v0.3.2 pending |
 | `rigor-cli` | git subtree (planned) | future |
 | `shopping-carts` | git subtree (planned) | future |
 
@@ -60,15 +59,16 @@ Consumed by downstream repos via git subtree pull.
 
 ## Engineering Protocol
 
-- **Tests**: always run with `env -i PATH="..." HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'bats scripts/tests/lib/'`
+- **Tests**: always run with `env -i PATH="/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'bats scripts/tests/lib/'`
 - **shellcheck**: run on every touched `.sh` file before commit
 - **No bare sudo**: always `_run_command --interactive-sudo` for install helpers, `--prefer-sudo` for non-interactive
 - **All changes originate here** — never edit consumer subtree copies directly
-- **Release flow**: PR → merge → tag → GitHub release → consumers run `git subtree pull`
+- **Release flow**: PR → merge → tag → GitHub release → flip public (already done) → consumers run `git subtree pull`
 
 ## Lessons Learned
 
-- `local -n` nameref requires bash 4.3+ — use global temp vars (`_RCRS_RUNNER`) for array output from helpers
+- `local -n` nameref requires bash 4.3+ — use global temp vars (`_RCRS_RUNNER`, `_DCRS_PROVIDER`) for output from helpers
+- Command substitution `$()` creates a subshell — `[[ -t 0 && -t 1 ]]` is always false inside; use global temp vars instead
 - `--prefer-sudo` silently drops to non-root when password sudo required — use `--interactive-sudo` for install helpers
 - `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override in consumers
 - BATS must run with `env -i` — ambient `SCRIPT_DIR` causes false passes
