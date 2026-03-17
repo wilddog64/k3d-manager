@@ -19,7 +19,7 @@
 | Frontend docs | **done** | architecture, api, troubleshooting — PR #4 merged |
 | Mermaid diagrams (order/catalog/basket) | **done** | ASCII → Mermaid |
 | ArgoCD cluster registration fix | **PR open** | shopping-cart-infra PR #5; Application manifests → host.k3d.internal:6443; register-ubuntu-k3s.sh added |
-| Jenkins optional | **Codex** | spec: `docs/issues/v0.9.4-codex-jenkins-optional.md` |
+| Jenkins optional | **done** | `ENABLE_JENKINS` gate shipped (08dc1bd) per `docs/plans/v0.9.4-codex-jenkins-optional.md`. |
 | Deploy key rotation policy | **specced** | roadmap-v1.md v0.8.0; implementation pending |
 | Verify ArgoCD all 5 apps Synced + Healthy | **Gemini** | spec: `docs/plans/v0.9.4-gemini-argocd-verify.md` |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |

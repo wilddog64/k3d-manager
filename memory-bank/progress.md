@@ -48,7 +48,7 @@
 - [x] ArgoCD cluster registration fix — PR #5 in shopping-cart-infra (`feat/argocd-cluster-registration`); Application manifests updated to `host.k3d.internal:6443`; `scripts/register-ubuntu-k3s.sh` added
 - [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **Gemini**: `docs/plans/v0.9.4-gemini-argocd-verify.md`
 - [ ] Deploy key rotation policy — 24h scheduled + on infra main merge; spec in `docs/plans/roadmap-v1.md` v0.8.0 section
-- [ ] Jenkins optional — **Codex**: `docs/issues/v0.9.4-codex-jenkins-optional.md`
+- [x] Jenkins optional — `ENABLE_JENKINS` gate + LDAP/Vault conditionals shipped (08dc1bd).
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run
 - [ ] Playwright E2E green in CI — milestone gate
 - Spec: `docs/plans/v0.9.4-full-stack-health.md`
