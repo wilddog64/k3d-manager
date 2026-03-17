@@ -19,9 +19,9 @@
 | Frontend docs | **done** | architecture, api, troubleshooting — PR #4 merged |
 | Mermaid diagrams (order/catalog/basket) | **done** | ASCII → Mermaid |
 | ArgoCD cluster registration fix | **PR open** | shopping-cart-infra PR #5; Application manifests → host.k3d.internal:6443; register-ubuntu-k3s.sh added |
-| Jenkins optional | **INCOMPLETE** | `deploy_jenkins()` gate done (08dc1bd); `ldap.sh` + `vault.sh` gates missing — Codex: `docs/issues/2026-03-17-jenkins-optional.md` |
+| Jenkins optional | **COMPLETE** | all 3 files gated — commits 08dc1bd + 4b02e16; BATS 2/2; shellcheck PASS |
 | Deploy key rotation policy | **specced** | roadmap-v1.md v0.8.0; implementation pending |
-| Verify ArgoCD all 5 apps Synced + Healthy | **Gemini** | spec: `docs/plans/v0.9.4-gemini-argocd-verify.md` |
+| Verify ArgoCD all 5 apps Synced + Healthy | **In Progress** | Gemini: 401 Unauthorized (private) + Platform mismatch (amd64 vs arm64) |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |
 | Playwright E2E green | **milestone gate** | |
 
@@ -60,9 +60,9 @@ Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
 
 | Component | Status |
 |---|---|
-| k3s node | Ready |
+| k3s node | Ready (arm64) |
 | Istio / ESO / Vault / OpenLDAP | Running |
-| shopping-cart-apps | ArgoCD Synced — `ImagePullBackOff` until images pushed to ghcr.io |
+| shopping-cart-apps | Synced — `ImagePullBackOff` (arch mismatch: amd64 on arm64 node + 401 Unauthorized) |
 
 **SSH:** `ForwardAgent yes`. Stale socket fix: `ssh -O exit ubuntu`.
 

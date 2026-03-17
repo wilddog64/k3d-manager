@@ -46,9 +46,9 @@
 - [x] Mermaid architecture diagrams — order, product-catalog, basket (ASCII → Mermaid)
 - [x] `copilot-instructions.md` added to shopping-cart-infra
 - [x] ArgoCD cluster registration fix — PR #5 in shopping-cart-infra (`feat/argocd-cluster-registration`); Application manifests updated to `host.k3d.internal:6443`; `scripts/register-ubuntu-k3s.sh` added
-- [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **Gemini**: `docs/plans/v0.9.4-gemini-argocd-verify.md`
+- [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **In Progress**: Gemini found 401 Unauthorized (private) + Platform mismatch (amd64 vs arm64) | fix: `ghcr-pull-secret` added + `fix/argocd-image-pull` branch pushed | `f1e12b1` (infra) |
 - [ ] Deploy key rotation policy — 24h scheduled + on infra main merge; spec in `docs/plans/roadmap-v1.md` v0.8.0 section
-- [ ] Jenkins optional — **INCOMPLETE**: `deploy_jenkins()` gate done (08dc1bd) but `ldap.sh` LDIF seeding and `vault.sh` `eso-init-jenkins-writer` policy gate missing — **Codex**: `docs/issues/2026-03-17-jenkins-optional.md`
+- [x] Jenkins optional — **COMPLETE**: all 3 files gated (jenkins.sh, ldap.sh, vault.sh) — commits 08dc1bd + 4b02e16; BATS 2/2 PASS; shellcheck PASS
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run
 - [ ] Playwright E2E green in CI — milestone gate
 - Spec: `docs/plans/v0.9.4-full-stack-health.md`
