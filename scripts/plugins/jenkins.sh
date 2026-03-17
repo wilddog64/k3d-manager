@@ -1039,6 +1039,10 @@ function _jenkins_run_smoke_test() {
 }
 
 function deploy_jenkins() {
+   if [[ "${ENABLE_JENKINS:-0}" != "1" ]]; then
+      _info "[jenkins] skipped — set ENABLE_JENKINS=1 to deploy"
+      return 0
+   fi
    local jenkins_namespace=""
    local vault_namespace=""
    local vault_release=""
