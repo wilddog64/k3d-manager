@@ -32,7 +32,7 @@
 ### v0.9.4 — active
 
 - [x] README releases table — v0.9.3 added — commit `1e3a930`
-- [ ] lib-foundation v0.3.3 subtree pull
+- [x] lib-foundation v0.3.3 subtree pull — commit `7684266`
 - [ ] Trigger CI in all 5 shopping-cart repos → images pushed to ghcr.io (owner action)
 - [x] NVD API key set in order + payment repos (2026-03-16)
 - [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s (Gemini)
