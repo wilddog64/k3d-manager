@@ -11,19 +11,15 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| README releases table | **done** | v0.9.3 added — commit `1e3a930` |
-| lib-foundation v0.3.3 subtree pull | **done** | commit `7684266` |
-| shopping-cart CI (5/5) | **done** | all images in ghcr.io; vuln scan added to all 5 repos |
-| Apache 2.0 LICENSE (7 repos) | **done** | all 6 shopping-cart repos + lib-foundation — merged 2026-03-17 |
-| Branch protection standardized | **done** | enforce_admins: true on all 6 shopping-cart repos |
-| Frontend docs | **done** | architecture, api, troubleshooting — PR #4 merged |
-| Mermaid diagrams (order/catalog/basket) | **done** | ASCII → Mermaid |
 | ArgoCD cluster registration fix | **PR open** | shopping-cart-infra PR #5; Application manifests → host.k3d.internal:6443; register-ubuntu-k3s.sh added |
 | Jenkins optional | **COMPLETE** | all 3 files gated — commits 08dc1bd + 4b02e16; BATS 2/2; shellcheck PASS |
 | Deploy key rotation policy | **specced** | roadmap-v1.md v0.8.0; implementation pending |
 | Pre-publication security cleanup | **COMPLETE** | 3 PRs merged — RSA key (product-catalog), CHANGE_ME placeholders (order, infra); all 6 repos now **public** (2026-03-17) |
-| Verify ArgoCD all 5 apps Synced + Healthy | **Blocked** | 401 fix: `fix/argocd-image-pull` (f1e12b1) — PR pending; arch fix: `fix/multi-arch-ci-builds` (6140ad3) — PR pending |
-| Multi-arch CI builds | **PR ready** | `fix/multi-arch-ci-builds` branch in shopping-cart-infra, SHA `6140ad3` — 1-line fix in `build-push-deploy.yml` |
+| Multi-arch CI builds | **merged** | infra PR #7 (a937211) — all 5 app repos benefit |
+| ArgoCD architecture docs | **merged** | infra PR #7 — app-of-apps rationale, kustomize patches, add-service guide |
+| Stale `examples/` deleted | **merged** | infra PR #7 — Jenkins CD never implemented |
+| Docs standardization (product-catalog + order) | **PR open** | product-catalog PR #8 + order PR #8; Copilot tagged; monitoring background |
+| Verify ArgoCD all 5 apps Synced + Healthy | **Blocked** | 401 fix: `fix/argocd-image-pull` (f1e12b1) — PR pending |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |
 | Playwright E2E green | **milestone gate** | |
 
