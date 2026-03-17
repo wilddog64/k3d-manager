@@ -19,7 +19,7 @@
 | ArgoCD architecture docs | **merged** | infra PR #7 — app-of-apps rationale, kustomize patches, add-service guide |
 | Stale `examples/` deleted | **merged** | infra PR #7 — Jenkins CD never implemented |
 | Docs standardization (product-catalog + order) | **merged** | product-catalog PR #8 (b6ff783) + order PR #8 (b2c1ba8) 2026-03-17 |
-| Docs standardization (payment) | **PR open** | payment PR #6 (`fix/readme-license`); Copilot tagged; arch + troubleshooting docs added |
+| Docs standardization (payment) | **merged** | payment PR #6 (224d721) 2026-03-17 |
 | Verify ArgoCD all 5 apps Synced + Healthy | **Blocked** | 401 fix: `fix/argocd-image-pull` (f1e12b1) — PR pending |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |
 | Playwright E2E green | **milestone gate** | |

@@ -55,7 +55,7 @@
 - [x] ArgoCD architecture docs + app-of-apps rationale — infra PR #7 (docs/architecture.md)
 - [x] Stale `examples/` deleted from shopping-cart-infra — infra PR #7
 - [x] Docs standardization — product-catalog PR #8 merged (b6ff783) + order PR #8 merged (b2c1ba8) 2026-03-17
-- [ ] Docs standardization — payment PR #6 open (`fix/readme-license`); Copilot tagged
+- [x] Docs standardization — payment PR #6 merged (224d721) 2026-03-17
 - [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **Blocked (1 PR pending)**:
   - 401 fix: `ghcr-pull-secret` patch — `fix/argocd-image-pull` branch `f1e12b1` (infra) — needs PR + merge
   - ~~Arch fix: multi-arch builds~~ — **merged** infra PR #7 (a937211) 2026-03-17
