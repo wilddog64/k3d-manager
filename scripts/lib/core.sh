@@ -1,4 +1,4 @@
-
+# shellcheck shell=bash
 function _cluster_provider() {
    local provider="${K3D_MANAGER_PROVIDER:-${K3DMGR_PROVIDER:-${CLUSTER_PROVIDER:-}}}"
 
@@ -72,6 +72,20 @@ PY
    if ! _run_command --prefer-sudo -- python3 - "$port" <<<"$script"; then
       _err "Port $port is already in use"
    fi
+}
+
+function _resolve_script_dir() {
+   local src="${BASH_SOURCE[1]}"
+   local dir
+   while [[ -h "$src" ]]; do
+      dir="$(cd -P "$(dirname "$src")" && pwd)"
+      src="$(readlink "$src")"
+      if [[ "$src" != /* ]]; then
+         src="$dir/$src"
+      fi
+   done
+   dir="$(cd -P "$(dirname "$src")" && pwd)"
+   printf '%s\n' "$dir"
 }
 
 function _k3s_asset_dir() {
@@ -419,10 +433,7 @@ function _install_docker() {
 
    case "$platform" in
       mac)
-         if ! _command_exist docker; then
-            _err "Docker not found. On macOS, Docker is provided by OrbStack — please install OrbStack and ensure it is running."
-         fi
-         _info "Docker available via OrbStack."
+         _info "On macOS, Docker is provided by OrbStack — no installation required."
          ;;
       debian|wsl)
          _install_debian_docker
@@ -457,7 +468,7 @@ function _install_istioctl() {
       echo installing istioctl
       tmp_script=$(mktemp -t istioctl-fetch.XXXXXX)
       trap 'rm -rf /tmp/istio-*' EXIT TERM
-      pushd /tmp || return
+      pushd /tmp >/dev/null || return 1
       curl -f -s https://raw.githubusercontent.com/istio/istio/master/release/downloadIstioCandidate.sh -o "$tmp_script"
       istio_bin=$(bash "$tmp_script" | perl -nle 'print $1 if /add the (.*) directory/')
       if [[ -z "$istio_bin" ]]; then
@@ -469,7 +480,7 @@ function _install_istioctl() {
       else
          _run_command --prefer-sudo -- cp -v "$istio_bin/istioctl" "${install_dir}/"
       fi
-      popd || return
+      popd >/dev/null || return 1
    fi
 
 }

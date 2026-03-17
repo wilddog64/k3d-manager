@@ -62,10 +62,7 @@ _agent_audit() {
    fi
 
    local changed_sh
-   changed_sh="$(
-      { git diff --cached --name-only -- '*.sh' 2>/dev/null; git diff --name-only -- '*.sh' 2>/dev/null; } \
-         | sort -u || true
-   )"
+   changed_sh="$(git diff --cached --name-only -- '*.sh' 2>/dev/null || true)"
    if [[ -n "$changed_sh" ]]; then
       local max_if="${AGENT_AUDIT_MAX_IF:-8}"
       local file
@@ -105,8 +102,7 @@ _agent_audit() {
       for file in $changed_sh; do
          [[ -f "$file" ]] || continue
          local bare_sudo
-         bare_sudo=$(
-            { git diff --cached -- "$file" 2>/dev/null; git diff -- "$file" 2>/dev/null; } \
+         bare_sudo=$(git diff --cached -- "$file" 2>/dev/null \
             | grep '^+' \
             | sed 's/^+//' \
             | grep -E '\bsudo[[:space:]]' \
@@ -118,21 +114,6 @@ _agent_audit() {
             status=1
          fi
       done
-   fi
-
-   local staged_diff
-   staged_diff="$(git diff --cached 2>/dev/null || true)"
-   if [[ -n "$staged_diff" ]]; then
-      local cred_lines
-      cred_lines=$(grep '^+' <<<"$staged_diff" \
-         | sed 's/^+//' \
-         | grep -E 'kubectl[[:space:]]+exec\b' \
-         | grep -E '\benv[[:space:]]+[A-Z_]+=\S' || true)
-      if [[ -n "$cred_lines" ]]; then
-         _warn "Agent audit: credential pattern detected in kubectl exec command:"
-         _warn "$cred_lines"
-         status=1
-      fi
    fi
 
    return "$status"

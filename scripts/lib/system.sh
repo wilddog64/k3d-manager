@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 if [[ -z "${SCRIPT_DIR:-}" ]]; then
     SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
 fi
@@ -38,6 +39,62 @@ function _command_exist() {
     command -v "$1" &> /dev/null
 }
 
+# _run_command_resolve_sudo <prog> <prefer_sudo> <require_sudo> <interactive_sudo> [probe_args...]
+#
+# Resolves the runner array (plain prog, sudo -n prog, or sudo prog) and stores
+# it in the global _RCRS_RUNNER. Caller must initialize _RCRS_RUNNER before
+# calling and unset it after reading.
+#
+# Returns 127 if --require-sudo is set but sudo is unavailable.
+function _run_command_resolve_sudo() {
+  local prog="$1"
+  local prefer_sudo="$2"
+  local require_sudo="$3"
+  local interactive_sudo="$4"
+  shift 4
+  local -a probe_args=("$@")
+
+  local -a sudo_flags=()
+  if (( interactive_sudo == 0 )); then
+    sudo_flags=(-n)
+  fi
+
+  if (( require_sudo )); then
+    if (( interactive_sudo )) || sudo -n true >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+    else
+      echo "sudo non-interactive not available" >&2
+      return 127
+    fi
+    return 0
+  fi
+
+  if (( ${#probe_args[@]} )); then
+    if "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
+      _RCRS_RUNNER=("$prog")
+    elif (( interactive_sudo )) && sudo "${sudo_flags[@]}" "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+    elif sudo -n "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo -n "$prog")
+    elif (( prefer_sudo && interactive_sudo )); then
+      _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+    elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
+      _RCRS_RUNNER=(sudo -n "$prog")
+    else
+      _RCRS_RUNNER=("$prog")
+    fi
+    return 0
+  fi
+
+  if (( prefer_sudo && interactive_sudo )); then
+    _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
+  elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
+    _RCRS_RUNNER=(sudo -n "$prog")
+  else
+    _RCRS_RUNNER=("$prog")
+  fi
+}
+
 # _run_command [--quiet] [--prefer-sudo|--require-sudo] [--probe '<subcmd>'] -- <prog> [args...]
 # - --quiet         : suppress wrapper error message (still returns real exit code)
 # - --prefer-sudo   : use sudo -n if available, otherwise run as user
@@ -47,7 +104,7 @@ function _command_exist() {
 #
 # Returns the command's real exit code; prints a helpful error unless --quiet.
 function _run_command() {
-  local quiet=0 prefer_sudo=0 require_sudo=0 interactive_sudo=0 probe= soft=0
+  local quiet=0 prefer_sudo=0 require_sudo=0 interactive_sudo=0 probe="" soft=0
   local -a probe_args=()
 
   while [[ $# -gt 0 ]]; do
@@ -80,51 +137,39 @@ function _run_command() {
   fi
 
   # Decide runner: user vs sudo -n vs sudo (interactive)
-  local runner
-  local sudo_flags=()
-  if (( interactive_sudo == 0 )); then
-    sudo_flags=(-n)  # Non-interactive sudo
-  fi
-
-  if (( require_sudo )); then
-    if (( interactive_sudo )) || sudo -n true >/dev/null 2>&1; then
-      runner=(sudo "${sudo_flags[@]}" "$prog")
-    else
-      (( quiet )) || echo "sudo non-interactive not available" >&2
-      exit 127
-    fi
+  _RCRS_RUNNER=()
+  if (( quiet )); then
+    _run_command_resolve_sudo "$prog" \
+      "$prefer_sudo" "$require_sudo" "$interactive_sudo" \
+      "${probe_args[@]}" 2>/dev/null || {
+        if (( soft )); then
+          return 127
+        else
+          exit 127
+        fi
+      }
   else
-    if (( ${#probe_args[@]} )); then
-      # Try user first; if probe fails, try sudo
-      if "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=("$prog")
-      elif (( interactive_sudo )) && sudo "${sudo_flags[@]}" "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=(sudo "${sudo_flags[@]}" "$prog")
-      elif sudo -n "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=(sudo -n "$prog")
-      elif (( prefer_sudo )) && ((interactive_sudo)) ; then
-        runner=(sudo "${sudo_flags[@]}" "$prog")
-      elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
-        runner=(sudo -n "$prog")
-      else
-        runner=("$prog")
-      fi
-    else
-      if (( prefer_sudo )) && (( interactive_sudo )); then
-        runner=(sudo "${sudo_flags[@]}" "$prog")
-      elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
-        runner=(sudo -n "$prog")
-      else
-        runner=("$prog")
-      fi
-    fi
+    _run_command_resolve_sudo "$prog" \
+      "$prefer_sudo" "$require_sudo" "$interactive_sudo" \
+      "${probe_args[@]}" || {
+        if (( soft )); then
+          return 127
+        else
+          exit 127
+        fi
+      }
   fi
+  local -a runner=("${_RCRS_RUNNER[@]}")
+  unset _RCRS_RUNNER
 
   # Execute and preserve exit code
   "${runner[@]}" "$@"
   local rc=$?
 
   if (( rc != 0 )); then
+     local -a executed=("${runner[@]}" "$@")
+     local cmd_str=""
+     printf -v cmd_str '%q ' "${executed[@]}"
      if (( quiet == 0 )); then
        printf '%s command failed (%d): ' "$prog" "$rc" >&2
        printf '%q ' "${runner[@]}" "$@" >&2
@@ -134,7 +179,7 @@ function _run_command() {
      if (( soft )); then
          return "$rc"
      else
-         _err "failed to execute ${runner[@]} $@: $rc"
+         _err "failed to execute ${cmd_str% }: $rc"
      fi
   fi
 
@@ -171,7 +216,7 @@ _ensure_secret_tool() {
     _run_command --prefer-sudo -- env DEBIAN_FRONTEND=noninteractive apt-get install -y libsecret-tools
   elif _command_exist dnf ; then
     _run_command --prefer-sudo -- dnf -y install libsecret
-  elif _command_exist -v yum >/dev/null 2>&1; then
+  elif _command_exist yum; then
     _run_command --prefer-sudo -- yum -y install libsecret
   elif _command_exist microdnf ; then
     _run_command --prefer-sudo -- microdnf -y install libsecret
@@ -185,7 +230,7 @@ _ensure_secret_tool() {
 
 function _install_redhat_kubernetes_client() {
   if ! _command_exist kubectl; then
-     _run_command -- sudo dnf install -y kubernetes-client
+     _run_command --interactive-sudo -- dnf install -y kubernetes-client
   fi
 }
 
@@ -376,7 +421,9 @@ function _store_registry_credentials() {
       local service="${context}:${host}"
       local account="${context}"
       local rc=0
+      # shellcheck disable=SC2016
       _no_trace bash -c 'security delete-generic-password -s "$1" >/dev/null 2>&1 || true' _ "$service" >/dev/null 2>&1
+      # shellcheck disable=SC2016
       if ! _no_trace bash -c 'security add-generic-password -s "$1" -a "$2" -w "$3" >/dev/null' _ "$service" "$account" "$blob"; then
          rc=$?
       fi
@@ -387,8 +434,10 @@ function _store_registry_credentials() {
    if _secret_tool_ready; then
       local label="${context} registry ${host}"
       local rc=0
+      # shellcheck disable=SC2016
       _no_trace bash -c 'secret-tool clear service "$1" registry "$2" type "$3" >/dev/null 2>&1 || true' _ "$context" "$host" "helm-oci" >/dev/null 2>&1
       local store_output=""
+      # shellcheck disable=SC2016
       store_output=$(_no_trace bash -c 'secret-tool store --label "$1" service "$2" registry "$3" type "$4" < "$5"' _ "$label" "$context" "$host" "helm-oci" "$blob_file" 2>&1)
       local store_rc=$?
       if (( store_rc != 0 )) || [[ -n "$store_output" ]]; then
@@ -429,8 +478,10 @@ function _registry_login() {
    local login_output=""
    local login_rc=0
    if [[ -n "$registry_config" ]]; then
+      # shellcheck disable=SC2016
       login_output=$(_no_trace bash -c 'HELM_REGISTRY_CONFIG="$4" helm registry login "$1" --username "$2" --password-stdin < "$3"' _ "$host" "$username" "$pass_file" "$registry_config" 2>&1) || login_rc=$?
    else
+      # shellcheck disable=SC2016
       login_output=$(_no_trace bash -c 'helm registry login "$1" --username "$2" --password-stdin < "$3"' _ "$host" "$username" "$pass_file" 2>&1) || login_rc=$?
    fi
    _remove_sensitive_file "$pass_file"
@@ -457,8 +508,10 @@ function _load_registry_credentials() {
 
    if _is_mac; then
       local service="${context}:${host}"
+      # shellcheck disable=SC2016
       blob=$(_no_trace bash -c 'security find-generic-password -s "$1" -w' _ "$service" 2>/dev/null || true)
    elif _command_exist secret-tool; then
+      # shellcheck disable=SC2016
       blob=$(_no_trace bash -c 'secret-tool lookup service "$1" registry "$2" type "$3"' _ "$context" "$host" "helm-oci" 2>/dev/null || true)
    fi
 
@@ -481,7 +534,9 @@ function _secret_store_data() {
 
    if _is_mac; then
       local rc=0
+      # shellcheck disable=SC2016
       _no_trace bash -c 'security delete-generic-password -s "$1" -a "$2" >/dev/null 2>&1 || true' _ "$service" "$key"
+      # shellcheck disable=SC2016
       if ! _no_trace bash -c 'security add-generic-password -s "$1" -a "$2" -w "$3" >/dev/null' _ "$service" "$key" "$data"; then
          rc=$?
       fi
@@ -495,7 +550,9 @@ function _secret_store_data() {
          _remove_sensitive_file "$tmp"
          return 1
       fi
+      # shellcheck disable=SC2016
       _no_trace bash -c 'secret-tool clear service "$1" name "$2" type "$3" >/dev/null 2>&1 || true' _ "$service" "$key" "$type"
+      # shellcheck disable=SC2016
       store_output=$(_no_trace bash -c 'secret-tool store --label "$1" service "$2" name "$3" type "$4" < "$5"' _ "$label" "$service" "$key" "$type" "$tmp" 2>&1)
       rc=$?
       _remove_sensitive_file "$tmp"
@@ -517,8 +574,10 @@ function _secret_load_data() {
    local value=""
 
    if _is_mac; then
+      # shellcheck disable=SC2016
       value=$(_no_trace bash -c 'security find-generic-password -s "$1" -a "$2" -w' _ "$service" "$key" 2>/dev/null || true)
    elif _command_exist secret-tool; then
+      # shellcheck disable=SC2016
       value=$(_no_trace bash -c 'secret-tool lookup service "$1" name "$2" type "$3"' _ "$service" "$key" "$type" 2>/dev/null || true)
    fi
 
@@ -536,11 +595,13 @@ function _secret_clear_data() {
    local type="${3:-note}"
 
    if _is_mac; then
+      # shellcheck disable=SC2016
       _no_trace bash -c 'security delete-generic-password -s "$1" -a "$2" >/dev/null 2>&1 || true' _ "$service" "$key"
       return 0
    fi
 
    if _command_exist secret-tool; then
+      # shellcheck disable=SC2016
       _no_trace bash -c 'secret-tool clear service "$1" name "$2" type "$3" >/dev/null 2>&1 || true' _ "$service" "$key" "$type"
       return 0
    fi
@@ -557,23 +618,23 @@ function _install_debian_kubernetes_client() {
    echo "Installing kubectl on Debian/Ubuntu system..."
 
    # Create the keyrings directory if it doesn't exist
-   _run_command -- sudo mkdir -p /etc/apt/keyrings
+   _run_command --interactive-sudo -- mkdir -p /etc/apt/keyrings
 
    # Download the Kubernetes signing key
    if [[ ! -e "/etc/apt/keyrings/kubernetes-apt-keyring.gpg" ]]; then
       curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key \
-         | _run_command -- sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+         | _run_command --interactive-sudo -- gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
    fi
 
    # Add the Kubernetes apt repository
    echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" | \
-      _run_command -- sudo tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
+      _run_command --interactive-sudo -- tee /etc/apt/sources.list.d/kubernetes.list > /dev/null
 
    # Update apt package index
-   _run_command -- sudo apt-get update -y
+   _run_command --interactive-sudo -- apt-get update -y
 
    # Install kubectl
-   _run_command -- sudo apt-get install -y kubectl
+   _run_command --interactive-sudo -- apt-get install -y kubectl
 
 }
 
@@ -608,26 +669,26 @@ function _install_mac_helm() {
 }
 
 function _install_redhat_helm() {
-  _run_command -- sudo dnf install -y helm
+  _run_command --interactive-sudo -- dnf install -y helm
 }
 
 function _install_debian_helm() {
   # 1) Prereqs
-  _run_command -- sudo apt-get update
-  _run_command -- sudo apt-get install -y curl gpg apt-transport-https
+  _run_command --interactive-sudo -- apt-get update
+  _run_command --interactive-sudo -- apt-get install -y curl gpg apt-transport-https
 
    # 2) Add Helm’s signing key (to /usr/share/keyrings)
    _run_command -- curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | \
       _run_command -- gpg --dearmor | \
-      _run_command -- sudo tee /usr/share/keyrings/helm.gpg >/dev/null
+      _run_command --interactive-sudo -- tee /usr/share/keyrings/helm.gpg >/dev/null
 
    # 3) Add the Helm repo (with signed-by, required on 24.04)
    echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | \
-   sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+   _run_command --interactive-sudo -- tee /etc/apt/sources.list.d/helm-stable-debian.list
 
    # 4) Install
-   _run_command sudo apt-get update
-   _run_command sudo apt-get install -y helm
+   _run_command --interactive-sudo -- apt-get update
+   _run_command --interactive-sudo -- apt-get install -y helm
 
 }
 
@@ -706,6 +767,7 @@ function _detect_platform() {
 
    _err "Unsupported platform: $(uname -s)"
 }
+
 
 function _create_nfs_share_mac() {
    local share_path="${1:-${HOME}/k3d-nfs}"
@@ -788,54 +850,54 @@ function _install_orbstack() {
 function _install_debian_docker() {
   echo "Installing Docker on Debian/Ubuntu system..."
   # Update apt
-  _run_command -- sudo apt-get update
+  _run_command --interactive-sudo -- apt-get update
   # Install dependencies
-  _run_command -- sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+  _run_command --interactive-sudo -- apt-get install -y apt-transport-https ca-certificates curl software-properties-common
   # Add Docker's GPG key
   if [[ ! -e "/usr/share/keyrings/docker-archive-keyring.gpg" ]]; then
-     _curl -fsSL https://download.docker.com/linux/$(lsb_release -is \
-        | tr '[:upper:]' '[:lower:]')/gpg \
-        | sudo gpg --dearmor \
+     _curl -fsSL https://download.docker.com/linux/"$(lsb_release -is \
+        | tr '[:upper:]' '[:lower:]')"/gpg \
+        | _run_command --interactive-sudo -- gpg --dearmor \
         -o /usr/share/keyrings/docker-archive-keyring.gpg
   fi
   # Add Docker repository
   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/$(lsb_release -is | tr '[:upper:]' '[:lower:]') $(lsb_release -cs) stable" | \
-     _run_command -- sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+     _run_command --interactive-sudo -- tee /etc/apt/sources.list.d/docker.list > /dev/null
   # Update package list
-  _run_command -- sudo apt-get update
+  _run_command --interactive-sudo -- apt-get update
   # Install Docker
-  _run_command -- sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+  _run_command --interactive-sudo -- apt-get install -y docker-ce docker-ce-cli containerd.io
   # Start and enable Docker when systemd is available
   if _systemd_available ; then
-     _run_command -- sudo systemctl start docker
-     _run_command -- sudo systemctl enable docker
+     _run_command --interactive-sudo -- systemctl start docker
+     _run_command --interactive-sudo -- systemctl enable docker
   else
      _warn "systemd not available; skipping docker service activation"
   fi
   # Add current user to docker group
-  _run_command -- sudo usermod -aG docker $USER
+  _run_command --interactive-sudo -- usermod -aG docker "$USER"
   echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
 }
 
 function _install_redhat_docker() {
   echo "Installing Docker on RHEL/Fedora/CentOS system..."
   # Install required packages
-  _run_command -- sudo dnf install -y dnf-plugins-core
+  _run_command --interactive-sudo -- dnf install -y dnf-plugins-core
   # Add Docker repository
-  _run_command -- sudo dnf config-manager addrepo --overwrite \
+  _run_command --interactive-sudo -- dnf config-manager addrepo --overwrite \
      --from-repofile https://download.docker.com/linux/fedora/docker-ce.repo
   # Install Docker
-  _run_command -- sudo dnf install -y docker-ce docker-ce-cli containerd.io
+  _run_command --interactive-sudo -- dnf install -y docker-ce docker-ce-cli containerd.io
   # Start and enable Docker when systemd is available
   if _systemd_available ; then
-     _run_command  -- sudo systemctl start docker
-     _run_command  -- sudo systemctl enable docker
+     _run_command --interactive-sudo -- systemctl start docker
+     _run_command --interactive-sudo -- systemctl enable docker
   else
      _warn "systemd not available; skipping docker service activation"
   fi
   # Add current user to docker group
-  _run_command  -- sudo usermod -aG docker "$USER"
-  echo "Docker instsudo alled successfully. You may need to log out and back in for group changes to take effect."
+  _run_command --interactive-sudo -- usermod -aG docker "$USER"
+  echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
 }
 
 function _k3d_cluster_exist() {
@@ -899,11 +961,9 @@ function _helm() {
   done
 
   # If you keep global flags, splice them in *before* user args:
-  if [[ -n "${HELM_GLOBAL_ARGS:-}" ]]; then
-    _run_command "${pre[@]}" --probe 'version --short' -- helm ${HELM_GLOBAL_ARGS} "$@"
-  else
-    _run_command "${pre[@]}" --probe 'version --short' -- helm "$@"
-  fi
+  local -a helm_global_arr=()
+  read -r -a helm_global_arr <<< "${HELM_GLOBAL_ARGS:-}"
+  _run_command "${pre[@]}" --probe 'version --short' -- helm "${helm_global_arr[@]}" "$@"
 }
 
 function _curl() {
@@ -1015,7 +1075,7 @@ function _sha256_12() {
       cmd=(sha256sum)
    else
       echo "No SHA256 command found" >&2
-      exit -1
+      return 1
    fi
 
    if [[ $# -gt 0 ]]; then
@@ -1235,7 +1295,7 @@ function _ensure_bats() {
       _run_command -- brew install bats-core
       pkg_attempted=1
    elif _command_exist apt-get && _sudo_available; then
-      _run_command --prefer-sudo -- apt-get update
+      _run_command --interactive-sudo -- apt-get update
       _run_command --prefer-sudo -- apt-get install -y bats
       pkg_attempted=1
    elif _command_exist dnf && _sudo_available; then
@@ -1362,7 +1422,7 @@ function _ensure_node() {
    fi
 
    if _is_debian_family && _command_exist apt-get && _sudo_available; then
-      _run_command --prefer-sudo -- apt-get update
+      _run_command --interactive-sudo -- apt-get update
       _run_command --prefer-sudo -- apt-get install -y nodejs npm
       if _command_exist node; then
          return 0
@@ -1573,16 +1633,15 @@ function _ensure_cargo() {
    fi
 
    if _is_debian_family ; then
-      _run_command -- sudo apt-get update
-      _run_command -- sudo apt-get install -y cargo
+      _run_command --interactive-sudo -- apt-get update
+      _run_command --interactive-sudo -- apt-get install -y cargo
    elif _is_redhat_family ; then
-      _run_command -- sudo dnf install -y cargo
+      _run_command --interactive-sudo -- dnf install -y cargo
    elif _is_wsl && grep -qi "debian" /etc/os-release &> /dev/null; then
-      _run_command -- sudo apt-get update
-      _run_command -- sudo apt-get install -y cargo
+      _run_command --interactive-sudo -- apt-get update
+      _run_command --interactive-sudo -- apt-get install -y cargo
    elif _is_wsl && grep -qi "redhat" /etc/os-release &> /dev/null; then
-      _run_command -- sudo apt-get update
-      _run_command -- sudo apt-get install -y cargo
+      _run_command --interactive-sudo -- dnf install -y cargo
    else
       echo "Cannot install cargo: unsupported OS or missing package manager" >&2
       exit 127
@@ -1595,9 +1654,11 @@ function _add_exit_trap() {
    cur="$(trap -p EXIT | sed -E "s/.*'(.+)'/\1/")"
 
    if [[ -n "$cur" ]]; then
-      trap '"$cur"; "$handler"' EXIT
+      # shellcheck disable=SC2064
+      trap "${cur}; ${handler}" EXIT
    else
-      trap '"$handler"' EXIT
+      # shellcheck disable=SC2064
+      trap "${handler}" EXIT
    fi
 }
 
