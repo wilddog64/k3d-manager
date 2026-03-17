@@ -51,10 +51,14 @@
   - order: CHANGE_ME placeholders in k8s/base/secret.yaml
   - infra: CHANGE_ME placeholders in 4 K8s Secret manifests
 - [x] All 6 shopping-cart repos made **public** — 2026-03-17
-- [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **Blocked (2 PRs pending)**:
+- [x] Multi-arch CI builds — infra PR #7 merged (a937211) 2026-03-17; all 5 app repos benefit
+- [x] ArgoCD architecture docs + app-of-apps rationale — infra PR #7 (docs/architecture.md)
+- [x] Stale `examples/` deleted from shopping-cart-infra — infra PR #7
+- [ ] Docs standardization — product-catalog PR #8 + order PR #8 open; Copilot tagged; monitoring in background
+- [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **Blocked (1 PR pending)**:
   - 401 fix: `ghcr-pull-secret` patch — `fix/argocd-image-pull` branch `f1e12b1` (infra) — needs PR + merge
-  - Arch fix: multi-arch builds — `fix/multi-arch-ci-builds` branch `6140ad3` (infra) — needs PR + merge
-  - After both merge: re-trigger 5 CI pipelines → Gemini re-verifies pods Running
+  - ~~Arch fix: multi-arch builds~~ — **merged** infra PR #7 (a937211) 2026-03-17
+  - After merge: re-trigger 5 CI pipelines → Gemini creates `ghcr-pull-secret` on k3s → re-verifies pods Running
 - [ ] Deploy key rotation policy — 24h scheduled + on infra main merge; spec in `docs/plans/roadmap-v1.md` v0.8.0 section
 - [x] Jenkins optional — **COMPLETE**: all 3 files gated (jenkins.sh, ldap.sh, vault.sh) — commits 08dc1bd + 4b02e16; BATS 2/2 PASS; shellcheck PASS
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run
