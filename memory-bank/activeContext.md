@@ -21,7 +21,9 @@
 | ArgoCD cluster registration fix | **PR open** | shopping-cart-infra PR #5; Application manifests → host.k3d.internal:6443; register-ubuntu-k3s.sh added |
 | Jenkins optional | **COMPLETE** | all 3 files gated — commits 08dc1bd + 4b02e16; BATS 2/2; shellcheck PASS |
 | Deploy key rotation policy | **specced** | roadmap-v1.md v0.8.0; implementation pending |
-| Verify ArgoCD all 5 apps Synced + Healthy | **Blocked** | 401 fix: `fix/argocd-image-pull` (f1e12b1); arch fix: Codex `fix/multi-arch-ci-builds` — spec: `shopping-cart-infra/docs/issues/2026-03-17-multi-arch-ci-builds.md` |
+| Pre-publication security cleanup | **COMPLETE** | 3 PRs merged — RSA key (product-catalog), CHANGE_ME placeholders (order, infra); all 6 repos now **public** (2026-03-17) |
+| Verify ArgoCD all 5 apps Synced + Healthy | **Blocked** | 401 fix: `fix/argocd-image-pull` (f1e12b1) — PR pending; arch fix: `fix/multi-arch-ci-builds` (6140ad3) — PR pending |
+| Multi-arch CI builds | **PR ready** | `fix/multi-arch-ci-builds` branch in shopping-cart-infra, SHA `6140ad3` — 1-line fix in `build-push-deploy.yml` |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |
 | Playwright E2E green | **milestone gate** | |
 
