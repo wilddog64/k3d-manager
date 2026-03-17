@@ -13,8 +13,9 @@
 |---|---|---|
 | README releases table | **done** | v0.9.3 added — commit `1e3a930` |
 | lib-foundation v0.3.3 subtree pull | **done** | commit `7684266` |
-| Trigger CI in 5 shopping-cart repos | **owner action** | see v0.9.4 spec |
-| Verify ArgoCD all 5 apps Synced + Healthy | **Gemini** | prereq: images in ghcr.io |
+| shopping-cart CI (4/5) | **done** | order/frontend/basket/product-catalog — images in ghcr.io |
+| shopping-cart-payment CI | **Codex** | fix at `8a77199`; spec: `docs/plans/v0.9.4-codex-shopping-cart-payment-ci.md` |
+| Verify ArgoCD all 5 apps Synced + Healthy | **Gemini** | prereq: payment CI green |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |
 | Playwright E2E green | **milestone gate** | |
 

@@ -33,9 +33,13 @@
 
 - [x] README releases table — v0.9.3 added — commit `1e3a930`
 - [x] lib-foundation v0.3.3 subtree pull — commit `7684266`
-- [ ] Trigger CI in all 5 shopping-cart repos → images pushed to ghcr.io (owner action)
 - [x] NVD API key set in order + payment repos (2026-03-16)
-- [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s (Gemini)
+- [x] shopping-cart-product-catalog — CI green, image in ghcr.io
+- [x] shopping-cart-basket — CI green, image in ghcr.io
+- [x] shopping-cart-frontend — CI green, image in ghcr.io
+- [x] shopping-cart-order — CI green, image in ghcr.io
+- [ ] shopping-cart-payment CI — fix at `8a77199` in progress; **Codex task**: `docs/plans/v0.9.4-codex-shopping-cart-payment-ci.md`
+- [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s (Gemini — after payment fixed)
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run
 - [ ] Playwright E2E green in CI — milestone gate
 - Spec: `docs/plans/v0.9.4-full-stack-health.md`
@@ -57,7 +61,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| Shopping Cart Apps ImagePullBackOff | OPEN | Images not pushed to ghcr.io — blocked on v0.9.4 CI trigger |
+| Shopping Cart Apps ImagePullBackOff | PARTIAL | order/frontend/basket/product-catalog images in ghcr.io; payment pending Codex fix |
 | Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps may exceed capacity — reduce replicas |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround |
 | `destroy_k3s_cluster` incomplete cleanup | BACKLOG | `k3s-uninstall.sh` leaves `/var/lib/rancher`, `/etc/rancher`, `/var/lib/kubelet` — causes ghost nodes on reinstall. Fix: add `sudo rm -rf` of those paths to `destroy_k3s_cluster` |
