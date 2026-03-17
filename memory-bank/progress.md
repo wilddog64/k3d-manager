@@ -56,6 +56,9 @@
 - [x] Stale `examples/` deleted from shopping-cart-infra — infra PR #7
 - [x] Docs standardization — product-catalog PR #8 merged (b6ff783) + order PR #8 merged (b2c1ba8) 2026-03-17
 - [x] Docs standardization — payment PR #6 merged (224d721) 2026-03-17
+- [x] Kustomize ghcr newName fix — order PR #9 merged (f19cc0c) 2026-03-17
+- [x] Kustomize ghcr newName fix — product-catalog PR #9 merged (22c5405) 2026-03-17
+- [x] Kustomize ghcr newName fix — payment PR #7 merged (7ab15c2) 2026-03-17
 - [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **Blocked (Gemini action needed)**:
   - ~~401 fix: `ghcr-pull-secret` patch~~ — **merged** infra PR #8 (37660a6) 2026-03-17
   - ~~Arch fix: multi-arch builds~~ — **merged** infra PR #7 (a937211) 2026-03-17
