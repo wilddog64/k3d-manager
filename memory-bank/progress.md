@@ -56,10 +56,10 @@
 - [x] Stale `examples/` deleted from shopping-cart-infra — infra PR #7
 - [x] Docs standardization — product-catalog PR #8 merged (b6ff783) + order PR #8 merged (b2c1ba8) 2026-03-17
 - [x] Docs standardization — payment PR #6 merged (224d721) 2026-03-17
-- [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **Blocked (1 PR pending)**:
-  - 401 fix: `ghcr-pull-secret` patch — `fix/argocd-image-pull` branch `f1e12b1` (infra) — needs PR + merge
+- [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **Blocked (Gemini action needed)**:
+  - ~~401 fix: `ghcr-pull-secret` patch~~ — **merged** infra PR #8 (37660a6) 2026-03-17
   - ~~Arch fix: multi-arch builds~~ — **merged** infra PR #7 (a937211) 2026-03-17
-  - After merge: re-trigger 5 CI pipelines → Gemini creates `ghcr-pull-secret` on k3s → re-verifies pods Running
+  - Next: Gemini creates `ghcr-pull-secret` on k3s → re-verifies pods Running
 - [ ] Deploy key rotation policy — 24h scheduled + on infra main merge; spec in `docs/plans/roadmap-v1.md` v0.8.0 section
 - [x] Jenkins optional — **COMPLETE**: all 3 files gated (jenkins.sh, ldap.sh, vault.sh) — commits 08dc1bd + 4b02e16; BATS 2/2 PASS; shellcheck PASS
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run
