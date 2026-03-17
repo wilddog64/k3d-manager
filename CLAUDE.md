@@ -1,110 +1,127 @@
-# CLAUDE.md
+# CLAUDE.md — lib-foundation
 
-Modular Bash utility for managing local Kubernetes dev clusters (Istio, Vault, Jenkins, OpenLDAP, ESO).
-Uses a dispatcher pattern with lazy plugin loading.
+Shared Bash foundation library. Consumed by `k3d-manager`, `rigor-cli`, and `shopping-carts` via git subtree.
 
-**Entry point:** `./scripts/k3d-manager <function> [args]`
 **Current state:** `memory-bank/activeContext.md` and `memory-bank/progress.md`
 **Task specs:** `docs/plans/`
+
+---
 
 ## Claude Session Rules
 
 - **Memory-bank update is mandatory and immediate** — after every completed action (spec written, PR created, agent assigned, merge done, task status changed), update `memory-bank/activeContext.md` and `memory-bank/progress.md` before doing anything else. Do not wait for the user to ask.
-- **PR creation gate** — do NOT create a PR until ALL of these pass: CI green, Copilot review comments addressed, Gemini live smoke test, Claude scope check. Draft PR is acceptable only as an explicit placeholder.
-- **Verify before trust** — never trust a commit SHA, BATS result, or "done" report from any agent without independently verifying via `gh api`, `gh run view`, or `git log`.
+- **PR creation gate** — do NOT create a PR until ALL of these pass: CI green, Copilot review comments addressed, Claude scope check. Draft PR is acceptable only as an explicit placeholder.
+- **Verify before trust** — never trust a commit SHA or BATS result from any agent without independently verifying via `gh api`, `gh run view`, or `git log`.
 
 ---
 
 ## Layout
 
 ```
-scripts/k3d-manager          # dispatcher
-scripts/lib/                 # core libraries (system.sh, core.sh, cluster_provider.sh, ...)
-scripts/plugins/             # lazy-loaded feature modules (vault.sh, jenkins.sh, eso.sh, ...)
-scripts/etc/                 # config templates and vars (*.yaml.tmpl, vars.sh)
-scripts/tests/               # BATS suites (pure logic only — no cluster mocks)
+scripts/lib/
+  core.sh            # Cluster lifecycle: create/destroy/deploy, provider abstraction
+  system.sh          # _run_command privilege model, package helpers, OS detection, BATS install
+  agent_rigor.sh     # _agent_checkpoint, _agent_audit, _agent_lint, pre-commit hook
+scripts/tests/lib/
+  system.bats        # Unit tests for system.sh
+  core.bats          # Unit tests for core.sh
+  agent_rigor.bats   # Unit tests for agent_rigor.sh
+memory-bank/         # activeContext.md + progress.md — read first, update after
+docs/plans/          # Task specs for Codex/Gemini assignments
+docs/issues/         # Post-mortems and issue logs
 ```
-
-Provider selected by `CLUSTER_PROVIDER` env var (`orbstack` / `k3d` / `k3s`).
-Directory service selected by `DIRECTORY_SERVICE_PROVIDER` (`openldap` / `activedirectory`).
 
 ---
 
-## Plugin Development
+## Key Contracts (do not break without versioning all consumers)
 
-New plugins go in `scripts/plugins/`. Public functions: no underscore. Private: `_` prefix.
-
+**`_run_command` (system.sh)** — privilege escalation wrapper, never call `sudo` directly:
 ```bash
-#!/usr/bin/env bash
-# scripts/plugins/mytool.sh
-
-function mytool_do_something() {
-  _kubectl apply -f my.yaml
-}
-
-function _mytool_helper() {
-  :
-}
+_run_command --prefer-sudo -- <cmd>          # sudo if available, else current user
+_run_command --require-sudo -- <cmd>         # fail if sudo unavailable
+_run_command --probe '<subcmd>' -- <cmd>     # probe subcommand to decide privilege
+_run_command --quiet -- <cmd>               # suppress stderr, return exit code
+_run_command --soft -- <cmd>                # return 127 instead of exit on failure
 ```
 
-**`_run_command` wrapper — always use this for privileged or external commands:**
+**`_detect_platform` (system.sh)** — returns `mac | wsl | debian | redhat | linux`
 
-```bash
-_run_command --prefer-sudo -- apt-get install -y jq   # prefer sudo, fall back to user
-_run_command --require-sudo -- mkdir /etc/myapp        # fail if sudo unavailable
-_run_command --probe 'config current-context' -- kubectl get nodes  # probe to decide sudo
-_run_command --quiet -- command_that_might_fail        # suppress stderr, still returns exit code
-```
+**`_cluster_provider` (core.sh)** — reads `CLUSTER_PROVIDER` / `K3D_MANAGER_PROVIDER` / `K3DMGR_PROVIDER`
 
-Do NOT call `sudo` directly. Do NOT use `command sudo`. Route through `_run_command`.
+**`_resolve_script_dir` (core.sh)** — portable symlink-aware absolute path of calling script's directory
 
 ---
 
 ## Code Style
 
-- Minimal patches — no unsolicited refactors
-- Maintain existing indentation, quoting, and naming
+- `set -euo pipefail` mandatory on all scripts
+- Public functions: no underscore prefix
+- Private functions: `_` prefix
+- Double-quote all variable expansions — no bare `$var` in command args
+- No bare `sudo` — always `_run_command --prefer-sudo`
 - LF line endings only — no CRLF
-- No inline comments in shell blocks unless explicitly requested
-- Use `${PLACEHOLDER}` for secrets — never hardcode
-- `set -euo pipefail` on all new bash scripts
+- Minimal patches — no unsolicited refactors
+
+---
+
+## Bash 3.2 Compatibility (hard requirement)
+
+macOS ships `/bin/bash` at 3.2. All lib code must be compatible:
+
+- **No `local -n`** (nameref) — use global temp vars (e.g., `_RCRS_RUNNER`) for array output
+- **No `declare -A`** — no associative arrays
+- **No `mapfile` / `readarray`**
+- **No `(( ))` with `+=` on arrays** — use `arr=("${arr[@]}" new_element)` form
 
 ---
 
 ## Security Rules (treat violations as bugs — catch before commit)
 
 **Shell Injection (OWASP A03)**
-- Always double-quote variable expansions: `"$var"`, never bare `$var` in command arguments.
-- Never pass external or user-supplied input to `eval`.
-- Use `--` to separate options from arguments in CLI calls where arguments may contain hyphens.
-- Variables expanded via `envsubst` in `*.yaml.tmpl` must not contain shell metacharacters — validate before substitution.
+- Always double-quote variable expansions: `"$var"`, never bare `$var` in command arguments
+- Never pass external or user-supplied input to `eval`
+- Use `--` to separate options from arguments in CLI calls
 
 **Least Privilege (OWASP A01)**
-- New Vault policies must grant only the minimum required paths (`read` unless `write` is explicitly needed).
-- New Kubernetes ServiceAccounts must not use `cluster-admin`. Use namespace-scoped Role + RoleBinding.
-- New ClusterRoles must be justified — prefer namespace-scoped resources.
-- GitHub Actions workflows must use `permissions: contents: read` unless elevated access is explicitly required.
-
-**Cryptographic Failures (OWASP A02)**
-- `AD_TLS_CONFIG=TRUST_ALL_CERTIFICATES` and `insecureSkipVerify: true` are dev-only. Never introduce in production config paths.
-- Vault PKI leaf cert TTL must stay short (≤720h). Do not increase `VAULT_PKI_ROLE_TTL` without justification.
-- Never add `--insecure` or `-k` to scripts that may run against production endpoints.
+- No bare `sudo` — route through `_run_command --prefer-sudo`
+- GitHub Actions workflows must use `permissions: contents: read` unless elevated access is required
 
 **Secret Hygiene (OWASP A02)**
-- Vault tokens must never appear in script arguments visible in shell history or CI logs. Use env vars or stdin.
-- New sensitive CLI flags must be registered in `_args_have_sensitive_flag` in `scripts/lib/system.sh`.
-- Test credentials (`alice/password`, etc.) are dev-only — never reference in production config paths.
-- No secrets in `kubectl exec` command strings that appear in logs.
-
-**Security Misconfiguration (OWASP A05)**
-- Every new deployed service must use its own namespace — never `default`.
-- New Helm chart installations must pin chart versions explicitly — no floating `latest`.
+- No secrets in script arguments visible in shell history or CI logs
 
 **Supply Chain Integrity (OWASP A08)**
-- GitHub Actions steps must pin to a version tag (`@v4`) — never `@main` or `@latest`.
-- New container image references in `*.yaml.tmpl` must use a pinned tag, not `latest`.
+- GitHub Actions steps must pin to a version tag (`@v4`) — never `@main` or `@latest`
 
-**Existing protections — do not remove or weaken:**
-- `_run_command` handles sudo probing and escalation safely.
-- `_args_have_sensitive_flag` disables trace for commands with `--password`, `--token`, `--username`.
-- ESO syncs credentials from Vault without exposing them in git.
+---
+
+## Testing
+
+```bash
+# BATS unit tests — ALWAYS run with clean env (mandatory)
+env -i HOME="$HOME" PATH="/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin" TMPDIR="$TMPDIR" \
+  bash --norc --noprofile -c 'bats scripts/tests/lib/'
+
+# shellcheck — run on every touched .sh file
+shellcheck scripts/lib/system.sh scripts/lib/core.sh scripts/lib/agent_rigor.sh
+
+# Agent rigor audit (if-count threshold)
+AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/lib/system.sh
+```
+
+Always run BATS with `env -i` — ambient `SCRIPT_DIR` causes false passes.
+
+---
+
+## Git Subtree Integration
+
+This repo is embedded into consumers via git subtree:
+
+```bash
+# Pull updates into a consumer
+git subtree pull --prefix=scripts/lib/foundation \
+  https://github.com/wilddog64/lib-foundation.git main --squash
+```
+
+Breaking changes to `_run_command`, `_detect_platform`, or `_cluster_provider` require coordination across all consumers before merging to `main`.
+
+**Never edit `scripts/lib/foundation/` inside a consumer directly** — fix here, PR, tag, then subtree pull.

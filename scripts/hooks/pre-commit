@@ -1,26 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../../scripts" >/dev/null 2>&1 && pwd)"
+SCRIPT_DIR=""
+if command -v git >/dev/null 2>&1; then
+   if repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+      SCRIPT_DIR="${repo_root}/scripts"
+   fi
+fi
+if [[ -z "${SCRIPT_DIR}" ]]; then
+   SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../../scripts" >/dev/null 2>&1 && pwd)"
+fi
 
 if [[ ! -f "${SCRIPT_DIR}/lib/agent_rigor.sh" ]]; then
    exit 0
-fi
-
-# Guard: block direct edits to the lib-foundation subtree
-# Bypass: set K3DM_SUBTREE_SYNC=1 when running git subtree pull/add
-if [[ "${K3DM_SUBTREE_SYNC:-0}" != "1" ]]; then
-   subtree_changes="$(git diff --cached --name-only | grep '^scripts/lib/foundation/' || true)"
-   if [[ -n "$subtree_changes" ]]; then
-      echo "Pre-commit hook: direct edits to scripts/lib/foundation/ are not allowed." >&2
-      echo "This directory is a git subtree from lib-foundation." >&2
-      echo "Fix the issue upstream in lib-foundation, then run:" >&2
-      echo "  K3DM_SUBTREE_SYNC=1 git subtree pull --prefix=scripts/lib/foundation ..." >&2
-      echo "" >&2
-      echo "Blocked files:" >&2
-      echo "$subtree_changes" | sed 's/^/  /' >&2
-      exit 1
-   fi
 fi
 
 # shellcheck source=/dev/null
@@ -33,7 +25,7 @@ if ! _agent_audit; then
    exit 1
 fi
 
-gate_var="${AGENT_LINT_GATE_VAR:-K3DM_ENABLE_AI}"
+gate_var="${AGENT_LINT_GATE_VAR:-ENABLE_AGENT_LINT}"
 if [[ "${!gate_var:-0}" == "1" ]]; then
    if ! _agent_lint; then
       echo "Pre-commit hook: _agent_lint failed — fix architectural violations before committing" >&2
