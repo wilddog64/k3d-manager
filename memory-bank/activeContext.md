@@ -25,7 +25,7 @@
 | Verify ArgoCD all 5 apps Synced + Healthy | **COMPLETE** | `ghcr-pull-secret` created; sync forced; Pods still `ImagePullBackOff` (arch mismatch). See `docs/issues/2026-03-17-shopping-cart-ghcr-pull-secret-and-arch-mismatch.md` |
 | v0.9.5 service mesh spec | **COMPLETE** | `docs/plans/v0.9.5-service-mesh.md` written; roadmap updated; shopping-cart-infra memory-bank updated |
 | tax-returns repo | **COMPLETE** | `github.com/wilddog64/tax-returns` created; OTS installed `~/tools/OpenTaxSolver2025/`; binaries in `~/.local/bin`; `docs/workflow.md` written |
-| Multi-arch workflow pin fix | **CODEX READY** | Spec: `docs/plans/v0.9.4-codex-multiarch-workflow-pin.md` — update `@8363caf` → `@999f8d7` in all 5 app repos; open PRs; wait for CI green |
+| Multi-arch workflow pin fix | **CODEX READY** | Spec: `shopping-cart-infra/docs/plans/codex-multiarch-workflow-pin.md` — update `@8363caf` → `@999f8d7` in all 5 app repos |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
 
