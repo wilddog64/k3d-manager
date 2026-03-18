@@ -38,6 +38,7 @@
 | v0.1.0–v0.9.3 | released | See README Releases table |
 | v0.9.4 | **active** | Full stack health — ImagePullBackOff fix + Playwright E2E in CI |
 | v0.9.5 | planned | Service mesh — Istio full activation (mTLS, AuthzPolicy, Gateway, DestinationRule, ServiceEntry) |
+| v0.9.6 | planned | Lab accessibility — LoadBalancer for ArgoCD, Keycloak, Jenkins, frontend |
 | v1.1.0 | planned | AWS EKS provider + ACG sandbox lifecycle |
 | v1.2.0 | planned | GKE provider |
 | v1.3.0 | planned | AKS provider |
