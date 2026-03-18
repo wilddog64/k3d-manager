@@ -38,13 +38,15 @@ hostname && uname -n
 Confirm you are on the correct machine before doing anything else.
 
 ### 3. Proof of work — commit SHA + test results required
-Reporting "done" requires:
-- A real commit SHA pushed to the remote branch (verify with `git log origin/<branch> --oneline -3`)
-- BATS output showing all tests passing (`bats scripts/tests/...`)
-- `shellcheck` clean on every touched `.sh` file
-- `_agent_audit` passing — all functions ≤ 8 if-blocks
+Reporting "done" requires ALL of the following — paste actual output, not summaries:
+
+- **Commit SHA** — run `git log origin/<branch> --oneline -3` and paste the output
+- **BATS output** — paste the full `bats scripts/tests/...` result (pass/fail counts)
+- **shellcheck** — paste `shellcheck scripts/plugins/<touched>.sh` output (must be clean)
+- **`_agent_audit`** — must pass (all functions ≤ 8 if-blocks)
 
 A memory-bank update alone is NOT proof of completion.
+A summary like "all tests passed" without pasted output is NOT proof of completion.
 
 ### 4. Commit before reporting done
 Every task ends with a real git commit pushed to the remote branch.

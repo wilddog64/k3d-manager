@@ -153,6 +153,30 @@ ssh -L 0.0.0.0:6443:localhost:6443 -N ubuntu &
 
 ---
 
+## Completion Report — Required Format
+
+Every task completion report to Claude must include ALL of the following. Paste actual command output — no summaries.
+
+```
+## Done: <task name>
+
+### Commit
+<paste: git log origin/<branch> --oneline -3>
+
+### ArgoCD App Status (infra cluster)
+<paste: kubectl config use-context k3d-k3d-cluster && kubectl get applications -n cicd>
+
+### Pod Status (ubuntu-k3s)
+<paste: kubectl config use-context ubuntu-k3s && kubectl get pods -n shopping-cart>
+
+### Notes
+<any errors, skipped steps, or observations>
+```
+
+If a section does not apply to the task (e.g. no cluster work), write `N/A` — do not omit the section.
+
+---
+
 ## Known Failure Modes (your history — avoid repeating)
 
 - You skip reading the memory-bank and start from your own interpretation — always read it first
@@ -161,3 +185,5 @@ ssh -L 0.0.0.0:6443:localhost:6443 -N ubuntu &
 - You report BATS tests as passing without running `env -i` — ambient env vars don't count
 - You start work on the wrong machine — `hostname` first, every session, no exceptions
 - You write thin one-line completion reports — the report must include actual output, not summaries
+- You omit commit SHA from completion reports — every report must include: `git log origin/<branch> --oneline -3` output
+- You omit pod status from cluster tasks — every cluster task report must include: `kubectl get pods -n shopping-cart` output (ubuntu-k3s context) and `kubectl get applications -n cicd` output (infra context)
