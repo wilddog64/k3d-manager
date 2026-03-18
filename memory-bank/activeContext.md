@@ -25,7 +25,11 @@
 | Verify ArgoCD all 5 apps Synced + Healthy | **COMPLETE** | `ghcr-pull-secret` created; sync forced; Pods still `ImagePullBackOff` (arch mismatch). See `docs/issues/2026-03-17-shopping-cart-ghcr-pull-secret-and-arch-mismatch.md` |
 | v0.9.5 service mesh spec | **COMPLETE** | `docs/plans/v0.9.5-service-mesh.md` written; roadmap updated; shopping-cart-infra memory-bank updated |
 | tax-returns repo | **COMPLETE** | `github.com/wilddog64/tax-returns` created; OTS installed `~/tools/OpenTaxSolver2025/`; binaries in `~/.local/bin`; `docs/workflow.md` written |
-| Multi-arch workflow pin fix | **CODEX READY** | Spec: `shopping-cart-infra/docs/plans/codex-multiarch-workflow-pin.md` — update `@8363caf` → `@999f8d7` in all 5 app repos |
+| Multi-arch workflow pin fix | **COMPLETE** | All 5 app repos merged to main 2026-03-18; arm64 images pushed to ghcr.io |
+| NVD database cache | **COMPLETE** | payment PR #10 merged 2026-03-18; first warm-cache run in progress |
+| Copilot review — basket PRs #4 #6 | **COMPLETE** | All 10 threads resolved; PRs merged 2026-03-18 |
+| Docs cleanup — basket, frontend, infra | **COMPLETE** | basket #4/#6, frontend #4, infra #1/#3/#10 merged 2026-03-18 |
+| Gemini: re-verify ArgoCD after arm64 images | **READY** | Spec: `docs/plans/v0.9.4-gemini-argocd-verify.md` — all 5 images in ghcr.io |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
 
@@ -70,7 +74,7 @@ Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
 |---|---|
 | k3s node | Ready (arm64) |
 | Istio / ESO / Vault / OpenLDAP | Running |
-| shopping-cart-apps | Synced — `ImagePullBackOff` (arch mismatch: app repos use pinned `amd64`-only CI workflow `8363caf` from `shopping-cart-infra`) |
+| shopping-cart-apps | `ImagePullBackOff` resolved upstream — arm64 images now in ghcr.io; **Gemini to verify pods Running** |
 
 **SSH:** `ForwardAgent yes`. Stale socket fix: `ssh -O exit ubuntu`.
 
