@@ -67,9 +67,12 @@
   - Detailed report: `docs/issues/2026-03-17-shopping-cart-ghcr-pull-secret-and-arch-mismatch.md`
 - [ ] Deploy key rotation policy — 24h scheduled + on infra main merge; spec in `docs/plans/roadmap-v1.md` v0.8.0 section
 - [x] Jenkins optional — **COMPLETE**: all 3 files gated (jenkins.sh, ldap.sh, vault.sh) — commits 08dc1bd + 4b02e16; BATS 2/2 PASS; shellcheck PASS
-- [ ] Multi-arch workflow pin — **CODEX READY**: update `@8363caf` → `@999f8d7` in all 5 app repos; spec: `shopping-cart-infra/docs/plans/codex-multiarch-workflow-pin.md`
-- [ ] Re-run CI on all 5 repos after pin fix — push arm64 images to ghcr.io
-- [ ] Gemini: re-verify ArgoCD all 5 apps Synced + Healthy after new images pushed
+- [x] Multi-arch workflow pin — ALL 5 app repos merged to main 2026-03-18 (basket already on main; order PR #12, product-catalog PR #12, frontend PR #7, payment PR #9 merged)
+- [x] NVD database cache — payment PR #10 merged 2026-03-18; `actions/cache@v4` keyed on pom.xml hash
+- [x] Copilot review — basket PR #4 (Mermaid diagram fixes) + PR #6 (README fixes) — all 10 threads resolved, merged 2026-03-18
+- [x] Docs cleanup — basket #4/#6, frontend #4, infra #1/#3/#10 merged 2026-03-18
+- [x] Re-run CI on all 5 repos — arm64 images in ghcr.io (order/product-catalog/frontend green; payment Security Scan still running but image already pushed)
+- [ ] Gemini: re-verify ArgoCD all 5 apps Synced + Healthy — spec: `docs/plans/v0.9.4-gemini-argocd-verify.md`
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
 - [ ] Playwright E2E green in CI — milestone gate
 - Spec: `docs/plans/v0.9.4-full-stack-health.md`
@@ -107,7 +110,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| Shopping Cart Apps ImagePullBackOff | PENDING ARGOCD | all 5 images in ghcr.io; Gemini to verify ArgoCD Synced + Healthy |
+| Shopping Cart Apps ImagePullBackOff | PENDING GEMINI VERIFY | arm64 images in ghcr.io 2026-03-18; Gemini to confirm pods Running + ArgoCD Synced |
 | Ubuntu k3s CPU capacity (2 cores) | OPEN | shopping-cart-apps may exceed capacity — reduce replicas |
 | `deploy_jenkins` (no flags) broken | BACKLOG | Use `--enable-vault` as workaround |
 | `destroy_k3s_cluster` incomplete cleanup | BACKLOG | `k3s-uninstall.sh` leaves `/var/lib/rancher`, `/etc/rancher`, `/var/lib/kubelet` — causes ghost nodes on reinstall. Fix: add `sudo rm -rf` of those paths to `destroy_k3s_cluster` |
