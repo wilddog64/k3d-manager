@@ -74,7 +74,7 @@
 - [x] Re-run CI on all 5 repos — arm64 images in ghcr.io (order/product-catalog/frontend green; payment Security Scan still running but image already pushed)
 - [ ] Gemini: re-verify ArgoCD all 5 apps Synced + Healthy — spec: `docs/plans/v0.9.4-gemini-argocd-verify.md`
 - [x] shopping-cart-infra PR #16 — remove broken `.pre-commit-config.yaml` (Gemini scope creep; lib-foundation@v0.3.4 not yet released) — merged 31b2ec4
-- [ ] shopping-cart-payment PR #11 — remove placeholder `deploy-dev` CI job
+- [x] shopping-cart-payment PR #11 — remove placeholder `deploy-dev` CI job — merged 844918b
 - [x] Codex: kubeconfig merge automation — spec: `docs/plans/v0.9.4-codex-kubeconfig-merge.md`; commit `6699ce8`
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
 - [ ] Playwright E2E green in CI — milestone gate
