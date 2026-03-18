@@ -30,7 +30,7 @@
 | Copilot review — basket PRs #4 #6 | **COMPLETE** | All 10 threads resolved; PRs merged 2026-03-18 |
 | Docs cleanup — basket, frontend, infra | **COMPLETE** | basket #4/#6, frontend #4, infra #1/#3/#10 merged 2026-03-18 |
 | Gemini: re-verify ArgoCD after arm64 images | **READY** | Spec: `docs/plans/v0.9.4-gemini-argocd-verify.md` — all 5 images in ghcr.io |
-| Codex: kubeconfig merge automation | **SPECCED** | Spec: `docs/plans/v0.9.4-codex-kubeconfig-merge.md` — merge ubuntu-k3s into ~/.kube/config on setup |
+| Codex: kubeconfig merge automation | **COMPLETE** | Spec: `docs/plans/v0.9.4-codex-kubeconfig-merge.md` — merged kubeconfig automation (6699ce8) |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
 
