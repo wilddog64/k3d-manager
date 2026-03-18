@@ -22,7 +22,7 @@
 | Docs standardization (payment) | **merged** | payment PR #6 (224d721) 2026-03-17 |
 | Kustomize ghcr newName fix | **merged** | order PR #9 (f19cc0c) + product-catalog PR #9 (22c5405) + payment PR #7 (7ab15c2) 2026-03-17 |
 | Mermaid diagrams + Architecture consistency | **COMPLETE** | All 5 service repos merged 2026-03-17; main synced; stale branches deleted; `docs/next-improvements` created on all 4 |
-| Verify ArgoCD all 5 apps Synced + Healthy | **Blocked** | fix/argocd-image-pull merged (37660a6, infra PR #8); waiting for Gemini to create ghcr-pull-secret + verify |
+| Verify ArgoCD all 5 apps Synced + Healthy | **GEMINI READY** | Spec: `docs/plans/v0.9.4-gemini-ghcr-pull-secret.md` — create ghcr-pull-secret in k3s namespaces → ArgoCD sync → verify pods Running |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |
 | Playwright E2E green | **milestone gate** | |
 

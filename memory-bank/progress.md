@@ -60,10 +60,9 @@
 - [x] Kustomize ghcr newName fix — product-catalog PR #9 merged (22c5405) 2026-03-17
 - [x] Kustomize ghcr newName fix — payment PR #7 merged (7ab15c2) 2026-03-17
 - [x] Mermaid architecture diagrams + consistent Architecture section presentation — all 5 service repos (payment PR #8, product-catalog PR #10, order PR #10, frontend PR #6) merged 2026-03-17; stale branches deleted; main synced; `docs/next-improvements` branches created
-- [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **Blocked (Gemini action needed)**:
-  - ~~401 fix: `ghcr-pull-secret` patch~~ — **merged** infra PR #8 (37660a6) 2026-03-17
-  - ~~Arch fix: multi-arch builds~~ — **merged** infra PR #7 (a937211) 2026-03-17
-  - Next: Gemini creates `ghcr-pull-secret` on k3s → re-verifies pods Running
+- [ ] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **GEMINI READY**
+  - Spec: `docs/plans/v0.9.4-gemini-ghcr-pull-secret.md`
+  - Gemini: create `ghcr-pull-secret` in `shopping-cart-apps` + `shopping-cart-payment` → ArgoCD sync → verify pods Running
 - [ ] Deploy key rotation policy — 24h scheduled + on infra main merge; spec in `docs/plans/roadmap-v1.md` v0.8.0 section
 - [x] Jenkins optional — **COMPLETE**: all 3 files gated (jenkins.sh, ldap.sh, vault.sh) — commits 08dc1bd + 4b02e16; BATS 2/2 PASS; shellcheck PASS
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run
