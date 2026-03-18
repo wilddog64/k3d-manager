@@ -73,6 +73,7 @@
 - [x] Docs cleanup — basket #4/#6, frontend #4, infra #1/#3/#10 merged 2026-03-18
 - [x] Re-run CI on all 5 repos — arm64 images in ghcr.io (order/product-catalog/frontend green; payment Security Scan still running but image already pushed)
 - [ ] Gemini: re-verify ArgoCD all 5 apps Synced + Healthy — spec: `docs/plans/v0.9.4-gemini-argocd-verify.md`
+- [ ] Codex: kubeconfig merge automation — spec: `docs/plans/v0.9.4-codex-kubeconfig-merge.md`
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
 - [ ] Playwright E2E green in CI — milestone gate
 - Spec: `docs/plans/v0.9.4-full-stack-health.md`
