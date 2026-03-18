@@ -34,7 +34,8 @@
 
 ### v0.9.4 — active
 
-- [ ] Fix missing Secrets + ConfigMaps on Ubuntu k3s — **HIGH PRIORITY** — `CreateContainerConfigError` blocks basket, order, product-catalog, payment; see `docs/issues/2026-03-18-shopping-cart-missing-secrets-configmaps.md`; Codex to add Kustomize overlays in shopping-cart-infra
+- [ ] Fix payment-service missing Secrets — **HIGH PRIORITY** — Codex spec: `shopping-cart-infra/docs/plans/codex-payment-missing-secrets.md`; adds `payment-db-credentials` + `payment-encryption-secret` to `shopping-cart-payment/k8s/base/secret.yaml` + kustomization; branch: `fix/payment-missing-secrets`
+- [ ] Force ArgoCD sync for order-service + product-catalog — **HIGH PRIORITY** — resources exist in git but sync Unknown due to tunnel; Gemini to run `argocd app sync`
 - [ ] Wait for all apps to reach `Synced` + `Healthy` — blocked by missing Secrets/ConfigMaps above
 - [ ] Confirm all 5 pods `Running` on Ubuntu k3s — currently: basket CrashLoopBackOff (163 restarts), order 1/2 Running+Error, product-catalog CrashLoopBackOff, payment ImagePullBackOff
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
