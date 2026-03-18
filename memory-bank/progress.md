@@ -34,7 +34,7 @@
 
 ### v0.9.4 — active
 
-- [ ] Fix payment-service missing Secrets — **HIGH PRIORITY** — Codex spec: `shopping-cart-infra/docs/plans/codex-payment-missing-secrets.md`; adds `payment-db-credentials` + `payment-encryption-secret` to `shopping-cart-payment/k8s/base/secret.yaml` + kustomization; branch: `fix/payment-missing-secrets`
+- [x] Fix payment-service missing Secrets — Codex COMPLETE (66c9eac); `payment-db-credentials` + `payment-encryption-secret` added to `shopping-cart-payment/k8s/base/secret.yaml`; branch: `fix/payment-missing-secrets` — pending PR + ArgoCD sync
 - [ ] Force ArgoCD sync for order-service + product-catalog — **HIGH PRIORITY** — resources exist in git but sync Unknown due to tunnel; Gemini to run `argocd app sync`
 - [ ] Wait for all apps to reach `Synced` + `Healthy` — blocked by missing Secrets/ConfigMaps above
 - [ ] Confirm all 5 pods `Running` on Ubuntu k3s — currently: basket CrashLoopBackOff (163 restarts), order 1/2 Running+Error, product-catalog CrashLoopBackOff, payment ImagePullBackOff
