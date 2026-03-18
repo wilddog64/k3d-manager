@@ -107,8 +107,39 @@ Subtree sync bypass: `K3DM_SUBTREE_SYNC=1 git subtree pull --prefix=scripts/lib/
 
 **Infra cluster:** k3d on OrbStack on M2 Air (context: `k3d-k3d-cluster`)
 **App cluster:** Ubuntu k3s at `10.211.55.14` — SSH: `ssh ubuntu` from M2 Air
-**k3s context name is always `default`** — never `k3s-automation`
+**k3s context name:** `default` inside the VM — merged into `~/.kube/config` on M2 Air as `ubuntu-k3s`
 **ArgoCD** runs on infra cluster in `cicd` ns — manages app cluster hub-and-spoke
+
+### Accessing the Ubuntu k3s cluster
+
+The ubuntu-k3s context is merged into `~/.kube/config` — no copy step needed.
+
+```bash
+# Switch to ubuntu k3s (via SSH tunnel — must be active)
+kubectl config use-context ubuntu-k3s
+kubectl get nodes
+
+# Switch back to infra cluster
+kubectl config use-context k3d-k3d-cluster
+```
+
+**One-time setup** (if `ubuntu-k3s` context is missing from `~/.kube/config`):
+```bash
+# Copy kubeconfig from VM and merge
+scp ubuntu:~/.kube/config ~/.kube/ubuntu-k3s.yaml
+# Edit ubuntu-k3s.yaml: rename context/cluster/user from 'default' to 'ubuntu-k3s'
+sed -i 's/: default/: ubuntu-k3s/g' ~/.kube/ubuntu-k3s.yaml
+KUBECONFIG=~/.kube/config:~/.kube/ubuntu-k3s.yaml kubectl config view --flatten > /tmp/merged.yaml
+mv /tmp/merged.yaml ~/.kube/config
+chmod 600 ~/.kube/config
+# Verify
+kubectl config get-contexts | grep ubuntu-k3s
+```
+
+**SSH tunnel** must be active before using `ubuntu-k3s` context:
+```bash
+ssh -L 0.0.0.0:6443:localhost:6443 -N ubuntu &
+```
 
 ---
 
