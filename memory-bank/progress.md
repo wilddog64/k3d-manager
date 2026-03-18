@@ -14,19 +14,12 @@
 - [x] README releases table — v0.9.3 added — commit `1e3a930`
 - [x] lib-foundation v0.3.3 subtree pull — commit `7684266`
 - [x] Multi-arch workflow pin — ALL 5 app repos merged to main 2026-03-18
-- [x] ArgoCD cluster registration fix — **COMPLETE**
-  - Manual cluster secret `cluster-ubuntu-k3s` in `cicd` ns.
-  - Configured with `insecure: true` for `host.k3d.internal` support.
-  - Successfully registered `ubuntu-k3s` cluster in ArgoCD.
-- [x] Missing `frontend` manifest — **COMPLETE**
-  - Created `argocd/applications/frontend.yaml` in `shopping-cart-infra`.
-  - Opened PR #17; applied manually to cluster.
-- [x] Verify `ghcr-pull-secret` — **COMPLETE**
-  - Verified presence in `shopping-cart-apps`, `shopping-cart-data`, `shopping-cart-payment`.
-- [x] Tag refresh for ARM64 images — **COMPLETE**
-  - Verified `newTag: latest` in all 5 app repositories.
-  - Created PR #9 for `shopping-cart-basket` to align tags.
+- [x] ArgoCD cluster registration fix — manual cluster secret `cluster-ubuntu-k3s` with `insecure: true`
+- [x] Missing `frontend` manifest — `argocd/applications/frontend.yaml` in shopping-cart-infra (PR #17)
+- [x] Verify `ghcr-pull-secret` — present in `apps`, `data`, `payment` namespaces
+- [x] Tag refresh for ARM64 images — `newTag: latest` in all 5 repos
 - [x] Codex: kubeconfig merge automation — commit `6699ce8`
+- [x] payment-service missing Secrets — PR #14 merged (9d9de98); `payment-db-credentials` + `payment-encryption-secret` in `shopping-cart-payment/k8s/base/secret.yaml`
 
 ---
 
@@ -34,12 +27,11 @@
 
 ### v0.9.4 — active
 
-- [x] Fix payment-service missing Secrets — Codex COMPLETE (66c9eac); `payment-db-credentials` + `payment-encryption-secret` added to `shopping-cart-payment/k8s/base/secret.yaml`; branch: `fix/payment-missing-secrets` — pending PR + ArgoCD sync
-- [ ] Force ArgoCD sync for order-service + product-catalog — **HIGH PRIORITY** — resources exist in git but sync Unknown due to tunnel; Gemini to run `argocd app sync`
-- [ ] Wait for all apps to reach `Synced` + `Healthy` — blocked by missing Secrets/ConfigMaps above
-- [ ] Confirm all 5 pods `Running` on Ubuntu k3s — currently: basket CrashLoopBackOff (163 restarts), order 1/2 Running+Error, product-catalog CrashLoopBackOff, payment ImagePullBackOff
+- [ ] Force ArgoCD sync — order-service + product-catalog — Gemini: `argocd app sync order-service && argocd app sync product-catalog`
+- [ ] Confirm all 5 pods `Running` on Ubuntu k3s — basket: CrashLoopBackOff (data layer Redis/RabbitMQ not deployed to Ubuntu k3s); payment: pending ArgoCD sync of secret
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
-- [ ] Playwright E2E green in CI — milestone gate
+- [ ] Playwright E2E green — milestone gate
+- [ ] Re-enable `enforce_admins` on shopping-cart-payment main branch
 
 ### v0.9.5 — planned
 
@@ -53,7 +45,6 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| Missing Secrets/ConfigMaps on Ubuntu k3s | OPEN | `CreateContainerConfigError` + `CrashLoopBackOff` on all 5 services; ESO not configured for app namespaces; see `docs/issues/2026-03-18-shopping-cart-missing-secrets-configmaps.md` |
+| basket-service CrashLoopBackOff | OPEN | Data layer (Redis `shopping-cart-data` ns, RabbitMQ) not deployed to Ubuntu k3s; separate issue from missing Secrets |
 | SSH Tunnel timeouts | OPEN | Frequent connection resets during heavy ArgoCD sync; requires `ServerAliveInterval` or `screen` for stability |
-| ArgoCD cluster registration over tunnel | FIXED | Using manual cluster secret pointing to `https://host.k3d.internal:6443` with `insecure: true` |
 | Vault Kubernetes auth over tunnel | KNOWN | CA cert validation fails over SSH tunnel; use static Vault token with `eso-reader` policy as fallback |
