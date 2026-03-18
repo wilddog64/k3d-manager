@@ -72,44 +72,43 @@ The Vault SecretStore on the infra cluster is namespace-scoped to `secrets` ns o
 
 ---
 
-## Fix Options
+## Refined Root Cause (after reading all manifests — 2026-03-18)
 
-### Option A — Kustomize overlays in shopping-cart-infra (recommended)
-Add `secrets-generator` or placeholder ConfigMap/Secret manifests in
-`shopping-cart-infra/argocd/overlays/ubuntu-k3s/` per namespace.
-Values can be dev-safe placeholders (Redis on `localhost:6379`, stub DB URL, stub encryption key).
-ArgoCD will apply them automatically on next sync.
-
-**Owner:** Codex (manifest authoring, no cluster dependency)
-**Files:** `shopping-cart-infra/argocd/overlays/ubuntu-k3s/<namespace>/`
-
-### Option B — ESO SecretStore + ExternalSecret for each service
-Configure ESO on Ubuntu k3s to pull secrets from Vault.
-Requires Vault to have the secret paths populated (currently unknown).
-
-**Owner:** Gemini (live cluster work)
-**Blocker:** Vault Kubernetes auth over tunnel is unreliable (known issue); static token fallback needed.
-
-### Option C — Manual `kubectl create secret/configmap` (hotfix)
-Gemini creates the resources manually with dev-safe values.
-Does not persist across cluster rebuilds; short-term only.
-
-**Owner:** Gemini
+| Service | Issue | Status |
+|---|---|---|
+| `payment-service` | `payment-db-credentials` + `payment-encryption-secret` Secrets **do not exist** in `k8s/base/` — no `secret.yaml`, not in kustomization.yaml | TRUE missing files → Codex fix |
+| `order-service` | `order-service-config` + `order-service-secrets` **exist** in `k8s/base/` and kustomization | ArgoCD sync Unknown → Gemini force sync |
+| `product-catalog` | `product-catalog-config` + `product-catalog-secrets` **exist** in `k8s/base/` and kustomization | ArgoCD sync Unknown → Gemini force sync |
+| `basket-service` | `basket-service-config` exists + included in kustomization; CrashLoopBackOff is app-level crash | Data layer (Redis, RabbitMQ) likely not deployed on Ubuntu k3s |
 
 ---
 
-## Recommended Path
+## Fix Plan
 
-1. **Immediate (Gemini):** `kubectl describe pod` on each failing pod to confirm exact missing resource names.
-2. **Short-term (Codex):** Add placeholder ConfigMap + stub Secret manifests to `shopping-cart-infra`
-   as Kustomize overlays — ArgoCD deploys them automatically.
-3. **Long-term:** Wire ESO SecretStore for each namespace once Vault paths are defined.
+### 1. Payment — Codex (no cluster needed)
+Add `k8s/base/secret.yaml` to `shopping-cart-payment` with dev-safe placeholder values:
+- `payment-db-credentials` (keys: `username`, `password`)
+- `payment-encryption-secret` (key: `encryption-key`)
+Update kustomization.yaml to include `secret.yaml`.
+
+**Spec:** `shopping-cart-infra/docs/plans/codex-payment-missing-secrets.md`
+**Branch:** `fix/payment-missing-secrets`
+
+### 2. Order + Product-catalog — Gemini (force ArgoCD sync)
+Run `argocd app sync order-service` and `argocd app sync product-catalog` on infra cluster.
+Resources already in git; sync Unknown because SSH tunnel resets gRPC during heavy sync.
+
+### 3. Basket — Investigation
+Data layer services (Redis in `shopping-cart-data` ns, RabbitMQ) may not be deployed on Ubuntu k3s.
+`shopping-cart-infra/data-layer/` has the manifests but no ArgoCD Application deploys them.
+Separate issue / future work.
 
 ---
 
-## Task Spec Location
+## Long-term
 
-When assigned: `docs/plans/v0.9.4-<agent>-shopping-cart-missing-secrets.md`
+Wire ESO SecretStore for each service namespace once Vault secret paths are defined.
+Do not proceed until Vault Kubernetes auth over tunnel is stable (known issue).
 
 ---
 

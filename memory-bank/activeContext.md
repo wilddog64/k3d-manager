@@ -13,7 +13,7 @@
 |---|---|---|
 | ArgoCD cluster registration fix | **COMPLETE** | Manual cluster secret `cluster-ubuntu-k3s` patched with `insecure: true`; registered with `https://host.k3d.internal:6443` |
 | Verify ArgoCD all 5 apps Synced + Healthy | **BLOCKED** | Missing Secrets + ConfigMaps on Ubuntu k3s — see `docs/issues/2026-03-18-shopping-cart-missing-secrets-configmaps.md` |
-| Shopping cart missing Secrets/ConfigMaps | **OPEN** | `CreateContainerConfigError` + `CrashLoopBackOff` on all 5 services; Codex spec needed for Kustomize overlay fix |
+| Shopping cart missing Secrets/ConfigMaps | **CODEX ASSIGNED** | payment-service: `payment-db-credentials` + `payment-encryption-secret` missing from k8s/base; Codex spec: `shopping-cart-infra/docs/plans/codex-payment-missing-secrets.md`; order/product-catalog: resources exist but ArgoCD sync Unknown — Gemini to force sync |
 | Jenkins optional | **COMPLETE** | all 3 files gated — commits 08dc1bd + 4b02e16; BATS 2/2; shellcheck PASS |
 | Multi-arch CI builds | **merged** | infra PR #7 (a937211) — all 5 app repos benefit |
 | Multi-arch workflow pin fix | **COMPLETE** | All 5 app repos merged to main 2026-03-18; arm64 images pushed to ghcr.io |
