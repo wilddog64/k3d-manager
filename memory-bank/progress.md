@@ -65,9 +65,10 @@
   - Gemini: create `ghcr-pull-secret` in `shopping-cart-apps` + `shopping-cart-payment` → ArgoCD sync → verify pods Running
 - [ ] Deploy key rotation policy — 24h scheduled + on infra main merge; spec in `docs/plans/roadmap-v1.md` v0.8.0 section
 - [x] Jenkins optional — **COMPLETE**: all 3 files gated (jenkins.sh, ldap.sh, vault.sh) — commits 08dc1bd + 4b02e16; BATS 2/2 PASS; shellcheck PASS
-- [ ] Re-enable `shopping-cart-e2e-tests` scheduled run
+- [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after Gemini confirms pods Running
 - [ ] Playwright E2E green in CI — milestone gate
 - Spec: `docs/plans/v0.9.4-full-stack-health.md`
+- Gemini unblock spec: `docs/plans/v0.9.4-gemini-ghcr-pull-secret.md`
 
 ### v0.9.5 — planned (after v0.9.4 ships)
 
@@ -78,6 +79,11 @@
 - [ ] `ServiceEntry` — Stripe + PayPal external gateways
 - [ ] Namespace label fix — product-catalog missing `istio-injection: enabled`
 - Spec: `docs/plans/v0.9.5-service-mesh.md`
+
+### Other work completed this session (2026-03-17)
+
+- [x] ASCII → Mermaid diagram fix — shopping-cart-order PR #11, shopping-cart-product-catalog PR #11, shopping-cart-infra PR #11 (was stale on branch) — all merged
+- [x] tax-returns repo created — `github.com/wilddog64/tax-returns`; OTS 2025 installed `~/tools/OpenTaxSolver2025/`; binaries symlinked to `~/.local/bin`; `docs/workflow.md` written
 
 ### After v0.9.x — k3dm-mcp v0.1.0
 

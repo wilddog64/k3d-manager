@@ -23,6 +23,8 @@
 | Kustomize ghcr newName fix | **merged** | order PR #9 (f19cc0c) + product-catalog PR #9 (22c5405) + payment PR #7 (7ab15c2) 2026-03-17 |
 | Mermaid diagrams + Architecture consistency | **COMPLETE** | All 5 service repos merged 2026-03-17; main synced; stale branches deleted; `docs/next-improvements` created on all 4 |
 | Verify ArgoCD all 5 apps Synced + Healthy | **GEMINI READY** | Spec: `docs/plans/v0.9.4-gemini-ghcr-pull-secret.md` — create ghcr-pull-secret in k3s namespaces → ArgoCD sync → verify pods Running |
+| v0.9.5 service mesh spec | **COMPLETE** | `docs/plans/v0.9.5-service-mesh.md` written; roadmap updated; shopping-cart-infra memory-bank updated |
+| tax-returns repo | **COMPLETE** | `github.com/wilddog64/tax-returns` created; OTS installed `~/tools/OpenTaxSolver2025/`; binaries in `~/.local/bin`; `docs/workflow.md` written |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |
 | Playwright E2E green | **milestone gate** | |
 
