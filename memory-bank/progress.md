@@ -61,10 +61,10 @@
 - [x] Kustomize ghcr newName fix — payment PR #7 merged (7ab15c2) 2026-03-17
 - [x] Mermaid architecture diagrams + consistent Architecture section presentation — all 5 service repos (payment PR #8, product-catalog PR #10, order PR #10, frontend PR #6) merged 2026-03-17; stale branches deleted; main synced; `docs/next-improvements` branches created
 - [x] Verify ArgoCD: all 5 apps Synced + Healthy on Ubuntu k3s — **COMPLETE**
-  - Gemini created `ghcr-pull-secret` in `shopping-cart-apps`, `shopping-cart-payment`, and `shopping-cart-data` (app cluster)
-  - ArgoCD sync forced via `kubectl patch` on infra cluster
-  - Pod status: `ImagePullBackOff` remains because app repos use pinned `amd64`-only CI workflow `8363caf` from `shopping-cart-infra`. Multi-arch PR #7 merged on infra but apps must update their `uses:` SHA to benefit.
-  - Verification: `no match for platform in manifest: not found` confirmed on `arm64` Ubuntu k3s node.
+  - Gemini created `ghcr-pull-secret` in 3 namespaces.
+  - ArgoCD sync forced via `kubectl patch` on infra cluster.
+  - Blocker: `ImagePullBackOff` persists due to architecture mismatch (amd64 images on arm64 node).
+  - Detailed report: `docs/issues/2026-03-17-shopping-cart-ghcr-pull-secret-and-arch-mismatch.md`
 - [ ] Deploy key rotation policy — 24h scheduled + on infra main merge; spec in `docs/plans/roadmap-v1.md` v0.8.0 section
 - [x] Jenkins optional — **COMPLETE**: all 3 files gated (jenkins.sh, ldap.sh, vault.sh) — commits 08dc1bd + 4b02e16; BATS 2/2 PASS; shellcheck PASS
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after Gemini confirms pods Running
