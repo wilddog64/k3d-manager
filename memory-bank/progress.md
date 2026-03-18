@@ -34,8 +34,9 @@
 
 ### v0.9.4 — active
 
-- [ ] Wait for all apps to reach `Synced` + `Healthy` — (intermittent tunnel timeouts observed)
-- [ ] Confirm all 5 pods `Running` on Ubuntu k3s — (currently moving from `ImagePullBackOff` to `Running`/`CrashLoopBackOff`)
+- [ ] Fix missing Secrets + ConfigMaps on Ubuntu k3s — **HIGH PRIORITY** — `CreateContainerConfigError` blocks basket, order, product-catalog, payment; see `docs/issues/2026-03-18-shopping-cart-missing-secrets-configmaps.md`; Codex to add Kustomize overlays in shopping-cart-infra
+- [ ] Wait for all apps to reach `Synced` + `Healthy` — blocked by missing Secrets/ConfigMaps above
+- [ ] Confirm all 5 pods `Running` on Ubuntu k3s — currently: basket CrashLoopBackOff (163 restarts), order 1/2 Running+Error, product-catalog CrashLoopBackOff, payment ImagePullBackOff
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
 - [ ] Playwright E2E green in CI — milestone gate
 
@@ -51,6 +52,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
+| Missing Secrets/ConfigMaps on Ubuntu k3s | OPEN | `CreateContainerConfigError` + `CrashLoopBackOff` on all 5 services; ESO not configured for app namespaces; see `docs/issues/2026-03-18-shopping-cart-missing-secrets-configmaps.md` |
 | SSH Tunnel timeouts | OPEN | Frequent connection resets during heavy ArgoCD sync; requires `ServerAliveInterval` or `screen` for stability |
 | ArgoCD cluster registration over tunnel | FIXED | Using manual cluster secret pointing to `https://host.k3d.internal:6443` with `insecure: true` |
 | Vault Kubernetes auth over tunnel | KNOWN | CA cert validation fails over SSH tunnel; use static Vault token with `eso-reader` policy as fallback |
