@@ -30,6 +30,8 @@
 | Copilot review — basket PRs #4 #6 | **COMPLETE** | All 10 threads resolved; PRs merged 2026-03-18 |
 | Docs cleanup — basket, frontend, infra | **COMPLETE** | basket #4/#6, frontend #4, infra #1/#3/#10 merged 2026-03-18 |
 | Gemini: re-verify ArgoCD after arm64 images | **READY** | Spec: `docs/plans/v0.9.4-gemini-argocd-verify.md` — all 5 images in ghcr.io |
+| shopping-cart-infra PR #16 | **open** | Remove broken `.pre-commit-config.yaml` (referenced lib-foundation@v0.3.4 + nonexistent hook) — Gemini scope creep 2026-03-18 |
+| shopping-cart-payment PR #11 | **open** | Remove placeholder `deploy-dev` CI job (missing INFRA_REPO_TOKEN, all steps stubbed) |
 | Codex: kubeconfig merge automation | **COMPLETE** | Spec: `docs/plans/v0.9.4-codex-kubeconfig-merge.md` — merged kubeconfig automation (6699ce8) |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |

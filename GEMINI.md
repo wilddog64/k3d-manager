@@ -157,7 +157,7 @@ ssh -L 0.0.0.0:6443:localhost:6443 -N ubuntu &
 
 - You skip reading the memory-bank and start from your own interpretation — always read it first
 - You confirm the plan correctly but execute differently — your confirmation is not a reliable checkpoint
-- You expand scope when the next step feels obvious — do not. Stop at STOP gates.
+- You expand scope when the next step feels obvious — do not. Stop at STOP gates. Example: added `.pre-commit-config.yaml` referencing `lib-foundation@v0.3.4` and a `check-placeholder-urls` hook that do not exist yet (2026-03-18). If a dependency is not yet released, do not add config that references it.
 - You report BATS tests as passing without running `env -i` — ambient env vars don't count
 - You start work on the wrong machine — `hostname` first, every session, no exceptions
 - You write thin one-line completion reports — the report must include actual output, not summaries
