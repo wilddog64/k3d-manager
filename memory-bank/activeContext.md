@@ -3,7 +3,7 @@
 ## Current Branch: `k3d-manager-v0.9.4` (as of 2026-03-16)
 
 **v0.9.3 SHIPPED** — PR #36 squash-merged (8046c73), 2026-03-16. Tagged + released.
-**v0.9.4 ACTIVE** — branch cut from main 2026-03-16. First commit: README releases table.
+**v0.9.4 ACTIVE** — branch cut from main 2026-03-16.
 
 ---
 
@@ -11,15 +11,10 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| ArgoCD cluster registration fix | **COMPLETE** | Manual cluster secret `cluster-ubuntu-k3s` patched with `insecure: true`; registered with `https://host.k3d.internal:6443` |
-| Verify ArgoCD all 5 apps Synced + Healthy | **BLOCKED** | Missing Secrets + ConfigMaps on Ubuntu k3s — see `docs/issues/2026-03-18-shopping-cart-missing-secrets-configmaps.md` |
-| Shopping cart missing Secrets/ConfigMaps | **PR NEEDED** | Codex COMPLETE (66c9eac) on `fix/payment-missing-secrets`; Claude to open PR; order/product-catalog: ArgoCD sync Unknown — Gemini to force sync |
-| Jenkins optional | **COMPLETE** | all 3 files gated — commits 08dc1bd + 4b02e16; BATS 2/2; shellcheck PASS |
-| Multi-arch CI builds | **merged** | infra PR #7 (a937211) — all 5 app repos benefit |
-| Multi-arch workflow pin fix | **COMPLETE** | All 5 app repos merged to main 2026-03-18; arm64 images pushed to ghcr.io |
-| Gemini: re-verify ArgoCD after arm64 images | **COMPLETE** | Spec: `docs/plans/v0.9.4-gemini-argocd-verify.md` — Verified `ghcr-pull-secret`, registered cluster, added frontend |
-| Codex: kubeconfig merge automation | **COMPLETE** | Spec: `docs/plans/v0.9.4-codex-kubeconfig-merge.md` — merged kubeconfig automation (6699ce8) |
-| Re-enable shopping-cart-e2e-tests schedule | **pending** | after all 5 pods Running |
+| payment-service missing Secrets | **MERGED** | PR #14 merged (9d9de98); `payment-db-credentials` + `payment-encryption-secret` in k8s/base; `enforce_admins` re-enable pending |
+| Force ArgoCD sync — order + product-catalog | **PENDING** | Resources exist in git; sync Unknown due to tunnel; Gemini to run `argocd app sync` |
+| Verify all 5 pods Running on Ubuntu k3s | **PENDING** | basket CrashLoopBackOff (app-level, data layer missing); order/product-catalog pending ArgoCD sync |
+| Re-enable shopping-cart-e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
 
 ---
@@ -29,15 +24,14 @@
 | Version | Status | Notes |
 |---|---|---|
 | v0.1.0–v0.9.3 | released | See README Releases table |
-| v0.9.4 | **active** | Full stack health — ImagePullBackOff fix + Playwright E2E in CI |
-| v0.9.5 | planned | Service mesh — Istio full activation (mTLS, AuthzPolicy, Gateway, DestinationRule, ServiceEntry) |
+| v0.9.4 | **active** | Full stack health — all app pods Running + Playwright E2E green |
+| v0.9.5 | planned | Service mesh — Istio full activation |
 
 ---
 
-## Cluster State (as of 2026-03-18 — Gemini verified)
+## Cluster State (as of 2026-03-18)
 
 **Architecture:** Infra cluster on M2 Air — ArgoCD manages Ubuntu k3s hub-and-spoke.
-Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
 
 ### Infra Cluster — k3d on OrbStack on M2 Air
 
@@ -59,23 +53,25 @@ Ubuntu at `10.211.55.14` (Parallels VM, only reachable from M2 Air).
 | k3s node | Ready (arm64) |
 | Istio / ESO / Vault / OpenLDAP | Running |
 | ghcr-pull-secret | Verified in `apps`, `data`, `payment` namespaces |
-| shopping-cart-apps | Pulling ARM64 images; some in CrashLoopBackOff (normal init); `payment-service` pending sync refresh |
+| basket-service | CrashLoopBackOff — app-level crash (data layer Redis/RabbitMQ not deployed) |
+| order-service | Pending ArgoCD sync (resources in git, sync Unknown) |
+| product-catalog | Pending ArgoCD sync (resources in git, sync Unknown) |
+| payment-service | Secrets now in k8s/base (PR #14 merged); pending ArgoCD sync |
 
 **SSH Tunnel (mandatory):** `ssh -L 0.0.0.0:6443:localhost:6443 -N ubuntu &`
 
 ---
 
-## Release Checklist
+## shopping-cart-payment
 
-1. `git tag v<X.Y.Z> <sha> && git push origin v<X.Y.Z>`
-2. `gh release create v<X.Y.Z> --title "..." --notes "..."`
-3. Update README Releases table on next feature branch
-4. `gh release list` — verify Latest
+- **main:** `9d9de98` — PR #14 merged
+- **active branch:** `feat/v0.1.1` — releases table updated (4e51a5d)
+- **enforce_admins:** disabled for merge — re-enable after next PR merges
+- **stale branches:** all cleaned up; `docs/next-improvements` retained
 
 ---
 
 ## Operational Notes
 
 - **ArgoCD Cluster Secret**: `cluster-ubuntu-k3s` in `cicd` ns requires `insecure: true` for `host.k3d.internal` mismatch.
-- **Frontend Manifest**: `argocd/applications/frontend.yaml` added to `shopping-cart-infra` (PR #17).
-- **Tag Refresh**: Run `update_tags.sh` to ensure `newTag: latest` across all app repos for ARM64 builds.
+- **payment encryption-key**: valid Base64 dev placeholder (`ZGV2LXBsYWNlaG9sZGVyLWtleS1kby1ub3QtdXNlLSE=`) — replace via ESO/Vault in production.
