@@ -252,6 +252,18 @@ JSON-RPC stdio. No direct k3d-manager calls — always through the MCP security 
 
 ---
 
+## v0.9.6 — Lab Accessibility: LoadBalancer Services
+*Focus: Eliminate port-forward — all UI services reachable via OrbStack LoadBalancer IP*
+
+- `argocd-server` — `server.service.type: LoadBalancer` in `scripts/etc/argocd/values.yaml.tmpl`
+- `keycloak` — `service.type: LoadBalancer` in `scripts/etc/keycloak/values.yaml.tmpl`
+- `jenkins` — `controller.serviceType: LoadBalancer` in `scripts/etc/jenkins/values-default.yaml.tmpl`
+- `shopping-cart-frontend` — `spec.type: LoadBalancer` in `k8s/base/service.yaml`
+- LDAP and data-layer services excluded (protocol services, no browser UI)
+- **Spec:** `docs/plans/v0.9.6-lab-accessibility.md`
+
+---
+
 ## v1.1.0 — AWS EKS Provider + ACG Sandbox Lifecycle
 *Focus: First cloud provider — AWS is the most common ACG sandbox*
 
