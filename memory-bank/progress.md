@@ -67,7 +67,10 @@
   - Detailed report: `docs/issues/2026-03-17-shopping-cart-ghcr-pull-secret-and-arch-mismatch.md`
 - [ ] Deploy key rotation policy — 24h scheduled + on infra main merge; spec in `docs/plans/roadmap-v1.md` v0.8.0 section
 - [x] Jenkins optional — **COMPLETE**: all 3 files gated (jenkins.sh, ldap.sh, vault.sh) — commits 08dc1bd + 4b02e16; BATS 2/2 PASS; shellcheck PASS
-- [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after Gemini confirms pods Running
+- [ ] Multi-arch workflow pin — **CODEX READY**: update `@8363caf` → `@999f8d7` in all 5 app repos; spec: `docs/plans/v0.9.4-codex-multiarch-workflow-pin.md`
+- [ ] Re-run CI on all 5 repos after pin fix — push arm64 images to ghcr.io
+- [ ] Gemini: re-verify ArgoCD all 5 apps Synced + Healthy after new images pushed
+- [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
 - [ ] Playwright E2E green in CI — milestone gate
 - Spec: `docs/plans/v0.9.4-full-stack-health.md`
 - Gemini unblock spec: `docs/plans/v0.9.4-gemini-ghcr-pull-secret.md`
