@@ -22,7 +22,7 @@
 | Docs standardization (payment) | **merged** | payment PR #6 (224d721) 2026-03-17 |
 | Kustomize ghcr newName fix | **merged** | order PR #9 (f19cc0c) + product-catalog PR #9 (22c5405) + payment PR #7 (7ab15c2) 2026-03-17 |
 | Mermaid diagrams + Architecture consistency | **COMPLETE** | All 5 service repos merged 2026-03-17; main synced; stale branches deleted; `docs/next-improvements` created on all 4 |
-| Verify ArgoCD all 5 apps Synced + Healthy | **COMPLETE** | `ghcr-pull-secret` created in 3 namespaces; ArgoCD sync forced; Pods still `ImagePullBackOff` due to pinned `amd64` CI workflows in app repos. |
+| Verify ArgoCD all 5 apps Synced + Healthy | **COMPLETE** | `ghcr-pull-secret` created; sync forced; Pods still `ImagePullBackOff` (arch mismatch). See `docs/issues/2026-03-17-shopping-cart-ghcr-pull-secret-and-arch-mismatch.md` |
 | v0.9.5 service mesh spec | **COMPLETE** | `docs/plans/v0.9.5-service-mesh.md` written; roadmap updated; shopping-cart-infra memory-bank updated |
 | tax-returns repo | **COMPLETE** | `github.com/wilddog64/tax-returns` created; OTS installed `~/tools/OpenTaxSolver2025/`; binaries in `~/.local/bin`; `docs/workflow.md` written |
 | Re-enable shopping-cart-e2e-tests schedule | **pending** | after ArgoCD green |
