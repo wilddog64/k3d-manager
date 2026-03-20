@@ -22,3 +22,6 @@ scripts/plugins/vault.sh:_vault_bootstrap_ha
 scripts/plugins/vault.sh:_vault_configure_secret_reader_role
 scripts/plugins/vault.sh:_vault_seed_ldap_service_accounts
 scripts/plugins/vault.sh:deploy_vault
+
+scripts/lib/system.sh:_run_command
+scripts/lib/system.sh:_ensure_node
