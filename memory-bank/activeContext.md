@@ -62,6 +62,10 @@
 
 **SSH Tunnel (autossh plugin live):** Use `tunnel_start`/`tunnel_status`/`tunnel_stop` from `scripts/k3d-manager` to manage the launchd-backed autossh bridge; defaults in `scripts/etc/tunnel/vars.sh`. Spec: `docs/plans/v0.9.4-codex-autossh-tunnel-plugin.md`
 
+**SSH Tunnel launchd fix (2026-03-20):** `~/.ssh/config` now has `Host ubuntu-tunnel` (no ControlMaster, IdentitiesOnly yes) for use by launchd. `com.k3d-manager.ssh-tunnel.plist` updated to use `ubuntu-tunnel`. Key added to macOS keychain via `ssh-add --apple-use-keychain`.
+
+**ArgoCD cluster secret:** `cluster-ubuntu-k3s` created in `cicd` ns pointing to `https://host.k3d.internal:6443`. Apps still `Unknown` — cluster secret missing bearer token. `register_app_cluster` spec updated to include `ARGOCD_APP_CLUSTER_TOKEN` (required). Pre-req: create `argocd-manager` service account on ubuntu k3s before running `register_app_cluster`.
+
 ---
 
 ## shopping-cart-payment
