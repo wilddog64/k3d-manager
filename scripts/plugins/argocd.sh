@@ -857,3 +857,48 @@ function _argocd_deploy_applicationsets() {
    _info "[argocd] Successfully deployed $deployed_count/${#appset_files[@]} ApplicationSet(s)"
    return 0
 }
+function register_app_cluster() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'HELP'
+Usage: register_app_cluster
+
+Register the Ubuntu k3s app cluster with ArgoCD by applying a cluster secret.
+Bypasses argocd cluster add (gRPC over SSH tunnel is unreliable).
+
+Requires a service account token from the ubuntu-k3s cluster:
+  ssh ubuntu kubectl create token argocd-manager -n kube-system --duration=8760h
+
+Config (override via env or scripts/etc/argocd/vars.sh):
+  ARGOCD_APP_CLUSTER_SECRET_NAME   Secret name   (default: cluster-ubuntu-k3s)
+  ARGOCD_APP_CLUSTER_NAME          Cluster name  (default: ubuntu-k3s)
+  ARGOCD_APP_CLUSTER_SERVER        API server    (default: https://host.k3d.internal:6443)
+  ARGOCD_APP_CLUSTER_INSECURE      Skip TLS      (default: true — dev only)
+  ARGOCD_APP_CLUSTER_TOKEN         Bearer token  (required — no default)
+HELP
+    return 0
+  fi
+
+  local tmpl="${SCRIPT_DIR}/etc/argocd/cluster-secret.yaml.tmpl"
+  if [[ ! -f "$tmpl" ]]; then
+    _err "[argocd] cluster secret template not found: $tmpl"
+    return 1
+  fi
+
+  if [[ -z "${ARGOCD_APP_CLUSTER_TOKEN:-}" ]]; then
+    _err "[argocd] ARGOCD_APP_CLUSTER_TOKEN is required — get it with:"
+    _err "  ssh ubuntu kubectl create token argocd-manager -n kube-system --duration=8760h"
+    return 1
+  fi
+
+  _info "[argocd] registering app cluster '${ARGOCD_APP_CLUSTER_NAME}' -> ${ARGOCD_APP_CLUSTER_SERVER}"
+
+  ARGOCD_APP_CLUSTER_SECRET_NAME="${ARGOCD_APP_CLUSTER_SECRET_NAME}" \
+  ARGOCD_APP_CLUSTER_NAME="${ARGOCD_APP_CLUSTER_NAME}" \
+  ARGOCD_APP_CLUSTER_SERVER="${ARGOCD_APP_CLUSTER_SERVER}" \
+  ARGOCD_APP_CLUSTER_INSECURE="${ARGOCD_APP_CLUSTER_INSECURE}" \
+  ARGOCD_APP_CLUSTER_TOKEN="${ARGOCD_APP_CLUSTER_TOKEN}" \
+  ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE}" \
+    envsubst < "$tmpl" | _kubectl apply -f -
+
+  _info "[argocd] cluster secret applied — verify with: kubectl get secret ${ARGOCD_APP_CLUSTER_SECRET_NAME} -n ${ARGOCD_NAMESPACE}"
+}

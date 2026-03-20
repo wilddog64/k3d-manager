@@ -30,6 +30,12 @@ During the Gemini cluster rebuild smoke test (v0.9.3), several issues were ident
 - Plugin uses configurable defaults from `scripts/etc/tunnel/vars.sh` and exposes `tunnel_start`, `tunnel_stop`, and `tunnel_status` commands through `scripts/k3d-manager`.
 - BATS coverage (`scripts/tests/plugins/tunnel.bats`) verifies autossh detection, idempotency, plist generation, and status reporting (process + launchd state).
 
+## Follow-up — ArgoCD Cluster Secret Automation (2026-03-20)
+
+- Added `register_app_cluster` command in `scripts/plugins/argocd.sh` plus dispatcher in `scripts/k3d-manager` to apply the ubuntu-k3s cluster secret without `argocd cluster add`.
+- Token/server/insecure defaults centralized in `scripts/etc/argocd/vars.sh`; template lives at `scripts/etc/argocd/cluster-secret.yaml.tmpl` with bearer token + TLS config.
+- Command enforces `ARGOCD_APP_CLUSTER_TOKEN` presence and pipes `envsubst` output to `_kubectl apply` so the secret stays templated while credentials remain outside git.
+
 ## Recommendation
 
 -   Update `destroy_k3s_cluster` to include a thorough cleanup of `/var/lib/rancher`.
