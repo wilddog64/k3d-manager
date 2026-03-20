@@ -24,6 +24,12 @@ During the Gemini cluster rebuild smoke test (v0.9.3), several issues were ident
 3.  **Manual ArgoCD Secret:** Manually created the ArgoCD cluster secret in the `cicd` namespace on the infra cluster, pointing to `https://host.k3d.internal:6443`.
 4.  **Vault Token Auth:** Switched the `ClusterSecretStore` on the app cluster to use a static Vault token with the `eso-reader` policy, as the Kubernetes auth mount was failing due to CA cert validation issues over the tunnel.
 
+## Follow-up — Tunnel Automation (2026-03-20)
+
+- Added an autossh-backed tunnel plugin (`scripts/plugins/tunnel.sh`) with launchd persistence so the `ssh -L 0.0.0.0:6443:localhost:6443 -N ubuntu` bridge survives host reboots and tunnel drops.
+- Plugin uses configurable defaults from `scripts/etc/tunnel/vars.sh` and exposes `tunnel_start`, `tunnel_stop`, and `tunnel_status` commands through `scripts/k3d-manager`.
+- BATS coverage (`scripts/tests/plugins/tunnel.bats`) verifies autossh detection, idempotency, plist generation, and status reporting (process + launchd state).
+
 ## Recommendation
 
 -   Update `destroy_k3s_cluster` to include a thorough cleanup of `/var/lib/rancher`.
