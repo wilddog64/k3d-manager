@@ -847,7 +847,7 @@ function _install_redhat_docker() {
   fi
   # Add current user to docker group
   _run_command  -- sudo usermod -aG docker "$USER"
-  echo "Docker instsudo alled successfully. You may need to log out and back in for group changes to take effect."
+  echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
 }
 
 function _k3d_cluster_exist() {
