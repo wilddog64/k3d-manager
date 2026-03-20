@@ -62,6 +62,7 @@
 
 **SSH Tunnel (autossh plugin live):** Use `tunnel_start`/`tunnel_status`/`tunnel_stop` from `scripts/k3d-manager` to manage the launchd-backed autossh bridge; defaults in `scripts/etc/tunnel/vars.sh`. Spec: `docs/plans/v0.9.4-codex-autossh-tunnel-plugin.md`
 **ArgoCD cluster registration:** `register_app_cluster` applies `scripts/etc/argocd/cluster-secret.yaml.tmpl` with `envsubst` (token via `ARGOCD_APP_CLUSTER_TOKEN`); replaces failing `argocd cluster add`. Spec: `docs/plans/v0.9.4-codex-argocd-cluster-registration.md`
+**Cluster smoke test:** `bin/smoke-test-cluster-health.sh` checks ghcr secret, ArgoCD sync, and pod counts before declaring success. Spec: `docs/plans/v0.9.4-codex-smoke-test-cluster-health.md`
 
 **SSH Tunnel launchd fix (2026-03-20):** `~/.ssh/config` now has `Host ubuntu-tunnel` (no ControlMaster, IdentitiesOnly yes) for use by launchd. `com.k3d-manager.ssh-tunnel.plist` updated to use `ubuntu-tunnel`. Key added to macOS keychain via `ssh-add --apple-use-keychain`.
 

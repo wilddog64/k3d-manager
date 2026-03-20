@@ -36,6 +36,11 @@ During the Gemini cluster rebuild smoke test (v0.9.3), several issues were ident
 - Token/server/insecure defaults centralized in `scripts/etc/argocd/vars.sh`; template lives at `scripts/etc/argocd/cluster-secret.yaml.tmpl` with bearer token + TLS config.
 - Command enforces `ARGOCD_APP_CLUSTER_TOKEN` presence and pipes `envsubst` output to `_kubectl apply` so the secret stays templated while credentials remain outside git.
 
+## Follow-up — Cluster Health Smoke Test (2026-03-20)
+
+- Added `bin/smoke-test-cluster-health.sh` to gate every cluster task; validates `ghcr-pull-secret`, ArgoCD sync status, and pod readiness with PASS/FAIL summaries.
+- Script honors `INFRA_CONTEXT`/`APP_CONTEXT` overrides and exits non-zero when any check fails so Gemini can block unhealthy states before closing work.
+
 ## Recommendation
 
 -   Update `destroy_k3s_cluster` to include a thorough cleanup of `/var/lib/rancher`.

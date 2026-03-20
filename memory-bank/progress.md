@@ -35,7 +35,7 @@
 - [ ] **Codex: fix `instsudo` typo** — `scripts/lib/system.sh` line 838 (Gemini red team finding)
 - [x] **autossh tunnel plugin** — Codex delivered autossh-backed tunnel plugin + BATS coverage per `docs/plans/v0.9.4-codex-autossh-tunnel-plugin.md`; commands exposed via `tunnel_start|stop|status`; commit msg: `feat(tunnel): add autossh tunnel plugin with launchd boot persistence`
 - [x] **ArgoCD cluster registration automation** — Codex delivered `register_app_cluster`, cluster-secret template, and vars per `docs/plans/v0.9.4-codex-argocd-cluster-registration.md`; replaces manual secret creation; commit msg: `feat(argocd): add register_app_cluster to automate ubuntu-k3s cluster secret`
-- [ ] **Smoke tests** — **ASSIGNED TO CODEX** (2026-03-20); spec: `docs/plans/v0.9.4-codex-smoke-test-cluster-health.md`; commit msg: `feat(bin): add smoke-test-cluster-health.sh — baseline health gate for cluster tasks`
+- [x] **Smoke tests** — Codex added `bin/smoke-test-cluster-health.sh` per `docs/plans/v0.9.4-codex-smoke-test-cluster-health.md`; command enforces ghcr secret, ArgoCD sync, and pod counts before sign-off
 - [ ] Confirm all 5 pods `Running` on Ubuntu k3s — basket: CrashLoopBackOff (data layer Redis/RabbitMQ not deployed to Ubuntu k3s); payment: pending ArgoCD sync of secret
 - [x] **Fix `_run_command` non-interactive sudo failure after VM restart** — Codex implemented `_run_command_has_tty`, interactive sudo fallbacks, and regression tests per `docs/plans/v0.9.4-codex-run-command-tty-sudo-fallback.md`; issue: `docs/issues/2026-03-19-run-command-non-interactive-sudo-failure.md`; commit msg: `fix(system): fall back to interactive sudo when sudo -n unavailable and TTY present`
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
