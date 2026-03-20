@@ -58,7 +58,7 @@
 | product-catalog | **PENDING REDEPLOY** |
 | payment-service | **PENDING REDEPLOY** |
 
-**BLOCKED:** `deploy_cluster` fails on remote Ubuntu host because `_run_command` uses non-interactive `sudo -n`, which is rejected after a VM reboot. Fix scheduled for 2026-03-20.
+**FIXED (2026-03-20):** `_run_command --prefer-sudo` now detects TTY availability and falls back to interactive sudo when `sudo -n` fails, covering `--prefer-sudo`, `--require-sudo`, and probe paths. Regression tests live in `scripts/tests/lib/run_command.bats`. Issue: `docs/issues/2026-03-19-run-command-non-interactive-sudo-failure.md`
 
 **SSH Tunnel (mandatory):** `ssh -L 0.0.0.0:6443:localhost:6443 -N ubuntu &`
 
