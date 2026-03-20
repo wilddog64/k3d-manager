@@ -1,7 +1,7 @@
 # Issue: _run_command Non-Interactive Sudo Failure after VM Restart
 
 **Date:** 2026-03-19
-**Status:** OPEN (Fix scheduled for 2026-03-20)
+**Status:** RESOLVED (2026-03-20)
 **Component:** `scripts/lib/system.sh` (`_run_command`), `scripts/lib/providers/k3s.sh`
 
 ## Description
@@ -36,8 +36,10 @@ ssh -t ubuntu "sudo true"
 ```
 After this, `sudo -n` will succeed for the duration of the `sudo` timeout (typically 5-15 minutes).
 
-## Permanent Fix (Planned)
+## Permanent Fix (Implemented)
 
-- Implement an `--interactive` flag for `deploy_cluster` that propagates to `_run_command`.
-- Update `_run_command` to detect if it's running in an interactive TTY and omit `-n` if a password is required.
-- Add a pre-flight check in `deploy_cluster` to verify `sudo` access before starting long-running operations.
+- Added `_run_command_has_tty` helper so `_run_command` can detect whether a TTY is present (overridable in tests).
+- Updated all `--prefer-sudo`, `--require-sudo`, and `--probe` paths to attempt interactive sudo when `sudo -n` fails but a TTY exists, and to keep failing fast when no TTY is available.
+- Added regression BATS coverage for the new fallback behavior and ensured `scripts/k3d-manager test run_command` exercises the new code paths.
+
+These changes shipped on `k3d-manager-v0.9.4` via commit `fix(system): fall back to interactive sudo when sudo -n unavailable and TTY present`.

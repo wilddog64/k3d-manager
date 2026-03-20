@@ -36,7 +36,7 @@
 - [ ] **ArgoCD cluster registration automation** — `argocd cluster add` over tunnel failed manually; should be automated IaC; Gemini finding
 - [ ] **Smoke tests** — verify `ghcr-pull-secret` exists + Application health before concluding any task; Gemini finding
 - [ ] Confirm all 5 pods `Running` on Ubuntu k3s — basket: CrashLoopBackOff (data layer Redis/RabbitMQ not deployed to Ubuntu k3s); payment: pending ArgoCD sync of secret
-- [ ] **Fix `_run_command` non-interactive sudo failure after VM restart** — OPEN (scheduled for 2026-03-20); see `docs/issues/2026-03-19-run-command-non-interactive-sudo-failure.md`
+- [x] **Fix `_run_command` non-interactive sudo failure after VM restart** — Codex implemented `_run_command_has_tty`, interactive sudo fallbacks, and regression tests per `docs/plans/v0.9.4-codex-run-command-tty-sudo-fallback.md`; issue: `docs/issues/2026-03-19-run-command-non-interactive-sudo-failure.md`; commit msg: `fix(system): fall back to interactive sudo when sudo -n unavailable and TTY present`
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
 - [ ] Playwright E2E green — milestone gate
 - [ ] Re-enable `enforce_admins` on shopping-cart-payment main branch
