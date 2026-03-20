@@ -31,6 +31,7 @@
 ### v0.9.4 — active
 
 - [ ] **Gemini: rebuild Ubuntu k3s + E2E verification** — **ASSIGNED TO GEMINI** (2026-03-20); spec: `docs/plans/v0.9.4-gemini-rebuild-ubuntu-k3s-e2e.md`; gate: Codex tunnel plugin must be verified first
+- [ ] **Gemini: ArgoCD cluster registration + app sync** — **ASSIGNED TO GEMINI** (2026-03-20); spec: `docs/plans/v0.9.4-gemini-argocd-cluster-registration.md`; gate: Codex argocd registration + smoke test committed
 - [ ] Force ArgoCD sync — order-service + product-catalog — covered in Gemini rebuild spec
 - [ ] **Codex: fix `instsudo` typo** — `scripts/lib/system.sh` line 838 (Gemini red team finding)
 - [x] **autossh tunnel plugin** — Codex delivered autossh-backed tunnel plugin + BATS coverage per `docs/plans/v0.9.4-codex-autossh-tunnel-plugin.md`; commands exposed via `tunnel_start|stop|status`; commit msg: `feat(tunnel): add autossh tunnel plugin with launchd boot persistence`
