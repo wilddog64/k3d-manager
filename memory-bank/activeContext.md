@@ -50,13 +50,15 @@
 
 | Component | Status |
 |---|---|
-| k3s node | Ready (arm64) |
-| Istio / ESO / Vault / OpenLDAP | Running |
-| ghcr-pull-secret | Verified in `apps`, `data`, `payment` namespaces |
-| basket-service | CrashLoopBackOff — app-level crash (data layer Redis/RabbitMQ not deployed) |
-| order-service | Pending ArgoCD sync (resources in git, sync Unknown) |
-| product-catalog | Pending ArgoCD sync (resources in git, sync Unknown) |
-| payment-service | Secrets now in k8s/base (PR #14 merged); pending ArgoCD sync |
+| k3s node | **UNINSTALLED** — VM hard-reset 2026-03-19; pending redeploy |
+| Istio / ESO / Vault / OpenLDAP | **PENDING REDEPLOY** |
+| ghcr-pull-secret | **PENDING REDEPLOY** |
+| basket-service | **PENDING REDEPLOY** |
+| order-service | **PENDING REDEPLOY** |
+| product-catalog | **PENDING REDEPLOY** |
+| payment-service | **PENDING REDEPLOY** |
+
+**BLOCKED:** `deploy_cluster` fails on remote Ubuntu host because `_run_command` uses non-interactive `sudo -n`, which is rejected after a VM reboot. Fix scheduled for 2026-03-20.
 
 **SSH Tunnel (mandatory):** `ssh -L 0.0.0.0:6443:localhost:6443 -N ubuntu &`
 
