@@ -5,6 +5,7 @@
 
 ## Build, Test, and Development Commands
 - `./scripts/k3d-manager <function>` — primary entrypoint; run `deploy_cluster`, `deploy_vault`, etc. from repo root.
+- All `deploy_*` invocations require explicit options or `--confirm`; add `--dry-run`/`-n` to print the planned commands and `--plan` (Vault) for a read-only state report.
 - `./scripts/k3d-manager test all` — runs the curated BATS bundles defined in `scripts/lib/test.sh`.
 - `bats scripts/tests` — executes every suite; handy before large refactors.
 - `shellcheck scripts/**/*.sh` — lint every touched shell file; CI blocks on failures.
@@ -76,3 +77,9 @@ If you find a bug outside your scope, report it in the memory-bank — do not fi
 ### 9. Update memory-bank on completion
 When your task is done, update `memory-bank/activeContext.md` and `memory-bank/progress.md`
 to reflect what you completed. Include the real commit SHA and PR URL.
+
+### 10. If-count allowlist is for legacy code only
+The `_agent_audit` threshold stays at 8 `if` blocks per function. If you touch a file with
+legacy functions that still exceed the limit, document the specific `file:function` pair in
+`scripts/etc/agent/if-count-allowlist` (with a follow-up issue) instead of raising the
+threshold. New or refactored code must stay within the budget.

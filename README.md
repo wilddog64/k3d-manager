@@ -15,15 +15,15 @@ The project includes an **Agent Rigor Protocol** (`_agent_checkpoint`, `_agent_l
 ### 1. Bootstrap the infra cluster (local — OrbStack or k3d)
 
 ```bash
-./scripts/k3d-manager deploy_cluster          # create cluster + install Istio
-./scripts/k3d-manager deploy_vault            # Vault HA + PKI
-./scripts/k3d-manager deploy_eso              # External Secrets Operator
-./scripts/k3d-manager deploy_ldap             # OpenLDAP directory
-./scripts/k3d-manager deploy_argocd           # ArgoCD GitOps engine
-./scripts/k3d-manager deploy_jenkins --enable-vault   # Jenkins + Vault auth
-./scripts/k3d-manager deploy_keycloak         # Keycloak identity provider
+./scripts/k3d-manager deploy_cluster --confirm          # create cluster + install Istio
+./scripts/k3d-manager deploy_vault --confirm            # Vault HA + PKI
+./scripts/k3d-manager deploy_eso --confirm              # External Secrets Operator
+./scripts/k3d-manager deploy_ldap --confirm             # OpenLDAP directory
+./scripts/k3d-manager deploy_argocd --confirm           # ArgoCD GitOps engine
+./scripts/k3d-manager deploy_jenkins --enable-vault     # Jenkins + Vault auth
+./scripts/k3d-manager deploy_keycloak --confirm         # Keycloak identity provider
 ACME_EMAIL=you@example.com \
-  ./scripts/k3d-manager deploy_cert_manager   # cert-manager + ACME ClusterIssuer
+  ./scripts/k3d-manager deploy_cert_manager --confirm   # cert-manager + ACME ClusterIssuer
 ```
 
 ### 2. Add the Ubuntu k3s app cluster
@@ -75,6 +75,12 @@ Run ./scripts/k3d-manager --help for full function list.
 ./scripts/k3d-manager create_cluster second 9090 9443   # custom ports
 CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f   # k3s, non-interactive
 ```
+
+### Safety Gates, Dry-Run, and Plans
+
+- Running any `deploy_*` function with no arguments now shows the help text instead of executing. Pass explicit options or `--confirm` to apply the defaults, e.g. `./scripts/k3d-manager deploy_vault --confirm --namespace secrets`.
+- Add `--dry-run` (or `-n`) to print every command that would run without executing, useful for reviewing changes or validating permissions.
+- `deploy_vault --plan` inspects the current cluster state (namespace, Helm release, Vault status, PKI/policy setup) and prints a Terraform-style plan before you run the real deployment.
 
 ---
 

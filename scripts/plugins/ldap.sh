@@ -1132,7 +1132,7 @@ EOF
 
       # Wait for ESO webhook to be ready
       _info "[ldap] waiting for ESO webhook to be ready..."
-      if ! kubectl wait --for=condition=available deployment/external-secrets-webhook -n "${ESO_NAMESPACE:-secrets}" --timeout=60s; then
+      if ! _kubectl --no-exit -n "${ESO_NAMESPACE:-secrets}" wait --for=condition=available deployment/external-secrets-webhook --timeout=60s; then
          _err "[ldap] ESO webhook did not become ready"
          return 1
       fi
@@ -1427,7 +1427,7 @@ EOF
 
       # Wait for ESO webhook to be ready
       _info "[ad] waiting for ESO webhook to be ready..."
-      if ! kubectl wait --for=condition=available deployment/external-secrets-webhook -n "${ESO_NAMESPACE:-secrets}" --timeout=60s; then
+      if ! _kubectl --no-exit -n "${ESO_NAMESPACE:-secrets}" wait --for=condition=available deployment/external-secrets-webhook --timeout=60s; then
          _err "[ad] ESO webhook did not become ready"
          return 1
       fi
