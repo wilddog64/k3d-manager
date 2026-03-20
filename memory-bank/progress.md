@@ -68,6 +68,7 @@
 - v1.2.0 — k3dm-mcp (gate: EKS delivered; k3d + EKS = two backends)
 - v1.3.0 — GKE (ships into working MCP framework)
 - v1.4.0 — AKS (known blocker: AADSTS130507)
+- v1.1.0 — **GitHub Actions OIDC** for ghcr.io pulls — keyless auth, eliminates PAT entirely for CI; needs workflow changes in all 5 shopping-cart repos + IRSA already in scope for EKS
 - v1.5.0 — vCluster
 
 ### v0.9.5 — planned
@@ -76,6 +77,8 @@
 - [ ] `PeerAuthentication` / `AuthorizationPolicy` / `Gateway`
 - Spec: `docs/plans/v0.9.5-service-mesh.md`
 - [ ] **sudo whitelist** — `scripts/etc/sudoers/k3d-manager` template installed during `deploy_cluster` bootstrap; `NOPASSWD` scoped to exact k3d-manager commands only (mkdir, cp, chmod, systemctl for k3s); eliminates need for warm sudo timestamp on fresh VM
+- [ ] **Vault backup/restore** — `backup_vault` / `restore_vault` commands using `vault operator raft snapshot`; run before any destructive VM operation; eliminates manual PAT re-provisioning after cluster wipe
+- [ ] **GitHub PAT rotation reminder** — current PAT expires 2026-04-12; rotate and re-store in Vault at `secret/github/pat-read-packages` before expiry
 
 ### k3dm-mcp tool surface (notes for when we get there)
 
