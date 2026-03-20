@@ -12,8 +12,8 @@
 | Item | Status | Notes |
 |---|---|---|
 | payment-service missing Secrets | **MERGED** | PR #14 merged (9d9de98); `payment-db-credentials` + `payment-encryption-secret` in k8s/base; `enforce_admins` re-enable pending |
-| Force ArgoCD sync — order + product-catalog | **PENDING** | Resources exist in git; sync Unknown due to tunnel; Gemini to run `argocd app sync` |
-| Verify all 5 pods Running on Ubuntu k3s | **PENDING** | basket CrashLoopBackOff (app-level, data layer missing); order/product-catalog pending ArgoCD sync |
+| Rebuild Ubuntu k3s + E2E verify | **ASSIGNED TO GEMINI** | spec: `docs/plans/v0.9.4-gemini-rebuild-ubuntu-k3s-e2e.md`; gate: Codex tunnel plugin verified first |
+| Verify all 5 pods Running on Ubuntu k3s | **PENDING** | basket CrashLoopBackOff expected (data layer missing); covered in Gemini rebuild spec |
 | Re-enable shopping-cart-e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
 
