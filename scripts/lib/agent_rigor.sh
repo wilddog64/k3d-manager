@@ -43,6 +43,19 @@ _agent_audit() {
       return 0
    fi
 
+   local allowlist_file="${AGENT_AUDIT_IF_ALLOWLIST_FILE:-${SCRIPT_DIR}/etc/agent/if-count-allowlist}"
+   local if_allowlist=""
+   if [[ -r "$allowlist_file" ]]; then
+      while IFS= read -r line; do
+         line=${line%%#*}
+         line="${line#${line%%[![:space:]]*}}"
+         line="${line%${line##*[![:space:]]}}"
+         [[ -z "$line" ]] && continue
+         if_allowlist+=$'\n'
+         if_allowlist+="$line"
+      done < "$allowlist_file"
+   fi
+
    local status=0
    local diff_bats
    diff_bats="$(git diff --cached -- '*.bats' 2>/dev/null || true)"
@@ -76,7 +89,10 @@ _agent_audit() {
          while IFS= read -r line; do
             if [[ $line =~ ^[[:space:]]*function[[:space:]]+ ]]; then
                if [[ -n "$current_func" && $if_count -gt $max_if ]]; then
-                  offenders_lines+="${current_func}:${if_count}"$'\n'
+                  local allow_key="${file}:${current_func}"
+                  if [[ ! $'\n'"$if_allowlist"$'\n' == *$'\n'"$allow_key"$'\n'* ]]; then
+                     offenders_lines+="${current_func}:${if_count}"$'\n'
+                  fi
                fi
                current_func="${line#*function }"
                current_func="${current_func%%(*}"
@@ -88,7 +104,10 @@ _agent_audit() {
          done < <(git show :"$file" 2>/dev/null || true)
 
          if [[ -n "$current_func" && $if_count -gt $max_if ]]; then
-            offenders_lines+="${current_func}:${if_count}"$'\n'
+            local allow_key="${file}:${current_func}"
+            if [[ ! $'\n'"$if_allowlist"$'\n' == *$'\n'"$allow_key"$'\n'* ]]; then
+               offenders_lines+="${current_func}:${if_count}"$'\n'
+            fi
          fi
 
          offenders_lines="${offenders_lines%$'\n'}"

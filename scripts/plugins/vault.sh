@@ -661,6 +661,117 @@ function _vault_purge_unseal_cache() {
    unset _VAULT_SESSION_TOKENS["$cluster"]
 }
 
+function __vault_plan_emit() {
+   local state="$1" desc="$2" detail="${3:-}"
+   printf '[%s] %s' "$state" "$desc"
+   if [[ -n "$detail" ]]; then
+      printf ' — %s' "$detail"
+   fi
+   printf '\n'
+}
+
+function __vault_plan_check_eso_operator() {
+   local eso_ns="$1"
+   if _kubectl --no-exit -n "$eso_ns" get deploy/external-secrets >/dev/null 2>&1; then
+      __vault_plan_emit OK "External Secrets Operator present (${eso_ns})"
+   else
+      __vault_plan_emit TODO "External Secrets Operator missing" "Would run: deploy_eso --confirm"
+   fi
+}
+
+function __vault_plan_check_namespace_exists() {
+   local ns="$1"
+   if _kubectl --no-exit get ns "$ns" >/dev/null 2>&1; then
+      __vault_plan_emit OK "Namespace ${ns} exists"
+   else
+      __vault_plan_emit TODO "Namespace ${ns} missing" "Would run: kubectl create namespace ${ns}"
+   fi
+}
+
+function __vault_plan_check_release_state() {
+   local ns="$1" release="$2" chart_version="$3"
+   if _helm --no-exit -n "$ns" status "$release" >/dev/null 2>&1; then
+      __vault_plan_emit OK "Helm release ${release} installed"
+      return 0
+   fi
+   __vault_plan_emit TODO "Helm release ${release} not found" "Would run: helm upgrade --install ${release} hashicorp/vault --version ${chart_version}"
+   return 1
+}
+
+function __vault_plan_fetch_status_flags() {
+   local ns="$1" release="$2"
+   local status_json initialized="false" sealed="true"
+   status_json=$(_vault_exec --no-exit "$ns" "vault status -format=json" "$release" 2>/dev/null || true)
+   if [[ -n "$status_json" ]]; then
+      initialized=$(printf '%s' "$status_json" | jq -r 'if .initialized == true then "true" elif .initialized == false then "false" else empty end' 2>/dev/null || printf '')
+      sealed=$(printf '%s' "$status_json" | jq -r 'if .sealed == true then "true" elif .sealed == false then "false" else empty end' 2>/dev/null || printf '')
+      [[ -z "$initialized" ]] && initialized="false"
+      [[ -z "$sealed" ]] && sealed="true"
+   fi
+   printf '%s %s\n' "$initialized" "$sealed"
+}
+
+function __vault_plan_check_downstream() {
+   local ns="$1" release="$2"
+   if _vault_policy_exists "$ns" "$release" "eso-reader"; then
+      __vault_plan_emit OK "ESO Kubernetes auth policies present"
+   else
+      __vault_plan_emit TODO "ESO policies missing" "Would run: _enable_kv2_k8s_auth"
+   fi
+
+   local mount_trim="${LDAP_VAULT_KV_MOUNT:-secret}"
+   local secret_trim="${LDAP_JENKINS_SERVICE_ACCOUNT_VAULT_PATH:-ldap/service-accounts/jenkins-admin}"
+   mount_trim="${mount_trim%/}"
+   secret_trim="${secret_trim#/}"
+   secret_trim="${secret_trim%/}"
+   local full_path="${mount_trim}/${secret_trim}"
+   if _vault_exec --no-exit "$ns" "vault kv get -format=json ${full_path}" "$release" >/dev/null 2>&1; then
+      __vault_plan_emit OK "LDAP service account secret (${full_path}) present"
+   else
+      __vault_plan_emit TODO "LDAP service account secret missing" "Would run: _vault_seed_ldap_service_accounts"
+   fi
+
+   if _is_vault_pki_mounted "$ns" "$release" "${VAULT_PKI_PATH:-pki}"; then
+      __vault_plan_emit OK "PKI mount ${VAULT_PKI_PATH:-pki} present"
+   else
+      __vault_plan_emit TODO "PKI mount ${VAULT_PKI_PATH:-pki} missing" "Would run: _vault_setup_pki"
+   fi
+}
+
+function _vault_plan_report() {
+   local ns="${1:-$VAULT_NS_DEFAULT}"
+   local release="${2:-$VAULT_RELEASE_DEFAULT}"
+   local chart_version="${3:-$VAULT_CHART_VERSION}"
+   local eso_ns="${ESO_NAMESPACE:-secrets}"
+   printf '[vault] plan for %s/%s\n' "$ns" "$release"
+
+   __vault_plan_check_eso_operator "$eso_ns"
+   __vault_plan_check_namespace_exists "$ns"
+
+   local release_ready=0
+   if __vault_plan_check_release_state "$ns" "$release" "$chart_version"; then
+      release_ready=1
+   fi
+
+   local initialized="false" sealed="true"
+   if (( release_ready )); then
+      read -r initialized sealed <<< "$(__vault_plan_fetch_status_flags "$ns" "$release")"
+   fi
+
+   if [[ "$initialized" == "true" && "$sealed" == "false" ]]; then
+      __vault_plan_emit OK "Vault initialized and unsealed"
+      __vault_plan_check_downstream "$ns" "$release"
+   elif [[ "$initialized" == "true" ]]; then
+      __vault_plan_emit TODO "Vault sealed" "Would run: deploy_vault --re-unseal"
+      __vault_plan_emit WARN "Skipping downstream checks until Vault is initialized"
+   else
+      __vault_plan_emit TODO "Vault not initialized" "Would run: deploy_vault"
+      __vault_plan_emit WARN "Skipping downstream checks until Vault is initialized"
+   fi
+
+   printf '\n'
+}
+
 function _deploy_vault_ha() {
    local ns="${1:-$VAULT_NS_DEFAULT}"
    local release="${2:-$VAULT_RELEASE_DEFAULT}"
@@ -704,6 +815,7 @@ Options:
   --release <name>       Helm release name (default: ${VAULT_RELEASE_DEFAULT})
   --chart-version <ver>  Vault chart version (default: ${VAULT_CHART_VERSION})
   --re-unseal            Replay cached unseal shards and exit
+  --plan                 Inspect current state and display the planned actions
   -h, --help             Show this message
 EOF
       return 0
@@ -723,6 +835,7 @@ EOF
    fi
 
    local re_unseal=0
+   local plan_mode=0
    local ns="${VAULT_NS:-$VAULT_NS_DEFAULT}"
    local release="$VAULT_RELEASE_DEFAULT"
    local version="$VAULT_CHART_VERSION"
@@ -782,6 +895,11 @@ EOF
                _err "[vault] --chart-version flag requires a non-empty argument"
             fi
             version_set=1
+            shift
+            continue
+            ;;
+         --plan)
+            plan_mode=1
             shift
             continue
             ;;
@@ -854,6 +972,18 @@ EOF
       _err "[vault] too many positional arguments"
    done
 
+   if (( plan_mode )) && [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
+      _err "[vault] --plan cannot be combined with --dry-run"
+   fi
+
+   if (( plan_mode )); then
+      if (( re_unseal )); then
+         _err "[vault] --plan cannot be combined with --re-unseal"
+      fi
+      _vault_plan_report "$ns" "$release" "$version"
+      return 0
+   fi
+
    if (( re_unseal )) && [[ -z "$mode" ]]; then
       _vault_replay_cached_unseal "$ns" "$release"
       return $?
@@ -902,6 +1032,10 @@ function _is_vault_deployed() {
 function _vault_bootstrap_ha() {
   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
   local leader="${release}-0"
+  if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
+     _info "[vault] dry-run requested; skipping bootstrap phase for ${ns}/${release}"
+     return 0
+  fi
   _info "[vault] bootstrap sequence starting for ${ns}/${release}"
   if ! _is_vault_deployed "$ns" "$release"; then
       _err "[vault] not deployed in ns=$ns release=$release" >&2
@@ -1178,6 +1312,11 @@ function _is_vault_health() {
 function _vault_login() {
    local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
    local token_b64 token=""
+
+   if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
+      _info "[vault] dry-run requested; skipping login for ${ns}/${release}"
+      return 0
+   fi
 
    token_b64=$(_no_trace _kubectl --no-exit -n "$ns" get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null || true)
    if [[ -z "$token_b64" ]]; then

@@ -857,3 +857,54 @@ JSON
   run _vault_is_sealed "$TEST_NS" "$TEST_RELEASE"
   [ "$status" -eq 2 ]  # Returns 2 when unknown
 }
+
+@test "_vault_plan_report surfaces missing components" {
+  KUBECTL_EXIT_CODES=(1 1)
+  HELM_EXIT_CODES=(1)
+  run _vault_plan_report plan-ns plan-release 0.30.1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[TODO] External Secrets Operator missing"* ]]
+  [[ "$output" == *"[TODO] Namespace plan-ns missing"* ]]
+  [[ "$output" == *"[TODO] Helm release plan-release not found"* ]]
+  [[ "$output" == *"[WARN] Skipping downstream checks"* ]]
+}
+
+@test "_vault_plan_report reports success when Vault ready" {
+  KUBECTL_EXIT_CODES=()
+  HELM_EXIT_CODES=()
+  _vault_exec() {
+    local ns cmd release
+    while [[ "$1" == --* ]]; do
+      shift
+    done
+    ns="$1"
+    cmd="$2"
+    release="$3"
+    case "$cmd" in
+      "vault status -format=json"*)
+        printf '{"initialized":true,"sealed":false}'
+        return 0
+        ;;
+      vault\ kv\ get*)
+        return 0
+        ;;
+      *)
+        return 0
+        ;;
+    esac
+  }
+  _vault_policy_exists() { return 0; }
+  _is_vault_pki_mounted() { return 0; }
+  export -f _vault_exec
+  export -f _vault_policy_exists
+  export -f _is_vault_pki_mounted
+  run _vault_plan_report secrets vault 0.30.1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"[OK] External Secrets Operator present"* ]]
+  [[ "$output" == *"[OK] Namespace secrets exists"* ]]
+  [[ "$output" == *"[OK] Helm release vault installed"* ]]
+  [[ "$output" == *"[OK] Vault initialized and unsealed"* ]]
+  [[ "$output" == *"[OK] ESO Kubernetes auth policies present"* ]]
+  [[ "$output" == *"[OK] LDAP service account secret"* ]]
+  [[ "$output" == *"[OK] PKI mount"* ]]
+}
