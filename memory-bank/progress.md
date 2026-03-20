@@ -33,7 +33,7 @@
 - [ ] **Gemini: rebuild Ubuntu k3s + E2E verification** — **ASSIGNED TO GEMINI** (2026-03-20); spec: `docs/plans/v0.9.4-gemini-rebuild-ubuntu-k3s-e2e.md`; gate: Codex tunnel plugin must be verified first
 - [ ] Force ArgoCD sync — order-service + product-catalog — covered in Gemini rebuild spec
 - [ ] **Codex: fix `instsudo` typo** — `scripts/lib/system.sh` line 838 (Gemini red team finding)
-- [ ] **autossh tunnel plugin** — **ASSIGNED TO CODEX** (2026-03-20); spec: `docs/plans/v0.9.4-codex-autossh-tunnel-plugin.md`; commit msg: `feat(tunnel): add autossh tunnel plugin with launchd boot persistence`
+- [x] **autossh tunnel plugin** — Codex delivered autossh-backed tunnel plugin + BATS coverage per `docs/plans/v0.9.4-codex-autossh-tunnel-plugin.md`; commands exposed via `tunnel_start|stop|status`; commit msg: `feat(tunnel): add autossh tunnel plugin with launchd boot persistence`
 - [ ] **ArgoCD cluster registration automation** — `argocd cluster add` over tunnel failed manually; should be automated IaC; Gemini finding
 - [ ] **Smoke tests** — verify `ghcr-pull-secret` exists + Application health before concluding any task; Gemini finding
 - [ ] Confirm all 5 pods `Running` on Ubuntu k3s — basket: CrashLoopBackOff (data layer Redis/RabbitMQ not deployed to Ubuntu k3s); payment: pending ArgoCD sync of secret

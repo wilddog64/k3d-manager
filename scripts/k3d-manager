@@ -61,7 +61,19 @@ function add_ubuntu_k3s_cluster() {
 }
 
 function register_shopping_cart_apps() {
-    _try_load_plugin register_shopping_cart_apps "$@"
+  _try_load_plugin register_shopping_cart_apps "$@"
+}
+
+function tunnel_start() {
+  _try_load_plugin tunnel_start "$@"
+}
+
+function tunnel_stop() {
+  _try_load_plugin tunnel_stop "$@"
+}
+
+function tunnel_status() {
+  _try_load_plugin tunnel_status "$@"
 }
 
 function _test_run_smoke() {
