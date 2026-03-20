@@ -75,6 +75,7 @@
 - [ ] Service mesh — Istio full activation
 - [ ] `PeerAuthentication` / `AuthorizationPolicy` / `Gateway`
 - Spec: `docs/plans/v0.9.5-service-mesh.md`
+- [ ] **sudo whitelist** — `scripts/etc/sudoers/k3d-manager` template installed during `deploy_cluster` bootstrap; `NOPASSWD` scoped to exact k3d-manager commands only (mkdir, cp, chmod, systemctl for k3s); eliminates need for warm sudo timestamp on fresh VM
 
 ### k3dm-mcp tool surface (notes for when we get there)
 
