@@ -61,6 +61,7 @@
 **FIXED (2026-03-20):** `_run_command --prefer-sudo` now detects TTY availability and falls back to interactive sudo when `sudo -n` fails, covering `--prefer-sudo`, `--require-sudo`, and probe paths. Regression tests live in `scripts/tests/lib/run_command.bats`. Issue: `docs/issues/2026-03-19-run-command-non-interactive-sudo-failure.md`
 
 **SSH Tunnel (autossh plugin live):** Use `tunnel_start`/`tunnel_status`/`tunnel_stop` from `scripts/k3d-manager` to manage the launchd-backed autossh bridge; defaults in `scripts/etc/tunnel/vars.sh`. Spec: `docs/plans/v0.9.4-codex-autossh-tunnel-plugin.md`
+**ArgoCD cluster registration:** `register_app_cluster` applies `scripts/etc/argocd/cluster-secret.yaml.tmpl` with `envsubst` (token via `ARGOCD_APP_CLUSTER_TOKEN`); replaces failing `argocd cluster add`. Spec: `docs/plans/v0.9.4-codex-argocd-cluster-registration.md`
 
 **SSH Tunnel launchd fix (2026-03-20):** `~/.ssh/config` now has `Host ubuntu-tunnel` (no ControlMaster, IdentitiesOnly yes) for use by launchd. `com.k3d-manager.ssh-tunnel.plist` updated to use `ubuntu-tunnel`. Key added to macOS keychain via `ssh-add --apple-use-keychain`.
 

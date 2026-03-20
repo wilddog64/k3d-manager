@@ -76,6 +76,10 @@ function tunnel_status() {
   _try_load_plugin tunnel_status "$@"
 }
 
+function register_app_cluster() {
+  _try_load_plugin register_app_cluster "$@"
+}
+
 function _test_run_smoke() {
     local bin_dir="$1"
     local smoke_namespace="${2:-}"
