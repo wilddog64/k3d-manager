@@ -60,7 +60,7 @@
 
 **FIXED (2026-03-20):** `_run_command --prefer-sudo` now detects TTY availability and falls back to interactive sudo when `sudo -n` fails, covering `--prefer-sudo`, `--require-sudo`, and probe paths. Regression tests live in `scripts/tests/lib/run_command.bats`. Issue: `docs/issues/2026-03-19-run-command-non-interactive-sudo-failure.md`
 
-**SSH Tunnel (mandatory):** `ssh -L 0.0.0.0:6443:localhost:6443 -N ubuntu &`
+**SSH Tunnel (mandatory, pending automation):** `ssh -L 0.0.0.0:6443:localhost:6443 -N ubuntu &` — Codex implementing autossh + launchd plugin per `docs/plans/v0.9.4-codex-autossh-tunnel-plugin.md`
 
 ---
 

@@ -32,7 +32,7 @@
 
 - [ ] Force ArgoCD sync — order-service + product-catalog — Gemini: `argocd app sync order-service && argocd app sync product-catalog`
 - [ ] **Codex: fix `instsudo` typo** — `scripts/lib/system.sh` line 838 (Gemini red team finding)
-- [ ] **autossh tunnel plugin** — replace ad-hoc SSH tunnel with formal plugin (autossh pattern); Gemini finding: TLS handshake timeouts + connection resets
+- [ ] **autossh tunnel plugin** — **ASSIGNED TO CODEX** (2026-03-20); spec: `docs/plans/v0.9.4-codex-autossh-tunnel-plugin.md`; commit msg: `feat(tunnel): add autossh tunnel plugin with launchd boot persistence`
 - [ ] **ArgoCD cluster registration automation** — `argocd cluster add` over tunnel failed manually; should be automated IaC; Gemini finding
 - [ ] **Smoke tests** — verify `ghcr-pull-secret` exists + Application health before concluding any task; Gemini finding
 - [ ] Confirm all 5 pods `Running` on Ubuntu k3s — basket: CrashLoopBackOff (data layer Redis/RabbitMQ not deployed to Ubuntu k3s); payment: pending ArgoCD sync of secret
