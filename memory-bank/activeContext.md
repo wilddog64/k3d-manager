@@ -46,17 +46,23 @@
 | Keycloak | Running — `identity` ns |
 | cert-manager | Running — `cert-manager` ns |
 
-### App Cluster — Ubuntu k3s
+### App Cluster — Ubuntu k3s (now on EC2)
+
+**Migrated 2026-03-20 from Parallels VM to AWS EC2 (ACG sandbox)**
+- Instance: `i-0f3de7d43ccae4a52` — `t3.medium` — `54.186.107.155` — `us-west-2`
+- SSH: `Host ubuntu` in `~/.ssh/config` — key `~/.ssh/k3d-manager-key.pem` — user `ubuntu`
+- Old Parallels config preserved as `Host ubuntu-parallels`
+- No ProxyJump — direct SSH from M4
 
 | Component | Status |
 |---|---|
-| k3s node | **UNINSTALLED** — VM hard-reset 2026-03-19; pending redeploy |
-| Istio / ESO / Vault / OpenLDAP | **PENDING REDEPLOY** |
-| ghcr-pull-secret | **PENDING REDEPLOY** |
-| basket-service | **PENDING REDEPLOY** |
-| order-service | **PENDING REDEPLOY** |
-| product-catalog | **PENDING REDEPLOY** |
-| payment-service | **PENDING REDEPLOY** |
+| k3s node | **PENDING DEPLOY** — fresh EC2 instance |
+| Istio / ESO / Vault / OpenLDAP | **PENDING DEPLOY** |
+| ghcr-pull-secret | **PENDING DEPLOY** |
+| basket-service | **PENDING DEPLOY** |
+| order-service | **PENDING DEPLOY** |
+| product-catalog | **PENDING DEPLOY** |
+| payment-service | **PENDING DEPLOY** |
 
 **FIXED (2026-03-20):** `_run_command --prefer-sudo` now detects TTY availability and falls back to interactive sudo when `sudo -n` fails, covering `--prefer-sudo`, `--require-sudo`, and probe paths. Regression tests live in `scripts/tests/lib/run_command.bats`. Issue: `docs/issues/2026-03-19-run-command-non-interactive-sudo-failure.md`
 
