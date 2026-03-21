@@ -40,6 +40,7 @@
 - [x] **Codex: reduce replicas to 1 + remove HPAs** — merged to main 2026-03-20; basket `f55effe` (#9), order `98b2f0b` (#13), payment `da0646f` (#15 → v0.1.1), product-catalog `41acad6` (#13), frontend `a9a1b70` (#8)
 - [ ] Confirm all 5 pods `Running` on Ubuntu k3s — basket: CrashLoopBackOff (data layer Redis/RabbitMQ not deployed to Ubuntu k3s); payment: pending ArgoCD sync of secret
 - [x] **Fix `_run_command` non-interactive sudo failure after VM restart** — Codex implemented `_run_command_has_tty`, interactive sudo fallbacks, and regression tests per `docs/plans/v0.9.4-codex-run-command-tty-sudo-fallback.md`; issue: `docs/issues/2026-03-19-run-command-non-interactive-sudo-failure.md`; commit msg: `fix(system): fall back to interactive sudo when sudo -n unavailable and TTY present`
+- [ ] **Codex: fix frontend nginx CrashLoopBackOff** — **ASSIGNED TO CODEX**; spec: `docs/plans/v0.9.4-codex-frontend-nginx-non-root.md`; branch: `fix/nginx-non-root-port-8080` in `shopping-cart-frontend`; commit msg: `fix(frontend): run nginx as non-root on port 8080 — fix CrashLoopBackOff`
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
 - [ ] Playwright E2E green — milestone gate
 - [ ] Re-enable `enforce_admins` on shopping-cart-payment main branch
