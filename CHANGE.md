@@ -1,5 +1,21 @@
 # Changes - k3d-manager
 
+## [Unreleased] v0.9.5 — deploy_app_cluster via k3sup
+
+### Added
+- **`deploy_app_cluster`** (`scripts/plugins/shopping_cart.sh`): Automates single-node EC2 k3s lifecycle via k3sup. Installs k3s on a remote host over SSH, waits for node Ready, and merges the kubeconfig into `~/.kube/config` as the `ubuntu-k3s` context. Prints ArgoCD registration next steps. Replaces manual Gemini rebuild session. Requires `--confirm` to prevent accidental runs; configurable via `UBUNTU_K3S_*` env vars.
+- **`scripts/tests/plugins/shopping_cart.bats`**: BATS test suite covering help flag, missing --confirm guard, k3sup not-found error, and argocd dir prerequisite check.
+
+### Changed
+- **`bin/acg-sandbox.sh`**: Updated k3s-not-responding warning to direct operators to `./scripts/k3d-manager deploy_app_cluster --confirm` instead of a stale Gemini rebuild spec reference.
+
+### Process
+- Sprint story rule (max 5 plan docs per release) added to CLAUDE.md, AGENTS.md, GEMINI.md.
+- v0.9.4 retrospective documented at `docs/retro/2026-03-21-v0.9.4-retrospective.md`.
+- v0.9.6 scope updated: frontend LoadBalancer deferred to v1.0.0 (needs multi-node).
+
+---
+
 ## v0.9.0 — k3dm-mcp Planning + Agent Workflow Lessons — dated 2026-03-14
 
 ### Added
