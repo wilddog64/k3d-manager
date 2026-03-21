@@ -15,7 +15,7 @@ set -euo pipefail
 
 REGION="${ACG_REGION:-us-west-2}"
 INSTANCE_NAME="k3d-manager-ubuntu"
-INSTANCE_TYPE="t3.medium"
+INSTANCE_TYPE="t3.large"
 KEY_NAME="k3d-manager-key"
 KEY_PEM="$HOME/.ssh/k3d-manager-key.pem"
 SSH_CONFIG="$HOME/.ssh/config"
