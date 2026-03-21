@@ -28,24 +28,12 @@ check_rollout() {
 }
 
 check_statefulset_ready() {
-  local name="$1" namespace="$2"
+  local name="$1" namespace="$2" timeout="${3:-120s}"
   _info "Checking StatefulSet $name in namespace $namespace..."
-  local desired ready attempts=0
-  until desired=$($KUBECTL -n "$namespace" get statefulset "$name" \
-      -o jsonpath='{.status.replicas}' 2>/dev/null) && [[ -n "$desired" ]]; do
-    (( attempts++ ))
-    if (( attempts >= 6 )); then
-      _err "StatefulSet $name not found in $namespace after retries"
-      return 1
-    fi
-    _warn "StatefulSet $name query timed out (attempt $attempts) — retrying in 5s..."
-    sleep 5
-  done
-  ready=$($KUBECTL -n "$namespace" get statefulset "$name" \
-      -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "")
-  ready="${ready:-0}"
-  if [[ "$desired" != "$ready" ]]; then
-    _err "StatefulSet $name Ready replicas $ready does not match desired $desired"
+  if ! $KUBECTL -n "$namespace" wait pod \
+      --for=condition=Ready --selector="app.kubernetes.io/name=${name}" \
+      --timeout="$timeout" 2>/dev/null; then
+    _err "StatefulSet $name pods not Ready in $namespace"
     return 1
   fi
 }
