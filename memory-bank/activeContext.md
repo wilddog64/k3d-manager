@@ -12,6 +12,8 @@
 | Item | Status | Notes |
 |---|---|---|
 | Reduce replicas + remove HPAs | **PRs merged** (5 repos) | basket, order, payment, product-catalog, frontend — squash-merged to main 2026-03-20 |
+| Frontend nginx CrashLoop | **PR #10 open** | `fix/nginx-non-root-port-8080` in `shopping-cart-frontend`; CI running; merge when green |
+| **Gemini: verify frontend Running** | **PENDING MERGE** | After PR #10 merges: `argocd app sync shopping-cart-frontend --force` on infra cluster, then confirm pod `Running` on ubuntu-k3s; update activeContext.md with result |
 | Rebuild Ubuntu k3s + E2E verify | **ASSIGNED TO GEMINI** | spec: `docs/plans/v0.9.4-gemini-rebuild-ubuntu-k3s-e2e.md`; gate: Codex tunnel plugin verified |
 | ArgoCD cluster registration | **ASSIGNED TO GEMINI** | spec: `docs/plans/v0.9.4-gemini-argocd-cluster-registration.md`; needs argocd-manager SA on EC2 first |
 | Verify all 5 pods Running | **PENDING** | basket CrashLoopBackOff expected (data layer Redis/RabbitMQ missing on k3s) |
@@ -53,7 +55,7 @@ ArgoCD cluster secret `cluster-ubuntu-k3s` updated with `bearerToken` from `argo
 | basket-service | **CrashLoopBackOff** (expected — Redis/RabbitMQ missing on k3s) |
 | order-service | **CrashLoopBackOff** (data layer missing) |
 | product-catalog | **CrashLoopBackOff** (data layer missing) |
-| frontend | **CrashLoopBackOff** (nginx permissions issue) |
+| frontend | **CrashLoopBackOff** (nginx fix merged — pending ArgoCD sync of new image) |
 
 ---
 
