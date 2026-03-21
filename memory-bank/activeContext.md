@@ -11,15 +11,14 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| Reduce replicas + remove HPAs | **PRs merged** (5 repos) | basket, order, payment, product-catalog, frontend — squash-merged to main 2026-03-20 |
+| Reduce replicas + remove HPAs | **MERGED** | 5 repos squash-merged to main 2026-03-20 |
 | Frontend nginx fix | **MERGED** | `65b354f` on main, tagged v0.1.1, released 2026-03-21 |
-| **Gemini: verify frontend Running** | **PENDING** | `argocd app sync shopping-cart-frontend --force` on infra cluster (k3d-k3d-cluster context), confirm pod `Running` on ubuntu-k3s; update activeContext.md with result |
+| **Gemini: verify frontend Running** | **PENDING** | `argocd app sync shopping-cart-frontend --force` on infra cluster (k3d-k3d-cluster context), confirm pod `Running` on ubuntu-k3s; update activeContext.md |
 | Rebuild Ubuntu k3s + E2E verify | **ASSIGNED TO GEMINI** | spec: `docs/plans/v0.9.4-gemini-rebuild-ubuntu-k3s-e2e.md`; gate: Codex tunnel plugin verified |
 | ArgoCD cluster registration | **ASSIGNED TO GEMINI** | spec: `docs/plans/v0.9.4-gemini-argocd-cluster-registration.md`; needs argocd-manager SA on EC2 first |
-| Verify all 5 pods Running | **PENDING** | basket CrashLoopBackOff expected (data layer Redis/RabbitMQ missing on k3s) |
+| Verify all 5 pods Running | **PENDING** | basket/order/product-catalog CrashLoopBackOff (data layer missing) |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
-| Codex: fix `instsudo` typo | **PENDING** | `scripts/lib/system.sh` line 838 |
 
 ---
 
@@ -43,8 +42,7 @@
 
 ### App Cluster (EC2 — Ubuntu k3s)
 
-**Migrated 2026-03-20 from Parallels VM to EC2 ACG sandbox.**
-ArgoCD cluster secret `cluster-ubuntu-k3s` updated with `bearerToken` from `argocd-manager` SA.
+Migrated 2026-03-20 from Parallels VM to EC2 ACG sandbox. ArgoCD cluster secret `cluster-ubuntu-k3s` updated with `bearerToken` from `argocd-manager` SA.
 
 | Component | Status |
 |---|---|
@@ -52,27 +50,26 @@ ArgoCD cluster secret `cluster-ubuntu-k3s` updated with `bearerToken` from `argo
 | Istio | **Running** — `istio-system` |
 | ghcr-pull-secret | **Verified** in `apps`, `data`, `payment` namespaces |
 | payment-service | **Running** (confirmed connectivity to infra cluster Vault) |
-| basket-service | **CrashLoopBackOff** (expected — Redis/RabbitMQ missing on k3s) |
-| order-service | **CrashLoopBackOff** (data layer missing) |
-| product-catalog | **CrashLoopBackOff** (data layer missing) |
+| basket-service | **CrashLoopBackOff** (Redis/RabbitMQ missing) |
+| order-service | **CrashLoopBackOff** (PostgreSQL missing) |
+| product-catalog | **CrashLoopBackOff** (PostgreSQL missing) |
 | frontend | **Pending** (v0.1.1 merged — awaiting ArgoCD sync + Gemini verification) |
 
 ---
 
 ## Key Capabilities Added (v0.9.4)
 
-- **`_run_command` TTY fallback** — `--prefer-sudo`/`--require-sudo`/probe paths fall back to interactive sudo when `sudo -n` unavailable; BATS coverage in `scripts/tests/lib/run_command.bats`
-- **autossh tunnel plugin** — `tunnel_start|stop|status` via `scripts/k3d-manager`; launchd plist `com.k3d-manager.ssh-tunnel` uses `Host ubuntu-tunnel` (no ControlMaster, keychain-loaded key)
+- **`_run_command` TTY fallback** — interactive sudo fallback when `sudo -n` unavailable; BATS coverage in `scripts/tests/lib/run_command.bats`
+- **autossh tunnel plugin** — `tunnel_start|stop|status`; launchd plist `com.k3d-manager.ssh-tunnel` uses `Host ubuntu-tunnel`
 - **`register_app_cluster`** — applies `scripts/etc/argocd/cluster-secret.yaml.tmpl` with `ARGOCD_APP_CLUSTER_TOKEN`; replaces manual `argocd cluster add`
 - **`bin/smoke-test-cluster-health.sh`** — ghcr secret + ArgoCD sync + pod count gate
-- **Safety gate audit + dry-run + plan mode** — `deploy_*` require `--confirm`; `--dry-run`/`-n` prints commands; `deploy_vault --plan` reads cluster state (unreviewed — Codex worked on wrong task)
+- **Safety gate audit + dry-run + plan mode** — `deploy_*` require `--confirm`; `--dry-run`/`-n` prints commands; `deploy_vault --plan` reads cluster state
 
 ---
 
 ## Operational Notes
 
-- **Branch protection** — review requirement temporarily set to 0 for merge; restore to 1 after all 5 PRs merged
-- **payment enforce_admins** — was disabled for PR #14; re-enable after feat/v0.1.1 merges
-- **ArgoCD cluster secret** — `cluster-ubuntu-k3s` in `cicd` ns; `insecure: true`; needs `bearerToken`
 - **payment encryption-key** — dev placeholder Base64 — replace via ESO/Vault in production
-- **PAT rotation** — expires 2026-04-12; reminder fires daily 9am April 5-11 via launchd
+- **ArgoCD cluster secret** — `cluster-ubuntu-k3s` in `cicd` ns; `insecure: true`; needs `bearerToken`
+- **PAT rotation** — expires 2026-04-12; launchd reminder fires daily 9am April 5-11
+- **Re-enable `enforce_admins`** — shopping-cart-payment main branch (was disabled for PR #14)
