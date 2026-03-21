@@ -13,9 +13,9 @@
 |---|---|---|
 | Reduce replicas + remove HPAs | **MERGED** | 5 repos squash-merged to main 2026-03-20 |
 | Frontend nginx fix | **MERGED** | `65b354f` on main, tagged v0.1.1, released 2026-03-21 |
-| **Gemini: verify frontend Running** | **COMPLETE** | Pod `frontend-85969b4bf-zq9st` is `Running` on ubuntu-k3s; manually patched with `emptyDir` volumes |
-| Rebuild Ubuntu k3s + E2E verify | **ASSIGNED TO GEMINI** | spec: `docs/plans/v0.9.4-gemini-rebuild-ubuntu-k3s-e2e.md`; gate: Codex tunnel plugin verified |
-| ArgoCD cluster registration | **ASSIGNED TO GEMINI** | spec: `docs/plans/v0.9.4-gemini-argocd-cluster-registration.md`; needs argocd-manager SA on EC2 first |
+| **Gemini: verify frontend Running** | **COMPLETE** | Pod `frontend-85969b4bf-zq9st` is `Running` on ubuntu-k3s; manually patched with `emptyDir` volumes; commit `d5bd618` |
+| shopping-cart-infra PR #18 | **MERGED** | `a97ee04` — fix trivy-action 0.30.0→v0.35.0 |
+| shopping-cart-infra PR #19 | **MERGED** | `4ecc6b5` — address Copilot PR #5 comments (register-ubuntu-k3s.sh security fixes + `destination.name: ubuntu-k3s` for all 5 apps) |
 | Verify all 5 pods Running | **PENDING** | basket/order/product-catalog CrashLoopBackOff (data layer missing) |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
@@ -50,7 +50,7 @@ Migrated 2026-03-20 from Parallels VM to EC2 ACG sandbox. ArgoCD cluster secret 
 | Istio | **Running** — `istio-system` |
 | ghcr-pull-secret | **Verified** in `apps`, `data`, `payment` namespaces |
 | payment-service | **Running** (confirmed connectivity to infra cluster Vault) |
-| frontend | **Running** (manually patched with emptyDir volumes for nginx cache) |
+| frontend | **Running** (manually patched with emptyDir volumes; permanent fix pending CI image push — trivy now fixed via PR #18) |
 | basket-service | **CrashLoopBackOff** (expected — Redis/RabbitMQ missing on k3s) |
 
 
