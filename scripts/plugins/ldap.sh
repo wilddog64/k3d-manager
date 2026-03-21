@@ -398,7 +398,8 @@ function _ldap_seed_ldif_secret() {
 
    if [[ "$enable_jenkins" == "1" ]]; then
       local jenkins_secret_json=""
-      jenkins_secret_json=$(_vault_exec --no-exit "$vault_ns" "vault kv get -format=json ${mount}/${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin}" "$vault_release" 2>/dev/null || true)
+      local _jenkins_vault_path="${mount}/${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin}"
+      jenkins_secret_json=$(_vault_exec --no-exit "$vault_ns" "vault kv get -format=json -- '${_jenkins_vault_path}'" "$vault_release" 2>/dev/null || true)
       if [[ -n "$jenkins_secret_json" ]]; then
          jenkins_password=$(printf '%s' "$jenkins_secret_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get("password",""))' 2>/dev/null || true)
       fi

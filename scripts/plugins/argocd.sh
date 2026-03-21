@@ -892,6 +892,8 @@ HELP
 
   _info "[argocd] registering app cluster '${ARGOCD_APP_CLUSTER_NAME}' -> ${ARGOCD_APP_CLUSTER_SERVER}"
 
+  local _wasx=0
+  case $- in *x*) _wasx=1; set +x;; esac
   ARGOCD_APP_CLUSTER_SECRET_NAME="${ARGOCD_APP_CLUSTER_SECRET_NAME}" \
   ARGOCD_APP_CLUSTER_NAME="${ARGOCD_APP_CLUSTER_NAME}" \
   ARGOCD_APP_CLUSTER_SERVER="${ARGOCD_APP_CLUSTER_SERVER}" \
@@ -899,6 +901,7 @@ HELP
   ARGOCD_APP_CLUSTER_TOKEN="${ARGOCD_APP_CLUSTER_TOKEN}" \
   ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE}" \
     envsubst < "$tmpl" | _kubectl apply -f -
+  (( _wasx )) && set -x
 
   _info "[argocd] cluster secret applied — verify with: kubectl get secret ${ARGOCD_APP_CLUSTER_SECRET_NAME} -n ${ARGOCD_NAMESPACE}"
 }
