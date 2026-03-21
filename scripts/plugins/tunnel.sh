@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # scripts/plugins/tunnel.sh
 # autossh-backed SSH tunnel plugin for k3d-manager
+set -euo pipefail
 
 _TUNNEL_VARS="${SCRIPT_DIR}/etc/tunnel/vars.sh"
 if [[ -r "$_TUNNEL_VARS" ]]; then
@@ -20,6 +21,7 @@ _tunnel_is_running() {
 }
 
 _tunnel_launchd_loaded() {
+  [[ "$(uname)" == "Darwin" ]] || return 1
   launchctl list "${TUNNEL_LAUNCHD_LABEL}" >/dev/null 2>&1
 }
 
@@ -95,7 +97,9 @@ EOF
   fi
 
   _tunnel_write_plist
-  launchctl load -w "${TUNNEL_PLIST_PATH}"
+  if [[ "$(uname)" == "Darwin" ]]; then
+    launchctl load -w "${TUNNEL_PLIST_PATH}"
+  fi
   echo "[tunnel] started — ${TUNNEL_BIND_ADDR}:${TUNNEL_LOCAL_PORT} -> ${TUNNEL_SSH_HOST}:${TUNNEL_REMOTE_PORT}"
 }
 
@@ -107,7 +111,9 @@ function tunnel_stop() {
   fi
 
   if _tunnel_launchd_loaded; then
-    launchctl unload -w "${TUNNEL_PLIST_PATH}"
+    if [[ "$(uname)" == "Darwin" ]]; then
+      launchctl unload -w "${TUNNEL_PLIST_PATH}"
+    fi
   fi
 
   if _tunnel_is_running; then
