@@ -394,11 +394,14 @@ function _ldap_seed_ldif_secret() {
    local service_ou_value="${service_ou#*=}"
    local jenkins_user_dn="uid=jenkins-admin,${service_ou},${base_dn}"
    local jenkins_password=""
+   local enable_jenkins="${ENABLE_JENKINS:-0}"
 
-   local jenkins_secret_json=""
-   jenkins_secret_json=$(_vault_exec --no-exit "$vault_ns" "vault kv get -format=json ${mount}/${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin}" "$vault_release" 2>/dev/null || true)
-   if [[ -n "$jenkins_secret_json" ]]; then
-      jenkins_password=$(printf '%s' "$jenkins_secret_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get("password",""))' 2>/dev/null || true)
+   if [[ "$enable_jenkins" == "1" ]]; then
+      local jenkins_secret_json=""
+      jenkins_secret_json=$(_vault_exec --no-exit "$vault_ns" "vault kv get -format=json ${mount}/${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin}" "$vault_release" 2>/dev/null || true)
+      if [[ -n "$jenkins_secret_json" ]]; then
+         jenkins_password=$(printf '%s' "$jenkins_secret_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get("password",""))' 2>/dev/null || true)
+      fi
    fi
 
    local ldif_content
@@ -415,11 +418,6 @@ function _ldap_seed_ldif_secret() {
       fi
    else
       # Generate default LDIF content (existing behavior)
-      local group_members="member: ${LDAP_BINDDN}"
-      if [[ -n "$jenkins_password" ]]; then
-         group_members+=$'\n'"member: ${jenkins_user_dn}"
-      fi
-
       ldif_content=$(cat <<EOF
 dn: ${base_dn}
 objectClass: top
@@ -437,24 +435,28 @@ dn: ${service_ou},${base_dn}
 objectClass: top
 objectClass: organizationalUnit
 ou: ${service_ou_value}
+EOF
+)
 
+      if [[ "$enable_jenkins" == "1" && -n "$jenkins_password" ]]; then
+         ldif_content+=$'\n'
+         ldif_content+=$(cat <<EOF
 dn: cn=jenkins-admins,${group_ou},${base_dn}
 objectClass: top
 objectClass: groupOfNames
 cn: jenkins-admins
-${group_members}
+member: ${LDAP_BINDDN}
+member: ${jenkins_user_dn}
 EOF
 )
 
-      if [[ -n "$jenkins_password" ]]; then
          ldif_content+=$'\n'
          ldif_content+=$(cat <<EOF
 dn: ${jenkins_user_dn}
 objectClass: inetOrgPerson
 objectClass: organizationalPerson
 objectClass: person
-cn: Jenkins Admin
-sn: Admin
+cn: Jenkins Admin\sn: Admin
 uid: jenkins-admin
 userPassword: ${jenkins_password}
 EOF
@@ -1130,7 +1132,7 @@ EOF
 
       # Wait for ESO webhook to be ready
       _info "[ldap] waiting for ESO webhook to be ready..."
-      if ! kubectl wait --for=condition=available deployment/external-secrets-webhook -n "${ESO_NAMESPACE:-secrets}" --timeout=60s; then
+      if ! _kubectl --no-exit -n "${ESO_NAMESPACE:-secrets}" wait --for=condition=available deployment/external-secrets-webhook --timeout=60s; then
          _err "[ldap] ESO webhook did not become ready"
          return 1
       fi
@@ -1425,7 +1427,7 @@ EOF
 
       # Wait for ESO webhook to be ready
       _info "[ad] waiting for ESO webhook to be ready..."
-      if ! kubectl wait --for=condition=available deployment/external-secrets-webhook -n "${ESO_NAMESPACE:-secrets}" --timeout=60s; then
+      if ! _kubectl --no-exit -n "${ESO_NAMESPACE:-secrets}" wait --for=condition=available deployment/external-secrets-webhook --timeout=60s; then
          _err "[ad] ESO webhook did not become ready"
          return 1
       fi

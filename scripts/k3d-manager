@@ -7,7 +7,33 @@
 #   ./k3d-manager                    # Show usage and list core functions
 #   ./k3d-manager <function> [args]  # Run specific function
 
-# ensure we are running bash
+# ensure we are running bash >= 4 (associative arrays required)
+if [[ -z "${BASH_VERSION:-}" ]]; then
+   echo "k3d-manager must be executed with bash. Run 'bash scripts/k3d-manager …'" >&2
+   exit 1
+fi
+
+if [[ -z "${BASH_VERSINFO[0]:-}" || ${BASH_VERSINFO[0]} -lt 4 ]]; then
+   declare -a __k3dm_bash_candidates=()
+   if [[ -n "${K3DM_BASH_BIN:-}" ]]; then
+      __k3dm_bash_candidates+=("$K3DM_BASH_BIN")
+   fi
+   __k3dm_bash_candidates+=(
+      "/opt/homebrew/bin/bash"
+      "/usr/local/bin/bash"
+   )
+   for __k3dm_bash in "${__k3dm_bash_candidates[@]}"; do
+      [[ -z "$__k3dm_bash" || "$__k3dm_bash" == "$BASH" ]] && continue
+      if [[ -x "$__k3dm_bash" ]]; then
+         exec "$__k3dm_bash" "$0" "$@"
+      fi
+   done
+   cat <<'EOF' >&2
+[k3d-manager] bash 4.0 or newer is required. Install a newer bash (./install.sh installs Homebrew bash) or set K3DM_BASH_BIN.
+EOF
+   exit 1
+fi
+
 if [[ -n "$BASH_VERSION" ]]; then
    echo "running under bash version ${BASH_VERSION}"
 elif [[ -n "$ZSH_VERSION" ]]; then
@@ -46,6 +72,10 @@ if [[ -f "${SCRIPT_DIR}/lib/foundation/scripts/lib/system.sh" ]]; then
 else
    source "${SCRIPT_DIR}/lib/system.sh"
 fi
+if [[ -f "${SCRIPT_DIR}/lib/system_overrides.sh" ]]; then
+   # Apply local overrides (dry-run handling) without editing the subtree copy.
+   source "${SCRIPT_DIR}/lib/system_overrides.sh"
+fi
 source "${SCRIPT_DIR}/lib/cluster_provider.sh"
 source "${SCRIPT_DIR}/lib/test.sh"
 if [[ -f "${SCRIPT_DIR}/lib/foundation/scripts/lib/core.sh" ]]; then
@@ -61,7 +91,23 @@ function add_ubuntu_k3s_cluster() {
 }
 
 function register_shopping_cart_apps() {
-    _try_load_plugin register_shopping_cart_apps "$@"
+  _try_load_plugin register_shopping_cart_apps "$@"
+}
+
+function tunnel_start() {
+  _try_load_plugin tunnel_start "$@"
+}
+
+function tunnel_stop() {
+  _try_load_plugin tunnel_stop "$@"
+}
+
+function tunnel_status() {
+  _try_load_plugin tunnel_status "$@"
+}
+
+function register_app_cluster() {
+  _try_load_plugin register_app_cluster "$@"
 }
 
 function _test_run_smoke() {
@@ -410,8 +456,70 @@ case "$1" in
   -h|--help) _usage 1; exit 0 ;;
 esac
 
+__k3dm_print_deploy_usage() {
+    local fn="$1"
+    if [[ -z "$fn" ]]; then
+        return
+    fi
+    if [[ "$(type -t "$fn")" == "function" ]]; then
+        "$fn" --help || true
+        return
+    fi
+    _try_load_plugin "$fn" --help || true
+}
+
+__k3dm_deploy_guard_args() {
+    local fn="$1"
+    shift || true
+    local confirm=0 dry_run_cli=0
+    local -a sanitized=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --confirm|-y|--yes)
+                confirm=1
+                shift
+                continue
+                ;;
+            --dry-run|-n)
+                dry_run_cli=1
+                shift
+                continue
+                ;;
+            *)
+                sanitized+=("$1")
+                shift
+                continue
+                ;;
+        esac
+    done
+
+    if (( dry_run_cli )); then
+        export K3DM_DEPLOY_DRY_RUN=1
+    fi
+
+    local env_dry="${K3DM_DEPLOY_DRY_RUN:-0}"
+    if (( !confirm && !dry_run_cli && env_dry != 1 && ${#sanitized[@]} == 0 )); then
+        __k3dm_print_deploy_usage "$fn"
+        cat <<'EOF'
+Safety gate: rerun with explicit options or pass --confirm to apply defaults.
+Dry-run requests (--dry-run/-n) bypass the confirmation gate.
+EOF
+        exit 1
+    fi
+
+    __K3DM_DEPLOY_SANITIZED_ARGS=("${sanitized[@]}")
+}
+
 function_name=$1
 shift  # Remove the function name from the arguments
+
+if [[ "$function_name" == deploy_* ]]; then
+    __K3DM_DEPLOY_SANITIZED_ARGS=()
+    __k3dm_deploy_guard_args "$function_name" "$@"
+    set -- "${__K3DM_DEPLOY_SANITIZED_ARGS[@]}"
+    unset __K3DM_DEPLOY_SANITIZED_ARGS
+fi
 
 secret_trace_guard=0
 if [[ $- == *x* ]]; then
