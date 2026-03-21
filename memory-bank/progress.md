@@ -96,4 +96,4 @@
 | basket-service CrashLoopBackOff | OPEN | Redis (`shopping-cart-data` ns) + RabbitMQ not deployed to Ubuntu k3s |
 | SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync; needs `ServerAliveInterval` or `screen` |
 | frontend emptyDir patch | OPEN | Live cluster has manual emptyDir patch; Dockerfile fix (v0.1.1) not yet active — CI was failing (trivy-action pin). Now that trivy is fixed, next frontend push will build+push image and make emptyDir patch redundant |
-| ~/.claude credentials exposed | OPEN | OAuth tokens in git history (commit 6447a8d); rotate via `claude auth logout && claude auth login`, then git filter-repo purge + force push |
+| ~/.claude credentials exposed | FIXED | Tokens rotated, history purged via git filter-repo, force pushed; .gitignore literal \\n bug also fixed |
