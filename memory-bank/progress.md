@@ -71,7 +71,8 @@ Shopping-cart pod health issues (order-service RabbitMQ, payment-service memory,
 
 ## Roadmap
 
-- **v1.0.0** — 3-node k3s via k3sup + Samba AD DC (NEXT — replaces single t3.medium; resolves resource exhaustion)
+- **v0.9.6** — Lab accessibility: LoadBalancer for ArgoCD, Keycloak, Jenkins (infra cluster only); frontend LoadBalancer deferred to v1.0.0 (pod not schedulable on single t3.medium)
+- **v1.0.0** — 3-node k3s via k3sup + Samba AD DC (NEXT — replaces single t3.medium; resolves resource exhaustion; enables frontend + e2e milestone gate)
 - **v1.1.0** — EKS provider + ACG lifecycle + AWS Managed AD
 - **v1.2.0** — k3dm-mcp (gate: EKS delivered)
 - **v1.3.0** — GKE + AD plugin: Google Cloud Identity
