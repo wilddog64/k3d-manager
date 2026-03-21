@@ -20,8 +20,9 @@
 | **Gemini: Fix Schema mismatch** | **COMPLETE** | Added missing columns to `orders` table in `postgresql-orders` |
 | **Gemini: Fix Health Checks** | **COMPLETE** | Patched `product-catalog` readiness probe path `/health/ready` -> `/health` |
 | **Gemini: Fix NetworkPolicies** | **COMPLETE** | Patched `allow-dns` and added `allow-to-istio` in `shopping-cart-payment` |
-| **Codex: fix app manifests** | **COMPLETE** | Mandated SHAs (order `007d80a`, product-catalog `f9a7381`, infra `aaa08c1`) unreachable by ArgoCD; tracking `HEAD` instead |
+| **Codex: fix app manifests** | **MERGED** | PRs merged to main 2026-03-21; order `d109004`, product-catalog `aa5de3c`, infra `1a5c34d`; tagged v0.1.1; `docs/next-improvements` branches created |
 | **Gemini: re-enable ArgoCD sync** | **COMPLETE** | Auto-sync re-enabled for all apps; verified tracking `HEAD` |
+| **Gemini: force sync post-manifest-fix** | **PENDING** | `argocd app sync` all 5 apps — env var fixes now on main |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
 
@@ -74,10 +75,12 @@
 
 ## Operational Notes
 
-- **ArgoCD Sync Issues:** Mandated SHAs (`007d80a`, `f9a7381`, `aaa08c1`) reported `not our ref` by ArgoCD server. Reverted applications to track `HEAD`.
-- **Findings (2026-03-21):**
+- **Manifest fix PRs (2026-03-21):** order PR #15 (`d109004`), product-catalog PR #14 (`aa5de3c`), infra PR #20 (`1a5c34d`) — all squash-merged; v0.1.1 tagged; `docs/next-improvements` branches created on all three.
+- **Copilot P1 bugs fixed:** product-catalog env var keys corrected (`DATABASE_*` → `DB_*`, `RABBITMQ_USER` → `RABBITMQ_USERNAME`, readiness probe `/health` → `/ready`); order-service `VAULT_ENABLED: false` set alongside `SPRING_CLOUD_VAULT_ENABLED: false`.
+- **ArgoCD Sync Issues (resolved):** Original Codex SHAs (`007d80a`, `f9a7381`, `aaa08c1`) were committed to local `main` only — never pushed. Fixed by feature branch workflow. Manifests now on remote main.
+- **Root findings (2026-03-21):**
     - `order-service` was missing `shipping_postal_code` and `total_amount` columns in PostgreSQL.
-    - `product-catalog` health probe path was `404` at `/health/ready`; application only responds to `/health`.
+    - `product-catalog` was connecting to `localhost` fallback — env var key mismatch silently ignored.
     - `shopping-cart-payment` namespace had restrictive NetworkPolicies blocking DNS and Istiod egress.
     - `order-service` experiencing `Connection refused` to RabbitMQ service despite successful DB connection.
 - **Memory Constraints** — `t3.medium` (4GB) is at 95% capacity; some pods scaled to 0 during troubleshooting.
