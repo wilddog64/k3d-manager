@@ -73,8 +73,9 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| frontend CrashLoopBackOff | FIXED | Manually patched with `emptyDir` volumes |
-| order-service CrashLoopBackOff | OPEN | PostgreSQL auth/schema FIXED; now RabbitMQ `Connection refused` |
+| frontend CrashLoopBackOff | REGRESSION | Was fixed with emptyDir patch; ArgoCD sync may have overwritten it — re-check volumes |
+| order-service CrashLoopBackOff | OPEN | PostgreSQL auth/schema FIXED; VAULT_ENABLED=false FIXED; now RabbitMQ `Connection refused` only |
 | payment-service Pending | OPEN | Memory constraints on `t3.medium` |
+| product-catalog OutOfSync | OPEN | Manifest fix `aa5de3c` on main; ArgoCD not yet synced to it |
 | SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync |
 | ~/.claude credentials exposed | FIXED | Tokens rotated, history purged |

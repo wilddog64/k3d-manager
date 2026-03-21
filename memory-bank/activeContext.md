@@ -22,7 +22,9 @@
 | **Gemini: Fix NetworkPolicies** | **COMPLETE** | Patched `allow-dns` and added `allow-to-istio` in `shopping-cart-payment` |
 | **Codex: fix app manifests** | **MERGED** | PRs merged to main 2026-03-21; order `d109004`, product-catalog `aa5de3c`, infra `1a5c34d`; tagged v0.1.1; `docs/next-improvements` branches created |
 | **Gemini: re-enable ArgoCD sync** | **COMPLETE** | Auto-sync re-enabled for all apps; verified tracking `HEAD` |
-| **Gemini: force sync post-manifest-fix** | **PENDING** | `argocd app sync` all 5 apps — env var fixes now on main |
+| **Gemini: force sync post-manifest-fix** | **BLOCKED** | Gemini exhausted context; documented discrepancies instead of running sync; `argocd app sync` still needed |
+| **Frontend regression** | **OPEN** | Was Running ✅; now CrashLoopBackOff after ArgoCD sync — emptyDir patch possibly overwritten; probe failing on port 8080 `/health` |
+| **product-catalog OutOfSync** | **OPEN** | ArgoCD shows OutOfSync+Degraded at `1214373f`; manifest fix `aa5de3c` on main but not picked up yet |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
 
@@ -53,11 +55,11 @@
 | k3s node | **Ready** — v1.34.5+k3s1 |
 | Istio | **Running** — `istio-system` |
 | ghcr-pull-secret | **Verified** in `apps`, `data`, `payment` namespaces |
-| basket-service | **Running** ✅ |
-| product-catalog | **Running** ✅ (Fixed PostgreSQL auth + probe path via `HEAD`) |
-| order-service | **Running** ⚠️ (Fixed PostgreSQL auth + schema; RabbitMQ connection refused) |
-| payment-service | **Pending** ⚠️ (Resource constraints; NetworkPolicies fixed) |
-| frontend | **Running** ✅ (Manual emptyDir patch remains active) |
+| basket-service | **Running** ✅ — ArgoCD Healthy |
+| product-catalog | **OutOfSync / Degraded** ⚠️ — manifest fix `aa5de3c` not yet picked up by ArgoCD |
+| order-service | **Degraded** ⚠️ — PostgreSQL OK; RabbitMQ `Connection refused` persists |
+| payment-service | **Progressing** ⚠️ — resource constraints; NetworkPolicies fixed |
+| frontend | **CrashLoopBackOff** ⚠️ — REGRESSION; was Running; emptyDir patch may have been overwritten by ArgoCD sync |
 
 
 ---
@@ -85,3 +87,6 @@
     - `order-service` experiencing `Connection refused` to RabbitMQ service despite successful DB connection.
 - **Memory Constraints** — `t3.medium` (4GB) is at 95% capacity; some pods scaled to 0 during troubleshooting.
 - **PTY watchdog** — guards against Gemini CLI PTY leak.
+- **Gemini context exhaustion (2026-03-21):** Gemini lost task context mid-session; documented discrepancies instead of running `argocd app sync`. Commit `ae2af95` (3 issue docs in `docs/issues/`). Force sync still pending.
+- **Frontend regression:** ArgoCD at `65b354f` (correct SHA) but pod CrashLoopBackOff — possible ArgoCD sync overwrote manual emptyDir volume patch. Next session must check `kubectl describe pod -l app=frontend | grep -A5 volume`.
+- **ArgoCD app status (last known 2026-03-21):** basket Healthy ✅, frontend Progressing/CrashLoop, order Degraded, payment Progressing, product-catalog OutOfSync+Degraded, shopping-cart-apps OutOfSync.
