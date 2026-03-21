@@ -39,20 +39,24 @@
 
 ---
 
-## v0.9.4 — Pending
+## v0.9.5 — Active
 
-- [ ] **Safety gate audit** — `deploy_*` functions called with no args should print help, NOT trigger deployment.
-- [ ] **`--dry-run` / `-n` mode** — all `deploy_*` print every command without executing.
-- [ ] **`plan` mode** — prototype with Vault first.
-- [ ] Confirm all 5 pods `Running` on Ubuntu k3s — basket/product-catalog/frontend: Running ✅; order-service: Crashing (RabbitMQ); payment-service: Pending (Memory)
+### Carried from v0.9.4
+- [ ] Confirm all 5 pods `Running` on Ubuntu k3s — basket ✅; order-service (RabbitMQ `Connection refused`); payment-service (memory constraints); frontend (deferred to v1.0.0)
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
 - [ ] Playwright E2E green — milestone gate
 - [ ] Re-enable `enforce_admins` on shopping-cart-payment main branch
+- [ ] **Safety gate audit** — `deploy_*` with no args should print help, NOT trigger deployment
+- [ ] **`--dry-run` / `-n` mode** — all `deploy_*` print every command without executing
+- [ ] **`plan` mode** — prototype with Vault first
 
----
+### Code Quality / Architecture
+- [ ] **Upstream local lib edits to lib-foundation** — `scripts/lib/system.sh` (TTY fix + `_run_command_resolve_sudo`) and `scripts/lib/agent_rigor.sh` (allowlist feature) need PRs to lib-foundation `feat/v0.3.4` → subtree pull → remove local divergence
+- [ ] **Reduce if-count allowlist** — refactor 13 allowlisted functions (jenkins x6, ldap x7, vault x5, system x2) to under 8-`if` threshold; remainder needs `docs/issues/` entry; no new entries without linked issue
+- [ ] **`bin/` script consistency** — all `bin/` scripts using `kubectl`/system commands must source lib-foundation and use `_kubectl`/`_run_command`; affected: `bin/smoke-test-cluster-health.sh`
+- [ ] **Relocate app-layer bug tracking** — file shopping-cart bugs as GitHub Issues in their respective repos; remove from k3d-manager Known Bugs table
 
-## v0.9.5 — Planned
-
+### Features
 - [ ] Service mesh — Istio full activation; `PeerAuthentication` / `AuthorizationPolicy` / `Gateway`
 - [ ] **`deploy_app_cluster` via k3sup** — remote k3s install + kubeconfig merge
 - [ ] **sudo whitelist** — `scripts/etc/sudoers/k3d-manager` template
@@ -74,11 +78,17 @@
 
 ## Known Bugs / Gaps
 
+**Infra / tooling (tracked here):**
+
 | Item | Status | Notes |
 |---|---|---|
-| frontend CrashLoopBackOff | REGRESSION | Was fixed with emptyDir patch; ArgoCD sync may have overwritten it — re-check volumes |
-| order-service CrashLoopBackOff | OPEN | PostgreSQL auth/schema FIXED; VAULT_ENABLED=false FIXED; now RabbitMQ `Connection refused` only |
-| payment-service Pending | OPEN | Memory constraints on `t3.medium` |
-| product-catalog OutOfSync | OPEN | Manifest fix `aa5de3c` on main; ArgoCD not yet synced to it |
 | SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync |
-| ~/.claude credentials exposed | FIXED | Tokens rotated, history purged |
+
+**App-layer (to be filed as GitHub Issues in their repos — v0.9.5 task):**
+
+| Item | Repo | Notes |
+|---|---|---|
+| frontend CrashLoopBackOff | shopping-cart-frontend | Root cause: resource exhaustion (t3.medium); deferred to v1.0.0 3-node cluster |
+| order-service CrashLoopBackOff | shopping-cart-order | PostgreSQL OK; RabbitMQ `Connection refused` only remaining |
+| payment-service Pending | shopping-cart-payment | Memory constraints on `t3.medium` |
+| product-catalog Degraded | shopping-cart-product-catalog | Synced to `aa5de3c`; `RABBITMQ_USERNAME` ESO key mismatch |
