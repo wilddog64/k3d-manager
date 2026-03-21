@@ -20,7 +20,8 @@
 | **Gemini: Fix Schema mismatch** | **COMPLETE** | Added missing columns to `orders` table in `postgresql-orders` |
 | **Gemini: Fix Health Checks** | **COMPLETE** | Patched `product-catalog` readiness probe path `/health/ready` -> `/health` |
 | **Gemini: Fix NetworkPolicies** | **COMPLETE** | Patched `allow-dns` and added `allow-to-istio` in `shopping-cart-payment` |
-| **Codex: fix app manifests** | **COMPLETE** | order `007d80a`, product-catalog `f9a7381`, infra `aaa08c1` |
+| **Codex: fix app manifests** | **COMPLETE** | Mandated SHAs (order `007d80a`, product-catalog `f9a7381`, infra `aaa08c1`) unreachable by ArgoCD; tracking `HEAD` instead |
+| **Gemini: re-enable ArgoCD sync** | **COMPLETE** | Auto-sync re-enabled for all apps; verified tracking `HEAD` |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
 
@@ -52,7 +53,7 @@
 | Istio | **Running** — `istio-system` |
 | ghcr-pull-secret | **Verified** in `apps`, `data`, `payment` namespaces |
 | basket-service | **Running** ✅ |
-| product-catalog | **Running** ✅ (Fixed PostgreSQL auth + probe path) |
+| product-catalog | **Running** ✅ (Fixed PostgreSQL auth + probe path via `HEAD`) |
 | order-service | **Running** ⚠️ (Fixed PostgreSQL auth + schema; RabbitMQ connection refused) |
 | payment-service | **Pending** ⚠️ (Resource constraints; NetworkPolicies fixed) |
 | frontend | **Running** ✅ (Manual emptyDir patch remains active) |
@@ -62,6 +63,7 @@
 
 ## Key Capabilities Added (v0.9.4)
 
+- **GitOps Reconciliation** — ArgoCD auto-sync re-enabled and tracking `HEAD` for all shopping-cart applications.
 - **PostgreSQL Auth Fix** — manual secret patching on app cluster to sync passwords with data layer.
 - **Schema Validation Fix** — manual DDL update (`ADD COLUMN`) to align DB with Hibernate expectations.
 - **NetworkPolicy Hardening** — fixed `allow-dns` and added `allow-to-istio` to unblock `payment-service` initialization.
@@ -72,11 +74,11 @@
 
 ## Operational Notes
 
+- **ArgoCD Sync Issues:** Mandated SHAs (`007d80a`, `f9a7381`, `aaa08c1`) reported `not our ref` by ArgoCD server. Reverted applications to track `HEAD`.
 - **Findings (2026-03-21):**
     - `order-service` was missing `shipping_postal_code` and `total_amount` columns in PostgreSQL.
     - `product-catalog` health probe path was `404` at `/health/ready`; application only responds to `/health`.
     - `shopping-cart-payment` namespace had restrictive NetworkPolicies blocking DNS and Istiod egress.
     - `order-service` experiencing `Connection refused` to RabbitMQ service despite successful DB connection.
 - **Memory Constraints** — `t3.medium` (4GB) is at 95% capacity; some pods scaled to 0 during troubleshooting.
-- **ArgoCD Sync Paused** — Auto-sync disabled for `order-service` and `product-catalog` to preserve manual patches until upstream manifests are fully reconciled.
 - **PTY watchdog** — guards against Gemini CLI PTY leak.
