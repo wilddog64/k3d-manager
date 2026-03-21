@@ -264,6 +264,158 @@ JSON-RPC stdio. No direct k3d-manager calls — always through the MCP security 
 
 ---
 
+## v0.9.7 — Vault Hardening
+*Focus: Close the 3 remaining gaps from HashiCorp's 12 capabilities for modern secrets management*
+
+### Gap #7 — Backup / Restore
+
+New plugin functions in `scripts/plugins/vault.sh`:
+
+```bash
+./scripts/k3d-manager backup_vault           # snapshot Vault to local file (default: ~/.k3d-manager/vault-snapshots/)
+./scripts/k3d-manager backup_vault --s3      # upload snapshot to S3 (requires AWS_S3_BACKUP_BUCKET env var)
+./scripts/k3d-manager restore_vault <file>   # restore from snapshot file
+```
+
+- Uses `vault operator raft snapshot save` (Raft integrated storage)
+- Snapshot file: `vault-snapshot-<YYYYMMDD-HHMMSS>.snap`
+- Restore requires Vault to be sealed — `restore_vault` checks and refuses if unsealed
+- `--s3` path: `aws s3 cp <snapshot> s3://${AWS_S3_BACKUP_BUCKET}/vault-snapshots/` — credentials via Vault, not env file
+
+### Gap #12 — Audit Logging
+
+Vault audit device enabled during `deploy_vault`:
+
+```bash
+vault audit enable file path=/var/log/vault/audit.log
+```
+
+- Audit log volume mounted in Vault pod via `extraVolumes` in Helm values template
+- Log rotation via `logrotate` config deployed alongside Vault
+- `audit_vault_status` function: `vault audit list` — reports enabled devices and file path
+- Dev-only exception: audit disabled when `VAULT_DEV_MODE=1`
+
+### Gap #3 — Secrets Scanning
+
+Two layers:
+
+**Pre-commit (local):**
+- `gitleaks` added to `.pre-commit-config.yaml` in k3d-manager and all shopping-cart repos (references `github.com/gitleaks/gitleaks` directly — no shared dependency)
+- Each repo owns its own `.gitleaks.toml` at repo root (allowlists for test credentials like `alice/password`)
+- Blocks commit if secrets pattern detected — no bypass without explicit `SKIP=gitleaks`
+
+**CI gate (`shopping-cart-infra`):**
+- `gitleaks/gitleaks-action@v2` step added to `build-push-deploy.yml` — runs before build
+- Pinned version — no `@latest`
+
+---
+
+## v0.9.8 — Vault-Managed ArgoCD Deploy Key Rotation
+*Focus: Eliminate empty-passphrase SSH deploy keys on disk — move all ArgoCD GitHub repo credentials into Vault*
+
+**Motivation:** Deploy keys with empty passphrases stored on disk are insecure and hard to rotate.
+ESO syncs them to Kubernetes secrets; ArgoCD reads from those secrets. No key files on disk.
+
+### Vault Storage
+
+One KV entry per repo:
+```
+secret/argocd/deploy-keys/shopping-cart-basket
+secret/argocd/deploy-keys/shopping-cart-order
+secret/argocd/deploy-keys/shopping-cart-payment
+secret/argocd/deploy-keys/shopping-cart-product-catalog
+secret/argocd/deploy-keys/shopping-cart-frontend
+```
+
+New Vault policy: `argocd-deploy-key-reader` — `read` only on `secret/argocd/deploy-keys/*`.
+
+### ESO + ArgoCD Wiring
+
+- One `ExternalSecret` per repo → syncs to `argocd-repo-<name>` secret in `cicd` ns
+- ArgoCD reads repo credentials from the Kubernetes secret — no key files on disk
+
+### Plugin Function
+
+New function `configure_vault_argocd_repos` in `scripts/plugins/argocd.sh` (or `vault.sh`):
+- Generates fresh ED25519 key pair per repo
+- Writes private key to Vault KV
+- Uploads public key as GitHub deploy key via `gh api`
+- Applies ESO `ExternalSecret` manifest
+
+### Rotation Policy (two-tier)
+
+- **Scheduled — every 24h:** rotate all 5 deploy keys (cron in `shopping-cart-infra` CI or k3d-manager launchd)
+- **On `shopping-cart-infra` main merge:** rotate all 5 deploy keys — infra changes are highest-risk event
+- **On demand:** `./scripts/k3d-manager argocd_rotate_deploy_keys` — manual escape hatch for suspected compromise
+- **Skip:** per-PR rotation on app repos — no infra change, low value, high Vault churn
+
+### Rotation Mechanism
+
+```bash
+vault kv put secret/argocd/deploy-keys/<repo> private_key=@<new-key>
+# ESO syncs automatically → ArgoCD picks up → update GitHub deploy key
+```
+One operation. No ArgoCD restart required.
+
+---
+
+## v0.9.9 — Copilot CLI Integration
+*Focus: AI-assisted cluster operations via GitHub Copilot CLI — opt-in, zero ambient state*
+
+**Spec:** `docs/plans/v0.6.2-ensure-copilot-cli.md` (written under v0.6.2, re-slotted here)
+
+### New helpers in `scripts/lib/system.sh`
+
+- **`_ensure_node`** — lazy-install Node.js if not present (required by Copilot CLI)
+- **`_ensure_copilot_cli`** — lazy-install `@githubnext/github-copilot-cli` via npm; graceful auth failure if `GITHUB_TOKEN` absent
+- **`_k3d_manager_copilot`** — scoped passthrough wrapper with deny-tool guardrails; sets `K3DM_ENABLE_AI=0` in subprocess env (One AI Layer Rule)
+
+### Gating
+
+- All Copilot features behind `K3DM_ENABLE_AI=1` — off by default
+- Graceful degradation: if Copilot CLI unavailable or unauthenticated, functions return non-fatal warning
+
+### BATS coverage
+
+- `scripts/tests/lib/copilot.bats` — `env -i` clean; tests lazy-install logic, deny-tool enforcement, auth failure path
+
+---
+
+## v1.0.0 — Remote k3s via k3sup
+*Focus: Fully automate the EC2 k3s lifecycle — replace manual Gemini rebuild with a single k3d-manager command*
+
+**Motivation:** k3s on EC2 ACG sandbox is already the app cluster target. k3sup eliminates the
+manual install/kubeconfig steps that currently require a Gemini task spec. Combined with
+`bin/acg-sandbox.sh` (EC2 provisioning), the full lifecycle becomes code.
+
+### New CLUSTER_PROVIDER value: `k3s-remote`
+
+Extends the existing `k3s` provider to remote hosts via k3sup:
+
+```bash
+CLUSTER_PROVIDER=k3s-remote ./scripts/k3d-manager deploy_cluster
+```
+
+- `_ensure_k3sup` — lazy-install k3sup binary if not present
+- `deploy_cluster` for `k3s-remote`:
+  1. Calls `bin/acg-sandbox.sh` — EC2 up, IP resolved
+  2. Runs `k3sup install --host <ip> --user ubuntu --ssh-key ~/.ssh/k3d-manager-key.pem`
+  3. Renames kubeconfig context to `ubuntu-k3s`
+  4. Points server to `https://localhost:6443` (tunnel endpoint)
+  5. Merges into `~/.kube/config`
+- `destroy_cluster` for `k3s-remote` — terminates EC2 instance via `aws ec2 terminate-instances`
+
+### SSH Tunnel integration
+
+- `deploy_cluster` starts tunnel automatically after k3s install (`tunnel_start`)
+- `destroy_cluster` stops tunnel before terminating instance (`tunnel_stop`)
+
+### BATS coverage
+
+- `scripts/tests/plugins/k3s_remote.bats` — `env -i` clean; mocks k3sup and aws CLI calls
+
+---
+
 ## v1.1.0 — AWS EKS Provider + ACG Sandbox Lifecycle
 *Focus: First cloud provider — AWS is the most common ACG sandbox*
 
@@ -402,6 +554,32 @@ This boundary is intentional and permanent. k3d-manager's value is **dev/staging
 parity**: the same stack definition runs locally, in staging, and can target production-grade
 clusters without modification. That problem is unsolved by Terraform and Pulumi — it is
 k3d-manager's lane.
+
+---
+
+## Homelab (Unscheduled — v0.9.x or v1.0.x depending on workload)
+*Focus: Remote access to always-on infra cluster — prerequisite for portable development*
+
+**Current state:** Infra cluster runs on M2 Air (no remote access). M4 Air is the dev workstation.
+**Target:** M4 Air connects to infra cluster remotely from anywhere — coffee shop, travel, etc.
+
+### WireGuard Setup
+
+- **Phase 1 (now):** M2 Air as WireGuard server — always-on, zero cost
+  - M4 Air as client — connects to M2 Air when away from home
+  - EC2 optionally added as a peer — all three nodes on same private network
+- **Phase 2 (October 2026):** Mac Mini M5 takes over as WireGuard server
+  - Copy server config from M2 Air to Mini
+  - Update peer configs to point to Mini's IP
+  - M2 Air retired from server role
+
+### What this unlocks
+
+- Full k3d-manager development from anywhere with internet
+- Infra cluster always reachable — no OrbStack tunnel management when traveling
+- Same workflow on M4 Air whether at home or remote
+
+**No timeline committed** — slot into a v0.9.x if workload is light, otherwise v1.0.x.
 
 ---
 
