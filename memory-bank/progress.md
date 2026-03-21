@@ -33,6 +33,7 @@
 - [x] Gemini: Fix product-catalog health check — patched readiness probe path
 - [x] Gemini: Fix NetworkPolicies — unblocked `payment-service` and local DNS
 - [x] Codex: fix app manifests — PRs merged to main; order `d109004`, product-catalog `aa5de3c`, infra `1a5c34d`; tagged v0.1.1; `docs/next-improvements` branch created
+- [x] Codex: fix frontend manifests — PR #11 CLOSED; Copilot P1 confirmed original port 8080 + /health was correct; root cause is resource exhaustion not manifest error; deferred to v1.0.0
 - [x] Gemini: Re-enable ArgoCD auto-sync — all apps reconciled to `HEAD`
 
 ---
@@ -61,8 +62,9 @@
 
 ## Roadmap
 
-- **v1.1.0** — EKS provider + ACG lifecycle
-- **v1.2.0** — k3dm-mcp
+- **v1.0.0** — 3-node k3s via k3sup + Samba AD DC (NEXT — replaces single t3.medium; resolves resource exhaustion)
+- **v1.1.0** — EKS provider + ACG lifecycle + AWS Managed AD
+- **v1.2.0** — k3dm-mcp (gate: EKS delivered)
 - **v1.3.0** — GKE + AD plugin: Google Cloud Identity
 - **v1.4.0** — AKS
 - **v1.5.0** — vCluster
