@@ -32,7 +32,8 @@
 - [x] Gemini: Fix PostgreSQL schema mismatch — added columns to `orders` table
 - [x] Gemini: Fix product-catalog health check — patched readiness probe path
 - [x] Gemini: Fix NetworkPolicies — unblocked `payment-service` and local DNS
-- [x] Codex: fix app manifests — order `007d80a`, product-catalog `f9a7381`, infra `aaa08c1`
+- [x] Codex: fix app manifests — order `007d80a`, product-catalog `f9a7381`, infra `aaa08c1` (unreachable, tracking `HEAD`)
+- [x] Gemini: Re-enable ArgoCD auto-sync — all apps reconciled to `HEAD`
 
 ---
 
