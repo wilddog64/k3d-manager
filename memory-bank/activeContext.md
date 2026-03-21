@@ -22,9 +22,10 @@
 | **Gemini: Fix NetworkPolicies** | **COMPLETE** | Patched `allow-dns` and added `allow-to-istio` in `shopping-cart-payment` |
 | **Codex: fix app manifests** | **MERGED** | PRs merged to main 2026-03-21; order `d109004`, product-catalog `aa5de3c`, infra `1a5c34d`; tagged v0.1.1; `docs/next-improvements` branches created |
 | **Gemini: re-enable ArgoCD sync** | **COMPLETE** | Auto-sync re-enabled for all apps; verified tracking `HEAD` |
-| **Gemini: force sync post-manifest-fix** | **BLOCKED** | Gemini exhausted context; documented discrepancies instead of running sync; `argocd app sync` still needed |
-| **Frontend regression** | **OPEN** | Was Running ✅; now CrashLoopBackOff after ArgoCD sync — emptyDir patch possibly overwritten; probe failing on port 8080 `/health` |
-| **product-catalog OutOfSync** | **OPEN** | ArgoCD shows OutOfSync+Degraded at `1214373f`; manifest fix `aa5de3c` on main but not picked up yet |
+| **Gemini: force sync post-manifest-fix** | **COMPLETE** | `product-catalog` synced to `aa5de3c`, env vars verified correct. |
+| **Frontend CrashLoopBackOff** | **DEFERRED → v1.0.0** | Root cause: resource exhaustion (FailedScheduling on t3.medium). PR #11 closed — Copilot P1 confirmed original port 8080 + /health was correct. Fix: 3-node k3sup. Doc: `docs/issues/2026-03-21-frontend-crashloopbackoff-misdiagnosis.md` |
+| **product-catalog Degraded** | **OPEN** | Synced to `aa5de3c`; DB env vars correct; RABBITMQ_USER vs RABBITMQ_USERNAME mismatch via ESO |
+| **v1.0.0 (3-node k3sup + Samba AD)** | **NEXT MILESTONE** | Replaces single t3.medium; resolves resource exhaustion structurally; spec: `docs/plans/roadmap-v1.md` |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
 
@@ -56,10 +57,10 @@
 | Istio | **Running** — `istio-system` |
 | ghcr-pull-secret | **Verified** in `apps`, `data`, `payment` namespaces |
 | basket-service | **Running** ✅ — ArgoCD Healthy |
-| product-catalog | **OutOfSync / Degraded** ⚠️ — manifest fix `aa5de3c` not yet picked up by ArgoCD |
+| product-catalog | **Synced / Degraded** ⚠️ — Synced to `aa5de3c`, env vars corrected. Pod still not ready. |
 | order-service | **Degraded** ⚠️ — PostgreSQL OK; RabbitMQ `Connection refused` persists |
 | payment-service | **Progressing** ⚠️ — resource constraints; NetworkPolicies fixed |
-| frontend | **CrashLoopBackOff** ⚠️ — REGRESSION; was Running; emptyDir patch may have been overwritten by ArgoCD sync |
+| frontend | **CrashLoopBackOff** ⚠️ — root cause: FailedScheduling (t3.medium resource exhaustion); original port 8080 + /health correct; deferred to v1.0.0 |
 
 
 ---
@@ -87,6 +88,5 @@
     - `order-service` experiencing `Connection refused` to RabbitMQ service despite successful DB connection.
 - **Memory Constraints** — `t3.medium` (4GB) is at 95% capacity; some pods scaled to 0 during troubleshooting.
 - **PTY watchdog** — guards against Gemini CLI PTY leak.
-- **Gemini context exhaustion (2026-03-21):** Gemini lost task context mid-session; documented discrepancies instead of running `argocd app sync`. Commit `ae2af95` (3 issue docs in `docs/issues/`). Force sync still pending.
-- **Frontend regression:** ArgoCD at `65b354f` (correct SHA) but pod CrashLoopBackOff — possible ArgoCD sync overwrote manual emptyDir volume patch. Next session must check `kubectl describe pod -l app=frontend | grep -A5 volume`.
-- **ArgoCD app status (last known 2026-03-21):** basket Healthy ✅, frontend Progressing/CrashLoop, order Degraded, payment Progressing, product-catalog OutOfSync+Degraded, shopping-cart-apps OutOfSync.
+- **Frontend regression (new finding):** The `CrashLoopBackOff` is caused by a read-only root filesystem preventing nginx from writing its config. See `docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md`.
+- **ArgoCD app status (as of this task):** basket Healthy ✅, frontend CrashLoopBackOff, order Degraded, payment Progressing, product-catalog Synced/Degraded, shopping-cart-apps OutOfSync.
