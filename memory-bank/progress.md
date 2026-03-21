@@ -37,7 +37,7 @@
 - [ ] **`--dry-run` / `-n` mode** — all `deploy_*` print every command without executing. Easy: `kubectl apply --dry-run=client`, `helm install --dry-run`. Hard (Vault init, LDAP bootstrap): print commands only.
 - [ ] **`plan` mode** — prototype with Vault first (`vault status`, `helm status`, `kubectl get pods`). Output: per-component ✓/✗. Extend to Jenkins, ESO, ArgoCD after Vault proven.
 - [ ] Confirm all 5 pods `Running` on Ubuntu k3s — basket/order/product-catalog: CrashLoopBackOff (data layer not deployed)
-- [ ] **Gemini: verify frontend pod Running** — `argocd app sync shopping-cart-frontend --force` on infra cluster; confirm pod `Running` on ubuntu-k3s; update activeContext.md
+- [x] **Gemini: verify frontend pod Running** — Pod `frontend-85969b4bf-zq9st` is `Running` on ubuntu-k3s; manually patched with `emptyDir` volumes
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
 - [ ] Playwright E2E green — milestone gate
 - [ ] Re-enable `enforce_admins` on shopping-cart-payment main branch
@@ -89,6 +89,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
+| frontend CrashLoopBackOff | FIXED | Manually patched with `emptyDir` volumes; permanent fix needed in repo |
 | order/product-catalog CrashLoopBackOff | OPEN | PostgreSQL missing on app cluster; `UnknownHostException` in pod logs |
 | basket-service CrashLoopBackOff | OPEN | Redis (`shopping-cart-data` ns) + RabbitMQ not deployed to Ubuntu k3s |
 | SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync; needs `ServerAliveInterval` or `screen` |

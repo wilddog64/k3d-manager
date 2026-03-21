@@ -1,7 +1,7 @@
 # Issue: frontend CrashLoopBackOff due to Nginx Permission Denied
 
 **Date:** 2026-03-20
-**Status:** OPEN
+**Status:** CLOSED (Manually patched 2026-03-20)
 **Component:** `shopping-cart-frontend`
 
 ## Symptoms
