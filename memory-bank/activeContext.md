@@ -20,7 +20,7 @@
 | **Gemini: Fix Schema mismatch** | **COMPLETE** | Added missing columns to `orders` table in `postgresql-orders` |
 | **Gemini: Fix Health Checks** | **COMPLETE** | Patched `product-catalog` readiness probe path `/health/ready` -> `/health` |
 | **Gemini: Fix NetworkPolicies** | **COMPLETE** | Patched `allow-dns` and added `allow-to-istio` in `shopping-cart-payment` |
-| **Codex: fix app manifests** | **ASSIGNED** | spec: `docs/plans/v0.9.4-codex-fix-app-manifests.md`; 6 files across 3 repos |
+| **Codex: fix app manifests** | **COMPLETED** | order `007d80a`, product-catalog `f9a7381`, infra `aaa08c1` — spec `docs/plans/v0.9.4-codex-fix-app-manifests.md` |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
 
@@ -29,7 +29,7 @@
 ## Cluster Architecture
 
 **Infra cluster:** k3d on OrbStack on M2 Air — ArgoCD hub for Ubuntu k3s.
-**App cluster:** Ubuntu k3s on AWS EC2 ACG sandbox — `i-0650af63c77af770c`, `34.219.1.106`, `t3.medium`, `us-west-2`.
+**App cluster:** Ubuntu k3s on AWS EC2 ACG sandbox — `i-03bb9ca1fb6d55633`, `16.147.37.214`, `t3.medium`, `us-west-2`.
 
 ### Infra Cluster (M2 Air — k3d/OrbStack)
 
