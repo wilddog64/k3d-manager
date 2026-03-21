@@ -41,27 +41,31 @@
 
 ## v0.9.5 — Active
 
-### Carried from v0.9.4
-- [ ] Confirm all 5 pods `Running` on Ubuntu k3s — basket ✅; order-service (RabbitMQ `Connection refused`); payment-service (memory constraints); frontend (deferred to v1.0.0)
-- [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
-- [ ] Playwright E2E green — milestone gate
-- [ ] Re-enable `enforce_admins` on shopping-cart-payment main branch
-- [ ] **Safety gate audit** — `deploy_*` with no args should print help, NOT trigger deployment
-- [ ] **`--dry-run` / `-n` mode** — all `deploy_*` print every command without executing
-- [ ] **`plan` mode** — prototype with Vault first
+**Primary focus: `deploy_app_cluster` via k3sup — single-node EC2 lifecycle automation.**
+Shopping-cart pod health issues (order-service RabbitMQ, payment-service memory, frontend) require multi-node to resolve structurally; deferred to v1.0.0.
+
+### Primary
+- [ ] **`deploy_app_cluster` via k3sup** — `k3sup install` on EC2 + kubeconfig merge + ArgoCD cluster registration; replaces manual Gemini rebuild; prerequisite for v1.0.0 multi-node extension
 
 ### Code Quality / Architecture
 - [ ] **Upstream local lib edits to lib-foundation** — `scripts/lib/system.sh` (TTY fix + `_run_command_resolve_sudo`) and `scripts/lib/agent_rigor.sh` (allowlist feature) need PRs to lib-foundation `feat/v0.3.4` → subtree pull → remove local divergence
 - [ ] **Reduce if-count allowlist** — refactor 13 allowlisted functions (jenkins x6, ldap x7, vault x5, system x2) to under 8-`if` threshold; remainder needs `docs/issues/` entry; no new entries without linked issue
 - [ ] **`bin/` script consistency** — all `bin/` scripts using `kubectl`/system commands must source lib-foundation and use `_kubectl`/`_run_command`; affected: `bin/smoke-test-cluster-health.sh`
-- [ ] **Relocate app-layer bug tracking** — file shopping-cart bugs as GitHub Issues in their respective repos; remove from k3d-manager Known Bugs table
+- [ ] **Relocate app-layer bug tracking** — file shopping-cart bugs as GitHub Issues in their repos; remove from k3d-manager Known Bugs table
 
-### Features
-- [ ] Service mesh — Istio full activation; `PeerAuthentication` / `AuthorizationPolicy` / `Gateway`
-- [ ] **`deploy_app_cluster` via k3sup** — remote k3s install + kubeconfig merge
+### Secondary (if primary complete)
+- [ ] **Safety gate audit** — `deploy_*` with no args should print help, NOT trigger deployment
+- [ ] **`--dry-run` / `-n` mode** — all `deploy_*` print every command without executing
+- [ ] **`plan` mode** — prototype with Vault first
 - [ ] **sudo whitelist** — `scripts/etc/sudoers/k3d-manager` template
 - [ ] **Vault backup/restore** — `backup_vault` / `restore_vault`
 - [ ] **GitHub PAT rotation** — expires 2026-04-12
+
+### Deferred to v1.0.0 (needs multi-node)
+- [ ] All 5 pods Running — order-service (RabbitMQ), payment-service (memory), frontend (resource exhaustion)
+- [ ] Re-enable `shopping-cart-e2e-tests` + Playwright E2E green
+- [ ] Re-enable `enforce_admins` on shopping-cart-payment
+- [ ] Service mesh — Istio full activation
 
 ---
 
