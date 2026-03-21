@@ -34,6 +34,7 @@ check_statefulset_ready() {
     _err "StatefulSet $name not found in $namespace"
     return 1
   fi
+  ready="${ready:-0}"
   if [[ "$desired" != "$ready" ]]; then
     _err "StatefulSet $name Ready replicas $ready does not match desired $desired"
     return 1
