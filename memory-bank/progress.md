@@ -28,6 +28,9 @@
 - [x] Gemini: ArgoCD cluster registration + app sync — `7d614bc`
 - [x] Force ArgoCD sync — order-service + product-catalog — verified
 - [x] Codex: fix `instsudo` typo — `scripts/lib/system.sh` line 850; `ef57b0f` (2026-03-20)
+- [x] Gemini: verify frontend pod Running — pod `frontend-85969b4bf-zq9st` Running on ubuntu-k3s (manually patched with emptyDir volumes); commit `d5bd618`
+- [x] shopping-cart-infra PR #18 merged (`a97ee04`) — fix trivy-action 0.30.0→v0.35.0
+- [x] shopping-cart-infra PR #19 merged (`4ecc6b5`) — address Copilot PR #5 comments (register-ubuntu-k3s.sh security fixes + `destination.name: ubuntu-k3s` for all 5 apps)
 
 ---
 
@@ -37,7 +40,6 @@
 - [ ] **`--dry-run` / `-n` mode** — all `deploy_*` print every command without executing. Easy: `kubectl apply --dry-run=client`, `helm install --dry-run`. Hard (Vault init, LDAP bootstrap): print commands only.
 - [ ] **`plan` mode** — prototype with Vault first (`vault status`, `helm status`, `kubectl get pods`). Output: per-component ✓/✗. Extend to Jenkins, ESO, ArgoCD after Vault proven.
 - [ ] Confirm all 5 pods `Running` on Ubuntu k3s — basket/order/product-catalog: CrashLoopBackOff (data layer not deployed)
-- [x] **Gemini: verify frontend pod Running** — Pod `frontend-85969b4bf-zq9st` is `Running` on ubuntu-k3s; manually patched with `emptyDir` volumes
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
 - [ ] Playwright E2E green — milestone gate
 - [ ] Re-enable `enforce_admins` on shopping-cart-payment main branch
@@ -93,3 +95,5 @@
 | order/product-catalog CrashLoopBackOff | OPEN | PostgreSQL missing on app cluster; `UnknownHostException` in pod logs |
 | basket-service CrashLoopBackOff | OPEN | Redis (`shopping-cart-data` ns) + RabbitMQ not deployed to Ubuntu k3s |
 | SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync; needs `ServerAliveInterval` or `screen` |
+| frontend emptyDir patch | OPEN | Live cluster has manual emptyDir patch; Dockerfile fix (v0.1.1) not yet active — CI was failing (trivy-action pin). Now that trivy is fixed, next frontend push will build+push image and make emptyDir patch redundant |
+| ~/.claude credentials exposed | OPEN | OAuth tokens in git history (commit 6447a8d); rotate via `claude auth logout && claude auth login`, then git filter-repo purge + force push |
