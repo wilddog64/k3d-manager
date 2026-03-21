@@ -28,9 +28,12 @@ flow runs from M4 Air with no manual SSH required.
 ### Target UX
 
 ```bash
-# From M4 Air — deploys k3s to EC2, merges kubeconfig automatically
-./scripts/k3d-manager deploy_app_cluster --host ubuntu
+# From M4 Air — deploys k3s to any SSH-reachable host
+./scripts/k3d-manager deploy_app_cluster ubuntu           # EC2 ACG sandbox
+./scripts/k3d-manager deploy_app_cluster ubuntu-parallels # Parallels Desktop VM
 ```
+
+Works with any host in `~/.ssh/config` — EC2, Parallels, bare metal.
 
 ### Implementation Plan
 
