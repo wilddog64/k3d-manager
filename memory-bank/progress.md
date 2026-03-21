@@ -30,9 +30,9 @@
 
 ### v0.9.4 — active
 
-- [ ] **Gemini: rebuild Ubuntu k3s + E2E verification** — **ASSIGNED TO GEMINI** (2026-03-20); spec: `docs/plans/v0.9.4-gemini-rebuild-ubuntu-k3s-e2e.md`; gate: Codex tunnel plugin must be verified first
-- [ ] **Gemini: ArgoCD cluster registration + app sync** — **ASSIGNED TO GEMINI** (2026-03-20); spec: `docs/plans/v0.9.4-gemini-argocd-cluster-registration.md`; gate: Codex argocd registration + smoke test committed
-- [ ] Force ArgoCD sync — order-service + product-catalog — covered in Gemini rebuild spec
+- [x] **Gemini: rebuild Ubuntu k3s + E2E verification** — commit `7d614bc`
+- [x] **Gemini: ArgoCD cluster registration + app sync** — commit `7d614bc`
+- [x] Force ArgoCD sync — order-service + product-catalog — verified
 - [ ] **Codex: fix `instsudo` typo** — `scripts/lib/system.sh` line 838 (Gemini red team finding)
 - [x] **autossh tunnel plugin** — Codex delivered autossh-backed tunnel plugin + BATS coverage per `docs/plans/v0.9.4-codex-autossh-tunnel-plugin.md`; commands exposed via `tunnel_start|stop|status`; commit msg: `feat(tunnel): add autossh tunnel plugin with launchd boot persistence`
 - [x] **ArgoCD cluster registration automation** — Codex delivered `register_app_cluster`, cluster-secret template, and vars per `docs/plans/v0.9.4-codex-argocd-cluster-registration.md`; replaces manual secret creation; commit msg: `feat(argocd): add register_app_cluster to automate ubuntu-k3s cluster secret`
@@ -105,6 +105,8 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| basket-service CrashLoopBackOff | OPEN | Data layer (Redis `shopping-cart-data` ns, RabbitMQ) not deployed to Ubuntu k3s; separate issue from missing Secrets |
+| frontend CrashLoopBackOff | OPEN | nginx permissions issue (`mkdir /var/cache/nginx/client_temp` failed) |
+| order/product-catalog CrashLoopBackOff | OPEN | Data layer (PostgreSQL) missing on app cluster; pod logs show `UnknownHostException` |
+| basket-service CrashLoopBackOff | OPEN | Data layer (Redis `shopping-cart-data` ns, RabbitMQ) not deployed to Ubuntu k3s |
 | SSH Tunnel timeouts | OPEN | Frequent connection resets during heavy ArgoCD sync; requires `ServerAliveInterval` or `screen` for stability |
-| Vault Kubernetes auth over tunnel | KNOWN | CA cert validation fails over SSH tunnel; use static Vault token with `eso-reader` policy as fallback |
+| Vault Kubernetes auth over tunnel | FIXED | Using reverse SSH tunnel to bridge connectivity from app cluster back to infra cluster |

@@ -42,14 +42,18 @@
 ### App Cluster (EC2 — Ubuntu k3s)
 
 **Migrated 2026-03-20 from Parallels VM to EC2 ACG sandbox.**
-ArgoCD cluster secret `cluster-ubuntu-k3s` requires `bearerToken` from `argocd-manager` SA — pending Gemini deployment.
+ArgoCD cluster secret `cluster-ubuntu-k3s` updated with `bearerToken` from `argocd-manager` SA.
 
 | Component | Status |
 |---|---|
-| k3s node | PENDING DEPLOY (fresh EC2) |
-| Istio / ESO / Vault / OpenLDAP | PENDING DEPLOY |
-| ghcr-pull-secret | PENDING DEPLOY |
-| shopping-cart apps (5) | PENDING DEPLOY |
+| k3s node | **Ready** — v1.34.5+k3s1 |
+| Istio | **Running** — `istio-system` |
+| ghcr-pull-secret | **Verified** in `apps`, `data`, `payment` namespaces |
+| payment-service | **Running** (confirmed connectivity to infra cluster Vault) |
+| basket-service | **CrashLoopBackOff** (expected — Redis/RabbitMQ missing on k3s) |
+| order-service | **CrashLoopBackOff** (data layer missing) |
+| product-catalog | **CrashLoopBackOff** (data layer missing) |
+| frontend | **CrashLoopBackOff** (nginx permissions issue) |
 
 ---
 
