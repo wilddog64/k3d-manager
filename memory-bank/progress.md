@@ -40,7 +40,7 @@
 - [x] **Codex: reduce replicas to 1 + remove HPAs** — merged to main 2026-03-20; basket `f55effe` (#9), order `98b2f0b` (#13), payment `da0646f` (#15 → v0.1.1), product-catalog `41acad6` (#13), frontend `a9a1b70` (#8)
 - [ ] Confirm all 5 pods `Running` on Ubuntu k3s — basket: CrashLoopBackOff (data layer Redis/RabbitMQ not deployed to Ubuntu k3s); payment: pending ArgoCD sync of secret
 - [x] **Fix `_run_command` non-interactive sudo failure after VM restart** — Codex implemented `_run_command_has_tty`, interactive sudo fallbacks, and regression tests per `docs/plans/v0.9.4-codex-run-command-tty-sudo-fallback.md`; issue: `docs/issues/2026-03-19-run-command-non-interactive-sudo-failure.md`; commit msg: `fix(system): fall back to interactive sudo when sudo -n unavailable and TTY present`
-- [x] **Codex: fix frontend nginx CrashLoopBackOff** — commit `a7529346` on `fix/nginx-non-root-port-8080`; spec: `docs/plans/v0.9.4-codex-frontend-nginx-non-root.md`
+- [x] **Codex: fix frontend nginx CrashLoopBackOff** — merged `65b354f` to main 2026-03-21; tagged v0.1.1, released; new branch `feat/v0.1.2` cut with README releases table
 - [ ] **Gemini: verify frontend pod Running** — after PR #10 merges to `shopping-cart-frontend` main: run `argocd app sync shopping-cart-frontend --force` (infra cluster context), confirm pod transitions to `Running` on ubuntu-k3s, update activeContext.md
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
 - [ ] Playwright E2E green — milestone gate
