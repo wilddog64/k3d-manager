@@ -35,27 +35,27 @@ function add_ubuntu_k3s_cluster() {
   fi
 
   _info "[shopping_cart] Merging ubuntu-k3s context into ~/.kube/config"
-  if ! kubectl config get-contexts ubuntu-k3s &>/dev/null; then
-    local _tmp_kube _tmp_merged
-    _tmp_kube="${HOME}/.kube/ubuntu-k3s-tmp.yaml"
-    _tmp_merged="${HOME}/.kube/config-merged-tmp.yaml"
-    cp "${local_kubeconfig}" "${_tmp_kube}"
-    chmod 600 "${_tmp_kube}"
-    local _src_context
-    if ! _src_context=$(KUBECONFIG="${_tmp_kube}" kubectl config current-context 2>/dev/null); then
-      _src_context=""
-    fi
-    if [[ -n "${_src_context}" && "${_src_context}" != "ubuntu-k3s" ]]; then
-      KUBECONFIG="${_tmp_kube}" kubectl config rename-context "${_src_context}" ubuntu-k3s
-    fi
-    KUBECONFIG="${HOME}/.kube/config:${_tmp_kube}" kubectl config view --flatten > "${_tmp_merged}"
-    mv "${_tmp_merged}" "${HOME}/.kube/config"
-    chmod 600 "${HOME}/.kube/config"
-    rm -f "${_tmp_kube}"
-    _info "[shopping_cart] ubuntu-k3s context merged into ~/.kube/config"
-  else
-    _info "[shopping_cart] Context 'ubuntu-k3s' already present in ~/.kube/config — skipping merge"
+  local _tmp_kube _tmp_merged
+  _tmp_kube="${HOME}/.kube/ubuntu-k3s-tmp.yaml"
+  _tmp_merged="${HOME}/.kube/config-merged-tmp.yaml"
+  if kubectl config get-contexts ubuntu-k3s &>/dev/null; then
+    kubectl config delete-context ubuntu-k3s &>/dev/null || true
+    _info "[shopping_cart] Removed stale ubuntu-k3s context — will re-merge with fresh credentials"
   fi
+  cp "${local_kubeconfig}" "${_tmp_kube}"
+  chmod 600 "${_tmp_kube}"
+  local _src_context
+  if ! _src_context=$(KUBECONFIG="${_tmp_kube}" kubectl config current-context 2>/dev/null); then
+    _src_context=""
+  fi
+  if [[ -n "${_src_context}" && "${_src_context}" != "ubuntu-k3s" ]]; then
+    KUBECONFIG="${_tmp_kube}" kubectl config rename-context "${_src_context}" ubuntu-k3s
+  fi
+  KUBECONFIG="${HOME}/.kube/config:${_tmp_kube}" kubectl config view --flatten > "${_tmp_merged}"
+  mv "${_tmp_merged}" "${HOME}/.kube/config"
+  chmod 600 "${HOME}/.kube/config"
+  rm -f "${_tmp_kube}"
+  _info "[shopping_cart] ubuntu-k3s context merged into ~/.kube/config"
 
   local kube_context
   if [[ -n "${UBUNTU_K3S_CONTEXT:-}" ]]; then

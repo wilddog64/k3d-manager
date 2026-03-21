@@ -456,7 +456,8 @@ dn: ${jenkins_user_dn}
 objectClass: inetOrgPerson
 objectClass: organizationalPerson
 objectClass: person
-cn: Jenkins Admin\sn: Admin
+cn: Jenkins Admin
+sn: Admin
 uid: jenkins-admin
 userPassword: ${jenkins_password}
 EOF
