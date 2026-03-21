@@ -20,6 +20,7 @@
 | **Gemini: Fix Schema mismatch** | **COMPLETE** | Added missing columns to `orders` table in `postgresql-orders` |
 | **Gemini: Fix Health Checks** | **COMPLETE** | Patched `product-catalog` readiness probe path `/health/ready` -> `/health` |
 | **Gemini: Fix NetworkPolicies** | **COMPLETE** | Patched `allow-dns` and added `allow-to-istio` in `shopping-cart-payment` |
+| **Codex: fix app manifests** | **ASSIGNED** | spec: `docs/plans/v0.9.4-codex-fix-app-manifests.md`; 6 files across 3 repos |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
 
