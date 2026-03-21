@@ -42,7 +42,7 @@
 
 ### App Cluster (EC2 — Ubuntu k3s)
 
-Migrated 2026-03-20 from Parallels VM to EC2 ACG sandbox. ArgoCD cluster secret `cluster-ubuntu-k3s` updated with `bearerToken` from `argocd-manager` SA.
+Sandbox recreated 2026-03-21. New instance: `i-0650af63c77af770c`, `34.219.1.106`, `t3.medium`, `us-west-2`. SSH: `Host ubuntu` → `~/.ssh/k3d-manager-key.pem`. **k3s not yet installed — Gemini must re-run full rebuild spec.**
 
 | Component | Status |
 |---|---|
