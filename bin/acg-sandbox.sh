@@ -15,7 +15,7 @@ set -euo pipefail
 
 REGION="${ACG_REGION:-us-west-2}"
 INSTANCE_NAME="k3d-manager-ubuntu"
-INSTANCE_TYPE="t3.large"
+INSTANCE_TYPE="t3.medium"
 KEY_NAME="k3d-manager-key"
 KEY_PEM="$HOME/.ssh/k3d-manager-key.pem"
 SSH_CONFIG="$HOME/.ssh/config"
@@ -59,7 +59,15 @@ _update_ssh_config() {
   _info "Updating ~/.ssh/config with IP $new_ip..."
   for host in ubuntu "ubuntu-tunnel"; do
     if grep -q "^Host ${host}$" "$SSH_CONFIG" 2>/dev/null; then
-      sed -i '' "/^Host ${host}$/,/^Host /{s/HostName .*/HostName ${new_ip}/}" "$SSH_CONFIG"
+      python3 -c "
+import re, sys
+with open('${SSH_CONFIG}', 'r') as f:
+    content = f.read()
+pattern = r'(^Host ${host}\$.*?^\s+HostName\s+)\S+'
+result = re.sub(pattern, r'\g<1>${new_ip}', content, flags=re.MULTILINE|re.DOTALL)
+with open('${SSH_CONFIG}', 'w') as f:
+    f.write(result)
+"
     fi
   done
 }
