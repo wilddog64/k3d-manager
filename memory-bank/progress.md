@@ -78,6 +78,7 @@
 - [ ] Service mesh — Istio full activation
 - [ ] `PeerAuthentication` / `AuthorizationPolicy` / `Gateway`
 - Spec: `docs/plans/v0.9.5-service-mesh.md`
+- [ ] **`deploy_app_cluster` via k3sup** — remote k3s install + kubeconfig merge from M4 in one command; eliminates manual SSH into EC2; issue: `docs/issues/2026-03-20-k3s-remote-deploy-via-k3sup.md`
 - [ ] **sudo whitelist** — `scripts/etc/sudoers/k3d-manager` template installed during `deploy_cluster` bootstrap; `NOPASSWD` scoped to exact k3d-manager commands only (mkdir, cp, chmod, systemctl for k3s); eliminates need for warm sudo timestamp on fresh VM
 - [ ] **Vault backup/restore** — `backup_vault` / `restore_vault` commands using `vault operator raft snapshot`; run before any destructive VM operation; eliminates manual PAT re-provisioning after cluster wipe
 - [ ] **GitHub PAT rotation reminder** — current PAT expires 2026-04-12; rotate and re-store in Vault at `secret/github/pat-read-packages` before expiry
