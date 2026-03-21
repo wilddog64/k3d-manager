@@ -79,11 +79,10 @@ When your task is done, update `memory-bank/activeContext.md` and `memory-bank/p
 to reflect what you completed. Include the real commit SHA and PR URL.
 
 ### 11. Stop at 5 plan docs per milestone
-If you are asked to write a spec and the current milestone already has 5 or more files in
-`docs/plans/`, flag it to Claude before proceeding. A high plan count signals scope creep,
-reactive planning, or a milestone that should be split. Do not write a sixth spec without
-explicit approval. This is a health check, not a hard block — Claude decides whether to
-proceed or replan.
+Each release is a sprint story with a maximum of 5 spec files. If the current milestone
+already has 5 or more files in `docs/plans/`, do not write another — flag it to Claude
+immediately. A 6th spec means the release is too large and must be split into two smaller
+releases. Claude decides how to split; you do not proceed until told to.
 
 ### 10. If-count allowlist is for legacy code only
 The `_agent_audit` threshold stays at 8 `if` blocks per function. If you touch a file with
