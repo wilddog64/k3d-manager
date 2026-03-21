@@ -36,6 +36,7 @@
 - [x] Codex: fix app manifests — PRs merged to main; order `d109004`, product-catalog `aa5de3c`, infra `1a5c34d`; tagged v0.1.1; `docs/next-improvements` branch created
 - [x] Codex: fix frontend manifests — PR #11 CLOSED; Copilot P1 confirmed original port 8080 + /health was correct; root cause is resource exhaustion not manifest error; deferred to v1.0.0
 - [x] Gemini: Re-enable ArgoCD auto-sync — all apps reconciled to `HEAD`
+- [x] Codex: add deploy_app_cluster automation — commit `2075672` adds k3sup install + kubeconfig merge helper and BATS coverage
 
 ---
 

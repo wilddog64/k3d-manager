@@ -96,3 +96,93 @@ function register_shopping_cart_apps() {
   _info "[shopping_cart] Applying ArgoCD applications from ${argocd_dir}"
   _run_command -- kubectl apply -f "${argocd_dir}/"
 }
+
+function deploy_app_cluster() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'HELP'
+Usage: deploy_app_cluster [--confirm]
+
+Install k3s on the remote EC2 app cluster via k3sup, then merge its kubeconfig
+into ~/.kube/config as the ubuntu-k3s context.
+
+Does NOT register the cluster with ArgoCD — that requires a bearer token:
+  ssh ubuntu kubectl create token argocd-manager -n kube-system --duration=8760h
+Then run: ./scripts/k3d-manager register_app_cluster
+
+Config (override via env or scripts/etc/tunnel/vars.sh):
+  UBUNTU_K3S_SSH_HOST          SSH host alias (default: ubuntu)
+  UBUNTU_K3S_SSH_USER          SSH user       (default: ubuntu)
+  UBUNTU_K3S_EXTERNAL_IP       Node IP        (default: UBUNTU_K3S_SSH_HOST)
+  UBUNTU_K3S_SSH_KEY           SSH key path   (default: ~/.ssh/k3d-manager-key.pem)
+  UBUNTU_K3S_LOCAL_KUBECONFIG  Local kubeconfig path (default: ~/.kube/k3s-ubuntu.yaml)
+HELP
+    return 0
+  fi
+
+  if [[ "${1:-}" != "--confirm" ]]; then
+    _err "[shopping_cart] deploy_app_cluster requires --confirm to prevent accidental runs"
+    return 1
+  fi
+
+  local ssh_host="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
+  local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
+  local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-${ssh_host}}"
+  local ssh_key="${UBUNTU_K3S_SSH_KEY:-${HOME}/.ssh/k3d-manager-key.pem}"
+  local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
+  local kube_context="ubuntu-k3s"
+
+  if ! command -v k3sup >/dev/null 2>&1; then
+    _err "[shopping_cart] k3sup not found — install with: brew install k3sup"
+    return 1
+  fi
+
+  if [[ ! -f "${ssh_key}" ]]; then
+    _err "[shopping_cart] SSH key not found: ${ssh_key}"
+    return 1
+  fi
+
+  _info "[shopping_cart] Installing k3s on ${ssh_user}@${external_ip} via k3sup..."
+  _run_command -- k3sup install \
+    --ip "${external_ip}" \
+    --user "${ssh_user}" \
+    --ssh-key "${ssh_key}" \
+    --local-path "${local_kubeconfig}" \
+    --context "${kube_context}" \
+    --k3s-extra-args '--disable traefik --disable servicelb'
+
+  _info "[shopping_cart] Waiting for node to be Ready..."
+  local attempts=0
+  until KUBECONFIG="${local_kubeconfig}" kubectl get nodes 2>/dev/null | grep -q " Ready"; do
+    (( attempts++ ))
+    if (( attempts >= 30 )); then
+      _err "[shopping_cart] Node did not become Ready after 150s"
+      return 1
+    fi
+    sleep 5
+  done
+  _info "[shopping_cart] Node Ready."
+
+  _info "[shopping_cart] Merging ubuntu-k3s context into ~/.kube/config"
+  local tmp_kube tmp_merged
+  tmp_kube="${HOME}/.kube/ubuntu-k3s.tmp"
+  tmp_merged="${HOME}/.kube/config.tmp"
+  if kubectl config get-contexts "${kube_context}" >/dev/null 2>&1; then
+    kubectl config delete-context "${kube_context}" >/dev/null 2>&1 || true
+    _info "[shopping_cart] Removed stale ${kube_context} context"
+  fi
+  cp "${local_kubeconfig}" "${tmp_kube}"
+  chmod 600 "${tmp_kube}"
+  KUBECONFIG="${HOME}/.kube/config:${tmp_kube}" kubectl config view --flatten > "${tmp_merged}"
+  mv "${tmp_merged}" "${HOME}/.kube/config"
+  chmod 600 "${HOME}/.kube/config"
+  rm -f "${tmp_kube}"
+  _info "[shopping_cart] ${kube_context} context merged into ~/.kube/config"
+
+  _info "[shopping_cart] k3s install complete."
+  _info ""
+  _info "Next steps:"
+  _info "  1. Get a bearer token:"
+  _info "       ssh ${ssh_host} kubectl create token argocd-manager -n kube-system --duration=8760h"
+  _info "  2. Register with ArgoCD:"
+  _info "       ARGOCD_APP_CLUSTER_TOKEN=<token> ./scripts/k3d-manager register_app_cluster"
+}
