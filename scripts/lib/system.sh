@@ -38,6 +38,11 @@ function _command_exist() {
     command -v "$1" &> /dev/null
 }
 
+# Testable TTY check. Override with _RC_FORCE_TTY=1 in tests.
+_run_command_has_tty() {
+  [[ "${_RC_FORCE_TTY:-0}" == "1" ]] || [[ -t 0 && -t 1 ]]
+}
+
 # _run_command [--quiet] [--prefer-sudo|--require-sudo] [--probe '<subcmd>'] -- <prog> [args...]
 # - --quiet         : suppress wrapper error message (still returns real exit code)
 # - --prefer-sudo   : use sudo -n if available, otherwise run as user
@@ -81,14 +86,17 @@ function _run_command() {
 
   # Decide runner: user vs sudo -n vs sudo (interactive)
   local runner
+  local sudo_cmd=sudo
   local sudo_flags=()
   if (( interactive_sudo == 0 )); then
     sudo_flags=(-n)  # Non-interactive sudo
   fi
 
   if (( require_sudo )); then
-    if (( interactive_sudo )) || sudo -n true >/dev/null 2>&1; then
-      runner=(sudo "${sudo_flags[@]}" "$prog")
+    if (( interactive_sudo )) || "$sudo_cmd" -n true >/dev/null 2>&1; then
+      runner=("$sudo_cmd" "${sudo_flags[@]}" "$prog")
+    elif _run_command_has_tty; then
+      runner=("$sudo_cmd" "$prog")
     else
       (( quiet )) || echo "sudo non-interactive not available" >&2
       exit 127
@@ -98,22 +106,26 @@ function _run_command() {
       # Try user first; if probe fails, try sudo
       if "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
         runner=("$prog")
-      elif (( interactive_sudo )) && sudo "${sudo_flags[@]}" "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=(sudo "${sudo_flags[@]}" "$prog")
-      elif sudo -n "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=(sudo -n "$prog")
+      elif (( interactive_sudo )) && "$sudo_cmd" "${sudo_flags[@]}" "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
+        runner=("$sudo_cmd" "${sudo_flags[@]}" "$prog")
+      elif "$sudo_cmd" -n "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
+        runner=("$sudo_cmd" -n "$prog")
       elif (( prefer_sudo )) && ((interactive_sudo)) ; then
-        runner=(sudo "${sudo_flags[@]}" "$prog")
-      elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
-        runner=(sudo -n "$prog")
+        runner=("$sudo_cmd" "${sudo_flags[@]}" "$prog")
+      elif (( prefer_sudo )) && "$sudo_cmd" -n true >/dev/null 2>&1; then
+        runner=("$sudo_cmd" -n "$prog")
+      elif (( prefer_sudo )) && _run_command_has_tty; then
+        runner=("$sudo_cmd" "$prog")
       else
         runner=("$prog")
       fi
     else
       if (( prefer_sudo )) && (( interactive_sudo )); then
-        runner=(sudo "${sudo_flags[@]}" "$prog")
-      elif (( prefer_sudo )) && sudo -n true >/dev/null 2>&1; then
-        runner=(sudo -n "$prog")
+        runner=("$sudo_cmd" "${sudo_flags[@]}" "$prog")
+      elif (( prefer_sudo )) && "$sudo_cmd" -n true >/dev/null 2>&1; then
+        runner=("$sudo_cmd" -n "$prog")
+      elif (( prefer_sudo )) && _run_command_has_tty; then
+        runner=("$sudo_cmd" "$prog")
       else
         runner=("$prog")
       fi
@@ -835,7 +847,7 @@ function _install_redhat_docker() {
   fi
   # Add current user to docker group
   _run_command  -- sudo usermod -aG docker "$USER"
-  echo "Docker instsudo alled successfully. You may need to log out and back in for group changes to take effect."
+  echo "Docker installed successfully. You may need to log out and back in for group changes to take effect."
 }
 
 function _k3d_cluster_exist() {

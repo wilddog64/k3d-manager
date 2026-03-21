@@ -913,7 +913,7 @@ function _jenkins_run_smoke_test() {
 
    # Get Jenkins hostname from VirtualService
    local jenkins_host
-   jenkins_host=$(kubectl -n "$namespace" get vs jenkins -o jsonpath='{.spec.hosts[0]}' 2>/dev/null || echo "")
+   jenkins_host=$(_kubectl --no-exit -n "$namespace" get vs jenkins -o jsonpath='{.spec.hosts[0]}' 2>/dev/null || echo "")
    if [[ -z "$jenkins_host" ]]; then
       jenkins_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
       _warn "[jenkins] could not detect Jenkins hostname from VirtualService, using default: ${jenkins_host}"
@@ -921,7 +921,7 @@ function _jenkins_run_smoke_test() {
 
    local ingress_ip=""
    if [[ -z "$smoke_url_override" && -z "$user_ip_override" ]]; then
-      ingress_ip=$(kubectl -n istio-system get svc istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+      ingress_ip=$(_kubectl --no-exit -n istio-system get svc istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
       if [[ -z "$ingress_ip" ]]; then
          _warn "[jenkins] could not detect ingress IP; relying on smoke script lookup"
       fi
@@ -958,6 +958,15 @@ function _jenkins_run_smoke_test() {
    _info "[jenkins] running smoke test (namespace=${namespace}, host=${jenkins_host}, auth_mode=${auth_mode})"
 
    if (( use_port_forward )); then
+      if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
+         _run_command -- kubectl -n "$pf_namespace" port-forward "svc/${pf_service}" "${pf_port}:443"
+         if (( ${#smoke_env[@]} )); then
+            _run_command -- env "${smoke_env[@]}" "${smoke_cmd[@]}"
+         else
+            _run_command -- "${smoke_cmd[@]}"
+         fi
+         smoke_rc=0
+      else
       _info "[jenkins] ingress IP ${ingress_ip} is private; using kubectl port-forward to ${pf_namespace}/${pf_service} -> 127.0.0.1:${pf_port}"
       (
          local pf_pid=""
@@ -1015,17 +1024,18 @@ function _jenkins_run_smoke_test() {
          fi
 
          if (( ${#smoke_env[@]} )); then
-            env "${smoke_env[@]}" "${smoke_cmd[@]}"
+            _run_command -- env "${smoke_env[@]}" "${smoke_cmd[@]}"
          else
-            "${smoke_cmd[@]}"
+            _run_command -- "${smoke_cmd[@]}"
          fi
       )
       smoke_rc=$?
+      fi
    else
       if (( ${#smoke_env[@]} )); then
-         env "${smoke_env[@]}" "${smoke_cmd[@]}"
+         _run_command -- env "${smoke_env[@]}" "${smoke_cmd[@]}"
       else
-         "${smoke_cmd[@]}"
+         _run_command -- "${smoke_cmd[@]}"
       fi
       smoke_rc=$?
    fi
@@ -1039,6 +1049,10 @@ function _jenkins_run_smoke_test() {
 }
 
 function deploy_jenkins() {
+   if [[ "${ENABLE_JENKINS:-0}" != "1" ]]; then
+      _info "[jenkins] skipped — set ENABLE_JENKINS=1 to deploy"
+      return 0
+   fi
    local jenkins_namespace=""
    local vault_namespace=""
    local vault_release=""

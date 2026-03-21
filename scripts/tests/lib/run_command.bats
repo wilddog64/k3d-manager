@@ -28,6 +28,45 @@ setup() {
   ! grep -q 'sudo -n echo hi' "$RUN_LOG"
 }
 
+@test "--prefer-sudo uses interactive sudo when sudo -n unavailable but TTY present" {
+  sudo() {
+    echo "sudo $*" >> "$RUN_LOG"
+    [[ "$1" == "-n" ]] && return 1
+    "$@"
+  }
+  export -f sudo
+  export _RC_FORCE_TTY=1
+  run _run_command --prefer-sudo -- echo hi
+  unset _RC_FORCE_TTY
+  [ "$status" -eq 0 ]
+  [[ "$output" = "hi" ]]
+  read_lines "$RUN_LOG" log
+  [ "${log[1]}" = "sudo echo hi" ]
+}
+
+@test "--require-sudo uses interactive sudo when sudo -n unavailable but TTY present" {
+  sudo() {
+    echo "sudo $*" >> "$RUN_LOG"
+    [[ "$1" == "-n" ]] && return 1
+    "$@"
+  }
+  export -f sudo
+  export _RC_FORCE_TTY=1
+  run _run_command --require-sudo -- echo hi
+  unset _RC_FORCE_TTY
+  [ "$status" -eq 0 ]
+  [[ "$output" = "hi" ]]
+  read_lines "$RUN_LOG" log
+  [ "${log[1]}" = "sudo echo hi" ]
+}
+
+@test "--require-sudo fails when sudo -n unavailable and no TTY" {
+  sudo() { return 1; }
+  export -f sudo
+  run -127 _run_command --require-sudo -- echo hi
+  [[ "$output" == *"sudo non-interactive not available"* ]]
+}
+
 @test "--require-sudo fails when sudo unavailable" {
   sudo() { return 1; }
   export -f sudo

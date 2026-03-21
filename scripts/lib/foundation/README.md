@@ -78,10 +78,8 @@ shellcheck scripts/lib/core.sh scripts/lib/system.sh
 
 | Version | Date | Highlights |
 |---|---|---|
-| v0.3.2 | 2026-03-16 | Sync `deploy_cluster` helpers from k3d-manager (`_deploy_cluster_prompt_provider`, `_deploy_cluster_resolve_provider`, `CLUSTER_NAME` propagation, remove duplicate mac+k3s guard); expand BATS to 36 tests |
-| [v0.3.1](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.1) | 2026-03-16 | Route bare `sudo` in install helpers through `_run_command --interactive-sudo`; AGENTS.md, GEMINI.md, CLAUDE.md overhaul; copilot-instructions.md |
-| [v0.3.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.0) | 2026-03-15 | `_run_command` if-count refactor, `_run_command_resolve_sudo` helper, bash 3.2 compat, BATS coverage |
-| [v0.2.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.2.0) | 2026-03-08 | `agent_rigor.sh` — `_agent_checkpoint`, `_agent_audit`, `_agent_lint`, pre-commit hook |
-| [v0.1.2](https://github.com/wilddog64/lib-foundation/releases/tag/v0.1.2) | 2026-03-07 | Drop Colima support |
-| [v0.1.1](https://github.com/wilddog64/lib-foundation/releases/tag/v0.1.1) | 2026-03-07 | `_resolve_script_dir` — portable symlink-aware script locator |
-| [v0.1.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.1.0) | 2026-03-07 | Initial extraction from k3d-manager — `core.sh`, `system.sh`, CI, branch protection |
+| [v0.3.2](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.2) | 2026-03-16 | Sync `deploy_cluster` helpers from k3d-manager, TTY fix (`_DCRS_PROVIDER` global), BATS expanded to 36 tests |
+| [v0.3.1](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.1) | 2026-03-16 | Route bare `sudo` in install helpers through `_run_command --interactive-sudo`; AGENTS.md, GEMINI.md, CLAUDE.md overhaul |
+| [v0.3.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.0) | 2026-03-15 | `_run_command` if-count refactor, `_run_command_resolve_sudo` helper, bash 3.2 compat |
+
+[Full release history →](docs/releases.md)

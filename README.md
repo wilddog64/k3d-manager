@@ -15,15 +15,15 @@ The project includes an **Agent Rigor Protocol** (`_agent_checkpoint`, `_agent_l
 ### 1. Bootstrap the infra cluster (local — OrbStack or k3d)
 
 ```bash
-./scripts/k3d-manager deploy_cluster          # create cluster + install Istio
-./scripts/k3d-manager deploy_vault            # Vault HA + PKI
-./scripts/k3d-manager deploy_eso              # External Secrets Operator
-./scripts/k3d-manager deploy_ldap             # OpenLDAP directory
-./scripts/k3d-manager deploy_argocd           # ArgoCD GitOps engine
-./scripts/k3d-manager deploy_jenkins --enable-vault   # Jenkins + Vault auth
-./scripts/k3d-manager deploy_keycloak         # Keycloak identity provider
+./scripts/k3d-manager deploy_cluster --confirm          # create cluster + install Istio
+./scripts/k3d-manager deploy_vault --confirm            # Vault HA + PKI
+./scripts/k3d-manager deploy_eso --confirm              # External Secrets Operator
+./scripts/k3d-manager deploy_ldap --confirm             # OpenLDAP directory
+./scripts/k3d-manager deploy_argocd --confirm           # ArgoCD GitOps engine
+./scripts/k3d-manager deploy_jenkins --enable-vault     # Jenkins + Vault auth
+./scripts/k3d-manager deploy_keycloak --confirm         # Keycloak identity provider
 ACME_EMAIL=you@example.com \
-  ./scripts/k3d-manager deploy_cert_manager   # cert-manager + ACME ClusterIssuer
+  ./scripts/k3d-manager deploy_cert_manager --confirm   # cert-manager + ACME ClusterIssuer
 ```
 
 ### 2. Add the Ubuntu k3s app cluster
@@ -75,6 +75,12 @@ Run ./scripts/k3d-manager --help for full function list.
 ./scripts/k3d-manager create_cluster second 9090 9443   # custom ports
 CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f   # k3s, non-interactive
 ```
+
+### Safety Gates, Dry-Run, and Plans
+
+- Running any `deploy_*` function with no arguments now shows the help text instead of executing. Pass explicit options or `--confirm` to apply the defaults, e.g. `./scripts/k3d-manager deploy_vault --confirm --namespace secrets`.
+- Add `--dry-run` (or `-n`) to print every command that would run without executing, useful for reviewing changes or validating permissions.
+- `deploy_vault --plan` inspects the current cluster state (namespace, Helm release, Vault status, PKI/policy setup) and prints a Terraform-style plan before you run the real deployment.
 
 ---
 
@@ -195,9 +201,9 @@ docs/
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.9.3](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.3) | 2026-03-16 | TTY fix (`_DCRS_PROVIDER` global), lib-foundation v0.3.2 subtree, cluster rebuild smoke test (Gemini-verified) |
 | [v0.9.2](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.2) | 2026-03-15 | vCluster E2E composite actions, 11-finding Copilot hardening (curl safety, mktemp, sudo -n, TAG env, input validation) |
 | [v0.9.1](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.1) | 2026-03-15 | vCluster plugin (`create/destroy/use/list`), two-tier `--help`, `function test()` refactor, 11 Copilot findings fixed |
-| [v0.9.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.0) | 2026-03-15 | k3dm-mcp planning, agent workflow lessons, roadmap restructure |
 | [v0.8.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.8.0) | 2026-03-13 | Vault-managed ArgoCD deploy keys, `deploy_cert_manager` (ACME/Let's Encrypt), Istio IngressClass |
 
 [Full release history →](docs/releases.md)
