@@ -12,6 +12,8 @@ _err() { printf 'ERROR: %s
 ' "$*" >&2; }
 
 : "${KUBECTL:=kubectl}"
+: "${KUBE_CONTEXT:=k3d-k3d-cluster}"
+KUBECTL="${KUBECTL} --context ${KUBE_CONTEXT}"
 VAULT_HEALTH_NS="${VAULT_NS:-secrets}"
 VAULT_HEALTH_RELEASE="${VAULT_RELEASE:-vault}"
 
