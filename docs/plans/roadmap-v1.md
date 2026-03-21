@@ -381,16 +381,26 @@ One operation. No ArgoCD restart required.
 
 ---
 
-## v1.0.0 — Remote k3s via k3sup
-*Focus: Fully automate the EC2 k3s lifecycle — replace manual Gemini rebuild with a single k3d-manager command*
+## v1.0.0 — Remote k3s via k3sup (3-node) + AD Plugin (on-prem)
+*Focus: Multi-node k3s cluster on ACG + Samba AD DC — production-grade topology at zero cost*
 
-**Motivation:** k3s on EC2 ACG sandbox is already the app cluster target. k3sup eliminates the
-manual install/kubeconfig steps that currently require a Gemini task spec. Combined with
-`bin/acg-sandbox.sh` (EC2 provisioning), the full lifecycle becomes code.
+**Motivation:** Single t3.medium at 95% memory capacity is a recurring blocker. ACG allows up to
+5 concurrent t3.medium instances. Three nodes gives control-plane isolation, workload distribution,
+and a dedicated identity/data tier — matching real k8s topology without managed cloud cost.
+Samba AD DC replaces OpenLDAP simulation with real AD behavior, resolving `AD_TLS_CONFIG=TRUST_ALL_CERTIFICATES`
+dev-only debt and enabling proper Jenkins AD authentication testing.
+
+### Node Layout (3 × t3.medium — ACG)
+
+| Node | Role | Workloads | EBS |
+|---|---|---|---|
+| Node 1 | Control plane | k3s server, ArgoCD, Vault, ESO | ~10GB |
+| Node 2 | App worker | basket, frontend, order, payment, product-catalog | ~10GB |
+| Node 3 | Data + Identity | PostgreSQL, RabbitMQ, Redis, **Samba AD DC** | ~10GB |
+
+Total: ~30GB EBS — at ACG limit. Size volumes carefully.
 
 ### New CLUSTER_PROVIDER value: `k3s-remote`
-
-Extends the existing `k3s` provider to remote hosts via k3sup:
 
 ```bash
 CLUSTER_PROVIDER=k3s-remote ./scripts/k3d-manager deploy_cluster
@@ -398,25 +408,43 @@ CLUSTER_PROVIDER=k3s-remote ./scripts/k3d-manager deploy_cluster
 
 - `_ensure_k3sup` — lazy-install k3sup binary if not present
 - `deploy_cluster` for `k3s-remote`:
-  1. Calls `bin/acg-sandbox.sh` — EC2 up, IP resolved
-  2. Runs `k3sup install --host <ip> --user ubuntu --ssh-key ~/.ssh/k3d-manager-key.pem`
-  3. Renames kubeconfig context to `ubuntu-k3s`
-  4. Points server to `https://localhost:6443` (tunnel endpoint)
-  5. Merges into `~/.kube/config`
-- `destroy_cluster` for `k3s-remote` — terminates EC2 instance via `aws ec2 terminate-instances`
+  1. Calls `bin/acg-sandbox.sh` three times — 3 EC2 instances provisioned, IPs resolved
+  2. `k3sup install` on Node 1 — control plane
+  3. `k3sup join` on Node 2 + Node 3 — workers join cluster
+  4. Renames kubeconfig context to `ubuntu-k3s`
+  5. Points server to `https://localhost:6443` (tunnel endpoint — Node 1)
+  6. Merges into `~/.kube/config`
+- Node taints + labels applied: `node-role=control-plane`, `node-role=app`, `node-role=data`
+- `destroy_cluster` — terminates all 3 EC2 instances via `aws ec2 terminate-instances`
+
+### AD Plugin — on-prem (Samba AD DC)
+
+New plugin: `scripts/plugins/activedirectory.sh`
+
+```bash
+DIRECTORY_SERVICE_PROVIDER=activedirectory ./scripts/k3d-manager deploy_directory
+```
+
+- Deploys `samba-ad-dc` container on Node 3 (identity tier)
+- Replaces OpenLDAP simulation with real AD protocol behavior
+- Resolves `AD_TLS_CONFIG=TRUST_ALL_CERTIFICATES` dev-only debt — proper TLS cert from Vault PKI
+- Jenkins LDAP plugin points to Samba AD DC — real group membership, nested groups, Kerberos
+- Test accounts provisioned via idempotent `samba-tool user create` calls
+- `DIRECTORY_SERVICE_PROVIDER=activedirectory` selects this path; `openldap` remains default for local k3d
 
 ### SSH Tunnel integration
 
-- `deploy_cluster` starts tunnel automatically after k3s install (`tunnel_start`)
-- `destroy_cluster` stops tunnel before terminating instance (`tunnel_stop`)
+- `deploy_cluster` starts tunnel automatically after k3s install (`tunnel_start` — Node 1)
+- `destroy_cluster` stops tunnel before terminating instances (`tunnel_stop`)
 
 ### BATS coverage
 
 - `scripts/tests/plugins/k3s_remote.bats` — `env -i` clean; mocks k3sup and aws CLI calls
+- `scripts/tests/plugins/activedirectory.bats` — mocks samba-tool calls, validates idempotency
 
 ---
 
-## v1.1.0 — AWS EKS Provider + ACG Sandbox Lifecycle
+## v1.1.0 — AWS EKS Provider + ACG Sandbox Lifecycle + AD Plugin (AWS Managed AD)
 *Focus: First cloud provider — AWS is the most common ACG sandbox*
 
 **Motivation:** The architectural boundary already supports this — `CLUSTER_PROVIDER`
@@ -451,6 +479,11 @@ Clean handoff: Antigravity outputs credentials → k3dm-mcp injects into Vault �
 - `sandbox_expiry` column — populated from Antigravity output
 - `stale: true` flag extended to cover expired sandboxes
 - `sync_state` tool warns when sandbox has < 30min remaining
+
+**AD Plugin — cloud variant (AWS Managed AD):**
+- `DIRECTORY_SERVICE_PROVIDER=activedirectory CLOUD_AD_PROVIDER=aws` — targets AWS Managed AD
+- Complements v1.0.0 on-prem Samba AD DC; same plugin interface, cloud backend
+- Resolves remaining cloud AD TLS debt when running on EKS
 
 **Design spec:** `docs/plans/v1.1.0-multi-cloud-design.md` (EKS + ACG sections)
 
