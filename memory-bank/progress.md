@@ -36,17 +36,17 @@
 - [x] Codex: fix app manifests — PRs merged to main; order `d109004`, product-catalog `aa5de3c`, infra `1a5c34d`; tagged v0.1.1; `docs/next-improvements` branch created
 - [x] Codex: fix frontend manifests — PR #11 CLOSED; Copilot P1 confirmed original port 8080 + /health was correct; root cause is resource exhaustion not manifest error; deferred to v1.0.0
 - [x] Gemini: Re-enable ArgoCD auto-sync — all apps reconciled to `HEAD`
-- [x] Codex: add deploy_app_cluster automation — commit `2075672` adds k3sup install + kubeconfig merge helper and BATS coverage
+- [x] Codex: add deploy_app_cluster automation — commit `13c79b3` adds k3sup install + kubeconfig merge helper and BATS coverage
 
 ---
 
 ## v0.9.5 — Active
 
-**Primary focus: `deploy_app_cluster` via k3sup — single-node EC2 lifecycle automation.**
+**Primary focus: plan v1.0.0 multi-node k3sup + Samba AD (deploy_app_cluster delivered in v0.9.5).**
 Shopping-cart pod health issues (order-service RabbitMQ, payment-service memory, frontend) require multi-node to resolve structurally; deferred to v1.0.0.
 
 ### Primary
-- [ ] **`deploy_app_cluster` via k3sup** — `k3sup install` on EC2 + kubeconfig merge + ArgoCD cluster registration; replaces manual Gemini rebuild; prerequisite for v1.0.0 multi-node extension
+- [x] **`deploy_app_cluster` via k3sup** — `k3sup install` on EC2 + kubeconfig merge + ArgoCD cluster registration; replaces manual Gemini rebuild; prerequisite for v1.0.0 multi-node extension
 
 ### Code Quality / Architecture
 - [ ] **Upstream local lib edits to lib-foundation** — `scripts/lib/system.sh` (TTY fix + `_run_command_resolve_sudo`) and `scripts/lib/agent_rigor.sh` (allowlist feature) need PRs to lib-foundation `feat/v0.3.4` → subtree pull → remove local divergence
