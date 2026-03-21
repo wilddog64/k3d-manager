@@ -16,7 +16,7 @@
 | **Gemini: verify frontend Running** | **COMPLETE** | Pod `frontend-85969b4bf-zq9st` is `Running` on ubuntu-k3s; manually patched with `emptyDir` volumes; commit `d5bd618` |
 | shopping-cart-infra PR #18 | **MERGED** | `a97ee04` — fix trivy-action 0.30.0→v0.35.0 |
 | shopping-cart-infra PR #19 | **MERGED** | `4ecc6b5` — address Copilot PR #5 comments (register-ubuntu-k3s.sh security fixes + `destination.name: ubuntu-k3s` for all 5 apps) |
-| Verify all 5 pods Running | **PENDING** | basket/order/product-catalog CrashLoopBackOff (data layer missing) |
+| **Gemini: deploy data layer to ubuntu-k3s** | **ASSIGNED TO GEMINI** | spec: `docs/plans/v0.9.4-gemini-deploy-data-layer.md`; apply PostgreSQL/Redis/RabbitMQ to `shopping-cart-data` ns; verify all 5 app pods Running |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
 
