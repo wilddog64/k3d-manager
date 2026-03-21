@@ -30,13 +30,19 @@ check_rollout() {
 check_statefulset_ready() {
   local name="$1" namespace="$2"
   _info "Checking StatefulSet $name in namespace $namespace..."
-  local desired ready
-  desired=$($KUBECTL -n "$namespace" get statefulset "$name" -o jsonpath='{.status.replicas}' || echo "")
-  ready=$($KUBECTL -n "$namespace" get statefulset "$name" -o jsonpath='{.status.readyReplicas}' || echo "")
-  if [[ -z "$desired" ]]; then
-    _err "StatefulSet $name not found in $namespace"
-    return 1
-  fi
+  local desired ready attempts=0
+  until desired=$($KUBECTL -n "$namespace" get statefulset "$name" \
+      -o jsonpath='{.status.replicas}' 2>/dev/null) && [[ -n "$desired" ]]; do
+    (( attempts++ ))
+    if (( attempts >= 6 )); then
+      _err "StatefulSet $name not found in $namespace after retries"
+      return 1
+    fi
+    _warn "StatefulSet $name query timed out (attempt $attempts) — retrying in 5s..."
+    sleep 5
+  done
+  ready=$($KUBECTL -n "$namespace" get statefulset "$name" \
+      -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "")
   ready="${ready:-0}"
   if [[ "$desired" != "$ready" ]]; then
     _err "StatefulSet $name Ready replicas $ready does not match desired $desired"
