@@ -33,11 +33,11 @@
 - [x] **Gemini: rebuild Ubuntu k3s + E2E verification** — commit `7d614bc`
 - [x] **Gemini: ArgoCD cluster registration + app sync** — commit `7d614bc`
 - [x] Force ArgoCD sync — order-service + product-catalog — verified
-- [ ] **Codex: fix `instsudo` typo** — `scripts/lib/system.sh` line 838 (Gemini red team finding)
+- [x] **Codex: fix `instsudo` typo** — `scripts/lib/system.sh` line 850; commit `ef57b0f` (2026-03-20)
 - [x] **autossh tunnel plugin** — Codex delivered autossh-backed tunnel plugin + BATS coverage per `docs/plans/v0.9.4-codex-autossh-tunnel-plugin.md`; commands exposed via `tunnel_start|stop|status`; commit msg: `feat(tunnel): add autossh tunnel plugin with launchd boot persistence`
 - [x] **ArgoCD cluster registration automation** — Codex delivered `register_app_cluster`, cluster-secret template, and vars per `docs/plans/v0.9.4-codex-argocd-cluster-registration.md`; replaces manual secret creation; commit msg: `feat(argocd): add register_app_cluster to automate ubuntu-k3s cluster secret`
 - [x] **Smoke tests** — Codex added `bin/smoke-test-cluster-health.sh` per `docs/plans/v0.9.4-codex-smoke-test-cluster-health.md`; command enforces ghcr secret, ArgoCD sync, and pod counts before sign-off
-- [ ] **Codex: reduce replicas to 1 + remove HPAs** — **ASSIGNED TO CODEX** (2026-03-20); spec: `docs/plans/v0.9.4-codex-reduce-replicas-dev.md`; 5 shopping-cart repos; commit msg: `chore(k8s): reduce to single replica and remove HPA for dev/test environment`
+- [x] **Codex: reduce replicas to 1 + remove HPAs** — merged to main 2026-03-20; basket `f55effe` (#9), order `98b2f0b` (#13), payment `da0646f` (#15 → v0.1.1), product-catalog `41acad6` (#13), frontend `a9a1b70` (#8)
 - [ ] Confirm all 5 pods `Running` on Ubuntu k3s — basket: CrashLoopBackOff (data layer Redis/RabbitMQ not deployed to Ubuntu k3s); payment: pending ArgoCD sync of secret
 - [x] **Fix `_run_command` non-interactive sudo failure after VM restart** — Codex implemented `_run_command_has_tty`, interactive sudo fallbacks, and regression tests per `docs/plans/v0.9.4-codex-run-command-tty-sudo-fallback.md`; issue: `docs/issues/2026-03-19-run-command-non-interactive-sudo-failure.md`; commit msg: `fix(system): fall back to interactive sudo when sudo -n unavailable and TTY present`
 - [ ] Re-enable `shopping-cart-e2e-tests` scheduled run — after pods Running
