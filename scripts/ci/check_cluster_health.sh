@@ -82,6 +82,17 @@ check_vault_status() {
 }
 
 main() {
+  local retries=3 delay=10
+  for i in $(seq 1 "$retries"); do
+    if $KUBECTL cluster-info >/dev/null 2>&1; then break; fi
+    _warn "API server not ready (attempt $i/$retries) — retrying in ${delay}s..."
+    sleep "$delay"
+    if (( i == retries )); then
+      _err "API server unreachable after $retries attempts"
+      return 1
+    fi
+  done
+
   check_rollout deployment/istio-ingressgateway istio-system "300s"
   check_statefulset_ready vault "$VAULT_HEALTH_NS"
   check_pods_ready "$VAULT_HEALTH_NS"
