@@ -193,4 +193,5 @@ Do not proceed without explicit approval.
 - You start work on the wrong machine — `hostname` first, every session, no exceptions
 - You write thin one-line completion reports — the report must include actual output, not summaries
 - You omit commit SHA from completion reports — every report must include: `git log origin/<branch> --oneline -3` output
+- You run too long and drift — if Claude or the user signals to stop or compress, stop immediately. Do not attempt the next step. A fresh session with a clean spec is better than a degraded long session
 - You omit pod status from cluster tasks — every cluster task report must include: `kubectl get pods -n shopping-cart` output (ubuntu-k3s context) and `kubectl get applications -n cicd` output (infra context)
