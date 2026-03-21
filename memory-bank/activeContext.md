@@ -20,7 +20,7 @@
 | **Gemini: Fix Schema mismatch** | **COMPLETE** | Added missing columns to `orders` table in `postgresql-orders` |
 | **Gemini: Fix Health Checks** | **COMPLETE** | Patched `product-catalog` readiness probe path `/health/ready` -> `/health` |
 | **Gemini: Fix NetworkPolicies** | **COMPLETE** | Patched `allow-dns` and added `allow-to-istio` in `shopping-cart-payment` |
-| **Codex: fix app manifests** | **COMPLETED** | order `007d80a`, product-catalog `f9a7381`, infra `aaa08c1` — spec `docs/plans/v0.9.4-codex-fix-app-manifests.md` |
+| **Codex: fix app manifests** | **COMPLETE** | order `007d80a`, product-catalog `f9a7381`, infra `aaa08c1` |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
 
@@ -29,7 +29,7 @@
 ## Cluster Architecture
 
 **Infra cluster:** k3d on OrbStack on M2 Air — ArgoCD hub for Ubuntu k3s.
-**App cluster:** Ubuntu k3s on AWS EC2 ACG sandbox — `i-03bb9ca1fb6d55633`, `16.147.37.214`, `t3.medium`, `us-west-2`.
+**App cluster:** Ubuntu k3s on AWS EC2 ACG sandbox — `i-0650af63c77af770c`, `34.219.1.106`, `t3.medium`, `us-west-2`.
 
 ### Infra Cluster (M2 Air — k3d/OrbStack)
 
@@ -72,6 +72,11 @@
 
 ## Operational Notes
 
+- **Findings (2026-03-21):**
+    - `order-service` was missing `shipping_postal_code` and `total_amount` columns in PostgreSQL.
+    - `product-catalog` health probe path was `404` at `/health/ready`; application only responds to `/health`.
+    - `shopping-cart-payment` namespace had restrictive NetworkPolicies blocking DNS and Istiod egress.
+    - `order-service` experiencing `Connection refused` to RabbitMQ service despite successful DB connection.
 - **Memory Constraints** — `t3.medium` (4GB) is at 95% capacity; some pods scaled to 0 during troubleshooting.
-- **ArgoCD Sync Paused** — Auto-sync disabled for `order-service` and `product-catalog` to preserve manual patches.
+- **ArgoCD Sync Paused** — Auto-sync disabled for `order-service` and `product-catalog` to preserve manual patches until upstream manifests are fully reconciled.
 - **PTY watchdog** — guards against Gemini CLI PTY leak.
