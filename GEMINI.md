@@ -177,6 +177,13 @@ If a section does not apply to the task (e.g. no cluster work), write `N/A` — 
 
 ---
 
+## Plan Doc Health Check
+
+If Claude asks you to write a spec and the current milestone already has 5 or more files
+in `docs/plans/`, stop and flag it before writing. A high plan count signals scope creep,
+reactive planning (specs written to fix mistakes rather than plan real work), or a milestone
+that needs to be split. Do not write a sixth spec without explicit approval from Claude.
+
 ## Known Failure Modes (your history — avoid repeating)
 
 - You skip reading the memory-bank and start from your own interpretation — always read it first
