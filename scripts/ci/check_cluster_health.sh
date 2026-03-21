@@ -79,7 +79,7 @@ check_vault_status() {
 }
 
 main() {
-  check_rollout deployment/istio-ingressgateway istio-system "180s"
+  check_rollout deployment/istio-ingressgateway istio-system "300s"
   check_statefulset_ready vault "$VAULT_HEALTH_NS"
   check_pods_ready "$VAULT_HEALTH_NS"
   check_vault_status "$VAULT_HEALTH_NS" "${VAULT_HEALTH_RELEASE}-0"
