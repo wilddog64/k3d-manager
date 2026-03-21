@@ -18,7 +18,8 @@ VAULT_HEALTH_RELEASE="${VAULT_RELEASE:-vault}"
 check_rollout() {
   local resource="$1" namespace="$2" timeout="${3:-120s}"
   _info "Waiting for $resource in namespace $namespace..."
-  if ! $KUBECTL -n "$namespace" rollout status "$resource" --timeout="$timeout"; then
+  if ! $KUBECTL -n "$namespace" wait "$resource" \
+      --for=condition=Available --timeout="$timeout"; then
     _err "$resource in namespace $namespace is not Ready"
     return 1
   fi
