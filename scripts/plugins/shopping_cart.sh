@@ -109,7 +109,7 @@ Does NOT register the cluster with ArgoCD — that requires a bearer token:
   ssh ubuntu kubectl create token argocd-manager -n kube-system --duration=8760h
 Then run: ./scripts/k3d-manager register_app_cluster
 
-Config (override via env or scripts/etc/tunnel/vars.sh):
+Config (override via env or scripts/etc/k3s/vars.sh):
   UBUNTU_K3S_SSH_HOST          SSH host alias (default: ubuntu)
   UBUNTU_K3S_SSH_USER          SSH user       (default: ubuntu)
   UBUNTU_K3S_EXTERNAL_IP       Node IP        (default: UBUNTU_K3S_SSH_HOST)
@@ -130,6 +130,7 @@ HELP
   local ssh_key="${UBUNTU_K3S_SSH_KEY:-${HOME}/.ssh/k3d-manager-key.pem}"
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
   local kube_context="ubuntu-k3s"
+  local kubeconfig_dir="${local_kubeconfig%/*}"
 
   if ! command -v k3sup >/dev/null 2>&1; then
     _err "[shopping_cart] k3sup not found — install with: brew install k3sup"
@@ -140,6 +141,8 @@ HELP
     _err "[shopping_cart] SSH key not found: ${ssh_key}"
     return 1
   fi
+
+  mkdir -p "${kubeconfig_dir}" "${HOME}/.kube"
 
   _info "[shopping_cart] Installing k3s on ${ssh_user}@${external_ip} via k3sup..."
   _run_command -- k3sup install \
@@ -172,7 +175,7 @@ HELP
   fi
   cp "${local_kubeconfig}" "${tmp_kube}"
   chmod 600 "${tmp_kube}"
-  KUBECONFIG="${HOME}/.kube/config:${tmp_kube}" kubectl config view --flatten > "${tmp_merged}"
+  KUBECONFIG="${tmp_kube}:${HOME}/.kube/config" kubectl config view --flatten > "${tmp_merged}"
   mv "${tmp_merged}" "${HOME}/.kube/config"
   chmod 600 "${HOME}/.kube/config"
   rm -f "${tmp_kube}"

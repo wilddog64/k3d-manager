@@ -20,7 +20,7 @@ The project includes an **Agent Rigor Protocol** (`_agent_checkpoint`, `_agent_l
 ./scripts/k3d-manager deploy_eso --confirm              # External Secrets Operator
 ./scripts/k3d-manager deploy_ldap --confirm             # OpenLDAP directory
 ./scripts/k3d-manager deploy_argocd --confirm           # ArgoCD GitOps engine
-ENABLE_JENKINS=1 ./scripts/k3d-manager deploy_jenkins --enable-vault --confirm  # Jenkins + Vault auth
+ENABLE_JENKINS=1 ./scripts/k3d-manager deploy_jenkins --enable-vault            # Jenkins + Vault auth
 ./scripts/k3d-manager deploy_keycloak --confirm         # Keycloak identity provider
 ACME_EMAIL=you@example.com \
   ./scripts/k3d-manager deploy_cert_manager --confirm   # cert-manager + ACME ClusterIssuer

@@ -62,8 +62,9 @@ setup() {
 @test "tunnel_start writes plist and calls launchctl load" {
   _tunnel_autossh_path() { echo "/usr/local/bin/autossh"; }
   _tunnel_is_running() { return 1; }
+  uname() { echo "Darwin"; }
   launchctl() { echo "launchctl $*" >> "${BATS_TEST_TMPDIR}/launchctl.log"; }
-  export -f _tunnel_autossh_path _tunnel_is_running launchctl
+  export -f _tunnel_autossh_path _tunnel_is_running uname launchctl
   run tunnel_start
   [ "$status" -eq 0 ]
   [[ -f "${TUNNEL_PLIST_PATH}" ]]
