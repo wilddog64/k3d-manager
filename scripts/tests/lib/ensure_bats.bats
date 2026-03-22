@@ -69,7 +69,7 @@ setup() {
 
     while [[ $# -gt 0 ]]; do
       case "$1" in
-        --prefer-sudo|--require-sudo|--quiet|--no-exit|--soft) shift ;;
+        --prefer-sudo|--require-sudo|--interactive-sudo|--quiet|--no-exit|--soft) shift ;;
         --probe) shift 2 ;;
         --) shift; break ;;
         *) break ;;

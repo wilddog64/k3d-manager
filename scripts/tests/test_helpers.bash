@@ -92,7 +92,7 @@ function stub_run_command() {
   _run_command() {
     while [[ $# -gt 0 ]]; do
       case "$1" in
-        --no-exit|--soft|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --no-exit|--soft|--quiet|--prefer-sudo|--require-sudo|--interactive-sudo) shift ;;
         --probe) shift 2 ;;
         --) shift; break ;;
         *) break ;;
