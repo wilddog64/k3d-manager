@@ -468,7 +468,7 @@ function _vault_replay_cached_unseal() {
    }
 
    local sealed=""
-   sealed=$(printf '%s' "$status_json" | jq -r '.sealed // empty' 2>/dev/null || true)
+   sealed=$(printf '%s' "$status_json" | jq -r '.sealed' 2>/dev/null || true)
    [[ "$sealed" == "false" ]] && {
       _info "[vault] instance ${cluster} already unsealed"
       return 0
@@ -487,8 +487,7 @@ function _vault_replay_cached_unseal() {
       unseal_output=$(_no_trace _vault_exec_stream --no-exit --pod "$pod" "$cluster_ns" "$cluster_release" -- vault operator unseal "$shard" 2>&1) || unseal_rc=$?
       (( unseal_rc != 0 )) && {
          _warn "[vault] unseal command returned rc=${unseal_rc}; output:"
-         printf '%s
-' "$unseal_output" >&2
+         printf '%s\n' "$unseal_output" >&2
       }
 
       [[ "$unseal_output" == *"invalid key"* || "$unseal_output" == *"failed to decrypt keys from storage"* ]] && {
@@ -1592,8 +1591,7 @@ SH
   _vault_build_policy_hcl "$mount_path" "${secret_prefixes[@]}"
   local policy_hcl="$_VAULT_POLICY_HCL"
 
-  if ! printf '%s
-' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" --     vault policy write "${policy}" -; then
+  if ! printf '%s\n' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" --     vault policy write "${policy}" -; then
      _err "[vault] failed to apply policy ${policy}"
   fi
 
@@ -1703,8 +1701,7 @@ EOF
    _vault_build_parent_metadata_policy "$mount_trim" "$secret_trim" "$metadata_path"
    policy_hcl+="$_VAULT_PARENT_POLICY_HCL"
 
-   if ! printf '%s
-' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- vault policy write "$policy" -; then
+   if ! printf '%s\n' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- vault policy write "$policy" -; then
       _err "[vault] failed to write policy ${policy}"
    fi
    _info "[vault] ensured policy ${policy} for ${data_path}"
