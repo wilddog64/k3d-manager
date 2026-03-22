@@ -3,7 +3,7 @@
 ## [Unreleased] v0.9.7 — README overhaul + tooling polish
 
 ### Changed
-- **`README.md`**: Plugins section — full table of all 13 plugins with key functions and descriptions, replacing single ACG link.
+- **`README.md`**: Plugins section — full table of all 14 plugins with key functions and descriptions, replacing single ACG link.
 - **`README.md`**: How-To section — grouped by component (Jenkins / LDAP).
 - **`README.md`**: Issue Logs promoted to top-level section; `docs/issues/` as canonical source; 5 most recent entries in table.
 - **`README.md`**: Releases table — top 3 in main table; older releases in `<details>` collapsible block.
