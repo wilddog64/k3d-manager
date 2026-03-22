@@ -34,6 +34,7 @@
 | **product-catalog Degraded** | **OPEN** | Synced to `aa5de3c`; DB env vars correct; RABBITMQ_USER vs RABBITMQ_USERNAME mismatch via ESO |
 | **App-layer bug tracking** | **DONE** | Filed GitHub Issues: order #16 (RabbitMQ), payment #16 (memory), product-catalog #16 (ESO key), frontend #12 (read-only FS) |
 | **`bin/` consistency spec** | **MERGED** | commit `b0b76b3` — bin/smoke-test-cluster-health.sh sources system.sh and uses `_kubectl` |
+| **if-count easy wins** | **MERGED** | commit `9a4f795` — `_jenkins_warn_on_cert_rotator_pull_failure` helper + allowlist trim; deferred functions in `docs/issues/2026-03-22-if-count-allowlist-deferred.md` |
 | **v1.0.0 (3-node k3sup + Samba AD)** | **NEXT MILESTONE** | Replaces single t3.medium; resolves resource exhaustion structurally; spec: `docs/plans/roadmap-v1.md` |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
