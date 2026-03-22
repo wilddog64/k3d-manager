@@ -91,7 +91,7 @@ CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f   # k3s, non-intera
 ### Safety Gates, Dry-Run, and Plans
 
 - Running any `deploy_*` function with no arguments now shows the help text instead of executing. Pass explicit options or `--confirm` to apply the defaults, e.g. `./scripts/k3d-manager deploy_vault --confirm --namespace secrets`.
-- Add `--dry-run` (or `-n`) to print every command that would run without executing, useful for reviewing changes or validating permissions.
+- Add `--dry-run` (or `-n`) to print every command that would run without executing, useful for reviewing changes or validating permissions. Sets `K3DM_DEPLOY_DRY_RUN=1`—set it in the environment to dry-run full sessions.
 - `deploy_vault --plan` inspects the current cluster state (namespace, Helm release, Vault status, PKI/policy setup) and prints a Terraform-style plan before you run the real deployment.
 
 ---
