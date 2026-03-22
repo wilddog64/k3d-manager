@@ -88,6 +88,7 @@
 - [x] **`--dry-run` / `-n` mode** — docs/tests added in commit `f1b4ca7` (README Safety Gates + `scripts/tests/lib/dry_run.bats`); implementation already shipped
 - [x] **Reduce if-count allowlist (ldap)** — commit `ba6f3a9` extracts helpers so `_ldap_*` + `deploy_ldap`/`deploy_ad` drop under threshold; allowlist trimmed to vault/system entries only
 - [x] **Reduce if-count allowlist (vault)** — commit `365846c` extracts deploy/HA helpers and guard clauses so 5 `vault.sh` functions drop ≤8 ifs; removed vault entries from the allowlist
+- [x] **Reduce if-count allowlist (jenkins)** — commit `733123a` on k3d-manager-v0.9.10 extracts helpers + rewires deploy path so 4 `jenkins.sh` functions drop ≤8 ifs; allowlist cleared
 - [ ] **GitHub PAT rotation** — expires 2026-04-12
 
 ### Deferred to v1.0.0 (needs multi-node)
