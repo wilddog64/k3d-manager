@@ -52,7 +52,7 @@ _run_command_has_tty() {
 #
 # Returns the command's real exit code; prints a helpful error unless --quiet.
 function _run_command() {
-  local quiet=0 prefer_sudo=0 require_sudo=0 interactive_sudo=0 probe= soft=0
+  local quiet=0 prefer_sudo=0 require_sudo=0 interactive_sudo=0 probe="" soft=0
   local -a probe_args=()
 
   while [[ $# -gt 0 ]]; do
@@ -85,52 +85,30 @@ function _run_command() {
   fi
 
   # Decide runner: user vs sudo -n vs sudo (interactive)
-  local runner
-  local sudo_cmd=sudo
-  local sudo_flags=()
-  if (( interactive_sudo == 0 )); then
-    sudo_flags=(-n)  # Non-interactive sudo
-  fi
-
-  if (( require_sudo )); then
-    if (( interactive_sudo )) || "$sudo_cmd" -n true >/dev/null 2>&1; then
-      runner=("$sudo_cmd" "${sudo_flags[@]}" "$prog")
-    elif _run_command_has_tty; then
-      runner=("$sudo_cmd" "$prog")
-    else
-      (( quiet )) || echo "sudo non-interactive not available" >&2
-      exit 127
-    fi
+  _RCRS_RUNNER=()
+  if (( quiet )); then
+    _run_command_resolve_sudo "$prog" \
+      "$prefer_sudo" "$require_sudo" "$interactive_sudo" \
+      "${probe_args[@]}" 2>/dev/null || {
+        if (( soft )); then
+          return 127
+        else
+          exit 127
+        fi
+      }
   else
-    if (( ${#probe_args[@]} )); then
-      # Try user first; if probe fails, try sudo
-      if "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=("$prog")
-      elif (( interactive_sudo )) && "$sudo_cmd" "${sudo_flags[@]}" "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=("$sudo_cmd" "${sudo_flags[@]}" "$prog")
-      elif "$sudo_cmd" -n "$prog" "${probe_args[@]}" >/dev/null 2>&1; then
-        runner=("$sudo_cmd" -n "$prog")
-      elif (( prefer_sudo )) && ((interactive_sudo)) ; then
-        runner=("$sudo_cmd" "${sudo_flags[@]}" "$prog")
-      elif (( prefer_sudo )) && "$sudo_cmd" -n true >/dev/null 2>&1; then
-        runner=("$sudo_cmd" -n "$prog")
-      elif (( prefer_sudo )) && _run_command_has_tty; then
-        runner=("$sudo_cmd" "$prog")
-      else
-        runner=("$prog")
-      fi
-    else
-      if (( prefer_sudo )) && (( interactive_sudo )); then
-        runner=("$sudo_cmd" "${sudo_flags[@]}" "$prog")
-      elif (( prefer_sudo )) && "$sudo_cmd" -n true >/dev/null 2>&1; then
-        runner=("$sudo_cmd" -n "$prog")
-      elif (( prefer_sudo )) && _run_command_has_tty; then
-        runner=("$sudo_cmd" "$prog")
-      else
-        runner=("$prog")
-      fi
-    fi
+    _run_command_resolve_sudo "$prog" \
+      "$prefer_sudo" "$require_sudo" "$interactive_sudo" \
+      "${probe_args[@]}" || {
+        if (( soft )); then
+          return 127
+        else
+          exit 127
+        fi
+      }
   fi
+  local -a runner=("${_RCRS_RUNNER[@]}")
+  unset _RCRS_RUNNER
 
   # Execute and preserve exit code
   "${runner[@]}" "$@"

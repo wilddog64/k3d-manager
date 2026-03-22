@@ -74,7 +74,7 @@
 - [x] **README overhaul** — PR #40 merged (`de684fe7`); Plugins table (14), How-To by component, Issue Logs section, Releases 3+collapsible; `docs/releases.md` backfilled
 
 ### Code Quality / Architecture (carried from v0.9.6)
-- [x] **Upstream local lib edits to lib-foundation** — commit `15f041a` on lib-foundation/feat/v0.3.4 brings system.sh TTY fix + agent_rigor allowlist upstream
+- [x] **Upstream local lib edits to lib-foundation** — commits `b60ddc6` (system.sh TTY fix) + `15f041a` (agent_rigor allowlist) on lib-foundation/feat/v0.3.4
 - [ ] **Reduce if-count allowlist** — refactor 20 allowlisted functions (jenkins x6, ldap x7, vault x5, system x2) to under 8-`if` threshold; remainder needs `docs/issues/` entry
 - [ ] **`bin/` script consistency** — `bin/smoke-test-cluster-health.sh` needs `_kubectl`/`_run_command`
 - [ ] **Relocate app-layer bug tracking** — file shopping-cart bugs as GitHub Issues in their repos
