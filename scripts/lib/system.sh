@@ -54,6 +54,8 @@ function _run_command_resolve_sudo() {
   shift 4
   local -a probe_args=("$@")
 
+  _RCRS_RUNNER=()
+
   local -a sudo_flags=()
   if (( interactive_sudo == 0 )); then
     sudo_flags=(-n)
@@ -64,6 +66,7 @@ function _run_command_resolve_sudo() {
       _RCRS_RUNNER=(sudo "${sudo_flags[@]}" "$prog")
     else
       echo "sudo non-interactive not available" >&2
+      _RCRS_RUNNER=()
       return 127
     fi
     return 0
@@ -138,26 +141,23 @@ function _run_command() {
 
   # Decide runner: user vs sudo -n vs sudo (interactive)
   _RCRS_RUNNER=()
+  local resolver_rc=0
   if (( quiet )); then
     _run_command_resolve_sudo "$prog" \
       "$prefer_sudo" "$require_sudo" "$interactive_sudo" \
-      "${probe_args[@]}" 2>/dev/null || {
-        if (( soft )); then
-          return 127
-        else
-          exit 127
-        fi
-      }
+      "${probe_args[@]}" 2>/dev/null || resolver_rc=$?
   else
     _run_command_resolve_sudo "$prog" \
       "$prefer_sudo" "$require_sudo" "$interactive_sudo" \
-      "${probe_args[@]}" || {
-        if (( soft )); then
-          return 127
-        else
-          exit 127
-        fi
-      }
+      "${probe_args[@]}" || resolver_rc=$?
+  fi
+
+  if (( resolver_rc != 0 )); then
+    if (( soft )); then
+      return 127
+    else
+      exit 127
+    fi
   fi
   local -a runner=("${_RCRS_RUNNER[@]}")
   unset _RCRS_RUNNER

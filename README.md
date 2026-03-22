@@ -53,6 +53,21 @@ Single source of truth for OS detection. Returns: `mac`, `wsl`, `debian`, `redha
 Returns active provider string (`k3d`, `k3s`, `orbstack`). Controlled by
 `CLUSTER_PROVIDER` / `K3D_MANAGER_PROVIDER` / `K3DMGR_PROVIDER`.
 
+## Contributed Scripts and Templates
+
+Standalone tools for the spec-driven multi-agent workflow — copy into your repo or
+Claude Code installation. Not part of the Bash library.
+
+| File | Purpose | Install to |
+|---|---|---|
+| `scripts/etc/contrib/agent-pickup.sh` | Agent orientation on session start | `bin/agent-pickup.sh` in your repo |
+| `scripts/etc/contrib/handoff-skill.md` | Claude Code `/handoff` skill template | `~/.claude/commands/handoff.md` |
+| `scripts/etc/contrib/statusline.sh` | Claude Code status line | via `/statusline-setup` skill |
+
+[Full contrib docs →](docs/contrib.md)
+
+---
+
 ## Development
 
 ```bash
