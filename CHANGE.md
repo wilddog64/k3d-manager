@@ -1,5 +1,20 @@
 # Changes - k3d-manager
 
+## [Unreleased] v0.9.7 — README overhaul + tooling polish
+
+### Changed
+- **`README.md`**: Plugins section — full table of all 13 plugins with key functions and descriptions, replacing single ACG link.
+- **`README.md`**: How-To section — grouped by component (Jenkins / LDAP).
+- **`README.md`**: Issue Logs promoted to top-level section; `docs/issues/` as canonical source; 5 most recent entries in table.
+- **`README.md`**: Releases table — top 3 in main table; older releases in `<details>` collapsible block.
+- **`docs/releases.md`**: Backfilled v0.9.2–v0.9.6 entries (were missing).
+
+### Added
+- **`docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md`**: Frontend nginx CrashLoopBackOff — read-only root filesystem prevents config write; fix: `emptyDir` at `/etc/nginx/conf.d/`.
+- **`docs/retro/2026-03-22-v0.9.6-retrospective.md`**: v0.9.6 retrospective + post-merge v0.9.7 session start (skill updates, README conventions, SSH keychain fix).
+
+---
+
 ## [Unreleased] v0.9.6 — ACG plugin + kops-for-k3s reframe
 
 ### Added
