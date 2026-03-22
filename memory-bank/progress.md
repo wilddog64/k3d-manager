@@ -75,6 +75,7 @@
 
 ### Code Quality / Architecture (carried from v0.9.6)
 - [x] **Upstream local lib edits to lib-foundation** — commits `b60ddc6` (system.sh TTY fix) + `15f041a` (agent_rigor allowlist) on lib-foundation/feat/v0.3.4
+- [x] **Sync scripts/lib/system.sh from lib-foundation** — commit `4c6e143` copies `b60ddc6`, `c216d45` adds bare-sudo allowlist so `_agent_audit` passes; tracked missing `scripts/tests/lib/system.bats` in `docs/issues/2026-03-22-missing-system-bats.md`
 - [ ] **Reduce if-count allowlist** — refactor 20 allowlisted functions (jenkins x6, ldap x7, vault x5, system x2) to under 8-`if` threshold; remainder needs `docs/issues/` entry
 - [ ] **`bin/` script consistency** — `bin/smoke-test-cluster-health.sh` needs `_kubectl`/`_run_command`
 - [ ] **Relocate app-layer bug tracking** — file shopping-cart bugs as GitHub Issues in their repos
