@@ -85,6 +85,7 @@
 ### Secondary
 - [x] **Safety gate audit** — commit `51a40b0` adds no-args guard to `deploy_cluster`; `deploy_k3d_cluster`/`deploy_k3s_cluster` inherit fix
 - [x] **`--dry-run` / `-n` mode** — docs/tests added in commit `f1b4ca7` (README Safety Gates + `scripts/tests/lib/dry_run.bats`); implementation already shipped
+- [x] **Reduce if-count allowlist (ldap)** — commit `ba6f3a9` extracts helpers so `_ldap_*` + `deploy_ldap`/`deploy_ad` drop under threshold; allowlist trimmed to vault/system entries only
 - [ ] **GitHub PAT rotation** — expires 2026-04-12
 
 ### Deferred to v1.0.0 (needs multi-node)
