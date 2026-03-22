@@ -2,10 +2,5 @@
 # Format: <path>:<function>
 # See docs/issues entries for each item.
 
-scripts/plugins/jenkins.sh:_jenkins_run_saved_trap_literal
-scripts/plugins/jenkins.sh:_jenkins_run_smoke_test
-scripts/plugins/jenkins.sh:_deploy_jenkins
-scripts/plugins/jenkins.sh:deploy_jenkins
-
 scripts/lib/system.sh:_run_command
 scripts/lib/system.sh:_ensure_node
