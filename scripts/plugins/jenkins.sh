@@ -554,6 +554,23 @@ function _deploy_jenkins_image() {
    fi
 }
 
+function _jenkins_format_pull_failure_details() {
+   local failure_fields="$1"
+   local failure_reason="" failure_message="" details=""
+   local IFS=$'\t'
+   read -r failure_reason failure_message <<< "$failure_fields"
+   if [[ -n "$failure_reason" && -n "$failure_message" ]]; then
+      details="${failure_reason}; ${failure_message}"
+   elif [[ -n "$failure_reason" ]]; then
+      details="$failure_reason"
+   elif [[ -n "$failure_message" ]]; then
+      details="$failure_message"
+   else
+      details="image pull failure"
+   fi
+   printf '%s' "$details"
+}
+
 function _jenkins_warn_on_cert_rotator_pull_failure() {
    local ns="$1"
 
@@ -586,22 +603,8 @@ function _jenkins_warn_on_cert_rotator_pull_failure() {
    ')
 
    if [[ -n "$failure_fields" ]]; then
-      local failure_reason="" failure_message="" failure_details=""
-      local IFS=$'\t'
-      read -r failure_reason failure_message <<< "$failure_fields"
-      if [[ -n "$failure_reason" ]]; then
-         failure_details="$failure_reason"
-      fi
-      if [[ -n "$failure_message" ]]; then
-         if [[ -n "$failure_details" ]]; then
-            failure_details+="; $failure_message"
-         else
-            failure_details="$failure_message"
-         fi
-      fi
-      if [[ -z "$failure_details" ]]; then
-         failure_details="image pull failure"
-      fi
+      local failure_details
+      failure_details=$(_jenkins_format_pull_failure_details "$failure_fields")
       _warn "Jenkins cert rotator pods are failing to pull their image (${failure_details}). Set JENKINS_CERT_ROTATOR_IMAGE or edit scripts/etc/jenkins/jenkins-vars.sh to point at an accessible registry."
    fi
 }
@@ -1649,13 +1652,6 @@ function _deploy_jenkins() {
       export VAULT_PKI_LEAF_HOST="$vault_leaf_host"
 
       awk -v leaf_host="$vault_leaf_host" '
-      function indent(n) {
-         if (n <= 0) {
-            return ""
-         }
-         return sprintf("%*s", n, "")
-      }
-
       BEGIN {
          skip_depth = 0
          ldap_indent = 0
@@ -1757,8 +1753,8 @@ function _deploy_jenkins() {
             match($0, /^[[:space:]]*/ )
             current_indent = RLENGTH
             if (current_indent <= env_block_indent && $0 ~ /^[[:space:]]*([a-zA-Z#])/ && $0 !~ /^[[:space:]]*containerEnv:/) {
-               print indent(env_block_indent + 2) "- name: VAULT_PKI_LEAF_HOST"
-               print indent(env_block_indent + 4) "value: \"" leaf_host "\""
+               printf "%s- name: VAULT_PKI_LEAF_HOST\n", sprintf("%*s", env_block_indent + 2, "")
+               printf "%svalue: \"%s\"\n", sprintf("%*s", env_block_indent + 4, ""), leaf_host
                inserted_leaf_env = 1
                in_env_block = 0
             }
@@ -1769,8 +1765,8 @@ function _deploy_jenkins() {
 
       END {
          if (in_env_block && !inserted_leaf_env) {
-            print indent(env_block_indent + 2) "- name: VAULT_PKI_LEAF_HOST"
-            print indent(env_block_indent + 4) "value: \"" leaf_host "\""
+            printf "%s- name: VAULT_PKI_LEAF_HOST\n", sprintf("%*s", env_block_indent + 2, "")
+            printf "%svalue: \"%s\"\n", sprintf("%*s", env_block_indent + 4, ""), leaf_host
          }
       }
       ' "$values_file" > "$temp_values"
