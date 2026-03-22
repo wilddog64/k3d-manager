@@ -7,13 +7,7 @@ scripts/plugins/jenkins.sh:_jenkins_run_smoke_test
 scripts/plugins/jenkins.sh:_deploy_jenkins
 scripts/plugins/jenkins.sh:deploy_jenkins
 
-scripts/plugins/ldap.sh:_ldap_seed_admin_secret
-scripts/plugins/ldap.sh:_ldap_seed_ldif_secret
-scripts/plugins/ldap.sh:_ldap_deploy_chart
-scripts/plugins/ldap.sh:_ldap_import_ldif
-scripts/plugins/ldap.sh:_ldap_sync_admin_password
-scripts/plugins/ldap.sh:deploy_ldap
-scripts/plugins/ldap.sh:deploy_ad
+
 
 scripts/plugins/vault.sh:_vault_replay_cached_unseal
 scripts/plugins/vault.sh:_vault_bootstrap_ha
