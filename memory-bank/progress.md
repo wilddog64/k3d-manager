@@ -65,6 +65,7 @@
 ## v0.9.7 — Active
 
 **Focus: code quality backlog + tooling polish. Branch cut 2026-03-22.**
+**PR #41 open** — https://github.com/wilddog64/k3d-manager/pull/41 — CI running, Copilot tagged.
 
 ### Tooling (done this session)
 - [x] `/create-pr` skill — Copilot reply+resolve flow (Steps 4+5, 3 new failure modes)
