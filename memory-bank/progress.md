@@ -65,21 +65,24 @@
 ## v0.9.7 — Active
 
 **Focus: code quality backlog + tooling polish. Branch cut 2026-03-22.**
+**PR #41 open** — https://github.com/wilddog64/k3d-manager/pull/41 — CI running, Copilot tagged.
 
 ### Tooling (done this session)
 - [x] `/create-pr` skill — Copilot reply+resolve flow (Steps 4+5, 3 new failure modes)
 - [x] `/post-merge` skill — branch cleanup step (Step 8, every 5 releases)
 - [x] SSH config — persistent Keychain (`Host *` block); `lib-foundation` remote → SSH
 - [x] Issue doc: `docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md`
+- [x] **README overhaul** — PR #40 merged (`de684fe7`); Plugins table (14), How-To by component, Issue Logs section, Releases 3+collapsible; `docs/releases.md` backfilled
 
 ### Code Quality / Architecture (carried from v0.9.6)
-- [ ] **Upstream local lib edits to lib-foundation** — `scripts/lib/system.sh` (TTY fix + `_run_command_resolve_sudo`) and `scripts/lib/agent_rigor.sh` (allowlist feature) need PRs to lib-foundation `feat/v0.3.4` → subtree pull → remove local divergence
+- [x] **Upstream local lib edits to lib-foundation** — commits `b60ddc6` (system.sh TTY fix) + `15f041a` (agent_rigor allowlist) on lib-foundation/feat/v0.3.4
+- [x] **Sync scripts/lib/system.sh from lib-foundation** — commit `4c6e143` copies `b60ddc6`, `c216d45` adds bare-sudo allowlist so `_agent_audit` passes; tracked missing `scripts/tests/lib/system.bats` in `docs/issues/2026-03-22-missing-system-bats.md`
 - [ ] **Reduce if-count allowlist** — refactor 20 allowlisted functions (jenkins x6, ldap x7, vault x5, system x2) to under 8-`if` threshold; remainder needs `docs/issues/` entry
-- [ ] **`bin/` script consistency** — `bin/smoke-test-cluster-health.sh` needs `_kubectl`/`_run_command`
-- [ ] **Relocate app-layer bug tracking** — file shopping-cart bugs as GitHub Issues in their repos
+- [x] **`bin/` script consistency** — commit `b0b76b3` makes `bin/smoke-test-cluster-health.sh` source system.sh + use `_kubectl`
+- [x] **Relocate app-layer bug tracking** — filed as GitHub Issues: order #16, payment #16, product-catalog #16, frontend #12
 
 ### Secondary
-- [ ] **Safety gate audit** — `deploy_*` with no args should print help, NOT trigger deployment
+- [x] **Safety gate audit** — commit `51a40b0` adds no-args guard to `deploy_cluster`; `deploy_k3d_cluster`/`deploy_k3s_cluster` inherit fix
 - [ ] **`--dry-run` / `-n` mode** — all `deploy_*` print every command without executing
 - [ ] **GitHub PAT rotation** — expires 2026-04-12
 

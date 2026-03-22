@@ -17,6 +17,11 @@
 
 set -euo pipefail
 
+SMOKE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SMOKE_SCRIPT_DIR}/.." && pwd)"
+# shellcheck source=scripts/lib/system.sh
+source "${REPO_ROOT}/scripts/lib/system.sh"
+
 INFRA_CONTEXT="${INFRA_CONTEXT:-k3d-k3d-cluster}"
 APP_CONTEXT="${APP_CONTEXT:-ubuntu-k3s}"
 ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-cicd}"
@@ -36,7 +41,7 @@ echo ""
 # --- 1. ghcr-pull-secret in all 3 namespaces (app cluster) ---
 echo "-- ghcr-pull-secret --"
 for ns in shopping-cart-apps shopping-cart-data shopping-cart-payment; do
-  if kubectl --context="${APP_CONTEXT}" get secret ghcr-pull-secret -n "${ns}" >/dev/null 2>&1; then
+  if _kubectl --quiet -- --context="${APP_CONTEXT}" get secret ghcr-pull-secret -n "${ns}" >/dev/null 2>&1; then
     _pass "ghcr-pull-secret present in ${ns}"
   else
     _fail "ghcr-pull-secret MISSING in ${ns}"
@@ -49,7 +54,7 @@ echo ""
 echo "-- ArgoCD sync status --"
 for app in shopping-cart-basket shopping-cart-order shopping-cart-payment \
            shopping-cart-product-catalog shopping-cart-frontend; do
-  sync_status=$(kubectl --context="${INFRA_CONTEXT}" get application "${app}" \
+  sync_status=$(_kubectl --quiet -- --context="${INFRA_CONTEXT}" get application "${app}" \
     -n "${ARGOCD_NAMESPACE}" \
     -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "NotFound")
   if [[ "${sync_status}" == "Synced" ]]; then
@@ -63,9 +68,9 @@ echo ""
 
 # --- 3. Pod status on app cluster ---
 echo "-- Pod status (${APP_CONTEXT}) --"
-running=$(kubectl --context="${APP_CONTEXT}" get pods -n "${SHOPPING_CART_NS}" \
+running=$(_kubectl --quiet -- --context="${APP_CONTEXT}" get pods -n "${SHOPPING_CART_NS}" \
   --no-headers 2>/dev/null | grep -c "Running" || true)
-crashloop=$(kubectl --context="${APP_CONTEXT}" get pods -n "${SHOPPING_CART_NS}" \
+crashloop=$(_kubectl --quiet -- --context="${APP_CONTEXT}" get pods -n "${SHOPPING_CART_NS}" \
   --no-headers 2>/dev/null | grep -c "CrashLoopBackOff" || true)
 
 echo "  Running:            ${running}"

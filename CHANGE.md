@@ -1,17 +1,28 @@
 # Changes - k3d-manager
 
-## [Unreleased] v0.9.7 — README overhaul + tooling polish
+## [Unreleased] v0.9.7 — lib sync + code quality + tooling polish
+
+### Fixed
+- **`scripts/lib/core.sh`**: `deploy_cluster` now prints help and returns 1 when called with no args, preventing accidental cluster creation (`51a40b0`).
 
 ### Changed
-- **`README.md`**: Plugins section — full table of all 14 plugins with key functions and descriptions, replacing single ACG link.
+- **`scripts/lib/system.sh`**: Synced from lib-foundation `b60ddc6` — adds `_run_command_resolve_sudo()`, `resolver_rc` unified error handling, `--interactive-sudo` flag throughout, `helm_global_arr` word-split fix (`56aec2f`).
+- **`scripts/lib/agent_rigor.sh`**: Synced from lib-foundation `15f041a` — adds allowlist file support, `kubectl exec` credential leak check, bare-sudo expanded diff.
+- **`scripts/lib/foundation/`**: Subtree pulled to lib-foundation `b60ddc6` (TTY fix + allowlist feature).
+- **`bin/smoke-test-cluster-health.sh`**: Sources `scripts/lib/system.sh` via `REPO_ROOT` and uses `_kubectl` wrapper for all kubectl calls (`b0b76b3`).
+- **`README.md`**: Plugins section — full table of all 14 plugins with key functions and descriptions.
 - **`README.md`**: How-To section — grouped by component (Jenkins / LDAP).
-- **`README.md`**: Issue Logs promoted to top-level section; `docs/issues/` as canonical source; 5 most recent entries in table.
-- **`README.md`**: Releases table — top 3 in main table; older releases in `<details>` collapsible block.
+- **`README.md`**: Issue Logs promoted to top-level section with 5 most recent entries.
+- **`README.md`**: Releases table — top 3 in main table; older in `<details>` collapsible block.
 - **`docs/releases.md`**: Backfilled v0.9.2–v0.9.6 entries (were missing).
+- **`CLAUDE.md`**: Added agent commit + memory-bank discipline rules.
 
 ### Added
-- **`docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md`**: Frontend nginx CrashLoopBackOff — read-only root filesystem prevents config write; fix: `emptyDir` at `/etc/nginx/conf.d/`.
-- **`docs/retro/2026-03-22-v0.9.6-retrospective.md`**: v0.9.6 retrospective + post-merge v0.9.7 session start (skill updates, README conventions, SSH keychain fix).
+- **`scripts/tests/lib/system.bats`**: Restored from lib-foundation — 8 BATS tests for `_run_command_resolve_sudo` + `_run_command` (`cc49b66`).
+- **`scripts/etc/agent/bare-sudo-allowlist`**: Allowlist file for `_agent_audit` — permits `system.sh` to use sudo internally (`c216d45`).
+- **`docs/issues/2026-03-22-missing-system-bats.md`**: Tracks missing `system.bats` (now restored).
+- **`docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md`**: Frontend nginx CrashLoopBackOff — read-only root filesystem prevents config write.
+- **`docs/retro/2026-03-22-v0.9.6-retrospective.md`**: v0.9.6 retrospective + post-merge v0.9.7 session start.
 
 ---
 
