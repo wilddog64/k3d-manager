@@ -3,11 +3,9 @@
 # See docs/issues entries for each item.
 
 scripts/plugins/jenkins.sh:_jenkins_run_saved_trap_literal
-scripts/plugins/jenkins.sh:_jenkins_warn_on_cert_rotator_pull_failure
 scripts/plugins/jenkins.sh:_jenkins_run_smoke_test
 scripts/plugins/jenkins.sh:_deploy_jenkins
 scripts/plugins/jenkins.sh:deploy_jenkins
-scripts/plugins/jenkins.sh:indent
 
 scripts/plugins/ldap.sh:_ldap_seed_admin_secret
 scripts/plugins/ldap.sh:_ldap_seed_ldif_secret
