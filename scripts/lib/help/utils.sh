@@ -102,6 +102,7 @@ function _usage() {
       "Networking"         "*ingress*"
       "vCluster"           "vcluster_*"
       "Shopping cart"      "add_ubuntu_k3s_cluster register_shopping_cart_apps deploy_app_cluster"
+      "ACG sandbox"        "acg_*"
       "Testing"            "test test_*"
     )
 
