@@ -233,11 +233,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-03-22 | [Copilot PR #41 review findings](docs/issues/2026-03-22-copilot-pr41-review-findings.md) | lib / agent_rigor / core |
 | 2026-03-22 | [Missing scripts/tests/lib/system.bats](docs/issues/2026-03-22-missing-system-bats.md) | lib / testing |
 | 2026-03-22 | [deploy_app_cluster manual gap](docs/issues/2026-03-22-deploy-app-cluster-manual-gap.md) | ACG / k3sup |
 | 2026-03-21 | [Frontend read-only filesystem failure](docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md) | Shopping Cart |
 | 2026-03-21 | [ArgoCD unreachable — mandated SHAs never pushed](docs/issues/2026-03-21-argocd-unreachable-mandated-shas.md) | ArgoCD |
-| 2026-03-21 | [Frontend CrashLoopBackOff misdiagnosis](docs/issues/2026-03-21-frontend-crashloopbackoff-misdiagnosis.md) | Shopping Cart |
 
 [All issues →](docs/issues/)
 
