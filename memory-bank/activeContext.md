@@ -1,9 +1,10 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.4` (as of 2026-03-21)
+## Current Branch: `k3d-manager-v0.9.6` (as of 2026-03-21)
 
-**v0.9.3 SHIPPED** — PR #36 squash-merged (8046c73), tagged + released 2026-03-16.
-**v0.9.4 ACTIVE** — full stack health milestone.
+**v0.9.5 SHIPPED** — PR #38 squash-merged (`573c0ac`), tagged v0.9.5, released 2026-03-21.
+**v0.9.6 ACTIVE** — ACG AWS sandbox development focus. M2 Air at resource ceiling; shift CI and smoke testing to EC2.
+**enforce_admins:** restored on main 2026-03-21.
 
 ---
 
