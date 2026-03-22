@@ -87,7 +87,8 @@
 | `/create-pr` skill — Copilot reply+resolve flow | **DONE** | Added Steps 4+5: reply each comment via REST, resolve threads via GraphQL `resolveReviewThread`; 3 new Known Failure Modes |
 | `/post-merge` skill — branch cleanup step | **DONE** | Step 8 added: delete stale branches every 5 releases; local `-d`/`-D` + remote protection removal + `git fetch --prune` |
 | SSH config — persistent Keychain | **DONE** | Added `Host *` block with `UseKeychain yes` + `AddKeysToAgent yes` to `~/.ssh/config`; `lib-foundation` remote switched to SSH |
-| Issue doc: frontend read-only filesystem | **COMMITTED** | `docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md` |
+| Issue doc: frontend read-only filesystem | **MERGED** | `docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md` |
+| **README overhaul** | **MERGED** | PR #40 `de684fe7` — Plugins table (14), How-To by component, Issue Logs section, Releases 3+collapsible; enforce_admins restored |
 
 ---
 

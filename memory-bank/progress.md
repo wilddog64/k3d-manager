@@ -71,6 +71,7 @@
 - [x] `/post-merge` skill — branch cleanup step (Step 8, every 5 releases)
 - [x] SSH config — persistent Keychain (`Host *` block); `lib-foundation` remote → SSH
 - [x] Issue doc: `docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md`
+- [x] **README overhaul** — PR #40 merged (`de684fe7`); Plugins table (14), How-To by component, Issue Logs section, Releases 3+collapsible; `docs/releases.md` backfilled
 
 ### Code Quality / Architecture (carried from v0.9.6)
 - [ ] **Upstream local lib edits to lib-foundation** — `scripts/lib/system.sh` (TTY fix + `_run_command_resolve_sudo`) and `scripts/lib/agent_rigor.sh` (allowlist feature) need PRs to lib-foundation `feat/v0.3.4` → subtree pull → remove local divergence
