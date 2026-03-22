@@ -77,10 +77,12 @@
 
 ## Roadmap
 
-- **v0.9.6** — Lab accessibility: LoadBalancer for ArgoCD, Keycloak, Jenkins (infra cluster only); frontend LoadBalancer deferred to v1.0.0 (pod not schedulable on single t3.medium)
-- **v1.0.0** — 3-node k3s via k3sup + Samba AD DC (NEXT — replaces single t3.medium; resolves resource exhaustion; enables frontend + e2e milestone gate)
-- **v1.1.0** — EKS provider + ACG lifecycle + AWS Managed AD
-- **v1.2.0** — k3dm-mcp (gate: EKS delivered)
+- **v0.9.6** — ACG plugin (`acg_provision`, `acg_extend`, `acg_teardown`) + LoadBalancer for ArgoCD/Keycloak/Jenkins; retire `bin/acg-sandbox.sh`
+- **v1.0.0** — 3-node k3s via k3sup + Samba AD DC; `CLUSTER_PROVIDER=k3s-remote`; resolves resource exhaustion; frontend + e2e milestone gate
+- **v1.1.0** — Full stack provisioning: `provision_full_stack` single command (k3s + Vault + ESO + Istio + ArgoCD)
+- **v1.2.0** — k3dm-mcp (gate: v1.0.0 multi-node proven; k3d + k3s-remote = two backends)
+- **v1.3.0** — Home lab: k3s on Mac Mini M5 (`CLUSTER_PROVIDER=k3s-local-arm64`); home automation plugins
+- **No EKS/GKE/AKS** — k3d-manager is kops-for-k3s; cloud-managed k8s is out of scope
 - **v1.3.0** — GKE + AD plugin: Google Cloud Identity
 - **v1.4.0** — AKS
 - **v1.5.0** — vCluster
