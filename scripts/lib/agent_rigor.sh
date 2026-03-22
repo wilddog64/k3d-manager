@@ -56,6 +56,19 @@ _agent_audit() {
       done < "$allowlist_file"
    fi
 
+   local bare_sudo_allowlist_file="${AGENT_AUDIT_BARE_SUDO_ALLOWLIST_FILE:-${SCRIPT_DIR}/etc/agent/bare-sudo-allowlist}"
+   local bare_sudo_allowlist=""
+   if [[ -r "$bare_sudo_allowlist_file" ]]; then
+      while IFS= read -r line; do
+         line=${line%%#*}
+         line="${line#${line%%[![:space:]]*}}"
+         line="${line%${line##*[![:space:]]}}"
+         [[ -z "$line" ]] && continue
+         bare_sudo_allowlist+=$'\n'
+         bare_sudo_allowlist+="$line"
+      done < "$bare_sudo_allowlist_file"
+   fi
+
    local status=0
    local diff_bats
    diff_bats="$(git diff --cached -- '*.bats' 2>/dev/null || true)"
@@ -132,6 +145,9 @@ _agent_audit() {
             | grep -Ev '^[[:space:]]*#' \
             | grep -Ev '^[[:space:]]*_run_command\b' || true)
          if [[ -n "$bare_sudo" ]]; then
+            if [[ $'\n'"$bare_sudo_allowlist"$'\n' == *$'\n'"$file"$'\n'* ]]; then
+               continue
+            fi
             _warn "Agent audit: bare sudo call in $file (use _run_command --prefer-sudo):"
             _warn "$bare_sudo"
             status=1
