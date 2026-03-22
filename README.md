@@ -177,7 +177,24 @@ docs/
 ### API Reference
 - **[Public Functions](docs/api/functions.md)** — All callable functions with source locations
 - **[Vault PKI Configuration](docs/api/vault-pki.md)** — PKI variables, example workflow, air-gapped setup
-- **[ACG Plugin](docs/plans/v0.9.6-acg-plugin.md)** — `acg_provision`, `acg_status`, `acg_extend`, `acg_teardown` — ACG sandbox lifecycle
+
+### Plugins
+
+| Plugin | Key Functions | Description |
+|---|---|---|
+| **ACG** | `acg_provision`, `acg_status`, `acg_extend`, `acg_teardown` | AWS ACG sandbox lifecycle — VPC + SG + EC2 provisioning; [spec](docs/plans/v0.9.6-acg-plugin.md) |
+| **ArgoCD** | `deploy_argocd`, `deploy_argocd_bootstrap`, `register_app_cluster`, `configure_vault_argocd_repos` | GitOps engine deployment + app cluster registration + Vault repo auth |
+| **Vault** | `deploy_vault`, `configure_vault_app_auth` | HashiCorp Vault HA + PKI + cross-cluster auth |
+| **ESO** | `deploy_eso` | External Secrets Operator — syncs Vault/AKV secrets into Kubernetes |
+| **Jenkins** | `deploy_jenkins` | Jenkins StatefulSet + Vault sidecar + ESO cert rotation CronJob |
+| **LDAP** | `deploy_ldap`, `deploy_ad`, `ldap_get_user_password` | OpenLDAP or Active Directory directory service |
+| **Keycloak** | `deploy_keycloak`, `test_keycloak` | Keycloak identity provider + smoke test |
+| **cert-manager** | `deploy_cert_manager` | cert-manager + ACME ClusterIssuer (Let's Encrypt) |
+| **vCluster** | `vcluster_create`, `vcluster_destroy`, `vcluster_use`, `vcluster_list` | Virtual cluster lifecycle on top of the infra cluster |
+| **Tunnel** | `tunnel_start`, `tunnel_stop`, `tunnel_status` | autossh persistent tunnel with launchd boot persistence |
+| **Azure** | `create_az_sp`, `deploy_azure_eso`, `eso_akv` | Azure Service Principal + ESO with Azure Key Vault backend |
+| **SMB CSI** | `deploy_smb_csi` | SMB CSI driver for Windows-compatible persistent volumes |
+| **Shopping Cart** | `register_shopping_cart_apps`, `deploy_app_cluster` | Demo app cluster bootstrap — k3sup EC2 install + ArgoCD app registration |
 
 ### Guides
 - **[Jenkins Authentication](docs/guides/jenkins-authentication.md)** — Auth modes (built-in / LDAP / AD), Vault sidecar, password rotation
