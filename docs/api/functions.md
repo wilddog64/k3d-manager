@@ -57,6 +57,14 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `add_ubuntu_k3s_cluster` | `scripts/plugins/shopping_cart.sh` | Export Ubuntu kubeconfig and register cluster in ArgoCD |
 | `register_shopping_cart_apps` | `scripts/plugins/shopping_cart.sh` | Apply shopping cart ArgoCD Application CRs |
 | `hello` | `scripts/plugins/hello.sh` | Example plugin |
+| `tunnel_start` | `scripts/plugins/tunnel.sh` | Start autossh SSH tunnel with launchd persistence |
+| `tunnel_stop` | `scripts/plugins/tunnel.sh` | Stop the SSH tunnel and unload launchd job |
+| `tunnel_status` | `scripts/plugins/tunnel.sh` | Show tunnel process and launchd status |
+| `deploy_app_cluster` | `scripts/plugins/shopping_cart.sh` | Install k3s on EC2 via k3sup and merge kubeconfig |
+| `acg_provision` | `scripts/plugins/acg.sh` | Provision ACG sandbox EC2 instance (VPC + SG + key + t3.medium) |
+| `acg_status` | `scripts/plugins/acg.sh` | Show ACG instance state, public IP, and k3s health |
+| `acg_extend` | `scripts/plugins/acg.sh` | Open ACG sandbox page to extend TTL (+4h) |
+| `acg_teardown` | `scripts/plugins/acg.sh` | Terminate ACG instance and remove ubuntu-k3s kubeconfig context |
 
 ## Running Tests
 

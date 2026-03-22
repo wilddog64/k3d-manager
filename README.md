@@ -26,7 +26,19 @@ ACME_EMAIL=you@example.com \
   ./scripts/k3d-manager deploy_cert_manager --confirm   # cert-manager + ACME ClusterIssuer
 ```
 
-### 2. Add the Ubuntu k3s app cluster
+### 2. Provision the ACG sandbox (app cluster on AWS EC2)
+
+```bash
+# One-time: set AWS credentials from the ACG console in ~/.aws/credentials
+acg_provision --confirm           # VPC + SG + key pair + t3.medium EC2; updates ~/.ssh/config
+acg_status                        # verify instance state + k3s health
+acg_extend                        # open browser to extend sandbox TTL (+4h)
+acg_teardown --confirm            # terminate instance; remove ubuntu-k3s kubeconfig context
+```
+
+> Set `ACG_ALLOWED_CIDR=<your-ip>/32` to restrict SSH/6443 ingress (default: `0.0.0.0/0`).
+
+### 3. Add the Ubuntu k3s app cluster
 
 ```bash
 UBUNTU_K3S_SSH_HOST=ubuntu \
@@ -35,7 +47,7 @@ UBUNTU_K3S_SSH_HOST=ubuntu \
 ./scripts/k3d-manager register_shopping_cart_apps # deploy shopping cart via ArgoCD
 ```
 
-### 3. Verify
+### 4. Verify
 
 ```bash
 ./scripts/k3d-manager test all    # run all BATS suites
@@ -165,6 +177,7 @@ docs/
 ### API Reference
 - **[Public Functions](docs/api/functions.md)** — All callable functions with source locations
 - **[Vault PKI Configuration](docs/api/vault-pki.md)** — PKI variables, example workflow, air-gapped setup
+- **[ACG Plugin](docs/plans/v0.9.6-acg-plugin.md)** — `acg_provision`, `acg_status`, `acg_extend`, `acg_teardown` — ACG sandbox lifecycle
 
 ### Guides
 - **[Jenkins Authentication](docs/guides/jenkins-authentication.md)** — Auth modes (built-in / LDAP / AD), Vault sidecar, password rotation
