@@ -14,11 +14,11 @@ teardown() {
 
 @test "dry-run prints command instead of executing" {
   export K3DM_DEPLOY_DRY_RUN=1
-  run _run_command -- echo hello
+  run _run_command -- touch "$BATS_TEST_TMPDIR/ran"
   [ "$status" -eq 0 ]
   [[ "$output" == *"[dry-run]"* ]]
-  [[ "$output" == *"echo"* ]]
-  [[ "$output" != "hello" ]]
+  [[ "$output" == *"touch"* ]]
+  [ ! -e "$BATS_TEST_TMPDIR/ran" ]
 }
 
 @test "dry-run with --prefer-sudo shows sudo prefix" {
