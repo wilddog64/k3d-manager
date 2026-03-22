@@ -51,10 +51,10 @@
 
 ## v0.9.6 — Active
 
-**Focus: ACG AWS sandbox development — M2 Air is at resource ceiling; shift CI and smoke testing to EC2.**
+**Focus: ACG AWS sandbox development — plugin shipped; next up: multi-node k3sup + Samba AD for v1.0.0.**
 
 ### Primary
-- [ ] **ACG plugin** — `scripts/plugins/acg.sh`: `acg_provision`, `acg_status`, `acg_extend`, `acg_teardown`; retire `bin/acg-sandbox.sh`; spec: `docs/plans/v0.9.6-acg-plugin.md` — **ASSIGNED to Codex**
+- [x] **ACG plugin** — `scripts/plugins/acg.sh`: `acg_provision`, `acg_status`, `acg_extend`, `acg_teardown`; retire `bin/acg-sandbox.sh`; spec: `docs/plans/v0.9.6-acg-plugin.md`; commit `37a6629`
 
 ### Code Quality / Architecture
 - [ ] **Upstream local lib edits to lib-foundation** — `scripts/lib/system.sh` (TTY fix + `_run_command_resolve_sudo`) and `scripts/lib/agent_rigor.sh` (allowlist feature) need PRs to lib-foundation `feat/v0.3.4` → subtree pull → remove local divergence
