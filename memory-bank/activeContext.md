@@ -31,6 +31,8 @@
 | ACG plugin (aws sandbox) | **MERGED** | commit `37a6629` — acg_provision/status/extend/teardown plugin replaces bin/acg-sandbox.sh |
 | **Copilot fixes (PR #39)** | **MERGED** | commit `7987453` — 9 findings: exit safety (`--soft`), VPC idempotency, CIDR security, heredoc fix, test pattern; `75f3b0f` — memory-bank roadmap; `157d431` — README + functions.md docs; CI green; all threads resolved; squash-merged in `8b09d577` |
 | **product-catalog Degraded** | **OPEN** | Synced to `aa5de3c`; DB env vars correct; RABBITMQ_USER vs RABBITMQ_USERNAME mismatch via ESO |
+| **App-layer bug tracking** | **DONE** | Filed GitHub Issues: order #16 (RabbitMQ), payment #16 (memory), product-catalog #16 (ESO key), frontend #12 (read-only FS) |
+| **`bin/` consistency spec** | **ASSIGNED** | Spec `docs/plans/v0.9.7-bin-smoke-test-consistency.md` pushed (7badec2); handed to Codex |
 | **v1.0.0 (3-node k3sup + Samba AD)** | **NEXT MILESTONE** | Replaces single t3.medium; resolves resource exhaustion structurally; spec: `docs/plans/roadmap-v1.md` |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
 | Playwright E2E green | **milestone gate** | |
