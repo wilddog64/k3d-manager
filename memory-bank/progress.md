@@ -81,7 +81,7 @@
 - [x] **Relocate app-layer bug tracking** — filed as GitHub Issues: order #16, payment #16, product-catalog #16, frontend #12
 
 ### Secondary
-- [ ] **Safety gate audit** — spec `docs/plans/v0.9.7-safety-gate-audit.md` written; only `deploy_cluster` is missing no-args guard; handed off to Codex (ea7482c)
+- [x] **Safety gate audit** — commit `51a40b0` adds no-args guard to `deploy_cluster`; `deploy_k3d_cluster`/`deploy_k3s_cluster` inherit fix
 - [ ] **`--dry-run` / `-n` mode** — all `deploy_*` print every command without executing
 - [ ] **GitHub PAT rotation** — expires 2026-04-12
 
