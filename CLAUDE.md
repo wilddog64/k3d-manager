@@ -10,7 +10,7 @@ Uses a dispatcher pattern with lazy plugin loading.
 ## Claude Session Rules
 
 - **Memory-bank update is mandatory and immediate** — after every completed action (spec written, PR created, agent assigned, merge done, task status changed), update `memory-bank/activeContext.md` and `memory-bank/progress.md` before doing anything else. Do not wait for the user to ask.
-- **Claude owns memory-bank — agents do not** — Codex and Gemini must NOT update `memory-bank/`. Do not include memory-bank update steps in task specs or handoff blocks. Claude reads the agent's report and does the update itself.
+
 - **PR creation gate** — do NOT create a PR until ALL of these pass: CI green, Copilot review comments addressed, Gemini live smoke test, Claude scope check. Draft PR is acceptable only as an explicit placeholder.
 - **Verify before trust** — never trust a commit SHA, BATS result, or "done" report from any agent without independently verifying via `gh api`, `gh run view`, or `git log`.
 - **Release scope limit — max 5 plan docs** — each release is a sprint story. If a milestone accumulates more than 5 spec files in `docs/plans/`, stop and split before writing another. A 6th spec is the signal the release is too large, not a reason to keep going. Split into two smaller releases with focused scopes.
