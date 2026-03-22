@@ -53,10 +53,13 @@
 
 **Focus: ACG AWS sandbox development — M2 Air is at resource ceiling; shift CI and smoke testing to EC2.**
 
+### Primary
+- [ ] **ACG plugin** — `scripts/plugins/acg.sh`: `acg_provision`, `acg_status`, `acg_extend`, `acg_teardown`; retire `bin/acg-sandbox.sh`; spec: `docs/plans/v0.9.6-acg-plugin.md` — **ASSIGNED to Codex**
+
 ### Code Quality / Architecture
 - [ ] **Upstream local lib edits to lib-foundation** — `scripts/lib/system.sh` (TTY fix + `_run_command_resolve_sudo`) and `scripts/lib/agent_rigor.sh` (allowlist feature) need PRs to lib-foundation `feat/v0.3.4` → subtree pull → remove local divergence
 - [ ] **Reduce if-count allowlist** — refactor 13 allowlisted functions (jenkins x6, ldap x7, vault x5, system x2) to under 8-`if` threshold; remainder needs `docs/issues/` entry; no new entries without linked issue
-- [ ] **`bin/` script consistency** — all `bin/` scripts using `kubectl`/system commands must source lib-foundation and use `_kubectl`/`_run_command`; affected: `bin/smoke-test-cluster-health.sh`
+- [ ] **`bin/` script consistency** — `bin/smoke-test-cluster-health.sh` needs `_kubectl`/`_run_command`
 - [ ] **Relocate app-layer bug tracking** — file shopping-cart bugs as GitHub Issues in their repos; remove from k3d-manager Known Bugs table
 
 ### Secondary (if primary complete)
