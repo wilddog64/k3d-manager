@@ -3,6 +3,7 @@
 ## Overall Status
 
 **v0.9.3 SHIPPED** — squash-merged to main (8046c73), PR #36, 2026-03-16. Tagged + released.
+**v0.9.8 ACTIVE** — branch cut from main 2026-03-22. Spec: `docs/plans/v0.9.8-if-count-easy-wins.md` — assigned to Codex.
 **v0.9.4 SHIPPED** — merged to main (662878a), PR #37, 2026-03-21.
 **v0.9.5 SHIPPED** — PR #38 squash-merged to main (`573c0ac`) 2026-03-21. Tagged v0.9.5, released.
 **v0.9.6 SHIPPED** — PR #39 merged to main (`8b09d577`) 2026-03-22. Tagged v0.9.6, released.
