@@ -1,6 +1,10 @@
 # Changes - k3d-manager
 
-## [Unreleased] v0.9.7 — lib sync + code quality + tooling polish
+## [Unreleased] v0.9.8
+
+---
+
+## [v0.9.7] — 2026-03-22 — lib sync + code quality + tooling polish
 
 ### Fixed
 - **`scripts/lib/core.sh`**: `deploy_cluster` now prints help and returns 1 when called with no args, preventing accidental cluster creation (`51a40b0`).
