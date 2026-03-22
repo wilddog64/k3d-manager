@@ -213,17 +213,32 @@ docs/
 - **[Two-Cluster Architecture](docs/plans/two-cluster-infra.md)** — Infra + app cluster design
 
 ### How-To
-- **[Configuring SSL Trust for jenkins-cli](docs/howto/jenkins-cli-ssl-trust.md)**
-- **[LDAP Bulk User Import](docs/howto/ldap-bulk-user-import.md)**
-- **[LDAP Password Rotation](docs/howto/ldap-password-rotation.md)**
-- **[Jenkins K8s Agents Testing](docs/howto/jenkins-k8s-agents-testing.md)**
 
-### Issue Logs
-- **[vCluster Copilot Review Findings](docs/issues/2026-03-15-vcluster-copilot-review-findings.md)** — 11 findings across 2 rounds (v0.9.1)
-- **[vCluster Smoke Test Failures](docs/issues/2026-03-15-vcluster-smoke-test-failures.md)** — Pod selector mismatch + missing plugin help (v0.9.1)
-- **[test() Function Refactor](docs/issues/2026-03-15-test-function-refactor.md)** — if-count violation + dispatcher move (v0.9.1)
-- **[Shopping Cart CI Failures](docs/issues/2026-03-11-shopping-cart-ci-failures.md)** — P1/P2 CI fixes (v0.8.0)
-- **[_run_command If-Count Refactor](docs/issues/2026-03-08-run-command-if-count-refactor.md)** — lib-foundation v0.3.0 debt
+**Jenkins**
+- **[Configuring SSL Trust for jenkins-cli](docs/howto/jenkins-cli-ssl-trust.md)** — Trust Vault-issued certs for `jenkins-cli.jar`
+- **[Jenkins K8s Agents Testing](docs/howto/jenkins-k8s-agents-testing.md)** — Verify dynamic pod agents in the infra cluster
+
+**LDAP / Directory**
+- **[LDAP Bulk User Import](docs/howto/ldap-bulk-user-import.md)** — Import users from a CSV into OpenLDAP
+- **[LDAP Password Rotation](docs/howto/ldap-password-rotation.md)** — Rotate user passwords via the rotator CronJob
+
+---
+
+## Issue Logs
+
+All tracked bugs, investigations, and debt are filed in **[docs/issues/](docs/issues/)** — one Markdown file per incident.
+
+Recent entries:
+
+| Date | Issue | Component |
+|---|---|---|
+| 2026-03-22 | [deploy_app_cluster manual gap](docs/issues/2026-03-22-deploy-app-cluster-manual-gap.md) | ACG / k3sup |
+| 2026-03-21 | [Frontend read-only filesystem failure](docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md) | Shopping Cart |
+| 2026-03-21 | [ArgoCD unreachable — mandated SHAs never pushed](docs/issues/2026-03-21-argocd-unreachable-mandated-shas.md) | ArgoCD |
+| 2026-03-21 | [Frontend CrashLoopBackOff misdiagnosis](docs/issues/2026-03-21-frontend-crashloopbackoff-misdiagnosis.md) | Shopping Cart |
+| 2026-03-21 | [order-service RabbitMQ connection refused](docs/issues/2026-03-21-order-service-rabbitmq-connection-refused.md) | Shopping Cart |
+
+[All issues →](docs/issues/)
 
 ---
 
