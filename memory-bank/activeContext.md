@@ -27,7 +27,7 @@
 | **Frontend CrashLoopBackOff** | **DEFERRED → v1.0.0** | Root cause: resource exhaustion (FailedScheduling on t3.medium). PR #11 closed — Copilot P1 confirmed original port 8080 + /health was correct. Fix: 3-node k3sup. Doc: `docs/issues/2026-03-21-frontend-crashloopbackoff-misdiagnosis.md` |
 | deploy_app_cluster automation | **MERGED** | commit `13c79b3` — adds k3sup install + kubeconfig merge + follow-up instructions |
 | ACG plugin (aws sandbox) | **MERGED** | commit `37a6629` — acg_provision/status/extend/teardown plugin replaces bin/acg-sandbox.sh |
-| **Copilot fixes (PR #39)** | **PUSHED — PR READY** | commit `7987453` — 9 findings: exit safety (`--soft`), VPC idempotency, CIDR security, heredoc fix, test pattern; `75f3b0f` — memory-bank roadmap; `157d431` — README + functions.md docs; CI green (`23393995884`); all threads resolved |
+| **Copilot fixes (PR #39)** | **MERGED** | commit `7987453` — 9 findings: exit safety (`--soft`), VPC idempotency, CIDR security, heredoc fix, test pattern; `75f3b0f` — memory-bank roadmap; `157d431` — README + functions.md docs; CI green; all threads resolved; squash-merged in `8b09d577` |
 | **product-catalog Degraded** | **OPEN** | Synced to `aa5de3c`; DB env vars correct; RABBITMQ_USER vs RABBITMQ_USERNAME mismatch via ESO |
 | **v1.0.0 (3-node k3sup + Samba AD)** | **NEXT MILESTONE** | Replaces single t3.medium; resolves resource exhaustion structurally; spec: `docs/plans/roadmap-v1.md` |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
@@ -77,6 +77,17 @@
 - **NetworkPolicy Hardening** — fixed `allow-dns` and added `allow-to-istio` to unblock `payment-service` initialization.
 - **`_run_command` TTY fallback** — interactive sudo fallback when `sudo -n` unavailable.
 - **autossh tunnel plugin** — `tunnel_start|stop|status`.
+
+---
+
+## v0.9.7 Tooling Changes
+
+| Item | Status | Notes |
+|---|---|---|
+| `/create-pr` skill — Copilot reply+resolve flow | **DONE** | Added Steps 4+5: reply each comment via REST, resolve threads via GraphQL `resolveReviewThread`; 3 new Known Failure Modes |
+| `/post-merge` skill — branch cleanup step | **DONE** | Step 8 added: delete stale branches every 5 releases; local `-d`/`-D` + remote protection removal + `git fetch --prune` |
+| SSH config — persistent Keychain | **DONE** | Added `Host *` block with `UseKeychain yes` + `AddKeysToAgent yes` to `~/.ssh/config`; `lib-foundation` remote switched to SSH |
+| Issue doc: frontend read-only filesystem | **COMMITTED** | `docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md` |
 
 ---
 
