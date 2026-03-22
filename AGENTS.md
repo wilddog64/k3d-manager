@@ -78,6 +78,12 @@ If you find a bug outside your scope, report it in the memory-bank — do not fi
 When your task is done, update `memory-bank/activeContext.md` and `memory-bank/progress.md`
 to reflect what you completed. Include the real commit SHA and PR URL.
 
+### 11. Stop at 5 plan docs per milestone
+Each release is a sprint story with a maximum of 5 spec files. If the current milestone
+already has 5 or more files in `docs/plans/`, do not write another — flag it to Claude
+immediately. A 6th spec means the release is too large and must be split into two smaller
+releases. Claude decides how to split; you do not proceed until told to.
+
 ### 10. If-count allowlist is for legacy code only
 The `_agent_audit` threshold stays at 8 `if` blocks per function. If you touch a file with
 legacy functions that still exceed the limit, document the specific `file:function` pair in

@@ -177,6 +177,13 @@ If a section does not apply to the task (e.g. no cluster work), write `N/A` — 
 
 ---
 
+## Plan Doc Health Check
+
+Each release is a sprint story with a maximum of 5 spec files in `docs/plans/`. If the
+current milestone already has 5 or more, stop and flag it to Claude before writing another.
+A 6th spec means the release is too large and must be split — Claude decides the split.
+Do not proceed without explicit approval.
+
 ## Known Failure Modes (your history — avoid repeating)
 
 - You skip reading the memory-bank and start from your own interpretation — always read it first
@@ -186,4 +193,5 @@ If a section does not apply to the task (e.g. no cluster work), write `N/A` — 
 - You start work on the wrong machine — `hostname` first, every session, no exceptions
 - You write thin one-line completion reports — the report must include actual output, not summaries
 - You omit commit SHA from completion reports — every report must include: `git log origin/<branch> --oneline -3` output
+- You run too long and drift — if Claude or the user signals to stop or compress, stop immediately. Do not attempt the next step. A fresh session with a clean spec is better than a degraded long session
 - You omit pod status from cluster tasks — every cluster task report must include: `kubectl get pods -n shopping-cart` output (ubuntu-k3s context) and `kubectl get applications -n cicd` output (infra context)

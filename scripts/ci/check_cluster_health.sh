@@ -12,30 +12,28 @@ _err() { printf 'ERROR: %s
 ' "$*" >&2; }
 
 : "${KUBECTL:=kubectl}"
+: "${KUBE_CONTEXT:=k3d-k3d-cluster}"
+KUBECTL="${KUBECTL} --context ${KUBE_CONTEXT}"
 VAULT_HEALTH_NS="${VAULT_NS:-secrets}"
 VAULT_HEALTH_RELEASE="${VAULT_RELEASE:-vault}"
 
 check_rollout() {
   local resource="$1" namespace="$2" timeout="${3:-120s}"
   _info "Waiting for $resource in namespace $namespace..."
-  if ! $KUBECTL -n "$namespace" rollout status "$resource" --timeout="$timeout"; then
+  if ! $KUBECTL -n "$namespace" wait "$resource" \
+      --for=condition=Available --timeout="$timeout"; then
     _err "$resource in namespace $namespace is not Ready"
     return 1
   fi
 }
 
 check_statefulset_ready() {
-  local name="$1" namespace="$2"
+  local name="$1" namespace="$2" timeout="${3:-120s}"
   _info "Checking StatefulSet $name in namespace $namespace..."
-  local desired ready
-  desired=$($KUBECTL -n "$namespace" get statefulset "$name" -o jsonpath='{.status.replicas}' || echo "")
-  ready=$($KUBECTL -n "$namespace" get statefulset "$name" -o jsonpath='{.status.readyReplicas}' || echo "")
-  if [[ -z "$desired" ]]; then
-    _err "StatefulSet $name not found in $namespace"
-    return 1
-  fi
-  if [[ "$desired" != "$ready" ]]; then
-    _err "StatefulSet $name Ready replicas $ready does not match desired $desired"
+  if ! $KUBECTL -n "$namespace" wait pod \
+      --for=condition=Ready --selector="app.kubernetes.io/name=${name}" \
+      --timeout="$timeout" 2>/dev/null; then
+    _err "StatefulSet $name pods not Ready in $namespace"
     return 1
   fi
 }
@@ -78,7 +76,18 @@ check_vault_status() {
 }
 
 main() {
-  check_rollout deployment/istio-ingressgateway istio-system "180s"
+  local retries=3 delay=10
+  for i in $(seq 1 "$retries"); do
+    if $KUBECTL cluster-info >/dev/null 2>&1; then break; fi
+    _warn "API server not ready (attempt $i/$retries) — retrying in ${delay}s..."
+    sleep "$delay"
+    if (( i == retries )); then
+      _err "API server unreachable after $retries attempts"
+      return 1
+    fi
+  done
+
+  check_rollout deployment/istio-ingressgateway istio-system "300s"
   check_statefulset_ready vault "$VAULT_HEALTH_NS"
   check_pods_ready "$VAULT_HEALTH_NS"
   check_vault_status "$VAULT_HEALTH_NS" "${VAULT_HEALTH_RELEASE}-0"

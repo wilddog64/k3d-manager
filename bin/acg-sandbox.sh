@@ -199,6 +199,6 @@ else
   if ssh -o ConnectTimeout=10 ubuntu "su -c '${_k3s_check}' root" 2>/dev/null; then
     _info "k3s is running."
   else
-    _info "WARNING: k3s not responding — may need full rebuild. Spec: docs/plans/v0.9.4-gemini-rebuild-ubuntu-k3s-e2e.md"
+    _info "WARNING: k3s not responding — run: ./scripts/k3d-manager deploy_app_cluster --confirm"
   fi
 fi
