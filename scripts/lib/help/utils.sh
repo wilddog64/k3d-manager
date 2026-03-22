@@ -101,7 +101,7 @@ function _usage() {
       "Directory service"  "dirservice_*"
       "Networking"         "*ingress*"
       "vCluster"           "vcluster_*"
-      "Shopping cart"      "add_ubuntu_k3s_cluster register_shopping_cart_apps"
+      "Shopping cart"      "add_ubuntu_k3s_cluster register_shopping_cart_apps deploy_app_cluster"
       "Testing"            "test test_*"
     )
 

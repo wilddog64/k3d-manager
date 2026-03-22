@@ -69,10 +69,12 @@ crashloop=$(kubectl --context="${APP_CONTEXT}" get pods -n "${SHOPPING_CART_NS}"
   --no-headers 2>/dev/null | grep -c "CrashLoopBackOff" || true)
 
 echo "  Running:            ${running}"
-echo "  CrashLoopBackOff:   ${crashloop} (basket expected)"
+echo "  CrashLoopBackOff:   ${crashloop}"
 
-if (( running >= 4 )); then
-  _pass "${running}/5 pods Running (basket CrashLoopBackOff exempt)"
+if (( running >= 5 )); then
+  _pass "${running}/5 pods Running"
+elif (( running >= 4 )); then
+  _pass "${running}/5 pods Running (1 pod exempt — see docs/issues/)"
 else
   _fail "only ${running}/5 pods Running — expected at least 4"
 fi

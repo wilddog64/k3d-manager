@@ -725,7 +725,7 @@ function __vault_plan_check_downstream() {
    secret_trim="${secret_trim#/}"
    secret_trim="${secret_trim%/}"
    local full_path="${mount_trim}/${secret_trim}"
-   if _vault_exec --no-exit "$ns" "vault kv get -format=json ${full_path}" "$release" >/dev/null 2>&1; then
+   if _vault_exec --no-exit "$ns" "vault kv get -format=json -- '${full_path}'" "$release" >/dev/null 2>&1; then
       __vault_plan_emit OK "LDAP service account secret (${full_path}) present"
    else
       __vault_plan_emit TODO "LDAP service account secret missing" "Would run: _vault_seed_ldap_service_accounts"
@@ -763,7 +763,7 @@ function _vault_plan_report() {
       __vault_plan_check_downstream "$ns" "$release"
    elif [[ "$initialized" == "true" ]]; then
       __vault_plan_emit TODO "Vault sealed" "Would run: deploy_vault --re-unseal"
-      __vault_plan_emit WARN "Skipping downstream checks until Vault is initialized"
+      __vault_plan_emit WARN "Skipping downstream checks until Vault is unsealed"
    else
       __vault_plan_emit TODO "Vault not initialized" "Would run: deploy_vault"
       __vault_plan_emit WARN "Skipping downstream checks until Vault is initialized"
