@@ -1,11 +1,12 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.9` (as of 2026-03-22)
+## Current Branch: `k3d-manager-v0.9.10` (as of 2026-03-22)
 
 **v0.9.6 SHIPPED** — PR #39 merged to main (`8b09d577`) 2026-03-22. Tagged v0.9.6, released.
 **v0.9.7 SHIPPED** — PR #41 merged to main (`97249a6f`) 2026-03-22. Tagged v0.9.7, released.
 **v0.9.8 SHIPPED** — PR #42 merged to main (`64525e3f`) 2026-03-22. No version tag (CHANGELOG [Unreleased]).
-**v0.9.9 ACTIVE** — branch cut from main 2026-03-22.
+**v0.9.9 SHIPPED** — PR #43 merged to main (`c1043175`) 2026-03-22. Tagged v0.9.9, released.
+**v0.9.10 ACTIVE** — branch cut from main 2026-03-22.
 **enforce_admins:** restored on main 2026-03-22.
 
 ---
@@ -38,6 +39,7 @@
 | **if-count easy wins** | **MERGED** | commit `9a4f795` — `_jenkins_warn_on_cert_rotator_pull_failure` helper + allowlist trim; deferred functions in `docs/issues/2026-03-22-if-count-allowlist-deferred.md` |
 | **if-count ldap refactor** | **MERGED** | commit `ba6f3a9` — extracted helpers so 7 `ldap.sh` functions drop ≤8 ifs; allowlist trimmed |
 | **if-count vault refactor** | **MERGED** | commit `365846c` — extracted helpers + guard clauses so 5 `vault.sh` functions drop ≤8 ifs; allowlist cleared |
+| **v0.9.9 PR #43** | **MERGED** | `c1043175` — ldap+vault allowlist elimination; 9 Copilot findings fixed in `bbfc12e`; tagged v0.9.9; branch v0.9.10 cut |
 | **Dry-run docs/tests** | **MERGED** | commit `f1b4ca7` — README Safety Gates doc + `scripts/tests/lib/dry_run.bats` coverage |
 | **v1.0.0 (3-node k3sup + Samba AD)** | **NEXT MILESTONE** | Replaces single t3.medium; resolves resource exhaustion structurally; spec: `docs/plans/roadmap-v1.md` |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
