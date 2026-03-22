@@ -86,9 +86,6 @@
 - **v1.2.0** — k3dm-mcp (gate: v1.0.0 multi-node proven; k3d + k3s-remote = two backends)
 - **v1.3.0** — Home lab: k3s on Mac Mini M5 (`CLUSTER_PROVIDER=k3s-local-arm64`); home automation plugins
 - **No EKS/GKE/AKS** — k3d-manager is kops-for-k3s; cloud-managed k8s is out of scope
-- **v1.3.0** — GKE + AD plugin: Google Cloud Identity
-- **v1.4.0** — AKS
-- **v1.5.0** — vCluster
 
 ---
 
