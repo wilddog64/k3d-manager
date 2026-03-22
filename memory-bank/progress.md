@@ -6,7 +6,8 @@
 **v0.9.4 SHIPPED** — merged to main (662878a), PR #37, 2026-03-21.
 **v0.9.5 SHIPPED** — PR #38 squash-merged to main (`573c0ac`) 2026-03-21. Tagged v0.9.5, released.
 **v0.9.6 SHIPPED** — PR #39 merged to main (`8b09d577`) 2026-03-22. Tagged v0.9.6, released.
-**v0.9.7 ACTIVE** — branch cut from main 2026-03-22.
+**v0.9.7 SHIPPED** — PR #41 merged to main (`97249a6f`) 2026-03-22. Tagged v0.9.7, released.
+**v0.9.8 ACTIVE** — branch cut from main 2026-03-22.
 
 ---
 
@@ -62,10 +63,9 @@
 
 ---
 
-## v0.9.7 — Active
+## v0.9.7 — Shipped
 
-**Focus: code quality backlog + tooling polish. Branch cut 2026-03-22.**
-**PR #41 open** — https://github.com/wilddog64/k3d-manager/pull/41 — CI running, Copilot tagged.
+**PR #41 merged to main (`97249a6f`) 2026-03-22. Tagged v0.9.7, released.**
 
 ### Tooling (done this session)
 - [x] `/create-pr` skill — Copilot reply+resolve flow (Steps 4+5, 3 new failure modes)
