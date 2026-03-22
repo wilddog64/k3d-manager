@@ -1,5 +1,14 @@
 # Changes - k3d-manager
 
+## [v0.9.9] — 2026-03-22 — if-count allowlist elimination (ldap + vault)
+
+### Changed
+- **`scripts/plugins/ldap.sh`**: Extracted 11 private helpers (`_ldap_generate_or_load_admin_creds`, `_ldap_build_ldif_content`, `_ldap_resolve_chart_ref`, `_ldap_ensure_helm_chart_available`, `_ldap_fetch_import_prereqs`, `_ldap_read_sync_creds`, `_ldap_parse_deploy_opts`, `_ldap_deploy_prerequisites`, `_ldap_ensure_vault_ready`, `_ldap_run_post_deploy`, `_ldap_run_ad_smoke_test`) so all 7 allowlisted functions drop to ≤ 8 ifs (`ba6f3a9`).
+- **`scripts/plugins/vault.sh`**: Extracted 6 private helpers (`_vault_parse_deploy_opts`, `_vault_source_optional_vars`, `_vault_reinit_from_reset`, `_vault_build_policy_hcl`, `_vault_build_parent_metadata_policy`, `_vault_load_cached_shards`, `_vault_clear_cached_shards`) so all 5 allowlisted functions drop to ≤ 8 ifs (`365846c`).
+- **`scripts/etc/agent/if-count-allowlist`**: Removed all ldap (7) and vault (5) entries — allowlist now contains only `system.sh:_run_command` and `system.sh:_ensure_node` (blocked on lib-foundation upstream).
+
+---
+
 ## [Unreleased] v0.9.8
 
 ### Fixed
