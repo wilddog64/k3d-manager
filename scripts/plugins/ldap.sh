@@ -477,8 +477,7 @@ EOF
 )
 
    if [[ "$enable_jenkins" == "1" && -n "$jenkins_password" ]]; then
-      _LDAP_LDIF_CONTENT+=$'
-'
+      _LDAP_LDIF_CONTENT+=$'\n'
       _LDAP_LDIF_CONTENT+=$(cat <<EOF
 dn: cn=jenkins-admins,${group_ou},${base_dn}
 objectClass: top
@@ -705,7 +704,7 @@ function _ldap_import_ldif() {
    local ldap_port="1389"
 
    [[ "${LDAP_LDIF_ENABLED:-false}" == "true" ]] || return 0
-   [[ -n "${LDAP_LDIF_VAULT_PATH:-}" ]] || { _warn "[ldap] LDIF sync enabled but LDAP_LDIF_VAULT_PATH is empty; skipping seed"; return 0; }
+   [[ -n "${LDAP_LDIF_VAULT_PATH:-}" ]] || { _warn "[ldap] LDIF sync enabled but LDAP_LDIF_VAULT_PATH is empty; skipping LDIF import"; return 0; }
 
    if ! _kubectl --no-exit -n "$ns" get secret "$ldif_secret" >/dev/null 2>&1; then
       _info "[ldap] LDIF secret ${ns}/${ldif_secret} not found; skipping LDIF import"
@@ -722,9 +721,9 @@ function _ldap_import_ldif() {
    fi
 
    _info "[ldap] checking if LDIF entries already exist..."
-   local search_result=""
+   local search_result="" search_output=""
    search_output=$(_no_trace _kubectl --no-exit -n "$ns" exec "$pod" --       ldapsearch -x -H "ldap://localhost:${ldap_port}"       -D "$admin_dn" -w "$admin_pass"       -b "$base_dn" -LLL dn 2>/dev/null || true)
-   search_result=$(echo "$search_output" | grep -c "^dn:" || echo "0")
+   search_result=$(echo "$search_output" | grep -c "^dn:" || true)
    if (( search_result > 1 )); then
       _info "[ldap] LDIF entries already exist (found $search_result entries); skipping import"
    else
@@ -960,9 +959,9 @@ function _ldap_parse_deploy_opts() {
 Usage: deploy_ldap [options] [namespace] [release] [chart-version]
 
 Options:
-  --namespace <ns>         Kubernetes namespace (default: \${LDAP_NAMESPACE})
-  --release <name>         Helm release name (default: \${LDAP_RELEASE})
-  --chart-version <ver>    Helm chart version (default: \${LDAP_HELM_CHART_VERSION:-<auto>})
+  --namespace <ns>         Kubernetes namespace (default: ${LDAP_NAMESPACE})
+  --release <name>         Helm release name (default: ${LDAP_RELEASE})
+  --chart-version <ver>    Helm chart version (default: ${LDAP_HELM_CHART_VERSION:-<auto>})
   --enable-vault           Deploy Vault and ESO if not already deployed
   -h, --help               Show this help message
 
@@ -1143,7 +1142,7 @@ function deploy_ldap() {
       _ldap_run_post_deploy "$namespace" "$release" "$deploy_name" "$smoke_port"
    fi
 
-   (( restore_trace )) && set +x
+   (( restore_trace )) && set -x
    return "$deploy_rc"
 }
 
