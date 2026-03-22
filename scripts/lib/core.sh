@@ -730,6 +730,13 @@ EOF
       return 0
    fi
 
+   if [[ ${#positional[@]} -eq 0 && -z "${provider_cli}" && "${force_k3s}" -eq 0 ]]; then
+      cat <<'EOF'
+deploy_cluster: no arguments given — run with -h for usage.
+EOF
+      return 1
+   fi
+
    local platform="" platform_msg=""
    platform="$(_detect_platform)"
    case "$platform" in
