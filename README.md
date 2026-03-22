@@ -195,6 +195,7 @@ docs/
 | **Azure** | `create_az_sp`, `deploy_azure_eso`, `eso_akv` | Azure Service Principal + ESO with Azure Key Vault backend |
 | **SMB CSI** | `deploy_smb_csi` | SMB CSI driver for Windows-compatible persistent volumes |
 | **Shopping Cart** | `register_shopping_cart_apps`, `deploy_app_cluster` | Demo app cluster bootstrap — k3sup EC2 install + ArgoCD app registration |
+| **Hello** | `hello` | Minimal example plugin — Hello World; reference for new plugin authors |
 
 ### Guides
 - **[Jenkins Authentication](docs/guides/jenkins-authentication.md)** — Auth modes (built-in / LDAP / AD), Vault sidecar, password rotation
