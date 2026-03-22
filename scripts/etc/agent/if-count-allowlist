@@ -7,13 +7,5 @@ scripts/plugins/jenkins.sh:_jenkins_run_smoke_test
 scripts/plugins/jenkins.sh:_deploy_jenkins
 scripts/plugins/jenkins.sh:deploy_jenkins
 
-
-
-scripts/plugins/vault.sh:_vault_replay_cached_unseal
-scripts/plugins/vault.sh:_vault_bootstrap_ha
-scripts/plugins/vault.sh:_vault_configure_secret_reader_role
-scripts/plugins/vault.sh:_vault_seed_ldap_service_accounts
-scripts/plugins/vault.sh:deploy_vault
-
 scripts/lib/system.sh:_run_command
 scripts/lib/system.sh:_ensure_node

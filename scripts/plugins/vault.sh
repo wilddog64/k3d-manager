@@ -379,24 +379,20 @@ function _vault_is_sealed() {
    fi
 }
 
-function _vault_replay_cached_unseal() {
-   local cluster_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
-   local cluster_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
-   local clear_after="${3:-0}"
-   case "${clear_after,,}" in
-      1|true|yes) clear_after=1 ;;
-      0|false|no|"") clear_after=0 ;;
-      *) clear_after=0 ;;
-   esac
-   local service="k3d-manager-vault-unseal"
-   local type="vault-unseal"
-   local cluster="${cluster_ns}/${cluster_release}"
-   local count cached_ok=1
-   local -a shards=()
-   local shard_count=0
+# _vault_load_cached_shards
+# Loads unseal shards from the k3d-manager-vault-unseal keychain service.
+# Sets global: _VAULT_CACHED_SHARDS (array) _VAULT_CACHED_COUNT
+# Args: $1=service $2=cluster $3=type
+function _vault_load_cached_shards() {
+   local service="$1" cluster="$2" type="$3"
+   _VAULT_CACHED_SHARDS=()
+   _VAULT_CACHED_COUNT=0
 
+   local count=""
    count=$(_secret_load_data "$service" "${cluster}:count" "$type" 2>/dev/null || true)
    count=${count%$'\r'}
+
+   local cached_ok=1
    if [[ "$count" =~ ^[0-9]+$ ]] && (( count > 0 )); then
       local idx
       for (( idx=1; idx<=count; idx++ )); do
@@ -407,116 +403,132 @@ function _vault_replay_cached_unseal() {
             cached_ok=0
             break
          fi
-         shards+=("$shard")
+         _VAULT_CACHED_SHARDS+=("$shard")
       done
-      if (( ! cached_ok )); then
-         shards=()
-      fi
+      (( ! cached_ok )) && _VAULT_CACHED_SHARDS=()
    else
       cached_ok=0
    fi
+   _VAULT_CACHED_COUNT="${#_VAULT_CACHED_SHARDS[@]}"
+}
 
-   if (( ${#shards[@]} == 0 )); then
+# _vault_clear_cached_shards
+# Clears unseal shards from the keychain service after a successful unseal.
+# Args: $1=service $2=cluster $3=type $4=shard_count
+function _vault_clear_cached_shards() {
+   local service="$1" cluster="$2" type="$3" shard_count="$4"
+   _secret_clear_data "$service" "${cluster}:count" "$type" >/dev/null 2>&1 || true
+   local j
+   for (( j=1; j<=shard_count; j++ )); do
+      _secret_clear_data "$service" "${cluster}:shard${j}" "$type" >/dev/null 2>&1 || true
+   done
+}
+
+function _vault_replay_cached_unseal() {
+   local cluster_ns="${1:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
+   local cluster_release="${2:-${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}}"
+   local clear_after="${3:-0}"
+   case "${clear_after,,}" in
+      1|true|yes) clear_after=1 ;;
+      *) clear_after=0 ;;
+   esac
+   local service="k3d-manager-vault-unseal"
+   local type="vault-unseal"
+   local cluster="${cluster_ns}/${cluster_release}"
+
+   _vault_load_cached_shards "$service" "$cluster" "$type"
+   local -a shards=("${_VAULT_CACHED_SHARDS[@]}")
+   local count="${_VAULT_CACHED_COUNT}"
+
+   (( ${#shards[@]} > 0 )) || {
       _warn "[vault] cached shards unavailable for ${cluster}; attempting vault-unseal secret"
-      if ! mapfile -t shards < <(_vault_collect_unseal_shards_from_secret "$cluster_ns"); then
+      mapfile -t shards < <(_vault_collect_unseal_shards_from_secret "$cluster_ns") || {
          _warn "[vault] unable to read shards from vault-unseal secret in ${cluster_ns}; manual unseal required"
          return 43
-      fi
-      if (( ${#shards[@]} == 0 )); then
+      }
+      (( ${#shards[@]} > 0 )) || {
          _warn "[vault] vault-unseal secret lacks shard data; manual unseal required"
          return 43
-      fi
+      }
       _vault_cache_unseal_keys "$cluster_ns" "$cluster_release" "${shards[@]}" >/dev/null 2>&1 || true
       count=${#shards[@]}
-      shard_count=$count
-   fi
+   }
 
    local pod="${cluster_release}-0"
-   if ! _kubectl --no-exit -n "$cluster_ns" get pod "$pod" >/dev/null 2>&1; then
+   _kubectl --no-exit -n "$cluster_ns" get pod "$pod" >/dev/null 2>&1 || {
       _warn "[vault] pod ${pod} not found in namespace ${cluster_ns}; skipping auto-unseal"
       return 1
-   fi
+   }
 
    local status_json=""
    status_json=$(_vault_exec --no-exit "$cluster_ns" "vault status -format=json" "$cluster_release" 2>/dev/null || true)
-   if [[ -z "$status_json" ]]; then
+   [[ -n "$status_json" ]] || {
       _warn "[vault] unable to query status for ${cluster}; skipping auto-unseal"
       return 1
-   fi
+   }
 
    local sealed=""
    sealed=$(printf '%s' "$status_json" | jq -r '.sealed // empty' 2>/dev/null || true)
-   if [[ "$sealed" == "false" ]]; then
+   [[ "$sealed" == "false" ]] && {
       _info "[vault] instance ${cluster} already unsealed"
       return 0
-   fi
+   }
 
    local threshold=""
    threshold=$(printf '%s' "$status_json" | jq -r '.t // empty' 2>/dev/null || true)
-   if [[ -n "$threshold" ]] && (( count < threshold )); then
-      _warn "[vault] only ${count} shard(s) cached, but cluster reports threshold ${threshold}"
-   fi
+   [[ -n "$threshold" ]] && (( count < threshold )) &&       _warn "[vault] only ${count} shard(s) cached, but cluster reports threshold ${threshold}"
 
    _info "[vault] applying ${count} cached unseal shard(s) to ${cluster}"
    local shard_count=$count
 
-   local shard="" unsealed=0 invalid_key=0
+   local shard unsealed=0 invalid_key=0
    for shard in "${shards[@]}"; do
-      local unseal_output=""
-      local unseal_rc=0
+      local unseal_output="" unseal_rc=0
       unseal_output=$(_no_trace _vault_exec_stream --no-exit --pod "$pod" "$cluster_ns" "$cluster_release" -- vault operator unseal "$shard" 2>&1) || unseal_rc=$?
-      if (( unseal_rc != 0 )); then
+      (( unseal_rc != 0 )) && {
          _warn "[vault] unseal command returned rc=${unseal_rc}; output:"
-         printf '%s\n' "$unseal_output" >&2
-      fi
+         printf '%s
+' "$unseal_output" >&2
+      }
 
-      if [[ "$unseal_output" == *"invalid key"* ]] || [[ "$unseal_output" == *"failed to decrypt keys from storage"* ]]; then
+      [[ "$unseal_output" == *"invalid key"* || "$unseal_output" == *"failed to decrypt keys from storage"* ]] && {
          invalid_key=1
          _warn "[vault] detected stale cached shard for ${cluster}; will regenerate"
-      fi
+      }
 
       status_json=$(_vault_exec --no-exit "$cluster_ns" "vault status -format=json" "$cluster_release" 2>/dev/null || true)
       sealed=$(_vault_parse_sealed_from_status "$status_json" 2>/dev/null || true)
 
-      if [[ "$sealed" == "false" ]]; then
+      [[ "$sealed" == "false" ]] && {
          unsealed=1
          _info "[vault] vault ${cluster} is now unsealed"
-         if (( clear_after == 1 )); then
-            _secret_clear_data "$service" "${cluster}:count" "$type" >/dev/null 2>&1 || true
-            local j
-            for (( j=1; j<=shard_count; j++ )); do
-               _secret_clear_data "$service" "${cluster}:shard${j}" "$type" >/dev/null 2>&1 || true
-            done
+         (( clear_after == 1 )) && {
+            _vault_clear_cached_shards "$service" "$cluster" "$type" "$shard_count"
             _info "[vault] cleared cached unseal shards for ${cluster}"
-         fi
+         }
          return 0
-      fi
+      }
       sleep 1
    done
 
-   if (( unsealed == 0 )); then
+   (( unsealed == 0 )) && {
       status_json=$(_vault_exec --no-exit "$cluster_ns" "vault status -format=json" "$cluster_release" 2>/dev/null || true)
       sealed=$(_vault_parse_sealed_from_status "$status_json" 2>/dev/null || true)
-   fi
-   if [[ "$sealed" == "false" ]]; then
+   }
+   [[ "$sealed" == "false" ]] && {
       _info "[vault] vault ${cluster} is now unsealed"
-      if (( clear_after == 1 )); then
-         _secret_clear_data "$service" "${cluster}:count" "$type" >/dev/null 2>&1 || true
-         local j
-         for (( j=1; j<=shard_count; j++ )); do
-            _secret_clear_data "$service" "${cluster}:shard${j}" "$type" >/dev/null 2>&1 || true
-         done
+      (( clear_after == 1 )) && {
+         _vault_clear_cached_shards "$service" "$cluster" "$type" "$shard_count"
          _info "[vault] cleared cached unseal shards for ${cluster}"
-      fi
+      }
       return 0
-   fi
+   }
 
    _warn "[vault] ${cluster} remains sealed after applying cached shards; manual intervention required"
-   if (( invalid_key )); then
-      return 42
-   fi
+   (( invalid_key )) && return 42
    return 1
 }
+
 function _mount_vault_immediate_sc() {
    local sc="${1:-local-path-immediate}"
 
@@ -804,6 +816,88 @@ YAML
    trap '$(_cleanup_trap_command "$f")' EXIT TERM
 }
 
+# _vault_parse_deploy_opts
+# Parses deploy_vault CLI args. Sets globals:
+#   _VAULT_DEPLOY_NS _VAULT_DEPLOY_RELEASE _VAULT_DEPLOY_VERSION
+#   _VAULT_DEPLOY_RE_UNSEAL _VAULT_DEPLOY_PLAN_MODE
+# Args: all original "$@" from deploy_vault (pass after the -h|--help and CLUSTER_ROLE guards)
+function _vault_parse_deploy_opts() {
+   _VAULT_DEPLOY_NS="${VAULT_NS:-$VAULT_NS_DEFAULT}"
+   _VAULT_DEPLOY_RELEASE="$VAULT_RELEASE_DEFAULT"
+   _VAULT_DEPLOY_VERSION="$VAULT_CHART_VERSION"
+   _VAULT_DEPLOY_RE_UNSEAL=0
+   _VAULT_DEPLOY_PLAN_MODE=0
+
+   local ns_set=0 release_set=0 version_set=0
+   local -a positional=()
+
+   while [[ $# -gt 0 ]]; do
+      case "$1" in
+         --namespace)
+            [[ -z "${2:-}" ]] && _err "[vault] --namespace flag requires an argument"
+            _VAULT_DEPLOY_NS="$2"; ns_set=1; shift 2; continue ;;
+         --namespace=*)
+            _VAULT_DEPLOY_NS="${1#*=}"
+            [[ -z "$_VAULT_DEPLOY_NS" ]] && _err "[vault] --namespace flag requires a non-empty argument"
+            ns_set=1; shift; continue ;;
+         --release)
+            [[ -z "${2:-}" ]] && _err "[vault] --release flag requires an argument"
+            _VAULT_DEPLOY_RELEASE="$2"; release_set=1; shift 2; continue ;;
+         --release=*)
+            _VAULT_DEPLOY_RELEASE="${1#*=}"
+            [[ -z "$_VAULT_DEPLOY_RELEASE" ]] && _err "[vault] --release flag requires a non-empty argument"
+            release_set=1; shift; continue ;;
+         --chart-version)
+            [[ -z "${2:-}" ]] && _err "[vault] --chart-version flag requires an argument"
+            _VAULT_DEPLOY_VERSION="$2"; version_set=1; shift 2; continue ;;
+         --chart-version=*)
+            _VAULT_DEPLOY_VERSION="${1#*=}"
+            [[ -z "$_VAULT_DEPLOY_VERSION" ]] && _err "[vault] --chart-version flag requires a non-empty argument"
+            version_set=1; shift; continue ;;
+         --plan)  _VAULT_DEPLOY_PLAN_MODE=1; shift; continue ;;
+         --re-unseal)  _VAULT_DEPLOY_RE_UNSEAL=1; shift; continue ;;
+         --re-unseal=*)
+            case "${1#*=}" in
+               1|true|yes|TRUE|YES) _VAULT_DEPLOY_RE_UNSEAL=1 ;;
+               0|false|no|FALSE|NO|"") _VAULT_DEPLOY_RE_UNSEAL=0 ;;
+               *) _err "[vault] --re-unseal expects yes/no" ;;
+            esac
+            shift; continue ;;
+         --) shift; while [[ $# -gt 0 ]]; do positional+=("$1"); shift; done; break ;;
+         -*) _err "[vault] unknown option: $1" ;;
+         *) positional+=("$1"); shift; continue ;;
+      esac
+   done
+
+   local mode="" idx=0
+   local positional_count="${#positional[@]}"
+   if (( positional_count > 0 )); then
+      case "${positional[0]}" in
+         ha) mode="ha"; idx=1 ;;
+         dev) _err "[vault] dev mode is no longer supported; Vault deploys in HA by default" ;;
+      esac
+   fi
+
+   for (( ; idx < positional_count; idx++ )); do
+      local value="${positional[idx]}"
+      (( ns_set == 0 )) && { _VAULT_DEPLOY_NS="$value"; ns_set=1; continue; }
+      (( release_set == 0 )) && { _VAULT_DEPLOY_RELEASE="$value"; release_set=1; continue; }
+      (( version_set == 0 )) && { _VAULT_DEPLOY_VERSION="$value"; version_set=1; continue; }
+      _err "[vault] too many positional arguments"
+   done
+
+   _VAULT_DEPLOY_MODE="$mode"
+}
+
+# _vault_source_optional_vars
+# Sources the optional Vault vars file if present, warns otherwise.
+function _vault_source_optional_vars() {
+   VAULT_VARS="$SCRIPT_DIR/etc/vault/vars.sh"
+   [[ -f "$VAULT_VARS" ]] || { _warn "[vault] missing optional config file: $VAULT_VARS"; return 0; }
+   # shellcheck disable=SC1090
+   source "$VAULT_VARS"
+}
+
 function deploy_vault() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
       cat <<EOF
@@ -826,151 +920,15 @@ EOF
       return 0
    fi
 
-   VAULT_VARS="$SCRIPT_DIR/etc/vault/vars.sh"
-   if [[ -f "$VAULT_VARS" ]]; then
-      # shellcheck disable=SC1090
-      source "$VAULT_VARS"
-   else
-      _warn "[vault] missing optional config file: $VAULT_VARS"
-   fi
+   _vault_source_optional_vars
 
-   local re_unseal=0
-   local plan_mode=0
-   local ns="${VAULT_NS:-$VAULT_NS_DEFAULT}"
-   local release="$VAULT_RELEASE_DEFAULT"
-   local version="$VAULT_CHART_VERSION"
-   local ns_set=0 release_set=0 version_set=0
-   local -a positional=()
-
-   while [[ $# -gt 0 ]]; do
-      case "$1" in
-         --namespace)
-            if [[ -z "${2:-}" ]]; then
-               _err "[vault] --namespace flag requires an argument"
-            fi
-            ns="$2"
-            ns_set=1
-            shift 2
-            continue
-            ;;
-         --namespace=*)
-            ns="${1#*=}"
-            if [[ -z "$ns" ]]; then
-               _err "[vault] --namespace flag requires a non-empty argument"
-            fi
-            ns_set=1
-            shift
-            continue
-            ;;
-         --release)
-            if [[ -z "${2:-}" ]]; then
-               _err "[vault] --release flag requires an argument"
-            fi
-            release="$2"
-            release_set=1
-            shift 2
-            continue
-            ;;
-         --release=*)
-            release="${1#*=}"
-            if [[ -z "$release" ]]; then
-               _err "[vault] --release flag requires a non-empty argument"
-            fi
-            release_set=1
-            shift
-            continue
-            ;;
-         --chart-version)
-            if [[ -z "${2:-}" ]]; then
-               _err "[vault] --chart-version flag requires an argument"
-            fi
-            version="$2"
-            version_set=1
-            shift 2
-            continue
-            ;;
-         --chart-version=*)
-            version="${1#*=}"
-            if [[ -z "$version" ]]; then
-               _err "[vault] --chart-version flag requires a non-empty argument"
-            fi
-            version_set=1
-            shift
-            continue
-            ;;
-         --plan)
-            plan_mode=1
-            shift
-            continue
-            ;;
-         --re-unseal)
-            re_unseal=1
-            shift
-            continue
-            ;;
-         --re-unseal=*)
-            case "${1#*=}" in
-               1|true|yes|TRUE|YES) re_unseal=1 ;;
-               0|false|no|FALSE|NO|"") re_unseal=0 ;;
-               *) _err "[vault] --re-unseal expects yes/no" ;;
-            esac
-            shift
-            continue
-            ;;
-         --)
-            shift
-            while [[ $# -gt 0 ]]; do
-               positional+=("$1")
-               shift
-            done
-            break
-            ;;
-         -*)
-            _err "[vault] unknown option: $1"
-            ;;
-         *)
-            positional+=("$1")
-            shift
-            continue
-            ;;
-      esac
-   done
-
-   local mode=""
-   local positional_count="${#positional[@]}"
-   local idx=0
-
-   if (( positional_count > 0 )); then
-      case "${positional[0]}" in
-         ha)
-            mode="ha"
-            idx=1
-            ;;
-         dev)
-            _err "[vault] dev mode is no longer supported; Vault deploys in HA by default"
-            ;;
-      esac
-   fi
-
-   for (( ; idx < positional_count; idx++ )); do
-      local value="${positional[idx]}"
-      if (( ns_set == 0 )); then
-         ns="$value"
-         ns_set=1
-         continue
-      fi
-      if (( release_set == 0 )); then
-         release="$value"
-         release_set=1
-         continue
-      fi
-      if (( version_set == 0 )); then
-         version="$value"
-         version_set=1
-         continue
-      fi
-      _err "[vault] too many positional arguments"
-   done
+   _vault_parse_deploy_opts "$@"
+   local ns="$_VAULT_DEPLOY_NS"
+   local release="$_VAULT_DEPLOY_RELEASE"
+   local version="$_VAULT_DEPLOY_VERSION"
+   local re_unseal="$_VAULT_DEPLOY_RE_UNSEAL"
+   local plan_mode="$_VAULT_DEPLOY_PLAN_MODE"
+   local mode="$_VAULT_DEPLOY_MODE"
 
    if (( plan_mode )) && [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
       _err "[vault] --plan cannot be combined with --dry-run"
@@ -994,12 +952,9 @@ EOF
    fi
 
    deploy_eso
-
    _vault_ns_ensure "$ns"
    _vault_repo_setup
-
    _deploy_vault_ha "$ns" "$release" "$version"
-
    _vault_bootstrap_ha "$ns" "$release"
    _enable_kv2_k8s_auth "$ns" "$release"
    _vault_seed_ldap_service_accounts "$ns" "$release"
@@ -1029,96 +984,82 @@ function _is_vault_deployed() {
    _helm --no-exit -n "$ns" status "$release" >/dev/null 2>&1
 }
 
+# _vault_reinit_from_reset
+# Purges unseal cache, resets data path, restarts pod, re-initializes Vault.
+# Args: $1=ns $2=release
+function _vault_reinit_from_reset() {
+   local ns="$1" release="$2"
+   _vault_purge_unseal_cache "$ns" "$release"
+   if ! _vault_reset_data_path "$ns" "$release"; then
+      _warn "[vault] failed to reset data directory; manual intervention required"
+      return 1
+   fi
+   _vault_restart_pod "$ns" "$release"
+   local jsonfile=""
+   jsonfile=$(_vault_operator_init "$ns" "$release")
+   if [[ -z "$jsonfile" || ! -f "$jsonfile" ]]; then
+      _cleanup_on_success "$jsonfile"
+      _err "[vault] operator init did not produce artifacts"
+   fi
+   trap '$(_cleanup_trap_command "$jsonfile")' EXIT TERM
+   _vault_process_init_artifacts "$ns" "$release" "$jsonfile"
+   trap - EXIT TERM
+   _vault_clear_init_json "$jsonfile"
+   _info "[vault] vault data directory reset and cluster re-initialized"
+}
+
 function _vault_bootstrap_ha() {
   local ns="${1:-$VAULT_NS_DEFAULT}" release="${2:-$VAULT_RELEASE_DEFAULT}"
-  local leader="${release}-0"
   if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
      _info "[vault] dry-run requested; skipping bootstrap phase for ${ns}/${release}"
      return 0
   fi
   _info "[vault] bootstrap sequence starting for ${ns}/${release}"
-  if ! _is_vault_deployed "$ns" "$release"; then
-      _err "[vault] not deployed in ns=$ns release=$release" >&2
-  fi
+  _is_vault_deployed "$ns" "$release" || _err "[vault] not deployed in ns=$ns release=$release" >&2
 
-  local status_output=""
-  local sealed_state=""
-  local init_state=""
-  local jsonfile=""
-
+  local status_output sealed_state init_state
   status_output=$(_vault_exec --no-exit "$ns" "vault status -format=json 2>/dev/null || vault status 2>&1 || true" "$release")
   sealed_state=$(_vault_parse_sealed_from_status "$status_output" 2>/dev/null || true)
   init_state=$(printf '%s' "$status_output" | jq -r '.initialized // empty' 2>/dev/null || true)
 
   local root_secret_present=0
-  if _kubectl --no-exit -n "$ns" get secret vault-root >/dev/null 2>&1; then
-     root_secret_present=1
+  _kubectl --no-exit -n "$ns" get secret vault-root >/dev/null 2>&1 && root_secret_present=1
+
+  if [[ "${init_state,,}" == "true" ]]; then
+     if [[ "${sealed_state,,}" == "true" ]]; then
+        _vault_cache_unseal_from_secret "$ns" "$release" >/dev/null 2>&1 || true
+        local replay_rc
+        _vault_replay_cached_unseal "$ns" "$release" 1
+        replay_rc=$?
+        _info "[vault] cached unseal replay exit=${replay_rc}"
+        if (( replay_rc == 0 )); then
+           _vault_login "$ns" "$release"
+           _info "[vault] already initialized; applied cached unseal shards"
+           return 0
+        fi
+        if (( replay_rc == 42 )); then
+           _warn "[vault] cached unseal shards rejected; resetting data directory and re-initializing"
+        elif (( replay_rc == 43 )); then
+           _warn "[vault] cached unseal shards missing; resetting data directory and re-initializing"
+        fi
+        if (( replay_rc == 42 || replay_rc == 43 )); then
+           _vault_reinit_from_reset "$ns" "$release" || return 1
+           return 0
+        fi
+        _warn "[vault] already initialized (sealed) but automatic unseal failed; manual intervention required"
+        return 1
+     fi
+     if (( !root_secret_present )); then
+        _warn "[vault] root token secret missing; resetting data directory and re-initializing"
+        _vault_reinit_from_reset "$ns" "$release" || return 1
+        return 0
+     fi
+     _vault_login "$ns" "$release"
+     _info "[vault] already initialized and unsealed"
+     return 0
   fi
 
-   if [[ "${init_state,,}" == "true" ]]; then
-      if [[ "${sealed_state,,}" == "true" ]]; then
-         _vault_cache_unseal_from_secret "$ns" "$release" >/dev/null 2>&1 || true
-         local replay_rc
-         _vault_replay_cached_unseal "$ns" "$release" 1
-         replay_rc=$?
-         _info "[vault] cached unseal replay exit=${replay_rc}"
-         if (( replay_rc == 0 )); then
-            _vault_login "$ns" "$release"
-            _info "[vault] already initialized; applied cached unseal shards"
-            return 0
-         fi
-         if (( replay_rc == 42 || replay_rc == 43 )); then
-            if (( replay_rc == 42 )); then
-               _warn "[vault] cached unseal shards rejected; resetting data directory and re-initializing"
-            else
-               _warn "[vault] cached unseal shards missing; resetting data directory and re-initializing"
-            fi
-            _vault_purge_unseal_cache "$ns" "$release"
-            if ! _vault_reset_data_path "$ns" "$release"; then
-               _warn "[vault] failed to reset data directory; manual intervention required"
-               return 1
-            fi
-            _vault_restart_pod "$ns" "$release"
-            jsonfile=$(_vault_operator_init "$ns" "$release")
-            if [[ -z "$jsonfile" || ! -f "$jsonfile" ]]; then
-               _cleanup_on_success "$jsonfile"
-               _err "[vault] operator init did not produce artifacts"
-            fi
-            trap '$(_cleanup_trap_command "$jsonfile")' EXIT TERM
-            _vault_process_init_artifacts "$ns" "$release" "$jsonfile"
-            trap - EXIT TERM
-            _vault_clear_init_json "$jsonfile"
-            _info "[vault] vault data directory reset and cluster re-initialized"
-            return 0
-         fi
-         _warn "[vault] already initialized (sealed) but automatic unseal failed; manual intervention required"
-         return 1
-      fi
-      if (( !root_secret_present )); then
-         _warn "[vault] root token secret missing; resetting data directory and re-initializing"
-         _vault_purge_unseal_cache "$ns" "$release"
-         if ! _vault_reset_data_path "$ns" "$release"; then
-            _warn "[vault] failed to reset data directory; manual intervention required"
-            return 1
-         fi
-         _vault_restart_pod "$ns" "$release"
-         jsonfile=$(_vault_operator_init "$ns" "$release")
-         if [[ -z "$jsonfile" || ! -f "$jsonfile" ]]; then
-            _cleanup_on_success "$jsonfile"
-            _err "[vault] operator init did not produce artifacts"
-         fi
-         trap '$(_cleanup_trap_command "$jsonfile")' EXIT TERM
-         _vault_process_init_artifacts "$ns" "$release" "$jsonfile"
-         trap - EXIT TERM
-         _vault_clear_init_json "$jsonfile"
-         _info "[vault] vault data directory reset and cluster re-initialized"
-         return 0
-      fi
-      _vault_login "$ns" "$release"
-      _info "[vault] already initialized and unsealed"
-      return 0
-   fi
-
+  local jsonfile=""
   jsonfile=$(_vault_operator_init "$ns" "$release")
   if [[ -z "$jsonfile" || ! -f "$jsonfile" ]]; then
      _cleanup_on_success "$jsonfile"
@@ -1548,6 +1489,62 @@ HCL
       ttl=15m
 }
 
+# _vault_build_policy_hcl
+# Builds a Vault policy HCL string granting read on a list of secret prefixes.
+# Sets global: _VAULT_POLICY_HCL
+# Args: $1=mount_path, remaining args=prefix list
+function _vault_build_policy_hcl() {
+   local mount_path="$1"; shift
+   local -a secret_prefixes=("$@")
+
+   _VAULT_POLICY_HCL=""
+   local prefixes_added=0
+   local -a metadata_paths=()
+
+   local prefix
+   for prefix in "${secret_prefixes[@]}"; do
+      local prefix_trimmed="${prefix#/}"
+      prefix_trimmed="${prefix_trimmed%/}"
+      [[ -z "$prefix_trimmed" ]] && continue
+
+      local data_block
+      printf -v data_block '%s\n%s\n%s\n%s' \
+        "path \"${mount_path}/data/${prefix_trimmed}\"       { capabilities = [\"read\"] }" \
+        "path \"${mount_path}/data/${prefix_trimmed}/*\"     { capabilities = [\"read\"] }" \
+        "path \"${mount_path}/metadata/${prefix_trimmed}\"   { capabilities = [\"read\", \"list\"] }" \
+        "path \"${mount_path}/metadata/${prefix_trimmed}/*\" { capabilities = [\"read\", \"list\"] }"
+
+      (( prefixes_added )) && _VAULT_POLICY_HCL+=$'\n'
+      _VAULT_POLICY_HCL+="$data_block"
+      prefixes_added=1
+
+      local parent_prefix="${prefix_trimmed%/*}"
+      while [[ -n "$parent_prefix" && "$parent_prefix" != "$prefix_trimmed" ]]; do
+         local skip_parent=0
+         local seen_prefix
+         for seen_prefix in "${metadata_paths[@]}"; do
+            [[ "$seen_prefix" == "$parent_prefix" ]] && { skip_parent=1; break; }
+         done
+         if (( ! skip_parent )); then
+            metadata_paths+=("$parent_prefix")
+            _VAULT_POLICY_HCL+=$'\n'
+            local metadata_block
+            printf -v metadata_block '%s\n%s' \
+              "path \"${mount_path}/metadata/${parent_prefix}\"   { capabilities = [\"read\", \"list\"] }" \
+              "path \"${mount_path}/metadata/${parent_prefix}/*\" { capabilities = [\"read\", \"list\"] }"
+            _VAULT_POLICY_HCL+="$metadata_block"
+         fi
+         local next_parent="${parent_prefix%/*}"
+         [[ "$next_parent" == "$parent_prefix" ]] && break
+         parent_prefix="$next_parent"
+      done
+   done
+
+   if (( ! prefixes_added )); then
+      _err "[vault] secret prefix required for role configuration"
+   fi
+}
+
 function _vault_configure_secret_reader_role() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
@@ -1576,108 +1573,66 @@ function _vault_configure_secret_reader_role() {
   local mount_json=""
   mount_json=$(_vault_exec --no-exit "$ns" "vault secrets list -format=json" "$release" 2>/dev/null || true)
   if [[ -z "$mount_json" ]] || ! printf '%s' "$mount_json" | jq -e --arg PATH "${mount_path}/" 'has($PATH)' >/dev/null 2>&1; then
-     _vault_exec "$ns" "vault secrets enable -path=${mount_path} kv-v2" "$release" || \
-        _err "[vault] failed to enable kv engine at ${mount_path}"
+     _vault_exec "$ns" "vault secrets enable -path=${mount_path} kv-v2" "$release" ||         _err "[vault] failed to enable kv engine at ${mount_path}"
   fi
 
   local auth_json=""
   auth_json=$(_vault_exec --no-exit "$ns" "vault auth list -format=json" "$release" 2>/dev/null || true)
   if [[ -z "$auth_json" ]] || ! printf '%s' "$auth_json" | jq -e --arg PATH "kubernetes/" 'has($PATH)' >/dev/null 2>&1; then
-     _vault_exec "$ns" "vault auth enable kubernetes" "$release" || \
-        _err "[vault] failed to enable kubernetes auth method"
+     _vault_exec "$ns" "vault auth enable kubernetes" "$release" ||         _err "[vault] failed to enable kubernetes auth method"
   fi
 
   cat <<'SH' | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- sh -
 set -e
-vault write auth/kubernetes/config \
-  token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
-  kubernetes_host="https://kubernetes.default.svc:443" \
-  kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+vault write auth/kubernetes/config   token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"   kubernetes_host="https://kubernetes.default.svc:443"   kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 SH
 
-  _kubectl create clusterrolebinding vault-auth-delegator \
-    --clusterrole=system:auth-delegator \
-    --serviceaccount="${ns}:${release}" \
-    --dry-run=client -o yaml | _kubectl apply -f -
+  _kubectl create clusterrolebinding vault-auth-delegator     --clusterrole=system:auth-delegator     --serviceaccount="${ns}:${release}"     --dry-run=client -o yaml | _kubectl apply -f -
 
-  local policy_hcl=""
-  local prefixes_added=0
-  local -a metadata_paths=()
+  _vault_build_policy_hcl "$mount_path" "${secret_prefixes[@]}"
+  local policy_hcl="$_VAULT_POLICY_HCL"
 
-  local prefix
-  for prefix in "${secret_prefixes[@]}"; do
-    local prefix_trimmed="${prefix#/}"
-    prefix_trimmed="${prefix_trimmed%/}"
-
-    if [[ -z "$prefix_trimmed" ]]; then
-      continue
-    fi
-
-    local data_block
-    printf -v data_block '%s\n%s\n%s\n%s' \
-      "path \"${mount_path}/data/${prefix_trimmed}\"       { capabilities = [\"read\"] }" \
-      "path \"${mount_path}/data/${prefix_trimmed}/*\"     { capabilities = [\"read\"] }" \
-      "path \"${mount_path}/metadata/${prefix_trimmed}\"   { capabilities = [\"read\", \"list\"] }" \
-      "path \"${mount_path}/metadata/${prefix_trimmed}/*\" { capabilities = [\"read\", \"list\"] }"
-
-    if (( prefixes_added )); then
-      policy_hcl+=$'\n'
-    fi
-    policy_hcl+="$data_block"
-    prefixes_added=1
-
-    local parent_prefix="${prefix_trimmed%/*}"
-    while [[ -n "$parent_prefix" && "$parent_prefix" != "$prefix_trimmed" ]]; do
-      local skip_parent=0
-      local seen_prefix
-      for seen_prefix in "${metadata_paths[@]}"; do
-        if [[ "$seen_prefix" == "$parent_prefix" ]]; then
-          skip_parent=1
-          break
-        fi
-      done
-
-      if (( ! skip_parent )); then
-        metadata_paths+=("$parent_prefix")
-        policy_hcl+=$'\n'
-        local metadata_block
-        printf -v metadata_block '%s\n%s' \
-          "path \"${mount_path}/metadata/${parent_prefix}\"   { capabilities = [\"read\", \"list\"] }" \
-          "path \"${mount_path}/metadata/${parent_prefix}/*\" { capabilities = [\"read\", \"list\"] }"
-        policy_hcl+="$metadata_block"
-      fi
-
-      local next_parent="${parent_prefix%/*}"
-      if [[ "$next_parent" == "$parent_prefix" ]]; then
-        break
-      fi
-      parent_prefix="$next_parent"
-    done
-  done
-
-  if (( ! prefixes_added )); then
-     _err "[vault] secret prefix required for role configuration"
-  fi
-
-  if ! printf '%s\n' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
-    vault policy write "${policy}" -; then
+  if ! printf '%s
+' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" --     vault policy write "${policy}" -; then
      _err "[vault] failed to apply policy ${policy}"
   fi
 
   local token_audience="${K8S_TOKEN_AUDIENCE:-https://kubernetes.default.svc.cluster.local}"
-  local role_cmd=""
   local bound_namespaces="$service_namespace"
-
   if [[ -n "$role_namespaces_override" ]]; then
      bound_namespaces="$role_namespaces_override"
   elif [[ "$role" == "eso-ldap-directory" && "$service_namespace" != "identity" ]]; then
      bound_namespaces="${service_namespace},identity"
   fi
 
-  printf -v role_cmd 'vault write "auth/kubernetes/role/%s" bound_service_account_names="%s" bound_service_account_namespaces="%s" policies="%s" ttl=1h token_audiences="%s"' \
-     "$role" "$service_account" "$bound_namespaces" "$policy" "$token_audience"
+  local role_cmd=""
+  printf -v role_cmd 'vault write "auth/kubernetes/role/%s" bound_service_account_names="%s" bound_service_account_namespaces="%s" policies="%s" ttl=1h token_audiences="%s"'      "$role" "$service_account" "$bound_namespaces" "$policy" "$token_audience"
 
   _vault_exec "$ns" "$role_cmd" "$release"
+}
+
+# _vault_build_parent_metadata_policy
+# Appends parent-path metadata policy blocks to an existing policy HCL string.
+# Sets global: _VAULT_PARENT_POLICY_HCL (appended)
+# Args: $1=mount_trim $2=secret_trim $3=metadata_path (to skip if already present)
+function _vault_build_parent_metadata_policy() {
+   local mount_trim="$1" secret_trim="$2" metadata_path="$3"
+
+   local parent="${secret_trim%/*}"
+   while [[ -n "$parent" && "$parent" != "$secret_trim" ]]; do
+      local parent_metadata="${mount_trim}/metadata/${parent}"
+      if [[ "$parent_metadata" != "$metadata_path" ]]; then
+         _VAULT_PARENT_POLICY_HCL+=$'\n'
+         _VAULT_PARENT_POLICY_HCL+=$(cat <<EOF
+path "${parent_metadata}" {
+  capabilities = ["read", "list"]
+}
+EOF
+)
+      fi
+      [[ "$parent" == "${parent%/*}" ]] && break
+      parent="${parent%/*}"
+   done
 }
 
 function _vault_seed_ldap_service_accounts() {
@@ -1696,17 +1651,9 @@ function _vault_seed_ldap_service_accounts() {
    local secret_trim="${secret_path#/}"
    secret_trim="${secret_trim%/}"
 
-   if [[ -z "$mount_trim" ]]; then
-      _err "[vault] KV mount required for LDAP service account seed"
-   fi
-
-   if [[ -z "$secret_trim" ]]; then
-      _err "[vault] LDAP service account path required"
-   fi
-
-   if [[ -z "$policy" ]]; then
-      _err "[vault] LDAP service account policy name required"
-   fi
+   [[ -z "$mount_trim" ]] && _err "[vault] KV mount required for LDAP service account seed"
+   [[ -z "$secret_trim" ]] && _err "[vault] LDAP service account path required"
+   [[ -z "$policy" ]] && _err "[vault] LDAP service account policy name required"
 
    local full_path="${mount_trim}/${secret_trim}"
    local pod="${release}-0"
@@ -1717,24 +1664,18 @@ function _vault_seed_ldap_service_accounts() {
    printf -v check_cmd 'vault kv get -format=json %q >/dev/null 2>&1' "$full_path"
 
    local secret_exists=0
-   if _vault_exec --no-exit "$ns" "$check_cmd" "$release" >/dev/null 2>&1; then
-      secret_exists=1
-   fi
+   _vault_exec --no-exit "$ns" "$check_cmd" "$release" >/dev/null 2>&1 && secret_exists=1
 
    if (( !secret_exists )); then
       local password=""
       password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"' 2>/dev/null || true)
-      if [[ -z "$password" ]]; then
-         _err "[vault] failed to generate password for ${full_path}"
-      fi
+      [[ -z "$password" ]] && _err "[vault] failed to generate password for ${full_path}"
 
       local write_cmd=""
       if [[ -n "$description" ]]; then
-         printf -v write_cmd 'vault kv put %q %s=%q %s=%q %s=%q description=%q' \
-            "$full_path" "$username_key" "$username" "$password_key" "$password" "$group_key" "$group_cn" "$description"
+         printf -v write_cmd 'vault kv put %q %s=%q %s=%q %s=%q description=%q'             "$full_path" "$username_key" "$username" "$password_key" "$password" "$group_key" "$group_cn" "$description"
       else
-         printf -v write_cmd 'vault kv put %q %s=%q %s=%q %s=%q' \
-            "$full_path" "$username_key" "$username" "$password_key" "$password" "$group_key" "$group_cn"
+         printf -v write_cmd 'vault kv put %q %s=%q %s=%q %s=%q'             "$full_path" "$username_key" "$username" "$password_key" "$password" "$group_key" "$group_cn"
       fi
 
       if ! _no_trace _vault_exec "$ns" "$write_cmd" "$release"; then
@@ -1748,7 +1689,6 @@ function _vault_seed_ldap_service_accounts() {
    local data_path="${mount_trim}/data/${secret_trim}"
    local metadata_path="${mount_trim}/metadata/${secret_trim}"
    local policy_hcl
-
    policy_hcl=$(cat <<EOF
 path "${data_path}" {
   capabilities = ["read"]
@@ -1759,25 +1699,12 @@ path "${metadata_path}" {
 EOF
 )
 
-   local parent="${secret_trim%/*}"
-   while [[ -n "$parent" && "$parent" != "$secret_trim" ]]; do
-      local parent_metadata="${mount_trim}/metadata/${parent}"
-      if [[ "$parent_metadata" != "$metadata_path" ]]; then
-         policy_hcl+=$'\n'
-         policy_hcl+=$(cat <<EOF
-path "${parent_metadata}" {
-  capabilities = ["read", "list"]
-}
-EOF
-)
-      fi
-      if [[ "$parent" == "${parent%/*}" ]]; then
-         break
-      fi
-      parent="${parent%/*}"
-   done
+   _VAULT_PARENT_POLICY_HCL=""
+   _vault_build_parent_metadata_policy "$mount_trim" "$secret_trim" "$metadata_path"
+   policy_hcl+="$_VAULT_PARENT_POLICY_HCL"
 
-   if ! printf '%s\n' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- vault policy write "$policy" -; then
+   if ! printf '%s
+' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- vault policy write "$policy" -; then
       _err "[vault] failed to write policy ${policy}"
    fi
    _info "[vault] ensured policy ${policy} for ${data_path}"
