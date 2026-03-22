@@ -16,6 +16,19 @@
 - **`scripts/lib/help/utils.sh`**: Added `ACG sandbox` category (`acg_*`) to the help system.
 - **`docs/plans/roadmap-v1.md`**: Reframed vision as kops-for-k3s — dropped EKS/GKE/AKS scope; revised v1.x milestones to focus on k3s multi-node, full-stack provisioning, k3dm-mcp, and home lab.
 
+### Fixed (Copilot review — commit `7987453`)
+- **`_acg_check_credentials`**: replaced `_err` (calls `exit 1`) with `printf >&2; return 1` — callers using `|| return 1` now work correctly.
+- **`_acg_get_instance_id` / `_acg_get_instance_attr`**: added `--soft` to `_run_command` so `|| true` fallback is reachable.
+- **`_acg_update_ssh_config`**: replaced `read -r -d ''` heredoc (returns non-zero at EOF) with `$(cat <<PY)`. Fixed `\\1${ip}` backreference to `\\g<1>${ip}` to prevent group-11 ambiguity.
+- **`_acg_check_k3s`**: added `--soft` so ssh failure is handled as a warning (else branch no longer unreachable).
+- **VPC/SG idempotency**: added `_acg_find_vpc()` and `_acg_find_sg()` — provision stack reuses existing VPC and SG by tag instead of always creating new ones.
+- **Security**: added `ACG_ALLOWED_CIDR` env var (default `0.0.0.0/0` with warning). Set to `<your-ip>/32` to restrict SSH/6443 ingress.
+- **`scripts/tests/plugins/acg.bats`**: added `source test_helpers.bash` to align with `tunnel.bats` pattern.
+
+### Documentation
+- **`README.md`**: added ACG sandbox Quick Start section; renumbered steps; added ACG Plugin link under API Reference.
+- **`docs/api/functions.md`**: added `tunnel_start/stop/status`, `deploy_app_cluster`, and all four ACG functions to the Plugins table.
+
 ---
 
 ## [Unreleased] v0.9.5 — deploy_app_cluster via k3sup
