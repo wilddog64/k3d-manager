@@ -2,6 +2,17 @@
 
 ## [Unreleased] v0.9.8
 
+### Fixed
+- **`scripts/plugins/jenkins.sh`**: Extracted `_jenkins_format_pull_failure_details()` helper from `_jenkins_warn_on_cert_rotator_pull_failure` — reduces if-count from 9 to 5; removes function from if-count allowlist (`9a4f795`).
+- **`scripts/etc/agent/if-count-allowlist`**: Removed `indent` (awk function inside here-doc — scanner false positive) and `_jenkins_warn_on_cert_rotator_pull_failure` (refactored above) (`9a4f795`).
+
+### Added
+- **`scripts/tests/lib/dry_run.bats`**: 5 BATS tests covering `--dry-run` / `K3DM_DEPLOY_DRY_RUN` — plain, `--prefer-sudo`, `--require-sudo`, and normal-mode cases (`f1b4ca7`).
+- **`docs/issues/2026-03-22-if-count-allowlist-deferred.md`**: Tracks 18 remaining allowlisted functions (jenkins x4, ldap x7, vault x5, system x2) deferred to v0.9.9+ with per-function if-counts and decomposition notes (`9a4f795`).
+
+### Changed
+- **`README.md`**: Safety Gates section — added note that `--dry-run` / `-n` sets `K3DM_DEPLOY_DRY_RUN=1`; can be set in environment to dry-run full sessions (`f1b4ca7`).
+
 ---
 
 ## [v0.9.7] — 2026-03-22 — lib sync + code quality + tooling polish
