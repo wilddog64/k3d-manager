@@ -731,8 +731,13 @@ EOF
    fi
 
    if [[ ${#positional[@]} -eq 0 && -z "${provider_cli}" && "${force_k3s}" -eq 0 ]]; then
-      cat <<'EOF'
-deploy_cluster: no arguments given — run with -h for usage.
+      cat >&2 <<'EOF'
+Usage: deploy_cluster [options] [cluster_name]
+
+Options:
+  -f, --force-k3s     Skip the provider prompt and deploy using k3s.
+  --provider <name>   Explicitly set the provider (k3d or k3s).
+  -h, --help          Show this help message.
 EOF
       return 1
    fi

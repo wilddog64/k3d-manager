@@ -114,7 +114,7 @@ _agent_audit() {
             elif [[ $line =~ ^[[:space:]]*if[[:space:]\(] ]]; then
                ((++if_count))
             fi
-         done < <(git show :"$file" 2>/dev/null || true)
+         done < <(git show :"$file" 2>/dev/null || cat "$file" 2>/dev/null || true)
 
          if [[ -n "$current_func" && $if_count -gt $max_if ]]; then
             local allow_key="${file}:${current_func}"
