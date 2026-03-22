@@ -130,6 +130,12 @@ function _jenkins_require_hostpath_mounts() {
 }
 
 declare -a _JENKINS_RENDERED_MANIFESTS=()
+declare -a _JENKINS_DEDUP_TRAP_ARGS=()
+declare -a _JENKINS_SMOKE_CMD=()
+declare -a _JENKINS_SMOKE_ENV=()
+declare _JENKINS_TEMPLATE_FILE=""
+declare _JENKINS_AUTH_MODE=""
+declare _JENKINS_VAULT_PREFIX_ARG=""
 _JENKINS_PREV_EXIT_TRAP_CMD=""
 _JENKINS_PREV_EXIT_TRAP_HANDLER=""
 _JENKINS_PREV_RETURN_TRAP_CMD=""
@@ -291,6 +297,77 @@ function _jenkins_capture_trap_state() {
    printf -v "$handler_var" '%s' "$handler"
 }
 
+# _jenkins_deduplicate_trap_tokens
+# Deduplicates trap args relative to saved handler tokens.
+# Sets global: _JENKINS_DEDUP_TRAP_ARGS
+function _jenkins_deduplicate_trap_tokens() {
+   local handler_var="$1"
+   shift || true
+   local -a trap_args=("$@")
+   local -a saved_tokens=()
+
+   [[ -n "${!handler_var:-}" ]] && eval "saved_tokens=( ${!handler_var} )"
+
+   local skip_count=0
+   (( ${#saved_tokens[@]} > 1 )) && skip_count=$(( ${#saved_tokens[@]} - 1 ))
+
+   if (( skip_count > 0 )); then
+      trap_args=("${trap_args[@]:${skip_count}}")
+   else
+      while (( ${#trap_args[@]} )); do
+         case "${trap_args[0]}" in
+            EXIT|RETURN|TERM|INT|HUP|_JENKINS_PREV_*)
+               trap_args=("${trap_args[@]:1}")
+               ;;
+            *)
+               break
+               ;;
+         esac
+      done
+
+      if (( ${#trap_args[@]} )); then
+         local -a filtered=()
+         local token discard=1
+         for token in "${trap_args[@]}"; do
+            case "$token" in
+               EXIT|RETURN|TERM|INT|HUP|_JENKINS_PREV_*) ;;
+               *) discard=0; break ;;
+            esac
+         done
+         if (( discard == 0 )); then
+            for token in "${trap_args[@]}"; do
+               case "$token" in
+                  EXIT|RETURN|TERM|INT|HUP|_JENKINS_PREV_*) ;;
+                  *) filtered+=("$token") ;;
+               esac
+            done
+            trap_args=("${filtered[@]}")
+         else
+            trap_args=()
+         fi
+      fi
+   fi
+
+   if (( ${#trap_args[@]} )); then
+      local total=${#trap_args[@]}
+      if (( total % 2 == 0 )); then
+         local half=$(( total / 2 ))
+         local duplicate=1 i
+         for (( i=0; i<half; i++ )); do
+            if [[ "${trap_args[i]}" != "${trap_args[i+half]}" ]]; then
+               duplicate=0
+               break
+            fi
+         done
+         if (( duplicate )); then
+            trap_args=("${trap_args[@]:0:half}")
+         fi
+      fi
+   fi
+
+   _JENKINS_DEDUP_TRAP_ARGS=("${trap_args[@]}")
+}
+
 function _jenkins_run_saved_trap_literal() {
    local signal="$1"
    shift || true
@@ -309,49 +386,9 @@ function _jenkins_run_saved_trap_literal() {
       return 0
    fi
 
-   local -a trap_args=("$@")
-   local -a saved_tokens=()
-   if [[ -n "${!handler_var:-}" ]]; then
-      eval "saved_tokens=( ${!handler_var} )"
-   fi
-   local skip_count=0
-   if (( ${#saved_tokens[@]} > 1 )); then
-      skip_count=$(( ${#saved_tokens[@]} - 1 ))
-   fi
-   if (( skip_count > 0 )); then
-      if (( ${#trap_args[@]} > skip_count )); then
-         trap_args=("${trap_args[@]:${skip_count}}")
-      else
-         trap_args=()
-      fi
-   else
-      while (( ${#trap_args[@]} )); do
-         case "${trap_args[0]}" in
-            "$signal"|_JENKINS_PREV_*)
-               trap_args=("${trap_args[@]:1}")
-               ;;
-            *)
-               break
-               ;;
-         esac
-      done
-   fi
+   _jenkins_deduplicate_trap_tokens "$handler_var" "$@"
+   local -a trap_args=("${_JENKINS_DEDUP_TRAP_ARGS[@]}")
    if (( ${#trap_args[@]} )); then
-      local total=${#trap_args[@]}
-      if (( total % 2 == 0 )); then
-         local half=$(( total / 2 ))
-         local duplicate=1
-         local i
-         for (( i=0; i<half; i++ )); do
-            if [[ "${trap_args[i]}" != "${trap_args[i+half]}" ]]; then
-               duplicate=0
-               break
-            fi
-         done
-         if (( duplicate )); then
-            trap_args=("${trap_args[@]:0:half}")
-         fi
-      fi
       set -- "${trap_args[@]}"
    else
       set --
@@ -359,7 +396,6 @@ function _jenkins_run_saved_trap_literal() {
 
    local -a handler_args=()
    eval "handler_args=( $handler_literal )"
-
    if (( ${#handler_args[@]} == 0 )); then
       return 0
    fi
@@ -879,43 +915,10 @@ function _jenkins_ip_is_loopback() {
    [[ "$candidate" =~ ^127\. ]]
 }
 
-function _jenkins_run_smoke_test() {
-   local namespace="${1:-jenkins}"
-   local enable_ldap="${2:-0}"
-   local enable_ad="${3:-0}"
-   local enable_ad_prod="${4:-0}"
-   local smoke_url_override="${JENKINS_SMOKE_URL:-}"
-   local user_ip_override="${JENKINS_SMOKE_IP_OVERRIDE:-}"
+function _jenkins_resolve_smoke_target() {
+   local namespace="$1" smoke_url_override="$2" user_ip_override="$3"
 
-   # Skip smoke test in BATS test environment
-   if [[ -n "${BATS_TEST_DIRNAME:-}" ]] || [[ -n "${BATS_TEST_TMPDIR:-}" ]]; then
-      return 0
-   fi
-
-   # Find smoke test script
-   local smoke_script="${SCRIPT_DIR}/../bin/smoke-test-jenkins.sh"
-   if [[ ! -x "$smoke_script" ]]; then
-      if [[ -r "$smoke_script" ]]; then
-         _warn "[jenkins] smoke test script not executable: ${smoke_script}"
-         return 0
-      else
-         _warn "[jenkins] smoke test script missing: ${smoke_script}"
-         return 0
-      fi
-   fi
-
-   # Auto-detect auth mode from deployment flags
-   local auth_mode="default"
-   if (( enable_ad_prod )); then
-      auth_mode="ad"  # production AD
-   elif (( enable_ad )); then
-      auth_mode="ad"  # AD schema testing (mock AD)
-   elif (( enable_ldap )); then
-      auth_mode="ldap"
-   fi
-
-   # Get Jenkins hostname from VirtualService
-   local jenkins_host
+   local jenkins_host=""
    jenkins_host=$(_kubectl --no-exit -n "$namespace" get vs jenkins -o jsonpath='{.spec.hosts[0]}' 2>/dev/null || echo "")
    if [[ -z "$jenkins_host" ]]; then
       jenkins_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
@@ -937,12 +940,115 @@ function _jenkins_run_smoke_test() {
       fi
    fi
 
-   local -a smoke_env=()
+   _JENKINS_SMOKE_HOST="$jenkins_host"
+   _JENKINS_SMOKE_INGRESS_IP="$ingress_ip"
+   _JENKINS_SMOKE_USE_PORT_FORWARD="$use_port_forward"
+}
+
+function _jenkins_run_smoke_via_port_forward() {
+   local pf_namespace="$1" pf_service="$2" pf_port="$3"
+   _JENKINS_SMOKE_PF_RC=0
+   (
+      local pf_pid="" port_forward_log="" preserve_log=0
+      port_forward_log=$(mktemp -t jenkins-port-forward.XXXXXX.log 2>/dev/null || printf '')
+      cleanup_pf() {
+         if [[ -n "$pf_pid" ]]; then
+            kill "$pf_pid" 2>/dev/null || true
+            wait "$pf_pid" 2>/dev/null || true
+         fi
+         if (( ! preserve_log )) && [[ -n "$port_forward_log" ]]; then
+            rm -f "$port_forward_log"
+         fi
+      }
+      trap cleanup_pf EXIT INT TERM
+      local log_target="${port_forward_log:-/dev/null}"
+      kubectl -n "$pf_namespace" port-forward "svc/${pf_service}" "${pf_port}:443" >"$log_target" 2>&1 &
+      pf_pid=$!
+      local ready=0
+      if command -v nc >/dev/null 2>&1; then
+         local attempt
+         for (( attempt=0; attempt<10; attempt++ )); do
+            kill -0 "$pf_pid" 2>/dev/null || break
+            if nc -z 127.0.0.1 "$pf_port" >/dev/null 2>&1; then
+               ready=1
+               break
+            fi
+            sleep 0.5
+         done
+      else
+         _warn "[jenkins] nc not found; waiting 5 seconds for port-forward readiness"
+         sleep 5
+         kill -0 "$pf_pid" 2>/dev/null && ready=1
+      fi
+      if (( ! ready )); then
+         preserve_log=1
+         if [[ -n "$port_forward_log" ]]; then
+            echo "ERROR: [jenkins] kubectl port-forward failed to become ready (see $port_forward_log)" >&2
+            cat "$port_forward_log" >&2 || true
+         else
+            echo "ERROR: [jenkins] kubectl port-forward failed to become ready" >&2
+         fi
+         exit 1
+      fi
+      if (( ${#_JENKINS_SMOKE_ENV[@]} )); then
+         _run_command -- env "${_JENKINS_SMOKE_ENV[@]}" "${_JENKINS_SMOKE_CMD[@]}"
+      else
+         _run_command -- "${_JENKINS_SMOKE_CMD[@]}"
+      fi
+   )
+   _JENKINS_SMOKE_PF_RC=$?
+}
+
+function _jenkins_exec_smoke_cmd() {
+   if (( ${#_JENKINS_SMOKE_ENV[@]} )); then
+     _run_command -- env "${_JENKINS_SMOKE_ENV[@]}" "${_JENKINS_SMOKE_CMD[@]}"
+   else
+     _run_command -- "${_JENKINS_SMOKE_CMD[@]}"
+   fi
+}
+
+function _jenkins_run_smoke_test() {
+   local namespace="${1:-jenkins}"
+   local enable_ldap="${2:-0}"
+   local enable_ad="${3:-0}"
+   local enable_ad_prod="${4:-0}"
+   local smoke_url_override="${JENKINS_SMOKE_URL:-}"
+   local user_ip_override="${JENKINS_SMOKE_IP_OVERRIDE:-}"
+
+   if [[ -n "${BATS_TEST_DIRNAME:-}" ]] || [[ -n "${BATS_TEST_TMPDIR:-}" ]]; then
+      return 0
+   fi
+
+   local smoke_script="${SCRIPT_DIR}/../bin/smoke-test-jenkins.sh"
+   if [[ ! -x "$smoke_script" ]]; then
+      if [[ -r "$smoke_script" ]]; then
+         _warn "[jenkins] smoke test script not executable: ${smoke_script}"
+      else
+         _warn "[jenkins] smoke test script missing: ${smoke_script}"
+      fi
+      return 0
+   fi
+
+   local auth_mode="default"
+   if (( enable_ad_prod )); then
+      auth_mode="ad"
+   elif (( enable_ad )); then
+      auth_mode="ad"
+   elif (( enable_ldap )); then
+      auth_mode="ldap"
+   fi
+
+   _jenkins_resolve_smoke_target "$namespace" "$smoke_url_override" "$user_ip_override"
+   local jenkins_host="$_JENKINS_SMOKE_HOST"
+   local ingress_ip="$_JENKINS_SMOKE_INGRESS_IP"
+   local use_port_forward="${_JENKINS_SMOKE_USE_PORT_FORWARD:-0}"
+
+   _JENKINS_SMOKE_ENV=()
    if [[ -z "$user_ip_override" ]]; then
       if (( use_port_forward )); then
-         smoke_env=("JENKINS_SMOKE_IP_OVERRIDE=127.0.0.1")
+         _JENKINS_SMOKE_ENV=("JENKINS_SMOKE_IP_OVERRIDE=127.0.0.1")
       elif [[ -n "$ingress_ip" ]]; then
-         smoke_env=("JENKINS_SMOKE_IP_OVERRIDE=$ingress_ip")
+         _JENKINS_SMOKE_ENV=("JENKINS_SMOKE_IP_OVERRIDE=$ingress_ip")
       fi
    fi
 
@@ -950,96 +1056,27 @@ function _jenkins_run_smoke_test() {
    local pf_port=8443
    local pf_namespace="istio-system"
    local pf_service="istio-ingressgateway"
-   local -a smoke_cmd
-   local smoke_rc=0
+   (( use_port_forward )) && smoke_port=$pf_port
 
-   if (( use_port_forward )); then
-      smoke_port=$pf_port
-   fi
-   smoke_cmd=("$smoke_script" "$namespace" "$jenkins_host" "$smoke_port" "$auth_mode")
-
+   _JENKINS_SMOKE_CMD=("$smoke_script" "$namespace" "$jenkins_host" "$smoke_port" "$auth_mode")
    _info "[jenkins] running smoke test (namespace=${namespace}, host=${jenkins_host}, auth_mode=${auth_mode})"
 
+   local smoke_rc=0
    if (( use_port_forward )); then
-      if [[ "${K3DM_DEPLOY_DRY_RUN:-0}" == "1" ]]; then
-         _run_command -- kubectl -n "$pf_namespace" port-forward "svc/${pf_service}" "${pf_port}:443"
-         if (( ${#smoke_env[@]} )); then
-            _run_command -- env "${smoke_env[@]}" "${smoke_cmd[@]}"
-         else
-            _run_command -- "${smoke_cmd[@]}"
-         fi
-         smoke_rc=0
-      else
-      _info "[jenkins] ingress IP ${ingress_ip} is private; using kubectl port-forward to ${pf_namespace}/${pf_service} -> 127.0.0.1:${pf_port}"
-      (
-         local pf_pid=""
-         local port_forward_log=""
-         port_forward_log=$(mktemp -t jenkins-port-forward.XXXXXX.log 2>/dev/null || printf '')
-         local preserve_log=0
-         cleanup_pf() {
-            if [[ -n "$pf_pid" ]]; then
-               kill "$pf_pid" 2>/dev/null || true
-               wait "$pf_pid" 2>/dev/null || true
-            fi
-            if (( ! preserve_log )) && [[ -n "$port_forward_log" ]]; then
-               rm -f "$port_forward_log"
-            fi
-         }
-         trap cleanup_pf EXIT INT TERM
-
-         local log_target="$port_forward_log"
-         if [[ -z "$log_target" ]]; then
-            log_target="/dev/null"
-         fi
-         kubectl -n "$pf_namespace" port-forward "svc/${pf_service}" "${pf_port}:443" >"$log_target" 2>&1 &
-         pf_pid=$!
-
-         local ready=0
-         if command -v nc >/dev/null 2>&1; then
-            local attempt
-            for (( attempt=0; attempt<10; attempt++ )); do
-               if ! kill -0 "$pf_pid" 2>/dev/null; then
-                  break
-               fi
-               if nc -z 127.0.0.1 "$pf_port" >/dev/null 2>&1; then
-                  ready=1
-                  break
-               fi
-               sleep 0.5
-            done
-         else
-            _warn "[jenkins] nc not found; waiting 5 seconds for port-forward readiness"
-            sleep 5
-            if kill -0 "$pf_pid" 2>/dev/null; then
-               ready=1
-            fi
-         fi
-
-         if (( ! ready )); then
-            preserve_log=1
-            if [[ -n "$port_forward_log" ]]; then
-               echo "ERROR: [jenkins] kubectl port-forward failed to become ready (see $port_forward_log)" >&2
-               cat "$port_forward_log" >&2 || true
-            else
-               echo "ERROR: [jenkins] kubectl port-forward failed to become ready" >&2
-            fi
-            exit 1
-         fi
-
-         if (( ${#smoke_env[@]} )); then
-            _run_command -- env "${smoke_env[@]}" "${smoke_cmd[@]}"
-         else
-            _run_command -- "${smoke_cmd[@]}"
-         fi
-      )
-      smoke_rc=$?
-      fi
+      case "${K3DM_DEPLOY_DRY_RUN:-0}" in
+         1)
+            _run_command -- kubectl -n "$pf_namespace" port-forward "svc/${pf_service}" "${pf_port}:443"
+            _jenkins_exec_smoke_cmd
+            smoke_rc=$?
+            ;;
+         *)
+            _info "[jenkins] ingress IP ${ingress_ip} is private; using kubectl port-forward to ${pf_namespace}/${pf_service} -> 127.0.0.1:${pf_port}"
+            _jenkins_run_smoke_via_port_forward "$pf_namespace" "$pf_service" "$pf_port"
+            smoke_rc="$_JENKINS_SMOKE_PF_RC"
+            ;;
+      esac
    else
-      if (( ${#smoke_env[@]} )); then
-         _run_command -- env "${smoke_env[@]}" "${smoke_cmd[@]}"
-      else
-         _run_command -- "${smoke_cmd[@]}"
-      fi
+      _jenkins_exec_smoke_cmd
       smoke_rc=$?
    fi
 
@@ -1047,8 +1084,158 @@ function _jenkins_run_smoke_test() {
       _info "[jenkins] smoke test passed"
       return 0
    fi
-
    return 1
+}
+
+function _jenkins_deploy_infra_prereqs() {
+   local enable_vault="$1"
+   local enable_ad="$2"
+   local enable_ldap="$3"
+   local vault_namespace="$4"
+   local vault_release="$5"
+   local enable_ad_prod="${JENKINS_AD_PROD_ENABLED:-0}"
+
+   if (( enable_vault )); then
+      deploy_eso
+      _info "[jenkins] deploying Vault to ${vault_namespace}/${vault_release}"
+      deploy_vault "$vault_namespace" "$vault_release"
+   else
+      _info "[jenkins] skipping Vault deployment (using existing instance)"
+   fi
+
+   if (( enable_ad_prod )); then
+      _info "[jenkins] production Active Directory enabled; skipping local directory service deployment"
+   elif (( enable_ad )); then
+      _deploy_jenkins_ad "$vault_namespace" "$vault_release"
+   elif (( enable_ldap )); then
+      _deploy_jenkins_ldap "$vault_namespace" "$vault_release"
+   else
+      _info "[jenkins] skipping directory service deployment"
+   fi
+}
+
+function _jenkins_collect_vault_prefix_arg() {
+   local -a secret_prefixes=()
+   if [[ -n "${JENKINS_VAULT_POLICY_PREFIX:-}" ]]; then
+      local -a configured_array=()
+      read -r -a configured_array <<< "${JENKINS_VAULT_POLICY_PREFIX//,/ }"
+      secret_prefixes+=("${configured_array[@]}")
+   fi
+
+   local -a secret_paths=("${JENKINS_ADMIN_VAULT_PATH:-}" "${JENKINS_LDAP_VAULT_PATH:-}")
+   local path
+   for path in "${secret_paths[@]}"; do
+      [[ -z "$path" ]] && continue
+      secret_prefixes+=("$path")
+   done
+
+   local -a unique_prefixes=()
+   for path in "${secret_prefixes[@]}"; do
+      [[ -z "$path" ]] && continue
+      local trimmed="${path#/}"
+      trimmed="${trimmed%/}"
+      [[ -z "$trimmed" ]] && continue
+      local seen=0 existing
+      for existing in "${unique_prefixes[@]}"; do
+         if [[ "$existing" == "$trimmed" ]]; then
+            seen=1
+            break
+         fi
+      done
+      (( seen )) && continue
+      unique_prefixes+=("$trimmed")
+   done
+
+   local result=""
+   for path in "${unique_prefixes[@]}"; do
+      [[ -n "$result" ]] && result+=","
+      result+="$path"
+   done
+   _JENKINS_VAULT_PREFIX_ARG="$result"
+}
+
+function _jenkins_ensure_secrets_ready() {
+   local vault_namespace="$1"
+   local vault_release="$2"
+   local jenkins_namespace="$3"
+
+   _jenkins_collect_vault_prefix_arg
+
+   if ! _vault_configure_secret_reader_role \
+         "$vault_namespace" "$vault_release" \
+         "$JENKINS_ESO_SERVICE_ACCOUNT" "$jenkins_namespace" \
+         "$JENKINS_VAULT_KV_MOUNT" "$_JENKINS_VAULT_PREFIX_ARG" \
+         "$JENKINS_ESO_ROLE"; then
+      _err "[jenkins] failed to configure Vault role ${JENKINS_ESO_ROLE} for namespace ${jenkins_namespace}"
+      return 1
+   fi
+
+   if ! _jenkins_apply_eso_resources "$jenkins_namespace"; then
+      _err "[jenkins] failed to apply ESO manifests for namespace ${jenkins_namespace}"
+      return 1
+   fi
+
+   if ! _jenkins_wait_for_secret "$jenkins_namespace" "$JENKINS_ADMIN_SECRET_NAME"; then
+      _err "[jenkins] Vault-sourced secret ${JENKINS_ADMIN_SECRET_NAME} not available"
+      return 1
+   fi
+
+   if (( JENKINS_LDAP_ENABLED )); then
+      if ! _jenkins_wait_for_secret "$jenkins_namespace" "$JENKINS_LDAP_SECRET_NAME"; then
+         _err "[jenkins] Vault-sourced secret ${JENKINS_LDAP_SECRET_NAME} not available"
+         return 1
+      fi
+   fi
+}
+
+function _jenkins_deploy_with_retry() {
+   local jenkins_namespace="$1"
+   local vault_namespace="$2"
+   local vault_release="$3"
+   local enable_ldap="$4"
+   local enable_ad="$5"
+   local enable_ad_prod="$6"
+
+   local max_attempts="${JENKINS_DEPLOY_RETRIES:-3}"
+   if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || (( max_attempts < 1 )); then
+      max_attempts=3
+   fi
+
+   local attempt deploy_rc wait_rc selector
+   selector='app.kubernetes.io/component=jenkins-controller'
+
+   for (( attempt=1; attempt<=max_attempts; attempt++ )); do
+      _deploy_jenkins "$jenkins_namespace" "$vault_namespace" "$vault_release"
+      deploy_rc=$?
+      wait_rc=0
+
+      if (( deploy_rc == 0 )); then
+         if _wait_for_jenkins_ready "$jenkins_namespace"; then
+            _jenkins_run_smoke_test "$jenkins_namespace" "$enable_ldap" "$enable_ad" "$enable_ad_prod" || \
+               _warn "[jenkins] smoke test failed; inspect output above"
+            return 0
+         fi
+         wait_rc=$?
+      else
+         wait_rc=$deploy_rc
+      fi
+
+      if (( attempt >= max_attempts )); then
+         printf 'ERROR: Jenkins deployment failed after %d attempt(s).\n' "$attempt" >&2
+         return "$wait_rc"
+      fi
+
+      _warn "Jenkins deployment attempt ${attempt} failed (rc=${wait_rc}); retrying..."
+      _kubectl --no-exit --quiet -n "$jenkins_namespace" delete pod -l "$selector" --ignore-not-found >/dev/null 2>&1 || true
+      sleep 10
+   done
+}
+
+function _jenkins_restore_trace() {
+   local should_restore="${1:-0}"
+   if (( should_restore )); then
+      set -x
+   fi
 }
 
 function deploy_jenkins() {
@@ -1073,8 +1260,8 @@ function deploy_jenkins() {
    esac
 
    # Show help if no arguments provided
-  if [[ $arg_count -eq 0 ]]; then
-     cat <<EOF
+   if [[ $arg_count -eq 0 ]]; then
+      cat <<EOF
 Usage: deploy_jenkins [options] [namespace] [vault-namespace] [vault-release]
 
 Options:
@@ -1134,13 +1321,13 @@ Examples:
 Positional arguments (backwards compatible):
   deploy_jenkins [namespace] [vault-namespace] [vault-release]
 EOF
-      if (( restore_trace )); then set -x; fi
+      _jenkins_restore_trace "$restore_trace"
       return 0
    fi
 
    if [[ "${CLUSTER_ROLE:-infra}" == "app" ]]; then
       _info "[jenkins] CLUSTER_ROLE=app — skipping deploy_jenkins"
-      if (( restore_trace )); then set -x; fi
+      _jenkins_restore_trace "$restore_trace"
       return 0
    fi
 
@@ -1205,7 +1392,7 @@ Examples:
 Positional arguments (backwards compatible):
   deploy_jenkins [namespace] [vault-namespace] [vault-release]
 EOF
-            if (( restore_trace )); then set -x; fi
+            _jenkins_restore_trace "$restore_trace"
             return 0
             ;;
          --namespace)
@@ -1299,164 +1486,301 @@ EOF
    jenkins_namespace="${jenkins_namespace:-${JENKINS_NAMESPACE:-jenkins}}"
    vault_namespace="${vault_namespace:-${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}}"
    vault_release="${vault_release:-${VAULT_RELEASE:-$VAULT_RELEASE_DEFAULT}}"
-
    export JENKINS_NAMESPACE="$jenkins_namespace"
 
-   # Mutual exclusivity check: only one directory service mode can be enabled
    local mode_count=$(( enable_ldap + enable_ad + enable_ad_prod ))
    if (( mode_count > 1 )); then
-      _err "[jenkins] --enable-ldap, --enable-ad, and --enable-ad-prod are mutually exclusive (use only one)"
+      _err "[jenkins] --enable-ldap, --enable-ad, and --enable-ad-prod are mutually exclusive"
    fi
 
-   # Export enable flags so downstream functions can check them
    export JENKINS_LDAP_ENABLED="$enable_ldap"
    export JENKINS_AD_ENABLED="$enable_ad"
    export JENKINS_AD_PROD_ENABLED="$enable_ad_prod"
    export JENKINS_VAULT_ENABLED="$enable_vault"
 
-   if (( restore_trace )); then set -x; fi
+   _jenkins_restore_trace "$restore_trace"
 
    _info "[jenkins] deploying to namespace: ${jenkins_namespace}"
-   _info "[jenkins] directory service: $( (( enable_ldap )) && echo "standard LDAP" || (( enable_ad )) && echo "AD schema testing" || (( enable_ad_prod )) && echo "production Active Directory" || echo "none" )"
-   _info "[jenkins] Vault deployment: $( (( enable_vault )) && echo "enabled" || echo "disabled" )"
-
    _jenkins_configure_leaf_host_defaults
-
-   # Deploy ESO only if Vault is enabled (ESO requires Vault as backend)
-   if (( enable_vault )); then
-      deploy_eso
-   fi
-
-   # Deploy Vault if enabled
-   if (( enable_vault )); then
-      _info "[jenkins] deploying Vault to ${vault_namespace}/${vault_release}"
-      deploy_vault "$vault_namespace" "$vault_release"
-   else
-      _info "[jenkins] skipping Vault deployment (using existing instance)"
-   fi
-
-   # Deploy directory service based on mode
-   if (( enable_ad )); then
-      # Deploy AD schema testing (OpenLDAP with AD schema)
-      _deploy_jenkins_ad "$vault_namespace" "$vault_release"
-   elif (( enable_ldap )); then
-      # Deploy standard LDAP
-      _deploy_jenkins_ldap "$vault_namespace" "$vault_release"
-   else
-      _info "[jenkins] skipping directory service deployment"
-   fi
+   _jenkins_deploy_infra_prereqs "$enable_vault" "$enable_ad" "$enable_ldap" "$vault_namespace" "$vault_release"
    _create_jenkins_admin_vault_policy "$vault_namespace" "$vault_release"
    _create_jenkins_vault_ad_policy "$vault_namespace" "$vault_release" "$jenkins_namespace"
    _create_jenkins_vault_ldap_reader_role "$vault_namespace" "$vault_release" "$jenkins_namespace"
    _create_jenkins_cert_rotator_policy "$vault_namespace" "$vault_release" "" "" "$jenkins_namespace"
    _create_jenkins_namespace "$jenkins_namespace"
-   local -a _jenkins_secret_prefixes=()
-   if [[ -n "${JENKINS_VAULT_POLICY_PREFIX:-}" ]]; then
-      local _configured_prefixes="${JENKINS_VAULT_POLICY_PREFIX//,/ }"
-      local -a _configured_array=()
-      read -r -a _configured_array <<< "$_configured_prefixes"
-      _jenkins_secret_prefixes+=("${_configured_array[@]}")
-   fi
-
-   local -a _jenkins_secret_paths=(
-      "${JENKINS_ADMIN_VAULT_PATH:-}"
-      "${JENKINS_LDAP_VAULT_PATH:-}"
-   )
-
-   local prefix
-   for prefix in "${_jenkins_secret_paths[@]}"; do
-      [[ -z "$prefix" ]] && continue
-      _jenkins_secret_prefixes+=("$prefix")
-   done
-
-   local -a _jenkins_unique_prefixes=()
-   for prefix in "${_jenkins_secret_prefixes[@]}"; do
-      [[ -z "$prefix" ]] && continue
-      local trimmed="${prefix#/}"
-      trimmed="${trimmed%/}"
-      [[ -z "$trimmed" ]] && continue
-      local seen=0 existing
-      for existing in "${_jenkins_unique_prefixes[@]}"; do
-         if [[ "$existing" == "$trimmed" ]]; then
-            seen=1
-            break
-         fi
-      done
-      (( seen )) && continue
-      _jenkins_unique_prefixes+=("$trimmed")
-   done
-
-   local _jenkins_prefix_arg=""
-   for prefix in "${_jenkins_unique_prefixes[@]}"; do
-      if [[ -n "$_jenkins_prefix_arg" ]]; then
-         _jenkins_prefix_arg+=","
-      fi
-      _jenkins_prefix_arg+="$prefix"
-   done
-
-   if ! _vault_configure_secret_reader_role \
-         "$vault_namespace" \
-         "$vault_release" \
-         "$JENKINS_ESO_SERVICE_ACCOUNT" \
-         "$jenkins_namespace" \
-         "$JENKINS_VAULT_KV_MOUNT" \
-         "$_jenkins_prefix_arg" \
-         "$JENKINS_ESO_ROLE"; then
-      _err "[jenkins] failed to configure Vault role ${JENKINS_ESO_ROLE} for namespace ${jenkins_namespace}"
-      return 1
-   fi
-   if ! _jenkins_apply_eso_resources "$jenkins_namespace"; then
-      _err "[jenkins] failed to apply ESO manifests for namespace ${jenkins_namespace}"
-      return 1
-   fi
-   if ! _jenkins_wait_for_secret "$jenkins_namespace" "$JENKINS_ADMIN_SECRET_NAME"; then
-      _err "[jenkins] Vault-sourced secret ${JENKINS_ADMIN_SECRET_NAME} not available"
-      return 1
-   fi
-   # Only wait for LDAP secret if LDAP is enabled
-   if (( JENKINS_LDAP_ENABLED )); then
-      if ! _jenkins_wait_for_secret "$jenkins_namespace" "$JENKINS_LDAP_SECRET_NAME"; then
-         _err "[jenkins] Vault-sourced secret ${JENKINS_LDAP_SECRET_NAME} not available"
-         return 1
-      fi
-   fi
+   _jenkins_ensure_secrets_ready "$vault_namespace" "$vault_release" "$jenkins_namespace" || return 1
    _create_jenkins_pv_pvc "$jenkins_namespace"
    _ensure_jenkins_cert "$vault_namespace" "$vault_release"
+   _jenkins_deploy_with_retry "$jenkins_namespace" "$vault_namespace" "$vault_release" \
+      "$enable_ldap" "$enable_ad" "$enable_ad_prod"
+}
 
-   local max_attempts="${JENKINS_DEPLOY_RETRIES:-3}"
-   if ! [[ "$max_attempts" =~ ^[0-9]+$ ]] || (( max_attempts < 1 )); then
-      max_attempts=3
+function _jenkins_select_template() {
+   local ns="$1"
+   local enable_ad_prod="$2"
+   local enable_ad="$3"
+   local enable_ldap="$4"
+   local skip_ad_validation="$5"
+
+   if (( enable_ad_prod )); then
+      local ad_vars_file="$JENKINS_CONFIG_DIR/ad-vars.sh"
+      if [[ -r "$ad_vars_file" ]]; then
+         _info "[jenkins] sourcing AD configuration: $ad_vars_file"
+         source "$ad_vars_file"
+      else
+         _warn "[jenkins] AD variables file not found: $ad_vars_file (using environment defaults)"
+      fi
+      if [[ -z "${AD_DOMAIN:-}" ]]; then
+         _err "[jenkins] AD_DOMAIN must be set for production AD (e.g., export AD_DOMAIN=\"corp.example.com\")"
+      fi
+      if (( ! skip_ad_validation )); then
+         _validate_ad_connectivity "$AD_DOMAIN" "${AD_SERVER:-}" "${AD_REQUIRE_TLS:-true}"
+      else
+         _warn "[jenkins] AD connectivity validation skipped (--skip-ad-validation)"
+      fi
+      _JENKINS_TEMPLATE_FILE="$JENKINS_CONFIG_DIR/values-ad-prod.yaml.tmpl"
+      _JENKINS_AUTH_MODE="production-ad"
+      _info "[jenkins] using production Active Directory template: values-ad-prod.yaml.tmpl"
+      _info "[jenkins] AD domain: ${AD_DOMAIN}"
+   elif (( enable_ad )); then
+      local ad_test_vars_file="$SCRIPT_DIR/etc/ad/vars.sh"
+      local ldap_vars_file="$SCRIPT_DIR/etc/ldap/vars.sh"
+      if [[ -r "$ldap_vars_file" ]]; then
+         _info "[jenkins] sourcing LDAP configuration: $ldap_vars_file"
+         source "$ldap_vars_file"
+      fi
+      if [[ -r "$ad_test_vars_file" ]]; then
+         _info "[jenkins] sourcing AD test configuration: $ad_test_vars_file"
+         source "$ad_test_vars_file"
+      fi
+      export LDAP_URL="${LDAP_URL:-ldap://openldap-openldap-bitnami.identity.svc:1389}"
+      export LDAP_BASE_DN="${LDAP_BASE_DN:-DC=corp,DC=example,DC=com}"
+      export LDAP_BIND_DN="${LDAP_BIND_DN:-cn=admin,DC=corp,DC=example,DC=com}"
+      export LDAP_USER_SEARCH_BASE="${LDAP_USER_SEARCH_BASE:-OU=Users,DC=corp,DC=example,DC=com}"
+      export LDAP_GROUP_SEARCH_BASE="${LDAP_GROUP_SEARCH_BASE:-OU=Groups,DC=corp,DC=example,DC=com}"
+      _JENKINS_TEMPLATE_FILE="$JENKINS_CONFIG_DIR/values-ad-test.yaml.tmpl"
+      _JENKINS_AUTH_MODE="ad-testing"
+      _info "[jenkins] using AD schema testing template: values-ad-test.yaml.tmpl"
+   elif (( enable_ldap )); then
+      local ldap_vars_file="$SCRIPT_DIR/etc/ldap/vars.sh"
+      if [[ -r "$ldap_vars_file" ]]; then
+         _info "[jenkins] sourcing LDAP configuration: $ldap_vars_file"
+         source "$ldap_vars_file"
+      fi
+      export LDAP_URL="${LDAP_URL:-ldap://openldap-openldap-bitnami.identity.svc:1389}"
+      _JENKINS_TEMPLATE_FILE="$JENKINS_CONFIG_DIR/values-ldap.yaml.tmpl"
+      _JENKINS_AUTH_MODE="standard-ldap"
+      _info "[jenkins] using standard LDAP template: values-ldap.yaml.tmpl"
+   else
+      _JENKINS_TEMPLATE_FILE="$JENKINS_CONFIG_DIR/values-default.yaml.tmpl"
+      _JENKINS_AUTH_MODE="none"
+      _info "[jenkins] using default template (no directory service): values-default.yaml.tmpl"
+   fi
+}
+
+function _jenkins_load_ldap_secret() {
+   local ns="$1"
+   if _kubectl --no-exit get secret jenkins-ldap-config -n "$ns" >/dev/null 2>&1; then
+      export LDAP_BASE_DN
+      export LDAP_BIND_DN
+      export LDAP_BIND_PASSWORD
+      LDAP_BASE_DN=$(_kubectl get secret jenkins-ldap-config -n "$ns" -o jsonpath='{.data.LDAP_BASE_DN}' 2>/dev/null | base64 -d)
+      LDAP_BIND_DN=$(_kubectl get secret jenkins-ldap-config -n "$ns" -o jsonpath='{.data.LDAP_BIND_DN}' 2>/dev/null | base64 -d)
+      LDAP_BIND_PASSWORD=$(_kubectl get secret jenkins-ldap-config -n "$ns" -o jsonpath='{.data.LDAP_BIND_PASSWORD}' 2>/dev/null | base64 -d)
+      if [[ -z "$LDAP_BIND_PASSWORD" ]]; then
+         _warn "[jenkins] LDAP_BIND_PASSWORD is empty in jenkins-ldap-config secret"
+      fi
+      return 0
+   fi
+   _warn "[jenkins] jenkins-ldap-config secret not found, LDAP variables will be empty"
+   return 1
+}
+
+function _jenkins_apply_istio_resources() {
+   local ns="$1"
+   local vault_pki_leaf_host="$2"
+   local vault_pki_secret_name="$3"
+
+   export VAULT_PKI_SECRET_NAME="$vault_pki_secret_name"
+   export VAULT_PKI_LEAF_HOST="$vault_pki_leaf_host"
+
+   local gw_template="$JENKINS_CONFIG_DIR/gateway.yaml"
+   [[ -r "$gw_template" ]] || _err "Gateway YAML file not found: $gw_template"
+   local gw_rendered
+   gw_rendered=$(mktemp -t jenkins-gateway.XXXXXX.yaml)
+   _jenkins_register_rendered_manifest "$gw_rendered"
+   envsubst < "$gw_template" > "$gw_rendered"
+   _kubectl apply -n istio-system --dry-run=client -f "$gw_rendered" || {
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
+      return "$rc"
+   }
+   _kubectl apply -n istio-system -f "$gw_rendered" || {
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
+      return "$rc"
+   }
+
+   local vs_template="$JENKINS_CONFIG_DIR/virtualservice.yaml.tmpl"
+   [[ -r "$vs_template" ]] || _err "VirtualService template file not found: $vs_template"
+   local dr_template="$JENKINS_CONFIG_DIR/destinationrule.yaml.tmpl"
+   [[ -r "$dr_template" ]] || _err "DestinationRule template file not found: $dr_template"
+
+   local vs_hosts_input="${JENKINS_VIRTUALSERVICE_HOSTS:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}}"
+   local -a vs_hosts_lines=()
+   local -a _vs_hosts_split=()
+   IFS=',' read -r -a _vs_hosts_split <<<"$vs_hosts_input"
+   local _vs_host trimmed
+   for _vs_host in "${_vs_hosts_split[@]}"; do
+      trimmed="${_vs_host#"${_vs_host%%[![:space:]]*}"}"
+      trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+      if [[ -n "$trimmed" ]]; then
+         vs_hosts_lines+=("    - ${trimmed}")
+      fi
+   done
+   (( ${#vs_hosts_lines[@]} )) || vs_hosts_lines=("    - jenkins.dev.local.me")
+   local JENKINS_VIRTUALSERVICE_HOSTS_YAML
+   printf -v JENKINS_VIRTUALSERVICE_HOSTS_YAML '%s\n' "${vs_hosts_lines[@]}"
+   export JENKINS_VIRTUALSERVICE_HOSTS_YAML
+
+   local vs_rendered
+   vs_rendered=$(mktemp -t jenkins-virtualservice.XXXXXX.yaml)
+   _jenkins_register_rendered_manifest "$vs_rendered"
+   envsubst < "$vs_template" > "$vs_rendered"
+   local dr_rendered
+   dr_rendered=$(mktemp -t jenkins-destinationrule.XXXXXX.yaml)
+   _jenkins_register_rendered_manifest "$dr_rendered"
+   envsubst < "$dr_template" > "$dr_rendered"
+
+   _kubectl apply -n "$ns" --dry-run=client -f "$vs_rendered" || {
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
+      return "$rc"
+   }
+   _kubectl apply -n "$ns" -f "$vs_rendered" || {
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
+      return "$rc"
+   }
+   _kubectl apply -n "$ns" --dry-run=client -f "$dr_rendered" || {
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
+      return "$rc"
+   }
+   _kubectl apply -n "$ns" -f "$dr_rendered" || {
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
+      return "$rc"
+   }
+}
+
+function _jenkins_deploy_cert_rotator_if_enabled() {
+   local ns="$1"
+   local vault_namespace="$2"
+   local vault_release="$3"
+
+   if [[ "${JENKINS_CERT_ROTATOR_ENABLED:-0}" != "1" ]]; then
+      return 0
    fi
 
-   local attempt deploy_rc wait_rc selector
-   selector='app.kubernetes.io/component=jenkins-controller'
+   local rotator_template="$JENKINS_CONFIG_DIR/jenkins-cert-rotator.yaml.tmpl"
+   local rotator_script="$JENKINS_CONFIG_DIR/cert-rotator.sh"
+   local rotator_lib="$SCRIPT_DIR/lib/vault_pki.sh"
+   [[ -r "$rotator_template" ]] || _err "Jenkins cert rotator template file not found: $rotator_template"
+   [[ -r "$rotator_script" ]] || _err "Jenkins cert rotator script not found: $rotator_script"
+   [[ -r "$rotator_lib" ]] || _err "Jenkins cert rotator Vault PKI helper not found: $rotator_lib"
 
-   for (( attempt=1; attempt<=max_attempts; attempt++ )); do
-      _deploy_jenkins "$jenkins_namespace" "$vault_namespace" "$vault_release"
-      deploy_rc=$?
+   local rotator_script_b64 rotator_lib_b64
+   rotator_script_b64=$(base64 < "$rotator_script" | tr -d '\n')
+   [[ -n "$rotator_script_b64" ]] || _err "Failed to encode Jenkins cert rotator script"
+   rotator_lib_b64=$(base64 < "$rotator_lib" | tr -d '\n')
+   [[ -n "$rotator_lib_b64" ]] || _err "Failed to encode Jenkins cert rotator Vault PKI helper"
 
-      wait_rc=0
-      if (( deploy_rc == 0 )); then
-         if _wait_for_jenkins_ready "$jenkins_namespace"; then
-            # Run smoke test after successful deployment
-            _jenkins_run_smoke_test "$jenkins_namespace" "$enable_ldap" "$enable_ad" "$enable_ad_prod" || \
-               _warn "[jenkins] smoke test failed; inspect output above"
-            return 0
-         fi
-         wait_rc=$?
+   export JENKINS_CERT_ROTATOR_SCRIPT_B64="$rotator_script_b64"
+   export JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64="$rotator_lib_b64"
+   [[ -n "${JENKINS_CERT_ROTATOR_VAULT_ADDR:-}" ]] || \
+      export JENKINS_CERT_ROTATOR_VAULT_ADDR="http://${vault_release}.${vault_namespace}.svc:8200"
+   export VAULT_PKI_PATH="${VAULT_PKI_PATH:-pki}"
+   export VAULT_PKI_ROLE_TTL="${VAULT_PKI_ROLE_TTL:-}"
+   export VAULT_NAMESPACE="${VAULT_NAMESPACE:-}"
+   export VAULT_SKIP_VERIFY="${VAULT_SKIP_VERIFY:-}"
+   export VAULT_CACERT="${VAULT_CACERT:-}"
+   export JENKINS_CERT_ROTATOR_ALT_NAMES="${JENKINS_CERT_ROTATOR_ALT_NAMES:-}"
+
+   local rotator_rendered
+   rotator_rendered=$(mktemp -t jenkins-cert-rotator.XXXXXX.yaml)
+   _jenkins_register_rendered_manifest "$rotator_rendered"
+   local envsubst_vars='$JENKINS_CERT_ROTATOR_NAME $JENKINS_NAMESPACE $JENKINS_CERT_ROTATOR_SCRIPT_B64 $JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64 $JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT $VAULT_PKI_SECRET_NS $VAULT_PKI_SECRET_NAME $JENKINS_CERT_ROTATOR_SCHEDULE $JENKINS_CERT_ROTATOR_IMAGE $JENKINS_CERT_ROTATOR_VAULT_ADDR $VAULT_PKI_PATH $VAULT_PKI_ROLE $VAULT_PKI_ROLE_TTL $VAULT_PKI_LEAF_HOST $VAULT_NAMESPACE $VAULT_SKIP_VERIFY $VAULT_CACERT $JENKINS_CERT_ROTATOR_RENEW_BEFORE $JENKINS_CERT_ROTATOR_VAULT_ROLE $JENKINS_CERT_ROTATOR_ALT_NAMES'
+   envsubst "$envsubst_vars" < "$rotator_template" > "$rotator_rendered"
+
+   _kubectl apply --dry-run=client -f "$rotator_rendered" || {
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
+      return "$rc"
+   }
+   if _kubectl apply -f "$rotator_rendered"; then
+      _jenkins_warn_on_cert_rotator_pull_failure "$ns"
+   else
+      local rc=$?
+      _jenkins_cleanup_and_return "$rc"
+      return "$rc"
+   fi
+}
+
+function _jenkins_deploy_agent_resources() {
+   local agent_rbac_template="$JENKINS_CONFIG_DIR/agent-rbac.yaml.tmpl"
+   if [[ -r "$agent_rbac_template" ]]; then
+      local agent_rbac_rendered
+      agent_rbac_rendered=$(mktemp -t jenkins-agent-rbac.XXXXXX.yaml)
+      _jenkins_register_rendered_manifest "$agent_rbac_rendered"
+      envsubst < "$agent_rbac_template" > "$agent_rbac_rendered"
+      if _kubectl apply -f "$agent_rbac_rendered"; then
+         _info "[jenkins] ✓ Agent RBAC configured"
       else
-         wait_rc=$deploy_rc
+         _warn "[jenkins] Failed to deploy agent RBAC (non-fatal)"
       fi
+   else
+      _info "[jenkins] Agent RBAC template not found (skipping)"
+   fi
 
-      if (( attempt >= max_attempts )); then
-         printf 'ERROR: Jenkins deployment failed after %d attempt(s).\n' "$attempt" >&2
-         return "$wait_rc"
+   _info "[jenkins] Agent service will be created automatically by Helm chart"
+
+   local job_dsl_configmap_template="$JENKINS_CONFIG_DIR/job-dsl-configmap.yaml.tmpl"
+   if [[ -r "$job_dsl_configmap_template" ]]; then
+      local job_dsl_configmap_rendered
+      job_dsl_configmap_rendered=$(mktemp -t jenkins-job-dsl-configmap.XXXXXX.yaml)
+      _jenkins_register_rendered_manifest "$job_dsl_configmap_rendered"
+      envsubst < "$job_dsl_configmap_template" > "$job_dsl_configmap_rendered"
+      if _kubectl apply -f "$job_dsl_configmap_rendered"; then
+         _info "[jenkins] ✓ Job DSL ConfigMap deployed"
+      else
+         _warn "[jenkins] Failed to deploy Job DSL ConfigMap (non-fatal)"
       fi
+   else
+      _info "[jenkins] Job DSL ConfigMap template not found (skipping)"
+   fi
+}
 
-      _warn "Jenkins deployment attempt ${attempt} failed (rc=${wait_rc}); retrying..."
-      _kubectl --no-exit --quiet -n "$jenkins_namespace" delete pod -l "$selector" --ignore-not-found >/dev/null 2>&1 || true
-      sleep 10
-   done
+function _jenkins_run_helm_install() {
+   local ns="$1"
+   local values_file="$2"
+   local helm_chart_ref="$3"
+   local admin_secret="$4"
+
+   local -a helm_args=(upgrade --install jenkins "$helm_chart_ref" --namespace "$ns" -f "$values_file")
+   local helm_rc=0
+   if ! _helm "${helm_args[@]}"; then
+      helm_rc=$?
+      if [[ "$admin_secret" == "jenkins" ]]; then
+         if _jenkins_adopt_admin_secret "$ns" "$admin_secret" "jenkins"; then
+            if _helm "${helm_args[@]}"; then
+               helm_rc=0
+            fi
+         fi
+      fi
+   fi
+
+   return "$helm_rc"
 }
 
 function _deploy_jenkins() {
@@ -1487,128 +1811,33 @@ function _deploy_jenkins() {
    _jenkins_capture_trap_state RETURN _JENKINS_PREV_RETURN_TRAP_CMD _JENKINS_PREV_RETURN_TRAP_HANDLER
 
    local exit_trap_cmd="_jenkins_cleanup_rendered_manifests EXIT"
-   if [[ -n "$_JENKINS_PREV_EXIT_TRAP_HANDLER" ]]; then
-      exit_trap_cmd+="; ${_JENKINS_PREV_EXIT_TRAP_HANDLER}"
-   fi
+   [[ -n "$_JENKINS_PREV_EXIT_TRAP_HANDLER" ]] && exit_trap_cmd+="; ${_JENKINS_PREV_EXIT_TRAP_HANDLER}"
    trap '$exit_trap_cmd' EXIT
 
    local return_trap_cmd="_jenkins_cleanup_rendered_manifests RETURN"
-   if [[ -n "$_JENKINS_PREV_RETURN_TRAP_HANDLER" ]]; then
-      return_trap_cmd+="; ${_JENKINS_PREV_RETURN_TRAP_HANDLER}"
-   fi
+   [[ -n "$_JENKINS_PREV_RETURN_TRAP_HANDLER" ]] && return_trap_cmd+="; ${_JENKINS_PREV_RETURN_TRAP_HANDLER}"
    trap '$return_trap_cmd' RETURN
 
    if (( ! skip_repo_ops )); then
-     if ! _helm repo list 2>/dev/null | grep -q jenkins; then
-       _helm repo add jenkins "$helm_repo_url"
-     fi
-     _helm repo update
+      _helm repo list 2>/dev/null | grep -q jenkins >/dev/null 2>&1 || _helm repo add jenkins "$helm_repo_url"
+      _helm repo update
    fi
 
-   # Template selection based on authentication mode
-   local template_file auth_mode
-   if (( enable_ad_prod )); then
-      # Production Active Directory - source AD variables and use AD prod template
-      local ad_vars_file="$JENKINS_CONFIG_DIR/ad-vars.sh"
-      if [[ -r "$ad_vars_file" ]]; then
-         _info "[jenkins] sourcing AD configuration: $ad_vars_file"
-         source "$ad_vars_file"
-      else
-         _warn "[jenkins] AD variables file not found: $ad_vars_file (using environment defaults)"
-      fi
+   _jenkins_select_template "$ns" "${enable_ad_prod:-0}" "${enable_ad:-0}" "${enable_ldap:-0}" "${skip_ad_validation:-0}"
+   local template_file="$_JENKINS_TEMPLATE_FILE"
+   local auth_mode="$_JENKINS_AUTH_MODE"
 
-      # Validate required AD variables
-      if [[ -z "${AD_DOMAIN:-}" ]]; then
-         _err "[jenkins] AD_DOMAIN must be set for production AD (e.g., export AD_DOMAIN=\"corp.example.com\")"
-      fi
-
-      # Validate AD connectivity unless validation is skipped
-      if (( ! skip_ad_validation )); then
-         _validate_ad_connectivity "$AD_DOMAIN" "${AD_SERVER:-}" "${AD_REQUIRE_TLS:-true}"
-      else
-         _warn "[jenkins] AD connectivity validation skipped (--skip-ad-validation)"
-      fi
-
-      template_file="$JENKINS_CONFIG_DIR/values-ad-prod.yaml.tmpl"
-      auth_mode="production-ad"
-      _info "[jenkins] using production Active Directory template: values-ad-prod.yaml.tmpl"
-      _info "[jenkins] AD domain: ${AD_DOMAIN}"
-   elif (( enable_ad )); then
-      # AD schema testing - source LDAP variables with AD-specific overrides
-      local ad_test_vars_file="$SCRIPT_DIR/etc/ad/vars.sh"
-      local ldap_vars_file="$SCRIPT_DIR/etc/ldap/vars.sh"
-
-      if [[ -r "$ldap_vars_file" ]]; then
-         _info "[jenkins] sourcing LDAP configuration: $ldap_vars_file"
-         source "$ldap_vars_file"
-      fi
-
-      if [[ -r "$ad_test_vars_file" ]]; then
-         _info "[jenkins] sourcing AD test configuration: $ad_test_vars_file"
-         source "$ad_test_vars_file"
-      fi
-
-      # Set AD-specific LDAP variables
-      export LDAP_URL="${LDAP_URL:-ldap://openldap-openldap-bitnami.identity.svc:1389}"
-      export LDAP_BASE_DN="${LDAP_BASE_DN:-DC=corp,DC=example,DC=com}"
-      export LDAP_BIND_DN="${LDAP_BIND_DN:-cn=admin,DC=corp,DC=example,DC=com}"
-      export LDAP_USER_SEARCH_BASE="${LDAP_USER_SEARCH_BASE:-OU=Users,DC=corp,DC=example,DC=com}"
-      export LDAP_GROUP_SEARCH_BASE="${LDAP_GROUP_SEARCH_BASE:-OU=Groups,DC=corp,DC=example,DC=com}"
-
-      template_file="$JENKINS_CONFIG_DIR/values-ad-test.yaml.tmpl"
-      auth_mode="ad-testing"
-      _info "[jenkins] using AD schema testing template: values-ad-test.yaml.tmpl"
-   elif (( enable_ldap )); then
-      # Standard LDAP - source LDAP variables
-      local ldap_vars_file="$SCRIPT_DIR/etc/ldap/vars.sh"
-
-      if [[ -r "$ldap_vars_file" ]]; then
-         _info "[jenkins] sourcing LDAP configuration: $ldap_vars_file"
-         source "$ldap_vars_file"
-      fi
-
-      # Set LDAP connection variables
-      export LDAP_URL="${LDAP_URL:-ldap://openldap-openldap-bitnami.identity.svc:1389}"
-
-      template_file="$JENKINS_CONFIG_DIR/values-ldap.yaml.tmpl"
-      auth_mode="standard-ldap"
-      _info "[jenkins] using standard LDAP template: values-ldap.yaml.tmpl"
-   else
-      # No directory service - use default template
-      template_file="$JENKINS_CONFIG_DIR/values-default.yaml.tmpl"
-      auth_mode="none"
-      _info "[jenkins] using default template (no directory service): values-default.yaml.tmpl"
-   fi
-
-   # Export LDAP credentials from Kubernetes secret for envsubst template processing
-   # The jenkins-ldap-config secret is created by ESO from Vault
-   # We need to read it and export as env vars for envsubst to work
-   if [[ "$auth_mode" == "standard-ldap" || "$auth_mode" == "ad-prod" || "$auth_mode" == "ad-test" ]]; then
-      _info "[jenkins] retrieving LDAP credentials from Kubernetes secret for template processing"
-      # Check if secret exists
-      if _kubectl --no-exit get secret jenkins-ldap-config -n "$ns" >/dev/null 2>&1; then
-         # Export credentials for envsubst
-         export LDAP_BASE_DN
-         export LDAP_BIND_DN
-         export LDAP_BIND_PASSWORD
-         LDAP_BASE_DN=$(_kubectl get secret jenkins-ldap-config -n "$ns" -o jsonpath='{.data.LDAP_BASE_DN}' 2>/dev/null | base64 -d)
-         LDAP_BIND_DN=$(_kubectl get secret jenkins-ldap-config -n "$ns" -o jsonpath='{.data.LDAP_BIND_DN}' 2>/dev/null | base64 -d)
-         LDAP_BIND_PASSWORD=$(_kubectl get secret jenkins-ldap-config -n "$ns" -o jsonpath='{.data.LDAP_BIND_PASSWORD}' 2>/dev/null | base64 -d)
-
-         if [[ -z "$LDAP_BIND_PASSWORD" ]]; then
-            _warn "[jenkins] LDAP_BIND_PASSWORD is empty in jenkins-ldap-config secret"
-         fi
-      else
-         _warn "[jenkins] jenkins-ldap-config secret not found, LDAP variables will be empty"
-      fi
-   fi
+   case "$auth_mode" in
+      standard-ldap|production-ad|ad-testing)
+         _info "[jenkins] retrieving LDAP credentials from Kubernetes secret for template processing"
+         _jenkins_load_ldap_secret "$ns" || true
+         ;;
+   esac
 
    # Process template with envsubst if it's a .tmpl file
    local values_file
    if [[ "$template_file" == *.tmpl ]]; then
-      if [[ ! -r "$template_file" ]]; then
-         _err "[jenkins] template file not found: $template_file"
-      fi
+      [[ -r "$template_file" ]] || _err "[jenkins] template file not found: $template_file"
       values_file=$(mktemp -t jenkins-values.XXXXXX.yaml)
       _jenkins_register_rendered_manifest "$values_file"
       # Export file reference variables for Vault agent sidecar
@@ -1635,11 +1864,8 @@ function _deploy_jenkins() {
       _info "[jenkins] DEBUG rendered values (JENKINS_NAMESPACE) -> $(grep -n 'jenkins\.\${' "$values_file" || true)"
       _info "[jenkins] DEBUG rendered values snippet: $(grep -n 'jenkins\.' "$values_file" | head -n 3)"
    else
-      # Use file directly (no template processing)
       values_file="${JENKINS_VALUES_FILE:-$template_file}"
-      if [[ ! -r "$values_file" ]]; then
-         _err "Jenkins values file not found: $values_file"
-      fi
+      [[ -r "$values_file" ]] || _err "Jenkins values file not found: $values_file"
    fi
 
    # If LDAP is disabled, create a temporary values file without LDAP env vars
@@ -1678,7 +1904,7 @@ function _deploy_jenkins() {
          match($0, /^[[:space:]]*/ )
          security_realm_indent = RLENGTH
          indent_str = substr($0, 1, security_realm_indent)
-         if (!inserted_local_realm) {
+         ;if (!inserted_local_realm) {
             print indent_str "securityRealm:"
             print indent_str "  local:"
             print indent_str "    allowsSignup: false"
@@ -1694,10 +1920,10 @@ function _deploy_jenkins() {
       skip_security_realm {
          match($0, /^[[:space:]]*/ )
          current_indent = RLENGTH
-         if (current_indent <= security_realm_indent && $0 ~ /^[[:space:]]*[a-zA-Z]+:/) {
+         ;if (current_indent <= security_realm_indent && $0 ~ /^[[:space:]]*[a-zA-Z]+:/) {
             skip_security_realm = 0
          }
-         if (skip_security_realm) next
+         ;if (skip_security_realm) next
       }
 
       in_jcasc_security && /^[[:space:]]*authorizationStrategy:/ {
@@ -1717,10 +1943,10 @@ function _deploy_jenkins() {
       skip_authz_block {
          match($0, /^[[:space:]]*/ )
          current_indent = RLENGTH
-         if (current_indent <= auth_block_indent && $0 ~ /^[[:space:]]*([a-zA-Z#])/) {
+         ;if (current_indent <= auth_block_indent && $0 ~ /^[[:space:]]*([a-zA-Z#])/) {
             skip_authz_block = 0
          }
-         if (skip_authz_block) next
+         ;if (skip_authz_block) next
       }
 
       /^[[:space:]]*containerEnv:/ {
@@ -1740,19 +1966,19 @@ function _deploy_jenkins() {
       skip_depth > 0 {
          match($0, /^[[:space:]]*/ )
          current_indent = RLENGTH
-         if ($0 ~ /^[[:space:]]*- name:/ && current_indent == ldap_indent) {
+         ;if ($0 ~ /^[[:space:]]*- name:/ && current_indent == ldap_indent) {
             skip_depth = 0
          } else if (current_indent <= ldap_indent && $0 !~ /^[[:space:]]*[a-zA-Z]+:/ && $0 !~ /^[[:space:]]*key:/) {
             skip_depth = 0
          }
-         if (skip_depth > 0) next
+         ;if (skip_depth > 0) next
       }
 
       {
-         if (in_env_block && !inserted_leaf_env) {
+         ;if (in_env_block && !inserted_leaf_env) {
             match($0, /^[[:space:]]*/ )
             current_indent = RLENGTH
-            if (current_indent <= env_block_indent && $0 ~ /^[[:space:]]*([a-zA-Z#])/ && $0 !~ /^[[:space:]]*containerEnv:/) {
+            ;if (current_indent <= env_block_indent && $0 ~ /^[[:space:]]*([a-zA-Z#])/ && $0 !~ /^[[:space:]]*containerEnv:/) {
                printf "%s- name: VAULT_PKI_LEAF_HOST\n", sprintf("%*s", env_block_indent + 2, "")
                printf "%svalue: \"%s\"\n", sprintf("%*s", env_block_indent + 4, ""), leaf_host
                inserted_leaf_env = 1
@@ -1764,7 +1990,7 @@ function _deploy_jenkins() {
       }
 
       END {
-         if (in_env_block && !inserted_leaf_env) {
+         ;if (in_env_block && !inserted_leaf_env) {
             printf "%s- name: VAULT_PKI_LEAF_HOST\n", sprintf("%*s", env_block_indent + 2, "")
             printf "%svalue: \"%s\"\n", sprintf("%*s", env_block_indent + 4, ""), leaf_host
          }
@@ -1774,19 +2000,8 @@ function _deploy_jenkins() {
       values_file="$temp_values"
    fi
 
-   local -a helm_args=(upgrade --install jenkins "$helm_chart_ref" --namespace "$ns" -f "$values_file")
-
-   local helm_rc=0
-   if ! _helm "${helm_args[@]}"; then
-      helm_rc=$?
-      if [[ "$admin_secret" == "jenkins" ]]; then
-         if _jenkins_adopt_admin_secret "$ns" "$admin_secret" "jenkins"; then
-            if _helm "${helm_args[@]}"; then
-               helm_rc=0
-            fi
-         fi
-      fi
-   fi
+   _jenkins_run_helm_install "$ns" "$values_file" "$helm_chart_ref" "$admin_secret"
+   local helm_rc=$?
 
    if (( helm_rc != 0 )); then
       _jenkins_cleanup_and_return "$helm_rc"
@@ -1799,220 +2014,21 @@ function _deploy_jenkins() {
    export VAULT_PKI_SECRET_NAME="$vault_pki_secret_name"
    export VAULT_PKI_LEAF_HOST="$vault_pki_leaf_host"
 
-   local gw_template="$JENKINS_CONFIG_DIR/gateway.yaml"
-   if [[ ! -r "$gw_template" ]]; then
-      _err "Gateway YAML file not found: $gw_template"
-   fi
+   local vault_pki_secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
+   local vault_pki_leaf_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
 
-   local gw_rendered
-   gw_rendered=$(mktemp -t jenkins-gateway.XXXXXX.yaml)
-   _jenkins_register_rendered_manifest "$gw_rendered"
-   envsubst < "$gw_template" > "$gw_rendered"
-
-   if _kubectl apply -n istio-system --dry-run=client -f "$gw_rendered"; then
-      :
-   else
-      local rc=$?
-      _jenkins_cleanup_and_return "$rc"
-      return "$rc"
-   fi
-   if _kubectl apply -n istio-system -f "$gw_rendered"; then
-      :
-   else
-      local rc=$?
-      _jenkins_cleanup_and_return "$rc"
-      return "$rc"
-   fi
-
+   export VAULT_PKI_SECRET_NAME="$vault_pki_secret_name"
+   export VAULT_PKI_LEAF_HOST="$vault_pki_leaf_host"
    JENKINS_NAMESPACE="${ns:-${JENKINS_NAMESPACE}}"
    : "${JENKINS_NAMESPACE:?JENKINS_NAMESPACE not set}"
-   local vs_template="$JENKINS_CONFIG_DIR/virtualservice.yaml.tmpl"
-   if [[ ! -r "$vs_template" ]]; then
-      _err "VirtualService template file not found: $vs_template"
-   fi
 
-   local dr_template="$JENKINS_CONFIG_DIR/destinationrule.yaml.tmpl"
-   if [[ ! -r "$dr_template" ]]; then
-      _err "DestinationRule template file not found: $dr_template"
-   fi
-
-   local vs_hosts_input="${JENKINS_VIRTUALSERVICE_HOSTS:-${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}}"
-   local -a vs_hosts_lines=()
-   local -a _vs_hosts_split=()
-   IFS=',' read -r -a _vs_hosts_split <<<"$vs_hosts_input"
-   local _vs_host trimmed
-   for _vs_host in "${_vs_hosts_split[@]}"; do
-      trimmed="${_vs_host#"${_vs_host%%[![:space:]]*}"}"
-      trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
-      if [[ -n "$trimmed" ]]; then
-         vs_hosts_lines+=("    - ${trimmed}")
-      fi
-   done
-   if (( ${#vs_hosts_lines[@]} == 0 )); then
-      vs_hosts_lines=("    - jenkins.dev.local.me")
-   fi
-   local JENKINS_VIRTUALSERVICE_HOSTS_YAML
-   printf -v JENKINS_VIRTUALSERVICE_HOSTS_YAML '%s\n' "${vs_hosts_lines[@]}"
-   export JENKINS_VIRTUALSERVICE_HOSTS_YAML
-
-   local vs_rendered
-   vs_rendered=$(mktemp -t jenkins-virtualservice.XXXXXX.yaml)
-   _jenkins_register_rendered_manifest "$vs_rendered"
-   envsubst < "$vs_template" > "$vs_rendered"
-
-   local dr_rendered
-   dr_rendered=$(mktemp -t jenkins-destinationrule.XXXXXX.yaml)
-   _jenkins_register_rendered_manifest "$dr_rendered"
-   envsubst < "$dr_template" > "$dr_rendered"
-
-   if _kubectl apply -n "$ns" --dry-run=client -f "$vs_rendered"; then
-      :
-   else
-      local rc=$?
-      _jenkins_cleanup_and_return "$rc"
-      return "$rc"
-   fi
-   if _kubectl apply -n "$ns" -f "$vs_rendered"; then
-      :
-   else
-      local rc=$?
-      _jenkins_cleanup_and_return "$rc"
-      return "$rc"
-   fi
-
-   if _kubectl apply -n "$ns" --dry-run=client -f "$dr_rendered"; then
-      :
-   else
-      local rc=$?
-      _jenkins_cleanup_and_return "$rc"
-      return "$rc"
-   fi
-   if _kubectl apply -n "$ns" -f "$dr_rendered"; then
-      :
-   else
-      local rc=$?
-      _jenkins_cleanup_and_return "$rc"
-      return "$rc"
-   fi
-
-   if [[ "${JENKINS_CERT_ROTATOR_ENABLED:-0}" == "1" ]]; then
-      local rotator_template="$JENKINS_CONFIG_DIR/jenkins-cert-rotator.yaml.tmpl"
-      local rotator_script="$JENKINS_CONFIG_DIR/cert-rotator.sh"
-      local rotator_lib="$SCRIPT_DIR/lib/vault_pki.sh"
-
-      if [[ ! -r "$rotator_template" ]]; then
-         _err "Jenkins cert rotator template file not found: $rotator_template"
-      fi
-
-      if [[ ! -r "$rotator_script" ]]; then
-         _err "Jenkins cert rotator script not found: $rotator_script"
-      fi
-
-      if [[ ! -r "$rotator_lib" ]]; then
-         _err "Jenkins cert rotator Vault PKI helper not found: $rotator_lib"
-      fi
-
-      local rotator_script_b64 rotator_lib_b64
-      rotator_script_b64=$(base64 < "$rotator_script" | tr -d '\n')
-
-      if [[ -z "$rotator_script_b64" ]]; then
-         _err "Failed to encode Jenkins cert rotator script"
-      fi
-
-      rotator_lib_b64=$(base64 < "$rotator_lib" | tr -d '\n')
-
-      if [[ -z "$rotator_lib_b64" ]]; then
-         _err "Failed to encode Jenkins cert rotator Vault PKI helper"
-      fi
-
-      export JENKINS_CERT_ROTATOR_SCRIPT_B64="$rotator_script_b64"
-      export JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64="$rotator_lib_b64"
-
-      if [[ -z "${JENKINS_CERT_ROTATOR_VAULT_ADDR:-}" ]]; then
-         export JENKINS_CERT_ROTATOR_VAULT_ADDR="http://${vault_release}.${vault_namespace}.svc:8200"
-      fi
-
-      # Ensure all template variables are exported with defaults for envsubst
-      # envsubst doesn't understand bash ${VAR:-default} syntax, so we must set defaults explicitly
-      export VAULT_PKI_PATH="${VAULT_PKI_PATH:-pki}"
-      export VAULT_PKI_ROLE_TTL="${VAULT_PKI_ROLE_TTL:-}"
-      export VAULT_NAMESPACE="${VAULT_NAMESPACE:-}"
-      export VAULT_SKIP_VERIFY="${VAULT_SKIP_VERIFY:-}"
-      export VAULT_CACERT="${VAULT_CACERT:-}"
-      export JENKINS_CERT_ROTATOR_ALT_NAMES="${JENKINS_CERT_ROTATOR_ALT_NAMES:-}"
-
-      local rotator_rendered
-      rotator_rendered=$(mktemp -t jenkins-cert-rotator.XXXXXX.yaml)
-      _jenkins_register_rendered_manifest "$rotator_rendered"
-      # Use variable whitelist to prevent envsubst from expanding shell variables in inline scripts
-      local envsubst_vars='$JENKINS_CERT_ROTATOR_NAME $JENKINS_NAMESPACE $JENKINS_CERT_ROTATOR_SCRIPT_B64 $JENKINS_CERT_ROTATOR_VAULT_PKI_LIB_B64 $JENKINS_CERT_ROTATOR_SERVICE_ACCOUNT $VAULT_PKI_SECRET_NS $VAULT_PKI_SECRET_NAME $JENKINS_CERT_ROTATOR_SCHEDULE $JENKINS_CERT_ROTATOR_IMAGE $JENKINS_CERT_ROTATOR_VAULT_ADDR $VAULT_PKI_PATH $VAULT_PKI_ROLE $VAULT_PKI_ROLE_TTL $VAULT_PKI_LEAF_HOST $VAULT_NAMESPACE $VAULT_SKIP_VERIFY $VAULT_CACERT $JENKINS_CERT_ROTATOR_RENEW_BEFORE $JENKINS_CERT_ROTATOR_VAULT_ROLE $JENKINS_CERT_ROTATOR_ALT_NAMES'
-      envsubst "$envsubst_vars" < "$rotator_template" > "$rotator_rendered"
-
-      if _kubectl apply --dry-run=client -f "$rotator_rendered"; then
-         :
-      else
-         local rc=$?
-         _jenkins_cleanup_and_return "$rc"
-         return "$rc"
-      fi
-
-      if _kubectl apply -f "$rotator_rendered"; then
-         _jenkins_warn_on_cert_rotator_pull_failure "$ns"
-      else
-         local rc=$?
-         _jenkins_cleanup_and_return "$rc"
-         return "$rc"
-      fi
-   fi
-
-   # Deploy Jenkins agent RBAC and service for Kubernetes pod-based agents
-   _info "[jenkins] Deploying Jenkins agent RBAC and service..."
-   local agent_rbac_template="$JENKINS_CONFIG_DIR/agent-rbac.yaml.tmpl"
-   local agent_service_template="$JENKINS_CONFIG_DIR/agent-service.yaml.tmpl"
-
-   if [[ -r "$agent_rbac_template" ]]; then
-      local agent_rbac_rendered
-      agent_rbac_rendered=$(mktemp -t jenkins-agent-rbac.XXXXXX.yaml)
-      _jenkins_register_rendered_manifest "$agent_rbac_rendered"
-      envsubst < "$agent_rbac_template" > "$agent_rbac_rendered"
-
-      if _kubectl apply -f "$agent_rbac_rendered"; then
-         _info "[jenkins] ✓ Agent RBAC configured"
-      else
-         _warn "[jenkins] Failed to deploy agent RBAC (non-fatal)"
-      fi
-   else
-      _info "[jenkins] Agent RBAC template not found (skipping)"
-   fi
-
-   # NOTE: Agent service is now automatically created by Helm chart when JCasC
-   # Kubernetes cloud configuration is present. Manual deployment removed to avoid conflicts.
-   # The Helm chart creates: jenkins-agent service on port 50000 (JNLP)
-   _info "[jenkins] Agent service will be created automatically by Helm chart"
-
-   # Deploy Job DSL ConfigMap for automated job creation
-   _info "[jenkins] Deploying Job DSL ConfigMap..."
-   local job_dsl_configmap_template="$JENKINS_CONFIG_DIR/job-dsl-configmap.yaml.tmpl"
-
-   if [[ -r "$job_dsl_configmap_template" ]]; then
-      local job_dsl_configmap_rendered
-      job_dsl_configmap_rendered=$(mktemp -t jenkins-job-dsl-configmap.XXXXXX.yaml)
-      _jenkins_register_rendered_manifest "$job_dsl_configmap_rendered"
-      envsubst < "$job_dsl_configmap_template" > "$job_dsl_configmap_rendered"
-
-      if _kubectl apply -f "$job_dsl_configmap_rendered"; then
-         _info "[jenkins] ✓ Job DSL ConfigMap deployed (seed job will auto-create jobs)"
-      else
-         _warn "[jenkins] Failed to deploy Job DSL ConfigMap (non-fatal)"
-      fi
-   else
-      _info "[jenkins] Job DSL ConfigMap template not found (skipping)"
-   fi
+   _jenkins_apply_istio_resources "$ns" "$vault_pki_leaf_host" "$vault_pki_secret_name" || return $?
+   _jenkins_deploy_cert_rotator_if_enabled "$ns" "$vault_namespace" "$vault_release" || return $?
+   _jenkins_deploy_agent_resources
 
    local jenkins_host="$vault_pki_leaf_host"
    local secret_namespace="${VAULT_PKI_SECRET_NS:-istio-system}"
    local secret_name="$vault_pki_secret_name"
-
    if [[ "${JENKINS_SKIP_TLS:-0}" != "1" ]]; then
       _vault_issue_pki_tls_secret "$vault_namespace" "$vault_release" "" "" \
          "$jenkins_host" "$secret_namespace" "$secret_name"
