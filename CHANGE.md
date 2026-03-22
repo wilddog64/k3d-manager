@@ -1,5 +1,23 @@
 # Changes - k3d-manager
 
+## [Unreleased] v0.9.6 — ACG plugin + kops-for-k3s reframe
+
+### Added
+- **`acg_provision`** (`scripts/plugins/acg.sh`): Provisions ACG AWS sandbox EC2 instance — VPC, subnet, IGW, SG, key pair, t3.medium launch, SSH config update. Requires `--confirm`. Replaces `bin/acg-sandbox.sh`.
+- **`acg_status`** (`scripts/plugins/acg.sh`): Reports instance state, public IP, and k3s health. Check-only, no side effects.
+- **`acg_extend`** (`scripts/plugins/acg.sh`): Opens ACG sandbox URL to extend TTL (+4h). macOS: opens browser. Linux: prints URL.
+- **`acg_teardown`** (`scripts/plugins/acg.sh`): Terminates EC2 instance and removes `ubuntu-k3s` kubeconfig context. Requires `--confirm`.
+- **`scripts/tests/plugins/acg.bats`**: 12-case BATS suite covering all four functions with AWS/kubectl/ssh stubs.
+
+### Removed
+- **`bin/acg-sandbox.sh`**: Retired — all functionality migrated to `scripts/plugins/acg.sh`.
+
+### Changed
+- **`scripts/lib/help/utils.sh`**: Added `ACG sandbox` category (`acg_*`) to the help system.
+- **`docs/plans/roadmap-v1.md`**: Reframed vision as kops-for-k3s — dropped EKS/GKE/AKS scope; revised v1.x milestones to focus on k3s multi-node, full-stack provisioning, k3dm-mcp, and home lab.
+
+---
+
 ## [Unreleased] v0.9.5 — deploy_app_cluster via k3sup
 
 ### Added
