@@ -4,7 +4,8 @@
 
 **v0.9.3 SHIPPED** — squash-merged to main (8046c73), PR #36, 2026-03-16. Tagged + released.
 **v0.9.4 SHIPPED** — merged to main (662878a), PR #37, 2026-03-21.
-**v0.9.5 ACTIVE** — branch cut from main 2026-03-21.
+**v0.9.5 SHIPPED** — PR #38 squash-merged to main (`573c0ac`) 2026-03-21. Tagged v0.9.5, released.
+**v0.9.6 ACTIVE** — branch cut from main 2026-03-21. Focus: ACG AWS sandbox development.
 
 ---
 
@@ -40,13 +41,17 @@
 
 ---
 
-## v0.9.5 — Active
+## v0.9.5 — Completed
 
-**Primary focus: plan v1.0.0 multi-node k3sup + Samba AD (deploy_app_cluster delivered in v0.9.5).**
-Shopping-cart pod health issues (order-service RabbitMQ, payment-service memory, frontend) require multi-node to resolve structurally; deferred to v1.0.0.
-
-### Primary
 - [x] **`deploy_app_cluster` via k3sup** — `k3sup install` on EC2 + kubeconfig merge + ArgoCD cluster registration; replaces manual Gemini rebuild; prerequisite for v1.0.0 multi-node extension
+- [x] check_cluster_health.sh hardening — kubectl context pinning, API server retry loop, `kubectl wait` replacing `rollout status`
+- [x] Retro: `docs/retro/2026-03-21-v0.9.5-retrospective.md`
+
+---
+
+## v0.9.6 — Active
+
+**Focus: ACG AWS sandbox development — M2 Air is at resource ceiling; shift CI and smoke testing to EC2.**
 
 ### Code Quality / Architecture
 - [ ] **Upstream local lib edits to lib-foundation** — `scripts/lib/system.sh` (TTY fix + `_run_command_resolve_sudo`) and `scripts/lib/agent_rigor.sh` (allowlist feature) need PRs to lib-foundation `feat/v0.3.4` → subtree pull → remove local divergence
