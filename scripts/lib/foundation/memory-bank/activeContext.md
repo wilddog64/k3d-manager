@@ -1,9 +1,9 @@
 # Active Context — lib-foundation
 
-## Current State: `feat/v0.3.3` (as of 2026-03-16)
+## Current State: `feat/v0.3.4` (as of 2026-03-16)
 
-**v0.3.2 SHIPPED** — PR #7 merged (98f6ee0), tagged, GitHub release created. Repo is now **public**.
-**feat/v0.3.3 ACTIVE** — branch cut from main 2026-03-16.
+**v0.3.3 SHIPPED** — PR #8 squash-merged (b9f1fda), tagged, GitHub release created 2026-03-16.
+**feat/v0.3.4 ACTIVE** — branch cut from main 2026-03-16. No spec yet.
 
 ---
 
@@ -15,6 +15,7 @@ Shared Bash foundation library. Contains:
 - `scripts/lib/agent_rigor.sh` — `_agent_checkpoint`, `_agent_audit`, `_agent_lint`
 
 Consumed by downstream repos via git subtree pull.
+API reference: `docs/api/functions.md`
 
 ---
 
@@ -22,17 +23,17 @@ Consumed by downstream repos via git subtree pull.
 
 | Version | Status | Notes |
 |---|---|---|
-| v0.1.0–v0.3.2 | released | See README Releases table |
-| v0.3.3 | **active** | cut 2026-03-16 |
+| v0.1.0–v0.3.3 | released | See `docs/releases.md` |
+| v0.3.4 | **active** | cut 2026-03-16 — no spec yet |
 
 ---
 
 ## Open Items
 
-- [x] **API reference doc** — `docs/api/functions.md` merged on feat/v0.3.3 (`9b224bb`)
-- [ ] **k3d-manager subtree pull** — pull v0.3.2 into k3d-manager-v0.9.3
-- [ ] Add `rigor-cli` as consumer
-- [ ] Add `shopping-carts` as consumer
+- [ ] **Fix `docs/api/functions.md`** — 12 Copilot findings from PR #8; Codex task on feat/v0.3.4. Must read each function body before writing description. Key fixes: remove `_DETECTED_PLATFORM` global, fix `_detect_platform` return values, `_deploy_cluster_resolve_provider` sets global not print, `_agent_lint` is AI-based not shellcheck, `_cluster_provider` precedence order wrong, `_agent_audit` scope wrong, sourcing paths wrong, `create_cluster` signature incomplete.
+- [ ] **k3d-manager subtree pull** — pull v0.3.3 into k3d-manager (after v0.9.3 smoke test)
+- [ ] `rigor-cli` — separate repo, lib-foundation as git subtree; CLI: `checkpoint|audit|lint`
+- [ ] `shopping-carts` as consumer (future)
 
 ---
 
@@ -51,8 +52,8 @@ Consumed by downstream repos via git subtree pull.
 
 | Repo | Integration | Status |
 |---|---|---|
-| `k3d-manager` | git subtree at `scripts/lib/foundation/` | subtree pull to v0.3.2 pending |
-| `rigor-cli` | git subtree (planned) | future |
+| `k3d-manager` | git subtree at `scripts/lib/foundation/` | on v0.3.2; v0.3.3 pull pending |
+| `rigor-cli` | git subtree (planned) | separate repo, future |
 | `shopping-carts` | git subtree (planned) | future |
 
 ---
@@ -63,7 +64,7 @@ Consumed by downstream repos via git subtree pull.
 - **shellcheck**: run on every touched `.sh` file before commit
 - **No bare sudo**: always `_run_command --interactive-sudo` for install helpers, `--prefer-sudo` for non-interactive
 - **All changes originate here** — never edit consumer subtree copies directly
-- **Release flow**: PR → merge → tag → GitHub release → flip public (already done) → consumers run `git subtree pull`
+- **Release flow**: PR → merge → tag → GitHub release → consumers run `git subtree pull`
 
 ## Lessons Learned
 

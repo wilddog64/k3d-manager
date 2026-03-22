@@ -376,7 +376,7 @@ fi
 
 # Session cost (from stdin, no API call)
 if [ "${STATUSLINE_SHOW_SESSION_COST}" = "true" ]; then
-    cost_fmt=$(printf "%.2f" "$session_cost" 2>/dev/null || echo "0.00")
+    cost_fmt=$(awk "BEGIN {printf \"%.4f\", $session_cost / 100}" 2>/dev/null || echo "0.0000")
     sym="${STATUSLINE_CURRENCY_SYMBOL}"
     out1+="${sep}${white}cost ${sym}${cost_fmt}${reset}"
 fi
