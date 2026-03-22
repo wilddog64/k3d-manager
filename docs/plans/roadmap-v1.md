@@ -44,14 +44,14 @@ as proper k3d-manager functions:
 ```bash
 ./scripts/k3d-manager acg_provision   # launch EC2, configure VPC/SG/key, update SSH config
 ./scripts/k3d-manager acg_status      # show instance state, TTL, credentials validity
-./scripts/k3d-manager acg_extend      # Antigravity TTL +4h (browser UI automation)
+./scripts/k3d-manager acg_extend      # open ACG sandbox page to extend TTL (+4h)
 ./scripts/k3d-manager acg_teardown    # terminate instance, clean kubeconfig entry
 ```
 
 - `acg_provision` absorbs all logic from `bin/acg-sandbox.sh`
-- `acg_extend` integrates Antigravity to automate the ACG web UI TTL extension
+- `acg_extend` opens the ACG sandbox page so the user can click "Extend Lab" (+4h)
 - `bin/acg-sandbox.sh` retired after migration
-- BATS coverage: `scripts/tests/plugins/acg.bats` (`env -i` clean; mocks aws CLI and Antigravity calls)
+- BATS coverage: `scripts/tests/plugins/acg.bats` (`env -i` clean; mocks aws CLI and ssh calls)
 
 ### Lab Accessibility (LoadBalancer Services)
 

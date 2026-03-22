@@ -3,6 +3,7 @@
 bats_require_minimum_version 1.5.0
 
 setup() {
+  source "${BATS_TEST_DIRNAME}/../test_helpers.bash"
   export SCRIPT_DIR="$(cd "${BATS_TEST_DIRNAME}/../.." && pwd)"
   export PLUGINS_DIR="${SCRIPT_DIR}/plugins"
   export HOME="${BATS_TEST_TMPDIR}"
