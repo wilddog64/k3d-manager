@@ -4,6 +4,7 @@
 # Functions: acg_provision acg_status acg_extend acg_teardown
 
 : "${ACG_REGION:=us-west-2}"
+: "${ACG_ALLOWED_CIDR:=0.0.0.0/0}"
 _ACG_INSTANCE_NAME="k3d-manager-ubuntu"
 _ACG_INSTANCE_TYPE="t3.medium"
 _ACG_KEY_NAME="k3d-manager-key"
@@ -18,15 +19,16 @@ _ACG_SANDBOX_URL="https://learn.acloud.guru/cloud-playground/cloud-sandboxes"
 _acg_check_credentials() {
   _info "[acg] Checking AWS credentials..."
   local arn
-  if ! arn=$(_run_command -- aws sts get-caller-identity --region "${ACG_REGION}" --query 'Arn' --output text 2>/dev/null); then
-    _err "[acg] AWS CLI credentials invalid or expired. Update ~/.aws/credentials from the ACG console."
+  if ! arn=$(_run_command --soft -- aws sts get-caller-identity --region "${ACG_REGION}" --query 'Arn' --output text 2>/dev/null); then
+    printf 'ERROR: %s\n' "[acg] AWS credentials invalid or expired. Update ~/.aws/credentials from the ACG console." >&2
+    return 1
   fi
   _info "[acg] Credentials OK (${arn})"
 }
 
 _acg_get_instance_id() {
   local instance_id
-  instance_id=$(_run_command -- aws ec2 describe-instances --region "${ACG_REGION}" \
+  instance_id=$(_run_command --soft -- aws ec2 describe-instances --region "${ACG_REGION}" \
     --filters "Name=tag:Name,Values=${_ACG_INSTANCE_NAME}" \
               "Name=instance-state-name,Values=running,stopped,pending" \
     --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || true)
@@ -38,7 +40,7 @@ _acg_get_instance_id() {
 
 _acg_get_instance_attr() {
   local instance_id="$1" query="$2"
-  _run_command -- aws ec2 describe-instances --region "${ACG_REGION}" --instance-ids "$instance_id" \
+  _run_command --soft -- aws ec2 describe-instances --region "${ACG_REGION}" --instance-ids "$instance_id" \
     --query "$query" --output text 2>/dev/null || true
 }
 
@@ -47,61 +49,97 @@ _acg_update_ssh_config() {
   [[ -f "${_ACG_SSH_CONFIG}" ]] || return 0
   _info "[acg] Updating SSH config with IP ${new_ip}"
   local python_cmd
-  read -r -d '' python_cmd <<PY
+  python_cmd=$(cat <<PY
 import re
 path = r"${_ACG_SSH_CONFIG}"
 with open(path, 'r') as f:
     content = f.read()
 for host in ('ubuntu', 'ubuntu-tunnel'):
-    pattern = rf"(^Host {host}$.*?^\\s+HostName\\s+)\\S+"
-    content = re.sub(pattern, rf"\\1${new_ip}", content, flags=re.MULTILINE | re.DOTALL)
+    pattern = rf"(^Host {host}\$.*?^\\s+HostName\\s+)\\S+"
+    content = re.sub(pattern, rf"\\g<1>${new_ip}", content, flags=re.MULTILINE | re.DOTALL)
 with open(path, 'w') as f:
     f.write(content)
 PY
+)
   _run_command -- python3 -c "$python_cmd"
+}
+
+_acg_find_vpc() {
+  local vpc_id
+  vpc_id=$(_run_command --soft -- aws ec2 describe-vpcs --region "${ACG_REGION}" \
+    --filters "Name=tag:Name,Values=k3d-manager-vpc" \
+    --query 'Vpcs[0].VpcId' --output text 2>/dev/null || true)
+  if [[ "$vpc_id" == "None" || "$vpc_id" == "null" ]]; then vpc_id=""; fi
+  printf '%s' "$vpc_id"
+}
+
+_acg_find_sg() {
+  local sg_id
+  sg_id=$(_run_command --soft -- aws ec2 describe-security-groups --region "${ACG_REGION}" \
+    --filters "Name=group-name,Values=k3d-manager-sg" \
+    --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || true)
+  if [[ "$sg_id" == "None" || "$sg_id" == "null" ]]; then sg_id=""; fi
+  printf '%s' "$sg_id"
 }
 
 _acg_provision_stack() {
   _info "[acg] Provisioning VPC stack in ${ACG_REGION}..."
   local vpc_id subnet_id igw_id rt_id sg_id ami_id instance_id public_ip
 
-  vpc_id=$(_run_command -- aws ec2 create-vpc --region "${ACG_REGION}" --cidr-block "${_ACG_VPC_CIDR}" \
-    --query 'Vpc.VpcId' --output text)
-  _run_command -- aws ec2 modify-vpc-attribute --region "${ACG_REGION}" --vpc-id "$vpc_id" --enable-dns-hostnames
-  _run_command -- aws ec2 create-tags --region "${ACG_REGION}" --resources "$vpc_id" \
-    --tags Key=Name,Value=k3d-manager-vpc
-  _info "[acg] VPC: $vpc_id"
+  vpc_id=$(_acg_find_vpc)
+  if [[ -n "$vpc_id" ]]; then
+    _info "[acg] Reusing existing VPC: $vpc_id"
+    subnet_id=$(_run_command --soft -- aws ec2 describe-subnets --region "${ACG_REGION}" \
+      --filters "Name=tag:Name,Values=k3d-manager-subnet" \
+      --query 'Subnets[0].SubnetId' --output text 2>/dev/null || true)
+    [[ "$subnet_id" == "None" || "$subnet_id" == "null" ]] && subnet_id=""
+  else
+    vpc_id=$(_run_command -- aws ec2 create-vpc --region "${ACG_REGION}" --cidr-block "${_ACG_VPC_CIDR}" \
+      --query 'Vpc.VpcId' --output text)
+    _run_command -- aws ec2 modify-vpc-attribute --region "${ACG_REGION}" --vpc-id "$vpc_id" --enable-dns-hostnames
+    _run_command -- aws ec2 create-tags --region "${ACG_REGION}" --resources "$vpc_id" \
+      --tags Key=Name,Value=k3d-manager-vpc
+    _info "[acg] VPC: $vpc_id"
 
-  subnet_id=$(_run_command -- aws ec2 create-subnet --region "${ACG_REGION}" --vpc-id "$vpc_id" \
-    --cidr-block "${_ACG_SUBNET_CIDR}" --availability-zone "${ACG_REGION}a" \
-    --query 'Subnet.SubnetId' --output text)
-  _run_command -- aws ec2 modify-subnet-attribute --region "${ACG_REGION}" --subnet-id "$subnet_id" --map-public-ip-on-launch
-  _run_command -- aws ec2 create-tags --region "${ACG_REGION}" --resources "$subnet_id" \
-    --tags Key=Name,Value=k3d-manager-subnet
-  _info "[acg] Subnet: $subnet_id"
+    subnet_id=$(_run_command -- aws ec2 create-subnet --region "${ACG_REGION}" --vpc-id "$vpc_id" \
+      --cidr-block "${_ACG_SUBNET_CIDR}" --availability-zone "${ACG_REGION}a" \
+      --query 'Subnet.SubnetId' --output text)
+    _run_command -- aws ec2 modify-subnet-attribute --region "${ACG_REGION}" --subnet-id "$subnet_id" --map-public-ip-on-launch
+    _run_command -- aws ec2 create-tags --region "${ACG_REGION}" --resources "$subnet_id" \
+      --tags Key=Name,Value=k3d-manager-subnet
+    _info "[acg] Subnet: $subnet_id"
 
-  igw_id=$(_run_command -- aws ec2 create-internet-gateway --region "${ACG_REGION}" \
-    --query 'InternetGateway.InternetGatewayId' --output text)
-  _run_command -- aws ec2 attach-internet-gateway --region "${ACG_REGION}" --vpc-id "$vpc_id" --internet-gateway-id "$igw_id"
-  _info "[acg] Internet gateway: $igw_id"
+    igw_id=$(_run_command -- aws ec2 create-internet-gateway --region "${ACG_REGION}" \
+      --query 'InternetGateway.InternetGatewayId' --output text)
+    _run_command -- aws ec2 attach-internet-gateway --region "${ACG_REGION}" --vpc-id "$vpc_id" --internet-gateway-id "$igw_id"
+    _info "[acg] Internet gateway: $igw_id"
 
-  rt_id=$(_run_command -- aws ec2 create-route-table --region "${ACG_REGION}" --vpc-id "$vpc_id" \
-    --query 'RouteTable.RouteTableId' --output text)
-  _run_command -- aws ec2 create-route --region "${ACG_REGION}" --route-table-id "$rt_id" \
-    --destination-cidr-block 0.0.0.0/0 --gateway-id "$igw_id"
-  _run_command -- aws ec2 associate-route-table --region "${ACG_REGION}" --route-table-id "$rt_id" --subnet-id "$subnet_id"
-  _info "[acg] Route table: $rt_id"
+    rt_id=$(_run_command -- aws ec2 create-route-table --region "${ACG_REGION}" --vpc-id "$vpc_id" \
+      --query 'RouteTable.RouteTableId' --output text)
+    _run_command -- aws ec2 create-route --region "${ACG_REGION}" --route-table-id "$rt_id" \
+      --destination-cidr-block 0.0.0.0/0 --gateway-id "$igw_id"
+    _run_command -- aws ec2 associate-route-table --region "${ACG_REGION}" --route-table-id "$rt_id" --subnet-id "$subnet_id"
+    _info "[acg] Route table: $rt_id"
+  fi
 
-  sg_id=$(_run_command -- aws ec2 create-security-group --region "${ACG_REGION}" \
-    --group-name k3d-manager-sg --description "k3d-manager EC2" --vpc-id "$vpc_id" \
-    --query 'GroupId' --output text)
-  _run_command -- aws ec2 authorize-security-group-ingress --region "${ACG_REGION}" --group-id "$sg_id" \
-    --protocol tcp --port 22 --cidr 0.0.0.0/0
-  _run_command -- aws ec2 authorize-security-group-ingress --region "${ACG_REGION}" --group-id "$sg_id" \
-    --protocol tcp --port 6443 --cidr 0.0.0.0/0
-  _run_command -- aws ec2 authorize-security-group-ingress --region "${ACG_REGION}" --group-id "$sg_id" \
-    --protocol -1 --port -1 --cidr 10.0.0.0/8
-  _info "[acg] Security group: $sg_id"
+  sg_id=$(_acg_find_sg)
+  if [[ -n "$sg_id" ]]; then
+    _info "[acg] Reusing existing security group: $sg_id"
+  else
+    if [[ "${ACG_ALLOWED_CIDR}" == "0.0.0.0/0" ]]; then
+      _info "[acg] NOTE: SSH/API ports open to 0.0.0.0/0 — set ACG_ALLOWED_CIDR=<your-ip>/32 to restrict access"
+    fi
+    sg_id=$(_run_command -- aws ec2 create-security-group --region "${ACG_REGION}" \
+      --group-name k3d-manager-sg --description "k3d-manager EC2" --vpc-id "$vpc_id" \
+      --query 'GroupId' --output text)
+    _run_command -- aws ec2 authorize-security-group-ingress --region "${ACG_REGION}" --group-id "$sg_id" \
+      --protocol tcp --port 22 --cidr "${ACG_ALLOWED_CIDR}"
+    _run_command -- aws ec2 authorize-security-group-ingress --region "${ACG_REGION}" --group-id "$sg_id" \
+      --protocol tcp --port 6443 --cidr "${ACG_ALLOWED_CIDR}"
+    _run_command -- aws ec2 authorize-security-group-ingress --region "${ACG_REGION}" --group-id "$sg_id" \
+      --protocol -1 --port -1 --cidr 10.0.0.0/8
+    _info "[acg] Security group: $sg_id"
+  fi
 
   if [[ ! -f "${_ACG_KEY_PEM%.pem}.pub" ]]; then
     _info "[acg] Deriving public key from ${_ACG_KEY_PEM}"
@@ -135,7 +173,7 @@ _acg_provision_stack() {
 _acg_check_k3s() {
   local ssh_host="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
   local cmd="su -c 'k3s kubectl get nodes 2>/dev/null' root"
-  if _run_command -- ssh -o ConnectTimeout=10 "${ssh_host}" "${cmd}" >/dev/null 2>&1; then
+  if _run_command --soft -- ssh -o ConnectTimeout=10 "${ssh_host}" "${cmd}" >/dev/null 2>&1; then
     _info "[acg] k3s is running"
   else
     _info "[acg] WARNING: k3s not responding — run: ./scripts/k3d-manager deploy_app_cluster --confirm"
@@ -166,7 +204,8 @@ HELP
   fi
 
   if [[ "${1:-}" != "--confirm" ]]; then
-    _err "[acg] acg_provision requires --confirm to prevent accidental provisioning"
+    printf 'ERROR: %s\n' "[acg] acg_provision requires --confirm to prevent accidental provisioning" >&2
+    return 1
   fi
 
   _acg_check_credentials || return 1
@@ -210,7 +249,8 @@ HELP
   local instance_id
   instance_id=$(_acg_get_instance_id)
   if [[ -z "$instance_id" ]]; then
-    _err "[acg] No instance found. Run acg_provision --confirm first."
+    printf 'ERROR: %s\n' "[acg] No instance found. Run acg_provision --confirm first." >&2
+    return 1
   fi
 
   local state public_ip
@@ -258,7 +298,8 @@ HELP
   fi
 
   if [[ "${1:-}" != "--confirm" ]]; then
-    _err "[acg] acg_teardown requires --confirm to prevent accidental teardown"
+    printf 'ERROR: %s\n' "[acg] acg_teardown requires --confirm to prevent accidental teardown" >&2
+    return 1
   fi
 
   _acg_check_credentials || return 1
