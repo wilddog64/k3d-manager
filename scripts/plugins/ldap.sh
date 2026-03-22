@@ -229,6 +229,114 @@ EOF
    return "$apply_rc"
 }
 
+# _ldap_resolve_chart_ref ...
+function _ldap_resolve_chart_ref() {
+   local helm_chart_ref_default="$1" helm_repo_name="$2" helm_repo_url="$3"
+   local version="$4" chart_archive_candidate="$5"
+
+   local chart_archive=""
+   if [[ -n "$chart_archive_candidate" && -f "$chart_archive_candidate" ]]; then
+      local archive_dir archive_name
+      archive_dir="$(cd "$(dirname "$chart_archive_candidate")" >/dev/null 2>&1 && pwd)"
+      archive_name="$(basename "$chart_archive_candidate")"
+      chart_archive="${archive_dir}/${archive_name}"
+   fi
+
+   _LDAP_CHART_REF="${LDAP_HELM_CHART_REF:-$helm_chart_ref_default}"
+   if [[ -n "$chart_archive" ]]; then
+      _LDAP_CHART_REF="$chart_archive"
+      _info "[ldap] using local Helm chart archive ${_LDAP_CHART_REF}"
+   fi
+
+   _LDAP_CHART_SKIP_REPO_OPS=0
+   _LDAP_CHART_IS_OCI=0
+   case "$_LDAP_CHART_REF" in
+      /*|./*|../*|file://*) _LDAP_CHART_SKIP_REPO_OPS=1 ;;
+      oci://*) _LDAP_CHART_SKIP_REPO_OPS=1; _LDAP_CHART_IS_OCI=1 ;;
+   esac
+   case "$helm_repo_url" in
+      ""|/*|./*|../*|file://*) _LDAP_CHART_SKIP_REPO_OPS=1 ;;
+   esac
+}
+
+function _ldap_ensure_helm_chart_available() {
+   local helm_chart_ref="$1" version="$2" helm_repo_name="$3"
+   local skip_repo_ops="$4" is_oci_ref="$5"
+
+   if (( is_oci_ref )) && [[ -z "$version" ]]; then
+      _err "[ldap] OCI charts require LDAP_HELM_CHART_VERSION. Set it to a published OpenLDAP chart version or point LDAP_HELM_CHART_ARCHIVE/LDAP_HELM_CHART_REF at a packaged chart."
+      return 1
+   fi
+
+   local -a chart_probe=(show chart "$helm_chart_ref")
+   if [[ -n "$version" ]]; then
+      chart_probe+=("--version" "$version")
+   fi
+
+   if ! _helm --no-exit "${chart_probe[@]}" >/dev/null 2>&1; then
+      if (( ! skip_repo_ops )); then
+         _warn "[ldap] Helm repo ${helm_repo_name} missing chart ${helm_chart_ref}; retrying index update."
+         if ! _helm --no-exit repo update "$helm_repo_name"; then
+            _err "[ldap] unable to refresh Helm repo ${helm_repo_name}; run 'helm repo update ${helm_repo_name}' or set LDAP_HELM_CHART_ARCHIVE/LDAP_HELM_CHART_REF to a local chart path."
+            return 1
+         fi
+         if ! _helm --no-exit "${chart_probe[@]}" >/dev/null 2>&1; then
+            _err "[ldap] chart ${helm_chart_ref} still unavailable. Run 'helm repo update ${helm_repo_name}' manually or point LDAP_HELM_CHART_ARCHIVE/LDAP_HELM_CHART_REF to a local package."
+            return 1
+         fi
+      else
+         if (( is_oci_ref )); then
+            local version_hint="${version:-<required>}"
+            _err "[ldap] OCI chart ${helm_chart_ref} is unreachable. Pull it with 'helm pull ${helm_chart_ref} --version ${version_hint}' and reference the cached file, or ensure registry access is available."
+         else
+            _err "[ldap] chart reference ${helm_chart_ref} not found; set LDAP_HELM_CHART_ARCHIVE/LDAP_HELM_CHART_REF to a valid chart location."
+         fi
+         return 1
+      fi
+   fi
+}
+
+# _ldap_generate_or_load_admin_creds
+# Reads existing admin/config passwords from Vault or generates new ones.
+# Sets globals: _LDAP_ADMIN_CRED_USERNAME _LDAP_ADMIN_CRED_ADMIN_PASS _LDAP_ADMIN_CRED_CONFIG_PASS
+# Args: $1=vault_ns $2=vault_release $3=full_path $4=username_key $5=password_key $6=config_key $7=username
+function _ldap_generate_or_load_admin_creds() {
+   local vault_ns="$1" vault_release="$2" full_path="$3"
+   local username_key="$4" password_key="$5" config_key="$6" username="$7"
+
+   local existing_json=""
+   existing_json=$(_vault_exec --no-exit "$vault_ns" "vault kv get -format=json ${full_path}" "$vault_release" 2>&1 || true)
+   existing_json=${existing_json//$'\r'/}
+   if [[ "$existing_json" == *"Error making API request"* ]] || [[ "$existing_json" != "{"* ]]; then
+      existing_json=""
+   fi
+
+   local existing_username="" admin_password="" config_password=""
+   if [[ -n "$existing_json" ]]; then
+      existing_username=$(printf '%s' "$existing_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get(sys.argv[1],""))' "$username_key" 2>/dev/null || true)
+      admin_password=$(printf '%s' "$existing_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get(sys.argv[1],""))' "$password_key" 2>/dev/null || true)
+      config_password=$(printf '%s' "$existing_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get(sys.argv[1],""))' "$config_key" 2>/dev/null || true)
+   fi
+
+   _LDAP_ADMIN_CRED_USERNAME="${existing_username:-$username}"
+
+   if [[ -z "$admin_password" ]]; then
+      admin_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
+      if [[ -z "$admin_password" ]]; then
+         _err "[ldap] failed to generate admin password"
+      fi
+   fi
+   if [[ -z "$config_password" ]]; then
+      config_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
+      if [[ -z "$config_password" ]]; then
+         _err "[ldap] failed to generate config password"
+      fi
+   fi
+
+   _LDAP_ADMIN_CRED_ADMIN_PASS="$admin_password"
+   _LDAP_ADMIN_CRED_CONFIG_PASS="$config_password"
+}
+
 function _ldap_seed_admin_secret() {
    local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
    local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
@@ -241,47 +349,16 @@ function _ldap_seed_admin_secret() {
    local base_dn="${LDAP_BASE_DN:-dc=${LDAP_DC_PRIMARY:-home},dc=${LDAP_DC_SECONDARY:-org}}"
 
    local full_path="${mount}/${vault_path}"
-   local existing_json=""
 
    if ! _vault_exec --no-exit "$vault_ns" "vault status >/dev/null 2>&1" "$vault_release"; then
       _err "[ldap] Vault instance ${vault_ns}/${vault_release} unavailable or sealed; unseal before deploy"
    fi
-
-   # Note: vault kv get -format=json may produce 403 errors on /sys/internal/ui/ endpoints
-   # These are harmless - they just mean we can't get UI metadata, but we can still read/write the secret
-   # Redirect both stdout and stderr, then check if we got valid JSON
-   existing_json=$(_vault_exec --no-exit "$vault_ns" "vault kv get -format=json ${full_path}" "$vault_release" 2>&1 || true)
-   existing_json=${existing_json//$'\r'/}
-   # If output contains "Error making API request" or doesn't start with {, it's not valid JSON
-   if [[ "$existing_json" == *"Error making API request"* ]] || [[ "$existing_json" != "{"* ]]; then
-      existing_json=""
-   fi
-
-   local admin_password=""
-   local config_password=""
-   local existing_username=""
-
-   if [[ -n "$existing_json" ]]; then
-      existing_username=$(printf '%s' "$existing_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get(sys.argv[1],""))' "$username_key" 2>/dev/null || true)
-      admin_password=$(printf '%s' "$existing_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get(sys.argv[1],""))' "$password_key" 2>/dev/null || true)
-      config_password=$(printf '%s' "$existing_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get(sys.argv[1],""))' "$config_key" 2>/dev/null || true)
-   fi
-
-   local username="${existing_username:-$username}"
-
-   if [[ -z "$admin_password" ]]; then
-      admin_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
-      if [[ -z "$admin_password" ]]; then
-         _err "[ldap] failed to generate admin password"
-      fi
-   fi
-
-   if [[ -z "$config_password" ]]; then
-      config_password=$(_no_trace bash -c 'openssl rand -base64 24 | tr -d "\n"')
-      if [[ -z "$config_password" ]]; then
-         _err "[ldap] failed to generate config password"
-      fi
-   fi
+   _ldap_generate_or_load_admin_creds \
+      "$vault_ns" "$vault_release" "$full_path" \
+      "$username_key" "$password_key" "$config_key" "$username"
+   local username="${_LDAP_ADMIN_CRED_USERNAME}"
+   local admin_password="${_LDAP_ADMIN_CRED_ADMIN_PASS}"
+   local config_password="${_LDAP_ADMIN_CRED_CONFIG_PASS}"
 
    local domain="${LDAP_DOMAIN}"
    local root_dn="${LDAP_ROOT}"
@@ -362,64 +439,24 @@ PY
    _err "[ldap] unable to seed Vault admin secret ${full_path}"
 }
 
-function _ldap_seed_ldif_secret() {
-   if [[ "${LDAP_LDIF_ENABLED:-false}" != "true" ]]; then
-      return 0
-   fi
-
-   if [[ -z "${LDAP_LDIF_VAULT_PATH:-}" ]]; then
-      _warn "[ldap] LDIF sync enabled but LDAP_LDIF_VAULT_PATH is empty; skipping seed"
-      return 0
-   fi
-
-   local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
-   local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
-   local mount="${LDAP_VAULT_KV_MOUNT:-secret}"
-   local vault_path="${LDAP_LDIF_VAULT_PATH}"
-   local content_key="${LDAP_LDIF_CONTENT_KEY:-content}"
-   local full_path="${mount}/${vault_path}"
-
-   if _vault_exec --no-exit "$vault_ns" "vault kv get ${full_path}" "$vault_release" >/dev/null 2>&1; then
-      _info "[ldap] refreshing Vault LDIF ${full_path}"
-   else
-      _info "[ldap] seeding Vault LDIF ${full_path}"
-   fi
-
-   local base_dn="${LDAP_VAULT_BASE_DN:-${LDAP_BASE_DN}}"
-   local org_name="${LDAP_VAULT_ORG_NAME:-${LDAP_ORG_NAME}}"
-   local dc_primary="${LDAP_DC_PRIMARY}"
-   local group_ou="${LDAP_GROUP_OU}"
-   local service_ou="${LDAP_SERVICE_OU}"
+function _ldap_build_ldif_content() {
+   local base_dn="$1" org_name="$2" dc_primary="$3"
+   local group_ou="$4" service_ou="$5"
+   local enable_jenkins="$6" jenkins_password="$7" jenkins_user_dn="$8"
    local group_ou_value="${group_ou#*=}"
    local service_ou_value="${service_ou#*=}"
-   local jenkins_user_dn="uid=jenkins-admin,${service_ou},${base_dn}"
-   local jenkins_password=""
-   local enable_jenkins="${ENABLE_JENKINS:-0}"
 
-   if [[ "$enable_jenkins" == "1" ]]; then
-      local jenkins_secret_json=""
-      local _jenkins_vault_path="${mount}/${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin}"
-      jenkins_secret_json=$(_vault_exec --no-exit "$vault_ns" "vault kv get -format=json -- '${_jenkins_vault_path}'" "$vault_release" 2>/dev/null || true)
-      if [[ -n "$jenkins_secret_json" ]]; then
-         jenkins_password=$(printf '%s' "$jenkins_secret_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get("password",""))' 2>/dev/null || true)
-      fi
-   fi
-
-   local ldif_content
-
-   # Check if custom LDIF file path is provided
    if [[ -n "${LDAP_LDIF_FILE:-}" && -f "${LDAP_LDIF_FILE}" ]]; then
       _info "[ldap] loading custom LDIF from file: ${LDAP_LDIF_FILE}"
-      ldif_content=$(cat "${LDAP_LDIF_FILE}")
-
-      # Validate LDIF has content
-      if [[ -z "$ldif_content" ]]; then
+      _LDAP_LDIF_CONTENT=$(cat "${LDAP_LDIF_FILE}")
+      if [[ -z "$_LDAP_LDIF_CONTENT" ]]; then
          _err "[ldap] custom LDIF file is empty: ${LDAP_LDIF_FILE}"
          return 1
       fi
-   else
-      # Generate default LDIF content (existing behavior)
-      ldif_content=$(cat <<EOF
+      return 0
+   fi
+
+   _LDAP_LDIF_CONTENT=$(cat <<EOF
 dn: ${base_dn}
 objectClass: top
 objectClass: dcObject
@@ -439,9 +476,10 @@ ou: ${service_ou_value}
 EOF
 )
 
-      if [[ "$enable_jenkins" == "1" && -n "$jenkins_password" ]]; then
-         ldif_content+=$'\n'
-         ldif_content+=$(cat <<EOF
+   if [[ "$enable_jenkins" == "1" && -n "$jenkins_password" ]]; then
+      _LDAP_LDIF_CONTENT+=$'
+'
+      _LDAP_LDIF_CONTENT+=$(cat <<EOF
 dn: cn=jenkins-admins,${group_ou},${base_dn}
 objectClass: top
 objectClass: groupOfNames
@@ -450,9 +488,9 @@ member: ${LDAP_BINDDN}
 member: ${jenkins_user_dn}
 EOF
 )
-
-         ldif_content+=$'\n'
-         ldif_content+=$(cat <<EOF
+      _LDAP_LDIF_CONTENT+=$'
+'
+      _LDAP_LDIF_CONTENT+=$(cat <<EOF
 dn: ${jenkins_user_dn}
 objectClass: inetOrgPerson
 objectClass: organizationalPerson
@@ -463,25 +501,59 @@ uid: jenkins-admin
 userPassword: ${jenkins_password}
 EOF
 )
+   fi
+}
+
+function _ldap_seed_ldif_secret() {
+   [[ "${LDAP_LDIF_ENABLED:-false}" == "true" ]] || return 0
+   [[ -n "${LDAP_LDIF_VAULT_PATH:-}" ]] || { _warn "[ldap] LDIF sync enabled but LDAP_LDIF_VAULT_PATH is empty; skipping seed"; return 0; }
+
+   local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
+   local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
+   local mount="${LDAP_VAULT_KV_MOUNT:-secret}"
+   local vault_path="${LDAP_LDIF_VAULT_PATH}"
+   local content_key="${LDAP_LDIF_CONTENT_KEY:-content}"
+   local full_path="${mount}/${vault_path}"
+
+   if _vault_exec --no-exit "$vault_ns" "vault kv get ${full_path}" "$vault_release" >/dev/null 2>&1; then
+      _info "[ldap] refreshing Vault LDIF ${full_path}"
+   else
+      _info "[ldap] seeding Vault LDIF ${full_path}"
+   fi
+
+   local base_dn="${LDAP_VAULT_BASE_DN:-${LDAP_BASE_DN}}"
+   local org_name="${LDAP_VAULT_ORG_NAME:-${LDAP_ORG_NAME}}"
+   local dc_primary="${LDAP_DC_PRIMARY}"
+   local group_ou="${LDAP_GROUP_OU}"
+   local service_ou="${LDAP_SERVICE_OU}"
+   local enable_jenkins="${ENABLE_JENKINS:-0}"
+   local jenkins_user_dn="uid=jenkins-admin,${service_ou},${base_dn}"
+   local jenkins_password=""
+   if [[ "$enable_jenkins" == "1" ]]; then
+      local jenkins_secret_json=""
+      local _jenkins_vault_path="${mount}/${JENKINS_ADMIN_VAULT_PATH:-eso/jenkins-admin}"
+      jenkins_secret_json=$(_vault_exec --no-exit "$vault_ns" "vault kv get -format=json -- '${_jenkins_vault_path}'" "$vault_release" 2>/dev/null || true)
+      if [[ -n "$jenkins_secret_json" ]]; then
+         jenkins_password=$(printf '%s' "$jenkins_secret_json" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("data",{}).get("data",{}).get("password",""))' 2>/dev/null || true)
       fi
    fi
 
-   # Use secret backend abstraction to avoid UI endpoint issues
+   _ldap_build_ldif_content       "$base_dn" "$org_name" "$dc_primary"       "$group_ou" "$service_ou"       "$enable_jenkins" "$jenkins_password" "$jenkins_user_dn" || return 1
+   local ldif_content="$_LDAP_LDIF_CONTENT"
+
    if declare -f secret_backend_put >/dev/null 2>&1; then
       export VAULT_SECRET_BACKEND_NS="$vault_ns"
       export VAULT_SECRET_BACKEND_RELEASE="$vault_release"
       export VAULT_SECRET_BACKEND_MOUNT="${mount}"
-
       if secret_backend_put "$vault_path" "${content_key}=${ldif_content}"; then
          _info "[ldap] seeded Vault LDIF ${full_path}"
          return 0
       fi
    else
-      # Fallback to direct vault command
       local script
-      printf -v script "cat <<'EOF_LDIF_SEED' | vault kv put %s %s=-\n%s\nEOF_LDIF_SEED" \
-         "$full_path" "$content_key" "$ldif_content"
-
+      printf -v script "cat <<'EOF_LDIF' | vault kv put %s %s=-
+%s
+EOF_LDIF" "$full_path" "$content_key" "$ldif_content"
       if _vault_exec --no-exit "$vault_ns" "$script" "$vault_release"; then
          _info "[ldap] seeded Vault LDIF ${full_path}"
          return 0
@@ -525,10 +597,8 @@ function _ldap_deploy_chart() {
    local helm_repo_url_default="https://johanneskastl.github.io/openldap-bitnami-helm-chart/"
    local helm_repo_url="${LDAP_HELM_REPO_URL:-$helm_repo_url_default}"
    local helm_chart_ref_default="${helm_repo_name_default}/openldap-bitnami"
-   local helm_chart_ref="${LDAP_HELM_CHART_REF:-$helm_chart_ref_default}"
-   local chart_archive_candidate="${LDAP_HELM_CHART_ARCHIVE:-}"
-   local chart_archive=""
 
+   local chart_archive_candidate="${LDAP_HELM_CHART_ARCHIVE:-}"
    if [[ -z "$chart_archive_candidate" ]]; then
       if [[ -n "$version" ]]; then
          chart_archive_candidate="${LDAP_CONFIG_DIR}/openldap-chart-${version}.tgz"
@@ -537,35 +607,10 @@ function _ldap_deploy_chart() {
       fi
    fi
 
-   if [[ -n "$chart_archive_candidate" && -f "$chart_archive_candidate" ]]; then
-      chart_archive="$chart_archive_candidate"
-   fi
-
-   if [[ -n "$chart_archive" ]]; then
-      local archive_dir archive_name
-      archive_dir="$(cd "$(dirname "$chart_archive")" >/dev/null 2>&1 && pwd)"
-      archive_name="$(basename "$chart_archive")"
-      chart_archive="${archive_dir}/${archive_name}"
-      helm_chart_ref="$chart_archive"
-      _info "[ldap] using local Helm chart archive ${helm_chart_ref}"
-   fi
-
-   local skip_repo_ops=0
-   local is_oci_ref=0
-   case "$helm_chart_ref" in
-      /*|./*|../*|file://*)
-         skip_repo_ops=1
-         ;;
-      oci://*)
-         skip_repo_ops=1
-         is_oci_ref=1
-         ;;
-   esac
-   case "$helm_repo_url" in
-      ""|/*|./*|../*|file://*)
-         skip_repo_ops=1
-         ;;
-   esac
+   _ldap_resolve_chart_ref       "$helm_chart_ref_default" "$helm_repo_name" "$helm_repo_url"       "$version" "$chart_archive_candidate"
+   local helm_chart_ref="$_LDAP_CHART_REF"
+   local skip_repo_ops="$_LDAP_CHART_SKIP_REPO_OPS"
+   local is_oci_ref="$_LDAP_CHART_IS_OCI"
 
    if (( ! skip_repo_ops )); then
       _helm repo add "$helm_repo_name" "$helm_repo_url"
@@ -578,39 +623,9 @@ function _ldap_deploy_chart() {
    local values_rendered
    values_rendered=$(_ldap_render_template "$values_template" "ldap-values") || return 1
 
-   if (( is_oci_ref )) && [[ -z "$version" ]]; then
-      _err "[ldap] OCI charts require LDAP_HELM_CHART_VERSION. Set it to a published OpenLDAP chart version (e.g. 1.5.3) or point LDAP_HELM_CHART_ARCHIVE/LDAP_HELM_CHART_REF at a packaged chart."
-      return 1
-   fi
+   _ldap_ensure_helm_chart_available "$helm_chart_ref" "$version" "$helm_repo_name" "$skip_repo_ops" "$is_oci_ref" || return 1
 
-   local -a chart_probe=(show chart "$helm_chart_ref")
-   if [[ -n "$version" ]]; then
-      chart_probe+=("--version" "$version")
-   fi
-
-   if ! _helm --no-exit "${chart_probe[@]}" >/dev/null 2>&1; then
-      if (( ! skip_repo_ops )); then
-         _warn "[ldap] Helm repo ${helm_repo_name} missing chart ${helm_chart_ref}; retrying index update."
-         if ! _helm --no-exit repo update "$helm_repo_name"; then
-            _err "[ldap] unable to refresh Helm repo ${helm_repo_name}; run 'helm repo update ${helm_repo_name}' or set LDAP_HELM_CHART_ARCHIVE/LDAP_HELM_CHART_REF to a local chart path."
-            return 1
-         fi
-         if ! _helm --no-exit "${chart_probe[@]}" >/dev/null 2>&1; then
-            _err "[ldap] chart ${helm_chart_ref} still unavailable. Run 'helm repo update ${helm_repo_name}' manually or point LDAP_HELM_CHART_ARCHIVE/LDAP_HELM_CHART_REF to a local package."
-            return 1
-         fi
-      else
-         if (( is_oci_ref )); then
-            local version_hint="${version:-<required>}"
-            _err "[ldap] OCI chart ${helm_chart_ref} is unreachable. Pull it with 'helm pull ${helm_chart_ref} --version ${version_hint}' and reference the cached file (set LDAP_HELM_CHART_ARCHIVE to the resulting tgz), or ensure registry access is available."
-         else
-            _err "[ldap] chart reference ${helm_chart_ref} not found; set LDAP_HELM_CHART_ARCHIVE/LDAP_HELM_CHART_REF to a valid chart location."
-         fi
-         return 1
-      fi
-   fi
-
-   local args=(upgrade --install "$release" "$helm_chart_ref" -n "$ns" -f "$values_rendered" --create-namespace)
+   local -a args=(upgrade --install "$release" "$helm_chart_ref" -n "$ns" -f "$values_rendered" --create-namespace)
    if [[ -n "$version" ]]; then
       args+=("--version" "$version")
    fi
@@ -634,8 +649,8 @@ data:
 $(sed 's/^/    /' "$values_rendered")
 EOF
 )
-         printf '%s\n' "$cm_yaml" | _kubectl apply -f - >/dev/null 2>&1 || \
-            _warn "[ldap] unable to persist rendered values in ConfigMap openldap-values"
+         printf '%s
+' "$cm_yaml" | _kubectl apply -f - >/dev/null 2>&1 ||             _warn "[ldap] unable to persist rendered values in ConfigMap openldap-values"
       else
          _warn "[ldap] rendered values file missing; skipping ConfigMap update"
       fi
@@ -643,6 +658,37 @@ EOF
 
    _cleanup_on_success "$values_rendered"
    return "$helm_rc"
+}
+
+
+# _ldap_fetch_import_prereqs
+# Reads admin password and pod name needed for LDIF import.
+# Sets globals: _LDAP_IMPORT_ADMIN_PASS _LDAP_IMPORT_POD
+# Args: $1=ns $2=release $3=admin_secret $4=admin_key
+function _ldap_fetch_import_prereqs() {
+   local ns="$1" release="$2" admin_secret="$3" admin_key="$4"
+
+   local admin_pass=""
+   admin_pass=$(_no_trace _kubectl --no-exit -n "$ns" get secret "$admin_secret" -o jsonpath="{.data.${admin_key}}" 2>/dev/null || true)
+   if [[ -z "$admin_pass" ]]; then
+      _warn "[ldap] unable to read ${admin_key} from secret ${ns}/${admin_secret}; skipping LDIF import"
+      return 1
+   fi
+   admin_pass=$(_no_trace bash -c 'printf %s "$1" | base64 -d 2>/dev/null | tr -d "\n"' _ "$admin_pass")
+   if [[ -z "$admin_pass" ]]; then
+      _warn "[ldap] decoded admin password empty; skipping LDIF import"
+      return 1
+   fi
+
+   local pod=""
+   pod=$(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/name=openldap-bitnami,app.kubernetes.io/instance=${release}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+   if [[ -z "$pod" ]]; then
+      _warn "[ldap] no OpenLDAP pod found for release ${ns}/${release}; skipping LDIF import"
+      return 1
+   fi
+
+   _LDAP_IMPORT_ADMIN_PASS="$admin_pass"
+   _LDAP_IMPORT_POD="$pod"
 }
 
 function _ldap_import_ldif() {
@@ -658,139 +704,69 @@ function _ldap_import_ldif() {
    local deploy_name="${release}-openldap-bitnami"
    local ldap_port="1389"
 
-   # Skip if LDIF import is not enabled
-   if [[ "${LDAP_LDIF_ENABLED:-false}" != "true" ]]; then
-      _info "[ldap] LDIF import disabled (LDAP_LDIF_ENABLED=${LDAP_LDIF_ENABLED:-false})"
-      return 0
-   fi
+   [[ "${LDAP_LDIF_ENABLED:-false}" == "true" ]] || return 0
+   [[ -n "${LDAP_LDIF_VAULT_PATH:-}" ]] || { _warn "[ldap] LDIF sync enabled but LDAP_LDIF_VAULT_PATH is empty; skipping seed"; return 0; }
 
-   # Check if LDIF secret exists
    if ! _kubectl --no-exit -n "$ns" get secret "$ldif_secret" >/dev/null 2>&1; then
       _info "[ldap] LDIF secret ${ns}/${ldif_secret} not found; skipping LDIF import"
       return 0
    fi
 
-   # Get admin password
-   local admin_pass=""
-   admin_pass=$(_no_trace _kubectl --no-exit -n "$ns" get secret "$admin_secret" -o jsonpath="{.data.${admin_key}}" 2>/dev/null || true)
-   if [[ -z "$admin_pass" ]]; then
-      _warn "[ldap] unable to read ${admin_key} from secret ${ns}/${admin_secret}; skipping LDIF import"
-      return 1
-   fi
-   admin_pass=$(_no_trace bash -c 'printf %s "$1" | base64 -d 2>/dev/null | tr -d "\n"' _ "$admin_pass")
-   if [[ -z "$admin_pass" ]]; then
-      _warn "[ldap] decoded admin password empty; skipping LDIF import"
-      return 1
-   fi
+   _ldap_fetch_import_prereqs "$ns" "$release" "$admin_secret" "$admin_key" || return $?
+   local admin_pass="$_LDAP_IMPORT_ADMIN_PASS"
+   local pod="$_LDAP_IMPORT_POD"
 
-   # Get pod name
-   local pod=""
-   pod=$(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/name=openldap-bitnami,app.kubernetes.io/instance=${release}" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-   if [[ -z "$pod" ]]; then
-      _warn "[ldap] no OpenLDAP pod found for release ${ns}/${release}; skipping LDIF import"
-      return 1
-   fi
-
-   # Check if LDIF file exists in pod
    if ! _kubectl --no-exit -n "$ns" exec "$pod" -- test -f "$ldif_mount_path" >/dev/null 2>&1; then
       _info "[ldap] LDIF file not found at ${ldif_mount_path} in pod; skipping LDIF import"
       return 0
    fi
 
-   # Check if entries already exist (idempotency check)
    _info "[ldap] checking if LDIF entries already exist..."
    local search_result=""
-   local search_output=""
-   search_output=$(_no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- \
-      ldapsearch -x -H "ldap://localhost:${ldap_port}" \
-      -D "$admin_dn" -w "$admin_pass" \
-      -b "$base_dn" -LLL dn 2>/dev/null || true)
-
+   search_output=$(_no_trace _kubectl --no-exit -n "$ns" exec "$pod" --       ldapsearch -x -H "ldap://localhost:${ldap_port}"       -D "$admin_dn" -w "$admin_pass"       -b "$base_dn" -LLL dn 2>/dev/null || true)
    search_result=$(echo "$search_output" | grep -c "^dn:" || echo "0")
-
-   # If more than just the base DN exists, assume LDIF is already imported
-   if [[ "$search_result" -gt 1 ]]; then
+   if (( search_result > 1 )); then
       _info "[ldap] LDIF entries already exist (found $search_result entries); skipping import"
    else
       _info "[ldap] importing LDIF from ${ldif_mount_path}..."
-
-      # Import LDIF with -c flag to continue on errors (base DN may already exist)
       local import_output=""
-      if import_output=$(_no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- \
-         ldapadd -c -x -H "ldap://localhost:${ldap_port}" \
-         -D "$admin_dn" -w "$admin_pass" \
-         -f "$ldif_mount_path" 2>&1); then
+      if import_output=$(_no_trace _kubectl --no-exit -n "$ns" exec "$pod" --          ldapadd -c -x -H "ldap://localhost:${ldap_port}"          -D "$admin_dn" -w "$admin_pass"          -f "$ldif_mount_path" 2>&1); then
          _info "[ldap] LDIF import completed successfully"
       else
-         # Check if errors are acceptable (already exists, base DN issues)
+         import_output=${import_output//$'
+'/}
          if echo "$import_output" | grep -qE "Already exists|no global superior knowledge"; then
             _info "[ldap] LDIF import completed (some entries skipped - base DN or duplicates)"
          else
-            _warn "[ldap] LDIF import encountered errors:"
-            echo "$import_output" | head -10
+            _warn "[ldap] LDIF import encountered errors:"; echo "$import_output" | head -10
             _warn "[ldap] LDIF import failed; continuing with smoke test"
          fi
       fi
-
-      # Verify import by checking entry count
-      search_result=$(_no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- \
-         ldapsearch -x -H "ldap://localhost:${ldap_port}" \
-         -D "$admin_dn" -w "$admin_pass" \
-         -b "$base_dn" -LLL dn 2>/dev/null | grep -c "^dn:" || echo "0")
-
+      search_result=$(_no_trace _kubectl --no-exit -n "$ns" exec "$pod" --          ldapsearch -x -H "ldap://localhost:${ldap_port}"          -D "$admin_dn" -w "$admin_pass"          -b "$base_dn" -LLL dn 2>/dev/null | grep -c "^dn:" || echo "0")
       _info "[ldap] LDIF import verification: found $search_result entries in directory"
    fi
 
-   # Reset passwords for test users with unique passwords stored in Vault
-   # The SSHA hashes in the LDIF may not work properly, so reset them
    _info "[ldap] resetting test user passwords with unique passwords..."
    local test_users=("chengkai.liang" "jenkins-admin" "test-user")
    local user_ou="ou=users"
    local vault_ns="${VAULT_NS:-vault}"
-   local vault_pod="vault-0"
-
    for user in "${test_users[@]}"; do
       local user_dn="cn=${user},${user_ou},${base_dn}"
-      # Check if user exists first
-      if _kubectl --no-exit -n "$ns" exec "$pod" -- \
-         ldapsearch -x -H "ldap://localhost:${ldap_port}" \
-         -D "$admin_dn" -w "$admin_pass" \
-         -b "$user_dn" -LLL dn 2>/dev/null | grep -q "^dn:"; then
-
-         # Check if password already exists in Vault
-         local vault_path="ldap/users/${user}"
-         local existing_pass
-         existing_pass=$(_no_trace _vault_exec "$vault_ns" "vault kv get -field=password secret/$vault_path" 2>/dev/null) || existing_pass=""
-
-         local user_password
-         if [[ -n "$existing_pass" ]]; then
-            # Use existing password from Vault
-            user_password="$existing_pass"
-            _info "[ldap] using existing password from Vault for $user"
-         else
-            # Generate new unique password (20 chars, alphanumeric + special)
-            user_password=$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)
-            _info "[ldap] generated new password for $user"
-
-            # Store in Vault using _vault_exec for proper authentication
-            local put_cmd
-            printf -v put_cmd 'vault kv put secret/%s username=%q password=%q dn=%q' \
-               "$vault_path" "$user" "$user_password" "$user_dn"
-            if _no_trace _vault_exec "$vault_ns" "$put_cmd" >/dev/null 2>&1; then
-               _info "[ldap] stored password in Vault: secret/$vault_path"
-            else
-               _warn "[ldap] failed to store password in Vault for $user"
-            fi
-         fi
-
-         # Reset password in LDAP
-         _info "[ldap] setting password for $user_dn"
-         _no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- \
-            ldappasswd -x -H "ldap://localhost:${ldap_port}" \
-            -D "$admin_dn" -w "$admin_pass" \
-            -s "$user_password" "$user_dn" >/dev/null 2>&1 || \
-            _warn "[ldap] failed to set password for $user_dn"
+      _kubectl --no-exit -n "$ns" exec "$pod" --          ldapsearch -x -H "ldap://localhost:${ldap_port}"          -D "$admin_dn" -w "$admin_pass"          -b "$user_dn" -LLL dn 2>/dev/null | grep -q "^dn:" || continue
+      local vault_path="ldap/users/${user}"
+      local existing_pass
+      existing_pass=$(_no_trace _vault_exec "$vault_ns" "vault kv get -field=password secret/$vault_path" 2>/dev/null) || existing_pass=""
+      local user_password="$existing_pass"
+      if [[ -n "$user_password" ]]; then
+         _info "[ldap] using existing password from Vault for $user"
+      else
+         user_password=$(openssl rand -base64 18 | tr -d '/+=' | head -c 20)
+         _info "[ldap] generated new password for $user"
+         printf -v put_cmd 'vault kv put secret/%s username=%q password=%q dn=%q'             "$vault_path" "$user" "$user_password" "$user_dn"
+         _no_trace _vault_exec "$vault_ns" "$put_cmd" >/dev/null 2>&1 ||             _warn "[ldap] failed to store password in Vault for $user"
       fi
+      _info "[ldap] setting password for $user_dn"
+      _no_trace _kubectl --no-exit -n "$ns" exec "$pod" --          ldappasswd -x -H "ldap://localhost:${ldap_port}"          -D "$admin_dn" -w "$admin_pass"          -s "$user_password" "$user_dn" >/dev/null 2>&1 ||          _warn "[ldap] failed to set password for $user_dn"
    done
 
    return 0
@@ -813,20 +789,14 @@ function ldap_get_user_password() {
    echo "$password"
 }
 
-function _ldap_sync_admin_password() {
-   local ns="${1:-$LDAP_NAMESPACE}"
-   local release="${2:-$LDAP_RELEASE}"
-   local secret="${LDAP_ADMIN_SECRET_NAME:-openldap-admin}"
-   local admin_key="${LDAP_ADMIN_PASSWORD_KEY:-LDAP_ADMIN_PASSWORD}"
-   local config_key="${LDAP_CONFIG_PASSWORD_KEY:-LDAP_CONFIG_PASSWORD}"
-   local admin_user="${LDAP_ADMIN_USERNAME:-ldap-admin}"
-   local base_dn="${LDAP_BASE_DN:-dc=${LDAP_DC_PRIMARY:-home},dc=${LDAP_DC_SECONDARY:-org}}"
-   local admin_dn="${LDAP_BINDDN:-cn=${admin_user},${base_dn}}"
-    local config_dn_override="${LDAP_CONFIG_ADMIN_DN:-}"
-   local admin_pass=""
-   local config_pass=""
-   local pod=""
+# _ldap_read_sync_creds
+# Reads and decodes admin/config passwords from secret.
+# Sets globals: _LDAP_SYNC_ADMIN_PASS _LDAP_SYNC_CONFIG_PASS
+# Args: $1=ns $2=secret $3=admin_key $4=config_key
+function _ldap_read_sync_creds() {
+   local ns="$1" secret="$2" admin_key="$3" config_key="$4"
 
+   local admin_pass=""
    admin_pass=$(_no_trace _kubectl --no-exit -n "$ns" get secret "$secret" -o jsonpath="{.data.${admin_key}}" 2>/dev/null || true)
    if [[ -z "$admin_pass" ]]; then
       _warn "[ldap] unable to read ${admin_key} from secret ${ns}/${secret}; skipping admin password sync"
@@ -838,6 +808,7 @@ function _ldap_sync_admin_password() {
       return 1
    fi
 
+   local config_pass=""
    config_pass=$(_no_trace _kubectl --no-exit -n "$ns" get secret "$secret" -o jsonpath="{.data.${config_key}}" 2>/dev/null || true)
    if [[ -z "$config_pass" ]]; then
       _warn "[ldap] unable to read ${config_key} from secret ${ns}/${secret}; skipping admin password sync"
@@ -849,6 +820,26 @@ function _ldap_sync_admin_password() {
       return 1
    fi
 
+   _LDAP_SYNC_ADMIN_PASS="$admin_pass"
+   _LDAP_SYNC_CONFIG_PASS="$config_pass"
+}
+
+function _ldap_sync_admin_password() {
+   local ns="${1:-$LDAP_NAMESPACE}"
+   local release="${2:-$LDAP_RELEASE}"
+   local secret="${LDAP_ADMIN_SECRET_NAME:-openldap-admin}"
+   local admin_key="${LDAP_ADMIN_PASSWORD_KEY:-LDAP_ADMIN_PASSWORD}"
+   local config_key="${LDAP_CONFIG_PASSWORD_KEY:-LDAP_CONFIG_PASSWORD}"
+   local admin_user="${LDAP_ADMIN_USERNAME:-ldap-admin}"
+   local base_dn="${LDAP_BASE_DN:-dc=${LDAP_DC_PRIMARY:-home},dc=${LDAP_DC_SECONDARY:-org}}"
+   local admin_dn="${LDAP_BINDDN:-cn=${admin_user},${base_dn}}"
+   local config_dn_override="${LDAP_CONFIG_ADMIN_DN:-}"
+
+   _ldap_read_sync_creds "$ns" "$secret" "$admin_key" "$config_key" || return 1
+   local admin_pass="$_LDAP_SYNC_ADMIN_PASS"
+   local config_pass="$_LDAP_SYNC_CONFIG_PASS"
+
+   local pod=""
    pod=$(_kubectl --no-exit -n "$ns" get pod -l "app.kubernetes.io/instance=${release},app.kubernetes.io/name=openldap-bitnami" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
    if [[ -z "$pod" ]]; then
       _warn "[ldap] unable to locate pod for release ${release} in namespace ${ns}; skipping admin password sync"
@@ -856,57 +847,41 @@ function _ldap_sync_admin_password() {
    fi
 
    local sync_cmd
-   read -r -d '' sync_cmd <<'EOS' || true
+   sync_cmd=$(cat <<'EOS'
 set -euo pipefail
 export PATH="/opt/bitnami/openldap/bin:$PATH"
 CONFIG_DN_VAR="${CONFIG_DN_OVERRIDE:-}"
-if [[ -z "$CONFIG_DN_VAR" ]]; then
-  CONFIG_DN_VAR="$(printenv LDAP_CONFIG_ADMIN_DN 2>/dev/null || true)"
-fi
-CONFIG_DN_VAR=${CONFIG_DN_VAR:-cn=admin,cn=config}
+CONFIG_DN_VAR="${CONFIG_DN_VAR:-$(printenv LDAP_CONFIG_ADMIN_DN 2>/dev/null || true)}"
+CONFIG_DN_VAR="${CONFIG_DN_VAR:-cn=admin,cn=config}"
 ADMIN_CN_VAR="${ADMIN_CN_OVERRIDE:-}"
-if [[ -z "$ADMIN_CN_VAR" ]]; then
-  ADMIN_CN_VAR="$(printenv LDAP_ADMIN_USERNAME 2>/dev/null || true)"
-fi
-ADMIN_CN_VAR=${ADMIN_CN_VAR:-ldap-admin}
+ADMIN_CN_VAR="${ADMIN_CN_VAR:-$(printenv LDAP_ADMIN_USERNAME 2>/dev/null || true)}"
+ADMIN_CN_VAR="${ADMIN_CN_VAR:-ldap-admin}"
 ADMIN_DN_VAR="$ADMIN_DN"
-SEARCH_DN=$(LDAPTLS_REQCERT=never ldapsearch -x -H ldap://127.0.0.1:1389 \
-  -D "$CONFIG_DN_VAR" -w "$CONFIG_PASS" \
-  -b "$BASE_DN" "(cn=${ADMIN_CN_VAR})" dn 2>/dev/null | awk 'tolower($1)=="dn:" {sub(/^dn:[[:space:]]*/,""); print; exit}')
-if [[ -n "$SEARCH_DN" ]]; then
-  ADMIN_DN_VAR="$SEARCH_DN"
-fi
-if command -v ldappasswd >/dev/null 2>&1; then
-  LDAPTLS_REQCERT=never ldappasswd -x -H ldap://127.0.0.1:1389 \
-    -D "$CONFIG_DN_VAR" -w "$CONFIG_PASS" \
-    "$ADMIN_DN_VAR" -s "$ADMIN_PASS"
-else
-  LDAPTLS_REQCERT=never ldapmodify -x -H ldap://127.0.0.1:1389 \
-    -D "$CONFIG_DN_VAR" -w "$CONFIG_PASS" <<EOF
+SEARCH_DN=$(LDAPTLS_REQCERT=never ldapsearch -x -H ldap://127.0.0.1:1389   -D "$CONFIG_DN_VAR" -w "$CONFIG_PASS"   -b "$BASE_DN" "(cn=${ADMIN_CN_VAR})" dn 2>/dev/null | awk 'tolower($1)=="dn:" {sub(/^dn:[[:space:]]*/,""); print; exit}')
+ADMIN_DN_VAR="${SEARCH_DN:-$ADMIN_DN_VAR}"
+command -v ldappasswd >/dev/null 2>&1 &&   LDAPTLS_REQCERT=never ldappasswd -x -H ldap://127.0.0.1:1389     -D "$CONFIG_DN_VAR" -w "$CONFIG_PASS"     "$ADMIN_DN_VAR" -s "$ADMIN_PASS" ||   LDAPTLS_REQCERT=never ldapmodify -x -H ldap://127.0.0.1:1389     -D "$CONFIG_DN_VAR" -w "$CONFIG_PASS" <<EOF
 dn: $ADMIN_DN_VAR
 changetype: modify
 replace: userPassword
 userPassword: $ADMIN_PASS
 EOF
-fi
 
-if ! LDAPTLS_REQCERT=never ldapwhoami -x -H ldap://127.0.0.1:1389 \
-  -D "$ADMIN_DN_VAR" -w "$ADMIN_PASS" >/dev/null 2>&1; then
-  printf 'VERIFY_FAIL:%s\n' "$ADMIN_DN_VAR"
+LDAPTLS_REQCERT=never ldapwhoami -x -H ldap://127.0.0.1:1389   -D "$ADMIN_DN_VAR" -w "$ADMIN_PASS" >/dev/null 2>&1 || {
+  printf 'VERIFY_FAIL:%s
+' "$ADMIN_DN_VAR"
   exit 2
-fi
+}
 
-printf 'SYNC_OK:%s\n' "$ADMIN_DN_VAR"
+printf 'SYNC_OK:%s
+' "$ADMIN_DN_VAR"
 EOS
-
-   if [[ -z "$sync_cmd" ]]; then
-      _warn "[ldap] unable to construct admin password sync script"
-      return 1
-   fi
+)
 
    local sync_output=""
-   if ! sync_output=$(printf '%s\n' "$sync_cmd" | _no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- env ADMIN_DN="$admin_dn" ADMIN_PASS="$admin_pass" CONFIG_PASS="$config_pass" CONFIG_DN_OVERRIDE="${config_dn_override}" ADMIN_CN_OVERRIDE="$admin_user" BASE_DN="$base_dn" bash -s 2>&1); then
-      sync_output=${sync_output//$'\r'/}
+   if ! sync_output=$(printf '%s
+' "$sync_cmd" | _no_trace _kubectl --no-exit -n "$ns" exec "$pod" -- env ADMIN_DN="$admin_dn" ADMIN_PASS="$admin_pass" CONFIG_PASS="$config_pass" CONFIG_DN_OVERRIDE="${config_dn_override}" ADMIN_CN_OVERRIDE="$admin_user" BASE_DN="$base_dn" bash -s 2>&1); then
+      sync_output=${sync_output//$'
+'/}
       if [[ "$sync_output" == *VERIFY_FAIL:* ]]; then
          local verified_dn="${sync_output##*VERIFY_FAIL:}"
          _warn "[ldap] unable to verify admin password for ${verified_dn}"
@@ -916,7 +891,8 @@ EOS
       return 1
    fi
 
-   sync_output=${sync_output//$'\r'/}
+   sync_output=${sync_output//$'
+'/}
    local reconciled_dn="$admin_dn"
    if [[ "$sync_output" == SYNC_OK:* ]]; then
       reconciled_dn="${sync_output#SYNC_OK:}"
@@ -925,6 +901,7 @@ EOS
    _info "[ldap] reconciled admin password for ${reconciled_dn}"
    return 0
 }
+
 
 function _ldap_deploy_password_rotator() {
    local ns="${1:?Namespace required}"
@@ -967,25 +944,14 @@ function _ldap_deploy_password_rotator() {
    fi
 }
 
-function deploy_ldap() {
-   local restore_trace=0
-   local namespace=""
-   local release=""
-   local chart_version=""
-   local enable_vault=0
-   local arg_count=$#
+function _ldap_parse_deploy_opts() {
+   _LDAP_DEPLOY_NAMESPACE=""
+   _LDAP_DEPLOY_RELEASE=""
+   _LDAP_DEPLOY_CHART_VERSION=""
+   _LDAP_DEPLOY_ENABLE_VAULT=0
+   _LDAP_DEPLOY_RESTORE_TRACE=0
 
-   case $- in
-      *x*)
-         restore_trace=1
-         ;;
-   esac
-
-   if [[ "${CLUSTER_ROLE:-infra}" == "app" ]]; then
-      _info "[ldap] CLUSTER_ROLE=app — skipping deploy_ldap"
-      if (( restore_trace )); then set -x; fi
-      return 0
-   fi
+   case $- in *x*) _LDAP_DEPLOY_RESTORE_TRACE=1 ;; esac
 
    while [[ $# -gt 0 ]]; do
       case "$1" in
@@ -994,514 +960,263 @@ function deploy_ldap() {
 Usage: deploy_ldap [options] [namespace] [release] [chart-version]
 
 Options:
-  --namespace <ns>         Kubernetes namespace (default: ${LDAP_NAMESPACE})
-  --release <name>         Helm release name (default: ${LDAP_RELEASE})
-  --chart-version <ver>    Helm chart version (default: ${LDAP_HELM_CHART_VERSION:-<auto>})
+  --namespace <ns>         Kubernetes namespace (default: \${LDAP_NAMESPACE})
+  --release <name>         Helm release name (default: \${LDAP_RELEASE})
+  --chart-version <ver>    Helm chart version (default: \${LDAP_HELM_CHART_VERSION:-<auto>})
   --enable-vault           Deploy Vault and ESO if not already deployed
   -h, --help               Show this help message
 
-Positional overrides (kept for backwards compatibility):
+Positional overrides (deprecated):
   namespace                Equivalent to --namespace <ns>
   release                  Equivalent to --release <name>
   chart-version            Equivalent to --chart-version <ver>
 
 Examples:
-  deploy_ldap                           # Deploy with defaults
-  deploy_ldap --enable-vault            # Deploy with automatic Vault setup
-  deploy_ldap --namespace my-ns         # Deploy to custom namespace
+  deploy_ldap
+  deploy_ldap --enable-vault
+  deploy_ldap --namespace my-ns
 EOF
-            if (( restore_trace )); then
-               set -x
-            fi
+            if (( _LDAP_DEPLOY_RESTORE_TRACE )); then set -x; fi
             return 0
             ;;
-         --enable-vault)
-            enable_vault=1
-            shift
-            continue
-            ;;
+         --enable-vault) _LDAP_DEPLOY_ENABLE_VAULT=1; shift; continue ;;
          --namespace)
-            if [[ -z "${2:-}" ]]; then
-               _err "[ldap] --namespace flag requires an argument"
-               return 1
-            fi
-            namespace="$2"
-            shift 2
-            continue
-            ;;
+            [[ -z "${2:-}" ]] && { _err "[ldap] --namespace flag requires an argument"; return 1; }
+            _LDAP_DEPLOY_NAMESPACE="$2"; shift 2; continue ;;
          --namespace=*)
-            namespace="${1#*=}"
-            if [[ -z "$namespace" ]]; then
-               _err "[ldap] --namespace flag requires a non-empty argument"
-               return 1
-            fi
-            shift
-            continue
-            ;;
+            _LDAP_DEPLOY_NAMESPACE="${1#*=}"; [[ -z "$_LDAP_DEPLOY_NAMESPACE" ]] && { _err "[ldap] --namespace flag requires an argument"; return 1; }
+            shift; continue ;;
          --release)
-            if [[ -z "${2:-}" ]]; then
-               _err "[ldap] --release flag requires an argument"
-               return 1
-            fi
-            release="$2"
-            shift 2
-            continue
-            ;;
+            [[ -z "${2:-}" ]] && { _err "[ldap] --release flag requires an argument"; return 1; }
+            _LDAP_DEPLOY_RELEASE="$2"; shift 2; continue ;;
          --release=*)
-            release="${1#*=}"
-            if [[ -z "$release" ]]; then
-               _err "[ldap] --release flag requires a non-empty argument"
-               return 1
-            fi
-            shift
-            continue
-            ;;
+            _LDAP_DEPLOY_RELEASE="${1#*=}"; [[ -z "$_LDAP_DEPLOY_RELEASE" ]] && { _err "[ldap] --release flag requires an argument"; return 1; }
+            shift; continue ;;
          --chart-version)
-            if [[ -z "${2:-}" ]]; then
-               _err "[ldap] --chart-version flag requires an argument"
-               return 1
-            fi
-            chart_version="$2"
-            shift 2
-            continue
-            ;;
+            [[ -z "${2:-}" ]] && { _err "[ldap] --chart-version flag requires an argument"; return 1; }
+            _LDAP_DEPLOY_CHART_VERSION="$2"; shift 2; continue ;;
          --chart-version=*)
-            chart_version="${1#*=}"
-            if [[ -z "$chart_version" ]]; then
-               _err "[ldap] --chart-version flag requires a non-empty argument"
-               return 1
-            fi
-            shift
-            continue
-            ;;
-         --)
-            shift
-            break
-            ;;
-         -*)
-            _err "[ldap] unknown option: $1"
-            return 1
-            ;;
+            _LDAP_DEPLOY_CHART_VERSION="${1#*=}"; [[ -z "$_LDAP_DEPLOY_CHART_VERSION" ]] && { _err "[ldap] --chart-version flag requires an argument"; return 1; }
+            shift; continue ;;
+         --) shift; break ;;
+         -*) _err "[ldap] unknown option: $1"; return 1 ;;
          *)
-            if [[ -z "$namespace" ]]; then
-               namespace="$1"
-            elif [[ -z "$release" ]]; then
-               release="$1"
-            elif [[ -z "$chart_version" ]]; then
-               chart_version="$1"
+            if [[ -z "$_LDAP_DEPLOY_NAMESPACE" ]]; then
+               _LDAP_DEPLOY_NAMESPACE="$1"
+            elif [[ -z "$_LDAP_DEPLOY_RELEASE" ]]; then
+               _LDAP_DEPLOY_RELEASE="$1"
+            elif [[ -z "$_LDAP_DEPLOY_CHART_VERSION" ]]; then
+               _LDAP_DEPLOY_CHART_VERSION="$1"
             else
-               _err "[ldap] unexpected argument: $1"
-               return 1
+               _err "[ldap] unexpected argument: $1"; return 1
             fi
             ;;
       esac
       shift
    done
 
-   if [[ -z "$namespace" ]]; then
-      namespace="$LDAP_NAMESPACE"
+   _LDAP_DEPLOY_NAMESPACE="${_LDAP_DEPLOY_NAMESPACE:-$LDAP_NAMESPACE}"
+   _LDAP_DEPLOY_RELEASE="${_LDAP_DEPLOY_RELEASE:-$LDAP_RELEASE}"
+   _LDAP_DEPLOY_CHART_VERSION="${_LDAP_DEPLOY_CHART_VERSION:-${LDAP_HELM_CHART_VERSION:-}}"
+   if [[ -z "$_LDAP_DEPLOY_NAMESPACE" ]]; then
+      _err "[ldap] namespace is required"; return 1
    fi
+}
 
-   if [[ -z "$release" ]]; then
-      release="$LDAP_RELEASE"
-   fi
-
-   if [[ -z "$chart_version" ]]; then
-      chart_version="${LDAP_HELM_CHART_VERSION:-}"
-   fi
-
-   if (( restore_trace )); then
-      set -x
-   fi
-
-   if [[ -z "$namespace" ]]; then
-      _err "[ldap] namespace is required"
+function _ldap_deploy_prerequisites() {
+   local tag="${1:-ldap}"
+   _info "[${tag}] deploying prerequisites (--enable-vault specified)"
+   if ! deploy_eso; then
+      _err "[${tag}] ESO deployment failed"
       return 1
    fi
+   _info "[${tag}] waiting for ESO webhook to be ready..."
+   if ! _kubectl --no-exit -n "${ESO_NAMESPACE:-secrets}" wait --for=condition=available deployment/external-secrets-webhook --timeout=60s; then
+      _err "[${tag}] ESO webhook did not become ready"
+      return 1
+   fi
+   if ! deploy_vault; then
+      _err "[${tag}] Vault deployment failed"
+      return 1
+   fi
+}
 
+function _ldap_ensure_vault_ready() {
+   local vault_ns="$1" vault_release="$2"
+   if _vault_is_sealed "$vault_ns" "$vault_release"; then
+      _info "[ldap] Vault ${vault_ns}/${vault_release} is sealed; attempting to unseal"
+      if ! _vault_replay_cached_unseal "$vault_ns" "$vault_release"; then
+         _err "[ldap] Vault ${vault_ns}/${vault_release} is sealed and cannot be unsealed"
+      fi
+   else
+      local seal_check_rc=$?
+      if (( seal_check_rc == 2 )); then
+         _warn "[ldap] Unable to determine Vault seal status; attempting unseal as fallback"
+         if ! _vault_replay_cached_unseal "$vault_ns" "$vault_release"; then
+            _err "[ldap] Cannot access Vault ${vault_ns}/${vault_release}"
+         fi
+      else
+         _info "[ldap] Vault ${vault_ns}/${vault_release} is already unsealed"
+      fi
+   fi
+}
+
+function _ldap_run_post_deploy() {
+   local namespace="$1" release="$2" deploy_name="$3" smoke_port="$4"
+
+   if ! _kubectl --no-exit -n "$namespace" rollout status "deployment/${deploy_name}" --timeout=180s; then
+      _warn "[ldap] deployment ${namespace}/${deploy_name} not ready; skipping smoke test"
+      return 0
+   fi
+
+   if ! _ldap_sync_admin_password "$namespace" "$release"; then
+      _warn "[ldap] admin password sync failed; continuing with smoke test"
+   fi
+
+   if ! _ldap_import_ldif "$namespace" "$release"; then
+      _warn "[ldap] LDIF import failed; continuing with smoke test"
+   fi
+
+   if (( LDAP_ROTATOR_ENABLED )); then
+      if ! _ldap_deploy_password_rotator "$namespace"; then
+         _warn "[ldap] password rotator deployment failed"
+      fi
+   fi
+
+   local smoke_script="${SCRIPT_DIR}/tests/plugins/openldap.sh"
+   local service_name="${LDAP_SERVICE_NAME:-${release}-openldap-bitnami}"
+   if [[ -x "$smoke_script" ]]; then
+      "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN" || _warn "[ldap] smoke test failed; inspect output above"
+   elif [[ -r "$smoke_script" ]]; then
+      bash "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN" || _warn "[ldap] smoke test failed; inspect output above"
+   else
+      _warn "[ldap] smoke test helper missing at ${smoke_script}; skipping verification"
+   fi
+}
+
+function deploy_ldap() {
+   _ldap_parse_deploy_opts "$@" || return $?
+   local namespace="$_LDAP_DEPLOY_NAMESPACE"
+   local release="$_LDAP_DEPLOY_RELEASE"
+   local chart_version="$_LDAP_DEPLOY_CHART_VERSION"
+   local enable_vault="$_LDAP_DEPLOY_ENABLE_VAULT"
+   local restore_trace="$_LDAP_DEPLOY_RESTORE_TRACE"
+
+   if [[ "${CLUSTER_ROLE:-infra}" == "app" ]]; then
+      _info "[ldap] CLUSTER_ROLE=app — skipping deploy_ldap"
+      (( restore_trace )) && set -x
+      return 0
+   fi
+
+   (( restore_trace )) && set -x
    export LDAP_NAMESPACE="$namespace"
    export LDAP_RELEASE="$release"
 
-   # Deploy prerequisites if requested
-   if [[ "$enable_vault" == "1" ]]; then
-      _info "[ldap] deploying prerequisites (--enable-vault specified)"
-
-      # Deploy ESO first (required for Vault secret syncing)
-      if ! deploy_eso; then
-         _err "[ldap] ESO deployment failed"
-         return 1
-      fi
-
-      # Wait for ESO webhook to be ready
-      _info "[ldap] waiting for ESO webhook to be ready..."
-      if ! _kubectl --no-exit -n "${ESO_NAMESPACE:-secrets}" wait --for=condition=available deployment/external-secrets-webhook --timeout=60s; then
-         _err "[ldap] ESO webhook did not become ready"
-         return 1
-      fi
-
-      # Deploy Vault
-      if ! deploy_vault; then
-         _err "[ldap] Vault deployment failed"
-         return 1
-      fi
+   if (( enable_vault )); then
+      _ldap_deploy_prerequisites "ldap" || return 1
    fi
 
    local vault_ns="${VAULT_NS:-${VAULT_NS_DEFAULT:-vault}}"
    local vault_release="${VAULT_RELEASE:-${VAULT_RELEASE_DEFAULT:-vault}}"
-
-   # Login to Vault to ensure we have a session token
    _vault_login "$vault_ns" "$vault_release"
+   _ldap_ensure_vault_ready "$vault_ns" "$vault_release"
 
-   # Check if Vault is sealed before attempting unseal
-   if _vault_is_sealed "$vault_ns" "$vault_release"; then
-      # Vault is sealed - attempt to unseal it
-      _info "[ldap] Vault ${vault_ns}/${vault_release} is sealed; attempting to unseal"
-      if ! _vault_replay_cached_unseal "$vault_ns" "$vault_release"; then
-         _err "[ldap] Vault ${vault_ns}/${vault_release} is sealed and cannot be unsealed; LDAP deployment requires accessible Vault"
-      fi
-   else
-      local seal_check_rc=$?
-      if (( seal_check_rc == 1 )); then
-         # Vault is unsealed - continue normally
-         _info "[ldap] Vault ${vault_ns}/${vault_release} is already unsealed"
-      elif (( seal_check_rc == 2 )); then
-         # Cannot determine seal status - attempt unseal anyway as fallback
-         _warn "[ldap] Unable to determine Vault seal status; attempting unseal as fallback"
-         if ! _vault_replay_cached_unseal "$vault_ns" "$vault_release"; then
-            _err "[ldap] Cannot access Vault ${vault_ns}/${vault_release}; LDAP deployment requires accessible Vault"
-         fi
-      fi
-   fi
+   _ldap_seed_admin_secret || return 1
+   _ldap_seed_ldif_secret || return 1
 
-   if ! _ldap_seed_admin_secret; then
-      return 1
-   fi
-
-   if ! _ldap_seed_ldif_secret; then
-      return 1
-   fi
-
-   if ! _vault_configure_secret_reader_role \
-         "$vault_ns" \
-         "$vault_release" \
-         "$LDAP_ESO_SERVICE_ACCOUNT" \
-         "$namespace" \
-         "$LDAP_VAULT_KV_MOUNT" \
-         "$LDAP_VAULT_POLICY_PREFIX" \
-         "$LDAP_ESO_ROLE"; then
-      _err "[ldap] failed to configure Vault role ${LDAP_ESO_ROLE} for namespace ${namespace}"
-      return 1
-   fi
+   _vault_configure_secret_reader_role       "$vault_ns" "$vault_release"       "$LDAP_ESO_SERVICE_ACCOUNT" "$namespace"       "$LDAP_VAULT_KV_MOUNT" "$LDAP_VAULT_POLICY_PREFIX" "$LDAP_ESO_ROLE" ||       { _err "[ldap] failed to configure Vault role ${LDAP_ESO_ROLE} for namespace ${namespace}"; return 1; }
 
    _ldap_ensure_namespace "$namespace" || return 1
-
-   if ! _ldap_apply_eso_resources "$namespace"; then
-      _err "[ldap] failed to apply ESO manifests for namespace ${namespace}"
-      return 1
-   fi
-
-   if ! _ldap_wait_for_secret "$namespace" "${LDAP_ADMIN_SECRET_NAME}"; then
-      _err "[ldap] Vault-sourced secret ${LDAP_ADMIN_SECRET_NAME} not available"
-      return 1
-   fi
+   _ldap_apply_eso_resources "$namespace" || return 1
+   _ldap_wait_for_secret "$namespace" "${LDAP_ADMIN_SECRET_NAME}" || { _err "[ldap] Vault-sourced secret ${LDAP_ADMIN_SECRET_NAME} not available"; return 1; }
 
    if [[ "${LDAP_LDIF_ENABLED:-false}" == "true" && -n "${LDAP_LDIF_VAULT_PATH:-}" ]]; then
-      if ! _ldap_wait_for_secret "$namespace" "${LDAP_LDIF_SECRET_NAME}"; then
-         _err "[ldap] Vault-sourced LDIF secret ${LDAP_LDIF_SECRET_NAME} not available"
-         return 1
-      fi
+      _ldap_wait_for_secret "$namespace" "${LDAP_LDIF_SECRET_NAME}" ||          { _err "[ldap] Vault-sourced LDIF secret ${LDAP_LDIF_SECRET_NAME} not available"; return 1; }
    fi
 
    local deploy_rc=0
-   if ! _ldap_deploy_chart "$namespace" "$release" "$chart_version"; then
-      deploy_rc=$?
-   fi
+   _ldap_deploy_chart "$namespace" "$release" "$chart_version" || deploy_rc=$?
 
    if (( deploy_rc == 0 )); then
       local deploy_name="${release}-openldap-bitnami"
-      if ! _kubectl --no-exit -n "$namespace" rollout status "deployment/${deploy_name}" --timeout=180s; then
-         _warn "[ldap] deployment ${namespace}/${deploy_name} not ready; skipping smoke test"
-         return "$deploy_rc"
-      fi
-
-      if ! _ldap_sync_admin_password "$namespace" "$release"; then
-         _warn "[ldap] admin password sync failed; continuing with smoke test"
-      fi
-
-      if ! _ldap_import_ldif "$namespace" "$release"; then
-         _warn "[ldap] LDIF import failed; continuing with smoke test"
-      fi
-
-      if (( LDAP_ROTATOR_ENABLED )); then
-         if ! _ldap_deploy_password_rotator "$namespace"; then
-            _warn "[ldap] password rotator deployment failed"
-         fi
-      fi
-
-      local smoke_script="${SCRIPT_DIR}/tests/plugins/openldap.sh"
-      local service_name="${LDAP_SERVICE_NAME:-${release}-openldap-bitnami}"
       local smoke_port="${LDAP_SMOKE_PORT:-3389}"
-      if [[ -x "$smoke_script" ]]; then
-         "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN" || \
-            _warn "[ldap] smoke test failed; inspect output above"
-      elif [[ -r "$smoke_script" ]]; then
-         bash "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN" || \
-            _warn "[ldap] smoke test failed; inspect output above"
-      else
-         _warn "[ldap] smoke test helper missing at ${smoke_script}; skipping verification"
-      fi
+      _ldap_run_post_deploy "$namespace" "$release" "$deploy_name" "$smoke_port"
    fi
 
+   (( restore_trace )) && set +x
    return "$deploy_rc"
 }
+
+
 
 # Deploy OpenLDAP with Active Directory-compatible schema for testing
 # This is a convenience wrapper that auto-configures AD schema settings
 # and runs fail-fast smoke tests
+# _ldap_run_ad_smoke_test
+function _ldap_run_ad_smoke_test() {
+   local namespace="$1" release="$2" smoke_port="$3"
+   local service_name="${LDAP_SERVICE_NAME:-${release}-openldap-bitnami}"
+   local smoke_script="${SCRIPT_DIR}/tests/plugins/openldap.sh"
+   if [[ -x "$smoke_script" ]]; then
+      "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN" || _warn "[ad] smoke test failed; inspect output above"
+   elif [[ -r "$smoke_script" ]]; then
+      bash "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN" || _warn "[ad] smoke test failed; inspect output above"
+   else
+      _warn "[ad] smoke test helper missing at ${smoke_script}; skipping"
+   fi
+}
+
 function deploy_ad() {
-   local restore_trace=0
-   local arg_count=$#
-   if [[ "$-" =~ x ]]; then
-      set +x
-      restore_trace=1
-   fi
-
-   # Show help if no arguments provided
-   if [[ $arg_count -eq 0 ]]; then
-      cat <<'EOF'
-Usage: deploy_ad [options] [namespace] [release]
-
-Deploy OpenLDAP with Active Directory-compatible schema for LOCAL TESTING.
-
-IMPORTANT: This does NOT deploy real Active Directory. It deploys OpenLDAP
-configured with AD-like schema to validate schema structure, users, and
-groups before deploying to production AD.
-
-Options:
-  --namespace <ns>   Namespace (default: directory)
-  --release <name>   Release name (default: openldap)
-  --enable-vault     Deploy Vault and ESO if not already deployed
-  -h, --help         Show this help
-
-Examples:
-  # Show this help message
-  deploy_ad
-
-  # Deploy with automatic Vault setup
-  deploy_ad --enable-vault
-
-  # Deploy to custom namespace
-  deploy_ad --namespace ad-test --enable-vault
-
-  # Next steps after deployment
-  deploy_jenkins --enable-ldap --enable-vault
-
-Note: Use --enable-ldap (not --enable-ad) for testing with deploy_ad.
-      The --enable-ad flag is for production Active Directory only.
-
-Prerequisites:
-  - Vault must be deployed (use --enable-vault or deploy_vault first)
-  - ESO must be deployed (automatically deployed with --enable-vault)
-EOF
-      if (( restore_trace )); then set -x; fi
-      return 0
-   fi
-
-   # Parse arguments
-   local show_help=0
    local enable_vault=0
-   local namespace_arg=""
-   local release_arg=""
-   local ldap_args=()
+   local namespace=""
+   local release=""
+   local args=()
 
    while [[ $# -gt 0 ]]; do
       case "$1" in
          -h|--help)
-            show_help=1
-            break
-            ;;
-         --enable-vault)
-            enable_vault=1
-            ldap_args+=("$1")
-            shift
-            ;;
-         --namespace)
-            namespace_arg="$2"
-            ldap_args+=("$1" "$2")
-            shift 2
-            ;;
-         --namespace=*)
-            namespace_arg="${1#*=}"
-            ldap_args+=("$1")
-            shift
-            ;;
-         --release)
-            release_arg="$2"
-            ldap_args+=("$1" "$2")
-            shift 2
-            ;;
-         --release=*)
-            release_arg="${1#*=}"
-            ldap_args+=("$1")
-            shift
-            ;;
-         *)
-            # Positional args - pass through to deploy_ldap
-            ldap_args+=("$1")
-            if [[ -z "$namespace_arg" ]]; then
-               namespace_arg="$1"
-            elif [[ -z "$release_arg" ]]; then
-               release_arg="$1"
-            fi
-            shift
-            ;;
-      esac
-   done
-
-   if [[ "$show_help" == "1" ]]; then
-      cat <<'EOF'
+            cat <<'EOF'
 Usage: deploy_ad [options] [namespace] [release]
 
-Deploy OpenLDAP with Active Directory-compatible schema for LOCAL TESTING.
-
-IMPORTANT: This does NOT deploy real Active Directory. It deploys OpenLDAP
-configured with AD-like schema to validate schema structure, users, and
-groups before deploying to production AD.
+Deploy OpenLDAP with AD-compatible schema for LOCAL TESTING.
 
 Options:
   --namespace <ns>   Namespace (default: directory)
   --release <name>   Release name (default: openldap)
-  --enable-vault     Deploy Vault if not already deployed
-  -h, --help         Show this help
-
-Examples:
-  # Deploy OpenLDAP with AD schema (requires Vault already deployed)
-  deploy_ad
-
-  # Deploy with Vault auto-deployment
-  deploy_ad --enable-vault
-
-  # Deploy to custom namespace
-  deploy_ad --namespace ad-test --enable-vault
-
-  # Next steps after deployment
-  deploy_jenkins --enable-ldap --enable-vault
-
-Note: Use --enable-ldap (not --enable-ad) for testing with deploy_ad.
-      The --enable-ad flag is for production Active Directory only.
-
-Prerequisites:
-  - Vault must be deployed (use --enable-vault or deploy_vault first)
-  - ESO must be deployed (deploy_eso)
+  --enable-vault     Deploy Vault + ESO prerequisites before LDAP
+  -h, --help         Show this help message
 EOF
-      if (( restore_trace )); then set +x; fi
-      return 0
-   fi
+            return 0
+            ;;
+         --enable-vault) enable_vault=1; shift; continue ;;
+         --namespace) namespace="${2:?}"; args+=("$1" "$2"); shift 2; continue ;;
+         --namespace=*) namespace="${1#*=}"; args+=("$1"); shift; continue ;;
+         --release) release="${2:?}"; args+=("$1" "$2"); shift 2; continue ;;
+         --release=*) release="${1#*=}"; args+=("$1"); shift; continue ;;
+         *) args+=("$1"); shift; continue ;;
+      esac
+   done
 
-   _info "[ad] deploying OpenLDAP with Active Directory-compatible schema"
-   _info "[ad] this is for testing AD schema structure, not production AD"
-
-   # Auto-configure AD schema environment variables
    export LDAP_LDIF_FILE="${SCRIPT_DIR}/etc/ldap/bootstrap-ad-schema.ldif"
    export LDAP_BASE_DN="DC=corp,DC=example,DC=com"
    export LDAP_BINDDN="cn=admin,DC=corp,DC=example,DC=com"
    export LDAP_DOMAIN="corp.example.com"
    export LDAP_ROOT="DC=corp,DC=example,DC=com"
-
-   # AD-specific DN paths for users and groups
    export LDAP_USERDN="OU=ServiceAccounts,DC=corp,DC=example,DC=com"
    export LDAP_GROUPDN="OU=Groups,DC=corp,DC=example,DC=com"
 
-   _info "[ad] using AD schema: ${LDAP_LDIF_FILE}"
-   _info "[ad] base DN: ${LDAP_BASE_DN}"
-   _info "[ad] user DN: ${LDAP_USERDN}"
-   _info "[ad] group DN: ${LDAP_GROUPDN}"
-
-   # Deploy prerequisites if requested
-   if [[ "$enable_vault" == "1" ]]; then
-      _info "[ad] deploying prerequisites (--enable-vault specified)"
-
-      # Deploy ESO first (required for Vault secret syncing)
-      if ! deploy_eso; then
-         _err "[ad] ESO deployment failed"
-         return 1
-      fi
-
-      # Wait for ESO webhook to be ready
-      _info "[ad] waiting for ESO webhook to be ready..."
-      if ! _kubectl --no-exit -n "${ESO_NAMESPACE:-secrets}" wait --for=condition=available deployment/external-secrets-webhook --timeout=60s; then
-         _err "[ad] ESO webhook did not become ready"
-         return 1
-      fi
-
-      # Deploy Vault
-      if ! deploy_vault; then
-         _err "[ad] Vault deployment failed"
-         return 1
-      fi
+   if (( enable_vault )); then
+      _ldap_deploy_prerequisites "ad" || return 1
    fi
 
-   # Call deploy_ldap with AD schema configuration
-   if ! deploy_ldap "${ldap_args[@]}"; then
+   if ! deploy_ldap "${args[@]}"; then
       _err "[ad] OpenLDAP deployment failed"
       return 1
    fi
 
-   # Run fail-fast smoke test
-   _info "[ad] running fail-fast smoke test..."
-
-   local namespace="${LDAP_NAMESPACE:-directory}"
-   local release="${LDAP_RELEASE:-openldap}"
-   local service_name="${LDAP_SERVICE_NAME:-${release}-openldap-bitnami}"
+   local final_ns="${LDAP_NAMESPACE:-directory}"
+   local final_release="${LDAP_RELEASE:-openldap}"
    local smoke_port="${LDAP_SMOKE_PORT:-3389}"
-   local smoke_script="${SCRIPT_DIR}/scripts/tests/plugins/openldap.sh"
-
-   if [[ -x "$smoke_script" ]]; then
-      if ! "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN"; then
-         _err "[ad] smoke test failed - deployment verification failed"
-         cat <<EOF
-
-❌ OpenLDAP deployed but smoke test FAILED
-
-Troubleshooting:
-  1. Check pod logs: kubectl logs -n ${namespace} -l app.kubernetes.io/name=openldap-bitnami
-  2. Check base DN: kubectl get secret openldap-admin -n ${namespace} -o jsonpath='{.data.LDAP_BASE_DN}' | base64 -d
-  3. Manual test: kubectl exec -n ${namespace} \$(kubectl get pods -n ${namespace} -l app.kubernetes.io/name=openldap-bitnami -o jsonpath='{.items[0].metadata.name}') -- ldapsearch -x -b "DC=corp,DC=example,DC=com"
-
-EOF
-         return 1
-      fi
-   elif [[ -r "$smoke_script" ]]; then
-      if ! bash "$smoke_script" "$namespace" "$release" "$service_name" "$smoke_port" "$LDAP_BASE_DN"; then
-         _err "[ad] smoke test failed - deployment verification failed"
-         return 1
-      fi
-   else
-      _warn "[ad] smoke test script not found at ${smoke_script}; skipping verification"
-   fi
-
-   # Success message
-   cat <<EOF
-
-✅ OpenLDAP with AD schema deployed successfully
-
-Base DN: ${LDAP_BASE_DN}
-Schema: Active Directory-compatible
-Namespace: ${namespace}
-Release: ${release}
-
-Next steps:
-  # Deploy Jenkins with LDAP authentication (uses LDAP plugin)
-  ./scripts/k3d-manager deploy_jenkins --enable-ldap --enable-vault
-
-  # Test login with AD-style users
-  # alice@corp.example.com / AlicePass123!
-  # bob@corp.example.com / BobPass456!
-
-Note: This deployment uses OpenLDAP with AD schema for testing.
-      For production AD, use --enable-ad flag instead of --enable-ldap.
-EOF
-
-   if (( restore_trace )); then set +x; fi
+   _ldap_run_ad_smoke_test "$final_ns" "$final_release" "$smoke_port"
    return 0
 }
