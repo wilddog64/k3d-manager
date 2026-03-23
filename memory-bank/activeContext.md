@@ -1,6 +1,6 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.12` (as of 2026-03-22)
+## Current Branch: `k3d-manager-v0.9.13` (as of 2026-03-23)
 
 **v0.9.7 SHIPPED** — PR #41 merged to main (`97249a6f`) 2026-03-22. Tagged v0.9.7, released.
 **v0.9.8 SHIPPED** — PR #42 merged to main (`64525e3f`) 2026-03-22. No version tag (CHANGELOG [Unreleased]).
