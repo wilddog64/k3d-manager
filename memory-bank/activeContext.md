@@ -7,7 +7,8 @@
 **v0.9.9 SHIPPED** — PR #43 merged to main (`c1043175`) 2026-03-22. Tagged v0.9.9, released.
 **v0.9.10 SHIPPED** — PR #44 merged to main (`877ec970`) 2026-03-22. Tagged v0.9.10, released.
 **v0.9.11 SHIPPED** — PR #45 merged to main (`1a0c913`) 2026-03-22. Tagged v0.9.11, released.
-**v0.9.12 ACTIVE** — branch cut from main 2026-03-22. PR #46 merged (`2b27028`) — roadmap Currently Shipped table updated to v0.9.11. lib-foundation v0.3.6 subtree pull (`9a030bc`) — `doc_hygiene.sh` + `doc_hygiene.bats` + hooks now in `scripts/lib/foundation/`. Copilot CLI auth CI integration shipped in `fd97705` — installs Copilot CLI in lint job, passes `COPILOT_GITHUB_TOKEN`/`K3DM_ENABLE_AI` into BATS, adds live `_copilot_auth_check` test per `docs/plans/v0.9.12-copilot-auth-ci-integration.md`.
+**v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. Copilot CLI CI integration: lint job installs CLI, wires `COPILOT_GITHUB_TOKEN`/`K3DM_ENABLE_AI`/`K3DM_COPILOT_LIVE_TESTS` into BATS, live binary check; 2 Copilot findings fixed (`fbb9ba4`).
+**v0.9.13 ACTIVE** — branch cut from main 2026-03-23.
 **enforce_admins:** restored on main 2026-03-23.
 
 ---
