@@ -1273,7 +1273,7 @@ Options:
   --enable-ad-prod           Deploy production Active Directory integration (default: disabled)
   --skip-ad-validation       Skip Active Directory connectivity validation (for testing)
   --disable-ldap             Skip directory service deployment
-  --enable-vault             Deploy Vault (default: disabled)
+  --enable-vault             Deploy Vault (default: enabled)
   --disable-vault            Skip Vault deployment (use existing)
   --disable-mfa              Disable TOTP/MFA plugin (enabled by default)
   -h, --help                 Show this help message
@@ -1282,7 +1282,7 @@ Feature Flags (environment variables):
   JENKINS_LDAP_ENABLED=0|1       Enable LDAP auto-deployment (default: 0)
   JENKINS_AD_ENABLED=0|1         Enable AD testing auto-deployment (default: 0)
   JENKINS_AD_PROD_ENABLED=0|1    Enable production AD auto-deployment (default: 0)
-  JENKINS_VAULT_ENABLED=0|1      Enable Vault auto-deployment (default: 0)
+  JENKINS_VAULT_ENABLED=0|1      Enable Vault auto-deployment (default: 1)
 
 Active Directory Production Setup:
   When using --enable-ad-prod, configure these environment variables:
@@ -1347,7 +1347,7 @@ Options:
   --enable-ad-prod           Deploy production Active Directory integration (default: disabled)
   --skip-ad-validation       Skip Active Directory connectivity validation (for testing)
   --disable-ldap             Skip directory service deployment
-  --enable-vault             Deploy Vault (default: disabled)
+  --enable-vault             Deploy Vault (default: enabled)
   --disable-vault            Skip Vault deployment (use existing)
   --disable-mfa              Disable TOTP/MFA plugin (enabled by default)
   -h, --help                 Show this help message
@@ -1356,7 +1356,7 @@ Feature Flags (environment variables):
   JENKINS_LDAP_ENABLED=0|1       Enable LDAP auto-deployment (default: 0)
   JENKINS_AD_ENABLED=0|1         Enable AD testing auto-deployment (default: 0)
   JENKINS_AD_PROD_ENABLED=0|1    Enable production AD auto-deployment (default: 0)
-  JENKINS_VAULT_ENABLED=0|1      Enable Vault auto-deployment (default: 0)
+  JENKINS_VAULT_ENABLED=0|1      Enable Vault auto-deployment (default: 1)
 
 Active Directory Production Setup:
   When using --enable-ad-prod, configure these environment variables:
@@ -2007,12 +2007,6 @@ function _deploy_jenkins() {
       _jenkins_cleanup_and_return "$helm_rc"
       return "$helm_rc"
    fi
-
-   local vault_pki_secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
-   local vault_pki_leaf_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
-
-   export VAULT_PKI_SECRET_NAME="$vault_pki_secret_name"
-   export VAULT_PKI_LEAF_HOST="$vault_pki_leaf_host"
 
    local vault_pki_secret_name="${VAULT_PKI_SECRET_NAME:-jenkins-tls}"
    local vault_pki_leaf_host="${VAULT_PKI_LEAF_HOST:-jenkins.dev.local.me}"
