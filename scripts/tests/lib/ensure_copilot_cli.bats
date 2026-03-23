@@ -72,10 +72,10 @@ setup() {
 }
 
 @test "fails when authentication is invalid and AI gated" {
-  export_stubs
+   export_stubs
 
-  copilot_ready=1
-  export K3DM_ENABLE_AI=1
+   copilot_ready=1
+   export K3DM_ENABLE_AI=1
   _command_exist() {
     [[ "$1" == copilot ]]
   }
@@ -91,5 +91,19 @@ setup() {
 
   run _ensure_copilot_cli
   [ "$status" -ne 0 ]
-  [[ "$output" == *"Copilot CLI authentication failed"* ]]
+   [[ "$output" == *"Copilot CLI authentication failed"* ]]
+}
+
+@test "_copilot_auth_check passes with real COPILOT_GITHUB_TOKEN" {
+  if [[ -z "${COPILOT_GITHUB_TOKEN:-}" ]]; then
+    skip "COPILOT_GITHUB_TOKEN not set — skipping live auth check"
+  fi
+  if ! command -v copilot >/dev/null 2>&1; then
+    skip "copilot binary not found — skipping live auth check"
+  fi
+
+  export K3DM_ENABLE_AI=1
+  # Do NOT stub _run_command — use the real copilot binary
+  run _copilot_auth_check
+  [ "$status" -eq 0 ]
 }
