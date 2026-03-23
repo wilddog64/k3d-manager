@@ -25,48 +25,15 @@ across clouds.
 
 | Version | Highlights |
 |---------|-----------|
+| v0.9.11 | Dynamic plugin CI — `detect` job skips cluster tests for docs-only PRs; maps plugin changes to targeted smoke tests |
+| v0.9.10 | if-count allowlist elimination (jenkins) — 8 helpers extracted; allowlist now `system.sh` only |
+| v0.9.9 | if-count allowlist elimination — 11 ldap helpers + 6 vault helpers extracted |
+| v0.9.8 | if-count easy wins + dry-run README doc + BATS coverage |
+| v0.9.7 | lib-foundation sync (`_run_command_resolve_sudo`), `deploy_cluster` no-args guard, `bin/` `_kubectl` wrapper |
+| v0.9.6 | ACG sandbox plugin (`acg_provision/status/extend/teardown`), VPC/SG idempotency, `ACG_ALLOWED_CIDR` security |
 | v0.9.5 | `deploy_app_cluster` — EC2 k3sup install + kubeconfig merge; replaces manual rebuild |
 | v0.9.4 | autossh tunnel plugin, ArgoCD cluster registration, smoke-test gate, `_run_command` TTY fallback |
 | v0.9.3 | TTY fix (`_DCRS_PROVIDER` global), lib-foundation v0.3.2 subtree, cluster rebuild smoke test |
-| v0.9.2 | vCluster E2E composite actions, 11-finding Copilot hardening |
-| v0.9.1 | vCluster plugin, two-tier `--help`, `function test()` refactor |
-
----
-
-## v0.9.6 — ACG Plugin + Lab Accessibility
-*Focus: ACG sandbox lifecycle as a first-class plugin; eliminate port-forward for UI services*
-
-### ACG Plugin (`scripts/plugins/acg.sh`)
-
-Migrate `bin/acg-sandbox.sh` into the dispatcher pattern. Expose ACG sandbox lifecycle
-as proper k3d-manager functions:
-
-```bash
-./scripts/k3d-manager acg_provision   # launch EC2, configure VPC/SG/key, update SSH config
-./scripts/k3d-manager acg_status      # show instance state, TTL, credentials validity
-./scripts/k3d-manager acg_extend      # open ACG sandbox page to extend TTL (+4h)
-./scripts/k3d-manager acg_teardown    # terminate instance, clean kubeconfig entry
-```
-
-- `acg_provision` absorbs all logic from `bin/acg-sandbox.sh`
-- `acg_extend` opens the ACG sandbox page so the user can click "Extend Lab" (+4h)
-- `bin/acg-sandbox.sh` retired after migration
-- BATS coverage: `scripts/tests/plugins/acg.bats` (`env -i` clean; mocks aws CLI and ssh calls)
-
-### Lab Accessibility (LoadBalancer Services)
-
-Eliminate port-forward for all UI services on the infra cluster:
-
-- `argocd-server` — `server.service.type: LoadBalancer` in `scripts/etc/argocd/values.yaml.tmpl`
-- `keycloak` — `service.type: LoadBalancer` in `scripts/etc/keycloak/values.yaml.tmpl`
-- `jenkins` — `controller.serviceType: LoadBalancer` in `scripts/etc/jenkins/values-default.yaml.tmpl`
-- LDAP and data-layer services excluded (protocol services, no browser UI)
-- Frontend LoadBalancer deferred to v1.0.0 (pod not schedulable on single t3.medium)
-
-### Code Quality
-- [ ] **Upstream lib edits to lib-foundation** — `system.sh` (TTY fix + `_run_command_resolve_sudo`) + `agent_rigor.sh` (allowlist feature) → subtree pull back
-- [ ] **`bin/` script consistency** — `bin/smoke-test-cluster-health.sh` needs `_kubectl`/`_run_command`
-- [ ] **Relocate app-layer bug tracking** — file shopping-cart bugs as GitHub Issues in their repos
 
 ---
 
