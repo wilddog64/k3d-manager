@@ -45,7 +45,7 @@
 | **Gemini: smoke test vault refactor** | **COMPLETE** | Ran `deploy_vault` and `deploy_vault --re-unseal` successfully. ESO integration confirmed working. |
 | **Gemini: smoke test jenkins refactor** | **COMPLETE** | Ran `deploy_jenkins --enable-ldap --enable-vault` successfully. Helm, Istio, and CronJob resources created as expected. |
 | **CI gap: no live cluster smoke tests** | **ROADMAP** | CI only runs pre-commit hooks; no automated deploy_vault/deploy_jenkins in CI — manual Gemini smoke tests are the only gate; track for v1.1.0 `provision_full_stack` work |
-| **v0.9.11: dynamic plugin CI** | **SPEC WRITTEN** | Spec: `docs/plans/v0.9.11-dynamic-plugin-ci.md`; adds `detect` job (ubuntu-latest) + conditional stage2; plugin→test map: jenkins→test_jenkins, vault→test_vault, eso→test_eso, keycloak→test_keycloak, cert-manager→test_cert_rotation; docs-only PRs skip stage2; Codex handoff next |
+| **v0.9.11: dynamic plugin CI** | **MERGED** | commit `e2241d6` — implements detect job + conditional stage2 per doc-only / plugin change spec (`docs/plans/v0.9.11-dynamic-plugin-ci.md`) |
 | **Dry-run docs/tests** | **MERGED** | commit `f1b4ca7` — README Safety Gates doc + `scripts/tests/lib/dry_run.bats` coverage |
 | **v1.0.0 (3-node k3sup + Samba AD)** | **NEXT MILESTONE** | Replaces single t3.medium; resolves resource exhaustion structurally; spec: `docs/plans/roadmap-v1.md` |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
