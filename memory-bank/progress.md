@@ -23,7 +23,10 @@
 
 ## v0.9.13 — In Progress
 
-- [ ] TBD
+- [x] v0.9.12 retrospective — `docs/retro/2026-03-23-v0.9.12-retrospective.md` (`3f19383`)
+- [x] `/create-pr` skill — `mergeable_state` check in Post-creation Steps + "Dirty PR silently kills CI" failure mode
+- [x] CHANGE.md — backfill `[v0.9.12]` entry; add `[v0.9.13]` section
+- [x] README + docs/releases.md — add v0.9.13 release row; v0.9.9 moved to collapsible
 
 ---
 
