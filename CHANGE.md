@@ -1,5 +1,13 @@
 # Changes - k3d-manager
 
+## [v0.9.10] — 2026-03-22 — if-count allowlist elimination (jenkins)
+
+### Changed
+- **`scripts/plugins/jenkins.sh`**: Extracted helpers (`_jenkins_deploy_infra_prereqs`, `_jenkins_select_template`, `_jenkins_load_ldap_secret`, `_jenkins_apply_istio_resources`, `_jenkins_deploy_cert_rotator_if_enabled`, `_jenkins_deploy_agent_resources`, `_jenkins_run_helm_install`, `_jenkins_deploy_with_retry`, etc.) so all 4 allowlisted functions drop to ≤ 8 ifs (`733123a`).
+- **`scripts/etc/agent/if-count-allowlist`**: Removed all jenkins (4) entries — allowlist now contains only `system.sh:_run_command` and `system.sh:_ensure_node` (blocked on lib-foundation upstream).
+
+---
+
 ## [v0.9.9] — 2026-03-22 — if-count allowlist elimination (ldap + vault)
 
 ### Changed
