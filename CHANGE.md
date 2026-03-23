@@ -1,5 +1,15 @@
 # Changes - k3d-manager
 
+## [v0.9.11] — 2026-03-22 — dynamic plugin CI
+
+### Added
+- **`.github/workflows/ci.yml`**: New `detect` job (ubuntu-latest) runs after `lint` — computes changed files via `git diff --name-only origin/main...HEAD`, emits `skip_cluster=true` for docs-only PRs, and emits per-plugin flags (`run_jenkins`, `run_vault`, `run_eso`, `run_keycloak`, `run_cert_manager`) when the corresponding plugin file is modified (`e2241d6`).
+
+### Changed
+- **`.github/workflows/ci.yml`**: `stage2` job now depends on `detect`; skips entirely when `skip_cluster=true`; always runs `test_istio` as structural baseline; conditionally runs `test_jenkins`, `test_vault`, `test_eso`, `test_keycloak`, or `test_cert_rotation` only when the matched plugin changed (`e2241d6`).
+
+---
+
 ## [v0.9.10] — 2026-03-22 — if-count allowlist elimination (jenkins)
 
 ### Changed
