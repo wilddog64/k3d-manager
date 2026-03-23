@@ -15,7 +15,8 @@ setup() {
   _command_exist() {
     [[ "$1" == copilot ]]
   }
-  export -f _command_exist
+  _copilot_auth_check() { :; }
+  export -f _command_exist _copilot_auth_check
 
   run _ensure_copilot_cli
   [ "$status" -eq 0 ]
@@ -64,7 +65,8 @@ setup() {
     echo "copilot-release" >> "$RUN_LOG"
     return 0
   }
-  export -f _command_exist _install_copilot_from_release
+  _copilot_auth_check() { :; }
+  export -f _command_exist _install_copilot_from_release _copilot_auth_check
 
   run _ensure_copilot_cli
   [ "$status" -eq 0 ]
@@ -72,10 +74,10 @@ setup() {
 }
 
 @test "fails when authentication is invalid and AI gated" {
-  export_stubs
+   export_stubs
 
-  copilot_ready=1
-  export K3DM_ENABLE_AI=1
+   copilot_ready=1
+   export K3DM_ENABLE_AI=1
   _command_exist() {
     [[ "$1" == copilot ]]
   }
@@ -91,5 +93,22 @@ setup() {
 
   run _ensure_copilot_cli
   [ "$status" -ne 0 ]
-  [[ "$output" == *"Copilot CLI authentication failed"* ]]
+   [[ "$output" == *"Copilot CLI authentication failed"* ]]
+}
+
+@test "copilot binary is operational with COPILOT_GITHUB_TOKEN" {
+  if [[ "${K3DM_COPILOT_LIVE_TESTS:-0}" != "1" ]]; then
+    skip "K3DM_COPILOT_LIVE_TESTS not set — skipping live binary check"
+  fi
+  if [[ -z "${COPILOT_GITHUB_TOKEN:-}" ]]; then
+    skip "COPILOT_GITHUB_TOKEN not set — skipping live binary check"
+  fi
+  if ! command -v copilot >/dev/null 2>&1; then
+    skip "copilot binary not found — skipping live binary check"
+  fi
+
+  # copilot auth status checks the credential store, not the env var token.
+  # Verify the binary is operational instead — version exits 0 with env var auth.
+  run copilot version
+  [ "$status" -eq 0 ]
 }

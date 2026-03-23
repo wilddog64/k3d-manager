@@ -37,6 +37,10 @@ _agent_checkpoint() {
    _err "Checkpoint commit failed; resolve git errors and retry"
 }
 
+# _agent_audit
+#
+# Audits staged diffs for safety violations. Requires SCRIPT_DIR to be set by
+# the sourcing script (system.sh sets it); override via AGENT_AUDIT_IF_ALLOWLIST_FILE.
 _agent_audit() {
    if ! command -v git >/dev/null 2>&1; then
       _warn "git not available; skipping agent audit"
@@ -46,10 +50,11 @@ _agent_audit() {
    local allowlist_file="${AGENT_AUDIT_IF_ALLOWLIST_FILE:-${SCRIPT_DIR}/etc/agent/if-count-allowlist}"
    local if_allowlist=""
    if [[ -r "$allowlist_file" ]]; then
+      local line
       while IFS= read -r line; do
          line=${line%%#*}
-         line="${line#${line%%[![:space:]]*}}"
-         line="${line%${line##*[![:space:]]}}"
+         line="${line#"${line%%[![:space:]]*}"}"
+         line="${line%"${line##*[![:space:]]}"}"
          [[ -z "$line" ]] && continue
          if_allowlist+=$'\n'
          if_allowlist+="$line"
@@ -76,8 +81,7 @@ _agent_audit() {
 
    local changed_sh
    changed_sh="$(
-      { git diff --cached --name-only -- '*.sh' 2>/dev/null; git diff --name-only -- '*.sh' 2>/dev/null; } \
-         | sort -u || true
+      git diff --cached --name-only -- '*.sh' 2>/dev/null || true
    )"
    if [[ -n "$changed_sh" ]]; then
       local max_if="${AGENT_AUDIT_MAX_IF:-8}"

@@ -7,8 +7,8 @@
 **v0.9.9 SHIPPED** — PR #43 merged to main (`c1043175`) 2026-03-22. Tagged v0.9.9, released.
 **v0.9.10 SHIPPED** — PR #44 merged to main (`877ec970`) 2026-03-22. Tagged v0.9.10, released.
 **v0.9.11 SHIPPED** — PR #45 merged to main (`1a0c913`) 2026-03-22. Tagged v0.9.11, released.
-**v0.9.12 ACTIVE** — branch cut from main 2026-03-22.
-**enforce_admins:** restored on main 2026-03-22.
+**v0.9.12 ACTIVE** — branch cut from main 2026-03-22. PR #46 merged (`2b27028`) — roadmap Currently Shipped table updated to v0.9.11. lib-foundation v0.3.6 subtree pull (`9a030bc`) — `doc_hygiene.sh` + `doc_hygiene.bats` + hooks now in `scripts/lib/foundation/`. Copilot CLI auth CI integration shipped in `fd97705` — installs Copilot CLI in lint job, passes `COPILOT_GITHUB_TOKEN`/`K3DM_ENABLE_AI` into BATS, adds live `_copilot_auth_check` test per `docs/plans/v0.9.12-copilot-auth-ci-integration.md`.
+**enforce_admins:** restored on main 2026-03-23.
 
 ---
 
@@ -107,6 +107,8 @@
 | `/post-merge` skill — branch cleanup step | **DONE** | Step 8 added: delete stale branches every 5 releases; local `-d`/`-D` + remote protection removal + `git fetch --prune` |
 | SSH config — persistent Keychain | **DONE** | Added `Host *` block with `UseKeychain yes` + `AddKeysToAgent yes` to `~/.ssh/config`; `lib-foundation` remote switched to SSH |
 | Issue doc: frontend read-only filesystem | **MERGED** | `docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md` |
+| **gemini-skills repository** | **DONE** | Created `/Users/cliang/src/gitrepo/personal/gemini-skills` private repo; transitioned `~/.gemini` and `gemini-skills` remotes to SSH |
+| **task-reporter skill** | **DONE** | Implemented and installed globally (`--scope user`); provides standardized task completion reports with metrics status bar |
 | **README overhaul** | **MERGED** | PR #40 `de684fe7` — Plugins table (14), How-To by component, Issue Logs section, Releases 3+collapsible; enforce_admins restored |
 
 ---

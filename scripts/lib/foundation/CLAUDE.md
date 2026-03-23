@@ -61,6 +61,7 @@ _run_command --soft -- <cmd>                # return 127 instead of exit on fail
 - No bare `sudo` — always `_run_command --prefer-sudo`
 - LF line endings only — no CRLF
 - Minimal patches — no unsolicited refactors
+- **Comment on touch** — when modifying a function that lacks a header comment, add one as part of the same commit. One line is sufficient: purpose + key parameters. If a file has no comments at all, leave it alone unless you're already touching it.
 
 ---
 

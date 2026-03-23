@@ -1,0 +1,9 @@
+- id: check-placeholder-urls
+  name: Check for placeholder and insecure URLs
+  description: >
+    Fails on github.com/user/ placeholder URLs and bare http:// links in
+    markdown. Warns on hardcoded private IPs in YAML manifests.
+  language: script
+  entry: scripts/hooks/check-placeholder-urls
+  types_or: [markdown, yaml]
+  pass_filenames: true

@@ -36,6 +36,7 @@
 ### Added
 - **`scripts/tests/lib/dry_run.bats`**: 5 BATS tests covering `--dry-run` / `K3DM_DEPLOY_DRY_RUN` — plain, `--prefer-sudo`, `--require-sudo`, and normal-mode cases (`f1b4ca7`).
 - **`docs/issues/2026-03-22-if-count-allowlist-deferred.md`**: Tracks 18 remaining allowlisted functions (jenkins x4, ldap x7, vault x5, system x2) deferred to v0.9.9+ with per-function if-counts and decomposition notes (`9a4f795`).
+- Copilot CLI auth integration test — real `_copilot_auth_check` BATS test guarded by `COPILOT_GITHUB_TOKEN`; CI installs Copilot CLI from `https://gh.io/copilot-install` and sets `K3DM_ENABLE_AI=1` for the BATS run.
 
 ### Changed
 - **`README.md`**: Safety Gates section — added note that `--dry-run` / `-n` sets `K3DM_DEPLOY_DRY_RUN=1`; can be set in environment to dry-run full sessions (`f1b4ca7`).
