@@ -233,11 +233,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-03-22 | [Copilot PR #45 review findings](docs/issues/2026-03-22-copilot-pr45-review-findings.md) | spec doc — plugin paths, Rules vs DoD contradiction |
 | 2026-03-22 | [Copilot PR #44 review findings](docs/issues/2026-03-22-copilot-pr44-review-findings.md) | jenkins — duplicate PKI vars, help text mismatch |
 | 2026-03-22 | [Copilot PR #43 review findings](docs/issues/2026-03-22-copilot-pr43-review-findings.md) | ldap / vault — newlines, local scope, jq bool, printf |
 | 2026-03-22 | [Copilot PR #42 review findings](docs/issues/2026-03-22-copilot-pr42-review-findings.md) | dry-run tests / memory-bank |
 | 2026-03-22 | [if-count allowlist deferred refactors](docs/issues/2026-03-22-if-count-allowlist-deferred.md) | jenkins / ldap / vault / system |
-| 2026-03-22 | [Copilot PR #41 review findings](docs/issues/2026-03-22-copilot-pr41-review-findings.md) | lib / agent_rigor / core |
 
 [All issues →](docs/issues/)
 
