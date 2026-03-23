@@ -25,6 +25,7 @@
 ## v0.9.14 — In Progress
 
 - [x] GitHub PAT rotation — rotated 2026-03-23; new expiry 2026-04-22
+- [ ] **if-count: `_run_command` + `_ensure_node`** — spec `docs/plans/v0.9.14-if-count-system-sh.md`; lib-foundation `feat/v0.3.7` first, then subtree pull + allowlist cleared
 
 ---
 

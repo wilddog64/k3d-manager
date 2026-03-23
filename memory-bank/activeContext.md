@@ -11,6 +11,7 @@
 **v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released.
 **v0.9.14 ACTIVE** — branch cut from main 2026-03-23.
 **enforce_admins:** restored on main 2026-03-23.
+**v0.9.14 current task:** if-count `_run_command` + `_ensure_node` — spec `docs/plans/v0.9.14-if-count-system-sh.md`; Codex → lib-foundation `feat/v0.3.7`, then subtree pull into k3d-manager.
 
 ---
 
