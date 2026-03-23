@@ -1,6 +1,6 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.13` (as of 2026-03-23)
+## Current Branch: `k3d-manager-v0.9.14` (as of 2026-03-23)
 
 **v0.9.7 SHIPPED** — PR #41 merged to main (`97249a6f`) 2026-03-22. Tagged v0.9.7, released.
 **v0.9.8 SHIPPED** — PR #42 merged to main (`64525e3f`) 2026-03-22. No version tag (CHANGELOG [Unreleased]).
@@ -8,7 +8,8 @@
 **v0.9.10 SHIPPED** — PR #44 merged to main (`877ec970`) 2026-03-22. Tagged v0.9.10, released.
 **v0.9.11 SHIPPED** — PR #45 merged to main (`1a0c913`) 2026-03-22. Tagged v0.9.11, released.
 **v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. Copilot CLI CI integration: lint job installs CLI, wires `COPILOT_GITHUB_TOKEN`/`K3DM_ENABLE_AI`/`K3DM_COPILOT_LIVE_TESTS` into BATS, live binary check; 2 Copilot findings fixed (`fbb9ba4`).
-**v0.9.13 ACTIVE** — branch cut from main 2026-03-23.
+**v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released.
+**v0.9.14 ACTIVE** — branch cut from main 2026-03-23.
 **enforce_admins:** restored on main 2026-03-23.
 
 ---
