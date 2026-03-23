@@ -7,7 +7,7 @@
 **v0.9.9 SHIPPED** — PR #43 merged to main (`c1043175`) 2026-03-22. Tagged v0.9.9, released.
 **v0.9.10 SHIPPED** — PR #44 merged to main (`877ec970`) 2026-03-22. Tagged v0.9.10, released.
 **v0.9.11 SHIPPED** — PR #45 merged to main (`1a0c913`) 2026-03-22. Tagged v0.9.11, released.
-**v0.9.12 ACTIVE** — branch cut from main 2026-03-22. PR #46 merged (`2b27028`) — roadmap Currently Shipped table updated to v0.9.11. lib-foundation v0.3.6 subtree pull (`9a030bc`) — `doc_hygiene.sh` + `doc_hygiene.bats` + hooks now in `scripts/lib/foundation/`.
+**v0.9.12 ACTIVE** — branch cut from main 2026-03-22. PR #46 merged (`2b27028`) — roadmap Currently Shipped table updated to v0.9.11. lib-foundation v0.3.6 subtree pull (`9a030bc`) — `doc_hygiene.sh` + `doc_hygiene.bats` + hooks now in `scripts/lib/foundation/`. Spec written: `docs/plans/v0.9.12-copilot-auth-ci-integration.md` — Copilot CLI install step + `_copilot_auth_check` integration test; assigned to Codex.
 **enforce_admins:** restored on main 2026-03-23.
 
 ---

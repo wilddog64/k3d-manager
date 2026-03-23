@@ -13,6 +13,13 @@
 **v0.9.11 SHIPPED** — PR #45 merged to main (`1a0c913`) 2026-03-22. Tagged v0.9.11, released. Dynamic plugin CI: detect job + conditional stage2.
 **v0.9.12 ACTIVE** — branch cut from main 2026-03-22. lib-foundation v0.3.6 subtree pull (`9a030bc`).
 
+## v0.9.12 — In Progress
+
+- [x] lib-foundation v0.3.6 subtree pull — `9a030bc` — `doc_hygiene.sh` + hooks now in subtree
+- [x] `_ensure_copilot_cli` / `_ensure_node` / `_k3d_manager_copilot` — already implemented (pre-compaction); BATS tests present in `scripts/tests/lib/`
+- [ ] Roadmap update — `docs/plans/roadmap-v1.md` revised sequencing (k3dm-mcp v1.2.0, GKE v1.3.0, AKS v1.4.0, vCluster v1.5.0; AD plugin in v1.1.0) — **STALE**: current roadmap already correct; no changes needed
+- [ ] **Copilot CLI auth CI integration** — spec `docs/plans/v0.9.12-copilot-auth-ci-integration.md`; `COPILOT_TOKEN` secret created (expires 2026-04-22); assigned to Codex
+
 ---
 
 ## v0.9.4 — Completed
