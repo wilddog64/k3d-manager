@@ -97,6 +97,9 @@ setup() {
 }
 
 @test "copilot binary is operational with COPILOT_GITHUB_TOKEN" {
+  if [[ "${K3DM_COPILOT_LIVE_TESTS:-0}" != "1" ]]; then
+    skip "K3DM_COPILOT_LIVE_TESTS not set — skipping live binary check"
+  fi
   if [[ -z "${COPILOT_GITHUB_TOKEN:-}" ]]; then
     skip "COPILOT_GITHUB_TOKEN not set — skipping live binary check"
   fi

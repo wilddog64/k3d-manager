@@ -34,7 +34,8 @@ jobs:
         run: |
           set -euo pipefail
           tmp_dir="$(mktemp -d)"
-          curl -fsSL https://gh.io/copilot-install \
+          curl -fsSL --retry 3 --retry-delay 5 \
+            https://gh.io/copilot-install \
             -o "${tmp_dir}/copilot-install.sh"
           chmod +x "${tmp_dir}/copilot-install.sh"
           env VERSION=latest bash "${tmp_dir}/copilot-install.sh"
@@ -72,6 +73,7 @@ jobs:
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
           K3DM_ENABLE_AI: "1"
+          K3DM_COPILOT_LIVE_TESTS: "1"
         run: |
           set -euo pipefail
           bats scripts/tests/lib
