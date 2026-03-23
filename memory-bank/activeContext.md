@@ -1,12 +1,12 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.10` (as of 2026-03-22)
+## Current Branch: `k3d-manager-v0.9.11` (as of 2026-03-22)
 
-**v0.9.6 SHIPPED** — PR #39 merged to main (`8b09d577`) 2026-03-22. Tagged v0.9.6, released.
 **v0.9.7 SHIPPED** — PR #41 merged to main (`97249a6f`) 2026-03-22. Tagged v0.9.7, released.
 **v0.9.8 SHIPPED** — PR #42 merged to main (`64525e3f`) 2026-03-22. No version tag (CHANGELOG [Unreleased]).
 **v0.9.9 SHIPPED** — PR #43 merged to main (`c1043175`) 2026-03-22. Tagged v0.9.9, released.
-**v0.9.10 ACTIVE** — branch cut from main 2026-03-22.
+**v0.9.10 SHIPPED** — PR #44 merged to main (`877ec970`) 2026-03-22. Tagged v0.9.10, released.
+**v0.9.11 ACTIVE** — branch cut from main 2026-03-22.
 **enforce_admins:** restored on main 2026-03-22.
 
 ---
@@ -40,6 +40,7 @@
 | **if-count ldap refactor** | **MERGED** | commit `ba6f3a9` — extracted helpers so 7 `ldap.sh` functions drop ≤8 ifs; allowlist trimmed |
 | **if-count vault refactor** | **MERGED** | commit `365846c` — extracted helpers + guard clauses so 5 `vault.sh` functions drop ≤8 ifs; allowlist cleared |
 | **if-count jenkins refactor** | **MERGED** | commit `733123a` on k3d-manager-v0.9.10 — new helpers drop 4 `jenkins.sh` functions ≤8 ifs; allowlist entries removed |
+| **v0.9.10 PR #44** | **MERGED** | `877ec970` — jenkins allowlist elimination; 4 Copilot findings fixed in `25e2b2a`; tagged v0.9.10; branch v0.9.11 cut |
 | **v0.9.9 PR #43** | **MERGED** | `c1043175` — ldap+vault allowlist elimination; 9 Copilot findings fixed in `bbfc12e`; tagged v0.9.9; branch v0.9.10 cut |
 | **Gemini: smoke test vault refactor** | **PENDING** | After v0.9.10 merges — run `deploy_vault` on infra cluster (M2 Air) to verify unseal flow works end-to-end after helper extraction |
 | **Gemini: smoke test jenkins refactor** | **PENDING** | After v0.9.10 merges — run `deploy_jenkins` on infra cluster (M2 Air) to verify Helm install + Istio resources + cert rotator path after helper extraction |
