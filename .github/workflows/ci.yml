@@ -34,7 +34,8 @@ jobs:
         run: |
           set -euo pipefail
           tmp_dir="$(mktemp -d)"
-          curl -fsSL https://gh.io/copilot-install -o "${tmp_dir}/copilot-install.sh"
+          curl -fsSL https://gh.io/copilot-install \
+            -o "${tmp_dir}/copilot-install.sh"
           chmod +x "${tmp_dir}/copilot-install.sh"
           env VERSION=latest bash "${tmp_dir}/copilot-install.sh"
           rm -rf "$tmp_dir"
