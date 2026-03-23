@@ -1,20 +1,14 @@
-# Release History — k3d-manager
+# Release History — lib-foundation
 
 | Version | Date | Highlights |
 |---|---|---|
-| [v0.9.6](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.6) | 2026-03-22 | ACG sandbox plugin (`acg_provision/status/extend/teardown`), VPC/SG idempotency, `ACG_ALLOWED_CIDR` security, kops-for-k3s reframe |
-| [v0.9.5](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.5) | 2026-03-21 | `deploy_app_cluster` — EC2 k3sup install + kubeconfig merge + ArgoCD registration; replaces manual rebuild |
-| [v0.9.4](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.4) | 2026-03-21 | autossh tunnel plugin, ArgoCD cluster registration, smoke-test gate, `_run_command` TTY fallback, lib-foundation v0.3.3 |
-| [v0.9.3](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.3) | 2026-03-16 | TTY fix (`_DCRS_PROVIDER` global), lib-foundation v0.3.2 subtree, cluster rebuild smoke test |
-| [v0.9.2](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.2) | 2026-03-15 | vCluster E2E composite actions, 11-finding Copilot hardening (curl safety, mktemp, sudo -n, input validation) |
-| [v0.9.1](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.1) | 2026-03-15 | vCluster plugin (`create/destroy/use/list`), two-tier `--help`, `function test()` refactor, 11 Copilot findings fixed |
-| [v0.9.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.0) | 2026-03-15 | k3dm-mcp planning, agent workflow lessons, roadmap restructure |
-| [v0.8.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.8.0) | 2026-03-13 | Vault-managed ArgoCD deploy keys, `deploy_cert_manager` (ACME/Let's Encrypt), Istio IngressClass, `install-hooks.sh` |
-| [v0.7.3](https://github.com/wilddog64/k3d-manager/releases/tag/v0.7.3) | 2026-03-11 | `shopping_cart.sh` plugin, reusable GitHub Actions CI/CD workflow, ArgoCD ubuntu-k3s, infra rebuilt on M2 Air |
-| [v0.7.2](https://github.com/wilddog64/k3d-manager/releases/tag/v0.7.2) | 2026-03-08 | dotfiles/hooks integration, lib-foundation v0.2.0, Ubuntu ESO + shopping-cart-data |
-| [v0.7.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.7.0) | 2026-03-07 | lib-foundation subtree, `deploy_cluster` refactored 12→5 if-blocks |
-| [v0.6.5](https://github.com/wilddog64/k3d-manager/releases/tag/v0.6.5) | 2026-03-07 | Agent Rigor BATS coverage, lib-foundation extracted |
-| [v0.6.4](https://github.com/wilddog64/k3d-manager/releases/tag/v0.6.4) | 2026-03-07 | Linux k3s validation, `_agent_audit`, provider contract BATS (30 tests) |
-| [v0.6.3](https://github.com/wilddog64/k3d-manager/releases/tag/v0.6.3) | 2026-03-06 | `_agent_lint` + `_agent_audit`, permission cascade refactor |
-| [v0.6.2](https://github.com/wilddog64/k3d-manager/releases/tag/v0.6.2) | 2026-03-06 | Agent Rigor Protocol, `_k3d_manager_copilot` wrapper, PATH hardening |
-| [v0.1.0](https://github.com/wilddog64/k3d-manager/releases/tag/v0.1.0) | 2026-02-27 | Initial release — k3d/k3s/OrbStack providers, Vault PKI, Jenkins, ESO, LDAP/AD |
+| [v0.3.6](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.6) | 2026-03-23 | `doc_hygiene.sh`: exclude fenced code blocks from Check 2 (`_dh_strip_fences`); add Check 4 — warn on hardcoded internal CoreDNS names in YAML (21 BATS) |
+| [v0.3.4](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.4) | 2026-03-22 | Fix 12 Copilot PR #8 doc accuracy findings in `docs/api/functions.md` and `docs/plans/v0.3.3-api-reference.md` — correct descriptions for `_detect_platform`, `_safe_path`, `_curl`, `_cluster_provider`, `_agent_audit`, `_agent_lint`, `create_cluster`; remove nonexistent `_DETECTED_PLATFORM` global |
+| [v0.3.3](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.3) | 2026-03-16 | API reference (`docs/api/functions.md`); README releases table split; `docs/releases.md` full history |
+| [v0.3.2](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.2) | 2026-03-16 | Sync `deploy_cluster` helpers from k3d-manager (`_deploy_cluster_prompt_provider`, `_deploy_cluster_resolve_provider`, `CLUSTER_NAME` propagation, remove duplicate mac+k3s guard); TTY fix (`_DCRS_PROVIDER` global replaces command substitution); BATS expanded to 36 tests |
+| [v0.3.1](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.1) | 2026-03-16 | Route bare `sudo` in all install helpers through `_run_command --interactive-sudo`; fix `_ensure_cargo` WSL redhat branch; AGENTS.md, GEMINI.md, CLAUDE.md overhaul; `.github/copilot-instructions.md` |
+| [v0.3.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.0) | 2026-03-15 | `_run_command` if-count refactor, `_run_command_resolve_sudo` extracted, bash 3.2 compat (`_RCRS_RUNNER` global), BATS coverage |
+| [v0.2.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.2.0) | 2026-03-08 | `agent_rigor.sh` — `_agent_checkpoint`, `_agent_audit`, `_agent_lint`, pre-commit hook, 13 BATS tests |
+| [v0.1.2](https://github.com/wilddog64/lib-foundation/releases/tag/v0.1.2) | 2026-03-07 | Drop Colima support |
+| [v0.1.1](https://github.com/wilddog64/lib-foundation/releases/tag/v0.1.1) | 2026-03-07 | `_resolve_script_dir` — portable symlink-aware script locator |
+| [v0.1.0](https://github.com/wilddog64/lib-foundation/releases/tag/v0.1.0) | 2026-03-07 | Initial extraction from k3d-manager — `core.sh`, `system.sh`, CI, branch protection |

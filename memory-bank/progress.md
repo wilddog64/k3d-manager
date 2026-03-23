@@ -1,123 +1,66 @@
-# Progress — k3d-manager
+# Progress — lib-foundation
 
 ## Overall Status
 
-**v0.9.3 SHIPPED** — squash-merged to main (8046c73), PR #36, 2026-03-16. Tagged + released.
-**v0.9.4 SHIPPED** — merged to main (662878a), PR #37, 2026-03-21.
-**v0.9.5 SHIPPED** — PR #38 squash-merged to main (`573c0ac`) 2026-03-21. Tagged v0.9.5, released.
-**v0.9.6 SHIPPED** — PR #39 merged to main (`8b09d577`) 2026-03-22. Tagged v0.9.6, released.
-**v0.9.7 ACTIVE** — branch cut from main 2026-03-22.
+**v0.3.3 SHIPPED** — PR #8 squash-merged (b9f1fda), tagged, GitHub release created 2026-03-16.
+**v0.3.4 SHIPPED** — PR #11 merged to main (`dbfafe9`), tagged v0.3.4, GitHub release created 2026-03-22.
+**feat/v0.3.5 ACTIVE** — branch cut from main 2026-03-22.
 
 ---
 
-## v0.9.4 — Completed
+## What Is Complete
 
-- [x] README releases table — v0.9.3 added — `1e3a930`
-- [x] lib-foundation v0.3.3 subtree pull — `7684266`
-- [x] Multi-arch workflow pin — all 5 app repos merged to main 2026-03-18
-- [x] ArgoCD cluster registration fix — manual cluster secret `cluster-ubuntu-k3s` with `insecure: true`
-- [x] Missing `frontend` manifest — `argocd/applications/frontend.yaml` in shopping-cart-infra (PR #17)
-- [x] Verify `ghcr-pull-secret` — present in `apps`, `data`, `payment` namespaces
-- [x] Tag refresh for ARM64 images — `newTag: latest` in all 5 repos
-- [x] Codex: kubeconfig merge automation — `6699ce8`
-- [x] payment-service missing Secrets — PR #14 merged (9d9de98)
-- [x] Fix `_run_command` non-interactive sudo failure — `fix(system): fall back to interactive sudo when sudo -n unavailable and TTY present`
-- [x] autossh tunnel plugin — `feat(tunnel): add autossh tunnel plugin with launchd boot persistence`
-- [x] ArgoCD cluster registration automation — `register_app_cluster` + cluster-secret template
-- [x] Smoke tests — `bin/smoke-test-cluster-health.sh`
-- [x] Reduce replicas to 1 + remove HPAs — merged 2026-03-20
-- [x] Fix frontend nginx CrashLoopBackOff — `65b354f` merged to main 2026-03-21; tagged v0.1.1
-- [x] Gemini: rebuild Ubuntu k3s + E2E verification — `7d614bc`
-- [x] Gemini: ArgoCD cluster registration + app sync — `7d614bc`
-- [x] Force ArgoCD sync — order-service + product-catalog — verified
-- [x] Gemini: deploy data layer to ubuntu-k3s — all Running in `shopping-cart-data`
-- [x] Gemini: Fix PostgreSQL auth issues — patched `order-service` and `product-catalog` secrets
-- [x] Gemini: Fix PostgreSQL schema mismatch — added columns to `orders` table
-- [x] Gemini: Fix product-catalog health check — patched readiness probe path
-- [x] Gemini: Fix NetworkPolicies — unblocked `payment-service` and local DNS
-- [x] Codex: fix app manifests — PRs merged to main; order `d109004`, product-catalog `aa5de3c`, infra `1a5c34d`; tagged v0.1.1; `docs/next-improvements` branch created
-- [x] Codex: fix frontend manifests — PR #11 CLOSED; Copilot P1 confirmed original port 8080 + /health was correct; root cause is resource exhaustion not manifest error; deferred to v1.0.0
-- [x] Gemini: Re-enable ArgoCD auto-sync — all apps reconciled to `HEAD`
-- [x] Codex: add deploy_app_cluster automation — commit `13c79b3` adds k3sup install + kubeconfig merge helper and BATS coverage
+- [x] GitHub repo + CI + branch protection (v0.1.0)
+- [x] `core.sh` + `system.sh` extracted from k3d-manager (v0.1.0)
+- [x] `_resolve_script_dir` — portable symlink-aware locator + BATS (v0.1.1)
+- [x] Drop Colima support (v0.1.2)
+- [x] `agent_rigor.sh` — `_agent_checkpoint`, `_agent_audit`, `_agent_lint`, pre-commit hook, 13 BATS (v0.2.0)
+- [x] k3d-manager subtree wired at `scripts/lib/foundation/` (k3d-manager v0.7.0)
+- [x] `_run_command` if-count refactor — `_run_command_resolve_sudo` extracted, both < 8 if-blocks (v0.3.0)
+- [x] Bash 3.2 compat — `_RCRS_RUNNER` global temp (v0.3.0)
+- [x] Route bare `sudo` in install helpers through `_run_command --interactive-sudo` (v0.3.1)
+- [x] Fix `_ensure_cargo` WSL redhat branch (v0.3.1)
+- [x] AGENTS.md, GEMINI.md, CLAUDE.md, copilot-instructions.md overhaul (v0.3.1)
+- [x] Sync `deploy_cluster` helpers from k3d-manager; TTY fix (`_DCRS_PROVIDER` global); BATS 36 tests (v0.3.2)
+- [x] Repo flipped **public** (v0.3.2)
+- [x] API reference — `docs/api/functions.md` (v0.3.3)
+- [x] README releases table split — top 3 + `docs/releases.md` full history (v0.3.3)
 
 ---
 
-## v0.9.5 — Completed
+## What Is Pending
 
-- [x] **`deploy_app_cluster` via k3sup** — `k3sup install` on EC2 + kubeconfig merge + ArgoCD cluster registration; replaces manual Gemini rebuild; prerequisite for v1.0.0 multi-node extension
-- [x] check_cluster_health.sh hardening — kubectl context pinning, API server retry loop, `kubectl wait` replacing `rollout status`
-- [x] Retro: `docs/retro/2026-03-21-v0.9.5-retrospective.md`
+### v0.3.4 — SHIPPED (`dbfafe9`)
 
----
+- [x] **Fix `docs/api/functions.md`** — 12 Copilot findings from PR #8 resolved in commit `7bb60c2`; spec `docs/plans/v0.3.4-api-doc-fixes.md`.
+- [x] **Upstream lib sync** — `system.sh` TTY fix (`_run_command_resolve_sudo` + remove `_run_command_has_tty`); `agent_rigor.sh` if-count allowlist + staged-only audit; `statusline.sh` cost display fix.
+- [x] **PR #11 Copilot review** — 8 findings addressed in `08cfbc8`, all threads resolved.
+- [x] **Retro** — `docs/retro/2026-03-22-v0.3.4-retrospective.md`
 
-## v0.9.6 — Shipped
+### v0.3.5 — SHIPPED (`2f895a99`)
 
-**ACG plugin shipped + 9 Copilot findings resolved. PR #39 squash-merged `8b09d577` 2026-03-22. Tagged v0.9.6, released.**
+- [x] **PR #10 doc-hygiene hook** — `doc_hygiene.sh` + pre-commit hook + BATS 14 tests; staged-only `_agent_audit` BATS test (`bdd60e7`); spec `docs/plans/v0.3.5-agent-audit-staged-only-test.md`.
+- [x] **Doc hygiene staged-content read** — commit `d00bccb` adds `_dh_grep` index reader + new BATS (spec `docs/plans/v0.3.5-doc-hygiene-staged-content-read.md`).
+- [x] **Doc hygiene staged-mode follow-ups** — commit `aeb1396` localizes `_DHC_STAGED`, adds staged `git cat-file` guard, and replaces staged-mode BATS per `docs/plans/v0.3.5-doc-hygiene-copilot-pr10-round2.md`.
+- [x] **PR #10 merged** — squash-merged to main (`2f895a99`) 2026-03-23.
 
-- [x] **ACG plugin** — `scripts/plugins/acg.sh`: `acg_provision`, `acg_status`, `acg_extend`, `acg_teardown`; retire `bin/acg-sandbox.sh`; commit `37a6629`
-- [x] **Copilot fixes** — 9 findings: exit safety (`--soft`), VPC idempotency, CIDR security, heredoc fix, test pattern; commits `7987453` + `75f3b0f` + `157d431`
-- [x] **README + functions.md** — ACG plugin documented; v0.9.6 in releases table
-- [x] **CHANGE.md** — v0.9.6 entry with Fixed + Documentation subsections
-- [x] **Retrospective** — `docs/retro/2026-03-22-v0.9.6-retrospective.md`
+### v0.3.6 — active
 
----
-
-## v0.9.7 — Active
-
-**Focus: code quality backlog + tooling polish. Branch cut 2026-03-22.**
-**PR #41 open** — https://github.com/wilddog64/k3d-manager/pull/41 — CI running, Copilot tagged.
-
-### Tooling (done this session)
-- [x] `/create-pr` skill — Copilot reply+resolve flow (Steps 4+5, 3 new failure modes)
-- [x] `/post-merge` skill — branch cleanup step (Step 8, every 5 releases)
-- [x] SSH config — persistent Keychain (`Host *` block); `lib-foundation` remote → SSH
-- [x] Issue doc: `docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md`
-- [x] **README overhaul** — PR #40 merged (`de684fe7`); Plugins table (14), How-To by component, Issue Logs section, Releases 3+collapsible; `docs/releases.md` backfilled
-
-### Code Quality / Architecture (carried from v0.9.6)
-- [x] **Upstream local lib edits to lib-foundation** — commits `b60ddc6` (system.sh TTY fix) + `15f041a` (agent_rigor allowlist) on lib-foundation/feat/v0.3.4
-- [x] **Sync scripts/lib/system.sh from lib-foundation** — commit `4c6e143` copies `b60ddc6`, `c216d45` adds bare-sudo allowlist so `_agent_audit` passes; tracked missing `scripts/tests/lib/system.bats` in `docs/issues/2026-03-22-missing-system-bats.md`
-- [ ] **Reduce if-count allowlist** — refactor 20 allowlisted functions (jenkins x6, ldap x7, vault x5, system x2) to under 8-`if` threshold; remainder needs `docs/issues/` entry
-- [x] **`bin/` script consistency** — commit `b0b76b3` makes `bin/smoke-test-cluster-health.sh` source system.sh + use `_kubectl`
-- [x] **Relocate app-layer bug tracking** — filed as GitHub Issues: order #16, payment #16, product-catalog #16, frontend #12
-
-### Secondary
-- [x] **Safety gate audit** — commit `51a40b0` adds no-args guard to `deploy_cluster`; `deploy_k3d_cluster`/`deploy_k3s_cluster` inherit fix
-- [ ] **`--dry-run` / `-n` mode** — all `deploy_*` print every command without executing
-- [ ] **GitHub PAT rotation** — expires 2026-04-12
-
-### Deferred to v1.0.0 (needs multi-node)
-- [ ] All 5 pods Running — order-service (RabbitMQ), payment-service (memory), frontend (resource exhaustion)
-- [ ] Re-enable `shopping-cart-e2e-tests` + Playwright E2E green
-- [ ] Re-enable `enforce_admins` on shopping-cart-payment
-- [ ] Service mesh — Istio full activation
+- [x] **Check 2 code-fence exclusion** — commit `7751068` adds `_dh_strip_fences`, `_dh_grep --strip-fences`, and 3 BATS covering fenced + tilde blocks (`docs/plans/v0.3.6-doc-hygiene-codefence-exclusion.md`).
+- [x] **CoreDNS Check 4** — commit `c352c1b` adds warn-only `<svc>.<ns>.svc(.cluster.local)` detection and 4 BATS per `docs/plans/v0.3.5-doc-hygiene-coredns-check.md`.
+- [x] **Indented fence fix** — commit `02e7418` updates `_dh_strip_fences` for indented fenced blocks + indented BATS (`docs/plans/v0.3.6-doc-hygiene-indented-fence-fix.md`).
+- [ ] `rigor-cli` — separate repo (planned, no spec yet)
+- [ ] Consumer integration: `shopping-carts`
 
 ---
 
-## Roadmap
+## Known Constraints
 
-- **v0.9.6** — ACG plugin (`acg_provision`, `acg_extend`, `acg_teardown`) + LoadBalancer for ArgoCD/Keycloak/Jenkins; retire `bin/acg-sandbox.sh`
-- **v1.0.0** — 3-node k3s via k3sup + Samba AD DC; `CLUSTER_PROVIDER=k3s-remote`; resolves resource exhaustion; frontend + e2e milestone gate
-- **v1.1.0** — Full stack provisioning: `provision_full_stack` single command (k3s + Vault + ESO + Istio + ArgoCD)
-- **v1.2.0** — k3dm-mcp (gate: v1.0.0 multi-node proven; k3d + k3s-remote = two backends)
-- **v1.3.0** — Home lab: k3s on Mac Mini M5 (`CLUSTER_PROVIDER=k3s-local-arm64`); home automation plugins
-- **No EKS/GKE/AKS** — k3d-manager is kops-for-k3s; cloud-managed k8s is out of scope
-
----
-
-## Known Bugs / Gaps
-
-**Infra / tooling (tracked here):**
-
-| Item | Status | Notes |
-|---|---|---|
-| SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync |
-
-**App-layer (to be filed as GitHub Issues in their repos — v0.9.5 task):**
-
-| Item | Repo | Notes |
-|---|---|---|
-| frontend CrashLoopBackOff | shopping-cart-frontend | Root cause: resource exhaustion (t3.medium); deferred to v1.0.0 3-node cluster |
-| order-service CrashLoopBackOff | shopping-cart-order | PostgreSQL OK; RabbitMQ `Connection refused` only remaining |
-| payment-service Pending | shopping-cart-payment | Memory constraints on `t3.medium` |
-| product-catalog Degraded | shopping-cart-product-catalog | Synced to `aa5de3c`; `RABBITMQ_USERNAME` ESO key mismatch |
+| Item | Notes |
+|---|---|
+| `SCRIPT_DIR` dependency | `system.sh` sources `agent_rigor.sh` via `$SCRIPT_DIR` at load time |
+| Contract stability | `_run_command`, `_detect_platform`, `_cluster_provider` — signature changes require all-consumer coordination |
+| Clean env testing | BATS must run with `env -i` — ambient `SCRIPT_DIR` causes false passes |
+| bash 3.2 compat | No `local -n`, no `declare -A`, no `mapfile` in lib code |
+| `--interactive-sudo` for installs | Install helpers use `--interactive-sudo`; `--prefer-sudo` is for non-interactive contexts only |
+| Global temp vars | `_RCRS_RUNNER` (sudo runner), `_DCRS_PROVIDER` (deploy provider) — never use `$()` for functions that check TTY |

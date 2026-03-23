@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# check-placeholder-urls — standalone pre-commit hook
+#
+# Usage (pre-commit framework):   check-placeholder-urls [file...]
+# Usage (shell hook):             source system.sh && source doc_hygiene.sh && _doc_hygiene_check
+#
+# Exit 0 = clean, Exit 1 = violations found
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../../scripts" >/dev/null 2>&1 && pwd)"
+
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/lib/system.sh"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/lib/doc_hygiene.sh"
+
+_doc_hygiene_check "$@"
