@@ -18,7 +18,7 @@
 - [x] lib-foundation v0.3.6 subtree pull — `9a030bc` — `doc_hygiene.sh` + hooks now in subtree
 - [x] `_ensure_copilot_cli` / `_ensure_node` / `_k3d_manager_copilot` — already implemented (pre-compaction); BATS tests present in `scripts/tests/lib/`
 - [ ] Roadmap update — `docs/plans/roadmap-v1.md` revised sequencing (k3dm-mcp v1.2.0, GKE v1.3.0, AKS v1.4.0, vCluster v1.5.0; AD plugin in v1.1.0) — **STALE**: current roadmap already correct; no changes needed
-- [ ] **Copilot CLI auth CI integration** — spec `docs/plans/v0.9.12-copilot-auth-ci-integration.md`; `COPILOT_TOKEN` secret created (expires 2026-04-22); assigned to Codex
+- [x] **Copilot CLI auth CI integration** — commit `fd97705` installs Copilot CLI in CI lint job, wires secrets into BATS, and adds live `_copilot_auth_check` test per `docs/plans/v0.9.12-copilot-auth-ci-integration.md`.
 
 ---
 
