@@ -58,11 +58,60 @@ jobs:
           set -euo pipefail
           bats scripts/tests/lib
 
-  stage2:
+  detect:
     needs: lint
     if: >-
       ${{ github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    outputs:
+      skip_cluster: ${{ steps.changes.outputs.skip_cluster }}
+      run_jenkins: ${{ steps.changes.outputs.run_jenkins }}
+      run_vault: ${{ steps.changes.outputs.run_vault }}
+      run_eso: ${{ steps.changes.outputs.run_eso }}
+      run_keycloak: ${{ steps.changes.outputs.run_keycloak }}
+      run_cert_manager: ${{ steps.changes.outputs.run_cert_manager }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed plugins
+        id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only "origin/main...HEAD")
+          NON_DOCS=$(printf '%s\n' "$CHANGED" |
+            grep -vE '^(docs/|memory-bank/|README\.md|CHANGE\.md)' || true)
+          if [[ -z "$NON_DOCS" ]]; then
+            echo "skip_cluster=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip_cluster=false" >> "$GITHUB_OUTPUT"
+          fi
+          PLUGINS=$(printf '%s\n' "$CHANGED" |
+            grep 'scripts/plugins/' |
+            sed 's|scripts/plugins/||; s|\.sh$||' || true)
+          for flag in jenkins vault eso keycloak; do
+            if printf '%s\n' "$PLUGINS" | grep -q "^${flag}$"; then
+              echo "run_${flag}=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "run_${flag}=false" >> "$GITHUB_OUTPUT"
+            fi
+          done
+          if printf '%s\n' "$PLUGINS" | grep -q '^cert-manager$'; then
+            echo "run_cert_manager=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_cert_manager=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  stage2:
+    needs: [lint, detect]
+    if: >-
+      ${{ github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
+          needs.detect.outputs.skip_cluster == 'false' }}
     runs-on: [self-hosted, macOS, ARM64]
     steps:
       - name: Checkout
@@ -74,9 +123,27 @@ jobs:
       - name: Run integration tests
         env:
           CLUSTER_PROVIDER: orbstack
+          RUN_JENKINS: ${{ needs.detect.outputs.run_jenkins }}
+          RUN_VAULT: ${{ needs.detect.outputs.run_vault }}
+          RUN_ESO: ${{ needs.detect.outputs.run_eso }}
+          RUN_KEYCLOAK: ${{ needs.detect.outputs.run_keycloak }}
+          RUN_CERT_MANAGER: ${{ needs.detect.outputs.run_cert_manager }}
         run: |
           set -euo pipefail
           export PATH="/opt/homebrew/bin:$PATH"
-          ./scripts/k3d-manager test_vault
-          ./scripts/k3d-manager test_eso
           ./scripts/k3d-manager test_istio
+          if [[ "$RUN_VAULT" == "true" ]]; then
+            ./scripts/k3d-manager test_vault
+          fi
+          if [[ "$RUN_ESO" == "true" ]]; then
+            ./scripts/k3d-manager test_eso
+          fi
+          if [[ "$RUN_JENKINS" == "true" ]]; then
+            ./scripts/k3d-manager test_jenkins
+          fi
+          if [[ "$RUN_KEYCLOAK" == "true" ]]; then
+            ./scripts/k3d-manager test_keycloak
+          fi
+          if [[ "$RUN_CERT_MANAGER" == "true" ]]; then
+            ./scripts/k3d-manager test_cert_rotation
+          fi
