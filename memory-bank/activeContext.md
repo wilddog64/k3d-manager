@@ -44,6 +44,7 @@
 | **Gemini: smoke test vault refactor** | **PENDING** | After v0.9.10 merges — run `deploy_vault` on infra cluster (M2 Air) to verify unseal flow works end-to-end after helper extraction |
 | **Gemini: smoke test jenkins refactor** | **PENDING** | After v0.9.10 merges — run `deploy_jenkins` on infra cluster (M2 Air) to verify Helm install + Istio resources + cert rotator path after helper extraction |
 | **CI gap: no live cluster smoke tests** | **ROADMAP** | CI only runs pre-commit hooks; no automated deploy_vault/deploy_jenkins in CI — manual Gemini smoke tests are the only gate; track for v1.1.0 `provision_full_stack` work |
+| **v0.9.11: dynamic plugin CI** | **PLANNED** | Detect changed plugins via `git diff --name-only origin/main...HEAD | grep scripts/plugins/`; map plugin→smoke test (jenkins→jenkins smoke, vault→unseal+policy, ldap→OpenLDAP connectivity, istio→IngressGateway); PRs touching only docs/memory-bank skip cluster tests entirely; spec: `docs/plans/v0.9.11-dynamic-plugin-ci.md` |
 | **Dry-run docs/tests** | **MERGED** | commit `f1b4ca7` — README Safety Gates doc + `scripts/tests/lib/dry_run.bats` coverage |
 | **v1.0.0 (3-node k3sup + Samba AD)** | **NEXT MILESTONE** | Replaces single t3.medium; resolves resource exhaustion structurally; spec: `docs/plans/roadmap-v1.md` |
 | Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
