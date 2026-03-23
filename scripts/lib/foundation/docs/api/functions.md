@@ -23,7 +23,7 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 
 | Function | Description |
 |---|---|
-| `_detect_platform` | Detects the current platform (`mac`, `wsl`, `debian`, `redhat`, `linux`, or `unknown`) and caches it in `_DETECTED_PLATFORM`. |
+| `_detect_platform` | Prints the current platform to stdout: one of `mac`, `wsl`, `debian`, `redhat`, or `linux`. Calls `_err` on unsupported platforms. Does not cache — use `_is_mac` / `_is_linux` etc. for repeated checks. |
 | `_is_mac` / `_is_linux` / `_is_wsl` / `_is_redhat_family` / `_is_debian_family` | Predicates returning 0 when the current system matches the given platform family. |
 
 ### Logging & Trace Control
@@ -39,7 +39,7 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 
 | Function | Description |
 |---|---|
-| `_safe_path` | Construct a sanitized `PATH` that excludes world-writable directories. |
+| `_safe_path` | Validates the current `PATH` for unsafe entries (world-writable directories or relative path components). Calls `_err` with the list of offending entries if any are found. |
 | `_is_world_writable_dir <dir>` | Returns 0 if `<dir>` is world-writable. |
 | `_set_sensitive_var <name> <value>` | Assign sensitive data to a variable without leaving traces in history. |
 | `_write_sensitive_file <path> <data>` | Write a secret to disk using `0600` permissions. |
@@ -53,7 +53,7 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 | `_helm ...` | Run `helm` with `_run_command` safety wrappers. |
 | `_istioctl ...` | Run `istioctl` via `_run_command`. |
 | `_k3d ...` | Run `k3d` command with logging/sudo guardrails. |
-| `_curl ...` | Wrapper around `curl` that enforces `_safe_path` and tracing rules. |
+| `_curl ...` | Ensures `curl` is installed, injects `--max-time` (default: 30 s via `CURL_MAX_TIME`) when not already specified, and forwards all arguments through `_run_command --quiet`. |
 | `_ip ...` | Wrapper for `ip` / `ifconfig` depending on platform. |
 
 ### Secret / Credential Store
@@ -80,7 +80,7 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 | `_ensure_bats` | Ensure BATS is installed via package manager/source. |
 | `_ensure_node` | Install Node.js + npm for CLI tooling. |
 | `_ensure_cargo` | Install Rust `cargo` via apt/dnf/homebrew. |
-| `_ensure_copilot_cli` | Install the GitHub Copilot CLI binary. |
+| `_ensure_copilot_cli` | Ensures the Copilot CLI binary is installed (via `brew install copilot-cli` or the official release installer) and authenticated (`_copilot_auth_check`). Exits via `_err` if installation fails. |
 
 ### Utilities
 
@@ -105,7 +105,7 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 |---|---|---|
 | `deploy_cluster [--provider k3d\|k3s\|orbstack] [--force-k3s] [cluster_name]` | Provider-aware cluster bootstrap including Istio and provider exports; resolves provider interactively or via env. |
 | `destroy_cluster [cluster_name]` | Destroy the active provider cluster. |
-| `create_cluster [cluster_name]` | Create infrastructure for the active provider. |
+| `create_cluster [cluster_name] [http_port=8000] [https_port=8443] [--dry-run\|-n] [-h\|--help]` | Create infrastructure for the active provider. `--dry-run` resolves the provider and prints intent without creating. |
 | `create_k3d_cluster` / `create_k3s_cluster` | Create provider-specific clusters. |
 | `destroy_k3d_cluster` / `destroy_k3s_cluster` | Destroy provider-specific clusters. |
 | `deploy_k3d_cluster` / `deploy_k3s_cluster` | Deploy full cluster stacks for k3d/k3s. |
@@ -117,8 +117,8 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 
 | Function | Description |
 |---|---|
-| `_cluster_provider` | Resolve the active provider from `CLUSTER_PROVIDER` → `K3D_MANAGER_PROVIDER` → `K3DMGR_PROVIDER` → auto-detected default. |
-| `_deploy_cluster_resolve_provider <platform> <provider_cli> <force_k3s>` | Determine provider (CLI override, env overrides, mac default) and return a normalized value. |
+| `_cluster_provider` | Resolves the active provider in precedence order: `K3D_MANAGER_PROVIDER` → `K3DMGR_PROVIDER` → `CLUSTER_PROVIDER` → auto-detected (`k3d` binary → `k3s` binary → `k3d` default). Normalizes to lowercase; exits via `_err` on unsupported values. |
+| `_deploy_cluster_resolve_provider <platform> <provider_cli> <force_k3s>` | Sets the `_DCRS_PROVIDER` global to the resolved provider: CLI flag → `--force-k3s` → env overrides → mac/interactive/k3d default. Does not print or return a value. |
 | `_deploy_cluster_prompt_provider` | Interactive prompt for provider selection (TTY only). |
 | `_resolve_script_dir` | Portable symlink-aware `SCRIPT_DIR` helper. |
 | `_ensure_path_exists <dir>` | Ensure a directory exists, creating it with sudo if required. |
@@ -129,13 +129,12 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 | Function | Signature | Description |
 |---|---|---|
 | `_agent_checkpoint <label>` | Commit the working tree with a checkpoint message before a risky change (no-op if clean). |
-| `_agent_audit [paths...]` | Static audit covering bare `sudo`, if-count thresholds, BATS tests, and credentialed `kubectl exec` usage. |
-| `_agent_lint [paths...]` | Run `shellcheck` on staged files respecting `AGENT_LINT_GATE_VAR`. |
+| `_agent_audit` | Audits staged diffs for: BATS assertion/test removal, if-count threshold violations (default: 8, configurable via `AGENT_AUDIT_MAX_IF`), bare `sudo` calls, and `kubectl exec` commands with inline credentials. Returns non-zero if any check fails. |
+| `_agent_lint` | AI-based lint pass on staged `.sh` files. Gated by `AGENT_LINT_GATE_VAR` (default: `ENABLE_AGENT_LINT=1`). Invokes the function named by `AGENT_LINT_AI_FUNC` with staged file names and rules from `scripts/etc/agent/lint-rules.md`. No-op when gate is off or no `.sh` files are staged. |
 
 ## Global Variables
 
 | Variable | Description |
 |---|---|
 | `_RCRS_RUNNER` | Populated by `_run_command_resolve_sudo` with the final runner array. |
-| `_DETECTED_PLATFORM` | Cached result of `_detect_platform`; reused by platform helpers. |
 | `_DCRS_PROVIDER` | Helper scratch variable set by `_deploy_cluster_resolve_provider` for downstream use.

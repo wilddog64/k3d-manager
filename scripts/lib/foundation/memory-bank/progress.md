@@ -3,7 +3,8 @@
 ## Overall Status
 
 **v0.3.3 SHIPPED** — PR #8 squash-merged (b9f1fda), tagged, GitHub release created 2026-03-16.
-**feat/v0.3.4 ACTIVE** — branch cut from main 2026-03-16.
+**v0.3.4 SHIPPED** — PR #11 merged to main (`dbfafe9`), tagged v0.3.4, GitHub release created 2026-03-22.
+**feat/v0.3.5 ACTIVE** — branch cut from main 2026-03-22.
 
 ---
 
@@ -29,20 +30,25 @@
 
 ## What Is Pending
 
-### v0.3.4 — active
+### v0.3.4 — SHIPPED (`dbfafe9`)
 
-- [ ] **Fix `docs/api/functions.md`** — 12 Copilot findings from PR #8 (merged); all doc accuracy issues requiring reading actual function bodies. Assigned to Codex.
-  - Remove `_DETECTED_PLATFORM` global — does not exist; `_detect_platform` exits via `_err` on unsupported, no caching
-  - `_detect_platform` returns `mac|wsl|debian|redhat|linux` only — no `unknown`
-  - `_deploy_cluster_resolve_provider` — sets `_DCRS_PROVIDER` global, does not print/return
-  - `_agent_lint` — AI-based (calls `AGENT_LINT_AI_FUNC`), not shellcheck; gated by `AGENT_LINT_GATE_VAR`
-  - `_safe_path` — validates existing PATH for unsafe entries, does not construct a new PATH
-  - `_curl` — ensures curl exists + adds `--max-time` default; does not enforce `_safe_path`
-  - `_cluster_provider` — actual precedence: `K3D_MANAGER_PROVIDER` → `K3DMGR_PROVIDER` → `CLUSTER_PROVIDER`
-  - `_agent_audit` — no path args; audits staged diffs for BATS removal, if-count, bare sudo; no kubectl credential check
-  - Sourcing example paths — wrong; update to reflect actual `scripts/lib/` layout and subtree consumer path
-  - `create_cluster` — missing `--dry-run/-n`, `--help`, positional ports `[http_port] [https_port]`
-  - Same `_DETECTED_PLATFORM` / `unknown` errors in `docs/plans/v0.3.3-api-reference.md` — fix there too
+- [x] **Fix `docs/api/functions.md`** — 12 Copilot findings from PR #8 resolved in commit `7bb60c2`; spec `docs/plans/v0.3.4-api-doc-fixes.md`.
+- [x] **Upstream lib sync** — `system.sh` TTY fix (`_run_command_resolve_sudo` + remove `_run_command_has_tty`); `agent_rigor.sh` if-count allowlist + staged-only audit; `statusline.sh` cost display fix.
+- [x] **PR #11 Copilot review** — 8 findings addressed in `08cfbc8`, all threads resolved.
+- [x] **Retro** — `docs/retro/2026-03-22-v0.3.4-retrospective.md`
+
+### v0.3.5 — SHIPPED (`2f895a99`)
+
+- [x] **PR #10 doc-hygiene hook** — `doc_hygiene.sh` + pre-commit hook + BATS 14 tests; staged-only `_agent_audit` BATS test (`bdd60e7`); spec `docs/plans/v0.3.5-agent-audit-staged-only-test.md`.
+- [x] **Doc hygiene staged-content read** — commit `d00bccb` adds `_dh_grep` index reader + new BATS (spec `docs/plans/v0.3.5-doc-hygiene-staged-content-read.md`).
+- [x] **Doc hygiene staged-mode follow-ups** — commit `aeb1396` localizes `_DHC_STAGED`, adds staged `git cat-file` guard, and replaces staged-mode BATS per `docs/plans/v0.3.5-doc-hygiene-copilot-pr10-round2.md`.
+- [x] **PR #10 merged** — squash-merged to main (`2f895a99`) 2026-03-23.
+
+### v0.3.6 — active
+
+- [x] **Check 2 code-fence exclusion** — commit `7751068` adds `_dh_strip_fences`, `_dh_grep --strip-fences`, and 3 BATS covering fenced + tilde blocks (`docs/plans/v0.3.6-doc-hygiene-codefence-exclusion.md`).
+- [x] **CoreDNS Check 4** — commit `c352c1b` adds warn-only `<svc>.<ns>.svc(.cluster.local)` detection and 4 BATS per `docs/plans/v0.3.5-doc-hygiene-coredns-check.md`.
+- [x] **Indented fence fix** — commit `02e7418` updates `_dh_strip_fences` for indented fenced blocks + indented BATS (`docs/plans/v0.3.6-doc-hygiene-indented-fence-fix.md`).
 - [ ] `rigor-cli` — separate repo (planned, no spec yet)
 - [ ] Consumer integration: `shopping-carts`
 
