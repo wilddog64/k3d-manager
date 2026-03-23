@@ -1,5 +1,28 @@
 # Changes - k3d-manager
 
+## [v0.9.13] — 2026-03-23 — v0.9.12 retro + process: mergeable_state check
+
+### Added
+- v0.9.12 retrospective (`docs/retro/2026-03-23-v0.9.12-retrospective.md`) — documents merge conflict / CI silence root cause, `copilot auth status` vs env var auth decision, `K3DM_COPILOT_LIVE_TESTS` opt-in guard rationale
+
+### Changed
+- `/create-pr` skill — Step 0 added to Post-creation Steps: check `mergeable_state` immediately after PR creation; if `"dirty"`, resolve conflicts before waiting for CI. Added "Dirty PR silently kills CI" to Known Failure Modes.
+
+---
+
+## [v0.9.12] — 2026-03-23 — Copilot CLI auth CI integration + lib-foundation v0.3.6
+
+### Added
+- **`.github/workflows/ci.yml`**: "Install Copilot CLI" step (conditional on `COPILOT_GITHUB_TOKEN`) — installs from `https://gh.io/copilot-install`, adds `$HOME/.local/bin` to `GITHUB_PATH`; "Run lib unit BATS" step now passes `COPILOT_GITHUB_TOKEN`, `K3DM_ENABLE_AI=1`, and `K3DM_COPILOT_LIVE_TESTS=1`
+- **`scripts/tests/lib/ensure_copilot_cli.bats`**: Live binary test (`copilot version`) gated behind `K3DM_COPILOT_LIVE_TESTS=1` + `COPILOT_GITHUB_TOKEN`; install-path tests stubbed for `_copilot_auth_check` to prevent `K3DM_ENABLE_AI` cascade
+- lib-foundation v0.3.6 subtree pull (`9a030bc`) — `doc_hygiene.sh` + hooks now in `scripts/lib/foundation/`
+
+### Fixed
+- `K3DM_ENABLE_AI=1` env cascade — install-path BATS tests now stub `_copilot_auth_check` so live auth check does not fire when copilot binary is present but unstubbed (`fbb9ba4`)
+- `copilot auth status` vs env var auth — live test changed to `copilot version` (which succeeds with `COPILOT_GITHUB_TOKEN` set); `copilot auth status` checks credential store only (`fbb9ba4`)
+
+---
+
 ## [v0.9.11] — 2026-03-22 — dynamic plugin CI
 
 ### Added
