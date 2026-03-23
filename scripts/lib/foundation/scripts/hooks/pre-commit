@@ -19,9 +19,16 @@ fi
 source "${SCRIPT_DIR}/lib/system.sh"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib/agent_rigor.sh"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/lib/doc_hygiene.sh"
 
 if ! _agent_audit; then
    echo "Pre-commit hook: _agent_audit failed — fix violations before committing" >&2
+   exit 1
+fi
+
+if ! _doc_hygiene_check; then
+   echo "Pre-commit hook: _doc_hygiene_check failed — fix doc violations before committing" >&2
    exit 1
 fi
 

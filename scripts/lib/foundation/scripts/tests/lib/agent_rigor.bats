@@ -188,3 +188,23 @@ SCRIPT
   [ "$status" -ne 0 ]
   [[ "$output" == *"exceeds if-count threshold"* ]]
 }
+
+@test "_agent_audit ignores unstaged .sh changes" {
+  mkdir -p scripts
+  cat <<'SCRIPT' > scripts/unstaged.sh
+function clean() {
+   echo ok
+}
+SCRIPT
+  git add scripts/unstaged.sh
+  git commit -m "add unstaged" >/dev/null
+  # Add bare sudo to the file but do NOT stage it
+  cat <<'SCRIPT' >> scripts/unstaged.sh
+function needs_sudo() {
+   sudo rm -rf /tmp/test
+}
+SCRIPT
+  # File has bare sudo but is NOT staged — audit must pass
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}

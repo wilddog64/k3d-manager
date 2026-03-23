@@ -42,8 +42,8 @@ function _command_exist() {
 # _run_command_resolve_sudo <prog> <prefer_sudo> <require_sudo> <interactive_sudo> [probe_args...]
 #
 # Resolves the runner array (plain prog, sudo -n prog, or sudo prog) and stores
-# it in the global _RCRS_RUNNER. Caller must initialize _RCRS_RUNNER before
-# calling and unset it after reading.
+# it in the global _RCRS_RUNNER. _RCRS_RUNNER is reset unconditionally on entry;
+# caller reads it after this returns and may unset it when done.
 #
 # Returns 127 if --require-sudo is set but sudo is unavailable.
 function _run_command_resolve_sudo() {
