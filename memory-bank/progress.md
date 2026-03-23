@@ -19,6 +19,8 @@
 - [x] `_ensure_copilot_cli` / `_ensure_node` / `_k3d_manager_copilot` — already implemented (pre-compaction); BATS tests present in `scripts/tests/lib/`
 - [ ] Roadmap update — `docs/plans/roadmap-v1.md` revised sequencing (k3dm-mcp v1.2.0, GKE v1.3.0, AKS v1.4.0, vCluster v1.5.0; AD plugin in v1.1.0) — **STALE**: current roadmap already correct; no changes needed
 - [x] **Copilot CLI auth CI integration** — commit `fd97705` installs Copilot CLI in CI lint job, wires secrets into BATS, and adds live `_copilot_auth_check` test per `docs/plans/v0.9.12-copilot-auth-ci-integration.md`.
+- [x] **Agent Experience: gemini-skills repo** — Created private Git repo for custom agent skills; configured all Gemini config remotes to use SSH.
+- [x] **Agent Experience: task-reporter skill** — Implemented standardized, copyable task completion report with dynamically generated metrics status bar.
 
 ---
 

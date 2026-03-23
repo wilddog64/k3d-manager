@@ -107,6 +107,8 @@
 | `/post-merge` skill — branch cleanup step | **DONE** | Step 8 added: delete stale branches every 5 releases; local `-d`/`-D` + remote protection removal + `git fetch --prune` |
 | SSH config — persistent Keychain | **DONE** | Added `Host *` block with `UseKeychain yes` + `AddKeysToAgent yes` to `~/.ssh/config`; `lib-foundation` remote switched to SSH |
 | Issue doc: frontend read-only filesystem | **MERGED** | `docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md` |
+| **gemini-skills repository** | **DONE** | Created `/Users/cliang/src/gitrepo/personal/gemini-skills` private repo; transitioned `~/.gemini` and `gemini-skills` remotes to SSH |
+| **task-reporter skill** | **DONE** | Implemented and installed globally (`--scope user`); provides standardized task completion reports with metrics status bar |
 | **README overhaul** | **MERGED** | PR #40 `de684fe7` — Plugins table (14), How-To by component, Issue Logs section, Releases 3+collapsible; enforce_admins restored |
 
 ---
