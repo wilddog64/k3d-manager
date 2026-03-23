@@ -11,16 +11,19 @@
 **v0.9.9 SHIPPED** — PR #43 merged to main (`c1043175`) 2026-03-22. Tagged v0.9.9, released. if-count allowlist: ldap (7) + vault (5) entries removed.
 **v0.9.10 SHIPPED** — PR #44 merged to main (`877ec970`) 2026-03-22. Tagged v0.9.10, released. if-count allowlist: jenkins (4) entries removed; allowlist now system.sh only.
 **v0.9.11 SHIPPED** — PR #45 merged to main (`1a0c913`) 2026-03-22. Tagged v0.9.11, released. Dynamic plugin CI: detect job + conditional stage2.
-**v0.9.12 ACTIVE** — branch cut from main 2026-03-22. lib-foundation v0.3.6 subtree pull (`9a030bc`).
+**v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. No version tag (CHANGELOG [Unreleased]). Copilot CLI CI integration + lib-foundation v0.3.6 subtree.
+**v0.9.13 ACTIVE** — branch cut from main 2026-03-23.
 
-## v0.9.12 — In Progress
+## v0.9.12 — Completed
 
 - [x] lib-foundation v0.3.6 subtree pull — `9a030bc` — `doc_hygiene.sh` + hooks now in subtree
 - [x] `_ensure_copilot_cli` / `_ensure_node` / `_k3d_manager_copilot` — already implemented (pre-compaction); BATS tests present in `scripts/tests/lib/`
-- [ ] Roadmap update — `docs/plans/roadmap-v1.md` revised sequencing (k3dm-mcp v1.2.0, GKE v1.3.0, AKS v1.4.0, vCluster v1.5.0; AD plugin in v1.1.0) — **STALE**: current roadmap already correct; no changes needed
-- [x] **Copilot CLI auth CI integration** — commit `fd97705` installs Copilot CLI in CI lint job, wires secrets into BATS, and adds live `_copilot_auth_check` test per `docs/plans/v0.9.12-copilot-auth-ci-integration.md`.
-- [x] **Agent Experience: gemini-skills repo** — Created private Git repo for custom agent skills; configured all Gemini config remotes to use SSH.
-- [x] **Agent Experience: task-reporter skill** — Implemented standardized, copyable task completion report with dynamically generated metrics status bar.
+- [x] Roadmap update — **STALE**: current roadmap already correct; no changes needed
+- [x] **Copilot CLI auth CI integration** — PR #47 (`f8014bc`): installs Copilot CLI in lint job, wires `COPILOT_GITHUB_TOKEN`/`K3DM_ENABLE_AI`/`K3DM_COPILOT_LIVE_TESTS` into BATS, adds live binary check; 2 Copilot findings fixed (`fbb9ba4`)
+
+## v0.9.13 — In Progress
+
+- [ ] TBD
 
 ---
 
