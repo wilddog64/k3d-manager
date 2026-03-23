@@ -11,7 +11,7 @@
 **v0.9.9 SHIPPED** — PR #43 merged to main (`c1043175`) 2026-03-22. Tagged v0.9.9, released. if-count allowlist: ldap (7) + vault (5) entries removed.
 **v0.9.10 SHIPPED** — PR #44 merged to main (`877ec970`) 2026-03-22. Tagged v0.9.10, released. if-count allowlist: jenkins (4) entries removed; allowlist now system.sh only.
 **v0.9.11 SHIPPED** — PR #45 merged to main (`1a0c913`) 2026-03-22. Tagged v0.9.11, released. Dynamic plugin CI: detect job + conditional stage2.
-**v0.9.12 ACTIVE** — branch cut from main 2026-03-22.
+**v0.9.12 ACTIVE** — branch cut from main 2026-03-22. lib-foundation v0.3.6 subtree pull (`9a030bc`).
 
 ---
 
