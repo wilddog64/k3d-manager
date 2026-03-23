@@ -42,8 +42,8 @@
 | **if-count jenkins refactor** | **MERGED** | commit `733123a` on k3d-manager-v0.9.10 — new helpers drop 4 `jenkins.sh` functions ≤8 ifs; allowlist entries removed |
 | **v0.9.10 PR #44** | **MERGED** | `877ec970` — jenkins allowlist elimination; 4 Copilot findings fixed in `25e2b2a`; tagged v0.9.10; branch v0.9.11 cut |
 | **v0.9.9 PR #43** | **MERGED** | `c1043175` — ldap+vault allowlist elimination; 9 Copilot findings fixed in `bbfc12e`; tagged v0.9.9; branch v0.9.10 cut |
-| **Gemini: smoke test vault refactor** | **PENDING** | After v0.9.10 merges — run `deploy_vault` on infra cluster (M2 Air) to verify unseal flow works end-to-end after helper extraction |
-| **Gemini: smoke test jenkins refactor** | **PENDING** | After v0.9.10 merges — run `deploy_jenkins` on infra cluster (M2 Air) to verify Helm install + Istio resources + cert rotator path after helper extraction |
+| **Gemini: smoke test vault refactor** | **COMPLETE** | Ran `deploy_vault` and `deploy_vault --re-unseal` successfully. ESO integration confirmed working. |
+| **Gemini: smoke test jenkins refactor** | **COMPLETE** | Ran `deploy_jenkins --enable-ldap --enable-vault` successfully. Helm, Istio, and CronJob resources created as expected. |
 | **CI gap: no live cluster smoke tests** | **ROADMAP** | CI only runs pre-commit hooks; no automated deploy_vault/deploy_jenkins in CI — manual Gemini smoke tests are the only gate; track for v1.1.0 `provision_full_stack` work |
 | **v0.9.11: dynamic plugin CI** | **PLANNED** | Detect changed plugins via `git diff --name-only origin/main...HEAD | grep scripts/plugins/`; map plugin→smoke test (jenkins→jenkins smoke, vault→unseal+policy, ldap→OpenLDAP connectivity, istio→IngressGateway); PRs touching only docs/memory-bank skip cluster tests entirely; spec: `docs/plans/v0.9.11-dynamic-plugin-ci.md` |
 | **Dry-run docs/tests** | **MERGED** | commit `f1b4ca7` — README Safety Gates doc + `scripts/tests/lib/dry_run.bats` coverage |
