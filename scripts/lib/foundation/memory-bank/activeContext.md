@@ -1,10 +1,11 @@
 # Active Context — lib-foundation
 
-## Current State: `feat/v0.3.6` (as of 2026-03-23)
+## Current State: `feat/v0.3.7` (as of 2026-03-23)
 
 **v0.3.4 SHIPPED** — PR #11 merged to main (`dbfafe9`), tagged v0.3.4, GitHub release created 2026-03-22.
 **v0.3.5 SHIPPED** — PR #10 squash-merged to main (`2f895a99`) 2026-03-23. No tag (no CHANGELOG entry). `enforce_admins` restored.
-**feat/v0.3.5 DONE** — retro written `docs/retro/2026-03-23-v0.3.5-retrospective.md`. Next work on `feat/v0.3.6`.
+**v0.3.6 SHIPPED** — PR #12 merged to main (`d8b4c48`) 2026-03-23. Tagged v0.3.6, GitHub release created. `enforce_admins` restored.
+**feat/v0.3.7 ACTIVE** — branch cut from main `d8b4c48`. Retro written `docs/retro/2026-03-23-v0.3.6-retrospective.md`.
 
 ---
 
