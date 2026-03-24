@@ -42,8 +42,8 @@ function _command_exist() {
 # _run_command_resolve_sudo <prog> <prefer_sudo> <require_sudo> <interactive_sudo> [probe_args...]
 #
 # Resolves the runner array (plain prog, sudo -n prog, or sudo prog) and stores
-# it in the global _RCRS_RUNNER. Caller should read _RCRS_RUNNER after calling
-# and unset it when done.
+# it in the global _RCRS_RUNNER. _RCRS_RUNNER is reset unconditionally on entry;
+# caller reads it after this returns and may unset it when done.
 #
 # Returns 127 if --require-sudo is set but sudo is unavailable.
 function _run_command_resolve_sudo() {
@@ -95,6 +95,25 @@ function _run_command_resolve_sudo() {
     _RCRS_RUNNER=(sudo -n "$prog")
   else
     _RCRS_RUNNER=("$prog")
+  fi
+}
+
+# _run_command_handle_failure <prog> <rc> <quiet> <soft> <runner+args...>
+# Logs failure (unless quiet) and either returns rc (soft) or calls _err (hard).
+function _run_command_handle_failure() {
+  local prog="$1" rc="$2" quiet="$3" soft="$4"
+  shift 4
+  local cmd_str=""
+  printf -v cmd_str '%q ' "$@"
+  if (( quiet == 0 )); then
+    printf '%s command failed (%d): ' "$prog" "$rc" >&2
+    printf '%q ' "$@" >&2
+    printf '\n' >&2
+  fi
+  if (( soft )); then
+    return "$rc"
+  else
+    _err "failed to execute ${cmd_str% }: $rc"
   fi
 }
 
@@ -167,20 +186,8 @@ function _run_command() {
   local rc=$?
 
   if (( rc != 0 )); then
-     local -a executed=("${runner[@]}" "$@")
-     local cmd_str=""
-     printf -v cmd_str '%q ' "${executed[@]}"
-     if (( quiet == 0 )); then
-       printf '%s command failed (%d): ' "$prog" "$rc" >&2
-       printf '%q ' "${runner[@]}" "$@" >&2
-       printf '\n' >&2
-     fi
-
-     if (( soft )); then
-         return "$rc"
-     else
-         _err "failed to execute ${cmd_str% }: $rc"
-     fi
+     _run_command_handle_failure "$prog" "$rc" "$quiet" "$soft" "${runner[@]}" "$@"
+     return "$?"
   fi
 
   return 0
@@ -1409,6 +1416,19 @@ function _install_node_from_release() {
    return 1
 }
 
+function _node_install_via_redhat() {
+   if _command_exist dnf && _sudo_available; then
+      _run_command --prefer-sudo -- dnf install -y nodejs npm
+   elif _command_exist yum && _sudo_available; then
+      _run_command --prefer-sudo -- yum install -y nodejs npm
+   elif _command_exist microdnf && _sudo_available; then
+      _run_command --prefer-sudo -- microdnf install -y nodejs npm
+   else
+      return 1
+   fi
+   _command_exist node
+}
+
 function _ensure_node() {
    if _command_exist node; then
       return 0
@@ -1429,18 +1449,8 @@ function _ensure_node() {
       fi
    fi
 
-   if _is_redhat_family; then
-      if _command_exist dnf && _sudo_available; then
-         _run_command --prefer-sudo -- dnf install -y nodejs npm
-      elif _command_exist yum && _sudo_available; then
-         _run_command --prefer-sudo -- yum install -y nodejs npm
-      elif _command_exist microdnf && _sudo_available; then
-         _run_command --prefer-sudo -- microdnf install -y nodejs npm
-      fi
-
-      if _command_exist node; then
-         return 0
-      fi
+   if _is_redhat_family && _node_install_via_redhat; then
+      return 0
    fi
 
    if _install_node_from_release; then
