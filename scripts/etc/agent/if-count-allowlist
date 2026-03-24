@@ -1,6 +1,3 @@
 # Temporary allowlist for functions pending refactors.
 # Format: <path>:<function>
 # See docs/issues entries for each item.
-
-scripts/lib/system.sh:_run_command
-scripts/lib/system.sh:_ensure_node
