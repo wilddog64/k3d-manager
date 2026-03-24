@@ -13,7 +13,8 @@
 **v0.9.11 SHIPPED** — PR #45 merged to main (`1a0c913`) 2026-03-22. Tagged v0.9.11, released. Dynamic plugin CI: detect job + conditional stage2.
 **v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. No version tag (CHANGE.md [Unreleased]). Copilot CLI CI integration + lib-foundation v0.3.6 subtree.
 **v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released. v0.9.12 retro + CHANGE.md backfill + mergeable_state process check.
-**v0.9.14 ACTIVE** — branch cut from main 2026-03-23.
+**v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag (CHANGE.md [Unreleased]). if-count allowlist fully cleared: _run_command + _ensure_node helpers extracted via lib-foundation PR #13.
+**v0.9.15 ACTIVE** — branch cut from main 2026-03-24.
 
 ## v0.9.12 — Completed
 
@@ -22,10 +23,11 @@
 - [x] Roadmap update — **STALE**: current roadmap already correct; no changes needed
 - [x] **Copilot CLI auth CI integration** — PR #47 (`f8014bc`): installs Copilot CLI in lint job, wires `COPILOT_GITHUB_TOKEN`/`K3DM_ENABLE_AI`/`K3DM_COPILOT_LIVE_TESTS` into BATS, adds live binary check; 2 Copilot findings fixed (`fbb9ba4`)
 
-## v0.9.14 — In Progress
+## v0.9.14 — Completed
 
 - [x] GitHub PAT rotation — rotated 2026-03-23; new expiry 2026-04-22
 - [x] **if-count: `_run_command` + `_ensure_node`** — commit `b9fcbf6` (lib-foundation feat/v0.3.7) extracts helpers; subtree pull `aec6673` copies `system.sh` + clears allowlist per spec `docs/plans/v0.9.14-if-count-system-sh.md`
+- [x] **PR #50 merged** — `d317429b` 2026-03-24; Copilot findings addressed; retro `docs/retro/2026-03-24-v0.9.14-retrospective.md`; branch v0.9.15 cut
 
 ---
 
