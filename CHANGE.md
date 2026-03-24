@@ -1,5 +1,14 @@
 # Changes - k3d-manager
 
+## [Unreleased] v0.9.14 — if-count elimination: system.sh
+
+### Changed
+- **`scripts/lib/system.sh`**: Extracted `_run_command_handle_failure` from `_run_command` — drops if-count from 9 to 7; failure logging + soft/hard exit now in dedicated helper (via lib-foundation `feat/v0.3.7` `b9fcbf6`)
+- **`scripts/lib/system.sh`**: Extracted `_node_install_via_redhat` from `_ensure_node` — drops if-count from 9 to 7; dnf/yum/microdnf dispatch now in dedicated helper (via lib-foundation `feat/v0.3.7` `b9fcbf6`)
+- **`scripts/etc/agent/if-count-allowlist`**: Both `system.sh:_run_command` and `system.sh:_ensure_node` entries removed — allowlist is now fully empty
+
+---
+
 ## [v0.9.13] — 2026-03-23 — v0.9.12 retro + process: mergeable_state check
 
 ### Added

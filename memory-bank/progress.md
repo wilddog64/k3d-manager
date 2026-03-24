@@ -12,7 +12,8 @@
 **v0.9.10 SHIPPED** — PR #44 merged to main (`877ec970`) 2026-03-22. Tagged v0.9.10, released. if-count allowlist: jenkins (4) entries removed; allowlist now system.sh only.
 **v0.9.11 SHIPPED** — PR #45 merged to main (`1a0c913`) 2026-03-22. Tagged v0.9.11, released. Dynamic plugin CI: detect job + conditional stage2.
 **v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. No version tag (CHANGE.md [Unreleased]). Copilot CLI CI integration + lib-foundation v0.3.6 subtree.
-**v0.9.13 ACTIVE** — branch cut from main 2026-03-23.
+**v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released. v0.9.12 retro + CHANGE.md backfill + mergeable_state process check.
+**v0.9.14 ACTIVE** — branch cut from main 2026-03-23.
 
 ## v0.9.12 — Completed
 
@@ -21,12 +22,21 @@
 - [x] Roadmap update — **STALE**: current roadmap already correct; no changes needed
 - [x] **Copilot CLI auth CI integration** — PR #47 (`f8014bc`): installs Copilot CLI in lint job, wires `COPILOT_GITHUB_TOKEN`/`K3DM_ENABLE_AI`/`K3DM_COPILOT_LIVE_TESTS` into BATS, adds live binary check; 2 Copilot findings fixed (`fbb9ba4`)
 
-## v0.9.13 — In Progress
+## v0.9.14 — In Progress
+
+- [x] GitHub PAT rotation — rotated 2026-03-23; new expiry 2026-04-22
+- [x] **if-count: `_run_command` + `_ensure_node`** — commit `b9fcbf6` (lib-foundation feat/v0.3.7) extracts helpers; subtree pull `aec6673` copies `system.sh` + clears allowlist per spec `docs/plans/v0.9.14-if-count-system-sh.md`
+
+---
+
+## v0.9.13 — Completed
 
 - [x] v0.9.12 retrospective — `docs/retro/2026-03-23-v0.9.12-retrospective.md` (`3f19383`)
 - [x] `/create-pr` skill — `mergeable_state` check in Post-creation Steps + "Dirty PR silently kills CI" failure mode
 - [x] CHANGE.md — backfill `[v0.9.12]` entry; add `[v0.9.13]` section
 - [x] README + docs/releases.md — add v0.9.13 release row; v0.9.9 moved to collapsible
+- [x] Copilot PR #48 findings fixed (`d1972ca`) — stale `memory/` ref, `CHANGELOG`→`CHANGE.md`, stale branch header
+- [x] v0.9.13 retrospective — `docs/retro/2026-03-23-v0.9.13-retrospective.md`
 
 ---
 
@@ -106,7 +116,7 @@
 - [x] **Reduce if-count allowlist (ldap)** — commit `ba6f3a9` extracts helpers so `_ldap_*` + `deploy_ldap`/`deploy_ad` drop under threshold; allowlist trimmed to vault/system entries only
 - [x] **Reduce if-count allowlist (vault)** — commit `365846c` extracts deploy/HA helpers and guard clauses so 5 `vault.sh` functions drop ≤8 ifs; removed vault entries from the allowlist
 - [x] **Reduce if-count allowlist (jenkins)** — commit `733123a` on k3d-manager-v0.9.10 extracts helpers + rewires deploy path so 4 `jenkins.sh` functions drop ≤8 ifs; allowlist cleared
-- [ ] **GitHub PAT rotation** — expires 2026-04-12
+- [x] **GitHub PAT rotation** — rotated 2026-03-23; new expiry 2026-04-22
 
 ### Deferred to v1.0.0 (needs multi-node)
 - [ ] All 5 pods Running — order-service (RabbitMQ), payment-service (memory), frontend (resource exhaustion)
