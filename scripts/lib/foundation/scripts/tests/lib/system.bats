@@ -65,3 +65,22 @@ bats_require_minimum_version 1.5.0
   [ "$output" = "hi" ]
   unset -f sudo
 }
+
+@test "_run_command_handle_failure: soft mode returns rc without exiting" {
+  run _run_command_handle_failure "myprog" 42 0 1 myprog arg1
+  [ "$status" -eq 42 ]
+}
+
+@test "_run_command_handle_failure: quiet=1 suppresses output" {
+  run _run_command_handle_failure "myprog" 1 1 1 myprog arg1
+  [ -z "$output" ]
+}
+
+@test "_node_install_via_redhat: returns 1 when no redhat package manager present" {
+  _command_exist() { return 1; }
+  export -f _command_exist
+
+  run _node_install_via_redhat
+  [ "$status" -eq 1 ]
+  unset -f _command_exist
+}
