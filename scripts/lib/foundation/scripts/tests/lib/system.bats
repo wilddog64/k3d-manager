@@ -74,6 +74,7 @@ bats_require_minimum_version 1.5.0
 @test "_run_command_handle_failure: quiet=1 suppresses output" {
   run _run_command_handle_failure "myprog" 1 1 1 myprog arg1
   [ -z "$output" ]
+  [ "$status" -eq 1 ]
 }
 
 @test "_node_install_via_redhat: returns 1 when no redhat package manager present" {

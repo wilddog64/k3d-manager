@@ -143,6 +143,20 @@ _agent_audit() {
       done
    fi
 
+   if [[ -n "$changed_sh" ]]; then
+      local file
+      for file in $changed_sh; do
+         [[ -f "$file" ]] || continue
+         local tab_lines
+         tab_lines=$(git show :"$file" 2>/dev/null | grep -n $'^ *\t' || true)
+         if [[ -n "$tab_lines" ]]; then
+            _warn "Agent audit: tab indentation in $file — use 2-space indentation:"
+            _warn "$tab_lines"
+            status=1
+         fi
+      done
+   fi
+
    local staged_diff
    staged_diff="$(git diff --cached 2>/dev/null || true)"
    if [[ -n "$staged_diff" ]]; then

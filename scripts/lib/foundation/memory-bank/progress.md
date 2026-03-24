@@ -4,7 +4,10 @@
 
 **v0.3.3 SHIPPED** — PR #8 squash-merged (b9f1fda), tagged, GitHub release created 2026-03-16.
 **v0.3.4 SHIPPED** — PR #11 merged to main (`dbfafe9`), tagged v0.3.4, GitHub release created 2026-03-22.
-**feat/v0.3.5 ACTIVE** — branch cut from main 2026-03-22.
+**v0.3.5 SHIPPED** — PR #10 squash-merged to main (`2f895a99`) 2026-03-23.
+**v0.3.6 SHIPPED** — PR #12 merged to main (`d8b4c48`) 2026-03-23. Tagged v0.3.6, released.
+**v0.3.7 SHIPPED** — PR #13 merged to main (`071c270`) 2026-03-24. No tag (CHANGE.md [Unreleased]); k3d-manager subtree pull drives release.
+**v0.3.8 ACTIVE** — branch `feat/v0.3.8`; tab indentation check in `_agent_audit` (commit `e431b1d`).
 
 ---
 

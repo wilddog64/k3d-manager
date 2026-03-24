@@ -189,6 +189,32 @@ SCRIPT
   [[ "$output" == *"exceeds if-count threshold"* ]]
 }
 
+@test "_agent_audit flags tab indentation in staged .sh file" {
+  mkdir -p scripts
+  printf 'function tabbed() {\n\techo "tab"\n}\n' > scripts/tabbed.sh
+  git add scripts/tabbed.sh
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"tab indentation"* ]]
+}
+
+@test "_agent_audit flags mixed space+tab indentation in staged .sh file" {
+  mkdir -p scripts
+  printf 'function mixed() {\n  \techo "mixed"\n}\n' > scripts/mixed.sh
+  git add scripts/mixed.sh
+  run _agent_audit
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"tab indentation"* ]]
+}
+
+@test "_agent_audit passes with 2-space indentation" {
+  mkdir -p scripts
+  printf 'function spaced() {\n  echo "spaces"\n}\n' > scripts/spaced.sh
+  git add scripts/spaced.sh
+  run _agent_audit
+  [ "$status" -eq 0 ]
+}
+
 @test "_agent_audit ignores unstaged .sh changes" {
   mkdir -p scripts
   cat <<'SCRIPT' > scripts/unstaged.sh
