@@ -7,6 +7,7 @@
 **v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag. if-count allowlist fully cleared: `_run_command_handle_failure` + `_node_install_via_redhat` extracted via lib-foundation PR #13 (`071c270e`).
 **v0.9.15 ACTIVE** — branch cut from main 2026-03-24.
 **enforce_admins:** restored on main 2026-03-24.
+**v0.9.15 scope:** Antigravity × GitHub Copilot coding agent validation — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`. No code changes — findings doc only.
 
 ---
 

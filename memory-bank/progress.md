@@ -16,6 +16,21 @@
 **v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag (CHANGE.md [Unreleased]). if-count allowlist fully cleared: _run_command + _ensure_node helpers extracted via lib-foundation PR #13.
 **v0.9.15 ACTIVE** — branch cut from main 2026-03-24.
 
+## v0.9.15 — In Progress
+
+- [ ] **Antigravity × Copilot coding agent validation** — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`; findings doc `docs/issues/2026-03-24-antigravity-copilot-agent-validation.md`
+
+---
+
+## v0.9.16 — Planned
+
+- [ ] CloudFormation template — `cloudformation/ec2-k3s-nodes.yaml.tmpl`
+- [ ] `acg_provision_nodes` plugin function
+- [ ] Antigravity ACG login + TTL extend automation
+*(contingent on v0.9.15 PASS verdict)*
+
+---
+
 ## v0.9.12 — Completed
 
 - [x] lib-foundation v0.3.6 subtree pull — `9a030bc` — `doc_hygiene.sh` + hooks now in subtree
