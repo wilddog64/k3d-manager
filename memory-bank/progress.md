@@ -18,6 +18,8 @@
 
 ## v0.9.15 — In Progress
 
+- [x] **Playwright Integration Documentation** — `docs/plans/playwright-gemini.md` created; defines high-level orchestration, MCP benefits, and cross-browser support strategy.
+- [ ] **Antigravity plugin rewrite** — gemini CLI + Playwright engine; spec `docs/plans/v0.9.15-antigravity-plugin-impl.md`; Codex implements, Gemini validates
 - [ ] **Antigravity × Copilot coding agent validation** — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`; findings doc `docs/issues/2026-03-24-antigravity-copilot-agent-validation.md`
 
 ---
