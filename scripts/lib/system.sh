@@ -186,8 +186,8 @@ function _run_command() {
   local rc=$?
 
   if (( rc != 0 )); then
-     _run_command_handle_failure "$prog" "$rc" "$quiet" "$soft" "${runner[@]}" "$@"
-     return "$?"
+    _run_command_handle_failure "$prog" "$rc" "$quiet" "$soft" "${runner[@]}" "$@"
+    return "$?"
   fi
 
   return 0
@@ -1416,6 +1416,7 @@ function _install_node_from_release() {
    return 1
 }
 
+# Install Node.js on RedHat-family systems via available package managers
 function _node_install_via_redhat() {
    if _command_exist dnf && _sudo_available; then
       _run_command --prefer-sudo -- dnf install -y nodejs npm
