@@ -28,6 +28,7 @@
 ## v0.9.16 — Planned
 
 - [x] **antigravity.sh MCP refactor** — commit `45168cf` switches plugin to Antigravity IDE + Playwright MCP over CDP (`_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready`); spec: `docs/plans/v0.9.16-antigravity-plugin-mcp-refactor.md`
+- [ ] **antigravity.sh launch + session** — `_antigravity_launch` (auto-start IDE) + `_antigravity_ensure_github_session` (CDP login check + wait); spec: `docs/plans/v0.9.16-antigravity-launch-session.md`; Codex assigned
 - [ ] CloudFormation template — `cloudformation/ec2-k3s-nodes.yaml.tmpl`
 - [ ] `acg_provision_nodes` plugin function
 - [ ] Antigravity ACG login + TTL extend automation
