@@ -25,23 +25,16 @@ function _ensure_antigravity() {
   fi
 }
 
-function _ensure_playwright() {
-  if _command_exist playwright; then
-    return 0
-  fi
-  _log "Playwright not found — installing..."
-  _ensure_node
-  _run_command -- npm install -g playwright
-  _run_command -- playwright install chromium
-}
-
 function antigravity_install() {
   _ensure_node
   _ensure_antigravity
-  _ensure_playwright
+  _ensure_antigravity_ide
+  _ensure_antigravity_mcp_playwright
   _log "Node.js: $(node --version 2>&1)"
   _log "gemini: $(gemini --version 2>&1 || echo 'version unknown')"
-  _log "playwright: $(playwright --version 2>&1 || echo 'version unknown')"
+  _log "antigravity: $(antigravity --version 2>&1 || echo 'version unknown')"
+  _log "Playwright MCP: configured in Antigravity mcp_config.json"
+  _log "Launch Antigravity with --remote-debugging-port=9222 and log into GitHub before running automation."
 }
 
 function antigravity_trigger_copilot_review() {
@@ -50,20 +43,21 @@ function antigravity_trigger_copilot_review() {
   local review_prompt="${3:-Review this codebase for code quality, security, and architecture.}"
 
   _ensure_antigravity
-  _ensure_playwright
+  _antigravity_browser_ready
 
   _log "Triggering Copilot coding agent on ${owner}/${repo}..."
 
   local gemini_prompt
   gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
 
-1. Launch a Chromium browser (headless: true).
-2. Navigate to https://github.com/${owner}/${repo}/agents
-3. Find and click the button to create a new Copilot coding agent task.
-4. Enter this review prompt in the task input: ${review_prompt}
-5. Submit the task.
-6. Wait until the page URL changes to https://github.com/${owner}/${repo}/tasks/<uuid>.
-7. Extract and print ONLY the task UUID (last path segment of the URL).
+1. Connect to the running Antigravity browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
+2. Use the first browser context and page (do NOT launch a new browser).
+3. Navigate to https://github.com/${owner}/${repo}/agents
+4. Find and click the button to create a new Copilot coding agent task.
+5. Enter this review prompt in the task input: ${review_prompt}
+6. Submit the task.
+7. Wait until the page URL changes to https://github.com/${owner}/${repo}/tasks/<uuid>.
+8. Extract and print ONLY the task UUID (last path segment of the URL).
 
 Write the Playwright script to /tmp/ag_trigger.js, execute with node, print the UUID.
 Exit code 1 if UUID not found within 60 seconds."
@@ -95,16 +89,16 @@ function antigravity_acg_extend() {
   local hours="${2:-4}"
 
   _ensure_antigravity
-  _ensure_playwright
+  _antigravity_browser_ready
 
   _log "Extending ACG sandbox TTL by ${hours}h at ${sandbox_url}..."
 
   local gemini_prompt
   gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
 
-1. Launch a Chromium browser (headless: true).
-2. Navigate to ${sandbox_url}
-3. If a Google login page appears, use stored session cookies or prompt the user to authenticate.
+1. Connect to the running Antigravity browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
+2. Use the first browser context and page (do NOT launch a new browser).
+3. Navigate to ${sandbox_url}
 4. Find the sandbox TTL extend button (look for 'Extend', '+4 hours', or similar).
 5. Click to extend by ${hours} hours.
 6. Confirm the new TTL is shown on the page.
