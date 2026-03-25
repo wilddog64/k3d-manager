@@ -21,7 +21,7 @@
 - [x] **Playwright Integration Documentation** — `docs/plans/playwright-gemini.md` created; defines high-level orchestration, MCP benefits, and cross-browser support strategy.
 - [x] **Antigravity plugin rewrite** — commit `b2ba187` rewrites plugin to use gemini CLI + Playwright per `docs/plans/v0.9.15-antigravity-plugin-impl.md`
 - [ ] **Antigravity × Copilot coding agent validation** — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`; findings doc `docs/issues/2026-03-24-antigravity-copilot-agent-validation.md`
-- [ ] **ldap-password-rotator vault kv put stdin fix** — spec `docs/plans/v0.9.15-ensure-copilot-cli.md`; closes v0.6.2 security hardening debt
+- [x] **ldap-password-rotator vault kv put stdin fix** — commit `11e653b` implements stdin (`@-`) vault writes per `docs/plans/v0.9.15-ensure-copilot-cli.md`
 
 ---
 

@@ -7,6 +7,9 @@
 - **`scripts/lib/system.sh`**: Extracted `_node_install_via_redhat` from `_ensure_node` — drops if-count from 9 to 7; dnf/yum/microdnf dispatch now in dedicated helper (via lib-foundation `feat/v0.3.7` `b9fcbf6`)
 - **`scripts/etc/agent/if-count-allowlist`**: Both `system.sh:_run_command` and `system.sh:_ensure_node` entries removed — allowlist is now fully empty
 
+### Security
+- `scripts/etc/ldap/ldap-password-rotator.sh`: `vault kv put` now reads credentials from stdin (`@-`) instead of CLI args — prevents password exposure in Vault pod `ps aux`
+
 ---
 
 ## [v0.9.13] — 2026-03-23 — v0.9.12 retro + process: mergeable_state check

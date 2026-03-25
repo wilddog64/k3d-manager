@@ -119,11 +119,9 @@ if [[ -z \"\$VAULT_TOKEN\" ]]; then
 fi
 
 export VAULT_TOKEN
-vault kv put \"\$TARGET_VAULT_PATH\" \\
-  username=\"\$username\" \\
-  password=\"\$password\" \\
-  dn=\"\$dn\" \\
-  rotated_at=\"\$rotated_at\" >/dev/null 2>&1
+printf '{\"username\":\"%s\",\"password\":\"%s\",\"dn\":\"%s\",\"rotated_at\":\"%s\"}' \
+  \"\$username\" \"\$password\" \"\$dn\" \"\$rotated_at\" \
+  | vault kv put \"\$TARGET_VAULT_PATH\" @- >/dev/null 2>&1
 "; then
         return 1
     fi
