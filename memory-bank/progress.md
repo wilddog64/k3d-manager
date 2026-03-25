@@ -27,6 +27,7 @@
 
 ## v0.9.16 — Planned
 
+- [ ] **antigravity.sh MCP refactor** — replace headless Playwright with `_ensure_antigravity_ide` + `_ensure_antigravity_mcp_playwright` + `connectOverCDP`; spec: `docs/plans/v0.9.16-antigravity-plugin-mcp-refactor.md`; Codex assigned
 - [ ] CloudFormation template — `cloudformation/ec2-k3s-nodes.yaml.tmpl`
 - [ ] `acg_provision_nodes` plugin function
 - [ ] Antigravity ACG login + TTL extend automation
