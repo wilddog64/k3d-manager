@@ -20,7 +20,7 @@
 
 - [x] **Playwright Integration Documentation** — `docs/plans/playwright-gemini.md` created; defines high-level orchestration, MCP benefits, and cross-browser support strategy.
 - [x] **Antigravity plugin rewrite** — commit `b2ba187` rewrites plugin to use gemini CLI + Playwright per `docs/plans/v0.9.15-antigravity-plugin-impl.md`
-- [ ] **Antigravity × Copilot coding agent validation** — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`; findings doc `docs/issues/2026-03-24-antigravity-copilot-agent-validation.md`
+- [x] **Antigravity × Copilot coding agent validation** — Determinism verdict: **FAIL**. Automation blocked by auth isolation. Findings doc: `docs/issues/2026-03-24-antigravity-copilot-agent-validation.md`
 - [x] **ldap-password-rotator vault kv put stdin fix** — commit `e91a662` implements stdin (`@-`) vault writes per `docs/plans/v0.9.15-ensure-copilot-cli.md`
 
 ---
