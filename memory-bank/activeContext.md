@@ -40,7 +40,7 @@
 | **if-count ldap refactor** | **MERGED** | commit `ba6f3a9` — extracted helpers so 7 `ldap.sh` functions drop ≤8 ifs; allowlist trimmed |
 | **if-count vault refactor** | **MERGED** | commit `365846c` — extracted helpers + guard clauses so 5 `vault.sh` functions drop ≤8 ifs; allowlist cleared |
 | **if-count jenkins refactor** | **MERGED** | commit `733123a` on k3d-manager-v0.9.10 — new helpers drop 4 `jenkins.sh` functions ≤8 ifs; allowlist entries removed |
-| **ldap password rotator security** | **COMPLETE** | commit `11e653b` on k3d-manager-v0.9.15 — `vault kv put` now reads credentials from stdin (`@-`) per `docs/plans/v0.9.15-ensure-copilot-cli.md` |
+| **ldap password rotator security** | **COMPLETE** | commit `e91a662` on k3d-manager-v0.9.15 — `vault kv put` now reads credentials from stdin (`@-`) per `docs/plans/v0.9.15-ensure-copilot-cli.md` |
 | **v0.9.10 PR #44** | **MERGED** | `877ec970` — jenkins allowlist elimination; 4 Copilot findings fixed in `25e2b2a`; tagged v0.9.10; branch v0.9.11 cut |
 | **v0.9.9 PR #43** | **MERGED** | `c1043175` — ldap+vault allowlist elimination; 9 Copilot findings fixed in `bbfc12e`; tagged v0.9.9; branch v0.9.10 cut |
 | **Gemini: smoke test vault refactor** | **COMPLETE** | Ran `deploy_vault` and `deploy_vault --re-unseal` successfully. ESO integration confirmed working. |
