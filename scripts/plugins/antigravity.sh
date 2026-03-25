@@ -5,7 +5,7 @@
 # gemini CLI drives Playwright for interactive browser tasks (GitHub Copilot agent trigger,
 # ACG sandbox TTL extend) and uses web_fetch for reading task output.
 #
-# Prerequisites: Node.js (via _ensure_node), gemini CLI, Playwright + Chromium
+# Prerequisites: Node.js (via _ensure_node), gemini CLI, Antigravity IDE
 #
 # Public functions:
 #   antigravity_install                  — verify full stack installed
@@ -25,6 +25,43 @@ function _ensure_antigravity() {
   fi
 }
 
+function _antigravity_launch() {
+  if _curl -sf http://localhost:9222/json >/dev/null 2>&1; then
+    return 0
+  fi
+  _log "Antigravity not running — launching with --remote-debugging-port=9222..."
+  if _is_mac; then
+    open -a "Antigravity" --args --remote-debugging-port=9222
+  else
+    antigravity --remote-debugging-port=9222 &
+  fi
+  _antigravity_browser_ready 30
+}
+
+function _antigravity_ensure_github_session() {
+  _log "Checking GitHub session in Antigravity browser..."
+
+  local gemini_prompt
+  gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
+
+1. Connect to the running Antigravity browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
+2. Use the first browser context and page (do NOT launch a new browser).
+3. Navigate to https://github.com and wait for the page to load.
+4. Check if the user is logged in by looking for an element matching: [aria-label='View profile and more'] or [data-login].
+5. If logged in: print GITHUB_SESSION_OK and exit with code 0.
+6. If NOT logged in:
+   a. Navigate to https://github.com/login
+   b. Print: ACTION REQUIRED: Please log into GitHub in the Antigravity browser window, then press Enter to continue.
+   c. Wait for the page URL to no longer contain '/login' — poll every 5 seconds, timeout after 300 seconds.
+   d. Once URL is no longer '/login', print GITHUB_SESSION_OK and exit with code 0.
+   e. If 300 seconds pass without login, print ERROR: GitHub login timeout and exit with code 1.
+
+Write the Playwright script to /tmp/ag_github_session.js, execute with node, print the result.
+Exit code 1 if session cannot be confirmed."
+
+  gemini --prompt "$gemini_prompt"
+}
+
 function antigravity_install() {
   _ensure_node
   _ensure_antigravity
@@ -34,7 +71,7 @@ function antigravity_install() {
   _log "gemini: $(gemini --version 2>&1 || echo 'version unknown')"
   _log "antigravity: $(antigravity --version 2>&1 || echo 'version unknown')"
   _log "Playwright MCP: configured in Antigravity mcp_config.json"
-  _log "Launch Antigravity with --remote-debugging-port=9222 and log into GitHub before running automation."
+  _log "Run 'antigravity_trigger_copilot_review <owner> <repo>' — Antigravity will launch and prompt for GitHub login if needed."
 }
 
 function antigravity_trigger_copilot_review() {
@@ -43,7 +80,8 @@ function antigravity_trigger_copilot_review() {
   local review_prompt="${3:-Review this codebase for code quality, security, and architecture.}"
 
   _ensure_antigravity
-  _antigravity_browser_ready
+  _antigravity_launch
+  _antigravity_ensure_github_session
 
   _log "Triggering Copilot coding agent on ${owner}/${repo}..."
 
@@ -89,7 +127,7 @@ function antigravity_acg_extend() {
   local hours="${2:-4}"
 
   _ensure_antigravity
-  _antigravity_browser_ready
+  _antigravity_launch
 
   _log "Extending ACG sandbox TTL by ${hours}h at ${sandbox_url}..."
 
