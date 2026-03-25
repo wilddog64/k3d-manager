@@ -817,6 +817,89 @@ function _orbstack_cli_ready() {
    return 1
 }
 
+function _antigravity_mcp_config_path() {
+   if _is_mac; then
+      printf '%s\n' "${HOME}/Library/Application Support/Antigravity/mcp_config.json"
+      return 0
+   fi
+   local config_dir="${XDG_CONFIG_HOME:-${HOME}/.config}"
+   printf '%s\n' "${config_dir}/Antigravity/mcp_config.json"
+}
+
+function _ensure_antigravity_ide() {
+   if _command_exist antigravity; then
+      return 0
+   fi
+
+   if _is_mac && _command_exist brew; then
+      _run_command -- brew install --cask antigravity
+      if _command_exist antigravity; then
+         return 0
+      fi
+   fi
+
+   if _is_debian_family && _command_exist apt-get && _sudo_available; then
+      _run_command --interactive-sudo -- apt-get update
+      _run_command --prefer-sudo -- apt-get install -y antigravity
+      if _command_exist antigravity; then
+         return 0
+      fi
+   fi
+
+   if _is_redhat_family && _command_exist dnf && _sudo_available; then
+      _run_command --prefer-sudo -- dnf install -y antigravity
+      if _command_exist antigravity; then
+         return 0
+      fi
+   fi
+
+   _err "Cannot install Antigravity IDE: no supported package manager found or install failed"
+}
+
+function _ensure_antigravity_mcp_playwright() {
+   if ! _command_exist jq; then
+      _err "_ensure_antigravity_mcp_playwright requires jq"
+   fi
+
+   local config_path
+   config_path="$(_antigravity_mcp_config_path)"
+
+   local config_dir
+   config_dir="$(dirname "$config_path")"
+   if [[ ! -d "$config_dir" ]]; then
+      mkdir -p "$config_dir"
+   fi
+   if [[ ! -f "$config_path" ]]; then
+      printf '{"mcpServers":{}}\n' > "$config_path"
+   fi
+
+   if jq -e '.mcpServers.playwright' "$config_path" >/dev/null 2>&1; then
+      return 0
+   fi
+
+   local playwright_mcp_version="${PLAYWRIGHT_MCP_VERSION:-0.0.26}"
+   local tmp
+   tmp="$(mktemp -t antigravity-mcp.XXXXXX)"
+   jq --arg ver "$playwright_mcp_version" \
+      '.mcpServers.playwright = {"command":"npx","args":["-y",("@playwright/mcp@" + $ver)]}' \
+      "$config_path" > "$tmp" && mv "$tmp" "$config_path"
+}
+
+function _antigravity_browser_ready() {
+   local timeout="${1:-10}"
+   local elapsed=0
+
+   while [[ "$elapsed" -lt "$timeout" ]]; do
+      if _command_exist curl && _curl -sf http://localhost:9222/json >/dev/null 2>&1; then
+         return 0
+      fi
+      sleep 2
+      elapsed=$(( elapsed + 2 ))
+   done
+
+   _err "Antigravity browser not ready on port 9222 after ${timeout}s — launch Antigravity with --remote-debugging-port=9222"
+}
+
 function _install_orbstack() {
    if ! _is_mac; then
       _err "_install_orbstack is only supported on macOS"

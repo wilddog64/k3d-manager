@@ -6,8 +6,16 @@
 **v0.3.4 SHIPPED** — PR #11 merged to main (`dbfafe9`), tagged v0.3.4, GitHub release created 2026-03-22.
 **v0.3.5 SHIPPED** — PR #10 squash-merged to main (`2f895a99`) 2026-03-23.
 **v0.3.6 SHIPPED** — PR #12 merged to main (`d8b4c48`) 2026-03-23. Tagged v0.3.6, released.
-**v0.3.7 SHIPPED** — PR #13 merged to main (`071c270`) 2026-03-24. No tag (CHANGE.md [Unreleased]); k3d-manager subtree pull drives release.
-**v0.3.8 ACTIVE** — branch `feat/v0.3.8`; tab indentation check in `_agent_audit` (commit `e431b1d`).
+**v0.3.7 SHIPPED** — PR #13 merged to main (`071c270`) 2026-03-24. Tagged v0.3.7 retroactively, GitHub release created.
+**v0.3.8 SHIPPED** — PR #14 merged to main (`a669a63`) 2026-03-24. Tagged v0.3.8 retroactively, GitHub release created.
+**v0.3.9 SHIPPED** — PR #15 merged to main (`fb09921`) 2026-03-24. No tag (docs-only, no version bump).
+**v0.3.10 SHIPPED** — PR #16 merged to main (`c5662c9`) 2026-03-24. No tag (docs-only, `.clinerules` fix).
+**v0.3.11 SHIPPED** — PR #17 merged to main (`2625683`) 2026-03-25. Tagged v0.3.11, GitHub release created. `enforce_admins` restored.
+**v0.3.12 ACTIVE** — branch `feat/v0.3.12` cut from `2625683`.
+
+## v0.3.12 — Active
+
+- [x] **`_ensure_antigravity_ide` + MCP helpers** — commit `ae0e8b9` adds `_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready` per `docs/plans/v0.3.12-ensure-antigravity.md`
 
 ---
 
@@ -52,7 +60,7 @@
 - [x] **Check 2 code-fence exclusion** — commit `7751068` adds `_dh_strip_fences`, `_dh_grep --strip-fences`, and 3 BATS covering fenced + tilde blocks (`docs/plans/v0.3.6-doc-hygiene-codefence-exclusion.md`).
 - [x] **CoreDNS Check 4** — commit `c352c1b` adds warn-only `<svc>.<ns>.svc(.cluster.local)` detection and 4 BATS per `docs/plans/v0.3.5-doc-hygiene-coredns-check.md`.
 - [x] **Indented fence fix** — commit `02e7418` updates `_dh_strip_fences` for indented fenced blocks + indented BATS (`docs/plans/v0.3.6-doc-hygiene-indented-fence-fix.md`).
-- [ ] `rigor-cli` — separate repo (planned, no spec yet)
+- [x] `rigor-cli` — repo bootstrapped (commit `a1c034f`, branch feat/init); mapfile compat fix (`8ae57bc`) + gist installer (`310fd16`).
 - [ ] Consumer integration: `shopping-carts`
 
 ---

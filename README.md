@@ -93,8 +93,16 @@ shellcheck scripts/lib/core.sh scripts/lib/system.sh
 
 | Version | Date | Highlights |
 |---|---|---|
-| [v0.3.6](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.6) | 2026-03-23 | `doc_hygiene.sh`: exclude fenced code blocks from Check 2 (`_dh_strip_fences`); add Check 4 — warn on hardcoded internal CoreDNS names in YAML (21 BATS) |
-| [v0.3.4](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.4) | 2026-03-22 | Fix 12 Copilot doc accuracy findings in `docs/api/functions.md` |
-| [v0.3.3](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.3) | 2026-03-16 | API reference (`docs/api/functions.md`); README releases table split |
+| [v0.3.11](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.11) | 2026-03-25 | `_agent_audit` YAML hardcoded-IP check — staged `.yaml`/`.yml` files with IPv4 addresses fail pre-commit |
+| [v0.3.8](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.8) | 2026-03-24 | `_agent_audit` tab indentation enforcement — staged `.sh` files with tab/mixed indent fail pre-commit; 15 BATS |
+| [v0.3.7](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.7) | 2026-03-24 | `system.sh` if-count cleanup — extract `_run_command_handle_failure` + `_node_install_via_redhat`; clears k3d-manager allowlist |
+
+<details><summary>Older releases</summary>
+
+| Version | Date | Highlights |
+|---|---|---|
+| [v0.3.6](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.6) | 2026-03-23 | `doc_hygiene.sh`: exclude fenced code blocks from Check 2; add CoreDNS Check 4 (21 BATS) |
+
+</details>
 
 [Full release history →](docs/releases.md)
