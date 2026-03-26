@@ -22,17 +22,13 @@ N/A - Automation failed to trigger.
 
 ## Failure Modes Observed
 
-The `antigravity.sh` plugin attempts to use Playwright (driven by a spawned `gemini` CLI sub-process) to navigate to `https://github.com/wilddog64/k3d-manager/agents`. 
-
-This approach completely fails due to **Authentication Isolation**:
-1.  The target URL (`/agents`) returns a 404 error for unauthenticated requests.
-2.  The Playwright instance spawned by the CLI runs headlessly in a clean context and **does not inherit** the session cookies or authentication state from the user's primary "Antigravity browser."
-3.  Because the headless browser is not logged in as `wilddog64`, it cannot access the page, find the "New task" button, or interact with the Copilot agent UI. 
-
-Furthermore, attempting to execute the plugin logic (`./scripts/k3d-manager antigravity_trigger_copilot_review`) causes the spawned `gemini` subprocess to enter an infinite loop of blocked tool calls because the sub-agent lacks the permissions required to write the temporary JavaScript file.
+1.  **Authentication Isolation (Primary Blocker):** The `antigravity.sh` plugin and direct Playwright scripts cannot inherit the GitHub session from the user's active browser. Even when launching Chrome with `--remote-debugging-port=9222` and the user's `--user-data-dir`, the resulting debugger session is redirected to the GitHub login page. This confirms that Chrome creates a separate context for remote debugging that does not share active session cookies.
+2.  **Binary Name Mismatch:** The `_ensure_antigravity_ide` helper fails on macOS because it expects an `antigravity` binary, but Homebrew links it as `agy`. (Documented in `docs/issues/2026-03-24-antigravity-binary-name-mismatch.md`).
+3.  **Sub-agent Hallucination Loop:** The plugin's use of `gemini --prompt` spawns a sub-agent that lacks local tool permissions (`run_shell_command`, `write_file`). This causes the sub-agent to enter an infinite loop of blocked tool calls and hallucinations.
+4.  **UI Mismatch:** The Copilot agents page for this repository uses a new input-based UI ("Give Copilot a background task to work on") instead of the "New task" button expected by the original automation strategy.
 
 ## Recommendation
 
 **Use for v0.9.16 ACG automation: NO**
 
-The current Antigravity browser automation surface, as implemented via headless Playwright in a stateless CLI environment, cannot bridge the authentication gap required for interacting with secured web UIs (like GitHub Copilot Agents or ACG Sandboxes). Until a secure, reliable mechanism exists to pass the user's live browser cookies into the Playwright context, any automation relying on web-based authentication will fail. We must either wait for official APIs or abandon browser-based scraping for these tasks.
+The current browser automation strategy is fundamentally blocked by session isolation and UI fragility. We should abandon the use of browser-based automation for interacting with secured GitHub surfaces and focus on official APIs or manual triggers.
