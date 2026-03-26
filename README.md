@@ -183,6 +183,7 @@ docs/
 | Plugin | Key Functions | Description |
 |---|---|---|
 | **ACG** | `acg_provision`, `acg_status`, `acg_extend`, `acg_teardown` | AWS ACG sandbox lifecycle — VPC + SG + EC2 provisioning; [spec](docs/plans/v0.9.6-acg-plugin.md) |
+| **Antigravity** | `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_poll_task`, `antigravity_acg_extend` | Browser automation via gemini CLI + Playwright over CDP (port 9222) — Copilot coding agent trigger, ACG sandbox TTL extend |
 | **ArgoCD** | `deploy_argocd`, `deploy_argocd_bootstrap`, `register_app_cluster`, `configure_vault_argocd_repos` | GitOps engine deployment + app cluster registration + Vault repo auth |
 | **Vault** | `deploy_vault`, `configure_vault_app_auth` | HashiCorp Vault HA + PKI + cross-cluster auth |
 | **ESO** | `deploy_eso` | External Secrets Operator — syncs Vault/AKV secrets into Kubernetes |
@@ -233,11 +234,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-03-24 | [Antigravity Copilot agent validation](docs/issues/2026-03-24-antigravity-copilot-agent-validation.md) | antigravity — auth isolation verdict: Playwright CLI cannot inherit browser cookies |
+| 2026-03-24 | [Antigravity binary name mismatch](docs/issues/2026-03-24-antigravity-binary-name-mismatch.md) | antigravity — IDE binary name resolution |
 | 2026-03-22 | [Copilot PR #45 review findings](docs/issues/2026-03-22-copilot-pr45-review-findings.md) | spec doc — plugin paths, Rules vs DoD contradiction |
 | 2026-03-22 | [Copilot PR #44 review findings](docs/issues/2026-03-22-copilot-pr44-review-findings.md) | jenkins — duplicate PKI vars, help text mismatch |
 | 2026-03-22 | [Copilot PR #43 review findings](docs/issues/2026-03-22-copilot-pr43-review-findings.md) | ldap / vault — newlines, local scope, jq bool, printf |
-| 2026-03-22 | [Copilot PR #42 review findings](docs/issues/2026-03-22-copilot-pr42-review-findings.md) | dry-run tests / memory-bank |
-| 2026-03-22 | [if-count allowlist deferred refactors](docs/issues/2026-03-22-if-count-allowlist-deferred.md) | jenkins / ldap / vault / system |
 
 [All issues →](docs/issues/)
 
@@ -247,15 +248,16 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.9.16](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.16) | 2026-03-26 | Antigravity IDE + CDP browser automation — gemini CLI + Playwright engine; `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_acg_extend`; ldap stdin hardening |
 | [v0.9.13](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.13) | 2026-03-23 | v0.9.12 retro, `/create-pr` `mergeable_state` check, CHANGE.md backfill for v0.9.12 |
 | [v0.9.11](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.11) | 2026-03-22 | dynamic plugin CI — `detect` job skips cluster tests for docs-only PRs; maps plugin changes to targeted smoke tests |
-| [v0.9.10](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.10) | 2026-03-22 | if-count allowlist elimination (jenkins) — 8 helpers extracted; allowlist now `system.sh` only |
 
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.9.10](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.10) | 2026-03-22 | if-count allowlist elimination (jenkins) — 8 helpers extracted; allowlist now `system.sh` only |
 | [v0.9.9](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.9) | 2026-03-22 | if-count allowlist elimination — 11 ldap helpers + 6 vault helpers extracted; allowlist down to `system.sh` only |
 | [v0.9.7](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.7) | 2026-03-22 | lib-foundation sync (`--interactive-sudo`, `_run_command_resolve_sudo`), `deploy_cluster` no-args guard, `bin/` `_kubectl` wrapper, BATS stub fixes, Copilot PR #41 findings |
 | [v0.9.6](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.6) | 2026-03-22 | ACG sandbox plugin (`acg_provision/status/extend/teardown`), VPC/SG idempotency, `ACG_ALLOWED_CIDR` security, kops-for-k3s reframe |

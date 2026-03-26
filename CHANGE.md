@@ -1,5 +1,29 @@
 # Changes - k3d-manager
 
+## [Unreleased] v0.9.16 — Antigravity IDE + CDP browser automation
+
+### Added
+- `scripts/plugins/antigravity.sh`: rewritten plugin — gemini CLI + Playwright browser automation engine (`b2ba187`); public functions: `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_poll_task`, `antigravity_acg_extend`
+- `_antigravity_launch`: auto-starts Antigravity IDE with `--remote-debugging-port=9222`; polls port 9222 via `_antigravity_browser_ready` (`e83d89d`)
+- `_antigravity_ensure_github_session`: CDP login check + wait loop for GitHub auth (`e83d89d`)
+- `_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready`: Antigravity install + MCP config + port readiness helpers via lib-foundation v0.3.12 (`45168cf`)
+
+### Fixed
+- `_antigravity_launch`: replaced `_curl` boolean probe with `_run_command --soft -- curl` — prevents silent `exit 1` on first poll iteration (`6b98902`)
+- lib-foundation v0.3.13 subtree pull: `_antigravity_browser_ready` probe fix upstream (`dfcb590`)
+
+---
+
+## [Unreleased] v0.9.15 — Antigravity × Copilot validation + ldap stdin hardening
+
+### Added
+- `docs/issues/2026-03-24-antigravity-copilot-agent-validation.md`: validation verdict — automation blocked by auth isolation; Playwright CLI cannot inherit browser session cookies
+
+### Security
+- `scripts/etc/ldap/ldap-password-rotator.sh`: `vault kv put` now reads credentials from stdin (`@-`) — prevents password exposure in `ps aux` (`e91a662`)
+
+---
+
 ## [Unreleased] v0.9.14 — if-count elimination: system.sh
 
 ### Changed
