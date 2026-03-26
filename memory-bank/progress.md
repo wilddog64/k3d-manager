@@ -29,6 +29,7 @@
 
 - [x] **antigravity.sh MCP refactor** — commit `45168cf` switches plugin to Antigravity IDE + Playwright MCP over CDP (`_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready`); spec: `docs/plans/v0.9.16-antigravity-plugin-mcp-refactor.md`
 - [x] **antigravity.sh launch + session** — commit `e83d89d` adds `_antigravity_launch` (auto-start IDE) + `_antigravity_ensure_github_session` (CDP login + wait) per `docs/plans/v0.9.16-antigravity-launch-session.md`
+- [ ] **antigravity _curl probe fix** — `_antigravity_launch` uses `_curl` as boolean which exits on failure; fix: `_run_command --soft`; spec: `docs/plans/v0.9.16-antigravity-curl-probe-fix.md`; Codex assigned
 - [ ] CloudFormation template — `cloudformation/ec2-k3s-nodes.yaml.tmpl`
 - [ ] `acg_provision_nodes` plugin function
 - [ ] Antigravity ACG login + TTL extend automation
