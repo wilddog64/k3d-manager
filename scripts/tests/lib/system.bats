@@ -177,21 +177,21 @@ bats_require_minimum_version 1.5.0
 
 @test "_antigravity_browser_ready: returns 0 when port 9222 responds" {
   _command_exist() { [[ "$1" == curl ]]; }
-  _curl() { return 0; }
-  export -f _command_exist _curl
+  _run_command() { return 0; }
+  export -f _command_exist _run_command
 
   run _antigravity_browser_ready 4
   [ "$status" -eq 0 ]
-  unset -f _command_exist _curl
+  unset -f _command_exist _run_command
 }
 
 @test "_antigravity_browser_ready: errors when port never responds within timeout" {
   _command_exist() { [[ "$1" == curl ]]; }
-  _curl() { return 1; }
+  _run_command() { return 1; }
   _err() { echo "ERROR: $*" >&2; return 1; }
-  export -f _command_exist _curl _err
+  export -f _command_exist _run_command _err
 
   run _antigravity_browser_ready 2
   [ "$status" -ne 0 ]
-  unset -f _command_exist _curl _err
+  unset -f _command_exist _run_command _err
 }

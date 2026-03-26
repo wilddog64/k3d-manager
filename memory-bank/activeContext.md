@@ -1,15 +1,10 @@
 # Active Context — lib-foundation
 
-## Current State: `feat/v0.3.10` (as of 2026-03-24)
+## Current State: `feat/v0.3.13` (as of 2026-03-25)
 
-**v0.3.4 SHIPPED** — PR #11 merged to main (`dbfafe9`), tagged v0.3.4, GitHub release created 2026-03-22.
-**v0.3.5 SHIPPED** — PR #10 squash-merged to main (`2f895a99`) 2026-03-23. No tag (no CHANGELOG entry). `enforce_admins` restored.
-**v0.3.6 SHIPPED** — PR #12 merged to main (`d8b4c48`) 2026-03-23. Tagged v0.3.6, GitHub release created. `enforce_admins` restored.
-**v0.3.7 SHIPPED** — PR #13 merged to main (`071c270`) 2026-03-24. Tagged v0.3.7 retroactively, GitHub release created. system.sh if-count cleanup.
-**v0.3.8 SHIPPED** — PR #14 merged to main (`a669a63`) 2026-03-24. Tagged v0.3.8 retroactively, GitHub release created. Tab indentation enforcement in `_agent_audit`.
-**v0.3.9 SHIPPED** — PR #15 merged to main (`fb09921`) 2026-03-24. No tag (docs-only, no version bump). Release history backfill + memory-bank reconciliation. `enforce_admins` restored.
-**feat/v0.3.10 ACTIVE** — branch cut from main `fb09921` 2026-03-24. `_detect_platform` contract corrected in `.clinerules` (`efb22e9`). `enforce_admins` restored.
-**feat/v0.3.12 ACTIVE** — branch cut from `2625683` 2026-03-25. Spec: `docs/plans/v0.3.12-ensure-antigravity.md` — Antigravity IDE install + MCP config helpers.
+**v0.3.11 SHIPPED** — PR #17 merged to main (`2625683`) 2026-03-25. Tagged v0.3.11, GitHub release created. `enforce_admins` restored.
+**v0.3.12 SHIPPED** — PR #18 squash-merged to main (`91340d62`) 2026-03-25. Tagged v0.3.12, GitHub release created. `enforce_admins` restored. Antigravity IDE install + Playwright MCP config helpers.
+**feat/v0.3.13 ACTIVE** — branch cut from `91340d62` 2026-03-25. Retro doc pending.
 
 ---
 
@@ -38,7 +33,8 @@ API reference: `docs/api/functions.md`
 | v0.3.9 | **SHIPPED** | PR #15 merged (`fb09921`) — release history backfill + memory-bank reconciliation; 2026-03-24; no tag (docs-only) |
 | v0.3.10 | **SHIPPED** | PR #16 merged (`c5662c9`) — `.clinerules` fix; 2026-03-24; no tag (docs-only) |
 | v0.3.11 | **SHIPPED** | PR #17 merged (`2625683`) — YAML IP check in `_agent_audit`; 2026-03-25; tagged v0.3.11 |
-| v0.3.12 | **ACTIVE** | branch `feat/v0.3.12` cut from `2625683` |
+| v0.3.12 | **SHIPPED** | PR #18 merged (`91340d62`) — Antigravity IDE + MCP helpers; 7 BATS; 2026-03-25; tagged v0.3.12 |
+| v0.3.13 | **ACTIVE** | branch `feat/v0.3.13` cut from `91340d62` |
 
 ---
 
@@ -54,6 +50,7 @@ API reference: `docs/api/functions.md`
 - [x] **v0.3.11: YAML hardcoded IP check** — commit `11e653b` adds staged `.yaml/.yml` IP detection to `_agent_audit` per `docs/plans/v0.3.11-agent-audit-yaml-ip-check.md`.
 - [x] `rigor-cli` — repo bootstrapped (commit `a1c034f`), bash 3.2 fix (`8ae57bc`), gist installer (`310fd16`); lib-foundation spec: `docs/plans/v0.3.10-rigor-cli-init.md`; rigor-cli specs tracked in that repo (`plans/v0.1.1-mapfile-compat.md`, `plans/v0.1.1-gist-install-script.md`).
 - [x] **v0.3.12: Antigravity helpers** — commit `ae0e8b9` adds `_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready` per `docs/plans/v0.3.12-ensure-antigravity.md`.
+- [x] **v0.3.13: antigravity browser probe fix** — commit `9350ecd` switches `_antigravity_browser_ready` to `_run_command --soft -- curl` per `docs/plans/v0.3.13-antigravity-browser-ready-fix.md`.
 - [ ] `shopping-carts` as consumer (future)
 
 ---

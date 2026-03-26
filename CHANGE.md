@@ -1,5 +1,10 @@
 # Changes - lib-foundation
 
+## [Unreleased] — v0.3.13
+
+### Fixed
+- `_antigravity_browser_ready()` — replace `_curl` boolean probe with `_run_command --soft -- curl` so the poll loop retries instead of calling `exit 1` on the first failed attempt
+
 ## [Unreleased] — v0.3.12
 
 ### Added
