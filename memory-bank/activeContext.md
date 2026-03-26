@@ -17,6 +17,7 @@
 | Item | Status | Notes |
 |---|---|---|
 | **Antigravity validation** | **COMPLETE (FAIL)** | Automation failed due to auth isolation. Playwright cannot inherit browser cookies in CLI. Recommendation: DO NOT use for v0.9.16 ACG automation. See `docs/issues/2026-03-24-antigravity-copilot-agent-validation.md` |
+| **Antigravity _curl probe fix** | **COMPLETE** | `6b98902` — `_antigravity_launch` now uses `_run_command --soft -- curl` per `docs/plans/v0.9.16-antigravity-curl-probe-fix.md` |
 | Reduce replicas + remove HPAs | **MERGED** | 5 repos squash-merged to main 2026-03-20 |
 | Frontend nginx fix | **MERGED** | `65b354f` on main, tagged v0.1.1, released 2026-03-21 |
 | **Gemini: verify frontend Running** | **COMPLETE** | Pod `frontend-85969b4bf-4wkdz` is `Running` on ubuntu-k3s |
