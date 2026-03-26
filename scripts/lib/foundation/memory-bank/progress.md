@@ -11,11 +11,16 @@
 **v0.3.9 SHIPPED** — PR #15 merged to main (`fb09921`) 2026-03-24. No tag (docs-only, no version bump).
 **v0.3.10 SHIPPED** — PR #16 merged to main (`c5662c9`) 2026-03-24. No tag (docs-only, `.clinerules` fix).
 **v0.3.11 SHIPPED** — PR #17 merged to main (`2625683`) 2026-03-25. Tagged v0.3.11, GitHub release created. `enforce_admins` restored.
-**v0.3.12 ACTIVE** — branch `feat/v0.3.12` cut from `2625683`.
+**v0.3.12 SHIPPED** — PR #18 squash-merged to main (`91340d62`) 2026-03-25. Tagged v0.3.12, GitHub release created. `enforce_admins` restored.
+**v0.3.13 ACTIVE** — branch `feat/v0.3.13` cut from `91340d62`.
 
-## v0.3.12 — Active
+## v0.3.13 — Active
 
-- [x] **`_ensure_antigravity_ide` + MCP helpers** — commit `ae0e8b9` adds `_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready` per `docs/plans/v0.3.12-ensure-antigravity.md`
+- [x] **`_antigravity_browser_ready` curl probe fix** — commit `9350ecd` replaces the `_curl` boolean probe with `_run_command --soft -- curl` per `docs/plans/v0.3.13-antigravity-browser-ready-fix.md`
+
+## v0.3.12 — Shipped
+
+- [x] **`_ensure_antigravity_ide` + MCP helpers** — Antigravity IDE install + Playwright MCP config helpers; Copilot PR #18 findings addressed in `9f28d88` (apt-get update, mktemp template, PLAYWRIGHT_MCP_VERSION, _curl wrapper, 7 BATS)
 
 ---
 

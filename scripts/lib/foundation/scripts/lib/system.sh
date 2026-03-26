@@ -890,7 +890,7 @@ function _antigravity_browser_ready() {
    local elapsed=0
 
    while [[ "$elapsed" -lt "$timeout" ]]; do
-      if _command_exist curl && _curl -sf http://localhost:9222/json >/dev/null 2>&1; then
+      if _command_exist curl && _run_command --soft -- curl --max-time "${CURL_MAX_TIME:-30}" -sf http://localhost:9222/json >/dev/null 2>&1; then
          return 0
       fi
       sleep 2
