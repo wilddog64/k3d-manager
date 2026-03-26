@@ -8,6 +8,7 @@
 **v0.9.15 COMPLETE** — all 4 scope items done. branch `k3d-manager-v0.9.15` ready for PR.
 **v0.9.16 COMPLETE ON BRANCH** — 4 items done: MCP refactor (`45168cf`), launch+session (`e83d89d`), curl probe fix (`6b98902`), lib-foundation v0.3.13 subtree pull (`dfcb590`). PR pending.
 **v0.9.17 NEXT** — `_antigravity_ensure_acg_session` (CDP login wait, mirrors GitHub session pattern); spec: `docs/plans/v0.9.17-antigravity-ensure-acg-session.md`. Cut branch after v0.9.16 merged.
+**BLOCKED ON lib-foundation v0.3.14** — 5 Copilot PR #51 findings deferred to lib-foundation. Must fix upstream + subtree-pull before k3d-manager work resumes on those items. See lib-foundation `memory-bank/progress.md` v0.3.14 section.
 **enforce_admins:** restored on main 2026-03-24.
 **v0.9.15 scope:** Antigravity × GitHub Copilot coding agent validation — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`. Antigravity plugin rewritten in `b2ba187` per `docs/plans/v0.9.15-antigravity-plugin-impl.md`. Also: ldap-password-rotator `vault kv put` stdin hardening — spec `docs/plans/v0.9.15-ensure-copilot-cli.md` (closes v0.6.2 security debt; `_ensure_copilot_cli`/`_k3d_manager_copilot`/`_ensure_node` already shipped in v0.9.12).
 
