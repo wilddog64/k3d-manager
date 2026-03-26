@@ -31,6 +31,8 @@
 - [x] **antigravity.sh launch + session** — commit `e83d89d` adds `_antigravity_launch` (auto-start IDE) + `_antigravity_ensure_github_session` (CDP login + wait) per `docs/plans/v0.9.16-antigravity-launch-session.md`
 - [x] **antigravity _curl probe fix** — commit `6b98902` updates `_antigravity_launch` to `_run_command --soft -- curl` per `docs/plans/v0.9.16-antigravity-curl-probe-fix.md`
 - [x] **lib-foundation v0.3.13 subtree pull** — commit `dfcb590` pulls `_antigravity_browser_ready` probe fix (`e870c6d9`) into `scripts/lib/foundation/`
+- [ ] **ACG session persistence (impl)** — Gemini implements `_acg_save_session`, `_acg_load_session`, `acg_login`, updates `antigravity_acg_extend`; spec: `docs/plans/v0.9.16-acg-session-persistence-impl.md`
+- [ ] **ACG session persistence (BATS)** — Codex writes 5 BATS tests after Gemini's commit; spec: `docs/plans/v0.9.16-acg-session-persistence-bats.md`
 - [ ] CloudFormation template — `cloudformation/ec2-k3s-nodes.yaml.tmpl`
 - [ ] `acg_provision_nodes` plugin function
 - [ ] Antigravity ACG login + TTL extend automation
