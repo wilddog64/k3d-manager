@@ -5,8 +5,9 @@
 **v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. Copilot CLI CI integration.
 **v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released.
 **v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag. if-count allowlist fully cleared: `_run_command_handle_failure` + `_node_install_via_redhat` extracted via lib-foundation PR #13 (`071c270e`).
-**v0.9.15 ACTIVE** — branch cut from main 2026-03-24. lib-foundation v0.3.13 subtree pulled (`dfcb590`) 2026-03-25.
-**v0.9.16 IN PROGRESS** — spec `docs/plans/v0.9.16-antigravity-plugin-mcp-refactor.md` implemented in commit `45168cf`: antigravity plugin now uses Antigravity IDE + Playwright MCP over CDP port 9222. `_antigravity_launch` + `_antigravity_ensure_github_session` added in `e83d89d`. `_antigravity_launch` curl probe fixed in `6b98902`. lib-foundation `_antigravity_browser_ready` probe fixed in lib-foundation PR #19 (`e870c6d9`), subtree pulled in `dfcb590`.
+**v0.9.15 COMPLETE** — all 4 scope items done. branch `k3d-manager-v0.9.15` ready for PR.
+**v0.9.16 COMPLETE ON BRANCH** — 4 items done: MCP refactor (`45168cf`), launch+session (`e83d89d`), curl probe fix (`6b98902`), lib-foundation v0.3.13 subtree pull (`dfcb590`). PR pending.
+**v0.9.17 NEXT** — `_antigravity_ensure_acg_session` (CDP login wait, mirrors GitHub session pattern); spec: `docs/plans/v0.9.17-antigravity-ensure-acg-session.md`. Cut branch after v0.9.16 merged.
 **enforce_admins:** restored on main 2026-03-24.
 **v0.9.15 scope:** Antigravity × GitHub Copilot coding agent validation — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`. Antigravity plugin rewritten in `b2ba187` per `docs/plans/v0.9.15-antigravity-plugin-impl.md`. Also: ldap-password-rotator `vault kv put` stdin hardening — spec `docs/plans/v0.9.15-ensure-copilot-cli.md` (closes v0.6.2 security debt; `_ensure_copilot_cli`/`_k3d_manager_copilot`/`_ensure_node` already shipped in v0.9.12).
 
