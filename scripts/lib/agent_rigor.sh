@@ -129,7 +129,7 @@ _agent_audit() {
          [[ -f "$file" ]] || continue
          local bare_sudo
          bare_sudo=$(
-            { git diff --cached -- "$file" 2>/dev/null; git diff -- "$file" 2>/dev/null; } \
+            git diff --cached -- "$file" 2>/dev/null \
             | grep '^+' \
             | sed 's/^+//' \
             | grep -E '\bsudo[[:space:]]' \

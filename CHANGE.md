@@ -1,6 +1,6 @@
 # Changes - k3d-manager
 
-## [Unreleased] v0.9.16 — Antigravity IDE + CDP browser automation
+## [v0.9.16] — 2026-03-26 — Antigravity IDE + CDP browser automation
 
 ### Added
 - `scripts/plugins/antigravity.sh`: rewritten plugin — gemini CLI + Playwright browser automation engine (`b2ba187`); public functions: `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_poll_task`, `antigravity_acg_extend`
@@ -14,7 +14,7 @@
 
 ---
 
-## [Unreleased] v0.9.15 — Antigravity × Copilot validation + ldap stdin hardening
+## [v0.9.15] — 2026-03-25 — Antigravity × Copilot validation + ldap stdin hardening
 
 ### Added
 - `docs/issues/2026-03-24-antigravity-copilot-agent-validation.md`: validation verdict — automation blocked by auth isolation; Playwright CLI cannot inherit browser session cookies

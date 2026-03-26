@@ -17,7 +17,7 @@ function _ensure_antigravity() {
   if _command_exist gemini; then
     return 0
   fi
-  _log "gemini CLI not found — installing @google/gemini-cli..."
+  _info "gemini CLI not found — installing @google/gemini-cli..."
   _ensure_node
   _run_command -- npm install -g @google/gemini-cli
   if ! _command_exist gemini; then
@@ -26,10 +26,13 @@ function _ensure_antigravity() {
 }
 
 function _antigravity_launch() {
+  if ! _command_exist curl; then
+    _err "curl is required for Antigravity browser probe — install curl and retry"
+  fi
   if _run_command --soft -- curl -sf http://localhost:9222/json >/dev/null 2>&1; then
     return 0
   fi
-  _log "Antigravity not running — launching with --remote-debugging-port=9222..."
+  _info "Antigravity not running — launching with --remote-debugging-port=9222..."
   if _is_mac; then
     open -a "Antigravity" --args --remote-debugging-port=9222
   else
@@ -39,7 +42,7 @@ function _antigravity_launch() {
 }
 
 function _antigravity_ensure_github_session() {
-  _log "Checking GitHub session in Antigravity browser..."
+  _info "Checking GitHub session in Antigravity browser..."
 
   local gemini_prompt
   gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
@@ -67,11 +70,13 @@ function antigravity_install() {
   _ensure_antigravity
   _ensure_antigravity_ide
   _ensure_antigravity_mcp_playwright
-  _log "Node.js: $(node --version 2>&1)"
-  _log "gemini: $(gemini --version 2>&1 || echo 'version unknown')"
-  _log "antigravity: $(antigravity --version 2>&1 || echo 'version unknown')"
-  _log "Playwright MCP: configured in Antigravity mcp_config.json"
-  _log "Run 'antigravity_trigger_copilot_review <owner> <repo>' — Antigravity will launch and prompt for GitHub login if needed."
+  _info "Node.js: $(node --version 2>&1)"
+  _info "gemini: $(gemini --version 2>&1 || echo 'version unknown')"
+  local _ag_bin
+  _ag_bin=$( (_command_exist agy && echo agy) || (_command_exist antigravity && echo antigravity) || echo "")
+  _info "antigravity: $( [[ -n "$_ag_bin" ]] && "$_ag_bin" --version 2>&1 || echo 'version unknown')"
+  _info "Playwright MCP: configured in Antigravity mcp_config.json"
+  _info "Run 'antigravity_trigger_copilot_review <owner> <repo>' — Antigravity will launch and prompt for GitHub login if needed."
 }
 
 function antigravity_trigger_copilot_review() {
@@ -80,10 +85,12 @@ function antigravity_trigger_copilot_review() {
   local review_prompt="${3:-Review this codebase for code quality, security, and architecture.}"
 
   _ensure_antigravity
+  _ensure_antigravity_ide
+  _ensure_antigravity_mcp_playwright
   _antigravity_launch
   _antigravity_ensure_github_session
 
-  _log "Triggering Copilot coding agent on ${owner}/${repo}..."
+  _info "Triggering Copilot coding agent on ${owner}/${repo}..."
 
   local gemini_prompt
   gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
@@ -111,7 +118,7 @@ function antigravity_poll_task() {
 
   _ensure_antigravity
 
-  _log "Polling task ${task_uuid} on ${owner}/${repo} (timeout: ${timeout}s)..."
+  _info "Polling task ${task_uuid} on ${owner}/${repo} (timeout: ${timeout}s)..."
 
   local gemini_prompt
   gemini_prompt="Use your web_fetch tool to fetch https://github.com/${owner}/${repo}/tasks/${task_uuid}
@@ -127,9 +134,11 @@ function antigravity_acg_extend() {
   local hours="${2:-4}"
 
   _ensure_antigravity
+  _ensure_antigravity_ide
+  _ensure_antigravity_mcp_playwright
   _antigravity_launch
 
-  _log "Extending ACG sandbox TTL by ${hours}h at ${sandbox_url}..."
+  _info "Extending ACG sandbox TTL by ${hours}h at ${sandbox_url}..."
 
   local gemini_prompt
   gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:

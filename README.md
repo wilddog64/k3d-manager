@@ -234,11 +234,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-03-26 | [Copilot PR #51 review findings](docs/issues/2026-03-26-copilot-pr51-review-findings.md) | antigravity, ldap, agent_rigor — 7 fixed, 5 deferred to lib-foundation v0.3.14 |
 | 2026-03-24 | [Antigravity Copilot agent validation](docs/issues/2026-03-24-antigravity-copilot-agent-validation.md) | antigravity — auth isolation verdict: Playwright CLI cannot inherit browser cookies |
 | 2026-03-24 | [Antigravity binary name mismatch](docs/issues/2026-03-24-antigravity-binary-name-mismatch.md) | antigravity — IDE binary name resolution |
 | 2026-03-22 | [Copilot PR #45 review findings](docs/issues/2026-03-22-copilot-pr45-review-findings.md) | spec doc — plugin paths, Rules vs DoD contradiction |
 | 2026-03-22 | [Copilot PR #44 review findings](docs/issues/2026-03-22-copilot-pr44-review-findings.md) | jenkins — duplicate PKI vars, help text mismatch |
-| 2026-03-22 | [Copilot PR #43 review findings](docs/issues/2026-03-22-copilot-pr43-review-findings.md) | ldap / vault — newlines, local scope, jq bool, printf |
 
 [All issues →](docs/issues/)
 
