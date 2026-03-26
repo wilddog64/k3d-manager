@@ -26,7 +26,7 @@ function _ensure_antigravity() {
 }
 
 function _antigravity_launch() {
-  if _curl -sf http://localhost:9222/json >/dev/null 2>&1; then
+  if _run_command --soft -- curl -sf http://localhost:9222/json >/dev/null 2>&1; then
     return 0
   fi
   _log "Antigravity not running — launching with --remote-debugging-port=9222..."
