@@ -184,6 +184,24 @@ current milestone already has 5 or more, stop and flag it to Claude before writi
 A 6th spec means the release is too large and must be split — Claude decides the split.
 Do not proceed without explicit approval.
 
+## Documentation and Issue Reporting — Mandatory
+
+After every task (implementation or live test), you must:
+
+1. **Update memory-bank** — `memory-bank/activeContext.md` and `memory-bank/progress.md` with results: pass, fail, or partial. Include actual output, not summaries.
+
+2. **Create an issue doc if anything failed or behaved unexpectedly** — `docs/issues/YYYY-MM-DD-<slug>.md` with:
+   - What was tested
+   - Full terminal output (verbatim — paste it)
+   - Root cause if known
+   - Recommended follow-up
+
+3. **For live tests** — paste the full terminal output in your completion report AND in the issue doc (if an issue exists). "It passed" without output is not acceptable.
+
+Do NOT skip issue docs to keep the report short. Unexpected behavior must be recorded.
+
+---
+
 ## Known Failure Modes (your history — avoid repeating)
 
 - You skip reading the memory-bank and start from your own interpretation — always read it first

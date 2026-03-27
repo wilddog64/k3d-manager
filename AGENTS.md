@@ -78,6 +78,17 @@ If you find a bug outside your scope, report it in the memory-bank — do not fi
 When your task is done, update `memory-bank/activeContext.md` and `memory-bank/progress.md`
 to reflect what you completed. Include the real commit SHA and PR URL.
 
+### 12. Document findings and create issue docs
+After every task — implementation or verification — you must:
+- Update `memory-bank/activeContext.md` and `memory-bank/progress.md` with results (pass, fail, or partial)
+- If anything failed, behaved unexpectedly, or was skipped: create `docs/issues/YYYY-MM-DD-<slug>.md` with:
+  - What was tested / attempted
+  - Actual output (paste verbatim — no summaries)
+  - Root cause if known
+  - Recommended follow-up
+- If the task was a live test, include the full terminal output in the issue doc or memory-bank notes
+- Do NOT omit issue docs to keep the report clean — unexpected behavior must be recorded
+
 ### 11. Stop at 5 plan docs per milestone
 Each release is a sprint story with a maximum of 5 spec files. If the current milestone
 already has 5 or more files in `docs/plans/`, do not write another — flag it to Claude
