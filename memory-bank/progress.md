@@ -21,6 +21,7 @@
 ## v0.9.17 — In Progress
 
 - [x] **`_antigravity_ensure_acg_session`** — Implemented in `scripts/plugins/antigravity.sh`; BATS coverage in `scripts/tests/lib/antigravity.bats`; verified via `env -i` BATS run.
+- [ ] **E2E live test: `_antigravity_ensure_acg_session`** — Gemini task. Spec: `docs/plans/v0.9.17-acg-session-e2e-test.md`. Requires sandbox URL from user. Two scenarios: session active (happy path) + session expired (login prompt). Blocked until user provides ACG sandbox URL.
 
 ---
 
