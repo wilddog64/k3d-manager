@@ -1,11 +1,20 @@
 # Changes - lib-foundation
 
-## [Unreleased] — v0.3.13
+## [v0.3.14] — 2026-03-27
+
+### Fixed
+- `_ensure_antigravity_ide()` — detect `agy` (Homebrew macOS binary) alongside `antigravity` at all 4 detection points
+- `_antigravity_browser_ready()` — fail fast with clear error when `curl` missing, instead of silently looping to timeout
+- `_agent_audit` tab-indentation scan — replace word-splitting `for file in $changed_sh` with NUL-delimited `while IFS= read -r -d ''` loop; safe for filenames with spaces
+- `docs/api/functions.md` — document `PLAYWRIGHT_MCP_VERSION` pinned default; remove `@latest` inaccuracy
+- `CHANGE.md` — version shipped v0.3.12 and v0.3.13 entries (were `[Unreleased]`)
+
+## [v0.3.13] — 2026-03-25
 
 ### Fixed
 - `_antigravity_browser_ready()` — replace `_curl` boolean probe with `_run_command --soft -- curl` so the poll loop retries instead of calling `exit 1` on the first failed attempt
 
-## [Unreleased] — v0.3.12
+## [v0.3.12] — 2026-03-25
 
 ### Added
 - `_ensure_antigravity_ide()` — install Antigravity IDE via brew (macOS), apt-get (Debian), or dnf (RedHat)

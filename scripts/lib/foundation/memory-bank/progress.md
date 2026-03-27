@@ -12,11 +12,22 @@
 **v0.3.10 SHIPPED** — PR #16 merged to main (`c5662c9`) 2026-03-24. No tag (docs-only, `.clinerules` fix).
 **v0.3.11 SHIPPED** — PR #17 merged to main (`2625683`) 2026-03-25. Tagged v0.3.11, GitHub release created. `enforce_admins` restored.
 **v0.3.12 SHIPPED** — PR #18 squash-merged to main (`91340d62`) 2026-03-25. Tagged v0.3.12, GitHub release created. `enforce_admins` restored.
-**v0.3.13 ACTIVE** — branch `feat/v0.3.13` cut from `91340d62`.
+**v0.3.13 SHIPPED** — PR #19 squash-merged to main (`e870c6d9`) 2026-03-25. Tagged v0.3.13, GitHub release created. `enforce_admins` restored.
+**v0.3.14 ACTIVE** — branch `feat/v0.3.14` cut from `e870c6d9` 2026-03-25.
 
-## v0.3.13 — Active
+## v0.3.14 — Active
 
-- [x] **`_antigravity_browser_ready` curl probe fix** — commit `9350ecd` replaces the `_curl` boolean probe with `_run_command --soft -- curl` per `docs/plans/v0.3.13-antigravity-browser-ready-fix.md`
+**Dependency:** k3d-manager PR #51 (Copilot) deferred 5 findings here. Fix these before k3d-manager can subtree-pull v0.3.14.
+
+- [x] **`_ensure_antigravity_ide` binary detection** — commit `e52b819` adds `agy`-first detection so macOS installs succeed post-brew
+- [x] **`_antigravity_browser_ready` curl fast-fail** — commit `e52b819` hard-fails when `curl` missing before the polling loop
+- [x] **`agent_rigor.sh` tab-scan NUL-delimited loop** — commit `e52b819` rewrites the tab scan to iterate staged `.sh` files via `-z` for filenames with spaces
+- [x] **`docs/api/functions.md` @latest inaccuracy** — commit `e52b819` documents the `PLAYWRIGHT_MCP_VERSION` env var + pinned version, not `@latest`
+- [x] **`CHANGE.md` version labels** — commit `e52b819` marks the shipped v0.3.12/v0.3.13 entries with release dates
+
+## v0.3.13 — Shipped
+
+- [x] **`_antigravity_browser_ready` curl probe fix** — PR #19 merged (`e870c6d9`); `_run_command --soft -- curl --max-time "${CURL_MAX_TIME:-30}"` replaces `_curl` probe; BATS stubs updated to target `_run_command`; Copilot `--max-time` finding addressed
 
 ## v0.3.12 — Shipped
 
