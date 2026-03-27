@@ -48,3 +48,56 @@ setup() {
   [[ "$output" =~ "SESSION_CHECKED" ]]
   unset -f _ensure_antigravity _ensure_antigravity_ide _ensure_antigravity_mcp_playwright _antigravity_launch _antigravity_ensure_acg_session gemini _info
 }
+
+@test "_antigravity_gemini_prompt: succeeds on first model" {
+  _info() { :; }
+  sleep() { :; }
+  gemini() {
+    [[ "$2" == "gemini-1.5-flash" ]] && echo "ok" && return 0
+    return 1
+  }
+  export -f _info gemini
+  source "scripts/plugins/antigravity.sh"
+
+  run _antigravity_gemini_prompt "test prompt"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok"* ]]
+  unset -f _info gemini sleep
+}
+
+@test "_antigravity_gemini_prompt: falls back to next model on 429" {
+  _info() { :; }
+  sleep() { :; }
+  gemini() {
+    if [[ "$2" == "gemini-1.5-flash" ]]; then
+      echo "429 RESOURCE_EXHAUSTED rateLimitExceeded"
+      return 1
+    fi
+    if [[ "$2" == "gemini-2.0-flash" ]]; then
+      echo "ok"
+      return 0
+    fi
+    return 1
+  }
+  export -f _info gemini
+  source "scripts/plugins/antigravity.sh"
+
+  run _antigravity_gemini_prompt "test prompt"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok"* ]]
+  unset -f _info gemini sleep
+}
+
+@test "_antigravity_gemini_prompt: fails when all models exhausted" {
+  _info() { :; }
+  _err() { echo "$*"; exit 1; }
+  sleep() { :; }
+  gemini() { echo "429 RESOURCE_EXHAUSTED rateLimitExceeded"; return 1; }
+  export -f _info _err gemini
+  source "scripts/plugins/antigravity.sh"
+
+  run _antigravity_gemini_prompt "test prompt"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"All gemini models exhausted"* ]]
+  unset -f _info _err gemini sleep
+}
