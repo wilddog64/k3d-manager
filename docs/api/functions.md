@@ -1,84 +1,144 @@
-# Public Functions Reference
+# lib-foundation API Reference
 
-All functions callable via `./scripts/k3d-manager <function> [args]`.
-
-Use `-h` or `--help` with any function for a brief usage message:
+Source the relevant files and call functions directly:
 
 ```bash
-./scripts/k3d-manager create_cluster -h
-./scripts/k3d-manager deploy_vault -h
+source "$(dirname "$0")/lib/system.sh"
+source "$(dirname "$0")/lib/core.sh"
+source "$(dirname "$0")/lib/agent_rigor.sh"
 ```
 
-## Core
+## system.sh — Command Execution & Platform Utilities
 
-| Function | Location | Description |
+### Command Execution
+
+| Function | Description |
+|---|---|
+| `_run_command [--prefer-sudo|--require-sudo|--interactive-sudo|--probe '<subcmd>'|--quiet|--soft] -- <cmd> [args...]` | Core wrapper for every privileged or traced command. Honors `--prefer-sudo` (attempt non-interactive sudo first), `--require-sudo` (fail if sudo unavailable), `--interactive-sudo` (allow password prompts), `--probe` to test a subcommand before deciding on sudo, `--quiet` to suppress wrapper errors, and `--soft` to return exit codes instead of exiting. Example: `_run_command --prefer-sudo -- apt-get update`. |
+| `_run_command_resolve_sudo <prog> <prefer> <require> <interactive> [probe_args...]` | Internal helper invoked by `_run_command`; resolves `_RCRS_RUNNER` to either the raw program or `sudo` with the correct flags, returning 127 when sudo is required but unavailable. |
+| `_command_exist <prog>` | Returns 0 if `<prog>` is found on `PATH`, 1 otherwise. |
+| `_args_have_sensitive_flag <args...>` | Returns 0 when CLI args contain `--password`, `--token`, or `--username` (either `--flag value` or `--flag=value` form); used to disable tracing. |
+
+### Platform Detection
+
+| Function | Description |
+|---|---|
+| `_detect_platform` | Prints the current platform to stdout: one of `mac`, `wsl`, `debian`, `redhat`, or `linux`. Calls `_err` on unsupported platforms. Does not cache — use `_is_mac` / `_is_linux` etc. for repeated checks. |
+| `_is_mac` / `_is_linux` / `_is_wsl` / `_is_redhat_family` / `_is_debian_family` | Predicates returning 0 when the current system matches the given platform family. |
+
+### Logging & Trace Control
+
+| Function | Description |
+|---|---|
+| `_info <msg>` | Print `INFO: <msg>` to stderr. |
+| `_warn <msg>` | Print `WARN: <msg>` to stderr. |
+| `_err <msg>` | Print `ERROR: <msg>` and exit 1. |
+| `_no_trace <cmd...>` | Execute a block with `set +x` to avoid leaking secrets in traces. |
+
+### Security & PATH Safety
+
+| Function | Description |
+|---|---|
+| `_safe_path` | Validates the current `PATH` for unsafe entries (world-writable directories or relative path components). Calls `_err` with the list of offending entries if any are found. |
+| `_is_world_writable_dir <dir>` | Returns 0 if `<dir>` is world-writable. |
+| `_set_sensitive_var <name> <value>` | Assign sensitive data to a variable without leaving traces in history. |
+| `_write_sensitive_file <path> <data>` | Write a secret to disk using `0600` permissions. |
+| `_remove_sensitive_file <path>` | Securely remove a previously written sensitive file. |
+
+### Tool Wrappers (inherit `_run_command` semantics)
+
+| Function | Description |
+|---|---|
+| `_kubectl ...` | Ensure `kubectl` is installed and forward arguments through `_run_command`. |
+| `_helm ...` | Run `helm` with `_run_command` safety wrappers. |
+| `_istioctl ...` | Run `istioctl` via `_run_command`. |
+| `_k3d ...` | Run `k3d` command with logging/sudo guardrails. |
+| `_curl ...` | Ensures `curl` is installed, injects `--max-time` (default: 30 s via `CURL_MAX_TIME`) when not already specified, and forwards all arguments through `_run_command --quiet`. |
+| `_ip ...` | Wrapper for `ip` / `ifconfig` depending on platform. |
+
+### Secret / Credential Store
+
+| Function | Description |
+|---|---|
+| `_secret_tool ...` | Linux `secret-tool` wrapper; installs prerequisites automatically. |
+| `_security ...` | macOS `security` tool wrapper. |
+| `_secret_store_data <service> <key> <value>` | Persist a secret in the platform credential store. |
+| `_secret_load_data <service> <key>` | Load a secret from the credential store. |
+| `_secret_clear_data <service> <key>` | Remove a secret from the credential store. |
+| `_store_registry_credentials <registry>` | Store OCI registry credentials securely. |
+| `_load_registry_credentials <registry>` | Retrieve a stored OCI registry credential set. |
+| `_registry_login <registry>` | Log into an OCI registry using stored credentials. |
+
+### Installers (require `--interactive-sudo`)
+
+| Function | Description |
+|---|---|
+| `_install_helm` | Install Helm via apt/dnf/homebrew depending on platform. |
+| `_install_kubernetes_cli` | Install `kubectl` (Debian/RedHat/mac). |
+| `_install_orbstack` | Install OrbStack on macOS. |
+| `_install_bats_from_source` | Build and install BATS from source tarball. |
+| `_ensure_bats` | Ensure BATS is installed via package manager/source. |
+| `_ensure_node` | Install Node.js + npm for CLI tooling. |
+| `_ensure_cargo` | Install Rust `cargo` via apt/dnf/homebrew. |
+| `_ensure_copilot_cli` | Ensures the Copilot CLI binary is installed (via `brew install copilot-cli` or the official release installer) and authenticated (`_copilot_auth_check`). Exits via `_err` if installation fails. |
+
+### Utilities
+
+| Function | Description |
+|---|---|
+| `_sha256_12 <data>` | Output the first 12 chars of the SHA-256 of `<data>`. |
+| `_version_ge <verA> <verB>` | Return 0 when `verA ≥ verB` using semantic version comparison. |
+| `_failfast_on` / `_failfast_off` | Toggle `set -e` for the current shell. |
+| `_add_exit_trap <handler>` / `_cleanup_register <handler>` | Register a cleanup handler invoked on script exit. |
+| `_k3dm_repo_root` | Return the repo root directory (via git or script location). |
+| `_detect_cluster_name` | Derive cluster name from current kubeconfig context. |
+
+### Internal Helpers (not for direct use)
+
+`_install_debian_kubernetes_client`, `_install_redhat_kubernetes_client`, `_install_debian_docker`, `_install_redhat_docker`, `_install_mac_helm`, `_install_redhat_helm`, `_install_debian_helm`, `_install_debian_kubectl`, `_install_redhat_kubectl` — platform-specific installers invoked by the higher-level workflows.
+
+## core.sh — Cluster Lifecycle
+
+### Public Functions
+
+| Function | Signature | Description |
 |---|---|---|
-| `create_cluster` | `scripts/lib/core.sh` | Create a cluster for the active provider |
-| `destroy_cluster` | `scripts/lib/core.sh` | Delete the active provider's cluster |
-| `deploy_cluster` | `scripts/lib/core.sh` | Provider-aware bootstrap (k3d or k3s) plus Istio |
-| `expose_ingress` | `scripts/lib/core.sh` | Expose the cluster ingress externally |
-| `setup_ingress_forward` | `scripts/lib/core.sh` | Set up port-forwarding for the ingress |
-| `status_ingress_forward` | `scripts/lib/core.sh` | Show ingress forward status |
-| `remove_ingress_forward` | `scripts/lib/core.sh` | Tear down ingress port-forwarding |
+| `deploy_cluster [--provider k3d\|k3s\|orbstack] [--force-k3s] [cluster_name]` | Provider-aware cluster bootstrap including Istio and provider exports; resolves provider interactively or via env. |
+| `destroy_cluster [cluster_name]` | Destroy the active provider cluster. |
+| `create_cluster [cluster_name] [http_port=8000] [https_port=8443] [--dry-run\|-n] [-h\|--help]` | Create infrastructure for the active provider. `--dry-run` resolves the provider and prints intent without creating. |
+| `create_k3d_cluster` / `create_k3s_cluster` | Create provider-specific clusters. |
+| `destroy_k3d_cluster` / `destroy_k3s_cluster` | Destroy provider-specific clusters. |
+| `deploy_k3d_cluster` / `deploy_k3s_cluster` | Deploy full cluster stacks for k3d/k3s. |
+| `deploy_ldap` | Deploy OpenLDAP directory to the active cluster. |
+| `expose_ingress [setup|status|remove]` | Expose cluster ingress externally or manage ingress forwarding. |
+| `setup_ingress_forward` / `status_ingress_forward` / `remove_ingress_forward` | Manage ingress port-forwarding for local access. |
 
-## Tests
+### Stable Internal Utilities
 
-| Function | Location | Description |
+| Function | Description |
+|---|---|
+| `_cluster_provider` | Resolves the active provider in precedence order: `K3D_MANAGER_PROVIDER` → `K3DMGR_PROVIDER` → `CLUSTER_PROVIDER` → auto-detected (`k3d` binary → `k3s` binary → `k3d` default). Normalizes to lowercase; exits via `_err` on unsupported values. |
+| `_deploy_cluster_resolve_provider <platform> <provider_cli> <force_k3s>` | Sets the `_DCRS_PROVIDER` global to the resolved provider: CLI flag → `--force-k3s` → env overrides → mac/interactive/k3d default. Does not print or return a value. |
+| `_deploy_cluster_prompt_provider` | Interactive prompt for provider selection (TTY only). |
+| `_resolve_script_dir` | Portable symlink-aware `SCRIPT_DIR` helper. |
+| `_ensure_path_exists <dir>` | Ensure a directory exists, creating it with sudo if required. |
+| `_ensure_port_available <port>` | Fail fast if a TCP port is already bound locally. |
+
+## agent_rigor.sh — Agent Safety Checks
+
+| Function | Signature | Description |
 |---|---|---|
-| `test_istio` | `scripts/lib/test.sh` | Run Istio validation tests |
-| `test_vault` | `scripts/lib/test.sh` | Run Vault smoke tests |
-| `test_eso` | `scripts/lib/test.sh` | Run ESO smoke tests |
-| `test_jenkins` | `scripts/lib/test.sh` | Run Jenkins smoke tests |
-| `test_jenkins_smoke` | `scripts/lib/test.sh` | Run full Jenkins smoke test suite |
-| `test_keycloak` | `scripts/plugins/keycloak.sh` | Run Keycloak smoke tests |
-| `test_cert_rotation` | `scripts/lib/test.sh` | Validate TLS certificate rotation |
-| `test_nfs_connectivity` | `scripts/lib/test.sh` | Check network connectivity to NFS |
-| `test_nfs_direct` | `scripts/lib/test.sh` | Directly mount NFS for troubleshooting |
+| `_agent_checkpoint <label>` | Commit the working tree with a checkpoint message before a risky change (no-op if clean). |
+| `_agent_audit` | Audits staged diffs for: BATS assertion/test removal, if-count threshold violations (default: 8, configurable via `AGENT_AUDIT_MAX_IF`), bare `sudo` calls, and `kubectl exec` commands with inline credentials. Returns non-zero if any check fails. |
+| `_agent_lint` | AI-based lint pass on staged `.sh` files. Gated by `AGENT_LINT_GATE_VAR` (default: `ENABLE_AGENT_LINT=1`). Invokes the function named by `AGENT_LINT_AI_FUNC` with staged file names and rules from `scripts/etc/agent/lint-rules.md`. No-op when gate is off or no `.sh` files are staged. |
 
-## Plugins
+## Global Variables
 
-| Function | Location | Description |
-|---|---|---|
-| `deploy_vault` | `scripts/plugins/vault.sh` | Deploy HashiCorp Vault |
-| `configure_vault_app_auth` | `scripts/plugins/vault.sh` | Register app cluster Kubernetes auth mount in Vault |
-| `deploy_eso` | `scripts/plugins/eso.sh` | Deploy External Secrets Operator |
-| `deploy_argocd` | `scripts/plugins/argocd.sh` | Deploy ArgoCD |
-| `deploy_argocd_bootstrap` | `scripts/plugins/argocd.sh` | Bootstrap ArgoCD with initial apps |
-| `deploy_keycloak` | `scripts/plugins/keycloak.sh` | Deploy Keycloak identity provider |
-| `deploy_jenkins` | `scripts/plugins/jenkins.sh` | Deploy Jenkins |
-| `deploy_ldap` | `scripts/plugins/ldap.sh` | Deploy OpenLDAP directory service |
-| `deploy_ad` | `scripts/plugins/ldap.sh` | Deploy Active Directory schema (local dev) |
-| `deploy_smb_csi` | `scripts/plugins/smb-csi.sh` | Deploy SMB CSI driver |
-| `create_az_sp` | `scripts/plugins/azure.sh` | Create an Azure service principal |
-| `deploy_azure_eso` | `scripts/plugins/azure.sh` | Deploy Azure ESO resources |
-| `eso_akv` | `scripts/plugins/azure.sh` | Manage Azure Key Vault ESO integration |
-| `configure_vault_argocd_repos` | `scripts/plugins/argocd.sh` | Configure Vault-managed deploy keys for ArgoCD repos |
-| `deploy_cert_manager` | `scripts/plugins/cert-manager.sh` | Install cert-manager and configure ACME ClusterIssuers |
-| `add_ubuntu_k3s_cluster` | `scripts/plugins/shopping_cart.sh` | Export Ubuntu kubeconfig and register cluster in ArgoCD |
-| `register_shopping_cart_apps` | `scripts/plugins/shopping_cart.sh` | Apply shopping cart ArgoCD Application CRs |
-| `hello` | `scripts/plugins/hello.sh` | Example plugin |
-| `tunnel_start` | `scripts/plugins/tunnel.sh` | Start autossh SSH tunnel with launchd persistence |
-| `tunnel_stop` | `scripts/plugins/tunnel.sh` | Stop the SSH tunnel and unload launchd job |
-| `tunnel_status` | `scripts/plugins/tunnel.sh` | Show tunnel process and launchd status |
-| `deploy_app_cluster` | `scripts/plugins/shopping_cart.sh` | Install k3s on EC2 via k3sup and merge kubeconfig |
-| `acg_provision` | `scripts/plugins/acg.sh` | Provision ACG sandbox EC2 instance (VPC + SG + key + t3.medium) |
-| `acg_status` | `scripts/plugins/acg.sh` | Show ACG instance state, public IP, and k3s health |
-| `acg_extend` | `scripts/plugins/acg.sh` | Open ACG sandbox page to extend TTL (+4h) |
-| `acg_teardown` | `scripts/plugins/acg.sh` | Terminate ACG instance and remove ubuntu-k3s kubeconfig context |
+| Variable | Description |
+|---|---|
+| `_RCRS_RUNNER` | Populated by `_run_command_resolve_sudo` with the final runner array. |
+| `_DCRS_PROVIDER` | Helper scratch variable set by `_deploy_cluster_resolve_provider` for downstream use.
 
-## Running Tests
-
-```bash
-./scripts/k3d-manager test all            # run all suites
-./scripts/k3d-manager test core           # run the core suite
-./scripts/k3d-manager test plugins        # run the plugins suite
-./scripts/k3d-manager test lib            # run the lib suite
-./scripts/k3d-manager test install_k3d    # run a single .bats file
-./scripts/k3d-manager test install_k3d --case "_install_k3d exports INSTALL_DIR"
-./scripts/k3d-manager test -v install_k3d --case "_install_k3d exports INSTALL_DIR"
-```
-
-Failed runs keep logs in `scratch/test-logs/<suite>/<case-hash>/<timestamp>.log`.
 ## Installation Helpers
 
 ### `_ensure_antigravity_ide`
@@ -98,7 +158,7 @@ Returns 0 if installed; calls `_err` if all methods fail.
 Ensures Antigravity is configured to launch the Playwright MCP server. Requires `jq`.
 - Determines `mcp_config.json` path via `_antigravity_mcp_config_path()`
 - Creates the file if missing
-- Adds the `playwright` entry `{ "command": "npx", "args": ["-y", "@playwright/mcp@<version>"] }` if not already present; version is read from `PLAYWRIGHT_MCP_VERSION` env var (defaults to a pinned version defined in the helper — does **not** float to `latest`)
+- Adds the `playwright` entry `{ "command": "npx", "args": ["-y", "@playwright/mcp@<version>"] }` if not already present; version comes from the `PLAYWRIGHT_MCP_VERSION` env var (defaults to a pinned release — does **not** use `latest`)
 
 ### `_antigravity_browser_ready`
 
