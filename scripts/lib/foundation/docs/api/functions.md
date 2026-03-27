@@ -138,3 +138,34 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 |---|---|
 | `_RCRS_RUNNER` | Populated by `_run_command_resolve_sudo` with the final runner array. |
 | `_DCRS_PROVIDER` | Helper scratch variable set by `_deploy_cluster_resolve_provider` for downstream use.
+
+## Installation Helpers
+
+### `_ensure_antigravity_ide`
+
+Installs the Antigravity IDE if not already present.
+
+| Platform | Method |
+|---|---|
+| macOS | `brew install --cask antigravity` |
+| Debian/Ubuntu | `apt-get install -y antigravity` |
+| RedHat/Fedora | `dnf install -y antigravity` |
+
+Returns 0 if installed; calls `_err` if all methods fail.
+
+### `_ensure_antigravity_mcp_playwright`
+
+Ensures Antigravity is configured to launch the Playwright MCP server. Requires `jq`.
+- Determines `mcp_config.json` path via `_antigravity_mcp_config_path()`
+- Creates the file if missing
+- Adds the `playwright` entry `{ "command": "npx", "args": ["-y", "@playwright/mcp@latest"] }` if not already present
+
+### `_antigravity_browser_ready`
+
+Waits for Antigravity (launched with `--remote-debugging-port=9222`) to expose the WebSocket endpoint.
+
+```
+_antigravity_browser_ready [timeout_seconds]
+```
+
+Returns 0 when port 9222 responds to `curl -sf http://localhost:9222/json`; otherwise calls `_err` after the timeout.
