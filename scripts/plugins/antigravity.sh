@@ -13,6 +13,36 @@
 #   antigravity_poll_task                — poll task until complete, print output
 #   antigravity_acg_extend               — extend ACG sandbox TTL via browser
 
+_ANTIGRAVITY_GEMINI_MODELS=(
+  "gemini-1.5-flash"
+  "gemini-2.0-flash"
+  "gemini-2.5-flash"
+)
+
+function _antigravity_gemini_prompt() {
+  local prompt="$1"
+  local output exit_code
+
+  for model in "${_ANTIGRAVITY_GEMINI_MODELS[@]}"; do
+    _info "Trying gemini model: ${model}..."
+    sleep 2
+    output=$(gemini --model "$model" --prompt "$prompt" 2>&1)
+    exit_code=$?
+    if [[ $exit_code -eq 0 ]]; then
+      echo "$output"
+      return 0
+    fi
+    if [[ "$output" == *"429"* || "$output" == *"RESOURCE_EXHAUSTED"* || "$output" == *"rateLimitExceeded"* ]]; then
+      _info "Model ${model} capacity exhausted — trying next model..."
+      continue
+    fi
+    echo "$output"
+    return "$exit_code"
+  done
+
+  _err "All gemini models exhausted (429). Models tried: ${_ANTIGRAVITY_GEMINI_MODELS[*]}"
+}
+
 function _ensure_antigravity() {
   if _command_exist gemini; then
     return 0
@@ -62,8 +92,7 @@ function _antigravity_ensure_github_session() {
 Write the Playwright script to /tmp/ag_github_session.js, execute with node, print the result.
 Exit code 1 if session cannot be confirmed."
 
-  sleep 2
-  gemini --model gemini-2.5-flash --prompt "$gemini_prompt"
+  _antigravity_gemini_prompt "$gemini_prompt"
 }
 
 function _antigravity_ensure_acg_session() {
@@ -87,8 +116,7 @@ function _antigravity_ensure_acg_session() {
 Write the Playwright script to /tmp/ag_acg_session.js, execute with node, print the result.
 Exit code 1 if session cannot be confirmed."
 
-  sleep 2
-  gemini --model gemini-2.5-flash --prompt "$gemini_prompt"
+  _antigravity_gemini_prompt "$gemini_prompt"
 }
 
 function antigravity_install() {
@@ -133,8 +161,7 @@ function antigravity_trigger_copilot_review() {
 Write the Playwright script to /tmp/ag_trigger.js, execute with node, print the UUID.
 Exit code 1 if UUID not found within 60 seconds."
 
-  sleep 2
-  gemini --model gemini-2.5-flash --prompt "$gemini_prompt"
+  _antigravity_gemini_prompt "$gemini_prompt"
 }
 
 function antigravity_poll_task() {
@@ -153,8 +180,7 @@ Poll every 30 seconds until the task status shows complete or done.
 Timeout after ${timeout} seconds — if not complete by then, print ERROR: timeout and exit.
 Once complete, extract and print the full review output verbatim. Do not summarize."
 
-  sleep 2
-  gemini --model gemini-2.5-flash --prompt "$gemini_prompt"
+  _antigravity_gemini_prompt "$gemini_prompt"
 }
 
 function antigravity_acg_extend() {
@@ -183,6 +209,5 @@ function antigravity_acg_extend() {
 Write the Playwright script to /tmp/ag_acg_extend.js, execute with node, print the result.
 Exit code 1 if the extend button is not found or the action fails."
 
-  sleep 2
-  gemini --model gemini-2.5-flash --prompt "$gemini_prompt"
+  _antigravity_gemini_prompt "$gemini_prompt"
 }
