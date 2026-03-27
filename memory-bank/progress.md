@@ -14,9 +14,17 @@
 **v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. No version tag (CHANGE.md [Unreleased]). Copilot CLI CI integration + lib-foundation v0.3.6 subtree.
 **v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released. v0.9.12 retro + CHANGE.md backfill + mergeable_state process check.
 **v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag (CHANGE.md [Unreleased]). if-count allowlist fully cleared: _run_command + _ensure_node helpers extracted via lib-foundation PR #13.
-**v0.9.15 ACTIVE** — branch cut from main 2026-03-24.
+**v0.9.15 SHIPPED** — PR #51 squash-merged to main (`484354da`) 2026-03-27. Tagged v0.9.15, released.
+**v0.9.16 SHIPPED** — PR #51 squash-merged to main (`484354da`) 2026-03-27. Tagged v0.9.16, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-27-v0.9.16-retrospective.md`.
+**v0.9.17 ACTIVE** — branch `k3d-manager-v0.9.17` cut from `484354da` 2026-03-27. Blocked on lib-foundation v0.3.14.
 
-## v0.9.15 — In Progress
+## v0.9.17 — In Progress
+
+- [ ] **`_antigravity_ensure_acg_session`** — Gemini implements + live-tests; Codex writes BATS; spec: `docs/plans/v0.9.17-antigravity-ensure-acg-session.md`
+
+---
+
+## v0.9.15+v0.9.16 — Shipped
 
 - [x] **Playwright Integration Documentation** — `docs/plans/playwright-gemini.md` created; defines high-level orchestration, MCP benefits, and cross-browser support strategy.
 - [x] **Antigravity plugin rewrite** — commit `b2ba187` rewrites plugin to use gemini CLI + Playwright per `docs/plans/v0.9.15-antigravity-plugin-impl.md`
