@@ -20,7 +20,7 @@
 
 ## v0.9.17 — In Progress
 
-- [ ] **`_antigravity_ensure_acg_session`** — Gemini implements + live-tests; Codex writes BATS; spec: `docs/plans/v0.9.17-antigravity-ensure-acg-session.md`
+- [x] **`_antigravity_ensure_acg_session`** — Implemented in `scripts/plugins/antigravity.sh`; BATS coverage in `scripts/tests/lib/antigravity.bats`; verified via `env -i` BATS run.
 
 ---
 
@@ -45,7 +45,7 @@
 
 ## v0.9.17 — Planned
 
-- [ ] **`_antigravity_ensure_acg_session`** — Gemini implements + live-tests; Codex writes BATS; spec: `docs/plans/v0.9.17-antigravity-ensure-acg-session.md`
+- [x] **`_antigravity_ensure_acg_session`** — Implemented in `scripts/plugins/antigravity.sh`; BATS coverage in `scripts/tests/lib/antigravity.bats`; verified via `env -i` BATS run.
 
 ---
 
