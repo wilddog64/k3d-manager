@@ -23,6 +23,7 @@
 - [x] **`_antigravity_ensure_acg_session`** — Implemented in `scripts/plugins/antigravity.sh`; BATS coverage in `scripts/tests/lib/antigravity.bats`; verified via `env -i` BATS run.
 - [ ] **E2E live test: `_antigravity_ensure_acg_session`** — **FAILED**. Gemini task. Spec: `docs/plans/v0.9.17-acg-session-e2e-test.md`. Failed due to API capacity (429). See `docs/issues/2026-03-27-acg-session-e2e-fail.md`.
 - [x] **Pin gemini model to gemini-2.5-flash** — Gemini implemented in `scripts/plugins/antigravity.sh`; BATS tests pending Codex implementation. Spec: `docs/plans/v0.9.17-antigravity-model-flag.md`.
+- [ ] **Model fallback helper** — Gemini implements `_antigravity_gemini_prompt` (tries gemini-1.5-flash → 2.0-flash → 2.5-flash before failing), Codex writes BATS. Spec: `docs/plans/v0.9.17-antigravity-model-fallback.md`.
 
 ---
 
