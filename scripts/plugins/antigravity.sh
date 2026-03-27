@@ -32,7 +32,7 @@ function _antigravity_gemini_prompt() {
       echo "$output"
       return 0
     fi
-    if [[ "$output" == *"429"* || "$output" == *"RESOURCE_EXHAUSTED"* || "$output" == *"rateLimitExceeded"* || "$output" == *"404"* || "$output" == *"ModelNotFoundError"* ]]; then
+    if [[ "$output" == *"429"* || "$output" == *"RESOURCE_EXHAUSTED"* || "$output" == *"rateLimitExceeded"* || "$output" == *"ModelNotFoundError"* ]]; then
       _info "Model ${model} unavailable (exhausted or not found) — trying next model..."
       continue
     fi
