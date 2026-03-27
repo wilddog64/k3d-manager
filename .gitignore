@@ -2,3 +2,4 @@ storage/
 scratch/
 .claude/
 .envrc
+node_modules/

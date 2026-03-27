@@ -143,6 +143,20 @@ _agent_audit() {
       done
    fi
 
+   if [[ -n "$changed_sh" ]]; then
+      local file
+      for file in $changed_sh; do
+         [[ -f "$file" ]] || continue
+         local tab_lines
+         tab_lines=$(git show :"$file" 2>/dev/null | grep -n $'^ *\t' || true)
+         if [[ -n "$tab_lines" ]]; then
+            _warn "Agent audit: tab indentation in $file — use 2-space indentation:"
+            _warn "$tab_lines"
+            status=1
+         fi
+      done
+   fi
+
    local staged_diff
    staged_diff="$(git diff --cached 2>/dev/null || true)"
    if [[ -n "$staged_diff" ]]; then
@@ -157,6 +171,18 @@ _agent_audit() {
          status=1
       fi
    fi
+
+   local file
+   while IFS= read -r -d '' file; do
+      local ip_lines
+      ip_lines=$(git show :"$file" 2>/dev/null \
+         | grep -En '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' || true)
+      if [[ -n "$ip_lines" ]]; then
+         _warn "Agent audit: hardcoded IP address in $file — use a CoreDNS hostname instead:"
+         _warn "$ip_lines"
+         status=1
+      fi
+   done < <(git diff --cached --name-only --diff-filter=ACM -z -- '*.yaml' '*.yml' 2>/dev/null || true)
 
    return "$status"
 }

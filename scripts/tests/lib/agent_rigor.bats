@@ -104,7 +104,7 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
-@test "_agent_audit: flags bare sudo in unstaged diff" {
+@test "_agent_audit: flags bare sudo in staged diff" {
   local repo="$BATS_TEST_TMPDIR/repo_sudo"
   git init "$repo"
   git -C "$repo" config user.email "test@test.com"
@@ -116,6 +116,7 @@ setup() {
   git commit -m "initial"
   
   echo "sudo apt-get install -y curl" >> test.sh
+  git add test.sh
 
   run _agent_audit
   [ "$status" -ne 0 ]

@@ -1,11 +1,38 @@
 # Changes - k3d-manager
 
+## [v0.9.16] — 2026-03-26 — Antigravity IDE + CDP browser automation
+
+### Added
+- `scripts/plugins/antigravity.sh`: rewritten plugin — gemini CLI + Playwright browser automation engine (`b2ba187`); public functions: `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_poll_task`, `antigravity_acg_extend`
+- `_antigravity_launch`: auto-starts Antigravity IDE with `--remote-debugging-port=9222`; polls port 9222 via `_antigravity_browser_ready` (`e83d89d`)
+- `_antigravity_ensure_github_session`: CDP login check + wait loop for GitHub auth (`e83d89d`)
+- `_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready`: Antigravity install + MCP config + port readiness helpers via lib-foundation v0.3.12 (`45168cf`)
+
+### Fixed
+- `_antigravity_launch`: replaced `_curl` boolean probe with `_run_command --soft -- curl` — prevents silent `exit 1` on first poll iteration (`6b98902`)
+- lib-foundation v0.3.13 subtree pull: `_antigravity_browser_ready` probe fix upstream (`dfcb590`)
+
+---
+
+## [v0.9.15] — 2026-03-25 — Antigravity × Copilot validation + ldap stdin hardening
+
+### Added
+- `docs/issues/2026-03-24-antigravity-copilot-agent-validation.md`: validation verdict — automation blocked by auth isolation; Playwright CLI cannot inherit browser session cookies
+
+### Security
+- `scripts/etc/ldap/ldap-password-rotator.sh`: `vault kv put` now reads credentials from stdin (`@-`) — prevents password exposure in `ps aux` (`e91a662`)
+
+---
+
 ## [Unreleased] v0.9.14 — if-count elimination: system.sh
 
 ### Changed
 - **`scripts/lib/system.sh`**: Extracted `_run_command_handle_failure` from `_run_command` — drops if-count from 9 to 7; failure logging + soft/hard exit now in dedicated helper (via lib-foundation `feat/v0.3.7` `b9fcbf6`)
 - **`scripts/lib/system.sh`**: Extracted `_node_install_via_redhat` from `_ensure_node` — drops if-count from 9 to 7; dnf/yum/microdnf dispatch now in dedicated helper (via lib-foundation `feat/v0.3.7` `b9fcbf6`)
 - **`scripts/etc/agent/if-count-allowlist`**: Both `system.sh:_run_command` and `system.sh:_ensure_node` entries removed — allowlist is now fully empty
+
+### Security
+- `scripts/etc/ldap/ldap-password-rotator.sh`: `vault kv put` now reads credentials from stdin (`@-`) instead of CLI args — prevents password exposure in Vault pod `ps aux`
 
 ---
 

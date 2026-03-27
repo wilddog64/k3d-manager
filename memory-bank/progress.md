@@ -13,7 +13,33 @@
 **v0.9.11 SHIPPED** — PR #45 merged to main (`1a0c913`) 2026-03-22. Tagged v0.9.11, released. Dynamic plugin CI: detect job + conditional stage2.
 **v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. No version tag (CHANGE.md [Unreleased]). Copilot CLI CI integration + lib-foundation v0.3.6 subtree.
 **v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released. v0.9.12 retro + CHANGE.md backfill + mergeable_state process check.
-**v0.9.14 ACTIVE** — branch cut from main 2026-03-23.
+**v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag (CHANGE.md [Unreleased]). if-count allowlist fully cleared: _run_command + _ensure_node helpers extracted via lib-foundation PR #13.
+**v0.9.15 ACTIVE** — branch cut from main 2026-03-24.
+
+## v0.9.15 — In Progress
+
+- [x] **Playwright Integration Documentation** — `docs/plans/playwright-gemini.md` created; defines high-level orchestration, MCP benefits, and cross-browser support strategy.
+- [x] **Antigravity plugin rewrite** — commit `b2ba187` rewrites plugin to use gemini CLI + Playwright per `docs/plans/v0.9.15-antigravity-plugin-impl.md`
+- [x] **Antigravity × Copilot coding agent validation** — Determinism verdict: **FAIL**. Automation blocked by auth isolation. Findings doc: `docs/issues/2026-03-24-antigravity-copilot-agent-validation.md`
+- [x] **ldap-password-rotator vault kv put stdin fix** — commit `e91a662` implements stdin (`@-`) vault writes per `docs/plans/v0.9.15-ensure-copilot-cli.md`
+
+---
+
+## v0.9.16 — Planned
+
+- [x] **antigravity.sh MCP refactor** — commit `45168cf` switches plugin to Antigravity IDE + Playwright MCP over CDP (`_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready`); spec: `docs/plans/v0.9.16-antigravity-plugin-mcp-refactor.md`
+- [x] **antigravity.sh launch + session** — commit `e83d89d` adds `_antigravity_launch` (auto-start IDE) + `_antigravity_ensure_github_session` (CDP login + wait) per `docs/plans/v0.9.16-antigravity-launch-session.md`
+- [x] **antigravity _curl probe fix** — commit `6b98902` updates `_antigravity_launch` to `_run_command --soft -- curl` per `docs/plans/v0.9.16-antigravity-curl-probe-fix.md`
+- [x] **lib-foundation v0.3.13 subtree pull** — commit `dfcb590` pulls `_antigravity_browser_ready` probe fix (`e870c6d9`) into `scripts/lib/foundation/`
+*(v0.9.16 scope complete — PR ready)*
+
+---
+
+## v0.9.17 — Planned
+
+- [ ] **`_antigravity_ensure_acg_session`** — Gemini implements + live-tests; Codex writes BATS; spec: `docs/plans/v0.9.17-antigravity-ensure-acg-session.md`
+
+---
 
 ## v0.9.12 — Completed
 
@@ -22,10 +48,11 @@
 - [x] Roadmap update — **STALE**: current roadmap already correct; no changes needed
 - [x] **Copilot CLI auth CI integration** — PR #47 (`f8014bc`): installs Copilot CLI in lint job, wires `COPILOT_GITHUB_TOKEN`/`K3DM_ENABLE_AI`/`K3DM_COPILOT_LIVE_TESTS` into BATS, adds live binary check; 2 Copilot findings fixed (`fbb9ba4`)
 
-## v0.9.14 — In Progress
+## v0.9.14 — Completed
 
 - [x] GitHub PAT rotation — rotated 2026-03-23; new expiry 2026-04-22
 - [x] **if-count: `_run_command` + `_ensure_node`** — commit `b9fcbf6` (lib-foundation feat/v0.3.7) extracts helpers; subtree pull `aec6673` copies `system.sh` + clears allowlist per spec `docs/plans/v0.9.14-if-count-system-sh.md`
+- [x] **PR #50 merged** — `d317429b` 2026-03-24; Copilot findings addressed; retro `docs/retro/2026-03-24-v0.9.14-retrospective.md`; branch v0.9.15 cut
 
 ---
 

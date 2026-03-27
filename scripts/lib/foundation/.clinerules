@@ -29,7 +29,7 @@ memory-bank/              — persistent agent context (read before any task)
 ## Key Contracts — Do Not Break
 
 `_run_command` mode flags: `--prefer-sudo`, `--require-sudo`, `--probe '<subcmd>'`, `--quiet`
-`_detect_platform` returns: `debian | rhel | arch | darwin | unknown`
+`_detect_platform` returns: `mac | wsl | debian | redhat | linux`
 `_cluster_provider` reads: `CLUSTER_PROVIDER` / `K3D_MANAGER_PROVIDER` / `K3DMGR_PROVIDER`
 
 Changing these signatures requires coordination with all consumers (k3d-manager, rigor-cli, shopping-carts).

@@ -79,3 +79,33 @@ Use `-h` or `--help` with any function for a brief usage message:
 ```
 
 Failed runs keep logs in `scratch/test-logs/<suite>/<case-hash>/<timestamp>.log`.
+## Installation Helpers
+
+### `_ensure_antigravity_ide`
+
+Installs the Antigravity IDE if not already present.
+
+| Platform | Method |
+|---|---|
+| macOS | `brew install --cask antigravity` |
+| Debian/Ubuntu | `apt-get install -y antigravity` |
+| RedHat/Fedora | `dnf install -y antigravity` |
+
+Returns 0 if installed; calls `_err` if all methods fail.
+
+### `_ensure_antigravity_mcp_playwright`
+
+Ensures Antigravity is configured to launch the Playwright MCP server. Requires `jq`.
+- Determines `mcp_config.json` path via `_antigravity_mcp_config_path()`
+- Creates the file if missing
+- Adds the `playwright` entry `{ "command": "npx", "args": ["-y", "@playwright/mcp@<version>"] }` if not already present; version is read from `PLAYWRIGHT_MCP_VERSION` env var (defaults to a pinned version defined in the helper — does **not** float to `latest`)
+
+### `_antigravity_browser_ready`
+
+Waits for Antigravity (launched with `--remote-debugging-port=9222`) to expose the WebSocket endpoint.
+
+```
+_antigravity_browser_ready [timeout_seconds]
+```
+
+Returns 0 when port 9222 responds to `curl -sf http://localhost:9222/json`; otherwise calls `_err` after the timeout.

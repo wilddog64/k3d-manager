@@ -1,17 +1,16 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.14` (as of 2026-03-23)
+## Current Branch: `k3d-manager-v0.9.15` (as of 2026-03-24)
 
-**v0.9.7 SHIPPED** — PR #41 merged to main (`97249a6f`) 2026-03-22. Tagged v0.9.7, released.
-**v0.9.8 SHIPPED** — PR #42 merged to main (`64525e3f`) 2026-03-22. No version tag (CHANGELOG [Unreleased]).
-**v0.9.9 SHIPPED** — PR #43 merged to main (`c1043175`) 2026-03-22. Tagged v0.9.9, released.
-**v0.9.10 SHIPPED** — PR #44 merged to main (`877ec970`) 2026-03-22. Tagged v0.9.10, released.
-**v0.9.11 SHIPPED** — PR #45 merged to main (`1a0c913`) 2026-03-22. Tagged v0.9.11, released.
-**v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. Copilot CLI CI integration: lint job installs CLI, wires `COPILOT_GITHUB_TOKEN`/`K3DM_ENABLE_AI`/`K3DM_COPILOT_LIVE_TESTS` into BATS, live binary check; 2 Copilot findings fixed (`fbb9ba4`).
+**v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. Copilot CLI CI integration.
 **v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released.
-**v0.9.14 ACTIVE** — branch cut from main 2026-03-23.
-**enforce_admins:** restored on main 2026-03-23.
-**v0.9.14 current task:** if-count `_run_command` + `_ensure_node` — DONE in `b9fcbf6` (lib-foundation feat/v0.3.7) + subtree pull `aec6673`; spec `docs/plans/v0.9.14-if-count-system-sh.md`.
+**v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag. if-count allowlist fully cleared: `_run_command_handle_failure` + `_node_install_via_redhat` extracted via lib-foundation PR #13 (`071c270e`).
+**v0.9.15 COMPLETE** — all 4 scope items done. branch `k3d-manager-v0.9.15` ready for PR.
+**v0.9.16 COMPLETE ON BRANCH** — 4 items done: MCP refactor (`45168cf`), launch+session (`e83d89d`), curl probe fix (`6b98902`), lib-foundation v0.3.13 subtree pull (`dfcb590`). PR pending.
+**v0.9.17 NEXT** — `_antigravity_ensure_acg_session` (CDP login wait, mirrors GitHub session pattern); spec: `docs/plans/v0.9.17-antigravity-ensure-acg-session.md`. Cut branch after v0.9.16 merged.
+**BLOCKED ON lib-foundation v0.3.14** — 5 Copilot PR #51 findings deferred to lib-foundation. Must fix upstream + subtree-pull before k3d-manager work resumes on those items. See lib-foundation `memory-bank/progress.md` v0.3.14 section.
+**enforce_admins:** restored on main 2026-03-24.
+**v0.9.15 scope:** Antigravity × GitHub Copilot coding agent validation — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`. Antigravity plugin rewritten in `b2ba187` per `docs/plans/v0.9.15-antigravity-plugin-impl.md`. Also: ldap-password-rotator `vault kv put` stdin hardening — spec `docs/plans/v0.9.15-ensure-copilot-cli.md` (closes v0.6.2 security debt; `_ensure_copilot_cli`/`_k3d_manager_copilot`/`_ensure_node` already shipped in v0.9.12).
 
 ---
 
@@ -19,6 +18,8 @@
 
 | Item | Status | Notes |
 |---|---|---|
+| **Antigravity validation** | **COMPLETE (FAIL)** | Automation failed due to auth isolation. Playwright cannot inherit browser cookies in CLI. Recommendation: DO NOT use for v0.9.16 ACG automation. See `docs/issues/2026-03-24-antigravity-copilot-agent-validation.md` |
+| **Antigravity _curl probe fix** | **COMPLETE** | `6b98902` — `_antigravity_launch` now uses `_run_command --soft -- curl` per `docs/plans/v0.9.16-antigravity-curl-probe-fix.md` |
 | Reduce replicas + remove HPAs | **MERGED** | 5 repos squash-merged to main 2026-03-20 |
 | Frontend nginx fix | **MERGED** | `65b354f` on main, tagged v0.1.1, released 2026-03-21 |
 | **Gemini: verify frontend Running** | **COMPLETE** | Pod `frontend-85969b4bf-4wkdz` is `Running` on ubuntu-k3s |
@@ -44,6 +45,7 @@
 | **if-count ldap refactor** | **MERGED** | commit `ba6f3a9` — extracted helpers so 7 `ldap.sh` functions drop ≤8 ifs; allowlist trimmed |
 | **if-count vault refactor** | **MERGED** | commit `365846c` — extracted helpers + guard clauses so 5 `vault.sh` functions drop ≤8 ifs; allowlist cleared |
 | **if-count jenkins refactor** | **MERGED** | commit `733123a` on k3d-manager-v0.9.10 — new helpers drop 4 `jenkins.sh` functions ≤8 ifs; allowlist entries removed |
+| **ldap password rotator security** | **COMPLETE** | commit `e91a662` on k3d-manager-v0.9.15 — `vault kv put` now reads credentials from stdin (`@-`) per `docs/plans/v0.9.15-ensure-copilot-cli.md` |
 | **v0.9.10 PR #44** | **MERGED** | `877ec970` — jenkins allowlist elimination; 4 Copilot findings fixed in `25e2b2a`; tagged v0.9.10; branch v0.9.11 cut |
 | **v0.9.9 PR #43** | **MERGED** | `c1043175` — ldap+vault allowlist elimination; 9 Copilot findings fixed in `bbfc12e`; tagged v0.9.9; branch v0.9.10 cut |
 | **Gemini: smoke test vault refactor** | **COMPLETE** | Ran `deploy_vault` and `deploy_vault --re-unseal` successfully. ESO integration confirmed working. |
