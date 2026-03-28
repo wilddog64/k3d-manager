@@ -23,6 +23,8 @@
 ## v0.9.19 — In Progress
 
 - [x] **`acg_get_credentials` + `acg_import_credentials`** — commit `3970623` adds `_acg_write_credentials`, both public functions, docs updates, and 8 BATS tests per `docs/plans/v0.9.19-acg-get-credentials.md`
+- [ ] **Static Playwright script** — Codex assigned. Spec: `docs/plans/v0.9.19-acg-playwright-script.md`. Creates `scripts/playwright/acg_credentials.js`; replaces Gemini-prompt block in `acg_get_credentials` with direct `node` call. Commit message: `feat(acg): replace Gemini-generated Playwright with static acg_credentials.js`
+- [ ] **Gemini: verify Playwright selectors** — after Codex, spin up live sandbox and run `acg_get_credentials <url>` to verify/update DOM selectors in `acg_credentials.js`
 - [ ] **scratch/ cleanup** — `rm -rf scratch/*` — wipe stale Playwright artifacts at release cut
 
 ## v0.9.17 — Shipped
