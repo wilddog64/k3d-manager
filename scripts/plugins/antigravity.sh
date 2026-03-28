@@ -14,9 +14,9 @@
 #   antigravity_acg_extend               — extend ACG sandbox TTL via browser
 
 _ANTIGRAVITY_GEMINI_MODELS=(
-  "gemini-1.5-flash"
-  "gemini-2.0-flash"
   "gemini-2.5-flash"
+  "gemini-2.0-flash"
+  "gemini-1.5-flash"
 )
 
 function _antigravity_gemini_prompt() {
