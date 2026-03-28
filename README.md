@@ -218,6 +218,22 @@ docs/
 
 ### How-To
 
+**Secrets & Identity**
+- **[Vault](docs/howto/vault.md)** — Deploy, init, PKI cert issuance, cross-cluster auth
+- **[ESO](docs/howto/eso.md)** — Deploy, connect a secret store, troubleshoot sync failures
+- **[Keycloak](docs/howto/keycloak.md)** — Deploy, smoke test, LDAP federation
+
+**GitOps & CI/CD**
+- **[ArgoCD](docs/howto/argocd.md)** — Deploy, register app cluster, configure deploy keys
+- **[cert-manager](docs/howto/cert-manager.md)** — Deploy, Vault + ACME issuers, certificate lifecycle
+
+**Cloud Sandbox**
+- **[ACG Sandbox](docs/howto/acg.md)** — Full lifecycle: provision → k3s install → extend TTL → teardown
+- **[Antigravity Browser Automation](docs/howto/antigravity.md)** — First-run setup, ACG extend, Copilot agent trigger
+
+**Networking**
+- **[SSH Tunnel](docs/howto/tunnel.md)** — autossh setup, launchd boot persistence, app cluster access
+
 **Jenkins**
 - **[Configuring SSL Trust for jenkins-cli](docs/howto/jenkins-cli-ssl-trust.md)** — Trust Vault-issued certs for `jenkins-cli.jar`
 - **[Jenkins K8s Agents Testing](docs/howto/jenkins-k8s-agents-testing.md)** — Verify dynamic pod agents in the infra cluster
