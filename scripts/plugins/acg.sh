@@ -187,6 +187,7 @@ _acg_write_credentials() {
   local session_token="${3:-}"
   local creds_file="${HOME}/.aws/credentials"
   mkdir -p "${HOME}/.aws"
+  { set +x; } 2>/dev/null
   {
     echo "[default]"
     echo "aws_access_key_id=${access_key}"
@@ -230,8 +231,8 @@ HELP
   secret_key=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_SECRET_ACCESS_KEY| Secret Access Key)[\s:=]+(\S+)/i) {print $1; exit}')
   session_token=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_SESSION_TOKEN| Session Token)[\s:=]+(\S+)/i) {print $1; exit}')
 
-  if [[ -z "$access_key" || -z "$secret_key" || -z "$session_token" ]]; then
-    printf 'ERROR: %s\n' "[acg] Could not parse credentials from stdin. Expected AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN." >&2
+  if [[ -z "$access_key" || -z "$secret_key" ]]; then
+    printf 'ERROR: %s\n' "[acg] Could not parse credentials from stdin. Expected AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY." >&2
     return 1
   fi
 
@@ -261,15 +262,24 @@ HELP
 
   local sandbox_url="${1:-${_ACG_SANDBOX_LIST_URL}}"
 
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local playwright_script="${script_dir}/../playwright/acg_credentials.js"
+
+  if ! command -v node >/dev/null 2>&1; then
+    printf 'ERROR: %s\n' "[acg] node is required for Playwright automation — install Node.js" >&2
+    return 1
+  fi
+  if ! node -e "require('playwright')" 2>/dev/null; then
+    printf 'ERROR: %s\n' "[acg] playwright npm module not found — run: cd scripts/playwright && npm install" >&2
+    return 1
+  fi
+
   _ensure_antigravity
   _antigravity_launch
   _antigravity_ensure_acg_session
 
   _info "[acg] Extracting AWS credentials from ${sandbox_url}..."
-
-  local script_dir
-  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  local playwright_script="${script_dir}/../playwright/acg_credentials.js"
 
   local output
   output=$(node "$playwright_script" "$sandbox_url" 2>&1)

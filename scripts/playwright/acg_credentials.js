@@ -79,8 +79,8 @@ async function extractCredentials() {
 
     for (let i = 0; i < inputs.length; i++) {
       const val = await inputs[i].inputValue();
-      const parent = await inputs[i].evaluateHandle(el => el.closest('div')?.parentElement);
-      const text = await parent.evaluate(el => el.innerText || '');
+      const parent = await inputs[i].evaluateHandle(el => el.closest('div')?.parentElement ?? null);
+      const text = parent ? await parent.evaluate(el => el.innerText || '') : '';
       
       if (text.toLowerCase().includes('access key id')) {
         accessKey = val;

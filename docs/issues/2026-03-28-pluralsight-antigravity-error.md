@@ -14,11 +14,11 @@ During the implementation of the static Playwright script for `acg_get_credentia
 - **Impact:** Real DOM selectors for the "Start Sandbox" button and the AWS credentials panel could not be verified against a live page.
 
 ## Action Taken
-- Implemented `scripts/playwright/acg_credentials.js` using robust, pattern-based selectors (`button:has-text("Start")`, `[data-testid="access-key-id"]`, etc.) and a regex-based fallback for log/code blocks.
-- Updated `scripts/plugins/acg.sh` to use this static script.
-- Verified basic script logic against a neutral URL.
-- All 252 BATS tests passed.
+- Implemented `scripts/playwright/acg_credentials.js` with dual-path selectors (`input[aria-label="Copyable input"]` confirmed live) and positional fallback.
+- Updated `scripts/plugins/acg.sh` to call the static script via `node "$playwright_script" "$sandbox_url"`.
+- **Root cause of CDP issue:** Chrome was launched without `--password-store=basic`, causing macOS Keychain `errSecInteractionNotAllowed` to block the debug port from binding. Chrome relaunched with the flag resolved the CDP connection.
+- **Live verification:** After relaunching Chrome with `--password-store=basic` and signing in to Pluralsight manually, `acg_get_credentials` successfully extracted AWS credentials and wrote them to `~/.aws/credentials`. `aws sts get-caller-identity` returned a valid account ID, confirming end-to-end success.
+- All BATS tests passed.
 
-## Recommended Follow-up
-- Verify the script end-to-end once the Pluralsight platform is stable in the Antigravity environment.
-- If the selectors fail, use `page.screenshot()` (once fonts/loading issues are resolved) or manual inspection to update `scripts/playwright/acg_credentials.js`.
+## Resolution
+Issue resolved. The "Oops" error and CDP binding failure were both caused by Chrome running without `--password-store=basic`. Once relaunched with that flag and after manual Pluralsight login, the static Playwright script extracted live credentials successfully.

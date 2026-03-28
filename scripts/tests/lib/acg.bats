@@ -65,6 +65,16 @@ export AWS_SESSION_TOKEN=AQoDYXdzEJr"
   [[ "$output" == *"aws_access_key_id=AKIAIOSFODNN7EXAMPLE"* ]]
 }
 
+@test "acg_import_credentials succeeds with AKIA key and no session token" {
+  local input="export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG"
+  run bash -c "source scripts/plugins/acg.sh && printf '%s' '$input' | acg_import_credentials"
+  [ "$status" -eq 0 ]
+  run cat "${HOME}/.aws/credentials"
+  [[ "$output" == *"aws_access_key_id=AKIAIOSFODNN7EXAMPLE"* ]]
+  [[ "$output" != *"aws_session_token"* ]]
+}
+
 @test "acg_import_credentials returns 1 on empty/unparseable input" {
   run bash -c "source scripts/plugins/acg.sh && printf '' | acg_import_credentials"
   [ "$status" -eq 1 ]

@@ -76,9 +76,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 
 Extracts AWS credentials from the Pluralsight Cloud Sandbox "Cloud Access" panel via Antigravity browser automation (Playwright CDP) and writes them to `~/.aws/credentials` under `[default]`. Falls back with instructions to use `acg_import_credentials` if Playwright extraction fails.
 
-**Usage:** `./scripts/k3d-manager acg_get_credentials <sandbox-url>`
-
-> **Note:** Pluralsight DOM selectors for the credentials panel are placeholders — verify against a live sandbox and update `ag_acg_credentials.js` selector hints if extraction fails.
+**Usage:** `./scripts/k3d-manager acg_get_credentials [sandbox-url]`
 
 ### `acg_import_credentials`
 
