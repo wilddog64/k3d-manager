@@ -25,8 +25,15 @@ across clouds.
 
 | Version | Highlights |
 |---------|-----------|
-| v0.9.11 | Dynamic plugin CI — `detect` job skips cluster tests for docs-only PRs; maps plugin changes to targeted smoke tests |
-| v0.9.10 | if-count allowlist elimination (jenkins) — 8 helpers extracted; allowlist now `system.sh` only |
+| v0.9.18 | Pluralsight URL migration — `_ACG_SANDBOX_URL` + `_antigravity_ensure_acg_session` updated to `app.pluralsight.com` |
+| v0.9.17 | Antigravity model fallback (`gemini-2.5-flash` first), ACG session check, nested agent fix (`--approval-mode yolo`) |
+| v0.9.16 | Antigravity IDE + CDP browser automation — gemini CLI + Playwright engine; `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_acg_extend` |
+| v0.9.15 | Antigravity × Copilot coding agent validation; ldap-password-rotator `vault kv put` stdin hardening |
+| v0.9.14 | if-count allowlist fully cleared — `_run_command` + `_ensure_node` helpers via lib-foundation PR #13 |
+| v0.9.13 | v0.9.12 retro, `/create-pr` `mergeable_state` check, CHANGE.md backfill |
+| v0.9.12 | Copilot CLI CI integration, lib-foundation v0.3.6 subtree pull |
+| v0.9.11 | Dynamic plugin CI — `detect` job skips cluster tests for docs-only PRs |
+| v0.9.10 | if-count allowlist elimination (jenkins) — allowlist now `system.sh` only |
 | v0.9.9 | if-count allowlist elimination — 11 ldap helpers + 6 vault helpers extracted |
 | v0.9.8 | if-count easy wins + dry-run README doc + BATS coverage |
 | v0.9.7 | lib-foundation sync (`_run_command_resolve_sudo`), `deploy_cluster` no-args guard, `bin/` `_kubectl` wrapper |
@@ -127,7 +134,7 @@ enough surface for a useful provider-agnostic MCP API.
 
 ---
 
-## v1.2.0 — Distribution Packages
+## v1.3.0 — Distribution Packages
 *Focus: Install k3d-manager as a system package — no manual clone required*
 
 **Debian/RedHat package** — `apt install k3d-manager` / `dnf install k3d-manager`
@@ -137,11 +144,11 @@ enough surface for a useful provider-agnostic MCP API.
 
 **Homebrew formula** — `brew install k3d-manager` (Mac-first, fits current user base)
 
-**Gate:** v1.1.0 `provision_full_stack` shipped — tool must be feature-stable before packaging.
+**Gate:** v1.2.0 k3dm-mcp shipped — tool must be feature-stable before packaging.
 
 ---
 
-## v1.3.0 — Home Lab (Mac Mini M5)
+## v1.4.0 — Home Lab (Mac Mini M5)
 *Focus: k3s on Mac Mini M5 as always-on home cluster*
 
 **Target hardware:** Mac Mini M5 (October 2026)

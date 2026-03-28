@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/plugins/acg.sh — ACG AWS sandbox lifecycle management
 #
-# Functions: acg_provision acg_status acg_extend acg_teardown
+# Functions: acg_get_credentials acg_import_credentials acg_provision acg_status acg_extend acg_teardown
 
 : "${ACG_REGION:=us-west-2}"
 : "${ACG_ALLOWED_CIDR:=0.0.0.0/0}"
@@ -15,6 +15,7 @@ _ACG_AMI_FILTER="ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
 _ACG_VPC_CIDR="10.0.0.0/16"
 _ACG_SUBNET_CIDR="10.0.1.0/24"
 _ACG_SANDBOX_URL="https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
+_ACG_SANDBOX_LIST_URL="${ACG_SANDBOX_LIST_URL:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}"
 
 _acg_check_credentials() {
   _info "[acg] Checking AWS credentials..."
@@ -178,6 +179,124 @@ _acg_check_k3s() {
   else
     _info "[acg] WARNING: k3s not responding — run: ./scripts/k3d-manager deploy_app_cluster --confirm"
   fi
+}
+
+_acg_write_credentials() {
+  local access_key="$1"
+  local secret_key="$2"
+  local session_token="${3:-}"
+  local creds_file="${HOME}/.aws/credentials"
+  mkdir -p "${HOME}/.aws"
+  { set +x; } 2>/dev/null
+  {
+    echo "[default]"
+    echo "aws_access_key_id=${access_key}"
+    echo "aws_secret_access_key=${secret_key}"
+    if [[ -n "${session_token}" ]]; then
+      echo "aws_session_token=${session_token}"
+    fi
+  } > "${creds_file}"
+  chmod 600 "${creds_file}"
+  _info "[acg] Credentials written to ${creds_file}"
+  _info "[acg] Access key: ${access_key:0:4}****"
+}
+
+function acg_import_credentials() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'HELP'
+Usage: pbpaste | acg_import_credentials
+       acg_import_credentials < credentials.txt
+
+Read AWS credentials block from stdin and write to ~/.aws/credentials.
+Expected input format (copy from Pluralsight Cloud Access panel):
+
+  AWS Access Key ID: ASIA...
+  AWS Secret Access Key: abc123...
+  AWS Session Token: IQo...
+
+Or the export block format:
+
+  export AWS_ACCESS_KEY_ID=ASIA...
+  export AWS_SECRET_ACCESS_KEY=abc123...
+  export AWS_SESSION_TOKEN=IQo...
+HELP
+    return 0
+  fi
+
+  _info "[acg] Reading credentials from stdin..."
+  local input access_key secret_key session_token
+  input=$(cat)
+
+  access_key=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_ACCESS_KEY_ID| Access Key ID)[\s:=]+(\S+)/i) {print $1; exit}')
+  secret_key=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_SECRET_ACCESS_KEY| Secret Access Key)[\s:=]+(\S+)/i) {print $1; exit}')
+  session_token=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_SESSION_TOKEN| Session Token)[\s:=]+(\S+)/i) {print $1; exit}')
+
+  if [[ -z "$access_key" || -z "$secret_key" ]]; then
+    printf 'ERROR: %s\n' "[acg] Could not parse credentials from stdin. Expected AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY." >&2
+    return 1
+  fi
+
+  _acg_write_credentials "$access_key" "$secret_key" "$session_token"
+}
+
+function acg_get_credentials() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<HELP
+Usage: acg_get_credentials [sandbox-url]
+
+Extract AWS credentials from the Pluralsight Cloud Sandbox "Cloud Access" panel
+via Antigravity browser automation and write to ~/.aws/credentials.
+
+If sandbox-url is omitted, navigates to the sandbox listing page, starts a new
+sandbox, waits for it to be ready, then extracts credentials.
+
+Falls back to: pbpaste | acg_import_credentials
+
+Arguments:
+  sandbox-url   (optional) URL of a running sandbox, e.g.
+                https://app.pluralsight.com/cloud-playground/cloud-sandboxes/<id>
+                Defaults to ACG_SANDBOX_LIST_URL (listing page — auto-start flow)
+HELP
+    return 0
+  fi
+
+  local sandbox_url="${1:-${_ACG_SANDBOX_LIST_URL}}"
+
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local playwright_script="${script_dir}/../playwright/acg_credentials.js"
+
+  if ! command -v node >/dev/null 2>&1; then
+    printf 'ERROR: %s\n' "[acg] node is required for Playwright automation — install Node.js" >&2
+    return 1
+  fi
+  if ! node -e "require('playwright')" 2>/dev/null; then
+    printf 'ERROR: %s\n' "[acg] playwright npm module not found — run: cd scripts/playwright && npm install" >&2
+    return 1
+  fi
+
+  _ensure_antigravity
+  _antigravity_launch
+  _antigravity_ensure_acg_session
+
+  _info "[acg] Extracting AWS credentials from ${sandbox_url}..."
+
+  local output
+  output=$(node "$playwright_script" "$sandbox_url" 2>&1)
+
+  local access_key secret_key session_token
+  access_key=$(printf '%s' "$output" | perl -ne 'if (/AWS_ACCESS_KEY_ID=(\S+)/) {print $1; exit}')
+  secret_key=$(printf '%s' "$output" | perl -ne 'if (/AWS_SECRET_ACCESS_KEY=(\S+)/) {print $1; exit}')
+  session_token=$(printf '%s' "$output" | perl -ne 'if (/AWS_SESSION_TOKEN=(\S+)/) {print $1; exit}')
+
+  if [[ -z "$access_key" || -z "$secret_key" ]]; then
+    _info "[acg] Playwright extraction failed — falling back to stdin paste"
+    _info "[acg] Copy the credentials block from the Pluralsight sandbox page, then run:"
+    _info "[acg]   pbpaste | ./scripts/k3d-manager acg_import_credentials"
+    return 1
+  fi
+
+  _acg_write_credentials "$access_key" "$secret_key" "$session_token"
 }
 
 function acg_provision() {
