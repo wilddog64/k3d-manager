@@ -132,4 +132,8 @@ Checks whether the user is logged into GitHub in the running Antigravity browser
 
 Checks whether the user is logged into ACG (`learn.acloud.guru`) in the running Antigravity browser (via Playwright CDP). If not logged in, navigates to the sign-in page and waits up to 300s for the user to complete login interactively. Returns 1 on timeout.
 
+**First-run note:** On a brand new environment, the Antigravity browser will open and display the ACG sign-in page. Log in manually — the session cookie is persisted in the Antigravity browser profile and reused on all subsequent runs until it expires.
+
+Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass this check (e.g. while the ACG domain migration to Pluralsight is pending).
+
 > **Note:** `learn.acloud.guru` currently redirects to Pluralsight — URL update tracked in v0.9.18 ([issue](../issues/2026-03-28-acg-domain-redirection.md)).
