@@ -27,6 +27,7 @@
 | Item | Status | Notes |
 |---|---|---|
 | **scratch/ cleanup** | **PENDING** | `rm -f scratch/*` — wipe stale Playwright artifacts; policy: wipe at each release cut |
+| **acg_get_credentials + acg_import_credentials** | **COMPLETE** | `3970623` adds credential extractor + stdin import helpers with docs/tests per `docs/plans/v0.9.19-acg-get-credentials.md` |
 | **Pluralsight URL fix** | **COMPLETE** | `8f857ea` updates ACG + Antigravity plugins and docs to use `app.pluralsight.com`; Gemini e2e verified |
 | **Nested agent fix** | **COMPLETE** | Implemented `--approval-mode yolo` + workspace temp path in `scripts/plugins/antigravity.sh`; commit `978b215`. |
 | **E2E live test: ACG session** | **COMPLETE** | Verified `gemini-2.5-flash` is used as the first attempt (no fallback needed). Nested agent fix verified. Platform redirection issue remains but session check logic passed via manual login. |

@@ -22,7 +22,7 @@
 
 ## v0.9.19 — In Progress
 
-- [ ] **`acg_get_credentials` + `acg_import_credentials`** — Codex assigned. Spec: `docs/plans/v0.9.19-acg-get-credentials.md`. Adds `_acg_write_credentials` private helper + two public functions + 8 BATS tests. Commit message: `feat(acg): add acg_get_credentials + acg_import_credentials — automate AWS credential extraction`
+- [x] **`acg_get_credentials` + `acg_import_credentials`** — commit `3970623` adds `_acg_write_credentials`, both public functions, docs updates, and 8 BATS tests per `docs/plans/v0.9.19-acg-get-credentials.md`
 - [ ] **scratch/ cleanup** — `rm -rf scratch/*` — wipe stale Playwright artifacts at release cut
 
 ## v0.9.17 — Shipped
