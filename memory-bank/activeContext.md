@@ -19,7 +19,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| **Pluralsight URL fix** | **SPEC READY** | Spec: `docs/plans/v0.9.18-pluralsight-url-fix.md`; assigned to Codex; Gemini verifies e2e |
+| **Pluralsight URL fix** | **COMPLETE** | `8f857ea` updates ACG + Antigravity plugins and docs to use `app.pluralsight.com` per `docs/plans/v0.9.18-pluralsight-url-fix.md`; Gemini to verify e2e |
 | **Nested agent fix** | **COMPLETE** | Implemented `--approval-mode yolo` + workspace temp path in `scripts/plugins/antigravity.sh`; commit `978b215`. |
 | **E2E live test: ACG session** | **COMPLETE** | Verified `gemini-2.5-flash` is used as the first attempt (no fallback needed). Nested agent fix verified. Platform redirection issue remains but session check logic passed via manual login. |
 | Reduce replicas + remove HPAs | **MERGED** | 5 repos squash-merged to main 2026-03-20 |
