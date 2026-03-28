@@ -16,6 +16,12 @@
 
 ---
 
+## v1.0.0 Design Decisions
+
+- **`acg_get_credentials <sandbox-url>`** — new function; extracts AWS credentials from Pluralsight sandbox "Cloud Access" panel via Antigravity Playwright; writes to `~/.aws/credentials`; stdin paste (`pbpaste | acg_import_credentials`) as fallback. Must run before any `acg_provision` call. Single extract covers all 3 nodes (same sandbox session).
+
+---
+
 ## Current Focus (v0.9.19)
 
 | Item | Status | Notes |
