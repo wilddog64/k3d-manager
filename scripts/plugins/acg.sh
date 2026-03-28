@@ -270,7 +270,7 @@ HELP
   local playwright_script="${script_dir}/../playwright/acg_credentials.js"
 
   local output
-  output=$(export NODE_PATH=/opt/homebrew/lib/node_modules; node "$playwright_script" "$sandbox_url" 2>&1)
+  output=$(node "$playwright_script" "$sandbox_url" 2>&1)
 
   local access_key secret_key session_token
   access_key=$(printf '%s' "$output" | perl -ne 'if (/AWS_ACCESS_KEY_ID=(\S+)/) {print $1; exit}')
