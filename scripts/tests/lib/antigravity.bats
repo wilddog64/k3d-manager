@@ -4,8 +4,9 @@ setup() {
   # Mock global dependencies
   _command_exist() { return 0; }
   _is_mac() { return 0; }
-  export -f _command_exist _is_mac
-  
+  sleep() { :; }
+  export -f _command_exist _is_mac sleep
+
   # Source the plugin under test
   source "scripts/plugins/antigravity.sh"
 }
@@ -102,9 +103,8 @@ setup() {
   unset -f _info _err gemini sleep
 }
 
-@test "_antigravity_gemini_prompt: passes --approval-mode yolo to gemini" {
+@test "_antigravity_gemini_prompt: passes --approval-mode yolo to gemini when --yolo flag given" {
   _info() { :; }
-  sleep() { :; }
   gemini() {
     local found_yolo=0
     for arg in "$@"; do
@@ -117,26 +117,24 @@ setup() {
     echo "ok"
     return 0
   }
-  export -f _info gemini sleep
+  export -f _info gemini
   source "scripts/plugins/antigravity.sh"
 
-  run _antigravity_gemini_prompt "test prompt"
+  run _antigravity_gemini_prompt "test prompt" --yolo
   [ "$status" -eq 0 ]
   [[ "$output" == *"ok"* ]]
-  unset -f _info gemini sleep
+  unset -f _info gemini
 }
 
 @test "_antigravity_gemini_prompt: creates workspace temp dir" {
   _info() { :; }
-  sleep() { :; }
   gemini() { echo "ok"; return 0; }
-  export -f _info gemini sleep
+  export -f _info gemini
+  HOME="${BATS_TEST_TMPDIR}"
   source "scripts/plugins/antigravity.sh"
 
-  local tmpdir="${HOME}/.gemini/tmp/k3d-manager"
-  rm -rf "$tmpdir"
   run _antigravity_gemini_prompt "test prompt"
   [ "$status" -eq 0 ]
-  [ -d "$tmpdir" ]
-  unset -f _info gemini sleep
+  [ -d "${BATS_TEST_TMPDIR}/.gemini/tmp/k3d-manager" ]
+  unset -f _info gemini
 }
