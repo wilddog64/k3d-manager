@@ -78,11 +78,33 @@ If you find a bug outside your scope, report it in the memory-bank — do not fi
 When your task is done, update `memory-bank/activeContext.md` and `memory-bank/progress.md`
 to reflect what you completed. Include the real commit SHA and PR URL.
 
+### 12. Document findings and create issue docs
+After every task — implementation or verification — you must:
+- Update `memory-bank/activeContext.md` and `memory-bank/progress.md` with results (pass, fail, or partial)
+- If anything failed, behaved unexpectedly, or was skipped: create `docs/issues/YYYY-MM-DD-<slug>.md` with:
+  - What was tested / attempted
+  - Actual output (paste verbatim — no summaries)
+  - Root cause if known
+  - Recommended follow-up
+- If the task was a live test, include the full terminal output in the issue doc or memory-bank notes
+- Do NOT omit issue docs to keep the report clean — unexpected behavior must be recorded
+
 ### 11. Stop at 5 plan docs per milestone
 Each release is a sprint story with a maximum of 5 spec files. If the current milestone
 already has 5 or more files in `docs/plans/`, do not write another — flag it to Claude
 immediately. A 6th spec means the release is too large and must be split into two smaller
 releases. Claude decides how to split; you do not proceed until told to.
+
+### 13. `--approval-mode yolo` is for tightly scoped prompts only
+
+`--approval-mode yolo` disables all confirmation prompts for the inner gemini subprocess.
+It is only permitted when ALL of the following are true:
+
+- The prompt specifies **exactly one file to write** and **one command to run** — nothing else
+- The write target is inside `${HOME}/.gemini/tmp/k3d-manager/` — never the project workspace
+- The prompt contains **no open-ended instructions** ("fix issues", "clean up", "improve")
+
+Never use `--approval-mode yolo` with broad or ambiguous prompts. Violation = treat as a bug.
 
 ### 10. If-count allowlist is for legacy code only
 The `_agent_audit` threshold stays at 8 `if` blocks per function. If you touch a file with

@@ -184,6 +184,30 @@ current milestone already has 5 or more, stop and flag it to Claude before writi
 A 6th spec means the release is too large and must be split — Claude decides the split.
 Do not proceed without explicit approval.
 
+## Documentation and Issue Reporting — Mandatory
+
+After every task (implementation or live test), you must:
+
+1. **Update memory-bank** — `memory-bank/activeContext.md` and `memory-bank/progress.md` with results: pass, fail, or partial. Include actual output, not summaries.
+
+2. **Create an issue doc if anything failed or behaved unexpectedly** — `docs/issues/YYYY-MM-DD-<slug>.md` with:
+   - What was tested
+   - Full terminal output (verbatim — paste it)
+   - Root cause if known
+   - Recommended follow-up
+
+3. **For live tests** — paste the full terminal output in your completion report AND in the issue doc (if an issue exists). "It passed" without output is not acceptable.
+
+Do NOT skip issue docs to keep the report short. Unexpected behavior must be recorded.
+
+---
+
+## `--approval-mode yolo` Safety Rule
+
+Only permitted when the prompt specifies exactly one file to write (inside `${HOME}/.gemini/tmp/k3d-manager/`) and one command to run. Never use with open-ended prompts ("fix", "improve", "clean up"). Violation = treat as a bug.
+
+---
+
 ## Known Failure Modes (your history — avoid repeating)
 
 - You skip reading the memory-bank and start from your own interpretation — always read it first
@@ -194,4 +218,5 @@ Do not proceed without explicit approval.
 - You write thin one-line completion reports — the report must include actual output, not summaries
 - You omit commit SHA from completion reports — every report must include: `git log origin/<branch> --oneline -3` output
 - You run too long and drift — if Claude or the user signals to stop or compress, stop immediately. Do not attempt the next step. A fresh session with a clean spec is better than a degraded long session
+- You make unsolicited code changes outside task scope — e.g., modified `scripts/etc/cluster_var.sh` during an e2e test task (2026-03-27). If you find something that looks wrong outside your scope, report it in memory-bank — do NOT fix it silently
 - You omit pod status from cluster tasks — every cluster task report must include: `kubectl get pods -n shopping-cart` output (ubuntu-k3s context) and `kubectl get applications -n cicd` output (infra context)

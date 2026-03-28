@@ -827,13 +827,13 @@ function _antigravity_mcp_config_path() {
 }
 
 function _ensure_antigravity_ide() {
-   if _command_exist antigravity; then
+   if _command_exist agy || _command_exist antigravity; then
       return 0
    fi
 
    if _is_mac && _command_exist brew; then
       _run_command -- brew install --cask antigravity
-      if _command_exist antigravity; then
+      if _command_exist agy || _command_exist antigravity; then
          return 0
       fi
    fi
@@ -841,14 +841,14 @@ function _ensure_antigravity_ide() {
    if _is_debian_family && _command_exist apt-get && _sudo_available; then
       _run_command --interactive-sudo -- apt-get update
       _run_command --prefer-sudo -- apt-get install -y antigravity
-      if _command_exist antigravity; then
+      if _command_exist agy || _command_exist antigravity; then
          return 0
       fi
    fi
 
    if _is_redhat_family && _command_exist dnf && _sudo_available; then
       _run_command --prefer-sudo -- dnf install -y antigravity
-      if _command_exist antigravity; then
+      if _command_exist agy || _command_exist antigravity; then
          return 0
       fi
    fi
@@ -889,8 +889,12 @@ function _antigravity_browser_ready() {
    local timeout="${1:-10}"
    local elapsed=0
 
+   if ! _command_exist curl; then
+      _err "curl is required for Antigravity browser probe — install curl and retry"
+   fi
+
    while [[ "$elapsed" -lt "$timeout" ]]; do
-      if _command_exist curl && _run_command --soft -- curl --max-time "${CURL_MAX_TIME:-30}" -sf http://localhost:9222/json >/dev/null 2>&1; then
+      if _run_command --soft -- curl --max-time "${CURL_MAX_TIME:-30}" -sf http://localhost:9222/json >/dev/null 2>&1; then
          return 0
       fi
       sleep 2

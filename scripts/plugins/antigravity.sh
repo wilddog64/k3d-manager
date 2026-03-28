@@ -13,6 +13,43 @@
 #   antigravity_poll_task                — poll task until complete, print output
 #   antigravity_acg_extend               — extend ACG sandbox TTL via browser
 
+_ANTIGRAVITY_GEMINI_MODELS=(
+  "gemini-2.5-flash"
+  "gemini-2.0-flash"
+  "gemini-1.5-flash"
+)
+
+function _antigravity_gemini_prompt() {
+  local prompt="$1"
+  local yolo_flag="${2:-}"
+  local output exit_code
+
+  mkdir -p "${HOME}/.gemini/tmp/k3d-manager"
+
+  for model in "${_ANTIGRAVITY_GEMINI_MODELS[@]}"; do
+    _info "Trying gemini model: ${model}..."
+    sleep 2
+    if [[ "$yolo_flag" == "--yolo" ]]; then
+      output=$(gemini --model "$model" --approval-mode yolo --prompt "$prompt" 2>&1)
+    else
+      output=$(gemini --model "$model" --prompt "$prompt" 2>&1)
+    fi
+    exit_code=$?
+    if [[ $exit_code -eq 0 ]]; then
+      echo "$output"
+      return 0
+    fi
+    if [[ "$output" == *"429"* || "$output" == *"RESOURCE_EXHAUSTED"* || "$output" == *"rateLimitExceeded"* || "$output" == *"ModelNotFoundError"* ]]; then
+      _info "Model ${model} unavailable (exhausted or not found) — trying next model..."
+      continue
+    fi
+    echo "$output"
+    return "$exit_code"
+  done
+
+  _err "All gemini models exhausted (429). Models tried: ${_ANTIGRAVITY_GEMINI_MODELS[*]}"
+}
+
 function _ensure_antigravity() {
   if _command_exist gemini; then
     return 0
@@ -59,10 +96,38 @@ function _antigravity_ensure_github_session() {
    d. Once URL is no longer '/login', print GITHUB_SESSION_OK and exit with code 0.
    e. If 300 seconds pass without login, print ERROR: GitHub login timeout and exit with code 1.
 
-Write the Playwright script to /tmp/ag_github_session.js, execute with node, print the result.
+Write the Playwright script to ${HOME}/.gemini/tmp/k3d-manager/ag_github_session.js, execute with node, print the result.
 Exit code 1 if session cannot be confirmed."
 
-  gemini --prompt "$gemini_prompt"
+  _antigravity_gemini_prompt "$gemini_prompt" --yolo
+}
+
+function _antigravity_ensure_acg_session() {
+  if [[ "${K3DM_ACG_SKIP_SESSION_CHECK:-0}" == "1" ]]; then
+    _info "K3DM_ACG_SKIP_SESSION_CHECK=1 — skipping ACG session check (ACG domain migration pending)"
+    return 0
+  fi
+  _info "Checking ACG session in Antigravity browser..."
+
+  local gemini_prompt
+  gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
+
+1. Connect to the running Antigravity browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
+2. Use the first browser context and page (do NOT launch a new browser).
+3. Navigate to https://learn.acloud.guru and wait for the page to load.
+4. Check if the user is logged in by looking for user avatar, account menu, or dashboard elements.
+5. If logged in: print ACG_SESSION_OK and exit with code 0.
+6. If NOT logged in:
+   a. Navigate to https://learn.acloud.guru/sign-in
+   b. Print: ACTION REQUIRED: Please log into ACG in the Antigravity browser window, then press Enter to continue.
+   c. Wait for the page URL to no longer contain '/sign-in' — poll every 5 seconds, timeout after 300 seconds.
+   d. Once URL is no longer '/sign-in', print ACG_SESSION_OK and exit with code 0.
+   e. If 300 seconds pass without login, print ERROR: ACG login timeout and exit with code 1.
+
+Write the Playwright script to ${HOME}/.gemini/tmp/k3d-manager/ag_acg_session.js, execute with node, print the result.
+Exit code 1 if session cannot be confirmed."
+
+  _antigravity_gemini_prompt "$gemini_prompt" --yolo
 }
 
 function antigravity_install() {
@@ -104,10 +169,10 @@ function antigravity_trigger_copilot_review() {
 7. Wait until the page URL changes to https://github.com/${owner}/${repo}/tasks/<uuid>.
 8. Extract and print ONLY the task UUID (last path segment of the URL).
 
-Write the Playwright script to /tmp/ag_trigger.js, execute with node, print the UUID.
+Write the Playwright script to ${HOME}/.gemini/tmp/k3d-manager/ag_trigger.js, execute with node, print the UUID.
 Exit code 1 if UUID not found within 60 seconds."
 
-  gemini --prompt "$gemini_prompt"
+  _antigravity_gemini_prompt "$gemini_prompt" --yolo
 }
 
 function antigravity_poll_task() {
@@ -126,7 +191,7 @@ Poll every 30 seconds until the task status shows complete or done.
 Timeout after ${timeout} seconds — if not complete by then, print ERROR: timeout and exit.
 Once complete, extract and print the full review output verbatim. Do not summarize."
 
-  gemini --prompt "$gemini_prompt"
+  _antigravity_gemini_prompt "$gemini_prompt"
 }
 
 function antigravity_acg_extend() {
@@ -137,6 +202,7 @@ function antigravity_acg_extend() {
   _ensure_antigravity_ide
   _ensure_antigravity_mcp_playwright
   _antigravity_launch
+  _antigravity_ensure_acg_session
 
   _info "Extending ACG sandbox TTL by ${hours}h at ${sandbox_url}..."
 
@@ -151,8 +217,8 @@ function antigravity_acg_extend() {
 6. Confirm the new TTL is shown on the page.
 7. Print the new sandbox expiry time.
 
-Write the Playwright script to /tmp/ag_acg_extend.js, execute with node, print the result.
+Write the Playwright script to ${HOME}/.gemini/tmp/k3d-manager/ag_acg_extend.js, execute with node, print the result.
 Exit code 1 if the extend button is not found or the action fails."
 
-  gemini --prompt "$gemini_prompt"
+  _antigravity_gemini_prompt "$gemini_prompt" --yolo
 }

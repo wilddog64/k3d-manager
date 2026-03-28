@@ -86,7 +86,16 @@ bats_require_minimum_version 1.5.0
   unset -f _command_exist
 }
 
-@test "_ensure_antigravity_ide: no-op when antigravity already installed" {
+@test "_ensure_antigravity_ide: returns 0 when agy exists" {
+  _command_exist() { [[ "$1" == agy ]]; }
+  export -f _command_exist
+
+  run _ensure_antigravity_ide
+  [ "$status" -eq 0 ]
+  unset -f _command_exist
+}
+
+@test "_ensure_antigravity_ide: returns 0 when antigravity exists" {
   _command_exist() { [[ "$1" == antigravity ]]; }
   export -f _command_exist
 
@@ -183,6 +192,17 @@ bats_require_minimum_version 1.5.0
   run _antigravity_browser_ready 4
   [ "$status" -eq 0 ]
   unset -f _command_exist _run_command
+}
+
+@test "_antigravity_browser_ready: fails fast when curl missing" {
+  _command_exist() { return 1; }
+  _err() { echo "$*"; exit 1; }
+  export -f _command_exist _err
+
+  run _antigravity_browser_ready 5
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"curl is required"* ]]
+  unset -f _command_exist _err
 }
 
 @test "_antigravity_browser_ready: errors when port never responds within timeout" {

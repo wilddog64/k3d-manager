@@ -234,11 +234,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-03-28 | [Copilot PR #52 review findings](docs/issues/2026-03-28-copilot-pr52-review-findings.md) | antigravity — yolo always-on, sleep not stubbed, tmpdir not isolated, model order wrong in 3 places |
+| 2026-03-28 | [ACG domain redirection](docs/issues/2026-03-28-acg-domain-redirection.md) | antigravity — `learn.acloud.guru` retired; redirects to Pluralsight |
+| 2026-03-27 | [ACG session E2E test failure](docs/issues/2026-03-27-acg-session-e2e-fail.md) | antigravity — nested gemini agent blocked by Plan Mode + path restriction |
 | 2026-03-26 | [Copilot PR #51 review findings](docs/issues/2026-03-26-copilot-pr51-review-findings.md) | antigravity, ldap, agent_rigor — 7 fixed, 5 deferred to lib-foundation v0.3.14 |
 | 2026-03-24 | [Antigravity Copilot agent validation](docs/issues/2026-03-24-antigravity-copilot-agent-validation.md) | antigravity — auth isolation verdict: Playwright CLI cannot inherit browser cookies |
-| 2026-03-24 | [Antigravity binary name mismatch](docs/issues/2026-03-24-antigravity-binary-name-mismatch.md) | antigravity — IDE binary name resolution |
-| 2026-03-22 | [Copilot PR #45 review findings](docs/issues/2026-03-22-copilot-pr45-review-findings.md) | spec doc — plugin paths, Rules vs DoD contradiction |
-| 2026-03-22 | [Copilot PR #44 review findings](docs/issues/2026-03-22-copilot-pr44-review-findings.md) | jenkins — duplicate PKI vars, help text mismatch |
 
 [All issues →](docs/issues/)
 
@@ -248,15 +248,16 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| v0.9.17 | 2026-03-27 | Antigravity model fallback (`gemini-2.5-flash` first), ACG session check, nested agent fix (`--approval-mode yolo` + workspace temp path) |
 | [v0.9.16](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.16) | 2026-03-26 | Antigravity IDE + CDP browser automation — gemini CLI + Playwright engine; `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_acg_extend`; ldap stdin hardening |
 | [v0.9.13](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.13) | 2026-03-23 | v0.9.12 retro, `/create-pr` `mergeable_state` check, CHANGE.md backfill for v0.9.12 |
-| [v0.9.11](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.11) | 2026-03-22 | dynamic plugin CI — `detect` job skips cluster tests for docs-only PRs; maps plugin changes to targeted smoke tests |
 
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.9.11](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.11) | 2026-03-22 | dynamic plugin CI — `detect` job skips cluster tests for docs-only PRs; maps plugin changes to targeted smoke tests |
 | [v0.9.10](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.10) | 2026-03-22 | if-count allowlist elimination (jenkins) — 8 helpers extracted; allowlist now `system.sh` only |
 | [v0.9.9](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.9) | 2026-03-22 | if-count allowlist elimination — 11 ldap helpers + 6 vault helpers extracted; allowlist down to `system.sh` only |
 | [v0.9.7](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.7) | 2026-03-22 | lib-foundation sync (`--interactive-sudo`, `_run_command_resolve_sudo`), `deploy_cluster` no-args guard, `bin/` `_kubectl` wrapper, BATS stub fixes, Copilot PR #41 findings |
