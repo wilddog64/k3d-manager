@@ -23,10 +23,12 @@ function _antigravity_gemini_prompt() {
   local prompt="$1"
   local output exit_code
 
+  mkdir -p "${HOME}/.gemini/tmp/k3d-manager"
+
   for model in "${_ANTIGRAVITY_GEMINI_MODELS[@]}"; do
     _info "Trying gemini model: ${model}..."
     sleep 2
-    output=$(gemini --model "$model" --prompt "$prompt" 2>&1)
+    output=$(gemini --model "$model" --approval-mode yolo --prompt "$prompt" 2>&1)
     exit_code=$?
     if [[ $exit_code -eq 0 ]]; then
       echo "$output"
@@ -89,7 +91,7 @@ function _antigravity_ensure_github_session() {
    d. Once URL is no longer '/login', print GITHUB_SESSION_OK and exit with code 0.
    e. If 300 seconds pass without login, print ERROR: GitHub login timeout and exit with code 1.
 
-Write the Playwright script to /tmp/ag_github_session.js, execute with node, print the result.
+Write the Playwright script to ${HOME}/.gemini/tmp/k3d-manager/ag_github_session.js, execute with node, print the result.
 Exit code 1 if session cannot be confirmed."
 
   _antigravity_gemini_prompt "$gemini_prompt"
@@ -113,7 +115,7 @@ function _antigravity_ensure_acg_session() {
    d. Once URL is no longer '/sign-in', print ACG_SESSION_OK and exit with code 0.
    e. If 300 seconds pass without login, print ERROR: ACG login timeout and exit with code 1.
 
-Write the Playwright script to /tmp/ag_acg_session.js, execute with node, print the result.
+Write the Playwright script to ${HOME}/.gemini/tmp/k3d-manager/ag_acg_session.js, execute with node, print the result.
 Exit code 1 if session cannot be confirmed."
 
   _antigravity_gemini_prompt "$gemini_prompt"
@@ -158,7 +160,7 @@ function antigravity_trigger_copilot_review() {
 7. Wait until the page URL changes to https://github.com/${owner}/${repo}/tasks/<uuid>.
 8. Extract and print ONLY the task UUID (last path segment of the URL).
 
-Write the Playwright script to /tmp/ag_trigger.js, execute with node, print the UUID.
+Write the Playwright script to ${HOME}/.gemini/tmp/k3d-manager/ag_trigger.js, execute with node, print the UUID.
 Exit code 1 if UUID not found within 60 seconds."
 
   _antigravity_gemini_prompt "$gemini_prompt"
@@ -206,7 +208,7 @@ function antigravity_acg_extend() {
 6. Confirm the new TTL is shown on the page.
 7. Print the new sandbox expiry time.
 
-Write the Playwright script to /tmp/ag_acg_extend.js, execute with node, print the result.
+Write the Playwright script to ${HOME}/.gemini/tmp/k3d-manager/ag_acg_extend.js, execute with node, print the result.
 Exit code 1 if the extend button is not found or the action fails."
 
   _antigravity_gemini_prompt "$gemini_prompt"
