@@ -1,5 +1,21 @@
 # Changes - k3d-manager
 
+## [v0.9.19] — 2026-03-28 — ACG automated credential extraction
+
+### Added
+- `acg_get_credentials [sandbox-url]`: Playwright-based AWS credential extraction from Pluralsight sandbox "Cloud Access" panel via Antigravity CDP; optional URL defaults to `_ACG_SANDBOX_LIST_URL` (listing page auto-start flow); writes to `~/.aws/credentials` with masked key preview (`3970623`, `a7aea9c`, `67a445c`)
+- `acg_import_credentials`: stdin fallback — parses both Pluralsight label format (`AWS Access Key ID: ...`) and shell export format (`export AWS_ACCESS_KEY_ID=...`); writes `[default]` profile with 600 permissions (`3970623`)
+- `_acg_write_credentials`: private helper — writes `[default]` profile to `~/.aws/credentials`; handles optional session token (AKIA permanent IAM keys supported) (`3970623`, `67a445c`)
+- `_ACG_SANDBOX_LIST_URL`: configurable listing page URL constant — `https://app.pluralsight.com/hands-on/playground/cloud-sandboxes` (`a7aea9c`)
+- `scripts/playwright/acg_credentials.js`: static Node.js Playwright script — CDP connect, dual-path logic (listing page auto-start vs direct sandbox URL), two-pass selector strategy with regex fallback; live-verified against Pluralsight sandbox (`a7aea9c`, `67a445c`)
+- 8 BATS tests in `scripts/tests/lib/acg.bats` (`3970623`)
+
+### Fixed
+- `acg_get_credentials`: removed hardcoded `NODE_PATH=/opt/homebrew/lib/node_modules` — not portable to Linux (`d3ea4b6`, `a90ae5d`)
+- `acg_get_credentials`: removed inline `source antigravity.sh` — dispatcher handles plugin loading (`a90ae5d`)
+
+---
+
 ## [v0.9.18] — 2026-03-28 — Pluralsight URL migration (ACG → app.pluralsight.com)
 
 ### Fixed

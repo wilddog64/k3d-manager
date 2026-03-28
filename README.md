@@ -29,7 +29,10 @@ ACME_EMAIL=you@example.com \
 ### 2. Provision the ACG sandbox (app cluster on AWS EC2)
 
 ```bash
-# One-time: set AWS credentials from the ACG console in ~/.aws/credentials
+# Extract AWS credentials from the Pluralsight sandbox (run before acg_provision)
+./scripts/k3d-manager acg_get_credentials              # Playwright auto-extract via Antigravity
+pbpaste | ./scripts/k3d-manager acg_import_credentials # fallback: paste from clipboard
+
 acg_provision --confirm           # VPC + SG + key pair + t3.medium EC2; updates ~/.ssh/config
 acg_status                        # verify instance state + k3s health
 acg_extend                        # open browser to extend sandbox TTL (+4h)
@@ -184,7 +187,7 @@ docs/
 
 | Plugin | Key Functions | Description |
 |---|---|---|
-| **ACG** | `acg_provision`, `acg_status`, `acg_extend`, `acg_teardown` | AWS ACG sandbox lifecycle — VPC + SG + EC2 provisioning; [spec](docs/plans/v0.9.6-acg-plugin.md) |
+| **ACG** | `acg_get_credentials`, `acg_import_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_teardown` | AWS ACG sandbox lifecycle — automated credential extraction via Playwright CDP, stdin fallback, VPC + SG + EC2 provisioning; [spec](docs/plans/v0.9.6-acg-plugin.md) |
 | **Antigravity** | `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_poll_task`, `antigravity_acg_extend` | Browser automation via gemini CLI + Playwright over CDP (port 9222) — Copilot coding agent trigger, ACG sandbox TTL extend |
 | **ArgoCD** | `deploy_argocd`, `deploy_argocd_bootstrap`, `register_app_cluster`, `configure_vault_argocd_repos` | GitOps engine deployment + app cluster registration + Vault repo auth |
 | **Vault** | `deploy_vault`, `configure_vault_app_auth` | HashiCorp Vault HA + PKI + cross-cluster auth |
@@ -252,11 +255,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-03-28 | [Pluralsight Antigravity error](docs/issues/2026-03-28-pluralsight-antigravity-error.md) | acg — "Oops! Something went wrong" on Pluralsight in Antigravity browser; root cause: Chrome launched without `--password-store=basic` |
+| 2026-03-28 | [ArgoCD sync ACG credentials expired](docs/issues/2026-03-28-argocd-sync-acg-credentials-expired.md) | argocd — sync failed; ACG sandbox EC2 unreachable; root cause: sandbox credentials expired |
 | 2026-03-28 | [Copilot PR #52 review findings](docs/issues/2026-03-28-copilot-pr52-review-findings.md) | antigravity — yolo always-on, sleep not stubbed, tmpdir not isolated, model order wrong in 3 places |
 | 2026-03-28 | [ACG domain redirection](docs/issues/2026-03-28-acg-domain-redirection.md) | antigravity — `learn.acloud.guru` retired; redirects to Pluralsight |
 | 2026-03-27 | [ACG session E2E test failure](docs/issues/2026-03-27-acg-session-e2e-fail.md) | antigravity — nested gemini agent blocked by Plan Mode + path restriction |
-| 2026-03-26 | [Copilot PR #51 review findings](docs/issues/2026-03-26-copilot-pr51-review-findings.md) | antigravity, ldap, agent_rigor — 7 fixed, 5 deferred to lib-foundation v0.3.14 |
-| 2026-03-24 | [Antigravity Copilot agent validation](docs/issues/2026-03-24-antigravity-copilot-agent-validation.md) | antigravity — auth isolation verdict: Playwright CLI cannot inherit browser cookies |
 
 [All issues →](docs/issues/)
 
@@ -266,15 +269,16 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| v0.9.19 | 2026-03-28 | ACG automated credential extraction — `acg_get_credentials` (Playwright CDP), `acg_import_credentials` (stdin), static `acg_credentials.js`; live-verified against Pluralsight sandbox |
 | [v0.9.18](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.18) | 2026-03-28 | Pluralsight URL migration — `_ACG_SANDBOX_URL` + `_antigravity_ensure_acg_session` updated to `app.pluralsight.com` |
 | [v0.9.17](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.17) | 2026-03-27 | Antigravity model fallback (`gemini-2.5-flash` first), ACG session check, nested agent fix (`--approval-mode yolo` + workspace temp path) |
-| [v0.9.16](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.16) | 2026-03-26 | Antigravity IDE + CDP browser automation — gemini CLI + Playwright engine; `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_acg_extend`; ldap stdin hardening |
 
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.9.16](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.16) | 2026-03-26 | Antigravity IDE + CDP browser automation — gemini CLI + Playwright engine; `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_acg_extend`; ldap stdin hardening |
 | [v0.9.11](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.11) | 2026-03-22 | dynamic plugin CI — `detect` job skips cluster tests for docs-only PRs; maps plugin changes to targeted smoke tests |
 | [v0.9.10](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.10) | 2026-03-22 | if-count allowlist elimination (jenkins) — 8 helpers extracted; allowlist now `system.sh` only |
 | [v0.9.9](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.9) | 2026-03-22 | if-count allowlist elimination — 11 ldap helpers + 6 vault helpers extracted; allowlist down to `system.sh` only |
