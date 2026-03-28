@@ -14,7 +14,7 @@ _ACG_AMI_OWNER="099720109477"
 _ACG_AMI_FILTER="ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
 _ACG_VPC_CIDR="10.0.0.0/16"
 _ACG_SUBNET_CIDR="10.0.1.0/24"
-_ACG_SANDBOX_URL="https://learn.acloud.guru/cloud-playground/cloud-sandboxes"
+_ACG_SANDBOX_URL="https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
 
 _acg_check_credentials() {
   _info "[acg] Checking AWS credentials..."

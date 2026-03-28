@@ -44,11 +44,13 @@ ACG sandboxes expire after 4 hours. To extend:
 
 ```bash
 antigravity_acg_extend <sandbox-url>
+# Example cloud playground URL
+antigravity_acg_extend "https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
 ```
 
-The Antigravity browser opens and clicks the extend button automatically. **First run:** you will be prompted to log into ACG manually in the browser window — session persists for subsequent runs.
+The Antigravity browser opens and clicks the extend button automatically. **First run:** you will be prompted to log into Pluralsight manually in the browser window — session persists for subsequent runs.
 
-Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the login check while the ACG → Pluralsight domain migration is pending (v0.9.18).
+Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Pluralsight session check (useful for CI or troubleshooting Playwright issues).
 
 ### 5. Teardown
 

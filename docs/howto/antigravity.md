@@ -37,9 +37,9 @@ Antigravity opens the sandbox page and clicks the extend button (+4 hours). The 
 
 ```bash
 # Example
-antigravity_acg_extend "https://learn.acloud.guru/lab/..."
+antigravity_acg_extend "https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
 
-# Skip ACG session check (while domain migration to Pluralsight is pending)
+# Skip ACG session check (useful for CI or if Playwright cannot launch)
 K3DM_ACG_SKIP_SESSION_CHECK=1 antigravity_acg_extend "<sandbox-url>"
 ```
 
