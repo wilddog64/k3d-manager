@@ -53,7 +53,7 @@ setup() {
   _info() { :; }
   sleep() { :; }
   gemini() {
-    [[ "$2" == "gemini-1.5-flash" ]] && echo "ok" && return 0
+    [[ "$2" == "gemini-2.5-flash" ]] && echo "ok" && return 0
     return 1
   }
   export -f _info gemini
@@ -69,7 +69,7 @@ setup() {
   _info() { :; }
   sleep() { :; }
   gemini() {
-    if [[ "$2" == "gemini-1.5-flash" ]]; then
+    if [[ "$2" == "gemini-2.5-flash" ]]; then
       echo "429 RESOURCE_EXHAUSTED rateLimitExceeded"
       return 1
     fi
