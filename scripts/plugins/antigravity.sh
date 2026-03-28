@@ -103,6 +103,10 @@ Exit code 1 if session cannot be confirmed."
 }
 
 function _antigravity_ensure_acg_session() {
+  if [[ "${K3DM_ACG_SKIP_SESSION_CHECK:-0}" == "1" ]]; then
+    _info "K3DM_ACG_SKIP_SESSION_CHECK=1 — skipping ACG session check (ACG domain migration pending)"
+    return 0
+  fi
   _info "Checking ACG session in Antigravity browser..."
 
   local gemini_prompt
