@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/plugins/acg.sh — ACG AWS sandbox lifecycle management
 #
-# Functions: acg_provision acg_status acg_extend acg_teardown
+# Functions: acg_get_credentials acg_import_credentials acg_provision acg_status acg_extend acg_teardown
 
 : "${ACG_REGION:=us-west-2}"
 : "${ACG_ALLOWED_CIDR:=0.0.0.0/0}"
@@ -178,6 +178,127 @@ _acg_check_k3s() {
   else
     _info "[acg] WARNING: k3s not responding — run: ./scripts/k3d-manager deploy_app_cluster --confirm"
   fi
+}
+
+_acg_write_credentials() {
+  local access_key="$1"
+  local secret_key="$2"
+  local session_token="$3"
+  local creds_file="${HOME}/.aws/credentials"
+  mkdir -p "${HOME}/.aws"
+  cat > "${creds_file}" <<EOF
+[default]
+aws_access_key_id=${access_key}
+aws_secret_access_key=${secret_key}
+aws_session_token=${session_token}
+EOF
+  chmod 600 "${creds_file}"
+  _info "[acg] Credentials written to ${creds_file}"
+  _info "[acg] Access key: ${access_key:0:4}****"
+}
+
+function acg_import_credentials() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'HELP'
+Usage: pbpaste | acg_import_credentials
+       acg_import_credentials < credentials.txt
+
+Read AWS credentials block from stdin and write to ~/.aws/credentials.
+Expected input format (copy from Pluralsight Cloud Access panel):
+
+  AWS Access Key ID: ASIA...
+  AWS Secret Access Key: abc123...
+  AWS Session Token: IQo...
+
+Or the export block format:
+
+  export AWS_ACCESS_KEY_ID=ASIA...
+  export AWS_SECRET_ACCESS_KEY=abc123...
+  export AWS_SESSION_TOKEN=IQo...
+HELP
+    return 0
+  fi
+
+  _info "[acg] Reading credentials from stdin..."
+  local input access_key secret_key session_token
+  input=$(cat)
+
+  access_key=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_ACCESS_KEY_ID| Access Key ID)[\s:=]+(\S+)/i) {print $1; exit}')
+  secret_key=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_SECRET_ACCESS_KEY| Secret Access Key)[\s:=]+(\S+)/i) {print $1; exit}')
+  session_token=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_SESSION_TOKEN| Session Token)[\s:=]+(\S+)/i) {print $1; exit}')
+
+  if [[ -z "$access_key" || -z "$secret_key" || -z "$session_token" ]]; then
+    printf 'ERROR: %s\n' "[acg] Could not parse credentials from stdin. Expected AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN." >&2
+    return 1
+  fi
+
+  _acg_write_credentials "$access_key" "$secret_key" "$session_token"
+}
+
+function acg_get_credentials() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'HELP'
+Usage: acg_get_credentials <sandbox-url>
+
+Extract AWS credentials from the Pluralsight Cloud Sandbox page via
+Antigravity browser automation and write to ~/.aws/credentials.
+
+Falls back to: pbpaste | acg_import_credentials
+
+Arguments:
+  sandbox-url   Full URL of the sandbox page, e.g.
+                https://app.pluralsight.com/cloud-playground/cloud-sandboxes/<id>
+HELP
+    return 0
+  fi
+
+  local sandbox_url="${1:?usage: acg_get_credentials <sandbox-url>}"
+
+  _ensure_antigravity
+  _ensure_antigravity_ide
+  _ensure_antigravity_mcp_playwright
+  _antigravity_launch
+  _antigravity_ensure_acg_session
+
+  _info "[acg] Extracting AWS credentials from ${sandbox_url}..."
+
+  local gemini_prompt
+  gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
+
+1. Connect to the running Antigravity browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
+2. Use the first browser context and page (do NOT launch a new browser).
+3. Navigate to ${sandbox_url} and wait for the page to load.
+4. Find the AWS credentials section (look for elements containing 'Access Key', 'Secret Key', 'Session Token', or a 'Cloud Access' / 'Credentials' panel).
+   NOTE: Pluralsight DOM selectors are not yet verified — try common patterns:
+   - [data-testid='access-key-id'], [data-testid='secret-access-key'], [data-testid='session-token']
+   - .credential-value, .aws-credentials code, pre code
+   - Any text input or readonly field near labels 'Access Key ID', 'Secret Access Key', 'Session Token'
+5. Extract the three values: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN.
+6. Print them in this exact format (one per line):
+   AWS_ACCESS_KEY_ID=<value>
+   AWS_SECRET_ACCESS_KEY=<value>
+   AWS_SESSION_TOKEN=<value>
+7. If the credentials panel is not found, print ERROR: credentials panel not found and exit with code 1.
+
+Write the Playwright script to \${HOME}/.gemini/tmp/k3d-manager/ag_acg_credentials.js, execute with node, print the result.
+Exit code 1 if credentials cannot be extracted."
+
+  local output
+  output=$(_antigravity_gemini_prompt "$gemini_prompt" --yolo)
+
+  local access_key secret_key session_token
+  access_key=$(printf '%s' "$output" | perl -ne 'if (/AWS_ACCESS_KEY_ID=(\S+)/) {print $1; exit}')
+  secret_key=$(printf '%s' "$output" | perl -ne 'if (/AWS_SECRET_ACCESS_KEY=(\S+)/) {print $1; exit}')
+  session_token=$(printf '%s' "$output" | perl -ne 'if (/AWS_SESSION_TOKEN=(\S+)/) {print $1; exit}')
+
+  if [[ -z "$access_key" || -z "$secret_key" || -z "$session_token" ]]; then
+    _info "[acg] Playwright extraction failed — falling back to stdin paste"
+    _info "[acg] Copy the credentials block from the Pluralsight sandbox page, then run:"
+    _info "[acg]   pbpaste | ./scripts/k3d-manager acg_import_credentials"
+    return 1
+  fi
+
+  _acg_write_credentials "$access_key" "$secret_key" "$session_token"
 }
 
 function acg_provision() {

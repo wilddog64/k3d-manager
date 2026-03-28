@@ -20,6 +20,11 @@
 }
 
 @test "register_shopping_cart_apps fails if argocd dir missing" {
+  local repo_root
+  repo_root="$(cd "${BATS_TEST_DIRNAME}/../../.." >/dev/null 2>&1 && pwd)"
+  if [[ -d "${repo_root}/../shopping-carts/shopping-cart-infra/argocd/applications" ]]; then
+    skip "shopping-cart-infra repo detected alongside k3d-manager"
+  fi
   run bash -c 'SCRIPT_DIR="$(pwd)/scripts"; source scripts/lib/system.sh; source scripts/lib/core.sh; source scripts/plugins/shopping_cart.sh; register_shopping_cart_apps'
   [ "$status" -ne 0 ]
 }
