@@ -7,9 +7,10 @@
 **v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag. if-count allowlist fully cleared.
 **v0.9.15 SHIPPED** — PR #51 merged (`484354da`) 2026-03-27. Tagged v0.9.15, released.
 **v0.9.16 SHIPPED** — PR #51 merged (`484354da`) 2026-03-27. Tagged v0.9.16, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-27-v0.9.16-retrospective.md`.
-**v0.9.17 ACTIVE** — branch `k3d-manager-v0.9.17` cut from `484354da` 2026-03-27. lib-foundation v0.3.14 subtree-pulled (`583b0d0`). Unblocked.
-**Current task:** Model fallback helper — **COMPLETE**. Implemented `_antigravity_gemini_prompt` in `scripts/plugins/antigravity.sh` (tries gemini-2.5-flash → 2.0-flash → 1.5-flash); verified via mock fallback test. Commit: `d004bb3`.
-**enforce_admins:** restored on main 2026-03-24.
+**v0.9.17 SHIPPED** — PR #52 merged (`c88ca7a`) 2026-03-28. Tagged v0.9.17. Released.
+**v0.9.18 ACTIVE** — branch `k3d-manager-v0.9.18` cut from `c88ca7a` 2026-03-28.
+**enforce_admins:** restored on main 2026-03-28.
+**Branch cleanup:** v0.9.7–v0.9.17 deleted (local + remote) 2026-03-28.
 **v0.9.15 scope:** Antigravity × GitHub Copilot coding agent validation — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`. Antigravity plugin rewritten in `b2ba187` per `docs/plans/v0.9.15-antigravity-plugin-impl.md`. Also: ldap-password-rotator `vault kv put` stdin hardening — spec `docs/plans/v0.9.15-ensure-copilot-cli.md` (closes v0.6.2 security debt; `_ensure_copilot_cli`/`_k3d_manager_copilot`/`_ensure_node` already shipped in v0.9.12).
 
 ---
