@@ -158,7 +158,7 @@ Returns 0 if installed; calls `_err` if all methods fail.
 Ensures Antigravity is configured to launch the Playwright MCP server. Requires `jq`.
 - Determines `mcp_config.json` path via `_antigravity_mcp_config_path()`
 - Creates the file if missing
-- Adds the `playwright` entry `{ "command": "npx", "args": ["-y", "@playwright/mcp@latest"] }` if not already present
+- Adds the `playwright` entry `{ "command": "npx", "args": ["-y", "@playwright/mcp@<version>"] }` if not already present; version comes from the `PLAYWRIGHT_MCP_VERSION` env var (defaults to a pinned release — does **not** use `latest`)
 
 ### `_antigravity_browser_ready`
 

@@ -1,5 +1,29 @@
 # Changes - k3d-manager
 
+## [v0.9.17] — 2026-03-27 — Antigravity model fallback + ACG session check + nested agent fix
+
+### Added
+- `_antigravity_ensure_acg_session`: CDP login check for ACG (`learn.acloud.guru`) — waits for login if not authenticated, 300s timeout (`bec1552`)
+- `_antigravity_gemini_prompt`: model fallback helper — tries `gemini-2.5-flash → gemini-2.0-flash → gemini-1.5-flash`; detects 429/RESOURCE_EXHAUSTED/ModelNotFoundError and degrades automatically (`d004bb3`)
+- `_ANTIGRAVITY_GEMINI_MODELS` array: ordered `gemini-2.5-flash` first — fastest, most capable; older models as fallback only (`3288fe2`)
+- `docs/gists/install.md`: 3-line install gist for k3d-manager clone + run (`fa91648`)
+
+### Fixed
+- `_antigravity_gemini_prompt`: `--approval-mode yolo` added — disables nested agent confirmation prompts; temp dir changed to `${HOME}/.gemini/tmp/k3d-manager/` — resolves Plan Mode + path restriction in inner `gemini` subprocess (`978b215`)
+- `_antigravity_gemini_prompt`: `sleep 2` before each model attempt — prevents rate-limit swarming (`1ac653d`)
+- `_antigravity_gemini_prompt`: removed overbroad `*"404"*` match — only match specific API errors (`ModelNotFoundError`) to avoid false positives from Playwright page 404s (`fe4915c`)
+- All Playwright temp scripts moved from `/tmp/ag_*.js` to `${HOME}/.gemini/tmp/k3d-manager/ag_*.js` (`978b215`)
+- Reverted unauthorized `JENKINS_HOME_PATH` default change in `cluster_var.sh` — scope creep by Gemini (`4e5c16d`)
+
+### Docs
+- `docs/plans/roadmap-v1.md`: shopping-cart rigor gap section + v1.2.0 distribution packages (Debian/RedHat/Homebrew) (`fa91648`)
+- `AGENTS.md` + `GEMINI.md`: `--approval-mode yolo` safety rule — only permitted for tightly scoped prompts writing to workspace temp dir (`2343d1e`)
+- `GEMINI.md`: Known Failure Mode added — unsolicited code changes outside task scope (`37d8d6d`)
+- `docs/issues/2026-03-27-acg-session-e2e-fail.md`: E2E failure — nested agent Plan Mode restriction
+- `docs/issues/2026-03-28-acg-domain-redirection.md`: ACG platform URL retired; `learn.acloud.guru` → Pluralsight redirect
+
+---
+
 ## [v0.9.16] — 2026-03-26 — Antigravity IDE + CDP browser automation
 
 ### Added

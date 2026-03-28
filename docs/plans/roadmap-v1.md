@@ -127,6 +127,20 @@ enough surface for a useful provider-agnostic MCP API.
 
 ---
 
+## v1.2.0 — Distribution Packages
+*Focus: Install k3d-manager as a system package — no manual clone required*
+
+**Debian/RedHat package** — `apt install k3d-manager` / `dnf install k3d-manager`
+- Installs dispatcher + libs to `/usr/local/lib/k3d-manager/`
+- Symlinks `k3d-manager` into `/usr/local/bin/`
+- Packaged with `fpm` or native `dpkg`/`rpmbuild`
+
+**Homebrew formula** — `brew install k3d-manager` (Mac-first, fits current user base)
+
+**Gate:** v1.1.0 `provision_full_stack` shipped — tool must be feature-stable before packaging.
+
+---
+
 ## v1.3.0 — Home Lab (Mac Mini M5)
 *Focus: k3s on Mac Mini M5 as always-on home cluster*
 
@@ -155,6 +169,41 @@ with an opinionated plugin stack that runs identically in every environment it s
 `CLUSTER_PROVIDER` controls only: create, destroy, get kubeconfig.
 Once those are done — plugins take over. Plugins speak only Kubernetes primitives
 (`kubectl`, `helm`) and have no opinion on what is underneath.
+
+---
+
+## Shopping-Cart App Rigor Gap
+
+The 13 shopping-cart repos (basket, order, payment, product-catalog, frontend, infra, e2e-tests,
+rabbitmq-client-*) have solid CI pipelines (lint, test, security scan per language) but zero
+commit-time enforcement and no agent instruction files.
+
+**Missing across all repos:**
+
+| Gap | Impact |
+|-----|--------|
+| No pre-commit hooks | Broken code reaches CI before failing; agents can push without local validation |
+| No `AGENTS.md` / `CLAUDE.md` | No scope rules, no off-limits file lists, no "do not create PRs" for AI agents |
+| No commit message convention | Codex/Gemini use inconsistent formats; no Conventional Commits enforcement |
+
+**What already exists (do not duplicate in pre-commit):**
+- Java: Checkstyle + OWASP dep-check (Maven)
+- Go: golangci-lint + govulncheck
+- Python: ruff + mypy + pip-audit
+- TypeScript: ESLint + Prettier + tsc + Jest + Playwright
+
+**Planned additions (track for v1.1.0 or a dedicated shopping-cart hardening sprint):**
+
+1. **`AGENTS.md` per repo** — language, framework, test command, off-limits files (`.github/`, infra manifests), commit message format, "do not create PRs"
+2. **Pre-commit hooks per repo** — mirror what CI already runs locally:
+   - Java: `mvn checkstyle:check`
+   - Go: `gofmt -l .` + `golangci-lint run`
+   - Python: `ruff check .` + `ruff format --check .`
+   - TypeScript: `eslint src/` + `prettier --check`
+3. **Shared `.pre-commit-config.yaml` template** — one template in `shopping-cart-infra`, symlinked or copied to each app repo
+
+**Priority:** Low — CI gates already catch issues before merge. Pre-commit is developer-experience
+and agent-safety hardening, not a blocker for v1.0.0.
 
 ---
 

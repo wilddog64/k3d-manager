@@ -1,14 +1,14 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.15` (as of 2026-03-24)
+## Current Branch: `k3d-manager-v0.9.17` (as of 2026-03-27)
 
 **v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. Copilot CLI CI integration.
 **v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released.
-**v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag. if-count allowlist fully cleared: `_run_command_handle_failure` + `_node_install_via_redhat` extracted via lib-foundation PR #13 (`071c270e`).
-**v0.9.15 COMPLETE** — all 4 scope items done. branch `k3d-manager-v0.9.15` ready for PR.
-**v0.9.16 COMPLETE ON BRANCH** — 4 items done: MCP refactor (`45168cf`), launch+session (`e83d89d`), curl probe fix (`6b98902`), lib-foundation v0.3.13 subtree pull (`dfcb590`). PR pending.
-**v0.9.17 NEXT** — `_antigravity_ensure_acg_session` (CDP login wait, mirrors GitHub session pattern); spec: `docs/plans/v0.9.17-antigravity-ensure-acg-session.md`. Cut branch after v0.9.16 merged.
-**BLOCKED ON lib-foundation v0.3.14** — 5 Copilot PR #51 findings deferred to lib-foundation. Must fix upstream + subtree-pull before k3d-manager work resumes on those items. See lib-foundation `memory-bank/progress.md` v0.3.14 section.
+**v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag. if-count allowlist fully cleared.
+**v0.9.15 SHIPPED** — PR #51 merged (`484354da`) 2026-03-27. Tagged v0.9.15, released.
+**v0.9.16 SHIPPED** — PR #51 merged (`484354da`) 2026-03-27. Tagged v0.9.16, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-27-v0.9.16-retrospective.md`.
+**v0.9.17 ACTIVE** — branch `k3d-manager-v0.9.17` cut from `484354da` 2026-03-27. lib-foundation v0.3.14 subtree-pulled (`583b0d0`). Unblocked.
+**Current task:** Model fallback helper — **COMPLETE**. Implemented `_antigravity_gemini_prompt` in `scripts/plugins/antigravity.sh` (tries gemini-2.5-flash → 2.0-flash → 1.5-flash); verified via mock fallback test. Commit: `d004bb3`.
 **enforce_admins:** restored on main 2026-03-24.
 **v0.9.15 scope:** Antigravity × GitHub Copilot coding agent validation — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`. Antigravity plugin rewritten in `b2ba187` per `docs/plans/v0.9.15-antigravity-plugin-impl.md`. Also: ldap-password-rotator `vault kv put` stdin hardening — spec `docs/plans/v0.9.15-ensure-copilot-cli.md` (closes v0.6.2 security debt; `_ensure_copilot_cli`/`_k3d_manager_copilot`/`_ensure_node` already shipped in v0.9.12).
 
@@ -18,8 +18,8 @@
 
 | Item | Status | Notes |
 |---|---|---|
-| **Antigravity validation** | **COMPLETE (FAIL)** | Automation failed due to auth isolation. Playwright cannot inherit browser cookies in CLI. Recommendation: DO NOT use for v0.9.16 ACG automation. See `docs/issues/2026-03-24-antigravity-copilot-agent-validation.md` |
-| **Antigravity _curl probe fix** | **COMPLETE** | `6b98902` — `_antigravity_launch` now uses `_run_command --soft -- curl` per `docs/plans/v0.9.16-antigravity-curl-probe-fix.md` |
+| **Nested agent fix** | **COMPLETE** | Implemented `--approval-mode yolo` + workspace temp path in `scripts/plugins/antigravity.sh`; commit `978b215`. |
+| **E2E live test: ACG session** | **COMPLETE** | Verified `gemini-2.5-flash` is used as the first attempt (no fallback needed). Nested agent fix verified. Platform redirection issue remains but session check logic passed via manual login. |
 | Reduce replicas + remove HPAs | **MERGED** | 5 repos squash-merged to main 2026-03-20 |
 | Frontend nginx fix | **MERGED** | `65b354f` on main, tagged v0.1.1, released 2026-03-21 |
 | **Gemini: verify frontend Running** | **COMPLETE** | Pod `frontend-85969b4bf-4wkdz` is `Running` on ubuntu-k3s |
