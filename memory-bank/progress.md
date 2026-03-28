@@ -20,6 +20,11 @@
 **v0.9.18 SHIPPED** — PR #53 merged (`7567a5c`) 2026-03-28. Tagged v0.9.18. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.18-retrospective.md`.
 **v0.9.19 ACTIVE** — branch `k3d-manager-v0.9.19` cut from `7567a5c` 2026-03-28.
 
+## v0.9.19 — In Progress
+
+- [ ] **`acg_get_credentials` + `acg_import_credentials`** — Codex assigned. Spec: `docs/plans/v0.9.19-acg-get-credentials.md`. Adds `_acg_write_credentials` private helper + two public functions + 8 BATS tests. Commit message: `feat(acg): add acg_get_credentials + acg_import_credentials — automate AWS credential extraction`
+- [ ] **scratch/ cleanup** — `rm -rf scratch/*` — wipe stale Playwright artifacts at release cut
+
 ## v0.9.17 — Shipped
 
 - [x] **`_antigravity_ensure_acg_session`** — Implemented in `scripts/plugins/antigravity.sh`; BATS coverage in `scripts/tests/lib/antigravity.bats`; verified via `env -i` BATS run.
