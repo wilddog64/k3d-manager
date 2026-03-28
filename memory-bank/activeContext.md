@@ -1,6 +1,6 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.17` (as of 2026-03-27)
+## Current Branch: `k3d-manager-v0.9.18` (as of 2026-03-28)
 
 **v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. Copilot CLI CI integration.
 **v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released.
@@ -15,10 +15,11 @@
 
 ---
 
-## Current Focus
+## Current Focus (v0.9.18)
 
 | Item | Status | Notes |
 |---|---|---|
+| **Pluralsight URL fix** | **SPEC READY** | Spec: `docs/plans/v0.9.18-pluralsight-url-fix.md`; assigned to Codex; Gemini verifies e2e |
 | **Nested agent fix** | **COMPLETE** | Implemented `--approval-mode yolo` + workspace temp path in `scripts/plugins/antigravity.sh`; commit `978b215`. |
 | **E2E live test: ACG session** | **COMPLETE** | Verified `gemini-2.5-flash` is used as the first attempt (no fallback needed). Nested agent fix verified. Platform redirection issue remains but session check logic passed via manual login. |
 | Reduce replicas + remove HPAs | **MERGED** | 5 repos squash-merged to main 2026-03-20 |

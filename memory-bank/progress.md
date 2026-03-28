@@ -48,6 +48,12 @@
 
 ---
 
+## v0.9.18 — Active
+
+- [ ] **Pluralsight URL fix** — update `_ACG_SANDBOX_URL` + `_antigravity_ensure_acg_session` URLs/selectors; spec: `docs/plans/v0.9.18-pluralsight-url-fix.md`; **Codex** implements, **Gemini** verifies e2e
+
+---
+
 ## v0.9.17 — Planned
 
 - [x] **`_antigravity_ensure_acg_session`** — Implemented in `scripts/plugins/antigravity.sh`; BATS coverage in `scripts/tests/lib/antigravity.bats`; verified via `env -i` BATS run.
