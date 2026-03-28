@@ -26,6 +26,7 @@
 
 | Item | Status | Notes |
 |---|---|---|
+| **Static acg_credentials.js** | **COMPLETE** | Implemented `scripts/playwright/acg_credentials.js` and updated `acg_get_credentials`. commit `a7aea9c`. |
 | **scratch/ cleanup** | **PENDING** | `rm -f scratch/*` — wipe stale Playwright artifacts; policy: wipe at each release cut |
 | **acg_get_credentials + acg_import_credentials** | **COMPLETE** | `3970623` adds credential extractor + stdin import helpers with docs/tests per `docs/plans/v0.9.19-acg-get-credentials.md` |
 | **Pluralsight URL fix** | **COMPLETE** | `8f857ea` updates ACG + Antigravity plugins and docs to use `app.pluralsight.com`; Gemini e2e verified |
