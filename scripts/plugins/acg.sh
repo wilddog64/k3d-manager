@@ -15,6 +15,7 @@ _ACG_AMI_FILTER="ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
 _ACG_VPC_CIDR="10.0.0.0/16"
 _ACG_SUBNET_CIDR="10.0.1.0/24"
 _ACG_SANDBOX_URL="https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
+_ACG_SANDBOX_LIST_URL="${ACG_SANDBOX_LIST_URL:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}"
 
 _acg_check_credentials() {
   _info "[acg] Checking AWS credentials..."
@@ -237,54 +238,39 @@ HELP
 
 function acg_get_credentials() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    cat <<'HELP'
-Usage: acg_get_credentials <sandbox-url>
+    cat <<HELP
+Usage: acg_get_credentials [sandbox-url]
 
-Extract AWS credentials from the Pluralsight Cloud Sandbox page via
-Antigravity browser automation and write to ~/.aws/credentials.
+Extract AWS credentials from the Pluralsight Cloud Sandbox "Cloud Access" panel
+via Antigravity browser automation and write to ~/.aws/credentials.
+
+If sandbox-url is omitted, navigates to the sandbox listing page, starts a new
+sandbox, waits for it to be ready, then extracts credentials.
 
 Falls back to: pbpaste | acg_import_credentials
 
 Arguments:
-  sandbox-url   Full URL of the sandbox page, e.g.
+  sandbox-url   (optional) URL of a running sandbox, e.g.
                 https://app.pluralsight.com/cloud-playground/cloud-sandboxes/<id>
+                Defaults to ACG_SANDBOX_LIST_URL (listing page — auto-start flow)
 HELP
     return 0
   fi
 
-  local sandbox_url="${1:?usage: acg_get_credentials <sandbox-url>}"
+  local sandbox_url="${1:-${_ACG_SANDBOX_LIST_URL}}"
 
   _ensure_antigravity
-  _ensure_antigravity_ide
-  _ensure_antigravity_mcp_playwright
   _antigravity_launch
   _antigravity_ensure_acg_session
 
   _info "[acg] Extracting AWS credentials from ${sandbox_url}..."
 
-  local gemini_prompt
-  gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
-
-1. Connect to the running Antigravity browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
-2. Use the first browser context and page (do NOT launch a new browser).
-3. Navigate to ${sandbox_url} and wait for the page to load.
-4. Find the AWS credentials section (look for elements containing 'Access Key', 'Secret Key', 'Session Token', or a 'Cloud Access' / 'Credentials' panel).
-   NOTE: Pluralsight DOM selectors are not yet verified — try common patterns:
-   - [data-testid='access-key-id'], [data-testid='secret-access-key'], [data-testid='session-token']
-   - .credential-value, .aws-credentials code, pre code
-   - Any text input or readonly field near labels 'Access Key ID', 'Secret Access Key', 'Session Token'
-5. Extract the three values: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN.
-6. Print them in this exact format (one per line):
-   AWS_ACCESS_KEY_ID=<value>
-   AWS_SECRET_ACCESS_KEY=<value>
-   AWS_SESSION_TOKEN=<value>
-7. If the credentials panel is not found, print ERROR: credentials panel not found and exit with code 1.
-
-Write the Playwright script to \${HOME}/.gemini/tmp/k3d-manager/ag_acg_credentials.js, execute with node, print the result.
-Exit code 1 if credentials cannot be extracted."
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local playwright_script="${script_dir}/../playwright/acg_credentials.js"
 
   local output
-  output=$(_antigravity_gemini_prompt "$gemini_prompt" --yolo)
+  output=$(export NODE_PATH=/opt/homebrew/lib/node_modules; node "$playwright_script" "$sandbox_url" 2>&1)
 
   local access_key secret_key session_token
   access_key=$(printf '%s' "$output" | perl -ne 'if (/AWS_ACCESS_KEY_ID=(\S+)/) {print $1; exit}')
