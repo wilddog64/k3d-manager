@@ -10,6 +10,27 @@ The ACG plugin provisions a t3.medium EC2 instance on an ACG (A Cloud Guru) sand
 
 ## Full Lifecycle
 
+### 0. Extract AWS Credentials
+
+Before provisioning, extract the sandbox AWS credentials from the Pluralsight Cloud Access panel.
+
+**Option A — Playwright (Antigravity must be running):**
+
+```bash
+./scripts/k3d-manager acg_get_credentials "https://app.pluralsight.com/cloud-playground/cloud-sandboxes/<sandbox-id>"
+```
+
+**Option B — Paste from clipboard (no Playwright needed):**
+
+1. Open the Pluralsight sandbox page and copy the credentials block
+2. Run:
+
+```bash
+pbpaste | ./scripts/k3d-manager acg_import_credentials
+```
+
+Both options write to `~/.aws/credentials` under `[default]` and confirm with a masked key preview.
+
 ### 1. Provision
 
 ```bash

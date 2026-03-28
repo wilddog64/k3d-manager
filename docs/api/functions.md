@@ -61,6 +61,8 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `tunnel_stop` | `scripts/plugins/tunnel.sh` | Stop the SSH tunnel and unload launchd job |
 | `tunnel_status` | `scripts/plugins/tunnel.sh` | Show tunnel process and launchd status |
 | `deploy_app_cluster` | `scripts/plugins/shopping_cart.sh` | Install k3s on EC2 via k3sup and merge kubeconfig |
+| `acg_get_credentials` | `scripts/plugins/acg.sh` | Extract AWS credentials from Pluralsight Cloud Access via Antigravity |
+| `acg_import_credentials` | `scripts/plugins/acg.sh` | Write AWS credentials from stdin to `~/.aws/credentials` |
 | `acg_provision` | `scripts/plugins/acg.sh` | Provision ACG sandbox EC2 instance (VPC + SG + key + t3.medium) |
 | `acg_status` | `scripts/plugins/acg.sh` | Show ACG instance state, public IP, and k3s health |
 | `acg_extend` | `scripts/plugins/acg.sh` | Open ACG sandbox page to extend TTL (+4h) |
@@ -69,6 +71,18 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `antigravity_trigger_copilot_review` | `scripts/plugins/antigravity.sh` | Trigger GitHub Copilot coding agent task via Playwright CDP automation |
 | `antigravity_poll_task` | `scripts/plugins/antigravity.sh` | Poll a Copilot coding agent task until complete; print full output verbatim |
 | `antigravity_acg_extend` | `scripts/plugins/antigravity.sh` | Extend ACG sandbox TTL via Playwright CDP automation |
+
+### `acg_get_credentials`
+
+Extracts AWS credentials from the Pluralsight Cloud Sandbox "Cloud Access" panel via Antigravity browser automation (Playwright CDP) and writes them to `~/.aws/credentials` under `[default]`. Falls back with instructions to use `acg_import_credentials` if Playwright extraction fails.
+
+**Usage:** `./scripts/k3d-manager acg_get_credentials [sandbox-url]`
+
+### `acg_import_credentials`
+
+Reads an AWS credentials block from stdin and writes to `~/.aws/credentials` under `[default]`. Supports both Pluralsight label format (`AWS Access Key ID: ...`) and shell export format (`export AWS_ACCESS_KEY_ID=...`).
+
+**Usage:** `pbpaste | ./scripts/k3d-manager acg_import_credentials`
 
 ## Running Tests
 

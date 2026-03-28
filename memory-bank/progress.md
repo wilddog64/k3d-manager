@@ -17,7 +17,15 @@
 **v0.9.15 SHIPPED** — PR #51 squash-merged to main (`484354da`) 2026-03-27. Tagged v0.9.15, released.
 **v0.9.16 SHIPPED** — PR #51 squash-merged to main (`484354da`) 2026-03-27. Tagged v0.9.16, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-27-v0.9.16-retrospective.md`.
 **v0.9.17 SHIPPED** — PR #52 merged to main (`c88ca7a`) 2026-03-28. Tagged v0.9.17, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.17-retrospective.md`. Branches v0.9.7–v0.9.17 deleted.
-**v0.9.18 ACTIVE** — branch `k3d-manager-v0.9.18` cut from `c88ca7a` 2026-03-28.
+**v0.9.18 SHIPPED** — PR #53 merged (`7567a5c`) 2026-03-28. Tagged v0.9.18. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.18-retrospective.md`.
+**v0.9.19 ACTIVE** — branch `k3d-manager-v0.9.19` cut from `7567a5c` 2026-03-28.
+
+## v0.9.19 — In Progress
+
+- [x] **`acg_get_credentials` + `acg_import_credentials`** — commit `3970623` adds `_acg_write_credentials`, both public functions, docs updates, and 8 BATS tests per `docs/plans/v0.9.19-acg-get-credentials.md`
+- [ ] **Static Playwright script** — Codex assigned. Spec: `docs/plans/v0.9.19-acg-playwright-script.md`. Creates `scripts/playwright/acg_credentials.js`; replaces Gemini-prompt block in `acg_get_credentials` with direct `node` call. Commit message: `feat(acg): replace Gemini-generated Playwright with static acg_credentials.js`
+- [ ] **Gemini: verify Playwright selectors** — after Codex, spin up live sandbox and run `acg_get_credentials <url>` to verify/update DOM selectors in `acg_credentials.js`
+- [ ] **scratch/ cleanup** — `rm -rf scratch/*` — wipe stale Playwright artifacts at release cut
 
 ## v0.9.17 — Shipped
 
@@ -48,10 +56,17 @@
 
 ---
 
-## v0.9.18 — Active
+## v0.9.19 — Active
 
-- [x] **Pluralsight URL fix** — commit `8f857ea` updates `_ACG_SANDBOX_URL`, `_antigravity_ensure_acg_session`, and docs per `docs/plans/v0.9.18-pluralsight-url-fix.md`; Gemini to run e2e verification
-- [ ] **scratch/ cleanup** — delete all stale Playwright artifacts and debug scripts from `scratch/` (already gitignored); policy: wipe at each release cut in `/post-merge` Step 8 alongside branch pruning
+- [x] **Static acg_credentials.js** — **COMPLETE**. Replaced Gemini-generated Playwright with static `scripts/playwright/acg_credentials.js`. Verified with live Pluralsight sandbox. commit `67a445c`. Spec: `docs/plans/v0.9.19-acg-playwright-script.md`.
+- [ ] **scratch/ cleanup** — `rm -f scratch/*`; stale Playwright artifacts from v0.9.18 and earlier
+- [ ] **ArgoCD Sync — `order-service` & `product-catalog`** — **FAILED**. Attempted sync on infra cluster; ArgoCD server logged in successfully but app cluster connection failed. Root cause: ACG sandbox credentials expired; SSH tunnel down. See `docs/issues/2026-03-28-argocd-sync-acg-credentials-expired.md`.
+
+---
+
+## v0.9.18 — Shipped
+
+- [x] **Pluralsight URL fix** — commit `8f857ea` updates `_ACG_SANDBOX_URL`, `_antigravity_ensure_acg_session`, and docs to `app.pluralsight.com`; Gemini e2e verified; PR #53 merged `7567a5c`
 
 ---
 
