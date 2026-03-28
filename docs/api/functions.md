@@ -65,6 +65,10 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `acg_status` | `scripts/plugins/acg.sh` | Show ACG instance state, public IP, and k3s health |
 | `acg_extend` | `scripts/plugins/acg.sh` | Open ACG sandbox page to extend TTL (+4h) |
 | `acg_teardown` | `scripts/plugins/acg.sh` | Terminate ACG instance and remove ubuntu-k3s kubeconfig context |
+| `antigravity_install` | `scripts/plugins/antigravity.sh` | Verify full Antigravity stack installed (Node.js, gemini CLI, IDE, Playwright MCP) |
+| `antigravity_trigger_copilot_review` | `scripts/plugins/antigravity.sh` | Trigger GitHub Copilot coding agent task via Playwright CDP automation |
+| `antigravity_poll_task` | `scripts/plugins/antigravity.sh` | Poll a Copilot coding agent task until complete; print full output verbatim |
+| `antigravity_acg_extend` | `scripts/plugins/antigravity.sh` | Extend ACG sandbox TTL via Playwright CDP automation |
 
 ## Running Tests
 
@@ -109,3 +113,23 @@ _antigravity_browser_ready [timeout_seconds]
 ```
 
 Returns 0 when port 9222 responds to `curl -sf http://localhost:9222/json`; otherwise calls `_err` after the timeout.
+
+### `_antigravity_gemini_prompt`
+
+Model fallback helper — tries each model in `_ANTIGRAVITY_GEMINI_MODELS` (`gemini-2.5-flash → 2.0-flash → 1.5-flash`) until one succeeds. Detects 429/RESOURCE_EXHAUSTED/ModelNotFoundError and continues to the next model; any other non-zero exit is returned immediately.
+
+```
+_antigravity_gemini_prompt <prompt> [--yolo]
+```
+
+Pass `--yolo` to add `--approval-mode yolo` to the gemini call (required for Playwright script prompts that write a file and run a command). Omit for web_fetch-only prompts. Creates `${HOME}/.gemini/tmp/k3d-manager/` before the first attempt. Sleeps 2s between attempts to avoid rate-limit swarming.
+
+### `_antigravity_ensure_github_session`
+
+Checks whether the user is logged into GitHub in the running Antigravity browser (via Playwright CDP). If not logged in, navigates to `github.com/login` and waits up to 300s for the user to complete login interactively.
+
+### `_antigravity_ensure_acg_session`
+
+Checks whether the user is logged into ACG (`learn.acloud.guru`) in the running Antigravity browser (via Playwright CDP). If not logged in, navigates to the sign-in page and waits up to 300s for the user to complete login interactively. Returns 1 on timeout.
+
+> **Note:** `learn.acloud.guru` currently redirects to Pluralsight — URL update tracked in v0.9.18 ([issue](../issues/2026-03-28-acg-domain-redirection.md)).
