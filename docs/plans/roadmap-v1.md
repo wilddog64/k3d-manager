@@ -127,6 +127,20 @@ enough surface for a useful provider-agnostic MCP API.
 
 ---
 
+## v1.2.0 — Distribution Packages
+*Focus: Install k3d-manager as a system package — no manual clone required*
+
+**Debian/RedHat package** — `apt install k3d-manager` / `dnf install k3d-manager`
+- Installs dispatcher + libs to `/usr/local/lib/k3d-manager/`
+- Symlinks `k3d-manager` into `/usr/local/bin/`
+- Packaged with `fpm` or native `dpkg`/`rpmbuild`
+
+**Homebrew formula** — `brew install k3d-manager` (Mac-first, fits current user base)
+
+**Gate:** v1.1.0 `provision_full_stack` shipped — tool must be feature-stable before packaging.
+
+---
+
 ## v1.3.0 — Home Lab (Mac Mini M5)
 *Focus: k3s on Mac Mini M5 as always-on home cluster*
 
