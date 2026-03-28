@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
  * scripts/playwright/acg_credentials.js
  * 
  * Static Playwright script to extract AWS credentials from Pluralsight Cloud Sandbox.
- * Connects to a running Antigravity instance via CDP.
+ * Connects to a running instance via CDP.
  */
 
 async function extractCredentials() {
@@ -16,7 +16,7 @@ async function extractCredentials() {
 
   let browser;
   try {
-    // 1. Connect to the running Antigravity browser via CDP
+    // 1. Connect to the running browser via CDP
     browser = await chromium.connectOverCDP('http://localhost:9222');
 
     // 2. Use the first browser context and page
@@ -31,123 +31,86 @@ async function extractCredentials() {
     // Give it time to render the SPA content
     await page.waitForTimeout(5000);
 
-    // Check if we are on the listing page or a specific sandbox
-    const isListingPage = targetUrl.includes('/hands-on/playground/cloud-sandboxes') || targetUrl.endsWith('/cloud-sandboxes');
+    // 3. Handle Sandbox Start/Open Flow
+    console.error('INFO: Looking for Start/Open button...');
+    
+    // Pattern 1: Direct "Start Sandbox" button (in a modal or panel)
+    const startButton = page.locator('button:has-text("Start Sandbox")').first();
+    // Pattern 2: "Open Sandbox" button (on the card)
+    const openButton = page.locator('button:has-text("Open Sandbox")').first();
+    // Pattern 3: "Resume Sandbox"
+    const resumeButton = page.locator('button:has-text("Resume"), button:has-text("Resume Sandbox")').first();
 
-    if (isListingPage) {
-      console.error('INFO: On listing page. Looking for AWS Sandbox...');
+    if (await startButton.isVisible()) {
+      console.error('INFO: Clicking Start Sandbox...');
+      await startButton.click();
+      await page.waitForTimeout(10000);
+    } else if (await openButton.isVisible()) {
+      console.error('INFO: Clicking Open Sandbox...');
+      await openButton.click();
+      await page.waitForTimeout(10000);
       
-      // Look for the AWS sandbox card and its start button
-      // Based on common Pluralsight patterns: buttons inside a card or grid
-      const startButtonSelector = 'button:has-text("Start"), button:has-text("Resume"), button:has-text("Open")';
-      
-      try {
-        // Find all buttons and pick the one related to AWS if multiple exist
-        const buttons = await page.locator(startButtonSelector).all();
-        let targetButton;
-        
-        for (const btn of buttons) {
-          const text = await btn.innerText();
-          const parentText = await btn.evaluate(el => el.closest('div')?.innerText || '');
-          if (parentText.toLowerCase().includes('aws')) {
-            targetButton = btn;
-            break;
-          }
-        }
-        
-        if (!targetButton && buttons.length > 0) {
-          targetButton = buttons[0]; // Fallback to first start button
-        }
-
-        if (targetButton) {
-          console.error('INFO: Clicking Start/Open button...');
-          await targetButton.click();
-          // Wait for navigation or panel to open
-          await page.waitForTimeout(10000);
-        } else {
-          throw new Error('Could not find a Start/Open button for AWS Sandbox');
-        }
-      } catch (e) {
-        console.error(`ERROR: Failed to handle listing page: ${e.message}`);
-        process.exit(1);
+      // After Open, there might be a Start Sandbox button in the slide-over
+      const startButton2 = page.locator('button:has-text("Start Sandbox")').first();
+      if (await startButton2.isVisible()) {
+        console.error('INFO: Clicking Start Sandbox (Step 2)...');
+        await startButton2.click();
+        await page.waitForTimeout(10000);
       }
+    } else if (await resumeButton.isVisible()) {
+      console.error('INFO: Clicking Resume Sandbox...');
+      await resumeButton.click();
+      await page.waitForTimeout(10000);
     }
 
-    // 3. Extract credentials
+    // 4. Extract credentials
     console.error('INFO: Extracting credentials...');
     
-    // Try multiple selector patterns for the credentials
-    const credentialSelectors = {
-      accessKey: [
-        '[data-testid="access-key-id"]',
-        'input[aria-label*="Access Key"]',
-        'div:has-text("Access Key ID") + div',
-        '.credential-value'
-      ],
-      secretKey: [
-        '[data-testid="secret-access-key"]',
-        'input[aria-label*="Secret Key"]',
-        'div:has-text("Secret Access Key") + div'
-      ],
-      sessionToken: [
-        '[data-testid="session-token"]',
-        'input[aria-label*="Session Token"]',
-        'div:has-text("Session Token") + div'
-      ]
-    };
+    // We found that credentials are in inputs with aria-label="Copyable input"
+    // The order is typically: Username, Password, Access Key ID, Secret Access Key, [Session Token]
+    
+    // Wait for the inputs to appear
+    await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 30000 });
+    
+    const inputs = await page.locator('input[aria-label="Copyable input"]').all();
+    console.error(`INFO: Found ${inputs.length} copyable inputs.`);
 
-    async function findValue(selectors) {
-      for (const selector of selectors) {
-        try {
-          const el = page.locator(selector).first();
-          if (await el.isVisible()) {
-            // Check if it's an input/textarea or a text element
-            const tagName = await el.evaluate(node => node.tagName);
-            if (tagName === 'INPUT' || tagName === 'TEXTAREA') {
-              return await el.inputValue();
-            }
-            return await el.innerText();
-          }
-        } catch (e) {}
+    let accessKey, secretKey, sessionToken;
+
+    for (let i = 0; i < inputs.length; i++) {
+      const val = await inputs[i].inputValue();
+      const parent = await inputs[i].evaluateHandle(el => el.closest('div')?.parentElement);
+      const text = await parent.evaluate(el => el.innerText || '');
+      
+      if (text.toLowerCase().includes('access key id')) {
+        accessKey = val;
+      } else if (text.toLowerCase().includes('secret access key')) {
+        secretKey = val;
+      } else if (text.toLowerCase().includes('session token')) {
+        sessionToken = val;
       }
-      return null;
     }
 
-    // Attempt to open the "Cloud Access" or "Credentials" panel if it's closed
-    const panelButton = page.locator('button:has-text("Cloud Access"), button:has-text("Credentials"), button:has-text("View Credentials")');
-    if (await panelButton.isVisible()) {
-      await panelButton.click();
-      await page.waitForTimeout(2000);
+    // Fallback based on known order if text matching fails
+    if (!accessKey && inputs.length >= 3) {
+      accessKey = await inputs[2].inputValue();
+    }
+    if (!secretKey && inputs.length >= 4) {
+      secretKey = await inputs[3].inputValue();
+    }
+    if (!sessionToken && inputs.length >= 5) {
+      sessionToken = await inputs[4].inputValue();
     }
 
-    const accessKey = await findValue(credentialSelectors.accessKey);
-    const secretKey = await findValue(credentialSelectors.secretKey);
-    const sessionToken = await findValue(credentialSelectors.sessionToken);
-
-    if (accessKey && secretKey && sessionToken) {
+    if (accessKey && secretKey) {
       console.log(`AWS_ACCESS_KEY_ID=${accessKey.trim()}`);
       console.log(`AWS_SECRET_ACCESS_KEY=${secretKey.trim()}`);
-      console.log(`AWS_SESSION_TOKEN=${sessionToken.trim()}`);
+      if (sessionToken) {
+        console.log(`AWS_SESSION_TOKEN=${sessionToken.trim()}`);
+      }
       process.exit(0);
     } else {
-      // Last ditch: check all code blocks
-      const codeBlocks = await page.locator('code, pre').all();
-      for (const block of codeBlocks) {
-        const text = await block.innerText();
-        if (text.includes('AWS_ACCESS_KEY_ID')) {
-          const ak = text.match(/AWS_ACCESS_KEY_ID=([^\s]+)/)?.[1];
-          const sk = text.match(/AWS_SECRET_ACCESS_KEY=([^\s]+)/)?.[1];
-          const st = text.match(/AWS_SESSION_TOKEN=([^\s]+)/)?.[1];
-          if (ak && sk && st) {
-            console.log(`AWS_ACCESS_KEY_ID=${ak}`);
-            console.log(`AWS_SECRET_ACCESS_KEY=${sk}`);
-            console.log(`AWS_SESSION_TOKEN=${st}`);
-            process.exit(0);
-          }
-        }
-      }
-      
-      throw new Error('Could not find all AWS credential values');
+      throw new Error('Could not find AWS Access Key and Secret Key');
     }
 
   } catch (error) {

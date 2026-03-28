@@ -184,15 +184,17 @@ _acg_check_k3s() {
 _acg_write_credentials() {
   local access_key="$1"
   local secret_key="$2"
-  local session_token="$3"
+  local session_token="${3:-}"
   local creds_file="${HOME}/.aws/credentials"
   mkdir -p "${HOME}/.aws"
-  cat > "${creds_file}" <<EOF
-[default]
-aws_access_key_id=${access_key}
-aws_secret_access_key=${secret_key}
-aws_session_token=${session_token}
-EOF
+  {
+    echo "[default]"
+    echo "aws_access_key_id=${access_key}"
+    echo "aws_secret_access_key=${secret_key}"
+    if [[ -n "${session_token}" ]]; then
+      echo "aws_session_token=${session_token}"
+    fi
+  } > "${creds_file}"
   chmod 600 "${creds_file}"
   _info "[acg] Credentials written to ${creds_file}"
   _info "[acg] Access key: ${access_key:0:4}****"
@@ -259,6 +261,9 @@ HELP
 
   local sandbox_url="${1:-${_ACG_SANDBOX_LIST_URL}}"
 
+  # Load antigravity plugin for browser automation
+  source "$(dirname "${BASH_SOURCE[0]}")/antigravity.sh"
+
   _ensure_antigravity
   _antigravity_launch
   _antigravity_ensure_acg_session
@@ -270,14 +275,14 @@ HELP
   local playwright_script="${script_dir}/../playwright/acg_credentials.js"
 
   local output
-  output=$(node "$playwright_script" "$sandbox_url" 2>&1)
+  output=$(export NODE_PATH=/opt/homebrew/lib/node_modules; node "$playwright_script" "$sandbox_url" 2>&1)
 
   local access_key secret_key session_token
   access_key=$(printf '%s' "$output" | perl -ne 'if (/AWS_ACCESS_KEY_ID=(\S+)/) {print $1; exit}')
   secret_key=$(printf '%s' "$output" | perl -ne 'if (/AWS_SECRET_ACCESS_KEY=(\S+)/) {print $1; exit}')
   session_token=$(printf '%s' "$output" | perl -ne 'if (/AWS_SESSION_TOKEN=(\S+)/) {print $1; exit}')
 
-  if [[ -z "$access_key" || -z "$secret_key" || -z "$session_token" ]]; then
+  if [[ -z "$access_key" || -z "$secret_key" ]]; then
     _info "[acg] Playwright extraction failed — falling back to stdin paste"
     _info "[acg] Copy the credentials block from the Pluralsight sandbox page, then run:"
     _info "[acg]   pbpaste | ./scripts/k3d-manager acg_import_credentials"
