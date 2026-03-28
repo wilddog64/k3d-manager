@@ -37,6 +37,8 @@ acg_teardown --confirm            # terminate instance; remove ubuntu-k3s kubeco
 ```
 
 > Set `ACG_ALLOWED_CIDR=<your-ip>/32` to restrict SSH/6443 ingress (default: `0.0.0.0/0`).
+>
+> **First run:** `antigravity_acg_extend` will open the Antigravity browser and prompt for Pluralsight login as needed. Log in manually — the session cookie persists across runs until it expires. Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Antigravity session check.
 
 ### 3. Add the Ubuntu k3s app cluster
 
@@ -216,6 +218,22 @@ docs/
 
 ### How-To
 
+**Secrets & Identity**
+- **[Vault](docs/howto/vault.md)** — Deploy, init, PKI cert issuance, cross-cluster auth
+- **[ESO](docs/howto/eso.md)** — Deploy, connect a secret store, troubleshoot sync failures
+- **[Keycloak](docs/howto/keycloak.md)** — Deploy, smoke test, LDAP federation
+
+**GitOps & CI/CD**
+- **[ArgoCD](docs/howto/argocd.md)** — Deploy, register app cluster, configure deploy keys
+- **[cert-manager](docs/howto/cert-manager.md)** — Deploy, Vault + ACME issuers, certificate lifecycle
+
+**Cloud Sandbox**
+- **[ACG Sandbox](docs/howto/acg.md)** — Full lifecycle: provision → k3s install → extend TTL → teardown
+- **[Antigravity Browser Automation](docs/howto/antigravity.md)** — First-run setup, ACG extend, Copilot agent trigger
+
+**Networking**
+- **[SSH Tunnel](docs/howto/tunnel.md)** — autossh setup, launchd boot persistence, app cluster access
+
 **Jenkins**
 - **[Configuring SSL Trust for jenkins-cli](docs/howto/jenkins-cli-ssl-trust.md)** — Trust Vault-issued certs for `jenkins-cli.jar`
 - **[Jenkins K8s Agents Testing](docs/howto/jenkins-k8s-agents-testing.md)** — Verify dynamic pod agents in the infra cluster
@@ -248,9 +266,9 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
-| v0.9.17 | 2026-03-27 | Antigravity model fallback (`gemini-2.5-flash` first), ACG session check, nested agent fix (`--approval-mode yolo` + workspace temp path) |
+| v0.9.18 | 2026-03-28 | Pluralsight URL migration — `_ACG_SANDBOX_URL` + `_antigravity_ensure_acg_session` updated to `app.pluralsight.com` |
+| [v0.9.17](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.17) | 2026-03-27 | Antigravity model fallback (`gemini-2.5-flash` first), ACG session check, nested agent fix (`--approval-mode yolo` + workspace temp path) |
 | [v0.9.16](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.16) | 2026-03-26 | Antigravity IDE + CDP browser automation — gemini CLI + Playwright engine; `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_acg_extend`; ldap stdin hardening |
-| [v0.9.13](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.13) | 2026-03-23 | v0.9.12 retro, `/create-pr` `mergeable_state` check, CHANGE.md backfill for v0.9.12 |
 
 <details>
 <summary>Older releases</summary>

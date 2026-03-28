@@ -16,9 +16,10 @@
 **v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag (CHANGE.md [Unreleased]). if-count allowlist fully cleared: _run_command + _ensure_node helpers extracted via lib-foundation PR #13.
 **v0.9.15 SHIPPED** — PR #51 squash-merged to main (`484354da`) 2026-03-27. Tagged v0.9.15, released.
 **v0.9.16 SHIPPED** — PR #51 squash-merged to main (`484354da`) 2026-03-27. Tagged v0.9.16, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-27-v0.9.16-retrospective.md`.
-**v0.9.17 ACTIVE** — branch `k3d-manager-v0.9.17`; PR #52 open 2026-03-28; CI in progress; Copilot tagged.
+**v0.9.17 SHIPPED** — PR #52 merged to main (`c88ca7a`) 2026-03-28. Tagged v0.9.17, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.17-retrospective.md`. Branches v0.9.7–v0.9.17 deleted.
+**v0.9.18 ACTIVE** — branch `k3d-manager-v0.9.18` cut from `c88ca7a` 2026-03-28.
 
-## v0.9.17 — In Progress
+## v0.9.17 — Shipped
 
 - [x] **`_antigravity_ensure_acg_session`** — Implemented in `scripts/plugins/antigravity.sh`; BATS coverage in `scripts/tests/lib/antigravity.bats`; verified via `env -i` BATS run.
 - [x] **E2E live test: `_antigravity_ensure_acg_session`** — **COMPLETE**. Verified `gemini-2.5-flash` is used as first attempt. Fallback helper and nested agent fix (YOLO + workspace temp) verified working. ACG login logic verified via manual prompt. Spec: `docs/plans/v0.9.17-acg-session-e2e-test.md`.
@@ -47,7 +48,14 @@
 
 ---
 
-## v0.9.17 — Planned
+## v0.9.18 — Active
+
+- [x] **Pluralsight URL fix** — commit `8f857ea` updates `_ACG_SANDBOX_URL`, `_antigravity_ensure_acg_session`, and docs per `docs/plans/v0.9.18-pluralsight-url-fix.md`; Gemini to run e2e verification
+- [ ] **scratch/ cleanup** — delete all stale Playwright artifacts and debug scripts from `scratch/` (already gitignored); policy: wipe at each release cut in `/post-merge` Step 8 alongside branch pruning
+
+---
+
+## v0.9.17 — Completed
 
 - [x] **`_antigravity_ensure_acg_session`** — Implemented in `scripts/plugins/antigravity.sh`; BATS coverage in `scripts/tests/lib/antigravity.bats`; verified via `env -i` BATS run.
 
