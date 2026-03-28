@@ -29,7 +29,7 @@ ESO polls Vault on a configurable interval. When a Vault secret changes, ESO upd
 
 1. Write the secret to Vault:
    ```bash
-   vault kv put secret/k3d-manager/myapp password=s3cr3t
+   vault kv put secret/k3d-manager/myapp password=<your-password>
    ```
 
 2. Create an `ExternalSecret` CR in your namespace:

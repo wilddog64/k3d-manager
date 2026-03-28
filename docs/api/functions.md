@@ -132,7 +132,7 @@ Checks whether the user is logged into GitHub in the running Antigravity browser
 
 Checks whether the user is logged into Pluralsight's Cloud Playground (`app.pluralsight.com/cloud-playground/cloud-sandboxes`) in the running Antigravity browser (via Playwright CDP). If not logged in, navigates to the sign-in page and waits up to 300s for the user to complete login interactively. Returns 1 on timeout.
 
-**First-run note:** On a brand new environment, the Antigravity browser will open and display the ACG sign-in page. Log in manually — the session cookie is persisted in the Antigravity browser profile and reused on all subsequent runs until it expires.
+**First-run note:** On a brand new environment, the Antigravity browser will open and display the Pluralsight (ACG) sign-in page. Log in manually — the session cookie is persisted in the Antigravity browser profile and reused on all subsequent runs until it expires.
 
 Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Pluralsight session check (e.g. for CI runs or when Playwright is unavailable).
 

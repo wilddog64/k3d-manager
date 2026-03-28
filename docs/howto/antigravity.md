@@ -30,17 +30,17 @@ On first use, Antigravity will open its browser window and navigate to the targe
 ## Extend ACG Sandbox TTL
 
 ```bash
-antigravity_acg_extend <sandbox-url>
+./scripts/k3d-manager antigravity_acg_extend <sandbox-url>
 ```
 
 Antigravity opens the sandbox page and clicks the extend button (+4 hours). The new expiry time is printed on completion.
 
 ```bash
 # Example
-antigravity_acg_extend "https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
+./scripts/k3d-manager antigravity_acg_extend "https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
 
 # Skip ACG session check (useful for CI or if Playwright cannot launch)
-K3DM_ACG_SKIP_SESSION_CHECK=1 antigravity_acg_extend "<sandbox-url>"
+K3DM_ACG_SKIP_SESSION_CHECK=1 ./scripts/k3d-manager antigravity_acg_extend "<sandbox-url>"
 ```
 
 ## Trigger a GitHub Copilot Coding Agent Review
@@ -53,16 +53,16 @@ Navigates to `github.com/<owner>/<repo>/agents`, creates a new Copilot coding ag
 
 ```bash
 # Default prompt: "Review this codebase for code quality, security, and architecture."
-antigravity_trigger_copilot_review wilddog64 k3d-manager
+./scripts/k3d-manager antigravity_trigger_copilot_review wilddog64 k3d-manager
 
 # Custom prompt
-antigravity_trigger_copilot_review wilddog64 k3d-manager "Focus on shell injection risks."
+./scripts/k3d-manager antigravity_trigger_copilot_review wilddog64 k3d-manager "Focus on shell injection risks."
 ```
 
 ## Poll a Copilot Task
 
 ```bash
-antigravity_poll_task <owner> <repo> <task-uuid> [timeout-seconds]
+./scripts/k3d-manager antigravity_poll_task <owner> <repo> <task-uuid> [timeout-seconds]
 ```
 
 Polls the task URL every 30 seconds until complete (default timeout: 300s). Prints the full review output verbatim.

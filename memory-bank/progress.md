@@ -51,10 +51,11 @@
 ## v0.9.18 — Active
 
 - [x] **Pluralsight URL fix** — commit `8f857ea` updates `_ACG_SANDBOX_URL`, `_antigravity_ensure_acg_session`, and docs per `docs/plans/v0.9.18-pluralsight-url-fix.md`; Gemini to run e2e verification
+- [ ] **scratch/ cleanup** — delete all stale Playwright artifacts and debug scripts from `scratch/` (already gitignored); policy: wipe at each release cut in `/post-merge` Step 8 alongside branch pruning
 
 ---
 
-## v0.9.17 — Planned
+## v0.9.17 — Completed
 
 - [x] **`_antigravity_ensure_acg_session`** — Implemented in `scripts/plugins/antigravity.sh`; BATS coverage in `scripts/tests/lib/antigravity.bats`; verified via `env -i` BATS run.
 

@@ -16,7 +16,7 @@ The ACG plugin provisions a t3.medium EC2 instance on an ACG (A Cloud Guru) sand
 # Restrict ingress to your IP (recommended)
 export ACG_ALLOWED_CIDR=$(curl -s ifconfig.me)/32
 
-acg_provision --confirm
+./scripts/k3d-manager acg_provision --confirm
 ```
 
 Creates: VPC, subnet, security group, key pair, t3.medium EC2 instance. Updates `~/.ssh/config` with the `ubuntu` host alias.
@@ -24,7 +24,7 @@ Creates: VPC, subnet, security group, key pair, t3.medium EC2 instance. Updates 
 ### 2. Verify
 
 ```bash
-acg_status
+./scripts/k3d-manager acg_status
 ```
 
 Shows instance state, public IP, and k3s health. Wait until k3s reports `Running` before proceeding.
@@ -43,9 +43,9 @@ Installs k3s via k3sup and merges the kubeconfig as the `ubuntu-k3s` context.
 ACG sandboxes expire after 4 hours. To extend:
 
 ```bash
-antigravity_acg_extend <sandbox-url>
+./scripts/k3d-manager antigravity_acg_extend <sandbox-url>
 # Example cloud playground URL
-antigravity_acg_extend "https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
+./scripts/k3d-manager antigravity_acg_extend "https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
 ```
 
 The Antigravity browser opens and clicks the extend button automatically. **First run:** you will be prompted to log into Pluralsight manually in the browser window — session persists for subsequent runs.
@@ -55,7 +55,7 @@ Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Pluralsight session check (use
 ### 5. Teardown
 
 ```bash
-acg_teardown --confirm
+./scripts/k3d-manager acg_teardown --confirm
 ```
 
 Terminates the EC2 instance, removes the VPC/SG/key pair, and removes the `ubuntu-k3s` context from `~/.kube/config`.
