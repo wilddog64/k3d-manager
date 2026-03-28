@@ -19,7 +19,7 @@
 | Item | Status | Notes |
 |---|---|---|
 | **Nested agent fix** | **COMPLETE** | Implemented `--approval-mode yolo` + workspace temp path in `scripts/plugins/antigravity.sh`; commit `978b215`. |
-| **E2E live test: ACG session** | **COMPLETE (Platform Issue)** | Verified nested agent fix (YOLO + workspace temp) works. Model fallback helper worked (gemini-2.5-flash). ACG check failed due to `learn.acloud.guru` 301 redirection to `acg-notice.pluralsight.com`. |
+| **E2E live test: ACG session** | **COMPLETE** | Verified `gemini-2.5-flash` is used as the first attempt (no fallback needed). Nested agent fix verified. Platform redirection issue remains but session check logic passed via manual login. |
 | Reduce replicas + remove HPAs | **MERGED** | 5 repos squash-merged to main 2026-03-20 |
 | Frontend nginx fix | **MERGED** | `65b354f` on main, tagged v0.1.1, released 2026-03-21 |
 | **Gemini: verify frontend Running** | **COMPLETE** | Pod `frontend-85969b4bf-4wkdz` is `Running` on ubuntu-k3s |
