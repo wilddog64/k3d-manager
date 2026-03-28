@@ -16,7 +16,7 @@
 **v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag (CHANGE.md [Unreleased]). if-count allowlist fully cleared: _run_command + _ensure_node helpers extracted via lib-foundation PR #13.
 **v0.9.15 SHIPPED** — PR #51 squash-merged to main (`484354da`) 2026-03-27. Tagged v0.9.15, released.
 **v0.9.16 SHIPPED** — PR #51 squash-merged to main (`484354da`) 2026-03-27. Tagged v0.9.16, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-27-v0.9.16-retrospective.md`.
-**v0.9.17 ACTIVE** — branch `k3d-manager-v0.9.17` cut from `484354da` 2026-03-27. Blocked on lib-foundation v0.3.14.
+**v0.9.17 ACTIVE** — branch `k3d-manager-v0.9.17`; PR #52 open 2026-03-28; CI in progress; Copilot tagged.
 
 ## v0.9.17 — In Progress
 
