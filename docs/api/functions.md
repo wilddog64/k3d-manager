@@ -130,6 +130,12 @@ Checks whether the user is logged into GitHub in the running Antigravity browser
 
 ### `_antigravity_ensure_acg_session`
 
-Checks whether the user is logged into ACG (`learn.acloud.guru`) in the running Antigravity browser (via Playwright CDP). If not logged in, navigates to the sign-in page and waits up to 300s for the user to complete login interactively. Returns 1 on timeout.
+Checks whether the user is logged into Pluralsight's Cloud Playground (`app.pluralsight.com/cloud-playground/cloud-sandboxes`) in the running Antigravity browser (via Playwright CDP). If not logged in, navigates to the sign-in page and waits up to 300s for the user to complete login interactively. Returns 1 on timeout.
 
-> **Note:** `learn.acloud.guru` currently redirects to Pluralsight — URL update tracked in v0.9.18 ([issue](../issues/2026-03-28-acg-domain-redirection.md)).
+**First-run note:** On a brand new environment, the Antigravity browser will open and display the Pluralsight (ACG) sign-in page. Log in manually — the session cookie is persisted in the Antigravity browser profile and reused on all subsequent runs until it expires.
+
+Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Pluralsight session check (e.g. for CI runs or when Playwright is unavailable).
+
+| Env Var | Default | Description |
+|---|---|---|
+| `K3DM_ACG_SKIP_SESSION_CHECK` | `0` | Set to `1` to bypass the Pluralsight session check (useful for CI or if Playwright cannot launch) |

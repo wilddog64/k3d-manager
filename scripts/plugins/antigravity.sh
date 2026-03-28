@@ -104,25 +104,25 @@ Exit code 1 if session cannot be confirmed."
 
 function _antigravity_ensure_acg_session() {
   if [[ "${K3DM_ACG_SKIP_SESSION_CHECK:-0}" == "1" ]]; then
-    _info "K3DM_ACG_SKIP_SESSION_CHECK=1 — skipping ACG session check (ACG domain migration pending)"
+    _info "K3DM_ACG_SKIP_SESSION_CHECK=1 — skipping ACG/Pluralsight session check"
     return 0
   fi
-  _info "Checking ACG session in Antigravity browser..."
+  _info "Checking Pluralsight (ACG) session in Antigravity browser..."
 
   local gemini_prompt
   gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
 
 1. Connect to the running Antigravity browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
 2. Use the first browser context and page (do NOT launch a new browser).
-3. Navigate to https://learn.acloud.guru and wait for the page to load.
-4. Check if the user is logged in by looking for user avatar, account menu, or dashboard elements.
+3. Navigate to https://app.pluralsight.com/cloud-playground/cloud-sandboxes and wait for the page to load.
+4. Check if the user is logged in by looking for user avatar, account menu, or sandbox list elements (e.g. [data-testid='user-menu'], [aria-label='User menu'], or a heading containing 'Cloud Sandboxes').
 5. If logged in: print ACG_SESSION_OK and exit with code 0.
 6. If NOT logged in:
-   a. Navigate to https://learn.acloud.guru/sign-in
-   b. Print: ACTION REQUIRED: Please log into ACG in the Antigravity browser window, then press Enter to continue.
-   c. Wait for the page URL to no longer contain '/sign-in' — poll every 5 seconds, timeout after 300 seconds.
-   d. Once URL is no longer '/sign-in', print ACG_SESSION_OK and exit with code 0.
-   e. If 300 seconds pass without login, print ERROR: ACG login timeout and exit with code 1.
+   a. Navigate to https://app.pluralsight.com/id/signin
+   b. Print: ACTION REQUIRED: Please log into Pluralsight in the Antigravity browser window, then press Enter to continue.
+   c. Wait for the page URL to no longer contain '/signin' — poll every 5 seconds, timeout after 300 seconds.
+   d. Once URL is no longer '/signin', print ACG_SESSION_OK and exit with code 0.
+   e. If 300 seconds pass without login, print ERROR: Pluralsight login timeout and exit with code 1.
 
 Write the Playwright script to ${HOME}/.gemini/tmp/k3d-manager/ag_acg_session.js, execute with node, print the result.
 Exit code 1 if session cannot be confirmed."

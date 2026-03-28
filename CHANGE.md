@@ -1,5 +1,18 @@
 # Changes - k3d-manager
 
+## [v0.9.18] — 2026-03-28 — Pluralsight URL migration (ACG → app.pluralsight.com)
+
+### Fixed
+- `_ACG_SANDBOX_URL` in `scripts/plugins/acg.sh`: updated from retired `learn.acloud.guru/cloud-playground/cloud-sandboxes` to `app.pluralsight.com/cloud-playground/cloud-sandboxes` (`8f857ea`)
+- `_antigravity_ensure_acg_session` in `scripts/plugins/antigravity.sh`: updated navigation URL, login URL (`/id/signin`), and DOM selector hints for Pluralsight; removed "ACG domain migration pending" language from bypass guard (`8f857ea`)
+
+### Docs
+- `docs/api/functions.md`: `_antigravity_ensure_acg_session` — updated domain reference, added `K3DM_ACG_SKIP_SESSION_CHECK` env var table, removed stale redirect note
+- `docs/howto/acg.md`: updated sandbox URL and first-run login note to Pluralsight
+- `docs/howto/antigravity.md`: updated example URL and bypass comment
+
+---
+
 ## [v0.9.17] — 2026-03-27 — Antigravity model fallback + ACG session check + nested agent fix
 
 ### Added
