@@ -17,7 +17,8 @@
 **v0.9.15 SHIPPED** — PR #51 squash-merged to main (`484354da`) 2026-03-27. Tagged v0.9.15, released.
 **v0.9.16 SHIPPED** — PR #51 squash-merged to main (`484354da`) 2026-03-27. Tagged v0.9.16, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-27-v0.9.16-retrospective.md`.
 **v0.9.17 SHIPPED** — PR #52 merged to main (`c88ca7a`) 2026-03-28. Tagged v0.9.17, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.17-retrospective.md`. Branches v0.9.7–v0.9.17 deleted.
-**v0.9.18 ACTIVE** — branch `k3d-manager-v0.9.18` cut from `c88ca7a` 2026-03-28.
+**v0.9.18 SHIPPED** — PR #53 merged (`7567a5c`) 2026-03-28. Tagged v0.9.18. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.18-retrospective.md`.
+**v0.9.19 ACTIVE** — branch `k3d-manager-v0.9.19` cut from `7567a5c` 2026-03-28.
 
 ## v0.9.17 — Shipped
 
@@ -48,10 +49,15 @@
 
 ---
 
-## v0.9.18 — Active
+## v0.9.19 — Active
 
-- [x] **Pluralsight URL fix** — commit `8f857ea` updates `_ACG_SANDBOX_URL`, `_antigravity_ensure_acg_session`, and docs per `docs/plans/v0.9.18-pluralsight-url-fix.md`; Gemini to run e2e verification
-- [ ] **scratch/ cleanup** — delete all stale Playwright artifacts and debug scripts from `scratch/` (already gitignored); policy: wipe at each release cut in `/post-merge` Step 8 alongside branch pruning
+- [ ] **scratch/ cleanup** — `rm -f scratch/*`; stale Playwright artifacts from v0.9.18 and earlier
+
+---
+
+## v0.9.18 — Shipped
+
+- [x] **Pluralsight URL fix** — commit `8f857ea` updates `_ACG_SANDBOX_URL`, `_antigravity_ensure_acg_session`, and docs to `app.pluralsight.com`; Gemini e2e verified; PR #53 merged `7567a5c`
 
 ---
 
