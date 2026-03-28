@@ -95,6 +95,17 @@ already has 5 or more files in `docs/plans/`, do not write another — flag it t
 immediately. A 6th spec means the release is too large and must be split into two smaller
 releases. Claude decides how to split; you do not proceed until told to.
 
+### 13. `--approval-mode yolo` is for tightly scoped prompts only
+
+`--approval-mode yolo` disables all confirmation prompts for the inner gemini subprocess.
+It is only permitted when ALL of the following are true:
+
+- The prompt specifies **exactly one file to write** and **one command to run** — nothing else
+- The write target is inside `${HOME}/.gemini/tmp/k3d-manager/` — never the project workspace
+- The prompt contains **no open-ended instructions** ("fix issues", "clean up", "improve")
+
+Never use `--approval-mode yolo` with broad or ambiguous prompts. Violation = treat as a bug.
+
 ### 10. If-count allowlist is for legacy code only
 The `_agent_audit` threshold stays at 8 `if` blocks per function. If you touch a file with
 legacy functions that still exceed the limit, document the specific `file:function` pair in

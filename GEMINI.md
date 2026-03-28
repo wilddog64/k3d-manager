@@ -202,6 +202,12 @@ Do NOT skip issue docs to keep the report short. Unexpected behavior must be rec
 
 ---
 
+## `--approval-mode yolo` Safety Rule
+
+Only permitted when the prompt specifies exactly one file to write (inside `${HOME}/.gemini/tmp/k3d-manager/`) and one command to run. Never use with open-ended prompts ("fix", "improve", "clean up"). Violation = treat as a bug.
+
+---
+
 ## Known Failure Modes (your history — avoid repeating)
 
 - You skip reading the memory-bank and start from your own interpretation — always read it first
