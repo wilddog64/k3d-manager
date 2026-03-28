@@ -18,13 +18,16 @@
 **v0.9.16 SHIPPED** — PR #51 squash-merged to main (`484354da`) 2026-03-27. Tagged v0.9.16, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-27-v0.9.16-retrospective.md`.
 **v0.9.17 SHIPPED** — PR #52 merged to main (`c88ca7a`) 2026-03-28. Tagged v0.9.17, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.17-retrospective.md`. Branches v0.9.7–v0.9.17 deleted.
 **v0.9.18 SHIPPED** — PR #53 merged (`7567a5c`) 2026-03-28. Tagged v0.9.18. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.18-retrospective.md`.
-**v0.9.19 ACTIVE** — branch `k3d-manager-v0.9.19` cut from `7567a5c` 2026-03-28.
+**v0.9.19 SHIPPED** — PR #54 merged (`0f13be1`) 2026-03-28. Tagged v0.9.19. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.19-retrospective.md`.
+**v0.9.20 ACTIVE** — branch `k3d-manager-v0.9.20` cut from `0f13be1` 2026-03-28.
 
-## v0.9.19 — In Progress
+## v0.9.19 — Shipped
 
 - [x] **`acg_get_credentials` + `acg_import_credentials`** — commit `3970623` adds `_acg_write_credentials`, both public functions, docs updates, and 8 BATS tests per `docs/plans/v0.9.19-acg-get-credentials.md`
-- [ ] **Static Playwright script** — Codex assigned. Spec: `docs/plans/v0.9.19-acg-playwright-script.md`. Creates `scripts/playwright/acg_credentials.js`; replaces Gemini-prompt block in `acg_get_credentials` with direct `node` call. Commit message: `feat(acg): replace Gemini-generated Playwright with static acg_credentials.js`
-- [ ] **Gemini: verify Playwright selectors** — after Codex, spin up live sandbox and run `acg_get_credentials <url>` to verify/update DOM selectors in `acg_credentials.js`
+- [x] **Static Playwright script** — `scripts/playwright/acg_credentials.js` implemented + live-verified by Gemini against Pluralsight sandbox. `acg_get_credentials` updated to call static script. Spec: `docs/plans/v0.9.19-acg-playwright-script.md`.
+- [x] **Gemini: verify Playwright selectors** — `aws sts get-caller-identity` confirmed valid account ID; credentials written to `~/.aws/credentials`. Live-verified.
+- [x] **Copilot PR #54 findings** — 9 findings addressed in `392dae5`: session token optional, playwright guard, null parent, chmod trace suppression, docs fixes, spec status, issue doc resolution, BATS AKIA test.
+- [x] **GitGuardian false positive** — `.gitguardian.yaml` added to exclude `scripts/tests/` from scanning.
 - [ ] **scratch/ cleanup** — `rm -rf scratch/*` — wipe stale Playwright artifacts at release cut
 
 ## v0.9.17 — Shipped
