@@ -101,3 +101,42 @@ setup() {
   [[ "$output" == *"All gemini models exhausted"* ]]
   unset -f _info _err gemini sleep
 }
+
+@test "_antigravity_gemini_prompt: passes --approval-mode yolo to gemini" {
+  _info() { :; }
+  sleep() { :; }
+  gemini() {
+    local found_yolo=0
+    for arg in "$@"; do
+      [[ "$arg" == "yolo" ]] && found_yolo=1
+    done
+    if [[ $found_yolo -ne 1 ]]; then
+      echo "missing --approval-mode yolo: $*"
+      return 1
+    fi
+    echo "ok"
+    return 0
+  }
+  export -f _info gemini sleep
+  source "scripts/plugins/antigravity.sh"
+
+  run _antigravity_gemini_prompt "test prompt"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok"* ]]
+  unset -f _info gemini sleep
+}
+
+@test "_antigravity_gemini_prompt: creates workspace temp dir" {
+  _info() { :; }
+  sleep() { :; }
+  gemini() { echo "ok"; return 0; }
+  export -f _info gemini sleep
+  source "scripts/plugins/antigravity.sh"
+
+  local tmpdir="${HOME}/.gemini/tmp/k3d-manager"
+  rm -rf "$tmpdir"
+  run _antigravity_gemini_prompt "test prompt"
+  [ "$status" -eq 0 ]
+  [ -d "$tmpdir" ]
+  unset -f _info gemini sleep
+}
