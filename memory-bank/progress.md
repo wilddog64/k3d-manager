@@ -23,7 +23,8 @@
 - [x] **`_antigravity_ensure_acg_session`** — Implemented in `scripts/plugins/antigravity.sh`; BATS coverage in `scripts/tests/lib/antigravity.bats`; verified via `env -i` BATS run.
 - [ ] **E2E live test: `_antigravity_ensure_acg_session`** — **FAILED (Retry)**. Gemini task. Spec: `docs/plans/v0.9.17-acg-session-e2e-test.md`. Fallback helper worked, but nested agent hit Plan Mode + path restrictions. See `docs/issues/2026-03-27-acg-session-e2e-fail.md`.
 - [x] **Pin gemini model to gemini-2.5-flash** — Gemini implemented in `scripts/plugins/antigravity.sh`; BATS tests pending Codex implementation. Spec: `docs/plans/v0.9.17-antigravity-model-flag.md`.
-- [ ] **Model fallback helper** — Gemini implements `_antigravity_gemini_prompt` (tries gemini-1.5-flash → 2.0-flash → 2.5-flash before failing), Codex writes BATS. Spec: `docs/plans/v0.9.17-antigravity-model-fallback.md`.
+- [x] **Model fallback helper** — implemented (`d004bb3`), BATS added by Codex (`74d182d`). Spec: `docs/plans/v0.9.17-antigravity-model-fallback.md`.
+- [ ] **Nested agent fix** — Gemini implements `--approval-mode yolo` + workspace temp path, Codex writes BATS. Spec: `docs/plans/v0.9.17-antigravity-nested-agent-fix.md`. Unblocks e2e retest.
 
 ---
 
