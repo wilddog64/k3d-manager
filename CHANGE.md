@@ -1,5 +1,26 @@
 # Changes - k3d-manager
 
+## [v1.0.0] — 2026-03-29 — k3s-aws provider foundation
+
+### Added
+- `CLUSTER_PROVIDER=k3s-aws` provider: `_provider_k3s_aws_deploy_cluster` (pre-flight extend → `acg_provision` → `deploy_app_cluster` → `tunnel_start` → `acg_watch`) and `_provider_k3s_aws_destroy_cluster` in `scripts/lib/providers/k3s-aws.sh` (`4aba999`)
+- `aws_import_credentials` in new `scripts/plugins/aws.sh`: supports CSV (IAM Download), quoted/unquoted export, labeled (Pluralsight), credentials file formats; replaces `acg_import_credentials` under generic namespace (`be7e997`)
+- `acg_provision --recreate` flag: tears down existing instance before provisioning fresh — handles unknown sandbox state (`51bdf3a`)
+- `acg_watch [interval_seconds]`: background TTL watcher; calls `antigravity_acg_extend` every 3.5h while EC2 instance alive; stops automatically when instance is gone (`51bdf3a`)
+- Pre-flight sandbox extend in `_provider_k3s_aws_deploy_cluster`: ensures fresh 4h TTL before long deploy; non-fatal on Antigravity unavailability (`51bdf3a`)
+
+### Fixed
+- `acg_get_credentials`: `acg.sh` now sources `antigravity.sh` — `_ensure_antigravity`/`_antigravity_launch` always defined at load time (`4357f90`)
+- `deploy_app_cluster`: resolves external IP from `~/.ssh/config` HostName before falling back to SSH alias — kubeconfig server address now correct (e.g. `https://1.2.3.4:6443` not `https://ubuntu:6443`) (`51983d3`)
+- `_acg_provision_stack`: keypair import uses `_run_command --soft` — silent on duplicate key, idempotent on re-run; removes noisy error that caused agent misdiagnosis (`4a57f44`)
+- `antigravity_acg_extend`: Playwright prompt now calls `page.goto()` unconditionally with `waitUntil: 'networkidle'` — no longer aborts on stale/404 browser state (`4a57f44`)
+
+### Changed
+- `acg_import_credentials` → deprecated alias for `aws_import_credentials` (generic AWS namespace) (`be7e997`)
+- `_cluster_provider_call` in `scripts/lib/provider.sh`: normalizes hyphens to underscores in provider slug for function lookup — enables `CLUSTER_PROVIDER=k3s-aws` routing
+
+---
+
 ## [v0.9.21] — 2026-03-29 — `_ensure_k3sup` auto-install helper
 
 ### Added
