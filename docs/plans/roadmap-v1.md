@@ -153,6 +153,16 @@ CLUSTER_PROVIDER=k3s-remote ./scripts/k3d-manager provision_full_stack
 **Gate:** v1.0.0 multi-node proven. k3d (local) + k3s-remote (ACG) = two backends,
 enough surface for a useful provider-agnostic MCP API.
 
+**Sudo pre-flight requirement:** k3dm-mcp agents run non-interactively — any sudo
+password prompt will hang the agent with no TTY to respond. Before v1.2.0 ships:
+- `deploy_cluster` / `deploy_app_cluster` must include a pre-flight check:
+  `ssh <host> sudo -n true 2>/dev/null` — fail fast with `_err` if passwordless sudo
+  is not configured rather than hanging on a prompt
+- Target node prerequisite documented: "provisioning user must have passwordless sudo
+  (`NOPASSWD:ALL` in `/etc/sudoers.d/`)"
+- ACG EC2 ubuntu user is passwordless by default — no change needed for that path
+- Home lab (Mac Mini M5, v1.3.0) and any self-managed VMs must be pre-configured
+
 **Discrete repo:** `wilddog64/k3dm-mcp`
 
 **MCP tools (initial set):**
