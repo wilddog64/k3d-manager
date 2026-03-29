@@ -10,9 +10,16 @@ setup() {
   _antigravity_launch() { :; }
   _antigravity_ensure_acg_session() { :; }
   _antigravity_gemini_prompt() { :; }
+  _write_sensitive_file() {
+    local path="$1" data="$2"
+    mkdir -p "$(dirname "$path")"
+    printf '%s' "$data" > "$path"
+    chmod 600 "$path"
+  }
   export -f _info _run_command _ensure_antigravity _ensure_antigravity_ide
   export -f _ensure_antigravity_mcp_playwright _antigravity_launch
   export -f _antigravity_ensure_acg_session _antigravity_gemini_prompt
+  export -f _write_sensitive_file
 
   export HOME="${BATS_TEST_TMPDIR}"
   source "scripts/plugins/acg.sh"

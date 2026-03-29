@@ -4,6 +4,11 @@ bats_require_minimum_version 1.5.0
 
 setup() {
   export PROJECT_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  if [[ -x /opt/homebrew/bin/bash ]]; then
+    PATH="/opt/homebrew/bin:${PATH}"
+  elif [[ -x /usr/local/bin/bash ]]; then
+    PATH="/usr/local/bin:${PATH}"
+  fi
 }
 
 @test "test_jenkins trap removes auth file" {

@@ -206,6 +206,7 @@ function _test_execute() {
     local repo_root="$5"
     local -a _selected=()
     local -a _bats_args=()
+    local bats_shell="${K3DM_BASH_BIN:-}"
 
     if [[ -n "$selected_data" ]]; then
         while IFS= read -r line; do
@@ -219,6 +220,16 @@ function _test_execute() {
             [[ -z "$line" ]] && continue
             _bats_args+=("$line")
         done <<< "$bats_args_data"$'\n'
+    fi
+
+    if [[ -z "$bats_shell" ]]; then
+        if [[ -x /opt/homebrew/bin/bash ]]; then
+            bats_shell="/opt/homebrew/bin/bash"
+        elif [[ -x /usr/local/bin/bash ]]; then
+            bats_shell="/usr/local/bin/bash"
+        else
+            bats_shell="$(command -v bash 2>/dev/null || printf 'bash')"
+        fi
     fi
 
     if [[ ${#_selected[@]} -eq 0 ]]; then
@@ -256,7 +267,7 @@ function _test_execute() {
 
             log_file="${base_dir}/${timestamp}.log"
             if : > "$log_file" 2>/dev/null; then
-                bats "${_bats_args[@]}" "${_selected[@]}" 2>&1 | tee "$log_file"
+                BATS_SHELL="$bats_shell" bats "${_bats_args[@]}" "${_selected[@]}" 2>&1 | tee "$log_file"
                 status=${PIPESTATUS[0]}
                 ran_with_logging=1
             else
@@ -268,7 +279,7 @@ function _test_execute() {
     fi
 
     if (( ran_with_logging == 0 )); then
-        bats "${_bats_args[@]}" "${_selected[@]}"
+        BATS_SHELL="$bats_shell" bats "${_bats_args[@]}" "${_selected[@]}"
         status=$?
     fi
 

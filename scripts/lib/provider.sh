@@ -66,7 +66,8 @@ function _cluster_provider_call() {
     _ensure_cluster_provider
 
     local provider="$CLUSTER_PROVIDER"
-    local func="_provider_${provider}_${action}"
+    local provider_slug="${provider//-/_}"
+    local func="_provider_${provider_slug}_${action}"
 
     if ! declare -f "$func" >/dev/null 2>&1; then
         _err "Cluster provider '$provider' does not implement action '$action'"

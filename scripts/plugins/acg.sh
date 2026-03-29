@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
 # scripts/plugins/acg.sh — ACG AWS sandbox lifecycle management
 #
-# Functions: acg_get_credentials acg_import_credentials acg_provision acg_status acg_extend acg_teardown
+# Functions: acg_get_credentials acg_provision acg_status acg_extend acg_watch acg_teardown
+# Credential parsing: aws_import_credentials (scripts/plugins/aws.sh)
+
+if [[ -z "${SCRIPT_DIR:-}" ]]; then
+  SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
+fi
+
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/plugins/aws.sh"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/plugins/antigravity.sh"
 
 : "${ACG_REGION:=us-west-2}"
 : "${ACG_ALLOWED_CIDR:=0.0.0.0/0}"
@@ -16,6 +26,7 @@ _ACG_VPC_CIDR="10.0.0.0/16"
 _ACG_SUBNET_CIDR="10.0.1.0/24"
 _ACG_SANDBOX_URL="https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
 _ACG_SANDBOX_LIST_URL="${ACG_SANDBOX_LIST_URL:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}"
+_ACG_WATCH_PID_FILE="${HOME}/.local/share/k3d-manager/acg-watch.pid"
 
 _acg_check_credentials() {
   _info "[acg] Checking AWS credentials..."
@@ -146,8 +157,8 @@ _acg_provision_stack() {
     _info "[acg] Deriving public key from ${_ACG_KEY_PEM}"
     _run_command -- ssh-keygen -y -f "${_ACG_KEY_PEM}" > "${_ACG_KEY_PEM%.pem}.pub"
   fi
-  _run_command -- aws ec2 import-key-pair --region "${ACG_REGION}" --key-name "${_ACG_KEY_NAME}" \
-    --public-key-material "fileb://${_ACG_KEY_PEM%.pem}.pub" >/dev/null 2>&1 || true
+  _run_command --soft -- aws ec2 import-key-pair --region "${ACG_REGION}" --key-name "${_ACG_KEY_NAME}" \
+    --public-key-material "fileb://${_ACG_KEY_PEM%.pem}.pub" >/dev/null 2>&1
 
   ami_id=$(_run_command -- aws ec2 describe-images --region "${ACG_REGION}" --owners "${_ACG_AMI_OWNER}" \
     --filters "Name=name,Values=${_ACG_AMI_FILTER}" "Name=state,Values=available" \
@@ -181,62 +192,14 @@ _acg_check_k3s() {
   fi
 }
 
+# Deprecated helper — use _aws_write_credentials instead
 _acg_write_credentials() {
-  local access_key="$1"
-  local secret_key="$2"
-  local session_token="${3:-}"
-  local creds_file="${HOME}/.aws/credentials"
-  mkdir -p "${HOME}/.aws"
-  { set +x; } 2>/dev/null
-  {
-    echo "[default]"
-    echo "aws_access_key_id=${access_key}"
-    echo "aws_secret_access_key=${secret_key}"
-    if [[ -n "${session_token}" ]]; then
-      echo "aws_session_token=${session_token}"
-    fi
-  } > "${creds_file}"
-  chmod 600 "${creds_file}"
-  _info "[acg] Credentials written to ${creds_file}"
-  _info "[acg] Access key: ${access_key:0:4}****"
+  _aws_write_credentials "$@"
 }
 
+# Deprecated alias — use aws_import_credentials instead
 function acg_import_credentials() {
-  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    cat <<'HELP'
-Usage: pbpaste | acg_import_credentials
-       acg_import_credentials < credentials.txt
-
-Read AWS credentials block from stdin and write to ~/.aws/credentials.
-Expected input format (copy from Pluralsight Cloud Access panel):
-
-  AWS Access Key ID: ASIA...
-  AWS Secret Access Key: abc123...
-  AWS Session Token: IQo...
-
-Or the export block format:
-
-  export AWS_ACCESS_KEY_ID=ASIA...
-  export AWS_SECRET_ACCESS_KEY=abc123...
-  export AWS_SESSION_TOKEN=IQo...
-HELP
-    return 0
-  fi
-
-  _info "[acg] Reading credentials from stdin..."
-  local input access_key secret_key session_token
-  input=$(cat)
-
-  access_key=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_ACCESS_KEY_ID| Access Key ID)[\s:=]+(\S+)/i) {print $1; exit}')
-  secret_key=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_SECRET_ACCESS_KEY| Secret Access Key)[\s:=]+(\S+)/i) {print $1; exit}')
-  session_token=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_SESSION_TOKEN| Session Token)[\s:=]+(\S+)/i) {print $1; exit}')
-
-  if [[ -z "$access_key" || -z "$secret_key" ]]; then
-    printf 'ERROR: %s\n' "[acg] Could not parse credentials from stdin. Expected AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY." >&2
-    return 1
-  fi
-
-  _acg_write_credentials "$access_key" "$secret_key" "$session_token"
+  aws_import_credentials "$@"
 }
 
 function acg_get_credentials() {
@@ -296,20 +259,23 @@ HELP
     return 1
   fi
 
-  _acg_write_credentials "$access_key" "$secret_key" "$session_token"
+  _aws_write_credentials "$access_key" "$secret_key" "$session_token"
 }
 
 function acg_provision() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
-Usage: acg_provision [--confirm]
+Usage: acg_provision --confirm [--recreate]
 
 Provision an ACG AWS sandbox EC2 instance. If an instance tagged
 'k3d-manager-ubuntu' already exists, start it (if stopped) and update
 ~/.ssh/config. If no instance exists, provision VPC + subnet + IGW + SG +
 key pair + t3.medium EC2.
 
-Requires --confirm to prevent accidental provisioning.
+Flags:
+  --confirm    Required — prevents accidental provisioning
+  --recreate   Tear down any existing instance before provisioning fresh.
+               Use when sandbox state is unknown or TTL has expired.
 
 Config (env overrides):
   ACG_REGION   AWS region (default: us-west-2)
@@ -322,7 +288,15 @@ HELP
     return 0
   fi
 
-  if [[ "${1:-}" != "--confirm" ]]; then
+  local _confirm=0 _recreate=0
+  for _arg in "$@"; do
+    case "$_arg" in
+      --confirm)  _confirm=1 ;;
+      --recreate) _recreate=1 ;;
+    esac
+  done
+
+  if [[ $_confirm -eq 0 ]]; then
     printf 'ERROR: %s\n' "[acg] acg_provision requires --confirm to prevent accidental provisioning" >&2
     return 1
   fi
@@ -330,6 +304,12 @@ HELP
   _acg_check_credentials || return 1
   local instance_id
   instance_id=$(_acg_get_instance_id)
+
+  if [[ $_recreate -eq 1 && -n "$instance_id" ]]; then
+    _info "[acg] --recreate: tearing down existing instance before provisioning fresh..."
+    acg_teardown --confirm || return 1
+    instance_id=""
+  fi
 
   if [[ -z "$instance_id" ]]; then
     _info "[acg] No instance found — provisioning..."
@@ -400,6 +380,44 @@ HELP
     _info "[acg] Open this URL in your browser and click 'Extend Lab':"
     _info "[acg] ${_ACG_SANDBOX_URL}"
   fi
+}
+
+function acg_watch() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'HELP'
+Usage: acg_watch [interval_seconds]
+
+Background sandbox TTL watcher. Extends the ACG sandbox every 3.5 hours
+while the EC2 instance is alive. Stops automatically when the instance
+is gone (after acg_teardown).
+
+Requires antigravity_acg_extend to be defined (antigravity.sh sourced).
+Default interval: 12600 seconds (3.5 hours).
+
+Example (run after deploy_cluster):
+  acg_watch &
+  echo "Watcher PID: $!"
+HELP
+    return 0
+  fi
+
+  local interval="${1:-12600}"
+  _info "[acg] Sandbox watcher started (PID $$, extending every $((interval / 3600))h)"
+
+  while true; do
+    sleep "$interval"
+    if [[ -z "$(_acg_get_instance_id 2>/dev/null)" ]]; then
+      _info "[acg] Instance gone — watcher stopping."
+      return 0
+    fi
+    _info "[acg] Extending sandbox TTL..."
+    if declare -f antigravity_acg_extend > /dev/null 2>&1; then
+      antigravity_acg_extend "${_ACG_SANDBOX_URL}" \
+        || _info "[acg] Extend failed — open ${_ACG_SANDBOX_URL} to extend manually"
+    else
+      _info "[acg] antigravity_acg_extend not available — open ${_ACG_SANDBOX_URL} to extend manually"
+    fi
+  done
 }
 
 function acg_teardown() {

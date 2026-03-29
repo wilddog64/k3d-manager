@@ -62,11 +62,13 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `tunnel_status` | `scripts/plugins/tunnel.sh` | Show tunnel process and launchd status |
 | `deploy_app_cluster` | `scripts/plugins/shopping_cart.sh` | Install k3s on EC2 via k3sup and merge kubeconfig |
 | `acg_get_credentials` | `scripts/plugins/acg.sh` | Extract AWS credentials from Pluralsight Cloud Access via Antigravity |
-| `acg_import_credentials` | `scripts/plugins/acg.sh` | Write AWS credentials from stdin to `~/.aws/credentials` |
-| `acg_provision` | `scripts/plugins/acg.sh` | Provision ACG sandbox EC2 instance (VPC + SG + key + t3.medium) |
+| `acg_import_credentials` | `scripts/plugins/acg.sh` | Deprecated alias for `aws_import_credentials` — use `aws_import_credentials` instead |
+| `acg_provision` | `scripts/plugins/acg.sh` | Provision ACG sandbox EC2 instance (VPC + SG + key + t3.medium); `--recreate` tears down and re-provisions |
 | `acg_status` | `scripts/plugins/acg.sh` | Show ACG instance state, public IP, and k3s health |
 | `acg_extend` | `scripts/plugins/acg.sh` | Open ACG sandbox page to extend TTL (+4h) |
+| `acg_watch` | `scripts/plugins/acg.sh` | Background TTL watcher — calls `antigravity_acg_extend` every 3.5h while EC2 instance alive |
 | `acg_teardown` | `scripts/plugins/acg.sh` | Terminate ACG instance and remove ubuntu-k3s kubeconfig context |
+| `aws_import_credentials` | `scripts/plugins/aws.sh` | Write AWS credentials from stdin to `~/.aws/credentials`; supports CSV, quoted/unquoted export, Pluralsight label, and credentials file formats |
 | `antigravity_install` | `scripts/plugins/antigravity.sh` | Verify full Antigravity stack installed (Node.js, gemini CLI, IDE, Playwright MCP) |
 | `antigravity_trigger_copilot_review` | `scripts/plugins/antigravity.sh` | Trigger GitHub Copilot coding agent task via Playwright CDP automation |
 | `antigravity_poll_task` | `scripts/plugins/antigravity.sh` | Poll a Copilot coding agent task until complete; print full output verbatim |
@@ -78,11 +80,37 @@ Extracts AWS credentials from the Pluralsight Cloud Sandbox "Cloud Access" panel
 
 **Usage:** `./scripts/k3d-manager acg_get_credentials [sandbox-url]`
 
+### `aws_import_credentials`
+
+Reads an AWS credentials block from stdin and writes to `~/.aws/credentials` under `[default]`. Supports multiple input formats:
+
+| Format | Example |
+|---|---|
+| CSV (IAM Download) | `Access key ID,Secret access key` header + data row |
+| Quoted export | `export AWS_ACCESS_KEY_ID="AKIA..."` |
+| Unquoted export | `export AWS_ACCESS_KEY_ID=AKIA...` |
+| Pluralsight label | `AWS Access Key ID: AKIA...` |
+| Credentials file | `[default]` block passthrough |
+
+**Usage:** `pbpaste | ./scripts/k3d-manager aws_import_credentials`
+
 ### `acg_import_credentials`
 
-Reads an AWS credentials block from stdin and writes to `~/.aws/credentials` under `[default]`. Supports both Pluralsight label format (`AWS Access Key ID: ...`) and shell export format (`export AWS_ACCESS_KEY_ID=...`).
+Deprecated alias for `aws_import_credentials`. Kept for backwards compatibility.
 
 **Usage:** `pbpaste | ./scripts/k3d-manager acg_import_credentials`
+
+### `acg_provision`
+
+Provisions the ACG sandbox EC2 instance. Requires `--confirm`. With `--recreate`, tears down any existing instance first.
+
+**Usage:** `./scripts/k3d-manager acg_provision --confirm [--recreate]`
+
+### `acg_watch`
+
+Starts a background loop that extends the ACG sandbox TTL via `antigravity_acg_extend` every `interval_seconds` (default 12600 = 3.5h). Stops automatically when the EC2 instance is gone.
+
+**Usage:** `acg_watch [interval_seconds]` (typically called as `acg_watch &` from `_provider_k3s_aws_deploy_cluster`)
 
 ## Running Tests
 
