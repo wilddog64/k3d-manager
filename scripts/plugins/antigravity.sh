@@ -69,11 +69,22 @@ function _antigravity_launch() {
   if _run_command --soft -- curl -sf http://localhost:9222/json >/dev/null 2>&1; then
     return 0
   fi
-  _info "Antigravity not running — launching with --remote-debugging-port=9222..."
+  _info "Chrome not running — launching with --remote-debugging-port=9222..."
   if _is_mac; then
-    open -a "Antigravity" --args --remote-debugging-port=9222
+    open -a "Google Chrome" --args \
+      --remote-debugging-port=9222 \
+      --password-store=basic \
+      --user-data-dir="${HOME}/.config/acg-chrome-profile"
   else
-    antigravity --remote-debugging-port=9222 &
+    local _chrome_bin
+    _chrome_bin=$(command -v google-chrome 2>/dev/null || command -v google-chrome-stable 2>/dev/null || command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || true)
+    if [[ -z "${_chrome_bin}" ]]; then
+      _err "[antigravity] Chrome/Chromium not found — install google-chrome, google-chrome-stable, chromium-browser, or chromium"
+    fi
+    "${_chrome_bin}" \
+      --remote-debugging-port=9222 \
+      --password-store=basic \
+      --user-data-dir="${HOME}/.config/acg-chrome-profile" &
   fi
   _antigravity_browser_ready 30
 }
