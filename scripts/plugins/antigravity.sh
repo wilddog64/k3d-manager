@@ -222,7 +222,7 @@ function antigravity_acg_extend() {
 
 1. Connect to the running Antigravity browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
 2. Use the first browser context and page (do NOT launch a new browser).
-3. Navigate to ${sandbox_url}
+3. Call \`await page.goto('${sandbox_url}', {waitUntil: 'networkidle'})\` unconditionally — regardless of the current page state, always navigate.
 4. Find the sandbox TTL extend button (look for 'Extend', '+4 hours', or similar).
 5. Click to extend by ${hours} hours.
 6. Confirm the new TTL is shown on the page.

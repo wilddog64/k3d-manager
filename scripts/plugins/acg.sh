@@ -156,8 +156,8 @@ _acg_provision_stack() {
     _info "[acg] Deriving public key from ${_ACG_KEY_PEM}"
     _run_command -- ssh-keygen -y -f "${_ACG_KEY_PEM}" > "${_ACG_KEY_PEM%.pem}.pub"
   fi
-  _run_command -- aws ec2 import-key-pair --region "${ACG_REGION}" --key-name "${_ACG_KEY_NAME}" \
-    --public-key-material "fileb://${_ACG_KEY_PEM%.pem}.pub" >/dev/null 2>&1 || true
+  _run_command --soft -- aws ec2 import-key-pair --region "${ACG_REGION}" --key-name "${_ACG_KEY_NAME}" \
+    --public-key-material "fileb://${_ACG_KEY_PEM%.pem}.pub" >/dev/null 2>&1
 
   ami_id=$(_run_command -- aws ec2 describe-images --region "${ACG_REGION}" --owners "${_ACG_AMI_OWNER}" \
     --filters "Name=name,Values=${_ACG_AMI_FILTER}" "Name=state,Values=available" \
