@@ -19,17 +19,40 @@ async function extractCredentials() {
     // 1. Connect to the running browser via CDP
     browser = await chromium.connectOverCDP('http://localhost:9222');
 
-    // 2. Use the first browser context and page
+    // 2. Find the Pluralsight page by URL (do not assume pages()[0])
     const context = browser.contexts()[0];
     if (!context) throw new Error('No browser context found');
-    const page = context.pages()[0];
-    if (!page) throw new Error('No page found in the first browser context');
+    const allPages = context.pages();
+    let page = allPages.find(p => p.url().includes('pluralsight.com'));
+    if (!page) {
+      page = allPages[0];
+      if (!page) throw new Error('No page found in the browser context');
+    }
 
-    console.error(`INFO: Navigating to ${targetUrl}...`);
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    
-    // Give it time to render the SPA content
-    await page.waitForTimeout(5000);
+    // Navigate only if not already on the target URL (hard reload kills SPA auth)
+    const currentUrl = page.url();
+    if (!currentUrl.startsWith('https://app.pluralsight.com')) {
+      console.error(`INFO: Navigating to ${targetUrl}...`);
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    } else if (!currentUrl.includes('cloud-sandboxes')) {
+      console.error(`INFO: SPA-navigating to cloud-sandboxes from ${currentUrl}...`);
+      const navLink = page.locator('a[href*="cloud-sandboxes"]').first();
+      const navVisible = await navLink.isVisible({ timeout: 5000 }).catch(() => false);
+      if (navVisible) {
+        await navLink.click();
+      } else {
+        await page.evaluate(url => window.location.assign(url), targetUrl);
+      }
+    } else {
+      console.error(`INFO: Already on ${currentUrl} — skipping navigation`);
+    }
+
+    // Give it time to render SPA content after navigation changes
+    console.error('INFO: Waiting for page content to load...');
+    await page.waitForFunction(
+      () => !document.querySelector('[aria-busy="true"]'),
+      { timeout: 30000 }
+    ).catch(() => console.error('WARN: Skeleton loaders did not clear within 30s — proceeding anyway'));
 
     // 3. Handle Sandbox Start/Open Flow
     console.error('INFO: Looking for Start/Open button...');
@@ -70,7 +93,7 @@ async function extractCredentials() {
     // The order is typically: Username, Password, Access Key ID, Secret Access Key, [Session Token]
     
     // Wait for the inputs to appear
-    await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 30000 });
+    await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 60000 });
     
     const inputs = await page.locator('input[aria-label="Copyable input"]').all();
     console.error(`INFO: Found ${inputs.length} copyable inputs.`);
