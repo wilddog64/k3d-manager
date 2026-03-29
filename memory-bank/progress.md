@@ -20,10 +20,16 @@
 **v0.9.18 SHIPPED** — PR #53 merged (`7567a5c`) 2026-03-28. Tagged v0.9.18. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.18-retrospective.md`.
 **v0.9.19 SHIPPED** — PR #54 merged (`0f13be1`) 2026-03-28. Tagged v0.9.19. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.19-retrospective.md`.
 **v0.9.20 SHIPPED** — PR #55 merged to main (`bfd66fe`) 2026-03-29. Tagged v0.9.20, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v0.9.20-retrospective.md`.
+**v0.9.21 SHIPPED** — PR #56 merged to main (`f98f2a8`) 2026-03-29. Tagged v0.9.21, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v0.9.21-retrospective.md`.
+**v1.0.0 ACTIVE** — branch `k3d-manager-v1.0.0` cut from `f98f2a8` 2026-03-29.
 
 ---
 
-## v0.9.21 — Active
+## v1.0.0 — Active
+
+- [ ] **Spec: AWS/ACG 3-node k3sup cluster** — full automation: provision 3× EC2 → k3sup install → k3sup join × 2 → node taints/labels → tunnel → kubeconfig merge
+
+## v0.9.21 — Shipped
 
 - [x] **`_ensure_k3sup` helper** — added helper before `deploy_app_cluster`, auto-installs via brew or curl | sudo sh, rewired call site; spec `docs/plans/v0.9.21-ensure-k3sup.md`, commit `11a3ac1`.
 - [x] **Smoke test `_ensure_k3sup`** — **COMPLETE**. Verified warm path (k3sup exists) and cold path (install triggered when hidden). Ubuntu parallels smoke test confirmed functional.
