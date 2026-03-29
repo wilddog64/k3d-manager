@@ -35,6 +35,7 @@
 - [x] **`acg_get_credentials` Antigravity source** — `acg.sh` now sources `antigravity.sh` so `_ensure_antigravity` helpers exist for `acg_get_credentials`; commit `4357f90`.
 - [x] **`deploy_app_cluster` IP resolve** — resolves external IP from `~/.ssh/config` `HostName` before falling back to alias; commit `51983d3`.
 - [x] **`acg_watch` + `acg_provision --recreate`** — adds sandbox watcher, pre-flight extend, and recreate flag plus provider wiring; commit `51bdf3a`.
+- [x] **Keypair + extend hotfix** — keypair import uses `--soft` and extend prompt forces `page.goto`; commit `4a57f44`.
 
 
 ## v0.9.21 — Shipped
