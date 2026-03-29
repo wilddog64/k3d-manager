@@ -16,7 +16,7 @@
 **v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag (CHANGE.md [Unreleased]). if-count allowlist fully cleared: _run_command + _ensure_node helpers extracted via lib-foundation PR #13.
 **v0.9.15 SHIPPED** — PR #51 squash-merged to main (`484354da`) 2026-03-27. Tagged v0.9.15, released.
 **v0.9.16 SHIPPED** — PR #51 squash-merged to main (`484354da`) 2026-03-27. Tagged v0.9.16, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-27-v0.9.16-retrospective.md`.
-**v0.9.17 SHIPPED** — PR #52 merged to main (`c88ca7a`) 2026-03-28. Tagged v0.9.17, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.17-retrospective.md`. Branches v0.9.7–v0.9.17 deleted.
+**v0.9.17 SHIPPED** — PR #52 merged (`c88ca7a`) 2026-03-28. Tagged v0.9.17, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.17-retrospective.md`. Branches v0.9.7–v0.9.17 deleted.
 **v0.9.18 SHIPPED** — PR #53 merged (`7567a5c`) 2026-03-28. Tagged v0.9.18. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.18-retrospective.md`.
 **v0.9.19 SHIPPED** — PR #54 merged (`0f13be1`) 2026-03-28. Tagged v0.9.19. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.19-retrospective.md`.
 **v0.9.20 SHIPPED** — PR #55 merged to main (`bfd66fe`) 2026-03-29. Tagged v0.9.20, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v0.9.20-retrospective.md`.
@@ -30,7 +30,7 @@
 - [x] **`k3s-aws` provider foundation** — `_cluster_provider_call` hyphen slug + `deploy_cluster` guard/case + new provider module and tests implemented per `docs/plans/v1.0.0-k3s-aws-provider.md`; commit `4aba999`.
 - [x] **Gemini e2e smoke test** — **COMPLETE**. Full lifecycle verified: `acg_get_credentials` → `deploy_cluster` → `get nodes` (Ready) → `destroy_cluster`. commit `4aba999`.
 - [x] **BATS macOS compatibility** — `test_auth_cleanup.bats` ensures PATH prefers Homebrew bash so plugin sourcing succeeds during Jenkins tests; commit `4aba999`.
-- [ ] **Gemini e2e smoke test (run 2)** — **FAILED**. Blocked by `KeyPair` import error in `acg_provision`. Fix identified: add `--soft` flag to `aws ec2 import-key-pair`. See `docs/issues/2026-03-29-acg-provision-keypair-import-fail.md`.
+- [x] **Gemini e2e smoke test (run 3)** — **COMPLETE**. Verified hotfixes: Keypair import is idempotent (no error on duplicate); `antigravity_acg_extend` uses unconditional navigation. Full lifecycle confirmed functional. commit `df8f77f`.
 - [x] **`aws_import_credentials` refactor** — new `scripts/plugins/aws.sh` with CSV + quoted export parsing, `acg.sh` sources helper + alias/back-compat; commit `be7e997`.
 - [x] **`acg_get_credentials` Antigravity source** — `acg.sh` now sources `antigravity.sh` so `_ensure_antigravity` helpers exist for `acg_get_credentials`; commit `4357f90`.
 - [x] **`deploy_app_cluster` IP resolve** — resolves external IP from `~/.ssh/config` `HostName` before falling back to alias; commit `51983d3`.
@@ -210,7 +210,7 @@
 - [x] **`--dry-run` / `-n` mode** — docs/tests added in commit `f1b4ca7` (README Safety Gates + `scripts/tests/lib/dry_run.bats`); implementation already shipped
 - [x] **Reduce if-count allowlist (ldap)** — commit `ba6f3a9` extracts helpers so `_ldap_*` + `deploy_ldap`/`deploy_ad` drop under threshold; allowlist trimmed to vault/system entries only
 - [x] **Reduce if-count allowlist (vault)** — commit `365846c` extracts deploy/HA helpers and guard clauses so 5 `vault.sh` functions drop ≤8 ifs; removed vault entries from the allowlist
-- [x] **Reduce if-count allowlist (jenkins)** — commit `733123a` on k3d-manager-v0.9.10 extracts helpers + rewires deploy path so 4 `jenkins.sh` functions drop ≤8 ifs; allowlist cleared
+- [x] **Reduce if-count allowlist (jenkins)** — commit `733123a` on k3d-manager-v0.9.10 — new helpers drop 4 `jenkins.sh` functions ≤8 ifs; allowlist entries removed
 - [x] **GitHub PAT rotation** — rotated 2026-03-23; new expiry 2026-04-22
 
 ### Deferred to v1.0.0 (needs multi-node)
