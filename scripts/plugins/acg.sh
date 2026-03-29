@@ -10,6 +10,8 @@ fi
 
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/aws.sh"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/plugins/antigravity.sh"
 
 : "${ACG_REGION:=us-west-2}"
 : "${ACG_ALLOWED_CIDR:=0.0.0.0/0}"
