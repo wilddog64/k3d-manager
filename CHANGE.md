@@ -1,5 +1,13 @@
 # Changes - k3d-manager
 
+## [v0.9.20] — 2026-03-29 — ACG Chrome launch + SPA navigation fix
+
+### Fixed
+- `_antigravity_launch` in `scripts/plugins/antigravity.sh`: now launches Google Chrome (not Antigravity IDE) with `--remote-debugging-port=9222 --password-store=basic --user-data-dir=~/.config/acg-chrome-profile`; fixes macOS Keychain `errSecInteractionNotAllowed` blocking CDP port bind on cold start (`8dd9cbb`, `653896e`)
+- `scripts/playwright/acg_credentials.js`: no longer calls `page.goto()` when already on `app.pluralsight.com` — hard navigation was destroying SPA auth state causing permanent skeleton-loading; now finds Pluralsight page by URL, SPA-navigates via nav link click when needed, waits for `aria-busy` to clear; credential selector timeout 30s → 60s (`8dd9cbb`)
+
+---
+
 ## [v0.9.19] — 2026-03-28 — ACG automated credential extraction
 
 ### Added
