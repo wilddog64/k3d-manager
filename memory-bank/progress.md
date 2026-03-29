@@ -19,9 +19,15 @@
 **v0.9.17 SHIPPED** — PR #52 merged to main (`c88ca7a`) 2026-03-28. Tagged v0.9.17, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.17-retrospective.md`. Branches v0.9.7–v0.9.17 deleted.
 **v0.9.18 SHIPPED** — PR #53 merged (`7567a5c`) 2026-03-28. Tagged v0.9.18. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.18-retrospective.md`.
 **v0.9.19 SHIPPED** — PR #54 merged (`0f13be1`) 2026-03-28. Tagged v0.9.19. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.19-retrospective.md`.
-**v0.9.20 ACTIVE** — branch `k3d-manager-v0.9.20` cut from `0f13be1` 2026-03-28.
+**v0.9.20 SHIPPED** — PR #55 merged to main (`bfd66fe`) 2026-03-29. Tagged v0.9.20, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v0.9.20-retrospective.md`.
+**v0.9.21 ACTIVE** — branch `k3d-manager-v0.9.21` cut from `bfd66fe` 2026-03-29.
 
-## v0.9.20 — Active
+## v0.9.21 — Active
+
+- [ ] **`_ensure_k3sup` helper** — add auto-install helper to `scripts/plugins/shopping_cart.sh`; replace raw `command -v k3sup` check in `deploy_app_cluster`
+- [ ] **BATS coverage** — k3sup present → 0; absent + brew → installs; absent + no brew → `_err`
+
+## v0.9.20 — Shipped
 
 - [x] **Antigravity Chrome launch** — `_antigravity_launch` now opens Google Chrome with `--password-store=basic` and dedicated user data dir so CDP probe works without manual browser start. Spec: `docs/plans/v0.9.20-acg-automation-fixes.md`, commit `8dd9cbb`.
 - [x] **`acg_credentials.js` SPA nav fix** — Script finds the Pluralsight tab, avoids hard `page.goto` when already on `app.pluralsight.com`, SPA-navigates when needed, waits for `aria-busy` to clear, and increases credential selector timeout to 60s. Commit `8dd9cbb`.

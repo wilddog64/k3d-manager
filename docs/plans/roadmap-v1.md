@@ -25,6 +25,8 @@ across clouds.
 
 | Version | Highlights |
 |---------|-----------|
+| v0.9.20 | `_antigravity_launch` Chrome fix + `acg_credentials.js` SPA nav guard — cold-start automation working |
+| v0.9.19 | `acg_get_credentials` + `acg_import_credentials` — static Playwright script extracts AWS credentials from Pluralsight sandbox |
 | v0.9.18 | Pluralsight URL migration — `_ACG_SANDBOX_URL` + `_antigravity_ensure_acg_session` updated to `app.pluralsight.com` |
 | v0.9.17 | Antigravity model fallback (`gemini-2.5-flash` first), ACG session check, nested agent fix (`--approval-mode yolo`) |
 | v0.9.16 | Antigravity IDE + CDP browser automation — gemini CLI + Playwright engine; `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_acg_extend` |
@@ -44,7 +46,17 @@ across clouds.
 
 ---
 
-## v1.0.0 — Multi-Node k3s Cluster + Samba AD
+## v0.9.21 — `_ensure_k3sup` (upcoming)
+*Focus: k3sup auto-install — prerequisite for v1.0.0 multi-node work*
+
+- `_ensure_k3sup` helper in `scripts/plugins/shopping_cart.sh` — follows `_ensure_node`/`_ensure_copilot_cli` pattern
+- `deploy_app_cluster` replaces raw `command -v k3sup` check with `_ensure_k3sup`
+- Install paths: `brew install k3sup` (macOS/Linuxbrew), `curl | sh` (Debian/Ubuntu + sudo), `_err` guidance if both unavailable
+- BATS coverage: k3sup present → returns 0; absent + brew → installs; absent + no brew → error
+
+---
+
+## v1.0.0 — AWS/ACG: Multi-Node k3s Cluster + Samba AD
 *Focus: 3-node k3sup cluster on ACG — resolves single t3.medium resource exhaustion*
 
 **Motivation:** Single t3.medium (4GB) at 95% capacity is a structural blocker for
@@ -92,6 +104,31 @@ DIRECTORY_SERVICE_PROVIDER=activedirectory ./scripts/k3d-manager deploy_director
 ### Milestone Gate
 
 All 5 shopping-cart pods Running + Playwright E2E green = v1.0.0 done.
+
+---
+
+## v1.0.1 — GCP Cloud Provider
+*Focus: k3s on GCP Compute Engine — second cloud backend*
+
+**New `CLUSTER_PROVIDER` value:** `k3s-gcp`
+
+- `acg_provision` equivalent for GCP: provision Compute Engine VM(s) via `gcloud`
+- k3sup install + kubeconfig merge (same pattern as ACG/k3s-remote)
+- Plugin layer identical — no changes needed above the provider abstraction
+- Credential extraction: GCP service account key → `~/.config/gcloud/`
+- Milestone gate: basket-service Running on GCP-provisioned k3s + `kubectl get nodes` shows Ready
+
+---
+
+## v1.0.2 — Azure Cloud Provider
+*Focus: k3s on Azure VM — third cloud backend*
+
+**New `CLUSTER_PROVIDER` value:** `k3s-azure`
+
+- `acg_provision` equivalent for Azure: provision Azure VM(s) via `az`
+- k3sup install + kubeconfig merge (same pattern as ACG/GCP)
+- Credential extraction: Azure service principal → `~/.azure/`
+- Milestone gate: basket-service Running on Azure-provisioned k3s + `kubectl get nodes` shows Ready
 
 ---
 

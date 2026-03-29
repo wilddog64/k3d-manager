@@ -1,6 +1,6 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.20` (as of 2026-03-28)
+## Current Branch: `k3d-manager-v0.9.21` (as of 2026-03-29)
 
 **v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. Copilot CLI CI integration.
 **v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released.
@@ -18,6 +18,17 @@
 
 ---
 
+## Roadmap Versioning Decision (2026-03-29)
+
+| Version | Scope |
+|---------|-------|
+| v0.9.21 | `_ensure_k3sup` + `deploy_app_cluster` auto-install — prerequisite cleanup |
+| v1.0.0 | AWS/ACG — 3-node k3sup cluster + Samba AD + full automation |
+| v1.0.1 | GCP cloud provider (`k3s-gcp`) |
+| v1.0.2 | Azure cloud provider (`k3s-azure`) |
+
+`v1.0.0` = first release where k3d-manager provisions and fully configures a remote multi-node cluster end-to-end without manual steps.
+
 ## v1.0.0 Design Decisions
 
 - **`acg_get_credentials <sandbox-url>`** — new function; extracts AWS credentials from Pluralsight sandbox "Cloud Access" panel via Antigravity Playwright; writes to `~/.aws/credentials`; stdin paste (`pbpaste | acg_import_credentials`) as fallback. Must run before any `acg_provision` call. Single extract covers all 3 nodes (same sandbox session).
@@ -26,7 +37,7 @@
 
 ## Current Focus (v0.9.21)
 
-Spec: `docs/plans/v0.9.20-acg-automation-fixes.md` (committed `b579043`)
+Scope: `_ensure_k3sup` helper + `deploy_app_cluster` replacement of raw `command -v k3sup` check.
 
 | Item | Status | Notes |
 |---|---|---|
