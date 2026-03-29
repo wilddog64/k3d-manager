@@ -23,7 +23,9 @@ async function extractCredentials() {
     const context = browser.contexts()[0];
     if (!context) throw new Error('No browser context found');
     const allPages = context.pages();
-    let page = allPages.find(p => p.url().includes('pluralsight.com'));
+    let page = allPages.find(p => {
+      try { return new URL(p.url()).hostname.endsWith('.pluralsight.com') || new URL(p.url()).hostname === 'pluralsight.com'; } catch { return false; }
+    });
     if (!page) {
       page = allPages[0];
       if (!page) throw new Error('No page found in the browser context');
@@ -31,7 +33,9 @@ async function extractCredentials() {
 
     // Navigate only if not already on the target URL (hard reload kills SPA auth)
     const currentUrl = page.url();
-    if (!currentUrl.startsWith('https://app.pluralsight.com')) {
+    let currentHostname = '';
+    try { currentHostname = new URL(currentUrl).hostname; } catch { /* non-URL, will navigate */ }
+    if (currentHostname !== 'app.pluralsight.com') {
       console.error(`INFO: Navigating to ${targetUrl}...`);
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     } else if (!currentUrl.includes('cloud-sandboxes')) {
