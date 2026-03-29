@@ -272,6 +272,23 @@ CLUSTER_PROVIDER=k3s-remote ./scripts/k3d-manager provision_full_stack
 **Gate:** v1.0.0 multi-node proven. k3d (local) + k3s-remote (ACG) = two backends,
 enough surface for a useful provider-agnostic MCP API.
 
+**Access model clarification (post-v1.0.1):**
+
+Claude Code Remote Control (`claude --remote-control`) covers the human operator on
+mobile — the mobile Claude app connects to a live Claude Code session on M2 Air over
+the Anthropic API (outbound only, no open ports) and can invoke `/k3s-up`, `/k3s-down`,
+`/k3s-recreate` skills with full local tool access.
+
+k3dm-mcp's value is **non-interactive AI agent access** — Codex, autonomous pipelines,
+and scheduled agents that run without a human in the loop and cannot use Claude Code's
+interactive session model.
+
+| Interface | Mechanism | Use case |
+|-----------|-----------|----------|
+| Terminal | `./bin/k3s-up` | Human operator, Gemini |
+| Claude Code desktop/mobile | `/k3s-up` skill + Remote Control | Human operator anywhere |
+| AI agent (non-interactive) | k3dm-mcp HTTP tools | Autonomous workflows, Codex |
+
 **Sudo pre-flight requirement:** k3dm-mcp agents run non-interactively — any sudo
 password prompt will hang the agent with no TTY to respond. Before v1.2.0 ships:
 - `deploy_cluster` / `deploy_app_cluster` must include a pre-flight check:
