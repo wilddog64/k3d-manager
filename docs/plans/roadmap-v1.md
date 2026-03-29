@@ -142,6 +142,72 @@ DIRECTORY_SERVICE_PROVIDER=activedirectory ./scripts/k3d-manager deploy_director
 
 ---
 
+## Post-v1.0.5 — Extract `lib-agc`
+*Gate: all 3 cloud providers shipped (k3s-aws, k3s-gcp, k3s-azure)*
+
+ACG sandbox tooling is not cluster lifecycle — it is Pluralsight/AWS sandbox automation.
+Once k3d-manager manages 3 cloud backends, the ACG-specific code should live in its own repo.
+
+**New repo:** `wilddog64/lib-agc`
+
+**Extraction scope:**
+
+| File | Destination |
+|------|-------------|
+| `scripts/plugins/acg.sh` | `lib-agc` — Playwright, CDP, sandbox lifecycle |
+| `scripts/plugins/aws.sh` | `lib-agc` — `aws_import_credentials`, `_aws_write_credentials` |
+| `scripts/plugins/antigravity.sh` | `lib-agc` — `_antigravity_launch`, CDP browser automation |
+
+**Integration:** k3d-manager sources `lib-agc` as a git subtree at `scripts/lib/agc/`,
+same pattern as `lib-foundation` at `scripts/lib/foundation/`.
+
+**k3dm-mcp** also depends on `lib-agc` directly — separate consumer, separate subtree pull.
+
+---
+
+## Pre-v1.1.0 — `aws_provision` Namespace Refactor
+*Pre-requisite for k3dm-mcp: public entry point + ACG auto-detection*
+
+Before the MCP layer is built, `acg_provision` must be promoted to a generic public API.
+AI agents should call `aws_provision`, not know ACG-specific internals.
+
+**Design:**
+
+```
+aws_provision()          ← public — calls _aws_is_acg_sandbox() to route
+  _aws_is_acg_sandbox()  ← private — checks `aws sts get-caller-identity` ARN for "cloud_user"
+  _acg_provision()       ← private — current acg_provision logic renamed
+  _aws_ec2_provision()   ← stub — _err "not yet implemented" (future: raw EC2 CLI path)
+```
+
+**Detection logic:**
+
+```bash
+function _aws_is_acg_sandbox() {
+  local arn
+  arn=$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)
+  [[ "$arn" == *"cloud_user"* ]]
+}
+```
+
+**Routing:**
+
+```bash
+function aws_provision() {
+  if _aws_is_acg_sandbox; then
+    _acg_provision "$@"
+  else
+    _err "[aws] Non-ACG EC2 provisioning not yet implemented"
+    return 1
+  fi
+}
+```
+
+**Rule:** `acg_provision` kept as deprecated alias → `aws_provision` until k3dm-mcp ships.
+**Gate:** implement before v1.2.0 (k3dm-mcp); k3dm-mcp tools must call `aws_provision`, not `acg_provision`.
+
+---
+
 ## v1.1.0 — Full Stack Provisioning (Single Command)
 *Focus: One command brings up k3s cluster + complete plugin stack*
 
