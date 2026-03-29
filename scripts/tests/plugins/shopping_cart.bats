@@ -47,3 +47,42 @@
   [ "$status" -ne 0 ]
   [[ "$output" == *"k3sup not found"* ]]
 }
+
+@test "_ensure_k3sup returns 0 after successful brew install" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh; source scripts/lib/core.sh; source scripts/plugins/shopping_cart.sh
+    _state="$(mktemp)"
+    _command_exist() {
+      case "$1" in
+        k3sup) [[ -s "$_state" ]] ;;
+        brew)  return 0 ;;
+        *)     return 1 ;;
+      esac
+    }
+    _run_command() { [[ "$*" == *"brew"* ]] && echo 1 > "$_state"; return 0; }
+    _ensure_k3sup; rc=$?; rm -f "$_state"; exit $rc
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "_ensure_k3sup returns 0 after successful curl install on debian" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh; source scripts/lib/core.sh; source scripts/plugins/shopping_cart.sh
+    _state="$(mktemp)"
+    _command_exist() {
+      case "$1" in
+        k3sup) [[ -s "$_state" ]] ;;
+        brew)  return 1 ;;
+        curl)  return 0 ;;
+        *)     return 1 ;;
+      esac
+    }
+    _is_debian_family() { return 0; }
+    curl() { return 0; }
+    _run_command() { [[ "$*" == *"sh "* ]] && echo 1 > "$_state"; return 0; }
+    _ensure_k3sup; rc=$?; rm -f "$_state"; exit $rc
+  '
+  [ "$status" -eq 0 ]
+}

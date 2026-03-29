@@ -103,13 +103,20 @@ function _ensure_k3sup() {
   fi
   _info "[shopping_cart] k3sup not found — installing..."
   if _command_exist brew; then
-    _run_command -- brew install k3sup
+    _run_command --soft -- brew install k3sup
     if _command_exist k3sup; then
       return 0
     fi
   fi
   if _is_debian_family && _command_exist curl; then
-    _run_command --prefer-sudo -- sh -c "$(curl -sLS https://get.k3sup.dev)"
+    local _k3sup_installer
+    _k3sup_installer="$(mktemp)"
+    if ! curl -fsSL -o "${_k3sup_installer}" https://get.k3sup.dev; then
+      rm -f "${_k3sup_installer}"
+      _err "[shopping_cart] Failed to download k3sup installer from https://get.k3sup.dev"
+    fi
+    _run_command --soft --prefer-sudo -- sh "${_k3sup_installer}"
+    rm -f "${_k3sup_installer}"
     if _command_exist k3sup; then
       return 0
     fi
