@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/plugins/acg.sh — ACG AWS sandbox lifecycle management
 #
-# Functions: acg_get_credentials acg_provision acg_status acg_extend acg_teardown
+# Functions: acg_get_credentials acg_provision acg_status acg_extend acg_watch acg_teardown
 # Credential parsing: aws_import_credentials (scripts/plugins/aws.sh)
 
 if [[ -z "${SCRIPT_DIR:-}" ]]; then
@@ -264,14 +264,17 @@ HELP
 function acg_provision() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
-Usage: acg_provision [--confirm]
+Usage: acg_provision --confirm [--recreate]
 
 Provision an ACG AWS sandbox EC2 instance. If an instance tagged
 'k3d-manager-ubuntu' already exists, start it (if stopped) and update
 ~/.ssh/config. If no instance exists, provision VPC + subnet + IGW + SG +
 key pair + t3.medium EC2.
 
-Requires --confirm to prevent accidental provisioning.
+Flags:
+  --confirm    Required — prevents accidental provisioning
+  --recreate   Tear down any existing instance before provisioning fresh.
+               Use when sandbox state is unknown or TTL has expired.
 
 Config (env overrides):
   ACG_REGION   AWS region (default: us-west-2)
@@ -284,7 +287,15 @@ HELP
     return 0
   fi
 
-  if [[ "${1:-}" != "--confirm" ]]; then
+  local _confirm=0 _recreate=0
+  for _arg in "$@"; do
+    case "$_arg" in
+      --confirm)  _confirm=1 ;;
+      --recreate) _recreate=1 ;;
+    esac
+  done
+
+  if [[ $_confirm -eq 0 ]]; then
     printf 'ERROR: %s\n' "[acg] acg_provision requires --confirm to prevent accidental provisioning" >&2
     return 1
   fi
@@ -292,6 +303,12 @@ HELP
   _acg_check_credentials || return 1
   local instance_id
   instance_id=$(_acg_get_instance_id)
+
+  if [[ $_recreate -eq 1 && -n "$instance_id" ]]; then
+    _info "[acg] --recreate: tearing down existing instance before provisioning fresh..."
+    acg_teardown --confirm || return 1
+    instance_id=""
+  fi
 
   if [[ -z "$instance_id" ]]; then
     _info "[acg] No instance found — provisioning..."
@@ -362,6 +379,44 @@ HELP
     _info "[acg] Open this URL in your browser and click 'Extend Lab':"
     _info "[acg] ${_ACG_SANDBOX_URL}"
   fi
+}
+
+function acg_watch() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'HELP'
+Usage: acg_watch [interval_seconds]
+
+Background sandbox TTL watcher. Extends the ACG sandbox every 3.5 hours
+while the EC2 instance is alive. Stops automatically when the instance
+is gone (after acg_teardown).
+
+Requires antigravity_acg_extend to be defined (antigravity.sh sourced).
+Default interval: 12600 seconds (3.5 hours).
+
+Example (run after deploy_cluster):
+  acg_watch &
+  echo "Watcher PID: $!"
+HELP
+    return 0
+  fi
+
+  local interval="${1:-12600}"
+  _info "[acg] Sandbox watcher started (PID $$, extending every $((interval / 3600))h)"
+
+  while true; do
+    sleep "$interval"
+    if [[ -z "$(_acg_get_instance_id 2>/dev/null)" ]]; then
+      _info "[acg] Instance gone — watcher stopping."
+      return 0
+    fi
+    _info "[acg] Extending sandbox TTL..."
+    if declare -f antigravity_acg_extend > /dev/null 2>&1; then
+      antigravity_acg_extend "${_ACG_SANDBOX_URL}" \
+        || _info "[acg] Extend failed — open ${_ACG_SANDBOX_URL} to extend manually"
+    else
+      _info "[acg] antigravity_acg_extend not available — open ${_ACG_SANDBOX_URL} to extend manually"
+    fi
+  done
 }
 
 function acg_teardown() {

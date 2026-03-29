@@ -8,6 +8,8 @@
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/acg.sh"
 # shellcheck source=/dev/null
+source "${SCRIPT_DIR}/plugins/antigravity.sh"
+# shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/shopping_cart.sh"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/tunnel.sh"
@@ -33,6 +35,10 @@ HELP
     return 0
   fi
 
+  _info "[k3s-aws] Extending sandbox TTL before deploy (pre-flight)..."
+  antigravity_acg_extend "${_ACG_SANDBOX_URL}" \
+    || _info "[k3s-aws] Pre-flight extend failed — proceeding (sandbox may have sufficient TTL)"
+
   _info "[k3s-aws] Provisioning EC2 instance..."
   acg_provision --confirm || return 1
 
@@ -41,6 +47,10 @@ HELP
 
   _info "[k3s-aws] Starting autossh tunnel..."
   tunnel_start || return 1
+
+  _info "[k3s-aws] Starting sandbox watcher..."
+  acg_watch &
+  _info "[k3s-aws] Watcher PID: $! (kill $! to stop)"
 
   _info "[k3s-aws] Cluster ready."
   _info "[k3s-aws] Verify: kubectl --context ubuntu-k3s get nodes"
