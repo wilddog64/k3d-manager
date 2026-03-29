@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 # scripts/plugins/acg.sh — ACG AWS sandbox lifecycle management
 #
-# Functions: acg_get_credentials acg_import_credentials acg_provision acg_status acg_extend acg_teardown
+# Functions: acg_get_credentials acg_provision acg_status acg_extend acg_teardown
+# Credential parsing: aws_import_credentials (scripts/plugins/aws.sh)
+
+if [[ -z "${SCRIPT_DIR:-}" ]]; then
+  SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
+fi
+
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/plugins/aws.sh"
 
 : "${ACG_REGION:=us-west-2}"
 : "${ACG_ALLOWED_CIDR:=0.0.0.0/0}"
@@ -181,62 +189,14 @@ _acg_check_k3s() {
   fi
 }
 
+# Deprecated helper — use _aws_write_credentials instead
 _acg_write_credentials() {
-  local access_key="$1"
-  local secret_key="$2"
-  local session_token="${3:-}"
-  local creds_file="${HOME}/.aws/credentials"
-  mkdir -p "${HOME}/.aws"
-  { set +x; } 2>/dev/null
-  {
-    echo "[default]"
-    echo "aws_access_key_id=${access_key}"
-    echo "aws_secret_access_key=${secret_key}"
-    if [[ -n "${session_token}" ]]; then
-      echo "aws_session_token=${session_token}"
-    fi
-  } > "${creds_file}"
-  chmod 600 "${creds_file}"
-  _info "[acg] Credentials written to ${creds_file}"
-  _info "[acg] Access key: ${access_key:0:4}****"
+  _aws_write_credentials "$@"
 }
 
+# Deprecated alias — use aws_import_credentials instead
 function acg_import_credentials() {
-  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    cat <<'HELP'
-Usage: pbpaste | acg_import_credentials
-       acg_import_credentials < credentials.txt
-
-Read AWS credentials block from stdin and write to ~/.aws/credentials.
-Expected input format (copy from Pluralsight Cloud Access panel):
-
-  AWS Access Key ID: ASIA...
-  AWS Secret Access Key: abc123...
-  AWS Session Token: IQo...
-
-Or the export block format:
-
-  export AWS_ACCESS_KEY_ID=ASIA...
-  export AWS_SECRET_ACCESS_KEY=abc123...
-  export AWS_SESSION_TOKEN=IQo...
-HELP
-    return 0
-  fi
-
-  _info "[acg] Reading credentials from stdin..."
-  local input access_key secret_key session_token
-  input=$(cat)
-
-  access_key=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_ACCESS_KEY_ID| Access Key ID)[\s:=]+(\S+)/i) {print $1; exit}')
-  secret_key=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_SECRET_ACCESS_KEY| Secret Access Key)[\s:=]+(\S+)/i) {print $1; exit}')
-  session_token=$(printf '%s' "$input" | perl -ne 'if (/AWS(?:_SESSION_TOKEN| Session Token)[\s:=]+(\S+)/i) {print $1; exit}')
-
-  if [[ -z "$access_key" || -z "$secret_key" ]]; then
-    printf 'ERROR: %s\n' "[acg] Could not parse credentials from stdin. Expected AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY." >&2
-    return 1
-  fi
-
-  _acg_write_credentials "$access_key" "$secret_key" "$session_token"
+  aws_import_credentials "$@"
 }
 
 function acg_get_credentials() {
@@ -296,7 +256,7 @@ HELP
     return 1
   fi
 
-  _acg_write_credentials "$access_key" "$secret_key" "$session_token"
+  _aws_write_credentials "$access_key" "$secret_key" "$session_token"
 }
 
 function acg_provision() {
