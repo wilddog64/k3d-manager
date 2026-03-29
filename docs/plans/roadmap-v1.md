@@ -106,6 +106,18 @@ reports green/red per item before the operator runs `deploy_cluster`:
 
 Non-zero exit if any check fails. Operator-facing — no cluster knowledge required.
 
+**Operator shortcuts — `bin/` scripts + Claude skills:**
+
+| Script | Claude skill | Does |
+|--------|-------------|------|
+| `bin/k3s-up` | `/k3s-up` | `acg_get_credentials` → `CLUSTER_PROVIDER=k3s-aws deploy_cluster` |
+| `bin/k3s-down` | `/k3s-down` | `CLUSTER_PROVIDER=k3s-aws destroy_cluster --confirm` |
+| `bin/k3s-recreate` | `/k3s-recreate` | `acg_get_credentials` → `deploy_cluster` with `acg_provision --recreate` |
+
+`bin/` scripts: thin wrappers calling `./scripts/k3d-manager` with pre-filled env + args.
+Claude skills: one-liners invoking the bin/ script and reporting output.
+Target audience: human operators and Claude Code sessions.
+
 **lib-agc preparation (step 1 of 3):** `aws_provision` namespace refactor.
 Promote `acg_provision` → `_acg_provision` (private). Add `aws_provision` public entry point
 with `_aws_is_acg_sandbox()` auto-detection. `acg_provision` becomes deprecated alias.
