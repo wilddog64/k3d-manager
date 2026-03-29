@@ -24,8 +24,8 @@
 
 ## v0.9.21 — Active
 
-- [ ] **`_ensure_k3sup` helper** — add auto-install helper to `scripts/plugins/shopping_cart.sh`; replace raw `command -v k3sup` check in `deploy_app_cluster`
-- [ ] **BATS coverage** — k3sup present → 0; absent + brew → installs; absent + no brew → `_err`
+- [x] **`_ensure_k3sup` helper** — added helper before `deploy_app_cluster`, auto-installs via brew or curl | sudo sh, rewired call site; spec `docs/plans/v0.9.21-ensure-k3sup.md`, commit `11a3ac1`.
+- [x] **BATS coverage** — `scripts/tests/plugins/shopping_cart.bats` gained `_ensure_k3sup` success/failure tests; suite run via `bats scripts/tests/plugins/shopping_cart.bats` green.
 
 ## v0.9.20 — Shipped
 

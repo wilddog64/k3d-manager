@@ -44,7 +44,7 @@ Scope: `_ensure_k3sup` helper + `deploy_app_cluster` replacement of raw `command
 | **v0.9.20 spec written** | **COMPLETE** | 3 fixes: Chrome launch, SPA nav, _ensure_k3sup. `b579043`. |
 | **`_antigravity_launch` Chrome fix** | **COMPLETE** | Verified Chrome cold-start with `--password-store=basic` and dedicated profile. |
 | **`acg_credentials.js` SPA nav fix** | **COMPLETE** | Verified SPA-navigation guard avoids hard goto when already on Pluralsight. |
-| **`_ensure_k3sup`** | **DEFERRED → v0.9.21** | Reverted from v0.9.20 (scope creep); not in repo; planned for next release |
+| **`_ensure_k3sup`** | **COMPLETE** | Auto-installs via brew/curl + `deploy_app_cluster` guard rewired; commit `11a3ac1`. |
 | **Static acg_credentials.js** | **COMPLETE** | Implemented `scripts/playwright/acg_credentials.js` and updated `acg_get_credentials`. Verified working with live Pluralsight sandbox via Chrome CDP. commit `67a445c`. |
 | **scratch/ cleanup** | **PENDING** | `rm -f scratch/*` — wipe stale Playwright artifacts; policy: wipe at each release cut |
 | **acg_get_credentials + acg_import_credentials** | **COMPLETE** | `3970623` adds credential extractor + stdin import helpers with docs/tests per `docs/plans/v0.9.19-acg-get-credentials.md` |
