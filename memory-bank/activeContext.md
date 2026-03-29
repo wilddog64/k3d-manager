@@ -23,12 +23,15 @@
 
 | Version | Scope |
 |---------|-------|
-| v0.9.21 | `_ensure_k3sup` + `deploy_app_cluster` auto-install — prerequisite cleanup |
-| v1.0.0 | AWS/ACG — 3-node k3sup cluster + Samba AD + full automation |
-| v1.0.1 | GCP cloud provider (`k3s-gcp`) |
-| v1.0.2 | Azure cloud provider (`k3s-azure`) |
+| v0.9.21 | `_ensure_k3sup` + `deploy_app_cluster` auto-install — SHIPPED `f98f2a8` |
+| v1.0.0 | `k3s-aws` provider foundation — rename `k3s-remote` → `k3s-aws`; single-node deploy/destroy; SSH config auto-update |
+| v1.0.1 | Multi-node: `acg_provision` × 3, k3sup join × 2, taints/labels |
+| v1.0.2 | Full stack on 3 nodes: all 5 pods Running + E2E green |
+| v1.0.3 | Samba AD DC plugin (`DIRECTORY_SERVICE_PROVIDER=activedirectory`) |
+| v1.0.4 | GCP cloud provider (`k3s-gcp`) |
+| v1.0.5 | Azure cloud provider (`k3s-azure`) |
 
-`v1.0.0` = first release where k3d-manager provisions and fully configures a remote multi-node cluster end-to-end without manual steps.
+`CLUSTER_PROVIDER` values: `k3s-aws` (AWS/ACG), `k3s-gcp` (GCP), `k3s-azure` (Azure) — symmetric naming across all three clouds.
 
 ## v1.0.0 Design Decisions
 
