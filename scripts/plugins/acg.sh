@@ -26,6 +26,7 @@ _ACG_VPC_CIDR="10.0.0.0/16"
 _ACG_SUBNET_CIDR="10.0.1.0/24"
 _ACG_SANDBOX_URL="https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
 _ACG_SANDBOX_LIST_URL="${ACG_SANDBOX_LIST_URL:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}"
+_ACG_WATCH_PID_FILE="${HOME}/.local/share/k3d-manager/acg-watch.pid"
 
 _acg_check_credentials() {
   _info "[acg] Checking AWS credentials..."

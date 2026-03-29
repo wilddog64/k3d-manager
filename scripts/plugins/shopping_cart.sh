@@ -156,7 +156,8 @@ HELP
   local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-}"
   if [[ -z "$external_ip" ]]; then
     if _command_exist awk; then
-      external_ip=$(awk "/^Host ${ssh_host}\$/{found=1} found && /HostName/{print \$2; exit}" \
+      external_ip=$(awk -v host="${ssh_host}" \
+        '$1=="Host" && $2==host {found=1; next} found && $1=="HostName" {print $2; exit}' \
         "${HOME}/.ssh/config" 2>/dev/null)
     fi
   fi

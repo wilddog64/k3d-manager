@@ -49,8 +49,22 @@ HELP
   tunnel_start || return 1
 
   _info "[k3s-aws] Starting sandbox watcher..."
-  acg_watch &
-  _info "[k3s-aws] Watcher PID: $! (kill $! to stop)"
+  local _existing_pid
+  if [[ -f "${_ACG_WATCH_PID_FILE}" ]]; then
+    _existing_pid=$(cat "${_ACG_WATCH_PID_FILE}")
+    if kill -0 "${_existing_pid}" 2>/dev/null; then
+      _info "[k3s-aws] Watcher already running (PID ${_existing_pid}) — skipping"
+    else
+      rm -f "${_ACG_WATCH_PID_FILE}"
+    fi
+  fi
+  if [[ ! -f "${_ACG_WATCH_PID_FILE}" ]]; then
+    acg_watch &
+    local _watcher_pid=$!
+    mkdir -p "$(dirname "${_ACG_WATCH_PID_FILE}")"
+    printf '%s\n' "${_watcher_pid}" > "${_ACG_WATCH_PID_FILE}"
+    _info "[k3s-aws] Watcher PID: ${_watcher_pid} (stored in ${_ACG_WATCH_PID_FILE})"
+  fi
 
   _info "[k3s-aws] Cluster ready."
   _info "[k3s-aws] Verify: kubectl --context ubuntu-k3s get nodes"
@@ -73,6 +87,16 @@ HELP
   if [[ "${1:-}" != "--confirm" ]]; then
     printf 'ERROR: %s\n' "[k3s-aws] destroy_cluster requires --confirm" >&2
     return 1
+  fi
+
+  if [[ -f "${_ACG_WATCH_PID_FILE}" ]]; then
+    local _watcher_pid
+    _watcher_pid=$(cat "${_ACG_WATCH_PID_FILE}")
+    if kill -0 "${_watcher_pid}" 2>/dev/null; then
+      _info "[k3s-aws] Stopping sandbox watcher (PID ${_watcher_pid})..."
+      kill "${_watcher_pid}" 2>/dev/null || true
+    fi
+    rm -f "${_ACG_WATCH_PID_FILE}"
   fi
 
   _info "[k3s-aws] Stopping tunnel..."
