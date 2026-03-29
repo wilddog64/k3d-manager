@@ -27,7 +27,7 @@
 
 ## v1.0.0 — Active
 
-- [ ] **Spec: AWS/ACG 3-node k3sup cluster** — full automation: provision 3× EC2 → k3sup install → k3sup join × 2 → node taints/labels → tunnel → kubeconfig merge
+- [ ] **Codex: k3s-aws provider** — `docs/plans/v1.0.0-k3s-aws-provider.md`; 4 files: `provider.sh` hyphen normalization, `core.sh` case+guard, NEW `providers/k3s-aws.sh`, NEW `tests/lib/k3s_aws_provider.bats`; assigned to Codex 2026-03-29
 
 ## v0.9.21 — Shipped
 
