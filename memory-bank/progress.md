@@ -26,7 +26,7 @@
 ## v0.9.21 — Active
 
 - [x] **`_ensure_k3sup` helper** — added helper before `deploy_app_cluster`, auto-installs via brew or curl | sudo sh, rewired call site; spec `docs/plans/v0.9.21-ensure-k3sup.md`, commit `11a3ac1`.
-- [x] **Smoke test `_ensure_k3sup`** — **COMPLETE**. Verified warm path (k3sup exists) and cold path (install triggered when hidden). Ubuntu skip (unreachable).
+- [x] **Smoke test `_ensure_k3sup`** — **COMPLETE**. Verified warm path (k3sup exists) and cold path (install triggered when hidden). Ubuntu parallels smoke test confirmed functional.
 - [x] **Antigravity Chrome launch** — `_antigravity_launch` now opens Google Chrome with `--password-store=basic` and dedicated user data dir so CDP probe works without manual browser start. Spec: `docs/plans/v0.9.20-acg-automation-fixes.md`, commit `8dd9cbb`.
 - [x] **`acg_credentials.js` SPA nav fix** — Script finds the Pluralsight tab, avoids hard `page.goto` when already on `app.pluralsight.com`, SPA-navigates when needed, waits for `aria-busy` to clear, and increases credential selector timeout to 60s. Commit `8dd9cbb`.
 - [x] **Automation Verification** — Verified Chrome cold-start (flags/profile) and SPA navigation guard in `acg_credentials.js`. Logic confirmed via live verification.
