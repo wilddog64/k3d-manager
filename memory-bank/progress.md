@@ -20,19 +20,19 @@
 **v0.9.18 SHIPPED** — PR #53 merged (`7567a5c`) 2026-03-28. Tagged v0.9.18. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.18-retrospective.md`.
 **v0.9.19 SHIPPED** — PR #54 merged (`0f13be1`) 2026-03-28. Tagged v0.9.19. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.19-retrospective.md`.
 **v0.9.20 SHIPPED** — PR #55 merged to main (`bfd66fe`) 2026-03-29. Tagged v0.9.20, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v0.9.20-retrospective.md`.
-**v0.9.21 ACTIVE** — branch `k3d-manager-v0.9.21` cut from `bfd66fe` 2026-03-29.
+
+---
 
 ## v0.9.21 — Active
 
 - [x] **`_ensure_k3sup` helper** — added helper before `deploy_app_cluster`, auto-installs via brew or curl | sudo sh, rewired call site; spec `docs/plans/v0.9.21-ensure-k3sup.md`, commit `11a3ac1`.
-- [x] **BATS coverage** — `scripts/tests/plugins/shopping_cart.bats` gained `_ensure_k3sup` success/failure tests; suite run via `bats scripts/tests/plugins/shopping_cart.bats` green.
-
-## v0.9.20 — Shipped
-
+- [x] **Smoke test `_ensure_k3sup`** — **COMPLETE**. Verified warm path (k3sup exists) and cold path (install triggered when hidden). Ubuntu skip (unreachable).
 - [x] **Antigravity Chrome launch** — `_antigravity_launch` now opens Google Chrome with `--password-store=basic` and dedicated user data dir so CDP probe works without manual browser start. Spec: `docs/plans/v0.9.20-acg-automation-fixes.md`, commit `8dd9cbb`.
 - [x] **`acg_credentials.js` SPA nav fix** — Script finds the Pluralsight tab, avoids hard `page.goto` when already on `app.pluralsight.com`, SPA-navigates when needed, waits for `aria-busy` to clear, and increases credential selector timeout to 60s. Commit `8dd9cbb`.
-- [ ] **`_ensure_k3sup` helper** — DEFERRED to v0.9.21; reverted from v0.9.20 (scope creep); not in repo.
 - [x] **Automation Verification** — Verified Chrome cold-start (flags/profile) and SPA navigation guard in `acg_credentials.js`. Logic confirmed via live verification.
+- [x] **BATS coverage** — `scripts/tests/plugins/shopping_cart.bats` gained `_ensure_k3sup` success/failure tests; suite run via `bats scripts/tests/plugins/shopping_cart.bats` green.
+
+---
 
 ## v0.9.19 — Shipped
 
@@ -42,6 +42,8 @@
 - [x] **Copilot PR #54 findings** — 9 findings addressed in `392dae5`: session token optional, playwright guard, null parent, chmod trace suppression, docs fixes, spec status, issue doc resolution, BATS AKIA test.
 - [x] **GitGuardian false positive** — `.gitguardian.yaml` added to exclude `scripts/tests/` from scanning.
 - [ ] **scratch/ cleanup** — `rm -rf scratch/*` — wipe stale Playwright artifacts at release cut
+
+---
 
 ## v0.9.17 — Shipped
 
