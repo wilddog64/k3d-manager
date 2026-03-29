@@ -108,10 +108,12 @@ CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f   # k3s, non-intera
 | `orbstack` | macOS + OrbStack running | Auto-detected (or `CLUSTER_PROVIDER=orbstack`) |
 | `k3d` | macOS, no OrbStack | Default fallback |
 | `k3s` | Linux bare-metal | `CLUSTER_PROVIDER=k3s` |
+| `k3s-aws` | AWS EC2 via ACG sandbox | `CLUSTER_PROVIDER=k3s-aws` |
 
 See **[docs/providers/](docs/providers/)** for per-provider guides:
 - [OrbStack](docs/providers/orbstack.md)
 - [k3s (bare-metal)](docs/providers/k3s.md)
+- [k3s-aws (ACG EC2 sandbox)](docs/howto/acg.md)
 
 ---
 
@@ -122,36 +124,38 @@ See **[docs/providers/](docs/providers/)** for per-provider guides:
 ```mermaid
 graph TD
   U[User CLI] --> KM[./scripts/k3d-manager]
-  KM --> SYS[lib/system.sh]
-  KM --> CORE[lib/core.sh]
-  KM --> TEST[lib/test.sh]
-  KM --|_try_load_plugin(func)|--> PLUG[plugins/*.sh]
-  PLUG --> HELM[helm]
-  PLUG --> KUB[kubectl]
-  PLUG --> JPLUG[plugins/jenkins.sh]
-  JPLUG --> ROTATOR["Jenkins cert rotator CronJob"]
-  JPLUG -->|ESO/Vault manifests| ESO
-  ROTATOR -->|refresh TLS secret| JENKINS[Jenkins StatefulSet]
-  ROTATOR --> ESO
-  CORE --> HELM
-  CORE --> KUB
-  subgraph Cluster
-     K3D[k3d/k3s API] --> K8S[Kubernetes]
-     ISTIO[Istio] --> K8S
-     ESO[External Secrets Operator] --> K8S
-     JENKINS --> K8S
-     ROTATOR --> K8S
-  end
-  HELM --> K3D
-  KUB --> K3D
+  KM --> LIB["lib/ — system · core · providers"]
+  KM --|lazy-load|--> PLUG["plugins/ — acg · aws · antigravity · tunnel · ..."]
 
-  subgraph Providers
-     VAULT[HashiCorp Vault]
-     AZ[Azure Key Vault]
+  subgraph Infra ["Infra Cluster — OrbStack / k3d / k3s (local)"]
+    VAULT["Vault (PKI + Auth)"]
+    ESO[ESO]
+    ARGOCD[ArgoCD]
+    JENKINS[Jenkins]
+    ISTIO[Istio]
+    LDAP[LDAP / AD]
+    ESO -->|sync| VAULT
   end
-  ESO <-- sync/reads --> VAULT
-  ESO <-- sync/reads --> AZ
-  ROTATOR -->|requests leaf certs| VAULT
+
+  subgraph AppCluster ["App Cluster — k3s-aws (EC2)"]
+    K3S[k3s node]
+    APPS[Shopping Cart pods]
+    K3S --> APPS
+  end
+
+  ANTG["Antigravity (Playwright CDP)"]
+  AWSC["aws.sh — credential import"]
+
+  PLUG -->|deploy stack| Infra
+  PLUG -->|acg_provision — EC2 + k3sup| AppCluster
+  PLUG -->|browser automation| ANTG
+  PLUG -->|credential import| AWSC
+  ANTG -->|extract from Pluralsight| AWSC
+  AWSC -->|auth| AppCluster
+  PLUG -.->|tunnel.sh — autossh :6443| K3S
+  ARGOCD -->|GitOps deploy| APPS
+  VAULT -.->|cross-cluster auth| K3S
+  ESO -.->|sync| AKV[Azure Key Vault]
 ```
 
 ---
