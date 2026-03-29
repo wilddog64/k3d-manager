@@ -1,5 +1,13 @@
 #!/usr/bin/env bats
 # scripts/tests/plugins/aws.bats — unit tests for aws.sh credential helpers
+#
+# NOTE: credential values below are deliberately invalid test fixtures
+# (wrong length, wrong prefix) and are not real AWS credentials.
+
+# Test fixture values — not real credentials
+_TEST_KEY_ID="TEST-KEY-ID-0000000001"
+_TEST_SECRET="TEST-SECRET-KEY-000000000000001"
+_TEST_TOKEN="TEST-SESSION-TOKEN-00001"
 
 setup() {
   _info() { :; }
@@ -28,7 +36,7 @@ setup() {
 
 @test "aws_import_credentials parses simple CSV (Access key ID,Secret access key)" {
   local input="Access key ID,Secret access key
-AKIAIOSFODNN7EXAMPLE,wJalrXUtnFEMI/K7MDENG"
+${_TEST_KEY_ID},${_TEST_SECRET}"
   run bash -c "
     _info(){ :; }
     _write_sensitive_file(){ local p=\$1 d=\$2; mkdir -p \"\$(dirname \"\$p\")\"; printf '%s' \"\$d\" > \"\$p\"; chmod 600 \"\$p\"; }
@@ -43,13 +51,13 @@ AKIAIOSFODNN7EXAMPLE,wJalrXUtnFEMI/K7MDENG"
     printf '%s' \"${input}\" | aws_import_credentials"
   [ "$status" -eq 0 ]
   run cat "${BATS_TEST_TMPDIR}/.aws/credentials"
-  [[ "$output" == *"aws_access_key_id=AKIAIOSFODNN7EXAMPLE"* ]]
-  [[ "$output" == *"aws_secret_access_key=wJalrXUtnFEMI/K7MDENG"* ]]
+  [[ "$output" == *"aws_access_key_id=${_TEST_KEY_ID}"* ]]
+  [[ "$output" == *"aws_secret_access_key=${_TEST_SECRET}"* ]]
 }
 
 @test "aws_import_credentials parses CSV with User name column" {
   local input="User name,Access key ID,Secret access key
-alice,AKIAIOSFODNN7EXAMPLE,wJalrXUtnFEMI/K7MDENG"
+alice,${_TEST_KEY_ID},${_TEST_SECRET}"
   run bash -c "
     _info(){ :; }
     _write_sensitive_file(){ local p=\$1 d=\$2; mkdir -p \"\$(dirname \"\$p\")\"; printf '%s' \"\$d\" > \"\$p\"; chmod 600 \"\$p\"; }
@@ -64,8 +72,8 @@ alice,AKIAIOSFODNN7EXAMPLE,wJalrXUtnFEMI/K7MDENG"
     printf '%s' \"${input}\" | aws_import_credentials"
   [ "$status" -eq 0 ]
   run cat "${BATS_TEST_TMPDIR}/.aws/credentials"
-  [[ "$output" == *"aws_access_key_id=AKIAIOSFODNN7EXAMPLE"* ]]
-  [[ "$output" == *"aws_secret_access_key=wJalrXUtnFEMI/K7MDENG"* ]]
+  [[ "$output" == *"aws_access_key_id=${_TEST_KEY_ID}"* ]]
+  [[ "$output" == *"aws_secret_access_key=${_TEST_SECRET}"* ]]
 }
 
 # aws_import_credentials — quoted export format
@@ -83,14 +91,14 @@ alice,AKIAIOSFODNN7EXAMPLE,wJalrXUtnFEMI/K7MDENG"
     export HOME='${BATS_TEST_TMPDIR}'
     source scripts/plugins/aws.sh
     printf '%s\n%s\n%s\n' \
-      'export AWS_ACCESS_KEY_ID=\"AKIAIOSFODNN7EXAMPLE\"' \
-      'export AWS_SECRET_ACCESS_KEY=\"wJalrXUtnFEMI/K7MDENG\"' \
-      'export AWS_SESSION_TOKEN=\"AQoDYXdzEJr\"' | aws_import_credentials"
+      'export AWS_ACCESS_KEY_ID=\"${_TEST_KEY_ID}\"' \
+      'export AWS_SECRET_ACCESS_KEY=\"${_TEST_SECRET}\"' \
+      'export AWS_SESSION_TOKEN=\"${_TEST_TOKEN}\"' | aws_import_credentials"
   [ "$status" -eq 0 ]
   run cat "${BATS_TEST_TMPDIR}/.aws/credentials"
-  [[ "$output" == *"aws_access_key_id=AKIAIOSFODNN7EXAMPLE"* ]]
-  [[ "$output" == *"aws_secret_access_key=wJalrXUtnFEMI/K7MDENG"* ]]
-  [[ "$output" == *"aws_session_token=AQoDYXdzEJr"* ]]
+  [[ "$output" == *"aws_access_key_id=${_TEST_KEY_ID}"* ]]
+  [[ "$output" == *"aws_secret_access_key=${_TEST_SECRET}"* ]]
+  [[ "$output" == *"aws_session_token=${_TEST_TOKEN}"* ]]
 }
 
 # aws_import_credentials — error cases
