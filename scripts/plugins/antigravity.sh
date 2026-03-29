@@ -69,7 +69,7 @@ function _antigravity_launch() {
   if _run_command --soft -- curl -sf http://localhost:9222/json >/dev/null 2>&1; then
     return 0
   fi
-  _info "Antigravity not running — launching Chrome with --remote-debugging-port=9222..."
+  _info "Chrome not running — launching with --remote-debugging-port=9222..."
   if _is_mac; then
     open -a "Google Chrome" --args \
       --remote-debugging-port=9222 \
