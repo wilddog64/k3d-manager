@@ -51,7 +51,7 @@
 | **`k3s_aws_provider.bats`** | **COMPLETE** | New suite validates help + `--confirm` gate; runs via `./scripts/k3d-manager test lib`; commit `4aba999`. |
 | **BATS PATH fix** | **COMPLETE** | Jenkins auth cleanup suite prepends Homebrew bash so plugin sourcing works on macOS; commit `4aba999`. |
 | **`aws_import_credentials` refactor** | **COMPLETE** | New `aws.sh` helper (CSV + quoted export) + acg alias/back-compat; commit `be7e997`. |
-| **Gemini e2e smoke test** | **PENDING** | `acg_get_credentials` → `CLUSTER_PROVIDER=k3s-aws deploy_cluster` → verify node Ready → `destroy_cluster --confirm` |
+| **Gemini e2e smoke test** | **COMPLETE** | Full lifecycle verified: `acg_get_credentials` → `deploy_cluster` → `get nodes` (Ready) → `destroy_cluster`. commit `4aba999`. |
 
 ## v1.0.0 Design Decisions
 

@@ -28,6 +28,7 @@
 ## v1.0.0 — Active
 
 - [x] **`k3s-aws` provider foundation** — `_cluster_provider_call` hyphen slug + `deploy_cluster` guard/case + new provider module and tests implemented per `docs/plans/v1.0.0-k3s-aws-provider.md`; commit `4aba999`.
+- [x] **Gemini e2e smoke test** — **COMPLETE**. Full lifecycle verified: `acg_get_credentials` → `deploy_cluster` → `get nodes` (Ready) → `destroy_cluster`. commit `4aba999`.
 - [x] **BATS macOS compatibility** — `test_auth_cleanup.bats` ensures PATH prefers Homebrew bash so plugin sourcing succeeds during Jenkins tests; commit `4aba999`.
 - [x] **`aws_import_credentials` refactor** — new `scripts/plugins/aws.sh` with CSV + quoted export parsing, `acg.sh` sources helper + alias/back-compat; commit `be7e997`.
 - [ ] **Codex: aws_import_credentials refactor** — `docs/plans/v1.0.0-acg-import-quoted-credentials.md`; NEW `aws.sh` + `acg.sh` updates; CSV support + quoted values + generic namespace; assigned to Codex 2026-03-29
