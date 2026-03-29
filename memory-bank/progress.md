@@ -21,6 +21,12 @@
 **v0.9.19 SHIPPED** — PR #54 merged (`0f13be1`) 2026-03-28. Tagged v0.9.19. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.19-retrospective.md`.
 **v0.9.20 ACTIVE** — branch `k3d-manager-v0.9.20` cut from `0f13be1` 2026-03-28.
 
+## v0.9.20 — Active
+
+- [x] **Antigravity Chrome launch** — `_antigravity_launch` now opens Google Chrome with `--password-store=basic` and dedicated user data dir so CDP probe works without manual browser start. Spec: `docs/plans/v0.9.20-acg-automation-fixes.md`, commit `8dd9cbb`.
+- [x] **`acg_credentials.js` SPA nav fix** — Script finds the Pluralsight tab, avoids hard `page.goto` when already on `app.pluralsight.com`, SPA-navigates when needed, waits for `aria-busy` to clear, and increases credential selector timeout to 60s. Commit `8dd9cbb`.
+- [x] **`_ensure_k3sup` helper** — Added auto-install helper in `shopping_cart.sh` (brew or curl | sudo sh) and wired `deploy_app_cluster` to `_ensure_k3sup || return 1`. Commit `8dd9cbb`.
+
 ## v0.9.19 — Shipped
 
 - [x] **`acg_get_credentials` + `acg_import_credentials`** — commit `3970623` adds `_acg_write_credentials`, both public functions, docs updates, and 8 BATS tests per `docs/plans/v0.9.19-acg-get-credentials.md`
