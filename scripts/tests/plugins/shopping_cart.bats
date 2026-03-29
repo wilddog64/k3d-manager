@@ -28,3 +28,22 @@
   run bash -c 'SCRIPT_DIR="$(pwd)/scripts"; source scripts/lib/system.sh; source scripts/lib/core.sh; source scripts/plugins/shopping_cart.sh; register_shopping_cart_apps'
   [ "$status" -ne 0 ]
 }
+
+@test "_ensure_k3sup returns 0 when k3sup is already installed" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    k3sup() { return 0; }
+    _command_exist() { [[ "$1" == "k3sup" ]]; }
+    _ensure_k3sup
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "_ensure_k3sup errors when k3sup absent and no installer available" {
+  run bash -c 'SCRIPT_DIR="$(pwd)/scripts"; PATH=/dev/null; source scripts/lib/system.sh; source scripts/lib/core.sh; source scripts/plugins/shopping_cart.sh; _ensure_k3sup'
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"k3sup not found"* ]]
+}

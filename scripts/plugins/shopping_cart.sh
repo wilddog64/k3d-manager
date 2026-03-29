@@ -97,6 +97,26 @@ function register_shopping_cart_apps() {
   _run_command -- kubectl apply -f "${argocd_dir}/"
 }
 
+function _ensure_k3sup() {
+  if _command_exist k3sup; then
+    return 0
+  fi
+  _info "[shopping_cart] k3sup not found — installing..."
+  if _command_exist brew; then
+    _run_command -- brew install k3sup
+    if _command_exist k3sup; then
+      return 0
+    fi
+  fi
+  if _is_debian_family && _command_exist curl; then
+    _run_command --prefer-sudo -- sh -c "$(curl -sLS https://get.k3sup.dev)"
+    if _command_exist k3sup; then
+      return 0
+    fi
+  fi
+  _err "[shopping_cart] k3sup not found and automatic installation failed — install manually: brew install k3sup"
+}
+
 function deploy_app_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
@@ -132,10 +152,7 @@ HELP
   local kube_context="ubuntu-k3s"
   local kubeconfig_dir="${local_kubeconfig%/*}"
 
-  if ! command -v k3sup >/dev/null 2>&1; then
-    _err "[shopping_cart] k3sup not found — install with: brew install k3sup"
-    return 1
-  fi
+  _ensure_k3sup
 
   if [[ ! -f "${ssh_key}" ]]; then
     _err "[shopping_cart] SSH key not found: ${ssh_key}"
