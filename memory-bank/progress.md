@@ -28,7 +28,7 @@
 ## v1.0.0 — Active
 
 - [ ] **Codex: k3s-aws provider** — `docs/plans/v1.0.0-k3s-aws-provider.md`; 4 files: `provider.sh` hyphen normalization, `core.sh` case+guard, NEW `providers/k3s-aws.sh`, NEW `tests/lib/k3s_aws_provider.bats`; assigned to Codex 2026-03-29
-- [ ] **Codex: acg_import_credentials quoted-value fix** — `docs/plans/v1.0.0-acg-import-quoted-credentials.md`; 1 file: `acg.sh` strip quotes + help text; assigned to Codex 2026-03-29
+- [ ] **Codex: aws_import_credentials refactor** — `docs/plans/v1.0.0-acg-import-quoted-credentials.md`; NEW `aws.sh` + `acg.sh` updates; CSV support + quoted values + generic namespace; assigned to Codex 2026-03-29
 
 ## v0.9.21 — Shipped
 
