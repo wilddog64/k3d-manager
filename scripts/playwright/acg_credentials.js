@@ -35,10 +35,17 @@ async function extractCredentials() {
     const currentUrl = page.url();
     let currentHostname = '';
     try { currentHostname = new URL(currentUrl).hostname; } catch { /* non-URL, will navigate */ }
+    let targetPathname = '';
+    try { targetPathname = new URL(targetUrl).pathname; } catch { /* invalid targetUrl */ }
+    let currentPathname = '';
+    try { currentPathname = new URL(currentUrl).pathname; } catch { /* non-URL */ }
+
     if (currentHostname !== 'app.pluralsight.com') {
       console.error(`INFO: Navigating to ${targetUrl}...`);
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    } else if (!currentUrl.includes('cloud-sandboxes')) {
+    } else if (currentPathname === targetPathname) {
+      console.error(`INFO: Already on ${currentUrl} — skipping navigation`);
+    } else if (targetPathname.includes('cloud-sandboxes')) {
       console.error(`INFO: SPA-navigating to cloud-sandboxes from ${currentUrl}...`);
       const navLink = page.locator('a[href*="cloud-sandboxes"]').first();
       const navVisible = await navLink.isVisible({ timeout: 5000 }).catch(() => false);
@@ -48,7 +55,8 @@ async function extractCredentials() {
         await page.evaluate(url => window.location.assign(url), targetUrl);
       }
     } else {
-      console.error(`INFO: Already on ${currentUrl} — skipping navigation`);
+      console.error(`INFO: Navigating to ${targetUrl}...`);
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     }
 
     // Give it time to render SPA content after navigation changes

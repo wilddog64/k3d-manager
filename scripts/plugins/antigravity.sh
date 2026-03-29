@@ -76,7 +76,12 @@ function _antigravity_launch() {
       --password-store=basic \
       --user-data-dir="${HOME}/.config/acg-chrome-profile"
   else
-    google-chrome \
+    local _chrome_bin
+    _chrome_bin=$(command -v google-chrome 2>/dev/null || command -v google-chrome-stable 2>/dev/null || command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || true)
+    if [[ -z "${_chrome_bin}" ]]; then
+      _err "[antigravity] Chrome/Chromium not found — install google-chrome, google-chrome-stable, chromium-browser, or chromium"
+    fi
+    "${_chrome_bin}" \
       --remote-debugging-port=9222 \
       --password-store=basic \
       --user-data-dir="${HOME}/.config/acg-chrome-profile" &
