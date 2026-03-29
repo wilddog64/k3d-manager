@@ -73,11 +73,13 @@ function _antigravity_launch() {
   if _is_mac; then
     open -a "Google Chrome" --args \
       --remote-debugging-port=9222 \
-      --password-store=basic
+      --password-store=basic \
+      --user-data-dir="${HOME}/.config/acg-chrome-profile"
   else
     google-chrome \
       --remote-debugging-port=9222 \
-      --password-store=basic &
+      --password-store=basic \
+      --user-data-dir="${HOME}/.config/acg-chrome-profile" &
   fi
   _antigravity_browser_ready 30
 }
