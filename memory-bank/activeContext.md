@@ -1,6 +1,6 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v0.9.20` (as of 2026-03-28)
+## Current Branch: `k3d-manager-v0.9.21` (as of 2026-03-29)
 
 **v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. Copilot CLI CI integration.
 **v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released.
@@ -10,12 +10,24 @@
 **v0.9.17 SHIPPED** — PR #52 merged (`c88ca7a`) 2026-03-28. Tagged v0.9.17. Released.
 **v0.9.18 SHIPPED** — PR #53 merged (`7567a5c`) 2026-03-28. Tagged v0.9.18. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.18-retrospective.md`.
 **v0.9.19 SHIPPED** — PR #54 merged (`0f13be1`) 2026-03-28. Tagged v0.9.19. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.19-retrospective.md`.
-**v0.9.20 ACTIVE** — branch `k3d-manager-v0.9.20` cut from `0f13be1` 2026-03-28.
-**enforce_admins:** restored on main 2026-03-28.
+**v0.9.20 SHIPPED** — PR #55 merged to main (`bfd66fe`) 2026-03-29. Tagged v0.9.20, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v0.9.20-retrospective.md`.
+**v0.9.21 ACTIVE** — branch `k3d-manager-v0.9.21` cut from `bfd66fe` 2026-03-29.
+**enforce_admins:** restored on main 2026-03-29.
 **Branch cleanup:** v0.9.7–v0.9.17 deleted (local + remote) 2026-03-28.
 **v0.9.15 scope:** Antigravity × GitHub Copilot coding agent validation — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`. Antigravity plugin rewritten in `b2ba187` per `docs/plans/v0.9.15-antigravity-plugin-impl.md`. Also: ldap-password-rotator `vault kv put` stdin hardening — spec `docs/plans/v0.9.15-ensure-copilot-cli.md` (closes v0.6.2 security debt; `_ensure_copilot_cli`/`_k3d_manager_copilot`/`_ensure_node` already shipped in v0.9.12).
 
 ---
+
+## Roadmap Versioning Decision (2026-03-29)
+
+| Version | Scope |
+|---------|-------|
+| v0.9.21 | `_ensure_k3sup` + `deploy_app_cluster` auto-install — prerequisite cleanup |
+| v1.0.0 | AWS/ACG — 3-node k3sup cluster + Samba AD + full automation |
+| v1.0.1 | GCP cloud provider (`k3s-gcp`) |
+| v1.0.2 | Azure cloud provider (`k3s-azure`) |
+
+`v1.0.0` = first release where k3d-manager provisions and fully configures a remote multi-node cluster end-to-end without manual steps.
 
 ## v1.0.0 Design Decisions
 
@@ -23,16 +35,18 @@
 
 ---
 
-## Current Focus (v0.9.20)
+## Current Focus (v0.9.21)
 
-Spec: `docs/plans/v0.9.20-acg-automation-fixes.md` (committed `b579043`)
+Scope: `_ensure_k3sup` helper + `deploy_app_cluster` replacement of raw `command -v k3sup` check.
 
 | Item | Status | Notes |
 |---|---|---|
 | **v0.9.20 spec written** | **COMPLETE** | 3 fixes: Chrome launch, SPA nav, _ensure_k3sup. `b579043`. |
 | **`_antigravity_launch` Chrome fix** | **COMPLETE** | Verified Chrome cold-start with `--password-store=basic` and dedicated profile. |
 | **`acg_credentials.js` SPA nav fix** | **COMPLETE** | Verified SPA-navigation guard avoids hard goto when already on Pluralsight. |
-| **`_ensure_k3sup`** | **DEFERRED → v0.9.21** | Reverted from v0.9.20 (scope creep); not in repo; planned for next release |
+| **`_ensure_k3sup`** | **COMPLETE** | Auto-installs via brew/curl + `deploy_app_cluster` guard rewired; commit `11a3ac1`. |
+| **Gemini: smoke test `_ensure_k3sup`** | **COMPLETE** | Verified warm path (returns 0) and cold path (triggers install message when hidden). Ubuntu skip (unreachable). |
+| **Gemini: Ubuntu smoke test `_ensure_k3sup`** | **COMPLETE** | Verified cold path on `ubuntu-parallels`. `k3sup` correctly installed via `curl | sudo sh` path after providing password. |
 | **Static acg_credentials.js** | **COMPLETE** | Implemented `scripts/playwright/acg_credentials.js` and updated `acg_get_credentials`. Verified working with live Pluralsight sandbox via Chrome CDP. commit `67a445c`. |
 | **scratch/ cleanup** | **PENDING** | `rm -f scratch/*` — wipe stale Playwright artifacts; policy: wipe at each release cut |
 | **acg_get_credentials + acg_import_credentials** | **COMPLETE** | `3970623` adds credential extractor + stdin import helpers with docs/tests per `docs/plans/v0.9.19-acg-get-credentials.md` |

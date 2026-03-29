@@ -1,5 +1,18 @@
 # Changes - k3d-manager
 
+## [v0.9.21] — 2026-03-29 — `_ensure_k3sup` auto-install helper
+
+### Added
+- `_ensure_k3sup` private helper in `scripts/plugins/shopping_cart.sh`: auto-installs k3sup via `brew install k3sup` (macOS/Linuxbrew) or `curl | sudo sh` (Debian/Ubuntu); emits `_err` with manual install guidance if neither installer is available (`11a3ac1`)
+
+### Changed
+- `deploy_app_cluster`: replaces raw `command -v k3sup` hard-error with `_ensure_k3sup` — consistent with `_ensure_node` / `_ensure_copilot_cli` auto-install pattern (`11a3ac1`)
+
+### Tests
+- 2 new BATS tests in `scripts/tests/plugins/shopping_cart.bats`: `_ensure_k3sup` returns 0 when k3sup present; errors when no installer available (`11a3ac1`)
+
+---
+
 ## [v0.9.20] — 2026-03-29 — ACG Chrome launch + SPA navigation fix
 
 ### Fixed
