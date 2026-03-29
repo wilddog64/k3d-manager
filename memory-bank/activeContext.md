@@ -23,10 +23,16 @@
 
 ---
 
-## Current Focus (v0.9.19)
+## Current Focus (v0.9.20)
+
+Spec: `docs/plans/v0.9.20-acg-automation-fixes.md` (committed `b579043`)
 
 | Item | Status | Notes |
 |---|---|---|
+| **v0.9.20 spec written** | **COMPLETE** | 3 fixes: Chrome launch, SPA nav, _ensure_k3sup. `b579043`. |
+| **`_antigravity_launch` Chrome fix** | **ASSIGNED → Codex** | Change `open -a "Antigravity"` to `open -a "Google Chrome"` + `--password-store=basic` + `--user-data-dir` |
+| **`acg_credentials.js` SPA nav fix** | **ASSIGNED → Codex** | Skip `page.goto()` if on pluralsight.com; find page by URL; wait for aria-busy clear |
+| **`_ensure_k3sup`** | **ASSIGNED → Codex** | Add to `shopping_cart.sh`; replace raw `command -v k3sup` check |
 | **Static acg_credentials.js** | **COMPLETE** | Implemented `scripts/playwright/acg_credentials.js` and updated `acg_get_credentials`. Verified working with live Pluralsight sandbox via Chrome CDP. commit `67a445c`. |
 | **scratch/ cleanup** | **PENDING** | `rm -f scratch/*` — wipe stale Playwright artifacts; policy: wipe at each release cut |
 | **acg_get_credentials + acg_import_credentials** | **COMPLETE** | `3970623` adds credential extractor + stdin import helpers with docs/tests per `docs/plans/v0.9.19-acg-get-credentials.md` |
