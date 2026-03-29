@@ -31,7 +31,10 @@
 - [x] **Gemini e2e smoke test** — **COMPLETE**. Full lifecycle verified: `acg_get_credentials` → `deploy_cluster` → `get nodes` (Ready) → `destroy_cluster`. commit `4aba999`.
 - [x] **BATS macOS compatibility** — `test_auth_cleanup.bats` ensures PATH prefers Homebrew bash so plugin sourcing succeeds during Jenkins tests; commit `4aba999`.
 - [x] **`aws_import_credentials` refactor** — new `scripts/plugins/aws.sh` with CSV + quoted export parsing, `acg.sh` sources helper + alias/back-compat; commit `be7e997`.
-- [ ] **Codex: aws_import_credentials refactor** — `docs/plans/v1.0.0-acg-import-quoted-credentials.md`; NEW `aws.sh` + `acg.sh` updates; CSV support + quoted values + generic namespace; assigned to Codex 2026-03-29
+- [x] **`acg_get_credentials` Antigravity source** — `acg.sh` now sources `antigravity.sh` so `_ensure_antigravity` helpers exist for `acg_get_credentials`; commit `4357f90`.
+- [x] **`deploy_app_cluster` IP resolve** — resolves external IP from `~/.ssh/config` `HostName` before falling back to alias; commit `51983d3`.
+- [x] **`acg_watch` + `acg_provision --recreate`** — adds sandbox watcher, pre-flight extend, and recreate flag plus provider wiring; commit `51bdf3a`.
+
 
 ## v0.9.21 — Shipped
 
