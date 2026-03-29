@@ -187,7 +187,8 @@ docs/
 
 | Plugin | Key Functions | Description |
 |---|---|---|
-| **ACG** | `acg_get_credentials`, `acg_import_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_teardown` | AWS ACG sandbox lifecycle — automated credential extraction via Playwright CDP, stdin fallback, VPC + SG + EC2 provisioning; [spec](docs/plans/v0.9.6-acg-plugin.md) |
+| **ACG** | `acg_get_credentials`, `acg_import_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_watch`, `acg_teardown` | AWS ACG sandbox lifecycle — automated credential extraction via Playwright CDP, stdin fallback, VPC + SG + EC2 provisioning, background TTL watcher; [spec](docs/plans/v0.9.6-acg-plugin.md) |
+| **AWS** | `aws_import_credentials` | Generic AWS credential import — supports CSV (IAM Download), quoted/unquoted export, labeled (Pluralsight), credentials file formats; writes `~/.aws/credentials` |
 | **Antigravity** | `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_poll_task`, `antigravity_acg_extend` | Browser automation via gemini CLI + Playwright over CDP (port 9222) — Copilot coding agent trigger, ACG sandbox TTL extend |
 | **ArgoCD** | `deploy_argocd`, `deploy_argocd_bootstrap`, `register_app_cluster`, `configure_vault_argocd_repos` | GitOps engine deployment + app cluster registration + Vault repo auth |
 | **Vault** | `deploy_vault`, `configure_vault_app_auth` | HashiCorp Vault HA + PKI + cross-cluster auth |
@@ -255,11 +256,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-03-29 | [ACG provision keypair import fails on re-run](docs/issues/2026-03-29-acg-provision-keypair-import-fail.md) | acg — `aws ec2 import-key-pair` prints error when key already exists; agent misdiagnosed as fatal; fixed with `_run_command --soft` |
 | 2026-03-28 | [Pluralsight Antigravity error](docs/issues/2026-03-28-pluralsight-antigravity-error.md) | acg — "Oops! Something went wrong" on Pluralsight in Antigravity browser; root cause: Chrome launched without `--password-store=basic` |
 | 2026-03-28 | [ArgoCD sync ACG credentials expired](docs/issues/2026-03-28-argocd-sync-acg-credentials-expired.md) | argocd — sync failed; ACG sandbox EC2 unreachable; root cause: sandbox credentials expired |
 | 2026-03-28 | [Copilot PR #52 review findings](docs/issues/2026-03-28-copilot-pr52-review-findings.md) | antigravity — yolo always-on, sleep not stubbed, tmpdir not isolated, model order wrong in 3 places |
 | 2026-03-28 | [ACG domain redirection](docs/issues/2026-03-28-acg-domain-redirection.md) | antigravity — `learn.acloud.guru` retired; redirects to Pluralsight |
-| 2026-03-27 | [ACG session E2E test failure](docs/issues/2026-03-27-acg-session-e2e-fail.md) | antigravity — nested gemini agent blocked by Plan Mode + path restriction |
 
 [All issues →](docs/issues/)
 
@@ -269,15 +270,16 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.0.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.0) | 2026-03-29 | k3s-aws provider foundation — `CLUSTER_PROVIDER=k3s-aws` end-to-end deploy; `aws_import_credentials`; `acg_provision --recreate`; `acg_watch` background TTL watcher; keypair idempotency + `page.goto()` fix |
 | [v0.9.21](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.21) | 2026-03-29 | `_ensure_k3sup` auto-install helper — `deploy_app_cluster` now auto-installs k3sup via brew or curl; consistent with `_ensure_node`/`_ensure_copilot_cli` pattern |
 | [v0.9.20](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.20) | 2026-03-29 | ACG Chrome launch fix — `_antigravity_launch` now opens Chrome (not Antigravity IDE) with `--password-store=basic`; `acg_credentials.js` SPA nav guard avoids hard reload |
-| [v0.9.19](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.19) | 2026-03-28 | ACG automated credential extraction — `acg_get_credentials` (Playwright CDP), `acg_import_credentials` (stdin), static `acg_credentials.js`; live-verified against Pluralsight sandbox |
 
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.9.19](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.19) | 2026-03-28 | ACG automated credential extraction — `acg_get_credentials` (Playwright CDP), `acg_import_credentials` (stdin), static `acg_credentials.js`; live-verified against Pluralsight sandbox |
 | [v0.9.18](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.18) | 2026-03-28 | Pluralsight URL migration — `_ACG_SANDBOX_URL` + `_antigravity_ensure_acg_session` updated to `app.pluralsight.com` |
 | [v0.9.17](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.17) | 2026-03-27 | Antigravity model fallback (`gemini-2.5-flash` first), ACG session check, nested agent fix (`--approval-mode yolo` + workspace temp path) |
 | [v0.9.16](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.16) | 2026-03-26 | Antigravity IDE + CDP browser automation — gemini CLI + Playwright engine; `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_acg_extend`; ldap stdin hardening |

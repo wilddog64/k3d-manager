@@ -56,15 +56,31 @@ across clouds.
 
 ---
 
-## v1.0.0 — AWS/ACG: Multi-Node k3s Cluster + Samba AD
-*Focus: 3-node k3sup cluster on ACG — resolves single t3.medium resource exhaustion*
+## v1.0.0 — `k3s-aws` Provider Foundation
+*Focus: establish `CLUSTER_PROVIDER=k3s-aws`; single-node deploy/destroy; SSH config auto-update*
 
-**Motivation:** Single t3.medium (4GB) at 95% capacity is a structural blocker for
-all 5 shopping-cart pods. ACG allows up to 5 concurrent t3.medium instances. Three nodes
-gives control-plane isolation, workload distribution, and a dedicated identity/data tier —
-matching real k8s topology at zero cost.
+**Rename:** `k3s-remote` → `k3s-aws` — symmetric naming with `k3s-gcp` and `k3s-azure`.
 
-### Node Layout (3 × t3.medium — ACG)
+```bash
+CLUSTER_PROVIDER=k3s-aws ./scripts/k3d-manager deploy_cluster
+CLUSTER_PROVIDER=k3s-aws ./scripts/k3d-manager destroy_cluster
+```
+
+- `deploy_cluster` with `k3s-aws`: `acg_provision` (single node) → `_ensure_k3sup` → k3sup install → kubeconfig merge → tunnel start
+- `destroy_cluster` with `k3s-aws`: `acg_teardown` → stop tunnel → remove kubeconfig context
+- **SSH config auto-update**: `acg_provision` writes new EC2 IP back to `~/.ssh/config` `ubuntu` + `ubuntu-tunnel` HostName entries automatically
+- Milestone gate: single node Ready, `kubectl get nodes` works from M2 Air via tunnel
+
+---
+
+## v1.0.1 — Multi-Node Expansion (3 × t3.medium)
+*Focus: 3-node k3sup cluster — resolves single t3.medium resource exhaustion*
+
+**Motivation:** Single t3.medium (4GB) at 95% capacity structurally blocks all 5 shopping-cart
+pods. ACG allows up to 5 concurrent instances. Three nodes gives control-plane isolation,
+workload distribution, and a dedicated data tier.
+
+### Node Layout
 
 | Node | Role | Workloads |
 |------|------|-----------|
@@ -72,63 +88,166 @@ matching real k8s topology at zero cost.
 | Node 2 | App worker | basket, frontend, order, payment, product-catalog |
 | Node 3 | Data + Identity | PostgreSQL, RabbitMQ, Redis, Samba AD DC |
 
-### New CLUSTER_PROVIDER value: `k3s-remote`
+- `deploy_cluster` calls `acg_provision` × 3 → k3sup install on Node 1 → k3sup join × 2
+- Node taints + labels applied (control-plane taint, app/data worker labels)
+- Tunnel started automatically from Node 1
+- Milestone gate: 3 nodes Ready in `kubectl get nodes`
 
-```bash
-CLUSTER_PROVIDER=k3s-remote ./scripts/k3d-manager deploy_cluster
+**`k3d-manager doctor`:** Pre-flight diagnostic command. Checks all prerequisites and
+reports green/red per item before the operator runs `deploy_cluster`:
+
+```
+✓ aws CLI, k3sup, autossh, kubectl, node, Playwright
+✓/✗ Antigravity (port 9222 open)
+✓/✗ AWS credentials valid (sts get-caller-identity)
+✓/✗ SSH config — Host ubuntu + Host ubuntu-tunnel present
+✓/✗ SSH key — ~/.ssh/k3d-manager-key.pem exists
 ```
 
-- `deploy_cluster` calls `acg_provision` three times → 3 EC2 instances
-- `k3sup install` on Node 1 (control plane)
-- `k3sup join` on Node 2 + Node 3 (workers)
-- Node taints + labels applied
-- Tunnel started automatically (`tunnel_start` — Node 1)
-- Kubeconfig merged as `ubuntu-k3s`
+Non-zero exit if any check fails. Operator-facing — no cluster knowledge required.
 
-```bash
-CLUSTER_PROVIDER=k3s-remote ./scripts/k3d-manager destroy_cluster
-# terminates all 3 EC2 instances, stops tunnel, removes kubeconfig context
-```
+**Operator shortcuts — `bin/` scripts + Claude skills:**
 
-### Samba AD DC Plugin
+| Script | Claude skill | Does |
+|--------|-------------|------|
+| `bin/k3s-up` | `/k3s-up` | `acg_get_credentials` → `CLUSTER_PROVIDER=k3s-aws deploy_cluster` |
+| `bin/k3s-down` | `/k3s-down` | `CLUSTER_PROVIDER=k3s-aws destroy_cluster --confirm` |
+| `bin/k3s-recreate` | `/k3s-recreate` | `acg_get_credentials` → `deploy_cluster` with `acg_provision --recreate` |
+
+`bin/` scripts: thin wrappers calling `./scripts/k3d-manager` with pre-filled env + args.
+Claude skills: one-liners invoking the bin/ script and reporting output.
+Target audience: human operators and Claude Code sessions.
+
+**lib-agc preparation (step 1 of 3):** `aws_provision` namespace refactor.
+Promote `acg_provision` → `_acg_provision` (private). Add `aws_provision` public entry point
+with `_aws_is_acg_sandbox()` auto-detection. `acg_provision` becomes deprecated alias.
+Goal: no k3d-manager-external caller should need to know about ACG internals.
+
+---
+
+## v1.0.2 — Full Stack on 3 Nodes
+*Focus: all 5 shopping-cart pods Running on the multi-node cluster*
+
+- Workload placement: app pods scheduled to Node 2, data tier (PostgreSQL, RabbitMQ, Redis) to Node 3
+- ArgoCD sync from infra cluster → app cluster
+- Milestone gate: all 5 pods Running + Playwright E2E green
+
+**lib-agc preparation (step 2 of 3):** Dependency audit.
+Verify `acg.sh`, `aws.sh`, and `antigravity.sh` have zero imports from k3d-manager core
+(`core.sh`, `cluster_provider.sh`, `_kubectl`). Any found dependencies are extracted or
+replaced with self-contained equivalents. Shared helpers (`_info`, `_err`, `_run_command`)
+are the only permitted cross-boundary calls — these will be satisfied by `lib-foundation`
+after extraction.
+
+---
+
+## v1.0.3 — Samba AD DC Plugin
+*Focus: real Active Directory protocol — replaces OpenLDAP simulation*
 
 ```bash
 DIRECTORY_SERVICE_PROVIDER=activedirectory ./scripts/k3d-manager deploy_directory
 ```
 
 - Deploys `samba-ad-dc` container on Node 3
-- Replaces OpenLDAP simulation with real AD protocol behavior
 - Resolves `AD_TLS_CONFIG=TRUST_ALL_CERTIFICATES` dev-only debt
 - `DIRECTORY_SERVICE_PROVIDER=openldap` remains the default for local k3d
+- Milestone gate: AD auth working end-to-end; `TRUST_ALL_CERTIFICATES` flag removed from production paths
 
-### Milestone Gate
-
-All 5 shopping-cart pods Running + Playwright E2E green = v1.0.0 done.
+**lib-agc preparation (step 3 of 3):** Standalone source test.
+Add a BATS test that sources `acg.sh`, `aws.sh`, `antigravity.sh` in a clean `env -i`
+environment (no k3d-manager dispatcher, no `SCRIPT_DIR` pre-set) and confirms all public
+functions are defined. Passing this test is the extractability gate — if it passes,
+`lib-agc` can be created as an independent repo at any point after v1.0.3.
 
 ---
 
-## v1.0.1 — GCP Cloud Provider
+## v1.0.4 — GCP Cloud Provider
 *Focus: k3s on GCP Compute Engine — second cloud backend*
 
 **New `CLUSTER_PROVIDER` value:** `k3s-gcp`
 
-- `acg_provision` equivalent for GCP: provision Compute Engine VM(s) via `gcloud`
-- k3sup install + kubeconfig merge (same pattern as ACG/k3s-remote)
-- Plugin layer identical — no changes needed above the provider abstraction
+- Provision Compute Engine VM(s) via `gcloud`
+- k3sup install + kubeconfig merge (same pattern as `k3s-aws`)
 - Credential extraction: GCP service account key → `~/.config/gcloud/`
-- Milestone gate: basket-service Running on GCP-provisioned k3s + `kubectl get nodes` shows Ready
+- Milestone gate: basket-service Running on GCP-provisioned k3s
 
 ---
 
-## v1.0.2 — Azure Cloud Provider
+## v1.0.5 — Azure Cloud Provider
 *Focus: k3s on Azure VM — third cloud backend*
 
 **New `CLUSTER_PROVIDER` value:** `k3s-azure`
 
-- `acg_provision` equivalent for Azure: provision Azure VM(s) via `az`
-- k3sup install + kubeconfig merge (same pattern as ACG/GCP)
+- Provision Azure VM(s) via `az`
+- k3sup install + kubeconfig merge (same pattern as `k3s-aws`)
 - Credential extraction: Azure service principal → `~/.azure/`
-- Milestone gate: basket-service Running on Azure-provisioned k3s + `kubectl get nodes` shows Ready
+- Milestone gate: basket-service Running on Azure-provisioned k3s
+
+---
+
+## Post-v1.0.5 — Extract `lib-agc`
+*Gate: all 3 cloud providers shipped (k3s-aws, k3s-gcp, k3s-azure)*
+
+ACG sandbox tooling is not cluster lifecycle — it is Pluralsight/AWS sandbox automation.
+Once k3d-manager manages 3 cloud backends, the ACG-specific code should live in its own repo.
+
+**New repo:** `wilddog64/lib-agc`
+
+**Extraction scope:**
+
+| File | Destination |
+|------|-------------|
+| `scripts/plugins/acg.sh` | `lib-agc` — Playwright, CDP, sandbox lifecycle |
+| `scripts/plugins/aws.sh` | `lib-agc` — `aws_import_credentials`, `_aws_write_credentials` |
+| `scripts/plugins/antigravity.sh` | `lib-agc` — `_antigravity_launch`, CDP browser automation |
+
+**Integration:** k3d-manager sources `lib-agc` as a git subtree at `scripts/lib/agc/`,
+same pattern as `lib-foundation` at `scripts/lib/foundation/`.
+
+**k3dm-mcp** also depends on `lib-agc` directly — separate consumer, separate subtree pull.
+
+---
+
+## Pre-v1.1.0 — `aws_provision` Namespace Refactor
+*Pre-requisite for k3dm-mcp: public entry point + ACG auto-detection*
+
+Before the MCP layer is built, `acg_provision` must be promoted to a generic public API.
+AI agents should call `aws_provision`, not know ACG-specific internals.
+
+**Design:**
+
+```
+aws_provision()          ← public — calls _aws_is_acg_sandbox() to route
+  _aws_is_acg_sandbox()  ← private — checks `aws sts get-caller-identity` ARN for "cloud_user"
+  _acg_provision()       ← private — current acg_provision logic renamed
+  _aws_ec2_provision()   ← stub — _err "not yet implemented" (future: raw EC2 CLI path)
+```
+
+**Detection logic:**
+
+```bash
+function _aws_is_acg_sandbox() {
+  local arn
+  arn=$(aws sts get-caller-identity --query Arn --output text 2>/dev/null)
+  [[ "$arn" == *"cloud_user"* ]]
+}
+```
+
+**Routing:**
+
+```bash
+function aws_provision() {
+  if _aws_is_acg_sandbox; then
+    _acg_provision "$@"
+  else
+    _err "[aws] Non-ACG EC2 provisioning not yet implemented"
+    return 1
+  fi
+}
+```
+
+**Rule:** `acg_provision` kept as deprecated alias → `aws_provision` until k3dm-mcp ships.
+**Gate:** implement before v1.2.0 (k3dm-mcp); k3dm-mcp tools must call `aws_provision`, not `acg_provision`.
 
 ---
 
@@ -152,6 +271,23 @@ CLUSTER_PROVIDER=k3s-remote ./scripts/k3d-manager provision_full_stack
 
 **Gate:** v1.0.0 multi-node proven. k3d (local) + k3s-remote (ACG) = two backends,
 enough surface for a useful provider-agnostic MCP API.
+
+**Access model clarification (post-v1.0.1):**
+
+Claude Code Remote Control (`claude --remote-control`) covers the human operator on
+mobile — the mobile Claude app connects to a live Claude Code session on M2 Air over
+the Anthropic API (outbound only, no open ports) and can invoke `/k3s-up`, `/k3s-down`,
+`/k3s-recreate` skills with full local tool access.
+
+k3dm-mcp's value is **non-interactive AI agent access** — Codex, autonomous pipelines,
+and scheduled agents that run without a human in the loop and cannot use Claude Code's
+interactive session model.
+
+| Interface | Mechanism | Use case |
+|-----------|-----------|----------|
+| Terminal | `./bin/k3s-up` | Human operator, Gemini |
+| Claude Code desktop/mobile | `/k3s-up` skill + Remote Control | Human operator anywhere |
+| AI agent (non-interactive) | k3dm-mcp HTTP tools | Autonomous workflows, Codex |
 
 **Sudo pre-flight requirement:** k3dm-mcp agents run non-interactively — any sudo
 password prompt will hang the agent with no TTY to respond. Before v1.2.0 ships:

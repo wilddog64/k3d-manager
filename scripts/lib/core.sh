@@ -16,7 +16,7 @@ function _cluster_provider() {
    provider="$(printf '%s' "$provider" | tr '[:upper:]' '[:lower:]')"
 
    case "$provider" in
-      k3d|orbstack|k3s)
+      k3d|orbstack|k3s|k3s-aws)
          printf '%s' "$provider"
          ;;
       *)
@@ -730,7 +730,8 @@ EOF
       return 0
    fi
 
-   if [[ ${#positional[@]} -eq 0 && -z "${provider_cli}" && "${force_k3s}" -eq 0 ]]; then
+   local _env_provider="${CLUSTER_PROVIDER:-${K3D_MANAGER_PROVIDER:-}}"
+   if [[ ${#positional[@]} -eq 0 && -z "${provider_cli}" && "${force_k3s}" -eq 0 && -z "${_env_provider}" ]]; then
       cat >&2 <<'EOF'
 Usage: deploy_cluster [options] [cluster_name]
 
@@ -775,7 +776,7 @@ EOF
    fi
 
    case "$provider" in
-      k3d|orbstack|k3s)
+      k3d|orbstack|k3s|k3s-aws)
          ;;
       "")
          _err "Failed to determine cluster provider."

@@ -153,7 +153,15 @@ HELP
 
   local ssh_host="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
   local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
-  local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-${ssh_host}}"
+  local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-}"
+  if [[ -z "$external_ip" ]]; then
+    if _command_exist awk; then
+      external_ip=$(awk -v host="${ssh_host}" \
+        '$1=="Host" && $2==host {found=1; next} found && $1=="HostName" {print $2; exit}' \
+        "${HOME}/.ssh/config" 2>/dev/null)
+    fi
+  fi
+  : "${external_ip:=${ssh_host}}"
   local ssh_key="${UBUNTU_K3S_SSH_KEY:-${HOME}/.ssh/k3d-manager-key.pem}"
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
   local kube_context="ubuntu-k3s"
