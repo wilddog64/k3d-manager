@@ -27,7 +27,8 @@
 
 ## v1.0.0 — Active
 
-- [ ] **Codex: k3s-aws provider** — `docs/plans/v1.0.0-k3s-aws-provider.md`; 4 files: `provider.sh` hyphen normalization, `core.sh` case+guard, NEW `providers/k3s-aws.sh`, NEW `tests/lib/k3s_aws_provider.bats`; assigned to Codex 2026-03-29
+- [x] **`k3s-aws` provider foundation** — `_cluster_provider_call` hyphen slug + `deploy_cluster` guard/case + new provider module and tests implemented per `docs/plans/v1.0.0-k3s-aws-provider.md`; commit `4aba999`.
+- [x] **BATS macOS compatibility** — `test_auth_cleanup.bats` ensures PATH prefers Homebrew bash so plugin sourcing succeeds during Jenkins tests; commit `4aba999`.
 - [ ] **Codex: aws_import_credentials refactor** — `docs/plans/v1.0.0-acg-import-quoted-credentials.md`; NEW `aws.sh` + `acg.sh` updates; CSV support + quoted values + generic namespace; assigned to Codex 2026-03-29
 
 ## v0.9.21 — Shipped
