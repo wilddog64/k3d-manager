@@ -93,6 +93,24 @@ workload distribution, and a dedicated data tier.
 - Tunnel started automatically from Node 1
 - Milestone gate: 3 nodes Ready in `kubectl get nodes`
 
+**`k3d-manager doctor`:** Pre-flight diagnostic command. Checks all prerequisites and
+reports green/red per item before the operator runs `deploy_cluster`:
+
+```
+✓ aws CLI, k3sup, autossh, kubectl, node, Playwright
+✓/✗ Antigravity (port 9222 open)
+✓/✗ AWS credentials valid (sts get-caller-identity)
+✓/✗ SSH config — Host ubuntu + Host ubuntu-tunnel present
+✓/✗ SSH key — ~/.ssh/k3d-manager-key.pem exists
+```
+
+Non-zero exit if any check fails. Operator-facing — no cluster knowledge required.
+
+**lib-agc preparation (step 1 of 3):** `aws_provision` namespace refactor.
+Promote `acg_provision` → `_acg_provision` (private). Add `aws_provision` public entry point
+with `_aws_is_acg_sandbox()` auto-detection. `acg_provision` becomes deprecated alias.
+Goal: no k3d-manager-external caller should need to know about ACG internals.
+
 ---
 
 ## v1.0.2 — Full Stack on 3 Nodes
@@ -101,6 +119,13 @@ workload distribution, and a dedicated data tier.
 - Workload placement: app pods scheduled to Node 2, data tier (PostgreSQL, RabbitMQ, Redis) to Node 3
 - ArgoCD sync from infra cluster → app cluster
 - Milestone gate: all 5 pods Running + Playwright E2E green
+
+**lib-agc preparation (step 2 of 3):** Dependency audit.
+Verify `acg.sh`, `aws.sh`, and `antigravity.sh` have zero imports from k3d-manager core
+(`core.sh`, `cluster_provider.sh`, `_kubectl`). Any found dependencies are extracted or
+replaced with self-contained equivalents. Shared helpers (`_info`, `_err`, `_run_command`)
+are the only permitted cross-boundary calls — these will be satisfied by `lib-foundation`
+after extraction.
 
 ---
 
@@ -115,6 +140,12 @@ DIRECTORY_SERVICE_PROVIDER=activedirectory ./scripts/k3d-manager deploy_director
 - Resolves `AD_TLS_CONFIG=TRUST_ALL_CERTIFICATES` dev-only debt
 - `DIRECTORY_SERVICE_PROVIDER=openldap` remains the default for local k3d
 - Milestone gate: AD auth working end-to-end; `TRUST_ALL_CERTIFICATES` flag removed from production paths
+
+**lib-agc preparation (step 3 of 3):** Standalone source test.
+Add a BATS test that sources `acg.sh`, `aws.sh`, `antigravity.sh` in a clean `env -i`
+environment (no k3d-manager dispatcher, no `SCRIPT_DIR` pre-set) and confirms all public
+functions are defined. Passing this test is the extractability gate — if it passes,
+`lib-agc` can be created as an independent repo at any point after v1.0.3.
 
 ---
 
