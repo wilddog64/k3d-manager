@@ -48,7 +48,7 @@
   [[ "$output" == *"--confirm"* ]]
 }
 
-@test "_provider_k3s_aws_deploy_cluster provisions agent nodes" {
+@test "_provider_k3s_aws_deploy_cluster runs acg_provision once" {
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"
     source scripts/lib/system.sh
@@ -57,8 +57,7 @@
     source scripts/lib/providers/k3s-aws.sh
     # stubs after source — override real implementations from acg.sh
     antigravity_acg_extend() { return 0; }
-    acg_provision() { return 0; }
-    _acg_provision_agents() { echo "[acg] provisioning agents"; return 0; }
+    acg_provision() { echo "[stub] acg_provision"; return 0; }
     deploy_app_cluster() { return 0; }
     tunnel_start() { return 0; }
     kubectl() { printf "n1 Ready\nn2 Ready\nn3 Ready\n"; }
@@ -67,10 +66,10 @@
     _provider_k3s_aws_deploy_cluster
   '
   [ "$status" -eq 0 ]
-  [[ "$output" == *"provisioning agents"* ]]
+  [[ "$output" == *"[stub] acg_provision"* ]]
 }
 
-@test "_provider_k3s_aws_destroy_cluster --confirm tears down agents" {
+@test "_provider_k3s_aws_destroy_cluster --confirm runs acg_teardown" {
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"
     source scripts/lib/system.sh
@@ -78,12 +77,11 @@
     source scripts/lib/provider.sh
     source scripts/lib/providers/k3s-aws.sh
     # stubs after source — override real implementations from acg.sh
-    _acg_teardown_agents() { echo "[acg] tearing down agents"; return 0; }
-    acg_teardown() { return 0; }
+    acg_teardown() { echo "[stub] acg_teardown"; return 0; }
     tunnel_stop() { return 0; }
     _ACG_WATCH_PID_FILE="$(mktemp)"; rm -f "$_ACG_WATCH_PID_FILE"
     _provider_k3s_aws_destroy_cluster --confirm
   '
   [ "$status" -eq 0 ]
-  [[ "$output" == *"tearing down agents"* ]]
+  [[ "$output" == *"[stub] acg_teardown"* ]]
 }

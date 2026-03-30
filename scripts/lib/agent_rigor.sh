@@ -172,8 +172,22 @@ _agent_audit() {
       fi
    fi
 
+   local ip_allowlist_file="${SCRIPT_DIR}/etc/agent/hardcoded-ip-allowlist"
    local file
    while IFS= read -r -d '' file; do
+      local skip_file=0
+      if [[ -r "$ip_allowlist_file" ]]; then
+         while IFS= read -r allow || [[ -n "$allow" ]]; do
+            [[ -z "$allow" || "$allow" =~ ^# ]] && continue
+            if [[ "$file" == "$allow" ]]; then
+               skip_file=1
+               break
+            fi
+         done < "$ip_allowlist_file"
+      fi
+      if [[ "$skip_file" -eq 1 ]]; then
+         continue
+      fi
       local ip_lines
       ip_lines=$(git show :"$file" 2>/dev/null \
          | grep -En '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' || true)

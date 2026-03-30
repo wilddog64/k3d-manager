@@ -2,9 +2,9 @@
 # scripts/lib/providers/k3s-aws.sh — k3s on ACG AWS sandbox (3-node cluster)
 #
 # Provider actions:
-#   deploy_cluster  — acg_provision (server) → _acg_provision_agents → deploy_app_cluster
+#   deploy_cluster  — acg_provision (CloudFormation stack) → deploy_app_cluster
 #                     → tunnel_start → kubectl label → acg_watch
-#   destroy_cluster — stop watcher → _acg_teardown_agents → tunnel_stop → acg_teardown
+#   destroy_cluster — stop watcher → tunnel_stop → acg_teardown
 
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/acg.sh"
@@ -22,12 +22,11 @@ Usage: CLUSTER_PROVIDER=k3s-aws ./scripts/k3d-manager deploy_cluster
 
 Provision a 3-node k3s cluster on ACG AWS sandbox:
   1. antigravity_acg_extend      — pre-flight TTL extend
-  2. acg_provision --confirm     — server EC2 (k3d-manager-ubuntu / ubuntu)
-  3. _acg_provision_agents       — agent EC2s (k3d-manager-ubuntu-1/2 / ubuntu-1/2)
-  4. deploy_app_cluster --confirm — k3sup install server + join agents; kubeconfig merge
-  5. tunnel_start                — autossh tunnel M2 Air → server :6443
-  6. kubectl label nodes         — k3d-manager/node-type=server|agent
-  7. acg_watch (background)      — sandbox TTL watcher
+  2. acg_provision --confirm     — CloudFormation stack (server + agents)
+  3. deploy_app_cluster --confirm — k3sup install server + join agents; kubeconfig merge
+  4. tunnel_start                — autossh tunnel M2 Air → server :6443
+  5. kubectl label nodes         — k3d-manager/node-type=server|agent
+  6. acg_watch (background)      — sandbox TTL watcher
 
 Milestone gate: kubectl --context ubuntu-k3s get nodes shows 3 nodes Ready.
 
@@ -45,11 +44,8 @@ HELP
   antigravity_acg_extend "${_ACG_SANDBOX_URL}" \
     || _info "[k3s-aws] Pre-flight extend failed — proceeding (sandbox may have sufficient TTL)"
 
-  _info "[k3s-aws] Provisioning server EC2..."
+  _info "[k3s-aws] Provisioning CloudFormation stack (server + agents)..."
   acg_provision --confirm || return 1
-
-  _info "[k3s-aws] Provisioning agent EC2s..."
-  _acg_provision_agents || return 1
 
   _info "[k3s-aws] Installing k3s server + joining agents..."
   UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" deploy_app_cluster --confirm || return 1
@@ -119,9 +115,8 @@ Usage: CLUSTER_PROVIDER=k3s-aws ./scripts/k3d-manager destroy_cluster --confirm
 
 Tear down the 3-node k3s-aws cluster:
   1. Stop sandbox watcher
-  2. _acg_teardown_agents       — terminate agent EC2s (k3d-manager-ubuntu-1/2)
-  3. tunnel_stop                — stop autossh tunnel
-  4. acg_teardown --confirm     — terminate server EC2; remove ubuntu-k3s kubeconfig context
+  2. tunnel_stop                — stop autossh tunnel
+  3. acg_teardown --confirm     — delete CloudFormation stack; remove ubuntu-k3s kubeconfig context
 
 Requires --confirm to prevent accidental teardown.
 HELP
@@ -142,9 +137,6 @@ HELP
     fi
     rm -f "${_ACG_WATCH_PID_FILE}"
   fi
-
-  _info "[k3s-aws] Terminating agent nodes..."
-  _acg_teardown_agents
 
   _info "[k3s-aws] Stopping tunnel..."
   tunnel_stop || true
