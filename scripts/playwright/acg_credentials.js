@@ -119,35 +119,41 @@ async function extractCredentials() {
     }
 
     // 3. Handle Sandbox Start/Open Flow
-    console.error('INFO: Looking for Start/Open button...');
+    // Skip button flow if credentials panel is already open
+    const credentialsAlreadyVisible = await page.locator('input[aria-label="Copyable input"]').first().isVisible({ timeout: 3000 }).catch(() => false);
+    if (credentialsAlreadyVisible) {
+      console.error('INFO: Credentials panel already open — skipping Start/Open flow');
+    } else {
+      console.error('INFO: Looking for Start/Open button...');
 
-    // Pattern 1: Direct "Start Sandbox" button (in a modal or panel)
-    const startButton = page.locator('button:has-text("Start Sandbox")').first();
-    // Pattern 2: "Open Sandbox" button (on the card)
-    const openButton = page.locator('button:has-text("Open Sandbox")').first();
-    // Pattern 3: "Resume Sandbox"
-    const resumeButton = page.locator('button:has-text("Resume"), button:has-text("Resume Sandbox")').first();
+      // Pattern 1: Direct "Start Sandbox" button (in a modal or panel)
+      const startButton = page.locator('button:has-text("Start Sandbox")').first();
+      // Pattern 2: "Open Sandbox" button (on the card)
+      const openButton = page.locator('button:has-text("Open Sandbox")').first();
+      // Pattern 3: "Resume Sandbox"
+      const resumeButton = page.locator('button:has-text("Resume"), button:has-text("Resume Sandbox")').first();
 
-    if (await startButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      console.error('INFO: Clicking Start Sandbox...');
-      await startButton.click();
-      await page.waitForTimeout(10000);
-    } else if (await openButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      console.error('INFO: Clicking Open Sandbox...');
-      await openButton.click();
-      await page.waitForTimeout(10000);
+      if (await startButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.error('INFO: Clicking Start Sandbox...');
+        await startButton.click();
+        await page.waitForTimeout(10000);
+      } else if (await openButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.error('INFO: Clicking Open Sandbox...');
+        await openButton.click();
+        await page.waitForTimeout(10000);
 
-      // After Open, there might be a Start Sandbox button in the slide-over
-      const startButton2 = page.locator('button:has-text("Start Sandbox")').first();
-      if (await startButton2.isVisible({ timeout: 5000 }).catch(() => false)) {
-        console.error('INFO: Clicking Start Sandbox (Step 2)...');
-        await startButton2.click();
+        // After Open, there might be a Start Sandbox button in the slide-over
+        const startButton2 = page.locator('button:has-text("Start Sandbox")').first();
+        if (await startButton2.isVisible({ timeout: 5000 }).catch(() => false)) {
+          console.error('INFO: Clicking Start Sandbox (Step 2)...');
+          await startButton2.click();
+          await page.waitForTimeout(10000);
+        }
+      } else if (await resumeButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.error('INFO: Clicking Resume Sandbox...');
+        await resumeButton.click();
         await page.waitForTimeout(10000);
       }
-    } else if (await resumeButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      console.error('INFO: Clicking Resume Sandbox...');
-      await resumeButton.click();
-      await page.waitForTimeout(10000);
     }
 
     // 4. Extract credentials
@@ -157,7 +163,7 @@ async function extractCredentials() {
     // The order is typically: Username, Password, Access Key ID, Secret Access Key, [Session Token]
     
     // Wait for the inputs to appear
-    await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 60000 });
+    await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 15000 });
     
     const inputs = await page.locator('input[aria-label="Copyable input"]').all();
     console.error(`INFO: Found ${inputs.length} copyable inputs.`);
@@ -208,4 +214,13 @@ async function extractCredentials() {
   }
 }
 
-extractCredentials();
+const OVERALL_TIMEOUT_MS = 30000;
+Promise.race([
+  extractCredentials(),
+  new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`Script timed out after ${OVERALL_TIMEOUT_MS / 1000}s`)), OVERALL_TIMEOUT_MS)
+  )
+]).catch(err => {
+  console.error(`ERROR: ${err.message}`);
+  process.exit(1);
+});
