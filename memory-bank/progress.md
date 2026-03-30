@@ -37,6 +37,7 @@
 - [x] **`deploy_app_cluster` IP resolve** — resolves external IP from `~/.ssh/config` `HostName` before falling back to alias; commit `51983d3`.
 - [x] **`acg_watch` + `acg_provision --recreate`** — adds sandbox watcher, pre-flight extend, and recreate flag plus provider wiring; commit `51bdf3a`.
 - [x] **`k3s-aws` multi-node cluster** — `_acg_provision_agents`, `_k3sup_join_agent`, node labeling, and new provider tests; commit `0c89f4e`.
+- [ ] **Gemini e2e smoke test (v1.0.1)** — 3-node deploy: `acg_get_credentials` → `deploy_cluster` → `kubectl get nodes` shows 3 Ready → `destroy_cluster`. Milestone gate.
 - [x] **Keypair + extend hotfix** — keypair import uses `--soft` and extend prompt forces `page.goto`; commit `4a57f44`.
 
 
