@@ -40,7 +40,8 @@
 - [ ] **Gemini e2e smoke test (v1.0.1)** — 3-node deploy: `acg_get_credentials` → `deploy_cluster` → `kubectl get nodes` shows 3 Ready → `destroy_cluster`. Milestone gate.
 - [x] **Keypair + extend hotfix** — keypair import uses `--soft` and extend prompt forces `page.goto`; commit `4a57f44`.
 - [x] **Playwright auto sign-in + fail-fast** — sign-in detection, `credentialsAlreadyVisible` guard, 30s overall timeout, 15s credential selector timeout; commits `52cf05e`, `7a7ec82`.
-- [x] **Codex: CloudFormation parallel provisioning** — replace sequential EC2 launch with CF stack; spec `docs/plans/v1.0.1-cloudformation-provisioning.md`; commit `abe149f`.
+- [x] **Codex: CloudFormation parallel provisioning** — replace sequential EC2 launch with CF stack; spec `docs/plans/v1.0.1-cloudformation-provisioning.md`; commit `abe149f`. ⚠️ Codex also directly edited subtree-managed `scripts/lib/agent_rigor.sh` (hardcoded allowlist path).
+- [ ] **Codex: agent_rigor IP allowlist — upstream fix** — lib-foundation `feat/v0.3.15` gets `AGENT_IP_ALLOWLIST` env var; k3d-manager working copy updated to match; pre-commit hook sets the var. Spec: `docs/plans/v1.0.1-agent-rigor-ip-allowlist-upstream.md`.
 - [ ] **Chrome naming cleanup** (after Codex + Gemini done) — rename `_antigravity_launch`/`_antigravity_browser_ready` → `_chrome_*` in `antigravity.sh`; drop `_ensure_antigravity` + `_antigravity_ensure_acg_session` calls from `acg_get_credentials` in `acg.sh` (static script handles session now).
 
 
