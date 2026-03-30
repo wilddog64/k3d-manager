@@ -260,11 +260,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-03-30 | [acg_get_credentials Playwright extraction always falls back to stdin paste](docs/issues/2026-03-30-acg-credentials-playwright-extraction-fail.md) | acg — `isVisible()` with no timeout silently skips Open Sandbox button; no sign-in detection causes 60s hang on expired session |
 | 2026-03-29 | [ACG provision keypair import fails on re-run](docs/issues/2026-03-29-acg-provision-keypair-import-fail.md) | acg — `aws ec2 import-key-pair` prints error when key already exists; agent misdiagnosed as fatal; fixed with `_run_command --soft` |
 | 2026-03-28 | [Pluralsight Antigravity error](docs/issues/2026-03-28-pluralsight-antigravity-error.md) | acg — "Oops! Something went wrong" on Pluralsight in Antigravity browser; root cause: Chrome launched without `--password-store=basic` |
 | 2026-03-28 | [ArgoCD sync ACG credentials expired](docs/issues/2026-03-28-argocd-sync-acg-credentials-expired.md) | argocd — sync failed; ACG sandbox EC2 unreachable; root cause: sandbox credentials expired |
 | 2026-03-28 | [Copilot PR #52 review findings](docs/issues/2026-03-28-copilot-pr52-review-findings.md) | antigravity — yolo always-on, sleep not stubbed, tmpdir not isolated, model order wrong in 3 places |
-| 2026-03-28 | [ACG domain redirection](docs/issues/2026-03-28-acg-domain-redirection.md) | antigravity — `learn.acloud.guru` retired; redirects to Pluralsight |
 
 [All issues →](docs/issues/)
 
