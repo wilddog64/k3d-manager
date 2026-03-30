@@ -1,6 +1,6 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v1.0.0` (as of 2026-03-29)
+## Current Branch: `k3d-manager-v1.0.1` (as of 2026-03-29)
 
 **v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. Copilot CLI CI integration.
 **v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released.
@@ -17,6 +17,19 @@
 **enforce_admins:** restored on main 2026-03-29.
 **Branch cleanup:** v0.9.7–v0.9.17 deleted 2026-03-28; v1.0.0 deleted 2026-03-29.
 **v0.9.15 scope:** Antigravity × GitHub Copilot coding agent validation — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`. Antigravity plugin rewritten in `b2ba187` per `docs/plans/v0.9.15-antigravity-plugin-impl.md`. Also: ldap-password-rotator `vault kv put` stdin hardening — spec `docs/plans/v0.9.15-ensure-copilot-cli.md` (closes v0.6.2 security debt; `_ensure_copilot_cli`/`_k3d_manager_copilot`/`_ensure_node` already shipped in v0.9.12).
+
+---
+
+## v1.0.1 Spec Written (2026-03-29)
+
+**Spec:** `docs/plans/v1.0.1-multi-node-k3s-aws.md` — assigned to Codex.
+**Scope:** 3-node cluster (1 server + 2 agents). Resolves t3.medium resource exhaustion.
+
+4 file changes:
+1. `scripts/plugins/acg.sh` — `_acg_upsert_ssh_host` + `_acg_provision_agents` + `_acg_teardown_agents`
+2. `scripts/plugins/shopping_cart.sh` — `_k3sup_join_agent` + `UBUNTU_K3S_AGENT_HOSTS` support in `deploy_app_cluster`
+3. `scripts/lib/providers/k3s-aws.sh` — replaced: 3-node deploy/destroy + node labels
+4. `scripts/tests/lib/k3s_aws_provider.bats` — 2 new tests (total: 5)
 
 ---
 
