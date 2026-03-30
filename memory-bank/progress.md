@@ -39,6 +39,7 @@
 - [x] **`k3s-aws` multi-node cluster** — `_acg_provision_agents`, `_k3sup_join_agent`, node labeling, and new provider tests; commit `0c89f4e`.
 - [ ] **Gemini e2e smoke test (v1.0.1)** — 3-node deploy: `acg_get_credentials` → `deploy_cluster` → `kubectl get nodes` shows 3 Ready → `destroy_cluster`. Milestone gate.
 - [x] **Keypair + extend hotfix** — keypair import uses `--soft` and extend prompt forces `page.goto`; commit `4a57f44`.
+- [ ] **Codex: Playwright auto sign-in** — insert sign-in detection block in `acg_credentials.js`; spec `docs/plans/v1.0.1-playwright-auto-signin.md`; commit message: `feat(playwright): auto sign-in via Google Password Manager in acg_credentials.js`.
 
 
 ## v0.9.21 — Shipped
