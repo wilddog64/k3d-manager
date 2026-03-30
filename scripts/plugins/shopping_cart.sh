@@ -124,6 +124,26 @@ function _ensure_k3sup() {
   _err "[shopping_cart] k3sup not found and automatic installation failed — install manually: brew install k3sup"
 }
 
+function _k3sup_join_agent() {
+  local agent_host="$1" server_ip="$2"
+  local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
+  local ssh_key="${UBUNTU_K3S_SSH_KEY:-${HOME}/.ssh/k3d-manager-key.pem}"
+  local agent_ip
+  if _command_exist awk; then
+    agent_ip=$(awk -v host="${agent_host}" \
+      '$1=="Host" && $2==host {found=1; next} found && $1=="HostName" {print $2; exit}' \
+      "${HOME}/.ssh/config" 2>/dev/null)
+  fi
+  : "${agent_ip:=${agent_host}}"
+  _info "[shopping_cart] Joining agent ${agent_host} (${agent_ip}) to server ${server_ip}..."
+  _run_command -- k3sup join \
+    --ip "${agent_ip}" \
+    --server-ip "${server_ip}" \
+    --user "${ssh_user}" \
+    --ssh-key "${ssh_key}"
+  _info "[shopping_cart] Agent ${agent_host} joined."
+}
+
 function deploy_app_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
@@ -212,6 +232,15 @@ HELP
   chmod 600 "${HOME}/.kube/config"
   rm -f "${tmp_kube}"
   _info "[shopping_cart] ${kube_context} context merged into ~/.kube/config"
+
+  if [[ -n "${UBUNTU_K3S_AGENT_HOSTS:-}" ]]; then
+    IFS=',' read -ra _agent_hosts <<< "${UBUNTU_K3S_AGENT_HOSTS}"
+    local agent_host
+    for agent_host in "${_agent_hosts[@]}"; do
+      _k3sup_join_agent "${agent_host}" "${external_ip}" || return 1
+    done
+    _info "[shopping_cart] All agent nodes joined."
+  fi
 
   _info "[shopping_cart] k3s install complete."
   _info ""

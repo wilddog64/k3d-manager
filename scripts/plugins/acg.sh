@@ -76,6 +76,32 @@ PY
   _run_command -- python3 -c "$python_cmd"
 }
 
+_acg_upsert_ssh_host() {
+  local alias="$1" ip="$2"
+  [[ -f "${_ACG_SSH_CONFIG}" ]] || return 0
+  _info "[acg] Updating SSH config: Host ${alias} → ${ip}"
+  local python_cmd
+  python_cmd=$(cat <<PY
+import re
+alias = "${alias}"
+ip    = "${ip}"
+path  = "${_ACG_SSH_CONFIG}"
+with open(path, 'r') as f:
+    content = f.read()
+pattern = r"(^Host " + re.escape(alias) + r"\$.*?^\s+HostName\s+)\S+"
+m = re.search(pattern, content, re.MULTILINE | re.DOTALL)
+if m:
+    content = re.sub(pattern, r"\g<1>" + ip, content, flags=re.MULTILINE | re.DOTALL)
+else:
+    block = "\nHost ${alias}\n  HostName ${ip}\n  User ubuntu\n  IdentityFile ~/.ssh/k3d-manager-key.pem\n  StrictHostKeyChecking no\n"
+    content = content.rstrip("\n") + block
+with open(path, 'w') as f:
+    f.write(content)
+PY
+)
+  _run_command -- python3 -c "$python_cmd"
+}
+
 _acg_find_vpc() {
   local vpc_id
   vpc_id=$(_run_command --soft -- aws ec2 describe-vpcs --region "${ACG_REGION}" \
@@ -190,6 +216,85 @@ _acg_check_k3s() {
   else
     _info "[acg] WARNING: k3s not responding — run: ./scripts/k3d-manager deploy_app_cluster --confirm"
   fi
+}
+
+_acg_provision_agents() {
+  local agent_count="${ACG_AGENT_COUNT:-2}"
+  local sg_id subnet_id ami_id
+  sg_id=$(_acg_find_sg)
+  if [[ -z "$sg_id" ]]; then
+    printf 'ERROR: %s\n' "[acg] Security group not found — run acg_provision --confirm first" >&2
+    return 1
+  fi
+  subnet_id=$(_run_command --soft -- aws ec2 describe-subnets --region "${ACG_REGION}" \
+    --filters "Name=tag:Name,Values=k3d-manager-subnet" \
+    --query 'Subnets[0].SubnetId' --output text 2>/dev/null || true)
+  [[ "$subnet_id" == "None" || "$subnet_id" == "null" ]] && subnet_id=""
+  if [[ -z "$subnet_id" ]]; then
+    printf 'ERROR: %s\n' "[acg] Subnet not found — run acg_provision --confirm first" >&2
+    return 1
+  fi
+  ami_id=$(_run_command -- aws ec2 describe-images --region "${ACG_REGION}" --owners "${_ACG_AMI_OWNER}" \
+    --filters "Name=name,Values=${_ACG_AMI_FILTER}" "Name=state,Values=available" \
+    --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
+
+  local i
+  for ((i = 1; i <= agent_count; i++)); do
+    local name="k3d-manager-ubuntu-${i}"
+    local ssh_alias="ubuntu-${i}"
+    local instance_id public_ip
+
+    local existing_id
+    existing_id=$(_run_command --soft -- aws ec2 describe-instances --region "${ACG_REGION}" \
+      --filters "Name=tag:Name,Values=${name}" \
+                "Name=instance-state-name,Values=running,stopped,pending" \
+      --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || true)
+    [[ "$existing_id" == "None" || "$existing_id" == "null" ]] && existing_id=""
+
+    if [[ -n "$existing_id" ]]; then
+      _info "[acg] Agent ${i}: reusing instance ${existing_id}"
+      local state
+      state=$(_acg_get_instance_attr "$existing_id" 'Reservations[0].Instances[0].State.Name')
+      if [[ "$state" == "stopped" ]]; then
+        _run_command -- aws ec2 start-instances --region "${ACG_REGION}" --instance-ids "$existing_id" >/dev/null
+        _run_command -- aws ec2 wait instance-running --region "${ACG_REGION}" --instance-ids "$existing_id"
+      fi
+      instance_id="$existing_id"
+    else
+      instance_id=$(_run_command -- aws ec2 run-instances --region "${ACG_REGION}" \
+        --image-id "$ami_id" --instance-type "${_ACG_INSTANCE_TYPE}" \
+        --key-name "${_ACG_KEY_NAME}" --subnet-id "$subnet_id" --security-group-ids "$sg_id" \
+        --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":30,"VolumeType":\"gp3\"}}]' \
+        --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${name}}]" \
+        --query 'Instances[0].InstanceId' --output text)
+      _info "[acg] Agent ${i} instance launched: ${instance_id}"
+      _run_command -- aws ec2 wait instance-running --region "${ACG_REGION}" --instance-ids "$instance_id"
+    fi
+
+    public_ip=$(_acg_get_instance_attr "$instance_id" 'Reservations[0].Instances[0].PublicIpAddress')
+    _acg_upsert_ssh_host "${ssh_alias}" "${public_ip}"
+    _info "[acg] Agent ${i} (${ssh_alias}): ${public_ip}"
+  done
+}
+
+_acg_teardown_agents() {
+  local agent_count="${ACG_AGENT_COUNT:-2}"
+  local i
+  for ((i = 1; i <= agent_count; i++)); do
+    local name="k3d-manager-ubuntu-${i}"
+    local instance_id
+    instance_id=$(_run_command --soft -- aws ec2 describe-instances --region "${ACG_REGION}" \
+      --filters "Name=tag:Name,Values=${name}" \
+                "Name=instance-state-name,Values=running,stopped,pending" \
+      --query 'Reservations[0].Instances[0].InstanceId' --output text 2>/dev/null || true)
+    [[ "$instance_id" == "None" || "$instance_id" == "null" ]] && instance_id=""
+    if [[ -n "$instance_id" ]]; then
+      _info "[acg] Terminating agent ${i} instance ${instance_id} (${name})..."
+      _run_command -- aws ec2 terminate-instances --region "${ACG_REGION}" --instance-ids "$instance_id" >/dev/null
+    else
+      _info "[acg] Agent ${i} (${name}): no instance found — skipping"
+    fi
+  done
 }
 
 # Deprecated helper — use _aws_write_credentials instead
