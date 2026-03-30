@@ -31,6 +31,8 @@
 3. `scripts/lib/providers/k3s-aws.sh` — replaced: 3-node deploy/destroy + node labels
 4. `scripts/tests/lib/k3s_aws_provider.bats` — 2 new tests (total: 5)
 
+**Spec:** `docs/plans/v1.0.1-cloudformation-provisioning.md` — COMPLETE (`abe149f`). Added `scripts/etc/acg-cluster.yaml`, rewired `acg.sh` + provider/tests for CloudFormation stack deploy/teardown, and extended `_agent_audit` allowlist for the template's fixed CIDRs.
+
 ---
 
 ## Roadmap Versioning Decision (2026-03-29)
