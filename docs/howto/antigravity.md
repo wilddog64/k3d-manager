@@ -1,6 +1,6 @@
 # How-To: Antigravity Browser Automation
 
-Antigravity is an agent-first IDE (VS Code fork) with a built-in Chromium browser. k3d-manager uses it for browser automation tasks — extending ACG sandbox TTL and triggering GitHub Copilot coding agent reviews — via the Playwright MCP server over CDP (port 9222).
+The `antigravity` plugin handles browser automation tasks — extending ACG sandbox TTL and triggering GitHub Copilot coding agent reviews. The browser is **Google Chrome**, launched with `--remote-debugging-port=9222` and `--password-store=basic`. Playwright connects to Chrome over CDP (port 9222). Antigravity IDE (a VS Code fork) is used as the Playwright MCP host for the Copilot agent trigger workflow.
 
 ## Prerequisites
 
@@ -22,7 +22,7 @@ This verifies and installs (if missing):
 
 ### First-Run Login
 
-On first use, Antigravity will open its browser window and navigate to the target site's login page. **Log in manually** — the session cookie is saved in Antigravity's browser profile and reused on all subsequent runs until it expires.
+On first use, Google Chrome will open and navigate to the target site's login page. **Log in manually** — the session cookie is saved in `~/.config/acg-chrome-profile` and reused on all subsequent runs until it expires.
 
 - **ACG login:** triggered by `antigravity_acg_extend`
 - **GitHub login:** triggered by `antigravity_trigger_copilot_review`
@@ -33,7 +33,7 @@ On first use, Antigravity will open its browser window and navigate to the targe
 ./scripts/k3d-manager antigravity_acg_extend <sandbox-url>
 ```
 
-Antigravity opens the sandbox page and clicks the extend button (+4 hours). The new expiry time is printed on completion.
+Chrome opens the sandbox page and Playwright clicks the extend button (+4 hours). The new expiry time is printed on completion.
 
 ```bash
 # Example
@@ -72,20 +72,20 @@ Polls the task URL every 30 seconds until complete (default timeout: 300s). Prin
 ```
 k3d-manager function
     → gemini CLI (--model gemini-2.5-flash, fallback to 2.0/1.5)
-        → Playwright MCP over CDP → Antigravity browser (port 9222)
+        → Playwright MCP over CDP → Google Chrome (port 9222)
 ```
 
-gemini generates a Playwright Node.js script, writes it to `${HOME}/.gemini/tmp/k3d-manager/`, and executes it. The script connects to the running Antigravity browser via CDP — it does not launch a new headless browser.
+gemini generates a Playwright Node.js script, writes it to `${HOME}/.gemini/tmp/k3d-manager/`, and executes it. The script connects to the running Chrome instance via CDP — it does not launch a new headless browser.
 
 ## Troubleshoot
 
 ```bash
-# Verify Antigravity is running and CDP is exposed
+# Verify Chrome is running with CDP exposed
 curl -sf http://localhost:9222/json | jq '.[0].title'
 
-# Manually launch Antigravity with CDP
-open -a "Antigravity" --args --remote-debugging-port=9222   # macOS
-antigravity --remote-debugging-port=9222 &                  # Linux
+# Manually launch Chrome with CDP
+open -a "Google Chrome" --args --remote-debugging-port=9222 --password-store=basic --user-data-dir=~/.config/acg-chrome-profile   # macOS
+google-chrome --remote-debugging-port=9222 --password-store=basic --user-data-dir=~/.config/acg-chrome-profile &                  # Linux
 
 # Check gemini CLI
 gemini --version
