@@ -169,6 +169,12 @@ scripts/
   plugins/           # optional features loaded on demand
   etc/               # templates and configs (*.yaml.tmpl, vars.sh)
   tests/             # BATS suites (pure logic — no cluster mocks)
+bin/                 # one-off convenience scripts (also exposed as Claude skills)
+  acg-up             # full provision: creds → cluster → tunnel → watcher → ghcr-pull-secret
+  acg-down           # teardown: tunnel stop → CloudFormation delete
+  acg-refresh        # refresh AWS credentials + restart tunnel (daily driver)
+  acg-status         # read-only snapshot: tunnel, nodes, pods, ArgoCD, AWS creds
+  rotate-ghcr-pat    # update PACKAGES_TOKEN in all shopping-cart repos via stdin
 docs/
   architecture/      # design documents
   api/               # function reference and Vault PKI config
@@ -238,6 +244,20 @@ docs/
 **Cloud Sandbox**
 - **[ACG Sandbox](docs/howto/acg.md)** — Full lifecycle: provision → k3s install → extend TTL → teardown
 - **[Antigravity Browser Automation](docs/howto/antigravity.md)** — First-run setup, ACG extend, Copilot agent trigger
+- **[ACG Credentials Flow](docs/howto/acg-credentials-flow.md)** — Decision-by-decision flow reference for debugging `acg_get_credentials`
+
+**Convenience Scripts** (`bin/` — also available as Claude `/skills`)
+
+| Script | Claude Skill | When to use |
+|---|---|---|
+| `bin/acg-up [--login-prompt]` | `/acg-up` | Start from scratch — full provision + ghcr-pull-secret |
+| `bin/acg-down --confirm` | `/acg-down` | Tear down cluster and tunnel |
+| `bin/acg-refresh [--login-prompt]` | `/acg-refresh` | Creds expired or tunnel dropped — daily driver |
+| `bin/acg-status` | `/acg-status` | Read-only health check — nodes, pods, ArgoCD, AWS |
+| `bin/rotate-ghcr-pat` | — | Rotate `PACKAGES_TOKEN` in all shopping-cart repos |
+
+> `GHCR_PAT` env var must be set before `acg-up` (used to create `ghcr-pull-secret`).
+> Pass tokens via `pbpaste | bin/rotate-ghcr-pat` — never paste into chat.
 
 **Virtual Clusters**
 - **[vCluster](docs/howto/vcluster.md)** — Create, use, list, and destroy virtual Kubernetes clusters inside the infra cluster
