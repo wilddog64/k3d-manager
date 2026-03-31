@@ -234,6 +234,7 @@ HELP
   _info "[shopping_cart] ${kube_context} context merged into ~/.kube/config"
 
   if [[ -n "${UBUNTU_K3S_AGENT_HOSTS:-}" ]]; then
+    local -a _agent_hosts
     IFS=',' read -ra _agent_hosts <<< "${UBUNTU_K3S_AGENT_HOSTS}"
     local agent_host
     for agent_host in "${_agent_hosts[@]}"; do

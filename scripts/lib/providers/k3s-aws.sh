@@ -54,8 +54,7 @@ HELP
   tunnel_start || return 1
 
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
-  local agent_count="${ACG_AGENT_COUNT:-2}"
-  local total_nodes=$(( agent_count + 1 ))
+  local total_nodes=3
 
   _info "[k3s-aws] Waiting for all ${total_nodes} nodes to be Ready..."
   local node_attempts=0

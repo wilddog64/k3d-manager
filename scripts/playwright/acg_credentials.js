@@ -82,7 +82,7 @@ async function extractCredentials() {
       const email = process.env.PLURALSIGHT_EMAIL || '';
       if (email) {
         await emailInput.fill(email);
-        console.error(`INFO: Filled email (${email})`);
+        console.error('INFO: Filled email from PLURALSIGHT_EMAIL');
       } else {
         console.error('INFO: Clicked email field — waiting for Google Password Manager auto-fill (set PLURALSIGHT_EMAIL to assist)');
         await page.waitForTimeout(2000);

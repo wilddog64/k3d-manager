@@ -67,6 +67,7 @@
   '
   [ "$status" -eq 0 ]
   [[ "$output" == *"[stub] acg_provision"* ]]
+  [ "$(echo "$output" | grep -c "\[stub\] acg_provision")" -eq 1 ]
 }
 
 @test "_provider_k3s_aws_destroy_cluster --confirm runs acg_teardown" {

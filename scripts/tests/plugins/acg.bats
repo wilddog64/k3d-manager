@@ -90,6 +90,7 @@ setup() {
   _acg_check_credentials() { return 0; }
   _run_command() {
     local mode="$1"; shift
+    [[ "${1:-}" == "--" ]] && shift
     echo "$mode $*" >> "$RUN_LOG"
     if [[ "$*" == aws\ cloudformation\ describe-stacks* ]]; then
       printf 'None'
@@ -110,6 +111,7 @@ setup() {
   kubectl() { return 0; }
   _run_command() {
     local mode="$1"; shift
+    [[ "${1:-}" == "--" ]] && shift
     if [[ "$*" == aws\ cloudformation\ describe-stacks* ]]; then
       printf 'CREATE_COMPLETE'
     elif [[ "$*" == aws\ cloudformation\ delete-stack* ]]; then

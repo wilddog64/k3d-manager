@@ -240,15 +240,16 @@ function acg_provision() {
     cat <<'HELP'
 Usage: acg_provision --confirm [--recreate]
 
-Provision an ACG AWS sandbox EC2 instance. If an instance tagged
-'k3d-manager-ubuntu' already exists, start it (if stopped) and update
-~/.ssh/config. If no instance exists, provision VPC + subnet + IGW + SG +
-key pair + t3.medium EC2.
+Provision a 3-node k3s cluster on ACG AWS sandbox via CloudFormation.
+Creates a VPC + subnet + IGW + SG + key pair + 1 server EC2 + 2 agent EC2
+instances (t3.medium). Updates ~/.ssh/config with Host entries for
+ubuntu (server), ubuntu-1 and ubuntu-2 (agents).
 
 Flags:
   --confirm    Required — prevents accidental provisioning
-  --recreate   Tear down any existing instance before provisioning fresh.
-               Use when sandbox state is unknown or TTL has expired.
+  --recreate   Tear down any existing CloudFormation stack before
+               reprovisioning. Use when sandbox state is unknown or
+               TTL has expired.
 
 Config (env overrides):
   ACG_REGION   AWS region (default: us-west-2)
@@ -379,9 +380,9 @@ function acg_teardown() {
     cat <<'HELP'
 Usage: acg_teardown [--confirm]
 
-Terminate the ACG sandbox EC2 instance and remove the ubuntu-k3s context
-from ~/.kube/config. Does not delete VPC/SG/key pair (those persist across
-ACG sessions and are reused by acg_provision).
+Delete the ACG CloudFormation stack (VPC + SG + all EC2 instances) and
+remove the ubuntu-k3s context from ~/.kube/config. The imported key pair
+persists and is reused by subsequent acg_provision calls.
 
 Requires --confirm to prevent accidental teardown.
 HELP
