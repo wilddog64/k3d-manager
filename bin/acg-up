@@ -72,20 +72,19 @@ _github_user="${GITHUB_USERNAME:-wilddog64}"
 if [[ -z "$_ghcr_pat" ]]; then
   _err "[acg-up] GHCR_PAT env var not set — set it to a GitHub PAT with read:packages scope and re-run"
 fi
-for ns in apps payment data; do
-  if kubectl get namespace "$ns" --context ubuntu-k3s >/dev/null 2>&1; then
-    kubectl create secret docker-registry ghcr-pull-secret \
-      --docker-server=ghcr.io \
-      --docker-username="${_github_user}" \
-      --docker-password="${_ghcr_pat}" \
-      --context ubuntu-k3s \
-      -n "$ns" \
-      --dry-run=client -o yaml \
-      | kubectl apply --context ubuntu-k3s -f -
-    _info "[acg-up] ghcr-pull-secret applied in namespace: ${ns}"
-  else
-    _info "[acg-up] Namespace ${ns} not found — skipping (ArgoCD will create it on first sync)"
-  fi
+for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
+  kubectl create namespace "$ns" --context ubuntu-k3s \
+    --dry-run=client -o yaml \
+    | kubectl apply --context ubuntu-k3s -f - >/dev/null
+  kubectl create secret docker-registry ghcr-pull-secret \
+    --docker-server=ghcr.io \
+    --docker-username="${_github_user}" \
+    --docker-password="${_ghcr_pat}" \
+    --context ubuntu-k3s \
+    -n "$ns" \
+    --dry-run=client -o yaml \
+    | kubectl apply --context ubuntu-k3s -f -
+  _info "[acg-up] ghcr-pull-secret applied in namespace: ${ns}"
 done
 
 _info "[acg-up] Step 5/5 — Starting sandbox TTL watcher..."
