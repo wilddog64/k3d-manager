@@ -36,6 +36,9 @@
 - [x] **Codex: acg_extend bugfix** — spec `docs/plans/v1.0.2-bugfix-acg-extend-selector.md`; commit `26a34cd`
   - Static `scripts/playwright/acg_extend.js` replaces Gemini prompt; `antigravity_acg_extend` runs it directly
 
+- [x] **Codex: ghcr-pull-secret bugfix** — spec `docs/plans/v1.0.2-bugfix-ghcr-pull-secret.md`; commit `06ef141`
+  - `bin/acg-up` now creates shopping-cart namespaces and always applies the secret
+
 - [ ] **Codex: ghcr-pull-secret bugfix** — spec `docs/plans/v1.0.2-bugfix-ghcr-pull-secret.md`
   - Wrong namespace names (`apps` → `shopping-cart-apps` etc.) + remove timing-dependent skip
 
