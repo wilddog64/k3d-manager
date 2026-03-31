@@ -29,9 +29,11 @@
 
 **Spec:** `docs/plans/v1.0.2-reverse-vault-tunnel.md` — assigned to Codex.
 **Scope:** Add `-R 8200:localhost:8200` reverse tunnel to autossh plist in `tunnel.sh`. Replaces Gemini's socat bridge workaround. 4 targeted changes in `tunnel.sh`.
+- COMPLETE (`4ff3cc3`): `tunnel.sh` now exposes `TUNNEL_VAULT_PORT`, updates plist ProgramArguments with `-R`, and documents forward/reverse tunnels in help/status output.
 
 **Spec:** `docs/plans/v1.0.2-bugfix-acg-extend-selector.md` — assigned to Codex.
 **Scope:** Replace freeform Gemini CLI prompt in `antigravity_acg_extend` with static `node acg_extend.js` call. New file `scripts/playwright/acg_extend.js` with 6 selector fallbacks, aria-busy wait, panel-open fallback, 90s timeout.
+- COMPLETE (`26a34cd`): Added `scripts/playwright/acg_extend.js` and rewired `antigravity_acg_extend` to call it directly, eliminating Gemini prompt fragility.
 
 ---
 
