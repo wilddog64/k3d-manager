@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# bin/acg-refresh
+#
+# Daily driver — refresh AWS credentials and restart the SSH tunnel.
+# Use this when the ACG sandbox is already provisioned but creds expired.
+#
+# Usage:
+#   bin/acg-refresh [sandbox-url]
+#
+# Environment:
+#   ACG_SANDBOX_URL   Override default sandbox listing URL
+#   PLURALSIGHT_EMAIL Pre-fill email on Pluralsight sign-in page
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${REPO_ROOT}/scripts/lib/system.sh"
+source "${REPO_ROOT}/scripts/lib/core.sh"
+source "${REPO_ROOT}/scripts/plugins/antigravity.sh"
+source "${REPO_ROOT}/scripts/plugins/aws.sh"
+source "${REPO_ROOT}/scripts/plugins/acg.sh"
+source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
+
+sandbox_url="${1:-${ACG_SANDBOX_URL:-}}"
+
+_info "[acg-refresh] Refreshing AWS credentials..."
+acg_get_credentials ${sandbox_url:+"$sandbox_url"}
+
+_info "[acg-refresh] Restarting tunnel..."
+tunnel_stop 2>/dev/null || true
+tunnel_start
+
+_info "[acg-refresh] Done. Cluster should be reachable."
+kubectl get nodes --context ubuntu-k3s
