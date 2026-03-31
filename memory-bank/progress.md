@@ -24,7 +24,7 @@
 
 - [ ] **Gemini: all 5 pods Running** — spec `docs/plans/v1.0.2-all-pods-running.md`
   - VERDICT: FAILED — 4 blockers identified (2026-03-31 session)
-  - Blocker 1: `ghcr-pull-secret` missing — timing gap in `bin/acg-up` (namespaces created by ArgoCD after step 4 runs) → **bugfix spec needed**
+  - Blocker 1: `ghcr-pull-secret` missing — wrong namespace names (`apps` not `shopping-cart-apps`) + timing gap → **spec: `docs/plans/v1.0.2-bugfix-ghcr-pull-secret.md`**
   - Blocker 2: ESO CRD `v1beta1` not served — manifests use `v1beta1`, cluster only enables `v1` → **spec work needed**
   - Blocker 3: Vault reverse tunnel not active — plist updated by Codex but `tunnel_stop && tunnel_start` not yet run → **operational**
   - Blocker 4: ArgoCD manager RBAC — `argocd-manager` SA/ClusterRoleBinding not automated → **spec work needed**
@@ -35,6 +35,9 @@
 
 - [x] **Codex: acg_extend bugfix** — spec `docs/plans/v1.0.2-bugfix-acg-extend-selector.md`; commit `26a34cd`
   - Static `scripts/playwright/acg_extend.js` replaces Gemini prompt; `antigravity_acg_extend` runs it directly
+
+- [ ] **Codex: ghcr-pull-secret bugfix** — spec `docs/plans/v1.0.2-bugfix-ghcr-pull-secret.md`
+  - Wrong namespace names (`apps` → `shopping-cart-apps` etc.) + remove timing-dependent skip
 
 - [ ] **Codex: acg_watch_start/stop launchd** — spec `docs/plans/v1.0.2-acg-watch-launchd.md`
   - Sandbox TTL extension survives terminal death and Gemini session blocks
