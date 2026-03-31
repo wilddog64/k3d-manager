@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# bin/acg-down
+#
+# Tear down the ACG cluster — stop tunnel, delete CloudFormation stack.
+# Requires --confirm to prevent accidental teardown.
+#
+# Usage:
+#   bin/acg-down --confirm
+#
+# Environment:
+#   ACG_REGION   AWS region (default: us-west-2)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${REPO_ROOT}/scripts/lib/system.sh"
+source "${REPO_ROOT}/scripts/lib/core.sh"
+source "${REPO_ROOT}/scripts/plugins/aws.sh"
+source "${REPO_ROOT}/scripts/plugins/acg.sh"
+source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
+
+if [[ "${1:-}" != "--confirm" ]]; then
+  echo "Usage: bin/acg-down --confirm"
+  echo "Tears down the CloudFormation stack and stops the tunnel."
+  exit 1
+fi
+
+_info "[acg-down] Stopping tunnel..."
+tunnel_stop 2>/dev/null || true
+
+_info "[acg-down] Tearing down CloudFormation stack..."
+acg_teardown --confirm
+
+_info "[acg-down] Done. Sandbox resources deleted."
