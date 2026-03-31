@@ -210,7 +210,7 @@ async function extractCredentials() {
     console.error(`ERROR: ${error.message}`);
     process.exit(1);
   } finally {
-    if (browser) await browser.disconnect();
+    if (browser) await browser.close();
   }
 }
 
