@@ -172,18 +172,14 @@ _agent_audit() {
       fi
    fi
 
+   local allowlist_content=""
+   if [[ -n "${AGENT_IP_ALLOWLIST:-}" && -f "${AGENT_IP_ALLOWLIST}" && -r "${AGENT_IP_ALLOWLIST}" ]]; then
+      allowlist_content="$(grep -vE '^[[:space:]]*(#|$)' "${AGENT_IP_ALLOWLIST}" || true)"
+   fi
    local file
    while IFS= read -r -d '' file; do
-      if [[ -n "${AGENT_IP_ALLOWLIST:-}" && -r "${AGENT_IP_ALLOWLIST}" ]]; then
-        local skip_file=0
-        while IFS= read -r allow || [[ -n "$allow" ]]; do
-           [[ -z "$allow" || "$allow" =~ ^# ]] && continue
-           if [[ "$file" == "$allow" ]]; then
-              skip_file=1
-              break
-           fi
-        done < "${AGENT_IP_ALLOWLIST}"
-        [[ "$skip_file" -eq 1 ]] && continue
+      if [[ -n "$allowlist_content" ]] && grep -Fqx "$file" <<< "$allowlist_content"; then
+         continue
       fi
       local ip_lines
       ip_lines=$(git show :"$file" 2>/dev/null \
