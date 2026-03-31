@@ -235,9 +235,15 @@
 ## Roadmap
 
 - **v0.9.6** — ACG plugin (`acg_provision`, `acg_extend`, `acg_teardown`) + LoadBalancer for ArgoCD/Keycloak/Jenkins; retire `bin/acg-sandbox.sh`
-- **v1.0.0** — 3-node k3s via k3sup + Samba AD DC; `CLUSTER_PROVIDER=k3s-remote`; resolves resource exhaustion; frontend + e2e milestone gate
-- **v1.1.0** — Full stack provisioning: `provision_full_stack` single command (k3s + Vault + ESO + Istio + ArgoCD)
-- **v1.2.0** — k3dm-mcp (gate: v1.0.0 multi-node proven; k3d + k3s-remote = two backends)
+- **v1.0.0** — `k3s-aws` provider foundation — SHIPPED `807c0432`
+- **v1.0.1** — Multi-node CloudFormation + Playwright hardening — SHIPPED `a8b6c583`
+- **v1.0.2** — Full stack on 3 nodes: all 5 pods Running + E2E green
+- **v1.0.3** — Service mesh: Istio fully activated + MetalLB + VirtualServices; GUI access via `argocd.k3s.local`, `vault.k3s.local`, `keycloak.k3s.local`, `jenkins.k3s.local` over SSH/Cloudflare tunnel. **Gate: v1.0.2 E2E green + Istio mTLS verified.**
+- **v1.0.4** — Samba AD DC plugin (`DIRECTORY_SERVICE_PROVIDER=activedirectory`)
+- **v1.0.5** — GCP cloud provider (`k3s-gcp`)
+- **v1.0.6** — Azure cloud provider (`k3s-azure`)
+- **v1.1.0** — `provision_full_stack` single command (k3s + full plugin stack end-to-end)
+- **v1.2.0** — k3dm-mcp (gate: v1.0.0 multi-node proven)
 - **v1.3.0** — Home lab: k3s on Mac Mini M5 (`CLUSTER_PROVIDER=k3s-local-arm64`); home automation plugins
 - **No EKS/GKE/AKS** — k3d-manager is kops-for-k3s; cloud-managed k8s is out of scope
 
