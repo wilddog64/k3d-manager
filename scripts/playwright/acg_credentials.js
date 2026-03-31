@@ -210,11 +210,11 @@ async function extractCredentials() {
     console.error(`ERROR: ${error.message}`);
     process.exit(1);
   } finally {
-    if (browser) await browser.close();
+    if (browser) await browser.disconnect();
   }
 }
 
-const OVERALL_TIMEOUT_MS = 30000;
+const OVERALL_TIMEOUT_MS = 120000;
 Promise.race([
   extractCredentials(),
   new Promise((_, reject) =>
