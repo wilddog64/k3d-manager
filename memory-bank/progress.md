@@ -26,13 +26,11 @@
   - Blocked: Vault → EC2 connectivity (socat workaround in progress)
   - acg_extend TTL extension failed (see bugfix below)
 
-- [ ] **Codex: reverse Vault tunnel** — spec `docs/plans/v1.0.2-reverse-vault-tunnel.md`
-  - Replaces Gemini's socat bridge workaround
-  - Adds `-R 8200:localhost:8200` to autossh plist in `tunnel.sh`
+- [x] **Codex: reverse Vault tunnel** — spec `docs/plans/v1.0.2-reverse-vault-tunnel.md`; commit `4ff3cc3`
+  - autossh plist now forwards k3s API and reverses Vault port 8200
 
-- [ ] **Codex: acg_extend bugfix** — spec `docs/plans/v1.0.2-bugfix-acg-extend-selector.md`
-  - New file: `scripts/playwright/acg_extend.js` (static, 6 selector fallbacks)
-  - Replace freeform Gemini CLI prompt in `antigravity_acg_extend`
+- [x] **Codex: acg_extend bugfix** — spec `docs/plans/v1.0.2-bugfix-acg-extend-selector.md`; commit `26a34cd`
+  - Static `scripts/playwright/acg_extend.js` replaces Gemini prompt; `antigravity_acg_extend` runs it directly
 
 - [ ] **lib-foundation PR #22** — `feat/v0.3.16`, `grep -Fqx --` fix; needs Copilot review + merge + subtree pull
 
