@@ -263,11 +263,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-03-31 | [Pluralsight session expiry independent of sandbox TTL](docs/issues/2026-03-31-pluralsight-session-expiry-independent-of-sandbox-ttl.md) | acg — browser session cookie expires separately from sandbox TTL; blocks `acg_get_credentials` auto sign-in; `acg_watch` has no visibility into session health |
 | 2026-03-31 | [Copilot PR #58 review findings](docs/issues/2026-03-31-copilot-pr58-review-findings.md) | 11 findings: _run_command stub `--` strip, ACG_AGENT_COUNT hardcode, PII in logs, local -a array, help text drift, grep-Fqx--, VPC CIDR /8→/16 |
 | 2026-03-30 | [acg_get_credentials Playwright extraction always falls back to stdin paste](docs/issues/2026-03-30-acg-credentials-playwright-extraction-fail.md) | acg — `isVisible()` with no timeout silently skips Open Sandbox button; no sign-in detection causes 60s hang on expired session |
 | 2026-03-29 | [ACG provision keypair import fails on re-run](docs/issues/2026-03-29-acg-provision-keypair-import-fail.md) | acg — `aws ec2 import-key-pair` prints error when key already exists; agent misdiagnosed as fatal; fixed with `_run_command --soft` |
 | 2026-03-28 | [Pluralsight Antigravity error](docs/issues/2026-03-28-pluralsight-antigravity-error.md) | acg — "Oops! Something went wrong" on Pluralsight in Antigravity browser; root cause: Chrome launched without `--password-store=basic` |
-| 2026-03-28 | [ArgoCD sync ACG credentials expired](docs/issues/2026-03-28-argocd-sync-acg-credentials-expired.md) | argocd — sync failed; ACG sandbox EC2 unreachable; root cause: sandbox credentials expired |
 
 [All issues →](docs/issues/)
 
