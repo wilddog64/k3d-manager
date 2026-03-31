@@ -179,16 +179,16 @@ function acg_get_credentials() {
 Usage: acg_get_credentials [sandbox-url]
 
 Extract AWS credentials from the Pluralsight Cloud Sandbox "Cloud Access" panel
-via Antigravity browser automation and write to ~/.aws/credentials.
+via Chrome CDP (Playwright) and write to ~/.aws/credentials.
 
-If sandbox-url is omitted, navigates to the sandbox listing page, starts a new
-sandbox, waits for it to be ready, then extracts credentials.
+Requires Chrome running with --remote-debugging-port=9222. If Chrome is not
+already running, it will be launched automatically.
 
 Falls back to: pbpaste | acg_import_credentials
 
 Arguments:
   sandbox-url   (optional) URL of a running sandbox, e.g.
-                https://app.pluralsight.com/cloud-playground/cloud-sandboxes/<id>
+                https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/<id>
                 Defaults to ACG_SANDBOX_LIST_URL (listing page — auto-start flow)
 HELP
     return 0
@@ -209,9 +209,11 @@ HELP
     return 1
   fi
 
-  _ensure_antigravity
-  _antigravity_launch
-  _antigravity_ensure_acg_session
+  if ! curl -sf http://localhost:9222/json >/dev/null 2>&1; then
+    _info "[acg] Chrome CDP not available on port 9222 — launching Chrome..."
+    _antigravity_launch
+    _antigravity_browser_ready 30
+  fi
 
   _info "[acg] Extracting AWS credentials from ${sandbox_url}..."
 
