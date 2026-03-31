@@ -37,7 +37,7 @@
 - [x] **`deploy_app_cluster` IP resolve** — resolves external IP from `~/.ssh/config` `HostName` before falling back to alias; commit `51983d3`.
 - [x] **`acg_watch` + `acg_provision --recreate`** — adds sandbox watcher, pre-flight extend, and recreate flag plus provider wiring; commit `51bdf3a`.
 - [x] **`k3s-aws` multi-node cluster** — `_acg_provision_agents`, `_k3sup_join_agent`, node labeling, and new provider tests; commit `0c89f4e`.
-- [ ] **Gemini e2e smoke test (v1.0.1)** — 3-node deploy: `acg_get_credentials` → `deploy_cluster` → `kubectl get nodes` shows 3 Ready → `destroy_cluster`. Milestone gate.
+- [x] **Gemini e2e smoke test (v1.0.1)** — **COMPLETE**. Full 3-node lifecycle verified: CloudFormation provision, 3 nodes Ready, successful teardown. Milestone gate passed.
 - [x] **Keypair + extend hotfix** — keypair import uses `--soft` and extend prompt forces `page.goto`; commit `4a57f44`.
 - [x] **Playwright auto sign-in + fail-fast** — sign-in detection, `credentialsAlreadyVisible` guard, 30s overall timeout, 15s credential selector timeout; commits `52cf05e`, `7a7ec82`.
 - [x] **Codex: CloudFormation parallel provisioning** — replace sequential EC2 launch with CF stack; spec `docs/plans/v1.0.1-cloudformation-provisioning.md`; commit `abe149f`. ⚠️ Codex also directly edited subtree-managed `scripts/lib/agent_rigor.sh` (hardcoded allowlist path).
