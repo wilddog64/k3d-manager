@@ -23,8 +23,12 @@
 ### Todo
 
 - [ ] **Gemini: all 5 pods Running** — spec `docs/plans/v1.0.2-all-pods-running.md`
-  - Blocked: Vault → EC2 connectivity (socat workaround in progress)
-  - acg_extend TTL extension failed (see bugfix below)
+  - VERDICT: FAILED — 4 blockers identified (2026-03-31 session)
+  - Blocker 1: `ghcr-pull-secret` missing — timing gap in `bin/acg-up` (namespaces created by ArgoCD after step 4 runs) → **bugfix spec needed**
+  - Blocker 2: ESO CRD `v1beta1` not served — manifests use `v1beta1`, cluster only enables `v1` → **spec work needed**
+  - Blocker 3: Vault reverse tunnel not active — plist updated by Codex but `tunnel_stop && tunnel_start` not yet run → **operational**
+  - Blocker 4: ArgoCD manager RBAC — `argocd-manager` SA/ClusterRoleBinding not automated → **spec work needed**
+  - Issue docs: `docs/issues/2026-03-31-v1.0.2-blockers-report.md`, `docs/issues/2026-03-31-eso-crd-version-mismatch.md`
 
 - [x] **Codex: reverse Vault tunnel** — spec `docs/plans/v1.0.2-reverse-vault-tunnel.md`; commit `4ff3cc3`
   - autossh plist now forwards k3s API and reverses Vault port 8200
