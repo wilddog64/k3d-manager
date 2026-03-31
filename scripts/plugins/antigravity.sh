@@ -206,30 +206,26 @@ Once complete, extract and print the full review output verbatim. Do not summari
 }
 
 function antigravity_acg_extend() {
-  local sandbox_url="${1:?usage: antigravity_acg_extend <sandbox_url> [hours]}"
-  local hours="${2:-4}"
+  local sandbox_url="${1:?usage: antigravity_acg_extend <sandbox_url>}"
 
-  _ensure_antigravity
-  _ensure_antigravity_ide
-  _ensure_antigravity_mcp_playwright
   _antigravity_launch
-  _antigravity_ensure_acg_session
 
-  _info "Extending ACG sandbox TTL by ${hours}h at ${sandbox_url}..."
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local playwright_script="${script_dir}/../playwright/acg_extend.js"
 
-  local gemini_prompt
-  gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
+  if ! command -v node >/dev/null 2>&1; then
+    _err "[antigravity] node is required — install Node.js"
+  fi
 
-1. Connect to the running Antigravity browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
-2. Use the first browser context and page (do NOT launch a new browser).
-3. Call \`await page.goto('${sandbox_url}', {waitUntil: 'networkidle'})\` unconditionally — regardless of the current page state, always navigate.
-4. Find the sandbox TTL extend button (look for 'Extend', '+4 hours', or similar).
-5. Click to extend by ${hours} hours.
-6. Confirm the new TTL is shown on the page.
-7. Print the new sandbox expiry time.
+  _info "[antigravity] Extending ACG sandbox TTL at ${sandbox_url}..."
+  local output exit_code
+  output=$(node "$playwright_script" "$sandbox_url" 2>&1)
+  exit_code=$?
 
-Write the Playwright script to ${HOME}/.gemini/tmp/k3d-manager/ag_acg_extend.js, execute with node, print the result.
-Exit code 1 if the extend button is not found or the action fails."
+  if [[ $exit_code -ne 0 ]]; then
+    _err "[antigravity] acg_extend failed: ${output}"
+  fi
 
-  _antigravity_gemini_prompt "$gemini_prompt" --yolo
+  echo "$output"
 }
