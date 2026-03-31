@@ -27,7 +27,8 @@
   - Blocker 1: `ghcr-pull-secret` missing — wrong namespace names (`apps` not `shopping-cart-apps`) + timing gap → **spec: `docs/plans/v1.0.2-bugfix-ghcr-pull-secret.md`**
   - Blocker 2: ESO CRD `v1beta1` not served — manifests use `v1beta1`, cluster only enables `v1` → **spec work needed**
   - Blocker 3: Vault reverse tunnel not active — plist updated by Codex but `tunnel_stop && tunnel_start` not yet run → **operational**
-  - Blocker 4: ArgoCD manager RBAC — `argocd-manager` SA/ClusterRoleBinding not automated → **spec work needed**
+  - Blocker 4: ArgoCD manager RBAC — `argocd-manager` SA/ClusterRoleBinding not automated → **in Gemini spec**
+  - **Gemini retry spec:** `docs/plans/v1.0.2-gemini-fix-cluster-blockers.md` — fix ESO CRD, reload tunnel, verify RBAC, force sync, verify all pods Running
   - Issue docs: `docs/issues/2026-03-31-v1.0.2-blockers-report.md`, `docs/issues/2026-03-31-eso-crd-version-mismatch.md`
 
 - [x] **Codex: reverse Vault tunnel** — spec `docs/plans/v1.0.2-reverse-vault-tunnel.md`; commit `4ff3cc3`
