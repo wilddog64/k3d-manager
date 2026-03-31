@@ -21,11 +21,17 @@
 
 ---
 
-## v1.0.2 Spec Written (2026-03-31)
+## v1.0.2 Specs Written (2026-03-31)
 
 **Spec:** `docs/plans/v1.0.2-all-pods-running.md` — assigned to Gemini.
 **Scope:** All 5 app pods Running on 3-node cluster + E2E green + Istio mTLS verified.
 **Known root causes:** frontend (resource exhaustion → resolved by 3 nodes), order-service (RabbitMQ DNS/port), payment-service (memory limits), product-catalog (ESO key mismatch RABBITMQ_USERNAME).
+
+**Spec:** `docs/plans/v1.0.2-reverse-vault-tunnel.md` — assigned to Codex.
+**Scope:** Add `-R 8200:localhost:8200` reverse tunnel to autossh plist in `tunnel.sh`. Replaces Gemini's socat bridge workaround. 4 targeted changes in `tunnel.sh`.
+
+**Spec:** `docs/plans/v1.0.2-bugfix-acg-extend-selector.md` — assigned to Codex.
+**Scope:** Replace freeform Gemini CLI prompt in `antigravity_acg_extend` with static `node acg_extend.js` call. New file `scripts/playwright/acg_extend.js` with 6 selector fallbacks, aria-busy wait, panel-open fallback, 90s timeout.
 
 ---
 
