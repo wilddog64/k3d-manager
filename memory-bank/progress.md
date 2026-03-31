@@ -32,6 +32,10 @@
 - [x] **Codex: acg_extend bugfix** — spec `docs/plans/v1.0.2-bugfix-acg-extend-selector.md`; commit `26a34cd`
   - Static `scripts/playwright/acg_extend.js` replaces Gemini prompt; `antigravity_acg_extend` runs it directly
 
+- [ ] **Codex: acg_watch_start/stop launchd** — spec `docs/plans/v1.0.2-acg-watch-launchd.md`
+  - Sandbox TTL extension survives terminal death and Gemini session blocks
+  - `acg_watch_start` writes wrapper + plist; `bin/acg-up` calls it instead of `acg_watch &`
+
 - [ ] **lib-foundation PR #22** — `feat/v0.3.16`, `grep -Fqx --` fix; needs Copilot review + merge + subtree pull
 
 - [ ] **docs/api/functions.md** — add new public functions: `acg_*`, `tunnel_*`, `aws_*`, `bin/` scripts
