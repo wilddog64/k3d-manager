@@ -66,36 +66,94 @@ async function extractCredentials() {
       { timeout: 30000 }
     ).catch(() => console.error('WARN: Skeleton loaders did not clear within 30s — proceeding anyway'));
 
-    // 3. Handle Sandbox Start/Open Flow
-    console.error('INFO: Looking for Start/Open button...');
-    
-    // Pattern 1: Direct "Start Sandbox" button (in a modal or panel)
-    const startButton = page.locator('button:has-text("Start Sandbox")').first();
-    // Pattern 2: "Open Sandbox" button (on the card)
-    const openButton = page.locator('button:has-text("Open Sandbox")').first();
-    // Pattern 3: "Resume Sandbox"
-    const resumeButton = page.locator('button:has-text("Resume"), button:has-text("Resume Sandbox")').first();
+    // 2b. Handle unauthenticated state — sign in via Google Password Manager if needed
+    const signInLink = page.locator('a[href*="id.pluralsight.com"], a:has-text("Sign In"), button:has-text("Sign In")').first();
+    const isSignInVisible = await signInLink.isVisible({ timeout: 3000 }).catch(() => false);
+    if (isSignInVisible) {
+      console.error('INFO: Not signed in — clicking Sign In...');
+      await signInLink.click();
+      await page.waitForURL('**id.pluralsight.com**', { timeout: 15000 })
+        .catch(() => console.error('WARN: Did not reach id.pluralsight.com — proceeding anyway'));
 
-    if (await startButton.isVisible()) {
-      console.error('INFO: Clicking Start Sandbox...');
-      await startButton.click();
-      await page.waitForTimeout(10000);
-    } else if (await openButton.isVisible()) {
-      console.error('INFO: Clicking Open Sandbox...');
-      await openButton.click();
-      await page.waitForTimeout(10000);
-      
-      // After Open, there might be a Start Sandbox button in the slide-over
-      const startButton2 = page.locator('button:has-text("Start Sandbox")').first();
-      if (await startButton2.isVisible()) {
-        console.error('INFO: Clicking Start Sandbox (Step 2)...');
-        await startButton2.click();
+      // Fill email field — set PLURALSIGHT_EMAIL env var to assist Google Password Manager
+      const emailInput = page.locator('input[type="email"], input[name="email"], input[id*="email"]').first();
+      await emailInput.waitFor({ timeout: 15000 });
+      await emailInput.click();
+      const email = process.env.PLURALSIGHT_EMAIL || '';
+      if (email) {
+        await emailInput.fill(email);
+        console.error('INFO: Filled email from PLURALSIGHT_EMAIL');
+      } else {
+        console.error('INFO: Clicked email field — waiting for Google Password Manager auto-fill (set PLURALSIGHT_EMAIL to assist)');
+        await page.waitForTimeout(2000);
+      }
+
+      // Click Continue if the form uses a two-step email-then-password flow
+      const continueBtn = page.locator('button[type="submit"], button:has-text("Continue")').first();
+      if (await continueBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await continueBtn.click();
+        await page.waitForTimeout(1500);
+      }
+
+      // Wait for password field and let Google Password Manager auto-fill it
+      const passwordInput = page.locator('input[type="password"]').first();
+      if (await passwordInput.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await passwordInput.click();
+        await page.waitForTimeout(2000); // allow Password Manager to populate
+        const submitBtn = page.locator('button[type="submit"], button:has-text("Sign in"), button:has-text("Log in")').first();
+        if (await submitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await submitBtn.click();
+          console.error('INFO: Submitted sign-in form — waiting for redirect...');
+        }
+      }
+
+      // Wait for redirect back to Pluralsight after successful auth
+      await page.waitForURL('**app.pluralsight.com**', { timeout: 60000 });
+      console.error('INFO: Sign-in complete — resuming credential extraction...');
+
+      // Re-wait for SPA content to settle after auth redirect
+      await page.waitForFunction(
+        () => !document.querySelector('[aria-busy="true"]'),
+        { timeout: 30000 }
+      ).catch(() => console.error('WARN: Skeleton loaders did not clear after login — proceeding anyway'));
+    }
+
+    // 3. Handle Sandbox Start/Open Flow
+    // Skip button flow if credentials panel is already open
+    const credentialsAlreadyVisible = await page.locator('input[aria-label="Copyable input"]').first().isVisible({ timeout: 3000 }).catch(() => false);
+    if (credentialsAlreadyVisible) {
+      console.error('INFO: Credentials panel already open — skipping Start/Open flow');
+    } else {
+      console.error('INFO: Looking for Start/Open button...');
+
+      // Pattern 1: Direct "Start Sandbox" button (in a modal or panel)
+      const startButton = page.locator('button:has-text("Start Sandbox")').first();
+      // Pattern 2: "Open Sandbox" button (on the card)
+      const openButton = page.locator('button:has-text("Open Sandbox")').first();
+      // Pattern 3: "Resume Sandbox"
+      const resumeButton = page.locator('button:has-text("Resume"), button:has-text("Resume Sandbox")').first();
+
+      if (await startButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.error('INFO: Clicking Start Sandbox...');
+        await startButton.click();
+        await page.waitForTimeout(10000);
+      } else if (await openButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.error('INFO: Clicking Open Sandbox...');
+        await openButton.click();
+        await page.waitForTimeout(10000);
+
+        // After Open, there might be a Start Sandbox button in the slide-over
+        const startButton2 = page.locator('button:has-text("Start Sandbox")').first();
+        if (await startButton2.isVisible({ timeout: 5000 }).catch(() => false)) {
+          console.error('INFO: Clicking Start Sandbox (Step 2)...');
+          await startButton2.click();
+          await page.waitForTimeout(10000);
+        }
+      } else if (await resumeButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.error('INFO: Clicking Resume Sandbox...');
+        await resumeButton.click();
         await page.waitForTimeout(10000);
       }
-    } else if (await resumeButton.isVisible()) {
-      console.error('INFO: Clicking Resume Sandbox...');
-      await resumeButton.click();
-      await page.waitForTimeout(10000);
     }
 
     // 4. Extract credentials
@@ -105,7 +163,7 @@ async function extractCredentials() {
     // The order is typically: Username, Password, Access Key ID, Secret Access Key, [Session Token]
     
     // Wait for the inputs to appear
-    await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 60000 });
+    await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 15000 });
     
     const inputs = await page.locator('input[aria-label="Copyable input"]').all();
     console.error(`INFO: Found ${inputs.length} copyable inputs.`);
@@ -156,4 +214,13 @@ async function extractCredentials() {
   }
 }
 
-extractCredentials();
+const OVERALL_TIMEOUT_MS = 120000;
+Promise.race([
+  extractCredentials(),
+  new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`Script timed out after ${OVERALL_TIMEOUT_MS / 1000}s`)), OVERALL_TIMEOUT_MS)
+  )
+]).catch(err => {
+  console.error(`ERROR: ${err.message}`);
+  process.exit(1);
+});

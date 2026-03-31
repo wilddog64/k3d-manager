@@ -21,7 +21,8 @@
 **v0.9.19 SHIPPED** — PR #54 merged (`0f13be1`) 2026-03-28. Tagged v0.9.19. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.19-retrospective.md`.
 **v0.9.20 SHIPPED** — PR #55 merged to main (`bfd66fe`) 2026-03-29. Tagged v0.9.20, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v0.9.20-retrospective.md`.
 **v0.9.21 SHIPPED** — PR #56 merged to main (`f98f2a8`) 2026-03-29. Tagged v0.9.21, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v0.9.21-retrospective.md`.
-**v1.0.0 ACTIVE** — branch `k3d-manager-v1.0.0` cut from `f98f2a8` 2026-03-29.
+**v1.0.0 SHIPPED** — PR #57 merged to main (`807c0432`) 2026-03-29. Tagged v1.0.0, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v1.0.0-retrospective.md`.
+**v1.0.1 ACTIVE** — branch `k3d-manager-v1.0.1` cut from `807c0432` 2026-03-29.
 
 ---
 
@@ -35,7 +36,16 @@
 - [x] **`acg_get_credentials` Antigravity source** — `acg.sh` now sources `antigravity.sh` so `_ensure_antigravity` helpers exist for `acg_get_credentials`; commit `4357f90`.
 - [x] **`deploy_app_cluster` IP resolve** — resolves external IP from `~/.ssh/config` `HostName` before falling back to alias; commit `51983d3`.
 - [x] **`acg_watch` + `acg_provision --recreate`** — adds sandbox watcher, pre-flight extend, and recreate flag plus provider wiring; commit `51bdf3a`.
+- [x] **`k3s-aws` multi-node cluster** — `_acg_provision_agents`, `_k3sup_join_agent`, node labeling, and new provider tests; commit `0c89f4e`.
+- [x] **Gemini e2e smoke test (v1.0.1)** — **COMPLETE**. Full 3-node lifecycle verified: CloudFormation provision, 3 nodes Ready, successful teardown. Milestone gate passed.
 - [x] **Keypair + extend hotfix** — keypair import uses `--soft` and extend prompt forces `page.goto`; commit `4a57f44`.
+- [x] **Playwright auto sign-in + fail-fast** — sign-in detection, `credentialsAlreadyVisible` guard, 30s overall timeout, 15s credential selector timeout; commits `52cf05e`, `7a7ec82`.
+- [x] **Codex: CloudFormation parallel provisioning** — replace sequential EC2 launch with CF stack; spec `docs/plans/v1.0.1-cloudformation-provisioning.md`; commit `abe149f`. ⚠️ Codex also directly edited subtree-managed `scripts/lib/agent_rigor.sh` (hardcoded allowlist path).
+- [x] **Codex: agent_rigor IP allowlist — upstream fix** — lib-foundation v0.3.15 merged (PR #21, `751a2c1`); 9 Copilot findings fixed (pre-load allowlist, -f guard, grep -Fqx, BATS tests, doc fixes); subtree pulled to k3d-manager (`314bab8`); working copy synced. Spec: `docs/plans/v1.0.1-agent-rigor-ip-allowlist-upstream.md`. COMPLETE.
+- [x] **Codex: acg_get_credentials cleanup** — remove `_ensure_antigravity`/`_antigravity_launch`/`_antigravity_ensure_acg_session` pre-calls; add CDP health check; update help text. Spec: `docs/plans/v1.0.1-acg-get-credentials-cleanup.md`. Commit: `f574e05`. COMPLETE.
+- [ ] **SSM transport (v1.0.2)** — SSM port forwarding as primary tunnel/k3sup transport; SSH as fallback. Affects: `tunnel.sh` (replace autossh), `shopping_cart.sh` (k3sup via SSM proxy or `ssm send-command`), `acg-cluster.yaml` (add IAM instance profile with `AmazonSSMManagedInstanceCore`). Enables corp environments with outbound SSH blocked.
+- [ ] **Playwright trace support** (`ENABLE_TRACE=1`) — `context.tracing.start/stop`, save to `scratch/playwright-trace-<timestamp>.zip`; viewable with `npx playwright show-trace`. Deferred backlog.
+- [ ] **Chrome naming cleanup** (after Codex + Gemini done) — rename `_antigravity_launch`/`_antigravity_browser_ready` → `_chrome_*` in `antigravity.sh`; drop `_ensure_antigravity` + `_antigravity_ensure_acg_session` calls from `acg_get_credentials` in `acg.sh` (static script handles session now).
 
 
 ## v0.9.21 — Shipped

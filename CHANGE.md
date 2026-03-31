@@ -1,5 +1,25 @@
 # Changes - k3d-manager
 
+## [v1.0.1] — 2026-03-31 — multi-node k3s-aws + CloudFormation + Playwright hardening
+
+### Added
+- `k3s-aws` multi-node cluster: `_acg_provision_agents`, `_k3sup_join_agent`, node labeling — 3-node cluster verified end-to-end (`0c89f4e`)
+- CloudFormation parallel provisioning: replaces sequential `aws ec2 run-instances` loop; single `wait stack-create-complete` covers all 3 nodes (`abe149f`)
+- Playwright auto sign-in via Google Password Manager in `acg_credentials.js`: detects sign-in link, fills email, submits, waits for redirect back to `app.pluralsight.com` (`52cf05e`)
+- vCluster how-to doc (`docs/howto/vcluster.md`) and API reference entry (`d4b8691`)
+
+### Fixed
+- `acg_get_credentials`: removed redundant `_ensure_antigravity`, `_antigravity_launch`, `_antigravity_ensure_acg_session` pre-calls that disrupted Chrome CDP page state; replaced with CDP health check — Chrome launched on demand only when port 9222 is not responding (`f574e05`)
+- `scripts/playwright/acg_credentials.js`: 30s overall timeout increased to 120s; `browser.disconnect()` reverted to `browser.close()` — CDP connections use `close()` not `disconnect()` (`2814396`, `a145075`)
+- `scripts/playwright/acg_credentials.js`: `isVisible()` calls without timeout replaced with 5–15s timeouts; `credentialsAlreadyVisible` guard skips Start/Open flow when panel already open (`7a7ec82`)
+- `_agent_audit` IP allowlist: replaced per-file inner loop with pre-loaded `grep -Fqx` approach; added `-f` guard to reject directory paths; synced with lib-foundation v0.3.15 (`314bab8`)
+- Pre-commit hook: exports `AGENT_IP_ALLOWLIST` env var pointing to `scripts/etc/agent/hardcoded-ip-allowlist` — CloudFormation CIDR literals exempted from IP audit (`c9419f2`)
+
+### Removed
+- `bin/setup-jenkins-cli-ssl`, `bin/setup-argocd-cli-ssl`, `bin/create-k8s-agent-test-jobs` — redundant scripts superseded by plugin functions (`980ca8d`)
+
+---
+
 ## [v1.0.0] — 2026-03-29 — k3s-aws provider foundation
 
 ### Added
