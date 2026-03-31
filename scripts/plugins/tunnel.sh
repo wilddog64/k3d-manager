@@ -13,6 +13,7 @@ fi
 : "${TUNNEL_LOCAL_PORT:=6443}"
 : "${TUNNEL_REMOTE_PORT:=6443}"
 : "${TUNNEL_BIND_ADDR:=0.0.0.0}"
+: "${TUNNEL_VAULT_PORT:=8200}"
 : "${TUNNEL_LAUNCHD_LABEL:=com.k3d-manager.ssh-tunnel}"
 : "${TUNNEL_PLIST_PATH:=${HOME}/Library/LaunchAgents/${TUNNEL_LAUNCHD_LABEL}.plist}"
 
@@ -53,6 +54,8 @@ _tunnel_write_plist() {
     <string>ExitOnForwardFailure=yes</string>
     <string>-L</string>
     <string>${TUNNEL_BIND_ADDR}:${TUNNEL_LOCAL_PORT}:localhost:${TUNNEL_REMOTE_PORT}</string>
+    <string>-R</string>
+    <string>${TUNNEL_VAULT_PORT}:localhost:${TUNNEL_VAULT_PORT}</string>
     <string>-N</string>
     <string>${TUNNEL_SSH_HOST}</string>
   </array>
@@ -74,7 +77,9 @@ function tunnel_start() {
     cat <<EOF
 Usage: tunnel_start
 
-Start the SSH tunnel (${TUNNEL_BIND_ADDR}:${TUNNEL_LOCAL_PORT} -> ${TUNNEL_SSH_HOST}:${TUNNEL_REMOTE_PORT}).
+Start the SSH tunnel:
+  Forward: ${TUNNEL_BIND_ADDR}:${TUNNEL_LOCAL_PORT} -> ${TUNNEL_SSH_HOST}:${TUNNEL_REMOTE_PORT} (k3s API)
+  Reverse: ${TUNNEL_SSH_HOST}:${TUNNEL_VAULT_PORT} -> localhost:${TUNNEL_VAULT_PORT} (Vault)
 Installs a launchd plist for boot persistence (macOS only).
 
 Config (override via env or scripts/etc/tunnel/vars.sh):
@@ -82,6 +87,7 @@ Config (override via env or scripts/etc/tunnel/vars.sh):
   TUNNEL_LOCAL_PORT  Local port        (default: 6443)
   TUNNEL_REMOTE_PORT Remote port       (default: 6443)
   TUNNEL_BIND_ADDR   Bind address      (default: 0.0.0.0)
+  TUNNEL_VAULT_PORT  Vault reverse port (default: 8200)
 EOF
     return 0
   fi
@@ -144,7 +150,8 @@ function tunnel_status() {
   fi
 
   echo "[tunnel] launchd: ${launchd_state} | process: ${process_state}"
-  echo "[tunnel] ${TUNNEL_BIND_ADDR}:${TUNNEL_LOCAL_PORT} -> ${TUNNEL_SSH_HOST}:${TUNNEL_REMOTE_PORT}"
+  echo "[tunnel] forward: ${TUNNEL_BIND_ADDR}:${TUNNEL_LOCAL_PORT} -> ${TUNNEL_SSH_HOST}:${TUNNEL_REMOTE_PORT} (k3s API)"
+  echo "[tunnel] reverse: ${TUNNEL_SSH_HOST}:${TUNNEL_VAULT_PORT} -> localhost:${TUNNEL_VAULT_PORT} (Vault)"
 
   if [[ "$process_state" == "not running" ]]; then
     return 1
