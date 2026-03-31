@@ -1,87 +1,60 @@
-## Done: Attempted to extend sandbox TTL
+# Progress — k3d-manager
 
-### ag_acg_extend.js
+## v1.0.1 SHIPPED
 
-```javascript
-const { chromium } = require('playwright');
+**PR #58** merged to main (`a8b6c583`) 2026-03-31. Tagged v1.0.1, released. `enforce_admins` restored.
+**Retro:** `docs/retro/2026-03-31-v1.0.1-retrospective.md`
 
-(async () => {
-  let browser;
-  try {
-    // 1. Connect to the running Antigravity browser via CDP
-    browser = await chromium.connectOverCDP('http://localhost:9222');
+**Scope shipped:**
+- [x] `bin/` convenience scripts: `acg-up`, `acg-down`, `acg-refresh`, `acg-status`, `rotate-ghcr-pat`
+- [x] Claude skills: `~/.claude/commands/acg-up.md`, `acg-down.md`, `acg-refresh.md`, `acg-status.md`
+- [x] README: Directory Layout + Convenience Scripts table + How-To link
+- [x] `docs/howto/acg-credentials-flow.md` — ASCII decision tree
+- [x] `memory-bank/projectbrief.md` — updated to reflect k3s-aws 3-node + ACG scope
+- [x] `.github/copilot-instructions.md` — acg_*, tunnel_*, Playwright review rules
+- [x] `~/.claude/commands/post-merge.md` — Step 7b standing docs audit added
 
-    // 2. Use the first browser context and page
-    const contexts = browser.contexts();
-    if (contexts.length === 0) {
-      console.error('Error: No browser contexts found. Ensure a browser is running.');
-      process.exit(1);
-    }
-    const page = contexts[0].pages()[0];
-    if (!page) {
-      console.error('Error: No page found in the first browser context. Ensure a page is open.');
-      process.exit(1);
-    }
+---
 
-    // 3. Call await page.goto('https://app.pluralsight.com/cloud-playground/cloud-sandboxes', {waitUntil: 'networkidle'}) unconditionally
-    console.log('Navigating to sandbox page...');
-    await page.goto('https://app.pluralsight.com/cloud-playground/cloud-sandboxes', { waitUntil: 'domcontentloaded' });
-    await page.waitForLoadState('domcontentloaded');
-    console.log('Navigation complete.');
+## v1.0.2 ACTIVE — branch `k3d-manager-v1.0.2`
 
-    // 4. Find the sandbox TTL extend button (look for 'Extend', '+4 hours', or similar)
-    // 5. Click to extend by 4 hours.
-    console.log('Searching for extend button...');
-    const extendButton = await page.getByRole('button', { name: /Extend|\+4 hours/i }).first();
-    
-    if (!(await extendButton.isVisible())) {
-      console.error('Error: Extend button not found or not visible.');
-      process.exit(1);
-    }
+**Cut from:** `a8b6c583` (2026-03-31)
 
-    console.log('Clicking extend button...');
-    await extendButton.click();
-    console.log('Extend button clicked. Waiting for confirmation...');
+### Todo
 
-    // 6. Confirm the new TTL is shown on the page.
-    // Wait for the confirmation message or the updated expiry time to appear.
-    // This is a heuristic: we'll look for text indicating a new expiry or an updated time.
-    await page.getByText(/(expires in|extended until)/i, { timeout: 10000 }).catch(() => {
-        console.error('Error: Could not confirm TTL extension message.');
-        process.exit(1);
-    });
-    console.log('TTL extension confirmed on page.');
+- [ ] **Gemini: all 5 pods Running** — spec `docs/plans/v1.0.2-all-pods-running.md`
+  - Blocked: Vault → EC2 connectivity (socat workaround in progress)
+  - acg_extend TTL extension failed (see bugfix below)
 
-    // 7. Print the new sandbox expiry time.
-    // Try to find an element that contains the expiry time.
-    const expiryTimeElement = await page.getByText(/(expires in|extended until)/i).first();    if (await expiryTimeElement.isVisible()) {
-      const expiryText = await expiryTimeElement.textContent();
-      console.log(`New Sandbox Expiry Time: ${expiryText.trim()}`);
-    } else {
-      console.log('Could not find specific element displaying the new expiry time. Extension likely successful.');
-    }
+- [ ] **Codex: reverse Vault tunnel** — spec `docs/plans/v1.0.2-reverse-vault-tunnel.md`
+  - Replaces Gemini's socat bridge workaround
+  - Adds `-R 8200:localhost:8200` to autossh plist in `tunnel.sh`
 
-  } catch (error) {
-    console.error(`An unexpected error occurred: ${error.message}`);
-    process.exit(1);
-  } finally {
-    if (browser) {
-      // In a real scenario, we might close the browser or context if we opened it.
-      // Since we are connecting to an existing one, we don't close it here.
-    }
-  }
-})();
-```
+- [ ] **Codex: acg_extend bugfix** — spec `docs/plans/v1.0.2-bugfix-acg-extend-selector.md`
+  - New file: `scripts/playwright/acg_extend.js` (static, 6 selector fallbacks)
+  - Replace freeform Gemini CLI prompt in `antigravity_acg_extend`
 
-### Execution Output
-```
-Output: Navigating to sandbox page...
-Navigation complete.
-Searching for extend button...
-Error: Extend button not found or not visible.
-Exit Code: 1
-Process Group PGID: 39103
-```
+- [ ] **lib-foundation PR #22** — `feat/v0.3.16`, `grep -Fqx --` fix; needs Copilot review + merge + subtree pull
 
-### Notes
-The Playwright script was executed but failed to find the "Extend" button or any element containing the text "+4 hours" on the target page. Multiple attempts were made to refine the locator strategy, including using `page.locator` with `has-text`, `page.getByRole`, and `page.getByText` with regular expressions. The issue seems to stem from the button genuinely not being present or visible in the observed page state. Without further information about the dynamic nature of the page or a direct inspection of its DOM, the script cannot proceed to click the button and confirm the TTL extension.
+- [ ] **docs/api/functions.md** — add new public functions: `acg_*`, `tunnel_*`, `aws_*`, `bin/` scripts
+
+### Issues Logged
+
+- `docs/issues/2026-03-31-pluralsight-session-expiry-independent-of-sandbox-ttl.md`
+- `docs/issues/2026-03-31-acg-extend-button-not-found.md`
+
+---
+
+## Roadmap (shipped + planned)
+
+| Version | Status | Scope |
+|---------|--------|-------|
+| v0.9.20 | SHIPPED `bfd66fe` | `_antigravity_launch` `--password-store=basic`; `_ensure_k3sup` |
+| v0.9.21 | SHIPPED `f98f2a8` | `_ensure_k3sup` + `deploy_app_cluster` auto-install |
+| v1.0.0  | SHIPPED `807c0432` | `k3s-aws` provider foundation |
+| v1.0.1  | SHIPPED `a8b6c583` | Multi-node + CloudFormation + bin/ scripts + copilot-instructions |
+| v1.0.2  | ACTIVE | Full stack: all 5 pods Running + E2E green |
+| v1.0.3  | PLANNED | Service mesh: Istio + MetalLB + GUI access |
+| v1.0.4  | PLANNED | Samba AD DC plugin |
+| v1.0.5  | PLANNED | GCP cloud provider (`k3s-gcp`) |
+| v1.0.6  | PLANNED | Azure cloud provider (`k3s-azure`) |
