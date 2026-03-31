@@ -26,24 +26,34 @@ source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
 source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
 source "${REPO_ROOT}/scripts/lib/providers/k3s-aws.sh"
 
-sandbox_url="${1:-${ACG_SANDBOX_URL:-}}"
+login_prompt=0
+sandbox_url=""
+for arg in "$@"; do
+  case "$arg" in
+    --login-prompt)    login_prompt=1 ;;
+    --no-login-prompt) login_prompt=0 ;;
+    *)                 sandbox_url="$arg" ;;
+  esac
+done
+sandbox_url="${sandbox_url:-${ACG_SANDBOX_URL:-}}"
 
-# Step 0 — prompt user to sign in before Playwright runs
-_acg_sandbox_url="${sandbox_url:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}"
-echo ""
-echo "=========================================================="
-echo "  ACTION REQUIRED: Sign in to Pluralsight ACG sandbox"
-echo "=========================================================="
-echo ""
-echo "  1. Open this URL in your browser (Chrome with CDP profile):"
-echo "     ${_acg_sandbox_url}"
-echo ""
-echo "  2. Sign in to Pluralsight if prompted"
-echo "  3. Start or resume your Cloud Sandbox"
-echo "  4. Confirm the sandbox is Running (green status)"
-echo ""
-read -r -p "Press Enter once you are signed in and the sandbox is Running... "
-echo ""
+if [[ "$login_prompt" -eq 1 ]]; then
+  _acg_sandbox_url="${sandbox_url:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}"
+  echo ""
+  echo "=========================================================="
+  echo "  ACTION REQUIRED: Sign in to Pluralsight ACG sandbox"
+  echo "=========================================================="
+  echo ""
+  echo "  1. Open this URL in your browser (Chrome with CDP profile):"
+  echo "     ${_acg_sandbox_url}"
+  echo ""
+  echo "  2. Sign in to Pluralsight if prompted"
+  echo "  3. Start or resume your Cloud Sandbox"
+  echo "  4. Confirm the sandbox is Running (green status)"
+  echo ""
+  read -r -p "Press Enter once you are signed in and the sandbox is Running... "
+  echo ""
+fi
 
 _info "[acg-up] Step 1/4 — Getting AWS credentials..."
 acg_get_credentials ${sandbox_url:+"$sandbox_url"}
