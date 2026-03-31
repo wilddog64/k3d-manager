@@ -30,7 +30,7 @@ ACME_EMAIL=you@example.com \
 
 ```bash
 # Extract AWS credentials from the Pluralsight sandbox (run before acg_provision)
-./scripts/k3d-manager acg_get_credentials              # Playwright auto-extract via Antigravity
+./scripts/k3d-manager acg_get_credentials              # Playwright auto-extract via Chrome CDP
 pbpaste | ./scripts/k3d-manager acg_import_credentials # fallback: paste from clipboard
 
 acg_provision --confirm           # VPC + SG + key pair + t3.medium EC2; updates ~/.ssh/config
@@ -41,7 +41,7 @@ acg_teardown --confirm            # terminate instance; remove ubuntu-k3s kubeco
 
 > Set `ACG_ALLOWED_CIDR=<your-ip>/32` to restrict SSH/6443 ingress (default: `0.0.0.0/0`).
 >
-> **First run:** `antigravity_acg_extend` will open the Antigravity browser and prompt for Pluralsight login as needed. Log in manually — the session cookie persists across runs until it expires. Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Antigravity session check.
+> **First run:** `antigravity_acg_extend` will open Google Chrome and prompt for Pluralsight login as needed. Log in manually — the session cookie persists across runs until it expires. Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Antigravity session check.
 
 ### 3. Add the Ubuntu k3s app cluster
 
@@ -108,10 +108,12 @@ CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f   # k3s, non-intera
 | `orbstack` | macOS + OrbStack running | Auto-detected (or `CLUSTER_PROVIDER=orbstack`) |
 | `k3d` | macOS, no OrbStack | Default fallback |
 | `k3s` | Linux bare-metal | `CLUSTER_PROVIDER=k3s` |
+| `k3s-aws` | AWS EC2 via ACG sandbox | `CLUSTER_PROVIDER=k3s-aws` |
 
 See **[docs/providers/](docs/providers/)** for per-provider guides:
 - [OrbStack](docs/providers/orbstack.md)
 - [k3s (bare-metal)](docs/providers/k3s.md)
+- [k3s-aws (ACG EC2 sandbox)](docs/howto/acg.md)
 
 ---
 
@@ -122,36 +124,38 @@ See **[docs/providers/](docs/providers/)** for per-provider guides:
 ```mermaid
 graph TD
   U[User CLI] --> KM[./scripts/k3d-manager]
-  KM --> SYS[lib/system.sh]
-  KM --> CORE[lib/core.sh]
-  KM --> TEST[lib/test.sh]
-  KM --|_try_load_plugin(func)|--> PLUG[plugins/*.sh]
-  PLUG --> HELM[helm]
-  PLUG --> KUB[kubectl]
-  PLUG --> JPLUG[plugins/jenkins.sh]
-  JPLUG --> ROTATOR["Jenkins cert rotator CronJob"]
-  JPLUG -->|ESO/Vault manifests| ESO
-  ROTATOR -->|refresh TLS secret| JENKINS[Jenkins StatefulSet]
-  ROTATOR --> ESO
-  CORE --> HELM
-  CORE --> KUB
-  subgraph Cluster
-     K3D[k3d/k3s API] --> K8S[Kubernetes]
-     ISTIO[Istio] --> K8S
-     ESO[External Secrets Operator] --> K8S
-     JENKINS --> K8S
-     ROTATOR --> K8S
-  end
-  HELM --> K3D
-  KUB --> K3D
+  KM --> LIB["lib/ — system · core · providers"]
+  KM --|lazy-load|--> PLUG["plugins/ — acg · aws · antigravity · tunnel · ..."]
 
-  subgraph Providers
-     VAULT[HashiCorp Vault]
-     AZ[Azure Key Vault]
+  subgraph Infra ["Infra Cluster — OrbStack / k3d / k3s (local)"]
+    VAULT["Vault (PKI + Auth)"]
+    ESO[ESO]
+    ARGOCD[ArgoCD]
+    JENKINS[Jenkins]
+    ISTIO[Istio]
+    LDAP[LDAP / AD]
+    ESO -->|sync| VAULT
   end
-  ESO <-- sync/reads --> VAULT
-  ESO <-- sync/reads --> AZ
-  ROTATOR -->|requests leaf certs| VAULT
+
+  subgraph AppCluster ["App Cluster — k3s-aws (EC2)"]
+    K3S[k3s node]
+    APPS[Shopping Cart pods]
+    K3S --> APPS
+  end
+
+  ANTG["Chrome (Playwright CDP :9222)"]
+  AWSC["aws.sh — credential import"]
+
+  PLUG -->|deploy stack| Infra
+  PLUG -->|acg_provision — EC2 + k3sup| AppCluster
+  PLUG -->|browser automation| ANTG
+  PLUG -->|credential import| AWSC
+  ANTG -->|extract from Pluralsight| AWSC
+  AWSC -->|auth| AppCluster
+  PLUG -.->|tunnel.sh — autossh :6443| K3S
+  ARGOCD -->|GitOps deploy| APPS
+  VAULT -.->|cross-cluster auth| K3S
+  ESO -.->|sync| AKV[Azure Key Vault]
 ```
 
 ---
@@ -235,6 +239,9 @@ docs/
 - **[ACG Sandbox](docs/howto/acg.md)** — Full lifecycle: provision → k3s install → extend TTL → teardown
 - **[Antigravity Browser Automation](docs/howto/antigravity.md)** — First-run setup, ACG extend, Copilot agent trigger
 
+**Virtual Clusters**
+- **[vCluster](docs/howto/vcluster.md)** — Create, use, list, and destroy virtual Kubernetes clusters inside the infra cluster
+
 **Networking**
 - **[SSH Tunnel](docs/howto/tunnel.md)** — autossh setup, launchd boot persistence, app cluster access
 
@@ -256,11 +263,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-03-31 | [Copilot PR #58 review findings](docs/issues/2026-03-31-copilot-pr58-review-findings.md) | 11 findings: _run_command stub `--` strip, ACG_AGENT_COUNT hardcode, PII in logs, local -a array, help text drift, grep-Fqx--, VPC CIDR /8→/16 |
+| 2026-03-30 | [acg_get_credentials Playwright extraction always falls back to stdin paste](docs/issues/2026-03-30-acg-credentials-playwright-extraction-fail.md) | acg — `isVisible()` with no timeout silently skips Open Sandbox button; no sign-in detection causes 60s hang on expired session |
 | 2026-03-29 | [ACG provision keypair import fails on re-run](docs/issues/2026-03-29-acg-provision-keypair-import-fail.md) | acg — `aws ec2 import-key-pair` prints error when key already exists; agent misdiagnosed as fatal; fixed with `_run_command --soft` |
 | 2026-03-28 | [Pluralsight Antigravity error](docs/issues/2026-03-28-pluralsight-antigravity-error.md) | acg — "Oops! Something went wrong" on Pluralsight in Antigravity browser; root cause: Chrome launched without `--password-store=basic` |
 | 2026-03-28 | [ArgoCD sync ACG credentials expired](docs/issues/2026-03-28-argocd-sync-acg-credentials-expired.md) | argocd — sync failed; ACG sandbox EC2 unreachable; root cause: sandbox credentials expired |
-| 2026-03-28 | [Copilot PR #52 review findings](docs/issues/2026-03-28-copilot-pr52-review-findings.md) | antigravity — yolo always-on, sleep not stubbed, tmpdir not isolated, model order wrong in 3 places |
-| 2026-03-28 | [ACG domain redirection](docs/issues/2026-03-28-acg-domain-redirection.md) | antigravity — `learn.acloud.guru` retired; redirects to Pluralsight |
 
 [All issues →](docs/issues/)
 
@@ -270,15 +277,16 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.0.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.1) | 2026-03-31 | multi-node k3s-aws + CloudFormation + Playwright hardening — 3-node CF stack; auto sign-in; remove Antigravity pre-calls from `acg_get_credentials`; `AGENT_IP_ALLOWLIST` in pre-commit hook |
 | [v1.0.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.0) | 2026-03-29 | k3s-aws provider foundation — `CLUSTER_PROVIDER=k3s-aws` end-to-end deploy; `aws_import_credentials`; `acg_provision --recreate`; `acg_watch` background TTL watcher; keypair idempotency + `page.goto()` fix |
 | [v0.9.21](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.21) | 2026-03-29 | `_ensure_k3sup` auto-install helper — `deploy_app_cluster` now auto-installs k3sup via brew or curl; consistent with `_ensure_node`/`_ensure_copilot_cli` pattern |
-| [v0.9.20](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.20) | 2026-03-29 | ACG Chrome launch fix — `_antigravity_launch` now opens Chrome (not Antigravity IDE) with `--password-store=basic`; `acg_credentials.js` SPA nav guard avoids hard reload |
 
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.9.20](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.20) | 2026-03-29 | ACG Chrome launch fix — `_antigravity_launch` now opens Chrome (not Antigravity IDE) with `--password-store=basic`; `acg_credentials.js` SPA nav guard avoids hard reload |
 | [v0.9.19](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.19) | 2026-03-28 | ACG automated credential extraction — `acg_get_credentials` (Playwright CDP), `acg_import_credentials` (stdin), static `acg_credentials.js`; live-verified against Pluralsight sandbox |
 | [v0.9.18](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.18) | 2026-03-28 | Pluralsight URL migration — `_ACG_SANDBOX_URL` + `_antigravity_ensure_acg_session` updated to `app.pluralsight.com` |
 | [v0.9.17](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.17) | 2026-03-27 | Antigravity model fallback (`gemini-2.5-flash` first), ACG session check, nested agent fix (`--approval-mode yolo` + workspace temp path) |

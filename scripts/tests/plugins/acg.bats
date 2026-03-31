@@ -85,27 +85,52 @@ setup() {
   [[ "$output" == *"requires --confirm"* ]]
 }
 
-@test "acg_teardown is idempotent when no instance found" {
-  _acg_check_credentials() { return 0; }
-  _acg_get_instance_id() { printf ''; }
-  run acg_teardown --confirm
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"nothing to tear down"* ]]
-}
-
-@test "acg_teardown terminates instance when found" {
+@test "acg_teardown is idempotent when no stack found" {
   RUN_LOG="${BATS_TEST_TMPDIR}/run.log"
   _acg_check_credentials() { return 0; }
-  _acg_get_instance_id() { printf 'i-1234567890'; }
+  _run_command() {
+    local mode="$1"; shift
+    [[ "${1:-}" == "--" ]] && shift
+    echo "$mode $*" >> "$RUN_LOG"
+    if [[ "$*" == aws\ cloudformation\ describe-stacks* ]]; then
+      printf 'None'
+    fi
+    return 0
+  }
+  export -f _run_command
+  run acg_teardown --confirm
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"No CloudFormation stack found"* ]]
+}
+
+@test "acg_teardown deletes stack when found" {
+  local stack_delete_log="${BATS_TEST_TMPDIR}/stack_delete"
+  local stack_wait_log="${BATS_TEST_TMPDIR}/stack_wait"
+  local kubectl_delete_log="${BATS_TEST_TMPDIR}/kubectl_delete"
+  _acg_check_credentials() { return 0; }
   kubectl() { return 0; }
   _run_command() {
-    shift
-    echo "$*" >> "$RUN_LOG"
+    local mode="$1"; shift
+    [[ "${1:-}" == "--" ]] && shift
+    if [[ "$*" == aws\ cloudformation\ describe-stacks* ]]; then
+      printf 'CREATE_COMPLETE'
+    elif [[ "$*" == aws\ cloudformation\ delete-stack* ]]; then
+      touch "$stack_delete_log"
+      echo "[stub] delete-stack"
+    elif [[ "$*" == aws\ cloudformation\ wait\ stack-delete-complete* ]]; then
+      touch "$stack_wait_log"
+      echo "[stub] wait-delete"
+    elif [[ "$*" == kubectl\ config\ delete-context* ]]; then
+      touch "$kubectl_delete_log"
+    fi
     return 0
   }
   export -f kubectl _run_command
   run acg_teardown --confirm
   [ "$status" -eq 0 ]
-  grep -q "aws ec2 terminate-instances" "$RUN_LOG"
-  grep -q "kubectl config delete-context" "$RUN_LOG"
+  [[ "$output" == *"[stub] delete-stack"* ]]
+  [[ "$output" == *"[stub] wait-delete"* ]]
+  [[ -f "$stack_delete_log" ]]
+  [[ -f "$stack_wait_log" ]]
+  [[ -f "$kubectl_delete_log" ]]
 }

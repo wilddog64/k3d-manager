@@ -61,22 +61,29 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `tunnel_stop` | `scripts/plugins/tunnel.sh` | Stop the SSH tunnel and unload launchd job |
 | `tunnel_status` | `scripts/plugins/tunnel.sh` | Show tunnel process and launchd status |
 | `deploy_app_cluster` | `scripts/plugins/shopping_cart.sh` | Install k3s on EC2 via k3sup and merge kubeconfig |
-| `acg_get_credentials` | `scripts/plugins/acg.sh` | Extract AWS credentials from Pluralsight Cloud Access via Antigravity |
+| `acg_get_credentials` | `scripts/plugins/acg.sh` | Extract AWS credentials from Pluralsight Cloud Access via Chrome CDP (Playwright) and write to `~/.aws/credentials` |
 | `acg_import_credentials` | `scripts/plugins/acg.sh` | Deprecated alias for `aws_import_credentials` — use `aws_import_credentials` instead |
-| `acg_provision` | `scripts/plugins/acg.sh` | Provision ACG sandbox EC2 instance (VPC + SG + key + t3.medium); `--recreate` tears down and re-provisions |
+| `acg_provision` | `scripts/plugins/acg.sh` | Provision ACG sandbox 3-node cluster via CloudFormation (server + 2 agents); `--recreate` tears down and re-provisions |
 | `acg_status` | `scripts/plugins/acg.sh` | Show ACG instance state, public IP, and k3s health |
 | `acg_extend` | `scripts/plugins/acg.sh` | Open ACG sandbox page to extend TTL (+4h) |
-| `acg_watch` | `scripts/plugins/acg.sh` | Background TTL watcher — calls `antigravity_acg_extend` every 3.5h while EC2 instance alive |
-| `acg_teardown` | `scripts/plugins/acg.sh` | Terminate ACG instance and remove ubuntu-k3s kubeconfig context |
+| `acg_watch` | `scripts/plugins/acg.sh` | Background TTL watcher — extends sandbox TTL every 3.5h while EC2 instance is alive |
+| `acg_teardown` | `scripts/plugins/acg.sh` | Delete ACG CloudFormation stack and remove ubuntu-k3s kubeconfig context |
 | `aws_import_credentials` | `scripts/plugins/aws.sh` | Write AWS credentials from stdin to `~/.aws/credentials`; supports CSV, quoted/unquoted export, Pluralsight label, and credentials file formats |
 | `antigravity_install` | `scripts/plugins/antigravity.sh` | Verify full Antigravity stack installed (Node.js, gemini CLI, IDE, Playwright MCP) |
 | `antigravity_trigger_copilot_review` | `scripts/plugins/antigravity.sh` | Trigger GitHub Copilot coding agent task via Playwright CDP automation |
 | `antigravity_poll_task` | `scripts/plugins/antigravity.sh` | Poll a Copilot coding agent task until complete; print full output verbatim |
 | `antigravity_acg_extend` | `scripts/plugins/antigravity.sh` | Extend ACG sandbox TTL via Playwright CDP automation |
+| `register_app_cluster` | `scripts/plugins/argocd.sh` | Register the app cluster (ubuntu-k3s) as an ArgoCD managed cluster |
+| `vcluster_create` | `scripts/plugins/vcluster.sh` | Create a virtual Kubernetes cluster inside the infra cluster; exports kubeconfig to `~/.kube/vclusters/<name>.yaml` |
+| `vcluster_destroy` | `scripts/plugins/vcluster.sh` | Delete a vCluster and remove its kubeconfig file |
+| `vcluster_use` | `scripts/plugins/vcluster.sh` | Merge vCluster kubeconfig into `~/.kube/config` and switch active context |
+| `vcluster_list` | `scripts/plugins/vcluster.sh` | List all vClusters in the active namespace |
+| `vcluster_install_cli` | `scripts/plugins/vcluster.sh` | Install the vcluster CLI (brew on macOS, binary download on Linux); auto-called by other vcluster commands |
+| `ldap_get_user_password` | `scripts/plugins/ldap.sh` | Retrieve an LDAP user's current password from Vault |
 
 ### `acg_get_credentials`
 
-Extracts AWS credentials from the Pluralsight Cloud Sandbox "Cloud Access" panel via Antigravity browser automation (Playwright CDP) and writes them to `~/.aws/credentials` under `[default]`. Falls back with instructions to use `acg_import_credentials` if Playwright extraction fails.
+Extracts AWS credentials from the Pluralsight Cloud Sandbox "Cloud Access" panel via Playwright CDP (connects to Google Chrome on port 9222) and writes them to `~/.aws/credentials` under `[default]`. Falls back with instructions to use `acg_import_credentials` if Playwright extraction fails. Set `PLURALSIGHT_EMAIL` to assist Google Password Manager auto-fill when the session has expired.
 
 **Usage:** `./scripts/k3d-manager acg_get_credentials [sandbox-url]`
 

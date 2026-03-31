@@ -27,6 +27,7 @@ _ACG_SUBNET_CIDR="10.0.1.0/24"
 _ACG_SANDBOX_URL="https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
 _ACG_SANDBOX_LIST_URL="${ACG_SANDBOX_LIST_URL:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}"
 _ACG_WATCH_PID_FILE="${HOME}/.local/share/k3d-manager/acg-watch.pid"
+_ACG_CF_STACK_NAME="k3d-manager-cluster"
 
 _acg_check_credentials() {
   _info "[acg] Checking AWS credentials..."
@@ -76,82 +77,38 @@ PY
   _run_command -- python3 -c "$python_cmd"
 }
 
-_acg_find_vpc() {
-  local vpc_id
-  vpc_id=$(_run_command --soft -- aws ec2 describe-vpcs --region "${ACG_REGION}" \
-    --filters "Name=tag:Name,Values=k3d-manager-vpc" \
-    --query 'Vpcs[0].VpcId' --output text 2>/dev/null || true)
-  if [[ "$vpc_id" == "None" || "$vpc_id" == "null" ]]; then vpc_id=""; fi
-  printf '%s' "$vpc_id"
+_acg_upsert_ssh_host() {
+  local alias="$1" ip="$2"
+  [[ -f "${_ACG_SSH_CONFIG}" ]] || return 0
+  _info "[acg] Updating SSH config: Host ${alias} → ${ip}"
+  local python_cmd
+  python_cmd=$(cat <<PY
+import re
+alias = "${alias}"
+ip    = "${ip}"
+path  = "${_ACG_SSH_CONFIG}"
+with open(path, 'r') as f:
+    content = f.read()
+pattern = r"(^Host " + re.escape(alias) + r"\$.*?^\s+HostName\s+)\S+"
+m = re.search(pattern, content, re.MULTILINE | re.DOTALL)
+if m:
+    content = re.sub(pattern, r"\g<1>" + ip, content, flags=re.MULTILINE | re.DOTALL)
+else:
+    block = "\nHost ${alias}\n  HostName ${ip}\n  User ubuntu\n  IdentityFile ~/.ssh/k3d-manager-key.pem\n  StrictHostKeyChecking no\n"
+    content = content.rstrip("\n") + block
+with open(path, 'w') as f:
+    f.write(content)
+PY
+)
+  _run_command -- python3 -c "$python_cmd"
 }
 
-_acg_find_sg() {
-  local sg_id
-  sg_id=$(_run_command --soft -- aws ec2 describe-security-groups --region "${ACG_REGION}" \
-    --filters "Name=group-name,Values=k3d-manager-sg" \
-    --query 'SecurityGroups[0].GroupId' --output text 2>/dev/null || true)
-  if [[ "$sg_id" == "None" || "$sg_id" == "null" ]]; then sg_id=""; fi
-  printf '%s' "$sg_id"
-}
-
-_acg_provision_stack() {
-  _info "[acg] Provisioning VPC stack in ${ACG_REGION}..."
-  local vpc_id subnet_id igw_id rt_id sg_id ami_id instance_id public_ip
-
-  vpc_id=$(_acg_find_vpc)
-  if [[ -n "$vpc_id" ]]; then
-    _info "[acg] Reusing existing VPC: $vpc_id"
-    subnet_id=$(_run_command --soft -- aws ec2 describe-subnets --region "${ACG_REGION}" \
-      --filters "Name=tag:Name,Values=k3d-manager-subnet" \
-      --query 'Subnets[0].SubnetId' --output text 2>/dev/null || true)
-    [[ "$subnet_id" == "None" || "$subnet_id" == "null" ]] && subnet_id=""
-  else
-    vpc_id=$(_run_command -- aws ec2 create-vpc --region "${ACG_REGION}" --cidr-block "${_ACG_VPC_CIDR}" \
-      --query 'Vpc.VpcId' --output text)
-    _run_command -- aws ec2 modify-vpc-attribute --region "${ACG_REGION}" --vpc-id "$vpc_id" --enable-dns-hostnames
-    _run_command -- aws ec2 create-tags --region "${ACG_REGION}" --resources "$vpc_id" \
-      --tags Key=Name,Value=k3d-manager-vpc
-    _info "[acg] VPC: $vpc_id"
-
-    subnet_id=$(_run_command -- aws ec2 create-subnet --region "${ACG_REGION}" --vpc-id "$vpc_id" \
-      --cidr-block "${_ACG_SUBNET_CIDR}" --availability-zone "${ACG_REGION}a" \
-      --query 'Subnet.SubnetId' --output text)
-    _run_command -- aws ec2 modify-subnet-attribute --region "${ACG_REGION}" --subnet-id "$subnet_id" --map-public-ip-on-launch
-    _run_command -- aws ec2 create-tags --region "${ACG_REGION}" --resources "$subnet_id" \
-      --tags Key=Name,Value=k3d-manager-subnet
-    _info "[acg] Subnet: $subnet_id"
-
-    igw_id=$(_run_command -- aws ec2 create-internet-gateway --region "${ACG_REGION}" \
-      --query 'InternetGateway.InternetGatewayId' --output text)
-    _run_command -- aws ec2 attach-internet-gateway --region "${ACG_REGION}" --vpc-id "$vpc_id" --internet-gateway-id "$igw_id"
-    _info "[acg] Internet gateway: $igw_id"
-
-    rt_id=$(_run_command -- aws ec2 create-route-table --region "${ACG_REGION}" --vpc-id "$vpc_id" \
-      --query 'RouteTable.RouteTableId' --output text)
-    _run_command -- aws ec2 create-route --region "${ACG_REGION}" --route-table-id "$rt_id" \
-      --destination-cidr-block 0.0.0.0/0 --gateway-id "$igw_id"
-    _run_command -- aws ec2 associate-route-table --region "${ACG_REGION}" --route-table-id "$rt_id" --subnet-id "$subnet_id"
-    _info "[acg] Route table: $rt_id"
-  fi
-
-  sg_id=$(_acg_find_sg)
-  if [[ -n "$sg_id" ]]; then
-    _info "[acg] Reusing existing security group: $sg_id"
-  else
-    if [[ "${ACG_ALLOWED_CIDR}" == "0.0.0.0/0" ]]; then
-      _info "[acg] NOTE: SSH/API ports open to 0.0.0.0/0 — set ACG_ALLOWED_CIDR=<your-ip>/32 to restrict access"
-    fi
-    sg_id=$(_run_command -- aws ec2 create-security-group --region "${ACG_REGION}" \
-      --group-name k3d-manager-sg --description "k3d-manager EC2" --vpc-id "$vpc_id" \
-      --query 'GroupId' --output text)
-    _run_command -- aws ec2 authorize-security-group-ingress --region "${ACG_REGION}" --group-id "$sg_id" \
-      --protocol tcp --port 22 --cidr "${ACG_ALLOWED_CIDR}"
-    _run_command -- aws ec2 authorize-security-group-ingress --region "${ACG_REGION}" --group-id "$sg_id" \
-      --protocol tcp --port 6443 --cidr "${ACG_ALLOWED_CIDR}"
-    _run_command -- aws ec2 authorize-security-group-ingress --region "${ACG_REGION}" --group-id "$sg_id" \
-      --protocol -1 --port -1 --cidr 10.0.0.0/8
-    _info "[acg] Security group: $sg_id"
-  fi
+_acg_cf_deploy() {
+  local ami_id
+  ami_id=$(_run_command -- aws ec2 describe-images --region "${ACG_REGION}" --owners "${_ACG_AMI_OWNER}" \
+    --filters "Name=name,Values=${_ACG_AMI_FILTER}" "Name=state,Values=available" \
+    --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
+  _info "[acg] AMI: ${ami_id}"
 
   if [[ ! -f "${_ACG_KEY_PEM%.pem}.pub" ]]; then
     _info "[acg] Deriving public key from ${_ACG_KEY_PEM}"
@@ -160,27 +117,41 @@ _acg_provision_stack() {
   _run_command --soft -- aws ec2 import-key-pair --region "${ACG_REGION}" --key-name "${_ACG_KEY_NAME}" \
     --public-key-material "fileb://${_ACG_KEY_PEM%.pem}.pub" >/dev/null 2>&1
 
-  ami_id=$(_run_command -- aws ec2 describe-images --region "${ACG_REGION}" --owners "${_ACG_AMI_OWNER}" \
-    --filters "Name=name,Values=${_ACG_AMI_FILTER}" "Name=state,Values=available" \
-    --query 'sort_by(Images, &CreationDate)[-1].ImageId' --output text)
-  _info "[acg] AMI: $ami_id"
+  _info "[acg] Deploying CloudFormation stack ${_ACG_CF_STACK_NAME} (3 nodes in parallel)..."
+  _run_command -- aws cloudformation deploy \
+    --region "${ACG_REGION}" \
+    --stack-name "${_ACG_CF_STACK_NAME}" \
+    --template-file "${SCRIPT_DIR}/etc/acg-cluster.yaml" \
+    --parameter-overrides \
+      "KeyName=${_ACG_KEY_NAME}" \
+      "AllowedCidr=${ACG_ALLOWED_CIDR}" \
+      "InstanceType=${_ACG_INSTANCE_TYPE}" \
+      "AmiId=${ami_id}" \
+    --no-fail-on-empty-changeset
 
-  instance_id=$(_run_command -- aws ec2 run-instances --region "${ACG_REGION}" \
-    --image-id "$ami_id" --instance-type "${_ACG_INSTANCE_TYPE}" \
-    --key-name "${_ACG_KEY_NAME}" --subnet-id "$subnet_id" --security-group-ids "$sg_id" \
-    --block-device-mappings '[{"DeviceName":"/dev/sda1","Ebs":{"VolumeSize":30,"VolumeType":"gp3"}}]' \
-    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=${_ACG_INSTANCE_NAME}}]" \
-    --query 'Instances[0].InstanceId' --output text)
-  _info "[acg] Instance launched: $instance_id"
+  local server_ip agent1_ip agent2_ip
+  server_ip=$(_run_command -- aws cloudformation describe-stacks --region "${ACG_REGION}" \
+    --stack-name "${_ACG_CF_STACK_NAME}" \
+    --query "Stacks[0].Outputs[?OutputKey==\`ServerPublicIP\`].OutputValue" --output text)
+  agent1_ip=$(_run_command -- aws cloudformation describe-stacks --region "${ACG_REGION}" \
+    --stack-name "${_ACG_CF_STACK_NAME}" \
+    --query "Stacks[0].Outputs[?OutputKey==\`Agent1PublicIP\`].OutputValue" --output text)
+  agent2_ip=$(_run_command -- aws cloudformation describe-stacks --region "${ACG_REGION}" \
+    --stack-name "${_ACG_CF_STACK_NAME}" \
+    --query "Stacks[0].Outputs[?OutputKey==\`Agent2PublicIP\`].OutputValue" --output text)
 
-  _run_command -- aws ec2 wait instance-running --region "${ACG_REGION}" --instance-ids "$instance_id"
-  public_ip=$(_acg_get_instance_attr "$instance_id" 'Reservations[0].Instances[0].PublicIpAddress')
-  _acg_update_ssh_config "$public_ip"
-  _info "[acg] Instance: $instance_id"
-  _info "[acg] Public IP: $public_ip"
-  _info "[acg] SSH: ssh ubuntu@${public_ip}"
+  _acg_update_ssh_config "${server_ip}"
+  _acg_upsert_ssh_host "ubuntu-1" "${agent1_ip}"
+  _acg_upsert_ssh_host "ubuntu-2" "${agent2_ip}"
+
+  _info "[acg] Server:  ${server_ip}"
+  _info "[acg] Agent 1: ${agent1_ip}"
+  _info "[acg] Agent 2: ${agent2_ip}"
   _info "[acg] NOTE: install k3s via ./scripts/k3d-manager deploy_app_cluster --confirm"
 }
+
+
+
 
 _acg_check_k3s() {
   local ssh_host="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
@@ -208,16 +179,16 @@ function acg_get_credentials() {
 Usage: acg_get_credentials [sandbox-url]
 
 Extract AWS credentials from the Pluralsight Cloud Sandbox "Cloud Access" panel
-via Antigravity browser automation and write to ~/.aws/credentials.
+via Chrome CDP (Playwright) and write to ~/.aws/credentials.
 
-If sandbox-url is omitted, navigates to the sandbox listing page, starts a new
-sandbox, waits for it to be ready, then extracts credentials.
+Requires Chrome running with --remote-debugging-port=9222. If Chrome is not
+already running, it will be launched automatically.
 
 Falls back to: pbpaste | acg_import_credentials
 
 Arguments:
   sandbox-url   (optional) URL of a running sandbox, e.g.
-                https://app.pluralsight.com/cloud-playground/cloud-sandboxes/<id>
+                https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/<id>
                 Defaults to ACG_SANDBOX_LIST_URL (listing page — auto-start flow)
 HELP
     return 0
@@ -238,9 +209,11 @@ HELP
     return 1
   fi
 
-  _ensure_antigravity
-  _antigravity_launch
-  _antigravity_ensure_acg_session
+  if ! curl -sf http://localhost:9222/json >/dev/null 2>&1; then
+    _info "[acg] Chrome CDP not available on port 9222 — launching Chrome..."
+    _antigravity_launch
+    _antigravity_browser_ready 30
+  fi
 
   _info "[acg] Extracting AWS credentials from ${sandbox_url}..."
 
@@ -267,15 +240,16 @@ function acg_provision() {
     cat <<'HELP'
 Usage: acg_provision --confirm [--recreate]
 
-Provision an ACG AWS sandbox EC2 instance. If an instance tagged
-'k3d-manager-ubuntu' already exists, start it (if stopped) and update
-~/.ssh/config. If no instance exists, provision VPC + subnet + IGW + SG +
-key pair + t3.medium EC2.
+Provision a 3-node k3s cluster on ACG AWS sandbox via CloudFormation.
+Creates a VPC + subnet + IGW + SG + key pair + 1 server EC2 + 2 agent EC2
+instances (t3.medium). Updates ~/.ssh/config with Host entries for
+ubuntu (server), ubuntu-1 and ubuntu-2 (agents).
 
 Flags:
   --confirm    Required — prevents accidental provisioning
-  --recreate   Tear down any existing instance before provisioning fresh.
-               Use when sandbox state is unknown or TTL has expired.
+  --recreate   Tear down any existing CloudFormation stack before
+               reprovisioning. Use when sandbox state is unknown or
+               TTL has expired.
 
 Config (env overrides):
   ACG_REGION   AWS region (default: us-west-2)
@@ -302,35 +276,16 @@ HELP
   fi
 
   _acg_check_credentials || return 1
-  local instance_id
-  instance_id=$(_acg_get_instance_id)
 
-  if [[ $_recreate -eq 1 && -n "$instance_id" ]]; then
-    _info "[acg] --recreate: tearing down existing instance before provisioning fresh..."
-    acg_teardown --confirm || return 1
-    instance_id=""
+  if [[ $_recreate -eq 1 ]]; then
+    _info "[acg] --recreate: deleting existing CloudFormation stack before reprovisioning..."
+    _run_command --soft -- aws cloudformation delete-stack \
+      --region "${ACG_REGION}" --stack-name "${_ACG_CF_STACK_NAME}" >/dev/null 2>&1 || true
+    _run_command --soft -- aws cloudformation wait stack-delete-complete \
+      --region "${ACG_REGION}" --stack-name "${_ACG_CF_STACK_NAME}" 2>/dev/null || true
   fi
 
-  if [[ -z "$instance_id" ]]; then
-    _info "[acg] No instance found — provisioning..."
-    _acg_provision_stack
-    return 0
-  fi
-
-  local state public_ip
-  state=$(_acg_get_instance_attr "$instance_id" 'Reservations[0].Instances[0].State.Name')
-  public_ip=$(_acg_get_instance_attr "$instance_id" 'Reservations[0].Instances[0].PublicIpAddress')
-
-  if [[ "$state" == "stopped" ]]; then
-    _info "[acg] Instance ${instance_id} is stopped — starting"
-    _run_command -- aws ec2 start-instances --region "${ACG_REGION}" --instance-ids "$instance_id" >/dev/null
-    _run_command -- aws ec2 wait instance-running --region "${ACG_REGION}" --instance-ids "$instance_id"
-    public_ip=$(_acg_get_instance_attr "$instance_id" 'Reservations[0].Instances[0].PublicIpAddress')
-  fi
-
-  _acg_update_ssh_config "$public_ip"
-  _info "[acg] Instance ${instance_id} is ${state} at ${public_ip}"
-  _acg_check_k3s
+  _acg_cf_deploy
 }
 
 function acg_status() {
@@ -425,9 +380,9 @@ function acg_teardown() {
     cat <<'HELP'
 Usage: acg_teardown [--confirm]
 
-Terminate the ACG sandbox EC2 instance and remove the ubuntu-k3s context
-from ~/.kube/config. Does not delete VPC/SG/key pair (those persist across
-ACG sessions and are reused by acg_provision).
+Delete the ACG CloudFormation stack (VPC + SG + all EC2 instances) and
+remove the ubuntu-k3s context from ~/.kube/config. The imported key pair
+persists and is reused by subsequent acg_provision calls.
 
 Requires --confirm to prevent accidental teardown.
 HELP
@@ -440,15 +395,22 @@ HELP
   fi
 
   _acg_check_credentials || return 1
-  local instance_id
-  instance_id=$(_acg_get_instance_id)
-  if [[ -z "$instance_id" ]]; then
-    _info "[acg] No instance found — nothing to tear down"
-    return 0
-  fi
 
-  _info "[acg] Terminating instance ${instance_id}..."
-  _run_command -- aws ec2 terminate-instances --region "${ACG_REGION}" --instance-ids "$instance_id" >/dev/null
+  local stack_status
+  stack_status=$(_run_command --soft -- aws cloudformation describe-stacks \
+    --region "${ACG_REGION}" --stack-name "${_ACG_CF_STACK_NAME}" \
+    --query 'Stacks[0].StackStatus' --output text 2>/dev/null || true)
+
+  if [[ -z "$stack_status" || "$stack_status" == "None" ]]; then
+    _info "[acg] No CloudFormation stack found — nothing to tear down"
+  else
+    _info "[acg] Deleting CloudFormation stack ${_ACG_CF_STACK_NAME}..."
+    _run_command -- aws cloudformation delete-stack \
+      --region "${ACG_REGION}" --stack-name "${_ACG_CF_STACK_NAME}"
+    _run_command -- aws cloudformation wait stack-delete-complete \
+      --region "${ACG_REGION}" --stack-name "${_ACG_CF_STACK_NAME}"
+    _info "[acg] Stack deleted"
+  fi
 
   _info "[acg] Removing ubuntu-k3s context from kubeconfig..."
   if kubectl config get-contexts ubuntu-k3s >/dev/null 2>&1; then

@@ -1,6 +1,6 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v1.0.0` (as of 2026-03-29)
+## Current Branch: `k3d-manager-v1.0.1` (as of 2026-03-29)
 
 **v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. Copilot CLI CI integration.
 **v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released.
@@ -12,10 +12,27 @@
 **v0.9.19 SHIPPED** — PR #54 merged (`0f13be1`) 2026-03-28. Tagged v0.9.19. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.19-retrospective.md`.
 **v0.9.20 SHIPPED** — PR #55 merged to main (`bfd66fe`) 2026-03-29. Tagged v0.9.20, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v0.9.20-retrospective.md`.
 **v0.9.21 SHIPPED** — PR #56 merged to main (`f98f2a8`) 2026-03-29. Tagged v0.9.21, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v0.9.21-retrospective.md`.
-**v1.0.0 ACTIVE** — branch `k3d-manager-v1.0.0` cut from `f98f2a8` 2026-03-29.
+**v1.0.0 SHIPPED** — PR #57 merged to main (`807c0432`) 2026-03-29. Tagged v1.0.0, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v1.0.0-retrospective.md`.
+**v1.0.1 ACTIVE** — branch `k3d-manager-v1.0.1` cut from `807c0432` 2026-03-29.
 **enforce_admins:** restored on main 2026-03-29.
-**Branch cleanup:** v0.9.7–v0.9.17 deleted (local + remote) 2026-03-28.
+**Branch cleanup:** v0.9.7–v0.9.17 deleted 2026-03-28; v1.0.0 deleted 2026-03-29.
 **v0.9.15 scope:** Antigravity × GitHub Copilot coding agent validation — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`. Antigravity plugin rewritten in `b2ba187` per `docs/plans/v0.9.15-antigravity-plugin-impl.md`. Also: ldap-password-rotator `vault kv put` stdin hardening — spec `docs/plans/v0.9.15-ensure-copilot-cli.md` (closes v0.6.2 security debt; `_ensure_copilot_cli`/`_k3d_manager_copilot`/`_ensure_node` already shipped in v0.9.12).
+
+---
+
+## v1.0.1 Spec Written (2026-03-29)
+
+**Spec:** `docs/plans/v1.0.1-multi-node-k3s-aws.md` — assigned to Codex.
+**Scope:** 3-node cluster (1 server + 2 agents). Resolves t3.medium resource exhaustion.
+
+4 file changes:
+1. `scripts/plugins/acg.sh` — `_acg_upsert_ssh_host` + `_acg_provision_agents` + `_acg_teardown_agents`
+2. `scripts/plugins/shopping_cart.sh` — `_k3sup_join_agent` + `UBUNTU_K3S_AGENT_HOSTS` support in `deploy_app_cluster`
+3. `scripts/lib/providers/k3s-aws.sh` — replaced: 3-node deploy/destroy + node labels
+4. `scripts/tests/lib/k3s_aws_provider.bats` — 2 new tests (total: 5)
+
+**Spec:** `docs/plans/v1.0.1-cloudformation-provisioning.md` — COMPLETE (`abe149f`). Added `scripts/etc/acg-cluster.yaml`, rewired `acg.sh` + provider/tests for CloudFormation stack deploy/teardown, and extended `_agent_audit` allowlist for the template's fixed CIDRs.
+**Spec:** `docs/plans/v1.0.1-acg-get-credentials-cleanup.md` — COMPLETE (`f574e05`). `acg_get_credentials` now relies on Chrome CDP health check instead of redundant Antigravity pre-calls; CLI help updated accordingly.
 
 ---
 
@@ -54,10 +71,11 @@
 | **`acg_get_credentials` Antigravity source** | **COMPLETE** | `acg.sh` now sources `antigravity.sh` so helpers are always defined; commit `4357f90`. |
 | **`deploy_app_cluster` IP resolve** | **COMPLETE** | Reads `HostName` from `~/.ssh/config` before falling back to alias; commit `51983d3`. |
 | **`acg_watch` + pre-flight extend`** | **COMPLETE** | `acg_provision --recreate`, new `acg_watch`, and provider pre-flight extend/watch wiring; commit `51bdf3a`. |
+| **`k3s-aws` multi-node deploy** | **COMPLETE** | `_acg_provision_agents`, `_k3sup_join_agent`, node labeling + tests; commit `0c89f4e`. |
 | **Keypair + extend hotfix** | **COMPLETE** | Keypair import uses `--soft` + extend prompt forces `page.goto`; commit `4a57f44`. |
 | **Gemini e2e smoke test (run 1)** | **COMPLETE** | Full lifecycle verified: `acg_get_credentials` → `deploy_cluster` → `get nodes` (Ready) → `destroy_cluster`. commit `4aba999`. |
 | **Gemini e2e smoke test (run 2)** | **FAILED** | Blocked by `KeyPair` import conflict in `acg_provision`. Documented in `docs/issues/2026-03-29-acg-provision-keypair-import-fail.md`. |
-| **Gemini e2e smoke test (run 3)** | **COMPLETE** | Verified hotfixes: Keypair import is idempotent (no error on duplicate); `antigravity_acg_extend` uses unconditional navigation. Full lifecycle confirmed functional. commit `df8f77f`. |
+| **Gemini e2e smoke test (3-node)** | **COMPLETE** | Full 3-node lifecycle verified: `acg_get_credentials` → `deploy_cluster` (CloudFormation + 3 nodes Ready) → `destroy_cluster`. |
 
 ## v1.0.0 Design Decisions
 

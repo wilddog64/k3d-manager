@@ -25,6 +25,8 @@ fi
 
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib/system.sh"
+# IP allowlist — files with intentional CIDR literals (e.g. CloudFormation templates)
+export AGENT_IP_ALLOWLIST="${SCRIPT_DIR}/etc/agent/hardcoded-ip-allowlist"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib/agent_rigor.sh"
 

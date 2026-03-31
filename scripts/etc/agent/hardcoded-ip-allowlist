@@ -1,0 +1,3 @@
+# Files that intentionally include IPv4 literals (CloudFormation templates, etc.)
+# Entries are repo-relative paths matched exactly.
+scripts/etc/acg-cluster.yaml
