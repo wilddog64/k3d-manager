@@ -42,6 +42,7 @@
 - [x] **Playwright auto sign-in + fail-fast** — sign-in detection, `credentialsAlreadyVisible` guard, 30s overall timeout, 15s credential selector timeout; commits `52cf05e`, `7a7ec82`.
 - [x] **Codex: CloudFormation parallel provisioning** — replace sequential EC2 launch with CF stack; spec `docs/plans/v1.0.1-cloudformation-provisioning.md`; commit `abe149f`. ⚠️ Codex also directly edited subtree-managed `scripts/lib/agent_rigor.sh` (hardcoded allowlist path).
 - [x] **Codex: agent_rigor IP allowlist — upstream fix** — lib-foundation `a568382` (feat/v0.3.15) + k3d-manager `6ea7b09` (k3d-manager-v1.0.1); pre-commit hook `AGENT_IP_ALLOWLIST` export added by Claude (untracked). Spec: `docs/plans/v1.0.1-agent-rigor-ip-allowlist-upstream.md`. Pending: Gemini functional verification.
+- [ ] **Codex: acg_get_credentials cleanup** — remove `_ensure_antigravity`/`_antigravity_launch`/`_antigravity_ensure_acg_session` pre-calls; add CDP health check; update help text. Spec: `docs/plans/v1.0.1-acg-get-credentials-cleanup.md`.
 - [ ] **Playwright trace support** (`ENABLE_TRACE=1`) — `context.tracing.start/stop`, save to `scratch/playwright-trace-<timestamp>.zip`; viewable with `npx playwright show-trace`. Deferred backlog.
 - [ ] **Chrome naming cleanup** (after Codex + Gemini done) — rename `_antigravity_launch`/`_antigravity_browser_ready` → `_chrome_*` in `antigravity.sh`; drop `_ensure_antigravity` + `_antigravity_ensure_acg_session` calls from `acg_get_credentials` in `acg.sh` (static script handles session now).
 
