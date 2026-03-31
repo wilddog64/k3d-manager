@@ -35,6 +35,10 @@
 **Scope:** Replace freeform Gemini CLI prompt in `antigravity_acg_extend` with static `node acg_extend.js` call. New file `scripts/playwright/acg_extend.js` with 6 selector fallbacks, aria-busy wait, panel-open fallback, 90s timeout.
 - COMPLETE (`26a34cd`): Added `scripts/playwright/acg_extend.js` and rewired `antigravity_acg_extend` to call it directly, eliminating Gemini prompt fragility.
 
+**Spec:** `docs/plans/v1.0.2-bugfix-ghcr-pull-secret.md` — assigned to Codex.
+**Scope:** Fix `bin/acg-up` step that seeds `ghcr-pull-secret` so it targets the shopping-cart namespaces and no longer skips when namespaces aren't pre-created.
+- COMPLETE (`06ef141`): `bin/acg-up` now creates the shopping-cart namespaces idempotently and always applies `ghcr-pull-secret`.
+
 **Spec:** `docs/plans/v1.0.2-acg-watch-launchd.md` — assigned to Codex.
 **Scope:** `acg_watch_start` / `acg_watch_stop` launchd job in `acg.sh`; writes wrapper script + plist with `StartInterval=12600`; survives terminal death and Gemini session blocks. Updates `bin/acg-up` to use `acg_watch_start` instead of `acg_watch &`.
 
