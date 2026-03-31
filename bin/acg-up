@@ -11,6 +11,8 @@
 #   ACG_SANDBOX_URL   Override default sandbox listing URL
 #   ACG_REGION        AWS region (default: us-west-2)
 #   PLURALSIGHT_EMAIL Pre-fill email on Pluralsight sign-in page
+#   GHCR_PAT          GitHub PAT with read:packages scope — required for ghcr-pull-secret
+#   GITHUB_USERNAME   GitHub username (default: wilddog64)
 
 set -euo pipefail
 
@@ -61,10 +63,32 @@ acg_get_credentials ${sandbox_url:+"$sandbox_url"}
 _info "[acg-up] Step 2/4 — Provisioning 3-node cluster..."
 CLUSTER_PROVIDER=k3s-aws deploy_cluster --confirm
 
-_info "[acg-up] Step 3/4 — Starting SSH tunnel..."
+_info "[acg-up] Step 3/5 — Starting SSH tunnel..."
 tunnel_start
 
-_info "[acg-up] Step 4/4 — Starting sandbox TTL watcher..."
+_info "[acg-up] Step 4/5 — Creating ghcr-pull-secret in all app namespaces..."
+_ghcr_pat="${GHCR_PAT:-}"
+_github_user="${GITHUB_USERNAME:-wilddog64}"
+if [[ -z "$_ghcr_pat" ]]; then
+  _err "[acg-up] GHCR_PAT env var not set — set it to a GitHub PAT with read:packages scope and re-run"
+fi
+for ns in apps payment data; do
+  if kubectl get namespace "$ns" --context ubuntu-k3s >/dev/null 2>&1; then
+    kubectl create secret docker-registry ghcr-pull-secret \
+      --docker-server=ghcr.io \
+      --docker-username="${_github_user}" \
+      --docker-password="${_ghcr_pat}" \
+      --context ubuntu-k3s \
+      -n "$ns" \
+      --dry-run=client -o yaml \
+      | kubectl apply --context ubuntu-k3s -f -
+    _info "[acg-up] ghcr-pull-secret applied in namespace: ${ns}"
+  else
+    _info "[acg-up] Namespace ${ns} not found — skipping (ArgoCD will create it on first sync)"
+  fi
+done
+
+_info "[acg-up] Step 5/5 — Starting sandbox TTL watcher..."
 acg_watch &
 echo "[acg-up] Watcher PID: $!"
 
