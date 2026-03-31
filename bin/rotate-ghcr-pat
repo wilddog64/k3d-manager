@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# bin/rotate-ghcr-pat
+#
+# Update PACKAGES_TOKEN secret in all shopping-cart GitHub repos.
+# Reads the new PAT from stdin — never echoed or stored in shell history.
+#
+# Usage:
+#   bin/rotate-ghcr-pat
+#   pbpaste | bin/rotate-ghcr-pat      # paste from clipboard (macOS)
+#
+# Environment:
+#   SHOPPING_CART_ORG   GitHub org/user (default: wilddog64)
+
+set -euo pipefail
+
+SHOPPING_CART_ORG="${SHOPPING_CART_ORG:-wilddog64}"
+
+REPOS=(
+  shopping-cart-order
+  shopping-cart-payment
+  shopping-cart-product-catalog
+  shopping-cart-frontend
+  shopping-cart-basket
+  shopping-cart-infra
+  shopping-cart-e2e-tests
+)
+
+# Read token from stdin — works with both interactive prompt and pipe
+if [[ -t 0 ]]; then
+  read -r -s -p "Paste new GitHub PAT (read:packages scope) and press Enter: " TOKEN
+  echo ""
+else
+  read -r TOKEN
+fi
+
+if [[ -z "$TOKEN" ]]; then
+  echo "ERROR: No token provided — exiting" >&2
+  exit 1
+fi
+
+echo ""
+echo "Updating PACKAGES_TOKEN in ${#REPOS[@]} repos..."
+echo ""
+
+pass=0
+fail=0
+for repo in "${REPOS[@]}"; do
+  if printf '%s' "$TOKEN" | gh secret set PACKAGES_TOKEN --repo "${SHOPPING_CART_ORG}/${repo}" 2>/dev/null; then
+    echo "  ✅ ${repo}"
+    (( pass++ )) || true
+  else
+    echo "  ❌ ${repo} — check gh auth status and repo access" >&2
+    (( fail++ )) || true
+  fi
+done
+
+unset TOKEN
+
+echo ""
+echo "Done: ${pass} updated, ${fail} failed."
+if [[ "$fail" -gt 0 ]]; then
+  exit 1
+fi
