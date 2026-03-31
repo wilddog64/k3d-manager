@@ -45,11 +45,14 @@
 | v1.0.0 | `k3s-aws` provider foundation — rename `k3s-remote` → `k3s-aws`; single-node deploy/destroy; SSH config auto-update |
 | v1.0.1 | Multi-node: `acg_provision` × 3, k3sup join × 2, taints/labels |
 | v1.0.2 | Full stack on 3 nodes: all 5 pods Running + E2E green |
-| v1.0.3 | Samba AD DC plugin (`DIRECTORY_SERVICE_PROVIDER=activedirectory`) |
-| v1.0.4 | GCP cloud provider (`k3s-gcp`) |
-| v1.0.5 | Azure cloud provider (`k3s-azure`) |
+| v1.0.3 | Service mesh: Istio fully activated + MetalLB + VirtualServices for all apps; GUI access via hostnames (`argocd.k3s.local`, `vault.k3s.local`, `keycloak.k3s.local`, `jenkins.k3s.local`) over SSH/Cloudflare tunnel |
+| v1.0.4 | Samba AD DC plugin (`DIRECTORY_SERVICE_PROVIDER=activedirectory`) |
+| v1.0.5 | GCP cloud provider (`k3s-gcp`) |
+| v1.0.6 | Azure cloud provider (`k3s-azure`) |
 
 `CLUSTER_PROVIDER` values: `k3s-aws` (AWS/ACG), `k3s-gcp` (GCP), `k3s-azure` (Azure) — symmetric naming across all three clouds.
+
+**v1.0.3 GUI access gate:** service mesh must be fully functional (all 5 pods Running, Istio sidecar injection verified, mTLS active) before adding MetalLB + VirtualService layer.
 
 ## v1.0.0 — Spec Written (2026-03-29)
 
