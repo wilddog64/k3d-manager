@@ -39,9 +39,6 @@
 - [x] **Codex: ghcr-pull-secret bugfix** — spec `docs/plans/v1.0.2-bugfix-ghcr-pull-secret.md`; commit `06ef141`
   - `bin/acg-up` now creates shopping-cart namespaces and always applies the secret
 
-- [ ] **Codex: ghcr-pull-secret bugfix** — spec `docs/plans/v1.0.2-bugfix-ghcr-pull-secret.md`
-  - Wrong namespace names (`apps` → `shopping-cart-apps` etc.) + remove timing-dependent skip
-
 - [ ] **Codex: acg_watch_start/stop launchd** — spec `docs/plans/v1.0.2-acg-watch-launchd.md`
   - Sandbox TTL extension survives terminal death and Gemini session blocks
   - `acg_watch_start` writes wrapper + plist; `bin/acg-up` calls it instead of `acg_watch &`
