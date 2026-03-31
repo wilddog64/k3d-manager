@@ -87,9 +87,8 @@ for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
   _info "[acg-up] ghcr-pull-secret applied in namespace: ${ns}"
 done
 
-_info "[acg-up] Step 5/5 — Starting sandbox TTL watcher..."
-acg_watch &
-echo "[acg-up] Watcher PID: $!"
+_info "[acg-up] Step 5/5 — Installing sandbox TTL watcher (launchd)..."
+acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
 
 _info "[acg-up] Cluster is up."
 kubectl get nodes --context ubuntu-k3s
