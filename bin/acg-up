@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# bin/acg-up
+#
+# Full ACG provision — credentials → 3-node cluster → tunnel → background watcher.
+# Use this when starting from scratch (new sandbox or after acg-down).
+#
+# Usage:
+#   bin/acg-up [sandbox-url]
+#
+# Environment:
+#   ACG_SANDBOX_URL   Override default sandbox listing URL
+#   ACG_REGION        AWS region (default: us-west-2)
+#   PLURALSIGHT_EMAIL Pre-fill email on Pluralsight sign-in page
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${REPO_ROOT}/scripts/lib/system.sh"
+source "${REPO_ROOT}/scripts/lib/core.sh"
+source "${REPO_ROOT}/scripts/lib/provider.sh"
+source "${REPO_ROOT}/scripts/plugins/antigravity.sh"
+source "${REPO_ROOT}/scripts/plugins/aws.sh"
+source "${REPO_ROOT}/scripts/plugins/acg.sh"
+source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
+source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
+source "${REPO_ROOT}/scripts/lib/providers/k3s-aws.sh"
+
+sandbox_url="${1:-${ACG_SANDBOX_URL:-}}"
+
+_info "[acg-up] Step 1/4 — Getting AWS credentials..."
+acg_get_credentials ${sandbox_url:+"$sandbox_url"}
+
+_info "[acg-up] Step 2/4 — Provisioning 3-node cluster..."
+CLUSTER_PROVIDER=k3s-aws deploy_cluster --confirm
+
+_info "[acg-up] Step 3/4 — Starting SSH tunnel..."
+tunnel_start
+
+_info "[acg-up] Step 4/4 — Starting sandbox TTL watcher..."
+acg_watch &
+echo "[acg-up] Watcher PID: $!"
+
+_info "[acg-up] Cluster is up."
+kubectl get nodes --context ubuntu-k3s
