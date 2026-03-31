@@ -32,6 +32,7 @@
 4. `scripts/tests/lib/k3s_aws_provider.bats` — 2 new tests (total: 5)
 
 **Spec:** `docs/plans/v1.0.1-cloudformation-provisioning.md` — COMPLETE (`abe149f`). Added `scripts/etc/acg-cluster.yaml`, rewired `acg.sh` + provider/tests for CloudFormation stack deploy/teardown, and extended `_agent_audit` allowlist for the template's fixed CIDRs.
+**Spec:** `docs/plans/v1.0.1-acg-get-credentials-cleanup.md` — COMPLETE (`f574e05`). `acg_get_credentials` now relies on Chrome CDP health check instead of redundant Antigravity pre-calls; CLI help updated accordingly.
 
 ---
 
