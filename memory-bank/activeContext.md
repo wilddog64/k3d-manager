@@ -41,6 +41,7 @@
 
 **Spec:** `docs/plans/v1.0.2-acg-watch-launchd.md` — assigned to Codex.
 **Scope:** `acg_watch_start` / `acg_watch_stop` launchd job in `acg.sh`; writes wrapper script + plist with `StartInterval=12600`; survives terminal death and Gemini session blocks. Updates `bin/acg-up` to use `acg_watch_start` instead of `acg_watch &`.
+- COMPLETE (`e4a4ff1`): Added launchd wrapper/plist helpers plus `acg_watch_start/stop`, and `bin/acg-up` now installs the watcher instead of backgrounding the function.
 
 ---
 
