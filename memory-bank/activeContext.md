@@ -21,6 +21,14 @@
 
 ---
 
+## v1.0.2 Spec Written (2026-03-31)
+
+**Spec:** `docs/plans/v1.0.2-all-pods-running.md` — assigned to Gemini.
+**Scope:** All 5 app pods Running on 3-node cluster + E2E green + Istio mTLS verified.
+**Known root causes:** frontend (resource exhaustion → resolved by 3 nodes), order-service (RabbitMQ DNS/port), payment-service (memory limits), product-catalog (ESO key mismatch RABBITMQ_USERNAME).
+
+---
+
 ## v1.0.1 Spec Written (2026-03-29)
 
 **Spec:** `docs/plans/v1.0.1-multi-node-k3s-aws.md` — assigned to Codex.
