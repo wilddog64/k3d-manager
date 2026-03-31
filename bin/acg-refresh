@@ -24,6 +24,19 @@ source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
 
 sandbox_url="${1:-${ACG_SANDBOX_URL:-}}"
 
+# Prompt user to ensure Pluralsight session is active before Playwright runs
+_acg_sandbox_url="${sandbox_url:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}"
+echo ""
+echo "=========================================================="
+echo "  ACTION REQUIRED: Confirm Pluralsight session is active"
+echo "=========================================================="
+echo ""
+echo "  If your Pluralsight session has expired, sign in first:"
+echo "     ${_acg_sandbox_url}"
+echo ""
+read -r -p "Press Enter once you are signed in to Pluralsight... "
+echo ""
+
 _info "[acg-refresh] Refreshing AWS credentials..."
 acg_get_credentials ${sandbox_url:+"$sandbox_url"}
 
