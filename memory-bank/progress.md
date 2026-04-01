@@ -29,6 +29,8 @@
 ## v1.0.2 — Active
 
 - [x] **Gemini blocker fixes verification** — Verified cluster rebuilding (after sandbox expiry), ESO CRD patching, and registry auth restore. 3 nodes Ready. Pods 5/5 transition from ImagePullBackOff to Running/CrashLoopBackOff (Vault dependency). Spec: `docs/plans/v1.0.2-gemini-fix-cluster-blockers.md`.
+
+- [ ] **ClusterSecretStore Vault fix** — `vault-backend` was never in Git; created manifest in shopping-cart-infra `data-layer/secrets/cluster-secret-store.yaml` (`5a747fa` on `docs/next-improvements`). Points to `http://localhost:8200` via reverse SSH tunnel. Pending: Gemini to apply + verify ESO connects + pods go Running. PR to main after verification.
 - [x] **Antigravity Chrome launch** — `_antigravity_launch` now opens Google Chrome with `--password-store=basic` and dedicated user data dir so CDP probe works without manual browser start. Spec: `docs/plans/v0.9.20-acg-automation-fixes.md`, commit `8dd9cbb`.
 - [x] **`acg_credentials.js` SPA nav fix** — Script finds the Pluralsight tab, avoids hard `page.goto` when already on `app.pluralsight.com`, SPA-navigates when needed, waits for `aria-busy` to clear, and increases credential selector timeout to 60s. Commit `8dd9cbb`.
 - [x] **Automation Verification** — Verified Chrome cold-start (flags/profile) and SPA navigation guard in `acg_credentials.js`. Logic confirmed via live verification.
