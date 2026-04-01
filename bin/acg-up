@@ -63,10 +63,10 @@ acg_get_credentials ${sandbox_url:+"$sandbox_url"}
 _info "[acg-up] Step 2/4 — Provisioning 3-node cluster..."
 CLUSTER_PROVIDER=k3s-aws deploy_cluster --confirm
 
-_info "[acg-up] Step 3/5 — Starting SSH tunnel..."
+_info "[acg-up] Step 3/6 — Starting SSH tunnel..."
 tunnel_start
 
-_info "[acg-up] Step 4/5 — Creating ghcr-pull-secret in all app namespaces..."
+_info "[acg-up] Step 4/6 — Creating ghcr-pull-secret in all app namespaces..."
 _ghcr_pat="${GHCR_PAT:-}"
 _github_user="${GITHUB_USERNAME:-wilddog64}"
 if [[ -z "$_ghcr_pat" ]]; then
@@ -87,7 +87,33 @@ for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
   _info "[acg-up] ghcr-pull-secret applied in namespace: ${ns}"
 done
 
-_info "[acg-up] Step 5/5 — Installing sandbox TTL watcher (launchd)..."
+_info "[acg-up] Step 5/6 — Creating vault-bridge Endpoints in secrets namespace..."
+_vault_node_ip=$(kubectl get nodes --context ubuntu-k3s \
+  -l node-role.kubernetes.io/control-plane \
+  --no-headers \
+  -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+if [[ -z "${_vault_node_ip}" ]]; then
+  _err "[acg-up] Could not determine server node internal IP — vault-bridge Endpoints skipped"
+else
+  kubectl create namespace secrets --context ubuntu-k3s \
+    --dry-run=client -o yaml \
+    | kubectl apply --context ubuntu-k3s -f - >/dev/null
+  kubectl apply --context ubuntu-k3s -f - <<EOF
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: vault-bridge
+  namespace: secrets
+subsets:
+- addresses:
+  - ip: ${_vault_node_ip}
+  ports:
+  - port: 8201
+EOF
+  _info "[acg-up] vault-bridge Endpoints → ${_vault_node_ip}:8201"
+fi
+
+_info "[acg-up] Step 6/6 — Installing sandbox TTL watcher (launchd)..."
 acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
 
 _info "[acg-up] Cluster is up."
