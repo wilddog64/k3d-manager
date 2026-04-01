@@ -144,6 +144,39 @@ function _k3sup_join_agent() {
   _info "[shopping_cart] Agent ${agent_host} joined."
 }
 
+function _setup_vault_bridge() {
+  local ssh_host="${1}"
+  local ssh_key="${2}"
+  _info "[shopping_cart] Installing socat and vault-bridge systemd unit on ${ssh_host}..."
+  # SC2087: single-quoted heredoc intentionally prevents local expansion
+  # shellcheck disable=SC2087
+ssh -i "${ssh_key}" "${ssh_host}" bash <<'REMOTE'
+set -euo pipefail
+SUDO="sudo"
+if ! command -v socat >/dev/null 2>&1; then
+  $SUDO apt-get update -qq
+  $SUDO apt-get install -y socat
+fi
+$SUDO tee /etc/systemd/system/vault-bridge.service >/dev/null <<'UNIT'
+[Unit]
+Description=Vault reverse tunnel bridge (socat)
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/socat TCP-LISTEN:8201,fork,bind=0.0.0.0 TCP:localhost:8200
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+$SUDO systemctl daemon-reload
+$SUDO systemctl enable vault-bridge
+$SUDO systemctl restart vault-bridge
+REMOTE
+  _info "[shopping_cart] vault-bridge active on ${ssh_host}:8201"
+}
+
 function deploy_app_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
@@ -242,6 +275,8 @@ HELP
     done
     _info "[shopping_cart] All agent nodes joined."
   fi
+
+  _setup_vault_bridge "${ssh_host}" "${ssh_key}" || return 1
 
   _info "[shopping_cart] k3s install complete."
   _info ""
