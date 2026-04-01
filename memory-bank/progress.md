@@ -29,8 +29,7 @@
 ## v1.0.2 — Active
 
 - [x] **Gemini blocker fixes verification** — Verified cluster rebuilding (after sandbox expiry), ESO CRD patching, and registry auth restore. 3 nodes Ready. Pods 5/5 transition from ImagePullBackOff to Running/CrashLoopBackOff (Vault dependency). Spec: `docs/plans/v1.0.2-gemini-fix-cluster-blockers.md`.
-
-- [ ] **ClusterSecretStore Vault fix** — `vault-backend` was never in Git; created manifest in shopping-cart-infra `data-layer/secrets/cluster-secret-store.yaml` (`5a747fa` on `docs/next-improvements`). Points to `http://localhost:8200` via reverse SSH tunnel. Pending: Gemini to apply + verify ESO connects + pods go Running. PR to main after verification.
+- [ ] **Vault Token transition** — **FAILED**. Successfully stored local Vault token as remote secret and applied `ClusterSecretStore`. Blocked by unstable `socat` bridge on remote server. See `docs/issues/2026-04-01-remote-vault-bridge-instability.md`.
 - [x] **Antigravity Chrome launch** — `_antigravity_launch` now opens Google Chrome with `--password-store=basic` and dedicated user data dir so CDP probe works without manual browser start. Spec: `docs/plans/v0.9.20-acg-automation-fixes.md`, commit `8dd9cbb`.
 - [x] **`acg_credentials.js` SPA nav fix** — Script finds the Pluralsight tab, avoids hard `page.goto` when already on `app.pluralsight.com`, SPA-navigates when needed, waits for `aria-busy` to clear, and increases credential selector timeout to 60s. Commit `8dd9cbb`.
 - [x] **Automation Verification** — Verified Chrome cold-start (flags/profile) and SPA navigation guard in `acg_credentials.js`. Logic confirmed via live verification.
@@ -41,7 +40,7 @@
 ## v0.9.19 — Shipped
 
 - [x] **`acg_get_credentials` + `acg_import_credentials`** — commit `3970623` adds `_acg_write_credentials`, both public functions, docs updates, and 8 BATS tests per `docs/plans/v0.9.19-acg-get-credentials.md`
-- [x] **Static Playwright script** — `scripts/playwright/acg_credentials.js` implemented + live-verified by Gemini against Pluralsight sandbox. `acg_get_credentials` updated to call static script. Spec: `docs/plans/v0.9.19-acg-playwright-script.md`.
+- [x] **Static Playwright script** — `scripts/playwright/acg_credentials.js` implemented + live-verified by Gemini against Pluralsight sandbox. `acg_get_credentials updated to call static script. Spec: `docs/plans/v0.9.19-acg-playwright-script.md`.
 - [x] **Gemini: verify Playwright selectors** — `aws sts get-caller-identity` confirmed valid account ID; credentials written to `~/.aws/credentials`. Live-verified.
 - [x] **Copilot PR #54 findings** — 9 findings addressed in `392dae5`: session token optional, playwright guard, null parent, chmod trace suppression, docs fixes, spec status, issue doc resolution, BATS AKIA test.
 - [x] **GitGuardian false positive** — `.gitguardian.yaml` added to exclude `scripts/tests/` from scanning.
