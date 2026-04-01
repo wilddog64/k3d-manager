@@ -21,46 +21,6 @@
 
 ---
 
-## v1.0.2 Specs Written (2026-03-31)
-
-**Spec:** `docs/plans/v1.0.2-all-pods-running.md` — assigned to Gemini.
-**Scope:** All 5 app pods Running on 3-node cluster + E2E green + Istio mTLS verified.
-**Known root causes:** frontend (resource exhaustion → resolved by 3 nodes), order-service (RabbitMQ DNS/port), payment-service (memory limits), product-catalog (ESO key mismatch RABBITMQ_USERNAME).
-
-**Spec:** `docs/plans/v1.0.2-reverse-vault-tunnel.md` — assigned to Codex.
-**Scope:** Add `-R 8200:localhost:8200` reverse tunnel to autossh plist in `tunnel.sh`. Replaces Gemini's socat bridge workaround. 4 targeted changes in `tunnel.sh`.
-- COMPLETE (`4ff3cc3`): `tunnel.sh` now exposes `TUNNEL_VAULT_PORT`, updates plist ProgramArguments with `-R`, and documents forward/reverse tunnels in help/status output.
-
-**Spec:** `docs/plans/v1.0.2-bugfix-acg-extend-selector.md` — assigned to Codex.
-**Scope:** Replace freeform Gemini CLI prompt in `antigravity_acg_extend` with static `node acg_extend.js` call. New file `scripts/playwright/acg_extend.js` with 6 selector fallbacks, aria-busy wait, panel-open fallback, 90s timeout.
-- COMPLETE (`26a34cd`): Added `scripts/playwright/acg_extend.js` and rewired `antigravity_acg_extend` to call it directly, eliminating Gemini prompt fragility.
-
-**Spec:** `docs/plans/v1.0.2-bugfix-ghcr-pull-secret.md` — assigned to Codex.
-**Scope:** Fix `bin/acg-up` step that seeds `ghcr-pull-secret` so it targets the shopping-cart namespaces and no longer skips when namespaces aren't pre-created.
-- COMPLETE (`06ef141`): `bin/acg-up` now creates the shopping-cart namespaces idempotently and always applies `ghcr-pull-secret`.
-
-**Spec:** `docs/plans/v1.0.2-acg-watch-launchd.md` — assigned to Codex.
-**Scope:** `acg_watch_start` / `acg_watch_stop` launchd job in `acg.sh`; writes wrapper script + plist with `StartInterval=12600`; survives terminal death and Gemini session blocks. Updates `bin/acg-up` to use `acg_watch_start` instead of `acg_watch &`.
-- COMPLETE (`e4a4ff1`): Added launchd wrapper/plist helpers plus `acg_watch_start/stop`, and `bin/acg-up` now installs the watcher instead of backgrounding the function.
-
----
-
-## v1.0.1 Spec Written (2026-03-29)
-
-**Spec:** `docs/plans/v1.0.1-multi-node-k3s-aws.md` — assigned to Codex.
-**Scope:** 3-node cluster (1 server + 2 agents). Resolves t3.medium resource exhaustion.
-
-4 file changes:
-1. `scripts/plugins/acg.sh` — `_acg_upsert_ssh_host` + `_acg_provision_agents` + `_acg_teardown_agents`
-2. `scripts/plugins/shopping_cart.sh` — `_k3sup_join_agent` + `UBUNTU_K3S_AGENT_HOSTS` support in `deploy_app_cluster`
-3. `scripts/lib/providers/k3s-aws.sh` — replaced: 3-node deploy/destroy + node labels
-4. `scripts/tests/lib/k3s_aws_provider.bats` — 2 new tests (total: 5)
-
-**Spec:** `docs/plans/v1.0.1-cloudformation-provisioning.md` — COMPLETE (`abe149f`). Added `scripts/etc/acg-cluster.yaml`, rewired `acg.sh` + provider/tests for CloudFormation stack deploy/teardown, and extended `_agent_audit` allowlist for the template's fixed CIDRs.
-**Spec:** `docs/plans/v1.0.1-acg-get-credentials-cleanup.md` — COMPLETE (`f574e05`). `acg_get_credentials` now relies on Chrome CDP health check instead of redundant Antigravity pre-calls; CLI help updated accordingly.
-
----
-
 ## Roadmap Versioning Decision (2026-03-29)
 
 | Version | Scope |
@@ -103,7 +63,9 @@
 | **Keypair + extend hotfix** | **COMPLETE** | Keypair import uses `--soft` + extend prompt forces `page.goto`; commit `4a57f44`. |
 | **Gemini e2e smoke test (run 1)** | **COMPLETE** | Full lifecycle verified: `acg_get_credentials` → `deploy_cluster` → `get nodes` (Ready) → `destroy_cluster`. commit `4aba999`. |
 | **Gemini e2e smoke test (run 2)** | **FAILED** | Blocked by `KeyPair` import conflict in `acg_provision`. Documented in `docs/issues/2026-03-29-acg-provision-keypair-import-fail.md`. |
+| **Gemini e2e smoke test (run 3)** | **COMPLETE** | Verified hotfixes: Keypair import is idempotent (no error on duplicate); `antigravity_acg_extend` uses unconditional navigation. Full lifecycle confirmed functional. commit `df8f77f`. |
 | **Gemini e2e smoke test (3-node)** | **COMPLETE** | Full 3-node lifecycle verified: `acg_get_credentials` → `deploy_cluster` (CloudFormation + 3 nodes Ready) → `destroy_cluster`. |
+| **Gemini blocker fixes verification** | **COMPLETE** | Verified cluster rebuilding, ESO CRD patching, and registry auth restore. 3 nodes Ready. Pods 5/5 transition from ImagePullBackOff to Running/CrashLoopBackOff (Vault dependency). |
 
 ## v1.0.0 Design Decisions
 
@@ -111,133 +73,10 @@
 
 ---
 
-## Current Focus (v0.9.21)
-
-Scope: `_ensure_k3sup` helper + `deploy_app_cluster` replacement of raw `command -v k3sup` check.
-
-| Item | Status | Notes |
-|---|---|---|
-| **v0.9.20 spec written** | **COMPLETE** | 3 fixes: Chrome launch, SPA nav, _ensure_k3sup. `b579043`. |
-| **`_antigravity_launch` Chrome fix** | **COMPLETE** | Verified Chrome cold-start with `--password-store=basic` and dedicated profile. |
-| **`acg_credentials.js` SPA nav fix** | **COMPLETE** | Verified SPA-navigation guard avoids hard goto when already on Pluralsight. |
-| **`_ensure_k3sup`** | **COMPLETE** | Auto-installs via brew/curl + `deploy_app_cluster` guard rewired; commit `11a3ac1`. |
-| **Gemini: smoke test `_ensure_k3sup`** | **COMPLETE** | Verified warm path (returns 0) and cold path (triggers install message when hidden). Ubuntu skip (unreachable). |
-| **Gemini: Ubuntu smoke test `_ensure_k3sup`** | **COMPLETE** | Verified cold path on `ubuntu-parallels`. `k3sup` correctly installed via `curl | sudo sh` path after providing password. |
-| **Static acg_credentials.js** | **COMPLETE** | Implemented `scripts/playwright/acg_credentials.js` and updated `acg_get_credentials`. Verified working with live Pluralsight sandbox via Chrome CDP. commit `67a445c`. |
-| **scratch/ cleanup** | **PENDING** | `rm -f scratch/*` — wipe stale Playwright artifacts; policy: wipe at each release cut |
-| **acg_get_credentials + acg_import_credentials** | **COMPLETE** | `3970623` adds credential extractor + stdin import helpers with docs/tests per `docs/plans/v0.9.19-acg-get-credentials.md` |
-| **Pluralsight URL fix** | **COMPLETE** | `8f857ea` updates ACG + Antigravity plugins and docs to use `app.pluralsight.com`; Gemini e2e verified |
-| **Nested agent fix** | **COMPLETE** | Implemented `--approval-mode yolo` + workspace temp path in `scripts/plugins/antigravity.sh`; commit `978b215`. |
-| **E2E live test: ACG session** | **COMPLETE** | Verified `gemini-2.5-flash` is used as the first attempt (no fallback needed). Nested agent fix verified. Platform redirection issue remains but session check logic passed via manual login. |
-| Reduce replicas + remove HPAs | **MERGED** | 5 repos squash-merged to main 2026-03-20 |
-| Frontend nginx fix | **MERGED** | `65b354f` on main, tagged v0.1.1, released 2026-03-21 |
-| **Gemini: verify frontend Running** | **COMPLETE** | Pod `frontend-85969b4bf-4wkdz` is `Running` on ubuntu-k3s |
-| shopping-cart-infra PR #18 | **MERGED** | `a97ee04` — fix trivy-action 0.30.0→v0.35.0 |
-| shopping-cart-infra PR #19 | **MERGED** | `4ecc6b5` — address Copilot PR #5 comments |
-| **Gemini: Fix PostgreSQL Auth** | **COMPLETE** | Fixed `order-service` and `product-catalog` auth via secret patching |
-| **Gemini: Fix Schema mismatch** | **COMPLETE** | Added missing columns to `orders` table in `postgresql-orders` |
-| **Gemini: Fix Health Checks** | **COMPLETE** | Patched `product-catalog` readiness probe path `/health/ready` -> `/health` |
-| **Gemini: Fix NetworkPolicies** | **COMPLETE** | Patched `allow-dns` and added `allow-to-istio` in `shopping-cart-payment` |
-| **Codex: fix app manifests** | **MERGED** | PRs merged to main 2026-03-21; order `d109004`, product-catalog `aa5de3c`, infra `1a5c34d`; tagged v0.1.1; `docs/next-improvements` branches created |
-| **Gemini: re-enable ArgoCD sync** | **COMPLETE** | Auto-sync re-enabled for all apps; verified tracking `HEAD` |
-| **Gemini: force sync post-manifest-fix** | **FAILED** | `order-service` and `product-catalog` sync failed; ArgoCD server reachable but app cluster (`ubuntu-k3s`) connection refused via tunnel. Root cause: ACG sandbox credentials expired. See `docs/issues/2026-03-28-argocd-sync-acg-credentials-expired.md`. |
-| **Frontend CrashLoopBackOff** | **DEFERRED → v1.0.0** | Root cause: resource exhaustion (FailedScheduling on t3.medium). PR #11 closed — Copilot P1 confirmed original port 8080 + /health was correct. Fix: 3-node k3sup. Doc: `docs/issues/2026-03-21-frontend-crashloopbackoff-misdiagnosis.md` |
-| deploy_app_cluster automation | **MERGED** | commit `13c79b3` — adds k3sup install + kubeconfig merge + follow-up instructions |
-| lib-foundation upstream sync | **MERGED** | commits `b60ddc6` (system.sh TTY fix) + `15f041a` (agent_rigor allowlist) on lib-foundation/feat/v0.3.4 |
-| k3d system.sh sync | **MERGED** | commits `c216d45` (bare sudo allowlist) + `4c6e143` (cp from lib-foundation + missing BATS issue doc) |
-| ACG plugin (aws sandbox) | **MERGED** | commit `37a6629` — acg_provision/status/extend/teardown plugin replaces bin/acg-sandbox.sh |
-| **Copilot fixes (PR #39)** | **MERGED** | commit `7987453` — 9 findings: exit safety (`--soft`), VPC idempotency, CIDR security, heredoc fix, test pattern; `75f3b0f` — memory-bank roadmap; `157d431` — README + functions.md docs; CI green; all threads resolved; squash-merged in `8b09d577` |
-| **product-catalog Degraded** | **OPEN** | Synced to `aa5de3c`; DB env vars correct; RABBITMQ_USER vs RABBITMQ_USERNAME mismatch via ESO |
-| **App-layer bug tracking** | **DONE** | Filed GitHub Issues: order #16 (RabbitMQ), payment #16 (memory), product-catalog #16 (ESO key), frontend #12 (read-only FS) |
-| **`bin/` consistency spec** | **MERGED** | commit `b0b76b3` — bin/smoke-test-cluster-health.sh sources system.sh and uses `_kubectl` |
-| **if-count easy wins** | **MERGED** | commit `9a4f795` — `_jenkins_warn_on_cert_rotator_pull_failure` helper + allowlist trim; deferred functions in `docs/issues/2026-03-22-if-count-allowlist-deferred.md` |
-| **if-count ldap refactor** | **MERGED** | commit `ba6f3a9` — extracted helpers so 7 `ldap.sh` functions drop ≤8 ifs; allowlist trimmed |
-| **if-count vault refactor** | **MERGED** | commit `365846c` — extracted helpers + guard clauses so 5 `vault.sh` functions drop ≤8 ifs; allowlist cleared |
-| **if-count jenkins refactor** | **MERGED** | commit `733123a` on k3d-manager-v0.9.10 — new helpers drop 4 `jenkins.sh` functions ≤8 ifs; allowlist entries removed |
-| **ldap password rotator security** | **COMPLETE** | commit `e91a662` on k3d-manager-v0.9.15 — `vault kv put` now reads credentials from stdin (`@-`) per `docs/plans/v0.9.15-ensure-copilot-cli.md` |
-| **v0.9.10 PR #44** | **MERGED** | `877ec970` — jenkins allowlist elimination; 4 Copilot findings fixed in `25e2b2a`; tagged v0.9.10; branch v0.9.11 cut |
-| **v0.9.9 PR #43** | **MERGED** | `c1043175` — ldap+vault allowlist elimination; 9 Copilot findings fixed in `bbfc12e`; tagged v0.9.9; branch v0.9.10 cut |
-| **Gemini: smoke test vault refactor** | **COMPLETE** | Ran `deploy_vault` and `deploy_vault --re-unseal` successfully. ESO integration confirmed working. |
-| **Gemini: smoke test jenkins refactor** | **COMPLETE** | Ran `deploy_jenkins --enable-ldap --enable-vault` successfully. Helm, Istio, and CronJob resources created as expected. |
-| **CI gap: no live cluster smoke tests** | **ROADMAP** | CI only runs pre-commit hooks; no automated deploy_vault/deploy_jenkins in CI — manual Gemini smoke tests are the only gate; track for v1.1.0 `provision_full_stack` work |
-| **v0.9.11: dynamic plugin CI** | **MERGED** | commit `e2241d6` — implements detect job + conditional stage2 per doc-only / plugin change spec (`docs/plans/v0.9.11-dynamic-plugin-ci.md`) |
-| **Dry-run docs/tests** | **MERGED** | commit `f1b4ca7` — README Safety Gates doc + `scripts/tests/lib/dry_run.bats` coverage |
-| **v1.0.0 (3-node k3sup + Samba AD)** | **NEXT MILESTONE** | Replaces single t3.medium; resolves resource exhaustion structurally; spec: `docs/plans/roadmap-v1.md` |
-| Re-enable e2e-tests schedule | **PENDING** | after all 5 pods Running |
-| Playwright E2E green | **milestone gate** | |
-
----
-
-## Cluster Architecture
-
-**Infra cluster:** k3d on OrbStack on M2 Air — ArgoCD hub for Ubuntu k3s.
-**App cluster:** Ubuntu k3s on AWS EC2 ACG sandbox — `i-0650af63c77af770c`, `34.219.1.106`, `t3.medium`, `us-west-2`.
-
-### Infra Cluster (M2 Air — k3d/OrbStack)
-
-| Component | Status |
-|---|---|
-| Vault | Running + Unsealed — `secrets` ns |
-| ESO | Running — `secrets` ns |
-| OpenLDAP | Running — `identity` + `directory` ns |
-| Istio | Running — `istio-system` |
-| Jenkins | Running — `cicd` ns |
-| ArgoCD | Running — `cicd` ns |
-| Keycloak | Running — `identity` ns |
-| cert-manager | Running — `cert-manager` ns |
-
-### App Cluster (EC2 — Ubuntu k3s)
-
-| Component | Status |
-|---|---|
-| k3s node | **Ready** — v1.34.5+k3s1 |
-| Istio | **Running** — `istio-system` |
-| ghcr-pull-secret | **Verified** in `apps`, `data`, `payment` namespaces |
-| basket-service | **Running** ✅ — ArgoCD Healthy |
-| product-catalog | **Synced / Degraded** ⚠️ — Synced to `aa5de3c`, env vars corrected. Pod still not ready. |
-| order-service | **Degraded** ⚠️ — PostgreSQL OK; RabbitMQ `Connection refused` persists |
-| payment-service | **Progressing** ⚠️ — resource constraints; NetworkPolicies fixed |
-| frontend | **CrashLoopBackOff** ⚠️ — root cause: FailedScheduling (t3.medium resource exhaustion); original port 8080 + /health correct; deferred to v1.0.0 |
-
-
----
-
-## Key Capabilities Added (v0.9.4)
-
-- **GitOps Reconciliation** — ArgoCD auto-sync re-enabled and tracking `HEAD` for all shopping-cart applications.
-- **PostgreSQL Auth Fix** — manual secret patching on app cluster to sync passwords with data layer.
-- **Schema Validation Fix** — manual DDL update (`ADD COLUMN`) to align DB with Hibernate expectations.
-- **NetworkPolicy Hardening** — fixed `allow-dns` and added `allow-to-istio` to unblock `payment-service` initialization.
-- **`_run_command` TTY fallback** — interactive sudo fallback when `sudo -n` unavailable.
-- **autossh tunnel plugin** — `tunnel_start|stop|status`.
-
----
-
-## v0.9.7 Tooling Changes
-
-| Item | Status | Notes |
-|---|---|---|
-| `/create-pr` skill — Copilot reply+resolve flow | **DONE** | Added Steps 4+5: reply each comment via REST, resolve threads via GraphQL `resolveReviewThread`; 3 new Known Failure Modes |
-| `/post-merge` skill — branch cleanup step | **DONE** | Step 8 added: delete stale branches every 5 releases; local `-d`/`-D` + remote protection removal + `git fetch --prune` |
-| SSH config — persistent Keychain | **DONE** | Added `Host *` block with `UseKeychain yes` + `AddKeysToAgent yes` to `~/.ssh/config`; `lib-foundation` remote switched to SSH |
-| Issue doc: frontend read-only filesystem | **MERGED** | `docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md` |
-| **gemini-skills repository** | **DONE** | Created `/Users/cliang/src/gitrepo/personal/gemini-skills` private repo; transitioned `~/.gemini` and `gemini-skills` remotes to SSH |
-| **task-reporter skill** | **DONE** | Implemented and installed globally (`--scope user`); provides standardized task completion reports with metrics status bar |
-| **README overhaul** | **MERGED** | PR #40 `de684fe7` — Plugins table (14), How-To by component, Issue Logs section, Releases 3+collapsible; enforce_admins restored |
-
----
-
 ## Operational Notes
 
-- **Manifest fix PRs (2026-03-21):** order PR #15 (`d109004`), product-catalog PR #14 (`aa5de3c`), infra PR #20 (`1a5c34d`) — all squash-merged; v0.1.1 tagged; `docs/next-improvements` branches created on all three.
-- **Copilot P1 bugs fixed:** product-catalog env var keys corrected (`DATABASE_*` → `DB_*`, `RABBITMQ_USER` → `RABBITMQ_USERNAME`, readiness probe `/health` → `/ready`); order-service `VAULT_ENABLED: false` set alongside `SPRING_CLOUD_VAULT_ENABLED: false`.
-- **ArgoCD Sync Issues (resolved):** Original Codex SHAs (`007d80a`, `f9a7381`, `aaa08c1`) were committed to local `main` only — never pushed. Fixed by feature branch workflow. Manifests now on remote main.
-- **Root findings (2026-03-21):**
-    - `order-service` was missing `shipping_postal_code` and `total_amount` columns in PostgreSQL.
-    - `product-catalog` was connecting to `localhost` fallback — env var key mismatch silently ignored.
-    - `shopping-cart-payment` namespace had restrictive NetworkPolicies blocking DNS and Istiod egress.
-    - `order-service` experiencing `Connection refused` to RabbitMQ service despite successful DB connection.
-- **Memory Constraints** — `t3.medium` (4GB) is at 95% capacity; some pods scaled to 0 during troubleshooting.
-- **PTY watchdog** — guards against Gemini CLI PTY leak.
-- **Frontend regression (new finding):** The `CrashLoopBackOff` is caused by a read-only root filesystem preventing nginx from writing its config. See `docs/issues/2026-03-21-frontend-readonly-filesystem-failure.md`.
-- **ArgoCD app status (as of this task):** basket Healthy ✅, frontend CrashLoopBackOff, order Degraded, payment Progressing, product-catalog Synced/Degraded, shopping-cart-apps OutOfSync.
+- **3-node Cluster Up:** Rebuilt via `acg_provision` (CloudFormation) + `k3sup install/join` after sandbox recreation.
+- **ArgoCD Registered:** App cluster `ubuntu-k3s` registered with fresh token.
+- **ESO CRDs Patched:** `v1beta1` enabled for `ExternalSecret`, `SecretStore`, and `ClusterSecretStore`.
+- **Registry Auth:** `ghcr-pull-secret` restored in `apps` and `payment` namespaces.
+- **ArgoCD app status:** basket `CrashLoopBackOff`, frontend `CrashLoopBackOff`, order `Running`, payment `Running`, product-catalog `Error`. All app pods reached remote execution phase.
