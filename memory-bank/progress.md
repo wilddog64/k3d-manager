@@ -30,6 +30,7 @@
 
 - [x] **Gemini blocker fixes verification** — Verified cluster rebuilding (after sandbox expiry), ESO CRD patching, and registry auth restore. 3 nodes Ready. Pods 5/5 transition from ImagePullBackOff to Running/CrashLoopBackOff (Vault dependency). Spec: `docs/plans/v1.0.2-gemini-fix-cluster-blockers.md`.
 - [ ] **Vault Token transition** — **FAILED**. Successfully stored local Vault token as remote secret and applied `ClusterSecretStore`. Blocked by unstable `socat` bridge on remote server. See `docs/issues/2026-04-01-remote-vault-bridge-instability.md`.
+- [ ] **Codex: vault-bridge automation** — automate socat systemd unit + Endpoints; fix ClusterSecretStore server address. Spec: `docs/plans/v1.0.2-bugfix-vault-bridge.md`. 4 files: `shopping_cart.sh`, `bin/acg-up`, `shopping-cart-infra/cluster-secret-store.yaml`, NEW `vault-bridge-svc.yaml`.
 - [x] **Antigravity Chrome launch** — `_antigravity_launch` now opens Google Chrome with `--password-store=basic` and dedicated user data dir so CDP probe works without manual browser start. Spec: `docs/plans/v0.9.20-acg-automation-fixes.md`, commit `8dd9cbb`.
 - [x] **`acg_credentials.js` SPA nav fix** — Script finds the Pluralsight tab, avoids hard `page.goto` when already on `app.pluralsight.com`, SPA-navigates when needed, waits for `aria-busy` to clear, and increases credential selector timeout to 60s. Commit `8dd9cbb`.
 - [x] **Automation Verification** — Verified Chrome cold-start (flags/profile) and SPA navigation guard in `acg_credentials.js`. Logic confirmed via live verification.

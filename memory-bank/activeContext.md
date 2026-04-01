@@ -81,4 +81,5 @@
 - **ESO CRDs Patched:** `v1beta1` enabled for `ExternalSecret`, `SecretStore`, and `ClusterSecretStore`.
 - **Registry Auth:** `ghcr-pull-secret` restored in `apps` and `payment` namespaces.
 - **Vault connectivity:** Transitioned to **Vault Token** auth. Secret `vault-token` exists on remote cluster. `ClusterSecretStore` applied but blocked by `socat` bridge failure.
+- **vault-bridge bugfix specced:** `docs/plans/v1.0.2-bugfix-vault-bridge.md` — Codex to add `_setup_vault_bridge` in `shopping_cart.sh`, Endpoints step in `bin/acg-up`, fix ClusterSecretStore server address, add `vault-bridge-svc.yaml` in shopping-cart-infra.
 - **ArgoCD app status:** basket `CrashLoopBackOff`, frontend `CrashLoopBackOff`, order `Running`, payment `Running`, product-catalog `Error`. All app pods reached remote execution phase.
