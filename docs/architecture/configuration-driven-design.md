@@ -21,43 +21,26 @@ The system behavior is entirely controlled by:
 
 ## Architecture Diagram
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Jenkins Deployment                       │
-│                  (Consumer - provider-agnostic)              │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       │ dirservice_init()
-                       │ dirservice_generate_jcasc()
-                       │ dirservice_create_credentials()
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Directory Service Abstraction                   │
-│          (Dispatcher based on configuration)                 │
-│                                                              │
-│  Routes based on: DIRECTORY_SERVICE_PROVIDER                 │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-            ┌──────────┴──────────────┐
-            │                         │
-    PROVIDER=openldap          PROVIDER=activedirectory
-            │                         │
-            ▼                         ▼
-┌──────────────────────┐   ┌──────────────────────┐
-│  OpenLDAP Provider   │   │  Active Dir Provider │
-│                      │   │                      │
-│ Configuration:       │   │ Configuration:       │
-│ • LDAP_NAMESPACE     │   │ • AD_DOMAIN          │
-│ • LDAP_RELEASE       │   │ • AD_SERVERS         │
-│ • LDAP_BASE_DN       │   │ • AD_BIND_DN         │
-│                      │   │ • AD_BIND_PASSWORD   │
-│ Behavior:            │   │                      │
-│ ✓ Deploy Helm chart  │   │ Behavior:            │
-│ ✓ Seed bootstrap     │   │ ✗ No deployment      │
-│ ✓ Create local users │   │ ✓ Validate remote    │
-│ ✓ Wait for ready     │   │ ✓ Test connectivity  │
-└──────────────────────┘   └──────────────────────┘
+```mermaid
+flowchart TD
+    Jenkins["Jenkins Deployment\n(Consumer — provider-agnostic)"]
+
+    Jenkins -->|"dirservice_init()\ndirservice_generate_jcasc()\ndirservice_create_credentials()"| Abstraction
+
+    Abstraction["Directory Service Abstraction\n(Dispatcher — routes on DIRECTORY_SERVICE_PROVIDER)"]
+
+    Abstraction -->|"PROVIDER=openldap"| OL
+    Abstraction -->|"PROVIDER=activedirectory"| AD
+
+    subgraph OL["OpenLDAP Provider"]
+        OL_cfg["Config: LDAP_NAMESPACE · LDAP_RELEASE · LDAP_BASE_DN"]
+        OL_beh["✓ Deploy Helm chart  ✓ Seed bootstrap\n✓ Create local users  ✓ Wait for ready"]
+    end
+
+    subgraph AD["Active Directory Provider"]
+        AD_cfg["Config: AD_DOMAIN · AD_SERVERS · AD_BIND_DN · AD_BIND_PASSWORD"]
+        AD_beh["✗ No deployment\n✓ Validate remote  ✓ Test connectivity"]
+    end
 ```
 
 ## Key Benefits
@@ -248,13 +231,6 @@ The `deploy_jenkins` function **has no idea** which provider is used. It calls t
 This is the **Strategy Pattern** from design patterns, implemented through configuration:
 
 ```bash
-# Traditional Strategy Pattern (runtime polymorphism)
-class DirectoryService {
-  init() { /* abstract */ }
-}
-class OpenLDAP extends DirectoryService { ... }
-class ActiveDirectory extends DirectoryService { ... }
-
 # Configuration-Driven Strategy (bash)
 function dirservice_init() {
   provider=$(_directory_service_provider)  # Read config
@@ -262,9 +238,45 @@ function dirservice_init() {
 }
 ```
 
+```mermaid
+flowchart LR
+    Call["dirservice_init()"] --> Dispatch{"DIRECTORY_SERVICE_PROVIDER"}
+    Dispatch -->|"openldap"| OL["_dirservice_openldap_init()"]
+    Dispatch -->|"activedirectory"| AD["_dirservice_activedirectory_init()"]
+    Dispatch -->|"azuread (future)"| AZ["_dirservice_azuread_init()"]
+```
+
 ## Extending to Other Abstractions
 
 This pattern is used throughout k3d-manager:
+
+```mermaid
+flowchart TD
+    CMD["./scripts/k3d-manager &lt;function&gt;"]
+
+    CMD --> CP
+    CMD --> DS
+    CMD --> SB
+
+    subgraph CP["Cluster Provider  (CLUSTER_PROVIDER)"]
+        k3d["k3d\nDocker-based local"]
+        orbstack["orbstack\nOrbStack VM local"]
+        k3saws["k3s-aws\nACG EC2 sandbox"]
+        k3sgcp["k3s-gcp (planned)"]
+        k3sazure["k3s-azure (planned)"]
+    end
+
+    subgraph DS["Directory Service  (DIRECTORY_SERVICE_PROVIDER)"]
+        openldap["openldap\nDeploy Helm chart"]
+        activedirectory["activedirectory\nConnect to remote AD"]
+        azuread["azuread (future)\nOAuth2 / SAML"]
+    end
+
+    subgraph SB["Secret Backend  (SECRET_BACKEND_PROVIDER)"]
+        vault["vault\nDeploy + PKI + ESO"]
+        azurekv["azure (future)\nAzure Key Vault"]
+    end
+```
 
 ### Secret Backend Abstraction
 ```bash
