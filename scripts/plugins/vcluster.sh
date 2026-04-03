@@ -127,28 +127,36 @@ function _vcluster_install_cli() {
     return 0
   fi
 
-  if _is_mac; then
-    _run_command -- brew install loft-sh/tap/vcluster
-  else
-    local install_dir="${VCLUSTER_INSTALL_DIR:-/usr/local/bin}"
-    local tmp_file
-    tmp_file="$(mktemp -t vcluster-cli.XXXXXX)"
-    trap '$(_cleanup_trap_command "$tmp_file")' RETURN
-    local machine_arch
-    machine_arch="$(uname -m)"
-    local dl_arch
-    case "$machine_arch" in
-      x86_64)          dl_arch="amd64" ;;
-      aarch64|arm64)   dl_arch="arm64" ;;
-      *)               _err "Unsupported architecture for vcluster CLI install: $machine_arch" ;;
-    esac
-    local url="https://github.com/loft-sh/vcluster/releases/download/v${VCLUSTER_VERSION}/vcluster-linux-${dl_arch}"
-    _run_command -- curl -fsSL -o "$tmp_file" "$url"
-    _run_command -- chmod +x "$tmp_file"
-    _run_command --prefer-sudo -- mkdir -p "$install_dir"
-    _run_command --prefer-sudo -- mv "$tmp_file" "${install_dir%/}/vcluster"
-    trap - RETURN
-  fi
+  local platform
+  platform="$(_detect_platform)"
+  case "$platform" in
+    mac)
+      _run_command -- brew install loft-sh/tap/vcluster
+      ;;
+    linux|debian|redhat|wsl)
+      local install_dir="${VCLUSTER_INSTALL_DIR:-/usr/local/bin}"
+      local tmp_file
+      tmp_file="$(mktemp -t vcluster-cli.XXXXXX)"
+      trap '$(_cleanup_trap_command "$tmp_file")' RETURN
+      local machine_arch
+      machine_arch="$(uname -m)"
+      local dl_arch
+      case "$machine_arch" in
+        x86_64)        dl_arch="amd64" ;;
+        aarch64|arm64) dl_arch="arm64" ;;
+        *)             _err "Unsupported architecture for vcluster CLI install: $machine_arch" ;;
+      esac
+      local url="https://github.com/loft-sh/vcluster/releases/download/v${VCLUSTER_VERSION}/vcluster-linux-${dl_arch}"
+      _run_command -- curl -fsSL -o "$tmp_file" "$url"
+      _run_command -- chmod +x "$tmp_file"
+      _run_command --prefer-sudo -- mkdir -p "$install_dir"
+      _run_command --prefer-sudo -- mv "$tmp_file" "${install_dir%/}/vcluster"
+      trap - RETURN
+      ;;
+    *)
+      _err "Unsupported platform for vcluster CLI install: $platform"
+      ;;
+  esac
 
   if ! _command_exist vcluster; then
     _err "vcluster CLI installation failed"
