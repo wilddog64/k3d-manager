@@ -33,7 +33,9 @@
 
 **bin/ SCRIPT_DIR fix:** ASSIGNED to Codex 2026-04-03. Spec: `docs/plans/v1.0.2-fix-bin-script-dir.md`. All `bin/` entry points (`acg-up`, `acg-refresh`, `acg-down`) set `SCRIPT_DIR` to `bin/` instead of `scripts/`; `acg.sh` guard fires false and tries `bin/plugins/aws.sh` — not found. Fix: compute REPO_ROOT first, then `SCRIPT_DIR="${REPO_ROOT}/scripts"`.
 
-**Gemini e2e (vault-bridge + bootstrap live test):** ASSIGNED 2026-04-03 (unblocked by `29a8535`). Gemini to run `bin/acg-up <sandbox-url>` end-to-end and verify: socat systemd active on server, vault-bridge Endpoints applied, ClusterSecretStore `Ready`, all 5 pods Running. Paste actual command output — do not summarize.
+**`antigravity_acg_extend` fatal exit fix:** COMPLETE (`<sha>`). `_err` replaced with `_info` + `return 1` so pre-flight extend failure is non-fatal. Issue: `docs/issues/2026-04-03-antigravity-acg-extend-err-exits-process.md`. Spec: `docs/plans/v1.0.2-fix-acg-extend-err.md`.
+
+**Gemini e2e (vault-bridge + bootstrap live test):** ASSIGNED 2026-04-03. User running `deploy_cluster` manually. Blocked by extend fix (now resolved).
 
 ---
 

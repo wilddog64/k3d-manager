@@ -222,7 +222,8 @@ function antigravity_acg_extend() {
   exit_code=$?
 
   if [[ $exit_code -ne 0 ]]; then
-    _err "[antigravity] acg_extend failed: ${output}"
+    _info "[antigravity] acg_extend failed: ${output}"
+    return 1
   fi
 
   echo "$output"
