@@ -15,8 +15,8 @@ Use the rules below to shape all code suggestions and PR reviews.
 - **Secret backends**: interface in `scripts/lib/secret_backends/` — Vault is complete, others stubbed.
 - **Cluster providers**: `scripts/lib/providers/` — `k3d`, `orbstack`, `k3s-aws`.
 - **ACG plugin**: `scripts/plugins/acg.sh` — `acg_get_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_watch`, `acg_teardown`. Manages Pluralsight ACG sandbox lifecycle via CloudFormation + k3sup.
-- **Playwright**: `scripts/playwright/acg_credentials.js` — static Node.js script; connects to Chrome via CDP (`localhost:9222`); extracts AWS credentials from Pluralsight sandbox UI.
-- **Browser automation**: `scripts/plugins/antigravity.sh` — `_antigravity_launch`, `_antigravity_browser_ready`, `antigravity_acg_extend`. Launches Chrome with `--remote-debugging-port=9222 --password-store=basic`.
+- **Playwright**: `scripts/playwright/acg_credentials.js` — static Node.js script; primarily uses Playwright `launchPersistentContext` to drive Chrome and extract AWS credentials from the Pluralsight sandbox UI; CDP (`localhost:9222`) is used only as a browser reuse probe.
+- **Browser automation**: `scripts/plugins/antigravity.sh` — `_browser_launch`, `_antigravity_browser_ready`, `antigravity_acg_extend`. Launches Chrome with `--remote-debugging-port=9222 --password-store=basic`.
 - **Tunnel**: `scripts/plugins/tunnel.sh` — `tunnel_start`, `tunnel_stop`, `tunnel_status`. autossh + launchd; forward tunnel (k3s API :6443) + reverse tunnel (Vault :8200).
 - **AWS helpers**: `scripts/plugins/aws.sh` — `aws_import_credentials`. `scripts/plugins/shopping_cart.sh` — `deploy_app_cluster`, `_ensure_k3sup`, `_k3sup_join_agent`.
 - **Convenience scripts**: `bin/acg-up`, `bin/acg-down`, `bin/acg-refresh`, `bin/acg-status`, `bin/rotate-ghcr-pat` — orchestrate plugin calls for common one-shot operations.
