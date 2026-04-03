@@ -1,11 +1,16 @@
 const { chromium } = require('playwright');
+const os = require('os');
+const path = require('path');
 
 /**
  * scripts/playwright/acg_credentials.js
- * 
+ *
  * Static Playwright script to extract AWS credentials from Pluralsight Cloud Sandbox.
- * Connects to a running instance via CDP.
+ * Launches a persistent Chrome context — session persists across runs via auth dir.
+ * Auth dir: ~/.local/share/k3d-manager/playwright-auth
  */
+
+const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'playwright-auth');
 
 async function extractCredentials() {
   const targetUrl = process.argv[2];
@@ -14,13 +19,16 @@ async function extractCredentials() {
     process.exit(1);
   }
 
-  let browser;
+  let browserContext;
   try {
-    // 1. Connect to the running browser via CDP
-    browser = await chromium.connectOverCDP('http://localhost:9222');
+    browserContext = await chromium.launchPersistentContext(AUTH_DIR, {
+      headless: false,
+      channel: 'chrome',
+      args: ['--password-store=basic'],
+    });
 
     // 2. Find the Pluralsight page by URL (do not assume pages()[0])
-    const context = browser.contexts()[0];
+    const context = browserContext;
     if (!context) throw new Error('No browser context found');
     const allPages = context.pages();
     let page = allPages.find(p => {
@@ -210,7 +218,7 @@ async function extractCredentials() {
     console.error(`ERROR: ${error.message}`);
     process.exit(1);
   } finally {
-    if (browser) await browser.close();
+    if (browserContext) await browserContext.close();
   }
 }
 
