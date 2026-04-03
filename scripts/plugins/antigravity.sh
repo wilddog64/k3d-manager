@@ -62,7 +62,7 @@ function _ensure_antigravity() {
   fi
 }
 
-function _antigravity_launch() {
+function _browser_launch() {
   if ! _command_exist curl; then
     _err "curl is required for Antigravity browser probe — install curl and retry"
   fi
@@ -163,7 +163,7 @@ function antigravity_trigger_copilot_review() {
   _ensure_antigravity
   _ensure_antigravity_ide
   _ensure_antigravity_mcp_playwright
-  _antigravity_launch
+  _browser_launch
   _antigravity_ensure_github_session
 
   _info "Triggering Copilot coding agent on ${owner}/${repo}..."
@@ -207,8 +207,6 @@ Once complete, extract and print the full review output verbatim. Do not summari
 
 function antigravity_acg_extend() {
   local sandbox_url="${1:?usage: antigravity_acg_extend <sandbox_url>}"
-
-  _antigravity_launch
 
   local script_dir
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
