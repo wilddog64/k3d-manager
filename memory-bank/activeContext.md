@@ -30,7 +30,9 @@
 **Playwright Start Sandbox detection fix (v1.0.4):** `docs/plans/v1.0.4-fix-start-sandbox-detection.md` — COMPLETE (`517f697`). Credentials skip guard now checks populated values and waits up to 60s after Start/Open/Resume before extracting credentials.
 **Playwright sandbox button race (v1.0.4):** `docs/plans/v1.0.4-fix-sandbox-button-race-condition.md` — COMPLETE (`f5a9399`). Waits for SPA cards to render before checking Start/Open/Resume buttons and restores conditional timeout.
 
-**Gemini e2e (vault-bridge + bootstrap live test):** ASSIGNED 2026-04-03. AWS credentials extracted successfully by user (`ffe0385` CDP fix confirmed working). Gemini to run `bin/acg-up` and verify vault-bridge + ClusterSecretStore + pods. Do NOT re-run acg_get_credentials — credentials already in ~/.aws/credentials.
+**bin/ SCRIPT_DIR fix:** ASSIGNED to Codex 2026-04-03. Spec: `docs/plans/v1.0.2-fix-bin-script-dir.md`. All `bin/` entry points (`acg-up`, `acg-refresh`, `acg-down`) set `SCRIPT_DIR` to `bin/` instead of `scripts/`; `acg.sh` guard fires false and tries `bin/plugins/aws.sh` — not found. Fix: compute REPO_ROOT first, then `SCRIPT_DIR="${REPO_ROOT}/scripts"`.
+
+**Gemini e2e (vault-bridge + bootstrap live test):** BLOCKED on bin/ SCRIPT_DIR fix. AWS credentials extracted successfully by user (`ffe0385` CDP fix confirmed working). Gemini to run `bin/acg-up` and verify vault-bridge + ClusterSecretStore + pods. Do NOT re-run acg_get_credentials — credentials already in ~/.aws/credentials.
 
 ---
 
