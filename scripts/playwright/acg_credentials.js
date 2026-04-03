@@ -119,16 +119,16 @@ async function extractCredentials() {
 
     // 2b. Handle unauthenticated state — sign in via Google Password Manager if needed
     const signInLink = page.locator('a[href*="id.pluralsight.com"], a:has-text("Sign In"), button:has-text("Sign In")').first();
-    const isSignInVisible = await signInLink.isVisible({ timeout: 3000 }).catch(() => false);
+    const isSignInVisible = await signInLink.isVisible({ timeout: 10000 }).catch(() => false);
     if (isSignInVisible) {
       console.error('INFO: Not signed in — clicking Sign In...');
       await signInLink.click();
-      await page.waitForURL('**id.pluralsight.com**', { timeout: 15000 })
+      await page.waitForURL('**id.pluralsight.com**', { timeout: 30000 })
         .catch(() => console.error('WARN: Did not reach id.pluralsight.com — proceeding anyway'));
 
       // Fill email field — set PLURALSIGHT_EMAIL env var to assist Google Password Manager
       const emailInput = page.locator('input[type="email"], input[name="email"], input[id*="email"]').first();
-      await emailInput.waitFor({ timeout: 15000 });
+      await emailInput.waitFor({ timeout: 30000 });
       await emailInput.click();
       const email = process.env.PLURALSIGHT_EMAIL || '';
       if (email) {
@@ -136,30 +136,30 @@ async function extractCredentials() {
         console.error('INFO: Filled email from PLURALSIGHT_EMAIL');
       } else {
         console.error('INFO: Clicked email field — waiting for Google Password Manager auto-fill (set PLURALSIGHT_EMAIL to assist)');
-        await page.waitForTimeout(2000);
+        await page.waitForTimeout(5000);
       }
 
       // Click Continue if the form uses a two-step email-then-password flow
       const continueBtn = page.locator('button[type="submit"], button:has-text("Continue")').first();
-      if (await continueBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      if (await continueBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
         await continueBtn.click();
-        await page.waitForTimeout(1500);
+        await page.waitForTimeout(3000);
       }
 
       // Wait for password field and let Google Password Manager auto-fill it
       const passwordInput = page.locator('input[type="password"]').first();
-      if (await passwordInput.isVisible({ timeout: 5000 }).catch(() => false)) {
+      if (await passwordInput.isVisible({ timeout: 10000 }).catch(() => false)) {
         await passwordInput.click();
-        await page.waitForTimeout(2000); // allow Password Manager to populate
+        await page.waitForTimeout(5000); // allow Password Manager to populate
         const submitBtn = page.locator('button[type="submit"], button:has-text("Sign in"), button:has-text("Log in")').first();
-        if (await submitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        if (await submitBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
           await submitBtn.click();
           console.error('INFO: Submitted sign-in form — waiting for redirect...');
         }
       }
 
       // Wait for redirect back to Pluralsight after successful auth
-      await page.waitForURL('**app.pluralsight.com**', { timeout: 60000 });
+      await page.waitForURL('**app.pluralsight.com**', { timeout: 300000 });
       console.error('INFO: Sign-in complete — resuming credential extraction...');
 
       // Re-wait for SPA content to settle after auth redirect
@@ -283,7 +283,7 @@ async function extractCredentials() {
   }
 }
 
-const OVERALL_TIMEOUT_MS = IS_FIRST_RUN ? 300000 : 120000;
+const OVERALL_TIMEOUT_MS = 600000;
 Promise.race([
   extractCredentials(),
   new Promise((_, reject) =>

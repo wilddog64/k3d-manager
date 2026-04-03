@@ -29,7 +29,8 @@
 **Playwright CDP session reuse (v1.0.4):** `docs/plans/v1.0.4-playwright-cdp-session-reuse.md` — COMPLETE (`dd024ed`). First-run flow probes CDP for an existing Pluralsight session and reuses it before launching a new Chrome instance.
 **Playwright Start Sandbox detection fix (v1.0.4):** `docs/plans/v1.0.4-fix-start-sandbox-detection.md` — COMPLETE (`517f697`). Credentials skip guard now checks populated values and waits up to 60s after Start/Open/Resume before extracting credentials.
 
-**Gemini e2e (vault-bridge + bootstrap live test):** ASSIGNED 2026-04-03. Tasks: (1) bootstrap playwright-auth dir via `acg_get_credentials` (user fills in Pluralsight login when Chrome opens); (2) run `bin/acg-up`; (3) verify socat systemd active on EC2, ClusterSecretStore `Ready`, all 5 pods Running. Report actual command output.
+**Gemini e2e (vault-bridge + bootstrap live test):** ASSIGNED 2026-04-03. Tasks: (1) bootstrap playwright-auth dir via `acg_get_credentials` (user fills in Pluralsight login when Chrome opens); (2) run `bin/acg-up`; (3) verify socat systemd active on EC2, ClusterSecretStore `Ready`, all 5 pods Running. 
+- **Status:** PART 1 (Credentials) failed due to isolated profile requiring manual login and aggressive timeouts. Timeouts in `acg_credentials.js` have been increased to 10m total. Documented in `docs/issues/2026-04-03-acg-credentials-auth-blockers.md`.
 
 ---
 
