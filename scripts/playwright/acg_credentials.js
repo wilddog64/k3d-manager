@@ -37,12 +37,38 @@ async function extractCredentials() {
   }
 
   let browserContext;
+  let _cdpBrowser = null;
   try {
-    browserContext = await chromium.launchPersistentContext(AUTH_DIR, {
-      headless: false,
-      channel: 'chrome',
-      args: ['--password-store=basic'],
-    });
+    if (IS_FIRST_RUN) {
+      try {
+        _cdpBrowser = await chromium.connectOverCDP('http://localhost:9222');
+        const _cdpContexts = _cdpBrowser.contexts();
+        if (_cdpContexts.length > 0) {
+          const _cdpContext = _cdpContexts[0];
+          const _cdpPages = _cdpContext.pages();
+          const _cdpPsPage = _cdpPages.find(p => {
+            try { return new URL(p.url()).hostname.endsWith('.pluralsight.com'); } catch { return false; }
+          });
+          if (_cdpPsPage) {
+            console.error('INFO: Found existing Pluralsight session via CDP — reusing existing Chrome instance.');
+            browserContext = _cdpContext;
+          }
+        }
+        if (!browserContext) {
+          await _cdpBrowser.disconnect();
+          _cdpBrowser = null;
+        }
+      } catch {
+        _cdpBrowser = null;
+      }
+    }
+    if (!browserContext) {
+      browserContext = await chromium.launchPersistentContext(AUTH_DIR, {
+        headless: false,
+        channel: 'chrome',
+        args: ['--password-store=basic'],
+      });
+    }
 
     // 2. Find the Pluralsight page by URL (do not assume pages()[0])
     const context = browserContext;
@@ -235,7 +261,11 @@ async function extractCredentials() {
     console.error(`ERROR: ${error.message}`);
     process.exit(1);
   } finally {
-    if (browserContext) await browserContext.close();
+    if (_cdpBrowser) {
+      await _cdpBrowser.disconnect().catch(() => {});
+    } else if (browserContext) {
+      await browserContext.close();
+    }
   }
 }
 
