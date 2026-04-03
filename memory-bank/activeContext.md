@@ -22,6 +22,8 @@
 **vault-bridge bugfix specced:** `docs/plans/v1.0.2-bugfix-vault-bridge.md` — Codex to add `_setup_vault_bridge` in `shopping_cart.sh`, Endpoints step in `bin/acg-up`, fix ClusterSecretStore server address, add `vault-bridge-svc.yaml` in shopping-cart-infra.
 - COMPLETE (`1cccf01` / `450d008`): socat systemd automation + Endpoints in k3d-manager; Service + ClusterSecretStore update in shopping-cart-infra.
 
+**Chrome Playwright refactor (early v1.0.4):** `docs/plans/v1.0.4-chrome-playwright-refactor.md` — COMPLETE (`f7f15c5`). `acg_credentials.js`/`acg_extend.js` now launch Chrome via Playwright `launchPersistentContext` with a persisted auth dir, `_antigravity_launch` renamed to `_browser_launch`, and `antigravity_acg_extend` no longer pre-launches Chrome.
+
 ---
 
 ## Roadmap Versioning Decision (2026-03-29)
