@@ -28,6 +28,7 @@
 **Playwright sandbox button race (v1.0.4):** `docs/plans/v1.0.4-fix-sandbox-button-race-condition.md` — COMPLETE (`f5a9399`). Waits for SPA cards to render before checking Start/Open/Resume buttons and restores conditional timeout.
 **bin/ SCRIPT_DIR fix:** `docs/plans/v1.0.2-fix-bin-script-dir.md` — COMPLETE (`29a8535`). All `bin/acg-*` entry points now set `SCRIPT_DIR="${REPO_ROOT}/scripts"` so plugin sourcing works.
 **bin/acg-up full stack automation:** `docs/plans/v1.0.2-fix-acg-up-full-stack.md` — COMPLETE (`e4b7527`). acg-up now performs Vault port-forward, vault-bridge Service, argocd-manager bootstrap, helm + ESO install, vault-token + ClusterSecretStore, ArgoCD registration, CSS verification, and Makefile shortcuts added; acg-down stops the port-forward.
+**acg credentials CDP removal:** `docs/plans/v1.0.3-remove-cdp-from-acg-credentials.md` — COMPLETE (`ac260d0`). `acg_credentials.js` always uses `launchPersistentContext`, and `acg_get_credentials` no longer probes CDP or launches Chrome manually.
 
 **bin/ SCRIPT_DIR fix:** ASSIGNED to Codex 2026-04-03. Spec: `docs/plans/v1.0.2-fix-bin-script-dir.md`. All `bin/` entry points (`acg-up`, `acg-refresh`, `acg-down`) set `SCRIPT_DIR` to `bin/` instead of `scripts/`; `acg.sh` guard fires false and tries `bin/plugins/aws.sh` — not found. Fix: compute REPO_ROOT first, then `SCRIPT_DIR="${REPO_ROOT}/scripts"`.
 
