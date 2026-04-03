@@ -33,9 +33,11 @@
 
 **bin/ SCRIPT_DIR fix:** ASSIGNED to Codex 2026-04-03. Spec: `docs/plans/v1.0.2-fix-bin-script-dir.md`. All `bin/` entry points (`acg-up`, `acg-refresh`, `acg-down`) set `SCRIPT_DIR` to `bin/` instead of `scripts/`; `acg.sh` guard fires false and tries `bin/plugins/aws.sh` — not found. Fix: compute REPO_ROOT first, then `SCRIPT_DIR="${REPO_ROOT}/scripts"`.
 
-**`antigravity_acg_extend` fatal exit fix:** COMPLETE (`<sha>`). `_err` replaced with `_info` + `return 1` so pre-flight extend failure is non-fatal. Issue: `docs/issues/2026-04-03-antigravity-acg-extend-err-exits-process.md`. Spec: `docs/plans/v1.0.2-fix-acg-extend-err.md`.
+**`antigravity_acg_extend` fatal exit fix:** COMPLETE (`ed3a548`). `_err` replaced with `_info` + `return 1` so pre-flight extend failure is non-fatal. Issue: `docs/issues/2026-04-03-antigravity-acg-extend-err-exits-process.md`. Spec: `docs/plans/v1.0.2-fix-acg-extend-err.md`.
 
-**Gemini e2e (vault-bridge + bootstrap live test):** ASSIGNED 2026-04-03. User running `deploy_cluster` manually. Blocked by extend fix (now resolved).
+**bin/acg-up full stack automation:** ASSIGNED to Codex 2026-04-03. Spec: `docs/plans/v1.0.2-fix-acg-up-full-stack.md`. 3 files: `bin/acg-up` (8 new steps), `bin/acg-down` (Vault PF cleanup), `Makefile` (new). Sandbox deleted — e2e blocked until this lands.
+
+**e2e verification:** blocked on Codex full stack spec. User runs `make up` to verify end-to-end.
 
 ---
 
