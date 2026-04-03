@@ -295,7 +295,7 @@ async function extractCredentials() {
     process.exit(1);
   } finally {
     if (_cdpBrowser) {
-      await _cdpBrowser.disconnect().catch(() => {});
+      try { await _cdpBrowser.close(); } catch {}
     } else if (browserContext) {
       await browserContext.close();
     }

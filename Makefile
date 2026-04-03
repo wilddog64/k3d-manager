@@ -4,12 +4,13 @@
 .DEFAULT_GOAL := help
 
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
+GHCR_PAT ?= $(shell gh auth token 2>/dev/null)
 
 .PHONY: up down refresh status creds help
 
 ## Provision full stack: credentials → cluster → ESO → ArgoCD
 up:
-	bin/acg-up "$(URL)"
+	GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)"
 
 ## Tear down cluster and stop all background processes
 down:
