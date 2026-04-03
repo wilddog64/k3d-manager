@@ -29,8 +29,9 @@
 **Playwright CDP session reuse (v1.0.4):** `docs/plans/v1.0.4-playwright-cdp-session-reuse.md` — COMPLETE (`dd024ed`). First-run flow probes CDP for an existing Pluralsight session and reuses it before launching a new Chrome instance.
 **Playwright Start Sandbox detection fix (v1.0.4):** `docs/plans/v1.0.4-fix-start-sandbox-detection.md` — COMPLETE (`517f697`). Credentials skip guard now checks populated values and waits up to 60s after Start/Open/Resume before extracting credentials.
 
-**Gemini e2e (vault-bridge + bootstrap live test):** ASSIGNED 2026-04-03. Tasks: (1) bootstrap playwright-auth dir via `acg_get_credentials` (user fills in Pluralsight login when Chrome opens); (2) run `bin/acg-up`; (3) verify socat systemd active on EC2, ClusterSecretStore `Ready`, all 5 pods Running. 
-- **Status:** PART 1 (Credentials) blocked by a **race condition** in `acg_credentials.js`. The script decides the "Start Sandbox" button is missing before the SPA finishes rendering, skipping the interaction phase entirely. Timeouts in `acg_credentials.js` have been increased to 10m to allow for manual login, but logic fix is needed. Documented in `docs/issues/2026-04-03-sandbox-button-click-race-condition.md`.
+**Sandbox button race condition fix (v1.0.4):** `docs/plans/v1.0.4-fix-sandbox-button-race-condition.md` — spec written 2026-04-03. ASSIGNED to Codex. Add `waitForFunction` to wait for SPA cards to render before checking buttons; revert Gemini's hardcoded 600000 timeout to `IS_FIRST_RUN ? 300000 : 120000`.
+
+**Gemini e2e (vault-bridge + bootstrap live test):** ASSIGNED 2026-04-03. BLOCKED pending race condition fix. Resume after Codex commits.
 
 ---
 
