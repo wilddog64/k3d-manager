@@ -30,7 +30,7 @@
 **Playwright Start Sandbox detection fix (v1.0.4):** `docs/plans/v1.0.4-fix-start-sandbox-detection.md` — COMPLETE (`517f697`). Credentials skip guard now checks populated values and waits up to 60s after Start/Open/Resume before extracting credentials.
 **Playwright sandbox button race (v1.0.4):** `docs/plans/v1.0.4-fix-sandbox-button-race-condition.md` — COMPLETE (`f5a9399`). Waits for SPA cards to render before checking Start/Open/Resume buttons and restores conditional timeout.
 
-**Gemini e2e (vault-bridge + bootstrap live test):** ASSIGNED 2026-04-03. BLOCKED pending race condition fix. Resume after Codex commits.
+**Gemini e2e (vault-bridge + bootstrap live test):** ASSIGNED 2026-04-03. AWS credentials extracted successfully by user (`ffe0385` CDP fix confirmed working). Gemini to run `bin/acg-up` and verify vault-bridge + ClusterSecretStore + pods. Do NOT re-run acg_get_credentials — credentials already in ~/.aws/credentials.
 
 ---
 
