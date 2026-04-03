@@ -170,12 +170,26 @@ async function extractCredentials() {
     }
 
     // 3. Handle Sandbox Start/Open Flow
-    // Skip button flow if credentials panel is already open
-    const credentialsAlreadyVisible = await page.locator('input[aria-label="Copyable input"]').first().isVisible({ timeout: 3000 }).catch(() => false);
+    // Skip only if credentials are already populated (not just visible — inputs render empty before start)
+    const _firstCredInput = page.locator('input[aria-label="Copyable input"]').first();
+    const _firstCredVisible = await _firstCredInput.isVisible({ timeout: 3000 }).catch(() => false);
+    const _firstCredValue = _firstCredVisible ? await _firstCredInput.inputValue().catch(() => '') : '';
+    const credentialsAlreadyVisible = _firstCredVisible && _firstCredValue.trim().length > 0;
     if (credentialsAlreadyVisible) {
-      console.error('INFO: Credentials panel already open — skipping Start/Open flow');
+      console.error('INFO: Credentials already populated — skipping Start/Open flow');
     } else {
       console.error('INFO: Looking for Start/Open button...');
+
+      const _waitForCredentials = async () => {
+        console.error('INFO: Waiting for credentials to populate (up to 60s)...');
+        await page.waitForFunction(
+          () => {
+            const inputs = document.querySelectorAll('input[aria-label="Copyable input"]');
+            return inputs.length > 0 && inputs[0].value.trim().length > 0;
+          },
+          { timeout: 60000 }
+        );
+      };
 
       // Pattern 1: Direct "Start Sandbox" button (in a modal or panel)
       const startButton = page.locator('button:has-text("Start Sandbox")').first();
@@ -187,23 +201,23 @@ async function extractCredentials() {
       if (await startButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         console.error('INFO: Clicking Start Sandbox...');
         await startButton.click();
-        await page.waitForTimeout(10000);
+        await _waitForCredentials();
       } else if (await openButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         console.error('INFO: Clicking Open Sandbox...');
         await openButton.click();
-        await page.waitForTimeout(10000);
+        await page.waitForTimeout(3000);
 
         // After Open, there might be a Start Sandbox button in the slide-over
         const startButton2 = page.locator('button:has-text("Start Sandbox")').first();
         if (await startButton2.isVisible({ timeout: 5000 }).catch(() => false)) {
           console.error('INFO: Clicking Start Sandbox (Step 2)...');
           await startButton2.click();
-          await page.waitForTimeout(10000);
         }
+        await _waitForCredentials();
       } else if (await resumeButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         console.error('INFO: Clicking Resume Sandbox...');
         await resumeButton.click();
-        await page.waitForTimeout(10000);
+        await _waitForCredentials();
       }
     }
 
