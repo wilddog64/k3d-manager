@@ -1,5 +1,28 @@
 # Changes - k3d-manager
 
+## [v1.0.2] — 2026-04-03 — full stack automation: make up, ESO, ArgoCD, vault-bridge, Playwright fixes
+
+### Added
+- `make up` one-command full stack: `bin/acg-up` now runs 12 automated steps — AWS credentials → 3-node k3s cluster → SSH tunnel → Vault port-forward → ghcr-pull-secret → vault-bridge Service → argocd-manager SA bootstrap → helm + ESO install → vault-token + ClusterSecretStore → ArgoCD cluster registration + controller restart → ClusterSecretStore verify → sandbox TTL watcher (`e4b7527`)
+- `Makefile` at repo root: `make up/down/refresh/status/creds/help` with `GHCR_PAT` auto-populated from `gh auth token` (`e4b7527`, `82a0376`)
+- Vault port-forward step in `bin/acg-up`: persistent `kubectl port-forward svc/vault` with PID tracking and `disown` so it survives shell exit (`e4b7527`)
+- vault-bridge headless Service in `secrets` namespace on remote cluster — enables `vault-bridge.secrets.svc.cluster.local:8201` DNS (`e4b7527`)
+- `argocd-manager` SA + ClusterRole + static token Secret bootstrap on remote cluster via SSH (`e4b7527`)
+- `helm` + ESO v0.9.20 install on remote cluster with idempotency check (`e4b7527`)
+- `vault-token` Secret + `ClusterSecretStore` apply on remote cluster from local `vault-root` secret (`e4b7527`)
+- ArgoCD cluster registration with static SA token + `argocd-application-controller` restart (`e4b7527`)
+- ClusterSecretStore Ready poll (12×10s) before watcher step (`e4b7527`)
+- `bin/acg-down`: Vault port-forward PID cleanup on teardown (`e4b7527`)
+
+### Fixed
+- `bin/` SCRIPT_DIR contamination: all entry points now compute `REPO_ROOT` first then `SCRIPT_DIR="${REPO_ROOT}/scripts"` — fixes plugin sourcing (`29a8535`)
+- `antigravity_acg_extend`: replaced `_err` with `_info + return 1` so pre-flight extend failure is non-fatal (`ed3a548`)
+- `acg_credentials.js`: CDP `browser.close()` replaces missing `disconnect()` in both the no-session path and `finally` block (`82a0376`)
+- `bin/acg-up` Step 9: reads `root_token` key (not `token`) from `vault-root` secret (`82a0376`)
+- `acg.sh`: `_antigravity_launch` → `_browser_launch` call site updated; launchd wrapper now invokes `k3d-manager` entry point instead of sourcing plugin directly (`50734a7`)
+- `vcluster.sh`: bare `linux` removed from `debian|redhat|wsl` install arm — falls through to unsupported error per convention (`50734a7`)
+- `shopping_cart.sh`: SSH heredoc wrapped in `_run_command` for consistent logging (`50734a7`)
+
 ## [v1.0.1] — 2026-03-31 — multi-node k3s-aws + CloudFormation + Playwright hardening
 
 ### Added

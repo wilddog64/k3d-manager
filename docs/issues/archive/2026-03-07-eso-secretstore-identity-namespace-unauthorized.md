@@ -48,7 +48,7 @@ Update the Vault role to include both namespaces:
 ```bash
 VAULT_TOKEN="$(kubectl get secret vault-root -n secrets \
   -o jsonpath='{.data.root_token}' | base64 -d)"
-kubectl exec -n secrets vault-0 -- env VAULT_TOKEN="$VAULT_TOKEN" \
+VAULT_TOKEN="${VAULT_TOKEN}" kubectl exec -n secrets vault-0 -- vault \
   vault write auth/kubernetes/role/eso-ldap-directory \
     bound_service_account_names=eso-ldap-sa \
     bound_service_account_namespaces=directory,identity \

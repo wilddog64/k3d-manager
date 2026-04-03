@@ -1,23 +1,18 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v1.0.2` (as of 2026-03-31)
+## Current Branch: `k3d-manager-v1.0.3` (as of 2026-04-03)
 
-**v0.9.12 SHIPPED** — PR #47 merged to main (`f8014bc`) 2026-03-23. Copilot CLI CI integration.
-**v0.9.13 SHIPPED** — PR #48 merged to main (`c54fbe6`) 2026-03-23. Tagged v0.9.13, released.
-**v0.9.14 SHIPPED** — PR #50 merged to main (`d317429b`) 2026-03-24. No version tag. if-count allowlist fully cleared.
-**v0.9.15 SHIPPED** — PR #51 merged (`484354da`) 2026-03-27. Tagged v0.9.15, released.
-**v0.9.16 SHIPPED** — PR #51 merged (`484354da`) 2026-03-27. Tagged v0.9.16, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-27-v0.9.16-retrospective.md`.
-**v0.9.17 SHIPPED** — PR #52 merged (`c88ca7a`) 2026-03-28. Tagged v0.9.17. Released.
-**v0.9.18 SHIPPED** — PR #53 merged (`7567a5c`) 2026-03-28. Tagged v0.9.18. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.18-retrospective.md`.
-**v0.9.19 SHIPPED** — PR #54 merged (`0f13be1`) 2026-03-28. Tagged v0.9.19. Released. `enforce_admins` restored. Retro: `docs/retro/2026-03-28-v0.9.19-retrospective.md`.
-**v0.9.20 SHIPPED** — PR #55 merged to main (`bfd66fe`) 2026-03-29. Tagged v0.9.20, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v0.9.20-retrospective.md`.
-**v0.9.21 SHIPPED** — PR #56 merged to main (`f98f2a8`) 2026-03-29. Tagged v0.9.21, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v0.9.21-retrospective.md`.
-**v1.0.0 SHIPPED** — PR #57 merged to main (`807c0432`) 2026-03-29. Tagged v1.0.0, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v1.0.0-retrospective.md`.
+**v1.0.0 SHIPPED** — PR #57 merged to main (`807c0432`) 2026-03-29. Tagged v1.0.0, released. `enforce_admins` restored.
 **v1.0.1 SHIPPED** — PR #58 merged to main (`a8b6c583`) 2026-03-31. Tagged v1.0.1, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-31-v1.0.1-retrospective.md`.
-**v1.0.2 ACTIVE** — branch `k3d-manager-v1.0.2` cut from `a8b6c583` 2026-03-31. e2e verified 2026-04-03: `make up` runs 12 steps end-to-end, ClusterSecretStore Ready, 3 nodes Ready. Fixes: vault-root key (`root_token`), GHCR_PAT auto-populate, CDP browser `close()`. Commit `82a0376`. PR #59 open.
+**v1.0.2 SHIPPED** — PR #59 merged to main (`1e6d35d`) 2026-04-03. Tagged v1.0.2, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-03-v1.0.2-retrospective.md`.
+**v1.0.3 ACTIVE** — branch `k3d-manager-v1.0.3` cut from `1e6d35d` 2026-04-03.
+**enforce_admins:** restored on main 2026-04-03.
+**Branch cleanup:** v0.9.7–v0.9.17 deleted 2026-03-28; v1.0.0–v1.0.2 deleted 2026-04-03.
+**docs archive:** pre-v1.0.3 plans + issues moved to `docs/plans/archive/` and `docs/issues/archive/` on v1.0.3 branch cut.
+
 **Full cold-run gate (next session):** run `make down --confirm` → `make up` from zero (no existing stack, no SSH config entries) to verify truly cold first-run path. Gate: ClusterSecretStore Ready + 3 nodes Ready. Shopping-cart app pod issues are BLOCKED on this — do not investigate app layer until cold infra deploy passes.
-**v1.0.3 first commit:** flat-archive `docs/plans/` and `docs/issues/` — move all pre-v1.0.3 files into `docs/plans/archive/` and `docs/issues/archive/`; add releases index table (version | SHA | key changes) in `docs/plans/archive/README.md`.
-**enforce_admins:** restored on main 2026-03-31.
+**Remove CDP from `acg_credentials.js`** — drop `connectOverCDP` probe; always use `launchPersistentContext`. Planned for v1.0.3.
+**enforce_admins:** restored on main 2026-04-03.
 **Branch cleanup:** v0.9.7–v0.9.17 deleted 2026-03-28; v1.0.0 deleted 2026-03-29.
 **v0.9.15 scope:** Antigravity × GitHub Copilot coding agent validation — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`. Antigravity plugin rewritten in `b2ba187` per `docs/plans/v0.9.15-antigravity-plugin-impl.md`. Also: ldap-password-rotator `vault kv put` stdin hardening — spec `docs/plans/v0.9.15-ensure-copilot-cli.md` (closes v0.6.2 security debt; `_ensure_copilot_cli`/`_k3d_manager_copilot`/`_ensure_node` already shipped in v0.9.12).
 
