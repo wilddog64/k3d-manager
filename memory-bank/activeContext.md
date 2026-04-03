@@ -24,7 +24,7 @@
 
 **Chrome Playwright refactor (early v1.0.4):** `docs/plans/v1.0.4-chrome-playwright-refactor.md` — COMPLETE (`f7f15c5`). `acg_credentials.js`/`acg_extend.js` now launch Chrome via Playwright `launchPersistentContext` with a persisted auth dir, `_antigravity_launch` renamed to `_browser_launch`, and `antigravity_acg_extend` no longer pre-launches Chrome.
 
-**Playwright auth bootstrap (v1.0.4):** `docs/plans/v1.0.4-playwright-auth-bootstrap.md` — spec written (`6d9b08f`) 2026-04-03. ASSIGNED to Codex. Detect empty auth dir on first run: `acg_credentials.js` prints bootstrap banner + extends timeout to 300s; `acg_extend.js` fails fast with clear message to run `acg_get_credentials` first.
+**Playwright auth bootstrap (v1.0.4):** `docs/plans/v1.0.4-playwright-auth-bootstrap.md` — COMPLETE (`ce4cff7`). `acg_credentials.js` detects empty auth dir, prints bootstrap banner, and extends timeout to 300s; `acg_extend.js` fails fast with clear instructions to run `acg_get_credentials` first.
 
 ---
 
