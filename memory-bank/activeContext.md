@@ -15,6 +15,7 @@
 **v1.0.0 SHIPPED** — PR #57 merged to main (`807c0432`) 2026-03-29. Tagged v1.0.0, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-29-v1.0.0-retrospective.md`.
 **v1.0.1 SHIPPED** — PR #58 merged to main (`a8b6c583`) 2026-03-31. Tagged v1.0.1, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-31-v1.0.1-retrospective.md`.
 **v1.0.2 ACTIVE** — branch `k3d-manager-v1.0.2` cut from `a8b6c583` 2026-03-31. e2e verified 2026-04-03: `make up` runs 12 steps end-to-end, ClusterSecretStore Ready, 3 nodes Ready. Fixes: vault-root key (`root_token`), GHCR_PAT auto-populate, CDP browser `close()`. Commit `82a0376`. PR #59 open.
+**Full cold-run gate (next session):** run `make down --confirm` → `make up` from zero (no existing stack, no SSH config entries) to verify truly cold first-run path. Gate: ClusterSecretStore Ready + 3 nodes Ready. Shopping-cart app pod issues are BLOCKED on this — do not investigate app layer until cold infra deploy passes.
 **v1.0.3 first commit:** flat-archive `docs/plans/` and `docs/issues/` — move all pre-v1.0.3 files into `docs/plans/archive/` and `docs/issues/archive/`; add releases index table (version | SHA | key changes) in `docs/plans/archive/README.md`.
 **enforce_admins:** restored on main 2026-03-31.
 **Branch cleanup:** v0.9.7–v0.9.17 deleted 2026-03-28; v1.0.0 deleted 2026-03-29.
