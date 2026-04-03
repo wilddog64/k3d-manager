@@ -252,7 +252,7 @@ async function extractCredentials() {
       if (sessionToken) {
         console.log(`AWS_SESSION_TOKEN=${sessionToken.trim()}`);
       }
-      process.exit(0);
+      return;
     } else {
       throw new Error('Could not find AWS Access Key and Secret Key');
     }
