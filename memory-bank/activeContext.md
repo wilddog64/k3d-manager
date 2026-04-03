@@ -11,7 +11,7 @@
 **docs archive:** pre-v1.0.3 plans + issues moved to `docs/plans/archive/` and `docs/issues/archive/` on v1.0.3 branch cut.
 
 **Full cold-run gate (next session):** run `make down --confirm` → `make up` from zero (no existing stack, no SSH config entries) to verify truly cold first-run path. Gate: ClusterSecretStore Ready + 3 nodes Ready. Shopping-cart app pod issues are BLOCKED on this — do not investigate app layer until cold infra deploy passes.
-**Remove CDP from `acg_credentials.js`** — drop `connectOverCDP` probe; always use `launchPersistentContext`. Planned for v1.0.3.
+**Remove CDP from `acg_credentials.js`** — ASSIGNED to Codex. Spec: `docs/plans/v1.0.3-remove-cdp-from-acg-credentials.md`. Drop `connectOverCDP` probe; always use `launchPersistentContext`; remove CDP pre-check in `acg.sh`.
 **enforce_admins:** restored on main 2026-04-03.
 **Branch cleanup:** v0.9.7–v0.9.17 deleted 2026-03-28; v1.0.0 deleted 2026-03-29.
 **v0.9.15 scope:** Antigravity × GitHub Copilot coding agent validation — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`. Antigravity plugin rewritten in `b2ba187` per `docs/plans/v0.9.15-antigravity-plugin-impl.md`. Also: ldap-password-rotator `vault kv put` stdin hardening — spec `docs/plans/v0.9.15-ensure-copilot-cli.md` (closes v0.6.2 security debt; `_ensure_copilot_cli`/`_k3d_manager_copilot`/`_ensure_node` already shipped in v0.9.12).
