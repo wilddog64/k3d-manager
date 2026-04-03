@@ -1,13 +1,18 @@
 const { chromium } = require('playwright');
+const os = require('os');
+const path = require('path');
 
 /**
  * scripts/playwright/acg_extend.js
  *
  * Static Playwright script to extend the ACG sandbox TTL by 4 hours.
- * Connects to a running Chrome instance via CDP.
+ * Launches a persistent Chrome context — session persists across runs via auth dir.
+ * Auth dir: ~/.local/share/k3d-manager/playwright-auth
  *
  * Usage: node acg_extend.js <sandbox-url>
  */
+
+const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'playwright-auth');
 
 async function extendSandbox() {
   const targetUrl = process.argv[2];
@@ -16,13 +21,15 @@ async function extendSandbox() {
     process.exit(1);
   }
 
-  let browser;
+  let browserContext;
   try {
-    browser = await chromium.connectOverCDP('http://localhost:9222');
+    browserContext = await chromium.launchPersistentContext(AUTH_DIR, {
+      headless: false,
+      channel: 'chrome',
+      args: ['--password-store=basic'],
+    });
 
-    const context = browser.contexts()[0];
-    if (!context) throw new Error('No browser context found');
-    const allPages = context.pages();
+    const allPages = browserContext.pages();
     let page = allPages.find(p => {
       try { return new URL(p.url()).hostname.endsWith('.pluralsight.com'); } catch { return false; }
     });
@@ -116,7 +123,7 @@ async function extendSandbox() {
     console.error(`ERROR: ${error.message}`);
     process.exit(1);
   } finally {
-    if (browser) await browser.close();
+    if (browserContext) await browserContext.close();
   }
 }
 
