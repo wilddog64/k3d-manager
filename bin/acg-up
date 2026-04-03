@@ -13,6 +13,7 @@
 #   PLURALSIGHT_EMAIL Pre-fill email on Pluralsight sign-in page
 #   GHCR_PAT          GitHub PAT with read:packages scope — required for ghcr-pull-secret
 #   GITHUB_USERNAME   GitHub username (default: wilddog64)
+#   ESO_VERSION       ESO helm chart version to install on remote (default: 0.9.20)
 
 set -euo pipefail
 
@@ -57,16 +58,31 @@ if [[ "$login_prompt" -eq 1 ]]; then
   echo ""
 fi
 
-_info "[acg-up] Step 1/4 — Getting AWS credentials..."
+_info "[acg-up] Step 1/12 — Getting AWS credentials..."
 acg_get_credentials ${sandbox_url:+"$sandbox_url"}
 
-_info "[acg-up] Step 2/4 — Provisioning 3-node cluster..."
+_info "[acg-up] Step 2/12 — Provisioning 3-node cluster..."
 CLUSTER_PROVIDER=k3s-aws deploy_cluster --confirm
 
-_info "[acg-up] Step 3/6 — Starting SSH tunnel..."
+_info "[acg-up] Step 3/12 — Starting SSH tunnel..."
 tunnel_start
 
-_info "[acg-up] Step 4/6 — Creating ghcr-pull-secret in all app namespaces..."
+_info "[acg-up] Step 4/12 — Starting Vault port-forward (k3d → localhost:8200)..."
+_vault_pf_pid_file="${HOME}/.local/share/k3d-manager/vault-pf.pid"
+mkdir -p "$(dirname "${_vault_pf_pid_file}")"
+if [[ -f "${_vault_pf_pid_file}" ]]; then
+  kill "$(cat "${_vault_pf_pid_file}")" 2>/dev/null || true
+  rm -f "${_vault_pf_pid_file}"
+fi
+kubectl port-forward svc/vault -n secrets --context k3d-k3d-cluster 8200:8200 \
+  >>"${HOME}/.local/share/k3d-manager/vault-pf.log" 2>&1 &
+_vault_pf_pid=$!
+disown "${_vault_pf_pid}"
+echo "${_vault_pf_pid}" > "${_vault_pf_pid_file}"
+sleep 3
+_info "[acg-up] Vault port-forward PID: ${_vault_pf_pid} (log: ${HOME}/.local/share/k3d-manager/vault-pf.log)"
+
+_info "[acg-up] Step 5/12 — Creating ghcr-pull-secret in all app namespaces..."
 _ghcr_pat="${GHCR_PAT:-}"
 _github_user="${GITHUB_USERNAME:-wilddog64}"
 if [[ -z "$_ghcr_pat" ]]; then
@@ -87,7 +103,7 @@ for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
   _info "[acg-up] ghcr-pull-secret applied in namespace: ${ns}"
 done
 
-_info "[acg-up] Step 5/6 — Creating vault-bridge Endpoints in secrets namespace..."
+_info "[acg-up] Step 6/12 — Creating vault-bridge Endpoints + Service in secrets namespace..."
 _vault_node_ip=$(kubectl get nodes --context ubuntu-k3s \
   -l node-role.kubernetes.io/control-plane \
   --no-headers \
@@ -111,9 +127,151 @@ subsets:
   - port: 8201
 EOF
   _info "[acg-up] vault-bridge Endpoints → ${_vault_node_ip}:8201"
+  kubectl apply --context ubuntu-k3s -f - <<'SVCEOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault-bridge
+  namespace: secrets
+spec:
+  ports:
+  - port: 8201
+    protocol: TCP
+    targetPort: 8201
+SVCEOF
+  _info "[acg-up] vault-bridge Service applied (DNS: vault-bridge.secrets.svc.cluster.local:8201)"
 fi
 
-_info "[acg-up] Step 6/6 — Installing sandbox TTL watcher (launchd)..."
+_info "[acg-up] Step 7/12 — Bootstrapping argocd-manager SA on remote cluster..."
+ssh ubuntu sudo kubectl apply -f - <<'SAEOF'
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argocd-manager
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argocd-manager-role
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+- nonResourceURLs: ["*"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argocd-manager-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-manager-role
+subjects:
+- kind: ServiceAccount
+  name: argocd-manager
+  namespace: kube-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-manager-token
+  namespace: kube-system
+  annotations:
+    kubernetes.io/service-account.name: argocd-manager
+type: kubernetes.io/service-account-token
+SAEOF
+sleep 5
+_info "[acg-up] argocd-manager SA + static token Secret ready"
+
+_info "[acg-up] Step 8/12 — Installing helm + ESO on remote cluster..."
+_eso_version="${ESO_VERSION:-0.9.20}"
+if ! ssh ubuntu command -v helm >/dev/null 2>&1; then
+  _info "[acg-up] helm not found — installing..."
+  ssh ubuntu "curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash" >/dev/null
+fi
+if ! ssh ubuntu "sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm status external-secrets -n secrets >/dev/null 2>&1"; then
+  _info "[acg-up] ESO not installed — installing v${_eso_version}..."
+  # shellcheck disable=SC2029
+  ssh ubuntu "sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm repo add external-secrets https://charts.external-secrets.io >/dev/null 2>&1 && \
+    sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm repo update >/dev/null 2>&1 && \
+    sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm install external-secrets external-secrets/external-secrets \
+      -n secrets --create-namespace --set installCRDs=true --version ${_eso_version}" >/dev/null
+  _info "[acg-up] ESO v${_eso_version} installed"
+else
+  _info "[acg-up] ESO already installed — skipping"
+fi
+
+_info "[acg-up] Step 9/12 — Applying vault-token secret + ClusterSecretStore on remote cluster..."
+_vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
+  -o jsonpath='{.data.token}' | base64 -d)
+if [[ -z "${_vault_root_token}" ]]; then
+  _err "[acg-up] Could not read vault-root token from k3d-k3d-cluster — is Vault running?"
+fi
+kubectl create namespace secrets --context ubuntu-k3s \
+  --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f - >/dev/null
+kubectl create secret generic vault-token \
+  -n secrets --context ubuntu-k3s \
+  --from-literal=token="${_vault_root_token}" \
+  --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f -
+sleep 10
+kubectl apply --context ubuntu-k3s -f - <<'CSSEOF'
+apiVersion: external-secrets.io/v1beta1
+kind: ClusterSecretStore
+metadata:
+  name: vault-backend
+spec:
+  provider:
+    vault:
+      server: "http://vault-bridge.secrets.svc.cluster.local:8201"
+      path: "secret"
+      version: "v2"
+      auth:
+        tokenSecretRef:
+          name: vault-token
+          namespace: secrets
+          key: token
+CSSEOF
+_info "[acg-up] vault-token secret + ClusterSecretStore applied"
+
+_info "[acg-up] Step 10/12 — Registering app cluster with ArgoCD..."
+_argocd_sa_token=$(kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s \
+  -o jsonpath='{.data.token}' | base64 -d | tr -d '\n')
+if [[ -z "${_argocd_sa_token}" ]]; then
+  _err "[acg-up] argocd-manager-token secret not yet populated — wait and retry"
+fi
+kubectl create namespace cicd --context k3d-k3d-cluster \
+  --dry-run=client -o yaml | kubectl apply --context k3d-k3d-cluster -f - >/dev/null
+ARGOCD_APP_CLUSTER_TOKEN="${_argocd_sa_token}" \
+  "${REPO_ROOT}/scripts/k3d-manager" register_app_cluster
+_info "[acg-up] Restarting ArgoCD application controller to pick up new cluster secret..."
+kubectl rollout restart statefulset/argocd-application-controller \
+  -n cicd --context k3d-k3d-cluster
+kubectl rollout status statefulset/argocd-application-controller \
+  -n cicd --context k3d-k3d-cluster --timeout=90s
+_info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → https://host.k3d.internal:6443"
+
+_info "[acg-up] Step 11/12 — Verifying ClusterSecretStore..."
+_css_ready=false
+for i in $(seq 1 12); do
+  _css_status=$(kubectl get clustersecretstore vault-backend --context ubuntu-k3s \
+    -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null || echo "")
+  if [[ "${_css_status}" == "True" ]]; then
+    _css_ready=true
+    break
+  fi
+  _info "[acg-up] ClusterSecretStore not Ready yet (attempt ${i}/12) — waiting 10s..."
+  sleep 10
+done
+if [[ "${_css_ready}" == "true" ]]; then
+  _info "[acg-up] ClusterSecretStore vault-backend: Ready"
+else
+  _info "[acg-up] ClusterSecretStore not Ready after 120s — check vault-bridge connectivity"
+fi
+
+_info "[acg-up] Step 12/12 — Installing sandbox TTL watcher (launchd)..."
 acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
 
 _info "[acg-up] Cluster is up."
