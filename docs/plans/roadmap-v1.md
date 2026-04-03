@@ -161,7 +161,46 @@ functions are defined. Passing this test is the extractability gate — if it pa
 
 ---
 
-## v1.0.4 — GCP Cloud Provider
+## v1.0.4 — Browser Automation Refactor
+*Focus: decouple Chrome/Playwright automation from the Antigravity IDE concept*
+
+The Playwright scripts and CDP launch logic have nothing to do with Antigravity — they
+are Chrome browser automation for the ACG sandbox credential panel. The `_antigravity_`
+prefix conflates two unrelated concerns and creates confusion when reading the code.
+
+**Renames:**
+
+| Old | New | Notes |
+|-----|-----|-------|
+| `_antigravity_launch` | `_browser_launch` | stays in `antigravity.sh` until extracted |
+| `antigravity_acg_extend` | `acg_extend` | move to `scripts/plugins/acg.sh` |
+
+`antigravity_install` and `antigravity_trigger_copilot_review` stay in `antigravity.sh`
+— they are genuinely Antigravity IDE functions.
+
+**`launchPersistentContext` migration** — replace the CDP connect pattern with Playwright's
+`launchPersistentContext`. This eliminates the pre-launch dependency and CDP port probe loop.
+Playwright owns the browser lifecycle; session persists via a dedicated auth dir.
+
+```js
+const { chromium } = require('playwright');
+const context = await chromium.launchPersistentContext(
+  path.join(os.homedir(), '.local/share/k3d-manager/playwright-auth'),
+  { headless: false, channel: 'chrome', args: ['--password-store=basic'] }
+);
+```
+
+- Auth dir: `~/.local/share/k3d-manager/playwright-auth/` — consistent with existing
+  `~/.local/share/k3d-manager/` convention; add to `.gitignore`
+- First run: `headless: false` for interactive login; subsequent runs can go headless
+- `_browser_launch` and its CDP probe logic removed once `launchPersistentContext` is live
+
+**Milestone gate:** `acg_get_credentials` and `acg_extend` both work end-to-end with
+`launchPersistentContext`; old `_antigravity_launch` / CDP probe deleted; shellcheck + BATS green.
+
+---
+
+## v1.0.6 — GCP Cloud Provider
 *Focus: k3s on GCP Compute Engine — second cloud backend*
 
 **New `CLUSTER_PROVIDER` value:** `k3s-gcp`
@@ -173,7 +212,7 @@ functions are defined. Passing this test is the extractability gate — if it pa
 
 ---
 
-## v1.0.5 — Azure Cloud Provider
+## v1.0.7 — Azure Cloud Provider
 *Focus: k3s on Azure VM — third cloud backend*
 
 **New `CLUSTER_PROVIDER` value:** `k3s-azure`
