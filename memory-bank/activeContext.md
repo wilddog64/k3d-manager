@@ -33,7 +33,7 @@
 
 **bin/ SCRIPT_DIR fix:** ASSIGNED to Codex 2026-04-03. Spec: `docs/plans/v1.0.2-fix-bin-script-dir.md`. All `bin/` entry points (`acg-up`, `acg-refresh`, `acg-down`) set `SCRIPT_DIR` to `bin/` instead of `scripts/`; `acg.sh` guard fires false and tries `bin/plugins/aws.sh` — not found. Fix: compute REPO_ROOT first, then `SCRIPT_DIR="${REPO_ROOT}/scripts"`.
 
-**Gemini e2e (vault-bridge + bootstrap live test):** BLOCKED on bin/ SCRIPT_DIR fix. AWS credentials extracted successfully by user (`ffe0385` CDP fix confirmed working). Gemini to run `bin/acg-up` and verify vault-bridge + ClusterSecretStore + pods. Do NOT re-run acg_get_credentials — credentials already in ~/.aws/credentials.
+**Gemini e2e (vault-bridge + bootstrap live test):** ASSIGNED 2026-04-03 (unblocked by `29a8535`). Gemini to run `bin/acg-up <sandbox-url>` end-to-end and verify: socat systemd active on server, vault-bridge Endpoints applied, ClusterSecretStore `Ready`, all 5 pods Running. Paste actual command output — do not summarize.
 
 ---
 
