@@ -54,7 +54,7 @@ async function extractCredentials() {
         }
       }
       if (!browserContext) {
-        await _cdpBrowser.disconnect();
+        try { await _cdpBrowser.close(); } catch {}
         _cdpBrowser = null;
       }
     } catch {

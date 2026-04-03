@@ -133,7 +133,7 @@ function _vcluster_install_cli() {
     mac)
       _run_command -- brew install loft-sh/tap/vcluster
       ;;
-    linux|debian|redhat|wsl)
+    debian|redhat|wsl)
       local install_dir="${VCLUSTER_INSTALL_DIR:-/usr/local/bin}"
       local tmp_file
       tmp_file="$(mktemp -t vcluster-cli.XXXXXX)"

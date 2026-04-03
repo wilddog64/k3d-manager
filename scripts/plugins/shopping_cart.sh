@@ -150,7 +150,7 @@ function _setup_vault_bridge() {
   _info "[shopping_cart] Installing socat and vault-bridge systemd unit on ${ssh_host}..."
   # SC2087: single-quoted heredoc intentionally prevents local expansion
   # shellcheck disable=SC2087
-ssh -i "${ssh_key}" "${ssh_host}" bash <<'REMOTE'
+_run_command -- ssh -i "${ssh_key}" "${ssh_host}" bash <<'REMOTE'
 set -euo pipefail
 SUDO="sudo"
 if ! command -v socat >/dev/null 2>&1; then
