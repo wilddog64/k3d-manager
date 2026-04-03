@@ -206,7 +206,7 @@ fi
 
 _info "[acg-up] Step 9/12 — Applying vault-token secret + ClusterSecretStore on remote cluster..."
 _vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
-  -o jsonpath='{.data.token}' | base64 -d)
+  -o jsonpath='{.data.root_token}' | base64 -d)
 if [[ -z "${_vault_root_token}" ]]; then
   _err "[acg-up] Could not read vault-root token from k3d-k3d-cluster — is Vault running?"
 fi
