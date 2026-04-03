@@ -30,8 +30,6 @@
 **Playwright Start Sandbox detection fix (v1.0.4):** `docs/plans/v1.0.4-fix-start-sandbox-detection.md` — COMPLETE (`517f697`). Credentials skip guard now checks populated values and waits up to 60s after Start/Open/Resume before extracting credentials.
 **Playwright sandbox button race (v1.0.4):** `docs/plans/v1.0.4-fix-sandbox-button-race-condition.md` — COMPLETE (`f5a9399`). Waits for SPA cards to render before checking Start/Open/Resume buttons and restores conditional timeout.
 
-**Sandbox button race condition fix (v1.0.4):** `docs/plans/v1.0.4-fix-sandbox-button-race-condition.md` — spec written 2026-04-03. ASSIGNED to Codex. Add `waitForFunction` to wait for SPA cards to render before checking buttons; revert Gemini's hardcoded 600000 timeout to `IS_FIRST_RUN ? 300000 : 120000`.
-
 **Gemini e2e (vault-bridge + bootstrap live test):** ASSIGNED 2026-04-03. BLOCKED pending race condition fix. Resume after Codex commits.
 
 ---
