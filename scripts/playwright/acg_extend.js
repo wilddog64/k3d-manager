@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
@@ -14,7 +15,21 @@ const path = require('path');
 
 const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'playwright-auth');
 
+function _isFirstRun() {
+  try {
+    return !fs.existsSync(AUTH_DIR) || fs.readdirSync(AUTH_DIR).length === 0;
+  } catch {
+    return true;
+  }
+}
+
 async function extendSandbox() {
+  if (_isFirstRun()) {
+    console.error(`ERROR: Auth dir is empty (${AUTH_DIR}).`);
+    console.error('ERROR: Run acg_get_credentials <sandbox-url> first to bootstrap the Pluralsight session.');
+    process.exit(1);
+  }
+
   const targetUrl = process.argv[2];
   if (!targetUrl) {
     console.error('ERROR: No sandbox URL provided');

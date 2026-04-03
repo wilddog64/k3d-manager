@@ -1,4 +1,5 @@
 const { chromium } = require('playwright');
+const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
@@ -12,11 +13,27 @@ const path = require('path');
 
 const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'playwright-auth');
 
+function _isFirstRun() {
+  try {
+    return !fs.existsSync(AUTH_DIR) || fs.readdirSync(AUTH_DIR).length === 0;
+  } catch {
+    return true;
+  }
+}
+const IS_FIRST_RUN = _isFirstRun();
+
 async function extractCredentials() {
   const targetUrl = process.argv[2];
   if (!targetUrl) {
     console.error('ERROR: No target URL provided');
     process.exit(1);
+  }
+
+  if (IS_FIRST_RUN) {
+    console.error('BOOTSTRAP: Auth dir is empty — first run detected.');
+    console.error(`BOOTSTRAP: Auth dir: ${AUTH_DIR}`);
+    console.error('BOOTSTRAP: Chrome will open. Please log in to Pluralsight when prompted.');
+    console.error('BOOTSTRAP: The script will continue automatically after successful login (up to 300s).');
   }
 
   let browserContext;
@@ -222,7 +239,7 @@ async function extractCredentials() {
   }
 }
 
-const OVERALL_TIMEOUT_MS = 120000;
+const OVERALL_TIMEOUT_MS = IS_FIRST_RUN ? 300000 : 120000;
 Promise.race([
   extractCredentials(),
   new Promise((_, reject) =>
