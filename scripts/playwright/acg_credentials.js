@@ -180,6 +180,18 @@ async function extractCredentials() {
     } else {
       console.error('INFO: Looking for Start/Open button...');
 
+      // Wait for SPA to render sandbox cards before checking buttons
+      // (skeleton clears aria-busy before cards appear — must wait for actual elements)
+      await page.waitForFunction(() => {
+        const buttons = Array.from(document.querySelectorAll('button'));
+        const hasStart = buttons.some(b => b.textContent.trim().includes('Start Sandbox'));
+        const hasOpen = buttons.some(b => b.textContent.trim().includes('Open Sandbox'));
+        const hasResume = buttons.some(b => b.textContent.trim().includes('Resume'));
+        const inputs = document.querySelectorAll('input[aria-label="Copyable input"]');
+        const hasCredentials = inputs.length > 0 && inputs[0].value.trim().length > 0;
+        return hasStart || hasOpen || hasResume || hasCredentials;
+      }, { timeout: 30000 }).catch(() => console.error('WARN: Timed out waiting for sandbox buttons or credentials — proceeding anyway'));
+
       const _waitForCredentials = async () => {
         console.error('INFO: Waiting for credentials to populate (up to 60s)...');
         await page.waitForFunction(
@@ -283,7 +295,7 @@ async function extractCredentials() {
   }
 }
 
-const OVERALL_TIMEOUT_MS = 600000;
+const OVERALL_TIMEOUT_MS = IS_FIRST_RUN ? 300000 : 120000;
 Promise.race([
   extractCredentials(),
   new Promise((_, reject) =>
