@@ -39,28 +39,26 @@ async function extractCredentials() {
   let browserContext;
   let _cdpBrowser = null;
   try {
-    if (IS_FIRST_RUN) {
-      try {
-        _cdpBrowser = await chromium.connectOverCDP('http://localhost:9222');
-        const _cdpContexts = _cdpBrowser.contexts();
-        if (_cdpContexts.length > 0) {
-          const _cdpContext = _cdpContexts[0];
-          const _cdpPages = _cdpContext.pages();
-          const _cdpPsPage = _cdpPages.find(p => {
-            try { return new URL(p.url()).hostname.endsWith('.pluralsight.com'); } catch { return false; }
-          });
-          if (_cdpPsPage) {
-            console.error('INFO: Found existing Pluralsight session via CDP — reusing existing Chrome instance.');
-            browserContext = _cdpContext;
-          }
+    try {
+      _cdpBrowser = await chromium.connectOverCDP('http://localhost:9222');
+      const _cdpContexts = _cdpBrowser.contexts();
+      if (_cdpContexts.length > 0) {
+        const _cdpContext = _cdpContexts[0];
+        const _cdpPages = _cdpContext.pages();
+        const _cdpPsPage = _cdpPages.find(p => {
+          try { return new URL(p.url()).hostname.endsWith('.pluralsight.com'); } catch { return false; }
+        });
+        if (_cdpPsPage) {
+          console.error('INFO: Found existing Pluralsight session via CDP — reusing existing Chrome instance.');
+          browserContext = _cdpContext;
         }
-        if (!browserContext) {
-          await _cdpBrowser.disconnect();
-          _cdpBrowser = null;
-        }
-      } catch {
+      }
+      if (!browserContext) {
+        await _cdpBrowser.disconnect();
         _cdpBrowser = null;
       }
+    } catch {
+      _cdpBrowser = null;
     }
     if (!browserContext) {
       browserContext = await chromium.launchPersistentContext(AUTH_DIR, {
@@ -81,6 +79,14 @@ async function extractCredentials() {
       page = allPages[0];
       if (!page) throw new Error('No page found in the browser context');
     }
+
+    // Skip navigation entirely if sandbox panel is already loaded on the current page
+    const _sandboxReady = await page.locator(
+      'button:has-text("Start Sandbox"), input[aria-label="Copyable input"]'
+    ).first().isVisible({ timeout: 2000 }).catch(() => false);
+    if (_sandboxReady) {
+      console.error('INFO: Sandbox panel already loaded — skipping navigation');
+    } else {
 
     // Navigate only if not already on the target URL (hard reload kills SPA auth)
     const currentUrl = page.url();
@@ -109,6 +115,7 @@ async function extractCredentials() {
       console.error(`INFO: Navigating to ${targetUrl}...`);
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     }
+    } // end else (_sandboxReady)
 
     // Give it time to render SPA content after navigation changes
     console.error('INFO: Waiting for page content to load...');
