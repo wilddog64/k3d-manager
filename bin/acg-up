@@ -220,7 +220,17 @@ kubectl create secret generic vault-token \
   -n secrets --context ubuntu-k3s \
   --from-literal=token="${_vault_root_token}" \
   --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f -
-sleep 10
+_info "[acg-up] Waiting for ESO webhook to be ready..."
+for i in $(seq 1 18); do
+  _wh_ip=$(kubectl get endpoints external-secrets-webhook -n secrets --context ubuntu-k3s \
+    -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null || true)
+  if [[ -n "${_wh_ip}" ]]; then
+    _info "[acg-up] ESO webhook ready (${_wh_ip})"
+    break
+  fi
+  _info "[acg-up] ESO webhook not ready yet (attempt ${i}/18) — waiting 10s..."
+  sleep 10
+done
 kubectl apply --context ubuntu-k3s -f - <<'CSSEOF'
 apiVersion: external-secrets.io/v1beta1
 kind: ClusterSecretStore
