@@ -26,6 +26,8 @@
 
 **Playwright auth bootstrap (v1.0.4):** `docs/plans/v1.0.4-playwright-auth-bootstrap.md` — COMPLETE (`ce4cff7`). `acg_credentials.js` detects empty auth dir, prints bootstrap banner, and extends timeout to 300s; `acg_extend.js` fails fast with clear instructions to run `acg_get_credentials` first.
 
+**Gemini e2e (vault-bridge + bootstrap live test):** ASSIGNED 2026-04-03. Tasks: (1) bootstrap playwright-auth dir via `acg_get_credentials` (user fills in Pluralsight login when Chrome opens); (2) run `bin/acg-up`; (3) verify socat systemd active on EC2, ClusterSecretStore `Ready`, all 5 pods Running. Report actual command output.
+
 ---
 
 ## Roadmap Versioning Decision (2026-03-29)
