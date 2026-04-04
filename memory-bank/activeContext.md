@@ -11,7 +11,8 @@
 **docs archive:** pre-v1.0.3 plans + issues moved to `docs/plans/archive/` and `docs/issues/archive/` on v1.0.3 branch cut.
 
 **Cold-run gate: PASSED (2026-04-03)** — `make up` from zero: 3 nodes Ready + ClusterSecretStore Ready. Commits: `96629e0` (ESO webhook wait), `e8b296b` (CSS poll 180s), `dc2c82d` (AWS creds check).
-**acg_extend selector fix** — ASSIGNED to Gemini. Extend button selectors stale against current Pluralsight UI. Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`. Only file: `scripts/playwright/acg_extend.js`.
+**acg_extend selector fix** — COMPLETE (`e39efa4`). Extend button selectors updated to match the new Pluralsight UI which now uses a Modal with "Extend Session" and only appears at 1 hour remaining. Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`.
+**Shopping-cart app pod investigation** — ASSIGNED to Gemini (2026-04-03). Diagnose CrashLoopBackOff on basket + frontend, Error on product-catalog. Context: ubuntu-k3s. Report pod logs + describe events. No code changes — investigation only.
 **Remove CDP from `acg_credentials.js`** — ASSIGNED to Codex. Spec: `docs/plans/v1.0.3-remove-cdp-from-acg-credentials.md`. Drop `connectOverCDP` probe; always use `launchPersistentContext`; remove CDP pre-check in `acg.sh`.
 **enforce_admins:** restored on main 2026-04-03.
 **Branch cleanup:** v0.9.7–v0.9.17 deleted 2026-03-28; v1.0.0 deleted 2026-03-29.
