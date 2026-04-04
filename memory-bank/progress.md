@@ -32,9 +32,9 @@
 
 - [x] **Chrome CDP launchd agent** — **COMPLETE**. `fe0f313` adds constants/helpers + `acg_chrome_cdp_install`/`acg_chrome_cdp_uninstall` + `make chrome-cdp`/`chrome-cdp-stop`. Platform detection fixed: `513009f` (`acg.sh`), `4ce2b51` (`antigravity.sh`). Spec: `docs/plans/v1.0.3-chrome-cdp-launchd.md`.
 
-- [ ] **acg-refresh skip creds fix** — ASSIGNED to Codex. Skip `acg_get_credentials` when AWS creds still valid. Spec: `docs/plans/v1.0.3-fix-acg-refresh-skip-creds.md`. Issue: `docs/issues/2026-04-04-acg-refresh-unconditional-cred-extraction.md`.
+- [x] **acg-refresh skip creds fix** — **COMPLETE**. Commit `6dcb913` gates `bin/acg-refresh` credential extraction behind `_acg_check_credentials` so existing AWS creds skip Playwright, preventing Chrome CDP lock conflicts. Spec: `docs/plans/v1.0.3-fix-acg-refresh-skip-creds.md`.
 
-- [ ] **ESO version bump** — ASSIGNED to Codex. Bump `ESO_VERSION` default from `0.9.20` to `0.14.0` in `bin/acg-up`. ESO v0.9.20 only serves `v1alpha1`; shopping-cart-infra manifests require `v1`. Spec: `docs/plans/v1.0.3-fix-eso-version.md`. Issue: `docs/issues/2026-04-04-eso-version-mismatch-v1alpha1.md`.
+- [x] **ESO version bump** — **COMPLETE**. Commit `216f6d5` sets the default ESO Helm chart version to 0.14.0 so remote installs expose `external-secrets.io/v1` required by shopping-cart-infra. Spec: `docs/plans/v1.0.3-fix-eso-version.md`.
 
 - [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.
 
