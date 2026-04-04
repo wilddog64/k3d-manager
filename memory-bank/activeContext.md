@@ -23,8 +23,8 @@
 - COMPLETE (`1cccf01` / `450d008`): socat systemd automation + Endpoints in k3d-manager; Service + ClusterSecretStore update in shopping-cart-infra.
 
 **Chrome CDP launchd agent (v1.0.3):** COMPLETE (`513009f`). All platform detection bugs fixed (`_is_mac` → `uname Darwin` in `acg.sh` + `antigravity.sh`). Launchd agent active on port 9222. Spec: `docs/plans/v1.0.3-chrome-cdp-launchd.md`.
-**acg-refresh skip creds fix (v1.0.3):** ASSIGNED to Codex. Spec: `docs/plans/v1.0.3-fix-acg-refresh-skip-creds.md`. `bin/acg-refresh` to skip `acg_get_credentials` when AWS creds are still valid. Issue: `docs/issues/2026-04-04-acg-refresh-unconditional-cred-extraction.md`.
-**ESO version bump (v1.0.3):** ASSIGNED to Codex. Spec: `docs/plans/v1.0.3-fix-eso-version.md`. Bump `ESO_VERSION` default from `0.9.20` to `0.14.0` in `bin/acg-up` — ESO v0.9.20 only serves `v1alpha1`; manifests require `v1`. Issue: `docs/issues/2026-04-04-eso-version-mismatch-v1alpha1.md`.
+**acg-refresh skip creds fix (v1.0.3):** COMPLETE (`6dcb913`). `bin/acg-refresh` now checks `_acg_check_credentials` before extracting AWS creds, so Chrome CDP launchd agent continues running without Playwright lock conflicts. Spec: `docs/plans/v1.0.3-fix-acg-refresh-skip-creds.md`.
+**ESO version bump (v1.0.3):** COMPLETE (`216f6d5`). `bin/acg-up` default `ESO_VERSION` now 0.14.0 (was 0.9.20) so remote installs serve `external-secrets.io/v1` to match shopping-cart-infra manifests. Spec: `docs/plans/v1.0.3-fix-eso-version.md`.
 
 **Chrome Playwright refactor (early v1.0.4):** `docs/plans/v1.0.4-chrome-playwright-refactor.md` — COMPLETE (`f7f15c5`). `acg_credentials.js`/`acg_extend.js` now launch Chrome via Playwright `launchPersistentContext` with a persisted auth dir, `_antigravity_launch` renamed to `_browser_launch`, and `antigravity_acg_extend` no longer pre-launches Chrome.
 
