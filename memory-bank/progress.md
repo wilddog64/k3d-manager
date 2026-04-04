@@ -30,8 +30,9 @@
 
 - [x] **acg_extend selector fix** — **COMPLETE**. Analyzed Pluralsight React JS bundle and added explicit selectors (`[data-heap-id*="Extend Sandbox"]`, `button:has-text("Extend Session")`) and a fallback to click the `h4` text so pre-flight checks pass safely even when the button is not rendered (i.e. >1 hr remaining). Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`; commit `e39efa4`.
 
-- [x] **Chrome CDP launchd agent** — **COMPLETE**. Commit `84725d2` adds Chrome CDP constants/helpers plus `acg_chrome_cdp_install` / `acg_chrome_cdp_uninstall` in `acg.sh`, exposes `make chrome-cdp` / `chrome-cdp-stop`, and installs a launchd agent. Bug fix for `$(n)` typo included.
+- [x] **Chrome CDP launchd agent** — **COMPLETE**. `fe0f313` adds constants/helpers + `acg_chrome_cdp_install`/`acg_chrome_cdp_uninstall` + `make chrome-cdp`/`chrome-cdp-stop`. Platform detection fixed: `513009f` (`acg.sh`), `4ce2b51` (`antigravity.sh`). Spec: `docs/plans/v1.0.3-chrome-cdp-launchd.md`.
 
+- [ ] **acg-refresh skip creds fix** — ASSIGNED to Codex. Skip `acg_get_credentials` when AWS creds still valid. Spec: `docs/plans/v1.0.3-fix-acg-refresh-skip-creds.md`. Issue: `docs/issues/2026-04-04-acg-refresh-unconditional-cred-extraction.md`.
 
 - [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.
 
