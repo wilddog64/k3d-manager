@@ -70,7 +70,7 @@ function _browser_launch() {
     return 0
   fi
   _info "Chrome not running — launching with --remote-debugging-port=9222..."
-  if _is_mac; then
+  if [[ "$(uname)" == "Darwin" ]]; then
     open -a "Google Chrome" --args \
       --remote-debugging-port=9222 \
       --password-store=basic \
