@@ -269,20 +269,20 @@ _info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → https://host.k3d.inter
 
 _info "[acg-up] Step 11/12 — Verifying ClusterSecretStore..."
 _css_ready=false
-for i in $(seq 1 12); do
+for i in $(seq 1 18); do
   _css_status=$(kubectl get clustersecretstore vault-backend --context ubuntu-k3s \
     -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null || echo "")
   if [[ "${_css_status}" == "True" ]]; then
     _css_ready=true
     break
   fi
-  _info "[acg-up] ClusterSecretStore not Ready yet (attempt ${i}/12) — waiting 10s..."
+  _info "[acg-up] ClusterSecretStore not Ready yet (attempt ${i}/18) — waiting 10s..."
   sleep 10
 done
 if [[ "${_css_ready}" == "true" ]]; then
   _info "[acg-up] ClusterSecretStore vault-backend: Ready"
 else
-  _info "[acg-up] ClusterSecretStore not Ready after 120s — check vault-bridge connectivity"
+  _info "[acg-up] ClusterSecretStore not Ready after 180s — check vault-bridge connectivity"
 fi
 
 _info "[acg-up] Step 12/12 — Installing sandbox TTL watcher (launchd)..."
