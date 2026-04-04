@@ -31,6 +31,10 @@ _ACG_WATCH_LAUNCHD_LABEL="com.k3d-manager.acg-watch"
 _ACG_WATCH_PLIST_PATH="${HOME}/Library/LaunchAgents/${_ACG_WATCH_LAUNCHD_LABEL}.plist"
 _ACG_WATCH_WRAPPER="${HOME}/.local/share/k3d-manager/acg-watch-run.sh"
 _ACG_CF_STACK_NAME="k3d-manager-cluster"
+_ACG_CHROME_CDP_LABEL="com.k3d-manager.chrome-cdp"
+_ACG_CHROME_CDP_PLIST="${HOME}/Library/LaunchAgents/${_ACG_CHROME_CDP_LABEL}.plist"
+_ACG_CHROME_CDP_AUTH_DIR="${HOME}/.local/share/k3d-manager/playwright-auth"
+_ACG_CHROME_CDP_PORT=9222
 
 _acg_check_credentials() {
   _info "[acg] Checking AWS credentials..."
@@ -201,6 +205,36 @@ _acg_watch_write_plist() {
   <string>/tmp/k3d-manager-acg-watch.out</string>
   <key>StandardErrorPath</key>
   <string>/tmp/k3d-manager-acg-watch.err</string>
+</dict>
+</plist>
+PLIST
+}
+
+_acg_chrome_cdp_write_plist() {
+  mkdir -p "$(dirname "${_ACG_CHROME_CDP_PLIST}")"
+  mkdir -p "${_ACG_CHROME_CDP_AUTH_DIR}"
+  cat > "${_ACG_CHROME_CDP_PLIST}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_ACG_CHROME_CDP_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Applications/Google Chrome.app/Contents/MacOS/Google Chrome</string>
+    <string>--remote-debugging-port=${_ACG_CHROME_CDP_PORT}</string>
+    <string>--user-data-dir=${_ACG_CHROME_CDP_AUTH_DIR}</string>
+    <string>--password-store=basic</string>
+    <string>--no-first-run</string>
+    <string>--no-default-browser-check</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardErrorPath</key>
+  <string>/tmp/k3d-manager-chrome-cdp.err</string>
 </dict>
 </plist>
 PLIST
@@ -470,6 +504,62 @@ function acg_watch_stop() {
 
   [[ -f "${_ACG_WATCH_PLIST_PATH}" ]] && rm -f "${_ACG_WATCH_PLIST_PATH}"
   [[ -f "${_ACG_WATCH_WRAPPER}" ]] && rm -f "${_ACG_WATCH_WRAPPER}"
+}
+
+function acg_chrome_cdp_install() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    echo "Usage: acg_chrome_cdp_install"
+    echo "Install a launchd agent that starts Chrome with CDP on port ${_ACG_CHROME_CDP_PORT}."
+    echo "Chrome uses ${_ACG_CHROME_CDP_AUTH_DIR} as its profile (shared with Playwright scripts)."
+    echo "Log: /tmp/k3d-manager-chrome-cdp.err"
+    return 0
+  fi
+
+  if [[ "$(uname)" != "Darwin" ]]; then
+    _info "[acg] acg_chrome_cdp_install is macOS only — skipping"
+    return 0
+  fi
+
+  if [[ ! -f "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]]; then
+    _err "[acg] Google Chrome not found at /Applications/Google Chrome.app — install Chrome first"
+  fi
+
+  _acg_chrome_cdp_write_plist
+
+  if launchctl list "${_ACG_CHROME_CDP_LABEL}" >/dev/null 2>&1; then
+    _info "[acg] Reloading Chrome CDP agent ${_ACG_CHROME_CDP_LABEL}..."
+    launchctl unload "${_ACG_CHROME_CDP_PLIST}" 2>/dev/null || true
+  fi
+
+  launchctl load "${_ACG_CHROME_CDP_PLIST}"
+  _info "[acg] Chrome CDP agent installed: ${_ACG_CHROME_CDP_LABEL}"
+  _info "[acg] Chrome launches on login with --remote-debugging-port=${_ACG_CHROME_CDP_PORT}"
+  _info "[acg] Profile: ${_ACG_CHROME_CDP_AUTH_DIR}"
+  _info "[acg] Log: /tmp/k3d-manager-chrome-cdp.err"
+  _info "[acg] Open http://localhost:${_ACG_CHROME_CDP_PORT} to verify CDP is active"
+}
+
+function acg_chrome_cdp_uninstall() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    echo "Usage: acg_chrome_cdp_uninstall"
+    echo "Unload and remove the Chrome CDP launchd agent."
+    return 0
+  fi
+
+  if [[ "$(uname)" != "Darwin" ]]; then
+    _info "[acg] acg_chrome_cdp_uninstall is macOS only — skipping"
+    return 0
+  fi
+
+  if launchctl list "${_ACG_CHROME_CDP_LABEL}" >/dev/null 2>&1; then
+    launchctl unload "${_ACG_CHROME_CDP_PLIST}" 2>/dev/null || true
+    _info "[acg] Chrome CDP agent stopped: ${_ACG_CHROME_CDP_LABEL}"
+  fi
+
+  if [[ -f "${_ACG_CHROME_CDP_PLIST}" ]]; then
+    rm -f "${_ACG_CHROME_CDP_PLIST}"
+    _info "[acg] Plist removed: ${_ACG_CHROME_CDP_PLIST}"
+  fi
 }
 
 function acg_teardown() {
