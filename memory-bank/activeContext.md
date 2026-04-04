@@ -98,9 +98,10 @@
 ## Operational Notes
 
 - **3-node Cluster Up:** Rebuilt via `acg_provision` (CloudFormation) + `k3sup install/join` after sandbox recreation.
-**ArgoCD Registered:** App cluster `ubuntu-k3s` registration is STALE. Cluster secret `cluster-ubuntu-k3s` (cicd ns) contains an old token. ArgoCD fails with `ComparisonError`.
-**Remote Pod Investigation:** **FAILED** (2026-04-04). No pods found in `shopping-cart-*` namespaces on `ubuntu-k3s`. `ClusterSecretStore` is `Ready`, but `ExternalSecrets` are missing because ArgoCD cannot connect to sync manifests.
-**Vault connectivity:** Transitioned to **Vault Token** auth. Secret `vault-token` exists on remote cluster. `ClusterSecretStore` applied and confirmed `Ready` via `vault-bridge` (DNS: `vault-bridge.secrets.svc.cluster.local:8201`).
+**ArgoCD Registered:** App cluster `ubuntu-k3s` re-registered with fresh token (UID `8494b655...`). Sync restored.
+**Remote Pod Investigation:** **FAILED** (2026-04-04). Pods are `CrashLoopBackOff` because the `data-layer` is missing.
+**ESO Incompatibility:** ArgoCD sync for `data-layer` failed because `ExternalSecret` version `v1beta1` is missing from the remote cluster (only `v1` and `v1alpha1` available).
+**Vault connectivity:** `ClusterSecretStore` confirmed `Ready`. `ExternalSecrets` for apps are missing/stale due to sync failure.
 
 - **vault-bridge bugfix specced:** `docs/plans/v1.0.2-bugfix-vault-bridge.md` — Codex to add `_setup_vault_bridge` in `shopping_cart.sh`, Endpoints step in `bin/acg-up`, fix ClusterSecretStore server address, add `vault-bridge-svc.yaml` in shopping-cart-infra.
 - **ArgoCD app status:** basket `CrashLoopBackOff`, frontend `CrashLoopBackOff`, order `Running`, payment `Running`, product-catalog `Error`. All app pods reached remote execution phase.
