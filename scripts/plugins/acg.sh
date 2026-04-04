@@ -515,7 +515,7 @@ function acg_chrome_cdp_install() {
     return 0
   fi
 
-  if [[ "$(n)" != "mac" ]]; then
+  if ! _is_mac; then
     _info "[acg] acg_chrome_cdp_install is macOS only — skipping"
     return 0
   fi
@@ -546,7 +546,7 @@ function acg_chrome_cdp_uninstall() {
     return 0
   fi
 
-  if [[ "$(n)" != "mac" ]]; then
+  if ! _is_mac; then
     _info "[acg] acg_chrome_cdp_uninstall is macOS only — skipping"
     return 0
   fi

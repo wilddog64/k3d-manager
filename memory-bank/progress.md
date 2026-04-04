@@ -30,7 +30,8 @@
 
 - [x] **acg_extend selector fix** — **COMPLETE**. Analyzed Pluralsight React JS bundle and added explicit selectors (`[data-heap-id*="Extend Sandbox"]`, `button:has-text("Extend Session")`) and a fallback to click the `h4` text so pre-flight checks pass safely even when the button is not rendered (i.e. >1 hr remaining). Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`; commit `e39efa4`.
 
-- [x] **Chrome CDP launchd agent** — **COMPLETE**. Commit `fe0f313` adds Chrome CDP constants/helpers plus `acg_chrome_cdp_install` / `acg_chrome_cdp_uninstall` in `acg.sh`, exposes `make chrome-cdp` / `chrome-cdp-stop`, and installs a launchd agent that keeps Chrome listening on port 9222 using the Playwright auth dir profile. Spec: `docs/plans/v1.0.3-chrome-cdp-launchd.md`.
+- [x] **Chrome CDP launchd agent** — **COMPLETE**. Commit `84725d2` adds Chrome CDP constants/helpers plus `acg_chrome_cdp_install` / `acg_chrome_cdp_uninstall` in `acg.sh`, exposes `make chrome-cdp` / `chrome-cdp-stop`, and installs a launchd agent. Bug fix for `$(n)` typo included.
+
 
 - [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.
 
