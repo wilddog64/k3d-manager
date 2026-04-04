@@ -34,6 +34,8 @@
 
 - [ ] **acg-refresh skip creds fix** — ASSIGNED to Codex. Skip `acg_get_credentials` when AWS creds still valid. Spec: `docs/plans/v1.0.3-fix-acg-refresh-skip-creds.md`. Issue: `docs/issues/2026-04-04-acg-refresh-unconditional-cred-extraction.md`.
 
+- [ ] **ESO version bump** — ASSIGNED to Codex. Bump `ESO_VERSION` default from `0.9.20` to `0.14.0` in `bin/acg-up`. ESO v0.9.20 only serves `v1alpha1`; shopping-cart-infra manifests require `v1`. Spec: `docs/plans/v1.0.3-fix-eso-version.md`. Issue: `docs/issues/2026-04-04-eso-version-mismatch-v1alpha1.md`.
+
 - [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.
 
 ## v1.0.2 — Active

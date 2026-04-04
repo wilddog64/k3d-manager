@@ -24,6 +24,7 @@
 
 **Chrome CDP launchd agent (v1.0.3):** COMPLETE (`513009f`). All platform detection bugs fixed (`_is_mac` → `uname Darwin` in `acg.sh` + `antigravity.sh`). Launchd agent active on port 9222. Spec: `docs/plans/v1.0.3-chrome-cdp-launchd.md`.
 **acg-refresh skip creds fix (v1.0.3):** ASSIGNED to Codex. Spec: `docs/plans/v1.0.3-fix-acg-refresh-skip-creds.md`. `bin/acg-refresh` to skip `acg_get_credentials` when AWS creds are still valid. Issue: `docs/issues/2026-04-04-acg-refresh-unconditional-cred-extraction.md`.
+**ESO version bump (v1.0.3):** ASSIGNED to Codex. Spec: `docs/plans/v1.0.3-fix-eso-version.md`. Bump `ESO_VERSION` default from `0.9.20` to `0.14.0` in `bin/acg-up` — ESO v0.9.20 only serves `v1alpha1`; manifests require `v1`. Issue: `docs/issues/2026-04-04-eso-version-mismatch-v1alpha1.md`.
 
 **Chrome Playwright refactor (early v1.0.4):** `docs/plans/v1.0.4-chrome-playwright-refactor.md` — COMPLETE (`f7f15c5`). `acg_credentials.js`/`acg_extend.js` now launch Chrome via Playwright `launchPersistentContext` with a persisted auth dir, `_antigravity_launch` renamed to `_browser_launch`, and `antigravity_acg_extend` no longer pre-launches Chrome.
 
@@ -102,9 +103,9 @@
 ## Operational Notes
 
 - **3-node Cluster Up:** Rebuilt via `acg_provision` (CloudFormation) + `k3sup install/join` after sandbox recreation.
-**ArgoCD Registered:** App cluster `ubuntu-k3s` re-registered with fresh token (UID `8494b655...`). Sync restored.
+**ArgoCD Registered:** App cluster `ubuntu-k3s` re-registered with fresh token (UID `9a98e65a...`). Sync restored.
 **Remote Pod Investigation:** **FAILED** (2026-04-04). Pods are `CrashLoopBackOff` because the `data-layer` is missing.
-**ESO Incompatibility:** ArgoCD sync for `data-layer` failed because `ExternalSecret` version `v1beta1` is missing from the remote cluster (only `v1` and `v1alpha1` available).
+**ESO apiVersion mismatch:** **FAILED** (2026-04-04). Fresh sandbox provisioned by `bin/acg-up` installed ESO `v0.9.20`, which only supports `v1alpha1` and `v1beta1`. The `shopping-cart-infra` repo manifests (updated in PR #23) now require `v1`, causing ArgoCD `SyncFailed` for `data-layer`. Application pods are `CrashLoopBackOff` due to missing DBs.
 **Vault connectivity:** `ClusterSecretStore` confirmed `Ready`. `ExternalSecrets` for apps are missing/stale due to sync failure.
 
 - **vault-bridge bugfix specced:** `docs/plans/v1.0.2-bugfix-vault-bridge.md` — Codex to add `_setup_vault_bridge` in `shopping_cart.sh`, Endpoints step in `bin/acg-up`, fix ClusterSecretStore server address, add `vault-bridge-svc.yaml` in shopping-cart-infra.
