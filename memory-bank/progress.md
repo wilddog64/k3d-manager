@@ -26,6 +26,10 @@
 
 ---
 
+## v1.0.3 — Active
+
+- [x] **acg_extend selector fix** — **COMPLETE**. Analyzed Pluralsight React JS bundle and added explicit selectors (`[data-heap-id*="Extend Sandbox"]`, `button:has-text("Extend Session")`) and a fallback to click the `h4` text so pre-flight checks pass safely even when the button is not rendered (i.e. >1 hr remaining). Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`; commit `e39efa4`.
+
 ## v1.0.2 — Active
 
 - [x] **Gemini blocker fixes verification** — Verified cluster rebuilding (after sandbox expiry), ESO CRD patching, and registry auth restore. 3 nodes Ready. Pods 5/5 transition from ImagePullBackOff to Running/CrashLoopBackOff (Vault dependency). Spec: `docs/plans/v1.0.2-gemini-fix-cluster-blockers.md`.
