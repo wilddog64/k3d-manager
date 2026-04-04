@@ -13,7 +13,7 @@
 #   PLURALSIGHT_EMAIL Pre-fill email on Pluralsight sign-in page
 #   GHCR_PAT          GitHub PAT with read:packages scope — required for ghcr-pull-secret
 #   GITHUB_USERNAME   GitHub username (default: wilddog64)
-#   ESO_VERSION       ESO helm chart version to install on remote (default: 0.9.20)
+#   ESO_VERSION       ESO helm chart version to install on remote (default: 0.14.0)
 
 set -euo pipefail
 
@@ -191,7 +191,7 @@ sleep 5
 _info "[acg-up] argocd-manager SA + static token Secret ready"
 
 _info "[acg-up] Step 8/12 — Installing helm + ESO on remote cluster..."
-_eso_version="${ESO_VERSION:-0.9.20}"
+_eso_version="${ESO_VERSION:-0.14.0}"
 if ! ssh ubuntu command -v helm >/dev/null 2>&1; then
   _info "[acg-up] helm not found — installing..."
   ssh ubuntu "curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash" >/dev/null
