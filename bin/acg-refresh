@@ -47,8 +47,13 @@ if [[ "$login_prompt" -eq 1 ]]; then
   echo ""
 fi
 
-_info "[acg-refresh] Refreshing AWS credentials..."
-acg_get_credentials ${sandbox_url:+"$sandbox_url"}
+_info "[acg-refresh] Checking AWS credentials..."
+if _acg_check_credentials 2>/dev/null; then
+  _info "[acg-refresh] Credentials still valid — skipping extraction"
+else
+  _info "[acg-refresh] Credentials expired — extracting..."
+  acg_get_credentials ${sandbox_url:+"$sandbox_url"}
+fi
 
 _info "[acg-refresh] Restarting tunnel..."
 tunnel_stop 2>/dev/null || true
