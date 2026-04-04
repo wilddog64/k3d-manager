@@ -105,7 +105,7 @@
 - **3-node Cluster Up:** Rebuilt via `acg_provision` (CloudFormation) + `k3sup install/join` after sandbox recreation.
 **ArgoCD Registered:** App cluster `ubuntu-k3s` re-registered with fresh token (UID `9a98e65a...`). Sync restored.
 **Remote Pod Investigation:** **FAILED** (2026-04-04). Pods are `CrashLoopBackOff` because the `data-layer` is missing.
-**ESO apiVersion mismatch:** **FAILED** (2026-04-04). Fresh sandbox provisioned by `bin/acg-up` installed ESO `v0.9.20`, which only supports `v1alpha1` and `v1beta1`. The `shopping-cart-infra` repo manifests (updated in PR #23) now require `v1`, causing ArgoCD `SyncFailed` for `data-layer`. Application pods are `CrashLoopBackOff` due to missing DBs.
+**ESO apiVersion mismatch:** **FAILED** (2026-04-04). Even with `bin/acg-up` updated to `ESO_VERSION=0.14.0`, the live cluster remains on `v0.9.20`. Sync failed for `data-layer` because `v1` CRDs are missing.
 **Vault connectivity:** `ClusterSecretStore` confirmed `Ready`. `ExternalSecrets` for apps are missing/stale due to sync failure.
 
 - **vault-bridge bugfix specced:** `docs/plans/v1.0.2-bugfix-vault-bridge.md` — Codex to add `_setup_vault_bridge` in `shopping_cart.sh`, Endpoints step in `bin/acg-up`, fix ClusterSecretStore server address, add `vault-bridge-svc.yaml` in shopping-cart-infra.
