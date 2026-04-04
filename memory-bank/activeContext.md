@@ -10,7 +10,8 @@
 **Branch cleanup:** v0.9.7–v0.9.17 deleted 2026-03-28; v1.0.0–v1.0.2 deleted 2026-04-03.
 **docs archive:** pre-v1.0.3 plans + issues moved to `docs/plans/archive/` and `docs/issues/archive/` on v1.0.3 branch cut.
 
-**Full cold-run gate (next session):** run `make down --confirm` → `make up` from zero (no existing stack, no SSH config entries) to verify truly cold first-run path. Gate: ClusterSecretStore Ready + 3 nodes Ready. Shopping-cart app pod issues are BLOCKED on this — do not investigate app layer until cold infra deploy passes.
+**Cold-run gate: PASSED (2026-04-03)** — `make up` from zero: 3 nodes Ready + ClusterSecretStore Ready. Commits: `96629e0` (ESO webhook wait), `e8b296b` (CSS poll 180s), `dc2c82d` (AWS creds check).
+**acg_extend selector fix** — ASSIGNED to Gemini. Extend button selectors stale against current Pluralsight UI. Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`. Only file: `scripts/playwright/acg_extend.js`.
 **Remove CDP from `acg_credentials.js`** — ASSIGNED to Codex. Spec: `docs/plans/v1.0.3-remove-cdp-from-acg-credentials.md`. Drop `connectOverCDP` probe; always use `launchPersistentContext`; remove CDP pre-check in `acg.sh`.
 **enforce_admins:** restored on main 2026-04-03.
 **Branch cleanup:** v0.9.7–v0.9.17 deleted 2026-03-28; v1.0.0 deleted 2026-03-29.
