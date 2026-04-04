@@ -22,7 +22,8 @@
 **vault-bridge bugfix specced:** `docs/plans/v1.0.2-bugfix-vault-bridge.md` — Codex to add `_setup_vault_bridge` in `shopping_cart.sh`, Endpoints step in `bin/acg-up`, fix ClusterSecretStore server address, add `vault-bridge-svc.yaml` in shopping-cart-infra.
 - COMPLETE (`1cccf01` / `450d008`): socat systemd automation + Endpoints in k3d-manager; Service + ClusterSecretStore update in shopping-cart-infra.
 
-**Chrome CDP launchd agent (v1.0.3):** COMPLETE (`84725d2`). Bug found in `acg_chrome_cdp_install`: typo `$(n)` instead of `_is_mac` caused syntax error on macOS. Fixed via unsolicited commit; launchd agent (`com.k3d-manager.chrome-cdp`) now active on port 9222. Spec: `docs/plans/v1.0.3-chrome-cdp-launchd.md`. Issue: `docs/issues/2026-04-04-acg-chrome-cdp-install-syntax-error.md`.
+**Chrome CDP launchd agent (v1.0.3):** COMPLETE (`513009f`). All platform detection bugs fixed (`_is_mac` → `uname Darwin` in `acg.sh` + `antigravity.sh`). Launchd agent active on port 9222. Spec: `docs/plans/v1.0.3-chrome-cdp-launchd.md`.
+**acg-refresh skip creds fix (v1.0.3):** ASSIGNED to Codex. Spec: `docs/plans/v1.0.3-fix-acg-refresh-skip-creds.md`. `bin/acg-refresh` to skip `acg_get_credentials` when AWS creds are still valid. Issue: `docs/issues/2026-04-04-acg-refresh-unconditional-cred-extraction.md`.
 
 **Chrome Playwright refactor (early v1.0.4):** `docs/plans/v1.0.4-chrome-playwright-refactor.md` — COMPLETE (`f7f15c5`). `acg_credentials.js`/`acg_extend.js` now launch Chrome via Playwright `launchPersistentContext` with a persisted auth dir, `_antigravity_launch` renamed to `_browser_launch`, and `antigravity_acg_extend` no longer pre-launches Chrome.
 
