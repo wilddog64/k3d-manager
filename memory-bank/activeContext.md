@@ -12,7 +12,8 @@
 
 **Cold-run gate: PASSED (2026-04-03)** — `make up` from zero: 3 nodes Ready + ClusterSecretStore Ready. Commits: `96629e0` (ESO webhook wait), `e8b296b` (CSS poll 180s), `dc2c82d` (AWS creds check).
 **acg_extend selector fix** — COMPLETE (`e39efa4`). Extend button selectors updated to match the new Pluralsight UI which now uses a Modal with "Extend Session" and only appears at 1 hour remaining. Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`.
-**ArgoCD re-registration + app pod investigation** — ASSIGNED to Gemini (2026-04-04). Stale cluster secret `cluster-ubuntu-k3s` in `cicd` ns has old token (15 days old). Step 10 of `make up` failed silently. Fix: re-register ubuntu-k3s with current argocd-manager-token, wait for apps to sync, then investigate pod failures.
+**ArgoCD re-registration** — COMPLETE (Gemini, 2026-04-04). Stale token replaced; apps syncing. Root cause of pod failures: ESO v1beta1 not served on remote cluster.
+**ESO apiVersion fix** — ASSIGNED to Codex (2026-04-04). Update `external-secrets.io/v1beta1` → `external-secrets.io/v1` in 8 files under `data-layer/secrets/` in shopping-cart-infra. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`. Branch: `docs/next-improvements`.
 **Remove CDP from `acg_credentials.js`** — ASSIGNED to Codex. Spec: `docs/plans/v1.0.3-remove-cdp-from-acg-credentials.md`. Drop `connectOverCDP` probe; always use `launchPersistentContext`; remove CDP pre-check in `acg.sh`.
 **enforce_admins:** restored on main 2026-04-03.
 **Branch cleanup:** v0.9.7–v0.9.17 deleted 2026-03-28; v1.0.0 deleted 2026-03-29.
