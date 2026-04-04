@@ -30,6 +30,8 @@
 
 - [x] **acg_extend selector fix** — **COMPLETE**. Analyzed Pluralsight React JS bundle and added explicit selectors (`[data-heap-id*="Extend Sandbox"]`, `button:has-text("Extend Session")`) and a fallback to click the `h4` text so pre-flight checks pass safely even when the button is not rendered (i.e. >1 hr remaining). Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`; commit `e39efa4`.
 
+- [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.
+
 ## v1.0.2 — Active
 
 - [x] **Gemini blocker fixes verification** — Verified cluster rebuilding (after sandbox expiry), ESO CRD patching, and registry auth restore. 3 nodes Ready. Pods 5/5 transition from ImagePullBackOff to Running/CrashLoopBackOff (Vault dependency). Spec: `docs/plans/v1.0.2-gemini-fix-cluster-blockers.md`.
