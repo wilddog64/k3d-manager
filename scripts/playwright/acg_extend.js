@@ -64,6 +64,12 @@ async function extendSandbox() {
 
     // Try multiple selector strategies for the extend button
     const extendSelectors = [
+      '[data-heap-id*="Extend Sandbox"]',
+      'button:has-text("Extend Session")',
+      'a:has-text("Extend Session")',
+      '[role="button"]:has-text("Extend Session")',
+      'text="Extend Session"',
+      'h4:has-text("Extend Your Session")',
       'button:has-text("Extend")',
       'button:has-text("+4")',
       'button:has-text("Add 4")',
@@ -86,8 +92,8 @@ async function extendSandbox() {
 
     if (!clicked) {
       // Try opening a sandbox card/panel first — extend button may be inside a slide-over
-      const openButton = page.locator('button:has-text("Open Sandbox"), button:has-text("Open")').first();
-      const openVisible = await openButton.isVisible({ timeout: 5000 }).catch(() => false);
+      const openButton = page.locator('button:has-text("Open Sandbox"), button:has-text("Open"), button:has-text("Start Sandbox"), button:has-text("Resume")').first();
+      const openVisible = await openButton.isVisible({ timeout: 15000 }).catch(() => false);
       if (openVisible) {
         console.error('INFO: Clicking Open to reveal extend button...');
         await openButton.click();
