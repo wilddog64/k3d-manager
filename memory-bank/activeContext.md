@@ -12,7 +12,7 @@
 
 **Cold-run gate: PASSED (2026-04-03)** — `make up` from zero: 3 nodes Ready + ClusterSecretStore Ready. Commits: `96629e0` (ESO webhook wait), `e8b296b` (CSS poll 180s), `dc2c82d` (AWS creds check).
 **acg_extend selector fix** — COMPLETE (`e39efa4`). Extend button selectors updated to match the new Pluralsight UI which now uses a Modal with "Extend Session" and only appears at 1 hour remaining. Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`.
-**Shopping-cart app pod investigation** — ASSIGNED to Gemini (2026-04-03). Diagnose CrashLoopBackOff on basket + frontend, Error on product-catalog. Context: ubuntu-k3s. Report pod logs + describe events. No code changes — investigation only.
+**ArgoCD re-registration + app pod investigation** — ASSIGNED to Gemini (2026-04-04). Stale cluster secret `cluster-ubuntu-k3s` in `cicd` ns has old token (15 days old). Step 10 of `make up` failed silently. Fix: re-register ubuntu-k3s with current argocd-manager-token, wait for apps to sync, then investigate pod failures.
 **Remove CDP from `acg_credentials.js`** — ASSIGNED to Codex. Spec: `docs/plans/v1.0.3-remove-cdp-from-acg-credentials.md`. Drop `connectOverCDP` probe; always use `launchPersistentContext`; remove CDP pre-check in `acg.sh`.
 **enforce_admins:** restored on main 2026-04-03.
 **Branch cleanup:** v0.9.7–v0.9.17 deleted 2026-03-28; v1.0.0 deleted 2026-03-29.
@@ -98,9 +98,9 @@
 ## Operational Notes
 
 - **3-node Cluster Up:** Rebuilt via `acg_provision` (CloudFormation) + `k3sup install/join` after sandbox recreation.
-- **ArgoCD Registered:** App cluster `ubuntu-k3s` registered with fresh token.
-- **ESO CRDs Patched:** `v1beta1` enabled for `ExternalSecret`, `SecretStore`, and `ClusterSecretStore`.
-- **Registry Auth:** `ghcr-pull-secret` restored in `apps` and `payment` namespaces.
-- **Vault connectivity:** Transitioned to **Vault Token** auth. Secret `vault-token` exists on remote cluster. `ClusterSecretStore` applied but blocked by `socat` bridge failure.
+**ArgoCD Registered:** App cluster `ubuntu-k3s` registration is STALE. Cluster secret `cluster-ubuntu-k3s` (cicd ns) contains an old token. ArgoCD fails with `ComparisonError`.
+**Remote Pod Investigation:** **FAILED** (2026-04-04). No pods found in `shopping-cart-*` namespaces on `ubuntu-k3s`. `ClusterSecretStore` is `Ready`, but `ExternalSecrets` are missing because ArgoCD cannot connect to sync manifests.
+**Vault connectivity:** Transitioned to **Vault Token** auth. Secret `vault-token` exists on remote cluster. `ClusterSecretStore` applied and confirmed `Ready` via `vault-bridge` (DNS: `vault-bridge.secrets.svc.cluster.local:8201`).
+
 - **vault-bridge bugfix specced:** `docs/plans/v1.0.2-bugfix-vault-bridge.md` — Codex to add `_setup_vault_bridge` in `shopping_cart.sh`, Endpoints step in `bin/acg-up`, fix ClusterSecretStore server address, add `vault-bridge-svc.yaml` in shopping-cart-infra.
 - **ArgoCD app status:** basket `CrashLoopBackOff`, frontend `CrashLoopBackOff`, order `Running`, payment `Running`, product-catalog `Error`. All app pods reached remote execution phase.
