@@ -22,7 +22,7 @@
 **vault-bridge bugfix specced:** `docs/plans/v1.0.2-bugfix-vault-bridge.md` — Codex to add `_setup_vault_bridge` in `shopping_cart.sh`, Endpoints step in `bin/acg-up`, fix ClusterSecretStore server address, add `vault-bridge-svc.yaml` in shopping-cart-infra.
 - COMPLETE (`1cccf01` / `450d008`): socat systemd automation + Endpoints in k3d-manager; Service + ClusterSecretStore update in shopping-cart-infra.
 
-**Chrome CDP launchd agent (v1.0.3):** `docs/plans/v1.0.3-chrome-cdp-launchd.md` — ASSIGNED to Codex. Adds `acg_chrome_cdp_install` / `acg_chrome_cdp_uninstall` to `acg.sh` and `chrome-cdp` / `chrome-cdp-stop` to `Makefile`. Installs a launchd agent (`com.k3d-manager.chrome-cdp`) that keeps Chrome running with `--remote-debugging-port=9222` using the Playwright auth dir as its profile, so CDP is always available and Pluralsight sessions persist across reboots.
+**Chrome CDP launchd agent (v1.0.3):** COMPLETE (`fe0f313`). `acg.sh` gained constants, plist writer, and `acg_chrome_cdp_install`/`acg_chrome_cdp_uninstall`; `Makefile` exposes `chrome-cdp` / `chrome-cdp-stop`. Launchd agent (`com.k3d-manager.chrome-cdp`) keeps Chrome running on port 9222 with the Playwright auth dir profile so CDP sessions persist. Spec: `docs/plans/v1.0.3-chrome-cdp-launchd.md`.
 
 **Chrome Playwright refactor (early v1.0.4):** `docs/plans/v1.0.4-chrome-playwright-refactor.md` — COMPLETE (`f7f15c5`). `acg_credentials.js`/`acg_extend.js` now launch Chrome via Playwright `launchPersistentContext` with a persisted auth dir, `_antigravity_launch` renamed to `_browser_launch`, and `antigravity_acg_extend` no longer pre-launches Chrome.
 
