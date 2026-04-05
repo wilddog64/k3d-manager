@@ -258,14 +258,20 @@ if [[ -z "${_argocd_sa_token}" ]]; then
 fi
 kubectl create namespace cicd --context k3d-k3d-cluster \
   --dry-run=client -o yaml | kubectl apply --context k3d-k3d-cluster -f - >/dev/null
+_cp_server=$(kubectl config view --minify --context ubuntu-k3s \
+  -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || echo "")
+if [[ -z "${_cp_server}" ]]; then
+  _err "[acg-up] Could not determine ubuntu-k3s API server URL — is the kubeconfig set up?"
+fi
 ARGOCD_APP_CLUSTER_TOKEN="${_argocd_sa_token}" \
+ARGOCD_APP_CLUSTER_SERVER="${_cp_server}" \
   "${REPO_ROOT}/scripts/k3d-manager" register_app_cluster
 _info "[acg-up] Restarting ArgoCD application controller to pick up new cluster secret..."
 kubectl rollout restart statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster
 kubectl rollout status statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster --timeout=90s
-_info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → https://host.k3d.internal:6443"
+_info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → ${_cp_server}"
 
 _info "[acg-up] Step 11/12 — Verifying ClusterSecretStore..."
 _css_ready=false
