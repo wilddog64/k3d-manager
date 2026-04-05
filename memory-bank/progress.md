@@ -51,7 +51,7 @@
 - [x] **Vault KV seeding** — **COMPLETE**. Commit `d11260d` seeds redis/postgres/payment static secrets in Vault KV so shopping-cart ExternalSecrets have data to sync. Spec: `docs/plans/v1.0.3-bugfix-vault-kv-seeding.md`.
 - [x] **shopping-cart-infra ESO storeRef/path fix** — **COMPLETE**. shopping-cart-infra commit `abb6aba` (branch `fix/eso-externalsecret-storeref`) switches ExternalSecrets to `ClusterSecretStore` and static KV paths matching the new Vault seeds. Spec: `shopping-cart-infra/docs/plans/bugfix-eso-externalsecret-storeref.md`.
 
-- [ ] **shopping-cart-infra App namespace ExternalSecrets** — ASSIGNED to Codex. Spec: `shopping-cart-infra/docs/plans/v0.2.1-bugfix-app-namespace-secrets.md`. Add four new ExternalSecrets under `shopping-cart-apps` namespace to mirror Vault KV secrets for basket, order, and product-catalog services.
+- [x] **shopping-cart-infra App namespace ExternalSecrets** — **COMPLETE**. shopping-cart-infra commit `5cc6c86` adds four ExternalSecrets under `shopping-cart-apps` namespace mirroring redis/postgres Vault KV secrets for basket, order-service, and product-catalog. Spec: `shopping-cart-infra/docs/plans/v0.2.1-bugfix-app-namespace-secrets.md`.
 
 - [x] **ESO version 1.0.0 bugfix** — **COMPLETE**. Commit `4dd1854` bumps the default `ESO_VERSION` in `bin/acg-up` to 1.0.0 so installed ESO serves `external-secrets.io/v1`. Spec: `docs/plans/v1.0.3-bugfix-eso-version-1.0.0.md`.
 
