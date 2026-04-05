@@ -250,6 +250,29 @@ spec:
 CSSEOF
 _info "[acg-up] vault-token secret + ClusterSecretStore applied"
 
+_info "[acg-up] Seeding Vault KV with sandbox static secrets..."
+VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
+  vault kv put secret/redis/cart password="redis-cart-dev-pass" >/dev/null
+VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
+  vault kv put secret/redis/orders-cache password="redis-orders-cache-dev-pass" >/dev/null
+VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
+  vault kv put secret/postgres/orders username="postgres" password="changeme456" >/dev/null
+VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
+  vault kv put secret/postgres/products username="postgres" password="changeme123" >/dev/null
+VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
+  vault kv put secret/postgres/payment username="postgres" password="CHANGE_ME" >/dev/null
+VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
+  vault kv put secret/payment/encryption key="dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg==" >/dev/null
+VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
+  vault kv put secret/payment/stripe \
+    api_key="sk_test_placeholder" \
+    webhook_secret="whsec_placeholder" >/dev/null
+VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
+  vault kv put secret/payment/paypal \
+    client_id="paypal_sandbox_client_id" \
+    client_secret="paypal_sandbox_client_secret" >/dev/null
+_info "[acg-up] Vault KV seeded (redis, postgres, payment sandbox secrets)"
+
 _info "[acg-up] Step 10/12 — Registering app cluster with ArgoCD..."
 _argocd_sa_token=$(kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s \
   -o jsonpath='{.data.token}' | base64 -d | tr -d '\n')
