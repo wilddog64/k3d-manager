@@ -1,5 +1,24 @@
 # Changes - k3d-manager
 
+## [v1.0.3] — 2026-04-05 — ACG full stack fixes: ESO 1.0.0, ArgoCD registration, GHCR_PAT masking, Chrome CDP
+
+### Added
+- `make sync-apps`: port-forwards argocd-server, logs in, syncs `cicd/data-layer`, shows remote pod status (`a47a4f5`)
+- `make argocd-registration`: re-registers ubuntu-k3s with ArgoCD (grabs token, reads server URL, switches context, restarts controller) — safe to run after sandbox recreation (`7dfa093`)
+- `acg_chrome_cdp_install`/`acg_chrome_cdp_uninstall`: launchd plist agent for persistent Chrome CDP session on macOS; `make chrome-cdp`/`chrome-cdp-stop` Makefile wrappers (`fe0f313`, `513009f`, `4ce2b51`)
+
+### Fixed
+- ESO default version bumped to 1.0.0 — `v0.14.0` only serves `v1beta1`; `external-secrets.io/v1` GA requires 1.0.0+ (`4dd1854`)
+- `ClusterSecretStore` manifest in `bin/acg-up` bumped from `external-secrets.io/v1beta1` to `external-secrets.io/v1` — ESO 1.0.0 dropped v1beta1 serving (`b8bcb89`)
+- `bin/acg-up` step 10: reads ubuntu-k3s server URL from kubeconfig; switches context to `k3d-k3d-cluster` before `register_app_cluster` — fixes ArgoCD registering EC2 cluster at wrong endpoint (`dec667f`, `5cbc3cf`)
+- `make up` no longer echoes `GHCR_PAT="ghp_xxx..."` to console — `@` prefix suppresses Make command echo (`613bb1e`)
+- `bin/acg-refresh`: skips credential extraction when existing AWS creds are still valid — prevents Chrome CDP lock conflict (`6dcb913`)
+- `bin/acg-up`: skips credential extraction when existing AWS creds are valid (`dc2c82d`)
+- `bin/acg-up`: waits for ESO webhook endpoints before applying ClusterSecretStore; poll window extended to 180s (`96629e0`, `e8b296b`)
+- `acg-extend` selectors updated for current Pluralsight UI — Modal with "Extend Session" button only visible at ≤1hr remaining (`e39efa4`)
+- `acg_credentials.js`: CDP probe removed — always uses `launchPersistentContext`; `acg_get_credentials` no longer probes CDP or launches Chrome manually (`ac260d0`)
+- Platform detection: `_is_mac` → `[[ "$(uname)" == "Darwin" ]]` in `acg.sh` and `antigravity.sh` — `_is_mac` not available outside dispatcher context (`513009f`, `4ce2b51`)
+
 ## [v1.0.2] — 2026-04-03 — full stack automation: make up, ESO, ArgoCD, vault-bridge, Playwright fixes
 
 ### Added
