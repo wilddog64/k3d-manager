@@ -52,6 +52,8 @@
 
 - [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.
 
+- [ ] **ESO ExternalSecret storeRef + Vault KV seeding** — SPECCED. shopping-cart-data ExternalSecrets reference namespace-scoped `SecretStore` that doesn't exist (fix: `ClusterSecretStore`); postgres ExternalSecrets use unconfigured Vault DB engine (fix: static KV + seed in `bin/acg-up`). Spec: `docs/plans/v1.0.3-bugfix-eso-externalsecret-storeref.md`. Multi-repo: shopping-cart-infra `fix/eso-externalsecret-storeref` + k3d-manager `k3d-manager-v1.0.3`. ASSIGNED to Codex.
+
 ## v1.0.2 — Active
 
 - [x] **Gemini blocker fixes verification** — Verified cluster rebuilding (after sandbox expiry), ESO CRD patching, and registry auth restore. 3 nodes Ready. Pods 5/5 transition from ImagePullBackOff to Running/CrashLoopBackOff (Vault dependency). Spec: `docs/plans/v1.0.2-gemini-fix-cluster-blockers.md`.
