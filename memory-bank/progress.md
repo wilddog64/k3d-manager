@@ -49,6 +49,7 @@
 - [x] **ClusterSecretStore apiVersion bump** — **COMPLETE**. Commit `b8bcb89` switches the `bin/acg-up` ClusterSecretStore manifest to `external-secrets.io/v1` so ESO 1.0.0 accepts it. Spec: `docs/plans/v1.0.3-bugfix-css-apiversion.md`.
 
 - [x] **Vault KV seeding** — **COMPLETE**. Commit `d11260d` seeds redis/postgres/payment static secrets in Vault KV so shopping-cart ExternalSecrets have data to sync. Spec: `docs/plans/v1.0.3-bugfix-vault-kv-seeding.md`.
+- [x] **RabbitMQ Vault creds seeding** — **COMPLETE**. Commit `77e69e2` adds `rabbitmq/default` KV seeding so shopping-cart-infra can source RabbitMQ credentials from Vault. Spec: `docs/plans/v0.2.1-bugfix-rabbitmq-vault-creds.md`.
 - [x] **shopping-cart-infra ESO storeRef/path fix** — **COMPLETE**. shopping-cart-infra commit `abb6aba` (branch `fix/eso-externalsecret-storeref`) switches ExternalSecrets to `ClusterSecretStore` and static KV paths matching the new Vault seeds. Spec: `shopping-cart-infra/docs/plans/bugfix-eso-externalsecret-storeref.md`.
 
 - [x] **shopping-cart-infra App namespace ExternalSecrets** — **COMPLETE**. shopping-cart-infra commit `5cc6c86` adds four ExternalSecrets under `shopping-cart-apps` namespace mirroring redis/postgres Vault KV secrets for basket, order-service, and product-catalog. Spec: `shopping-cart-infra/docs/plans/v0.2.1-bugfix-app-namespace-secrets.md`.
@@ -56,8 +57,6 @@
 - [x] **ESO version 1.0.0 bugfix** — **COMPLETE**. Commit `4dd1854` bumps the default `ESO_VERSION` in `bin/acg-up` to 1.0.0 so installed ESO serves `external-secrets.io/v1`. Spec: `docs/plans/v1.0.3-bugfix-eso-version-1.0.0.md`.
 
 - [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.
-
-- [ ] **ESO ExternalSecret storeRef + Vault KV seeding** — SPECCED. Split into two specs: shopping-cart-infra `docs/plans/bugfix-eso-externalsecret-storeref.md` (storeRef kind + postgres paths); k3d-manager `docs/plans/v1.0.3-bugfix-vault-kv-seeding.md` (`bin/acg-up` Vault KV seeding). ASSIGNED to Codex.
 
 ## v1.0.2 — Active
 
