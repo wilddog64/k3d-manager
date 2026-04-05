@@ -26,7 +26,13 @@
 
 ---
 
-## v1.0.3 — Active
+## v1.0.3 — SHIPPED
+
+**PR #60 merged to main (`91552139`) 2026-04-05. Tagged v1.0.3, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-05-v1.0.3-retrospective.md`.**
+
+## v1.0.4 — Active (branch `k3d-manager-v1.0.4`)
+
+## v1.0.3 — Complete
 
 - [x] **acg_extend selector fix** — **COMPLETE**. Analyzed Pluralsight React JS bundle and added explicit selectors (`[data-heap-id*="Extend Sandbox"]`, `button:has-text("Extend Session")`) and a fallback to click the `h4` text so pre-flight checks pass safely even when the button is not rendered (i.e. >1 hr remaining). Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`; commit `e39efa4`.
 

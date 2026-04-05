@@ -1,5 +1,10 @@
 # Active Context — k3d-manager
 
+## Current Branch: `k3d-manager-v1.0.4` (as of 2026-04-05)
+
+**v1.0.3 SHIPPED** — PR #60 merged to main (`91552139`) 2026-04-05. Tagged v1.0.3, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-05-v1.0.3-retrospective.md`.
+**Next:** k3d-manager-v1.0.4 branch created. No specs yet. shopping-cart-infra v0.2.2 is the active in-flight work (ArgoCD sync waves + ddl-auto=create, branch `fix/argocd-sync-waves-ddl-auto`, spec `shopping-cart-infra/docs/plans/v0.2.2-fix-argocd-sync-waves-ddl-auto.md`, assigned Codex).
+
 ## Current Branch: `k3d-manager-v1.0.3` (as of 2026-04-03)
 
 **v1.0.0 SHIPPED** — PR #57 merged to main (`807c0432`) 2026-03-29. Tagged v1.0.0, released. `enforce_admins` restored.
