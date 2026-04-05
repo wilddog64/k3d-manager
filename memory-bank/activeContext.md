@@ -11,7 +11,7 @@
 **docs archive:** pre-v1.0.3 plans + issues moved to `docs/plans/archive/` and `docs/issues/archive/` on v1.0.3 branch cut.
 
 **Cold-run gate: PASSED (2026-04-03)** — `make up` from zero: 3 nodes Ready + ClusterSecretStore Ready. Commits: `96629e0` (ESO webhook wait), `e8b296b` (CSS poll 180s), `dc2c82d` (AWS creds check).
-**ArgoCD cluster server URL bugfix** — SPECCED (2026-04-04). `bin/acg-up` never overrides `ARGOCD_APP_CLUSTER_SERVER` so ubuntu-k3s is always registered as `host.k3d.internal:6443` (local k3d IP) instead of the EC2 public IP. ArgoCD cannot sync to remote cluster at all — root cause of all data-layer OutOfSync failures. Spec: `docs/plans/v1.0.3-bugfix-argocd-cluster-server-url.md`. ASSIGNED to Codex.
+**ArgoCD cluster server URL bugfix** — COMPLETE (`dec667f`). `bin/acg-up` now reads the EC2 kubeconfig server URL and passes it via `ARGOCD_APP_CLUSTER_SERVER` so ubuntu-k3s registers with its public API endpoint instead of `host.k3d.internal`. Spec: `docs/plans/v1.0.3-bugfix-argocd-cluster-server-url.md`.
 **acg_extend selector fix** — COMPLETE (`e39efa4`). Extend button selectors updated to match the new Pluralsight UI which now uses a Modal with "Extend Session" and only appears at 1 hour remaining. Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`.
 **ArgoCD re-registration** — COMPLETE (Gemini, 2026-04-04). Stale token replaced; apps syncing. Root cause of pod failures: ESO v1beta1 not served on remote cluster.
 **ESO apiVersion fix** — MERGED (shopping-cart-infra PR #23, `0a38037`, 2026-04-04). ESO v1 manifests + validate CI + Copilot fixes merged to main. Retro: `docs/retro/2026-04-04-pr23-eso-apiversion-fix-retrospective.md`. `enforce_admins` restored.
