@@ -232,7 +232,7 @@ for i in $(seq 1 18); do
   sleep 10
 done
 kubectl apply --context ubuntu-k3s -f - <<'CSSEOF'
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore
 metadata:
   name: vault-backend
