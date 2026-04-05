@@ -10,7 +10,8 @@ GHCR_PAT ?= $(shell gh auth token 2>/dev/null)
 
 ## Provision full stack: credentials → cluster → ESO → ArgoCD
 up:
-	GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)"
+	@echo "[make] Running bin/acg-up..."
+	@GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)"
 
 ## Tear down cluster and stop all background processes
 down:
