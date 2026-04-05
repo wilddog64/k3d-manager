@@ -46,6 +46,7 @@ argocd login localhost:8080 --username admin --password "${_argocd_pass}" --inse
 
 _info "[sync-apps] Terminating any in-progress operation on data-layer..."
 argocd app terminate-op cicd/data-layer 2>/dev/null || true
+sleep 5
 
 _info "[sync-apps] Syncing data-layer..."
 argocd app sync cicd/data-layer --timeout 180
