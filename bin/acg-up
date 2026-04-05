@@ -266,7 +266,8 @@ _vault_kv_put '{"username":"postgres","password":"CHANGE_ME"}'                  
 _vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}'                             payment/encryption
 _vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}'           payment/stripe
 _vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
-_info "[acg-up] Vault KV seeded (redis, postgres, payment sandbox secrets)"
+_vault_kv_put '{"username":"rabbitmq","password":"rabbitmq-sandbox-pass"}'                         rabbitmq/default
+_info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq sandbox secrets)"
 
 _info "[acg-up] Step 10/12 — Registering app cluster with ArgoCD..."
 _argocd_sa_token=$(kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s \
