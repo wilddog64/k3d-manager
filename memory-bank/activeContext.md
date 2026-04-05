@@ -11,6 +11,7 @@
 **docs archive:** pre-v1.0.3 plans + issues moved to `docs/plans/archive/` and `docs/issues/archive/` on v1.0.3 branch cut.
 
 **Cold-run gate: PASSED (2026-04-03)** — `make up` from zero: 3 nodes Ready + ClusterSecretStore Ready. Commits: `96629e0` (ESO webhook wait), `e8b296b` (CSS poll 180s), `dc2c82d` (AWS creds check).
+**GHCR_PAT console leak bugfix** — SPECCED (2026-04-04). Makefile `up` target echoes `GHCR_PAT="ghp_xxx..."` to console. Fix: add `@` prefix. Spec: `docs/plans/v1.0.3-bugfix-ghcr-pat-mask.md`. ASSIGNED to Codex.
 **ESO version 1.0.0 bugfix** — COMPLETE (`4dd1854`). `bin/acg-up` default `ESO_VERSION` now 1.0.0 so remote installs serve the GA `external-secrets.io/v1` API required by shopping-cart-infra manifests. Spec: `docs/plans/v1.0.3-bugfix-eso-version-1.0.0.md`.
 **Makefile sync-apps target** — COMPLETE (`a47a4f5`). Added `bin/acg-sync-apps` (port-forward, argocd login, sync data-layer, pod status) and `make sync-apps` wrapper. Spec: `docs/plans/v1.0.3-makefile-sync-apps.md`.
 **ArgoCD register wrong context bugfix** — COMPLETE (`5cbc3cf`). `bin/acg-up` now reads the ubuntu-k3s server via name filter and switches kubectl to `k3d-k3d-cluster` before `register_app_cluster`, ensuring the cluster secret updates the local ArgoCD instance. Spec: `docs/plans/v1.0.3-bugfix-argocd-register-context.md`.
