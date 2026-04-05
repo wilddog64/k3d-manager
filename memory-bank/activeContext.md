@@ -11,6 +11,7 @@
 **docs archive:** pre-v1.0.3 plans + issues moved to `docs/plans/archive/` and `docs/issues/archive/` on v1.0.3 branch cut.
 
 **Cold-run gate: PASSED (2026-04-03)** — `make up` from zero: 3 nodes Ready + ClusterSecretStore Ready. Commits: `96629e0` (ESO webhook wait), `e8b296b` (CSS poll 180s), `dc2c82d` (AWS creds check).
+**ArgoCD register wrong context bugfix** — SPECCED (2026-04-04). `bin/acg-up` step 10 doesn't switch to `k3d-k3d-cluster` before `register_app_cluster` — `_kubectl apply` silently targets remote cluster, stale secret persists. Spec: `docs/plans/v1.0.3-bugfix-argocd-register-context.md`. ASSIGNED to Codex.
 **ArgoCD cluster server URL bugfix** — COMPLETE (`dec667f`). `bin/acg-up` now reads the EC2 kubeconfig server URL and passes it via `ARGOCD_APP_CLUSTER_SERVER` so ubuntu-k3s registers with its public API endpoint instead of `host.k3d.internal`. Spec: `docs/plans/v1.0.3-bugfix-argocd-cluster-server-url.md`.
 **acg_extend selector fix** — COMPLETE (`e39efa4`). Extend button selectors updated to match the new Pluralsight UI which now uses a Modal with "Extend Session" and only appears at 1 hour remaining. Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`.
 **ArgoCD re-registration** — COMPLETE (Gemini, 2026-04-04). Stale token replaced; apps syncing. Root cause of pod failures: ESO v1beta1 not served on remote cluster.
