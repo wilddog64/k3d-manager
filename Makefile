@@ -6,7 +6,7 @@
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?= $(shell gh auth token 2>/dev/null)
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop help
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration help
 
 ## Provision full stack: credentials → cluster → ESO → ArgoCD
 up:
@@ -36,6 +36,29 @@ chrome-cdp:
 chrome-cdp-stop:
 	scripts/k3d-manager acg_chrome_cdp_uninstall
 
+## Re-register ubuntu-k3s app cluster with ArgoCD (use after sandbox recreation or IP change)
+argocd-registration:
+	@_token=$$(kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s \
+	  -o jsonpath='{.data.token}' 2>/dev/null | base64 -d | tr -d '\n'); \
+	if [ -z "$$_token" ]; then \
+	  echo "ERROR: argocd-manager-token not found on ubuntu-k3s — is the cluster up?"; \
+	  exit 1; \
+	fi; \
+	_server=$$(kubectl config view \
+	  -o jsonpath='{.clusters[?(@.name=="ubuntu-k3s")].cluster.server}' 2>/dev/null); \
+	if [ -z "$$_server" ]; then \
+	  echo "ERROR: ubuntu-k3s context not found in kubeconfig"; \
+	  exit 1; \
+	fi; \
+	kubectl config use-context k3d-k3d-cluster >/dev/null; \
+	ARGOCD_APP_CLUSTER_TOKEN="$$_token" \
+	ARGOCD_APP_CLUSTER_SERVER="$$_server" \
+	  scripts/k3d-manager register_app_cluster; \
+	kubectl rollout restart statefulset/argocd-application-controller \
+	  -n cicd --context k3d-k3d-cluster; \
+	kubectl rollout status statefulset/argocd-application-controller \
+	  -n cicd --context k3d-k3d-cluster --timeout=90s
+
 ## Show this help
 help:
 	@echo ""
@@ -49,6 +72,7 @@ help:
 	@echo "    make creds     Extract AWS credentials only"
 	@echo "    make chrome-cdp        Install Chrome CDP launchd agent (enables automated credentials)"
 	@echo "    make chrome-cdp-stop   Uninstall Chrome CDP launchd agent"
+	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
 	@echo ""
 	@echo "  Override sandbox URL (falls back to default if omitted):"
 	@echo "    make up URL=https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/..."
