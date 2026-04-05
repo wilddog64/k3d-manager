@@ -18,6 +18,8 @@
 - `acg-extend` selectors updated for current Pluralsight UI — Modal with "Extend Session" button only visible at ≤1hr remaining (`e39efa4`)
 - `acg_credentials.js`: CDP probe removed — always uses `launchPersistentContext`; `acg_get_credentials` no longer probes CDP or launches Chrome manually (`ac260d0`)
 - Platform detection: `_is_mac` → `[[ "$(uname)" == "Darwin" ]]` in `acg.sh` and `antigravity.sh` — `_is_mac` not available outside dispatcher context (`513009f`, `4ce2b51`)
+- `bin/acg-up`: replaces `vault kv put` CLI calls with `curl` against Vault HTTP API — `vault` binary not installed on EC2 nodes (`07e89f9`)
+- `bin/acg-up`: seeds `secret/data/rabbitmq/default` in Vault KV — credentials for RabbitMQ StatefulSet and app-namespace ExternalSecrets on remote cluster (`77e69e2`)
 
 ## [v1.0.2] — 2026-04-03 — full stack automation: make up, ESO, ArgoCD, vault-bridge, Playwright fixes
 
