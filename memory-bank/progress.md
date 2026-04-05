@@ -60,6 +60,8 @@
 
 - [x] **shopping-cart-infra App namespace ExternalSecrets** — **COMPLETE**. shopping-cart-infra commit `5cc6c86` adds four ExternalSecrets under `shopping-cart-apps` namespace mirroring redis/postgres Vault KV secrets for basket, order-service, and product-catalog. Spec: `shopping-cart-infra/docs/plans/v0.2.1-bugfix-app-namespace-secrets.md`.
 
+- [x] **shopping-cart-infra ArgoCD sync waves + ddl-auto sandbox fix** — **COMPLETE**. shopping-cart-infra commit `3b8b13b` (branch `fix/argocd-sync-waves-ddl-auto`) adds the ExternalSecret Lua health check, sync-wave annotations (wave 0 for ExternalSecrets, wave 1 for StatefulSets), and ddl-auto=create ConfigMap patches for order-service/product-catalog. Spec: `shopping-cart-infra/docs/plans/v0.2.2-fix-argocd-sync-waves-ddl-auto.md`.
+
 - [x] **ESO version 1.0.0 bugfix** — **COMPLETE**. Commit `4dd1854` bumps the default `ESO_VERSION` in `bin/acg-up` to 1.0.0 so installed ESO serves `external-secrets.io/v1`. Spec: `docs/plans/v1.0.3-bugfix-eso-version-1.0.0.md`.
 
 - [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.

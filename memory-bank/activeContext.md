@@ -3,7 +3,8 @@
 ## Current Branch: `k3d-manager-v1.0.4` (as of 2026-04-05)
 
 **v1.0.3 SHIPPED** — PR #60 merged to main (`91552139`) 2026-04-05. Tagged v1.0.3, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-05-v1.0.3-retrospective.md`.
-**Next:** k3d-manager-v1.0.4 branch created. No specs yet. shopping-cart-infra v0.2.2 is the active in-flight work (ArgoCD sync waves + ddl-auto=create, branch `fix/argocd-sync-waves-ddl-auto`, spec `shopping-cart-infra/docs/plans/v0.2.2-fix-argocd-sync-waves-ddl-auto.md`, assigned Codex).
+**Next:** k3d-manager-v1.0.4 branch created. No specs yet.
+**shopping-cart-infra v0.2.2 — ArgoCD sync waves + ddl-auto** — COMPLETE (`3b8b13b`). Branch `fix/argocd-sync-waves-ddl-auto` added the ExternalSecret Lua health check, sync-wave annotations, and ddl-auto=create ConfigMap patches so ArgoCD waits for ESO before StatefulSets and Hibernate recreates schemas on sandbox rebuilds. Spec: `shopping-cart-infra/docs/plans/v0.2.2-fix-argocd-sync-waves-ddl-auto.md`.
 
 ## Current Branch: `k3d-manager-v1.0.3` (as of 2026-04-03)
 
