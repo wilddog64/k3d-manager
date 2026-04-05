@@ -52,7 +52,7 @@
 
 - [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.
 
-- [ ] **ESO ExternalSecret storeRef + Vault KV seeding** — SPECCED. shopping-cart-data ExternalSecrets reference namespace-scoped `SecretStore` that doesn't exist (fix: `ClusterSecretStore`); postgres ExternalSecrets use unconfigured Vault DB engine (fix: static KV + seed in `bin/acg-up`). Spec: `docs/plans/v1.0.3-bugfix-eso-externalsecret-storeref.md`. Multi-repo: shopping-cart-infra `fix/eso-externalsecret-storeref` + k3d-manager `k3d-manager-v1.0.3`. ASSIGNED to Codex.
+- [ ] **ESO ExternalSecret storeRef + Vault KV seeding** — SPECCED. Split into two specs: shopping-cart-infra `docs/plans/bugfix-eso-externalsecret-storeref.md` (storeRef kind + postgres paths); k3d-manager `docs/plans/v1.0.3-bugfix-vault-kv-seeding.md` (`bin/acg-up` Vault KV seeding). ASSIGNED to Codex.
 
 ## v1.0.2 — Active
 
