@@ -48,8 +48,8 @@ _info "[sync-apps] Terminating any in-progress operation on data-layer..."
 argocd app terminate-op cicd/data-layer 2>/dev/null || true
 sleep 5
 
-_info "[sync-apps] Syncing data-layer..."
-argocd app sync cicd/data-layer --timeout 180
+_info "[sync-apps] Syncing data-layer (async)..."
+argocd app sync cicd/data-layer --async
 
 _info "[sync-apps] Pod status (${APP_CONTEXT}):"
 kubectl get pods -A --context "${APP_CONTEXT}"
