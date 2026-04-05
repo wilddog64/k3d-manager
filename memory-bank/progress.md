@@ -48,6 +48,9 @@
 
 - [x] **ClusterSecretStore apiVersion bump** — **COMPLETE**. Commit `b8bcb89` switches the `bin/acg-up` ClusterSecretStore manifest to `external-secrets.io/v1` so ESO 1.0.0 accepts it. Spec: `docs/plans/v1.0.3-bugfix-css-apiversion.md`.
 
+- [x] **Vault KV seeding** — **COMPLETE**. Commit `d11260d` seeds redis/postgres/payment static secrets in Vault KV so shopping-cart ExternalSecrets have data to sync. Spec: `docs/plans/v1.0.3-bugfix-vault-kv-seeding.md`.
+- [x] **shopping-cart-infra ESO storeRef/path fix** — **COMPLETE**. shopping-cart-infra commit `abb6aba` (branch `fix/eso-externalsecret-storeref`) switches ExternalSecrets to `ClusterSecretStore` and static KV paths matching the new Vault seeds. Spec: `shopping-cart-infra/docs/plans/bugfix-eso-externalsecret-storeref.md`.
+
 - [x] **ESO version 1.0.0 bugfix** — **COMPLETE**. Commit `4dd1854` bumps the default `ESO_VERSION` in `bin/acg-up` to 1.0.0 so installed ESO serves `external-secrets.io/v1`. Spec: `docs/plans/v1.0.3-bugfix-eso-version-1.0.0.md`.
 
 - [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.
