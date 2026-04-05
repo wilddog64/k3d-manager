@@ -6,7 +6,7 @@
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?= $(shell gh auth token 2>/dev/null)
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration help
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps help
 
 ## Provision full stack: credentials → cluster → ESO → ArgoCD
 up:
@@ -59,6 +59,10 @@ argocd-registration:
 	kubectl rollout status statefulset/argocd-application-controller \
 	  -n cicd --context k3d-k3d-cluster --timeout=90s
 
+## Sync ArgoCD data-layer and show remote pod status
+sync-apps:
+	bin/acg-sync-apps
+
 ## Show this help
 help:
 	@echo ""
@@ -73,6 +77,7 @@ help:
 	@echo "    make chrome-cdp        Install Chrome CDP launchd agent (enables automated credentials)"
 	@echo "    make chrome-cdp-stop   Uninstall Chrome CDP launchd agent"
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
+	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
 	@echo ""
 	@echo "  Override sandbox URL (falls back to default if omitted):"
 	@echo "    make up URL=https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/..."
