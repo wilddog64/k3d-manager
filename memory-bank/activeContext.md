@@ -11,6 +11,7 @@
 **docs archive:** pre-v1.0.3 plans + issues moved to `docs/plans/archive/` and `docs/issues/archive/` on v1.0.3 branch cut.
 
 **Cold-run gate: PASSED (2026-04-03)** — `make up` from zero: 3 nodes Ready + ClusterSecretStore Ready. Commits: `96629e0` (ESO webhook wait), `e8b296b` (CSS poll 180s), `dc2c82d` (AWS creds check).
+**ESO version 1.0.0 bugfix** — SPECCED (2026-04-04). ESO v0.14.0 only serves v1beta1 — v1 GA requires 1.0.0+. Bump default in `bin/acg-up` from `0.14.0` to `1.0.0`. Spec: `docs/plans/v1.0.3-bugfix-eso-version-1.0.0.md`. ASSIGNED to Codex.
 **Makefile sync-apps target** — COMPLETE (`a47a4f5`). Added `bin/acg-sync-apps` (port-forward, argocd login, sync data-layer, pod status) and `make sync-apps` wrapper. Spec: `docs/plans/v1.0.3-makefile-sync-apps.md`.
 **ArgoCD register wrong context bugfix** — COMPLETE (`5cbc3cf`). `bin/acg-up` now reads the ubuntu-k3s server via name filter and switches kubectl to `k3d-k3d-cluster` before `register_app_cluster`, ensuring the cluster secret updates the local ArgoCD instance. Spec: `docs/plans/v1.0.3-bugfix-argocd-register-context.md`.
 **Makefile argocd-registration target** — COMPLETE (`7dfa093`). Added `make argocd-registration` to rerun the Step 10 registration flow: grab ubuntu-k3s token, read server URL, switch to `k3d-k3d-cluster`, call `register_app_cluster`, and restart the ArgoCD controller. Spec: `docs/plans/v1.0.3-makefile-register-apps.md`.
