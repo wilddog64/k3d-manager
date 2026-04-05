@@ -251,26 +251,21 @@ CSSEOF
 _info "[acg-up] vault-token secret + ClusterSecretStore applied"
 
 _info "[acg-up] Seeding Vault KV with sandbox static secrets..."
-VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
-  vault kv put secret/redis/cart password="redis-cart-dev-pass" >/dev/null
-VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
-  vault kv put secret/redis/orders-cache password="redis-orders-cache-dev-pass" >/dev/null
-VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
-  vault kv put secret/postgres/orders username="postgres" password="changeme456" >/dev/null
-VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
-  vault kv put secret/postgres/products username="postgres" password="changeme123" >/dev/null
-VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
-  vault kv put secret/postgres/payment username="postgres" password="CHANGE_ME" >/dev/null
-VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
-  vault kv put secret/payment/encryption key="dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg==" >/dev/null
-VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
-  vault kv put secret/payment/stripe \
-    api_key="sk_test_placeholder" \
-    webhook_secret="whsec_placeholder" >/dev/null
-VAULT_ADDR="http://localhost:8200" VAULT_TOKEN="${_vault_root_token}" \
-  vault kv put secret/payment/paypal \
-    client_id="paypal_sandbox_client_id" \
-    client_secret="paypal_sandbox_client_secret" >/dev/null
+_vault_kv_put() {
+  curl -sf -X POST \
+    -H "X-Vault-Token: ${_vault_root_token}" \
+    -H "Content-Type: application/json" \
+    -d "{\"data\":$1}" \
+    "http://localhost:8200/v1/secret/data/$2" >/dev/null
+}
+_vault_kv_put '{"password":"redis-cart-dev-pass"}'                                              redis/cart
+_vault_kv_put '{"password":"redis-orders-cache-dev-pass"}'                                      redis/orders-cache
+_vault_kv_put '{"username":"postgres","password":"changeme456"}'                                 postgres/orders
+_vault_kv_put '{"username":"postgres","password":"changeme123"}'                                 postgres/products
+_vault_kv_put '{"username":"postgres","password":"CHANGE_ME"}'                                   postgres/payment
+_vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}'                             payment/encryption
+_vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}'           payment/stripe
+_vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
 _info "[acg-up] Vault KV seeded (redis, postgres, payment sandbox secrets)"
 
 _info "[acg-up] Step 10/12 — Registering app cluster with ArgoCD..."
