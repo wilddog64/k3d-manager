@@ -58,15 +58,15 @@ argocd-registration:
 	  exit 1; \
 	fi; \
 	_prev_ctx=$$(kubectl config current-context 2>/dev/null || echo ""); \
-	kubectl config use-context k3d-k3d-cluster >/dev/null; \
+	trap '[ -n "$$_prev_ctx" ] && kubectl config use-context "$$_prev_ctx" >/dev/null 2>&1 || true' EXIT; \
+	kubectl config use-context k3d-k3d-cluster >/dev/null || exit 1; \
 	ARGOCD_APP_CLUSTER_TOKEN="$$_token" \
 	ARGOCD_APP_CLUSTER_SERVER="$$_server" \
-	  scripts/k3d-manager register_app_cluster; \
+	  scripts/k3d-manager register_app_cluster && \
 	kubectl rollout restart statefulset/argocd-application-controller \
-	  -n cicd --context k3d-k3d-cluster; \
+	  -n cicd --context k3d-k3d-cluster && \
 	kubectl rollout status statefulset/argocd-application-controller \
-	  -n cicd --context k3d-k3d-cluster --timeout=90s; \
-	if [ -n "$$_prev_ctx" ]; then kubectl config use-context "$$_prev_ctx" >/dev/null 2>&1 || true; fi
+	  -n cicd --context k3d-k3d-cluster --timeout=90s
 
 ## Sync ArgoCD data-layer and show remote pod status
 sync-apps:
