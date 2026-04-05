@@ -45,12 +45,19 @@ argocd-registration:
 	  echo "ERROR: argocd-manager-token not found on ubuntu-k3s — is the cluster up?"; \
 	  exit 1; \
 	fi; \
-	_server=$$(kubectl config view \
-	  -o jsonpath='{.clusters[?(@.name=="ubuntu-k3s")].cluster.server}' 2>/dev/null); \
-	if [ -z "$$_server" ]; then \
+	_ctx_cluster=$$(kubectl config view \
+	  -o jsonpath='{.contexts[?(@.name=="ubuntu-k3s")].context.cluster}' 2>/dev/null); \
+	if [ -z "$$_ctx_cluster" ]; then \
 	  echo "ERROR: ubuntu-k3s context not found in kubeconfig"; \
 	  exit 1; \
 	fi; \
+	_server=$$(kubectl config view \
+	  -o jsonpath="{.clusters[?(@.name==\"$$_ctx_cluster\")].cluster.server}" 2>/dev/null); \
+	if [ -z "$$_server" ]; then \
+	  echo "ERROR: server for cluster $$_ctx_cluster not found in kubeconfig"; \
+	  exit 1; \
+	fi; \
+	_prev_ctx=$$(kubectl config current-context 2>/dev/null || echo ""); \
 	kubectl config use-context k3d-k3d-cluster >/dev/null; \
 	ARGOCD_APP_CLUSTER_TOKEN="$$_token" \
 	ARGOCD_APP_CLUSTER_SERVER="$$_server" \
@@ -58,7 +65,8 @@ argocd-registration:
 	kubectl rollout restart statefulset/argocd-application-controller \
 	  -n cicd --context k3d-k3d-cluster; \
 	kubectl rollout status statefulset/argocd-application-controller \
-	  -n cicd --context k3d-k3d-cluster --timeout=90s
+	  -n cicd --context k3d-k3d-cluster --timeout=90s; \
+	if [ -n "$$_prev_ctx" ]; then kubectl config use-context "$$_prev_ctx" >/dev/null 2>&1 || true; fi
 
 ## Sync ArgoCD data-layer and show remote pod status
 sync-apps:
