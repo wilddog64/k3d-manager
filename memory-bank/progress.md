@@ -42,6 +42,8 @@
 
 - [x] **Makefile argocd-registration target** — **COMPLETE**. Commit `7dfa093` adds `make argocd-registration` so users can re-register ubuntu-k3s with ArgoCD (Step 10 logic) after sandbox recreation or IP change. Spec: `docs/plans/v1.0.3-makefile-register-apps.md`.
 
+- [x] **Makefile sync-apps target** — **COMPLETE**. Commit `a47a4f5` adds `bin/acg-sync-apps` + `make sync-apps` to port-forward argocd-server, log in, sync `cicd/data-layer`, and show remote pod status. Spec: `docs/plans/v1.0.3-makefile-sync-apps.md`.
+
 - [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.
 
 ## v1.0.2 — Active
