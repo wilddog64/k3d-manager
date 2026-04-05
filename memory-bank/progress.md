@@ -36,6 +36,8 @@
 
 - [x] **ESO version bump** — **COMPLETE**. Commit `216f6d5` sets the default ESO Helm chart version to 0.14.0 so remote installs expose `external-secrets.io/v1` required by shopping-cart-infra. Spec: `docs/plans/v1.0.3-fix-eso-version.md`.
 
+- [x] **ArgoCD cluster server URL bugfix** — **COMPLETE**. Commit `dec667f` injects the ubuntu-k3s API server URL into `register_app_cluster` so ArgoCD registers the EC2 cluster endpoint instead of `host.k3d.internal`. Spec: `docs/plans/v1.0.3-bugfix-argocd-cluster-server-url.md`.
+
 - [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.
 
 ## v1.0.2 — Active
