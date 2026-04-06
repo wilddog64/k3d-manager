@@ -64,12 +64,17 @@ async function extendSandbox() {
 
     // Try multiple selector strategies for the extend button
     const extendSelectors = [
+      '[data-heap-id="Hands-on Playground - Click - AWS Sandbox - Extend Sandbox"]',
       '[data-heap-id*="Extend Sandbox"]',
+      '[data-heap-id*="Extend Session"]',
       'button:has-text("Extend Session")',
+      'button:has-text("Extend Sandbox")',
+      '[id="extend-sandbox"] button',
+      'h4:has-text("Extend Your Session")',
+      'text="Extend Session"',
+      'text="Extend Your Session"',
       'a:has-text("Extend Session")',
       '[role="button"]:has-text("Extend Session")',
-      'text="Extend Session"',
-      'h4:has-text("Extend Your Session")',
       'button:has-text("Extend")',
       'button:has-text("+4")',
       'button:has-text("Add 4")',
