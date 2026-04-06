@@ -3,7 +3,11 @@
 ## Current Branch: `k3d-manager-v1.0.4` (as of 2026-04-05)
 
 **v1.0.3 SHIPPED** — PR #60 merged to main (`91552139`) 2026-04-05. Tagged v1.0.3, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-05-v1.0.3-retrospective.md`.
-**Next:** k3d-manager-v1.0.4 branch created. No specs yet.
+
+**v1.0.4 active specs (3 of 5 slots used):**
+- `v1.0.4-bugfix-acg-up-random-passwords.md` — Codex: replace hardcoded sandbox passwords with `openssl rand`
+- `v1.0.4-bugfix-acg-extend-selectors.md` — **Gemini** (needs live sandbox): update `acg_extend.js` extendSelectors array; run `debug_buttons.js`, confirm working selector, put at top of array. Issue: `docs/issues/2026-04-06-acg-extend-selectors-stale.md`
+- `v1.0.4-bugfix-acg-up-sandbox-expired.md` — **Codex**: expand `_acg_check_credentials` error message to explain "start new sandbox first" step. Issue: `docs/issues/2026-04-06-acg-up-sandbox-expired.md`
 **shopping-cart-infra v0.2.2 — ArgoCD sync waves + ddl-auto** — COMPLETE (`3b8b13b`). Branch `fix/argocd-sync-waves-ddl-auto` added the ExternalSecret Lua health check, sync-wave annotations, and ddl-auto=create ConfigMap patches so ArgoCD waits for ESO before StatefulSets and Hibernate recreates schemas on sandbox rebuilds. Spec: `shopping-cart-infra/docs/plans/v0.2.2-fix-argocd-sync-waves-ddl-auto.md`.
 **shopping-cart-infra v0.3.0 — manifest cross-check CI** — COMPLETE (`a37d8e1`). Branch `docs/next-improvements` adds `scripts/check-manifest-refs.sh`, wires it into pre-commit + `validate.yml` (manifest-cross-check job + smoke-test workflow_dispatch gate) so secret/configmap key mismatches halt locally and in CI. Spec: `shopping-cart-infra/docs/plans/v0.3.0-ci-manifest-validation.md`.
 **shopping-cart-order v0.3.1 — Spring Rabbit health** — COMPLETE (`6cffb1e`). Branch `fix/order-service-spring-amqp-config` updates `k8s/base/configmap.yaml` with `SPRING_RABBITMQ_*` host/port/vhost env vars so Spring's RabbitHealthIndicator hits the real RabbitMQ endpoint instead of localhost. Spec: `shopping-cart-infra/docs/plans/v0.3.1-fix-order-service-spring-rabbitmq-config.md`.
