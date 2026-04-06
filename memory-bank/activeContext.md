@@ -6,6 +6,8 @@
 **Next:** k3d-manager-v1.0.4 branch created. No specs yet.
 **shopping-cart-infra v0.2.2 — ArgoCD sync waves + ddl-auto** — COMPLETE (`3b8b13b`). Branch `fix/argocd-sync-waves-ddl-auto` added the ExternalSecret Lua health check, sync-wave annotations, and ddl-auto=create ConfigMap patches so ArgoCD waits for ESO before StatefulSets and Hibernate recreates schemas on sandbox rebuilds. Spec: `shopping-cart-infra/docs/plans/v0.2.2-fix-argocd-sync-waves-ddl-auto.md`.
 **shopping-cart-infra v0.3.0 — manifest cross-check CI** — COMPLETE (`a37d8e1`). Branch `docs/next-improvements` adds `scripts/check-manifest-refs.sh`, wires it into pre-commit + `validate.yml` (manifest-cross-check job + smoke-test workflow_dispatch gate) so secret/configmap key mismatches halt locally and in CI. Spec: `shopping-cart-infra/docs/plans/v0.3.0-ci-manifest-validation.md`.
+**shopping-cart-order v0.3.1 — Spring Rabbit health** — COMPLETE (`6cffb1e`). Branch `fix/order-service-spring-amqp-config` updates `k8s/base/configmap.yaml` with `SPRING_RABBITMQ_*` host/port/vhost env vars so Spring's RabbitHealthIndicator hits the real RabbitMQ endpoint instead of localhost. Spec: `shopping-cart-infra/docs/plans/v0.3.1-fix-order-service-spring-rabbitmq-config.md`.
+**shopping-cart-infra v0.3.1 — Spring Rabbit secrets** — COMPLETE (`edae82c`). Same branch adds `SPRING_RABBITMQ_USERNAME/PASSWORD` to `data-layer/secrets/postgres-orders-apps-externalsecret.yaml` so Spring AMQP auto-config reuses Vault-managed credentials. Spec: `shopping-cart-infra/docs/plans/v0.3.1-fix-order-service-spring-rabbitmq-config.md`.
 
 ## Current Branch: `k3d-manager-v1.0.3` (as of 2026-04-03)
 

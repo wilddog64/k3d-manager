@@ -64,6 +64,9 @@
 
 - [x] **shopping-cart-infra manifest cross-check CI** — **COMPLETE**. shopping-cart-infra commit `a37d8e1` (branch `docs/next-improvements`) adds `scripts/check-manifest-refs.sh`, wires it into `.pre-commit-config.yaml`, and extends `validate.yml` with the manifest-cross-check job + workflow-dispatched smoke test. Spec: `shopping-cart-infra/docs/plans/v0.3.0-ci-manifest-validation.md`.
 
+- [x] **shopping-cart order-service Spring Rabbit health fix** — **COMPLETE**. shopping-cart-order commit `6cffb1e` (branch `fix/order-service-spring-amqp-config`) adds `SPRING_RABBITMQ_HOST/PORT/VIRTUAL_HOST` to `k8s/base/configmap.yaml` so Spring's RabbitHealthIndicator hits the cluster RabbitMQ endpoint. Spec: `shopping-cart-infra/docs/plans/v0.3.1-fix-order-service-spring-rabbitmq-config.md`.
+- [x] **shopping-cart-infra order-service ExternalSecret update** — **COMPLETE**. shopping-cart-infra commit `edae82c` (branch `fix/order-service-spring-amqp-config`) adds `SPRING_RABBITMQ_USERNAME/PASSWORD` to `data-layer/secrets/postgres-orders-apps-externalsecret.yaml` so Spring AMQP auto-config uses Vault credentials. Spec: `shopping-cart-infra/docs/plans/v0.3.1-fix-order-service-spring-rabbitmq-config.md`.
+
 - [x] **ESO version 1.0.0 bugfix** — **COMPLETE**. Commit `4dd1854` bumps the default `ESO_VERSION` in `bin/acg-up` to 1.0.0 so installed ESO serves `external-secrets.io/v1`. Spec: `docs/plans/v1.0.3-bugfix-eso-version-1.0.0.md`.
 
 - [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.
