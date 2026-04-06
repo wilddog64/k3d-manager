@@ -69,6 +69,8 @@
 
 - [x] **ACG sandbox expired guidance** — **COMPLETE**. k3d-manager commit `bf569a80` expands `_acg_check_credentials` with the sandbox-expired path (start new sandbox → `acg_get_credentials` → `make up`) per `docs/plans/v1.0.4-bugfix-acg-up-sandbox-expired.md`.
 
+- [x] **rabbitmq-client ConnectionManager stats fix** — **COMPLETE**. Commit `36ed860` (branch `fix/connection-manager-get-stats-npe`) guards `getCacheProperties()` so `/actuator/health` no longer throws before the first AMQP channel is opened. Spec: `rabbitmq-client-java/docs/plans/bugfix-connection-manager-get-stats-npe.md`.
+
 - [x] **ESO version 1.0.0 bugfix** — **COMPLETE**. Commit `4dd1854` bumps the default `ESO_VERSION` in `bin/acg-up` to 1.0.0 so installed ESO serves `external-secrets.io/v1`. Spec: `docs/plans/v1.0.3-bugfix-eso-version-1.0.0.md`.
 
 - [x] **ESO apiVersion fix** — **COMPLETE**. shopping-cart-infra commit `c34b690` updates all 8 `data-layer/secrets/*.yaml` manifests (ClusterSecretStore + ExternalSecrets) from `external-secrets.io/v1beta1` to `external-secrets.io/v1` so ArgoCD can sync against the remote cluster. Spec: `docs/plans/v1.0.3-fix-eso-api-version.md`; branch `docs/next-improvements`.

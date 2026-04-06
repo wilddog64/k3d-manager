@@ -13,6 +13,7 @@
 **shopping-cart-order v0.3.1 — Spring Rabbit health** — MERGED (PR #21, `4872691`, 2026-04-06). `SPRING_RABBITMQ_HOST/PORT/VIRTUAL_HOST` added to configmap. `enforce_admins` restored. Next branch: `docs/next-improvements`.
 **shopping-cart-infra v0.3.1 — Spring Rabbit secrets** — MERGED (PR #30, `eeb34d9`, 2026-04-06). `SPRING_RABBITMQ_USERNAME/PASSWORD` added to ExternalSecret. `enforce_admins` restored. Next branch: `docs/next-improvements`.
 **k3d-manager v1.0.4 — ACG sandbox expired guidance** — COMPLETE (`bf569a80`). `_acg_check_credentials` now prints actionable steps (start sandbox → `acg_get_credentials` → `make up`) when AWS credentials are invalid due to expired/removed ACG sandboxes. Spec: `docs/plans/v1.0.4-bugfix-acg-up-sandbox-expired.md`.
+**rabbitmq-client-java — ConnectionManager stats NPE** — COMPLETE (`36ed860`). Branch `fix/connection-manager-get-stats-npe` wraps `getCacheProperties()` in try/catch so `/actuator/health` no longer fails before any channel is opened. Spec: `rabbitmq-client-java/docs/plans/bugfix-connection-manager-get-stats-npe.md`.
 
 ## Current Branch: `k3d-manager-v1.0.3` (as of 2026-04-03)
 
