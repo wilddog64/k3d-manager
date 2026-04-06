@@ -40,7 +40,12 @@ _acg_check_credentials() {
   _info "[acg] Checking AWS credentials..."
   local arn
   if ! arn=$(_run_command --soft -- aws sts get-caller-identity --region "${ACG_REGION}" --query 'Arn' --output text 2>/dev/null); then
-    printf 'ERROR: %s\n' "[acg] AWS credentials invalid or expired. Update ~/.aws/credentials from the ACG console." >&2
+    printf 'ERROR: %s\n' "[acg] AWS credentials invalid or expired." >&2
+    printf 'ERROR: %s\n' "[acg] If the sandbox was removed (expired TTL):" >&2
+    printf 'ERROR: %s\n' "[acg]   1. Start a new sandbox at ${_ACG_SANDBOX_URL}" >&2
+    printf 'ERROR: %s\n' "[acg]   2. Run: acg_get_credentials" >&2
+    printf 'ERROR: %s\n' "[acg]   3. Re-run: make up" >&2
+    printf 'ERROR: %s\n' "[acg] If the sandbox is still running: update ~/.aws/credentials from the ACG console." >&2
     return 1
   fi
   _info "[acg] Credentials OK (${arn})"
