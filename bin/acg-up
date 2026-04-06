@@ -17,7 +17,9 @@
 
 set -euo pipefail
 
+# shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck disable=SC2034
 SCRIPT_DIR="${REPO_ROOT}/scripts"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
@@ -275,15 +277,22 @@ _vault_kv_put() {
     -d "{\"data\":$1}" \
     "http://localhost:8200/v1/secret/data/$2" >/dev/null
 }
-_vault_kv_put '{"password":"redis-cart-dev-pass"}'                                              redis/cart
-_vault_kv_put '{"password":"redis-orders-cache-dev-pass"}'                                      redis/orders-cache
-_vault_kv_put '{"username":"postgres","password":"changeme456"}'                                 postgres/orders
-_vault_kv_put '{"username":"postgres","password":"changeme123"}'                                 postgres/products
-_vault_kv_put '{"username":"postgres","password":"CHANGE_ME"}'                                   postgres/payment
+_pg_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
+_pg_pass_products=$(openssl rand -base64 24 | tr -d '=+/')
+_pg_pass_payment=$(openssl rand -base64 24 | tr -d '=+/')
+_redis_pass_cart=$(openssl rand -base64 24 | tr -d '=+/')
+_redis_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
+_rabbitmq_pass=$(openssl rand -base64 24 | tr -d '=+/')
+
+_vault_kv_put "{\"password\":\"${_redis_pass_cart}\"}"                                           redis/cart
+_vault_kv_put "{\"password\":\"${_redis_pass_orders}\"}"                                         redis/orders-cache
+_vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_orders}\"}"                  postgres/orders
+_vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_products}\"}"                postgres/products
+_vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_payment}\"}"                 postgres/payment
 _vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}'                             payment/encryption
 _vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}'           payment/stripe
 _vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
-_vault_kv_put '{"username":"rabbitmq","password":"rabbitmq-sandbox-pass"}'                         rabbitmq/default
+_vault_kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbitmq_pass}\"}"                   rabbitmq/default
 _info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq sandbox secrets)"
 
 _info "[acg-up] Step 10/12 — Registering app cluster with ArgoCD..."
