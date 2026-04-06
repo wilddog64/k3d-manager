@@ -96,6 +96,23 @@ for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
   kubectl create namespace "$ns" --context ubuntu-k3s \
     --dry-run=client -o yaml \
     | kubectl apply --context ubuntu-k3s -f - >/dev/null
+  case "$ns" in
+    shopping-cart-data)
+      kubectl label namespace "$ns" --context ubuntu-k3s \
+        app.kubernetes.io/component=data \
+        app.kubernetes.io/part-of=shopping-cart \
+        --overwrite >/dev/null ;;
+    shopping-cart-apps)
+      kubectl label namespace "$ns" --context ubuntu-k3s \
+        app.kubernetes.io/component=application \
+        app.kubernetes.io/part-of=shopping-cart \
+        --overwrite >/dev/null ;;
+    shopping-cart-payment)
+      kubectl label namespace "$ns" --context ubuntu-k3s \
+        app.kubernetes.io/component=payment \
+        app.kubernetes.io/part-of=shopping-cart \
+        --overwrite >/dev/null ;;
+  esac
   kubectl create secret docker-registry ghcr-pull-secret \
     --docker-server=ghcr.io \
     --docker-username="${_github_user}" \
