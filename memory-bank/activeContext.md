@@ -5,7 +5,7 @@
 **v1.0.3 SHIPPED** — PR #60 merged to main (`91552139`) 2026-04-05. Tagged v1.0.3, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-05-v1.0.3-retrospective.md`.
 
 **v1.0.4 active specs (3 of 5 slots used):**
-- `v1.0.4-bugfix-acg-up-random-passwords.md` — Codex: replace hardcoded sandbox passwords with `openssl rand`
+**acg-up random passwords** — COMPLETE (`f709cb3c`). `bin/acg-up` now generates redis/postgres/rabbitmq sandbox passwords via `openssl rand` per spec `docs/plans/v1.0.4-bugfix-acg-up-random-passwords.md`; AES/payment placeholders unchanged.
 **acg_extend selector fix (v1.0.4):** COMPLETE (`1d2f70ce`). Analyzed Pluralsight JavaScript index and identified Pando-based modal (`#extend-sandbox`) and button (`Extend Session`). Updated `scripts/playwright/acg_extend.js` with specific selectors. Verification partially blocked by Cloudflare and the 1-hour rendering rule, but selectors are confirmed via JS source. Spec: `docs/plans/v1.0.4-bugfix-acg-extend-selectors.md`.
 - `v1.0.4-bugfix-acg-up-sandbox-expired.md` — **Codex**: expand `_acg_check_credentials` error message to explain "start new sandbox first" step. Issue: `docs/issues/2026-04-06-acg-up-sandbox-expired.md`
 **shopping-cart-infra v0.2.2 — ArgoCD sync waves + ddl-auto** — COMPLETE (`3b8b13b`). Branch `fix/argocd-sync-waves-ddl-auto` added the ExternalSecret Lua health check, sync-wave annotations, and ddl-auto=create ConfigMap patches so ArgoCD waits for ESO before StatefulSets and Hibernate recreates schemas on sandbox rebuilds. Spec: `shopping-cart-infra/docs/plans/v0.2.2-fix-argocd-sync-waves-ddl-auto.md`.
