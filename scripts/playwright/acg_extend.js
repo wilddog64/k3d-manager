@@ -30,19 +30,39 @@ async function extendSandbox() {
     process.exit(1);
   }
 
-  const targetUrl = process.argv[2];
+  let targetUrl = process.argv[2];
   if (!targetUrl) {
     console.error('ERROR: No sandbox URL provided');
     process.exit(1);
   }
+  // Standardize URL to minimize SPA redirects
+  if (targetUrl.includes('cloud-playground/cloud-sandboxes')) {
+    targetUrl = targetUrl.replace('cloud-playground/cloud-sandboxes', 'hands-on/playground/cloud-sandboxes');
+  }
 
   let browserContext;
+  let _cdpBrowser = null;
   try {
-    browserContext = await chromium.launchPersistentContext(AUTH_DIR, {
-      headless: false,
-      channel: 'chrome',
-      args: ['--password-store=basic'],
-    });
+    // Try to connect via CDP first to catch already-open modals
+    try {
+      _cdpBrowser = await chromium.connectOverCDP('http://localhost:9222');
+      const _cdpContexts = _cdpBrowser.contexts();
+      if (_cdpContexts.length > 0) {
+        browserContext = _cdpContexts[0];
+        console.error('INFO: Connected via CDP to existing browser session.');
+      }
+    } catch (e) {
+      // CDP failed, fall back to persistent context
+      _cdpBrowser = null;
+    }
+
+    if (!browserContext) {
+      browserContext = await chromium.launchPersistentContext(AUTH_DIR, {
+        headless: false,
+        channel: 'chrome',
+        args: ['--password-store=basic'],
+      });
+    }
 
     const allPages = browserContext.pages();
     let page = allPages.find(p => {
@@ -53,14 +73,63 @@ async function extendSandbox() {
       if (!page) throw new Error('No page found in the browser context');
     }
 
-    console.error(`INFO: Navigating to ${targetUrl}...`);
-    await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    const currentUrl = page.url();
+    if (currentUrl.includes('pluralsight.com')) {
+      console.error(`INFO: Already on Pluralsight page: ${currentUrl}`);
+    } else {
+      console.error(`INFO: Navigating to ${targetUrl}...`);
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    }
 
     // Wait for skeleton loaders to clear
     await page.waitForFunction(
       () => !document.querySelector('[aria-busy="true"]'),
       { timeout: 30000 }
     ).catch(() => console.error('WARN: Skeleton loaders did not clear within 30s — proceeding anyway'));
+
+    // Try to parse TTL and exit gracefully if > 1 hour remains
+    const shutdownTitleLoc = page.locator('[data-testid="auto-shutdown-title"]');
+    const hasShutdownTitle = await shutdownTitleLoc.isVisible({ timeout: 10000 }).catch(() => false);
+    
+    if (hasShutdownTitle) {
+      const shutdownText = await shutdownTitleLoc.innerText().catch(() => '');
+      console.error(`INFO: Detected shutdown text: ${shutdownText}`);
+      const match = shutdownText.match(/at\s+(\d{1,2}:\d{2}(?:\s*)(?:AM|PM|am|pm))/i);
+      if (match) {
+        const timeStr = match[1].replace(/\s+/g, '');
+        const now = new Date();
+        const shutdownMatch = timeStr.match(/(\d+):(\d+)(AM|PM|am|pm)/i);
+        if (shutdownMatch) {
+          let hours = parseInt(shutdownMatch[1], 10);
+          const mins = parseInt(shutdownMatch[2], 10);
+          const ampm = shutdownMatch[3].toUpperCase();
+          if (ampm === 'PM' && hours < 12) hours += 12;
+          if (ampm === 'AM' && hours === 12) hours = 0;
+          
+          const shutdownTime = new Date();
+          shutdownTime.setHours(hours, mins, 0, 0);
+          
+          // Handle case where shutdown is tomorrow morning (e.g. now is 11 PM, shutdown is 2 AM)
+          if (shutdownTime < now && (now.getHours() > 12 && hours < 12)) {
+             shutdownTime.setDate(shutdownTime.getDate() + 1);
+          }
+          
+          const remainingMs = shutdownTime.getTime() - now.getTime();
+          const remainingMins = Math.floor(remainingMs / 60000);
+          
+          console.error(`INFO: Calculated remaining TTL: ~${remainingMins} minutes`);
+          
+          if (remainingMins > 65) {
+            console.log(`INFO: Extension window not open yet (${remainingMins}m remaining). Skipping extension.`);
+            process.exit(0);
+          } else {
+            console.error(`INFO: Within 1h extension window (${remainingMins}m remaining). Proceeding to extend...`);
+          }
+        }
+      }
+    } else {
+      console.error(`WARN: Auto Shutdown text not found. Proceeding to search for Extend button anyway.`);
+    }
 
     // Try multiple selector strategies for the extend button
     const extendSelectors = [
@@ -86,7 +155,7 @@ async function extendSandbox() {
     let clicked = false;
     for (const selector of extendSelectors) {
       const btn = page.locator(selector).first();
-      const visible = await btn.isVisible({ timeout: 3000 }).catch(() => false);
+      const visible = await btn.isVisible({ timeout: 5000 }).catch(() => false);
       if (visible) {
         console.error(`INFO: Found extend button with selector: ${selector}`);
         await btn.click();
@@ -106,7 +175,7 @@ async function extendSandbox() {
 
         for (const selector of extendSelectors) {
           const btn = page.locator(selector).first();
-          const visible = await btn.isVisible({ timeout: 3000 }).catch(() => false);
+          const visible = await btn.isVisible({ timeout: 15000 }).catch(() => false);
           if (visible) {
             console.error(`INFO: Found extend button (post-open) with selector: ${selector}`);
             await btn.click();
@@ -149,7 +218,11 @@ async function extendSandbox() {
     console.error(`ERROR: ${error.message}`);
     process.exit(1);
   } finally {
-    if (browserContext) await browserContext.close();
+    if (_cdpBrowser) {
+      await _cdpBrowser.close().catch(() => {});
+    } else if (browserContext) {
+      await browserContext.close();
+    }
   }
 }
 
