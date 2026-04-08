@@ -162,9 +162,6 @@ async function extendSandbox() {
       'button:has-text("Extend Session")',
       'button:has-text("Extend Sandbox")',
       '[id="extend-sandbox"] button',
-      'h4:has-text("Extend Your Session")',
-      'text="Extend Session"',
-      'text="Extend Your Session"',
       'a:has-text("Extend Session")',
       '[role="button"]:has-text("Extend Session")',
       'button:has-text("Extend")',
@@ -184,6 +181,30 @@ async function extendSandbox() {
         await btn.click();
         clicked = true;
         break;
+      }
+    }
+
+    if (!clicked) {
+      // Logic for "Trapped" UI: Sometimes the extend button only appears after a fresh Start/Resume click
+      console.error('INFO: Extend button not found. Attempting to click Open/Resume to force reveal...');
+      const openButton = page.locator('button:has-text("Open Sandbox"), button:has-text("Open"), button:has-text("Start Sandbox"), button:has-text("Resume")').first();
+      const openVisible = await openButton.isVisible({ timeout: 10000 }).catch(() => false);
+      
+      if (openVisible) {
+        console.error('INFO: Clicking Open/Resume (force) to reveal modal...');
+        await openButton.click({ force: true });
+        await page.waitForTimeout(5000); // Wait for modal to render
+
+        for (const selector of extendSelectors) {
+          const btn = page.locator(selector).first();
+          const visible = await btn.isVisible({ timeout: 10000 }).catch(() => false);
+          if (visible) {
+            console.error(`INFO: Found extend button (after forced click) with selector: ${selector}`);
+            await btn.click();
+            clicked = true;
+            break;
+          }
+        }
       }
     }
 
