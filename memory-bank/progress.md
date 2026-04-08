@@ -34,7 +34,7 @@
 
 ## v1.0.3 — Complete
 
-- [x] **acg_extend selector fix** — **COMPLETE**. Analyzed Pluralsight JavaScript index (`index.*.js`) and confirmed Pando design system selectors: `button:has-text("Extend Session")` and `[data-heap-id="Hands-on Playground - Click - AWS Sandbox - Extend Sandbox"]`. Updated `acg_extend.js` with CDP support and TTL-aware graceful exit logic. **Finding:** Confirmed ACG extension logic has NO dependency on Antigravity IDE. Commit `c21f33d9`.
+- [x] **acg_extend selector fix** — **PARTIAL**. Script successfully connect via CDP and parses TTL. However, it erroneously clicks informational `h4` text instead of the actual button due to broad selectors. **Fix Pending:** Remove non-button selectors from `acg_extend.js`. Commit `c21f33d9`.
 
 - [x] **Chrome CDP launchd agent** — **COMPLETE**. `fe0f313` adds constants/helpers + `acg_chrome_cdp_install`/`acg_chrome_cdp_uninstall` + `make chrome-cdp`/`chrome-cdp-stop`. Platform detection fixed: `513009f` (`acg.sh`), `4ce2b51` (`antigravity.sh`). Spec: `docs/plans/v1.0.3-chrome-cdp-launchd.md`.
 
