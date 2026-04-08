@@ -12,6 +12,8 @@
 | jq | JSON parsing in scripts |
 | Bats | Auto-installed by `_ensure_bats` for tests |
 | vault CLI | For PKI / unseal operations |
+| Node.js | Required for Playwright browser automation (ACG extend) |
+| Playwright | Browser automation engine for ACG lifecycle |
 
 ## Platform Defaults
 

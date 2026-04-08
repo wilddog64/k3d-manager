@@ -217,9 +217,10 @@ re-commit on their behalf.
 writing the next task. This is where inaccuracies, overclaiming, and stale entries are
 caught — not by blocking agent writes.
 
-## 14) Agent Rigor Protocol
+## 16) Antigravity Browser Automation Pattern
 
-`scripts/lib/agent_rigor.sh` — requires `system.sh` sourced first (dependency guard via `declare -f _err`).
-
-- `_agent_checkpoint` — commits the current working state with a spec-derived message before any surgical operation. Prevents partial-fix loss.
-- Pattern: spec → checkpoint → implement → verify → Claude review → commit.
+- The `antigravity` plugin handles browser-based automation (e.g., ACG sandbox TTL extension).
+- **Standalone Logic:** While using the "Antigravity" name (legacy from Copilot experiments), the ACG extension logic is **standalone** and depends only on Node.js, Playwright, and Chrome (CDP port 9222).
+- **IDE Independence:** The Antigravity IDE is **NOT** required for sandbox lifecycle management.
+- **CDP Session Reuse:** Automation scripts prefer attaching to the user's active Chrome instance via CDP to reuse existing authentication sessions and interact with already-open modals.
+- **TTL-Awareness:** Scripts parse the sandbox "Auto Shutdown" time from the DOM to gracefully skip extension attempts when > 65 minutes remain, preventing false failures.
