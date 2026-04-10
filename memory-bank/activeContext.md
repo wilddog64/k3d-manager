@@ -9,6 +9,7 @@
 
 **Latest progress for v1.0.5:**
 - **antigravity.sh refactor** — COMPLETE (`291a60dc`). `_acg_extend_playwright` now lives in `acg.sh`, `acg_watch` + `_acg_watch_write_wrapper` call it directly, `antigravity.sh` no longer exports `antigravity_acg_extend`, and dependent provider/tests were updated per `docs/plans/v1.0.5-antigravity-decouple.md` / `docs/issues/2026-04-06-acg-antigravity-false-dependency.md`.
+- **hardcoded password cleanup** — ASSIGNED to Codex (2026-04-10). Spec: `docs/plans/v1.0.5-fix-hardcoded-passwords.md`. `bin/acg-up` seeds postgres admin + LDAP secrets at provision time; 5 infra/app files get `CHANGE_ME` placeholders. Branch `fix/k8s-base-secret-placeholder` in shopping-cart-infra, shopping-cart-order, shopping-cart-product-catalog.
 
 **v1.0.4 completed items:**
 - acg-up random passwords — COMPLETE (`f709cb3c`)

@@ -36,6 +36,7 @@
 
 - [x] **antigravity.sh refactor** — **COMPLETE** (`291a60dc`). `_acg_extend_playwright` moved into `acg.sh`, `acg_watch` + `_acg_watch_write_wrapper` now invoke it directly, `antigravity.sh` dropped the old helper, and dependent provider/tests were updated per `docs/plans/v1.0.5-antigravity-decouple.md`.
 - [x] **rabbitmq-client-java NPE fix PR** — **COMPLETE**. PR #3 merged to main (`723eb7fc`) 2026-04-10. `enforce_admins` restored. Retro: `docs/retro/2026-04-10-npe-fix-retrospective.md`. Next branch: `docs/next-improvements`.
+- [ ] **hardcoded password cleanup** — **ASSIGNED to Codex** (2026-04-10). Spec: `docs/plans/v1.0.5-fix-hardcoded-passwords.md`. Replace `changeme*`/`guest` with `CHANGE_ME` in 5 files across shopping-cart-infra, shopping-cart-order, shopping-cart-product-catalog; add postgres admin + LDAP kubectl applies to `bin/acg-up`. Branch `fix/k8s-base-secret-placeholder` in all three shopping-cart repos.
 
 ## v1.0.4 — SHIPPED
 
