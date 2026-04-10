@@ -23,10 +23,14 @@ function _isFirstRun() {
 const IS_FIRST_RUN = _isFirstRun();
 
 async function extractCredentials() {
-  const targetUrl = process.argv[2];
+  let targetUrl = process.argv[2];
   if (!targetUrl) {
     console.error('ERROR: No target URL provided');
     process.exit(1);
+  }
+  // Standardize URL to minimize SPA redirects and Cloudflare triggers
+  if (targetUrl.includes('cloud-playground/cloud-sandboxes')) {
+    targetUrl = targetUrl.replace('cloud-playground/cloud-sandboxes', 'hands-on/playground/cloud-sandboxes');
   }
 
   if (IS_FIRST_RUN) {

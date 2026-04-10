@@ -1,5 +1,20 @@
 # Active Context — k3d-manager
 
+## Current Branch: `k3d-manager-v1.0.4` (as of 2026-04-05)
+
+**v1.0.3 SHIPPED** — PR #60 merged to main (`91552139`) 2026-04-05. Tagged v1.0.3, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-05-v1.0.3-retrospective.md`.
+
+**v1.0.4 active specs (3 of 5 slots used):**
+**acg-up random passwords** — COMPLETE (`f709cb3c`). `bin/acg-up` now generates redis/postgres/rabbitmq sandbox passwords via `openssl rand` per spec `docs/plans/v1.0.4-bugfix-acg-up-random-passwords.md`; AES/payment placeholders unchanged.
+**acg_extend logic refinement (v1.0.4):** IN PROGRESS. Identified "Ghost State" bug where credentials are visible but the "Extend" button is missing because the session is internally stale. Fix: Implement "Delete -> Start -> Extend" recovery flow to force the modal to appear when the button is missing during the final window. Also fixing the midnight date-wrap bug. Issues: `docs/issues/2026-04-08-acg-extend-midnight-and-modal-trapping.md`, `docs/issues/2026-04-08-acg-extend-stale-session-ghost-state.md`.
+**acg_credentials URL fix (v1.0.4):** COMPLETE (`86883...`). Standardized all Pluralsight URLs to `/hands-on/playground/` across `acg.sh` and `acg_credentials.js`. Verified CDP session reuse successfully bypasses Cloudflare blocks and extracts credentials.
+**shopping-cart-infra v0.2.2 — ArgoCD sync waves + ddl-auto** — COMPLETE (`3b8b13b`). Branch `fix/argocd-sync-waves-ddl-auto` added the ExternalSecret Lua health check, sync-wave annotations, and ddl-auto=create ConfigMap patches so ArgoCD waits for ESO before StatefulSets and Hibernate recreates schemas on sandbox rebuilds. Spec: `shopping-cart-infra/docs/plans/v0.2.2-fix-argocd-sync-waves-ddl-auto.md`.
+**shopping-cart-infra v0.3.0 — manifest cross-check CI** — COMPLETE (`a37d8e1`). Branch `docs/next-improvements` adds `scripts/check-manifest-refs.sh`, wires it into pre-commit + `validate.yml` (manifest-cross-check job + smoke-test workflow_dispatch gate) so secret/configmap key mismatches halt locally and in CI. Spec: `shopping-cart-infra/docs/plans/v0.3.0-ci-manifest-validation.md`.
+**shopping-cart-order v0.3.1 — Spring Rabbit health** — MERGED (PR #21, `4872691`, 2026-04-06). `SPRING_RABBITMQ_HOST/PORT/VIRTUAL_HOST` added to configmap. `enforce_admins` restored. Next branch: `docs/next-improvements`.
+**shopping-cart-infra v0.3.1 — Spring Rabbit secrets** — MERGED (PR #30, `eeb34d9`, 2026-04-06). `SPRING_RABBITMQ_USERNAME/PASSWORD` added to ExternalSecret. `enforce_admins` restored. Next branch: `docs/next-improvements`.
+**k3d-manager v1.0.4 — ACG sandbox expired guidance** — COMPLETE (`bf569a80`). `_acg_check_credentials` now prints actionable steps (start sandbox → `acg_get_credentials` → `make up`) when AWS credentials are invalid due to expired/removed ACG sandboxes. Spec: `docs/plans/v1.0.4-bugfix-acg-up-sandbox-expired.md`.
+**rabbitmq-client-java — ConnectionManager stats NPE** — COMPLETE (`36ed860`). Branch `fix/connection-manager-get-stats-npe` wraps `getCacheProperties()` in try/catch so `/actuator/health` no longer fails before any channel is opened. Spec: `rabbitmq-client-java/docs/plans/bugfix-connection-manager-get-stats-npe.md`.
+
 ## Current Branch: `k3d-manager-v1.0.3` (as of 2026-04-03)
 
 **v1.0.0 SHIPPED** — PR #57 merged to main (`807c0432`) 2026-03-29. Tagged v1.0.0, released. `enforce_admins` restored.

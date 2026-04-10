@@ -24,7 +24,7 @@ _ACG_AMI_OWNER="099720109477"
 _ACG_AMI_FILTER="ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"
 _ACG_VPC_CIDR="10.0.0.0/16"
 _ACG_SUBNET_CIDR="10.0.1.0/24"
-_ACG_SANDBOX_URL="https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
+_ACG_SANDBOX_URL="https://app.pluralsight.com/hands-on/playground/cloud-sandboxes"
 _ACG_SANDBOX_LIST_URL="${ACG_SANDBOX_LIST_URL:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}"
 _ACG_WATCH_PID_FILE="${HOME}/.local/share/k3d-manager/acg-watch.pid"
 _ACG_WATCH_LAUNCHD_LABEL="com.k3d-manager.acg-watch"
@@ -40,7 +40,12 @@ _acg_check_credentials() {
   _info "[acg] Checking AWS credentials..."
   local arn
   if ! arn=$(_run_command --soft -- aws sts get-caller-identity --region "${ACG_REGION}" --query 'Arn' --output text 2>/dev/null); then
-    printf 'ERROR: %s\n' "[acg] AWS credentials invalid or expired. Update ~/.aws/credentials from the ACG console." >&2
+    printf 'ERROR: %s\n' "[acg] AWS credentials invalid or expired." >&2
+    printf 'ERROR: %s\n' "[acg] If the sandbox was removed (expired TTL):" >&2
+    printf 'ERROR: %s\n' "[acg]   1. Start a new sandbox at ${_ACG_SANDBOX_URL}" >&2
+    printf 'ERROR: %s\n' "[acg]   2. Run: acg_get_credentials" >&2
+    printf 'ERROR: %s\n' "[acg]   3. Re-run: make up" >&2
+    printf 'ERROR: %s\n' "[acg] If the sandbox is still running: update ~/.aws/credentials from the ACG console." >&2
     return 1
   fi
   _info "[acg] Credentials OK (${arn})"

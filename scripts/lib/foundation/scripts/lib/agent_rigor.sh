@@ -178,7 +178,7 @@ _agent_audit() {
    fi
    local file
    while IFS= read -r -d '' file; do
-      if [[ -n "$allowlist_content" ]] && grep -Fqx "$file" <<< "$allowlist_content"; then
+      if [[ -n "$allowlist_content" ]] && grep -Fqx -- "$file" <<< "$allowlist_content"; then
          continue
       fi
       local ip_lines

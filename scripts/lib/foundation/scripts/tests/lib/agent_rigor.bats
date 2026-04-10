@@ -332,3 +332,38 @@ SCRIPT
     [ "$status" -eq 0 ]
   )
 }
+
+@test "_agent_audit: passes on hardcoded-IP yaml when dash-prefix path is in allowlist" {
+  local repo allowlist
+  repo="$(mktemp -d)"
+  allowlist="$(mktemp)"
+  trap 'rm -rf "$repo" "$allowlist"' RETURN
+  git -C "$repo" init -q
+  git -C "$repo" config user.email "test@example.com"
+  git -C "$repo" config user.name "Test"
+  printf 'host: 10.0.0.1\n' > "$repo/-infra.yaml"
+  git -C "$repo" add -- -infra.yaml
+  printf '%s\n' '-infra.yaml' > "$allowlist"
+  (
+    cd "$repo"
+    AGENT_IP_ALLOWLIST="$allowlist" run _agent_audit
+    [ "$status" -eq 0 ]
+  )
+}
+
+@test "_agent_audit: fails on hardcoded-IP yaml when dash-prefix path is not allowlisted" {
+  local repo
+  repo="$(mktemp -d)"
+  trap 'rm -rf "$repo"' RETURN
+  git -C "$repo" init -q
+  git -C "$repo" config user.email "test@example.com"
+  git -C "$repo" config user.name "Test"
+  printf 'host: 10.0.0.1\n' > "$repo/-infra.yaml"
+  git -C "$repo" add -- -infra.yaml
+  (
+    cd "$repo"
+    run _agent_audit
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"hardcoded IP"* ]]
+  )
+}

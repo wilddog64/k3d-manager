@@ -44,8 +44,23 @@ _argocd_pass=$(kubectl get secret argocd-initial-admin-secret \
 _info "[sync-apps] Logging in to ArgoCD..."
 argocd login localhost:8080 --username admin --password "${_argocd_pass}" --insecure >/dev/null
 
-_info "[sync-apps] Syncing data-layer..."
-argocd app sync cicd/data-layer --timeout 180
+_info "[sync-apps] Terminating any in-progress operation on data-layer..."
+argocd app terminate-op cicd/data-layer 2>/dev/null || true
+
+_info "[sync-apps] Waiting for operation to clear..."
+for _i in $(seq 1 20); do
+  _phase=$(argocd app get cicd/data-layer --output json 2>/dev/null \
+    | grep -o '"phase":"[^"]*"' | head -1 | grep -o '[^"]*$' || echo "none")
+  if [[ "$_phase" == "none" || "$_phase" == "Succeeded" || \
+        "$_phase" == "Failed"  || "$_phase" == "Error" ]]; then
+    break
+  fi
+  _info "[sync-apps] Operation still ${_phase}, waiting... (${_i}/20)"
+  sleep 3
+done
+
+_info "[sync-apps] Syncing data-layer (async)..."
+argocd app sync cicd/data-layer --async
 
 _info "[sync-apps] Pod status (${APP_CONTEXT}):"
 kubectl get pods -A --context "${APP_CONTEXT}"

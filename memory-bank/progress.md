@@ -26,9 +26,17 @@
 
 ---
 
-## v1.0.3 — Active
+## v1.0.3 — SHIPPED
 
-- [x] **acg_extend selector fix** — **COMPLETE**. Analyzed Pluralsight React JS bundle and added explicit selectors (`[data-heap-id*="Extend Sandbox"]`, `button:has-text("Extend Session")`) and a fallback to click the `h4` text so pre-flight checks pass safely even when the button is not rendered (i.e. >1 hr remaining). Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`; commit `e39efa4`.
+**PR #60 merged to main (`91552139`) 2026-04-05. Tagged v1.0.3, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-05-v1.0.3-retrospective.md`.**
+
+## v1.0.4 — Active (branch `k3d-manager-v1.0.4`)
+
+## v1.0.3 — Complete
+
+- [ ] **acg_extend logic refinement** — **IN PROGRESS**. Identified midnight calculation bug, modal-trapping, and "Ghost State" (stale session). Implementing "Delete -> Start -> Extend" recovery flow and date-wrap TTL parsing. Issues: `docs/issues/2026-04-08-acg-extend-midnight-and-modal-trapping.md`, `docs/issues/2026-04-08-acg-extend-stale-session-ghost-state.md`.
+- [x] **acg_credentials URL mismatch fix** — **COMPLETE**. Standardized all Pluralsight URLs to `/hands-on/playground/` across `acg.sh` and `acg_credentials.js`. Commit `86883...`.
+- [x] **acg_extend selector fix** — **COMPLETE**. Fixed `h4` false positive by sanitizing `extendSelectors`. Implemented robust "trapped UI" handling: script now forces a "Start/Resume" click if the extend button is missing. Commit `ae765f2d`.
 
 - [x] **Chrome CDP launchd agent** — **COMPLETE**. `fe0f313` adds constants/helpers + `acg_chrome_cdp_install`/`acg_chrome_cdp_uninstall` + `make chrome-cdp`/`chrome-cdp-stop`. Platform detection fixed: `513009f` (`acg.sh`), `4ce2b51` (`antigravity.sh`). Spec: `docs/plans/v1.0.3-chrome-cdp-launchd.md`.
 
@@ -53,6 +61,19 @@
 - [x] **shopping-cart-infra ESO storeRef/path fix** — **COMPLETE**. shopping-cart-infra commit `abb6aba` (branch `fix/eso-externalsecret-storeref`) switches ExternalSecrets to `ClusterSecretStore` and static KV paths matching the new Vault seeds. Spec: `shopping-cart-infra/docs/plans/bugfix-eso-externalsecret-storeref.md`.
 
 - [x] **shopping-cart-infra App namespace ExternalSecrets** — **COMPLETE**. shopping-cart-infra commit `5cc6c86` adds four ExternalSecrets under `shopping-cart-apps` namespace mirroring redis/postgres Vault KV secrets for basket, order-service, and product-catalog. Spec: `shopping-cart-infra/docs/plans/v0.2.1-bugfix-app-namespace-secrets.md`.
+
+- [x] **shopping-cart-infra ArgoCD sync waves + ddl-auto sandbox fix** — **COMPLETE**. shopping-cart-infra commit `3b8b13b` (branch `fix/argocd-sync-waves-ddl-auto`) adds the ExternalSecret Lua health check, sync-wave annotations (wave 0 for ExternalSecrets, wave 1 for StatefulSets), and ddl-auto=create ConfigMap patches for order-service/product-catalog. Spec: `shopping-cart-infra/docs/plans/v0.2.2-fix-argocd-sync-waves-ddl-auto.md`.
+
+- [x] **shopping-cart-infra manifest cross-check CI** — **COMPLETE**. shopping-cart-infra commit `a37d8e1` (branch `docs/next-improvements`) adds `scripts/check-manifest-refs.sh`, wires it into `.pre-commit-config.yaml`, and extends `validate.yml` with the manifest-cross-check job + workflow-dispatched smoke test. Spec: `shopping-cart-infra/docs/plans/v0.3.0-ci-manifest-validation.md`.
+
+- [x] **shopping-cart order-service Spring Rabbit health fix** — **MERGED**. shopping-cart-order PR #21 merged to main (`4872691`) 2026-04-06. `SPRING_RABBITMQ_HOST/PORT/VIRTUAL_HOST` added to `k8s/base/configmap.yaml`. `enforce_admins` restored. Next branch: `docs/next-improvements`.
+- [x] **shopping-cart-infra order-service ExternalSecret update** — **MERGED**. shopping-cart-infra PR #30 merged to main (`eeb34d9`) 2026-04-06. `SPRING_RABBITMQ_USERNAME/PASSWORD` added to ExternalSecret. `enforce_admins` restored. Next branch: `docs/next-improvements`.
+
+- [x] **ACG sandbox expired guidance** — **COMPLETE**. k3d-manager commit `bf569a80` expands `_acg_check_credentials` with the sandbox-expired path (start new sandbox → `acg_get_credentials` → `make up`) per `docs/plans/v1.0.4-bugfix-acg-up-sandbox-expired.md`.
+
+- [x] **rabbitmq-client ConnectionManager stats fix** — **COMPLETE**. Commit `36ed860` (branch `fix/connection-manager-get-stats-npe`) guards `getCacheProperties()` so `/actuator/health` no longer throws before the first AMQP channel is opened. Spec: `rabbitmq-client-java/docs/plans/bugfix-connection-manager-get-stats-npe.md`.
+
+- [x] **acg-up random password generation** — **COMPLETE**. k3d-manager commit `f709cb3c` swaps the hardcoded redis/postgres/rabbitmq passwords in `bin/acg-up` for per-run `openssl rand` secrets while leaving AES/payment placeholders untouched. Spec: `docs/plans/v1.0.4-bugfix-acg-up-random-passwords.md`.
 
 - [x] **ESO version 1.0.0 bugfix** — **COMPLETE**. Commit `4dd1854` bumps the default `ESO_VERSION` in `bin/acg-up` to 1.0.0 so installed ESO serves `external-secrets.io/v1`. Spec: `docs/plans/v1.0.3-bugfix-eso-version-1.0.0.md`.
 

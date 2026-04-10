@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Fixed
+- `_agent_audit` IP allowlist: use `grep -Fqx -- "$file"` to prevent repo-relative paths beginning with `-` from being parsed as grep flags.
+
+## [v0.3.15] — 2026-03-31
+
+### Fixed
 - `_agent_audit` IP audit loop — supports `AGENT_IP_ALLOWLIST` env var; when set to a readable regular file, skips IP literal check for paths listed in it (one repo-relative path per line; lines beginning with `#` are ignored). Consumers set this env var before running `_agent_audit` (for example, in the pre-commit hook environment).
 
 ## [v0.3.14] — 2026-03-27
