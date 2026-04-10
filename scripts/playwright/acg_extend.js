@@ -87,74 +87,7 @@ async function extendSandbox() {
       { timeout: 30000 }
     ).catch(() => console.error('WARN: Skeleton loaders did not clear within 30s — proceeding anyway'));
 
-    // Wait for actual content cards to render
-    await page.waitForSelector('[data-testid*="sandbox-card"], button:has-text("Open Sandbox")', { timeout: 15000 })
-      .catch(() => console.error('WARN: Sandbox cards not found after 15s.'));
-
-    // Check if the details panel is already open
-    const isPanelOpen = await page.locator('[data-testid="auto-shutdown-title"]').isVisible({ timeout: 2000 }).catch(() => false);
-    
-    if (!isPanelOpen) {
-      // Try opening a sandbox card/panel first to ensure TTL and extend buttons are rendered
-      const openButton = page.locator('button:has-text("Open Sandbox"), button:has-text("Open"), button:has-text("Start Sandbox"), button:has-text("Resume")').first();
-      const openVisible = await openButton.isVisible({ timeout: 15000 }).catch(() => false);
-      if (openVisible) {
-        console.error('INFO: Clicking Open to reveal sandbox details...');
-        // Use force click because Pluralsight SPAs often have invisible overlays
-        await openButton.click({ force: true });
-        await page.waitForTimeout(5000); // Wait for slide-over/modal animation
-      }
-    } else {
-      console.error('INFO: Sandbox details panel already visible — skipping Open click.');
-    }
-
-    // Try to parse TTL and exit gracefully if > 1 hour remains
-    // Use a broader text-based locator for the shutdown title
-    const shutdownTitleLoc = page.locator('text=/Auto Shutdown/i').first();
-    const hasShutdownTitle = await shutdownTitleLoc.isVisible({ timeout: 10000 }).catch(() => false);
-    
-    if (hasShutdownTitle) {
-      // Get text from parent to ensure we capture the time (which might be in a sibling <p>)
-      const shutdownText = await shutdownTitleLoc.evaluate(el => el.parentElement.innerText).catch(() => '');
-      console.error(`INFO: Detected shutdown text: ${shutdownText.replace(/\n/g, ' ')}`);
-      const match = shutdownText.match(/at\s+(\d{1,2}:\d{2}(?:\s*)(?:AM|PM|am|pm))/i);
-      if (match) {
-        const timeStr = match[1].replace(/\s+/g, '');
-        const now = new Date();
-        const shutdownMatch = timeStr.match(/(\d+):(\d+)(AM|PM|am|pm)/i);
-        if (shutdownMatch) {
-          let hours = parseInt(shutdownMatch[1], 10);
-          const mins = parseInt(shutdownMatch[2], 10);
-          const ampm = shutdownMatch[3].toUpperCase();
-          if (ampm === 'PM' && hours < 12) hours += 12;
-          if (ampm === 'AM' && hours === 12) hours = 0;
-          
-          const shutdownTime = new Date();
-          shutdownTime.setHours(hours, mins, 0, 0);
-          
-          // Handle case where shutdown is tomorrow morning (e.g. now is 11 PM, shutdown is 2 AM)
-          if (shutdownTime < now && (now.getHours() > 12 && hours < 12)) {
-             shutdownTime.setDate(shutdownTime.getDate() + 1);
-          }
-          
-          const remainingMs = shutdownTime.getTime() - now.getTime();
-          const remainingMins = Math.floor(remainingMs / 60000);
-          
-          console.error(`INFO: Calculated remaining TTL: ~${remainingMins} minutes`);
-          
-          if (remainingMins > 65) {
-            console.log(`INFO: Extension window not open yet (${remainingMins}m remaining). Skipping extension.`);
-            process.exit(0);
-          } else {
-            console.error(`INFO: Within 1h extension window (${remainingMins}m remaining). Proceeding to extend...`);
-          }
-        }
-      }
-    } else {
-      console.error(`WARN: Auto Shutdown text not found. Proceeding to search for Extend button anyway.`);
-    }
-
-    // Try multiple selector strategies for the extend button
+    // 1. "Button First" check — if the modal is already open, just click it and finish.
     const extendSelectors = [
       '[data-heap-id="Hands-on Playground - Click - AWS Sandbox - Extend Sandbox"]',
       '[data-heap-id*="Extend Sandbox"]',
@@ -177,40 +110,132 @@ async function extendSandbox() {
       const btn = page.locator(selector).first();
       const visible = await btn.isVisible({ timeout: 5000 }).catch(() => false);
       if (visible) {
-        console.error(`INFO: Found extend button with selector: ${selector}`);
-        await btn.click();
+        console.error(`INFO: Found extend button immediately with selector: ${selector}`);
+        await btn.click({ force: true });
         clicked = true;
         break;
       }
     }
 
-    if (!clicked) {
-      // Logic for "Trapped" UI: Sometimes the extend button only appears after a fresh Start/Resume click
-      console.error('INFO: Extend button not found. Attempting to click Open/Resume to force reveal...');
-      const openButton = page.locator('button:has-text("Open Sandbox"), button:has-text("Open"), button:has-text("Start Sandbox"), button:has-text("Resume")').first();
-      const openVisible = await openButton.isVisible({ timeout: 10000 }).catch(() => false);
-      
-      if (openVisible) {
-        console.error('INFO: Clicking Open/Resume (force) to reveal modal...');
-        await openButton.click({ force: true });
-        await page.waitForTimeout(5000); // Wait for modal to render
+    if (clicked) {
+      console.log('Extend action complete (Immediate).');
+      return;
+    }
 
-        for (const selector of extendSelectors) {
-          const btn = page.locator(selector).first();
-          const visible = await btn.isVisible({ timeout: 10000 }).catch(() => false);
-          if (visible) {
-            console.error(`INFO: Found extend button (after forced click) with selector: ${selector}`);
-            await btn.click();
-            clicked = true;
-            break;
+    // 2. Try to parse TTL and exit gracefully if > 1 hour remains
+    // Use a broader text-based locator for the shutdown title
+    const shutdownTitleLoc = page.locator('text=/Auto Shutdown/i').first();
+    let remainingMins = null;
+
+    if (await shutdownTitleLoc.isVisible({ timeout: 10000 }).catch(() => false)) {
+      // Get text from parent to ensure we capture the time (which might be in a sibling <p>)
+      const shutdownText = await shutdownTitleLoc.evaluate(el => el.parentElement.innerText).catch(() => '');
+      console.error(`INFO: Detected shutdown text: ${shutdownText.replace(/\n/g, ' ')}`);
+      const match = shutdownText.match(/at\s+(\d{1,2}:\d{2}(?:\s*)(?:AM|PM|am|pm))/i);
+      if (match) {
+        const timeStr = match[1].replace(/\s+/g, '');
+        const now = new Date();
+        const shutdownMatch = timeStr.match(/(\d+):(\d+)(AM|PM|am|pm)/i);
+        if (shutdownMatch) {
+          let hours = parseInt(shutdownMatch[1], 10);
+          const mins = parseInt(shutdownMatch[2], 10);
+          const ampm = shutdownMatch[3].toUpperCase();
+          if (ampm === 'PM' && hours < 12) hours += 12;
+          if (ampm === 'AM' && hours === 12) hours = 0;
+          
+          const shutdownTime = new Date();
+          shutdownTime.setHours(hours, mins, 0, 0);
+          
+          // Midnight/Date-wrap fix: Handle case where shutdown is tomorrow morning
+          if (shutdownTime < now) {
+             shutdownTime.setDate(shutdownTime.getDate() + 1);
+          }
+          
+          const remainingMs = shutdownTime.getTime() - now.getTime();
+          remainingMins = Math.floor(remainingMs / 60000);
+          
+          console.error(`INFO: Calculated remaining TTL: ~${remainingMins} minutes`);
+          
+          if (remainingMins > 65) {
+            console.log(`INFO: Extension window not open yet (${remainingMins}m remaining). Skipping extension.`);
+            process.exit(0);
+          } else {
+            console.error(`INFO: Within 1h extension window (${remainingMins}m remaining). Proceeding to extend...`);
+          }
+        }
+      }
+    } else {
+      console.error(`WARN: Auto Shutdown text not found. Proceeding anyway.`);
+    }
+
+    // 3. Reveal the panel/modal if still not clicked
+    // Check if the details panel is already open
+    const isPanelOpen = await page.locator('text=/Auto Shutdown/i').first().isVisible({ timeout: 2000 }).catch(() => false);
+    
+    if (!isPanelOpen) {
+      const openButton = page.locator('button:has-text("Open Sandbox"), button:has-text("Open"), button:has-text("Start Sandbox"), button:has-text("Resume")').first();
+      if (await openButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.error('INFO: Clicking Open to reveal sandbox details...');
+        await openButton.click({ force: true });
+        await page.waitForTimeout(5000);
+      }
+    }
+
+    // 4. Second search for extend button
+    for (const selector of extendSelectors) {
+      const btn = page.locator(selector).first();
+      const visible = await btn.isVisible({ timeout: 5000 }).catch(() => false);
+      if (visible) {
+        console.error(`INFO: Found extend button with selector: ${selector}`);
+        await btn.click({ force: true });
+        clicked = true;
+        break;
+      }
+    }
+
+    // 5. "Ghost State" Recovery: If still not clicked and time is critical, Delete and Restart
+    if (!clicked && (remainingMins === null || remainingMins < 15)) {
+      console.error('INFO: Extend button missing in critical window. Attempting "Ghost State" recovery (Delete/Restart)...');
+      
+      const deleteBtn = page.locator('button:has-text("Delete Sandbox")').first();
+      if (await deleteBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.error('INFO: Clicking Delete Sandbox...');
+        await deleteBtn.click({ force: true });
+        
+        const confirmBtn = page.locator('div[role="dialog"] button:has-text("Delete"), button:has-text("Confirm"), button:has-text("Yes, delete")').first();
+        if (await confirmBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+          await confirmBtn.click({ force: true });
+          console.error('INFO: Deletion confirmed. Waiting for Start button...');
+          await page.waitForTimeout(5000);
+          
+          const startBtn = page.locator('button:has-text("Start Sandbox")').first();
+          if (await startBtn.isVisible({ timeout: 30000 }).catch(() => false)) {
+            console.error('INFO: Clicking Start Sandbox...');
+            await startBtn.click({ force: true });
+            
+            // Pluralsight should now show the "Extend Your Session" modal
+            console.error('INFO: Waiting for Extension Modal...');
+            await page.waitForTimeout(10000);
+            
+            for (const selector of extendSelectors) {
+              const btn = page.locator(selector).first();
+              const visible = await btn.isVisible({ timeout: 15000 }).catch(() => false);
+              if (visible) {
+                console.error(`INFO: Found extend button (Recovery) with selector: ${selector}`);
+                await btn.click({ force: true });
+                clicked = true;
+                break;
+              }
+            }
           }
         }
       }
     }
 
     if (!clicked) {
-      throw new Error('Extend button not found or not visible after multiple attempts');
+      throw new Error('Extend button not found or not visible after multiple attempts (including recovery)');
     }
+
 
     // Wait for confirmation toast or updated TTL text
     const confirmationSelectors = [
