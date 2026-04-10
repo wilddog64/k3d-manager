@@ -36,7 +36,7 @@
 
 - [x] **antigravity.sh refactor** — **COMPLETE** (`291a60dc`). `_acg_extend_playwright` moved into `acg.sh`, `acg_watch` + `_acg_watch_write_wrapper` now invoke it directly, `antigravity.sh` dropped the old helper, and dependent provider/tests were updated per `docs/plans/v1.0.5-antigravity-decouple.md`.
 - [x] **rabbitmq-client-java NPE fix PR** — **COMPLETE**. PR #3 merged to main (`723eb7fc`) 2026-04-10. `enforce_admins` restored. Retro: `docs/retro/2026-04-10-npe-fix-retrospective.md`. Next branch: `docs/next-improvements`.
-- [ ] **hardcoded password cleanup → Vault/ESO** — **ASSIGNED to Codex** (2026-04-10, spec updated). Spec: `docs/plans/v1.0.5-fix-hardcoded-passwords.md`. Replace postgres admin + LDAP static Secrets with ExternalSecrets pulling from Vault; seed `ldap/admin` in `bin/acg-up`; postgres admin reuses existing `secret/data/postgres/<instance>` paths. App-level secrets (order, product-catalog) get `CHANGE_ME` placeholders. Branch `fix/k8s-base-secret-placeholder` in all three shopping-cart repos (infra branch already exists with prior CHANGE_ME pass `ed0cf82`).
+- [x] **hardcoded password cleanup** — **COMPLETE**. `bin/acg-up` now applies postgres admin + LDAP secrets using the generated passwords (`719b1505`), and the shopping-cart repos store `CHANGE_ME` placeholders instead of `changeme/guest` (infra `ed0cf82`, order `597f231`, product-catalog `36a800c`). Spec: `docs/plans/v1.0.5-fix-hardcoded-passwords.md`.
 
 ## v1.0.4 — SHIPPED
 
