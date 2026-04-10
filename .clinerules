@@ -1,6 +1,16 @@
 # k3d-manager – Cline Rules
 # Generated from docs/ and CLAUDE.md – 2026-02-19
 
+## Token Efficiency & SDD Rules
+- Operating under a 8,192 thinking token cap (via .envrc).
+- Prioritize logic density over exhaustive chain-of-thought.
+- If a solution requires >8k thinking tokens, stop and ask to /compact context first.
+- Use RTK-style compression for all terminal outputs.
+- **Direct Action:** Skip preamble and flattery.
+- **Reasoning Density:** Given the 8k limit, use "Sparse Logic" (skip obvious steps, focus on edge cases).
+- **Infrastructure Safety:** When generating K3s or Terraform, prioritize manifest validity over explanatory text.
+- **Budget Exhaustion:** If a task seems to require >8k tokens, output a "Reasoning Partial" and ask to continue or compact.
+
 ## Project Overview
 
 k3d-manager is a modular Bash utility for managing local Kubernetes development clusters
