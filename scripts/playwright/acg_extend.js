@@ -74,7 +74,12 @@ async function extendSandbox() {
     }
 
     const currentUrl = page.url();
-    if (currentUrl.includes('pluralsight.com')) {
+    let isPluralsight = false;
+    try {
+      const parsedUrl = new URL(currentUrl);
+      isPluralsight = parsedUrl.hostname === 'pluralsight.com' || parsedUrl.hostname.endsWith('.pluralsight.com');
+    } catch { isPluralsight = false; }
+    if (isPluralsight) {
       console.error(`INFO: Already on Pluralsight page: ${currentUrl}`);
     } else {
       console.error(`INFO: Navigating to ${targetUrl}...`);
@@ -130,7 +135,6 @@ async function extendSandbox() {
     if (await shutdownTitleLoc.isVisible({ timeout: 10000 }).catch(() => false)) {
       // Get text from parent to ensure we capture the time (which might be in a sibling <p>)
       const shutdownText = await shutdownTitleLoc.evaluate(el => el.parentElement.innerText).catch(() => '');
-      console.error(`INFO: Detected shutdown text: ${shutdownText.replace(/\n/g, ' ')}`);
       const match = shutdownText.match(/at\s+(\d{1,2}:\d{2}(?:\s*)(?:AM|PM|am|pm))/i);
       if (match) {
         const timeStr = match[1].replace(/\s+/g, '');
@@ -193,8 +197,10 @@ async function extendSandbox() {
       }
     }
 
-    // 5. "Ghost State" Recovery: If still not clicked and time is critical, Delete and Restart
-    if (!clicked && (remainingMins === null || remainingMins < 15)) {
+    // 5. "Ghost State" Recovery: If still not clicked and TTL is confirmed critical, Delete and Restart
+    // Only trigger when remainingMins is definitively known to be critical — never on null (TTL parse
+    // failure alone is not a strong enough signal to perform a destructive delete/restart action)
+    if (!clicked && remainingMins !== null && remainingMins < 15) {
       console.error('INFO: Extend button missing in critical window. Attempting "Ghost State" recovery (Delete/Restart)...');
       
       const deleteBtn = page.locator('button:has-text("Delete Sandbox")').first();
@@ -265,10 +271,10 @@ async function extendSandbox() {
     console.error(`ERROR: ${error.message}`);
     process.exit(1);
   } finally {
-    if (_cdpBrowser) {
-      await _cdpBrowser.close().catch(() => {});
-    } else if (browserContext) {
-      await browserContext.close();
+    // Only close if we launched a persistent context (not if we attached via CDP — closing a CDP
+    // browser shuts down the entire Chrome process, disrupting other sessions)
+    if (!_cdpBrowser && browserContext) {
+      await browserContext.close().catch(() => {});
     }
   }
 }
