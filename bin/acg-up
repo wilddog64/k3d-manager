@@ -295,6 +295,59 @@ _vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_s
 _vault_kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbitmq_pass}\"}"                   rabbitmq/default
 _info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq sandbox secrets)"
 
+_info "[acg-up] Applying postgres admin + LDAP secrets on remote cluster..."
+_ldap_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
+_ldap_readonly_pass=$(openssl rand -base64 24 | tr -d '=+/')
+
+kubectl create namespace shopping-cart-data --context ubuntu-k3s \
+  --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f - >/dev/null
+
+kubectl apply --context ubuntu-k3s -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-orders-admin
+  namespace: shopping-cart-data
+type: Opaque
+stringData:
+  password: "${_pg_pass_orders}"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-products-admin
+  namespace: shopping-cart-data
+type: Opaque
+stringData:
+  password: "${_pg_pass_products}"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-payment-admin
+  namespace: shopping-cart-data
+type: Opaque
+stringData:
+  password: "${_pg_pass_payment}"
+EOF
+_info "[acg-up] postgres admin secrets applied on ubuntu-k3s"
+
+kubectl create namespace identity --context ubuntu-k3s \
+  --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f - >/dev/null
+
+kubectl apply --context ubuntu-k3s -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ldap-secrets
+  namespace: identity
+type: Opaque
+stringData:
+  LDAP_ADMIN_PASSWORD: "${_ldap_admin_pass}"
+  LDAP_READONLY_USER_PASSWORD: "${_ldap_readonly_pass}"
+EOF
+_info "[acg-up] ldap-secrets applied on ubuntu-k3s"
+
 _info "[acg-up] Step 10/12 — Registering app cluster with ArgoCD..."
 _argocd_sa_token=$(kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s \
   -o jsonpath='{.data.token}' | base64 -d | tr -d '\n')
