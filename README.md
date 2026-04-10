@@ -283,11 +283,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-04-10 | [Copilot PR #61 review findings](docs/issues/2026-04-10-copilot-pr61-review-findings.md) | acg-extend — CodeQL URL substring check, credential leak in shutdown text log, CDP browser close disrupts session, Ghost State fires on weak null signal |
 | 2026-04-08 | [acg_extend fails due to stale "Ghost" session state](docs/issues/2026-04-08-acg-extend-stale-session-ghost-state.md) | acg-extend — extend button missing when session internally stale with <1hr remaining; delete→start→extend recovery flow |
 | 2026-04-08 | [acg_extend Midnight Calculation and Modal Trapping](docs/issues/2026-04-08-acg-extend-midnight-and-modal-trapping.md) | acg-extend — date rolls backward at midnight; extend modal stays open after success, trapping UI |
 | 2026-04-08 | [acg_credentials URL mismatch triggers Cloudflare block](docs/issues/2026-04-08-acg-credentials-url-mismatch.md) | acg — `/cloud-labs/` URL path triggers Cloudflare 403; standardized to `/hands-on/playground/` |
 | 2026-04-06 | [`make up` fails with unhelpful error when ACG sandbox is expired/removed](docs/issues/2026-04-06-acg-up-sandbox-expired.md) | acg — `_acg_check_credentials` silent failure with no remediation steps when sandbox TTL expired |
-| 2026-04-06 | [acg_extend.js — Extend button selectors stale against current Pluralsight UI](docs/issues/2026-04-06-acg-extend-selectors-stale.md) | acg-extend — old `button-title` selector attribute no longer present; `data-heap-id` selector added |
 
 [All issues →](docs/issues/)
 
