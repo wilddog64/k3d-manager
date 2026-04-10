@@ -16,7 +16,7 @@ Use the rules below to shape all code suggestions and PR reviews.
 - **Cluster providers**: `scripts/lib/providers/` — `k3d`, `orbstack`, `k3s-aws`.
 - **ACG plugin**: `scripts/plugins/acg.sh` — `acg_get_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_watch`, `acg_teardown`. Manages Pluralsight ACG sandbox lifecycle via CloudFormation + k3sup.
 - **Playwright**: `scripts/playwright/acg_credentials.js` — static Node.js script; primarily uses Playwright `launchPersistentContext` to drive Chrome and extract AWS credentials from the Pluralsight sandbox UI; CDP (`localhost:9222`) is used only as a browser reuse probe.
-- **Browser automation**: `scripts/plugins/antigravity.sh` — `_browser_launch`, `_antigravity_browser_ready`, `antigravity_acg_extend`. Launches Chrome with `--remote-debugging-port=9222 --password-store=basic`.
+- **Browser automation**: `scripts/plugins/antigravity.sh` — `_browser_launch`, `antigravity_acg_extend`. `_browser_launch` calls `n()` (lib-foundation CDP readiness probe) internally. Launches Chrome with `--remote-debugging-port=9222 --password-store=basic`.
 - **Tunnel**: `scripts/plugins/tunnel.sh` — `tunnel_start`, `tunnel_stop`, `tunnel_status`. autossh + launchd; forward tunnel (k3s API :6443) + reverse tunnel (Vault :8200).
 - **AWS helpers**: `scripts/plugins/aws.sh` — `aws_import_credentials`. `scripts/plugins/shopping_cart.sh` — `deploy_app_cluster`, `_ensure_k3sup`, `_k3sup_join_agent`.
 - **Convenience scripts**: `bin/acg-up`, `bin/acg-down`, `bin/acg-refresh`, `bin/acg-status`, `bin/rotate-ghcr-pat` — orchestrate plugin calls for common one-shot operations.
@@ -68,7 +68,7 @@ Use the rules below to shape all code suggestions and PR reviews.
 - `acg_provision`, `acg_teardown` must check for existing resources before creating/deleting — "resource already exists" is not an error (`--soft` pattern or describe-stacks check).
 - CloudFormation stack operations must always check stack existence before delete: `describe-stacks` → if None, skip.
 - Playwright selectors (`input[aria-label="Copyable input"]`) are fragile — flag hardcoded positional index fallbacks that assume a fixed UI layout without a comment explaining why.
-- `browser.close()` must be called in a `finally` block for CDP connections — never `browser.disconnect()` which leaves the browser open.
+- For Playwright scripts that may attach via CDP: in the `finally` block, only call `browserContext.close()` when the context was launched by the script (`!_cdpBrowser`). Never call `browser.close()` on a CDP-attached session — it shuts down the entire Chrome process and disrupts other sessions.
 - Chrome must always be launched with `--password-store=basic` and a dedicated `--user-data-dir` — flag any launch path that omits these flags.
 - `GHCR_PAT` and GitHub PATs must be passed via stdin or env var — never as CLI arguments visible in `ps aux`.
 

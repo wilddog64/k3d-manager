@@ -61,7 +61,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `tunnel_stop` | `scripts/plugins/tunnel.sh` | Stop the SSH tunnel and unload launchd job |
 | `tunnel_status` | `scripts/plugins/tunnel.sh` | Show tunnel process and launchd status |
 | `deploy_app_cluster` | `scripts/plugins/shopping_cart.sh` | Install k3s on EC2 via k3sup and merge kubeconfig |
-| `acg_get_credentials` | `scripts/plugins/acg.sh` | Extract AWS credentials from Pluralsight Cloud Access via Chrome CDP (Playwright) and write to `~/.aws/credentials` |
+| `acg_get_credentials` | `scripts/plugins/acg.sh` | Extract AWS credentials from Pluralsight Cloud Access via Playwright persistent context and write to `~/.aws/credentials` |
 | `acg_import_credentials` | `scripts/plugins/acg.sh` | Deprecated alias for `aws_import_credentials` — use `aws_import_credentials` instead |
 | `acg_provision` | `scripts/plugins/acg.sh` | Provision ACG sandbox 3-node cluster via CloudFormation (server + 2 agents); `--recreate` tears down and re-provisions |
 | `acg_status` | `scripts/plugins/acg.sh` | Show ACG instance state, public IP, and k3s health |
@@ -83,7 +83,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 
 ### `acg_get_credentials`
 
-Extracts AWS credentials from the Pluralsight Cloud Sandbox "Cloud Access" panel via Playwright CDP (connects to Google Chrome on port 9222) and writes them to `~/.aws/credentials` under `[default]`. Falls back with instructions to use `acg_import_credentials` if Playwright extraction fails. Set `PLURALSIGHT_EMAIL` to assist Google Password Manager auto-fill when the session has expired.
+Extracts AWS credentials from the Pluralsight Cloud Sandbox "Cloud Access" panel via Playwright `launchPersistentContext` (persisted auth dir `~/.local/share/k3d-manager/playwright-auth`) and writes them to `~/.aws/credentials` under `[default]`. Falls back with instructions to use `acg_import_credentials` if Playwright extraction fails. Set `PLURALSIGHT_EMAIL` to assist Google Password Manager auto-fill when the session has expired.
 
 **Usage:** `./scripts/k3d-manager acg_get_credentials [sandbox-url]`
 
