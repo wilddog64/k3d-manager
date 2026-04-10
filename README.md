@@ -283,11 +283,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
-| 2026-03-31 | [Pluralsight session expiry independent of sandbox TTL](docs/issues/2026-03-31-pluralsight-session-expiry-independent-of-sandbox-ttl.md) | acg — browser session cookie expires separately from sandbox TTL; blocks `acg_get_credentials` auto sign-in; `acg_watch` has no visibility into session health |
-| 2026-03-31 | [Copilot PR #58 review findings](docs/issues/2026-03-31-copilot-pr58-review-findings.md) | 11 findings: _run_command stub `--` strip, ACG_AGENT_COUNT hardcode, PII in logs, local -a array, help text drift, grep-Fqx--, VPC CIDR /8→/16 |
-| 2026-03-30 | [acg_get_credentials Playwright extraction always falls back to stdin paste](docs/issues/2026-03-30-acg-credentials-playwright-extraction-fail.md) | acg — `isVisible()` with no timeout silently skips Open Sandbox button; no sign-in detection causes 60s hang on expired session |
-| 2026-03-29 | [ACG provision keypair import fails on re-run](docs/issues/2026-03-29-acg-provision-keypair-import-fail.md) | acg — `aws ec2 import-key-pair` prints error when key already exists; agent misdiagnosed as fatal; fixed with `_run_command --soft` |
-| 2026-03-28 | [Pluralsight Antigravity error](docs/issues/2026-03-28-pluralsight-antigravity-error.md) | acg — "Oops! Something went wrong" on Pluralsight in Antigravity browser; root cause: Chrome launched without `--password-store=basic` |
+| 2026-04-08 | [acg_extend fails due to stale "Ghost" session state](docs/issues/2026-04-08-acg-extend-stale-session-ghost-state.md) | acg-extend — extend button missing when session internally stale with <1hr remaining; delete→start→extend recovery flow |
+| 2026-04-08 | [acg_extend Midnight Calculation and Modal Trapping](docs/issues/2026-04-08-acg-extend-midnight-and-modal-trapping.md) | acg-extend — date rolls backward at midnight; extend modal stays open after success, trapping UI |
+| 2026-04-08 | [acg_credentials URL mismatch triggers Cloudflare block](docs/issues/2026-04-08-acg-credentials-url-mismatch.md) | acg — `/cloud-labs/` URL path triggers Cloudflare 403; standardized to `/hands-on/playground/` |
+| 2026-04-06 | [`make up` fails with unhelpful error when ACG sandbox is expired/removed](docs/issues/2026-04-06-acg-up-sandbox-expired.md) | acg — `_acg_check_credentials` silent failure with no remediation steps when sandbox TTL expired |
+| 2026-04-06 | [acg_extend.js — Extend button selectors stale against current Pluralsight UI](docs/issues/2026-04-06-acg-extend-selectors-stale.md) | acg-extend — old `button-title` selector attribute no longer present; `data-heap-id` selector added |
 
 [All issues →](docs/issues/)
 
@@ -297,15 +297,16 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.0.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.4) | 2026-04-10 | ACG extend hardening — button-first search; midnight date-wrap fix; random passwords in `bin/acg-up`; sandbox-expired guidance in `_acg_check_credentials`; Pluralsight URL standardization |
 | [v1.0.3](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.3) | 2026-04-05 | ACG full stack fixes — ESO 1.0.0; ClusterSecretStore `v1`; ArgoCD context + server URL fix; `GHCR_PAT` masking; Chrome CDP launchd agent; `make sync-apps` + `make argocd-registration` |
 | [v1.0.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.2) | 2026-04-03 | full stack automation — `make up` 12-step provision; Vault port-forward; vault-bridge Service; argocd-manager bootstrap; helm + ESO install; `bin/` SCRIPT_DIR fix |
-| [v1.0.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.1) | 2026-03-31 | multi-node k3s-aws + CloudFormation + Playwright hardening — 3-node CF stack; auto sign-in; remove Antigravity pre-calls from `acg_get_credentials`; `AGENT_IP_ALLOWLIST` in pre-commit hook |
 
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.0.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.1) | 2026-03-31 | multi-node k3s-aws + CloudFormation + Playwright hardening — 3-node CF stack; auto sign-in; remove Antigravity pre-calls from `acg_get_credentials`; `AGENT_IP_ALLOWLIST` in pre-commit hook |
 | [v1.0.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.0) | 2026-03-29 | k3s-aws provider foundation — `CLUSTER_PROVIDER=k3s-aws` end-to-end deploy; `aws_import_credentials`; `acg_provision --recreate`; `acg_watch` background TTL watcher; keypair idempotency + `page.goto()` fix |
 | [v0.9.21](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.21) | 2026-03-29 | `_ensure_k3sup` auto-install helper — `deploy_app_cluster` now auto-installs k3sup via brew or curl; consistent with `_ensure_node`/`_ensure_copilot_cli` pattern |
 | [v0.9.20](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.20) | 2026-03-29 | ACG Chrome launch fix — `_antigravity_launch` now opens Chrome (not Antigravity IDE) with `--password-store=basic`; `acg_credentials.js` SPA nav guard avoids hard reload |

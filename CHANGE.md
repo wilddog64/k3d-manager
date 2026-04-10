@@ -1,5 +1,14 @@
 # Changes - k3d-manager
 
+## [v1.0.4] — 2026-04-10 — ACG extend hardening: button-first search, random passwords, sandbox expired guidance
+
+### Fixed
+- `acg_extend.js`: button-first approach — checks for extend button immediately before TTL logic; sanitizes selectors to remove `h4` false-positive; handles "trapped UI" by forcing Start/Resume click when extend button is missing (`64313224`, `715bfaa1`, `1d2f70ce`)
+- `acg_extend.js`: midnight date-wrap bug fixed — `if (shutdownTime < now)` without narrow hour guard; robust TTL parsing with CDP + fallback (`c21f33d9`, `d0dcdf22`)
+- `acg.sh` / `acg_credentials.js`: standardize all Pluralsight URLs to `/hands-on/playground/` — prevents Cloudflare block on `/cloud-labs/` path (`89b8572f`)
+- `_acg_check_credentials`: expanded error message explains both remediation paths when sandbox is expired (start new sandbox + `acg_get_credentials` + `make up`) vs still running (`bf569a80`)
+- `bin/acg-up`: replace 6 hardcoded redis/postgres/rabbitmq passwords with per-run `openssl rand -base64 24 | tr -d '=+/'` — AES/payment placeholders unchanged (`f709cb3c`)
+
 ## [v1.0.3] — 2026-04-05 — ACG full stack fixes: ESO 1.0.0, ArgoCD registration, GHCR_PAT masking, Chrome CDP
 
 ### Added
