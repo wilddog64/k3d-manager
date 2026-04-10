@@ -96,3 +96,43 @@ export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG"
   run acg_get_credentials --help
   [ "$status" -eq 0 ]
 }
+
+# _acg_extend_playwright
+
+_acg_stub_node() {
+  local exit_code="$1" message="$2"
+  local stub_dir="${BATS_TEST_TMPDIR}/bin"
+  mkdir -p "$stub_dir"
+  cat > "${stub_dir}/node" <<NODE
+#!/usr/bin/env bash
+echo "$message"
+exit $exit_code
+NODE
+  chmod +x "${stub_dir}/node"
+  printf '%s\n' "$stub_dir"
+}
+
+@test "_acg_extend_playwright: returns 0 when node script succeeds" {
+  local stub_dir old_path
+  stub_dir=$(_acg_stub_node 0 "EXTEND_OK")
+  old_path="$PATH"
+  PATH="${stub_dir}:$PATH"
+
+  run _acg_extend_playwright "https://example.com/sandbox"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"EXTEND_OK"* ]]
+
+  PATH="$old_path"
+}
+
+@test "_acg_extend_playwright: returns 1 when node script fails" {
+  local stub_dir old_path
+  stub_dir=$(_acg_stub_node 1 "Extend button not found")
+  old_path="$PATH"
+  PATH="${stub_dir}:$PATH"
+
+  run _acg_extend_playwright "https://example.com/sandbox"
+  [ "$status" -eq 1 ]
+
+  PATH="$old_path"
+}
