@@ -35,6 +35,7 @@
 ## v1.0.5 — Active (branch `k3d-manager-v1.0.5`)
 
 - [x] **antigravity.sh refactor** — **COMPLETE** (`291a60dc`). `_acg_extend_playwright` moved into `acg.sh`, `acg_watch` + `_acg_watch_write_wrapper` now invoke it directly, `antigravity.sh` dropped the old helper, and dependent provider/tests were updated per `docs/plans/v1.0.5-antigravity-decouple.md`.
+- [x] **rabbitmq-client-java NPE fix PR** — **COMPLETE**. PR #3 merged to main (`723eb7fc`) 2026-04-10. `enforce_admins` restored. Retro: `docs/retro/2026-04-10-npe-fix-retrospective.md`. Next branch: `docs/next-improvements`.
 
 ## v1.0.4 — SHIPPED
 

@@ -5,7 +5,7 @@
 **v1.0.4 SHIPPED** — PR #61 merged to main (`bc9028fb`) 2026-04-10. Tagged v1.0.4, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-10-v1.0.4-retrospective.md`.
 
 **Pending work for v1.0.5:**
-- **rabbitmq-client-java CHANGELOG + PR** — add CHANGELOG.md, create PR for `fix/connection-manager-get-stats-npe`. NPE fix commit: `36ed860`. SPECCED, ASSIGNED to Codex. Spec: `rabbitmq-client-java/docs/plans/v1.0.1-create-pr-and-changelog.md`.
+- **rabbitmq-client-java NPE fix** — MERGED (`723eb7fc`) 2026-04-10. PR #3 merged to main. `enforce_admins` restored. Retro: `docs/retro/2026-04-10-npe-fix-retrospective.md`. Next branch: `docs/next-improvements`.
 
 **Latest progress for v1.0.5:**
 - **antigravity.sh refactor** — COMPLETE (`291a60dc`). `_acg_extend_playwright` now lives in `acg.sh`, `acg_watch` + `_acg_watch_write_wrapper` call it directly, `antigravity.sh` no longer exports `antigravity_acg_extend`, and dependent provider/tests were updated per `docs/plans/v1.0.5-antigravity-decouple.md` / `docs/issues/2026-04-06-acg-antigravity-false-dependency.md`.
