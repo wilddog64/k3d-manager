@@ -34,6 +34,7 @@
 
 ## v1.0.3 — Complete
 
+- [ ] **acg_extend logic refinement** — **IN PROGRESS**. Identified midnight calculation bug and modal-trapping issue. Implementing "button-first" check and date-wrap TTL parsing. Issue: `docs/issues/2026-04-08-acg-extend-midnight-and-modal-trapping.md`.
 - [x] **acg_credentials URL mismatch fix** — **COMPLETE**. Standardized all Pluralsight URLs to `/hands-on/playground/` across `acg.sh` and `acg_credentials.js`. Commit `86883...`.
 - [x] **acg_extend selector fix** — **COMPLETE**. Fixed `h4` false positive by sanitizing `extendSelectors`. Implemented robust "trapped UI" handling: script now forces a "Start/Resume" click if the extend button is missing. Commit `ae765f2d`.
 
