@@ -6,6 +6,8 @@
 
 **v1.0.6 — AWS SSM Support for k3s-aws Provider** — COMPLETE (`8d35e2cb`). Added SSM IAM role/profile to CloudFormation, new `scripts/plugins/ssm.sh` helpers + BATS suite, `_ssm_bootstrap_k3s` path in `shopping_cart.sh`, and opt-in `K3S_AWS_SSM_ENABLED` flow in the k3s-aws provider per `docs/plans/v1.0.6-aws-ssm-support.md`. Vault reverse bridge remains SSH-only.
 
+**shopping-cart-order PR #24 MERGED** (`7f0ea87e`) 2026-04-11. Bumped `rabbitmq-client` `1.0.0-SNAPSHOT` → `1.0.1`; deleted `RabbitHealthConfig.java` workaround; 3 Copilot findings addressed (`412dd4a`). `enforce_admins` restored. Next branch: `docs/next-improvements`. Once CI `publish` completes, ArgoCD will deploy the fixed image and resolve the `order-service` CrashLoopBackOff.
+
 **v1.0.5 summary:** antigravity decoupling (`_acg_extend_playwright` → `acg.sh`); LDAP Vault KV seeding in `bin/acg-up`; 13 Copilot findings fixed across 2 PRs; new process rule: wait for Copilot review entry before merging (`feedback_copilot_review_wait.md`).
 
 ---
