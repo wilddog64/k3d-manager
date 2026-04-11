@@ -34,7 +34,7 @@
 
 ## v1.0.6 — Active (branch `k3d-manager-v1.0.6`)
 
-- [ ] **AWS SSM Support for k3s-aws** — SPECCED (2026-04-11). Zero-SSH management via SSM Session Manager. Spec: `docs/plans/v1.0.6-aws-ssm-support.md`.
+- [x] **AWS SSM Support for k3s-aws** — **COMPLETE** (`8d35e2cb`). Added IAM role/profile and opt-in `K3S_AWS_SSM_ENABLED` flow so deploy/destroy can use `ssm_exec`/`ssm_tunnel`; introduced `scripts/plugins/ssm.sh` + tests. Spec: `docs/plans/v1.0.6-aws-ssm-support.md`.
 
 ---
 
