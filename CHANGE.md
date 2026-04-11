@@ -1,5 +1,15 @@
 # Changes - k3d-manager
 
+## [v1.0.6] — 2026-04-11 — AWS SSM support for k3s-aws provider
+
+### Added
+- `scripts/plugins/ssm.sh`: new `ssm_wait`, `ssm_exec`, `ssm_tunnel` helpers — opt-in EC2 SSM access via `K3S_AWS_SSM_ENABLED=true`; `_provider_k3s_aws_deploy_cluster` uses SSM paths when enabled (`8d35e2cb`)
+- `acg-cluster.yaml` CloudFormation: IAM role + instance profile granting `AmazonSSMManagedInstanceCore` — EC2 instances auto-register with SSM on launch (`8d35e2cb`)
+- `Makefile`: `ssm` target (open SSM shell) and `provision` target (full provision shortcut); `provision` depends on `ssm` (`b977709a`)
+
+### Fixed
+- `acg.sh` `_acg_deploy_cluster`: added `--capabilities CAPABILITY_NAMED_IAM` to `aws cloudformation deploy` — required because CloudFormation stack now contains a named IAM role and instance profile (`290edd1f`)
+
 ## [v1.0.5] — 2026-04-10 — antigravity decoupling + LDAP Vault KV seeding
 
 ### Changed
