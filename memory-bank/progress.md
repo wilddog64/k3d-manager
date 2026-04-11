@@ -32,12 +32,21 @@
 
 **v1.0.4 SHIPPED** — PR #61 merged to main (`bc9028fb`) 2026-04-10. Tagged v1.0.4, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-10-v1.0.4-retrospective.md`.
 
-## v1.0.6 — Active (branch `k3d-manager-v1.0.6`)
+## v1.0.7 — Active (branch `k3d-manager-v1.0.7`)
+
+- [ ] **GCP provider (`k3s-gcp`)** — `_provider_k3s_gcp_deploy_cluster` / `_provider_k3s_gcp_destroy_cluster` in `scripts/lib/providers/k3s-gcp.sh`
+- [ ] **CLUSTER_PROVIDER-aware Makefile** — generic `make up`/`make down`/`make refresh`/`make status` dispatch via `CLUSTER_PROVIDER` env (Option B); removes AWS-specific hardcoding from Makefile targets
+
+---
+
+## v1.0.6 — SHIPPED
+
+**PR #64 merged to main (`279db18c`) 2026-04-11. Tagged v1.0.6, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-11-v1.0.6-retrospective.md`.**
 
 - [x] **AWS SSM Support for k3s-aws** — **COMPLETE** (`8d35e2cb`). Added IAM role/profile and opt-in `K3S_AWS_SSM_ENABLED` flow so deploy/destroy can use `ssm_exec`/`ssm_tunnel`; introduced `scripts/plugins/ssm.sh` + tests. Spec: `docs/plans/v1.0.6-aws-ssm-support.md`.
 - [x] **shopping-cart-order: bump rabbitmq-client to 1.0.1** — **MERGED** (PR #24, `7f0ea87e`) 2026-04-11. Bumped `rabbitmq-client` from `1.0.0-SNAPSHOT` to `1.0.1`; deleted `RabbitHealthConfig.java` + test (wrong bean name, NPE fix at source in `1.0.1`); 3 Copilot findings addressed (`412dd4a`): kustomization tag reverted to `latest`, stale CHANGELOG bullet removed, dangling word fixed. `enforce_admins` restored. Next branch: `docs/next-improvements`.
 - [x] **shopping-cart-order: CI fix + docs catch-up** — **MERGED** (PR #25, `49ff6b87`) 2026-04-11. Fixed `trivy-action@0.30.0` → `@v0.35.0`; resolved docs/next-improvements divergence. 2 Copilot findings fixed. Branch protection updated: stale `"CI"` context → `Build & Test` + `Checkstyle`. `enforce_admins` restored. Next branch: `docs/next-improvements-2`. Retro: `docs/retro/2026-04-11-pr25-ci-fix-retrospective.md`. **`Build, Scan & Push` now unblocked — next main push builds Docker image with rabbitmq-client 1.0.1 to resolve order-service CrashLoopBackOff.**
-- [x] **PR #64 OPEN** — `https://github.com/wilddog64/k3d-manager/pull/64`. CI green (`24293717584`). Copilot tagged. Waiting for Copilot review.
+- [x] **PR #64 MERGED** (`279db18c`) 2026-04-11. 6 Copilot findings fixed (`6fb423e5`). Retro: `docs/retro/2026-04-11-v1.0.6-retrospective.md`.
 
 ---
 

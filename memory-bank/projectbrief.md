@@ -39,17 +39,18 @@ and two functions — nothing else changes.
 
 | `CLUSTER_PROVIDER` | Provider slug | Status |
 |--------------------|---------------|--------|
-| `k3s-aws`          | `k3s_aws`     | Active (AWS ACG sandbox via CloudFormation + k3sup) |
+| `k3s-aws`          | `k3s_aws`     | Active (AWS ACG sandbox via CloudFormation + k3sup; SSM opt-in via `K3S_AWS_SSM_ENABLED=true`) |
 | `k3d`              | `k3d`         | Active (local Docker-based) |
 | `orbstack`         | `orbstack`    | Active (local OrbStack VM) |
-| `k3s-gcp`          | `k3s_gcp`     | Planned (v1.0.5) |
-| `k3s-azure`        | `k3s_azure`   | Planned (v1.0.6) |
+| `k3s-gcp`          | `k3s_gcp`     | Planned (v1.0.7) |
+| `k3s-azure`        | `k3s_azure`   | Planned (v1.0.8) |
 
 ### Plugin System
 
 Feature modules live in `scripts/plugins/` and are **lazy-loaded** — sourced only when
 a matching function is invoked. Plugins are independent: Vault, ESO, Jenkins, ArgoCD,
-Istio, LDAP, Antigravity, and AWS credential management each live in their own file.
+Istio, LDAP, Antigravity, AWS credential management, and SSM (EC2 Systems Manager) each
+live in their own file.
 
 Public functions have no underscore prefix and are first-class CLI commands:
 ```
@@ -81,7 +82,7 @@ directory integration plugin, mirroring the same pattern as cluster providers.
 **Out of scope:**
 - Production cluster management.
 - Cloud-managed Kubernetes (EKS, GKE, AKS) — k3d-manager is kops-for-k3s only.
-- GCP and Azure provisioning — planned for v1.0.5 and v1.0.6 respectively.
+- GCP and Azure provisioning — planned for v1.0.7 and v1.0.8 respectively.
 
 ## Why This Stack (Component Origin Story)
 

@@ -19,6 +19,7 @@ Use the rules below to shape all code suggestions and PR reviews.
 - **Browser automation**: `scripts/plugins/antigravity.sh` — `_browser_launch`. `_browser_launch` calls `_antigravity_browser_ready` (defined in `scripts/lib/system.sh` via lib-foundation subtree) internally. Launches Chrome with `--remote-debugging-port=9222 --password-store=basic`.
 - **Tunnel**: `scripts/plugins/tunnel.sh` — `tunnel_start`, `tunnel_stop`, `tunnel_status`. autossh + launchd; forward tunnel (k3s API :6443) + reverse tunnel (Vault :8200).
 - **AWS helpers**: `scripts/plugins/aws.sh` — `aws_import_credentials`. `scripts/plugins/shopping_cart.sh` — `deploy_app_cluster`, `_ensure_k3sup`, `_k3sup_join_agent`.
+- **SSM**: `scripts/plugins/ssm.sh` — `ssm_wait`, `ssm_exec`, `ssm_tunnel`. Opt-in EC2 SSM access (`K3S_AWS_SSM_ENABLED=true`). Private: `_ensure_session_manager_plugin`, `_ssm_get_instance_id`.
 - **Convenience scripts**: `bin/acg-up`, `bin/acg-down`, `bin/acg-refresh`, `bin/acg-status`, `bin/rotate-ghcr-pat` — orchestrate plugin calls for common one-shot operations.
 
 ---
@@ -71,6 +72,16 @@ Use the rules below to shape all code suggestions and PR reviews.
 - For Playwright scripts that may attach via CDP: in the `finally` block, only call `browserContext.close()` when the context was launched by the script (`!_cdpBrowser`). Never call `browser.close()` on a CDP-attached session — it shuts down the entire Chrome process and disrupts other sessions.
 - Chrome must always be launched with `--password-store=basic` and a dedicated `--user-data-dir` — flag any launch path that omits these flags.
 - `GHCR_PAT` and GitHub PATs must be passed via stdin or env var — never as CLI arguments visible in `ps aux`.
+
+### AWS CLI Sentinel Values
+- `aws ... --output text` returns the string `"None"` (not empty string) when a JMESPath query matches no value. Any call that returns an instance ID, ARN, or similar must guard: `[[ -z "${val}" || "${val}" == "None" || "${val}" == "null" ]]` → error + return 1.
+- Flag any caller that passes `--output text` results directly to other commands without this guard.
+
+### Kubeconfig Writes
+- Any function that writes to `~/.kube/` must call `mkdir -p "${HOME}/.kube"` first. Flag functions that write temp kubeconfig files (`cp`, `mv`, `>`) without this guard.
+
+### Makefile Targets and Privilege Escalation
+- Makefile recipe lines cannot use `_run_command`. Flag any Makefile recipe that calls bare `sudo`. The correct pattern for non-brew installs is: print the manual install URL and `exit 1`.
 
 ### Idempotency
 - Every public function must be safe to run more than once.

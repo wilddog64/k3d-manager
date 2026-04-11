@@ -1,10 +1,16 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v1.0.6` (as of 2026-04-11)
+## Current Branch: `k3d-manager-v1.0.7` (as of 2026-04-11)
+
+**v1.0.6 SHIPPED** — PR #64 merged (`279db18c`) 2026-04-11. Tagged v1.0.6, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-11-v1.0.6-retrospective.md`.
+
+**v1.0.6 summary:** AWS SSM support — `ssm_wait`/`ssm_exec`/`ssm_tunnel` in new `scripts/plugins/ssm.sh`; `K3S_AWS_SSM_ENABLED` opt-in; IAM role + instance profile in CloudFormation; `--capabilities CAPABILITY_NAMED_IAM` fix; `make ssm`/`provision` targets; 6 Copilot findings fixed. `make up` smoke-tested end-to-end.
+
+**v1.0.7 — GCP provider (`k3s-gcp`) + CLUSTER_PROVIDER-aware Makefile** — next milestone. Two-part scope:
+1. `_provider_k3s_gcp_deploy_cluster` / `_provider_k3s_gcp_destroy_cluster` in `scripts/lib/providers/k3s-gcp.sh`
+2. Generic `make up`/`make down`/`make refresh`/`make status` dispatch via `CLUSTER_PROVIDER` env var (Option B decision from v1.0.6 retro) — removes AWS-specific hardcoding from Makefile targets.
 
 **v1.0.5 SHIPPED** — PR #62 merged (`2a38bf84`) + fix-up PR #63 merged (`71c88b05`) 2026-04-11. Tagged v1.0.5 at `71c88b05`, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-11-v1.0.5-retrospective.md`.
-
-**v1.0.6 — AWS SSM Support for k3s-aws Provider** — PR #64 OPEN (`https://github.com/wilddog64/k3d-manager/pull/64`). CI green (`a54e152f`). Copilot tagged. All work complete: `8d35e2cb` (SSM plugin + CloudFormation IAM), `b977709a` (Makefile targets), `290edd1f` (CAPABILITY_NAMED_IAM fix), `a54e152f` (docs: CHANGE.md, README, functions.md, releases.md). `make up` verified working 2026-04-11.
 
 **shopping-cart-order PR #24 MERGED** (`7f0ea87e`) 2026-04-11. Bumped `rabbitmq-client` `1.0.0-SNAPSHOT` → `1.0.1`; deleted `RabbitHealthConfig.java` workaround; 3 Copilot findings addressed (`412dd4a`). `enforce_admins` restored.
 **shopping-cart-order PR #25 MERGED** (`49ff6b87`) 2026-04-11. Fixed `trivy-action@0.30.0` → `@v0.35.0`; branch protection updated (stale `"CI"` context → `Build & Test` + `Checkstyle`). 2 Copilot findings fixed. `enforce_admins` restored. Next branch: `docs/next-improvements-2`. **`Build, Scan & Push` now unblocked on next main push — will build Docker image with rabbitmq-client 1.0.1 and ArgoCD auto-deploys to resolve order-service CrashLoopBackOff.**
