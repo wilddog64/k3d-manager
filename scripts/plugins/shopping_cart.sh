@@ -282,15 +282,15 @@ HELP
     _info "[shopping_cart] All agent nodes joined."
   fi
 
-_setup_vault_bridge "${ssh_host}" "${ssh_key}" || return 1
+  _setup_vault_bridge "${ssh_host}" "${ssh_key}" || return 1
 
-_info "[shopping_cart] k3s install complete."
-_info ""
-_info "Next steps:"
-_info "  1. Get a bearer token:"
-_info "       ssh ${ssh_host} kubectl create token argocd-manager -n kube-system --duration=8760h"
-_info "  2. Register with ArgoCD:"
-_info "       ARGOCD_APP_CLUSTER_TOKEN=<token> ./scripts/k3d-manager register_app_cluster"
+  _info "[shopping_cart] k3s install complete."
+  _info ""
+  _info "Next steps:"
+  _info "  1. Get a bearer token:"
+  _info "       ssh ${ssh_host} kubectl create token argocd-manager -n kube-system --duration=8760h"
+  _info "  2. Register with ArgoCD:"
+  _info "       ARGOCD_APP_CLUSTER_TOKEN=<token> ./scripts/k3d-manager register_app_cluster"
 }
 
 function _ssm_bootstrap_k3s() {
@@ -356,6 +356,7 @@ function _ssm_bootstrap_k3s() {
   local tmp_kube tmp_merged
   tmp_kube="${HOME}/.kube/ubuntu-k3s.tmp"
   tmp_merged="${HOME}/.kube/config.tmp"
+  mkdir -p "${HOME}/.kube"
   if kubectl config get-contexts "${kube_context}" >/dev/null 2>&1; then
     kubectl config delete-context "${kube_context}" >/dev/null 2>&1 || true
     _info "[shopping_cart] Removed stale ${kube_context} context"
