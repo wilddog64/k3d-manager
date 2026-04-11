@@ -2,6 +2,7 @@
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.0.6](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.6) | 2026-04-11 | AWS SSM support — `ssm_wait`/`ssm_exec`/`ssm_tunnel` helpers; `K3S_AWS_SSM_ENABLED` opt-in; IAM role + instance profile in CloudFormation; `--capabilities CAPABILITY_NAMED_IAM` fix; `make ssm`/`provision` targets |
 | [v1.0.5](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.5) | 2026-04-10 | antigravity decoupling + LDAP Vault KV seeding — `antigravity_acg_extend` renamed/moved to `acg_extend_playwright` in `acg.sh`; `bin/acg-up` seeds `secret/data/ldap/admin` for ESO ExternalSecret |
 | [v1.0.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.4) | 2026-04-10 | ACG extend hardening — button-first search; midnight date-wrap fix; random passwords in `bin/acg-up`; sandbox-expired guidance in `_acg_check_credentials`; Pluralsight URL standardization |
 | [v1.0.3](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.3) | 2026-04-05 | ACG full stack fixes — ESO 1.0.0; ClusterSecretStore `v1`; ArgoCD context + server URL fix; `GHCR_PAT` masking; Chrome CDP launchd agent; `make sync-apps` + `make argocd-registration` |
