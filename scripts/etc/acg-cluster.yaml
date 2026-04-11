@@ -62,6 +62,27 @@ Resources:
       SubnetId: !Ref Subnet
       RouteTableId: !Ref RouteTable
 
+  SSMInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: k3d-manager-ssm-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  SSMInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: k3d-manager-ssm-profile
+      Roles:
+        - !Ref SSMInstanceRole
+
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -91,6 +112,7 @@ Resources:
       SubnetId: !Ref Subnet
       SecurityGroupIds:
         - !Ref SecurityGroup
+      IamInstanceProfile: !Ref SSMInstanceProfile
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
@@ -109,6 +131,7 @@ Resources:
       SubnetId: !Ref Subnet
       SecurityGroupIds:
         - !Ref SecurityGroup
+      IamInstanceProfile: !Ref SSMInstanceProfile
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
@@ -127,6 +150,7 @@ Resources:
       SubnetId: !Ref Subnet
       SecurityGroupIds:
         - !Ref SecurityGroup
+      IamInstanceProfile: !Ref SSMInstanceProfile
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
