@@ -4,6 +4,8 @@
 
 **v1.0.5 SHIPPED** — PR #62 merged (`2a38bf84`) + fix-up PR #63 merged (`71c88b05`) 2026-04-11. Tagged v1.0.5 at `71c88b05`, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-11-v1.0.5-retrospective.md`.
 
+**v1.0.6 — AWS SSM Support for k3s-aws Provider** — SPECCED (2026-04-11). Implement AWS SSM Session Manager as a zero-SSH alternative for cluster management and port-forwarding. Spec: `docs/plans/v1.0.6-aws-ssm-support.md`.
+
 **v1.0.5 summary:** antigravity decoupling (`_acg_extend_playwright` → `acg.sh`); LDAP Vault KV seeding in `bin/acg-up`; 13 Copilot findings fixed across 2 PRs; new process rule: wait for Copilot review entry before merging (`feedback_copilot_review_wait.md`).
 
 ---
