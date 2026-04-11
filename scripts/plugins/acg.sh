@@ -139,6 +139,7 @@ _acg_cf_deploy() {
       "AllowedCidr=${ACG_ALLOWED_CIDR}" \
       "InstanceType=${_ACG_INSTANCE_TYPE}" \
       "AmiId=${ami_id}" \
+    --capabilities CAPABILITY_NAMED_IAM \
     --no-fail-on-empty-changeset
 
   local server_ip agent1_ip agent2_ip
