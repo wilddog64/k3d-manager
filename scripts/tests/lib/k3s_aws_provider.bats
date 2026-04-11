@@ -56,7 +56,7 @@
     source scripts/lib/provider.sh
     source scripts/lib/providers/k3s-aws.sh
     # stubs after source — override real implementations from acg.sh
-    antigravity_acg_extend() { return 0; }
+    _acg_extend_playwright() { return 0; }
     acg_provision() { echo "[stub] acg_provision"; return 0; }
     deploy_app_cluster() { return 0; }
     tunnel_start() { return 0; }

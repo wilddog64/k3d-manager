@@ -33,26 +33,6 @@ setup() {
   unset -f _ensure_antigravity gemini _info
 }
 
-@test "antigravity_acg_extend: returns 0 when node playwright script succeeds" {
-  node() { echo "EXTEND_OK"; return 0; }
-  _info() { :; }
-  export -f node _info
-
-  run antigravity_acg_extend "https://example.com/sandbox"
-  [ "$status" -eq 0 ]
-  unset -f node _info
-}
-
-@test "antigravity_acg_extend: returns 1 when node playwright script fails" {
-  node() { echo "Extend button not found"; return 1; }
-  _info() { :; }
-  export -f node _info
-
-  run antigravity_acg_extend "https://example.com/sandbox"
-  [ "$status" -eq 1 ]
-  unset -f node _info
-}
-
 @test "_antigravity_gemini_prompt: succeeds on first model" {
   _info() { :; }
   sleep() { :; }

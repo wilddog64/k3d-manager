@@ -21,7 +21,7 @@ function _provider_k3s_aws_deploy_cluster() {
 Usage: CLUSTER_PROVIDER=k3s-aws ./scripts/k3d-manager deploy_cluster
 
 Provision a 3-node k3s cluster on ACG AWS sandbox:
-  1. antigravity_acg_extend      — pre-flight TTL extend
+  1. _acg_extend_playwright      — pre-flight TTL extend
   2. acg_provision --confirm     — CloudFormation stack (server + agents)
   3. deploy_app_cluster --confirm — k3sup install server + join agents; kubeconfig merge
   4. tunnel_start                — autossh tunnel M2 Air → server :6443
@@ -41,7 +41,7 @@ HELP
   fi
 
   _info "[k3s-aws] Extending sandbox TTL before deploy (pre-flight)..."
-  antigravity_acg_extend "${_ACG_SANDBOX_URL}" \
+  _acg_extend_playwright "${_ACG_SANDBOX_URL}" \
     || _info "[k3s-aws] Pre-flight extend failed — proceeding (sandbox may have sufficient TTL)"
 
   _info "[k3s-aws] Provisioning CloudFormation stack (server + agents)..."

@@ -297,15 +297,16 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.0.5](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.5) | 2026-04-10 | antigravity decoupling + LDAP Vault KV seeding — `_acg_extend_playwright` moved to `acg.sh`; `bin/acg-up` seeds `secret/data/ldap/admin` for ESO ExternalSecret |
 | [v1.0.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.4) | 2026-04-10 | ACG extend hardening — button-first search; midnight date-wrap fix; random passwords in `bin/acg-up`; sandbox-expired guidance in `_acg_check_credentials`; Pluralsight URL standardization |
 | [v1.0.3](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.3) | 2026-04-05 | ACG full stack fixes — ESO 1.0.0; ClusterSecretStore `v1`; ArgoCD context + server URL fix; `GHCR_PAT` masking; Chrome CDP launchd agent; `make sync-apps` + `make argocd-registration` |
-| [v1.0.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.2) | 2026-04-03 | full stack automation — `make up` 12-step provision; Vault port-forward; vault-bridge Service; argocd-manager bootstrap; helm + ESO install; `bin/` SCRIPT_DIR fix |
 
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.0.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.2) | 2026-04-03 | full stack automation — `make up` 12-step provision; Vault port-forward; vault-bridge Service; argocd-manager bootstrap; helm + ESO install; `bin/` SCRIPT_DIR fix |
 | [v1.0.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.1) | 2026-03-31 | multi-node k3s-aws + CloudFormation + Playwright hardening — 3-node CF stack; auto sign-in; remove Antigravity pre-calls from `acg_get_credentials`; `AGENT_IP_ALLOWLIST` in pre-commit hook |
 | [v1.0.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.0) | 2026-03-29 | k3s-aws provider foundation — `CLUSTER_PROVIDER=k3s-aws` end-to-end deploy; `aws_import_credentials`; `acg_provision --recreate`; `acg_watch` background TTL watcher; keypair idempotency + `page.goto()` fix |
 | [v0.9.21](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.21) | 2026-03-29 | `_ensure_k3sup` auto-install helper — `deploy_app_cluster` now auto-installs k3sup via brew or curl; consistent with `_ensure_node`/`_ensure_copilot_cli` pattern |

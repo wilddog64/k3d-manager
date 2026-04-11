@@ -1,5 +1,13 @@
 # Changes - k3d-manager
 
+## [v1.0.5] — 2026-04-10 — antigravity decoupling + LDAP Vault KV seeding
+
+### Changed
+- `acg.sh` / `antigravity.sh`: `_acg_extend_playwright` moved from `antigravity.sh` into `acg.sh` — `acg_watch` and `_acg_watch_write_wrapper` call it directly; `antigravity.sh` no longer exports the helper; removes false coupling between ACG watch loop and Antigravity IDE (`291a60dc`)
+
+### Fixed
+- `bin/acg-up`: LDAP admin and readonly passwords now generated and seeded to `secret/data/ldap/admin` in Vault KV at provision time — ESO ExternalSecret in `shopping-cart-infra` syncs them to the `identity` namespace (`e5b77474`)
+
 ## [v1.0.4] — 2026-04-10 — ACG extend hardening: button-first search, random passwords, sandbox expired guidance
 
 ### Fixed

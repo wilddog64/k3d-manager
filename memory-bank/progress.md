@@ -30,11 +30,19 @@
 
 **PR #60 merged to main (`91552139`) 2026-04-05. Tagged v1.0.3, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-05-v1.0.3-retrospective.md`.**
 
-## v1.0.4 — Active (branch `k3d-manager-v1.0.4`)
+**v1.0.4 SHIPPED** — PR #61 merged to main (`bc9028fb`) 2026-04-10. Tagged v1.0.4, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-10-v1.0.4-retrospective.md`.
+
+## v1.0.5 — Active (branch `k3d-manager-v1.0.5`)
+
+- [x] **antigravity.sh refactor** — **COMPLETE** (`291a60dc`). `_acg_extend_playwright` moved into `acg.sh`, `acg_watch` + `_acg_watch_write_wrapper` now invoke it directly, `antigravity.sh` dropped the old helper, and dependent provider/tests were updated per `docs/plans/v1.0.5-antigravity-decouple.md`.
+- [x] **rabbitmq-client-java NPE fix PR** — **COMPLETE**. PR #3 merged to main (`723eb7fc`) 2026-04-10. `enforce_admins` restored. Retro: `docs/retro/2026-04-10-npe-fix-retrospective.md`. Next branch: `docs/next-improvements`.
+- [x] **hardcoded password cleanup** — **MERGED**. k3d-manager `e5b77474`; shopping-cart-infra PR #31 (`39c30727`); shopping-cart-order PR #22 (`d5c7a097`); shopping-cart-product-catalog PR #18 (`30bb7723`). All 3 repos merged to main, `enforce_admins` restored. Spec: `docs/plans/v1.0.5-fix-hardcoded-passwords.md`.
+
+## v1.0.4 — SHIPPED
 
 ## v1.0.3 — Complete
 
-- [ ] **acg_extend logic refinement** — **IN PROGRESS**. Identified midnight calculation bug, modal-trapping, and "Ghost State" (stale session). Implementing "Delete -> Start -> Extend" recovery flow and date-wrap TTL parsing. Issues: `docs/issues/2026-04-08-acg-extend-midnight-and-modal-trapping.md`, `docs/issues/2026-04-08-acg-extend-stale-session-ghost-state.md`.
+- [x] **acg_extend logic refinement** — **COMPLETE** (PR #61, `bc9028fb`). Button-first search, midnight date-wrap fix, ghost state guard tightened (`remainingMins !== null && remainingMins < 15`), CDP browser close scoped to launched contexts. Issues: `docs/issues/2026-04-08-acg-extend-midnight-and-modal-trapping.md`, `docs/issues/2026-04-08-acg-extend-stale-session-ghost-state.md`. Copilot PR #61 findings documented: `docs/issues/2026-04-10-copilot-pr61-review-findings.md`.
 - [x] **acg_credentials URL mismatch fix** — **COMPLETE**. Standardized all Pluralsight URLs to `/hands-on/playground/` across `acg.sh` and `acg_credentials.js`. Commit `86883...`.
 - [x] **acg_extend selector fix** — **COMPLETE**. Fixed `h4` false positive by sanitizing `extendSelectors`. Implemented robust "trapped UI" handling: script now forces a "Start/Resume" click if the extend button is missing. Commit `ae765f2d`.
 

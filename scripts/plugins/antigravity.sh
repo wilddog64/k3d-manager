@@ -11,7 +11,6 @@
 #   antigravity_install                  — verify full stack installed
 #   antigravity_trigger_copilot_review   — trigger GitHub Copilot coding agent task
 #   antigravity_poll_task                — poll task until complete, print output
-#   antigravity_acg_extend               — extend ACG sandbox TTL via browser
 
 _ANTIGRAVITY_GEMINI_MODELS=(
   "gemini-2.5-flash"
@@ -203,28 +202,4 @@ Timeout after ${timeout} seconds — if not complete by then, print ERROR: timeo
 Once complete, extract and print the full review output verbatim. Do not summarize."
 
   _antigravity_gemini_prompt "$gemini_prompt"
-}
-
-function antigravity_acg_extend() {
-  local sandbox_url="${1:?usage: antigravity_acg_extend <sandbox_url>}"
-
-  local script_dir
-  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  local playwright_script="${script_dir}/../playwright/acg_extend.js"
-
-  if ! command -v node >/dev/null 2>&1; then
-    _err "[antigravity] node is required — install Node.js"
-  fi
-
-  _info "[antigravity] Extending ACG sandbox TTL at ${sandbox_url}..."
-  local output exit_code
-  output=$(node "$playwright_script" "$sandbox_url" 2>&1)
-  exit_code=$?
-
-  if [[ $exit_code -ne 0 ]]; then
-    _info "[antigravity] acg_extend failed: ${output}"
-    return 1
-  fi
-
-  echo "$output"
 }

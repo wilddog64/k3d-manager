@@ -15,6 +15,11 @@ Uses a dispatcher pattern with lazy plugin loading.
 - **Verify before trust** — never trust a commit SHA, BATS result, or "done" report from any agent without independently verifying via `gh api`, `gh run view`, or `git log`.
 - **Release scope limit — max 5 plan docs** — each release is a sprint story. If a milestone accumulates more than 5 spec files in `docs/plans/`, stop and split before writing another. A 6th spec is the signal the release is too large, not a reason to keep going. Split into two smaller releases with focused scopes.
 
+## Environment Constraints
+- **Thinking Budget:** Capped at 8,192 tokens (set via .envrc).
+- **Context Management:** Manual `/compact` required at 60% utilization.
+- **Output Compression:** RTK (Rust Token Killer) is active for all CLI output.
+
 ---
 
 ## Layout
@@ -72,6 +77,7 @@ Do NOT call `sudo` directly. Do NOT use `command sudo`. Route through `_run_comm
 - `set -euo pipefail` on all new bash scripts
 
 ---
+
 
 ## Security Rules (treat violations as bugs — catch before commit)
 
