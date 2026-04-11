@@ -41,7 +41,7 @@ acg_teardown --confirm            # terminate instance; remove ubuntu-k3s kubeco
 
 > Set `ACG_ALLOWED_CIDR=<your-ip>/32` to restrict SSH/6443 ingress (default: `0.0.0.0/0`).
 >
-> **First run:** `antigravity_acg_extend` will open Google Chrome and prompt for Pluralsight login as needed. Log in manually — the session cookie persists across runs until it expires. Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Antigravity session check.
+> **First run:** `acg_extend_playwright` will open Google Chrome and prompt for Pluralsight login as needed. Log in manually — the session cookie persists across runs until it expires. Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Antigravity session check.
 
 ### 3. Add the Ubuntu k3s app cluster
 
@@ -197,9 +197,9 @@ docs/
 
 | Plugin | Key Functions | Description |
 |---|---|---|
-| **ACG** | `acg_get_credentials`, `acg_import_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_watch`, `acg_teardown` | AWS ACG sandbox lifecycle — automated credential extraction via Playwright CDP, stdin fallback, VPC + SG + EC2 provisioning, background TTL watcher; [spec](docs/plans/v0.9.6-acg-plugin.md) |
+| **ACG** | `acg_get_credentials`, `acg_import_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_extend_playwright`, `acg_watch`, `acg_teardown` | AWS ACG sandbox lifecycle — automated credential extraction via Playwright CDP, stdin fallback, VPC + SG + EC2 provisioning, background TTL watcher; [spec](docs/plans/v0.9.6-acg-plugin.md) |
 | **AWS** | `aws_import_credentials` | Generic AWS credential import — supports CSV (IAM Download), quoted/unquoted export, labeled (Pluralsight), credentials file formats; writes `~/.aws/credentials` |
-| **Antigravity** | `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_poll_task`, `antigravity_acg_extend` | Browser automation via gemini CLI + Playwright over CDP (port 9222) — Copilot coding agent trigger, ACG sandbox TTL extend |
+| **Antigravity** | `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_poll_task` | Browser automation via gemini CLI + Playwright over CDP (port 9222) — Copilot coding agent trigger |
 | **ArgoCD** | `deploy_argocd`, `deploy_argocd_bootstrap`, `register_app_cluster`, `configure_vault_argocd_repos` | GitOps engine deployment + app cluster registration + Vault repo auth |
 | **Vault** | `deploy_vault`, `configure_vault_app_auth` | HashiCorp Vault HA + PKI + cross-cluster auth |
 | **ESO** | `deploy_eso` | External Secrets Operator — syncs Vault/AKV secrets into Kubernetes |

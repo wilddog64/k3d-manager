@@ -55,6 +55,12 @@ setup() {
   [[ "$output" == *"Usage: acg_extend"* ]]
 }
 
+@test "acg_extend_playwright prints help with --help" {
+  run acg_extend_playwright --help
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Usage: acg_extend_playwright"* ]]
+}
+
 @test "acg_extend opens browser on macOS" {
   uname() { echo "Darwin"; }
   _run_command() { echo "$*" >> "${BATS_TEST_TMPDIR}/run.log"; }

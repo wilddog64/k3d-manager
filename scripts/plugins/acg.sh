@@ -422,6 +422,18 @@ _acg_extend_playwright() {
 }
 
 function acg_extend_playwright() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'HELP'
+Usage: acg_extend_playwright <sandbox_url>
+
+Extend the ACG sandbox TTL via Playwright automation.
+Called by the launchd wrapper (acg_watch_start) and by acg_watch in-process.
+
+Arguments:
+  sandbox_url   Pluralsight sandbox URL (https://app.pluralsight.com/...)
+HELP
+    return 0
+  fi
   _acg_extend_playwright "${@}"
 }
 
