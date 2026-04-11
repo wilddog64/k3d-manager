@@ -32,6 +32,7 @@
 **shopping-cart-order v0.3.1 — Spring Rabbit health** — MERGED (PR #21, `4872691`, 2026-04-06). `SPRING_RABBITMQ_HOST/PORT/VIRTUAL_HOST` added to configmap. `enforce_admins` restored. Next branch: `docs/next-improvements`.
 **shopping-cart-infra v0.3.1 — Spring Rabbit secrets** — MERGED (PR #30, `eeb34d9`, 2026-04-06). `SPRING_RABBITMQ_USERNAME/PASSWORD` added to ExternalSecret. `enforce_admins` restored. Next branch: `docs/next-improvements`.
 **rabbitmq-client-java v1.0.1** — SHIPPED (`295459c9`). PR #4 merged 2026-04-11. Tag `v1.0.1` pushed. GitHub Release created. JAR published to GitHub Packages. `enforce_admins` restored. Retro: `docs/retro/2026-04-11-v1.0.1-release-retrospective.md`. Next branch: `docs/next-improvements`.
+**rabbitmq-client-java CI fix** — MERGED (`6268b08a`). PR #5 merged 2026-04-11. Flaky vault apt install removed; curl API calls + vault image pinned to 1.15.6. `enforce_admins` restored. Retro: `docs/retro/2026-04-11-ci-stabilization-retrospective.md`.
 
 ## Current Branch: `k3d-manager-v1.0.3` (as of 2026-04-03)
 
