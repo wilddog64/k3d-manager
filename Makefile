@@ -76,16 +76,13 @@ sync-apps:
 ssm:
 	@if command -v session-manager-plugin >/dev/null 2>&1; then \
 	  echo "[make] session-manager-plugin already installed"; \
+	elif command -v brew >/dev/null 2>&1; then \
+	  brew install --cask session-manager-plugin; \
 	else \
-	  if command -v brew >/dev/null 2>&1; then \
-	    brew install --cask session-manager-plugin; \
-	  elif command -v curl >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then \
-	    curl -sf "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" \
-	      -o /tmp/session-manager-plugin.deb && sudo dpkg -i /tmp/session-manager-plugin.deb; \
-	  else \
-	    echo "[make] ERROR: cannot auto-install session-manager-plugin — install manually"; \
-	    exit 1; \
-	  fi; \
+	  echo "[make] ERROR: cannot auto-install session-manager-plugin in this environment"; \
+	  echo "[make] Install it manually from:"; \
+	  echo "[make]   https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html"; \
+	  exit 1; \
 	fi
 
 ## Provision ACG CloudFormation stack with SSM support (credentials → acg_provision)

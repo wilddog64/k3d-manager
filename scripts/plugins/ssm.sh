@@ -39,11 +39,17 @@ function _ssm_get_instance_id() {
       return 1
       ;;
   esac
-  aws ec2 describe-instances \
+  local instance_id
+  instance_id=$(aws ec2 describe-instances \
     --filters "Name=tag:Name,Values=${tag_value}" \
                "Name=instance-state-name,Values=running" \
     --query "Reservations[0].Instances[0].InstanceId" \
-    --output text
+    --output text)
+  if [[ -z "${instance_id}" || "${instance_id}" == "None" || "${instance_id}" == "null" ]]; then
+    _err "[ssm] No running instance found with tag Name=${tag_value}"
+    return 1
+  fi
+  echo "${instance_id}"
 }
 
 function ssm_wait() {

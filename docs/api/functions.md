@@ -74,7 +74,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `antigravity_poll_task` | `scripts/plugins/antigravity.sh` | Poll a Copilot coding agent task until complete; print full output verbatim |
 | `acg_extend_playwright` | `scripts/plugins/acg.sh` | Extend ACG sandbox TTL via Playwright automation (public dispatcher entry point for `_acg_extend_playwright`) |
 | `ssm_wait` | `scripts/plugins/ssm.sh` | Wait until an EC2 instance is registered and reachable via SSM (polls `ssm describe-instance-information`) |
-| `ssm_exec` | `scripts/plugins/ssm.sh` | Run a shell command on an EC2 instance via SSM `send-command`; streams stdout/stderr; requires `K3S_AWS_SSM_ENABLED=true` |
+| `ssm_exec` | `scripts/plugins/ssm.sh` | Run a shell command on an EC2 instance via SSM `send-command`; prints command output/results after execution |
 | `ssm_tunnel` | `scripts/plugins/ssm.sh` | Open an SSM port-forward tunnel to an EC2 instance (wraps `aws ssm start-session --document-name AWS-StartPortForwardingSession`) |
 | `register_app_cluster` | `scripts/plugins/argocd.sh` | Register the app cluster (ubuntu-k3s) as an ArgoCD managed cluster |
 | `vcluster_create` | `scripts/plugins/vcluster.sh` | Create a virtual Kubernetes cluster inside the infra cluster; exports kubeconfig to `~/.kube/vclusters/<name>.yaml` |
