@@ -35,6 +35,7 @@
 ## v1.0.6 — Active (branch `k3d-manager-v1.0.6`)
 
 - [x] **AWS SSM Support for k3s-aws** — **COMPLETE** (`8d35e2cb`). Added IAM role/profile and opt-in `K3S_AWS_SSM_ENABLED` flow so deploy/destroy can use `ssm_exec`/`ssm_tunnel`; introduced `scripts/plugins/ssm.sh` + tests. Spec: `docs/plans/v1.0.6-aws-ssm-support.md`.
+- [x] **shopping-cart-order: bump rabbitmq-client to 1.0.1** — **MERGED** (PR #24, `7f0ea87e`) 2026-04-11. Bumped `rabbitmq-client` from `1.0.0-SNAPSHOT` to `1.0.1`; deleted `RabbitHealthConfig.java` + test (wrong bean name, NPE fix at source in `1.0.1`); 3 Copilot findings addressed (`412dd4a`): kustomization tag reverted to `latest`, stale CHANGELOG bullet removed, dangling word fixed. `enforce_admins` restored. Next branch: `docs/next-improvements`.
 
 ---
 
