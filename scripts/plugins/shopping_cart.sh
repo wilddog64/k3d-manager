@@ -204,6 +204,13 @@ HELP
     return 1
   fi
 
+  local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
+
+  [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]] && {
+    _ssm_bootstrap_k3s "${local_kubeconfig}" || return 1
+    return 0
+  }
+
   local ssh_host="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
   local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
   local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-}"
@@ -216,7 +223,6 @@ HELP
   fi
   : "${external_ip:=${ssh_host}}"
   local ssh_key="${UBUNTU_K3S_SSH_KEY:-${HOME}/.ssh/k3d-manager-key.pem}"
-  local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
   local kube_context="ubuntu-k3s"
   local kubeconfig_dir="${local_kubeconfig%/*}"
 
@@ -276,13 +282,92 @@ HELP
     _info "[shopping_cart] All agent nodes joined."
   fi
 
-  _setup_vault_bridge "${ssh_host}" "${ssh_key}" || return 1
+_setup_vault_bridge "${ssh_host}" "${ssh_key}" || return 1
 
-  _info "[shopping_cart] k3s install complete."
-  _info ""
-  _info "Next steps:"
-  _info "  1. Get a bearer token:"
-  _info "       ssh ${ssh_host} kubectl create token argocd-manager -n kube-system --duration=8760h"
-  _info "  2. Register with ArgoCD:"
-  _info "       ARGOCD_APP_CLUSTER_TOKEN=<token> ./scripts/k3d-manager register_app_cluster"
+_info "[shopping_cart] k3s install complete."
+_info ""
+_info "Next steps:"
+_info "  1. Get a bearer token:"
+_info "       ssh ${ssh_host} kubectl create token argocd-manager -n kube-system --duration=8760h"
+_info "  2. Register with ArgoCD:"
+_info "       ARGOCD_APP_CLUSTER_TOKEN=<token> ./scripts/k3d-manager register_app_cluster"
+}
+
+function _ssm_bootstrap_k3s() {
+  local local_kubeconfig="$1"
+  local server_alias="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
+  local kube_context="ubuntu-k3s"
+
+  local server_id
+  server_id=$(_ssm_get_instance_id "${server_alias}") || return 1
+  ssm_wait "${server_id}" || return 1
+
+  _info "[shopping_cart] Installing k3s server on ${server_alias} via SSM..."
+  ssm_exec "${server_id}" \
+    "curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='--disable traefik --disable servicelb' sh -" \
+    || return 1
+
+  _info "[shopping_cart] Waiting for k3s node to be Ready..."
+  local attempts=0
+  until ssm_exec "${server_id}" \
+      "kubectl get nodes --no-headers 2>/dev/null | grep -q ' Ready'" 2>/dev/null; do
+    (( attempts++ ))
+    if (( attempts >= 30 )); then
+      _err "[shopping_cart] k3s node did not become Ready after 150s"
+      return 1
+    fi
+    sleep 5
+  done
+  _info "[shopping_cart] Node Ready."
+
+  local kubeconfig_content server_ip
+  kubeconfig_content=$(ssm_exec "${server_id}" "cat /etc/rancher/k3s/k3s.yaml") || return 1
+  server_ip=$(aws ec2 describe-instances \
+    --instance-ids "${server_id}" \
+    --query "Reservations[0].Instances[0].PublicIpAddress" \
+    --output text) || return 1
+
+  mkdir -p "$(dirname "${local_kubeconfig}")"
+  printf '%s\n' "${kubeconfig_content}" \
+    | sed "s|127.0.0.1|${server_ip}|g" > "${local_kubeconfig}"
+  chmod 600 "${local_kubeconfig}"
+  KUBECONFIG="${local_kubeconfig}" kubectl config rename-context default \
+    "${kube_context}" 2>/dev/null || true
+
+  local k3s_token
+  k3s_token=$(ssm_exec "${server_id}" \
+    "cat /var/lib/rancher/k3s/server/node-token") || return 1
+
+  if [[ -n "${UBUNTU_K3S_AGENT_HOSTS:-}" ]]; then
+    local -a _agent_hosts
+    IFS=',' read -ra _agent_hosts <<< "${UBUNTU_K3S_AGENT_HOSTS}"
+    local agent_alias agent_id
+    for agent_alias in "${_agent_hosts[@]}"; do
+      agent_id=$(_ssm_get_instance_id "${agent_alias}") || return 1
+      ssm_wait "${agent_id}" || return 1
+      _info "[shopping_cart] Joining agent ${agent_alias} to server ${server_ip}..."
+      ssm_exec "${agent_id}" \
+        "curl -sfL https://get.k3s.io | K3S_URL=https://${server_ip}:6443 K3S_TOKEN=${k3s_token} sh -" \
+        || return 1
+      _info "[shopping_cart] Agent ${agent_alias} joined."
+    done
+  fi
+
+  local tmp_kube tmp_merged
+  tmp_kube="${HOME}/.kube/ubuntu-k3s.tmp"
+  tmp_merged="${HOME}/.kube/config.tmp"
+  if kubectl config get-contexts "${kube_context}" >/dev/null 2>&1; then
+    kubectl config delete-context "${kube_context}" >/dev/null 2>&1 || true
+    _info "[shopping_cart] Removed stale ${kube_context} context"
+  fi
+  cp "${local_kubeconfig}" "${tmp_kube}"
+  chmod 600 "${tmp_kube}"
+  KUBECONFIG="${tmp_kube}:${HOME}/.kube/config" kubectl config view --flatten > "${tmp_merged}"
+  mv "${tmp_merged}" "${HOME}/.kube/config"
+  chmod 600 "${HOME}/.kube/config"
+  rm -f "${tmp_kube}"
+  _info "[shopping_cart] ${kube_context} context merged into ~/.kube/config"
+
+  _info "[shopping_cart] k3s install complete (SSM mode)."
+  _info "[shopping_cart] Note: Vault reverse bridge not available in SSM mode."
 }

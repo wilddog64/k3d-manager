@@ -14,6 +14,8 @@ source "${SCRIPT_DIR}/plugins/antigravity.sh"
 source "${SCRIPT_DIR}/plugins/shopping_cart.sh"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/tunnel.sh"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/plugins/ssm.sh"
 
 function _provider_k3s_aws_deploy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
@@ -23,8 +25,8 @@ Usage: CLUSTER_PROVIDER=k3s-aws ./scripts/k3d-manager deploy_cluster
 Provision a 3-node k3s cluster on ACG AWS sandbox:
   1. acg_extend_playwright       — pre-flight TTL extend
   2. acg_provision --confirm     — CloudFormation stack (server + agents)
-  3. deploy_app_cluster --confirm — k3sup install server + join agents; kubeconfig merge
-  4. tunnel_start                — autossh tunnel M2 Air → server :6443
+  3. deploy_app_cluster --confirm — install k3s + join agents; kubeconfig merge
+  4. tunnel_start / ssm_tunnel   — port-forward to server :6443
   5. kubectl label nodes         — k3d-manager/node-type=server|agent
   6. acg_watch (background)      — sandbox TTL watcher
 
@@ -36,6 +38,8 @@ Config (env overrides):
   UBUNTU_K3S_SSH_HOST     SSH host alias for server (default: ubuntu)
   UBUNTU_K3S_SSH_USER     SSH user (default: ubuntu)
   UBUNTU_K3S_SSH_KEY      SSH key path (default: ~/.ssh/k3d-manager-key.pem)
+  K3S_AWS_SSM_ENABLED     Set to 'true' to use SSM instead of SSH (default: false)
+                          Note: Vault reverse bridge not supported in SSM mode.
 HELP
     return 0
   fi
@@ -50,8 +54,15 @@ HELP
   _info "[k3s-aws] Installing k3s server + joining agents..."
   UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" deploy_app_cluster --confirm || return 1
 
-  _info "[k3s-aws] Starting autossh tunnel..."
-  tunnel_start || return 1
+  if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
+    _info "[k3s-aws] Starting SSM port-forwarding tunnel (k3s API :6443)..."
+    local _server_id
+    _server_id=$(_ssm_get_instance_id "${UBUNTU_K3S_SSH_HOST:-ubuntu}") || return 1
+    ssm_tunnel "${_server_id}" "6443" "6443" || return 1
+  else
+    _info "[k3s-aws] Starting autossh tunnel..."
+    tunnel_start || return 1
+  fi
 
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
   local total_nodes=3
@@ -137,8 +148,20 @@ HELP
     rm -f "${_ACG_WATCH_PID_FILE}"
   fi
 
-  _info "[k3s-aws] Stopping tunnel..."
-  tunnel_stop || true
+  if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
+    if [[ -f "${_SSM_TUNNEL_FWD_PID_FILE}" ]]; then
+      local _ssm_pid
+      _ssm_pid=$(cat "${_SSM_TUNNEL_FWD_PID_FILE}")
+      if kill -0 "${_ssm_pid}" 2>/dev/null; then
+        _info "[k3s-aws] Stopping SSM tunnel (PID ${_ssm_pid})..."
+        kill "${_ssm_pid}" 2>/dev/null || true
+      fi
+      rm -f "${_SSM_TUNNEL_FWD_PID_FILE}"
+    fi
+  else
+    _info "[k3s-aws] Stopping tunnel..."
+    tunnel_stop || true
+  fi
 
   _info "[k3s-aws] Tearing down server EC2..."
   acg_teardown --confirm || return 1
