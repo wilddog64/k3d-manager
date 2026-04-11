@@ -31,7 +31,7 @@
 **shopping-cart-infra v0.3.0 — manifest cross-check CI** — COMPLETE (`a37d8e1`). Branch `docs/next-improvements` adds `scripts/check-manifest-refs.sh`, wires it into pre-commit + `validate.yml` (manifest-cross-check job + smoke-test workflow_dispatch gate) so secret/configmap key mismatches halt locally and in CI. Spec: `shopping-cart-infra/docs/plans/v0.3.0-ci-manifest-validation.md`.
 **shopping-cart-order v0.3.1 — Spring Rabbit health** — MERGED (PR #21, `4872691`, 2026-04-06). `SPRING_RABBITMQ_HOST/PORT/VIRTUAL_HOST` added to configmap. `enforce_admins` restored. Next branch: `docs/next-improvements`.
 **shopping-cart-infra v0.3.1 — Spring Rabbit secrets** — MERGED (PR #30, `eeb34d9`, 2026-04-06). `SPRING_RABBITMQ_USERNAME/PASSWORD` added to ExternalSecret. `enforce_admins` restored. Next branch: `docs/next-improvements`.
-**rabbitmq-client-java — ConnectionManager stats NPE** — COMPLETE (`36ed860`). Branch `fix/connection-manager-get-stats-npe` wraps `getCacheProperties()` in try/catch so `/actuator/health` no longer fails before any channel is opened. Spec: `rabbitmq-client-java/docs/plans/bugfix-connection-manager-get-stats-npe.md`. PR + JAR publish pending.
+**rabbitmq-client-java v1.0.1** — SHIPPED (`295459c9`). PR #4 merged 2026-04-11. Tag `v1.0.1` pushed. GitHub Release created. JAR published to GitHub Packages. `enforce_admins` restored. Retro: `docs/retro/2026-04-11-v1.0.1-release-retrospective.md`. Next branch: `docs/next-improvements`.
 
 ## Current Branch: `k3d-manager-v1.0.3` (as of 2026-04-03)
 
