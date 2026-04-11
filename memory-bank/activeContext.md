@@ -9,7 +9,7 @@
 
 **Latest progress for v1.0.5:**
 - **antigravity.sh refactor** — COMPLETE (`291a60dc`). `_acg_extend_playwright` now lives in `acg.sh`, `acg_watch` + `_acg_watch_write_wrapper` call it directly, `antigravity.sh` no longer exports `antigravity_acg_extend`, and dependent provider/tests were updated per `docs/plans/v1.0.5-antigravity-decouple.md` / `docs/issues/2026-04-06-acg-antigravity-false-dependency.md`.
-- **hardcoded password cleanup** — COMPLETE (k3d-manager `e5b77474`; shopping-cart-infra `e4a49b6`; shopping-cart-order `44edbd9`; shopping-cart-product-catalog `fa58fb9`). `bin/acg-up` now seeds LDAP credentials into Vault KV, postgres admin + LDAP Secrets moved to ExternalSecret manifests in shopping-cart-infra, and the app repos carry `CHANGE_ME` placeholders per `docs/plans/v1.0.5-fix-hardcoded-passwords.md` (Option A).
+- **hardcoded password cleanup** — MERGED. k3d-manager `e5b77474`; shopping-cart-infra PR #31 merged (`39c30727`); shopping-cart-order PR #22 merged (`d5c7a097`); shopping-cart-product-catalog PR #18 merged (`30bb7723`). `bin/acg-up` seeds LDAP credentials into Vault KV, postgres admin + LDAP Secrets moved to ExternalSecret manifests in shopping-cart-infra, app repos carry `CHANGE_ME` placeholders. Spec: `docs/plans/v1.0.5-fix-hardcoded-passwords.md` (Option A). `enforce_admins` restored on all 3 repos.
 
 **v1.0.4 completed items:**
 - acg-up random passwords — COMPLETE (`f709cb3c`)

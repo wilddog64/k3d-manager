@@ -36,7 +36,7 @@
 
 - [x] **antigravity.sh refactor** — **COMPLETE** (`291a60dc`). `_acg_extend_playwright` moved into `acg.sh`, `acg_watch` + `_acg_watch_write_wrapper` now invoke it directly, `antigravity.sh` dropped the old helper, and dependent provider/tests were updated per `docs/plans/v1.0.5-antigravity-decouple.md`.
 - [x] **rabbitmq-client-java NPE fix PR** — **COMPLETE**. PR #3 merged to main (`723eb7fc`) 2026-04-10. `enforce_admins` restored. Retro: `docs/retro/2026-04-10-npe-fix-retrospective.md`. Next branch: `docs/next-improvements`.
-- [x] **hardcoded password cleanup** — **COMPLETE**. `bin/acg-up` seeds LDAP admin credentials to Vault KV (`e5b77474`), postgres admin + LDAP Secrets in shopping-cart-infra are now ExternalSecrets (`e4a49b6`), and the app repos carry `CHANGE_ME` placeholders instead of `changeme/guest` (order `44edbd9`, product-catalog `fa58fb9`). Spec: `docs/plans/v1.0.5-fix-hardcoded-passwords.md`.
+- [x] **hardcoded password cleanup** — **MERGED**. k3d-manager `e5b77474`; shopping-cart-infra PR #31 (`39c30727`); shopping-cart-order PR #22 (`d5c7a097`); shopping-cart-product-catalog PR #18 (`30bb7723`). All 3 repos merged to main, `enforce_admins` restored. Spec: `docs/plans/v1.0.5-fix-hardcoded-passwords.md`.
 
 ## v1.0.4 — SHIPPED
 
