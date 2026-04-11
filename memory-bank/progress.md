@@ -36,7 +36,7 @@
 
 - [x] **AWS SSM Support for k3s-aws** — **COMPLETE** (`8d35e2cb`). Added IAM role/profile and opt-in `K3S_AWS_SSM_ENABLED` flow so deploy/destroy can use `ssm_exec`/`ssm_tunnel`; introduced `scripts/plugins/ssm.sh` + tests. Spec: `docs/plans/v1.0.6-aws-ssm-support.md`.
 - [x] **shopping-cart-order: bump rabbitmq-client to 1.0.1** — **MERGED** (PR #24, `7f0ea87e`) 2026-04-11. Bumped `rabbitmq-client` from `1.0.0-SNAPSHOT` to `1.0.1`; deleted `RabbitHealthConfig.java` + test (wrong bean name, NPE fix at source in `1.0.1`); 3 Copilot findings addressed (`412dd4a`): kustomization tag reverted to `latest`, stale CHANGELOG bullet removed, dangling word fixed. `enforce_admins` restored. Next branch: `docs/next-improvements`.
-- [ ] **shopping-cart-order: CI fix + docs catch-up** — PR #25 open (`docs/next-improvements`). Fix pre-existing `Build, Scan & Push` failure (`trivy-action@0.30.0` → `@v0.35.0`, SHA `999f8d70` → `39c3072`); docs/next-improvements catch-up (configuration guide, Copilot PR #19 fixes). CI running. **Unblocks Docker image build and ArgoCD auto-deploy for order-service.**
+- [ ] **shopping-cart-order: CI fix + docs catch-up** — PR #25 open (`docs/next-improvements`). Fix pre-existing `Build, Scan & Push` failure (`trivy-action@0.30.0` → `@v0.35.0`, SHA `999f8d70` → `39c3072`); docs/next-improvements catch-up. Initial CI ✅. 2 Copilot findings fixed (`4a13dba`): stale date in activeContext.md, inaccurate CHANGELOG entry. Issue doc + README (`53f67f4`). CI re-running (run 24290020404). `enforce_admins` disabled. **Waiting for CI green then merge to unblock order-service Docker image build.**
 
 ---
 
