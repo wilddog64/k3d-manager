@@ -284,11 +284,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-04-11 | [Copilot PR #64 review findings](docs/issues/2026-04-11-copilot-pr64-review-findings.md) | ssm — bare sudo dpkg in Makefile; lost indentation in deploy_app_cluster; missing mkdir -p ~/.kube; None/null sentinel not normalized; inaccurate ssm_exec docs; wrong make ssm description |
 | 2026-04-11 | [Copilot PR #63 review findings](docs/issues/2026-04-11-copilot-pr63-review-findings.md) | acg — missing --help on public wrapper, no BATS test, private call in k3s-aws.sh, CHANGE.md wording, stale README refs, wrong location for `_antigravity_browser_ready` |
 | 2026-04-11 | [Copilot PR #62 review findings](docs/issues/2026-04-11-copilot-pr62-review-findings.md) | acg — dispatcher rejects private function in launchd wrapper; help text private name; stale browser automation doc; misleading rename description; typos |
 | 2026-04-10 | [Copilot PR #61 review findings](docs/issues/2026-04-10-copilot-pr61-review-findings.md) | acg-extend — CodeQL URL substring check, credential leak in shutdown text log, CDP browser close disrupts session, Ghost State fires on weak null signal |
 | 2026-04-08 | [acg_extend fails due to stale "Ghost" session state](docs/issues/2026-04-08-acg-extend-stale-session-ghost-state.md) | acg-extend — extend button missing when session internally stale with <1hr remaining; delete→start→extend recovery flow |
-| 2026-04-08 | [acg_extend Midnight Calculation and Modal Trapping](docs/issues/2026-04-08-acg-extend-midnight-and-modal-trapping.md) | acg-extend — date rolls backward at midnight; extend modal stays open after success, trapping UI |
 
 [All issues →](docs/issues/)
 
