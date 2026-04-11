@@ -45,6 +45,7 @@
 - [x] **antigravity.sh refactor** — **COMPLETE** (`291a60dc`). `_acg_extend_playwright` moved into `acg.sh`, `acg_watch` + `_acg_watch_write_wrapper` now invoke it directly, `antigravity.sh` dropped the old helper, and dependent provider/tests were updated per `docs/plans/v1.0.5-antigravity-decouple.md`.
 - [x] **rabbitmq-client-java NPE fix PR** — **COMPLETE**. PR #3 merged to main (`723eb7fc`) 2026-04-10. `enforce_admins` restored. Retro: `docs/retro/2026-04-10-npe-fix-retrospective.md`. Next branch: `docs/next-improvements`.
 - [x] **rabbitmq-client-java v1.0.1 release** — **SHIPPED** (`295459c9`). PR #4 merged 2026-04-11. Tag `v1.0.1` pushed. GitHub Release created. JAR published to GitHub Packages (Publish job SUCCESS). `enforce_admins` restored. Retro: `docs/retro/2026-04-11-v1.0.1-release-retrospective.md`.
+- [ ] **rabbitmq-client-java CI fix** — PR open: https://github.com/wilddog64/rabbitmq-client-java/pull/5 (`fix/ci-stabilization`, `aebe7b5`). Removes flaky vault apt install; replaces with curl API calls; pins vault image to 1.15.6. Integration Tests only runs on main — verifiable post-merge.
 - [x] **hardcoded password cleanup** — **MERGED**. k3d-manager `e5b77474`; shopping-cart-infra PR #31 (`39c30727`); shopping-cart-order PR #22 (`d5c7a097`); shopping-cart-product-catalog PR #18 (`30bb7723`). All 3 repos merged to main, `enforce_admins` restored. Spec: `docs/plans/v1.0.5-fix-hardcoded-passwords.md`.
 
 ## v1.0.4 — SHIPPED
