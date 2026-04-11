@@ -41,7 +41,7 @@ HELP
   fi
 
   _info "[k3s-aws] Extending sandbox TTL before deploy (pre-flight)..."
-  _acg_extend_playwright "${_ACG_SANDBOX_URL}" \
+  acg_extend_playwright "${_ACG_SANDBOX_URL}" \
     || _info "[k3s-aws] Pre-flight extend failed — proceeding (sandbox may have sufficient TTL)"
 
   _info "[k3s-aws] Provisioning CloudFormation stack (server + agents)..."
