@@ -21,7 +21,7 @@ function _provider_k3s_aws_deploy_cluster() {
 Usage: CLUSTER_PROVIDER=k3s-aws ./scripts/k3d-manager deploy_cluster
 
 Provision a 3-node k3s cluster on ACG AWS sandbox:
-  1. _acg_extend_playwright      — pre-flight TTL extend
+  1. acg_extend_playwright       — pre-flight TTL extend
   2. acg_provision --confirm     — CloudFormation stack (server + agents)
   3. deploy_app_cluster --confirm — k3sup install server + join agents; kubeconfig merge
   4. tunnel_start                — autossh tunnel M2 Air → server :6443
