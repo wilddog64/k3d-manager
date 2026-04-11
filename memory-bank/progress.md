@@ -37,6 +37,7 @@
 - [x] **AWS SSM Support for k3s-aws** — **COMPLETE** (`8d35e2cb`). Added IAM role/profile and opt-in `K3S_AWS_SSM_ENABLED` flow so deploy/destroy can use `ssm_exec`/`ssm_tunnel`; introduced `scripts/plugins/ssm.sh` + tests. Spec: `docs/plans/v1.0.6-aws-ssm-support.md`.
 - [x] **shopping-cart-order: bump rabbitmq-client to 1.0.1** — **MERGED** (PR #24, `7f0ea87e`) 2026-04-11. Bumped `rabbitmq-client` from `1.0.0-SNAPSHOT` to `1.0.1`; deleted `RabbitHealthConfig.java` + test (wrong bean name, NPE fix at source in `1.0.1`); 3 Copilot findings addressed (`412dd4a`): kustomization tag reverted to `latest`, stale CHANGELOG bullet removed, dangling word fixed. `enforce_admins` restored. Next branch: `docs/next-improvements`.
 - [x] **shopping-cart-order: CI fix + docs catch-up** — **MERGED** (PR #25, `49ff6b87`) 2026-04-11. Fixed `trivy-action@0.30.0` → `@v0.35.0`; resolved docs/next-improvements divergence. 2 Copilot findings fixed. Branch protection updated: stale `"CI"` context → `Build & Test` + `Checkstyle`. `enforce_admins` restored. Next branch: `docs/next-improvements-2`. Retro: `docs/retro/2026-04-11-pr25-ci-fix-retrospective.md`. **`Build, Scan & Push` now unblocked — next main push builds Docker image with rabbitmq-client 1.0.1 to resolve order-service CrashLoopBackOff.**
+- [x] **PR #64 OPEN** — `https://github.com/wilddog64/k3d-manager/pull/64`. CI green (`24293717584`). Copilot tagged. Waiting for Copilot review.
 
 ---
 

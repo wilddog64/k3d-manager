@@ -4,7 +4,7 @@
 
 **v1.0.5 SHIPPED** — PR #62 merged (`2a38bf84`) + fix-up PR #63 merged (`71c88b05`) 2026-04-11. Tagged v1.0.5 at `71c88b05`, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-11-v1.0.5-retrospective.md`.
 
-**v1.0.6 — AWS SSM Support for k3s-aws Provider** — COMPLETE (`8d35e2cb`). Added SSM IAM role/profile to CloudFormation, new `scripts/plugins/ssm.sh` helpers + BATS suite, `_ssm_bootstrap_k3s` path in `shopping_cart.sh`, and opt-in `K3S_AWS_SSM_ENABLED` flow in the k3s-aws provider per `docs/plans/v1.0.6-aws-ssm-support.md`. Vault reverse bridge remains SSH-only.
+**v1.0.6 — AWS SSM Support for k3s-aws Provider** — PR #64 OPEN (`https://github.com/wilddog64/k3d-manager/pull/64`). CI green (`a54e152f`). Copilot tagged. All work complete: `8d35e2cb` (SSM plugin + CloudFormation IAM), `b977709a` (Makefile targets), `290edd1f` (CAPABILITY_NAMED_IAM fix), `a54e152f` (docs: CHANGE.md, README, functions.md, releases.md). `make up` verified working 2026-04-11.
 
 **shopping-cart-order PR #24 MERGED** (`7f0ea87e`) 2026-04-11. Bumped `rabbitmq-client` `1.0.0-SNAPSHOT` → `1.0.1`; deleted `RabbitHealthConfig.java` workaround; 3 Copilot findings addressed (`412dd4a`). `enforce_admins` restored.
 **shopping-cart-order PR #25 MERGED** (`49ff6b87`) 2026-04-11. Fixed `trivy-action@0.30.0` → `@v0.35.0`; branch protection updated (stale `"CI"` context → `Build & Test` + `Checkstyle`). 2 Copilot findings fixed. `enforce_admins` restored. Next branch: `docs/next-improvements-2`. **`Build, Scan & Push` now unblocked on next main push — will build Docker image with rabbitmq-client 1.0.1 and ArgoCD auto-deploys to resolve order-service CrashLoopBackOff.**
