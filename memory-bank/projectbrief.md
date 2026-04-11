@@ -173,8 +173,7 @@ It is the single source of truth for current branch, task status, decisions, and
 
 The runtime is plain Bash — no Python, no Go, no Node.js in the critical path. This
 means k3d-manager installs and runs on any Linux or macOS machine with only standard
-POSIX tools + kubectl + helm. Playwright (Node.js) is used only for the Antigravity
-browser automation plugin, isolated in `scripts/plugins/antigravity.sh`.
+POSIX tools + kubectl + helm. Playwright (Node.js) is used for browser automation — ACG sandbox TTL extend (`scripts/plugins/acg.sh`) and Antigravity Copilot agent trigger (`scripts/plugins/antigravity.sh`).
 
 ### Enforcement at Commit Time
 

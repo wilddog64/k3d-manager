@@ -72,7 +72,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `antigravity_install` | `scripts/plugins/antigravity.sh` | Verify full Antigravity stack installed (Node.js, gemini CLI, IDE, Playwright MCP) |
 | `antigravity_trigger_copilot_review` | `scripts/plugins/antigravity.sh` | Trigger GitHub Copilot coding agent task via Playwright CDP automation |
 | `antigravity_poll_task` | `scripts/plugins/antigravity.sh` | Poll a Copilot coding agent task until complete; print full output verbatim |
-| `antigravity_acg_extend` | `scripts/plugins/antigravity.sh` | Extend ACG sandbox TTL via Playwright CDP automation |
+| `acg_extend_playwright` | `scripts/plugins/acg.sh` | Extend ACG sandbox TTL via Playwright automation (public dispatcher entry point for `_acg_extend_playwright`) |
 | `register_app_cluster` | `scripts/plugins/argocd.sh` | Register the app cluster (ubuntu-k3s) as an ArgoCD managed cluster |
 | `vcluster_create` | `scripts/plugins/vcluster.sh` | Create a virtual Kubernetes cluster inside the infra cluster; exports kubeconfig to `~/.kube/vclusters/<name>.yaml` |
 | `vcluster_destroy` | `scripts/plugins/vcluster.sh` | Delete a vCluster and remove its kubeconfig file |
@@ -115,7 +115,7 @@ Provisions the ACG sandbox EC2 instance. Requires `--confirm`. With `--recreate`
 
 ### `acg_watch`
 
-Starts a background loop that extends the ACG sandbox TTL via `antigravity_acg_extend` every `interval_seconds` (default 12600 = 3.5h). Stops automatically when the EC2 instance is gone.
+Starts a background loop that extends the ACG sandbox TTL via `_acg_extend_playwright` every `interval_seconds` (default 12600 = 3.5h). Stops automatically when the EC2 instance is gone.
 
 **Usage:** `acg_watch [interval_seconds]` (typically called as `acg_watch &` from `_provider_k3s_aws_deploy_cluster`)
 

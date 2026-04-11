@@ -32,7 +32,15 @@
 
 **v1.0.4 SHIPPED** — PR #61 merged to main (`bc9028fb`) 2026-04-10. Tagged v1.0.4, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-10-v1.0.4-retrospective.md`.
 
-## v1.0.5 — Active (branch `k3d-manager-v1.0.5`)
+## v1.0.6 — Active (branch `k3d-manager-v1.0.6`)
+
+*(no tasks yet)*
+
+---
+
+## v1.0.5 — SHIPPED
+
+**PR #62 merged (`2a38bf84`) + fix-up PR #63 merged (`71c88b05`) 2026-04-11. Tagged v1.0.5 at `71c88b05`, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-11-v1.0.5-retrospective.md`.**
 
 - [x] **antigravity.sh refactor** — **COMPLETE** (`291a60dc`). `_acg_extend_playwright` moved into `acg.sh`, `acg_watch` + `_acg_watch_write_wrapper` now invoke it directly, `antigravity.sh` dropped the old helper, and dependent provider/tests were updated per `docs/plans/v1.0.5-antigravity-decouple.md`.
 - [x] **rabbitmq-client-java NPE fix PR** — **COMPLETE**. PR #3 merged to main (`723eb7fc`) 2026-04-10. `enforce_admins` restored. Retro: `docs/retro/2026-04-10-npe-fix-retrospective.md`. Next branch: `docs/next-improvements`.

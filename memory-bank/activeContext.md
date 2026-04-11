@@ -1,6 +1,14 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v1.0.5` (as of 2026-04-10)
+## Current Branch: `k3d-manager-v1.0.6` (as of 2026-04-11)
+
+**v1.0.5 SHIPPED** — PR #62 merged (`2a38bf84`) + fix-up PR #63 merged (`71c88b05`) 2026-04-11. Tagged v1.0.5 at `71c88b05`, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-11-v1.0.5-retrospective.md`.
+
+**v1.0.5 summary:** antigravity decoupling (`_acg_extend_playwright` → `acg.sh`); LDAP Vault KV seeding in `bin/acg-up`; 13 Copilot findings fixed across 2 PRs; new process rule: wait for Copilot review entry before merging (`feedback_copilot_review_wait.md`).
+
+---
+
+## Previous Branch: `k3d-manager-v1.0.5` (as of 2026-04-10)
 
 **v1.0.4 SHIPPED** — PR #61 merged to main (`bc9028fb`) 2026-04-10. Tagged v1.0.4, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-10-v1.0.4-retrospective.md`.
 
