@@ -6,7 +6,7 @@
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?= $(shell gh auth token 2>/dev/null)
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps help
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision help
 
 ## Provision full stack: credentials → cluster → ESO → ArgoCD
 up:
@@ -72,6 +72,26 @@ argocd-registration:
 sync-apps:
 	bin/acg-sync-apps
 
+## Ensure AWS Session Manager plugin is installed (required for SSM-based deployment)
+ssm:
+	@if command -v session-manager-plugin >/dev/null 2>&1; then \
+	  echo "[make] session-manager-plugin already installed"; \
+	else \
+	  if command -v brew >/dev/null 2>&1; then \
+	    brew install --cask session-manager-plugin; \
+	  elif command -v curl >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then \
+	    curl -sf "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" \
+	      -o /tmp/session-manager-plugin.deb && sudo dpkg -i /tmp/session-manager-plugin.deb; \
+	  else \
+	    echo "[make] ERROR: cannot auto-install session-manager-plugin — install manually"; \
+	    exit 1; \
+	  fi; \
+	fi
+
+## Provision ACG CloudFormation stack with SSM support (credentials → acg_provision)
+provision: ssm
+	K3S_AWS_SSM_ENABLED=true scripts/k3d-manager acg_provision --confirm
+
 ## Show this help
 help:
 	@echo ""
@@ -87,6 +107,8 @@ help:
 	@echo "    make chrome-cdp-stop   Uninstall Chrome CDP launchd agent"
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
+	@echo "    make ssm                   Ensure session-manager-plugin is installed"
+	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
 	@echo ""
 	@echo "  Override sandbox URL (falls back to default if omitted):"
 	@echo "    make up URL=https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/..."
