@@ -98,9 +98,20 @@ HELP
 
   _ensure_gcloud || return 1
 
-  _info "[k3s-gcp] Configuring ADC credentials for project ${project}..."
-  export CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE="${key_file}"
+  _info "[k3s-gcp] Obtaining access token from service account key..."
+  local _gcp_access_token
+  _gcp_access_token=$(GOOGLE_APPLICATION_CREDENTIALS="${key_file}" \
+    gcloud auth application-default print-access-token 2>/dev/null) || {
+    _err "[k3s-gcp] Failed to obtain access token from service account key: ${key_file}"
+    return 1
+  }
+  if [[ -z "${_gcp_access_token}" ]]; then
+    _err "[k3s-gcp] Access token is empty — service account key may be invalid"
+    return 1
+  fi
+  export CLOUDSDK_AUTH_ACCESS_TOKEN="${_gcp_access_token}"
   export CLOUDSDK_CORE_PROJECT="${project}"
+  unset _gcp_access_token
 
   _info "[k3s-gcp] Checking for existing instance ${_GCP_INSTANCE_NAME}..."
   local existing
