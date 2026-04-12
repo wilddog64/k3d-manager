@@ -99,8 +99,11 @@ HELP
   _ensure_gcloud || return 1
 
   _info "[k3s-gcp] Activating service account for project ${project}..."
-  gcloud auth activate-service-account --key-file="${key_file}" || return 1
-  gcloud config set project "${project}" || return 1
+  gcloud auth activate-service-account --key-file="${key_file}" --quiet || return 1
+  gcloud config set project "${project}" --quiet || return 1
+
+  _info "[k3s-gcp] Enabling Compute Engine API..."
+  gcloud services enable compute.googleapis.com --quiet || return 1
 
   _info "[k3s-gcp] Checking for existing instance ${_GCP_INSTANCE_NAME}..."
   local existing
