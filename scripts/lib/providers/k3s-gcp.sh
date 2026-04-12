@@ -48,9 +48,9 @@ HELP
   fi
 
   if [[ ! -f "${_GCP_SSH_KEY_FILE}" || ! -f "${_GCP_SSH_KEY_FILE}.pub" ]]; then
-    _err "[k3s-gcp] SSH key not found: ${_GCP_SSH_KEY_FILE}"
-    _err "[k3s-gcp] Generate with: ssh-keygen -t ed25519 -f ${_GCP_SSH_KEY_FILE} -N \"\""
-    return 1
+    _info "[k3s-gcp] SSH key not found — generating ${_GCP_SSH_KEY_FILE}..."
+    mkdir -p "$(dirname "${_GCP_SSH_KEY_FILE}")"
+    ssh-keygen -t ed25519 -f "${_GCP_SSH_KEY_FILE}" -N "" || return 1
   fi
 
   _info "[k3s-gcp] Extracting GCP sandbox credentials..."
