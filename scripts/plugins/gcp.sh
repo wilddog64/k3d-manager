@@ -7,6 +7,42 @@ set -euo pipefail
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 PLAYWRIGHT_SCRIPT="${SCRIPT_DIR}/playwright/acg_credentials.js"
 
+function _ensure_gcloud() {
+  if command -v gcloud >/dev/null 2>&1; then
+    return 0
+  fi
+  _info "[gcp] gcloud CLI not found — installing..."
+  if _command_exist brew; then
+    _run_command --soft -- brew install --cask google-cloud-sdk
+    if command -v gcloud >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+  if _is_debian_family && _command_exist curl; then
+    local _gcloud_installer
+    _gcloud_installer="$(mktemp)"
+    if ! curl -fsSL -o "${_gcloud_installer}" https://sdk.cloud.google.com; then
+      rm -f "${_gcloud_installer}"
+      _err "[gcp] Failed to download Google Cloud SDK installer"
+      return 1
+    fi
+    CLOUDSDK_CORE_DISABLE_PROMPTS=1 \
+      _run_command --soft -- bash "${_gcloud_installer}" --disable-prompts \
+        --install-dir="${HOME}/.local/share/google-cloud-sdk"
+    rm -f "${_gcloud_installer}"
+    if command -v gcloud >/dev/null 2>&1; then
+      return 0
+    fi
+    local _gcloud_bin="${HOME}/.local/share/google-cloud-sdk/google-cloud-sdk/bin"
+    if [[ -f "${_gcloud_bin}/gcloud" ]]; then
+      export PATH="${_gcloud_bin}:${PATH}"
+      return 0
+    fi
+  fi
+  _err "[gcp] gcloud CLI not found and automatic installation failed — install manually: brew install --cask google-cloud-sdk"
+  return 1
+}
+
 function gcp_get_credentials() {
   local url="${1:-}"; shift || true
   if [[ -z "${url}" ]]; then

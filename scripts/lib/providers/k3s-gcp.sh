@@ -96,10 +96,7 @@ HELP
     return 1
   fi
 
-  if ! command -v gcloud >/dev/null 2>&1; then
-    _err "[k3s-gcp] gcloud CLI not found in PATH"
-    return 1
-  fi
+  _ensure_gcloud || return 1
 
   _info "[k3s-gcp] Activating service account for project ${project}..."
   gcloud auth activate-service-account --key-file="${key_file}" || return 1
