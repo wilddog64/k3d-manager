@@ -15,7 +15,7 @@ up:
 	  k3s-aws) echo "[make] CLUSTER_PROVIDER=k3s-aws — running bin/acg-up..."; \
 	           GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)" ;; \
 	  *)       echo "[make] CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) — running deploy_cluster..."; \
-	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" _GCP_SANDBOX_URL="$(URL)" scripts/k3d-manager deploy_cluster ;; \
+	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" _GCP_SANDBOX_URL="$(URL)" scripts/k3d-manager deploy_cluster --confirm ;; \
 	esac
 
 ## Tear down cluster and stop all background processes

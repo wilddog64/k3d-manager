@@ -21,6 +21,35 @@ _GCP_MACHINE_TYPE="${GCP_MACHINE_TYPE:-e2-medium}"
 _GCP_INSTANCE_NAME="${GCP_INSTANCE_NAME:-k3s-gcp-server}"
 _GCP_SSH_KEY_FILE="${GCP_SSH_KEY_FILE:-${HOME}/.ssh/k3d-manager-gcp-key}"
 _GCP_KUBECONFIG="${HOME}/.kube/k3s-gcp.yaml"
+_GCP_SSH_HOST="ubuntu-gcp"
+
+function _gcp_ssh_config_upsert() {
+  local ip="$1"
+  local config="${HOME}/.ssh/config"
+  local tmp
+  tmp=$(mktemp)
+  # Strip existing ubuntu-gcp block (from Host line to next Host line, exclusive)
+  awk '/^Host ubuntu-gcp$/{skip=1} skip && /^Host / && !/^Host ubuntu-gcp$/{skip=0} !skip{print}' \
+    "${config}" > "${tmp}"
+  # Append fresh entry
+  printf '\nHost %s\n  HostName %s\n  User ubuntu\n  IdentityFile %s\n  IdentitiesOnly yes\n  StrictHostKeyChecking no\n' \
+    "${_GCP_SSH_HOST}" "${ip}" "${_GCP_SSH_KEY_FILE}" >> "${tmp}"
+  mv "${tmp}" "${config}"
+  chmod 600 "${config}"
+  _info "[k3s-gcp] ~/.ssh/config: Host ${_GCP_SSH_HOST} → ${ip}"
+}
+
+function _gcp_ssh_config_remove() {
+  local config="${HOME}/.ssh/config"
+  [[ ! -f "${config}" ]] && return 0
+  local tmp
+  tmp=$(mktemp)
+  awk '/^Host ubuntu-gcp$/{skip=1} skip && /^Host / && !/^Host ubuntu-gcp$/{skip=0} !skip{print}' \
+    "${config}" > "${tmp}"
+  mv "${tmp}" "${config}"
+  chmod 600 "${config}"
+  _info "[k3s-gcp] ~/.ssh/config: Host ${_GCP_SSH_HOST} removed"
+}
 
 function _provider_k3s_gcp_deploy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
@@ -111,6 +140,8 @@ HELP
     return 1
   fi
 
+  _gcp_ssh_config_upsert "${external_ip}"
+
   _ensure_k3sup || return 1
   _info "[k3s-gcp] Installing k3s via k3sup..."
   k3sup install \
@@ -163,6 +194,8 @@ HELP
   kubectl config delete-context k3s-gcp 2>/dev/null || true
   kubectl config delete-cluster k3s-gcp 2>/dev/null || true
   rm -f "${_GCP_KUBECONFIG}"
+
+  _gcp_ssh_config_remove
 
   _info "[k3s-gcp] Cluster destroyed."
 }
