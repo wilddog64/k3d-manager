@@ -98,19 +98,21 @@ HELP
 
   _ensure_gcloud || return 1
 
-  _info "[k3s-gcp] Activating service account for project ${project}..."
-  gcloud auth activate-service-account --key-file="${key_file}" --quiet || return 1
-  gcloud config set project "${project}" --quiet || return 1
+  _info "[k3s-gcp] Configuring ADC credentials for project ${project}..."
+  export CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE="${key_file}"
+  export CLOUDSDK_CORE_PROJECT="${project}"
 
   _info "[k3s-gcp] Checking for existing instance ${_GCP_INSTANCE_NAME}..."
   local existing
   existing=$(gcloud compute instances describe "${_GCP_INSTANCE_NAME}" \
+    --project="${project}" \
     --zone="${_GCP_ZONE}" --format="value(name)" 2>/dev/null || true)
   if [[ -n "${existing}" ]]; then
     _info "[k3s-gcp] Instance already exists — skipping create"
   else
     _info "[k3s-gcp] Creating compute instance ${_GCP_INSTANCE_NAME}..."
     gcloud compute instances create "${_GCP_INSTANCE_NAME}" \
+      --project="${project}" \
       --zone="${_GCP_ZONE}" \
       --machine-type="${_GCP_MACHINE_TYPE}" \
       --image-family=ubuntu-2204-lts \
@@ -121,8 +123,10 @@ HELP
   fi
 
   _info "[k3s-gcp] Ensuring firewall rule for k3s API (tcp:6443)..."
-  gcloud compute firewall-rules describe k3s-api --quiet 2>/dev/null \
+  gcloud compute firewall-rules describe k3s-api \
+    --project="${project}" --quiet 2>/dev/null \
     || gcloud compute firewall-rules create k3s-api \
+         --project="${project}" \
          --allow=tcp:6443 \
          --target-tags=k3s-server \
          --description="k3s API server" \
@@ -131,6 +135,7 @@ HELP
   _info "[k3s-gcp] Fetching instance external IP..."
   local external_ip
   external_ip=$(gcloud compute instances describe "${_GCP_INSTANCE_NAME}" \
+    --project="${project}" \
     --zone="${_GCP_ZONE}" --format="value(networkInterfaces[0].accessConfigs[0].natIP)") || return 1
   if [[ -z "${external_ip}" || "${external_ip}" == "None" || "${external_ip}" == "null" ]]; then
     _err "[k3s-gcp] Could not determine external IP for ${_GCP_INSTANCE_NAME}"
