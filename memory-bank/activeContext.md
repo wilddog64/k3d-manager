@@ -12,6 +12,7 @@
 - `docs/plans/v1.0.7-playwright-provider-flag.md` — `--provider aws|gcp` flag; `_extractGcpCredentials` stub (TBD pending sandbox UI inspection)
 
 - **CLUSTER_PROVIDER-aware Makefile (Option B)** — COMPLETE (`9d013bee`). Added default `CLUSTER_PROVIDER=k3s-aws`, wrapped `up`/`down`/`refresh`/`status`/`creds` in provider dispatch cases, and documented overrides in `make help`. Verified with `make --dry-run up`, `make --dry-run up CLUSTER_PROVIDER=k3s-gcp`, and `make --dry-run down CLUSTER_PROVIDER=k3d` — the outputs show `bin/acg-up`, `deploy_cluster`, and `destroy_cluster` paths respectively.
+- **Playwright `--provider` flag** — COMPLETE (`89664941`). `scripts/playwright/acg_credentials.js` now accepts `--provider aws|gcp`, defaults to AWS when omitted, splits credential extraction into `_extractAwsCredentials` and `_extractGcpCredentials`, and writes the GCP service-account JSON to `~/.local/share/k3d-manager/gcp-service-account.json`. Verified CLI usage with `node scripts/playwright/acg_credentials.js` (no args) and `node scripts/playwright/acg_credentials.js https://example.com` (defaults to AWS before Chrome launch).
 
 **GCP sandbox UI confirmed 2026-04-11:** Same `input[aria-label="Copyable input"]` selector as AWS; three fields: Username, Password, Service Account Credentials (JSON). `project_id` parsed from JSON; `gcloud auth activate-service-account --key-file` is the auth path. All 3 specs are Codex-ready. Remaining unknowns (machine type, zone, SSH user) resolved on first live sandbox run.
 

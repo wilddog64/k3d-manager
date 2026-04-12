@@ -38,7 +38,7 @@ Specs written 2026-04-11:
 
 - [x] **CLUSTER_PROVIDER-aware Makefile (Option B)** — **COMPLETE** (`9d013bee`). `docs/plans/v1.0.7-makefile-provider-dispatch.md`; Makefile now defaults `CLUSTER_PROVIDER=k3s-aws`, wraps `make up`/`down`/`refresh`/`status`/`creds` in `case "$(CLUSTER_PROVIDER)"` dispatch, adds `k3s-gcp` credential extraction, and documents overrides in `make help`. Verified with `make --dry-run up`, `make --dry-run up CLUSTER_PROVIDER=k3s-gcp`, and `make --dry-run down CLUSTER_PROVIDER=k3d`.
 - [ ] **GCP provider skeleton** — `docs/plans/v1.0.7-gcp-provider.md`; `scripts/lib/providers/k3s-gcp.sh` + `scripts/plugins/gcp.sh` stub; `gcloud` imperative CLI; `gcp_get_credentials` stub TBD pending sandbox UI inspection. Assign: Codex.
-- [ ] **Playwright `--provider` flag** — `docs/plans/v1.0.7-playwright-provider-flag.md`; `_extractAwsCredentials` / `_extractGcpCredentials` (full impl) split; selectors confirmed from sandbox screenshot 2026-04-11: same `input[aria-label="Copyable input"]`, fields: Username/Password/Service Account Credentials JSON. Assign: Codex.
+- [x] **Playwright `--provider` flag** — **COMPLETE** (`89664941`). Added `--provider` (default `aws`) to `scripts/playwright/acg_credentials.js`, split extraction into `_extractAwsCredentials` / `_extractGcpCredentials`, and implemented the confirmed GCP selectors + service account key writer. Verified CLI usage with `node scripts/playwright/acg_credentials.js` (error with no URL) and `node scripts/playwright/acg_credentials.js https://example.com` (defaults to AWS path before Chrome launch).
 
 ---
 
