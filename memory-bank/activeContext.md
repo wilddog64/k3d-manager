@@ -11,6 +11,8 @@
 - `docs/plans/v1.0.7-gcp-provider.md` — `k3s-gcp.sh` skeleton + `gcp.sh` stub via `gcloud` imperative CLI
 - `docs/plans/v1.0.7-playwright-provider-flag.md` — `--provider aws|gcp` flag; `_extractGcpCredentials` stub (TBD pending sandbox UI inspection)
 
+- **CLUSTER_PROVIDER-aware Makefile (Option B)** — COMPLETE (`9d013bee`). Added default `CLUSTER_PROVIDER=k3s-aws`, wrapped `up`/`down`/`refresh`/`status`/`creds` in provider dispatch cases, and documented overrides in `make help`. Verified with `make --dry-run up`, `make --dry-run up CLUSTER_PROVIDER=k3s-gcp`, and `make --dry-run down CLUSTER_PROVIDER=k3d` — the outputs show `bin/acg-up`, `deploy_cluster`, and `destroy_cluster` paths respectively.
+
 **GCP sandbox UI confirmed 2026-04-11:** Same `input[aria-label="Copyable input"]` selector as AWS; three fields: Username, Password, Service Account Credentials (JSON). `project_id` parsed from JSON; `gcloud auth activate-service-account --key-file` is the auth path. All 3 specs are Codex-ready. Remaining unknowns (machine type, zone, SSH user) resolved on first live sandbox run.
 
 **v1.0.5 SHIPPED** — PR #62 merged (`2a38bf84`) + fix-up PR #63 merged (`71c88b05`) 2026-04-11. Tagged v1.0.5 at `71c88b05`, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-11-v1.0.5-retrospective.md`.
