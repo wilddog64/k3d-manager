@@ -5,29 +5,47 @@
 
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?= $(shell gh auth token 2>/dev/null)
+CLUSTER_PROVIDER ?= k3s-aws
 
 .PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision help
 
 ## Provision full stack: credentials → cluster → ESO → ArgoCD
 up:
-	@echo "[make] Running bin/acg-up..."
-	@GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)"
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-aws) echo "[make] CLUSTER_PROVIDER=k3s-aws — running bin/acg-up..."; \
+	           GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)" ;; \
+	  *)       echo "[make] CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) — running deploy_cluster..."; \
+	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" scripts/k3d-manager deploy_cluster ;; \
+	esac
 
 ## Tear down cluster and stop all background processes
 down:
-	bin/acg-down --confirm
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-aws) bin/acg-down --confirm ;; \
+	  *)       CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" scripts/k3d-manager destroy_cluster --confirm ;; \
+	esac
 
-## Refresh AWS credentials and restart tunnel (use when creds expire)
+## Refresh credentials and restart tunnel (use when creds expire)
 refresh:
-	bin/acg-refresh "$(URL)"
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-aws) bin/acg-refresh "$(URL)" ;; \
+	  *)       echo "[make] refresh not yet implemented for CLUSTER_PROVIDER=$(CLUSTER_PROVIDER)"; exit 1 ;; \
+	esac
 
 ## Show cluster nodes, pod status, tunnel health
 status:
-	bin/acg-status
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-aws) bin/acg-status ;; \
+	  *)       CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" scripts/k3d-manager status ;; \
+	esac
 
-## Extract AWS credentials only (no cluster changes)
+## Extract cloud credentials only (no cluster changes)
 creds:
-	scripts/k3d-manager acg_get_credentials "$(URL)"
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-aws) scripts/k3d-manager acg_get_credentials "$(URL)" ;; \
+	  k3s-gcp) scripts/k3d-manager gcp_get_credentials "$(URL)" ;; \
+	  *)       echo "[make] creds not yet implemented for CLUSTER_PROVIDER=$(CLUSTER_PROVIDER)"; exit 1 ;; \
+	esac
 
 ## Install Chrome CDP launchd agent (enables credential automation without manual login)
 chrome-cdp:
@@ -109,6 +127,12 @@ help:
 	@echo ""
 	@echo "  Override sandbox URL (falls back to default if omitted):"
 	@echo "    make up URL=https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/..."
+	@echo ""
+	@echo "  Override cloud provider (default: k3s-aws):"
+	@echo "    make up CLUSTER_PROVIDER=k3s-gcp"
+	@echo "    make up CLUSTER_PROVIDER=k3d"
+	@echo ""
+	@echo "  Current CLUSTER_PROVIDER: $(CLUSTER_PROVIDER)"
 	@echo ""
 	@echo "  Default URL: $(URL)"
 	@echo ""
