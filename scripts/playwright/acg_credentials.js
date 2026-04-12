@@ -22,12 +22,116 @@ function _isFirstRun() {
 }
 const IS_FIRST_RUN = _isFirstRun();
 
+async function _extractAwsCredentials(page) {
+  await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 15000 });
+  const inputs = await page.locator('input[aria-label="Copyable input"]').all();
+  console.error(`INFO: Found ${inputs.length} copyable inputs.`);
+
+  let accessKey, secretKey, sessionToken;
+  for (let i = 0; i < inputs.length; i++) {
+    const val = await inputs[i].inputValue();
+    const parent = await inputs[i].evaluateHandle(el => el.closest('div')?.parentElement ?? null);
+    const text = parent ? await parent.evaluate(el => el.innerText || '') : '';
+
+    if (text.toLowerCase().includes('access key id')) {
+      accessKey = val;
+    } else if (text.toLowerCase().includes('secret access key')) {
+      secretKey = val;
+    } else if (text.toLowerCase().includes('session token')) {
+      sessionToken = val;
+    }
+  }
+
+  if (!accessKey && inputs.length >= 3) {
+    accessKey = await inputs[2].inputValue();
+  }
+  if (!secretKey && inputs.length >= 4) {
+    secretKey = await inputs[3].inputValue();
+  }
+  if (!sessionToken && inputs.length >= 5) {
+    sessionToken = await inputs[4].inputValue();
+  }
+
+  if (accessKey && secretKey) {
+    console.log(`AWS_ACCESS_KEY_ID=${accessKey.trim()}`);
+    console.log(`AWS_SECRET_ACCESS_KEY=${secretKey.trim()}`);
+    if (sessionToken) {
+      console.log(`AWS_SESSION_TOKEN=${sessionToken.trim()}`);
+    }
+  } else {
+    throw new Error('Could not find AWS Access Key and Secret Key');
+  }
+}
+
+async function _extractGcpCredentials(page) {
+  await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 15000 });
+  const inputs = await page.locator('input[aria-label="Copyable input"]').all();
+  console.error(`INFO: Found ${inputs.length} copyable inputs.`);
+
+  let username, password, serviceAccountJson;
+  for (let i = 0; i < inputs.length; i++) {
+    const val = await inputs[i].inputValue();
+    const parent = await inputs[i].evaluateHandle(el => el.closest('div')?.parentElement ?? null);
+    const text = parent ? await parent.evaluate(el => el.innerText || '') : '';
+
+    if (text.toLowerCase().includes('username')) {
+      username = val;
+    } else if (text.toLowerCase().includes('password')) {
+      password = val;
+    } else if (text.toLowerCase().includes('service account')) {
+      serviceAccountJson = val;
+    }
+  }
+
+  if (!username && inputs.length >= 1) {
+    username = await inputs[0].inputValue();
+  }
+  if (!password && inputs.length >= 2) {
+    password = await inputs[1].inputValue();
+  }
+  if (!serviceAccountJson && inputs.length >= 3) {
+    serviceAccountJson = await inputs[2].inputValue();
+  }
+
+  if (!serviceAccountJson) {
+    throw new Error('Could not find Service Account Credentials field');
+  }
+
+  let projectId;
+  try {
+    projectId = JSON.parse(serviceAccountJson).project_id;
+  } catch {
+    throw new Error('Service Account Credentials is not valid JSON');
+  }
+  if (!projectId) {
+    throw new Error('project_id not found in Service Account Credentials JSON');
+  }
+
+  const keyDir = path.join(os.homedir(), '.local', 'share', 'k3d-manager');
+  const keyPath = path.join(keyDir, 'gcp-service-account.json');
+  fs.mkdirSync(keyDir, { recursive: true });
+  fs.writeFileSync(keyPath, serviceAccountJson, { mode: 0o600 });
+  console.error(`INFO: Service account key written to ${keyPath}`);
+
+  console.log(`GCP_PROJECT=${projectId}`);
+  console.log(`GCP_USERNAME=${(username || '').trim()}`);
+  console.log(`GCP_PASSWORD=${(password || '').trim()}`);
+  console.log(`GOOGLE_APPLICATION_CREDENTIALS=${keyPath}`);
+}
+
 async function extractCredentials() {
   let targetUrl = process.argv[2];
   if (!targetUrl) {
     console.error('ERROR: No target URL provided');
     process.exit(1);
   }
+  const _providerIdx = process.argv.indexOf('--provider');
+  const _provider = _providerIdx !== -1 && process.argv[_providerIdx + 1] ? process.argv[_providerIdx + 1] : 'aws';
+  if (_provider !== 'aws' && _provider !== 'gcp') {
+    console.error(`ERROR: Unknown provider "${_provider}" — must be "aws" or "gcp"`);
+    process.exit(1);
+  }
+  console.error(`INFO: Using provider ${_provider}`);
   // Standardize URL to minimize SPA redirects and Cloudflare triggers
   if (targetUrl.includes('cloud-playground/cloud-sandboxes')) {
     targetUrl = targetUrl.replace('cloud-playground/cloud-sandboxes', 'hands-on/playground/cloud-sandboxes');
@@ -245,53 +349,11 @@ async function extractCredentials() {
     }
 
     // 4. Extract credentials
-    console.error('INFO: Extracting credentials...');
-    
-    // We found that credentials are in inputs with aria-label="Copyable input"
-    // The order is typically: Username, Password, Access Key ID, Secret Access Key, [Session Token]
-    
-    // Wait for the inputs to appear
-    await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 15000 });
-    
-    const inputs = await page.locator('input[aria-label="Copyable input"]').all();
-    console.error(`INFO: Found ${inputs.length} copyable inputs.`);
-
-    let accessKey, secretKey, sessionToken;
-
-    for (let i = 0; i < inputs.length; i++) {
-      const val = await inputs[i].inputValue();
-      const parent = await inputs[i].evaluateHandle(el => el.closest('div')?.parentElement ?? null);
-      const text = parent ? await parent.evaluate(el => el.innerText || '') : '';
-      
-      if (text.toLowerCase().includes('access key id')) {
-        accessKey = val;
-      } else if (text.toLowerCase().includes('secret access key')) {
-        secretKey = val;
-      } else if (text.toLowerCase().includes('session token')) {
-        sessionToken = val;
-      }
-    }
-
-    // Fallback based on known order if text matching fails
-    if (!accessKey && inputs.length >= 3) {
-      accessKey = await inputs[2].inputValue();
-    }
-    if (!secretKey && inputs.length >= 4) {
-      secretKey = await inputs[3].inputValue();
-    }
-    if (!sessionToken && inputs.length >= 5) {
-      sessionToken = await inputs[4].inputValue();
-    }
-
-    if (accessKey && secretKey) {
-      console.log(`AWS_ACCESS_KEY_ID=${accessKey.trim()}`);
-      console.log(`AWS_SECRET_ACCESS_KEY=${secretKey.trim()}`);
-      if (sessionToken) {
-        console.log(`AWS_SESSION_TOKEN=${sessionToken.trim()}`);
-      }
-      return;
+    console.error(`INFO: Extracting credentials (provider: ${_provider})...`);
+    if (_provider === 'aws') {
+      await _extractAwsCredentials(page);
     } else {
-      throw new Error('Could not find AWS Access Key and Secret Key');
+      await _extractGcpCredentials(page);
     }
 
   } catch (error) {
