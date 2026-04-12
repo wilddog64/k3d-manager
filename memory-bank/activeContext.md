@@ -6,9 +6,12 @@
 
 **v1.0.6 summary:** AWS SSM support — `ssm_wait`/`ssm_exec`/`ssm_tunnel` in new `scripts/plugins/ssm.sh`; `K3S_AWS_SSM_ENABLED` opt-in; IAM role + instance profile in CloudFormation; `--capabilities CAPABILITY_NAMED_IAM` fix; `make ssm`/`provision` targets; 6 Copilot findings fixed. `make up` smoke-tested end-to-end.
 
-**v1.0.7 — GCP provider (`k3s-gcp`) + CLUSTER_PROVIDER-aware Makefile** — next milestone. Two-part scope:
-1. `_provider_k3s_gcp_deploy_cluster` / `_provider_k3s_gcp_destroy_cluster` in `scripts/lib/providers/k3s-gcp.sh`
-2. Generic `make up`/`make down`/`make refresh`/`make status` dispatch via `CLUSTER_PROVIDER` env var (Option B decision from v1.0.6 retro) — removes AWS-specific hardcoding from Makefile targets.
+**v1.0.7 — GCP provider (`k3s-gcp`) + CLUSTER_PROVIDER-aware Makefile** — next milestone. Three specs written 2026-04-11:
+- `docs/plans/v1.0.7-makefile-provider-dispatch.md` — Option B Makefile dispatch via `CLUSTER_PROVIDER`
+- `docs/plans/v1.0.7-gcp-provider.md` — `k3s-gcp.sh` skeleton + `gcp.sh` stub via `gcloud` imperative CLI
+- `docs/plans/v1.0.7-playwright-provider-flag.md` — `--provider aws|gcp` flag; `_extractGcpCredentials` stub (TBD pending sandbox UI inspection)
+
+**GCP sandbox UI confirmed 2026-04-11:** Same `input[aria-label="Copyable input"]` selector as AWS; three fields: Username, Password, Service Account Credentials (JSON). `project_id` parsed from JSON; `gcloud auth activate-service-account --key-file` is the auth path. All 3 specs are Codex-ready. Remaining unknowns (machine type, zone, SSH user) resolved on first live sandbox run.
 
 **v1.0.5 SHIPPED** — PR #62 merged (`2a38bf84`) + fix-up PR #63 merged (`71c88b05`) 2026-04-11. Tagged v1.0.5 at `71c88b05`, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-11-v1.0.5-retrospective.md`.
 

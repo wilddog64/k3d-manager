@@ -34,8 +34,11 @@
 
 ## v1.0.7 — Active (branch `k3d-manager-v1.0.7`)
 
-- [ ] **GCP provider (`k3s-gcp`)** — `_provider_k3s_gcp_deploy_cluster` / `_provider_k3s_gcp_destroy_cluster` in `scripts/lib/providers/k3s-gcp.sh`
-- [ ] **CLUSTER_PROVIDER-aware Makefile** — generic `make up`/`make down`/`make refresh`/`make status` dispatch via `CLUSTER_PROVIDER` env (Option B); removes AWS-specific hardcoding from Makefile targets
+Specs written 2026-04-11:
+
+- [ ] **CLUSTER_PROVIDER-aware Makefile (Option B)** — `docs/plans/v1.0.7-makefile-provider-dispatch.md`; `make up`/`down`/`refresh`/`status`/`creds` dispatch via `case "$(CLUSTER_PROVIDER)"`. Assign: Codex.
+- [ ] **GCP provider skeleton** — `docs/plans/v1.0.7-gcp-provider.md`; `scripts/lib/providers/k3s-gcp.sh` + `scripts/plugins/gcp.sh` stub; `gcloud` imperative CLI; `gcp_get_credentials` stub TBD pending sandbox UI inspection. Assign: Codex.
+- [ ] **Playwright `--provider` flag** — `docs/plans/v1.0.7-playwright-provider-flag.md`; `_extractAwsCredentials` / `_extractGcpCredentials` (full impl) split; selectors confirmed from sandbox screenshot 2026-04-11: same `input[aria-label="Copyable input"]`, fields: Username/Password/Service Account Credentials JSON. Assign: Codex.
 
 ---
 
