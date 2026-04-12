@@ -102,9 +102,6 @@ HELP
   gcloud auth activate-service-account --key-file="${key_file}" --quiet || return 1
   gcloud config set project "${project}" --quiet || return 1
 
-  _info "[k3s-gcp] Enabling Compute Engine API..."
-  gcloud services enable compute.googleapis.com --quiet || return 1
-
   _info "[k3s-gcp] Checking for existing instance ${_GCP_INSTANCE_NAME}..."
   local existing
   existing=$(gcloud compute instances describe "${_GCP_INSTANCE_NAME}" \
