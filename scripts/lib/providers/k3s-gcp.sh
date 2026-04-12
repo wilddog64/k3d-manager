@@ -51,6 +51,23 @@ function _gcp_ssh_config_remove() {
   _info "[k3s-gcp] ~/.ssh/config: Host ${_GCP_SSH_HOST} removed"
 }
 
+function _gcp_preflight_check_compute() {
+  local project="$1"
+  local key_file="$2"
+  local sa_email
+  sa_email=$(jq -r '.client_email' "${key_file}" 2>/dev/null || true)
+  if ! gcloud compute instances list \
+      --project="${project}" \
+      --limit=1 \
+      --quiet >/dev/null 2>&1; then
+    _err "[k3s-gcp] SA lacks Compute permissions on project ${project}."
+    _err "[k3s-gcp] Grant roles/compute.admin to: ${sa_email:-<service-account>}"
+    _err "[k3s-gcp] Via: GCP Console → IAM & Admin → IAM → Grant Access"
+    _err "[k3s-gcp] Then retry: make up CLUSTER_PROVIDER=k3s-gcp"
+    return 1
+  fi
+}
+
 function _provider_k3s_gcp_deploy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
@@ -112,6 +129,9 @@ HELP
   export CLOUDSDK_AUTH_ACCESS_TOKEN="${_gcp_access_token}"
   export CLOUDSDK_CORE_PROJECT="${project}"
   unset _gcp_access_token
+
+  _info "[k3s-gcp] Pre-flight: checking Compute IAM permissions..."
+  _gcp_preflight_check_compute "${project}" "${key_file}" || return 1
 
   _info "[k3s-gcp] Checking for existing instance ${_GCP_INSTANCE_NAME}..."
   local existing
