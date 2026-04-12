@@ -20,13 +20,26 @@ function gcp_get_credentials() {
     return 1
   }
 
-  GCP_PROJECT=$(printf '%s\n' "${output}" | grep '^GCP_PROJECT=' | cut -d= -f2-)
-  GOOGLE_APPLICATION_CREDENTIALS=$(printf '%s\n' "${output}" | grep '^GOOGLE_APPLICATION_CREDENTIALS=' | cut -d= -f2-)
-  GCP_USERNAME=$(printf '%s\n' "${output}" | grep '^GCP_USERNAME=' | cut -d= -f2-)
-  GCP_PASSWORD=$(printf '%s\n' "${output}" | grep '^GCP_PASSWORD=' | cut -d= -f2-)
+  local project key_path username password
+  project=$(printf '%s\n' "${output}" | grep '^GCP_PROJECT=' | cut -d= -f2-)
+  key_path=$(printf '%s\n' "${output}" | grep '^GOOGLE_APPLICATION_CREDENTIALS=' | cut -d= -f2-)
+  username=$(printf '%s\n' "${output}" | grep '^GCP_USERNAME=' | cut -d= -f2-)
+  password=$(printf '%s\n' "${output}" | grep '^GCP_PASSWORD=' | cut -d= -f2-)
 
-  export GCP_PROJECT GOOGLE_APPLICATION_CREDENTIALS GCP_USERNAME GCP_PASSWORD
+  if [[ -z "${project}" || "${project}" == "None" || "${project}" == "null" ]]; then
+    _err "[gcp] Could not extract GCP_PROJECT from Playwright output"
+    return 1
+  fi
+  if [[ -z "${key_path}" || ! -f "${key_path}" ]]; then
+    _err "[gcp] GOOGLE_APPLICATION_CREDENTIALS not set or key file not found: ${key_path}"
+    return 1
+  fi
 
-  _info "[gcp] GCP_PROJECT=${GCP_PROJECT}"
-  _info "[gcp] GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS}"
+  export GCP_PROJECT="${project}"
+  export GOOGLE_APPLICATION_CREDENTIALS="${key_path}"
+  export GCP_USERNAME="${username}"
+  export GCP_PASSWORD="${password}"
+
+  _info "[gcp] GCP_PROJECT=${project}"
+  _info "[gcp] GOOGLE_APPLICATION_CREDENTIALS=${key_path}"
 }

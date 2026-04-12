@@ -87,6 +87,8 @@ HELP
     gcloud compute instances create "${_GCP_INSTANCE_NAME}" \
       --zone="${_GCP_ZONE}" \
       --machine-type="${_GCP_MACHINE_TYPE}" \
+      --image-family=ubuntu-2204-lts \
+      --image-project=ubuntu-os-cloud \
       --tags=k3s-server \
       --metadata="ssh-keys=ubuntu:$(<"${_GCP_SSH_KEY_FILE}.pub")" \
       --quiet || return 1
@@ -104,8 +106,8 @@ HELP
   local external_ip
   external_ip=$(gcloud compute instances describe "${_GCP_INSTANCE_NAME}" \
     --zone="${_GCP_ZONE}" --format="value(networkInterfaces[0].accessConfigs[0].natIP)") || return 1
-  if [[ -z "${external_ip}" ]]; then
-    _err "[k3s-gcp] Could not determine external IP"
+  if [[ -z "${external_ip}" || "${external_ip}" == "None" || "${external_ip}" == "null" ]]; then
+    _err "[k3s-gcp] Could not determine external IP for ${_GCP_INSTANCE_NAME}"
     return 1
   fi
 
@@ -116,7 +118,8 @@ HELP
     --user ubuntu \
     --ssh-key "${_GCP_SSH_KEY_FILE}" \
     --context k3s-gcp \
-    --kubeconfig "${_GCP_KUBECONFIG}" || return 1
+    --local-path "${_GCP_KUBECONFIG}" \
+    --k3s-extra-args="--disable=traefik" || return 1
 
   mkdir -p "${HOME}/.kube"
   KUBECONFIG="${HOME}/.kube/config:${_GCP_KUBECONFIG}" \
@@ -155,6 +158,11 @@ HELP
   _info "[k3s-gcp] Deleting compute instance ${_GCP_INSTANCE_NAME}..."
   gcloud compute instances delete "${_GCP_INSTANCE_NAME}" \
     --zone="${_GCP_ZONE}" --quiet || return 1
+
+  _info "[k3s-gcp] Removing kubeconfig context k3s-gcp..."
+  kubectl config delete-context k3s-gcp 2>/dev/null || true
+  kubectl config delete-cluster k3s-gcp 2>/dev/null || true
+  rm -f "${_GCP_KUBECONFIG}"
 
   _info "[k3s-gcp] Cluster destroyed."
 }
