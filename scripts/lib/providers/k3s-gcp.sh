@@ -51,6 +51,7 @@ function _gcp_ssh_config_remove() {
   _info "[k3s-gcp] ~/.ssh/config: Host ${_GCP_SSH_HOST} removed"
 }
 
+# Pre-flight guard: ensures sandbox service account has Compute IAM permissions
 function _gcp_preflight_check_compute() {
   local project="$1"
   local key_file="$2"
