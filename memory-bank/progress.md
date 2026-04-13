@@ -360,4 +360,4 @@ Specs written 2026-04-11:
 | Bug: `provision: ssm` unconditional prereq | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-provision-stack-ssm-vault.md` |
 | Bug: `deploy_vault` bare `$1` unbound var | ASSIGNED → Codex | same spec |
 | Live smoke test `make provision CLUSTER_PROVIDER=k3s-gcp` | PENDING | After Codex bugfixes |
-- [ ] **ESO deploy_eso bugfix** — ASSIGNED → Codex. Spec `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md`. `eso.sh:12` `"$1"` → `"${1:-}"`.
+- [x] **ESO deploy_eso bugfix** — COMPLETE (`320ae211`). Spec `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md`. `scripts/plugins/eso.sh:12` now uses `${1:-}` so Stage 3 of GCP provision stops crashing under `set -u`; `shellcheck` + `bats scripts/tests/providers/k3s_gcp.bats` pass.
