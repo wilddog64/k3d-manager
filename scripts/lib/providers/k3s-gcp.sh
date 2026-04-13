@@ -51,7 +51,37 @@ function _gcp_ssh_config_remove() {
   _info "[k3s-gcp] ~/.ssh/config: Host ${_GCP_SSH_HOST} removed"
 }
 
-# Pre-flight guard: ensures sandbox service account has Compute IAM permissions
+function _gcp_load_credentials() {
+  local sandbox_url="${1:-}"
+  local _default_key="${HOME}/.local/share/k3d-manager/gcp-service-account.json"
+  if [[ -z "${sandbox_url}" && -f "${_default_key}" ]]; then
+    _info "[k3s-gcp] SA key already on disk — skipping Playwright extraction"
+    local _cached_project
+    _cached_project=$(jq -r '.project_id' "${_default_key}" 2>/dev/null || true)
+    if [[ -z "${_cached_project}" || "${_cached_project}" == "null" ]]; then
+      _err "[k3s-gcp] Cached key at ${_default_key} has no project_id — re-run with GCP_SANDBOX_URL=<url>"
+      return 1
+    fi
+    export GCP_PROJECT="${_cached_project}"
+    export GOOGLE_APPLICATION_CREDENTIALS="${_default_key}"
+    local _active_account
+    _active_account=$(gcloud auth list --filter="status:ACTIVE" --format="value(account)" 2>/dev/null || true)
+    [[ -n "${_active_account}" ]] && export GCP_USERNAME="${_active_account}"
+  else
+    _info "[k3s-gcp] Extracting GCP sandbox credentials..."
+    gcp_get_credentials "${sandbox_url}" || return 1
+  fi
+  if [[ -z "${GCP_PROJECT:-}" ]]; then
+    _err "[k3s-gcp] GCP_PROJECT is not set — pass GCP_SANDBOX_URL=<url> to extract fresh credentials"
+    return 1
+  fi
+  if [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" || ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]]; then
+    _err "[k3s-gcp] GOOGLE_APPLICATION_CREDENTIALS not set or key file not found"
+    return 1
+  fi
+}
+
+# Pre-flight guard: ensures console user has Compute IAM permissions
 function _gcp_preflight_check_compute() {
   local project="$1"
   if ! gcloud compute instances list \
@@ -96,19 +126,8 @@ HELP
     ssh-keygen -t ed25519 -f "${_GCP_SSH_KEY_FILE}" -N "" || return 1
   fi
 
-  _info "[k3s-gcp] Extracting GCP sandbox credentials..."
-  gcp_get_credentials "${_GCP_SANDBOX_URL:-}" || return 1
-
-  local project="${GCP_PROJECT:-}"
-  local key_file="${GOOGLE_APPLICATION_CREDENTIALS:-}"
-  if [[ -z "${project}" ]]; then
-    _err "[k3s-gcp] GCP_PROJECT is not set — credential extraction may have failed"
-    return 1
-  fi
-  if [[ -z "${key_file}" || ! -f "${key_file}" ]]; then
-    _err "[k3s-gcp] GOOGLE_APPLICATION_CREDENTIALS not set or key file not found: ${key_file}"
-    return 1
-  fi
+  _gcp_load_credentials "${_GCP_SANDBOX_URL:-}" || return 1
+  local project="${GCP_PROJECT}"
 
   _ensure_gcloud || return 1
 
