@@ -48,6 +48,7 @@ Specs written 2026-04-11:
 
 - [x] **GCP full stack provisioner** — **COMPLETE** (`1430b47e`). Spec `docs/plans/v1.1.0-gcp-provision-full-stack.md`. Added `gcp_provision_stack` + `_gcp_seed_vault_kv` to `scripts/plugins/gcp.sh` so Vault → ESO/ClusterSecretStore → namespaces + ghcr secrets → ArgoCD bootstrap → shopping-cart apps deploy on the single `k3s-gcp` cluster; Makefile `provision` dispatches `k3s-gcp` to the new flow. `make --dry-run provision` (default + CLUSTER_PROVIDER=k3s-gcp), `shellcheck scripts/plugins/gcp.sh`, and `bats scripts/tests/providers/k3s_gcp.bats` pass.
 - [x] **GCP provision bugfix (SSM + Vault args)** — **COMPLETE** (`3fd62f33`). Spec `docs/bugs/v1.1.0-bugfix-gcp-provision-stack-ssm-vault.md`. Moves the `ssm` prerequisite into the AWS case so GCP runs skip it, and fixes `deploy_vault`'s `$1` access so `set -u` no longer errors.
+- [x] **Stale kubeconfig merge bugfix** — **COMPLETE** (`fb694ac6`). Spec `docs/bugs/v1.1.0-bugfix-gcp-kubeconfig-stale-merge.md`. Purges existing k3s-gcp context/cluster/user entries from `~/.kube/config` before flattening with the fresh `k3s-gcp.yaml` so k3sup restarts after an IP change keep the new credentials.
 
 ---
 
