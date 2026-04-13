@@ -47,6 +47,7 @@ Specs written 2026-04-11:
 ## v1.1.0 — Active (branch `k3d-manager-v1.1.0`)
 
 - [x] **GCP full stack provisioner** — **COMPLETE** (`1430b47e`). Spec `docs/plans/v1.1.0-gcp-provision-full-stack.md`. Added `gcp_provision_stack` + `_gcp_seed_vault_kv` to `scripts/plugins/gcp.sh` so Vault → ESO/ClusterSecretStore → namespaces + ghcr secrets → ArgoCD bootstrap → shopping-cart apps deploy on the single `k3s-gcp` cluster; Makefile `provision` dispatches `k3s-gcp` to the new flow. `make --dry-run provision` (default + CLUSTER_PROVIDER=k3s-gcp), `shellcheck scripts/plugins/gcp.sh`, and `bats scripts/tests/providers/k3s_gcp.bats` pass.
+- [x] **GCP provision bugfix (SSM + Vault args)** — **COMPLETE** (`7360d96e`). Spec `docs/bugs/v1.1.0-bugfix-gcp-provision-stack-ssm-vault.md`. Moves the `ssm` prerequisite into the AWS case so GCP runs skip it, and fixes `deploy_vault`'s `$1` access so `set -u` no longer errors.
 
 ---
 
