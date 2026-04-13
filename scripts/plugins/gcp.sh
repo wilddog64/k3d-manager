@@ -185,3 +185,136 @@ function gcp_grant_compute_admin() {
 
   _info "[gcp] roles/compute.admin granted to ${sa_email} (idempotent)"
 }
+
+function gcp_provision_stack() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'HELP'
+Usage: CLUSTER_PROVIDER=k3s-gcp ./scripts/k3d-manager gcp_provision_stack
+
+Deploy the full plugin stack on the k3s-gcp single-node cluster:
+  1. Vault (secrets backend)
+  2. External Secrets Operator + ClusterSecretStore
+  3. App namespaces + ghcr-pull-secret
+  4. ArgoCD + ApplicationSets (--bootstrap, no LDAP, no Istio)
+  5. shopping-cart ArgoCD Applications
+
+Prerequisites:
+  make up CLUSTER_PROVIDER=k3s-gcp      — node must be Running
+  GHCR_PAT=<pat>                         — GitHub PAT with read:packages
+  ../shopping-carts/shopping-cart-infra  — ArgoCD app manifests
+HELP
+    return 0
+  fi
+
+  local _ghcr_pat="${GHCR_PAT:-}"
+  local _github_user="${GITHUB_USERNAME:-wilddog64}"
+  local _kubeconfig="${HOME}/.kube/k3s-gcp.yaml"
+  local _context="k3s-gcp"
+
+  if [[ -z "${_ghcr_pat}" ]]; then
+    _err "[gcp] GHCR_PAT is not set — required for ghcr-pull-secret"
+    return 1
+  fi
+  if [[ ! -f "${_kubeconfig}" ]]; then
+    _err "[gcp] ${_kubeconfig} not found — run: make up CLUSTER_PROVIDER=k3s-gcp"
+    return 1
+  fi
+
+  export KUBECONFIG="${_kubeconfig}"
+
+  _info "[gcp] Step 1/7 — Deploying Vault..."
+  CLUSTER_ROLE=infra deploy_vault || return 1
+
+  _info "[gcp] Step 2/7 — Seeding Vault KV..."
+  local _vault_pf_pid
+  kubectl port-forward svc/vault -n secrets --context "${_context}" 8200:8200 >/dev/null 2>&1 &
+  _vault_pf_pid=$!
+  sleep 5
+  local _vault_token
+  _vault_token=$(kubectl get secret vault-root -n secrets --context "${_context}" \
+    -o jsonpath='{.data.root_token}' | base64 -d)
+  if [[ -z "${_vault_token}" ]]; then
+    kill "${_vault_pf_pid}" 2>/dev/null || true
+    _err "[gcp] Could not read vault-root token — is Vault ready?"
+    return 1
+  fi
+  _gcp_seed_vault_kv "${_vault_token}"
+  kill "${_vault_pf_pid}" 2>/dev/null || true
+
+  _info "[gcp] Step 3/7 — Deploying ESO..."
+  deploy_eso || return 1
+
+  _info "[gcp] Step 4/7 — Applying ClusterSecretStore..."
+  kubectl apply --context "${_context}" -f - <<'CSSEOF'
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: vault-backend
+spec:
+  provider:
+    vault:
+      server: "http://vault.secrets.svc.cluster.local:8200"
+      path: "secret"
+      version: "v2"
+      auth:
+        tokenSecretRef:
+          name: vault-root
+          namespace: secrets
+          key: root_token
+CSSEOF
+
+  _info "[gcp] Step 5/7 — Creating namespaces and ghcr-pull-secret..."
+  for _ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
+    kubectl create namespace "${_ns}" --context "${_context}" \
+      --dry-run=client -o yaml | kubectl apply --context "${_context}" -f - >/dev/null
+    kubectl create secret docker-registry ghcr-pull-secret \
+      --docker-server=ghcr.io \
+      --docker-username="${_github_user}" \
+      --docker-password="${_ghcr_pat}" \
+      --context "${_context}" -n "${_ns}" \
+      --dry-run=client -o yaml | kubectl apply --context "${_context}" -f -
+    _info "[gcp] ghcr-pull-secret applied in namespace: ${_ns}"
+  done
+
+  _info "[gcp] Step 6/7 — Deploying ArgoCD..."
+  deploy_argocd --bootstrap --skip-ldap --skip-istio || return 1
+
+  _info "[gcp] Step 7/7 — Registering shopping-cart apps..."
+  register_shopping_cart_apps || return 1
+
+  _info "[gcp] Full stack provisioned on k3s-gcp."
+  kubectl get pods -A --context "${_context}"
+}
+
+function _gcp_seed_vault_kv() {
+  local _token="$1"
+  local _kv_put
+  _kv_put() {
+    curl -sf -X POST \
+      -H "X-Vault-Token: ${_token}" \
+      -H "Content-Type: application/json" \
+      -d "{\"data\":$1}" \
+      "http://localhost:8200/v1/secret/data/$2" >/dev/null
+  }
+  local _pg_orders _pg_products _pg_payment _redis_cart _redis_orders _rabbit _ldap_admin _ldap_ro
+  _pg_orders=$(openssl rand -base64 24 | tr -d '=+/')
+  _pg_products=$(openssl rand -base64 24 | tr -d '=+/')
+  _pg_payment=$(openssl rand -base64 24 | tr -d '=+/')
+  _redis_cart=$(openssl rand -base64 24 | tr -d '=+/')
+  _redis_orders=$(openssl rand -base64 24 | tr -d '=+/')
+  _rabbit=$(openssl rand -base64 24 | tr -d '=+/')
+  _ldap_admin=$(openssl rand -base64 24 | tr -d '=+/')
+  _ldap_ro=$(openssl rand -base64 24 | tr -d '=+/')
+
+  _kv_put "{\"password\":\"${_redis_cart}\"}"                                                redis/cart
+  _kv_put "{\"password\":\"${_redis_orders}\"}"                                              redis/orders-cache
+  _kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_orders}\"}"                      postgres/orders
+  _kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_products}\"}"                    postgres/products
+  _kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_payment}\"}"                     postgres/payment
+  _kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}'                            payment/encryption
+  _kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}'          payment/stripe
+  _kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
+  _kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbit}\"}"                         rabbitmq/default
+  _kv_put "{\"admin_password\":\"${_ldap_admin}\",\"readonly_password\":\"${_ldap_ro}\"}"   ldap/admin
+  _info "[gcp] Vault KV seeded"
+}

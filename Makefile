@@ -103,9 +103,16 @@ ssm:
 	  exit 1; \
 	fi
 
-## Provision ACG CloudFormation stack with SSM support (credentials → acg_provision)
+## Provision full plugin stack (Vault + ESO + ArgoCD + apps)
 provision: ssm
-	K3S_AWS_SSM_ENABLED=true scripts/k3d-manager acg_provision --confirm
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-gcp) echo "[make] CLUSTER_PROVIDER=k3s-gcp — running gcp_provision_stack..."; \
+	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" \
+	           GHCR_PAT="$(GHCR_PAT)" \
+	           scripts/k3d-manager gcp_provision_stack ;; \
+	  *)       echo "[make] CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) — running acg_provision..."; \
+	           K3S_AWS_SSM_ENABLED=true scripts/k3d-manager acg_provision --confirm ;; \
+	esac
 
 ## Show this help
 help:
@@ -124,6 +131,7 @@ help:
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
 	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
+	@echo "    make provision CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>   Deploy full stack on GCP"
 	@echo ""
 	@echo "  Override sandbox URL (falls back to default if omitted):"
 	@echo "    make up URL=https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/..."
