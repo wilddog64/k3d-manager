@@ -215,4 +215,4 @@
 - Live smoke test: `make provision CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` against running GCP node
 - **ESO deploy_eso bugfix** — COMPLETE (`320ae211`). `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md` — `deploy_eso` now guards `$1` with `${1:-}` so gcp_provision_stack can call it without args under `set -u`; shellcheck + BATS re-run.
 - **Stale SA key bugfix** — ASSIGNED → Codex (`docs/bugs/v1.1.0-bugfix-gcp-stale-sa-key-project-probe.md`). New sandbox = new project ID; cached key causes pre-flight failure. Fix: probe project in `_gcp_load_credentials` before trusting cache.
-- **SSH readiness probe bugfix** — ASSIGNED → Codex (`docs/bugs/v1.1.0-bugfix-gcp-ssh-readiness-probe.md`). k3sup fails immediately after VM creation — SSH not ready. Fix: poll `nc -z` port 22 for up to 5 min before calling k3sup.
+- **SSH readiness probe bugfix** — COMPLETE (`de83535d`). `docs/bugs/v1.1.0-bugfix-gcp-ssh-readiness-probe.md`; `_provider_k3s_gcp_deploy_cluster` now polls `nc -z ${ip} 22` (10s backoff, 30 retries) after `_gcp_ssh_config_upsert` so `k3sup install` waits for SSH to come up.
