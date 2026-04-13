@@ -106,7 +106,9 @@ ssm:
 ## Provision full plugin stack (Vault + ESO + ArgoCD + apps)
 provision:
 	@case "$(CLUSTER_PROVIDER)" in \
-	  k3s-gcp) echo "[make] CLUSTER_PROVIDER=k3s-gcp — running gcp_provision_stack..."; \
+	  k3s-gcp) echo "[make] CLUSTER_PROVIDER=k3s-gcp — ensuring cluster is up..."; \
+	           $(MAKE) --no-print-directory up CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" URL="$(URL)"; \
+	           echo "[make] CLUSTER_PROVIDER=k3s-gcp — running gcp_provision_stack..."; \
 	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" \
 	           GHCR_PAT="$(GHCR_PAT)" \
 	           scripts/k3d-manager gcp_provision_stack ;; \
