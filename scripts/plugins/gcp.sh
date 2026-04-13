@@ -43,6 +43,41 @@ function _ensure_gcloud() {
   return 1
 }
 
+function _ensure_k3sup() {
+  if command -v k3sup >/dev/null 2>&1; then
+    return 0
+  fi
+  _info "[gcp] k3sup not found — installing..."
+  if _command_exist brew; then
+    _run_command --soft -- brew install k3sup
+    if command -v k3sup >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+  if _command_exist curl; then
+    local _k3sup_installer
+    _k3sup_installer="$(mktemp)"
+    if ! curl -fsSL -o "${_k3sup_installer}" https://get.k3sup.dev; then
+      rm -f "${_k3sup_installer}"
+      _err "[gcp] Failed to download k3sup installer"
+      return 1
+    fi
+    mkdir -p "${HOME}/.local/bin"
+    INSTALL_PATH="${HOME}/.local/bin" \
+      _run_command --soft -- sh "${_k3sup_installer}"
+    rm -f "${_k3sup_installer}"
+    if command -v k3sup >/dev/null 2>&1; then
+      return 0
+    fi
+    if [[ -f "${HOME}/.local/bin/k3sup" ]]; then
+      export PATH="${HOME}/.local/bin:${PATH}"
+      return 0
+    fi
+  fi
+  _err "[gcp] k3sup not found and automatic installation failed — install manually: brew install k3sup"
+  return 1
+}
+
 function gcp_get_credentials() {
   local url="${1:-}"; shift || true
   if [[ -z "${url}" ]]; then
