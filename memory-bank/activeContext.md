@@ -21,10 +21,8 @@
 - **GCP provider post-review bugfix** — COMPLETE (`d4e73a66`). Five issues fixed: Ubuntu 22.04 image pins, `--local-path`, `--disable=traefik`, destroy kubeconfig cleanup, `gcp.sh` validate-before-export.
 - **GCP provider pre-flight compute check** — COMPLETE (`7360d96e`). `_gcp_preflight_check_compute` in `k3s-gcp.sh` probes `gcloud compute instances list --limit=1` before any instance work and fails fast with actionable guidance (SA email + IAM role to grant) instead of letting `gcloud compute create` fail deep in the flow.
 - **`_ensure_gcloud`** — COMPLETE (`13ec1f67`). Auto-install `gcloud` CLI when missing; wired into `_provider_k3s_gcp_deploy_cluster`; BATS-tested.
-- **GCP IAM auto-grant** — HYBRID STRATEGY (2026-04-12). Full automation abandoned due to platform constraints.
-    - **Discovery:** (1) CLI `setIamPolicy` is blocked for sandbox users; (2) Google login blocks Playwright bot interactions; (3) UI requires manual ToS acceptance to enable "Grant access" buttons.
-    - **Hybrid Strategy:** Gemini performs extraction; User performs manual login in Chrome (bypassing system default Safari); Gemini "latches on" via CDP to automate final IAM table clicks.
-    - **Status:** Constraints documented in `docs/issues/2026-04-12-gcp-iam-automation-constraints.md`.
+- **GCP IAM + auth pivot** — COMPLETE (`8cd1156e`). Sandbox constraint: `setIamPolicy` blocked for console user at API level; IAM grant UI greyed out. Resolution: pivot to console user credentials for all `gcloud compute` ops. Console user has `StudentLabAdmin1/2/3` custom roles with full compute permissions (verified via `testIamPermissions`). Replaced ADC SA token block in `k3s-gcp.sh` with `gcp_login` call; simplified `_gcp_preflight_check_compute`; added `gcp_login` + `gcp_grant_compute_admin` to `gcp.sh`; 5 BATS tests pass.
+- **Next:** live run — `make up CLUSTER_PROVIDER=k3s-gcp` after `gcloud auth login` as console user.
 
 **GCP sandbox UI confirmed 2026-04-11:** Same `input[aria-label="Copyable input"]` selector as AWS; three fields: Username, Password, Service Account Credentials (JSON). `project_id` parsed from JSON; `gcloud auth activate-service-account --key-file` is the auth path. All 3 specs are Codex-ready. Remaining unknowns (machine type, zone, SSH user) resolved on first live sandbox run.
 
