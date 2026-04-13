@@ -345,3 +345,17 @@ Specs written 2026-04-11:
 | order-service CrashLoopBackOff | shopping-cart-order | PostgreSQL OK; RabbitMQ `Connection refused` only remaining |
 | payment-service Pending | shopping-cart-payment | Memory constraints on `t3.medium` |
 | product-catalog Degraded | shopping-cart-product-catalog | Synced to `aa5de3c`; `RABBITMQ_USERNAME` ESO key mismatch |
+
+---
+
+## v1.1.0 — GCP Full Stack Provision
+
+**Branch:** `k3d-manager-v1.1.0`
+
+| Item | Status | Notes |
+|---|---|---|
+| `gcp_provision_stack` + `_gcp_seed_vault_kv` | COMPLETE | SHA `1430b47e` — Codex |
+| Makefile `provision` case dispatch | COMPLETE | SHA `1430b47e` — Codex |
+| Bug: `provision: ssm` unconditional prereq | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-provision-stack-ssm-vault.md` |
+| Bug: `deploy_vault` bare `$1` unbound var | ASSIGNED → Codex | same spec |
+| Live smoke test `make provision CLUSTER_PROVIDER=k3s-gcp` | PENDING | After Codex bugfixes |

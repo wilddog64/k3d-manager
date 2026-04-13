@@ -184,3 +184,31 @@
 
 - **vault-bridge bugfix specced:** `docs/plans/v1.0.2-bugfix-vault-bridge.md` — Codex to add `_setup_vault_bridge` in `shopping_cart.sh`, Endpoints step in `bin/acg-up`, fix ClusterSecretStore server address, add `vault-bridge-svc.yaml` in shopping-cart-infra.
 - **ArgoCD app status:** basket `CrashLoopBackOff`, frontend `CrashLoopBackOff`, order `Running`, payment `Running`, product-catalog `Error`. All app pods reached remote execution phase.
+
+---
+
+## v1.1.0 — GCP Full Stack Provision (branch: `k3d-manager-v1.1.0`)
+
+**Active branch:** `k3d-manager-v1.1.0`
+
+### Completed
+
+| Item | SHA | Notes |
+|---|---|---|
+| `_ensure_k3sup` auto-install helper | `c322e483` | Follows `_ensure_gcloud` pattern; brew → curl fallback |
+| `_gcp_load_credentials` helper | `a7195034` | Caches SA key; skips Playwright if key valid on disk |
+| SA key cache simplification | `5e7566b8` | Single condition: file exists + project_id valid |
+| `gcp_login` + `gcp_grant_compute_admin` | `153fc922` | Three-tier gcloud auth; IAM grant helper |
+| `gcp_provision_stack` spec | `2745e57b` | `docs/plans/v1.1.0-gcp-provision-full-stack.md` |
+| `gcp_provision_stack` implementation | `1430b47e` | Codex; Makefile case dispatch + full 7-step stack |
+| Bug spec: ssm prereq + vault unbound $1 | `04943cdd` | `docs/bugs/v1.1.0-bugfix-gcp-provision-stack-ssm-vault.md` |
+
+### In Progress
+
+| Item | Assignee | Spec |
+|---|---|---|
+| Fix `provision: ssm` unconditional prereq + `deploy_vault` bare `$1` | Codex | `docs/bugs/v1.1.0-bugfix-gcp-provision-stack-ssm-vault.md` |
+
+### Pending
+
+- Live smoke test: `make provision CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` against running GCP node
