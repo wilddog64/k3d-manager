@@ -277,7 +277,9 @@ CSSEOF
   done
 
   _info "[gcp] Step 6/7 — Deploying ArgoCD..."
-  deploy_argocd --bootstrap --skip-ldap --skip-istio || return 1
+  # shellcheck source=/dev/null
+  source "${SCRIPT_DIR}/plugins/argocd.sh"
+  deploy_argocd --bootstrap --skip-istio || return 1
 
   _info "[gcp] Step 7/7 — Registering shopping-cart apps..."
   register_shopping_cart_apps || return 1
