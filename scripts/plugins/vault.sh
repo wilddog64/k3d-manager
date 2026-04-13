@@ -898,7 +898,7 @@ function _vault_source_optional_vars() {
 }
 
 function deploy_vault() {
-   if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
       cat <<EOF
 Usage: deploy_vault [options]
        deploy_vault --re-unseal [options]

@@ -104,13 +104,14 @@ ssm:
 	fi
 
 ## Provision full plugin stack (Vault + ESO + ArgoCD + apps)
-provision: ssm
+provision:
 	@case "$(CLUSTER_PROVIDER)" in \
 	  k3s-gcp) echo "[make] CLUSTER_PROVIDER=k3s-gcp — running gcp_provision_stack..."; \
 	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" \
 	           GHCR_PAT="$(GHCR_PAT)" \
 	           scripts/k3d-manager gcp_provision_stack ;; \
-	  *)       echo "[make] CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) — running acg_provision..."; \
+	  *)       $(MAKE) --no-print-directory ssm; \
+	           echo "[make] CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) — running acg_provision..."; \
 	           K3S_AWS_SSM_ENABLED=true scripts/k3d-manager acg_provision --confirm ;; \
 	esac
 
