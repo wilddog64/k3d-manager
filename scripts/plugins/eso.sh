@@ -9,7 +9,7 @@ export ESO_NAMESPACE
 
 # Install ESO (External Secrets Operator)
 function deploy_eso() {
-  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     echo "Usage: deploy_eso [namespace=${ESO_NAMESPACE:-secrets}] [release=external-secrets]"
     return 0
   fi
