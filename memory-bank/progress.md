@@ -51,6 +51,7 @@ Specs written 2026-04-11:
 - [x] **Stale kubeconfig merge bugfix** — **COMPLETE** (`fb694ac6`). Spec `docs/bugs/v1.1.0-bugfix-gcp-kubeconfig-stale-merge.md`. Purges existing k3s-gcp context/cluster/user entries from `~/.kube/config` before flattening with the fresh `k3s-gcp.yaml` so k3sup restarts after an IP change keep the new credentials.
 - [x] **ArgoCD rendered unbound EXIT trap bugfix** — **COMPLETE** (`17d16e8c`). Spec `docs/bugs/v1.1.0-bugfix-argocd-rendered-unbound-exit-trap.md`. Replaced RETURN trap with explicit `rm -f "$rendered"` + `trap - EXIT`; dangling EXIT trap no longer fires with unbound local after function returns.
 - [x] **ACG AWS functions wrong plugin** — **COMPLETE (`b5f9754b`)**. Spec `docs/bugs/v1.1.0-bugfix-acg-aws-functions-wrong-plugin.md`. Move 9 AWS-specific functions + 14 constants from `acg.sh` to `aws.sh`; no circular dep since `acg.sh` already sources `aws.sh`.
+- [ ] **GCP pre-flight stale project bug** — OPEN. Issue `docs/bugs/2026-04-13-gcp-preflight-stale-project.md`; `_gcp_load_credentials` must probe cached project via `gcloud projects describe` before skipping Playwright to avoid expired sandbox failures.
 
 ---
 
