@@ -44,6 +44,10 @@ Specs written 2026-04-11:
 - [x] **Playwright `--provider` flag** — **COMPLETE** (`89664941`). Added `--provider` (default `aws`) to `scripts/playwright/acg_credentials.js`, split extraction into `_extractAwsCredentials` / `_extractGcpCredentials`, and implemented the confirmed GCP selectors + service account key writer. Verified CLI usage with `node scripts/playwright/acg_credentials.js` (error with no URL) and `node scripts/playwright/acg_credentials.js https://example.com` (defaults to AWS path before Chrome launch).
 - [x] **GCP IAM + auth pivot** — **COMPLETE** (`8cd1156e`). SA `setIamPolicy` blocked; IAM UI greyed out in sandbox. Resolution: console user (`cloud_user_p_...`) has compute permissions via `StudentLabAdmin` custom roles — pivot `k3s-gcp.sh` to use `gcp_login` for all compute ops. Added `gcp_login` + `gcp_grant_compute_admin` to `gcp.sh`; simplified `_gcp_preflight_check_compute`; 5 BATS pass.
 
+## v1.1.0 — Active (branch `k3d-manager-v1.1.0`)
+
+- [x] **GCP full stack provisioner** — **COMPLETE** (`1430b47e`). Spec `docs/plans/v1.1.0-gcp-provision-full-stack.md`. Added `gcp_provision_stack` + `_gcp_seed_vault_kv` to `scripts/plugins/gcp.sh` so Vault → ESO/ClusterSecretStore → namespaces + ghcr secrets → ArgoCD bootstrap → shopping-cart apps deploy on the single `k3s-gcp` cluster; Makefile `provision` dispatches `k3s-gcp` to the new flow. `make --dry-run provision` (default + CLUSTER_PROVIDER=k3s-gcp), `shellcheck scripts/plugins/gcp.sh`, and `bats scripts/tests/providers/k3s_gcp.bats` pass.
+
 ---
 
 ## v1.0.6 — SHIPPED
