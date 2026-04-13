@@ -181,6 +181,23 @@ HELP
 
   _gcp_ssh_config_upsert "${external_ip}"
 
+  _info "[k3s-gcp] Waiting for SSH on ${external_ip}..."
+  local _ssh_retries=30
+  local _ssh_i=0
+  while (( _ssh_i < _ssh_retries )); do
+    if nc -z -w 5 "${external_ip}" 22 2>/dev/null; then
+      _info "[k3s-gcp] SSH port open on ${external_ip}"
+      break
+    fi
+    _ssh_i=$(( _ssh_i + 1 ))
+    _info "[k3s-gcp] SSH not ready yet (${_ssh_i}/${_ssh_retries}) — retrying in 10s..."
+    sleep 10
+  done
+  if (( _ssh_i >= _ssh_retries )); then
+    _err "[k3s-gcp] SSH not available on ${external_ip} after $(( _ssh_retries * 10 ))s"
+    return 1
+  fi
+
   _ensure_k3sup || return 1
   _info "[k3s-gcp] Installing k3s via k3sup..."
   k3sup install \
