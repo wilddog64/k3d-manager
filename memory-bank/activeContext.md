@@ -213,3 +213,4 @@
 ### Pending
 
 - Live smoke test: `make provision CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` against running GCP node
+- **ESO deploy_eso bugfix** — ASSIGNED → Codex (`docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md`). `deploy_eso` bare `$1` crashes GCP provision at Step 3.

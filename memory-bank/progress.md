@@ -360,3 +360,4 @@ Specs written 2026-04-11:
 | Bug: `provision: ssm` unconditional prereq | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-provision-stack-ssm-vault.md` |
 | Bug: `deploy_vault` bare `$1` unbound var | ASSIGNED → Codex | same spec |
 | Live smoke test `make provision CLUSTER_PROVIDER=k3s-gcp` | PENDING | After Codex bugfixes |
+- [ ] **ESO deploy_eso bugfix** — ASSIGNED → Codex. Spec `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md`. `eso.sh:12` `"$1"` → `"${1:-}"`.
