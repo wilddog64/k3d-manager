@@ -217,6 +217,23 @@ HELP
     mv "${HOME}/.kube/config.tmp" "${HOME}/.kube/config"
   chmod 600 "${HOME}/.kube/config" "${_GCP_KUBECONFIG}"
 
+  _info "[k3s-gcp] Waiting for k3s API server on ${external_ip}:6443..."
+  local _api_retries=30
+  local _api_i=0
+  while (( _api_i < _api_retries )); do
+    if nc -z -w 5 "${external_ip}" 6443 2>/dev/null; then
+      _info "[k3s-gcp] k3s API server ready on ${external_ip}:6443"
+      break
+    fi
+    _api_i=$(( _api_i + 1 ))
+    _info "[k3s-gcp] API server not ready yet (${_api_i}/${_api_retries}) — retrying in 10s..."
+    sleep 10
+  done
+  if (( _api_i >= _api_retries )); then
+    _err "[k3s-gcp] k3s API server not available on ${external_ip}:6443 after $(( _api_retries * 10 ))s"
+    return 1
+  fi
+
   _info "[k3s-gcp] Labeling node..."
   kubectl --context k3s-gcp label nodes --all k3d-manager/node-type=server --overwrite || return 1
 
