@@ -79,3 +79,74 @@ function gcp_get_credentials() {
   _info "[gcp] GCP_PROJECT=${project}"
   _info "[gcp] GOOGLE_APPLICATION_CREDENTIALS=${key_path}"
 }
+
+function gcp_login() {
+  local expected_user="${1:-${GCP_USERNAME:-}}"
+  if [[ -z "${expected_user}" ]]; then
+    _err "[gcp] gcp_login: GCP_USERNAME not set"
+    return 1
+  fi
+
+  local active_account
+  active_account=$(gcloud auth list --filter="status:ACTIVE" --format="value(account)" 2>/dev/null || true)
+
+  if [[ "${active_account}" == "${expected_user}" ]]; then
+    _info "[gcp] CLI already authenticated as ${expected_user}"
+    return 0
+  fi
+
+  # Account exists in credential store but is not active — switch without browser
+  if gcloud auth list --format="value(account)" 2>/dev/null | grep -qF "${expected_user}"; then
+    gcloud config set account "${expected_user}" --quiet
+    _info "[gcp] Switched active gcloud account to ${expected_user}"
+    return 0
+  fi
+
+  # Account not in store — need interactive login (browser will open once; token is cached)
+  _info "[gcp] Authenticating as ${expected_user} (browser will open)..."
+  if ! gcloud auth login --account "${expected_user}"; then
+    _err "[gcp] Failed to authenticate as ${expected_user}"
+    return 1
+  fi
+}
+
+function gcp_grant_compute_admin() {
+  local project="${1:-${GCP_PROJECT:-}}"
+  local key_file="${2:-${GOOGLE_APPLICATION_CREDENTIALS:-}}"
+  local username="${GCP_USERNAME:-}"
+
+  if [[ -z "${project}" ]]; then
+    _err "[gcp] gcp_grant_compute_admin: GCP_PROJECT not set"
+    return 1
+  fi
+  if [[ -z "${key_file}" || ! -f "${key_file}" ]]; then
+    _err "[gcp] gcp_grant_compute_admin: key file not found: ${key_file}"
+    return 1
+  fi
+  if [[ -z "${username}" ]]; then
+    _err "[gcp] gcp_grant_compute_admin: GCP_USERNAME not set (needed for identity guard)"
+    return 1
+  fi
+
+  local sa_email
+  sa_email=$(jq -r '.client_email' "${key_file}" 2>/dev/null)
+  if [[ -z "${sa_email}" || "${sa_email}" == "null" ]]; then
+    _err "[gcp] gcp_grant_compute_admin: could not extract client_email from ${key_file}"
+    return 1
+  fi
+
+  _info "[gcp] Ensuring CLI is authenticated as sandbox user ${username}..."
+  gcp_login "${username}" || return 1
+
+  _info "[gcp] Granting roles/compute.admin to ${sa_email} on project ${project}..."
+  if ! gcloud projects add-iam-policy-binding "${project}" \
+    --member="serviceAccount:${sa_email}" \
+    --role="roles/compute.admin" \
+    --condition=None \
+    --quiet >/dev/null; then
+    _err "[gcp] IAM grant failed — check that ${username} has roles/resourcemanager.projectIamAdmin or Owner on ${project}"
+    return 1
+  fi
+
+  _info "[gcp] roles/compute.admin granted to ${sa_email} (idempotent)"
+}

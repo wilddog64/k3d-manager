@@ -54,17 +54,13 @@ function _gcp_ssh_config_remove() {
 # Pre-flight guard: ensures sandbox service account has Compute IAM permissions
 function _gcp_preflight_check_compute() {
   local project="$1"
-  local key_file="$2"
-  local sa_email
-  sa_email=$(jq -r '.client_email' "${key_file}" 2>/dev/null || true)
   if ! gcloud compute instances list \
       --project="${project}" \
       --limit=1 \
       --quiet >/dev/null 2>&1; then
-    _err "[k3s-gcp] SA lacks Compute permissions on project ${project}."
-    _err "[k3s-gcp] Grant roles/compute.admin to: ${sa_email:-<service-account>}"
-    _err "[k3s-gcp] Via: GCP Console → IAM & Admin → IAM → Grant Access"
-    _err "[k3s-gcp] Then retry: make up CLUSTER_PROVIDER=k3s-gcp"
+    _err "[k3s-gcp] Compute access check failed on project ${project}."
+    _err "[k3s-gcp] Ensure gcloud is authenticated as a user with Compute permissions."
+    _err "[k3s-gcp] Run: gcloud auth login  then retry: make up CLUSTER_PROVIDER=k3s-gcp"
     return 1
   fi
 }
@@ -116,23 +112,17 @@ HELP
 
   _ensure_gcloud || return 1
 
-  _info "[k3s-gcp] Obtaining access token from service account key..."
-  local _gcp_access_token
-  _gcp_access_token=$(GOOGLE_APPLICATION_CREDENTIALS="${key_file}" \
-    gcloud auth application-default print-access-token 2>/dev/null) || {
-    _err "[k3s-gcp] Failed to obtain access token from service account key: ${key_file}"
-    return 1
-  }
-  if [[ -z "${_gcp_access_token}" ]]; then
-    _err "[k3s-gcp] Access token is empty — service account key may be invalid"
+  local username="${GCP_USERNAME:-}"
+  if [[ -z "${username}" ]]; then
+    _err "[k3s-gcp] GCP_USERNAME not set — credential extraction may have failed"
     return 1
   fi
-  export CLOUDSDK_AUTH_ACCESS_TOKEN="${_gcp_access_token}"
+  _info "[k3s-gcp] Ensuring gcloud is authenticated as ${username}..."
+  gcp_login "${username}" || return 1
   export CLOUDSDK_CORE_PROJECT="${project}"
-  unset _gcp_access_token
 
   _info "[k3s-gcp] Pre-flight: checking Compute IAM permissions..."
-  _gcp_preflight_check_compute "${project}" "${key_file}" || return 1
+  _gcp_preflight_check_compute "${project}" || return 1
 
   _info "[k3s-gcp] Checking for existing instance ${_GCP_INSTANCE_NAME}..."
   local existing
