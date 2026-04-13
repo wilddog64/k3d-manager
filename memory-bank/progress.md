@@ -50,7 +50,7 @@ Specs written 2026-04-11:
 - [x] **GCP provision bugfix (SSM + Vault args)** — **COMPLETE** (`3fd62f33`). Spec `docs/bugs/v1.1.0-bugfix-gcp-provision-stack-ssm-vault.md`. Moves the `ssm` prerequisite into the AWS case so GCP runs skip it, and fixes `deploy_vault`'s `$1` access so `set -u` no longer errors.
 - [x] **Stale kubeconfig merge bugfix** — **COMPLETE** (`fb694ac6`). Spec `docs/bugs/v1.1.0-bugfix-gcp-kubeconfig-stale-merge.md`. Purges existing k3s-gcp context/cluster/user entries from `~/.kube/config` before flattening with the fresh `k3s-gcp.yaml` so k3sup restarts after an IP change keep the new credentials.
 - [x] **ArgoCD rendered unbound EXIT trap bugfix** — **COMPLETE** (`17d16e8c`). Spec `docs/bugs/v1.1.0-bugfix-argocd-rendered-unbound-exit-trap.md`. Replaced RETURN trap with explicit `rm -f "$rendered"` + `trap - EXIT`; dangling EXIT trap no longer fires with unbound local after function returns.
-- [ ] **ACG AWS functions wrong plugin** — **ASSIGNED → Codex**. Spec `docs/bugs/v1.1.0-bugfix-acg-aws-functions-wrong-plugin.md`. Move 9 AWS-specific functions + 14 constants from `acg.sh` to `aws.sh`; no circular dep since `acg.sh` already sources `aws.sh`.
+- [x] **ACG AWS functions wrong plugin** — **COMPLETE (`b5f9754b`)**. Spec `docs/bugs/v1.1.0-bugfix-acg-aws-functions-wrong-plugin.md`. Move 9 AWS-specific functions + 14 constants from `acg.sh` to `aws.sh`; no circular dep since `acg.sh` already sources `aws.sh`.
 
 ---
 
