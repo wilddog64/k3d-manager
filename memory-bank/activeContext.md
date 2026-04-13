@@ -21,7 +21,7 @@
 - **GCP provider post-review bugfix** — COMPLETE (`d4e73a66`). Five issues fixed: Ubuntu 22.04 image pins, `--local-path`, `--disable=traefik`, destroy kubeconfig cleanup, `gcp.sh` validate-before-export.
 - **GCP provider pre-flight compute check** — COMPLETE (`7360d96e`). `_gcp_preflight_check_compute` in `k3s-gcp.sh` probes `gcloud compute instances list --limit=1` before any instance work and fails fast with actionable guidance (SA email + IAM role to grant) instead of letting `gcloud compute create` fail deep in the flow.
 - **`_ensure_gcloud`** — COMPLETE (`13ec1f67`). Auto-install `gcloud` CLI when missing; wired into `_provider_k3s_gcp_deploy_cluster`; BATS-tested.
-- **GCP IAM CLI pivot** — ASSIGNED to Gemini (`docs/plans/v1.0.7-gcp-iam-cli-pivot.md`). Replace Playwright-based IAM grant with `gcp_login` + `gcp_grant_compute_admin` in `gcp.sh` using `gcloud projects add-iam-policy-binding`. `gcp_iam_grant.js` already deleted. Adds BATS test with `gcloud` stub.
+- **GCP IAM auto-grant** — ABANDONED (2026-04-12). All technical paths (CLI, API, Playwright) failed due to hard platform restrictions in the ACG GCP Sandbox. Issue documented in `docs/issues/2026-04-12-gcp-iam-automation-blocked.md`. Strategy shifted to manual verification only.
 
 **GCP sandbox UI confirmed 2026-04-11:** Same `input[aria-label="Copyable input"]` selector as AWS; three fields: Username, Password, Service Account Credentials (JSON). `project_id` parsed from JSON; `gcloud auth activate-service-account --key-file` is the auth path. All 3 specs are Codex-ready. Remaining unknowns (machine type, zone, SSH user) resolved on first live sandbox run.
 
