@@ -362,3 +362,4 @@ Specs written 2026-04-11:
 | Live smoke test `make provision CLUSTER_PROVIDER=k3s-gcp` | PENDING | After Codex bugfixes |
 - [x] **ESO deploy_eso bugfix** — COMPLETE (`320ae211`). Spec `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md`. `scripts/plugins/eso.sh:12` now uses `${1:-}` so Stage 3 of GCP provision stops crashing under `set -u`; `shellcheck` + `bats scripts/tests/providers/k3s_gcp.bats` pass.
 - [ ] **Stale SA key auto-re-extract** — ASSIGNED → Codex. Spec `docs/bugs/v1.1.0-bugfix-gcp-stale-sa-key-project-probe.md`. `_gcp_load_credentials`: probe `gcloud projects describe` before trusting cached key.
+- [ ] **SSH readiness probe** — ASSIGNED → Codex. Spec `docs/bugs/v1.1.0-bugfix-gcp-ssh-readiness-probe.md`. Insert `nc` probe loop between `_gcp_ssh_config_upsert` and `_ensure_k3sup` in `k3s-gcp.sh`.
