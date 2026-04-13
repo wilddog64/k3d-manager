@@ -209,6 +209,9 @@ HELP
     --k3s-extra-args="--disable=traefik" || return 1
 
   mkdir -p "${HOME}/.kube"
+  kubectl config delete-context k3s-gcp 2>/dev/null || true
+  kubectl config delete-cluster k3s-gcp 2>/dev/null || true
+  kubectl config delete-user k3s-gcp 2>/dev/null || true
   KUBECONFIG="${HOME}/.kube/config:${_GCP_KUBECONFIG}" \
     kubectl config view --flatten > "${HOME}/.kube/config.tmp" && \
     mv "${HOME}/.kube/config.tmp" "${HOME}/.kube/config"
