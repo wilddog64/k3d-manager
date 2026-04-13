@@ -54,14 +54,10 @@ function _gcp_ssh_config_remove() {
 function _gcp_load_credentials() {
   local sandbox_url="${1:-}"
   local _default_key="${HOME}/.local/share/k3d-manager/gcp-service-account.json"
-  if [[ -z "${sandbox_url}" && -f "${_default_key}" ]]; then
-    _info "[k3s-gcp] SA key already on disk — skipping Playwright extraction"
-    local _cached_project
-    _cached_project=$(jq -r '.project_id' "${_default_key}" 2>/dev/null || true)
-    if [[ -z "${_cached_project}" || "${_cached_project}" == "null" ]]; then
-      _err "[k3s-gcp] Cached key at ${_default_key} has no project_id — re-run with GCP_SANDBOX_URL=<url>"
-      return 1
-    fi
+  local _cached_project
+  _cached_project=$(jq -r '.project_id' "${_default_key}" 2>/dev/null || true)
+  if [[ -f "${_default_key}" && -n "${_cached_project}" && "${_cached_project}" != "null" ]]; then
+    _info "[k3s-gcp] SA key valid on disk — skipping Playwright extraction"
     export GCP_PROJECT="${_cached_project}"
     export GOOGLE_APPLICATION_CREDENTIALS="${_default_key}"
     local _active_account
@@ -72,7 +68,7 @@ function _gcp_load_credentials() {
     gcp_get_credentials "${sandbox_url}" || return 1
   fi
   if [[ -z "${GCP_PROJECT:-}" ]]; then
-    _err "[k3s-gcp] GCP_PROJECT is not set — pass GCP_SANDBOX_URL=<url> to extract fresh credentials"
+    _err "[k3s-gcp] GCP_PROJECT is not set after credential load"
     return 1
   fi
   if [[ -z "${GOOGLE_APPLICATION_CREDENTIALS:-}" || ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]]; then
