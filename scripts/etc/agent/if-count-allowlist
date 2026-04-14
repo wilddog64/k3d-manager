@@ -1,3 +1,4 @@
 # Temporary allowlist for functions pending refactors.
 # Format: <path>:<function>
 # See docs/issues entries for each item.
+scripts/lib/providers/k3s-gcp.sh:_provider_k3s_gcp_deploy_cluster

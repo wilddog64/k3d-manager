@@ -57,12 +57,18 @@ function _gcp_load_credentials() {
   local _cached_project
   _cached_project=$(jq -r '.project_id' "${_default_key}" 2>/dev/null || true)
   if [[ -f "${_default_key}" && -n "${_cached_project}" && "${_cached_project}" != "null" ]]; then
-    _info "[k3s-gcp] SA key valid on disk — skipping Playwright extraction"
-    export GCP_PROJECT="${_cached_project}"
-    export GOOGLE_APPLICATION_CREDENTIALS="${_default_key}"
-    local _active_account
-    _active_account=$(gcloud auth list --filter="status:ACTIVE" --format="value(account)" 2>/dev/null || true)
-    [[ -n "${_active_account}" ]] && export GCP_USERNAME="${_active_account}"
+    if gcloud projects describe "${_cached_project}" --quiet >/dev/null 2>&1; then
+      _info "[k3s-gcp] SA key valid on disk — skipping Playwright extraction"
+      export GCP_PROJECT="${_cached_project}"
+      export GOOGLE_APPLICATION_CREDENTIALS="${_default_key}"
+      local _active_account
+      _active_account=$(gcloud auth list --filter="status:ACTIVE" --format="value(account)" 2>/dev/null || true)
+      [[ -n "${_active_account}" ]] && export GCP_USERNAME="${_active_account}"
+    else
+      _info "[k3s-gcp] Cached project ${_cached_project} not accessible — sandbox may have changed; re-extracting credentials..."
+      rm -f "${_default_key}"
+      gcp_get_credentials "${sandbox_url}" || return 1
+    fi
   else
     _info "[k3s-gcp] Extracting GCP sandbox credentials..."
     gcp_get_credentials "${sandbox_url}" || return 1
