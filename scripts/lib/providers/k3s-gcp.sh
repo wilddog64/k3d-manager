@@ -83,6 +83,54 @@ function _gcp_load_credentials() {
   fi
 }
 
+function _provider_k3s_gcp_status() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'HELP'
+Usage: CLUSTER_PROVIDER=k3s-gcp ./scripts/k3d-manager status
+
+Show instance state and Kubernetes status for the k3s-gcp cluster:
+  1. gcloud compute instance describe (if credentials available)
+  2. kubectl --context k3s-gcp get nodes
+  3. kubectl --context k3s-gcp get pods --all-namespaces -o wide
+
+Requires kubeconfig (~/.kube/k3s-gcp.yaml). Run `make up CLUSTER_PROVIDER=k3s-gcp`
+first if the file is missing.
+HELP
+    return 0
+  fi
+
+  local kubeconfig="${_GCP_KUBECONFIG}"
+  if [[ ! -f "${kubeconfig}" ]]; then
+    _err "[k3s-gcp] ${kubeconfig} not found — run: make up CLUSTER_PROVIDER=k3s-gcp"
+    return 1
+  fi
+
+  local project="${GCP_PROJECT:-}"
+  if [[ -z "${project}" ]]; then
+    local _default_key="${HOME}/.local/share/k3d-manager/gcp-service-account.json"
+    if [[ -f "${_default_key}" ]]; then
+      project=$(jq -r '.project_id' "${_default_key}" 2>/dev/null || true)
+      [[ "${project}" == "null" ]] && project=""
+    fi
+  fi
+
+  if [[ -n "${project}" ]] && _command_exist gcloud; then
+    _info "[k3s-gcp] Instance ${_GCP_INSTANCE_NAME} (project ${project}, zone ${_GCP_ZONE})"
+    _run_command --soft -- gcloud compute instances describe "${_GCP_INSTANCE_NAME}" \
+      --project="${project}" \
+      --zone="${_GCP_ZONE}" \
+      --format='table(name,status,networkInterfaces[0].accessConfigs[0].natIP)' || true
+  else
+    _info "[k3s-gcp] Skipping gcloud instance describe (set GCP_PROJECT and ensure gcloud is installed)"
+  fi
+
+  _info "[k3s-gcp] kubectl get nodes (context k3s-gcp)"
+  KUBECONFIG="${kubeconfig}" kubectl get nodes || return 1
+
+  _info "[k3s-gcp] kubectl get pods --all-namespaces -o wide"
+  KUBECONFIG="${kubeconfig}" kubectl get pods --all-namespaces -o wide || return 1
+}
+
 # Pre-flight guard: ensures console user has Compute IAM permissions
 function _gcp_preflight_check_compute() {
   local project="$1"
