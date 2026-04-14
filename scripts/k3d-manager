@@ -106,6 +106,10 @@ function tunnel_status() {
   _try_load_plugin tunnel_status "$@"
 }
 
+function status() {
+  _cluster_provider_call status "$@"
+}
+
 function register_app_cluster() {
   _try_load_plugin register_app_cluster "$@"
 }

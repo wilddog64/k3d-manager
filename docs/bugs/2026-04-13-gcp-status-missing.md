@@ -37,13 +37,21 @@ fallback to `kubectl get pods` exists.
 
 ## Proposed Fix
 
-Implement `_provider_k3s_gcp_status` mirroring the k3s-aws implementation:
+### Change 1 — `scripts/lib/providers/k3s-gcp.sh`
+
+Implement `_provider_k3s_gcp_status` mirroring the k3s-aws UX:
 
 1. Ensure kubeconfig `~/.kube/k3s-gcp.yaml` exists; guide user to `make up` if missing.
 2. Run `gcloud compute instances describe` to show instance state/IP (optional but
    consistent with other providers).
 3. Execute `kubectl --context k3s-gcp get nodes` and `get pods --all-namespaces` to
    provide cluster health and microservice status.
+
+### Change 2 — `scripts/k3d-manager`
+
+Add a top-level `status()` function that calls `_cluster_provider_call status "$@"` so
+`make status` dispatches through the provider modules instead of looking for a plugin
+named `status`.
 
 Update `docs/plans/v1.1.0-gcp-provision-full-stack.md` if status expectations change.
 
@@ -62,4 +70,3 @@ k3s-aws provider and the Makefile UX described in `docs/plans/v1.0.7-makefile-pr
 - `_provider_k3s_gcp_status` implemented
 - `make status CLUSTER_PROVIDER=k3s-gcp` shows node + pod status
 - `shellcheck scripts/lib/providers/k3s-gcp.sh` and relevant BATS suites pass
-
