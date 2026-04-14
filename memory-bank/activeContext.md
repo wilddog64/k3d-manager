@@ -211,7 +211,7 @@
 | Fix `provision: ssm` unconditional prereq + `deploy_vault` bare `$1` | Codex | `docs/bugs/v1.1.0-bugfix-gcp-provision-stack-ssm-vault.md` |
 
 ### Pending
-- **GCP IAM auto-grant** — HYBRID+ STRATEGY (`docs/plans/v1.1.0-gcp-iam-hybrid-plus.md`). Final strategy after exploring CLI and full-automation dead ends. Combines manual login in Chrome with automated consent handling and surgical IAM binding via Playwright CDP latch-on. Secure stdin injection for credentials.
+- **GCP IAM auto-grant** — HYBRID+ STRATEGY (`docs/plans/v1.1.0-gcp-iam-hybrid-plus.md`). Final strategy after exploring CLI and full-automation dead ends. Utilizes Chrome (now system default) with automated consent handling and surgical IAM binding via Playwright CDP latch-on. Secure stdin injection for credentials.
 - Live smoke test: `make provision CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` against running GCP node
 - **ESO deploy_eso bugfix** — COMPLETE (`320ae211`). `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md` — `deploy_eso` now guards `$1` with `${1:-}` so gcp_provision_stack can call it without args under `set -u`; shellcheck + BATS re-run.
 - **Stale SA key bugfix** — ASSIGNED → Codex (`docs/bugs/v1.1.0-bugfix-gcp-stale-sa-key-project-probe.md`). New sandbox = new project ID; cached key causes pre-flight failure. Fix: probe project in `_gcp_load_credentials` before trusting cache.
