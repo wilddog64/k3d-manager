@@ -52,7 +52,7 @@ Specs written 2026-04-11:
 - [x] **ArgoCD rendered unbound EXIT trap bugfix** — **COMPLETE** (`17d16e8c`). Spec `docs/bugs/v1.1.0-bugfix-argocd-rendered-unbound-exit-trap.md`. Replaced RETURN trap with explicit `rm -f "$rendered"` + `trap - EXIT`; dangling EXIT trap no longer fires with unbound local after function returns.
 - [x] **ACG AWS functions wrong plugin** — **COMPLETE (`b5f9754b`)**. Spec `docs/bugs/v1.1.0-bugfix-acg-aws-functions-wrong-plugin.md`. Move 9 AWS-specific functions + 14 constants from `acg.sh` to `aws.sh`; no circular dep since `acg.sh` already sources `aws.sh`.
 - [x] **GCP pre-flight stale project bug** — COMPLETE (`acfb0470`). Issue `docs/bugs/2026-04-13-gcp-preflight-stale-project.md`; `_gcp_load_credentials` now probes cached project via `gcloud projects describe` and re-extracts credentials when sandbox changes.
-- [ ] **GCP provider missing status command** — OPEN. Issue `docs/bugs/2026-04-13-gcp-status-missing.md`; add `_provider_k3s_gcp_status` so `make status CLUSTER_PROVIDER=k3s-gcp` reports node/pod health like other providers.
+- [x] **GCP provider missing status command** — COMPLETE (`00b1b8c7`). Issue `docs/bugs/2026-04-13-gcp-status-missing.md`; `_provider_k3s_gcp_status` now prints instance info via gcloud (if configured) and runs kubectl nodes/pods.
 
 ---
 

@@ -223,4 +223,4 @@
 - **ArgoCD rendered unbound EXIT trap bugfix** — COMPLETE (`17d16e8c`). Spec `docs/bugs/v1.1.0-bugfix-argocd-rendered-unbound-exit-trap.md`. Replaced RETURN trap with explicit `rm -f "$rendered"` + `trap - EXIT`; dangling EXIT trap no longer fires with unbound local after function returns.
 - **ACG AWS functions wrong plugin** — COMPLETE (`b5f9754b`). 9 AWS-specific functions + constants moved from `acg.sh` to `aws.sh`; no circular dep since `acg.sh` already sources `aws.sh`.
 - **GCP pre-flight stale project bug** — COMPLETE (`acfb0470`). `_gcp_load_credentials` probes cached project via `gcloud projects describe`; deletes key + re-extracts when sandbox changes.
-- **GCP provider missing status command** — OPEN (`docs/bugs/2026-04-13-gcp-status-missing.md`). `make status CLUSTER_PROVIDER=k3s-gcp` fails because `_provider_k3s_gcp_status` is not implemented; add parity with AWS status output.
+- **GCP provider missing status command** — COMPLETE (`00b1b8c7`). Added `_provider_k3s_gcp_status` to run gcloud describe + kubectl nodes/pods; Makefile status now works on k3s-gcp.
