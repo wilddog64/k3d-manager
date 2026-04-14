@@ -54,6 +54,7 @@ Specs written 2026-04-11:
 - [x] **GCP pre-flight stale project bug** — COMPLETE (`acfb0470`). Issue `docs/bugs/2026-04-13-gcp-preflight-stale-project.md`; `_gcp_load_credentials` now probes cached project via `gcloud projects describe` and re-extracts credentials when sandbox changes.
 - [x] **GCP provider missing status command** — COMPLETE (`00b1b8c7`, `bf156657`). Issue `docs/bugs/2026-04-13-gcp-status-missing.md`; `_provider_k3s_gcp_status` plus a new top-level `status()` dispatcher print gcloud instance info (if configured) and kubectl nodes/pods.
 - [ ] **PLAN — `_kubectl` consistency sweep** — OPEN. Standardize runtime modules on `_kubectl` by iterating through providers/plugins/system helpers, refactoring bare calls, and adding an `_agent_audit` lint to catch regressions (bin/Makefile/docs remain exempt).
+- [ ] **PLAN — GCP IAM Hybrid+** — UPDATED. doc `docs/plans/v1.1.0-gcp-iam-hybrid-plus.md` now covers CDP attach flow, identity verification selectors, IAM UI automation steps, fallback exit codes, and success criteria.
 
 ---
 
