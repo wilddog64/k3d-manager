@@ -55,6 +55,9 @@ Specs written 2026-04-11:
 - [x] **GCP provider missing status command** — COMPLETE (`00b1b8c7`, `bf156657`). Issue `docs/bugs/2026-04-13-gcp-status-missing.md`; `_provider_k3s_gcp_status` plus a new top-level `status()` dispatcher print gcloud instance info (if configured) and kubectl nodes/pods.
 - [ ] **PLAN — `_kubectl` consistency sweep** — OPEN. Standardize runtime modules on `_kubectl` by iterating through providers/plugins/system helpers, refactoring bare calls, and adding an `_agent_audit` lint to catch regressions (bin/Makefile/docs remain exempt).
 - [ ] **PLAN — GCP IAM Hybrid+** — UPDATED. doc `docs/plans/v1.1.0-gcp-iam-hybrid-plus.md` now covers CDP attach flow, identity verification selectors, IAM UI automation steps, fallback exit codes, and success criteria.
+- [ ] **GCP topology parity gap** — OPEN. Issue `docs/bugs/2026-04-13-gcp-single-node-topology-mismatch.md`; update `k3s-gcp` from single-node to the standard 3-node cluster shape (server + 2 agents).
+- [ ] **Provider Make lifecycle inconsistency** — OPEN. Issue `docs/bugs/2026-04-13-provider-make-target-inconsistency.md`; align `make up` and the post-cluster bootstrap target across AWS/GCP/future Azure.
+- [ ] **Provider SSH alias inconsistency** — OPEN. Issue `docs/bugs/2026-04-13-provider-ssh-alias-inconsistency.md`; standardize SSH aliases across providers and keep IPs refreshed dynamically.
 
 ---
 
