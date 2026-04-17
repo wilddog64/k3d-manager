@@ -64,34 +64,26 @@ async function _extractAwsCredentials(page) {
 }
 
 async function _extractGcpCredentials(page) {
-  await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 15000 });
-  const inputs = await page.locator('input[aria-label="Copyable input"]').all();
-  console.error(`INFO: Found ${inputs.length} copyable inputs.`);
+  // Wait for the GCP credentials panel — 'Username' label signals it is loaded
+  await page.waitForSelector('text=Username', { timeout: 15000 });
 
-  let username, password, serviceAccountJson;
-  for (let i = 0; i < inputs.length; i++) {
-    const val = await inputs[i].inputValue();
-    const parent = await inputs[i].evaluateHandle(el => el.closest('div')?.parentElement ?? null);
-    const text = parent ? await parent.evaluate(el => el.innerText || '') : '';
-
-    if (text.toLowerCase().includes('username')) {
-      username = val;
-    } else if (text.toLowerCase().includes('password')) {
-      password = val;
-    } else if (text.toLowerCase().includes('service account')) {
-      serviceAccountJson = val;
-    }
+  // Diagnostic: log all visible inputs and textareas to aid selector development
+  const allInputs = await page.locator('input, textarea').all();
+  console.error(`INFO: Found ${allInputs.length} input/textarea elements on page`);
+  for (let i = 0; i < allInputs.length; i++) {
+    const tag = await allInputs[i].evaluate(el => el.tagName.toLowerCase());
+    const ariaLabel = await allInputs[i].getAttribute('aria-label');
+    const val = await allInputs[i].inputValue().catch(() => '');
+    const visible = await allInputs[i].isVisible();
+    console.error(`INFO: [${i}] <${tag}> aria-label="${ariaLabel}" visible=${visible} value="${val.slice(0, 40)}"`);
   }
 
-  if (!username && inputs.length >= 1) {
-    username = await inputs[0].inputValue();
-  }
-  if (!password && inputs.length >= 2) {
-    password = await inputs[1].inputValue();
-  }
-  if (!serviceAccountJson && inputs.length >= 3) {
-    serviceAccountJson = await inputs[2].inputValue();
-  }
+  // Extract by label — Playwright resolves the associated input/textarea for each label
+  const username = await page.getByLabel('Username').inputValue().catch(() => '');
+  const password = await page.getByLabel('Password').inputValue().catch(() => '');
+  const serviceAccountJson = await page.getByLabel('Service Account Credentials').inputValue().catch(() => '');
+
+  console.error(`INFO: username="${username.slice(0, 30)}" password="${password ? '[set]' : '[empty]'}" sa_json_len=${serviceAccountJson.length}`);
 
   if (!serviceAccountJson) {
     throw new Error('Could not find Service Account Credentials field');
@@ -114,8 +106,8 @@ async function _extractGcpCredentials(page) {
   console.error(`INFO: Service account key written to ${keyPath}`);
 
   console.log(`GCP_PROJECT=${projectId}`);
-  console.log(`GCP_USERNAME=${(username || '').trim()}`);
-  console.log(`GCP_PASSWORD=${(password || '').trim()}`);
+  console.log(`GCP_USERNAME=${username.trim()}`);
+  console.log(`GCP_PASSWORD=${password.trim()}`);
   console.log(`GOOGLE_APPLICATION_CREDENTIALS=${keyPath}`);
 }
 
