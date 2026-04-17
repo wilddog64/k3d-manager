@@ -33,6 +33,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Scope sandbox button clicks to provider card | COMPLETE (`0bab1ba4`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-provider-card-scope.md`; `acg_credentials.js` now scopes Start/Open/Resume buttons to the active provider card before clicking |
 | Check Open Sandbox before Start Sandbox | COMPLETE (`c463a942`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-button-priority.md`; `acg_credentials.js` now prefers `Open Sandbox` before `Start Sandbox` to avoid disabled AWS button clicks when GCP is active |
 | Use `data-heap-id` for sandbox button selection | COMPLETE (`132421ad`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-heap-id-selector.md`; `acg_credentials.js` now selects Start/Open/Resume buttons by provider-specific `data-heap-id` instead of brittle card text matching |
+| GCP credential extraction (`_extractGcpCredentials`) | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-credential-extraction.md`; replace broken `aria-label="Copyable input"` wait with `text=Username` wait + `getByLabel` extraction + diagnostic dump |
 
 ### Pending
 - **GCP IAM auto-grant** — SUPERSEDED. `cloud_user` already has sufficient compute permissions; no IAM grant step needed. `gcp_grant_compute_admin` and all Playwright IAM automation dropped from v1.1.0 scope. Plan archived in `docs/plans/v1.1.0-gcp-iam-hybrid-plus.md` with SUPERSEDED notice.
