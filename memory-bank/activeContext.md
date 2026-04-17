@@ -34,6 +34,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Check Open Sandbox before Start Sandbox | COMPLETE (`c463a942`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-button-priority.md`; `acg_credentials.js` now prefers `Open Sandbox` before `Start Sandbox` to avoid disabled AWS button clicks when GCP is active |
 | Use `data-heap-id` for sandbox button selection | COMPLETE (`132421ad`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-heap-id-selector.md`; `acg_credentials.js` now selects Start/Open/Resume buttons by provider-specific `data-heap-id` instead of brittle card text matching |
 | Extract GCP credentials via `getByLabel` | COMPLETE (`6bb2bbcf`) | `docs/bugs/v1.1.0-bugfix-gcp-credential-extraction.md`; `_extractGcpCredentials` now waits on `text=Username` and reads Username/Password/Service Account fields via `page.getByLabel(...)` |
+| Extract GCP credentials by position | COMPLETE (`8e34610e`) | `docs/bugs/v1.1.0-bugfix-gcp-credential-extraction-v2.md`; `_extractGcpCredentials` now reads `input[aria-label="Copyable input"]` by position because GCP panel labels are not HTML-associated |
 | GCP credential extraction v2 — positional | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-credential-extraction-v2.md`; `getByLabel` returns empty — GCP fields use `aria-label="Copyable input"`; fix: positional extraction on `Copyable input` inputs[0/1/2] |
 
 ### Pending
