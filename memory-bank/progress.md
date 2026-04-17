@@ -25,7 +25,7 @@ History through `v0.9.18` is archived in `memory-bank/archive/progress-pre-v0.9.
 | Remove dead `gcp_grant_compute_admin` + test | COMPLETE (`840ae84c`) | `docs/bugs/v1.1.0-bugfix-remove-gcp-grant-compute-admin.md` |
 | `gcp_login` Playwright automation | COMPLETE (`70c80354`) | `docs/bugs/v1.1.0-bugfix-gcp-login-playwright.md` |
 | Separate `register_shopping_cart_apps` into `make sync-apps` | COMPLETE (`a1f9fc25`) | `docs/bugs/v1.1.0-bugfix-gcp-sync-apps-separation.md` |
-| `make sync-apps` k3s-gcp missing KUBECONFIG | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-sync-apps-kubeconfig.md` |
+| `make sync-apps` k3s-gcp missing KUBECONFIG | COMPLETE (`fbbcf742`) | `docs/bugs/v1.1.0-bugfix-sync-apps-kubeconfig.md` |
 | `gcp_login` FIFO deadlock | COMPLETE (`9d8fca41`) | `docs/bugs/v1.1.0-bugfix-gcp-login-fifo-deadlock.md` |
 | Live smoke test `make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` | PENDING | After dead code removal |
 - [x] **ESO deploy_eso bugfix** — COMPLETE (`320ae211`). Spec `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md`. `scripts/plugins/eso.sh:12` now uses `${1:-}` so Stage 3 of GCP provision stops crashing under `set -u`; `shellcheck` + `bats scripts/tests/providers/k3s_gcp.bats` pass.
@@ -40,4 +40,5 @@ History through `v0.9.18` is archived in `memory-bank/archive/progress-pre-v0.9.
 - [x] **Fix `gcp_login` FIFO deadlock** — COMPLETE (`9d8fca41`). Spec `docs/bugs/v1.1.0-bugfix-gcp-login-fifo-deadlock.md`. `gcp_login` now opens the FIFO write end before starting gcloud, kills `_fifo_writer_pid` in every cleanup path, and logs raw gcloud output when auth URL extraction fails.
 - [ ] **GCP Playwright login auth URL extraction bug** — OPEN. Issue `docs/issues/2026-04-17-gcp-login-auth-url-extraction-failure.md`; the current grep in `gcp_login` only matches `https://accounts.google.com...`, so no auth URL is extracted from `gcloud auth login --no-launch-browser` output and Playwright never starts.
 - [x] **Separate GCP app registration into `make sync-apps`** — COMPLETE (`a1f9fc25`). Spec `docs/bugs/v1.1.0-bugfix-gcp-sync-apps-separation.md`. `gcp_provision_stack` now stops after ArgoCD bootstrap, and `make sync-apps CLUSTER_PROVIDER=k3s-gcp` calls `register_shopping_cart_apps` instead of a no-op.
+- [x] **Fix `sync-apps` k3s-gcp KUBECONFIG** — COMPLETE (`fbbcf742`). Spec `docs/bugs/v1.1.0-bugfix-sync-apps-kubeconfig.md`. `Makefile` now logs the GCP sync action and exports `KUBECONFIG=$HOME/.kube/k3s-gcp.yaml` before calling `register_shopping_cart_apps`.
 - [x] **deploy_argocd not loaded + invalid flag** — COMPLETE (`17d16e8c`). Spec `docs/bugs/v1.1.0-bugfix-gcp-deploy-argocd-not-loaded.md`. `gcp_provision_stack` now sources `argocd.sh` before calling `deploy_argocd`, removes the invalid `--skip-ldap` flag, and clears the EXIT trap so the rendered manifest is deleted immediately; shellcheck + bats pass.

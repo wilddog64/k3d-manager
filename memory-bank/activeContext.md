@@ -29,6 +29,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Automate `gcp_login` via Playwright | COMPLETE (`70c80354`) | `docs/bugs/v1.1.0-bugfix-gcp-login-playwright.md`; `gcp_login` now runs `gcloud auth login --no-launch-browser` and delegates OAuth consent to `scripts/playwright/gcp_login.js` |
 | Fix `gcp_login` FIFO deadlock | COMPLETE (`9d8fca41`) | `docs/bugs/v1.1.0-bugfix-gcp-login-fifo-deadlock.md`; opens FIFO write end before spawning gcloud and logs raw gcloud output on URL extraction failure |
 | Separate GCP app registration into `make sync-apps` | COMPLETE (`a1f9fc25`) | `docs/bugs/v1.1.0-bugfix-gcp-sync-apps-separation.md`; `gcp_provision_stack` no longer registers apps and `Makefile` `sync-apps` now delegates to `register_shopping_cart_apps` |
+| Fix `sync-apps` k3s-gcp KUBECONFIG | COMPLETE (`fbbcf742`) | `docs/bugs/v1.1.0-bugfix-sync-apps-kubeconfig.md`; `Makefile` now exports `KUBECONFIG=$HOME/.kube/k3s-gcp.yaml` when `sync-apps` targets GCP |
 | `make sync-apps` k3s-gcp missing KUBECONFIG | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-sync-apps-kubeconfig.md` |
 | `gcp_login` FIFO deadlock | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-login-fifo-deadlock.md` |
 
