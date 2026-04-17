@@ -19,7 +19,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | `gcp_provision_stack` spec | `2745e57b` | `docs/plans/v1.1.0-gcp-provision-full-stack.md` |
 | `gcp_provision_stack` implementation | `1430b47e` | Codex; Makefile case dispatch + full 7-step stack |
 | Bug spec: ssm prereq + vault unbound $1 | `04943cdd` | COMPLETE — both fixes already in code (Makefile + vault.sh) |
-| Makefile GCP up-target spec | `ae747192` | COMPLETE — `Makefile` now runs `deploy_cluster && gcp_provision_stack` from `make up CLUSTER_PROVIDER=k3s-gcp`; `sync-apps` is a GCP no-op; `provision` is AWS-only again |
+| Makefile GCP up-target spec | `ae747192`, `a1f9fc25` | COMPLETE — `Makefile` now runs `deploy_cluster && gcp_provision_stack` from `make up CLUSTER_PROVIDER=k3s-gcp`; `make sync-apps CLUSTER_PROVIDER=k3s-gcp` now calls `register_shopping_cart_apps` for AWS parity |
 
 ### In Progress
 
@@ -27,6 +27,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 |---|---|---|
 | Remove dead `gcp_grant_compute_admin` | COMPLETE (`840ae84c`) | `docs/bugs/v1.1.0-bugfix-remove-gcp-grant-compute-admin.md` |
 | Automate `gcp_login` via Playwright | COMPLETE (`70c80354`) | `docs/bugs/v1.1.0-bugfix-gcp-login-playwright.md`; `gcp_login` now runs `gcloud auth login --no-launch-browser` and delegates OAuth consent to `scripts/playwright/gcp_login.js` |
+| Separate GCP app registration into `make sync-apps` | COMPLETE (`a1f9fc25`) | `docs/bugs/v1.1.0-bugfix-gcp-sync-apps-separation.md`; `gcp_provision_stack` no longer registers apps and `Makefile` `sync-apps` now delegates to `register_shopping_cart_apps` |
 | Separate `register_shopping_cart_apps` into `make sync-apps` | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-sync-apps-separation.md` |
 
 ### Pending
