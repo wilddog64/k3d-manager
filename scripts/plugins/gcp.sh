@@ -137,12 +137,77 @@ function gcp_login() {
     return 0
   fi
 
-  # Account not in store — need interactive login (browser will open once; token is cached)
-  _info "[gcp] Authenticating as ${expected_user} (browser will open)..."
-  if ! gcloud auth login --account "${expected_user}"; then
-    _err "[gcp] Failed to authenticate as ${expected_user}"
+  # Account not in store — automate OAuth via Playwright
+  _info "[gcp] Authenticating as ${expected_user} via Playwright (automated)..."
+
+  if [[ -z "${GCP_PASSWORD:-}" ]]; then
+    _err "[gcp] gcp_login: GCP_PASSWORD not set — cannot automate OAuth"
     return 1
   fi
+
+  local _pw_script="${SCRIPT_DIR}/playwright/gcp_login.js"
+  if [[ ! -f "${_pw_script}" ]]; then
+    _err "[gcp] gcp_login: Playwright script not found: ${_pw_script}"
+    return 1
+  fi
+
+  local _auth_log _auth_fifo
+  _auth_log=$(mktemp)
+  _auth_fifo=$(mktemp -u)
+  mkfifo "${_auth_fifo}"
+
+  # Run gcloud without browser; it prints an auth URL then waits on stdin for the code
+  gcloud auth login --no-launch-browser --account "${expected_user}" \
+    >"${_auth_log}" 2>&1 <"${_auth_fifo}" &
+  local _gcloud_pid=$!
+
+  # Poll for the auth URL in gcloud's output (up to 30s)
+  local _auth_url="" _attempts=0
+  while [[ "${_attempts}" -lt 30 ]]; do
+    _auth_url=$(grep -oE 'https://accounts\.google\.com[^ ]+' "${_auth_log}" 2>/dev/null | head -1 || true)
+    [[ -n "${_auth_url}" ]] && break
+    sleep 1
+    (( _attempts++ )) || true
+  done
+
+  if [[ -z "${_auth_url}" ]]; then
+    _err "[gcp] gcp_login: could not extract auth URL from gcloud output"
+    kill "${_gcloud_pid}" 2>/dev/null || true
+    rm -f "${_auth_log}" "${_auth_fifo}"
+    return 1
+  fi
+
+  # Playwright automates the consent flow; receives URL+credentials via stdin JSON,
+  # returns the one-time auth code on stdout
+  local _auth_code
+  _auth_code=$(printf '{"url":"%s","username":"%s","password":"%s"}' \
+    "${_auth_url}" "${expected_user}" "${GCP_PASSWORD}" \
+    | node "${_pw_script}") || {
+    _err "[gcp] gcp_login: Playwright auth failed"
+    kill "${_gcloud_pid}" 2>/dev/null || true
+    rm -f "${_auth_log}" "${_auth_fifo}"
+    return 1
+  }
+
+  if [[ -z "${_auth_code}" ]]; then
+    _err "[gcp] gcp_login: Playwright returned empty auth code"
+    kill "${_gcloud_pid}" 2>/dev/null || true
+    rm -f "${_auth_log}" "${_auth_fifo}"
+    return 1
+  fi
+
+  # Feed the auth code to gcloud's stdin
+  printf '%s\n' "${_auth_code}" >"${_auth_fifo}"
+  wait "${_gcloud_pid}"
+  local _exit=$?
+  rm -f "${_auth_log}" "${_auth_fifo}"
+
+  if [[ "${_exit}" -ne 0 ]]; then
+    _err "[gcp] gcp_login: gcloud auth login failed (exit ${_exit})"
+    return 1
+  fi
+
+  _info "[gcp] Authenticated as ${expected_user}"
 }
 
 function gcp_provision_stack() {
