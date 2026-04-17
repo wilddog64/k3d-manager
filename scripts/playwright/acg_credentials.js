@@ -318,24 +318,17 @@ async function extractCredentials() {
         );
       };
 
-      // Scope button lookups to the provider's sandbox card — when multiple providers
-      // are visible (e.g. GCP running + AWS available), .first() would hit the wrong one.
+      // Use data-heap-id to select the correct provider's button — prevents clicking
+      // the wrong provider's button when multiple sandboxes are visible on the page.
       const _providerLabel = _provider === 'gcp' ? 'GCP' : 'AWS';
-      const _cardLocator = page.locator('div').filter({ hasText: new RegExp(`${_providerLabel}\\s+Sandbox`, 'i') });
-      const _cardCount = await _cardLocator.count();
-      const _scope = _cardCount > 0 ? _cardLocator.last() : page;
-      if (_cardCount > 0) {
-        console.error(`INFO: Scoping sandbox buttons to ${_providerLabel} Sandbox card`);
-      } else {
-        console.error(`WARN: ${_providerLabel} Sandbox card not found — falling back to full page scope`);
-      }
+      console.error(`INFO: Selecting ${_providerLabel} Sandbox buttons via data-heap-id`);
 
       // Pattern 1: Direct "Start Sandbox" button (in a modal or panel)
-      const startButton = _scope.locator('button:has-text("Start Sandbox")').first();
+      const startButton = page.locator(`button[data-heap-id*="${_providerLabel} Sandbox - Start Sandbox"]`).first();
       // Pattern 2: "Open Sandbox" button (on the card)
-      const openButton = _scope.locator('button:has-text("Open Sandbox")').first();
+      const openButton = page.locator(`button[data-heap-id*="${_providerLabel} Sandbox - Open Sandbox"]`).first();
       // Pattern 3: "Resume Sandbox"
-      const resumeButton = _scope.locator('button:has-text("Resume"), button:has-text("Resume Sandbox")').first();
+      const resumeButton = page.locator(`button[data-heap-id*="${_providerLabel} Sandbox - Resume"]`).first();
 
       if (await openButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         console.error('INFO: Clicking Open Sandbox...');
@@ -343,7 +336,7 @@ async function extractCredentials() {
         await page.waitForTimeout(3000);
 
         // After Open, there might be a Start Sandbox button in the slide-over
-        const startButton2 = _scope.locator('button:has-text("Start Sandbox")').first();
+        const startButton2 = page.locator(`button[data-heap-id*="${_providerLabel} Sandbox - Start Sandbox"]`).first();
         if (await startButton2.isVisible({ timeout: 5000 }).catch(() => false)) {
           console.error('INFO: Clicking Start Sandbox (Step 2)...');
           await startButton2.click();
