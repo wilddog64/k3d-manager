@@ -77,6 +77,8 @@ If you find a bug outside your scope, report it in the memory-bank — do not fi
 ### 9. Update memory-bank on completion
 When your task is done, update `memory-bank/activeContext.md` and `memory-bank/progress.md`
 to reflect what you completed. Include the real commit SHA and PR URL.
+Keep active memory-bank files lean: when milestone detail stops guiding current work,
+move it to `memory-bank/archive/*.md` instead of leaving long historical blocks in the active files.
 
 ### 12. Document findings and create issue docs
 After every task — implementation or verification — you must:
