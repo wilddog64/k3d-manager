@@ -14,6 +14,10 @@ up:
 	@case "$(CLUSTER_PROVIDER)" in \
 	  k3s-aws) echo "[make] CLUSTER_PROVIDER=k3s-aws — running bin/acg-up..."; \
 	           GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)" ;; \
+	  k3s-gcp) echo "[make] CLUSTER_PROVIDER=k3s-gcp — running deploy_cluster..."; \
+	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" _GCP_SANDBOX_URL="$(URL)" scripts/k3d-manager deploy_cluster --confirm && \
+	           echo "[make] CLUSTER_PROVIDER=k3s-gcp — running gcp_provision_stack..." && \
+	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" GHCR_PAT="$(GHCR_PAT)" scripts/k3d-manager gcp_provision_stack ;; \
 	  *)       echo "[make] CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) — running deploy_cluster..."; \
 	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" _GCP_SANDBOX_URL="$(URL)" scripts/k3d-manager deploy_cluster --confirm ;; \
 	esac
@@ -88,7 +92,10 @@ argocd-registration:
 
 ## Sync ArgoCD data-layer and show remote pod status
 sync-apps:
-	bin/acg-sync-apps
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-gcp) echo "[make] CLUSTER_PROVIDER=k3s-gcp — sync-apps is a no-op (stack deployed by make up)" ;; \
+	  *)       bin/acg-sync-apps ;; \
+	esac
 
 ## Ensure AWS Session Manager plugin is installed (required for SSM-based deployment)
 ssm:
@@ -106,12 +113,6 @@ ssm:
 ## Provision full plugin stack (Vault + ESO + ArgoCD + apps)
 provision:
 	@case "$(CLUSTER_PROVIDER)" in \
-	  k3s-gcp) echo "[make] CLUSTER_PROVIDER=k3s-gcp — ensuring cluster is up..."; \
-	           $(MAKE) --no-print-directory up CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" URL="$(URL)"; \
-	           echo "[make] CLUSTER_PROVIDER=k3s-gcp — running gcp_provision_stack..."; \
-	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" \
-	           GHCR_PAT="$(GHCR_PAT)" \
-	           scripts/k3d-manager gcp_provision_stack ;; \
 	  *)       $(MAKE) --no-print-directory ssm; \
 	           echo "[make] CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) — running acg_provision..."; \
 	           K3S_AWS_SSM_ENABLED=true scripts/k3d-manager acg_provision --confirm ;; \
@@ -123,7 +124,7 @@ help:
 	@echo "  k3d-manager — ACG cluster lifecycle"
 	@echo ""
 	@echo "  Targets:"
-	@echo "    make up        Provision full stack (credentials → cluster → ESO → ArgoCD)"
+	@echo "    make up        Provision cluster (AWS) or cluster + stack (GCP)"
 	@echo "    make down      Tear down cluster and stop all background processes"
 	@echo "    make refresh   Refresh AWS credentials and restart tunnel"
 	@echo "    make status    Show cluster nodes, pod status, tunnel health"
@@ -133,8 +134,7 @@ help:
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
-	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
-	@echo "    make provision CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>   Deploy full stack on GCP"
+	@echo "    make provision             Provision ACG stack via SSM (AWS only)"
 	@echo ""
 	@echo "  Override sandbox URL (falls back to default if omitted):"
 	@echo "    make up URL=https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/..."
@@ -142,6 +142,10 @@ help:
 	@echo "  Override cloud provider (default: k3s-aws):"
 	@echo "    make up CLUSTER_PROVIDER=k3s-gcp"
 	@echo "    make up CLUSTER_PROVIDER=k3d"
+	@echo ""
+	@echo "  GCP workflow (same commands as AWS):"
+	@echo "    make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>          Provision cluster + full stack"
+	@echo "    make sync-apps CLUSTER_PROVIDER=k3s-gcp                   No-op (stack deployed by make up)"
 	@echo ""
 	@echo "  Current CLUSTER_PROVIDER: $(CLUSTER_PROVIDER)"
 	@echo ""
