@@ -18,13 +18,14 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | `gcp_login` + `gcp_grant_compute_admin` | `153fc922` | Three-tier gcloud auth; IAM grant helper |
 | `gcp_provision_stack` spec | `2745e57b` | `docs/plans/v1.1.0-gcp-provision-full-stack.md` |
 | `gcp_provision_stack` implementation | `1430b47e` | Codex; Makefile case dispatch + full 7-step stack |
-| Bug spec: ssm prereq + vault unbound $1 | `04943cdd` | `docs/bugs/v1.1.0-bugfix-gcp-provision-stack-ssm-vault.md` |
+| Bug spec: ssm prereq + vault unbound $1 | `04943cdd` | COMPLETE — both fixes already in code (Makefile + vault.sh) |
+| Makefile GCP up-target spec | pending | `docs/bugs/v1.1.0-bugfix-makefile-gcp-up-target.md` — ASSIGNED → Codex |
 
 ### In Progress
 
 | Item | Assignee | Spec |
 |---|---|---|
-| Fix `provision: ssm` unconditional prereq + `deploy_vault` bare `$1` | Codex | `docs/bugs/v1.1.0-bugfix-gcp-provision-stack-ssm-vault.md` |
+| Makefile `make up` GCP inconsistency | Codex | `docs/bugs/v1.1.0-bugfix-makefile-gcp-up-target.md` |
 
 ### Pending
 - **GCP IAM auto-grant** — HYBRID+ STRATEGY (`docs/plans/v1.1.0-gcp-iam-hybrid-plus.md`). Final strategy after exploring CLI and full-automation dead ends. Utilizes Chrome (now system default) with automated consent handling and surgical IAM binding via Playwright CDP latch-on. Secure stdin injection for credentials.
