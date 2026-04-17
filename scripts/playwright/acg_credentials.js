@@ -321,7 +321,7 @@ async function extractCredentials() {
       // Scope button lookups to the provider's sandbox card — when multiple providers
       // are visible (e.g. GCP running + AWS available), .first() would hit the wrong one.
       const _providerLabel = _provider === 'gcp' ? 'GCP' : 'AWS';
-      const _cardLocator = page.locator('div').filter({ hasText: new RegExp(`${_providerLabel}\s+Sandbox`, 'i') });
+      const _cardLocator = page.locator('div').filter({ hasText: new RegExp(`${_providerLabel}\\s+Sandbox`, 'i') });
       const _cardCount = await _cardLocator.count();
       const _scope = _cardCount > 0 ? _cardLocator.last() : page;
       if (_cardCount > 0) {
