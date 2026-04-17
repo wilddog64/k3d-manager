@@ -32,6 +32,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Fix `sync-apps` k3s-gcp KUBECONFIG | COMPLETE (`fbbcf742`) | `docs/bugs/v1.1.0-bugfix-sync-apps-kubeconfig.md`; `Makefile` now exports `KUBECONFIG=$HOME/.kube/k3s-gcp.yaml` when `sync-apps` targets GCP |
 | Scope sandbox button clicks to provider card | COMPLETE (`0bab1ba4`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-provider-card-scope.md`; `acg_credentials.js` now scopes Start/Open/Resume buttons to the active provider card before clicking |
 | Check Open Sandbox before Start Sandbox | COMPLETE (`c463a942`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-button-priority.md`; `acg_credentials.js` now prefers `Open Sandbox` before `Start Sandbox` to avoid disabled AWS button clicks when GCP is active |
+| Use `data-heap-id` for sandbox button selection | COMPLETE (`132421ad`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-heap-id-selector.md`; `acg_credentials.js` now selects Start/Open/Resume buttons by provider-specific `data-heap-id` instead of brittle card text matching |
 | `acg_credentials.js` data-heap-id selector | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-acg-credentials-heap-id-selector.md`; card-scope approach failed (GCP card text never matched); replace with `data-heap-id` attribute selectors |
 
 ### Pending
