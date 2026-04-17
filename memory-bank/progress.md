@@ -23,7 +23,8 @@ History through `v0.9.18` is archived in `memory-bank/archive/progress-pre-v0.9.
 | Bug: `deploy_vault` bare `$1` unbound var | COMPLETE | Already in code; `vault.sh:901` uses `${1:-}` |
 | Bug: Makefile `make up` GCP inconsistency | COMPLETE | SHA `ae747192` — `make up CLUSTER_PROVIDER=k3s-gcp` now runs cluster + stack; `sync-apps` is a GCP no-op; `provision` is AWS-only |
 | Remove dead `gcp_grant_compute_admin` + test | COMPLETE (`840ae84c`) | `docs/bugs/v1.1.0-bugfix-remove-gcp-grant-compute-admin.md` |
-| `gcp_login` Playwright automation | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-login-playwright.md` |
+| `gcp_login` Playwright automation | COMPLETE (`70c80354`) | `docs/bugs/v1.1.0-bugfix-gcp-login-playwright.md` |
+| Separate `register_shopping_cart_apps` into `make sync-apps` | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-sync-apps-separation.md` |
 | Live smoke test `make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` | PENDING | After dead code removal |
 - [x] **ESO deploy_eso bugfix** — COMPLETE (`320ae211`). Spec `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md`. `scripts/plugins/eso.sh:12` now uses `${1:-}` so Stage 3 of GCP provision stops crashing under `set -u`; `shellcheck` + `bats scripts/tests/providers/k3s_gcp.bats` pass.
 - [x] **Stale SA key auto-re-extract** — COMPLETE (`acfb0470`). Spec `docs/bugs/v1.1.0-bugfix-gcp-stale-sa-key-project-probe.md`. `_gcp_load_credentials` probes cached project via `gcloud projects describe`; deletes key + re-extracts on new sandbox.
