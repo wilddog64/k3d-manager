@@ -65,10 +65,11 @@ async function run() {
       if (useAnotherVisible) {
         console.error('INFO: Clicking "Use another account"');
         await useAnother.click();
+        await page.waitForLoadState('domcontentloaded');
       }
       // Fill email
       const emailInput = page.locator('input[type="email"]').first();
-      await emailInput.waitFor({ timeout: 10000 });
+      await emailInput.waitFor({ timeout: 15000 });
       await emailInput.fill(username);
       console.error(`INFO: Filled email ${username}`);
       const nextBtn = page.locator('button:has-text("Next")').first();
