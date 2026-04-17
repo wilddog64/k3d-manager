@@ -25,7 +25,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 
 | Item | Assignee | Spec |
 |---|---|---|
-| _(none — smoke test is next)_ | — | — |
+| Remove dead `gcp_grant_compute_admin` | Codex | `docs/bugs/v1.1.0-bugfix-remove-gcp-grant-compute-admin.md` |
 
 ### Pending
 - **GCP IAM auto-grant** — SUPERSEDED. `cloud_user` already has sufficient compute permissions; no IAM grant step needed. `gcp_grant_compute_admin` and all Playwright IAM automation dropped from v1.1.0 scope. Plan archived in `docs/plans/v1.1.0-gcp-iam-hybrid-plus.md` with SUPERSEDED notice.
