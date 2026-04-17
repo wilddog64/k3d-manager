@@ -29,7 +29,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 
 ### Pending
 - **GCP IAM auto-grant** — HYBRID+ STRATEGY (`docs/plans/v1.1.0-gcp-iam-hybrid-plus.md`). Final strategy after exploring CLI and full-automation dead ends. Utilizes Chrome (now system default) with automated consent handling and surgical IAM binding via Playwright CDP latch-on. Secure stdin injection for credentials.
-- Live smoke test: `make provision CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` against running GCP node
+- Live smoke test: `make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` against running GCP node
 - **ESO deploy_eso bugfix** — COMPLETE (`320ae211`). `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md` — `deploy_eso` now guards `$1` with `${1:-}` so gcp_provision_stack can call it without args under `set -u`; shellcheck + BATS re-run.
 - **Stale SA key bugfix** — ASSIGNED → Codex (`docs/bugs/v1.1.0-bugfix-gcp-stale-sa-key-project-probe.md`). New sandbox = new project ID; cached key causes pre-flight failure. Fix: probe project in `_gcp_load_credentials` before trusting cache.
 - **SSH readiness probe bugfix** — COMPLETE (`de83535d`). `docs/bugs/v1.1.0-bugfix-gcp-ssh-readiness-probe.md`; `_provider_k3s_gcp_deploy_cluster` now polls `nc -z ${ip} 22` (10s backoff, 30 retries) after `_gcp_ssh_config_upsert` so `k3sup install` waits for SSH to come up.
