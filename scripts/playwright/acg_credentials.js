@@ -337,11 +337,7 @@ async function extractCredentials() {
       // Pattern 3: "Resume Sandbox"
       const resumeButton = _scope.locator('button:has-text("Resume"), button:has-text("Resume Sandbox")').first();
 
-      if (await startButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-        console.error('INFO: Clicking Start Sandbox...');
-        await startButton.click();
-        await _waitForCredentials();
-      } else if (await openButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      if (await openButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         console.error('INFO: Clicking Open Sandbox...');
         await openButton.click();
         await page.waitForTimeout(3000);
@@ -352,6 +348,10 @@ async function extractCredentials() {
           console.error('INFO: Clicking Start Sandbox (Step 2)...');
           await startButton2.click();
         }
+        await _waitForCredentials();
+      } else if (await startButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.error('INFO: Clicking Start Sandbox...');
+        await startButton.click();
         await _waitForCredentials();
       } else if (await resumeButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         console.error('INFO: Clicking Resume Sandbox...');
