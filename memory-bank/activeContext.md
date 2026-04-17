@@ -31,7 +31,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Separate GCP app registration into `make sync-apps` | COMPLETE (`a1f9fc25`) | `docs/bugs/v1.1.0-bugfix-gcp-sync-apps-separation.md`; `gcp_provision_stack` no longer registers apps and `Makefile` `sync-apps` now delegates to `register_shopping_cart_apps` |
 | Fix `sync-apps` k3s-gcp KUBECONFIG | COMPLETE (`fbbcf742`) | `docs/bugs/v1.1.0-bugfix-sync-apps-kubeconfig.md`; `Makefile` now exports `KUBECONFIG=$HOME/.kube/k3s-gcp.yaml` when `sync-apps` targets GCP |
 | Scope sandbox button clicks to provider card | COMPLETE (`0bab1ba4`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-provider-card-scope.md`; `acg_credentials.js` now scopes Start/Open/Resume buttons to the active provider card before clicking |
-| `acg_credentials.js` provider card scope | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-acg-credentials-provider-card-scope.md` |
+| `acg_credentials.js` button priority (Open before Start) | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-acg-credentials-button-priority.md` |
 
 ### Pending
 - **GCP IAM auto-grant** — SUPERSEDED. `cloud_user` already has sufficient compute permissions; no IAM grant step needed. `gcp_grant_compute_admin` and all Playwright IAM automation dropped from v1.1.0 scope. Plan archived in `docs/plans/v1.1.0-gcp-iam-hybrid-plus.md` with SUPERSEDED notice.
