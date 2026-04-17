@@ -78,10 +78,14 @@ async function _extractGcpCredentials(page) {
     console.error(`INFO: [${i}] <${tag}> aria-label="${ariaLabel}" visible=${visible} value="${val.slice(0, 40)}"`);
   }
 
-  // Extract by label — Playwright resolves the associated input/textarea for each label
-  const username = await page.getByLabel('Username').inputValue().catch(() => '');
-  const password = await page.getByLabel('Password').inputValue().catch(() => '');
-  const serviceAccountJson = await page.getByLabel('Service Account Credentials').inputValue().catch(() => '');
+  // GCP fields use aria-label="Copyable input" (same as AWS) — getByLabel() finds nothing
+  // because the visible labels are not HTML-associated. Use positional extraction.
+  const inputs = await page.locator('input[aria-label="Copyable input"]').all();
+  console.error(`INFO: Found ${inputs.length} copyable inputs`);
+
+  const username = inputs.length >= 1 ? await inputs[0].inputValue().catch(() => '') : '';
+  const password = inputs.length >= 2 ? await inputs[1].inputValue().catch(() => '') : '';
+  const serviceAccountJson = inputs.length >= 3 ? await inputs[2].inputValue().catch(() => '') : '';
 
   console.error(`INFO: username="${username.slice(0, 30)}" password="${password ? '[set]' : '[empty]'}" sa_json_len=${serviceAccountJson.length}`);
 
