@@ -26,6 +26,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Item | Assignee | Spec |
 |---|---|---|
 | Remove dead `gcp_grant_compute_admin` | COMPLETE (`840ae84c`) | `docs/bugs/v1.1.0-bugfix-remove-gcp-grant-compute-admin.md` |
+| Automate `gcp_login` via Playwright | COMPLETE (`70c80354`) | `docs/bugs/v1.1.0-bugfix-gcp-login-playwright.md`; `gcp_login` now runs `gcloud auth login --no-launch-browser` and delegates OAuth consent to `scripts/playwright/gcp_login.js` |
 | `gcp_login` Playwright automation | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-login-playwright.md` |
 
 ### Pending
