@@ -151,10 +151,14 @@ function gcp_login() {
     return 1
   fi
 
-  local _auth_log _auth_fifo
+  local _auth_log _auth_fifo _fifo_writer_pid
   _auth_log=$(mktemp)
   _auth_fifo=$(mktemp -u)
   mkfifo "${_auth_fifo}"
+
+  # Open write end first so gcloud's open(FIFO, O_RDONLY) does not block
+  { sleep 300; } >"${_auth_fifo}" &
+  _fifo_writer_pid=$!
 
   # Run gcloud without browser; it prints an auth URL then waits on stdin for the code
   gcloud auth login --no-launch-browser --account "${expected_user}" \
@@ -172,6 +176,8 @@ function gcp_login() {
 
   if [[ -z "${_auth_url}" ]]; then
     _err "[gcp] gcp_login: could not extract auth URL from gcloud output"
+    _err "[gcp] gcloud raw output: $(cat "${_auth_log}" 2>/dev/null || echo '<empty>')"
+    kill "${_fifo_writer_pid}" 2>/dev/null || true
     kill "${_gcloud_pid}" 2>/dev/null || true
     rm -f "${_auth_log}" "${_auth_fifo}"
     return 1
@@ -184,6 +190,7 @@ function gcp_login() {
     "${_auth_url}" "${expected_user}" "${GCP_PASSWORD}" \
     | node "${_pw_script}") || {
     _err "[gcp] gcp_login: Playwright auth failed"
+    kill "${_fifo_writer_pid}" 2>/dev/null || true
     kill "${_gcloud_pid}" 2>/dev/null || true
     rm -f "${_auth_log}" "${_auth_fifo}"
     return 1
@@ -191,15 +198,17 @@ function gcp_login() {
 
   if [[ -z "${_auth_code}" ]]; then
     _err "[gcp] gcp_login: Playwright returned empty auth code"
+    kill "${_fifo_writer_pid}" 2>/dev/null || true
     kill "${_gcloud_pid}" 2>/dev/null || true
     rm -f "${_auth_log}" "${_auth_fifo}"
     return 1
   fi
 
-  # Feed the auth code to gcloud's stdin
+  # Feed the auth code to gcloud's stdin; kill sleeper after gcloud reads it
   printf '%s\n' "${_auth_code}" >"${_auth_fifo}"
   wait "${_gcloud_pid}"
   local _exit=$?
+  kill "${_fifo_writer_pid}" 2>/dev/null || true
   rm -f "${_auth_log}" "${_auth_fifo}"
 
   if [[ "${_exit}" -ne 0 ]]; then
