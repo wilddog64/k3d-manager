@@ -28,8 +28,9 @@ History through `v0.9.18` is archived in `memory-bank/archive/progress-pre-v0.9.
 | `make sync-apps` k3s-gcp missing KUBECONFIG | COMPLETE (`fbbcf742`) | `docs/bugs/v1.1.0-bugfix-sync-apps-kubeconfig.md` |
 | `gcp_login` FIFO deadlock | COMPLETE (`9d8fca41`) | `docs/bugs/v1.1.0-bugfix-gcp-login-fifo-deadlock.md` |
 | `acg_credentials.js` provider card scope | COMPLETE (`0bab1ba4`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-provider-card-scope.md` |
-| `acg_credentials.js` button priority (Open before Start) | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-acg-credentials-button-priority.md` |
-| Live smoke test `make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` | PENDING | After button priority fix |
+| `acg_credentials.js` button priority (Open before Start) | COMPLETE (`c463a942`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-button-priority.md` |
+| `acg_credentials.js` data-heap-id selector | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-acg-credentials-heap-id-selector.md` |
+| Live smoke test `make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` | PENDING | After data-heap-id fix |
 - [x] **ESO deploy_eso bugfix** — COMPLETE (`320ae211`). Spec `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md`. `scripts/plugins/eso.sh:12` now uses `${1:-}` so Stage 3 of GCP provision stops crashing under `set -u`; `shellcheck` + `bats scripts/tests/providers/k3s_gcp.bats` pass.
 - [x] **Stale SA key auto-re-extract** — COMPLETE (`acfb0470`). Spec `docs/bugs/v1.1.0-bugfix-gcp-stale-sa-key-project-probe.md`. `_gcp_load_credentials` probes cached project via `gcloud projects describe`; deletes key + re-extracts on new sandbox.
 - [x] **SSH readiness probe** — COMPLETE (`de83535d`). Spec `docs/bugs/v1.1.0-bugfix-gcp-ssh-readiness-probe.md`. `_provider_k3s_gcp_deploy_cluster` now runs an `nc -z` loop (10s backoff, 30 retries) after `_gcp_ssh_config_upsert` so SSH is ready before `k3sup install`; `shellcheck scripts/lib/providers/k3s-gcp.sh` + `bats scripts/tests/providers/k3s_gcp.bats` pass.
