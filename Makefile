@@ -93,7 +93,9 @@ argocd-registration:
 ## Sync ArgoCD data-layer and show remote pod status
 sync-apps:
 	@case "$(CLUSTER_PROVIDER)" in \
-	  k3s-gcp) CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" scripts/k3d-manager register_shopping_cart_apps ;; \
+	  k3s-gcp) echo "[make] CLUSTER_PROVIDER=k3s-gcp — registering shopping-cart apps..."; \
+	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" KUBECONFIG="$$HOME/.kube/k3s-gcp.yaml" \
+	           scripts/k3d-manager register_shopping_cart_apps ;; \
 	  *)       bin/acg-sync-apps ;; \
 	esac
 
