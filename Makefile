@@ -93,7 +93,7 @@ argocd-registration:
 ## Sync ArgoCD data-layer and show remote pod status
 sync-apps:
 	@case "$(CLUSTER_PROVIDER)" in \
-	  k3s-gcp) echo "[make] CLUSTER_PROVIDER=k3s-gcp — sync-apps is a no-op (stack deployed by make up)" ;; \
+	  k3s-gcp) CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" scripts/k3d-manager register_shopping_cart_apps ;; \
 	  *)       bin/acg-sync-apps ;; \
 	esac
 
@@ -145,7 +145,7 @@ help:
 	@echo ""
 	@echo "  GCP workflow (same commands as AWS):"
 	@echo "    make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>          Provision cluster + full stack"
-	@echo "    make sync-apps CLUSTER_PROVIDER=k3s-gcp                   No-op (stack deployed by make up)"
+	@echo "    make sync-apps CLUSTER_PROVIDER=k3s-gcp                   Register shopping-cart apps with ArgoCD"
 	@echo ""
 	@echo "  Current CLUSTER_PROVIDER: $(CLUSTER_PROVIDER)"
 	@echo ""

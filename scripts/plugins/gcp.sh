@@ -215,12 +215,13 @@ function gcp_provision_stack() {
     cat <<'HELP'
 Usage: CLUSTER_PROVIDER=k3s-gcp ./scripts/k3d-manager gcp_provision_stack
 
-Deploy the full plugin stack on the k3s-gcp single-node cluster:
+Deploy the infrastructure plugin stack on the k3s-gcp single-node cluster:
   1. Vault (secrets backend)
   2. External Secrets Operator + ClusterSecretStore
   3. App namespaces + ghcr-pull-secret
   4. ArgoCD + ApplicationSets (--bootstrap, no LDAP, no Istio)
-  5. shopping-cart ArgoCD Applications
+
+Run `make sync-apps CLUSTER_PROVIDER=k3s-gcp` to register shopping-cart apps with ArgoCD.
 
 Prerequisites:
   make up CLUSTER_PROVIDER=k3s-gcp      — node must be Running
@@ -246,10 +247,10 @@ HELP
 
   export KUBECONFIG="${_kubeconfig}"
 
-  _info "[gcp] Step 1/7 — Deploying Vault..."
+  _info "[gcp] Step 1/6 — Deploying Vault..."
   CLUSTER_ROLE=infra deploy_vault || return 1
 
-  _info "[gcp] Step 2/7 — Seeding Vault KV..."
+  _info "[gcp] Step 2/6 — Seeding Vault KV..."
   local _vault_pf_pid
   kubectl port-forward svc/vault -n secrets --context "${_context}" 8200:8200 >/dev/null 2>&1 &
   _vault_pf_pid=$!
@@ -265,10 +266,10 @@ HELP
   _gcp_seed_vault_kv "${_vault_token}"
   kill "${_vault_pf_pid}" 2>/dev/null || true
 
-  _info "[gcp] Step 3/7 — Deploying ESO..."
+  _info "[gcp] Step 3/6 — Deploying ESO..."
   deploy_eso || return 1
 
-  _info "[gcp] Step 4/7 — Applying ClusterSecretStore..."
+  _info "[gcp] Step 4/6 — Applying ClusterSecretStore..."
   kubectl apply --context "${_context}" -f - <<'CSSEOF'
 apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore
@@ -287,7 +288,7 @@ spec:
           key: root_token
 CSSEOF
 
-  _info "[gcp] Step 5/7 — Creating namespaces and ghcr-pull-secret..."
+  _info "[gcp] Step 5/6 — Creating namespaces and ghcr-pull-secret..."
   for _ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
     kubectl create namespace "${_ns}" --context "${_context}" \
       --dry-run=client -o yaml | kubectl apply --context "${_context}" -f - >/dev/null
@@ -300,13 +301,10 @@ CSSEOF
     _info "[gcp] ghcr-pull-secret applied in namespace: ${_ns}"
   done
 
-  _info "[gcp] Step 6/7 — Deploying ArgoCD..."
+  _info "[gcp] Step 6/6 — Deploying ArgoCD..."
   # shellcheck source=/dev/null
   source "${SCRIPT_DIR}/plugins/argocd.sh"
   deploy_argocd --bootstrap --skip-istio || return 1
-
-  _info "[gcp] Step 7/7 — Registering shopping-cart apps..."
-  register_shopping_cart_apps || return 1
 
   _info "[gcp] Full stack provisioned on k3s-gcp."
   kubectl get pods -A --context "${_context}"
