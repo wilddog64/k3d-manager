@@ -10,6 +10,7 @@ Uses a dispatcher pattern with lazy plugin loading.
 ## Claude Session Rules
 
 - **Memory-bank update is mandatory and immediate** — after every completed action (spec written, PR created, agent assigned, merge done, task status changed), update `memory-bank/activeContext.md` and `memory-bank/progress.md` before doing anything else. Do not wait for the user to ask.
+- **Memory-bank hygiene is required** — keep `memory-bank/activeContext.md` and `memory-bank/progress.md` focused on the current branch, open bugs/plans, and near-term context. When older milestone detail stops guiding active work, move it into `memory-bank/archive/*.md` instead of leaving long historical blocks in the active files. Archive; do not delete.
 
 - **PR creation gate** — do NOT create a PR until ALL of these pass: CI green, Copilot review comments addressed, Gemini live smoke test, Claude scope check. Draft PR is acceptable only as an explicit placeholder.
 - **Verify before trust** — never trust a commit SHA, BATS result, or "done" report from any agent without independently verifying via `gh api`, `gh run view`, or `git log`.
