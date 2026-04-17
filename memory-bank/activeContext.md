@@ -15,7 +15,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | `_ensure_k3sup` auto-install helper | `c322e483` | Follows `_ensure_gcloud` pattern; brew → curl fallback |
 | `_gcp_load_credentials` helper | `a7195034` | Caches SA key; skips Playwright if key valid on disk |
 | SA key cache simplification | `5e7566b8` | Single condition: file exists + project_id valid |
-| `gcp_login` + `gcp_grant_compute_admin` | `153fc922` | Three-tier gcloud auth; IAM grant helper |
+| `gcp_login` cleanup | `840ae84c` | Removed dead `gcp_grant_compute_admin`; `cloud_user` already has sufficient permissions |
 | `gcp_provision_stack` spec | `2745e57b` | `docs/plans/v1.1.0-gcp-provision-full-stack.md` |
 | `gcp_provision_stack` implementation | `1430b47e` | Codex; Makefile case dispatch + full 7-step stack |
 | Bug spec: ssm prereq + vault unbound $1 | `04943cdd` | COMPLETE — both fixes already in code (Makefile + vault.sh) |
@@ -25,7 +25,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 
 | Item | Assignee | Spec |
 |---|---|---|
-| Remove dead `gcp_grant_compute_admin` | Codex | `docs/bugs/v1.1.0-bugfix-remove-gcp-grant-compute-admin.md` |
+| Remove dead `gcp_grant_compute_admin` | COMPLETE (`840ae84c`) | `docs/bugs/v1.1.0-bugfix-remove-gcp-grant-compute-admin.md` |
 
 ### Pending
 - **GCP IAM auto-grant** — SUPERSEDED. `cloud_user` already has sufficient compute permissions; no IAM grant step needed. `gcp_grant_compute_admin` and all Playwright IAM automation dropped from v1.1.0 scope. Plan archived in `docs/plans/v1.1.0-gcp-iam-hybrid-plus.md` with SUPERSEDED notice.
