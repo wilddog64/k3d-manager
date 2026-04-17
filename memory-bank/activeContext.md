@@ -28,7 +28,8 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Remove dead `gcp_grant_compute_admin` | COMPLETE (`840ae84c`) | `docs/bugs/v1.1.0-bugfix-remove-gcp-grant-compute-admin.md` |
 | Automate `gcp_login` via Playwright | COMPLETE (`70c80354`) | `docs/bugs/v1.1.0-bugfix-gcp-login-playwright.md`; `gcp_login` now runs `gcloud auth login --no-launch-browser` and delegates OAuth consent to `scripts/playwright/gcp_login.js` |
 | Separate GCP app registration into `make sync-apps` | COMPLETE (`a1f9fc25`) | `docs/bugs/v1.1.0-bugfix-gcp-sync-apps-separation.md`; `gcp_provision_stack` no longer registers apps and `Makefile` `sync-apps` now delegates to `register_shopping_cart_apps` |
-| Separate `register_shopping_cart_apps` into `make sync-apps` | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-sync-apps-separation.md` |
+| `make sync-apps` k3s-gcp missing KUBECONFIG | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-sync-apps-kubeconfig.md` |
+| `gcp_login` FIFO deadlock | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-login-fifo-deadlock.md` |
 
 ### Pending
 - **GCP IAM auto-grant** — SUPERSEDED. `cloud_user` already has sufficient compute permissions; no IAM grant step needed. `gcp_grant_compute_admin` and all Playwright IAM automation dropped from v1.1.0 scope. Plan archived in `docs/plans/v1.1.0-gcp-iam-hybrid-plus.md` with SUPERSEDED notice.
