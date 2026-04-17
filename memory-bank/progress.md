@@ -30,8 +30,9 @@ History through `v0.9.18` is archived in `memory-bank/archive/progress-pre-v0.9.
 | `acg_credentials.js` provider card scope | COMPLETE (`0bab1ba4`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-provider-card-scope.md` |
 | `acg_credentials.js` button priority (Open before Start) | COMPLETE (`c463a942`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-button-priority.md` |
 | `acg_credentials.js` data-heap-id selector | COMPLETE (`132421ad`) | `docs/bugs/v1.1.0-bugfix-acg-credentials-heap-id-selector.md` |
-| GCP credential extraction (`_extractGcpCredentials`) | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-credential-extraction.md` |
-| Live smoke test `make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` | PENDING | After GCP credential extraction fix |
+| GCP credential extraction (`_extractGcpCredentials`) | COMPLETE (`6bb2bbcf`) | `docs/bugs/v1.1.0-bugfix-gcp-credential-extraction.md` |
+| GCP credential extraction v2 — positional | ASSIGNED → Codex | `docs/bugs/v1.1.0-bugfix-gcp-credential-extraction-v2.md` |
+| Live smoke test `make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` | PENDING | After GCP credential extraction v2 fix |
 - [x] **ESO deploy_eso bugfix** — COMPLETE (`320ae211`). Spec `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md`. `scripts/plugins/eso.sh:12` now uses `${1:-}` so Stage 3 of GCP provision stops crashing under `set -u`; `shellcheck` + `bats scripts/tests/providers/k3s_gcp.bats` pass.
 - [x] **Stale SA key auto-re-extract** — COMPLETE (`acfb0470`). Spec `docs/bugs/v1.1.0-bugfix-gcp-stale-sa-key-project-probe.md`. `_gcp_load_credentials` probes cached project via `gcloud projects describe`; deletes key + re-extracts on new sandbox.
 - [x] **SSH readiness probe** — COMPLETE (`de83535d`). Spec `docs/bugs/v1.1.0-bugfix-gcp-ssh-readiness-probe.md`. `_provider_k3s_gcp_deploy_cluster` now runs an `nc -z` loop (10s backoff, 30 retries) after `_gcp_ssh_config_upsert` so SSH is ready before `k3sup install`; `shellcheck scripts/lib/providers/k3s-gcp.sh` + `bats scripts/tests/providers/k3s_gcp.bats` pass.
