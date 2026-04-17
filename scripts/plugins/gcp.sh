@@ -145,47 +145,6 @@ function gcp_login() {
   fi
 }
 
-function gcp_grant_compute_admin() {
-  local project="${1:-${GCP_PROJECT:-}}"
-  local key_file="${2:-${GOOGLE_APPLICATION_CREDENTIALS:-}}"
-  local username="${GCP_USERNAME:-}"
-
-  if [[ -z "${project}" ]]; then
-    _err "[gcp] gcp_grant_compute_admin: GCP_PROJECT not set"
-    return 1
-  fi
-  if [[ -z "${key_file}" || ! -f "${key_file}" ]]; then
-    _err "[gcp] gcp_grant_compute_admin: key file not found: ${key_file}"
-    return 1
-  fi
-  if [[ -z "${username}" ]]; then
-    _err "[gcp] gcp_grant_compute_admin: GCP_USERNAME not set (needed for identity guard)"
-    return 1
-  fi
-
-  local sa_email
-  sa_email=$(jq -r '.client_email' "${key_file}" 2>/dev/null)
-  if [[ -z "${sa_email}" || "${sa_email}" == "null" ]]; then
-    _err "[gcp] gcp_grant_compute_admin: could not extract client_email from ${key_file}"
-    return 1
-  fi
-
-  _info "[gcp] Ensuring CLI is authenticated as sandbox user ${username}..."
-  gcp_login "${username}" || return 1
-
-  _info "[gcp] Granting roles/compute.admin to ${sa_email} on project ${project}..."
-  if ! gcloud projects add-iam-policy-binding "${project}" \
-    --member="serviceAccount:${sa_email}" \
-    --role="roles/compute.admin" \
-    --condition=None \
-    --quiet >/dev/null; then
-    _err "[gcp] IAM grant failed — check that ${username} has roles/resourcemanager.projectIamAdmin or Owner on ${project}"
-    return 1
-  fi
-
-  _info "[gcp] roles/compute.admin granted to ${sa_email} (idempotent)"
-}
-
 function gcp_provision_stack() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'

@@ -53,26 +53,9 @@ setup() {
   [[ "$output" == *"install manually"* ]] || [[ "$stderr" == *"install manually"* ]]
 }
 
-@test "gcp_grant_compute_admin returns 0 when gcloud grant succeeds" {
+@test "gcp_grant_compute_admin is not defined — superseded by cloud_user permissions" {
   source "${BATS_TEST_DIRNAME}/../../plugins/gcp.sh"
-  local _tmpkey
-  _tmpkey=$(mktemp)
-  printf '{"client_email":"sa@proj.iam.gserviceaccount.com"}' > "${_tmpkey}"
-
-  gcloud() {
-    case "$*" in
-      *"auth list"*"ACTIVE"*) echo "sandbox@example.com" ;;
-      *"auth list"*) echo "sandbox@example.com" ;;
-      *"add-iam-policy-binding"*) return 0 ;;
-      *) return 0 ;;
-    esac
-  }
-  export -f gcloud
-
-  GCP_PROJECT="test-proj" GCP_USERNAME="sandbox@example.com" \
-    run gcp_grant_compute_admin "test-proj" "${_tmpkey}"
-  rm -f "${_tmpkey}"
-  [ "$status" -eq 0 ]
+  ! declare -f gcp_grant_compute_admin >/dev/null 2>&1
 }
 
 @test "_provider_k3s_gcp_status errors when kubeconfig missing" {
