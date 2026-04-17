@@ -19,13 +19,13 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | `gcp_provision_stack` spec | `2745e57b` | `docs/plans/v1.1.0-gcp-provision-full-stack.md` |
 | `gcp_provision_stack` implementation | `1430b47e` | Codex; Makefile case dispatch + full 7-step stack |
 | Bug spec: ssm prereq + vault unbound $1 | `04943cdd` | COMPLETE — both fixes already in code (Makefile + vault.sh) |
-| Makefile GCP up-target spec | pending | `docs/bugs/v1.1.0-bugfix-makefile-gcp-up-target.md` — ASSIGNED → Codex |
+| Makefile GCP up-target spec | `ae747192` | COMPLETE — `Makefile` now runs `deploy_cluster && gcp_provision_stack` from `make up CLUSTER_PROVIDER=k3s-gcp`; `sync-apps` is a GCP no-op; `provision` is AWS-only again |
 
 ### In Progress
 
 | Item | Assignee | Spec |
 |---|---|---|
-| Makefile `make up` GCP inconsistency | Codex | `docs/bugs/v1.1.0-bugfix-makefile-gcp-up-target.md` |
+| Makefile `make up` GCP inconsistency | COMPLETE (`ae747192`) | `docs/bugs/v1.1.0-bugfix-makefile-gcp-up-target.md` |
 
 ### Pending
 - **GCP IAM auto-grant** — HYBRID+ STRATEGY (`docs/plans/v1.1.0-gcp-iam-hybrid-plus.md`). Final strategy after exploring CLI and full-automation dead ends. Utilizes Chrome (now system default) with automated consent handling and surgical IAM binding via Playwright CDP latch-on. Secure stdin injection for credentials.
