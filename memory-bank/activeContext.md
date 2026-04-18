@@ -36,6 +36,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Extract GCP credentials via `getByLabel` | COMPLETE (`6bb2bbcf`) | `docs/bugs/v1.1.0-bugfix-gcp-credential-extraction.md`; `_extractGcpCredentials` now waits on `text=Username` and reads Username/Password/Service Account fields via `page.getByLabel(...)` |
 | Extract GCP credentials by position | COMPLETE (`8e34610e`) | `docs/bugs/v1.1.0-bugfix-gcp-credential-extraction-v2.md`; `_extractGcpCredentials` now reads `input[aria-label="Copyable input"]` by position because GCP panel labels are not HTML-associated |
 | Wait for DOM after "Use another account" | REGRESSION (`c7930b93` — post-click `waitForLoadState` still races) | `docs/bugs/v1.1.0-bugfix-gcp-login-email-input-timeout.md`; fix did not work — `waitForLoadState` resolves against already-loaded page, misses navigation |
+| Guard "Use another account" navigation with `Promise.all` | COMPLETE (`1bcee5fd`) | `docs/bugs/v1.1.0-bugfix-gcp-login-email-navigation-race.md`; `gcp_login.js` now registers `waitForNavigation({ waitUntil: 'domcontentloaded' })` before clicking and increases email wait to 20s |
 | GCP credential extraction v2 — positional | COMPLETE (`8e34610e`) | verified — no `.getByLabel()` calls remain; `Copyable input` positional extraction in place |
 | `gcp_login` email navigation race | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-login-email-navigation-race.md`; root cause: `waitForLoadState` called after click resolves immediately — fix: `Promise.all([waitForNavigation, click])` |
 
