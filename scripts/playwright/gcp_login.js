@@ -85,6 +85,8 @@ async function run() {
     console.error('INFO: Filled password');
     const passNext = page.locator('button:has-text("Next")').first();
     await passNext.click();
+    await page.waitForTimeout(500);
+    console.error(`INFO: URL after password Next: ${page.url()}`);
 
     // "I understand" — may appear twice (new account welcome)
     for (let i = 0; i < 2; i++) {
@@ -97,6 +99,17 @@ async function run() {
       }
     }
 
+    // "Skip" / "Not now" — Google phone/recovery prompts on new accounts
+    for (const label of ['Skip', 'Not now', 'Confirm']) {
+      const btn = page.getByRole('button', { name: label }).first();
+      const visible = await btn.isVisible({ timeout: 3000 }).catch(() => false);
+      if (visible) {
+        console.error(`INFO: Clicking "${label}"`);
+        await btn.click();
+        await page.waitForTimeout(500);
+      }
+    }
+
     // "Continue" (Sign in to Google Cloud SDK confirmation)
     const continueBtn = page.locator('button:has-text("Continue")').first();
     const continueVisible = await continueBtn.isVisible({ timeout: 10000 }).catch(() => false);
@@ -106,8 +119,9 @@ async function run() {
     }
 
     // "Allow" (Google Cloud SDK access grant)
+    console.error(`INFO: URL before Allow: ${page.url()}`);
     const allowBtn = page.locator('button:has-text("Allow")').first();
-    await allowBtn.waitFor({ timeout: 15000 });
+    await allowBtn.waitFor({ timeout: 30000 });
     console.error('INFO: Clicking "Allow"');
     await allowBtn.click();
 
