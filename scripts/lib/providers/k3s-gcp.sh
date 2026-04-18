@@ -116,10 +116,10 @@ HELP
   fi
 
   if [[ -n "${project}" ]] && _command_exist gcloud; then
-    local _status_auth
-    _status_auth=$(gcloud auth list --filter="status:ACTIVE" --format="value(account)" 2>/dev/null || true)
-    if [[ -z "${_status_auth}" ]]; then
-      _info "[k3s-gcp] No active gcloud account — run: make up CLUSTER_PROVIDER=k3s-gcp to re-authenticate"
+    local _gcloud_token
+    _gcloud_token=$(gcloud auth print-access-token 2>/dev/null || true)
+    if [[ -z "${_gcloud_token}" ]]; then
+      _info "[k3s-gcp] Stale gcloud credentials (sandbox rotated) — run: make up CLUSTER_PROVIDER=k3s-gcp to re-authenticate"
     else
       _info "[k3s-gcp] Instance ${_GCP_INSTANCE_NAME} (project ${project}, zone ${_GCP_ZONE})"
       _run_command --soft -- gcloud compute instances describe "${_GCP_INSTANCE_NAME}" \
