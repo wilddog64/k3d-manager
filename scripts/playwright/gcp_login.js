@@ -143,6 +143,16 @@ async function run() {
       await secondChooser.first().click({ force: true });
       await page.waitForTimeout(2000);
       console.error(`INFO: URL after second chooser: ${page.url()}`);
+
+      // Post-chooser "Continue" — consent confirmation screen appears after account selection
+      const continueBtn2 = page.locator('button:has-text("Continue")').first();
+      const continue2Visible = await continueBtn2.isVisible({ timeout: 5000 }).catch(() => false);
+      if (continue2Visible) {
+        console.error('INFO: Clicking "Continue" after second chooser');
+        await continueBtn2.click();
+        await page.waitForTimeout(1000);
+        console.error(`INFO: URL after post-chooser Continue: ${page.url()}`);
+      }
     }
 
     // Try Allow variants — Google sometimes uses different labels
