@@ -38,7 +38,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Wait for DOM after "Use another account" | REGRESSION (`c7930b93` — post-click `waitForLoadState` still races) | `docs/bugs/v1.1.0-bugfix-gcp-login-email-input-timeout.md`; fix did not work — `waitForLoadState` resolves against already-loaded page, misses navigation |
 | Guard "Use another account" navigation with `Promise.all` | REGRESSION (`1bcee5fd`) | No navigation event fires — Google account chooser is a SPA; `waitForNavigation` always times out |
 | Treat "Use another account" as SPA transition | REGRESSION (`886bc24b`) | Still times out — root cause: `div:has-text` matches container div, click lands on wrong element |
-| `gcp_login` wrong click target for "Use another account" | COMPLETE (SHA pending push) | `docs/bugs/v1.1.0-bugfix-gcp-login-use-another-locator.md`; email fills confirmed in live test |
+| `gcp_login` wrong click target for "Use another account" | COMPLETE (`6178c6a0`) | `docs/bugs/v1.1.0-bugfix-gcp-login-use-another-locator.md`; fix accidentally bundled into docs commit; email fills confirmed in live test |
 | `gcp_login` Allow button timeout — unhandled post-password screens | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-login-allow-button-timeout.md`; fix: Skip/Not-now/Confirm handlers + URL diagnostics + Allow timeout 30s |
 
 ### Pending

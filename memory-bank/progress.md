@@ -35,7 +35,7 @@ History through `v0.9.18` is archived in `memory-bank/archive/progress-pre-v0.9.
 | `gcp_login` email input timeout — `waitForLoadState` (REGRESSION) | COMPLETE (`c7930b93`) | Fix did not work — `waitForLoadState` resolves against already-loaded page, misses navigation event |
 | `gcp_login` email navigation race — `Promise.all` guard (REGRESSION) | COMPLETE (`1bcee5fd`) | Also failed — no nav event fires; Google account chooser is SPA |
 | `gcp_login` SPA transition — remove nav guard (REGRESSION) | COMPLETE (`886bc24b`) | Still times out — `div:has-text` locator clicks wrong element; no transition fires |
-| `gcp_login` wrong click target — `getByText` exact | COMPLETE (SHA pending push) | Email fills confirmed in live test; Codex commit not yet on origin |
+| `gcp_login` wrong click target — `getByText` exact | COMPLETE (`6178c6a0`) | Fix bundled into docs commit; email fills confirmed in live test |
 | `gcp_login` Allow button timeout — unhandled post-password screens | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-login-allow-button-timeout.md`; Skip/Not-now/Confirm handlers + Allow timeout 30s |
 | Live smoke test `make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` | PENDING | After Allow button fix |
 - [x] **ESO deploy_eso bugfix** — COMPLETE (`320ae211`). Spec `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md`. `scripts/plugins/eso.sh:12` now uses `${1:-}` so Stage 3 of GCP provision stops crashing under `set -u`; `shellcheck` + `bats scripts/tests/providers/k3s_gcp.bats` pass.
