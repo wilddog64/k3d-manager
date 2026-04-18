@@ -37,7 +37,8 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Extract GCP credentials by position | COMPLETE (`8e34610e`) | `docs/bugs/v1.1.0-bugfix-gcp-credential-extraction-v2.md`; `_extractGcpCredentials` now reads `input[aria-label="Copyable input"]` by position because GCP panel labels are not HTML-associated |
 | Wait for DOM after "Use another account" | REGRESSION (`c7930b93` — post-click `waitForLoadState` still races) | `docs/bugs/v1.1.0-bugfix-gcp-login-email-input-timeout.md`; fix did not work — `waitForLoadState` resolves against already-loaded page, misses navigation |
 | Guard "Use another account" navigation with `Promise.all` | REGRESSION (`1bcee5fd`) | No navigation event fires — Google account chooser is a SPA; `waitForNavigation` always times out |
-| Treat "Use another account" as SPA transition | COMPLETE (`886bc24b`) | `docs/bugs/v1.1.0-bugfix-gcp-login-spa-transition.md`; `gcp_login.js` now clicks directly, waits for `input[type="email"], input#identifierId`, and avoids navigation guards that never fire |
+| Treat "Use another account" as SPA transition | REGRESSION (`886bc24b`) | Still times out — root cause: `div:has-text` matches container div, click lands on wrong element |
+| `gcp_login` wrong click target for "Use another account" | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-login-use-another-locator.md`; fix: `getByText('Use another account', {exact:true})` + URL diagnostics + 1s settle |
 
 ### Pending
 - **GCP IAM auto-grant** — SUPERSEDED. `cloud_user` already has sufficient compute permissions; no IAM grant step needed. `gcp_grant_compute_admin` and all Playwright IAM automation dropped from v1.1.0 scope. Plan archived in `docs/plans/v1.1.0-gcp-iam-hybrid-plus.md` with SUPERSEDED notice.
