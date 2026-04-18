@@ -78,15 +78,20 @@ async function run() {
       await nextBtn.click();
     }
 
-    // Password
+    // Password — optional: persistent context may already have an active session
     const passwordInput = page.locator('input[type="password"]').first();
-    await passwordInput.waitFor({ timeout: 15000 });
-    await passwordInput.fill(password);
-    console.error('INFO: Filled password');
-    const passNext = page.locator('button:has-text("Next")').first();
-    await passNext.click();
-    await page.waitForTimeout(500);
-    console.error(`INFO: URL after password Next: ${page.url()}`);
+    const passwordVisible = await passwordInput.isVisible({ timeout: 5000 }).catch(() => false);
+    if (passwordVisible) {
+      await passwordInput.fill(password);
+      console.error('INFO: Filled password');
+      const passNext = page.locator('button:has-text("Next")').first();
+      await passNext.click();
+      await page.waitForTimeout(500);
+      console.error(`INFO: URL after password Next: ${page.url()}`);
+    } else {
+      console.error('INFO: Password step skipped — session already authenticated');
+      console.error(`INFO: URL (no password): ${page.url()}`);
+    }
 
     // "I understand" — may appear twice (new account welcome)
     for (let i = 0; i < 2; i++) {
