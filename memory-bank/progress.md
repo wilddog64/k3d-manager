@@ -37,7 +37,7 @@ History through `v0.9.18` is archived in `memory-bank/archive/progress-pre-v0.9.
 | `gcp_login` SPA transition — remove nav guard (REGRESSION) | COMPLETE (`886bc24b`) | Still times out — `div:has-text` locator clicks wrong element; no transition fires |
 | `gcp_login` wrong click target — `getByText` exact | COMPLETE (`6178c6a0`) | Fix bundled into docs commit; email fills confirmed in live test |
 | `gcp_login` Allow button timeout — unhandled post-password screens | COMPLETE (`8ea4310b`) | `docs/bugs/v1.1.0-bugfix-gcp-login-allow-button-timeout.md`; Skip/Not-now/Confirm handlers + Allow timeout 30s |
-| `gcp_login` Allow button not found on ifWebSignIn page (live test) | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-login-allow-button-not-found.md`; button:has-text("Allow") never visible; need diagnostics + broader selector |
+| `gcp_login` Allow button not found on ifWebSignIn page (live test) | COMPLETE (`6a46fdab`) | `docs/bugs/v1.1.0-bugfix-gcp-login-allow-button-not-found.md`; logs visible buttons, broadens Allow selector, dumps page body on timeout |
 | Live smoke test `make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` | PENDING | After Allow button not-found fix |
 - [x] **ESO deploy_eso bugfix** — COMPLETE (`320ae211`). Spec `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md`. `scripts/plugins/eso.sh:12` now uses `${1:-}` so Stage 3 of GCP provision stops crashing under `set -u`; `shellcheck` + `bats scripts/tests/providers/k3s_gcp.bats` pass.
 - [x] **Stale SA key auto-re-extract** — COMPLETE (`acfb0470`). Spec `docs/bugs/v1.1.0-bugfix-gcp-stale-sa-key-project-probe.md`. `_gcp_load_credentials` probes cached project via `gcloud projects describe`; deletes key + re-extracts on new sandbox.
