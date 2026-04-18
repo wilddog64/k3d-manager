@@ -209,12 +209,14 @@ function gcp_login() {
   wait "${_gcloud_pid}"
   local _exit=$?
   kill "${_fifo_writer_pid}" 2>/dev/null || true
-  rm -f "${_auth_log}" "${_auth_fifo}"
 
   if [[ "${_exit}" -ne 0 ]]; then
     _err "[gcp] gcp_login: gcloud auth login failed (exit ${_exit})"
+    _err "[gcp] gcloud output: $(cat "${_auth_log}" 2>/dev/null || echo '<empty>')"
+    rm -f "${_auth_log}" "${_auth_fifo}"
     return 1
   fi
+  rm -f "${_auth_log}" "${_auth_fifo}"
 
   _info "[gcp] Authenticated as ${expected_user}"
 }
