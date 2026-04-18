@@ -40,6 +40,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Treat "Use another account" as SPA transition | REGRESSION (`886bc24b`) | Still times out — root cause: `div:has-text` matches container div, click lands on wrong element |
 | `gcp_login` wrong click target for "Use another account" | COMPLETE (`6178c6a0`) | `docs/bugs/v1.1.0-bugfix-gcp-login-use-another-locator.md`; fix accidentally bundled into docs commit; email fills confirmed in live test |
 | `gcp_login` Allow button timeout — unhandled post-password screens | COMPLETE (`8ea4310b`) | `docs/bugs/v1.1.0-bugfix-gcp-login-allow-button-timeout.md`; `gcp_login.js` now logs URLs after password/before Allow, handles Skip/Not now/Confirm prompts, and waits up to 30s for Allow |
+| `gcp_login` Allow button not found on ifWebSignIn | COMPLETE (`6a46fdab`) | `docs/bugs/v1.1.0-bugfix-gcp-login-allow-button-not-found.md`; `gcp_login.js` now logs visible buttons, tries broader Allow label variants, and dumps page body text on timeout |
 | `gcp_login` Allow button not found on ifWebSignIn page | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-login-allow-button-not-found.md`; broaden Allow selector + dump visible buttons + body text on timeout |
 
 ### Pending
