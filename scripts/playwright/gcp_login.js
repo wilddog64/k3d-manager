@@ -140,8 +140,8 @@ async function run() {
     const secondChooserVisible = await secondChooser.first().isVisible({ timeout: 5000 }).catch(() => false);
     if (secondChooserVisible) {
       console.error(`INFO: Second account chooser detected — clicking ${username}`);
-      await secondChooser.first().click();
-      await page.waitForTimeout(1000);
+      await secondChooser.first().click({ force: true });
+      await page.waitForTimeout(2000);
       console.error(`INFO: URL after second chooser: ${page.url()}`);
     }
 
