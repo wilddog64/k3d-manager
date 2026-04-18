@@ -45,7 +45,8 @@ History through `v0.9.18` is archived in `memory-bank/archive/progress-pre-v0.9.
 | `gcloud auth login` exit 1 — auth log deleted before error check | COMPLETE (`3569a718`) | `docs/bugs/v1.1.0-bugfix-gcp-login-gcloud-exit-diagnostics.md`; `rm -f` moved after exit check; gcloud output logged on failure |
 | Auth code prefix/length diagnostics | COMPLETE (`a548b132`) | gcp_login.js logs URL after Allow, code len/prefix, body dump; gcp.sh logs code len/prefix before FIFO write |
 | Auth code extracted from `<code>` HTML element instead of URL | COMPLETE (`e646714f`) | `<code>` tag matched gcloud command snippet; fix extracts from URL `?code=` param first |
-| Persistent Playwright log + empty-session AccountChooser re-login | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-login-pw-log-and-empty-session.md`; tee stderr to fixed log file; re-login in polling loop when AccountChooser has no account rows |
+| Persistent Playwright log (`gcp.sh`) | COMPLETE (`982de6b8`) | Playwright stderr teed to `~/.local/share/k3d-manager/gcp_login_pw.log` |
+| Empty-session AccountChooser re-login + 60s deadline | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-login-pw-log-and-empty-session.md`; `gcp_login.js` polling loop re-login when AccountChooser has no account rows |
 | Live smoke test `make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` | PENDING | After empty-session fix |
 - [x] **ESO deploy_eso bugfix** — COMPLETE (`320ae211`). Spec `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md`. `scripts/plugins/eso.sh:12` now uses `${1:-}` so Stage 3 of GCP provision stops crashing under `set -u`; `shellcheck` + `bats scripts/tests/providers/k3s_gcp.bats` pass.
 - [x] **Stale SA key auto-re-extract** — COMPLETE (`acfb0470`). Spec `docs/bugs/v1.1.0-bugfix-gcp-stale-sa-key-project-probe.md`. `_gcp_load_credentials` probes cached project via `gcloud projects describe`; deletes key + re-extracts on new sandbox.
