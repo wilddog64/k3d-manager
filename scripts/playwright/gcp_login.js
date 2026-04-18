@@ -169,20 +169,24 @@ async function run() {
     }
     console.error('INFO: Clicking "Allow"');
     await allowBtn.click();
+    await page.waitForTimeout(2000);
+    console.error(`INFO: URL after Allow: ${page.url()}`);
 
     // Extract the one-time auth code from the final page
-    await page.waitForTimeout(2000);
     const codeInput = page.locator('input[readonly], textarea[readonly], code').first();
     const codeVisible = await codeInput.isVisible({ timeout: 10000 }).catch(() => false);
     let authCode = '';
     if (codeVisible) {
       authCode = await codeInput.inputValue().catch(() => '') || await codeInput.textContent().catch(() => '');
+      console.error(`INFO: auth code from input (len=${authCode.length}, prefix=${authCode.substring(0, 10)})`);
     }
     if (!authCode) {
       // Fallback: look for the code in page text
       const bodyText = await page.textContent('body').catch(() => '');
+      console.error(`INFO: page body after Allow:\n${bodyText.substring(0, 1000)}`);
       const match = bodyText.match(/4\/[A-Za-z0-9_\-]+/);
       if (match) authCode = match[0];
+      if (authCode) console.error(`INFO: auth code from body regex (len=${authCode.length}, prefix=${authCode.substring(0, 10)})`);
     }
     if (!authCode) {
       console.error('ERROR: Could not extract auth code from final page');

@@ -205,6 +205,7 @@ function gcp_login() {
   fi
 
   # Feed the auth code to gcloud's stdin; kill sleeper after gcloud reads it
+  _info "[gcp] Feeding auth code to gcloud (${#_auth_code} chars, prefix: ${_auth_code:0:10}...)"
   printf '%s\n' "${_auth_code}" >"${_auth_fifo}"
   wait "${_gcloud_pid}"
   local _exit=$?
