@@ -64,12 +64,14 @@ async function run() {
       const useAnotherVisible = await useAnother.isVisible({ timeout: 5000 }).catch(() => false);
       if (useAnotherVisible) {
         console.error('INFO: Clicking "Use another account"');
-        await useAnother.click();
-        await page.waitForLoadState('domcontentloaded');
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 20000 }),
+          useAnother.click(),
+        ]);
       }
       // Fill email
       const emailInput = page.locator('input[type="email"]').first();
-      await emailInput.waitFor({ timeout: 15000 });
+      await emailInput.waitFor({ timeout: 20000 });
       await emailInput.fill(username);
       console.error(`INFO: Filled email ${username}`);
       const nextBtn = page.locator('button:has-text("Next")').first();
