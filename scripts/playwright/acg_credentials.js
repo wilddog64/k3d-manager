@@ -366,6 +366,30 @@ async function extractCredentials() {
         console.error('INFO: Clicking Resume Sandbox...');
         await resumeButton.click();
         await _waitForCredentials();
+      } else {
+        console.error('WARN: No data-heap-id button matched — falling back to text-based selectors');
+        const _fbOpen = page.locator('button:has-text("Open Sandbox")').first();
+        const _fbStart = page.locator('button:has-text("Start Sandbox")').first();
+        const _fbResume = page.locator('button:has-text("Resume")').first();
+        if (await _fbOpen.isVisible({ timeout: 2000 }).catch(() => false)) {
+          console.error('INFO: Fallback: Clicking Open Sandbox...');
+          await _fbOpen.click();
+          await page.waitForTimeout(3000);
+          const _fbStart2 = page.locator('button:has-text("Start Sandbox")').first();
+          if (await _fbStart2.isVisible({ timeout: 5000 }).catch(() => false)) {
+            console.error('INFO: Fallback: Clicking Start Sandbox (Step 2)...');
+            await _fbStart2.click();
+          }
+          await _waitForCredentials();
+        } else if (await _fbStart.isVisible({ timeout: 2000 }).catch(() => false)) {
+          console.error('INFO: Fallback: Clicking Start Sandbox...');
+          await _fbStart.click();
+          await _waitForCredentials();
+        } else if (await _fbResume.isVisible({ timeout: 2000 }).catch(() => false)) {
+          console.error('INFO: Fallback: Clicking Resume...');
+          await _fbResume.click();
+          await _waitForCredentials();
+        }
       }
     }
 
