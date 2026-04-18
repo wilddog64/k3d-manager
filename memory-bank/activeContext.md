@@ -57,6 +57,8 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Auth code extracted from `<code>` HTML element instead of URL | COMPLETE (`e646714f`) | gcp_login.js now extracts code from URL query param (`?code=...`) first; `<code>` tag dropped (matches gcloud command snippets, not the auth code) |
 
 | Persistent Playwright log (`gcp.sh`) | COMPLETE (`982de6b8`) | Playwright stderr teed to `~/.local/share/k3d-manager/gcp_login_pw.log`; Claude applied directly |
+| Use print-access-token to validate gcloud auth in status describe guard | COMPLETE (`e9749112`) | `docs/bugs/v1.1.0-bugfix-gcp-status-token-validity-check.md`; `_provider_k3s_gcp_status` now probes `gcloud auth print-access-token` instead of trusting `gcloud auth list`, suppressing stale deleted-account `invalid_grant` errors |
+| Status runs kubectl when stale — timeout + exit 1 | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-status-stale-kubectl-timeout.md`; assigned to Codex |
 
 
 ### Pending
