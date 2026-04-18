@@ -221,6 +221,16 @@ async function extractCredentials() {
     }
     } // end else (_sandboxReady)
 
+    // Handle Cloudflare bot-check page — auto-redirects within ~5s; wait for it to clear
+    const _cfText = page.locator('text=Checking your browser before accessing');
+    const _isCfPage = await _cfText.isVisible({ timeout: 2000 }).catch(() => false);
+    if (_isCfPage) {
+      console.error('INFO: Cloudflare bot check detected — waiting for redirect (up to 15s)...');
+      await _cfText.waitFor({ state: 'hidden', timeout: 15000 })
+        .catch(() => console.error('WARN: Cloudflare check did not clear — proceeding anyway'));
+      await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+    }
+
     // Give it time to render SPA content after navigation changes
     console.error('INFO: Waiting for page content to load...');
     await page.waitForFunction(
