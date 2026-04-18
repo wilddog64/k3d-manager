@@ -60,13 +60,16 @@ async function run() {
       console.error(`INFO: Selecting existing account ${username}`);
       await accountChooser.first().click();
     } else {
-      const useAnother = page.locator('li:has-text("Use another account"), div:has-text("Use another account")').first();
+      const useAnother = page.getByText('Use another account', { exact: true }).first();
       const useAnotherVisible = await useAnother.isVisible({ timeout: 5000 }).catch(() => false);
       if (useAnotherVisible) {
+        console.error(`INFO: URL before click: ${page.url()}`);
         console.error('INFO: Clicking "Use another account"');
         await useAnother.click();
+        await page.waitForTimeout(1000);
+        console.error(`INFO: URL after click: ${page.url()}`);
       }
-      // Fill email — SPA transition, no navigation event; wait directly for input
+      // Fill email — SPA transition; wait directly for input
       const emailInput = page.locator('input[type="email"], input#identifierId').first();
       await emailInput.waitFor({ timeout: 30000 });
       await emailInput.fill(username);
