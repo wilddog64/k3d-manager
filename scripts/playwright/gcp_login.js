@@ -180,9 +180,10 @@ async function run() {
       'button:has-text("Allow"), button:has-text("Grant access"), button:has-text("Yes, I\'m in")'
     ).first();
 
-    // Poll up to 30s — AccountChooser may navigate in AFTER the lateChooser pass completes
+    // Poll up to 60s — AccountChooser may navigate in AFTER the lateChooser pass completes;
+    // 60s allows time for a full re-login when the persistent context session is stale
     let _allowFound = false;
-    const _allowDeadline = Date.now() + 30000;
+    const _allowDeadline = Date.now() + 60000;
     while (Date.now() < _allowDeadline) {
       const _loopChooser = page.locator('div[data-identifier]').filter({ hasText: username });
       const _loopChooserVisible = await _loopChooser.first().isVisible({ timeout: 500 }).catch(() => false);
@@ -198,6 +199,34 @@ async function run() {
           await _loopContinue.click();
           await page.waitForTimeout(1000);
           console.error(`INFO: Allow-loop: URL after Continue: ${page.url()}`);
+        }
+        continue;
+      }
+      // AccountChooser with no account rows — persistent context session stale; re-login
+      if (page.url().includes('AccountChooser')) {
+        console.error('INFO: Allow-loop: AccountChooser with no matching account — re-login');
+        const _loopUseAnother = page.getByText('Use another account', { exact: true }).first();
+        const _loopUseAnotherVisible = await _loopUseAnother.isVisible({ timeout: 1000 }).catch(() => false);
+        if (_loopUseAnotherVisible) {
+          console.error('INFO: Allow-loop: Clicking "Use another account"');
+          await _loopUseAnother.click();
+          await page.waitForTimeout(1000);
+        }
+        const _loopEmail = page.locator('input[type="email"], input#identifierId').first();
+        const _loopEmailVisible = await _loopEmail.isVisible({ timeout: 5000 }).catch(() => false);
+        if (_loopEmailVisible) {
+          console.error(`INFO: Allow-loop: Filling email ${username}`);
+          await _loopEmail.fill(username);
+          await page.locator('button:has-text("Next")').first().click();
+          await page.waitForTimeout(2000);
+          const _loopPw = page.locator('input[type="password"]').first();
+          const _loopPwVisible = await _loopPw.isVisible({ timeout: 5000 }).catch(() => false);
+          if (_loopPwVisible) {
+            console.error('INFO: Allow-loop: Filling password');
+            await _loopPw.fill(password);
+            await page.locator('button:has-text("Next")').first().click();
+            await page.waitForTimeout(2000);
+          }
         }
         continue;
       }
