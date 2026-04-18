@@ -34,7 +34,7 @@ History through `v0.9.18` is archived in `memory-bank/archive/progress-pre-v0.9.
 | GCP credential extraction v2 — positional | COMPLETE (`8e34610e`) | `docs/bugs/v1.1.0-bugfix-gcp-credential-extraction-v2.md`; verified |
 | `gcp_login` email input timeout — `waitForLoadState` (REGRESSION) | COMPLETE (`c7930b93`) | Fix did not work — `waitForLoadState` resolves against already-loaded page, misses navigation event |
 | `gcp_login` email navigation race — `Promise.all` guard (REGRESSION) | COMPLETE (`1bcee5fd`) | Also failed — no nav event fires; Google account chooser is SPA |
-| `gcp_login` SPA transition — remove nav guard | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-login-spa-transition.md`; fix: plain click + 30s wait on `input[type="email"], input#identifierId` |
+| `gcp_login` SPA transition — remove nav guard | COMPLETE (`886bc24b`) | `docs/bugs/v1.1.0-bugfix-gcp-login-spa-transition.md`; plain click + 30s wait on `input[type="email"], input#identifierId` |
 | Live smoke test `make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>` | PENDING | After SPA transition fix |
 - [x] **ESO deploy_eso bugfix** — COMPLETE (`320ae211`). Spec `docs/bugs/v1.1.0-bugfix-eso-deploy-unbound-arg.md`. `scripts/plugins/eso.sh:12` now uses `${1:-}` so Stage 3 of GCP provision stops crashing under `set -u`; `shellcheck` + `bats scripts/tests/providers/k3s_gcp.bats` pass.
 - [x] **Stale SA key auto-re-extract** — COMPLETE (`acfb0470`). Spec `docs/bugs/v1.1.0-bugfix-gcp-stale-sa-key-project-probe.md`. `_gcp_load_credentials` probes cached project via `gcloud projects describe`; deletes key + re-extracts on new sandbox.
