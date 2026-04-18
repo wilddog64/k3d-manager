@@ -172,16 +172,28 @@ async function run() {
     await page.waitForTimeout(2000);
     console.error(`INFO: URL after Allow: ${page.url()}`);
 
-    // Extract the one-time auth code from the final page
-    const codeInput = page.locator('input[readonly], textarea[readonly], code').first();
-    const codeVisible = await codeInput.isVisible({ timeout: 10000 }).catch(() => false);
+    // Extract the one-time auth code — prefer URL query param (sdk.cloud.google.com/authcode.html?code=...)
     let authCode = '';
-    if (codeVisible) {
-      authCode = await codeInput.inputValue().catch(() => '') || await codeInput.textContent().catch(() => '');
-      console.error(`INFO: auth code from input (len=${authCode.length}, prefix=${authCode.substring(0, 10)})`);
+
+    // 1. URL-based extraction (most reliable — code is in the redirect URL)
+    const urlCodeMatch = page.url().match(/[?&]code=([^&]+)/);
+    if (urlCodeMatch) {
+      authCode = decodeURIComponent(urlCodeMatch[1]);
+      console.error(`INFO: auth code from URL (len=${authCode.length}, prefix=${authCode.substring(0, 10)})`);
     }
+
+    // 2. Input element fallback (legacy OOB flow — no <code> tag: that matches gcloud command snippets)
     if (!authCode) {
-      // Fallback: look for the code in page text
+      const codeInput = page.locator('input[readonly], textarea[readonly]').first();
+      const codeVisible = await codeInput.isVisible({ timeout: 5000 }).catch(() => false);
+      if (codeVisible) {
+        authCode = await codeInput.inputValue().catch(() => '') || await codeInput.textContent().catch(() => '');
+        if (authCode) console.error(`INFO: auth code from input (len=${authCode.length}, prefix=${authCode.substring(0, 10)})`);
+      }
+    }
+
+    // 3. Body text regex fallback
+    if (!authCode) {
       const bodyText = await page.textContent('body').catch(() => '');
       console.error(`INFO: page body after Allow:\n${bodyText.substring(0, 1000)}`);
       const match = bodyText.match(/4\/[A-Za-z0-9_\-]+/);
