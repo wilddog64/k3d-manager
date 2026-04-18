@@ -15,9 +15,7 @@ up:
 	  k3s-aws) echo "[make] CLUSTER_PROVIDER=k3s-aws — running bin/acg-up..."; \
 	           GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)" ;; \
 	  k3s-gcp) echo "[make] CLUSTER_PROVIDER=k3s-gcp — running deploy_cluster..."; \
-	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" _GCP_SANDBOX_URL="$(URL)" scripts/k3d-manager deploy_cluster --confirm && \
-	           echo "[make] CLUSTER_PROVIDER=k3s-gcp — running gcp_provision_stack..." && \
-	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" GHCR_PAT="$(GHCR_PAT)" scripts/k3d-manager gcp_provision_stack ;; \
+	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" _GCP_SANDBOX_URL="$(URL)" scripts/k3d-manager deploy_cluster --confirm ;; \
 	  *)       echo "[make] CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) — running deploy_cluster..."; \
 	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" _GCP_SANDBOX_URL="$(URL)" scripts/k3d-manager deploy_cluster --confirm ;; \
 	esac
@@ -115,6 +113,9 @@ ssm:
 ## Provision full plugin stack (Vault + ESO + ArgoCD + apps)
 provision:
 	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-gcp) echo "[make] CLUSTER_PROVIDER=k3s-gcp — provisioning cluster + full stack..."; \
+	           $(MAKE) --no-print-directory up CLUSTER_PROVIDER=k3s-gcp URL="$(URL)" GHCR_PAT="$(GHCR_PAT)" && \
+	           CLUSTER_PROVIDER="$(CLUSTER_PROVIDER)" GHCR_PAT="$(GHCR_PAT)" scripts/k3d-manager gcp_provision_stack ;; \
 	  *)       $(MAKE) --no-print-directory ssm; \
 	           echo "[make] CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) — running acg_provision..."; \
 	           K3S_AWS_SSM_ENABLED=true scripts/k3d-manager acg_provision --confirm ;; \
@@ -146,7 +147,8 @@ help:
 	@echo "    make up CLUSTER_PROVIDER=k3d"
 	@echo ""
 	@echo "  GCP workflow (same commands as AWS):"
-	@echo "    make up CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>          Provision cluster + full stack"
+	@echo "    make up CLUSTER_PROVIDER=k3s-gcp                          Provision cluster nodes only"
+	@echo "    make provision CLUSTER_PROVIDER=k3s-gcp GHCR_PAT=<pat>   Provision cluster + full plugin stack"
 	@echo "    make sync-apps CLUSTER_PROVIDER=k3s-gcp                   Register shopping-cart apps with ArgoCD"
 	@echo ""
 	@echo "  Current CLUSTER_PROVIDER: $(CLUSTER_PROVIDER)"
