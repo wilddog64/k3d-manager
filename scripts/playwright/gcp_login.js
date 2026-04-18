@@ -155,6 +155,26 @@ async function run() {
       }
     }
 
+    // Late account chooser check — runs unconditionally in case the chooser appeared
+    // after the secondChooserVisible 5s window (e.g. delayed page load after Continue)
+    const lateChooser = page.locator('div[data-identifier]').filter({ hasText: username });
+    const lateChooserVisible = await lateChooser.first().isVisible({ timeout: 5000 }).catch(() => false);
+    if (lateChooserVisible) {
+      console.error(`INFO: Late account chooser detected — clicking ${username}`);
+      await lateChooser.first().click({ force: true });
+      await page.waitForTimeout(2000);
+      console.error(`INFO: URL after late chooser: ${page.url()}`);
+      // Post-late-chooser Continue
+      const lateContinueBtn = page.locator('button:has-text("Continue")').first();
+      const lateContinueVisible = await lateContinueBtn.isVisible({ timeout: 5000 }).catch(() => false);
+      if (lateContinueVisible) {
+        console.error('INFO: Clicking "Continue" after late chooser');
+        await lateContinueBtn.click();
+        await page.waitForTimeout(1000);
+        console.error(`INFO: URL after late-chooser Continue: ${page.url()}`);
+      }
+    }
+
     // Try Allow variants — Google sometimes uses different labels
     const allowBtn = page.locator(
       'button:has-text("Allow"), button:has-text("Grant access"), button:has-text("Yes, I\'m in")'
