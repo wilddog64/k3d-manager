@@ -185,9 +185,12 @@ function gcp_login() {
 
   # Playwright automates the consent flow; receives URL+credentials via stdin JSON,
   # returns the one-time auth code on stdout
-  local _pw_log="${HOME}/.local/share/k3d-manager/gcp_login_pw.log"
-  mkdir -p "${HOME}/.local/share/k3d-manager"
-  : > "${_pw_log}"
+  local _log_dir="${HOME}/.local/share/k3d-manager/logs"
+  local _log_retention="${GCP_LOG_RETENTION_DAYS:-7}"
+  local _pw_log
+  _pw_log="${_log_dir}/gcp_login_pw_$(date +%Y%m%dT%H%M%S).log"
+  mkdir -p "${_log_dir}"
+  find "${_log_dir}" -name "gcp_login_pw_*.log" -mtime +"${_log_retention}" -delete 2>/dev/null || true
   local _auth_code
   _auth_code=$(printf '{"url":"%s","username":"%s","password":"%s"}' \
     "${_auth_url}" "${expected_user}" "${GCP_PASSWORD}" \
