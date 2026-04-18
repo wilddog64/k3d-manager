@@ -39,7 +39,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Guard "Use another account" navigation with `Promise.all` | REGRESSION (`1bcee5fd`) | No navigation event fires — Google account chooser is a SPA; `waitForNavigation` always times out |
 | Treat "Use another account" as SPA transition | REGRESSION (`886bc24b`) | Still times out — root cause: `div:has-text` matches container div, click lands on wrong element |
 | `gcp_login` wrong click target for "Use another account" | COMPLETE (`6178c6a0`) | `docs/bugs/v1.1.0-bugfix-gcp-login-use-another-locator.md`; fix accidentally bundled into docs commit; email fills confirmed in live test |
-| `gcp_login` Allow button timeout — unhandled post-password screens | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-login-allow-button-timeout.md`; fix: Skip/Not-now/Confirm handlers + URL diagnostics + Allow timeout 30s |
+| `gcp_login` Allow button timeout — unhandled post-password screens | COMPLETE (`8ea4310b`) | `docs/bugs/v1.1.0-bugfix-gcp-login-allow-button-timeout.md`; `gcp_login.js` now logs URLs after password/before Allow, handles Skip/Not now/Confirm prompts, and waits up to 30s for Allow |
 
 ### Pending
 - **GCP IAM auto-grant** — SUPERSEDED. `cloud_user` already has sufficient compute permissions; no IAM grant step needed. `gcp_grant_compute_admin` and all Playwright IAM automation dropped from v1.1.0 scope. Plan archived in `docs/plans/v1.1.0-gcp-iam-hybrid-plus.md` with SUPERSEDED notice.
