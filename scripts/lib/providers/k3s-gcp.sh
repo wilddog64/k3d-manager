@@ -120,22 +120,22 @@ HELP
     _gcloud_token=$(gcloud auth print-access-token 2>/dev/null || true)
     if [[ -z "${_gcloud_token}" ]]; then
       _info "[k3s-gcp] Stale gcloud credentials (sandbox rotated) — run: make up CLUSTER_PROVIDER=k3s-gcp to re-authenticate"
-    else
-      _info "[k3s-gcp] Instance ${_GCP_INSTANCE_NAME} (project ${project}, zone ${_GCP_ZONE})"
-      _run_command --soft -- gcloud compute instances describe "${_GCP_INSTANCE_NAME}" \
-        --project="${project}" \
-        --zone="${_GCP_ZONE}" \
-        --format='table(name,status,networkInterfaces[0].accessConfigs[0].natIP)' || true
+      return 0
     fi
+    _info "[k3s-gcp] Instance ${_GCP_INSTANCE_NAME} (project ${project}, zone ${_GCP_ZONE})"
+    _run_command --soft -- gcloud compute instances describe "${_GCP_INSTANCE_NAME}" \
+      --project="${project}" \
+      --zone="${_GCP_ZONE}" \
+      --format='table(name,status,networkInterfaces[0].accessConfigs[0].natIP)' || true
   else
     _info "[k3s-gcp] Skipping gcloud instance describe (set GCP_PROJECT and ensure gcloud is installed)"
   fi
 
   _info "[k3s-gcp] kubectl get nodes (context k3s-gcp)"
-  KUBECONFIG="${kubeconfig}" kubectl get nodes || return 1
+  KUBECONFIG="${kubeconfig}" kubectl get nodes || true
 
   _info "[k3s-gcp] kubectl get pods --all-namespaces -o wide"
-  KUBECONFIG="${kubeconfig}" kubectl get pods --all-namespaces -o wide || return 1
+  KUBECONFIG="${kubeconfig}" kubectl get pods --all-namespaces -o wide || true
 }
 
 # Pre-flight guard: ensures console user has Compute IAM permissions

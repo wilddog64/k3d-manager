@@ -69,6 +69,8 @@ setup() {
   : > "${_GCP_KUBECONFIG}"
   _command_exist() { [[ "$1" == "gcloud" ]] && return 0 || command -v "$1" >/dev/null 2>&1; }
   export -f _command_exist
+  gcloud() { [[ "$1 $2" == "auth print-access-token" ]] && printf 'dummy-token\n'; }
+  export -f gcloud
   kubectl() { printf 'kubectl %s\n' "$*"; }
   export -f kubectl
   GCP_PROJECT="test-proj" run _provider_k3s_gcp_status
