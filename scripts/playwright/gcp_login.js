@@ -134,6 +134,17 @@ async function run() {
       if (vis && txt.trim()) console.error(`INFO: visible button: "${txt.trim()}"`);
     }
 
+    // Second account chooser — signin/oauth/id shows an inline account picker
+    // before the Allow button when authuser=0 (active session) is set
+    const secondChooser = page.locator('div[data-identifier]').filter({ hasText: username });
+    const secondChooserVisible = await secondChooser.first().isVisible({ timeout: 5000 }).catch(() => false);
+    if (secondChooserVisible) {
+      console.error(`INFO: Second account chooser detected — clicking ${username}`);
+      await secondChooser.first().click();
+      await page.waitForTimeout(1000);
+      console.error(`INFO: URL after second chooser: ${page.url()}`);
+    }
+
     // Try Allow variants — Google sometimes uses different labels
     const allowBtn = page.locator(
       'button:has-text("Allow"), button:has-text("Grant access"), button:has-text("Yes, I\'m in")'
