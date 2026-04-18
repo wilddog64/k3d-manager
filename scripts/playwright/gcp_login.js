@@ -120,8 +120,27 @@ async function run() {
 
     // "Allow" (Google Cloud SDK access grant)
     console.error(`INFO: URL before Allow: ${page.url()}`);
-    const allowBtn = page.locator('button:has-text("Allow")').first();
-    await allowBtn.waitFor({ timeout: 30000 });
+    
+    // Log all visible button texts for diagnosis
+    const allBtns = await page.locator('button').all();
+    for (const b of allBtns) {
+      const txt = await b.textContent().catch(() => '');
+      const vis = await b.isVisible().catch(() => false);
+      if (vis && txt.trim()) console.error(`INFO: visible button: "${txt.trim()}"`);
+    }
+
+    // Try Allow variants — Google sometimes uses different labels
+    const allowBtn = page.locator(
+      'button:has-text("Allow"), button:has-text("Grant access"), button:has-text("Yes, I\'m in")'
+    ).first();
+    try {
+      await allowBtn.waitFor({ timeout: 30000 });
+    } catch (e) {
+      // Dump page text for diagnosis before failing
+      const bodyText = await page.textContent('body').catch(() => '');
+      console.error(`INFO: page body on Allow timeout:\n${bodyText.substring(0, 2000)}`);
+      throw e;
+    }
     console.error('INFO: Clicking "Allow"');
     await allowBtn.click();
 
