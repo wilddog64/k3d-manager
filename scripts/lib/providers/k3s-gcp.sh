@@ -67,6 +67,7 @@ function _gcp_load_credentials() {
     else
       _info "[k3s-gcp] Cached project ${_cached_project} not accessible — sandbox may have changed; re-extracting credentials..."
       rm -f "${_default_key}"
+      gcloud auth revoke --all --quiet 2>/dev/null || true
       gcp_get_credentials "${sandbox_url}" || return 1
     fi
   else
@@ -115,11 +116,17 @@ HELP
   fi
 
   if [[ -n "${project}" ]] && _command_exist gcloud; then
-    _info "[k3s-gcp] Instance ${_GCP_INSTANCE_NAME} (project ${project}, zone ${_GCP_ZONE})"
-    _run_command --soft -- gcloud compute instances describe "${_GCP_INSTANCE_NAME}" \
-      --project="${project}" \
-      --zone="${_GCP_ZONE}" \
-      --format='table(name,status,networkInterfaces[0].accessConfigs[0].natIP)' || true
+    local _status_auth
+    _status_auth=$(gcloud auth list --filter="status:ACTIVE" --format="value(account)" 2>/dev/null || true)
+    if [[ -z "${_status_auth}" ]]; then
+      _info "[k3s-gcp] No active gcloud account — run: make up CLUSTER_PROVIDER=k3s-gcp to re-authenticate"
+    else
+      _info "[k3s-gcp] Instance ${_GCP_INSTANCE_NAME} (project ${project}, zone ${_GCP_ZONE})"
+      _run_command --soft -- gcloud compute instances describe "${_GCP_INSTANCE_NAME}" \
+        --project="${project}" \
+        --zone="${_GCP_ZONE}" \
+        --format='table(name,status,networkInterfaces[0].accessConfigs[0].natIP)' || true
+    fi
   else
     _info "[k3s-gcp] Skipping gcloud instance describe (set GCP_PROJECT and ensure gcloud is installed)"
   fi
