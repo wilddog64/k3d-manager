@@ -54,7 +54,6 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 
 | Persistent Playwright log (`gcp.sh`) | COMPLETE (`982de6b8`) | Playwright stderr teed to `~/.local/share/k3d-manager/gcp_login_pw.log`; Claude applied directly |
 
-| AccountChooser URL case mismatch + post-email chooser | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-login-accountchooser-case-and-post-email.md`; `includes('AccountChooser')` misses lowercase URL; add post-email-Next 2s wait + chooser check |
 
 ### Pending
 - **GCP IAM auto-grant** — SUPERSEDED. `cloud_user` already has sufficient compute permissions; no IAM grant step needed. `gcp_grant_compute_admin` and all Playwright IAM automation dropped from v1.1.0 scope. Plan archived in `docs/plans/v1.1.0-gcp-iam-hybrid-plus.md` with SUPERSEDED notice.
