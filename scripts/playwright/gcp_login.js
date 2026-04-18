@@ -76,6 +76,17 @@ async function run() {
       console.error(`INFO: Filled email ${username}`);
       const nextBtn = page.locator('button:has-text("Next")').first();
       await nextBtn.click();
+      await page.waitForTimeout(2000);
+      console.error(`INFO: URL after email Next: ${page.url()}`);
+      // Post-email account chooser — Google may redirect to accountchooser after recognising the email
+      const postEmailChooser = page.locator('div[data-identifier]').filter({ hasText: username });
+      const postEmailChooserVisible = await postEmailChooser.first().isVisible({ timeout: 3000 }).catch(() => false);
+      if (postEmailChooserVisible) {
+        console.error(`INFO: Post-email AccountChooser detected — clicking ${username}`);
+        await postEmailChooser.first().click({ force: true });
+        await page.waitForTimeout(2000);
+        console.error(`INFO: URL after post-email chooser: ${page.url()}`);
+      }
     }
 
     // Password — optional: persistent context may already have an active session
@@ -203,7 +214,7 @@ async function run() {
         continue;
       }
       // AccountChooser with no account rows — persistent context session stale; re-login
-      if (page.url().includes('AccountChooser')) {
+      if (page.url().toLowerCase().includes('accountchooser')) {
         console.error('INFO: Allow-loop: AccountChooser with no matching account — re-login');
         const _loopUseAnother = page.getByText('Use another account', { exact: true }).first();
         const _loopUseAnotherVisible = await _loopUseAnother.isVisible({ timeout: 1000 }).catch(() => false);
