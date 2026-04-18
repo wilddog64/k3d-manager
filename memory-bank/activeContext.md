@@ -47,6 +47,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | Continue not clicked after second chooser — consent page blocks Allow | COMPLETE (`e71f302b`) | `docs/bugs/v1.1.0-bugfix-gcp-login-continue-after-second-chooser.md`; post-chooser Continue handler added inside secondChooserVisible block |
 | `gcloud auth login` exit 1 — auth log deleted before error check | COMPLETE (`3569a718`) | `docs/bugs/v1.1.0-bugfix-gcp-login-gcloud-exit-diagnostics.md`; `rm -f` moved after exit check; gcloud output logged on failure |
 | Auth code extracted from `<code>` HTML element instead of URL | COMPLETE (`e646714f`) | gcp_login.js now extracts code from URL query param (`?code=...`) first; `<code>` tag dropped (matches gcloud command snippets, not the auth code) |
+| Allow timeout: late account chooser not handled before Allow wait | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-login-late-account-chooser.md`; body shows AccountChooser + empty session; need unconditional chooser check before Allow |
 
 ### Pending
 - **GCP IAM auto-grant** — SUPERSEDED. `cloud_user` already has sufficient compute permissions; no IAM grant step needed. `gcp_grant_compute_admin` and all Playwright IAM automation dropped from v1.1.0 scope. Plan archived in `docs/plans/v1.1.0-gcp-iam-hybrid-plus.md` with SUPERSEDED notice.
