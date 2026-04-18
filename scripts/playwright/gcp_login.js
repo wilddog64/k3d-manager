@@ -97,7 +97,7 @@ async function run() {
       console.error('INFO: Filled password');
       const passNext = page.locator('button:has-text("Next")').first();
       await passNext.click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(2000);
       console.error(`INFO: URL after password Next: ${page.url()}`);
     } else {
       console.error('INFO: Password step skipped — session already authenticated');
@@ -239,6 +239,16 @@ async function run() {
             await page.waitForTimeout(2000);
           }
         }
+        continue;
+      }
+      // "I understand" / new-account welcome screen — appears after password on enterprise accounts
+      const _iUnderstand = page.locator('button:has-text("I understand"), input[value="I understand"]').first();
+      const _iUnderstandVisible = await _iUnderstand.isVisible({ timeout: 500 }).catch(() => false);
+      if (_iUnderstandVisible) {
+        console.error('INFO: Allow-loop: Clicking "I understand"');
+        await _iUnderstand.click();
+        await page.waitForTimeout(1000);
+        console.error(`INFO: Allow-loop: URL after "I understand": ${page.url()}`);
         continue;
       }
       const _allowVisible = await allowBtn.isVisible({ timeout: 500 }).catch(() => false);
