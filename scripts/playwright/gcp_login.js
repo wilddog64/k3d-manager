@@ -179,13 +179,40 @@ async function run() {
     const allowBtn = page.locator(
       'button:has-text("Allow"), button:has-text("Grant access"), button:has-text("Yes, I\'m in")'
     ).first();
-    try {
-      await allowBtn.waitFor({ timeout: 30000 });
-    } catch (e) {
-      // Dump page text for diagnosis before failing
+
+    // Poll up to 30s — AccountChooser may navigate in AFTER the lateChooser pass completes
+    let _allowFound = false;
+    const _allowDeadline = Date.now() + 30000;
+    while (Date.now() < _allowDeadline) {
+      const _loopChooser = page.locator('div[data-identifier]').filter({ hasText: username });
+      const _loopChooserVisible = await _loopChooser.first().isVisible({ timeout: 500 }).catch(() => false);
+      if (_loopChooserVisible) {
+        console.error(`INFO: Allow-loop: AccountChooser detected — clicking ${username}`);
+        await _loopChooser.first().click({ force: true });
+        await page.waitForTimeout(2000);
+        console.error(`INFO: Allow-loop: URL after chooser click: ${page.url()}`);
+        const _loopContinue = page.locator('button:has-text("Continue")').first();
+        const _loopContinueVisible = await _loopContinue.isVisible({ timeout: 3000 }).catch(() => false);
+        if (_loopContinueVisible) {
+          console.error('INFO: Allow-loop: Clicking "Continue" after chooser');
+          await _loopContinue.click();
+          await page.waitForTimeout(1000);
+          console.error(`INFO: Allow-loop: URL after Continue: ${page.url()}`);
+        }
+        continue;
+      }
+      const _allowVisible = await allowBtn.isVisible({ timeout: 500 }).catch(() => false);
+      if (_allowVisible) {
+        _allowFound = true;
+        break;
+      }
+      await page.waitForTimeout(500);
+    }
+    if (!_allowFound) {
       const bodyText = await page.textContent('body').catch(() => '');
-      console.error(`INFO: page body on Allow timeout:\n${bodyText.substring(0, 2000)}`);
-      throw e;
+      console.error(`INFO: page body on Allow timeout:
+${bodyText.substring(0, 2000)}`);
+      throw new Error('locator.waitFor: Timeout 30000ms exceeded.');
     }
     console.error('INFO: Clicking "Allow"');
     await allowBtn.click();
