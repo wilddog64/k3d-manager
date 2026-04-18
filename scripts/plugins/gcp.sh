@@ -185,11 +185,14 @@ function gcp_login() {
 
   # Playwright automates the consent flow; receives URL+credentials via stdin JSON,
   # returns the one-time auth code on stdout
+  local _pw_log="${HOME}/.local/share/k3d-manager/gcp_login_pw.log"
+  mkdir -p "${HOME}/.local/share/k3d-manager"
+  : > "${_pw_log}"
   local _auth_code
   _auth_code=$(printf '{"url":"%s","username":"%s","password":"%s"}' \
     "${_auth_url}" "${expected_user}" "${GCP_PASSWORD}" \
-    | node "${_pw_script}") || {
-    _err "[gcp] gcp_login: Playwright auth failed"
+    | node "${_pw_script}" 2> >(tee -a "${_pw_log}" >&2)) || {
+    _err "[gcp] gcp_login: Playwright auth failed — see ${_pw_log}"
     kill "${_fifo_writer_pid}" 2>/dev/null || true
     kill "${_gcloud_pid}" 2>/dev/null || true
     rm -f "${_auth_log}" "${_auth_fifo}"
