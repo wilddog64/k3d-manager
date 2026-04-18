@@ -43,6 +43,7 @@ Earlier branch/milestone context through `v1.0.7` is archived in `memory-bank/ar
 | `gcp_login` Allow button not found on ifWebSignIn | COMPLETE (`6a46fdab`) | `docs/bugs/v1.1.0-bugfix-gcp-login-allow-button-not-found.md`; `gcp_login.js` now logs visible buttons, tries broader Allow label variants, and dumps page body text on timeout |
 | Make password step optional when session already authenticated | COMPLETE (`0fbb516a`) | `docs/bugs/v1.1.0-bugfix-gcp-login-password-step-optional.md`; `gcp_login.js` now checks `passwordInput.isVisible({ timeout: 5000 })` and skips password entry when Google session cookies are already active |
 | Handle second account chooser before Allow | COMPLETE (`39e2a05f`) | `docs/bugs/v1.1.0-bugfix-gcp-login-second-account-chooser.md`; `gcp_login.js` now clicks the inline `div[data-identifier]` account picker on `signin/oauth/id` before waiting for Allow |
+| Second chooser click intercepted by overlay (live test) | OPEN | `docs/bugs/v1.1.0-bugfix-gcp-login-second-chooser-force-click.md`; div.dKGsO blocks click; fix: `click({ force: true })` + 2s wait |
 
 ### Pending
 - **GCP IAM auto-grant** — SUPERSEDED. `cloud_user` already has sufficient compute permissions; no IAM grant step needed. `gcp_grant_compute_admin` and all Playwright IAM automation dropped from v1.1.0 scope. Plan archived in `docs/plans/v1.1.0-gcp-iam-hybrid-plus.md` with SUPERSEDED notice.
