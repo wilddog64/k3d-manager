@@ -311,7 +311,17 @@ async function extractCredentials() {
         const inputs = document.querySelectorAll('input[aria-label="Copyable input"]');
         const hasCredentials = inputs.length > 0 && inputs[0].value.trim().length > 0;
         return hasStart || hasOpen || hasResume || hasCredentials;
-      }, { timeout: 30000 }).catch(() => console.error('WARN: Timed out waiting for sandbox buttons or credentials — proceeding anyway'));
+      }, { timeout: 30000 }).catch(async () => {
+        console.error('WARN: Timed out waiting for sandbox buttons or credentials');
+        console.error(`DIAG: URL at timeout: ${page.url()}`);
+        console.error(`DIAG: Title at timeout: ${await page.title().catch(() => '(error)')}`);
+        const _diagButtons = await page.locator('button').allTextContents().catch(() => []);
+        console.error(`DIAG: Visible buttons: ${JSON.stringify(_diagButtons.slice(0, 10))}`);
+        const _screenshotDir = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'logs');
+        const _screenshotPath = path.join(_screenshotDir, `acg_creds_timeout_${Date.now()}.png`);
+        await page.screenshot({ path: _screenshotPath, fullPage: false }).catch(() => {});
+        console.error(`DIAG: Screenshot saved to ${_screenshotPath}`);
+      });
 
       const _waitForCredentials = async () => {
         console.error('INFO: Waiting for credentials to populate (up to 60s)...');
