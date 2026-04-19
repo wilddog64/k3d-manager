@@ -325,3 +325,4 @@
 | order-service CrashLoopBackOff | shopping-cart-order | PostgreSQL OK; RabbitMQ `Connection refused` only remaining |
 | payment-service Pending | shopping-cart-payment | Memory constraints on `t3.medium` |
 | product-catalog Degraded | shopping-cart-product-catalog | Synced to `aa5de3c`; `RABBITMQ_USERNAME` ESO key mismatch |
+- [ ] **Unified Automation Recovery** — SPECCED. Plan `docs/plans/v1.1.0-recovery-unified-automation.md`; restore AWS and unify CDP/Identity logic for all clouds.
