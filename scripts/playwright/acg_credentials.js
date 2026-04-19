@@ -6,11 +6,24 @@ const path = require('path');
 /**
  * scripts/playwright/acg_credentials.js
  *
- * Static Playwright script to extract AWS credentials from Pluralsight Cloud Sandbox.
- * Reuses existing Chrome context via CDP if available, otherwise fails.
+ * Static Playwright script to extract AWS/GCP credentials from Pluralsight Cloud Sandbox.
+ * Reuses existing Chrome context via CDP.
+ *
+ * Exit Code Contract:
+ * 0: SUCCESS          - Credentials extracted
+ * 1: ERROR            - Unexpected internal failure
+ * 10: LOGIN_REQUIRED  - Session expired, redirected to /id or /hands-on
+ * 11: UNEXPECTED_PAGE - CDP attached but no relevant sandbox tab found
+ * 12: TIMEOUT         - Dashboard reached but content failed to load
  */
 
-const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'playwright-auth');
+const STATUS = {
+  SUCCESS: 0,
+  ERROR: 1,
+  LOGIN_REQUIRED: 10,
+  UNEXPECTED_PAGE: 11,
+  TIMEOUT: 12
+};
 
 async function _extractAwsCredentials(page) {
   await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 15000 });
@@ -77,7 +90,7 @@ async function extractCredentials() {
   const targetUrl = process.argv[2];
   if (!targetUrl) {
     console.error('ERROR: No target URL provided');
-    process.exit(1);
+    process.exit(STATUS.ERROR);
   }
   const _providerIdx = process.argv.indexOf('--provider');
   const _provider = _providerIdx !== -1 && process.argv[_providerIdx + 1] ? process.argv[_providerIdx + 1] : 'aws';
@@ -85,64 +98,77 @@ async function extractCredentials() {
   console.error(`INFO: Using provider ${_provider}`);
 
   let browser;
-  let browserContext;
-
   try {
-    // 1. MUST use CDP (stability contract)
+    // 1. CDP Attach
     try {
       browser = await chromium.connectOverCDP('http://localhost:9222');
-      browserContext = browser.contexts()[0];
     } catch (e) {
-      throw new Error(`Cannot connect to Chrome CDP: ${e.message}. Ensure Chrome is running with --remote-debugging-port=9222`);
+      console.error(`ERROR: Cannot connect to Chrome CDP: ${e.message}`);
+      process.exit(STATUS.ERROR);
     }
 
-    if (!browserContext) {
-      throw new Error('CDP connected but no browser contexts found. Restart Chrome with --remote-debugging-port=9222');
+    const context = browser.contexts()[0];
+    if (!context) {
+      console.error('ERROR: CDP connected but no browser context found.');
+      process.exit(STATUS.ERROR);
     }
 
-    // 2. Find or create page
-    const allPages = browserContext.pages();
+    // 2. Tab Discovery and Classification
+    const allPages = context.pages();
     let page = allPages.find(p => {
       try { return new URL(p.url()).hostname.includes('pluralsight.com'); } catch { return false; }
     });
     
     if (!page) {
-      console.error('INFO: No Pluralsight tab open, will open one in existing Chrome.');
-      page = await browserContext.newPage();
+      console.error('INFO: No Pluralsight tab open, opening a new one.');
+      page = await context.newPage();
     }
 
-    // 3. Navigation with "Patient Polling" for Cold Starts
+    // 3. Strategic Navigation
     console.error(`INFO: Navigating to ${targetUrl}...`);
-    const currentUrl = page.url();
-    if (!currentUrl.includes('cloud-sandboxes')) {
+    if (!page.url().includes('cloud-sandboxes')) {
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     }
 
-    // 4. Session classification loop
+    // 4. Session State Machine (Granular Classification)
     const deadline = Date.now() + 300000;
     while (Date.now() < deadline) {
       const url = page.url();
+      
+      // State: READY
       if (url.includes('cloud-sandboxes')) {
-        console.error('INFO: Dashboard reached.');
+        console.error('DIAGNOSTIC: Session state is READY (Dashboard reached).');
         break;
       }
       
-      if (url.includes('/id') || url.includes('/hands-on')) {
+      // State: LOGIN_REQUIRED
+      if (url.includes('/id') || url.includes('/hands-on') || url.includes('/home')) {
+        console.error('DIAGNOSTIC: Session state is LOGIN_REQUIRED.');
         console.error('ACTION REQUIRED: Pluralsight session invalid or expired. PLEASE SIGN IN MANUALLY IN CHROME.');
-        console.error(`INFO: Current URL: ${url}. Waiting...`);
+        // We stay in the loop to allow the user to fix it
+      } else {
+        // State: UNEXPECTED_PAGE
+        console.error('DIAGNOSTIC: Session state is UNEXPECTED_PAGE.');
+        console.error(`INFO: Attached to non-sandbox URL: ${url}`);
       }
       
       await page.waitForTimeout(5000);
     }
 
+    // Post-loop check
     if (!page.url().includes('cloud-sandboxes')) {
-      throw new Error('Timed out waiting for sandbox dashboard. Manual sign-in failed or took too long.');
+      const finalUrl = page.url();
+      if (finalUrl.includes('/id') || finalUrl.includes('/hands-on')) {
+        process.exit(STATUS.LOGIN_REQUIRED);
+      } else {
+        process.exit(STATUS.UNEXPECTED_PAGE);
+      }
     }
 
     // 5. Extraction
-    await page.waitForSelector('button:has-text("Sandbox"), input[aria-label="Copyable input"]', { timeout: 30000 });
+    await page.waitForSelector('button:has-text("Sandbox"), input[aria-label="Copyable input"]', { timeout: 30000 })
+      .catch(() => { throw new Error('TIMEOUT: Dashboard elements failed to appear'); });
     
-    // Check if panel needs opening
     const credInput = page.locator('input[aria-label="Copyable input"]').first();
     const hasCreds = await credInput.isVisible({ timeout: 2000 }).then(async (vis) => vis && (await credInput.inputValue()).length > 0).catch(() => false);
     
@@ -150,12 +176,17 @@ async function extractCredentials() {
       console.error('INFO: Panel not loaded, searching for provider button...');
       const providerLabel = _provider === 'gcp' ? 'GCP' : 'AWS';
       const openBtn = page.locator(`button:has-text("Open Sandbox"), button[data-heap-id*="${providerLabel} Sandbox - Open Sandbox"]`).first();
-      await openBtn.click();
+      
+      if (await openBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await openBtn.click();
+      } else {
+        console.error('WARN: Provider button not found. Manual interaction may be required.');
+      }
       
       await page.waitForFunction(() => {
         const el = document.querySelector('input[aria-label="Copyable input"]');
         return el && el.value.trim().length > 0;
-      }, { timeout: 60000 });
+      }, { timeout: 45000 }).catch(() => { throw new Error('TIMEOUT: Credentials failed to populate in panel'); });
     }
 
     console.error(`INFO: Extracting credentials...`);
@@ -167,7 +198,7 @@ async function extractCredentials() {
 
   } catch (error) {
     console.error(`ERROR: ${error.message}`);
-    throw error;
+    process.exit(error.message.includes('TIMEOUT') ? STATUS.TIMEOUT : STATUS.ERROR);
   } finally {
     if (browser) {
       await browser.disconnect().catch(() => {});
@@ -184,5 +215,5 @@ Promise.race([
   )
 ]).catch(err => {
   console.error(`ERROR: ${err.message}`);
-  process.exit(1);
+  process.exit(STATUS.TIMEOUT);
 });

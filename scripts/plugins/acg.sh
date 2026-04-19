@@ -197,8 +197,37 @@ HELP
 
   _info "[acg] Extracting AWS credentials from ${sandbox_url}..."
 
-  local output
+  local output exit_code
   output=$(node "$playwright_script" "$sandbox_url" 2>&1)
+  exit_code=$?
+
+  case "${exit_code}" in
+    0)
+      _info "[acg] Credentials successfully extracted"
+      ;;
+    10)
+      _err "[acg] Pluralsight session invalid or expired."
+      _err "[acg]   1. Open Google Chrome"
+      _err "[acg]   2. Sign in to Pluralsight manually"
+      _err "[acg]   3. Rerun your command"
+      return 1
+      ;;
+    11)
+      _err "[acg] Attached to a non-sandbox browser page."
+      _err "[acg] Please ensure the sandbox URL is correct and no security blocks are active."
+      return 1
+      ;;
+    12)
+      _err "[acg] Timed out waiting for sandbox credentials to populate."
+      _err "[acg] The dashboard reached but expected elements did not appear."
+      return 1
+      ;;
+    *)
+      _err "[acg] Unexpected extraction failure (exit: ${exit_code})"
+      _err "[acg] Log: ${output}"
+      return 1
+      ;;
+  esac
 
   local access_key secret_key session_token
   access_key=$(printf '%s' "$output" | perl -ne 'if (/AWS_ACCESS_KEY_ID=(\S+)/) {print $1; exit}')
