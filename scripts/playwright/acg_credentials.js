@@ -154,8 +154,10 @@ async function extractCredentials() {
         });
         if (_cdpPsPage) {
           console.error('INFO: Found existing Pluralsight session via CDP — reusing existing Chrome instance.');
-          browserContext = _cdpContext;
+        } else {
+          console.error('INFO: CDP connected — no Pluralsight tab open, will open one in existing Chrome.');
         }
+        browserContext = _cdpContext;
       }
       if (!browserContext) {
         try { await _cdpBrowser.close(); } catch {}
@@ -425,7 +427,7 @@ async function extractCredentials() {
 
   } catch (error) {
     console.error(`ERROR: ${error.message}`);
-    process.exit(1);
+    throw error;
   } finally {
     if (_cdpBrowser) {
       try { await _cdpBrowser.close(); } catch {}
