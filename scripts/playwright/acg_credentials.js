@@ -435,7 +435,7 @@ async function extractCredentials() {
   }
 }
 
-const OVERALL_TIMEOUT_MS = IS_FIRST_RUN ? 300000 : 120000;
+const OVERALL_TIMEOUT_MS = 300000;
 Promise.race([
   extractCredentials(),
   new Promise((_, reject) =>
