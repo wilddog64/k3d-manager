@@ -109,3 +109,4 @@ History through `v0.9.18` is archived in `memory-bank/archive/progress-pre-v0.9.
 - [x] **Playwright Stability Hardening** — COMPLETE (`5b6d030e`).
 - [x] **ACG CDP/session mismatch** — RESOLVED (`5b6d030e`).
 - [x] **ACG CDP/session contract** — COMPLETE (`5b6d030e`).
+- [ ] **ACG Credentials Observability Gap** — OPEN. Issue `docs/bugs/2026-04-19-acg-credentials-observability-gap.md`; lacks reserved exit codes and granular state machine for session classification.
