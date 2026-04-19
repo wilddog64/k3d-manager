@@ -85,6 +85,30 @@ function gcp_get_credentials() {
     return 1
   fi
 
+  if ! curl -sf http://localhost:9222/json >/dev/null 2>&1; then
+    _info "[gcp] Chrome not running on CDP port 9222 — launching Chrome with your default profile..."
+    if [[ "$(uname)" == "Darwin" ]]; then
+      pkill -x "Google Chrome" 2>/dev/null || true
+      sleep 1
+      open -a "Google Chrome" --args --remote-debugging-port=9222
+    else
+      local _chrome_bin
+      _chrome_bin=$(command -v google-chrome 2>/dev/null || command -v google-chrome-stable 2>/dev/null || command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || true)
+      if [[ -z "${_chrome_bin}" ]]; then
+        _err "[gcp] Chrome/Chromium not found — install google-chrome or chromium"
+      fi
+      "${_chrome_bin}" --remote-debugging-port=9222 &
+    fi
+    local _cdp_deadline=$(( $(date +%s) + 15 ))
+    until curl -sf http://localhost:9222/json >/dev/null 2>&1; do
+      if (( $(date +%s) >= _cdp_deadline )); then
+        _err "[gcp] Timed out waiting for Chrome CDP on port 9222"
+      fi
+      sleep 1
+    done
+    _info "[gcp] Chrome CDP ready on port 9222"
+  fi
+
   local output
   output=$(node "${PLAYWRIGHT_SCRIPT}" "${url}" --provider gcp) || {
     _err "[gcp] Failed to extract credentials via Playwright"
