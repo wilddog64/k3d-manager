@@ -109,4 +109,5 @@ History through `v0.9.18` is archived in `memory-bank/archive/progress-pre-v0.9.
 - [x] **Playwright Stability Hardening** — COMPLETE (`5b6d030e`).
 - [x] **ACG CDP/session mismatch** — LARGELY RESOLVED (`5b6d030e`). Main attachability mismatch is addressed, but observability/classification gaps remain open.
 - [x] **ACG CDP/session contract** — MOSTLY COMPLETE (`5b6d030e`). Unified helper/delegation landed; finer-grained shell/Playwright state reporting remains open.
-- [ ] **ACG Credentials Observability Gap** — OPEN. Issue `docs/bugs/2026-04-19-acg-credentials-observability-gap.md`; lacks reserved exit codes and granular state machine for session classification.
+- [x] **ACG Credentials Observability Gap** — COMPLETE (`8978c2f4`). Granular state machine and reserved exit codes implemented in acg_credentials.js; acg.sh surfaces specific error modes.
+- [ ] **GCP Identity Mismatch (SSH Blocked)** — OPEN. Issue `docs/bugs/2026-04-19-gcp-identity-mismatch-ssh-blocked.md`; CLI must be switched to `cloud_user` to enable SSH access and instance management.
