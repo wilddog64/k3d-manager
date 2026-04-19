@@ -54,16 +54,18 @@ function _gcp_ssh_config_remove() {
 function _gcp_load_credentials() {
   local sandbox_url="${1:-}"
   local _default_key="${HOME}/.local/share/k3d-manager/gcp-service-account.json"
-  local _cached_project
+  local _cached_project _sa_email
   _cached_project=$(jq -r '.project_id' "${_default_key}" 2>/dev/null || true)
-  if [[ -f "${_default_key}" && -n "${_cached_project}" && "${_cached_project}" != "null" ]]; then
-    if gcloud projects describe "${_cached_project}" --quiet >/dev/null 2>&1; then
+  _sa_email=$(jq -r '.client_email' "${_default_key}" 2>/dev/null || true)
+  if [[ -f "${_default_key}" && -n "${_cached_project}" && "${_cached_project}" != "null" \
+        && -n "${_sa_email}" && "${_sa_email}" != "null" ]]; then
+    if gcloud auth activate-service-account "${_sa_email}" \
+         --key-file="${_default_key}" --quiet >/dev/null 2>&1 \
+       && gcloud projects describe "${_cached_project}" --quiet >/dev/null 2>&1; then
       _info "[k3s-gcp] SA key valid on disk — skipping Playwright extraction"
       export GCP_PROJECT="${_cached_project}"
       export GOOGLE_APPLICATION_CREDENTIALS="${_default_key}"
-      local _active_account
-      _active_account=$(gcloud auth list --filter="status:ACTIVE" --format="value(account)" 2>/dev/null || true)
-      [[ -n "${_active_account}" ]] && export GCP_USERNAME="${_active_account}"
+      export GCP_USERNAME="${_sa_email}"
     else
       _info "[k3s-gcp] Cached project ${_cached_project} not accessible — sandbox may have changed; re-extracting credentials..."
       rm -f "${_default_key}"
