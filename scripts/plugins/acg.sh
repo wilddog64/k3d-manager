@@ -112,12 +112,13 @@ function _acg_browser_attach_or_launch() {
   fi
 
   # 1. Check if CDP is already responding
-  if curl -sf http://localhost:9222/json >/dev/null 2>&1; then
+  if curl --noproxy "*" -sf http://127.0.0.1:9222/json >/dev/null 2>&1; then
     return 0
   fi
 
   # 2. If port is silent, check if Chrome is already running
-  if pgrep -x "Google Chrome" >/dev/null 2>&1 || pgrep -x "chrome" >/dev/null 2>&1; then
+  # Use -f to match the command line but exclude helpers/renderers
+  if pgrep -f "Google Chrome.app/Contents/MacOS/Google Chrome" >/dev/null 2>&1; then
     _err "[acg] Google Chrome is running but CDP is not enabled on port 9222."
     _err "[acg] To use automation, you must restart Chrome with the debugging port enabled:"
     _err "[acg]   1. Quit Chrome completely (Cmd+Q)"
@@ -146,7 +147,7 @@ function _acg_browser_attach_or_launch() {
 
   # Wait for port to become active
   local deadline=$(( $(date +%s) + timeout ))
-  until curl -sf http://localhost:9222/json >/dev/null 2>&1; do
+  until curl -sf http://127.0.0.1:9222/json >/dev/null 2>&1; do
     if (( $(date +%s) >= deadline )); then
       _err "[acg] Timed out waiting for Chrome CDP on port 9222"
       return 1

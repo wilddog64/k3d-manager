@@ -3,7 +3,7 @@
 
 .DEFAULT_GOAL := help
 
-URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
+URL ?= https://app.pluralsight.com/hands-on/playground/cloud-sandboxes
 GHCR_PAT ?= $(shell gh auth token 2>/dev/null)
 CLUSTER_PROVIDER ?= k3s-aws
 

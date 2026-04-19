@@ -101,7 +101,7 @@ async function extractCredentials() {
   try {
     // 1. CDP Attach
     try {
-      browser = await chromium.connectOverCDP('http://localhost:9222');
+      browser = await chromium.connectOverCDP('http://127.0.0.1:9222');
     } catch (e) {
       console.error(`ERROR: Cannot connect to Chrome CDP: ${e.message}`);
       process.exit(STATUS.ERROR);
