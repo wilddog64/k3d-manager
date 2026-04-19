@@ -104,6 +104,59 @@ function acg_import_credentials() {
   aws_import_credentials "$@"
 }
 
+function _acg_browser_attach_or_launch() {
+  local timeout="${1:-30}"
+  
+  if ! _command_exist curl; then
+    _err "[acg] curl is required for browser CDP probe"
+  fi
+
+  # 1. Check if CDP is already responding
+  if curl -sf http://localhost:9222/json >/dev/null 2>&1; then
+    return 0
+  fi
+
+  # 2. If port is silent, check if Chrome is already running
+  if pgrep -x "Google Chrome" >/dev/null 2>&1 || pgrep -x "chrome" >/dev/null 2>&1; then
+    _err "[acg] Google Chrome is running but CDP is not enabled on port 9222."
+    _err "[acg] To use automation, you must restart Chrome with the debugging port enabled:"
+    _err "[acg]   1. Quit Chrome completely (Cmd+Q)"
+    _err "[acg]   2. Run: open -a \"Google Chrome\" --args --remote-debugging-port=9222"
+    return 1
+  fi
+
+  # 3. Chrome not running at all — launch it with CDP enabled
+  _info "[acg] Chrome not running — launching with --remote-debugging-port=9222..."
+  if [[ "$(uname)" == "Darwin" ]]; then
+    open -a "Google Chrome" --args \
+      --remote-debugging-port=9222 \
+      --password-store=basic \
+      --user-data-dir="${HOME}/.config/acg-chrome-profile"
+  else
+    local _chrome_bin
+    _chrome_bin=$(command -v google-chrome 2>/dev/null || command -v google-chrome-stable 2>/dev/null || command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || true)
+    if [[ -z "${_chrome_bin}" ]]; then
+      _err "[acg] Chrome/Chromium not found — install google-chrome or chromium"
+    fi
+    "${_chrome_bin}" \
+      --remote-debugging-port=9222 \
+      --password-store=basic \
+      --user-data-dir="${HOME}/.config/acg-chrome-profile" &
+  fi
+
+  # Wait for port to become active
+  local deadline=$(( $(date +%s) + timeout ))
+  until curl -sf http://localhost:9222/json >/dev/null 2>&1; do
+    if (( $(date +%s) >= deadline )); then
+      _err "[acg] Timed out waiting for Chrome CDP on port 9222"
+      return 1
+    fi
+    sleep 1
+  done
+  _info "[acg] Chrome CDP ready on port 9222"
+  return 0
+}
+
 function acg_get_credentials() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<HELP
@@ -140,11 +193,7 @@ HELP
     return 1
   fi
 
-  if ! curl -sf http://localhost:9222/json >/dev/null 2>&1; then
-    _info "[acg] Chrome CDP not available on port 9222 — launching Chrome..."
-    _browser_launch
-    _antigravity_browser_ready 30
-  fi
+  _acg_browser_attach_or_launch 30 || return 1
 
   _info "[acg] Extracting AWS credentials from ${sandbox_url}..."
 

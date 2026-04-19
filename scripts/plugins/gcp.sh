@@ -78,49 +78,6 @@ function _ensure_k3sup() {
   return 1
 }
 
-function _gcp_launch_cdp_chrome() {
-  if [[ "$(uname)" == "Darwin" ]]; then
-    if pgrep -x "Google Chrome" >/dev/null 2>&1; then
-      _err "[gcp] Chrome is running without CDP; it cannot be fixed automatically."
-      _err "[gcp] Quit Chrome completely."
-      _err "[gcp] Relaunch it with CDP enabled:"
-      _err "[gcp]   open -a \"Google Chrome\" --args --remote-debugging-port=9222"
-      return 1
-    fi
-    _info "[gcp] Launching Chrome with CDP port 9222 and your default profile..."
-    open -a "Google Chrome" --args --remote-debugging-port=9222
-    return 0
-  fi
-
-  local chrome_bin
-  chrome_bin=$(command -v google-chrome 2>/dev/null || command -v google-chrome-stable 2>/dev/null || command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || true)
-  if [[ -z "${chrome_bin}" ]]; then
-    _err "[gcp] Chrome/Chromium not found — install google-chrome or chromium"
-    return 1
-  fi
-  if pgrep -x "google-chrome" >/dev/null 2>&1 || pgrep -x "google-chrome-stable" >/dev/null 2>&1 || pgrep -x "chromium-browser" >/dev/null 2>&1 || pgrep -x "chromium" >/dev/null 2>&1; then
-    _err "[gcp] Chrome is running without CDP; it cannot be fixed automatically."
-    _err "[gcp] Quit Chrome completely."
-    _err "[gcp] Relaunch it with CDP enabled:"
-    _err "[gcp]   ${chrome_bin} --remote-debugging-port=9222"
-    return 1
-  fi
-  _info "[gcp] Launching Chrome with CDP port 9222..."
-  "${chrome_bin}" --remote-debugging-port=9222 &
-}
-
-function _gcp_wait_for_cdp() {
-  local cdp_deadline=$(( $(date +%s) + 15 ))
-  until curl -sf http://localhost:9222/json >/dev/null 2>&1; do
-    if (( $(date +%s) >= cdp_deadline )); then
-      _err "[gcp] Timed out waiting for Chrome CDP on port 9222"
-      return 1
-    fi
-    sleep 1
-  done
-  _info "[gcp] Chrome CDP ready on port 9222"
-}
-
 function gcp_get_credentials() {
   local url="${1:-}"; shift || true
   if [[ -z "${url}" ]]; then
@@ -128,10 +85,9 @@ function gcp_get_credentials() {
     return 1
   fi
 
-  if ! curl -sf http://localhost:9222/json >/dev/null 2>&1; then
-    _gcp_launch_cdp_chrome || return 1
-    _gcp_wait_for_cdp || return 1
-  fi
+  # shellcheck source=/dev/null
+  source "${SCRIPT_DIR}/plugins/acg.sh"
+  _acg_browser_attach_or_launch 30 || return 1
 
   local output
   output=$(node "${PLAYWRIGHT_SCRIPT}" "${url}" --provider gcp) || {

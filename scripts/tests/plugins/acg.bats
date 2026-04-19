@@ -140,3 +140,33 @@ setup() {
   [[ -f "$stack_wait_log" ]]
   [[ -f "$kubectl_delete_log" ]]
 }
+
+@test "_acg_browser_attach_or_launch fails when Chrome is running without CDP" {
+  source "${BATS_TEST_DIRNAME}/../../plugins/acg.sh"
+  
+  # Stub curl to fail (simulate silent port)
+  curl() { return 1; }
+  # Stub pgrep to succeed (simulate running chrome)
+  pgrep() { return 0; }
+  export -f curl pgrep
+
+  run _acg_browser_attach_or_launch 1
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"running but CDP is not enabled"* ]]
+}
+
+@test "_acg_browser_attach_or_launch attempts to launch when Chrome is not running" {
+  source "${BATS_TEST_DIRNAME}/../../plugins/acg.sh"
+  
+  # Stub curl to fail
+  curl() { return 1; }
+  # Stub pgrep to fail (simulate chrome not running)
+  pgrep() { return 1; }
+  # Stub open to return success
+  open() { return 0; }
+  export -f curl pgrep open
+
+  # It will still fail on the wait-loop, but we check that it attempted the launch
+  run _acg_browser_attach_or_launch 1
+  [[ "$output" == *"Chrome not running — launching"* ]]
+}
