@@ -81,10 +81,14 @@ function _ensure_k3sup() {
 function _gcp_launch_cdp_chrome() {
   if [[ "$(uname)" == "Darwin" ]]; then
     if pgrep -x "Google Chrome" >/dev/null 2>&1; then
-      _err "[gcp] Chrome is running but CDP is not enabled. Quit Chrome and rerun: open -a \"Google Chrome\" --args --remote-debugging-port=9222"
-      return 1
+      _info "[gcp] Chrome is running without CDP. It must be restarted to enable --remote-debugging-port=9222."
+      _info "[gcp] Chrome will restore your tabs via session restore."
+      _info "[gcp] Restarting Chrome in 5 seconds — Ctrl+C to abort..."
+      sleep 5
+      pkill -x "Google Chrome" 2>/dev/null || true
+      sleep 1
     fi
-    _info "[gcp] Chrome not running — launching with CDP port 9222 and your default profile..."
+    _info "[gcp] Launching Chrome with CDP port 9222 and your default profile..."
     open -a "Google Chrome" --args --remote-debugging-port=9222
     return 0
   fi
@@ -96,10 +100,17 @@ function _gcp_launch_cdp_chrome() {
     return 1
   fi
   if pgrep -x "google-chrome" >/dev/null 2>&1 || pgrep -x "google-chrome-stable" >/dev/null 2>&1 || pgrep -x "chromium-browser" >/dev/null 2>&1 || pgrep -x "chromium" >/dev/null 2>&1; then
-    _err "[gcp] Chrome is running but CDP is not enabled. Quit Chrome and rerun: ${chrome_bin} --remote-debugging-port=9222"
-    return 1
+    _info "[gcp] Chrome is running without CDP. It must be restarted to enable --remote-debugging-port=9222."
+    _info "[gcp] Chrome will restore your tabs via session restore."
+    _info "[gcp] Restarting Chrome in 5 seconds — Ctrl+C to abort..."
+    sleep 5
+    pkill -x "google-chrome" 2>/dev/null || true
+    pkill -x "google-chrome-stable" 2>/dev/null || true
+    pkill -x "chromium-browser" 2>/dev/null || true
+    pkill -x "chromium" 2>/dev/null || true
+    sleep 1
   fi
-  _info "[gcp] Chrome not running — launching with CDP port 9222..."
+  _info "[gcp] Launching Chrome with CDP port 9222..."
   "${chrome_bin}" --remote-debugging-port=9222 &
 }
 
