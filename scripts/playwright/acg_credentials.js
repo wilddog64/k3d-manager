@@ -242,13 +242,16 @@ async function extractCredentials() {
     await page.waitForTimeout(1000);
     if (page.url().includes('/id')) {
       console.error('INFO: Pluralsight redirected to /id — waiting for manual sign-in (up to 300s)...');
-      await page.waitForURL(url => !url.includes('/id'), { timeout: 300000 })
-        .catch(() => {
-          throw new Error(
-            'Pluralsight session expired (timed out waiting for sign-in at /id).\n' +
-            'Fix: rm -rf ~/.local/share/k3d-manager/playwright-auth && re-run make up to re-authenticate.'
-          );
-        });
+      const _idDeadline = Date.now() + 300000;
+      while (page.url().includes('/id') && Date.now() < _idDeadline) {
+        await page.waitForTimeout(2000);
+      }
+      if (page.url().includes('/id')) {
+        throw new Error(
+          'Pluralsight session expired (timed out waiting for sign-in at /id).\n' +
+          'Fix: rm -rf ~/.local/share/k3d-manager/playwright-auth && re-run make up to re-authenticate.'
+        );
+      }
       console.error('INFO: Sign-in complete — re-navigating to sandbox page...');
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
       await page.waitForFunction(
