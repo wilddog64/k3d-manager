@@ -238,6 +238,15 @@ async function extractCredentials() {
       { timeout: 30000 }
     ).catch(() => console.error('WARN: Skeleton loaders did not clear within 30s — proceeding anyway'));
 
+    // Detect Pluralsight session expiry — /id redirect means cookies are invalid
+    await page.waitForTimeout(1000);
+    if (page.url().includes('/id')) {
+      throw new Error(
+        'Pluralsight session expired (redirected to /id auth gateway).\n' +
+        'Fix: rm -rf ~/.local/share/k3d-manager/playwright && re-run make up to trigger manual re-login.'
+      );
+    }
+
     // 2b. Handle unauthenticated state — sign in via Google Password Manager if needed
     const signInLink = page.locator('a[href*="id.pluralsight.com"], a:has-text("Sign In"), button:has-text("Sign In")').first();
     const isSignInVisible = await signInLink.isVisible({ timeout: 10000 }).catch(() => false);
