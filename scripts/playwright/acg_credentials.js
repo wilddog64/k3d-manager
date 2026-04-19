@@ -164,16 +164,13 @@ async function extractCredentials() {
         _cdpBrowser = null;
       }
     } catch {
-      console.error('INFO: Chrome not running on CDP port 9222 — falling back to isolated Playwright profile.');
-      console.error('INFO: A new Chrome window will open. Log in to Pluralsight there, OR restart Chrome with --remote-debugging-port=9222 to reuse your existing session automatically.');
-      _cdpBrowser = null;
+      console.error('ERROR: Chrome is not running with --remote-debugging-port=9222.');
+      console.error('ERROR: Start Chrome with CDP enabled, then rerun:');
+      console.error('ERROR:   open -a "Google Chrome" --args --remote-debugging-port=9222');
+      throw new Error('Chrome not running with --remote-debugging-port=9222 — cannot access Pluralsight session');
     }
     if (!browserContext) {
-      browserContext = await chromium.launchPersistentContext(AUTH_DIR, {
-        headless: false,
-        channel: 'chrome',
-        args: ['--password-store=basic'],
-      });
+      throw new Error('CDP connected but no browser contexts found — restart Chrome with --remote-debugging-port=9222 and try again');
     }
 
     // 2. Find the Pluralsight page by URL (do not assume pages()[0])
