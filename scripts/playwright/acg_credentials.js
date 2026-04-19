@@ -165,6 +165,7 @@ async function extractCredentials() {
       }
     } catch {
       console.error('INFO: Chrome not running on CDP port 9222 — falling back to isolated Playwright profile.');
+      console.error('INFO: A new Chrome window will open. Log in to Pluralsight there, OR restart Chrome with --remote-debugging-port=9222 to reuse your existing session automatically.');
       _cdpBrowser = null;
     }
     if (!browserContext) {
