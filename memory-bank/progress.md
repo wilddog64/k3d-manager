@@ -107,6 +107,6 @@ History through `v0.9.18` is archived in `memory-bank/archive/progress-pre-v0.9.
 - [x] **Playwright CDP Destructive Cleanup** — HISTORICAL (`ecec0ff8`, `75aa65a8`). Issue `docs/bugs/2026-04-18-playwright-cdp-destructive-cleanup.md`; the destructive `.close()` cleanup and `allPages[0]` tab hijack paths were fixed later on this branch, so this issue no longer reflects the active failure mode.
 - [x] **ACG Credentials Landing Page Bug** — COMPLETE (`5b6d030e`).
 - [x] **Playwright Stability Hardening** — COMPLETE (`5b6d030e`).
-- [x] **ACG CDP/session mismatch** — RESOLVED (`5b6d030e`).
-- [x] **ACG CDP/session contract** — COMPLETE (`5b6d030e`).
+- [x] **ACG CDP/session mismatch** — LARGELY RESOLVED (`5b6d030e`). Main attachability mismatch is addressed, but observability/classification gaps remain open.
+- [x] **ACG CDP/session contract** — MOSTLY COMPLETE (`5b6d030e`). Unified helper/delegation landed; finer-grained shell/Playwright state reporting remains open.
 - [ ] **ACG Credentials Observability Gap** — OPEN. Issue `docs/bugs/2026-04-19-acg-credentials-observability-gap.md`; lacks reserved exit codes and granular state machine for session classification.
