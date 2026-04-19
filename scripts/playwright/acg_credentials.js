@@ -164,6 +164,7 @@ async function extractCredentials() {
         _cdpBrowser = null;
       }
     } catch {
+      console.error('INFO: Chrome not running on CDP port 9222 — falling back to isolated Playwright profile.');
       _cdpBrowser = null;
     }
     if (!browserContext) {
@@ -182,8 +183,7 @@ async function extractCredentials() {
       try { return new URL(p.url()).hostname.endsWith('.pluralsight.com') || new URL(p.url()).hostname === 'pluralsight.com'; } catch { return false; }
     });
     if (!page) {
-      page = allPages[0];
-      if (!page) throw new Error('No page found in the browser context');
+      page = await context.newPage();
     }
 
     // Skip navigation entirely if sandbox panel is already loaded on the current page
