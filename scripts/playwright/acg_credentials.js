@@ -160,7 +160,7 @@ async function extractCredentials() {
         browserContext = _cdpContext;
       }
       if (!browserContext) {
-        try { await _cdpBrowser.close(); } catch {}
+        try { await _cdpBrowser.disconnect(); } catch {}
         _cdpBrowser = null;
       }
     } catch {
@@ -430,7 +430,7 @@ async function extractCredentials() {
     throw error;
   } finally {
     if (_cdpBrowser) {
-      try { await _cdpBrowser.close(); } catch {}
+      try { await _cdpBrowser.disconnect(); } catch {}
     } else if (browserContext) {
       await browserContext.close();
     }
