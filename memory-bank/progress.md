@@ -105,7 +105,7 @@ History through `v0.9.18` is archived in `memory-bank/archive/progress-pre-v0.9.
 - [x] **macOS Chrome CDP relaunch timeout** — RESOLVED (`7cf8fc6f`). Issue `docs/bugs/2026-04-19-gcp-cdp-relaunch-timeout-macos.md`; removing the auto-restart path eliminates this timeout failure mode on macOS.
 - [x] **`_gcp_load_credentials` stale user auth triggers false Playwright re-run** — COMPLETE (`274a5989`). Spec `docs/bugs/v1.1.0-bugfix-gcp-sa-key-validation.md`; `scripts/lib/providers/k3s-gcp.sh` now activates the cached SA key before `gcloud projects describe`, avoiding false Playwright re-extraction when user auth is stale.
 - [x] **Playwright CDP Destructive Cleanup** — HISTORICAL (`ecec0ff8`, `75aa65a8`). Issue `docs/bugs/2026-04-18-playwright-cdp-destructive-cleanup.md`; the destructive `.close()` cleanup and `allPages[0]` tab hijack paths were fixed later on this branch, so this issue no longer reflects the active failure mode.
-- [ ] **ACG Credentials Landing Page Bug** — OPEN. Issue `docs/bugs/2026-04-18-acg-credentials-landing-page-redirect.md`; script hangs on Pluralsight landing page redirects when session is invalid.
-- [ ] **Playwright Stability Hardening** — SPECCED. Plan `docs/plans/v1.1.0-playwright-stability-hardening.md`; fix destructive cleanup, add cold-start polling, and unify Chrome CDP launcher. **NEW:** Added IDP safety guards to prevent Auth0 "suspicious activity" blocks.
-- [ ] **ACG CDP/session mismatch is the current blocker** — OPEN. Issue `docs/bugs/2026-04-19-acg-credentials-current-blocker-cdp-session-mismatch.md`; historical singleton-lock RCA is still true, but current live failures stem from CDP attach/session-state mismatch rather than the old Playwright profile lock.
-- [ ] **ACG CDP/session contract** — SPECCED. Plan `docs/plans/v1.1.0-acg-cdp-session-contract.md`; unify Chrome/CDP orchestration in `scripts/plugins/acg.sh`, make `scripts/plugins/gcp.sh` delegate to it, and add explicit post-attach session classification in `scripts/playwright/acg_credentials.js`.
+- [x] **ACG Credentials Landing Page Bug** — COMPLETE (`5b6d030e`).
+- [x] **Playwright Stability Hardening** — COMPLETE (`5b6d030e`).
+- [x] **ACG CDP/session mismatch** — RESOLVED (`5b6d030e`).
+- [x] **ACG CDP/session contract** — COMPLETE (`5b6d030e`).
