@@ -21,7 +21,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - **Seed commit** `11da18d8` (Gemini, 2026-04-19) — added `scripts/etc/playwright/vars.sh` + thin plan skeleton `docs/plans/v1.1.0-recovery-unified-automation.md`.
 - [x] **Phase A — Shared playwright vars** — **COMPLETE** (`3de58f4d`, memory-bank `349bddbf`). Reconciled `vars.sh` with existing `playwright-auth`; sourced `vars.sh` from `acg.sh`. E2E A1/A2/A4 ✓; A3 has 5 pre-existing SC2034 warnings (not new).
 - [x] **Phase B — Robot engine unification** — **COMPLETE** (`a986d5bb`). Issue `docs/bugs/v1.1.0-recovery-phase-b-robot-engine.md`. `acg_credentials.js`: `.close()`→`.disconnect()` for CDP; `--provider aws|gcp` flag; 127.0.0.1 CDP host; timer cleanup + explicit `process.exit(0)`.
-- [x] **Phase C — GCP identity (`gcp.sh`)** — **COMPLETE** (`5cb4c68c`). Issue `docs/bugs/2026-04-20-acg-up-monolithic-aws-lock.md`. Implemented credential scrubbing and surgical latch-on; refactored `bin/acg-up` with provider dispatch to unblock GCP `make up`.
+- [ ] **Phase C — GCP identity (`gcp.sh`)** — **PARTIAL / BLOCKED**. Issue `docs/bugs/2026-04-20-gcp-provider-unsupported-in-core.md`. Plugin ready and `acg-up` refactored, but the core dispatcher in `scripts/lib/core.sh` must be updated to allow `k3s-gcp`.
 - [x] **Phase D — Documentation Alignment** — **COMPLETE** (`7f3bd0a6`). Updated `README.md`, `docs/howto/acg-credentials-flow.md`, and `docs/howto/antigravity.md` to match the unified 127.0.0.1/vars.sh reality.
 - [ ] **E2E verify** — `CLUSTER_PROVIDER=k3s-aws make up` AND `CLUSTER_PROVIDER=k3s-gcp make up`; browser stays open; session cookies persist; active gcloud CLI account is user's, not the SA.
 

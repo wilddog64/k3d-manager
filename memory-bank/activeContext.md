@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | A — shared vars | **COMPLETE** (impl `3de58f4d`, memory-bank `349bddbf`, Gemini) | `docs/bugs/v1.1.0-recovery-phase-a-shared-vars.md` | `scripts/etc/playwright/vars.sh`, `scripts/plugins/acg.sh` | `fix(playwright): reconcile shared vars with existing auth dir` |
 | B — robot engine | **COMPLETE** (impl `a986d5bb`, Gemini) | `docs/bugs/v1.1.0-recovery-phase-b-robot-engine.md` | `scripts/playwright/acg_credentials.js` | `fix(playwright): disconnect over CDP, provider flag, IPv4, patient sign-in` |
-| C — gcp.sh | **COMPLETE** (impl `5cb4c68c`, Gemini) | `docs/bugs/2026-04-20-acg-up-provider-dispatch.md` | `bin/acg-up` | `fix(acg-up): provider-aware dispatch — unblock k3s-gcp make up` |
+| C — gcp.sh | **PARTIAL / BLOCKED** | `docs/bugs/2026-04-20-gcp-provider-unsupported-in-core.md` | `scripts/lib/core.sh` | `feat(gcp): plugin ready, core dispatcher needs k3s-gcp allowlist` |
 | D — docs | **COMPLETE** (impl `7f3bd0a6`, Gemini) | N/A | `README.md`, `docs/howto/*` | `docs: align README and guides with unified 127.0.0.1/vars.sh` |
 
 ## Agent Rigor CLI Improvements
