@@ -110,6 +110,9 @@ HELP
 
   _info "[gcp] GCP_PROJECT=${project}"
   _info "[gcp] GOOGLE_APPLICATION_CREDENTIALS=${key_path}"
+
+  # Final Step: Trigger the identity switch to unblock SSH and management
+  gcp_login "${username}"
 }
 
 function gcp_login() {
