@@ -13,29 +13,29 @@ acg_get_credentials [sandbox-url]
 │
 ├─ playwright module installed?  ──── NO ──► ERROR: cd scripts/playwright && npm install
 │
-├─ curl localhost:9222/json  ──── OK ──► Chrome already running, skip launch
+├─ curl 127.0.0.1:9222/json  ──── OK ──► Chrome already running, skip launch
 │
 └─ NOT OK ──► _antigravity_launch
               │
               ├─ macOS:  open -a "Google Chrome" --args
               │            --remote-debugging-port=9222
               │            --password-store=basic
-              │            --user-data-dir=~/.config/acg-chrome-profile
+              │            --user-data-dir=~/.local/share/k3d-manager/playwright-auth
               │
               └─ Linux:  google-chrome / chromium --remote-debugging-port=9222
                            --password-store=basic
-                           --user-data-dir=~/.config/acg-chrome-profile &
+                           --user-data-dir=~/.local/share/k3d-manager/playwright-auth &
                          │
                          └─ Chrome binary not found?  ──► ERROR
 
               _antigravity_browser_ready 30
               │
-              └─ polls localhost:9222/json every 1s for up to 30s
+              └─ polls 127.0.0.1:9222/json every 1s for up to 30s
                  timeout?  ──► ERROR: Chrome did not become ready
 
-node scripts/playwright/acg_credentials.js <sandbox-url>
+node scripts/playwright/acg_credentials.js <sandbox-url> --provider aws|gcp
 │
-├─ chromium.connectOverCDP('http://localhost:9222')
+├─ chromium.connectOverCDP('http://127.0.0.1:9222')
 │  └─ FAIL ──► ERROR: CDP connection refused (Chrome not on port 9222)
 │
 ├─ Find Pluralsight tab
@@ -108,8 +108,8 @@ Back in acg_get_credentials (bash)
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `CDP connection refused` | Chrome not running on 9222 | `acg_get_credentials` auto-launches; if it fails, check `ps aux \| grep chrome` for a conflicting Chrome instance without `--remote-debugging-port` |
-| `No browser context found` | Chrome launched but no window/tab open | Open any tab in the `acg-chrome-profile` Chrome window |
-| `Chrome did not become ready` | macOS Keychain blocked Chrome startup | Confirm `--password-store=basic` is in the launch args; check `~/.config/acg-chrome-profile` exists |
+| `No browser context found` | Chrome launched but no window/tab open | Open any tab in the `playwright-auth` Chrome window |
+| `Chrome did not become ready` | macOS Keychain blocked Chrome startup | Confirm `--password-store=basic` is in the launch args; check `~/.local/share/k3d-manager/playwright-auth` exists |
 | Sign-in loop / stuck on id.pluralsight.com | `PLURALSIGHT_EMAIL` not set + Password Manager didn't fire | Set `export PLURALSIGHT_EMAIL=you@example.com` before running |
 | `credentials panel did not appear` | Sandbox not started, or UI changed | Manually click "Start Sandbox" in the Chrome window, then re-run |
 | `Could not find AWS credentials` (positional fallback hit) | Pluralsight changed DOM order | Check `input[aria-label="Copyable input"]` count in DevTools; update positional index in `acg_credentials.js` |
@@ -119,6 +119,6 @@ Back in acg_get_credentials (bash)
 
 ## Chrome Profile
 
-The dedicated profile at `~/.config/acg-chrome-profile` keeps Pluralsight session cookies separate from your main Chrome. Once you sign in once, subsequent `acg_get_credentials` calls skip the sign-in flow entirely — as long as Chrome stays open.
+The dedicated profile at `~/.local/share/k3d-manager/playwright-auth` keeps Pluralsight session cookies separate from your main Chrome. Once you sign in once, subsequent `acg_get_credentials` calls skip the sign-in flow entirely — as long as Chrome stays open.
 
-To reset the session: `rm -rf ~/.config/acg-chrome-profile`
+To reset the session: `rm -rf ~/.local/share/k3d-manager/playwright-auth`

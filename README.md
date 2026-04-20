@@ -109,11 +109,12 @@ CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f   # k3s, non-intera
 | `k3d` | macOS, no OrbStack | Default fallback |
 | `k3s` | Linux bare-metal | `CLUSTER_PROVIDER=k3s` |
 | `k3s-aws` | AWS EC2 via ACG sandbox | `CLUSTER_PROVIDER=k3s-aws` |
+| `k3s-gcp` | GCP compute instance via ACG sandbox | `CLUSTER_PROVIDER=k3s-gcp` |
 
 See **[docs/providers/](docs/providers/)** for per-provider guides:
 - [OrbStack](docs/providers/orbstack.md)
 - [k3s (bare-metal)](docs/providers/k3s.md)
-- [k3s-aws (ACG EC2 sandbox)](docs/howto/acg.md)
+- [k3s-aws / k3s-gcp (ACG sandbox)](docs/howto/acg.md)
 
 ---
 
@@ -197,7 +198,7 @@ docs/
 
 | Plugin | Key Functions | Description |
 |---|---|---|
-| **ACG** | `acg_get_credentials`, `acg_import_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_extend_playwright`, `acg_watch`, `acg_teardown` | AWS ACG sandbox lifecycle — automated credential extraction via Playwright CDP, stdin fallback, VPC + SG + EC2 provisioning, background TTL watcher; [spec](docs/plans/v0.9.6-acg-plugin.md) |
+| **ACG** | `acg_get_credentials`, `acg_import_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_extend_playwright`, `acg_watch`, `acg_teardown` | AWS/GCP ACG sandbox lifecycle — automated credential extraction via Playwright CDP, stdin fallback, cloud VM provisioning, background TTL watcher; [spec](docs/plans/archive/v0.9.6-acg-plugin.md) |
 | **AWS** | `aws_import_credentials` | Generic AWS credential import — supports CSV (IAM Download), quoted/unquoted export, labeled (Pluralsight), credentials file formats; writes `~/.aws/credentials` |
 | **Antigravity** | `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_poll_task` | Browser automation via gemini CLI + Playwright over CDP (port 9222) — Copilot coding agent trigger |
 | **ArgoCD** | `deploy_argocd`, `deploy_argocd_bootstrap`, `register_app_cluster`, `configure_vault_argocd_repos` | GitOps engine deployment + app cluster registration + Vault repo auth |
@@ -228,7 +229,7 @@ docs/
 
 ### Architecture
 - **[Configuration-Driven Design](docs/architecture/configuration-driven-design.md)** — Core design principle
-- **[Strategic Roadmap v1.0](docs/plans/roadmap-v1.md)** — v0.8.0 → v1.0.0 roadmap
+- **[Strategic Roadmap v1.0](docs/plans/archive/roadmap-v1.md)** — v0.8.0 → v1.0.0 roadmap
 - **[Two-Cluster Architecture](docs/plans/two-cluster-infra.md)** — Infra + app cluster design
 
 ### How-To
