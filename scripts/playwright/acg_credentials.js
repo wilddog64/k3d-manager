@@ -28,6 +28,21 @@ function _isFirstRun() {
 }
 const IS_FIRST_RUN = _isFirstRun();
 
+/**
+ * Write credentials to secure file or stdout based on environment.
+ */
+function _outputCredentials(data) {
+  const credsFile = process.env.PLAYWRIGHT_CREDS_FILE;
+  const output = Object.entries(data).map(([k, v]) => `${k}=${v}`).join('\n');
+  
+  if (credsFile) {
+    fs.writeFileSync(credsFile, output, { mode: 0o600 });
+    console.error(`INFO: Credentials scrubbed to secure file: ${credsFile}`);
+  } else {
+    process.stdout.write(output + '\n');
+  }
+}
+
 async function _extractAwsCredentials(page) {
   await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 15000 });
   const inputs = await page.locator('input[aria-label="Copyable input"]').all();
@@ -59,11 +74,12 @@ async function _extractAwsCredentials(page) {
   }
 
   if (accessKey && secretKey) {
-    console.log(`AWS_ACCESS_KEY_ID=${accessKey.trim()}`);
-    console.log(`AWS_SECRET_ACCESS_KEY=${secretKey.trim()}`);
-    if (sessionToken) {
-      console.log(`AWS_SESSION_TOKEN=${sessionToken.trim()}`);
-    }
+    const creds = {
+      AWS_ACCESS_KEY_ID: accessKey.trim(),
+      AWS_SECRET_ACCESS_KEY: secretKey.trim()
+    };
+    if (sessionToken) creds.AWS_SESSION_TOKEN = sessionToken.trim();
+    _outputCredentials(creds);
   } else {
     throw new Error('Could not find AWS Access Key and Secret Key');
   }
@@ -115,10 +131,12 @@ async function _extractGcpCredentials(page) {
   fs.writeFileSync(keyPath, serviceAccountJson, { mode: 0o600 });
   console.error(`INFO: Service account key written to ${keyPath}`);
 
-  console.log(`GCP_PROJECT=${projectId}`);
-  console.log(`GCP_USERNAME=${username.trim()}`);
-  console.log(`GCP_PASSWORD=${password.trim()}`);
-  console.log(`GOOGLE_APPLICATION_CREDENTIALS=${keyPath}`);
+  _outputCredentials({
+    GCP_PROJECT: projectId,
+    GCP_USERNAME: username.trim(),
+    GCP_PASSWORD: password.trim(),
+    GOOGLE_APPLICATION_CREDENTIALS: keyPath
+  });
 }
 
 async function extractCredentials() {
@@ -131,15 +149,12 @@ async function extractCredentials() {
   const PROVIDER = (_providerIdx !== -1 && process.argv[_providerIdx + 1])
     ? process.argv[_providerIdx + 1]
     : 'aws';
-  if (PROVIDER !== 'aws' && PROVIDER !== 'gcp') {
-    console.error(`ERROR: Unknown provider '${PROVIDER}' (expected 'aws' or 'gcp')`);
+  
+  if (PROVIDER !== 'aws' && PROVIDER !== 'gcp' && PROVIDER !== 'azure') {
+    console.error(`ERROR: Unknown provider '${PROVIDER}' (expected 'aws', 'gcp', or 'azure')`);
     process.exit(1);
   }
   console.error(`INFO: Using provider ${PROVIDER}`);
-  // Standardize URL to minimize SPA redirects and Cloudflare triggers
-  if (targetUrl.includes('cloud-playground/cloud-sandboxes')) {
-    targetUrl = targetUrl.replace('cloud-playground/cloud-sandboxes', 'hands-on/playground/cloud-sandboxes');
-  }
 
   if (IS_FIRST_RUN) {
     console.error('BOOTSTRAP: Auth dir is empty — first run detected.');
@@ -200,33 +215,33 @@ async function extractCredentials() {
       console.error('INFO: Sandbox panel already loaded — skipping navigation');
     } else {
 
-    // Navigate only if not already on the target URL (hard reload kills SPA auth)
-    const currentUrl = page.url();
-    let currentHostname = '';
-    try { currentHostname = new URL(currentUrl).hostname; } catch { /* non-URL, will navigate */ }
-    let targetPathname = '';
-    try { targetPathname = new URL(targetUrl).pathname; } catch { /* invalid targetUrl */ }
-    let currentPathname = '';
-    try { currentPathname = new URL(currentUrl).pathname; } catch { /* non-URL */ }
+      // Navigate only if not already on the target URL (hard reload kills SPA auth)
+      const currentUrl = page.url();
+      let currentHostname = '';
+      try { currentHostname = new URL(currentUrl).hostname; } catch { /* non-URL, will navigate */ }
+      let targetPathname = '';
+      try { targetPathname = new URL(targetUrl).pathname; } catch { /* invalid targetUrl */ }
+      let currentPathname = '';
+      try { currentPathname = new URL(currentUrl).pathname; } catch { /* non-URL */ }
 
-    if (currentHostname !== 'app.pluralsight.com') {
-      console.error(`INFO: Navigating to ${targetUrl}...`);
-      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    } else if (currentPathname === targetPathname) {
-      console.error(`INFO: Already on ${currentUrl} — skipping navigation`);
-    } else if (targetPathname.includes('cloud-sandboxes')) {
-      console.error(`INFO: SPA-navigating to cloud-sandboxes from ${currentUrl}...`);
-      const navLink = page.locator('a[href*="cloud-sandboxes"]').first();
-      const navVisible = await navLink.isVisible({ timeout: 5000 }).catch(() => false);
-      if (navVisible) {
-        await navLink.click();
+      if (currentHostname !== 'app.pluralsight.com') {
+        console.error(`INFO: Navigating to ${targetUrl}...`);
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      } else if (currentPathname === targetPathname) {
+        console.error(`INFO: Already on ${currentUrl} — skipping navigation`);
+      } else if (targetPathname.includes('cloud-sandboxes')) {
+        console.error(`INFO: SPA-navigating to cloud-sandboxes from ${currentUrl}...`);
+        const navLink = page.locator('a[href*="cloud-sandboxes"]').first();
+        const navVisible = await navLink.isVisible({ timeout: 5000 }).catch(() => false);
+        if (navVisible) {
+          await navLink.click();
+        } else {
+          await page.evaluate(url => window.location.assign(url), targetUrl);
+        }
       } else {
-        await page.evaluate(url => window.location.assign(url), targetUrl);
+        console.error(`INFO: Navigating to ${targetUrl}...`);
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
       }
-    } else {
-      console.error(`INFO: Navigating to ${targetUrl}...`);
-      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    }
     } // end else (_sandboxReady)
 
     // Give it time to render SPA content after navigation changes
@@ -242,8 +257,7 @@ async function extractCredentials() {
     if (isSignInVisible) {
       console.error('INFO: Not signed in — clicking Sign In...');
       await signInLink.click();
-      await page.waitForURL('**id.pluralsight.com**', { timeout: 30000 })
-        .catch(() => console.error('WARN: Did not reach id.pluralsight.com — proceeding anyway'));
+      await page.waitForURL('**id.pluralsight.com**', { timeout: 300000 }); // "Patient Bridge"
 
       // Fill email field — set PLURALSIGHT_EMAIL env var to assist Google Password Manager
       const emailInput = page.locator('input[type="email"], input[name="email"], input[id*="email"]').first();
@@ -352,65 +366,17 @@ async function extractCredentials() {
       }
     }
 
-    // 4. Extract credentials
+    // 4. Provider Dispatcher (Symmetric Pattern)
     console.error('INFO: Extracting credentials...');
-
-    // Credentials live in inputs with aria-label="Copyable input".
-    // AWS layout: [Username, Password, Access Key ID, Secret Access Key, Session Token]
-    // GCP layout: [Username, Password, Service Account Key JSON]
-    await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 15000 });
-
-    const inputs = await page.locator('input[aria-label="Copyable input"]').all();
-    console.error(`INFO: Found ${inputs.length} copyable inputs.`);
-
     if (PROVIDER === 'aws') {
-      let accessKey, secretKey, sessionToken;
-      for (let i = 0; i < inputs.length; i++) {
-        const val = await inputs[i].inputValue();
-        const parent = await inputs[i].evaluateHandle(el => el.closest('div')?.parentElement ?? null);
-        const text = parent ? await parent.evaluate(el => el.innerText || '') : '';
-        if (text.toLowerCase().includes('access key id')) {
-          accessKey = val;
-        } else if (text.toLowerCase().includes('secret access key')) {
-          secretKey = val;
-        } else if (text.toLowerCase().includes('session token')) {
-          sessionToken = val;
-        }
-      }
-      if (!accessKey && inputs.length >= 3) accessKey = await inputs[2].inputValue();
-      if (!secretKey && inputs.length >= 4) secretKey = await inputs[3].inputValue();
-      if (!sessionToken && inputs.length >= 5) sessionToken = await inputs[4].inputValue();
-
-      if (!accessKey || !secretKey) {
-        throw new Error('Could not find AWS Access Key and Secret Key');
-      }
-      console.log(`AWS_ACCESS_KEY_ID=${accessKey.trim()}`);
-      console.log(`AWS_SECRET_ACCESS_KEY=${secretKey.trim()}`);
-      if (sessionToken) console.log(`AWS_SESSION_TOKEN=${sessionToken.trim()}`);
-      return;
+      await _extractAwsCredentials(page);
+    } else if (PROVIDER === 'gcp') {
+      await _extractGcpCredentials(page);
+    } else if (PROVIDER === 'azure') {
+      throw new Error('Azure extraction is not yet implemented.');
+    } else {
+      throw new Error(`Unsupported provider: ${PROVIDER}`);
     }
-
-    // PROVIDER === 'gcp'
-    const username = inputs.length >= 1 ? (await inputs[0].inputValue().catch(() => '')) : '';
-    const password = inputs.length >= 2 ? (await inputs[1].inputValue().catch(() => '')) : '';
-    const serviceAccountJson = inputs.length >= 3 ? (await inputs[2].inputValue().catch(() => '')) : '';
-    if (!serviceAccountJson) {
-      throw new Error('Could not find Service Account Credentials field');
-    }
-    let projectId;
-    try {
-      projectId = JSON.parse(serviceAccountJson).project_id;
-    } catch {
-      throw new Error('Service Account Credentials is not valid JSON');
-    }
-    const keyPath = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'gcp-service-account.json');
-    fs.writeFileSync(keyPath, serviceAccountJson, { mode: 0o600 });
-    console.error(`INFO: Service account key written to ${keyPath}`);
-    console.log(`GCP_PROJECT=${projectId}`);
-    console.log(`GCP_USERNAME=${username.trim()}`);
-    console.log(`GCP_PASSWORD=${password.trim()}`);
-    console.log(`GOOGLE_APPLICATION_CREDENTIALS=${keyPath}`);
-    return;
 
   } catch (error) {
     console.error(`ERROR: ${error.message}`);
