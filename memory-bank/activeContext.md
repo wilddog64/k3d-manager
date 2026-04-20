@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | A — shared vars | **COMPLETE** (impl `3de58f4d`, memory-bank `349bddbf`, Gemini) | `docs/bugs/v1.1.0-recovery-phase-a-shared-vars.md` | `scripts/etc/playwright/vars.sh`, `scripts/plugins/acg.sh` | `fix(playwright): reconcile shared vars with existing auth dir` |
 | B — robot engine | **COMPLETE** (impl `a986d5bb`, Gemini) | `docs/bugs/v1.1.0-recovery-phase-b-robot-engine.md` | `scripts/playwright/acg_credentials.js` | `fix(playwright): disconnect over CDP, provider flag, IPv4, patient sign-in` |
-| C — gcp.sh | **PARTIAL / BLOCKED** | `docs/bugs/2026-04-20-gcp-provisioning-missing.md` | `scripts/lib/providers/k3s-gcp.sh` | `feat(gcp): extraction works, provisioning is still a skeleton` |
+| C — gcp.sh | **COMPLETE** (credential flow + identity bridge verified `9686e5c3`; GCP provisioning tracked as roadmap bug `docs/bugs/2026-04-20-gcp-provisioning-missing.md`) | `docs/bugs/v1.1.0-recovery-phase-c-gcp-identity.md` | `scripts/plugins/gcp.sh`, `scripts/playwright/acg_credentials.js`, `scripts/playwright/gcp_login.js`, `scripts/lib/core.sh`, `scripts/lib/providers/k3s-gcp.sh`, `bin/acg-up` | `fix(gcp): automate OAuth consent flow in gcp_login via Playwright CDP` |
 | D — docs | **COMPLETE** (impl `7f3bd0a6`, Gemini) | N/A | `README.md`, `docs/howto/*` | `docs: align README and guides with unified 127.0.0.1/vars.sh` |
 
 ## Verification Milestones (2026-04-20)
