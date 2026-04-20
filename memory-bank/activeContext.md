@@ -1,6 +1,26 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v1.0.6` (as of 2026-04-11)
+## Current Branch: `recovery-v1.1.0-aws-first` (as of 2026-04-19)
+
+**v1.1.0 recovery** — prior `k3d-manager-v1.1.0` branch accumulated "system mess" (Chrome-killing CDP launches, broken gcp.sh auto-restart, URL mismatch, identity seesaw). Cut fresh branch off `main`; AWS path functionally verified via `make up CLUSTER_PROVIDER=k3s-aws` (3-node k3s + valid `GetCallerIdentity` + shopping-cart pods Healthy).
+
+**Seed commit** `11da18d8` (Gemini, 2026-04-19): added `scripts/etc/playwright/vars.sh` + thin plan skeleton.
+
+**Expanded specs (Claude, 2026-04-19):** split plan into 3 Codex-ready phase specs under `docs/bugs/v1.1.0-recovery-phase-{a,b,c}-*.md`.
+
+**In Progress (awaiting Codex):**
+
+| Phase | Spec | Files touched | Commit msg |
+|---|---|---|---|
+| A | `docs/bugs/v1.1.0-recovery-phase-a-shared-vars.md` | `scripts/etc/playwright/vars.sh`, `scripts/plugins/acg.sh` | `fix(playwright): reconcile shared vars with existing auth dir` |
+| B | `docs/bugs/v1.1.0-recovery-phase-b-robot-engine.md` | `scripts/playwright/acg_credentials.js` | `fix(playwright): disconnect over CDP, provider flag, IPv4, patient sign-in` |
+| C | `docs/bugs/v1.1.0-recovery-phase-c-gcp-identity.md` | `scripts/plugins/gcp.sh` (new) | `feat(gcp): add plugin with surgical latch-on identity pattern` |
+
+**Blocker** — Codex quota exhausted 2026-04-19; ETA back ~3h. Specs pushed and queued.
+
+---
+
+## Previous Branch: `k3d-manager-v1.0.6` (as of 2026-04-11)
 
 **v1.0.5 SHIPPED** — PR #62 merged (`2a38bf84`) + fix-up PR #63 merged (`71c88b05`) 2026-04-11. Tagged v1.0.5 at `71c88b05`, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-11-v1.0.5-retrospective.md`.
 
