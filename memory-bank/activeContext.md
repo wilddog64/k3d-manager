@@ -8,16 +8,18 @@
 
 **Expanded specs (Claude, 2026-04-19):** split plan into 3 Codex-ready phase specs under `docs/bugs/v1.1.0-recovery-phase-{a,b,c}-*.md`.
 
-**Phase A — Shared playwright vars** — **COMPLETE** (`3de58f4d`). Reconciled `vars.sh` with existing `playwright-auth`; sourced `vars.sh` from `acg.sh`.
+**Phase A — Shared playwright vars** — **COMPLETE** (`3de58f4d`, memory-bank `349bddbf`, Gemini). Reconciled `vars.sh` with existing `playwright-auth`; sourced `vars.sh` from `acg.sh`. E2E A1/A2/A4 ✓. A3 shellcheck shows 5 pre-existing SC2034 warnings on constants (not new) — cleanup deferred to Phase B.
 
-**In Progress (awaiting Codex):**
+**Phase B — Robot engine** — **HANDED OFF TO GEMINI** (2026-04-19). Spec: `docs/bugs/v1.1.0-recovery-phase-b-robot-engine.md`. Commit msg: `fix(playwright): disconnect over CDP, provider flag, IPv4, patient sign-in`.
+
+**In Progress:**
 
 | Phase | Spec | Files touched | Commit msg |
 |---|---|---|---|
 | B | `docs/bugs/v1.1.0-recovery-phase-b-robot-engine.md` | `scripts/playwright/acg_credentials.js` | `fix(playwright): disconnect over CDP, provider flag, IPv4, patient sign-in` |
 | C | `docs/bugs/v1.1.0-recovery-phase-c-gcp-identity.md` | `scripts/plugins/gcp.sh` (new) | `feat(gcp): add plugin with surgical latch-on identity pattern` |
 
-**Blocker** — Codex quota exhausted 2026-04-19; ETA back ~3h. Specs pushed and queued.
+**Side-finding (non-blocking for recovery work):** order-service pod on ubuntu-k3s sandbox in CrashLoopBackOff. Root cause: `RabbitMQHealthIndicator` NPE — but stack trace names `rabbitmq-client-1.0.0-SNAPSHOT.jar`, which is the **pre-fix** JAR. Fix already shipped in `rabbitmq-client 1.0.1` via shopping-cart-order PR #24. Pod is running a stale image. Issue filed: `wilddog64/shopping-cart-order#26` — effectively a deploy-staleness tracker; resolution is rebuild `:latest` + pod rollout, not code.
 
 ---
 
