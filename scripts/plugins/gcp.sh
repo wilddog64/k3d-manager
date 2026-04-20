@@ -154,7 +154,22 @@ HELP
   fi
 
   _info "[gcp] Running one-time 'gcloud auth login' for ${account}..."
-  gcloud auth login --account "${account}" --quiet
+  local playwright_dir
+  playwright_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../playwright"
+
+  if ! command -v node >/dev/null 2>&1 || ! node -e "require('playwright')" 2>/dev/null; then
+    printf 'WARN: %s\n' "[gcp] node/playwright not available — gcloud auth login will require manual browser interaction" >&2
+    gcloud auth login --account "${account}"
+  else
+    # Run gcloud in background (blocks until OAuth callback); Playwright automates the browser
+    gcloud auth login --account "${account}" &
+    local gcloud_pid=$!
+    GCP_USERNAME="${account}" \
+    PLAYWRIGHT_CDP_HOST="${PLAYWRIGHT_CDP_HOST}" \
+    PLAYWRIGHT_CDP_PORT="${PLAYWRIGHT_CDP_PORT}" \
+    node "${playwright_dir}/gcp_login.js" "${account}"
+    wait "${gcloud_pid}"
+  fi
   _info "[gcp] Authenticated as ${account}"
 }
 
