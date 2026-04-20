@@ -33,8 +33,11 @@ _ACG_WATCH_WRAPPER="${HOME}/.local/share/k3d-manager/acg-watch-run.sh"
 _ACG_CF_STACK_NAME="k3d-manager-cluster"
 _ACG_CHROME_CDP_LABEL="com.k3d-manager.chrome-cdp"
 _ACG_CHROME_CDP_PLIST="${HOME}/Library/LaunchAgents/${_ACG_CHROME_CDP_LABEL}.plist"
-_ACG_CHROME_CDP_AUTH_DIR="${HOME}/.local/share/k3d-manager/playwright-auth"
-_ACG_CHROME_CDP_PORT=9222
+# Load shared playwright constants (PLAYWRIGHT_AUTH_DIR, PLAYWRIGHT_CDP_PORT, URLs).
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/etc/playwright/vars.sh"
+_ACG_CHROME_CDP_AUTH_DIR="${PLAYWRIGHT_AUTH_DIR}"
+_ACG_CHROME_CDP_PORT="${PLAYWRIGHT_CDP_PORT}"
 
 _acg_check_credentials() {
   _info "[acg] Checking AWS credentials..."

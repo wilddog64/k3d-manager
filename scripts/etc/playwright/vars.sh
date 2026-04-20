@@ -1,7 +1,12 @@
 # scripts/etc/playwright/vars.sh
-# 
-# CRITICAL: The PLAYWRIGHT_PROFILE_DIR stores your Pluralsight/GCP session cookies.
-# Do not delete this directory unless you want to perform manual re-authentication.
+#
+# Single source of truth for Playwright automation constants.
+# Sourced by scripts/plugins/acg.sh and scripts/plugins/gcp.sh; also read by
+# scripts/playwright/*.js via argv (not by sourcing — node cannot source bash).
+#
+# CRITICAL: PLAYWRIGHT_AUTH_DIR holds the Chrome profile with your Pluralsight
+# session cookies. Deleting it forces manual re-login and can trigger ACG
+# bot-detection. Keep this path stable across versions.
 
 PLAYWRIGHT_URL_AWS="https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
 PLAYWRIGHT_URL_GCP="https://app.pluralsight.com/hands-on/playground/cloud-sandboxes"
@@ -9,5 +14,7 @@ PLAYWRIGHT_URL_GCP="https://app.pluralsight.com/hands-on/playground/cloud-sandbo
 PLAYWRIGHT_CDP_HOST="127.0.0.1"
 PLAYWRIGHT_CDP_PORT="9222"
 
-# Persistent profile used for automation
-PLAYWRIGHT_PROFILE_DIR="${HOME}/.local/share/k3d-manager/profile"
+# Persistent Chrome profile used for CDP automation (shared with launchd job
+# com.k3d-manager.chrome-cdp). Path must match _ACG_CHROME_CDP_AUTH_DIR in
+# scripts/plugins/acg.sh.
+PLAYWRIGHT_AUTH_DIR="${HOME}/.local/share/k3d-manager/playwright-auth"
