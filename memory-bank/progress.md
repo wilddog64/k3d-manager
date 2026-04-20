@@ -332,7 +332,7 @@
 
 - **Branch baseline** — branched off `main`; AWS path functionally verified 2026-04-19 (3-node k3s Ready, `aws sts get-caller-identity` OK, shopping-cart pods mostly Healthy).
 - **Seed commit** `11da18d8` (Gemini, 2026-04-19) — added `scripts/etc/playwright/vars.sh` + thin plan skeleton `docs/plans/v1.1.0-recovery-unified-automation.md`.
-- [ ] **Phase A — Shared playwright vars** — SPECCED `docs/bugs/v1.1.0-recovery-phase-a-shared-vars.md`. Reconcile `vars.sh` with existing `_ACG_CHROME_CDP_AUTH_DIR=playwright-auth`; source `vars.sh` from `acg.sh`.
+- [x] **Phase A — Shared playwright vars** — **COMPLETE** (`3de58f4d`). Issue `docs/bugs/v1.1.0-recovery-phase-a-shared-vars.md`. Reconciled `vars.sh` with existing `playwright-auth`; sourced `vars.sh` from `acg.sh`.
 - [ ] **Phase B — Robot engine unification** — SPECCED `docs/bugs/v1.1.0-recovery-phase-b-robot-engine.md`. `acg_credentials.js`: `.close()`→`.disconnect()` for CDP; `--provider aws|gcp` flag; 127.0.0.1 CDP host; 300s sign-in polling loop; `process.exit(0)` on success.
 - [ ] **Phase C — GCP identity (gcp.sh)** — SPECCED `docs/bugs/v1.1.0-recovery-phase-c-gcp-identity.md`. Create `scripts/plugins/gcp.sh` with surgical latch-on (`gcloud auth login` for `cloud_user`), ADC via `GOOGLE_APPLICATION_CREDENTIALS` env (no `activate-service-account`), surgical revoke (SA email only).
 - [ ] **E2E verify** — `CLUSTER_PROVIDER=k3s-aws make up` AND `CLUSTER_PROVIDER=k3s-gcp make up`; browser stays open; session cookies persist.

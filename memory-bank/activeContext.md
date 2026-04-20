@@ -8,11 +8,12 @@
 
 **Expanded specs (Claude, 2026-04-19):** split plan into 3 Codex-ready phase specs under `docs/bugs/v1.1.0-recovery-phase-{a,b,c}-*.md`.
 
+**Phase A — Shared playwright vars** — **COMPLETE** (`3de58f4d`). Reconciled `vars.sh` with existing `playwright-auth`; sourced `vars.sh` from `acg.sh`.
+
 **In Progress (awaiting Codex):**
 
 | Phase | Spec | Files touched | Commit msg |
 |---|---|---|---|
-| A | `docs/bugs/v1.1.0-recovery-phase-a-shared-vars.md` | `scripts/etc/playwright/vars.sh`, `scripts/plugins/acg.sh` | `fix(playwright): reconcile shared vars with existing auth dir` |
 | B | `docs/bugs/v1.1.0-recovery-phase-b-robot-engine.md` | `scripts/playwright/acg_credentials.js` | `fix(playwright): disconnect over CDP, provider flag, IPv4, patient sign-in` |
 | C | `docs/bugs/v1.1.0-recovery-phase-c-gcp-identity.md` | `scripts/plugins/gcp.sh` (new) | `feat(gcp): add plugin with surgical latch-on identity pattern` |
 
