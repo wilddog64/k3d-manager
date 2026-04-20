@@ -3,6 +3,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const CDP_HOST = process.env.PLAYWRIGHT_CDP_HOST || '127.0.0.1';
+const CDP_PORT = process.env.PLAYWRIGHT_CDP_PORT || '9222';
+const CDP_URL = `http://${CDP_HOST}:${CDP_PORT}`;
+const AUTH_DIR_OVERRIDE = process.env.PLAYWRIGHT_AUTH_DIR;
+
 /**
  * scripts/playwright/acg_credentials.js
  *
@@ -11,7 +16,8 @@ const path = require('path');
  * Auth dir: ~/.local/share/k3d-manager/playwright-auth
  */
 
-const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'playwright-auth');
+const AUTH_DIR = AUTH_DIR_OVERRIDE ||
+  path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'playwright-auth');
 
 function _isFirstRun() {
   try {
@@ -22,12 +28,114 @@ function _isFirstRun() {
 }
 const IS_FIRST_RUN = _isFirstRun();
 
+async function _extractAwsCredentials(page) {
+  await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 15000 });
+  const inputs = await page.locator('input[aria-label="Copyable input"]').all();
+  console.error(`INFO: Found ${inputs.length} copyable inputs.`);
+
+  let accessKey, secretKey, sessionToken;
+  for (let i = 0; i < inputs.length; i++) {
+    const val = await inputs[i].inputValue();
+    const parent = await inputs[i].evaluateHandle(el => el.closest('div')?.parentElement ?? null);
+    const text = parent ? await parent.evaluate(el => el.innerText || '') : '';
+
+    if (text.toLowerCase().includes('access key id')) {
+      accessKey = val;
+    } else if (text.toLowerCase().includes('secret access key')) {
+      secretKey = val;
+    } else if (text.toLowerCase().includes('session token')) {
+      sessionToken = val;
+    }
+  }
+
+  if (!accessKey && inputs.length >= 3) {
+    accessKey = await inputs[2].inputValue();
+  }
+  if (!secretKey && inputs.length >= 4) {
+    secretKey = await inputs[3].inputValue();
+  }
+  if (!sessionToken && inputs.length >= 5) {
+    sessionToken = await inputs[4].inputValue();
+  }
+
+  if (accessKey && secretKey) {
+    console.log(`AWS_ACCESS_KEY_ID=${accessKey.trim()}`);
+    console.log(`AWS_SECRET_ACCESS_KEY=${secretKey.trim()}`);
+    if (sessionToken) {
+      console.log(`AWS_SESSION_TOKEN=${sessionToken.trim()}`);
+    }
+  } else {
+    throw new Error('Could not find AWS Access Key and Secret Key');
+  }
+}
+
+async function _extractGcpCredentials(page) {
+  // Wait for the GCP credentials panel — 'Username' label signals it is loaded
+  await page.waitForSelector('text=Username', { timeout: 15000 });
+
+  // Diagnostic: log all visible inputs and textareas to aid selector development
+  const allInputs = await page.locator('input, textarea').all();
+  console.error(`INFO: Found ${allInputs.length} input/textarea elements on page`);
+  for (let i = 0; i < allInputs.length; i++) {
+    const tag = await allInputs[i].evaluate(el => el.tagName.toLowerCase());
+    const ariaLabel = await allInputs[i].getAttribute('aria-label');
+    const val = await allInputs[i].inputValue().catch(() => '');
+    const visible = await allInputs[i].isVisible();
+    console.error(`INFO: [${i}] <${tag}> aria-label="${ariaLabel}" visible=${visible} value="${val.slice(0, 40)}"`);
+  }
+
+  // GCP fields use aria-label="Copyable input" (same as AWS) — getByLabel() finds nothing
+  // because the visible labels are not HTML-associated. Use positional extraction.
+  const inputs = await page.locator('input[aria-label="Copyable input"]').all();
+  console.error(`INFO: Found ${inputs.length} copyable inputs`);
+
+  const username = inputs.length >= 1 ? await inputs[0].inputValue().catch(() => '') : '';
+  const password = inputs.length >= 2 ? await inputs[1].inputValue().catch(() => '') : '';
+  const serviceAccountJson = inputs.length >= 3 ? await inputs[2].inputValue().catch(() => '') : '';
+
+  console.error(`INFO: username="${username.slice(0, 30)}" password="${password ? '[set]' : '[empty]'}" sa_json_len=${serviceAccountJson.length}`);
+
+  if (!serviceAccountJson) {
+    throw new Error('Could not find Service Account Credentials field');
+  }
+
+  let projectId;
+  try {
+    projectId = JSON.parse(serviceAccountJson).project_id;
+  } catch {
+    throw new Error('Service Account Credentials is not valid JSON');
+  }
+  if (!projectId) {
+    throw new Error('project_id not found in Service Account Credentials JSON');
+  }
+
+  const keyDir = path.join(os.homedir(), '.local', 'share', 'k3d-manager');
+  const keyPath = path.join(keyDir, 'gcp-service-account.json');
+  fs.mkdirSync(keyDir, { recursive: true });
+  fs.writeFileSync(keyPath, serviceAccountJson, { mode: 0o600 });
+  console.error(`INFO: Service account key written to ${keyPath}`);
+
+  console.log(`GCP_PROJECT=${projectId}`);
+  console.log(`GCP_USERNAME=${username.trim()}`);
+  console.log(`GCP_PASSWORD=${password.trim()}`);
+  console.log(`GOOGLE_APPLICATION_CREDENTIALS=${keyPath}`);
+}
+
 async function extractCredentials() {
   let targetUrl = process.argv[2];
   if (!targetUrl) {
     console.error('ERROR: No target URL provided');
     process.exit(1);
   }
+  const _providerIdx = process.argv.indexOf('--provider');
+  const PROVIDER = (_providerIdx !== -1 && process.argv[_providerIdx + 1])
+    ? process.argv[_providerIdx + 1]
+    : 'aws';
+  if (PROVIDER !== 'aws' && PROVIDER !== 'gcp') {
+    console.error(`ERROR: Unknown provider '${PROVIDER}' (expected 'aws' or 'gcp')`);
+    process.exit(1);
+  }
+  console.error(`INFO: Using provider ${PROVIDER}`);
   // Standardize URL to minimize SPA redirects and Cloudflare triggers
   if (targetUrl.includes('cloud-playground/cloud-sandboxes')) {
     targetUrl = targetUrl.replace('cloud-playground/cloud-sandboxes', 'hands-on/playground/cloud-sandboxes');
@@ -44,7 +152,7 @@ async function extractCredentials() {
   let _cdpBrowser = null;
   try {
     try {
-      _cdpBrowser = await chromium.connectOverCDP('http://localhost:9222');
+      _cdpBrowser = await chromium.connectOverCDP(CDP_URL);
       const _cdpContexts = _cdpBrowser.contexts();
       if (_cdpContexts.length > 0) {
         const _cdpContext = _cdpContexts[0];
@@ -58,7 +166,7 @@ async function extractCredentials() {
         }
       }
       if (!browserContext) {
-        try { await _cdpBrowser.close(); } catch {}
+        try { await _cdpBrowser.disconnect(); } catch {}
         _cdpBrowser = null;
       }
     } catch {
@@ -246,60 +354,72 @@ async function extractCredentials() {
 
     // 4. Extract credentials
     console.error('INFO: Extracting credentials...');
-    
-    // We found that credentials are in inputs with aria-label="Copyable input"
-    // The order is typically: Username, Password, Access Key ID, Secret Access Key, [Session Token]
-    
-    // Wait for the inputs to appear
+
+    // Credentials live in inputs with aria-label="Copyable input".
+    // AWS layout: [Username, Password, Access Key ID, Secret Access Key, Session Token]
+    // GCP layout: [Username, Password, Service Account Key JSON]
     await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 15000 });
-    
+
     const inputs = await page.locator('input[aria-label="Copyable input"]').all();
     console.error(`INFO: Found ${inputs.length} copyable inputs.`);
 
-    let accessKey, secretKey, sessionToken;
-
-    for (let i = 0; i < inputs.length; i++) {
-      const val = await inputs[i].inputValue();
-      const parent = await inputs[i].evaluateHandle(el => el.closest('div')?.parentElement ?? null);
-      const text = parent ? await parent.evaluate(el => el.innerText || '') : '';
-      
-      if (text.toLowerCase().includes('access key id')) {
-        accessKey = val;
-      } else if (text.toLowerCase().includes('secret access key')) {
-        secretKey = val;
-      } else if (text.toLowerCase().includes('session token')) {
-        sessionToken = val;
+    if (PROVIDER === 'aws') {
+      let accessKey, secretKey, sessionToken;
+      for (let i = 0; i < inputs.length; i++) {
+        const val = await inputs[i].inputValue();
+        const parent = await inputs[i].evaluateHandle(el => el.closest('div')?.parentElement ?? null);
+        const text = parent ? await parent.evaluate(el => el.innerText || '') : '';
+        if (text.toLowerCase().includes('access key id')) {
+          accessKey = val;
+        } else if (text.toLowerCase().includes('secret access key')) {
+          secretKey = val;
+        } else if (text.toLowerCase().includes('session token')) {
+          sessionToken = val;
+        }
       }
-    }
+      if (!accessKey && inputs.length >= 3) accessKey = await inputs[2].inputValue();
+      if (!secretKey && inputs.length >= 4) secretKey = await inputs[3].inputValue();
+      if (!sessionToken && inputs.length >= 5) sessionToken = await inputs[4].inputValue();
 
-    // Fallback based on known order if text matching fails
-    if (!accessKey && inputs.length >= 3) {
-      accessKey = await inputs[2].inputValue();
-    }
-    if (!secretKey && inputs.length >= 4) {
-      secretKey = await inputs[3].inputValue();
-    }
-    if (!sessionToken && inputs.length >= 5) {
-      sessionToken = await inputs[4].inputValue();
-    }
-
-    if (accessKey && secretKey) {
+      if (!accessKey || !secretKey) {
+        throw new Error('Could not find AWS Access Key and Secret Key');
+      }
       console.log(`AWS_ACCESS_KEY_ID=${accessKey.trim()}`);
       console.log(`AWS_SECRET_ACCESS_KEY=${secretKey.trim()}`);
-      if (sessionToken) {
-        console.log(`AWS_SESSION_TOKEN=${sessionToken.trim()}`);
-      }
+      if (sessionToken) console.log(`AWS_SESSION_TOKEN=${sessionToken.trim()}`);
       return;
-    } else {
-      throw new Error('Could not find AWS Access Key and Secret Key');
     }
+
+    // PROVIDER === 'gcp'
+    const username = inputs.length >= 1 ? (await inputs[0].inputValue().catch(() => '')) : '';
+    const password = inputs.length >= 2 ? (await inputs[1].inputValue().catch(() => '')) : '';
+    const serviceAccountJson = inputs.length >= 3 ? (await inputs[2].inputValue().catch(() => '')) : '';
+    if (!serviceAccountJson) {
+      throw new Error('Could not find Service Account Credentials field');
+    }
+    let projectId;
+    try {
+      projectId = JSON.parse(serviceAccountJson).project_id;
+    } catch {
+      throw new Error('Service Account Credentials is not valid JSON');
+    }
+    const keyPath = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'gcp-service-account.json');
+    fs.writeFileSync(keyPath, serviceAccountJson, { mode: 0o600 });
+    console.error(`INFO: Service account key written to ${keyPath}`);
+    console.log(`GCP_PROJECT=${projectId}`);
+    console.log(`GCP_USERNAME=${username.trim()}`);
+    console.log(`GCP_PASSWORD=${password.trim()}`);
+    console.log(`GOOGLE_APPLICATION_CREDENTIALS=${keyPath}`);
+    return;
 
   } catch (error) {
     console.error(`ERROR: ${error.message}`);
-    process.exit(1);
+    throw error;
   } finally {
     if (_cdpBrowser) {
-      try { await _cdpBrowser.close(); } catch {}
+      // CDP attach: detach only — leave the user's Chrome running with tabs intact.
+      try { await _cdpBrowser.disconnect(); } catch {}
+      console.error('INFO: Detached from Chrome CDP session.');
     } else if (browserContext) {
       await browserContext.close();
     }
@@ -307,12 +427,21 @@ async function extractCredentials() {
 }
 
 const OVERALL_TIMEOUT_MS = IS_FIRST_RUN ? 300000 : 120000;
-Promise.race([
-  extractCredentials(),
-  new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Script timed out after ${OVERALL_TIMEOUT_MS / 1000}s`)), OVERALL_TIMEOUT_MS)
-  )
-]).catch(err => {
-  console.error(`ERROR: ${err.message}`);
-  process.exit(1);
+let _timeoutHandle;
+const _timeoutPromise = new Promise((_, reject) => {
+  _timeoutHandle = setTimeout(
+    () => reject(new Error(`Script timed out after ${OVERALL_TIMEOUT_MS / 1000}s`)),
+    OVERALL_TIMEOUT_MS
+  );
 });
+
+Promise.race([extractCredentials(), _timeoutPromise])
+  .then(() => {
+    clearTimeout(_timeoutHandle);
+    process.exit(0);
+  })
+  .catch(err => {
+    clearTimeout(_timeoutHandle);
+    console.error(`ERROR: ${err.message}`);
+    process.exit(1);
+  });
