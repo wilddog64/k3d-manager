@@ -22,6 +22,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [x] **Phase A — Shared playwright vars** — **COMPLETE** (`3de58f4d`, memory-bank `349bddbf`). Reconciled `vars.sh` with existing `playwright-auth`; sourced `vars.sh` from `acg.sh`. E2E A1/A2/A4 ✓; A3 has 5 pre-existing SC2034 warnings (not new).
 - [x] **Phase B — Robot engine unification** — **COMPLETE** (`a986d5bb`). Issue `docs/bugs/v1.1.0-recovery-phase-b-robot-engine.md`. `acg_credentials.js`: `.close()`→`.disconnect()` for CDP; `--provider aws|gcp` flag; 127.0.0.1 CDP host; timer cleanup + explicit `process.exit(0)`.
 - [ ] **Phase C — GCP identity (`gcp.sh`)** — SPEC `docs/bugs/v1.1.0-recovery-phase-c-gcp-identity.md`. Create `scripts/plugins/gcp.sh` with surgical latch-on (`gcloud auth login` for `cloud_user`), ADC via `GOOGLE_APPLICATION_CREDENTIALS` env (no `activate-service-account`), surgical revoke (SA email only).
+- [ ] **Phase D — Documentation Alignment** — **NEW**. Update `README.md` (broken links, AWS URL, add GCP), `docs/howto/acg-credentials-flow.md`, and `docs/howto/antigravity.md` to match the unified 127.0.0.1/vars.sh reality.
 - [ ] **E2E verify** — `CLUSTER_PROVIDER=k3s-aws make up` AND `CLUSTER_PROVIDER=k3s-gcp make up`; browser stays open; session cookies persist; active gcloud CLI account is user's, not the SA.
 
 ---
