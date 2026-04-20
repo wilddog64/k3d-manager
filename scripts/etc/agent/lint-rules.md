@@ -5,3 +5,4 @@
 3. **Secret Hygiene** – tokens and passwords must never appear in command arguments (e.g., `kubectl exec -- VAULT_TOKEN=...`). Use stdin payloads or env files.
 4. **Namespace Isolation** – every `kubectl apply` or `kubectl create` must include an explicit `-n <namespace>` flag.
 5. **Prompt Scope** – Copilot prompts must reject shell escape fragments (`shell(cd …)`, `shell(git push …)`, `shell(rm -rf …)`, `shell(sudo …)`, `shell(eval …)`, `shell(curl …)`, `shell(wget …)`).
+6. **No Trailing Whitespace** – lines must not end with spaces or tabs. Applies to all staged file types (`.sh`, `.js`, `.md`).

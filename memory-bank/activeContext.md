@@ -17,6 +17,10 @@
 | C — gcp.sh | **HANDED OFF TO GEMINI** (2026-04-19) | `docs/bugs/v1.1.0-recovery-phase-c-gcp-identity.md` | `scripts/plugins/gcp.sh` (new) | `feat(gcp): add plugin with surgical latch-on and credential scrubbing` |
 | D — docs | **COMPLETE** (impl `7f3bd0a6`, Gemini) | N/A | `README.md`, `docs/howto/*` | `docs: align README and guides with unified 127.0.0.1/vars.sh` |
 
+## Agent Rigor CLI Improvements
+
+- **Whitespace Enforcement** — OPEN. Audit in `acg_extend.js` revealed trailing whitespaces. Requires improvement to `_agent_lint` to automatically detect and block these on every commit.
+
 Phase A notes: E2E A1/A2/A4 ✓. A3 shellcheck shows 5 pre-existing SC2034 warnings on constants (not new) — cleanup deferred to Phase B via `# shellcheck disable=SC2034` header on `vars.sh`.
 
 ### Side-finding (non-blocking for recovery work)

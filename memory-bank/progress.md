@@ -27,6 +27,12 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 
 ---
 
+## Agent Rigor CLI Improvements
+
+- [ ] **Whitespace Enforcement** — OPEN. Improve `_agent_lint` or add a pre-commit hook to detect and block trailing whitespaces in `.js` and `.sh` files (Issue identified in `acg_extend.js`).
+
+---
+
 ## Known Bugs / Gaps
 
 **Infra / tooling (tracked here):**
