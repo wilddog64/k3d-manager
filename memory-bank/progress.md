@@ -34,6 +34,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 ---
 
 ## Known Bugs / Gaps
+- [ ] **GCP Latch-on Failure** — OPEN. Issue `docs/bugs/2026-04-20-gcp-latch-on-automation-failure.md`; consent screen clicks not triggering automatically.
 
 **Infra / tooling (tracked here):**
 
