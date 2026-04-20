@@ -24,7 +24,8 @@
 - **Stability:** ✓ Chrome window remains open; sessions persist.
 - **Security:** ✓ Sensitive keys scrubbed via secure file pattern.
 
-- **GCP Latch-on Automation Failure** — OPEN (`docs/bugs/2026-04-20-gcp-latch-on-automation-failure.md`). Playwright fails to find the Google Login tab in time; requires hardening of the tab-search loop.
+- **GCP Latch-on Failure** — **RESOLVED** (`9686e5c3`). Implemented `gcp_login.js` to automate consent screens via CDP; `gcp_login` refactored to background `gcloud` and run concurrently with Playwright.
+
 ## Agent Rigor CLI Improvements
 
 - **Whitespace Enforcement** — OPEN. Audit in `acg_extend.js` revealed trailing whitespaces. Requires improvement to `_agent_lint` to automatically detect and block these on every commit.
