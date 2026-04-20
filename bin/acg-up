@@ -25,11 +25,23 @@ source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
 source "${REPO_ROOT}/scripts/plugins/antigravity.sh"
-source "${REPO_ROOT}/scripts/plugins/aws.sh"
 source "${REPO_ROOT}/scripts/plugins/acg.sh"
 source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
 source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
-source "${REPO_ROOT}/scripts/lib/providers/k3s-aws.sh"
+
+_cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
+case "${_cluster_provider}" in
+  k3s-aws)
+    source "${REPO_ROOT}/scripts/plugins/aws.sh"
+    source "${REPO_ROOT}/scripts/lib/providers/k3s-aws.sh"
+    ;;
+  k3s-gcp)
+    source "${REPO_ROOT}/scripts/plugins/gcp.sh"
+    ;;
+  *)
+    _err "[acg-up] Unsupported CLUSTER_PROVIDER: ${_cluster_provider} (supported: k3s-aws, k3s-gcp)"
+    ;;
+esac
 
 login_prompt=0
 sandbox_url=""
@@ -60,15 +72,29 @@ if [[ "$login_prompt" -eq 1 ]]; then
   echo ""
 fi
 
-_info "[acg-up] Step 1/12 — Getting AWS credentials..."
-if aws sts get-caller-identity >/dev/null 2>&1; then
-  _info "[acg-up] Existing AWS credentials valid — skipping extraction"
-else
-  acg_get_credentials ${sandbox_url:+"$sandbox_url"}
-fi
+_info "[acg-up] Step 1/12 — Getting ${_cluster_provider} credentials..."
+case "${_cluster_provider}" in
+  k3s-aws)
+    if aws sts get-caller-identity >/dev/null 2>&1; then
+      _info "[acg-up] Existing AWS credentials valid — skipping extraction"
+    else
+      acg_get_credentials ${sandbox_url:+"$sandbox_url"}
+    fi
+    ;;
+  k3s-gcp)
+    gcp_get_credentials ${sandbox_url:+"$sandbox_url"}
+    ;;
+esac
 
 _info "[acg-up] Step 2/12 — Provisioning 3-node cluster..."
-CLUSTER_PROVIDER=k3s-aws deploy_cluster --confirm
+deploy_cluster --confirm
+
+if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
+  _info "[acg-up] GCP cluster deployed. Steps 3–12 (SSH tunnel, Vault, ESO, ArgoCD) are AWS-only and not yet ported for GCP."
+  _info "[acg-up] Run 'kubectl get nodes' to verify the cluster."
+  kubectl get nodes
+  exit 0
+fi
 
 _info "[acg-up] Step 3/12 — Starting SSH tunnel..."
 tunnel_start
