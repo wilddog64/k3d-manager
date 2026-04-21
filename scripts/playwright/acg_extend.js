@@ -8,12 +8,12 @@ const path = require('path');
  *
  * Static Playwright script to extend the ACG sandbox TTL by 4 hours.
  * Launches a persistent Chrome context — session persists across runs via auth dir.
- * Auth dir: ~/.local/share/k3d-manager/playwright-auth
+ * Auth dir: ~/.local/share/k3d-manager/profile
  *
  * Usage: node acg_extend.js <sandbox-url>
  */
 
-const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'playwright-auth');
+const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'profile');
 
 function _isFirstRun() {
   try {
