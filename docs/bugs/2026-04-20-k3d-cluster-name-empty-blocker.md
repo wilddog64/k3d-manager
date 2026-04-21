@@ -27,14 +27,23 @@ When running `make up`, the local infra cluster (k3d) fails to start with a `FAT
 1. **Dispatcher Logic:** In `scripts/lib/core.sh`, the `deploy_cluster` function reads `cluster_name_value="${positional[0]:-${CLUSTER_NAME:-}}"`.
 2. **Missing Fallback:** If no name is provided as an argument and `$CLUSTER_NAME` is not exported, the variable becomes an empty string.
 3. **Template Violation:** The template `scripts/etc/cluster.yaml.tmpl` uses `name: "${CLUSTER_NAME}"`. K3d requires a non-empty string following hostname rules.
-4. **Regression:** A recent refactor in `bin/acg-up` used a local `_cluster_provider` variable, which prevented the global `CLUSTER_PROVIDER` from being set correctly, triggering the k3d fallback without a valid name.
+4. **Trigger:** `bin/acg-up` reads `CLUSTER_PROVIDER` correctly via `_cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"` (line 32) — the provider dispatch is not broken. The empty `CLUSTER_NAME` occurs because no caller passes a cluster name argument and `$CLUSTER_NAME` is not pre-exported, leaving `core.sh` line 796 with an empty value and no default.
 
 ---
 
 ## Proposed Fix
 
-1.  Harden `scripts/lib/core.sh` to ensure `CLUSTER_NAME` always has a safe fallback (e.g., `k3d-k3d-cluster` or `infra-cluster`) if it is empty.
-2.  Ensure `bin/acg-up` correctly exports `CLUSTER_PROVIDER` globally so the dispatcher targets the correct cloud provider.
+Harden `scripts/lib/core.sh` line 796 to add a safe default:
+
+```bash
+# current
+local cluster_name_value="${positional[0]:-${CLUSTER_NAME:-}}"
+
+# replacement
+local cluster_name_value="${positional[0]:-${CLUSTER_NAME:-k3d-cluster}}"
+```
+
+`bin/acg-up` does not need changes — its `CLUSTER_PROVIDER` handling is correct.
 
 ---
 
