@@ -21,7 +21,7 @@ setup() {
   cat > "${SCRIPT_DIR}/etc/playwright/vars.sh" <<'EOF'
 PLAYWRIGHT_CDP_HOST="127.0.0.1"
 PLAYWRIGHT_CDP_PORT="9222"
-PLAYWRIGHT_AUTH_DIR="${HOME}/.local/share/k3d-manager/profile"
+PLAYWRIGHT_AUTH_DIR="${HOME}/.local/share/k3d-manager/playwright-auth"
 EOF
 
   source "scripts/plugins/gcp.sh"

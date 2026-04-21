@@ -13,11 +13,11 @@ const AUTH_DIR_OVERRIDE = process.env.PLAYWRIGHT_AUTH_DIR;
  *
  * Static Playwright script to extract AWS credentials from Pluralsight Cloud Sandbox.
  * Launches a persistent Chrome context — session persists across runs via auth dir.
- * Auth dir: ~/.local/share/k3d-manager/profile
+ * Auth dir: ~/.local/share/k3d-manager/playwright-auth
  */
 
 const AUTH_DIR = AUTH_DIR_OVERRIDE ||
-  path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'profile');
+  path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'playwright-auth');
 
 function _isFirstRun() {
   try {
