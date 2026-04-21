@@ -1,37 +1,39 @@
 # Active Context — k3d-manager
 
-## Current Branch: `recovery-v1.1.0-aws-first` (as of 2026-04-19)
+## Current Branch: `k3d-manager-v1.1.0` (as of 2026-04-20)
 
-**v1.1.0 recovery** — prior `k3d-manager-v1.1.0` accumulated "system mess" (Chrome-killing CDP launches, broken `gcp.sh` auto-restart, URL mismatch, identity seesaw). Cut fresh branch off `main`; AWS path functionally verified via `make up CLUSTER_PROVIDER=k3s-aws` on 2026-04-19 (3-node k3s Ready, `aws sts get-caller-identity` OK, shopping-cart pods mostly Healthy).
+Renamed from `recovery-v1.1.0-aws-first` (2026-04-20). Old `k3d-manager-v1.1.0` (the messy branch)
+preserved as `k3d-manager-v1.1.0-backup` on remote.
 
-**Seed commit** `11da18d8` (Gemini, 2026-04-19): added `scripts/etc/playwright/vars.sh` + thin plan skeleton.
+**v1.1.0 goal** — Unified ACG automation for AWS + GCP: shared vars, unified robot engine,
+GCP identity/credential flow, docs alignment. All four phases complete. GCP cluster
+provisioning is the remaining open item (next task on this branch).
 
-**Expanded specs (Claude, 2026-04-19):** 3 Codex-ready phase specs under `docs/bugs/v1.1.0-recovery-phase-{a,b,c}-*.md`. E2E-gated — one phase at a time.
+## Completed (all phases done)
 
-### Phase status
+| Phase | Commit | Summary |
+|---|---|---|
+| A — shared vars | `3de58f4d` | `vars.sh` reconciled; sourced from `acg.sh` |
+| B — robot engine | `a986d5bb` | `acg_credentials.js`: CDP disconnect, `--provider` flag, IPv4, patient sign-in |
+| C — GCP identity | `9686e5c3` | `gcp.sh` plugin, `gcp_login.js` OAuth automation, `bin/acg-up` provider dispatch, core allowlist |
+| D — docs | `7f3bd0a6` | README + howto guides aligned to 127.0.0.1/vars.sh |
 
-| Phase | Status | Spec | Files | Commit msg |
-|---|---|---|---|---|
-| A — shared vars | **COMPLETE** (impl `3de58f4d`, memory-bank `349bddbf`, Gemini) | `docs/bugs/v1.1.0-recovery-phase-a-shared-vars.md` | `scripts/etc/playwright/vars.sh`, `scripts/plugins/acg.sh` | `fix(playwright): reconcile shared vars with existing auth dir` |
-| B — robot engine | **COMPLETE** (impl `a986d5bb`, Gemini) | `docs/bugs/v1.1.0-recovery-phase-b-robot-engine.md` | `scripts/playwright/acg_credentials.js` | `fix(playwright): disconnect over CDP, provider flag, IPv4, patient sign-in` |
-| C — gcp.sh | **COMPLETE** (credential flow + identity bridge verified `9686e5c3`; GCP provisioning tracked as roadmap bug `docs/bugs/2026-04-20-gcp-provisioning-missing.md`) | `docs/bugs/v1.1.0-recovery-phase-c-gcp-identity.md` | `scripts/plugins/gcp.sh`, `scripts/playwright/acg_credentials.js`, `scripts/playwright/gcp_login.js`, `scripts/lib/core.sh`, `scripts/lib/providers/k3s-gcp.sh`, `bin/acg-up` | `fix(gcp): automate OAuth consent flow in gcp_login via Playwright CDP` |
-| D — docs | **COMPLETE** (impl `7f3bd0a6`, Gemini) | N/A | `README.md`, `docs/howto/*` | `docs: align README and guides with unified 127.0.0.1/vars.sh` |
+## Next Task: GCP cluster provisioning
 
-## Verification Milestones (2026-04-20)
+**Status:** OPEN — `scripts/lib/providers/k3s-gcp.sh` is a skeleton (placeholder functions only).
+**Spec:** `docs/bugs/2026-04-20-gcp-provisioning-missing.md`
+**Blocked on:** need live ACG GCP sandbox to determine zone, machine type, SSH key pattern.
 
-- **AWS Functional Path:** ✓ `CLUSTER_PROVIDER=k3s-aws make up` extracted and deployed successfully.
-- **GCP Functional Path:** ✓ `CLUSTER_PROVIDER=k3s-gcp make up` triggers identity bridge; management unblocked.
-- **Stability:** ✓ Chrome window remains open; sessions persist.
-- **Security:** ✓ Sensitive keys scrubbed via secure file pattern.
+Provisioning steps to implement:
+1. `gcloud compute firewall-rules create` — open port 6443
+2. `gcloud compute instances create` — provision GCE instance(s)
+3. `k3sup install` — bootstrap k3s on remote node
+4. SSH config update + tunnel equivalent
+5. Wait for nodes Ready + label nodes
 
-- **GCP Latch-on Failure** — **RESOLVED** (`9686e5c3`). Implemented `gcp_login.js` to automate consent screens via CDP; `gcp_login` refactored to background `gcloud` and run concurrently with Playwright.
+## Open Items
 
-## Agent Rigor CLI Improvements
-
-- **Whitespace Enforcement** — OPEN. Audit in `acg_extend.js` revealed trailing whitespaces. Requires improvement to `_agent_lint` to automatically detect and block these on every commit.
-
-Phase A notes: E2E A1/A2/A4 ✓. A3 shellcheck shows 5 pre-existing SC2034 warnings on constants (not new) — cleanup deferred to Phase B via `# shellcheck disable=SC2034` header on `vars.sh`.
-
-### Side-finding (non-blocking for recovery work)
-
-order-service pod on ubuntu-k3s sandbox in CrashLoopBackOff. Root cause: `RabbitMQHealthIndicator` NPE — stack trace names `rabbitmq-client-1.0.0-SNAPSHOT.jar` (**pre-fix** JAR). Fix already shipped in `rabbitmq-client 1.0.1` via shopping-cart-order PR #24 (2026-04-11). Pod is running a stale image. Issue filed: `wilddog64/shopping-cart-order#26` — effectively a deploy-staleness tracker; resolution is rebuild `:latest` + pod rollout, not code.
+- **GCP cluster provisioning** — see Next Task above
+- **Whitespace enforcement** — `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh` files
+  (lib-foundation v0.3.17 shipped glob expansion; whitespace rule is a follow-up)
+- **SSH tunnel timeouts** — connection resets during heavy ArgoCD sync (infra, non-blocking)

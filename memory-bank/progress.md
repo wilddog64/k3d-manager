@@ -15,46 +15,42 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 
 ---
 
-## v1.1.0 Recovery Track (branch: `recovery-v1.1.0-aws-first`)
+## v1.1.0 Track (branch: `k3d-manager-v1.1.0`)
 
-- **Baseline** — branched off `main`; AWS path functionally verified 2026-04-19 (3-node k3s Ready, `aws sts get-caller-identity` OK, shopping-cart pods mostly Healthy).
-- **Seed commit** `11da18d8` (Gemini, 2026-04-19) — added `scripts/etc/playwright/vars.sh` + thin plan skeleton `docs/plans/v1.1.0-recovery-unified-automation.md`.
-- [x] **Phase A — Shared playwright vars** — **COMPLETE** (`3de58f4d`, memory-bank `349bddbf`). Reconciled `vars.sh` with existing `playwright-auth`; sourced `vars.sh` from `acg.sh`. E2E A1/A2/A4 ✓; A3 has 5 pre-existing SC2034 warnings (not new).
-- [x] **Phase B — Robot engine unification** — **COMPLETE** (`a986d5bb`). Issue `docs/bugs/v1.1.0-recovery-phase-b-robot-engine.md`. `acg_credentials.js`: `.close()`→`.disconnect()` for CDP; `--provider aws|gcp` flag; 127.0.0.1 CDP host; timer cleanup + explicit `process.exit(0)`.
-- [x] **Phase C — GCP identity (`gcp.sh`)** — **COMPLETE** (`9686e5c3`). Credential extraction, identity bridge, OAuth automation all verified. GCP cluster provisioning is out of v1.1.0 scope — tracked as `docs/bugs/2026-04-20-gcp-provisioning-missing.md` (roadmap: v1.2.0 or later).
-- [x] **Phase D — Documentation Alignment** — **COMPLETE** (`7f3bd0a6`). Updated `README.md`, `docs/howto/acg-credentials-flow.md`, and `docs/howto/antigravity.md` to match the unified 127.0.0.1/vars.sh reality.
-- [x] **E2E verify** — `CLUSTER_PROVIDER=k3s-aws make up` AND `CLUSTER_PROVIDER=k3s-gcp make up` (Verified functional 2026-04-20). Browser stays open; session cookies persist; active gcloud CLI account is user's, not the SA; SSH and management unblocked.
+- **Baseline** — branched off `main` (`279db18c`); AWS path verified 2026-04-19.
+- [x] **Phase A — Shared playwright vars** — COMPLETE (`3de58f4d`)
+- [x] **Phase B — Robot engine unification** — COMPLETE (`a986d5bb`)
+- [x] **Phase C — GCP identity** — COMPLETE (`9686e5c3`). Credential extraction, identity bridge, OAuth automation verified.
+- [x] **Phase D — Documentation alignment** — COMPLETE (`7f3bd0a6`)
+- [x] **lib-foundation v0.3.17** — COMPLETE (PR #23 merged). `_agent_lint` glob expanded to `*.sh *.js *.md`.
+- [ ] **GCP cluster provisioning** — OPEN. `scripts/lib/providers/k3s-gcp.sh` is a skeleton. Spec: `docs/bugs/2026-04-20-gcp-provisioning-missing.md`. Needs live ACG GCP sandbox for topology details.
 
 ---
 
 ## Agent Rigor CLI Improvements
 
-- [ ] **Whitespace Enforcement** — OPEN. Improve `_agent_lint` or add a pre-commit hook to detect and block trailing whitespaces in `.js` and `.sh` files (Issue identified in `acg_extend.js`).
+- [ ] **Whitespace Enforcement** — OPEN. Add trailing-whitespace detection to `_agent_lint` for `.js`/`.sh` files.
 
 ---
 
 ## Known Bugs / Gaps
-- [x] **GCP Latch-on Failure** — **RESOLVED** (`9686e5c3`). Implemented `gcp_login.js` to automate consent screens via CDP; `gcp_login` refactored to background `gcloud` and run concurrently with Playwright.
-
 
 **Infra / tooling (tracked here):**
 
 | Item | Status | Notes |
 |---|---|---|
+| GCP cluster provisioning | OPEN | `k3s-gcp.sh` is a skeleton. Spec at `docs/bugs/2026-04-20-gcp-provisioning-missing.md`. |
 | SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync |
-| GCP cluster provisioning | OPEN | `scripts/lib/providers/k3s-gcp.sh` is a skeleton — no GCE instances, no k3sup, no SSH tunnel. Spec: `docs/bugs/2026-04-20-gcp-provisioning-missing.md`. Roadmap: v1.2.0 or later. |
 
-**App-layer bugs** live in their repos as GitHub Issues (per "Bug Tracking Ownership" rule):
+**App-layer bugs** live in their repos as GitHub Issues:
 
-- `wilddog64/shopping-cart-order#26` — RabbitMQHealthIndicator NPE on stale `:latest` image; fix already in `rabbitmq-client 1.0.1`, remediation is rebuild + rollout.
+- `wilddog64/shopping-cart-order#26` — RabbitMQHealthIndicator NPE on stale `:latest` image; fix in `rabbitmq-client 1.0.1`, remediation is rebuild + rollout.
 
 ---
 
 ## Roadmap
 
-Authoritative roadmap lives in `~/.claude/projects/.../memory/MEMORY.md`. Summary for this file:
-
-- **v1.1.0** — Unified ACG automation (AWS + GCP), surgical identity/Chrome handling (IN PROGRESS on `recovery-v1.1.0-aws-first`)
-- **v1.2.0** — k3dm-mcp (gate: v1.1.0 AWS+GCP proven; two cloud backends = two clouds worth of plugin surface)
+- **v1.1.0** — Unified ACG automation AWS + GCP (IN PROGRESS on `k3d-manager-v1.1.0`)
+- **v1.2.0** — k3dm-mcp (gate: v1.1.0 AWS+GCP fully provisioning; two cloud backends)
 - **v1.3.0** — Home lab on Mac Mini M5 (`CLUSTER_PROVIDER=k3s-local-arm64`); home automation plugins
 - **No EKS/GKE/AKS** — k3d-manager is kops-for-k3s; cloud-managed k8s is out of scope
