@@ -34,6 +34,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 ---
 
 ## Known Bugs / Gaps
+- [ ] **Google Identity Drift** — OPEN. Issue `docs/bugs/2026-04-20-google-account-mismatch-blocker.md`; robot clicks accounts but gcloud stays unauthenticated.
 
 **Infra / tooling (tracked here):**
 
