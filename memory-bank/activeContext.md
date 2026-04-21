@@ -18,6 +18,7 @@ provisioning is the remaining open item (next task on this branch).
 | GCP identity bridge | `9686e5c3` | `gcp.sh` plugin, `gcp_login.js` OAuth automation, `bin/acg-up` provider dispatch, core allowlist |
 | Documentation alignment | `7f3bd0a6` | README + howto guides aligned to 127.0.0.1/vars.sh |
 | GCP cluster provisioning | `c65f0c90` | Firewall, GCE instance, k3sup, functional E2E (timeout fix included) |
+| GCP latch-on hardening | `e45d9a04` | `gcp_login.js` hardened with "Agree and continue" + "Confirm" buttons |
 
 ## Next Task: GCP cluster provisioning
 
