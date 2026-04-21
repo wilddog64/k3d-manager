@@ -79,7 +79,7 @@ async function handleGcpOAuthFlow() {
 
   // Step 2 — Managed Profile confirmation (shown for Google Workspace accounts)
   const managedProfileBtn = oauthPage.locator(
-    'button:has-text("Got it"), button:has-text("Continue"), button:has-text("I understand")'
+    'button:has-text("Got it"), button:has-text("Continue"), button:has-text("I understand"), button:has-text("Confirm")'
   ).first();
   if (await managedProfileBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
     console.error('INFO: Confirming Managed Profile...');
@@ -89,7 +89,7 @@ async function handleGcpOAuthFlow() {
 
   // Step 3 — Terms of Service
   const tosBtn = oauthPage.locator(
-    'button:has-text("I agree"), button:has-text("Accept")'
+    'button:has-text("I agree"), button:has-text("Accept"), button:has-text("Agree and continue")'
   ).first();
   if (await tosBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
     console.error('INFO: Accepting Terms of Service...');
