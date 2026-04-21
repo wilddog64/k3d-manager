@@ -5,8 +5,8 @@
 # Invoked by: scripts/lib/providers/k3s-gcp.sh (Phase D or later)
 #
 # Design notes (v1.1.0 recovery):
-#   - Never launches, restarts, or kills Chrome. Relies on the CDP launchd job
-#     managed by scripts/plugins/acg.sh (_acg_chrome_cdp_*).
+#   - Reuses the shared Chrome/CDP launcher from scripts/plugins/antigravity.sh
+#     when port 9222 is not yet available.
 #   - GCP SA key is consumed via GOOGLE_APPLICATION_CREDENTIALS env var (ADC).
 #     We do NOT run `gcloud auth activate-service-account` globally because that
 #     overwrites the user's CLI identity.
@@ -42,6 +42,26 @@ _gcp_ensure_node() {
   return 1
 }
 
+_gcp_ensure_cdp() {
+  if curl -sf "http://${PLAYWRIGHT_CDP_HOST}:${PLAYWRIGHT_CDP_PORT}/json" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if declare -f _browser_launch >/dev/null 2>&1; then
+    _info "[gcp] Chrome CDP not available on ${PLAYWRIGHT_CDP_HOST}:${PLAYWRIGHT_CDP_PORT} — launching Chrome..."
+    _browser_launch || return 1
+  fi
+
+  if curl -sf "http://${PLAYWRIGHT_CDP_HOST}:${PLAYWRIGHT_CDP_PORT}/json" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  printf 'ERROR: %s\n' "[gcp] Chrome CDP not reachable on ${PLAYWRIGHT_CDP_HOST}:${PLAYWRIGHT_CDP_PORT}." >&2
+  printf 'ERROR: %s\n' "[gcp] Run: ./scripts/k3d-manager acg_chrome_cdp_install" >&2
+  printf 'ERROR: %s\n' "[gcp] Then sign in to Pluralsight once in that Chrome window." >&2
+  return 1
+}
+
 function gcp_get_credentials() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<HELP
@@ -70,12 +90,7 @@ HELP
     return 1
   fi
 
-  if ! curl -sf "http://${PLAYWRIGHT_CDP_HOST}:${PLAYWRIGHT_CDP_PORT}/json" >/dev/null 2>&1; then
-    printf 'ERROR: %s\n' "[gcp] Chrome CDP not reachable on ${PLAYWRIGHT_CDP_HOST}:${PLAYWRIGHT_CDP_PORT}." >&2
-    printf 'ERROR: %s\n' "[gcp] Run: ./scripts/k3d-manager acg_chrome_cdp_install" >&2
-    printf 'ERROR: %s\n' "[gcp] Then sign in to Pluralsight once in that Chrome window." >&2
-    return 1
-  fi
+  _gcp_ensure_cdp || return 1
 
   _info "[gcp] Extracting GCP credentials from ${sandbox_url}..."
 

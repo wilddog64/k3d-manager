@@ -20,6 +20,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 | GCP latch-on hardening | `e45d9a04` | `gcp_login.js` hardened with "Agree and continue" + "Confirm" buttons |
 | Clean-slate login | `6ae2a6c3` | Logout + explicit email/password to unblock OAuth callback |
 | CLUSTER_NAME default fix | `3a3806aa` | `core.sh` now falls back to `k3d-cluster` when `CLUSTER_NAME` is empty |
+| GCP Node fallback | `dd425084` | `gcp_get_credentials` now auto-runs `_ensure_node` before Playwright extraction |
 
 ## Latest Task: CLUSTER_NAME empty-string fix
 
@@ -31,9 +32,23 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## Latest Task: CDP Linux headless launch + profile path unification
 
-**Status:** ASSIGNED TO CODEX — spec: `docs/bugs/2026-04-21-cdp-linux-headless-launch-failure.md`
-**Files:** `antigravity.sh`, `vars.sh`, `acg_credentials.js`, `acg_extend.js`, `gcp.bats`
-**Fix:** Add `--headless=new --no-sandbox --disable-dev-shm-usage` to Linux Chrome launch; rename profile dir from `playwright-auth` → `profile` across all five files
+**Status:** COMPLETE — spec: `docs/bugs/2026-04-21-cdp-linux-headless-launch-failure.md`
+**Files:** `scripts/plugins/antigravity.sh`, `scripts/etc/playwright/vars.sh`, `scripts/playwright/acg_credentials.js`, `scripts/playwright/acg_extend.js`, `scripts/tests/plugins/gcp.bats`
+**Commit:** `f0ba9eb2`
+**Fix:** Added `--headless=new --no-sandbox --disable-dev-shm-usage` to Linux Chrome launch; renamed the shared profile path from `playwright-auth` to `profile`
+**Smoke test:** `make up` on this macOS host still did not bring up CDP on port 9222; see `docs/issues/2026-04-21-macos-open-reuses-existing-chrome-cdp.md`
+
+## Latest Task: GCP Node fallback
+
+**Status:** COMPLETE — `make up CLUSTER_PROVIDER=k3s-gcp` no longer hard-fails on missing Node before Playwright extraction.
+**Commit:** `dd425084`
+**Fix:** `gcp_get_credentials` now invokes `_ensure_node` when `node` is absent, matching the repo’s auto-install pattern.
+
+## Latest Task: GCP CDP bootstrap + sandbox-page recovery
+
+**Status:** IN PROGRESS — GCP now bootstraps the shared CDP launcher, prefers the GCP sandbox URL, stays on sandbox tabs, and uses copyable-field selectors for GCP extraction.
+**Pending verification:** full `make up CLUSTER_PROVIDER=k3s-gcp` from the normal interactive shell.
+**Harness note:** Codex could not complete the live localhost/CDP check due local LaunchAgents/`127.0.0.1:9222` restrictions; see `docs/issues/2026-04-21-gcp-cdp-e2e-blocked-by-harness.md`.
 
 ## Open Items
 
