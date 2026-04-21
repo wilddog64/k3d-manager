@@ -20,16 +20,18 @@ provisioning is the remaining open item (next task on this branch).
 
 ## Next Task: GCP cluster provisioning
 
-**Status:** OPEN — `scripts/lib/providers/k3s-gcp.sh` is a skeleton (placeholder functions only).
+**Status:** ASSIGNED TO GEMINI — spec committed `2d8a3607` (2026-04-20).
 **Spec:** `docs/bugs/2026-04-20-gcp-provisioning-missing.md`
-**Blocked on:** need live ACG GCP sandbox to determine zone, machine type, SSH key pattern.
+**Sandbox topology:** zone `us-west1-a`, SSH key `~/.ssh/k3d-manager-gcp-key`, user `ubuntu`,
+machine `e2-standard-2`, image `ubuntu-2004-lts`, single-node, project from `$GCP_PROJECT`.
 
-Provisioning steps to implement:
-1. `gcloud compute firewall-rules create` — open port 6443
-2. `gcloud compute instances create` — provision GCE instance(s)
-3. `k3sup install` — bootstrap k3s on remote node
-4. SSH config update + tunnel equivalent
-5. Wait for nodes Ready + label nodes
+Provisioning steps (spec):
+1. `gcloud compute firewall-rules create k3d-manager-k3s-api` — open port 6443
+2. `gcloud compute instances create k3d-manager-gcp-node` — e2-standard-2, ubuntu-2004-lts
+3. SSH config update (`~/.ssh/config`) + `_gcp_wait_for_ssh`
+4. `k3sup install` — bootstrap k3s on remote node
+5. Merge kubeconfig as context `ubuntu-gcp`, wait for node Ready, label node
+**Commit message:** `feat(gcp): implement GCP cluster provisioning — firewall, GCE instance, k3sup, kubeconfig`
 
 ## Open Items
 
