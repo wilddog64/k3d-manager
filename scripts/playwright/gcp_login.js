@@ -24,6 +24,7 @@ const CDP_HOST = process.env.PLAYWRIGHT_CDP_HOST || '127.0.0.1';
 const CDP_PORT = process.env.PLAYWRIGHT_CDP_PORT || '9222';
 const CDP_URL = `http://${CDP_HOST}:${CDP_PORT}`;
 const GCP_ACCOUNT = process.argv[2] || process.env.GCP_USERNAME || '';
+const GCP_PASSWORD = process.env.GCP_PASSWORD || '';
 
 async function handleGcpOAuthFlow() {
   const browser = await chromium.connectOverCDP(CDP_URL);
@@ -32,6 +33,12 @@ async function handleGcpOAuthFlow() {
     throw new Error('No browser context found via CDP');
   }
   const context = contexts[0];
+
+  // Step 0 — Navigate to Google logout to clear all stale sessions
+  console.error('INFO: Clearing stale Google sessions...');
+  const logoutPage = await context.newPage();
+  await logoutPage.goto('https://accounts.google.com/Logout', { waitUntil: 'domcontentloaded', timeout: 15000 });
+  await logoutPage.close();
 
   // Check if the OAuth tab is already open before waiting for a new one
   let oauthPage = context.pages().find(p => {
@@ -57,23 +64,36 @@ async function handleGcpOAuthFlow() {
 
   await oauthPage.waitForLoadState('domcontentloaded', { timeout: 15000 });
 
-  // Step 1 — Choose account
+  // Step 1 — Use another account (force fresh credential entry after logout)
+  const useAnotherAccountBtn = oauthPage.locator(
+    'li:has-text("Use another account"), div:has-text("Use another account")'
+  ).first();
+  if (await useAnotherAccountBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+    console.error('INFO: Clicking "Use another account"...');
+    await useAnotherAccountBtn.click();
+    await oauthPage.waitForLoadState('domcontentloaded', { timeout: 10000 });
+  }
+
+  // Step 1b — Enter email
   if (GCP_ACCOUNT) {
-    const accountLink = oauthPage.locator(
-      `[data-email="${GCP_ACCOUNT}"], div[data-identifier="${GCP_ACCOUNT}"]`
-    ).first();
-    if (await accountLink.isVisible({ timeout: 5000 }).catch(() => false)) {
-      console.error(`INFO: Selecting account ${GCP_ACCOUNT}...`);
-      await accountLink.click();
+    const emailInput = oauthPage.locator('input[type="email"]').first();
+    if (await emailInput.isVisible({ timeout: 5000 }).catch(() => false)) {
+      console.error(`INFO: Entering email ${GCP_ACCOUNT}...`);
+      await emailInput.fill(GCP_ACCOUNT);
+      await oauthPage.locator('button:has-text("Next")').first().click();
       await oauthPage.waitForLoadState('domcontentloaded', { timeout: 10000 });
-    } else {
-      // Fallback: click the first listed account
-      const firstAccount = oauthPage.locator('div[data-identifier], li.JDAKTe').first();
-      if (await firstAccount.isVisible({ timeout: 5000 }).catch(() => false)) {
-        console.error('INFO: Clicking first listed account (fallback)...');
-        await firstAccount.click();
-        await oauthPage.waitForLoadState('domcontentloaded', { timeout: 10000 });
-      }
+    }
+  }
+
+  // Step 1c — Enter password
+  const gcpPassword = process.env.GCP_PASSWORD || '';
+  if (gcpPassword) {
+    const passwordInput = oauthPage.locator('input[type="password"]').first();
+    if (await passwordInput.isVisible({ timeout: 10000 }).catch(() => false)) {
+      console.error('INFO: Entering password...');
+      await passwordInput.fill(gcpPassword);
+      await oauthPage.locator('button:has-text("Next")').first().click();
+      await oauthPage.waitForLoadState('domcontentloaded', { timeout: 10000 });
     }
   }
 
