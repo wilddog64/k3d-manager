@@ -40,10 +40,10 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 
 | Item | Status | Notes |
 |---|---|---|
-| GCP node readiness timeout | OPEN | 150s too short for fresh GCE bootstrap; bump to 300s. Spec: `docs/bugs/2026-04-20-gcp-node-readiness-timeout.md`. |
-| GCP latch-on selector gap | OPEN | `gcp_login.js` missing "Agree and continue" + "Confirm" selectors. Spec: `docs/bugs/2026-04-20-gcp-latch-on-selector-gap.md`. |
+| GCP node readiness timeout | COMPLETE | Extended to 300s (`c65f0c90`). |
+| GCP latch-on selector gap | COMPLETE | `gcp_login.js` hardened with "Agree and continue" + "Confirm" (`e45d9a04`). |
+| Google identity drift | OPEN | Robot clicks ghost account; gcloud never receives token. Spec: `docs/bugs/2026-04-20-google-account-mismatch-blocker.md`. |
 | SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync |
-| GCP Latch-on selectors | COMPLETE | `gcp_login.js` hardened with "Agree and continue" + "Confirm" buttons (`e45d9a04`). |
 
 **App-layer bugs** live in their repos as GitHub Issues:
 
