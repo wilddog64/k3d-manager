@@ -699,6 +699,9 @@ function deploy_cluster() {
             provider_cli="${1#*=}"
             shift
             ;;
+         --confirm)
+            shift
+            ;;
          -h|--help)
             show_help=1
             shift
