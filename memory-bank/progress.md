@@ -25,7 +25,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [x] **lib-foundation v0.3.17** — COMPLETE (PR #23 merged). `_agent_lint` glob expanded to `*.sh *.js *.md`.
 - [ ] **GCP cluster provisioning** — **PARTIAL**. CLUSTER_NAME default fix committed in `3a3806aa`; live smoke test is still blocked by Chrome CDP startup (`docs/issues/2026-04-21-cluster-name-smoke-test-blocked-by-cdp.md`).
 - [ ] **E2E verify** — **BLOCKED**. Needs a clean `make up` run past Chrome CDP startup.
-- [ ] **CDP profile-path verification** — **OPEN**. Current launcher paths still resolve to `playwright-auth` / `acg-chrome-profile`; user reports `~/.local/share/k3d-manager/profile/` should be the active background-CDP profile and was working yesterday.
+- [ ] **CDP Linux headless + profile unification** — **ASSIGNED TO CODEX**. Spec: `docs/bugs/2026-04-21-cdp-linux-headless-launch-failure.md`. Add headless flags to Linux launch; rename `playwright-auth` → `profile` in 5 files.
 
 ---
 

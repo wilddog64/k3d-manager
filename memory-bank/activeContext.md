@@ -29,8 +29,13 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Commit:** `3a3806aa`
 **Smoke test:** `make up` reached `bin/acg-up` but stopped on Chrome CDP startup (`docs/issues/2026-04-21-cluster-name-smoke-test-blocked-by-cdp.md`). User reports this path should start CDP in the background and use `~/.local/share/k3d-manager/profile/`.
 
+## Latest Task: CDP Linux headless launch + profile path unification
+
+**Status:** ASSIGNED TO CODEX — spec: `docs/bugs/2026-04-21-cdp-linux-headless-launch-failure.md`
+**Files:** `antigravity.sh`, `vars.sh`, `acg_credentials.js`, `acg_extend.js`, `gcp.bats`
+**Fix:** Add `--headless=new --no-sandbox --disable-dev-shm-usage` to Linux Chrome launch; rename profile dir from `playwright-auth` → `profile` across all five files
+
 ## Open Items
 
 - **Whitespace enforcement** — `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh` files
 - **SSH tunnel timeouts** — connection resets during heavy ArgoCD sync (infra, non-blocking)
-- **CDP launcher profile path** — current scripts still point at `playwright-auth` / `acg-chrome-profile`; user says `.../profile/` was working yesterday and should be treated as the expected path until re-verified.
