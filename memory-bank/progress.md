@@ -23,7 +23,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [x] **Phase C — GCP identity** — COMPLETE (`9686e5c3`). Credential extraction, identity bridge, OAuth automation verified.
 - [x] **Phase D — Documentation alignment** — COMPLETE (`7f3bd0a6`)
 - [x] **lib-foundation v0.3.17** — COMPLETE (PR #23 merged). `_agent_lint` glob expanded to `*.sh *.js *.md`.
-- [x] **GCP cluster provisioning** — **COMPLETE** (`916d71fc`). Implemented `scripts/lib/providers/k3s-gcp.sh` with firewall automation, GCE instance creation, and `k3sup` bootstrapping.
+- [ ] **GCP Cluster Provisioning** — **PARTIAL / BLOCKED**. Issue `docs/bugs/2026-04-20-gcp-node-readiness-timeout.md`. Provisioning logic complete but timeout is too short for fresh GCE.
 
 ---
 
@@ -41,6 +41,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 |---|---|---|
 | GCP cluster provisioning | OPEN | `k3s-gcp.sh` is a skeleton. Spec at `docs/bugs/2026-04-20-gcp-provisioning-missing.md`. |
 | SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync |
+| GCP Latch-on selectors | OPEN | `gcp_login.js` missing "Agree and continue" + "Confirm" buttons. |
 
 **App-layer bugs** live in their repos as GitHub Issues:
 
