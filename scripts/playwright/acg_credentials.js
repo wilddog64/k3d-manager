@@ -86,10 +86,8 @@ async function _extractAwsCredentials(page) {
 }
 
 async function _extractGcpCredentials(page) {
-  await page.waitForFunction(
-    () => document.querySelectorAll('input[aria-label="Copyable input"], textarea[aria-label="Copyable input"]').length >= 3,
-    { timeout: 15000 }
-  );
+  // Wait for the GCP credentials panel — 'Username' label signals it is loaded
+  await page.waitForSelector('text=Username', { timeout: 15000 });
 
   // Diagnostic: log all visible inputs and textareas to aid selector development
   const allInputs = await page.locator('input, textarea').all();
@@ -104,12 +102,12 @@ async function _extractGcpCredentials(page) {
 
   // GCP fields use aria-label="Copyable input" (same as AWS) — getByLabel() finds nothing
   // because the visible labels are not HTML-associated. Use positional extraction.
-  const copyableFields = await page.locator('input[aria-label="Copyable input"], textarea[aria-label="Copyable input"]').all();
-  console.error(`INFO: Found ${copyableFields.length} copyable fields`);
+  const inputs = await page.locator('input[aria-label="Copyable input"]').all();
+  console.error(`INFO: Found ${inputs.length} copyable inputs`);
 
-  const username = copyableFields.length >= 1 ? await copyableFields[0].inputValue().catch(() => '') : '';
-  const password = copyableFields.length >= 2 ? await copyableFields[1].inputValue().catch(() => '') : '';
-  const serviceAccountJson = copyableFields.length >= 3 ? await copyableFields[2].inputValue().catch(() => '') : '';
+  const username = inputs.length >= 1 ? await inputs[0].inputValue().catch(() => '') : '';
+  const password = inputs.length >= 2 ? await inputs[1].inputValue().catch(() => '') : '';
+  const serviceAccountJson = inputs.length >= 3 ? await inputs[2].inputValue().catch(() => '') : '';
 
   console.error(`INFO: username="${username.slice(0, 30)}" password="${password ? '[set]' : '[empty]'}" sa_json_len=${serviceAccountJson.length}`);
 
@@ -201,15 +199,7 @@ async function extractCredentials() {
     const context = browserContext;
     if (!context) throw new Error('No browser context found');
     const allPages = context.pages();
-    const preferredSandboxPage = allPages.find(p => {
-      try {
-        const url = new URL(p.url());
-        return url.hostname === 'app.pluralsight.com' && url.pathname.includes('cloud-sandboxes');
-      } catch {
-        return false;
-      }
-    });
-    let page = preferredSandboxPage || allPages.find(p => {
+    let page = allPages.find(p => {
       try { return new URL(p.url()).hostname.endsWith('.pluralsight.com') || new URL(p.url()).hostname === 'pluralsight.com'; } catch { return false; }
     });
     if (!page) {
@@ -239,8 +229,6 @@ async function extractCredentials() {
         await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
       } else if (currentPathname === targetPathname) {
         console.error(`INFO: Already on ${currentUrl} — skipping navigation`);
-      } else if (currentPathname.includes('cloud-sandboxes')) {
-        console.error(`INFO: Already on sandbox page ${currentUrl} — keeping current tab`);
       } else if (targetPathname.includes('cloud-sandboxes')) {
         console.error(`INFO: SPA-navigating to cloud-sandboxes from ${currentUrl}...`);
         const navLink = page.locator('a[href*="cloud-sandboxes"]').first();

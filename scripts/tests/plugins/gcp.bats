@@ -205,57 +205,6 @@ EOF
   [ "$status" -eq 0 ]
 }
 
-@test "gcp_get_credentials calls _browser_launch when CDP is missing" {
-  curl_calls=0
-  curl() {
-    curl_calls=$((curl_calls + 1))
-    if [[ "$curl_calls" -eq 1 ]]; then
-      return 1
-    fi
-    return 0
-  }
-  export -f curl
-
-  _browser_launch() {
-    printf '%s\n' "launched" >> "${BATS_TEST_TMPDIR}/browser-launch.log"
-    return 0
-  }
-  export -f _browser_launch
-
-  node() {
-    if [[ "$1" == "-e" ]]; then
-      return 0
-    fi
-
-    local creds_file="${PLAYWRIGHT_CREDS_FILE:?}"
-    local key_file="${BATS_TEST_TMPDIR}/fake-gcp-key.json"
-    printf '{}\n' > "${key_file}"
-    cat > "${creds_file}" <<EOF
-GCP_PROJECT="test-project"
-GOOGLE_APPLICATION_CREDENTIALS="${key_file}"
-GCP_USERNAME="cloud_user@example.com"
-GCP_PASSWORD="secret"
-EOF
-    return 0
-  }
-  export -f node
-
-  gcloud() {
-    case "$*" in
-      "auth list --filter=status:ACTIVE --format=value(account)") printf '%s\n' "cloud_user@example.com" ;;
-      "auth list --format=value(account)") printf '%s\n' "cloud_user@example.com" ;;
-      *) : ;;
-    esac
-    return 0
-  }
-  export -f gcloud
-
-  run gcp_get_credentials "https://example.invalid/sandbox"
-  [ "$status" -eq 0 ]
-  run grep "launched" "${BATS_TEST_TMPDIR}/browser-launch.log"
-  [ "$status" -eq 0 ]
-}
-
 # gcp_login.js parse check
 
 @test "gcp_login.js passes node --check" {

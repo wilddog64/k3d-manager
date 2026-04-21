@@ -3,7 +3,7 @@
 
 .DEFAULT_GOAL := help
 
-URL ?= $(if $(filter k3s-gcp,$(CLUSTER_PROVIDER)),https://app.pluralsight.com/hands-on/playground/cloud-sandboxes,https://app.pluralsight.com/cloud-playground/cloud-sandboxes)
+URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?= $(shell gh auth token 2>/dev/null)
 
 .PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision help

@@ -71,18 +71,10 @@ function _browser_launch() {
   _info "Chrome not running — launching with --remote-debugging-port=9222..."
   local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/profile}"
   if [[ "$(uname)" == "Darwin" ]]; then
-    local _chrome_app="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-    if [[ ! -x "${_chrome_app}" ]]; then
-      _err "[antigravity] Google Chrome not found at ${_chrome_app}"
-    fi
-    mkdir -p "${_cdp_profile_dir}"
-    "${_chrome_app}" \
+    open -a "Google Chrome" --args \
       --remote-debugging-port=9222 \
       --password-store=basic \
-      --user-data-dir="${_cdp_profile_dir}" \
-      --no-first-run \
-      --no-default-browser-check \
-      >>/tmp/k3d-manager-chrome-cdp.err 2>&1 &
+      --user-data-dir="${_cdp_profile_dir}"
   else
     local _chrome_bin
     _chrome_bin=$(command -v google-chrome 2>/dev/null || command -v google-chrome-stable 2>/dev/null || command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || true)

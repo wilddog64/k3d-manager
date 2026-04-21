@@ -117,25 +117,6 @@ function _run_command_handle_failure() {
   fi
 }
 
-function _antigravity_browser_ready() {
-   local timeout="${1:-10}"
-   local elapsed=0
-
-   if ! _command_exist curl; then
-      _err "curl is required for Antigravity browser probe — install curl and retry"
-   fi
-
-   while [[ "$elapsed" -lt "$timeout" ]]; do
-      if _run_command --soft -- curl --max-time "${CURL_MAX_TIME:-30}" -sf http://localhost:9222/json >/dev/null 2>&1; then
-         return 0
-      fi
-      sleep 2
-      elapsed=$(( elapsed + 2 ))
-   done
-
-   _err "Antigravity browser not ready on port 9222 after ${timeout}s — launch Antigravity with --remote-debugging-port=9222"
-}
-
 # _run_command [--quiet] [--prefer-sudo|--require-sudo] [--probe '<subcmd>'] -- <prog> [args...]
 # - --quiet         : suppress wrapper error message (still returns real exit code)
 # - --prefer-sudo   : use sudo -n if available, otherwise run as user
