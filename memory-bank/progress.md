@@ -23,8 +23,9 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [x] **GCP identity bridge** — COMPLETE (`9686e5c3`). Credential extraction, identity bridge, OAuth automation verified.
 - [x] **Documentation alignment** — COMPLETE (`7f3bd0a6`)
 - [x] **lib-foundation v0.3.17** — COMPLETE (PR #23 merged). `_agent_lint` glob expanded to `*.sh *.js *.md`.
-- [ ] **GCP cluster provisioning** — **PARTIAL / BLOCKED**. Issue `docs/bugs/2026-04-20-k3d-cluster-name-empty-blocker.md`. Logic implemented (`916d71fc`), but local infra cluster naming failure prevents functional E2E.
-- [ ] **E2E verify** — **BLOCKED**. Local k3d naming failure prevents cluster creation.
+- [ ] **GCP cluster provisioning** — **PARTIAL**. CLUSTER_NAME default fix committed in `3a3806aa`; live smoke test is still blocked by Chrome CDP startup (`docs/issues/2026-04-21-cluster-name-smoke-test-blocked-by-cdp.md`).
+- [ ] **E2E verify** — **BLOCKED**. Needs a clean `make up` run past Chrome CDP startup.
+- [ ] **CDP profile-path verification** — **OPEN**. Current launcher paths still resolve to `playwright-auth` / `acg-chrome-profile`; user reports `~/.local/share/k3d-manager/profile/` should be the active background-CDP profile and was working yesterday.
 
 ---
 
