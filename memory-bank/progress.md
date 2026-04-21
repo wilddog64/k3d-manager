@@ -23,7 +23,8 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [x] **GCP identity bridge** — COMPLETE (`9686e5c3`). Credential extraction, identity bridge, OAuth automation verified.
 - [x] **Documentation alignment** — COMPLETE (`7f3bd0a6`)
 - [x] **lib-foundation v0.3.17** — COMPLETE (PR #23 merged). `_agent_lint` glob expanded to `*.sh *.js *.md`.
-- [x] **GCP cluster provisioning** — COMPLETE (`c65f0c90`). Logic implemented (`916d71fc`); node-readiness timeout extended to 300s (`c65f0c90`).
+- [ ] **GCP cluster provisioning** — **PARTIAL / BLOCKED**. Issue `docs/bugs/2026-04-20-k3d-cluster-name-empty-blocker.md`. Logic implemented (`916d71fc`), but local infra cluster naming failure prevents functional E2E.
+- [ ] **E2E verify** — **BLOCKED**. Local k3d naming failure prevents cluster creation.
 
 ---
 
