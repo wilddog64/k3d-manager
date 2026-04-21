@@ -793,7 +793,7 @@ EOF
       _cluster_provider_set_active "$provider"
    fi
 
-   local cluster_name_value="${positional[0]:-${CLUSTER_NAME:-}}"
+   local cluster_name_value="${positional[0]:-${CLUSTER_NAME:-k3d-cluster}}"
    if [[ -n "$cluster_name_value" ]]; then
       positional=("$cluster_name_value" "${positional[@]:1}")
       export CLUSTER_NAME="$cluster_name_value"
