@@ -37,6 +37,7 @@ Provisioning steps (spec):
 **Commit message:** `feat(gcp): implement GCP cluster provisioning — firewall, GCE instance, k3sup, kubeconfig`
 
 ## Open Items
+- **Gemini CLI Traffic Filter** — Google has implemented traffic prioritization and policy-violating detection. Automation must be clean and non-repetitive to minimize capacity errors and bot-detection triggers.
 
 - **GCP cluster provisioning** — see Next Task above
 - **Whitespace enforcement** — `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh` files
