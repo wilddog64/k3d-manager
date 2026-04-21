@@ -44,6 +44,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 | GCP node readiness timeout | COMPLETE | Extended to 300s (`c65f0c90`). |
 | GCP latch-on selector gap | COMPLETE | `gcp_login.js` hardened with "Agree and continue" + "Confirm" (`e45d9a04`). |
 | Google identity drift | COMPLETE | `6ae2a6c3` — implemented clean-slate login pattern. |
+| Gemini CLI Throttling | OPEN | Policy-driven traffic prioritization may cause capacity errors. |
 | SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync |
 
 **App-layer bugs** live in their repos as GitHub Issues:
