@@ -46,9 +46,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## Latest Task: GCP CDP bootstrap + sandbox-page recovery
 
-**Status:** PARTIAL — code fix committed, but Codex could not complete the live local-CDP verification inside the harness.
-**Commit:** `1fabf691`
-**Fix:** GCP now bootstraps the shared CDP launcher, prefers the GCP sandbox URL, stays on sandbox tabs, and uses copyable-field selectors for GCP extraction.
+**Status:** IN PROGRESS — GCP now bootstraps the shared CDP launcher, prefers the GCP sandbox URL, stays on sandbox tabs, and uses copyable-field selectors for GCP extraction.
 **Pending verification:** full `make up CLUSTER_PROVIDER=k3s-gcp` from the normal interactive shell.
 **Harness note:** Codex could not complete the live localhost/CDP check due local LaunchAgents/`127.0.0.1:9222` restrictions; see `docs/issues/2026-04-21-gcp-cdp-e2e-blocked-by-harness.md`.
 

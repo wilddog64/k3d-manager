@@ -27,7 +27,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [ ] **E2E verify** — **BLOCKED**. Needs a clean `make up` run past Chrome CDP startup.
 - [x] **CDP Linux headless + profile unification** — COMPLETE (`f0ba9eb2`). Linux launch now uses `--headless=new --no-sandbox --disable-dev-shm-usage`; shared profile path renamed to `profile` in 5 files. Mac smoke test still needs follow-up (`docs/issues/2026-04-21-macos-open-reuses-existing-chrome-cdp.md`).
 - [x] **GCP Node fallback** — COMPLETE (`dd425084`). `gcp_get_credentials` now auto-runs `_ensure_node` before Playwright extraction, so `make up CLUSTER_PROVIDER=k3s-gcp` no longer stops at the missing-Node error.
-- [ ] **GCP CDP bootstrap + sandbox-page recovery** — **PARTIAL** (`1fabf691`). Repo now bootstraps CDP from `gcp_get_credentials`, defaults `make up` to the GCP sandbox URL, and updates Playwright page/selector logic. Live verification is still blocked in the Codex harness by local LaunchAgents/localhost restrictions (`docs/issues/2026-04-21-gcp-cdp-e2e-blocked-by-harness.md`).
+- [ ] **GCP CDP bootstrap + sandbox-page recovery** — **PARTIAL**. Repo now bootstraps CDP from `gcp_get_credentials`, defaults `make up` to the GCP sandbox URL, and updates Playwright page/selector logic. Live verification is still blocked in the Codex harness by local LaunchAgents/localhost restrictions (`docs/issues/2026-04-21-gcp-cdp-e2e-blocked-by-harness.md`).
 
 ---
 
