@@ -34,7 +34,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 ---
 
 ## Known Bugs / Gaps
-- [ ] **Google Identity Drift** — OPEN. Issue `docs/bugs/2026-04-20-google-account-mismatch-blocker.md`; robot clicks accounts but gcloud stays unauthenticated.
+- [x] **Google Identity Drift** — **COMPLETE** (`6ae2a6c3`). Implemented clean-slate login pattern (logout + explicit credentials entry).
 
 **Infra / tooling (tracked here):**
 
@@ -42,7 +42,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 |---|---|---|
 | GCP node readiness timeout | COMPLETE | Extended to 300s (`c65f0c90`). |
 | GCP latch-on selector gap | COMPLETE | `gcp_login.js` hardened with "Agree and continue" + "Confirm" (`e45d9a04`). |
-| Google identity drift | OPEN | Robot clicks ghost account; gcloud never receives token. Spec: `docs/bugs/2026-04-20-google-account-mismatch-blocker.md`. |
+| Google identity drift | COMPLETE | `6ae2a6c3` — implemented clean-slate login pattern. |
 | SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync |
 
 **App-layer bugs** live in their repos as GitHub Issues:

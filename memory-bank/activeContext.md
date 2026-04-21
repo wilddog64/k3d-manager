@@ -19,6 +19,7 @@ provisioning is the remaining open item (next task on this branch).
 | Documentation alignment | `7f3bd0a6` | README + howto guides aligned to 127.0.0.1/vars.sh |
 | GCP cluster provisioning | `c65f0c90` | Firewall, GCE instance, k3sup, functional E2E (timeout fix included) |
 | GCP latch-on hardening | `e45d9a04` | `gcp_login.js` hardened with "Agree and continue" + "Confirm" buttons |
+| Clean-slate login | `6ae2a6c3` | Logout + explicit email/password to unblock OAuth callback |
 
 ## Next Task: GCP cluster provisioning
 
