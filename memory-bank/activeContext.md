@@ -17,7 +17,7 @@ provisioning is the remaining open item (next task on this branch).
 | Robot engine unification | `a986d5bb` | `acg_credentials.js`: CDP disconnect, `--provider` flag, IPv4, patient sign-in |
 | GCP identity bridge | `9686e5c3` | `gcp.sh` plugin, `gcp_login.js` OAuth automation, `bin/acg-up` provider dispatch, core allowlist |
 | Documentation alignment | `7f3bd0a6` | README + howto guides aligned to 127.0.0.1/vars.sh |
-| GCP cluster provisioning | `916d71fc` | Firewall, GCE instance, k3sup; (E2E timeout fix pending `docs/bugs/2026-04-20-gcp-node-readiness-timeout.md`) |
+| GCP cluster provisioning | `c65f0c90` | Firewall, GCE instance, k3sup, functional E2E (timeout fix included) |
 
 ## Next Task: GCP cluster provisioning
 
