@@ -35,7 +35,16 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Files:** `antigravity.sh`, `vars.sh`, `acg_credentials.js`, `acg_extend.js`, `gcp.bats`
 **Fix:** Add `--headless=new --no-sandbox --disable-dev-shm-usage` to Linux Chrome launch; rename profile dir from `playwright-auth` → `profile` across all five files
 
+## Latest Task: ACG repo extraction plan
+
+**Status:** PLANNED — `docs/plans/v1.1.0-acg-extraction-repo-split.md`
+**Commit:** `8639592c`
+**PR:** `N/A`
+**Why:** Shared browser/CDP code is destabilizing AWS while GCP evolves.
+**Direction:** Extract ACG automation into its own repo, test browser automation there, keep `k3d-manager` focused on orchestration.
+
 ## Open Items
 
 - **Whitespace enforcement** — `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh` files
 - **SSH tunnel timeouts** — connection resets during heavy ArgoCD sync (infra, non-blocking)
+- **ACG extraction** — treat browser automation repo split as the stabilization path before further provider automation work.

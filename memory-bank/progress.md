@@ -26,6 +26,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [ ] **GCP cluster provisioning** — **PARTIAL**. CLUSTER_NAME default fix committed in `3a3806aa`; live smoke test is still blocked by Chrome CDP startup (`docs/issues/2026-04-21-cluster-name-smoke-test-blocked-by-cdp.md`).
 - [ ] **E2E verify** — **BLOCKED**. Needs a clean `make up` run past Chrome CDP startup.
 - [ ] **CDP Linux headless + profile unification** — **ASSIGNED TO CODEX**. Spec: `docs/bugs/2026-04-21-cdp-linux-headless-launch-failure.md`. Add headless flags to Linux launch; rename `playwright-auth` → `profile` in 5 files.
+- [ ] **ACG repo extraction** — **PLANNED** (`8639592c`). Plan: `docs/plans/v1.1.0-acg-extraction-repo-split.md`. Extract browser/CDP/Playwright automation into its own repo to stop polluting `k3d-manager` stability.
 
 ---
 
@@ -57,7 +58,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 
 ## Roadmap
 
-- **v1.1.0** — Unified ACG automation AWS + GCP (IN PROGRESS on `k3d-manager-v1.1.0`)
+- **v1.1.0** — Unified ACG automation AWS + GCP (IN PROGRESS on `k3d-manager-v1.1.0`; extraction plan now defined for browser automation)
 - **v1.2.0** — k3dm-mcp (gate: v1.1.0 AWS+GCP fully provisioning; two cloud backends)
 - **v1.3.0** — Home lab on Mac Mini M5 (`CLUSTER_PROVIDER=k3s-local-arm64`); home automation plugins
 - **No EKS/GKE/AKS** — k3d-manager is kops-for-k3s; cloud-managed k8s is out of scope
