@@ -87,7 +87,7 @@ case "${_cluster_provider}" in
 esac
 
 _info "[acg-up] Step 2/12 — Provisioning 3-node cluster..."
-deploy_cluster --confirm
+deploy_cluster --provider "${_cluster_provider}" --confirm
 
 if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
   _info "[acg-up] GCP cluster deployed. Steps 3–12 (SSH tunnel, Vault, ESO, ArgoCD) are AWS-only and not yet ported for GCP."
