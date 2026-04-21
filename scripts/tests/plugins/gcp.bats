@@ -149,6 +149,62 @@ EOF
   [ "$status" -eq 1 ]
 }
 
+# gcp_get_credentials — node missing → _ensure_node invoked
+
+@test "gcp_get_credentials calls _ensure_node when node is missing" {
+  node_missing_count=0
+  command() {
+    if [[ "$1" == "-v" && "$2" == "node" && "$node_missing_count" -eq 0 ]]; then
+      node_missing_count=1
+      return 1
+    fi
+    builtin command "$@"
+  }
+  export -f command
+
+  _ensure_node() {
+    printf '%s\n' "called" >> "${BATS_TEST_TMPDIR}/ensure-node.log"
+    node() {
+      if [[ "$1" == "-e" ]]; then
+        return 0
+      fi
+
+      local creds_file="${PLAYWRIGHT_CREDS_FILE:?}"
+      local key_file="${BATS_TEST_TMPDIR}/fake-gcp-key.json"
+      printf '{}\n' > "${key_file}"
+      cat > "${creds_file}" <<EOF
+GCP_PROJECT="test-project"
+GOOGLE_APPLICATION_CREDENTIALS="${key_file}"
+GCP_USERNAME="cloud_user@example.com"
+GCP_PASSWORD="secret"
+EOF
+      return 0
+    }
+    export -f node
+  }
+  export -f _ensure_node
+
+  curl() {
+    return 0
+  }
+  export -f curl
+
+  gcloud() {
+    case "$*" in
+      "auth list --filter=status:ACTIVE --format=value(account)") printf '%s\n' "cloud_user@example.com" ;;
+      "auth list --format=value(account)") printf '%s\n' "cloud_user@example.com" ;;
+      *) : ;;
+    esac
+    return 0
+  }
+  export -f gcloud
+
+  run gcp_get_credentials "https://example.invalid/sandbox"
+  [ "$status" -eq 0 ]
+  run grep "called" "${BATS_TEST_TMPDIR}/ensure-node.log"
+  [ "$status" -eq 0 ]
+}
+
 # gcp_login.js parse check
 
 @test "gcp_login.js passes node --check" {

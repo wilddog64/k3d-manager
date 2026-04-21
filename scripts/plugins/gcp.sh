@@ -25,6 +25,23 @@ source "${SCRIPT_DIR}/etc/playwright/vars.sh"
 _GCP_SA_KEY_PATH="${HOME}/.local/share/k3d-manager/gcp-service-account.json"
 _GCP_SANDBOX_URL="${GCP_SANDBOX_URL:-${PLAYWRIGHT_URL_GCP}}"
 
+_gcp_ensure_node() {
+  if command -v node >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if declare -f _ensure_node >/dev/null 2>&1; then
+    _ensure_node || return 1
+  fi
+
+  if command -v node >/dev/null 2>&1; then
+    return 0
+  fi
+
+  printf 'ERROR: %s\n' "[gcp] node is required for Playwright automation" >&2
+  return 1
+}
+
 function gcp_get_credentials() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<HELP
@@ -47,10 +64,7 @@ HELP
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   local playwright_script="${script_dir}/../playwright/acg_credentials.js"
 
-  if ! command -v node >/dev/null 2>&1; then
-    printf 'ERROR: %s\n' "[gcp] node is required for Playwright automation" >&2
-    return 1
-  fi
+  _gcp_ensure_node || return 1
   if ! node -e "require('playwright')" 2>/dev/null; then
     printf 'ERROR: %s\n' "[gcp] playwright npm module not found — run: cd scripts/playwright && npm install" >&2
     return 1
