@@ -209,8 +209,8 @@ HELP
   local attempts=0
   until KUBECONFIG="${_GCP_KUBECONFIG}" kubectl get nodes 2>/dev/null | grep -q " Ready"; do
     (( attempts++ ))
-    if (( attempts >= 30 )); then
-      printf 'ERROR: %s\n' "[k3s-gcp] Node did not become Ready after 150s" >&2
+    if (( attempts >= 60 )); then
+      printf 'ERROR: %s\n' "[k3s-gcp] Node did not become Ready after 300s" >&2
       return 1
     fi
     sleep 5
