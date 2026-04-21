@@ -33,7 +33,7 @@ exits immediately after the credential step with no cluster created.
 - **SSH user:** `ubuntu`
 - **Instance name:** `k3d-manager-gcp-node`
 - **Machine type:** `e2-standard-2` (2 vCPU, 8 GB)
-- **OS image:** `ubuntu-2004-lts` from project `ubuntu-os-cloud`
+- **OS image:** `ubuntu-2204-lts` from project `ubuntu-os-cloud` (20.04 removed from ACG sandbox; 22.04 verified 2026-04-20)
 - **Network tag:** `k3d-manager` (used to scope firewall rule)
 - **Firewall rule:** `k3d-manager-k3s-api` — allow TCP 6443 inbound
 - **kubeconfig context:** `ubuntu-gcp`

@@ -39,7 +39,8 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 
 | Item | Status | Notes |
 |---|---|---|
-| GCP cluster provisioning | OPEN | `k3s-gcp.sh` is a skeleton. Spec at `docs/bugs/2026-04-20-gcp-provisioning-missing.md`. |
+| GCP node readiness timeout | OPEN | 150s too short for fresh GCE bootstrap; bump to 300s. Spec: `docs/bugs/2026-04-20-gcp-node-readiness-timeout.md`. |
+| GCP latch-on selector gap | OPEN | `gcp_login.js` missing "Agree and continue" + "Confirm" selectors. Spec: `docs/bugs/2026-04-20-gcp-latch-on-selector-gap.md`. |
 | SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync |
 | GCP Latch-on selectors | OPEN | `gcp_login.js` missing "Agree and continue" + "Confirm" buttons. |
 
