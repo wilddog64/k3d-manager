@@ -23,7 +23,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [x] **Phase C — GCP identity** — COMPLETE (`9686e5c3`). Credential extraction, identity bridge, OAuth automation verified.
 - [x] **Phase D — Documentation alignment** — COMPLETE (`7f3bd0a6`)
 - [x] **lib-foundation v0.3.17** — COMPLETE (PR #23 merged). `_agent_lint` glob expanded to `*.sh *.js *.md`.
-- [ ] **GCP cluster provisioning** — OPEN. `scripts/lib/providers/k3s-gcp.sh` is a skeleton. Spec: `docs/bugs/2026-04-20-gcp-provisioning-missing.md`. Needs live ACG GCP sandbox for topology details.
+- [x] **GCP cluster provisioning** — **COMPLETE** (`916d71fc`). Implemented `scripts/lib/providers/k3s-gcp.sh` with firewall automation, GCE instance creation, and `k3sup` bootstrapping.
 
 ---
 
