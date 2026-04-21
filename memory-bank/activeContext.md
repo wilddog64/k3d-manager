@@ -9,14 +9,15 @@ preserved as `k3d-manager-v1.1.0-backup` on remote.
 GCP identity/credential flow, docs alignment. All four phases complete. GCP cluster
 provisioning is the remaining open item (next task on this branch).
 
-## Completed (all phases done)
+## Completed (v1.1.0 Recovery)
 
-| Phase | Commit | Summary |
+| Task | Commit | Summary |
 |---|---|---|
-| A — shared vars | `3de58f4d` | `vars.sh` reconciled; sourced from `acg.sh` |
-| B — robot engine | `a986d5bb` | `acg_credentials.js`: CDP disconnect, `--provider` flag, IPv4, patient sign-in |
-| C — GCP identity | `9686e5c3` | `gcp.sh` plugin, `gcp_login.js` OAuth automation, `bin/acg-up` provider dispatch, core allowlist |
-| D — docs | `7f3bd0a6` | README + howto guides aligned to 127.0.0.1/vars.sh |
+| Shared playwright vars | `3de58f4d` | `vars.sh` reconciled; sourced from `acg.sh` |
+| Robot engine unification | `a986d5bb` | `acg_credentials.js`: CDP disconnect, `--provider` flag, IPv4, patient sign-in |
+| GCP identity bridge | `9686e5c3` | `gcp.sh` plugin, `gcp_login.js` OAuth automation, `bin/acg-up` provider dispatch, core allowlist |
+| Documentation alignment | `7f3bd0a6` | README + howto guides aligned to 127.0.0.1/vars.sh |
+| GCP cluster provisioning | `916d71fc` | Firewall, GCE instance, k3sup; (E2E timeout fix pending `docs/bugs/2026-04-20-gcp-node-readiness-timeout.md`) |
 
 ## Next Task: GCP cluster provisioning
 

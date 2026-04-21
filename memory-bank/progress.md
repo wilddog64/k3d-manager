@@ -18,12 +18,12 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 ## v1.1.0 Track (branch: `k3d-manager-v1.1.0`)
 
 - **Baseline** — branched off `main` (`279db18c`); AWS path verified 2026-04-19.
-- [x] **Phase A — Shared playwright vars** — COMPLETE (`3de58f4d`)
-- [x] **Phase B — Robot engine unification** — COMPLETE (`a986d5bb`)
-- [x] **Phase C — GCP identity** — COMPLETE (`9686e5c3`). Credential extraction, identity bridge, OAuth automation verified.
-- [x] **Phase D — Documentation alignment** — COMPLETE (`7f3bd0a6`)
+- [x] **Shared playwright vars** — COMPLETE (`3de58f4d`)
+- [x] **Robot engine unification** — COMPLETE (`a986d5bb`)
+- [x] **GCP identity bridge** — COMPLETE (`9686e5c3`). Credential extraction, identity bridge, OAuth automation verified.
+- [x] **Documentation alignment** — COMPLETE (`7f3bd0a6`)
 - [x] **lib-foundation v0.3.17** — COMPLETE (PR #23 merged). `_agent_lint` glob expanded to `*.sh *.js *.md`.
-- [ ] **GCP Cluster Provisioning** — **PARTIAL / BLOCKED**. Issue `docs/bugs/2026-04-20-gcp-node-readiness-timeout.md`. Provisioning logic complete but timeout is too short for fresh GCE.
+- [ ] **GCP cluster provisioning** — **PARTIAL**. Logic implemented (`916d71fc`). Issue `docs/bugs/2026-04-20-gcp-node-readiness-timeout.md` (timeout fix needed).
 
 ---
 
