@@ -45,6 +45,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Direction:** Extract ACG automation into its own repo, test browser automation there, keep `k3d-manager` focused on orchestration.
 
 ## Open Items
+- **Vault Orphaned Port-Forward** — OPEN (`docs/bugs/2026-04-22-vault-orphaned-port-forward-ghost-blocker.md`). Ghost processes on port 8200 route to dead pods, causing Error 22.
 - **macOS CDP Direct Launch** — OPEN (`docs/bugs/2026-04-21-cdp-macos-direct-launch-gcp-ensure-cdp.md`). "open -a" ignores CDP flags; requires direct binary launch for reliability.
 - **Vault Readiness Gate Missing** — BLOCKED (`docs/bugs/2026-04-20-vault-readiness-gate-missing.md`). acg-up fails during seeding if local Vault is sealed after Mac sleep.
 

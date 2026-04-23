@@ -38,7 +38,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 ---
 
 ## Known Bugs / Gaps
-- [ ] **Vault Resilience Gap** — OPEN. Issue `docs/bugs/2026-04-20-vault-readiness-gate-missing.md`; acg-up lacks seal status check before seeding.
+- [ ] **Vault Resilience Gap** — SPEC COMPLETE (`docs/bugs/2026-04-22-vault-orphaned-port-forward-ghost-blocker.md`). Planned fix: aggressive port cleanup + health probe in acg-up.
 - [x] **Google Identity Drift** — **COMPLETE** (`6ae2a6c3`). Implemented clean-slate login pattern (logout + explicit credentials entry).
 
 **Infra / tooling (tracked here):**
