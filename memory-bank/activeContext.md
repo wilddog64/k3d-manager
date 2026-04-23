@@ -20,6 +20,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 | GCP latch-on hardening | `e45d9a04` | `gcp_login.js` hardened with "Agree and continue" + "Confirm" buttons |
 | Clean-slate login | `6ae2a6c3` | Logout + explicit email/password to unblock OAuth callback |
 | CLUSTER_NAME default fix | `3a3806aa` | `core.sh` now falls back to `k3d-cluster` when `CLUSTER_NAME` is empty |
+| Polite tab selection | `131dca33` | Hardened `acg_credentials.js` to avoid hijacking user's active page (RCA 1) |
 
 ## Latest Task: CLUSTER_NAME empty-string fix
 
