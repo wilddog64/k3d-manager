@@ -40,6 +40,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 ## Known Bugs / Gaps
 - [ ] **Orchestration Fragility** — OPEN. Issue `docs/bugs/2026-04-23-infra-orchestration-fragility.md`; the local Hub flow does not explicitly unify ArgoCD install, bootstrap, app-cluster registration, and operator access setup.
 - [ ] **Dual-cluster Status UX** — OPEN. Issue `docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`; `make up` and `make status` do not clearly separate local Hub health, remote app-cluster health, tunnel endpoint state, and local ArgoCD access setup.
+- [ ] **Vault Preflight After Sleep** — OPEN. Issue `docs/bugs/2026-04-23-acg-up-vault-state-preflight-gap-after-mac-sleep.md`; `acg-up` should classify local Vault state after Mac sleep / clamshell resume before seeding.
 - [ ] **Vault Resilience Gap** — BLOCKED. `docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md` now tracks the remaining gap accurately: cached unseal replacement and some automatic recovery already exist, but local Vault can still land in drifted states that are not fully reconciled before seeding.
 - [x] **Google Identity Drift** — **COMPLETE** (`6ae2a6c3`). Implemented clean-slate login pattern (logout + explicit credentials entry).
 
