@@ -50,6 +50,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 | Google identity drift | COMPLETE | `6ae2a6c3` — implemented clean-slate login pattern. |
 | Polite tab selection | COMPLETE | Hardened `acg_credentials.js` to avoid hijacking active page (RCA 1 fix: `131dca33`). |
 | Gemini CLI Throttling | OPEN | Policy-driven traffic prioritization may cause capacity errors. |
+| macOS CDP Direct Launch | OPEN | "open -a" ignores port flags; needs direct binary execution. |
 | SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync |
 
 **App-layer bugs** live in their repos as GitHub Issues:
