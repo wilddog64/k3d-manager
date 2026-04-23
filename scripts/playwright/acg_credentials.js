@@ -34,7 +34,7 @@ const IS_FIRST_RUN = _isFirstRun();
 function _outputCredentials(data) {
   const credsFile = process.env.PLAYWRIGHT_CREDS_FILE;
   const output = Object.entries(data).map(([k, v]) => `${k}=${v}`).join('\n');
-  
+
   if (credsFile) {
     fs.writeFileSync(credsFile, output, { mode: 0o600 });
     console.error(`INFO: Credentials scrubbed to secure file: ${credsFile}`);
@@ -149,7 +149,7 @@ async function extractCredentials() {
   const PROVIDER = (_providerIdx !== -1 && process.argv[_providerIdx + 1])
     ? process.argv[_providerIdx + 1]
     : 'aws';
-  
+
   if (PROVIDER !== 'aws' && PROVIDER !== 'gcp' && PROVIDER !== 'azure') {
     console.error(`ERROR: Unknown provider '${PROVIDER}' (expected 'aws', 'gcp', or 'azure')`);
     process.exit(1);
@@ -195,16 +195,22 @@ async function extractCredentials() {
       });
     }
 
-    // 2. Find the Pluralsight page by URL (do not assume pages()[0])
+    // 2. Find the Pluralsight page by URL (Surgical Search)
     const context = browserContext;
     if (!context) throw new Error('No browser context found');
     const allPages = context.pages();
+
+    // Priority 1: Look for an existing sandbox page
     let page = allPages.find(p => {
-      try { return new URL(p.url()).hostname.endsWith('.pluralsight.com') || new URL(p.url()).hostname === 'pluralsight.com'; } catch { return false; }
+      try { return p.url().includes('cloud-playground/cloud-sandboxes') || p.url().includes('hands-on/playground/cloud-sandboxes'); } catch { return false; }
     });
+
+    // Priority 2: If no sandbox page found, open a FRESH tab
     if (!page) {
-      page = allPages[0];
-      if (!page) throw new Error('No page found in the browser context');
+      console.error('INFO: No existing sandbox tab found — opening new extraction tab.');
+      page = await context.newPage();
+    } else {
+      console.error(`INFO: Found existing sandbox tab: ${page.url()}`);
     }
 
     // Skip navigation entirely if sandbox panel is already loaded on the current page
