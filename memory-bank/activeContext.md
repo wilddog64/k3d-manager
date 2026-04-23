@@ -45,6 +45,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Direction:** Extract ACG automation into its own repo, test browser automation there, keep `k3d-manager` focused on orchestration.
 
 ## Open Items
+- **Vault Sync Mismatch** — CRITICAL BLOCKER (`docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md`). Vault storage and Keychain shards are out of sync; manual "Nuclear Reset" required.
 - **Vault Resilience Gap** — OPEN (`docs/bugs/2026-04-20-vault-readiness-gate-missing.md`, `docs/bugs/2026-04-22-vault-orphaned-port-forward-ghost-blocker.md`). `acg-up` can fail at Vault seeding because Vault is sealed after Mac sleep or because a ghost port-forward on `8200` routes to a dead pod.
 - **macOS CDP Direct Launch** — OPEN (`docs/bugs/2026-04-21-cdp-macos-direct-launch-gcp-ensure-cdp.md`). macOS `open -a` can reuse an existing Chrome instance and fail to apply CDP flags; fix must stay aligned with the shared CDP ownership model.
 

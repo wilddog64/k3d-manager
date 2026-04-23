@@ -38,7 +38,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 ---
 
 ## Known Bugs / Gaps
-- [ ] **Vault Resilience Gap** — OPEN. Two tracked RCAs remain active: `docs/bugs/2026-04-20-vault-readiness-gate-missing.md` (sealed Vault after Mac sleep) and `docs/bugs/2026-04-22-vault-orphaned-port-forward-ghost-blocker.md` (ghost `kubectl port-forward` on `8200`).
+- [ ] **Vault Resilience Gap** — BLOCKED. Issue `docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md`; persistent storage mismatch prevents unsealing.
 - [x] **Google Identity Drift** — **COMPLETE** (`6ae2a6c3`). Implemented clean-slate login pattern (logout + explicit credentials entry).
 
 **Infra / tooling (tracked here):**
