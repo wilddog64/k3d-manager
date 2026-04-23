@@ -46,6 +46,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## Open Items
 - **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Local Hub orchestration is fragmented: `acg-up` assumes ArgoCD infrastructure, bootstrap remains separate, and local ArgoCD access still requires manual port-forward setup.
+- **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up` does not clearly summarize local Hub vs remote app-cluster readiness and does not guide optional local runtime startup.
 - **Vault Sync Mismatch** — CRITICAL BLOCKER (`docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md`). Vault storage state and cached unseal material can still drift apart; current automatic recovery is not sufficient for every local failure state.
 - **Vault Resilience Gap** — OPEN (`docs/bugs/2026-04-20-vault-readiness-gate-missing.md`, `docs/bugs/2026-04-22-vault-orphaned-port-forward-ghost-blocker.md`). `acg-up` can fail at Vault seeding because Vault is sealed after Mac sleep or because a ghost port-forward on `8200` routes to a dead pod.
 - **macOS CDP Direct Launch** — OPEN (`docs/bugs/2026-04-21-cdp-macos-direct-launch-gcp-ensure-cdp.md`). macOS `open -a` can reuse an existing Chrome instance and fail to apply CDP flags; fix must stay aligned with the shared CDP ownership model.
@@ -53,3 +54,6 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 - **Whitespace enforcement** — `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh` files
 - **SSH tunnel timeouts** — connection resets during heavy ArgoCD sync (infra, non-blocking)
 - **ACG extraction** — treat browser automation repo split as the stabilization path before further provider automation work.
+
+## Documentation Note
+- Memory Bank size is still manageable (~37 KB total across the tracked files), but `docs/plans/` has grown much faster than Memory Bank. Future cleanup pressure is primarily in plans/archive hygiene rather than immediate Memory Bank trimming.
