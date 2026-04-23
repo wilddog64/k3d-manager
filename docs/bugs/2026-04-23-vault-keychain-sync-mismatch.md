@@ -1,4 +1,4 @@
-# Bug: Vault Database and Keychain Synchronization Mismatch
+# Bug: Vault storage / cached unseal state can still drift out of sync
 
 **Branch:** `k3d-manager-v1.1.0`
 **Files Implicated:** `scripts/plugins/vault.sh`, `scripts/lib/system.sh`
@@ -7,7 +7,7 @@
 
 ## Summary
 
-`make up` continues to fail with `Error 22` during the Vault seeding step. Investigation reveals a **cryptographic state mismatch**: the Vault persistent storage (PVC) contains data encrypted with a previous Master Key, while the macOS Keychain contains an unseal shard from a different initialization attempt.
+`make up` can still fail with `Error 22` during the Vault seeding step when Vault storage state and cached unseal material drift apart. The likely operator-facing symptom is that Vault remains sealed even though cached shards exist, and the later seeding step fails because `acg-up` expects a healthy unsealed Vault.
 
 ---
 
@@ -23,20 +23,27 @@
 
 ## Root Cause
 
-Vault storage is persistent. If a re-initialization is forced while old data exists on the disk, Vault becomes "State-Confused." It expects the original Master Key for the existing data but receives a new key generated during the recent `operator init`. 
-
-Furthermore, our automation caches shards in the macOS Keychain based on the namespace/release name. If multiple initializations happen, the Keychain may hold "Ghost Shards" that no longer match the active database.
+- Vault storage is persistent. If a re-initialization is forced while old data still exists on disk, Vault may reject cached unseal shards because the underlying storage expects a different initialization state.
+- The automation does cache shards by namespace/release, so stale cached material is part of the failure surface.
+- However, the code already deletes cached entries before storing replacements, and it already attempts automatic recovery when cached shards are rejected or missing.
+- The bug is therefore not simply "Keychain never replaced old shards." The more precise problem is that the current automatic recovery and operator feedback are still not sufficient for every drifted Vault state that can occur locally.
 
 ---
 
+## Current Code Reality
+
+- macOS secret storage already does delete-before-add replacement in `scripts/lib/system.sh`.
+- Vault bootstrap already attempts automatic recovery in `scripts/plugins/vault.sh` when cached shards are rejected or missing.
+- The remaining gap is that the operator can still end up in a state where these recovery paths do not restore Vault cleanly enough before `acg-up` reaches the seeding phase.
+
 ## Proposed Fix
 
-1.  **Harden Re-initialization:** The `deploy_vault` command should check for existing PVCs and refuse to re-initialize unless the storage is explicitly purged first.
-2.  **Atomic Keychain Sync:** Update the unseal-key caching logic to perform a `delete` before every `add` to ensure the Keychain only ever contains the most recent, valid shard.
-3.  **Manual Remediation (Current):** A "Nuclear Reset" is required: delete the Vault Pod, delete the PVC, purge the Keychain entries, and run a clean initialization.
+1. **Harden Re-initialization:** `deploy_vault` should surface clearer guardrails and diagnostics around persistent data reuse versus reset paths.
+2. **Clarify Recovery State:** Distinguish between sealed-but-recoverable, sealed-with-stale-cache, and storage-reset-required states in operator output.
+3. **Manual Remediation (Current Worst Case):** If automatic recovery still cannot reconcile the state, a "Nuclear Reset" may be required: delete the Vault Pod, delete the PVC, purge the cached unseal entries, and run a clean initialization.
 
 ---
 
 ## Impact
 
-High. Prevents all cluster deployments until the local management hub is manually synchronized and unsealed.
+High. Can block all cluster deployments when local Vault recovery lands in a state that the current automation does not fully reconcile.

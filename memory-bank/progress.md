@@ -38,7 +38,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 ---
 
 ## Known Bugs / Gaps
-- [ ] **Vault Resilience Gap** — BLOCKED. Issue `docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md`; persistent storage mismatch prevents unsealing.
+- [ ] **Vault Resilience Gap** — BLOCKED. `docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md` now tracks the remaining gap accurately: cached unseal replacement and some automatic recovery already exist, but local Vault can still land in drifted states that are not fully reconciled before seeding.
 - [x] **Google Identity Drift** — **COMPLETE** (`6ae2a6c3`). Implemented clean-slate login pattern (logout + explicit credentials entry).
 
 **Infra / tooling (tracked here):**
