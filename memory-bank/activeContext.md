@@ -44,6 +44,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Direction:** Extract ACG automation into its own repo, test browser automation there, keep `k3d-manager` focused on orchestration.
 
 ## Open Items
+- **Vault Readiness Gate Missing** — BLOCKED (`docs/bugs/2026-04-20-vault-readiness-gate-missing.md`). acg-up fails during seeding if local Vault is sealed after Mac sleep.
 
 - **Whitespace enforcement** — `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh` files
 - **SSH tunnel timeouts** — connection resets during heavy ArgoCD sync (infra, non-blocking)
