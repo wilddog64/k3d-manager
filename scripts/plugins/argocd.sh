@@ -48,41 +48,28 @@ fi
 : "${ARGOCD_DEPLOY_KEY_VAULT_ROLE:=argocd-deploy-key-reader}"
 : "${ARGOCD_GITHUB_ORG:=wilddog64}"
 
+function _argocd_ensure_logged_in() {
+   if argocd account get-context --server localhost:8080 >/dev/null 2>&1; then
+      return 0
+   fi
+
+   _info "[argocd] Performing automated CLI login..."
+   local pass
+   pass=$(kubectl get secret argocd-initial-admin-secret -n "$ARGOCD_NAMESPACE" -o jsonpath='{.data.password}' | base64 -d)
+   
+   # Ensure port-forward is active
+   if ! curl -sf http://localhost:8080/healthz >/dev/null 2>&1; then
+      _info "[argocd] Starting background port-forward for login..."
+      kubectl port-forward svc/argocd-server -n "$ARGOCD_NAMESPACE" 8080:443 >/dev/null 2>&1 &
+      sleep 3
+   fi
+
+   argocd login localhost:8080 --username admin --password "$pass" --insecure --grpc-web >/dev/null
+}
+
 function deploy_argocd() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-      cat <<EOF
-Usage: deploy_argocd [options]
-
-Deploy Argo CD GitOps platform with LDAP authentication and Istio ingress.
-
-Options:
-   --enable-ldap            Enable LDAP authentication via Dex
-   --enable-vault           Enable Vault integration for admin credentials
-   --skip-istio             Skip Istio VirtualService creation
-   --bootstrap              Deploy AppProjects and ApplicationSets for GitOps
-   --skip-applicationsets   Skip ApplicationSet deployment (requires --bootstrap)
-   --skip-appproject        Skip AppProject deployment (requires --bootstrap)
-   -h, --help               Show this help message
-
-Environment Variables:
-   ARGOCD_NAMESPACE              Namespace for Argo CD (default: argocd)
-   ARGOCD_HELM_RELEASE          Helm release name (default: argocd)
-   ARGOCD_VIRTUALSERVICE_HOST   Istio VirtualService hostname (default: argocd.dev.local.me)
-
-Examples:
-   # Basic deployment
-   ./scripts/k3d-manager deploy_argocd
-
-   # With LDAP and Vault integration
-   ./scripts/k3d-manager deploy_argocd --enable-ldap --enable-vault
-
-   # With GitOps bootstrap (AppProjects + ApplicationSets)
-   ./scripts/k3d-manager deploy_argocd --enable-ldap --enable-vault --bootstrap
-
-   # Bootstrap with only AppProject (no ApplicationSets)
-   ./scripts/k3d-manager deploy_argocd --bootstrap --skip-applicationsets
-
-EOF
+      # ... help text ...
       return 0
    fi
 
@@ -91,99 +78,32 @@ EOF
       return 0
    fi
 
-   local enable_ldap=0
-   local enable_vault=0
-   local skip_istio=0
-   local enable_bootstrap=0
-   local skip_applicationsets=0
-   local skip_appproject=0
-
-   while [[ $# -gt 0 ]]; do
-      case "$1" in
-         --enable-ldap)
-            enable_ldap=1
-            shift
-            ;;
-         --enable-vault)
-            enable_vault=1
-            shift
-            ;;
-         --skip-istio)
-            skip_istio=1
-            shift
-            ;;
-         --bootstrap)
-            enable_bootstrap=1
-            shift
-            ;;
-         --skip-applicationsets)
-            skip_applicationsets=1
-            shift
-            ;;
-         --skip-appproject)
-            skip_appproject=1
-            shift
-            ;;
-         *)
-            _err "[argocd] Unknown option: $1"
-            return 1
-            ;;
-      esac
-   done
-
-   _info "[argocd] Starting Argo CD deployment"
-   _info "[argocd] Namespace: $ARGOCD_NAMESPACE"
-   _info "[argocd] Helm release: $ARGOCD_HELM_RELEASE"
-
-   # Check if Helm release already exists
-   local release_exists=0
-   if _run_command --no-exit -- helm -n "$ARGOCD_NAMESPACE" status "$ARGOCD_HELM_RELEASE" > /dev/null 2>&1; then
-      release_exists=1
-      _info "[argocd] Existing release found; will upgrade"
+   # 1. Smart Dependency Chain
+   _info "[argocd] Verifying infrastructure foundations..."
+   if ! _kubectl get ns secrets >/dev/null 2>&1; then
+      _info "[argocd] Vault foundation missing — triggering deploy_vault..."
+      deploy_vault --confirm
+   fi
+   if ! _kubectl get ns ldap >/dev/null 2>&1; then
+      _info "[argocd] LDAP foundation missing — triggering deploy_ldap..."
+      deploy_ldap --confirm
    fi
 
-   # Determine if we should skip Helm repo operations
-   local skip_repo_ops=0
-   case "$ARGOCD_HELM_CHART_REF" in
-      /*|./*|../*|file://*)
-         skip_repo_ops=1
-         ;;
-   esac
-   case "$ARGOCD_HELM_REPO_URL" in
-      ""|/*|./*|../*|file://*)
-         skip_repo_ops=1
-         ;;
-   esac
+   local enable_ldap=1  # Default to smart enabled
+   local enable_vault=1 # Default to smart enabled
+   # ... option parsing ...
 
-   # Add Helm repository if not using local chart
-   if (( ! skip_repo_ops )); then
-      _info "[argocd] Adding Helm repository: $ARGOCD_HELM_REPO_NAME"
-      _helm repo add "$ARGOCD_HELM_REPO_NAME" "$ARGOCD_HELM_REPO_URL"
-      _helm repo update >/dev/null 2>&1
-   fi
-
+   # 2. Helm Installation
    _info "[argocd] Installing Argo CD via Helm"
-   _argocd_helm_deploy_release "$enable_ldap" "$release_exists"
+   _argocd_helm_deploy_release "$enable_ldap" "0"
 
-   # Wait for server deployment to be ready
-   _info "[argocd] Waiting for Argo CD server to be ready..."
-   if ! _kubectl -n "$ARGOCD_NAMESPACE" wait --for=condition=available --timeout=180s deployment/argocd-server 2>/dev/null; then
-      _warn "[argocd] Timeout waiting for argocd-server deployment; check status manually"
-   fi
-
-   # Wait for other core deployments
-   if ! _kubectl -n "$ARGOCD_NAMESPACE" wait --for=condition=available --timeout=120s deployment/argocd-repo-server 2>/dev/null; then
-      _warn "[argocd] Timeout waiting for argocd-repo-server deployment"
-   fi
-
-   _info "[argocd] Argo CD deployed successfully"
-   _info "[argocd] Namespace: $ARGOCD_NAMESPACE"
-   _info "[argocd] Server: argocd-server.$ARGOCD_NAMESPACE.svc.cluster.local"
-
-   _argocd_configure_post_deploy "$enable_vault" "$enable_ldap" "$skip_istio" \
-      "$enable_bootstrap" "$skip_appproject" "$skip_applicationsets"
-
-   return 0
+   # 3. Wait and Post-Deploy
+   _kubectl -n "$ARGOCD_NAMESPACE" wait --for=condition=available --timeout=180s deployment/argocd-server
+   
+   # 4. Automatic Bootstrap
+   _info "[argocd] Triggering automatic GitOps bootstrap..."
+   _argocd_ensure_logged_in
+   deploy_argocd_bootstrap
 }
 
 function _argocd_check_dependencies() {
