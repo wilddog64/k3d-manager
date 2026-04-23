@@ -38,7 +38,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 ---
 
 ## Known Bugs / Gaps
-- [ ] **Vault Resilience Gap** — SPEC COMPLETE (`docs/bugs/2026-04-22-vault-orphaned-port-forward-ghost-blocker.md`). Planned fix: aggressive port cleanup + health probe in acg-up.
+- [ ] **Vault Resilience Gap** — OPEN. Two tracked RCAs remain active: `docs/bugs/2026-04-20-vault-readiness-gate-missing.md` (sealed Vault after Mac sleep) and `docs/bugs/2026-04-22-vault-orphaned-port-forward-ghost-blocker.md` (ghost `kubectl port-forward` on `8200`).
 - [x] **Google Identity Drift** — **COMPLETE** (`6ae2a6c3`). Implemented clean-slate login pattern (logout + explicit credentials entry).
 
 **Infra / tooling (tracked here):**
@@ -50,7 +50,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 | Google identity drift | COMPLETE | `6ae2a6c3` — implemented clean-slate login pattern. |
 | Polite tab selection | COMPLETE | Hardened `acg_credentials.js` to avoid hijacking active page (RCA 1 fix: `131dca33`). |
 | Gemini CLI Throttling | OPEN | Policy-driven traffic prioritization may cause capacity errors. |
-| macOS CDP Direct Launch | OPEN | "open -a" ignores port flags; needs direct binary execution. |
+| macOS CDP Direct Launch | OPEN | `open -a` can reuse an existing Chrome instance and fail to apply CDP flags; bug doc is now scoped as a problem statement, not an implementation script. |
 | SSH Tunnel timeouts | OPEN | Connection resets during heavy ArgoCD sync |
 
 **App-layer bugs** live in their repos as GitHub Issues:
