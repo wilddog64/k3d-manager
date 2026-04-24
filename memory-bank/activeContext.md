@@ -58,7 +58,14 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 2026-04-24 implementation batch complete for Bugs 1–4; Bug 5 remains deferred to lib-acg extraction.
 
-## New Bug: acg-down expired credentials abort (2026-04-24)
+## New Bug: acg-down credential check noise (2026-04-24)
+
+**Status:** OPEN — spec: `docs/bugs/2026-04-24-acg-down-credential-check-noise.md`
+**File:** `bin/acg-down` lines 49–51
+**Fix:** Pre-check `aws sts get-caller-identity` silently before calling `acg_teardown`; skip with single clean `_info` when invalid. Eliminates ERROR-level noise that makes expired vs live-but-stale indistinguishable.
+**Supersedes:** `ae2fca66` approach (catch-after-fail) — this fixes the noise problem that approach left behind.
+
+## Prev Bug: acg-down expired credentials abort (2026-04-24)
 
 **Status:** COMPLETE (`ae2fca66`) — spec: `docs/bugs/2026-04-24-acg-down-expired-credentials-abort.md`
 **File:** `bin/acg-down` line 50
