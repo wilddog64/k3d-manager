@@ -36,6 +36,13 @@ else
    source "$ARGOCD_VARS_FILE"
 fi
 
+# Load LDAP configuration variables for dependency checks
+ARGOCD_LDAP_VARS_FILE="$SCRIPT_DIR/etc/ldap/vars.sh"
+if [[ -r "$ARGOCD_LDAP_VARS_FILE" ]]; then
+   # shellcheck disable=SC1090
+   source "$ARGOCD_LDAP_VARS_FILE"
+fi
+
 # Default configuration values
 : "${ARGOCD_NAMESPACE:=argocd}"
 : "${ARGOCD_HELM_RELEASE:=argocd}"
@@ -80,11 +87,11 @@ function deploy_argocd() {
 
    # 1. Smart Dependency Chain
    _info "[argocd] Verifying infrastructure foundations..."
-   if ! _kubectl get ns secrets >/dev/null 2>&1; then
+   if ! _kubectl --no-exit get ns secrets >/dev/null 2>&1; then
       _info "[argocd] Vault foundation missing — triggering deploy_vault..."
       deploy_vault --confirm
    fi
-   if ! _kubectl get ns "${LDAP_NAMESPACE:-ldap}" >/dev/null 2>&1; then
+   if ! _kubectl --no-exit get ns "${LDAP_NAMESPACE:-ldap}" >/dev/null 2>&1; then
       _info "[argocd] LDAP foundation missing — triggering deploy_ldap..."
       deploy_ldap --confirm
    fi
