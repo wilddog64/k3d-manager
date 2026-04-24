@@ -1,7 +1,7 @@
 # Bug: `bin/acg-sync-apps` does not preflight local port 8080
 
 **Date:** 2026-04-24
-**Status:** OPEN
+**Status:** COMPLETE (`3a1e2554`)
 **Branch:** `k3d-manager-v1.1.0`
 
 ## Problem
@@ -23,10 +23,17 @@ The script only checks whether `https://localhost:8080/` becomes reachable after
 background `kubectl port-forward`. It does not check whether the local port is already bound
 before starting the forward.
 
-## Expected Fix
+## Fix
 
-Add a local port 8080 occupancy check before starting the `kubectl port-forward`, and abort
-immediately with a clear message if something is already listening there.
+`bin/acg-sync-apps` now checks whether local port 8080 is already bound before starting the
+ArgoCD port-forward. If the port is occupied, the script exits immediately with a clear error.
+
+## Validation
+
+`shellcheck -x bin/acg-sync-apps` passes, and a focused bats test confirms both cases:
+
+- occupied port 8080 exits early with a clear message
+- a free port still reaches the existing early-forward failure path and surfaces the log tail
 
 ## Impact
 
