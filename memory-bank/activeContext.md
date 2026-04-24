@@ -155,7 +155,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## New Bug: acg-sync-apps default ARGOCD_APP is 'data-layer' — never exists (2026-04-24)
 
-**Status:** OPEN — spec: `docs/bugs/2026-04-24-acg-sync-apps-argocd-app-default-wrong.md`
+**Status:** COMPLETE (`b83d5596`) — spec: `docs/bugs/2026-04-24-acg-sync-apps-argocd-app-default-wrong.md`
 **File:** `bin/acg-sync-apps` line 24
 **Fix:** `ARGOCD_APP="${ARGOCD_APP:-data-layer}"` → `ARGOCD_APP="${ARGOCD_APP:-rollout-demo-default}"`
 **Why:** `_argocd_deploy_applicationsets` deploys three ApplicationSets. Only `demo-rollout.yaml` (static list generator) creates apps unconditionally — `rollout-demo-default` and `rollout-demo-staging`. `services-git.yaml` generates zero apps (no `services/` dir in repo). `platform-helm.yaml` generates zero apps (no cluster with `environment: dev` label at bootstrap). `data-layer` was a stale planned default that was never implemented.
@@ -172,6 +172,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 - **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up` does not clearly summarize local Hub vs remote app-cluster readiness and does not guide optional local runtime startup.
 - **ACG Extraction Boundary** — OPEN (`docs/bugs/2026-04-23-acg-extraction-boundary-gemini-coupling.md`). The `acg_*` interaction surface still keeps Gemini/browser automation coupled to `k3d-manager`; that subsystem should move out as one extraction unit.
 - **acg-sync-apps https vs http readiness** — COMPLETE (`0896d9ec`). Spec `docs/bugs/2026-04-24-acg-sync-apps-https-vs-http-readiness-check.md`; `bin/acg-sync-apps` now uses `http://localhost:<port>/healthz` for both the managed port-forward reuse check and the startup readiness loop, matching ArgoCD's insecure HTTP mode.
+- **acg-sync-apps default app wrong** — COMPLETE (`b83d5596`). Spec `docs/bugs/2026-04-24-acg-sync-apps-argocd-app-default-wrong.md`; `bin/acg-sync-apps` now defaults `ARGOCD_APP` to `rollout-demo-default`, which is the canonical app generated after bootstrap.
 - **Teardown State Drift** — COMPLETE (`docs/bugs/2026-04-23-acg-down-full-teardown-spec.md`). Implemented in `3fd6f4d6`; `acg-down` now tears down the local Hub by default and supports `--keep-hub` as the explicit opt-out.
 - **acg-up Hub bootstrap LDAP missing** — COMPLETE (`c650f032`). `acg-up` Step 3.6 now pre-deploys LDAP through the dispatcher before ArgoCD, so `deploy_argocd` no longer falls into its direct `deploy_ldap --confirm` path on a fresh Hub.
 - **acg-sync-apps + acg-status dual-cluster** — COMPLETE (`docs/bugs/2026-04-23-acg-sync-apps-and-acg-status-dual-cluster.md`). Implemented in `a5422141`; `acg-sync-apps` now polls port-forward readiness and uses configurable `ARGOCD_APP`, and `acg-status` now shows Hub cluster nodes + pods before tunnel status.
