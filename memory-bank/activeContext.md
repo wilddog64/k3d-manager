@@ -86,6 +86,13 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Fix:** `trap '...' EXIT` → `trap '...' RETURN` in `_provider_k3d_configure_istio`
 **Why:** EXIT trap registers on the caller shell; when `deploy_cluster --provider k3d` is called inline from `bin/acg-up` (Step 3.5, `73382eb2`), the trap fires on acg-up exit with `$istio_yamlfile` out of scope → unbound variable under `set -u`.
 
+## New Bug: k3d-provider RETURN trap scope (2026-04-24)
+
+**Status:** OPEN — spec: `docs/bugs/2026-04-24-k3d-provider-return-trap-scope.md`
+**File:** `scripts/lib/providers/k3d.sh` lines 100 and 142
+**Fix:** Prepend `trap - RETURN;` inside both RETURN trap handlers — self-clears trap on first fire, preventing re-fire in parent functions where local variables are out of scope.
+**Why:** Bash RETURN traps are shell-global, not function-scoped. After `_provider_k3d_configure_istio` returns, its trap re-fires when `_provider_k3d_deploy_cluster` returns, with `$istio_yamlfile` out of scope → unbound variable.
+
 ## Open Items
 - **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Local Hub orchestration is fragmented: `acg-up` assumes ArgoCD infrastructure, bootstrap remains separate, and local ArgoCD access still requires manual port-forward setup.
 - **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up` does not clearly summarize local Hub vs remote app-cluster readiness and does not guide optional local runtime startup.
