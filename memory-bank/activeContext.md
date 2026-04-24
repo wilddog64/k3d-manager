@@ -50,13 +50,13 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 | Bug | Spec | Action |
 |-----|------|--------|
-| acg-sync-apps app not found | `docs/bugs/2026-04-24-acg-sync-apps-argocd-app-not-found.md` | Implement |
-| acg-extend isPanelOpen false positive | `docs/bugs/2026-04-24-acg-extend-ispanelopen-false-positive.md` | Implement |
-| Vault preflight after sleep | `docs/bugs/2026-04-23-acg-up-vault-state-preflight-gap-after-mac-sleep.md` | Implement (impl spec added) |
-| acg-down provider dispatch + GCP teardown | `docs/bugs/2026-04-24-acg-down-provider-dispatch-gcp-teardown.md` | Implement |
+| acg-sync-apps app not found | `docs/bugs/2026-04-24-acg-sync-apps-argocd-app-not-found.md` | COMPLETE (`eaaf9a9e`) |
+| acg-extend isPanelOpen false positive | `docs/bugs/2026-04-24-acg-extend-ispanelopen-false-positive.md` | COMPLETE (`79b87e36`) |
+| Vault preflight after sleep | `docs/bugs/2026-04-23-acg-up-vault-state-preflight-gap-after-mac-sleep.md` | COMPLETE (`e577579e`) |
+| acg-down provider dispatch + GCP teardown | `docs/bugs/2026-04-24-acg-down-provider-dispatch-gcp-teardown.md` | COMPLETE (`706e0ba2`) |
 | acg-credentials Open Sandbox provider-blind | `docs/bugs/2026-04-24-acg-credentials-open-sandbox-provider-blind.md` | DEFERRED to lib-acg |
 
-Bugs 1/3/4/5 handed off to Gemini next. Bug 2 deferred to lib-acg extraction.
+2026-04-24 implementation batch complete for Bugs 1–4; Bug 5 remains deferred to lib-acg extraction.
 
 ## Open Items
 - **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Local Hub orchestration is fragmented: `acg-up` assumes ArgoCD infrastructure, bootstrap remains separate, and local ArgoCD access still requires manual port-forward setup.
@@ -64,7 +64,7 @@ Bugs 1/3/4/5 handed off to Gemini next. Bug 2 deferred to lib-acg extraction.
 - **ACG Extraction Boundary** — OPEN (`docs/bugs/2026-04-23-acg-extraction-boundary-gemini-coupling.md`). The `acg_*` interaction surface still keeps Gemini/browser automation coupled to `k3d-manager`; that subsystem should move out as one extraction unit.
 - **Teardown State Drift** — COMPLETE (`docs/bugs/2026-04-23-acg-down-full-teardown-spec.md`). Implemented in `3fd6f4d6`; `acg-down` now tears down the local Hub by default and supports `--keep-hub` as the explicit opt-out.
 - **acg-sync-apps + acg-status dual-cluster** — COMPLETE (`docs/bugs/2026-04-23-acg-sync-apps-and-acg-status-dual-cluster.md`). Implemented in `a5422141`; `acg-sync-apps` now polls port-forward readiness and uses configurable `ARGOCD_APP`, and `acg-status` now shows Hub cluster nodes + pods before tunnel status.
-- **Vault Preflight After Sleep** — OPEN (`docs/bugs/2026-04-23-acg-up-vault-state-preflight-gap-after-mac-sleep.md`). `acg-up` does not robustly re-classify local Vault state after Mac sleep / clamshell resume before attempting KV seeding.
+- **Vault Preflight After Sleep** — COMPLETE (`e577579e`). `acg-up` now verifies the local Hub cluster before Vault PF startup and fails early if Vault is sealed or unreachable after OrbStack restart / Mac sleep.
 - **Repo Retention Cleanup** — OPEN (`docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`). `scratch/` and accumulated historical docs are now a larger maintenance/size concern than Memory Bank itself.
 - **Vault Sync Mismatch** — CRITICAL BLOCKER (`docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md`). Vault storage state and cached unseal material can still drift apart; current automatic recovery is not sufficient for every local failure state.
 - **Vault Resilience Gap** — OPEN (`docs/bugs/2026-04-20-vault-readiness-gate-missing.md`, `docs/bugs/2026-04-22-vault-orphaned-port-forward-ghost-blocker.md`). `acg-up` can fail at Vault seeding because Vault is sealed after Mac sleep or because a ghost port-forward on `8200` routes to a dead pod.
