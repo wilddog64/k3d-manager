@@ -74,7 +74,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## New Bug: acg-up Step 3.5 aborts instead of creating missing Hub cluster (2026-04-24)
 
-**Status:** OPEN — spec: `docs/bugs/2026-04-24-acg-up-hub-cluster-not-created.md`
+**Status:** COMPLETE (`73382eb2`) — spec: `docs/bugs/2026-04-24-acg-up-hub-cluster-not-created.md`
 **File:** `bin/acg-up` lines 104–105
 **Fix:** Replace `_err` (abort) with `deploy_cluster --provider k3d` — auto-create the Hub cluster when missing. Keep the `kubectl get nodes` unreachable check as the true OrbStack-broken guard.
 **Why:** `make down` deletes the Hub cluster; `make up` never creates it (Step 2 provisions remote k3s-aws only). `make down → make up` always fails at Step 3.5.
@@ -86,6 +86,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 - **Teardown State Drift** — COMPLETE (`docs/bugs/2026-04-23-acg-down-full-teardown-spec.md`). Implemented in `3fd6f4d6`; `acg-down` now tears down the local Hub by default and supports `--keep-hub` as the explicit opt-out.
 - **acg-sync-apps + acg-status dual-cluster** — COMPLETE (`docs/bugs/2026-04-23-acg-sync-apps-and-acg-status-dual-cluster.md`). Implemented in `a5422141`; `acg-sync-apps` now polls port-forward readiness and uses configurable `ARGOCD_APP`, and `acg-status` now shows Hub cluster nodes + pods before tunnel status.
 - **Vault Preflight After Sleep** — COMPLETE (`e577579e`). `acg-up` now verifies the local Hub cluster before Vault PF startup and fails early if Vault is sealed or unreachable after OrbStack restart / Mac sleep.
+- **acg-up Hub cluster auto-create** — COMPLETE (`73382eb2`). `acg-up` now recreates the local Hub cluster during Step 3.5 when it was legitimately removed by `make down`, while keeping the unreachable-cluster check as the real OrbStack guard.
 - **acg-down expired credentials abort** — COMPLETE (`07ca18a6`). `acg-down` now silently pre-checks AWS credentials, skips CloudFormation teardown with a clean INFO when the sandbox already expired, and still completes local Vault PF + Hub cleanup.
 - **Repo Retention Cleanup** — OPEN (`docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`). `scratch/` and accumulated historical docs are now a larger maintenance/size concern than Memory Bank itself.
 - **Vault Sync Mismatch** — CRITICAL BLOCKER (`docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md`). Vault storage state and cached unseal material can still drift apart; current automatic recovery is not sufficient for every local failure state.
