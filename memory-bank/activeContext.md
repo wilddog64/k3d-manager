@@ -57,7 +57,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 | acg-sync-apps state dir not writable | `docs/bugs/2026-04-24-acg-sync-apps-state-dir-not-writable.md` | COMPLETE (`890ba2a6`) |
 | acg-sync-apps live port-forward connect failure | `docs/issues/2026-04-24-acg-sync-apps-live-port-forward-connect-operation-not-permitted.md` | OPEN |
 | acg-sync-apps error log preserved in scratch | `docs/bugs/2026-04-24-acg-sync-apps-error-log-preserved-in-scratch.md` | COMPLETE (`2e766a43`) |
-| acg-sync-apps ArgoCD login still interactive | `docs/bugs/2026-04-24-acg-sync-apps-argocd-login-noninteractive.md` | OPEN |
+| acg-sync-apps ArgoCD login still interactive | `docs/bugs/2026-04-24-acg-sync-apps-argocd-login-noninteractive.md` | COMPLETE (`c3a2f146`) |
 | acg-extend isPanelOpen false positive | `docs/bugs/2026-04-24-acg-extend-ispanelopen-false-positive.md` | COMPLETE (`79b87e36`) |
 | Vault preflight after sleep | `docs/bugs/2026-04-23-acg-up-vault-state-preflight-gap-after-mac-sleep.md` | COMPLETE (`e577579e`) |
 | acg-down provider dispatch + GCP teardown | `docs/bugs/2026-04-24-acg-down-provider-dispatch-gcp-teardown.md` | COMPLETE (`706e0ba2`) |
@@ -167,7 +167,6 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 - **Vault Preflight After Sleep** — COMPLETE (`e577579e`). `acg-up` now verifies the local Hub cluster before Vault PF startup and fails early if Vault is sealed or unreachable after OrbStack restart / Mac sleep.
 - **acg-up Hub cluster auto-create** — COMPLETE (`73382eb2`). `acg-up` now recreates the local Hub cluster during Step 3.5 when it was legitimately removed by `make down`, while keeping the unreachable-cluster check as the real OrbStack guard.
 - **acg-down expired credentials abort** — COMPLETE (`07ca18a6`). `acg-down` now silently pre-checks AWS credentials, skips CloudFormation teardown with a clean INFO when the sandbox already expired, and still completes local Vault PF + Hub cleanup.
-- **acg-sync-apps ArgoCD login still interactive** — OPEN (`docs/bugs/2026-04-24-acg-sync-apps-argocd-login-noninteractive.md`). `bin/acg-sync-apps` still calls `argocd login` without the non-interactive flags already used by `_argocd_ensure_logged_in()`, so `make sync-apps` can die after the port-forward is ready.
 - **Repo Retention Cleanup** — OPEN (`docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`). `scratch/` and accumulated historical docs are now a larger maintenance/size concern than Memory Bank itself.
 - **Vault Sync Mismatch** — CRITICAL BLOCKER (`docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md`). Vault storage state and cached unseal material can still drift apart; current automatic recovery is not sufficient for every local failure state.
 - **Vault Resilience Gap** — OPEN (`docs/bugs/2026-04-20-vault-readiness-gate-missing.md`, `docs/bugs/2026-04-22-vault-orphaned-port-forward-ghost-blocker.md`). `acg-up` can fail at Vault seeding because Vault is sealed after Mac sleep or because a ghost port-forward on `8200` routes to a dead pod.

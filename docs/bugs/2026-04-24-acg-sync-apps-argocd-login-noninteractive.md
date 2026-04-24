@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-24
 **Branch:** `k3d-manager-v1.1.0`
-**Status:** OPEN
+**Status:** COMPLETE (`c3a2f146`)
 **Files:** `bin/acg-sync-apps`
 
 ## Problem
@@ -61,3 +61,8 @@ Either way, the login path should not depend on stdin or interactive TLS confirm
 
 Medium. `make sync-apps` stops after the port-forward is ready, which blocks the sync flow and
 leaves the user with no useful progress past the ArgoCD login phase.
+
+## Validation
+
+`shellcheck -x bin/acg-sync-apps` passes, `bats scripts/tests/bin/acg_sync_apps.bats` passes,
+and the login invocation now includes `--plaintext --skip-test-tls --insecure --grpc-web </dev/null`.
