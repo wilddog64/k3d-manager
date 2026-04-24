@@ -116,6 +116,7 @@ if [[ "${_hub_newly_created}" -eq 1 ]]; then
   _info "[acg-up] Step 3.6/12 — Bootstrapping Hub cluster (Vault + LDAP + ArgoCD)..."
   kubectl config use-context "${_HUB_CLUSTER_CTX}" >/dev/null 2>&1 || true
   "${REPO_ROOT}/scripts/k3d-manager" deploy_vault --confirm
+  "${REPO_ROOT}/scripts/k3d-manager" deploy_ldap --confirm
   "${REPO_ROOT}/scripts/k3d-manager" deploy_argocd --confirm
   _info "[acg-up] Hub cluster bootstrapped."
 fi
