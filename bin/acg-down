@@ -47,7 +47,7 @@ case "${_cluster_provider}" in
     _info "[acg-down] Stopping tunnel..."
     tunnel_stop 2>/dev/null || true
     _info "[acg-down] Tearing down CloudFormation stack (AWS)..."
-    acg_teardown --confirm
+    acg_teardown --confirm || _info "[acg-down] CloudFormation teardown failed — credentials may have expired (sandbox already removed). Continuing local cleanup."
     ;;
   k3s-gcp)
     source "${REPO_ROOT}/scripts/lib/providers/k3s-gcp.sh"
