@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-24
 **Branch:** `k3d-manager-v1.1.0`
-**Status:** COMPLETE (`unassigned`) — implemented in `scripts/plugins/argocd.sh`
+**Status:** COMPLETE (`fdbef8c4`) — implemented in `scripts/plugins/argocd.sh`
 
 ## Problem
 

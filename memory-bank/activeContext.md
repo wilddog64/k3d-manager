@@ -126,7 +126,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## New Bug: ArgoCD CLI login plaintext prompt blocks bootstrap (2026-04-24)
 
-**Status:** COMPLETE (`unassigned`) — spec: `docs/bugs/2026-04-24-argocd-cli-login-plaintext-prompt.md`
+**Status:** COMPLETE (`fdbef8c4`) — spec: `docs/bugs/2026-04-24-argocd-cli-login-plaintext-prompt.md`
 **File:** `scripts/plugins/argocd.sh`
 **Fix:** `_argocd_ensure_logged_in()` now uses `--plaintext --skip-test-tls` and closes stdin with `</dev/null`.
 **Why:** `_argocd_ensure_logged_in()` forwards Argo CD to `localhost:8080` via a plaintext `kubectl port-forward`, then calls `argocd login` non-interactively. The CLI printed `WARNING: server is not configured with TLS. Proceed (y/n)?` and then hit EOF, which stalled bootstrap.
