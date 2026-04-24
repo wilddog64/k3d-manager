@@ -23,8 +23,13 @@ APP_CONTEXT="${APP_CONTEXT:-ubuntu-k3s}"
 ARGOCD_NS="${ARGOCD_NS:-cicd}"
 ARGOCD_APP="${ARGOCD_APP:-data-layer}"
 
+SYNC_APPS_STATE_DIR="${SYNC_APPS_STATE_DIR:-${HOME}/.local/share/k3d-manager}"
+SYNC_APPS_PF_STATE_FILE="${SYNC_APPS_STATE_DIR}/acg-sync-apps-argocd-pf.env"
+SYNC_APPS_PF_LOG_FILE="${SYNC_APPS_STATE_DIR}/acg-sync-apps-argocd-pf.log"
+
 _pf_pid=""
-_pf_log="$(mktemp -t acg-sync-apps-argocd-pf.XXXXXX.log 2>/dev/null || printf '%s\n' "${TMPDIR:-/tmp}/acg-sync-apps-argocd-pf.log")"
+_pf_owned=0
+_pf_log="${SYNC_APPS_PF_LOG_FILE}"
 
 function _sync_apps_port_in_use() {
   local pf_port="$1"
@@ -42,45 +47,125 @@ function _sync_apps_port_in_use() {
   return 1
 }
 
+function _sync_apps_listener_pids() {
+  local pf_port="$1"
+
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"${pf_port}" -sTCP:LISTEN -t 2>/dev/null | sort -u
+  fi
+}
+
+function _sync_apps_load_port_forward_state() {
+  if [[ -r "${SYNC_APPS_PF_STATE_FILE}" ]]; then
+    # shellcheck disable=SC1090
+    source "${SYNC_APPS_PF_STATE_FILE}"
+  fi
+}
+
+function _sync_apps_state_matches() {
+  [[ "${SYNC_APPS_PF_CONTEXT:-}" == "${INFRA_CONTEXT}" ]] &&
+    [[ "${SYNC_APPS_PF_NS:-}" == "${ARGOCD_NS}" ]] &&
+    [[ "${SYNC_APPS_PF_PORT:-}" == "8080" ]] &&
+    [[ "${SYNC_APPS_PF_SERVICE:-}" == "svc/argocd-server" ]]
+}
+
+function _sync_apps_write_port_forward_state() {
+  mkdir -p "${SYNC_APPS_STATE_DIR}"
+  cat >"${SYNC_APPS_PF_STATE_FILE}" <<EOF
+SYNC_APPS_PF_PID=${_pf_pid}
+SYNC_APPS_PF_CONTEXT=${INFRA_CONTEXT}
+SYNC_APPS_PF_NS=${ARGOCD_NS}
+SYNC_APPS_PF_PORT=8080
+SYNC_APPS_PF_SERVICE=svc/argocd-server
+SYNC_APPS_PF_LOG=${_pf_log}
+EOF
+}
+
+function _sync_apps_clear_port_forward_state() {
+  rm -f "${SYNC_APPS_PF_STATE_FILE}" 2>/dev/null || true
+}
+
+function _sync_apps_reconcile_port_forward() {
+  local pf_port="$1"
+
+  if ! _sync_apps_port_in_use "${pf_port}"; then
+    return 1
+  fi
+
+  _sync_apps_load_port_forward_state
+  if _sync_apps_state_matches &&
+     [[ -n "${SYNC_APPS_PF_PID:-}" ]] &&
+     kill -0 "${SYNC_APPS_PF_PID}" 2>/dev/null; then
+    _pf_pid="${SYNC_APPS_PF_PID}"
+    _pf_log="${SYNC_APPS_PF_LOG:-${_pf_log}}"
+    if curl -sk --max-time 1 https://localhost:"${pf_port}"/ >/dev/null 2>&1; then
+      _pf_owned=0
+      _info "[sync-apps] Reusing existing argocd-server port-forward on ${pf_port}"
+      return 0
+    fi
+
+    _warn "[sync-apps] Managed argocd-server port-forward is not ready yet — restarting it"
+  else
+    _warn "[sync-apps] Local port ${pf_port} is already in use by an unmanaged listener — stopping it"
+  fi
+
+  mapfile -t _existing_pids < <(_sync_apps_listener_pids "${pf_port}")
+  if ((${#_existing_pids[@]})); then
+    kill "${_existing_pids[@]}" 2>/dev/null || true
+    for _i in $(seq 1 5); do
+      if ! _sync_apps_port_in_use "${pf_port}"; then
+        break
+      fi
+      sleep 1
+    done
+  fi
+
+  _sync_apps_clear_port_forward_state
+  return 1
+}
+
 _cleanup() {
-  if [[ -n "${_pf_pid}" ]]; then
+  if [[ "${_pf_owned}" -eq 1 && -n "${_pf_pid}" ]]; then
     kill "${_pf_pid}" 2>/dev/null || true
   fi
-  if [[ -n "${_pf_log}" ]]; then
+  if [[ "${_pf_owned}" -eq 1 ]]; then
+    _sync_apps_clear_port_forward_state
+  fi
+  if [[ "${_pf_owned}" -eq 1 && -n "${_pf_log}" ]]; then
     rm -f "${_pf_log}" 2>/dev/null || true
   fi
 }
 trap _cleanup EXIT
 
-if _sync_apps_port_in_use 8080; then
-  _err "[sync-apps] Local port 8080 is already in use — stop the existing listener and retry"
-fi
-
-_info "[sync-apps] Starting argocd-server port-forward..."
-kubectl port-forward svc/argocd-server -n "${ARGOCD_NS}" 8080:443 \
-  --context "${INFRA_CONTEXT}" >"${_pf_log}" 2>&1 &
-_pf_pid=$!
-_pf_ready=0
-_pf_failed=0
-for _i in $(seq 1 15); do
-  if curl -sk --max-time 1 https://localhost:8080/ >/dev/null 2>&1; then
-    _pf_ready=1
-    break
+if ! _sync_apps_reconcile_port_forward 8080; then
+  _info "[sync-apps] Starting argocd-server port-forward..."
+  kubectl port-forward svc/argocd-server -n "${ARGOCD_NS}" 8080:443 \
+    --context "${INFRA_CONTEXT}" >"${_pf_log}" 2>&1 &
+  _pf_pid=$!
+  _pf_owned=1
+  _sync_apps_write_port_forward_state
+  _pf_ready=0
+  _pf_failed=0
+  for _i in $(seq 1 15); do
+    if curl -sk --max-time 1 https://localhost:8080/ >/dev/null 2>&1; then
+      _pf_ready=1
+      break
+    fi
+    if ! kill -0 "${_pf_pid}" 2>/dev/null; then
+      _pf_failed=1
+      break
+    fi
+    sleep 1
+  done
+  if [[ "${_pf_ready}" -eq 0 ]]; then
+    if [[ "${_pf_failed}" -eq 1 ]]; then
+      _info "[sync-apps] ERROR: argocd-server port-forward exited early — see ${_pf_log}"
+    else
+      _info "[sync-apps] ERROR: argocd-server port-forward not ready after 15s — see ${_pf_log}"
+    fi
+    tail -n 20 "${_pf_log}" 2>/dev/null || true
+    exit 1
   fi
-  if ! kill -0 "${_pf_pid}" 2>/dev/null; then
-    _pf_failed=1
-    break
-  fi
-  sleep 1
-done
-if [[ "${_pf_ready}" -eq 0 ]]; then
-  if [[ "${_pf_failed}" -eq 1 ]]; then
-    _info "[sync-apps] ERROR: argocd-server port-forward exited early — see ${_pf_log}"
-  else
-    _info "[sync-apps] ERROR: argocd-server port-forward not ready after 15s — see ${_pf_log}"
-  fi
-  tail -n 20 "${_pf_log}" 2>/dev/null || true
-  exit 1
 fi
 
 _argocd_pass=$(kubectl get secret argocd-initial-admin-secret \
