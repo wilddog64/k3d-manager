@@ -114,7 +114,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **File:** `scripts/plugins/argocd.sh`
 **Fix:** `argocd.sh` now sources `scripts/etc/ldap/vars.sh` before dependency checks and uses `_kubectl --no-exit` for Vault/LDAP namespace probes.
 **Why:** The prior namespace fix used `LDAP_NAMESPACE`, but `argocd.sh` did not source LDAP vars in the `deploy_argocd` subprocess. `LDAP_NAMESPACE` was unset, so the dependency check fell back to `ldap` while LDAP was deployed to `identity`; `_kubectl` then exited during the dependency probe.
-**Validation:** Live `./scripts/k3d-manager deploy_argocd --confirm` passed the dependency phase, installed ArgoCD, and exited 0. `_agent_lint` and `_agent_audit` passed. Current shellcheck and BATS still show the pre-existing ArgoCD help/bootstrap findings tracked in `docs/issues/2026-04-24-argocd-verification-preexisting-failures.md`. Follow-up issue: `docs/issues/2026-04-24-argocd-cli-login-eof-during-bootstrap.md` for a non-blocking `argocd login` EOF emitted during bootstrap.
+**Validation:** Live `./scripts/k3d-manager deploy_argocd --confirm` passed the dependency phase, installed ArgoCD, and exited 0. `_agent_lint` and `_agent_audit` passed. Current shellcheck and BATS still show the pre-existing ArgoCD help/bootstrap findings tracked in `docs/issues/2026-04-24-argocd-verification-preexisting-failures.md`. The earlier non-blocking EOF issue is now resolved by the plaintext-login fix below.
 
 ## New Bug: deploy_eso returns before webhook endpoints are ready (2026-04-24)
 
@@ -123,6 +123,14 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Fix:** `deploy_eso` now waits for `external-secrets`, `external-secrets-webhook`, and `external-secrets-cert-controller` rollouts, then waits for `external-secrets-webhook` endpoints before returning. The already-installed fast path also verifies readiness.
 **Why:** `deploy_vault` installs ESO and previously returned after only the main `external-secrets` deployment was ready. Fresh Hub Step 3.6 then ran `deploy_ldap`, which applied ExternalSecret resources while `external-secrets-webhook` could still lack endpoints, causing Kubernetes admission to fail with `no endpoints available for service "external-secrets-webhook"`.
 **Validation:** `shellcheck -x scripts/plugins/eso.sh`, `bats scripts/tests/plugins/eso.bats`, `_agent_lint`, `_agent_audit`, and live `./scripts/k3d-manager deploy_eso --confirm` passed. Full `./scripts/k3d-manager test all` still has the known ArgoCD help-test failure tracked in `docs/issues/2026-04-24-argocd-verification-preexisting-failures.md`.
+
+## New Bug: ArgoCD CLI login plaintext prompt blocks bootstrap (2026-04-24)
+
+**Status:** COMPLETE (`unassigned`) — spec: `docs/bugs/2026-04-24-argocd-cli-login-plaintext-prompt.md`
+**File:** `scripts/plugins/argocd.sh`
+**Fix:** `_argocd_ensure_logged_in()` now uses `--plaintext --skip-test-tls` and closes stdin with `</dev/null`.
+**Why:** `_argocd_ensure_logged_in()` forwards Argo CD to `localhost:8080` via a plaintext `kubectl port-forward`, then calls `argocd login` non-interactively. The CLI printed `WARNING: server is not configured with TLS. Proceed (y/n)?` and then hit EOF, which stalled bootstrap.
+**Validation:** Focused `_argocd_ensure_logged_in` test passes, and live `./scripts/k3d-manager deploy_argocd --confirm` now runs past the login step and completes bootstrap.
 
 ## New Bug: Step 3.6 deploy_argocd fails — deploy_ldap called directly with --confirm (2026-04-24)
 

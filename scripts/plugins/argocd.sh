@@ -71,7 +71,7 @@ function _argocd_ensure_logged_in() {
       sleep 3
    fi
 
-   argocd login localhost:8080 --username admin --password "$pass" --insecure --grpc-web >/dev/null
+   argocd login localhost:8080 --username admin --password "$pass" --plaintext --skip-test-tls --insecure --grpc-web </dev/null >/dev/null
 }
 
 function deploy_argocd() {

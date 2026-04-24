@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-24
 **Task:** `docs/bugs/2026-04-24-argocd-ldap-vars-not-sourced.md`
-**Status:** OPEN
+**Status:** RESOLVED — fixed by `docs/bugs/2026-04-24-argocd-cli-login-plaintext-prompt.md`
 
 ## What was tested / attempted
 
@@ -83,10 +83,10 @@ The escalated live verification exited 0.
 
 ## Root cause if known
 
-Unknown. The `argocd login` command emitted a fatal EOF while the deployment script continued and completed bootstrap successfully. This appears separate from the LDAP namespace dependency check fixed in `1c3ead28`.
+The `argocd login` command emitted a TLS confirmation prompt on the plaintext forwarded endpoint, then hit EOF because the bootstrap is non-interactive. This is now addressed by the plaintext-login fix in `scripts/plugins/argocd.sh`.
 
 The sandboxed attempt is not a product failure; sandboxed commands cannot reach the local k3d API server on `127.0.0.1`.
 
 ## Recommended follow-up
 
-Create a focused follow-up for ArgoCD CLI login reliability. The deploy path should either wait for the port-forward/CLI login path to be truly ready or treat login failure consistently instead of allowing a fatal CLI message in an otherwise successful bootstrap.
+No follow-up needed for this specific EOF failure. Track any future ArgoCD login changes in the plaintext-login bug/spec instead.
