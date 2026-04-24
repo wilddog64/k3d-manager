@@ -100,9 +100,10 @@ _info "[acg-up] Step 3/12 — Starting SSH tunnel..."
 tunnel_start
 
 _HUB_CLUSTER_CTX="k3d-${HUB_CLUSTER_NAME:-k3d-cluster}"
-_info "[acg-up] Step 3.5/12 — Verifying local Hub cluster (OrbStack clamshell resume guard)..."
+_info "[acg-up] Step 3.5/12 — Verifying local Hub cluster (create if missing)..."
 if ! k3d cluster list 2>/dev/null | grep -q "^${HUB_CLUSTER_NAME:-k3d-cluster}[[:space:]]"; then
-  _err "[acg-up] Local Hub cluster '${HUB_CLUSTER_NAME:-k3d-cluster}' not found — OrbStack may have restarted after Mac sleep. Run 'k3d cluster list' and check OrbStack, then re-run."
+  _info "[acg-up] Local Hub cluster '${HUB_CLUSTER_NAME:-k3d-cluster}' not found — creating it now..."
+  deploy_cluster --provider k3d "${HUB_CLUSTER_NAME:-k3d-cluster}"
 fi
 if ! kubectl get nodes --context "${_HUB_CLUSTER_CTX}" --request-timeout=10s >/dev/null 2>&1; then
   _err "[acg-up] Local Hub cluster '${_HUB_CLUSTER_CTX}' is unreachable — OrbStack/k3d may be in a broken state after sleep. Check 'orbctl status'."
