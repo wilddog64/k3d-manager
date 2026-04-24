@@ -3,7 +3,7 @@
 **Date:** 2026-04-24
 **Task:** `docs/bugs/2026-04-24-argocd-ldap-namespace-hardcoded.md`
 **Commit pushed:** `032bfadb`
-**Status:** OPEN
+**Status:** OPEN — reproduced again during `docs/bugs/2026-04-24-argocd-ldap-vars-not-sourced.md` verification (`1c3ead28`)
 
 ## What was tested / attempted
 
@@ -17,15 +17,15 @@ if ! _kubectl get ns "${LDAP_NAMESPACE:-ldap}" >/dev/null 2>&1; then
 
 ## Actual output
 
-Pre-edit and post-edit `shellcheck -x scripts/plugins/argocd.sh` both reported the same existing findings:
+Pre-edit and post-edit `shellcheck -x scripts/plugins/argocd.sh` both reported the same existing findings during the namespace hardcoded fix. The LDAP vars fix added seven lines near the top of `argocd.sh`, so the same findings now appear at shifted line numbers:
 
 ```text
-In scripts/plugins/argocd.sh line 106:
+In scripts/plugins/argocd.sh line 113:
    deploy_argocd_bootstrap
    ^---------------------^ SC2119 (info): Use deploy_argocd_bootstrap "$@" if function's $1 should mean script's $1.
 
 
-In scripts/plugins/argocd.sh line 627:
+In scripts/plugins/argocd.sh line 634:
 function deploy_argocd_bootstrap() {
 ^-- SC2120 (warning): deploy_argocd_bootstrap references arguments, but none are ever passed.
 
@@ -65,6 +65,17 @@ not ok 172 deploy_argocd --help shows usage
 #   `[[ "$output" == *"Usage: deploy_argocd"* ]]' failed
 Test log saved to scratch/test-logs/all/20260424-105749.log
 Collected artifacts in scratch/test-logs/all/20260424-105749
+```
+
+Current full curated BATS during LDAP vars fix verification:
+
+```text
+1..283
+not ok 172 deploy_argocd --help shows usage
+# (in test file scripts/tests/plugins/argocd.bats, line 12)
+#   `[[ "$output" == *"Usage: deploy_argocd"* ]]' failed
+Test log saved to scratch/test-logs/all/20260424-131334.log
+Collected artifacts in scratch/test-logs/all/20260424-131334
 ```
 
 `_agent_lint` and `_agent_audit` both exited 0:
