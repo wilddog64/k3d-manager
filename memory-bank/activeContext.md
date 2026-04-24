@@ -116,6 +116,12 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Why:** The prior namespace fix used `LDAP_NAMESPACE`, but `argocd.sh` did not source LDAP vars in the `deploy_argocd` subprocess. `LDAP_NAMESPACE` was unset, so the dependency check fell back to `ldap` while LDAP was deployed to `identity`; `_kubectl` then exited during the dependency probe.
 **Validation:** Live `./scripts/k3d-manager deploy_argocd --confirm` passed the dependency phase, installed ArgoCD, and exited 0. `_agent_lint` and `_agent_audit` passed. Current shellcheck and BATS still show the pre-existing ArgoCD help/bootstrap findings tracked in `docs/issues/2026-04-24-argocd-verification-preexisting-failures.md`. Follow-up issue: `docs/issues/2026-04-24-argocd-cli-login-eof-during-bootstrap.md` for a non-blocking `argocd login` EOF emitted during bootstrap.
 
+## New Bug: deploy_eso returns before webhook endpoints are ready (2026-04-24)
+
+**Status:** ASSIGNED TO CODEX — spec: `docs/bugs/2026-04-24-eso-webhook-readiness-race.md`
+**File:** `scripts/plugins/eso.sh`
+**Why:** `deploy_vault` installs ESO and returns after only the main `external-secrets` deployment is ready. Fresh Hub Step 3.6 then runs `deploy_ldap`, which applies ExternalSecret resources while `external-secrets-webhook` can still lack endpoints, causing Kubernetes admission to fail with `no endpoints available for service "external-secrets-webhook"`.
+
 ## New Bug: Step 3.6 deploy_argocd fails — deploy_ldap called directly with --confirm (2026-04-24)
 
 **Status:** COMPLETE (`c650f032`) — spec: `docs/bugs/2026-04-24-acg-up-hub-bootstrap-ldap-missing.md`
