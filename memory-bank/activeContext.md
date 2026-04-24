@@ -101,6 +101,13 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Why:** `make down` deletes the Hub cluster; Step 3.5 re-creates it but never bootstraps workloads; Step 4 `kubectl port-forward svc/vault -n secrets` fails because `secrets` ns doesn't exist on fresh Hub.
 **Key constraint:** Call `deploy_vault` (no `--confirm`) via `"${REPO_ROOT}/scripts/k3d-manager"` subprocess — `--confirm` is not a recognized flag in `_vault_parse_deploy_opts`.
 
+## New Bug: Step 3.6 deploy_vault/deploy_argocd hit dispatcher safety gate (2026-04-24)
+
+**Status:** ASSIGNED TO CODEX — spec: `docs/bugs/2026-04-24-acg-up-hub-bootstrap-safety-gate.md`
+**File:** `bin/acg-up` lines 118–119
+**Fix:** Add `--confirm` to both dispatcher calls: `deploy_vault --confirm` and `deploy_argocd --confirm`.
+**Why:** `scripts/k3d-manager` dispatcher requires `--confirm` or explicit options; `--confirm` is consumed/stripped by dispatcher so vault.sh never sees it.
+
 ## Open Items
 - **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Local Hub orchestration is fragmented: `acg-up` assumes ArgoCD infrastructure, bootstrap remains separate, and local ArgoCD access still requires manual port-forward setup.
 - **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up` does not clearly summarize local Hub vs remote app-cluster readiness and does not guide optional local runtime startup.

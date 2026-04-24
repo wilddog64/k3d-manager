@@ -59,6 +59,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [x] **GCP Provisioning Error 1** — COMPLETE (`346c3df2`). Bug `docs/bugs/2026-04-23-gcp-node-readiness-timeout-bash-pitfall.md`; `(( attempts++ ))` → `(( ++attempts ))` at lines 109 + 211 of `k3s-gcp.sh`. Spec complete; committed 2026-04-23.
 - [x] **Start Sandbox Disabled Timeout** — COMPLETE (`13d398ab`). Bug `docs/bugs/2026-04-23-acg-start-sandbox-button-disabled-timeout.md`; add `isEnabled()` guard before `startButton.click()` in `acg_credentials.js`; committed 2026-04-23.
 - [x] **acg-up Hub cluster bootstrap** — COMPLETE (`c59f2c3a`). Bug `docs/bugs/2026-04-24-acg-up-hub-cluster-bootstrap.md`; `bin/acg-up` now tracks fresh Hub creation in Step 3.5 and runs Step 3.6 to bootstrap Vault + ArgoCD before the Vault port-forward path.
+- [ ] **acg-up Hub bootstrap safety gate** — OPEN. Bug `docs/bugs/2026-04-24-acg-up-hub-bootstrap-safety-gate.md`; Step 3.6 dispatcher calls missing `--confirm`; safety gate exits 1.
 - [x] **Google Identity Drift** — **COMPLETE** (`6ae2a6c3`). Implemented clean-slate login pattern (logout + explicit credentials entry).
 
 **Infra / tooling (tracked here):**
