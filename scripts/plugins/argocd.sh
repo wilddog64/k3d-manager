@@ -84,7 +84,7 @@ function deploy_argocd() {
       _info "[argocd] Vault foundation missing — triggering deploy_vault..."
       deploy_vault --confirm
    fi
-   if ! _kubectl get ns ldap >/dev/null 2>&1; then
+   if ! _kubectl get ns "${LDAP_NAMESPACE:-ldap}" >/dev/null 2>&1; then
       _info "[argocd] LDAP foundation missing — triggering deploy_ldap..."
       deploy_ldap --confirm
    fi
