@@ -51,6 +51,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 | Bug | Spec | Action |
 |-----|------|--------|
 | acg-sync-apps app not found | `docs/bugs/2026-04-24-acg-sync-apps-argocd-app-not-found.md` | COMPLETE (`eaaf9a9e`) |
+| acg-sync-apps port-forward hidden failure | `docs/bugs/2026-04-24-acg-sync-apps-port-forward-hidden-failure.md` | OPEN |
 | acg-extend isPanelOpen false positive | `docs/bugs/2026-04-24-acg-extend-ispanelopen-false-positive.md` | COMPLETE (`79b87e36`) |
 | Vault preflight after sleep | `docs/bugs/2026-04-23-acg-up-vault-state-preflight-gap-after-mac-sleep.md` | COMPLETE (`e577579e`) |
 | acg-down provider dispatch + GCP teardown | `docs/bugs/2026-04-24-acg-down-provider-dispatch-gcp-teardown.md` | COMPLETE (`706e0ba2`) |
