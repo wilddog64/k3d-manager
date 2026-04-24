@@ -153,6 +153,13 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Fix:** Add `--confirm` to both dispatcher calls: `deploy_vault --confirm` and `deploy_argocd --confirm`.
 **Why:** `scripts/k3d-manager` dispatcher requires `--confirm` or explicit options; `--confirm` is consumed/stripped by dispatcher so vault.sh never sees it.
 
+## New Bug: acg-sync-apps default ARGOCD_APP is 'data-layer' — never exists (2026-04-24)
+
+**Status:** OPEN — spec: `docs/bugs/2026-04-24-acg-sync-apps-argocd-app-default-wrong.md`
+**File:** `bin/acg-sync-apps` line 24
+**Fix:** `ARGOCD_APP="${ARGOCD_APP:-data-layer}"` → `ARGOCD_APP="${ARGOCD_APP:-rollout-demo-default}"`
+**Why:** `_argocd_deploy_applicationsets` deploys three ApplicationSets. Only `demo-rollout.yaml` (static list generator) creates apps unconditionally — `rollout-demo-default` and `rollout-demo-staging`. `services-git.yaml` generates zero apps (no `services/` dir in repo). `platform-helm.yaml` generates zero apps (no cluster with `environment: dev` label at bootstrap). `data-layer` was a stale planned default that was never implemented.
+
 ## New Bug: acg-sync-apps readiness check uses https:// but ArgoCD serves HTTP (2026-04-24)
 
 **Status:** OPEN — spec: `docs/bugs/2026-04-24-acg-sync-apps-https-vs-http-readiness-check.md`
