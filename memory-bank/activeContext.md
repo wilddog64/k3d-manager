@@ -103,10 +103,16 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## New Bug: deploy_argocd hardcodes `ldap` namespace — always fails LDAP check (2026-04-24)
 
-**Status:** ASSIGNED TO CODEX — spec: `docs/bugs/2026-04-24-argocd-ldap-namespace-hardcoded.md`
+**Status:** COMPLETE (`032bfadb`) — spec: `docs/bugs/2026-04-24-argocd-ldap-namespace-hardcoded.md`
 **File:** `scripts/plugins/argocd.sh` line 87
 **Fix:** `_kubectl get ns ldap` → `_kubectl get ns "${LDAP_NAMESPACE:-ldap}"`
-**Why:** `LDAP_NAMESPACE` defaults to `identity` (not `ldap`). The `ldap` namespace never exists, so the check always fires, calls `deploy_ldap --confirm` directly → `_err "[ldap] unknown option: --confirm"` → exit 1. Pre-deploying LDAP to `identity` ns doesn't help because the check is hardcoded to `ldap`.
+**Why:** `LDAP_NAMESPACE` defaults to `identity` (not `ldap`). `deploy_argocd` now checks `ns "${LDAP_NAMESPACE:-ldap}"`, matching the configured LDAP namespace and avoiding the direct `deploy_ldap --confirm` failure path when LDAP already exists in `identity`.
+
+## New Bug: deploy_argocd does not source LDAP vars before namespace check (2026-04-24)
+
+**Status:** ASSIGNED TO CODEX — spec: `docs/bugs/2026-04-24-argocd-ldap-vars-not-sourced.md`
+**File:** `scripts/plugins/argocd.sh`
+**Why:** The prior namespace fix uses `LDAP_NAMESPACE`, but `argocd.sh` does not source `scripts/etc/ldap/vars.sh` in the `deploy_argocd` subprocess. `LDAP_NAMESPACE` is unset, so the dependency check falls back to `ldap` while LDAP is deployed to `identity`; `_kubectl` then exits during the dependency probe.
 
 ## New Bug: Step 3.6 deploy_argocd fails — deploy_ldap called directly with --confirm (2026-04-24)
 

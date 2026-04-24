@@ -61,7 +61,8 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [x] **acg-up Hub cluster bootstrap** — COMPLETE (`c59f2c3a`). Bug `docs/bugs/2026-04-24-acg-up-hub-cluster-bootstrap.md`; `bin/acg-up` now tracks fresh Hub creation in Step 3.5 and runs Step 3.6 to bootstrap Vault + ArgoCD before the Vault port-forward path.
 - [x] **acg-up Hub bootstrap safety gate** — COMPLETE (`8b43122f`). Bug `docs/bugs/2026-04-24-acg-up-hub-bootstrap-safety-gate.md`; Step 3.6 now passes `--confirm` to both dispatcher calls so Hub bootstrap clears the deploy safety gate.
 - [x] **acg-up Hub bootstrap LDAP missing** — COMPLETE (`c650f032`). Bug `docs/bugs/2026-04-24-acg-up-hub-bootstrap-ldap-missing.md`; Step 3.6 now deploys LDAP through the dispatcher before ArgoCD, preventing the direct `deploy_ldap --confirm` failure path.
-- [ ] **argocd LDAP namespace hardcoded** — OPEN. Bug `docs/bugs/2026-04-24-argocd-ldap-namespace-hardcoded.md`; `deploy_argocd` checks `ns ldap` but `LDAP_NAMESPACE=identity`; check always fires, calls `deploy_ldap --confirm` directly → `_err`.
+- [x] **argocd LDAP namespace hardcoded** — COMPLETE (`032bfadb`). Bug `docs/bugs/2026-04-24-argocd-ldap-namespace-hardcoded.md`; `deploy_argocd` now checks `ns "${LDAP_NAMESPACE:-ldap}"`, matching LDAP's configured namespace and avoiding the direct `deploy_ldap --confirm` failure path when LDAP already exists in `identity`.
+- [ ] **argocd LDAP vars not sourced** — OPEN. Bug `docs/bugs/2026-04-24-argocd-ldap-vars-not-sourced.md`; `deploy_argocd` uses `LDAP_NAMESPACE` but does not source LDAP vars in its subprocess, so it falls back to `ldap` while LDAP exists in `identity`.
 - [x] **Google Identity Drift** — **COMPLETE** (`6ae2a6c3`). Implemented clean-slate login pattern (logout + explicit credentials entry).
 
 **Infra / tooling (tracked here):**
