@@ -25,6 +25,7 @@ const CDP_PORT = process.env.PLAYWRIGHT_CDP_PORT || '9222';
 const CDP_URL = `http://${CDP_HOST}:${CDP_PORT}`;
 const GCP_ACCOUNT = process.argv[2] || process.env.GCP_USERNAME || '';
 const GCP_PASSWORD = process.env.GCP_PASSWORD || '';
+const GCP_AUTH_URL = process.env.GCP_AUTH_URL || '';
 
 async function handleGcpOAuthFlow() {
   const browser = await chromium.connectOverCDP(CDP_URL);
@@ -40,25 +41,33 @@ async function handleGcpOAuthFlow() {
   await logoutPage.goto('https://accounts.google.com/Logout', { waitUntil: 'domcontentloaded', timeout: 15000 });
   await logoutPage.close();
 
-  // Check if the OAuth tab is already open before waiting for a new one
-  let oauthPage = context.pages().find(p => {
-    try {
-      const h = new URL(p.url()).hostname;
-      return h === 'accounts.google.com' || h.endsWith('.google.com');
-    } catch { return false; }
-  });
-
-  if (!oauthPage) {
-    console.error('INFO: Waiting for Google OAuth tab (up to 30s)...');
-    oauthPage = await context.waitForEvent('page', {
-      predicate: p => {
-        try {
-          const h = new URL(p.url()).hostname;
-          return h === 'accounts.google.com' || h.endsWith('.google.com');
-        } catch { return false; }
-      },
-      timeout: 30000
+  let oauthPage;
+  if (GCP_AUTH_URL) {
+    // Linux headless: gcloud cannot open a browser — navigate to the URL it printed
+    console.error('INFO: Navigating directly to gcloud OAuth URL (Linux headless)...');
+    oauthPage = await context.newPage();
+    await oauthPage.goto(GCP_AUTH_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  } else {
+    // macOS: gcloud opens the OAuth tab in this Chrome session — wait for it
+    oauthPage = context.pages().find(p => {
+      try {
+        const h = new URL(p.url()).hostname;
+        return h === 'accounts.google.com' || h.endsWith('.google.com');
+      } catch { return false; }
     });
+
+    if (!oauthPage) {
+      console.error('INFO: Waiting for Google OAuth tab (up to 30s)...');
+      oauthPage = await context.waitForEvent('page', {
+        predicate: p => {
+          try {
+            const h = new URL(p.url()).hostname;
+            return h === 'accounts.google.com' || h.endsWith('.google.com');
+          } catch { return false; }
+        },
+        timeout: 30000
+      });
+    }
   }
   console.error(`INFO: OAuth tab found: ${oauthPage.url()}`);
 

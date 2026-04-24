@@ -129,6 +129,71 @@ HELP
   gcp_login "${username}"
 }
 
+function _gcp_capture_auth_url() {
+  local account="$1"
+  local url_file="$2"
+  local url=""
+  local i
+
+  gcloud auth login --account "${account}" >"${url_file}" 2>&1 &
+  local pid=$!
+
+  for i in $(seq 1 10); do
+    url=$(grep -oE 'https://accounts\.google\.com[^[:space:]]+' "${url_file}" 2>/dev/null | head -1 || true)
+    if [[ -n "${url}" ]]; then
+      break
+    fi
+    sleep 1
+  done
+
+  if [[ -n "${url}" ]]; then
+    printf '%s' "${url}"
+  fi
+  return 0
+}
+
+function _gcp_perform_login_auth() {
+  local account="$1"
+  local playwright_dir="$2"
+
+  if ! command -v node >/dev/null 2>&1 || ! node -e "require('playwright')" 2>/dev/null; then
+    printf 'WARN: %s\n' "[gcp] node/playwright not available — gcloud auth login will require manual browser interaction" >&2
+    gcloud auth login --account "${account}"
+    return $?
+  fi
+
+  if [[ "$(uname)" == "Linux" ]]; then
+    local _gcloud_url_file
+    _gcloud_url_file=$(mktemp)
+    local _auth_url
+    _auth_url=$(_gcp_capture_auth_url "${account}" "${_gcloud_url_file}")
+    local gcloud_pid
+    gcloud_pid=$(pgrep -n -f "gcloud auth login --account ${account}")
+    
+    rm -f "${_gcloud_url_file}"
+    if [[ -z "${_auth_url}" ]]; then
+      _err "[gcp] Could not capture gcloud OAuth URL — manual gcloud auth login required"
+    fi
+    GCP_USERNAME="${account}" \
+    GCP_AUTH_URL="${_auth_url}" \
+    PLAYWRIGHT_CDP_HOST="${PLAYWRIGHT_CDP_HOST}" \
+    PLAYWRIGHT_CDP_PORT="${PLAYWRIGHT_CDP_PORT}" \
+    node "${playwright_dir}/gcp_login.js" "${account}"
+    if [[ -n "$gcloud_pid" ]]; then
+      wait "${gcloud_pid}"
+    fi
+  else
+    # macOS: gcloud opens the OAuth tab in this Chrome session — Playwright waits for it
+    gcloud auth login --account "${account}" &
+    local gcloud_pid=$!
+    GCP_USERNAME="${account}" \
+    PLAYWRIGHT_CDP_HOST="${PLAYWRIGHT_CDP_HOST}" \
+    PLAYWRIGHT_CDP_PORT="${PLAYWRIGHT_CDP_PORT}" \
+    node "${playwright_dir}/gcp_login.js" "${account}"
+    wait "${gcloud_pid}"
+  fi
+}
+
 function gcp_login() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<HELP
@@ -171,19 +236,8 @@ HELP
   local playwright_dir
   playwright_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../playwright"
 
-  if ! command -v node >/dev/null 2>&1 || ! node -e "require('playwright')" 2>/dev/null; then
-    printf 'WARN: %s\n' "[gcp] node/playwright not available — gcloud auth login will require manual browser interaction" >&2
-    gcloud auth login --account "${account}"
-  else
-    # Run gcloud in background (blocks until OAuth callback); Playwright automates the browser
-    gcloud auth login --account "${account}" &
-    local gcloud_pid=$!
-    GCP_USERNAME="${account}" \
-    PLAYWRIGHT_CDP_HOST="${PLAYWRIGHT_CDP_HOST}" \
-    PLAYWRIGHT_CDP_PORT="${PLAYWRIGHT_CDP_PORT}" \
-    node "${playwright_dir}/gcp_login.js" "${account}"
-    wait "${gcloud_pid}"
-  fi
+  _gcp_perform_login_auth "${account}" "${playwright_dir}"
+  
   _info "[gcp] Authenticated as ${account}"
 }
 
