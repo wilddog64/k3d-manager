@@ -1,7 +1,7 @@
 # Bug: `bin/acg-sync-apps` hides `kubectl port-forward` failures behind a generic timeout
 
 **Date:** 2026-04-24
-**Status:** OPEN
+**Status:** COMPLETE (`3bd96955`)
 **Branch:** `k3d-manager-v1.1.0`
 
 ## Problem
@@ -34,10 +34,16 @@ kubectl port-forward svc/argocd-server -n "${ARGOCD_NS}" 8080:443 \
 Then it only polls `curl` against `localhost:8080`. If the forward fails immediately, there is
 no log to inspect and no early exit path.
 
-## Expected Fix
+## Fix
 
-Capture port-forward stderr to a log file, fail fast if the background process exits before the
-socket becomes ready, and print the log tail when readiness times out.
+`bin/acg-sync-apps` now captures the background `kubectl port-forward` stderr to a log file,
+fails fast when the process exits before `localhost:8080` becomes ready, and prints the log tail
+when readiness times out.
+
+## Validation
+
+`shellcheck -x bin/acg-sync-apps` passes, and a focused bats test confirms the script reports
+`port-forward exited early` together with the underlying log output.
 
 ## Impact
 
