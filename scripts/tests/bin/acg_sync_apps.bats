@@ -118,3 +118,29 @@ EOF
   [ -n "$log_file" ]
   grep -q "boom from port-forward" "$log_file"
 }
+
+@test "acg-sync-apps uses non-interactive ArgoCD login flags" {
+  export LSOF_EXIT_CODE=0
+  sleep 60 &
+  local managed_listener_pid=$!
+  export LSOF_PIDS="${managed_listener_pid}"
+  cat > "${SYNC_APPS_STATE_DIR}/acg-sync-apps-argocd-pf.env" <<EOF
+SYNC_APPS_PF_PID=${managed_listener_pid}
+SYNC_APPS_PF_CONTEXT=k3d-k3d-cluster
+SYNC_APPS_PF_NS=cicd
+SYNC_APPS_PF_PORT=8080
+SYNC_APPS_PF_SERVICE=svc/argocd-server
+SYNC_APPS_PF_LOG=${SYNC_APPS_LOG_DIR}/managed.log
+EOF
+  : > "${BATS_TEST_TMPDIR}/pf_ready"
+
+  run "${BATS_TEST_DIRNAME}/../../../bin/acg-sync-apps"
+  local rc=$?
+  kill "${managed_listener_pid}" 2>/dev/null || true
+  wait "${managed_listener_pid}" 2>/dev/null || true
+
+  [ "$rc" -eq 0 ]
+  [ "$status" -eq 0 ]
+
+  grep -q "argocd login localhost:8080 --username admin --password fake-pass --plaintext --skip-test-tls --insecure --grpc-web" "${BATS_TEST_TMPDIR}/argocd.log"
+}

@@ -174,7 +174,8 @@ _argocd_pass=$(kubectl get secret argocd-initial-admin-secret \
   -o jsonpath='{.data.password}' | base64 -d)
 
 _info "[sync-apps] Logging in to ArgoCD..."
-argocd login localhost:8080 --username admin --password "${_argocd_pass}" --insecure >/dev/null
+argocd login localhost:8080 --username admin --password "${_argocd_pass}" \
+  --plaintext --skip-test-tls --insecure --grpc-web </dev/null >/dev/null
 
 if ! argocd app get "${ARGOCD_APP}" >/dev/null 2>&1; then
   _info "[sync-apps] ERROR: ArgoCD app '${ARGOCD_APP}' not found — is bootstrap complete?"
