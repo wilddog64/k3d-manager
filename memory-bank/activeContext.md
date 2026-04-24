@@ -47,6 +47,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Direction:** Extract ACG automation into its own repo, test browser automation there, keep `k3d-manager` focused on orchestration.
 
 ## Open Items
+- **GCP Provisioning Error 1** — CRITICAL (`docs/bugs/2026-04-23-gcp-node-readiness-timeout-bash-pitfall.md`). Bash arithmetic evaluation `(( 0 ))` triggers `set -e` exit.
 - **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Local Hub orchestration is fragmented: `acg-up` assumes ArgoCD infrastructure, bootstrap remains separate, and local ArgoCD access still requires manual port-forward setup.
 - **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up` does not clearly summarize local Hub vs remote app-cluster readiness and does not guide optional local runtime startup.
 - **ACG Extraction Boundary** — OPEN (`docs/bugs/2026-04-23-acg-extraction-boundary-gemini-coupling.md`). The `acg_*` interaction surface still keeps Gemini/browser automation coupled to `k3d-manager`; that subsystem should move out as one extraction unit.
