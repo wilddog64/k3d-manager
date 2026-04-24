@@ -58,7 +58,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 - **Vault Resilience Gap** — OPEN (`docs/bugs/2026-04-20-vault-readiness-gate-missing.md`, `docs/bugs/2026-04-22-vault-orphaned-port-forward-ghost-blocker.md`). `acg-up` can fail at Vault seeding because Vault is sealed after Mac sleep or because a ghost port-forward on `8200` routes to a dead pod.
 - **macOS CDP Direct Launch** — OPEN (`docs/bugs/2026-04-21-cdp-macos-direct-launch-gcp-ensure-cdp.md`). macOS `open -a` can reuse an existing Chrome instance and fail to apply CDP flags; fix must stay aligned with the shared CDP ownership model.
 - **GCP Login Linux Headless OAuth** — COMPLETE (`927cb452`). `gcp.sh` OS-split captures OAuth URL from gcloud output; `gcp_login.js` navigates directly via `GCP_AUTH_URL` on Linux. Shellcheck fix committed (unused `pid`/`i` vars renamed). Live test pending user execution on ACG GCP sandbox.
-- **GCP Provisioning Error 1** — ASSIGNED TO GEMINI (`docs/bugs/2026-04-23-gcp-node-readiness-timeout-bash-pitfall.md`). `(( attempts++ ))` → `(( ++attempts ))` in `k3s-gcp.sh` lines 109 and 211. Spec complete; assigned 2026-04-23.
+- **GCP Provisioning Error 1** — COMPLETE (`346c3df2`). `(( attempts++ ))` → `(( ++attempts ))` in `k3s-gcp.sh` lines 109 and 211. Spec complete; committed 2026-04-23.
 
 - **Whitespace enforcement** — `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh` files
 - **SSH tunnel timeouts** — connection resets during heavy ArgoCD sync (infra, non-blocking)
