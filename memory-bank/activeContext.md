@@ -93,6 +93,14 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Fix:** Prepend `trap - RETURN;` inside both RETURN trap handlers — self-clears trap on first fire, preventing re-fire in parent functions where local variables are out of scope.
 **Why:** Bash RETURN traps are shell-global, not function-scoped. After `_provider_k3d_configure_istio` returns, its trap re-fires when `_provider_k3d_deploy_cluster` returns, with `$istio_yamlfile` out of scope → unbound variable.
 
+## New Bug: acg-up Step 4 fails on fresh Hub — no Vault/LDAP/ArgoCD (2026-04-24)
+
+**Status:** ASSIGNED TO CODEX — spec: `docs/bugs/2026-04-24-acg-up-hub-cluster-bootstrap.md`
+**File:** `bin/acg-up` lines 102–124
+**Fix:** Add `_hub_newly_created` flag in Step 3.5; add Step 3.6 that runs `deploy_vault` then `deploy_argocd` via subprocess when Hub was just created.
+**Why:** `make down` deletes the Hub cluster; Step 3.5 re-creates it but never bootstraps workloads; Step 4 `kubectl port-forward svc/vault -n secrets` fails because `secrets` ns doesn't exist on fresh Hub.
+**Key constraint:** Call `deploy_vault` (no `--confirm`) via `"${REPO_ROOT}/scripts/k3d-manager"` subprocess — `--confirm` is not a recognized flag in `_vault_parse_deploy_opts`.
+
 ## Open Items
 - **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Local Hub orchestration is fragmented: `acg-up` assumes ArgoCD infrastructure, bootstrap remains separate, and local ArgoCD access still requires manual port-forward setup.
 - **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up` does not clearly summarize local Hub vs remote app-cluster readiness and does not guide optional local runtime startup.
