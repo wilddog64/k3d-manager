@@ -46,5 +46,84 @@ make: *** [up] Error 1
 Update the automation to check for an already-active sandbox state before attempting to click "Start Sandbox". If the button is disabled, the script should look for "Open Console" or "Clear Sandbox" to confirm the environment is ready for latching.
 
 ## Files Implicated
-- `scripts/playwright/acg_credentials.js`
-- `scripts/playwright/acg_extend.js`
+- `scripts/playwright/acg_credentials.js` (primary — this is where the timeout occurs)
+- `scripts/playwright/acg_extend.js` (not in scope — its Ghost State recovery uses `force: true` and is a different flow)
+
+---
+
+## Fix
+
+One hunk — `scripts/playwright/acg_credentials.js` only.
+
+**Location:** lines 352–355 inside the `else` block of `credentialsAlreadyVisible`.
+
+**Old:**
+```js
+      if (await startButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.error('INFO: Clicking Start Sandbox...');
+        await startButton.click();
+        await _waitForCredentials();
+```
+
+**New:**
+```js
+      if (await startButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        const _startEnabled = await startButton.isEnabled({ timeout: 1000 }).catch(() => false);
+        if (_startEnabled) {
+          console.error('INFO: Clicking Start Sandbox...');
+          await startButton.click();
+        } else {
+          console.error('INFO: Start Sandbox button is disabled — sandbox already running; waiting for credentials...');
+        }
+        await _waitForCredentials();
+```
+
+The `} else if (await openButton...` line that follows is unchanged.
+
+---
+
+## Before You Start
+
+1. `git pull origin k3d-manager-v1.1.0`
+2. Read `scripts/playwright/acg_credentials.js` lines 311–373 in full (the Start/Open flow block).
+3. Read `memory-bank/activeContext.md`.
+4. Run `node --check scripts/playwright/acg_credentials.js` — must exit 0 before and after.
+5. Do NOT touch `acg_extend.js`.
+
+---
+
+## Rules
+
+- `node --check scripts/playwright/acg_credentials.js` must exit 0.
+- Only `scripts/playwright/acg_credentials.js` may be touched.
+- Do NOT add `--no-verify` to any git command.
+- Do NOT commit to `main`.
+- Do NOT create a PR.
+
+---
+
+## Definition of Done
+
+1. `scripts/playwright/acg_credentials.js` lines 352–355 match the **New** block above exactly.
+2. The `} else if (await openButton...` continuation is unchanged.
+3. `node --check scripts/playwright/acg_credentials.js` exits 0.
+4. Committed on `k3d-manager-v1.1.0` with message:
+   ```
+   fix(acg-credentials): skip disabled Start Sandbox button; wait for credentials instead
+   ```
+5. Branch pushed to `origin/k3d-manager-v1.1.0` before reporting done.
+6. `memory-bank/activeContext.md`: update "Start Sandbox Disabled Timeout" from OPEN → COMPLETE with real commit SHA.
+7. `memory-bank/progress.md`: add `[x] **Start Sandbox Disabled Timeout** — COMPLETE (<sha>)` under Known Bugs / Gaps.
+8. Report back: commit SHA + paste the memory-bank lines you updated.
+
+---
+
+## What NOT To Do
+
+- Do NOT create a PR.
+- Do NOT skip pre-commit hooks (`--no-verify`).
+- Do NOT modify files outside `scripts/playwright/acg_credentials.js`.
+- Do NOT commit to `main`.
+- Do NOT touch `acg_extend.js`.
+- Do NOT add `force: true` to the startButton click — that bypasses the disabled check and hangs anyway.
+- Do NOT restructure the Start/Open/Resume if-else chain — only modify the `startButton` branch.
