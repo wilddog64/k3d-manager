@@ -78,6 +78,17 @@ Test log saved to scratch/test-logs/all/20260424-131334.log
 Collected artifacts in scratch/test-logs/all/20260424-131334
 ```
 
+Current full curated BATS during ESO webhook readiness verification:
+
+```text
+1..283
+not ok 172 deploy_argocd --help shows usage
+# (in test file scripts/tests/plugins/argocd.bats, line 12)
+#   `[[ "$output" == *"Usage: deploy_argocd"* ]]' failed
+Test log saved to scratch/test-logs/all/20260424-141536.log
+Collected artifacts in scratch/test-logs/all/20260424-141536
+```
+
 `_agent_lint` and `_agent_audit` both exited 0:
 
 ```text

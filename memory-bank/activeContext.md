@@ -118,9 +118,11 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## New Bug: deploy_eso returns before webhook endpoints are ready (2026-04-24)
 
-**Status:** ASSIGNED TO CODEX — spec: `docs/bugs/2026-04-24-eso-webhook-readiness-race.md`
+**Status:** COMPLETE (`e7b06b2b`) — spec: `docs/bugs/2026-04-24-eso-webhook-readiness-race.md`; PR: N/A
 **File:** `scripts/plugins/eso.sh`
-**Why:** `deploy_vault` installs ESO and returns after only the main `external-secrets` deployment is ready. Fresh Hub Step 3.6 then runs `deploy_ldap`, which applies ExternalSecret resources while `external-secrets-webhook` can still lack endpoints, causing Kubernetes admission to fail with `no endpoints available for service "external-secrets-webhook"`.
+**Fix:** `deploy_eso` now waits for `external-secrets`, `external-secrets-webhook`, and `external-secrets-cert-controller` rollouts, then waits for `external-secrets-webhook` endpoints before returning. The already-installed fast path also verifies readiness.
+**Why:** `deploy_vault` installs ESO and previously returned after only the main `external-secrets` deployment was ready. Fresh Hub Step 3.6 then ran `deploy_ldap`, which applied ExternalSecret resources while `external-secrets-webhook` could still lack endpoints, causing Kubernetes admission to fail with `no endpoints available for service "external-secrets-webhook"`.
+**Validation:** `shellcheck -x scripts/plugins/eso.sh`, `bats scripts/tests/plugins/eso.bats`, `_agent_lint`, `_agent_audit`, and live `./scripts/k3d-manager deploy_eso --confirm` passed. Full `./scripts/k3d-manager test all` still has the known ArgoCD help-test failure tracked in `docs/issues/2026-04-24-argocd-verification-preexisting-failures.md`.
 
 ## New Bug: Step 3.6 deploy_argocd fails — deploy_ldap called directly with --confirm (2026-04-24)
 
