@@ -103,7 +103,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## New Bug: Step 3.6 deploy_vault/deploy_argocd hit dispatcher safety gate (2026-04-24)
 
-**Status:** ASSIGNED TO CODEX — spec: `docs/bugs/2026-04-24-acg-up-hub-bootstrap-safety-gate.md`
+**Status:** COMPLETE (`8b43122f`) — spec: `docs/bugs/2026-04-24-acg-up-hub-bootstrap-safety-gate.md`
 **File:** `bin/acg-up` lines 118–119
 **Fix:** Add `--confirm` to both dispatcher calls: `deploy_vault --confirm` and `deploy_argocd --confirm`.
 **Why:** `scripts/k3d-manager` dispatcher requires `--confirm` or explicit options; `--confirm` is consumed/stripped by dispatcher so vault.sh never sees it.
@@ -116,6 +116,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 - **acg-sync-apps + acg-status dual-cluster** — COMPLETE (`docs/bugs/2026-04-23-acg-sync-apps-and-acg-status-dual-cluster.md`). Implemented in `a5422141`; `acg-sync-apps` now polls port-forward readiness and uses configurable `ARGOCD_APP`, and `acg-status` now shows Hub cluster nodes + pods before tunnel status.
 - **k3d-provider EXIT trap leak** — COMPLETE (`258de0d1`). `_provider_k3d_configure_istio` now uses a `RETURN` trap for temp file cleanup, preventing the trap from leaking into long-running caller shells like `bin/acg-up`.
 - **acg-up Hub cluster bootstrap** — COMPLETE (`c59f2c3a`). `acg-up` now bootstraps Vault and ArgoCD on a freshly created Hub cluster before attempting the Vault port-forward path, so `make down → make up` no longer fails on missing `secrets` resources.
+- **acg-up Hub bootstrap safety gate** — COMPLETE (`8b43122f`). `acg-up` Step 3.6 now passes `--confirm` through the dispatcher for both Hub bootstrap calls, satisfying the deploy safety gate without forwarding that flag into the underlying plugin parsers.
 - **k3d-provider RETURN trap scope** — COMPLETE (`e6a9ec91`). Both k3d provider RETURN trap handlers now self-clear on first fire, preventing repeated cleanup execution in parent functions after inline `deploy_cluster --provider k3d` calls.
 - **Vault Preflight After Sleep** — COMPLETE (`e577579e`). `acg-up` now verifies the local Hub cluster before Vault PF startup and fails early if Vault is sealed or unreachable after OrbStack restart / Mac sleep.
 - **acg-up Hub cluster auto-create** — COMPLETE (`73382eb2`). `acg-up` now recreates the local Hub cluster during Step 3.5 when it was legitimately removed by `make down`, while keeping the unreachable-cluster check as the real OrbStack guard.
