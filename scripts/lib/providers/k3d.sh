@@ -97,7 +97,7 @@ function _provider_k3d_configure_istio() {
    _kubectl apply -f "${SCRIPT_DIR}/etc/istio-ingressclass.yaml"
    _kubectl label ns default istio-injection=enabled --overwrite
 
-   trap '$(_cleanup_trap_command "$istio_yamlfile")' RETURN
+   trap 'trap - RETURN; $(_cleanup_trap_command "$istio_yamlfile")' RETURN
 }
 
 function _provider_k3d_create_cluster() {
@@ -139,7 +139,7 @@ function _provider_k3d_create_cluster() {
    yamlfile=$(mktemp -t k3d-cluster.XXXXXX.yaml)
    envsubst < "$cluster_template" > "$yamlfile"
 
-   trap '$(_cleanup_trap_command "$yamlfile")' RETURN
+   trap 'trap - RETURN; $(_cleanup_trap_command "$yamlfile")' RETURN
 
    if _provider_k3d_list_clusters | grep -q -- "$cluster_name"; then
       echo "Cluster $cluster_name already exists, skip"
