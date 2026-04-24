@@ -100,15 +100,25 @@ _info "[acg-up] Step 3/12 — Starting SSH tunnel..."
 tunnel_start
 
 _HUB_CLUSTER_CTX="k3d-${HUB_CLUSTER_NAME:-k3d-cluster}"
+_hub_newly_created=0
 _info "[acg-up] Step 3.5/12 — Verifying local Hub cluster (create if missing)..."
 if ! k3d cluster list 2>/dev/null | grep -q "^${HUB_CLUSTER_NAME:-k3d-cluster}[[:space:]]"; then
   _info "[acg-up] Local Hub cluster '${HUB_CLUSTER_NAME:-k3d-cluster}' not found — creating it now..."
   deploy_cluster --provider k3d "${HUB_CLUSTER_NAME:-k3d-cluster}"
+  _hub_newly_created=1
 fi
 if ! kubectl get nodes --context "${_HUB_CLUSTER_CTX}" --request-timeout=10s >/dev/null 2>&1; then
   _err "[acg-up] Local Hub cluster '${_HUB_CLUSTER_CTX}' is unreachable — OrbStack/k3d may be in a broken state after sleep. Check 'orbctl status'."
 fi
 _info "[acg-up] Local Hub cluster verified."
+
+if [[ "${_hub_newly_created}" -eq 1 ]]; then
+  _info "[acg-up] Step 3.6/12 — Bootstrapping Hub cluster (Vault + LDAP + ArgoCD)..."
+  kubectl config use-context "${_HUB_CLUSTER_CTX}" >/dev/null 2>&1 || true
+  "${REPO_ROOT}/scripts/k3d-manager" deploy_vault
+  "${REPO_ROOT}/scripts/k3d-manager" deploy_argocd
+  _info "[acg-up] Hub cluster bootstrapped."
+fi
 
 _info "[acg-up] Step 4/12 — Starting Vault port-forward (k3d → localhost:8200)..."
 _vault_pf_pid_file="${HOME}/.local/share/k3d-manager/vault-pf.pid"
