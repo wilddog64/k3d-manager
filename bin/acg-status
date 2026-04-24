@@ -20,6 +20,16 @@ source "${REPO_ROOT}/scripts/lib/system.sh"
 APP_CONTEXT="${APP_CONTEXT:-ubuntu-k3s}"
 INFRA_CONTEXT="${INFRA_CONTEXT:-k3d-k3d-cluster}"
 
+echo "=== Hub Cluster (${INFRA_CONTEXT}) ==="
+kubectl get nodes --context "${INFRA_CONTEXT}" 2>/dev/null \
+  || echo "Cannot reach Hub cluster"
+
+echo ""
+echo "=== Hub Pods — all namespaces (${INFRA_CONTEXT}) ==="
+kubectl get pods -A --context "${INFRA_CONTEXT}" 2>/dev/null \
+  || echo "Cannot reach Hub cluster"
+
+echo ""
 echo "=== Tunnel ==="
 if curl -sf --max-time 3 http://localhost:6443 >/dev/null 2>&1; then
   echo "SSH tunnel: UP (port 6443 reachable)"
