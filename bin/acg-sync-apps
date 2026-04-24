@@ -26,6 +26,22 @@ ARGOCD_APP="${ARGOCD_APP:-data-layer}"
 _pf_pid=""
 _pf_log="$(mktemp -t acg-sync-apps-argocd-pf.XXXXXX.log 2>/dev/null || printf '%s\n' "${TMPDIR:-/tmp}/acg-sync-apps-argocd-pf.log")"
 
+function _sync_apps_port_in_use() {
+  local pf_port="$1"
+
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"${pf_port}" -sTCP:LISTEN >/dev/null 2>&1
+    return $?
+  fi
+
+  if command -v nc >/dev/null 2>&1; then
+    nc -z 127.0.0.1 "${pf_port}" >/dev/null 2>&1
+    return $?
+  fi
+
+  return 1
+}
+
 _cleanup() {
   if [[ -n "${_pf_pid}" ]]; then
     kill "${_pf_pid}" 2>/dev/null || true
@@ -35,6 +51,10 @@ _cleanup() {
   fi
 }
 trap _cleanup EXIT
+
+if _sync_apps_port_in_use 8080; then
+  _err "[sync-apps] Local port 8080 is already in use — stop the existing listener and retry"
+fi
 
 _info "[sync-apps] Starting argocd-server port-forward..."
 kubectl port-forward svc/argocd-server -n "${ARGOCD_NS}" 8080:443 \
