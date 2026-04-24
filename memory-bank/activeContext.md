@@ -60,17 +60,17 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## New Bug: acg-down credential check noise (2026-04-24)
 
-**Status:** OPEN — spec: `docs/bugs/2026-04-24-acg-down-credential-check-noise.md`
+**Status:** COMPLETE (`07ca18a6`) — spec: `docs/bugs/2026-04-24-acg-down-credential-check-noise.md`
 **File:** `bin/acg-down` lines 49–51
 **Fix:** Pre-check `aws sts get-caller-identity` silently before calling `acg_teardown`; skip with single clean `_info` when invalid. Eliminates ERROR-level noise that makes expired vs live-but-stale indistinguishable.
 **Supersedes:** `ae2fca66` approach (catch-after-fail) — this fixes the noise problem that approach left behind.
 
 ## Prev Bug: acg-down expired credentials abort (2026-04-24)
 
-**Status:** COMPLETE (`ae2fca66`) — spec: `docs/bugs/2026-04-24-acg-down-expired-credentials-abort.md`
+**Status:** COMPLETE (`07ca18a6`) — spec: `docs/bugs/2026-04-24-acg-down-expired-credentials-abort.md`
 **File:** `bin/acg-down` line 50
 **Fix:** `acg_teardown --confirm` → `acg_teardown --confirm || _info "[acg-down] CloudFormation teardown failed — credentials may have expired (sandbox already removed). Continuing local cleanup."`
-**Why:** Expired sandbox TTL causes `_acg_check_credentials` to return 1, aborting the script before Vault PF kill + k3d Hub delete run.
+**Why:** Expired sandbox TTL causes `_acg_check_credentials` to return 1, aborting the script before Vault PF kill + k3d Hub delete run. Follow-up `07ca18a6` keeps the cleanup behavior and suppresses credential ERROR noise with a silent pre-check.
 
 ## Open Items
 - **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Local Hub orchestration is fragmented: `acg-up` assumes ArgoCD infrastructure, bootstrap remains separate, and local ArgoCD access still requires manual port-forward setup.
@@ -79,7 +79,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 - **Teardown State Drift** — COMPLETE (`docs/bugs/2026-04-23-acg-down-full-teardown-spec.md`). Implemented in `3fd6f4d6`; `acg-down` now tears down the local Hub by default and supports `--keep-hub` as the explicit opt-out.
 - **acg-sync-apps + acg-status dual-cluster** — COMPLETE (`docs/bugs/2026-04-23-acg-sync-apps-and-acg-status-dual-cluster.md`). Implemented in `a5422141`; `acg-sync-apps` now polls port-forward readiness and uses configurable `ARGOCD_APP`, and `acg-status` now shows Hub cluster nodes + pods before tunnel status.
 - **Vault Preflight After Sleep** — COMPLETE (`e577579e`). `acg-up` now verifies the local Hub cluster before Vault PF startup and fails early if Vault is sealed or unreachable after OrbStack restart / Mac sleep.
-- **acg-down expired credentials abort** — COMPLETE (`ae2fca66`). `acg-down` now logs a visible warning if AWS teardown fails after sandbox expiry and still completes local Vault PF + Hub cleanup.
+- **acg-down expired credentials abort** — COMPLETE (`07ca18a6`). `acg-down` now silently pre-checks AWS credentials, skips CloudFormation teardown with a clean INFO when the sandbox already expired, and still completes local Vault PF + Hub cleanup.
 - **Repo Retention Cleanup** — OPEN (`docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`). `scratch/` and accumulated historical docs are now a larger maintenance/size concern than Memory Bank itself.
 - **Vault Sync Mismatch** — CRITICAL BLOCKER (`docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md`). Vault storage state and cached unseal material can still drift apart; current automatic recovery is not sufficient for every local failure state.
 - **Vault Resilience Gap** — OPEN (`docs/bugs/2026-04-20-vault-readiness-gate-missing.md`, `docs/bugs/2026-04-22-vault-orphaned-port-forward-ghost-blocker.md`). `acg-up` can fail at Vault seeding because Vault is sealed after Mac sleep or because a ghost port-forward on `8200` routes to a dead pod.
