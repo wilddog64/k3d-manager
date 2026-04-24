@@ -7,72 +7,94 @@
 ESO_NAMESPACE="${ESO_NAMESPACE:-secrets}"
 export ESO_NAMESPACE
 
-# Install ESO (External Secrets Operator)
-function deploy_eso() {
-  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    echo "Usage: deploy_eso [namespace=${ESO_NAMESPACE:-secrets}] [release=external-secrets]"
-    return 0
-  fi
+function _eso_wait_for_webhook_endpoint() {
   local ns="${1:-${ESO_NAMESPACE:-secrets}}"
-  local release="${2:-external-secrets}"
+  local endpoint_ip=""
+  local attempt
 
-  local helm_repo_url_default="https://charts.external-secrets.io"
-  local helm_repo_url="${ESO_HELM_REPO_URL:-$helm_repo_url_default}"
-  local helm_chart_ref_default="external-secrets/external-secrets"
-  local helm_chart_ref="${ESO_HELM_CHART_REF:-$helm_chart_ref_default}"
+  _info "[eso] Waiting for external-secrets webhook endpoint..."
+  for ((attempt=1; attempt<=18; attempt++)); do
+    endpoint_ip=$(_kubectl --no-exit -n "$ns" get endpoints external-secrets-webhook \
+      -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null || true)
+    if [[ -n "$endpoint_ip" ]]; then
+      _info "[eso] external-secrets webhook ready (${endpoint_ip})"
+      return 0
+    fi
+    sleep 10
+  done
 
-  local -a required_crds=(
-    secretstores.external-secrets.io
-    externalsecrets.external-secrets.io
-    clustersecretstores.external-secrets.io
+  _err "[eso] external-secrets webhook endpoint did not become ready"
+  return 1
+}
+
+function _eso_wait_for_core_readiness() {
+  local ns="${1:-${ESO_NAMESPACE:-secrets}}"
+  local deployment
+  local -a deployments=(
+    external-secrets
+    external-secrets-webhook
+    external-secrets-cert-controller
   )
 
-  local -a missing_crds=()
-  local crd
-  for crd in "${required_crds[@]}"; do
-    if ! _kubectl --no-exit get crd "$crd" >/dev/null 2>&1; then
-      missing_crds+=("$crd")
+  for deployment in "${deployments[@]}"; do
+    if ! _kubectl --no-exit -n "$ns" rollout status "deploy/${deployment}" --timeout=120s; then
+      _err "[eso] deployment ${deployment} did not become ready"
+      return 1
     fi
   done
 
-  local release_exists=0
-  local skip_repo_ops=0
+  _eso_wait_for_webhook_endpoint "$ns"
+}
+
+function _eso_required_crds() {
+  printf '%s\n' \
+    secretstores.external-secrets.io \
+    externalsecrets.external-secrets.io \
+    clustersecretstores.external-secrets.io
+}
+
+function _eso_missing_crds() {
+  local crd
+  while IFS= read -r crd; do
+    if ! _kubectl --no-exit get crd "$crd" >/dev/null 2>&1; then
+      printf '%s\n' "$crd"
+    fi
+  done < <(_eso_required_crds)
+}
+
+function _eso_chart_skip_repo_ops() {
+  local helm_chart_ref="$1"
+  local helm_repo_url="$2"
+
   case "$helm_chart_ref" in
-    /*|./*|../*|file://*)
-      skip_repo_ops=1
-      ;;
+    /*|./*|../*|file://*) return 0 ;;
   esac
   case "$helm_repo_url" in
-    ""|/*|./*|../*|file://*)
-      skip_repo_ops=1
-      ;;
+    ""|/*|./*|../*|file://*) return 0 ;;
   esac
+  return 1
+}
 
-  if _run_command --no-exit -- helm -n "$ns" status "$release" > /dev/null 2>&1 ; then
-      release_exists=1
-  fi
+function _eso_install_chart() {
+  local ns="$1"
+  local helm_chart_ref="$2"
+  local helm_repo_url="$3"
 
-  if (( release_exists )) && (( ${#missing_crds[@]} == 0 )); then
-      echo "ESO already installed in namespace $ns"
-      return 0
-  fi
-
-  if (( release_exists )) && (( ${#missing_crds[@]} > 0 )); then
-      _warn "ESO release '$release' is present but required CRDs are missing; reapplying chart installation."
-  fi
-
-  # _kubectl --no-exit --quiet get ns "$ns" >/dev/null 2>&1 || _kubectl create ns "$ns"
-
-  # Helm repo
-  if (( ! skip_repo_ops )); then
+  if ! _eso_chart_skip_repo_ops "$helm_chart_ref" "$helm_repo_url"; then
     _helm repo add external-secrets "$helm_repo_url"
     _helm repo update >/dev/null 2>&1
   fi
+
   _helm upgrade --install -n "$ns" external-secrets "$helm_chart_ref" \
       --create-namespace \
       --set installCRDs=true
+}
 
-  for crd in "${required_crds[@]}"; do
+function _eso_wait_for_crds() {
+  local crd
+  local attempt
+
+  while IFS= read -r crd; do
     local observed=0
     for ((attempt=0; attempt<12; attempt++)); do
       if _kubectl --no-exit get crd "$crd" >/dev/null 2>&1; then
@@ -88,10 +110,47 @@ function deploy_eso() {
     if ! _kubectl --no-exit wait --for=condition=Established --timeout=120s "crd/${crd}" >/dev/null 2>&1; then
       _warn "Timed out waiting for CRD ${crd} to become ready; verify the ESO installation if issues persist."
     fi
-  done
+  done < <(_eso_required_crds)
+}
 
-  # Wait for controllers and the SDK server
-  _kubectl -n "$ns" rollout status deploy/external-secrets --timeout=120s
+# Install ESO (External Secrets Operator)
+function deploy_eso() {
+  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+    echo "Usage: deploy_eso [namespace=${ESO_NAMESPACE:-secrets}] [release=external-secrets]"
+    return 0
+  fi
+  local ns="${1:-${ESO_NAMESPACE:-secrets}}"
+  local release="${2:-external-secrets}"
+
+  local helm_repo_url_default="https://charts.external-secrets.io"
+  local helm_repo_url="${ESO_HELM_REPO_URL:-$helm_repo_url_default}"
+  local helm_chart_ref_default="external-secrets/external-secrets"
+  local helm_chart_ref="${ESO_HELM_CHART_REF:-$helm_chart_ref_default}"
+
+  local -a missing_crds=()
+  local release_exists=0
+  mapfile -t missing_crds < <(_eso_missing_crds)
+
+  if _run_command --no-exit -- helm -n "$ns" status "$release" > /dev/null 2>&1 ; then
+      release_exists=1
+  fi
+
+  if (( release_exists )) && (( ${#missing_crds[@]} == 0 )); then
+      _eso_wait_for_core_readiness "$ns"
+      echo "ESO already installed in namespace $ns"
+      return 0
+  fi
+
+  if (( release_exists )) && (( ${#missing_crds[@]} > 0 )); then
+      _warn "ESO release '$release' is present but required CRDs are missing; reapplying chart installation."
+  fi
+
+  # _kubectl --no-exit --quiet get ns "$ns" >/dev/null 2>&1 || _kubectl create ns "$ns"
+
+  _eso_install_chart "$ns" "$helm_chart_ref" "$helm_repo_url"
+  _eso_wait_for_crds
+
+  _eso_wait_for_core_readiness "$ns"
   echo "ESO installed namespace $ns"
 
   if [[ -n "${REMOTE_VAULT_ADDR:-}" ]]; then

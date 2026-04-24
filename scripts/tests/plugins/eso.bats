@@ -7,6 +7,7 @@ setup() {
   RUN_LOG="$BATS_TEST_TMPDIR/run.log"
   : > "$RUN_LOG"
   RUN_EXIT_CODES=()
+  ESO_WEBHOOK_ENDPOINT_IP="${ESO_WEBHOOK_ENDPOINT_IP:-10.42.0.10}"
   _run_command() {
     while [[ $# -gt 0 ]]; do
       case "$1" in
@@ -23,7 +24,30 @@ setup() {
     fi
     return "$rc"
   }
+  _kubectl() {
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --no-exit|--quiet|--prefer-sudo|--require-sudo) shift ;;
+        --) shift; break ;;
+        *) break ;;
+      esac
+    done
+    echo "$*" >> "$KUBECTL_LOG"
+
+    if [[ "$*" == *"get endpoints external-secrets-webhook"* ]]; then
+      printf '%s\n' "$ESO_WEBHOOK_ENDPOINT_IP"
+      return 0
+    fi
+
+    local rc=0
+    if ((${#KUBECTL_EXIT_CODES[@]})); then
+      rc=${KUBECTL_EXIT_CODES[0]}
+      KUBECTL_EXIT_CODES=("${KUBECTL_EXIT_CODES[@]:1}")
+    fi
+    return "$rc"
+  }
   export -f _run_command
+  export -f _kubectl
   export_stubs
 }
 
@@ -37,15 +61,16 @@ setup() {
   RUN_EXIT_CODES=(0)
   run deploy_eso test-ns test-release
   [ "$status" -eq 0 ]
-  [ "$output" = "ESO already installed in namespace test-ns" ]
+  [[ "$output" == *"ESO already installed in namespace test-ns"* ]]
   read_lines "$RUN_LOG" run_calls
   [ "${run_calls[0]}" = "helm -n test-ns status test-release" ]
   [ ! -s "$HELM_LOG" ]
   read_lines "$KUBECTL_LOG" kubectl_calls
-  [ "${#kubectl_calls[@]}" -eq 3 ]
   [ "${kubectl_calls[0]}" = "get crd secretstores.external-secrets.io" ]
   [ "${kubectl_calls[1]}" = "get crd externalsecrets.external-secrets.io" ]
   [ "${kubectl_calls[2]}" = "get crd clustersecretstores.external-secrets.io" ]
+  [[ "${kubectl_calls[*]}" == *"-n test-ns rollout status deploy/external-secrets-webhook --timeout=120s"* ]]
+  [[ "${kubectl_calls[*]}" == *"-n test-ns get endpoints external-secrets-webhook -o jsonpath={.subsets[0].addresses[0].ip}"* ]]
 }
 
 @test "Fresh install" {
@@ -67,6 +92,9 @@ setup() {
     fi
   done
   [ "$rollout_found" -eq 1 ]
+  [[ "${kubectl_calls[*]}" == *"-n sample-ns rollout status deploy/external-secrets-webhook --timeout=120s"* ]]
+  [[ "${kubectl_calls[*]}" == *"-n sample-ns rollout status deploy/external-secrets-cert-controller --timeout=120s"* ]]
+  [[ "${kubectl_calls[*]}" == *"-n sample-ns get endpoints external-secrets-webhook -o jsonpath={.subsets[0].addresses[0].ip}"* ]]
 }
 
 @test "Local ESO chart skips repo add" {
