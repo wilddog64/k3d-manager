@@ -101,6 +101,13 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Why:** `make down` deletes the Hub cluster; Step 3.5 re-creates it but never bootstraps workloads; Step 4 `kubectl port-forward svc/vault -n secrets` fails because `secrets` ns doesn't exist on fresh Hub.
 **Key constraint:** Call `deploy_vault` (no `--confirm`) via `"${REPO_ROOT}/scripts/k3d-manager"` subprocess — `--confirm` is not a recognized flag in `_vault_parse_deploy_opts`.
 
+## New Bug: Step 3.6 deploy_argocd fails — deploy_ldap called directly with --confirm (2026-04-24)
+
+**Status:** ASSIGNED TO CODEX — spec: `docs/bugs/2026-04-24-acg-up-hub-bootstrap-ldap-missing.md`
+**File:** `bin/acg-up` line 119 (add before deploy_argocd)
+**Fix:** Add `"${REPO_ROOT}/scripts/k3d-manager" deploy_ldap --confirm` between deploy_vault and deploy_argocd in Step 3.6.
+**Why:** `deploy_argocd` calls `deploy_ldap --confirm` directly when `ldap` ns missing; `_ldap_parse_deploy_opts` hits `_err "[ldap] unknown option: --confirm"`. Pre-deploying LDAP via dispatcher ensures namespace exists → argocd skips the direct call.
+
 ## New Bug: Step 3.6 deploy_vault/deploy_argocd hit dispatcher safety gate (2026-04-24)
 
 **Status:** COMPLETE (`8b43122f`) — spec: `docs/bugs/2026-04-24-acg-up-hub-bootstrap-safety-gate.md`
