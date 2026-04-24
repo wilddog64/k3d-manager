@@ -23,11 +23,13 @@ APP_CONTEXT="${APP_CONTEXT:-ubuntu-k3s}"
 ARGOCD_NS="${ARGOCD_NS:-cicd}"
 ARGOCD_APP="${ARGOCD_APP:-data-layer}"
 
-SYNC_APPS_STATE_DIR="${SYNC_APPS_STATE_DIR:-${TMPDIR:-/tmp}/k3d-manager}"
+SYNC_APPS_STATE_DIR="${SYNC_APPS_STATE_DIR:-${REPO_ROOT}/scratch/.state/acg-sync-apps}"
+SYNC_APPS_LOG_DIR="${SYNC_APPS_LOG_DIR:-${REPO_ROOT}/scratch/logs}"
 SYNC_APPS_PF_STATE_FILE="${SYNC_APPS_STATE_DIR}/acg-sync-apps-argocd-pf.env"
-SYNC_APPS_PF_LOG_FILE="${SYNC_APPS_STATE_DIR}/acg-sync-apps-argocd-pf.log"
 
-mkdir -p "${SYNC_APPS_STATE_DIR}"
+mkdir -p "${SYNC_APPS_STATE_DIR}" "${SYNC_APPS_LOG_DIR}"
+
+SYNC_APPS_PF_LOG_FILE="$(mktemp "${SYNC_APPS_LOG_DIR}/acg-sync-apps-argocd-pf.XXXXXX.log" 2>/dev/null || printf '%s\n' "${SYNC_APPS_LOG_DIR}/acg-sync-apps-argocd-pf.log")"
 
 _pf_pid=""
 _pf_owned=0
@@ -132,9 +134,6 @@ _cleanup() {
   fi
   if [[ "${_pf_owned}" -eq 1 ]]; then
     _sync_apps_clear_port_forward_state
-  fi
-  if [[ "${_pf_owned}" -eq 1 && -n "${_pf_log}" ]]; then
-    rm -f "${_pf_log}" 2>/dev/null || true
   fi
 }
 trap _cleanup EXIT

@@ -3,8 +3,9 @@
 setup() {
   export HOME="${BATS_TEST_TMPDIR}/home"
   export PATH="${BATS_TEST_TMPDIR}/bin:$PATH"
-  export SYNC_APPS_STATE_DIR="${HOME}/.local/share/k3d-manager"
-  mkdir -p "${BATS_TEST_TMPDIR}/bin" "${SYNC_APPS_STATE_DIR}"
+  export SYNC_APPS_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+  export SYNC_APPS_LOG_DIR="${BATS_TEST_TMPDIR}/logs"
+  mkdir -p "${BATS_TEST_TMPDIR}/bin" "${SYNC_APPS_STATE_DIR}" "${SYNC_APPS_LOG_DIR}"
   : > "${BATS_TEST_TMPDIR}/kubectl.log"
   : > "${BATS_TEST_TMPDIR}/argocd.log"
   rm -f "${BATS_TEST_TMPDIR}/pf_ready"
@@ -75,7 +76,7 @@ SYNC_APPS_PF_CONTEXT=k3d-k3d-cluster
 SYNC_APPS_PF_NS=cicd
 SYNC_APPS_PF_PORT=8080
 SYNC_APPS_PF_SERVICE=svc/argocd-server
-SYNC_APPS_PF_LOG=${BATS_TEST_TMPDIR}/managed.log
+SYNC_APPS_PF_LOG=${BATS_TEST_TMPDIR}/logs/managed.log
 EOF
   : > "${BATS_TEST_TMPDIR}/pf_ready"
 
@@ -87,11 +88,9 @@ EOF
 
 @test "acg-sync-apps replaces an unmanaged listener on 8080" {
   export LSOF_EXIT_CODE=0
-  local old_listener_pid
   sleep 60 &
-  old_listener_pid=$!
+  local old_listener_pid=$!
   export LSOF_PIDS="${old_listener_pid}"
-  unset PF_SHOULD_FAIL
 
   run "${BATS_TEST_DIRNAME}/../../../bin/acg-sync-apps"
   local rc=$?
@@ -104,11 +103,18 @@ EOF
   grep -q "port-forward svc/argocd-server -n cicd 8080:443 --context k3d-k3d-cluster" "${BATS_TEST_TMPDIR}/kubectl.log"
 }
 
-@test "acg-sync-apps reports early port-forward failure details" {
+@test "acg-sync-apps preserves the port-forward log on failure" {
   export LSOF_EXIT_CODE=1
   export PF_SHOULD_FAIL=1
+
   run "${BATS_TEST_DIRNAME}/../../../bin/acg-sync-apps"
   [ "$status" -eq 1 ]
   [[ "$output" == *"port-forward exited early"* ]]
   [[ "$output" == *"boom from port-forward"* ]]
+  [ ! -e "${SYNC_APPS_STATE_DIR}/acg-sync-apps-argocd-pf.env" ]
+
+  local log_file
+  log_file="$(find "${SYNC_APPS_LOG_DIR}" -maxdepth 1 -name 'acg-sync-apps-argocd-pf.*.log' | head -1)"
+  [ -n "$log_file" ]
+  grep -q "boom from port-forward" "$log_file"
 }
