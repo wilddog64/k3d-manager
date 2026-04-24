@@ -46,6 +46,18 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Why:** Shared browser/CDP code is destabilizing AWS while GCP evolves.
 **Direction:** Extract ACG automation into its own repo, test browser automation there, keep `k3d-manager` focused on orchestration.
 
+## Latest Batch: 5 bugs specced 2026-04-24
+
+| Bug | Spec | Action |
+|-----|------|--------|
+| acg-sync-apps app not found | `docs/bugs/2026-04-24-acg-sync-apps-argocd-app-not-found.md` | Implement |
+| acg-extend isPanelOpen false positive | `docs/bugs/2026-04-24-acg-extend-ispanelopen-false-positive.md` | Implement |
+| Vault preflight after sleep | `docs/bugs/2026-04-23-acg-up-vault-state-preflight-gap-after-mac-sleep.md` | Implement (impl spec added) |
+| acg-down provider dispatch + GCP teardown | `docs/bugs/2026-04-24-acg-down-provider-dispatch-gcp-teardown.md` | Implement |
+| acg-credentials Open Sandbox provider-blind | `docs/bugs/2026-04-24-acg-credentials-open-sandbox-provider-blind.md` | DEFERRED to lib-acg |
+
+Bugs 1/3/4/5 handed off to Gemini next. Bug 2 deferred to lib-acg extraction.
+
 ## Open Items
 - **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Local Hub orchestration is fragmented: `acg-up` assumes ArgoCD infrastructure, bootstrap remains separate, and local ArgoCD access still requires manual port-forward setup.
 - **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up` does not clearly summarize local Hub vs remote app-cluster readiness and does not guide optional local runtime startup.
