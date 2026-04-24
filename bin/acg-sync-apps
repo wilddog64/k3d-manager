@@ -23,9 +23,11 @@ APP_CONTEXT="${APP_CONTEXT:-ubuntu-k3s}"
 ARGOCD_NS="${ARGOCD_NS:-cicd}"
 ARGOCD_APP="${ARGOCD_APP:-data-layer}"
 
-SYNC_APPS_STATE_DIR="${SYNC_APPS_STATE_DIR:-${HOME}/.local/share/k3d-manager}"
+SYNC_APPS_STATE_DIR="${SYNC_APPS_STATE_DIR:-${TMPDIR:-/tmp}/k3d-manager}"
 SYNC_APPS_PF_STATE_FILE="${SYNC_APPS_STATE_DIR}/acg-sync-apps-argocd-pf.env"
 SYNC_APPS_PF_LOG_FILE="${SYNC_APPS_STATE_DIR}/acg-sync-apps-argocd-pf.log"
+
+mkdir -p "${SYNC_APPS_STATE_DIR}"
 
 _pf_pid=""
 _pf_owned=0
