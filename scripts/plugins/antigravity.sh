@@ -69,11 +69,12 @@ function _browser_launch() {
     return 0
   fi
   _info "Chrome not running — launching with --remote-debugging-port=9222..."
+  local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/profile}"
   if [[ "$(uname)" == "Darwin" ]]; then
     open -a "Google Chrome" --args \
       --remote-debugging-port=9222 \
       --password-store=basic \
-      --user-data-dir="${HOME}/.config/acg-chrome-profile"
+      --user-data-dir="${_cdp_profile_dir}"
   else
     local _chrome_bin
     _chrome_bin=$(command -v google-chrome 2>/dev/null || command -v google-chrome-stable 2>/dev/null || command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || true)
@@ -81,9 +82,12 @@ function _browser_launch() {
       _err "[antigravity] Chrome/Chromium not found — install google-chrome, google-chrome-stable, chromium-browser, or chromium"
     fi
     "${_chrome_bin}" \
+      --headless=new \
+      --no-sandbox \
+      --disable-dev-shm-usage \
       --remote-debugging-port=9222 \
       --password-store=basic \
-      --user-data-dir="${HOME}/.config/acg-chrome-profile" &
+      --user-data-dir="${_cdp_profile_dir}" &
   fi
   _antigravity_browser_ready 30
 }
