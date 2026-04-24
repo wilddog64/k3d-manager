@@ -79,6 +79,13 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Fix:** Replace `_err` (abort) with `deploy_cluster --provider k3d` — auto-create the Hub cluster when missing. Keep the `kubectl get nodes` unreachable check as the true OrbStack-broken guard.
 **Why:** `make down` deletes the Hub cluster; `make up` never creates it (Step 2 provisions remote k3s-aws only). `make down → make up` always fails at Step 3.5.
 
+## New Bug: k3d-provider EXIT trap leak (2026-04-24)
+
+**Status:** OPEN — spec: `docs/bugs/2026-04-24-k3d-provider-exit-trap-leak.md`
+**File:** `scripts/lib/providers/k3d.sh` line 100
+**Fix:** `trap '...' EXIT` → `trap '...' RETURN` in `_provider_k3d_configure_istio`
+**Why:** EXIT trap registers on the caller shell; when `deploy_cluster --provider k3d` is called inline from `bin/acg-up` (Step 3.5, `73382eb2`), the trap fires on acg-up exit with `$istio_yamlfile` out of scope → unbound variable under `set -u`.
+
 ## Open Items
 - **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Local Hub orchestration is fragmented: `acg-up` assumes ArgoCD infrastructure, bootstrap remains separate, and local ArgoCD access still requires manual port-forward setup.
 - **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up` does not clearly summarize local Hub vs remote app-cluster readiness and does not guide optional local runtime startup.
