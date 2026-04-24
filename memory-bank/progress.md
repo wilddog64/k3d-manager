@@ -48,6 +48,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [ ] **Vault Resilience Gap** — BLOCKED. `docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md` now tracks the remaining gap accurately: cached unseal replacement and some automatic recovery already exist, but local Vault can still land in drifted states that are not fully reconciled before seeding.
 - [x] **GCP Login Linux Headless OAuth** — COMPLETE (`927cb452`). Spec `docs/bugs/2026-04-23-gcp-login-linux-headless-oauth-url-capture.md`; `gcp.sh` captures OAuth URL from gcloud on Linux; `gcp_login.js` navigates directly via `GCP_AUTH_URL`. Live test pending.
 - [x] **GCP Provisioning Error 1** — COMPLETE (`346c3df2`). Bug `docs/bugs/2026-04-23-gcp-node-readiness-timeout-bash-pitfall.md`; `(( attempts++ ))` → `(( ++attempts ))` at lines 109 + 211 of `k3s-gcp.sh`. Spec complete; committed 2026-04-23.
+- [ ] **Start Sandbox Disabled Timeout** — OPEN. Bug `docs/bugs/2026-04-23-acg-start-sandbox-button-disabled-timeout.md`. Found 2026-04-23.
 - [x] **Google Identity Drift** — **COMPLETE** (`6ae2a6c3`). Implemented clean-slate login pattern (logout + explicit credentials entry).
 
 **Infra / tooling (tracked here):**
