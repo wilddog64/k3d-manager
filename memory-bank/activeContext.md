@@ -72,6 +72,13 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Fix:** `acg_teardown --confirm` → `acg_teardown --confirm || _info "[acg-down] CloudFormation teardown failed — credentials may have expired (sandbox already removed). Continuing local cleanup."`
 **Why:** Expired sandbox TTL causes `_acg_check_credentials` to return 1, aborting the script before Vault PF kill + k3d Hub delete run. Follow-up `07ca18a6` keeps the cleanup behavior and suppresses credential ERROR noise with a silent pre-check.
 
+## New Bug: acg-up Step 3.5 aborts instead of creating missing Hub cluster (2026-04-24)
+
+**Status:** OPEN — spec: `docs/bugs/2026-04-24-acg-up-hub-cluster-not-created.md`
+**File:** `bin/acg-up` lines 104–105
+**Fix:** Replace `_err` (abort) with `deploy_cluster --provider k3d` — auto-create the Hub cluster when missing. Keep the `kubectl get nodes` unreachable check as the true OrbStack-broken guard.
+**Why:** `make down` deletes the Hub cluster; `make up` never creates it (Step 2 provisions remote k3s-aws only). `make down → make up` always fails at Step 3.5.
+
 ## Open Items
 - **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Local Hub orchestration is fragmented: `acg-up` assumes ArgoCD infrastructure, bootstrap remains separate, and local ArgoCD access still requires manual port-forward setup.
 - **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up` does not clearly summarize local Hub vs remote app-cluster readiness and does not guide optional local runtime startup.
