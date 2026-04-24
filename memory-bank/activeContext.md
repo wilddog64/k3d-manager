@@ -58,6 +58,13 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 2026-04-24 implementation batch complete for Bugs 1–4; Bug 5 remains deferred to lib-acg extraction.
 
+## New Bug: acg-down expired credentials abort (2026-04-24)
+
+**Status:** OPEN — spec: `docs/bugs/2026-04-24-acg-down-expired-credentials-abort.md`
+**File:** `bin/acg-down` line 50
+**Fix:** `acg_teardown --confirm` → `acg_teardown --confirm || _info "[acg-down] CloudFormation teardown failed — credentials may have expired (sandbox already removed). Continuing local cleanup."`
+**Why:** Expired sandbox TTL causes `_acg_check_credentials` to return 1, aborting the script before Vault PF kill + k3d Hub delete run.
+
 ## Open Items
 - **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Local Hub orchestration is fragmented: `acg-up` assumes ArgoCD infrastructure, bootstrap remains separate, and local ArgoCD access still requires manual port-forward setup.
 - **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up` does not clearly summarize local Hub vs remote app-cluster readiness and does not guide optional local runtime startup.
