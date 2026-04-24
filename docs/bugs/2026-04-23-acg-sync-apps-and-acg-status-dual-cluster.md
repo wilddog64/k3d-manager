@@ -215,8 +215,11 @@ fi
 
 ## What NOT To Do
 
+- Do not create a PR.
+- Do not skip pre-commit hooks (`--no-verify`).
 - Do not change `sleep 3` inside the operation-wait loop (lines 59/60) — that poll is intentional.
 - Do not rename `INFRA_CONTEXT` or `APP_CONTEXT`.
 - Do not add `--app-namespace` flags — the app name env var handles the naming concern.
 - Do not touch `scripts/plugins/argocd.sh`.
+- Do not modify files outside `bin/acg-sync-apps` and `bin/acg-status`.
 - Do not commit to `main`.
