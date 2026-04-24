@@ -60,7 +60,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [x] **Start Sandbox Disabled Timeout** — COMPLETE (`13d398ab`). Bug `docs/bugs/2026-04-23-acg-start-sandbox-button-disabled-timeout.md`; add `isEnabled()` guard before `startButton.click()` in `acg_credentials.js`; committed 2026-04-23.
 - [x] **acg-up Hub cluster bootstrap** — COMPLETE (`c59f2c3a`). Bug `docs/bugs/2026-04-24-acg-up-hub-cluster-bootstrap.md`; `bin/acg-up` now tracks fresh Hub creation in Step 3.5 and runs Step 3.6 to bootstrap Vault + ArgoCD before the Vault port-forward path.
 - [x] **acg-up Hub bootstrap safety gate** — COMPLETE (`8b43122f`). Bug `docs/bugs/2026-04-24-acg-up-hub-bootstrap-safety-gate.md`; Step 3.6 now passes `--confirm` to both dispatcher calls so Hub bootstrap clears the deploy safety gate.
-- [ ] **acg-up Hub bootstrap LDAP missing** — OPEN. Bug `docs/bugs/2026-04-24-acg-up-hub-bootstrap-ldap-missing.md`; Step 3.6 missing `deploy_ldap` via dispatcher; `deploy_argocd` calls it directly with `--confirm` → `_err`.
+- [x] **acg-up Hub bootstrap LDAP missing** — COMPLETE (`c650f032`). Bug `docs/bugs/2026-04-24-acg-up-hub-bootstrap-ldap-missing.md`; Step 3.6 now deploys LDAP through the dispatcher before ArgoCD, preventing the direct `deploy_ldap --confirm` failure path.
 - [x] **Google Identity Drift** — **COMPLETE** (`6ae2a6c3`). Implemented clean-slate login pattern (logout + explicit credentials entry).
 
 **Infra / tooling (tracked here):**

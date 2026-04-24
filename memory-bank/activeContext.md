@@ -103,7 +103,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## New Bug: Step 3.6 deploy_argocd fails — deploy_ldap called directly with --confirm (2026-04-24)
 
-**Status:** ASSIGNED TO CODEX — spec: `docs/bugs/2026-04-24-acg-up-hub-bootstrap-ldap-missing.md`
+**Status:** COMPLETE (`c650f032`) — spec: `docs/bugs/2026-04-24-acg-up-hub-bootstrap-ldap-missing.md`
 **File:** `bin/acg-up` line 119 (add before deploy_argocd)
 **Fix:** Add `"${REPO_ROOT}/scripts/k3d-manager" deploy_ldap --confirm` between deploy_vault and deploy_argocd in Step 3.6.
 **Why:** `deploy_argocd` calls `deploy_ldap --confirm` directly when `ldap` ns missing; `_ldap_parse_deploy_opts` hits `_err "[ldap] unknown option: --confirm"`. Pre-deploying LDAP via dispatcher ensures namespace exists → argocd skips the direct call.
@@ -120,6 +120,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 - **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up` does not clearly summarize local Hub vs remote app-cluster readiness and does not guide optional local runtime startup.
 - **ACG Extraction Boundary** — OPEN (`docs/bugs/2026-04-23-acg-extraction-boundary-gemini-coupling.md`). The `acg_*` interaction surface still keeps Gemini/browser automation coupled to `k3d-manager`; that subsystem should move out as one extraction unit.
 - **Teardown State Drift** — COMPLETE (`docs/bugs/2026-04-23-acg-down-full-teardown-spec.md`). Implemented in `3fd6f4d6`; `acg-down` now tears down the local Hub by default and supports `--keep-hub` as the explicit opt-out.
+- **acg-up Hub bootstrap LDAP missing** — COMPLETE (`c650f032`). `acg-up` Step 3.6 now pre-deploys LDAP through the dispatcher before ArgoCD, so `deploy_argocd` no longer falls into its direct `deploy_ldap --confirm` path on a fresh Hub.
 - **acg-sync-apps + acg-status dual-cluster** — COMPLETE (`docs/bugs/2026-04-23-acg-sync-apps-and-acg-status-dual-cluster.md`). Implemented in `a5422141`; `acg-sync-apps` now polls port-forward readiness and uses configurable `ARGOCD_APP`, and `acg-status` now shows Hub cluster nodes + pods before tunnel status.
 - **k3d-provider EXIT trap leak** — COMPLETE (`258de0d1`). `_provider_k3d_configure_istio` now uses a `RETURN` trap for temp file cleanup, preventing the trap from leaking into long-running caller shells like `bin/acg-up`.
 - **acg-up Hub cluster bootstrap** — COMPLETE (`c59f2c3a`). `acg-up` now bootstraps Vault and ArgoCD on a freshly created Hub cluster before attempting the Vault port-forward path, so `make down → make up` no longer fails on missing `secrets` resources.
