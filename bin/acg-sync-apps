@@ -58,6 +58,8 @@ argocd login localhost:8080 --username admin --password "${_argocd_pass}" --inse
 
 if ! argocd app get "${ARGOCD_APP}" >/dev/null 2>&1; then
   _info "[sync-apps] ERROR: ArgoCD app '${ARGOCD_APP}' not found — is bootstrap complete?"
+  _info "[sync-apps] Available apps (set ARGOCD_APP=<name> to target a different one):"
+  argocd app list --output name 2>/dev/null || true
   exit 1
 fi
 
