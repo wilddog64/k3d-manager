@@ -59,7 +59,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 - **macOS CDP Direct Launch** — OPEN (`docs/bugs/2026-04-21-cdp-macos-direct-launch-gcp-ensure-cdp.md`). macOS `open -a` can reuse an existing Chrome instance and fail to apply CDP flags; fix must stay aligned with the shared CDP ownership model.
 - **GCP Login Linux Headless OAuth** — COMPLETE (`927cb452`). `gcp.sh` OS-split captures OAuth URL from gcloud output; `gcp_login.js` navigates directly via `GCP_AUTH_URL` on Linux. Shellcheck fix committed (unused `pid`/`i` vars renamed). Live test pending user execution on ACG GCP sandbox.
 - **GCP Provisioning Error 1** — COMPLETE (`346c3df2`). `(( attempts++ ))` → `(( ++attempts ))` in `k3s-gcp.sh` lines 109 and 211. Spec complete; committed 2026-04-23.
-- **Start Sandbox Disabled Timeout** — ASSIGNED TO GEMINI (`docs/bugs/2026-04-23-acg-start-sandbox-button-disabled-timeout.md`). Add `isEnabled()` guard before `startButton.click()` in `acg_credentials.js` line 352; if disabled, skip click and wait for credentials. Spec complete; assigned 2026-04-23.
+- **Start Sandbox Disabled Timeout** — COMPLETE (`13d398ab`). Add `isEnabled()` guard before `startButton.click()` in `acg_credentials.js` line 352; if disabled, skip click and wait for credentials. Spec complete; committed 2026-04-23.
 
 - **Whitespace enforcement** — `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh` files
 - **SSH tunnel timeouts** — connection resets during heavy ArgoCD sync (infra, non-blocking)
