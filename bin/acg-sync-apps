@@ -102,7 +102,7 @@ function _sync_apps_reconcile_port_forward() {
      kill -0 "${SYNC_APPS_PF_PID}" 2>/dev/null; then
     _pf_pid="${SYNC_APPS_PF_PID}"
     _pf_log="${SYNC_APPS_PF_LOG:-${_pf_log}}"
-    if curl -sk --max-time 1 https://localhost:"${pf_port}"/ >/dev/null 2>&1; then
+    if curl -sf --max-time 1 http://localhost:"${pf_port}"/healthz >/dev/null 2>&1; then
       _pf_owned=0
       _info "[sync-apps] Reusing existing argocd-server port-forward on ${pf_port}"
       return 0
@@ -148,7 +148,7 @@ if ! _sync_apps_reconcile_port_forward 8080; then
   _pf_ready=0
   _pf_failed=0
   for _i in $(seq 1 15); do
-    if curl -sk --max-time 1 https://localhost:8080/ >/dev/null 2>&1; then
+    if curl -sf --max-time 1 http://localhost:8080/healthz >/dev/null 2>&1; then
       _pf_ready=1
       break
     fi
