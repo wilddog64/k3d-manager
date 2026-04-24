@@ -46,7 +46,8 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [ ] **Repo Retention Cleanup** — OPEN. Issue `docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`; `scratch/` and historical docs should be reviewed for purge/archive based on active references.
 - [ ] **Vault Preflight After Sleep** — OPEN. Issue `docs/bugs/2026-04-23-acg-up-vault-state-preflight-gap-after-mac-sleep.md`; `acg-up` should classify local Vault state after Mac sleep / clamshell resume before seeding.
 - [ ] **Vault Resilience Gap** — BLOCKED. `docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md` now tracks the remaining gap accurately: cached unseal replacement and some automatic recovery already exist, but local Vault can still land in drifted states that are not fully reconciled before seeding.
-- [ ] **GCP Login Linux Headless OAuth** — SPEC READY. Spec `docs/bugs/2026-04-23-gcp-login-linux-headless-oauth-url-capture.md`; assigned to Gemini 2026-04-23. Capture gcloud OAuth URL on Linux; navigate directly in Chrome CDP.
+- [x] **GCP Login Linux Headless OAuth** — COMPLETE (`927cb452`). Spec `docs/bugs/2026-04-23-gcp-login-linux-headless-oauth-url-capture.md`; `gcp.sh` captures OAuth URL from gcloud on Linux; `gcp_login.js` navigates directly via `GCP_AUTH_URL`. Live test pending.
+- [ ] **GCP Provisioning Error 1** — OPEN. Bug `docs/bugs/2026-04-23-gcp-node-readiness-timeout-bash-pitfall.md`; `(( attempts++ ))` triggers `set -e` on first iteration; fix: use `(( ++attempts ))` in `k3s-gcp.sh`.
 - [x] **Google Identity Drift** — **COMPLETE** (`6ae2a6c3`). Implemented clean-slate login pattern (logout + explicit credentials entry).
 
 **Infra / tooling (tracked here):**

@@ -133,12 +133,11 @@ function _gcp_capture_auth_url() {
   local account="$1"
   local url_file="$2"
   local url=""
-  local i
+  local _i
 
   gcloud auth login --account "${account}" >"${url_file}" 2>&1 &
-  local pid=$!
 
-  for i in $(seq 1 10); do
+  for _i in $(seq 1 10); do
     url=$(grep -oE 'https://accounts\.google\.com[^[:space:]]+' "${url_file}" 2>/dev/null | head -1 || true)
     if [[ -n "${url}" ]]; then
       break
