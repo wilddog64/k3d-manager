@@ -110,9 +110,11 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## New Bug: deploy_argocd does not source LDAP vars before namespace check (2026-04-24)
 
-**Status:** ASSIGNED TO CODEX — spec: `docs/bugs/2026-04-24-argocd-ldap-vars-not-sourced.md`
+**Status:** COMPLETE (`1c3ead28`) — spec: `docs/bugs/2026-04-24-argocd-ldap-vars-not-sourced.md`; PR: N/A
 **File:** `scripts/plugins/argocd.sh`
-**Why:** The prior namespace fix uses `LDAP_NAMESPACE`, but `argocd.sh` does not source `scripts/etc/ldap/vars.sh` in the `deploy_argocd` subprocess. `LDAP_NAMESPACE` is unset, so the dependency check falls back to `ldap` while LDAP is deployed to `identity`; `_kubectl` then exits during the dependency probe.
+**Fix:** `argocd.sh` now sources `scripts/etc/ldap/vars.sh` before dependency checks and uses `_kubectl --no-exit` for Vault/LDAP namespace probes.
+**Why:** The prior namespace fix used `LDAP_NAMESPACE`, but `argocd.sh` did not source LDAP vars in the `deploy_argocd` subprocess. `LDAP_NAMESPACE` was unset, so the dependency check fell back to `ldap` while LDAP was deployed to `identity`; `_kubectl` then exited during the dependency probe.
+**Validation:** Live `./scripts/k3d-manager deploy_argocd --confirm` passed the dependency phase, installed ArgoCD, and exited 0. Follow-up issue: `docs/issues/2026-04-24-argocd-cli-login-eof-during-bootstrap.md` for a non-blocking `argocd login` EOF emitted during bootstrap.
 
 ## New Bug: Step 3.6 deploy_argocd fails — deploy_ldap called directly with --confirm (2026-04-24)
 
