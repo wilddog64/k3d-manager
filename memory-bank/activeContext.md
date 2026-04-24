@@ -81,7 +81,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## New Bug: k3d-provider EXIT trap leak (2026-04-24)
 
-**Status:** OPEN — spec: `docs/bugs/2026-04-24-k3d-provider-exit-trap-leak.md`
+**Status:** COMPLETE (`258de0d1`) — spec: `docs/bugs/2026-04-24-k3d-provider-exit-trap-leak.md`
 **File:** `scripts/lib/providers/k3d.sh` line 100
 **Fix:** `trap '...' EXIT` → `trap '...' RETURN` in `_provider_k3d_configure_istio`
 **Why:** EXIT trap registers on the caller shell; when `deploy_cluster --provider k3d` is called inline from `bin/acg-up` (Step 3.5, `73382eb2`), the trap fires on acg-up exit with `$istio_yamlfile` out of scope → unbound variable under `set -u`.
@@ -92,6 +92,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 - **ACG Extraction Boundary** — OPEN (`docs/bugs/2026-04-23-acg-extraction-boundary-gemini-coupling.md`). The `acg_*` interaction surface still keeps Gemini/browser automation coupled to `k3d-manager`; that subsystem should move out as one extraction unit.
 - **Teardown State Drift** — COMPLETE (`docs/bugs/2026-04-23-acg-down-full-teardown-spec.md`). Implemented in `3fd6f4d6`; `acg-down` now tears down the local Hub by default and supports `--keep-hub` as the explicit opt-out.
 - **acg-sync-apps + acg-status dual-cluster** — COMPLETE (`docs/bugs/2026-04-23-acg-sync-apps-and-acg-status-dual-cluster.md`). Implemented in `a5422141`; `acg-sync-apps` now polls port-forward readiness and uses configurable `ARGOCD_APP`, and `acg-status` now shows Hub cluster nodes + pods before tunnel status.
+- **k3d-provider EXIT trap leak** — COMPLETE (`258de0d1`). `_provider_k3d_configure_istio` now uses a `RETURN` trap for temp file cleanup, preventing the trap from leaking into long-running caller shells like `bin/acg-up`.
 - **Vault Preflight After Sleep** — COMPLETE (`e577579e`). `acg-up` now verifies the local Hub cluster before Vault PF startup and fails early if Vault is sealed or unreachable after OrbStack restart / Mac sleep.
 - **acg-up Hub cluster auto-create** — COMPLETE (`73382eb2`). `acg-up` now recreates the local Hub cluster during Step 3.5 when it was legitimately removed by `make down`, while keeping the unreachable-cluster check as the real OrbStack guard.
 - **acg-down expired credentials abort** — COMPLETE (`07ca18a6`). `acg-down` now silently pre-checks AWS credentials, skips CloudFormation teardown with a clean INFO when the sandbox already expired, and still completes local Vault PF + Hub cleanup.
