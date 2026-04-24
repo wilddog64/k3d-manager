@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # bin/acg-down
 #
-# Tear down the ACG cluster — stop tunnel, delete CloudFormation stack.
+# Tear down the ACG cluster — stop tunnel (AWS), delete remote cluster, stop Vault PF.
 # Requires --confirm to prevent accidental teardown.
 #
 # Usage:
-#   bin/acg-down --confirm
+#   bin/acg-down --confirm [--keep-hub]
 #
 # Environment:
-#   ACG_REGION   AWS region (default: us-west-2)
+#   CLUSTER_PROVIDER   k3s-aws (default) or k3s-gcp
+#   ACG_REGION         AWS region (default: us-west-2)
+#   GCP_PROJECT        GCP project ID (required when CLUSTER_PROVIDER=k3s-gcp)
 
 set -euo pipefail
 
@@ -16,12 +18,10 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="${REPO_ROOT}/scripts"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
-source "${REPO_ROOT}/scripts/plugins/aws.sh"
-source "${REPO_ROOT}/scripts/plugins/acg.sh"
-source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
 
 : "${SCRIPT_DIR}"
 
+_cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
 _confirm=0
 _keep_hub=0
 for _arg in "$@"; do
@@ -34,13 +34,30 @@ done
 if [[ "${_confirm}" -eq 0 ]]; then
   echo "Usage: bin/acg-down --confirm [--keep-hub]"
   echo ""
-  echo "  --confirm    Required. Tears down CloudFormation stack and local Hub cluster."
+  echo "  --confirm    Required. Tears down remote cluster and local Hub cluster."
   echo "  --keep-hub   Optional. Skip local Hub (k3d-cluster) teardown."
   exit 1
 fi
 
-_info "[acg-down] Stopping tunnel..."
-tunnel_stop 2>/dev/null || true
+case "${_cluster_provider}" in
+  k3s-aws)
+    source "${REPO_ROOT}/scripts/plugins/aws.sh"
+    source "${REPO_ROOT}/scripts/plugins/acg.sh"
+    source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
+    _info "[acg-down] Stopping tunnel..."
+    tunnel_stop 2>/dev/null || true
+    _info "[acg-down] Tearing down CloudFormation stack (AWS)..."
+    acg_teardown --confirm
+    ;;
+  k3s-gcp)
+    source "${REPO_ROOT}/scripts/lib/providers/k3s-gcp.sh"
+    _info "[acg-down] Tearing down GCP cluster..."
+    destroy_cluster --confirm
+    ;;
+  *)
+    _info "[acg-down] Unknown CLUSTER_PROVIDER '${_cluster_provider}' — skipping remote teardown"
+    ;;
+esac
 
 _info "[acg-down] Stopping Vault port-forward..."
 _vault_pf_pid_file="${HOME}/.local/share/k3d-manager/vault-pf.pid"
@@ -49,9 +66,6 @@ if [[ -f "${_vault_pf_pid_file}" ]]; then
   rm -f "${_vault_pf_pid_file}"
   _info "[acg-down] Vault port-forward stopped"
 fi
-
-_info "[acg-down] Tearing down CloudFormation stack..."
-acg_teardown --confirm
 
 if [[ "${_keep_hub}" -eq 0 ]]; then
   _HUB_CLUSTER="${HUB_CLUSTER_NAME:-k3d-cluster}"
@@ -66,4 +80,4 @@ else
   _info "[acg-down] --keep-hub set — local Hub cluster preserved"
 fi
 
-_info "[acg-down] Done. Remote sandbox and local Hub deleted."
+_info "[acg-down] Done. Remote cluster and local Hub deleted."
