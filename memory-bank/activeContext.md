@@ -56,7 +56,7 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 | acg-sync-apps port-forward reuse | `docs/bugs/2026-04-24-acg-sync-apps-port-forward-reuse.md` | COMPLETE (`f18c8ec7`) |
 | acg-sync-apps state dir not writable | `docs/bugs/2026-04-24-acg-sync-apps-state-dir-not-writable.md` | COMPLETE (`890ba2a6`) |
 | acg-sync-apps live port-forward connect failure | `docs/issues/2026-04-24-acg-sync-apps-live-port-forward-connect-operation-not-permitted.md` | OPEN |
-| acg-sync-apps error log preserved in scratch | `docs/bugs/2026-04-24-acg-sync-apps-error-log-preserved-in-scratch.md` | COMPLETE (`890ba2a6`) |
+| acg-sync-apps error log preserved in scratch | `docs/bugs/2026-04-24-acg-sync-apps-error-log-preserved-in-scratch.md` | COMPLETE (`2e766a43`) |
 | acg-extend isPanelOpen false positive | `docs/bugs/2026-04-24-acg-extend-ispanelopen-false-positive.md` | COMPLETE (`79b87e36`) |
 | Vault preflight after sleep | `docs/bugs/2026-04-23-acg-up-vault-state-preflight-gap-after-mac-sleep.md` | COMPLETE (`e577579e`) |
 | acg-down provider dispatch + GCP teardown | `docs/bugs/2026-04-24-acg-down-provider-dispatch-gcp-teardown.md` | COMPLETE (`706e0ba2`) |

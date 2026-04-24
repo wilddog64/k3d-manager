@@ -1,7 +1,7 @@
 # Bug: `bin/acg-sync-apps` deletes the failure log and keeps it out of `./scratch/`
 
 **Date:** 2026-04-24
-**Status:** COMPLETE (`890ba2a6`)
+**Status:** COMPLETE (`2e766a43`)
 **Branch:** `k3d-manager-v1.1.0`
 
 ## Problem
