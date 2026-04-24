@@ -106,7 +106,7 @@ function _gcp_wait_for_ssh() {
   local attempts=0
   until ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=5 "${ssh_user}@${external_ip}" true 2>/dev/null; do
-    (( attempts++ ))
+    (( ++attempts ))
     if (( attempts >= 24 )); then
       printf 'ERROR: %s\n' "[k3s-gcp] SSH not ready after 120s" >&2
       return 1
@@ -208,7 +208,7 @@ HELP
   _info "[k3s-gcp] Waiting for node to be Ready..."
   local attempts=0
   until KUBECONFIG="${_GCP_KUBECONFIG}" kubectl get nodes 2>/dev/null | grep -q " Ready"; do
-    (( attempts++ ))
+    (( ++attempts ))
     if (( attempts >= 60 )); then
       printf 'ERROR: %s\n' "[k3s-gcp] Node did not become Ready after 300s" >&2
       return 1
