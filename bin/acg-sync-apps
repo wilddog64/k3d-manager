@@ -24,28 +24,42 @@ ARGOCD_NS="${ARGOCD_NS:-cicd}"
 ARGOCD_APP="${ARGOCD_APP:-data-layer}"
 
 _pf_pid=""
+_pf_log="$(mktemp -t acg-sync-apps-argocd-pf.XXXXXX.log 2>/dev/null || printf '%s\n' "${TMPDIR:-/tmp}/acg-sync-apps-argocd-pf.log")"
 
 _cleanup() {
   if [[ -n "${_pf_pid}" ]]; then
     kill "${_pf_pid}" 2>/dev/null || true
+  fi
+  if [[ -n "${_pf_log}" ]]; then
+    rm -f "${_pf_log}" 2>/dev/null || true
   fi
 }
 trap _cleanup EXIT
 
 _info "[sync-apps] Starting argocd-server port-forward..."
 kubectl port-forward svc/argocd-server -n "${ARGOCD_NS}" 8080:443 \
-  --context "${INFRA_CONTEXT}" >/dev/null 2>&1 &
+  --context "${INFRA_CONTEXT}" >"${_pf_log}" 2>&1 &
 _pf_pid=$!
 _pf_ready=0
+_pf_failed=0
 for _i in $(seq 1 15); do
   if curl -sk --max-time 1 https://localhost:8080/ >/dev/null 2>&1; then
     _pf_ready=1
     break
   fi
+  if ! kill -0 "${_pf_pid}" 2>/dev/null; then
+    _pf_failed=1
+    break
+  fi
   sleep 1
 done
 if [[ "${_pf_ready}" -eq 0 ]]; then
-  _info "[sync-apps] ERROR: argocd-server port-forward not ready after 15s — aborting"
+  if [[ "${_pf_failed}" -eq 1 ]]; then
+    _info "[sync-apps] ERROR: argocd-server port-forward exited early — see ${_pf_log}"
+  else
+    _info "[sync-apps] ERROR: argocd-server port-forward not ready after 15s — see ${_pf_log}"
+  fi
+  tail -n 20 "${_pf_log}" 2>/dev/null || true
   exit 1
 fi
 
