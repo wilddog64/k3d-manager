@@ -25,7 +25,7 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 - [x] **lib-foundation v0.3.17** — COMPLETE (PR #23 merged). `_agent_lint` glob expanded to `*.sh *.js *.md`.
 - [ ] **GCP cluster provisioning** — **PARTIAL**. CLUSTER_NAME default fix committed in `3a3806aa`; live smoke test is still blocked by Chrome CDP startup (`docs/issues/2026-04-21-cluster-name-smoke-test-blocked-by-cdp.md`).
 - [ ] **E2E verify** — **BLOCKED**. Needs a clean `make up` run past Chrome CDP startup.
-- [ ] **CDP Linux headless + profile unification** — **ASSIGNED TO CODEX**. Spec: `docs/bugs/2026-04-21-cdp-linux-headless-launch-failure.md`. Add headless flags to Linux launch; rename `playwright-auth` → `profile` in 5 files.
+- [x] **CDP Linux headless + profile unification** — **COMPLETE** (`1ab14ebf`). Implemented `docs/bugs/2026-04-21-cdp-linux-headless-launch-failure.md`; D1/D2/D3 passed locally and D4 live sandbox validation remains pending user execution.
 - [ ] **ACG repo extraction** — **PLANNED** (`8639592c`). Plan: `docs/plans/v1.1.0-acg-extraction-repo-split.md`. Extract browser/CDP/Playwright automation into its own repo to stop polluting `k3d-manager` stability.
 
 ---

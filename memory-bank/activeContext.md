@@ -32,9 +32,11 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 
 ## Latest Task: CDP Linux headless launch + profile path unification
 
-**Status:** ASSIGNED TO CODEX — spec: `docs/bugs/2026-04-21-cdp-linux-headless-launch-failure.md`
+**Status:** COMPLETE — spec: `docs/bugs/2026-04-21-cdp-linux-headless-launch-failure.md`
 **Files:** `antigravity.sh`, `vars.sh`, `acg_credentials.js`, `acg_extend.js`, `gcp.bats`
 **Fix:** Add `--headless=new --no-sandbox --disable-dev-shm-usage` to Linux Chrome launch; rename profile dir from `playwright-auth` → `profile` across all five files
+**Commit:** `1ab14ebf`
+**Validation:** D1/D2/D3 completed locally; D4 live `make up` on ACG sandbox remains pending user validation.
 
 ## Latest Task: ACG repo extraction plan
 
