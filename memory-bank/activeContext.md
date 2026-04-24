@@ -153,6 +153,13 @@ live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
 **Fix:** Add `--confirm` to both dispatcher calls: `deploy_vault --confirm` and `deploy_argocd --confirm`.
 **Why:** `scripts/k3d-manager` dispatcher requires `--confirm` or explicit options; `--confirm` is consumed/stripped by dispatcher so vault.sh never sees it.
 
+## New Bug: acg-sync-apps readiness check uses https:// but ArgoCD serves HTTP (2026-04-24)
+
+**Status:** OPEN — spec: `docs/bugs/2026-04-24-acg-sync-apps-https-vs-http-readiness-check.md`
+**File:** `bin/acg-sync-apps` lines 105 and 151
+**Fix:** Change `curl -sk --max-time 1 https://localhost:<port>/` → `curl -sf --max-time 1 http://localhost:<port>/healthz` in both the reconcile check and the startup readiness loop.
+**Why:** `deploy_argocd` installs ArgoCD with `server.insecure=true` → plain HTTP on container port 8080. The `https://` curl sends a TLS ClientHello to an HTTP endpoint; the handshake fails, the connection drops. Port-forward logs "Handling connection for 8080" but curl returns non-zero every iteration; after 15s the script exits 1. `argocd.sh` line 68 already uses the correct form: `curl -sf http://localhost:8080/healthz`.
+
 ## Open Items
 - **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Local Hub orchestration is fragmented: `acg-up` assumes ArgoCD infrastructure, bootstrap remains separate, and local ArgoCD access still requires manual port-forward setup.
 - **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up` does not clearly summarize local Hub vs remote app-cluster readiness and does not guide optional local runtime startup.
