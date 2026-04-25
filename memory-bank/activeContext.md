@@ -1,6 +1,11 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v1.1.0` (as of 2026-04-20)
+## Current Branch: `k3d-manager-v1.2.0` (as of 2026-04-25)
+
+**v1.1.0 SHIPPED** — PR #65 merged to main (`e013d23b`), tagged `v1.1.0`, released 2026-04-25.
+Branch protection (`enforce_admins`) restored. Retro: `docs/retro/2026-04-25-v1.1.0-retrospective.md`.
+
+## Current Branch: `k3d-manager-v1.1.0` (SHIPPED — archived below)
 
 Renamed from `recovery-v1.1.0-aws-first` (2026-04-20). Old `k3d-manager-v1.1.0` (the messy branch)
 preserved as `k3d-manager-v1.1.0-backup` on remote.

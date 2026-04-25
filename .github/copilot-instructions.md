@@ -13,13 +13,14 @@ Use the rules below to shape all code suggestions and PR reviews.
 - **Privilege escalation**: always via `_run_command --prefer-sudo` or `--require-sudo` — never bare `sudo`.
 - **OS detection**: always via `_detect_platform` — never inline `_is_mac`/`_is_debian_family` dispatch chains.
 - **Secret backends**: interface in `scripts/lib/secret_backends/` — Vault is complete, others stubbed.
-- **Cluster providers**: `scripts/lib/providers/` — `k3d`, `orbstack`, `k3s-aws`.
-- **ACG plugin**: `scripts/plugins/acg.sh` — `acg_get_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_watch`, `acg_teardown`. Manages Pluralsight ACG sandbox lifecycle via CloudFormation + k3sup.
-- **Playwright**: `scripts/playwright/acg_credentials.js` — static Node.js script; primarily uses Playwright `launchPersistentContext` to drive Chrome and extract AWS credentials from the Pluralsight sandbox UI; CDP (`localhost:9222`) is used only as a browser reuse probe.
-- **Browser automation**: `scripts/plugins/antigravity.sh` — `_browser_launch`. `_browser_launch` calls `_antigravity_browser_ready` (defined in `scripts/lib/system.sh` via lib-foundation subtree) internally. Launches Chrome with `--remote-debugging-port=9222 --password-store=basic`.
+- **Cluster providers**: `scripts/lib/providers/` — `k3d`, `orbstack`, `k3s-aws`, `k3s-gcp`.
+- **ACG plugin**: `scripts/plugins/acg.sh` — `acg_get_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_watch`, `acg_teardown`. Manages Pluralsight ACG sandbox lifecycle via CloudFormation + k3sup (AWS) or GCP.
+- **GCP plugin**: `scripts/plugins/gcp.sh` — `gcp_login`, `gcp_get_credentials`. OAuth automation via CDP; GCE cluster provisioning via k3sup.
+- **Playwright**: `scripts/playwright/` — static Node.js scripts: `acg_credentials.js` (AWS/GCP credential extraction), `acg_extend.js` (sandbox TTL extend), `gcp_login.js` (Google OAuth flow automation). All connect to Chrome via CDP (`localhost:9222`).
+- **Browser automation**: `scripts/plugins/antigravity.sh` — `_browser_launch`. Launches Chrome with `--remote-debugging-port=9222 --password-store=basic`. On Linux, `--no-sandbox` is added only when running as root (`$EUID -eq 0`) or `ANTIGRAVITY_CHROME_NO_SANDBOX=1`.
 - **Tunnel**: `scripts/plugins/tunnel.sh` — `tunnel_start`, `tunnel_stop`, `tunnel_status`. autossh + launchd; forward tunnel (k3s API :6443) + reverse tunnel (Vault :8200).
 - **AWS helpers**: `scripts/plugins/aws.sh` — `aws_import_credentials`. `scripts/plugins/shopping_cart.sh` — `deploy_app_cluster`, `_ensure_k3sup`, `_k3sup_join_agent`.
-- **Convenience scripts**: `bin/acg-up`, `bin/acg-down`, `bin/acg-refresh`, `bin/acg-status`, `bin/rotate-ghcr-pat` — orchestrate plugin calls for common one-shot operations.
+- **Convenience scripts**: `bin/acg-up`, `bin/acg-down`, `bin/acg-refresh`, `bin/acg-status`, `bin/acg-sync-apps`, `bin/rotate-ghcr-pat` — orchestrate plugin calls for common one-shot operations.
 
 ---
 

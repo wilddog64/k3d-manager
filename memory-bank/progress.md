@@ -6,16 +6,23 @@ The authoritative release record lives in `docs/releases.md`, `CHANGE.md`, and `
 
 **Most recent shipped:**
 
+- v1.1.0 — Unified ACG automation AWS + GCP (PR #65, `e013d23b`, 2026-04-25)
 - v1.0.6 — AWS SSM support for `k3s-aws` (PR #64, `a54e152f`, 2026-04-11)
 - v1.0.5 — antigravity decoupling + LDAP Vault KV seeding + Copilot fix-up (PR #62/#63, `71c88b05`, 2026-04-11)
 - v1.0.4 — acg-up random passwords, acg_extend hardening (PR #61, `bc9028fb`, 2026-04-10)
-- v1.0.3 — `bin/` SCRIPT_DIR, Vault KV seeding, ArgoCD registration fixes (PR #60, `91552139`, 2026-04-05)
 
-Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --tags` and `docs/retro/`.
+Pre-v1.0.4 detail removed from this file; see `git log --tags` and `docs/retro/`.
 
 ---
 
-## v1.1.0 Track (branch: `k3d-manager-v1.1.0`)
+## v1.2.0 Track (branch: `k3d-manager-v1.2.0`)
+
+- [ ] **ACG repo extraction** — PLANNED. Plan: `docs/plans/v1.1.0-acg-extraction-repo-split.md`. Extract browser/CDP/Playwright automation into its own repo.
+- [ ] **GCP E2E smoke test** — BLOCKED. GCP cluster provisioning is PARTIAL; full `make up` end-to-end on a live GCP sandbox not yet verified.
+
+---
+
+## v1.1.0 Track (branch: `k3d-manager-v1.1.0` — SHIPPED)
 
 - **Baseline** — branched off `main` (`279db18c`); AWS path verified 2026-04-19.
 - [x] **Shared playwright vars** — COMPLETE (`3de58f4d`)
