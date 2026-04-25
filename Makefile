@@ -23,7 +23,7 @@ refresh:
 
 ## Show cluster nodes, pod status, tunnel health
 status:
-	bin/acg-status
+	APP_CONTEXT=$(if $(filter k3s-gcp,$(CLUSTER_PROVIDER)),ubuntu-gcp,ubuntu-k3s) bin/acg-status
 
 ## Extract AWS credentials only (no cluster changes)
 creds:
