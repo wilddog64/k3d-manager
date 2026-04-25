@@ -17,7 +17,8 @@ Pre-v1.0.4 detail removed from this file; see `git log --tags` and `docs/retro/`
 
 ## v1.2.0 Track (branch: `k3d-manager-v1.2.0`)
 
-- [ ] **ACG repo extraction** — IN PROGRESS. Plan: `docs/plans/v1.2.0-lib-acg-extraction.md`. P1+P2+P3+P4 done (`20df717c`, `b253b9b`, `f1c577c`, `99b2e143`); residual ArgoCD help/login verification gaps are tracked in `docs/issues/2026-04-25-phase4-verification-argocd-preexisting-failures.md`.
+- [ ] **ACG repo extraction** — IN PROGRESS. Plan: `docs/plans/v1.2.0-lib-acg-extraction.md`. P1+P2+P3+P4+P4b done (`20df717c`, `b253b9b`, `f1c577c`, `99b2e143`, `c54de858`); residual ArgoCD help/login verification gaps are tracked in `docs/issues/2026-04-25-phase4-verification-argocd-preexisting-failures.md`.
+- [x] **ACG repo extraction P4b** — COMPLETE (`c54de858`). Replaced the source-only `acg.sh` and `gcp.sh` stubs with grep-compatible wrapper functions and preserved the existing test harness behavior.
 - [x] **ACG repo extraction P4** — COMPLETE (`99b2e143`). Wired `scripts/lib/acg/` subtree into k3d-manager, replaced `acg.sh` and `gcp.sh` with stubs, and moved CDP helper sourcing into `gemini.sh`.
 - [x] **ACG repo extraction P3** — COMPLETE (`f1c577c`). Migrated `acg.sh`, `gcp.sh`, `vars.sh`, `acg-cluster.yaml`, and the Playwright scripts into `wilddog64/lib-acg` and pushed `feat/phase3-migration`.
 - [x] **ACG repo extraction P1** — COMPLETE (`20df717c`). Renamed `antigravity.sh` → `gemini.sh`; all `antigravity_*` → `gemini_*`.
