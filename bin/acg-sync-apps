@@ -23,6 +23,11 @@ APP_CONTEXT="${APP_CONTEXT:-ubuntu-k3s}"
 ARGOCD_NS="${ARGOCD_NS:-cicd}"
 ARGOCD_APP="${ARGOCD_APP:-rollout-demo-default}"
 
+if ! kubectl config get-contexts "${INFRA_CONTEXT}" >/dev/null 2>&1; then
+  _info "[sync-apps] ERROR: Hub cluster context '${INFRA_CONTEXT}' not found — run 'make up' first"
+  exit 1
+fi
+
 SYNC_APPS_STATE_DIR="${SYNC_APPS_STATE_DIR:-${REPO_ROOT}/scratch/.state/acg-sync-apps}"
 SYNC_APPS_LOG_DIR="${SYNC_APPS_LOG_DIR:-${REPO_ROOT}/scratch/logs}"
 SYNC_APPS_PF_STATE_FILE="${SYNC_APPS_STATE_DIR}/acg-sync-apps-argocd-pf.env"
