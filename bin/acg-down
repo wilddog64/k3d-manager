@@ -56,7 +56,7 @@ case "${_cluster_provider}" in
   k3s-gcp)
     source "${REPO_ROOT}/scripts/lib/providers/k3s-gcp.sh"
     _info "[acg-down] Tearing down GCP cluster..."
-    destroy_cluster --confirm
+    _provider_k3s_gcp_destroy_cluster --confirm
     ;;
   *)
     _info "[acg-down] Unknown CLUSTER_PROVIDER '${_cluster_provider}' — skipping remote teardown"
