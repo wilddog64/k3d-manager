@@ -56,6 +56,11 @@ function _gcp_ensure_firewall() {
 
 function _gcp_create_instance() {
   local project="$1" zone="$2" ssh_user="$3" ssh_key_pub="$4"
+  if gcloud compute instances describe "${_GCP_INSTANCE_NAME}" \
+      --project="${project}" --zone="${zone}" --quiet >/dev/null 2>&1; then
+    _info "[k3s-gcp] Instance ${_GCP_INSTANCE_NAME} already exists — skipping"
+    return 0
+  fi
   _info "[k3s-gcp] Creating instance ${_GCP_INSTANCE_NAME} in ${zone}..."
   gcloud compute instances create "${_GCP_INSTANCE_NAME}" \
     --project="${project}" \
