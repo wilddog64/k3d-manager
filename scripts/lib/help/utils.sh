@@ -79,6 +79,7 @@ function __discover_tests() {
 
 function _usage() {
     local verbose="${1:-0}"
+    local filter="${2:-}"
 
     local -a all_fns=()
     while IFS= read -r fn; do
@@ -124,7 +125,38 @@ function _usage() {
 
     printf 'Usage: ./scripts/k3d-manager <function> [args]\n\n'
 
-    if [[ "$verbose" == "1" ]]; then
+    if [[ -n "$filter" ]]; then
+      local filter_lower i label pats
+      filter_lower="${filter,,}"
+      local matched=0
+      for (( i=0; i<${#categories[@]}; i+=2 )); do
+        label="${categories[$i]}"
+        pats="${categories[$i+1]}"
+        local _label_lower="${label,,}"
+        local _word_match=0
+        for _word in ${_label_lower}; do
+          [[ "$_word" == "${filter_lower}"* ]] && { _word_match=1; break; }
+        done
+        if [[ "$_word_match" -eq 1 ]]; then
+          local -a matches=()
+          while IFS= read -r fn; do
+            [[ -n "$fn" ]] && matches+=("$fn")
+          done < <(__usage_match_category "$pats")
+          if [[ ${#matches[@]} -gt 0 ]]; then
+            printf '%s:\n' "$label"
+            printf '  %s\n' "${matches[@]}"
+            matched=1
+          fi
+        fi
+      done
+      if [[ "$matched" -eq 0 ]]; then
+        printf 'No category matching "%s".\n' "$filter"
+        printf 'Available categories:\n'
+        for (( i=0; i<${#categories[@]}; i+=2 )); do
+          printf '  %s\n' "${categories[$i]}"
+        done
+      fi
+    elif [[ "$verbose" == "1" ]]; then
       printf 'Available functions:\n'
       local i label pats
       for (( i=0; i<${#categories[@]}; i+=2 )); do
@@ -170,6 +202,7 @@ EOF
         fi
       done
       printf '\nRun ./scripts/k3d-manager --help for full function list.\n'
+      printf 'Run ./scripts/k3d-manager help <category> to list functions in a category.\n'
     fi
 }
 
