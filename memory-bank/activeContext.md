@@ -15,7 +15,7 @@ All v1.1.0 bug detail archived in `docs/bugs/` and `git log`.
 ## v1.2.0 Open Items
 
 - **ACG repo extraction** — PLANNED (`docs/plans/v1.2.0-lib-acg-extraction.md`). Extract browser/CDP/Playwright into `lib-acg` repo; rename `antigravity.sh` → `gemini.sh`. 4-phase plan: P1 rename, P2 repo skeleton, P3 migrate files, P4 wire subtree.
-- **ACG repo extraction phase 1** — COMPLETE (`b83d5596`). Spec `docs/plans/v1.2.0-phase1-gemini-rename.md`; renamed `scripts/plugins/antigravity.sh` → `scripts/plugins/gemini.sh`, `docs/howto/antigravity.md` → `docs/howto/gemini.md`, and updated the public Gemini entry points plus checked-path references.
+- **ACG repo extraction phase 1** — COMPLETE (`20df717c`). Spec `docs/plans/v1.2.0-phase1-gemini-rename.md`; renamed `scripts/plugins/antigravity.sh` → `scripts/plugins/gemini.sh`, `docs/howto/antigravity.md` → `docs/howto/gemini.md`, and updated the public Gemini entry points plus checked-path references.
 - **GCP E2E smoke test** — BLOCKED. `k3s-gcp` provisioning logic is in place; full `make up` end-to-end on a live GCP sandbox has not been verified. Blocked by CDP startup on Linux.
 - **Whitespace enforcement** — OPEN. `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh` files.
 - **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Hub orchestration does not explicitly sequence ArgoCD install + bootstrap + app-cluster registration.
