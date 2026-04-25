@@ -1,5 +1,29 @@
 # Changes - k3d-manager
 
+## [v1.1.0] — 2026-04-24 — Unified ACG automation AWS + GCP
+
+### Added
+- GCP provider (`k3s-gcp`): GCP identity bridge, Playwright CDP OAuth automation, GCP cluster provisioning — firewall, GCE instance, k3sup install, kubeconfig merge (`9686e5c3`, `916d71fc`, `927cb452`)
+- `bin/acg-sync-apps`: ArgoCD port-forward reuse with state persistence, managed PF metadata, foreign listener replacement, failure log retention in `scratch/logs/` (`f18c8ec7`, `890ba2a6`, `2e766a43`)
+
+### Changed
+- `bin/acg-down`: tears down local Hub cluster by default; `--keep-hub` to opt out (`3fd6f4d6`)
+- `bin/acg-up` Step 3.5: auto-creates Hub cluster when missing instead of aborting (`73382eb2`)
+- `bin/acg-up` Step 3.6: bootstraps Vault + LDAP + ArgoCD on fresh Hub create with `--confirm` safety gate (`c59f2c3a`, `8b43122f`, `c650f032`)
+
+### Fixed
+- `bin/acg-sync-apps`: `ARGOCD_APP` default changed from `data-layer` to `rollout-demo-default` — only app always present after bootstrap (`b83d5596`)
+- `bin/acg-sync-apps`: readiness checks use `http://healthz` matching ArgoCD `server.insecure=true` mode (`0896d9ec`)
+- `bin/acg-sync-apps`: non-interactive ArgoCD login (`--plaintext --skip-test-tls --grpc-web </dev/null`) (`c3a2f146`)
+- `bin/acg-down`: provider-aware teardown dispatch — GCP calls `destroy_cluster --confirm`; expired AWS credentials path is silent (`706e0ba2`, `ae2fca66`, `07ca18a6`)
+- `bin/acg-up`: Vault preflight checks Hub reachability and Vault seal state after OrbStack restart (`e577579e`)
+- `scripts/plugins/argocd.sh`: LDAP vars sourced before dependency checks; `LDAP_NAMESPACE` var replaces hardcoded `ldap`; `_kubectl --no-exit` for soft namespace probes; non-interactive CLI login (`1c3ead28`, `032bfadb`, `fdbef8c4`)
+- `scripts/plugins/eso.sh`: wait for webhook endpoint + all three deployments before returning — prevents race with ESO-dependent resources (`e7b06b2b`)
+- `scripts/etc/antigravity/acg_credentials.js`: polite tab selection; disabled Start Sandbox `isEnabled()` guard (`131dca33`, `13d398ab`)
+- `scripts/lib/cluster_provider.sh` (k3d): RETURN trap self-clears to prevent re-fire in parent scope; `configure_istio` EXIT trap scoped to RETURN (`e6a9ec91`, `258de0d1`)
+- `scripts/etc/antigravity/gcp_login.js`: capture OAuth URL on Linux headless; clean-slate login pattern (`927cb452`, `6ae2a6c3`)
+- `bin/acg-sync-apps`: pre-built port-forward rejects pre-existing port 8080 listener before starting (`3a1e2554`)
+
 ## [v1.0.6] — 2026-04-11 — AWS SSM support for k3s-aws provider
 
 ### Added
