@@ -208,6 +208,6 @@ EOF
 # gcp_login.js parse check
 
 @test "gcp_login.js passes node --check" {
-  run node --check scripts/playwright/gcp_login.js
+  run "$(command -v node)" --check scripts/playwright/gcp_login.js
   [ "$status" -eq 0 ]
 }

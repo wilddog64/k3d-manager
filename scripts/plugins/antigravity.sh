@@ -81,9 +81,13 @@ function _browser_launch() {
     if [[ -z "${_chrome_bin}" ]]; then
       _err "[antigravity] Chrome/Chromium not found — install google-chrome, google-chrome-stable, chromium-browser, or chromium"
     fi
+    local _extra_flags=()
+    if [[ $EUID -eq 0 || "${ANTIGRAVITY_CHROME_NO_SANDBOX:-0}" == "1" ]]; then
+      _extra_flags+=(--no-sandbox)
+    fi
     "${_chrome_bin}" \
       --headless=new \
-      --no-sandbox \
+      "${_extra_flags[@]}" \
       --disable-dev-shm-usage \
       --remote-debugging-port=9222 \
       --password-store=basic \

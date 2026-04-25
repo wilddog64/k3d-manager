@@ -22,7 +22,7 @@ This verifies and installs (if missing):
 
 ### First-Run Login
 
-On first use, Google Chrome will open and navigate to the target site's login page. **Log in manually** — the session cookie is saved in `~/.local/share/k3d-manager/playwright-auth` and reused on all subsequent runs until it expires.
+On first use, Google Chrome will open and navigate to the target site's login page. **Log in manually** — the session cookie is saved in `~/.local/share/k3d-manager/profile` and reused on all subsequent runs until it expires.
 
 - **ACG login:** triggered by `antigravity_acg_extend`
 - **GitHub login:** triggered by `antigravity_trigger_copilot_review`
@@ -84,8 +84,8 @@ gemini generates a Playwright Node.js script, writes it to `${HOME}/.gemini/tmp/
 curl -sf http://127.0.0.1:9222/json | jq '.[0].title'
 
 # Manually launch Chrome with CDP
-open -a "Google Chrome" --args --remote-debugging-port=9222 --password-store=basic --user-data-dir=~/.local/share/k3d-manager/playwright-auth   # macOS
-google-chrome --remote-debugging-port=9222 --password-store=basic --user-data-dir=~/.local/share/k3d-manager/playwright-auth &                  # Linux
+open -a "Google Chrome" --args --remote-debugging-port=9222 --password-store=basic --user-data-dir=~/.local/share/k3d-manager/profile   # macOS
+google-chrome --remote-debugging-port=9222 --password-store=basic --user-data-dir=~/.local/share/k3d-manager/profile &                  # Linux
 ```
 
 # Check gemini CLI

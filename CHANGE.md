@@ -19,9 +19,9 @@
 - `bin/acg-up`: Vault preflight checks Hub reachability and Vault seal state after OrbStack restart (`e577579e`)
 - `scripts/plugins/argocd.sh`: LDAP vars sourced before dependency checks; `LDAP_NAMESPACE` var replaces hardcoded `ldap`; `_kubectl --no-exit` for soft namespace probes; non-interactive CLI login (`1c3ead28`, `032bfadb`, `fdbef8c4`)
 - `scripts/plugins/eso.sh`: wait for webhook endpoint + all three deployments before returning — prevents race with ESO-dependent resources (`e7b06b2b`)
-- `scripts/etc/antigravity/acg_credentials.js`: polite tab selection; disabled Start Sandbox `isEnabled()` guard (`131dca33`, `13d398ab`)
+- `scripts/playwright/acg_credentials.js`: polite tab selection; disabled Start Sandbox `isEnabled()` guard (`131dca33`, `13d398ab`)
 - `scripts/lib/cluster_provider.sh` (k3d): RETURN trap self-clears to prevent re-fire in parent scope; `configure_istio` EXIT trap scoped to RETURN (`e6a9ec91`, `258de0d1`)
-- `scripts/etc/antigravity/gcp_login.js`: capture OAuth URL on Linux headless; clean-slate login pattern (`927cb452`, `6ae2a6c3`)
+- `scripts/playwright/gcp_login.js`: capture OAuth URL on Linux headless; clean-slate login pattern (`927cb452`, `6ae2a6c3`)
 - `bin/acg-sync-apps`: pre-built port-forward rejects pre-existing port 8080 listener before starting (`3a1e2554`)
 
 ## [v1.0.6] — 2026-04-11 — AWS SSM support for k3s-aws provider

@@ -64,14 +64,18 @@ function _argocd_ensure_logged_in() {
    local pass
    pass=$(kubectl get secret argocd-initial-admin-secret -n "$ARGOCD_NAMESPACE" -o jsonpath='{.data.password}' | base64 -d)
    
-   # Ensure port-forward is active
+   local _pf_pid=""
    if ! curl -sf http://localhost:8080/healthz >/dev/null 2>&1; then
       _info "[argocd] Starting background port-forward for login..."
       kubectl port-forward svc/argocd-server -n "$ARGOCD_NAMESPACE" 8080:443 >/dev/null 2>&1 &
+      _pf_pid=$!
+      # shellcheck disable=SC2064
+      trap "[[ -n '${_pf_pid}' ]] && kill '${_pf_pid}' 2>/dev/null || true" RETURN
       sleep 3
    fi
 
-   argocd login localhost:8080 --username admin --password "$pass" --plaintext --skip-test-tls --insecure --grpc-web </dev/null >/dev/null
+   printf '%s' "$pass" | argocd login localhost:8080 --username admin --stdin \
+      --plaintext --skip-test-tls --insecure --grpc-web >/dev/null
 }
 
 function deploy_argocd() {
@@ -89,11 +93,11 @@ function deploy_argocd() {
    _info "[argocd] Verifying infrastructure foundations..."
    if ! _kubectl --no-exit get ns secrets >/dev/null 2>&1; then
       _info "[argocd] Vault foundation missing — triggering deploy_vault..."
-      deploy_vault --confirm
+      deploy_vault
    fi
    if ! _kubectl --no-exit get ns "${LDAP_NAMESPACE:-ldap}" >/dev/null 2>&1; then
       _info "[argocd] LDAP foundation missing — triggering deploy_ldap..."
-      deploy_ldap --confirm
+      deploy_ldap
    fi
 
    local enable_ldap=1  # Default to smart enabled
