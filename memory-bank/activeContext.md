@@ -14,8 +14,9 @@ All v1.1.0 bug detail archived in `docs/bugs/` and `git log`.
 
 ## v1.2.0 Open Items
 
-- **ACG repo extraction** — IN PROGRESS (`docs/plans/v1.2.0-lib-acg-extraction.md`). P1 COMPLETE, P2 COMPLETE, P3 COMPLETE (`f1c577c`), P4 COMPLETE (`99b2e143`), P4b COMPLETE (`c54de858`). P5 ASSIGNED: lib-acg CI + pre-commit setup (`docs/plans/v1.2.0-phase5-lib-acg-ci-setup.md`).
-- **ACG repo extraction P5** — ASSIGNED. lib-acg CI (shellcheck + node --check + yamllint) + pre-commit hook + CHANGELOG. Spec: `docs/plans/v1.2.0-phase5-lib-acg-ci-setup.md`. Branch: `feat/phase5-ci-setup` in lib-acg.
+- **ACG repo extraction** — IN PROGRESS (`docs/plans/v1.2.0-lib-acg-extraction.md`). P1 COMPLETE, P2 COMPLETE, P3 COMPLETE (`f1c577c`), P4 COMPLETE (`99b2e143`), P4b COMPLETE (`c54de858`), GCP OAuth fix COMPLETE (`04493b3` lib-acg / `d25477c4` k3d-manager). P5 ASSIGNED: lib-acg CI + pre-commit setup (`docs/plans/v1.2.0-phase5-lib-acg-ci-setup.md`).
+- **ACG repo extraction P5** — ASSIGNED (Codex, resumes tomorrow). lib-acg CI (shellcheck + node --check + yamllint) + pre-commit hook + CHANGELOG. Spec: `docs/plans/v1.2.0-phase5-lib-acg-ci-setup.md`. Branch: `feat/phase5-ci-setup` in lib-acg (already exists, based on `feat/phase3-migration` + GCP fix).
+- **GCP OAuth fix** — COMPLETE (`04493b3` lib-acg, `d25477c4` k3d-manager). Fixed `_gcp_perform_login_auth` to use URL-capture path on macOS (`--no-launch-browser`) instead of waiting for CDP tab that never arrives. Spec: `docs/bugs/2026-04-25-gcp-oauth-tab-timeout-macos.md`.
 - **ACG repo extraction P4b bug** — COMPLETE (`c54de858`). Replaced source-only `acg.sh` / `gcp.sh` stubs with grep-compatible wrapper functions so the dispatcher can discover `acg_*` and `gcp_*` entry points.
 - **ACG repo extraction P4** — COMPLETE (`99b2e143`). Wired the `wilddog64/lib-acg` subtree into `scripts/lib/acg/`, replaced `scripts/plugins/acg.sh` and `scripts/plugins/gcp.sh` with stubs, and updated `scripts/plugins/gemini.sh` to source CDP helpers from the subtree.
 - **ACG repo extraction P3** — COMPLETE (`f1c577c`). Migrated acg/gcp/playwright files from k3d-manager to `wilddog64/lib-acg` and pushed `feat/phase3-migration`.
