@@ -24,7 +24,7 @@ setup() {
     eval "_ensure_${legacy_plugin_name}_ide() { :; }"
     eval "_ensure_${legacy_plugin_name}_mcp_playwright() { :; }"
     eval "_${legacy_plugin_name}_launch() { :; }"
-    eval "_${legacy_plugin_name}_ensure_acg_session() { :; }"
+    _cdp_ensure_acg_session() { :; }
     eval "_${legacy_plugin_name}_gemini_prompt() { :; }"
   }
   _ensure_gemini() { :; }
