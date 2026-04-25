@@ -50,11 +50,8 @@ kubectl get pods -A --context "${APP_CONTEXT}" 2>/dev/null \
 
 echo ""
 echo "=== ArgoCD Apps ==="
-if command -v argocd >/dev/null 2>&1; then
-  argocd app list 2>/dev/null || echo "ArgoCD CLI not logged in — run: argocd login"
-else
-  echo "argocd CLI not installed"
-fi
+kubectl get applications.argoproj.io -A --context "${INFRA_CONTEXT}" 2>/dev/null \
+  || echo "Cannot reach Hub cluster or ArgoCD CRDs not installed"
 
 if [[ "${CLUSTER_PROVIDER}" != "k3s-gcp" ]]; then
   echo ""
