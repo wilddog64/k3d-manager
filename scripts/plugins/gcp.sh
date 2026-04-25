@@ -131,7 +131,7 @@ function _gcp_capture_auth_url() {
   local url=""
   local _i
 
-  gcloud auth login --account "${account}" >"${url_file}" 2>&1 &
+  gcloud auth login --no-launch-browser --account "${account}" >"${url_file}" 2>&1 &
 
   for _i in $(seq 1 10); do
     url=$(grep -oE 'https://accounts\.google\.com[^[:space:]]+' "${url_file}" 2>/dev/null | head -1 || true)
@@ -157,34 +157,23 @@ function _gcp_perform_login_auth() {
     return $?
   fi
 
-  if [[ "$(uname)" == "Linux" ]]; then
-    local _gcloud_url_file
-    _gcloud_url_file=$(mktemp)
-    local _auth_url
-    _auth_url=$(_gcp_capture_auth_url "${account}" "${_gcloud_url_file}")
-    local gcloud_pid
-    gcloud_pid=$(pgrep -n -f "gcloud auth login --account ${account}")
-    
-    rm -f "${_gcloud_url_file}"
-    if [[ -z "${_auth_url}" ]]; then
-      _err "[gcp] Could not capture gcloud OAuth URL — manual gcloud auth login required"
-    fi
-    GCP_USERNAME="${account}" \
-    GCP_AUTH_URL="${_auth_url}" \
-    PLAYWRIGHT_CDP_HOST="${PLAYWRIGHT_CDP_HOST}" \
-    PLAYWRIGHT_CDP_PORT="${PLAYWRIGHT_CDP_PORT}" \
-    node "${playwright_dir}/gcp_login.js" "${account}"
-    if [[ -n "$gcloud_pid" ]]; then
-      wait "${gcloud_pid}"
-    fi
-  else
-    # macOS: gcloud opens the OAuth tab in this Chrome session — Playwright waits for it
-    gcloud auth login --account "${account}" &
-    local gcloud_pid=$!
-    GCP_USERNAME="${account}" \
-    PLAYWRIGHT_CDP_HOST="${PLAYWRIGHT_CDP_HOST}" \
-    PLAYWRIGHT_CDP_PORT="${PLAYWRIGHT_CDP_PORT}" \
-    node "${playwright_dir}/gcp_login.js" "${account}"
+  local _gcloud_url_file
+  _gcloud_url_file=$(mktemp)
+  local _auth_url
+  _auth_url=$(_gcp_capture_auth_url "${account}" "${_gcloud_url_file}")
+  local gcloud_pid
+  gcloud_pid=$(pgrep -n -f "gcloud auth login --no-launch-browser --account ${account}")
+
+  rm -f "${_gcloud_url_file}"
+  if [[ -z "${_auth_url}" ]]; then
+    _err "[gcp] Could not capture gcloud OAuth URL — manual gcloud auth login required"
+  fi
+  GCP_USERNAME="${account}" \
+  GCP_AUTH_URL="${_auth_url}" \
+  PLAYWRIGHT_CDP_HOST="${PLAYWRIGHT_CDP_HOST}" \
+  PLAYWRIGHT_CDP_PORT="${PLAYWRIGHT_CDP_PORT}" \
+  node "${playwright_dir}/gcp_login.js" "${account}"
+  if [[ -n "$gcloud_pid" ]]; then
     wait "${gcloud_pid}"
   fi
 }
