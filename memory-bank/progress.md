@@ -17,7 +17,7 @@ Pre-v1.0.4 detail removed from this file; see `git log --tags` and `docs/retro/`
 
 ## v1.2.0 Track (branch: `k3d-manager-v1.2.0`)
 
-- [ ] **ACG repo extraction** — PLANNED. Plan: `docs/plans/v1.1.0-acg-extraction-repo-split.md`. Extract browser/CDP/Playwright automation into its own repo.
+- [ ] **ACG repo extraction** — PLANNED. Plan: `docs/plans/v1.2.0-lib-acg-extraction.md`. 4 phases: (1) rename antigravity→gemini, (2) create lib-acg repo, (3) migrate files, (4) wire subtree into k3d-manager.
 - [ ] **GCP E2E smoke test** — BLOCKED. GCP cluster provisioning is PARTIAL; full `make up` end-to-end on a live GCP sandbox not yet verified.
 
 ---
