@@ -3,15 +3,21 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const CDP_HOST = process.env.PLAYWRIGHT_CDP_HOST || '127.0.0.1';
+const CDP_PORT = process.env.PLAYWRIGHT_CDP_PORT || '9222';
+const CDP_URL = `http://${CDP_HOST}:${CDP_PORT}`;
+const AUTH_DIR_OVERRIDE = process.env.PLAYWRIGHT_AUTH_DIR;
+
 /**
  * scripts/playwright/acg_credentials.js
  *
  * Static Playwright script to extract AWS credentials from Pluralsight Cloud Sandbox.
  * Launches a persistent Chrome context — session persists across runs via auth dir.
- * Auth dir: ~/.local/share/k3d-manager/playwright-auth
+ * Auth dir: ~/.local/share/k3d-manager/profile
  */
 
-const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'playwright-auth');
+const AUTH_DIR = AUTH_DIR_OVERRIDE ||
+  path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'profile');
 
 function _isFirstRun() {
   try {
@@ -22,16 +28,133 @@ function _isFirstRun() {
 }
 const IS_FIRST_RUN = _isFirstRun();
 
+/**
+ * Write credentials to secure file or stdout based on environment.
+ */
+function _outputCredentials(data) {
+  const credsFile = process.env.PLAYWRIGHT_CREDS_FILE;
+  const output = Object.entries(data).map(([k, v]) => `${k}=${v}`).join('\n');
+
+  if (credsFile) {
+    fs.writeFileSync(credsFile, output, { mode: 0o600 });
+    console.error(`INFO: Credentials scrubbed to secure file: ${credsFile}`);
+  } else {
+    process.stdout.write(output + '\n');
+  }
+}
+
+async function _extractAwsCredentials(page) {
+  await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 15000 });
+  const inputs = await page.locator('input[aria-label="Copyable input"]').all();
+  console.error(`INFO: Found ${inputs.length} copyable inputs.`);
+
+  let accessKey, secretKey, sessionToken;
+  for (let i = 0; i < inputs.length; i++) {
+    const val = await inputs[i].inputValue();
+    const parent = await inputs[i].evaluateHandle(el => el.closest('div')?.parentElement ?? null);
+    const text = parent ? await parent.evaluate(el => el.innerText || '') : '';
+
+    if (text.toLowerCase().includes('access key id')) {
+      accessKey = val;
+    } else if (text.toLowerCase().includes('secret access key')) {
+      secretKey = val;
+    } else if (text.toLowerCase().includes('session token')) {
+      sessionToken = val;
+    }
+  }
+
+  if (!accessKey && inputs.length >= 3) {
+    accessKey = await inputs[2].inputValue();
+  }
+  if (!secretKey && inputs.length >= 4) {
+    secretKey = await inputs[3].inputValue();
+  }
+  if (!sessionToken && inputs.length >= 5) {
+    sessionToken = await inputs[4].inputValue();
+  }
+
+  if (accessKey && secretKey) {
+    const creds = {
+      AWS_ACCESS_KEY_ID: accessKey.trim(),
+      AWS_SECRET_ACCESS_KEY: secretKey.trim()
+    };
+    if (sessionToken) creds.AWS_SESSION_TOKEN = sessionToken.trim();
+    _outputCredentials(creds);
+  } else {
+    throw new Error('Could not find AWS Access Key and Secret Key');
+  }
+}
+
+async function _extractGcpCredentials(page) {
+  // Wait for the GCP credentials panel — 'Username' label signals it is loaded
+  await page.waitForSelector('text=Username', { timeout: 15000 });
+
+  // Diagnostic: log all visible inputs and textareas to aid selector development
+  const allInputs = await page.locator('input, textarea').all();
+  console.error(`INFO: Found ${allInputs.length} input/textarea elements on page`);
+  for (let i = 0; i < allInputs.length; i++) {
+    const tag = await allInputs[i].evaluate(el => el.tagName.toLowerCase());
+    const ariaLabel = await allInputs[i].getAttribute('aria-label');
+    const val = await allInputs[i].inputValue().catch(() => '');
+    const visible = await allInputs[i].isVisible();
+    console.error(`INFO: [${i}] <${tag}> aria-label="${ariaLabel}" visible=${visible} value="${val.slice(0, 40)}"`);
+  }
+
+  // GCP fields use aria-label="Copyable input" (same as AWS) — getByLabel() finds nothing
+  // because the visible labels are not HTML-associated. Use positional extraction.
+  const inputs = await page.locator('input[aria-label="Copyable input"]').all();
+  console.error(`INFO: Found ${inputs.length} copyable inputs`);
+
+  const username = inputs.length >= 1 ? await inputs[0].inputValue().catch(() => '') : '';
+  const password = inputs.length >= 2 ? await inputs[1].inputValue().catch(() => '') : '';
+  const serviceAccountJson = inputs.length >= 3 ? await inputs[2].inputValue().catch(() => '') : '';
+
+  console.error(`INFO: username="${username.slice(0, 30)}" password="${password ? '[set]' : '[empty]'}" sa_json_len=${serviceAccountJson.length}`);
+
+  if (!serviceAccountJson) {
+    throw new Error('Could not find Service Account Credentials field');
+  }
+
+  let projectId;
+  try {
+    projectId = JSON.parse(serviceAccountJson).project_id;
+  } catch {
+    throw new Error('Service Account Credentials is not valid JSON');
+  }
+  if (!projectId) {
+    throw new Error('project_id not found in Service Account Credentials JSON');
+  }
+
+  const keyDir = path.join(os.homedir(), '.local', 'share', 'k3d-manager');
+  const keyPath = path.join(keyDir, 'gcp-service-account.json');
+  fs.mkdirSync(keyDir, { recursive: true });
+  fs.writeFileSync(keyPath, serviceAccountJson, { mode: 0o600 });
+  console.error(`INFO: Service account key written to ${keyPath}`);
+
+  _outputCredentials({
+    GCP_PROJECT: projectId,
+    GCP_USERNAME: username.trim(),
+    GCP_PASSWORD: password.trim(),
+    GOOGLE_APPLICATION_CREDENTIALS: keyPath
+  });
+}
+
 async function extractCredentials() {
   let targetUrl = process.argv[2];
   if (!targetUrl) {
     console.error('ERROR: No target URL provided');
     process.exit(1);
   }
-  // Standardize URL to minimize SPA redirects and Cloudflare triggers
-  if (targetUrl.includes('cloud-playground/cloud-sandboxes')) {
-    targetUrl = targetUrl.replace('cloud-playground/cloud-sandboxes', 'hands-on/playground/cloud-sandboxes');
+  const _providerIdx = process.argv.indexOf('--provider');
+  const PROVIDER = (_providerIdx !== -1 && process.argv[_providerIdx + 1])
+    ? process.argv[_providerIdx + 1]
+    : 'aws';
+
+  if (PROVIDER !== 'aws' && PROVIDER !== 'gcp' && PROVIDER !== 'azure') {
+    console.error(`ERROR: Unknown provider '${PROVIDER}' (expected 'aws', 'gcp', or 'azure')`);
+    process.exit(1);
   }
+  console.error(`INFO: Using provider ${PROVIDER}`);
 
   if (IS_FIRST_RUN) {
     console.error('BOOTSTRAP: Auth dir is empty — first run detected.');
@@ -44,7 +167,7 @@ async function extractCredentials() {
   let _cdpBrowser = null;
   try {
     try {
-      _cdpBrowser = await chromium.connectOverCDP('http://localhost:9222');
+      _cdpBrowser = await chromium.connectOverCDP(CDP_URL);
       const _cdpContexts = _cdpBrowser.contexts();
       if (_cdpContexts.length > 0) {
         const _cdpContext = _cdpContexts[0];
@@ -58,7 +181,7 @@ async function extractCredentials() {
         }
       }
       if (!browserContext) {
-        try { await _cdpBrowser.close(); } catch {}
+        try { await _cdpBrowser.disconnect(); } catch {}
         _cdpBrowser = null;
       }
     } catch {
@@ -72,16 +195,22 @@ async function extractCredentials() {
       });
     }
 
-    // 2. Find the Pluralsight page by URL (do not assume pages()[0])
+    // 2. Find the Pluralsight page by URL (Surgical Search)
     const context = browserContext;
     if (!context) throw new Error('No browser context found');
     const allPages = context.pages();
+
+    // Priority 1: Look for an existing sandbox page
     let page = allPages.find(p => {
-      try { return new URL(p.url()).hostname.endsWith('.pluralsight.com') || new URL(p.url()).hostname === 'pluralsight.com'; } catch { return false; }
+      try { return p.url().includes('cloud-playground/cloud-sandboxes') || p.url().includes('hands-on/playground/cloud-sandboxes'); } catch { return false; }
     });
+
+    // Priority 2: If no sandbox page found, open a FRESH tab
     if (!page) {
-      page = allPages[0];
-      if (!page) throw new Error('No page found in the browser context');
+      console.error('INFO: No existing sandbox tab found — opening new extraction tab.');
+      page = await context.newPage();
+    } else {
+      console.error(`INFO: Found existing sandbox tab: ${page.url()}`);
     }
 
     // Skip navigation entirely if sandbox panel is already loaded on the current page
@@ -92,33 +221,33 @@ async function extractCredentials() {
       console.error('INFO: Sandbox panel already loaded — skipping navigation');
     } else {
 
-    // Navigate only if not already on the target URL (hard reload kills SPA auth)
-    const currentUrl = page.url();
-    let currentHostname = '';
-    try { currentHostname = new URL(currentUrl).hostname; } catch { /* non-URL, will navigate */ }
-    let targetPathname = '';
-    try { targetPathname = new URL(targetUrl).pathname; } catch { /* invalid targetUrl */ }
-    let currentPathname = '';
-    try { currentPathname = new URL(currentUrl).pathname; } catch { /* non-URL */ }
+      // Navigate only if not already on the target URL (hard reload kills SPA auth)
+      const currentUrl = page.url();
+      let currentHostname = '';
+      try { currentHostname = new URL(currentUrl).hostname; } catch { /* non-URL, will navigate */ }
+      let targetPathname = '';
+      try { targetPathname = new URL(targetUrl).pathname; } catch { /* invalid targetUrl */ }
+      let currentPathname = '';
+      try { currentPathname = new URL(currentUrl).pathname; } catch { /* non-URL */ }
 
-    if (currentHostname !== 'app.pluralsight.com') {
-      console.error(`INFO: Navigating to ${targetUrl}...`);
-      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    } else if (currentPathname === targetPathname) {
-      console.error(`INFO: Already on ${currentUrl} — skipping navigation`);
-    } else if (targetPathname.includes('cloud-sandboxes')) {
-      console.error(`INFO: SPA-navigating to cloud-sandboxes from ${currentUrl}...`);
-      const navLink = page.locator('a[href*="cloud-sandboxes"]').first();
-      const navVisible = await navLink.isVisible({ timeout: 5000 }).catch(() => false);
-      if (navVisible) {
-        await navLink.click();
+      if (currentHostname !== 'app.pluralsight.com') {
+        console.error(`INFO: Navigating to ${targetUrl}...`);
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      } else if (currentPathname === targetPathname) {
+        console.error(`INFO: Already on ${currentUrl} — skipping navigation`);
+      } else if (targetPathname.includes('cloud-sandboxes')) {
+        console.error(`INFO: SPA-navigating to cloud-sandboxes from ${currentUrl}...`);
+        const navLink = page.locator('a[href*="cloud-sandboxes"]').first();
+        const navVisible = await navLink.isVisible({ timeout: 5000 }).catch(() => false);
+        if (navVisible) {
+          await navLink.click();
+        } else {
+          await page.evaluate(url => window.location.assign(url), targetUrl);
+        }
       } else {
-        await page.evaluate(url => window.location.assign(url), targetUrl);
+        console.error(`INFO: Navigating to ${targetUrl}...`);
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
       }
-    } else {
-      console.error(`INFO: Navigating to ${targetUrl}...`);
-      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    }
     } // end else (_sandboxReady)
 
     // Give it time to render SPA content after navigation changes
@@ -134,8 +263,7 @@ async function extractCredentials() {
     if (isSignInVisible) {
       console.error('INFO: Not signed in — clicking Sign In...');
       await signInLink.click();
-      await page.waitForURL('**id.pluralsight.com**', { timeout: 30000 })
-        .catch(() => console.error('WARN: Did not reach id.pluralsight.com — proceeding anyway'));
+      await page.waitForURL('**id.pluralsight.com**', { timeout: 300000 }); // "Patient Bridge"
 
       // Fill email field — set PLURALSIGHT_EMAIL env var to assist Google Password Manager
       const emailInput = page.locator('input[type="email"], input[name="email"], input[id*="email"]').first();
@@ -222,8 +350,13 @@ async function extractCredentials() {
       const resumeButton = page.locator('button:has-text("Resume"), button:has-text("Resume Sandbox")').first();
 
       if (await startButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-        console.error('INFO: Clicking Start Sandbox...');
-        await startButton.click();
+        const _startEnabled = await startButton.isEnabled({ timeout: 1000 }).catch(() => false);
+        if (_startEnabled) {
+          console.error('INFO: Clicking Start Sandbox...');
+          await startButton.click();
+        } else {
+          console.error('INFO: Start Sandbox button is disabled — sandbox already running; waiting for credentials...');
+        }
         await _waitForCredentials();
       } else if (await openButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         console.error('INFO: Clicking Open Sandbox...');
@@ -244,62 +377,26 @@ async function extractCredentials() {
       }
     }
 
-    // 4. Extract credentials
+    // 4. Provider Dispatcher (Symmetric Pattern)
     console.error('INFO: Extracting credentials...');
-    
-    // We found that credentials are in inputs with aria-label="Copyable input"
-    // The order is typically: Username, Password, Access Key ID, Secret Access Key, [Session Token]
-    
-    // Wait for the inputs to appear
-    await page.waitForSelector('input[aria-label="Copyable input"]', { timeout: 15000 });
-    
-    const inputs = await page.locator('input[aria-label="Copyable input"]').all();
-    console.error(`INFO: Found ${inputs.length} copyable inputs.`);
-
-    let accessKey, secretKey, sessionToken;
-
-    for (let i = 0; i < inputs.length; i++) {
-      const val = await inputs[i].inputValue();
-      const parent = await inputs[i].evaluateHandle(el => el.closest('div')?.parentElement ?? null);
-      const text = parent ? await parent.evaluate(el => el.innerText || '') : '';
-      
-      if (text.toLowerCase().includes('access key id')) {
-        accessKey = val;
-      } else if (text.toLowerCase().includes('secret access key')) {
-        secretKey = val;
-      } else if (text.toLowerCase().includes('session token')) {
-        sessionToken = val;
-      }
-    }
-
-    // Fallback based on known order if text matching fails
-    if (!accessKey && inputs.length >= 3) {
-      accessKey = await inputs[2].inputValue();
-    }
-    if (!secretKey && inputs.length >= 4) {
-      secretKey = await inputs[3].inputValue();
-    }
-    if (!sessionToken && inputs.length >= 5) {
-      sessionToken = await inputs[4].inputValue();
-    }
-
-    if (accessKey && secretKey) {
-      console.log(`AWS_ACCESS_KEY_ID=${accessKey.trim()}`);
-      console.log(`AWS_SECRET_ACCESS_KEY=${secretKey.trim()}`);
-      if (sessionToken) {
-        console.log(`AWS_SESSION_TOKEN=${sessionToken.trim()}`);
-      }
-      return;
+    if (PROVIDER === 'aws') {
+      await _extractAwsCredentials(page);
+    } else if (PROVIDER === 'gcp') {
+      await _extractGcpCredentials(page);
+    } else if (PROVIDER === 'azure') {
+      throw new Error('Azure extraction is not yet implemented.');
     } else {
-      throw new Error('Could not find AWS Access Key and Secret Key');
+      throw new Error(`Unsupported provider: ${PROVIDER}`);
     }
 
   } catch (error) {
     console.error(`ERROR: ${error.message}`);
-    process.exit(1);
+    throw error;
   } finally {
     if (_cdpBrowser) {
-      try { await _cdpBrowser.close(); } catch {}
+      // CDP attach: detach only — leave the user's Chrome running with tabs intact.
+      try { await _cdpBrowser.disconnect(); } catch {}
+      console.error('INFO: Detached from Chrome CDP session.');
     } else if (browserContext) {
       await browserContext.close();
     }
@@ -307,12 +404,21 @@ async function extractCredentials() {
 }
 
 const OVERALL_TIMEOUT_MS = IS_FIRST_RUN ? 300000 : 120000;
-Promise.race([
-  extractCredentials(),
-  new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Script timed out after ${OVERALL_TIMEOUT_MS / 1000}s`)), OVERALL_TIMEOUT_MS)
-  )
-]).catch(err => {
-  console.error(`ERROR: ${err.message}`);
-  process.exit(1);
+let _timeoutHandle;
+const _timeoutPromise = new Promise((_, reject) => {
+  _timeoutHandle = setTimeout(
+    () => reject(new Error(`Script timed out after ${OVERALL_TIMEOUT_MS / 1000}s`)),
+    OVERALL_TIMEOUT_MS
+  );
 });
+
+Promise.race([extractCredentials(), _timeoutPromise])
+  .then(() => {
+    clearTimeout(_timeoutHandle);
+    process.exit(0);
+  })
+  .catch(err => {
+    clearTimeout(_timeoutHandle);
+    console.error(`ERROR: ${err.message}`);
+    process.exit(1);
+  });

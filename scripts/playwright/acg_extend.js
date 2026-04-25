@@ -8,12 +8,12 @@ const path = require('path');
  *
  * Static Playwright script to extend the ACG sandbox TTL by 4 hours.
  * Launches a persistent Chrome context — session persists across runs via auth dir.
- * Auth dir: ~/.local/share/k3d-manager/playwright-auth
+ * Auth dir: ~/.local/share/k3d-manager/profile
  *
  * Usage: node acg_extend.js <sandbox-url>
  */
 
-const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'playwright-auth');
+const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'profile');
 
 function _isFirstRun() {
   try {
@@ -173,14 +173,34 @@ async function extendSandbox() {
     }
 
     // 3. Reveal the panel/modal if still not clicked
-    // Check if the details panel is already open
-    const isPanelOpen = await page.locator('text=/Auto Shutdown/i').first().isVisible({ timeout: 2000 }).catch(() => false);
-    
+    // isPanelOpen: "Auto Shutdown" text appears on the listing-page card — not a reliable signal
+    // that the extend panel is open. If step 1 found no extend button, the panel is NOT open.
+    const isPanelOpen = clicked;
+
     if (!isPanelOpen) {
-      const openButton = page.locator('button:has-text("Open Sandbox"), button:has-text("Open"), button:has-text("Start Sandbox"), button:has-text("Resume")').first();
-      if (await openButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-        console.error('INFO: Clicking Open to reveal sandbox details...');
-        await openButton.click({ force: true });
+      // Click "Open Sandbox" on the card with the "Auto Shutdown" banner (the running sandbox),
+      // not .first() which always picks the first card (AWS) regardless of provider.
+      const _allOpenBtns = page.locator('button:has-text("Open Sandbox")');
+      const _btnCount = await _allOpenBtns.count();
+      let _openBtn = null;
+      for (let _i = 0; _i < _btnCount; _i++) {
+        const _hasShutdown = await _allOpenBtns.nth(_i).evaluate(el => {
+          let node = el.parentElement;
+          for (let _j = 0; _j < 6; _j++) {
+            if (!node) break;
+            if (/auto\s*shutdown/i.test(node.innerText || '')) return true;
+            node = node.parentElement;
+          }
+          return false;
+        }).catch(() => false);
+        if (_hasShutdown) { _openBtn = _allOpenBtns.nth(_i); break; }
+      }
+      if (!_openBtn) {
+        _openBtn = page.locator('button:has-text("Open Sandbox"), button:has-text("Start Sandbox"), button:has-text("Resume")').first();
+      }
+      if (await _openBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.error('INFO: Clicking Open Sandbox to reveal extend panel...');
+        await _openBtn.click({ force: true });
         await page.waitForTimeout(5000);
       }
     }

@@ -18,17 +18,22 @@ function init_test_env() {
   KUBECTL_LOG="$BATS_TEST_TMPDIR/kubectl.log"
   HELM_LOG="$BATS_TEST_TMPDIR/helm.log"
   RUN_LOG="$BATS_TEST_TMPDIR/run.log"
+  ARGOCD_LOG="$BATS_TEST_TMPDIR/argocd.log"
   export KUBECTL_LOG HELM_LOG RUN_LOG
+  export ARGOCD_LOG
   : > "$KUBECTL_LOG"
   : > "$HELM_LOG"
   : > "$RUN_LOG"
+  : > "$ARGOCD_LOG"
 
   _cleanup_on_success() { :; }
 
   stub_envsubst
   stub_kubectl
+  stub_kubectl_command
   stub_helm
   stub_run_command
+  stub_argocd
   stub_vault
 
   _systemd_available() { return 0; }
@@ -51,6 +56,11 @@ function stub_kubectl() {
       return 1
     fi
 
+    if [[ "$*" == *"get secret argocd-initial-admin-secret"* && "$*" == *"jsonpath"* ]]; then
+      echo "ZmFrZS1wYXNz"  # "fake-pass" in base64
+      return 0
+    fi
+
     # Special handling for vault-root secret queries (for Vault integration tests)
     if [[ "$*" == *"get secret vault-root"* && "$*" == *"jsonpath"* ]]; then
       # Return a fake base64-encoded token
@@ -64,6 +74,12 @@ function stub_kubectl() {
       KUBECTL_EXIT_CODES=("${KUBECTL_EXIT_CODES[@]:1}")
     fi
     return "$rc"
+  }
+}
+
+function stub_kubectl_command() {
+  kubectl() {
+    _kubectl "$@"
   }
 }
 
@@ -105,6 +121,26 @@ function stub_run_command() {
       RUN_EXIT_CODES=("${RUN_EXIT_CODES[@]:1}")
     fi
     return "$rc"
+  }
+}
+
+# Define argocd stub that logs commands and simulates login behavior
+function stub_argocd() {
+  argocd() {
+    echo "$*" >> "$ARGOCD_LOG"
+
+    if [[ "$1" == "account" && "${2:-}" == "get-context" ]]; then
+      if [[ "${ARGOCD_ACCOUNT_CONTEXT_EXISTS:-0}" == "1" ]]; then
+        return 0
+      fi
+      return 1
+    fi
+
+    if [[ "$1" == "login" ]]; then
+      return 0
+    fi
+
+    return 0
   }
 }
 
@@ -171,9 +207,11 @@ function read_lines() {
 # Export stub functions for visibility in subshells
 function export_stubs() {
   export -f _cleanup_on_success
+  export -f kubectl
   export -f _kubectl
   export -f _helm
   export -f _run_command
+  export -f argocd
   export -f envsubst
   export -f _vault_login
   export -f _vault_policy_exists

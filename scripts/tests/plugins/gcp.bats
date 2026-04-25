@@ -1,0 +1,213 @@
+#!/usr/bin/env bats
+# scripts/tests/plugins/gcp.bats — unit tests for gcp.sh
+
+setup() {
+  _info() { :; }
+  export -f _info
+
+  # Stub gcloud — records calls to BATS_TEST_TMPDIR/gcloud.log
+  gcloud() {
+    printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/gcloud.log"
+    return 0
+  }
+  export -f gcloud
+
+  # Stub node — succeeds silently
+  node() { return 0; }
+  export -f node
+
+  export SCRIPT_DIR="${BATS_TEST_TMPDIR}/scripts"
+  mkdir -p "${SCRIPT_DIR}/etc/playwright"
+  cat > "${SCRIPT_DIR}/etc/playwright/vars.sh" <<'EOF'
+PLAYWRIGHT_CDP_HOST="127.0.0.1"
+PLAYWRIGHT_CDP_PORT="9222"
+PLAYWRIGHT_AUTH_DIR="${HOME}/.local/share/k3d-manager/profile"
+EOF
+
+  source "scripts/plugins/gcp.sh"
+}
+
+# gcp_login --help
+
+@test "gcp_login --help exits 0" {
+  run gcp_login --help
+  [ "$status" -eq 0 ]
+}
+
+# gcp_login — already authenticated as target account
+
+@test "gcp_login skips gcloud when already active account" {
+  gcloud() {
+    case "$*" in
+      "auth list --filter=status:ACTIVE --format=value(account)")
+        printf '%s\n' "cloud_user@example.com" ;;
+      *) printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/gcloud.log" ;;
+    esac
+    return 0
+  }
+  export -f gcloud
+
+  run gcp_login "cloud_user@example.com"
+  [ "$status" -eq 0 ]
+  # gcloud auth login must NOT have been called
+  run grep "auth login" "${BATS_TEST_TMPDIR}/gcloud.log" 2>/dev/null
+  [ "$status" -ne 0 ]
+}
+
+# gcp_login — account in store but not active → config set
+
+@test "gcp_login uses config set when account in store but not active" {
+  gcloud() {
+    case "$*" in
+      "auth list --filter=status:ACTIVE --format=value(account)")
+        printf '%s\n' "other_user@example.com" ;;
+      "auth list --format=value(account)")
+        printf '%s\n' "cloud_user@example.com" ;;
+      *) printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/gcloud.log" ;;
+    esac
+    return 0
+  }
+  export -f gcloud
+
+  run gcp_login "cloud_user@example.com"
+  [ "$status" -eq 0 ]
+  run grep "config set account cloud_user@example.com" "${BATS_TEST_TMPDIR}/gcloud.log"
+  [ "$status" -eq 0 ]
+}
+
+# gcp_login — new account, node+playwright available → background gcloud + node
+
+@test "gcp_login runs gcloud in background and node when playwright available" {
+  gcloud() {
+    case "$*" in
+      "auth list --filter=status:ACTIVE --format=value(account)") printf '' ;;
+      "auth list --format=value(account)")                        printf '' ;;
+      *) printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/gcloud.log" ;;
+    esac
+    return 0
+  }
+  export -f gcloud
+
+  node() {
+    printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/node.log"
+    return 0
+  }
+  export -f node
+
+  run gcp_login "cloud_user@example.com"
+  [ "$status" -eq 0 ]
+  run grep "auth login --account cloud_user@example.com" "${BATS_TEST_TMPDIR}/gcloud.log"
+  [ "$status" -eq 0 ]
+  run grep "gcp_login.js cloud_user@example.com" "${BATS_TEST_TMPDIR}/node.log"
+  [ "$status" -eq 0 ]
+}
+
+# gcp_login — node unavailable → manual fallback
+
+@test "gcp_login falls back to manual gcloud when node unavailable" {
+  gcloud() {
+    case "$*" in
+      "auth list --filter=status:ACTIVE --format=value(account)") printf '' ;;
+      "auth list --format=value(account)")                        printf '' ;;
+      *) printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/gcloud.log" ;;
+    esac
+    return 0
+  }
+  export -f gcloud
+
+  # Override command to make node appear missing
+  command() {
+    if [[ "$*" == "-v node" ]]; then return 1; fi
+    builtin command "$@"
+  }
+  export -f command
+
+  run gcp_login "cloud_user@example.com"
+  [ "$status" -eq 0 ]
+  run grep "auth login --account cloud_user@example.com" "${BATS_TEST_TMPDIR}/gcloud.log"
+  [ "$status" -eq 0 ]
+}
+
+# gcp_login — no account arg and GCP_USERNAME unset → returns 1
+
+@test "gcp_login returns 1 when account not set" {
+  unset GCP_USERNAME
+  run gcp_login
+  [ "$status" -eq 1 ]
+}
+
+# gcp_login — gcloud not found → returns 1
+
+@test "gcp_login returns 1 when gcloud not found" {
+  command() {
+    if [[ "$*" == "-v gcloud" ]]; then return 1; fi
+    builtin command "$@"
+  }
+  export -f command
+
+  run gcp_login "cloud_user@example.com"
+  [ "$status" -eq 1 ]
+}
+
+# gcp_get_credentials — node missing → _ensure_node invoked
+
+@test "gcp_get_credentials calls _ensure_node when node is missing" {
+  node_missing_count=0
+  command() {
+    if [[ "$1" == "-v" && "$2" == "node" && "$node_missing_count" -eq 0 ]]; then
+      node_missing_count=1
+      return 1
+    fi
+    builtin command "$@"
+  }
+  export -f command
+
+  _ensure_node() {
+    printf '%s\n' "called" >> "${BATS_TEST_TMPDIR}/ensure-node.log"
+    node() {
+      if [[ "$1" == "-e" ]]; then
+        return 0
+      fi
+
+      local creds_file="${PLAYWRIGHT_CREDS_FILE:?}"
+      local key_file="${BATS_TEST_TMPDIR}/fake-gcp-key.json"
+      printf '{}\n' > "${key_file}"
+      cat > "${creds_file}" <<EOF
+GCP_PROJECT="test-project"
+GOOGLE_APPLICATION_CREDENTIALS="${key_file}"
+GCP_USERNAME="cloud_user@example.com"
+GCP_PASSWORD="secret"
+EOF
+      return 0
+    }
+    export -f node
+  }
+  export -f _ensure_node
+
+  curl() {
+    return 0
+  }
+  export -f curl
+
+  gcloud() {
+    case "$*" in
+      "auth list --filter=status:ACTIVE --format=value(account)") printf '%s\n' "cloud_user@example.com" ;;
+      "auth list --format=value(account)") printf '%s\n' "cloud_user@example.com" ;;
+      *) : ;;
+    esac
+    return 0
+  }
+  export -f gcloud
+
+  run gcp_get_credentials "https://example.invalid/sandbox"
+  [ "$status" -eq 0 ]
+  run grep "called" "${BATS_TEST_TMPDIR}/ensure-node.log"
+  [ "$status" -eq 0 ]
+}
+
+# gcp_login.js parse check
+
+@test "gcp_login.js passes node --check" {
+  run "$(command -v node)" --check scripts/playwright/gcp_login.js
+  [ "$status" -eq 0 ]
+}

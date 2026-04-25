@@ -16,7 +16,7 @@ function _cluster_provider() {
    provider="$(printf '%s' "$provider" | tr '[:upper:]' '[:lower:]')"
 
    case "$provider" in
-      k3d|orbstack|k3s|k3s-aws)
+      k3d|orbstack|k3s|k3s-aws|k3s-gcp)
          printf '%s' "$provider"
          ;;
       *)
@@ -699,6 +699,9 @@ function deploy_cluster() {
             provider_cli="${1#*=}"
             shift
             ;;
+         --confirm)
+            shift
+            ;;
          -h|--help)
             show_help=1
             shift
@@ -776,7 +779,7 @@ EOF
    fi
 
    case "$provider" in
-      k3d|orbstack|k3s|k3s-aws)
+      k3d|orbstack|k3s|k3s-aws|k3s-gcp)
          ;;
       "")
          _err "Failed to determine cluster provider."
@@ -793,7 +796,7 @@ EOF
       _cluster_provider_set_active "$provider"
    fi
 
-   local cluster_name_value="${positional[0]:-${CLUSTER_NAME:-}}"
+   local cluster_name_value="${positional[0]:-${CLUSTER_NAME:-k3d-cluster}}"
    if [[ -n "$cluster_name_value" ]]; then
       positional=("$cluster_name_value" "${positional[@]:1}")
       export CLUSTER_NAME="$cluster_name_value"

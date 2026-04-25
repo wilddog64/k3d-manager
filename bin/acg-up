@@ -25,11 +25,23 @@ source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
 source "${REPO_ROOT}/scripts/plugins/antigravity.sh"
-source "${REPO_ROOT}/scripts/plugins/aws.sh"
 source "${REPO_ROOT}/scripts/plugins/acg.sh"
 source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
 source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
-source "${REPO_ROOT}/scripts/lib/providers/k3s-aws.sh"
+
+_cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
+case "${_cluster_provider}" in
+  k3s-aws)
+    source "${REPO_ROOT}/scripts/plugins/aws.sh"
+    source "${REPO_ROOT}/scripts/lib/providers/k3s-aws.sh"
+    ;;
+  k3s-gcp)
+    source "${REPO_ROOT}/scripts/plugins/gcp.sh"
+    ;;
+  *)
+    _err "[acg-up] Unsupported CLUSTER_PROVIDER: ${_cluster_provider} (supported: k3s-aws, k3s-gcp)"
+    ;;
+esac
 
 login_prompt=0
 sandbox_url=""
@@ -60,18 +72,54 @@ if [[ "$login_prompt" -eq 1 ]]; then
   echo ""
 fi
 
-_info "[acg-up] Step 1/12 — Getting AWS credentials..."
-if aws sts get-caller-identity >/dev/null 2>&1; then
-  _info "[acg-up] Existing AWS credentials valid — skipping extraction"
-else
-  acg_get_credentials ${sandbox_url:+"$sandbox_url"}
-fi
+_info "[acg-up] Step 1/12 — Getting ${_cluster_provider} credentials..."
+case "${_cluster_provider}" in
+  k3s-aws)
+    if aws sts get-caller-identity >/dev/null 2>&1; then
+      _info "[acg-up] Existing AWS credentials valid — skipping extraction"
+    else
+      acg_get_credentials ${sandbox_url:+"$sandbox_url"}
+    fi
+    ;;
+  k3s-gcp)
+    gcp_get_credentials ${sandbox_url:+"$sandbox_url"}
+    ;;
+esac
 
 _info "[acg-up] Step 2/12 — Provisioning 3-node cluster..."
-CLUSTER_PROVIDER=k3s-aws deploy_cluster --confirm
+deploy_cluster --provider "${_cluster_provider}" --confirm
+
+if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
+  _info "[acg-up] GCP cluster deployed. Steps 3–12 (SSH tunnel, Vault, ESO, ArgoCD) are AWS-only and not yet ported for GCP."
+  _info "[acg-up] Run 'kubectl get nodes' to verify the cluster."
+  kubectl get nodes
+  exit 0
+fi
 
 _info "[acg-up] Step 3/12 — Starting SSH tunnel..."
 tunnel_start
+
+_HUB_CLUSTER_CTX="k3d-${HUB_CLUSTER_NAME:-k3d-cluster}"
+_hub_newly_created=0
+_info "[acg-up] Step 3.5/12 — Verifying local Hub cluster (create if missing)..."
+if ! k3d cluster list 2>/dev/null | grep -q "^${HUB_CLUSTER_NAME:-k3d-cluster}[[:space:]]"; then
+  _info "[acg-up] Local Hub cluster '${HUB_CLUSTER_NAME:-k3d-cluster}' not found — creating it now..."
+  deploy_cluster --provider k3d "${HUB_CLUSTER_NAME:-k3d-cluster}"
+  _hub_newly_created=1
+fi
+if ! kubectl get nodes --context "${_HUB_CLUSTER_CTX}" --request-timeout=10s >/dev/null 2>&1; then
+  _err "[acg-up] Local Hub cluster '${_HUB_CLUSTER_CTX}' is unreachable — OrbStack/k3d may be in a broken state after sleep. Check 'orbctl status'."
+fi
+_info "[acg-up] Local Hub cluster verified."
+
+if [[ "${_hub_newly_created}" -eq 1 ]]; then
+  _info "[acg-up] Step 3.6/12 — Bootstrapping Hub cluster (Vault + LDAP + ArgoCD)..."
+  kubectl config use-context "${_HUB_CLUSTER_CTX}" >/dev/null 2>&1 || true
+  "${REPO_ROOT}/scripts/k3d-manager" deploy_vault --confirm
+  "${REPO_ROOT}/scripts/k3d-manager" deploy_ldap --confirm
+  "${REPO_ROOT}/scripts/k3d-manager" deploy_argocd --confirm
+  _info "[acg-up] Hub cluster bootstrapped."
+fi
 
 _info "[acg-up] Step 4/12 — Starting Vault port-forward (k3d → localhost:8200)..."
 _vault_pf_pid_file="${HOME}/.local/share/k3d-manager/vault-pf.pid"
@@ -87,6 +135,15 @@ disown "${_vault_pf_pid}"
 echo "${_vault_pf_pid}" > "${_vault_pf_pid_file}"
 sleep 3
 _info "[acg-up] Vault port-forward PID: ${_vault_pf_pid} (log: ${HOME}/.local/share/k3d-manager/vault-pf.log)"
+
+_vault_health=$(curl -sf --max-time 5 http://localhost:8200/v1/sys/health 2>/dev/null || echo '{}')
+_vault_sealed=$(printf '%s' "${_vault_health}" | grep -o '"sealed":[^,}]*' | grep -o 'true\|false' || echo 'unknown')
+if [[ "${_vault_sealed}" == "true" ]]; then
+  _err "[acg-up] Vault is sealed — likely caused by OrbStack restart after Mac sleep. Unseal with stored shards, then re-run."
+elif [[ "${_vault_sealed}" == "unknown" ]]; then
+  _err "[acg-up] Vault not responding on localhost:8200 — port-forward may have failed. Check: ${HOME}/.local/share/k3d-manager/vault-pf.log"
+fi
+_info "[acg-up] Vault is unsealed and reachable."
 
 _info "[acg-up] Step 5/12 — Creating ghcr-pull-secret in all app namespaces..."
 _ghcr_pat="${GHCR_PAT:-}"

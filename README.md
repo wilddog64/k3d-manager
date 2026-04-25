@@ -109,11 +109,12 @@ CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f   # k3s, non-intera
 | `k3d` | macOS, no OrbStack | Default fallback |
 | `k3s` | Linux bare-metal | `CLUSTER_PROVIDER=k3s` |
 | `k3s-aws` | AWS EC2 via ACG sandbox | `CLUSTER_PROVIDER=k3s-aws` |
+| `k3s-gcp` | GCP compute instance via ACG sandbox | `CLUSTER_PROVIDER=k3s-gcp` |
 
 See **[docs/providers/](docs/providers/)** for per-provider guides:
 - [OrbStack](docs/providers/orbstack.md)
 - [k3s (bare-metal)](docs/providers/k3s.md)
-- [k3s-aws (ACG EC2 sandbox)](docs/howto/acg.md)
+- [k3s-aws / k3s-gcp (ACG sandbox)](docs/howto/acg.md)
 
 ---
 
@@ -197,7 +198,7 @@ docs/
 
 | Plugin | Key Functions | Description |
 |---|---|---|
-| **ACG** | `acg_get_credentials`, `acg_import_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_extend_playwright`, `acg_watch`, `acg_teardown` | AWS ACG sandbox lifecycle — automated credential extraction via Playwright CDP, stdin fallback, VPC + SG + EC2 provisioning, background TTL watcher; [spec](docs/plans/v0.9.6-acg-plugin.md) |
+| **ACG** | `acg_get_credentials`, `acg_import_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_extend_playwright`, `acg_watch`, `acg_teardown` | AWS/GCP ACG sandbox lifecycle — automated credential extraction via Playwright CDP, stdin fallback, cloud VM provisioning, background TTL watcher; [spec](docs/plans/archive/v0.9.6-acg-plugin.md) |
 | **AWS** | `aws_import_credentials` | Generic AWS credential import — supports CSV (IAM Download), quoted/unquoted export, labeled (Pluralsight), credentials file formats; writes `~/.aws/credentials` |
 | **Antigravity** | `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_poll_task` | Browser automation via gemini CLI + Playwright over CDP (port 9222) — Copilot coding agent trigger |
 | **ArgoCD** | `deploy_argocd`, `deploy_argocd_bootstrap`, `register_app_cluster`, `configure_vault_argocd_repos` | GitOps engine deployment + app cluster registration + Vault repo auth |
@@ -228,7 +229,7 @@ docs/
 
 ### Architecture
 - **[Configuration-Driven Design](docs/architecture/configuration-driven-design.md)** — Core design principle
-- **[Strategic Roadmap v1.0](docs/plans/roadmap-v1.md)** — v0.8.0 → v1.0.0 roadmap
+- **[Strategic Roadmap v1.0](docs/plans/archive/roadmap-v1.md)** — v0.8.0 → v1.0.0 roadmap
 - **[Two-Cluster Architecture](docs/plans/two-cluster-infra.md)** — Infra + app cluster design
 
 ### How-To
@@ -284,11 +285,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-04-25 | [Copilot PR #65 review findings](docs/issues/2026-04-25-copilot-pr65-review-findings.md) | gcp_login — CodeQL clear-text env logging; redact GCP_ACCOUNT from console.error |
 | 2026-04-11 | [Copilot PR #64 review findings](docs/issues/2026-04-11-copilot-pr64-review-findings.md) | ssm — bare sudo dpkg in Makefile; lost indentation in deploy_app_cluster; missing mkdir -p ~/.kube; None/null sentinel not normalized; inaccurate ssm_exec docs; wrong make ssm description |
 | 2026-04-11 | [Copilot PR #63 review findings](docs/issues/2026-04-11-copilot-pr63-review-findings.md) | acg — missing --help on public wrapper, no BATS test, private call in k3s-aws.sh, CHANGE.md wording, stale README refs, wrong location for `_antigravity_browser_ready` |
 | 2026-04-11 | [Copilot PR #62 review findings](docs/issues/2026-04-11-copilot-pr62-review-findings.md) | acg — dispatcher rejects private function in launchd wrapper; help text private name; stale browser automation doc; misleading rename description; typos |
 | 2026-04-10 | [Copilot PR #61 review findings](docs/issues/2026-04-10-copilot-pr61-review-findings.md) | acg-extend — CodeQL URL substring check, credential leak in shutdown text log, CDP browser close disrupts session, Ghost State fires on weak null signal |
-| 2026-04-08 | [acg_extend fails due to stale "Ghost" session state](docs/issues/2026-04-08-acg-extend-stale-session-ghost-state.md) | acg-extend — extend button missing when session internally stale with <1hr remaining; delete→start→extend recovery flow |
 
 [All issues →](docs/issues/)
 
@@ -298,15 +299,16 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.1.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.1.0) | 2026-04-24 | Unified ACG automation AWS + GCP — GCP provider (`k3s-gcp`), OAuth automation, CDP headless Linux, `bin/acg-sync-apps` port-forward hardening, Hub auto-create + bootstrap, provider-aware teardown |
 | [v1.0.6](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.6) | 2026-04-11 | AWS SSM support — `ssm_wait`/`ssm_exec`/`ssm_tunnel` helpers; `K3S_AWS_SSM_ENABLED` opt-in; IAM role + instance profile in CloudFormation; `--capabilities CAPABILITY_NAMED_IAM` fix; `make ssm`/`provision` targets |
 | [v1.0.5](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.5) | 2026-04-10 | antigravity decoupling + LDAP Vault KV seeding — `antigravity_acg_extend` renamed/moved to `acg_extend_playwright` in `acg.sh`; `bin/acg-up` seeds `secret/data/ldap/admin` for ESO ExternalSecret |
-| [v1.0.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.4) | 2026-04-10 | ACG extend hardening — button-first search; midnight date-wrap fix; random passwords in `bin/acg-up`; sandbox-expired guidance in `_acg_check_credentials`; Pluralsight URL standardization |
 
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.0.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.4) | 2026-04-10 | ACG extend hardening — button-first search; midnight date-wrap fix; random passwords in `bin/acg-up`; sandbox-expired guidance in `_acg_check_credentials`; Pluralsight URL standardization |
 | [v1.0.3](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.3) | 2026-04-05 | ACG full stack fixes — ESO 1.0.0; ClusterSecretStore `v1`; ArgoCD context + server URL fix; `GHCR_PAT` masking; Chrome CDP launchd agent; `make sync-apps` + `make argocd-registration` |
 | [v1.0.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.2) | 2026-04-03 | full stack automation — `make up` 12-step provision; Vault port-forward; vault-bridge Service; argocd-manager bootstrap; helm + ESO install; `bin/` SCRIPT_DIR fix |
 | [v1.0.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.1) | 2026-03-31 | multi-node k3s-aws + CloudFormation + Playwright hardening — 3-node CF stack; auto sign-in; remove Antigravity pre-calls from `acg_get_credentials`; `AGENT_IP_ALLOWLIST` in pre-commit hook |

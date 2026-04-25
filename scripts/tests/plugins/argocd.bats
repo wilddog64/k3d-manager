@@ -33,6 +33,19 @@ setup() {
   [ "${calls[1]}" = "-n cicd get deployment argocd-server" ]
 }
 
+@test "_argocd_ensure_logged_in uses plaintext non-interactive login" {
+  : > "$KUBECTL_LOG"
+  : > "$ARGOCD_LOG"
+  run _argocd_ensure_logged_in
+  [ "$status" -eq 0 ]
+  read_lines "$KUBECTL_LOG" kubectl_calls
+  [ "${kubectl_calls[0]}" = "get secret argocd-initial-admin-secret -n cicd -o jsonpath={.data.password}" ]
+  [ "${kubectl_calls[1]}" = "port-forward svc/argocd-server -n cicd 8080:443" ]
+  read_lines "$ARGOCD_LOG" argocd_calls
+  [[ "${argocd_calls[0]}" == "account get-context --server localhost:8080" ]]
+  [[ "${argocd_calls[1]}" == *"login localhost:8080 --username admin --password fake-pass --plaintext --skip-test-tls --insecure --grpc-web"* ]]
+}
+
 @test "_argocd_deploy_appproject fails when template missing" {
   local original_config="$ARGOCD_CONFIG_DIR"
   ARGOCD_CONFIG_DIR="$BATS_TEST_TMPDIR/argocd-empty"
