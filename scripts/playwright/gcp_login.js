@@ -87,7 +87,7 @@ async function handleGcpOAuthFlow() {
   if (GCP_ACCOUNT) {
     const emailInput = oauthPage.locator('input[type="email"]').first();
     if (await emailInput.isVisible({ timeout: 5000 }).catch(() => false)) {
-      console.error(`INFO: Entering email ${GCP_ACCOUNT}...`);
+      console.error('INFO: Entering email...');
       await emailInput.fill(GCP_ACCOUNT);
       await oauthPage.locator('button:has-text("Next")').first().click();
       await oauthPage.waitForLoadState('domcontentloaded', { timeout: 10000 });
