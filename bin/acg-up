@@ -89,15 +89,10 @@ esac
 _info "[acg-up] Step 2/12 — Provisioning 3-node cluster..."
 deploy_cluster --provider "${_cluster_provider}" --confirm
 
-if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
-  _info "[acg-up] GCP cluster deployed. Steps 3–12 (SSH tunnel, Vault, ESO, ArgoCD) are AWS-only and not yet ported for GCP."
-  _info "[acg-up] Run 'kubectl get nodes' to verify the cluster."
-  kubectl get nodes
-  exit 0
+if [[ "${_cluster_provider}" != "k3s-gcp" ]]; then
+  _info "[acg-up] Step 3/12 — Starting SSH tunnel..."
+  tunnel_start
 fi
-
-_info "[acg-up] Step 3/12 — Starting SSH tunnel..."
-tunnel_start
 
 _HUB_CLUSTER_CTX="k3d-${HUB_CLUSTER_NAME:-k3d-cluster}"
 _hub_newly_created=0
@@ -144,6 +139,13 @@ elif [[ "${_vault_sealed}" == "unknown" ]]; then
   _err "[acg-up] Vault not responding on localhost:8200 — port-forward may have failed. Check: ${HOME}/.local/share/k3d-manager/vault-pf.log"
 fi
 _info "[acg-up] Vault is unsealed and reachable."
+
+if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
+  _info "[acg-up] Steps 5–12 (ESO, ArgoCD registration, Vault bridge) not yet ported for GCP."
+  _info "[acg-up] Hub cluster is up. GCP app cluster nodes:"
+  kubectl get nodes --context ubuntu-gcp 2>/dev/null || true
+  exit 0
+fi
 
 _info "[acg-up] Step 5/12 — Creating ghcr-pull-secret in all app namespaces..."
 _ghcr_pat="${GHCR_PAT:-}"
