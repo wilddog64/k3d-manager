@@ -131,7 +131,7 @@ function _gcp_capture_auth_url() {
   local url=""
   local _i
 
-  gcloud auth login --no-launch-browser --account "${account}" >"${url_file}" 2>&1 &
+  gcloud auth login --account "${account}" >"${url_file}" 2>&1 &
 
   for _i in $(seq 1 10); do
     url=$(grep -oE 'https://accounts\.google\.com[^[:space:]]+' "${url_file}" 2>/dev/null | head -1 || true)
@@ -157,25 +157,24 @@ function _gcp_perform_login_auth() {
     return $?
   fi
 
-  local _gcloud_url_file
-  _gcloud_url_file=$(mktemp)
-  local _auth_url
-  _auth_url=$(_gcp_capture_auth_url "${account}" "${_gcloud_url_file}")
-  local gcloud_pid
-  gcloud_pid=$(pgrep -n -f "gcloud auth login --no-launch-browser --account ${account}")
+  # Inject fake browser-open commands so gcloud's OAuth URL is routed into the
+  # CDP Chrome session instead of the system default browser.
+  # macOS: gcloud calls `open <url>`; Linux: gcloud calls `xdg-open <url>` or $BROWSER.
+  local _open_dir
+  _open_dir=$(mktemp -d)
+  cat > "${_open_dir}/browser" <<INTERCEPT
+#!/usr/bin/env bash
+exec env GCP_AUTH_URL="\$1" GCP_USERNAME="${account}" PLAYWRIGHT_CDP_HOST="${PLAYWRIGHT_CDP_HOST}" PLAYWRIGHT_CDP_PORT="${PLAYWRIGHT_CDP_PORT}" node "${playwright_dir}/gcp_login.js" "${account}"
+INTERCEPT
+  chmod +x "${_open_dir}/browser"
+  ln -s "${_open_dir}/browser" "${_open_dir}/open"
+  ln -s "${_open_dir}/browser" "${_open_dir}/xdg-open"
 
-  rm -f "${_gcloud_url_file}"
-  if [[ -z "${_auth_url}" ]]; then
-    _err "[gcp] Could not capture gcloud OAuth URL — manual gcloud auth login required"
-  fi
-  GCP_USERNAME="${account}" \
-  GCP_AUTH_URL="${_auth_url}" \
-  PLAYWRIGHT_CDP_HOST="${PLAYWRIGHT_CDP_HOST}" \
-  PLAYWRIGHT_CDP_PORT="${PLAYWRIGHT_CDP_PORT}" \
-  node "${playwright_dir}/gcp_login.js" "${account}"
-  if [[ -n "$gcloud_pid" ]]; then
-    wait "${gcloud_pid}"
-  fi
+  PATH="${_open_dir}:${PATH}" BROWSER="${_open_dir}/browser" \
+    gcloud auth login --account "${account}"
+  local exit_code=$?
+  rm -rf "${_open_dir}"
+  return "${exit_code}"
 }
 
 function gcp_login() {
