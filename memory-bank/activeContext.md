@@ -14,7 +14,8 @@ All v1.1.0 bug detail archived in `docs/bugs/` and `git log`.
 
 ## v1.2.0 Open Items
 
-- **ACG repo extraction** — IN PROGRESS (`docs/plans/v1.2.0-lib-acg-extraction.md`). P1 COMPLETE, P2 COMPLETE, P3 COMPLETE (`f1c577c`), P4 COMPLETE (`99b2e143`). Next: verify/close residual ArgoCD help/login gaps.
+- **ACG repo extraction** — IN PROGRESS (`docs/plans/v1.2.0-lib-acg-extraction.md`). P1 COMPLETE, P2 COMPLETE, P3 COMPLETE (`f1c577c`), P4 COMPLETE (`99b2e143`). Bug fix P4b in progress: stub grep incompatibility (`docs/bugs/2026-04-25-acg-gcp-stub-grep-incompatible.md`).
+- **ACG repo extraction P4b bug** — IN PROGRESS. Phase 4 stubs use source-only pattern; dispatcher grep can't find function names. Fix: replace with wrapper-function stubs. Spec: `docs/bugs/2026-04-25-acg-gcp-stub-grep-incompatible.md`.
 - **ACG repo extraction P4** — COMPLETE (`99b2e143`). Wired the `wilddog64/lib-acg` subtree into `scripts/lib/acg/`, replaced `scripts/plugins/acg.sh` and `scripts/plugins/gcp.sh` with stubs, and updated `scripts/plugins/gemini.sh` to source CDP helpers from the subtree.
 - **ACG repo extraction P3** — COMPLETE (`f1c577c`). Migrated acg/gcp/playwright files from k3d-manager to `wilddog64/lib-acg` and pushed `feat/phase3-migration`.
 - **ACG repo extraction P1** — COMPLETE (`20df717c`). Renamed `antigravity.sh` → `gemini.sh`; all `antigravity_*` → `gemini_*`.
