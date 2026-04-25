@@ -250,6 +250,8 @@ docs/
 
 **Convenience Scripts** (`bin/` — also available as Claude `/skills`)
 
+- **[Makefile Reference](docs/howto/makefile.md)** — All `make` targets with usage, env vars, and when to use each
+
 | Script | Claude Skill | When to use |
 |---|---|---|
 | `bin/acg-up [--login-prompt]` | `/acg-up` | Start from scratch — full provision + ghcr-pull-secret |
