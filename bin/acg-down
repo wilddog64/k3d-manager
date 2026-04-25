@@ -56,6 +56,13 @@ case "${_cluster_provider}" in
   k3s-gcp)
     source "${REPO_ROOT}/scripts/lib/providers/k3s-gcp.sh"
     _info "[acg-down] Tearing down GCP cluster..."
+    if [[ -z "${GCP_PROJECT:-}" ]]; then
+      _gcp_sa_json="${HOME}/.local/share/k3d-manager/gcp-service-account.json"
+      if [[ -f "${_gcp_sa_json}" ]]; then
+        GCP_PROJECT="$(python3 -c "import json; print(json.load(open('${_gcp_sa_json}')).get('project_id',''))" 2>/dev/null || true)"
+        export GCP_PROJECT
+      fi
+    fi
     _provider_k3s_gcp_destroy_cluster --confirm
     ;;
   *)
