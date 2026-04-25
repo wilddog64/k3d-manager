@@ -70,7 +70,7 @@ argocd-registration:
 
 ## Sync ArgoCD data-layer and show remote pod status
 sync-apps:
-	bin/acg-sync-apps
+	APP_CONTEXT=$(if $(filter k3s-gcp,$(CLUSTER_PROVIDER)),ubuntu-gcp,ubuntu-k3s) bin/acg-sync-apps
 
 ## Ensure AWS Session Manager plugin is installed (required for SSM-based deployment)
 ssm:
