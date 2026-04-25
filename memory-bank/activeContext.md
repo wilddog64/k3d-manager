@@ -14,7 +14,8 @@ All v1.1.0 bug detail archived in `docs/bugs/` and `git log`.
 
 ## v1.2.0 Open Items
 
-- **ACG repo extraction** — IN PROGRESS (`docs/plans/v1.2.0-lib-acg-extraction.md`). P1 COMPLETE, P2 COMPLETE, P3 COMPLETE (`f1c577c`). Next: P4 wire subtree.
+- **ACG repo extraction** — IN PROGRESS (`docs/plans/v1.2.0-lib-acg-extraction.md`). P1 COMPLETE, P2 COMPLETE, P3 COMPLETE (`f1c577c`), P4 COMPLETE (`99b2e143`). Next: verify/close residual ArgoCD help/login gaps.
+- **ACG repo extraction P4** — COMPLETE (`99b2e143`). Wired the `wilddog64/lib-acg` subtree into `scripts/lib/acg/`, replaced `scripts/plugins/acg.sh` and `scripts/plugins/gcp.sh` with stubs, and updated `scripts/plugins/gemini.sh` to source CDP helpers from the subtree.
 - **ACG repo extraction P3** — COMPLETE (`f1c577c`). Migrated acg/gcp/playwright files from k3d-manager to `wilddog64/lib-acg` and pushed `feat/phase3-migration`.
 - **ACG repo extraction P1** — COMPLETE (`20df717c`). Renamed `antigravity.sh` → `gemini.sh`; all `antigravity_*` → `gemini_*`.
 - **ACG repo extraction P2** — COMPLETE (`b253b9b`). `wilddog64/lib-acg` created; skeleton + lib-foundation subtree committed and pushed; branch protection set.
