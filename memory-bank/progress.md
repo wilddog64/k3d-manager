@@ -18,6 +18,7 @@ Pre-v1.0.4 detail removed from this file; see `git log --tags` and `docs/retro/`
 ## v1.2.0 Track (branch: `k3d-manager-v1.2.0`)
 
 - [ ] **ACG repo extraction** — PLANNED. Plan: `docs/plans/v1.2.0-lib-acg-extraction.md`. 4 phases: (1) rename antigravity→gemini, (2) create lib-acg repo, (3) migrate files, (4) wire subtree into k3d-manager.
+- [x] **ACG repo extraction phase 1** — COMPLETE (`b83d5596`). Spec `docs/plans/v1.2.0-phase1-gemini-rename.md`; renamed the plugin and how-to entry points to `gemini`, updated checked-path references, and left the remaining lib-acg phases planned.
 - [ ] **GCP E2E smoke test** — BLOCKED. GCP cluster provisioning is PARTIAL; full `make up` end-to-end on a live GCP sandbox not yet verified.
 
 ---

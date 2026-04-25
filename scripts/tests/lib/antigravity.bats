@@ -8,32 +8,32 @@ setup() {
   export -f _command_exist _is_mac sleep
 
   # Source the plugin under test
-  source "scripts/plugins/antigravity.sh"
+  source "scripts/plugins/gemini.sh"
 }
 
-@test "_antigravity_ensure_acg_session: returns 0 when gemini succeeds" {
-  _ensure_antigravity() { return 0; }
+@test "_gemini_ensure_github_session: returns 0 when gemini succeeds" {
+  _ensure_gemini() { return 0; }
   gemini() { return 0; }
   _info() { :; }
-  export -f _ensure_antigravity gemini _info
+  export -f _ensure_gemini gemini _info
 
-  run _antigravity_ensure_acg_session
+  run _gemini_ensure_github_session
   [ "$status" -eq 0 ]
-  unset -f _ensure_antigravity gemini _info
+  unset -f _ensure_gemini gemini _info
 }
 
-@test "_antigravity_ensure_acg_session: returns 1 when gemini fails" {
-  _ensure_antigravity() { return 0; }
+@test "_gemini_ensure_github_session: returns 1 when gemini fails" {
+  _ensure_gemini() { return 0; }
   gemini() { return 1; }
   _info() { :; }
-  export -f _ensure_antigravity gemini _info
+  export -f _ensure_gemini gemini _info
 
-  run _antigravity_ensure_acg_session
+  run _gemini_ensure_github_session
   [ "$status" -eq 1 ]
-  unset -f _ensure_antigravity gemini _info
+  unset -f _ensure_gemini gemini _info
 }
 
-@test "_antigravity_gemini_prompt: succeeds on first model" {
+@test "_gemini_prompt: succeeds on first model" {
   _info() { :; }
   sleep() { :; }
   gemini() {
@@ -41,15 +41,15 @@ setup() {
     return 1
   }
   export -f _info gemini
-  source "scripts/plugins/antigravity.sh"
+  source "scripts/plugins/gemini.sh"
 
-  run _antigravity_gemini_prompt "test prompt"
+  run _gemini_prompt "test prompt"
   [ "$status" -eq 0 ]
   [[ "$output" == *"ok"* ]]
   unset -f _info gemini sleep
 }
 
-@test "_antigravity_gemini_prompt: falls back to next model on 429" {
+@test "_gemini_prompt: falls back to next model on 429" {
   _info() { :; }
   sleep() { :; }
   gemini() {
@@ -64,29 +64,29 @@ setup() {
     return 1
   }
   export -f _info gemini
-  source "scripts/plugins/antigravity.sh"
+  source "scripts/plugins/gemini.sh"
 
-  run _antigravity_gemini_prompt "test prompt"
+  run _gemini_prompt "test prompt"
   [ "$status" -eq 0 ]
   [[ "$output" == *"ok"* ]]
   unset -f _info gemini sleep
 }
 
-@test "_antigravity_gemini_prompt: fails when all models exhausted" {
+@test "_gemini_prompt: fails when all models exhausted" {
   _info() { :; }
   _err() { echo "$*"; exit 1; }
   sleep() { :; }
   gemini() { echo "429 RESOURCE_EXHAUSTED rateLimitExceeded"; return 1; }
   export -f _info _err gemini
-  source "scripts/plugins/antigravity.sh"
+  source "scripts/plugins/gemini.sh"
 
-  run _antigravity_gemini_prompt "test prompt"
+  run _gemini_prompt "test prompt"
   [ "$status" -ne 0 ]
   [[ "$output" == *"All gemini models exhausted"* ]]
   unset -f _info _err gemini sleep
 }
 
-@test "_antigravity_gemini_prompt: passes --approval-mode yolo to gemini when --yolo flag given" {
+@test "_gemini_prompt: passes --approval-mode yolo to gemini when --yolo flag given" {
   _info() { :; }
   gemini() {
     local found_yolo=0
@@ -101,22 +101,22 @@ setup() {
     return 0
   }
   export -f _info gemini
-  source "scripts/plugins/antigravity.sh"
+  source "scripts/plugins/gemini.sh"
 
-  run _antigravity_gemini_prompt "test prompt" --yolo
+  run _gemini_prompt "test prompt" --yolo
   [ "$status" -eq 0 ]
   [[ "$output" == *"ok"* ]]
   unset -f _info gemini
 }
 
-@test "_antigravity_gemini_prompt: creates workspace temp dir" {
+@test "_gemini_prompt: creates workspace temp dir" {
   _info() { :; }
   gemini() { echo "ok"; return 0; }
   export -f _info gemini
   HOME="${BATS_TEST_TMPDIR}"
-  source "scripts/plugins/antigravity.sh"
+  source "scripts/plugins/gemini.sh"
 
-  run _antigravity_gemini_prompt "test prompt"
+  run _gemini_prompt "test prompt"
   [ "$status" -eq 0 ]
   [ -d "${BATS_TEST_TMPDIR}/.gemini/tmp/k3d-manager" ]
   unset -f _info gemini
