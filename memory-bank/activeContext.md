@@ -14,10 +14,10 @@ All v1.1.0 bug detail archived in `docs/bugs/` and `git log`.
 
 ## v1.2.0 Open Items
 
-- **ACG repo extraction** — IN PROGRESS (`docs/plans/v1.2.0-lib-acg-extraction.md`). P1 COMPLETE, P2 COMPLETE, P3 COMPLETE (`f1c577c`), P4 COMPLETE (`99b2e143`), P4b COMPLETE (`c54de858`), GCP OAuth fix COMPLETE (`04493b3` lib-acg / `d25477c4` k3d-manager). P5 ASSIGNED: lib-acg CI + pre-commit setup (`docs/plans/v1.2.0-phase5-lib-acg-ci-setup.md`).
-- **ACG repo extraction P5** — COMPLETE (`ba45bd5` lib-acg). lib-acg CI (shellcheck + node --check + yamllint) + pre-commit hook + CHANGELOG. Spec: `docs/plans/v1.2.0-phase5-lib-acg-ci-setup.md`. Branch: `feat/phase5-ci-setup` in lib-acg.
-- **GCP Sign-in-to-Chrome dialog** — COMPLETE (`ff44516` lib-acg). `gcp_login.js` now dismisses Chrome's account-sync prompt via `context.on('page', ...)` handler. Spec: `docs/bugs/2026-04-25-gcp-login-chrome-signin-dialog.md`.
-- **acg-extend Session Extended modal** — COMPLETE (`ac6525a` lib-acg). Modal dismissed via Escape + fallback X-button before extend button search. Spec: `docs/bugs/2026-04-26-acg-extend-session-extended-modal-blocks-button.md`.
+- **ACG repo extraction** — IN PROGRESS (`docs/plans/v1.2.0-lib-acg-extraction.md`). P1–P5 COMPLETE. lib-acg PR #1 merged (`5c0e8e2d`). k3d-manager subtree synced from main (`84da5d5e`). enforce_admins restored on lib-acg.
+- **ACG repo extraction P5** — COMPLETE. lib-acg PR #1 merged to main (`5c0e8e2d`). CI (shellcheck + node --check + yamllint) + pre-commit hook + Copilot findings fixed (`698e65f`). k3d-manager subtree at `scripts/lib/acg/` updated (`84da5d5e`).
+- **GCP Sign-in-to-Chrome dialog** — COMPLETE (`ff44516` lib-acg, merged `5c0e8e2d`). `gcp_login.js` now dismisses Chrome's account-sync prompt via `context.on('page', ...)` handler. Spec: `docs/bugs/2026-04-25-gcp-login-chrome-signin-dialog.md`.
+- **acg-extend Session Extended modal** — COMPLETE (`ac6525a` lib-acg, merged `5c0e8e2d`). Modal dismissed via Escape + fallback X-button + waitFor(hidden) guard. Spec: `docs/bugs/2026-04-26-acg-extend-session-extended-modal-blocks-button.md`.
 - **sync-apps APP_CONTEXT hardwired** — COMPLETE. `make sync-apps CLUSTER_PROVIDER=k3s-gcp` was using `ubuntu-k3s` (AWS) context for pod status check instead of `ubuntu-gcp`. Fixed in Makefile `sync-apps` target. Spec: `docs/bugs/2026-04-25-sync-apps-app-context-hardwired-ubuntu-k3s.md`.
 - **status APP_CONTEXT hardwired** — COMPLETE. Same root cause: `make status CLUSTER_PROVIDER=k3s-gcp` showed empty nodes from unreachable `ubuntu-k3s`. Fixed with same Makefile pattern. Spec: `docs/bugs/2026-04-25-status-app-context-hardwired-ubuntu-k3s.md`.
 - **status ArgoCD CLI requires port-forward** — COMPLETE. Replaced `argocd app list` (requires active port-forward) with `kubectl get applications.argoproj.io -A --context INFRA_CONTEXT` (reads CRDs directly, no port-forward needed). Spec: `docs/bugs/2026-04-25-status-argocd-requires-port-forward.md`.
