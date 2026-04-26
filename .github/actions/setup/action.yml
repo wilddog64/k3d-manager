@@ -1,0 +1,23 @@
+name: Setup CI Dependencies
+description: Install shellcheck, Node.js, and yamllint
+runs:
+  using: composite
+  steps:
+    - name: Install apt packages
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt-get update
+        sudo apt-get install -y shellcheck python3-pip
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install yamllint
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 -m pip install --user yamllint
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
