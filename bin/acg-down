@@ -48,7 +48,8 @@ case "${_cluster_provider}" in
     tunnel_stop 2>/dev/null || true
     _info "[acg-down] Tearing down CloudFormation stack (AWS)..."
     if aws sts get-caller-identity --region "${ACG_REGION}" --query 'Arn' --output text >/dev/null 2>&1; then
-      acg_teardown --confirm
+      acg_teardown --confirm || \
+        _info "[acg-down] CloudFormation teardown failed — sandbox may have been recreated with new credentials. Stack cleanup skipped; continuing Hub teardown."
     else
       _info "[acg-down] AWS credentials invalid or expired — sandbox already removed. Skipping CloudFormation teardown."
     fi
