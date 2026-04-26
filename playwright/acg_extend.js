@@ -94,10 +94,15 @@ async function extendSandbox() {
       await page.waitForTimeout(500);
       // Fallback: click the X button if Escape didn't close it
       const _closeBtn = page.locator('[role="dialog"] button, button:has-text("×"), button[aria-label*="close" i]').first();
-      if (await _closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      if (await _sessionExtendedModal.isVisible({ timeout: 1000 }).catch(() => false) &&
+          await _closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
         await _closeBtn.click({ force: true }).catch(() => {});
         await page.waitForTimeout(500);
       }
+      // Confirm the modal is gone before proceeding — guards against slow close animations
+      await _sessionExtendedModal.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {
+        console.error('WARN: "Session extended" modal did not close within 3s — proceeding anyway');
+      });
     }
 
     // Wait for skeleton loaders to clear
