@@ -15,6 +15,8 @@ All v1.1.0 bug detail archived in `docs/bugs/` and `git log`.
 ## v1.2.0 Open Items
 
 - **LDAP hardcoded test password** — OPEN. All LDAP users share static `test1234` baked into `bootstrap-basic-schema.ldif`. Fix: remove `userPassword` from LDIF; add `_ldap_rotate_user_passwords` to `ldap.sh` (generates unique pw per user, stores in Vault `secret/ldap/users/<user>`); also persist Dex bind PW into `argocd-secret` via `deploy_argocd`. Spec: `docs/bugs/2026-04-26-ldap-users-hardcoded-test-password.md`.
+- **LDAP SSHA double-hash** — OPEN. Bitnami OpenLDAP re-hashes `{SSHA}` values in LDIF import — all bootstrapped users have unknown passwords. Workaround: set passwords via `ldappasswd`. Permanent fix: remove `userPassword` from LDIF (covered in parent bug spec). Spec: `docs/bugs/2026-04-26-ldap-ssha-rehash-password-unusable.md`. Current live cred: `chengkai.liang` / `ChangeMe123!` (ephemeral).
+- **ArgoCD missing shopping-cart apps** — OPEN. `services/` directory missing — `services-git` ApplicationSet generates zero apps. Also: ApplicationSet hardcodes Hub cluster as destination instead of ubuntu-k3s. Spec: `docs/bugs/2026-04-26-argocd-missing-shopping-cart-apps.md`.
 - **ArgoCD port-forward on acg-up** — COMPLETE (`3c671667`). Step 4b added to `bin/acg-up`; cleanup in `bin/acg-down`. PID at `~/.local/share/k3d-manager/argocd-pf.pid`.
 - **ArgoCD LDAP RBAC group mismatch** — PATCHED (ephemeral). `argocd-rbac-cm` mapped `cn=admins` (non-existent) to `role:admin`; patched to map `cn=it-devops` instead. Dex bind PW patched into `argocd-secret` ephemerally — both lost on Hub rebuild. Permanent fix is part of LDAP hardcoded password bug spec.
 
