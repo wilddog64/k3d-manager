@@ -160,8 +160,13 @@ function _gcp_perform_login_auth() {
   # Inject fake browser-open commands so gcloud's OAuth URL is routed into the
   # CDP Chrome session instead of the system default browser.
   # macOS: gcloud calls `open <url>`; Linux: gcloud calls `xdg-open <url>` or $BROWSER.
+  # The intercept script runs synchronously (blocking) so gcloud's localhost redirect
+  # server receives the OAuth callback only after the browser completes the full flow.
   local _open_dir
   _open_dir=$(mktemp -d)
+  # Ensure the temp dir is always removed — even if gcloud or Playwright is interrupted.
+  # shellcheck disable=SC2064
+  trap "rm -rf '${_open_dir}'" RETURN
   cat > "${_open_dir}/browser" <<INTERCEPT
 #!/usr/bin/env bash
 exec env GCP_AUTH_URL="\$1" GCP_USERNAME="${account}" PLAYWRIGHT_CDP_HOST="${PLAYWRIGHT_CDP_HOST}" PLAYWRIGHT_CDP_PORT="${PLAYWRIGHT_CDP_PORT}" node "${playwright_dir}/gcp_login.js" "${account}"
@@ -173,7 +178,6 @@ INTERCEPT
   PATH="${_open_dir}:${PATH}" BROWSER="${_open_dir}/browser" \
     gcloud auth login --account "${account}"
   local exit_code=$?
-  rm -rf "${_open_dir}"
   return "${exit_code}"
 }
 
