@@ -14,6 +14,10 @@ All v1.1.0 bug detail archived in `docs/bugs/` and `git log`.
 
 ## v1.2.0 Open Items
 
+- **LDAP hardcoded test password** — OPEN. All LDAP users share static `test1234` baked into `bootstrap-basic-schema.ldif`. Fix: remove `userPassword` from LDIF; add `_ldap_rotate_user_passwords` to `ldap.sh` (generates unique pw per user, stores in Vault `secret/ldap/users/<user>`); also persist Dex bind PW into `argocd-secret` via `deploy_argocd`. Spec: `docs/bugs/2026-04-26-ldap-users-hardcoded-test-password.md`.
+- **ArgoCD port-forward on acg-up** — COMPLETE (`3c671667`). Step 4b added to `bin/acg-up`; cleanup in `bin/acg-down`. PID at `~/.local/share/k3d-manager/argocd-pf.pid`.
+- **ArgoCD LDAP RBAC group mismatch** — PATCHED (ephemeral). `argocd-rbac-cm` mapped `cn=admins` (non-existent) to `role:admin`; patched to map `cn=it-devops` instead. Dex bind PW patched into `argocd-secret` ephemerally — both lost on Hub rebuild. Permanent fix is part of LDAP hardcoded password bug spec.
+
 - **ACG repo extraction** — IN PROGRESS (`docs/plans/v1.2.0-lib-acg-extraction.md`). P1–P5 COMPLETE. lib-acg PR #1 merged (`5c0e8e2d`). k3d-manager subtree synced from main (`84da5d5e`). enforce_admins restored on lib-acg.
 - **ACG repo extraction P5** — COMPLETE. lib-acg PR #1 merged to main (`5c0e8e2d`). CI (shellcheck + node --check + yamllint) + pre-commit hook + Copilot findings fixed (`698e65f`). k3d-manager subtree at `scripts/lib/acg/` updated (`84da5d5e`).
 - **GCP Sign-in-to-Chrome dialog** — COMPLETE (`ff44516` lib-acg, merged `5c0e8e2d`). `gcp_login.js` now dismisses Chrome's account-sync prompt via `context.on('page', ...)` handler. Spec: `docs/bugs/2026-04-25-gcp-login-chrome-signin-dialog.md`.
