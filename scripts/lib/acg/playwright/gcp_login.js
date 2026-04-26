@@ -35,6 +35,19 @@ async function handleGcpOAuthFlow() {
   }
   const context = contexts[0];
 
+  // Dismiss "Sign in to Chrome?" dialog — Chrome offers to sync with the signed-in Google
+  // account; appears as a new page mid-OAuth flow. Dismiss without creating a Chrome profile.
+  context.on('page', async (page) => {
+    try {
+      await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
+      const noChromeSignInBtn = page.locator('button:has-text("Use Chrome Without an Account")');
+      if (await noChromeSignInBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        console.error('INFO: Dismissing "Sign in to Chrome?" dialog...');
+        await noChromeSignInBtn.click();
+      }
+    } catch { /* best-effort */ }
+  });
+
   // Step 0 — Navigate to Google logout to clear all stale sessions
   console.error('INFO: Clearing stale Google sessions...');
   const logoutPage = await context.newPage();
@@ -48,7 +61,7 @@ async function handleGcpOAuthFlow() {
     oauthPage = await context.newPage();
     await oauthPage.goto(GCP_AUTH_URL, { waitUntil: 'domcontentloaded', timeout: 30000 });
   } else {
-    // macOS: gcloud opens the OAuth tab in this Chrome session — wait for it
+    // No URL provided: wait for gcloud to open the OAuth tab directly in this CDP session
     oauthPage = context.pages().find(p => {
       try {
         const h = new URL(p.url()).hostname;
