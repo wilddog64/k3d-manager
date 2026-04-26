@@ -79,13 +79,14 @@ if [[ -f "${_vault_pf_pid_file}" ]]; then
   _info "[acg-down] Vault port-forward stopped"
 fi
 
-_info "[acg-down] Stopping ArgoCD port-forward..."
-_argocd_pf_pid_file="${HOME}/.local/share/k3d-manager/argocd-pf.pid"
-if [[ -f "${_argocd_pf_pid_file}" ]]; then
-  kill "$(cat "${_argocd_pf_pid_file}")" 2>/dev/null || true
-  rm -f "${_argocd_pf_pid_file}"
-  _info "[acg-down] ArgoCD port-forward stopped"
+_info "[acg-down] Stopping ArgoCD port-forward launchd agent..."
+_argocd_pf_label="com.k3d-manager.argocd-port-forward"
+_argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
+if launchctl list "${_argocd_pf_label}" >/dev/null 2>&1; then
+  launchctl unload "${_argocd_pf_plist}" 2>/dev/null || true
+  _info "[acg-down] ArgoCD port-forward launchd agent unloaded"
 fi
+rm -f "${_argocd_pf_plist}"
 
 if [[ "${_keep_hub}" -eq 0 ]]; then
   _HUB_CLUSTER="${HUB_CLUSTER_NAME:-k3d-cluster}"
