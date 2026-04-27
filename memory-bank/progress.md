@@ -50,7 +50,7 @@ Pre-v1.0.4 detail removed from this file; see `git log --tags` and `docs/retro/`
 ---
 
 ## Known Bugs / Gaps
-- [ ] **shopping-cart ImagePullBackOff — no ghcr-pull-secret** — OPEN. `acg-up` Step 5 exits when `GHCR_PAT` unset; `services/` overlays lack `imagePullSecrets` patch. Spec: `docs/bugs/2026-04-26-shopping-cart-imagepullbackoff-no-ghcr-pull-secret.md`.
+- [x] **shopping-cart ImagePullBackOff — no ghcr-pull-secret** — COMPLETE (`4b0856cb`). `gh auth token` fallback + kustomize `imagePullSecrets` patch on all 5 services. Takes effect on next `make up`.
 - [ ] **ArgoCD SharedResourceWarning — duplicate Namespace/shopping-cart-apps** — OPEN. `shopping-cart-order` + `shopping-cart-product-catalog` both define `Namespace/shopping-cart-apps`; `product-catalog` stays OutOfSync. Fix: remove `namespace.yaml` from both repos, add `services/shopping-cart-namespace/` in k3d-manager. Spec: `docs/bugs/2026-04-26-argocd-shared-namespace-shopping-cart.md`. Repos: `shopping-cart-order`, `shopping-cart-product-catalog`, `k3d-manager`.
 - [ ] **Orchestration Fragility** — OPEN. Issue `docs/bugs/2026-04-23-infra-orchestration-fragility.md`; the local Hub flow does not explicitly unify ArgoCD install, bootstrap, app-cluster registration, and operator access setup.
 - [ ] **Dual-cluster Status UX** — OPEN. Issue `docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`; `make up` and `make status` do not clearly separate local Hub health, remote app-cluster health, tunnel endpoint state, and local ArgoCD access setup.
