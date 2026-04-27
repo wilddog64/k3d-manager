@@ -9,8 +9,15 @@ patches:
         value:
           - name: ghcr-pull-secret
       - op: replace
-        path: /spec/template/spec/containers/0/readinessProbe/httpGet/path
-        value: /actuator/health
+        path: /spec/template/spec/containers/0/readinessProbe
+        value:
+          tcpSocket:
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
       - op: replace
         path: /spec/template/spec/containers/0/livenessProbe/httpGet/path
         value: /actuator/health
@@ -26,12 +33,6 @@ patches:
       - op: add
         path: /data/SPRING_RABBITMQ_USERNAME
         value: guest
-      - op: add
-        path: /data/MANAGEMENT_HEALTH_STATUS_HTTP_MAPPING_DOWN
-        value: "200"
-      - op: add
-        path: /data/MANAGEMENT_HEALTH_STATUS_HTTP_MAPPING_OUT_OF_SERVICE
-        value: "200"
     target:
       kind: ConfigMap
       name: order-service-config
