@@ -46,9 +46,14 @@ longer in use.
 
 ## Fix
 
-### Part A — `bin/acg-up`: fall back to Vault for GHCR PAT
+### Part A — `bin/acg-up`: fall back to `gh auth token` for GHCR PAT
 
 **File:** `bin/acg-up`
+
+**Why `gh auth token` and not Vault:** Vault is wiped on every full `acg-down`. A Vault-stored
+PAT would not survive sandbox rebuilds. The `gh` CLI PAT is persistent on the Mac, already
+managed by `pat-rotate.sh`, and the user's PAT includes `read:packages` scope. Using
+`gh auth token` auto-rotates whenever the user rotates their PAT.
 
 **Exact old block (lines ~194–198):**
 ```bash
@@ -64,11 +69,12 @@ fi
 _ghcr_pat="${GHCR_PAT:-}"
 _github_user="${GITHUB_USERNAME:-wilddog64}"
 if [[ -z "$_ghcr_pat" ]]; then
-  _info "[acg-up] GHCR_PAT not in env — reading from Vault secret/github/ghcr-pull-token"
-  _ghcr_pat=$(vault kv get -field=token secret/github/ghcr-pull-token 2>/dev/null || true)
+  _info "[acg-up] GHCR_PAT not in env — falling back to gh auth token"
+  _ghcr_pat=$(gh auth token 2>/dev/null || true)
   if [[ -z "$_ghcr_pat" ]]; then
-    _err "[acg-up] GHCR_PAT not set and Vault secret/github/ghcr-pull-token not found. Seed it once: vault kv put secret/github/ghcr-pull-token token=<PAT-with-read:packages>"
+    _err "[acg-up] GHCR_PAT not set and gh auth token returned nothing — run: gh auth login"
   fi
+  _info "[acg-up] using gh CLI token for ghcr-pull-secret"
 fi
 ```
 
@@ -209,18 +215,6 @@ patches:
 
 ---
 
-## One-Time Manual Setup (run once before next `make up`)
-
-Store a GitHub PAT with `read:packages` scope in Vault:
-```bash
-vault kv put secret/github/ghcr-pull-token token=<your-PAT>
-```
-
-The PAT needs only `read:packages` — a fine-grained PAT scoped to
-`wilddog64/shopping-cart-*` packages is sufficient. It is separate from the
-`gh` CLI PAT (which needs broader scopes).
-
----
 
 ## Rules
 
@@ -231,7 +225,7 @@ The PAT needs only `read:packages` — a fine-grained PAT scoped to
 
 ## Definition of Done
 
-- [ ] `bin/acg-up` Step 5 reads `GHCR_PAT` from Vault `secret/github/ghcr-pull-token` when env var is not set
+- [ ] `bin/acg-up` Step 5 falls back to `gh auth token` when `GHCR_PAT` env var is not set
 - [ ] All 5 `services/shopping-cart-*/kustomization.yaml` files have the `imagePullSecrets` patch block
 - [ ] `shellcheck` passes with zero new warnings on `bin/acg-up`
 - [ ] Commit message: `fix(acg-up): read GHCR_PAT from Vault and patch imagePullSecrets into services kustomizations`
@@ -246,5 +240,6 @@ The PAT needs only `read:packages` — a fine-grained PAT scoped to
 - Do NOT skip pre-commit hooks (`--no-verify`)
 - Do NOT modify files outside the listed targets
 - Do NOT commit to `main` — work on `k3d-manager-v1.2.0`
-- Do NOT modify `bin/pat-rotate.sh` — the gh CLI PAT and the GHCR pull token are separate concerns
-- Do NOT add `GHCR_PAT` to any file in git — tokens stay in Vault only
+- Do NOT modify `bin/pat-rotate.sh`
+- Do NOT add `GHCR_PAT` or any token value to any file in git
+- Do NOT use Vault as the fallback — Vault is wiped on `acg-down`; use `gh auth token`
