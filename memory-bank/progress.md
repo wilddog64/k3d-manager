@@ -50,6 +50,7 @@ Pre-v1.0.4 detail removed from this file; see `git log --tags` and `docs/retro/`
 ---
 
 ## Known Bugs / Gaps
+- [ ] **ArgoCD SharedResourceWarning — duplicate Namespace/shopping-cart-apps** — OPEN. `shopping-cart-order` + `shopping-cart-product-catalog` both define `Namespace/shopping-cart-apps`; `product-catalog` stays OutOfSync. Fix: remove `namespace.yaml` from both repos, add `services/shopping-cart-namespace/` in k3d-manager. Spec: `docs/bugs/2026-04-26-argocd-shared-namespace-shopping-cart.md`. Repos: `shopping-cart-order`, `shopping-cart-product-catalog`, `k3d-manager`.
 - [ ] **Orchestration Fragility** — OPEN. Issue `docs/bugs/2026-04-23-infra-orchestration-fragility.md`; the local Hub flow does not explicitly unify ArgoCD install, bootstrap, app-cluster registration, and operator access setup.
 - [ ] **Dual-cluster Status UX** — OPEN. Issue `docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`; `make up` and `make status` do not clearly separate local Hub health, remote app-cluster health, tunnel endpoint state, and local ArgoCD access setup.
 - [ ] **ACG Extraction Boundary** — OPEN. Issue `docs/bugs/2026-04-23-acg-extraction-boundary-gemini-coupling.md`; the `acg_*` workflow still keeps Gemini/browser automation coupled to `k3d-manager` instead of an extracted ACG subsystem.
