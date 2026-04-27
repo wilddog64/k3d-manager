@@ -222,6 +222,13 @@ The PAT needs only `read:packages` — a fine-grained PAT scoped to
 
 ---
 
+## Rules
+
+- Run `shellcheck -S warning bin/acg-up` — zero new warnings required before committing
+- No BATS tests required for this change (no pure-logic functions added)
+
+---
+
 ## Definition of Done
 
 - [ ] `bin/acg-up` Step 5 reads `GHCR_PAT` from Vault `secret/github/ghcr-pull-token` when env var is not set
