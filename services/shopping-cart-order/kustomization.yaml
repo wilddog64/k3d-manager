@@ -26,6 +26,9 @@ patches:
       - op: add
         path: /data/SPRING_RABBITMQ_USERNAME
         value: guest
+      - op: add
+        path: /data/MANAGEMENT_HEALTH_RABBITMQ_ENABLED
+        value: "false"
     target:
       kind: ConfigMap
       name: order-service-config
