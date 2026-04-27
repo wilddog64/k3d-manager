@@ -31,6 +31,8 @@ spec:
         repoURL: https://github.com/wilddog64/k3d-manager
         targetRevision: main
         path: '{{.path.path}}'
+      orphanedResources:
+        warn: false
       syncPolicy:
         automated:
           prune: true
