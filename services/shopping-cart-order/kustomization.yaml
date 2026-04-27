@@ -10,3 +10,10 @@ patches:
           - name: ghcr-pull-secret
     target:
       kind: Deployment
+  - patch: |-
+      - op: add
+        path: /data/SPRING_JPA_HIBERNATE_DDL_AUTO
+        value: update
+    target:
+      kind: ConfigMap
+      name: order-service-config
