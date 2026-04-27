@@ -10,7 +10,7 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/wilddog64/k3d-manager
-        revision: HEAD
+        revision: main
         directories:
           - path: services/*
   goTemplate: true
@@ -29,7 +29,7 @@ spec:
         namespace: shopping-cart-apps
       source:
         repoURL: https://github.com/wilddog64/k3d-manager
-        targetRevision: HEAD
+        targetRevision: main
         path: '{{.path.path}}'
       syncPolicy:
         automated:
