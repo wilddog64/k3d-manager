@@ -12,6 +12,35 @@ Key commits: `3de58f4d` vars.sh, `a986d5bb` robot engine, `9686e5c3` GCP identit
 All v1.1.0 bug detail archived in `docs/bugs/` and `git log`.
 
 
+## Sandbox Rebuild Readiness — Option 2 Decision (2026-04-27)
+
+**Decision:** Permanent fixes first, then cleanup, then merge to `main`. No ApplicationSet branch-pin hack.
+
+**Why rebuild is NOT clean today:** ApplicationSet template uses `targetRevision: main`. The kustomize workarounds for order-service (TCP probes, `ddl-auto=update`, `SPRING_RABBITMQ_*`) live on `k3d-manager-v1.2.0`, not `main`. After a fresh `make up`, order-service breaks immediately.
+
+**Cleanup dependency chain (do IN ORDER after each fix merges):**
+
+1. **After Fix 1 merges** (`shopping-cart-infra` init SQL UUID — Codex):
+   - Remove `SPRING_JPA_HIBERNATE_DDL_AUTO=update` patch from `services/shopping-cart-order/kustomization.yaml`
+
+2. **After Fix 2 AND RabbitMQHealthIndicator JAR are both fixed**:
+   - Remove all three TCP socket probe patches (readiness, liveness, startup) from `services/shopping-cart-order/kustomization.yaml`
+   - NOTE: Fix 2 (SecurityConfig) alone is NOT enough — JAR NPE still causes 503. Both must land before TCP probes come out.
+
+3. **After Fix 3 merges** (`shopping-cart-order` + `shopping-cart-product-catalog` + k3d-manager namespace app — Codex):
+   - No cleanup needed. `services/shopping-cart-namespace/` stays as the permanent namespace owner.
+
+4. **After all three cleanups above are done:**
+   - Merge `k3d-manager-v1.2.0` → `main`
+   - ApplicationSet then uses `main` forever — no workarounds, no branch-pin needed
+   - `make down` → `make up` → `make sync-apps` produces all 5 pods Running + all apps Synced+Healthy
+
+**What already survives rebuilds (no action needed):**
+- `ghcr-pull-secret` — Step 5 of `acg-up` creates it automatically
+- Data layer (PostgreSQL, Redis, RabbitMQ) — Step 10b `deploy_shopping_cart_data()` handles it
+- Password alignment — automated in `deploy_shopping_cart_data()`
+- `OrphanedResourceWarning` suppressed — `platform.yaml.tmpl` has `warn: false` (`625b82c2`)
+
 ## v1.2.0 Open Items
 
 - **LDAP hardcoded test password** — OPEN. All LDAP users share static `test1234` baked into `bootstrap-basic-schema.ldif`. Fix: remove `userPassword` from LDIF; add `_ldap_rotate_user_passwords` to `ldap.sh` (generates unique pw per user, stores in Vault `secret/ldap/users/<user>`); also persist Dex bind PW into `argocd-secret` via `deploy_argocd`. Spec: `docs/bugs/2026-04-26-ldap-users-hardcoded-test-password.md`.
