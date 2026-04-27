@@ -23,6 +23,28 @@ patches:
       - op: add
         path: /data/SPRING_JPA_HIBERNATE_DDL_AUTO
         value: update
+      - op: add
+        path: /data/SPRING_RABBITMQ_USERNAME
+        value: guest
     target:
       kind: ConfigMap
       name: order-service-config
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: order-service
+      spec:
+        template:
+          spec:
+            containers:
+            - name: order-service
+              env:
+              - name: SPRING_RABBITMQ_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: order-service-secrets
+                    key: RABBITMQ_PASSWORD
+    target:
+      kind: Deployment
+      name: order-service
