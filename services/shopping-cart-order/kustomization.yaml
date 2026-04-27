@@ -27,8 +27,11 @@ patches:
         path: /data/SPRING_RABBITMQ_USERNAME
         value: guest
       - op: add
-        path: /data/MANAGEMENT_HEALTH_RABBITMQ_ENABLED
-        value: "false"
+        path: /data/MANAGEMENT_HEALTH_STATUS_HTTP_MAPPING_DOWN
+        value: "200"
+      - op: add
+        path: /data/MANAGEMENT_HEALTH_STATUS_HTTP_MAPPING_OUT_OF_SERVICE
+        value: "200"
     target:
       kind: ConfigMap
       name: order-service-config
