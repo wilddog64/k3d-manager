@@ -194,7 +194,12 @@ _info "[acg-up] Step 5/12 — Creating ghcr-pull-secret in all app namespaces...
 _ghcr_pat="${GHCR_PAT:-}"
 _github_user="${GITHUB_USERNAME:-wilddog64}"
 if [[ -z "$_ghcr_pat" ]]; then
-  _err "[acg-up] GHCR_PAT env var not set — set it to a GitHub PAT with read:packages scope and re-run"
+  _info "[acg-up] GHCR_PAT not in env — falling back to gh auth token"
+  _ghcr_pat=$(gh auth token 2>/dev/null || true)
+  if [[ -z "$_ghcr_pat" ]]; then
+    _err "[acg-up] GHCR_PAT not set and gh auth token returned nothing — run: gh auth login"
+  fi
+  _info "[acg-up] using gh CLI token for ghcr-pull-secret"
 fi
 for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
   kubectl create namespace "$ns" --context ubuntu-k3s \
