@@ -429,6 +429,9 @@ kubectl rollout status statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster --timeout=90s
 _info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → ${_cp_server}"
 
+_info "[acg-up] Step 10b/12 — Deploying shopping-cart data layer (PostgreSQL, Redis, RabbitMQ)..."
+deploy_shopping_cart_data
+
 _info "[acg-up] Step 11/12 — Verifying ClusterSecretStore..."
 _css_ready=false
 for i in $(seq 1 18); do
