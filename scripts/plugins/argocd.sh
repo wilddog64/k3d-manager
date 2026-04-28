@@ -778,7 +778,7 @@ function _argocd_deploy_applicationsets() {
       filename=$(basename "$file")
       _info "[argocd] Deploying ApplicationSet: $filename"
 
-      if envsubst '$ARGOCD_NAMESPACE' < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
+      if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
          ((deployed_count++))
       else
          _warn "[argocd] Failed to deploy ApplicationSet: $filename"

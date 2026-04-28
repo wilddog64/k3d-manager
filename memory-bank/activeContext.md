@@ -40,6 +40,7 @@ All v1.1.0 bug detail archived in `docs/bugs/` and `git log`.
 - Data layer (PostgreSQL, Redis, RabbitMQ) — Step 10b `deploy_shopping_cart_data()` handles it
 - Password alignment — automated in `deploy_shopping_cart_data()`
 - `OrphanedResourceWarning` suppressed — `platform.yaml.tmpl` has `warn: false` (`625b82c2`)
+- ApplicationSet revision — `services-git.yaml` template uses `${K3D_MANAGER_BRANCH}` variable; `acg-up` exports it from `git rev-parse --abbrev-ref HEAD` before calling `deploy_argocd`. No runtime kubectl patch needed. **When `k3d-manager-v1.2.0` merges to `main`, change template back to hardcoded `main`** and remove the `K3D_MANAGER_BRANCH` export from `acg-up`.
 
 ## v1.2.0 Open Items
 
