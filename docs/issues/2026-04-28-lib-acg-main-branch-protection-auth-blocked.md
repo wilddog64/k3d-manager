@@ -1,7 +1,7 @@
 # Issue: lib-acg main branch protection could not be enabled from Codex session
 
 **Date:** 2026-04-28
-**Status:** Blocked by GitHub API authentication/tooling
+**Status:** Resolved after GitHub CLI re-authentication
 **Severity:** Medium
 
 ## What Was Attempted
@@ -39,7 +39,7 @@ $ curl -sS -o /tmp/lib-acg-user.json -w '%{http_code}\n' -H "Authorization: Bear
 
 ## Actual Behavior
 
-Branch protection was not enabled from this session.
+Initial branch protection attempt was blocked because the session did not have a working GitHub API auth path.
 
 ## Root Cause
 
@@ -49,9 +49,37 @@ Codex has no available write-capable GitHub API auth path for branch protection:
 - Local `gh` token is invalid.
 - Available environment token returns `401`.
 
+## Resolution
+
+After the user re-authenticated `gh`, branch protection was applied to `wilddog64/lib-acg` `main`.
+
+Command:
+
+```text
+$ gh api --method PUT repos/wilddog64/lib-acg/branches/main/protection -H 'Accept: application/vnd.github+json' --input -
+```
+
+Applied policy:
+
+```text
+required_pull_request_reviews.required_approving_review_count: 1
+required_pull_request_reviews.dismiss_stale_reviews: true
+enforce_admins.enabled: true
+allow_force_pushes.enabled: false
+allow_deletions.enabled: false
+required_conversation_resolution.enabled: true
+```
+
+Verification:
+
+```text
+$ gh api repos/wilddog64/lib-acg/branches/main/protection --jq '{enforce_admins: .enforce_admins.enabled, required_approving_review_count: .required_pull_request_reviews.required_approving_review_count, dismiss_stale_reviews: .required_pull_request_reviews.dismiss_stale_reviews, required_conversation_resolution: .required_conversation_resolution.enabled, allow_force_pushes: .allow_force_pushes.enabled, allow_deletions: .allow_deletions.enabled}'
+{"allow_deletions":false,"allow_force_pushes":false,"dismiss_stale_reviews":true,"enforce_admins":true,"required_approving_review_count":1,"required_conversation_resolution":true}
+```
+
 ## Recommended Follow-Up
 
-Authenticate `gh` with a token that has administration access to `wilddog64/lib-acg`, then apply branch protection for `main`.
+If lib-acg adds named required CI checks later, update branch protection to require those status checks explicitly.
 
 Suggested command shape:
 
@@ -61,4 +89,4 @@ gh api --method PUT repos/wilddog64/lib-acg/branches/main/protection \
   --input <branch-protection-json>
 ```
 
-Recommended protection policy should be confirmed before applying, but should at minimum require pull requests before merge and require the repository CI check to pass before merging to `main`.
+Do not enable an empty required-status-checks set as a substitute for real CI requirements; add concrete status check context names once stable.
