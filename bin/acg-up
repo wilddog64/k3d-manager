@@ -134,10 +134,19 @@ echo "${_vault_pf_pid}" > "${_vault_pf_pid_file}"
 sleep 3
 _info "[acg-up] Vault port-forward PID: ${_vault_pf_pid} (log: ${HOME}/.local/share/k3d-manager/vault-pf.log)"
 
-_vault_health=$(curl -sf --max-time 5 http://localhost:8200/v1/sys/health 2>/dev/null || echo '{}')
+_vault_health=$(curl -s --max-time 5 http://localhost:8200/v1/sys/health 2>/dev/null || echo '{}')
 _vault_sealed=$(printf '%s' "${_vault_health}" | grep -o '"sealed":[^,}]*' | grep -o 'true\|false' || echo 'unknown')
 if [[ "${_vault_sealed}" == "true" ]]; then
-  _err "[acg-up] Vault is sealed — likely caused by OrbStack restart after Mac sleep. Unseal with stored shards, then re-run."
+  _info "[acg-up] Vault is sealed — attempting cached unseal recovery..."
+  kubectl config use-context "${_HUB_CLUSTER_CTX}" >/dev/null 2>&1 || true
+  if ! "${REPO_ROOT}/scripts/k3d-manager" deploy_vault --re-unseal; then
+    _err "[acg-up] Vault is sealed and cached unseal recovery failed. Check: ${HOME}/.local/share/k3d-manager/vault-pf.log"
+  fi
+  _vault_health=$(curl -s --max-time 5 http://localhost:8200/v1/sys/health 2>/dev/null || echo '{}')
+  _vault_sealed=$(printf '%s' "${_vault_health}" | grep -o '"sealed":[^,}]*' | grep -o 'true\|false' || echo 'unknown')
+  if [[ "${_vault_sealed}" == "true" ]]; then
+    _err "[acg-up] Vault remains sealed after cached unseal recovery."
+  fi
 elif [[ "${_vault_sealed}" == "unknown" ]]; then
   _err "[acg-up] Vault not responding on localhost:8200 — port-forward may have failed. Check: ${HOME}/.local/share/k3d-manager/vault-pf.log"
 fi
