@@ -50,6 +50,7 @@ Pre-v1.0.4 detail removed from this file; see `git log --tags` and `docs/retro/`
 ---
 
 ## Known Bugs / Gaps
+- [ ] **ACG credential extraction misses visible sandbox** — SOURCE FIX IN LIB-ACG. Fix branch `wilddog64/lib-acg:fix/acg-credentials-cdp-context-reuse`; k3d-manager subtree pull still pending. Temporary local verification with the same patch passed: `acg_get_credentials` and `aws sts get-caller-identity`. Spec: `docs/issues/2026-04-28-acg-credentials-cdp-context-miss.md`.
 - [x] **shopping-cart ImagePullBackOff — no ghcr-pull-secret** — COMPLETE (`4b0856cb`). `gh auth token` fallback + kustomize `imagePullSecrets` patch on all 5 services. Takes effect on next `make up`.
 - [x] **shopping-cart data layer not auto-deployed on sandbox creation** — COMPLETE (`d5cf80ed`). `deploy_shopping_cart_data()` in `shopping_cart.sh`; wired into `acg-up` Step 10b. Aligns all passwords to `CHANGE_ME`, creates RabbitMQ + Redis secrets.
 - [x] **order-service kustomize workarounds** — COMPLETE (`20b0408e`). TCP socket probes (readiness+startup), DDL-auto, Spring AMQP credentials all patched. All 5 shopping-cart pods now 1/1 Running.
