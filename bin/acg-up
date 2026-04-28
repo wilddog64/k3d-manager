@@ -432,6 +432,14 @@ _info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → ${_cp_server}"
 _info "[acg-up] Step 10b/12 — Deploying shopping-cart data layer (PostgreSQL, Redis, RabbitMQ)..."
 deploy_shopping_cart_data
 
+_info "[acg-up] Step 10c/12 — Pinning ApplicationSet revision to current branch..."
+_current_branch=$(git -C "$(dirname "$0")/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+kubectl patch applicationset services-git -n cicd --context k3d-k3d-cluster --type json -p "[
+  {\"op\":\"replace\",\"path\":\"/spec/generators/0/git/revision\",\"value\":\"${_current_branch}\"},
+  {\"op\":\"replace\",\"path\":\"/spec/template/spec/source/targetRevision\",\"value\":\"${_current_branch}\"}
+]" 2>/dev/null || _warn "[acg-up] Could not patch ApplicationSet revision — apps may not appear"
+_info "[acg-up] ApplicationSet now tracking branch: ${_current_branch}"
+
 _info "[acg-up] Step 11/12 — Verifying ClusterSecretStore..."
 _css_ready=false
 for i in $(seq 1 18); do
