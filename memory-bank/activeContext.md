@@ -54,6 +54,8 @@ All v1.1.0 bug detail archived in `docs/bugs/` and `git log`.
 - **ArgoCD port-forward on acg-up** — COMPLETE (`3c671667`). Step 4b added to `bin/acg-up`; cleanup in `bin/acg-down`. PID at `~/.local/share/k3d-manager/argocd-pf.pid`.
 - **ArgoCD LDAP RBAC group mismatch** — PATCHED (ephemeral). `argocd-rbac-cm` mapped `cn=admins` (non-existent) to `role:admin`; patched to map `cn=it-devops` instead. Dex bind PW patched into `argocd-secret` ephemerally — both lost on Hub rebuild. Permanent fix is part of LDAP hardcoded password bug spec.
 
+- **k3d-manager / shopping-cart tight coupling** — OPEN (v1.3.0). `services/`, `shopping_cart.sh`, and Step 10b in `acg-up` make k3d-manager app-specific. Fix: move overlays + bootstrap to `shopping-cart-infra/k8s-overlays/`; make ApplicationSet repoURL configurable. Spec: `docs/issues/2026-04-27-k3d-manager-shopping-cart-tight-coupling.md`.
+
 - **ACG repo extraction** — IN PROGRESS (`docs/plans/v1.2.0-lib-acg-extraction.md`). P1–P5 COMPLETE. lib-acg PR #1 merged (`5c0e8e2d`). k3d-manager subtree synced from main (`84da5d5e`). enforce_admins restored on lib-acg.
 - **ACG repo extraction P5** — COMPLETE. lib-acg PR #1 merged to main (`5c0e8e2d`). CI (shellcheck + node --check + yamllint) + pre-commit hook + Copilot findings fixed (`698e65f`). k3d-manager subtree at `scripts/lib/acg/` updated (`84da5d5e`).
 - **GCP Sign-in-to-Chrome dialog** — COMPLETE (`ff44516` lib-acg, merged `5c0e8e2d`). `gcp_login.js` now dismisses Chrome's account-sync prompt via `context.on('page', ...)` handler. Spec: `docs/bugs/2026-04-25-gcp-login-chrome-signin-dialog.md`.
