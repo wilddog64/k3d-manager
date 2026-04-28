@@ -209,3 +209,35 @@ argocd app sync "${ARGOCD_APP}" --async
 
 _info "[sync-apps] Pod status (${APP_CONTEXT}):"
 kubectl get pods -A --context "${APP_CONTEXT}"
+
+_info "[sync-apps] Starting frontend port-forward (localhost:${FRONTEND_PORT:-8081} → shopping-cart-apps/frontend:80)..."
+_frontend_pf_pid_file="${HOME}/.local/share/k3d-manager/frontend-pf.pid"
+_frontend_pf_log="${HOME}/.local/share/k3d-manager/frontend-pf.log"
+mkdir -p "$(dirname "${_frontend_pf_pid_file}")"
+
+if [[ -f "${_frontend_pf_pid_file}" ]]; then
+  kill "$(cat "${_frontend_pf_pid_file}")" 2>/dev/null || true
+  rm -f "${_frontend_pf_pid_file}"
+fi
+
+kubectl port-forward svc/frontend -n shopping-cart-apps \
+  --context "${APP_CONTEXT}" "${FRONTEND_PORT:-8081}:80" \
+  >"${_frontend_pf_log}" 2>&1 &
+_frontend_pf_pid=$!
+disown "${_frontend_pf_pid}"
+echo "${_frontend_pf_pid}" > "${_frontend_pf_pid_file}"
+
+_frontend_ready=0
+for _i in $(seq 1 10); do
+  if curl -sf --max-time 1 "http://localhost:${FRONTEND_PORT:-8081}" >/dev/null 2>&1; then
+    _frontend_ready=1
+    break
+  fi
+  sleep 1
+done
+
+if [[ "${_frontend_ready}" -eq 1 ]]; then
+  _info "[sync-apps] Frontend available at http://localhost:${FRONTEND_PORT:-8081}"
+else
+  _info "[sync-apps] Frontend port-forward started (PID: ${_frontend_pf_pid}) — may take a moment at http://localhost:${FRONTEND_PORT:-8081}"
+fi
