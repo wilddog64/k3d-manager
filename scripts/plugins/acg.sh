@@ -296,7 +296,16 @@ HELP
   _info "[acg] Extracting AWS credentials from ${sandbox_url}..."
 
   local output
-  output=$(node "$playwright_script" "$sandbox_url" 2>&1)
+  if ! output=$(node "$playwright_script" "$sandbox_url" 2>&1); then
+    _info "[acg] Playwright extraction failed. Sanitized extractor output:"
+    printf '%s\n' "$output" | sed -E \
+      -e 's/(AWS_ACCESS_KEY_ID=).*/\1[redacted]/' \
+      -e 's/(AWS_SECRET_ACCESS_KEY=).*/\1[redacted]/' \
+      -e 's/(AWS_SESSION_TOKEN=).*/\1[redacted]/' >&2
+    _info "[acg] Copy the credentials block from the Pluralsight sandbox page, then run:"
+    _info "[acg]   source scripts/plugins/acg.sh && pbpaste | acg_import_credentials"
+    return 1
+  fi
 
   local access_key secret_key session_token
   access_key=$(printf '%s' "$output" | perl -ne 'if (/AWS_ACCESS_KEY_ID=(\S+)/) {print $1; exit}')
@@ -304,9 +313,13 @@ HELP
   session_token=$(printf '%s' "$output" | perl -ne 'if (/AWS_SESSION_TOKEN=(\S+)/) {print $1; exit}')
 
   if [[ -z "$access_key" || -z "$secret_key" ]]; then
-    _info "[acg] Playwright extraction failed — falling back to stdin paste"
+    _info "[acg] Playwright did not print complete AWS credentials. Sanitized extractor output:"
+    printf '%s\n' "$output" | sed -E \
+      -e 's/(AWS_ACCESS_KEY_ID=).*/\1[redacted]/' \
+      -e 's/(AWS_SECRET_ACCESS_KEY=).*/\1[redacted]/' \
+      -e 's/(AWS_SESSION_TOKEN=).*/\1[redacted]/' >&2
     _info "[acg] Copy the credentials block from the Pluralsight sandbox page, then run:"
-    _info "[acg]   pbpaste | ./scripts/k3d-manager acg_import_credentials"
+    _info "[acg]   source scripts/plugins/acg.sh && pbpaste | acg_import_credentials"
     return 1
   fi
 
