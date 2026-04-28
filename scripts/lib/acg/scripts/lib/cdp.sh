@@ -22,10 +22,23 @@ function _browser_launch() {
   _info "Chrome not running — launching with --remote-debugging-port=9222..."
   local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/profile}"
   if [[ "$(uname)" == "Darwin" ]]; then
-    open -a "Google Chrome" --args \
-      --remote-debugging-port=9222 \
-      --password-store=basic \
-      --user-data-dir="${_cdp_profile_dir}"
+    local _chrome_app_bin="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    if [[ -x "${_chrome_app_bin}" ]]; then
+      local _chrome_cdp_log="${HOME}/.local/share/k3d-manager/chrome-cdp.log"
+      mkdir -p "$(dirname "${_chrome_cdp_log}")"
+      "${_chrome_app_bin}" \
+        --remote-debugging-port=9222 \
+        --password-store=basic \
+        --user-data-dir="${_cdp_profile_dir}" \
+        --no-first-run \
+        --no-default-browser-check \
+        >>"${_chrome_cdp_log}" 2>&1 &
+    else
+      open -a "Google Chrome" --args \
+        --remote-debugging-port=9222 \
+        --password-store=basic \
+        --user-data-dir="${_cdp_profile_dir}"
+    fi
   else
     local _chrome_bin
     _chrome_bin=$(command -v google-chrome 2>/dev/null || command -v google-chrome-stable 2>/dev/null || command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || true)
@@ -59,7 +72,7 @@ function _cdp_ensure_acg_session() {
 
 1. Connect to the running Gemini browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
 2. Use the first browser context and page (do NOT launch a new browser).
-3. Navigate to https://app.pluralsight.com/cloud-playground/cloud-sandboxes and wait for the page to load.
+3. Navigate to https://app.pluralsight.com/hands-on/playground/cloud-sandboxes and wait for the page to load.
 4. Check if the user is logged in by looking for user avatar, account menu, or sandbox list elements (e.g. [data-testid='user-menu'], [aria-label='User menu'], or a heading containing 'Cloud Sandboxes').
 5. If logged in: print ACG_SESSION_OK and exit with code 0.
 6. If NOT logged in:

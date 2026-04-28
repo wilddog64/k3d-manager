@@ -177,8 +177,10 @@ async function extractCredentials() {
         });
         if (_cdpPsPage) {
           console.error('INFO: Found existing Pluralsight session via CDP — reusing existing Chrome instance.');
-          browserContext = _cdpContext;
+        } else {
+          console.error('INFO: CDP browser has no Pluralsight tab — opening sandbox tab in existing Chrome context.');
         }
+        browserContext = _cdpContext;
       }
       if (!browserContext) {
         try { await _cdpBrowser.disconnect(); } catch {}
@@ -319,17 +321,48 @@ async function extractCredentials() {
     } else {
       console.error('INFO: Looking for Start/Open button...');
 
-      // Wait for SPA to render sandbox cards before checking buttons
-      // (skeleton clears aria-busy before cards appear — must wait for actual elements)
-      await page.waitForFunction(() => {
-        const buttons = Array.from(document.querySelectorAll('button'));
-        const hasStart = buttons.some(b => b.textContent.trim().includes('Start Sandbox'));
-        const hasOpen = buttons.some(b => b.textContent.trim().includes('Open Sandbox'));
-        const hasResume = buttons.some(b => b.textContent.trim().includes('Resume'));
-        const inputs = document.querySelectorAll('input[aria-label="Copyable input"]');
-        const hasCredentials = inputs.length > 0 && inputs[0].value.trim().length > 0;
-        return hasStart || hasOpen || hasResume || hasCredentials;
-      }, { timeout: 30000 }).catch(() => console.error('WARN: Timed out waiting for sandbox buttons or credentials — proceeding anyway'));
+      const _waitForSandboxEntry = async (timeout = 30000) => {
+        // Skeleton clears before cards appear, so wait for the actual sandbox controls.
+        await page.waitForFunction(() => {
+          const buttons = Array.from(document.querySelectorAll('button'));
+          const hasStart = buttons.some(b => b.textContent.trim().includes('Start Sandbox'));
+          const hasOpen = buttons.some(b => b.textContent.trim().includes('Open Sandbox'));
+          const hasResume = buttons.some(b => b.textContent.trim().includes('Resume'));
+          const inputs = document.querySelectorAll('input[aria-label="Copyable input"]');
+          const hasCredentials = inputs.length > 0 && inputs[0].value.trim().length > 0;
+          return hasStart || hasOpen || hasResume || hasCredentials;
+        }, { timeout });
+      };
+
+      const _waitForSandboxEntrySoft = async (timeout = 30000) => {
+        try {
+          await _waitForSandboxEntry(timeout);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+
+      let sandboxEntryReady = await _waitForSandboxEntrySoft(30000);
+      const retryPathname = (() => {
+        try { return new URL(targetUrl).pathname; } catch { return ''; }
+      })();
+      if (!sandboxEntryReady && retryPathname.includes('cloud-sandboxes') && !page.url().includes('cloud-sandboxes')) {
+        console.error(`INFO: Sandbox route not active (${page.url()}) — retrying via Hands-on route...`);
+        await page.goto('https://app.pluralsight.com/hands-on', { waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.waitForFunction(() => {
+          return document.readyState === 'complete' ||
+            Boolean(document.querySelector('a[href*="cloud-sandboxes"]')) ||
+            document.body.innerText.includes('Cloud Sandboxes');
+        }, { timeout: 15000 }).catch(() => console.error('WARN: Hands-on route did not settle before sandbox retry'));
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        sandboxEntryReady = await _waitForSandboxEntrySoft(30000);
+      }
+      if (!sandboxEntryReady) {
+        // The sandbox button/credentials did not appear — proceed anyway and let the
+        // button-click block below surface the real failure with more context.
+        console.error('WARN: Timed out waiting for sandbox buttons or credentials — proceeding anyway');
+      }
 
       const _waitForCredentials = async () => {
         console.error('INFO: Waiting for credentials to populate (up to 60s)...');

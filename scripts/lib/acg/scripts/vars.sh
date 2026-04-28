@@ -9,7 +9,7 @@
 # session cookies. Deleting it forces manual re-login and can trigger ACG
 # bot-detection. Keep this path stable across versions.
 
-export PLAYWRIGHT_URL_AWS="https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
+export PLAYWRIGHT_URL_AWS="https://app.pluralsight.com/hands-on/playground/cloud-sandboxes"
 export PLAYWRIGHT_URL_GCP="https://app.pluralsight.com/hands-on/playground/cloud-sandboxes"
 
 export PLAYWRIGHT_CDP_HOST="127.0.0.1"
