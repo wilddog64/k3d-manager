@@ -1,7 +1,7 @@
 # Issue: `make up` stops at ACG credential extraction despite visible sandbox credentials
 
 **Date:** 2026-04-28
-**Status:** Source fix in lib-acg pending PR/subtree pull
+**Status:** Source fix merged and pulled into k3d-manager subtree
 **Severity:** Critical
 
 ## What Was Attempted
@@ -97,13 +97,26 @@ Fix the credential automation so `make up` can run unattended after the user has
 
 The implementation belongs in `wilddog64/lib-acg`, which is consumed by k3d-manager through the `scripts/lib/acg/` subtree. Do not manually patch the vendored subtree in k3d-manager.
 
-Source branch:
+Source PR:
 
 ```text
-wilddog64/lib-acg:fix/acg-credentials-cdp-context-reuse
+https://github.com/wilddog64/lib-acg/pull/2
 ```
 
-Planned fix:
+Merged source commit:
+
+```text
+7cb7f64a701ef3f30d14f018a9a9d1635b899ed9
+```
+
+k3d-manager subtree sync:
+
+```text
+88cb8bbc Merge commit 'a0b44c878b9922974aea787342bf9d4242e5252b' into k3d-manager-v1.2.0
+a0b44c87 Squashed 'scripts/lib/acg/' changes from 5c0e8e2d..7cb7f64a
+```
+
+Implemented fix:
 
 - Default AWS sandbox navigation to `https://app.pluralsight.com/hands-on/playground/cloud-sandboxes`.
 - Reuse the active CDP browser context even when that context has no Pluralsight tab yet.
@@ -124,4 +137,39 @@ Planned fix:
 arn:aws:iam::905293745314:user/cloud_user
 ```
 
-Final k3d-manager verification must be rerun after the lib-acg PR is merged and the subtree is pulled into `scripts/lib/acg/`.
+Post-subtree verification on k3d-manager:
+
+```text
+$ node --check scripts/lib/acg/playwright/acg_credentials.js
+```
+
+```text
+$ shellcheck scripts/lib/acg/scripts/plugins/acg.sh scripts/lib/acg/scripts/lib/cdp.sh scripts/lib/acg/scripts/vars.sh
+```
+
+```text
+$ bats scripts/tests/lib/acg.bats
+1..11
+ok 1 _acg_write_credentials writes [default] profile to ~/.aws/credentials
+ok 2 _acg_write_credentials sets file permissions to 600
+ok 3 _acg_write_credentials creates ~/.aws directory if missing
+ok 4 acg_import_credentials parses label format (Pluralsight UI copy)
+ok 5 acg_import_credentials parses export format
+ok 6 acg_import_credentials succeeds with AKIA key and no session token
+ok 7 acg_import_credentials returns 1 on empty/unparseable input
+ok 8 acg_import_credentials --help exits 0
+ok 9 acg_get_credentials --help exits 0
+ok 10 _acg_extend_playwright: returns 0 when node script succeeds
+ok 11 _acg_extend_playwright: returns 1 when node script fails
+```
+
+```text
+$ git diff --check
+```
+
+```text
+$ ./scripts/k3d-manager _agent_audit
+running under bash version 5.3.9(1)-release
+```
+
+Final live `make up` verification remains pending after this subtree sync.
