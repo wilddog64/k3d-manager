@@ -119,14 +119,15 @@ if [[ "${_hub_newly_created}" -eq 1 ]]; then
   _info "[acg-up] Hub cluster bootstrapped."
 fi
 
-_info "[acg-up] Step 4/12 — Starting Vault port-forward (k3d → localhost:8200)..."
+_vault_local_port="${TUNNEL_VAULT_LOCAL_PORT:-18200}"
+_info "[acg-up] Step 4/12 — Starting Vault port-forward (k3d → localhost:${_vault_local_port})..."
 _vault_pf_pid_file="${HOME}/.local/share/k3d-manager/vault-pf.pid"
 mkdir -p "$(dirname "${_vault_pf_pid_file}")"
 if [[ -f "${_vault_pf_pid_file}" ]]; then
   kill "$(cat "${_vault_pf_pid_file}")" 2>/dev/null || true
   rm -f "${_vault_pf_pid_file}"
 fi
-kubectl port-forward svc/vault -n secrets --context k3d-k3d-cluster 8200:8200 \
+kubectl port-forward svc/vault -n secrets --context k3d-k3d-cluster "${_vault_local_port}:8200" \
   >>"${HOME}/.local/share/k3d-manager/vault-pf.log" 2>&1 &
 _vault_pf_pid=$!
 disown "${_vault_pf_pid}"
@@ -134,7 +135,7 @@ echo "${_vault_pf_pid}" > "${_vault_pf_pid_file}"
 sleep 3
 _info "[acg-up] Vault port-forward PID: ${_vault_pf_pid} (log: ${HOME}/.local/share/k3d-manager/vault-pf.log)"
 
-_vault_health=$(curl -s --max-time 5 http://localhost:8200/v1/sys/health 2>/dev/null || echo '{}')
+_vault_health=$(curl -s --max-time 5 "http://localhost:${_vault_local_port}/v1/sys/health" 2>/dev/null || echo '{}')
 _vault_sealed=$(printf '%s' "${_vault_health}" | grep -o '"sealed":[^,}]*' | grep -o 'true\|false' || echo 'unknown')
 if [[ "${_vault_sealed}" == "true" ]]; then
   _info "[acg-up] Vault is sealed — attempting cached unseal recovery..."
@@ -142,13 +143,13 @@ if [[ "${_vault_sealed}" == "true" ]]; then
   if ! "${REPO_ROOT}/scripts/k3d-manager" deploy_vault --re-unseal; then
     _err "[acg-up] Vault is sealed and cached unseal recovery failed. Check: ${HOME}/.local/share/k3d-manager/vault-pf.log"
   fi
-  _vault_health=$(curl -s --max-time 5 http://localhost:8200/v1/sys/health 2>/dev/null || echo '{}')
+  _vault_health=$(curl -s --max-time 5 "http://localhost:${_vault_local_port}/v1/sys/health" 2>/dev/null || echo '{}')
   _vault_sealed=$(printf '%s' "${_vault_health}" | grep -o '"sealed":[^,}]*' | grep -o 'true\|false' || echo 'unknown')
   if [[ "${_vault_sealed}" == "true" ]]; then
     _err "[acg-up] Vault remains sealed after cached unseal recovery."
   fi
 elif [[ "${_vault_sealed}" == "unknown" ]]; then
-  _err "[acg-up] Vault not responding on localhost:8200 — port-forward may have failed. Check: ${HOME}/.local/share/k3d-manager/vault-pf.log"
+  _err "[acg-up] Vault not responding on localhost:${_vault_local_port} — port-forward may have failed. Check: ${HOME}/.local/share/k3d-manager/vault-pf.log"
 fi
 _info "[acg-up] Vault is unsealed and reachable."
 
@@ -386,6 +387,9 @@ spec:
           namespace: secrets
           key: token
 CSSEOF
+kubectl annotate clustersecretstore vault-backend --context ubuntu-k3s \
+  "k3d-manager/reconcile-at=$(date -u +%Y%m%dT%H%M%SZ)" \
+  --overwrite >/dev/null
 _info "[acg-up] vault-token secret + ClusterSecretStore applied"
 
 _info "[acg-up] Seeding Vault KV with sandbox static secrets..."
@@ -394,7 +398,7 @@ _vault_kv_put() {
     -H "X-Vault-Token: ${_vault_root_token}" \
     -H "Content-Type: application/json" \
     -d "{\"data\":$1}" \
-    "http://localhost:8200/v1/secret/data/$2" >/dev/null
+    "http://localhost:${_vault_local_port}/v1/secret/data/$2" >/dev/null
 }
 _pg_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
 _pg_pass_products=$(openssl rand -base64 24 | tr -d '=+/')
@@ -449,7 +453,7 @@ _info "[acg-up] Step 11/12 — Verifying ClusterSecretStore..."
 _css_ready=false
 for i in $(seq 1 18); do
   _css_status=$(kubectl get clustersecretstore vault-backend --context ubuntu-k3s \
-    -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}' 2>/dev/null || echo "")
+    -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
   if [[ "${_css_status}" == "True" ]]; then
     _css_ready=true
     break
