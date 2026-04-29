@@ -54,6 +54,33 @@ for repo in "${REPOS[@]}"; do
   fi
 done
 
+# --- Cluster Update (Quick Fix) -------------------------------------------
+
+echo ""
+echo "Propagating ghcr-pull-secret to ubuntu-k3s cluster..."
+echo ""
+
+NAMESPACES=(
+  shopping-cart-apps
+  shopping-cart-payment
+  shopping-cart-data
+)
+
+for ns in "${NAMESPACES[@]}"; do
+  if kubectl create secret docker-registry ghcr-pull-secret \
+    --docker-server=ghcr.io \
+    --docker-username="${SHOPPING_CART_ORG}" \
+    --docker-password="${TOKEN}" \
+    --context ubuntu-k3s \
+    -n "$ns" \
+    --dry-run=client -o yaml \
+    | kubectl apply --context ubuntu-k3s -f - >/dev/null 2>&1; then
+    echo "  ✅ namespace: ${ns}"
+  else
+    echo "  ❌ namespace: ${ns} — check kubectl connectivity and context" >&2
+  fi
+done
+
 unset TOKEN
 
 echo ""
