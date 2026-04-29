@@ -207,12 +207,22 @@ _info "[acg-up] Step 5/12 — Creating ghcr-pull-secret in all app namespaces...
 _ghcr_pat="${GHCR_PAT:-}"
 _github_user="${GITHUB_USERNAME:-wilddog64}"
 if [[ -z "$_ghcr_pat" ]]; then
-  _info "[acg-up] GHCR_PAT not in env — falling back to gh auth token"
-  _ghcr_pat=$(gh auth token 2>/dev/null || true)
-  if [[ -z "$_ghcr_pat" ]]; then
-    _err "[acg-up] GHCR_PAT not set and gh auth token returned nothing — run: gh auth login"
+  _info "[acg-up] GHCR_PAT not in env — checking Vault..."
+  _vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d 2>/dev/null || true)
+  if [[ -n "$_vault_root_token" ]]; then
+    _ghcr_pat=$(curl -s -H "X-Vault-Token: ${_vault_root_token}" "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" | jq -r '.data.data.token // empty' 2>/dev/null || true)
   fi
-  _info "[acg-up] using gh CLI token for ghcr-pull-secret"
+  
+  if [[ -n "$_ghcr_pat" ]]; then
+    _info "[acg-up] using PAT from Vault for ghcr-pull-secret"
+  else
+    _info "[acg-up] PAT not in Vault — falling back to gh auth token"
+    _ghcr_pat=$(gh auth token 2>/dev/null || true)
+    if [[ -z "$_ghcr_pat" ]]; then
+      _err "[acg-up] GHCR_PAT not set, not in Vault, and gh auth token failed — run: gh auth login"
+    fi
+    _info "[acg-up] using gh CLI token for ghcr-pull-secret"
+  fi
 fi
 for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
   kubectl create namespace "$ns" --context ubuntu-k3s \
