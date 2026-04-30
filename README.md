@@ -287,11 +287,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
-| 2026-04-25 | [Copilot PR #65 review findings](docs/issues/2026-04-25-copilot-pr65-review-findings.md) | gcp_login — CodeQL clear-text env logging; redact GCP_ACCOUNT from console.error |
-| 2026-04-11 | [Copilot PR #64 review findings](docs/issues/2026-04-11-copilot-pr64-review-findings.md) | ssm — bare sudo dpkg in Makefile; lost indentation in deploy_app_cluster; missing mkdir -p ~/.kube; None/null sentinel not normalized; inaccurate ssm_exec docs; wrong make ssm description |
-| 2026-04-11 | [Copilot PR #63 review findings](docs/issues/2026-04-11-copilot-pr63-review-findings.md) | acg — missing --help on public wrapper, no BATS test, private call in k3s-aws.sh, CHANGE.md wording, stale README refs, wrong location for `_antigravity_browser_ready` |
-| 2026-04-11 | [Copilot PR #62 review findings](docs/issues/2026-04-11-copilot-pr62-review-findings.md) | acg — dispatcher rejects private function in launchd wrapper; help text private name; stale browser automation doc; misleading rename description; typos |
-| 2026-04-10 | [Copilot PR #61 review findings](docs/issues/2026-04-10-copilot-pr61-review-findings.md) | acg-extend — CodeQL URL substring check, credential leak in shutdown text log, CDP browser close disrupts session, Ghost State fires on weak null signal |
+| 2026-04-30 | [GHCR secret rotation fallback fails open](docs/issues/2026-04-30-ghcr-secret-rotation-fallback-fails-open.md) | acg-up, rotate-ghcr-pat — `gh auth token` OAuth fallback recreates invalid pull secret; fix: fail closed, Vault-first |
+| 2026-04-29 | [ACG Watcher extend button not found](docs/issues/2026-04-29-acg-watcher-extend-button-not-found.md) | lib-acg watcher — button not located during 1h TTL window; manual sequence documented |
+| 2026-04-29 | [gh auth token insufficient scope for GHCR](docs/issues/2026-04-29-gh-auth-token-insufficient-scope-for-ghcr.md) | acg-up — OAuth token lacks `read:packages`; resolved via Vault-first PAT strategy |
+| 2026-04-28 | [ClusterSecretStore vault-bridge pod-origin empty reply](docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md) | vault-bridge — pod-origin traffic returns empty reply; `ClusterSecretStore/vault-backend` stays `Ready=False` |
+| 2026-04-28 | [Vault sealed health misclassified as unreachable](docs/issues/2026-04-28-acg-up-vault-sealed-health-misclassified.md) | acg-up — sealed Vault returns non-2xx; `curl -f` discarded JSON; auto-recover via `--re-unseal` |
 
 [All issues →](docs/issues/)
 
@@ -301,9 +301,9 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.2.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.2.0) | 2026-04-30 | lib-acg extraction + shopping-cart bootstrap + GHCR hardening — ACG/GCP automation extracted to `scripts/lib/acg/` subtree; `deploy_shopping_cart_data()` in `acg-up`; Vault-first GHCR fail-closed; ArgoCD launchd port-forward; ApplicationSet branch var; Vault sealed-state recovery |
 | [v1.1.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.1.0) | 2026-04-24 | Unified ACG automation AWS + GCP — GCP provider (`k3s-gcp`), OAuth automation, CDP headless Linux, `bin/acg-sync-apps` port-forward hardening, Hub auto-create + bootstrap, provider-aware teardown |
 | [v1.0.6](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.6) | 2026-04-11 | AWS SSM support — `ssm_wait`/`ssm_exec`/`ssm_tunnel` helpers; `K3S_AWS_SSM_ENABLED` opt-in; IAM role + instance profile in CloudFormation; `--capabilities CAPABILITY_NAMED_IAM` fix; `make ssm`/`provision` targets |
-| [v1.0.5](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.5) | 2026-04-10 | gemini decoupling + LDAP Vault KV seeding — `gemini_acg_extend` renamed/moved to `acg_extend_playwright` in `acg.sh`; `bin/acg-up` seeds `secret/data/ldap/admin` for ESO ExternalSecret |
 
 <details>
 <summary>Older releases</summary>
