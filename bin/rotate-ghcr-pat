@@ -38,18 +38,6 @@ if [[ -t 0 ]]; then
   else
     read -r -s -p "Paste new GitHub PAT (read:packages scope) and press Enter: " TOKEN
     echo ""
-    
-    # --- Auto-save to Vault (Single-Step Fix) -----------------------------
-    if [[ -n "${TOKEN}" && -n "${_vault_root_token}" ]]; then
-      echo "Saving new token to Vault..."
-      if curl -s -X POST -H "X-Vault-Token: ${_vault_root_token}" \
-        -d "{\"data\": {\"token\": \"${TOKEN}\"}}" \
-        "http://localhost:18200/v1/secret/data/github/pat" >/dev/null; then
-        echo "  ✅ Token persisted to Vault"
-      else
-        echo "  ⚠️ Failed to save token to Vault — you may need to re-paste after acg-down" >&2
-      fi
-    fi
   fi
 else
   read -r TOKEN
@@ -58,6 +46,21 @@ fi
 if [[ -z "$TOKEN" ]]; then
   echo "ERROR: No token provided — exiting" >&2
   exit 1
+fi
+
+if [[ -z "${_vault_root_token:-}" ]]; then
+  _vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d 2>/dev/null || true)
+fi
+
+if [[ -n "${TOKEN}" && -n "${_vault_root_token:-}" ]]; then
+  echo "Saving new token to Vault..."
+  if curl -s -X POST -H "X-Vault-Token: ${_vault_root_token}" \
+    -d "{\"data\": {\"token\": \"${TOKEN}\"}}" \
+    "http://localhost:18200/v1/secret/data/github/pat" >/dev/null; then
+    echo "  ✅ Token persisted to Vault"
+  else
+    echo "  ⚠️ Failed to save token to Vault — you may need to re-paste after acg-down" >&2
+  fi
 fi
 
 echo ""

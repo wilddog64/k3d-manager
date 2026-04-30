@@ -216,12 +216,7 @@ if [[ -z "$_ghcr_pat" ]]; then
   if [[ -n "$_ghcr_pat" ]]; then
     _info "[acg-up] using PAT from Vault for ghcr-pull-secret"
   else
-    _info "[acg-up] PAT not in Vault — falling back to gh auth token"
-    _ghcr_pat=$(gh auth token 2>/dev/null || true)
-    if [[ -z "$_ghcr_pat" ]]; then
-      _err "[acg-up] GHCR_PAT not set, not in Vault, and gh auth token failed — run: gh auth login"
-    fi
-    _info "[acg-up] using gh CLI token for ghcr-pull-secret"
+    _err "[acg-up] GHCR_PAT not set and no PAT found in Vault at secret/data/github/pat — run bin/rotate-ghcr-pat with a read:packages PAT"
   fi
 fi
 for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
