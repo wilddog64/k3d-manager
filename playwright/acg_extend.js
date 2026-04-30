@@ -23,6 +23,55 @@ function _isFirstRun() {
   }
 }
 
+async function _waitForVisibleExtendButton(page, selectors, timeoutMs, phaseLabel) {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() <= deadline) {
+    const remainingMs = Math.max(0, deadline - Date.now());
+    if (remainingMs === 0 && timeoutMs > 0) {
+      break;
+    }
+
+    for (const selector of selectors) {
+      const btn = page.locator(selector).first();
+      const visible = await btn.isVisible({ timeout: remainingMs }).catch(() => false);
+      if (visible) {
+        console.error(`INFO: Found extend button${phaseLabel ? ` (${phaseLabel})` : ''} with selector: ${selector}`);
+        return btn;
+      }
+    }
+
+    if (Date.now() < deadline) {
+      await page.waitForTimeout(500);
+    }
+  }
+
+  return null;
+}
+
+function _sanitizePhaseLabel(phaseLabel) {
+  return phaseLabel
+    ? phaseLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+    : '';
+}
+
+async function _captureExtendFailure(page, phaseLabel) {
+  const diagnosticsDir = path.join(os.homedir(), '.local', 'share', 'k3d-manager');
+  const safePhaseLabel = _sanitizePhaseLabel(phaseLabel);
+  const screenshotPath = path.join(
+    diagnosticsDir,
+    `acg-extend-failure-${Date.now()}${safePhaseLabel ? `-${safePhaseLabel}` : ''}.png`
+  );
+
+  try {
+    await fs.promises.mkdir(diagnosticsDir, { recursive: true });
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+    console.error(`INFO: Saved extend failure screenshot to ${screenshotPath}`);
+  } catch (err) {
+    console.error(`WARN: Could not save extend failure screenshot: ${err.message}`);
+  }
+}
+
 async function extendSandbox() {
   if (_isFirstRun()) {
     console.error(`ERROR: Auth dir is empty (${AUTH_DIR}).`);
@@ -130,15 +179,10 @@ async function extendSandbox() {
     ];
 
     let clicked = false;
-    for (const selector of extendSelectors) {
-      const btn = page.locator(selector).first();
-      const visible = await btn.isVisible({ timeout: 5000 }).catch(() => false);
-      if (visible) {
-        console.error(`INFO: Found extend button immediately with selector: ${selector}`);
-        await btn.click({ force: true });
-        clicked = true;
-        break;
-      }
+    const immediateBtn = await _waitForVisibleExtendButton(page, extendSelectors, 0, 'immediately');
+    if (immediateBtn) {
+      await immediateBtn.click({ force: true });
+      clicked = true;
     }
 
     if (clicked) {
@@ -220,19 +264,11 @@ async function extendSandbox() {
       if (await _openBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
         console.error('INFO: Clicking Open Sandbox to reveal extend panel...');
         await _openBtn.click({ force: true });
-        await page.waitForTimeout(5000);
-      }
-    }
-
-    // 4. Second search for extend button
-    for (const selector of extendSelectors) {
-      const btn = page.locator(selector).first();
-      const visible = await btn.isVisible({ timeout: 5000 }).catch(() => false);
-      if (visible) {
-        console.error(`INFO: Found extend button with selector: ${selector}`);
-        await btn.click({ force: true });
-        clicked = true;
-        break;
+        const _openPanelBtn = await _waitForVisibleExtendButton(page, extendSelectors, 15000, 'after Open Sandbox');
+        if (_openPanelBtn) {
+          await _openPanelBtn.click({ force: true });
+          clicked = true;
+        }
       }
     }
 
@@ -260,17 +296,10 @@ async function extendSandbox() {
             
             // Pluralsight should now show the "Extend Your Session" modal
             console.error('INFO: Waiting for Extension Modal...');
-            await page.waitForTimeout(10000);
-            
-            for (const selector of extendSelectors) {
-              const btn = page.locator(selector).first();
-              const visible = await btn.isVisible({ timeout: 15000 }).catch(() => false);
-              if (visible) {
-                console.error(`INFO: Found extend button (Recovery) with selector: ${selector}`);
-                await btn.click({ force: true });
-                clicked = true;
-                break;
-              }
+            const _recoveryBtn = await _waitForVisibleExtendButton(page, extendSelectors, 20000, 'after recovery');
+            if (_recoveryBtn) {
+              await _recoveryBtn.click({ force: true });
+              clicked = true;
             }
           }
         }
@@ -278,6 +307,7 @@ async function extendSandbox() {
     }
 
     if (!clicked) {
+      await _captureExtendFailure(page, 'missing-extend-button');
       throw new Error('Extend button not found or not visible after multiple attempts (including recovery)');
     }
 
