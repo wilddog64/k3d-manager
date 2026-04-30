@@ -1,14 +1,14 @@
-# Bug: "Session Extended" Modal Blocks Extend Button on Repeat Calls
+# Bug: `acg_extend` misses the extend surface when it appears late
 
 **File:** `playwright/acg_extend.js`
-**Branch:** `feat/phase5-ci-setup`
-**Severity:** High — `acg_extend` fails every time except the very first call per browser session
+**Branch:** `feat/acg-extend-modal-wait`
+**Severity:** High — `acg_extend` can fail if the extend surface is slower than the fixed post-click sleep
 
 ---
 
 ## Symptom
 
-```
+```text
 INFO: Already on Pluralsight page: https://app.pluralsight.com/hands-on/playground/cloud-sandboxes
 INFO: Calculated remaining TTL: ~42 minutes
 INFO: Within 1h extension window (42m remaining). Proceeding to extend...
@@ -16,62 +16,37 @@ INFO: Clicking Open Sandbox to reveal extend panel...
 ERROR: Extend button not found or not visible after multiple attempts (including recovery)
 ```
 
-The "Session extended" confirmation modal (title: "Session extended", body: "Your sandbox has been extended.") appears after a successful extension and is never dismissed. On the next call, the modal is still on screen and blocks the extend button from being visible, causing all selector checks to fail.
+The automation was relying on a fixed post-click sleep and then searching once for the extend button. In the live UI, the extend surface can take longer to appear, and a lingering `"Session extended"` confirmation modal can also still be present from the previous run.
 
 ---
 
 ## Root Cause
 
-`extendSandbox()` has no step to dismiss lingering confirmation modals before beginning its extend button search. The modal remains open indefinitely until the user manually closes it.
+`extendSandbox()` needs to handle both of these states before it can safely extend again:
+1. dismiss any lingering `"Session extended"` confirmation modal
+2. wait for the extend button / modal surface to appear after clicking **Open Sandbox**
 
 ---
 
 ## Fix
 
-In `playwright/acg_extend.js`, add a modal dismissal step **immediately after the `page` object is resolved** (after line 87, before the skeleton loader wait at line 90).
-
-### Exact insertion point
-
-After this block (lines 82–87):
-```javascript
-    if (isPluralsight) {
-      console.error(`INFO: Already on Pluralsight page: ${currentUrl}`);
-    } else {
-      console.error(`INFO: Navigating to ${targetUrl}...`);
-      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    }
-```
-
-Insert:
-```javascript
-    // Dismiss any lingering "Session extended" confirmation modal before searching for extend button
-    const _sessionExtendedModal = page.locator('text="Session extended"').first();
-    if (await _sessionExtendedModal.isVisible({ timeout: 3000 }).catch(() => false)) {
-      console.error('INFO: Dismissing "Session extended" modal...');
-      await page.keyboard.press('Escape').catch(() => {});
-      await page.waitForTimeout(500);
-      // Fallback: click the X button if Escape didn't close it
-      const _closeBtn = page.locator('[role="dialog"] button, button:has-text("×"), button[aria-label*="close" i]').first();
-      if (await _closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await _closeBtn.click({ force: true }).catch(() => {});
-        await page.waitForTimeout(500);
-      }
-    }
-```
+In `playwright/acg_extend.js`:
+1. Dismiss any lingering `"Session extended"` confirmation modal before searching for the button.
+2. Replace the fixed post-`Open Sandbox` sleep with an explicit polling loop for the extend button.
+3. Capture a screenshot if the button still cannot be found after all attempts.
 
 ---
 
 ## Definition of Done
 
-- [ ] Dismissal block added after the navigation guard (before the skeleton loader wait)
+- [ ] Dismissal block added after the navigation guard
+- [ ] Post-`Open Sandbox` wait uses an explicit polling loop instead of a fixed sleep
 - [ ] `node --check playwright/acg_extend.js` passes with zero errors
-- [ ] Committed on branch `feat/phase5-ci-setup` in lib-acg with message:
-  `fix(acg-extend): dismiss Session Extended modal before searching for extend button`
+- [ ] Committed on branch `feat/acg-extend-modal-wait` in lib-acg with message:
+  `fix(acg-extend): wait for extend surface before searching for extend button`
 - [ ] SHA reported; pushed to origin
 
-## What NOT to Do
+## Historical Notes
 
-- Do NOT create a PR
-- Do NOT skip pre-commit hooks (`--no-verify`)
-- Do NOT modify any file other than `playwright/acg_extend.js`
-- Do NOT commit to `main`
+- This fix was developed on `feat/acg-extend-modal-wait` and recorded in PR #3.
+- The repo-level workflow in this issue doc is historical context from the original bug report, not a live restriction on follow-up documentation updates.
