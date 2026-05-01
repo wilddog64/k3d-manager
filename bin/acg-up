@@ -29,9 +29,6 @@ source "${REPO_ROOT}/scripts/plugins/acg.sh"
 source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
 source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
 
-export K3D_MANAGER_BRANCH
-K3D_MANAGER_BRANCH="$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")"
-
 _cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
 case "${_cluster_provider}" in
   k3s-aws)
