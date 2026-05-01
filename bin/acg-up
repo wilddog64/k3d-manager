@@ -211,9 +211,27 @@ if [[ -z "$_ghcr_pat" ]]; then
   fi
   
   if [[ -n "$_ghcr_pat" ]]; then
-    _info "[acg-up] using PAT from Vault for ghcr-pull-secret"
-  else
-    _err "[acg-up] GHCR_PAT not set and no PAT found in Vault at secret/data/github/pat — run bin/rotate-ghcr-pat with a read:packages PAT"
+    _pat_http=$(curl -s -o /dev/null -w "%{http_code}" -u "${_github_user}:${_ghcr_pat}" "https://api.github.com/user" 2>/dev/null || true)
+    if [[ "$_pat_http" == "200" ]]; then
+      _info "[acg-up] using PAT from Vault for ghcr-pull-secret"
+    else
+      _info "[acg-up] Vault PAT is expired (HTTP ${_pat_http}) — prompting for a new one"
+      _ghcr_pat=""
+    fi
+  fi
+  if [[ -z "$_ghcr_pat" ]]; then
+    if [[ -t 0 && -t 1 ]]; then
+      read -r -s -p "[acg-up] Paste GitHub PAT (repo + read:packages) and press Enter: " _ghcr_pat
+      echo ""
+      if [[ -n "${_vault_root_token:-}" && -n "$_ghcr_pat" ]]; then
+        curl -s -X POST -H "X-Vault-Token: ${_vault_root_token}" \
+          -d "{\"data\": {\"token\": \"${_ghcr_pat}\"}}" \
+          "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" >/dev/null || true
+        _info "[acg-up] new PAT saved to Vault"
+      fi
+    else
+      _err "[acg-up] GHCR_PAT not set and no valid PAT in Vault — set GHCR_PAT env var or run: pbpaste | bin/rotate-ghcr-pat"
+    fi
   fi
 fi
 for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
