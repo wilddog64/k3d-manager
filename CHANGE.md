@@ -1,6 +1,21 @@
 # Changes - k3d-manager
 
-## [Unreleased] — Copilot CLI plugin + _copilot_review rename + sandbox rebuild hardening
+## [Unreleased] — `_ai_agent_review` generic AI dispatch abstraction
+
+### Changed
+- `scripts/plugins/copilot.sh`: both `copilot_triage_pod` and `copilot_draft_spec` now route through `_ai_agent_review` instead of `_copilot_review` directly — backend selected by `AI_REVIEW_FUNC` (default: `copilot`), model by `AI_REVIEW_MODEL` (default: `gpt-5.4-mini`) (`c8ac9b2f`)
+- `scripts/hooks/pre-commit`: `AGENT_LINT_AI_FUNC` updated from `_copilot_review` to `_ai_agent_review` (`c8ac9b2f`)
+- `scripts/tests/lib/k3d_manager_copilot.bats`: `run` calls updated to invoke `_ai_agent_review`; source path updated to subtree location (`c8ac9b2f`)
+- `docs/howto/copilot.md`: all user-facing `_copilot_review` references replaced with `_ai_agent_review`; `AI_REVIEW_FUNC` + `AI_REVIEW_MODEL` env vars documented with usage table (`c8ac9b2f`)
+- `docs/api/functions.md`: copilot plugin table rows updated to reference `_ai_agent_review` and `AI_REVIEW_FUNC` (`c8ac9b2f`)
+- `scripts/lib/foundation/scripts/lib/system.sh` (lib-foundation subtree): `_ai_agent_review` dispatch wrapper added — routes to `_copilot_review` via `AI_REVIEW_FUNC`; `ai_agent_review.bats` 3-test suite added (`448560a`, `80bf01cd`)
+
+### Fixed
+- `scripts/lib/foundation/scripts/lib/system.sh` (lib-foundation subtree): removed `K3DM_ENABLE_AI` gate from `_copilot_review` — a lib-foundation backend must not check a consumer-specific env var; gate belongs in callers (`copilot_triage_pod`, `copilot_draft_spec`) which already have it (`657fd91`, `f6362f79`)
+
+---
+
+## [v1.4.0] — 2026-05-01 — Copilot CLI plugin + _copilot_review rename + sandbox rebuild hardening
 
 ### Added
 - `scripts/plugins/copilot.sh`: new plugin — `copilot_triage_pod <ns> <pod>` collects `kubectl describe` + last 100 log lines and asks Copilot to diagnose the failure; `copilot_draft_spec '<desc>'` collects git context and scaffolds a `docs/bugs/` spec with Root Cause / What to Change / DoD sections; requires `K3DM_ENABLE_AI=1` (`a7ad7fac`)
