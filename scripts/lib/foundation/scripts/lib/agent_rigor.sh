@@ -217,7 +217,7 @@ _agent_lint() {
    fi
 
    local staged_files
-   staged_files="$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' 2>/dev/null || true)"
+   staged_files="$(git diff --cached --name-only --diff-filter=ACM -- '*.sh' '*.js' '*.md' 2>/dev/null || true)"
    if [[ -z "$staged_files" ]]; then
       return 0
    fi
@@ -229,7 +229,7 @@ _agent_lint() {
    fi
 
    local prompt
-   prompt="Review the following staged shell files for architectural violations.\n\nRules:\n$(cat "$rules_file")\n\nFiles:\n$staged_files"
+   prompt="Review the following staged files for architectural violations.\n\nRules:\n$(cat "$rules_file")\n\nFiles:\n$staged_files"
 
    "$ai_func" -p "$prompt"
 }

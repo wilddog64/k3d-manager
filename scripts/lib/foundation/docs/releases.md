@@ -2,6 +2,8 @@
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.3.16](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.16) | 2026-04-05 | `_agent_audit` IP allowlist: `grep -Fqx -- "$file"` prevents dash-prefix paths from being parsed as grep flags; 2 BATS |
+| [v0.3.15](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.15) | 2026-03-31 | `_agent_audit` IP allowlist — `AGENT_IP_ALLOWLIST` env var skips IP check for listed paths; 2 BATS |
 | [v0.3.14](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.14) | 2026-03-27 | `agy` binary detection, `_antigravity_browser_ready` curl fast-fail, NUL-safe tab scan, doc + CHANGE.md fixes; 78 BATS |
 | [v0.3.13](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.13) | 2026-03-25 | `_antigravity_browser_ready` curl probe fix — `_run_command --soft -- curl` replaces `_curl` to allow polling retries |
 | [v0.3.12](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.12) | 2026-03-25 | `_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready` — Antigravity IDE install + Playwright MCP config helpers; 7 BATS |

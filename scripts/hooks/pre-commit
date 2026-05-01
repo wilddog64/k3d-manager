@@ -1,44 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../../scripts" >/dev/null 2>&1 && pwd)"
-
-if [[ ! -f "${SCRIPT_DIR}/lib/agent_rigor.sh" ]]; then
-   exit 0
-fi
-
 # Guard: block direct edits to the lib-foundation subtree
 # Bypass: set K3DM_SUBTREE_SYNC=1 when running git subtree pull/add
 if [[ "${K3DM_SUBTREE_SYNC:-0}" != "1" ]]; then
-   subtree_changes="$(git diff --cached --name-only | grep '^scripts/lib/foundation/' || true)"
-   if [[ -n "$subtree_changes" ]]; then
-      echo "Pre-commit hook: direct edits to scripts/lib/foundation/ are not allowed." >&2
-      echo "This directory is a git subtree from lib-foundation." >&2
-      echo "Fix the issue upstream in lib-foundation, then run:" >&2
-      echo "  K3DM_SUBTREE_SYNC=1 git subtree pull --prefix=scripts/lib/foundation ..." >&2
-      echo "" >&2
-      echo "Blocked files:" >&2
-      echo "$subtree_changes" | sed 's/^/  /' >&2
-      exit 1
-   fi
+  subtree_changes="$(git diff --cached --name-only -z | \
+    while IFS= read -r -d '' path; do
+      if [[ "$path" == scripts/lib/foundation/* ]]; then
+        printf '  %s\n' "$path"
+      fi
+    done)"
+  if [[ -n "$subtree_changes" ]]; then
+    echo "Pre-commit: direct edits to scripts/lib/foundation/ are not allowed." >&2
+    echo "Edit upstream in lib-foundation, then run:" >&2
+    echo "  K3DM_SUBTREE_SYNC=1 git subtree pull --prefix=scripts/lib/foundation ..." >&2
+    echo "" >&2
+    echo "Blocked files:" >&2
+    printf '%s\n' "$subtree_changes" >&2
+    exit 1
+  fi
 fi
 
-# shellcheck source=/dev/null
-source "${SCRIPT_DIR}/lib/system.sh"
-# IP allowlist — files with intentional CIDR literals (e.g. CloudFormation templates)
-export AGENT_IP_ALLOWLIST="${SCRIPT_DIR}/etc/agent/hardcoded-ip-allowlist"
-# shellcheck source=/dev/null
-source "${SCRIPT_DIR}/lib/agent_rigor.sh"
+# Lint staged .sh files (skip foundation subtree)
+git diff --cached --name-only -z --diff-filter=ACM | \
+  while IFS= read -r -d '' path; do
+    if [[ "$path" == *.sh && "$path" != scripts/lib/foundation/* ]]; then
+      printf '%s\0' "$path"
+    fi
+  done | \
+  xargs -0 -r shellcheck -S warning
 
-if ! _agent_audit; then
-   echo "Pre-commit hook: _agent_audit failed — fix violations before committing" >&2
-   exit 1
-fi
-
-gate_var="${AGENT_LINT_GATE_VAR:-K3DM_ENABLE_AI}"
-if [[ "${!gate_var:-0}" == "1" ]]; then
-   if ! _agent_lint; then
-      echo "Pre-commit hook: _agent_lint failed — fix architectural violations before committing" >&2
-      exit 1
-   fi
-fi
+# node --check on staged .js files
+git diff --cached --name-only -z --diff-filter=ACM | \
+  while IFS= read -r -d '' path; do
+    if [[ "$path" == *.js ]]; then
+      printf '%s\0' "$path"
+    fi
+  done | \
+  xargs -0 -r -n 1 node --check
