@@ -1,6 +1,6 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v1.4.0` (as of 2026-05-01)
+## Current Branch: `k3d-manager-v1.4.1` (as of 2026-05-01)
 
 **PR #68 OPEN** — https://github.com/wilddog64/k3d-manager/pull/68
 - CI queued (run `25227116723`); Copilot tagged; `mergeable: true`

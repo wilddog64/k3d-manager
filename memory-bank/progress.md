@@ -34,7 +34,7 @@ Pre-v1.0.5 detail removed; see `git log --tags` and `docs/retro/`.
 - [x] **Copilot public functions** — DONE (`a7ad7fac`). Added `scripts/plugins/copilot.sh` with `copilot_triage_pod` and `copilot_draft_spec`, and wired `AGENT_LINT_AI_FUNC="_copilot_review"` in the pre-commit hook. Spec: `docs/plans/v1.4.0-copilot-review-public-functions.md`.
 - [x] **BATS rename fix** — DONE (`3865cd82`). Updated `k3d_manager_copilot.bats` to call `_copilot_review` after the rename.
 - [x] **Docs** — DONE (`d64ddecf`). Added `docs/howto/copilot.md`; updated `docs/api/functions.md` and README Plugins table + How-To section.
-- [ ] **PR #69** — OPEN. https://github.com/wilddog64/k3d-manager/pull/69 — CI green (`25234016283`). Copilot review pending.
+- [x] **PR #69** — MERGED `a805dee0`. CI green. All 9 Copilot findings addressed + resolved. enforce_admins restored.
 
 ---
 
