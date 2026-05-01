@@ -33,10 +33,10 @@ Pre-v1.0.5 detail removed; see `git log --tags` and `docs/retro/`.
 
 Spec: `docs/plans/v1.2.0-fix-orders-init-sql-and-security-config.md`
 
-- [x] **Fix 1** — `shopping-cart-infra` init SQL: replace SERIAL with UUID in orders configmap. Branch: `fix/orders-init-sql-uuid` (`c3c6a3d`).
-- [x] **Fix 2** — `shopping-cart-order` SecurityConfig: add `/actuator/health/**` to permit list. Branch: `fix/actuator-health-security` (`9020be4`).
-- [x] **Fix 3b** — `shopping-cart-order` namespace cleanup: remove `namespace.yaml` from kustomize base. Branch: `fix/argocd-shared-namespace` (`3583e0d`).
-- [x] **Fix 3c** — `shopping-cart-product-catalog` namespace cleanup: remove `namespace.yaml` from kustomize base. Branch: `fix/argocd-shared-namespace` (`b24f676`).
+- [x] **Fix 1** — `shopping-cart-infra` init SQL: replace SERIAL with UUID. PR open: https://github.com/wilddog64/shopping-cart-infra/pull/32 (CI ✅, Copilot ✅)
+- [x] **Fix 2** — `shopping-cart-order` SecurityConfig: add `/actuator/health/**`. PR open: https://github.com/wilddog64/shopping-cart-order/pull/27 (CI ✅, Copilot ✅)
+- [x] **Fix 3b** — `shopping-cart-order` namespace cleanup. PR open: https://github.com/wilddog64/shopping-cart-order/pull/28 (CI ✅, Copilot resolved ✅)
+- [x] **Fix 3c** — `shopping-cart-product-catalog` namespace cleanup. PR open: https://github.com/wilddog64/shopping-cart-product-catalog/pull/19 (CI ✅, Copilot resolved ✅)
 - [ ] **Post-Fix-1 cleanup** — remove `SPRING_JPA_HIBERNATE_DDL_AUTO=update` from `services/shopping-cart-order/kustomization.yaml` after Fix 1 merges.
 - [ ] **Post-Fix-2 cleanup** — remove TCP socket probe patches from `services/shopping-cart-order/kustomization.yaml` after Fix 2 AND RabbitMQHealthIndicator JAR fix both land.
 
