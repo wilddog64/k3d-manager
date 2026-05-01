@@ -17,11 +17,12 @@ Pre-v1.0.5 detail removed; see `git log --tags` and `docs/retro/`.
 
 ## v1.3.0 Track (branch: `k3d-manager-v1.3.0`)
 
-- [ ] **`${K3D_MANAGER_BRANCH}` cleanup** — IMMEDIATE. Revert to hardcoded `main` in `services-git.yaml`; remove export from `bin/acg-up`. Must be first commit on this branch.
+- [x] **`${K3D_MANAGER_BRANCH}` cleanup** — DONE `23475ac0`. Reverted to hardcoded `main` in `services-git.yaml`; removed export from `bin/acg-up`.
+- [x] **lib-acg subtree pull** — DONE `dec36c9f`. Extend timing fix (lib-acg PR #3, `9b39df02`) pulled in.
+- [ ] **ACG Watcher extend button** — lib-acg fix merged; needs live validation on next sandbox run.
 - [ ] **Keycloak deployment** — OPEN. Spec: `docs/plans/v1.2.0-deploy-keycloak.md`. Assign to Codex.
 - [ ] **LDAP hardcoded password** — OPEN. Spec: `docs/bugs/2026-04-26-ldap-users-hardcoded-test-password.md`.
 - [ ] **vault-bridge pod-origin traffic** — OPEN. `ClusterSecretStore/vault-backend` stays `Ready=False`. Spec: `docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md`.
-- [ ] **ACG Watcher extend button** — OPEN. Spec: `docs/issues/2026-04-29-acg-watcher-extend-button-not-found.md`.
 - [ ] **k3d-manager / shopping-cart decoupling** — OPEN (v1.3.0). Spec: `docs/issues/2026-04-27-k3d-manager-shopping-cart-tight-coupling.md`.
 - [ ] **stage2 CI cluster health** — OPEN. Requires live OrbStack cluster on self-hosted runner; always fails in PR context. Needs label-gate or optional workflow step.
 - [ ] **GCP E2E smoke test** — BLOCKED. Full `make up` on live GCP sandbox not verified.

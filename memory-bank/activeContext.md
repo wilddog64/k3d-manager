@@ -21,14 +21,10 @@ All v1.2.0 bug/issue detail in `docs/bugs/`, `docs/issues/`, and `git log`.
 
 ---
 
-## FIRST COMMIT ON v1.3.0 — Required cleanup
+## v1.3.0 First Commits (DONE)
 
-Before any other work on this branch:
-
-1. **Revert `${K3D_MANAGER_BRANCH}` to hardcoded `main`** in `scripts/etc/argocd/applicationsets/services-git.yaml` (both `revision:` and `targetRevision:` fields).
-2. **Remove `K3D_MANAGER_BRANCH` export** from `bin/acg-up` (the `git rev-parse --abbrev-ref HEAD` line).
-
-This was a development workaround so the ApplicationSet tracked the feature branch during development. On `main`, it always resolves to `main` via `git rev-parse`, but hardcoding avoids detached-HEAD surprises and makes intent clear.
+- `23475ac0` — `chore: revert K3D_MANAGER_BRANCH to hardcoded main` — `services-git.yaml` + `bin/acg-up` cleanup
+- `dec36c9f` — `chore(subtree): pull lib-acg main` — extend timing fix (PR #3, `9b39df02`); `_sanitizePhaseLabel`, dynamic `remainingMs`, screenshot on failure
 
 ---
 
