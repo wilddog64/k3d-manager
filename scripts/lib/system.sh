@@ -1565,7 +1565,7 @@ function _copilot_prompt_guard() {
    done
 }
 
-function _k3d_manager_copilot() {
+function _copilot_review() {
    if [[ "${K3DM_ENABLE_AI:-0}" != "1" ]]; then
       _err "Copilot CLI is disabled. Set K3DM_ENABLE_AI=1 to enable AI tooling."
    fi
@@ -1595,7 +1595,7 @@ function _k3d_manager_copilot() {
                cd "$prev_pwd" >/dev/null 2>&1 || true
                CDPATH="$prev_cdpath"
                OLDPWD="$prev_oldpwd"
-               _err "_k3d_manager_copilot requires a prompt value"
+               _err "_copilot_review requires a prompt value"
             fi
             local scoped
             scoped="$(_copilot_scope_prompt "$2")"
