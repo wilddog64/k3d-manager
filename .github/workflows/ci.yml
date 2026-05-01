@@ -131,7 +131,9 @@ jobs:
     if: >-
       ${{ github.event_name == 'pull_request' &&
           github.event.pull_request.head.repo.full_name == github.repository &&
-          needs.detect.outputs.skip_cluster == 'false' }}
+          needs.detect.outputs.skip_cluster == 'false' &&
+          contains(github.event.pull_request.labels.*.name,
+            'ci:cluster-tests') }}
     runs-on: [self-hosted, macOS, ARM64]
     steps:
       - name: Checkout
