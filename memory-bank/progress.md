@@ -17,8 +17,8 @@ Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 
 ## v1.4.1 Track (branch: `k3d-manager-v1.4.1`)
 
-- [ ] **`_ai_agent_review` abstraction** — OPEN. Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`. Assign to Codex.
-- [ ] **BATS suite for copilot plugin** — OPEN. `scripts/tests/plugins/copilot.bats`. Follow-on from v1.4.0 Copilot finding.
+- [x] **`_ai_agent_review` abstraction** — DONE (`448560a` / `c8ac9b2f`). Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`. lib-foundation adds `_ai_agent_review`; k3d-manager updates `copilot.sh`, pre-commit hook, BATS, and howto docs.
+- [x] **BATS suite for copilot plugin** — DONE (`c8ac9b2f`). Updated `scripts/tests/lib/k3d_manager_copilot.bats` to invoke `_ai_agent_review` with the subtree-loaded foundation `system.sh`.
 
 ---
 

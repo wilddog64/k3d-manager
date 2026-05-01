@@ -2,7 +2,7 @@
 
 ## Current Branch: `k3d-manager-v1.4.1` (as of 2026-05-01)
 
-**Next task:** `_ai_agent_review` refactor — add generic AI dispatch abstraction to lib-foundation; update k3d-manager callers. Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`. Assign to Codex.
+**Completed:** `_ai_agent_review` refactor — generic AI dispatch abstraction landed in lib-foundation and k3d-manager callers were updated. Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`. lib-foundation SHA `448560a`; k3d-manager SHA `c8ac9b2f`.
 
 ---
 
@@ -14,15 +14,15 @@
 
 ---
 
-## v1.4.1 Open Work
+## v1.4.1 Completed Work
 
-### _ai_agent_review abstraction (NEXT — assign to Codex)
+### _ai_agent_review abstraction (DONE)
 Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`
-- lib-foundation: add `_ai_agent_review` to `scripts/lib/system.sh`; `AI_REVIEW_FUNC` (default: `copilot`), `AI_REVIEW_MODEL` (default: `gpt-5.4-mini`)
-- k3d-manager: update `copilot.sh` + pre-commit hook + BATS + howto doc
+- lib-foundation `448560a`: add `_ai_agent_review` to `scripts/lib/system.sh`; `AI_REVIEW_FUNC` (default: `copilot`), `AI_REVIEW_MODEL` (default: `gpt-5.4-mini`)
+- k3d-manager `c8ac9b2f`: update `copilot.sh` + pre-commit hook + BATS + howto doc
 
-### BATS suite for copilot plugin (follow-on from v1.4.0)
-`scripts/tests/plugins/copilot.bats` — argument validation, K3DM_ENABLE_AI gate, `_ai_agent_review` invocation with kubectl/git stubs.
+### BATS suite for copilot plugin (DONE)
+`scripts/tests/lib/k3d_manager_copilot.bats` — argument validation, K3DM_ENABLE_AI gate, `_ai_agent_review` invocation with kubectl/git stubs.
 
 ---
 
