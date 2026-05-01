@@ -1,68 +1,68 @@
-# How-To: Antigravity Browser Automation
+# How-To: Gemini Browser Automation
 
-The `antigravity` plugin handles browser automation tasks — extending ACG sandbox TTL and triggering GitHub Copilot coding agent reviews. The browser is **Google Chrome**, launched with `--remote-debugging-port=9222` and `--password-store=basic`. Playwright connects to Chrome over CDP (port 9222). Antigravity IDE (a VS Code fork) is used as the Playwright MCP host for the Copilot agent trigger workflow.
+The `gemini` plugin handles browser automation tasks such as triggering GitHub Copilot coding agent reviews. The browser is **Google Chrome**, launched with `--remote-debugging-port=9222` and `--password-store=basic`. Playwright connects to Chrome over CDP (port 9222). A browser IDE host is used as the Playwright MCP host for the Copilot agent trigger workflow.
 
 ## Prerequisites
 
 - Node.js 18+ (`_ensure_node` installs it if missing)
-- Antigravity IDE installed (see below)
+- Browser IDE installed and available on PATH
 - gemini CLI authenticated (`gemini auth login`)
 
 ## First-Time Setup
 
 ```bash
-./scripts/k3d-manager antigravity_install
+./scripts/k3d-manager gemini_install
 ```
 
 This verifies and installs (if missing):
 - Node.js
 - `@google/gemini-cli`
-- Antigravity IDE binary (`agy` or `antigravity`)
-- Playwright MCP entry in Antigravity's `mcp_config.json`
+- Browser IDE binary
+- Playwright MCP entry in the browser IDE `mcp_config.json`
 
 ### First-Run Login
 
-On first use, Google Chrome will open and navigate to the target site's login page. **Log in manually** — the session cookie is saved in `~/.local/share/k3d-manager/profile` and reused on all subsequent runs until it expires.
+On first use, Google Chrome will open and navigate to the target site's login page. Log in manually. The session cookie is saved in `~/.local/share/k3d-manager/profile` and reused on all subsequent runs until it expires.
 
-- **ACG login:** triggered by `antigravity_acg_extend`
-- **GitHub login:** triggered by `antigravity_trigger_copilot_review`
+- **ACG login:** triggered by `acg_extend_playwright`
+- **GitHub login:** triggered by `gemini_trigger_copilot_review`
 
 ## Extend ACG Sandbox TTL
 
 ```bash
-./scripts/k3d-manager antigravity_acg_extend <sandbox-url>
+./scripts/k3d-manager acg_extend_playwright <sandbox-url>
 ```
 
 Chrome opens the sandbox page and Playwright clicks the extend button (+4 hours). The new expiry time is printed on completion.
 
 ```bash
 # Example
-./scripts/k3d-manager antigravity_acg_extend "https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
+./scripts/k3d-manager acg_extend_playwright "https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
 
 # Skip ACG session check (useful for CI or if Playwright cannot launch)
-K3DM_ACG_SKIP_SESSION_CHECK=1 ./scripts/k3d-manager antigravity_acg_extend "<sandbox-url>"
+K3DM_ACG_SKIP_SESSION_CHECK=1 ./scripts/k3d-manager acg_extend_playwright "<sandbox-url>"
 ```
 
 ## Trigger a GitHub Copilot Coding Agent Review
 
 ```bash
-antigravity_trigger_copilot_review <owner> <repo> [prompt]
+gemini_trigger_copilot_review <owner> <repo> [prompt]
 ```
 
 Navigates to `github.com/<owner>/<repo>/agents`, creates a new Copilot coding agent task with the given prompt, and returns the task UUID.
 
 ```bash
 # Default prompt: "Review this codebase for code quality, security, and architecture."
-./scripts/k3d-manager antigravity_trigger_copilot_review wilddog64 k3d-manager
+./scripts/k3d-manager gemini_trigger_copilot_review wilddog64 k3d-manager
 
 # Custom prompt
-./scripts/k3d-manager antigravity_trigger_copilot_review wilddog64 k3d-manager "Focus on shell injection risks."
+./scripts/k3d-manager gemini_trigger_copilot_review wilddog64 k3d-manager "Focus on shell injection risks."
 ```
 
 ## Poll a Copilot Task
 
 ```bash
-./scripts/k3d-manager antigravity_poll_task <owner> <repo> <task-uuid> [timeout-seconds]
+./scripts/k3d-manager gemini_poll_task <owner> <repo> <task-uuid> [timeout-seconds]
 ```
 
 Polls the task URL every 30 seconds until complete (default timeout: 300s). Prints the full review output verbatim.
@@ -91,4 +91,3 @@ google-chrome --remote-debugging-port=9222 --password-store=basic --user-data-di
 # Check gemini CLI
 gemini --version
 gemini --model gemini-2.5-flash --prompt "say hello"
-```

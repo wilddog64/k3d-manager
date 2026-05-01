@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Guard: block direct edits to the lib-foundation subtree
+# Bypass: set K3DM_SUBTREE_SYNC=1 when running git subtree pull/add
+if [[ "${K3DM_SUBTREE_SYNC:-0}" != "1" ]]; then
+  subtree_changes="$(git diff --cached --name-only -z | \
+    while IFS= read -r -d '' path; do
+      if [[ "$path" == scripts/lib/foundation/* ]]; then
+        printf '  %s\n' "$path"
+      fi
+    done)"
+  if [[ -n "$subtree_changes" ]]; then
+    echo "Pre-commit: direct edits to scripts/lib/foundation/ are not allowed." >&2
+    echo "Edit upstream in lib-foundation, then run:" >&2
+    echo "  K3DM_SUBTREE_SYNC=1 git subtree pull --prefix=scripts/lib/foundation ..." >&2
+    echo "" >&2
+    echo "Blocked files:" >&2
+    printf '%s\n' "$subtree_changes" >&2
+    exit 1
+  fi
+fi
+
+# Lint staged .sh files (skip foundation subtree)
+git diff --cached --name-only -z --diff-filter=ACM | \
+  while IFS= read -r -d '' path; do
+    if [[ "$path" == *.sh && "$path" != scripts/lib/foundation/* ]]; then
+      printf '%s\0' "$path"
+    fi
+  done | \
+  xargs -0 -r shellcheck -S warning
+
+# node --check on staged .js files
+git diff --cached --name-only -z --diff-filter=ACM | \
+  while IFS= read -r -d '' path; do
+    if [[ "$path" == *.js ]]; then
+      printf '%s\0' "$path"
+    fi
+  done | \
+  xargs -0 -r -n 1 node --check

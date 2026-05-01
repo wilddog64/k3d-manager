@@ -1,5 +1,39 @@
 # Changes - k3d-manager
 
+## [v1.2.0] — 2026-04-30 — lib-acg extraction + shopping-cart bootstrap + GHCR hardening
+
+### Added
+- `scripts/lib/acg/` subtree from `wilddog64/lib-acg` — ACG/GCP Playwright automation extracted from k3d-manager into a standalone library; k3d-manager stubs in `scripts/plugins/acg.sh` and `scripts/plugins/gcp.sh` delegate to subtree (`99b2e143`, `c54de858`, `84da5d5e`, `a0b44c87`, `e300db31`)
+- `bin/acg-up` Step 4b: ArgoCD port-forward installed as a launchd KeepAlive agent (`localhost:8080`, auto-restarts); stops in `bin/acg-down` (`3c671667`)
+- `bin/acg-up` Step 10b: `deploy_shopping_cart_data()` auto-deploys PostgreSQL (orders/payment/products), Redis cart, RabbitMQ; aligns all passwords to `CHANGE_ME`; creates `rabbitmq-credentials` + `redis-cart-secret` (`d5cf80ed`)
+- `bin/rotate-ghcr-pat`: new helper to rotate `ghcr-pull-secret` from a real PAT; persists PAT to Vault `secret/data/github/pat` for both interactive and piped input (`5d139afb`, `f4a9d78b`)
+- `services/shopping-cart-namespace/`: dedicated ArgoCD Application owns `Namespace/shopping-cart-apps` with `istio-injection: enabled` — partial fix for SharedResourceWarning (`5d139afb`)
+- `services/shopping-cart-order/kustomization.yaml`: TCP socket probes (readiness+startup), `SPRING_JPA_HIBERNATE_DDL_AUTO=update`, `SPRING_RABBITMQ_*` env vars — workarounds for order-service init SQL and RabbitMQHealthIndicator NPE (`9db9589c`, `013cfd08`, `20b0408e`, `4ad6bbae`)
+- `bin/acg-sync-apps`: persistent frontend port-forward on `localhost:8081` after sync; stops in `bin/acg-down` (`6eee7afc`)
+
+### Changed
+- `scripts/plugins/gemini.sh` (was `antigravity.sh`): all `antigravity_*` functions renamed to `gemini_*`; `gemini.sh` sources CDP helpers from `scripts/lib/acg/` subtree (`20df717c`)
+- `scripts/etc/argocd/applicationsets/services-git.yaml`: `targetRevision` and `revision` now use `${K3D_MANAGER_BRANCH}` envsubst variable (set from `git rev-parse --abbrev-ref HEAD` in `bin/acg-up`) so the ApplicationSet tracks the current branch during development; reverts to `main` after merge (`522aceb7`)
+- `scripts/etc/argocd/projects/platform.yaml.tmpl`: `orphanedResources.warn: false` — suppresses OrphanedResourceWarning for imperative bootstrap secrets not tracked by ArgoCD (`625b82c2`)
+- `bin/acg-up`: GHCR pull secret sourced from Vault `secret/data/github/pat` first; fails closed if neither `GHCR_PAT` nor Vault PAT is set — prevents `gh auth token` OAuth fallback which lacks `read:packages` (`9b2d3cb5`)
+- `bin/acg-up`: Vault sealed-state recovery — preserves health JSON from non-2xx `/v1/sys/health`, auto-runs `deploy_vault --re-unseal`, rechecks before continuing (`786c5e6c`)
+- `scripts/lib/providers/tunnel.sh`: reverse tunnel port mapping changed from `-R 8200:localhost:8200` to `-R 8200:localhost:18200` to prevent same-port reset; local Vault port-forward uses `18200:8200`
+- `bin/acg-down`: `--keep-hub` flag added; continues Hub teardown even when CloudFormation teardown fails due to recycled sandbox credentials (`68eba803`, `727cde2f`)
+- `Makefile` `sync-apps`/`status`: `APP_CONTEXT` passed as `ubuntu-gcp` when `CLUSTER_PROVIDER=k3s-gcp` (`7585d63c`, `f2f74b98`)
+
+### Fixed
+- `scripts/plugins/argocd.sh`: `envsubst` call updated to include `$K3D_MANAGER_BRANCH` alongside `$ARGOCD_NAMESPACE` (`522aceb7`)
+- `bin/acg-down` (k3s-gcp): calls `_provider_k3s_gcp_destroy_cluster` directly — removed broken `destroy_cluster` → `_cluster_provider_call` routing (`b8b72a67`)
+- `bin/acg-down` (k3s-gcp): `GCP_PROJECT` auto-detected from `~/.local/share/k3d-manager/gcp-service-account.json` when not set in environment (`ca18e581`)
+- `bin/acg-sync-apps`: `argocd app list` replaced with `kubectl get applications.argoproj.io -A` (CRD query — no active port-forward required) (`237d0b2c`)
+- `bin/acg-sync-apps`: Hub cluster context pre-flight check before kubectl commands (`7fc1a6f4`)
+- `scripts/lib/providers/k3s-gcp.sh`: `_gcp_create_instance` now idempotent — skips create if instance already exists (`7582e290`)
+- `bin/acg-up` (k3s-gcp): Hub cluster + Vault + ArgoCD now created for GCP provider (previously skipped after Step 2) (`f8f9d93b`)
+- `bin/acg-status`: `aws sts get-caller-identity` gated behind `CLUSTER_PROVIDER != k3s-gcp` (`20e4bd44`)
+- `scripts/lib/acg/playwright/gcp_login.js`: Chrome account-sync sign-in dialog dismissed via `context.on('page', ...)` handler (`lib-acg 5c0e8e2d`)
+- `scripts/lib/acg/playwright/acg.js`: "Session Extended" modal dismissed via Escape + X-button fallback + `waitFor(hidden)` guard (`lib-acg 5c0e8e2d`)
+- `scripts/lib/acg/playwright/acg_credentials.js`: CDP context miss when sandbox card is visible but wrong frame used — fixed with scoped frame selection (`lib-acg 7cb7f64a`)
+
 ## [v1.1.0] — 2026-04-24 — Unified ACG automation AWS + GCP
 
 ### Added

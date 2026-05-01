@@ -1,199 +1,90 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v1.1.0` (as of 2026-04-20)
+## Current Branch: `k3d-manager-v1.2.0` (as of 2026-04-25)
 
-Renamed from `recovery-v1.1.0-aws-first` (2026-04-20). Old `k3d-manager-v1.1.0` (the messy branch)
-preserved as `k3d-manager-v1.1.0-backup` on remote.
+**v1.1.0 SHIPPED** — PR #65 merged to main (`e013d23b`), tagged `v1.1.0`, released 2026-04-25.
+Branch protection (`enforce_admins`) restored. Retro: `docs/retro/2026-04-25-v1.1.0-retrospective.md`.
 
-**v1.1.0 goal** — Unified ACG automation for AWS + GCP. Core provisioning logic is in place;
-live E2E still needs a clean smoke test after the CLUSTER_NAME default fix.
+## v1.1.0 Summary (SHIPPED — see `docs/retro/2026-04-25-v1.1.0-retrospective.md`)
 
-## Completed (v1.1.0 Recovery)
+Key commits: `3de58f4d` vars.sh, `a986d5bb` robot engine, `9686e5c3` GCP identity bridge,
+`3a3806aa` CLUSTER_NAME fix, `1ab14ebf` CDP headless, `e013d23b` merge SHA.
+All v1.1.0 bug detail archived in `docs/bugs/` and `git log`.
 
-| Task | Commit | Summary |
-|---|---|---|
-| Shared playwright vars | `3de58f4d` | `vars.sh` reconciled; sourced from `acg.sh` |
-| Robot engine unification | `a986d5bb` | `acg_credentials.js`: CDP disconnect, `--provider` flag, IPv4, patient sign-in |
-| GCP identity bridge | `9686e5c3` | `gcp.sh` plugin, `gcp_login.js` OAuth automation, `bin/acg-up` provider dispatch, core allowlist |
-| Documentation alignment | `7f3bd0a6` | README + howto guides aligned to 127.0.0.1/vars.sh |
-| GCP cluster provisioning | `c65f0c90` | Firewall, GCE instance, k3sup, timeout fix (300s) |
-| GCP latch-on hardening | `e45d9a04` | `gcp_login.js` hardened with "Agree and continue" + "Confirm" buttons |
-| Clean-slate login | `6ae2a6c3` | Logout + explicit email/password to unblock OAuth callback |
-| CLUSTER_NAME default fix | `3a3806aa` | `core.sh` now falls back to `k3d-cluster` when `CLUSTER_NAME` is empty |
-| Polite tab selection | `131dca33` | Hardened `acg_credentials.js` to avoid hijacking user's active page (RCA 1) |
 
-## Latest Task: CLUSTER_NAME empty-string fix
+## Sandbox Rebuild Readiness — Option 2 Decision (2026-04-27)
 
-**Status:** COMPLETE — spec: `docs/bugs/2026-04-20-k3d-cluster-name-empty-blocker.md`
-**File:** `scripts/lib/core.sh` line 796
-**Fix:** `${CLUSTER_NAME:-}` → `${CLUSTER_NAME:-k3d-cluster}`
-**Commit:** `3a3806aa`
-**Smoke test:** `make up` reached `bin/acg-up` but stopped on Chrome CDP startup (`docs/issues/2026-04-21-cluster-name-smoke-test-blocked-by-cdp.md`). User reports this path should start CDP in the background and use `~/.local/share/k3d-manager/profile/`.
+**Decision:** Permanent fixes first, then cleanup, then merge to `main`. No ApplicationSet branch-pin hack.
 
-## Latest Task: CDP Linux headless launch + profile path unification
+**Why rebuild is NOT clean today:** ApplicationSet template uses `targetRevision: main`. The kustomize workarounds for order-service (TCP probes, `ddl-auto=update`, `SPRING_RABBITMQ_*`) live on `k3d-manager-v1.2.0`, not `main`. After a fresh `make up`, order-service breaks immediately.
 
-**Status:** COMPLETE — spec: `docs/bugs/2026-04-21-cdp-linux-headless-launch-failure.md`
-**Files:** `antigravity.sh`, `vars.sh`, `acg_credentials.js`, `acg_extend.js`, `gcp.bats`
-**Fix:** Add `--headless=new --no-sandbox --disable-dev-shm-usage` to Linux Chrome launch; rename profile dir from `playwright-auth` → `profile` across all five files
-**Commit:** `1ab14ebf`
-**Validation:** D1/D2/D3 completed locally; D4 live `make up` on ACG sandbox remains pending user validation.
+**Cleanup dependency chain (do IN ORDER after each fix merges):**
 
-## Latest Task: ACG repo extraction plan
+1. **After Fix 1 merges** (`shopping-cart-infra` init SQL UUID — Codex):
+   - Remove `SPRING_JPA_HIBERNATE_DDL_AUTO=update` patch from `services/shopping-cart-order/kustomization.yaml`
 
-**Status:** PLANNED — `docs/plans/v1.1.0-acg-extraction-repo-split.md`
-**Commit:** `8639592c`
-**PR:** `N/A`
-**Why:** Shared browser/CDP code is destabilizing AWS while GCP evolves.
-**Direction:** Extract ACG automation into its own repo, test browser automation there, keep `k3d-manager` focused on orchestration.
+2. **After Fix 2 AND RabbitMQHealthIndicator JAR are both fixed**:
+   - Remove all three TCP socket probe patches (readiness, liveness, startup) from `services/shopping-cart-order/kustomization.yaml`
+   - NOTE: Fix 2 (SecurityConfig) alone is NOT enough — JAR NPE still causes 503. Both must land before TCP probes come out.
 
-## Latest Batch: 5 bugs specced 2026-04-24
+3. **After Fix 3 merges** (`shopping-cart-order` + `shopping-cart-product-catalog` + k3d-manager namespace app — Codex):
+   - No cleanup needed. `services/shopping-cart-namespace/` stays as the permanent namespace owner.
 
-| Bug | Spec | Action |
-|-----|------|--------|
-| acg-sync-apps app not found | `docs/bugs/2026-04-24-acg-sync-apps-argocd-app-not-found.md` | COMPLETE (`eaaf9a9e`) |
-| acg-sync-apps port-forward hidden failure | `docs/bugs/2026-04-24-acg-sync-apps-port-forward-hidden-failure.md` | COMPLETE (`3bd96955`) |
-| acg-sync-apps local port 8080 collision | `docs/bugs/2026-04-24-acg-sync-apps-local-port-8080-collision.md` | COMPLETE (`3a1e2554`) |
-| acg-sync-apps port-forward reuse | `docs/bugs/2026-04-24-acg-sync-apps-port-forward-reuse.md` | COMPLETE (`f18c8ec7`) |
-| acg-sync-apps state dir not writable | `docs/bugs/2026-04-24-acg-sync-apps-state-dir-not-writable.md` | COMPLETE (`890ba2a6`) |
-| acg-sync-apps live port-forward connect failure | `docs/issues/2026-04-24-acg-sync-apps-live-port-forward-connect-operation-not-permitted.md` | OPEN |
-| acg-sync-apps error log preserved in scratch | `docs/bugs/2026-04-24-acg-sync-apps-error-log-preserved-in-scratch.md` | COMPLETE (`2e766a43`) |
-| acg-sync-apps ArgoCD login still interactive | `docs/bugs/2026-04-24-acg-sync-apps-argocd-login-noninteractive.md` | COMPLETE (`c3a2f146`) |
-| acg-extend isPanelOpen false positive | `docs/bugs/2026-04-24-acg-extend-ispanelopen-false-positive.md` | COMPLETE (`79b87e36`) |
-| Vault preflight after sleep | `docs/bugs/2026-04-23-acg-up-vault-state-preflight-gap-after-mac-sleep.md` | COMPLETE (`e577579e`) |
-| acg-down provider dispatch + GCP teardown | `docs/bugs/2026-04-24-acg-down-provider-dispatch-gcp-teardown.md` | COMPLETE (`706e0ba2`) |
-| acg-credentials Open Sandbox provider-blind | `docs/bugs/2026-04-24-acg-credentials-open-sandbox-provider-blind.md` | DEFERRED to lib-acg |
+4. **After all three cleanups above are done:**
+   - Merge `k3d-manager-v1.2.0` → `main`
+   - ApplicationSet then uses `main` forever — no workarounds, no branch-pin needed
+   - `make down` → `make up` → `make sync-apps` produces all 5 pods Running + all apps Synced+Healthy
 
-2026-04-24 implementation batch complete for Bugs 1–4; Bug 5 remains deferred to lib-acg extraction.
+**What already survives rebuilds (no action needed):**
+- `ghcr-pull-secret` — Step 5 of `acg-up` creates it automatically
+- Data layer (PostgreSQL, Redis, RabbitMQ) — Step 10b `deploy_shopping_cart_data()` handles it
+- Password alignment — automated in `deploy_shopping_cart_data()`
+- `OrphanedResourceWarning` suppressed — `platform.yaml.tmpl` has `warn: false` (`625b82c2`)
+- ApplicationSet revision — `services-git.yaml` template uses `${K3D_MANAGER_BRANCH}` variable; `acg-up` exports it from `git rev-parse --abbrev-ref HEAD` before calling `deploy_argocd`. No runtime kubectl patch needed. **When `k3d-manager-v1.2.0` merges to `main`, change template back to hardcoded `main`** and remove the `K3D_MANAGER_BRANCH` export from `acg-up`.
 
-## New Bug: acg-down credential check noise (2026-04-24)
+## v1.2.0 Open Items
 
-**Status:** COMPLETE (`07ca18a6`) — spec: `docs/bugs/2026-04-24-acg-down-credential-check-noise.md`
-**File:** `bin/acg-down` lines 49–51
-**Fix:** Pre-check `aws sts get-caller-identity` silently before calling `acg_teardown`; skip with single clean `_info` when invalid. Eliminates ERROR-level noise that makes expired vs live-but-stale indistinguishable.
-**Supersedes:** `ae2fca66` approach (catch-after-fail) — this fixes the noise problem that approach left behind.
+- **ACG credential extraction misses visible sandbox** — SUBTREE SYNCED (2026-04-28). lib-acg PR #2 merged (`7cb7f64a`); Copilot comments addressed and resolved before merge. k3d-manager pulled `wilddog64/lib-acg@main` into `scripts/lib/acg/` via subtree (`88cb8bbc` merge commit, `a0b44c87` subtree squash). Focused verification passed: `node --check scripts/lib/acg/playwright/acg_credentials.js`, `shellcheck scripts/lib/acg/scripts/plugins/acg.sh scripts/lib/acg/scripts/lib/cdp.sh scripts/lib/acg/scripts/vars.sh`, `bats scripts/tests/lib/acg.bats`, `git diff --check`, and `./scripts/k3d-manager _agent_audit`. Live `make up` rerun remains pending. Spec: `docs/issues/2026-04-28-acg-credentials-cdp-context-miss.md`.
+- **ACG Watcher fails to find "Extend" button** — OPEN. The watcher log reports failure to locate the button during the 1h window. Downstream `scripts/lib/acg/` has been synced to lib-acg PR #3 / commit `602e421`, and the local k3d-manager checks passed. Manual sequence requires "Open Sandbox" -> Wait for Modal -> "Extend Session". Spec: `docs/issues/2026-04-29-acg-watcher-extend-button-not-found.md`.
+- **lib-acg main branch protection** — COMPLETE (2026-04-28). After user re-authenticated `gh`, `wilddog64/lib-acg` `main` protection was enabled: enforce admins, require 1 approving review, dismiss stale reviews, require conversation resolution, disallow force pushes/deletions. Verification returned `{"allow_deletions":false,"allow_force_pushes":false,"dismiss_stale_reviews":true,"enforce_admins":true,"required_approving_review_count":1,"required_conversation_resolution":true}`. Issue: `docs/issues/2026-04-28-lib-acg-main-branch-protection-auth-blocked.md`.
+- **acg-up sealed Vault health misclassified** — FIXED (2026-04-28). Live `make up` failed at Step 4 with "Vault not responding"; actual state was `secrets/vault-0` sealed after host/runtime restart. Root cause: `curl -f` discarded Vault `/v1/sys/health` sealed-state JSON because sealed Vault returns non-2xx. `bin/acg-up` now preserves health JSON, auto-runs `deploy_vault --re-unseal`, and rechecks before continuing. Live manual recovery passed: `deploy_vault --re-unseal` unsealed `secrets/vault`. Issue: `docs/issues/2026-04-28-acg-up-vault-sealed-health-misclassified.md`.
+- **vault-bridge same-port reverse tunnel reset** — PARTIAL FIX (2026-04-28). Live `make up` reached Step 11 but `ClusterSecretStore` became `InvalidProviderConfig` with `EOF` from `vault-bridge.secrets.svc.cluster.local:8201`. Root cause 1 fixed: reverse tunnel used `-R 8200:localhost:8200`; remote access reset the local `kubectl port-forward` on the same port. `tunnel_start` now maps remote `8200` to local `127.0.0.1:18200`, and `bin/acg-up` uses local port-forward `18200:8200` plus that port for local Vault seeding. Host-origin remote Vault health now returns HTTP 200. Remaining blocker: pod-origin traffic to `vault-bridge` still gets empty reply, so `ClusterSecretStore/vault-backend` remains `Ready=False`. Issues: `docs/issues/2026-04-28-vault-bridge-same-port-reverse-tunnel-reset.md`, `docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md`.
+- **LDAP hardcoded test password** — OPEN. All LDAP users share static `test1234` baked into `bootstrap-basic-schema.ldif`. Fix: remove `userPassword` from LDIF; add `_ldap_rotate_user_passwords` to `ldap.sh` (generates unique pw per user, stores in Vault `secret/ldap/users/<user>`); also persist Dex bind PW into `argocd-secret` via `deploy_argocd`. Spec: `docs/bugs/2026-04-26-ldap-users-hardcoded-test-password.md`.
+- **LDAP SSHA double-hash** — OPEN. Bitnami OpenLDAP re-hashes `{SSHA}` values in LDIF import — all bootstrapped users have unknown passwords. Workaround: set passwords via `ldappasswd`. Permanent fix: remove `userPassword` from LDIF (covered in parent bug spec). Spec: `docs/bugs/2026-04-26-ldap-ssha-rehash-password-unusable.md`. Current live cred: `chengkai.liang` / `ChangeMe123!` (ephemeral).
+- **ArgoCD missing shopping-cart apps** — COMPLETE (2026-04-27). All 5 services deployed via ArgoCD ApplicationSet on ubuntu-k3s. Spec: `docs/bugs/2026-04-26-argocd-missing-shopping-cart-apps.md`.
+- **shopping-cart data layer not auto-deployed** — COMPLETE (`d5cf80ed`). `deploy_shopping_cart_data()` added to `shopping_cart.sh`; wired into `bin/acg-up` Step 10b. Deploys PostgreSQL (orders/payment/products), Redis cart, RabbitMQ; aligns passwords to `CHANGE_ME`; creates `rabbitmq-credentials`; copies `redis-cart-secret` to shopping-cart-apps. Takes effect on next sandbox creation.
+- **order-service all 5 pods Running** — COMPLETE (`20b0408e`). All shopping-cart pods now 1/1 Running. Kustomize patches applied: (1) `SPRING_JPA_HIBERNATE_DDL_AUTO=update`; (2) readiness+startup probes changed to TCP socket (bypass broken RabbitMQHealthIndicator NPE); (3) liveness probe patched to `/actuator/health`; (4) `SPRING_RABBITMQ_*` env vars for Spring AMQP. Permanent fix needed: update rabbitmq-client JAR + init SQL + SecurityConfig. Spec: `docs/bugs/2026-04-27-orders-init-sql-serial-vs-uuid.md`.
+- **shopping-cart ImagePullBackOff — GHCR token source hardening** — FIXED (2026-04-30). `bin/acg-up` now fails closed if `GHCR_PAT` is missing and Vault has no PAT at `secret/data/github/pat`; `bin/rotate-ghcr-pat` now persists tokens to Vault for both interactive and piped input. This prevents `gh auth token` OAuth fallbacks from recreating a bad `ghcr-pull-secret`. Issue: `docs/issues/2026-04-30-ghcr-secret-rotation-fallback-fails-open.md`.
+- **ArgoCD SharedResourceWarning** — PARTIAL (`5d139afb`). Added `services/shopping-cart-namespace/` in k3d-manager. Upstream removal pending.
+- **ArgoCD port-forward on acg-up** — COMPLETE (`3c671667`). Step 4b added to `bin/acg-up`; cleanup in `bin/acg-down`. PID at `~/.local/share/k3d-manager/argocd-pf.pid`.
+- **ArgoCD LDAP RBAC group mismatch** — PATCHED (ephemeral). `argocd-rbac-cm` mapped `cn=admins` (non-existent) to `role:admin`; patched to map `cn=it-devops` instead. Dex bind PW patched into `argocd-secret` ephemerally — both lost on Hub rebuild. Permanent fix is part of LDAP hardcoded password bug spec.
 
-## Prev Bug: acg-down expired credentials abort (2026-04-24)
+- **shopping-cart frontend login (Keycloak)** — OPEN. Frontend uses Keycloak OIDC at `localhost:8080` (baked into JS bundle). Keycloak not yet deployed. Fix: add `services/shopping-cart-identity/` kustomization; move ArgoCD to port 9090; Keycloak port-forward on 8080. Login: `testuser`/`testpassword`. Spec: `docs/plans/v1.2.0-deploy-keycloak.md`. Assign to Codex.
+- **k3d-manager / shopping-cart tight coupling** — OPEN (v1.3.0). `services/`, `shopping_cart.sh`, and Step 10b in `acg-up` make k3d-manager app-specific. Fix: move overlays + bootstrap to `shopping-cart-infra/k8s-overlays/`; make ApplicationSet repoURL configurable. Spec: `docs/issues/2026-04-27-k3d-manager-shopping-cart-tight-coupling.md`.
 
-**Status:** COMPLETE (`07ca18a6`) — spec: `docs/bugs/2026-04-24-acg-down-expired-credentials-abort.md`
-**File:** `bin/acg-down` line 50
-**Fix:** `acg_teardown --confirm` → `acg_teardown --confirm || _info "[acg-down] CloudFormation teardown failed — credentials may have expired (sandbox already removed). Continuing local cleanup."`
-**Why:** Expired sandbox TTL causes `_acg_check_credentials` to return 1, aborting the script before Vault PF kill + k3d Hub delete run. Follow-up `07ca18a6` keeps the cleanup behavior and suppresses credential ERROR noise with a silent pre-check.
-
-## New Bug: acg-up Step 3.5 aborts instead of creating missing Hub cluster (2026-04-24)
-
-**Status:** COMPLETE (`73382eb2`) — spec: `docs/bugs/2026-04-24-acg-up-hub-cluster-not-created.md`
-**File:** `bin/acg-up` lines 104–105
-**Fix:** Replace `_err` (abort) with `deploy_cluster --provider k3d` — auto-create the Hub cluster when missing. Keep the `kubectl get nodes` unreachable check as the true OrbStack-broken guard.
-**Why:** `make down` deletes the Hub cluster; `make up` never creates it (Step 2 provisions remote k3s-aws only). `make down → make up` always fails at Step 3.5.
-
-## New Bug: k3d-provider EXIT trap leak (2026-04-24)
-
-**Status:** COMPLETE (`258de0d1`) — spec: `docs/bugs/2026-04-24-k3d-provider-exit-trap-leak.md`
-**File:** `scripts/lib/providers/k3d.sh` line 100
-**Fix:** `trap '...' EXIT` → `trap '...' RETURN` in `_provider_k3d_configure_istio`
-**Why:** EXIT trap registers on the caller shell; when `deploy_cluster --provider k3d` is called inline from `bin/acg-up` (Step 3.5, `73382eb2`), the trap fires on acg-up exit with `$istio_yamlfile` out of scope → unbound variable under `set -u`.
-
-## New Bug: k3d-provider RETURN trap scope (2026-04-24)
-
-**Status:** COMPLETE (`e6a9ec91`) — spec: `docs/bugs/2026-04-24-k3d-provider-return-trap-scope.md`
-**File:** `scripts/lib/providers/k3d.sh` lines 100 and 142
-**Fix:** Prepend `trap - RETURN;` inside both RETURN trap handlers — self-clears trap on first fire, preventing re-fire in parent functions where local variables are out of scope.
-**Why:** Bash RETURN traps are shell-global, not function-scoped. After `_provider_k3d_configure_istio` returns, its trap re-fires when `_provider_k3d_deploy_cluster` returns, with `$istio_yamlfile` out of scope → unbound variable.
-
-## New Bug: acg-up Step 4 fails on fresh Hub — no Vault/LDAP/ArgoCD (2026-04-24)
-
-**Status:** COMPLETE (`c59f2c3a`) — spec: `docs/bugs/2026-04-24-acg-up-hub-cluster-bootstrap.md`
-**File:** `bin/acg-up` lines 102–124
-**Fix:** Add `_hub_newly_created` flag in Step 3.5; add Step 3.6 that runs `deploy_vault` then `deploy_argocd` via subprocess when Hub was just created.
-**Why:** `make down` deletes the Hub cluster; Step 3.5 re-creates it but never bootstraps workloads; Step 4 `kubectl port-forward svc/vault -n secrets` fails because `secrets` ns doesn't exist on fresh Hub.
-**Key constraint:** Call `deploy_vault` (no `--confirm`) via `"${REPO_ROOT}/scripts/k3d-manager"` subprocess — `--confirm` is not a recognized flag in `_vault_parse_deploy_opts`.
-
-## New Bug: deploy_argocd hardcodes `ldap` namespace — always fails LDAP check (2026-04-24)
-
-**Status:** COMPLETE (`032bfadb`) — spec: `docs/bugs/2026-04-24-argocd-ldap-namespace-hardcoded.md`
-**File:** `scripts/plugins/argocd.sh` line 87
-**Fix:** `_kubectl get ns ldap` → `_kubectl get ns "${LDAP_NAMESPACE:-ldap}"`
-**Why:** `LDAP_NAMESPACE` defaults to `identity` (not `ldap`). `deploy_argocd` now checks `ns "${LDAP_NAMESPACE:-ldap}"`, matching the configured LDAP namespace and avoiding the direct `deploy_ldap --confirm` failure path when LDAP already exists in `identity`.
-
-## New Bug: deploy_argocd does not source LDAP vars before namespace check (2026-04-24)
-
-**Status:** COMPLETE (`1c3ead28`) — spec: `docs/bugs/2026-04-24-argocd-ldap-vars-not-sourced.md`; PR: N/A
-**File:** `scripts/plugins/argocd.sh`
-**Fix:** `argocd.sh` now sources `scripts/etc/ldap/vars.sh` before dependency checks and uses `_kubectl --no-exit` for Vault/LDAP namespace probes.
-**Why:** The prior namespace fix used `LDAP_NAMESPACE`, but `argocd.sh` did not source LDAP vars in the `deploy_argocd` subprocess. `LDAP_NAMESPACE` was unset, so the dependency check fell back to `ldap` while LDAP was deployed to `identity`; `_kubectl` then exited during the dependency probe.
-**Validation:** Live `./scripts/k3d-manager deploy_argocd --confirm` passed the dependency phase, installed ArgoCD, and exited 0. `_agent_lint` and `_agent_audit` passed. Current shellcheck and BATS still show the pre-existing ArgoCD help/bootstrap findings tracked in `docs/issues/2026-04-24-argocd-verification-preexisting-failures.md`. The earlier non-blocking EOF issue is now resolved by the plaintext-login fix below.
-
-## New Bug: deploy_eso returns before webhook endpoints are ready (2026-04-24)
-
-**Status:** COMPLETE (`e7b06b2b`) — spec: `docs/bugs/2026-04-24-eso-webhook-readiness-race.md`; PR: N/A
-**File:** `scripts/plugins/eso.sh`
-**Fix:** `deploy_eso` now waits for `external-secrets`, `external-secrets-webhook`, and `external-secrets-cert-controller` rollouts, then waits for `external-secrets-webhook` endpoints before returning. The already-installed fast path also verifies readiness.
-**Why:** `deploy_vault` installs ESO and previously returned after only the main `external-secrets` deployment was ready. Fresh Hub Step 3.6 then ran `deploy_ldap`, which applied ExternalSecret resources while `external-secrets-webhook` could still lack endpoints, causing Kubernetes admission to fail with `no endpoints available for service "external-secrets-webhook"`.
-**Validation:** `shellcheck -x scripts/plugins/eso.sh`, `bats scripts/tests/plugins/eso.bats`, `_agent_lint`, `_agent_audit`, and live `./scripts/k3d-manager deploy_eso --confirm` passed. Full `./scripts/k3d-manager test all` still has the known ArgoCD help-test failure tracked in `docs/issues/2026-04-24-argocd-verification-preexisting-failures.md`.
-
-## New Bug: ArgoCD CLI login plaintext prompt blocks bootstrap (2026-04-24)
-
-**Status:** COMPLETE (`fdbef8c4`) — spec: `docs/bugs/2026-04-24-argocd-cli-login-plaintext-prompt.md`
-**File:** `scripts/plugins/argocd.sh`
-**Fix:** `_argocd_ensure_logged_in()` now uses `--plaintext --skip-test-tls` and closes stdin with `</dev/null`.
-**Why:** `_argocd_ensure_logged_in()` forwards Argo CD to `localhost:8080` via a plaintext `kubectl port-forward`, then calls `argocd login` non-interactively. The CLI printed `WARNING: server is not configured with TLS. Proceed (y/n)?` and then hit EOF, which stalled bootstrap.
-**Validation:** Focused `_argocd_ensure_logged_in` test passes, and live `./scripts/k3d-manager deploy_argocd --confirm` now runs past the login step and completes bootstrap.
-
-## New Bug: Step 3.6 deploy_argocd fails — deploy_ldap called directly with --confirm (2026-04-24)
-
-**Status:** COMPLETE (`c650f032`) — spec: `docs/bugs/2026-04-24-acg-up-hub-bootstrap-ldap-missing.md`
-**File:** `bin/acg-up` line 119 (add before deploy_argocd)
-**Fix:** Add `"${REPO_ROOT}/scripts/k3d-manager" deploy_ldap --confirm` between deploy_vault and deploy_argocd in Step 3.6.
-**Why:** `deploy_argocd` calls `deploy_ldap --confirm` directly when `ldap` ns missing; `_ldap_parse_deploy_opts` hits `_err "[ldap] unknown option: --confirm"`. Pre-deploying LDAP via dispatcher ensures namespace exists → argocd skips the direct call.
-
-## New Bug: Step 3.6 deploy_vault/deploy_argocd hit dispatcher safety gate (2026-04-24)
-
-**Status:** COMPLETE (`8b43122f`) — spec: `docs/bugs/2026-04-24-acg-up-hub-bootstrap-safety-gate.md`
-**File:** `bin/acg-up` lines 118–119
-**Fix:** Add `--confirm` to both dispatcher calls: `deploy_vault --confirm` and `deploy_argocd --confirm`.
-**Why:** `scripts/k3d-manager` dispatcher requires `--confirm` or explicit options; `--confirm` is consumed/stripped by dispatcher so vault.sh never sees it.
-
-## New Bug: acg-sync-apps default ARGOCD_APP is 'data-layer' — never exists (2026-04-24)
-
-**Status:** COMPLETE (`b83d5596`) — spec: `docs/bugs/2026-04-24-acg-sync-apps-argocd-app-default-wrong.md`
-**File:** `bin/acg-sync-apps` line 24
-**Fix:** `ARGOCD_APP="${ARGOCD_APP:-data-layer}"` → `ARGOCD_APP="${ARGOCD_APP:-rollout-demo-default}"`
-**Why:** `_argocd_deploy_applicationsets` deploys three ApplicationSets. Only `demo-rollout.yaml` (static list generator) creates apps unconditionally — `rollout-demo-default` and `rollout-demo-staging`. `services-git.yaml` generates zero apps (no `services/` dir in repo). `platform-helm.yaml` generates zero apps (no cluster with `environment: dev` label at bootstrap). `data-layer` was a stale planned default that was never implemented.
-
-## New Bug: acg-sync-apps readiness check uses https:// but ArgoCD serves HTTP (2026-04-24)
-
-**Status:** OPEN — spec: `docs/bugs/2026-04-24-acg-sync-apps-https-vs-http-readiness-check.md`
-**File:** `bin/acg-sync-apps` lines 105 and 151
-**Fix:** Change `curl -sk --max-time 1 https://localhost:<port>/` → `curl -sf --max-time 1 http://localhost:<port>/healthz` in both the reconcile check and the startup readiness loop.
-**Why:** `deploy_argocd` installs ArgoCD with `server.insecure=true` → plain HTTP on container port 8080. The `https://` curl sends a TLS ClientHello to an HTTP endpoint; the handshake fails, the connection drops. Port-forward logs "Handling connection for 8080" but curl returns non-zero every iteration; after 15s the script exits 1. `argocd.sh` line 68 already uses the correct form: `curl -sf http://localhost:8080/healthz`.
-
-## Open Items
-- **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Local Hub orchestration is fragmented: `acg-up` assumes ArgoCD infrastructure, bootstrap remains separate, and local ArgoCD access still requires manual port-forward setup.
-- **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up` does not clearly summarize local Hub vs remote app-cluster readiness and does not guide optional local runtime startup.
-- **ACG Extraction Boundary** — OPEN (`docs/bugs/2026-04-23-acg-extraction-boundary-gemini-coupling.md`). The `acg_*` interaction surface still keeps Gemini/browser automation coupled to `k3d-manager`; that subsystem should move out as one extraction unit.
-- **acg-sync-apps https vs http readiness** — COMPLETE (`0896d9ec`). Spec `docs/bugs/2026-04-24-acg-sync-apps-https-vs-http-readiness-check.md`; `bin/acg-sync-apps` now uses `http://localhost:<port>/healthz` for both the managed port-forward reuse check and the startup readiness loop, matching ArgoCD's insecure HTTP mode.
-- **acg-sync-apps default app wrong** — COMPLETE (`b83d5596`). Spec `docs/bugs/2026-04-24-acg-sync-apps-argocd-app-default-wrong.md`; `bin/acg-sync-apps` now defaults `ARGOCD_APP` to `rollout-demo-default`, which is the canonical app generated after bootstrap.
-- **Teardown State Drift** — COMPLETE (`docs/bugs/2026-04-23-acg-down-full-teardown-spec.md`). Implemented in `3fd6f4d6`; `acg-down` now tears down the local Hub by default and supports `--keep-hub` as the explicit opt-out.
-- **acg-up Hub bootstrap LDAP missing** — COMPLETE (`c650f032`). `acg-up` Step 3.6 now pre-deploys LDAP through the dispatcher before ArgoCD, so `deploy_argocd` no longer falls into its direct `deploy_ldap --confirm` path on a fresh Hub.
-- **acg-sync-apps + acg-status dual-cluster** — COMPLETE (`docs/bugs/2026-04-23-acg-sync-apps-and-acg-status-dual-cluster.md`). Implemented in `a5422141`; `acg-sync-apps` now polls port-forward readiness and uses configurable `ARGOCD_APP`, and `acg-status` now shows Hub cluster nodes + pods before tunnel status.
-- **k3d-provider EXIT trap leak** — COMPLETE (`258de0d1`). `_provider_k3d_configure_istio` now uses a `RETURN` trap for temp file cleanup, preventing the trap from leaking into long-running caller shells like `bin/acg-up`.
-- **acg-up Hub cluster bootstrap** — COMPLETE (`c59f2c3a`). `acg-up` now bootstraps Vault and ArgoCD on a freshly created Hub cluster before attempting the Vault port-forward path, so `make down → make up` no longer fails on missing `secrets` resources.
-- **acg-up Hub bootstrap safety gate** — COMPLETE (`8b43122f`). `acg-up` Step 3.6 now passes `--confirm` through the dispatcher for both Hub bootstrap calls, satisfying the deploy safety gate without forwarding that flag into the underlying plugin parsers.
-- **k3d-provider RETURN trap scope** — COMPLETE (`e6a9ec91`). Both k3d provider RETURN trap handlers now self-clear on first fire, preventing repeated cleanup execution in parent functions after inline `deploy_cluster --provider k3d` calls.
-- **Vault Preflight After Sleep** — COMPLETE (`e577579e`). `acg-up` now verifies the local Hub cluster before Vault PF startup and fails early if Vault is sealed or unreachable after OrbStack restart / Mac sleep.
-- **acg-up Hub cluster auto-create** — COMPLETE (`73382eb2`). `acg-up` now recreates the local Hub cluster during Step 3.5 when it was legitimately removed by `make down`, while keeping the unreachable-cluster check as the real OrbStack guard.
-- **acg-down expired credentials abort** — COMPLETE (`07ca18a6`). `acg-down` now silently pre-checks AWS credentials, skips CloudFormation teardown with a clean INFO when the sandbox already expired, and still completes local Vault PF + Hub cleanup.
-- **Repo Retention Cleanup** — OPEN (`docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`). `scratch/` and accumulated historical docs are now a larger maintenance/size concern than Memory Bank itself.
-- **Vault Sync Mismatch** — CRITICAL BLOCKER (`docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md`). Vault storage state and cached unseal material can still drift apart; current automatic recovery is not sufficient for every local failure state.
-- **Vault Resilience Gap** — OPEN (`docs/bugs/2026-04-20-vault-readiness-gate-missing.md`, `docs/bugs/2026-04-22-vault-orphaned-port-forward-ghost-blocker.md`). `acg-up` can fail at Vault seeding because Vault is sealed after Mac sleep or because a ghost port-forward on `8200` routes to a dead pod.
-- **macOS CDP Direct Launch** — OPEN (`docs/bugs/2026-04-21-cdp-macos-direct-launch-gcp-ensure-cdp.md`). macOS `open -a` can reuse an existing Chrome instance and fail to apply CDP flags; fix must stay aligned with the shared CDP ownership model.
-- **GCP Login Linux Headless OAuth** — COMPLETE (`927cb452`). `gcp.sh` OS-split captures OAuth URL from gcloud output; `gcp_login.js` navigates directly via `GCP_AUTH_URL` on Linux. Shellcheck fix committed (unused `pid`/`i` vars renamed). Live test pending user execution on ACG GCP sandbox.
-- **GCP Provisioning Error 1** — COMPLETE (`346c3df2`). `(( attempts++ ))` → `(( ++attempts ))` in `k3s-gcp.sh` lines 109 and 211. Spec complete; committed 2026-04-23.
-- **Start Sandbox Disabled Timeout** — COMPLETE (`13d398ab`). Add `isEnabled()` guard before `startButton.click()` in `acg_credentials.js` line 352; if disabled, skip click and wait for credentials. Spec complete; committed 2026-04-23.
-
-- **Whitespace enforcement** — `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh` files
-- **SSH tunnel timeouts** — connection resets during heavy ArgoCD sync (infra, non-blocking)
-- **ACG extraction** — treat browser automation repo split as the stabilization path before further provider automation work.
-
-## Documentation Note
-- Memory Bank size is still manageable (~37 KB total across the tracked files), but `docs/plans/` has grown much faster than Memory Bank. Future cleanup pressure is primarily in plans/archive hygiene rather than immediate Memory Bank trimming.
+- **ACG repo extraction** — IN PROGRESS (`docs/plans/v1.2.0-lib-acg-extraction.md`). P1–P5 COMPLETE. lib-acg PR #1 merged (`5c0e8e2d`). k3d-manager subtree synced from main (`84da5d5e`). enforce_admins restored on lib-acg.
+- **ACG repo extraction P5** — COMPLETE. lib-acg PR #1 merged to main (`5c0e8e2d`). CI (shellcheck + node --check + yamllint) + pre-commit hook + Copilot findings fixed (`698e65f`). k3d-manager subtree at `scripts/lib/acg/` updated (`84da5d5e`).
+- **GCP Sign-in-to-Chrome dialog** — COMPLETE (`ff44516` lib-acg, merged `5c0e8e2d`). `gcp_login.js` now dismisses Chrome's account-sync prompt via `context.on('page', ...)` handler. Spec: `docs/bugs/2026-04-25-gcp-login-chrome-signin-dialog.md`.
+- **acg-extend Session Extended modal** — COMPLETE (`ac6525a` lib-acg, merged `5c0e8e2d`). Modal dismissed via Escape + fallback X-button + waitFor(hidden) guard. Spec: `docs/bugs/2026-04-26-acg-extend-session-extended-modal-blocks-button.md`.
+- **sync-apps APP_CONTEXT hardwired** — COMPLETE. `make sync-apps CLUSTER_PROVIDER=k3s-gcp` was using `ubuntu-k3s` (AWS) context for pod status check instead of `ubuntu-gcp`. Fixed in Makefile `sync-apps` target. Spec: `docs/bugs/2026-04-25-sync-apps-app-context-hardwired-ubuntu-k3s.md`.
+- **status APP_CONTEXT hardwired** — COMPLETE. Same root cause: `make status CLUSTER_PROVIDER=k3s-gcp` showed empty nodes from unreachable `ubuntu-k3s`. Fixed with same Makefile pattern. Spec: `docs/bugs/2026-04-25-status-app-context-hardwired-ubuntu-k3s.md`.
+- **status ArgoCD CLI requires port-forward** — COMPLETE. Replaced `argocd app list` (requires active port-forward) with `kubectl get applications.argoproj.io -A --context INFRA_CONTEXT` (reads CRDs directly, no port-forward needed). Spec: `docs/bugs/2026-04-25-status-argocd-requires-port-forward.md`.
+- **acg-down GCP _cluster_provider_call missing** — COMPLETE (`b8b72a67`). `bin/acg-down` k3s-gcp branch called `destroy_cluster` which routes through `_cluster_provider_call` (defined in `provider.sh`, never sourced). Fixed by calling `_provider_k3s_gcp_destroy_cluster` directly. Spec: `docs/bugs/2026-04-25-acg-down-gcp-cluster-provider-call-missing.md`.
+- **acg-down GCP_PROJECT not set** — COMPLETE (`ca18e581`). `GCP_PROJECT` only exported in-memory by `gcp_get_credentials`; lost in new shell. Fixed by auto-detecting from `~/.local/share/k3d-manager/gcp-service-account.json` in `bin/acg-down`.
+- **sync-apps missing Hub cluster preflight** — COMPLETE (`7fc1a6f4`). `bin/acg-sync-apps` gave cryptic kubectl error when Hub context missing. Added pre-flight check with clear message. Spec: `docs/bugs/2026-04-25-sync-apps-missing-hub-cluster-context.md`.
+- **GCP instance creation not idempotent** — COMPLETE (`7582e290`). `_gcp_create_instance` failed on re-run if instance already existed. Added `instances describe` existence check matching `_gcp_ensure_firewall` pattern. Spec: `docs/bugs/2026-04-25-gcp-create-instance-not-idempotent.md`.
+- **acg-up GCP skips Hub cluster** — COMPLETE (`f8f9d93b`). Early exit after Step 2 for k3s-gcp skipped Hub k3d cluster creation (Steps 3.5/3.6/4 are provider-agnostic). Fixed: only SSH tunnel (Step 3) gated behind non-GCP; Hub cluster + Vault + ArgoCD now created for GCP too. Steps 5–12 still AWS-only. Spec: `docs/bugs/2026-04-25-acg-up-gcp-skips-hub-cluster.md`.
+- **status AWS Credentials section shown for GCP** — COMPLETE. `bin/acg-status` always ran `aws sts get-caller-identity` regardless of provider. Gated behind `CLUSTER_PROVIDER != k3s-gcp`; Makefile now passes `CLUSTER_PROVIDER` to the script. Spec: `docs/bugs/2026-04-25-status-shows-aws-creds-for-gcp.md`.
+- **GCP OAuth fix (attempt 2)** — COMPLETE (`51afead` lib-acg, `df143452` k3d-manager). `--no-launch-browser` causes `EOFError` (gcloud waits for stdin verification code when run backgrounded). Fix: inject fake `open`/`xdg-open` into PATH so gcloud's browser-open call routes to CDP Chrome; localhost-redirect flow needs no code entry. Spec: `docs/bugs/2026-04-25-gcp-oauth-eof-stdin-crash.md`.
+- **ACG repo extraction P4b bug** — COMPLETE (`c54de858`). Replaced source-only `acg.sh` / `gcp.sh` stubs with grep-compatible wrapper functions so the dispatcher can discover `acg_*` and `gcp_*` entry points.
+- **ACG repo extraction P4** — COMPLETE (`99b2e143`). Wired the `wilddog64/lib-acg` subtree into `scripts/lib/acg/`, replaced `scripts/plugins/acg.sh` and `scripts/plugins/gcp.sh` with stubs, and updated `scripts/plugins/gemini.sh` to source CDP helpers from the subtree.
+- **ACG repo extraction P3** — COMPLETE (`f1c577c`). Migrated acg/gcp/playwright files from k3d-manager to `wilddog64/lib-acg` and pushed `feat/phase3-migration`.
+- **ACG repo extraction P1** — COMPLETE (`20df717c`). Renamed `antigravity.sh` → `gemini.sh`; all `antigravity_*` → `gemini_*`.
+- **ACG repo extraction P2** — COMPLETE (`b253b9b`). `wilddog64/lib-acg` created; skeleton + lib-foundation subtree committed and pushed; branch protection set.
+- **GCP E2E smoke test** — BLOCKED. `k3s-gcp` provisioning logic is in place; full `make up` end-to-end on a live GCP sandbox has not been verified. Blocked by CDP startup on Linux.
+- **GCP single-node vs AWS 3-node** — OPEN. GCP provider creates 1 node; AWS creates 3 (server + 2 agents). Consistency gap, no stress testing done yet. Spec: `docs/bugs/2026-04-25-gcp-single-node-vs-aws-three-node.md`.
+- **Whitespace enforcement** — OPEN. `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh` files.
+- **Orchestration Fragility** — OPEN (`docs/bugs/2026-04-23-infra-orchestration-fragility.md`). Hub orchestration does not explicitly sequence ArgoCD install + bootstrap + app-cluster registration.
+- **Dual-cluster Status UX** — OPEN (`docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`). `make up/status` do not clearly separate Hub health from app-cluster health.
+- **Vault Resilience Gap** — OPEN. Vault can still drift after Mac sleep; `docs/bugs/2026-04-23-vault-keychain-sync-mismatch.md` tracks the remaining gap.
+- **Repo Retention Cleanup** — OPEN (`docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`). `scratch/` and historical docs should be reviewed for purge.

@@ -68,5 +68,6 @@ setup() {
   run tunnel_start
   [ "$status" -eq 0 ]
   [[ -f "${TUNNEL_PLIST_PATH}" ]]
+  grep -q "8200:127.0.0.1:18200" "${TUNNEL_PLIST_PATH}"
   grep -q "load" "${BATS_TEST_TMPDIR}/launchctl.log"
 }

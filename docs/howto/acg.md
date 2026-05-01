@@ -14,13 +14,13 @@ The ACG plugin provisions a t3.medium EC2 instance on an ACG (A Cloud Guru) sand
 
 Before provisioning, extract the sandbox AWS credentials from the Pluralsight Cloud Access panel.
 
-**Option A — Playwright (Antigravity must be running):**
+**Option A - Playwright (browser helper must be running):**
 
 ```bash
 ./scripts/k3d-manager acg_get_credentials "https://app.pluralsight.com/cloud-playground/cloud-sandboxes/<sandbox-id>"
 ```
 
-**Option B — Paste from clipboard (no Playwright needed):**
+**Option B - Paste from clipboard (no Playwright needed):**
 
 1. Open the Pluralsight sandbox page and copy the credentials block
 2. Run:
@@ -64,12 +64,12 @@ Installs k3s via k3sup and merges the kubeconfig as the `ubuntu-k3s` context.
 ACG sandboxes expire after 4 hours. To extend:
 
 ```bash
-./scripts/k3d-manager antigravity_acg_extend <sandbox-url>
+./scripts/k3d-manager acg_extend_playwright <sandbox-url>
 # Example cloud playground URL
-./scripts/k3d-manager antigravity_acg_extend "https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
+./scripts/k3d-manager acg_extend_playwright "https://app.pluralsight.com/cloud-playground/cloud-sandboxes"
 ```
 
-The Antigravity browser opens and clicks the extend button automatically. **First run:** you will be prompted to log into Pluralsight manually in the browser window — session persists for subsequent runs.
+The browser helper opens the sandbox page and clicks the extend button automatically. First run: you will be prompted to log into Pluralsight manually in the browser window; the session persists for subsequent runs.
 
 Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Pluralsight session check (useful for CI or troubleshooting Playwright issues).
 
@@ -83,6 +83,6 @@ Terminates the EC2 instance, removes the VPC/SG/key pair, and removes the `ubunt
 
 ## Notes
 
-- `ACG_ALLOWED_CIDR` defaults to `0.0.0.0/0` (open) — always set it to your IP in shared/public environments
+- `ACG_ALLOWED_CIDR` defaults to `0.0.0.0/0` (open) - always set it to your IP in shared/public environments
 - The sandbox TTL is 4 hours by default; extend before it expires to avoid losing cluster state
 - All AWS resources are tagged with `k3d-manager` for easy identification in the ACG console

@@ -41,7 +41,7 @@ acg_teardown --confirm            # terminate instance; remove ubuntu-k3s kubeco
 
 > Set `ACG_ALLOWED_CIDR=<your-ip>/32` to restrict SSH/6443 ingress (default: `0.0.0.0/0`).
 >
-> **First run:** `acg_extend_playwright` will open Google Chrome and prompt for Pluralsight login as needed. Log in manually — the session cookie persists across runs until it expires. Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Antigravity session check.
+> **First run:** `acg_extend_playwright` will open Google Chrome and prompt for Pluralsight login as needed. Log in manually — the session cookie persists across runs until it expires. Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the browser session check.
 
 ### 3. Add the Ubuntu k3s app cluster
 
@@ -126,7 +126,7 @@ See **[docs/providers/](docs/providers/)** for per-provider guides:
 graph TD
   U[User CLI] --> KM[./scripts/k3d-manager]
   KM --> LIB["lib/ — system · core · providers"]
-  KM --|lazy-load|--> PLUG["plugins/ — acg · aws · antigravity · tunnel · ..."]
+  KM --|lazy-load|--> PLUG["plugins/ — acg · aws · gemini · tunnel · ..."]
 
   subgraph Infra ["Infra Cluster — OrbStack / k3d / k3s (local)"]
     VAULT["Vault (PKI + Auth)"]
@@ -200,7 +200,7 @@ docs/
 |---|---|---|
 | **ACG** | `acg_get_credentials`, `acg_import_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_extend_playwright`, `acg_watch`, `acg_teardown` | AWS/GCP ACG sandbox lifecycle — automated credential extraction via Playwright CDP, stdin fallback, cloud VM provisioning, background TTL watcher; [spec](docs/plans/archive/v0.9.6-acg-plugin.md) |
 | **AWS** | `aws_import_credentials` | Generic AWS credential import — supports CSV (IAM Download), quoted/unquoted export, labeled (Pluralsight), credentials file formats; writes `~/.aws/credentials` |
-| **Antigravity** | `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_poll_task` | Browser automation via gemini CLI + Playwright over CDP (port 9222) — Copilot coding agent trigger |
+| **Gemini** | `gemini_install`, `gemini_trigger_copilot_review`, `gemini_poll_task` | Browser automation via gemini CLI + Playwright over CDP (port 9222) — Copilot coding agent trigger |
 | **ArgoCD** | `deploy_argocd`, `deploy_argocd_bootstrap`, `register_app_cluster`, `configure_vault_argocd_repos` | GitOps engine deployment + app cluster registration + Vault repo auth |
 | **Vault** | `deploy_vault`, `configure_vault_app_auth` | HashiCorp Vault HA + PKI + cross-cluster auth |
 | **ESO** | `deploy_eso` | External Secrets Operator — syncs Vault/AKV secrets into Kubernetes |
@@ -245,10 +245,12 @@ docs/
 
 **Cloud Sandbox**
 - **[ACG Sandbox](docs/howto/acg.md)** — Full lifecycle: provision → k3s install → extend TTL → teardown
-- **[Antigravity Browser Automation](docs/howto/antigravity.md)** — First-run setup, ACG extend, Copilot agent trigger
+- **[Gemini Browser Automation](docs/howto/gemini.md)** — First-run setup, ACG extend, Copilot agent trigger
 - **[ACG Credentials Flow](docs/howto/acg-credentials-flow.md)** — Decision-by-decision flow reference for debugging `acg_get_credentials`
 
 **Convenience Scripts** (`bin/` — also available as Claude `/skills`)
+
+- **[Makefile Reference](docs/howto/makefile.md)** — All `make` targets with usage, env vars, and when to use each
 
 | Script | Claude Skill | When to use |
 |---|---|---|
@@ -285,11 +287,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
-| 2026-04-25 | [Copilot PR #65 review findings](docs/issues/2026-04-25-copilot-pr65-review-findings.md) | gcp_login — CodeQL clear-text env logging; redact GCP_ACCOUNT from console.error |
-| 2026-04-11 | [Copilot PR #64 review findings](docs/issues/2026-04-11-copilot-pr64-review-findings.md) | ssm — bare sudo dpkg in Makefile; lost indentation in deploy_app_cluster; missing mkdir -p ~/.kube; None/null sentinel not normalized; inaccurate ssm_exec docs; wrong make ssm description |
-| 2026-04-11 | [Copilot PR #63 review findings](docs/issues/2026-04-11-copilot-pr63-review-findings.md) | acg — missing --help on public wrapper, no BATS test, private call in k3s-aws.sh, CHANGE.md wording, stale README refs, wrong location for `_antigravity_browser_ready` |
-| 2026-04-11 | [Copilot PR #62 review findings](docs/issues/2026-04-11-copilot-pr62-review-findings.md) | acg — dispatcher rejects private function in launchd wrapper; help text private name; stale browser automation doc; misleading rename description; typos |
-| 2026-04-10 | [Copilot PR #61 review findings](docs/issues/2026-04-10-copilot-pr61-review-findings.md) | acg-extend — CodeQL URL substring check, credential leak in shutdown text log, CDP browser close disrupts session, Ghost State fires on weak null signal |
+| 2026-04-30 | [GHCR secret rotation fallback fails open](docs/issues/2026-04-30-ghcr-secret-rotation-fallback-fails-open.md) | acg-up, rotate-ghcr-pat — `gh auth token` OAuth fallback recreates invalid pull secret; fix: fail closed, Vault-first |
+| 2026-04-29 | [ACG Watcher extend button not found](docs/issues/2026-04-29-acg-watcher-extend-button-not-found.md) | lib-acg watcher — button not located during 1h TTL window; manual sequence documented |
+| 2026-04-29 | [gh auth token insufficient scope for GHCR](docs/issues/2026-04-29-gh-auth-token-insufficient-scope-for-ghcr.md) | acg-up — OAuth token lacks `read:packages`; resolved via Vault-first PAT strategy |
+| 2026-04-28 | [ClusterSecretStore vault-bridge pod-origin empty reply](docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md) | vault-bridge — pod-origin traffic returns empty reply; `ClusterSecretStore/vault-backend` stays `Ready=False` |
+| 2026-04-28 | [Vault sealed health misclassified as unreachable](docs/issues/2026-04-28-acg-up-vault-sealed-health-misclassified.md) | acg-up — sealed Vault returns non-2xx; `curl -f` discarded JSON; auto-recover via `--re-unseal` |
 
 [All issues →](docs/issues/)
 
@@ -299,9 +301,9 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.2.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.2.0) | 2026-04-30 | lib-acg extraction + shopping-cart bootstrap + GHCR hardening — ACG/GCP automation extracted to `scripts/lib/acg/` subtree; `deploy_shopping_cart_data()` in `acg-up`; Vault-first GHCR fail-closed; ArgoCD launchd port-forward; ApplicationSet branch var; Vault sealed-state recovery |
 | [v1.1.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.1.0) | 2026-04-24 | Unified ACG automation AWS + GCP — GCP provider (`k3s-gcp`), OAuth automation, CDP headless Linux, `bin/acg-sync-apps` port-forward hardening, Hub auto-create + bootstrap, provider-aware teardown |
 | [v1.0.6](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.6) | 2026-04-11 | AWS SSM support — `ssm_wait`/`ssm_exec`/`ssm_tunnel` helpers; `K3S_AWS_SSM_ENABLED` opt-in; IAM role + instance profile in CloudFormation; `--capabilities CAPABILITY_NAMED_IAM` fix; `make ssm`/`provision` targets |
-| [v1.0.5](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.5) | 2026-04-10 | antigravity decoupling + LDAP Vault KV seeding — `antigravity_acg_extend` renamed/moved to `acg_extend_playwright` in `acg.sh`; `bin/acg-up` seeds `secret/data/ldap/admin` for ESO ExternalSecret |
 
 <details>
 <summary>Older releases</summary>
@@ -314,11 +316,11 @@ Recent entries:
 | [v1.0.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.1) | 2026-03-31 | multi-node k3s-aws + CloudFormation + Playwright hardening — 3-node CF stack; auto sign-in; remove Antigravity pre-calls from `acg_get_credentials`; `AGENT_IP_ALLOWLIST` in pre-commit hook |
 | [v1.0.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.0.0) | 2026-03-29 | k3s-aws provider foundation — `CLUSTER_PROVIDER=k3s-aws` end-to-end deploy; `aws_import_credentials`; `acg_provision --recreate`; `acg_watch` background TTL watcher; keypair idempotency + `page.goto()` fix |
 | [v0.9.21](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.21) | 2026-03-29 | `_ensure_k3sup` auto-install helper — `deploy_app_cluster` now auto-installs k3sup via brew or curl; consistent with `_ensure_node`/`_ensure_copilot_cli` pattern |
-| [v0.9.20](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.20) | 2026-03-29 | ACG Chrome launch fix — `_antigravity_launch` now opens Chrome (not Antigravity IDE) with `--password-store=basic`; `acg_credentials.js` SPA nav guard avoids hard reload |
+| [v0.9.20](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.20) | 2026-03-29 | ACG Chrome launch fix — `_antigravity_launch` now opens Chrome (not browser IDE) with `--password-store=basic`; `acg_credentials.js` SPA nav guard avoids hard reload |
 | [v0.9.19](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.19) | 2026-03-28 | ACG automated credential extraction — `acg_get_credentials` (Playwright CDP), `acg_import_credentials` (stdin), static `acg_credentials.js`; live-verified against Pluralsight sandbox |
 | [v0.9.18](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.18) | 2026-03-28 | Pluralsight URL migration — `_ACG_SANDBOX_URL` + `_antigravity_ensure_acg_session` updated to `app.pluralsight.com` |
 | [v0.9.17](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.17) | 2026-03-27 | Antigravity model fallback (`gemini-2.5-flash` first), ACG session check, nested agent fix (`--approval-mode yolo` + workspace temp path) |
-| [v0.9.16](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.16) | 2026-03-26 | Antigravity IDE + CDP browser automation — gemini CLI + Playwright engine; `antigravity_install`, `antigravity_trigger_copilot_review`, `antigravity_acg_extend`; ldap stdin hardening |
+| [v0.9.16](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.16) | 2026-03-26 | Gemini browser automation + CDP browser automation — gemini CLI + Playwright engine; `gemini_install`, `gemini_trigger_copilot_review`, `gemini_acg_extend`; ldap stdin hardening |
 | [v0.9.11](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.11) | 2026-03-22 | dynamic plugin CI — `detect` job skips cluster tests for docs-only PRs; maps plugin changes to targeted smoke tests |
 | [v0.9.10](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.10) | 2026-03-22 | if-count allowlist elimination (jenkins) — 8 helpers extracted; allowlist now `system.sh` only |
 | [v0.9.9](https://github.com/wilddog64/k3d-manager/releases/tag/v0.9.9) | 2026-03-22 | if-count allowlist elimination — 11 ldap helpers + 6 vault helpers extracted; allowlist down to `system.sh` only |

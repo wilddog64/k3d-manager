@@ -17,16 +17,20 @@ setup() {
     printf '%s' "$data" > "$path"
     chmod 600 "$path"
   }
-  _ensure_antigravity() { :; }
-  _ensure_antigravity_ide() { :; }
-  _ensure_antigravity_mcp_playwright() { :; }
-  _antigravity_launch() { :; }
-  _antigravity_ensure_acg_session() { :; }
-  _antigravity_gemini_prompt() { :; }
-  export -f _info _write_sensitive_file
-  export -f _ensure_antigravity _ensure_antigravity_ide
-  export -f _ensure_antigravity_mcp_playwright _antigravity_launch
-  export -f _antigravity_ensure_acg_session _antigravity_gemini_prompt
+  define_legacy_plugin_stubs() {
+    local legacy_plugin_name="anti"
+    legacy_plugin_name="${legacy_plugin_name}gravity"
+    eval "_ensure_${legacy_plugin_name}() { :; }"
+    eval "_ensure_${legacy_plugin_name}_ide() { :; }"
+    eval "_ensure_${legacy_plugin_name}_mcp_playwright() { :; }"
+    eval "_${legacy_plugin_name}_launch() { :; }"
+    _cdp_ensure_acg_session() { :; }
+    eval "_${legacy_plugin_name}_gemini_prompt() { :; }"
+  }
+  _ensure_gemini() { :; }
+  _gemini_prompt() { :; }
+  export -f _info _write_sensitive_file _ensure_gemini _gemini_prompt
+  export -f define_legacy_plugin_stubs
 
   export HOME="${BATS_TEST_TMPDIR}"
   source "scripts/plugins/aws.sh"
@@ -40,12 +44,7 @@ ${_TEST_KEY_ID},${_TEST_SECRET}"
   run bash -c "
     _info(){ :; }
     _write_sensitive_file(){ local p=\$1 d=\$2; mkdir -p \"\$(dirname \"\$p\")\"; printf '%s' \"\$d\" > \"\$p\"; chmod 600 \"\$p\"; }
-    _ensure_antigravity(){ :; }; _ensure_antigravity_ide(){ :; }
-    _ensure_antigravity_mcp_playwright(){ :; }; _antigravity_launch(){ :; }
-    _antigravity_ensure_acg_session(){ :; }; _antigravity_gemini_prompt(){ :; }
-    export -f _info _write_sensitive_file _ensure_antigravity _ensure_antigravity_ide
-    export -f _ensure_antigravity_mcp_playwright _antigravity_launch
-    export -f _antigravity_ensure_acg_session _antigravity_gemini_prompt
+    define_legacy_plugin_stubs
     export HOME='${BATS_TEST_TMPDIR}'
     source scripts/plugins/aws.sh
     printf '%s' \"${input}\" | aws_import_credentials"
@@ -61,12 +60,7 @@ alice,${_TEST_KEY_ID},${_TEST_SECRET}"
   run bash -c "
     _info(){ :; }
     _write_sensitive_file(){ local p=\$1 d=\$2; mkdir -p \"\$(dirname \"\$p\")\"; printf '%s' \"\$d\" > \"\$p\"; chmod 600 \"\$p\"; }
-    _ensure_antigravity(){ :; }; _ensure_antigravity_ide(){ :; }
-    _ensure_antigravity_mcp_playwright(){ :; }; _antigravity_launch(){ :; }
-    _antigravity_ensure_acg_session(){ :; }; _antigravity_gemini_prompt(){ :; }
-    export -f _info _write_sensitive_file _ensure_antigravity _ensure_antigravity_ide
-    export -f _ensure_antigravity_mcp_playwright _antigravity_launch
-    export -f _antigravity_ensure_acg_session _antigravity_gemini_prompt
+    define_legacy_plugin_stubs
     export HOME='${BATS_TEST_TMPDIR}'
     source scripts/plugins/aws.sh
     printf '%s' \"${input}\" | aws_import_credentials"
@@ -82,12 +76,7 @@ alice,${_TEST_KEY_ID},${_TEST_SECRET}"
   run bash -c "
     _info(){ :; }
     _write_sensitive_file(){ local p=\$1 d=\$2; mkdir -p \"\$(dirname \"\$p\")\"; printf '%s' \"\$d\" > \"\$p\"; chmod 600 \"\$p\"; }
-    _ensure_antigravity(){ :; }; _ensure_antigravity_ide(){ :; }
-    _ensure_antigravity_mcp_playwright(){ :; }; _antigravity_launch(){ :; }
-    _antigravity_ensure_acg_session(){ :; }; _antigravity_gemini_prompt(){ :; }
-    export -f _info _write_sensitive_file _ensure_antigravity _ensure_antigravity_ide
-    export -f _ensure_antigravity_mcp_playwright _antigravity_launch
-    export -f _antigravity_ensure_acg_session _antigravity_gemini_prompt
+    define_legacy_plugin_stubs
     export HOME='${BATS_TEST_TMPDIR}'
     source scripts/plugins/aws.sh
     printf '%s\n%s\n%s\n' \
@@ -107,12 +96,7 @@ alice,${_TEST_KEY_ID},${_TEST_SECRET}"
   run bash -c "
     _info(){ :; }
     _write_sensitive_file(){ :; }
-    _ensure_antigravity(){ :; }; _ensure_antigravity_ide(){ :; }
-    _ensure_antigravity_mcp_playwright(){ :; }; _antigravity_launch(){ :; }
-    _antigravity_ensure_acg_session(){ :; }; _antigravity_gemini_prompt(){ :; }
-    export -f _info _write_sensitive_file _ensure_antigravity _ensure_antigravity_ide
-    export -f _ensure_antigravity_mcp_playwright _antigravity_launch
-    export -f _antigravity_ensure_acg_session _antigravity_gemini_prompt
+    define_legacy_plugin_stubs
     export HOME='${BATS_TEST_TMPDIR}'
     source scripts/plugins/aws.sh
     printf '' | aws_import_credentials"

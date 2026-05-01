@@ -27,8 +27,18 @@ REPOS=(
 
 # Read token from stdin — works with both interactive prompt and pipe
 if [[ -t 0 ]]; then
-  read -r -s -p "Paste new GitHub PAT (read:packages scope) and press Enter: " TOKEN
-  echo ""
+  # Try to read from Vault first
+  _vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d 2>/dev/null || true)
+  if [[ -n "$_vault_root_token" ]]; then
+    TOKEN=$(curl -s -H "X-Vault-Token: ${_vault_root_token}" "http://localhost:18200/v1/secret/data/github/pat" | jq -r '.data.data.token // empty' 2>/dev/null || true)
+  fi
+
+  if [[ -n "${TOKEN:-}" ]]; then
+    echo "Using PAT from Vault..."
+  else
+    read -r -s -p "Paste new GitHub PAT (read:packages scope) and press Enter: " TOKEN
+    echo ""
+  fi
 else
   read -r TOKEN
 fi
@@ -36,6 +46,21 @@ fi
 if [[ -z "$TOKEN" ]]; then
   echo "ERROR: No token provided — exiting" >&2
   exit 1
+fi
+
+if [[ -z "${_vault_root_token:-}" ]]; then
+  _vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d 2>/dev/null || true)
+fi
+
+if [[ -n "${TOKEN}" && -n "${_vault_root_token:-}" ]]; then
+  echo "Saving new token to Vault..."
+  if curl -s -X POST -H "X-Vault-Token: ${_vault_root_token}" \
+    -d "{\"data\": {\"token\": \"${TOKEN}\"}}" \
+    "http://localhost:18200/v1/secret/data/github/pat" >/dev/null; then
+    echo "  ✅ Token persisted to Vault"
+  else
+    echo "  ⚠️ Failed to save token to Vault — you may need to re-paste after acg-down" >&2
+  fi
 fi
 
 echo ""
@@ -51,6 +76,33 @@ for repo in "${REPOS[@]}"; do
   else
     echo "  ❌ ${repo} — check gh auth status and repo access" >&2
     (( fail++ )) || true
+  fi
+done
+
+# --- Cluster Update (Quick Fix) -------------------------------------------
+
+echo ""
+echo "Propagating ghcr-pull-secret to ubuntu-k3s cluster..."
+echo ""
+
+NAMESPACES=(
+  shopping-cart-apps
+  shopping-cart-payment
+  shopping-cart-data
+)
+
+for ns in "${NAMESPACES[@]}"; do
+  if kubectl create secret docker-registry ghcr-pull-secret \
+    --docker-server=ghcr.io \
+    --docker-username="${SHOPPING_CART_ORG}" \
+    --docker-password="${TOKEN}" \
+    --context ubuntu-k3s \
+    -n "$ns" \
+    --dry-run=client -o yaml \
+    | kubectl apply --context ubuntu-k3s -f - >/dev/null 2>&1; then
+    echo "  ✅ namespace: ${ns}"
+  else
+    echo "  ❌ namespace: ${ns} — check kubectl connectivity and context" >&2
   fi
 done
 

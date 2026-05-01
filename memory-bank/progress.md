@@ -6,16 +6,28 @@ The authoritative release record lives in `docs/releases.md`, `CHANGE.md`, and `
 
 **Most recent shipped:**
 
+- v1.1.0 — Unified ACG automation AWS + GCP (PR #65, `e013d23b`, 2026-04-25)
 - v1.0.6 — AWS SSM support for `k3s-aws` (PR #64, `a54e152f`, 2026-04-11)
 - v1.0.5 — antigravity decoupling + LDAP Vault KV seeding + Copilot fix-up (PR #62/#63, `71c88b05`, 2026-04-11)
 - v1.0.4 — acg-up random passwords, acg_extend hardening (PR #61, `bc9028fb`, 2026-04-10)
-- v1.0.3 — `bin/` SCRIPT_DIR, Vault KV seeding, ArgoCD registration fixes (PR #60, `91552139`, 2026-04-05)
 
-Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --tags` and `docs/retro/`.
+Pre-v1.0.4 detail removed from this file; see `git log --tags` and `docs/retro/`.
 
 ---
 
-## v1.1.0 Track (branch: `k3d-manager-v1.1.0`)
+## v1.2.0 Track (branch: `k3d-manager-v1.2.0`)
+
+- [ ] **ACG repo extraction** — IN PROGRESS. Plan: `docs/plans/v1.2.0-lib-acg-extraction.md`. P1+P2+P3+P4+P4b done (`20df717c`, `b253b9b`, `f1c577c`, `99b2e143`, `c54de858`); residual ArgoCD help/login verification gaps are tracked in `docs/issues/2026-04-25-phase4-verification-argocd-preexisting-failures.md`.
+- [x] **ACG repo extraction P4b** — COMPLETE (`c54de858`). Replaced the source-only `acg.sh` and `gcp.sh` stubs with grep-compatible wrapper functions and preserved the existing test harness behavior.
+- [x] **ACG repo extraction P4** — COMPLETE (`99b2e143`). Wired `scripts/lib/acg/` subtree into k3d-manager, replaced `acg.sh` and `gcp.sh` with stubs, and moved CDP helper sourcing into `gemini.sh`.
+- [x] **ACG repo extraction P3** — COMPLETE (`f1c577c`). Migrated `acg.sh`, `gcp.sh`, `vars.sh`, `acg-cluster.yaml`, and the Playwright scripts into `wilddog64/lib-acg` and pushed `feat/phase3-migration`.
+- [x] **ACG repo extraction P1** — COMPLETE (`20df717c`). Renamed `antigravity.sh` → `gemini.sh`; all `antigravity_*` → `gemini_*`.
+- [x] **ACG repo extraction P2** — COMPLETE (`b253b9b`). `wilddog64/lib-acg` repo created; skeleton + lib-foundation subtree on `main`; `enforce_admins` branch protection set.
+- [ ] **GCP E2E smoke test** — BLOCKED. GCP cluster provisioning is PARTIAL; full `make up` end-to-end on a live GCP sandbox not yet verified.
+
+---
+
+## v1.1.0 Track (branch: `k3d-manager-v1.1.0` — SHIPPED)
 
 - **Baseline** — branched off `main` (`279db18c`); AWS path verified 2026-04-19.
 - [x] **Shared playwright vars** — COMPLETE (`3de58f4d`)
@@ -38,6 +50,20 @@ Pre-v1.0.3 detail removed from this file (2026-04-19 cleanup); see `git log --ta
 ---
 
 ## Known Bugs / Gaps
+- [x] **ACG credential extraction misses visible sandbox** — SUBTREE SYNCED from lib-acg PR #2 (`https://github.com/wilddog64/lib-acg/pull/2`). PR merged to lib-acg `main` as `7cb7f64a`; k3d-manager pulled the subtree into `scripts/lib/acg/` (`88cb8bbc` merge commit, `a0b44c87` subtree squash). Focused verification passed: `node --check`, `shellcheck`, `bats scripts/tests/lib/acg.bats`, `git diff --check`, and `_agent_audit`. Temporary live validation with the same patch also passed: `acg_get_credentials` and `aws sts get-caller-identity`. Full live `make up` rerun remains pending. Spec: `docs/issues/2026-04-28-acg-credentials-cdp-context-miss.md`.
+- [ ] **ACG Watcher fails to find "Extend" button** — OPEN. The watcher log reports failure to locate the button during the 1h window. Downstream `scripts/lib/acg/` has been synced to lib-acg PR #3 / commit `602e421`, and the local k3d-manager checks passed. Manual sequence requires "Open Sandbox" -> Wait for Modal -> "Extend Session". Spec: `docs/issues/2026-04-29-acg-watcher-extend-button-not-found.md`.
+- [x] **lib-acg main branch protection** — COMPLETE. After user re-authenticated `gh`, `wilddog64/lib-acg` `main` protection was enabled: enforce admins, require 1 approving review, dismiss stale reviews, require conversation resolution, disallow force pushes/deletions. Issue: `docs/issues/2026-04-28-lib-acg-main-branch-protection-auth-blocked.md`.
+- [x] **acg-up sealed Vault health misclassified** — FIXED. Live `make up` failed at Step 4 with "Vault not responding"; actual state was sealed `secrets/vault-0`. `bin/acg-up` now preserves Vault health JSON for sealed non-2xx responses, runs `deploy_vault --re-unseal`, and rechecks before continuing. Issue: `docs/issues/2026-04-28-acg-up-vault-sealed-health-misclassified.md`.
+- [ ] **vault-bridge pod-origin traffic empty reply** — OPEN. Same-port reverse tunnel reset has a partial fix (`remote 8200 -> local 18200`), and host-origin remote Vault health returns HTTP 200. Remaining blocker: pod-origin traffic to `vault-bridge.secrets.svc.cluster.local:8201` returns empty reply, so `ClusterSecretStore/vault-backend` stays `Ready=False`. Issues: `docs/issues/2026-04-28-vault-bridge-same-port-reverse-tunnel-reset.md`, `docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md`.
+- [x] **shopping-cart ImagePullBackOff — GHCR token source hardening** — FIXED (2026-04-30). `bin/acg-up` now fails closed if `GHCR_PAT` is missing and Vault has no PAT at `secret/data/github/pat`; `bin/rotate-ghcr-pat` now persists tokens to Vault for both interactive and piped input. This prevents `gh auth token` OAuth fallbacks from recreating a bad `ghcr-pull-secret`. Issue: `docs/issues/2026-04-30-ghcr-secret-rotation-fallback-fails-open.md`.
+- [x] **shopping-cart data layer not auto-deployed on sandbox creation** — COMPLETE (`d5cf80ed`). `deploy_shopping_cart_data()` in `shopping_cart.sh`; wired into `acg-up` Step 10b. Aligns all passwords to `CHANGE_ME`, creates RabbitMQ + Redis secrets.
+- [x] **order-service kustomize workarounds** — COMPLETE (`20b0408e`). TCP socket probes (readiness+startup), DDL-auto, Spring AMQP credentials all patched. All 5 shopping-cart pods now 1/1 Running.
+- [ ] **Sandbox rebuild clean (Option 2)** — BLOCKED. `make down` → `make up` → `make sync-apps` does NOT produce all-healthy ArgoCD yet. Three cleanup gates required (in order): (1) Fix 1 merges → remove `ddl-auto=update` patch; (2) Fix 2 + JAR fix both land → remove TCP probe patches; (3) Fix 3 merges → (no cleanup); (4) all three done → merge `k3d-manager-v1.2.0` to `main`. Decision: no ApplicationSet branch-pin hack — permanent fixes first. See `activeContext.md` "Sandbox Rebuild Readiness" section.
+- [ ] **orders init SQL SERIAL vs UUID + SecurityConfig probe gap** — OPEN. Spec: `docs/bugs/2026-04-27-orders-init-sql-serial-vs-uuid.md`. Needs PRs in `shopping-cart-infra` (init SQL) and `shopping-cart-order` (SecurityConfig). Codex spec: `docs/plans/v1.2.0-fix-orders-init-sql-and-security-config.md`. Assign to Codex.
+- [ ] **ACG Watcher fails to find "Extend" button** — OPEN. The watcher log reports failure to locate the button during the 1h window. Manual sequence requires "Open Sandbox" -> Wait for Modal -> "Extend Session". Spec: `docs/issues/2026-04-29-acg-watcher-extend-button-not-found.md`.
+ Repos: `shopping-cart-order`, `shopping-cart-product-catalog`, `k3d-manager`.
+- [ ] **shopping-cart frontend login (Keycloak)** — OPEN. Deploy Keycloak to `identity` ns; move ArgoCD to 9090; Keycloak port-forward on 8080 (frontend hardcoded). Realm `shopping-cart` + client `frontend` + user `testuser/testpassword` auto-imported via realm.json. Spec: `docs/plans/v1.2.0-deploy-keycloak.md`. Assign to Codex.
+- [ ] **k3d-manager / shopping-cart tight coupling** — OPEN (v1.3.0). `services/`, `shopping_cart.sh`, Step 10b in `acg-up` make k3d-manager app-specific. Fix: move overlays + data-layer bootstrap to `shopping-cart-infra/k8s-overlays/`; make ApplicationSet repoURL/branch configurable via env vars. Spec: `docs/issues/2026-04-27-k3d-manager-shopping-cart-tight-coupling.md`.
 - [ ] **Orchestration Fragility** — OPEN. Issue `docs/bugs/2026-04-23-infra-orchestration-fragility.md`; the local Hub flow does not explicitly unify ArgoCD install, bootstrap, app-cluster registration, and operator access setup.
 - [ ] **Dual-cluster Status UX** — OPEN. Issue `docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`; `make up` and `make status` do not clearly separate local Hub health, remote app-cluster health, tunnel endpoint state, and local ArgoCD access setup.
 - [ ] **ACG Extraction Boundary** — OPEN. Issue `docs/bugs/2026-04-23-acg-extraction-boundary-gemini-coupling.md`; the `acg_*` workflow still keeps Gemini/browser automation coupled to `k3d-manager` instead of an extracted ACG subsystem.

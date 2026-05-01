@@ -77,6 +77,54 @@ function add_ubuntu_k3s_cluster() {
     --kubeconfig "${local_kubeconfig}"
 }
 
+function deploy_shopping_cart_data() {
+  local repo_root
+  if ! repo_root=$(git rev-parse --show-toplevel 2>/dev/null); then
+    _err "[shopping_cart] Unable to determine repository root"
+    return 1
+  fi
+
+  local infra_root="${repo_root}/../shopping-carts/shopping-cart-infra/data-layer"
+  if [[ ! -d "${infra_root}" ]]; then
+    _err "[shopping_cart] shopping-cart-infra data-layer not found: ${infra_root}"
+    _err "[shopping_cart] Clone shopping-cart-infra under ../shopping-carts/"
+    return 1
+  fi
+
+  _info "[shopping_cart] Deploying data layer (PostgreSQL, Redis, RabbitMQ)..."
+  for pg_dir in orders payment products; do
+    _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/postgresql/${pg_dir}/"
+  done
+  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/redis/cart/"
+  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/rabbitmq/"
+
+  _info "[shopping_cart] Waiting for PostgreSQL instances to be Ready..."
+  for pg in postgresql-orders postgresql-payment postgresql-products; do
+    kubectl rollout status statefulset/"${pg}" \
+      -n shopping-cart-data --context ubuntu-k3s --timeout=120s
+  done
+
+  _info "[shopping_cart] Aligning PostgreSQL passwords to match app secrets (CHANGE_ME)..."
+  for pg_pod in postgresql-orders-0 postgresql-products-0; do
+    kubectl exec "${pg_pod}" -n shopping-cart-data --context ubuntu-k3s -- \
+      psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'CHANGE_ME';" 2>/dev/null || true
+  done
+
+  _info "[shopping_cart] Creating rabbitmq-credentials secret..."
+  kubectl create secret generic rabbitmq-credentials \
+    --context ubuntu-k3s -n shopping-cart-data \
+    --from-literal=username=guest \
+    --from-literal=password=CHANGE_ME \
+    --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f -
+
+  _info "[shopping_cart] Copying redis-cart-secret to shopping-cart-apps namespace..."
+  kubectl get secret redis-cart-secret -n shopping-cart-data --context ubuntu-k3s -o json \
+    | python3 -c "import sys,json; d=json.load(sys.stdin); d['metadata']={'name':'redis-cart-secret','namespace':'shopping-cart-apps'}; print(json.dumps(d))" \
+    | kubectl apply --context ubuntu-k3s -f -
+
+  _info "[shopping_cart] Data layer deployed."
+}
+
 function register_shopping_cart_apps() {
   local repo_root
   if ! repo_root=$(git rev-parse --show-toplevel 2>/dev/null); then

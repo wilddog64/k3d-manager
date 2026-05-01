@@ -19,6 +19,7 @@ source "${REPO_ROOT}/scripts/lib/system.sh"
 
 APP_CONTEXT="${APP_CONTEXT:-ubuntu-k3s}"
 INFRA_CONTEXT="${INFRA_CONTEXT:-k3d-k3d-cluster}"
+CLUSTER_PROVIDER="${CLUSTER_PROVIDER:-k3d}"
 
 echo "=== Hub Cluster (${INFRA_CONTEXT}) ==="
 kubectl get nodes --context "${INFRA_CONTEXT}" 2>/dev/null \
@@ -49,16 +50,15 @@ kubectl get pods -A --context "${APP_CONTEXT}" 2>/dev/null \
 
 echo ""
 echo "=== ArgoCD Apps ==="
-if command -v argocd >/dev/null 2>&1; then
-  argocd app list 2>/dev/null || echo "ArgoCD CLI not logged in — run: argocd login"
-else
-  echo "argocd CLI not installed"
-fi
+kubectl get applications.argoproj.io -A --context "${INFRA_CONTEXT}" 2>/dev/null \
+  || echo "Cannot reach Hub cluster or ArgoCD CRDs not installed"
 
-echo ""
-echo "=== AWS Credentials ==="
-if aws sts get-caller-identity --output table 2>/dev/null; then
-  : # printed inline
-else
-  echo "AWS credentials invalid or expired — run bin/acg-refresh"
+if [[ "${CLUSTER_PROVIDER}" != "k3s-gcp" ]]; then
+  echo ""
+  echo "=== AWS Credentials ==="
+  if aws sts get-caller-identity --output table 2>/dev/null; then
+    : # printed inline
+  else
+    echo "AWS credentials invalid or expired — run bin/acg-refresh"
+  fi
 fi

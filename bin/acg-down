@@ -48,7 +48,8 @@ case "${_cluster_provider}" in
     tunnel_stop 2>/dev/null || true
     _info "[acg-down] Tearing down CloudFormation stack (AWS)..."
     if aws sts get-caller-identity --region "${ACG_REGION}" --query 'Arn' --output text >/dev/null 2>&1; then
-      acg_teardown --confirm
+      acg_teardown --confirm || \
+        _info "[acg-down] CloudFormation teardown failed — sandbox may have been recreated with new credentials. Stack cleanup skipped; continuing Hub teardown."
     else
       _info "[acg-down] AWS credentials invalid or expired — sandbox already removed. Skipping CloudFormation teardown."
     fi
@@ -56,7 +57,14 @@ case "${_cluster_provider}" in
   k3s-gcp)
     source "${REPO_ROOT}/scripts/lib/providers/k3s-gcp.sh"
     _info "[acg-down] Tearing down GCP cluster..."
-    destroy_cluster --confirm
+    if [[ -z "${GCP_PROJECT:-}" ]]; then
+      _gcp_sa_json="${HOME}/.local/share/k3d-manager/gcp-service-account.json"
+      if [[ -f "${_gcp_sa_json}" ]]; then
+        GCP_PROJECT="$(python3 -c "import json; print(json.load(open('${_gcp_sa_json}')).get('project_id',''))" 2>/dev/null || true)"
+        export GCP_PROJECT
+      fi
+    fi
+    _provider_k3s_gcp_destroy_cluster --confirm
     ;;
   *)
     _info "[acg-down] Unknown CLUSTER_PROVIDER '${_cluster_provider}' — skipping remote teardown"
@@ -70,6 +78,23 @@ if [[ -f "${_vault_pf_pid_file}" ]]; then
   rm -f "${_vault_pf_pid_file}"
   _info "[acg-down] Vault port-forward stopped"
 fi
+
+_info "[acg-down] Stopping frontend port-forward..."
+_frontend_pf_pid_file="${HOME}/.local/share/k3d-manager/frontend-pf.pid"
+if [[ -f "${_frontend_pf_pid_file}" ]]; then
+  kill "$(cat "${_frontend_pf_pid_file}")" 2>/dev/null || true
+  rm -f "${_frontend_pf_pid_file}"
+  _info "[acg-down] Frontend port-forward stopped"
+fi
+
+_info "[acg-down] Stopping ArgoCD port-forward launchd agent..."
+_argocd_pf_label="com.k3d-manager.argocd-port-forward"
+_argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
+if launchctl list "${_argocd_pf_label}" >/dev/null 2>&1; then
+  launchctl unload "${_argocd_pf_plist}" 2>/dev/null || true
+  _info "[acg-down] ArgoCD port-forward launchd agent unloaded"
+fi
+rm -f "${_argocd_pf_plist}"
 
 if [[ "${_keep_hub}" -eq 0 ]]; then
   _HUB_CLUSTER="${HUB_CLUSTER_NAME:-k3d-cluster}"

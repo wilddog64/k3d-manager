@@ -10,7 +10,7 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/wilddog64/k3d-manager
-        revision: HEAD
+        revision: ${K3D_MANAGER_BRANCH}
         directories:
           - path: services/*
   goTemplate: true
@@ -25,11 +25,11 @@ spec:
     spec:
       project: platform
       destination:
-        server: https://kubernetes.default.svc
-        namespace: '{{.path.basename}}'
+        name: ubuntu-k3s
+        namespace: shopping-cart-apps
       source:
         repoURL: https://github.com/wilddog64/k3d-manager
-        targetRevision: HEAD
+        targetRevision: ${K3D_MANAGER_BRANCH}
         path: '{{.path.path}}'
       syncPolicy:
         automated:

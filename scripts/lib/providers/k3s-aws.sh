@@ -9,7 +9,7 @@
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/acg.sh"
 # shellcheck source=/dev/null
-source "${SCRIPT_DIR}/plugins/antigravity.sh"
+source "${SCRIPT_DIR}/plugins/gemini.sh"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/shopping_cart.sh"
 # shellcheck source=/dev/null

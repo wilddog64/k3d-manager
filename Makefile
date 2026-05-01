@@ -23,7 +23,7 @@ refresh:
 
 ## Show cluster nodes, pod status, tunnel health
 status:
-	bin/acg-status
+	APP_CONTEXT=$(if $(filter k3s-gcp,$(CLUSTER_PROVIDER)),ubuntu-gcp,ubuntu-k3s) CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) bin/acg-status
 
 ## Extract AWS credentials only (no cluster changes)
 creds:
@@ -70,7 +70,7 @@ argocd-registration:
 
 ## Sync ArgoCD data-layer and show remote pod status
 sync-apps:
-	bin/acg-sync-apps
+	APP_CONTEXT=$(if $(filter k3s-gcp,$(CLUSTER_PROVIDER)),ubuntu-gcp,ubuntu-k3s) bin/acg-sync-apps
 
 ## Ensure AWS Session Manager plugin is installed (required for SSM-based deployment)
 ssm:

@@ -21,6 +21,14 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: default
       server: https://kubernetes.default.svc
+    - namespace: staging
+      server: https://kubernetes.default.svc
+    - namespace: shopping-cart-apps
+      name: ubuntu-k3s
+    - namespace: shopping-cart-payment
+      name: ubuntu-k3s
+    - namespace: shopping-cart-data
+      name: ubuntu-k3s
   clusterResourceWhitelist:
     - group: ''
       kind: Namespace
@@ -44,7 +52,7 @@ spec:
     - group: '*'
       kind: '*'
   orphanedResources:
-    warn: true
+    warn: false
   roles:
     - name: admin
       description: Full admin access to platform project
