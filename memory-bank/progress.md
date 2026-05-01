@@ -37,7 +37,7 @@ Spec: `docs/plans/v1.2.0-fix-orders-init-sql-and-security-config.md`
 - [x] **Fix 2** — `shopping-cart-order` SecurityConfig `/actuator/health/**`. Merged `64f82fe3` (PR #27).
 - [x] **Fix 3b** — `shopping-cart-order` namespace cleanup. Merged `6195bd42` (PR #28).
 - [x] **Fix 3c** — `shopping-cart-product-catalog` namespace cleanup. Merged `19d5a2b7` (PR #19).
-- [ ] **Post-Fix-1 cleanup** — READY. Remove `SPRING_JPA_HIBERNATE_DDL_AUTO=update` from `services/shopping-cart-order/kustomization.yaml` on k3d-manager-v1.3.0.
+- [x] **Post-Fix-1 cleanup** — DONE `9aaa0cea`. Removed `SPRING_JPA_HIBERNATE_DDL_AUTO=update` from `services/shopping-cart-order/kustomization.yaml`.
 - [ ] **Post-Fix-2 cleanup** — BLOCKED on RabbitMQHealthIndicator JAR fix. Remove TCP socket probe patches only after that lands too.
 
 ---
