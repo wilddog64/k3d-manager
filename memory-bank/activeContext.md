@@ -1,141 +1,102 @@
-# Active Context — k3d-manager
+# Active Context — lib-foundation
 
-## Current Branch: `k3d-manager-v1.0.4` (as of 2026-04-05)
+## Current State: `feat/v0.3.15` (as of 2026-03-31)
 
-**v1.0.3 SHIPPED** — PR #60 merged to main (`91552139`) 2026-04-05. Tagged v1.0.3, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-05-v1.0.3-retrospective.md`.
-
-**v1.0.4 active specs (3 of 5 slots used):**
-**acg-up random passwords** — COMPLETE (`f709cb3c`). `bin/acg-up` now generates redis/postgres/rabbitmq sandbox passwords via `openssl rand` per spec `docs/plans/v1.0.4-bugfix-acg-up-random-passwords.md`; AES/payment placeholders unchanged.
-**acg_extend logic refinement (v1.0.4):** IN PROGRESS. Identified "Ghost State" bug where credentials are visible but the "Extend" button is missing because the session is internally stale. Fix: Implement "Delete -> Start -> Extend" recovery flow to force the modal to appear when the button is missing during the final window. Also fixing the midnight date-wrap bug. Issues: `docs/issues/2026-04-08-acg-extend-midnight-and-modal-trapping.md`, `docs/issues/2026-04-08-acg-extend-stale-session-ghost-state.md`.
-**acg_credentials URL fix (v1.0.4):** COMPLETE (`86883...`). Standardized all Pluralsight URLs to `/hands-on/playground/` across `acg.sh` and `acg_credentials.js`. Verified CDP session reuse successfully bypasses Cloudflare blocks and extracts credentials.
-**shopping-cart-infra v0.2.2 — ArgoCD sync waves + ddl-auto** — COMPLETE (`3b8b13b`). Branch `fix/argocd-sync-waves-ddl-auto` added the ExternalSecret Lua health check, sync-wave annotations, and ddl-auto=create ConfigMap patches so ArgoCD waits for ESO before StatefulSets and Hibernate recreates schemas on sandbox rebuilds. Spec: `shopping-cart-infra/docs/plans/v0.2.2-fix-argocd-sync-waves-ddl-auto.md`.
-**shopping-cart-infra v0.3.0 — manifest cross-check CI** — COMPLETE (`a37d8e1`). Branch `docs/next-improvements` adds `scripts/check-manifest-refs.sh`, wires it into pre-commit + `validate.yml` (manifest-cross-check job + smoke-test workflow_dispatch gate) so secret/configmap key mismatches halt locally and in CI. Spec: `shopping-cart-infra/docs/plans/v0.3.0-ci-manifest-validation.md`.
-**shopping-cart-order v0.3.1 — Spring Rabbit health** — MERGED (PR #21, `4872691`, 2026-04-06). `SPRING_RABBITMQ_HOST/PORT/VIRTUAL_HOST` added to configmap. `enforce_admins` restored. Next branch: `docs/next-improvements`.
-**shopping-cart-infra v0.3.1 — Spring Rabbit secrets** — MERGED (PR #30, `eeb34d9`, 2026-04-06). `SPRING_RABBITMQ_USERNAME/PASSWORD` added to ExternalSecret. `enforce_admins` restored. Next branch: `docs/next-improvements`.
-**k3d-manager v1.0.4 — ACG sandbox expired guidance** — COMPLETE (`bf569a80`). `_acg_check_credentials` now prints actionable steps (start sandbox → `acg_get_credentials` → `make up`) when AWS credentials are invalid due to expired/removed ACG sandboxes. Spec: `docs/plans/v1.0.4-bugfix-acg-up-sandbox-expired.md`.
-**rabbitmq-client-java — ConnectionManager stats NPE** — COMPLETE (`36ed860`). Branch `fix/connection-manager-get-stats-npe` wraps `getCacheProperties()` in try/catch so `/actuator/health` no longer fails before any channel is opened. Spec: `rabbitmq-client-java/docs/plans/bugfix-connection-manager-get-stats-npe.md`.
-
-## Current Branch: `k3d-manager-v1.0.3` (as of 2026-04-03)
-
-**v1.0.0 SHIPPED** — PR #57 merged to main (`807c0432`) 2026-03-29. Tagged v1.0.0, released. `enforce_admins` restored.
-**v1.0.1 SHIPPED** — PR #58 merged to main (`a8b6c583`) 2026-03-31. Tagged v1.0.1, released. `enforce_admins` restored. Retro: `docs/retro/2026-03-31-v1.0.1-retrospective.md`.
-**v1.0.2 SHIPPED** — PR #59 merged to main (`1e6d35d`) 2026-04-03. Tagged v1.0.2, released. `enforce_admins` restored. Retro: `docs/retro/2026-04-03-v1.0.2-retrospective.md`.
-**v1.0.3 ACTIVE** — branch `k3d-manager-v1.0.3` cut from `1e6d35d` 2026-04-03.
-**enforce_admins:** restored on main 2026-04-03.
-**Branch cleanup:** v0.9.7–v0.9.17 deleted 2026-03-28; v1.0.0–v1.0.2 deleted 2026-04-03.
-**docs archive:** pre-v1.0.3 plans + issues moved to `docs/plans/archive/` and `docs/issues/archive/` on v1.0.3 branch cut.
-
-**Cold-run gate: PASSED (2026-04-03)** — `make up` from zero: 3 nodes Ready + ClusterSecretStore Ready. Commits: `96629e0` (ESO webhook wait), `e8b296b` (CSS poll 180s), `dc2c82d` (AWS creds check).
-**ClusterSecretStore apiVersion bugfix** — SPECCED (2026-04-04). `bin/acg-up` step 9 uses `v1beta1` for ClusterSecretStore — ESO 1.0.0 dropped v1beta1. Bump to `v1`. Spec: `docs/plans/v1.0.3-bugfix-css-apiversion.md`. ASSIGNED to Codex.
-**GHCR_PAT console leak bugfix** — SPECCED (2026-04-04). Makefile `up` target echoes `GHCR_PAT="ghp_xxx..."` to console. Fix: add `@` prefix. Spec: `docs/plans/v1.0.3-bugfix-ghcr-pat-mask.md`. ASSIGNED to Codex.
-**ESO version 1.0.0 bugfix** — COMPLETE (`4dd1854`). `bin/acg-up` default `ESO_VERSION` now 1.0.0 so remote installs serve the GA `external-secrets.io/v1` API required by shopping-cart-infra manifests. Spec: `docs/plans/v1.0.3-bugfix-eso-version-1.0.0.md`.
-**Makefile sync-apps target** — COMPLETE (`a47a4f5`). Added `bin/acg-sync-apps` (port-forward, argocd login, sync data-layer, pod status) and `make sync-apps` wrapper. Spec: `docs/plans/v1.0.3-makefile-sync-apps.md`.
-**GHCR PAT masking** — COMPLETE (`613bb1e`). `make up` now echoes a neutral message and suppresses the GHCR_PAT command line so credentials stay off the console. Spec: `docs/plans/v1.0.3-bugfix-ghcr-pat-mask.md`.
-**ClusterSecretStore apiVersion bump** — COMPLETE (`b8bcb89`). `bin/acg-up` now applies the ClusterSecretStore manifest with `external-secrets.io/v1` so ESO 1.0.0 accepts it. Spec: `docs/plans/v1.0.3-bugfix-css-apiversion.md`.
-**Vault KV seeding** — COMPLETE (`d11260d`). `bin/acg-up` now seeds redis/postgres/payment static secrets in Vault KV so shopping-cart ExternalSecrets have values to sync. Spec: `docs/plans/v1.0.3-bugfix-vault-kv-seeding.md`.
-**RabbitMQ Vault creds seeding** — COMPLETE (`77e69e2`). `bin/acg-up` now seeds `secret/data/rabbitmq/default` so RabbitMQ StatefulSet and app ExternalSecrets can pull credentials from Vault. Spec: `docs/plans/v0.2.1-bugfix-rabbitmq-vault-creds.md`.
-**shopping-cart-infra ESO storeRef/path fix** — COMPLETE (`abb6aba`). Branch `fix/eso-externalsecret-storeref` switches ExternalSecrets to `ClusterSecretStore` and static KV paths to match the new Vault seeding. Spec: `shopping-cart-infra/docs/plans/bugfix-eso-externalsecret-storeref.md`.
-**App namespace ExternalSecrets** — COMPLETE (`5cc6c86`). shopping-cart-infra branch `fix/app-namespace-secrets` adds four ExternalSecrets in `shopping-cart-apps` mirroring redis/postgres Vault KV secrets for basket, order, and product-catalog. Spec: `shopping-cart-infra/docs/plans/v0.2.1-bugfix-app-namespace-secrets.md`.
-**ArgoCD register wrong context bugfix** — COMPLETE (`5cbc3cf`). `bin/acg-up` now reads the ubuntu-k3s server via name filter and switches kubectl to `k3d-k3d-cluster` before `register_app_cluster`, ensuring the cluster secret updates the local ArgoCD instance. Spec: `docs/plans/v1.0.3-bugfix-argocd-register-context.md`.
-**Makefile argocd-registration target** — COMPLETE (`7dfa093`). Added `make argocd-registration` to rerun the Step 10 registration flow: grab ubuntu-k3s token, read server URL, switch to `k3d-k3d-cluster`, call `register_app_cluster`, and restart the ArgoCD controller. Spec: `docs/plans/v1.0.3-makefile-register-apps.md`.
-**ArgoCD cluster server URL bugfix** — COMPLETE (`dec667f`). `bin/acg-up` now reads the EC2 kubeconfig server URL and passes it via `ARGOCD_APP_CLUSTER_SERVER` so ubuntu-k3s registers with its public API endpoint instead of `host.k3d.internal`. Spec: `docs/plans/v1.0.3-bugfix-argocd-cluster-server-url.md`.
-**acg_extend selector fix** — COMPLETE (`e39efa4`). Extend button selectors updated to match the new Pluralsight UI which now uses a Modal with "Extend Session" and only appears at 1 hour remaining. Spec: `docs/plans/v1.0.3-fix-acg-extend-selectors.md`.
-**ArgoCD re-registration** — COMPLETE (Gemini, 2026-04-04). Stale token replaced; apps syncing. Root cause of pod failures: ESO v1beta1 not served on remote cluster.
-**ESO apiVersion fix** — MERGED (shopping-cart-infra PR #23, `0a38037`, 2026-04-04). ESO v1 manifests + validate CI + Copilot fixes merged to main. Retro: `docs/retro/2026-04-04-pr23-eso-apiversion-fix-retrospective.md`. `enforce_admins` restored.
-**Remove CDP from `acg_credentials.js`** — ASSIGNED to Codex. Spec: `docs/plans/v1.0.3-remove-cdp-from-acg-credentials.md`. Drop `connectOverCDP` probe; always use `launchPersistentContext`; remove CDP pre-check in `acg.sh`.
-**enforce_admins:** restored on main 2026-04-03.
-**Branch cleanup:** v0.9.7–v0.9.17 deleted 2026-03-28; v1.0.0 deleted 2026-03-29.
-**v0.9.15 scope:** Antigravity × GitHub Copilot coding agent validation — 3 runs, determinism verdict; spec `docs/plans/v0.9.15-antigravity-copilot-agent.md`. Antigravity plugin rewritten in `b2ba187` per `docs/plans/v0.9.15-antigravity-plugin-impl.md`. Also: ldap-password-rotator `vault kv put` stdin hardening — spec `docs/plans/v0.9.15-ensure-copilot-cli.md` (closes v0.6.2 security debt; `_ensure_copilot_cli`/`_k3d_manager_copilot`/`_ensure_node` already shipped in v0.9.12).
-
-**vault-bridge bugfix specced:** `docs/plans/v1.0.2-bugfix-vault-bridge.md` — Codex to add `_setup_vault_bridge` in `shopping_cart.sh`, Endpoints step in `bin/acg-up`, fix ClusterSecretStore server address, add `vault-bridge-svc.yaml` in shopping-cart-infra.
-- COMPLETE (`1cccf01` / `450d008`): socat systemd automation + Endpoints in k3d-manager; Service + ClusterSecretStore update in shopping-cart-infra.
-
-**Chrome CDP launchd agent (v1.0.3):** COMPLETE (`513009f`). All platform detection bugs fixed (`_is_mac` → `uname Darwin` in `acg.sh` + `antigravity.sh`). Launchd agent active on port 9222. Spec: `docs/plans/v1.0.3-chrome-cdp-launchd.md`.
-**acg-refresh skip creds fix (v1.0.3):** COMPLETE (`6dcb913`). `bin/acg-refresh` now checks `_acg_check_credentials` before extracting AWS creds, so Chrome CDP launchd agent continues running without Playwright lock conflicts. Spec: `docs/plans/v1.0.3-fix-acg-refresh-skip-creds.md`.
-**ESO version bump (v1.0.3):** COMPLETE (`216f6d5`). `bin/acg-up` default `ESO_VERSION` now 0.14.0 (was 0.9.20) so remote installs serve `external-secrets.io/v1` to match shopping-cart-infra manifests. Spec: `docs/plans/v1.0.3-fix-eso-version.md`.
-
-**Chrome Playwright refactor (early v1.0.4):** `docs/plans/v1.0.4-chrome-playwright-refactor.md` — COMPLETE (`f7f15c5`). `acg_credentials.js`/`acg_extend.js` now launch Chrome via Playwright `launchPersistentContext` with a persisted auth dir, `_antigravity_launch` renamed to `_browser_launch`, and `antigravity_acg_extend` no longer pre-launches Chrome.
-
-**Playwright auth bootstrap (v1.0.4):** `docs/plans/v1.0.4-playwright-auth-bootstrap.md` — COMPLETE (`ce4cff7`). `acg_credentials.js` detects empty auth dir, prints bootstrap banner, and extends timeout to 300s; `acg_extend.js` fails fast with clear instructions to run `acg_get_credentials` first.
-
-**Playwright CDP session reuse (v1.0.4):** `docs/plans/v1.0.4-playwright-cdp-session-reuse.md` — COMPLETE (`dd024ed`). First-run flow probes CDP for an existing Pluralsight session and reuses it before launching a new Chrome instance.
-**Playwright Start Sandbox detection fix (v1.0.4):** `docs/plans/v1.0.4-fix-start-sandbox-detection.md` — COMPLETE (`517f697`). Credentials skip guard now checks populated values and waits up to 60s after Start/Open/Resume before extracting credentials.
-**Playwright sandbox button race (v1.0.4):** `docs/plans/v1.0.4-fix-sandbox-button-race-condition.md` — COMPLETE (`f5a9399`). Waits for SPA cards to render before checking Start/Open/Resume buttons and restores conditional timeout.
-**bin/ SCRIPT_DIR fix:** `docs/plans/v1.0.2-fix-bin-script-dir.md` — COMPLETE (`29a8535`). All `bin/acg-*` entry points now set `SCRIPT_DIR="${REPO_ROOT}/scripts"` so plugin sourcing works.
-**bin/acg-up full stack automation:** `docs/plans/v1.0.2-fix-acg-up-full-stack.md` — COMPLETE (`e4b7527`). acg-up now performs Vault port-forward, vault-bridge Service, argocd-manager bootstrap, helm + ESO install, vault-token + ClusterSecretStore, ArgoCD registration, CSS verification, and Makefile shortcuts added; acg-down stops the port-forward.
-**acg credentials CDP removal:** `docs/plans/v1.0.3-remove-cdp-from-acg-credentials.md` — COMPLETE (`ac260d0`). `acg_credentials.js` always uses `launchPersistentContext`, and `acg_get_credentials` no longer probes CDP or launches Chrome manually.
-**ESO ExternalSecret storeRef + Vault KV seeding bugfix** — SPECCED (2026-04-05). Two split specs: (1) shopping-cart-infra `docs/plans/bugfix-eso-externalsecret-storeref.md` on branch `fix/eso-externalsecret-storeref` — fix `kind: SecretStore` → `ClusterSecretStore` + postgres paths to static KV; (2) k3d-manager `docs/plans/v1.0.3-bugfix-vault-kv-seeding.md` on `k3d-manager-v1.0.3` — seed Vault KV in `bin/acg-up`. ASSIGNED to Codex.
-
-**bin/ SCRIPT_DIR fix:** ASSIGNED to Codex 2026-04-03. Spec: `docs/plans/v1.0.2-fix-bin-script-dir.md`. All `bin/` entry points (`acg-up`, `acg-refresh`, `acg-down`) set `SCRIPT_DIR` to `bin/` instead of `scripts/`; `acg.sh` guard fires false and tries `bin/plugins/aws.sh` — not found. Fix: compute REPO_ROOT first, then `SCRIPT_DIR="${REPO_ROOT}/scripts"`.
-
-**`antigravity_acg_extend` fatal exit fix:** COMPLETE (`ed3a548`). `_err` replaced with `_info` + `return 1` so pre-flight extend failure is non-fatal. Issue: `docs/issues/2026-04-03-antigravity-acg-extend-err-exits-process.md`. Spec: `docs/plans/v1.0.2-fix-acg-extend-err.md`.
-
-**bin/acg-up full stack automation:** ASSIGNED to Codex 2026-04-03. Spec: `docs/plans/v1.0.2-fix-acg-up-full-stack.md`. 3 files: `bin/acg-up` (8 new steps), `bin/acg-down` (Vault PF cleanup), `Makefile` (new). Sandbox deleted — e2e blocked until this lands.
-
-**e2e verification:** blocked on Codex full stack spec. User runs `make up` to verify end-to-end.
+**v0.3.11 SHIPPED** — PR #17 merged to main (`2625683`) 2026-03-25. Tagged v0.3.11, GitHub release created. `enforce_admins` restored.
+**v0.3.12 SHIPPED** — PR #18 squash-merged to main (`91340d62`) 2026-03-25. Tagged v0.3.12, GitHub release created. `enforce_admins` restored. Antigravity IDE install + Playwright MCP config helpers.
+**v0.3.13 SHIPPED** — PR #19 squash-merged to main (`e870c6d9`) 2026-03-25. Tagged v0.3.13, GitHub release created. `enforce_admins` restored. Fix `_antigravity_browser_ready` curl probe (`_run_command --soft`).
+**v0.3.14 SHIPPED** — PR #20 squash-merged to main (`bbbaf053`) 2026-03-27. Tagged v0.3.14, GitHub release created. `enforce_admins` restored. 5 deferred Copilot PR #51 findings: agy binary detection, curl fast-fail, NUL audit loops, doc fix, CHANGE.md versioning.
+**feat/v0.3.15 ACTIVE** — branch cut from `bbbaf053` 2026-03-27.
 
 ---
 
-## Roadmap Versioning Decision (2026-03-29)
+## Purpose
 
-| Version | Scope |
-|---------|-------|
-| v0.9.21 | `_ensure_k3sup` + `deploy_app_cluster` auto-install — SHIPPED `f98f2a8` |
-| v1.0.0 | `k3s-aws` provider foundation — rename `k3s-remote` → `k3s-aws`; single-node deploy/destroy; SSH config auto-update |
-| v1.0.1 | Multi-node: `acg_provision` × 3, k3sup join × 2, taints/labels |
-| v1.0.2 | Full stack on 3 nodes: all 5 pods Running + E2E green |
-| v1.0.3 | Service mesh: Istio fully activated + MetalLB + VirtualServices for all apps; GUI access via hostnames (`argocd.k3s.local`, `vault.k3s.local`, `keycloak.k3s.local`, `jenkins.k3s.local`) over SSH/Cloudflare tunnel |
-| v1.0.4 | Samba AD DC plugin (`DIRECTORY_SERVICE_PROVIDER=activedirectory`) |
-| v1.0.5 | GCP cloud provider (`k3s-gcp`) |
-| v1.0.6 | Azure cloud provider (`k3s-azure`) |
+Shared Bash foundation library. Contains:
+- `scripts/lib/core.sh` — cluster lifecycle, provider abstraction, `_resolve_script_dir`
+- `scripts/lib/system.sh` — `_run_command`, `_run_command_resolve_sudo`, `_detect_platform`, package helpers, BATS install
+- `scripts/lib/agent_rigor.sh` — `_agent_checkpoint`, `_agent_audit`, `_agent_lint`
 
-`CLUSTER_PROVIDER` values: `k3s-aws` (AWS/ACG), `k3s-gcp` (GCP), `k3s-azure` (Azure) — symmetric naming across all three clouds.
+Consumed by downstream repos via git subtree pull.
+API reference: `docs/api/functions.md`
 
-**v1.0.3 GUI access gate:** service mesh must be fully functional (all 5 pods Running, Istio sidecar injection verified, mTLS active) before adding MetalLB + VirtualService layer.
+---
 
-## v1.0.0 — Spec Written (2026-03-29)
+## Version Roadmap
 
-**Spec:** `docs/plans/v1.0.0-k3s-aws-provider.md` — assigned to Codex.
-
-4 file changes:
-1. `scripts/lib/provider.sh` — `provider_slug="${provider//-/_}"` so hyphenated `k3s-aws` maps to `_provider_k3s_aws_*` functions
-2. `scripts/lib/core.sh` — add `k3s-aws` to `deploy_cluster` case statement; fix no-args guard to skip when `CLUSTER_PROVIDER` env is set
-3. NEW `scripts/lib/providers/k3s-aws.sh` — `_provider_k3s_aws_deploy_cluster` + `_provider_k3s_aws_destroy_cluster`
-4. NEW `scripts/tests/lib/k3s_aws_provider.bats` — 3 tests (--help, destroy without --confirm)
-
-| Item | Status | Notes |
+| Version | Status | Notes |
 |---|---|---|
-| **`_cluster_provider_call` slug guard** | **COMPLETE** | Hyphen providers map to `_provider_k3s_aws_*`; commit `4aba999`. |
-| **`deploy_cluster` guard + case** | **COMPLETE** | Accepts `k3s-aws` and respects env-configured providers; commit `4aba999`. |
-| **`scripts/lib/providers/k3s-aws.sh`** | **COMPLETE** | Wires `acg_provision` → `deploy_app_cluster` → `tunnel_start` + teardown helper; commit `4aba999`. |
-| **`k3s_aws_provider.bats`** | **COMPLETE** | New suite validates help + `--confirm` gate; runs via `./scripts/k3d-manager test lib`; commit `4aba999`. |
-| **BATS PATH fix** | **COMPLETE** | Jenkins auth cleanup suite prepends Homebrew bash so plugin sourcing works on macOS; commit `4aba999`. |
-| **`aws_import_credentials` refactor** | **COMPLETE** | New `aws.sh` helper (CSV + quoted export) + acg alias/back-compat; commit `be7e997`. |
-| **`acg_get_credentials` Antigravity source** | **COMPLETE** | `acg.sh` now sources `antigravity.sh` so helpers are always defined; commit `4357f90`. |
-| **`deploy_app_cluster` IP resolve** | **COMPLETE** | Reads `HostName` from `~/.ssh/config` before falling back to alias; commit `51983d3`. |
-| **`acg_watch` + pre-flight extend`** | **COMPLETE** | `acg_provision --recreate`, new `acg_watch`, and provider pre-flight extend/watch wiring; commit `51bdf3a`. |
-| **`k3s-aws` multi-node deploy** | **COMPLETE** | `_acg_provision_agents`, `_k3sup_join_agent`, node labeling + tests; commit `0c89f4e`. |
-| **Keypair + extend hotfix** | **COMPLETE** | Keypair import uses `--soft` + extend prompt forces `page.goto`; commit `4a57f44`. |
-| **Gemini e2e smoke test (run 1)** | **COMPLETE** | Full lifecycle verified: `acg_get_credentials` → `deploy_cluster` → `get nodes` (Ready) → `destroy_cluster`. commit `4aba999`. |
-| **Gemini e2e smoke test (run 2)** | **FAILED** | Blocked by `KeyPair` import conflict in `acg_provision`. Documented in `docs/issues/2026-03-29-acg-provision-keypair-import-fail.md`. |
-| **Gemini e2e smoke test (run 3)** | **COMPLETE** | Verified hotfixes: Keypair import is idempotent (no error on duplicate); `antigravity_acg_extend` uses unconditional navigation. Full lifecycle confirmed functional. commit `df8f77f`. |
-| **Gemini e2e smoke test (3-node)** | **COMPLETE** | Full 3-node lifecycle verified: `acg_get_credentials` → `deploy_cluster` (CloudFormation + 3 nodes Ready) → `destroy_cluster`. |
-| **Gemini blocker fixes verification** | **COMPLETE** | Verified cluster rebuilding, ESO CRD patching, and registry auth restore. 3 nodes Ready. Pods 5/5 transition from ImagePullBackOff to Running/CrashLoopBackOff (Vault dependency). |
-| **Vault Token transition** | **FAILED** | `ClusterSecretStore` applied with static Vault Token; still `False` due to unstable `socat` bridge on remote server. Documented in `docs/issues/2026-04-01-remote-vault-bridge-instability.md`. |
-
-## v1.0.0 Design Decisions
-
-- **`acg_get_credentials <sandbox-url>`** — new function; extracts AWS credentials from Pluralsight sandbox "Cloud Access" panel via Antigravity Playwright; writes to `~/.aws/credentials`; stdin paste (`pbpaste | acg_import_credentials`) as fallback. Must run before any `acg_provision` call. Single extract covers all 3 nodes (same sandbox session).
+| v0.1.0–v0.3.3 | released | See `docs/releases.md` |
+| v0.3.4 | **SHIPPED** | PR #11 merged (`dbfafe9`) — doc fixes + upstream lib sync; tagged + released 2026-03-22 |
+| v0.3.5 | **SHIPPED** | PR #10 merged (`2f895a99`) — doc-hygiene hook; 2026-03-23 |
+| v0.3.6 | **SHIPPED** | PR #12 merged (`d8b4c48`) — code-fence exclusion + CoreDNS Check 4; 2026-03-23 |
+| v0.3.7 | **SHIPPED** | PR #13 merged (`071c270`) — system.sh if-count cleanup; 2026-03-24; tagged v0.3.7 retroactively |
+| v0.3.8 | **SHIPPED** | PR #14 merged (`a669a63`) — tab indentation enforcement in `_agent_audit`; 2026-03-24; tagged v0.3.8 retroactively |
+| v0.3.9 | **SHIPPED** | PR #15 merged (`fb09921`) — release history backfill + memory-bank reconciliation; 2026-03-24; no tag (docs-only) |
+| v0.3.10 | **SHIPPED** | PR #16 merged (`c5662c9`) — `.clinerules` fix; 2026-03-24; no tag (docs-only) |
+| v0.3.11 | **SHIPPED** | PR #17 merged (`2625683`) — YAML IP check in `_agent_audit`; 2026-03-25; tagged v0.3.11 |
+| v0.3.12 | **SHIPPED** | PR #18 merged (`91340d62`) — Antigravity IDE + MCP helpers; 7 BATS; 2026-03-25; tagged v0.3.12 |
+| v0.3.13 | **SHIPPED** | PR #19 merged (`e870c6d9`) — `_antigravity_browser_ready` curl probe fix; 2026-03-25; tagged v0.3.13 |
+| v0.3.14 | **ACTIVE** | branch `feat/v0.3.14` cut from `e870c6d9` |
 
 ---
 
-## Operational Notes
+## Open Items
 
-- **3-node Cluster Up:** Rebuilt via `acg_provision` (CloudFormation) + `k3sup install/join` after sandbox recreation.
-**ArgoCD Registered:** App cluster `ubuntu-k3s` re-registered with fresh token (UID `9a98e65a...`). Sync restored.
-**Remote Pod Investigation:** **FAILED** (2026-04-04). Pods are `CrashLoopBackOff` because the `data-layer` is missing.
-**ESO apiVersion mismatch:** **FAILED** (2026-04-04). Even with `bin/acg-up` updated to `ESO_VERSION=0.14.0`, the live cluster remains on `v0.9.20`. Sync failed for `data-layer` because `v1` CRDs are missing.
-**Vault connectivity:** `ClusterSecretStore` confirmed `Ready`. `ExternalSecrets` for apps are missing/stale due to sync failure.
+- [x] **PR #10 doc-hygiene hook** — staged-only `_agent_audit` BATS test added in commit `bdd60e7`; spec `docs/plans/v0.3.5-agent-audit-staged-only-test.md`. Branch: `feat/doc-hygiene-hook`.
+- [x] **Doc hygiene staged-content read** — commit `d00bccb` implements `_dh_grep` index reader per `docs/plans/v0.3.5-doc-hygiene-staged-content-read.md`; branch pushed `feat/doc-hygiene-hook`.
+- [x] **Doc hygiene staged-mode follow-ups** — commit `aeb1396` localizes `_DHC_STAGED`, gates staged file existence via `git cat-file`, and replaces staged-mode BATS per `docs/plans/v0.3.5-doc-hygiene-copilot-pr10-round2.md`.
+- [ ] **k3d-manager subtree pull** — pull v0.3.5 into k3d-manager (PR #10 now merged)
+- [x] **v0.3.6: Check 2 code-fence exclusion** — commit `7751068` adds `_dh_strip_fences`, optional `_dh_grep --strip-fences`, and 3 BATS tests per `docs/plans/v0.3.6-doc-hygiene-codefence-exclusion.md`.
+- [x] **v0.3.6: CoreDNS Check 4** — commit `c352c1b` adds YAML-only warn on `<svc>.<ns>.svc(.cluster.local)` + 4 BATS tests per `docs/plans/v0.3.5-doc-hygiene-coredns-check.md`.
+- [x] **v0.3.6: indented fence fix** — commit `02e7418` updates `_dh_strip_fences` to handle indented fences + adds indented BATS per `docs/plans/v0.3.6-doc-hygiene-indented-fence-fix.md`.
+- [x] **v0.3.11: YAML hardcoded IP check** — commit `11e653b` adds staged `.yaml/.yml` IP detection to `_agent_audit` per `docs/plans/v0.3.11-agent-audit-yaml-ip-check.md`.
+- [x] `rigor-cli` — repo bootstrapped (commit `a1c034f`), bash 3.2 fix (`8ae57bc`), gist installer (`310fd16`); lib-foundation spec: `docs/plans/v0.3.10-rigor-cli-init.md`; rigor-cli specs tracked in that repo (`plans/v0.1.1-mapfile-compat.md`, `plans/v0.1.1-gist-install-script.md`).
+- [x] **v0.3.12: Antigravity helpers** — commit `ae0e8b9` adds `_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready` per `docs/plans/v0.3.12-ensure-antigravity.md`.
+- [x] **v0.3.13: antigravity browser probe fix** — commit `9350ecd` switches `_antigravity_browser_ready` to `_run_command --soft -- curl` per `docs/plans/v0.3.13-antigravity-browser-ready-fix.md`.
+- [x] **v0.3.14: k3d-manager Copilot PR #51 deferred findings** — `e52b819` fixes all 5 upstream gaps per `docs/plans/v0.3.14-copilot-pr51-deferred-fixes.md`:
+  - `_ensure_antigravity_ide` now detects `agy` binaries first
+  - `_antigravity_browser_ready` fails fast when `curl` missing
+  - `_agent_audit` tab scan iterates staged files via NUL-delimited loop
+  - `docs/api/functions.md` explains `PLAYWRIGHT_MCP_VERSION` pinned MCP default
+  - `CHANGE.md` versions the v0.3.12/v0.3.13 release notes
+- [ ] `shopping-carts` as consumer (future)
 
-- **vault-bridge bugfix specced:** `docs/plans/v1.0.2-bugfix-vault-bridge.md` — Codex to add `_setup_vault_bridge` in `shopping_cart.sh`, Endpoints step in `bin/acg-up`, fix ClusterSecretStore server address, add `vault-bridge-svc.yaml` in shopping-cart-infra.
-- **ArgoCD app status:** basket `CrashLoopBackOff`, frontend `CrashLoopBackOff`, order `Running`, payment `Running`, product-catalog `Error`. All app pods reached remote execution phase.
+---
+
+## Key Contracts (must not change without coordinating all consumers)
+
+- `_run_command [--prefer-sudo|--require-sudo|--interactive-sudo|--probe '<subcmd>'|--quiet|--soft] -- <cmd>`
+- `_detect_platform` → `mac | wsl | debian | redhat | linux`
+- `_cluster_provider` → `k3d | k3s | orbstack`
+- `_resolve_script_dir` → absolute canonical path of calling script's real directory
+- `_DCRS_PROVIDER` — global temp set by `_deploy_cluster_resolve_provider` (no command substitution — preserves TTY)
+- `_RCRS_RUNNER` — global temp set by `_run_command_resolve_sudo`
+
+---
+
+## Consumers
+
+| Repo | Integration | Status |
+|---|---|---|
+| `k3d-manager` | git subtree at `scripts/lib/foundation/` | subtree pull to v0.3.13 pending |
+| `rigor-cli` | git subtree at `scripts/lib/foundation/` | subtree pull to v0.3.13 pending |
+| `shopping-carts` | git subtree (planned) | future |
+
+---
+
+## Engineering Protocol
+
+- **Tests**: always run with `env -i PATH="/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'bats scripts/tests/lib/'`
+- **shellcheck**: run on every touched `.sh` file before commit
+- **No bare sudo**: always `_run_command --interactive-sudo` for install helpers, `--prefer-sudo` for non-interactive
+- **All changes originate here** — never edit consumer subtree copies directly
+- **Release flow**: PR → merge → tag → GitHub release → consumers run `git subtree pull`
+
+## Lessons Learned
+
+- `local -n` nameref requires bash 4.3+ — use global temp vars (`_RCRS_RUNNER`, `_DCRS_PROVIDER`) for output from helpers
+- Command substitution `$()` creates a subshell — `[[ -t 0 && -t 1 ]]` is always false inside; use global temp vars instead
+- `--prefer-sudo` silently drops to non-root when password sudo required — use `--interactive-sudo` for install helpers
+- `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override in consumers
+- BATS must run with `env -i` — ambient `SCRIPT_DIR` causes false passes
