@@ -50,6 +50,21 @@ These are the remaining shopping-cart sync issues from v1.2.0. Spec: `docs/plans
 
 ---
 
+## Sandbox Rebuild — 2026-05-01 (In Progress)
+
+Cluster rebuilt post `make down`. Issues found and resolved:
+
+- `cdp.sh` path bug (`../foundation` → `foundation`) — fixed `3c70c3a8`, applied to lib-acg standalone too (`369ef9f`)
+- GHCR PAT missing `repo` scope + `read:packages` — fixed by user rotating PAT
+- `payment-db-credentials` had `CHANGE_ME` postgres password — fixed `dfb65c73`:
+  - Added `services/shopping-cart-payment/postgres-payment-apps-externalsecret.yaml` (ESO, `creationPolicy: Merge`)
+  - Added `ignoreDifferences` for `payment-db-credentials` Secret in `services-git.yaml` ApplicationSet
+- **shopping-cart-payment CI broken** — `aquasecurity/trivy-action@0.30.0` SHA invalid (`999f8d70`); image never pushed to GHCR. **Assigned to Codex** — spec: `docs/bugs/2026-05-01-shopping-cart-payment-ci-broken-trivy-sha.md`. Branch: `fix/ci-trivy-sha` in shopping-cart-payment.
+
+Current ArgoCD status: basket ✅ frontend ✅ product-catalog ✅ order ✅ payment ❌ (image missing)
+
+---
+
 ## v1.3.0 Planned Work
 
 - **`${K3D_MANAGER_BRANCH}` cleanup** — see FIRST COMMIT section above (immediate)

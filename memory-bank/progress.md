@@ -42,6 +42,14 @@ Spec: `docs/plans/v1.2.0-fix-orders-init-sql-and-security-config.md`
 
 ---
 
+## Sandbox Rebuild Fixes — 2026-05-01
+
+- [x] **cdp.sh path bug** — `../foundation` → `foundation`; `3c70c3a8` (k3d-manager), `369ef9f` (lib-acg)
+- [x] **payment-db-credentials ESO** — `dfb65c73`; postgres password from Vault, ArgoCD ignoreDifferences
+- [ ] **shopping-cart-payment CI** — ASSIGNED to Codex. Spec: `docs/bugs/2026-05-01-shopping-cart-payment-ci-broken-trivy-sha.md`. Branch: `fix/ci-trivy-sha`. Fix: bump `build-push-deploy.yml` SHA `999f8d70` → `39c3072`.
+
+---
+
 ## Known Bugs / Gaps
 
 - [ ] **Orchestration Fragility** — OPEN. `docs/bugs/2026-04-23-infra-orchestration-fragility.md`.
