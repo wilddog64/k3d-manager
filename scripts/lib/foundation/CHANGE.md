@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.3.16] — 2026-04-05
+
 ### Fixed
 - `_agent_audit` IP allowlist: use `grep -Fqx -- "$file"` to prevent repo-relative paths beginning with `-` from being parsed as grep flags.
 
