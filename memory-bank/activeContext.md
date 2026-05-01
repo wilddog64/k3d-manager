@@ -21,6 +21,12 @@ Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`
 - lib-foundation `448560a`: add `_ai_agent_review` to `scripts/lib/system.sh`; `AI_REVIEW_FUNC` (default: `copilot`), `AI_REVIEW_MODEL` (default: `gpt-5.4-mini`)
 - k3d-manager `c8ac9b2f`: update `copilot.sh` + pre-commit hook + BATS + howto doc
 
+### Bugfix: _copilot_review K3DM_ENABLE_AI gate (PARTIAL)
+Spec: `docs/plans/v1.4.1-bugfix-copilot-review-k3dm-gate.md`
+- lib-foundation `657fd91`: removed the `K3DM_ENABLE_AI` gate from `_copilot_review`
+- k3d-manager `4d36dcba`: subtree-pulled `feat/v0.3.17` to pick up the gate removal
+- smoke test from the lib-foundation repo root still fails in this environment with Copilot CLI exit 1; see `docs/issues/2026-05-01-bugfix-copilot-review-k3dm-gate-smoke-test-failed.md`
+
 ### Bugfix: `_copilot_review` K3DM_ENABLE_AI gate (NEXT — assign to Codex)
 Spec: `docs/plans/v1.4.1-bugfix-copilot-review-k3dm-gate.md`
 - lib-foundation `feat/v0.3.17`: remove 3 lines (1656–1658) from `_copilot_review` in `scripts/lib/system.sh`
