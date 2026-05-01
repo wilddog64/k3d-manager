@@ -18,7 +18,7 @@ setup() {
   _k3dm_repo_root() { echo "$SCRIPT_DIR"; }
   export -f _safe_path _ensure_copilot_cli _k3dm_repo_root
 
-  run _k3d_manager_copilot -p "run shell(cd ..)"
+  run _copilot_review -p "run shell(cd ..)"
   [ "$status" -ne 0 ]
   [[ "$output" == *"shell(cd"* ]]
   [ ! -s "$RUN_LOG" ]
@@ -37,7 +37,7 @@ setup() {
   }
   export -f _safe_path _ensure_copilot_cli _k3dm_repo_root _run_command
 
-  run _k3d_manager_copilot -p "generate summary" --model claude-sonnet-4-5
+  run _copilot_review -p "generate summary" --model claude-sonnet-4-5
   [ "$status" -eq 0 ]
   grep -q '^safe_path$' "$RUN_LOG"
   grep -q '^ensure_cli$' "$RUN_LOG"

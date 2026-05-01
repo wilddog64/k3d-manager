@@ -29,6 +29,13 @@ Pre-v1.0.5 detail removed; see `git log --tags` and `docs/retro/`.
 - [x] **stage2 CI cluster health** — FIXED (`f4e7da4e`). CI now gates stage2 behind the `ci:cluster-tests` label, so PRs without the label skip the job and pass on lint + detect alone. Spec: `docs/bugs/2026-05-01-stage2-ci-always-fails-in-pr-context.md`.
 - [ ] **GCP E2E smoke test** — BLOCKED. Full `make up` on live GCP sandbox not verified.
 
+## v1.4.0 Track (branch: `k3d-manager-v1.4.0`)
+
+- [x] **Copilot public functions** — DONE (`a7ad7fac`). Added `scripts/plugins/copilot.sh` with `copilot_triage_pod` and `copilot_draft_spec`, and wired `AGENT_LINT_AI_FUNC="_copilot_review"` in the pre-commit hook. Spec: `docs/plans/v1.4.0-copilot-review-public-functions.md`.
+- [x] **BATS rename fix** — DONE (`3865cd82`). Updated `k3d_manager_copilot.bats` to call `_copilot_review` after the rename.
+- [x] **Docs** — DONE (`d64ddecf`). Added `docs/howto/copilot.md`; updated `docs/api/functions.md` and README Plugins table + How-To section.
+- [ ] **PR #69** — OPEN. https://github.com/wilddog64/k3d-manager/pull/69 — CI green (`25234016283`). Copilot review pending.
+
 ---
 
 ## v1.2.1 Track (shopping-cart upstream fixes — Codex)

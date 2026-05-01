@@ -213,6 +213,7 @@ docs/
 | **Azure** | `create_az_sp`, `deploy_azure_eso`, `eso_akv` | Azure Service Principal + ESO with Azure Key Vault backend |
 | **SMB CSI** | `deploy_smb_csi` | SMB CSI driver for Windows-compatible persistent volumes |
 | **Shopping Cart** | `register_shopping_cart_apps`, `deploy_app_cluster` | Demo app cluster bootstrap — k3sup EC2 install + ArgoCD app registration |
+| **Copilot** | `copilot_triage_pod`, `copilot_draft_spec` | AI-assisted pod failure diagnosis and bug spec drafting via `_copilot_review`; requires `K3DM_ENABLE_AI=1` |
 | **SSM** | `ssm_wait`, `ssm_exec`, `ssm_tunnel` | AWS Systems Manager helpers — wait for SSM registration, run commands on EC2, open SSM port-forward tunnel; opt-in via `K3S_AWS_SSM_ENABLED=true` |
 | **Hello** | `hello` | Minimal example plugin — Hello World; reference for new plugin authors |
 
@@ -276,6 +277,9 @@ docs/
 **LDAP / Directory**
 - **[LDAP Bulk User Import](docs/howto/ldap-bulk-user-import.md)** — Import users from a CSV into OpenLDAP
 - **[LDAP Password Rotation](docs/howto/ldap-password-rotation.md)** — Rotate user passwords via the rotator CronJob
+
+**AI Tooling**
+- **[Copilot CLI Integration](docs/howto/copilot.md)** — Setup, `copilot_triage_pod` / `copilot_draft_spec` examples, pre-commit AI lint, cross-project adoption via lib-foundation subtree
 
 ---
 
