@@ -31,6 +31,12 @@ spec:
         repoURL: https://github.com/wilddog64/k3d-manager
         targetRevision: main
         path: '{{.path.path}}'
+      ignoreDifferences:
+        - group: ""
+          kind: Secret
+          name: payment-db-credentials
+          jsonPointers:
+            - /data
       syncPolicy:
         automated:
           prune: true
