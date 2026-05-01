@@ -32,14 +32,17 @@ All v1.2.0 bug/issue detail in `docs/bugs/`, `docs/issues/`, and `git log`.
 
 These are the remaining shopping-cart sync issues from v1.2.0. Spec: `docs/plans/v1.2.0-fix-orders-init-sql-and-security-config.md`.
 
-**Fix 1** — `shopping-cart-infra` (`fix/orders-init-sql-uuid`): Replace SERIAL with UUID in orders init SQL configmap.
+**Fix 1** — `shopping-cart-infra` (`fix/orders-init-sql-uuid`): Replace SERIAL with UUID in orders init SQL configmap. SHA: `c3c6a3d`.
 - After merge: remove `SPRING_JPA_HIBERNATE_DDL_AUTO=update` from `services/shopping-cart-order/kustomization.yaml`
 
-**Fix 2** — `shopping-cart-order` (`fix/actuator-health-security`): Add `/actuator/health/**` to SecurityConfig permit list.
+**Fix 2** — `shopping-cart-order` (`fix/actuator-health-security`): Add `/actuator/health/**` to SecurityConfig permit list. SHA: `9020be4`.
 - After merge + RabbitMQHealthIndicator JAR fix: remove TCP socket probe patches from `services/shopping-cart-order/kustomization.yaml`
 - NOTE: Fix 2 alone is NOT enough — JAR NPE still causes 503. Both must land.
 
-**Fix 3** — Remove `namespace.yaml` from `shopping-cart-order` and `shopping-cart-product-catalog` kustomize bases.
+**Fix 3b** — `shopping-cart-order` (`fix/argocd-shared-namespace`): Remove `namespace.yaml` from `k8s/base/` and let k3d-manager own `shopping-cart-apps`. SHA: `3583e0d`.
+
+**Fix 3c** — `shopping-cart-product-catalog` (`fix/argocd-shared-namespace`): Remove `namespace.yaml` from `k8s/base/` and let k3d-manager own `shopping-cart-apps`. SHA: `b24f676`.
+
 - k3d-manager side already done (`services/shopping-cart-namespace/`)
 - After merge: SharedResourceWarning clears; `shopping-cart-product-catalog` goes Synced+Healthy
 

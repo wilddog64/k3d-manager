@@ -33,11 +33,12 @@ Pre-v1.0.5 detail removed; see `git log --tags` and `docs/retro/`.
 
 Spec: `docs/plans/v1.2.0-fix-orders-init-sql-and-security-config.md`
 
-- [ ] **Fix 1** — `shopping-cart-infra` init SQL: replace SERIAL with UUID in orders configmap. Branch: `fix/orders-init-sql-uuid`.
-- [ ] **Fix 2** — `shopping-cart-order` SecurityConfig: add `/actuator/health/**` to permit list. Branch: `fix/actuator-health-security`.
-- [ ] **Fix 3** — `shopping-cart-order` + `shopping-cart-product-catalog`: remove `namespace.yaml` from kustomize base. Branch: `fix/argocd-shared-namespace`.
-- [ ] **Post-Fix-1 cleanup** — remove `SPRING_JPA_HIBERNATE_DDL_AUTO=update` from `services/shopping-cart-order/kustomization.yaml`.
-- [ ] **Post-Fix-2 cleanup** — remove TCP socket probe patches from `services/shopping-cart-order/kustomization.yaml` (only after Fix 2 AND RabbitMQHealthIndicator JAR fix both land).
+- [x] **Fix 1** — `shopping-cart-infra` init SQL: replace SERIAL with UUID in orders configmap. Branch: `fix/orders-init-sql-uuid` (`c3c6a3d`).
+- [x] **Fix 2** — `shopping-cart-order` SecurityConfig: add `/actuator/health/**` to permit list. Branch: `fix/actuator-health-security` (`9020be4`).
+- [x] **Fix 3b** — `shopping-cart-order` namespace cleanup: remove `namespace.yaml` from kustomize base. Branch: `fix/argocd-shared-namespace` (`3583e0d`).
+- [x] **Fix 3c** — `shopping-cart-product-catalog` namespace cleanup: remove `namespace.yaml` from kustomize base. Branch: `fix/argocd-shared-namespace` (`b24f676`).
+- [ ] **Post-Fix-1 cleanup** — remove `SPRING_JPA_HIBERNATE_DDL_AUTO=update` from `services/shopping-cart-order/kustomization.yaml` after Fix 1 merges.
+- [ ] **Post-Fix-2 cleanup** — remove TCP socket probe patches from `services/shopping-cart-order/kustomization.yaml` after Fix 2 AND RabbitMQHealthIndicator JAR fix both land.
 
 ---
 
