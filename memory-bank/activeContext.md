@@ -21,8 +21,8 @@ Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`
 - lib-foundation `448560a`: add `_ai_agent_review` to `scripts/lib/system.sh`; `AI_REVIEW_FUNC` (default: `copilot`), `AI_REVIEW_MODEL` (default: `gpt-5.4-mini`)
 - k3d-manager `c8ac9b2f`: update `copilot.sh` + pre-commit hook + BATS + howto doc
 
-### BATS suite for copilot plugin (DONE)
-`scripts/tests/lib/k3d_manager_copilot.bats` — argument validation, K3DM_ENABLE_AI gate, `_ai_agent_review` invocation with kubectl/git stubs.
+### BATS suite for copilot plugin (OPEN — next task)
+`scripts/tests/plugins/copilot.bats` — argument validation, K3DM_ENABLE_AI gate, `_ai_agent_review` invocation with kubectl/git stubs. `k3d_manager_copilot.bats` was updated (`c8ac9b2f`) but is the lib unit test; the plugin suite is a separate file still pending.
 
 ---
 

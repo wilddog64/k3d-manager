@@ -18,7 +18,7 @@ Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 ## v1.4.1 Track (branch: `k3d-manager-v1.4.1`)
 
 - [x] **`_ai_agent_review` abstraction** — DONE (`448560a` / `c8ac9b2f`). Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`. lib-foundation adds `_ai_agent_review`; k3d-manager updates `copilot.sh`, pre-commit hook, BATS, and howto docs.
-- [x] **BATS suite for copilot plugin** — DONE (`c8ac9b2f`). Updated `scripts/tests/lib/k3d_manager_copilot.bats` to invoke `_ai_agent_review` with the subtree-loaded foundation `system.sh`.
+- [ ] **BATS suite for copilot plugin** — OPEN. `scripts/tests/plugins/copilot.bats` — argument validation, K3DM_ENABLE_AI gate, `_ai_agent_review` invocation with kubectl/git stubs. Follow-on from v1.4.0. (`k3d_manager_copilot.bats` was updated in `c8ac9b2f` but is the lib-unit test, not the plugin suite.)
 
 ---
 
