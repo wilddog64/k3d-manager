@@ -1,6 +1,11 @@
 # Changes - k3d-manager
 
-## [Unreleased] — sandbox rebuild hardening + GHCR PAT validation
+## [Unreleased] — Copilot CLI plugin + _copilot_review rename + sandbox rebuild hardening
+
+### Added
+- `scripts/plugins/copilot.sh`: new plugin — `copilot_triage_pod <ns> <pod>` collects `kubectl describe` + last 100 log lines and asks Copilot to diagnose the failure; `copilot_draft_spec '<desc>'` collects git context and scaffolds a `docs/bugs/` spec with Root Cause / What to Change / DoD sections; requires `K3DM_ENABLE_AI=1` (`a7ad7fac`)
+- `scripts/hooks/pre-commit`: wired `AGENT_LINT_AI_FUNC="_copilot_review"` + `K3DM_ENABLE_AI="${K3DM_ENABLE_AI:-0}"` before `_agent_lint` — AI architectural lint at commit time is now opt-in (`a7ad7fac`)
+- `docs/howto/copilot.md`: how-to guide — setup, `copilot_triage_pod` / `copilot_draft_spec` examples, low-level `_copilot_review` API, pre-commit hook wiring, cross-project adoption via lib-foundation subtree (`d64ddecf`)
 
 ### Changed
 - `scripts/etc/argocd/applicationsets/services-git.yaml`: `targetRevision` reverted to hardcoded `main`; `${K3D_MANAGER_BRANCH}` envsubst variable removed — was only needed during v1.2.0 development (`23475ac0`)
@@ -16,6 +21,8 @@
 - `bin/acg-up` Step 5: Vault PAT validated against `api.github.com/user` before applying to `ghcr-pull-secret`; prompts and saves replacement PAT to Vault if expired (`3a0901cc`)
 - `bin/rotate-ghcr-pat`: Vault PAT validated before use; falls through to interactive prompt if expired — prevents silently applying an unusable token to cluster (`3a0901cc`)
 - `bin/acg-up` Step 5: env-supplied `GHCR_PAT` validated against `api.github.com/user` before use; falls back to Vault if invalid — closes the bypass introduced by the now-removed Makefile OAuth fallback (`7bbac0d3`)
+- `scripts/lib/system.sh` (lib-foundation subtree): `_k3d_manager_copilot` → `_copilot_review` — renamed to match the `_copilot_*` helper family; no behavior change (`d8181e3f`)
+- `scripts/tests/lib/k3d_manager_copilot.bats`: updated `run` calls to use `_copilot_review` after rename (`3865cd82`)
 
 ## [v1.2.0] — 2026-04-30 — lib-acg extraction + shopping-cart bootstrap + GHCR hardening
 
