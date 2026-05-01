@@ -1,6 +1,6 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v1.3.0` (as of 2026-05-01)
+## Current Branch: `k3d-manager-v1.4.0` (as of 2026-05-01)
 
 **PR #68 OPEN** — https://github.com/wilddog64/k3d-manager/pull/68
 - CI queued (run `25227116723`); Copilot tagged; `mergeable: true`
@@ -29,6 +29,10 @@ All v1.2.0 bug/issue detail in `docs/bugs/`, `docs/issues/`, and `git log`.
 
 - `23475ac0` — `chore: revert K3D_MANAGER_BRANCH to hardcoded main` — `services-git.yaml` + `bin/acg-up` cleanup
 - `dec36c9f` — `chore(subtree): pull lib-acg main` — extend timing fix (PR #3, `9b39df02`); `_sanitizePhaseLabel`, dynamic `remainingMs`, screenshot on failure
+
+## v1.4.0 First Commits (DONE)
+
+- `a7ad7fac` — `feat(copilot): add copilot_triage_pod + copilot_draft_spec public functions` — added `scripts/plugins/copilot.sh` and wired `AGENT_LINT_AI_FUNC="_copilot_review"` in the pre-commit hook.
 
 ---
 

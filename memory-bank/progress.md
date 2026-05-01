@@ -29,6 +29,10 @@ Pre-v1.0.5 detail removed; see `git log --tags` and `docs/retro/`.
 - [x] **stage2 CI cluster health** — FIXED (`f4e7da4e`). CI now gates stage2 behind the `ci:cluster-tests` label, so PRs without the label skip the job and pass on lint + detect alone. Spec: `docs/bugs/2026-05-01-stage2-ci-always-fails-in-pr-context.md`.
 - [ ] **GCP E2E smoke test** — BLOCKED. Full `make up` on live GCP sandbox not verified.
 
+## v1.4.0 Track (branch: `k3d-manager-v1.4.0`)
+
+- [x] **Copilot public functions** — DONE (`a7ad7fac`). Added `scripts/plugins/copilot.sh` with `copilot_triage_pod` and `copilot_draft_spec`, and wired `AGENT_LINT_AI_FUNC="_copilot_review"` in the pre-commit hook. Spec: `docs/plans/v1.4.0-copilot-review-public-functions.md`.
+
 ---
 
 ## v1.2.1 Track (shopping-cart upstream fixes — Codex)
