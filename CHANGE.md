@@ -1,5 +1,22 @@
 # Changes - k3d-manager
 
+## [Unreleased] — sandbox rebuild hardening + GHCR PAT validation
+
+### Changed
+- `scripts/etc/argocd/applicationsets/services-git.yaml`: `targetRevision` reverted to hardcoded `main`; `${K3D_MANAGER_BRANCH}` envsubst variable removed — was only needed during v1.2.0 development (`23475ac0`)
+- `bin/acg-up`: removed `export K3D_MANAGER_BRANCH` — no longer required now that ApplicationSet tracks `main` (`23475ac0`)
+- `scripts/lib/acg/` subtree: pulled lib-acg `main` — extend timing fix (`9b39df02`); `_sanitizePhaseLabel` helper, dynamic `remainingMs` from live TTL API, screenshot on extend failure (`dec36c9f`)
+- `Makefile`: `GHCR_PAT ?=` (was `$(shell gh auth token 2>/dev/null)`) — OAuth token lacked `read:packages`; every `make up` was overwriting `ghcr-pull-secret` with an unusable token (`7bbac0d3`)
+
+### Fixed
+- `scripts/lib/acg/cdp.sh`: `../foundation` → `foundation` — path was broken when `cdp.sh` is loaded from inside the k3d-manager subtree context (`3c70c3a8`)
+- `services/shopping-cart-order/kustomization.yaml`: removed `SPRING_JPA_HIBERNATE_DDL_AUTO=update` workaround — no longer needed after upstream `shopping-cart-infra` UUID init SQL fix (`9aaa0cea`)
+- `services/shopping-cart-payment/`: added `postgres-payment-apps-externalsecret.yaml` (ESO, `creationPolicy: Merge`) — Vault-managed postgres password synced to `payment-db-credentials` instead of `CHANGE_ME` placeholder (`dfb65c73`)
+- `services-git.yaml`: added `ignoreDifferences` for `payment-db-credentials` Secret `/data` field — prevents ArgoCD `selfHeal` from reverting ESO-managed password on every reconcile (`dfb65c73`)
+- `bin/acg-up` Step 5: Vault PAT validated against `api.github.com/user` before applying to `ghcr-pull-secret`; prompts and saves replacement PAT to Vault if expired (`3a0901cc`)
+- `bin/rotate-ghcr-pat`: Vault PAT validated before use; falls through to interactive prompt if expired — prevents silently applying an unusable token to cluster (`3a0901cc`)
+- `bin/acg-up` Step 5: env-supplied `GHCR_PAT` validated against `api.github.com/user` before use; falls back to Vault if invalid — closes the bypass introduced by the now-removed Makefile OAuth fallback (`7bbac0d3`)
+
 ## [v1.2.0] — 2026-04-30 — lib-acg extraction + shopping-cart bootstrap + GHCR hardening
 
 ### Added
