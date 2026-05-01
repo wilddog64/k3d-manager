@@ -59,7 +59,7 @@ Cluster rebuilt post `make down`. Issues found and resolved:
 - `payment-db-credentials` had `CHANGE_ME` postgres password — fixed `dfb65c73`:
   - Added `services/shopping-cart-payment/postgres-payment-apps-externalsecret.yaml` (ESO, `creationPolicy: Merge`)
   - Added `ignoreDifferences` for `payment-db-credentials` Secret in `services-git.yaml` ApplicationSet
-- **shopping-cart-payment CI broken** — `aquasecurity/trivy-action@0.30.0` SHA invalid (`999f8d70`); image never pushed to GHCR. **Assigned to Codex** — spec: `docs/bugs/2026-05-01-shopping-cart-payment-ci-broken-trivy-sha.md`. Branch: `fix/ci-trivy-sha` in shopping-cart-payment.
+- **shopping-cart-payment CI broken** — FIXED (`4fa5fc1`). Bumped `build-push-deploy.yml` from `999f8d70` to `39c3072` in `shopping-cart-payment` branch `fix/ci-trivy-sha`, resolving the invalid `aquasecurity/trivy-action@0.30.0` pin. Spec: `docs/bugs/2026-05-01-shopping-cart-payment-ci-broken-trivy-sha.md`.
 
 Current ArgoCD status: basket ✅ frontend ✅ product-catalog ✅ order ✅ payment ❌ (image missing)
 
