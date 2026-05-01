@@ -1719,6 +1719,15 @@ function _copilot_review() {
    return "$rc"
 }
 
+function _ai_agent_review() {
+   local ai_func="${AI_REVIEW_FUNC:-copilot}"
+   local model="${AI_REVIEW_MODEL:-gpt-5.4-mini}"
+
+   case "$ai_func" in
+      copilot) _copilot_review --model "$model" "$@" ;;
+      *) _err "Unknown AI_REVIEW_FUNC: ${ai_func}. Supported: copilot" ;;
+   esac
+}
 
 function _ensure_cargo() {
    if _command_exist cargo ; then
