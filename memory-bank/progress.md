@@ -33,12 +33,12 @@ Pre-v1.0.5 detail removed; see `git log --tags` and `docs/retro/`.
 
 Spec: `docs/plans/v1.2.0-fix-orders-init-sql-and-security-config.md`
 
-- [x] **Fix 1** — `shopping-cart-infra` init SQL: replace SERIAL with UUID. PR open: https://github.com/wilddog64/shopping-cart-infra/pull/32 (CI ✅, Copilot ✅)
-- [x] **Fix 2** — `shopping-cart-order` SecurityConfig: add `/actuator/health/**`. PR open: https://github.com/wilddog64/shopping-cart-order/pull/27 (CI ✅, Copilot ✅)
-- [x] **Fix 3b** — `shopping-cart-order` namespace cleanup. PR open: https://github.com/wilddog64/shopping-cart-order/pull/28 (CI ✅, Copilot resolved ✅)
-- [x] **Fix 3c** — `shopping-cart-product-catalog` namespace cleanup. PR open: https://github.com/wilddog64/shopping-cart-product-catalog/pull/19 (CI ✅, Copilot resolved ✅)
-- [ ] **Post-Fix-1 cleanup** — remove `SPRING_JPA_HIBERNATE_DDL_AUTO=update` from `services/shopping-cart-order/kustomization.yaml` after Fix 1 merges.
-- [ ] **Post-Fix-2 cleanup** — remove TCP socket probe patches from `services/shopping-cart-order/kustomization.yaml` after Fix 2 AND RabbitMQHealthIndicator JAR fix both land.
+- [x] **Fix 1** — `shopping-cart-infra` init SQL UUID. Merged `0bf8b8ec` (PR #32).
+- [x] **Fix 2** — `shopping-cart-order` SecurityConfig `/actuator/health/**`. Merged `64f82fe3` (PR #27).
+- [x] **Fix 3b** — `shopping-cart-order` namespace cleanup. Merged `6195bd42` (PR #28).
+- [x] **Fix 3c** — `shopping-cart-product-catalog` namespace cleanup. Merged `19d5a2b7` (PR #19).
+- [ ] **Post-Fix-1 cleanup** — READY. Remove `SPRING_JPA_HIBERNATE_DDL_AUTO=update` from `services/shopping-cart-order/kustomization.yaml` on k3d-manager-v1.3.0.
+- [ ] **Post-Fix-2 cleanup** — BLOCKED on RabbitMQHealthIndicator JAR fix. Remove TCP socket probe patches only after that lands too.
 
 ---
 
