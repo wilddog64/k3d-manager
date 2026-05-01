@@ -17,6 +17,8 @@ Pre-v1.0.5 detail removed; see `git log --tags` and `docs/retro/`.
 
 ## v1.3.0 Track (branch: `k3d-manager-v1.3.0`)
 
+**PR #68 OPEN** — https://github.com/wilddog64/k3d-manager/pull/68 (CI queued, Copilot tagged)
+
 - [x] **`${K3D_MANAGER_BRANCH}` cleanup** — DONE `23475ac0`. Reverted to hardcoded `main` in `services-git.yaml`; removed export from `bin/acg-up`.
 - [x] **lib-acg subtree pull** — DONE `dec36c9f`. Extend timing fix (lib-acg PR #3, `9b39df02`) pulled in.
 - [ ] **ACG Watcher extend button** — extend works; post-extend modal not dismissed in CDP mode. Spec: `docs/bugs/2026-05-01-acg-extend-session-extended-modal-not-dismissed.md`. Assign to Codex.

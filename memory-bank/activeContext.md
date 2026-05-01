@@ -1,6 +1,10 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v1.3.0` (as of 2026-04-30)
+## Current Branch: `k3d-manager-v1.3.0` (as of 2026-05-01)
+
+**PR #68 OPEN** — https://github.com/wilddog64/k3d-manager/pull/68
+- CI queued (run `25227116723`); Copilot tagged; `mergeable: true`
+- Waiting for: CI green + Copilot review
 
 **v1.2.0 SHIPPED** — PR #67 merged to main (`f628c3cb`), tagged `v1.2.0`, released 2026-04-30.
 `enforce_admins` restored. Retro: `docs/retro/2026-04-30-v1.2.0-retrospective.md`.
