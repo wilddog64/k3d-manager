@@ -34,9 +34,16 @@ if [[ -t 0 ]]; then
   fi
 
   if [[ -n "${TOKEN:-}" ]]; then
-    echo "Using PAT from Vault..."
-  else
-    read -r -s -p "Paste new GitHub PAT (read:packages scope) and press Enter: " TOKEN
+    _pat_http=$(curl -s -o /dev/null -w "%{http_code}" -u "${SHOPPING_CART_ORG}:${TOKEN}" "https://api.github.com/user" 2>/dev/null || true)
+    if [[ "$_pat_http" == "200" ]]; then
+      echo "Using PAT from Vault..."
+    else
+      echo "⚠️  Vault PAT is expired (HTTP ${_pat_http}) — please paste a new one" >&2
+      TOKEN=""
+    fi
+  fi
+  if [[ -z "${TOKEN:-}" ]]; then
+    read -r -s -p "Paste new GitHub PAT (repo + read:packages) and press Enter: " TOKEN
     echo ""
   fi
 else

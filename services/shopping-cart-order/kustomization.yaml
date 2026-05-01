@@ -42,9 +42,6 @@ patches:
       kind: Deployment
   - patch: |-
       - op: add
-        path: /data/SPRING_JPA_HIBERNATE_DDL_AUTO
-        value: update
-      - op: add
         path: /data/SPRING_RABBITMQ_USERNAME
         value: guest
     target:

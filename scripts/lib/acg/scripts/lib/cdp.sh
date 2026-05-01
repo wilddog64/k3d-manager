@@ -7,7 +7,7 @@
 
 # Ensure _antigravity_browser_ready is available (provided by lib-foundation/system.sh)
 if ! declare -f _antigravity_browser_ready >/dev/null 2>&1; then
-  _CDP_FOUNDATION="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../foundation/scripts/lib" && pwd)"
+  _CDP_FOUNDATION="$(cd "$(dirname "${BASH_SOURCE[0]}")/foundation/scripts/lib" && pwd)"
   # shellcheck source=/dev/null
   [[ -f "${_CDP_FOUNDATION}/system.sh" ]] && source "${_CDP_FOUNDATION}/system.sh"
 fi
