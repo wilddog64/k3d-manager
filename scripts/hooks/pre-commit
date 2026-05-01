@@ -37,6 +37,8 @@ fi
 
 gate_var="${AGENT_LINT_GATE_VAR:-K3DM_ENABLE_AI}"
 if [[ "${!gate_var:-0}" == "1" ]]; then
+   export AGENT_LINT_AI_FUNC="_copilot_review"
+   export K3DM_ENABLE_AI="${K3DM_ENABLE_AI:-0}"
    if ! _agent_lint; then
       echo "Pre-commit hook: _agent_lint failed — fix architectural violations before committing" >&2
       exit 1
