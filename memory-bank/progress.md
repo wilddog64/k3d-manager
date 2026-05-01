@@ -19,7 +19,7 @@ Pre-v1.0.5 detail removed; see `git log --tags` and `docs/retro/`.
 
 - [x] **`${K3D_MANAGER_BRANCH}` cleanup** — DONE `23475ac0`. Reverted to hardcoded `main` in `services-git.yaml`; removed export from `bin/acg-up`.
 - [x] **lib-acg subtree pull** — DONE `dec36c9f`. Extend timing fix (lib-acg PR #3, `9b39df02`) pulled in.
-- [ ] **ACG Watcher extend button** — lib-acg fix merged; needs live validation on next sandbox run.
+- [ ] **ACG Watcher extend button** — extend works; post-extend modal not dismissed in CDP mode. Spec: `docs/bugs/2026-05-01-acg-extend-session-extended-modal-not-dismissed.md`. Assign to Codex.
 - [ ] **Keycloak deployment** — OPEN. Spec: `docs/plans/v1.2.0-deploy-keycloak.md`. Assign to Codex.
 - [ ] **LDAP hardcoded password** — OPEN. Spec: `docs/bugs/2026-04-26-ldap-users-hardcoded-test-password.md`.
 - [ ] **vault-bridge pod-origin traffic** — OPEN. `ClusterSecretStore/vault-backend` stays `Ready=False`. Spec: `docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md`.
