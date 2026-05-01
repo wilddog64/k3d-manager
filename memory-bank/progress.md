@@ -47,6 +47,7 @@ Spec: `docs/plans/v1.2.0-fix-orders-init-sql-and-security-config.md`
 - [x] **cdp.sh path bug** — `../foundation` → `foundation`; `3c70c3a8` (k3d-manager), `369ef9f` (lib-acg)
 - [x] **payment-db-credentials ESO** — `dfb65c73`; postgres password from Vault, ArgoCD ignoreDifferences
 - [x] **shopping-cart-payment CI** — FIXED. SHAs: `4fa5fc1` (trivy) + `ff5c6ad` (changelog) merged to `shopping-cart-payment` main directly. CI green (`25213671956`); `shopping-cart-payment:latest` pushed to GHCR. Spec: `docs/bugs/2026-05-01-shopping-cart-payment-ci-broken-trivy-sha.md`.
+- [ ] **ghcr-pull-secret PAT validation** — ASSIGNED to Codex. `acg-up` Step 5 and `rotate-ghcr-pat` apply Vault PAT without validating it; expired PAT causes all pods to ImagePullBackOff on rebuild. Spec: `docs/bugs/2026-05-01-ghcr-pat-validation-missing-acg-up-step5.md`.
 
 ---
 

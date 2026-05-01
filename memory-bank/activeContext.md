@@ -61,7 +61,8 @@ Cluster rebuilt post `make down`. Issues found and resolved:
   - Added `ignoreDifferences` for `payment-db-credentials` Secret in `services-git.yaml` ApplicationSet
 - **shopping-cart-payment CI broken** — FIXED. Codex commit `4fa5fc1` + CHANGELOG `ff5c6ad` landed on `shopping-cart-payment` `origin/main` directly (local branch tracked `origin/main`; no PR). CI run `25213671956` green: Trivy scan passed, `shopping-cart-payment:latest` pushed to GHCR. Spec: `docs/bugs/2026-05-01-shopping-cart-payment-ci-broken-trivy-sha.md`.
 
-Current ArgoCD status: basket ✅ frontend ✅ product-catalog ✅ order ✅ payment ⏳ (image now on GHCR; pending ArgoCD pull)
+Current ArgoCD status: basket ❌ frontend ❌ product-catalog ❌ order ❌ payment ❌ — all ImagePullBackOff; Vault PAT expired, ghcr-pull-secret has dead token.
+- **ghcr-pull-secret PAT validation** — ASSIGNED to Codex. Spec: `docs/bugs/2026-05-01-ghcr-pat-validation-missing-acg-up-step5.md`. Fix: validate Vault PAT in `acg-up` Step 5 + `rotate-ghcr-pat` before applying; prompt for new PAT if expired.
 
 ---
 
