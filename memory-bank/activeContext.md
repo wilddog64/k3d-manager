@@ -61,8 +61,8 @@ Cluster rebuilt post `make down`. Issues found and resolved:
   - Added `ignoreDifferences` for `payment-db-credentials` Secret in `services-git.yaml` ApplicationSet
 - **shopping-cart-payment CI broken** — FIXED. Codex commit `4fa5fc1` + CHANGELOG `ff5c6ad` landed on `shopping-cart-payment` `origin/main` directly (local branch tracked `origin/main`; no PR). CI run `25213671956` green: Trivy scan passed, `shopping-cart-payment:latest` pushed to GHCR. Spec: `docs/bugs/2026-05-01-shopping-cart-payment-ci-broken-trivy-sha.md`.
 
-Current ArgoCD status: basket ❌ frontend ❌ product-catalog ❌ order ❌ payment ❌ — all ImagePullBackOff; Vault PAT validation fix landed in `k3d-manager-v1.3.0` commit `3a0901cc`.
-- **ghcr-pull-secret PAT validation** — FIXED (`3a0901cc`). Spec: `docs/bugs/2026-05-01-ghcr-pat-validation-missing-acg-up-step5.md`. `acg-up` Step 5 and `rotate-ghcr-pat` now validate Vault PAT against `api.github.com/user` before use and prompt for a replacement if expired.
+Current ArgoCD status: basket ✅ frontend ✅ product-catalog ✅ order ✅ payment ✅ — all 1/1 Running as of 2026-05-01.
+- **ghcr-pull-secret PAT validation** — FIXED (`3a0901cc`). Vault PAT was expired; `rotate-ghcr-pat` applied via stdin path with valid PAT (`ghp_ngRECzD...`; rotate after session). All namespaces updated, pods restarted and healthy.
 
 ---
 
