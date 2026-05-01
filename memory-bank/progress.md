@@ -26,7 +26,7 @@ Pre-v1.0.5 detail removed; see `git log --tags` and `docs/retro/`.
 - [ ] **LDAP hardcoded password** — OPEN. Spec: `docs/bugs/2026-04-26-ldap-users-hardcoded-test-password.md`.
 - [ ] **vault-bridge pod-origin traffic** — OPEN. `ClusterSecretStore/vault-backend` stays `Ready=False`. Spec: `docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md`.
 - [ ] **k3d-manager / shopping-cart decoupling** — OPEN (v1.3.0). Spec: `docs/issues/2026-04-27-k3d-manager-shopping-cart-tight-coupling.md`.
-- [ ] **stage2 CI cluster health** — OPEN. Requires live OrbStack cluster on self-hosted runner; always fails in PR context. Needs label-gate or optional workflow step.
+- [x] **stage2 CI cluster health** — FIXED (`f4e7da4e`). CI now gates stage2 behind the `ci:cluster-tests` label, so PRs without the label skip the job and pass on lint + detect alone. Spec: `docs/bugs/2026-05-01-stage2-ci-always-fails-in-pr-context.md`.
 - [ ] **GCP E2E smoke test** — BLOCKED. Full `make up` on live GCP sandbox not verified.
 
 ---

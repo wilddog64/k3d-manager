@@ -79,7 +79,7 @@ Current ArgoCD status: basket ✅ frontend ✅ product-catalog ✅ order ✅ pay
 - **LDAP hardcoded password** — remove `userPassword` from LDIF; `_ldap_rotate_user_passwords` → Vault. Spec: `docs/bugs/2026-04-26-ldap-users-hardcoded-test-password.md`.
 - **vault-bridge pod-origin traffic** — `ClusterSecretStore/vault-backend` stays `Ready=False`. Spec: `docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md`.
 - **ACG Watcher extend button** — button not found during 1h TTL window. Spec: `docs/issues/2026-04-29-acg-watcher-extend-button-not-found.md`.
-- **stage2 CI always fails in PR context** — cluster health check requires live OrbStack/k3d on self-hosted runner; should be gated behind a label or made optional.
+- **stage2 CI always fails in PR context** — FIXED (`f4e7da4e`). CI now gates stage2 behind the `ci:cluster-tests` label, so PRs without the label skip the job and pass on lint + detect alone. Spec: `docs/bugs/2026-05-01-stage2-ci-always-fails-in-pr-context.md`.
 - **GCP E2E smoke test** — BLOCKED. Full `make up` end-to-end on live GCP sandbox not verified.
 - **ACG Watcher / Extend button** — OPEN. See spec above.
 - **Orchestration Fragility** — OPEN. `docs/bugs/2026-04-23-infra-orchestration-fragility.md`.
