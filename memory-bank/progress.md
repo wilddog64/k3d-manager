@@ -48,7 +48,7 @@ Spec: `docs/plans/v1.2.0-fix-orders-init-sql-and-security-config.md`
 - [x] **payment-db-credentials ESO** — `dfb65c73`; postgres password from Vault, ArgoCD ignoreDifferences
 - [x] **shopping-cart-payment CI** — FIXED. SHAs: `4fa5fc1` (trivy) + `ff5c6ad` (changelog) merged to `shopping-cart-payment` main directly. CI green (`25213671956`); `shopping-cart-payment:latest` pushed to GHCR. Spec: `docs/bugs/2026-05-01-shopping-cart-payment-ci-broken-trivy-sha.md`.
 - [x] **ghcr-pull-secret PAT validation** — FIXED (`3a0901cc`). `acg-up` Step 5 and `rotate-ghcr-pat` now validate Vault PAT against `api.github.com/user` before use and prompt for a replacement if expired. Spec: `docs/bugs/2026-05-01-ghcr-pat-validation-missing-acg-up-step5.md`.
-- [ ] **Makefile OAuth fallback for GHCR_PAT** — ASSIGNED to Codex. `Makefile` line 7 sets `GHCR_PAT=$(gh auth token)`, bypassing Vault validation on every `make up`. Fix: remove OAuth fallback + add env-var validation in `acg-up`. Spec: `docs/bugs/2026-05-01-makefile-ghcr-pat-oauth-fallback.md`.
+- [x] **Makefile OAuth fallback for GHCR_PAT** — FIXED (`7bbac0d3`). `Makefile` now leaves `GHCR_PAT` empty by default, and `acg-up` validates env-supplied PATs against `api.github.com/user` before applying them. Spec: `docs/bugs/2026-05-01-makefile-ghcr-pat-oauth-fallback.md`.
 
 ---
 

@@ -63,6 +63,7 @@ Cluster rebuilt post `make down`. Issues found and resolved:
 
 Current ArgoCD status: basket ✅ frontend ✅ product-catalog ✅ order ✅ payment ✅ — all 1/1 Running as of 2026-05-01.
 - **ghcr-pull-secret PAT validation** — FIXED (`3a0901cc`). Vault PAT was expired; `rotate-ghcr-pat` applied via stdin path with valid PAT (`ghp_ngRECzD...`; rotate after session). All namespaces updated, pods restarted and healthy.
+- **Makefile OAuth fallback for GHCR_PAT** — FIXED (`7bbac0d3`). `Makefile` now leaves `GHCR_PAT` empty by default, and `acg-up` validates env-supplied PATs against `api.github.com/user` before applying them. Spec: `docs/bugs/2026-05-01-makefile-ghcr-pat-oauth-fallback.md`.
 
 ---
 
