@@ -4,7 +4,7 @@
 .DEFAULT_GOAL := help
 
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
-GHCR_PAT ?= $(shell gh auth token 2>/dev/null)
+GHCR_PAT ?=
 
 .PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision help
 

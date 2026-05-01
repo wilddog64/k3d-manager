@@ -203,6 +203,15 @@ fi
 _info "[acg-up] Step 5/12 — Creating ghcr-pull-secret in all app namespaces..."
 _ghcr_pat="${GHCR_PAT:-}"
 _github_user="${GITHUB_USERNAME:-wilddog64}"
+if [[ -n "$_ghcr_pat" ]]; then
+  _pat_http=$(curl -s -o /dev/null -w "%{http_code}" -u "${_github_user}:${_ghcr_pat}" "https://api.github.com/user" 2>/dev/null || true)
+  if [[ "$_pat_http" != "200" ]]; then
+    _info "[acg-up] GHCR_PAT env var is invalid (HTTP ${_pat_http}) — falling back to Vault"
+    _ghcr_pat=""
+  else
+    _info "[acg-up] using validated GHCR_PAT from env for ghcr-pull-secret"
+  fi
+fi
 if [[ -z "$_ghcr_pat" ]]; then
   _info "[acg-up] GHCR_PAT not in env — checking Vault..."
   _vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d 2>/dev/null || true)
