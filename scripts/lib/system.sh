@@ -1653,10 +1653,6 @@ function _copilot_prompt_guard() {
 }
 
 function _copilot_review() {
-   if [[ "${K3DM_ENABLE_AI:-0}" != "1" ]]; then
-      _err "Copilot CLI is disabled. Set K3DM_ENABLE_AI=1 to enable AI tooling."
-   fi
-
    _safe_path
    _ensure_copilot_cli
 
