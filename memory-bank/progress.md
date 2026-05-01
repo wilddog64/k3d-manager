@@ -6,58 +6,31 @@ The authoritative release record lives in `docs/releases.md`, `CHANGE.md`, and `
 
 **Most recent shipped:**
 
+- v1.4.0 — Copilot CLI plugin + `_copilot_review` rename + pre-commit AI lint wiring (PR #69, `a805dee0`, 2026-05-01)
+- v1.3.0 — Sandbox rebuild hardening: GHCR PAT validation, payment ESO, cdp.sh path, stage2 gate (PR #68, `8136c4e3`, 2026-05-01)
 - v1.2.0 — lib-acg extraction + shopping-cart bootstrap + GHCR hardening (PR #67, `f628c3cb`, 2026-04-30)
 - v1.1.0 — Unified ACG automation AWS + GCP (PR #65, `e013d23b`, 2026-04-25)
-- v1.0.6 — AWS SSM support for `k3s-aws` (PR #64, `a54e152f`, 2026-04-11)
-- v1.0.5 — antigravity decoupling + LDAP Vault KV seeding + Copilot fix-up (PR #62/#63, `71c88b05`, 2026-04-11)
 
-Pre-v1.0.5 detail removed; see `git log --tags` and `docs/retro/`.
+Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 
 ---
 
-## v1.3.0 Track (branch: `k3d-manager-v1.3.0`)
+## v1.4.1 Track (branch: `k3d-manager-v1.4.1`)
 
-**PR #68 OPEN** — https://github.com/wilddog64/k3d-manager/pull/68 (CI queued, Copilot tagged)
-
-- [x] **`${K3D_MANAGER_BRANCH}` cleanup** — DONE `23475ac0`. Reverted to hardcoded `main` in `services-git.yaml`; removed export from `bin/acg-up`.
-- [x] **lib-acg subtree pull** — DONE `dec36c9f`. Extend timing fix (lib-acg PR #3, `9b39df02`) pulled in.
-- [ ] **ACG Watcher extend button** — extend works; post-extend modal not dismissed in CDP mode. Spec: `docs/bugs/2026-05-01-acg-extend-session-extended-modal-not-dismissed.md`. Assign to Codex.
-- [ ] **Keycloak deployment** — OPEN. Spec: `docs/plans/v1.2.0-deploy-keycloak.md`. Assign to Codex.
-- [ ] **LDAP hardcoded password** — OPEN. Spec: `docs/bugs/2026-04-26-ldap-users-hardcoded-test-password.md`.
-- [ ] **vault-bridge pod-origin traffic** — OPEN. `ClusterSecretStore/vault-backend` stays `Ready=False`. Spec: `docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md`.
-- [ ] **k3d-manager / shopping-cart decoupling** — OPEN (v1.3.0). Spec: `docs/issues/2026-04-27-k3d-manager-shopping-cart-tight-coupling.md`.
-- [x] **stage2 CI cluster health** — FIXED (`f4e7da4e`). CI now gates stage2 behind the `ci:cluster-tests` label, so PRs without the label skip the job and pass on lint + detect alone. Spec: `docs/bugs/2026-05-01-stage2-ci-always-fails-in-pr-context.md`.
-- [ ] **GCP E2E smoke test** — BLOCKED. Full `make up` on live GCP sandbox not verified.
-
-## v1.4.0 Track (branch: `k3d-manager-v1.4.0`)
-
-- [x] **Copilot public functions** — DONE (`a7ad7fac`). Added `scripts/plugins/copilot.sh` with `copilot_triage_pod` and `copilot_draft_spec`, and wired `AGENT_LINT_AI_FUNC="_copilot_review"` in the pre-commit hook. Spec: `docs/plans/v1.4.0-copilot-review-public-functions.md`.
-- [x] **BATS rename fix** — DONE (`3865cd82`). Updated `k3d_manager_copilot.bats` to call `_copilot_review` after the rename.
-- [x] **Docs** — DONE (`d64ddecf`). Added `docs/howto/copilot.md`; updated `docs/api/functions.md` and README Plugins table + How-To section.
-- [x] **PR #69** — MERGED `a805dee0`. CI green. All 9 Copilot findings addressed + resolved. enforce_admins restored.
+- [ ] **`_ai_agent_review` abstraction** — OPEN. Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`. Assign to Codex.
+- [ ] **BATS suite for copilot plugin** — OPEN. `scripts/tests/plugins/copilot.bats`. Follow-on from v1.4.0 Copilot finding.
 
 ---
 
-## v1.2.1 Track (shopping-cart upstream fixes — Codex)
+## v1.3.0 Carry-forward (open items not yet resolved)
 
-Spec: `docs/plans/v1.2.0-fix-orders-init-sql-and-security-config.md`
-
-- [x] **Fix 1** — `shopping-cart-infra` init SQL UUID. Merged `0bf8b8ec` (PR #32).
-- [x] **Fix 2** — `shopping-cart-order` SecurityConfig `/actuator/health/**`. Merged `64f82fe3` (PR #27).
-- [x] **Fix 3b** — `shopping-cart-order` namespace cleanup. Merged `6195bd42` (PR #28).
-- [x] **Fix 3c** — `shopping-cart-product-catalog` namespace cleanup. Merged `19d5a2b7` (PR #19).
-- [x] **Post-Fix-1 cleanup** — DONE `9aaa0cea`. Removed `SPRING_JPA_HIBERNATE_DDL_AUTO=update` from `services/shopping-cart-order/kustomization.yaml`.
-- [ ] **Post-Fix-2 cleanup** — BLOCKED on RabbitMQHealthIndicator JAR fix. Remove TCP socket probe patches only after that lands too.
-
----
-
-## Sandbox Rebuild Fixes — 2026-05-01
-
-- [x] **cdp.sh path bug** — `../foundation` → `foundation`; `3c70c3a8` (k3d-manager), `369ef9f` (lib-acg)
-- [x] **payment-db-credentials ESO** — `dfb65c73`; postgres password from Vault, ArgoCD ignoreDifferences
-- [x] **shopping-cart-payment CI** — FIXED. SHAs: `4fa5fc1` (trivy) + `ff5c6ad` (changelog) merged to `shopping-cart-payment` main directly. CI green (`25213671956`); `shopping-cart-payment:latest` pushed to GHCR. Spec: `docs/bugs/2026-05-01-shopping-cart-payment-ci-broken-trivy-sha.md`.
-- [x] **ghcr-pull-secret PAT validation** — FIXED (`3a0901cc`). `acg-up` Step 5 and `rotate-ghcr-pat` now validate Vault PAT against `api.github.com/user` before use and prompt for a replacement if expired. Spec: `docs/bugs/2026-05-01-ghcr-pat-validation-missing-acg-up-step5.md`.
-- [x] **Makefile OAuth fallback for GHCR_PAT** — FIXED (`7bbac0d3`). `Makefile` now leaves `GHCR_PAT` empty by default, and `acg-up` validates env-supplied PATs against `api.github.com/user` before applying them. Spec: `docs/bugs/2026-05-01-makefile-ghcr-pat-oauth-fallback.md`.
+- [ ] **ACG Watcher extend button** — post-extend modal not dismissed. Spec: `docs/bugs/2026-05-01-acg-extend-session-extended-modal-not-dismissed.md`.
+- [ ] **Keycloak deployment** — Spec: `docs/plans/v1.2.0-deploy-keycloak.md`. Assign to Codex.
+- [ ] **LDAP hardcoded password** — Spec: `docs/bugs/2026-04-26-ldap-users-hardcoded-test-password.md`.
+- [ ] **vault-bridge pod-origin traffic** — `ClusterSecretStore/vault-backend` stays `Ready=False`. Spec: `docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md`.
+- [ ] **k3d-manager / shopping-cart decoupling** — Spec: `docs/issues/2026-04-27-k3d-manager-shopping-cart-tight-coupling.md`.
+- [ ] **GCP E2E smoke test** — BLOCKED.
+- [ ] **Post-Fix-2 cleanup** — BLOCKED on RabbitMQHealthIndicator JAR fix.
 
 ---
 
