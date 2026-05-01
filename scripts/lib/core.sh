@@ -1,4 +1,4 @@
-
+# shellcheck shell=bash
 function _cluster_provider() {
    local provider="${K3D_MANAGER_PROVIDER:-${K3DMGR_PROVIDER:-${CLUSTER_PROVIDER:-}}}"
 
@@ -16,7 +16,7 @@ function _cluster_provider() {
    provider="$(printf '%s' "$provider" | tr '[:upper:]' '[:lower:]')"
 
    case "$provider" in
-      k3d|orbstack|k3s|k3s-aws|k3s-gcp)
+      k3d|orbstack|k3s)
          printf '%s' "$provider"
          ;;
       *)
@@ -72,6 +72,20 @@ PY
    if ! _run_command --prefer-sudo -- python3 - "$port" <<<"$script"; then
       _err "Port $port is already in use"
    fi
+}
+
+function _resolve_script_dir() {
+   local src="${BASH_SOURCE[1]}"
+   local dir
+   while [[ -h "$src" ]]; do
+      dir="$(cd -P "$(dirname "$src")" && pwd)"
+      src="$(readlink "$src")"
+      if [[ "$src" != /* ]]; then
+         src="$dir/$src"
+      fi
+   done
+   dir="$(cd -P "$(dirname "$src")" && pwd)"
+   printf '%s\n' "$dir"
 }
 
 function _k3s_asset_dir() {
@@ -419,10 +433,7 @@ function _install_docker() {
 
    case "$platform" in
       mac)
-         if ! _command_exist docker; then
-            _err "Docker not found. On macOS, Docker is provided by OrbStack — please install OrbStack and ensure it is running."
-         fi
-         _info "Docker available via OrbStack."
+         _info "On macOS, Docker is provided by OrbStack — no installation required."
          ;;
       debian|wsl)
          _install_debian_docker
@@ -457,7 +468,7 @@ function _install_istioctl() {
       echo installing istioctl
       tmp_script=$(mktemp -t istioctl-fetch.XXXXXX)
       trap 'rm -rf /tmp/istio-*' EXIT TERM
-      pushd /tmp || return
+      pushd /tmp >/dev/null || return 1
       curl -f -s https://raw.githubusercontent.com/istio/istio/master/release/downloadIstioCandidate.sh -o "$tmp_script"
       istio_bin=$(bash "$tmp_script" | perl -nle 'print $1 if /add the (.*) directory/')
       if [[ -z "$istio_bin" ]]; then
@@ -469,7 +480,7 @@ function _install_istioctl() {
       else
          _run_command --prefer-sudo -- cp -v "$istio_bin/istioctl" "${install_dir}/"
       fi
-      popd || return
+      popd >/dev/null || return 1
    fi
 
 }
@@ -699,9 +710,6 @@ function deploy_cluster() {
             provider_cli="${1#*=}"
             shift
             ;;
-         --confirm)
-            shift
-            ;;
          -h|--help)
             show_help=1
             shift
@@ -731,19 +739,6 @@ Options:
   -h, --help          Show this help message.
 EOF
       return 0
-   fi
-
-   local _env_provider="${CLUSTER_PROVIDER:-${K3D_MANAGER_PROVIDER:-}}"
-   if [[ ${#positional[@]} -eq 0 && -z "${provider_cli}" && "${force_k3s}" -eq 0 && -z "${_env_provider}" ]]; then
-      cat >&2 <<'EOF'
-Usage: deploy_cluster [options] [cluster_name]
-
-Options:
-  -f, --force-k3s     Skip the provider prompt and deploy using k3s.
-  --provider <name>   Explicitly set the provider (k3d or k3s).
-  -h, --help          Show this help message.
-EOF
-      return 1
    fi
 
    local platform="" platform_msg=""
@@ -779,7 +774,7 @@ EOF
    fi
 
    case "$provider" in
-      k3d|orbstack|k3s|k3s-aws|k3s-gcp)
+      k3d|orbstack|k3s)
          ;;
       "")
          _err "Failed to determine cluster provider."
@@ -796,7 +791,7 @@ EOF
       _cluster_provider_set_active "$provider"
    fi
 
-   local cluster_name_value="${positional[0]:-${CLUSTER_NAME:-k3d-cluster}}"
+   local cluster_name_value="${positional[0]:-${CLUSTER_NAME:-}}"
    if [[ -n "$cluster_name_value" ]]; then
       positional=("$cluster_name_value" "${positional[@]:1}")
       export CLUSTER_NAME="$cluster_name_value"

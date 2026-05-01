@@ -1,92 +1,102 @@
-# Active Context — k3d-manager
+# Active Context — lib-foundation
 
-## Current Branch: `k3d-manager-v1.4.0` (as of 2026-05-01)
+## Current State: `feat/v0.3.15` (as of 2026-03-31)
 
-**PR #68 OPEN** — https://github.com/wilddog64/k3d-manager/pull/68
-- CI queued (run `25227116723`); Copilot tagged; `mergeable: true`
-- Waiting for: CI green + Copilot review
-
-**v1.2.0 SHIPPED** — PR #67 merged to main (`f628c3cb`), tagged `v1.2.0`, released 2026-04-30.
-`enforce_admins` restored. Retro: `docs/retro/2026-04-30-v1.2.0-retrospective.md`.
-
-## v1.2.0 Summary (SHIPPED)
-
-Key deliverables:
-- `scripts/lib/acg/` subtree from `wilddog64/lib-acg` — ACG/GCP Playwright automation extracted
-- `gemini.sh` (renamed from `antigravity.sh`) — browser automation plugin
-- `deploy_shopping_cart_data()` — full data layer auto-bootstrap in `acg-up` Step 10b
-- GHCR Vault-first fail-closed — no `gh auth token` OAuth fallback
-- ArgoCD launchd KeepAlive port-forward (localhost:8080)
-- ApplicationSet `${K3D_MANAGER_BRANCH}` envsubst variable
-- Vault sealed-state auto-recovery; tunnel reverse-port fix (18200)
-- `services/shopping-cart-namespace/` — namespace ownership (partial SharedResourceWarning fix)
-
-All v1.2.0 bug/issue detail in `docs/bugs/`, `docs/issues/`, and `git log`.
+**v0.3.11 SHIPPED** — PR #17 merged to main (`2625683`) 2026-03-25. Tagged v0.3.11, GitHub release created. `enforce_admins` restored.
+**v0.3.12 SHIPPED** — PR #18 squash-merged to main (`91340d62`) 2026-03-25. Tagged v0.3.12, GitHub release created. `enforce_admins` restored. Antigravity IDE install + Playwright MCP config helpers.
+**v0.3.13 SHIPPED** — PR #19 squash-merged to main (`e870c6d9`) 2026-03-25. Tagged v0.3.13, GitHub release created. `enforce_admins` restored. Fix `_antigravity_browser_ready` curl probe (`_run_command --soft`).
+**v0.3.14 SHIPPED** — PR #20 squash-merged to main (`bbbaf053`) 2026-03-27. Tagged v0.3.14, GitHub release created. `enforce_admins` restored. 5 deferred Copilot PR #51 findings: agy binary detection, curl fast-fail, NUL audit loops, doc fix, CHANGE.md versioning.
+**feat/v0.3.15 ACTIVE** — branch cut from `bbbaf053` 2026-03-27.
 
 ---
 
-## v1.3.0 First Commits (DONE)
+## Purpose
 
-- `23475ac0` — `chore: revert K3D_MANAGER_BRANCH to hardcoded main` — `services-git.yaml` + `bin/acg-up` cleanup
-- `dec36c9f` — `chore(subtree): pull lib-acg main` — extend timing fix (PR #3, `9b39df02`); `_sanitizePhaseLabel`, dynamic `remainingMs`, screenshot on failure
+Shared Bash foundation library. Contains:
+- `scripts/lib/core.sh` — cluster lifecycle, provider abstraction, `_resolve_script_dir`
+- `scripts/lib/system.sh` — `_run_command`, `_run_command_resolve_sudo`, `_detect_platform`, package helpers, BATS install
+- `scripts/lib/agent_rigor.sh` — `_agent_checkpoint`, `_agent_audit`, `_agent_lint`
 
-## v1.4.0 First Commits (DONE)
-
-- `a7ad7fac` — `feat(copilot): add copilot_triage_pod + copilot_draft_spec public functions` — added `scripts/plugins/copilot.sh` and wired `AGENT_LINT_AI_FUNC="_copilot_review"` in the pre-commit hook.
-
----
-
-## v1.2.1 Open Items (shopping-cart upstream fixes — Codex)
-
-These are the remaining shopping-cart sync issues from v1.2.0. Spec: `docs/plans/v1.2.0-fix-orders-init-sql-and-security-config.md`.
-
-**Fix 1** — `shopping-cart-infra` (`fix/orders-init-sql-uuid`): Replace SERIAL with UUID in orders init SQL configmap. SHA: `c3c6a3d`.
-- After merge: remove `SPRING_JPA_HIBERNATE_DDL_AUTO=update` from `services/shopping-cart-order/kustomization.yaml`
-
-**Fix 2** — `shopping-cart-order` (`fix/actuator-health-security`): Add `/actuator/health/**` to SecurityConfig permit list. SHA: `9020be4`.
-- After merge + RabbitMQHealthIndicator JAR fix: remove TCP socket probe patches from `services/shopping-cart-order/kustomization.yaml`
-- NOTE: Fix 2 alone is NOT enough — JAR NPE still causes 503. Both must land.
-
-**Fix 3b** — `shopping-cart-order` (`fix/argocd-shared-namespace`): Remove `namespace.yaml` from `k8s/base/` and let k3d-manager own `shopping-cart-apps`. SHA: `3583e0d`.
-
-**Fix 3c** — `shopping-cart-product-catalog` (`fix/argocd-shared-namespace`): Remove `namespace.yaml` from `k8s/base/` and let k3d-manager own `shopping-cart-apps`. SHA: `b24f676`.
-
-- k3d-manager side already done (`services/shopping-cart-namespace/`)
-- After merge: SharedResourceWarning clears; `shopping-cart-product-catalog` goes Synced+Healthy
-
-**Final gate**: after all three cleanup steps done → `make down` → `make up` → `make sync-apps` → all 5 pods Running + all apps Synced+Healthy
+Consumed by downstream repos via git subtree pull.
+API reference: `docs/api/functions.md`
 
 ---
 
-## Sandbox Rebuild — 2026-05-01 (In Progress)
+## Version Roadmap
 
-Cluster rebuilt post `make down`. Issues found and resolved:
-
-- `cdp.sh` path bug (`../foundation` → `foundation`) — fixed `3c70c3a8`, applied to lib-acg standalone too (`369ef9f`)
-- GHCR PAT missing `repo` scope + `read:packages` — fixed by user rotating PAT
-- `payment-db-credentials` had `CHANGE_ME` postgres password — fixed `dfb65c73`:
-  - Added `services/shopping-cart-payment/postgres-payment-apps-externalsecret.yaml` (ESO, `creationPolicy: Merge`)
-  - Added `ignoreDifferences` for `payment-db-credentials` Secret in `services-git.yaml` ApplicationSet
-- **shopping-cart-payment CI broken** — FIXED. Codex commit `4fa5fc1` + CHANGELOG `ff5c6ad` landed on `shopping-cart-payment` `origin/main` directly (local branch tracked `origin/main`; no PR). CI run `25213671956` green: Trivy scan passed, `shopping-cart-payment:latest` pushed to GHCR. Spec: `docs/bugs/2026-05-01-shopping-cart-payment-ci-broken-trivy-sha.md`.
-
-Current ArgoCD status: basket ✅ frontend ✅ product-catalog ✅ order ✅ payment ✅ — all 1/1 Running as of 2026-05-01.
-- **ghcr-pull-secret PAT validation** — FIXED (`3a0901cc`). Vault PAT was expired; `rotate-ghcr-pat` applied via stdin path with valid PAT (`ghp_ngRECzD...`; rotate after session). All namespaces updated, pods restarted and healthy.
-- **Makefile OAuth fallback for GHCR_PAT** — FIXED (`7bbac0d3`). `Makefile` now leaves `GHCR_PAT` empty by default, and `acg-up` validates env-supplied PATs against `api.github.com/user` before applying them. Spec: `docs/bugs/2026-05-01-makefile-ghcr-pat-oauth-fallback.md`.
+| Version | Status | Notes |
+|---|---|---|
+| v0.1.0–v0.3.3 | released | See `docs/releases.md` |
+| v0.3.4 | **SHIPPED** | PR #11 merged (`dbfafe9`) — doc fixes + upstream lib sync; tagged + released 2026-03-22 |
+| v0.3.5 | **SHIPPED** | PR #10 merged (`2f895a99`) — doc-hygiene hook; 2026-03-23 |
+| v0.3.6 | **SHIPPED** | PR #12 merged (`d8b4c48`) — code-fence exclusion + CoreDNS Check 4; 2026-03-23 |
+| v0.3.7 | **SHIPPED** | PR #13 merged (`071c270`) — system.sh if-count cleanup; 2026-03-24; tagged v0.3.7 retroactively |
+| v0.3.8 | **SHIPPED** | PR #14 merged (`a669a63`) — tab indentation enforcement in `_agent_audit`; 2026-03-24; tagged v0.3.8 retroactively |
+| v0.3.9 | **SHIPPED** | PR #15 merged (`fb09921`) — release history backfill + memory-bank reconciliation; 2026-03-24; no tag (docs-only) |
+| v0.3.10 | **SHIPPED** | PR #16 merged (`c5662c9`) — `.clinerules` fix; 2026-03-24; no tag (docs-only) |
+| v0.3.11 | **SHIPPED** | PR #17 merged (`2625683`) — YAML IP check in `_agent_audit`; 2026-03-25; tagged v0.3.11 |
+| v0.3.12 | **SHIPPED** | PR #18 merged (`91340d62`) — Antigravity IDE + MCP helpers; 7 BATS; 2026-03-25; tagged v0.3.12 |
+| v0.3.13 | **SHIPPED** | PR #19 merged (`e870c6d9`) — `_antigravity_browser_ready` curl probe fix; 2026-03-25; tagged v0.3.13 |
+| v0.3.14 | **ACTIVE** | branch `feat/v0.3.14` cut from `e870c6d9` |
 
 ---
 
-## v1.3.0 Planned Work
+## Open Items
 
-- **`${K3D_MANAGER_BRANCH}` cleanup** — see FIRST COMMIT section above (immediate)
-- **shopping-cart / k3d-manager decoupling** — `services/`, `shopping_cart.sh`, Step 10b make k3d-manager app-specific. Fix: move overlays + data-layer bootstrap to `shopping-cart-infra/k8s-overlays/`; ApplicationSet repoURL/branch configurable. Spec: `docs/issues/2026-04-27-k3d-manager-shopping-cart-tight-coupling.md`.
-- **Keycloak deployment** — spec at `docs/plans/v1.2.0-deploy-keycloak.md`. Move ArgoCD to 9090; Keycloak on 8080; `testuser`/`testpassword`. Assign to Codex.
-- **LDAP hardcoded password** — remove `userPassword` from LDIF; `_ldap_rotate_user_passwords` → Vault. Spec: `docs/bugs/2026-04-26-ldap-users-hardcoded-test-password.md`.
-- **vault-bridge pod-origin traffic** — `ClusterSecretStore/vault-backend` stays `Ready=False`. Spec: `docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md`.
-- **ACG Watcher extend button** — button not found during 1h TTL window. Spec: `docs/issues/2026-04-29-acg-watcher-extend-button-not-found.md`.
-- **stage2 CI always fails in PR context** — FIXED (`f4e7da4e`). CI now gates stage2 behind the `ci:cluster-tests` label, so PRs without the label skip the job and pass on lint + detect alone. Spec: `docs/bugs/2026-05-01-stage2-ci-always-fails-in-pr-context.md`.
-- **GCP E2E smoke test** — BLOCKED. Full `make up` end-to-end on live GCP sandbox not verified.
-- **ACG Watcher / Extend button** — OPEN. See spec above.
-- **Orchestration Fragility** — OPEN. `docs/bugs/2026-04-23-infra-orchestration-fragility.md`.
-- **Dual-cluster Status UX** — OPEN. `docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`.
-- **Repo Retention Cleanup** — OPEN. `docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`.
-- **Whitespace Enforcement** — OPEN. Add trailing-whitespace detection to `_agent_lint` for `.js`/`.sh`.
+- [x] **PR #10 doc-hygiene hook** — staged-only `_agent_audit` BATS test added in commit `bdd60e7`; spec `docs/plans/v0.3.5-agent-audit-staged-only-test.md`. Branch: `feat/doc-hygiene-hook`.
+- [x] **Doc hygiene staged-content read** — commit `d00bccb` implements `_dh_grep` index reader per `docs/plans/v0.3.5-doc-hygiene-staged-content-read.md`; branch pushed `feat/doc-hygiene-hook`.
+- [x] **Doc hygiene staged-mode follow-ups** — commit `aeb1396` localizes `_DHC_STAGED`, gates staged file existence via `git cat-file`, and replaces staged-mode BATS per `docs/plans/v0.3.5-doc-hygiene-copilot-pr10-round2.md`.
+- [ ] **k3d-manager subtree pull** — pull v0.3.5 into k3d-manager (PR #10 now merged)
+- [x] **v0.3.6: Check 2 code-fence exclusion** — commit `7751068` adds `_dh_strip_fences`, optional `_dh_grep --strip-fences`, and 3 BATS tests per `docs/plans/v0.3.6-doc-hygiene-codefence-exclusion.md`.
+- [x] **v0.3.6: CoreDNS Check 4** — commit `c352c1b` adds YAML-only warn on `<svc>.<ns>.svc(.cluster.local)` + 4 BATS tests per `docs/plans/v0.3.5-doc-hygiene-coredns-check.md`.
+- [x] **v0.3.6: indented fence fix** — commit `02e7418` updates `_dh_strip_fences` to handle indented fences + adds indented BATS per `docs/plans/v0.3.6-doc-hygiene-indented-fence-fix.md`.
+- [x] **v0.3.11: YAML hardcoded IP check** — commit `11e653b` adds staged `.yaml/.yml` IP detection to `_agent_audit` per `docs/plans/v0.3.11-agent-audit-yaml-ip-check.md`.
+- [x] `rigor-cli` — repo bootstrapped (commit `a1c034f`), bash 3.2 fix (`8ae57bc`), gist installer (`310fd16`); lib-foundation spec: `docs/plans/v0.3.10-rigor-cli-init.md`; rigor-cli specs tracked in that repo (`plans/v0.1.1-mapfile-compat.md`, `plans/v0.1.1-gist-install-script.md`).
+- [x] **v0.3.12: Antigravity helpers** — commit `ae0e8b9` adds `_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready` per `docs/plans/v0.3.12-ensure-antigravity.md`.
+- [x] **v0.3.13: antigravity browser probe fix** — commit `9350ecd` switches `_antigravity_browser_ready` to `_run_command --soft -- curl` per `docs/plans/v0.3.13-antigravity-browser-ready-fix.md`.
+- [x] **v0.3.14: k3d-manager Copilot PR #51 deferred findings** — `e52b819` fixes all 5 upstream gaps per `docs/plans/v0.3.14-copilot-pr51-deferred-fixes.md`:
+  - `_ensure_antigravity_ide` now detects `agy` binaries first
+  - `_antigravity_browser_ready` fails fast when `curl` missing
+  - `_agent_audit` tab scan iterates staged files via NUL-delimited loop
+  - `docs/api/functions.md` explains `PLAYWRIGHT_MCP_VERSION` pinned MCP default
+  - `CHANGE.md` versions the v0.3.12/v0.3.13 release notes
+- [ ] `shopping-carts` as consumer (future)
+
+---
+
+## Key Contracts (must not change without coordinating all consumers)
+
+- `_run_command [--prefer-sudo|--require-sudo|--interactive-sudo|--probe '<subcmd>'|--quiet|--soft] -- <cmd>`
+- `_detect_platform` → `mac | wsl | debian | redhat | linux`
+- `_cluster_provider` → `k3d | k3s | orbstack`
+- `_resolve_script_dir` → absolute canonical path of calling script's real directory
+- `_DCRS_PROVIDER` — global temp set by `_deploy_cluster_resolve_provider` (no command substitution — preserves TTY)
+- `_RCRS_RUNNER` — global temp set by `_run_command_resolve_sudo`
+
+---
+
+## Consumers
+
+| Repo | Integration | Status |
+|---|---|---|
+| `k3d-manager` | git subtree at `scripts/lib/foundation/` | subtree pull to v0.3.13 pending |
+| `rigor-cli` | git subtree at `scripts/lib/foundation/` | subtree pull to v0.3.13 pending |
+| `shopping-carts` | git subtree (planned) | future |
+
+---
+
+## Engineering Protocol
+
+- **Tests**: always run with `env -i PATH="/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'bats scripts/tests/lib/'`
+- **shellcheck**: run on every touched `.sh` file before commit
+- **No bare sudo**: always `_run_command --interactive-sudo` for install helpers, `--prefer-sudo` for non-interactive
+- **All changes originate here** — never edit consumer subtree copies directly
+- **Release flow**: PR → merge → tag → GitHub release → consumers run `git subtree pull`
+
+## Lessons Learned
+
+- `local -n` nameref requires bash 4.3+ — use global temp vars (`_RCRS_RUNNER`, `_DCRS_PROVIDER`) for output from helpers
+- Command substitution `$()` creates a subshell — `[[ -t 0 && -t 1 ]]` is always false inside; use global temp vars instead
+- `--prefer-sudo` silently drops to non-root when password sudo required — use `--interactive-sudo` for install helpers
+- `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override in consumers
+- BATS must run with `env -i` — ambient `SCRIPT_DIR` causes false passes

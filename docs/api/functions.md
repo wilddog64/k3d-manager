@@ -1,143 +1,206 @@
-# Public Functions Reference
+# lib-foundation API Reference
 
-All functions callable via `./scripts/k3d-manager <function> [args]`.
-
-Use `-h` or `--help` with any function for a brief usage message:
+Source the relevant files and call functions directly:
 
 ```bash
-./scripts/k3d-manager create_cluster -h
-./scripts/k3d-manager deploy_vault -h
+source "$(dirname "$0")/lib/system.sh"
+source "$(dirname "$0")/lib/core.sh"
+source "$(dirname "$0")/lib/agent_rigor.sh"
 ```
 
-## Core
+## system.sh — Command Execution & Platform Utilities
 
-| Function | Location | Description |
-|---|---|---|
-| `create_cluster` | `scripts/lib/core.sh` | Create a cluster for the active provider |
-| `destroy_cluster` | `scripts/lib/core.sh` | Delete the active provider's cluster |
-| `deploy_cluster` | `scripts/lib/core.sh` | Provider-aware bootstrap (k3d or k3s) plus Istio |
-| `expose_ingress` | `scripts/lib/core.sh` | Expose the cluster ingress externally |
-| `setup_ingress_forward` | `scripts/lib/core.sh` | Set up port-forwarding for the ingress |
-| `status_ingress_forward` | `scripts/lib/core.sh` | Show ingress forward status |
-| `remove_ingress_forward` | `scripts/lib/core.sh` | Tear down ingress port-forwarding |
+### Command Execution
 
-## Tests
-
-| Function | Location | Description |
-|---|---|---|
-| `test_istio` | `scripts/lib/test.sh` | Run Istio validation tests |
-| `test_vault` | `scripts/lib/test.sh` | Run Vault smoke tests |
-| `test_eso` | `scripts/lib/test.sh` | Run ESO smoke tests |
-| `test_jenkins` | `scripts/lib/test.sh` | Run Jenkins smoke tests |
-| `test_jenkins_smoke` | `scripts/lib/test.sh` | Run full Jenkins smoke test suite |
-| `test_keycloak` | `scripts/plugins/keycloak.sh` | Run Keycloak smoke tests |
-| `test_cert_rotation` | `scripts/lib/test.sh` | Validate TLS certificate rotation |
-| `test_nfs_connectivity` | `scripts/lib/test.sh` | Check network connectivity to NFS |
-| `test_nfs_direct` | `scripts/lib/test.sh` | Directly mount NFS for troubleshooting |
-
-## Plugins
-
-| Function | Location | Description |
-|---|---|---|
-| `deploy_vault` | `scripts/plugins/vault.sh` | Deploy HashiCorp Vault |
-| `configure_vault_app_auth` | `scripts/plugins/vault.sh` | Register app cluster Kubernetes auth mount in Vault |
-| `deploy_eso` | `scripts/plugins/eso.sh` | Deploy External Secrets Operator |
-| `deploy_argocd` | `scripts/plugins/argocd.sh` | Deploy ArgoCD |
-| `deploy_argocd_bootstrap` | `scripts/plugins/argocd.sh` | Bootstrap ArgoCD with initial apps |
-| `deploy_keycloak` | `scripts/plugins/keycloak.sh` | Deploy Keycloak identity provider |
-| `deploy_jenkins` | `scripts/plugins/jenkins.sh` | Deploy Jenkins |
-| `deploy_ldap` | `scripts/plugins/ldap.sh` | Deploy OpenLDAP directory service |
-| `deploy_ad` | `scripts/plugins/ldap.sh` | Deploy Active Directory schema (local dev) |
-| `deploy_smb_csi` | `scripts/plugins/smb-csi.sh` | Deploy SMB CSI driver |
-| `create_az_sp` | `scripts/plugins/azure.sh` | Create an Azure service principal |
-| `deploy_azure_eso` | `scripts/plugins/azure.sh` | Deploy Azure ESO resources |
-| `eso_akv` | `scripts/plugins/azure.sh` | Manage Azure Key Vault ESO integration |
-| `configure_vault_argocd_repos` | `scripts/plugins/argocd.sh` | Configure Vault-managed deploy keys for ArgoCD repos |
-| `deploy_cert_manager` | `scripts/plugins/cert-manager.sh` | Install cert-manager and configure ACME ClusterIssuers |
-| `add_ubuntu_k3s_cluster` | `scripts/plugins/shopping_cart.sh` | Export Ubuntu kubeconfig and register cluster in ArgoCD |
-| `register_shopping_cart_apps` | `scripts/plugins/shopping_cart.sh` | Apply shopping cart ArgoCD Application CRs |
-| `hello` | `scripts/plugins/hello.sh` | Example plugin |
-| `tunnel_start` | `scripts/plugins/tunnel.sh` | Start autossh SSH tunnel with launchd persistence |
-| `tunnel_stop` | `scripts/plugins/tunnel.sh` | Stop the SSH tunnel and unload launchd job |
-| `tunnel_status` | `scripts/plugins/tunnel.sh` | Show tunnel process and launchd status |
-| `deploy_app_cluster` | `scripts/plugins/shopping_cart.sh` | Install k3s on EC2 via k3sup and merge kubeconfig |
-| `acg_get_credentials` | `scripts/plugins/acg.sh` | Extract AWS credentials from Pluralsight Cloud Access via Playwright persistent context and write to `~/.aws/credentials` |
-| `acg_import_credentials` | `scripts/plugins/acg.sh` | Deprecated alias for `aws_import_credentials` — use `aws_import_credentials` instead |
-| `acg_provision` | `scripts/plugins/acg.sh` | Provision ACG sandbox 3-node cluster via CloudFormation (server + 2 agents); `--recreate` tears down and re-provisions |
-| `acg_status` | `scripts/plugins/acg.sh` | Show ACG instance state, public IP, and k3s health |
-| `acg_extend` | `scripts/plugins/acg.sh` | Open ACG sandbox page to extend TTL (+4h) |
-| `acg_watch` | `scripts/plugins/acg.sh` | Background TTL watcher — extends sandbox TTL every 3.5h while EC2 instance is alive |
-| `acg_teardown` | `scripts/plugins/acg.sh` | Delete ACG CloudFormation stack and remove ubuntu-k3s kubeconfig context |
-| `aws_import_credentials` | `scripts/plugins/aws.sh` | Write AWS credentials from stdin to `~/.aws/credentials`; supports CSV, quoted/unquoted export, Pluralsight label, and credentials file formats |
-| `gemini_install` | `scripts/plugins/gemini.sh` | Verify full Gemini stack installed (Node.js, gemini CLI, IDE, Playwright MCP) |
-| `gemini_trigger_copilot_review` | `scripts/plugins/gemini.sh` | Trigger GitHub Copilot coding agent task via Playwright CDP automation |
-| `gemini_poll_task` | `scripts/plugins/gemini.sh` | Poll a Copilot coding agent task until complete; print full output verbatim |
-| `deploy_shopping_cart_data` | `scripts/plugins/shopping_cart.sh` | Deploy PostgreSQL (orders/payment/products), Redis cart, RabbitMQ; align passwords to `CHANGE_ME`; create `rabbitmq-credentials` and `redis-cart-secret` |
-| `acg_extend_playwright` | `scripts/plugins/acg.sh` | Extend ACG sandbox TTL via Playwright automation (public dispatcher entry point for `_acg_extend_playwright`) |
-| `ssm_wait` | `scripts/plugins/ssm.sh` | Wait until an EC2 instance is registered and reachable via SSM (polls `ssm describe-instance-information`) |
-| `ssm_exec` | `scripts/plugins/ssm.sh` | Run a shell command on an EC2 instance via SSM `send-command`; prints command output/results after execution |
-| `ssm_tunnel` | `scripts/plugins/ssm.sh` | Open an SSM port-forward tunnel to an EC2 instance (wraps `aws ssm start-session --document-name AWS-StartPortForwardingSession`) |
-| `register_app_cluster` | `scripts/plugins/argocd.sh` | Register the app cluster (ubuntu-k3s) as an ArgoCD managed cluster |
-| `vcluster_create` | `scripts/plugins/vcluster.sh` | Create a virtual Kubernetes cluster inside the infra cluster; exports kubeconfig to `~/.kube/vclusters/<name>.yaml` |
-| `vcluster_destroy` | `scripts/plugins/vcluster.sh` | Delete a vCluster and remove its kubeconfig file |
-| `vcluster_use` | `scripts/plugins/vcluster.sh` | Merge vCluster kubeconfig into `~/.kube/config` and switch active context |
-| `vcluster_list` | `scripts/plugins/vcluster.sh` | List all vClusters in the active namespace |
-| `vcluster_install_cli` | `scripts/plugins/vcluster.sh` | Install the vcluster CLI (brew on macOS, binary download on Linux); auto-called by other vcluster commands |
-| `ldap_get_user_password` | `scripts/plugins/ldap.sh` | Retrieve an LDAP user's current password from Vault |
-| `copilot_triage_pod` | `scripts/plugins/copilot.sh` | Collect `kubectl describe pod` + last 100 log lines and ask Copilot to diagnose the failure; requires `K3DM_ENABLE_AI=1` |
-| `copilot_draft_spec` | `scripts/plugins/copilot.sh` | Collect recent git log + changed files and ask Copilot to scaffold a `docs/bugs/` spec with Root Cause / What to Change / DoD sections; requires `K3DM_ENABLE_AI=1` |
-
-### `acg_get_credentials`
-
-Extracts AWS credentials from the Pluralsight Cloud Sandbox "Cloud Access" panel via Playwright `launchPersistentContext` (persisted auth dir `~/.local/share/k3d-manager/playwright-auth`) and writes them to `~/.aws/credentials` under `[default]`. Falls back with instructions to use `acg_import_credentials` if Playwright extraction fails. Set `PLURALSIGHT_EMAIL` to assist Google Password Manager auto-fill when the session has expired.
-
-**Usage:** `./scripts/k3d-manager acg_get_credentials [sandbox-url]`
-
-### `aws_import_credentials`
-
-Reads an AWS credentials block from stdin and writes to `~/.aws/credentials` under `[default]`. Supports multiple input formats:
-
-| Format | Example |
+| Function | Description |
 |---|---|
-| CSV (IAM Download) | `Access key ID,Secret access key` header + data row |
-| Quoted export | `export AWS_ACCESS_KEY_ID="AKIA..."` |
-| Unquoted export | `export AWS_ACCESS_KEY_ID=AKIA...` |
-| Pluralsight label | `AWS Access Key ID: AKIA...` |
-| Credentials file | `[default]` block passthrough |
+| `_run_command [--prefer-sudo|--require-sudo|--interactive-sudo|--probe '<subcmd>'|--quiet|--soft] -- <cmd> [args...]` | Core wrapper for every privileged or traced command. Honors `--prefer-sudo` (attempt non-interactive sudo first), `--require-sudo` (fail if sudo unavailable), `--interactive-sudo` (allow password prompts), `--probe` to test a subcommand before deciding on sudo, `--quiet` to suppress wrapper errors, and `--soft` to return exit codes instead of exiting. Example: `_run_command --prefer-sudo -- apt-get update`. |
+| `_run_command_resolve_sudo <prog> <prefer> <require> <interactive> [probe_args...]` | Internal helper invoked by `_run_command`; resolves `_RCRS_RUNNER` to either the raw program or `sudo` with the correct flags, returning 127 when sudo is required but unavailable. |
+| `_command_exist <prog>` | Returns 0 if `<prog>` is found on `PATH`, 1 otherwise. |
+| `_args_have_sensitive_flag <args...>` | Returns 0 when CLI args contain `--password`, `--token`, or `--username` (either `--flag value` or `--flag=value` form); used to disable tracing. |
 
-**Usage:** `pbpaste | ./scripts/k3d-manager aws_import_credentials`
+### Platform Detection
 
-### `acg_import_credentials`
+| Function | Description |
+|---|---|
+| `_detect_platform` | Prints the current platform to stdout: one of `mac`, `wsl`, `debian`, `redhat`, or `linux`. Calls `_err` on unsupported platforms. Does not cache — use `_is_mac` / `_is_linux` etc. for repeated checks. |
+| `_is_mac` / `_is_linux` / `_is_wsl` / `_is_redhat_family` / `_is_debian_family` | Predicates returning 0 when the current system matches the given platform family. |
 
-Deprecated alias for `aws_import_credentials`. Kept for backwards compatibility.
+### Logging & Trace Control
 
-**Usage:** `pbpaste | ./scripts/k3d-manager acg_import_credentials`
+| Function | Description |
+|---|---|
+| `_info <msg>` | Print `INFO: <msg>` to stderr. |
+| `_warn <msg>` | Print `WARN: <msg>` to stderr. |
+| `_err <msg>` | Print `ERROR: <msg>` and exit 1. |
+| `_no_trace <cmd...>` | Execute a block with `set +x` to avoid leaking secrets in traces. |
 
-### `acg_provision`
+### Security & PATH Safety
 
-Provisions the ACG sandbox EC2 instance. Requires `--confirm`. With `--recreate`, tears down any existing instance first.
+| Function | Description |
+|---|---|
+| `_safe_path` | Validates the current `PATH` for unsafe entries (world-writable directories or relative path components). Calls `_err` with the list of offending entries if any are found. |
+| `_is_world_writable_dir <dir>` | Returns 0 if `<dir>` is world-writable. |
+| `_set_sensitive_var <name> <value>` | Assign sensitive data to a variable without leaving traces in history. |
+| `_write_sensitive_file <path> <data>` | Write a secret to disk using `0600` permissions. |
+| `_remove_sensitive_file <path>` | Securely remove a previously written sensitive file. |
 
-**Usage:** `./scripts/k3d-manager acg_provision --confirm [--recreate]`
+### Tool Wrappers (inherit `_run_command` semantics)
 
-### `acg_watch`
+| Function | Description |
+|---|---|
+| `_kubectl ...` | Ensure `kubectl` is installed and forward arguments through `_run_command`. |
+| `_helm ...` | Run `helm` with `_run_command` safety wrappers. |
+| `_istioctl ...` | Run `istioctl` via `_run_command`. |
+| `_k3d ...` | Run `k3d` command with logging/sudo guardrails. |
+| `_curl ...` | Ensures `curl` is installed, injects `--max-time` (default: 30 s via `CURL_MAX_TIME`) when not already specified, and forwards all arguments through `_run_command --quiet`. |
+| `_ip ...` | Wrapper for `ip` / `ifconfig` depending on platform. |
 
-Starts a background loop that extends the ACG sandbox TTL via `_acg_extend_playwright` every `interval_seconds` (default 12600 = 3.5h). Stops automatically when the EC2 instance is gone.
+### Secret / Credential Store
 
-**Usage:** `acg_watch [interval_seconds]` (typically called as `acg_watch &` from `_provider_k3s_aws_deploy_cluster`)
+| Function | Description |
+|---|---|
+| `_secret_tool ...` | Linux `secret-tool` wrapper; installs prerequisites automatically. |
+| `_security ...` | macOS `security` tool wrapper. |
+| `_secret_store_data <service> <key> <value>` | Persist a secret in the platform credential store. |
+| `_secret_load_data <service> <key>` | Load a secret from the credential store. |
+| `_secret_clear_data <service> <key>` | Remove a secret from the credential store. |
+| `_store_registry_credentials <registry>` | Store OCI registry credentials securely. |
+| `_load_registry_credentials <registry>` | Retrieve a stored OCI registry credential set. |
+| `_registry_login <registry>` | Log into an OCI registry using stored credentials. |
 
-## Running Tests
+### Installers (require `--interactive-sudo`)
+
+| Function | Description |
+|---|---|
+| `_install_helm` | Install Helm via apt/dnf/homebrew depending on platform. |
+| `_install_kubernetes_cli` | Install `kubectl` (Debian/RedHat/mac). |
+| `_install_orbstack` | Install OrbStack on macOS. |
+| `_install_bats_from_source` | Build and install BATS from source tarball. |
+| `_ensure_bats` | Ensure BATS is installed via package manager/source. |
+| `_ensure_node` | Install Node.js + npm for CLI tooling. |
+| `_ensure_cargo` | Install Rust `cargo` via apt/dnf/homebrew. |
+| `_ensure_copilot_cli` | Ensures the Copilot CLI binary is installed (via `brew install copilot-cli` or the official release installer) and authenticated (`_copilot_auth_check`). Exits via `_err` if installation fails. |
+
+### Copilot CLI Integration
+
+All functions require `K3DM_ENABLE_AI=1`. They exit early (no-op) when the var is unset or `0`.
+
+| Function | Description |
+|---|---|
+| `_copilot_auth_check` | Verify `copilot auth status` succeeds; calls `_err` if auth fails and `K3DM_ENABLE_AI=1`. |
+| `_copilot_scope_prompt <text>` | Prepend a k3d-manager repo scope statement to `<text>` before passing to Copilot. |
+| `_copilot_prompt_guard <text>` | Block prompts containing forbidden fragments (`shell(git push)`, `shell(rm`, `shell(eval`, `shell(sudo`, `shell(curl`, `shell(wget`, `shell(cd`). Calls `_err` on match. |
+| `_copilot_review [--prompt\|-p <text>] [--model <id>] [<flags>...]` | Sandboxed Copilot CLI wrapper. Scopes the prompt, applies the prompt guard, runs from repo root, and passes `--deny-tool` flags for all forbidden shell operations. Returns Copilot's exit code. |
+| `_ai_agent_review [--prompt\|-p <text>] [<flags>...]` | Generic AI dispatch wrapper. Reads `AI_REVIEW_FUNC` (default: `copilot`) to select backend and `AI_REVIEW_MODEL` (default: `gpt-5.4-mini`) for model. Currently supports `copilot` only; additional backends are added as new `case` branches. Passes all args through to the selected backend. |
+
+**`_copilot_review` usage:**
 
 ```bash
-./scripts/k3d-manager test all            # run all suites
-./scripts/k3d-manager test core           # run the core suite
-./scripts/k3d-manager test plugins        # run the plugins suite
-./scripts/k3d-manager test lib            # run the lib suite
-./scripts/k3d-manager test install_k3d    # run a single .bats file
-./scripts/k3d-manager test install_k3d --case "_install_k3d exports INSTALL_DIR"
-./scripts/k3d-manager test -v install_k3d --case "_install_k3d exports INSTALL_DIR"
+source scripts/lib/system.sh
+export K3DM_ENABLE_AI=1
+
+# Basic prompt
+_copilot_review --prompt "Explain the _agent_lint flow in this repo."
+
+# With model override
+_copilot_review --prompt "Review staged shell changes for injection risks." \
+  --model claude-sonnet-4-5
+
+# Pipe external context into the prompt
+context="$(kubectl describe pod -n vault vault-0 2>&1)"
+_copilot_review --prompt "Diagnose this pod failure:\n\n${context}"
 ```
 
-Failed runs keep logs in `scratch/test-logs/<suite>/<case-hash>/<timestamp>.log`.
+**`_ai_agent_review` env vars:**
+
+| Env Var | Default | Description |
+|---|---|---|
+| `AI_REVIEW_FUNC` | `copilot` | AI backend to use. Currently only `copilot` is supported. |
+| `AI_REVIEW_MODEL` | `gpt-5.4-mini` | Model passed to the backend. Override per-call by passing `--model` in args. |
+
+**Using in another project via subtree:**
+
+```bash
+# Pull lib-foundation
+git subtree add --prefix scripts/lib/foundation \
+  https://github.com/wilddog64/lib-foundation.git main --squash
+
+# Source and use
+source scripts/lib/foundation/scripts/lib/system.sh
+export K3DM_ENABLE_AI=1
+_copilot_review --prompt "Your prompt here."
+```
+
+**Wire AI lint in a pre-commit hook:**
+
+```bash
+# In your pre-commit hook, before calling _agent_lint:
+export AGENT_LINT_AI_FUNC="_copilot_review"
+export K3DM_ENABLE_AI="${K3DM_ENABLE_AI:-0}"
+```
+
+`_agent_lint` reads `AGENT_LINT_AI_FUNC` and calls it with staged `.sh` files. Setting
+`K3DM_ENABLE_AI` to `0` by default makes the AI step opt-in — users set `K3DM_ENABLE_AI=1`
+in their environment to activate it.
+
+### Utilities
+
+| Function | Description |
+|---|---|
+| `_sha256_12 <data>` | Output the first 12 chars of the SHA-256 of `<data>`. |
+| `_version_ge <verA> <verB>` | Return 0 when `verA ≥ verB` using semantic version comparison. |
+| `_failfast_on` / `_failfast_off` | Toggle `set -e` for the current shell. |
+| `_add_exit_trap <handler>` / `_cleanup_register <handler>` | Register a cleanup handler invoked on script exit. |
+| `_k3dm_repo_root` | Return the repo root directory (via git or script location). |
+| `_detect_cluster_name` | Derive cluster name from current kubeconfig context. |
+
+### Internal Helpers (not for direct use)
+
+`_install_debian_kubernetes_client`, `_install_redhat_kubernetes_client`, `_install_debian_docker`, `_install_redhat_docker`, `_install_mac_helm`, `_install_redhat_helm`, `_install_debian_helm`, `_install_debian_kubectl`, `_install_redhat_kubectl` — platform-specific installers invoked by the higher-level workflows.
+
+## core.sh — Cluster Lifecycle
+
+### Public Functions
+
+| Function | Signature | Description |
+|---|---|---|
+| `deploy_cluster [--provider k3d\|k3s\|orbstack] [--force-k3s] [cluster_name]` | Provider-aware cluster bootstrap including Istio and provider exports; resolves provider interactively or via env. |
+| `destroy_cluster [cluster_name]` | Destroy the active provider cluster. |
+| `create_cluster [cluster_name] [http_port=8000] [https_port=8443] [--dry-run\|-n] [-h\|--help]` | Create infrastructure for the active provider. `--dry-run` resolves the provider and prints intent without creating. |
+| `create_k3d_cluster` / `create_k3s_cluster` | Create provider-specific clusters. |
+| `destroy_k3d_cluster` / `destroy_k3s_cluster` | Destroy provider-specific clusters. |
+| `deploy_k3d_cluster` / `deploy_k3s_cluster` | Deploy full cluster stacks for k3d/k3s. |
+| `deploy_ldap` | Deploy OpenLDAP directory to the active cluster. |
+| `expose_ingress [setup|status|remove]` | Expose cluster ingress externally or manage ingress forwarding. |
+| `setup_ingress_forward` / `status_ingress_forward` / `remove_ingress_forward` | Manage ingress port-forwarding for local access. |
+
+### Stable Internal Utilities
+
+| Function | Description |
+|---|---|
+| `_cluster_provider` | Resolves the active provider in precedence order: `K3D_MANAGER_PROVIDER` → `K3DMGR_PROVIDER` → `CLUSTER_PROVIDER` → auto-detected (`k3d` binary → `k3s` binary → `k3d` default). Normalizes to lowercase; exits via `_err` on unsupported values. |
+| `_deploy_cluster_resolve_provider <platform> <provider_cli> <force_k3s>` | Sets the `_DCRS_PROVIDER` global to the resolved provider: CLI flag → `--force-k3s` → env overrides → mac/interactive/k3d default. Does not print or return a value. |
+| `_deploy_cluster_prompt_provider` | Interactive prompt for provider selection (TTY only). |
+| `_resolve_script_dir` | Portable symlink-aware `SCRIPT_DIR` helper. |
+| `_ensure_path_exists <dir>` | Ensure a directory exists, creating it with sudo if required. |
+| `_ensure_port_available <port>` | Fail fast if a TCP port is already bound locally. |
+
+## agent_rigor.sh — Agent Safety Checks
+
+| Function | Signature | Description |
+|---|---|---|
+| `_agent_checkpoint <label>` | Commit the working tree with a checkpoint message before a risky change (no-op if clean). |
+| `_agent_audit` | Audits staged diffs for: BATS assertion/test removal, if-count threshold violations (default: 8, configurable via `AGENT_AUDIT_MAX_IF`), bare `sudo` calls, `kubectl exec` commands with inline credentials, and hardcoded IPv4 literals in staged `.yaml`/`.yml` files. Set `AGENT_IP_ALLOWLIST` to a regular file path listing repo-relative paths to exempt from the IP check (one path per line; lines beginning with `#` are ignored). Returns non-zero if any check fails. |
+| `_agent_lint` | AI-based lint pass on staged `.sh` files. Gated by `AGENT_LINT_GATE_VAR` (default: `ENABLE_AGENT_LINT=1`). Invokes the function named by `AGENT_LINT_AI_FUNC` with staged file names and rules from `scripts/etc/agent/lint-rules.md`. No-op when gate is off or no `.sh` files are staged. |
+
+## Global Variables
+
+| Variable | Description |
+|---|---|
+| `_RCRS_RUNNER` | Populated by `_run_command_resolve_sudo` with the final runner array. |
+| `_DCRS_PROVIDER` | Helper scratch variable set by `_deploy_cluster_resolve_provider` for downstream use.
+
 ## Installation Helpers
 
 ### `_ensure_antigravity_ide`
@@ -157,7 +220,7 @@ Returns 0 if installed; calls `_err` if all methods fail.
 Ensures Antigravity is configured to launch the Playwright MCP server. Requires `jq`.
 - Determines `mcp_config.json` path via `_antigravity_mcp_config_path()`
 - Creates the file if missing
-- Adds the `playwright` entry `{ "command": "npx", "args": ["-y", "@playwright/mcp@<version>"] }` if not already present; version is read from `PLAYWRIGHT_MCP_VERSION` env var (defaults to a pinned version defined in the helper — does **not** float to `latest`)
+- Adds the `playwright` entry `{ "command": "npx", "args": ["-y", "@playwright/mcp@<version>"] }` if not already present; version comes from the `PLAYWRIGHT_MCP_VERSION` env var (defaults to a pinned release — does **not** use `latest`)
 
 ### `_antigravity_browser_ready`
 
@@ -168,29 +231,3 @@ _antigravity_browser_ready [timeout_seconds]
 ```
 
 Returns 0 when port 9222 responds to `curl -sf http://localhost:9222/json`; otherwise calls `_err` after the timeout.
-
-### `_antigravity_gemini_prompt`
-
-Model fallback helper — tries each model in `_ANTIGRAVITY_GEMINI_MODELS` (`gemini-2.5-flash → 2.0-flash → 1.5-flash`) until one succeeds. Detects 429/RESOURCE_EXHAUSTED/ModelNotFoundError and continues to the next model; any other non-zero exit is returned immediately.
-
-```
-_antigravity_gemini_prompt <prompt> [--yolo]
-```
-
-Pass `--yolo` to add `--approval-mode yolo` to the gemini call (required for Playwright script prompts that write a file and run a command). Omit for web_fetch-only prompts. Creates `${HOME}/.gemini/tmp/k3d-manager/` before the first attempt. Sleeps 2s between attempts to avoid rate-limit swarming.
-
-### `_antigravity_ensure_github_session`
-
-Checks whether the user is logged into GitHub in the running Antigravity browser (via Playwright CDP). If not logged in, navigates to `github.com/login` and waits up to 300s for the user to complete login interactively.
-
-### `_antigravity_ensure_acg_session`
-
-Checks whether the user is logged into Pluralsight's Cloud Playground (`app.pluralsight.com/cloud-playground/cloud-sandboxes`) in the running Antigravity browser (via Playwright CDP). If not logged in, navigates to the sign-in page and waits up to 300s for the user to complete login interactively. Returns 1 on timeout.
-
-**First-run note:** On a brand new environment, the Antigravity browser will open and display the Pluralsight (ACG) sign-in page. Log in manually — the session cookie is persisted in the Antigravity browser profile and reused on all subsequent runs until it expires.
-
-Set `K3DM_ACG_SKIP_SESSION_CHECK=1` to bypass the Pluralsight session check (e.g. for CI runs or when Playwright is unavailable).
-
-| Env Var | Default | Description |
-|---|---|---|
-| `K3DM_ACG_SKIP_SESSION_CHECK` | `0` | Set to `1` to bypass the Pluralsight session check (useful for CI or if Playwright cannot launch) |
