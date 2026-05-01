@@ -79,7 +79,7 @@ implementation.
 
 `_copilot_review` is wired into the pre-commit hook via `AGENT_LINT_AI_FUNC`. When
 `K3DM_ENABLE_AI=1`, the hook calls `_agent_lint` which passes staged `.sh` files to Copilot
-for architectural lint against `scripts/etc/lint-rules.md`.
+for architectural lint against `scripts/etc/agent/lint-rules.md`.
 
 This is **opt-in** — the hook does nothing extra when `K3DM_ENABLE_AI` is unset or `0`.
 No Copilot CLI required for users who don't set it.
@@ -113,7 +113,7 @@ _copilot_review --prompt "Review staged changes for security issues." --model cl
 - Forbidden fragments blocked: `shell(git push)`, `shell(rm`, `shell(eval`, `shell(sudo`,
   `shell(curl`, `shell(wget`, `shell(cd`
 - Runs from repo root (via `_k3dm_repo_root`)
-- Exits early when `K3DM_ENABLE_AI=0`
+- Errors out (exits non-zero) when `K3DM_ENABLE_AI=0`
 
 **Signature:**
 
@@ -157,6 +157,7 @@ function myproject_triage_db() {
 ```bash
 # In .git/hooks/pre-commit or scripts/hooks/pre-commit
 export AGENT_LINT_AI_FUNC="_copilot_review"
+export AGENT_LINT_GATE_VAR="K3DM_ENABLE_AI"
 export K3DM_ENABLE_AI="${K3DM_ENABLE_AI:-0}"
 # ... then call _agent_lint
 ```
@@ -167,8 +168,8 @@ export K3DM_ENABLE_AI="${K3DM_ENABLE_AI:-0}"
 # Verify Copilot CLI is installed and authenticated
 copilot auth status
 
-# Test _copilot_review directly (requires K3DM_ENABLE_AI=1)
-K3DM_ENABLE_AI=1 ./scripts/k3d-manager copilot_triage_pod --help
+# Show usage for copilot_triage_pod
+./scripts/k3d-manager copilot_triage_pod --help
 
 # Run a minimal review
 K3DM_ENABLE_AI=1 source scripts/lib/system.sh

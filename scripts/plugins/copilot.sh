@@ -4,8 +4,18 @@
 function copilot_triage_pod() {
   local namespace="${1:-}"
   local pod="${2:-}"
+
+  if [[ "$namespace" == "-h" || "$namespace" == "--help" ]]; then
+    echo "Usage: copilot_triage_pod <namespace> <pod-name>"
+    return 0
+  fi
+
   if [[ -z "$namespace" || -z "$pod" ]]; then
     _err "Usage: copilot_triage_pod <namespace> <pod-name>"
+  fi
+
+  if [[ "${K3DM_ENABLE_AI:-0}" != "1" ]]; then
+    _err "Copilot CLI is disabled. Set K3DM_ENABLE_AI=1 to enable AI tooling."
   fi
 
   local context
@@ -24,17 +34,30 @@ function copilot_triage_pod() {
 
 function copilot_draft_spec() {
   local description="${1:-}"
+
+  if [[ "$description" == "-h" || "$description" == "--help" ]]; then
+    echo "Usage: copilot_draft_spec '<short bug description>'"
+    return 0
+  fi
+
   if [[ -z "$description" ]]; then
     _err "Usage: copilot_draft_spec '<short bug description>'"
   fi
 
+  if [[ "${K3DM_ENABLE_AI:-0}" != "1" ]]; then
+    _err "Copilot CLI is disabled. Set K3DM_ENABLE_AI=1 to enable AI tooling."
+  fi
+
+  local repo_root
+  repo_root="$(_k3dm_repo_root 2>/dev/null || true)"
+
   local context
   context="$(
     echo "=== recent git log ==="
-    git log --oneline -10 2>/dev/null || true
+    git -C "${repo_root:-.}" log --oneline -10 2>/dev/null || true
     echo ""
     echo "=== recently changed files ==="
-    git diff --name-only HEAD~3..HEAD 2>/dev/null || true
+    git -C "${repo_root:-.}" diff --name-only HEAD~3..HEAD 2>/dev/null || true
   )"
 
   _copilot_review --prompt \
