@@ -22,6 +22,7 @@ Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 - [x] **Bugfix: `_copilot_review` K3DM_ENABLE_AI gate** — DONE (`657fd91` / `f6362f79`). Spec: `docs/plans/v1.4.1-bugfix-copilot-review-k3dm-gate.md`. Gate removed from lib-foundation; subtree pulled into k3d-manager. Smoke test error changed from K3DM_ENABLE_AI message to Copilot CLI exit 1 (environment, not code).
 - [x] **ACG credentials 30s timeout** — DONE. lib-acg fix `076f65d` merged (PR #4, `c34c0d80`); subtree pulled into k3d-manager at `dcfeec75`.
 - [x] **ACG credentials timeout values + _waitForSandboxEntry arg-slot bug** — DONE. lib-acg PR #5 merged (`f744901`); subtree pulled into k3d-manager at `ce7077ca`.
+- [ ] **ACG credentials provision timeout + waitForFunction CDP reliability** — OPEN. 180s still too short; `waitForFunction` unreliable in CDP mode. lib-acg spec: `docs/bugs/2026-05-02-acg-credentials-provision-timeout.md`, branch `fix/acg-credentials-provision-timeout`. Assigned to Codex.
 - [ ] **Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate** — OPEN. lib-foundation spec: `docs/plans/v0.3.18-bugfix-copilot-auth-preflight.md`, branch `feat/v0.3.18`. Assigned to Codex.
 - [ ] **BATS suite for copilot plugin** — OPEN. `scripts/tests/plugins/copilot.bats` — argument validation, K3DM_ENABLE_AI gate, `_ai_agent_review` invocation with kubectl/git stubs. Follow-on from v1.4.0. (`k3d_manager_copilot.bats` was updated in `c8ac9b2f` but is the lib-unit test, not the plugin suite.)
 
