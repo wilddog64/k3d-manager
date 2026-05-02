@@ -6,7 +6,7 @@ The authoritative release record lives in `docs/releases.md`, `CHANGE.md`, and `
 
 **Most recent shipped:**
 
-- lib-foundation v0.3.17 — `_ai_agent_review` dispatch + `_copilot_review` gate fix + Copilot review fixes (PR #24, `108924b9`, 2026-05-01); k3d-manager subtree pulled at `37234a96`
+- lib-foundation v0.3.18 — `_copilot_auth_check` rewrite: env tokens → apps.json → gh auth status; 6 BATS (PR #25, `ce9e5dbc`, 2026-05-02); k3d-manager subtree pulled at `cb08a90d`
 - v1.4.0 — Copilot CLI plugin + `_copilot_review` rename + pre-commit AI lint wiring (PR #69, `a805dee0`, 2026-05-01)
 - v1.3.0 — Sandbox rebuild hardening: GHCR PAT validation, payment ESO, cdp.sh path, stage2 gate (PR #68, `8136c4e3`, 2026-05-01)
 - v1.2.0 — lib-acg extraction + shopping-cart bootstrap + GHCR hardening (PR #67, `f628c3cb`, 2026-04-30)
@@ -23,7 +23,7 @@ Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 - [x] **ACG credentials 30s timeout** — DONE. lib-acg fix `076f65d` merged (PR #4, `c34c0d80`); subtree pulled into k3d-manager at `dcfeec75`.
 - [x] **ACG credentials timeout values + _waitForSandboxEntry arg-slot bug** — DONE. lib-acg PR #5 merged (`f744901`); subtree pulled into k3d-manager at `ce7077ca`.
 - [x] **ACG credentials provision timeout + waitForFunction CDP reliability** — DONE. lib-acg PR #6 merged (`671b8b23`); subtree pulled into k3d-manager at `b23e29fb` (2026-05-02).
-- [ ] **Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate** — OPEN. lib-foundation spec: `docs/plans/v0.3.18-bugfix-copilot-auth-preflight.md`, branch `feat/v0.3.18`. Assigned to Codex.
+- [x] **Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate** — DONE. lib-foundation PR #25 merged (`ce9e5dbc`) 2026-05-02; subtree pulled into k3d-manager at `cb08a90d`.
 - [ ] **BATS suite for copilot plugin** — OPEN. `scripts/tests/plugins/copilot.bats` — argument validation, K3DM_ENABLE_AI gate, `_ai_agent_review` invocation with kubectl/git stubs. Follow-on from v1.4.0. (`k3d_manager_copilot.bats` was updated in `c8ac9b2f` but is the lib-unit test, not the plugin suite.)
 
 ---

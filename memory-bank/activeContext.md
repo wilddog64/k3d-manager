@@ -34,9 +34,9 @@ lib-acg fix `076f65d` merged PR #4 (`c34c0d80`); subtree pulled into k3d-manager
 ### ACG credentials provision timeout — DONE
 lib-acg PR #6 merged (`671b8b23`); subtree pulled into k3d-manager at `b23e29fb` (2026-05-02). Locator polling 420s; `OVERALL_TIMEOUT_MS` 780s.
 
-### Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate (PUSHED — needs PR)
-Repo: lib-foundation. Spec: `docs/plans/v0.3.18-bugfix-copilot-auth-preflight.md` on branch `feat/v0.3.18`.
-Codex implemented env tokens + apps.json checks (`feat/v0.3.18`). Claude patched fallback from `copilot auth status` → `gh auth status` (invalid subcommand in v1.0.40). Commit `eede5c3` pushed to `feat/v0.3.18`. BATS 5/5 pass. Next: `/create-pr` for lib-foundation.
+### Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate (DONE)
+lib-foundation PR #25 merged (`ce9e5dbc`) 2026-05-02. Tagged v0.3.18. `enforce_admins` restored.
+Subtree pulled into k3d-manager at `cb08a90d` (2026-05-02). lib-foundation next branch: `feat/v0.3.19`.
 
 ### BATS suite for copilot plugin (OPEN — next task)
 `scripts/tests/plugins/copilot.bats` — argument validation, K3DM_ENABLE_AI gate, `_ai_agent_review` invocation with kubectl/git stubs. `k3d_manager_copilot.bats` was updated (`c8ac9b2f`) but is the lib unit test; the plugin suite is a separate file still pending.
