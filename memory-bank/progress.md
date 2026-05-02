@@ -1,63 +1,15 @@
-# Progress — k3d-manager
+# Progress — lib-acg
 
-## Shipped — pointer, not record
+## v0.1.0 Track (branch: `main`)
 
-The authoritative release record lives in `docs/releases.md`, `CHANGE.md`, and `git tag -l`. Retros for each release are under `docs/retro/`. This file tracks **in-flight** work only.
-
-**Most recent shipped:**
-
-- v1.2.0 — lib-acg extraction + shopping-cart bootstrap + GHCR hardening (PR #67, `f628c3cb`, 2026-04-30)
-- v1.1.0 — Unified ACG automation AWS + GCP (PR #65, `e013d23b`, 2026-04-25)
-- v1.0.6 — AWS SSM support for `k3s-aws` (PR #64, `a54e152f`, 2026-04-11)
-- v1.0.5 — antigravity decoupling + LDAP Vault KV seeding + Copilot fix-up (PR #62/#63, `71c88b05`, 2026-04-11)
-
-Pre-v1.0.5 detail removed; see `git log --tags` and `docs/retro/`.
-
----
-
-## v1.3.0 Track (branch: `k3d-manager-v1.3.0`)
-
-**PR #68 OPEN** — https://github.com/wilddog64/k3d-manager/pull/68 (CI queued, Copilot tagged)
-
-- [x] **`${K3D_MANAGER_BRANCH}` cleanup** — DONE `23475ac0`. Reverted to hardcoded `main` in `services-git.yaml`; removed export from `bin/acg-up`.
-- [x] **lib-acg subtree pull** — DONE `dec36c9f`. Extend timing fix (lib-acg PR #3, `9b39df02`) pulled in.
-- [ ] **ACG Watcher extend button** — extend works; post-extend modal not dismissed in CDP mode. Spec: `docs/bugs/2026-05-01-acg-extend-session-extended-modal-not-dismissed.md`. Assign to Codex.
-- [ ] **Keycloak deployment** — OPEN. Spec: `docs/plans/v1.2.0-deploy-keycloak.md`. Assign to Codex.
-- [ ] **LDAP hardcoded password** — OPEN. Spec: `docs/bugs/2026-04-26-ldap-users-hardcoded-test-password.md`.
-- [ ] **vault-bridge pod-origin traffic** — OPEN. `ClusterSecretStore/vault-backend` stays `Ready=False`. Spec: `docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md`.
-- [ ] **k3d-manager / shopping-cart decoupling** — OPEN (v1.3.0). Spec: `docs/issues/2026-04-27-k3d-manager-shopping-cart-tight-coupling.md`.
-- [x] **stage2 CI cluster health** — FIXED (`f4e7da4e`). CI now gates stage2 behind the `ci:cluster-tests` label, so PRs without the label skip the job and pass on lint + detect alone. Spec: `docs/bugs/2026-05-01-stage2-ci-always-fails-in-pr-context.md`.
-- [ ] **GCP E2E smoke test** — BLOCKED. Full `make up` on live GCP sandbox not verified.
-
----
-
-## v1.2.1 Track (shopping-cart upstream fixes — Codex)
-
-Spec: `docs/plans/v1.2.0-fix-orders-init-sql-and-security-config.md`
-
-- [x] **Fix 1** — `shopping-cart-infra` init SQL UUID. Merged `0bf8b8ec` (PR #32).
-- [x] **Fix 2** — `shopping-cart-order` SecurityConfig `/actuator/health/**`. Merged `64f82fe3` (PR #27).
-- [x] **Fix 3b** — `shopping-cart-order` namespace cleanup. Merged `6195bd42` (PR #28).
-- [x] **Fix 3c** — `shopping-cart-product-catalog` namespace cleanup. Merged `19d5a2b7` (PR #19).
-- [x] **Post-Fix-1 cleanup** — DONE `9aaa0cea`. Removed `SPRING_JPA_HIBERNATE_DDL_AUTO=update` from `services/shopping-cart-order/kustomization.yaml`.
-- [ ] **Post-Fix-2 cleanup** — BLOCKED on RabbitMQHealthIndicator JAR fix. Remove TCP socket probe patches only after that lands too.
-
----
-
-## Sandbox Rebuild Fixes — 2026-05-01
-
-- [x] **cdp.sh path bug** — `../foundation` → `foundation`; `3c70c3a8` (k3d-manager), `369ef9f` (lib-acg)
-- [x] **payment-db-credentials ESO** — `dfb65c73`; postgres password from Vault, ArgoCD ignoreDifferences
-- [x] **shopping-cart-payment CI** — FIXED. SHAs: `4fa5fc1` (trivy) + `ff5c6ad` (changelog) merged to `shopping-cart-payment` main directly. CI green (`25213671956`); `shopping-cart-payment:latest` pushed to GHCR. Spec: `docs/bugs/2026-05-01-shopping-cart-payment-ci-broken-trivy-sha.md`.
-- [x] **ghcr-pull-secret PAT validation** — FIXED (`3a0901cc`). `acg-up` Step 5 and `rotate-ghcr-pat` now validate Vault PAT against `api.github.com/user` before use and prompt for a replacement if expired. Spec: `docs/bugs/2026-05-01-ghcr-pat-validation-missing-acg-up-step5.md`.
-- [x] **Makefile OAuth fallback for GHCR_PAT** — FIXED (`7bbac0d3`). `Makefile` now leaves `GHCR_PAT` empty by default, and `acg-up` validates env-supplied PATs against `api.github.com/user` before applying them. Spec: `docs/bugs/2026-05-01-makefile-ghcr-pat-oauth-fallback.md`.
-
----
-
-## Known Bugs / Gaps
-
-- [ ] **Orchestration Fragility** — OPEN. `docs/bugs/2026-04-23-infra-orchestration-fragility.md`.
-- [ ] **Dual-cluster Status UX** — OPEN. `docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`.
-- [ ] **Repo Retention Cleanup** — OPEN. `docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`.
-- [ ] **Whitespace Enforcement** — OPEN. `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh`.
-- [ ] **GCP single-node vs AWS 3-node** — OPEN. `docs/bugs/2026-04-25-gcp-single-node-vs-aws-three-node.md`.
+- [x] **Repo skeleton** — COMPLETE. CLAUDE.md, README.md, package.json, placeholder
+      scripts/lib/cdp.sh, scripts/plugins/acg.sh, scripts/plugins/gcp.sh, scripts/vars.sh,
+      playwright/, memory-bank/.
+- [x] **lib-foundation subtree** — COMPLETE. Present under scripts/lib/foundation/.
+- [x] **Phase 3 migration** — COMPLETE (`5c0e8e2`). Copied acg.sh, gcp.sh, playwright/*.js, vars.sh from
+      k3d-manager; extracted _browser_launch + _cdp_ensure_acg_session into cdp.sh.
+- [x] **Pre-commit hooks / CI** — COMPLETE (`5c0e8e2`). GitHub Actions and pre-commit hook are present.
+- [x] **ACG credential extraction misses visible sandbox** — FIXED in PR #2 (`https://github.com/wilddog64/lib-acg/pull/2`). Copilot review comments addressed and both inline threads resolved. Latest code commit `1ddbf7c` has GitHub Actions CI green; local checks passed (`npm run check`, `node --check playwright/acg_credentials.js`, `shellcheck scripts/**/*.sh`). Merge is blocked only because the PR is still draft: connector ready-for-review mutation failed with a response-shape error, shell GitHub token returned 401, and GitHub rejected merge with `Pull Request is still a draft`. Bug: `docs/bugs/2026-04-28-acg-credentials-cdp-context-miss.md`.
+- [ ] **ACG extend surface timing gap** — REVIEW FIXES COMPLETE. `playwright/acg_extend.js` now dismisses lingering confirmation modals, bounds per-selector waits to the remaining deadline, and sanitizes failure screenshot labels. PR #3 (`https://github.com/wilddog64/lib-acg/pull/3`), commits `c442490` and `11df1fb`. Copilot review threads were addressed and resolved. Bug: `docs/bugs/2026-04-26-acg-extend-session-extended-modal-blocks-button.md`.
+- [x] **acg_credentials waitForFunction timeout** — FIXED (`076f65d`). `playwright/acg_credentials.js` now passes `null` as the `waitForFunction` arg so the 60s credential timeout is applied as intended. Spec: `docs/plans/bugfix-acg-credentials-waitforfunction-timeout.md`.
+- [ ] **BATS tests** — PLANNED. Add tests/lib/cdp.bats for cdp.sh primitives.
