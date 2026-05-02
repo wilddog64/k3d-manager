@@ -1,5 +1,6 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
+const http = require('http');
 const os = require('os');
 const path = require('path');
 
@@ -183,8 +184,30 @@ async function extractCredentials() {
         browserContext = _cdpContext;
       }
       if (!browserContext) {
-        try { await _cdpBrowser.disconnect(); } catch {}
-        _cdpBrowser = null;
+        // Chrome has no open tabs — its default context is invisible to CDP until
+        // a tab exists. Open a blank tab via the HTTP API to surface the profile
+        // context; then re-query so Playwright can see it.
+        console.error('INFO: CDP connected but no open contexts — opening blank tab to expose profile context.');
+        try {
+          await new Promise((resolve, reject) => {
+            const req = http.request(
+              { hostname: CDP_HOST, port: CDP_PORT, path: '/json/new', method: 'PUT' },
+              res => { res.resume(); resolve(); }
+            );
+            req.on('error', reject);
+            req.end();
+          });
+          await new Promise(r => setTimeout(r, 500));
+          const _refreshedContexts = _cdpBrowser.contexts();
+          if (_refreshedContexts.length > 0) {
+            browserContext = _refreshedContexts[0];
+            console.error('INFO: Default Chrome context now accessible after blank tab.');
+          }
+        } catch { /* fall through if blank tab fails */ }
+        if (!browserContext) {
+          try { await _cdpBrowser.disconnect(); } catch {}
+          _cdpBrowser = null;
+        }
       }
     } catch {
       _cdpBrowser = null;

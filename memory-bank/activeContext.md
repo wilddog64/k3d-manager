@@ -1,9 +1,9 @@
 # Active Context — lib-acg
 
-## Current Branch: `fix/acg-credentials-provision-timeout`
+## Current Branch: `fix/acg-credentials-cdp-empty-contexts`
 
 **Repo created:** 2026-04-25
-**Status:** Phase 3 migration and Phase 5 CI content are on `main` (`5c0e8e2`). Current work fixes ACG credential provisioning timeouts so the sandbox wait and credential wait can tolerate slower credential population and overall sandbox startup.
+**Status:** Phase 3 migration and Phase 5 CI content are on `main` (`5c0e8e2`). Current work fixes ACG credential extraction when CDP Chrome has no open tabs by opening a blank tab via the HTTP API and re-querying contexts.
 
 ## Phase Status
 
@@ -16,6 +16,14 @@
 - [x] **acg_credentials waitForFunction timeout** — FIXED (`076f65d`). `playwright/acg_credentials.js` now passes `null` as the `waitForFunction` arg so the 60s credential timeout is applied as intended. Spec: `docs/plans/bugfix-acg-credentials-waitforfunction-timeout.md`.
 - [x] **acg_credentials timeout values** — FIXED (`315e9fe`). `playwright/acg_credentials.js` now passes `null` to `_waitForSandboxEntry`, waits up to 180s for credentials, and extends the non-first-run overall timeout to 300s. Spec: `docs/plans/bugfix-acg-credentials-timeout-values.md`.
 - [x] **acg_credentials provision timeout** — FIXED (`9f6bf71`). `playwright/acg_credentials.js` now uses locator polling for credentials up to 420s and extends the non-first-run overall timeout to 660s. Spec: `docs/bugs/2026-05-02-acg-credentials-provision-timeout.md`.
+
+## Open: CDP empty-contexts fix (DONE)
+Branch: `fix/acg-credentials-cdp-empty-contexts`
+Bug: `docs/bugs/2026-05-02-acg-credentials-cdp-empty-contexts.md`
+Commit: `d0603bd`
+Root cause: `_cdpBrowser.contexts()` returns `[]` when Chrome has no open tabs → falls
+through to `launchPersistentContext` which fails (profile locked by CDP Chrome process).
+Fix: open a blank tab via `http.request({method:'PUT'}, .../json/new)` when contexts is empty, then re-query.
 
 ## Consumed By
 
