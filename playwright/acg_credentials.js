@@ -365,15 +365,19 @@ async function extractCredentials() {
       }
 
       const _waitForCredentials = async () => {
-        console.error('INFO: Waiting for credentials to populate (up to 180s)...');
-        await page.waitForFunction(
-          () => {
-            const inputs = document.querySelectorAll('input[aria-label="Copyable input"]');
-            return inputs.length > 0 && inputs[0].value.trim().length > 0;
-          },
-          null,
-          { timeout: 180000 }
-        );
+        console.error('INFO: Waiting for credentials to populate (up to 420s)...');
+        const deadline = Date.now() + 420000;
+        while (Date.now() < deadline) {
+          const inputs = page.locator('input[aria-label="Copyable input"]');
+          if (await inputs.count() > 0) {
+            const value = await inputs.first().inputValue().catch(() => '');
+            if (value.trim().length > 0) {
+              return;
+            }
+          }
+          await page.waitForTimeout(2000);
+        }
+        throw new Error('Locator polling timed out after 420000ms waiting for input[aria-label="Copyable input"] to have a non-empty value.');
       };
 
       // Pattern 1: Direct "Start Sandbox" button (in a modal or panel)
@@ -437,7 +441,8 @@ async function extractCredentials() {
   }
 }
 
-const OVERALL_TIMEOUT_MS = 300000;
+// 300s (waitForURL patient bridge) + 420s (credential polling) + 60s buffer
+const OVERALL_TIMEOUT_MS = 780000;
 let _timeoutHandle;
 const _timeoutPromise = new Promise((_, reject) => {
   _timeoutHandle = setTimeout(
