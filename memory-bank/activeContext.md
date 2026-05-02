@@ -21,6 +21,9 @@ Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`
 - lib-foundation `448560a`: add `_ai_agent_review` to `scripts/lib/system.sh`; `AI_REVIEW_FUNC` (default: `copilot`), `AI_REVIEW_MODEL` (default: `gpt-5.4-mini`)
 - k3d-manager `c8ac9b2f`: update `copilot.sh` + pre-commit hook + BATS + howto doc
 
+### ACG credentials CDP reconnect after blank tab (DONE)
+lib-acg PR #8 merged (`3091744`) 2026-05-02; subtree pulled into k3d-manager at `fc152a34`. Disconnect + reconnect after PUT `/json/new` so `_cdpBrowser.contexts()` re-runs `Target.getTargets` and sees the new tab.
+
 ### Bugfix: `_copilot_review` K3DM_ENABLE_AI gate (DONE)
 Spec: `docs/plans/v1.4.1-bugfix-copilot-review-k3dm-gate.md`
 - lib-foundation `657fd91`: removed the `K3DM_ENABLE_AI` gate from `_copilot_review`
