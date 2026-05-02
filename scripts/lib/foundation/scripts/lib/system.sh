@@ -1718,9 +1718,19 @@ function _copilot_review() {
 function _ai_agent_review() {
    local ai_func="${AI_REVIEW_FUNC:-copilot}"
    local model="${AI_REVIEW_MODEL:-gpt-5.4-mini}"
+   local arg has_model=0
+   for arg in "$@"; do
+      [[ "$arg" == "--model" || "$arg" == "-m" ]] && { has_model=1; break; }
+   done
 
    case "$ai_func" in
-      copilot) _copilot_review --model "$model" "$@" ;;
+      copilot)
+         if [[ "$has_model" -eq 1 ]]; then
+            _copilot_review "$@"
+         else
+            _copilot_review --model "$model" "$@"
+         fi
+         ;;
       *) _err "Unknown AI_REVIEW_FUNC: ${ai_func}. Supported: copilot" ;;
    esac
 }

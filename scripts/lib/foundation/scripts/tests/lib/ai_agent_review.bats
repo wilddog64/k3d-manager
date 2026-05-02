@@ -7,6 +7,7 @@ setup() {
   SYSTEM_LIB="${BATS_TEST_DIRNAME}/../../lib/system.sh"
   # shellcheck source=/dev/null
   source "$SYSTEM_LIB"
+  : > "$BATS_TEST_TMPDIR/ai_agent_review.log"
 }
 
 @test "_ai_agent_review dispatches to _copilot_review with default model" {
