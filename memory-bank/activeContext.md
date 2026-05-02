@@ -1,12 +1,12 @@
 # Active Context — lib-foundation
 
-## Current State: `feat/v0.3.15` (as of 2026-03-31)
+## Current State: `feat/v0.3.18` (as of 2026-05-02)
 
 **v0.3.11 SHIPPED** — PR #17 merged to main (`2625683`) 2026-03-25. Tagged v0.3.11, GitHub release created. `enforce_admins` restored.
 **v0.3.12 SHIPPED** — PR #18 squash-merged to main (`91340d62`) 2026-03-25. Tagged v0.3.12, GitHub release created. `enforce_admins` restored. Antigravity IDE install + Playwright MCP config helpers.
 **v0.3.13 SHIPPED** — PR #19 squash-merged to main (`e870c6d9`) 2026-03-25. Tagged v0.3.13, GitHub release created. `enforce_admins` restored. Fix `_antigravity_browser_ready` curl probe (`_run_command --soft`).
 **v0.3.14 SHIPPED** — PR #20 squash-merged to main (`bbbaf053`) 2026-03-27. Tagged v0.3.14, GitHub release created. `enforce_admins` restored. 5 deferred Copilot PR #51 findings: agy binary detection, curl fast-fail, NUL audit loops, doc fix, CHANGE.md versioning.
-**feat/v0.3.15 ACTIVE** — branch cut from `bbbaf053` 2026-03-27.
+**feat/v0.3.18 ACTIVE** — `_copilot_auth_check` rewrite; PR #25 open.
 
 ---
 
@@ -37,11 +37,20 @@ API reference: `docs/api/functions.md`
 | v0.3.11 | **SHIPPED** | PR #17 merged (`2625683`) — YAML IP check in `_agent_audit`; 2026-03-25; tagged v0.3.11 |
 | v0.3.12 | **SHIPPED** | PR #18 merged (`91340d62`) — Antigravity IDE + MCP helpers; 7 BATS; 2026-03-25; tagged v0.3.12 |
 | v0.3.13 | **SHIPPED** | PR #19 merged (`e870c6d9`) — `_antigravity_browser_ready` curl probe fix; 2026-03-25; tagged v0.3.13 |
-| v0.3.14 | **ACTIVE** | branch `feat/v0.3.14` cut from `e870c6d9` |
+| v0.3.14 | **SHIPPED** | PR #20 merged (`bbbaf053`) 2026-03-27 |
+| v0.3.15–v0.3.17 | **SHIPPED** | PRs #21–#24 merged; v0.3.17 at `108924b9` 2026-05-01 |
+| v0.3.18 | **IN PROGRESS** | branch `feat/v0.3.18`; PR #25 open |
 
 ---
 
-## Open Items
+## v0.3.18 Open Items
+
+- [x] **Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate** — DONE (`f0e29d9`, `eede5c3`). Spec: `docs/plans/v0.3.18-bugfix-copilot-auth-preflight.md`. Removed `K3DM_ENABLE_AI` gate; checks env tokens → `~/.config/github-copilot/apps.json` → `gh auth status`; clear error on failure. New `scripts/tests/lib/copilot_auth.bats` (6 tests).
+- [ ] **Copilot review non-interactive permissions** — OPEN. `docs/issues/2026-05-02-copilot-review-noninteractive-permissions.md`. `_copilot_review` still emits a non-interactive Copilot call without the CLI permission mode the help text describes as required.
+
+---
+
+## Pre-v0.3.18 Open Items
 
 - [x] **PR #10 doc-hygiene hook** — staged-only `_agent_audit` BATS test added in commit `bdd60e7`; spec `docs/plans/v0.3.5-agent-audit-staged-only-test.md`. Branch: `feat/doc-hygiene-hook`.
 - [x] **Doc hygiene staged-content read** — commit `d00bccb` implements `_dh_grep` index reader per `docs/plans/v0.3.5-doc-hygiene-staged-content-read.md`; branch pushed `feat/doc-hygiene-hook`.

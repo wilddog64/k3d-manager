@@ -1589,15 +1589,21 @@ function _install_copilot_from_release() {
 }
 
 function _copilot_auth_check() {
-   if [[ "${K3DM_ENABLE_AI:-0}" != "1" ]]; then
+   if [[ -n "${COPILOT_GITHUB_TOKEN:-}" || -n "${GH_TOKEN:-}" || -n "${GITHUB_TOKEN:-}" ]]; then
+     return 0
+   fi
+
+   local _apps_json="${HOME}/.config/github-copilot/apps.json"
+   if [[ -f "$_apps_json" ]] && grep -q '"oauth_token"' "$_apps_json" 2>/dev/null; then
       return 0
    fi
 
-   if _run_command --soft --quiet -- copilot auth status >/dev/null 2>&1; then
+   # gh CLI auth as final fallback — copilot v1.0.40 uses gh OAuth tokens
+   if _run_command --soft --quiet -- gh auth status >/dev/null 2>&1; then
       return 0
    fi
 
-   _err "Error: AI features enabled, but Copilot CLI authentication failed. Please verify your GitHub Copilot subscription or unset K3DM_ENABLE_AI."
+   _err "Copilot CLI is not authenticated. Set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN, or run 'copilot /login' for interactive use."
 }
 
 function _ensure_copilot_cli() {

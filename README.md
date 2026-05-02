@@ -93,14 +93,15 @@ shellcheck scripts/lib/core.sh scripts/lib/system.sh
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.3.17](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.17) | 2026-05-01 | `_ai_agent_review` dispatch wrapper (`AI_REVIEW_FUNC`/`AI_REVIEW_MODEL`); `_copilot_review` rename; `K3DM_ENABLE_AI` gate removed from backend; `_agent_lint` glob expanded to `.sh`/`.js`/`.md`; 3 BATS |
 | [v0.3.16](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.16) | 2026-04-05 | `_agent_audit` IP allowlist: `grep -Fqx -- "$file"` prevents dash-prefix paths from being parsed as grep flags; 2 BATS |
 | [v0.3.15](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.15) | 2026-03-31 | `_agent_audit` IP allowlist — `AGENT_IP_ALLOWLIST` env var skips IP check for listed paths; 2 BATS |
-| [v0.3.14](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.14) | 2026-03-27 | `agy` binary detection, `_antigravity_browser_ready` curl fast-fail, NUL-safe tab scan, doc + CHANGE.md fixes; 78 BATS |
 
 <details><summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.3.14](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.14) | 2026-03-27 | `agy` binary detection, `_antigravity_browser_ready` curl fast-fail, NUL-safe tab scan, doc + CHANGE.md fixes; 78 BATS |
 | [v0.3.13](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.13) | 2026-03-25 | `_antigravity_browser_ready` curl probe fix — `_run_command --soft -- curl` replaces `_curl` to allow polling retries |
 | [v0.3.12](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.12) | 2026-03-25 | `_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready` — Antigravity IDE install + Playwright MCP config helpers; 7 BATS |
 | [v0.3.11](https://github.com/wilddog64/lib-foundation/releases/tag/v0.3.11) | 2026-03-25 | `_agent_audit` YAML hardcoded-IP check — staged `.yaml`/`.yml` files with IPv4 addresses fail pre-commit |

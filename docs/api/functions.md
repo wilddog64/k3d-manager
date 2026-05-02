@@ -84,11 +84,11 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 
 ### Copilot CLI Integration
 
-`_copilot_auth_check` gates on `K3DM_ENABLE_AI=1` — the other helpers run unconditionally. Callers are responsible for feature-gating if needed.
+`_copilot_auth_check` runs unconditionally — no feature gate. Checks `COPILOT_GITHUB_TOKEN`/`GH_TOKEN`/`GITHUB_TOKEN` env tokens, then `~/.config/github-copilot/apps.json`, then `gh auth status`. Callers are responsible for feature-gating if needed.
 
 | Function | Description |
 |---|---|
-| `_copilot_auth_check` | Verify `copilot auth status` succeeds; calls `_err` if auth fails and `K3DM_ENABLE_AI=1`. |
+| `_copilot_auth_check` | Verify Copilot auth: checks env tokens → `apps.json` → `gh auth status`; calls `_err` if all checks fail. |
 | `_copilot_scope_prompt <text>` | Prepend a k3d-manager repo scope statement to `<text>` before passing to Copilot. |
 | `_copilot_prompt_guard <text>` | Block prompts containing forbidden fragments (`shell(git push)`, `shell(rm`, `shell(eval`, `shell(sudo`, `shell(curl`, `shell(wget`, `shell(cd`). Calls `_err` on match. |
 | `_copilot_review [--prompt\|-p <text>] [--model <id>] [<flags>...]` | Sandboxed Copilot CLI wrapper. Scopes the prompt, applies the prompt guard, runs from repo root, and passes `--deny-tool` flags for all forbidden shell operations. Returns Copilot's exit code. |
