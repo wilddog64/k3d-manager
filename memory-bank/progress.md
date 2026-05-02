@@ -41,6 +41,7 @@ Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 - [ ] **Orchestration Fragility** — OPEN. `docs/bugs/2026-04-23-infra-orchestration-fragility.md`.
 - [ ] **Dual-cluster Status UX** — OPEN. `docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`.
 - [ ] **Copilot wrapper auth preflight** — OPEN. `docs/issues/2026-05-01-copilot-wrapper-noninteractive-order-bug.md`. Use the existing local Copilot auth cache when present; prompt only when auth is missing or invalid.
+- [ ] **Copilot docs drift after `_ai_agent_review` refactor** — OPEN. `docs/issues/2026-05-01-copilot-docs-still-reference-stale-gate-and-caller-surface.md`. Current docs still mix `_ai_agent_review` with stale `K3DM_ENABLE_AI` / `_copilot_review` wording.
 - [ ] **Repo Retention Cleanup** — OPEN. `docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`.
 - [ ] **Whitespace Enforcement** — OPEN. `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh`.
 - [ ] **GCP single-node vs AWS 3-node** — OPEN. `docs/bugs/2026-04-25-gcp-single-node-vs-aws-three-node.md`.
