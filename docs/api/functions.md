@@ -84,7 +84,7 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 
 ### Copilot CLI Integration
 
-All functions require `K3DM_ENABLE_AI=1`. They exit early (no-op) when the var is unset or `0`.
+`_copilot_auth_check` gates on `K3DM_ENABLE_AI=1` — the other helpers run unconditionally. Callers are responsible for feature-gating if needed.
 
 | Function | Description |
 |---|---|
@@ -117,7 +117,7 @@ _copilot_review --prompt "Diagnose this pod failure:\n\n${context}"
 | Env Var | Default | Description |
 |---|---|---|
 | `AI_REVIEW_FUNC` | `copilot` | AI backend to use. Currently only `copilot` is supported. |
-| `AI_REVIEW_MODEL` | `gpt-5.4-mini` | Model passed to the backend. Override per-call by passing `--model` in args. |
+| `AI_REVIEW_MODEL` | `gpt-5.4-mini` | Default model passed to the backend. An explicit `--model` in args takes precedence over this env default. |
 
 **Using in another project via subtree:**
 
@@ -128,9 +128,10 @@ git subtree add --prefix scripts/lib/foundation \
 
 # Source and use
 source scripts/lib/foundation/scripts/lib/system.sh
-export K3DM_ENABLE_AI=1
-_copilot_review --prompt "Your prompt here."
+_ai_agent_review --prompt "Your prompt here."
 ```
+
+> **Note:** `_copilot_scope_prompt` hardcodes "k3d-manager repository" in the scope header it prepends to every prompt. When using lib-foundation in another project, the AI receives incorrect repo context. Override `_copilot_scope_prompt` in your consumer shell to customize the scope statement.
 
 **Wire AI lint in a pre-commit hook:**
 
@@ -140,7 +141,7 @@ export AGENT_LINT_AI_FUNC="_copilot_review"
 export K3DM_ENABLE_AI="${K3DM_ENABLE_AI:-0}"
 ```
 
-`_agent_lint` reads `AGENT_LINT_AI_FUNC` and calls it with staged `.sh` files. Setting
+`_agent_lint` reads `AGENT_LINT_AI_FUNC` and calls it with staged `.sh`, `.js`, and `.md` files. Setting
 `K3DM_ENABLE_AI` to `0` by default makes the AI step opt-in — users set `K3DM_ENABLE_AI=1`
 in their environment to activate it.
 
