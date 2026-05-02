@@ -6,6 +6,7 @@ The authoritative release record lives in `docs/releases.md`, `CHANGE.md`, and `
 
 **Most recent shipped:**
 
+- lib-foundation v0.3.17 — `_ai_agent_review` dispatch + `_copilot_review` gate fix + Copilot review fixes (PR #24, `108924b9`, 2026-05-01); k3d-manager subtree pulled at `37234a96`
 - v1.4.0 — Copilot CLI plugin + `_copilot_review` rename + pre-commit AI lint wiring (PR #69, `a805dee0`, 2026-05-01)
 - v1.3.0 — Sandbox rebuild hardening: GHCR PAT validation, payment ESO, cdp.sh path, stage2 gate (PR #68, `8136c4e3`, 2026-05-01)
 - v1.2.0 — lib-acg extraction + shopping-cart bootstrap + GHCR hardening (PR #67, `f628c3cb`, 2026-04-30)

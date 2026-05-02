@@ -24,8 +24,9 @@ Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`
 ### Bugfix: `_copilot_review` K3DM_ENABLE_AI gate (DONE)
 Spec: `docs/plans/v1.4.1-bugfix-copilot-review-k3dm-gate.md`
 - lib-foundation `657fd91`: removed the `K3DM_ENABLE_AI` gate from `_copilot_review`
-- k3d-manager `f6362f79`: subtree pull merge — picks up gate removal
-- Smoke test error changed from `K3DM_ENABLE_AI` gate message to Copilot CLI exit 1 (env issue, not a code bug). Fix is complete.
+- lib-foundation `8d5edd2`: Copilot review fixes — `_ai_agent_review` `--model` dedup, BATS isolation, docs accuracy (PR #24, `108924b9`)
+- k3d-manager `37234a96`: subtree pull from lib-foundation main (v0.3.17 + Copilot review fixes)
+- enforce_admins restored on lib-foundation. lib-foundation next branch: `feat/v0.3.18`.
 
 ### BATS suite for copilot plugin (OPEN — next task)
 `scripts/tests/plugins/copilot.bats` — argument validation, K3DM_ENABLE_AI gate, `_ai_agent_review` invocation with kubectl/git stubs. `k3d_manager_copilot.bats` was updated (`c8ac9b2f`) but is the lib unit test; the plugin suite is a separate file still pending.
