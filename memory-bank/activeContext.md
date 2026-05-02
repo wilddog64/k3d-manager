@@ -41,6 +41,9 @@ Subtree pulled into k3d-manager at `cb08a90d` (2026-05-02). lib-foundation next 
 ### BATS suite for copilot plugin (DONE)
 Spec: `docs/plans/v1.4.1-copilot-plugin-bats.md`. 9 tests: argument validation, K3DM_ENABLE_AI gate, and `_ai_agent_review` invocation stubs for both `copilot_triage_pod` and `copilot_draft_spec`. New file: `scripts/tests/plugins/copilot.bats`. Commit `d371b47b`.
 
+### ACG credentials CDP empty-contexts fix (DONE)
+lib-acg PR #7 merged (`027b5765`) 2026-05-02. Open blank tab via PUT `/json/new` when `contexts()` returns `[]`; guard `_cdpBrowser.disconnect()` behind `if (!browserContext)`. Copilot caught GET→PUT issue. Subtree pulled into k3d-manager at `cccd69d5` (2026-05-02). lib-acg next branch: `feat/lib-acg-next`.
+
 ---
 
 ## Carry-forward Open Items (from v1.3.0)

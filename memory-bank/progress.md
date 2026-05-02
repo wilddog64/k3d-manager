@@ -25,6 +25,7 @@ Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 - [x] **ACG credentials provision timeout + waitForFunction CDP reliability** — DONE. lib-acg PR #6 merged (`671b8b23`); subtree pulled into k3d-manager at `b23e29fb` (2026-05-02).
 - [x] **Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate** — DONE. lib-foundation PR #25 merged (`ce9e5dbc`) 2026-05-02; subtree pulled into k3d-manager at `cb08a90d`.
 - [x] **BATS suite for copilot plugin** — DONE (`d371b47b`). Spec: `docs/plans/v1.4.1-copilot-plugin-bats.md`. 9 tests for `copilot_triage_pod` + `copilot_draft_spec`. New file: `scripts/tests/plugins/copilot.bats`.
+- [x] **ACG credentials CDP empty-contexts fix** — DONE. lib-acg PR #7 merged (`027b5765`) 2026-05-02; subtree pulled into k3d-manager at `cccd69d5`. PUT /json/new blank-tab recovery + disconnect guard.
 
 ---
 
