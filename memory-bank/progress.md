@@ -20,6 +20,7 @@ Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 
 - [x] **`_ai_agent_review` abstraction** — DONE (`448560a` / `c8ac9b2f`). Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`. lib-foundation adds `_ai_agent_review`; k3d-manager updates `copilot.sh`, pre-commit hook, BATS, and howto docs.
 - [x] **Bugfix: `_copilot_review` K3DM_ENABLE_AI gate** — DONE (`657fd91` / `f6362f79`). Spec: `docs/plans/v1.4.1-bugfix-copilot-review-k3dm-gate.md`. Gate removed from lib-foundation; subtree pulled into k3d-manager. Smoke test error changed from K3DM_ENABLE_AI message to Copilot CLI exit 1 (environment, not code).
+- [ ] **ACG credentials 30s timeout** — OPEN. lib-acg spec: `docs/plans/bugfix-acg-credentials-waitforfunction-timeout.md`, branch `fix/acg-credentials-waitforfunction-timeout`. Assigned to Codex.
 - [ ] **BATS suite for copilot plugin** — OPEN. `scripts/tests/plugins/copilot.bats` — argument validation, K3DM_ENABLE_AI gate, `_ai_agent_review` invocation with kubectl/git stubs. Follow-on from v1.4.0. (`k3d_manager_copilot.bats` was updated in `c8ac9b2f` but is the lib-unit test, not the plugin suite.)
 
 ---
