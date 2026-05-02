@@ -20,6 +20,7 @@ data:
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         customer_id VARCHAR(255) NOT NULL,
         status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+        cancellation_reason VARCHAR(255),
         total_amount NUMERIC(10, 2) NOT NULL,
         currency VARCHAR(3) NOT NULL DEFAULT 'USD',
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
