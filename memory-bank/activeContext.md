@@ -31,8 +31,8 @@ Spec: `docs/plans/v1.4.1-bugfix-copilot-review-k3dm-gate.md`
 ### ACG credentials 30s timeout — DONE
 lib-acg fix `076f65d` merged PR #4 (`c34c0d80`); subtree pulled into k3d-manager at `dcfeec75` (2026-05-02).
 
-### ACG credentials provision timeout (SUBTREE PULL PENDING)
-lib-acg PR #6 merged (`671b8b23`). Locator polling 420s; `OVERALL_TIMEOUT_MS` 780s. Next: `git subtree pull --prefix=scripts/lib/acg https://github.com/wilddog64/lib-acg.git main --squash`.
+### ACG credentials provision timeout — DONE
+lib-acg PR #6 merged (`671b8b23`); subtree pulled into k3d-manager at `b23e29fb` (2026-05-02). Locator polling 420s; `OVERALL_TIMEOUT_MS` 780s.
 
 ### Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate (PUSHED — needs PR)
 Repo: lib-foundation. Spec: `docs/plans/v0.3.18-bugfix-copilot-auth-preflight.md` on branch `feat/v0.3.18`.
