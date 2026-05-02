@@ -331,7 +331,7 @@ async function extractCredentials() {
           const inputs = document.querySelectorAll('input[aria-label="Copyable input"]');
           const hasCredentials = inputs.length > 0 && inputs[0].value.trim().length > 0;
           return hasStart || hasOpen || hasResume || hasCredentials;
-        }, { timeout });
+        }, null, { timeout });
       };
 
       const _waitForSandboxEntrySoft = async (timeout = 30000) => {
@@ -365,14 +365,14 @@ async function extractCredentials() {
       }
 
       const _waitForCredentials = async () => {
-        console.error('INFO: Waiting for credentials to populate (up to 60s)...');
+        console.error('INFO: Waiting for credentials to populate (up to 180s)...');
         await page.waitForFunction(
           () => {
             const inputs = document.querySelectorAll('input[aria-label="Copyable input"]');
             return inputs.length > 0 && inputs[0].value.trim().length > 0;
           },
           null,
-          { timeout: 60000 }
+          { timeout: 180000 }
         );
       };
 
@@ -437,7 +437,7 @@ async function extractCredentials() {
   }
 }
 
-const OVERALL_TIMEOUT_MS = IS_FIRST_RUN ? 300000 : 120000;
+const OVERALL_TIMEOUT_MS = 300000;
 let _timeoutHandle;
 const _timeoutPromise = new Promise((_, reject) => {
   _timeoutHandle = setTimeout(
