@@ -38,8 +38,8 @@ lib-acg PR #6 merged (`671b8b23`); subtree pulled into k3d-manager at `b23e29fb`
 lib-foundation PR #25 merged (`ce9e5dbc`) 2026-05-02. Tagged v0.3.18. `enforce_admins` restored.
 Subtree pulled into k3d-manager at `cb08a90d` (2026-05-02). lib-foundation next branch: `feat/v0.3.19`.
 
-### BATS suite for copilot plugin (OPEN — next task)
-`scripts/tests/plugins/copilot.bats` — argument validation, K3DM_ENABLE_AI gate, `_ai_agent_review` invocation with kubectl/git stubs. `k3d_manager_copilot.bats` was updated (`c8ac9b2f`) but is the lib unit test; the plugin suite is a separate file still pending.
+### BATS suite for copilot plugin (ASSIGNED TO CODEX)
+Spec: `docs/plans/v1.4.1-copilot-plugin-bats.md`. 9 tests: argument validation, K3DM_ENABLE_AI gate, and `_ai_agent_review` invocation stubs for both `copilot_triage_pod` and `copilot_draft_spec`. New file: `scripts/tests/plugins/copilot.bats`.
 
 ---
 
