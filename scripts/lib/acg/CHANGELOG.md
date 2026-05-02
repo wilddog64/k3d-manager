@@ -5,6 +5,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `_waitForCredentials`: pass `null` as `waitForFunction` arg so the 60s credential timeout reaches the options slot instead of defaulting to 30s
+
 ### Added
 - CI workflow: shellcheck, node --check, yamllint on PRs to main
 - Pre-commit hook: subtree guard + shellcheck + node --check on staged files
