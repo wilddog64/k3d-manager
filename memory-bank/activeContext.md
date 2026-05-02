@@ -14,6 +14,12 @@ Automation fails to launch if another Chrome instance is using the profile or if
 - **Status:** Bug documented in `docs/issues/2026-05-02-lib-acg-chrome-singleton-lock-collision.md`.
 - **Planned Fix:** Implement pre-flight cleanup and process guards in `lib-acg` subsystem.
 
+### order-service CrashLoopBackOff (Schema Mismatch)
+The `order-service` pod is crashing during startup because it cannot find the `cancellation_reason` column in the `orders` table.
+- **Root Cause:** `shopping-cart-infra` initialization SQL is stale compared to the Java application code.
+- **Status:** Bug reported in `shopping-cart-infra` repo (`docs/issues/2026-05-02-order-service-missing-column-cancellation-reason.md`).
+- **Required Fix:** Update `shopping-cart-infra` init SQL.
+
 ---
 
 ## Recently Shipped
