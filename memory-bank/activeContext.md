@@ -28,9 +28,8 @@ Spec: `docs/plans/v1.4.1-bugfix-copilot-review-k3dm-gate.md`
 - k3d-manager `37234a96`: subtree pull from lib-foundation main (v0.3.17 + Copilot review fixes)
 - enforce_admins restored on lib-foundation. lib-foundation next branch: `feat/v0.3.18`.
 
-### ACG credentials 30s timeout — waitForFunction API misuse (OPEN — assigned to Codex)
-Repo: lib-acg. Spec: `docs/plans/bugfix-acg-credentials-waitforfunction-timeout.md` on branch `fix/acg-credentials-waitforfunction-timeout`.
-Root cause: `_waitForCredentials` calls `page.waitForFunction(fn, { timeout: 60000 })` — `{ timeout: 60000 }` lands in the `arg` slot, not `options`. Playwright uses default 30000ms. Fix: insert `null` between fn and options.
+### ACG credentials 30s timeout — DONE
+lib-acg fix `076f65d` merged PR #4 (`c34c0d80`); subtree pulled into k3d-manager at `dcfeec75` (2026-05-02).
 
 ### BATS suite for copilot plugin (OPEN — next task)
 `scripts/tests/plugins/copilot.bats` — argument validation, K3DM_ENABLE_AI gate, `_ai_agent_review` invocation with kubectl/git stubs. `k3d_manager_copilot.bats` was updated (`c8ac9b2f`) but is the lib unit test; the plugin suite is a separate file still pending.
