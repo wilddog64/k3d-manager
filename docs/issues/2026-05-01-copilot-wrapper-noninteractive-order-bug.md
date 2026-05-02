@@ -1,4 +1,4 @@
-# 2026-05-01 — Copilot wrapper fails without Copilot auth and hides the setup error
+# 2026-05-01 — Copilot wrapper does not preflight Copilot auth and hides the setup error
 
 ## What Was Tested
 
@@ -38,12 +38,20 @@ To authenticate, you can use any of the following methods:
 
 ## Root Cause
 
-`_ai_agent_review` reaches the Copilot CLI, but in a clean shell there is no usable Copilot
-auth context. The wrapper reports only `copilot command failed (1)` and does not surface the
-underlying Copilot setup error clearly enough for the caller to fix it.
+`_ai_agent_review` reaches the Copilot CLI, but it does not first check whether Copilot already
+has a usable local auth cache. On this machine, Copilot auth lives in
+`~/.config/github-copilot/apps.json`, which contains an `oauth_token` entry from a prior login.
+That auth state is separate from `gh auth status` and is not CI-friendly.
+
+The wrapper currently reports only `copilot command failed (1)` instead of:
+- reusing an existing Copilot auth cache when it exists
+- prompting for login only when the Copilot auth cache is missing or invalid
+- surfacing the underlying Copilot auth/setup error clearly
 
 ## Recommended Follow-Up
 
 - Add an explicit Copilot auth preflight before invoking `_copilot_review` / `_ai_agent_review`.
+- Reuse the existing Copilot auth cache when present.
+- Prompt for login only when the Copilot auth cache is missing or invalid.
 - Surface the Copilot login requirement directly instead of only printing a generic exit code.
 - Keep the `K3DM_ENABLE_AI` gate removed; this bug is separate from that fix.

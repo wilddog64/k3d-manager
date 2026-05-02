@@ -47,7 +47,7 @@ Spec: `docs/plans/v1.4.1-bugfix-copilot-review-k3dm-gate.md`
 
 - **Orchestration Fragility** — `docs/bugs/2026-04-23-infra-orchestration-fragility.md`
 - **Dual-cluster Status UX** — `docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`
-- **Copilot wrapper auth preflight** — `docs/issues/2026-05-01-copilot-wrapper-noninteractive-order-bug.md`
+- **Copilot wrapper auth preflight** — `docs/issues/2026-05-01-copilot-wrapper-noninteractive-order-bug.md` (needs to reuse the local Copilot auth cache in `~/.config/github-copilot/apps.json` and only prompt when auth is missing/invalid)
 - **Repo Retention Cleanup** — `docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`
 - **Whitespace Enforcement** — `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh`
 - **GCP single-node vs AWS 3-node** — `docs/bugs/2026-04-25-gcp-single-node-vs-aws-three-node.md`
