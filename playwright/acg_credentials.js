@@ -198,10 +198,12 @@ async function extractCredentials() {
             req.end();
           });
           await new Promise(r => setTimeout(r, 500));
+          try { await _cdpBrowser.disconnect(); } catch {}
+          _cdpBrowser = await chromium.connectOverCDP(CDP_URL);
           const _refreshedContexts = _cdpBrowser.contexts();
           if (_refreshedContexts.length > 0) {
             browserContext = _refreshedContexts[0];
-            console.error('INFO: Default Chrome context now accessible after blank tab.');
+            console.error('INFO: Default Chrome context now accessible after blank tab + reconnect.');
           }
         } catch { /* fall through if blank tab fails */ }
         if (!browserContext) {
