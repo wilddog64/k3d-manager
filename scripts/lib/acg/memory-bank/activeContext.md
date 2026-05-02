@@ -1,9 +1,9 @@
 # Active Context — lib-acg
 
-## Current Branch: `fix/acg-credentials-cdp-empty-contexts`
+## Current Branch: `fix/acg-credentials-cdp-reconnect`
 
 **Repo created:** 2026-04-25
-**Status:** Phase 3 migration and Phase 5 CI content are on `main` (`5c0e8e2`). Current work fixes ACG credential extraction when CDP Chrome has no open tabs by opening a blank tab via the HTTP API and re-querying contexts.
+**Status:** PR #7 merged (`027b5765`). New bug: `_cdpBrowser.contexts()` doesn't update after blank tab — need disconnect+reconnect. Branch: `fix/acg-credentials-cdp-reconnect`.
 
 ## Phase Status
 
@@ -17,13 +17,22 @@
 - [x] **acg_credentials timeout values** — FIXED (`315e9fe`). `playwright/acg_credentials.js` now passes `null` to `_waitForSandboxEntry`, waits up to 180s for credentials, and extends the non-first-run overall timeout to 300s. Spec: `docs/plans/bugfix-acg-credentials-timeout-values.md`.
 - [x] **acg_credentials provision timeout** — FIXED (`9f6bf71`). `playwright/acg_credentials.js` now uses locator polling for credentials up to 420s and extends the non-first-run overall timeout to 660s. Spec: `docs/bugs/2026-05-02-acg-credentials-provision-timeout.md`.
 
-## Open: CDP empty-contexts fix (DONE)
-Branch: `fix/acg-credentials-cdp-empty-contexts`
-Bug: `docs/bugs/2026-05-02-acg-credentials-cdp-empty-contexts.md`
-Commit: `d0603bd`
-Root cause: `_cdpBrowser.contexts()` returns `[]` when Chrome has no open tabs → falls
-through to `launchPersistentContext` which fails (profile locked by CDP Chrome process).
-Fix: open a blank tab via `http.request({method:'PUT'}, .../json/new)` when contexts is empty, then re-query.
+## Merged: CDP empty-contexts fix (PR #7, `027b5765`)
+- Open blank tab via PUT `/json/new` when `contexts()` returns `[]`
+- Guard `_cdpBrowser.disconnect()` behind `if (!browserContext)`
+- Retro: `docs/retro/2026-05-02-pr7-cdp-empty-contexts-retrospective.md`
+- enforce_admins: restored on main
+
+## Open: CDP reconnect after blank tab (DONE)
+Branch: `fix/acg-credentials-cdp-reconnect`
+Bug: `docs/bugs/2026-05-02-acg-credentials-cdp-reconnect-after-blank-tab.md`
+Commit: `73771ba`
+Root cause: `_cdpBrowser.contexts()` is not live — returns stale `[]` even after PUT
+`/json/new` creates a tab, because Playwright doesn't materialize a BrowserContext for
+the default context from `Target.targetCreated` events post-connect. Falls through to
+`launchPersistentContext`; profile still locked by CDP Chrome → Chrome exits
+(`[pid=N] <gracefully close end>`).
+Fix: disconnect + reconnect after blank tab so fresh `connectOverCDP` sees the new target.
 
 ## Consumed By
 
