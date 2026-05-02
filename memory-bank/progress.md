@@ -50,4 +50,5 @@ Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 - [ ] **Copilot docs drift after `_ai_agent_review` refactor** — OPEN. `docs/issues/2026-05-01-copilot-docs-still-reference-stale-gate-and-caller-surface.md`. Current docs still mix `_ai_agent_review` with stale `K3DM_ENABLE_AI` / `_copilot_review` wording.
 - [ ] **Repo Retention Cleanup** — OPEN. `docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`.
 - [ ] **Whitespace Enforcement** — OPEN. `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh`.
+- [ ] **lib-acg Chrome SingletonLock Collision** — OPEN (2026-05-02). Chrome fails to launch because a previous instance or the background agent is holding the profile lock. Spec: `docs/issues/2026-05-02-lib-acg-chrome-singleton-lock-collision.md`.
 - [ ] **GCP single-node vs AWS 3-node** — OPEN. `docs/bugs/2026-04-25-gcp-single-node-vs-aws-three-node.md`.

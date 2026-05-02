@@ -6,6 +6,16 @@
 
 ---
 
+## Current Investigation
+
+### lib-acg Chrome SingletonLock Collision
+Automation fails to launch if another Chrome instance is using the profile or if the background agent is active.
+- **Root Cause:** Chrome `SingletonLock` prevents multiple instances sharing the same `--user-data-dir`.
+- **Status:** Bug documented in `docs/issues/2026-05-02-lib-acg-chrome-singleton-lock-collision.md`.
+- **Planned Fix:** Implement pre-flight cleanup and process guards in `lib-acg` subsystem.
+
+---
+
 ## Recently Shipped
 
 - **v1.4.0** — Copilot CLI plugin (`copilot_triage_pod`, `copilot_draft_spec`) + `_copilot_review` rename + pre-commit `AGENT_LINT_AI_FUNC` wiring. PR #69 merged `a805dee0`, 2026-05-01. Retro: `docs/retro/2026-05-01-v1.4.0-retrospective.md`. `enforce_admins` restored.
