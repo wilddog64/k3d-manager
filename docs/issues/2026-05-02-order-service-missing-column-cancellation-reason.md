@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-02
 **Severity:** High — blocks order-service startup (CrashLoopBackOff)
-**Status:** Open
+**Status:** Fixed
 **Assignee:** Gemini CLI
 
 ## Symptom
@@ -16,8 +16,6 @@ Schema-validation: missing column [cancellation_reason] in table [orders]
 The JPA entity in the `order-service` application code has been updated to include a `cancellation_reason` field, but the PostgreSQL initialization SQL in the `shopping-cart-infra` repository (`data-layer/postgresql/orders/configmap.yaml`) has not been updated to match the new schema. Hibernate validation fails during startup because the actual database table is missing the required column.
 
 ## Required Fix
-Update `data-layer/postgresql/orders/configmap.yaml` to include the `cancellation_reason` column in the `CREATE TABLE orders` statement:
-```sql
-ALTER TABLE orders ADD COLUMN cancellation_reason VARCHAR(255);
-```
-Or update the base `CREATE TABLE` definition if starting from scratch.
+Update `data-layer/postgresql/orders/configmap.yaml` so the init SQL's `CREATE TABLE orders` statement includes `cancellation_reason VARCHAR(255)`.
+
+Because this SQL only runs when Postgres initializes a fresh data directory, existing volumes that were already initialized also need a one-time migration or recreation before the new column will appear.

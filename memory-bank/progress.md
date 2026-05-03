@@ -118,4 +118,4 @@
 |---|---|---|
 | 001 | RabbitMQ NodePort accessibility in k3d | Documented |
 | 002 | RabbitMQ Prometheus plugin configuration | Documented |
-| 003 | order-service missing column cancellation_reason | Open | 
+| 003 | order-service missing column cancellation_reason | Fixed |
