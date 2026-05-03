@@ -243,6 +243,9 @@ if [[ -z "$_ghcr_pat" ]]; then
     fi
   fi
 fi
+if [[ -z "$_ghcr_pat" ]]; then
+  _err "[acg-up] GitHub PAT is empty — cannot create ghcr-pull-secret. Re-run with: GHCR_PAT=\$(pbpaste) make up"
+fi
 for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
   kubectl create namespace "$ns" --context ubuntu-k3s \
     --dry-run=client -o yaml \
