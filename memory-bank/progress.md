@@ -27,6 +27,8 @@ Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 - [x] **BATS suite for copilot plugin** — DONE (`d371b47b`). Spec: `docs/plans/v1.4.1-copilot-plugin-bats.md`. 9 tests for `copilot_triage_pod` + `copilot_draft_spec`. New file: `scripts/tests/plugins/copilot.bats`.
 - [x] **ACG credentials CDP empty-contexts fix** — DONE. lib-acg PR #7 merged (`027b5765`) 2026-05-02; subtree pulled into k3d-manager at `cccd69d5`. PUT /json/new blank-tab recovery + disconnect guard.
 - [x] **ACG credentials CDP reconnect after blank tab** — DONE. lib-acg PR #8 merged (`3091744`) 2026-05-02; subtree pulled into k3d-manager at `fc152a34`. Disconnect + reconnect after PUT /json/new so Playwright re-discovers the default context.
+- [x] **shopping-cart-infra order-service schema mismatch** — MERGED (`7c2b164`). `shopping-cart-infra` main now includes the `cancellation_reason` schema fix; stale issue row removed from the k3d-manager backlog.
+- [x] **lib-acg Chrome SingletonLock Collision** — MERGED (`e26396b`). `lib-acg` main now includes the CDP profile-lock guard; subtree pulled into k3d-manager at `eb25604b`.
 
 ---
 
@@ -50,6 +52,4 @@ Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 - [ ] **Copilot docs drift after `_ai_agent_review` refactor** — OPEN. `docs/issues/2026-05-01-copilot-docs-still-reference-stale-gate-and-caller-surface.md`. Current docs still mix `_ai_agent_review` with stale `K3DM_ENABLE_AI` / `_copilot_review` wording.
 - [ ] **Repo Retention Cleanup** — OPEN. `docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`.
 - [ ] **Whitespace Enforcement** — OPEN. `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh`.
-- [ ] **order-service missing column cancellation_reason** — OPEN (2026-05-02). order-service fails to start because the database schema in `shopping-cart-infra` is missing a column required by the Java code. Spec: `shopping-cart-infra/docs/issues/2026-05-02-order-service-missing-column-cancellation-reason.md`.
-- [ ] **lib-acg Chrome SingletonLock Collision** — OPEN (2026-05-02). Chrome fails to launch because a previous instance or the background agent is holding the profile lock. Spec: `docs/issues/2026-05-02-lib-acg-chrome-singleton-lock-collision.md`.
 - [ ] **GCP single-node vs AWS 3-node** — OPEN. `docs/bugs/2026-04-25-gcp-single-node-vs-aws-three-node.md`.

@@ -4,21 +4,7 @@
 
 **Completed:** `_ai_agent_review` refactor — generic AI dispatch abstraction landed in lib-foundation and k3d-manager callers were updated. Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`. lib-foundation SHA `448560a`; k3d-manager SHA `c8ac9b2f`.
 
----
-
-## Current Investigation
-
-### lib-acg Chrome SingletonLock Collision
-Automation fails to launch if another Chrome instance is using the profile or if the background agent is active.
-- **Root Cause:** Chrome `SingletonLock` prevents multiple instances sharing the same `--user-data-dir`.
-- **Status:** Bug documented in `docs/issues/2026-05-02-lib-acg-chrome-singleton-lock-collision.md`.
-- **Planned Fix:** Implement pre-flight cleanup and process guards in `lib-acg` subsystem.
-
-### order-service CrashLoopBackOff (Schema Mismatch)
-The `order-service` pod is crashing during startup because it cannot find the `cancellation_reason` column in the `orders` table.
-- **Root Cause:** `shopping-cart-infra` initialization SQL is stale compared to the Java application code.
-- **Status:** Bug reported in `shopping-cart-infra` repo (`docs/issues/2026-05-02-order-service-missing-column-cancellation-reason.md`).
-- **Required Fix:** Update `shopping-cart-infra` init SQL.
+**External merges:** `shopping-cart-infra` order-service schema mismatch merged to main (`7c2b164`); `lib-acg` Chrome SingletonLock collision merged to main (`e26396b`); `k3d-manager` subtree pulled from `lib-acg/main` at `eb25604b`.
 
 ---
 
