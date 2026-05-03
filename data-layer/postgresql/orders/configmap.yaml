@@ -22,6 +22,7 @@ data:
         status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
         total_amount NUMERIC(10, 2) NOT NULL,
         currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+        cancellation_reason VARCHAR(255),
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );

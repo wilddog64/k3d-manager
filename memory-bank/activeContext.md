@@ -1,5 +1,14 @@
 # Active Context: shopping-cart-infra
 
+## Current Status (2026-05-02)
+
+**order-service schema mismatch — FIXED (`5a0914c`):**
+- Issue: missing column `cancellation_reason` in `orders` table.
+- RCA: JPA entity in order-service repo updated, but infra repo init SQL remained stale.
+- Fix: `data-layer/postgresql/orders/configmap.yaml` now includes `cancellation_reason VARCHAR(255)`.
+- Bug doc: `docs/issues/2026-05-02-order-service-missing-column-cancellation-reason.md`.
+
+
 ## Current Status (2026-04-05)
 
 **CrashLoopBackOff diagnosis complete — PRs open for all 3 root causes:**
