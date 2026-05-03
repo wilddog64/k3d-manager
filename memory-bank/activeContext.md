@@ -2,7 +2,7 @@
 
 ## Current Status (2026-05-02)
 
-**order-service schema mismatch — FIXED (`09fc99b`):**
+**order-service schema mismatch — FIXED (`5a0914c`):**
 - Issue: missing column `cancellation_reason` in `orders` table.
 - RCA: JPA entity in order-service repo updated, but infra repo init SQL remained stale.
 - Fix: `data-layer/postgresql/orders/configmap.yaml` now includes `cancellation_reason VARCHAR(255)`.

@@ -17,7 +17,7 @@
 - [x] Namespace definitions (`shopping-cart-data`, `shopping-cart-apps`)
 - [x] PostgreSQL StatefulSet: products (with init SQL schema)
 - [x] PostgreSQL StatefulSet: orders (with init SQL schema)
-- [x] order-service schema: add cancellation_reason column to orders table (`09fc99b`)
+- [x] order-service schema: add cancellation_reason column to orders table (`5a0914c`)
 
 - [x] Redis StatefulSet: cart session storage
 - [x] Redis StatefulSet: orders-cache
