@@ -4,7 +4,7 @@
 
 **Completed:** `_ai_agent_review` refactor — generic AI dispatch abstraction landed in lib-foundation and k3d-manager callers were updated. Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`. lib-foundation SHA `448560a`; k3d-manager SHA `c8ac9b2f`.
 
-**External merges:** `shopping-cart-infra` order-service schema mismatch merged to main (`7c2b164`); `lib-acg` Chrome SingletonLock collision merged to main (`e26396b`); `k3d-manager` subtree pulled from `lib-acg/main` at `eb25604b`.
+**External merges:** `shopping-cart-infra` order-service schema expansion (11 columns) merged to main — PR #34 (`b8ff919d`, 2026-05-03); `lib-acg` Chrome SingletonLock collision merged to main (`e26396b`); `k3d-manager` subtree pulled from `lib-acg/main` at `eb25604b`.
 
 ---
 

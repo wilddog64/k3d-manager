@@ -28,6 +28,7 @@ Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 - [x] **ACG credentials CDP empty-contexts fix** — DONE. lib-acg PR #7 merged (`027b5765`) 2026-05-02; subtree pulled into k3d-manager at `cccd69d5`. PUT /json/new blank-tab recovery + disconnect guard.
 - [x] **ACG credentials CDP reconnect after blank tab** — DONE. lib-acg PR #8 merged (`3091744`) 2026-05-02; subtree pulled into k3d-manager at `fc152a34`. Disconnect + reconnect after PUT /json/new so Playwright re-discovers the default context.
 - [x] **shopping-cart-infra order-service schema mismatch** — MERGED (`7c2b164`). `shopping-cart-infra` main now includes the `cancellation_reason` schema fix; stale issue row removed from the k3d-manager backlog.
+- [x] **shopping-cart-infra order-service schema expansion (11 columns)** — MERGED. PR #34 (`b8ff919d`, 2026-05-03). Codex commit `2e8d0bf`; Copilot fixes `aefa5c4`. `enforce_admins` restored.
 - [x] **lib-acg Chrome SingletonLock Collision** — MERGED (`e26396b`). `lib-acg` main now includes the CDP profile-lock guard; subtree pulled into k3d-manager at `eb25604b`.
 
 ---
