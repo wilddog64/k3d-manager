@@ -12,122 +12,35 @@ metadata:
 data:
   01-init-schema.sql: |
     -- Orders Database Schema
-    -- Shopping Cart Application - Order Service
+    -- Aligned with Order and OrderItem JPA entities (UUID primary keys)
 
-    -- Create order status enum
-    CREATE TYPE order_status AS ENUM (
-        'pending',
-        'processing',
-        'shipped',
-        'delivered',
-        'cancelled'
-    );
+    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
-    -- Create payment status enum
-    CREATE TYPE payment_status AS ENUM (
-        'pending',
-        'authorized',
-        'captured',
-        'failed',
-        'refunded'
-    );
-
-    -- Create orders table
     CREATE TABLE IF NOT EXISTS orders (
-        id SERIAL PRIMARY KEY,
-        order_number VARCHAR(50) UNIQUE NOT NULL,
-        user_id INTEGER NOT NULL,
-        status order_status NOT NULL DEFAULT 'pending',
-        payment_status payment_status NOT NULL DEFAULT 'pending',
-        subtotal NUMERIC(10, 2) NOT NULL CHECK (subtotal >= 0),
-        tax NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (tax >= 0),
-        shipping NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (shipping >= 0),
-        total NUMERIC(10, 2) NOT NULL CHECK (total >= 0),
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        customer_id VARCHAR(255) NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+        total_amount NUMERIC(10, 2) NOT NULL,
         currency VARCHAR(3) NOT NULL DEFAULT 'USD',
         cancellation_reason VARCHAR(255),
-
-        -- Shipping address
-        shipping_name VARCHAR(255) NOT NULL,
-        shipping_address_line1 VARCHAR(255) NOT NULL,
-        shipping_address_line2 VARCHAR(255),
-        shipping_city VARCHAR(100) NOT NULL,
-        shipping_state VARCHAR(100),
-        shipping_postal_code VARCHAR(20) NOT NULL,
-        shipping_country VARCHAR(2) NOT NULL,
-
-        -- Billing address
-        billing_name VARCHAR(255) NOT NULL,
-        billing_address_line1 VARCHAR(255) NOT NULL,
-        billing_address_line2 VARCHAR(255),
-        billing_city VARCHAR(100) NOT NULL,
-        billing_state VARCHAR(100),
-        billing_postal_code VARCHAR(20) NOT NULL,
-        billing_country VARCHAR(2) NOT NULL,
-
-        -- Timestamps
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        shipped_at TIMESTAMP WITH TIME ZONE,
-        delivered_at TIMESTAMP WITH TIME ZONE
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
 
-    -- Create order items table
     CREATE TABLE IF NOT EXISTS order_items (
-        id SERIAL PRIMARY KEY,
-        order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-        product_sku VARCHAR(50) NOT NULL,
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        product_id VARCHAR(255) NOT NULL,
         product_name VARCHAR(255) NOT NULL,
         quantity INTEGER NOT NULL CHECK (quantity > 0),
         unit_price NUMERIC(10, 2) NOT NULL CHECK (unit_price >= 0),
-        total_price NUMERIC(10, 2) NOT NULL CHECK (total_price >= 0),
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        total_price NUMERIC(10, 2) NOT NULL CHECK (total_price >= 0)
     );
 
-    -- Create payment transactions table
-    CREATE TABLE IF NOT EXISTS payment_transactions (
-        id SERIAL PRIMARY KEY,
-        order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-        transaction_id VARCHAR(100) UNIQUE NOT NULL,
-        payment_method VARCHAR(50) NOT NULL,
-        amount NUMERIC(10, 2) NOT NULL CHECK (amount >= 0),
-        currency VARCHAR(3) NOT NULL DEFAULT 'USD',
-        status payment_status NOT NULL,
-        gateway_response JSONB,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-        processed_at TIMESTAMP WITH TIME ZONE
-    );
-
-    -- Create shipping events table for tracking
-    CREATE TABLE IF NOT EXISTS shipping_events (
-        id SERIAL PRIMARY KEY,
-        order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-        event_type VARCHAR(50) NOT NULL,
-        description TEXT,
-        location VARCHAR(255),
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-    );
-
-    -- Create indexes for performance
-    CREATE INDEX IF NOT EXISTS idx_orders_order_number ON orders(order_number);
-    CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_customer_id ON orders(customer_id);
     CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
     CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
-    CREATE INDEX IF NOT EXISTS idx_order_items_product_sku ON order_items(product_sku);
-    CREATE INDEX IF NOT EXISTS idx_payment_transactions_order_id ON payment_transactions(order_id);
-    CREATE INDEX IF NOT EXISTS idx_payment_transactions_transaction_id ON payment_transactions(transaction_id);
-    CREATE INDEX IF NOT EXISTS idx_shipping_events_order_id ON shipping_events(order_id);
-
-    -- Create function to generate order number
-    CREATE OR REPLACE FUNCTION generate_order_number()
-    RETURNS VARCHAR AS $$
-    DECLARE
-        new_order_number VARCHAR;
-    BEGIN
-        new_order_number := 'ORD-' || TO_CHAR(CURRENT_TIMESTAMP, 'YYYYMMDD') || '-' || LPAD(NEXTVAL('orders_id_seq')::TEXT, 6, '0');
-        RETURN new_order_number;
-    END;
-    $$ LANGUAGE plpgsql;
 
     -- Create function to update updated_at timestamp
     CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -138,112 +51,8 @@ data:
     END;
     $$ LANGUAGE plpgsql;
 
-    -- Create function to calculate order total
-    CREATE OR REPLACE FUNCTION calculate_order_total(order_id_param INTEGER)
-    RETURNS NUMERIC AS $$
-    DECLARE
-        items_total NUMERIC;
-        order_tax NUMERIC;
-        order_shipping NUMERIC;
-    BEGIN
-        SELECT COALESCE(SUM(total_price), 0) INTO items_total
-        FROM order_items
-        WHERE order_id = order_id_param;
-
-        SELECT tax, shipping INTO order_tax, order_shipping
-        FROM orders
-        WHERE id = order_id_param;
-
-        RETURN items_total + COALESCE(order_tax, 0) + COALESCE(order_shipping, 0);
-    END;
-    $$ LANGUAGE plpgsql;
-
-    -- Create trigger to automatically update updated_at
     DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
     CREATE TRIGGER update_orders_updated_at
         BEFORE UPDATE ON orders
         FOR EACH ROW
         EXECUTE FUNCTION update_updated_at_column();
-
-    -- Create view for order summary
-    CREATE OR REPLACE VIEW order_summary AS
-    SELECT
-        o.id,
-        o.order_number,
-        o.user_id,
-        o.status,
-        o.payment_status,
-        o.total,
-        o.currency,
-        o.created_at,
-        COUNT(oi.id) as item_count,
-        SUM(oi.quantity) as total_items
-    FROM orders o
-    LEFT JOIN order_items oi ON o.id = oi.order_id
-    GROUP BY o.id, o.order_number, o.user_id, o.status, o.payment_status, o.total, o.currency, o.created_at
-    ORDER BY o.created_at DESC;
-
-    -- Create view for daily sales statistics
-    CREATE OR REPLACE VIEW daily_sales_stats AS
-    SELECT
-        DATE(created_at) as order_date,
-        COUNT(*) as order_count,
-        SUM(total) as total_revenue,
-        AVG(total) as average_order_value,
-        COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered_orders,
-        COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_orders
-    FROM orders
-    GROUP BY DATE(created_at)
-    ORDER BY order_date DESC;
-
-    -- Insert sample orders
-    INSERT INTO orders (
-        order_number, user_id, status, payment_status,
-        subtotal, tax, shipping, total,
-        shipping_name, shipping_address_line1, shipping_city, shipping_state, shipping_postal_code, shipping_country,
-        billing_name, billing_address_line1, billing_city, billing_state, billing_postal_code, billing_country
-    ) VALUES
-        ('ORD-20250101-000001', 1, 'delivered', 'captured', 1499.99, 120.00, 15.00, 1634.99,
-         'John Developer', '123 Main St', 'San Francisco', 'CA', '94102', 'US',
-         'John Developer', '123 Main St', 'San Francisco', 'CA', '94102', 'US'),
-        ('ORD-20250102-000002', 2, 'shipped', 'captured', 999.99, 80.00, 10.00, 1089.99,
-         'Jane Engineer', '456 Tech Blvd', 'Seattle', 'WA', '98101', 'US',
-         'Jane Engineer', '456 Tech Blvd', 'Seattle', 'WA', '98101', 'US'),
-        ('ORD-20250103-000003', 3, 'processing', 'authorized', 299.99, 24.00, 8.00, 331.99,
-         'Bob Designer', '789 Creative Ave', 'Austin', 'TX', '78701', 'US',
-         'Bob Designer', '789 Creative Ave', 'Austin', 'TX', '78701', 'US')
-    ON CONFLICT (order_number) DO NOTHING;
-
-    -- Insert sample order items
-    INSERT INTO order_items (order_id, product_sku, product_name, quantity, unit_price, total_price) VALUES
-        (1, 'LAPTOP-001', 'Developer Laptop Pro', 1, 1499.99, 1499.99),
-        (2, 'PHONE-001', 'Smartphone X', 1, 999.99, 999.99),
-        (3, 'PHONE-002', 'Budget Smartphone', 1, 299.99, 299.99)
-    ON CONFLICT DO NOTHING;
-
-    -- Insert sample payment transactions
-    INSERT INTO payment_transactions (order_id, transaction_id, payment_method, amount, status, processed_at) VALUES
-        (1, 'TXN-20250101-001', 'credit_card', 1634.99, 'captured', CURRENT_TIMESTAMP - INTERVAL '5 days'),
-        (2, 'TXN-20250102-002', 'credit_card', 1089.99, 'captured', CURRENT_TIMESTAMP - INTERVAL '3 days'),
-        (3, 'TXN-20250103-003', 'credit_card', 331.99, 'authorized', CURRENT_TIMESTAMP - INTERVAL '1 day')
-    ON CONFLICT (transaction_id) DO NOTHING;
-
-    -- Display initialization summary
-    DO $$
-    DECLARE
-        order_count INTEGER;
-        item_count INTEGER;
-        transaction_count INTEGER;
-    BEGIN
-        SELECT COUNT(*) INTO order_count FROM orders;
-        SELECT COUNT(*) INTO item_count FROM order_items;
-        SELECT COUNT(*) INTO transaction_count FROM payment_transactions;
-
-        RAISE NOTICE '========================================';
-        RAISE NOTICE 'Orders Database Initialization Complete';
-        RAISE NOTICE '========================================';
-        RAISE NOTICE 'Orders created: %', order_count;
-        RAISE NOTICE 'Order items created: %', item_count;
-        RAISE NOTICE 'Transactions created: %', transaction_count;
-        RAISE NOTICE '========================================';
-    END $$;

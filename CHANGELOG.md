@@ -10,7 +10,7 @@
 - `data-layer/secrets/postgres-products-apps-externalsecret.yaml` — sync postgres/products creds into `shopping-cart-apps/product-catalog-secrets` (all env keys)
 
 ### Fixed
-- `data-layer/postgresql/orders/configmap.yaml`: add `cancellation_reason VARCHAR(255)` to the `orders` table init SQL — resolves the `order-service` schema-validation failure caused by the missing column
+- `data-layer/postgresql/orders/configmap.yaml`: align the orders init SQL with the UUID primary-key schema and add `cancellation_reason VARCHAR(255)` to the `orders` table — resolves the `order-service` schema-validation failure caused by the missing column
 - `data-layer/secrets/postgres-orders-apps-externalsecret.yaml`: add `SPRING_RABBITMQ_USERNAME`/`SPRING_RABBITMQ_PASSWORD` to ESO template — supplies Vault-managed RabbitMQ credentials to Spring AMQP auto-config; host/port/vhost are set via the companion `shopping-cart-order` ConfigMap change (`SPRING_RABBITMQ_HOST/PORT/VIRTUAL_HOST`)
 - `argocd/config/argocd-cm.yaml`: add ExternalSecret custom Lua health check so ArgoCD waits for `SecretSynced` before advancing past wave 0 — prevents StatefulSets from starting before secrets exist
 - `data-layer/secrets/*.yaml` (12 files): add `argocd.argoproj.io/sync-wave: "0"` — ExternalSecrets deploy in wave 0 and must reach Healthy before wave 1 begins
