@@ -2,7 +2,7 @@
 
 ## Current Status (2026-05-02)
 
-**order-service CrashLoopBackOff — schema expansion fix ASSIGNED TO CODEX:**
+**order-service CrashLoopBackOff — schema expansion fix FIXED (`2e8d0bf`):**
 - Issue: Missing 11 columns in `orders` table (timestamps, shipping, tracking).
 - Spec: `docs/bugs/2026-05-02-order-service-schema-expansion-fix.md`. Branch: `bug/order-service-schema-expansion`.
 - Commit: `fix(orders): add 11 missing columns to orders schema (lifecycle, shipping, tracking)`

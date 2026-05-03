@@ -18,6 +18,7 @@
 - [x] PostgreSQL StatefulSet: products (with init SQL schema)
 - [x] PostgreSQL StatefulSet: orders (with init SQL schema)
 - [x] order-service schema: add cancellation_reason column to orders table (`5a0914c`)
+- [x] order-service schema expansion: add 11 missing columns to orders table (`2e8d0bf`)
 
 - [x] Redis StatefulSet: cart session storage
 - [x] Redis StatefulSet: orders-cache
@@ -119,3 +120,4 @@
 | 001 | RabbitMQ NodePort accessibility in k3d | Documented |
 | 002 | RabbitMQ Prometheus plugin configuration | Documented |
 | 003 | order-service missing column cancellation_reason | Fixed |
+| 004 | order-service schema expansion | Fixed |
