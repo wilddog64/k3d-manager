@@ -12,6 +12,53 @@ if ! declare -f _antigravity_browser_ready >/dev/null 2>&1; then
   [[ -f "${_CDP_FOUNDATION}/system.sh" ]] && source "${_CDP_FOUNDATION}/system.sh"
 fi
 
+_CDP_CHROME_CDP_LABEL="${CDP_CHROME_CDP_LABEL:-com.k3d-manager.chrome-cdp}"
+_CDP_CHROME_CDP_PLIST="${CDP_CHROME_CDP_PLIST:-${HOME}/Library/LaunchAgents/${_CDP_CHROME_CDP_LABEL}.plist}"
+
+function _cdp_profile_in_use() {
+  local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/profile}"
+  local _profile_arg="--user-data-dir=${_cdp_profile_dir}"
+
+  ps -ax -o command= | awk -v profile="${_profile_arg}" '
+    index($0, profile) && $0 ~ /(Google Chrome|chromium|chrome)/ {
+      found = 1
+    }
+    END { exit(found ? 0 : 1) }
+  '
+}
+
+function _cdp_stop_chrome_cdp_agent() {
+  if [[ "$(uname)" != "Darwin" ]]; then
+    return 0
+  fi
+
+  if [[ -f "${_CDP_CHROME_CDP_PLIST}" ]] && launchctl list "${_CDP_CHROME_CDP_LABEL}" >/dev/null 2>&1; then
+    _info "[acg] Stopping Chrome CDP agent before taking over the browser profile..."
+    launchctl unload "${_CDP_CHROME_CDP_PLIST}" 2>/dev/null || true
+    local _wait_for_exit=0
+    while _cdp_profile_in_use && [[ ${_wait_for_exit} -lt 5 ]]; do
+      sleep 1
+      _wait_for_exit=$((_wait_for_exit + 1))
+    done
+  fi
+}
+
+function _cdp_remove_stale_singleton_lock() {
+  local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/profile}"
+  local _singleton_lock="${_cdp_profile_dir}/SingletonLock"
+
+  if [[ ! -e "${_singleton_lock}" ]]; then
+    return 0
+  fi
+
+  if _cdp_profile_in_use; then
+    return 0
+  fi
+
+  _info "[acg] Removing stale Chrome profile lock: ${_singleton_lock}"
+  rm -f "${_singleton_lock}"
+}
+
 function _browser_launch() {
   if ! _command_exist curl; then
     _err "curl is required for Gemini browser probe — install curl and retry"
@@ -19,6 +66,8 @@ function _browser_launch() {
   if _run_command --soft -- curl -sf http://localhost:9222/json >/dev/null 2>&1; then
     return 0
   fi
+  _cdp_stop_chrome_cdp_agent
+  _cdp_remove_stale_singleton_lock
   _info "Chrome not running — launching with --remote-debugging-port=9222..."
   local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/profile}"
   if [[ "$(uname)" == "Darwin" ]]; then
