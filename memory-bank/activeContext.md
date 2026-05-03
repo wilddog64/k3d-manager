@@ -2,10 +2,10 @@
 
 ## Current Status (2026-05-02)
 
-**order-service CrashLoopBackOff — deep schema audit:** 
-- Issue: Missing 11 columns in `orders` table (timestamps, shipping, tracking). 
-- Status: Bug documented in `docs/issues/2026-05-03-order-service-schema-expansion-mismatch.md`. 
-- Action: Need to align init SQL with refactored Java entities. 
+**order-service CrashLoopBackOff — schema expansion fix ASSIGNED TO CODEX:**
+- Issue: Missing 11 columns in `orders` table (timestamps, shipping, tracking).
+- Spec: `docs/bugs/2026-05-02-order-service-schema-expansion-fix.md`. Branch: `bug/order-service-schema-expansion`.
+- Commit: `fix(orders): add 11 missing columns to orders schema (lifecycle, shipping, tracking)`
 
 
 **order-service schema mismatch — FIXED (`5a0914c`):**
