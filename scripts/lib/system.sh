@@ -1700,14 +1700,15 @@ function _copilot_review() {
    done
 
    local -a guard_args=(
+      "--allow-all-tools"
       "--deny-tool" "shell(cd ..)"
       "--deny-tool" "shell(git push)"
       "--deny-tool" "shell(git push --force)"
       "--deny-tool" "shell(rm -rf)"
-      "--deny-tool" "shell(sudo"
-      "--deny-tool" "shell(eval"
-      "--deny-tool" "shell(curl"
-      "--deny-tool" "shell(wget"
+      "--deny-tool" "shell(sudo)"
+      "--deny-tool" "shell(eval)"
+      "--deny-tool" "shell(curl)"
+      "--deny-tool" "shell(wget)"
    )
    local -a processed_args=("${guard_args[@]}" "${final_args[@]}")
 
