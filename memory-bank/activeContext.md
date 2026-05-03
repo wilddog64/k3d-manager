@@ -2,12 +2,11 @@
 
 ## Current Status (2026-05-03)
 
-**payment-service CrashLoopBackOff — DB auth failure FIXED (`a184bf7`):**
-- Issue: Flyway fails with `FATAL: password authentication failed for user "postgres"`.
-- Root cause: `payment-db-credentials` has `CHANGE_ME` password (base secret / imperative `payment-db-credentials-eso`) — not the Vault random password that `postgresql-payment` was seeded with.
-- `payment-db-credentials-eso` ExternalSecret exists on cluster but NOT in any repo file (imperative drift).
-- `postgres-payment-externalsecret.yaml` (repo) is already correct; ArgoCD now ignores `/data` on the ESO-managed Secret so self-heal no longer overwrites the Vault value.
-- Bug doc: `docs/bugs/2026-05-03-payment-service-db-auth-failure.md`. Branch: `bug/payment-service-db-auth-failure`.
+**payment-service CrashLoopBackOff — DB auth failure MERGED (PR #35, `65c92057`):**
+- Fix: `argocd/applications/payment-service.yaml` — `ignoreDifferences` for `payment-db-credentials` Secret `/data` + `/metadata/ownerReferences`; `RespectIgnoreDifferences=true` added to syncOptions.
+- `enforce_admins` restored on `main` after merge.
+- Next branch: `docs/next-improvements`. Retro: `docs/retro/2026-05-03-pr35-payment-service-db-auth-fix-retrospective.md`.
+- **Pending manual step:** `kubectl delete externalsecret payment-db-credentials-eso -n shopping-cart-payment` — imperative ESO not in any repo file; must be removed after ArgoCD syncs.
 
 ---
 
