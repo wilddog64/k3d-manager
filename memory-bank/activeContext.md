@@ -2,6 +2,12 @@
 
 ## Current Status (2026-05-02)
 
+**order-service CrashLoopBackOff — deep schema audit:** 
+- Issue: Missing 11 columns in `orders` table (timestamps, shipping, tracking). 
+- Status: Bug documented in `docs/issues/2026-05-03-order-service-schema-expansion-mismatch.md`. 
+- Action: Need to align init SQL with refactored Java entities. 
+
+
 **order-service schema mismatch — FIXED (`5a0914c`):**
 - Issue: missing column `cancellation_reason` in `orders` table.
 - RCA: JPA entity in order-service repo updated, but infra repo init SQL remained stale.
