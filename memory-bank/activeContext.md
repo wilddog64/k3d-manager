@@ -6,6 +6,8 @@
 
 **External merges:** `shopping-cart-infra` order-service schema expansion (11 columns) merged to main — PR #34 (`b8ff919d`, 2026-05-03); `lib-acg` Chrome SingletonLock collision merged to main (`e26396b`); `k3d-manager` subtree pulled from `lib-acg/main` at `eb25604b`.
 
+**Bugfix: `acg-up` empty PAT guard — OPEN.** Spec: `docs/bugs/v1.4.1-bugfix-acg-up-empty-pat-guard.md`. Assigned to Codex. Fix: add `if [[ -z "$_ghcr_pat" ]]; then _err ...` guard in `bin/acg-up` between PAT resolution block and namespace loop.
+
 ---
 
 ## Recently Shipped

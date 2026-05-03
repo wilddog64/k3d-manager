@@ -31,6 +31,7 @@ Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 - [x] **shopping-cart-infra order-service schema expansion (11 columns)** — MERGED. PR #34 (`b8ff919d`, 2026-05-03). Codex commit `2e8d0bf`; Copilot fixes `aefa5c4`. `enforce_admins` restored.
 - [x] **lib-acg Chrome SingletonLock Collision** — MERGED (`e26396b`). `lib-acg` main now includes the CDP profile-lock guard; subtree pulled into k3d-manager at `eb25604b`.
 - [ ] **shopping-cart-infra payment-service DB auth failure** — OPEN. Spec: `shopping-cart-infra/docs/bugs/2026-05-03-payment-service-db-auth-failure.md`. Branch: `bug/payment-service-db-auth-failure`. Assigned to Codex. Fix: add `ignoreDifferences` for `payment-db-credentials` Secret in `argocd/applications/payment-service.yaml`.
+- [ ] **Bugfix: `acg-up` empty PAT guard** — OPEN. Spec: `docs/bugs/v1.4.1-bugfix-acg-up-empty-pat-guard.md`. Assigned to Codex. Fix: guard empty `_ghcr_pat` before namespace loop in `bin/acg-up`.
 
 ---
 
