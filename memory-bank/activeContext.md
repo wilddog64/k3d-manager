@@ -1,5 +1,16 @@
 # Active Context: shopping-cart-infra
 
+## Current Status (2026-05-03)
+
+**payment-service CrashLoopBackOff — DB auth failure OPEN (`f0fffe8`):**
+- Issue: Flyway fails with `FATAL: password authentication failed for user "postgres"`.
+- Root cause: `payment-db-credentials` has `CHANGE_ME` password (base secret / imperative `payment-db-credentials-eso`) — not the Vault random password that `postgresql-payment` was seeded with.
+- `payment-db-credentials-eso` ExternalSecret exists on cluster but NOT in any repo file (imperative drift).
+- `postgres-payment-externalsecret.yaml` (repo) is already correct; fix is deleting the imperative ESO and forcing a re-sync.
+- Bug doc: `docs/bugs/2026-05-03-payment-service-db-auth-failure.md`. Branch: `bug/payment-service-db-auth-failure`.
+
+---
+
 ## Current Status (2026-05-02)
 
 **order-service CrashLoopBackOff — schema expansion fix FIXED (`2e8d0bf`):**
