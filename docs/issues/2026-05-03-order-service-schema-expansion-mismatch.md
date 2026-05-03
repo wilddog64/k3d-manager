@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-03
 **Severity:** High — blocks order-service startup (CrashLoopBackOff)
-**Status:** Open
+**Status:** Fixed (`2e8d0bf` — `bug/order-service-schema-expansion`)
 **Assignee:** Gemini CLI
 
 ## Symptom
@@ -21,7 +21,13 @@ A deep audit of the Java `Order` entity reveals that the database schema in `sho
 - **Shipping Address:** `shipping_street`, `shipping_city`, `shipping_state`, `shipping_postal_code`, `shipping_country`
 
 ## Required Fix
-Update `data-layer/postgresql/orders/configmap.yaml` to include the full schema:
+Update `data-layer/postgresql/orders/configmap.yaml` to include the full schema.
+
+> **Scope limitation:** The init SQL runs only when PostgreSQL initialises a brand-new data directory.
+> Any already-provisioned `orders` PVC will retain the old schema and must be either recreated
+> or migrated with `ALTER TABLE orders ADD COLUMN …` before `order-service` stops failing
+> schema validation.
+
 ```sql
 ALTER TABLE orders 
 ADD COLUMN tracking_number VARCHAR(255),

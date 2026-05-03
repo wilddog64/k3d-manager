@@ -37,6 +37,8 @@ data:
         created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
     );
+    -- This script runs only on fresh PostgreSQL data directories (new PVC).
+    -- Existing PVCs need recreation or ALTER TABLE to pick up new columns.
 
     CREATE TABLE IF NOT EXISTS order_items (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

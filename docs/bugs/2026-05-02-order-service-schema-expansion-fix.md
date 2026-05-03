@@ -80,6 +80,25 @@ shipping address fields (5), and tracking fields (`tracking_number`, `carrier`).
     );
 ```
 
+**Scope limitation:** This init SQL only runs when PostgreSQL initialises a brand-new data directory.
+Existing `orders` PVCs will retain the old schema. To fix an already-provisioned sandbox, either
+delete and recreate the PVC or run a one-time migration:
+
+```sql
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS tracking_number VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS carrier VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS shipping_street VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS shipping_city VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS shipping_state VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS shipping_postal_code VARCHAR(20),
+  ADD COLUMN IF NOT EXISTS shipping_country VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP WITH TIME ZONE,
+  ADD COLUMN IF NOT EXISTS shipped_at TIMESTAMP WITH TIME ZONE,
+  ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP WITH TIME ZONE,
+  ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP WITH TIME ZONE;
+```
+
 ---
 
 ## Files Changed
@@ -117,6 +136,6 @@ fix(orders): add 11 missing columns to orders schema (lifecycle, shipping, track
 
 - Do NOT create a PR
 - Do NOT skip pre-commit hooks (`--no-verify`)
-- Do NOT modify any file other than `data-layer/postgresql/orders/configmap.yaml`
+- Do NOT modify any file other than `data-layer/postgresql/orders/configmap.yaml`, `memory-bank/activeContext.md`, `memory-bank/progress.md`, and files under `docs/`
 - Do NOT commit to `main` — work on `bug/order-service-schema-expansion`
 - Do NOT add `NOT NULL` constraints to the new columns — they must be nullable to allow existing rows
