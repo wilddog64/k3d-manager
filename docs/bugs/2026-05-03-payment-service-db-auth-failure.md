@@ -1,17 +1,13 @@
-# Bug: payment-service DB auth failure at startup (Flyway password mismatch)
+# Bugfix: payment-service DB auth failure — ArgoCD/ESO credential conflict
 
-**Status:** Open
 **Branch:** `bug/payment-service-db-auth-failure`
-**Severity:** P1 — service cannot start; payment flows unavailable
-**Observed:** 2026-05-03
-**Repo:** `shopping-cart-infra`
+**Files:** `argocd/applications/payment-service.yaml`
 
 ---
 
-## Symptom
+## Problem
 
-`payment-service` pod enters `CrashLoopBackOff` immediately after the GHCR image pull
-recovers. Flyway fails on the first DB migration attempt:
+`payment-service` enters `CrashLoopBackOff` immediately at startup. Flyway fails with:
 
 ```
 org.flywaydb.core.api.exception.FlywaySqlException:
@@ -21,108 +17,115 @@ Caused by: org.postgresql.util.PSQLException:
   FATAL: password authentication failed for user "postgres"
 ```
 
-Service never reaches `Running` state.
+**Root cause:** ArgoCD `payment-service` Application has `selfHeal: true` and deploys
+`k8s/base/secret.yaml` from `shopping-cart-payment`, which contains hardcoded `CHANGE_ME`
+values. ArgoCD continuously overwrites `payment-db-credentials` (in `shopping-cart-payment`
+namespace) back to `CHANGE_ME` whenever ESO syncs the correct Vault password. The
+`postgres-payment-app` ExternalSecret has a 24h refresh interval — ArgoCD's self-heal fires
+every few minutes and wins the race.
+
+`postgresql-payment` was initialized by `acg-up` via `postgres-payment-admin` ESO with a
+random Vault password. ArgoCD's CHANGE_ME cannot authenticate against it.
 
 ---
 
-## Root Cause
+## Reproduction
 
-Two conflicting credential sources for the `payment-db-credentials` Secret:
-
-| Source | Secret target | Password value |
-|--------|---------------|----------------|
-| `postgres-payment-app` ESO (repo: `data-layer/secrets/postgres-payment-externalsecret.yaml`) | `payment-db-credentials` | Vault `secret/data/postgres/payment` → **random password seeded by `acg-up`** |
-| `payment-db-credentials-eso` ExternalSecret (**imperative, not in any repo**) | `payment-db-credentials` | Unknown / `CHANGE_ME` |
-| Base secret (`shopping-cart-payment/k8s/base/secret.yaml`) | `payment-db-credentials` | `CHANGE_ME` |
-
-`postgresql-payment` StatefulSet was initialized via `postgres-payment-admin` ESO which
-reads the **same** Vault random password. So PostgreSQL was seeded with the random password,
-but at some point `payment-db-credentials` reverted to `CHANGE_ME` — either because:
-
-- The imperative `payment-db-credentials-eso` overwrote the repo-managed secret with stale
-  values, **or**
-- `postgres-payment-app` ESO was never synced (ArgoCD application not targeting its namespace),
-  leaving only the base secret with `CHANGE_ME` on the cluster.
-
-Evidence: `kubectl get secret payment-db-credentials -n shopping-cart-payment -o yaml` shows
-`DATA: 4` with `CHANGE_ME` values for `password` and `DB_PASSWORD` — matching `base/secret.yaml`
-exactly, not a Vault-synced secret.
-
----
-
-## Diagnosis Steps Taken
-
-1. Pod logs confirmed `PSQLException: password authentication failed for user "postgres"`.
-2. `kubectl get externalsecret -n shopping-cart-payment` — found `payment-db-credentials-eso`
-   (`SecretSynced: True`, `DATA: 4`) and `postgres-payment-app` (`Ready: True`).
-3. `payment-db-credentials-eso` is **not** defined in any repo file — imperative drift.
-4. `postgres-payment-externalsecret.yaml` (repo) already contains the correct config:
-   target `payment-db-credentials`, reads `DB_USERNAME`/`DB_PASSWORD` from
-   `secret/data/postgres/payment`, and `RABBITMQ_USERNAME`/`RABBITMQ_PASSWORD` from
-   `secret/data/rabbitmq/default`.
-5. Base secret (`shopping-cart-payment/k8s/base/secret.yaml`) has `password: CHANGE_ME`.
+After sandbox boot:
+1. `kubectl get secret payment-db-credentials -n shopping-cart-payment -o jsonpath='{.data.password}' | base64 -d`
+   → outputs `CHANGE_ME`
+2. `kubectl logs -n shopping-cart-payment -l app.kubernetes.io/name=payment-service --tail=20`
+   → `FATAL: password authentication failed for user "postgres"`
 
 ---
 
 ## Fix
 
-### Option A — Delete imperative ESO and verify repo ESO wins (preferred)
+### Change 1 — `argocd/applications/payment-service.yaml`: add ignoreDifferences for payment-db-credentials
 
-Delete the out-of-repo `payment-db-credentials-eso` from the cluster so `postgres-payment-app`
-ESO (already in the repo) is the sole owner and syncs the correct Vault password.
+Stop ArgoCD from treating ESO-managed Secret data as out-of-sync. ArgoCD will still create
+the Secret initially (so the resource exists), but will no longer overwrite `/data` on
+self-heal cycles. ESO then owns the actual credential values.
 
-```bash
-kubectl delete externalsecret payment-db-credentials-eso -n shopping-cart-payment
+**Exact old block (lines 59–64):**
+
+```yaml
+  # Health checks
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # Ignore HPA-managed replicas
 ```
 
-Then force ESO to re-sync:
-```bash
-kubectl annotate externalsecret postgres-payment-app -n shopping-cart-payment \
-  force-sync=$(date +%s) --overwrite
+**Exact new block:**
+
+```yaml
+  # Health checks
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas  # Ignore HPA-managed replicas
+    - group: ""
+      kind: Secret
+      name: payment-db-credentials
+      jsonPointers:
+        - /data
 ```
-
-Verify the secret now contains the Vault password (not `CHANGE_ME`):
-```bash
-kubectl get secret payment-db-credentials -n shopping-cart-payment \
-  -o jsonpath='{.data.password}' | base64 -d
-```
-
-Restart the pod:
-```bash
-kubectl rollout restart deployment/payment-service -n shopping-cart-payment
-```
-
-### Option B — Codify the imperative ESO (if Option A fails)
-
-If `postgres-payment-app` ESO is not in ArgoCD scope, add the imperative ESO to the repo
-by reconciling it with `data-layer/secrets/postgres-payment-externalsecret.yaml`.
-This file already has the correct spec — the issue is whether ArgoCD is syncing it.
-
-Check: `argocd app get data-layer --show-managed-fields | grep payment` — confirm
-`postgres-payment-app` ExternalSecret is managed.
 
 ---
 
-## Files
+## Files Changed
 
-| File | Status |
+| File | Change |
 |------|--------|
-| `data-layer/secrets/postgres-payment-externalsecret.yaml` | Already correct — no change needed |
-| `apps/shopping-cart-payment/` (ArgoCD Application) | Verify `data-layer` app includes `shopping-cart-payment` namespace resources |
+| `argocd/applications/payment-service.yaml` | Add `ignoreDifferences` entry for `payment-db-credentials` Secret `/data` |
+
+---
+
+## Rules
+
+- No shell scripts — YAML-only change; shellcheck does not apply
+- Do not modify any other file
+
+---
+
+## Definition of Done
+
+- [ ] `argocd/applications/payment-service.yaml` has the new `ignoreDifferences` entry
+- [ ] YAML is valid: `python3 -c "import yaml; yaml.safe_load(open('argocd/applications/payment-service.yaml'))"` exits 0
+- [ ] Committed and pushed to `bug/payment-service-db-auth-failure`
+- [ ] `memory-bank/activeContext.md` updated: change status to `FIXED (<sha>)`
+- [ ] `memory-bank/progress.md` updated with the commit SHA
+
+**Commit message (exact):**
+```
+fix(payment): stop ArgoCD self-heal from overwriting ESO-managed payment-db-credentials
+```
 
 ---
 
 ## What NOT to Do
 
-- Do NOT recreate the PostgreSQL PVC — data would be lost; fix is credential alignment only.
-- Do NOT hardcode the Vault password in `postgres-payment-externalsecret.yaml`.
-- Do NOT add `optional: true` to the payment-service deployment's `envFrom` as a workaround
-  — the service will silently use `CHANGE_ME` and still fail at Flyway.
+- Do NOT create a PR
+- Do NOT skip pre-commit hooks (`--no-verify`)
+- Do NOT modify any file other than `argocd/applications/payment-service.yaml`,
+  `memory-bank/activeContext.md`, and `memory-bank/progress.md`
+- Do NOT commit to `main` — work on `bug/payment-service-db-auth-failure`
+- Do NOT delete the `payment-db-credentials-eso` from the cluster — that is a manual
+  step documented in `docs/bugs/2026-05-03-payment-service-db-auth-failure-tracking.md`
 
 ---
 
-## Related
+## Post-Fix Manual Step (not for Codex)
 
-- `data-layer/secrets/postgres-payment-externalsecret.yaml` — repo ESO (already correct)
-- `shopping-cart-payment/k8s/base/secret.yaml` — base secret with `CHANGE_ME` placeholder
-- `docs/issues/2026-04-05-crashloopbackoff-diagnosis.md` — prior payment credential fix (PR #28)
+After this PR merges and ArgoCD syncs, the imperative `payment-db-credentials-eso`
+(not in any repo) should be removed from the cluster to eliminate ESO ownership ambiguity:
+
+```bash
+kubectl delete externalsecret payment-db-credentials-eso -n shopping-cart-payment
+kubectl annotate externalsecret postgres-payment-app -n shopping-cart-payment \
+  force-sync=$(date +%s) --overwrite
+kubectl rollout restart deployment/payment-service -n shopping-cart-payment
+```
