@@ -22,6 +22,7 @@
 - RabbitMQ `statefulset.yaml`: reduce resource requests 500m/1Gi → 200m/512Mi to fit t3.medium with co-located services; keep limits at 1000m/1Gi
 - Scale RabbitMQ from 3 replicas to 1 to reduce memory pressure on t3.medium (3×1Gi requests exhausted available RAM)
 - `data-layer/rabbitmq/service.yaml`: change `rabbitmq-management` from `LoadBalancer` to `ClusterIP` — LoadBalancer stays `Progressing` on k3s (no cloud LB), blocking ArgoCD wave 1 (StatefulSets) from deploying; ClusterIP resolves immediately as Healthy (`dfc949d` — PR #27)
+- `argocd/applications/payment-service.yaml`: add `ignoreDifferences` for `payment-db-credentials` Secret `/data` — stops ArgoCD `selfHeal` from overwriting the ESO-managed Vault password back to the `CHANGE_ME` placeholder in `k8s/base/secret.yaml`, resolving `payment-service` CrashLoopBackOff caused by Flyway `FATAL: password authentication failed`
 - `data-layer/secrets/*.yaml`: use single-line connection strings — remove backslash-newline continuations in double-quoted YAML scalars to avoid whitespace/backslash ambiguity across tooling (`ad0817d` — PR #26)
 
 ## [0.1.0] - 2026-03-14
