@@ -87,7 +87,7 @@ self-heal cycles. ESO then owns the actual credential values.
 ## Rules
 
 - No shell scripts — YAML-only change; shellcheck does not apply
-- Do not modify any other file
+- Files modified in this fix: `argocd/applications/payment-service.yaml`, `CHANGELOG.md`, `memory-bank/activeContext.md`, `memory-bank/progress.md`, and this doc
 
 ---
 
@@ -114,7 +114,7 @@ fix(payment): stop ArgoCD self-heal from overwriting ESO-managed payment-db-cred
   `memory-bank/activeContext.md`, and `memory-bank/progress.md`
 - Do NOT commit to `main` — work on `bug/payment-service-db-auth-failure`
 - Do NOT delete the `payment-db-credentials-eso` from the cluster — that is a manual
-  step documented in `docs/bugs/2026-05-03-payment-service-db-auth-failure-tracking.md`
+  step documented in the Post-Fix Manual Step section below
 
 ---
 

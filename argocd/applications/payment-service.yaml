@@ -48,6 +48,7 @@ spec:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
+      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
@@ -66,6 +67,7 @@ spec:
       name: payment-db-credentials
       jsonPointers:
         - /data
+        - /metadata/ownerReferences
 
   info:
     - name: Description
