@@ -32,7 +32,7 @@ Pre-v1.1.0 detail removed; see `git log --tags` and `docs/retro/`.
 - [x] **lib-acg Chrome SingletonLock Collision** — MERGED (`e26396b`). `lib-acg` main now includes the CDP profile-lock guard; subtree pulled into k3d-manager at `eb25604b`.
 - [x] **shopping-cart-infra payment-service DB auth failure** — MERGED (PR #35, `65c92057`, 2026-05-03). `ignoreDifferences` + `RespectIgnoreDifferences=true` for `payment-db-credentials`. `enforce_admins` restored.
 - [x] **Bugfix: `acg-up` empty PAT guard** — DONE (`bbca2198`). Spec: `docs/bugs/v1.4.1-bugfix-acg-up-empty-pat-guard.md`. Guard added before namespace loop in `bin/acg-up`.
-- [ ] **Bugfix: `_copilot_review` malformed `--deny-tool` patterns** — PR OPEN (lib-foundation PR #26, `fix/copilot-deny-tool-patterns`). Adds `--allow-all-tools` + closes 4 malformed `shell(` patterns. CI queued. After merge: subtree pull into k3d-manager, then k3d-manager v1.4.1 PR.
+- [x] **Bugfix: `_copilot_review` malformed `--deny-tool` patterns** — DONE. lib-foundation PR #26 merged (`45040e22`, v0.3.19, 2026-05-03); subtree pulled into k3d-manager at `21d6188a`.
 
 ---
 
