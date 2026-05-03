@@ -61,6 +61,11 @@ spec:
       kind: Deployment
       jsonPointers:
         - /spec/replicas  # Ignore HPA-managed replicas
+    - group: ""
+      kind: Secret
+      name: payment-db-credentials
+      jsonPointers:
+        - /data
 
   info:
     - name: Description
