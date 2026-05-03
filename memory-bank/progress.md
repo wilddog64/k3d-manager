@@ -19,6 +19,7 @@
 - [x] PostgreSQL StatefulSet: orders (with init SQL schema)
 - [x] order-service schema: add cancellation_reason column to orders table (`5a0914c`)
 - [x] order-service schema expansion: add 11 missing columns to orders table (`2e8d0bf`)
+- [x] payment-service DB auth failure: stop ArgoCD self-heal from overwriting ESO-managed `payment-db-credentials` (`a184bf7`)
 
 - [x] Redis StatefulSet: cart session storage
 - [x] Redis StatefulSet: orders-cache
@@ -121,3 +122,4 @@
 | 002 | RabbitMQ Prometheus plugin configuration | Documented |
 | 003 | order-service missing column cancellation_reason | Fixed |
 | 004 | order-service schema expansion | Fixed |
+| 005 | payment-service DB auth failure | Fixed |
