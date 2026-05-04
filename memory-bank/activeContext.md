@@ -8,6 +8,8 @@
 
 **Bugfix: `acg-up` empty PAT guard — DONE (`bbca2198`).** Spec: `docs/bugs/v1.4.1-bugfix-acg-up-empty-pat-guard.md`. Added `if [[ -z "$_ghcr_pat" ]]; then _err ...` guard in `bin/acg-up` between PAT resolution block and namespace loop.
 
+**Copilot review docs updated — IN PROGRESS.** PR #70 review comments on `_ai_agent_review` dispatch, pre-commit docs, and shell-script review guidance are being addressed in `docs/howto/copilot.md`, `.github/copilot-instructions.md`, and `scripts/lib/foundation/docs/api/functions.md`. Follow-up issue: `docs/issues/2026-05-03-agent-audit-zsh-status-variable.md`.
+
 ---
 
 ## Recently Shipped

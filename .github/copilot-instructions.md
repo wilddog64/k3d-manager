@@ -21,7 +21,7 @@ Use the rules below to shape all code suggestions and PR reviews.
 - **lib-acg subtree**: `scripts/lib/acg/` — ACG/GCP Playwright automation library (`wilddog64/lib-acg`). Contains `scripts/plugins/acg.sh`, `scripts/plugins/gcp.sh`, `scripts/lib/cdp.sh`, `playwright/` scripts, and `scripts/vars.sh`. k3d-manager stubs in `scripts/plugins/acg.sh` and `scripts/plugins/gcp.sh` delegate to this subtree.
 - **Tunnel**: `scripts/plugins/tunnel.sh` — `tunnel_start`, `tunnel_stop`, `tunnel_status`. autossh + launchd; forward tunnel (k3s API :6443) + reverse tunnel (Vault :8200).
 - **AWS helpers**: `scripts/plugins/aws.sh` — `aws_import_credentials`. `scripts/plugins/shopping_cart.sh` — `deploy_app_cluster`, `_ensure_k3sup`, `_k3sup_join_agent`.
-- **Copilot plugin**: `scripts/plugins/copilot.sh` — `copilot_triage_pod <ns> <pod>` (collects kubectl describe + logs → Copilot diagnosis), `copilot_draft_spec '<desc>'` (collects git context → scaffolds a `docs/bugs/` spec). Both require `K3DM_ENABLE_AI=1`. Route through `_copilot_review` in `scripts/lib/system.sh`.
+- **Copilot plugin**: `scripts/plugins/copilot.sh` — `copilot_triage_pod <ns> <pod>` (collects kubectl describe + logs → Copilot diagnosis), `copilot_draft_spec '<desc>'` (collects git context → scaffolds a `docs/bugs/` spec). Both require `K3DM_ENABLE_AI=1`. Route through `_ai_agent_review` in `scripts/lib/system.sh` and keep `_copilot_review` as the backend implementation.
 - **Convenience scripts**: `bin/acg-up`, `bin/acg-down`, `bin/acg-refresh`, `bin/acg-status`, `bin/acg-sync-apps`, `bin/rotate-ghcr-pat` — orchestrate plugin calls for common one-shot operations.
 
 ---
@@ -39,6 +39,8 @@ Use the rules below to shape all code suggestions and PR reviews.
 - `_run_command --prefer-sudo` for operations that may succeed without sudo.
 - `_run_command --require-sudo` for operations that always need root.
 - Flag any multi-attempt permission cascades (trying the same operation 2+ times with escalating privilege).
+- When reviewing shell scripts, check that every privileged operation is routed through `_run_command`; only the runner internals may call `sudo` directly.
+- When reviewing shell scripts, call out unquoted variables, direct `eval`, ad hoc `sudo`, and commands that will fail non-interactively in CI.
 
 ### Platform Detection
 - `_detect_platform` is the single source of truth for OS detection in `core.sh`.

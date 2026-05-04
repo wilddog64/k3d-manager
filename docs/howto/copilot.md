@@ -77,9 +77,9 @@ implementation.
 
 ## Pre-Commit Architectural Lint (opt-in)
 
-`_ai_agent_review` is wired into the pre-commit hook via `AGENT_LINT_AI_FUNC`. When
-`K3DM_ENABLE_AI=1`, the hook calls `_agent_lint` which passes staged `.sh` files to Copilot
-for architectural lint against `scripts/etc/agent/lint-rules.md`.
+`_ai_agent_review` is wired into the pre-commit hook via `AGENT_LINT_AI_FUNC`. In
+k3d-manager, the hook calls `_agent_lint` only when `K3DM_ENABLE_AI=1`, which passes staged
+`.sh` files to Copilot for architectural lint against `scripts/etc/agent/lint-rules.md`.
 
 This is **opt-in** — the hook does nothing extra when `K3DM_ENABLE_AI` is unset or `0`.
 No Copilot CLI required for users who don't set it.
@@ -101,7 +101,9 @@ code and commit again.
 `_ai_agent_review` is the generic AI dispatch wrapper in lib-foundation. It reads
 `AI_REVIEW_FUNC` (default: `copilot`) and `AI_REVIEW_MODEL` (default: `gpt-5.4-mini`)
 and routes to the selected backend. Currently only the `copilot` backend is supported.
-You can call it directly in any shell script that sources `scripts/lib/system.sh`:
+In k3d-manager, source `scripts/lib/system.sh` and the dispatcher loads the vendored
+lib-foundation subtree for you. In another project that vendors lib-foundation directly,
+source `scripts/lib/foundation/scripts/lib/system.sh` instead:
 
 ```bash
 source scripts/lib/system.sh
@@ -129,7 +131,8 @@ AI_REVIEW_FUNC=copilot AI_REVIEW_MODEL=gpt-5.4-mini \
 - Forbidden fragments blocked: `shell(git push)`, `shell(rm`, `shell(eval`, `shell(sudo`,
   `shell(curl`, `shell(wget`, `shell(cd`
 - Runs from repo root (via `_k3dm_repo_root`)
-- Errors out (exits non-zero) when `K3DM_ENABLE_AI=0`
+- The k3d-manager public wrappers gate access with `K3DM_ENABLE_AI`; `_ai_agent_review`
+  itself is generic and does not read that variable.
 
 **Signature:**
 
@@ -139,8 +142,8 @@ _ai_agent_review [--prompt|-p <text>] [<flags>...]
 
 ## Using `_ai_agent_review` in Other Projects
 
-`_ai_agent_review` ships in lib-foundation (`scripts/lib/system.sh`). Any project that pulls
-lib-foundation as a subtree can call it directly.
+`_ai_agent_review` ships in lib-foundation (`scripts/lib/foundation/scripts/lib/system.sh`).
+Any project that pulls lib-foundation as a subtree can call it directly.
 
 **Step 1 — Pull lib-foundation:**
 
@@ -153,8 +156,6 @@ git subtree add --prefix scripts/lib/foundation \
 
 ```bash
 source scripts/lib/foundation/scripts/lib/system.sh
-
-export K3DM_ENABLE_AI=1
 _ai_agent_review --prompt "Review this deployment manifest for security issues."
 ```
 

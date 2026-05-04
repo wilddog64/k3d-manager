@@ -119,7 +119,7 @@ _copilot_review --prompt "Diagnose this pod failure:\n\n${context}"
 | `AI_REVIEW_FUNC` | `copilot` | AI backend to use. Currently only `copilot` is supported. |
 | `AI_REVIEW_MODEL` | `gpt-5.4-mini` | Default model passed to the backend. An explicit `--model` in args takes precedence over this env default. |
 
-**Using in another project via subtree:**
+**Using `_ai_agent_review` in another project via subtree:**
 
 ```bash
 # Pull lib-foundation
@@ -137,13 +137,13 @@ _ai_agent_review --prompt "Your prompt here."
 
 ```bash
 # In your pre-commit hook, before calling _agent_lint:
-export AGENT_LINT_AI_FUNC="_copilot_review"
+export AGENT_LINT_AI_FUNC="_ai_agent_review"
 export K3DM_ENABLE_AI="${K3DM_ENABLE_AI:-0}"
 ```
 
-`_agent_lint` reads `AGENT_LINT_AI_FUNC` and calls it with staged `.sh`, `.js`, and `.md` files. Setting
-`K3DM_ENABLE_AI` to `0` by default makes the AI step opt-in — users set `K3DM_ENABLE_AI=1`
-in their environment to activate it.
+`_agent_lint` reads `AGENT_LINT_AI_FUNC` and calls it with staged `.sh`, `.js`, and `.md` files. In
+k3d-manager, `K3DM_ENABLE_AI` makes the AI step opt-in — users set `K3DM_ENABLE_AI=1` in their
+environment to activate it. In another project, choose a repo-local gate variable if you need one.
 
 ### Utilities
 
