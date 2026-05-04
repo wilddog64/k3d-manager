@@ -1,76 +1,15 @@
 # Active Context — k3d-manager
 
-## Current Branch: `k3d-manager-v1.4.1` (as of 2026-05-01)
+## Current Status
+- Current branch: `k3d-manager-v1.4.2` (created from `origin/k3d-manager-v1.4.1`).
+- The repository is at the post-v1.4.1 handoff point; `_ai_agent_review`, Copilot docs cleanup, and ACG hardening are already shipped.
+- One unrelated local modification exists in `scripts/playwright/acg_extend.js`; leave it untouched unless the task explicitly includes it.
 
-**Completed:** `_ai_agent_review` refactor — generic AI dispatch abstraction landed in lib-foundation and k3d-manager callers were updated. Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`. lib-foundation SHA `448560a`; k3d-manager SHA `c8ac9b2f`.
+## Current Focus
+- Keep the next branch lean and focused on the next queued task.
+- Preserve compatibility for the legacy CLI and vendored tooling boundaries.
+- Treat `tools/rigor-cli/` as read-only vendored tooling unless the task explicitly refreshes the subtree.
+- Keep the helper naming / review-doc cleanup aligned with the repo-local `bin/` surface and docs references.
 
-**External merges:** `shopping-cart-infra` order-service schema expansion (11 columns) merged to main — PR #34 (`b8ff919d`, 2026-05-03); `lib-acg` Chrome SingletonLock collision merged to main (`e26396b`); `k3d-manager` subtree pulled from `lib-acg/main` at `eb25604b`.
-
-**Bugfix: `acg-up` empty PAT guard — DONE (`bbca2198`).** Spec: `docs/bugs/v1.4.1-bugfix-acg-up-empty-pat-guard.md`. Added `if [[ -z "$_ghcr_pat" ]]; then _err ...` guard in `bin/acg-up` between PAT resolution block and namespace loop.
-
-**Copilot review docs updated — DONE (`44eece3f`).** PR #70 review comments on `_ai_agent_review` dispatch, pre-commit docs, and shell-script review guidance were addressed in `docs/howto/copilot.md`, `.github/copilot-instructions.md`, and `scripts/lib/foundation/docs/api/functions.md`. Follow-up issue recorded: `docs/issues/2026-05-03-agent-audit-zsh-status-variable.md`.
-
----
-
-## Recently Shipped
-
-- **v1.4.0** — Copilot CLI plugin (`copilot_triage_pod`, `copilot_draft_spec`) + `_copilot_review` rename + pre-commit `AGENT_LINT_AI_FUNC` wiring. PR #69 merged `a805dee0`, 2026-05-01. Retro: `docs/retro/2026-05-01-v1.4.0-retrospective.md`. `enforce_admins` restored.
-- **v1.3.0** — Sandbox rebuild hardening: GHCR PAT validation, payment ESO postgres creds, cdp.sh subtree path fix, stage2 CI label gate, Makefile OAuth fallback removed. PR #68 merged `8136c4e3`, 2026-05-01. Retro: `docs/retro/2026-05-01-v1.3.0-retrospective.md`.
-- **v1.2.0** — lib-acg subtree extraction, shopping-cart bootstrap, GHCR hardening. PR #67 `f628c3cb`, 2026-04-30. Retro: `docs/retro/2026-04-30-v1.2.0-retrospective.md`.
-
----
-
-## v1.4.1 Completed Work
-
-### _ai_agent_review abstraction (DONE)
-Spec: `docs/plans/v1.4.1-ai-agent-review-abstraction.md`
-- lib-foundation `448560a`: add `_ai_agent_review` to `scripts/lib/system.sh`; `AI_REVIEW_FUNC` (default: `copilot`), `AI_REVIEW_MODEL` (default: `gpt-5.4-mini`)
-- k3d-manager `c8ac9b2f`: update `copilot.sh` + pre-commit hook + BATS + howto doc
-
-### ACG credentials CDP reconnect after blank tab (DONE)
-lib-acg PR #8 merged (`3091744`) 2026-05-02; subtree pulled into k3d-manager at `fc152a34`. Disconnect + reconnect after PUT `/json/new` so `_cdpBrowser.contexts()` re-runs `Target.getTargets` and sees the new tab.
-
-### Bugfix: `_copilot_review` K3DM_ENABLE_AI gate (DONE)
-Spec: `docs/plans/v1.4.1-bugfix-copilot-review-k3dm-gate.md`
-- lib-foundation `657fd91`: removed the `K3DM_ENABLE_AI` gate from `_copilot_review`
-- lib-foundation `8d5edd2`: Copilot review fixes — `_ai_agent_review` `--model` dedup, BATS isolation, docs accuracy (PR #24, `108924b9`)
-- k3d-manager `37234a96`: subtree pull from lib-foundation main (v0.3.17 + Copilot review fixes)
-- enforce_admins restored on lib-foundation. lib-foundation next branch: `feat/v0.3.18`.
-
-### ACG credentials 30s timeout — DONE
-lib-acg fix `076f65d` merged PR #4 (`c34c0d80`); subtree pulled into k3d-manager at `dcfeec75` (2026-05-02).
-
-### ACG credentials provision timeout — DONE
-lib-acg PR #6 merged (`671b8b23`); subtree pulled into k3d-manager at `b23e29fb` (2026-05-02). Locator polling 420s; `OVERALL_TIMEOUT_MS` 780s.
-
-### Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate (DONE)
-lib-foundation PR #25 merged (`ce9e5dbc`) 2026-05-02. Tagged v0.3.18. `enforce_admins` restored.
-Subtree pulled into k3d-manager at `cb08a90d` (2026-05-02). lib-foundation next branch: `feat/v0.3.19`.
-
-### BATS suite for copilot plugin (DONE)
-Spec: `docs/plans/v1.4.1-copilot-plugin-bats.md`. 9 tests: argument validation, K3DM_ENABLE_AI gate, and `_ai_agent_review` invocation stubs for both `copilot_triage_pod` and `copilot_draft_spec`. New file: `scripts/tests/plugins/copilot.bats`. Commit `d371b47b`.
-
-### ACG credentials CDP empty-contexts fix (DONE)
-lib-acg PR #7 merged (`027b5765`) 2026-05-02. Open blank tab via PUT `/json/new` when `contexts()` returns `[]`; guard `_cdpBrowser.disconnect()` behind `if (!browserContext)`. Copilot caught GET→PUT issue. Subtree pulled into k3d-manager at `cccd69d5` (2026-05-02). lib-acg next branch: `feat/lib-acg-next`.
-
----
-
-## Carry-forward Open Items (from v1.3.0)
-
-- **ACG Watcher extend button** — post-extend modal not dismissed in CDP mode. Spec: `docs/bugs/2026-05-01-acg-extend-session-extended-modal-not-dismissed.md`.
-- **Keycloak deployment** — spec: `docs/plans/v1.2.0-deploy-keycloak.md`. Assign to Codex.
-- **LDAP hardcoded password** — spec: `docs/bugs/2026-04-26-ldap-users-hardcoded-test-password.md`.
-- **vault-bridge pod-origin traffic** — `ClusterSecretStore/vault-backend` stays `Ready=False`. Spec: `docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md`.
-- **k3d-manager / shopping-cart decoupling** — spec: `docs/issues/2026-04-27-k3d-manager-shopping-cart-tight-coupling.md`.
-- **GCP E2E smoke test** — BLOCKED. Full `make up` on live GCP sandbox not verified.
-- **Post-Fix-2 cleanup** — BLOCKED on RabbitMQHealthIndicator JAR fix. Remove TCP socket probe patches from `services/shopping-cart-order/kustomization.yaml` only after JAR fix lands.
-
-## Known Bugs / Gaps (standing)
-
-- **Orchestration Fragility** — `docs/bugs/2026-04-23-infra-orchestration-fragility.md`
-- **Dual-cluster Status UX** — `docs/bugs/2026-04-23-make-up-dual-cluster-status-and-orbstack-gap.md`
-- **Copilot wrapper auth preflight** — `docs/issues/2026-05-01-copilot-wrapper-noninteractive-order-bug.md` (needs to reuse the local Copilot auth cache in `~/.config/github-copilot/apps.json` and only prompt when auth is missing/invalid)
-- **Copilot docs drift after `_ai_agent_review` refactor** — `docs/issues/2026-05-01-copilot-docs-still-reference-stale-gate-and-caller-surface.md` (current docs still mix `_ai_agent_review` with stale `K3DM_ENABLE_AI` / `_copilot_review` wording)
-- **Repo Retention Cleanup** — `docs/issues/2026-04-23-repo-retention-cleanup-for-scratch-and-docs.md`
-- **Whitespace Enforcement** — `_agent_lint` needs trailing-whitespace detection for `.js`/`.sh`
-- **GCP single-node vs AWS 3-node** — `docs/bugs/2026-04-25-gcp-single-node-vs-aws-three-node.md`
+## Notes
+- Update this file after the next significant milestone or direction change.
