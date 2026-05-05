@@ -33,6 +33,30 @@ setup() {
   [ "${calls[1]}" = "-n cicd get deployment argocd-server" ]
 }
 
+@test "_argocd_bootstrap_is_ready returns 0 when AppProject and ApplicationSets exist" {
+  : > "$KUBECTL_LOG"
+  KUBECTL_EXIT_CODES=()
+  run _argocd_bootstrap_is_ready
+  [ "$status" -eq 0 ]
+  read_lines "$KUBECTL_LOG" calls
+  [ "${calls[0]}" = "-n cicd get appproject/platform" ]
+  [ "${calls[1]}" = "-n cicd get applicationset/demo-rollout" ]
+  [ "${calls[2]}" = "-n cicd get applicationset/platform-helm" ]
+  [ "${calls[3]}" = "-n cicd get applicationset/services-git" ]
+}
+
+@test "_argocd_bootstrap_is_ready returns 1 when an ApplicationSet is missing" {
+  : > "$KUBECTL_LOG"
+  KUBECTL_EXIT_CODES=(0 0 0 1)
+  run _argocd_bootstrap_is_ready
+  [ "$status" -eq 1 ]
+  read_lines "$KUBECTL_LOG" calls
+  [ "${calls[0]}" = "-n cicd get appproject/platform" ]
+  [ "${calls[1]}" = "-n cicd get applicationset/demo-rollout" ]
+  [ "${calls[2]}" = "-n cicd get applicationset/platform-helm" ]
+  [ "${calls[3]}" = "-n cicd get applicationset/services-git" ]
+}
+
 @test "_argocd_ensure_logged_in uses plaintext non-interactive login" {
   : > "$KUBECTL_LOG"
   : > "$ARGOCD_LOG"

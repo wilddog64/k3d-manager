@@ -56,6 +56,24 @@ fi
 : "${ARGOCD_DEPLOY_KEY_VAULT_ROLE:=argocd-deploy-key-reader}"
 : "${ARGOCD_GITHUB_ORG:=wilddog64}"
 
+function _argocd_bootstrap_is_ready() {
+   local -a required_resources=(
+      "appproject/platform"
+      "applicationset/demo-rollout"
+      "applicationset/platform-helm"
+      "applicationset/services-git"
+   )
+
+   local resource
+   for resource in "${required_resources[@]}"; do
+      if ! _kubectl --no-exit -n "$ARGOCD_NAMESPACE" get "$resource" >/dev/null 2>&1; then
+         return 1
+      fi
+   done
+
+   return 0
+}
+
 function _argocd_ensure_logged_in() {
    if argocd account get-context --server localhost:8080 >/dev/null 2>&1; then
       return 0

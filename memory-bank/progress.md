@@ -14,6 +14,7 @@
 - Argo CD bootstrap now uses a configurable `ARGOCD_SERVER_WAIT_TIMEOUT` because the local cluster can take longer than 180s to cold-pull and become Available.
 - The full `scripts/tests/plugins/argocd.bats` suite still has two unrelated baseline failures; the timeout fix was verified with a targeted smoke run instead.
 - `bin/acg-sync-apps` can still fail when the local `cicd` namespace has no ApplicationSet/Application resources; a new issue doc records the missing-bootstrap state and root cause.
+- `bin/acg-up` now refreshes Argo CD bootstrap resources on existing Hub clusters when the bootstrap objects are absent, closing the gap that left `sync-apps` with no `rollout-demo-default` app.
 
 ## Next Steps
 - Pick up the next scoped task on `k3d-manager-v1.4.2`.

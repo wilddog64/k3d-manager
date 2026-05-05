@@ -1,5 +1,8 @@
 # `bin/acg-sync-apps` cannot find `rollout-demo-default`
 
+## Status
+- Fixed in `bin/acg-up` on `k3d-manager-v1.4.2` by refreshing Argo CD bootstrap resources when the Hub cluster already exists but the AppProject/ApplicationSets are missing.
+
 ## What was tested
 - `APP_CONTEXT=ubuntu-k3s bin/acg-sync-apps`
 - Live Argo CD objects in the local `cicd` namespace
@@ -34,5 +37,5 @@ default   19m
 - The current bootstrap path in `bin/acg-up` only applies the Argo CD bootstrap resources when the Hub cluster is created fresh, so an existing Hub can end up with a healthy `argocd-server` but no bootstrap objects.
 
 ## Recommended follow-up
-- Ensure Argo CD bootstrap resources are applied even when the Hub cluster already exists, or make `make sync-apps` fail with a more explicit bootstrap-absent message and recovery hint.
-- For immediate recovery, run the Argo CD bootstrap step before retrying `sync-apps`.
+- Keep the `sync-apps` failure message if the bootstrap objects are absent, but rely on `acg-up` to refresh them during setup.
+- For immediate recovery on older branches, run the Argo CD bootstrap step before retrying `sync-apps`.
