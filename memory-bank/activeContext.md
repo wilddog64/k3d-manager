@@ -6,6 +6,7 @@
 - One unrelated local modification exists in `scripts/playwright/acg_extend.js`; leave it untouched unless the task explicitly includes it.
 - The Argo CD bootstrap timeout issue was traced to a fixed 180s wait on `deployment/argocd-server`; the wait is now configurable via `ARGOCD_SERVER_WAIT_TIMEOUT` with a longer default.
 - The full `scripts/tests/plugins/argocd.bats` suite still has two unrelated baseline failures; the timeout fix was validated with a targeted smoke run instead.
+- `bin/acg-sync-apps` now has a recorded failure case where Argo CD is healthy but the `demo-rollout` ApplicationSet has not been bootstrapped, leaving no `rollout-demo-default` app to sync.
 
 ## Current Focus
 - Keep the next branch lean and focused on the next queued task.
@@ -13,6 +14,7 @@
 - Treat `tools/rigor-cli/` as read-only vendored tooling unless the task explicitly refreshes the subtree.
 - Keep the helper naming / review-doc cleanup aligned with the repo-local `bin/` surface and docs references.
 - Keep the Argo CD readiness gate aligned with the observed cold-start timing on the local cluster.
+- Keep the Argo CD bootstrap and `sync-apps` target expectations aligned so healthy servers do not hide missing `ApplicationSet`/`Application` resources.
 
 ## Notes
 - Update this file after the next significant milestone or direction change.
