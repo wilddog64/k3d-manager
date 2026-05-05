@@ -7,7 +7,7 @@
 - The Argo CD bootstrap timeout issue was traced to a fixed 180s wait on `deployment/argocd-server`; the wait is now configurable via `ARGOCD_SERVER_WAIT_TIMEOUT` with a longer default.
 - The full `scripts/tests/plugins/argocd.bats` suite still has two unrelated baseline failures; the timeout fix was validated with a targeted smoke run instead.
 - `bin/acg-sync-apps` now has a recorded failure case where Argo CD is healthy but the `demo-rollout` ApplicationSet has not been bootstrapped, leaving no `rollout-demo-default` app to sync.
-- `bin/acg-up` now refreshes Argo CD bootstrap resources on an existing Hub cluster when the AppProject/ApplicationSets are missing instead of skipping bootstrap solely because the Hub already exists.
+- `bin/acg-up` now refreshes Argo CD bootstrap resources on an existing Hub cluster when the AppProject/ApplicationSets are missing instead of skipping bootstrap solely because the Hub already exists. Commit `416d260e`.
 
 ## Current Focus
 - Keep the next branch lean and focused on the next queued task.
