@@ -146,20 +146,20 @@ async function extendSandbox() {
           const ampm = shutdownMatch[3].toUpperCase();
           if (ampm === 'PM' && hours < 12) hours += 12;
           if (ampm === 'AM' && hours === 12) hours = 0;
-          
+
           const shutdownTime = new Date();
           shutdownTime.setHours(hours, mins, 0, 0);
-          
+
           // Midnight/Date-wrap fix: Handle case where shutdown is tomorrow morning
           if (shutdownTime < now) {
              shutdownTime.setDate(shutdownTime.getDate() + 1);
           }
-          
+
           const remainingMs = shutdownTime.getTime() - now.getTime();
           remainingMins = Math.floor(remainingMs / 60000);
-          
+
           console.error(`INFO: Calculated remaining TTL: ~${remainingMins} minutes`);
-          
+
           if (remainingMins > 65) {
             console.log(`INFO: Extension window not open yet (${remainingMins}m remaining). Skipping extension.`);
             process.exit(0);
@@ -222,27 +222,27 @@ async function extendSandbox() {
     // failure alone is not a strong enough signal to perform a destructive delete/restart action)
     if (!clicked && remainingMins !== null && remainingMins < 15) {
       console.error('INFO: Extend button missing in critical window. Attempting "Ghost State" recovery (Delete/Restart)...');
-      
+
       const deleteBtn = page.locator('button:has-text("Delete Sandbox")').first();
       if (await deleteBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
         console.error('INFO: Clicking Delete Sandbox...');
         await deleteBtn.click({ force: true });
-        
+
         const confirmBtn = page.locator('div[role="dialog"] button:has-text("Delete"), button:has-text("Confirm"), button:has-text("Yes, delete")').first();
         if (await confirmBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
           await confirmBtn.click({ force: true });
           console.error('INFO: Deletion confirmed. Waiting for Start button...');
           await page.waitForTimeout(5000);
-          
+
           const startBtn = page.locator('button:has-text("Start Sandbox")').first();
           if (await startBtn.isVisible({ timeout: 30000 }).catch(() => false)) {
             console.error('INFO: Clicking Start Sandbox...');
             await startBtn.click({ force: true });
-            
+
             // Pluralsight should now show the "Extend Your Session" modal
             console.error('INFO: Waiting for Extension Modal...');
             await page.waitForTimeout(10000);
-            
+
             for (const selector of extendSelectors) {
               const btn = page.locator(selector).first();
               const visible = await btn.isVisible({ timeout: 15000 }).catch(() => false);
