@@ -117,7 +117,7 @@ if [[ "${_hub_newly_created}" -eq 1 ]]; then
 elif ! _argocd_bootstrap_is_ready; then
   _info "[acg-up] Step 3.6/12 — Refreshing ArgoCD bootstrap resources on existing Hub cluster..."
   kubectl config use-context "${_HUB_CLUSTER_CTX}" >/dev/null 2>&1 || true
-  "${REPO_ROOT}/scripts/k3d-manager" deploy_argocd_bootstrap
+  "${REPO_ROOT}/scripts/k3d-manager" deploy_argocd_bootstrap --confirm
   _info "[acg-up] ArgoCD bootstrap resources refreshed."
 fi
 
