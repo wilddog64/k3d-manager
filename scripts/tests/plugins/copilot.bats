@@ -95,10 +95,10 @@ setup() {
   }
   git() {
     case "$*" in
-      -C\ "$SCRIPT_DIR"\ log\ --oneline\ -10)
+      -C\ *\ log\ --oneline\ -10)
         echo "abc1234 fix: something"
         ;;
-      -C\ "$SCRIPT_DIR"\ diff\ --name-only\ HEAD~3..HEAD)
+      -C\ *\ diff\ --name-only\ HEAD~3..HEAD)
         echo "scripts/plugins/copilot.sh"
         ;;
       *)
