@@ -456,7 +456,15 @@ _vault_kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbitmq_pass}\"}"  
 _ldap_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
 _ldap_readonly_pass=$(openssl rand -base64 24 | tr -d '=+/')
 _vault_kv_put "{\"admin_password\":\"${_ldap_admin_pass}\",\"readonly_password\":\"${_ldap_readonly_pass}\"}" ldap/admin
-_info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq, ldap sandbox secrets)"
+_kc_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
+_kc_db_pass=$(openssl rand -base64 24 | tr -d '=+/')
+_argocd_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+_order_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+_product_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+_grafana_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+_vault_kv_put "{\"admin_password\":\"${_kc_admin_pass}\",\"db_password\":\"${_kc_db_pass}\"}" keycloak/admin
+_vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
+_info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq, ldap, keycloak sandbox secrets)"
 
 _info "[acg-up] Step 10/12 — Registering app cluster with ArgoCD..."
 _argocd_sa_token=$(kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s \
