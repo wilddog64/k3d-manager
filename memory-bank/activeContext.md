@@ -27,8 +27,9 @@
 - **lib-foundation upstream doc fix** — `scripts/lib/foundation/docs/api/functions.md` usage snippet still has k3d-manager-specific `K3DM_ENABLE_AI=1` context; needs upstream lib-foundation PR
 
 ## Current Focus (v1.4.5)
-- **ASSIGNED TO GEMINI:** `fix(argocd-sso)` — spec at `docs/plans/v1.4.5-argocd-sso-keycloak.md`; implement 5-change ArgoCD SSO wiring (namespace fix, Keycloak hostname, ExternalSecret, acg-up Step 10e). k3d-manager branch: `k3d-manager-v1.4.5`; shopping-cart-infra branch: `docs/next-improvements`.
-- **ASSIGNED TO GEMINI:** pyjenkinsapi rigor-cli v0.1.6 subtree pull — branch `docs/next-improvements`; pull from `14b65d63`; resolve ai-review conflict; re-enable BATS in CI.
+- **COMPLETE:** `fix(acg-up-bugs)` — spec `docs/plans/v1.4.5-bugfix-gemini.md`. Fixed CoreDNS NodeHosts patch and /etc/hosts sudo fallback (SHA: `d6a31c5`).
+- **COMPLETE:** `fix(argocd-sso)` — spec at `docs/plans/v1.4.5-argocd-sso-keycloak.md`; implemented 5-change ArgoCD SSO wiring.
+- **COMPLETE:** pyjenkinsapi rigor-cli v0.1.6 subtree pull.
 - **Pending:** `refactor(plugins)` — spec at `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex after SSO wiring is verified. Updated to include `k3s-aws.sh` and `k3s-gcp.sh` source-line changes (both source `shopping_cart.sh` directly — must rename to `k3s_remote.sh`).
 - **Next:** `feat(providers)` — spec at `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; depends on refactor spec.
 - **Next:** `feat(tunnel)` — spec at `docs/plans/v1.4.3-chisel-tunnel.md`; depends on refactor spec.
