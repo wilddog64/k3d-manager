@@ -462,7 +462,7 @@ _argocd_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
 _order_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
 _product_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
 _grafana_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-_vault_kv_put "{\"admin_password\":\"${_kc_admin_pass}\",\"db_password\":\"${_kc_db_pass}\",\"ldap_bind_credential\":\"${_ldap_admin_pass}\"}" keycloak/admin
+_vault_kv_put "{\"admin_password\":\"${_kc_admin_pass}\",\"db_password\":\"${_kc_db_pass}\"}" keycloak/admin
 _vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
 _info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq, ldap, keycloak sandbox secrets)"
 
