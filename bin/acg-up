@@ -605,18 +605,17 @@ KEYCLOAK_SERVICE_PORT=80 \
 _gw_ip=$(kubectl get svc istio-ingressgateway -n istio-system --context k3d-k3d-cluster \
   -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
 if [[ -n "${_gw_ip}" ]]; then
-  _cf=$(kubectl get cm coredns -n kube-system --context k3d-k3d-cluster \
-    -o jsonpath='{.data.Corefile}')
-  if ! printf '%s' "${_cf}" | grep -qF 'keycloak.shopping-cart.local'; then
-    _new_cf=$(printf '%s' "${_cf}" | awk \
-      -v ip="${_gw_ip}" \
-      '/^    health \{/{print "    hosts {"; printf "      %s keycloak.shopping-cart.local\n", ip; print "      fallthrough"; print "    }"} {print}')
+  _nh=$(kubectl get cm coredns -n kube-system --context k3d-k3d-cluster \
+    -o jsonpath='{.data.NodeHosts}')
+  if ! printf '%s' "${_nh}" | grep -qF 'keycloak.shopping-cart.local'; then
+    _new_nh="${_nh}
+${_gw_ip} keycloak.shopping-cart.local"
     kubectl patch cm coredns -n kube-system --context k3d-k3d-cluster \
       --type merge \
-      --patch "$(printf '{"data":{"Corefile":%s}}' "$(printf '%s' "${_new_cf}" | jq -Rs .)")"
+      --patch "$(python3 -c "import json,sys; print(json.dumps({'data':{'NodeHosts':sys.argv[1]}}))" "${_new_nh}")"
     kubectl rollout restart deployment/coredns -n kube-system --context k3d-k3d-cluster
     kubectl rollout status deployment/coredns -n kube-system --context k3d-k3d-cluster --timeout=60s
-    _info "[acg-up] CoreDNS patched: keycloak.shopping-cart.local → ${_gw_ip}"
+    _info "[acg-up] CoreDNS NodeHosts patched: keycloak.shopping-cart.local → ${_gw_ip}"
   fi
 else
   _info "[acg-up] WARNING: IngressGateway LB IP not found — CoreDNS not patched; ArgoCD SSO in-cluster resolution may fail"
@@ -637,9 +636,12 @@ kubectl patch secret argocd-secret -n cicd --context k3d-k3d-cluster \
 
 # Add /etc/hosts entry on the Mac host so the browser reaches keycloak.shopping-cart.local
 if ! grep -qF 'keycloak.shopping-cart.local' /etc/hosts; then
-  _run_command --require-sudo -- \
-    sh -c 'printf "127.0.0.1 keycloak.shopping-cart.local\n" >> /etc/hosts'
-  _info "[acg-up] /etc/hosts: added keycloak.shopping-cart.local → 127.0.0.1"
+  if _run_command --prefer-sudo -- \
+      sh -c 'printf "127.0.0.1 keycloak.shopping-cart.local\n" >> /etc/hosts' 2>/dev/null; then
+    _info "[acg-up] /etc/hosts: added keycloak.shopping-cart.local → 127.0.0.1"
+  else
+    _info "[acg-up] WARNING: could not update /etc/hosts — add manually: 127.0.0.1 keycloak.shopping-cart.local"
+  fi
 fi
 
 # Restart argocd-server to pick up the updated argocd-cm and argocd-secret
