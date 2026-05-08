@@ -13,7 +13,7 @@
 
 ### Fixed
 - `scripts/lib/foundation/scripts/lib/system.sh` (lib-foundation subtree): removed `K3DM_ENABLE_AI` gate from `_copilot_review` — a lib-foundation backend must not check a consumer-specific env var; gate belongs in callers (`copilot_triage_pod`, `copilot_draft_spec`) which already have it (`657fd91`, `f6362f79`)
-- `scripts/plugins/argocd.sh`: `ARGOCD_SERVER_WAIT_TIMEOUT` now configurable (default 300s) — prevents cold-pull timeout on local cluster where argocd-server needs more than 180s to become Available (`e79b2310`)
+- `scripts/plugins/argocd.sh`: `ARGOCD_SERVER_WAIT_TIMEOUT` now configurable (default 600s) — prevents cold-pull timeout on local cluster where argocd-server needs more than 180s to become Available (`e79b2310`)
 - `bin/acg-up`: refreshes ArgoCD bootstrap resources (AppProject + ApplicationSets) on existing Hub clusters when the objects are absent — previously skipped bootstrap if Hub already existed, leaving `sync-apps` with no rollout app (`416d260e`)
 - `bin/acg-up`: added `--confirm` flag to `deploy_argocd_bootstrap` call — prevents interactive prompt from blocking automation (`a49d25df`)
 

@@ -189,6 +189,7 @@ copilot auth status
 ./scripts/k3d-manager copilot_triage_pod --help
 
 # Run a minimal review
-K3DM_ENABLE_AI=1 source scripts/lib/system.sh
+export K3DM_ENABLE_AI=1
+source scripts/lib/system.sh
 _ai_agent_review --prompt "say hello"
 ```

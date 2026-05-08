@@ -133,7 +133,7 @@ function deploy_argocd() {
    # 4. Automatic Bootstrap
    _info "[argocd] Triggering automatic GitOps bootstrap..."
    _argocd_ensure_logged_in
-   deploy_argocd_bootstrap "$@"
+   deploy_argocd_bootstrap
 }
 
 function _argocd_check_dependencies() {
