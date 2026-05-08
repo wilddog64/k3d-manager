@@ -4,6 +4,8 @@ kind: Deployment
 metadata:
   name: keycloak
   namespace: identity
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     app.kubernetes.io/name: keycloak
     app.kubernetes.io/component: identity-provider

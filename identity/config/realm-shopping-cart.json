@@ -297,7 +297,7 @@
       "publicClient": true,
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": true,
+      "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "redirectUris": [
         "http://localhost:3000/*",

@@ -34,6 +34,8 @@ kind: Deployment
 metadata:
   name: ldap
   namespace: identity
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
   labels:
     app.kubernetes.io/name: ldap
     app.kubernetes.io/component: directory
