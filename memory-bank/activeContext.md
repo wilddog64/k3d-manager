@@ -18,8 +18,7 @@
 - **lib-foundation upstream doc fix** — `scripts/lib/foundation/docs/api/functions.md` usage snippet still has k3d-manager-specific `K3DM_ENABLE_AI=1` context; needs upstream lib-foundation PR
 
 ## Current Focus
-- Pick up the next queued task on `k3d-manager-v1.4.3`.
-- Lead item: restore `deploy_argocd_bootstrap "$@"` passthrough via lib-foundation flag-filtering approach.
+- **OPEN:** `refactor(plugins)` — spec at `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; hand off to Codex
 - Preserve subtree discipline: `scripts/lib/foundation/` and `scripts/lib/acg/` edits upstream first.
 
 ## Notes

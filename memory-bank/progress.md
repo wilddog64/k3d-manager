@@ -18,6 +18,6 @@
 - [x] Retrospective: `docs/retro/2026-05-07-v1.4.2-retrospective.md`
 
 ## Next Steps (v1.4.3)
+- [ ] **Refactor shopping_cart.sh → k3s_remote.sh** — spec: `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex
 - [ ] Restore `deploy_argocd_bootstrap "$@"` passthrough — lib-foundation flag-filtering approach; fix callers that depended on it (esp. `provision-tomcat`)
 - [ ] lib-foundation upstream: remove `K3DM_ENABLE_AI=1` from `_copilot_review` usage snippet in `docs/api/functions.md`
-- [ ] Pick up next feature scoped for v1.4.3
