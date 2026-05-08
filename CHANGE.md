@@ -1,6 +1,6 @@
 # Changes - k3d-manager
 
-## [Unreleased] — `_ai_agent_review` generic AI dispatch abstraction
+## [v1.4.2] — 2026-05-07 — _ai_agent_review abstraction + ArgoCD bootstrap hardening + cdp.sh fixes
 
 ### Changed
 - `scripts/plugins/copilot.sh`: both `copilot_triage_pod` and `copilot_draft_spec` now route through `_ai_agent_review` instead of `_copilot_review` directly — backend selected by `AI_REVIEW_FUNC` (default: `copilot`), model by `AI_REVIEW_MODEL` (default: `gpt-5.4-mini`) (`c8ac9b2f`)
@@ -9,9 +9,13 @@
 - `docs/howto/copilot.md`: all user-facing `_copilot_review` references replaced with `_ai_agent_review`; `AI_REVIEW_FUNC` + `AI_REVIEW_MODEL` env vars documented with usage table (`c8ac9b2f`)
 - `docs/api/functions.md`: copilot plugin table rows updated to reference `_ai_agent_review` and `AI_REVIEW_FUNC` (`c8ac9b2f`)
 - `scripts/lib/foundation/scripts/lib/system.sh` (lib-foundation subtree): `_ai_agent_review` dispatch wrapper added — routes to `_copilot_review` via `AI_REVIEW_FUNC`; `ai_agent_review.bats` 3-test suite added (`448560a`, `80bf01cd`)
+- `scripts/lib/acg/` subtree: pulled lib-acg PR #10 — `launchctl unload` replaced with `launchctl bootout "gui/$(id -u)/<label>"`; deprecated `_CDP_CHROME_CDP_PLIST` variable removed; `bootout` failure now surfaces via `_warn` instead of being silenced; dead 17-line Linux else-block removed from `_browser_launch` (library is macOS-only) (`0038ce4d`)
 
 ### Fixed
 - `scripts/lib/foundation/scripts/lib/system.sh` (lib-foundation subtree): removed `K3DM_ENABLE_AI` gate from `_copilot_review` — a lib-foundation backend must not check a consumer-specific env var; gate belongs in callers (`copilot_triage_pod`, `copilot_draft_spec`) which already have it (`657fd91`, `f6362f79`)
+- `scripts/plugins/argocd.sh`: `ARGOCD_SERVER_WAIT_TIMEOUT` now configurable (default 300s) — prevents cold-pull timeout on local cluster where argocd-server needs more than 180s to become Available (`e79b2310`)
+- `bin/acg-up`: refreshes ArgoCD bootstrap resources (AppProject + ApplicationSets) on existing Hub clusters when the objects are absent — previously skipped bootstrap if Hub already existed, leaving `sync-apps` with no rollout app (`416d260e`)
+- `bin/acg-up`: added `--confirm` flag to `deploy_argocd_bootstrap` call — prevents interactive prompt from blocking automation (`a49d25df`)
 
 ---
 
