@@ -1,6 +1,6 @@
 # How-To: Copilot CLI Integration
 
-The `copilot` plugin exposes `_copilot_review` (from lib-foundation) as two practical public
+The `copilot` plugin exposes `_ai_agent_review` (from lib-foundation) as two practical public
 functions: one for pod failure triage and one for bug spec drafting. A pre-commit hook
 integration wires AI architectural lint on staged shell files.
 
@@ -77,9 +77,9 @@ implementation.
 
 ## Pre-Commit Architectural Lint (opt-in)
 
-`_copilot_review` is wired into the pre-commit hook via `AGENT_LINT_AI_FUNC`. When
-`K3DM_ENABLE_AI=1`, the hook calls `_agent_lint` which passes staged `.sh` files to Copilot
-for architectural lint against `scripts/etc/agent/lint-rules.md`.
+`_ai_agent_review` is wired into the pre-commit hook via `AGENT_LINT_AI_FUNC`. In
+k3d-manager, the hook calls `_agent_lint` only when `K3DM_ENABLE_AI=1`, which passes staged
+`.sh` files to Copilot for architectural lint against `scripts/etc/agent/lint-rules.md`.
 
 This is **opt-in** — the hook does nothing extra when `K3DM_ENABLE_AI` is unset or `0`.
 No Copilot CLI required for users who don't set it.
@@ -96,35 +96,54 @@ git commit -m "feat: my change"
 If Copilot flags a violation, the commit is blocked with the lint output. Fix the flagged
 code and commit again.
 
-## Low-Level API: `_copilot_review`
+## Low-Level API: `_ai_agent_review`
 
-`_copilot_review` is the sandboxed Copilot CLI wrapper in lib-foundation. You can call it
-directly in any shell script that sources `scripts/lib/system.sh`:
+`_ai_agent_review` is the generic AI dispatch wrapper in lib-foundation. It reads
+`AI_REVIEW_FUNC` (default: `copilot`) and `AI_REVIEW_MODEL` (default: `gpt-5.4-mini`)
+and routes to the selected backend. Currently only the `copilot` backend is supported.
+In k3d-manager, source `scripts/lib/system.sh` and the dispatcher loads the vendored
+lib-foundation subtree for you. In another project that vendors lib-foundation directly,
+source `scripts/lib/foundation/scripts/lib/system.sh` instead:
 
 ```bash
 source scripts/lib/system.sh
 
-_copilot_review --prompt "Explain the purpose of _agent_lint in this repo."
-_copilot_review --prompt "Review staged changes for security issues." --model claude-sonnet-4-5
+# Uses default backend (copilot) and default model (gpt-5.4-mini)
+_ai_agent_review --prompt "Explain the purpose of _agent_lint in this repo."
+
+# Override model for this call
+_ai_agent_review --prompt "Review staged changes for security issues." --model claude-sonnet-4-6
+
+# Select backend and model via env vars
+AI_REVIEW_FUNC=copilot AI_REVIEW_MODEL=gpt-5.4-mini \
+  _ai_agent_review --prompt "Diagnose this failure."
 ```
+
+**`_ai_agent_review` env vars:**
+
+| Env Var | Default | Description |
+|---|---|---|
+| `AI_REVIEW_FUNC` | `copilot` | AI backend. Currently only `copilot` is supported. |
+| `AI_REVIEW_MODEL` | `gpt-5.4-mini` | Model passed to the backend. |
 
 **Guard rails applied automatically:**
 - Prompt is scoped to the k3d-manager repo context
 - Forbidden fragments blocked: `shell(git push)`, `shell(rm`, `shell(eval`, `shell(sudo`,
   `shell(curl`, `shell(wget`, `shell(cd`
 - Runs from repo root (via `_k3dm_repo_root`)
-- Errors out (exits non-zero) when `K3DM_ENABLE_AI=0`
+- The k3d-manager public wrappers gate access with `K3DM_ENABLE_AI`; `_ai_agent_review`
+  itself is generic and does not read that variable.
 
 **Signature:**
 
 ```
-_copilot_review [--prompt|-p <text>] [--model <model-id>] [<copilot-flags>...]
+_ai_agent_review [--prompt|-p <text>] [<flags>...]
 ```
 
-## Using `_copilot_review` in Other Projects
+## Using `_ai_agent_review` in Other Projects
 
-`_copilot_review` ships in lib-foundation (`scripts/lib/system.sh`). Any project that pulls
-lib-foundation as a subtree can call it directly.
+`_ai_agent_review` ships in lib-foundation (`scripts/lib/foundation/scripts/lib/system.sh`).
+Any project that pulls lib-foundation as a subtree can call it directly.
 
 **Step 1 — Pull lib-foundation:**
 
@@ -137,9 +156,7 @@ git subtree add --prefix scripts/lib/foundation \
 
 ```bash
 source scripts/lib/foundation/scripts/lib/system.sh
-
-export K3DM_ENABLE_AI=1
-_copilot_review --prompt "Review this deployment manifest for security issues."
+_ai_agent_review --prompt "Review this deployment manifest for security issues."
 ```
 
 **Step 3 — Write a project-specific wrapper** (same pattern as `copilot_triage_pod`):
@@ -148,7 +165,7 @@ _copilot_review --prompt "Review this deployment manifest for security issues."
 function myproject_triage_db() {
   local context
   context="$(psql -c "SELECT * FROM pg_stat_activity;" 2>&1 || true)"
-  _copilot_review --prompt "Diagnose this PostgreSQL activity. Do not run commands.\n\n${context}"
+  _ai_agent_review --prompt "Diagnose this PostgreSQL activity. Do not run commands.\n\n${context}"
 }
 ```
 
@@ -156,7 +173,7 @@ function myproject_triage_db() {
 
 ```bash
 # In .git/hooks/pre-commit or scripts/hooks/pre-commit
-export AGENT_LINT_AI_FUNC="_copilot_review"
+export AGENT_LINT_AI_FUNC="_ai_agent_review"
 export AGENT_LINT_GATE_VAR="K3DM_ENABLE_AI"
 export K3DM_ENABLE_AI="${K3DM_ENABLE_AI:-0}"
 # ... then call _agent_lint
@@ -172,6 +189,7 @@ copilot auth status
 ./scripts/k3d-manager copilot_triage_pod --help
 
 # Run a minimal review
-K3DM_ENABLE_AI=1 source scripts/lib/system.sh
-_copilot_review --prompt "say hello"
+export K3DM_ENABLE_AI=1
+source scripts/lib/system.sh
+_ai_agent_review --prompt "say hello"
 ```

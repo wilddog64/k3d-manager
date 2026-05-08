@@ -114,6 +114,11 @@ if [[ "${_hub_newly_created}" -eq 1 ]]; then
   "${REPO_ROOT}/scripts/k3d-manager" deploy_ldap --confirm
   "${REPO_ROOT}/scripts/k3d-manager" deploy_argocd --confirm
   _info "[acg-up] Hub cluster bootstrapped."
+elif ! _argocd_bootstrap_is_ready; then
+  _info "[acg-up] Step 3.6/12 — Refreshing ArgoCD bootstrap resources on existing Hub cluster..."
+  kubectl config use-context "${_HUB_CLUSTER_CTX}" >/dev/null 2>&1 || true
+  "${REPO_ROOT}/scripts/k3d-manager" deploy_argocd_bootstrap --confirm
+  _info "[acg-up] ArgoCD bootstrap resources refreshed."
 fi
 
 _vault_local_port="${TUNNEL_VAULT_LOCAL_PORT:-18200}"
@@ -242,6 +247,9 @@ if [[ -z "$_ghcr_pat" ]]; then
       _err "[acg-up] GHCR_PAT not set and no valid PAT in Vault — set GHCR_PAT env var or run: pbpaste | bin/rotate-ghcr-pat"
     fi
   fi
+fi
+if [[ -z "$_ghcr_pat" ]]; then
+  _err "[acg-up] GitHub PAT is empty — cannot create ghcr-pull-secret. Re-run with: GHCR_PAT=\$(pbpaste) make up"
 fi
 for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
   kubectl create namespace "$ns" --context ubuntu-k3s \

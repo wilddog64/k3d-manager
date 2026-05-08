@@ -84,8 +84,8 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `vcluster_list` | `scripts/plugins/vcluster.sh` | List all vClusters in the active namespace |
 | `vcluster_install_cli` | `scripts/plugins/vcluster.sh` | Install the vcluster CLI (brew on macOS, binary download on Linux); auto-called by other vcluster commands |
 | `ldap_get_user_password` | `scripts/plugins/ldap.sh` | Retrieve an LDAP user's current password from Vault |
-| `copilot_triage_pod` | `scripts/plugins/copilot.sh` | Collect `kubectl describe pod` + last 100 log lines and ask Copilot to diagnose the failure; requires `K3DM_ENABLE_AI=1` |
-| `copilot_draft_spec` | `scripts/plugins/copilot.sh` | Collect recent git log + changed files and ask Copilot to scaffold a `docs/bugs/` spec with Root Cause / What to Change / DoD sections; requires `K3DM_ENABLE_AI=1` |
+| `copilot_triage_pod` | `scripts/plugins/copilot.sh` | Collect `kubectl describe pod` + last 100 log lines and pass to `_ai_agent_review` for diagnosis; backend selected by `AI_REVIEW_FUNC`; requires `K3DM_ENABLE_AI=1` |
+| `copilot_draft_spec` | `scripts/plugins/copilot.sh` | Collect recent git log + changed files and pass to `_ai_agent_review` to scaffold a `docs/bugs/` spec; backend selected by `AI_REVIEW_FUNC`; requires `K3DM_ENABLE_AI=1` |
 
 ### `acg_get_credentials`
 

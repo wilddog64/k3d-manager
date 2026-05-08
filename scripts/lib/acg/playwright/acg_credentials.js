@@ -1,5 +1,6 @@
 const { chromium } = require('playwright');
 const fs = require('fs');
+const http = require('http');
 const os = require('os');
 const path = require('path');
 
@@ -183,8 +184,32 @@ async function extractCredentials() {
         browserContext = _cdpContext;
       }
       if (!browserContext) {
-        try { await _cdpBrowser.disconnect(); } catch {}
-        _cdpBrowser = null;
+        // Chrome has no open tabs — its default context is invisible to CDP until
+        // a tab exists. Open a blank tab via the HTTP API to surface the profile
+        // context; then re-query so Playwright can see it.
+        console.error('INFO: CDP connected but no open contexts — opening blank tab to expose profile context.');
+        try {
+          await new Promise((resolve, reject) => {
+            const req = http.request(
+              { hostname: CDP_HOST, port: CDP_PORT, path: '/json/new', method: 'PUT' },
+              res => { res.resume(); resolve(); }
+            );
+            req.on('error', reject);
+            req.end();
+          });
+          await new Promise(r => setTimeout(r, 500));
+          try { await _cdpBrowser.disconnect(); } catch {}
+          _cdpBrowser = await chromium.connectOverCDP(CDP_URL);
+          const _refreshedContexts = _cdpBrowser.contexts();
+          if (_refreshedContexts.length > 0) {
+            browserContext = _refreshedContexts[0];
+            console.error('INFO: Default Chrome context now accessible after blank tab + reconnect.');
+          }
+        } catch { /* fall through if blank tab fails */ }
+        if (!browserContext) {
+          try { await _cdpBrowser.disconnect(); } catch {}
+          _cdpBrowser = null;
+        }
       }
     } catch {
       _cdpBrowser = null;
@@ -331,7 +356,7 @@ async function extractCredentials() {
           const inputs = document.querySelectorAll('input[aria-label="Copyable input"]');
           const hasCredentials = inputs.length > 0 && inputs[0].value.trim().length > 0;
           return hasStart || hasOpen || hasResume || hasCredentials;
-        }, { timeout });
+        }, null, { timeout });
       };
 
       const _waitForSandboxEntrySoft = async (timeout = 30000) => {
@@ -365,14 +390,19 @@ async function extractCredentials() {
       }
 
       const _waitForCredentials = async () => {
-        console.error('INFO: Waiting for credentials to populate (up to 60s)...');
-        await page.waitForFunction(
-          () => {
-            const inputs = document.querySelectorAll('input[aria-label="Copyable input"]');
-            return inputs.length > 0 && inputs[0].value.trim().length > 0;
-          },
-          { timeout: 60000 }
-        );
+        console.error('INFO: Waiting for credentials to populate (up to 420s)...');
+        const deadline = Date.now() + 420000;
+        while (Date.now() < deadline) {
+          const inputs = page.locator('input[aria-label="Copyable input"]');
+          if (await inputs.count() > 0) {
+            const value = await inputs.first().inputValue().catch(() => '');
+            if (value.trim().length > 0) {
+              return;
+            }
+          }
+          await page.waitForTimeout(2000);
+        }
+        throw new Error('Locator polling timed out after 420000ms waiting for input[aria-label="Copyable input"] to have a non-empty value.');
       };
 
       // Pattern 1: Direct "Start Sandbox" button (in a modal or panel)
@@ -436,7 +466,8 @@ async function extractCredentials() {
   }
 }
 
-const OVERALL_TIMEOUT_MS = IS_FIRST_RUN ? 300000 : 120000;
+// 300s (waitForURL patient bridge) + 420s (credential polling) + 60s buffer
+const OVERALL_TIMEOUT_MS = 780000;
 let _timeoutHandle;
 const _timeoutPromise = new Promise((_, reject) => {
   _timeoutHandle = setTimeout(

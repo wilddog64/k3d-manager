@@ -50,10 +50,29 @@ fi
 : "${ARGOCD_HELM_REPO_URL:=https://argoproj.github.io/argo-helm}"
 : "${ARGOCD_HELM_CHART_REF:=argo/argo-cd}"
 : "${ARGOCD_VIRTUALSERVICE_HOST:=argocd.dev.local.me}"
+: "${ARGOCD_SERVER_WAIT_TIMEOUT:=600s}"
 : "${ARGOCD_DEPLOY_KEY_SECRETSTORE:=argocd-deploy-key-store}"
 : "${ARGOCD_DEPLOY_KEY_ESO_SA:=eso-argocd-deploy-keys-sa}"
 : "${ARGOCD_DEPLOY_KEY_VAULT_ROLE:=argocd-deploy-key-reader}"
 : "${ARGOCD_GITHUB_ORG:=wilddog64}"
+
+function _argocd_bootstrap_is_ready() {
+   local -a required_resources=(
+      "appproject/platform"
+      "applicationset/demo-rollout"
+      "applicationset/platform-helm"
+      "applicationset/services-git"
+   )
+
+   local resource
+   for resource in "${required_resources[@]}"; do
+      if ! _kubectl --no-exit -n "$ARGOCD_NAMESPACE" get "$resource" >/dev/null 2>&1; then
+         return 1
+      fi
+   done
+
+   return 0
+}
 
 function _argocd_ensure_logged_in() {
    if argocd account get-context --server localhost:8080 >/dev/null 2>&1; then
@@ -109,7 +128,7 @@ function deploy_argocd() {
    _argocd_helm_deploy_release "$enable_ldap" "0"
 
    # 3. Wait and Post-Deploy
-   _kubectl -n "$ARGOCD_NAMESPACE" wait --for=condition=available --timeout=180s deployment/argocd-server
+   _kubectl -n "$ARGOCD_NAMESPACE" wait --for=condition=available --timeout="$ARGOCD_SERVER_WAIT_TIMEOUT" deployment/argocd-server
    
    # 4. Automatic Bootstrap
    _info "[argocd] Triggering automatic GitOps bootstrap..."

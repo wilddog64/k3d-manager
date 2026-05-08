@@ -12,6 +12,52 @@ if ! declare -f _antigravity_browser_ready >/dev/null 2>&1; then
   [[ -f "${_CDP_FOUNDATION}/system.sh" ]] && source "${_CDP_FOUNDATION}/system.sh"
 fi
 
+_CDP_CHROME_CDP_LABEL="${CDP_CHROME_CDP_LABEL:-com.k3d-manager.chrome-cdp}"
+
+function _cdp_profile_in_use() {
+  local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/profile}"
+  local _profile_arg="--user-data-dir=${_cdp_profile_dir}"
+
+  ps -ax -o command= | awk -v profile="${_profile_arg}" '
+    index($0, profile) && $0 ~ /(Google Chrome|chromium|chrome)/ {
+      found = 1
+    }
+    END { exit(found ? 0 : 1) }
+  '
+}
+
+function _cdp_stop_chrome_cdp_agent() {
+  if [[ "$(uname)" != "Darwin" ]]; then
+    return 0
+  fi
+
+  if launchctl list "${_CDP_CHROME_CDP_LABEL}" >/dev/null 2>&1; then
+    _info "[acg] Stopping Chrome CDP agent before taking over the browser profile..."
+    launchctl bootout "gui/$(id -u)/${_CDP_CHROME_CDP_LABEL}" || _warn "[acg] launchctl bootout ${_CDP_CHROME_CDP_LABEL} failed — agent may still be running"
+    local _wait_for_exit=0
+    while _cdp_profile_in_use && [[ ${_wait_for_exit} -lt 5 ]]; do
+      sleep 1
+      _wait_for_exit=$((_wait_for_exit + 1))
+    done
+  fi
+}
+
+function _cdp_remove_stale_singleton_lock() {
+  local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/profile}"
+  local _singleton_lock="${_cdp_profile_dir}/SingletonLock"
+
+  if [[ ! -e "${_singleton_lock}" ]]; then
+    return 0
+  fi
+
+  if _cdp_profile_in_use; then
+    return 0
+  fi
+
+  _info "[acg] Removing stale Chrome profile lock: ${_singleton_lock}"
+  rm -f "${_singleton_lock}"
+}
+
 function _browser_launch() {
   if ! _command_exist curl; then
     _err "curl is required for Gemini browser probe — install curl and retry"
@@ -19,6 +65,8 @@ function _browser_launch() {
   if _run_command --soft -- curl -sf http://localhost:9222/json >/dev/null 2>&1; then
     return 0
   fi
+  _cdp_stop_chrome_cdp_agent
+  _cdp_remove_stale_singleton_lock
   _info "Chrome not running — launching with --remote-debugging-port=9222..."
   local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/profile}"
   if [[ "$(uname)" == "Darwin" ]]; then
@@ -40,22 +88,7 @@ function _browser_launch() {
         --user-data-dir="${_cdp_profile_dir}"
     fi
   else
-    local _chrome_bin
-    _chrome_bin=$(command -v google-chrome 2>/dev/null || command -v google-chrome-stable 2>/dev/null || command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || true)
-    if [[ -z "${_chrome_bin}" ]]; then
-      _err "[gemini] Chrome/Chromium not found — install google-chrome, google-chrome-stable, chromium-browser, or chromium"
-    fi
-    local _extra_flags=()
-    if [[ $EUID -eq 0 || "${ANTIGRAVITY_CHROME_NO_SANDBOX:-0}" == "1" ]]; then
-      _extra_flags+=(--no-sandbox)
-    fi
-    "${_chrome_bin}" \
-      --headless=new \
-      "${_extra_flags[@]}" \
-      --disable-dev-shm-usage \
-      --remote-debugging-port=9222 \
-      --password-store=basic \
-      --user-data-dir="${_cdp_profile_dir}" &
+    _err "[acg] _browser_launch is macOS-only — $(uname) is not supported"
   fi
   _antigravity_browser_ready 30
 }

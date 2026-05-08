@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Fixed
+- `scripts/lib/system.sh`: `_copilot_review` — add `--allow-all-tools` flag and close malformed `--deny-tool` patterns (`shell(sudo`, `shell(eval`, `shell(curl`, `shell(wget` were missing closing `)`) — Copilot CLI exits 1 on malformed patterns, blocking all `_ai_agent_review` callers (`713c18e`)
+- `scripts/lib/system.sh`: `_copilot_auth_check` — remove `K3DM_ENABLE_AI` gate; check env tokens (`COPILOT_GITHUB_TOKEN`/`GH_TOKEN`/`GITHUB_TOKEN`), then `~/.config/github-copilot/apps.json`, then `gh auth status`; `_err` on failure with clear message — Copilot v1.0.40 has no `auth status` subcommand (`f0e29d9`, `eede5c3`)
+
+### Added
+- `scripts/tests/lib/copilot_auth.bats`: 5-test BATS suite covering all auth paths — env token (3 variants), `apps.json`, and failure with clear error message (`f0e29d9`)
+
+## [v0.3.17] — 2026-05-01
+
+### Added
+- `scripts/lib/system.sh`: `_ai_agent_review` — generic AI dispatch wrapper; routes to backend selected by `AI_REVIEW_FUNC` (default: `copilot`) with model from `AI_REVIEW_MODEL` (default: `gpt-5.4-mini`); passes all args through to the selected backend (`448560a`)
+- `scripts/tests/lib/ai_agent_review.bats`: 3-test BATS suite — default dispatch to `_copilot_review`, `AI_REVIEW_MODEL` override, unknown `AI_REVIEW_FUNC` error path (`448560a`)
+- `docs/api/functions.md`: `_ai_agent_review` function entry + `AI_REVIEW_FUNC` / `AI_REVIEW_MODEL` env var table in Copilot CLI Integration section (`448560a`)
+
+### Changed
+- `scripts/lib/system.sh`: `_k3d_manager_copilot` renamed to `_copilot_review` — aligns with the `_copilot_*` helper family; no behavior change (`d24b457`)
+- `docs/api/functions.md`: Copilot CLI Integration section — full documentation of `_copilot_auth_check`, `_copilot_scope_prompt`, `_copilot_prompt_guard`, `_copilot_review` with usage examples and adoption pattern (`98a58e0`)
+
+### Fixed
+- `scripts/lib/system.sh`: removed `K3DM_ENABLE_AI` gate from `_copilot_review` — a lib-foundation backend must not check a consumer-specific env var; gate belongs in callers (`657fd91`)
+- `scripts/lib/agent_rigor.sh`: `_agent_lint` staged-files glob expanded to `.sh`, `.js`, `.md` — previously only matched `.sh` (`af1356a`)
+
 ## [v0.3.16] — 2026-04-05
 
 ### Fixed
