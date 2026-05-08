@@ -20,6 +20,7 @@
 ## Current Focus
 - **OPEN:** `refactor(plugins)` — spec at `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; ready to hand off to Codex. Updated to include `k3s-aws.sh` and `k3s-gcp.sh` source-line changes (both source `shopping_cart.sh` directly — must rename to `k3s_remote.sh`).
 - **OPEN:** `feat(providers)` — spec at `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; Istio + MetalLB (k3s-aws) + externalIPs + GCP firewall (k3s-gcp). Depends on refactor spec first. Assign to Codex after refactor is merged.
+- **OPEN:** `feat(tunnel)` — spec at `docs/plans/v1.4.3-chisel-tunnel.md`; replace autossh+socat with chisel HTTPS WebSocket tunnel; `TUNNEL_PROVIDER=chisel` gate; autossh remains default. AWS: install via SSM. GCP: cloud-init startup-script. Depends on refactor spec.
 - Preserve subtree discipline: `scripts/lib/foundation/` and `scripts/lib/acg/` edits upstream first.
 
 ## Notes
