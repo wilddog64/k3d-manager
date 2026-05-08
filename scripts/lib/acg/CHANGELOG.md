@@ -15,6 +15,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - CDP disconnect guard: wrap `_cdpBrowser.disconnect()` in `if (!browserContext)` so the browser is only disconnected when the blank-tab recovery also fails — prevents disconnecting a context that was successfully recovered
 - CDP blank-tab reconnect: after PUT `/json/new`, disconnect and reconnect via `connectOverCDP` instead of re-querying the stale `contexts()` list — Playwright does not materialize BrowserContext from `Target.targetCreated` events post-connect, so a fresh connection is required to see the new tab
 - Chrome SingletonLock collision: stop the `chrome-cdp` launchd agent before taking over the shared profile and remove stale `SingletonLock` files only when the profile is not in use
+- `_cdp_stop_chrome_cdp_agent`: replace deprecated `launchctl unload <plist>` with `launchctl bootout "gui/$(id -u)/<label>"` — required on macOS 15+ (Darwin 25); `2>/dev/null` was silently masking failures from the deprecated call; also removed redundant plist-file existence check since `launchctl list` already confirms service state
+- `_browser_launch`: remove 17-line dead Linux else-block; library is macOS-only by design — non-Darwin callers now get a clear `_err` instead of silently entering unreachable code
 
 ### Added
 - CI workflow: shellcheck, node --check, yamllint on PRs to main

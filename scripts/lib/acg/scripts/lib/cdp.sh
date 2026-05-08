@@ -13,7 +13,6 @@ if ! declare -f _antigravity_browser_ready >/dev/null 2>&1; then
 fi
 
 _CDP_CHROME_CDP_LABEL="${CDP_CHROME_CDP_LABEL:-com.k3d-manager.chrome-cdp}"
-_CDP_CHROME_CDP_PLIST="${CDP_CHROME_CDP_PLIST:-${HOME}/Library/LaunchAgents/${_CDP_CHROME_CDP_LABEL}.plist}"
 
 function _cdp_profile_in_use() {
   local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/profile}"
@@ -32,9 +31,9 @@ function _cdp_stop_chrome_cdp_agent() {
     return 0
   fi
 
-  if [[ -f "${_CDP_CHROME_CDP_PLIST}" ]] && launchctl list "${_CDP_CHROME_CDP_LABEL}" >/dev/null 2>&1; then
+  if launchctl list "${_CDP_CHROME_CDP_LABEL}" >/dev/null 2>&1; then
     _info "[acg] Stopping Chrome CDP agent before taking over the browser profile..."
-    launchctl unload "${_CDP_CHROME_CDP_PLIST}" 2>/dev/null || true
+    launchctl bootout "gui/$(id -u)/${_CDP_CHROME_CDP_LABEL}" || _warn "[acg] launchctl bootout ${_CDP_CHROME_CDP_LABEL} failed — agent may still be running"
     local _wait_for_exit=0
     while _cdp_profile_in_use && [[ ${_wait_for_exit} -lt 5 ]]; do
       sleep 1
@@ -89,22 +88,7 @@ function _browser_launch() {
         --user-data-dir="${_cdp_profile_dir}"
     fi
   else
-    local _chrome_bin
-    _chrome_bin=$(command -v google-chrome 2>/dev/null || command -v google-chrome-stable 2>/dev/null || command -v chromium-browser 2>/dev/null || command -v chromium 2>/dev/null || true)
-    if [[ -z "${_chrome_bin}" ]]; then
-      _err "[gemini] Chrome/Chromium not found — install google-chrome, google-chrome-stable, chromium-browser, or chromium"
-    fi
-    local _extra_flags=()
-    if [[ $EUID -eq 0 || "${ANTIGRAVITY_CHROME_NO_SANDBOX:-0}" == "1" ]]; then
-      _extra_flags+=(--no-sandbox)
-    fi
-    "${_chrome_bin}" \
-      --headless=new \
-      "${_extra_flags[@]}" \
-      --disable-dev-shm-usage \
-      --remote-debugging-port=9222 \
-      --password-store=basic \
-      --user-data-dir="${_cdp_profile_dir}" &
+    _err "[acg] _browser_launch is macOS-only — $(uname) is not supported"
   fi
   _antigravity_browser_ready 30
 }
