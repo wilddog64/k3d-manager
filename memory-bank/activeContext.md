@@ -5,6 +5,13 @@
 - **v1.4.3 SHIPPED** — PR #72 merged to main (`b5601cb5`). `enforce_admins` restored on `main`. No prior CHANGE.md entry needed (small identity provisioning milestone).
 - **v1.4.2 SHIPPED** — PR #71 merged to main (`ad8df98c`), tagged `v1.4.2`, released 2026-05-07.
 
+## Post-Merge Housekeeping — 2026-05-08
+- **rigor-cli v0.1.4 tag restored** — v0.1.4 shipped 2026-05-03 via PR #7 (`ac7a39d5`) but tag was missing; created and pushed to origin
+- **rigor-cli enforce_admins restored** — was `false`; restored to `true`
+- **k3d-manager enforce_admins verified** — `true` ✓
+- **shopping-cart-infra enforce_admins verified** — `true` ✓
+- **All next branches verified as present** — k3d-manager-v1.4.4, shopping-cart-infra docs/next-improvements, rigor-cli-v0.1.6
+
 ## Shipped in v1.4.2
 - `_ai_agent_review` dispatch wrapper added to lib-foundation; copilot plugin functions route through it
 - `K3DM_ENABLE_AI` gate removed from lib-foundation backend (`_copilot_review`) — gate stays in callers
