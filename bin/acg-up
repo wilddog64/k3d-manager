@@ -591,6 +591,61 @@ else
   fi
 fi
 
+_info "[acg-up] Step 10e/14 — Wiring ArgoCD SSO (Keycloak VirtualService + argocd-cm + secret patch)..."
+
+# Apply Keycloak VirtualService so in-cluster pods reach keycloak.shopping-cart.local via Istio
+KEYCLOAK_VIRTUALSERVICE_HOST=keycloak.shopping-cart.local \
+KEYCLOAK_VIRTUALSERVICE_GATEWAY=istio-system/default-gateway \
+KEYCLOAK_NAMESPACE=identity \
+KEYCLOAK_SERVICE_PORT=80 \
+  envsubst < "${REPO_ROOT}/scripts/etc/keycloak/virtualservice.yaml.tmpl" | \
+  kubectl apply --context k3d-k3d-cluster -f -
+
+# Patch CoreDNS so in-cluster pods resolve keycloak.shopping-cart.local → IngressGateway IP
+_gw_ip=$(kubectl get svc istio-ingressgateway -n istio-system --context k3d-k3d-cluster \
+  -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+if [[ -n "${_gw_ip}" ]]; then
+  _cf=$(kubectl get cm coredns -n kube-system --context k3d-k3d-cluster \
+    -o jsonpath='{.data.Corefile}')
+  if ! printf '%s' "${_cf}" | grep -qF 'keycloak.shopping-cart.local'; then
+    _new_cf=$(printf '%s' "${_cf}" | awk \
+      -v ip="${_gw_ip}" \
+      '/^    health \{/{print "    hosts {"; printf "      %s keycloak.shopping-cart.local\n", ip; print "      fallthrough"; print "    }"} {print}')
+    kubectl patch cm coredns -n kube-system --context k3d-k3d-cluster \
+      --type merge \
+      --patch "$(printf '{"data":{"Corefile":%s}}' "$(printf '%s' "${_new_cf}" | jq -Rs .)")"
+    kubectl rollout restart deployment/coredns -n kube-system --context k3d-k3d-cluster
+    kubectl rollout status deployment/coredns -n kube-system --context k3d-k3d-cluster --timeout=60s
+    _info "[acg-up] CoreDNS patched: keycloak.shopping-cart.local → ${_gw_ip}"
+  fi
+else
+  _info "[acg-up] WARNING: IngressGateway LB IP not found — CoreDNS not patched; ArgoCD SSO in-cluster resolution may fail"
+fi
+
+# Apply argocd-cm and argocd-rbac-cm from shopping-cart-infra (now using namespace: cicd)
+_infra_root="${REPO_ROOT}/../shopping-carts/shopping-cart-infra"
+kubectl apply --context k3d-k3d-cluster \
+  -f "${_infra_root}/argocd/config/argocd-cm.yaml" \
+  -f "${_infra_root}/argocd/config/argocd-rbac-cm.yaml"
+
+# Patch argocd-secret directly with the OIDC client secret generated earlier in this run.
+# The ExternalSecret (argocd-oidc-secret) will take over once ClusterSecretStore is Ready;
+# this immediate patch ensures ArgoCD SSO works on first boot before ESO syncs.
+kubectl patch secret argocd-secret -n cicd --context k3d-k3d-cluster \
+  --type merge \
+  --patch "{\"stringData\":{\"oidc.keycloak.clientSecret\":\"${_argocd_client_secret}\"}}"
+
+# Add /etc/hosts entry on the Mac host so the browser reaches keycloak.shopping-cart.local
+if ! grep -qF 'keycloak.shopping-cart.local' /etc/hosts; then
+  _run_command --require-sudo -- \
+    sh -c 'printf "127.0.0.1 keycloak.shopping-cart.local\n" >> /etc/hosts'
+  _info "[acg-up] /etc/hosts: added keycloak.shopping-cart.local → 127.0.0.1"
+fi
+
+# Restart argocd-server to pick up the updated argocd-cm and argocd-secret
+kubectl rollout restart deployment/argocd-server -n cicd --context k3d-k3d-cluster
+kubectl rollout status deployment/argocd-server -n cicd --context k3d-k3d-cluster --timeout=120s
+_info "[acg-up] ArgoCD SSO wired: login at https://argocd.shopping-cart.local → Keycloak realm shopping-cart"
 
 _info "[acg-up] Step 11/14 — Verifying ClusterSecretStore..."
 _css_ready=false
