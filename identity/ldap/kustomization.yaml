@@ -10,6 +10,7 @@ namespace: identity
 resources:
 - bootstrap.yaml
 - deployment.yaml
+- ldap-secrets-externalsecret.yaml
 
 labels:
 - pairs:

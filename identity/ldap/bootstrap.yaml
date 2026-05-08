@@ -140,7 +140,7 @@ data:
     sn: Admin
     givenName: Platform
     mail: admin@shopping-cart.local
-    userPassword: {SSHA}admin-password-hash
+    userPassword: {SSHA}c4VLGxkUYG0Mf6BXs0JfdcH/bD4rHFAZ
 
     # Developer User
     dn: uid=developer,ou=users,dc=shopping-cart,dc=local
@@ -152,7 +152,7 @@ data:
     sn: Developer
     givenName: Dev
     mail: developer@shopping-cart.local
-    userPassword: {SSHA}developer-password-hash
+    userPassword: {SSHA}Xj7GXIDV5iNGOZY8mEYfCYcMH1YSXbYK
 
     # Operator User
     dn: uid=operator,ou=users,dc=shopping-cart,dc=local
@@ -164,7 +164,7 @@ data:
     sn: Operator
     givenName: Ops
     mail: operator@shopping-cart.local
-    userPassword: {SSHA}operator-password-hash
+    userPassword: {SSHA}TL5f2e2nA0Hn67E+J3JACb51b7AWr0oh
 
   # Service Accounts
   07-service-accounts.ldif: |

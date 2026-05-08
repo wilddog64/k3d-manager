@@ -26,7 +26,6 @@
   "accessCodeLifespan": 60,
   "accessCodeLifespanUserAction": 300,
   "accessCodeLifespanLogin": 1800,
-
   "roles": {
     "realm": [
       {
@@ -59,24 +58,29 @@
       }
     ]
   },
-
   "groups": [
     {
       "name": "platform-admins",
       "path": "/platform-admins",
-      "realmRoles": ["platform-admin"],
+      "realmRoles": [
+        "platform-admin"
+      ],
       "subGroups": []
     },
     {
       "name": "platform-developers",
       "path": "/platform-developers",
-      "realmRoles": ["platform-developer"],
+      "realmRoles": [
+        "platform-developer"
+      ],
       "subGroups": []
     },
     {
       "name": "platform-operators",
       "path": "/platform-operators",
-      "realmRoles": ["platform-operator"],
+      "realmRoles": [
+        "platform-operator"
+      ],
       "subGroups": []
     },
     {
@@ -86,23 +90,29 @@
         {
           "name": "order-service",
           "path": "/service-accounts/order-service",
-          "realmRoles": ["order-admin"]
+          "realmRoles": [
+            "order-admin"
+          ]
         },
         {
           "name": "product-catalog",
           "path": "/service-accounts/product-catalog",
-          "realmRoles": ["catalog-admin"]
+          "realmRoles": [
+            "catalog-admin"
+          ]
         }
       ]
     },
     {
       "name": "application-users",
       "path": "/application-users",
-      "realmRoles": ["order-user", "catalog-user"],
+      "realmRoles": [
+        "order-user",
+        "catalog-user"
+      ],
       "subGroups": []
     }
   ],
-
   "clients": [
     {
       "clientId": "argocd",
@@ -115,7 +125,9 @@
         "https://argocd.shopping-cart.local/*",
         "http://localhost:8080/*"
       ],
-      "webOrigins": ["+"],
+      "webOrigins": [
+        "+"
+      ],
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
@@ -152,7 +164,9 @@
         "https://order.shopping-cart.local/*",
         "http://localhost:8081/*"
       ],
-      "webOrigins": ["+"],
+      "webOrigins": [
+        "+"
+      ],
       "bearerOnly": false,
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
@@ -200,7 +214,9 @@
         "https://catalog.shopping-cart.local/*",
         "http://localhost:8082/*"
       ],
-      "webOrigins": ["+"],
+      "webOrigins": [
+        "+"
+      ],
       "bearerOnly": false,
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
@@ -248,7 +264,9 @@
         "https://grafana.shopping-cart.local/*",
         "http://localhost:3000/*"
       ],
-      "webOrigins": ["+"],
+      "webOrigins": [
+        "+"
+      ],
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
@@ -270,44 +288,141 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "frontend",
+      "name": "Shopping Cart Frontend",
+      "description": "React frontend SPA",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:5173/*",
+        "https://frontend.shopping-cart.local/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "groups",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
-
   "components": {
     "org.keycloak.storage.UserStorageProvider": [
       {
         "name": "ldap",
         "providerId": "ldap",
         "config": {
-          "enabled": ["true"],
-          "priority": ["0"],
-          "fullSyncPeriod": ["604800"],
-          "changedSyncPeriod": ["86400"],
-          "cachePolicy": ["DEFAULT"],
-          "editMode": ["READ_ONLY"],
-          "syncRegistrations": ["false"],
-          "vendor": ["other"],
-          "usernameLDAPAttribute": ["uid"],
-          "rdnLDAPAttribute": ["uid"],
-          "uuidLDAPAttribute": ["entryUUID"],
-          "userObjectClasses": ["inetOrgPerson, organizationalPerson"],
-          "connectionUrl": ["ldap://ldap.identity.svc.cluster.local:389"],
-          "usersDn": ["ou=users,dc=shopping-cart,dc=local"],
-          "authType": ["simple"],
-          "bindDn": ["cn=admin,dc=shopping-cart,dc=local"],
-          "bindCredential": ["${LDAP_BIND_CREDENTIAL}"],
-          "searchScope": ["2"],
-          "validatePasswordPolicy": ["false"],
-          "trustEmail": ["true"],
-          "useTruststoreSpi": ["ldapsOnly"],
-          "connectionPooling": ["true"],
-          "pagination": ["true"],
-          "batchSizeForSync": ["1000"]
+          "enabled": [
+            "true"
+          ],
+          "priority": [
+            "0"
+          ],
+          "fullSyncPeriod": [
+            "604800"
+          ],
+          "changedSyncPeriod": [
+            "86400"
+          ],
+          "cachePolicy": [
+            "DEFAULT"
+          ],
+          "editMode": [
+            "READ_ONLY"
+          ],
+          "syncRegistrations": [
+            "false"
+          ],
+          "vendor": [
+            "other"
+          ],
+          "usernameLDAPAttribute": [
+            "uid"
+          ],
+          "rdnLDAPAttribute": [
+            "uid"
+          ],
+          "uuidLDAPAttribute": [
+            "entryUUID"
+          ],
+          "userObjectClasses": [
+            "inetOrgPerson, organizationalPerson"
+          ],
+          "connectionUrl": [
+            "ldap://ldap.identity.svc.cluster.local:389"
+          ],
+          "usersDn": [
+            "ou=users,dc=shopping-cart,dc=local"
+          ],
+          "authType": [
+            "simple"
+          ],
+          "bindDn": [
+            "cn=admin,dc=shopping-cart,dc=local"
+          ],
+          "bindCredential": [
+            "${LDAP_BIND_CREDENTIAL}"
+          ],
+          "searchScope": [
+            "2"
+          ],
+          "validatePasswordPolicy": [
+            "false"
+          ],
+          "trustEmail": [
+            "true"
+          ],
+          "useTruststoreSpi": [
+            "ldapsOnly"
+          ],
+          "connectionPooling": [
+            "true"
+          ],
+          "pagination": [
+            "true"
+          ],
+          "batchSizeForSync": [
+            "1000"
+          ]
         }
       }
     ]
   },
-
   "browserSecurityHeaders": {
     "contentSecurityPolicyReportOnly": "",
     "xContentTypeOptions": "nosniff",

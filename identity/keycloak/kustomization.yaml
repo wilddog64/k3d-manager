@@ -11,7 +11,8 @@ resources:
 - namespace.yaml
 - postgres.yaml
 - configmap.yaml
-- secret.yaml
+- keycloak-secrets-externalsecret.yaml
+- keycloak-client-secrets-externalsecret.yaml
 - deployment.yaml
 
 labels:
