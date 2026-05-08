@@ -1,11 +1,20 @@
 # Progress — k3d-manager
 
 ## Status
-- Current branch: `k3d-manager-v1.4.4`.
-- **v1.4.4 IN REVIEW** — PR #73 open (identity SSO fixes); shopping-cart-infra PR #37 open (Keycloak ExternalSecrets); both awaiting Copilot review.
+- Current branch: `k3d-manager-v1.4.5`.
+- **v1.4.4 SHIPPED** — PR #73 merged (`92ccaec1`), tagged v1.4.4, released 2026-05-08. enforce_admins restored. Retro: `docs/retro/2026-05-08-v1.4.4-retrospective.md`
+- **shopping-cart-infra PR #37 SHIPPED** — merged (`867d861`). enforce_admins restored. Retro: `docs/retro/2026-05-08-pr37-keycloak-externalsecret-retrospective.md`
 - **v1.4.3 SHIPPED** — PR #72 merged (`b5601cb5`), enforce_admins restored. Retro: `docs/retro/2026-05-08-v1.4.3-retrospective.md`
 - **shopping-cart-infra PR #36 SHIPPED** — merged (`060e388`), enforce_admins restored. Retro: `docs/retro/2026-05-08-pr36-keycloak-eso-retrospective.md`
 - **v1.4.2 SHIPPED** — PR #71 merged (`ad8df98c`), tagged + released 2026-05-07.
+
+## Completed (v1.4.4)
+- [x] **Keycloak ExternalSecret files missing** — spec: `docs/bugs/2026-05-08-keycloak-externalsecret-files-missing.md`
+- [x] **Identity SSO fixes** — spec: `docs/plans/v1.4.4-identity-sso-fixes.md`
+- [x] PR #73 merged, v1.4.4 tagged + released
+- [x] enforce_admins restored on both repos
+- [x] Retrospective: `docs/retro/2026-05-08-v1.4.4-retrospective.md`
+- [x] Next branch created: `k3d-manager-v1.4.5`
 
 ## Completed (v1.4.3)
 - [x] **Keycloak Vault KV seeding** — bin/acg-up provisions keycloak/admin and keycloak/clients KV paths
@@ -28,9 +37,7 @@
 - [x] v1.4.2 tag + GitHub release created
 - [x] Retrospective: `docs/retro/2026-05-07-v1.4.2-retrospective.md`
 
-## Next Steps (v1.4.4)
-- [x] **Keycloak ExternalSecret files missing** — COMPLETE (`7bc6e96` in infra). Created missing files and moved static variables to configmap. Spec: `docs/bugs/2026-05-08-keycloak-externalsecret-files-missing.md`
-- [x] **Identity SSO fixes** — COMPLETE (infra: `7bc6e96`, manager: `95d0226`). Missing ExternalSecret files created and static vars moved to configmap. spec: `docs/plans/v1.4.4-identity-sso-fixes.md`
+## Next Steps (v1.4.5)
 - [ ] **Refactor shopping_cart.sh → k3s_remote.sh** — spec: `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex (spec updated to also rename source line in `k3s-aws.sh` and `k3s-gcp.sh`)
 - [ ] **Service mesh + LB for k3s-aws and k3s-gcp** — spec: `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; assign to Codex AFTER refactor is done
 - [ ] **chisel HTTPS tunnel** — spec: `docs/plans/v1.4.3-chisel-tunnel.md`; replaces autossh+socat with HTTPS WebSocket; `TUNNEL_PROVIDER=chisel` gate; depends on refactor spec
