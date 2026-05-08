@@ -1,22 +1,27 @@
 # Active Context — k3d-manager
 
 ## Current Status
-- Current branch: `k3d-manager-v1.4.2` (created from `origin/k3d-manager-v1.4.1`).
-- The repository is at the post-v1.4.1 handoff point; `_ai_agent_review`, Copilot docs cleanup, and ACG hardening are already shipped.
-- One unrelated local modification exists in `scripts/playwright/acg_extend.js`; leave it untouched unless the task explicitly includes it.
-- The Argo CD bootstrap timeout issue was traced to a fixed 180s wait on `deployment/argocd-server`; the wait is now configurable via `ARGOCD_SERVER_WAIT_TIMEOUT` with a longer default.
-- The full `scripts/tests/plugins/argocd.bats` suite still has two unrelated baseline failures; the timeout fix was validated with a targeted smoke run instead.
-- `bin/acg-sync-apps` now has a recorded failure case where Argo CD is healthy but the `demo-rollout` ApplicationSet has not been bootstrapped, leaving no `rollout-demo-default` app to sync.
-- `bin/acg-up` now refreshes Argo CD bootstrap resources on an existing Hub cluster when the AppProject/ApplicationSets are missing instead of skipping bootstrap solely because the Hub already exists. Commit `416d260e`.
+- Current branch: `k3d-manager-v1.4.3` (created from `main` at `ad8df98c`).
+- **v1.4.2 SHIPPED** — PR #71 merged to main (`ad8df98c`), tagged `v1.4.2`, released 2026-05-07. `enforce_admins` restored on `main`.
+- v1.4.2 accumulated v1.4.1 + v1.4.2 changes because PR #70 (v1.4.1) was closed without merging.
+
+## Shipped in v1.4.2
+- `_ai_agent_review` dispatch wrapper added to lib-foundation; copilot plugin functions route through it
+- `K3DM_ENABLE_AI` gate removed from lib-foundation backend (`_copilot_review`) — gate stays in callers
+- ArgoCD bootstrap: `ARGOCD_SERVER_WAIT_TIMEOUT` configurable (default 600s)
+- `bin/acg-up`: bootstrap refresh on existing Hub when AppProject/ApplicationSets absent
+- `bin/acg-up`: `--confirm` flag added to `deploy_argocd_bootstrap` call
+- lib-acg PR #10 subtree pull: `launchctl bootout`, dead Linux else-block removal
+
+## Deferred to v1.4.3
+- **`deploy_argocd_bootstrap "$@"` passthrough** — removed in v1.4.2 (Copilot finding); correct fix is lib-foundation change to filter flags explicitly; callers (especially `provision-tomcat`) depend on this behavior
+- **lib-foundation upstream doc fix** — `scripts/lib/foundation/docs/api/functions.md` usage snippet still has k3d-manager-specific `K3DM_ENABLE_AI=1` context; needs upstream lib-foundation PR
 
 ## Current Focus
-- Keep the next branch lean and focused on the next queued task.
-- Preserve compatibility for the legacy CLI and vendored tooling boundaries.
-- Treat `tools/rigor-cli/` as read-only vendored tooling unless the task explicitly refreshes the subtree.
-- Keep the helper naming / review-doc cleanup aligned with the repo-local `bin/` surface and docs references.
-- Keep the Argo CD readiness gate aligned with the observed cold-start timing on the local cluster.
-- Keep the Argo CD bootstrap and `sync-apps` target expectations aligned so healthy servers do not hide missing `ApplicationSet`/`Application` resources.
-- Keep `bin/acg-up` from assuming a pre-existing Hub already has the expected Argo CD bootstrap resources.
+- Pick up the next queued task on `k3d-manager-v1.4.3`.
+- Lead item: restore `deploy_argocd_bootstrap "$@"` passthrough via lib-foundation flag-filtering approach.
+- Preserve subtree discipline: `scripts/lib/foundation/` and `scripts/lib/acg/` edits upstream first.
 
 ## Notes
-- Update this file after the next significant milestone or direction change.
+- The two baseline failures in `scripts/tests/plugins/argocd.bats` remain unresolved (pre-existing, unrelated to v1.4.2 changes).
+- Retro: `docs/retro/2026-05-07-v1.4.2-retrospective.md`

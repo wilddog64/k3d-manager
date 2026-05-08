@@ -1,21 +1,23 @@
 # Progress — k3d-manager
 
 ## Status
-- Current branch: `k3d-manager-v1.4.2`.
-- The repository is at the post-v1.4.1 handoff point; `_ai_agent_review`, Copilot docs cleanup, and ACG hardening are already shipped.
-- The only known local worktree deviation is the unrelated `scripts/playwright/acg_extend.js` modification, which remains untouched.
+- Current branch: `k3d-manager-v1.4.3`.
+- **v1.4.2 SHIPPED** — PR #71 merged (`ad8df98c`), tagged + released 2026-05-07.
 
-## Milestones
-- `k3d-manager-v1.4.1` completed and shipped.
-- `k3d-manager-v1.4.2` created as the next working branch.
-- `tools/rigor-cli/` remains vendored and treated as read-only unless explicitly refreshed.
-- Repo-local review/docs cleanup around `_ai_agent_review` is done.
-- Current-state memory-bank files are compressed and maintained for handoff continuity.
-- Argo CD bootstrap now uses a configurable `ARGOCD_SERVER_WAIT_TIMEOUT` because the local cluster can take longer than 180s to cold-pull and become Available.
-- The full `scripts/tests/plugins/argocd.bats` suite still has two unrelated baseline failures; the timeout fix was verified with a targeted smoke run instead.
-- `bin/acg-sync-apps` can still fail when the local `cicd` namespace has no ApplicationSet/Application resources; a new issue doc records the missing-bootstrap state and root cause.
-- `bin/acg-up` now refreshes Argo CD bootstrap resources on existing Hub clusters when the bootstrap objects are absent, closing the gap that left `sync-apps` with no `rollout-demo-default` app. Commit `416d260e`.
+## Completed (v1.4.2)
+- [x] `_ai_agent_review` dispatch layer in lib-foundation
+- [x] `K3DM_ENABLE_AI` gate removed from lib-foundation backend
+- [x] `ARGOCD_SERVER_WAIT_TIMEOUT` configurable (default 600s)
+- [x] `bin/acg-up` bootstrap refresh on existing Hub
+- [x] `bin/acg-up` `--confirm` flag
+- [x] lib-acg PR #10 subtree pull (`launchctl bootout`, dead else-block)
+- [x] Copilot plugin BATS suite (`scripts/tests/plugins/copilot.bats`)
+- [x] All 8 Copilot PR #71 review threads resolved
+- [x] `enforce_admins` restored on `main`
+- [x] v1.4.2 tag + GitHub release created
+- [x] Retrospective: `docs/retro/2026-05-07-v1.4.2-retrospective.md`
 
-## Next Steps
-- Pick up the next scoped task on `k3d-manager-v1.4.2`.
-- Keep `main` protection/restoration work aligned with the current release flow.
+## Next Steps (v1.4.3)
+- [ ] Restore `deploy_argocd_bootstrap "$@"` passthrough — lib-foundation flag-filtering approach; fix callers that depended on it (esp. `provision-tomcat`)
+- [ ] lib-foundation upstream: remove `K3DM_ENABLE_AI=1` from `_copilot_review` usage snippet in `docs/api/functions.md`
+- [ ] Pick up next feature scoped for v1.4.3
