@@ -490,11 +490,109 @@ kubectl rollout status statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster --timeout=90s
 _info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → ${_cp_server}"
 
-_info "[acg-up] Step 10b/12 — Deploying shopping-cart data layer (PostgreSQL, Redis, RabbitMQ)..."
+_info "[acg-up] Step 10b/14 — Deploying shopping-cart data layer (PostgreSQL, Redis, RabbitMQ)..."
 deploy_shopping_cart_data
 
+_info "[acg-up] Step 10c/14 — Deploying identity stack (Keycloak + LDAP) via ArgoCD..."
+# Force ArgoCD to pick up the identity Application from shopping-cart-infra
+kubectl apply --context k3d-k3d-cluster -f - <<'IDEOF'
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shopping-cart-identity
+  namespace: cicd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: shopping-cart
+  sources:
+    - repoURL: https://github.com/wilddog64/shopping-cart-infra.git
+      targetRevision: HEAD
+      path: identity/keycloak
+    - repoURL: https://github.com/wilddog64/shopping-cart-infra.git
+      targetRevision: HEAD
+      path: identity/ldap
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: identity
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+IDEOF
 
-_info "[acg-up] Step 11/12 — Verifying ClusterSecretStore..."
+_info "[acg-up] Waiting for Keycloak pod to be Running (up to 5 min)..."
+_kc_ready=false
+for i in $(seq 1 30); do
+  _kc_phase=$(kubectl get pods -n identity --context k3d-k3d-cluster \
+    -l app.kubernetes.io/name=keycloak \
+    -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "")
+  if [[ "${_kc_phase}" == "Running" ]]; then
+    _kc_ready=true
+    break
+  fi
+  _info "[acg-up] Keycloak not Running yet (attempt ${i}/30, phase=${_kc_phase}) — waiting 10s..."
+  sleep 10
+done
+if [[ "${_kc_ready}" != "true" ]]; then
+  _info "[acg-up] WARNING: Keycloak not Running after 5 min — skipping realm import. Run manually: bin/acg-up --import-realm"
+else
+  _info "[acg-up] Step 10d/14 — Importing Keycloak realm shopping-cart..."
+  _kc_pf_port=18080
+  kubectl port-forward svc/keycloak -n identity --context k3d-k3d-cluster "${_kc_pf_port}:80" \
+    >>"${HOME}/.local/share/k3d-manager/keycloak-pf.log" 2>&1 &
+  _kc_pf_pid=$!
+  disown "${_kc_pf_pid}"
+  sleep 3
+
+  _kc_token=$(curl -sf -X POST \
+    "http://localhost:${_kc_pf_port}/realms/master/protocol/openid-connect/token" \
+    -d "client_id=admin-cli&grant_type=password&username=admin&password=${_kc_admin_pass}" \
+    | grep -o '"access_token":"[^"]*"' | sed 's/"access_token":"//;s/"//') || _kc_token=""
+
+  if [[ -z "${_kc_token}" ]]; then
+    _info "[acg-up] WARNING: Could not get Keycloak admin token — skipping realm import"
+    kill "${_kc_pf_pid}" 2>/dev/null || true
+  else
+    _realm_json=$(sed \
+      -e "s/\${ARGOCD_CLIENT_SECRET}/${_argocd_client_secret}/g" \
+      -e "s/\${ORDER_SERVICE_CLIENT_SECRET}/${_order_client_secret}/g" \
+      -e "s/\${PRODUCT_CATALOG_CLIENT_SECRET}/${_product_client_secret}/g" \
+      -e "s/\${GRAFANA_CLIENT_SECRET}/${_grafana_client_secret}/g" \
+      -e "s/\${LDAP_BIND_CREDENTIAL}/${_ldap_admin_pass}/g" \
+      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/config/realm-shopping-cart.json")
+
+    _import_status=$(curl -sf -o /dev/null -w "%%{http_code}" \
+      -X POST \
+      -H "Authorization: Bearer ${_kc_token}" \
+      -H "Content-Type: application/json" \
+      -d "${_realm_json}" \
+      "http://localhost:${_kc_pf_port}/admin/realms" 2>/dev/null || echo "000")
+
+    if [[ "${_import_status}" == "201" ]]; then
+      _info "[acg-up] Keycloak realm 'shopping-cart' imported successfully"
+    elif [[ "${_import_status}" == "409" ]]; then
+      _info "[acg-up] Keycloak realm 'shopping-cart' already exists — skipping import"
+    else
+      _info "[acg-up] WARNING: Realm import returned HTTP ${_import_status} — check Keycloak logs"
+    fi
+
+    kill "${_kc_pf_pid}" 2>/dev/null || true
+  fi
+fi
+
+
+_info "[acg-up] Step 11/14 — Verifying ClusterSecretStore..."
 _css_ready=false
 for i in $(seq 1 18); do
   _css_status=$(kubectl get clustersecretstore vault-backend --context ubuntu-k3s \
@@ -512,7 +610,7 @@ else
   _info "[acg-up] ClusterSecretStore not Ready after 180s — check vault-bridge connectivity"
 fi
 
-_info "[acg-up] Step 12/12 — Installing sandbox TTL watcher (launchd)..."
+_info "[acg-up] Step 12/14 — Installing sandbox TTL watcher (launchd)..."
 acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
 
 _info "[acg-up] Cluster is up."
