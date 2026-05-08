@@ -39,7 +39,7 @@
 
 ## Next Steps (v1.4.5)
 - [x] **ArgoCD SSO via Keycloak** — COMPLETE (infra: `473dd01`, manager: `aa3dc6f`).  ASSIGNED TO GEMINI; spec: `docs/plans/v1.4.5-argocd-sso-keycloak.md`; k3d-manager `k3d-manager-v1.4.5` + shopping-cart-infra `docs/next-improvements`
-- [ ] **pyjenkinsapi rigor-cli v0.1.6 subtree pull** — ASSIGNED TO GEMINI; branch `docs/next-improvements`; pull to `14b65d63`; re-enable BATS CI
+- [x] **pyjenkinsapi rigor-cli v0.1.6 subtree pull** — COMPLETE (subtree: `7d8a894b`, ci-fix: `0c479c99`); branch `docs/next-improvements`; BATS re-enabled
 - [ ] **Refactor shopping_cart.sh → k3s_remote.sh** — spec: `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex (spec updated to also rename source line in `k3s-aws.sh` and `k3s-gcp.sh`)
 - [ ] **Service mesh + LB for k3s-aws and k3s-gcp** — spec: `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; assign to Codex AFTER refactor is done
 - [ ] **chisel HTTPS tunnel** — spec: `docs/plans/v1.4.3-chisel-tunnel.md`; replaces autossh+socat with HTTPS WebSocket; `TUNNEL_PROVIDER=chisel` gate; depends on refactor spec
