@@ -25,8 +25,8 @@
 - **lib-foundation upstream doc fix** — `scripts/lib/foundation/docs/api/functions.md` usage snippet still has k3d-manager-specific `K3DM_ENABLE_AI=1` context; needs upstream lib-foundation PR
 
 ## Current Focus (v1.4.4)
-- **OPEN: Keycloak ExternalSecret files missing** — bug spec at `docs/bugs/2026-05-08-keycloak-externalsecret-files-missing.md`; assign to Gemini. shopping-cart-infra `docs/next-improvements` branch: create `keycloak-secrets-externalsecret.yaml`, `keycloak-client-secrets-externalsecret.yaml`, patch `configmap.yaml` with `KEYCLOAK_ADMIN` + `KC_DB_USERNAME`. Discovered during verify pass after v1.4.4-identity-sso-fixes.
 - **DONE:** `feat(identity)` — spec at `docs/plans/v1.4.4-identity-sso-fixes.md`. k3d-manager `95d0226` + shopping-cart-infra `7bc6e96` committed and pushed. Missing ExternalSecret files created and static vars moved to configmap.
+- **DONE:** `fix(identity)` — Keycloak ExternalSecret files missing bug fixed in `shopping-cart-infra` PR #37 (`7bc6e96`). PRs created: k3d-manager PR #73 + shopping-cart-infra PR #37.
 - **Next:** `refactor(plugins)` — spec at `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex after identity SSO fixes. Updated to include `k3s-aws.sh` and `k3s-gcp.sh` source-line changes (both source `shopping_cart.sh` directly — must rename to `k3s_remote.sh`).
 - **Next:** `feat(providers)` — spec at `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; Istio + MetalLB (k3s-aws) + externalIPs + GCP firewall (k3s-gcp). Depends on refactor spec first. Assign to Codex after refactor is merged.
 - **Next:** `feat(tunnel)` — spec at `docs/plans/v1.4.3-chisel-tunnel.md`; replace autossh+socat with chisel HTTPS WebSocket tunnel; `TUNNEL_PROVIDER=chisel` gate; autossh remains default. AWS: install via SSM. GCP: cloud-init startup-script. Depends on refactor spec.

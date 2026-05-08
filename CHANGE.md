@@ -1,5 +1,17 @@
 # Changes - k3d-manager
 
+## [v1.4.4] — 2026-05-08 — Identity SSO fixes: Keycloak ExternalSecrets + realm import
+
+### Added
+- `bin/acg-up` Steps 10c/10d: deploy identity ArgoCD Application + import Keycloak realm with Vault-seeded client secrets (`95d0226a`)
+- `docs/plans/v1.4.4-identity-sso-fixes.md`: feature spec for Keycloak + realm import flow (`3ab4e82b`)
+- `docs/bugs/2026-05-08-keycloak-externalsecret-files-missing.md`: bug spec for missing ExternalSecret files discovered during identity stack verify (`42f898ce`)
+
+### Fixed
+- **shopping-cart-infra** companion PR: missing `keycloak-secrets-externalsecret.yaml` and `keycloak-client-secrets-externalsecret.yaml` created; static Keycloak vars moved to ConfigMap
+
+---
+
 ## [v1.4.2] — 2026-05-07 — _ai_agent_review abstraction + ArgoCD bootstrap hardening + cdp.sh fixes
 
 ### Changed

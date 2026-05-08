@@ -2,6 +2,7 @@
 
 ## Status
 - Current branch: `k3d-manager-v1.4.4`.
+- **v1.4.4 IN REVIEW** — PR #73 open (identity SSO fixes); shopping-cart-infra PR #37 open (Keycloak ExternalSecrets); both awaiting Copilot review.
 - **v1.4.3 SHIPPED** — PR #72 merged (`b5601cb5`), enforce_admins restored. Retro: `docs/retro/2026-05-08-v1.4.3-retrospective.md`
 - **shopping-cart-infra PR #36 SHIPPED** — merged (`060e388`), enforce_admins restored. Retro: `docs/retro/2026-05-08-pr36-keycloak-eso-retrospective.md`
 - **v1.4.2 SHIPPED** — PR #71 merged (`ad8df98c`), tagged + released 2026-05-07.
