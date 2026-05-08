@@ -32,3 +32,7 @@ data:
   LDAP_RDN_ATTRIBUTE: uid
   LDAP_FULL_SYNC_PERIOD: "604800"
   LDAP_CHANGED_SYNC_PERIOD: "86400"
+
+  # Static identity values (moved from secret.yaml — not secret)
+  KEYCLOAK_ADMIN: admin
+  KC_DB_USERNAME: keycloak

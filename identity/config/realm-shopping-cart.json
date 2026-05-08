@@ -292,16 +292,17 @@
     {
       "clientId": "frontend",
       "name": "Shopping Cart Frontend",
-      "description": "React frontend SPA",
+      "description": "Shopping Cart React SPA \u2014 public PKCE client",
       "enabled": true,
+      "clientAuthenticatorType": "client-secret",
       "publicClient": true,
       "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
       "redirectUris": [
-        "http://localhost:3000/*",
         "http://localhost:5173/*",
+        "http://localhost:3000/*",
         "https://frontend.shopping-cart.local/*"
       ],
       "webOrigins": [

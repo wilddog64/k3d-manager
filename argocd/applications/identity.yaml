@@ -1,0 +1,44 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shopping-cart-identity
+  namespace: cicd
+  labels:
+    app.kubernetes.io/name: shopping-cart-identity
+    app.kubernetes.io/part-of: shopping-cart
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: shopping-cart
+
+  sources:
+    - repoURL: https://github.com/wilddog64/shopping-cart-infra.git
+      targetRevision: HEAD
+      path: identity/keycloak
+    - repoURL: https://github.com/wilddog64/shopping-cart-infra.git
+      targetRevision: HEAD
+      path: identity/ldap
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: identity
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+
+  info:
+    - name: Description
+      value: Keycloak + OpenLDAP identity stack for SSO

@@ -44,8 +44,8 @@ spec:
           value: keycloak
         - name: POSTGRES_USER
           valueFrom:
-            secretKeyRef:
-              name: keycloak-secrets
+            configMapKeyRef:
+              name: keycloak-config
               key: KC_DB_USERNAME
         - name: POSTGRES_PASSWORD
           valueFrom:

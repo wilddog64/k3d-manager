@@ -9,6 +9,7 @@ namespace: identity
 
 resources:
 - bootstrap.yaml
+- ldap-secrets-externalsecret.yaml
 - deployment.yaml
 - ldap-secrets-externalsecret.yaml
 
