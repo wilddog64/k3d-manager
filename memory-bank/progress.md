@@ -28,7 +28,8 @@
 - [x] Retrospective: `docs/retro/2026-05-07-v1.4.2-retrospective.md`
 
 ## Next Steps (v1.4.4)
-- [x] **Identity SSO fixes** — COMPLETE (infra: `c73a191`, manager: `95d0226`).  spec: `docs/plans/v1.4.4-identity-sso-fixes.md`; assign to Codex; two repos: shopping-cart-infra (`docs/next-improvements`) + k3d-manager (`k3d-manager-v1.4.4`)
+- [ ] **Keycloak ExternalSecret files missing** — OPEN; bug spec: `docs/bugs/2026-05-08-keycloak-externalsecret-files-missing.md`; assign to Gemini; shopping-cart-infra `docs/next-improvements` branch
+- [~] **Identity SSO fixes** — PARTIAL (infra: `c73a191`, manager: `95d0226`); gap: keycloak-secrets-externalsecret.yaml + keycloak-client-secrets-externalsecret.yaml never created; spec: `docs/plans/v1.4.4-identity-sso-fixes.md`
 - [ ] **Refactor shopping_cart.sh → k3s_remote.sh** — spec: `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex (spec updated to also rename source line in `k3s-aws.sh` and `k3s-gcp.sh`)
 - [ ] **Service mesh + LB for k3s-aws and k3s-gcp** — spec: `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; assign to Codex AFTER refactor is done
 - [ ] **chisel HTTPS tunnel** — spec: `docs/plans/v1.4.3-chisel-tunnel.md`; replaces autossh+socat with HTTPS WebSocket; `TUNNEL_PROVIDER=chisel` gate; depends on refactor spec
