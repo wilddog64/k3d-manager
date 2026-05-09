@@ -45,7 +45,8 @@
 - [x] **eso-ldap-directory Vault policy missing keycloak/* paths** — COMPLETE (`48938dea`). Extended `LDAP_VAULT_POLICY_PREFIX` default to `ldap,keycloak`. spec: `docs/bugs/v1.4.5-bugfix-eso-ldap-policy-missing-keycloak.md`
 - [x] **shopping-cart-identity AppProject missing** — COMPLETE (`771ba5cf`). `project: shopping-cart` → `project: platform`; removed dead kustomization. spec: `docs/bugs/v1.4.5-bugfix-identity-appproject-missing.md`
 - [x] **identity ESO bootstrap Bug 1** — COMPLETE (`f969b299`). `_eso_apply_vault_cluster_store` added to `eso.sh`; `ldap.sh` source guard + `deploy_ldap()` call added. Verified by Claude.
-- [ ] **identity ESO bootstrap Bugs 2+3** — spec: `docs/bugs/v1.4.5-bugfix-identity-externalsecret-bootstrap.md`; shopping-cart-infra branch `fix/identity-externalsecret-bootstrap`; (2) `keycloak-secrets` ExternalSecret template, (3) `ldap-data-pvc` sync wave
+- [ ] **identity ESO bootstrap Bugs 2+3** — spec: `docs/bugs/v1.4.5-bugfix-identity-externalsecret-bootstrap.md`; shopping-cart-infra PR #40 `fix/identity-externalsecret-bootstrap`; Gemini + Claude fixup committed (`ccfc2e0`); awaiting merge
+- [x] **deploy_eso unpinned chart version** — spec: `docs/bugs/v1.4.5-bugfix-deploy-eso-no-version-pin.md`; pinned to `1.0.0` via `ESO_HELM_CHART_VERSION` (SHA: `50851f0e`)
 - [ ] **Refactor shopping_cart.sh → k3s_remote.sh** — spec: `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex (spec updated to also rename source line in `k3s-aws.sh` and `k3s-gcp.sh`)
 - [ ] **Service mesh + LB for k3s-aws and k3s-gcp** — spec: `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; assign to Codex AFTER refactor is done
 - [ ] **chisel HTTPS tunnel** — spec: `docs/plans/v1.4.3-chisel-tunnel.md`; replaces autossh+socat with HTTPS WebSocket; `TUNNEL_PROVIDER=chisel` gate; depends on refactor spec
