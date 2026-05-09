@@ -42,6 +42,8 @@
 - [x] **pyjenkinsapi rigor-cli v0.1.6 subtree pull** — COMPLETE (subtree: `7d8a894b`, ci-fix: `0c479c99`); branch `docs/next-improvements`; BATS re-enabled
 - [x] **acg-up /etc/hosts --soft** — COMPLETE (`3c096f6`). `_run_command --prefer-sudo` missing `--soft` causes `exit 1` instead of warning when EPERM. spec: `docs/bugs/v1.4.5-bugfix-etc-hosts-soft.md`.
 - [x] **acg-up Step 10e bugs** — COMPLETE (`d6a31c5`). Fixed CoreDNS awk pattern + /etc/hosts sudo hard-fail. spec: `docs/plans/v1.4.5-bugfix-gemini.md`
+- [x] **eso-ldap-directory Vault policy missing keycloak/* paths** — COMPLETE (`48938dea`). Extended `LDAP_VAULT_POLICY_PREFIX` default to `ldap,keycloak`. spec: `docs/bugs/v1.4.5-bugfix-eso-ldap-policy-missing-keycloak.md`
+- [x] **shopping-cart-identity AppProject missing** — COMPLETE (`771ba5cf`). `project: shopping-cart` → `project: platform`; removed dead kustomization. spec: `docs/bugs/v1.4.5-bugfix-identity-appproject-missing.md`
 - [ ] **Refactor shopping_cart.sh → k3s_remote.sh** — spec: `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex (spec updated to also rename source line in `k3s-aws.sh` and `k3s-gcp.sh`)
 - [ ] **Service mesh + LB for k3s-aws and k3s-gcp** — spec: `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; assign to Codex AFTER refactor is done
 - [ ] **chisel HTTPS tunnel** — spec: `docs/plans/v1.4.3-chisel-tunnel.md`; replaces autossh+socat with HTTPS WebSocket; `TUNNEL_PROVIDER=chisel` gate; depends on refactor spec
