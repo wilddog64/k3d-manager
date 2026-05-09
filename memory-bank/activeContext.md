@@ -32,6 +32,7 @@
 - **COMPLETE:** `fix(argocd-sso)` — spec at `docs/plans/v1.4.5-argocd-sso-keycloak.md`; implemented 5-change ArgoCD SSO wiring.
 - **COMPLETE:** pyjenkinsapi rigor-cli v0.1.6 subtree pull.
 - **COMPLETE:** `fix(ldap)` — shopping-cart-infra PR #39 `fix/ldap-duplicate-externalsecret` (SHA: `afaf109`) + PR #38 SSO wiring (SHA: `d314c34`). Removed duplicate `ldap-secrets-externalsecret.yaml` entry; ArgoCD SSO Keycloak wired end-to-end. enforce_admins restored on shopping-cart-infra.
+- **COMPLETE:** `fix(argocd)` — spec `docs/bugs/v1.4.5-bugfix-services-git-identity-exclude.md` (SHA: `fa7bb830`). Excluded `shopping-cart-identity` from `services-git` ApplicationSet generator; re-applied identity Application with correct local-cluster destination.
 - **Pending:** `refactor(plugins)` — spec at `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex after SSO wiring is verified. Updated to include `k3s-aws.sh` and `k3s-gcp.sh` source-line changes (both source `shopping_cart.sh` directly — must rename to `k3s_remote.sh`).
 - **Next:** `feat(providers)` — spec at `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; depends on refactor spec.
 - **Next:** `feat(tunnel)` — spec at `docs/plans/v1.4.3-chisel-tunnel.md`; depends on refactor spec.
