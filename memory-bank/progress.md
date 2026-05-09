@@ -20,6 +20,8 @@
 - [x] order-service schema: add cancellation_reason column to orders table (`5a0914c`)
 - [x] order-service schema expansion: add 11 missing columns to orders table (`2e8d0bf`)
 - [x] payment-service DB auth failure: stop ArgoCD self-heal from overwriting ESO-managed `payment-db-credentials` (`a184bf7`)
+- [x] Keycloak PostgreSQL driver fix: `--db=postgres` in args is single source of truth; KC_DB removed from ConfigMap (`180f5f89` — PR #41, Bug 4)
+- [x] LDAP LDIF chown fix: initContainer copies ConfigMap to emptyDir; main mounts emptyDir (`180f5f89` — PR #41, Bug 5)
 
 - [x] Redis StatefulSet: cart session storage
 - [x] Redis StatefulSet: orders-cache

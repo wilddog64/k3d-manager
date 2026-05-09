@@ -1,5 +1,14 @@
 # Active Context: shopping-cart-infra
 
+## Current Status (2026-05-09)
+
+**identity stack — Keycloak PostgreSQL + LDAP LDIF chown fixes MERGED (PR #41, `180f5f89`):**
+- Fix 1: `--db=postgres` in Keycloak Deployment args is single source of truth; `KC_DB` removed from ConfigMap to avoid drift.
+- Fix 2: LDAP LDIF chown fix pattern — initContainer copies ConfigMap files to emptyDir, main container mounts emptyDir instead of ConfigMap directly.
+- Spec: `docs/bugs/2026-05-08-pr41-keycloak-postgresql-driver-ldap-ldif-chown-fixes.md` (Bugs 4+5).
+- `enforce_admins` restored on `main` after merge.
+- Next branch: `docs/next-improvements`. Retro: `docs/retro/2026-05-09-pr41-keycloak-ldap-startup-retrospective.md` (committed `e0837c4`).
+
 ## Current Status (2026-05-03)
 
 **payment-service CrashLoopBackOff — DB auth failure MERGED (PR #35, `65c92057`):**
