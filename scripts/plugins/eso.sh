@@ -161,6 +161,36 @@ function deploy_eso() {
   fi
 }
 
+function _eso_apply_vault_cluster_store() {
+  local store_name="${ESO_VAULT_CLUSTER_STORE:-vault-backend}"
+  local server="${VAULT_ENDPOINT:-http://vault.${VAULT_NS:-secrets}.svc:8200}"
+  local path="${LDAP_VAULT_KV_MOUNT:-secret}"
+  local role="${LDAP_ESO_ROLE:-eso-ldap-directory}"
+  local sa="${LDAP_ESO_SERVICE_ACCOUNT:-eso-ldap-sa}"
+  local sa_ns="${LDAP_NAMESPACE:-identity}"
+
+  _info "[eso] Applying ClusterSecretStore/${store_name}"
+  cat <<YAML | _kubectl apply -f -
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: ${store_name}
+spec:
+  provider:
+    vault:
+      server: "${server}"
+      path: "${path}"
+      version: v2
+      auth:
+        kubernetes:
+          mountPath: kubernetes
+          role: "${role}"
+          serviceAccountRef:
+            name: ${sa}
+            namespace: ${sa_ns}
+YAML
+}
+
 function _eso_configure_remote_vault() {
   local store_name="${1:-remote-vault-store}"
   local service_account="${2:-external-secrets}"

@@ -20,6 +20,15 @@ if ! declare -f deploy_vault >/dev/null 2>&1; then
    source "$VAULT_PLUGIN"
 fi
 
+# Source ESO plugin if not already loaded
+if ! declare -f _eso_apply_vault_cluster_store >/dev/null 2>&1; then
+   ESO_PLUGIN="$PLUGINS_DIR/eso.sh"
+   if [[ -r "$ESO_PLUGIN" ]]; then
+      # shellcheck disable=SC1090
+      source "$ESO_PLUGIN"
+   fi
+fi
+
 VAULT_VARS_FILE="$SCRIPT_DIR/etc/vault/vars.sh"
 if [[ -r "$VAULT_VARS_FILE" ]]; then
    # shellcheck disable=SC1090
@@ -1127,8 +1136,8 @@ function deploy_ldap() {
 
    _ldap_ensure_namespace "$namespace" || return 1
    _ldap_apply_eso_resources "$namespace" || return 1
+   _eso_apply_vault_cluster_store || return 1
    _ldap_wait_for_secret "$namespace" "${LDAP_ADMIN_SECRET_NAME}" || { _err "[ldap] Vault-sourced secret ${LDAP_ADMIN_SECRET_NAME} not available"; return 1; }
-
    if [[ "${LDAP_LDIF_ENABLED:-false}" == "true" && -n "${LDAP_LDIF_VAULT_PATH:-}" ]]; then
       _ldap_wait_for_secret "$namespace" "${LDAP_LDIF_SECRET_NAME}" ||          { _err "[ldap] Vault-sourced LDIF secret ${LDAP_LDIF_SECRET_NAME} not available"; return 1; }
    fi
