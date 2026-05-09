@@ -38,7 +38,7 @@
 - [x] Retrospective: `docs/retro/2026-05-07-v1.4.2-retrospective.md`
 
 ## Next Steps (v1.4.5)
-- [x] **ArgoCD SSO via Keycloak** — COMPLETE (infra: `473dd01`, manager: `aa3dc6f`).  ASSIGNED TO GEMINI; spec: `docs/plans/v1.4.5-argocd-sso-keycloak.md`; k3d-manager `k3d-manager-v1.4.5` + shopping-cart-infra `docs/next-improvements`
+- [x] **ArgoCD SSO via Keycloak** — COMPLETE. shopping-cart-infra PR #38 (`d314c34`, feat: ArgoCD SSO) + PR #39 (`afaf109`, fix: ldap duplicate) merged to main. enforce_admins restored. spec: `docs/plans/v1.4.5-argocd-sso-keycloak.md`; retro: `docs/retro/2026-05-09-pr38-pr39-argocd-sso-kustomize-fix.md` (on `docs/next-improvements`)
 - [x] **pyjenkinsapi rigor-cli v0.1.6 subtree pull** — COMPLETE (subtree: `7d8a894b`, ci-fix: `0c479c99`); branch `docs/next-improvements`; BATS re-enabled
 - [x] **acg-up /etc/hosts --soft** — COMPLETE (`3c096f6`). `_run_command --prefer-sudo` missing `--soft` causes `exit 1` instead of warning when EPERM. spec: `docs/bugs/v1.4.5-bugfix-etc-hosts-soft.md`.
 - [x] **acg-up Step 10e bugs** — COMPLETE (`d6a31c5`). Fixed CoreDNS awk pattern + /etc/hosts sudo hard-fail. spec: `docs/plans/v1.4.5-bugfix-gemini.md`
