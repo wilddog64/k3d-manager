@@ -506,7 +506,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: shopping-cart
+  project: platform
   sources:
     - repoURL: https://github.com/wilddog64/shopping-cart-infra.git
       targetRevision: HEAD
