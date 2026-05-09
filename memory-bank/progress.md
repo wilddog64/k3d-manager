@@ -51,6 +51,8 @@
 - [x] **LDAP CrashLoopBackOff Bug 6** — PR #42 merged (`11aa8d7d`); enforce_admins restored. Spec: `docs/bugs/2026-05-09-ldap-emptydir-mountpoint-rm-fails.md`
 - [x] **LDAP CrashLoopBackOff Bug 7** — PR #43 merged (`dcd18af7`). enforce_admins restored. Fix: `enableServiceLinks: false` in pod spec. Retro: `docs/retro/2026-05-09-pr43-ldap-service-links-retrospective.md`
 - [x] **deploy_eso unpinned chart version** — spec: `docs/bugs/v1.4.5-bugfix-deploy-eso-no-version-pin.md`; pinned to `1.0.0` via `ESO_HELM_CHART_VERSION` (SHA: `50851f0e`)
+- [ ] **Bug 8 — CoreDNS keycloak.shopping-cart.local → Keycloak ClusterIP** — spec: `docs/bugs/2026-05-09-argocd-sso-coredns-keycloak-clusterip.md`; fix: patch Corefile `hosts` block instead of NodeHosts/IngressGateway IP. Assign to Codex.
+- [ ] **Bug 9 — acg-up frontend port-forward launchd agent** — spec: `docs/bugs/2026-05-09-acg-up-frontend-port-forward.md`; fix: step 13 launchd plist (`localhost:3000 → ubuntu-k3s/shopping-cart-apps/frontend:80`). Assign to Codex.
 - [ ] **Refactor shopping_cart.sh → k3s_remote.sh** — spec: `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex (spec updated to also rename source line in `k3s-aws.sh` and `k3s-gcp.sh`)
 - [ ] **Service mesh + LB for k3s-aws and k3s-gcp** — spec: `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; assign to Codex AFTER refactor is done
 - [ ] **chisel HTTPS tunnel** — spec: `docs/plans/v1.4.3-chisel-tunnel.md`; replaces autossh+socat with HTTPS WebSocket; `TUNNEL_PROVIDER=chisel` gate; depends on refactor spec
