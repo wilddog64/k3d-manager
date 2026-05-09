@@ -52,6 +52,16 @@ spec:
         app.kubernetes.io/name: ldap
         app.kubernetes.io/component: directory
     spec:
+      initContainers:
+      - name: copy-ldif
+        image: busybox:1.36
+        command: ["sh", "-c", "cp /ldif-source/* /ldif-dest/ && chown -R 911:911 /ldif-dest/"]
+        volumeMounts:
+        - name: ldap-bootstrap
+          mountPath: /ldif-source
+          readOnly: true
+        - name: ldap-bootstrap-writable
+          mountPath: /ldif-dest
       containers:
       - name: openldap
         image: osixia/openldap:1.5.0
@@ -77,7 +87,7 @@ spec:
           mountPath: /var/lib/ldap
         - name: ldap-config-vol
           mountPath: /etc/ldap/slapd.d
-        - name: ldap-bootstrap
+        - name: ldap-bootstrap-writable
           mountPath: /container/service/slapd/assets/config/bootstrap/ldif/custom
         livenessProbe:
           tcpSocket:
@@ -98,6 +108,8 @@ spec:
       - name: ldap-bootstrap
         configMap:
           name: ldap-bootstrap
+      - name: ldap-bootstrap-writable
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
