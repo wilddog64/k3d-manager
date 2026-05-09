@@ -49,7 +49,7 @@
 - [x] **identity ESO bootstrap Bugs 2+3** — spec: `docs/bugs/v1.4.5-bugfix-identity-externalsecret-bootstrap.md`; shopping-cart-infra PR #40 merged (`dfe00df1`); enforce_admins restored
 - [x] **identity ESO bootstrap Bugs 4+5** — spec: `docs/bugs/2026-05-08-pr41-keycloak-postgresql-driver-ldap-ldif-chown-fixes.md`; shopping-cart-infra PR #41 merged (`180f5f89`); Bug 4: Keycloak `--db=postgres` in args, KC_DB removed from ConfigMap; Bug 5: LDAP LDIF chown fix via initContainer + emptyDir; enforce_admins restored
 - [x] **LDAP CrashLoopBackOff Bug 6** — PR #42 merged (`11aa8d7d`); enforce_admins restored. Spec: `docs/bugs/2026-05-09-ldap-emptydir-mountpoint-rm-fails.md`
-- [ ] **LDAP CrashLoopBackOff Bug 7** — LDAP_PORT service link conflict; fix: `enableServiceLinks: false` in pod spec. Branch: `bug/ldap-port-service-link-conflict`. Spec: `docs/bugs/2026-05-09-ldap-port-service-link-conflict.md`. Assign to Codex.
+- [x] **LDAP CrashLoopBackOff Bug 7** — PR #43 merged (`dcd18af7`). enforce_admins restored. Fix: `enableServiceLinks: false` in pod spec. Retro: `docs/retro/2026-05-09-pr43-ldap-service-links-retrospective.md`
 - [x] **deploy_eso unpinned chart version** — spec: `docs/bugs/v1.4.5-bugfix-deploy-eso-no-version-pin.md`; pinned to `1.0.0` via `ESO_HELM_CHART_VERSION` (SHA: `50851f0e`)
 - [ ] **Refactor shopping_cart.sh → k3s_remote.sh** — spec: `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex (spec updated to also rename source line in `k3s-aws.sh` and `k3s-gcp.sh`)
 - [ ] **Service mesh + LB for k3s-aws and k3s-gcp** — spec: `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; assign to Codex AFTER refactor is done
