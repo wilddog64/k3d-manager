@@ -5,6 +5,7 @@
 - **v1.4.4 SHIPPED** — PR #73 merged to main (`92ccaec1`). Tagged v1.4.4, released 2026-05-08. `enforce_admins` restored on both k3d-manager and shopping-cart-infra.
 - **v1.4.3 SHIPPED** — PR #72 merged to main (`b5601cb5`). `enforce_admins` restored on `main`. No prior CHANGE.md entry needed (small identity provisioning milestone).
 - **v1.4.2 SHIPPED** — PR #71 merged to main (`ad8df98c`), tagged `v1.4.2`, released 2026-05-07.
+- **shopping-cart-infra PR #41 MERGED** — `180f5f89` 2026-05-09 — Keycloak PostgreSQL driver fix + LDAP LDIF chown fix (Bugs 4+5). `enforce_admins` restored. Retro: `docs/retro/2026-05-09-pr41-keycloak-ldap-startup-retrospective.md` (committed `e0837c4` on `docs/next-improvements`).
 
 ## Post-Merge Housekeeping — 2026-05-08 (v1.4.4 + PR #37)
 - **k3d-manager PR #73 + shopping-cart-infra PR #37 merged** — both enforced to main
@@ -35,7 +36,7 @@
 - **COMPLETE:** `fix(argocd)` — spec `docs/bugs/v1.4.5-bugfix-services-git-identity-exclude.md` (SHA: `fa7bb830`). Excluded `shopping-cart-identity` from `services-git` ApplicationSet generator; re-applied identity Application with correct local-cluster destination.
 - **COMPLETE:** `fix(vault)` — spec `docs/bugs/v1.4.5-bugfix-eso-ldap-policy-missing-keycloak.md` (SHA: `48938dea`). Extended `LDAP_VAULT_POLICY_PREFIX` default to `ldap,keycloak` so `eso-ldap-directory` policy covers `keycloak/*` paths.
 - **COMPLETE:** `fix(acg-up)` — spec `docs/bugs/v1.4.5-bugfix-identity-appproject-missing.md` (SHA: `771ba5cf`). Changed `project: shopping-cart` → `project: platform` in step 10c inline Application; removed dead `services/shopping-cart-identity/kustomization.yaml`.
-- **COMPLETE:** `fix(identity-eso-bootstrap)` — spec `docs/bugs/v1.4.5-bugfix-identity-externalsecret-bootstrap.md`. Bug 1 (`f969b299`). Bugs 2+3: shopping-cart-infra PR #40 merged to main (`dfe00df1`). enforce_admins restored.
+- **COMPLETE:** `fix(identity-eso-bootstrap)` — spec `docs/bugs/v1.4.5-bugfix-identity-externalsecret-bootstrap.md`. Bug 1 (`f969b299`). Bugs 2+3: shopping-cart-infra PR #40 merged to main (`dfe00df1`). Bugs 4+5: shopping-cart-infra PR #41 merged to main (`180f5f89`) — Keycloak PostgreSQL driver + LDAP LDIF chown fixes. enforce_admins restored.
 - **COMPLETE:** `fix(eso)` — spec `docs/bugs/v1.4.5-bugfix-deploy-eso-no-version-pin.md` (SHA: `50851f0e`). Pinned ESO Helm chart version to `1.0.0` (overridable via `ESO_HELM_CHART_VERSION`); matches remote cluster install in `acg-up`.
 - **Pending:** `refactor(plugins)` — spec at `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex after SSO wiring is verified. Updated to include `k3s-aws.sh` and `k3s-gcp.sh` source-line changes (both source `shopping_cart.sh` directly — must rename to `k3s_remote.sh`).
 - **Next:** `feat(providers)` — spec at `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; depends on refactor spec.
