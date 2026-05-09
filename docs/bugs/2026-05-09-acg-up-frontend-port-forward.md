@@ -5,6 +5,24 @@
 
 ---
 
+## Before You Start
+
+1. `git pull origin k3d-manager-v1.4.5` in the k3d-manager repo
+2. Read `bin/acg-up` lines 670–673 (end of file) in full before touching anything
+3. Read step 4b (lines 158–199) — the frontend launchd block must follow the same pattern exactly
+
+---
+
+## What NOT to Do
+
+- Do NOT create a PR
+- Do NOT skip pre-commit hooks (`--no-verify`)
+- Do NOT modify files outside `bin/acg-up`
+- Do NOT commit to `main` — work on `k3d-manager-v1.4.5`
+- Do NOT change the ArgoCD or Keycloak launchd blocks — only add the new frontend block
+
+---
+
 ## Problem
 
 `acg-up` sets up auto-restarting launchd port-forwards for ArgoCD (step 4b, `localhost:8080`) and a

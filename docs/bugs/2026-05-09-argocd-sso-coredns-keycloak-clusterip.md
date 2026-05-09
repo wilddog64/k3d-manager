@@ -5,6 +5,24 @@
 
 ---
 
+## Before You Start
+
+1. `git pull origin k3d-manager-v1.4.5` in the k3d-manager repo
+2. Read `bin/acg-up` lines 594–650 in full before touching anything
+3. Confirm Keycloak ClusterIP: `kubectl get svc keycloak -n identity --context k3d-k3d-cluster -o jsonpath='{.spec.clusterIP}'`
+
+---
+
+## What NOT to Do
+
+- Do NOT create a PR
+- Do NOT skip pre-commit hooks (`--no-verify`)
+- Do NOT modify files outside `bin/acg-up`
+- Do NOT commit to `main` — work on `k3d-manager-v1.4.5`
+- Do NOT touch the `NodeHosts` field — the fix replaces that approach entirely with a `Corefile` patch
+
+---
+
 ## Problem
 
 ArgoCD SSO fails with:
