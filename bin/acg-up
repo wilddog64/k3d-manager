@@ -644,15 +644,20 @@ kubectl apply --context k3d-k3d-cluster \
 kubectl patch secret argocd-secret -n cicd --context k3d-k3d-cluster \
   --type merge \
   --patch "{\"stringData\":{\"oidc.keycloak.clientSecret\":\"${_argocd_client_secret}\"}}"
-# Add /etc/hosts entry on the Mac host so the browser reaches keycloak.shopping-cart.local
-if ! grep -qF 'keycloak.shopping-cart.local' /etc/hosts; then
-  if _run_command --prefer-sudo --soft -- \
-      sh -c 'printf "127.0.0.1 keycloak.shopping-cart.local\n" >> /etc/hosts' 2>/dev/null; then
-    _info "[acg-up] /etc/hosts: added keycloak.shopping-cart.local → 127.0.0.1"
-  else
-    _info "[acg-up] WARNING: could not update /etc/hosts — add manually: 127.0.0.1 keycloak.shopping-cart.local"
+# Add /etc/hosts entries on the Mac host for local browser access
+_HOSTS_LIST=(
+  "keycloak.shopping-cart.local"
+  "argocd.shopping-cart.local"
+)
+for _h in "${_HOSTS_LIST[@]}"; do
+  if ! grep -qF "${_h}" /etc/hosts; then
+    _info "[acg-up] Adding ${_h} to /etc/hosts (requires sudo)..."
+    if ! _run_command --prefer-sudo -- \
+        sh -c "printf '127.0.0.1 %s\n' '${_h}' >> /etc/hosts"; then
+      _warn "could not update /etc/hosts for ${_h} — please add manually: 127.0.0.1 ${_h}"
+    fi
   fi
-fi
+done
 
 # Restart argocd-server to pick up the updated argocd-cm and argocd-secret
 kubectl rollout restart deployment/argocd-server -n cicd --context k3d-k3d-cluster
