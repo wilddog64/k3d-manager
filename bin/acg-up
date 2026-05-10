@@ -644,7 +644,6 @@ kubectl apply --context k3d-k3d-cluster \
 kubectl patch secret argocd-secret -n cicd --context k3d-k3d-cluster \
   --type merge \
   --patch "{\"stringData\":{\"oidc.keycloak.clientSecret\":\"${_argocd_client_secret}\"}}"
-
 # Add /etc/hosts entry on the Mac host so the browser reaches keycloak.shopping-cart.local
 if ! grep -qF 'keycloak.shopping-cart.local' /etc/hosts; then
   if _run_command --prefer-sudo --soft -- \

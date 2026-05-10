@@ -44,7 +44,10 @@ case "${_cluster_provider}" in
     source "${REPO_ROOT}/scripts/plugins/aws.sh"
     source "${REPO_ROOT}/scripts/plugins/acg.sh"
     source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
-    _info "[acg-down] Stopping tunnel..."
+    _info "[acg-down] Clearing local port-forwarding processes (8080, 18080, 18200)..."
+lsof -ti :8080,18080,18200 | xargs kill -9 2>/dev/null || true
+
+_info "[acg-down] Stopping tunnel..."
     tunnel_stop 2>/dev/null || true
     _info "[acg-down] Tearing down CloudFormation stack (AWS)..."
     if aws sts get-caller-identity --region "${ACG_REGION}" --query 'Arn' --output text >/dev/null 2>&1; then
