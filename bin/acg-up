@@ -473,8 +473,7 @@ if [[ -z "${_argocd_sa_token}" ]]; then
   _err "[acg-up] argocd-manager-token secret not yet populated — wait and retry"
 fi
 kubectl create namespace cicd --context k3d-k3d-cluster \
-  --dry-run=client -o yaml | kubectl apply --context k3d-k3d-cluster -f -
-kubectl label namespace cicd istio-injection=enabled --overwrite --context k3d-k3d-cluster >/dev/null
+  --dry-run=client -o yaml | kubectl apply --context k3d-k3d-cluster -f - >/dev/null
 _cp_server=$(kubectl config view \
   -o jsonpath='{.clusters[?(@.name=="ubuntu-k3s")].cluster.server}' 2>/dev/null || echo "")
 if [[ -z "${_cp_server}" ]]; then
@@ -532,30 +531,24 @@ spec:
         maxDuration: 3m
 IDEOF
 
-_info "[acg-up] Waiting for Keycloak API to be Ready (up to 5 min)..."
-_kc_pf_port=18080
+_info "[acg-up] Waiting for Keycloak pod to be Running (up to 5 min)..."
 _kc_ready=false
-# Start a temporary port-forward for the health check
-kubectl port-forward svc/keycloak -n identity --context k3d-k3d-cluster "${_kc_pf_port}:80" \
-  >>"${HOME}/.local/share/k3d-manager/keycloak-readiness-pf.log" 2>&1 &
-_kc_readiness_pf_pid=$!
-
 for i in $(seq 1 30); do
-  if curl -sf "http://localhost:${_kc_pf_port}/health/ready" >/dev/null 2>&1; then
+  _kc_phase=$(kubectl get pods -n identity --context k3d-k3d-cluster \
+    -l app.kubernetes.io/name=keycloak \
+    -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "")
+  if [[ "${_kc_phase}" == "Running" ]]; then
     _kc_ready=true
     break
   fi
-  _info "[acg-up] Keycloak API not ready yet (attempt ${i}/30) — waiting 10s..."
+  _info "[acg-up] Keycloak not Running yet (attempt ${i}/30, phase=${_kc_phase}) — waiting 10s..."
   sleep 10
 done
-
-kill "${_kc_readiness_pf_pid}" 2>/dev/null || true
-
 if [[ "${_kc_ready}" != "true" ]]; then
-  _info "[acg-up] WARNING: Keycloak API not Ready after 5 min — skipping realm import. Run manually: bin/acg-up --import-realm"
+  _info "[acg-up] WARNING: Keycloak not Running after 5 min — skipping realm import. Run manually: bin/acg-up --import-realm"
 else
   _info "[acg-up] Step 10d/14 — Importing Keycloak realm shopping-cart..."
-  # Re-establish port-forward for actual import
+  _kc_pf_port=18080
   kubectl port-forward svc/keycloak -n identity --context k3d-k3d-cluster "${_kc_pf_port}:80" \
     >>"${HOME}/.local/share/k3d-manager/keycloak-pf.log" 2>&1 &
   _kc_pf_pid=$!
