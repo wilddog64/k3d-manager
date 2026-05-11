@@ -8,4 +8,8 @@
   run grep -nF 'source "${REPO_ROOT}/scripts/plugins/argocd.sh"' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"scripts/plugins/argocd.sh"* ]]
+
+  run grep -nF 'source "${REPO_ROOT}/scripts/plugins/keycloak.sh"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"scripts/plugins/keycloak.sh"* ]]
 }

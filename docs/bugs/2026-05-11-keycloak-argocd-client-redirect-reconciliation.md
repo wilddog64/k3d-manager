@@ -1,7 +1,7 @@
 # Bug: `acg-up` does not reconcile the existing Keycloak `argocd` client redirect URIs
 
 ## Status
-Open
+Fixed
 
 ## Symptom
 After rebuilding the cluster, Argo CD SSO still fails with a Keycloak redirect error such as:

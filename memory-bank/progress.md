@@ -57,7 +57,8 @@
 - [x] **Bug 11 — acg-down keep-hub preservation trust gap** — `bin/acg-down` now logs the resolved Hub cluster and the `Makefile` wrapper exposes `KEEP_LOCAL` directly, making `--keep-hub` unambiguous to operators.
 - [x] **Bug 12 — acg-up missing Argo CD plugin source** — `bin/acg-up` now sources `scripts/plugins/argocd.sh` before Step 4b calls `_argocd_wait_for_local_port_forward` (SHA: `6052786a`).
 - [x] **Bug 13 — acg-up PLUGINS_DIR unbound before plugin sourcing** — `bin/acg-up` now initializes `PLUGINS_DIR="${SCRIPT_DIR}/plugins"` before sourcing `scripts/plugins/argocd.sh` (SHA: `5d4b9b1e`).
-- [ ] **Bug 14 — Keycloak `argocd` client redirect reconciliation** — `bin/acg-up` still skips client reconciliation on realm `409`, so stale redirect URIs can survive rebuilds and break SSO. Spec: `docs/bugs/2026-05-11-keycloak-argocd-client-redirect-reconciliation.md`.
+- [x] **Bug 14 — Keycloak `argocd` client redirect reconciliation** — `bin/acg-up` now reconciles the existing `argocd` client redirect URIs even when the realm already exists, so rebuilds do not preserve stale OIDC callbacks. Spec: `docs/bugs/2026-05-11-keycloak-argocd-client-redirect-reconciliation.md`.
+- [ ] **Follow-up — `deploy_keycloak` if-count refactor** — temporary allowlist entry added for `scripts/plugins/keycloak.sh:deploy_keycloak`; separate refactor needed. Spec: `docs/issues/2026-05-11-keycloak-deploy_keycloak-if-count.md`.
 - [ ] **Refactor shopping_cart.sh → k3s_remote.sh** — spec: `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex (spec updated to also rename source line in `k3s-aws.sh` and `k3s-gcp.sh`)
 - [ ] **Service mesh + LB for k3s-aws and k3s-gcp** — spec: `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; assign to Codex AFTER refactor is done
 - [ ] **chisel HTTPS tunnel** — spec: `docs/plans/v1.4.3-chisel-tunnel.md`; replaces autossh+socat with HTTPS WebSocket; `TUNNEL_PROVIDER=chisel` gate; depends on refactor spec

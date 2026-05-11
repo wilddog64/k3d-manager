@@ -242,7 +242,7 @@ function _keycloak_apply_realm_configmap() {
    bind_pw=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_LDAP_SECRET_NAME" -o jsonpath="{.data.${KEYCLOAK_LDAP_PASSWORD_KEY}}" | base64 -d)
 
    KEYCLOAK_LDAP_BIND_DN="$bind_dn" KEYCLOAK_LDAP_PASSWORD="$bind_pw" \
-      envsubst '$KEYCLOAK_REALM_NAME $KEYCLOAK_REALM_DISPLAY_NAME $KEYCLOAK_LDAP_HOST $KEYCLOAK_LDAP_PORT $KEYCLOAK_LDAP_BASE_DN $KEYCLOAK_LDAP_USERS_DN $KEYCLOAK_LDAP_BIND_DN $KEYCLOAK_LDAP_PASSWORD' \
+  envsubst '$KEYCLOAK_REALM_NAME $KEYCLOAK_REALM_DISPLAY_NAME $KEYCLOAK_LDAP_HOST $KEYCLOAK_LDAP_PORT $KEYCLOAK_LDAP_BASE_DN $KEYCLOAK_LDAP_USERS_DN $KEYCLOAK_LDAP_BIND_DN $KEYCLOAK_LDAP_PASSWORD' \
       < "$KEYCLOAK_CONFIG_DIR/realm-config.json.tmpl" > "$rendered"
 
    cat <<REALM | _kubectl apply -f - >/dev/null
@@ -255,6 +255,53 @@ data:
   realm-config.json: |
 $(sed 's/^/    /' "$rendered")
 REALM
+}
+
+function _keycloak_reconcile_realm_client() {
+   local base_url="${1:-}"
+   local admin_token="${2:-}"
+   local realm_name="${3:-}"
+   local client_id="${4:-}"
+   local realm_json_file="${5:-}"
+
+   if [[ -z "$base_url" || -z "$admin_token" || -z "$realm_name" || -z "$client_id" || -z "$realm_json_file" ]]; then
+      _err "[keycloak] usage: _keycloak_reconcile_realm_client <base_url> <admin_token> <realm_name> <client_id> <realm_json_file>"
+      return 1
+   fi
+
+   if [[ ! -r "$realm_json_file" ]]; then
+      _err "[keycloak] Realm JSON file not readable: $realm_json_file"
+      return 1
+   fi
+
+   local client_payload
+   client_payload=$(jq -c --arg clientId "$client_id" \
+      '.clients[] | select(.clientId == $clientId)' "$realm_json_file" 2>/dev/null || true)
+   if [[ -z "$client_payload" ]]; then
+      _err "[keycloak] Client '$client_id' not found in realm JSON: $realm_json_file"
+      return 1
+   fi
+
+   local client_uuid
+   client_uuid=$(_curl -sf \
+      -H "Authorization: Bearer ${admin_token}" \
+      "${base_url}/admin/realms/${realm_name}/clients?clientId=${client_id}" \
+      | jq -r '.[0].id // empty' 2>/dev/null || true)
+   if [[ -z "$client_uuid" ]]; then
+      _err "[keycloak] Client '$client_id' not found in Keycloak realm '$realm_name'"
+      return 1
+   fi
+
+   client_payload=$(printf '%s' "$client_payload" | jq --arg id "$client_uuid" '.id = $id')
+
+   _curl -sf \
+      -X PUT \
+      -H "Authorization: Bearer ${admin_token}" \
+      -H "Content-Type: application/json" \
+      --data-binary "$client_payload" \
+      "${base_url}/admin/realms/${realm_name}/clients/${client_uuid}" >/dev/null
+
+   _info "[keycloak] Reconciled client '$client_id' in realm '$realm_name'"
 }
 
 function test_keycloak() {

@@ -30,6 +30,7 @@ source "${REPO_ROOT}/scripts/plugins/gemini.sh"
 source "${REPO_ROOT}/scripts/plugins/acg.sh"
 source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
 source "${REPO_ROOT}/scripts/plugins/argocd.sh"
+source "${REPO_ROOT}/scripts/plugins/keycloak.sh"
 source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
 
 _cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
@@ -580,23 +581,32 @@ else
       -e "s/\${GRAFANA_CLIENT_SECRET}/${_grafana_client_secret}/g" \
       -e "s/\${LDAP_BIND_CREDENTIAL}/${_ldap_admin_pass}/g" \
       "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/config/realm-shopping-cart.json")
+    _realm_json_file="$(mktemp -t keycloak-realm.XXXXXX.json)"
+    printf '%s\n' "${_realm_json}" > "${_realm_json_file}"
 
-    _import_status=$(curl -sf -o /dev/null -w "%%{http_code}" \
+    _import_status=$(curl -sf -o /dev/null -w "%{http_code}" \
       -X POST \
       -H "Authorization: Bearer ${_kc_token}" \
       -H "Content-Type: application/json" \
-      -d "${_realm_json}" \
+      --data-binary @"${_realm_json_file}" \
       "http://localhost:${_kc_pf_port}/admin/realms" 2>/dev/null || echo "000")
 
     if [[ "${_import_status}" == "201" ]]; then
       _info "[acg-up] Keycloak realm 'shopping-cart' imported successfully"
     elif [[ "${_import_status}" == "409" ]]; then
-      _info "[acg-up] Keycloak realm 'shopping-cart' already exists — skipping import"
+      _info "[acg-up] Keycloak realm 'shopping-cart' already exists — reconciling client config"
     else
       _info "[acg-up] WARNING: Realm import returned HTTP ${_import_status} — check Keycloak logs"
     fi
 
+    if _keycloak_reconcile_realm_client "http://localhost:${_kc_pf_port}" "${_kc_token}" "shopping-cart" "argocd" "${_realm_json_file}"; then
+      _info "[acg-up] Keycloak client 'argocd' reconciled from realm JSON"
+    else
+      _warn "[acg-up] Could not reconcile Keycloak client 'argocd' — check Keycloak logs"
+    fi
+
     kill "${_kc_pf_pid}" 2>/dev/null || true
+    rm -f "${_realm_json_file}"
   fi
 fi
 
