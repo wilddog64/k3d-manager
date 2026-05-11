@@ -27,6 +27,7 @@ source "${REPO_ROOT}/scripts/lib/provider.sh"
 source "${REPO_ROOT}/scripts/plugins/gemini.sh"
 source "${REPO_ROOT}/scripts/plugins/acg.sh"
 source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
+source "${REPO_ROOT}/scripts/plugins/argocd.sh"
 source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
 
 _cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
