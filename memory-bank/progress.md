@@ -54,7 +54,7 @@
 - [x] **Bug 8 — CoreDNS keycloak.shopping-cart.local → Keycloak ClusterIP** — `34e0101f`. Corefile patched with `hosts` block; NodeHosts/IngressGateway approach removed.
 - [x] **Bug 9 — acg-up frontend port-forward launchd agent** — `fb56a443`. Step 13 launchd plist added (`localhost:3000 → ubuntu-k3s/shopping-cart-apps/frontend:80`).
 - [x] **Bug 10 — acg-up ArgoCD localhost:8080 readiness gate** — `bin/acg-up` now waits for the Argo CD launchd listener to answer `localhost:8080/healthz` and fails fast with the log tail when it never becomes reachable.
-- [ ] **Bug 11 — acg-down keep-hub preservation trust gap** — `bin/acg-down` still needs explicit resolved Hub logging and a conditional completion message so `--keep-hub` is unambiguous to operators.
+- [x] **Bug 11 — acg-down keep-hub preservation trust gap** — `bin/acg-down` now logs the resolved Hub cluster and the `Makefile` wrapper exposes `KEEP_LOCAL` directly, making `--keep-hub` unambiguous to operators.
 - [ ] **Refactor shopping_cart.sh → k3s_remote.sh** — spec: `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex (spec updated to also rename source line in `k3s-aws.sh` and `k3s-gcp.sh`)
 - [ ] **Service mesh + LB for k3s-aws and k3s-gcp** — spec: `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; assign to Codex AFTER refactor is done
 - [ ] **chisel HTTPS tunnel** — spec: `docs/plans/v1.4.3-chisel-tunnel.md`; replaces autossh+socat with HTTPS WebSocket; `TUNNEL_PROVIDER=chisel` gate; depends on refactor spec
