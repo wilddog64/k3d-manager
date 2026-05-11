@@ -21,6 +21,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC2034
 SCRIPT_DIR="${REPO_ROOT}/scripts"
+# shellcheck disable=SC2034
+PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
