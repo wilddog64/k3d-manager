@@ -70,6 +70,28 @@ setup() {
   [[ "${argocd_calls[1]}" == *"login localhost:8080 --username admin --password fake-pass --plaintext --skip-test-tls --insecure --grpc-web"* ]]
 }
 
+@test "_argocd_wait_for_local_port_forward returns 0 when healthz is reachable" {
+  local port_forward_log="${BATS_TEST_TMPDIR}/argocd-pf.log"
+  : > "$port_forward_log"
+  curl() { return 0; }
+  sleep() { return 0; }
+  export -f curl sleep
+  run _argocd_wait_for_local_port_forward "$port_forward_log" 1
+  [ "$status" -eq 0 ]
+}
+
+@test "_argocd_wait_for_local_port_forward returns 1 when healthz never becomes reachable" {
+  local port_forward_log="${BATS_TEST_TMPDIR}/argocd-pf.log"
+  printf 'port-forward boom\n' > "$port_forward_log"
+  curl() { return 1; }
+  sleep() { return 0; }
+  export -f curl sleep
+  run _argocd_wait_for_local_port_forward "$port_forward_log" 1
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Argo CD did not become reachable on localhost:8080"* ]]
+  [[ "$output" == *"port-forward boom"* ]]
+}
+
 @test "_argocd_deploy_appproject fails when template missing" {
   local original_config="$ARGOCD_CONFIG_DIR"
   ARGOCD_CONFIG_DIR="$BATS_TEST_TMPDIR/argocd-empty"

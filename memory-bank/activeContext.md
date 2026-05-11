@@ -42,6 +42,7 @@
 - **COMPLETE:** `fix(eso)` — spec `docs/bugs/v1.4.5-bugfix-deploy-eso-no-version-pin.md` (SHA: `50851f0e`). Pinned ESO Helm chart version to `1.0.0` (overridable via `ESO_HELM_CHART_VERSION`); matches remote cluster install in `acg-up`.
 - **COMPLETE Bug 8 — CoreDNS Corefile patched with Keycloak ClusterIP** — `34e0101f`. Removed NodeHosts/IngressGateway approach; added stable `hosts` block in Corefile pointing to Keycloak ClusterIP. Spec: `docs/bugs/2026-05-09-argocd-sso-coredns-keycloak-clusterip.md`.
 - **COMPLETE Bug 9 — frontend port-forward launchd agent** — `fb56a443`. Step 13 added to acg-up; plist targets `ubuntu-k3s/shopping-cart-apps/frontend:80 → localhost:3000`. Spec: `docs/bugs/2026-05-09-acg-up-frontend-port-forward.md`.
+- **COMPLETE Bug 10 — ArgoCD localhost:8080 readiness gate** — `bin/acg-up` now waits for `localhost:8080/healthz` after loading the Argo CD launchd agent and fails fast with the log tail if the listener never becomes reachable. Spec: `docs/bugs/2026-05-11-acg-up-argocd-port-forward-readiness.md`.
 - **Pending:** `refactor(plugins)` — spec at `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex after SSO wiring is verified. Updated to include `k3s-aws.sh` and `k3s-gcp.sh` source-line changes (both source `shopping_cart.sh` directly — must rename to `k3s_remote.sh`).
 - **Next:** `feat(providers)` — spec at `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; depends on refactor spec.
 - **Next:** `feat(tunnel)` — spec at `docs/plans/v1.4.3-chisel-tunnel.md`; depends on refactor spec.

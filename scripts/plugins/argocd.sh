@@ -51,6 +51,7 @@ fi
 : "${ARGOCD_HELM_CHART_REF:=argo/argo-cd}"
 : "${ARGOCD_VIRTUALSERVICE_HOST:=argocd.dev.local.me}"
 : "${ARGOCD_SERVER_WAIT_TIMEOUT:=600s}"
+: "${ARGOCD_PORT_FORWARD_WAIT_TIMEOUT:=30}"
 : "${ARGOCD_DEPLOY_KEY_SECRETSTORE:=argocd-deploy-key-store}"
 : "${ARGOCD_DEPLOY_KEY_ESO_SA:=eso-argocd-deploy-keys-sa}"
 : "${ARGOCD_DEPLOY_KEY_VAULT_ROLE:=argocd-deploy-key-reader}"
@@ -72,6 +73,24 @@ function _argocd_bootstrap_is_ready() {
    done
 
    return 0
+}
+
+function _argocd_wait_for_local_port_forward() {
+   local log_file="$1"
+   local timeout="${2:-$ARGOCD_PORT_FORWARD_WAIT_TIMEOUT}"
+
+   for ((attempt=1; attempt<=timeout; attempt++)); do
+      if curl -sf --max-time 1 http://localhost:8080/healthz >/dev/null 2>&1; then
+         return 0
+      fi
+      sleep 1
+   done
+
+   printf 'ERROR: %s\n' "[argocd] Argo CD did not become reachable on localhost:8080 within ${timeout}s — check ${log_file}" >&2
+   {
+      tail -n 20 "$log_file" 2>/dev/null || true
+   } >&2
+   return 1
 }
 
 function _argocd_ensure_logged_in() {
@@ -654,6 +673,7 @@ function _argocd_apply_repo_deploy_keys() {
    return 0
 }
 
+# shellcheck disable=SC2120
 function deploy_argocd_bootstrap() {
    if [[ "${CLUSTER_ROLE:-infra}" == "app" ]]; then
       _info "[argocd] CLUSTER_ROLE=app — skipping deploy_argocd_bootstrap"
