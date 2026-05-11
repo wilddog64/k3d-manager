@@ -24,6 +24,7 @@ source "${REPO_ROOT}/scripts/lib/core.sh"
 _cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
 _confirm=0
 _keep_hub=0
+_HUB_CLUSTER="${HUB_CLUSTER_NAME:-k3d-cluster}"
 for _arg in "$@"; do
   case "${_arg}" in
     --confirm)  _confirm=1 ;;
@@ -38,6 +39,8 @@ if [[ "${_confirm}" -eq 0 ]]; then
   echo "  --keep-hub   Optional. Skip local Hub (k3d-cluster) teardown."
   exit 1
 fi
+
+_info "[acg-down] keep-hub=${_keep_hub} hub-cluster=${_HUB_CLUSTER}"
 
 case "${_cluster_provider}" in
   k3s-aws)
@@ -100,7 +103,6 @@ fi
 rm -f "${_argocd_pf_plist}"
 
 if [[ "${_keep_hub}" -eq 0 ]]; then
-  _HUB_CLUSTER="${HUB_CLUSTER_NAME:-k3d-cluster}"
   _info "[acg-down] Tearing down local Hub cluster (${_HUB_CLUSTER})..."
   if k3d cluster list 2>/dev/null | grep -q "^${_HUB_CLUSTER}[[:space:]]"; then
     k3d cluster delete "${_HUB_CLUSTER}"
@@ -112,4 +114,8 @@ else
   _info "[acg-down] --keep-hub set — local Hub cluster preserved"
 fi
 
-_info "[acg-down] Done. Remote cluster and local Hub deleted."
+if [[ "${_keep_hub}" -eq 1 ]]; then
+  _info "[acg-down] Done. Remote cluster deleted; local Hub preserved."
+else
+  _info "[acg-down] Done. Remote cluster and local Hub deleted."
+fi
