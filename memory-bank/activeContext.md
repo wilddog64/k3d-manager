@@ -56,6 +56,7 @@
 - **COMPLETE:** Argo CD browser TLS role creation now derives `allowed_domains=shopping-cart.local` for `argocd.shopping-cart.local` so Vault accepts the PKI role write on rebuild. Spec: `docs/issues/2026-05-11-argocd-browser-tls-role-allowed-domains.md` (fixed).
 - **COMPLETE:** Argo CD browser TLS role write now authenticates to Vault before upserting the PKI role so the browser TLS helper does not hit `403 permission denied` on rebuild. Spec: `docs/issues/2026-05-11-argocd-browser-tls-vault-login-permission-denied.md`.
 - **COMPLETE:** Argo CD browser TLS cleanup now skips revoke when the prior cert is already gone, so stale serials no longer abort `make up`. Fixed in `f2942bf9`. Spec: `docs/issues/2026-05-11-argocd-browser-tls-revoke-missing-cert.md`.
+- **PLANNED:** `make up TRUST_CA=1` host CA trust bootstrap — spec `docs/plans/v1.4.5-trust-ca-auto-import.md`. Goal is to keep trust installation opt-in while letting the helper auto-detect macOS vs Linux.
 - **Pending:** `refactor(plugins)` — spec at `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex after SSO wiring is verified. Updated to include `k3s-aws.sh` and `k3s-gcp.sh` source-line changes (both source `shopping_cart.sh` directly — must rename to `k3s_remote.sh`).
 - **Next:** `feat(providers)` — spec at `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; depends on refactor spec.
 - **Next:** `feat(tunnel)` — spec at `docs/plans/v1.4.3-chisel-tunnel.md`; depends on refactor spec.
