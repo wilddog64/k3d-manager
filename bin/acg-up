@@ -231,13 +231,16 @@ if _is_mac; then
   <string>${_argocd_browser_log}</string>
   <key>StandardErrorPath</key>
   <string>${_argocd_browser_log}</string>
-</dict>
+  </dict>
 </plist>
 PLIST
   : > "${_argocd_browser_launchctl_log}"
-  if _run_command --interactive-sudo --quiet -- launchctl bootout system "${_argocd_browser_plist}" \
+  if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
       >"${_argocd_browser_launchctl_log}" 2>&1; then
     _info "[acg-up] Stopped existing ArgoCD browser HTTPS listener"
+  elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
+    tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+    _warn "[acg-up] existing ArgoCD browser HTTPS listener was not loaded; continuing"
   fi
   : > "${_argocd_browser_launchctl_log}"
   if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" \

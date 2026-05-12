@@ -29,6 +29,10 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"argocd-browser-https-launchctl.log"* ]]
 
+  run grep -nF '_run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"launchctl bootout system"* ]]
+
   run grep -nF '_run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_argocd_browser_plist}"' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"launchctl bootstrap system"* ]]

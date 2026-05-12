@@ -58,6 +58,8 @@
 - **COMPLETE:** Argo CD browser TLS cleanup now skips revoke when the prior cert is already gone, so stale serials no longer abort `make up`. Fixed in `f2942bf9`. Spec: `docs/issues/2026-05-11-argocd-browser-tls-revoke-missing-cert.md`.
 - **PLANNED:** `make up TRUST_CA=1` host CA trust bootstrap — spec `docs/plans/v1.4.5-trust-ca-auto-import.md`. Goal is to keep trust installation opt-in while letting the helper auto-detect macOS vs Linux.
 - **COMPLETE:** `fix(acg-up)` now preserves stderr from the macOS browser `launchctl` install/bootstrap path and reports `argocd-browser-https-launchctl.log` on failure. Commit `8d18e18c`.
+- **COMPLETE:** `fix(acg-up)` now treats the macOS browser `launchctl bootout` step as best-effort, so a missing existing listener no longer aborts bootstrap. Commit `8d18e18c`.
+- **NOTE:** Added `docs/issues/2026-05-12-acg-up-argocd-browser-bootout-fails-when-listener-missing.md` to record `launchctl bootout system` exit code `5` during rebuilds.
 - **Pending:** `refactor(plugins)` — spec at `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex after SSO wiring is verified. Updated to include `k3s-aws.sh` and `k3s-gcp.sh` source-line changes (both source `shopping_cart.sh` directly — must rename to `k3s_remote.sh`).
 - **Next:** `feat(providers)` — spec at `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; depends on refactor spec.
 - **Next:** `feat(tunnel)` — spec at `docs/plans/v1.4.3-chisel-tunnel.md`; depends on refactor spec.
