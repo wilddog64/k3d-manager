@@ -69,6 +69,10 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"Opening canonical ArgoCD browser URL"* ]]
 
+  run grep -nF '_argocd_open_browser_url()' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'_argocd_open_browser_url'* ]]
+
   run grep -nF '_keycloak_browser_kubeconfig="${HOME}/.kube/config"' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *".kube/config"* ]]

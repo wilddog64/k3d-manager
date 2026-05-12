@@ -47,6 +47,29 @@ case "${_cluster_provider}" in
     ;;
 esac
 
+function _argocd_open_browser_url() {
+  local url="$1"
+
+  if command -v osascript >/dev/null 2>&1; then
+    if osascript >/dev/null 2>&1 <<OSA
+tell application "Safari"
+  activate
+  open location "${url}"
+end tell
+OSA
+    then
+      return 0
+    fi
+  fi
+
+  if command -v open >/dev/null 2>&1; then
+    open "${url}"
+    return $?
+  fi
+
+  return 1
+}
+
 login_prompt=0
 sandbox_url=""
 for arg in "$@"; do
@@ -273,9 +296,9 @@ PLIST
     fi
   fi
   if [[ "${_argocd_browser_ready:-0}" == "1" ]]; then
-    if command -v open >/dev/null 2>&1; then
+    if command -v osascript >/dev/null 2>&1 || command -v open >/dev/null 2>&1; then
       _info "[acg-up] Opening canonical ArgoCD browser URL: ${_argocd_browser_url}"
-      _run_command --no-exit -- open "${_argocd_browser_url}" >/dev/null 2>&1 || true
+      _argocd_open_browser_url "${_argocd_browser_url}" >/dev/null 2>&1 || true
     else
       _warn "[acg-up] open command not available — open ${_argocd_browser_url} manually"
     fi
