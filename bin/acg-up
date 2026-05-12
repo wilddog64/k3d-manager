@@ -192,7 +192,7 @@ if launchctl list "${_argocd_pf_label}" >/dev/null 2>&1; then
 fi
 launchctl load "${_argocd_pf_plist}"
 if _argocd_wait_for_local_port_forward "${_argocd_pf_log}" "${ARGOCD_PORT_FORWARD_WAIT_TIMEOUT:-30}"; then
-  _info "[acg-up] ArgoCD reachable at http://localhost:8080 (launchd: ${_argocd_pf_label})"
+  _info "[acg-up] ArgoCD port-forward ready at http://localhost:8080 (terminal-only; browser login uses https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local})"
 else
   exit 1
 fi

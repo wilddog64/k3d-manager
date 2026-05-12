@@ -37,6 +37,10 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"launchctl bootstrap system"* ]]
 
+  run grep -nF 'ArgoCD port-forward ready at http://localhost:8080 (terminal-only; browser login uses https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local})' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'terminal-only; browser login uses https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}'* ]]
+
   run grep -nF 'Step 4c/12 — Installing ArgoCD browser HTTPS listener' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"browser HTTPS listener"* ]]
