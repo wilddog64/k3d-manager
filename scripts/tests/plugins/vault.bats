@@ -569,6 +569,33 @@ JSON
   [[ "${vault_calls[*]}" != *"${revoke_cmd}"* ]]
 }
 
+@test "_vault_post_revoke_request skips revoke when cert is already gone" {
+  local vault_log="$BATS_TEST_TMPDIR/vault-post-revoke.log"
+  : >"$vault_log"
+
+  _vault_exec() {
+    local args=("$@")
+    local cmd="${args[*]}"
+    echo "$cmd" >>"$VAULT_LOG"
+    if [[ "$cmd" == *"vault read -format=json pki/cert/"* ]]; then
+      return 1
+    fi
+    return 0
+  }
+
+  export -f _vault_exec
+
+  VAULT_LOG="$vault_log"
+  export VAULT_LOG
+
+  run _vault_post_revoke_request POST pki/revoke '{"serial_number":"AB:CD"}' secrets vault
+  [ "$status" -eq 0 ]
+
+  read_lines "$vault_log" vault_calls
+  [[ "${vault_calls[*]}" == *"vault read -format=json pki/cert/ABCD"* ]]
+  [[ "${vault_calls[*]}" != *"vault write pki/revoke serial_number=AB:CD"* ]]
+}
+
 @test "Full deployment" {
   _vault_ns_ensure() { CALLS+=("_vault_ns_ensure"); }
   _vault_repo_setup() { CALLS+=("_vault_repo_setup"); }
