@@ -127,6 +127,12 @@ function _argocd_wait_for_browser_https() {
    return 1
 }
 
+function _argocd_browser_https_is_ready() {
+   local url="${1:-https://${ARGOCD_BROWSER_HOST}:${ARGOCD_BROWSER_PORT}/healthz}"
+
+   curl -sk --max-time 1 "$url" >/dev/null 2>&1
+}
+
 function _argocd_browser_tls_allowed_domains() {
    local host="${1:-}"
    local host_no_wildcard="${host#\*\.}"

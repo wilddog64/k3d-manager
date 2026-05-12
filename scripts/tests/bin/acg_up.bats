@@ -25,6 +25,10 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"_argocd_issue_browser_tls_material"* ]]
 
+  run grep -nF '_argocd_browser_https_is_ready "https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}/healthz"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"_argocd_browser_https_is_ready"* ]]
+
   run grep -nF '_argocd_browser_launchctl_log="${ARGOCD_BROWSER_LISTENER_LAUNCHCTL_LOG:-${HOME}/.local/share/k3d-manager/argocd-browser-https-launchctl.log}"' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"argocd-browser-https-launchctl.log"* ]]
@@ -40,6 +44,10 @@
   run grep -nF 'ArgoCD port-forward ready at http://localhost:8080 (terminal-only; browser login uses https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local})' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *'terminal-only; browser login uses https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}'* ]]
+
+  run grep -nF 'ArgoCD browser HTTPS listener already healthy at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443} — skipping launchd reinstall' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"skipping launchd reinstall"* ]]
 
   run grep -nF 'Step 4c/12 — Installing ArgoCD browser HTTPS listener' bin/acg-up
   [ "$status" -eq 0 ]

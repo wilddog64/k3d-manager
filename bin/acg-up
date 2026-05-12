@@ -209,9 +209,12 @@ if _is_mac; then
   _argocd_browser_tls_key="${ARGOCD_BROWSER_TLS_KEY_FILE:-${_argocd_browser_tls_dir}/tls.key}"
   _argocd_browser_plist_tmp="${HOME}/.local/share/k3d-manager/argocd-browser-https.plist"
   mkdir -p "$(dirname "${_argocd_browser_log}")"
-  _argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}" || exit 1
-  _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}/healthz"
-  cat > "${_argocd_browser_plist_tmp}" <<PLIST
+  if _argocd_browser_https_is_ready "https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}/healthz"; then
+    _info "[acg-up] ArgoCD browser HTTPS listener already healthy at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443} — skipping launchd reinstall"
+  else
+    _argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}" || exit 1
+    _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}/healthz"
+    cat > "${_argocd_browser_plist_tmp}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -234,35 +237,36 @@ if _is_mac; then
   </dict>
 </plist>
 PLIST
-  : > "${_argocd_browser_launchctl_log}"
-  if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
-      >"${_argocd_browser_launchctl_log}" 2>&1; then
-    _info "[acg-up] Stopped existing ArgoCD browser HTTPS listener"
-  elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
-    tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
-    _warn "[acg-up] existing ArgoCD browser HTTPS listener was not loaded; continuing"
-  fi
-  : > "${_argocd_browser_launchctl_log}"
-  if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" \
-      >"${_argocd_browser_launchctl_log}" 2>&1; then
-    if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
+    : > "${_argocd_browser_launchctl_log}"
+    if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
+        >"${_argocd_browser_launchctl_log}" 2>&1; then
+      _info "[acg-up] Stopped existing ArgoCD browser HTTPS listener"
+    elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
       tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+      _warn "[acg-up] existing ArgoCD browser HTTPS listener was not loaded; continuing"
     fi
-    _err "[acg-up] failed to install ArgoCD browser HTTPS listener plist; see ${_argocd_browser_launchctl_log}"
-  fi
-  rm -f "${_argocd_browser_plist_tmp}"
-  : > "${_argocd_browser_launchctl_log}"
-  if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_argocd_browser_plist}" \
-      >"${_argocd_browser_launchctl_log}" 2>&1; then
-    if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
-      tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+    : > "${_argocd_browser_launchctl_log}"
+    if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" \
+        >"${_argocd_browser_launchctl_log}" 2>&1; then
+      if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
+        tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+      fi
+      _err "[acg-up] failed to install ArgoCD browser HTTPS listener plist; see ${_argocd_browser_launchctl_log}"
     fi
-    _err "[acg-up] failed to bootstrap ArgoCD browser HTTPS listener; see ${_argocd_browser_launchctl_log}"
-  fi
-  if _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-30}"; then
-    _info "[acg-up] ArgoCD reachable at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local} (launchd: ${_argocd_browser_label})"
-  else
-    exit 1
+    rm -f "${_argocd_browser_plist_tmp}"
+    : > "${_argocd_browser_launchctl_log}"
+    if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_argocd_browser_plist}" \
+        >"${_argocd_browser_launchctl_log}" 2>&1; then
+      if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
+        tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+      fi
+      _err "[acg-up] failed to bootstrap ArgoCD browser HTTPS listener; see ${_argocd_browser_launchctl_log}"
+    fi
+    if _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-30}"; then
+      _info "[acg-up] ArgoCD reachable at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local} (launchd: ${_argocd_browser_label})"
+    else
+      exit 1
+    fi
   fi
 fi
 
