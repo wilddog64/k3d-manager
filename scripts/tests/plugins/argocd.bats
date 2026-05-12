@@ -109,6 +109,17 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "_argocd_write_port_forward_wrapper falls back when the requested context is missing" {
+  run grep -F 'if [[ -n "${CONTEXT}" ]] && "${KUBECTL_BIN}" config get-contexts "${CONTEXT}" >/dev/null 2>&1; then' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F '_current_context="$("${KUBECTL_BIN}" config current-context 2>/dev/null || true)"' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'falling back to kubeconfig default' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F '"${KUBECTL_BIN}" "${_kubectl_context_args[@]}" port-forward "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}"' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+}
+
 @test "_argocd_write_browser_https_wrapper includes a canonical HTTPS listener" {
   run grep -F 'function _argocd_write_browser_https_wrapper()' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
   [ "$status" -eq 0 ]

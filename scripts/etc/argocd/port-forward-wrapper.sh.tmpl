@@ -18,6 +18,18 @@ if [[ -n "${KUBECONFIG_FILE}" ]]; then
 fi
 
 _pf_pid=""
+_kubectl_context_args=()
+
+if [[ -n "${CONTEXT}" ]] && "${KUBECTL_BIN}" config get-contexts "${CONTEXT}" >/dev/null 2>&1; then
+   _kubectl_context_args=(--context "${CONTEXT}")
+else
+   _current_context="$("${KUBECTL_BIN}" config current-context 2>/dev/null || true)"
+   if [[ -n "${_current_context}" ]] && "${KUBECTL_BIN}" config get-contexts "${_current_context}" >/dev/null 2>&1; then
+      _kubectl_context_args=(--context "${_current_context}")
+   elif [[ -n "${CONTEXT}" ]]; then
+      printf '%s\n' "[argocd-pf] WARNING: kubectl context '${CONTEXT}' not found — falling back to kubeconfig default" >> "${LOG_FILE}"
+   fi
+fi
 
 _cleanup() {
    case "${_pf_pid}" in
@@ -34,7 +46,7 @@ trap _cleanup EXIT INT TERM HUP
 
 while true; do
    printf '%s\n' "[argocd-pf] starting port-forward: ${SERVICE} -> localhost:${LOCAL_PORT}" >> "${LOG_FILE}"
-   "${KUBECTL_BIN}" port-forward "${SERVICE}" -n "${NAMESPACE}" --context "${CONTEXT}" "${LOCAL_PORT}:${REMOTE_PORT}" >> "${LOG_FILE}" 2>&1 &
+   "${KUBECTL_BIN}" "${_kubectl_context_args[@]}" port-forward "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}" >> "${LOG_FILE}" 2>&1 &
    _pf_pid=$!
 
    _ready=0
