@@ -234,6 +234,7 @@ function _argocd_write_port_forward_wrapper() {
    local local_port="${8:-8080}"
    local remote_port="${9:-80}"
    local healthz_url="${10:-}"
+   local kubeconfig_file="${11:-}"
 
    case "$kubectl_bin" in
       "") kubectl_bin="$(command -v kubectl 2>/dev/null || true)" ;;
@@ -264,10 +265,11 @@ function _argocd_write_port_forward_wrapper() {
       return 1
    fi
 
-   local q_kubectl_bin q_curl_bin q_log_file q_namespace q_context q_service q_local_port q_remote_port q_healthz_url q_startup_timeout
+   local q_kubectl_bin q_curl_bin q_log_file q_kubeconfig_file q_namespace q_context q_service q_local_port q_remote_port q_healthz_url q_startup_timeout
    printf -v q_kubectl_bin '%q' "$kubectl_bin"
    printf -v q_curl_bin '%q' "$curl_bin"
    printf -v q_log_file '%q' "$log_file"
+   printf -v q_kubeconfig_file '%q' "$kubeconfig_file"
    printf -v q_namespace '%q' "$namespace"
    printf -v q_context '%q' "$context"
    printf -v q_service '%q' "$service"
@@ -280,6 +282,7 @@ function _argocd_write_port_forward_wrapper() {
    KUBECTL_BIN="$q_kubectl_bin" \
    CURL_BIN="$q_curl_bin" \
    LOG_FILE="$q_log_file" \
+   KUBECONFIG_FILE="$q_kubeconfig_file" \
    NAMESPACE="$q_namespace" \
    CONTEXT="$q_context" \
    SERVICE="$q_service" \
@@ -287,7 +290,7 @@ function _argocd_write_port_forward_wrapper() {
    REMOTE_PORT="$q_remote_port" \
    HEALTHZ_URL="$q_healthz_url" \
    STARTUP_TIMEOUT="$q_startup_timeout" \
-      envsubst '$KUBECTL_BIN $CURL_BIN $LOG_FILE $NAMESPACE $CONTEXT $SERVICE $LOCAL_PORT $REMOTE_PORT $HEALTHZ_URL $STARTUP_TIMEOUT' \
+      envsubst '$KUBECTL_BIN $CURL_BIN $LOG_FILE $KUBECONFIG_FILE $NAMESPACE $CONTEXT $SERVICE $LOCAL_PORT $REMOTE_PORT $HEALTHZ_URL $STARTUP_TIMEOUT' \
          < "$template_path" > "$wrapper_path"
    chmod 700 "$wrapper_path"
 }

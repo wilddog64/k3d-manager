@@ -29,6 +29,18 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"_argocd_browser_https_is_ready"* ]]
 
+  run grep -nF '_argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"_argocd_write_port_forward_wrapper"* ]]
+
+  run grep -nF 'svc/keycloak" "80" "80" "http://127.0.0.1/health/ready"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"health/ready"* ]]
+
+  run grep -nF '_keycloak_browser_label="com.k3d-manager.keycloak-browser-http"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"keycloak-browser-http"* ]]
+
   run grep -nF '_argocd_browser_launchctl_log="${ARGOCD_BROWSER_LISTENER_LAUNCHCTL_LOG:-${HOME}/.local/share/k3d-manager/argocd-browser-https-launchctl.log}"' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"argocd-browser-https-launchctl.log"* ]]
@@ -49,17 +61,21 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"skipping launchd reinstall"* ]]
 
-  run grep -nF '_kc_browser_ip=$(kubectl get svc istio-ingressgateway -n istio-system --context k3d-k3d-cluster' bin/acg-up
+  run grep -nF '_keycloak_browser_kubeconfig="${HOME}/.kube/config"' bin/acg-up
   [ "$status" -eq 0 ]
-  [[ "$output" == *"istio-ingressgateway"* ]]
+  [[ "$output" == *".kube/config"* ]]
 
-  run grep -nF '_warn "[acg-up] could not determine the ingressgateway IP for ${_h} — browser login may fail"' bin/acg-up
+  run grep -nF '_kc_browser_ip="127.0.0.1"' bin/acg-up
   [ "$status" -eq 0 ]
-  [[ "$output" == *"browser login may fail"* ]]
+  [[ "$output" == *'_kc_browser_ip="127.0.0.1"'* ]]
 
-  run grep -nF 'Step 4c/12 — Installing ArgoCD browser HTTPS listener' bin/acg-up
+  run grep -nF 'Step 10e/14 — Installing Keycloak browser HTTP listener' bin/acg-up
   [ "$status" -eq 0 ]
-  [[ "$output" == *"browser HTTPS listener"* ]]
+  [[ "$output" == *"Keycloak browser HTTP listener"* ]]
+
+  run grep -nF 'Step 10f/14 — Wiring ArgoCD SSO' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Wiring ArgoCD SSO"* ]]
 }
 
 @test "acg-up preserves existing Vault identity secrets on rebuild" {

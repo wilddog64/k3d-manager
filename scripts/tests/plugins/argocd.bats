@@ -103,6 +103,10 @@ setup() {
   [ "$status" -eq 0 ]
   run grep -F 'STARTUP_TIMEOUT=${STARTUP_TIMEOUT}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
+  run grep -F 'KUBECONFIG_FILE=${KUBECONFIG_FILE}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'if [[ -n "${KUBECONFIG_FILE}" ]]; then' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
 }
 
 @test "_argocd_write_browser_https_wrapper includes a canonical HTTPS listener" {

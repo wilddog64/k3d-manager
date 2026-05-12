@@ -716,7 +716,73 @@ else
   fi
 fi
 
-_info "[acg-up] Step 10e/14 — Wiring ArgoCD SSO (Keycloak VirtualService + argocd-cm + secret patch)..."
+if _is_mac; then
+  _info "[acg-up] Step 10e/14 — Installing Keycloak browser HTTP listener (keycloak.shopping-cart.local:80, auto-restart)..."
+  _keycloak_browser_label="com.k3d-manager.keycloak-browser-http"
+  _keycloak_browser_plist="${HOME}/Library/LaunchDaemons/${_keycloak_browser_label}.plist"
+  _keycloak_browser_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http.log"
+  _keycloak_browser_launchctl_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log"
+  _keycloak_browser_wrapper="${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh"
+  _keycloak_browser_plist_tmp="${HOME}/.local/share/k3d-manager/keycloak-browser-http.plist"
+  _keycloak_browser_kubeconfig="${HOME}/.kube/config"
+  mkdir -p "$(dirname "${_keycloak_browser_log}")"
+  if curl -sf --max-time 1 http://127.0.0.1/health/ready >/dev/null 2>&1; then
+    _info "[acg-up] Keycloak browser HTTP listener already healthy at http://keycloak.shopping-cart.local — skipping launchd reinstall"
+  else
+    _argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl)" "$(command -v curl)" "identity" "k3d-k3d-cluster" "svc/keycloak" "80" "80" "http://127.0.0.1/health/ready" "${_keycloak_browser_kubeconfig}"
+    cat > "${_keycloak_browser_plist_tmp}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_keycloak_browser_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${_keycloak_browser_wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_keycloak_browser_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_keycloak_browser_log}</string>
+</dict>
+</plist>
+PLIST
+    : > "${_keycloak_browser_launchctl_log}"
+    if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
+        >"${_keycloak_browser_launchctl_log}" 2>&1; then
+      _info "[acg-up] Stopped existing Keycloak browser HTTP listener"
+    elif [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
+      tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
+      _warn "[acg-up] existing Keycloak browser HTTP listener was not loaded; continuing"
+    fi
+    : > "${_keycloak_browser_launchctl_log}"
+    if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" \
+        >"${_keycloak_browser_launchctl_log}" 2>&1; then
+      if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
+        tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
+      fi
+      _err "[acg-up] failed to install Keycloak browser HTTP listener plist; see ${_keycloak_browser_launchctl_log}"
+    fi
+    rm -f "${_keycloak_browser_plist_tmp}"
+    : > "${_keycloak_browser_launchctl_log}"
+    if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_keycloak_browser_plist}" \
+        >"${_keycloak_browser_launchctl_log}" 2>&1; then
+      if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
+        tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
+      fi
+      _err "[acg-up] failed to bootstrap Keycloak browser HTTP listener; see ${_keycloak_browser_launchctl_log}"
+    fi
+    _info "[acg-up] Keycloak browser HTTP listener reachable at http://keycloak.shopping-cart.local (launchd: ${_keycloak_browser_label})"
+  fi
+fi
+
+_info "[acg-up] Step 10f/14 — Wiring ArgoCD SSO (Keycloak VirtualService + argocd-cm + secret patch)..."
 
 # Apply Keycloak VirtualService so in-cluster pods reach keycloak.shopping-cart.local via Istio
 KEYCLOAK_VIRTUALSERVICE_HOST=keycloak.shopping-cart.local \
@@ -764,8 +830,7 @@ kubectl patch secret argocd-secret -n cicd --context k3d-k3d-cluster \
   --patch "{\"stringData\":{\"oidc.keycloak.clientSecret\":\"${_argocd_client_secret}\"}}"
 # Add /etc/hosts entries on the Mac host for local browser access
 _argocd_host_ip="127.0.0.1"
-_kc_browser_ip=$(kubectl get svc istio-ingressgateway -n istio-system --context k3d-k3d-cluster \
-  -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+_kc_browser_ip="127.0.0.1"
 _HOSTS_LIST=(
   "argocd.shopping-cart.local|${_argocd_host_ip}"
   "keycloak.shopping-cart.local|${_kc_browser_ip}"
