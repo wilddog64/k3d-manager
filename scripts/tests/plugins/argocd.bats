@@ -108,11 +108,40 @@ setup() {
 @test "_argocd_write_browser_https_wrapper includes a canonical HTTPS listener" {
   run grep -F 'function _argocd_write_browser_https_wrapper()' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
   [ "$status" -eq 0 ]
+  run grep -F 'function _argocd_issue_browser_tls_material()' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
   run grep -F 'template_path="${SCRIPT_DIR}/etc/argocd/browser-https-wrapper.sh.tmpl"' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
   [ "$status" -eq 0 ]
-  run grep -F 'TCP-LISTEN:${LOCAL_PORT},fork,reuseaddr,bind=${LOCAL_HOST} TCP:${UPSTREAM_HOST}:${UPSTREAM_PORT}' "$BATS_TEST_DIRNAME/../../etc/argocd/browser-https-wrapper.sh.tmpl"
+  run grep -F 'OPENSSL-LISTEN:${LOCAL_PORT},fork,reuseaddr,bind=${LOCAL_HOST},cert=${CERT_FILE},key=${KEY_FILE},verify=0 TCP:${UPSTREAM_HOST}:${UPSTREAM_PORT}' "$BATS_TEST_DIRNAME/../../etc/argocd/browser-https-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
   run grep -F 'healthz lost — restarting' "$BATS_TEST_DIRNAME/../../etc/argocd/browser-https-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+}
+
+@test "_argocd_issue_browser_tls_material writes Vault-issued TLS files" {
+  local tls_dir="${BATS_TEST_TMPDIR}/browser-tls"
+  mkdir -p "$tls_dir"
+
+  _vault_upsert_pki_role() {
+    echo "role $*" >> "${BATS_TEST_TMPDIR}/vault.log"
+    return 0
+  }
+
+  _vault_exec() {
+    cat <<'JSON'
+{"data":{"certificate":"-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----","private_key":"-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----","issuing_ca":"-----BEGIN CERTIFICATE-----\nCA==\n-----END CERTIFICATE-----"}}
+JSON
+  }
+
+  export -f _vault_upsert_pki_role _vault_exec
+
+  run _argocd_issue_browser_tls_material "$tls_dir" "vault" "argocd" "pki" "argocd-browser-tls" "argocd.shopping-cart.local" "24h"
+  [ "$status" -eq 0 ]
+  [ -s "${tls_dir}/fullchain.crt" ]
+  [ -s "${tls_dir}/tls.crt" ]
+  [ -s "${tls_dir}/tls.key" ]
+  [ -s "${tls_dir}/ca.crt" ]
+  run grep -F 'role vault argocd pki argocd-browser-tls 24h argocd.shopping-cart.local true' "${BATS_TEST_TMPDIR}/vault.log"
   [ "$status" -eq 0 ]
 }
 

@@ -142,9 +142,19 @@ STUB
 }
 
 @test "acg-down removes the ArgoCD browser HTTPS listener" {
+  mkdir -p "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls"
+  touch \
+    "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/fullchain.crt" \
+    "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.key" \
+    "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/ca.crt" \
+    "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.crt"
   run bash -c 'bin/acg-down --confirm --keep-hub 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"Stopping ArgoCD browser HTTPS listener launchd daemon"* ]]
   run grep -F 'launchctl bootout system /Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist' "${BATS_TEST_TMPDIR}/launchctl.log"
   [ "$status" -eq 0 ]
+  [ ! -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/fullchain.crt" ]
+  [ ! -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.key" ]
+  [ ! -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/ca.crt" ]
+  [ ! -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.crt" ]
 }

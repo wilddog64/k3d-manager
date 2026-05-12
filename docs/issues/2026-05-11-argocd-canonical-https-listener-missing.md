@@ -32,14 +32,8 @@ The bootstrap currently exposes Argo CD on `localhost:8080`, but the SSO/browser
 
 Without a local `443` proxy/listener that forwards to Argo CD, Safari cannot reach the canonical URL even though the cluster and Keycloak config are otherwise healthy.
 
-## Recommended follow-up
-
-- Local `acg-up` now installs a root-owned HTTPS listener on `argocd.shopping-cart.local:443` that forwards to the existing `localhost:8080` Argo CD port-forward.
-- Keep the `localhost:8080` listener available for terminal smoke tests.
-- Update bootstrap output so the browser entrypoint is explicit and not implied to be the same as the terminal login URL.
-
 ## Fixed by
 
-- [`bin/acg-up`](/Users/cliang/src/gitrepo/personal/k3d-manager/bin/acg-up) now installs the browser HTTPS listener after the Argo CD `localhost:8080` port-forward is ready.
-- [`bin/acg-down`](/Users/cliang/src/gitrepo/personal/k3d-manager/bin/acg-down) now removes the browser HTTPS listener on teardown.
-- [`scripts/plugins/argocd.sh`](/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/plugins/argocd.sh) now renders a self-healing `socat` wrapper for the canonical HTTPS listener.
+- [`bin/acg-up`](/Users/cliang/src/gitrepo/personal/k3d-manager/bin/acg-up) now installs the browser TLS listener after the Argo CD `localhost:8080` port-forward is ready.
+- [`bin/acg-down`](/Users/cliang/src/gitrepo/personal/k3d-manager/bin/acg-down) now removes the browser TLS listener on teardown.
+- [`scripts/plugins/argocd.sh`](/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/plugins/argocd.sh) now issues a Vault PKI certificate for the browser listener and renders a self-healing `socat` TLS wrapper for the canonical HTTPS listener.

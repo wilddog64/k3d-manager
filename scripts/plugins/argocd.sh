@@ -56,6 +56,13 @@ fi
 : "${ARGOCD_BROWSER_LISTENER_STARTUP_TIMEOUT:=30}"
 : "${ARGOCD_BROWSER_HOST:=argocd.shopping-cart.local}"
 : "${ARGOCD_BROWSER_PORT:=443}"
+: "${ARGOCD_BROWSER_TLS_DIR:=${HOME}/.local/share/k3d-manager/argocd-browser-https-tls}"
+: "${ARGOCD_BROWSER_TLS_CERT_FILE:=${ARGOCD_BROWSER_TLS_DIR}/fullchain.crt}"
+: "${ARGOCD_BROWSER_TLS_KEY_FILE:=${ARGOCD_BROWSER_TLS_DIR}/tls.key}"
+: "${ARGOCD_BROWSER_TLS_CA_FILE:=${ARGOCD_BROWSER_TLS_DIR}/ca.crt}"
+: "${ARGOCD_BROWSER_VAULT_PKI_PATH:=pki}"
+: "${ARGOCD_BROWSER_VAULT_PKI_ROLE:=argocd-browser-tls}"
+: "${ARGOCD_BROWSER_VAULT_PKI_ROLE_TTL:=${VAULT_PKI_ROLE_TTL:-720h}}"
 : "${ARGOCD_BROWSER_LISTENER_LABEL:=com.k3d-manager.argocd-browser-https}"
 : "${ARGOCD_BROWSER_LISTENER_PLIST:=/Library/LaunchDaemons/${ARGOCD_BROWSER_LISTENER_LABEL}.plist}"
 : "${ARGOCD_BROWSER_LISTENER_WRAPPER:=${HOME}/.local/share/k3d-manager/argocd-browser-https.sh}"
@@ -118,6 +125,74 @@ function _argocd_wait_for_browser_https() {
       tail -n 20 "$log_file" 2>/dev/null || true
    } >&2
    return 1
+}
+
+function _argocd_issue_browser_tls_material() {
+   local material_dir="$1"
+   local ns="${2:-$VAULT_NS_DEFAULT}"
+   local release="${3:-$VAULT_RELEASE_DEFAULT}"
+   local path="${4:-$ARGOCD_BROWSER_VAULT_PKI_PATH}"
+   local role="${5:-$ARGOCD_BROWSER_VAULT_PKI_ROLE}"
+   local host="${6:-$ARGOCD_BROWSER_HOST}"
+   local ttl="${7:-$ARGOCD_BROWSER_VAULT_PKI_ROLE_TTL}"
+
+   if [[ -z "${material_dir:-}" ]]; then
+      _err "[argocd] browser TLS material directory not provided"
+      return 1
+   fi
+
+   if ! declare -f _vault_upsert_pki_role >/dev/null 2>&1 || \
+      ! declare -f _vault_exec >/dev/null 2>&1; then
+      _err "[argocd] Vault helpers not loaded before browser TLS issuance"
+      return 1
+   fi
+
+   mkdir -p "$material_dir"
+
+   local existing_serial=""
+   local existing_cert_file="${material_dir}/fullchain.crt"
+   if [[ -s "$existing_cert_file" ]]; then
+      existing_serial=$(_vault_pki_extract_certificate_serial "$existing_cert_file" 2>/dev/null || true)
+   fi
+
+   _vault_upsert_pki_role "$ns" "$release" "$path" "$role" "$ttl" "$host" "true" || return 1
+
+   local json cert key ca
+   json="$(_vault_exec "$ns" "vault write -format=json ${path}/issue/${role} common_name=\"${host}\" alt_names=\"${host}\" ttl=\"${ttl}\"" "$release")"
+   cert=$(printf '%s' "$json" | jq -r '.data.certificate // empty')
+   key=$(printf '%s' "$json" | jq -r '.data.private_key // empty')
+   ca=$(printf '%s' "$json" | jq -r '.data.issuing_ca // empty')
+   if [[ -z "$cert" || -z "$key" || -z "$ca" ]]; then
+      _err "[argocd] failed to issue browser TLS cert from ${path}/issue/${role}"
+      return 1
+   fi
+
+   umask 077
+   local cert_tmp key_tmp ca_tmp chain_tmp
+   cert_tmp="$(mktemp "${material_dir}/fullchain.crt.XXXXXX")"
+   key_tmp="$(mktemp "${material_dir}/tls.key.XXXXXX")"
+   ca_tmp="$(mktemp "${material_dir}/ca.crt.XXXXXX")"
+   chain_tmp="$(mktemp "${material_dir}/tls.crt.XXXXXX")"
+
+   {
+      printf '%s\n' "$cert"
+      printf '%s\n' "$ca"
+   } > "$cert_tmp"
+   printf '%s\n' "$cert" > "$chain_tmp"
+   printf '%s\n' "$key" > "$key_tmp"
+   printf '%s\n' "$ca" > "$ca_tmp"
+
+   mv "$cert_tmp" "${material_dir}/fullchain.crt"
+   mv "$chain_tmp" "${material_dir}/tls.crt"
+   mv "$key_tmp" "${material_dir}/tls.key"
+   mv "$ca_tmp" "${material_dir}/ca.crt"
+   chmod 600 "${material_dir}/fullchain.crt" "${material_dir}/tls.crt" "${material_dir}/tls.key" "${material_dir}/ca.crt"
+
+   if [[ -n "$existing_serial" ]]; then
+      if ! _vault_pki_revoke_certificate_serial "$existing_serial" "$path" _vault_post_revoke_request "$ns" "$release"; then
+         _warn "[argocd] failed to revoke previous browser TLS certificate serial $existing_serial"
+      fi
+   fi
 }
 
 function _argocd_write_port_forward_wrapper() {
@@ -198,7 +273,9 @@ function _argocd_write_browser_https_wrapper() {
    local local_port="${6:-$ARGOCD_BROWSER_PORT}"
    local upstream_host="${7:-127.0.0.1}"
    local upstream_port="${8:-8080}"
-   local healthz_url="${9:-https://${ARGOCD_BROWSER_HOST}:${ARGOCD_BROWSER_PORT}/healthz}"
+   local cert_file="${9:-$ARGOCD_BROWSER_TLS_CERT_FILE}"
+   local key_file="${10:-$ARGOCD_BROWSER_TLS_KEY_FILE}"
+   local healthz_url="${11:-https://${ARGOCD_BROWSER_HOST}:${ARGOCD_BROWSER_PORT}/healthz}"
 
    case "$socat_bin" in
       "") socat_bin="$(command -v socat 2>/dev/null || true)" ;;
@@ -226,7 +303,7 @@ function _argocd_write_browser_https_wrapper() {
       return 1
    fi
 
-   local q_socat_bin q_curl_bin q_log_file q_local_host q_local_port q_upstream_host q_upstream_port q_healthz_url q_startup_timeout
+   local q_socat_bin q_curl_bin q_log_file q_local_host q_local_port q_upstream_host q_upstream_port q_cert_file q_key_file q_healthz_url q_startup_timeout
    printf -v q_socat_bin '%q' "$socat_bin"
    printf -v q_curl_bin '%q' "$curl_bin"
    printf -v q_log_file '%q' "$log_file"
@@ -234,6 +311,8 @@ function _argocd_write_browser_https_wrapper() {
    printf -v q_local_port '%q' "$local_port"
    printf -v q_upstream_host '%q' "$upstream_host"
    printf -v q_upstream_port '%q' "$upstream_port"
+   printf -v q_cert_file '%q' "$cert_file"
+   printf -v q_key_file '%q' "$key_file"
    printf -v q_healthz_url '%q' "$healthz_url"
    printf -v q_startup_timeout '%q' "${ARGOCD_BROWSER_LISTENER_STARTUP_TIMEOUT:-30}"
 
@@ -245,9 +324,11 @@ function _argocd_write_browser_https_wrapper() {
    LOCAL_PORT="$q_local_port" \
    UPSTREAM_HOST="$q_upstream_host" \
    UPSTREAM_PORT="$q_upstream_port" \
+   CERT_FILE="$q_cert_file" \
+   KEY_FILE="$q_key_file" \
    HEALTHZ_URL="$q_healthz_url" \
    STARTUP_TIMEOUT="$q_startup_timeout" \
-      envsubst '$SOCAT_BIN $CURL_BIN $LOG_FILE $LOCAL_HOST $LOCAL_PORT $UPSTREAM_HOST $UPSTREAM_PORT $HEALTHZ_URL $STARTUP_TIMEOUT' \
+      envsubst '$SOCAT_BIN $CURL_BIN $LOG_FILE $LOCAL_HOST $LOCAL_PORT $UPSTREAM_HOST $UPSTREAM_PORT $CERT_FILE $KEY_FILE $HEALTHZ_URL $STARTUP_TIMEOUT' \
          < "$template_path" > "$wrapper_path"
    chmod 700 "$wrapper_path"
 }

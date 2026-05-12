@@ -21,6 +21,10 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"_argocd_write_browser_https_wrapper"* ]]
 
+  run grep -nF '_argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"_argocd_issue_browser_tls_material"* ]]
+
   run grep -nF 'Step 4c/12 — Installing ArgoCD browser HTTPS listener' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"browser HTTPS listener"* ]]

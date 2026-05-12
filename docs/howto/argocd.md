@@ -63,7 +63,9 @@ kubectl port-forward svc/argocd-server -n cicd 8080:443
 
 The localhost port-forward remains useful for terminal smoke tests and CLI login.
 The canonical browser entrypoint is `https://argocd.shopping-cart.local`, which
-is backed by a local HTTPS listener on port 443.
+is backed by a local TLS listener on port 443. The listener uses a Vault PKI
+certificate for `argocd.shopping-cart.local`; if Safari does not yet trust the
+Vault CA, run `bin/setup-vault-ca.sh -m` to install it into the macOS keychain.
 
 ## Notes
 
