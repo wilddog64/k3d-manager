@@ -87,6 +87,35 @@ setup() {
   [[ "$put_payload" == *"http://localhost:8080/*"* ]]
 }
 
+@test "_keycloak_remove_client_attribute deletes stale pkce attribute rows" {
+  local exec_log="$BATS_TEST_TMPDIR/exec.log"
+  : > "$exec_log"
+
+  _kubectl() {
+    printf '%s\n' "$*" >> "$exec_log"
+    case "$*" in
+      *"get secret keycloak-secrets"*)
+        printf 'ZHVtbXktZGItcGFzcw=='
+        return 0
+        ;;
+      *"get pod -l app.kubernetes.io/name=postgres-keycloak"*)
+        printf 'postgres-keycloak-0'
+        return 0
+        ;;
+      *"exec postgres-keycloak-0 -- env PGPASSWORD=dummy-db-pass psql -U keycloak -d keycloak -v ON_ERROR_STOP=1 -c delete from client_attributes using client, realm where client_attributes.client_id = client.id and client.realm_id = realm.id and realm.name = '\''shopping-cart'\'' and client.client_id = '\''argocd'\'' and client_attributes.name = '\''pkce.code.challenge.method'\'';"*)
+        return 0
+        ;;
+    esac
+    return 1
+  }
+  export -f _kubectl
+
+  run _keycloak_remove_client_attribute "shopping-cart" "argocd" "pkce.code.challenge.method" "identity"
+  [ "$status" -eq 0 ]
+  grep -q "client_attributes" "$exec_log"
+  grep -q "postgres-keycloak-0" "$exec_log"
+}
+
 @test "KEYCLOAK_CONFIG_CLI_ENABLED defaults to false" {
   [ "$KEYCLOAK_CONFIG_CLI_ENABLED" = "false" ]
 }

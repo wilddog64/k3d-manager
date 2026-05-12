@@ -304,6 +304,47 @@ function _keycloak_reconcile_realm_client() {
    _info "[keycloak] Reconciled client '$client_id' in realm '$realm_name'"
 }
 
+function _keycloak_remove_client_attribute() {
+   local realm_name="${1:-}"
+   local client_id="${2:-}"
+   local attribute_name="${3:-}"
+   local ns="${4:-$KEYCLOAK_NAMESPACE}"
+
+   if [[ -z "$realm_name" || -z "$client_id" || -z "$attribute_name" ]]; then
+      _err "[keycloak] usage: _keycloak_remove_client_attribute <realm_name> <client_id> <attribute_name> [namespace]"
+      return 1
+   fi
+
+   local db_secret_name db_secret
+   for db_secret_name in keycloak-secrets "$KEYCLOAK_ADMIN_SECRET_NAME"; do
+      db_secret=$(_kubectl -n "$ns" get secret "$db_secret_name" -o jsonpath="{.data.KC_DB_PASSWORD}" 2>/dev/null | base64 -d 2>/dev/null || true)
+      if [[ -n "$db_secret" ]]; then
+         break
+      fi
+   done
+   if [[ -z "${db_secret:-}" ]]; then
+      _warn "[keycloak] KC_DB_PASSWORD not available; skipping client attribute cleanup for '$client_id'"
+      return 0
+   fi
+
+   local db_pod
+   db_pod=$(_kubectl -n "$ns" get pod -l app.kubernetes.io/name=postgres-keycloak -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+   if [[ -z "$db_pod" ]]; then
+      _warn "[keycloak] postgres-keycloak pod not found; skipping client attribute cleanup for '$client_id'"
+      return 0
+   fi
+
+   local escaped_realm escaped_client escaped_attribute
+   escaped_realm=${realm_name//\'/\'\'}
+   escaped_client=${client_id//\'/\'\'}
+   escaped_attribute=${attribute_name//\'/\'\'}
+
+   _kubectl -n "$ns" exec "$db_pod" -- env PGPASSWORD="$db_secret" psql -U keycloak -d keycloak -v ON_ERROR_STOP=1 -c \
+      "delete from client_attributes using client, realm where client_attributes.client_id = client.id and client.realm_id = realm.id and realm.name = '${escaped_realm}' and client.client_id = '${escaped_client}' and client_attributes.name = '${escaped_attribute}';" >/dev/null
+
+   _info "[keycloak] Removed client attribute '$attribute_name' from '$client_id' in realm '$realm_name' if present"
+}
+
 function test_keycloak() {
    local ns="${KEYCLOAK_NAMESPACE:-identity}"
    local service_port="${KEYCLOAK_SERVICE_PORT:-8080}"

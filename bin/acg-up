@@ -742,6 +742,9 @@ else
 
     if _keycloak_reconcile_realm_client "http://localhost:${_kc_pf_port}" "${_kc_token}" "shopping-cart" "argocd" "${_realm_json_file}"; then
       _info "[acg-up] Keycloak client 'argocd' reconciled from realm JSON"
+      if _keycloak_remove_client_attribute "shopping-cart" "argocd" "pkce.code.challenge.method"; then
+        _info "[acg-up] Keycloak client 'argocd' PKCE attribute removed"
+      fi
     else
       _warn "[acg-up] Could not reconcile Keycloak client 'argocd' — check Keycloak logs"
     fi
