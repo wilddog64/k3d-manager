@@ -269,7 +269,11 @@ function _argocd_write_port_forward_wrapper() {
    printf -v q_kubectl_bin '%q' "$kubectl_bin"
    printf -v q_curl_bin '%q' "$curl_bin"
    printf -v q_log_file '%q' "$log_file"
-   printf -v q_kubeconfig_file '%q' "$kubeconfig_file"
+   if [[ -n "$kubeconfig_file" ]]; then
+      printf -v q_kubeconfig_file '%q' "$kubeconfig_file"
+   else
+      q_kubeconfig_file=""
+   fi
    printf -v q_namespace '%q' "$namespace"
    printf -v q_context '%q' "$context"
    printf -v q_service '%q' "$service"

@@ -116,7 +116,9 @@ setup() {
   [ "$status" -eq 0 ]
   run grep -F 'falling back to kubeconfig default' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
-  run grep -F '"${KUBECTL_BIN}" "${_kubectl_context_args[@]}" port-forward "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}"' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  run grep -F '_kubectl_context_arg=""' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F '"${KUBECTL_BIN}" ${_kubectl_context_arg} port-forward "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}"' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
 }
 
