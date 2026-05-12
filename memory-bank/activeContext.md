@@ -62,6 +62,7 @@
 - **NOTE:** Added `docs/issues/2026-05-12-acg-up-argocd-browser-bootout-fails-when-listener-missing.md` to record `launchctl bootout system` exit code `5` during rebuilds.
 - **COMPLETE:** `docs: stop advertising localhost as browser entrypoint` — `bin/acg-up` now labels localhost as terminal-only and `docs/howto/argocd.md` points browser SSO users at `https://argocd.shopping-cart.local`. Commit `b086aef2`. Added `docs/issues/2026-05-12-argocd-localhost-browser-entrypoint-misleading.md`.
 - **COMPLETE:** `fix(acg-up)` — browser HTTPS preflight now skips the privileged launchd reinstall when `https://argocd.shopping-cart.local:443/healthz` is already healthy, so repeat `make up` runs no longer prompt for sudo unnecessarily. Commit `d5be3d0e`.
+- **COMPLETE:** `fix(acg-up)` — browser-side `keycloak.shopping-cart.local` is now rewritten to the ingress gateway IP instead of loopback, fixing the Safari “can’t connect to server” redirect path. Commit `99581cc7`. Issue doc: `docs/issues/2026-05-12-keycloak-browser-connectivity-loopback.md`.
 - **Pending:** `refactor(plugins)` — spec at `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex after SSO wiring is verified. Updated to include `k3s-aws.sh` and `k3s-gcp.sh` source-line changes (both source `shopping_cart.sh` directly — must rename to `k3s_remote.sh`).
 - **Next:** `feat(providers)` — spec at `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; depends on refactor spec.
 - **Next:** `feat(tunnel)` — spec at `docs/plans/v1.4.3-chisel-tunnel.md`; depends on refactor spec.
