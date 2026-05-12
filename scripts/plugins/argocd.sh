@@ -127,6 +127,23 @@ function _argocd_wait_for_browser_https() {
    return 1
 }
 
+function _argocd_browser_tls_allowed_domains() {
+   local host="${1:-}"
+   local host_no_wildcard="${host#\*\.}"
+
+   case "$host_no_wildcard" in
+      *.nip.io|*.sslip.io)
+         printf '%s\n' "${host_no_wildcard#*.}"
+         ;;
+      *.*.*)
+         printf '%s\n' "${host_no_wildcard#*.}"
+         ;;
+      *)
+         printf '%s\n' "$host_no_wildcard"
+         ;;
+   esac
+}
+
 function _argocd_issue_browser_tls_material() {
    local material_dir="$1"
    local ns="${2:-$VAULT_NS_DEFAULT}"
@@ -142,7 +159,8 @@ function _argocd_issue_browser_tls_material() {
    fi
 
    if ! declare -f _vault_upsert_pki_role >/dev/null 2>&1 || \
-      ! declare -f _vault_exec >/dev/null 2>&1; then
+      ! declare -f _vault_exec >/dev/null 2>&1 || \
+      ! declare -f _vault_login >/dev/null 2>&1; then
       _err "[argocd] Vault helpers not loaded before browser TLS issuance"
       return 1
    fi
@@ -155,19 +173,10 @@ function _argocd_issue_browser_tls_material() {
       existing_serial=$(_vault_pki_extract_certificate_serial "$existing_cert_file" 2>/dev/null || true)
    fi
 
-   local allowed_domains=""
-   local host_no_wildcard="$host"
-   if [[ "$host_no_wildcard" == \*.* ]]; then
-      host_no_wildcard="${host_no_wildcard#*.}"
-   fi
-   if [[ "$host_no_wildcard" =~ \.(nip\.io|sslip\.io)$ ]]; then
-      allowed_domains="${BASH_REMATCH[1]}"
-   elif [[ "$host_no_wildcard" == *.*.* ]]; then
-      allowed_domains="${host_no_wildcard#*.}"
-   else
-      allowed_domains="$host_no_wildcard"
-   fi
+   local allowed_domains
+   allowed_domains="$(_argocd_browser_tls_allowed_domains "$host")"
 
+   _vault_login "$ns" "$release"
    _vault_upsert_pki_role "$ns" "$release" "$path" "$role" "$ttl" "$allowed_domains" "true" || return 1
 
    local json cert key ca

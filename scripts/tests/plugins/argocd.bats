@@ -127,13 +127,18 @@ setup() {
     return 0
   }
 
+  _vault_login() {
+    echo "login $*" >> "${BATS_TEST_TMPDIR}/vault.log"
+    return 0
+  }
+
   _vault_exec() {
     cat <<'JSON'
 {"data":{"certificate":"-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----","private_key":"-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----","issuing_ca":"-----BEGIN CERTIFICATE-----\nCA==\n-----END CERTIFICATE-----"}}
 JSON
   }
 
-  export -f _vault_upsert_pki_role _vault_exec
+  export -f _vault_login _vault_upsert_pki_role _vault_exec
 
   run _argocd_issue_browser_tls_material "$tls_dir" "vault" "argocd" "pki" "argocd-browser-tls" "argocd.shopping-cart.local" "24h"
   [ "$status" -eq 0 ]
@@ -141,6 +146,8 @@ JSON
   [ -s "${tls_dir}/tls.crt" ]
   [ -s "${tls_dir}/tls.key" ]
   [ -s "${tls_dir}/ca.crt" ]
+  run grep -F 'login vault argocd' "${BATS_TEST_TMPDIR}/vault.log"
+  [ "$status" -eq 0 ]
   run grep -F 'role vault argocd pki argocd-browser-tls 24h shopping-cart.local true' "${BATS_TEST_TMPDIR}/vault.log"
   [ "$status" -eq 0 ]
 }
