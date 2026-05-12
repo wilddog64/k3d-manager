@@ -105,7 +105,7 @@ rm -f "${_argocd_pf_plist}"
 if _is_mac; then
   _info "[acg-down] Stopping Keycloak browser HTTP listener launchd daemon..."
   _keycloak_browser_label="com.k3d-manager.keycloak-browser-http"
-  _keycloak_browser_plist="${HOME}/Library/LaunchDaemons/${_keycloak_browser_label}.plist"
+  _keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"
   _keycloak_browser_wrapper="${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh"
   _keycloak_browser_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http.log"
   _keycloak_browser_launchctl_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log"

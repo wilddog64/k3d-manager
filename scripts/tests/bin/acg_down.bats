@@ -167,6 +167,8 @@ STUB
   run bash -c 'bin/acg-down --confirm --keep-hub 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"Stopping Keycloak browser HTTP listener launchd daemon"* ]]
+  run grep -F '_keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"' bin/acg-down
+  [ "$status" -eq 0 ]
   [ ! -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh" ]
   [ -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http.log" ]
   [ -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log" ]

@@ -41,6 +41,10 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"keycloak-browser-http"* ]]
 
+  run grep -nF '_keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"/Library/LaunchDaemons/"* ]]
+
   run grep -nF '_argocd_browser_launchctl_log="${ARGOCD_BROWSER_LISTENER_LAUNCHCTL_LOG:-${HOME}/.local/share/k3d-manager/argocd-browser-https-launchctl.log}"' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"argocd-browser-https-launchctl.log"* ]]
