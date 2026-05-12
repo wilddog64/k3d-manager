@@ -71,6 +71,7 @@
 - [x] **Argo CD browser `launchctl` stderr visibility** — `bin/acg-up` now captures stderr from the macOS browser listener install/bootstrap path in `argocd-browser-https-launchctl.log` and prints it on failure. Commit `8d18e18c`.
 - [x] **Argo CD browser `launchctl bootout` best-effort** — `bin/acg-up` now ignores the expected `launchctl bootout system` failure when no listener is loaded, preventing the missing-listener case from aborting bootstrap. Commit `8d18e18c`.
 - [x] **Recorded launchctl bootout edge case** — `docs/issues/2026-05-12-acg-up-argocd-browser-bootout-fails-when-listener-missing.md` captures the `Boot-out failed: 5: Input/output error` rebuild case.
+- [x] **Stopped advertising localhost as browser entrypoint** — `bin/acg-up` now labels `http://localhost:8080` as terminal-only and `docs/howto/argocd.md` directs browser users to `https://argocd.shopping-cart.local`. Commit `b086aef2`. Issue doc: `docs/issues/2026-05-12-argocd-localhost-browser-entrypoint-misleading.md`.
 - [ ] **Refactor shopping_cart.sh → k3s_remote.sh** — spec: `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex (spec updated to also rename source line in `k3s-aws.sh` and `k3s-gcp.sh`)
 - [ ] **Service mesh + LB for k3s-aws and k3s-gcp** — spec: `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; assign to Codex AFTER refactor is done
 - [ ] **chisel HTTPS tunnel** — spec: `docs/plans/v1.4.3-chisel-tunnel.md`; replaces autossh+socat with HTTPS WebSocket; `TUNNEL_PROVIDER=chisel` gate; depends on refactor spec
