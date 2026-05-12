@@ -24,3 +24,6 @@ The Vault revoke helper was still issuing a revoke request even when the serial 
 - `shellcheck -S warning scripts/plugins/vault.sh scripts/plugins/argocd.sh`
 - `bats scripts/tests/plugins/vault.bats scripts/tests/plugins/argocd.bats`
 - `_agent_audit`
+
+## Fixed In
+- `f2942bf9` `fix(vault): skip revoke when browser cert is gone`
