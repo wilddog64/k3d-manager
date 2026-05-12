@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+KUBECTL_BIN=${KUBECTL_BIN}
+CURL_BIN=${CURL_BIN}
+LOG_FILE=${LOG_FILE}
+NAMESPACE=${NAMESPACE}
+CONTEXT=${CONTEXT}
+SERVICE=${SERVICE}
+LOCAL_PORT=${LOCAL_PORT}
+REMOTE_PORT=${REMOTE_PORT}
+HEALTHZ_URL=${HEALTHZ_URL}
+STARTUP_TIMEOUT=${STARTUP_TIMEOUT}
+
+_pf_pid=""
+
+_cleanup() {
+   case "${_pf_pid}" in
+      "")
+         :
+         ;;
+      *)
+         kill "${_pf_pid}" 2>/dev/null || true
+         wait "${_pf_pid}" 2>/dev/null || true
+         ;;
+   esac
+}
+trap _cleanup EXIT INT TERM HUP
+
+while true; do
+   printf '%s\n' "[argocd-pf] starting port-forward: ${SERVICE} -> localhost:${LOCAL_PORT}" >> "${LOG_FILE}"
+   "${KUBECTL_BIN}" port-forward "${SERVICE}" -n "${NAMESPACE}" --context "${CONTEXT}" "${LOCAL_PORT}:${REMOTE_PORT}" >> "${LOG_FILE}" 2>&1 &
+   _pf_pid=$!
+
+   _ready=0
+   for (( _attempt=1; _attempt<=STARTUP_TIMEOUT; _attempt++ )); do
+      "${CURL_BIN}" -sf --max-time 1 "${HEALTHZ_URL}" >/dev/null 2>&1 && {
+         _ready=1
+         break
+      }
+      kill -0 "${_pf_pid}" 2>/dev/null || break
+      sleep 1
+   done
+
+   case "${_ready}" in
+      0)
+         if kill -0 "${_pf_pid}" 2>/dev/null; then
+            printf '%s\n' "[argocd-pf] healthz did not become reachable — restarting" >> "${LOG_FILE}"
+            kill "${_pf_pid}" 2>/dev/null || true
+         else
+            printf '%s\n' "[argocd-pf] port-forward exited before healthz became reachable — restarting" >> "${LOG_FILE}"
+         fi
+         wait "${_pf_pid}" 2>/dev/null || true
+         _pf_pid=""
+         sleep 2
+         continue
+         ;;
+   esac
+
+   printf '%s\n' "[argocd-pf] healthz reachable — monitoring backend availability" >> "${LOG_FILE}"
+   while kill -0 "${_pf_pid}" 2>/dev/null; do
+      "${CURL_BIN}" -sf --max-time 1 "${HEALTHZ_URL}" >/dev/null 2>&1 || {
+         printf '%s\n' "[argocd-pf] healthz lost — restarting" >> "${LOG_FILE}"
+         kill "${_pf_pid}" 2>/dev/null || true
+         break
+      }
+      sleep 5
+   done
+
+   wait "${_pf_pid}" 2>/dev/null || true
+   _pf_pid=""
+   sleep 2
+done

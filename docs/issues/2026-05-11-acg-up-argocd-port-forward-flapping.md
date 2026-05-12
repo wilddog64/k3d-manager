@@ -1,5 +1,9 @@
 # ACG up Argo CD port-forward flaps after sandbox rebuild
 
+## Status
+
+Fixed in `bin/acg-up` by replacing the one-shot Argo CD port-forward launchd command with a self-healing wrapper that restarts the listener when `localhost:8080/healthz` stops responding.
+
 ## What was observed
 
 After a fresh `make up` on a rebuilt sandbox, Safari still reported:
@@ -31,6 +35,5 @@ error: lost connection to pod
 
 ## Recommended follow-up
 
-- Add a watchdog that revalidates `localhost:8080/healthz` after startup and restarts the Argo CD port-forward if the backend pod is lost.
-- Consider reusing the more explicit managed port-forward pattern already used by `bin/acg-sync-apps` instead of relying on a one-shot launchd `kubectl port-forward`.
 - Re-test after a sandbox rebuild to confirm Safari can reach the login page consistently.
+- If the wrapper still misses a flapping backend, consider moving the launchd agent to the explicit managed port-forward state pattern used by `bin/acg-sync-apps`.

@@ -2,3 +2,4 @@
 # Format: <path>:<function>
 # See docs/issues entries for each item.
 scripts/plugins/keycloak.sh:deploy_keycloak
+scripts/plugins/argocd.sh:_argocd_write_port_forward_wrapper

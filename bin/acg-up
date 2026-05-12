@@ -163,7 +163,9 @@ _info "[acg-up] Step 4b/12 — Installing ArgoCD port-forward launchd agent (loc
 _argocd_pf_label="com.k3d-manager.argocd-port-forward"
 _argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
 _argocd_pf_log="${HOME}/.local/share/k3d-manager/argocd-pf.log"
+_argocd_pf_wrapper="${HOME}/.local/share/k3d-manager/argocd-port-forward.sh"
 mkdir -p "$(dirname "${_argocd_pf_log}")" "$(dirname "${_argocd_pf_plist}")"
+_argocd_write_port_forward_wrapper "${_argocd_pf_wrapper}" "${_argocd_pf_log}" "$(command -v kubectl)" "$(command -v curl)" "cicd" "k3d-k3d-cluster" "svc/argocd-server" "8080" "80"
 cat > "${_argocd_pf_plist}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -173,14 +175,8 @@ cat > "${_argocd_pf_plist}" <<PLIST
   <string>${_argocd_pf_label}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/opt/homebrew/bin/kubectl</string>
-    <string>port-forward</string>
-    <string>svc/argocd-server</string>
-    <string>--namespace</string>
-    <string>cicd</string>
-    <string>--context</string>
-    <string>k3d-k3d-cluster</string>
-    <string>8080:80</string>
+    <string>/bin/bash</string>
+    <string>${_argocd_pf_wrapper}</string>
   </array>
   <key>KeepAlive</key>
   <true/>

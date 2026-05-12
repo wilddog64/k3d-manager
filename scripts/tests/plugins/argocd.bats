@@ -92,6 +92,19 @@ setup() {
   [[ "$output" == *"port-forward boom"* ]]
 }
 
+@test "_argocd_write_port_forward_wrapper includes a self-healing loop" {
+  run grep -F 'function _argocd_write_port_forward_wrapper()' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'template_path="${SCRIPT_DIR}/etc/argocd/port-forward-wrapper.sh.tmpl"' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'healthz did not become reachable — restarting' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'healthz lost — restarting' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'STARTUP_TIMEOUT=${STARTUP_TIMEOUT}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+}
+
 @test "_argocd_deploy_appproject fails when template missing" {
   local original_config="$ARGOCD_CONFIG_DIR"
   ARGOCD_CONFIG_DIR="$BATS_TEST_TMPDIR/argocd-empty"

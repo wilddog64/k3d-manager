@@ -12,4 +12,8 @@
   run grep -nF 'source "${REPO_ROOT}/scripts/plugins/keycloak.sh"' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"scripts/plugins/keycloak.sh"* ]]
+
+  run grep -nF '_argocd_write_port_forward_wrapper "${_argocd_pf_wrapper}" "${_argocd_pf_log}"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"_argocd_write_port_forward_wrapper"* ]]
 }
