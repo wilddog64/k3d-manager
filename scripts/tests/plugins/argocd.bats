@@ -141,7 +141,7 @@ JSON
   [ -s "${tls_dir}/tls.crt" ]
   [ -s "${tls_dir}/tls.key" ]
   [ -s "${tls_dir}/ca.crt" ]
-  run grep -F 'role vault argocd pki argocd-browser-tls 24h argocd.shopping-cart.local true' "${BATS_TEST_TMPDIR}/vault.log"
+  run grep -F 'role vault argocd pki argocd-browser-tls 24h shopping-cart.local true' "${BATS_TEST_TMPDIR}/vault.log"
   [ "$status" -eq 0 ]
 }
 

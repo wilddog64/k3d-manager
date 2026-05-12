@@ -155,7 +155,20 @@ function _argocd_issue_browser_tls_material() {
       existing_serial=$(_vault_pki_extract_certificate_serial "$existing_cert_file" 2>/dev/null || true)
    fi
 
-   _vault_upsert_pki_role "$ns" "$release" "$path" "$role" "$ttl" "$host" "true" || return 1
+   local allowed_domains=""
+   local host_no_wildcard="$host"
+   if [[ "$host_no_wildcard" == \*.* ]]; then
+      host_no_wildcard="${host_no_wildcard#*.}"
+   fi
+   if [[ "$host_no_wildcard" =~ \.(nip\.io|sslip\.io)$ ]]; then
+      allowed_domains="${BASH_REMATCH[1]}"
+   elif [[ "$host_no_wildcard" == *.*.* ]]; then
+      allowed_domains="${host_no_wildcard#*.}"
+   else
+      allowed_domains="$host_no_wildcard"
+   fi
+
+   _vault_upsert_pki_role "$ns" "$release" "$path" "$role" "$ttl" "$allowed_domains" "true" || return 1
 
    local json cert key ca
    json="$(_vault_exec "$ns" "vault write -format=json ${path}/issue/${role} common_name=\"${host}\" alt_names=\"${host}\" ttl=\"${ttl}\"" "$release")"
