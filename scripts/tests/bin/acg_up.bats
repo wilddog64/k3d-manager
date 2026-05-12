@@ -25,6 +25,14 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"_argocd_issue_browser_tls_material"* ]]
 
+  run grep -nF '_argocd_browser_launchctl_log="${ARGOCD_BROWSER_LISTENER_LAUNCHCTL_LOG:-${HOME}/.local/share/k3d-manager/argocd-browser-https-launchctl.log}"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"argocd-browser-https-launchctl.log"* ]]
+
+  run grep -nF '_run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_argocd_browser_plist}"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"launchctl bootstrap system"* ]]
+
   run grep -nF 'Step 4c/12 — Installing ArgoCD browser HTTPS listener' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"browser HTTPS listener"* ]]
