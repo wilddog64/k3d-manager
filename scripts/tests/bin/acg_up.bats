@@ -65,6 +65,10 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"skipping launchd reinstall"* ]]
 
+  run grep -nF 'Opening canonical ArgoCD browser URL: ${_argocd_browser_url}' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Opening canonical ArgoCD browser URL"* ]]
+
   run grep -nF '_keycloak_browser_kubeconfig="${HOME}/.kube/config"' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *".kube/config"* ]]

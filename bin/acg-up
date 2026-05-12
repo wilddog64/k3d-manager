@@ -208,10 +208,13 @@ if _is_mac; then
   _argocd_browser_tls_cert="${ARGOCD_BROWSER_TLS_CERT_FILE:-${_argocd_browser_tls_dir}/fullchain.crt}"
   _argocd_browser_tls_key="${ARGOCD_BROWSER_TLS_KEY_FILE:-${_argocd_browser_tls_dir}/tls.key}"
   _argocd_browser_plist_tmp="${HOME}/.local/share/k3d-manager/argocd-browser-https.plist"
+  _argocd_browser_url="https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}"
   mkdir -p "$(dirname "${_argocd_browser_log}")"
   if _argocd_browser_https_is_ready "https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}/healthz"; then
     _info "[acg-up] ArgoCD browser HTTPS listener already healthy at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443} — skipping launchd reinstall"
+    _argocd_browser_ready=1
   else
+    _argocd_browser_ready=0
     _argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}" || exit 1
     _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}/healthz"
     cat > "${_argocd_browser_plist_tmp}" <<PLIST
@@ -264,8 +267,17 @@ PLIST
     fi
     if _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-30}"; then
       _info "[acg-up] ArgoCD reachable at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local} (launchd: ${_argocd_browser_label})"
+      _argocd_browser_ready=1
     else
       exit 1
+    fi
+  fi
+  if [[ "${_argocd_browser_ready:-0}" == "1" ]]; then
+    if command -v open >/dev/null 2>&1; then
+      _info "[acg-up] Opening canonical ArgoCD browser URL: ${_argocd_browser_url}"
+      _run_command --no-exit -- open "${_argocd_browser_url}" >/dev/null 2>&1 || true
+    else
+      _warn "[acg-up] open command not available — open ${_argocd_browser_url} manually"
     fi
   fi
 fi
