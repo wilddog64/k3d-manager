@@ -49,6 +49,14 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"skipping launchd reinstall"* ]]
 
+  run grep -nF '_kc_browser_ip=$(kubectl get svc istio-ingressgateway -n istio-system --context k3d-k3d-cluster' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"istio-ingressgateway"* ]]
+
+  run grep -nF '_warn "[acg-up] could not determine the ingressgateway IP for ${_h} — browser login may fail"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"browser login may fail"* ]]
+
   run grep -nF 'Step 4c/12 — Installing ArgoCD browser HTTPS listener' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"browser HTTPS listener"* ]]
