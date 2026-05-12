@@ -56,7 +56,14 @@ argocd app history <app-name>
 # Access ArgoCD UI (port-forward)
 kubectl port-forward svc/argocd-server -n cicd 8080:443
 # then open https://localhost:8080
+
+# Browser entrypoint (canonical host)
+# open https://argocd.shopping-cart.local
 ```
+
+The localhost port-forward remains useful for terminal smoke tests and CLI login.
+The canonical browser entrypoint is `https://argocd.shopping-cart.local`, which
+is backed by a local HTTPS listener on port 443.
 
 ## Notes
 

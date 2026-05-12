@@ -1,6 +1,6 @@
 # Argo CD canonical HTTPS hostname is not backed by a local listener
 
-Status: OPEN
+Status: FIXED
 
 ## What was observed
 
@@ -34,7 +34,12 @@ Without a local `443` proxy/listener that forwards to Argo CD, Safari cannot rea
 
 ## Recommended follow-up
 
-- Add a local HTTPS listener or reverse proxy for `argocd.shopping-cart.local` that forwards to the Argo CD server.
-- Keep the existing `localhost:8080` listener available for terminal smoke tests.
+- Local `acg-up` now installs a root-owned HTTPS listener on `argocd.shopping-cart.local:443` that forwards to the existing `localhost:8080` Argo CD port-forward.
+- Keep the `localhost:8080` listener available for terminal smoke tests.
 - Update bootstrap output so the browser entrypoint is explicit and not implied to be the same as the terminal login URL.
 
+## Fixed by
+
+- [`bin/acg-up`](/Users/cliang/src/gitrepo/personal/k3d-manager/bin/acg-up) now installs the browser HTTPS listener after the Argo CD `localhost:8080` port-forward is ready.
+- [`bin/acg-down`](/Users/cliang/src/gitrepo/personal/k3d-manager/bin/acg-down) now removes the browser HTTPS listener on teardown.
+- [`scripts/plugins/argocd.sh`](/Users/cliang/src/gitrepo/personal/k3d-manager/scripts/plugins/argocd.sh) now renders a self-healing `socat` wrapper for the canonical HTTPS listener.

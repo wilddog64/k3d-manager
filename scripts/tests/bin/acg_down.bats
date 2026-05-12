@@ -72,6 +72,24 @@ exit 0
 STUB
   chmod +x "${BATS_TEST_TMPDIR}/bin/launchctl"
 
+  cat <<'STUB' > "${BATS_TEST_TMPDIR}/bin/sudo"
+#!/usr/bin/env bash
+set -euo pipefail
+args=()
+for arg in "$@"; do
+  case "$arg" in
+    -n|--)
+      continue
+      ;;
+    *)
+      args+=("$arg")
+      ;;
+  esac
+done
+exec "${args[@]}"
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/bin/sudo"
+
   cat <<'STUB' > "${BATS_TEST_TMPDIR}/bin/pgrep"
 #!/usr/bin/env bash
 set -euo pipefail
@@ -121,4 +139,12 @@ STUB
   [[ "$output" == *"Local Hub cluster deleted"* ]]
   [[ "$output" == *"Done. Remote cluster and local Hub deleted."* ]]
   [ -f "${BATS_TEST_TMPDIR}/k3d-delete-called" ]
+}
+
+@test "acg-down removes the ArgoCD browser HTTPS listener" {
+  run bash -c 'bin/acg-down --confirm --keep-hub 2>&1'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Stopping ArgoCD browser HTTPS listener launchd daemon"* ]]
+  run grep -F 'launchctl bootout system /Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist' "${BATS_TEST_TMPDIR}/launchctl.log"
+  [ "$status" -eq 0 ]
 }

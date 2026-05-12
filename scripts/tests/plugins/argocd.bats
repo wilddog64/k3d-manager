@@ -67,7 +67,7 @@ setup() {
   [ "${kubectl_calls[1]}" = "port-forward svc/argocd-server -n cicd 8080:443" ]
   read_lines "$ARGOCD_LOG" argocd_calls
   [[ "${argocd_calls[0]}" == "account get-context --server localhost:8080" ]]
-  [[ "${argocd_calls[1]}" == *"login localhost:8080 --username admin --password fake-pass --plaintext --skip-test-tls --insecure --grpc-web"* ]]
+  [[ "${argocd_calls[1]}" == *"login localhost:8080 --username admin --stdin --plaintext --skip-test-tls --insecure --grpc-web"* ]]
 }
 
 @test "_argocd_wait_for_local_port_forward returns 0 when healthz is reachable" {
@@ -102,6 +102,17 @@ setup() {
   run grep -F 'healthz lost — restarting' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
   run grep -F 'STARTUP_TIMEOUT=${STARTUP_TIMEOUT}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+}
+
+@test "_argocd_write_browser_https_wrapper includes a canonical HTTPS listener" {
+  run grep -F 'function _argocd_write_browser_https_wrapper()' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'template_path="${SCRIPT_DIR}/etc/argocd/browser-https-wrapper.sh.tmpl"' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'TCP-LISTEN:${LOCAL_PORT},fork,reuseaddr,bind=${LOCAL_HOST} TCP:${UPSTREAM_HOST}:${UPSTREAM_PORT}' "$BATS_TEST_DIRNAME/../../etc/argocd/browser-https-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'healthz lost — restarting' "$BATS_TEST_DIRNAME/../../etc/argocd/browser-https-wrapper.sh.tmpl"
   [ "$status" -eq 0 ]
 }
 

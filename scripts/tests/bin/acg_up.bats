@@ -16,6 +16,14 @@
   run grep -nF '_argocd_write_port_forward_wrapper "${_argocd_pf_wrapper}" "${_argocd_pf_log}"' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"_argocd_write_port_forward_wrapper"* ]]
+
+  run grep -nF '_argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"_argocd_write_browser_https_wrapper"* ]]
+
+  run grep -nF 'Step 4c/12 — Installing ArgoCD browser HTTPS listener' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"browser HTTPS listener"* ]]
 }
 
 @test "acg-up preserves existing Vault identity secrets on rebuild" {

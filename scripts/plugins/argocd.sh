@@ -52,6 +52,14 @@ fi
 : "${ARGOCD_VIRTUALSERVICE_HOST:=argocd.dev.local.me}"
 : "${ARGOCD_SERVER_WAIT_TIMEOUT:=600s}"
 : "${ARGOCD_PORT_FORWARD_WAIT_TIMEOUT:=30}"
+: "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:=30}"
+: "${ARGOCD_BROWSER_LISTENER_STARTUP_TIMEOUT:=30}"
+: "${ARGOCD_BROWSER_HOST:=argocd.shopping-cart.local}"
+: "${ARGOCD_BROWSER_PORT:=443}"
+: "${ARGOCD_BROWSER_LISTENER_LABEL:=com.k3d-manager.argocd-browser-https}"
+: "${ARGOCD_BROWSER_LISTENER_PLIST:=/Library/LaunchDaemons/${ARGOCD_BROWSER_LISTENER_LABEL}.plist}"
+: "${ARGOCD_BROWSER_LISTENER_WRAPPER:=${HOME}/.local/share/k3d-manager/argocd-browser-https.sh}"
+: "${ARGOCD_BROWSER_LISTENER_LOG:=${HOME}/.local/share/k3d-manager/argocd-browser-https.log}"
 : "${ARGOCD_DEPLOY_KEY_SECRETSTORE:=argocd-deploy-key-store}"
 : "${ARGOCD_DEPLOY_KEY_ESO_SA:=eso-argocd-deploy-keys-sa}"
 : "${ARGOCD_DEPLOY_KEY_VAULT_ROLE:=argocd-deploy-key-reader}"
@@ -87,6 +95,25 @@ function _argocd_wait_for_local_port_forward() {
    done
 
    printf 'ERROR: %s\n' "[argocd] Argo CD did not become reachable on localhost:8080 within ${timeout}s — check ${log_file}" >&2
+   {
+      tail -n 20 "$log_file" 2>/dev/null || true
+   } >&2
+   return 1
+}
+
+function _argocd_wait_for_browser_https() {
+   local log_file="$1"
+   local timeout="${2:-$ARGOCD_PORT_FORWARD_WAIT_TIMEOUT}"
+   local url="${3:-https://${ARGOCD_BROWSER_HOST}:${ARGOCD_BROWSER_PORT}/healthz}"
+
+   for ((attempt=1; attempt<=timeout; attempt++)); do
+      if curl -sk --max-time 1 "$url" >/dev/null 2>&1; then
+         return 0
+      fi
+      sleep 1
+   done
+
+   printf 'ERROR: %s\n' "[argocd] Argo CD did not become reachable on ${ARGOCD_BROWSER_HOST}:${ARGOCD_BROWSER_PORT} within ${timeout}s — check ${log_file}" >&2
    {
       tail -n 20 "$log_file" 2>/dev/null || true
    } >&2
@@ -162,6 +189,69 @@ function _argocd_write_port_forward_wrapper() {
    chmod 700 "$wrapper_path"
 }
 
+function _argocd_write_browser_https_wrapper() {
+   local wrapper_path="$1"
+   local log_file="$2"
+   local socat_bin="${3:-}"
+   local curl_bin="${4:-}"
+   local local_host="${5:-127.0.0.1}"
+   local local_port="${6:-$ARGOCD_BROWSER_PORT}"
+   local upstream_host="${7:-127.0.0.1}"
+   local upstream_port="${8:-8080}"
+   local healthz_url="${9:-https://${ARGOCD_BROWSER_HOST}:${ARGOCD_BROWSER_PORT}/healthz}"
+
+   case "$socat_bin" in
+      "") socat_bin="$(command -v socat 2>/dev/null || true)" ;;
+   esac
+   case "$curl_bin" in
+      "") curl_bin="$(command -v curl 2>/dev/null || true)" ;;
+   esac
+
+   case "$socat_bin" in
+      "")
+         _err "[argocd] socat not found while writing browser HTTPS wrapper"
+         return 1
+         ;;
+   esac
+   case "$curl_bin" in
+      "")
+         _err "[argocd] curl not found while writing browser HTTPS wrapper"
+         return 1
+         ;;
+   esac
+
+   local template_path="${SCRIPT_DIR}/etc/argocd/browser-https-wrapper.sh.tmpl"
+   if [[ ! -r "$template_path" ]]; then
+      _err "[argocd] Browser HTTPS wrapper template not found: $template_path"
+      return 1
+   fi
+
+   local q_socat_bin q_curl_bin q_log_file q_local_host q_local_port q_upstream_host q_upstream_port q_healthz_url q_startup_timeout
+   printf -v q_socat_bin '%q' "$socat_bin"
+   printf -v q_curl_bin '%q' "$curl_bin"
+   printf -v q_log_file '%q' "$log_file"
+   printf -v q_local_host '%q' "$local_host"
+   printf -v q_local_port '%q' "$local_port"
+   printf -v q_upstream_host '%q' "$upstream_host"
+   printf -v q_upstream_port '%q' "$upstream_port"
+   printf -v q_healthz_url '%q' "$healthz_url"
+   printf -v q_startup_timeout '%q' "${ARGOCD_BROWSER_LISTENER_STARTUP_TIMEOUT:-30}"
+
+   mkdir -p "$(dirname "$wrapper_path")"
+   SOCAT_BIN="$q_socat_bin" \
+   CURL_BIN="$q_curl_bin" \
+   LOG_FILE="$q_log_file" \
+   LOCAL_HOST="$q_local_host" \
+   LOCAL_PORT="$q_local_port" \
+   UPSTREAM_HOST="$q_upstream_host" \
+   UPSTREAM_PORT="$q_upstream_port" \
+   HEALTHZ_URL="$q_healthz_url" \
+   STARTUP_TIMEOUT="$q_startup_timeout" \
+      envsubst '$SOCAT_BIN $CURL_BIN $LOG_FILE $LOCAL_HOST $LOCAL_PORT $UPSTREAM_HOST $UPSTREAM_PORT $HEALTHZ_URL $STARTUP_TIMEOUT' \
+         < "$template_path" > "$wrapper_path"
+   chmod 700 "$wrapper_path"
+}
+
 function _argocd_ensure_logged_in() {
    if argocd account get-context --server localhost:8080 >/dev/null 2>&1; then
       return 0
@@ -187,7 +277,14 @@ function _argocd_ensure_logged_in() {
 
 function deploy_argocd() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-      # ... help text ...
+      cat <<'HELP'
+Usage: deploy_argocd [--help]
+
+Install Argo CD via Helm into the cicd namespace and bootstrap the shopping-cart GitOps stack.
+
+Options:
+  -h, --help   Show this help text and exit
+HELP
       return 0
    fi
 

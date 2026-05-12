@@ -197,6 +197,51 @@ else
   exit 1
 fi
 
+if _is_mac; then
+  _info "[acg-up] Step 4c/12 — Installing ArgoCD browser HTTPS listener (${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}, auto-restart)..."
+  _argocd_browser_label="${ARGOCD_BROWSER_LISTENER_LABEL:-com.k3d-manager.argocd-browser-https}"
+  _argocd_browser_plist="${ARGOCD_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_argocd_browser_label}.plist}"
+  _argocd_browser_log="${ARGOCD_BROWSER_LISTENER_LOG:-${HOME}/.local/share/k3d-manager/argocd-browser-https.log}"
+  _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${HOME}/.local/share/k3d-manager/argocd-browser-https.sh}"
+  _argocd_browser_plist_tmp="${HOME}/.local/share/k3d-manager/argocd-browser-https.plist"
+  mkdir -p "$(dirname "${_argocd_browser_log}")"
+  _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}/healthz"
+  cat > "${_argocd_browser_plist_tmp}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_argocd_browser_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${_argocd_browser_wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_argocd_browser_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_argocd_browser_log}</string>
+</dict>
+</plist>
+PLIST
+  if _run_command --interactive-sudo -- launchctl bootout system "${_argocd_browser_plist}" 2>/dev/null; then
+    _info "[acg-up] Stopped existing ArgoCD browser HTTPS listener"
+  fi
+  _run_command --interactive-sudo -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}"
+  rm -f "${_argocd_browser_plist_tmp}"
+  _run_command --interactive-sudo -- launchctl bootstrap system "${_argocd_browser_plist}"
+  if _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-30}"; then
+    _info "[acg-up] ArgoCD reachable at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local} (launchd: ${_argocd_browser_label})"
+  else
+    exit 1
+  fi
+fi
+
 if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
   _info "[acg-up] Steps 5–12 (ESO, ArgoCD registration, Vault bridge) not yet ported for GCP."
   _info "[acg-up] Hub cluster is up. GCP app cluster nodes:"

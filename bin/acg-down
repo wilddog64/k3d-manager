@@ -102,6 +102,17 @@ if launchctl list "${_argocd_pf_label}" >/dev/null 2>&1; then
 fi
 rm -f "${_argocd_pf_plist}"
 
+if _is_mac; then
+  _info "[acg-down] Stopping ArgoCD browser HTTPS listener launchd daemon..."
+  _argocd_browser_label="${ARGOCD_BROWSER_LISTENER_LABEL:-com.k3d-manager.argocd-browser-https}"
+  _argocd_browser_plist="${ARGOCD_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_argocd_browser_label}.plist}"
+  _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${HOME}/.local/share/k3d-manager/argocd-browser-https.sh}"
+  if _run_command --interactive-sudo -- launchctl bootout system "${_argocd_browser_plist}" 2>/dev/null; then
+    _info "[acg-down] ArgoCD browser HTTPS listener launchd daemon unloaded"
+  fi
+  _run_command --interactive-sudo -- rm -f "${_argocd_browser_plist}" "${_argocd_browser_wrapper}"
+fi
+
 if [[ "${_keep_hub}" -eq 0 ]]; then
   _info "[acg-down] Tearing down local Hub cluster (${_HUB_CLUSTER})..."
   if k3d cluster list 2>/dev/null | grep -q "^${_HUB_CLUSTER}[[:space:]]"; then
