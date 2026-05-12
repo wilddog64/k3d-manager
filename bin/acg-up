@@ -436,6 +436,20 @@ _vault_kv_put() {
     -d "{\"data\":$1}" \
     "http://localhost:${_vault_local_port}/v1/secret/data/$2" >/dev/null
 }
+_vault_kv_exists() {
+  local path="$1"
+  curl -sf \
+    -H "X-Vault-Token: ${_vault_root_token}" \
+    "http://localhost:${_vault_local_port}/v1/secret/data/${path}" >/dev/null 2>&1
+}
+_vault_kv_get_field() {
+  local path="$1"
+  local field="$2"
+  curl -sf \
+    -H "X-Vault-Token: ${_vault_root_token}" \
+    "http://localhost:${_vault_local_port}/v1/secret/data/${path}" \
+    | jq -r --arg field "$field" '.data.data[$field] // empty'
+}
 _pg_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
 _pg_pass_products=$(openssl rand -base64 24 | tr -d '=+/')
 _pg_pass_payment=$(openssl rand -base64 24 | tr -d '=+/')
@@ -452,17 +466,40 @@ _vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}'              
 _vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}'           payment/stripe
 _vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
 _vault_kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbitmq_pass}\"}"                   rabbitmq/default
-_ldap_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
-_ldap_readonly_pass=$(openssl rand -base64 24 | tr -d '=+/')
-_vault_kv_put "{\"admin_password\":\"${_ldap_admin_pass}\",\"readonly_password\":\"${_ldap_readonly_pass}\"}" ldap/admin
-_kc_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
-_kc_db_pass=$(openssl rand -base64 24 | tr -d '=+/')
-_argocd_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-_order_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-_product_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-_grafana_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-_vault_kv_put "{\"admin_password\":\"${_kc_admin_pass}\",\"db_password\":\"${_kc_db_pass}\"}" keycloak/admin
-_vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
+
+if _vault_kv_exists "ldap/admin"; then
+  _info "[acg-up] Reusing existing Vault secret ldap/admin"
+  _ldap_admin_pass=$(_vault_kv_get_field "ldap/admin" "admin_password")
+  _ldap_readonly_pass=$(_vault_kv_get_field "ldap/admin" "readonly_password")
+else
+  _ldap_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
+  _ldap_readonly_pass=$(openssl rand -base64 24 | tr -d '=+/')
+  _vault_kv_put "{\"admin_password\":\"${_ldap_admin_pass}\",\"readonly_password\":\"${_ldap_readonly_pass}\"}" ldap/admin
+fi
+
+if _vault_kv_exists "keycloak/admin"; then
+  _info "[acg-up] Reusing existing Vault secret keycloak/admin"
+  _kc_admin_pass=$(_vault_kv_get_field "keycloak/admin" "admin_password")
+  _kc_db_pass=$(_vault_kv_get_field "keycloak/admin" "db_password")
+else
+  _kc_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
+  _kc_db_pass=$(openssl rand -base64 24 | tr -d '=+/')
+  _vault_kv_put "{\"admin_password\":\"${_kc_admin_pass}\",\"db_password\":\"${_kc_db_pass}\"}" keycloak/admin
+fi
+
+if _vault_kv_exists "keycloak/clients"; then
+  _info "[acg-up] Reusing existing Vault secret keycloak/clients"
+  _argocd_client_secret=$(_vault_kv_get_field "keycloak/clients" "argocd_client_secret")
+  _order_client_secret=$(_vault_kv_get_field "keycloak/clients" "order_service_client_secret")
+  _product_client_secret=$(_vault_kv_get_field "keycloak/clients" "product_catalog_client_secret")
+  _grafana_client_secret=$(_vault_kv_get_field "keycloak/clients" "grafana_client_secret")
+else
+  _argocd_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+  _order_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+  _product_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+  _grafana_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+  _vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
+fi
 _info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq, ldap, keycloak sandbox secrets)"
 
 _info "[acg-up] Step 10/12 — Registering app cluster with ArgoCD..."

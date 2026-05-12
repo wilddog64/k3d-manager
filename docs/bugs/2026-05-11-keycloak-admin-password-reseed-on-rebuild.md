@@ -1,6 +1,6 @@
 # Bug: `acg-up` reseeds Keycloak admin credentials on every rebuild
 
-**Status:** OPEN  
+**Status:** FIXED  
 **Area:** `bin/acg-up` / Vault KV bootstrap / shopping-cart-infra Keycloak bootstrap
 
 ## Summary
@@ -37,4 +37,6 @@ HTTP:401
 - Preserve the existing `admin_password` so the admin token flow remains stable across cluster rebuilds.
 
 ## Follow-up
-- Once the bootstrap is idempotent, refresh the live Vault `keycloak/admin` secret back to the version that still matches Keycloak's DB.
+- Done:
+  - `bin/acg-up` now preserves existing Vault identity secrets on rebuild.
+  - The live Vault `secret/keycloak/admin` secret was restored to the historical admin password version that still matches the rebuilt Keycloak database.

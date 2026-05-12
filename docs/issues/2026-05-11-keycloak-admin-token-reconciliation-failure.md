@@ -1,7 +1,7 @@
 # Issue: Keycloak admin token fetch fails after remote cluster rebuild, blocking Argo CD client reconciliation
 
 ## Status
-OPEN
+FIXED
 
 ## Reported Symptom
 After a remote cluster rebuild, Argo CD SSO still fails with:
@@ -46,15 +46,15 @@ HTTP:401
 
 Keycloak logs also show repeated `invalid_user_credentials` attempts for `admin-cli`.
 
-## Root Cause Hypothesis
-`bin/acg-up` can only reconcile the live `argocd` client if it can obtain a valid Keycloak admin token. On the rebuilt cluster, the admin token request using the current `keycloak-secrets` password returns `401 invalid_grant`, so the reconciliation step cannot be trusted to run.
+## Root Cause
+`bin/acg-up` reseeded the `secret/keycloak/admin` Vault path on every rebuild, which drifted the live Keycloak admin password away from the persisted Keycloak database. That made the admin token request return `401 invalid_grant` and blocked the reconciliation step.
 
-That leaves the live `argocd` client vulnerable to stale redirect URIs even though the repo JSON already includes both:
+That failure left the live `argocd` client vulnerable to stale redirect URIs even though the repo JSON already includes both:
 
 - `https://argocd.shopping-cart.local/*`
 - `http://localhost:8080/*`
 
-## Follow-up
-- Verify which component owns the live Keycloak admin password after rebuild.
-- Make the bootstrap path reconcile or re-seed the admin credentials before attempting client redirect updates.
-- Re-check the `argocd` client after a rebuild once admin login works again.
+## Resolution
+- `bin/acg-up` now preserves existing Vault identity secrets instead of reseeding them on every run.
+- The live Vault `secret/keycloak/admin` secret was restored to the historical working password version.
+- Admin token requests now return `200` again, which allows client redirect reconciliation to proceed on the rebuilt cluster.

@@ -17,3 +17,17 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"_argocd_write_port_forward_wrapper"* ]]
 }
+
+@test "acg-up preserves existing Vault identity secrets on rebuild" {
+  run grep -nF '_vault_kv_exists "keycloak/admin"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'_vault_kv_exists "keycloak/admin"'* ]]
+
+  run grep -nF '_vault_kv_exists "keycloak/clients"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'_vault_kv_exists "keycloak/clients"'* ]]
+
+  run grep -nF '_vault_kv_exists "ldap/admin"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'_vault_kv_exists "ldap/admin"'* ]]
+}
