@@ -5,7 +5,7 @@
 
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
-KEEP_LOCAL ?= 1
+KEEP_LOCAL ?= 0
 
 .PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision help
 
@@ -14,8 +14,8 @@ up:
 	@echo "[make] Running bin/acg-up..."
 	@GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)"
 
-## Tear down remote cluster and stop background processes (local Hub preserved by default)
-## Set KEEP_LOCAL=0 to also delete the local Hub cluster: make down KEEP_LOCAL=0
+## Tear down remote cluster and stop background processes (local Hub deleted by default)
+## Set KEEP_LOCAL=1 to preserve the local Hub cluster: make down KEEP_LOCAL=1
 down:
 	bin/acg-down --confirm $(if $(filter 1,$(KEEP_LOCAL)),--keep-hub,)
 
@@ -98,7 +98,7 @@ help:
 	@echo ""
 	@echo "  Targets:"
 	@echo "    make up        Provision full stack (credentials → cluster → ESO → ArgoCD)"
-	@echo "    make down          Tear down remote cluster; local Hub preserved (add KEEP_LOCAL=0 to also delete Hub)"
+	@echo "    make down          Tear down remote cluster; local Hub deleted by default (set KEEP_LOCAL=1 to preserve Hub)"
 	@echo "    make refresh   Refresh AWS credentials and restart tunnel"
 	@echo "    make status    Show cluster nodes, pod status, tunnel health"
 	@echo "    make creds     Extract AWS credentials only"
