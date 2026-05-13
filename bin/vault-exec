@@ -69,4 +69,22 @@ if [[ ${#CMD[@]} -eq 0 ]]; then
   CMD=(sh)
 fi
 
-_identity_exec_pod "$VAULT_NAMESPACE" "$VAULT_POD" "$VAULT_CONTAINER" "${CMD[@]}"
+if [[ "${CMD[0]}" == "vault" ]]; then
+  VAULT_ROOT_TOKEN="$(_identity_secret_field "$VAULT_NAMESPACE" vault-root root_token)"
+  if [[ -z "$VAULT_ROOT_TOKEN" ]]; then
+    printf 'ERROR: unable to read vault-root/root_token from namespace %s\n' "$VAULT_NAMESPACE" >&2
+    exit 1
+  fi
+
+  if [[ -n "$VAULT_CONTAINER" ]]; then
+    _run_command --quiet -- kubectl exec -i -n "$VAULT_NAMESPACE" -c "$VAULT_CONTAINER" "$VAULT_POD" -- \
+      sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; exec "$@"' sh "${CMD[@]}" \
+      <<<"${VAULT_ROOT_TOKEN}"
+  else
+    _run_command --quiet -- kubectl exec -i -n "$VAULT_NAMESPACE" "$VAULT_POD" -- \
+      sh -c 'read -r VAULT_TOKEN; export VAULT_TOKEN; exec "$@"' sh "${CMD[@]}" \
+      <<<"${VAULT_ROOT_TOKEN}"
+  fi
+else
+  _identity_exec_pod "$VAULT_NAMESPACE" "$VAULT_POD" "$VAULT_CONTAINER" "${CMD[@]}"
+fi

@@ -12,6 +12,10 @@ bin/vault-exec -- vault status
 bin/vault-exec -- vault kv list secret/
 ```
 
+`bin/vault-exec -- vault ...` auto-authenticates with the live `vault-root`
+token from the `vault-root` secret before running the command, so `vault kv`
+inspection works without a manual login step.
+
 ## LDAP
 
 Search the live LDAP directory through the running pod:

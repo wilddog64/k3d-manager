@@ -5,6 +5,14 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *'_identity_exec_pod'* ]]
 
+  run grep -nF '_identity_secret_field "$VAULT_NAMESPACE" vault-root root_token' bin/vault-exec
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'_identity_secret_field'* ]]
+
+  run grep -nF 'read -r VAULT_TOKEN; export VAULT_TOKEN; exec "$@"' bin/vault-exec
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'VAULT_TOKEN'* ]]
+
   run grep -nF '_run_command --quiet -- "${cmd[@]}"' scripts/lib/identity_tools.sh
   [ "$status" -eq 0 ]
   [[ "$output" == *'kubectl exec'* || "$output" == *'_run_command --quiet -- "${cmd[@]}"'* ]]
