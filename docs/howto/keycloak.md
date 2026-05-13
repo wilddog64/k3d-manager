@@ -37,9 +37,9 @@ vault kv get secret/k3d-manager/keycloak
 For live troubleshooting, use the shared identity helpers:
 
 ```bash
-bin/keycloak-logs.sh
-bin/ldap-search.sh --filter '(mail=admin@shopping-cart.local)' mail uid cn sn givenName
-bin/vault-exec.sh -- vault status
+bin/keycloak-logs
+bin/ldap-search --filter '(mail=admin@shopping-cart.local)' mail uid cn sn givenName
+bin/vault-exec -- vault status
 ```
 
 ## LDAP Federation
