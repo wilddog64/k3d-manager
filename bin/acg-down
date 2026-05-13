@@ -126,8 +126,14 @@ if _is_mac; then
   _argocd_browser_tls_cert="${ARGOCD_BROWSER_TLS_CERT_FILE:-${_argocd_browser_tls_dir}/fullchain.crt}"
   _argocd_browser_tls_key="${ARGOCD_BROWSER_TLS_KEY_FILE:-${_argocd_browser_tls_dir}/tls.key}"
   _argocd_browser_tls_ca="${ARGOCD_BROWSER_TLS_CA_FILE:-${_argocd_browser_tls_dir}/ca.crt}"
-  if _run_command --interactive-sudo -- launchctl bootout system "${_argocd_browser_plist}" 2>/dev/null; then
+  _argocd_browser_launchctl_log="${HOME}/.local/share/k3d-manager/argocd-browser-https-launchctl.log"
+  : > "${_argocd_browser_launchctl_log}"
+  if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
+      >"${_argocd_browser_launchctl_log}" 2>&1; then
     _info "[acg-down] ArgoCD browser HTTPS listener launchd daemon unloaded"
+  elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
+    tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+    _warn "[acg-down] existing ArgoCD browser HTTPS listener was not loaded; continuing"
   fi
   _run_command --interactive-sudo --soft -- rm -f "${_argocd_browser_plist}" "${_argocd_browser_wrapper}" >/dev/null 2>&1 || true
   _run_command --interactive-sudo --soft -- rm -f "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "${_argocd_browser_tls_ca}" "${_argocd_browser_tls_dir}/tls.crt" >/dev/null 2>&1 || true

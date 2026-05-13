@@ -68,6 +68,10 @@ STUB
 #!/usr/bin/env bash
 set -euo pipefail
 echo "launchctl $*" >> "${BATS_TEST_TMPDIR}/launchctl.log"
+if [[ "${STUB_LAUNCHCTL_BOOTOUT_FAIL:-0}" == "1" && "$*" == *"bootout system"* ]]; then
+  echo "Boot-out failed: 5: Input/output error" >&2
+  exit 5
+fi
 exit 0
 STUB
   chmod +x "${BATS_TEST_TMPDIR}/bin/launchctl"
@@ -157,6 +161,13 @@ STUB
   [ ! -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.key" ]
   [ ! -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/ca.crt" ]
   [ ! -e "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.crt" ]
+}
+
+@test "acg-down warns and continues when the ArgoCD browser listener is not loaded" {
+  export STUB_LAUNCHCTL_BOOTOUT_FAIL=1
+  run bash -c 'bin/acg-down --confirm --keep-hub 2>&1'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"existing ArgoCD browser HTTPS listener was not loaded; continuing"* ]]
 }
 
 @test "acg-down removes the Keycloak browser HTTP listener" {
