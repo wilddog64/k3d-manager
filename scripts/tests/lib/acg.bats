@@ -104,6 +104,23 @@ NODE
   printf '%s\n' "$stub_dir"
 }
 
+_acg_stub_ssh_keyscan() {
+  local stub_dir="${BATS_TEST_TMPDIR}/bin"
+  mkdir -p "$stub_dir"
+  cat > "${stub_dir}/ssh-keyscan" <<'NODE'
+#!/usr/bin/env bash
+set -euo pipefail
+host="${@: -1}"
+case "${host}" in
+  2.2.2.2) printf '%s\n' "2.2.2.2 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICURRENTKEY" ;;
+  3.3.3.3) printf '%s\n' "3.3.3.3 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICURRENTKEY2" ;;
+  *) printf '%s\n' "${host} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDEFAULTKEY" ;;
+esac
+NODE
+  chmod +x "${stub_dir}/ssh-keyscan"
+  printf '%s\n' "$stub_dir"
+}
+
 @test "_acg_extend_playwright: returns 0 when node script succeeds" {
   local stub_dir old_path
   stub_dir=$(_acg_stub_node 0 "EXTEND_OK")
@@ -115,6 +132,44 @@ NODE
   [[ "$output" == *"EXTEND_OK"* ]]
 
   PATH="$old_path"
+}
+
+@test "_acg_sync_known_hosts prunes stale managed AWS IPs and records current ones" {
+  local stub_dir old_path
+  mkdir -p "${HOME}/.ssh"
+  cat > "${HOME}/.ssh/config" <<'EOF'
+Host ubuntu
+  HostName 1.1.1.1
+  User ubuntu
+Host ubuntu-tunnel
+  HostName 1.1.1.1
+  User ubuntu
+Host ubuntu-1
+  HostName 2.2.2.2
+  User ubuntu
+Host ubuntu-2
+  HostName 3.3.3.3
+  User ubuntu
+EOF
+  cat > "${HOME}/.ssh/known_hosts" <<'EOF'
+1.1.1.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOLDKEY
+4.4.4.4 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAISTALEKEY
+EOF
+
+  stub_dir=$(_acg_stub_ssh_keyscan)
+  old_path="$PATH"
+  PATH="${stub_dir}:$PATH"
+
+  _acg_sync_known_hosts "4.4.4.4"
+
+  PATH="$old_path"
+
+  run cat "${HOME}/.ssh/known_hosts"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"4.4.4.4"* ]]
+  [[ "$output" == *"1.1.1.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOLDKEY"* ]]
+  [[ "$output" == *"2.2.2.2 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICURRENTKEY"* ]]
+  [[ "$output" == *"3.3.3.3 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICURRENTKEY2"* ]]
 }
 
 @test "_acg_extend_playwright: returns 1 when node script fails" {
