@@ -88,6 +88,10 @@
   run grep -nF 'ArgoCD browser login URL: https://argocd.shopping-cart.local' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"ArgoCD browser login URL"* ]]
+
+  run grep -nF 'realm import is required for SSO and cannot be skipped' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"realm import is required for SSO and cannot be skipped"* ]]
 }
 
 @test "acg-up preserves existing Vault identity secrets on rebuild" {

@@ -70,6 +70,12 @@ OSA
   return 1
 }
 
+function _acg_fail() {
+  _err "$1"
+  # shellcheck disable=SC2317
+  exit 1
+}
+
 login_prompt=0
 sandbox_url=""
 for arg in "$@"; do
@@ -688,7 +694,7 @@ done
 kill "${_kc_readiness_pf_pid}" 2>/dev/null || true
 
 if [[ "${_kc_ready}" != "true" ]]; then
-  _info "[acg-up] WARNING: Keycloak API not Ready after 5 min — skipping realm import. Run manually: bin/acg-up --import-realm"
+  _acg_fail "[acg-up] Keycloak API not Ready after 5 min — realm import is required for SSO and cannot be skipped"
 else
   _info "[acg-up] Step 10d/14 — Importing Keycloak realm shopping-cart..."
   # Re-establish port-forward for actual import
@@ -704,8 +710,8 @@ else
     | grep -o '"access_token":"[^"]*"' | sed 's/"access_token":"//;s/"//') || _kc_token=""
 
   if [[ -z "${_kc_token}" ]]; then
-    _info "[acg-up] WARNING: Could not get Keycloak admin token — skipping realm import"
     kill "${_kc_pf_pid}" 2>/dev/null || true
+    _acg_fail "[acg-up] Could not get Keycloak admin token — realm import is required for SSO and cannot be skipped"
   else
     _realm_json=$(sed \
       -e "s/\${ARGOCD_CLIENT_SECRET}/${_argocd_client_secret}/g" \
@@ -729,16 +735,24 @@ else
     elif [[ "${_import_status}" == "409" ]]; then
       _info "[acg-up] Keycloak realm 'shopping-cart' already exists — reconciling client config"
     else
-      _info "[acg-up] WARNING: Realm import returned HTTP ${_import_status} — check Keycloak logs"
+      kill "${_kc_pf_pid}" 2>/dev/null || true
+      rm -f "${_realm_json_file}"
+      _acg_fail "[acg-up] Realm import returned HTTP ${_import_status} — SSO cannot be trusted without a successful realm sync"
     fi
 
     if _keycloak_reconcile_realm_client "http://localhost:${_kc_pf_port}" "${_kc_token}" "shopping-cart" "argocd" "${_realm_json_file}"; then
       _info "[acg-up] Keycloak client 'argocd' reconciled from realm JSON"
       if _keycloak_remove_client_attribute "shopping-cart" "argocd" "pkce.code.challenge.method"; then
         _info "[acg-up] Keycloak client 'argocd' PKCE attribute removed"
+      else
+        kill "${_kc_pf_pid}" 2>/dev/null || true
+        rm -f "${_realm_json_file}"
+        _acg_fail "[acg-up] Failed to remove stale Keycloak argocd PKCE attribute"
       fi
     else
-      _warn "[acg-up] Could not reconcile Keycloak client 'argocd' — check Keycloak logs"
+      kill "${_kc_pf_pid}" 2>/dev/null || true
+      rm -f "${_realm_json_file}"
+      _acg_fail "[acg-up] Could not reconcile Keycloak client 'argocd' — SSO cannot proceed with a stale realm"
     fi
 
     kill "${_kc_pf_pid}" 2>/dev/null || true
