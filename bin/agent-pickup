@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# bin/agent-pickup.sh
+# bin/agent-pickup
 # Agent orientation script — run at the start of any Codex or Gemini session.
 # Prints branch, recent commits, pending specs, and active context summary.
 #
 # Usage:
-#   bin/agent-pickup.sh
+#   bin/agent-pickup
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"

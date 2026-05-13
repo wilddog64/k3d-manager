@@ -1,6 +1,6 @@
 #!/bin/bash
-# fix-k3s.sh - Fix k3s cluster after clock skew issues
-# Run with: sudo ./bin/fix-k3s.sh
+# fix-k3s - Fix k3s cluster after clock skew issues
+# Run with: sudo ./bin/fix-k3s
 
 set -e
 
@@ -50,7 +50,7 @@ systemctl start k3s
 
 echo ""
 echo "=== Waiting for k3s to initialize (60 seconds) ==="
-for i in {1..12}; do
+for _ in {1..12}; do
     echo -n "."
     sleep 5
 done

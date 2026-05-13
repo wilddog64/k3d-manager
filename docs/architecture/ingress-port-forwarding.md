@@ -714,5 +714,5 @@ wsl --list --verbose
 ## Related Documentation
 
 - [Vault PKI Setup](../howto/vault-pki-setup.md)
-- [SSL Certificate Scripts](../../bin/setup-vault-ca.sh)
+- [SSL Certificate Scripts](../../bin/setup-vault-ca)
 - [k3s Provider Configuration](../../scripts/lib/providers/k3s.sh)

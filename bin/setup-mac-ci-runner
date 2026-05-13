@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# setup-mac-ci-runner.sh — Pre-build the persistent Stage 2 CI cluster on a macOS runner.
+# setup-mac-ci-runner — Pre-build the persistent Stage 2 CI cluster on a macOS runner.
 #
 # Platform: macOS only (uses OrbStack as the container runtime).
 # For a Linux runner (Ubuntu + k3s), a separate setup-linux-ci-runner.sh will be needed.
@@ -11,8 +11,8 @@ set -euo pipefail
 # stack (Istio, Vault HA, ESO). The cluster is left running as a persistent fixture for CI.
 #
 # Usage:
-#   ./bin/setup-mac-ci-runner.sh               # full setup (safe to re-run)
-#   ./bin/setup-mac-ci-runner.sh --health-only # just run the health check, no setup
+#   ./bin/setup-mac-ci-runner               # full setup (safe to re-run)
+#   ./bin/setup-mac-ci-runner --health-only # just run the health check, no setup
 #
 # Environment variables:
 #   CLUSTER_PROVIDER  — cluster backend (default: orbstack)
@@ -33,8 +33,7 @@ _ok()   { printf '[setup-mac-ci-runner] OK: %s\n' "$*"; }
 # ── Platform guard ─────────────────────────────────────────────────────────────
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
-  _err "This script is macOS-only (OrbStack is not available on Linux)."
-  _err "For a Linux runner, use a separate setup-linux-ci-runner.sh with k3s or k3d+Docker."
+  _err "This script is macOS-only (OrbStack is not available on Linux). For a Linux runner, use a separate setup-linux-ci-runner.sh with k3s or k3d+Docker."
 fi
 
 # ── Preflight ──────────────────────────────────────────────────────────────────
@@ -124,6 +123,6 @@ cat <<'EOF'
     CLUSTER_PROVIDER=orbstack ./scripts/k3d-manager reunseal_vault
 
   To verify cluster health at any time:
-    ./bin/setup-mac-ci-runner.sh --health-only
+    ./bin/setup-mac-ci-runner --health-only
 ────────────────────────────────────────────────────────
 EOF

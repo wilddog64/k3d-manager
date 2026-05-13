@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2034,SC1091
+# shellcheck disable=SC2034,SC1091,SC2329
 
 # k3d-manager - K3d Kubernetes cluster setup with Istio and storage configuration
 #
@@ -115,10 +115,10 @@ function _test_run_smoke() {
     local smoke_namespace="${2:-}"
     local smoke_rc=0
     local -a smoke_scripts=(
-        "smoke-test-jenkins.sh"
-        "test-openldap.sh"
-        "test-argocd-cli.sh"
-        "test-directory-auto-load.sh"
+        "smoke-test-jenkins"
+        "test-openldap"
+        "test-argocd-cli"
+        "test-directory-auto-load"
     )
 
     local script

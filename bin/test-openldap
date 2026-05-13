@@ -2,7 +2,6 @@
 set -euo pipefail
 
 namespace="${1:-directory}"
-release="${2:-openldap}"
 service="${3:-openldap-openldap-bitnami}"
 local_port="${4:-3389}"
 

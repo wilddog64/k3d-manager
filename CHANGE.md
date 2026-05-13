@@ -410,7 +410,7 @@
 - **`scripts/lib/system.sh`**: Synced from lib-foundation `b60ddc6` — adds `_run_command_resolve_sudo()`, `resolver_rc` unified error handling, `--interactive-sudo` flag throughout, `helm_global_arr` word-split fix (`56aec2f`).
 - **`scripts/lib/agent_rigor.sh`**: Synced from lib-foundation `15f041a` — adds allowlist file support, `kubectl exec` credential leak check, bare-sudo expanded diff.
 - **`scripts/lib/foundation/`**: Subtree pulled to lib-foundation `b60ddc6` (TTY fix + allowlist feature).
-- **`bin/smoke-test-cluster-health.sh`**: Sources `scripts/lib/system.sh` via `REPO_ROOT` and uses `_kubectl` wrapper for all kubectl calls (`b0b76b3`).
+- **`bin/smoke-test-cluster-health`**: Sources `scripts/lib/system.sh` via `REPO_ROOT` and uses `_kubectl` wrapper for all kubectl calls (`b0b76b3`).
 - **`README.md`**: Plugins section — full table of all 14 plugins with key functions and descriptions.
 - **`README.md`**: How-To section — grouped by component (Jenkins / LDAP).
 - **`README.md`**: Issue Logs promoted to top-level section with 5 most recent entries.

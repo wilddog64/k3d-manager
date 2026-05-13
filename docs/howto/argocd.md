@@ -67,7 +67,7 @@ Do not use it as the browser SSO entrypoint.
 The canonical browser entrypoint is `https://argocd.shopping-cart.local`, which
 is backed by a local TLS listener on port 443. The listener uses a Vault PKI
 certificate for `argocd.shopping-cart.local`; if Safari does not yet trust the
-Vault CA, run `bin/setup-vault-ca.sh -m` to install it into the macOS keychain.
+Vault CA, run `bin/setup-vault-ca -m` to install it into the macOS keychain.
 
 ## Notes
 

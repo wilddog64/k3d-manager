@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bin/test-argocd-cli.sh
+# bin/test-argocd-cli
 # Test script for Argo CD CLI functionality with LDAP authentication
 #
 # This script runs tests in-cluster to avoid kubectl port-forward issues.
@@ -254,7 +254,7 @@ kubectl logs -f argocd-cli-test -n argocd 2>&1 || echo "(Pod may have completed 
 # Wait for pod to complete
 echo ""
 echo -e "${YELLOW}6. Waiting for test completion...${NC}"
-for i in {1..60}; do
+for _ in {1..60}; do
     POD_PHASE=$(kubectl get pod argocd-cli-test -n argocd -o jsonpath='{.status.phase}' 2>/dev/null || echo "NotFound")
     if [[ "$POD_PHASE" == "Succeeded" || "$POD_PHASE" == "Failed" || "$POD_PHASE" == "NotFound" ]]; then
         echo "   Pod phase: $POD_PHASE"

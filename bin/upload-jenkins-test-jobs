@@ -18,12 +18,12 @@ JENKINS_URL="http://jenkins.${JENKINS_NAMESPACE}.svc.cluster.local:8080"
 
 echo "Creating test jobs..."
 
-for job_file in ${TEST_JOBS_DIR}/*.groovy; do
+for job_file in "$TEST_JOBS_DIR"/*.groovy; do
     job_name=$(basename "$job_file" .groovy)
     echo "  - Creating job: $job_name"
 
     # Create job XML from Groovy pipeline
-    cat > /tmp/${job_name}.xml <<EOF
+    cat > /tmp/"${job_name}".xml <<EOF
 <?xml version='1.1' encoding='UTF-8'?>
 <flow-definition plugin="workflow-job@2.40">
   <description>Kubernetes agent test job</description>
@@ -45,7 +45,7 @@ EOF
         -u "${JENKINS_USER}:${JENKINS_PASS}" \
         -H "Content-Type: application/xml" \
         --data-binary "@-" \
-        "${JENKINS_URL}/createItem?name=${job_name}" < /tmp/${job_name}.xml 2>/dev/null)
+        "${JENKINS_URL}/createItem?name=${job_name}" < /tmp/"${job_name}".xml 2>/dev/null)
 
     http_code=$(echo "$response" | tail -n1)
 
@@ -58,7 +58,7 @@ EOF
             -u "${JENKINS_USER}:${JENKINS_PASS}" \
             -H "Content-Type: application/xml" \
             --data-binary "@-" \
-            "${JENKINS_URL}/job/${job_name}/config.xml" < /tmp/${job_name}.xml > /dev/null 2>&1
+            "${JENKINS_URL}/job/${job_name}/config.xml" < /tmp/"${job_name}".xml > /dev/null 2>&1
         echo "    ✓ Job $job_name updated"
     else
         echo "    ✗ Job $job_name failed (HTTP $http_code)"

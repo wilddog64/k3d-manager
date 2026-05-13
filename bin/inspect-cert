@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bin/inspect-cert.sh
+# bin/inspect-cert
 # Unified certificate inspection tool - inspect certs from K8s secret or live endpoint
 
 set -euo pipefail
@@ -113,7 +113,7 @@ inspect_secret() {
   fi
 
   local temp_cert="/tmp/ingress-cert-$$.crt"
-  trap "rm -f $temp_cert" RETURN
+  trap 'rm -f "$temp_cert"' RETURN
 
   kubectl -n "$TLS_NS" get secret "$TLS_SECRET" \
     -o jsonpath='{.data.tls\.crt}' | base64 -d > "$temp_cert"
@@ -165,7 +165,7 @@ inspect_live() {
   echo
 
   local temp_cert="/tmp/live-cert-$$.crt"
-  trap "rm -f $temp_cert" RETURN
+  trap 'rm -f "$temp_cert"' RETURN
 
   # Extract the leaf certificate
   if ! openssl s_client -showcerts -servername "$HOST" -connect "$ip:$PORT" </dev/null 2>/dev/null \

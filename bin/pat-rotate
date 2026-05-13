@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# bin/pat-rotate.sh
+# bin/pat-rotate
 #
 # Rotate a GitHub Personal Access Token.
 # Reads the new token from stdin (interactive prompt or pipe) and updates
 # gh CLI auth via `gh auth login --with-token`.
 #
-# Usage (interactive):  ./bin/pat-rotate.sh
-# Usage (pipe):         printf '%s' "$NEW_TOKEN" | ./bin/pat-rotate.sh
+# Usage (interactive):  ./bin/pat-rotate
+# Usage (pipe):         printf '%s' "$NEW_TOKEN" | ./bin/pat-rotate
 #
 # The token is NEVER passed as a command-line argument to avoid shell history
 # and process-listing exposure.

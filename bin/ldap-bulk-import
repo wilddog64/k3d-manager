@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # LDAP Bulk Import - Convert CSV to LDIF and import users
-# Usage: ./bin/ldap-bulk-import.sh [OPTIONS] <csv-file>
+# Usage: ./bin/ldap-bulk-import [OPTIONS] <csv-file>
 
 set -euo pipefail
 
@@ -19,7 +19,7 @@ fi
 
 usage() {
     cat << 'EOF'
-Usage: ldap-bulk-import.sh [OPTIONS] <csv-file>
+Usage: ldap-bulk-import [OPTIONS] <csv-file>
 
 Convert CSV user data to LDIF format and optionally import into OpenLDAP.
 
@@ -48,16 +48,16 @@ Schema Types:
 
 Examples:
   # Generate LDIF only
-  ldap-bulk-import.sh users.csv
+  ldap-bulk-import users.csv
 
   # Generate and import with custom base DN
-  ldap-bulk-import.sh --import --base-dn "dc=corp,dc=example,dc=com" users.csv
+  ldap-bulk-import --import --base-dn "dc=corp,dc=example,dc=com" users.csv
 
   # Generate AD-compatible LDIF
-  ldap-bulk-import.sh --schema ad --base-dn "DC=corp,DC=example,DC=com" users.csv
+  ldap-bulk-import --schema ad --base-dn "DC=corp,DC=example,DC=com" users.csv
 
   # Import with custom password
-  ldap-bulk-import.sh --import --password "SecurePass123!" users.csv
+  ldap-bulk-import --import --password "SecurePass123!" users.csv
 
 CSV Requirements:
   - Header row required: username,givenName,surname,email,uidNumber,gidNumber,groups
@@ -165,7 +165,7 @@ generate_ssha_hash() {
     local password="$1"
     # Generate SSHA hash using slappasswd if available, otherwise use default test hash
     if command -v slappasswd >/dev/null 2>&1; then
-        slappasswd -s "$password" -h {SSHA}
+        slappasswd -s "$password" -h '{SSHA}'
     else
         # Default test hash for password "test1234"
         echo "{SSHA}W6ph5Mm5Pz8GgiULbPgzG37mj9g1gLQy"
@@ -245,7 +245,7 @@ _info "Output file: $OUTPUT_FILE"
 PASSWORD_HASH=$(generate_ssha_hash "$DEFAULT_PASSWORD")
 
 # Initialize output file
-> "$OUTPUT_FILE"
+: > "$OUTPUT_FILE"
 
 # Track groups mentioned in CSV for group creation
 declare -A GROUPS_NEEDED
@@ -325,38 +325,40 @@ _info "Generated $user_count user entries"
 if [[ ${#GROUPS_NEEDED[@]} -gt 0 ]]; then
     _info "Generating ${#GROUPS_NEEDED[@]} group entries"
 
-    echo "" >> "$OUTPUT_FILE"
-    echo "# Groups" >> "$OUTPUT_FILE"
+    {
+        echo ""
+        echo "# Groups"
 
-    for group in "${!GROUPS_NEEDED[@]}"; do
-        if [[ "$SCHEMA" == "ad" ]]; then
-            group_dn="CN=$group,$GROUP_OU,$BASE_DN"
-        else
-            group_dn="cn=$group,$GROUP_OU,$BASE_DN"
-        fi
+        for group in "${!GROUPS_NEEDED[@]}"; do
+            if [[ "$SCHEMA" == "ad" ]]; then
+                group_dn="CN=$group,$GROUP_OU,$BASE_DN"
+            else
+                group_dn="cn=$group,$GROUP_OU,$BASE_DN"
+            fi
 
-        echo "" >> "$OUTPUT_FILE"
-        echo "# Group: $group" >> "$OUTPUT_FILE"
-        echo "dn: $group_dn" >> "$OUTPUT_FILE"
-        echo "objectClass: top" >> "$OUTPUT_FILE"
-        echo "objectClass: groupOfNames" >> "$OUTPUT_FILE"
+            echo ""
+            echo "# Group: $group"
+            echo "dn: $group_dn"
+            echo "objectClass: top"
+            echo "objectClass: groupOfNames"
 
-        if [[ "$SCHEMA" == "ad" ]]; then
-            echo "cn: $group" >> "$OUTPUT_FILE"
-        else
-            echo "cn: $group" >> "$OUTPUT_FILE"
-        fi
+            if [[ "$SCHEMA" == "ad" ]]; then
+                echo "cn: $group"
+            else
+                echo "cn: $group"
+            fi
 
-        echo "description: Auto-generated group from bulk import" >> "$OUTPUT_FILE"
+            echo "description: Auto-generated group from bulk import"
 
-        # Add members
-        IFS='|' read -ra members <<< "${GROUP_MEMBERS[$group]}"
-        for member in "${members[@]}"; do
-            echo "member: $member" >> "$OUTPUT_FILE"
+            # Add members
+            IFS='|' read -ra members <<< "${GROUP_MEMBERS[$group]}"
+            for member in "${members[@]}"; do
+                echo "member: $member"
+            done
+
+            echo ""
         done
-
-        echo "" >> "$OUTPUT_FILE"
-    done
+    } >> "$OUTPUT_FILE"
 fi
 
 _info "LDIF generation complete: $OUTPUT_FILE"

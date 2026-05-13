@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bin/smoke-test-cluster-health.sh
+# bin/smoke-test-cluster-health
 # Baseline cluster health gate — run after every cluster task before reporting done.
 #
 # Checks:
@@ -8,7 +8,7 @@
 #   3. At least 4 pods Running on ubuntu-k3s (basket CrashLoopBackOff is expected)
 #
 # Usage:
-#   bin/smoke-test-cluster-health.sh
+#   bin/smoke-test-cluster-health
 #
 # Environment:
 #   INFRA_CONTEXT      kubectl context for infra cluster (default: k3d-k3d-cluster)

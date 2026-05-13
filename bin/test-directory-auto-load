@@ -45,7 +45,7 @@ ENTRIES=$(kubectl -n directory exec "$LDAP_POD" -- ldapsearch -x -H ldap://127.0
   -D "cn=ldap-admin,dc=home,dc=org" \
   -w "$LDAP_PASS" \
   -b "dc=home,dc=org" \
-  "(objectClass=*)" dn 2>/dev/null | grep "^dn:" | wc -l)
+  "(objectClass=*)" dn 2>/dev/null | grep -c "^dn:")
 [[ "${TRACE_ENABLED:-}" == "1" ]] && set -x
 
 echo "   Total entries found: $ENTRIES"
