@@ -92,6 +92,10 @@
   run grep -nF 'realm import is required for SSO and cannot be skipped' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"realm import is required for SSO and cannot be skipped"* ]]
+
+  run grep -nF '_import_status=$(curl -sS -o /dev/null -w "%{http_code}"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'_import_status=$(curl -sS -o /dev/null -w "%{http_code}"'* ]]
 }
 
 @test "acg-up preserves existing Vault identity secrets on rebuild" {

@@ -723,12 +723,15 @@ else
     _realm_json_file="$(mktemp -t keycloak-realm.XXXXXX.json)"
     printf '%s\n' "${_realm_json}" > "${_realm_json_file}"
 
-    _import_status=$(curl -sf -o /dev/null -w "%{http_code}" \
+    _import_status=$(curl -sS -o /dev/null -w "%{http_code}" \
       -X POST \
       -H "Authorization: Bearer ${_kc_token}" \
       -H "Content-Type: application/json" \
       --data-binary @"${_realm_json_file}" \
-      "http://localhost:${_kc_pf_port}/admin/realms" 2>/dev/null || echo "000")
+      "http://localhost:${_kc_pf_port}/admin/realms" 2>/dev/null || true)
+    if [[ -z "${_import_status}" ]]; then
+      _import_status="000"
+    fi
 
     if [[ "${_import_status}" == "201" ]]; then
       _info "[acg-up] Keycloak realm 'shopping-cart' imported successfully"
