@@ -37,7 +37,15 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"KEYCLOAK_READY_TIMEOUT_SECONDS"* ]]
 
-  run grep -nF 'kubectl --context k3d-k3d-cluster -n identity wait --for=condition=Available --timeout="${_kc_ready_timeout_seconds}s" deployment/keycloak' bin/acg-up
+  run grep -nF '_kc_ready_poll_interval_seconds="${KEYCLOAK_READY_POLL_INTERVAL_SECONDS:-10}"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"KEYCLOAK_READY_POLL_INTERVAL_SECONDS"* ]]
+
+  run grep -nF 'Keycloak deployment/keycloak not created yet — waiting for ArgoCD sync...' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ArgoCD sync"* ]]
+
+  run grep -nF 'kubectl --context k3d-k3d-cluster -n identity wait --for=condition=Available --timeout="${_kc_ready_poll_interval_seconds}s" deployment/keycloak' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"deployment/keycloak"* ]]
 
@@ -96,6 +104,10 @@
   run grep -nF 'realm import is required for SSO and cannot be skipped' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"realm import is required for SSO and cannot be skipped"* ]]
+
+  run grep -nF 'kubectl --context k3d-k3d-cluster -n cicd get app shopping-cart-identity -o wide || true' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"shopping-cart-identity"* ]]
 
   run grep -nF '_import_status=$(curl -sS -o /dev/null -w "%{http_code}"' bin/acg-up
   [ "$status" -eq 0 ]
