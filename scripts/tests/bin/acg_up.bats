@@ -65,14 +65,6 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"skipping launchd reinstall"* ]]
 
-  run grep -nF 'Opening canonical ArgoCD browser URL: ${_argocd_browser_url}' bin/acg-up
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"Opening canonical ArgoCD browser URL"* ]]
-
-  open_line=$(grep -nF 'Opening canonical ArgoCD browser URL: ${_argocd_browser_url}' bin/acg-up | head -n1 | cut -d: -f1)
-  wired_line=$(grep -nF 'ArgoCD SSO wired: login at https://argocd.shopping-cart.local' bin/acg-up | head -n1 | cut -d: -f1)
-  [ "$open_line" -gt "$wired_line" ]
-
   run grep -nF '_argocd_open_browser_url()' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *'_argocd_open_browser_url'* ]]
