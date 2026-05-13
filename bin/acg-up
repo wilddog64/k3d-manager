@@ -295,14 +295,6 @@ PLIST
       exit 1
     fi
   fi
-  if [[ "${_argocd_browser_ready:-0}" == "1" ]]; then
-    if command -v osascript >/dev/null 2>&1 || command -v open >/dev/null 2>&1; then
-      _info "[acg-up] Opening canonical ArgoCD browser URL: ${_argocd_browser_url}"
-      _argocd_open_browser_url "${_argocd_browser_url}" >/dev/null 2>&1 || true
-    else
-      _warn "[acg-up] open command not available — open ${_argocd_browser_url} manually"
-    fi
-  fi
 fi
 
 if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
@@ -902,6 +894,15 @@ done
 kubectl rollout restart deployment/argocd-server -n cicd --context k3d-k3d-cluster
 kubectl rollout status deployment/argocd-server -n cicd --context k3d-k3d-cluster --timeout=120s
 _info "[acg-up] ArgoCD SSO wired: login at https://argocd.shopping-cart.local → Keycloak realm shopping-cart"
+
+if _is_mac && [[ "${_argocd_browser_ready:-0}" == "1" ]]; then
+  if command -v osascript >/dev/null 2>&1 || command -v open >/dev/null 2>&1; then
+    _info "[acg-up] Opening canonical ArgoCD browser URL: ${_argocd_browser_url}"
+    _argocd_open_browser_url "${_argocd_browser_url}" >/dev/null 2>&1 || true
+  else
+    _warn "[acg-up] open command not available — open ${_argocd_browser_url} manually"
+  fi
+fi
 
 _info "[acg-up] Step 11/14 — Verifying ClusterSecretStore..."
 _css_ready=false
