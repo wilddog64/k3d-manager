@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# shellcheck disable=SC2317
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# shellcheck source=scripts/lib/system.sh
+source "${REPO_ROOT}/scripts/lib/system.sh"
+# shellcheck source=scripts/lib/identity_tools.sh
+source "${REPO_ROOT}/scripts/lib/identity_tools.sh"
+
+KEYCLOAK_NAMESPACE="${KEYCLOAK_NAMESPACE:-identity}"
+KEYCLOAK_POD="${KEYCLOAK_POD:-}"
+KEYCLOAK_TAIL="${KEYCLOAK_TAIL:-200}"
+declare -a KEYCLOAK_LABELS=(
+  "${KEYCLOAK_POD_LABEL:-app.kubernetes.io/name=keycloak}"
+  "${KEYCLOAK_POD_LABEL_FALLBACK:-app=keycloak}"
+)
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--namespace)
+      KEYCLOAK_NAMESPACE="$2"
+      shift 2
+      ;;
+    -p|--pod)
+      KEYCLOAK_POD="$2"
+      shift 2
+      ;;
+    -t|--tail)
+      KEYCLOAK_TAIL="$2"
+      shift 2
+      ;;
+    -l|--label)
+      KEYCLOAK_LABELS+=("$2")
+      shift 2
+      ;;
+    -f|--follow)
+      KEYCLOAK_FOLLOW=1
+      shift
+      ;;
+    -h|--help)
+      cat <<'EOF'
+Usage: bin/keycloak-logs.sh [OPTIONS]
+  -n, --namespace NS   Keycloak namespace (default: identity)
+  -p, --pod POD        Keycloak pod name (optional)
+  -t, --tail N         Number of log lines to show (default: 200)
+  -l, --label SEL      Pod label selector (repeatable)
+  -f, --follow         Follow logs
+EOF
+      exit 0
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+if [[ -z "$KEYCLOAK_POD" ]]; then
+  KEYCLOAK_POD="$(_identity_first_pod "$KEYCLOAK_NAMESPACE" "${KEYCLOAK_LABELS[@]}")"
+fi
+if [[ -z "$KEYCLOAK_POD" ]]; then
+  _err "Could not find a Keycloak pod in namespace '$KEYCLOAK_NAMESPACE'"
+  exit 1
+fi
+
+declare -a LOG_ARGS=(--tail="$KEYCLOAK_TAIL")
+if [[ "${KEYCLOAK_FOLLOW:-0}" == "1" ]]; then
+  LOG_ARGS+=(-f)
+fi
+
+_identity_logs_pod "$KEYCLOAK_NAMESPACE" "$KEYCLOAK_POD" "${LOG_ARGS[@]}"
