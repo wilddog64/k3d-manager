@@ -961,3 +961,5 @@ fi
 
 _info "[acg-up] Cluster is up."
 kubectl get nodes --context ubuntu-k3s
+_info "[acg-up] ArgoCD browser login URL: https://argocd.shopping-cart.local"
+_info "[acg-up] Open that URL manually in your browser to continue SSO login."

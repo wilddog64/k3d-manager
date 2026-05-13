@@ -84,6 +84,10 @@
   run grep -nF 'Step 10f/14 — Wiring ArgoCD SSO' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"Wiring ArgoCD SSO"* ]]
+
+  run grep -nF 'ArgoCD browser login URL: https://argocd.shopping-cart.local' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ArgoCD browser login URL"* ]]
 }
 
 @test "acg-up preserves existing Vault identity secrets on rebuild" {
