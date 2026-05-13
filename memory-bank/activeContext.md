@@ -93,6 +93,7 @@
 
 ## Notes
 - The two baseline failures in `scripts/tests/plugins/argocd.bats` remain unresolved (pre-existing, unrelated to v1.4.2 changes).
+- Historical branch pruning recommendation recorded in `docs/issues/2026-05-13-k3d-manager-historical-branches-prune-recommendation.md`: `docs/next-improvements` and `k3d-manager-v1.1.0` through `k3d-manager-v1.4.4` are not ancestors of `main` or `k3d-manager-v1.4.5`; keep them for auditability unless the team explicitly decides to prune refs.
 - Retro (v1.4.4): `docs/retro/2026-05-08-v1.4.4-retrospective.md`
 - Retro (v1.4.3): `docs/retro/2026-05-08-v1.4.3-retrospective.md`
 - Retro (v1.4.2): `docs/retro/2026-05-07-v1.4.2-retrospective.md`
