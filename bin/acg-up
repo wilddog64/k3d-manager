@@ -675,29 +675,13 @@ spec:
 IDEOF
 
 _kc_ready_timeout_seconds="${KEYCLOAK_READY_TIMEOUT_SECONDS:-900}"
-_kc_ready_poll_interval_seconds="${KEYCLOAK_READY_POLL_INTERVAL_SECONDS:-10}"
-_kc_ready_max_attempts=$(( (_kc_ready_timeout_seconds + _kc_ready_poll_interval_seconds - 1) / _kc_ready_poll_interval_seconds ))
-
-_info "[acg-up] Waiting for Keycloak API to be Ready (up to ${_kc_ready_timeout_seconds}s)..."
 _kc_pf_port=18080
-_kc_ready=false
-# Start a temporary port-forward for the health check
-kubectl port-forward svc/keycloak -n identity --context k3d-k3d-cluster "${_kc_pf_port}:80" \
-  >>"${HOME}/.local/share/k3d-manager/keycloak-readiness-pf.log" 2>&1 &
-_kc_readiness_pf_pid=$!
 
-for i in $(seq 1 "${_kc_ready_max_attempts}"); do
-  if curl -sf "http://localhost:${_kc_pf_port}/health/ready" >/dev/null 2>&1; then
-    _kc_ready=true
-    break
-  fi
-  _info "[acg-up] Keycloak API not ready yet (attempt ${i}/${_kc_ready_max_attempts}) — waiting ${_kc_ready_poll_interval_seconds}s..."
-  sleep "${_kc_ready_poll_interval_seconds}"
-done
-
-kill "${_kc_readiness_pf_pid}" 2>/dev/null || true
-
-if [[ "${_kc_ready}" != "true" ]]; then
+_info "[acg-up] Waiting for Keycloak deployment to be Available (up to ${_kc_ready_timeout_seconds}s)..."
+if ! kubectl --context k3d-k3d-cluster -n identity wait --for=condition=Available --timeout="${_kc_ready_timeout_seconds}s" deployment/keycloak >/dev/null 2>&1; then
+  _warn "[acg-up] Keycloak deployment did not become Available after ${_kc_ready_timeout_seconds}s"
+  kubectl --context k3d-k3d-cluster -n identity get deploy keycloak -o wide || true
+  kubectl --context k3d-k3d-cluster -n identity get pods -l app.kubernetes.io/name=keycloak -o wide || true
   _acg_fail "[acg-up] Keycloak API not Ready after ${_kc_ready_timeout_seconds}s — realm import is required for SSO and cannot be skipped"
 else
   _info "[acg-up] Step 10d/14 — Importing Keycloak realm shopping-cart..."

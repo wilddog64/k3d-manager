@@ -33,13 +33,13 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"_argocd_write_port_forward_wrapper"* ]]
 
-  run grep -nF 'svc/keycloak" "80" "80" "http://127.0.0.1/health/ready"' bin/acg-up
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"health/ready"* ]]
-
   run grep -nF '_kc_ready_timeout_seconds="${KEYCLOAK_READY_TIMEOUT_SECONDS:-900}"' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"KEYCLOAK_READY_TIMEOUT_SECONDS"* ]]
+
+  run grep -nF 'kubectl --context k3d-k3d-cluster -n identity wait --for=condition=Available --timeout="${_kc_ready_timeout_seconds}s" deployment/keycloak' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"deployment/keycloak"* ]]
 
   run grep -nF '_keycloak_browser_label="com.k3d-manager.keycloak-browser-http"' bin/acg-up
   [ "$status" -eq 0 ]
