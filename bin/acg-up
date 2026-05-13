@@ -674,7 +674,11 @@ spec:
         maxDuration: 3m
 IDEOF
 
-_info "[acg-up] Waiting for Keycloak API to be Ready (up to 5 min)..."
+_kc_ready_timeout_seconds="${KEYCLOAK_READY_TIMEOUT_SECONDS:-900}"
+_kc_ready_poll_interval_seconds="${KEYCLOAK_READY_POLL_INTERVAL_SECONDS:-10}"
+_kc_ready_max_attempts=$(( (_kc_ready_timeout_seconds + _kc_ready_poll_interval_seconds - 1) / _kc_ready_poll_interval_seconds ))
+
+_info "[acg-up] Waiting for Keycloak API to be Ready (up to ${_kc_ready_timeout_seconds}s)..."
 _kc_pf_port=18080
 _kc_ready=false
 # Start a temporary port-forward for the health check
@@ -682,19 +686,19 @@ kubectl port-forward svc/keycloak -n identity --context k3d-k3d-cluster "${_kc_p
   >>"${HOME}/.local/share/k3d-manager/keycloak-readiness-pf.log" 2>&1 &
 _kc_readiness_pf_pid=$!
 
-for i in $(seq 1 30); do
+for i in $(seq 1 "${_kc_ready_max_attempts}"); do
   if curl -sf "http://localhost:${_kc_pf_port}/health/ready" >/dev/null 2>&1; then
     _kc_ready=true
     break
   fi
-  _info "[acg-up] Keycloak API not ready yet (attempt ${i}/30) — waiting 10s..."
-  sleep 10
+  _info "[acg-up] Keycloak API not ready yet (attempt ${i}/${_kc_ready_max_attempts}) — waiting ${_kc_ready_poll_interval_seconds}s..."
+  sleep "${_kc_ready_poll_interval_seconds}"
 done
 
 kill "${_kc_readiness_pf_pid}" 2>/dev/null || true
 
 if [[ "${_kc_ready}" != "true" ]]; then
-  _acg_fail "[acg-up] Keycloak API not Ready after 5 min — realm import is required for SSO and cannot be skipped"
+  _acg_fail "[acg-up] Keycloak API not Ready after ${_kc_ready_timeout_seconds}s — realm import is required for SSO and cannot be skipped"
 else
   _info "[acg-up] Step 10d/14 — Importing Keycloak realm shopping-cart..."
   # Re-establish port-forward for actual import

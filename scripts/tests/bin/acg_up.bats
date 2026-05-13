@@ -37,6 +37,10 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"health/ready"* ]]
 
+  run grep -nF '_kc_ready_timeout_seconds="${KEYCLOAK_READY_TIMEOUT_SECONDS:-900}"' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"KEYCLOAK_READY_TIMEOUT_SECONDS"* ]]
+
   run grep -nF '_keycloak_browser_label="com.k3d-manager.keycloak-browser-http"' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"keycloak-browser-http"* ]]
