@@ -6,6 +6,7 @@
 - `k3d-manager` is carrying branch-handoff / ops notes only for this turn.
 - `v1.4.4`, `v1.4.3`, and `v1.4.2` remain shipped; branch protection was restored after each merge.
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
+- A new spec was recorded for live Keycloak realm JSON reconciliation without rebuilding clusters: `docs/issues/2026-05-14-keycloak-live-json-reconcile-without-rebuild.md`.
 
 ## Post-Merge Housekeeping — 2026-05-08 (v1.4.4 + PR #37)
 - **k3d-manager PR #73 + shopping-cart-infra PR #37 merged** — both enforced to main
