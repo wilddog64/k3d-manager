@@ -2,12 +2,9 @@
 
 ## Status
 - Current branch: `k3d-manager-v1.4.5`.
-- **v1.4.4 SHIPPED** — PR #73 merged (`92ccaec1`), tagged v1.4.4, released 2026-05-08. enforce_admins restored. Retro: `docs/retro/2026-05-08-v1.4.4-retrospective.md`
-- **shopping-cart-infra PR #37 SHIPPED** — merged (`867d861`). enforce_admins restored. Retro: `docs/retro/2026-05-08-pr37-keycloak-externalsecret-retrospective.md`
-- **shopping-cart-infra PR #41 SHIPPED** — merged (`180f5f89`) 2026-05-09. Keycloak PostgreSQL driver + LDAP LDIF chown fixes (Bugs 4+5). enforce_admins restored. Retro: `docs/retro/2026-05-09-pr41-keycloak-ldap-startup-retrospective.md`
-- **v1.4.3 SHIPPED** — PR #72 merged (`b5601cb5`), enforce_admins restored. Retro: `docs/retro/2026-05-08-v1.4.3-retrospective.md`
-- **shopping-cart-infra PR #36 SHIPPED** — merged (`060e388`), enforce_admins restored. Retro: `docs/retro/2026-05-08-pr36-keycloak-eso-retrospective.md`
-- **v1.4.2 SHIPPED** — PR #71 merged (`ad8df98c`), tagged + released 2026-05-07.
+- `shopping-cart-infra` main is synced and the next branch `shopping-cart-infra-v0.5.0` was cut from the merged `main` tip (`1a80e8b`).
+- `k3d-manager` is keeping the branch-handoff / ops notes only for this turn.
+- v1.4.4, v1.4.3, and v1.4.2 remain shipped; branch protection was restored after each merge.
 
 ## Completed (v1.4.4)
 - [x] **Keycloak ExternalSecret files missing** — spec: `docs/bugs/2026-05-08-keycloak-externalsecret-files-missing.md`

@@ -2,10 +2,9 @@
 
 ## Current Status
 - Current branch: `k3d-manager-v1.4.5` (created from merge SHA `92ccaec1`).
-- **v1.4.4 SHIPPED** — PR #73 merged to main (`92ccaec1`). Tagged v1.4.4, released 2026-05-08. `enforce_admins` restored on both k3d-manager and shopping-cart-infra.
-- **v1.4.3 SHIPPED** — PR #72 merged to main (`b5601cb5`). `enforce_admins` restored on `main`. No prior CHANGE.md entry needed (small identity provisioning milestone).
-- **v1.4.2 SHIPPED** — PR #71 merged to main (`ad8df98c`), tagged `v1.4.2`, released 2026-05-07.
-- **shopping-cart-infra PR #41 MERGED** — `180f5f89` 2026-05-09 — Keycloak PostgreSQL driver fix + LDAP LDIF chown fix (Bugs 4+5). `enforce_admins` restored. Retro: `docs/retro/2026-05-09-pr41-keycloak-ldap-startup-retrospective.md` (committed `e0837c4` on `docs/next-improvements`).
+- `shopping-cart-infra` is synced on its merged `main` line, and the next feature branch `shopping-cart-infra-v0.5.0` has been cut from that tip (`1a80e8b`).
+- `k3d-manager` is carrying branch-handoff / ops notes only for this turn.
+- `v1.4.4`, `v1.4.3`, and `v1.4.2` remain shipped; branch protection was restored after each merge.
 
 ## Post-Merge Housekeeping — 2026-05-08 (v1.4.4 + PR #37)
 - **k3d-manager PR #73 + shopping-cart-infra PR #37 merged** — both enforced to main
