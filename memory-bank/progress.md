@@ -5,7 +5,7 @@
 - `shopping-cart-infra` main branch protection is restored (`enforce_admins=true`), and `shopping-cart-infra-v0.5.0` already exists on the post-release line (`c178b60`).
 - `k3d-manager` is keeping the branch-handoff / ops notes only for this turn.
 - v1.4.4, v1.4.3, and v1.4.2 remain shipped; branch protection was restored after each merge.
-- Live Keycloak realm reconciliation without rebuild is now documented as a spec only; implementation has not started yet.
+- Live Keycloak realm reconciliation without rebuild is now documented in `shopping-cart-infra`; implementation has not started yet.
 
 ## Completed (v1.4.4)
 - [x] **Keycloak ExternalSecret files missing** — spec: `docs/bugs/2026-05-08-keycloak-externalsecret-files-missing.md`
