@@ -5,6 +5,7 @@
 - `shopping-cart-infra` is synced on its merged `main` line, and the next feature branch `shopping-cart-infra-v0.5.0` has been cut from that tip (`1a80e8b`).
 - `k3d-manager` is carrying branch-handoff / ops notes only for this turn.
 - `v1.4.4`, `v1.4.3`, and `v1.4.2` remain shipped; branch protection was restored after each merge.
+- The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 
 ## Post-Merge Housekeeping — 2026-05-08 (v1.4.4 + PR #37)
 - **k3d-manager PR #73 + shopping-cart-infra PR #37 merged** — both enforced to main
@@ -87,6 +88,7 @@
 - **NEW FINDING:** Live Keycloak still re-ran the `shopping-cart` realm import on startup and hit `Key (name)=(shopping-cart) already exists`. The updated fix removes the boot-time realm import from `shopping-cart-infra` entirely and lets the live `acg-up` reconciliation step own realm sync after Keycloak becomes healthy. Issue docs: `docs/issues/2026-05-13-keycloak-realm-import-should-skip-existing-shopping-cart-realm.md` and `docs/issues/2026-05-14-keycloak-realm-sync-moved-out-of-startup.md`.
 - **COMPLETE:** shopping-cart-infra v0.4.0 release note / PR follow-up — added a short README release-notes bullet linking the realm-import idempotency bug doc, tagged the branch tip as `v0.4.0`, opened PR #53 (`https://github.com/wilddog64/shopping-cart-infra/pull/53`), and requested Copilot review via `gh api`.
 - **COMPLETE:** shopping-cart-infra v0.4.0 release material refresh — consolidated the README release-note entry into the existing `### Release Notes` section in CI/CD Integration and removed the duplicate top-level section; PR #54 (`https://github.com/wilddog64/shopping-cart-infra/pull/54`) still carries the release-note material. Release note commit: `2e97ec6` (`docs: add v0.4.0 release note`); release tag `v0.4.0` already exists on `128ab3f`.
+- **COMPLETE:** shopping-cart-infra `v0.4.0` tag correction — the tag had pointed at `128ab3f` before the Keycloak fix; it now points at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which keeps the fix in the release tag.
 - **FOLLOW-UP:** PR #53 YAML lint initially failed because `identity/keycloak/deployment.yaml` had one overlong `sed` line in the realm-import render block. I wrapped the command, pushed commit `272f5d2`, and left the PR to rerun CI.
 - **FOLLOW-UP:** Copilot then flagged the fresh-DB precheck path. The fix now guards the `realm` lookup with `to_regclass('public.realm')` before querying for `shopping-cart`, so a brand-new Keycloak database falls through to the import without a misleading `relation "realm" does not exist` error.
 - **COMPLETE:** shopping-cart-infra main branch protection admin enforcement was temporarily disabled on request so PR #53 can be merged; verified `enforce_admins=false`.
