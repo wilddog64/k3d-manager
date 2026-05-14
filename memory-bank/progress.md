@@ -2,7 +2,7 @@
 
 ## Status
 - Current branch: `k3d-manager-v1.4.5`.
-- `shopping-cart-infra` main is synced and the next branch `shopping-cart-infra-v0.5.0` was cut from the merged `main` tip (`1a80e8b`).
+- `shopping-cart-infra` main branch protection is restored (`enforce_admins=true`), and `shopping-cart-infra-v0.5.0` already exists on the post-release line (`c178b60`).
 - `k3d-manager` is keeping the branch-handoff / ops notes only for this turn.
 - v1.4.4, v1.4.3, and v1.4.2 remain shipped; branch protection was restored after each merge.
 
