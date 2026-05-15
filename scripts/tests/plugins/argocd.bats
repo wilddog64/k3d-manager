@@ -67,7 +67,106 @@ setup() {
   [ "${kubectl_calls[1]}" = "port-forward svc/argocd-server -n cicd 8080:443" ]
   read_lines "$ARGOCD_LOG" argocd_calls
   [[ "${argocd_calls[0]}" == "account get-context --server localhost:8080" ]]
-  [[ "${argocd_calls[1]}" == *"login localhost:8080 --username admin --password fake-pass --plaintext --skip-test-tls --insecure --grpc-web"* ]]
+  [[ "${argocd_calls[1]}" == *"login localhost:8080 --username admin --stdin --plaintext --skip-test-tls --insecure --grpc-web"* ]]
+}
+
+@test "_argocd_wait_for_local_port_forward returns 0 when healthz is reachable" {
+  local port_forward_log="${BATS_TEST_TMPDIR}/argocd-pf.log"
+  : > "$port_forward_log"
+  curl() { return 0; }
+  sleep() { return 0; }
+  export -f curl sleep
+  run _argocd_wait_for_local_port_forward "$port_forward_log" 1
+  [ "$status" -eq 0 ]
+}
+
+@test "_argocd_wait_for_local_port_forward returns 1 when healthz never becomes reachable" {
+  local port_forward_log="${BATS_TEST_TMPDIR}/argocd-pf.log"
+  printf 'port-forward boom\n' > "$port_forward_log"
+  curl() { return 1; }
+  sleep() { return 0; }
+  export -f curl sleep
+  run _argocd_wait_for_local_port_forward "$port_forward_log" 1
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"Argo CD did not become reachable on localhost:8080"* ]]
+  [[ "$output" == *"port-forward boom"* ]]
+}
+
+@test "_argocd_write_port_forward_wrapper includes a self-healing loop" {
+  run grep -F 'function _argocd_write_port_forward_wrapper()' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'template_path="${SCRIPT_DIR}/etc/argocd/port-forward-wrapper.sh.tmpl"' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'healthz did not become reachable — restarting' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'healthz lost — restarting' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'STARTUP_TIMEOUT=${STARTUP_TIMEOUT}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'KUBECONFIG_FILE=${KUBECONFIG_FILE}' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'if [[ -n "${KUBECONFIG_FILE}" ]]; then' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+}
+
+@test "_argocd_write_port_forward_wrapper falls back when the requested context is missing" {
+  run grep -F 'if [[ -n "${CONTEXT}" ]] && "${KUBECTL_BIN}" config get-contexts "${CONTEXT}" >/dev/null 2>&1; then' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F '_current_context="$("${KUBECTL_BIN}" config current-context 2>/dev/null || true)"' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'falling back to kubeconfig default' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F '_kubectl_context_arg=""' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F '"${KUBECTL_BIN}" ${_kubectl_context_arg} port-forward "${SERVICE}" -n "${NAMESPACE}" "${LOCAL_PORT}:${REMOTE_PORT}"' "$BATS_TEST_DIRNAME/../../etc/argocd/port-forward-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+}
+
+@test "_argocd_write_browser_https_wrapper includes a canonical HTTPS listener" {
+  run grep -F 'function _argocd_write_browser_https_wrapper()' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'function _argocd_issue_browser_tls_material()' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'template_path="${SCRIPT_DIR}/etc/argocd/browser-https-wrapper.sh.tmpl"' "$BATS_TEST_DIRNAME/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'OPENSSL-LISTEN:${LOCAL_PORT},fork,reuseaddr,bind=${LOCAL_HOST},cert=${CERT_FILE},key=${KEY_FILE},verify=0 TCP:${UPSTREAM_HOST}:${UPSTREAM_PORT}' "$BATS_TEST_DIRNAME/../../etc/argocd/browser-https-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+  run grep -F 'healthz lost — restarting' "$BATS_TEST_DIRNAME/../../etc/argocd/browser-https-wrapper.sh.tmpl"
+  [ "$status" -eq 0 ]
+}
+
+@test "_argocd_issue_browser_tls_material writes Vault-issued TLS files" {
+  local tls_dir="${BATS_TEST_TMPDIR}/browser-tls"
+  mkdir -p "$tls_dir"
+
+  _vault_upsert_pki_role() {
+    echo "role $*" >> "${BATS_TEST_TMPDIR}/vault.log"
+    return 0
+  }
+
+  _vault_login() {
+    echo "login $*" >> "${BATS_TEST_TMPDIR}/vault.log"
+    return 0
+  }
+
+  _vault_exec() {
+    cat <<'JSON'
+{"data":{"certificate":"-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----","private_key":"-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----","issuing_ca":"-----BEGIN CERTIFICATE-----\nCA==\n-----END CERTIFICATE-----"}}
+JSON
+  }
+
+  export -f _vault_login _vault_upsert_pki_role _vault_exec
+
+  run _argocd_issue_browser_tls_material "$tls_dir" "vault" "argocd" "pki" "argocd-browser-tls" "argocd.shopping-cart.local" "24h"
+  [ "$status" -eq 0 ]
+  [ -s "${tls_dir}/fullchain.crt" ]
+  [ -s "${tls_dir}/tls.crt" ]
+  [ -s "${tls_dir}/tls.key" ]
+  [ -s "${tls_dir}/ca.crt" ]
+  run grep -F 'login vault argocd' "${BATS_TEST_TMPDIR}/vault.log"
+  [ "$status" -eq 0 ]
+  run grep -F 'role vault argocd pki argocd-browser-tls 24h shopping-cart.local true' "${BATS_TEST_TMPDIR}/vault.log"
+  [ "$status" -eq 0 ]
 }
 
 @test "_argocd_deploy_appproject fails when template missing" {

@@ -91,7 +91,7 @@
 | `scripts/plugins/azure.sh` | Azure Key Vault ESO provider |
 | `scripts/lib/test.sh` | Bats runner integration |
 | `scripts/tests/` | Bats test suites (core, lib, plugins) |
-| `bin/smoke-test-jenkins.sh` | Manual Jenkins smoke test (SSL + auth, Phases 1-3 done) |
+| `bin/smoke-test-jenkins` | Manual Jenkins smoke test (SSL + auth, Phases 1-3 done) |
 | `scratch/test-logs/` | Test run artifacts (gitignored) |
 | `scripts/etc/ldap/bootstrap-ad-schema.ldif` | Pre-seeded AD-schema LDIF (alice/bob/charlie) |
 

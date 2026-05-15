@@ -242,7 +242,7 @@ function _keycloak_apply_realm_configmap() {
    bind_pw=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_LDAP_SECRET_NAME" -o jsonpath="{.data.${KEYCLOAK_LDAP_PASSWORD_KEY}}" | base64 -d)
 
    KEYCLOAK_LDAP_BIND_DN="$bind_dn" KEYCLOAK_LDAP_PASSWORD="$bind_pw" \
-      envsubst '$KEYCLOAK_REALM_NAME $KEYCLOAK_REALM_DISPLAY_NAME $KEYCLOAK_LDAP_HOST $KEYCLOAK_LDAP_PORT $KEYCLOAK_LDAP_BASE_DN $KEYCLOAK_LDAP_USERS_DN $KEYCLOAK_LDAP_BIND_DN $KEYCLOAK_LDAP_PASSWORD' \
+  envsubst '$KEYCLOAK_REALM_NAME $KEYCLOAK_REALM_DISPLAY_NAME $KEYCLOAK_LDAP_HOST $KEYCLOAK_LDAP_PORT $KEYCLOAK_LDAP_BASE_DN $KEYCLOAK_LDAP_USERS_DN $KEYCLOAK_LDAP_BIND_DN $KEYCLOAK_LDAP_PASSWORD' \
       < "$KEYCLOAK_CONFIG_DIR/realm-config.json.tmpl" > "$rendered"
 
    cat <<REALM | _kubectl apply -f - >/dev/null
@@ -255,6 +255,96 @@ data:
   realm-config.json: |
 $(sed 's/^/    /' "$rendered")
 REALM
+}
+
+function _keycloak_reconcile_realm_client() {
+   local base_url="${1:-}"
+   local admin_token="${2:-}"
+   local realm_name="${3:-}"
+   local client_id="${4:-}"
+   local realm_json_file="${5:-}"
+
+   if [[ -z "$base_url" || -z "$admin_token" || -z "$realm_name" || -z "$client_id" || -z "$realm_json_file" ]]; then
+      _err "[keycloak] usage: _keycloak_reconcile_realm_client <base_url> <admin_token> <realm_name> <client_id> <realm_json_file>"
+      return 1
+   fi
+
+   if [[ ! -r "$realm_json_file" ]]; then
+      _err "[keycloak] Realm JSON file not readable: $realm_json_file"
+      return 1
+   fi
+
+   local client_payload
+   client_payload=$(jq -c --arg clientId "$client_id" \
+      '.clients[] | select(.clientId == $clientId)' "$realm_json_file" 2>/dev/null || true)
+   if [[ -z "$client_payload" ]]; then
+      _err "[keycloak] Client '$client_id' not found in realm JSON: $realm_json_file"
+      return 1
+   fi
+
+   local client_uuid
+   client_uuid=$(_curl -sf \
+      -H "Authorization: Bearer ${admin_token}" \
+      "${base_url}/admin/realms/${realm_name}/clients?clientId=${client_id}" \
+      | jq -r '.[0].id // empty' 2>/dev/null || true)
+   if [[ -z "$client_uuid" ]]; then
+      _err "[keycloak] Client '$client_id' not found in Keycloak realm '$realm_name'"
+      return 1
+   fi
+
+   client_payload=$(printf '%s' "$client_payload" | jq --arg id "$client_uuid" '.id = $id')
+
+   _curl -sf \
+      -X PUT \
+      -H "Authorization: Bearer ${admin_token}" \
+      -H "Content-Type: application/json" \
+      --data-binary "$client_payload" \
+      "${base_url}/admin/realms/${realm_name}/clients/${client_uuid}" >/dev/null
+
+   _info "[keycloak] Reconciled client '$client_id' in realm '$realm_name'"
+}
+
+function _keycloak_remove_client_attribute() {
+   local realm_name="${1:-}"
+   local client_id="${2:-}"
+   local attribute_name="${3:-}"
+   local ns="${4:-$KEYCLOAK_NAMESPACE}"
+
+   if [[ -z "$realm_name" || -z "$client_id" || -z "$attribute_name" ]]; then
+      _err "[keycloak] usage: _keycloak_remove_client_attribute <realm_name> <client_id> <attribute_name> [namespace]"
+      return 1
+   fi
+
+   local db_secret_name db_secret
+   for db_secret_name in keycloak-secrets "$KEYCLOAK_ADMIN_SECRET_NAME"; do
+      db_secret=$(_kubectl -n "$ns" get secret "$db_secret_name" -o jsonpath="{.data.KC_DB_PASSWORD}" 2>/dev/null | base64 -d 2>/dev/null || true)
+      if [[ -n "$db_secret" ]]; then
+         break
+      fi
+   done
+   if [[ -z "${db_secret:-}" ]]; then
+      _warn "[keycloak] KC_DB_PASSWORD not available; skipping client attribute cleanup for '$client_id'"
+      return 0
+   fi
+
+   local db_pod
+   db_pod=$(_kubectl -n "$ns" get pod -l app.kubernetes.io/name=postgres-keycloak -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+   if [[ -z "$db_pod" ]]; then
+      _warn "[keycloak] postgres-keycloak pod not found; skipping client attribute cleanup for '$client_id'"
+      return 0
+   fi
+
+   local escaped_realm escaped_client escaped_attribute
+   escaped_realm=${realm_name//\'/\'\'}
+   escaped_client=${client_id//\'/\'\'}
+   escaped_attribute=${attribute_name//\'/\'\'}
+
+   _kubectl -n "$ns" exec -i "$db_pod" -- bash <<KEYCLOAK_PSQL >/dev/null
+export PGPASSWORD="$db_secret"
+psql -U keycloak -d keycloak -v ON_ERROR_STOP=1 -c "delete from client_attributes using client, realm where client_attributes.client_id = client.id and client.realm_id = realm.id and realm.name = '${escaped_realm}' and client.client_id = '${escaped_client}' and client_attributes.name = '${escaped_attribute}';"
+KEYCLOAK_PSQL
+
+   _info "[keycloak] Removed client attribute '$attribute_name' from '$client_id' in realm '$realm_name' if present"
 }
 
 function test_keycloak() {

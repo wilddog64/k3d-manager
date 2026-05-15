@@ -16,7 +16,7 @@
 - **Pre-built cluster model** — cluster is a persistent fixture on the Mac runner. CI runs test
   functions against existing infrastructure. No cluster create/destroy per CI run.
 - **Strict Secret Hygiene** — CI logs must never leak secrets. All test functions must use
-  redaction or avoid printing sensitive variables (e.g., from `get-ldap-password.sh`).
+  redaction or avoid printing sensitive variables (e.g., from `get-ldap-password`).
 
 ---
 

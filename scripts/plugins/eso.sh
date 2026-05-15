@@ -79,15 +79,19 @@ function _eso_install_chart() {
   local ns="$1"
   local helm_chart_ref="$2"
   local helm_repo_url="$3"
+  local helm_chart_version="${4:-}"
 
   if ! _eso_chart_skip_repo_ops "$helm_chart_ref" "$helm_repo_url"; then
     _helm repo add external-secrets "$helm_repo_url"
     _helm repo update >/dev/null 2>&1
   fi
 
+  local -a version_arg=()
+  [[ -n "$helm_chart_version" ]] && version_arg=(--version "$helm_chart_version")
   _helm upgrade --install -n "$ns" external-secrets "$helm_chart_ref" \
       --create-namespace \
-      --set installCRDs=true
+      --set installCRDs=true \
+      "${version_arg[@]}"
 }
 
 function _eso_wait_for_crds() {
@@ -126,6 +130,7 @@ function deploy_eso() {
   local helm_repo_url="${ESO_HELM_REPO_URL:-$helm_repo_url_default}"
   local helm_chart_ref_default="external-secrets/external-secrets"
   local helm_chart_ref="${ESO_HELM_CHART_REF:-$helm_chart_ref_default}"
+  local helm_chart_version="${ESO_HELM_CHART_VERSION:-1.0.0}"
 
   local -a missing_crds=()
   local release_exists=0
@@ -147,7 +152,7 @@ function deploy_eso() {
 
   # _kubectl --no-exit --quiet get ns "$ns" >/dev/null 2>&1 || _kubectl create ns "$ns"
 
-  _eso_install_chart "$ns" "$helm_chart_ref" "$helm_repo_url"
+  _eso_install_chart "$ns" "$helm_chart_ref" "$helm_repo_url" "$helm_chart_version"
   _eso_wait_for_crds
 
   _eso_wait_for_core_readiness "$ns"
@@ -159,6 +164,36 @@ function deploy_eso() {
       "${ESO_REMOTE_SERVICE_ACCOUNT:-external-secrets}" \
       "${ESO_REMOTE_SERVICE_ACCOUNT_NAMESPACE:-${ns}}"
   fi
+}
+
+function _eso_apply_vault_cluster_store() {
+  local store_name="${ESO_VAULT_CLUSTER_STORE:-vault-backend}"
+  local server="${VAULT_ENDPOINT:-http://vault.${VAULT_NS:-secrets}.svc:8200}"
+  local path="${LDAP_VAULT_KV_MOUNT:-secret}"
+  local role="${LDAP_ESO_ROLE:-eso-ldap-directory}"
+  local sa="${LDAP_ESO_SERVICE_ACCOUNT:-eso-ldap-sa}"
+  local sa_ns="${LDAP_NAMESPACE:-identity}"
+
+  _info "[eso] Applying ClusterSecretStore/${store_name}"
+  cat <<YAML | _kubectl apply -f -
+apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: ${store_name}
+spec:
+  provider:
+    vault:
+      server: "${server}"
+      path: "${path}"
+      version: v2
+      auth:
+        kubernetes:
+          mountPath: kubernetes
+          role: "${role}"
+          serviceAccountRef:
+            name: ${sa}
+            namespace: ${sa_ns}
+YAML
 }
 
 function _eso_configure_remote_vault() {

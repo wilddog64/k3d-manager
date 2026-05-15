@@ -74,7 +74,7 @@ argocd login localhost:$NODE_PORT --insecure --grpc-web --username admin --passw
 
 ## Impact on Testing
 
-The `bin/test-argocd-cli.sh` script cannot run successfully with `kubectl port-forward`. The script should be updated to use **Option 1** (in-cluster testing) for reliable execution.
+The `bin/test-argocd-cli` script cannot run successfully with `kubectl port-forward`. The script should be updated to use **Option 1** (in-cluster testing) for reliable execution.
 
 ## Related Investigation
 
@@ -86,7 +86,7 @@ The `bin/test-argocd-cli.sh` script cannot run successfully with `kubectl port-f
 
 ## Recommended Fix
 
-Update `bin/test-argocd-cli.sh` to deploy a test pod inside the cluster that runs the `argocd` CLI commands against the in-cluster service endpoint (`argocd-server.argocd.svc.cluster.local:80`).
+Update `bin/test-argocd-cli` to deploy a test pod inside the cluster that runs the `argocd` CLI commands against the in-cluster service endpoint (`argocd-server.argocd.svc.cluster.local:80`).
 
 ## References
 

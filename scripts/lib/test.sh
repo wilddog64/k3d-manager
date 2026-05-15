@@ -1134,7 +1134,7 @@ function test_jenkins_smoke() {
   fi
 
   # 3. Find smoke test script
-  local smoke_script="${SCRIPT_DIR}/../bin/smoke-test-jenkins.sh"
+  local smoke_script="${SCRIPT_DIR}/../bin/smoke-test-jenkins"
   if [[ ! -x "$smoke_script" ]]; then
     if [[ -r "$smoke_script" ]]; then
       chmod +x "$smoke_script"

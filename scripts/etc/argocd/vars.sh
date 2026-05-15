@@ -13,7 +13,7 @@ export ARGOCD_LDAP_ENABLED="${ARGOCD_LDAP_ENABLED:-0}"    # 0 = disabled by defa
 export ARGOCD_VAULT_ENABLED="${ARGOCD_VAULT_ENABLED:-0}"  # 0 = disabled by default, use --enable-vault to deploy
 
 # Istio ingress configuration
-export ARGOCD_VIRTUALSERVICE_HOST="${ARGOCD_VIRTUALSERVICE_HOST:-argocd.dev.local.me}"
+export ARGOCD_VIRTUALSERVICE_HOST="${ARGOCD_VIRTUALSERVICE_HOST:-argocd.shopping-cart.local}"
 export ARGOCD_VIRTUALSERVICE_GATEWAY="${ARGOCD_VIRTUALSERVICE_GATEWAY:-istio-system/default-gateway}"
 
 # LDAP/Dex configuration (for LDAP authentication)

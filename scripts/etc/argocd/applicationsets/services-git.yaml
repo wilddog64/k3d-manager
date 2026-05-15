@@ -13,6 +13,8 @@ spec:
         revision: main
         directories:
           - path: services/*
+          - path: services/shopping-cart-identity
+            exclude: true
   goTemplate: true
   goTemplateOptions:
     - missingkey=error

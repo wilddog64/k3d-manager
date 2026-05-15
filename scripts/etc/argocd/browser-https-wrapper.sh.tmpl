@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SOCAT_BIN=${SOCAT_BIN}
+CURL_BIN=${CURL_BIN}
+LOG_FILE=${LOG_FILE}
+LOCAL_HOST=${LOCAL_HOST}
+LOCAL_PORT=${LOCAL_PORT}
+UPSTREAM_HOST=${UPSTREAM_HOST}
+UPSTREAM_PORT=${UPSTREAM_PORT}
+CERT_FILE=${CERT_FILE}
+KEY_FILE=${KEY_FILE}
+HEALTHZ_URL=${HEALTHZ_URL}
+STARTUP_TIMEOUT=${STARTUP_TIMEOUT}
+
+_socat_pid=""
+
+_cleanup() {
+   case "${_socat_pid}" in
+      "")
+         :
+         ;;
+      *)
+         kill "${_socat_pid}" 2>/dev/null || true
+         wait "${_socat_pid}" 2>/dev/null || true
+         ;;
+   esac
+}
+trap _cleanup EXIT INT TERM HUP
+
+while true; do
+   printf '%s\n' "[argocd-browser] starting HTTPS listener: ${LOCAL_HOST}:${LOCAL_PORT} -> ${UPSTREAM_HOST}:${UPSTREAM_PORT}" >> "${LOG_FILE}"
+   "${SOCAT_BIN}" OPENSSL-LISTEN:${LOCAL_PORT},fork,reuseaddr,bind=${LOCAL_HOST},cert=${CERT_FILE},key=${KEY_FILE},verify=0 TCP:${UPSTREAM_HOST}:${UPSTREAM_PORT} >> "${LOG_FILE}" 2>&1 &
+   _socat_pid=$!
+
+   _ready=0
+   for (( _attempt=1; _attempt<=STARTUP_TIMEOUT; _attempt++ )); do
+      "${CURL_BIN}" -sk --max-time 1 "${HEALTHZ_URL}" >/dev/null 2>&1 && {
+         _ready=1
+         break
+      }
+      kill -0 "${_socat_pid}" 2>/dev/null || break
+      sleep 1
+   done
+
+   case "${_ready}" in
+      0)
+         if kill -0 "${_socat_pid}" 2>/dev/null; then
+            printf '%s\n' "[argocd-browser] healthz did not become reachable — restarting" >> "${LOG_FILE}"
+            kill "${_socat_pid}" 2>/dev/null || true
+         else
+            printf '%s\n' "[argocd-browser] listener exited before healthz became reachable — restarting" >> "${LOG_FILE}"
+         fi
+         wait "${_socat_pid}" 2>/dev/null || true
+         _socat_pid=""
+         sleep 2
+         continue
+         ;;
+   esac
+
+   printf '%s\n' "[argocd-browser] healthz reachable — monitoring backend availability" >> "${LOG_FILE}"
+   while kill -0 "${_socat_pid}" 2>/dev/null; do
+      "${CURL_BIN}" -sk --max-time 1 "${HEALTHZ_URL}" >/dev/null 2>&1 || {
+         printf '%s\n' "[argocd-browser] healthz lost — restarting" >> "${LOG_FILE}"
+         kill "${_socat_pid}" 2>/dev/null || true
+         break
+      }
+      sleep 5
+   done
+
+   wait "${_socat_pid}" 2>/dev/null || true
+   _socat_pid=""
+   sleep 2
+done

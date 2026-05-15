@@ -114,6 +114,75 @@ PY
   _run_command -- python3 -c "$python_cmd"
 }
 
+_acg_managed_ssh_host_ips() {
+  [[ -f "${_ACG_SSH_CONFIG}" ]] || return 0
+  awk '
+    BEGIN {
+      split("ubuntu ubuntu-tunnel ubuntu-1 ubuntu-2", wanted_aliases, " ")
+      for (i in wanted_aliases) {
+        wanted[wanted_aliases[i]] = 1
+      }
+      capture = 0
+    }
+    $1 == "Host" {
+      capture = wanted[$2] ? 1 : 0
+      next
+    }
+    capture && $1 == "HostName" {
+      print $2
+    }
+  ' "${_ACG_SSH_CONFIG}"
+}
+
+_acg_array_contains() {
+  local needle="$1"
+  shift
+  local item
+  for item in "$@"; do
+    if [[ "${item}" == "${needle}" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+_acg_sync_known_hosts() {
+  local -a previous_ips=("$@")
+  local known_hosts="${HOME}/.ssh/known_hosts"
+  local -a current_ips=()
+  local ip current_ip
+
+  if [[ ! -f "${_ACG_SSH_CONFIG}" ]]; then
+    return 0
+  fi
+
+  mapfile -t current_ips < <(_acg_managed_ssh_host_ips | sort -u)
+  mkdir -p "$(dirname "${known_hosts}")"
+  touch "${known_hosts}"
+
+  for ip in "${previous_ips[@]}"; do
+    [[ -n "${ip}" ]] || continue
+    if ! _acg_array_contains "${ip}" "${current_ips[@]}"; then
+      if ssh-keygen -F "${ip}" -f "${known_hosts}" >/dev/null 2>&1; then
+        _info "[acg] Removing stale SSH known_hosts entry for ${ip}"
+        _run_command --soft -- ssh-keygen -R "${ip}" -f "${known_hosts}" >/dev/null 2>&1 || true
+      fi
+    fi
+  done
+
+  for current_ip in "${current_ips[@]}"; do
+    [[ -n "${current_ip}" ]] || continue
+    if ! ssh-keygen -F "${current_ip}" -f "${known_hosts}" >/dev/null 2>&1; then
+      _info "[acg] Recording SSH host key for ${current_ip}"
+      if ip=$(_run_command --soft -- ssh-keyscan -T 5 -t ed25519,rsa,ecdsa "${current_ip}" 2>/dev/null); then
+        printf '%s\n' "${ip}" >> "${known_hosts}"
+      else
+        _info "[acg] WARNING: unable to scan SSH host key for ${current_ip}; leaving known_hosts unchanged"
+      fi
+    fi
+  done
+}
+
 _acg_cf_deploy() {
   local ami_id
   ami_id=$(_run_command -- aws ec2 describe-images --region "${ACG_REGION}" --owners "${_ACG_AMI_OWNER}" \
@@ -152,9 +221,12 @@ _acg_cf_deploy() {
     --stack-name "${_ACG_CF_STACK_NAME}" \
     --query "Stacks[0].Outputs[?OutputKey==\`Agent2PublicIP\`].OutputValue" --output text)
 
+  local -a _acg_known_hosts_before=()
+  mapfile -t _acg_known_hosts_before < <(_acg_managed_ssh_host_ips | sort -u)
   _acg_update_ssh_config "${server_ip}"
   _acg_upsert_ssh_host "ubuntu-1" "${agent1_ip}"
   _acg_upsert_ssh_host "ubuntu-2" "${agent2_ip}"
+  _acg_sync_known_hosts "${_acg_known_hosts_before[@]}"
 
   _info "[acg] Server:  ${server_ip}"
   _info "[acg] Agent 1: ${agent1_ip}"
@@ -401,7 +473,10 @@ HELP
   local state public_ip
   state=$(_acg_get_instance_attr "$instance_id" 'Reservations[0].Instances[0].State.Name')
   public_ip=$(_acg_get_instance_attr "$instance_id" 'Reservations[0].Instances[0].PublicIpAddress')
+  local -a _acg_known_hosts_before=()
+  mapfile -t _acg_known_hosts_before < <(_acg_managed_ssh_host_ips | sort -u)
   _acg_update_ssh_config "$public_ip"
+  _acg_sync_known_hosts "${_acg_known_hosts_before[@]}"
   _info "[acg] Instance ${instance_id} is ${state} at ${public_ip}"
   _acg_check_k3s
 }

@@ -4,7 +4,7 @@ Utility to convert CSV user data to LDIF format and import users into OpenLDAP.
 
 ## Overview
 
-The `ldap-bulk-import.sh` script automates the process of creating multiple LDAP users and groups from a CSV file. It supports both standard LDAP schema and Active Directory-compatible schema.
+The `ldap-bulk-import` script automates the process of creating multiple LDAP users and groups from a CSV file. It supports both standard LDAP schema and Active Directory-compatible schema.
 
 ## Features
 
@@ -22,13 +22,13 @@ The `ldap-bulk-import.sh` script automates the process of creating multiple LDAP
 
 ```bash
 # Generate LDIF from CSV
-./bin/ldap-bulk-import.sh users.csv
+./bin/ldap-bulk-import users.csv
 
 # Generate and import into LDAP
-./bin/ldap-bulk-import.sh --import users.csv
+./bin/ldap-bulk-import --import users.csv
 
 # Preview without importing
-./bin/ldap-bulk-import.sh --dry-run users.csv
+./bin/ldap-bulk-import --dry-run users.csv
 ```
 
 ### CSV Format
@@ -72,7 +72,7 @@ jane.smith,Jane,Smith,jane.smith@home.org,10101,10000,developers
 EOF
 
 # Generate and import
-./bin/ldap-bulk-import.sh --import users.csv
+./bin/ldap-bulk-import --import users.csv
 ```
 
 **Output:**
@@ -90,7 +90,7 @@ EOF
 
 ```bash
 # Generate AD-compatible LDIF
-./bin/ldap-bulk-import.sh \
+./bin/ldap-bulk-import \
   --schema ad \
   --base-dn "DC=corp,DC=example,DC=com" \
   --user-ou "OU=Users" \
@@ -119,7 +119,7 @@ userPassword: {SSHA}...
 
 ```bash
 # Import with custom settings
-./bin/ldap-bulk-import.sh \
+./bin/ldap-bulk-import \
   --base-dn "dc=mycompany,dc=com" \
   --user-ou "ou=employees" \
   --group-ou "ou=teams" \
@@ -135,16 +135,16 @@ An example CSV file is provided in `docs/examples/ldap-users-example.csv`:
 
 ```bash
 # Test with example file
-./bin/ldap-bulk-import.sh --dry-run docs/examples/ldap-users-example.csv
+./bin/ldap-bulk-import --dry-run docs/examples/ldap-users-example.csv
 
 # Import example users
-./bin/ldap-bulk-import.sh --import docs/examples/ldap-users-example.csv
+./bin/ldap-bulk-import --import docs/examples/ldap-users-example.csv
 ```
 
 ## Command Options
 
 ```
-Usage: ldap-bulk-import.sh [OPTIONS] <csv-file>
+Usage: ldap-bulk-import [OPTIONS] <csv-file>
 
 Options:
   -b, --base-dn DN      Base DN (default: dc=home,dc=org)
@@ -193,7 +193,7 @@ Default password is `test1234` (suitable for testing only).
 
 Change default password:
 ```bash
-./bin/ldap-bulk-import.sh --password "SecurePassword123!" users.csv
+./bin/ldap-bulk-import --password "SecurePassword123!" users.csv
 ```
 
 ### SSHA Hash Generation
@@ -352,7 +352,7 @@ See [LDAP Password Rotation](ldap-password-rotation.md) for details.
 ## See Also
 
 - [LDAP Password Rotation](ldap-password-rotation.md)
-- [Get LDAP Password Tool](../bin/get-ldap-password.sh)
+- [Get LDAP Password Tool](../bin/get-ldap-password)
 - [Example CSV File](../examples/ldap-users-example.csv)
 - [OpenLDAP Bootstrap Schema](../../scripts/etc/ldap/bootstrap-basic-schema.ldif)
 - [Active Directory Schema](../../scripts/etc/ldap/bootstrap-ad-schema.ldif)

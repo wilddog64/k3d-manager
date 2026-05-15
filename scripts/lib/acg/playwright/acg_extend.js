@@ -123,15 +123,16 @@ async function extendSandbox() {
     }
 
     const currentUrl = page.url();
-    let isPluralsight = false;
+    let isOnSandboxPage = false;
     try {
       const parsedUrl = new URL(currentUrl);
-      isPluralsight = parsedUrl.hostname === 'pluralsight.com' || parsedUrl.hostname.endsWith('.pluralsight.com');
-    } catch { isPluralsight = false; }
-    if (isPluralsight) {
-      console.error(`INFO: Already on Pluralsight page: ${currentUrl}`);
+      isOnSandboxPage = parsedUrl.pathname.includes('hands-on/playground/cloud-sandboxes') ||
+                        parsedUrl.pathname.includes('cloud-playground/cloud-sandboxes');
+    } catch { isOnSandboxPage = false; }
+    if (isOnSandboxPage) {
+      console.error(`INFO: Already on sandbox page: ${currentUrl}`);
     } else {
-      console.error(`INFO: Navigating to ${targetUrl}...`);
+      console.error(`INFO: Navigating to ${targetUrl} (currently on: ${currentUrl})...`);
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     }
 

@@ -21,12 +21,16 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck disable=SC2034
 SCRIPT_DIR="${REPO_ROOT}/scripts"
+# shellcheck disable=SC2034
+PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
 source "${REPO_ROOT}/scripts/plugins/gemini.sh"
 source "${REPO_ROOT}/scripts/plugins/acg.sh"
 source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
+source "${REPO_ROOT}/scripts/plugins/argocd.sh"
+source "${REPO_ROOT}/scripts/plugins/keycloak.sh"
 source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
 
 _cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
@@ -42,6 +46,35 @@ case "${_cluster_provider}" in
     _err "[acg-up] Unsupported CLUSTER_PROVIDER: ${_cluster_provider} (supported: k3s-aws, k3s-gcp)"
     ;;
 esac
+
+function _argocd_open_browser_url() {
+  local url="$1"
+
+  if command -v osascript >/dev/null 2>&1; then
+    if osascript >/dev/null 2>&1 <<OSA
+tell application "Safari"
+  activate
+  open location "${url}"
+end tell
+OSA
+    then
+      return 0
+    fi
+  fi
+
+  if command -v open >/dev/null 2>&1; then
+    open "${url}"
+    return $?
+  fi
+
+  return 1
+}
+
+function _acg_fail() {
+  _err "$1"
+  # shellcheck disable=SC2317
+  exit 1
+}
 
 login_prompt=0
 sandbox_url=""
@@ -159,7 +192,9 @@ _info "[acg-up] Step 4b/12 — Installing ArgoCD port-forward launchd agent (loc
 _argocd_pf_label="com.k3d-manager.argocd-port-forward"
 _argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
 _argocd_pf_log="${HOME}/.local/share/k3d-manager/argocd-pf.log"
+_argocd_pf_wrapper="${HOME}/.local/share/k3d-manager/argocd-port-forward.sh"
 mkdir -p "$(dirname "${_argocd_pf_log}")" "$(dirname "${_argocd_pf_plist}")"
+_argocd_write_port_forward_wrapper "${_argocd_pf_wrapper}" "${_argocd_pf_log}" "$(command -v kubectl)" "$(command -v curl)" "cicd" "k3d-k3d-cluster" "svc/argocd-server" "8080" "80"
 cat > "${_argocd_pf_plist}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -169,14 +204,8 @@ cat > "${_argocd_pf_plist}" <<PLIST
   <string>${_argocd_pf_label}</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/opt/homebrew/bin/kubectl</string>
-    <string>port-forward</string>
-    <string>svc/argocd-server</string>
-    <string>--namespace</string>
-    <string>cicd</string>
-    <string>--context</string>
-    <string>k3d-k3d-cluster</string>
-    <string>8080:80</string>
+    <string>/bin/bash</string>
+    <string>${_argocd_pf_wrapper}</string>
   </array>
   <key>KeepAlive</key>
   <true/>
@@ -191,11 +220,87 @@ if launchctl list "${_argocd_pf_label}" >/dev/null 2>&1; then
   launchctl unload "${_argocd_pf_plist}" 2>/dev/null || true
 fi
 launchctl load "${_argocd_pf_plist}"
-sleep 2
-if curl -sf --max-time 5 http://localhost:8080/healthz >/dev/null 2>&1; then
-  _info "[acg-up] ArgoCD reachable at http://localhost:8080 (launchd: ${_argocd_pf_label})"
+if _argocd_wait_for_local_port_forward "${_argocd_pf_log}" "${ARGOCD_PORT_FORWARD_WAIT_TIMEOUT:-30}"; then
+  _info "[acg-up] ArgoCD port-forward ready at http://localhost:8080 (terminal-only; browser login uses https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local})"
 else
-  _info "[acg-up] ArgoCD launchd agent loaded — UI may take a moment to be ready at http://localhost:8080"
+  exit 1
+fi
+
+if _is_mac; then
+  _info "[acg-up] Step 4c/12 — Installing ArgoCD browser HTTPS listener (${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}, Vault PKI, auto-restart)..."
+  _argocd_browser_label="${ARGOCD_BROWSER_LISTENER_LABEL:-com.k3d-manager.argocd-browser-https}"
+  _argocd_browser_plist="${ARGOCD_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_argocd_browser_label}.plist}"
+  _argocd_browser_log="${ARGOCD_BROWSER_LISTENER_LOG:-${HOME}/.local/share/k3d-manager/argocd-browser-https.log}"
+  _argocd_browser_launchctl_log="${ARGOCD_BROWSER_LISTENER_LAUNCHCTL_LOG:-${HOME}/.local/share/k3d-manager/argocd-browser-https-launchctl.log}"
+  _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${HOME}/.local/share/k3d-manager/argocd-browser-https.sh}"
+  _argocd_browser_tls_dir="${ARGOCD_BROWSER_TLS_DIR:-${HOME}/.local/share/k3d-manager/argocd-browser-https-tls}"
+  _argocd_browser_tls_cert="${ARGOCD_BROWSER_TLS_CERT_FILE:-${_argocd_browser_tls_dir}/fullchain.crt}"
+  _argocd_browser_tls_key="${ARGOCD_BROWSER_TLS_KEY_FILE:-${_argocd_browser_tls_dir}/tls.key}"
+  _argocd_browser_plist_tmp="${HOME}/.local/share/k3d-manager/argocd-browser-https.plist"
+  _argocd_browser_url="https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}"
+  mkdir -p "$(dirname "${_argocd_browser_log}")"
+  if _argocd_browser_https_is_ready "https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}/healthz"; then
+    _info "[acg-up] ArgoCD browser HTTPS listener already healthy at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443} — skipping launchd reinstall"
+    _argocd_browser_ready=1
+  else
+    _argocd_browser_ready=0
+    _argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}" || exit 1
+    _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}/healthz"
+    cat > "${_argocd_browser_plist_tmp}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_argocd_browser_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${_argocd_browser_wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_argocd_browser_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_argocd_browser_log}</string>
+  </dict>
+</plist>
+PLIST
+    : > "${_argocd_browser_launchctl_log}"
+    if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
+        >"${_argocd_browser_launchctl_log}" 2>&1; then
+      _info "[acg-up] Stopped existing ArgoCD browser HTTPS listener"
+    elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
+      tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+      _warn "[acg-up] existing ArgoCD browser HTTPS listener was not loaded; continuing"
+    fi
+    : > "${_argocd_browser_launchctl_log}"
+    if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" \
+        >"${_argocd_browser_launchctl_log}" 2>&1; then
+      if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
+        tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+      fi
+      _err "[acg-up] failed to install ArgoCD browser HTTPS listener plist; see ${_argocd_browser_launchctl_log}"
+    fi
+    rm -f "${_argocd_browser_plist_tmp}"
+    : > "${_argocd_browser_launchctl_log}"
+    if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_argocd_browser_plist}" \
+        >"${_argocd_browser_launchctl_log}" 2>&1; then
+      if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
+        tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+      fi
+      _err "[acg-up] failed to bootstrap ArgoCD browser HTTPS listener; see ${_argocd_browser_launchctl_log}"
+    fi
+    if _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-30}"; then
+      _info "[acg-up] ArgoCD reachable at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local} (launchd: ${_argocd_browser_label})"
+      _argocd_browser_ready=1
+    else
+      exit 1
+    fi
+  fi
 fi
 
 if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
@@ -437,6 +542,20 @@ _vault_kv_put() {
     -d "{\"data\":$1}" \
     "http://localhost:${_vault_local_port}/v1/secret/data/$2" >/dev/null
 }
+_vault_kv_exists() {
+  local path="$1"
+  curl -sf \
+    -H "X-Vault-Token: ${_vault_root_token}" \
+    "http://localhost:${_vault_local_port}/v1/secret/data/${path}" >/dev/null 2>&1
+}
+_vault_kv_get_field() {
+  local path="$1"
+  local field="$2"
+  curl -sf \
+    -H "X-Vault-Token: ${_vault_root_token}" \
+    "http://localhost:${_vault_local_port}/v1/secret/data/${path}" \
+    | jq -r --arg field "$field" '.data.data[$field] // empty'
+}
 _pg_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
 _pg_pass_products=$(openssl rand -base64 24 | tr -d '=+/')
 _pg_pass_payment=$(openssl rand -base64 24 | tr -d '=+/')
@@ -453,17 +572,40 @@ _vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}'              
 _vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}'           payment/stripe
 _vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
 _vault_kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbitmq_pass}\"}"                   rabbitmq/default
-_ldap_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
-_ldap_readonly_pass=$(openssl rand -base64 24 | tr -d '=+/')
-_vault_kv_put "{\"admin_password\":\"${_ldap_admin_pass}\",\"readonly_password\":\"${_ldap_readonly_pass}\"}" ldap/admin
-_kc_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
-_kc_db_pass=$(openssl rand -base64 24 | tr -d '=+/')
-_argocd_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-_order_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-_product_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-_grafana_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-_vault_kv_put "{\"admin_password\":\"${_kc_admin_pass}\",\"db_password\":\"${_kc_db_pass}\"}" keycloak/admin
-_vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
+
+if _vault_kv_exists "ldap/admin"; then
+  _info "[acg-up] Reusing existing Vault secret ldap/admin"
+  _ldap_admin_pass=$(_vault_kv_get_field "ldap/admin" "admin_password")
+  _ldap_readonly_pass=$(_vault_kv_get_field "ldap/admin" "readonly_password")
+else
+  _ldap_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
+  _ldap_readonly_pass=$(openssl rand -base64 24 | tr -d '=+/')
+  _vault_kv_put "{\"admin_password\":\"${_ldap_admin_pass}\",\"readonly_password\":\"${_ldap_readonly_pass}\"}" ldap/admin
+fi
+
+if _vault_kv_exists "keycloak/admin"; then
+  _info "[acg-up] Reusing existing Vault secret keycloak/admin"
+  _kc_admin_pass=$(_vault_kv_get_field "keycloak/admin" "admin_password")
+  _kc_db_pass=$(_vault_kv_get_field "keycloak/admin" "db_password")
+else
+  _kc_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
+  _kc_db_pass=$(openssl rand -base64 24 | tr -d '=+/')
+  _vault_kv_put "{\"admin_password\":\"${_kc_admin_pass}\",\"db_password\":\"${_kc_db_pass}\"}" keycloak/admin
+fi
+
+if _vault_kv_exists "keycloak/clients"; then
+  _info "[acg-up] Reusing existing Vault secret keycloak/clients"
+  _argocd_client_secret=$(_vault_kv_get_field "keycloak/clients" "argocd_client_secret")
+  _order_client_secret=$(_vault_kv_get_field "keycloak/clients" "order_service_client_secret")
+  _product_client_secret=$(_vault_kv_get_field "keycloak/clients" "product_catalog_client_secret")
+  _grafana_client_secret=$(_vault_kv_get_field "keycloak/clients" "grafana_client_secret")
+else
+  _argocd_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+  _order_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+  _product_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+  _grafana_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+  _vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
+fi
 _info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq, ldap, keycloak sandbox secrets)"
 
 _info "[acg-up] Step 10/12 — Registering app cluster with ArgoCD..."
@@ -474,6 +616,7 @@ if [[ -z "${_argocd_sa_token}" ]]; then
 fi
 kubectl create namespace cicd --context k3d-k3d-cluster \
   --dry-run=client -o yaml | kubectl apply --context k3d-k3d-cluster -f - >/dev/null
+kubectl label namespace cicd istio-injection=enabled --overwrite --context k3d-k3d-cluster >/dev/null
 _cp_server=$(kubectl config view \
   -o jsonpath='{.clusters[?(@.name=="ubuntu-k3s")].cluster.server}' 2>/dev/null || echo "")
 if [[ -z "${_cp_server}" ]]; then
@@ -487,7 +630,7 @@ _info "[acg-up] Restarting ArgoCD application controller to pick up new cluster 
 kubectl rollout restart statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster
 kubectl rollout status statefulset/argocd-application-controller \
-  -n cicd --context k3d-k3d-cluster --timeout=90s
+  -n cicd --context k3d-k3d-cluster --timeout=300s
 _info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → ${_cp_server}"
 
 _info "[acg-up] Step 10b/14 — Deploying shopping-cart data layer (PostgreSQL, Redis, RabbitMQ)..."
@@ -506,7 +649,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: shopping-cart
+  project: platform
   sources:
     - repoURL: https://github.com/wilddog64/shopping-cart-infra.git
       targetRevision: HEAD
@@ -531,24 +674,33 @@ spec:
         maxDuration: 3m
 IDEOF
 
-_info "[acg-up] Waiting for Keycloak pod to be Running (up to 5 min)..."
-_kc_ready=false
-for i in $(seq 1 30); do
-  _kc_phase=$(kubectl get pods -n identity --context k3d-k3d-cluster \
-    -l app.kubernetes.io/name=keycloak \
-    -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "")
-  if [[ "${_kc_phase}" == "Running" ]]; then
-    _kc_ready=true
-    break
+_kc_ready_timeout_seconds="${KEYCLOAK_READY_TIMEOUT_SECONDS:-900}"
+_kc_ready_poll_interval_seconds="${KEYCLOAK_READY_POLL_INTERVAL_SECONDS:-10}"
+_kc_pf_port=18080
+
+_info "[acg-up] Waiting for Keycloak deployment to be Available (up to ${_kc_ready_timeout_seconds}s)..."
+_kc_ready_started_at="${SECONDS}"
+while (( SECONDS - _kc_ready_started_at < _kc_ready_timeout_seconds )); do
+  if kubectl --context k3d-k3d-cluster -n identity get deployment/keycloak >/dev/null 2>&1; then
+    if kubectl --context k3d-k3d-cluster -n identity wait --for=condition=Available --timeout="${_kc_ready_poll_interval_seconds}s" deployment/keycloak >/dev/null 2>&1; then
+      break
+    fi
+  else
+    _info "[acg-up] Keycloak deployment/keycloak not created yet — waiting for ArgoCD sync..."
   fi
-  _info "[acg-up] Keycloak not Running yet (attempt ${i}/30, phase=${_kc_phase}) — waiting 10s..."
-  sleep 10
+  sleep "${_kc_ready_poll_interval_seconds}"
 done
-if [[ "${_kc_ready}" != "true" ]]; then
-  _info "[acg-up] WARNING: Keycloak not Running after 5 min — skipping realm import. Run manually: bin/acg-up --import-realm"
+
+if ! kubectl --context k3d-k3d-cluster -n identity get deployment/keycloak >/dev/null 2>&1 || \
+   ! kubectl --context k3d-k3d-cluster -n identity wait --for=condition=Available --timeout=1s deployment/keycloak >/dev/null 2>&1; then
+  _warn "[acg-up] Keycloak deployment did not become Available after ${_kc_ready_timeout_seconds}s"
+  kubectl --context k3d-k3d-cluster -n identity get deploy keycloak -o wide || true
+  kubectl --context k3d-k3d-cluster -n identity get pods -l app.kubernetes.io/name=keycloak -o wide || true
+  kubectl --context k3d-k3d-cluster -n cicd get app shopping-cart-identity -o wide || true
+  _acg_fail "[acg-up] Keycloak API not Ready after ${_kc_ready_timeout_seconds}s — realm import is required for SSO and cannot be skipped"
 else
   _info "[acg-up] Step 10d/14 — Importing Keycloak realm shopping-cart..."
-  _kc_pf_port=18080
+  # Re-establish port-forward for actual import
   kubectl port-forward svc/keycloak -n identity --context k3d-k3d-cluster "${_kc_pf_port}:80" \
     >>"${HOME}/.local/share/k3d-manager/keycloak-pf.log" 2>&1 &
   _kc_pf_pid=$!
@@ -561,8 +713,8 @@ else
     | grep -o '"access_token":"[^"]*"' | sed 's/"access_token":"//;s/"//') || _kc_token=""
 
   if [[ -z "${_kc_token}" ]]; then
-    _info "[acg-up] WARNING: Could not get Keycloak admin token — skipping realm import"
     kill "${_kc_pf_pid}" 2>/dev/null || true
+    _acg_fail "[acg-up] Could not get Keycloak admin token — realm import is required for SSO and cannot be skipped"
   else
     _realm_json=$(sed \
       -e "s/\${ARGOCD_CLIENT_SECRET}/${_argocd_client_secret}/g" \
@@ -570,27 +722,198 @@ else
       -e "s/\${PRODUCT_CATALOG_CLIENT_SECRET}/${_product_client_secret}/g" \
       -e "s/\${GRAFANA_CLIENT_SECRET}/${_grafana_client_secret}/g" \
       -e "s/\${LDAP_BIND_CREDENTIAL}/${_ldap_admin_pass}/g" \
-      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/config/realm-shopping-cart.json")
+      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/keycloak/realm-shopping-cart.json")
+    _realm_json_file="$(mktemp -t keycloak-realm.XXXXXX.json)"
+    printf '%s\n' "${_realm_json}" > "${_realm_json_file}"
 
-    _import_status=$(curl -sf -o /dev/null -w "%%{http_code}" \
+    _import_status=$(curl -sS -o /dev/null -w "%{http_code}" \
       -X POST \
       -H "Authorization: Bearer ${_kc_token}" \
       -H "Content-Type: application/json" \
-      -d "${_realm_json}" \
-      "http://localhost:${_kc_pf_port}/admin/realms" 2>/dev/null || echo "000")
+      --data-binary @"${_realm_json_file}" \
+      "http://localhost:${_kc_pf_port}/admin/realms" 2>/dev/null || true)
+    if [[ -z "${_import_status}" ]]; then
+      _import_status="000"
+    fi
 
     if [[ "${_import_status}" == "201" ]]; then
       _info "[acg-up] Keycloak realm 'shopping-cart' imported successfully"
     elif [[ "${_import_status}" == "409" ]]; then
-      _info "[acg-up] Keycloak realm 'shopping-cart' already exists — skipping import"
+      _info "[acg-up] Keycloak realm 'shopping-cart' already exists — reconciling client config"
     else
-      _info "[acg-up] WARNING: Realm import returned HTTP ${_import_status} — check Keycloak logs"
+      kill "${_kc_pf_pid}" 2>/dev/null || true
+      rm -f "${_realm_json_file}"
+      _acg_fail "[acg-up] Realm import returned HTTP ${_import_status} — SSO cannot be trusted without a successful realm sync"
+    fi
+
+    if _keycloak_reconcile_realm_client "http://localhost:${_kc_pf_port}" "${_kc_token}" "shopping-cart" "argocd" "${_realm_json_file}"; then
+      _info "[acg-up] Keycloak client 'argocd' reconciled from realm JSON"
+      if _keycloak_remove_client_attribute "shopping-cart" "argocd" "pkce.code.challenge.method"; then
+        _info "[acg-up] Keycloak client 'argocd' PKCE attribute removed"
+      else
+        kill "${_kc_pf_pid}" 2>/dev/null || true
+        rm -f "${_realm_json_file}"
+        _acg_fail "[acg-up] Failed to remove stale Keycloak argocd PKCE attribute"
+      fi
+    else
+      kill "${_kc_pf_pid}" 2>/dev/null || true
+      rm -f "${_realm_json_file}"
+      _acg_fail "[acg-up] Could not reconcile Keycloak client 'argocd' — SSO cannot proceed with a stale realm"
     fi
 
     kill "${_kc_pf_pid}" 2>/dev/null || true
+    rm -f "${_realm_json_file}"
   fi
 fi
 
+if _is_mac; then
+  _info "[acg-up] Step 10e/14 — Installing Keycloak browser HTTP listener (keycloak.shopping-cart.local:80, auto-restart)..."
+  _keycloak_browser_label="com.k3d-manager.keycloak-browser-http"
+  _keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"
+  _keycloak_browser_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http.log"
+  _keycloak_browser_launchctl_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log"
+  _keycloak_browser_wrapper="${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh"
+  _keycloak_browser_plist_tmp="${HOME}/.local/share/k3d-manager/keycloak-browser-http.plist"
+  _keycloak_browser_kubeconfig="${HOME}/.kube/config"
+  mkdir -p "$(dirname "${_keycloak_browser_log}")"
+  if curl -sf --max-time 1 http://127.0.0.1/health/ready >/dev/null 2>&1; then
+    _info "[acg-up] Keycloak browser HTTP listener already healthy at http://keycloak.shopping-cart.local — skipping launchd reinstall"
+  else
+    _argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl)" "$(command -v curl)" "identity" "k3d-k3d-cluster" "svc/keycloak" "80" "80" "http://127.0.0.1/health/ready" "${_keycloak_browser_kubeconfig}"
+    cat > "${_keycloak_browser_plist_tmp}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_keycloak_browser_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${_keycloak_browser_wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_keycloak_browser_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_keycloak_browser_log}</string>
+</dict>
+</plist>
+PLIST
+    : > "${_keycloak_browser_launchctl_log}"
+    if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
+        >"${_keycloak_browser_launchctl_log}" 2>&1; then
+      _info "[acg-up] Stopped existing Keycloak browser HTTP listener"
+    elif [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
+      tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
+      _warn "[acg-up] existing Keycloak browser HTTP listener was not loaded; continuing"
+    fi
+    : > "${_keycloak_browser_launchctl_log}"
+    if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" \
+        >"${_keycloak_browser_launchctl_log}" 2>&1; then
+      if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
+        tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
+      fi
+      _err "[acg-up] failed to install Keycloak browser HTTP listener plist; see ${_keycloak_browser_launchctl_log}"
+    fi
+    rm -f "${_keycloak_browser_plist_tmp}"
+    : > "${_keycloak_browser_launchctl_log}"
+    if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_keycloak_browser_plist}" \
+        >"${_keycloak_browser_launchctl_log}" 2>&1; then
+      if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
+        tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
+      fi
+      _err "[acg-up] failed to bootstrap Keycloak browser HTTP listener; see ${_keycloak_browser_launchctl_log}"
+    fi
+    _info "[acg-up] Keycloak browser HTTP listener reachable at http://keycloak.shopping-cart.local (launchd: ${_keycloak_browser_label})"
+  fi
+fi
+
+_info "[acg-up] Step 10f/14 — Wiring ArgoCD SSO (Keycloak VirtualService + argocd-cm + secret patch)..."
+
+# Apply Keycloak VirtualService so in-cluster pods reach keycloak.shopping-cart.local via Istio
+KEYCLOAK_VIRTUALSERVICE_HOST=keycloak.shopping-cart.local \
+KEYCLOAK_VIRTUALSERVICE_GATEWAY=istio-system/default-gateway \
+KEYCLOAK_NAMESPACE=identity \
+KEYCLOAK_SERVICE_PORT=80 \
+  envsubst < "${REPO_ROOT}/scripts/etc/keycloak/virtualservice.yaml.tmpl" | \
+  kubectl apply --context k3d-k3d-cluster -f -
+
+# Patch CoreDNS Corefile to rewrite keycloak.shopping-cart.local → keycloak.identity.svc.cluster.local.
+# Using 'rewrite' plugin because 'hosts' can only be used once per server block (conflicts with NodeHosts).
+_current_corefile=$(kubectl get cm coredns -n kube-system --context k3d-k3d-cluster \
+  -o jsonpath='{.data.Corefile}')
+if ! printf '%s' "${_current_corefile}" | grep -qF 'keycloak.shopping-cart.local'; then
+  _new_corefile=$(python3 - "${_current_corefile}" <<'PYEOF'
+import sys, re
+text = sys.argv[1]
+rewrite_rule = "    rewrite name keycloak.shopping-cart.local keycloak.identity.svc.cluster.local\n"
+# Remove any previous attempt (idempotent re-runs)
+text = re.sub(r'    rewrite name keycloak\.shopping-cart\.local .*\n', '', text)
+# Insert before 'kubernetes cluster.local'
+text = text.replace('    kubernetes cluster.local', rewrite_rule + '    kubernetes cluster.local')
+print(text, end='')
+PYEOF
+)
+  kubectl patch cm coredns -n kube-system --context k3d-k3d-cluster \
+    --type merge \
+    --patch "$(python3 -c "import json,sys; print(json.dumps({'data':{'Corefile':sys.argv[1]}}))" "${_new_corefile}")"
+  kubectl rollout restart deployment/coredns -n kube-system --context k3d-k3d-cluster
+  kubectl rollout status deployment/coredns -n kube-system --context k3d-k3d-cluster --timeout=60s
+  _info "[acg-up] CoreDNS Corefile patched (rewrite): keycloak.shopping-cart.local → keycloak.identity.svc.cluster.local"
+fi
+
+# Apply argocd-cm and argocd-rbac-cm from shopping-cart-infra (now using namespace: cicd)
+_infra_root="${REPO_ROOT}/../shopping-carts/shopping-cart-infra"
+kubectl apply --context k3d-k3d-cluster \
+  -f "${_infra_root}/argocd/config/argocd-cm.yaml" \
+  -f "${_infra_root}/argocd/config/argocd-rbac-cm.yaml"
+
+# Patch argocd-secret directly with the OIDC client secret generated earlier in this run.
+# The ExternalSecret (argocd-oidc-secret) will take over once ClusterSecretStore is Ready;
+# this immediate patch ensures ArgoCD SSO works on first boot before ESO syncs.
+kubectl patch secret argocd-secret -n cicd --context k3d-k3d-cluster \
+  --type merge \
+  --patch "{\"stringData\":{\"oidc.keycloak.clientSecret\":\"${_argocd_client_secret}\"}}"
+# Add /etc/hosts entries on the Mac host for local browser access
+_argocd_host_ip="127.0.0.1"
+_kc_browser_ip="127.0.0.1"
+_HOSTS_LIST=(
+  "argocd.shopping-cart.local|${_argocd_host_ip}"
+  "keycloak.shopping-cart.local|${_kc_browser_ip}"
+)
+for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
+  _h="${_host_ip_pair%%|*}"
+  _desired_ip="${_host_ip_pair#*|}"
+  if [[ -z "${_desired_ip}" ]]; then
+    _warn "[acg-up] could not determine the ingressgateway IP for ${_h} — browser login may fail"
+    continue
+  fi
+  _desired_host_entry="${_desired_ip} ${_h}"
+  _current_host_entry=$(grep -E "^[0-9.]+[[:space:]]+${_h//./\\.}$" /etc/hosts | tail -n 1 || true)
+  if [[ "${_current_host_entry}" != "${_desired_host_entry}" ]]; then
+    _info "[acg-up] Updating /etc/hosts for ${_h} → ${_desired_ip} (requires sudo)..."
+    if _run_command --prefer-sudo --soft -- \
+        sh -c "set -e
+tmp=\$(mktemp)
+grep -vE '^[0-9.]+[[:space:]]+${_h//./\\.}$' /etc/hosts > \"\$tmp\"
+printf '%s\n' '${_desired_host_entry}' >> \"\$tmp\"
+cat \"\$tmp\" > /etc/hosts
+rm -f \"\$tmp\""; then
+      _info "[acg-up] /etc/hosts: ${_h} → ${_desired_ip}"
+    else
+      _warn "could not update /etc/hosts for ${_h} — please add manually: ${_desired_host_entry}"
+    fi
+  fi
+done
+
+# Restart argocd-server to pick up the updated argocd-cm and argocd-secret
+kubectl rollout restart deployment/argocd-server -n cicd --context k3d-k3d-cluster
+kubectl rollout status deployment/argocd-server -n cicd --context k3d-k3d-cluster --timeout=120s
+_info "[acg-up] ArgoCD SSO wired: login at https://argocd.shopping-cart.local → Keycloak realm shopping-cart"
 
 _info "[acg-up] Step 11/14 — Verifying ClusterSecretStore..."
 _css_ready=false
@@ -613,5 +936,50 @@ fi
 _info "[acg-up] Step 12/14 — Installing sandbox TTL watcher (launchd)..."
 acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
 
+_info "[acg-up] Step 13/14 — Installing frontend port-forward launchd agent (localhost:3000, auto-restart)..."
+_frontend_pf_label="com.k3d-manager.frontend-port-forward"
+_frontend_pf_plist="${HOME}/Library/LaunchAgents/${_frontend_pf_label}.plist"
+_frontend_pf_log="${HOME}/.local/share/k3d-manager/frontend-pf.log"
+mkdir -p "$(dirname "${_frontend_pf_log}")" "$(dirname "${_frontend_pf_plist}")"
+cat > "${_frontend_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_frontend_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/kubectl</string>
+    <string>port-forward</string>
+    <string>svc/frontend</string>
+    <string>--namespace</string>
+    <string>shopping-cart-apps</string>
+    <string>--context</string>
+    <string>ubuntu-k3s</string>
+    <string>3000:80</string>
+  </array>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_frontend_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_frontend_pf_log}</string>
+</dict>
+</plist>
+PLIST
+if launchctl list "${_frontend_pf_label}" >/dev/null 2>&1; then
+  launchctl unload "${_frontend_pf_plist}" 2>/dev/null || true
+fi
+launchctl load "${_frontend_pf_plist}"
+sleep 2
+if curl -sf --max-time 5 http://localhost:3000 >/dev/null 2>&1; then
+  _info "[acg-up] Frontend reachable at http://localhost:3000 (launchd: ${_frontend_pf_label})"
+else
+  _info "[acg-up] Frontend launchd agent loaded — UI may take a moment to be ready at http://localhost:3000"
+fi
+
 _info "[acg-up] Cluster is up."
 kubectl get nodes --context ubuntu-k3s
+_info "[acg-up] ArgoCD browser login URL: https://argocd.shopping-cart.local"
+_info "[acg-up] Open that URL manually in your browser to continue SSO login."

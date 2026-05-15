@@ -291,11 +291,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
-| 2026-05-01 | [_copilot_review gate removal smoke test failed](docs/issues/2026-05-01-bugfix-copilot-review-k3dm-gate-smoke-test-failed.md) | lib-foundation — K3DM_ENABLE_AI gate removed; smoke test still fails with Copilot CLI exit 1 (auth/env issue, not a code regression) |
-| 2026-04-30 | [GHCR secret rotation fallback fails open](docs/issues/2026-04-30-ghcr-secret-rotation-fallback-fails-open.md) | acg-up, rotate-ghcr-pat — `gh auth token` OAuth fallback recreates invalid pull secret; fix: fail closed, Vault-first |
-| 2026-04-29 | [ACG Watcher extend button not found](docs/issues/2026-04-29-acg-watcher-extend-button-not-found.md) | lib-acg watcher — button not located during 1h TTL window; manual sequence documented |
-| 2026-04-29 | [gh auth token insufficient scope for GHCR](docs/issues/2026-04-29-gh-auth-token-insufficient-scope-for-ghcr.md) | acg-up — OAuth token lacks `read:packages`; resolved via Vault-first PAT strategy |
-| 2026-04-28 | [ClusterSecretStore vault-bridge pod-origin empty reply](docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md) | vault-bridge — pod-origin traffic returns empty reply; `ClusterSecretStore/vault-backend` stays `Ready=False` |
+| 2026-05-15 | [Copilot PR #74 review findings](docs/issues/2026-05-15-copilot-pr74-review-findings.md) | acg_extend.js URL matching, keycloak.sh PGPASSWORD exposure, ldap.sh ESO dependency guard, vault.sh revoke error propagation |
+| 2026-05-15 | [frontend main push reverted](docs/issues/2026-05-15-frontend-main-push-reverted.md) | shopping-cart-frontend — accidental push to main during SSO wiring; reverted to 2872a4cd |
+| 2026-05-14 | [shopping-cart-infra v0.4.0 tag pointed before fix](docs/issues/2026-05-14-shopping-cart-infra-v0.4.0-tag-pointed-before-fix.md) | shopping-cart-infra release tag — v0.4.0 was initially on the commit before the Keycloak realm import fix; corrected to point at the merge commit |
+| 2026-05-13 | [acg-up stale shopping-cart-infra realm JSON path](docs/issues/2026-05-13-acg-up-uses-stale-realm-json-path-after-shopping-cart-infra-layout-change.md) | acg-up — reads deleted `identity/config/realm-shopping-cart.json` instead of `shopping-cart-infra/identity/keycloak/realm-shopping-cart.json`; path fixed in acg-up |
+| 2026-05-13 | [Argo CD VirtualService host default still dev-local-me](docs/issues/2026-05-13-argocd-virtualservice-host-default-still-dev-local-me.md) | argocd vars — defaults to stale `argocd.dev.local.me` instead of `argocd.shopping-cart.local`; fixed in vars.sh |
 
 [All issues →](docs/issues/)
 

@@ -34,6 +34,14 @@ kubectl port-forward svc/keycloak -n keycloak 8443:443
 vault kv get secret/k3d-manager/keycloak
 ```
 
+For live troubleshooting, use the shared identity helpers:
+
+```bash
+bin/keycloak-logs
+bin/ldap-search --filter '(mail=admin@shopping-cart.local)' mail uid cn sn givenName
+bin/vault-exec -- vault status
+```
+
 ## LDAP Federation
 
 To connect Keycloak to the OpenLDAP instance deployed by `deploy_ldap`:

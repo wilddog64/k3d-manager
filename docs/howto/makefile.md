@@ -15,7 +15,7 @@ make up URL=https://...      # provision with explicit sandbox URL
 | Target | Command | When to use |
 |---|---|---|
 | `make up` | `bin/acg-up` | Start from scratch — credentials → Hub cluster → ESO → ArgoCD → app cluster |
-| `make down` | `bin/acg-down --confirm` | Tear down app cluster, Hub cluster, and Vault port-forward |
+| `make down` | `bin/acg-down --confirm` | Tear down app cluster, Hub cluster, and Vault port-forward; add `KEEP_LOCAL=1` to preserve the local Hub |
 | `make refresh` | `bin/acg-refresh` | Creds expired or tunnel dropped — re-extracts credentials and restarts tunnel |
 | `make status` | `bin/acg-status` | Read-only health check — Hub nodes, pods, tunnel, ArgoCD |
 
