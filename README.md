@@ -291,11 +291,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-05-15 | [Copilot PR #74 review findings](docs/issues/2026-05-15-copilot-pr74-review-findings.md) | acg_extend.js URL matching, keycloak.sh PGPASSWORD exposure, ldap.sh ESO dependency guard, vault.sh revoke error propagation |
+| 2026-05-15 | [frontend main push reverted](docs/issues/2026-05-15-frontend-main-push-reverted.md) | shopping-cart-frontend — accidental push to main during SSO wiring; reverted to 2872a4cd |
 | 2026-05-14 | [shopping-cart-infra v0.4.0 tag pointed before fix](docs/issues/2026-05-14-shopping-cart-infra-v0.4.0-tag-pointed-before-fix.md) | shopping-cart-infra release tag — v0.4.0 was initially on the commit before the Keycloak realm import fix; corrected to point at the merge commit |
 | 2026-05-13 | [acg-up stale shopping-cart-infra realm JSON path](docs/issues/2026-05-13-acg-up-uses-stale-realm-json-path-after-shopping-cart-infra-layout-change.md) | acg-up — reads deleted `identity/config/realm-shopping-cart.json` instead of `shopping-cart-infra/identity/keycloak/realm-shopping-cart.json`; path fixed in acg-up |
 | 2026-05-13 | [Argo CD VirtualService host default still dev-local-me](docs/issues/2026-05-13-argocd-virtualservice-host-default-still-dev-local-me.md) | argocd vars — defaults to stale `argocd.dev.local.me` instead of `argocd.shopping-cart.local`; fixed in vars.sh |
-| 2026-05-12 | [Keycloak readiness loop watched dead port-forward](docs/issues/2026-05-12-keycloak-readiness-loop-watched-dead-port-forward.md) | bin/acg-up — waits on stale port-forward instead of deployment availability; fixed to poll deployment status first |
-| 2026-05-12 | [Argo CD localhost browser entrypoint misleading](docs/issues/2026-05-12-argocd-localhost-browser-entrypoint-misleading.md) | bin/acg-up — advertises terminal-only `localhost:8080` as browser entrypoint; docs updated to direct users to canonical `https://argocd.shopping-cart.local` |
 
 [All issues →](docs/issues/)
 
