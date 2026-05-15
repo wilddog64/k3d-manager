@@ -2,9 +2,10 @@
 
 ## Status
 - Current branch: `k3d-manager-v1.4.5`.
+- **shopping-cart-infra PR #56 merged** — shopping-cart-infra-v0.5.1 → main (SHA: `79c42b7`); python3 → kcadm.sh bugfix + retrospective on v0.5.2
 - **shopping-cart-infra PR #55 merged** — bug/keycloak-ldap-mappers-missing → main; v0.5.1 next branch created with retrospective
 - **rigor-cli PR #10 merged** — rigor-cli-v0.1.6 → main; v0.1.6 tagged and released; v0.1.7 next branch created with retrospective
-- Branch protection (`enforce_admins=true`) restored on both repos after merge
+- Branch protection (`enforce_admins=true`) restored on all repos after merge
 - v1.4.4, v1.4.3, and v1.4.2 remain shipped; branch protection was restored after each merge.
 
 ## Completed (v1.4.4)

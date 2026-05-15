@@ -2,12 +2,20 @@
 
 ## Current Status
 - Current branch: `k3d-manager-v1.4.5` (created from merge SHA `92ccaec1`).
-- `shopping-cart-infra` main branch protection is restored (`enforce_admins=true`), and `shopping-cart-infra-v0.5.0` was cleanly re-created from the current `main` tip (`4a6c14f`).
-- `shopping-cart-infra` v0.4.0 GitHub release was published on the existing verified tag `v0.4.0` after the live Keycloak reconcile hook landed.
+- **shopping-cart-infra PR #56 merged** — `shopping-cart-infra-v0.5.1` → `main`, merge SHA `79c42b71`. Keycloak reconcile hook python3 → kcadm.sh fix. enforce_admins restored. v0.5.2 branch created with retrospective.
+- `shopping-cart-infra` main branch protection is restored (`enforce_admins=true`).
 - `k3d-manager` is carrying branch-handoff / ops notes only for this turn.
 - `v1.4.4`, `v1.4.3`, and `v1.4.2` remain shipped; branch protection was restored after each merge.
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
+
+## Post-Merge Housekeeping — 2026-05-15 (shopping-cart-infra #56)
+- **shopping-cart-infra PR #56 merged** — shopping-cart-infra-v0.5.1 → main, SHA `79c42b71db07f0889f90e744d571d2a9998a4934`
+- **Keycloak reconcile hook fix shipped** — replaced python3 JSON parsing with kcadm.sh -q server-side filters; hook now compatible with ubi9-minimal
+- **enforce_admins restored** — `true` ✓ (shopping-cart-infra)
+- **v0.5.2 branch created** — `shopping-cart-infra-v0.5.2` from merge SHA; retrospective added + committed + pushed
+- **Retrospective doc** — `docs/retro/2026-05-15-v0.5.1-retrospective.md` (on shopping-cart-infra-v0.5.2)
+- **Summary** — v0.5.1 fixed SSO login failures caused by the reconcile hook's python3 dependency, which is absent in the ubi9-minimal container. Follow-up commit corrected a `|| echo 0` pattern that would have produced invalid integer output for the mapper-exists check.
 
 ## Post-Merge Housekeeping — 2026-05-15 (shopping-cart-infra #55 + rigor-cli #10)
 - **shopping-cart-infra PR #55 merged** — bug/keycloak-ldap-mappers-missing → main, SHA `ff9e4d5a`
