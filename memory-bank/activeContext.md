@@ -2,12 +2,22 @@
 
 ## Current Status
 - Current branch: `k3d-manager-v1.4.5` (created from merge SHA `92ccaec1`).
+- **shopping-cart-infra PR #57 merged** — `shopping-cart-infra-v0.5.2` → `main`, merge SHA `adbaec8`. Networking + mTLS fixes for SSO. enforce_admins restored. v0.5.3 branch created with retrospective and spec commits deleted.
 - **shopping-cart-infra PR #56 merged** — `shopping-cart-infra-v0.5.1` → `main`, merge SHA `79c42b71`. Keycloak reconcile hook python3 → kcadm.sh fix. enforce_admins restored. v0.5.2 branch created with retrospective.
 - `shopping-cart-infra` main branch protection is restored (`enforce_admins=true`).
 - `k3d-manager` is carrying branch-handoff / ops notes only for this turn.
 - `v1.4.4`, `v1.4.3`, and `v1.4.2` remain shipped; branch protection was restored after each merge.
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
+
+## Post-Merge Housekeeping — 2026-05-15 (shopping-cart-infra #57)
+- **shopping-cart-infra PR #57 merged** — shopping-cart-infra-v0.5.2 → main, SHA `adbaec8de6725817ba55b8a36c1653a5fa1bb3ae`
+- **Networking + mTLS fixes shipped** — `project: shopping-cart` AppProject now applied, Keycloak DestinationRule with `tls.mode: DISABLE` for ArgoCD OIDC token exchange
+- **enforce_admins restored** — `true` ✓ (shopping-cart-infra)
+- **v0.5.3 branch created** — `shopping-cart-infra-v0.5.3` from merge SHA; retrospective added + committed + pushed
+- **Retrospective doc** — `docs/retro/2026-05-15-v0.5.2-retrospective.md` (on shopping-cart-infra-v0.5.3, commit `907bf06`)
+- **Branch cleanup** — deleted v0.4.0, v0.5.0, v0.5.2; retained v0.5.3 as current feature branch
+- **Summary** — v0.5.2 fixed the remaining SSO blockers: the `shopping-cart` AppProject was never applied to the cluster (blocking the networking ArgoCD app), and Istio mTLS was blocking ArgoCD's in-cluster OIDC token exchange to Keycloak. Copilot caught a backwards fix in the initial commit.
 
 ## Post-Merge Housekeeping — 2026-05-15 (shopping-cart-infra #56)
 - **shopping-cart-infra PR #56 merged** — shopping-cart-infra-v0.5.1 → main, SHA `79c42b71db07f0889f90e744d571d2a9998a4934`
@@ -47,6 +57,7 @@
 - **lib-foundation upstream doc fix** — `scripts/lib/foundation/docs/api/functions.md` usage snippet still has k3d-manager-specific `K3DM_ENABLE_AI=1` context; needs upstream lib-foundation PR
 
 ## Current Focus (v1.4.5)
+- **COMPLETE:** `fix(networking)` — shopping-cart-infra branch `shopping-cart-infra-v0.5.2` updated per spec `docs/bugs/2026-05-15-networking-app-project-and-mtls.md`; changed `argocd/applications/networking.yaml` to `project: platform`, added `networking/istio/keycloak-destinationrule.yaml`, committed as `6c70fee99baa2c2f29330113e4f1c96b2b94cf75`, and pushed to `origin/shopping-cart-infra-v0.5.2`.
 - **COMPLETE:** `fix(acg-up)` — spec `docs/bugs/v1.4.5-bugfix-etc-hosts-soft.md`. Added `--soft` to line 639 (SHA: `3c096f6`).
 - **COMPLETE:** `fix(acg-up-bugs)` — spec `docs/plans/v1.4.5-bugfix-gemini.md`. Fixed CoreDNS NodeHosts patch and /etc/hosts sudo fallback (SHA: `3c096f6`).
 - **COMPLETE:** `fix(argocd-sso)` — spec at `docs/plans/v1.4.5-argocd-sso-keycloak.md`; implemented 5-change ArgoCD SSO wiring.

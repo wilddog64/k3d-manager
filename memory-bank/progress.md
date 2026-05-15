@@ -2,11 +2,19 @@
 
 ## Status
 - Current branch: `k3d-manager-v1.4.5`.
+- **shopping-cart-infra PR #57 merged** — shopping-cart-infra-v0.5.2 → main (SHA: `adbaec8`); networking + mTLS fixes; v0.5.3 branch created with retrospective
 - **shopping-cart-infra PR #56 merged** — shopping-cart-infra-v0.5.1 → main (SHA: `79c42b7`); python3 → kcadm.sh bugfix + retrospective on v0.5.2
 - **shopping-cart-infra PR #55 merged** — bug/keycloak-ldap-mappers-missing → main; v0.5.1 next branch created with retrospective
 - **rigor-cli PR #10 merged** — rigor-cli-v0.1.6 → main; v0.1.6 tagged and released; v0.1.7 next branch created with retrospective
 - Branch protection (`enforce_admins=true`) restored on all repos after merge
 - v1.4.4, v1.4.3, and v1.4.2 remain shipped; branch protection was restored after each merge.
+
+## Completed (v1.4.5 partial — shopping-cart-infra #57)
+- [x] **shopping-cart-infra PR #57 merged** — networking + mTLS fixes (appproject + keycloak-destinationrule); SHA `adbaec8`
+- [x] enforce_admins restored on shopping-cart-infra
+- [x] v0.5.3 branch created from merge SHA
+- [x] Retrospective: `docs/retro/2026-05-15-v0.5.2-retrospective.md` (on shopping-cart-infra-v0.5.3)
+- [x] Branch cleanup — deleted v0.4.0, v0.5.0, v0.5.2; retained v0.5.3
 
 ## Completed (v1.4.4)
 - [x] **Keycloak ExternalSecret files missing** — spec: `docs/bugs/2026-05-08-keycloak-externalsecret-files-missing.md`
@@ -38,6 +46,7 @@
 - [x] Retrospective: `docs/retro/2026-05-07-v1.4.2-retrospective.md`
 
 ## Next Steps (v1.4.5)
+- [x] **networking ArgoCD project + Keycloak mTLS fix** — COMPLETE (`6c70fee99baa2c2f29330113e4f1c96b2b94cf75`). `argocd/applications/networking.yaml` now uses `project: platform`; added `networking/istio/keycloak-destinationrule.yaml` with `tls.mode: DISABLE`. Spec: `docs/bugs/2026-05-15-networking-app-project-and-mtls.md`.
 - [x] **ArgoCD SSO via Keycloak** — COMPLETE. shopping-cart-infra PR #38 (`d314c34`, feat: ArgoCD SSO) + PR #39 (`afaf109`, fix: ldap duplicate) merged to main. enforce_admins restored. spec: `docs/plans/v1.4.5-argocd-sso-keycloak.md`; retro: `docs/retro/2026-05-09-pr38-pr39-argocd-sso-kustomize-fix.md` (on `docs/next-improvements`)
 - [x] **pyjenkinsapi rigor-cli v0.1.6 subtree pull** — COMPLETE (subtree: `7d8a894b`, ci-fix: `0c479c99`); branch `docs/next-improvements`; BATS re-enabled
 - [x] **acg-up /etc/hosts --soft** — COMPLETE (`3c096f6`). `_run_command --prefer-sudo` missing `--soft` causes `exit 1` instead of warning when EPERM. spec: `docs/bugs/v1.4.5-bugfix-etc-hosts-soft.md`.
