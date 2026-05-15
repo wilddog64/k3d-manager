@@ -14,11 +14,7 @@
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
 ## In Progress (v1.4.6)
-- **OPEN: Codex — /etc/hosts sudo + HTTPS listener timeout** — spec: `docs/bugs/2026-05-15-acg-up-etc-hosts-sudo-and-listener-timeout.md`; branch: `k3d-manager-v1.4.6`
-  - Bug 1: `--prefer-sudo` (non-interactive) silently fails when sudo session expired → /etc/hosts not updated → hostname resolves to wrong IP → healthz fails
-  - Bug 2: `ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-30` too short; socat→8080 takes up to 3 min after port-forward reload
-  - Fix: `--interactive-sudo` at line 248; default timeout 30→120 at line 330
-  - Commit: `fix(acg-up): use interactive-sudo for /etc/hosts and increase HTTPS listener timeout to 120s`
+- **COMPLETE:** Codex — /etc/hosts sudo + HTTPS listener timeout — spec: `docs/bugs/2026-05-15-acg-up-etc-hosts-sudo-and-listener-timeout.md`; branch: `k3d-manager-v1.4.6`; `bin/acg-up` now uses `--interactive-sudo` for the `/etc/hosts` update and `ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-120` for the HTTPS listener; committed as `0ea4cc9f89649a3a5ca7d8a2da4df4f6b39fb4b9` and pushed to `origin/k3d-manager-v1.4.6`.
 
 ## Post-Merge Housekeeping — 2026-05-15 (shopping-cart-frontend #15)
 - **shopping-cart-frontend PR #15 merged** — shopping-cart-frontend-v0.5.1 → main, SHA `19e47118a2156589fadcfc8998b37f29bda18f75`
