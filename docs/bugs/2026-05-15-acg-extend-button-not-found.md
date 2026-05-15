@@ -63,7 +63,43 @@ Add a screenshot step after the TTL check so we can see the listing page state:
 
 The "Auto Shutdown at HH:MMpm" text may now be the trigger for the extend modal. Try it BEFORE clicking "Open Sandbox".
 
-**Replace the `if (!isPanelOpen)` block (lines ~244–274) with:**
+**Replace this exact block (lines ~244–274):**
+
+```javascript
+    if (!isPanelOpen) {
+      // Click "Open Sandbox" on the card with the "Auto Shutdown" banner (the running sandbox),
+      // not .first() which always picks the first card (AWS) regardless of provider.
+      const _allOpenBtns = page.locator('button:has-text("Open Sandbox")');
+      const _btnCount = await _allOpenBtns.count();
+      let _openBtn = null;
+      for (let _i = 0; _i < _btnCount; _i++) {
+        const _hasShutdown = await _allOpenBtns.nth(_i).evaluate(el => {
+          let node = el.parentElement;
+          for (let _j = 0; _j < 6; _j++) {
+            if (!node) break;
+            if (/auto\s*shutdown/i.test(node.innerText || '')) return true;
+            node = node.parentElement;
+          }
+          return false;
+        }).catch(() => false);
+        if (_hasShutdown) { _openBtn = _allOpenBtns.nth(_i); break; }
+      }
+      if (!_openBtn) {
+        _openBtn = page.locator('button:has-text("Open Sandbox"), button:has-text("Start Sandbox"), button:has-text("Resume")').first();
+      }
+      if (await _openBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+        console.error('INFO: Clicking Open Sandbox to reveal extend panel...');
+        await _openBtn.click({ force: true });
+        const _openPanelBtn = await _waitForVisibleExtendButton(page, extendSelectors, 15000, 'after Open Sandbox');
+        if (_openPanelBtn) {
+          await _openPanelBtn.click({ force: true });
+          clicked = true;
+        }
+      }
+    }
+```
+
+**With this new block:**
 
 ```javascript
     if (!isPanelOpen) {
@@ -154,7 +190,7 @@ Add selectors for the redesigned Pluralsight UI that may use different attribute
 - [ ] The debug screenshots reveal where the extend button actually is in the current Pluralsight UI
 - [ ] Commit message: `fix(acg): add Auto Shutdown click, debug screenshots, and broader extend selectors`
 - [ ] Push: `git push origin k3d-manager-v1.4.6`
-- [ ] Update `memory-bank/activeContext.md` and `memory-bank/progress.md` with commit SHA
+- [ ] Update `memory-bank/activeContext.md` and `memory-bank/progress.md` with commit SHA and task status
 
 ## What NOT to do
 
