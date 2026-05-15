@@ -9,6 +9,15 @@
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
+## Post-Merge Housekeeping — 2026-05-15 (shopping-cart-infra #55 + rigor-cli #10)
+- **shopping-cart-infra PR #55 merged** — bug/keycloak-ldap-mappers-missing → main, SHA `ff9e4d5a`
+- **rigor-cli PR #10 merged** — rigor-cli-v0.1.6 → main, SHA `2d6d4b68`, tagged `v0.1.6`
+- **enforce_admins restored on both repos** — `true` ✓ (shopping-cart-infra + rigor-cli)
+- **rigor-cli v0.1.6 tag + GitHub release created** — merge SHA `2d6d4b68` tagged, released 2026-05-15
+- **Retrospectives created** — shopping-cart-infra `docs/retro/2026-05-15-v0.5.0-retrospective.md`, rigor-cli `docs/retro/2026-05-15-v0.1.6-retrospective.md` (on next branches)
+- **Next branches created** — shopping-cart-infra-v0.5.1, rigor-cli-v0.1.7; retrospectives committed and pushed
+- **bug/keycloak-ldap-mappers-missing deleted** — merged branch cleaned up from shopping-cart-infra
+
 ## Post-Merge Housekeeping — 2026-05-08 (v1.4.4 + PR #37)
 - **k3d-manager PR #73 + shopping-cart-infra PR #37 merged** — both enforced to main
 - **k3d-manager enforce_admins restored** — `true` ✓

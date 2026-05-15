@@ -2,10 +2,10 @@
 
 ## Status
 - Current branch: `k3d-manager-v1.4.5`.
-- `shopping-cart-infra` main branch protection is restored (`enforce_admins=true`), `shopping-cart-infra-v0.5.0` was cleanly re-created from the current `main` tip (`4a6c14f`), and the `v0.4.0` GitHub release was published on the verified tag.
-- `k3d-manager` is keeping the branch-handoff / ops notes only for this turn.
+- **shopping-cart-infra PR #55 merged** — bug/keycloak-ldap-mappers-missing → main; v0.5.1 next branch created with retrospective
+- **rigor-cli PR #10 merged** — rigor-cli-v0.1.6 → main; v0.1.6 tagged and released; v0.1.7 next branch created with retrospective
+- Branch protection (`enforce_admins=true`) restored on both repos after merge
 - v1.4.4, v1.4.3, and v1.4.2 remain shipped; branch protection was restored after each merge.
-- Live Keycloak realm reconciliation without rebuild is now documented in `shopping-cart-infra`; implementation has not started yet.
 
 ## Completed (v1.4.4)
 - [x] **Keycloak ExternalSecret files missing** — spec: `docs/bugs/2026-05-08-keycloak-externalsecret-files-missing.md`
