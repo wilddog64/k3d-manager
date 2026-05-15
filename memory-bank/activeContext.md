@@ -13,6 +13,13 @@
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
+## In Progress (v1.4.6)
+- **OPEN: Codex — /etc/hosts sudo + HTTPS listener timeout** — spec: `docs/bugs/2026-05-15-acg-up-etc-hosts-sudo-and-listener-timeout.md`; branch: `k3d-manager-v1.4.6`
+  - Bug 1: `--prefer-sudo` (non-interactive) silently fails when sudo session expired → /etc/hosts not updated → hostname resolves to wrong IP → healthz fails
+  - Bug 2: `ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-30` too short; socat→8080 takes up to 3 min after port-forward reload
+  - Fix: `--interactive-sudo` at line 248; default timeout 30→120 at line 330
+  - Commit: `fix(acg-up): use interactive-sudo for /etc/hosts and increase HTTPS listener timeout to 120s`
+
 ## Post-Merge Housekeeping — 2026-05-15 (shopping-cart-frontend #15)
 - **shopping-cart-frontend PR #15 merged** — shopping-cart-frontend-v0.5.1 → main, SHA `19e47118a2156589fadcfc8998b37f29bda18f75`
 - **Keycloak SSO wiring shipped** — `.github/workflows/ci.yml` now passes `VITE_KEYCLOAK_URL` build arg; `nginx.conf` updated with canonical `keycloak.shopping-cart.local` CSP allowlist; deployment stabilized with `nginx-cache` emptyDir

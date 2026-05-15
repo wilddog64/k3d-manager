@@ -3,7 +3,8 @@
 ## Status
 - Current branch: `k3d-manager-v1.4.6` (created from k3d-manager PR #74 merge SHA `8f93df25`)
 - **k3d-manager PR #74 merged** — k3d-manager-v1.4.5 → main (SHA: `8f93df25`); ACG extend navigation fix + frontend SSO wiring; v1.4.6 branch created with retrospective
-- **k3d-manager v1.4.6 follow-up completed** — `scripts/lib/acg/playwright/acg_extend.js` commit `34c41ced492f37525f170feed6664156b5647634`; `bin/acg-up` final commit `9c0c6e63f128be4db3d166007ff4909c623e9faa` (healthz URL corrected to `127.0.0.1`); both pushed to `origin/k3d-manager-v1.4.6`
+- **k3d-manager v1.4.6 follow-up (partial)** — `scripts/lib/acg/playwright/acg_extend.js` commit `34c41ced`; `bin/acg-up` /etc/hosts move + healthz URL commit `9c0c6e63`; both pushed to `origin/k3d-manager-v1.4.6`
+- **OPEN: Codex — /etc/hosts sudo + HTTPS listener timeout** — spec: `docs/bugs/2026-05-15-acg-up-etc-hosts-sudo-and-listener-timeout.md`; `bin/acg-up` lines 248 + 330; commit: `fix(acg-up): use interactive-sudo for /etc/hosts and increase HTTPS listener timeout to 120s`
 - **shopping-cart-frontend PR #15 merged** — shopping-cart-frontend-v0.5.1 → main (SHA: `19e47118`); Keycloak SSO wiring (CI build-args + nginx CSP); v0.5.1 branch created with retrospective
 - **shopping-cart-infra PR #57 merged** — shopping-cart-infra-v0.5.2 → main (SHA: `adbaec8`); networking + mTLS fixes; v0.5.3 branch created with retrospective
 - **shopping-cart-infra PR #56 merged** — shopping-cart-infra-v0.5.1 → main (SHA: `79c42b7`); python3 → kcadm.sh bugfix + retrospective on v0.5.2
