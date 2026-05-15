@@ -26,6 +26,11 @@ if ! declare -f _eso_apply_vault_cluster_store >/dev/null 2>&1; then
    if [[ -r "$ESO_PLUGIN" ]]; then
       # shellcheck disable=SC1090
       source "$ESO_PLUGIN"
+   else
+      _err "[ldap] required plugin eso.sh not found or not readable at $ESO_PLUGIN"
+   fi
+   if ! declare -f _eso_apply_vault_cluster_store >/dev/null 2>&1; then
+      _err "[ldap] _eso_apply_vault_cluster_store not defined after sourcing eso.sh"
    fi
 fi
 

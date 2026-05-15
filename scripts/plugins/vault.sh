@@ -1799,6 +1799,7 @@ function _vault_post_revoke_request() {
 
    if ! _vault_exec "$ns" "VAULT_HTTP_DEBUG=\${VAULT_HTTP_DEBUG:-1} vault write ${path} serial_number=${serial}" "$release"; then
       _warn "[vault] failed to revoke certificate with serial_number $serial at ${path}"
+      return 1
    fi
 
    return 0

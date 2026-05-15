@@ -123,8 +123,12 @@ async function extendSandbox() {
     }
 
     const currentUrl = page.url();
-    const isOnSandboxPage = currentUrl.includes('hands-on/playground/cloud-sandboxes') ||
-                            currentUrl.includes('cloud-playground/cloud-sandboxes');
+    let isOnSandboxPage = false;
+    try {
+      const parsedUrl = new URL(currentUrl);
+      isOnSandboxPage = parsedUrl.pathname.includes('hands-on/playground/cloud-sandboxes') ||
+                        parsedUrl.pathname.includes('cloud-playground/cloud-sandboxes');
+    } catch { isOnSandboxPage = false; }
     if (isOnSandboxPage) {
       console.error(`INFO: Already on sandbox page: ${currentUrl}`);
     } else {

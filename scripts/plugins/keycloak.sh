@@ -339,8 +339,10 @@ function _keycloak_remove_client_attribute() {
    escaped_client=${client_id//\'/\'\'}
    escaped_attribute=${attribute_name//\'/\'\'}
 
-   _kubectl -n "$ns" exec "$db_pod" -- env PGPASSWORD="$db_secret" psql -U keycloak -d keycloak -v ON_ERROR_STOP=1 -c \
-      "delete from client_attributes using client, realm where client_attributes.client_id = client.id and client.realm_id = realm.id and realm.name = '${escaped_realm}' and client.client_id = '${escaped_client}' and client_attributes.name = '${escaped_attribute}';" >/dev/null
+   _kubectl -n "$ns" exec -i "$db_pod" -- bash <<KEYCLOAK_PSQL >/dev/null
+export PGPASSWORD="$db_secret"
+psql -U keycloak -d keycloak -v ON_ERROR_STOP=1 -c "delete from client_attributes using client, realm where client_attributes.client_id = client.id and client.realm_id = realm.id and realm.name = '${escaped_realm}' and client.client_id = '${escaped_client}' and client_attributes.name = '${escaped_attribute}';"
+KEYCLOAK_PSQL
 
    _info "[keycloak] Removed client attribute '$attribute_name' from '$client_id' in realm '$realm_name' if present"
 }
