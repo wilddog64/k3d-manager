@@ -1,11 +1,13 @@
 # Active Context — k3d-manager
 
 ## Current Status
-- Current branch: `k3d-manager-v1.4.5` (created from merge SHA `92ccaec1`).
+- Current branch: `k3d-manager-v1.4.6` (created from k3d-manager PR #74 merge SHA `8f93df25`).
+- **k3d-manager PR #74 merged** — `k3d-manager-v1.4.5` → `main`, merge SHA `8f93df25`. ACG extend navigation fix + frontend SSO wiring. enforce_admins restored. v1.4.6 branch created with retrospective.
 - **shopping-cart-infra PR #57 merged** — `shopping-cart-infra-v0.5.2` → `main`, merge SHA `adbaec8`. Networking + mTLS fixes for SSO. enforce_admins restored. v0.5.3 branch created with retrospective and spec commits deleted.
 - **shopping-cart-infra PR #56 merged** — `shopping-cart-infra-v0.5.1` → `main`, merge SHA `79c42b71`. Keycloak reconcile hook python3 → kcadm.sh fix. enforce_admins restored. v0.5.2 branch created with retrospective.
+- `k3d-manager` main branch protection is restored (`enforce_admins=true`).
 - `shopping-cart-infra` main branch protection is restored (`enforce_admins=true`).
-- `k3d-manager` is carrying branch-handoff / ops notes only for this turn.
+- `shopping-cart-infra PR #58` and `shopping-cart-frontend PR #15` remain OPEN (NOT merged).
 - `v1.4.4`, `v1.4.3`, and `v1.4.2` remain shipped; branch protection was restored after each merge.
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
