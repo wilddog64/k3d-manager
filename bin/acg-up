@@ -245,7 +245,7 @@ for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
   _current_host_entry=$(grep -E "^[0-9.]+[[:space:]]+${_h//./\\.}$" /etc/hosts | tail -n 1 || true)
   if [[ "${_current_host_entry}" != "${_desired_host_entry}" ]]; then
     _info "[acg-up] Updating /etc/hosts for ${_h} → ${_desired_ip} (requires sudo)..."
-    if _run_command --prefer-sudo --soft -- \
+    if _run_command --interactive-sudo --soft -- \
         sh -c "set -e
 tmp=\$(mktemp)
 grep -vE '^[0-9.]+[[:space:]]+${_h//./\\.}$' /etc/hosts > \"\$tmp\"
@@ -327,7 +327,7 @@ PLIST
       fi
       _err "[acg-up] failed to bootstrap ArgoCD browser HTTPS listener; see ${_argocd_browser_launchctl_log}"
     fi
-    if _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-30}"; then
+    if _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-120}"; then
       _info "[acg-up] ArgoCD reachable at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local} (launchd: ${_argocd_browser_label})"
       _argocd_browser_ready=1
     else
