@@ -3,12 +3,19 @@
 ## Status
 - Current branch: `k3d-manager-v1.4.6` (created from k3d-manager PR #74 merge SHA `8f93df25`)
 - **k3d-manager PR #74 merged** — k3d-manager-v1.4.5 → main (SHA: `8f93df25`); ACG extend navigation fix + frontend SSO wiring; v1.4.6 branch created with retrospective
+- **shopping-cart-frontend PR #15 merged** — shopping-cart-frontend-v0.5.1 → main (SHA: `19e47118`); Keycloak SSO wiring (CI build-args + nginx CSP); v0.5.1 branch created with retrospective
 - **shopping-cart-infra PR #57 merged** — shopping-cart-infra-v0.5.2 → main (SHA: `adbaec8`); networking + mTLS fixes; v0.5.3 branch created with retrospective
 - **shopping-cart-infra PR #56 merged** — shopping-cart-infra-v0.5.1 → main (SHA: `79c42b7`); python3 → kcadm.sh bugfix + retrospective on v0.5.2
 - **shopping-cart-infra PR #55 merged** — bug/keycloak-ldap-mappers-missing → main; v0.5.1 next branch created with retrospective
 - **rigor-cli PR #10 merged** — rigor-cli-v0.1.6 → main; v0.1.6 tagged and released; v0.1.7 next branch created with retrospective
 - Branch protection (`enforce_admins=true`) restored on all repos after merge
 - v1.4.4, v1.4.3, and v1.4.2 remain shipped; branch protection was restored after each merge.
+
+## Completed (v1.4.5 partial — shopping-cart-frontend #15)
+- [x] **shopping-cart-frontend PR #15 merged** — Keycloak SSO wiring (CI build-args + nginx CSP); SHA `19e47118`
+- [x] enforce_admins restored on shopping-cart-frontend
+- [x] v0.5.1 branch created from merge SHA
+- [x] Retrospective: `docs/retro/2026-05-15-v0.5.1-retrospective.md` (on shopping-cart-frontend-v0.5.1, commit `60e660f`)
 
 ## Completed (v1.4.5 — k3d-manager PR #74)
 - [x] **k3d-manager PR #74 merged** — merge SHA `8f93df25`; branch `k3d-manager-v1.4.5`; next branch `k3d-manager-v1.4.6` cut

@@ -7,10 +7,19 @@
 - **shopping-cart-infra PR #56 merged** — `shopping-cart-infra-v0.5.1` → `main`, merge SHA `79c42b71`. Keycloak reconcile hook python3 → kcadm.sh fix. enforce_admins restored. v0.5.2 branch created with retrospective.
 - `k3d-manager` main branch protection is restored (`enforce_admins=true`).
 - `shopping-cart-infra` main branch protection is restored (`enforce_admins=true`).
-- `shopping-cart-infra PR #58` and `shopping-cart-frontend PR #15` remain OPEN (NOT merged).
+- **shopping-cart-frontend PR #15 merged** — `shopping-cart-frontend-v0.5.1` → `main`, merge SHA `19e47118`. Keycloak SSO wiring (CI build-args + nginx CSP). enforce_admins restored. v0.5.1 branch created with retrospective.
+- `shopping-cart-infra PR #58` remains OPEN (NOT merged).
 - `v1.4.4`, `v1.4.3`, and `v1.4.2` remain shipped; branch protection was restored after each merge.
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
+
+## Post-Merge Housekeeping — 2026-05-15 (shopping-cart-frontend #15)
+- **shopping-cart-frontend PR #15 merged** — shopping-cart-frontend-v0.5.1 → main, SHA `19e47118a2156589fadcfc8998b37f29bda18f75`
+- **Keycloak SSO wiring shipped** — `.github/workflows/ci.yml` now passes `VITE_KEYCLOAK_URL` build arg; `nginx.conf` updated with canonical `keycloak.shopping-cart.local` CSP allowlist; deployment stabilized with `nginx-cache` emptyDir
+- **enforce_admins restored** — `true` ✓ (shopping-cart-frontend)
+- **v0.5.1 branch created** — `shopping-cart-frontend-v0.5.1` from merge SHA; retrospective added + committed + pushed
+- **Retrospective doc** — `docs/retro/2026-05-15-v0.5.1-retrospective.md` (on shopping-cart-frontend-v0.5.1, commit `60e660f`)
+- **Summary** — v0.5.1 completed the multi-repo SSO wiring after a revert from an accidental main push. Copilot caught a merge-base misalignment that hid the functional commits from the PR diff; the fix was re-applied via the feature branch merge.
 
 ## Post-Merge Housekeeping — 2026-05-15 (shopping-cart-infra #57)
 - **shopping-cart-infra PR #57 merged** — shopping-cart-infra-v0.5.2 → main, SHA `adbaec8de6725817ba55b8a36c1653a5fa1bb3ae`
