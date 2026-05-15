@@ -226,6 +226,39 @@ else
   exit 1
 fi
 
+_info "[acg-up] Updating /etc/hosts entries before starting the ArgoCD browser HTTPS listener..."
+# Add /etc/hosts entries on the Mac host for local browser access
+_argocd_host_ip="127.0.0.1"
+_kc_browser_ip="127.0.0.1"
+_HOSTS_LIST=(
+  "argocd.shopping-cart.local|${_argocd_host_ip}"
+  "keycloak.shopping-cart.local|${_kc_browser_ip}"
+)
+for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
+  _h="${_host_ip_pair%%|*}"
+  _desired_ip="${_host_ip_pair#*|}"
+  if [[ -z "${_desired_ip}" ]]; then
+    _warn "[acg-up] could not determine the ingressgateway IP for ${_h} — browser login may fail"
+    continue
+  fi
+  _desired_host_entry="${_desired_ip} ${_h}"
+  _current_host_entry=$(grep -E "^[0-9.]+[[:space:]]+${_h//./\\.}$" /etc/hosts | tail -n 1 || true)
+  if [[ "${_current_host_entry}" != "${_desired_host_entry}" ]]; then
+    _info "[acg-up] Updating /etc/hosts for ${_h} → ${_desired_ip} (requires sudo)..."
+    if _run_command --prefer-sudo --soft -- \
+        sh -c "set -e
+tmp=\$(mktemp)
+grep -vE '^[0-9.]+[[:space:]]+${_h//./\\.}$' /etc/hosts > \"\$tmp\"
+printf '%s\n' '${_desired_host_entry}' >> \"\$tmp\"
+cat \"\$tmp\" > /etc/hosts
+rm -f \"\$tmp\""; then
+      _info "[acg-up] /etc/hosts: ${_h} → ${_desired_ip}"
+    else
+      _warn "could not update /etc/hosts for ${_h} — please add manually: ${_desired_host_entry}"
+    fi
+  fi
+done
+
 if _is_mac; then
   _info "[acg-up] Step 4c/12 — Installing ArgoCD browser HTTPS listener (${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}, Vault PKI, auto-restart)..."
   _argocd_browser_label="${ARGOCD_BROWSER_LISTENER_LABEL:-com.k3d-manager.argocd-browser-https}"
@@ -878,37 +911,6 @@ kubectl apply --context k3d-k3d-cluster \
 kubectl patch secret argocd-secret -n cicd --context k3d-k3d-cluster \
   --type merge \
   --patch "{\"stringData\":{\"oidc.keycloak.clientSecret\":\"${_argocd_client_secret}\"}}"
-# Add /etc/hosts entries on the Mac host for local browser access
-_argocd_host_ip="127.0.0.1"
-_kc_browser_ip="127.0.0.1"
-_HOSTS_LIST=(
-  "argocd.shopping-cart.local|${_argocd_host_ip}"
-  "keycloak.shopping-cart.local|${_kc_browser_ip}"
-)
-for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
-  _h="${_host_ip_pair%%|*}"
-  _desired_ip="${_host_ip_pair#*|}"
-  if [[ -z "${_desired_ip}" ]]; then
-    _warn "[acg-up] could not determine the ingressgateway IP for ${_h} — browser login may fail"
-    continue
-  fi
-  _desired_host_entry="${_desired_ip} ${_h}"
-  _current_host_entry=$(grep -E "^[0-9.]+[[:space:]]+${_h//./\\.}$" /etc/hosts | tail -n 1 || true)
-  if [[ "${_current_host_entry}" != "${_desired_host_entry}" ]]; then
-    _info "[acg-up] Updating /etc/hosts for ${_h} → ${_desired_ip} (requires sudo)..."
-    if _run_command --prefer-sudo --soft -- \
-        sh -c "set -e
-tmp=\$(mktemp)
-grep -vE '^[0-9.]+[[:space:]]+${_h//./\\.}$' /etc/hosts > \"\$tmp\"
-printf '%s\n' '${_desired_host_entry}' >> \"\$tmp\"
-cat \"\$tmp\" > /etc/hosts
-rm -f \"\$tmp\""; then
-      _info "[acg-up] /etc/hosts: ${_h} → ${_desired_ip}"
-    else
-      _warn "could not update /etc/hosts for ${_h} — please add manually: ${_desired_host_entry}"
-    fi
-  fi
-done
 
 # Restart argocd-server to pick up the updated argocd-cm and argocd-secret
 kubectl rollout restart deployment/argocd-server -n cicd --context k3d-k3d-cluster
