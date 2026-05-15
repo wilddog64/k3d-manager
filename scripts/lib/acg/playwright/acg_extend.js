@@ -177,6 +177,13 @@ async function extendSandbox() {
       'button:has-text("Renew")',
       '[data-testid*="extend"]',
       '[aria-label*="extend" i]',
+      // Redesigned UI selectors (2025+)
+      'a:has-text("Extend")',
+      '[class*="extend" i]',
+      '[href*="extend" i]',
+      'button[class*="Extend"]',
+      'span:has-text("Extend Session")',
+      'div[role="button"]:has-text("Extend")',
     ];
 
     let clicked = false;
@@ -236,39 +243,80 @@ async function extendSandbox() {
       console.error(`WARN: Auto Shutdown text not found. Proceeding anyway.`);
     }
 
+    // Debug: capture listing page state before attempting reveal
+    {
+      const _debugDir = path.join(os.homedir(), '.local', 'share', 'k3d-manager');
+      const _debugPath = path.join(_debugDir, `acg-extend-debug-listing-${Date.now()}.png`);
+      try {
+        await fs.promises.mkdir(_debugDir, { recursive: true });
+        await page.screenshot({ path: _debugPath, fullPage: true });
+        console.error(`INFO: Debug screenshot (listing page): ${_debugPath}`);
+      } catch (_e) { /* non-fatal */ }
+    }
+
     // 3. Reveal the panel/modal if still not clicked
     // isPanelOpen: "Auto Shutdown" text appears on the listing-page card — not a reliable signal
     // that the extend panel is open. If step 1 found no extend button, the panel is NOT open.
     const isPanelOpen = clicked;
 
     if (!isPanelOpen) {
-      // Click "Open Sandbox" on the card with the "Auto Shutdown" banner (the running sandbox),
-      // not .first() which always picks the first card (AWS) regardless of provider.
-      const _allOpenBtns = page.locator('button:has-text("Open Sandbox")');
-      const _btnCount = await _allOpenBtns.count();
-      let _openBtn = null;
-      for (let _i = 0; _i < _btnCount; _i++) {
-        const _hasShutdown = await _allOpenBtns.nth(_i).evaluate(el => {
-          let node = el.parentElement;
-          for (let _j = 0; _j < 6; _j++) {
-            if (!node) break;
-            if (/auto\s*shutdown/i.test(node.innerText || '')) return true;
-            node = node.parentElement;
-          }
-          return false;
-        }).catch(() => false);
-        if (_hasShutdown) { _openBtn = _allOpenBtns.nth(_i); break; }
-      }
-      if (!_openBtn) {
-        _openBtn = page.locator('button:has-text("Open Sandbox"), button:has-text("Start Sandbox"), button:has-text("Resume")').first();
-      }
-      if (await _openBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-        console.error('INFO: Clicking Open Sandbox to reveal extend panel...');
-        await _openBtn.click({ force: true });
-        const _openPanelBtn = await _waitForVisibleExtendButton(page, extendSelectors, 15000, 'after Open Sandbox');
-        if (_openPanelBtn) {
-          await _openPanelBtn.click({ force: true });
+      // NEW: Try clicking the "Auto Shutdown" section — may trigger extend modal in redesigned UI
+      const _shutdownLink = page.locator('text=/Auto Shutdown/i').first();
+      if (await _shutdownLink.isVisible({ timeout: 3000 }).catch(() => false)) {
+        console.error('INFO: Clicking Auto Shutdown section to trigger extend modal...');
+        await _shutdownLink.click({ force: true });
+        await page.waitForTimeout(2000);
+        const _shutdownPanelBtn = await _waitForVisibleExtendButton(page, extendSelectors, 10000, 'after AutoShutdown click');
+        if (_shutdownPanelBtn) {
+          await _shutdownPanelBtn.click({ force: true });
           clicked = true;
+        }
+      }
+
+      // Fallback: click "Open Sandbox" on the card with the "Auto Shutdown" banner
+      if (!clicked) {
+        const _allOpenBtns = page.locator('button:has-text("Open Sandbox")');
+        const _btnCount = await _allOpenBtns.count();
+        let _openBtn = null;
+        for (let _i = 0; _i < _btnCount; _i++) {
+          const _hasShutdown = await _allOpenBtns.nth(_i).evaluate(el => {
+            let node = el.parentElement;
+            for (let _j = 0; _j < 6; _j++) {
+              if (!node) break;
+              if (/auto\s*shutdown/i.test(node.innerText || '')) return true;
+              node = node.parentElement;
+            }
+            return false;
+          }).catch(() => false);
+          if (_hasShutdown) { _openBtn = _allOpenBtns.nth(_i); break; }
+        }
+        if (!_openBtn) {
+          _openBtn = page.locator('button:has-text("Open Sandbox"), button:has-text("Start Sandbox"), button:has-text("Resume")').first();
+        }
+        if (await _openBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+          console.error('INFO: Clicking Open Sandbox to reveal extend panel...');
+          await _openBtn.click({ force: true });
+
+          // After opening, scroll to top — extend button may be above the fold
+          await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
+          await page.waitForTimeout(1000);
+
+          const _openPanelBtn = await _waitForVisibleExtendButton(page, extendSelectors, 15000, 'after Open Sandbox');
+          if (_openPanelBtn) {
+            await _openPanelBtn.click({ force: true });
+            clicked = true;
+          }
+
+          // NEW: If extend button still not found, take a screenshot of what we see
+          if (!clicked) {
+            const _debugDir = path.join(os.homedir(), '.local', 'share', 'k3d-manager');
+            const _debugPath = path.join(_debugDir, `acg-extend-debug-after-open-${Date.now()}.png`);
+            try {
+              await fs.promises.mkdir(_debugDir, { recursive: true });
+              await page.screenshot({ path: _debugPath, fullPage: true });
+              console.error(`INFO: Debug screenshot (after Open Sandbox): ${_debugPath}`);
+            } catch (_e) { /* non-fatal */ }
+          }
         }
       }
     }
