@@ -1,5 +1,12 @@
 # Changes - k3d-manager
 
+## [Unreleased]
+
+### Fixed
+- `scripts/lib/acg/playwright/acg_extend.js`: replace broad `isPluralsight` hostname check with `isOnSandboxPage` path check — navigation to the sandbox URL is now attempted unless the browser is already on the exact sandbox management page, fixing silent failures when CDP session is on a Pluralsight library page
+
+---
+
 ## [v1.4.4] — 2026-05-08 — Identity SSO fixes: Keycloak ExternalSecrets + realm import
 
 ### Added
