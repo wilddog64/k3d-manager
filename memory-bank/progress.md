@@ -17,6 +17,7 @@
 - [x] v0.5.1 branch created from merge SHA
 - [x] Retrospective: `docs/retro/2026-05-15-v0.5.1-retrospective.md` (on shopping-cart-frontend-v0.5.1, commit `60e660f`)
 
+
 ## Completed (v1.4.5 — k3d-manager PR #74)
 - [x] **k3d-manager PR #74 merged** — merge SHA `8f93df25`; branch `k3d-manager-v1.4.5`; next branch `k3d-manager-v1.4.6` cut
 - [x] enforce_admins restored on k3d-manager main

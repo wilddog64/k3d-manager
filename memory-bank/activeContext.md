@@ -21,6 +21,7 @@
 - **Retrospective doc** — `docs/retro/2026-05-15-v0.5.1-retrospective.md` (on shopping-cart-frontend-v0.5.1, commit `60e660f`)
 - **Summary** — v0.5.1 completed the multi-repo SSO wiring after a revert from an accidental main push. Copilot caught a merge-base misalignment that hid the functional commits from the PR diff; the fix was re-applied via the feature branch merge.
 
+
 ## Post-Merge Housekeeping — 2026-05-15 (shopping-cart-infra #57)
 - **shopping-cart-infra PR #57 merged** — shopping-cart-infra-v0.5.2 → main, SHA `adbaec8de6725817ba55b8a36c1653a5fa1bb3ae`
 - **Networking + mTLS fixes shipped** — `project: shopping-cart` AppProject now applied, Keycloak DestinationRule with `tls.mode: DISABLE` for ArgoCD OIDC token exchange
