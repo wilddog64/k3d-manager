@@ -46,6 +46,7 @@
 - [x] Retrospective: `docs/retro/2026-05-07-v1.4.2-retrospective.md`
 
 ## Next Steps (v1.4.5)
+- [x] **multi-repo SSO wiring follow-up** — COMPLETE. `k3d-manager` ACG sandbox navigation fix: `3bb7aa817983948cd426bc6a96525a811b2bd7ff`; `shopping-cart-infra` SSO ingress/workflow update: `8c581840b904f21459fa225c80ddfe54f93ed9aa`; `shopping-cart-frontend` CI/CSP update: `6120783b8af124abebca7f242f5b905a29734836`; frontend `main` reverted to `2872a4cd9b120b55673b0c2633ab8e6270cb6b8c` after an accidental remote update. Issue doc: `docs/issues/2026-05-15-frontend-main-push-reverted.md`.
 - [x] **networking ArgoCD project + Keycloak mTLS fix** — COMPLETE (`6c70fee99baa2c2f29330113e4f1c96b2b94cf75`). `argocd/applications/networking.yaml` now uses `project: platform`; added `networking/istio/keycloak-destinationrule.yaml` with `tls.mode: DISABLE`. Spec: `docs/bugs/2026-05-15-networking-app-project-and-mtls.md`.
 - [x] **ArgoCD SSO via Keycloak** — COMPLETE. shopping-cart-infra PR #38 (`d314c34`, feat: ArgoCD SSO) + PR #39 (`afaf109`, fix: ldap duplicate) merged to main. enforce_admins restored. spec: `docs/plans/v1.4.5-argocd-sso-keycloak.md`; retro: `docs/retro/2026-05-09-pr38-pr39-argocd-sso-kustomize-fix.md` (on `docs/next-improvements`)
 - [x] **pyjenkinsapi rigor-cli v0.1.6 subtree pull** — COMPLETE (subtree: `7d8a894b`, ci-fix: `0c479c99`); branch `docs/next-improvements`; BATS re-enabled

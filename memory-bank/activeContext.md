@@ -57,6 +57,7 @@
 - **lib-foundation upstream doc fix** — `scripts/lib/foundation/docs/api/functions.md` usage snippet still has k3d-manager-specific `K3DM_ENABLE_AI=1` context; needs upstream lib-foundation PR
 
 ## Current Focus (v1.4.5)
+- **COMPLETE:** multi-repo SSO wiring follow-up — `k3d-manager` ACG sandbox navigation fix committed as `3bb7aa817983948cd426bc6a96525a811b2bd7ff` on `k3d-manager-v1.4.5`; `shopping-cart-infra` SSO ingress/workflow update committed as `8c581840b904f21459fa225c80ddfe54f93ed9aa` on `shopping-cart-infra-v0.5.3`; `shopping-cart-frontend` CI/CSP update committed as `6120783b8af124abebca7f242f5b905a29734836` on `shopping-cart-frontend-v0.5.1`, with `main` later reverted to `2872a4cd9b120b55673b0c2633ab8e6270cb6b8c` after an accidental remote update. Manual cluster/bootstrap follow-up step 9 was intentionally skipped per instruction.
 - **COMPLETE:** `fix(networking)` — shopping-cart-infra branch `shopping-cart-infra-v0.5.2` updated per spec `docs/bugs/2026-05-15-networking-app-project-and-mtls.md`; changed `argocd/applications/networking.yaml` to `project: platform`, added `networking/istio/keycloak-destinationrule.yaml`, committed as `6c70fee99baa2c2f29330113e4f1c96b2b94cf75`, and pushed to `origin/shopping-cart-infra-v0.5.2`.
 - **COMPLETE:** `fix(acg-up)` — spec `docs/bugs/v1.4.5-bugfix-etc-hosts-soft.md`. Added `--soft` to line 639 (SHA: `3c096f6`).
 - **COMPLETE:** `fix(acg-up-bugs)` — spec `docs/plans/v1.4.5-bugfix-gemini.md`. Fixed CoreDNS NodeHosts patch and /etc/hosts sudo fallback (SHA: `3c096f6`).
