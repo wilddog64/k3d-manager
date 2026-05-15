@@ -2,7 +2,7 @@
 
 ## Current Status
 - Current branch: `k3d-manager-v1.4.5` (created from merge SHA `92ccaec1`).
-- `shopping-cart-infra` main branch protection is restored (`enforce_admins=true`), and `shopping-cart-infra-v0.5.0` already exists on the post-release line (`c178b60`).
+- `shopping-cart-infra` main branch protection is restored (`enforce_admins=true`), and `shopping-cart-infra-v0.5.0` was cleanly re-created from the current `main` tip (`4a6c14f`).
 - `k3d-manager` is carrying branch-handoff / ops notes only for this turn.
 - `v1.4.4`, `v1.4.3`, and `v1.4.2` remain shipped; branch protection was restored after each merge.
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
@@ -106,6 +106,8 @@
 - **FIX IN PROGRESS:** The Keycloak readiness gate now polls for `deployment/keycloak` to exist before waiting for `Available`, so an ArgoCD sync delay no longer fails `make up` immediately with `NotFound`. New issue doc: `docs/issues/2026-05-13-keycloak-deployment-notfound-should-poll-for-creation.md`.
 - **NEW FINDING:** The live Argo CD ConfigMap is still being rendered with `url: https://argocd.dev.local.me`, which causes `/auth/login` to reject the canonical browser flow even after cluster rebuilds. `scripts/etc/argocd/vars.sh` now defaults `ARGOCD_VIRTUALSERVICE_HOST` to `argocd.shopping-cart.local`. Issue doc: `docs/issues/2026-05-13-argocd-virtualservice-host-default-still-dev-local-me.md`.
 - **COMPLETE:** `fix(acg-up)` — `bin/acg-up` now reads the current shopping-cart-infra realm import artifact at `identity/keycloak/realm-shopping-cart.json` instead of the deleted `identity/config/realm-shopping-cart.json`, and the Keycloak fixture test was updated to match. Issue doc: `docs/issues/2026-05-13-acg-up-uses-stale-realm-json-path-after-shopping-cart-infra-layout-change.md`. Commit: `c0566cb4`.
+- **COMPLETE:** shopping-cart-infra `shopping-cart-infra-v0.5.0` branch cut from the merged `main` tip (`4a6c14f`), and `main` branch protection was restored (`enforce_admins=true`).
+- **COMPLETE:** shopping-cart-infra `shopping-cart-infra-v0.5.0` was cleaned up and re-created from the current `main` tip (`4a6c14f`) after the release sync, keeping the release line aligned with the merged `main` commit.
 - **Next:** `feat(providers)` — spec at `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; depends on refactor spec.
 - **Next:** `feat(tunnel)` — spec at `docs/plans/v1.4.3-chisel-tunnel.md`; depends on refactor spec.
 - Preserve subtree discipline: `scripts/lib/foundation/` and `scripts/lib/acg/` edits upstream first.
