@@ -291,11 +291,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
-| 2026-05-01 | [_copilot_review gate removal smoke test failed](docs/issues/2026-05-01-bugfix-copilot-review-k3dm-gate-smoke-test-failed.md) | lib-foundation — K3DM_ENABLE_AI gate removed; smoke test still fails with Copilot CLI exit 1 (auth/env issue, not a code regression) |
-| 2026-04-30 | [GHCR secret rotation fallback fails open](docs/issues/2026-04-30-ghcr-secret-rotation-fallback-fails-open.md) | acg-up, rotate-ghcr-pat — `gh auth token` OAuth fallback recreates invalid pull secret; fix: fail closed, Vault-first |
-| 2026-04-29 | [ACG Watcher extend button not found](docs/issues/2026-04-29-acg-watcher-extend-button-not-found.md) | lib-acg watcher — button not located during 1h TTL window; manual sequence documented |
-| 2026-04-29 | [gh auth token insufficient scope for GHCR](docs/issues/2026-04-29-gh-auth-token-insufficient-scope-for-ghcr.md) | acg-up — OAuth token lacks `read:packages`; resolved via Vault-first PAT strategy |
-| 2026-04-28 | [ClusterSecretStore vault-bridge pod-origin empty reply](docs/issues/2026-04-28-clustersecretstore-vault-bridge-pod-traffic-empty-reply.md) | vault-bridge — pod-origin traffic returns empty reply; `ClusterSecretStore/vault-backend` stays `Ready=False` |
+| 2026-05-14 | [shopping-cart-infra v0.4.0 tag pointed before fix](docs/issues/2026-05-14-shopping-cart-infra-v0.4.0-tag-pointed-before-fix.md) | shopping-cart-infra release tag — v0.4.0 was initially on the commit before the Keycloak realm import fix; corrected to point at the merge commit |
+| 2026-05-13 | [acg-up stale shopping-cart-infra realm JSON path](docs/issues/2026-05-13-acg-up-uses-stale-realm-json-path-after-shopping-cart-infra-layout-change.md) | acg-up — reads deleted `identity/config/realm-shopping-cart.json` instead of `shopping-cart-infra/identity/keycloak/realm-shopping-cart.json`; path fixed in acg-up |
+| 2026-05-13 | [Argo CD VirtualService host default still dev-local-me](docs/issues/2026-05-13-argocd-virtualservice-host-default-still-dev-local-me.md) | argocd vars — defaults to stale `argocd.dev.local.me` instead of `argocd.shopping-cart.local`; fixed in vars.sh |
+| 2026-05-12 | [Keycloak readiness loop watched dead port-forward](docs/issues/2026-05-12-keycloak-readiness-loop-watched-dead-port-forward.md) | bin/acg-up — waits on stale port-forward instead of deployment availability; fixed to poll deployment status first |
+| 2026-05-12 | [Argo CD localhost browser entrypoint misleading](docs/issues/2026-05-12-argocd-localhost-browser-entrypoint-misleading.md) | bin/acg-up — advertises terminal-only `localhost:8080` as browser entrypoint; docs updated to direct users to canonical `https://argocd.shopping-cart.local` |
 
 [All issues →](docs/issues/)
 
