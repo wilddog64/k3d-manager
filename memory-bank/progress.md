@@ -2,7 +2,7 @@
 
 ## Status
 - Current branch: `k3d-manager-v1.4.5`.
-- `shopping-cart-infra` main branch protection is restored (`enforce_admins=true`), and `shopping-cart-infra-v0.5.0` was cleanly re-created from the current `main` tip (`4a6c14f`).
+- `shopping-cart-infra` main branch protection is restored (`enforce_admins=true`), `shopping-cart-infra-v0.5.0` was cleanly re-created from the current `main` tip (`4a6c14f`), and the `v0.4.0` GitHub release was published on the verified tag.
 - `k3d-manager` is keeping the branch-handoff / ops notes only for this turn.
 - v1.4.4, v1.4.3, and v1.4.2 remain shipped; branch protection was restored after each merge.
 - Live Keycloak realm reconciliation without rebuild is now documented in `shopping-cart-infra`; implementation has not started yet.
@@ -110,6 +110,7 @@
 - [x] **shopping-cart-infra main admin enforcement disabled temporarily** — set `enforce_admins=false` on `main` so PR #53 can be merged; verified the change.
 - [x] **shopping-cart-infra v0.5.0 branch cut** — advanced `shopping-cart-infra-v0.5.0` to the current `main` tip (`4a6c14f`) after PR #54 merged, then restored `enforce_admins=true` on `main`.
 - [x] **shopping-cart-infra v0.5.0 branch cleanup** — deleted and re-created the local `shopping-cart-infra-v0.5.0` ref from the current `main` tip (`4a6c14f`) so the release branch is clean again.
+- [x] **shopping-cart-infra v0.4.0 release published** — created the GitHub release object on the verified `v0.4.0` tag with notes describing the Argo CD PostSync live-reconcile fix. Release URL: `https://github.com/wilddog64/shopping-cart-infra/releases/tag/v0.4.0`.
 - [x] **Identity troubleshooting helpers** — added `bin/vault-exec`, `bin/ldap-search`, `bin/keycloak-logs`, and `bin/ldap-logs` with shared `_run_command`-backed wrappers in `scripts/lib/identity_tools.sh`. Added `docs/howto/identity-troubleshooting.md` for quick operator reference.
 - [x] **Historical branch prune recommendation documented** — `docs/next-improvements` and `k3d-manager-v1.1.0` through `k3d-manager-v1.4.4` are not ancestors of current `main` or `k3d-manager-v1.4.5`. Recommendation: keep for auditability unless the team explicitly decides to prune branch refs. Issue doc: `docs/issues/2026-05-13-k3d-manager-historical-branches-prune-recommendation.md`.
 - [ ] **acg-up known_hosts sync** — managed AWS host IPs in `~/.ssh/config` are now tracked so stale public IP entries can be pruned from `~/.ssh/known_hosts` while current entries remain. Issue doc: `docs/issues/2026-05-13-acg-up-maintain-known-hosts-for-managed-aws-ips.md`.
