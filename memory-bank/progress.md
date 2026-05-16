@@ -3,6 +3,7 @@
 ## Status
 - Current branch: `k3d-manager-v1.4.6` (created from k3d-manager PR #74 merge SHA `8f93df25`)
 - **k3d-manager PR #74 merged** — k3d-manager-v1.4.5 → main (SHA: `8f93df25`); ACG extend navigation fix + frontend SSO wiring; v1.4.6 branch created with retrospective
+- **k3d-manager v1.4.6 acg-extend Start Sandbox race fix completed** — `scripts/lib/acg/playwright/acg_extend.js` now exits 0 when the fallback button text is `Start Sandbox` instead of waiting for an extend button that never appears; committed as `bae89aafae42aeea7b7d71cd65eed4c24ca84962` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 auto-trust Vault CA fix completed** — `bin/acg-up` now trusts the Vault CA cert in the macOS System Keychain via `_run_command --interactive-sudo --soft` after `_argocd_issue_browser_tls_material`, and `scripts/tests/bin/acg_up.bats` asserts the `security add-trusted-cert -d -r trustRoot` call; committed as `42d9941306658c259f367916bc68ea69573a3085` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 follow-up completed** — `scripts/lib/acg/playwright/acg_extend.js` commit `34c41ced492f37525f170feed6664156b5647634`; `bin/acg-up` final fix commit `0ea4cc9f89649a3a5ca7d8a2da4df4f6b39fb4b9` (interactive sudo + 120s listener timeout); both pushed to `origin/k3d-manager-v1.4.6`
 - **shopping-cart-infra PR #58 merged** — shopping-cart-infra-v0.5.3 → main (SHA: `67f8d228`); ArgoCD SSO OIDC callback fix (`url: http://` → `url: https://`); v0.5.4 next branch created; retrospective added and pushed
