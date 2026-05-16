@@ -1,7 +1,8 @@
 # Progress — k3d-manager
 
 ## Status
-- **k3d-manager v1.4.6 acg-credentials remove-addlocatorhandler completed** — `scripts/lib/acg/playwright/acg_credentials.js` now deletes the 16-line `addLocatorHandler` block and keeps the existing inline proactive dismiss blocks; committed as `02d792a4` and pushed to `origin/k3d-manager-v1.4.6`
+- **k3d-manager v1.4.6 acg-credentials addlocatorhandler-extend-session-button ASSIGNED** — spec: `docs/bugs/2026-05-16-acg-credentials-addlocatorhandler-extend-session-button.md`; re-add addLocatorHandler with `button:has-text("Extend Session")` (confirmed from live screenshot) + 3000ms isVisible timeout; after click: 500ms + Escape to close "Session extended" confirmation (×-only modal); branch: `k3d-manager-v1.4.6`
+- **k3d-manager v1.4.6 acg-credentials remove-addlocatorhandler SUPERSEDED** — `02d792a4`; superseded — live dialog screenshot confirmed button text is "Extend Session"; re-adding handler with exact label
 - **k3d-manager v1.4.6 acg-credentials extend-session-via-filled-button SUPERSEDED** — `452fee93`; pando-button--usage_filled also doesn't extend session; Extend button selector unknown after 5+ attempts
 - **k3d-manager v1.4.6 acg-credentials start-sandbox-detached SUPERSEDED** — `7d2faaba`; still failing — Cancel in handler causes dialog to loop; button hidden behind reappearing modal; force:true doesn't bypass true visibility block
 - **k3d-manager v1.4.6 acg-credentials handler-nonblocking-250ms completed** — `e2d4bb1b`; handler now ~350ms/cycle; still failing post-dismiss due to React re-render detaching button — new bug filed
