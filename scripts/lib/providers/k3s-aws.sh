@@ -49,7 +49,7 @@ HELP
     || _info "[k3s-aws] Pre-flight extend failed — proceeding (sandbox may have sufficient TTL)"
 
   _info "[k3s-aws] Provisioning CloudFormation stack (server + agents)..."
-  acg_provision --confirm || return 1
+  acg_provision --confirm --recreate || return 1
 
   _info "[k3s-aws] Installing k3s server + joining agents..."
   UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" deploy_app_cluster --confirm || return 1
