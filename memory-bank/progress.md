@@ -1,7 +1,8 @@
 # Progress — k3d-manager
 
 ## Status
-- **k3d-manager v1.4.6 acg-credentials handler-nonblocking-250ms completed** — `scripts/lib/acg/playwright/acg_credentials.js` now removes the redundant hidden `waitFor` and settles with `waitForTimeout(250)` only; committed as `e2d4bb1b` and pushed to `origin/k3d-manager-v1.4.6`
+- **k3d-manager v1.4.6 acg-credentials start-sandbox-detached ASSIGNED** — spec: `docs/bugs/2026-05-16-acg-credentials-start-sandbox-detached-after-modal-dismiss.md`; add `_clickStartSandbox` helper (scrollIntoViewIfNeeded + force:true), replace both startButton.click() call sites; branch: `k3d-manager-v1.4.6`
+- **k3d-manager v1.4.6 acg-credentials handler-nonblocking-250ms completed** — `e2d4bb1b`; handler now ~350ms/cycle; still failing post-dismiss due to React re-render detaching button — new bug filed
 - **k3d-manager v1.4.6 acg-credentials handler-dismiss-waitfor SUPERSEDED** — `73660e6a`; waitFor still burns entire 30s in one cycle (redundant with Playwright built-in); replaced by nonblocking-250ms spec
 - **k3d-manager v1.4.6 acg-credentials extend-not-cancel completed** — `scripts/lib/acg/playwright/acg_credentials.js` now clicks `Extend` first in the `addLocatorHandler` callback, falls back to `Cancel`/Escape, and keeps the 500ms Escape plus 1s settle wait; committed as `a07c3c10` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials handler animation settle completed** — `scripts/lib/acg/playwright/acg_credentials.js` now waits 1s at the end of the `addLocatorHandler` callback so the modal animation and React re-render settle before Playwright resumes the intercepted click; committed as `0fbdba3079b8c1e183e8cb1b72fdbf1429a3f3ff` and pushed to `origin/k3d-manager-v1.4.6`
