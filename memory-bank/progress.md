@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
+- **k3d-manager v1.4.6 acg-credentials handler-times-1-click-helper completed** — `scripts/lib/acg/playwright/acg_credentials.js` now adds `{ times: 1 }` to the "Extend Your Session" handler, waits 1000ms to settle after dismiss, adds `_clickStartSandbox(page, buttonLocator)` with hidden-prompt wait + scroll + force-click, and routes both Start Sandbox call sites through the helper; committed as `982d551e` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials handler-times-1-click-helper ASSIGNED** — spec: `docs/bugs/2026-05-16-acg-credentials-handler-times-1-click-helper.md`; adds `{ times: 1 }` + 1000ms settle to handler; adds `_clickStartSandbox` helper with waitFor(hidden)+scrollIntoView+force-click; replaces both Start Sandbox `.click()` calls
 - **k3d-manager v1.4.6 acg-credentials addlocatorhandler-extend-session-button STILL FAILING** — spec: `docs/bugs/2026-05-16-acg-credentials-addlocatorhandler-extend-session-button.md`; committed as `6154b0df`; handler fires 3× due to SPA re-render flicker on `data-open`; superseded by handler-times-1-click-helper spec
 - **k3d-manager v1.4.6 acg-credentials remove-addlocatorhandler SUPERSEDED** — `02d792a4`; superseded — live dialog screenshot confirmed button text is "Extend Session"; re-adding handler with exact label
