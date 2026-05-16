@@ -2,6 +2,8 @@
 
 ## Status
 - Current branch: `k3d-manager-v1.4.6` (created from k3d-manager PR #74 merge SHA `8f93df25`)
+- **k3d-manager v1.4.6 acg-credentials Extend Your Session modal fix completed** — `scripts/lib/acg/playwright/acg_credentials.js` now dismisses the lingering "Extend Your Session" prompt before the Start/Open flow; committed as `69204c91e5e060df6e2ca230c1180d6055f1d91d` and pushed to `origin/k3d-manager-v1.4.6`
+- **k3d-manager v1.4.6 acg-credentials GCP reads AWS inputs fix completed** — `scripts/lib/acg/playwright/acg_credentials.js` now waits for GCP JSON content and extracts by content instead of position; committed as `1ba5c5ac66d5493cdfa8ca661c0372ca518c6882` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager PR #74 merged** — k3d-manager-v1.4.5 → main (SHA: `8f93df25`); ACG extend navigation fix + frontend SSO wiring; v1.4.6 branch created with retrospective
 - **k3d-manager v1.4.6 acg-credentials "Extend Your Session" modal fix ASSIGNED** — spec: `docs/plans/v1.4.6-bugfix-acg-credentials-extend-session-modal.md`; apply first
 - **k3d-manager v1.4.6 acg-credentials GCP reads AWS inputs fix ASSIGNED** — spec: `docs/plans/v1.4.6-bugfix-acg-credentials-gcp-reads-aws-inputs.md`; apply after extend-session-modal fix
