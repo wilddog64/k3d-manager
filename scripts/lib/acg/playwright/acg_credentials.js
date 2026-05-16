@@ -251,7 +251,7 @@ async function extractCredentials() {
 
     // Auto-dismiss "Extend Your Session" at any point — fires during waitForFunction, clicks, etc.
     await page.addLocatorHandler(
-      page.locator('[role="dialog"]:has-text("Extend Your Session")'),
+      page.locator('[role="dialog"][data-open="true"]:has-text("Extend Your Session")'),
       async () => {
         console.error('INFO: [handler] Auto-dismissing "Extend Your Session" prompt...');
         const _handlerCancelBtn = page.locator('[role="dialog"]:has-text("Extend Your Session") button:has-text("Cancel")').first();
