@@ -1,7 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
-- **k3d-manager v1.4.6 acg-credentials extend-session-via-filled-button ASSIGNED** — spec: `docs/bugs/2026-05-16-acg-credentials-extend-session-via-filled-button.md`; handler to click `button.pando-button--usage_filled` (Extend) + Escape confirmation; remove `_clickStartSandbox`; revert both startButton call sites to plain `.click()`; branch: `k3d-manager-v1.4.6`
+- **k3d-manager v1.4.6 acg-credentials extend-session-via-filled-button completed** — `scripts/lib/acg/playwright/acg_credentials.js` now clicks the filled `Extend` button in the `addLocatorHandler` callback, presses Escape after the extension confirmation, removes `_clickStartSandbox`, and restores both Start Sandbox call sites to plain `.click()`; committed as `452fee93` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials start-sandbox-detached SUPERSEDED** — `7d2faaba`; still failing — Cancel in handler causes dialog to loop; button hidden behind reappearing modal; force:true doesn't bypass true visibility block
 - **k3d-manager v1.4.6 acg-credentials handler-nonblocking-250ms completed** — `e2d4bb1b`; handler now ~350ms/cycle; still failing post-dismiss due to React re-render detaching button — new bug filed
 - **k3d-manager v1.4.6 acg-credentials handler-dismiss-waitfor SUPERSEDED** — `73660e6a`; waitFor still burns entire 30s in one cycle (redundant with Playwright built-in); replaced by nonblocking-250ms spec
