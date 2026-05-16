@@ -352,6 +352,21 @@ async function extractCredentials() {
       });
     }
 
+    // Dismiss "Extend Your Session" prompt — appears when a sandbox is about to expire
+    const _extendSessionPrompt = page.locator('[role="dialog"]:has-text("Extend Your Session")').first();
+    if (await _extendSessionPrompt.isVisible({ timeout: 2000 }).catch(() => false)) {
+      console.error('INFO: Dismissing "Extend Your Session" prompt (clicking Cancel)...');
+      const _cancelBtn = _extendSessionPrompt.locator('button:has-text("Cancel")').first();
+      if (await _cancelBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await _cancelBtn.click({ force: true }).catch(() => {});
+      } else {
+        await page.keyboard.press('Escape').catch(() => {});
+      }
+      await _extendSessionPrompt.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {
+        console.error('WARN: "Extend Your Session" prompt did not close within 3s — proceeding anyway');
+      });
+    }
+
     // 3. Handle Sandbox Start/Open Flow
     // Skip only if credentials are already populated (not just visible — inputs render empty before start)
     const _firstCredInput = page.locator('input[aria-label="Copyable input"]').first();
