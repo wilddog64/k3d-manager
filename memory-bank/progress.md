@@ -1,7 +1,8 @@
 # Progress — k3d-manager
 
 ## Status
-- **k3d-manager v1.4.6 acg-credentials addlocatorhandler-extend-session-button ASSIGNED** — spec: `docs/bugs/2026-05-16-acg-credentials-addlocatorhandler-extend-session-button.md`; re-add addLocatorHandler with `button:has-text("Extend Session")` (confirmed from live screenshot) + 3000ms isVisible timeout; after click: 500ms + Escape to close "Session extended" confirmation (×-only modal); branch: `k3d-manager-v1.4.6`
+- **k3d-manager v1.4.6 acg-credentials handler-times-1-click-helper ASSIGNED** — spec: `docs/bugs/2026-05-16-acg-credentials-handler-times-1-click-helper.md`; adds `{ times: 1 }` + 1000ms settle to handler; adds `_clickStartSandbox` helper with waitFor(hidden)+scrollIntoView+force-click; replaces both Start Sandbox `.click()` calls
+- **k3d-manager v1.4.6 acg-credentials addlocatorhandler-extend-session-button STILL FAILING** — spec: `docs/bugs/2026-05-16-acg-credentials-addlocatorhandler-extend-session-button.md`; committed as `6154b0df`; handler fires 3× due to SPA re-render flicker on `data-open`; superseded by handler-times-1-click-helper spec
 - **k3d-manager v1.4.6 acg-credentials remove-addlocatorhandler SUPERSEDED** — `02d792a4`; superseded — live dialog screenshot confirmed button text is "Extend Session"; re-adding handler with exact label
 - **k3d-manager v1.4.6 acg-credentials extend-session-via-filled-button SUPERSEDED** — `452fee93`; pando-button--usage_filled also doesn't extend session; Extend button selector unknown after 5+ attempts
 - **k3d-manager v1.4.6 acg-credentials start-sandbox-detached SUPERSEDED** — `7d2faaba`; still failing — Cancel in handler causes dialog to loop; button hidden behind reappearing modal; force:true doesn't bypass true visibility block
