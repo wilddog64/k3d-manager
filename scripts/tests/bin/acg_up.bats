@@ -25,6 +25,10 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"_argocd_issue_browser_tls_material"* ]]
 
+  run grep -nF 'security add-trusted-cert -d -r trustRoot' bin/acg-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"security add-trusted-cert"* ]]
+
   run grep -nF '_argocd_browser_https_is_ready "https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}/healthz"' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"_argocd_browser_https_is_ready"* ]]
