@@ -260,6 +260,7 @@ async function extractCredentials() {
         } else {
           await page.keyboard.press('Escape').catch(() => {});
         }
+        await page.waitForTimeout(1000).catch(() => {});
       }
     );
 
