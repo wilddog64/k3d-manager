@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
+- **k3d-manager v1.4.6 frontend.shopping-cart.local automation ASSIGNED** — spec: `docs/plans/v1.4.6-frontend-browser-access-via-istio-ingress.md`; switches Keycloak browser daemon to `svc/istio-ingressgateway -n istio-system`; adds `frontend.shopping-cart.local` to `_HOSTS_LIST`; removes localhost:3000 port-forward
 - Current branch: `k3d-manager-v1.4.6` (created from k3d-manager PR #74 merge SHA `8f93df25`)
 - **k3d-manager v1.4.6 acg-credentials Extend Your Session modal fix completed** — `scripts/lib/acg/playwright/acg_credentials.js` now dismisses the lingering "Extend Your Session" prompt before the Start/Open flow; committed as `69204c91e5e060df6e2ca230c1180d6055f1d91d` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials GCP reads AWS inputs fix completed** — `scripts/lib/acg/playwright/acg_credentials.js` now waits for GCP JSON content and extracts by content instead of position; committed as `1ba5c5ac66d5493cdfa8ca661c0372ca518c6882` and pushed to `origin/k3d-manager-v1.4.6`
