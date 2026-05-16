@@ -266,7 +266,8 @@ async function extractCredentials() {
           await _extendBtn.click({ force: true }).catch(() => {});
           const _sessionExtendedConfirm = page.locator('[role="dialog"]:has-text("Session extended")').first();
           if (await _sessionExtendedConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await page.keyboard.press('Escape').catch(() => {});
+            await _sessionExtendedConfirm.locator('button').first().click({ force: true }).catch(() => {});
+            await _sessionExtendedConfirm.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
           }
         }
         await page.locator('[role="dialog"]:has-text("Extend Your Session")').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
@@ -371,19 +372,12 @@ async function extractCredentials() {
     }
 
     // Dismiss any lingering "Session extended" modal that may obscure sandbox controls
-    const _sessionExtendedModal = page.locator('text="Session extended"').first();
+    const _sessionExtendedModal = page.locator('[role="dialog"]:has-text("Session extended")').first();
     if (await _sessionExtendedModal.isVisible({ timeout: 3000 }).catch(() => false)) {
       console.error('INFO: Dismissing "Session extended" modal...');
-      await page.keyboard.press('Escape').catch(() => {});
-      await page.waitForTimeout(500);
-      const _closeBtn = page.locator('[role="dialog"] button, button:has-text("×"), button[aria-label*="close" i]').first();
-      if (await _sessionExtendedModal.isVisible({ timeout: 1000 }).catch(() => false) &&
-          await _closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await _closeBtn.click({ force: true }).catch(() => {});
-        await page.waitForTimeout(500);
-      }
-      await _sessionExtendedModal.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {
-        console.error('WARN: "Session extended" modal did not close within 3s — proceeding anyway');
+      await _sessionExtendedModal.locator('button').first().click({ force: true }).catch(() => {});
+      await _sessionExtendedModal.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
+        console.error('WARN: "Session extended" modal did not close within 5s — proceeding anyway');
       });
     }
 
@@ -468,7 +462,8 @@ async function extractCredentials() {
               await _extendDuringWaitBtn.click({ force: true }).catch(() => {});
               const _sessionExtendedConfirm = page.locator('[role="dialog"]:has-text("Session extended")').first();
               if (await _sessionExtendedConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await page.keyboard.press('Escape').catch(() => {});
+                await _sessionExtendedConfirm.locator('button').first().click({ force: true }).catch(() => {});
+                await _sessionExtendedConfirm.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
               }
             }
             await _extendDuringWait.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});

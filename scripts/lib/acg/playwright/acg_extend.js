@@ -137,21 +137,12 @@ async function extendSandbox() {
     }
 
     // Dismiss any lingering "Session extended" confirmation modal before searching for extend button
-    const _sessionExtendedModal = page.locator('text="Session extended"').first();
+    const _sessionExtendedModal = page.locator('[role="dialog"]:has-text("Session extended")').first();
     if (await _sessionExtendedModal.isVisible({ timeout: 3000 }).catch(() => false)) {
       console.error('INFO: Dismissing "Session extended" modal...');
-      await page.keyboard.press('Escape').catch(() => {});
-      await page.waitForTimeout(500);
-      // Fallback: click the X button if Escape didn't close it
-      const _closeBtn = page.locator('[role="dialog"] button, button:has-text("×"), button[aria-label*="close" i]').first();
-      if (await _sessionExtendedModal.isVisible({ timeout: 1000 }).catch(() => false) &&
-          await _closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await _closeBtn.click({ force: true }).catch(() => {});
-        await page.waitForTimeout(500);
-      }
-      // Confirm the modal is gone before proceeding — guards against slow close animations
-      await _sessionExtendedModal.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {
-        console.error('WARN: "Session extended" modal did not close within 3s — proceeding anyway');
+      await _sessionExtendedModal.locator('button').first().click({ force: true }).catch(() => {});
+      await _sessionExtendedModal.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
+        console.error('WARN: "Session extended" modal did not close within 5s — proceeding anyway');
       });
     }
 
@@ -194,6 +185,11 @@ async function extendSandbox() {
     }
 
     if (clicked) {
+      const _extendedConfirm = page.locator('[role="dialog"]:has-text("Session extended")').first();
+      if (await _extendedConfirm.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await _extendedConfirm.locator('button').first().click({ force: true }).catch(() => {});
+        await _extendedConfirm.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+      }
       console.log('Extend action complete (Immediate).');
       return;
     }
@@ -386,6 +382,12 @@ async function extendSandbox() {
 
     if (!confirmed) {
       console.error('WARN: Could not confirm extension via toast/TTL text — proceeding anyway');
+    }
+
+    const _extendedConfirmGeneral = page.locator('[role="dialog"]:has-text("Session extended")').first();
+    if (await _extendedConfirmGeneral.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await _extendedConfirmGeneral.locator('button').first().click({ force: true }).catch(() => {});
+      await _extendedConfirmGeneral.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
     const expiryText = await page.locator('text=/expires/i').first().textContent().catch(() => 'unknown');
