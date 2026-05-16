@@ -497,13 +497,8 @@ async function extractCredentials() {
       const resumeButton = page.locator('button:has-text("Resume"), button:has-text("Resume Sandbox")').first();
 
       if (await startButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-        const _startEnabled = await startButton.isEnabled({ timeout: 1000 }).catch(() => false);
-        if (_startEnabled) {
-          console.error('INFO: Clicking Start Sandbox...');
-          await _clickStartSandbox(page, startButton);
-        } else {
-          console.error('INFO: Start Sandbox button is disabled — sandbox already running; waiting for credentials...');
-        }
+        console.error('INFO: Clicking Start Sandbox...');
+        await _clickStartSandbox(page, startButton);
         await _waitForCredentials();
       } else if (await openButton.isVisible({ timeout: 5000 }).catch(() => false)) {
         let _openBtnToClick = openButton;
