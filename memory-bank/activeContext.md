@@ -15,7 +15,7 @@
 
 ## In Progress (v1.4.6)
 - **COMPLETE:** Codex — /etc/hosts sudo + HTTPS listener timeout — spec: `docs/bugs/2026-05-15-acg-up-etc-hosts-sudo-and-listener-timeout.md`; branch: `k3d-manager-v1.4.6`; `bin/acg-up` now uses `--interactive-sudo` for the `/etc/hosts` update and `ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-120` for the HTTPS listener; committed as `0ea4cc9f89649a3a5ca7d8a2da4df4f6b39fb4b9` and pushed to `origin/k3d-manager-v1.4.6`.
-- **OPEN:** Codex — argocd-cm HTTP URL breaks OIDC SSO callback — spec: `shopping-cart-infra/docs/bugs/2026-05-15-argocd-cm-http-url-breaks-sso-callback.md`; branch: `shopping-cart-infra-v0.5.3`; change `url: http://` → `url: https://` in `argocd/config/argocd-cm.yaml` line 13; live cluster patched manually as unblock (reverts on next `make up`).
+- **COMPLETE:** Codex — argocd-cm HTTP URL breaks OIDC SSO callback — spec: `shopping-cart-infra/docs/bugs/2026-05-15-argocd-cm-http-url-breaks-sso-callback.md`; branch: `shopping-cart-infra-v0.5.3`; changed `url: http://` → `url: https://` in `argocd/config/argocd-cm.yaml` line 13; committed as `411ebb2e3b551cccbe44260c30bb561940357eb8` and pushed to `origin/shopping-cart-infra-v0.5.3`.
   - Root cause: `url: http://argocd.shopping-cart.local` causes OIDC callback redirect to port 80 (Keycloak port-forward) instead of port 443 (ArgoCD socat HTTPS wrapper).
   - Commit message: `fix(argocd): use https url so OIDC callback resolves to ArgoCD not Keycloak`
 
