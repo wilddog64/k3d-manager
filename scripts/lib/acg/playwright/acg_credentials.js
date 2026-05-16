@@ -335,6 +335,23 @@ async function extractCredentials() {
       ).catch(() => console.error('WARN: Skeleton loaders did not clear after login — proceeding anyway'));
     }
 
+    // Dismiss any lingering "Session extended" modal that may obscure sandbox controls
+    const _sessionExtendedModal = page.locator('text="Session extended"').first();
+    if (await _sessionExtendedModal.isVisible({ timeout: 3000 }).catch(() => false)) {
+      console.error('INFO: Dismissing "Session extended" modal...');
+      await page.keyboard.press('Escape').catch(() => {});
+      await page.waitForTimeout(500);
+      const _closeBtn = page.locator('[role="dialog"] button, button:has-text("×"), button[aria-label*="close" i]').first();
+      if (await _sessionExtendedModal.isVisible({ timeout: 1000 }).catch(() => false) &&
+          await _closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+        await _closeBtn.click({ force: true }).catch(() => {});
+        await page.waitForTimeout(500);
+      }
+      await _sessionExtendedModal.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {
+        console.error('WARN: "Session extended" modal did not close within 3s — proceeding anyway');
+      });
+    }
+
     // 3. Handle Sandbox Start/Open Flow
     // Skip only if credentials are already populated (not just visible — inputs render empty before start)
     const _firstCredInput = page.locator('input[aria-label="Copyable input"]').first();
