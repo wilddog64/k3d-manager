@@ -389,7 +389,7 @@ async function extractCredentials() {
       if (await _cancelBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
         await _cancelBtn.click({ force: true }).catch(() => {});
       } else {
-        await page.keyboard.press('Escape').catch(() => {});
+        await _extendSessionPrompt.locator('button[aria-label="Close"]').first().click({ force: true }).catch(() => {});
       }
       await _extendSessionPrompt.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {
         console.error('WARN: "Extend Your Session" prompt did not close within 3s — proceeding anyway');
