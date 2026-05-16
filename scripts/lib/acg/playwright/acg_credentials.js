@@ -264,7 +264,7 @@ async function extractCredentials() {
         const _extendBtn = page.locator('[role="dialog"]:has-text("Extend Your Session") button:has-text("Extend Session")').first();
         if (await _extendBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
           await _extendBtn.click({ force: true }).catch(() => {});
-          const _sessionExtendedConfirm = page.locator('[role="dialog"]:has-text("Session extended")').first();
+          const _sessionExtendedConfirm = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
           if (await _sessionExtendedConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
             await _sessionExtendedConfirm.locator('button').first().click({ force: true }).catch(() => {});
             await _sessionExtendedConfirm.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
@@ -372,7 +372,7 @@ async function extractCredentials() {
     }
 
     // Dismiss any lingering "Session extended" modal that may obscure sandbox controls
-    const _sessionExtendedModal = page.locator('[role="dialog"]:has-text("Session extended")').first();
+    const _sessionExtendedModal = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
     if (await _sessionExtendedModal.isVisible({ timeout: 3000 }).catch(() => false)) {
       console.error('INFO: Dismissing "Session extended" modal...');
       await _sessionExtendedModal.locator('button').first().click({ force: true }).catch(() => {});
@@ -460,7 +460,7 @@ async function extractCredentials() {
             const _extendDuringWaitBtn = page.locator('[role="dialog"]:has-text("Extend Your Session") button:has-text("Extend Session")').first();
             if (await _extendDuringWaitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
               await _extendDuringWaitBtn.click({ force: true }).catch(() => {});
-              const _sessionExtendedConfirm = page.locator('[role="dialog"]:has-text("Session extended")').first();
+              const _sessionExtendedConfirm = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
               if (await _sessionExtendedConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await _sessionExtendedConfirm.locator('button').first().click({ force: true }).catch(() => {});
                 await _sessionExtendedConfirm.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});

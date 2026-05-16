@@ -137,7 +137,7 @@ async function extendSandbox() {
     }
 
     // Dismiss any lingering "Session extended" confirmation modal before searching for extend button
-    const _sessionExtendedModal = page.locator('[role="dialog"]:has-text("Session extended")').first();
+    const _sessionExtendedModal = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
     if (await _sessionExtendedModal.isVisible({ timeout: 3000 }).catch(() => false)) {
       console.error('INFO: Dismissing "Session extended" modal...');
       await _sessionExtendedModal.locator('button').first().click({ force: true }).catch(() => {});
@@ -185,7 +185,7 @@ async function extendSandbox() {
     }
 
     if (clicked) {
-      const _extendedConfirm = page.locator('[role="dialog"]:has-text("Session extended")').first();
+      const _extendedConfirm = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
       if (await _extendedConfirm.isVisible({ timeout: 3000 }).catch(() => false)) {
         await _extendedConfirm.locator('button').first().click({ force: true }).catch(() => {});
         await _extendedConfirm.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
@@ -384,7 +384,7 @@ async function extendSandbox() {
       console.error('WARN: Could not confirm extension via toast/TTL text — proceeding anyway');
     }
 
-    const _extendedConfirmGeneral = page.locator('[role="dialog"]:has-text("Session extended")').first();
+    const _extendedConfirmGeneral = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
     if (await _extendedConfirmGeneral.isVisible({ timeout: 2000 }).catch(() => false)) {
       await _extendedConfirmGeneral.locator('button').first().click({ force: true }).catch(() => {});
       await _extendedConfirmGeneral.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
