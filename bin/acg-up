@@ -108,11 +108,7 @@ fi
 _info "[acg-up] Step 1/12 — Getting ${_cluster_provider} credentials..."
 case "${_cluster_provider}" in
   k3s-aws)
-    if aws sts get-caller-identity >/dev/null 2>&1; then
-      _info "[acg-up] Existing AWS credentials valid — skipping extraction"
-    else
-      acg_get_credentials ${sandbox_url:+"$sandbox_url"}
-    fi
+    acg_get_credentials ${sandbox_url:+"$sandbox_url"} || return 1
     ;;
   k3s-gcp)
     gcp_get_credentials ${sandbox_url:+"$sandbox_url"}
