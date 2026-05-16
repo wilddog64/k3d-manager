@@ -102,13 +102,22 @@ async function _extractGcpCredentials(page) {
   }
 
   // GCP fields use aria-label="Copyable input" (same as AWS) — getByLabel() finds nothing
-  // because the visible labels are not HTML-associated. Use positional extraction.
+  // because the visible labels are not HTML-associated.
+  // Find the service account JSON by content (starts with '{') to avoid reading AWS sandbox
+  // inputs when both AWS and GCP panels are visible on the same page.
   const inputs = await page.locator('input[aria-label="Copyable input"]').all();
   console.error(`INFO: Found ${inputs.length} copyable inputs`);
 
-  const username = inputs.length >= 1 ? await inputs[0].inputValue().catch(() => '') : '';
-  const password = inputs.length >= 2 ? await inputs[1].inputValue().catch(() => '') : '';
-  const serviceAccountJson = inputs.length >= 3 ? await inputs[2].inputValue().catch(() => '') : '';
+  let _saJsonIdx = -1;
+  for (let _gi = 0; _gi < inputs.length; _gi++) {
+    const _v = await inputs[_gi].inputValue().catch(() => '');
+    if (_v.trim().startsWith('{')) { _saJsonIdx = _gi; break; }
+  }
+  const serviceAccountJson = _saJsonIdx >= 0 ? await inputs[_saJsonIdx].inputValue().catch(() => '') : '';
+  const username = _saJsonIdx >= 2 ? await inputs[_saJsonIdx - 2].inputValue().catch(() => '') :
+    (inputs.length >= 1 ? await inputs[0].inputValue().catch(() => '') : '');
+  const password = _saJsonIdx >= 1 ? await inputs[_saJsonIdx - 1].inputValue().catch(() => '') :
+    (inputs.length >= 2 ? await inputs[1].inputValue().catch(() => '') : '');
 
   console.error(`INFO: username="${username.slice(0, 30)}" password="${password ? '[set]' : '[empty]'}" sa_json_len=${serviceAccountJson.length}`);
 
@@ -425,11 +434,30 @@ async function extractCredentials() {
         console.error('INFO: Waiting for credentials to populate (up to 420s)...');
         const deadline = Date.now() + 420000;
         while (Date.now() < deadline) {
+          const _extendDuringWait = page.locator('[role="dialog"]:has-text("Extend Your Session")').first();
+          if (await _extendDuringWait.isVisible({ timeout: 500 }).catch(() => false)) {
+            console.error('INFO: Dismissing "Extend Your Session" prompt during credentials wait...');
+            const _cancelDuringWait = _extendDuringWait.locator('button:has-text("Cancel")').first();
+            if (await _cancelDuringWait.isVisible({ timeout: 500 }).catch(() => false)) {
+              await _cancelDuringWait.click({ force: true }).catch(() => {});
+            } else {
+              await page.keyboard.press('Escape').catch(() => {});
+            }
+            await page.waitForTimeout(300);
+          }
           const inputs = page.locator('input[aria-label="Copyable input"]');
-          if (await inputs.count() > 0) {
-            const value = await inputs.first().inputValue().catch(() => '');
-            if (value.trim().length > 0) {
-              return;
+          const _count = await inputs.count();
+          if (_count > 0) {
+            if (PROVIDER === 'gcp') {
+              for (let _wi = 0; _wi < _count; _wi++) {
+                const _v = await inputs.nth(_wi).inputValue().catch(() => '');
+                if (_v.trim().startsWith('{')) return;
+              }
+            } else {
+              const value = await inputs.first().inputValue().catch(() => '');
+              if (value.trim().length > 0) {
+                return;
+              }
             }
           }
           await page.waitForTimeout(2000);
