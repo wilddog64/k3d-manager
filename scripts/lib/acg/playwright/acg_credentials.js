@@ -260,10 +260,7 @@ async function extractCredentials() {
         } else {
           await page.keyboard.press('Escape').catch(() => {});
         }
-        await page.locator('[role="dialog"][data-open="true"]:has-text("Extend Your Session")')
-          .waitFor({ state: 'hidden', timeout: 5000 })
-          .catch(() => {});
-        await page.waitForTimeout(500).catch(() => {});
+        await page.waitForTimeout(250).catch(() => {});
       }
     );
 
