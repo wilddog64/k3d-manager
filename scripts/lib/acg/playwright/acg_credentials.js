@@ -249,6 +249,23 @@ async function extractCredentials() {
       console.error(`INFO: Found existing sandbox tab: ${page.url()}`);
     }
 
+    // Intercept "Extend Your Session" dialog if it appears mid-click — fires at most once per session
+    await page.addLocatorHandler(
+      page.locator('[role="dialog"][data-open="true"]:has-text("Extend Your Session")'),
+      async () => {
+        console.error('INFO: [handler] Clicking "Extend Session" to extend sandbox...');
+        const _extendBtn = page.locator('[role="dialog"]:has-text("Extend Your Session") button:has-text("Extend Session")').first();
+        if (await _extendBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+          await _extendBtn.click({ force: true }).catch(() => {});
+          await page.waitForTimeout(500).catch(() => {});
+          await page.keyboard.press('Escape').catch(() => {});
+        } else {
+          await page.keyboard.press('Escape').catch(() => {});
+        }
+        await page.waitForTimeout(250).catch(() => {});
+      }
+    );
+
     // Skip navigation entirely if sandbox panel is already loaded on the current page
     const _sandboxReady = await page.locator(
       'button:has-text("Start Sandbox"), input[aria-label="Copyable input"]'
@@ -436,10 +453,12 @@ async function extractCredentials() {
         while (Date.now() < deadline) {
           const _extendDuringWait = page.locator('[role="dialog"]:has-text("Extend Your Session")').first();
           if (await _extendDuringWait.isVisible({ timeout: 500 }).catch(() => false)) {
-            console.error('INFO: Dismissing "Extend Your Session" prompt during credentials wait...');
-            const _cancelDuringWait = _extendDuringWait.locator('button:has-text("Cancel")').first();
-            if (await _cancelDuringWait.isVisible({ timeout: 500 }).catch(() => false)) {
-              await _cancelDuringWait.click({ force: true }).catch(() => {});
+            console.error('INFO: Extending "Extend Your Session" prompt during credentials wait...');
+            const _extendDuringWaitBtn = page.locator('[role="dialog"]:has-text("Extend Your Session") button:has-text("Extend Session")').first();
+            if (await _extendDuringWaitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+              await _extendDuringWaitBtn.click({ force: true }).catch(() => {});
+              await page.waitForTimeout(500).catch(() => {});
+              await page.keyboard.press('Escape').catch(() => {});
             } else {
               await page.keyboard.press('Escape').catch(() => {});
             }
