@@ -264,11 +264,12 @@ async function extractCredentials() {
         const _extendBtn = page.locator('[role="dialog"]:has-text("Extend Your Session") button:has-text("Extend Session")').first();
         if (await _extendBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
           await _extendBtn.click({ force: true }).catch(() => {});
-          await page.waitForTimeout(500).catch(() => {});
-          await page.keyboard.press('Escape').catch(() => {});
-        } else {
-          await page.keyboard.press('Escape').catch(() => {});
+          const _sessionExtendedConfirm = page.locator('[role="dialog"]:has-text("Session extended")').first();
+          if (await _sessionExtendedConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await page.keyboard.press('Escape').catch(() => {});
+          }
         }
+        await page.locator('[role="dialog"]:has-text("Extend Your Session")').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
         await page.waitForTimeout(1000).catch(() => {});
       },
       { times: 1 }
@@ -465,11 +466,12 @@ async function extractCredentials() {
             const _extendDuringWaitBtn = page.locator('[role="dialog"]:has-text("Extend Your Session") button:has-text("Extend Session")').first();
             if (await _extendDuringWaitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
               await _extendDuringWaitBtn.click({ force: true }).catch(() => {});
-              await page.waitForTimeout(500).catch(() => {});
-              await page.keyboard.press('Escape').catch(() => {});
-            } else {
-              await page.keyboard.press('Escape').catch(() => {});
+              const _sessionExtendedConfirm = page.locator('[role="dialog"]:has-text("Session extended")').first();
+              if (await _sessionExtendedConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
+                await page.keyboard.press('Escape').catch(() => {});
+              }
             }
+            await _extendDuringWait.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
             await page.waitForTimeout(300);
           }
           const inputs = page.locator('input[aria-label="Copyable input"]');
