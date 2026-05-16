@@ -152,6 +152,11 @@ async function _extractGcpCredentials(page) {
 async function _clickStartSandbox(page, buttonLocator) {
   const _prompt = page.locator('[role="dialog"]:has-text("Extend Your Session")').first();
   await _prompt.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+  const _sessionExtended = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
+  if (await _sessionExtended.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await _sessionExtended.locator('button').first().click({ force: true }).catch(() => {});
+    await _sessionExtended.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+  }
   await buttonLocator.scrollIntoViewIfNeeded().catch(() => {});
   await buttonLocator.click({ force: true });
 }
