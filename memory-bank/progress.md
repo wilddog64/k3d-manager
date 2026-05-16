@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
+- **k3d-manager v1.4.6 acg-credentials extend-not-cancel ASSIGNED** — spec: `docs/bugs/2026-05-16-acg-credentials-extend-session-not-cancel.md`; change handler callback to try `button:has-text("Extend")` first (+ 500ms + Escape), Cancel as fallback; branch: `k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials handler animation settle completed** — `scripts/lib/acg/playwright/acg_credentials.js` now waits 1s at the end of the `addLocatorHandler` callback so the modal animation and React re-render settle before Playwright resumes the intercepted click; committed as `0fbdba3079b8c1e183e8cb1b72fdbf1429a3f3ff` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials addLocatorHandler animation wait loop completed** — `scripts/lib/acg/playwright/acg_credentials.js` now scopes `page.addLocatorHandler()` to `[data-open="true"]` so the post-handler wait exits immediately when Cancel sets `data-open="false"`; committed as `1026389cdbb4353ec4a4dba6b402f0ec5e9bcb88` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials Extend Modal addLocatorHandler completed** — `scripts/lib/acg/playwright/acg_credentials.js` now registers `page.addLocatorHandler()` immediately after page establishment to auto-dismiss the modal at any point; committed as `4cbe3b7e26e41eee1a2e05897a75c1d030557ef8` and pushed to `origin/k3d-manager-v1.4.6`
