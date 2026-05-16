@@ -1,7 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
-- **k3d-manager v1.4.6 acg-credentials Extend Modal addLocatorHandler ASSIGNED** — spec: `docs/bugs/2026-05-16-acg-credentials-extend-modal-addlocatorhandler.md`; branch: `k3d-manager-v1.4.6`; add `page.addLocatorHandler()` to auto-dismiss "Extend Your Session" modal at any point in the script
+- **k3d-manager v1.4.6 acg-credentials Extend Modal addLocatorHandler completed** — `scripts/lib/acg/playwright/acg_credentials.js` now registers `page.addLocatorHandler()` immediately after page establishment to auto-dismiss the modal at any point; committed as `4cbe3b7e26e41eee1a2e05897a75c1d030557ef8` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 frontend.shopping-cart.local automation completed** — `bin/acg-up` now adds `frontend.shopping-cart.local` to `_HOSTS_LIST`, points Step 10e at `svc/istio-ingressgateway` in `istio-system`, removes the localhost:3000 frontend port-forward, and prints the frontend URL in the final summary; committed as `e701139a17eb4acb19bb84976db5e4a14e795a8f` and pushed to `origin/k3d-manager-v1.4.6`
 - Current branch: `k3d-manager-v1.4.6` (created from k3d-manager PR #74 merge SHA `8f93df25`)
 - **k3d-manager v1.4.6 acg-credentials Extend Your Session modal fix completed** — `scripts/lib/acg/playwright/acg_credentials.js` now dismisses the lingering "Extend Your Session" prompt before the Start/Open flow; committed as `69204c91e5e060df6e2ca230c1180d6055f1d91d` and pushed to `origin/k3d-manager-v1.4.6`
