@@ -1,7 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
-- **k3d-manager v1.4.6 acg-credentials extend-dialog-button-enumerate ASSIGNED** — spec: `docs/bugs/2026-05-16-acg-credentials-extend-dialog-button-enumerate.md`; enumerate dialog buttons + click first non-cancel; branch: `k3d-manager-v1.4.6`
+- **k3d-manager v1.4.6 acg-credentials handler-dismiss-waitfor ASSIGNED** — spec: `docs/bugs/2026-05-16-acg-credentials-handler-dismiss-waitfor.md`; remove Extend branch, Cancel/Escape + waitFor hidden + 500ms settle; branch: `k3d-manager-v1.4.6` (enumerate spec superseded — do not implement)
 - **k3d-manager v1.4.6 acg-credentials extend-not-cancel completed** — `scripts/lib/acg/playwright/acg_credentials.js` now clicks `Extend` first in the `addLocatorHandler` callback, falls back to `Cancel`/Escape, and keeps the 500ms Escape plus 1s settle wait; committed as `a07c3c10` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials handler animation settle completed** — `scripts/lib/acg/playwright/acg_credentials.js` now waits 1s at the end of the `addLocatorHandler` callback so the modal animation and React re-render settle before Playwright resumes the intercepted click; committed as `0fbdba3079b8c1e183e8cb1b72fdbf1429a3f3ff` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials addLocatorHandler animation wait loop completed** — `scripts/lib/acg/playwright/acg_credentials.js` now scopes `page.addLocatorHandler()` to `[data-open="true"]` so the post-handler wait exits immediately when Cancel sets `data-open="false"`; committed as `1026389cdbb4353ec4a4dba6b402f0ec5e9bcb88` and pushed to `origin/k3d-manager-v1.4.6`
