@@ -14,6 +14,8 @@
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
 ## In Progress (v1.4.6)
+- **OPEN:** Codex — acg-credentials _clickStartSandbox blocked by Session extended modal — spec: `docs/bugs/2026-05-16-acg-credentials-click-start-sandbox-blocked-by-session-extended.md`; add "Session extended" dismissal inside `_clickStartSandbox` (lines 152–157) before scroll+click
+- **OPEN:** Codex — acg-up return outside function — spec: `docs/bugs/2026-05-16-acg-up-return-outside-function.md`; `bin/acg-up` line 111: `|| return 1` → `|| exit 1`
 - **COMPLETE:** Codex — acg-credentials isEnabled() gate skips Start Sandbox click — spec: `docs/bugs/2026-05-16-acg-credentials-start-sandbox-isenabled-gate.md`; `scripts/lib/acg/playwright/acg_credentials.js` Pattern 1 now always clicks Start Sandbox when visible; committed as `ee8be3ca` and pushed to `origin/k3d-manager-v1.4.6`
 - **COMPLETE:** Codex — acg-up aws sts shortcut skips credential extraction — spec: `docs/bugs/2026-05-16-acg-up-credential-shortcut-skips-extraction.md`; `bin/acg-up` now always calls `acg_get_credentials ${sandbox_url:+"$sandbox_url"} || return 1` for `k3s-aws`; committed as `b1da7ef4` and pushed to `origin/k3d-manager-v1.4.6`
 - **COMPLETE:** Codex — acg-credentials Escape does not dismiss "Extend Your Session" dialog — spec: `docs/bugs/2026-05-16-acg-credentials-escape-does-not-dismiss-extend-session-dialog.md`; `scripts/lib/acg/playwright/acg_credentials.js` now clicks `_extendSessionPrompt.locator('button[aria-label="Close"]').first().click({ force: true })` instead of pressing Escape; committed as `c66e8bc5` and pushed to `origin/k3d-manager-v1.4.6`

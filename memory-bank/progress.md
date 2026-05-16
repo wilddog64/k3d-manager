@@ -1,6 +1,8 @@
 # Progress — k3d-manager
 
 ## Status
+- **k3d-manager v1.4.6 acg-credentials _clickStartSandbox blocked by Session extended — OPEN** — spec: `docs/bugs/2026-05-16-acg-credentials-click-start-sandbox-blocked-by-session-extended.md`; add 4-line "Session extended" dismissal block inside `_clickStartSandbox`; assign to Codex
+- **k3d-manager v1.4.6 acg-up return outside function — OPEN** — spec: `docs/bugs/2026-05-16-acg-up-return-outside-function.md`; `bin/acg-up` line 111 `return` → `exit`; assign to Codex
 - **k3d-manager v1.4.6 acg-credentials isEnabled() gate skips Start Sandbox — completed** — spec: `docs/bugs/2026-05-16-acg-credentials-start-sandbox-isenabled-gate.md`; `scripts/lib/acg/playwright/acg_credentials.js` Pattern 1 now always clicks Start Sandbox when visible; committed as `ee8be3ca` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-up credential shortcut skips extraction — completed** — spec: `docs/bugs/2026-05-16-acg-up-credential-shortcut-skips-extraction.md`; `bin/acg-up` now always calls `acg_get_credentials ${sandbox_url:+"$sandbox_url"} || return 1` for `k3s-aws`; committed as `b1da7ef4` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials Escape does not dismiss Extend Your Session dialog — completed** — spec: `docs/bugs/2026-05-16-acg-credentials-escape-does-not-dismiss-extend-session-dialog.md`; `scripts/lib/acg/playwright/acg_credentials.js` line 392 now clicks `_extendSessionPrompt.locator('button[aria-label="Close"]').first().click({ force: true })`; committed as `c66e8bc5` and pushed to `origin/k3d-manager-v1.4.6`
