@@ -249,6 +249,20 @@ async function extractCredentials() {
       console.error(`INFO: Found existing sandbox tab: ${page.url()}`);
     }
 
+    // Auto-dismiss "Extend Your Session" at any point — fires during waitForFunction, clicks, etc.
+    await page.addLocatorHandler(
+      page.locator('[role="dialog"]:has-text("Extend Your Session")'),
+      async () => {
+        console.error('INFO: [handler] Auto-dismissing "Extend Your Session" prompt...');
+        const _handlerCancelBtn = page.locator('[role="dialog"]:has-text("Extend Your Session") button:has-text("Cancel")').first();
+        if (await _handlerCancelBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await _handlerCancelBtn.click({ force: true }).catch(() => {});
+        } else {
+          await page.keyboard.press('Escape').catch(() => {});
+        }
+      }
+    );
+
     // Skip navigation entirely if sandbox panel is already loaded on the current page
     const _sandboxReady = await page.locator(
       'button:has-text("Start Sandbox"), input[aria-label="Copyable input"]'
