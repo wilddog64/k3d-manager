@@ -3,6 +3,8 @@
 ## Status
 - Current branch: `k3d-manager-v1.4.6` (created from k3d-manager PR #74 merge SHA `8f93df25`)
 - **k3d-manager PR #74 merged** — k3d-manager-v1.4.5 → main (SHA: `8f93df25`); ACG extend navigation fix + frontend SSO wiring; v1.4.6 branch created with retrospective
+- **k3d-manager v1.4.6 acg-credentials "Extend Your Session" modal fix ASSIGNED** — spec: `docs/plans/v1.4.6-bugfix-acg-credentials-extend-session-modal.md`; apply first
+- **k3d-manager v1.4.6 acg-credentials GCP reads AWS inputs fix ASSIGNED** — spec: `docs/plans/v1.4.6-bugfix-acg-credentials-gcp-reads-aws-inputs.md`; apply after extend-session-modal fix
 - **k3d-manager v1.4.6 acg-credentials Session extended modal fix completed** — `scripts/lib/acg/playwright/acg_credentials.js` now dismisses the lingering "Session extended" modal before the Start/Open flow; committed as `3444c171d4797e4cc305b4fc9c1bc707b6a9fb5c` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials wrong sandbox provider fix completed** — `scripts/lib/acg/playwright/acg_credentials.js` now selects the provider-specific "Open Sandbox" card by walking ancestors before clicking; committed as `5dfbdf44c2f3dce49e53f1e3f245b5c8e3a470fd` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-extend Start Sandbox race fix completed** — `scripts/lib/acg/playwright/acg_extend.js` now exits 0 when the fallback button text is `Start Sandbox` instead of waiting for an extend button that never appears; committed as `bae89aafae42aeea7b7d71cd65eed4c24ca84962` and pushed to `origin/k3d-manager-v1.4.6`
