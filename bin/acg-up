@@ -233,6 +233,7 @@ _kc_browser_ip="127.0.0.1"
 _HOSTS_LIST=(
   "argocd.shopping-cart.local|${_argocd_host_ip}"
   "keycloak.shopping-cart.local|${_kc_browser_ip}"
+  "frontend.shopping-cart.local|127.0.0.1"
 )
 for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
   _h="${_host_ip_pair%%|*}"
@@ -807,7 +808,7 @@ else
 fi
 
 if _is_mac; then
-  _info "[acg-up] Step 10e/14 — Installing Keycloak browser HTTP listener (keycloak.shopping-cart.local:80, auto-restart)..."
+  _info "[acg-up] Step 10e/14 — Installing Istio ingress HTTP listener (keycloak + frontend → 127.0.0.1:80, auto-restart)..."
   _keycloak_browser_label="com.k3d-manager.keycloak-browser-http"
   _keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"
   _keycloak_browser_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http.log"
@@ -816,10 +817,10 @@ if _is_mac; then
   _keycloak_browser_plist_tmp="${HOME}/.local/share/k3d-manager/keycloak-browser-http.plist"
   _keycloak_browser_kubeconfig="${HOME}/.kube/config"
   mkdir -p "$(dirname "${_keycloak_browser_log}")"
-  if curl -sf --max-time 1 http://127.0.0.1/health/ready >/dev/null 2>&1; then
-    _info "[acg-up] Keycloak browser HTTP listener already healthy at http://keycloak.shopping-cart.local — skipping launchd reinstall"
+  if curl -sf --max-time 1 http://keycloak.shopping-cart.local/health/ready >/dev/null 2>&1; then
+    _info "[acg-up] Istio ingress HTTP listener already healthy at http://keycloak.shopping-cart.local — skipping launchd reinstall"
   else
-    _argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl)" "$(command -v curl)" "identity" "k3d-k3d-cluster" "svc/keycloak" "80" "80" "http://127.0.0.1/health/ready" "${_keycloak_browser_kubeconfig}"
+    _argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl)" "$(command -v curl)" "istio-system" "k3d-k3d-cluster" "svc/istio-ingressgateway" "80" "80" "http://keycloak.shopping-cart.local/health/ready" "${_keycloak_browser_kubeconfig}"
     cat > "${_keycloak_browser_plist_tmp}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -868,7 +869,7 @@ PLIST
       fi
       _err "[acg-up] failed to bootstrap Keycloak browser HTTP listener; see ${_keycloak_browser_launchctl_log}"
     fi
-    _info "[acg-up] Keycloak browser HTTP listener reachable at http://keycloak.shopping-cart.local (launchd: ${_keycloak_browser_label})"
+    _info "[acg-up] Istio ingress HTTP listener reachable at http://keycloak.shopping-cart.local and http://frontend.shopping-cart.local (launchd: ${_keycloak_browser_label})"
   fi
 fi
 
@@ -945,50 +946,10 @@ fi
 _info "[acg-up] Step 12/14 — Installing sandbox TTL watcher (launchd)..."
 acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
 
-_info "[acg-up] Step 13/14 — Installing frontend port-forward launchd agent (localhost:3000, auto-restart)..."
-_frontend_pf_label="com.k3d-manager.frontend-port-forward"
-_frontend_pf_plist="${HOME}/Library/LaunchAgents/${_frontend_pf_label}.plist"
-_frontend_pf_log="${HOME}/.local/share/k3d-manager/frontend-pf.log"
-mkdir -p "$(dirname "${_frontend_pf_log}")" "$(dirname "${_frontend_pf_plist}")"
-cat > "${_frontend_pf_plist}" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>${_frontend_pf_label}</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/opt/homebrew/bin/kubectl</string>
-    <string>port-forward</string>
-    <string>svc/frontend</string>
-    <string>--namespace</string>
-    <string>shopping-cart-apps</string>
-    <string>--context</string>
-    <string>ubuntu-k3s</string>
-    <string>3000:80</string>
-  </array>
-  <key>KeepAlive</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>${_frontend_pf_log}</string>
-  <key>StandardErrorPath</key>
-  <string>${_frontend_pf_log}</string>
-</dict>
-</plist>
-PLIST
-if launchctl list "${_frontend_pf_label}" >/dev/null 2>&1; then
-  launchctl unload "${_frontend_pf_plist}" 2>/dev/null || true
-fi
-launchctl load "${_frontend_pf_plist}"
-sleep 2
-if curl -sf --max-time 5 http://localhost:3000 >/dev/null 2>&1; then
-  _info "[acg-up] Frontend reachable at http://localhost:3000 (launchd: ${_frontend_pf_label})"
-else
-  _info "[acg-up] Frontend launchd agent loaded — UI may take a moment to be ready at http://localhost:3000"
-fi
+_info "[acg-up] Step 13/14 — Frontend is served via the Istio ingress HTTP listener at http://frontend.shopping-cart.local (Step 10e). No separate port-forward needed."
 
 _info "[acg-up] Cluster is up."
 kubectl get nodes --context ubuntu-k3s
 _info "[acg-up] ArgoCD browser login URL: https://argocd.shopping-cart.local"
-_info "[acg-up] Open that URL manually in your browser to continue SSO login."
+_info "[acg-up] Frontend URL: http://frontend.shopping-cart.local"
+_info "[acg-up] Open those URLs manually in your browser to continue SSO login."
