@@ -1,6 +1,8 @@
 # Progress — k3d-manager
 
 ## Status
+- **k3d-manager v1.4.6 acg-credentials isEnabled() gate skips Start Sandbox — OPEN** — spec: `docs/bugs/2026-05-16-acg-credentials-start-sandbox-isenabled-gate.md`; remove `isEnabled()` check at Pattern 1 in `acg_credentials.js` lines 499–507; assign to Codex
+- **k3d-manager v1.4.6 acg-up credential shortcut skips extraction — OPEN** — spec: `docs/bugs/2026-05-16-acg-up-credential-shortcut-skips-extraction.md`; replace `aws sts get-caller-identity` shortcut block in `bin/acg-up` lines 110–115 with `acg_get_credentials ... || return 1`; assign to Codex
 - **k3d-manager v1.4.6 acg-credentials Escape does not dismiss Extend Your Session dialog — completed** — spec: `docs/bugs/2026-05-16-acg-credentials-escape-does-not-dismiss-extend-session-dialog.md`; `scripts/lib/acg/playwright/acg_credentials.js` line 392 now clicks `_extendSessionPrompt.locator('button[aria-label="Close"]').first().click({ force: true })`; committed as `c66e8bc5` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg Session extended modal wrong-button completed** — spec: `docs/bugs/2026-05-16-acg-session-extended-modal-wrong-button.md`; 6 single-line locator changes in acg_extend.js (3) + acg_credentials.js (3); committed as `8eb6fd02` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 k3s-aws CloudFormation rollback-state completed** — spec: `docs/bugs/2026-05-16-k3s-aws-cloudformation-rollback-state.md`; `scripts/lib/providers/k3s-aws.sh` now calls `acg_provision --confirm --recreate`; committed as `bc4485d8` and pushed to `origin/k3d-manager-v1.4.6`
