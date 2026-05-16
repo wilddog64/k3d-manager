@@ -253,19 +253,17 @@ async function extractCredentials() {
     await page.addLocatorHandler(
       page.locator('[role="dialog"][data-open="true"]:has-text("Extend Your Session")'),
       async () => {
-        console.error('INFO: [handler] Auto-extending "Extend Your Session" prompt...');
-        const _handlerExtendBtn = page.locator('[role="dialog"]:has-text("Extend Your Session") button:has-text("Extend")').first();
+        console.error('INFO: [handler] Dismissing "Extend Your Session" prompt...');
         const _handlerCancelBtn = page.locator('[role="dialog"]:has-text("Extend Your Session") button:has-text("Cancel")').first();
-        if (await _handlerExtendBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-          await _handlerExtendBtn.click({ force: true }).catch(() => {});
-          await page.waitForTimeout(500).catch(() => {});
-          await page.keyboard.press('Escape').catch(() => {});
-        } else if (await _handlerCancelBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+        if (await _handlerCancelBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
           await _handlerCancelBtn.click({ force: true }).catch(() => {});
         } else {
           await page.keyboard.press('Escape').catch(() => {});
         }
-        await page.waitForTimeout(1000).catch(() => {});
+        await page.locator('[role="dialog"][data-open="true"]:has-text("Extend Your Session")')
+          .waitFor({ state: 'hidden', timeout: 5000 })
+          .catch(() => {});
+        await page.waitForTimeout(500).catch(() => {});
       }
     );
 
