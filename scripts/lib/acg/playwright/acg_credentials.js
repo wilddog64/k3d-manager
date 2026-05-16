@@ -149,6 +149,14 @@ async function _extractGcpCredentials(page) {
   });
 }
 
+async function _clickStartSandbox(page, buttonLocator) {
+  const _prompt = page.locator('[role="dialog"]:has-text("Extend Your Session")').first();
+  await _prompt.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+  const _btn = buttonLocator.first();
+  await _btn.scrollIntoViewIfNeeded().catch(() => {});
+  await _btn.click({ force: true });
+}
+
 async function extractCredentials() {
   let targetUrl = process.argv[2];
   if (!targetUrl) {
@@ -491,7 +499,7 @@ async function extractCredentials() {
         const _startEnabled = await startButton.isEnabled({ timeout: 1000 }).catch(() => false);
         if (_startEnabled) {
           console.error('INFO: Clicking Start Sandbox...');
-          await startButton.click();
+          await _clickStartSandbox(page, startButton);
         } else {
           console.error('INFO: Start Sandbox button is disabled — sandbox already running; waiting for credentials...');
         }
@@ -529,7 +537,7 @@ async function extractCredentials() {
         const startButton2 = page.locator('button:has-text("Start Sandbox")').first();
         if (await startButton2.isVisible({ timeout: 5000 }).catch(() => false)) {
           console.error('INFO: Clicking Start Sandbox (Step 2)...');
-          await startButton2.click();
+          await _clickStartSandbox(page, startButton2);
         }
         await _waitForCredentials();
       } else if (await resumeButton.isVisible({ timeout: 5000 }).catch(() => false)) {
