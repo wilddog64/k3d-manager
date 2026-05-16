@@ -4,7 +4,7 @@
 - Current branch: `k3d-manager-v1.4.6` (created from k3d-manager PR #74 merge SHA `8f93df25`)
 - **k3d-manager PR #74 merged** — k3d-manager-v1.4.5 → main (SHA: `8f93df25`); ACG extend navigation fix + frontend SSO wiring; v1.4.6 branch created with retrospective
 - **k3d-manager v1.4.6 follow-up completed** — `scripts/lib/acg/playwright/acg_extend.js` commit `34c41ced492f37525f170feed6664156b5647634`; `bin/acg-up` final fix commit `0ea4cc9f89649a3a5ca7d8a2da4df4f6b39fb4b9` (interactive sudo + 120s listener timeout); both pushed to `origin/k3d-manager-v1.4.6`
-- **shopping-cart-infra argocd-cm http→https bug completed** — spec: `shopping-cart-infra/docs/bugs/2026-05-15-argocd-cm-http-url-breaks-sso-callback.md`; commit `411ebb2e3b551cccbe44260c30bb561940357eb8`; branch `shopping-cart-infra-v0.5.3`; `url: http://` → `url: https://` in `argocd/config/argocd-cm.yaml`; pushed to `origin/shopping-cart-infra-v0.5.3`
+- **shopping-cart-infra PR #58 merged** — shopping-cart-infra-v0.5.3 → main (SHA: `67f8d228`); ArgoCD SSO OIDC callback fix (`url: http://` → `url: https://`); v0.5.4 next branch created; retrospective added and pushed
 - **shopping-cart-frontend PR #15 merged** — shopping-cart-frontend-v0.5.1 → main (SHA: `19e47118`); Keycloak SSO wiring (CI build-args + nginx CSP); v0.5.1 branch created with retrospective
 - **shopping-cart-infra PR #57 merged** — shopping-cart-infra-v0.5.2 → main (SHA: `adbaec8`); networking + mTLS fixes; v0.5.3 branch created with retrospective
 - **shopping-cart-infra PR #56 merged** — shopping-cart-infra-v0.5.1 → main (SHA: `79c42b7`); python3 → kcadm.sh bugfix + retrospective on v0.5.2
