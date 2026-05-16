@@ -1,7 +1,8 @@
 # Progress — k3d-manager
 
 ## Status
-- **k3d-manager v1.4.6 acg-credentials handler-dismiss-waitfor completed** — `scripts/lib/acg/playwright/acg_credentials.js` now dismisses via Cancel/Escape only, waits for the dialog to be hidden, and settles 500ms before returning; committed as `73660e6a` and pushed to `origin/k3d-manager-v1.4.6`
+- **k3d-manager v1.4.6 acg-credentials handler-nonblocking-250ms ASSIGNED** — spec: `docs/bugs/2026-05-16-acg-credentials-handler-nonblocking-250ms.md`; remove redundant `waitFor({ state: 'hidden', timeout: 5000 })`, reduce settle to 250ms; branch: `k3d-manager-v1.4.6` (dismiss-waitfor spec superseded — do not implement)
+- **k3d-manager v1.4.6 acg-credentials handler-dismiss-waitfor SUPERSEDED** — `73660e6a`; waitFor still burns entire 30s in one cycle (redundant with Playwright built-in); replaced by nonblocking-250ms spec
 - **k3d-manager v1.4.6 acg-credentials extend-not-cancel completed** — `scripts/lib/acg/playwright/acg_credentials.js` now clicks `Extend` first in the `addLocatorHandler` callback, falls back to `Cancel`/Escape, and keeps the 500ms Escape plus 1s settle wait; committed as `a07c3c10` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials handler animation settle completed** — `scripts/lib/acg/playwright/acg_credentials.js` now waits 1s at the end of the `addLocatorHandler` callback so the modal animation and React re-render settle before Playwright resumes the intercepted click; committed as `0fbdba3079b8c1e183e8cb1b72fdbf1429a3f3ff` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials addLocatorHandler animation wait loop completed** — `scripts/lib/acg/playwright/acg_credentials.js` now scopes `page.addLocatorHandler()` to `[data-open="true"]` so the post-handler wait exits immediately when Cancel sets `data-open="false"`; committed as `1026389cdbb4353ec4a4dba6b402f0ec5e9bcb88` and pushed to `origin/k3d-manager-v1.4.6`
