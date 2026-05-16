@@ -1,7 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
-- **k3d-manager v1.4.6 acg-credentials addLocatorHandler animation wait loop ASSIGNED** — spec: `docs/bugs/2026-05-16-acg-credentials-extend-modal-handler-wait-timeout.md`; add `[data-open="true"]` to `addLocatorHandler` locator
+- **k3d-manager v1.4.6 acg-credentials addLocatorHandler animation wait loop completed** — `scripts/lib/acg/playwright/acg_credentials.js` now scopes `page.addLocatorHandler()` to `[data-open="true"]` so the post-handler wait exits immediately when Cancel sets `data-open="false"`; committed as `1026389cdbb4353ec4a4dba6b402f0ec5e9bcb88` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials Extend Modal addLocatorHandler completed** — `scripts/lib/acg/playwright/acg_credentials.js` now registers `page.addLocatorHandler()` immediately after page establishment to auto-dismiss the modal at any point; committed as `4cbe3b7e26e41eee1a2e05897a75c1d030557ef8` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 frontend.shopping-cart.local automation completed** — `bin/acg-up` now adds `frontend.shopping-cart.local` to `_HOSTS_LIST`, points Step 10e at `svc/istio-ingressgateway` in `istio-system`, removes the localhost:3000 frontend port-forward, and prints the frontend URL in the final summary; committed as `e701139a17eb4acb19bb84976db5e4a14e795a8f` and pushed to `origin/k3d-manager-v1.4.6`
 - Current branch: `k3d-manager-v1.4.6` (created from k3d-manager PR #74 merge SHA `8f93df25`)
