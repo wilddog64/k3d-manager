@@ -294,6 +294,11 @@ async function extendSandbox() {
           _openBtn = page.locator('button:has-text("Open Sandbox"), button:has-text("Start Sandbox"), button:has-text("Resume")').first();
         }
         if (await _openBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+          const _btnText = await _openBtn.textContent().catch(() => '');
+          if (/start\s+sandbox/i.test(_btnText)) {
+            console.log('INFO: Sandbox not yet started — fresh 4h TTL. Skipping extension.');
+            process.exit(0);
+          }
           console.error('INFO: Clicking Open Sandbox to reveal extend panel...');
           await _openBtn.click({ force: true });
 
