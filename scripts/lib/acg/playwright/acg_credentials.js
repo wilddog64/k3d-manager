@@ -422,8 +422,32 @@ async function extractCredentials() {
         }
         await _waitForCredentials();
       } else if (await openButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        let _openBtnToClick = openButton;
+        if (PROVIDER !== 'aws') {
+          const _providerPattern = PROVIDER === 'gcp' ? 'google\\s*cloud|gcp' : PROVIDER;
+          const _allOpenBtns = page.locator('button:has-text("Open Sandbox")');
+          const _btnCount = await _allOpenBtns.count();
+          for (let _i = 0; _i < _btnCount; _i++) {
+            const _hasProvider = await _allOpenBtns.nth(_i).evaluate((el, pattern) => {
+              const re = new RegExp(pattern, 'i');
+              let node = el.parentElement;
+              for (let _j = 0; _j < 8; _j++) {
+                if (!node) break;
+                if (re.test(node.innerText || '')) return true;
+                node = node.parentElement;
+              }
+              return false;
+            }, _providerPattern).catch(() => false);
+            if (_hasProvider) { _openBtnToClick = _allOpenBtns.nth(_i); break; }
+          }
+          if (_openBtnToClick !== openButton) {
+            console.error(`INFO: Found ${PROVIDER.toUpperCase()} sandbox card — clicking its Open Sandbox button`);
+          } else {
+            console.error(`WARN: No ${PROVIDER.toUpperCase()}-specific sandbox card found — falling back to first Open Sandbox button`);
+          }
+        }
         console.error('INFO: Clicking Open Sandbox...');
-        await openButton.click();
+        await _openBtnToClick.click();
         await page.waitForTimeout(3000);
 
         // After Open, there might be a Start Sandbox button in the slide-over
