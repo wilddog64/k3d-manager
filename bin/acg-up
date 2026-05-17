@@ -229,7 +229,7 @@ _kc_browser_ip="127.0.0.1"
 _HOSTS_LIST=(
   "argocd.shopping-cart.local|${_argocd_host_ip}"
   "keycloak.shopping-cart.local|${_kc_browser_ip}"
-  "frontend.shopping-cart.local|127.0.0.1"
+  "frontend.shopping-cart.local|127.0.0.2"
 )
 for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
   _h="${_host_ip_pair%%|*}"
@@ -944,75 +944,80 @@ kubectl rollout restart deployment/argocd-server -n cicd --context k3d-k3d-clust
 kubectl rollout status deployment/argocd-server -n cicd --context k3d-k3d-cluster --timeout=120s
 _info "[acg-up] ArgoCD SSO wired: login at https://argocd.shopping-cart.local → Keycloak realm shopping-cart"
 
-_info "[acg-up] Step 10g/14 — Wiring frontend.shopping-cart.local → ubuntu-k3s frontend (NodePort + ServiceEntry + VirtualService)..."
-
-# 1. Create / reconcile NodePort 30080 for the frontend service on ubuntu-k3s.
-#    NodePort 30080 is reserved for frontend; 30081 = order-service, 30082 = product-catalog.
-kubectl apply --context ubuntu-k3s -f - <<'FRONTEND_NP_EOF'
-apiVersion: v1
-kind: Service
-metadata:
-  name: frontend-nodeport
-  namespace: shopping-cart-apps
-spec:
-  type: NodePort
-  selector:
-    app: frontend
-  ports:
-    - port: 80
-      targetPort: 8080
-      nodePort: 30080
-FRONTEND_NP_EOF
-
-# 2. Get the ubuntu-k3s control-plane public IP from the kubeconfig server URL.
-_ubuntu_k3s_ip=$(kubectl config view \
-  --context ubuntu-k3s --minify \
-  -o jsonpath='{.clusters[0].cluster.server}' \
-  | sed 's|https://||; s|:.*||')
-
-# 3. Apply a ServiceEntry in k3d so Istio can route to the remote NodePort.
-kubectl apply --context k3d-k3d-cluster -f - <<FRONTEND_SE_EOF
-apiVersion: networking.istio.io/v1beta1
-kind: ServiceEntry
-metadata:
-  name: frontend-ubuntu-k3s
-  namespace: istio-system
-spec:
-  hosts:
-    - frontend-ubuntu-k3s.external
-  addresses:
-    - ${_ubuntu_k3s_ip}/32
-  ports:
-    - number: 30080
-      name: http
-      protocol: HTTP
-  location: MESH_EXTERNAL
-  resolution: STATIC
-  endpoints:
-    - address: ${_ubuntu_k3s_ip}
-FRONTEND_SE_EOF
-
-# 4. Apply VirtualService in k3d: frontend.shopping-cart.local → ServiceEntry host:30080.
-kubectl apply --context k3d-k3d-cluster -f - <<'FRONTEND_VS_EOF'
-apiVersion: networking.istio.io/v1beta1
-kind: VirtualService
-metadata:
-  name: frontend
-  namespace: istio-system
-spec:
-  hosts:
-    - frontend.shopping-cart.local
-  gateways:
-    - istio-system/default-gateway
-  http:
-    - route:
-        - destination:
-            host: frontend-ubuntu-k3s.external
-            port:
-              number: 30080
-FRONTEND_VS_EOF
-
-_info "[acg-up] frontend.shopping-cart.local wired: ingressgateway → ${_ubuntu_k3s_ip}:30080 → frontend pod"
+if _is_mac; then
+  _info "[acg-up] Step 10g/14 — Installing frontend HTTP listener (frontend.shopping-cart.local → 127.0.0.2:80 → ubuntu-k3s, auto-restart)..."
+  _frontend_browser_label="com.k3d-manager.frontend-browser-http"
+  _frontend_browser_plist="${FRONTEND_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_frontend_browser_label}.plist}"
+  _frontend_browser_log="${HOME}/.local/share/k3d-manager/frontend-browser-http.log"
+  _frontend_browser_launchctl_log="${HOME}/.local/share/k3d-manager/frontend-browser-http-launchctl.log"
+  _frontend_browser_wrapper="${HOME}/.local/share/k3d-manager/frontend-browser-http.sh"
+  _frontend_browser_plist_tmp="${HOME}/.local/share/k3d-manager/frontend-browser-http.plist"
+  _frontend_browser_kubeconfig="${HOME}/.kube/config"
+  mkdir -p "$(dirname "${_frontend_browser_log}")"
+  # Write self-contained wrapper script; paths are baked in at write-time.
+  cat > "${_frontend_browser_wrapper}" <<FRONTEND_WRAPPER
+#!/usr/bin/env bash
+set -euo pipefail
+export KUBECONFIG="${_frontend_browser_kubeconfig}"
+_log="${_frontend_browser_log}"
+while true; do
+  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.2:80" >> "\${_log}"
+  kubectl --context ubuntu-k3s port-forward --address=127.0.0.2 \
+    svc/frontend 80:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
+  sleep 2
+done
+FRONTEND_WRAPPER
+  chmod +x "${_frontend_browser_wrapper}"
+  cat > "${_frontend_browser_plist_tmp}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_frontend_browser_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${_frontend_browser_wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_frontend_browser_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_frontend_browser_log}</string>
+</dict>
+</plist>
+PLIST
+  : > "${_frontend_browser_launchctl_log}"
+  if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
+      >"${_frontend_browser_launchctl_log}" 2>&1; then
+    _info "[acg-up] Stopped existing frontend browser HTTP listener"
+  elif [[ -s "${_frontend_browser_launchctl_log}" ]]; then
+    tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
+    _warn "[acg-up] existing frontend browser HTTP listener was not loaded; continuing"
+  fi
+  : > "${_frontend_browser_launchctl_log}"
+  if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" \
+      >"${_frontend_browser_launchctl_log}" 2>&1; then
+    if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
+      tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
+    fi
+    _err "[acg-up] failed to install frontend browser HTTP listener plist"
+  fi
+  rm -f "${_frontend_browser_plist_tmp}"
+  : > "${_frontend_browser_launchctl_log}"
+  if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_frontend_browser_plist}" \
+      >"${_frontend_browser_launchctl_log}" 2>&1; then
+    if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
+      tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
+    fi
+    _err "[acg-up] failed to bootstrap frontend browser HTTP listener"
+  fi
+  _info "[acg-up] Frontend HTTP listener active: http://frontend.shopping-cart.local → ubuntu-k3s svc/frontend via 127.0.0.2 (launchd: ${_frontend_browser_label})"
+fi
 
 _info "[acg-up] Step 11/14 — Verifying ClusterSecretStore..."
 _css_ready=false
@@ -1035,7 +1040,7 @@ fi
 _info "[acg-up] Step 12/14 — Installing sandbox TTL watcher (launchd)..."
 acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
 
-_info "[acg-up] Step 13/14 — Frontend wired via NodePort 30080 on ubuntu-k3s (Step 10g). URL: http://frontend.shopping-cart.local"
+_info "[acg-up] Step 13/14 — Frontend served via direct kubectl port-forward on 127.0.0.2:80 → ubuntu-k3s (Step 10g). URL: http://frontend.shopping-cart.local"
 
 _info "[acg-up] Cluster is up."
 kubectl get nodes --context ubuntu-k3s
