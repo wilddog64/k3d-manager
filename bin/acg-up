@@ -871,6 +871,26 @@ fi
 
 _info "[acg-up] Step 10f/14 — Wiring ArgoCD SSO (Keycloak VirtualService + argocd-cm + secret patch)..."
 
+# Apply the default Istio Gateway (default-gateway) so IngressGateway envoy has an HTTP listener.
+# VirtualServices for Keycloak and ArgoCD both reference istio-system/default-gateway.
+kubectl apply --context k3d-k3d-cluster -f - <<'GATEWAY_EOF'
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: default-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
+GATEWAY_EOF
+
 # Apply Keycloak VirtualService so in-cluster pods reach keycloak.shopping-cart.local via Istio
 KEYCLOAK_VIRTUALSERVICE_HOST=keycloak.shopping-cart.local \
 KEYCLOAK_VIRTUALSERVICE_GATEWAY=istio-system/default-gateway \
