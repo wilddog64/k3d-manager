@@ -955,6 +955,7 @@ if _is_mac; then
   _frontend_browser_kubeconfig="${HOME}/.kube/config"
   mkdir -p "$(dirname "${_frontend_browser_log}")"
   # Write self-contained wrapper script; paths are baked in at write-time.
+  _kubectl_bin="$(command -v kubectl)"
   cat > "${_frontend_browser_wrapper}" <<FRONTEND_WRAPPER
 #!/usr/bin/env bash
 set -euo pipefail
@@ -962,7 +963,7 @@ export KUBECONFIG="${_frontend_browser_kubeconfig}"
 _log="${_frontend_browser_log}"
 while true; do
   printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.2:80" >> "\${_log}"
-  kubectl --context ubuntu-k3s port-forward --address=127.0.0.2 \
+  ${_kubectl_bin} --context ubuntu-k3s port-forward --address=127.0.0.2 \
     svc/frontend 80:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
   sleep 2
 done
