@@ -154,22 +154,30 @@ async function _clickStartSandbox(page, buttonLocator) {
   await _prompt.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
   const _sessionExtended = page.locator('text="Your sandbox has been extended."').first();
   if (await _sessionExtended.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await page.evaluate(() => {
-      const closeBtn = document.querySelector('button[aria-label="close" i]');
-      if (closeBtn) { closeBtn.click(); return; }
-      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-      let node;
-      while ((node = walker.nextNode())) {
-        if (node.nodeValue.includes('Your sandbox has been extended.')) {
-          let el = node.parentElement;
+    const _closeBox = await page.evaluate(() => {
+      const cb = document.querySelector('button[aria-label="close" i]');
+      if (cb) {
+        const r = cb.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+      }
+      const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let n;
+      while ((n = w.nextNode())) {
+        if (n.nodeValue.includes('Your sandbox has been extended.')) {
+          let el = n.parentElement;
           for (let i = 0; i < 8 && el && el !== document.body; i++, el = el.parentElement) {
-            const btns = [...el.querySelectorAll('button')];
-            if (btns.length) { btns[btns.length - 1].click(); return; }
+            const bs = [...el.querySelectorAll('button')];
+            if (bs.length) {
+              const r = bs[bs.length - 1].getBoundingClientRect();
+              return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+            }
           }
           break;
         }
       }
-    }).catch(() => {});
+      return null;
+    }).catch(() => null);
+    if (_closeBox) await page.mouse.click(_closeBox.x, _closeBox.y);
     await _sessionExtended.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
   for (let _attempt = 0; _attempt < 3; _attempt++) {
@@ -294,22 +302,30 @@ async function extractCredentials() {
           await _extendBtn.click({ force: true }).catch(() => {});
           const _sessionExtendedConfirm = page.locator('text="Your sandbox has been extended."').first();
           if (await _sessionExtendedConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await page.evaluate(() => {
-              const closeBtn = document.querySelector('button[aria-label="close" i]');
-              if (closeBtn) { closeBtn.click(); return; }
-              const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-              let node;
-              while ((node = walker.nextNode())) {
-                if (node.nodeValue.includes('Your sandbox has been extended.')) {
-                  let el = node.parentElement;
+            const _closeBox = await page.evaluate(() => {
+              const cb = document.querySelector('button[aria-label="close" i]');
+              if (cb) {
+                const r = cb.getBoundingClientRect();
+                return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+              }
+              const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+              let n;
+              while ((n = w.nextNode())) {
+                if (n.nodeValue.includes('Your sandbox has been extended.')) {
+                  let el = n.parentElement;
                   for (let i = 0; i < 8 && el && el !== document.body; i++, el = el.parentElement) {
-                    const btns = [...el.querySelectorAll('button')];
-                    if (btns.length) { btns[btns.length - 1].click(); return; }
+                    const bs = [...el.querySelectorAll('button')];
+                    if (bs.length) {
+                      const r = bs[bs.length - 1].getBoundingClientRect();
+                      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+                    }
                   }
                   break;
                 }
               }
-            }).catch(() => {});
+              return null;
+            }).catch(() => null);
+            if (_closeBox) await page.mouse.click(_closeBox.x, _closeBox.y);
             await _sessionExtendedConfirm.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
           }
         }
@@ -418,22 +434,30 @@ async function extractCredentials() {
     const _sessionExtendedModal = page.locator('text="Your sandbox has been extended."').first();
     if (await _sessionExtendedModal.isVisible({ timeout: 3000 }).catch(() => false)) {
       console.error('INFO: Dismissing "Session extended" modal...');
-      await page.evaluate(() => {
-        const closeBtn = document.querySelector('button[aria-label="close" i]');
-        if (closeBtn) { closeBtn.click(); return; }
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-        let node;
-        while ((node = walker.nextNode())) {
-          if (node.nodeValue.includes('Your sandbox has been extended.')) {
-            let el = node.parentElement;
+      const _closeBox = await page.evaluate(() => {
+        const cb = document.querySelector('button[aria-label="close" i]');
+        if (cb) {
+          const r = cb.getBoundingClientRect();
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        }
+        const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        let n;
+        while ((n = w.nextNode())) {
+          if (n.nodeValue.includes('Your sandbox has been extended.')) {
+            let el = n.parentElement;
             for (let i = 0; i < 8 && el && el !== document.body; i++, el = el.parentElement) {
-              const btns = [...el.querySelectorAll('button')];
-              if (btns.length) { btns[btns.length - 1].click(); return; }
+              const bs = [...el.querySelectorAll('button')];
+              if (bs.length) {
+                const r = bs[bs.length - 1].getBoundingClientRect();
+                return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+              }
             }
             break;
           }
         }
-      }).catch(() => {});
+        return null;
+      }).catch(() => null);
+      if (_closeBox) await page.mouse.click(_closeBox.x, _closeBox.y);
       await _sessionExtendedModal.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
         console.error('WARN: "Session extended" modal did not close within 5s — proceeding anyway');
       });
@@ -520,22 +544,30 @@ async function extractCredentials() {
               await _extendDuringWaitBtn.click({ force: true }).catch(() => {});
               const _sessionExtendedConfirm = page.locator('text="Your sandbox has been extended."').first();
               if (await _sessionExtendedConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await page.evaluate(() => {
-                  const closeBtn = document.querySelector('button[aria-label="close" i]');
-                  if (closeBtn) { closeBtn.click(); return; }
-                  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-                  let node;
-                  while ((node = walker.nextNode())) {
-                    if (node.nodeValue.includes('Your sandbox has been extended.')) {
-                      let el = node.parentElement;
+                const _closeBox = await page.evaluate(() => {
+                  const cb = document.querySelector('button[aria-label="close" i]');
+                  if (cb) {
+                    const r = cb.getBoundingClientRect();
+                    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+                  }
+                  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+                  let n;
+                  while ((n = w.nextNode())) {
+                    if (n.nodeValue.includes('Your sandbox has been extended.')) {
+                      let el = n.parentElement;
                       for (let i = 0; i < 8 && el && el !== document.body; i++, el = el.parentElement) {
-                        const btns = [...el.querySelectorAll('button')];
-                        if (btns.length) { btns[btns.length - 1].click(); return; }
+                        const bs = [...el.querySelectorAll('button')];
+                        if (bs.length) {
+                          const r = bs[bs.length - 1].getBoundingClientRect();
+                          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+                        }
                       }
                       break;
                     }
                   }
-                }).catch(() => {});
+                  return null;
+                }).catch(() => null);
+                if (_closeBox) await page.mouse.click(_closeBox.x, _closeBox.y);
                 await _sessionExtendedConfirm.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
               }
             }
