@@ -165,7 +165,8 @@ async function extendSandbox() {
         }).catch(() => null);
         if (_closeBox) await page.mouse.click(_closeBox.x, _closeBox.y);
         await page.locator('text="Your sandbox has been extended."').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-      }
+      },
+      { noWaitAfter: true }
     );
 
     // Dismiss any lingering "Session extended" confirmation modal before searching for extend button

@@ -332,7 +332,7 @@ async function extractCredentials() {
         await page.locator('[role="dialog"]:has-text("Extend Your Session")').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
         await page.waitForTimeout(1000).catch(() => {});
       },
-      { times: 1 }
+      { times: 1, noWaitAfter: true }
     );
 
     // Skip navigation entirely if sandbox panel is already loaded on the current page
