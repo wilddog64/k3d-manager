@@ -1,7 +1,8 @@
 # Progress — k3d-manager
 
 ## Status
-- **k3d-manager v1.4.6 acg-credentials Start Sandbox outside viewport — OPEN** — spec: `docs/bugs/2026-05-16-acg-credentials-start-sandbox-outside-viewport.md`; add 3× retry loop to `_clickStartSandbox` scroll+click; assign to Codex
+- **k3d-manager v1.4.6 acg "Session extended" toast never dismissed — OPEN** — spec: `docs/bugs/2026-05-16-session-extended-text-locator-page-level-close.md`; text-locator + page-level `button[aria-label="Close" i]` + `[role="alert"]` fallback at all 7 dismiss sites; NOT YET implemented; commit msg: `fix(acg): text-locator + page-level case-insensitive close for Session extended toast`
+- **k3d-manager v1.4.6 acg-credentials Start Sandbox outside viewport — completed** — spec: `docs/bugs/2026-05-16-acg-credentials-start-sandbox-outside-viewport.md`; added 3× retry loop to `_clickStartSandbox` scroll+click; committed as `7b828419` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg "Session extended" × close fallback — completed** — spec: `docs/bugs/2026-05-16-session-extended-close-fallback-button-last.md`; added count-check + `button.last()` fallback at all 7 dismiss sites in `acg_credentials.js` + `acg_extend.js`; committed as `e464bafa` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg "Session extended" × button[aria-label="Close"] — STILL FAILING** — spec: `docs/bugs/2026-05-16-session-extended-button-aria-label.md`; `button[aria-label="Close"]` silently finds 0 elements inside container (.catch swallows), card stays visible; committed as `fd9b2fe7` but still fails
 - **k3d-manager v1.4.6 acg-up return outside function — completed** — spec: `docs/bugs/2026-05-16-acg-up-return-outside-function.md`; changed `bin/acg-up` `|| return 1` to `|| exit 1`; committed as `fd9b2fe7`
