@@ -108,7 +108,7 @@ fi
 _info "[acg-up] Step 1/12 — Getting ${_cluster_provider} credentials..."
 case "${_cluster_provider}" in
   k3s-aws)
-    acg_get_credentials ${sandbox_url:+"$sandbox_url"} || return 1
+    acg_get_credentials ${sandbox_url:+"$sandbox_url"} || exit 1
     ;;
   k3s-gcp)
     gcp_get_credentials ${sandbox_url:+"$sandbox_url"}
