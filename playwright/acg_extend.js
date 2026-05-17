@@ -135,23 +135,10 @@ async function extendSandbox() {
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     }
 
-    // Dismiss any lingering "Session extended" confirmation modal before searching for extend button
-    const _sessionExtendedModal = page.locator('text="Session extended"').first();
-    if (await _sessionExtendedModal.isVisible({ timeout: 3000 }).catch(() => false)) {
-      console.error('INFO: Dismissing "Session extended" modal...');
-      await page.keyboard.press('Escape').catch(() => {});
-      await page.waitForTimeout(500);
-      // Fallback: click the X button if Escape didn't close it
-      const _closeBtn = page.locator('[role="dialog"] button, button:has-text("×"), button[aria-label*="close" i]').first();
-      if (await _sessionExtendedModal.isVisible({ timeout: 1000 }).catch(() => false) &&
-          await _closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await _closeBtn.click({ force: true }).catch(() => {});
-        await page.waitForTimeout(500);
-      }
-      // Confirm the modal is gone before proceeding — guards against slow close animations
-      await _sessionExtendedModal.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {
-        console.error('WARN: "Session extended" modal did not close within 3s — proceeding anyway');
-      });
+    // If "Session extended" toast is already visible, extension already succeeded — exit immediately.
+    if (await page.locator('text="Session extended"').first().isVisible({ timeout: 2000 }).catch(() => false)) {
+      console.error('INFO: "Session extended" toast already visible — extension already succeeded. Exiting.');
+      process.exit(0);
     }
 
     // Wait for skeleton loaders to clear
