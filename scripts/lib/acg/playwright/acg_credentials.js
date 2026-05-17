@@ -152,11 +152,10 @@ async function _extractGcpCredentials(page) {
 async function _clickStartSandbox(page, buttonLocator) {
   const _prompt = page.locator('[role="dialog"]:has-text("Extend Your Session")').first();
   await _prompt.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
-  const _sessionExtended = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
+  const _sessionExtended = page.locator('text="Your sandbox has been extended."').first();
   if (await _sessionExtended.isVisible({ timeout: 2000 }).catch(() => false)) {
-    const _hasClose = await _sessionExtended.locator('button[aria-label="Close"]').count().catch(() => 0) > 0;
-    const _closeBtn = _hasClose ? _sessionExtended.locator('button[aria-label="Close"]').first() : _sessionExtended.locator('button').last();
-    await _closeBtn.click({ force: true }).catch(() => {});
+    const _hasCIClose = await page.locator('button[aria-label="Close" i]').count().catch(() => 0) > 0;
+    await (_hasCIClose ? page.locator('button[aria-label="Close" i]').first() : page.locator('[role="alert"] button, [role="status"] button').first()).click({ force: true }).catch(() => {});
     await _sessionExtended.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
   for (let _attempt = 0; _attempt < 3; _attempt++) {
@@ -279,11 +278,10 @@ async function extractCredentials() {
         const _extendBtn = page.locator('[role="dialog"]:has-text("Extend Your Session") button:has-text("Extend Session")').first();
         if (await _extendBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
           await _extendBtn.click({ force: true }).catch(() => {});
-          const _sessionExtendedConfirm = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
+          const _sessionExtendedConfirm = page.locator('text="Your sandbox has been extended."').first();
           if (await _sessionExtendedConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
-            const _hasClose = await _sessionExtendedConfirm.locator('button[aria-label="Close"]').count().catch(() => 0) > 0;
-            const _closeBtn = _hasClose ? _sessionExtendedConfirm.locator('button[aria-label="Close"]').first() : _sessionExtendedConfirm.locator('button').last();
-            await _closeBtn.click({ force: true }).catch(() => {});
+            const _hasCIClose = await page.locator('button[aria-label="Close" i]').count().catch(() => 0) > 0;
+            await (_hasCIClose ? page.locator('button[aria-label="Close" i]').first() : page.locator('[role="alert"] button, [role="status"] button').first()).click({ force: true }).catch(() => {});
             await _sessionExtendedConfirm.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
           }
         }
@@ -389,12 +387,11 @@ async function extractCredentials() {
     }
 
     // Dismiss any lingering "Session extended" modal that may obscure sandbox controls
-    const _sessionExtendedModal = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
+    const _sessionExtendedModal = page.locator('text="Your sandbox has been extended."').first();
     if (await _sessionExtendedModal.isVisible({ timeout: 3000 }).catch(() => false)) {
       console.error('INFO: Dismissing "Session extended" modal...');
-      const _hasClose = await _sessionExtendedModal.locator('button[aria-label="Close"]').count().catch(() => 0) > 0;
-      const _closeBtn = _hasClose ? _sessionExtendedModal.locator('button[aria-label="Close"]').first() : _sessionExtendedModal.locator('button').last();
-      await _closeBtn.click({ force: true }).catch(() => {});
+      const _hasCIClose = await page.locator('button[aria-label="Close" i]').count().catch(() => 0) > 0;
+      await (_hasCIClose ? page.locator('button[aria-label="Close" i]').first() : page.locator('[role="alert"] button, [role="status"] button').first()).click({ force: true }).catch(() => {});
       await _sessionExtendedModal.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
         console.error('WARN: "Session extended" modal did not close within 5s — proceeding anyway');
       });
@@ -479,11 +476,10 @@ async function extractCredentials() {
             const _extendDuringWaitBtn = page.locator('[role="dialog"]:has-text("Extend Your Session") button:has-text("Extend Session")').first();
             if (await _extendDuringWaitBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
               await _extendDuringWaitBtn.click({ force: true }).catch(() => {});
-              const _sessionExtendedConfirm = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
+              const _sessionExtendedConfirm = page.locator('text="Your sandbox has been extended."').first();
               if (await _sessionExtendedConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
-                const _hasClose = await _sessionExtendedConfirm.locator('button[aria-label="Close"]').count().catch(() => 0) > 0;
-                const _closeBtn = _hasClose ? _sessionExtendedConfirm.locator('button[aria-label="Close"]').first() : _sessionExtendedConfirm.locator('button').last();
-                await _closeBtn.click({ force: true }).catch(() => {});
+                const _hasCIClose = await page.locator('button[aria-label="Close" i]').count().catch(() => 0) > 0;
+                await (_hasCIClose ? page.locator('button[aria-label="Close" i]').first() : page.locator('[role="alert"] button, [role="status"] button').first()).click({ force: true }).catch(() => {});
                 await _sessionExtendedConfirm.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
               }
             }
