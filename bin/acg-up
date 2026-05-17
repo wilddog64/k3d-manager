@@ -954,6 +954,54 @@ if _is_mac; then
   _frontend_browser_plist_tmp="${HOME}/.local/share/k3d-manager/frontend-browser-http.plist"
   _frontend_browser_kubeconfig="${HOME}/.kube/config"
   mkdir -p "$(dirname "${_frontend_browser_log}")"
+  # Ensure 127.0.0.2 loopback alias exists (macOS does not expose 127.0.0.0/8 automatically)
+  if ! ifconfig lo0 | grep -q '127\.0\.0\.2'; then
+    _run_command --interactive-sudo --quiet -- ifconfig lo0 alias 127.0.0.2 || \
+      _warn "[acg-up] failed to add 127.0.0.2 loopback alias — frontend port-forward will fail to bind"
+  fi
+
+  # Install persistent loopback alias launchd agent (survives reboots)
+  _loopback_label="com.k3d-manager.loopback-alias"
+  _loopback_plist="/Library/LaunchDaemons/${_loopback_label}.plist"
+  _loopback_plist_tmp="${HOME}/.local/share/k3d-manager/loopback-alias.plist"
+  _loopback_launchctl_log="${HOME}/.local/share/k3d-manager/loopback-alias-launchctl.log"
+  cat > "${_loopback_plist_tmp}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_loopback_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/sbin/ifconfig</string>
+    <string>lo0</string>
+    <string>alias</string>
+    <string>127.0.0.2</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/dev/null</string>
+  <key>StandardErrorPath</key>
+  <string>/dev/null</string>
+</dict>
+</plist>
+PLIST
+  : > "${_loopback_launchctl_log}"
+  _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_loopback_plist}" \
+    >"${_loopback_launchctl_log}" 2>&1 || true
+  : > "${_loopback_launchctl_log}"
+  if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_loopback_plist_tmp}" "${_loopback_plist}" \
+      >"${_loopback_launchctl_log}" 2>&1; then
+    _warn "[acg-up] failed to install loopback alias plist — frontend may fail after reboot"
+  else
+    rm -f "${_loopback_plist_tmp}"
+    : > "${_loopback_launchctl_log}"
+    _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_loopback_plist}" \
+      >"${_loopback_launchctl_log}" 2>&1 || \
+      _warn "[acg-up] failed to bootstrap loopback alias agent"
+  fi
   # Write self-contained wrapper script; paths are baked in at write-time.
   _kubectl_bin="$(command -v kubectl)"
   cat > "${_frontend_browser_wrapper}" <<FRONTEND_WRAPPER
