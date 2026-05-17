@@ -136,70 +136,10 @@ async function extendSandbox() {
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     }
 
-    await page.addLocatorHandler(
-      page.locator('text="Your sandbox has been extended."').first(),
-      async () => {
-        console.error('INFO: [handler] Dismissing "Session extended" toast...');
-        const _closeBox = await page.evaluate(() => {
-          const cb = document.querySelector('button[aria-label="close" i]');
-          if (cb) {
-            const r = cb.getBoundingClientRect();
-            return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-          }
-          const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-          let n;
-          while ((n = w.nextNode())) {
-            if (n.nodeValue.includes('Your sandbox has been extended.')) {
-              let el = n.parentElement;
-              for (let i = 0; i < 8 && el && el !== document.body; i++, el = el.parentElement) {
-                const bs = [...el.querySelectorAll('button')];
-                if (bs.length) {
-                  const r = bs[bs.length - 1].getBoundingClientRect();
-                  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-                }
-              }
-              break;
-            }
-          }
-          return null;
-        }).catch(() => null);
-        if (_closeBox) await page.mouse.click(_closeBox.x, _closeBox.y);
-        await page.locator('text="Your sandbox has been extended."').first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-      },
-      { noWaitAfter: true }
-    );
-
-    // Dismiss any lingering "Session extended" confirmation modal before searching for extend button
-    const _sessionExtendedModal = page.locator('text="Your sandbox has been extended."').first();
-    if (await _sessionExtendedModal.isVisible({ timeout: 3000 }).catch(() => false)) {
-      console.error('INFO: Dismissing "Session extended" modal...');
-      const _closeBox = await page.evaluate(() => {
-        const cb = document.querySelector('button[aria-label="close" i]');
-        if (cb) {
-          const r = cb.getBoundingClientRect();
-          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-        }
-        const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-        let n;
-        while ((n = w.nextNode())) {
-          if (n.nodeValue.includes('Your sandbox has been extended.')) {
-            let el = n.parentElement;
-            for (let i = 0; i < 8 && el && el !== document.body; i++, el = el.parentElement) {
-              const bs = [...el.querySelectorAll('button')];
-              if (bs.length) {
-                const r = bs[bs.length - 1].getBoundingClientRect();
-                return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-              }
-            }
-            break;
-          }
-        }
-        return null;
-      }).catch(() => null);
-      if (_closeBox) await page.mouse.click(_closeBox.x, _closeBox.y);
-      await _sessionExtendedModal.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
-        console.error('WARN: "Session extended" modal did not close within 5s — proceeding anyway');
-      });
+    // If "Session extended" toast is already visible, extension already succeeded — exit immediately.
+    if (await page.locator('text="Session extended"').first().isVisible({ timeout: 2000 }).catch(() => false)) {
+      console.error('INFO: "Session extended" toast already visible — extension already succeeded. Exiting.');
+      process.exit(0);
     }
 
     // Wait for skeleton loaders to clear
