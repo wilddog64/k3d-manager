@@ -140,7 +140,9 @@ async function extendSandbox() {
     const _sessionExtendedModal = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
     if (await _sessionExtendedModal.isVisible({ timeout: 3000 }).catch(() => false)) {
       console.error('INFO: Dismissing "Session extended" modal...');
-      await _sessionExtendedModal.locator('button[aria-label="Close"]').first().click({ force: true }).catch(() => {});
+      const _hasClose = await _sessionExtendedModal.locator('button[aria-label="Close"]').count().catch(() => 0) > 0;
+      const _closeBtn = _hasClose ? _sessionExtendedModal.locator('button[aria-label="Close"]').first() : _sessionExtendedModal.locator('button').last();
+      await _closeBtn.click({ force: true }).catch(() => {});
       await _sessionExtendedModal.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
         console.error('WARN: "Session extended" modal did not close within 5s — proceeding anyway');
       });
@@ -187,7 +189,9 @@ async function extendSandbox() {
     if (clicked) {
       const _extendedConfirm = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
       if (await _extendedConfirm.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await _extendedConfirm.locator('button[aria-label="Close"]').first().click({ force: true }).catch(() => {});
+        const _hasClose = await _extendedConfirm.locator('button[aria-label="Close"]').count().catch(() => 0) > 0;
+        const _closeBtn = _hasClose ? _extendedConfirm.locator('button[aria-label="Close"]').first() : _extendedConfirm.locator('button').last();
+        await _closeBtn.click({ force: true }).catch(() => {});
         await _extendedConfirm.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
       }
       console.log('Extend action complete (Immediate).');
@@ -386,7 +390,9 @@ async function extendSandbox() {
 
     const _extendedConfirmGeneral = page.locator(':has-text("Your sandbox has been extended."):has(button)').last();
     if (await _extendedConfirmGeneral.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await _extendedConfirmGeneral.locator('button[aria-label="Close"]').first().click({ force: true }).catch(() => {});
+      const _hasClose = await _extendedConfirmGeneral.locator('button[aria-label="Close"]').count().catch(() => 0) > 0;
+      const _closeBtn = _hasClose ? _extendedConfirmGeneral.locator('button[aria-label="Close"]').first() : _extendedConfirmGeneral.locator('button').last();
+      await _closeBtn.click({ force: true }).catch(() => {});
       await _extendedConfirmGeneral.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
