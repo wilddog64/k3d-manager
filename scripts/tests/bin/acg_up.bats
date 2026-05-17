@@ -93,9 +93,9 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *'_kc_browser_ip="127.0.0.1"'* ]]
 
-  run grep -nF 'Step 10e/14 — Installing Keycloak browser HTTP listener' bin/acg-up
+  run grep -nF 'Step 10e/14 — Installing Istio ingress HTTP listener' bin/acg-up
   [ "$status" -eq 0 ]
-  [[ "$output" == *"Keycloak browser HTTP listener"* ]]
+  [[ "$output" == *"Istio ingress HTTP listener"* ]]
 
   run grep -nF 'Step 10f/14 — Wiring ArgoCD SSO' bin/acg-up
   [ "$status" -eq 0 ]
