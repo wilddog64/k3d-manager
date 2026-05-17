@@ -58,6 +58,13 @@
 - Branch protection (`enforce_admins=true`) restored on all repos after merge
 - v1.4.4, v1.4.3, and v1.4.2 remain shipped; branch protection was restored after each merge.
 
+## Completed (v1.4.6 partial — lib-acg PR #12)
+- [x] **lib-acg PR #12 merged** — feat/acg-multi-provider → main; exit 0 on stale "Session extended" toast at startup; SHA `8fe35fa1`
+- [x] enforce_admins + required_approving_review_count=1 restored on lib-acg
+- [x] feat/acg-gcp-credentials branch created from merge SHA
+- [x] Retrospective: `docs/retro/2026-05-17-pr12-retrospective.md` (on lib-acg feat/acg-gcp-credentials, commit `0b9c224`)
+- [x] k3d-manager memory-bank updated (activeContext.md + progress.md)
+
 ## Completed (v1.4.6 partial — lib-acg PR #11)
 - [x] **lib-acg PR #11 merged** — fix/acg-credentials-extend-dialog → main; AWS credential extraction + dialog handling; SHA `feeb8e80`
 - [x] enforce_admins restored on lib-acg (required_approving_review_count=1)
