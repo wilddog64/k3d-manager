@@ -82,69 +82,6 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 | `_ensure_cargo` | Install Rust `cargo` via apt/dnf/homebrew. |
 | `_ensure_copilot_cli` | Ensures the Copilot CLI binary is installed (via `brew install copilot-cli` or the official release installer) and authenticated (`_copilot_auth_check`). Exits via `_err` if installation fails. |
 
-### Copilot CLI Integration
-
-`_copilot_auth_check` runs unconditionally — no feature gate. Checks `COPILOT_GITHUB_TOKEN`/`GH_TOKEN`/`GITHUB_TOKEN` env tokens, then `~/.config/github-copilot/apps.json`, then `gh auth status`. Callers are responsible for feature-gating if needed.
-
-| Function | Description |
-|---|---|
-| `_copilot_auth_check` | Verify Copilot auth: checks env tokens → `apps.json` → `gh auth status`; calls `_err` if all checks fail. |
-| `_copilot_scope_prompt <text>` | Prepend a k3d-manager repo scope statement to `<text>` before passing to Copilot. |
-| `_copilot_prompt_guard <text>` | Block prompts containing forbidden fragments (`shell(git push)`, `shell(rm`, `shell(eval`, `shell(sudo`, `shell(curl`, `shell(wget`, `shell(cd`). Calls `_err` on match. |
-| `_copilot_review [--prompt\|-p <text>] [--model <id>] [<flags>...]` | Sandboxed Copilot CLI wrapper. Scopes the prompt, applies the prompt guard, runs from repo root, and passes `--deny-tool` flags for all forbidden shell operations. Returns Copilot's exit code. |
-| `_ai_agent_review [--prompt\|-p <text>] [<flags>...]` | Generic AI dispatch wrapper. Reads `AI_REVIEW_FUNC` (default: `copilot`) to select backend and `AI_REVIEW_MODEL` (default: `gpt-5.4-mini`) for model. Currently supports `copilot` only; additional backends are added as new `case` branches. Passes all args through to the selected backend. |
-
-**`_copilot_review` usage:**
-
-```bash
-source scripts/lib/system.sh
-export K3DM_ENABLE_AI=1
-
-# Basic prompt
-_copilot_review --prompt "Explain the _agent_lint flow in this repo."
-
-# With model override
-_copilot_review --prompt "Review staged shell changes for injection risks." \
-  --model claude-sonnet-4-5
-
-# Pipe external context into the prompt
-context="$(kubectl describe pod -n vault vault-0 2>&1)"
-_copilot_review --prompt "Diagnose this pod failure:\n\n${context}"
-```
-
-**`_ai_agent_review` env vars:**
-
-| Env Var | Default | Description |
-|---|---|---|
-| `AI_REVIEW_FUNC` | `copilot` | AI backend to use. Currently only `copilot` is supported. |
-| `AI_REVIEW_MODEL` | `gpt-5.4-mini` | Default model passed to the backend. An explicit `--model` in args takes precedence over this env default. |
-
-**Using `_ai_agent_review` in another project via subtree:**
-
-```bash
-# Pull lib-foundation
-git subtree add --prefix scripts/lib/foundation \
-  https://github.com/wilddog64/lib-foundation.git main --squash
-
-# Source and use
-source scripts/lib/foundation/scripts/lib/system.sh
-_ai_agent_review --prompt "Your prompt here."
-```
-
-> **Note:** `_copilot_scope_prompt` hardcodes "k3d-manager repository" in the scope header it prepends to every prompt. When using lib-foundation in another project, the AI receives incorrect repo context. Override `_copilot_scope_prompt` in your consumer shell to customize the scope statement.
-
-**Wire AI lint in a pre-commit hook:**
-
-```bash
-# In your pre-commit hook, before calling _agent_lint:
-export AGENT_LINT_AI_FUNC="_ai_agent_review"
-export K3DM_ENABLE_AI="${K3DM_ENABLE_AI:-0}"
-```
-
-`_agent_lint` reads `AGENT_LINT_AI_FUNC` and calls it with staged `.sh`, `.js`, and `.md` files. In
-k3d-manager, `K3DM_ENABLE_AI` makes the AI step opt-in — users set `K3DM_ENABLE_AI=1` in their
-environment to activate it. In another project, choose a repo-local gate variable if you need one.
-
 ### Utilities
 
 | Function | Description |

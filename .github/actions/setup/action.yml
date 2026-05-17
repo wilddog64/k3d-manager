@@ -1,5 +1,5 @@
 name: Setup CI Dependencies
-description: Install bats, shellcheck, and yamllint
+description: Install shellcheck, Node.js, and yamllint
 runs:
   using: composite
   steps:
@@ -10,13 +10,10 @@ runs:
         sudo apt-get update
         sudo apt-get install -y shellcheck python3-pip
 
-    - name: Install bats 1.11.0
-      shell: bash
-      run: |
-        set -euo pipefail
-        curl -fsSL https://github.com/bats-core/bats-core/archive/refs/tags/v1.11.0.tar.gz \
-          | tar -xz -C /tmp
-        sudo /tmp/bats-core-1.11.0/install.sh /usr/local
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
 
     - name: Install yamllint
       shell: bash

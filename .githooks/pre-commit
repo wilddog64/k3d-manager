@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Guard: block direct edits to the lib-foundation subtree
-# Bypass: set K3DM_SUBTREE_SYNC=1 when running git subtree pull/add
 if [[ "${K3DM_SUBTREE_SYNC:-0}" != "1" ]]; then
   subtree_changes="$(git diff --cached --name-only -z | \
     while IFS= read -r -d '' path; do
@@ -21,20 +19,16 @@ if [[ "${K3DM_SUBTREE_SYNC:-0}" != "1" ]]; then
   fi
 fi
 
-# Lint staged .sh files (skip foundation subtree)
-git diff --cached --name-only -z --diff-filter=ACM | \
-  while IFS= read -r -d '' path; do
-    if [[ "$path" == *.sh && "$path" != scripts/lib/foundation/* ]]; then
-      printf '%s\0' "$path"
-    fi
-  done | \
-  xargs -0 -r shellcheck -S warning
+staged_js=$(git diff --cached --name-only --diff-filter=ACM | grep '\.js$' || true)
+if [[ -n "$staged_js" ]]; then
+  while IFS= read -r f; do
+    node --check "$f"
+  done <<< "$staged_js"
+fi
 
-# node --check on staged .js files
-git diff --cached --name-only -z --diff-filter=ACM | \
-  while IFS= read -r -d '' path; do
-    if [[ "$path" == *.js ]]; then
-      printf '%s\0' "$path"
-    fi
-  done | \
-  xargs -0 -r -n 1 node --check
+staged_sh=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^(bin/|scripts/)' | grep -v '\.js$' || true)
+if [[ -n "$staged_sh" ]]; then
+  while IFS= read -r f; do
+    shellcheck -S warning "$f"
+  done <<< "$staged_sh"
+fi
