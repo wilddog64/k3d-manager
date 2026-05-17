@@ -1,7 +1,8 @@
 # Progress — k3d-manager
 
 ## Status
-- **k3d-manager v1.4.6 acg "Session extended" toast × — mouse.click bounding-rect + addLocatorHandler — completed** — spec: `docs/bugs/2026-05-16-session-extended-mouse-click-and-locator-handler.md`; evaluate returns { x, y } via getBoundingClientRect → page.mouse.click() at all 7 sites; new addLocatorHandler in acg_extend.js for async toast appearance; committed as `718562b9`
+- **k3d-manager v1.4.6 acg_extend.js addLocatorHandler infinite loop — OPEN** — spec: `docs/bugs/2026-05-16-acg-extend-locator-handler-no-wait-after.md`; fix: `{ noWaitAfter: true }` on addLocatorHandler; one-line change in acg_extend.js only
+- **k3d-manager v1.4.6 acg "Session extended" toast × — mouse.click bounding-rect + addLocatorHandler — STILL FAILING (new issue)** — spec: `docs/bugs/2026-05-16-session-extended-mouse-click-and-locator-handler.md`; committed as `718562b9`; × click works but addLocatorHandler fires in infinite loop; superseded by noWaitAfter spec
 - **k3d-manager v1.4.6 acg "Session extended" toast × — page.evaluate DOM traversal — STILL FAILING** — spec: `docs/bugs/2026-05-16-session-extended-evaluate-close-button.md`; element.click() in evaluate does not trigger React synthetic event handler; committed as `ebd3a985`; superseded by mouse-click-bounding-rect spec
 - **k3d-manager v1.4.6 acg "Session extended" toast never dismissed — STILL FAILING** — spec: `docs/bugs/2026-05-16-session-extended-text-locator-page-level-close.md`; `[role="alert"]` fallback hangs 30s (no role on toast container); committed as `70ce5ca9`; superseded by evaluate spec
 - **k3d-manager v1.4.6 acg-credentials Start Sandbox outside viewport — completed** — spec: `docs/bugs/2026-05-16-acg-credentials-start-sandbox-outside-viewport.md`; added 3× retry loop to `_clickStartSandbox` scroll+click; committed as `7b828419` and pushed to `origin/k3d-manager-v1.4.6`
