@@ -117,23 +117,62 @@ Make executable: `chmod +x .githooks/pre-commit`
 
 ---
 
-### Change 3 — `Makefile`: add hook wiring to `setup` target
+### Change 3 — `Makefile`: add hook wiring, `credential-test`, `extend-test` targets
 
-**Exact old block:**
+**Exact old block (entire file):**
 
 ```makefile
+.PHONY: setup check lint help
+
+help:
+	@printf 'Targets:\n'
+	@printf '  setup  — npm install + download Playwright Chromium browser\n'
+	@printf '  check  — node --check all playwright/*.js files\n'
+	@printf '  lint   — shellcheck all bin/ scripts\n'
+
 setup:
 	npm install
 	npx playwright install chromium
+
+check:
+	node --check playwright/*.js
+
+lint:
+	shellcheck -S warning bin/acg-credential-test bin/acg-extend-test
 ```
 
-**Exact new block:**
+**Exact new block (entire file):**
 
 ```makefile
+.PHONY: setup check lint credential-test extend-test help
+
+help:
+	@printf 'Targets:\n'
+	@printf '  setup             — npm install + download Playwright Chromium browser\n'
+	@printf '  check             — node --check all playwright/*.js files\n'
+	@printf '  lint              — shellcheck all bin/ scripts\n'
+	@printf '  credential-test   — run bin/acg-credential-test (requires SANDBOX_URL=<url>)\n'
+	@printf '                      optional: PROVIDER=aws|gcp\n'
+	@printf '  extend-test       — run bin/acg-extend-test (requires SANDBOX_URL=<url>)\n'
+
 setup:
 	npm install
 	npx playwright install chromium
 	git config core.hooksPath .githooks
+
+check:
+	node --check playwright/*.js
+
+lint:
+	shellcheck -S warning bin/acg-credential-test bin/acg-extend-test
+
+credential-test:
+	@if [ -z "$(SANDBOX_URL)" ]; then printf 'Usage: make credential-test SANDBOX_URL=<url> [PROVIDER=aws|gcp]\n' >&2; exit 1; fi
+	bin/acg-credential-test "$(SANDBOX_URL)" $(if $(PROVIDER),--provider "$(PROVIDER)",)
+
+extend-test:
+	@if [ -z "$(SANDBOX_URL)" ]; then printf 'Usage: make extend-test SANDBOX_URL=<url>\n' >&2; exit 1; fi
+	bin/acg-extend-test "$(SANDBOX_URL)"
 ```
 
 ---
@@ -144,7 +183,7 @@ setup:
 |------|--------|
 | `.github/copilot-instructions.md` | New file — Copilot review instructions |
 | `.githooks/pre-commit` | New file — `node --check` + `shellcheck` on staged files |
-| `Makefile` | Add `git config core.hooksPath .githooks` to `setup` target |
+| `Makefile` | Add hook wiring to `setup`; add `credential-test` and `extend-test` targets |
 
 ---
 
@@ -161,6 +200,8 @@ setup:
 - [ ] `.github/copilot-instructions.md` created
 - [ ] `.githooks/pre-commit` created and executable
 - [ ] `Makefile` `setup` target includes `git config core.hooksPath .githooks`
+- [ ] `Makefile` has `credential-test` and `extend-test` targets
+- [ ] `.PHONY` includes: `setup check lint credential-test extend-test help`
 - [ ] `shellcheck -S warning .githooks/pre-commit` passes
 - [ ] No other files modified
 - [ ] Committed to `fix/acg-credentials-extend-dialog` in lib-acg
