@@ -944,6 +944,76 @@ kubectl rollout restart deployment/argocd-server -n cicd --context k3d-k3d-clust
 kubectl rollout status deployment/argocd-server -n cicd --context k3d-k3d-cluster --timeout=120s
 _info "[acg-up] ArgoCD SSO wired: login at https://argocd.shopping-cart.local → Keycloak realm shopping-cart"
 
+_info "[acg-up] Step 10g/14 — Wiring frontend.shopping-cart.local → ubuntu-k3s frontend (NodePort + ServiceEntry + VirtualService)..."
+
+# 1. Create / reconcile NodePort 30080 for the frontend service on ubuntu-k3s.
+#    NodePort 30080 is reserved for frontend; 30081 = order-service, 30082 = product-catalog.
+kubectl apply --context ubuntu-k3s -f - <<'FRONTEND_NP_EOF'
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-nodeport
+  namespace: shopping-cart-apps
+spec:
+  type: NodePort
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 8080
+      nodePort: 30080
+FRONTEND_NP_EOF
+
+# 2. Get the ubuntu-k3s control-plane public IP from the kubeconfig server URL.
+_ubuntu_k3s_ip=$(kubectl config view \
+  --context ubuntu-k3s --minify \
+  -o jsonpath='{.clusters[0].cluster.server}' \
+  | sed 's|https://||; s|:.*||')
+
+# 3. Apply a ServiceEntry in k3d so Istio can route to the remote NodePort.
+kubectl apply --context k3d-k3d-cluster -f - <<FRONTEND_SE_EOF
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: frontend-ubuntu-k3s
+  namespace: istio-system
+spec:
+  hosts:
+    - frontend-ubuntu-k3s.external
+  addresses:
+    - ${_ubuntu_k3s_ip}/32
+  ports:
+    - number: 30080
+      name: http
+      protocol: HTTP
+  location: MESH_EXTERNAL
+  resolution: STATIC
+  endpoints:
+    - address: ${_ubuntu_k3s_ip}
+FRONTEND_SE_EOF
+
+# 4. Apply VirtualService in k3d: frontend.shopping-cart.local → ServiceEntry host:30080.
+kubectl apply --context k3d-k3d-cluster -f - <<'FRONTEND_VS_EOF'
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: frontend
+  namespace: istio-system
+spec:
+  hosts:
+    - frontend.shopping-cart.local
+  gateways:
+    - istio-system/default-gateway
+  http:
+    - route:
+        - destination:
+            host: frontend-ubuntu-k3s.external
+            port:
+              number: 30080
+FRONTEND_VS_EOF
+
+_info "[acg-up] frontend.shopping-cart.local wired: ingressgateway → ${_ubuntu_k3s_ip}:30080 → frontend pod"
+
 _info "[acg-up] Step 11/14 — Verifying ClusterSecretStore..."
 _css_ready=false
 for i in $(seq 1 18); do
@@ -965,7 +1035,7 @@ fi
 _info "[acg-up] Step 12/14 — Installing sandbox TTL watcher (launchd)..."
 acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
 
-_info "[acg-up] Step 13/14 — Frontend is served via the Istio ingress HTTP listener at http://frontend.shopping-cart.local (Step 10e). No separate port-forward needed."
+_info "[acg-up] Step 13/14 — Frontend wired via NodePort 30080 on ubuntu-k3s (Step 10g). URL: http://frontend.shopping-cart.local"
 
 _info "[acg-up] Cluster is up."
 kubectl get nodes --context ubuntu-k3s
