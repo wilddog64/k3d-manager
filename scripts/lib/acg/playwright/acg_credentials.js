@@ -159,8 +159,16 @@ async function _clickStartSandbox(page, buttonLocator) {
     await _closeBtn.click({ force: true }).catch(() => {});
     await _sessionExtended.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
-  await buttonLocator.scrollIntoViewIfNeeded().catch(() => {});
-  await buttonLocator.click({ force: true });
+  for (let _attempt = 0; _attempt < 3; _attempt++) {
+    await buttonLocator.scrollIntoViewIfNeeded().catch(() => {});
+    try {
+      await buttonLocator.click({ force: true });
+      break;
+    } catch (_clickErr) {
+      if (_attempt === 2) throw _clickErr;
+      await page.waitForTimeout(800).catch(() => {});
+    }
+  }
 }
 
 async function extractCredentials() {
