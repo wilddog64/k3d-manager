@@ -49,7 +49,23 @@ HELP
     || _info "[k3s-aws] Pre-flight extend failed — proceeding (sandbox may have sufficient TTL)"
 
   _info "[k3s-aws] Provisioning CloudFormation stack (server + agents)..."
-  acg_provision --confirm --recreate || return 1
+  _cf_stack_status=$(_run_command --soft -- aws cloudformation describe-stacks \
+    --region "${ACG_REGION}" --stack-name "${_ACG_CF_STACK_NAME}" \
+    --query 'Stacks[0].StackStatus' --output text 2>/dev/null || true)
+  case "${_cf_stack_status}" in
+    CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)
+      _info "[k3s-aws] CloudFormation stack is healthy (${_cf_stack_status}) — reusing without recreate"
+      acg_provision --confirm || return 1
+      ;;
+    ROLLBACK_COMPLETE|CREATE_FAILED|ROLLBACK_FAILED|UPDATE_ROLLBACK_FAILED|DELETE_FAILED)
+      _info "[k3s-aws] CloudFormation stack is in broken state (${_cf_stack_status}) — recreating"
+      acg_provision --confirm --recreate || return 1
+      ;;
+    *)
+      _info "[k3s-aws] CloudFormation stack not found or unknown state (${_cf_stack_status:-none}) — creating"
+      acg_provision --confirm || return 1
+      ;;
+  esac
 
   _info "[k3s-aws] Installing k3s server + joining agents..."
   UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" deploy_app_cluster --confirm || return 1
