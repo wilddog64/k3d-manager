@@ -624,6 +624,9 @@ if _vault_kv_exists "keycloak/admin"; then
   _info "[acg-up] Reusing existing Vault secret keycloak/admin"
   _kc_admin_pass=$(_vault_kv_get_field "keycloak/admin" "admin_password")
   _kc_db_pass=$(_vault_kv_get_field "keycloak/admin" "db_password")
+  if [[ -z "${_kc_admin_pass}" || -z "${_kc_db_pass}" ]]; then
+    _acg_fail "[acg-up] Vault secret keycloak/admin is missing admin_password or db_password — restore the secret before continuing"
+  fi
 else
   _kc_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
   _kc_db_pass=$(openssl rand -base64 24 | tr -d '=+/')
