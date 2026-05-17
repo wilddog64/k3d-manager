@@ -33,13 +33,16 @@ path to install dependencies and Playwright browsers before running the bin harn
 ### Change 1 — `Makefile`: new file
 
 ```makefile
-.PHONY: setup check lint help
+.PHONY: setup check lint credential-test extend-test help
 
 help:
 	@printf 'Targets:\n'
-	@printf '  setup  — npm install + download Playwright Chromium browser\n'
-	@printf '  check  — node --check all playwright/*.js files\n'
-	@printf '  lint   — shellcheck all bin/ scripts\n'
+	@printf '  setup             — npm install + download Playwright Chromium browser\n'
+	@printf '  check             — node --check all playwright/*.js files\n'
+	@printf '  lint              — shellcheck all bin/ scripts\n'
+	@printf '  credential-test   — run bin/acg-credential-test (requires SANDBOX_URL=<url>)\n'
+	@printf '                      optional: PROVIDER=aws|gcp\n'
+	@printf '  extend-test       — run bin/acg-extend-test (requires SANDBOX_URL=<url>)\n'
 
 setup:
 	npm install
@@ -50,6 +53,14 @@ check:
 
 lint:
 	shellcheck -S warning bin/acg-credential-test bin/acg-extend-test
+
+credential-test:
+	@if [ -z "$(SANDBOX_URL)" ]; then printf 'Usage: make credential-test SANDBOX_URL=<url> [PROVIDER=aws|gcp]\n' >&2; exit 1; fi
+	bin/acg-credential-test "$(SANDBOX_URL)" $(if $(PROVIDER),--provider "$(PROVIDER)",)
+
+extend-test:
+	@if [ -z "$(SANDBOX_URL)" ]; then printf 'Usage: make extend-test SANDBOX_URL=<url>\n' >&2; exit 1; fi
+	bin/acg-extend-test "$(SANDBOX_URL)"
 ```
 
 ---
@@ -58,7 +69,7 @@ lint:
 
 | File | Change |
 |------|--------|
-| `Makefile` | New file — setup, check, lint, help targets |
+| `Makefile` | New file — setup, check, lint, credential-test, extend-test, help targets |
 
 ---
 
@@ -77,7 +88,10 @@ lint:
 - [ ] `make setup` runs `npm install` then `npx playwright install chromium`
 - [ ] `make check` runs `node --check playwright/*.js`
 - [ ] `make lint` runs `shellcheck -S warning bin/acg-credential-test bin/acg-extend-test`
-- [ ] `make help` prints target descriptions
+- [ ] `make credential-test SANDBOX_URL=<url>` invokes `bin/acg-credential-test`; exits 1 with usage if `SANDBOX_URL` unset
+- [ ] `make extend-test SANDBOX_URL=<url>` invokes `bin/acg-extend-test`; exits 1 with usage if `SANDBOX_URL` unset
+- [ ] `make help` prints all target descriptions
+- [ ] `.PHONY` includes: `setup check lint credential-test extend-test help`
 - [ ] No other files modified
 - [ ] Committed to `fix/acg-credentials-extend-dialog` in lib-acg
 - [ ] `git push origin fix/acg-credentials-extend-dialog` — do NOT report done until push succeeds
