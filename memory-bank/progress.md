@@ -1,8 +1,12 @@
 # Progress — k3d-manager
 
 ## Status
+- **lib-acg extend dialog AppleScript native click fix completed** — `playwright/acg_credentials.js` now computes screen coordinates in `page.evaluate()` and uses `osascript` via `child_process.execSync` to native-click the close button; committed as `7874e9d` and pushed to `origin/fix/acg-credentials-extend-dialog`; PR URL: not created (per repository instruction).
+- **lib-acg extend dialog bringToFront/Enter attempt superseded** — `1e7f2ff` used `page.bringToFront()` plus `Enter`, but that dismissed iTerm2 hotkey focus and reset the page before the key event arrived; superseded by the AppleScript native-click fix.
+- **lib-acg extend dialog selector fix completed** — `playwright/acg_credentials.js` now uses `getByRole('button', { name: 'Cancel' })` and logs click errors instead of swallowing them; committed as `787cab8` and pushed to `origin/fix/acg-credentials-extend-dialog`; PR URL: not created (per repository instruction).
+- **lib-acg extend dialog locator-click attempt superseded** — the earlier `locator('button', { hasText: 'Cancel' })` fix was superseded by the new `getByRole('button', { name: 'Cancel' })` selector and error logging; prior commit `98bbf59` is no longer the branch tip.
 - **k3d-manager validation follow-up docs committed** — recorded the `.git/index.lock` permission note and the unrelated-suite `./scripts/k3d-manager test all` failures in `docs/issues/2026-05-16-git-commit-index-lock-permission-error.md` and `docs/issues/2026-05-17-repo-test-all-existing-failures.md`; committed as `65582d0c` (`docs: record validation follow-up notes`); PR URL: not created (per repository instruction).
-- **lib-acg extend dialog STILL FAILING (3 attempts) — Escape key spec assigned** — `4cd3e35` (`page.mouse.click getBoundingClientRect`) also fails on live test; `page.mouse.click` unreliable in CDP background tab. Key finding: credentials populate on Cancel or Extend. New spec: `docs/bugs/2026-05-17-lib-acg-extend-dialog-keyboard-escape.md` (`f8adb23f`); fix: `page.keyboard.press('Escape')` primary + `page.locator().click({ force: true })` fallback + WARN instead of `process.exit(1)`. `d265f38` (`fix(bin): validate AWS credentials`) intact. Branch: `fix/acg-credentials-extend-dialog` in lib-acg; subtree pull pending lib-acg PR merge.
+- **lib-acg extend dialog and credential write fixes completed** — the prior escape-key fallback spec is superseded by the committed locator-click and credential-write fixes on `fix/acg-credentials-extend-dialog`; remote SHAs are `98bbf59` and `217609a`; PR URL: not created (per repository instruction).
 - **k3d-manager v1.4.6 addLocatorHandler post-handler wait loop (acg_extend.js + acg_credentials.js) — completed** — spec: `docs/bugs/2026-05-16-acg-extend-locator-handler-no-wait-after.md` (updated to cover both files); implemented `{ noWaitAfter: true }` in `acg_extend.js` + `{ times: 1, noWaitAfter: true }` in `acg_credentials.js`; committed as `5a638912` (`fix(acg): add noWaitAfter: true to both addLocatorHandler calls`) and pushed to `origin/k3d-manager-v1.4.6`; `node --check scripts/lib/acg/playwright/acg_extend.js`, `node --check scripts/lib/acg/playwright/acg_credentials.js`, `_agent_audit`, and `_agent_lint` passed; `./scripts/k3d-manager test all` failed in unrelated existing suites (`scripts/tests/plugins/eso.bats`, `scripts/tests/plugins/gcp.bats`, `scripts/tests/plugins/keycloak.bats`), recorded in `docs/issues/2026-05-17-repo-test-all-existing-failures.md`
 - **k3d-manager v1.4.6 acg "Session extended" toast × — mouse.click bounding-rect + addLocatorHandler — STILL FAILING (new issue)** — spec: `docs/bugs/2026-05-16-session-extended-mouse-click-and-locator-handler.md`; committed as `718562b9`; × click works but addLocatorHandler fires in infinite loop; superseded by noWaitAfter spec
 - **k3d-manager v1.4.6 acg "Session extended" toast × — page.evaluate DOM traversal — STILL FAILING** — spec: `docs/bugs/2026-05-16-session-extended-evaluate-close-button.md`; element.click() in evaluate does not trigger React synthetic event handler; committed as `ebd3a985`; superseded by mouse-click-bounding-rect spec
@@ -53,6 +57,12 @@
 - **rigor-cli PR #10 merged** — rigor-cli-v0.1.6 → main; v0.1.6 tagged and released; v0.1.7 next branch created with retrospective
 - Branch protection (`enforce_admins=true`) restored on all repos after merge
 - v1.4.4, v1.4.3, and v1.4.2 remain shipped; branch protection was restored after each merge.
+
+## Completed (v1.4.6 partial — lib-acg PR #11)
+- [x] **lib-acg PR #11 merged** — fix/acg-credentials-extend-dialog → main; AWS credential extraction + dialog handling; SHA `feeb8e80`
+- [x] enforce_admins restored on lib-acg (required_approving_review_count=1)
+- [x] feat/acg-multi-provider branch created from merge SHA
+- [x] Retrospective: `docs/retro/2026-05-17-pr11-retrospective.md` (on lib-acg feat/acg-multi-provider, commit `d2e3e48`)
 
 ## Completed (v1.4.5 partial — shopping-cart-frontend #15)
 - [x] **shopping-cart-frontend PR #15 merged** — Keycloak SSO wiring (CI build-args + nginx CSP); SHA `19e47118`
