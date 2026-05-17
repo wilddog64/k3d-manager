@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
+- **k3d-manager v1.4.6 acg "Session extended" × button not clicked — OPEN** — spec: `docs/bugs/2026-05-16-session-extended-button-aria-label.md`; 7 `.locator('button').first()` → `.locator('button[aria-label="Close"]').first()` in acg_credentials.js (4 sites) + acg_extend.js (3 sites); assign to Codex
 - **k3d-manager v1.4.6 acg-up return outside function — OPEN** — spec: `docs/bugs/2026-05-16-acg-up-return-outside-function.md`; `bin/acg-up` line 111 `return` → `exit`; assign to Codex
 - **k3d-manager v1.4.6 acg-credentials _clickStartSandbox blocked by Session extended — completed** — spec: `docs/bugs/2026-05-16-acg-credentials-click-start-sandbox-blocked-by-session-extended.md`; `_clickStartSandbox` now dismisses the "Your sandbox has been extended." card before scrolling/clicking Start Sandbox; committed as `644ec725` and pushed to `origin/k3d-manager-v1.4.6`
 - **k3d-manager v1.4.6 acg-credentials isEnabled() gate skips Start Sandbox — completed** — spec: `docs/bugs/2026-05-16-acg-credentials-start-sandbox-isenabled-gate.md`; `scripts/lib/acg/playwright/acg_credentials.js` Pattern 1 now always clicks Start Sandbox when visible; committed as `ee8be3ca` and pushed to `origin/k3d-manager-v1.4.6`

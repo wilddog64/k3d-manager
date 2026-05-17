@@ -14,6 +14,7 @@
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
 ## In Progress (v1.4.6)
+- **OPEN:** Codex — acg "Session extended" × button not clicked — spec: `docs/bugs/2026-05-16-session-extended-button-aria-label.md`; change all 7 `.locator('button').first()` dismiss calls to `.locator('button[aria-label="Close"]').first()` in `acg_credentials.js` (lines 157, 274, 383, 470) and `acg_extend.js` (lines 143, 190, 389)
 - **OPEN:** Codex — acg-up return outside function — spec: `docs/bugs/2026-05-16-acg-up-return-outside-function.md`; `bin/acg-up` line 111: `|| return 1` → `|| exit 1`
 - **COMPLETE:** Codex — acg-credentials _clickStartSandbox blocked by Session extended modal — spec: `docs/bugs/2026-05-16-acg-credentials-click-start-sandbox-blocked-by-session-extended.md`; `_clickStartSandbox` now dismisses the "Your sandbox has been extended." card before scrolling/clicking Start Sandbox; committed as `644ec725` and pushed to `origin/k3d-manager-v1.4.6`
 - **COMPLETE:** Codex — acg-credentials isEnabled() gate skips Start Sandbox click — spec: `docs/bugs/2026-05-16-acg-credentials-start-sandbox-isenabled-gate.md`; `scripts/lib/acg/playwright/acg_credentials.js` Pattern 1 now always clicks Start Sandbox when visible; committed as `ee8be3ca` and pushed to `origin/k3d-manager-v1.4.6`
