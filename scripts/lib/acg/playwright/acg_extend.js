@@ -136,10 +136,10 @@ async function extendSandbox() {
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     }
 
-    // If "Session extended" toast is already visible, extension already succeeded — exit immediately.
+    // If "Session extended" toast is already visible, extension already succeeded — return so finally runs.
     if (await page.locator('text="Session extended"').first().isVisible({ timeout: 2000 }).catch(() => false)) {
       console.error('INFO: "Session extended" toast already visible — extension already succeeded. Exiting.');
-      process.exit(0);
+      return;
     }
 
     // Wait for skeleton loaders to clear

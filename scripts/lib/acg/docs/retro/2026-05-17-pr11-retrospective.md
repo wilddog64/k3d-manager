@@ -3,7 +3,7 @@
 **Date:** 2026-05-17
 **PR:** #11 — fix: AWS sandbox credential extraction and dialog handling
 **Merged to:** main
-**Participants:** Claude, Copilot
+**Participants:** Claude, Codex, Copilot
 
 ## What Went Well
 - AWS credential extraction fully functional: `bin/acg-credential-test` writes to `~/.aws/credentials [default]`, validates with `sts:GetCallerIdentity`

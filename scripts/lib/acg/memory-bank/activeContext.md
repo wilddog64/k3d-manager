@@ -1,6 +1,6 @@
 # Active Context — lib-acg
 
-## Current Branch: `fix/acg-credentials-extend-dialog`
+## Current Branch: `feat/acg-multi-provider`
 
 **Repo created:** 2026-04-25
 **Status:** Post-merge cleanup after PR #9 complete.
@@ -65,6 +65,19 @@ Branch: `fix/post-merge-pr9-cleanup`
 - [x] Remove dead Linux else-block from `_browser_launch` in `scripts/lib/cdp.sh` (`5f45069`)
       Spec: `docs/bugs/2026-05-07-browser-launch-linux-dead-code.md`
 
+## Done: PR #11 — AWS credential extraction and dialog handling
+
+- [x] `fix/acg-credentials-extend-dialog` merged to main (`feeb8e80`) — 2026-05-17
+- [x] `bin/acg-credential-test`: writes to `~/.aws/credentials [default]`, validates with `sts:GetCallerIdentity`, suppresses credential stdout
+- [x] `playwright/acg_credentials.js`: Extend Your Session dialog — bringToFront+Enter WARN fallback
+- [x] Makefile, CI shellcheck, copilot-instructions, pre-commit hook
+- [x] PR #12 open: `feat/acg-multi-provider` — fix `acg_extend.js` hang on Session extended toast
+
+## In Progress: PR #12 — acg_extend.js startup toast hang fix
+
+- [ ] Merge PR #12 (`feat/acg-multi-provider`) after Copilot review addressed
+- [ ] Subtree pull into k3d-manager after merge
+
 ## Consumed By
 
-- `k3d-manager` — will pull via git subtree at `scripts/lib/acg/` (Phase 4)
+- `k3d-manager` — pulled via git subtree at `scripts/lib/acg/` (Phase 4 complete)
