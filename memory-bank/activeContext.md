@@ -23,7 +23,7 @@
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
 ## In Progress (v1.4.7)
-- **ASSIGNED TO CODEX:** ArgoCD SSO `invalid_scope: groups` — spec: `docs/bugs/2026-05-18-argocd-sso-invalid-groups-scope.md`; remove `groups` from `requestedScopes` in `shopping-cart-infra/argocd/config/argocd-cm.yaml`; branch `fix/argocd-groups-scope`; live cluster already patched as workaround (2026-05-18).
+- **NO-OP:** ArgoCD SSO `invalid_scope: groups` spec was already satisfied on `origin/main` in `shopping-cart-infra`; `requestedScopes` already contains only `openid`, `profile`, and `email`, so there was nothing to commit. Issue doc: `docs/issues/2026-05-18-argocd-groups-scope-already-fixed.md`.
 
 ## Completed (v1.4.6)
 - **SPEC WRITTEN:** Frontend API contract mismatch — spec: `docs/bugs/2026-05-17-frontend-api-contract-mismatch.md`; products blank (backend `items/total/page_size/pages` → frontend needs `data/totalItems/pageSize/totalPages`; `quantity` → `stock`, `image_url` → `imageUrl`); orders 400 (missing `customerId`; backend returns plain array, frontend expects paginated shape); all fixes in `shopping-cart-frontend` on branch `fix/frontend-api-contract`.
