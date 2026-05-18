@@ -867,8 +867,14 @@ else
     }
 COREDNS_PATCH
 )
-    _new_corefile=$(echo "${_coredns_corefile}" | sed "/^    prometheus/i\\
-${_coredns_patch}")
+    _new_corefile=$(COREDNS_PATCH="${_coredns_patch}" python3 -c "
+import sys, os
+patch = os.environ['COREDNS_PATCH']
+for line in sys.stdin:
+    if line.strip().startswith('prometheus'):
+        sys.stdout.write(patch + '\n')
+    sys.stdout.write(line)
+" <<< "${_coredns_corefile}")
     kubectl patch configmap coredns -n kube-system --context ubuntu-k3s \
       --type merge -p "{\"data\":{\"Corefile\":$(echo "${_new_corefile}" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}}" >/dev/null 2>&1 || \
       _warn "[acg-up] CoreDNS patch for keycloak.shopping-cart.local failed"
