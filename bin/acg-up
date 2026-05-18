@@ -810,6 +810,35 @@ else
   fi
 fi
 
+_info "[acg-up] Step 10d.5/14 — Seeding Keycloak LDAP user passwords in LDAP + Vault..."
+_ldap_pod=$(kubectl get pod -n identity --context k3d-k3d-cluster \
+  -l app.kubernetes.io/name=ldap \
+  -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+if [[ -z "${_ldap_pod}" ]]; then
+  _warn "[acg-up] LDAP pod not found in identity namespace — skipping user password seed"
+else
+  for _ldap_user in admin developer operator; do
+    _ldap_user_vault_path="keycloak/users/${_ldap_user}"
+    if _vault_kv_exists "${_ldap_user_vault_path}"; then
+      _ldap_user_pass=$(_vault_kv_get_field "${_ldap_user_vault_path}" "password")
+    else
+      _ldap_user_pass=$(openssl rand -base64 18 | tr -d '=+/')
+      _vault_kv_put "{\"username\":\"${_ldap_user}\",\"password\":\"${_ldap_user_pass}\"}" "${_ldap_user_vault_path}"
+    fi
+    if kubectl exec -n identity --context k3d-k3d-cluster "${_ldap_pod}" -- \
+        ldappasswd -x -H ldap://localhost:389 \
+        -D "cn=admin,dc=shopping-cart,dc=local" \
+        -w "${_ldap_admin_pass}" \
+        -s "${_ldap_user_pass}" \
+        "uid=${_ldap_user},ou=users,dc=shopping-cart,dc=local" >/dev/null 2>&1; then
+      _info "[acg-up] LDAP password set for user '${_ldap_user}'"
+    else
+      _warn "[acg-up] Failed to set LDAP password for user '${_ldap_user}' — login may fail"
+    fi
+  done
+  _info "[acg-up] Retrieve passwords: bin/vault-exec --namespace secrets -- vault kv get -field=password secret/keycloak/users/<user>"
+fi
+
 if _is_mac; then
   _info "[acg-up] Step 10e/14 — Installing Istio ingress HTTP listener (keycloak + frontend → 127.0.0.1:80, auto-restart)..."
   _keycloak_browser_label="com.k3d-manager.keycloak-browser-http"
