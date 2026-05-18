@@ -22,7 +22,10 @@
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
-## In Progress (v1.4.6)
+## In Progress (v1.4.7)
+- **ASSIGNED TO CODEX:** ArgoCD SSO `invalid_scope: groups` — spec: `docs/bugs/2026-05-18-argocd-sso-invalid-groups-scope.md`; remove `groups` from `requestedScopes` in `shopping-cart-infra/argocd/config/argocd-cm.yaml`; branch `fix/argocd-groups-scope`; live cluster already patched as workaround (2026-05-18).
+
+## Completed (v1.4.6)
 - **SPEC WRITTEN:** Frontend API contract mismatch — spec: `docs/bugs/2026-05-17-frontend-api-contract-mismatch.md`; products blank (backend `items/total/page_size/pages` → frontend needs `data/totalItems/pageSize/totalPages`; `quantity` → `stock`, `image_url` → `imageUrl`); orders 400 (missing `customerId`; backend returns plain array, frontend expects paginated shape); all fixes in `shopping-cart-frontend` on branch `fix/frontend-api-contract`.
 - **SPEC WRITTEN:** Keycloak JWT issuer mismatch (app cluster) — spec: `docs/bugs/2026-05-17-keycloak-jwt-issuer-mismatch-app-cluster.md`; OAUTH2_ISSUER_URI must change from `keycloak.identity.svc.cluster.local` to `keycloak.shopping-cart.local` (matches actual JWT iss); `bin/acg-up` Step 10g.5 adds SSH tunnel + iptables DNAT + CoreDNS patch on ubuntu-k3s; changes also in `shopping-cart-order/k8s/base/configmap.yaml` and `shopping-cart-basket/k8s/base/configmap.yaml`.
 - **SPEC WRITTEN:** product-catalog init SQL UUID/SERIAL mismatch — spec: `docs/bugs/2026-05-17-product-catalog-init-sql-serial-vs-uuid.md`; `shopping-cart-infra/data-layer/postgresql/products/init-db.sql` must remove the SERIAL products table DDL so SQLAlchemy owns the schema; workaround (table drop + restart) applied 2026-05-17 on live cluster.
