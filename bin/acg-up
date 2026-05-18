@@ -108,7 +108,11 @@ fi
 _info "[acg-up] Step 1/12 — Getting ${_cluster_provider} credentials..."
 case "${_cluster_provider}" in
   k3s-aws)
-    acg_get_credentials ${sandbox_url:+"$sandbox_url"} || exit 1
+    if _acg_check_credentials 2>/dev/null; then
+      _info "[acg-up] AWS credentials are valid — skipping Playwright extraction"
+    else
+      acg_get_credentials ${sandbox_url:+"$sandbox_url"} || exit 1
+    fi
     ;;
   k3s-gcp)
     gcp_get_credentials ${sandbox_url:+"$sandbox_url"}
