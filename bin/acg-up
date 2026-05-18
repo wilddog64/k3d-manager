@@ -839,6 +839,44 @@ else
   _info "[acg-up] Retrieve passwords: bin/vault-exec --namespace secrets -- vault kv get -field=password secret/keycloak/users/<user>"
 fi
 
+_info "[acg-up] Step 10g.5/14 — Wiring Keycloak cross-cluster reachability on ubuntu-k3s..."
+_node_ip=$(kubectl get node --context ubuntu-k3s \
+  -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
+if [[ -z "${_node_ip}" ]]; then
+  _warn "[acg-up] Could not determine ubuntu-k3s node IP — skipping Keycloak cross-cluster tunnel"
+else
+  ssh -f -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
+    -R 127.0.0.1:18080:127.0.0.1:80 ubuntu 2>/dev/null || \
+    _warn "[acg-up] Keycloak reverse tunnel setup failed — JWT auth from app cluster may be unavailable"
+
+  ssh ubuntu "sudo sysctl -w net.ipv4.conf.all.route_localnet=1" >/dev/null 2>&1 || true
+
+  ssh ubuntu "sudo iptables -t nat -D PREROUTING -p tcp -d ${_node_ip} --dport 80 -j DNAT --to-destination 127.0.0.1:18080" >/dev/null 2>&1 || true
+  ssh ubuntu "sudo iptables -t nat -A PREROUTING -p tcp -d ${_node_ip} --dport 80 -j DNAT --to-destination 127.0.0.1:18080" >/dev/null 2>&1 || \
+    _warn "[acg-up] iptables DNAT rule for Keycloak failed — JWT auth from app cluster may be unavailable"
+
+  _coredns_corefile=$(kubectl get configmap coredns -n kube-system --context ubuntu-k3s \
+    -o jsonpath='{.data.Corefile}' 2>/dev/null || true)
+  if echo "${_coredns_corefile}" | grep -q "keycloak.shopping-cart.local"; then
+    _info "[acg-up] CoreDNS keycloak hosts entry already present — skipping"
+  else
+    _coredns_patch=$(cat <<COREDNS_PATCH
+    hosts {
+        ${_node_ip} keycloak.shopping-cart.local
+        fallthrough
+    }
+COREDNS_PATCH
+)
+    _new_corefile=$(echo "${_coredns_corefile}" | sed "/^    prometheus/i\\
+${_coredns_patch}")
+    kubectl patch configmap coredns -n kube-system --context ubuntu-k3s \
+      --type merge -p "{\"data\":{\"Corefile\":$(echo "${_new_corefile}" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}}" >/dev/null 2>&1 || \
+      _warn "[acg-up] CoreDNS patch for keycloak.shopping-cart.local failed"
+    kubectl rollout restart deployment/coredns -n kube-system --context ubuntu-k3s >/dev/null 2>&1 || true
+    _info "[acg-up] CoreDNS updated: keycloak.shopping-cart.local → ${_node_ip} (via port 80 DNAT → 127.0.0.1:18080 → SSH tunnel → Keycloak)"
+  fi
+fi
+
 if _is_mac; then
   _info "[acg-up] Step 10e/14 — Installing Istio ingress HTTP listener (keycloak + frontend → 127.0.0.1:80, auto-restart)..."
   _keycloak_browser_label="com.k3d-manager.keycloak-browser-http"
