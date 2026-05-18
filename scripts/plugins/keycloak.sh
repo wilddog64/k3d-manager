@@ -105,7 +105,15 @@ HELP
       _keycloak_seed_vault_admin_secret
       envsubst < "$KEYCLOAK_CONFIG_DIR/externalsecret-admin.yaml.tmpl" | _kubectl apply -f - >/dev/null
       if ! _kubectl -n "$KEYCLOAK_NAMESPACE" wait --for=condition=Ready --timeout=60s externalsecret/"$KEYCLOAK_ADMIN_SECRET_NAME" 2>/dev/null; then
-         _warn "[keycloak] Timeout waiting for admin ExternalSecret"
+         _err "[keycloak] Admin ExternalSecret not Ready; refusing to start Keycloak with an empty admin password"
+         return 1
+      fi
+      local _admin_pw
+      _admin_pw=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_ADMIN_SECRET_NAME" \
+         -o jsonpath="{.data.${KEYCLOAK_ADMIN_PASSWORD_KEY}}" | base64 -d)
+      if [[ -z "${_admin_pw}" ]]; then
+         _err "[keycloak] Secret '$KEYCLOAK_ADMIN_SECRET_NAME' has an empty '${KEYCLOAK_ADMIN_PASSWORD_KEY}'"
+         return 1
       fi
    else
       _keycloak_ensure_admin_secret

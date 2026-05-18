@@ -136,23 +136,10 @@ async function extendSandbox() {
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     }
 
-    // Dismiss any lingering "Session extended" confirmation modal before searching for extend button
-    const _sessionExtendedModal = page.locator('text="Session extended"').first();
-    if (await _sessionExtendedModal.isVisible({ timeout: 3000 }).catch(() => false)) {
-      console.error('INFO: Dismissing "Session extended" modal...');
-      await page.keyboard.press('Escape').catch(() => {});
-      await page.waitForTimeout(500);
-      // Fallback: click the X button if Escape didn't close it
-      const _closeBtn = page.locator('[role="dialog"] button, button:has-text("×"), button[aria-label*="close" i]').first();
-      if (await _sessionExtendedModal.isVisible({ timeout: 1000 }).catch(() => false) &&
-          await _closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await _closeBtn.click({ force: true }).catch(() => {});
-        await page.waitForTimeout(500);
-      }
-      // Confirm the modal is gone before proceeding — guards against slow close animations
-      await _sessionExtendedModal.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {
-        console.error('WARN: "Session extended" modal did not close within 3s — proceeding anyway');
-      });
+    // If "Session extended" toast is already visible, extension already succeeded — return so finally runs.
+    if (await page.locator('text="Session extended"').first().isVisible({ timeout: 2000 }).catch(() => false)) {
+      console.error('INFO: "Session extended" toast already visible — extension already succeeded. Exiting.');
+      return;
     }
 
     // Wait for skeleton loaders to clear
@@ -177,6 +164,13 @@ async function extendSandbox() {
       'button:has-text("Renew")',
       '[data-testid*="extend"]',
       '[aria-label*="extend" i]',
+      // Redesigned UI selectors (2025+)
+      'a:has-text("Extend")',
+      '[class*="extend" i]',
+      '[href*="extend" i]',
+      'button[class*="Extend"]',
+      'span:has-text("Extend Session")',
+      'div[role="button"]:has-text("Extend")',
     ];
 
     let clicked = false;
@@ -187,6 +181,34 @@ async function extendSandbox() {
     }
 
     if (clicked) {
+      const _extendedConfirm = page.locator('text="Your sandbox has been extended."').first();
+      if (await _extendedConfirm.isVisible({ timeout: 3000 }).catch(() => false)) {
+        const _closeBox = await page.evaluate(() => {
+          const cb = document.querySelector('button[aria-label="close" i]');
+          if (cb) {
+            const r = cb.getBoundingClientRect();
+            return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+          }
+          const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          let n;
+          while ((n = w.nextNode())) {
+            if (n.nodeValue.includes('Your sandbox has been extended.')) {
+              let el = n.parentElement;
+              for (let i = 0; i < 8 && el && el !== document.body; i++, el = el.parentElement) {
+                const bs = [...el.querySelectorAll('button')];
+                if (bs.length) {
+                  const r = bs[bs.length - 1].getBoundingClientRect();
+                  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+                }
+              }
+              break;
+            }
+          }
+          return null;
+        }).catch(() => null);
+        if (_closeBox) await page.mouse.click(_closeBox.x, _closeBox.y);
+        await _extendedConfirm.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+      }
       console.log('Extend action complete (Immediate).');
       return;
     }
@@ -236,39 +258,85 @@ async function extendSandbox() {
       console.error(`WARN: Auto Shutdown text not found. Proceeding anyway.`);
     }
 
+    // Debug: capture listing page state before attempting reveal
+    {
+      const _debugDir = path.join(os.homedir(), '.local', 'share', 'k3d-manager');
+      const _debugPath = path.join(_debugDir, `acg-extend-debug-listing-${Date.now()}.png`);
+      try {
+        await fs.promises.mkdir(_debugDir, { recursive: true });
+        await page.screenshot({ path: _debugPath, fullPage: true });
+        console.error(`INFO: Debug screenshot (listing page): ${_debugPath}`);
+      } catch (_e) { /* non-fatal */ }
+    }
+
     // 3. Reveal the panel/modal if still not clicked
     // isPanelOpen: "Auto Shutdown" text appears on the listing-page card — not a reliable signal
     // that the extend panel is open. If step 1 found no extend button, the panel is NOT open.
     const isPanelOpen = clicked;
 
     if (!isPanelOpen) {
-      // Click "Open Sandbox" on the card with the "Auto Shutdown" banner (the running sandbox),
-      // not .first() which always picks the first card (AWS) regardless of provider.
-      const _allOpenBtns = page.locator('button:has-text("Open Sandbox")');
-      const _btnCount = await _allOpenBtns.count();
-      let _openBtn = null;
-      for (let _i = 0; _i < _btnCount; _i++) {
-        const _hasShutdown = await _allOpenBtns.nth(_i).evaluate(el => {
-          let node = el.parentElement;
-          for (let _j = 0; _j < 6; _j++) {
-            if (!node) break;
-            if (/auto\s*shutdown/i.test(node.innerText || '')) return true;
-            node = node.parentElement;
-          }
-          return false;
-        }).catch(() => false);
-        if (_hasShutdown) { _openBtn = _allOpenBtns.nth(_i); break; }
-      }
-      if (!_openBtn) {
-        _openBtn = page.locator('button:has-text("Open Sandbox"), button:has-text("Start Sandbox"), button:has-text("Resume")').first();
-      }
-      if (await _openBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
-        console.error('INFO: Clicking Open Sandbox to reveal extend panel...');
-        await _openBtn.click({ force: true });
-        const _openPanelBtn = await _waitForVisibleExtendButton(page, extendSelectors, 15000, 'after Open Sandbox');
-        if (_openPanelBtn) {
-          await _openPanelBtn.click({ force: true });
+      // NEW: Try clicking the "Auto Shutdown" section — may trigger extend modal in redesigned UI
+      const _shutdownLink = page.locator('text=/Auto Shutdown/i').first();
+      if (await _shutdownLink.isVisible({ timeout: 3000 }).catch(() => false)) {
+        console.error('INFO: Clicking Auto Shutdown section to trigger extend modal...');
+        await _shutdownLink.click({ force: true });
+        await page.waitForTimeout(2000);
+        const _shutdownPanelBtn = await _waitForVisibleExtendButton(page, extendSelectors, 10000, 'after AutoShutdown click');
+        if (_shutdownPanelBtn) {
+          await _shutdownPanelBtn.click({ force: true });
           clicked = true;
+        }
+      }
+
+      // Fallback: click "Open Sandbox" on the card with the "Auto Shutdown" banner
+      if (!clicked) {
+        const _allOpenBtns = page.locator('button:has-text("Open Sandbox")');
+        const _btnCount = await _allOpenBtns.count();
+        let _openBtn = null;
+        for (let _i = 0; _i < _btnCount; _i++) {
+          const _hasShutdown = await _allOpenBtns.nth(_i).evaluate(el => {
+            let node = el.parentElement;
+            for (let _j = 0; _j < 6; _j++) {
+              if (!node) break;
+              if (/auto\s*shutdown/i.test(node.innerText || '')) return true;
+              node = node.parentElement;
+            }
+            return false;
+          }).catch(() => false);
+          if (_hasShutdown) { _openBtn = _allOpenBtns.nth(_i); break; }
+        }
+        if (!_openBtn) {
+          _openBtn = page.locator('button:has-text("Open Sandbox"), button:has-text("Start Sandbox"), button:has-text("Resume")').first();
+        }
+        if (await _openBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+          const _btnText = await _openBtn.textContent().catch(() => '');
+          if (/start\s+sandbox/i.test(_btnText)) {
+            console.log('INFO: Sandbox not yet started — fresh 4h TTL. Skipping extension.');
+            process.exit(0);
+          }
+          console.error('INFO: Clicking Open Sandbox to reveal extend panel...');
+          await _openBtn.click({ force: true });
+
+          // After opening, scroll to top — extend button may be above the fold
+          await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
+          await page.waitForTimeout(1000);
+
+          const _openPanelBtn = await _waitForVisibleExtendButton(page, extendSelectors, 15000, 'after Open Sandbox');
+          if (_openPanelBtn) {
+            await _openPanelBtn.click({ force: true });
+            clicked = true;
+          }
+
+          // NEW: If extend button still not found, take a screenshot of what we see
+          if (!clicked) {
+            const _debugDir = path.join(os.homedir(), '.local', 'share', 'k3d-manager');
+            const _debugPath = path.join(_debugDir, `acg-extend-debug-after-open-${Date.now()}.png`);
+            try {
+              await fs.promises.mkdir(_debugDir, { recursive: true });
+              await page.screenshot({ path: _debugPath, fullPage: true });
+              console.error(`INFO: Debug screenshot (after Open Sandbox): ${_debugPath}`);
+            } catch (_e) { /* non-fatal */ }
+          }
         }
       }
     }
@@ -333,6 +401,35 @@ async function extendSandbox() {
 
     if (!confirmed) {
       console.error('WARN: Could not confirm extension via toast/TTL text — proceeding anyway');
+    }
+
+    const _extendedConfirmGeneral = page.locator('text="Your sandbox has been extended."').first();
+    if (await _extendedConfirmGeneral.isVisible({ timeout: 2000 }).catch(() => false)) {
+      const _closeBox = await page.evaluate(() => {
+        const cb = document.querySelector('button[aria-label="close" i]');
+        if (cb) {
+          const r = cb.getBoundingClientRect();
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        }
+        const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        let n;
+        while ((n = w.nextNode())) {
+          if (n.nodeValue.includes('Your sandbox has been extended.')) {
+            let el = n.parentElement;
+            for (let i = 0; i < 8 && el && el !== document.body; i++, el = el.parentElement) {
+              const bs = [...el.querySelectorAll('button')];
+              if (bs.length) {
+                const r = bs[bs.length - 1].getBoundingClientRect();
+                return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+              }
+            }
+            break;
+          }
+        }
+        return null;
+      }).catch(() => null);
+      if (_closeBox) await page.mouse.click(_closeBox.x, _closeBox.y);
+      await _extendedConfirmGeneral.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
     const expiryText = await page.locator('text=/expires/i').first().textContent().catch(() => 'unknown');

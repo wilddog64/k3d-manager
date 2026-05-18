@@ -6,6 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Fixed
+- `acg_extend.js`: detect "Session extended" toast at startup — if already visible, extension already succeeded; exit 0 immediately instead of looping forever trying to dismiss via CDP mouse click
 - `_waitForSandboxEntry`: pass `null` as `waitForFunction` arg so the timeout option reaches the options slot (same arg-slot bug as `_waitForCredentials`)
 - `_waitForCredentials`: fix arg-slot bug (pass `null` as `waitForFunction` arg) and increase timeout from 60s to 180s — sandbox provisioning can take 60–120s
 - `OVERALL_TIMEOUT_MS`: simplify redundant conditional to a single 300s constant — both first-run and non-first-run now use the same deadline
@@ -19,6 +20,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `_browser_launch`: remove 17-line dead Linux else-block; library is macOS-only by design — non-Darwin callers now get a clear `_err` instead of silently entering unreachable code
 
 ### Added
+- `bin/acg-credential-test`: AWS credential extraction with write to `~/.aws/credentials [default]`, validation via `sts:GetCallerIdentity`, credential value suppression from terminal
+- `playwright/acg_credentials.js`: "Extend Your Session" dialog handling via bringToFront+Enter with best-effort dismiss (WARN logged if dismiss fails; credentials still populate via Extend path)
+- Makefile `setup`, `check`, `lint` targets for local development
 - CI workflow: shellcheck, node --check, yamllint on PRs to main
 - Pre-commit hook: subtree guard + shellcheck + node --check on staged files
 - Phase 3 migration: acg.sh, gcp.sh, cdp.sh, vars.sh, playwright scripts, acg-cluster.yaml

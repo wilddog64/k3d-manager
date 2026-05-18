@@ -39,6 +39,12 @@ jobs:
             shellcheck -S error "${files[@]}"
           fi
 
+      - name: Run shellcheck on bin/ scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          shellcheck -S warning bin/acg-credential-test bin/acg-extend-test
+
       - name: Run node syntax checks
         shell: bash
         run: |

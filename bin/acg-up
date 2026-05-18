@@ -108,10 +108,10 @@ fi
 _info "[acg-up] Step 1/12 — Getting ${_cluster_provider} credentials..."
 case "${_cluster_provider}" in
   k3s-aws)
-    if aws sts get-caller-identity >/dev/null 2>&1; then
-      _info "[acg-up] Existing AWS credentials valid — skipping extraction"
+    if _acg_check_credentials 2>/dev/null; then
+      _info "[acg-up] AWS credentials are valid — skipping Playwright extraction"
     else
-      acg_get_credentials ${sandbox_url:+"$sandbox_url"}
+      acg_get_credentials ${sandbox_url:+"$sandbox_url"} || exit 1
     fi
     ;;
   k3s-gcp)
@@ -226,6 +226,40 @@ else
   exit 1
 fi
 
+_info "[acg-up] Updating /etc/hosts entries before starting the ArgoCD browser HTTPS listener..."
+# Add /etc/hosts entries on the Mac host for local browser access
+_argocd_host_ip="127.0.0.1"
+_kc_browser_ip="127.0.0.1"
+_HOSTS_LIST=(
+  "argocd.shopping-cart.local|${_argocd_host_ip}"
+  "keycloak.shopping-cart.local|${_kc_browser_ip}"
+  "frontend.shopping-cart.local|127.0.0.2"
+)
+for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
+  _h="${_host_ip_pair%%|*}"
+  _desired_ip="${_host_ip_pair#*|}"
+  if [[ -z "${_desired_ip}" ]]; then
+    _warn "[acg-up] could not determine the ingressgateway IP for ${_h} — browser login may fail"
+    continue
+  fi
+  _desired_host_entry="${_desired_ip} ${_h}"
+  _current_host_entry=$(grep -E "^[0-9.]+[[:space:]]+${_h//./\\.}$" /etc/hosts | tail -n 1 || true)
+  if [[ "${_current_host_entry}" != "${_desired_host_entry}" ]]; then
+    _info "[acg-up] Updating /etc/hosts for ${_h} → ${_desired_ip} (requires sudo)..."
+    if _run_command --interactive-sudo --soft -- \
+        sh -c "set -e
+tmp=\$(mktemp)
+grep -vE '^[0-9.]+[[:space:]]+${_h//./\\.}$' /etc/hosts > \"\$tmp\"
+printf '%s\n' '${_desired_host_entry}' >> \"\$tmp\"
+cat \"\$tmp\" > /etc/hosts
+rm -f \"\$tmp\""; then
+      _info "[acg-up] /etc/hosts: ${_h} → ${_desired_ip}"
+    else
+      _warn "could not update /etc/hosts for ${_h} — please add manually: ${_desired_host_entry}"
+    fi
+  fi
+done
+
 if _is_mac; then
   _info "[acg-up] Step 4c/12 — Installing ArgoCD browser HTTPS listener (${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}, Vault PKI, auto-restart)..."
   _argocd_browser_label="${ARGOCD_BROWSER_LISTENER_LABEL:-com.k3d-manager.argocd-browser-https}"
@@ -245,7 +279,14 @@ if _is_mac; then
   else
     _argocd_browser_ready=0
     _argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}" || exit 1
-    _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local}:${ARGOCD_BROWSER_PORT:-443}/healthz"
+    if [[ "$(uname)" == "Darwin" ]]; then
+      _info "[acg-up] Trusting Vault CA cert in macOS System Keychain (may prompt for sudo password)..."
+      _run_command --interactive-sudo --soft -- \
+        security add-trusted-cert -d -r trustRoot \
+          -k /Library/Keychains/System.keychain \
+          "${_argocd_browser_tls_dir}/ca.crt"
+    fi
+    _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz"
     cat > "${_argocd_browser_plist_tmp}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -294,7 +335,7 @@ PLIST
       fi
       _err "[acg-up] failed to bootstrap ArgoCD browser HTTPS listener; see ${_argocd_browser_launchctl_log}"
     fi
-    if _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-30}"; then
+    if _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-120}"; then
       _info "[acg-up] ArgoCD reachable at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local} (launchd: ${_argocd_browser_label})"
       _argocd_browser_ready=1
     else
@@ -587,6 +628,9 @@ if _vault_kv_exists "keycloak/admin"; then
   _info "[acg-up] Reusing existing Vault secret keycloak/admin"
   _kc_admin_pass=$(_vault_kv_get_field "keycloak/admin" "admin_password")
   _kc_db_pass=$(_vault_kv_get_field "keycloak/admin" "db_password")
+  if [[ -z "${_kc_admin_pass}" || -z "${_kc_db_pass}" ]]; then
+    _acg_fail "[acg-up] Vault secret keycloak/admin is missing admin_password or db_password — restore the secret before continuing"
+  fi
 else
   _kc_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
   _kc_db_pass=$(openssl rand -base64 24 | tr -d '=+/')
@@ -766,8 +810,75 @@ else
   fi
 fi
 
+_info "[acg-up] Step 10d.5/14 — Seeding Keycloak LDAP user passwords in LDAP + Vault..."
+_ldap_pod=$(kubectl get pod -n identity --context k3d-k3d-cluster \
+  -l app.kubernetes.io/name=ldap \
+  -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+if [[ -z "${_ldap_pod}" ]]; then
+  _warn "[acg-up] LDAP pod not found in identity namespace — skipping user password seed"
+else
+  for _ldap_user in admin developer operator; do
+    _ldap_user_vault_path="keycloak/users/${_ldap_user}"
+    if _vault_kv_exists "${_ldap_user_vault_path}"; then
+      _ldap_user_pass=$(_vault_kv_get_field "${_ldap_user_vault_path}" "password")
+    else
+      _ldap_user_pass=$(openssl rand -base64 18 | tr -d '=+/')
+      _vault_kv_put "{\"username\":\"${_ldap_user}\",\"password\":\"${_ldap_user_pass}\"}" "${_ldap_user_vault_path}"
+    fi
+    if kubectl exec -n identity --context k3d-k3d-cluster "${_ldap_pod}" -- \
+        ldappasswd -x -H ldap://localhost:389 \
+        -D "cn=admin,dc=shopping-cart,dc=local" \
+        -w "${_ldap_admin_pass}" \
+        -s "${_ldap_user_pass}" \
+        "uid=${_ldap_user},ou=users,dc=shopping-cart,dc=local" >/dev/null 2>&1; then
+      _info "[acg-up] LDAP password set for user '${_ldap_user}'"
+    else
+      _warn "[acg-up] Failed to set LDAP password for user '${_ldap_user}' — login may fail"
+    fi
+  done
+  _info "[acg-up] Retrieve passwords: bin/vault-exec --namespace secrets -- vault kv get -field=password secret/keycloak/users/<user>"
+fi
+
+_info "[acg-up] Step 10g.5/14 — Wiring Keycloak cross-cluster reachability on ubuntu-k3s..."
+_node_ip=$(kubectl get node --context ubuntu-k3s \
+  -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
+if [[ -z "${_node_ip}" ]]; then
+  _warn "[acg-up] Could not determine ubuntu-k3s node IP — skipping Keycloak cross-cluster tunnel"
+else
+  ssh -f -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 \
+    -R 127.0.0.1:18080:127.0.0.1:80 ubuntu 2>/dev/null || \
+    _warn "[acg-up] Keycloak reverse tunnel setup failed — JWT auth from app cluster may be unavailable"
+
+  ssh ubuntu "sudo sysctl -w net.ipv4.conf.all.route_localnet=1" >/dev/null 2>&1 || true
+
+  ssh ubuntu "sudo iptables -t nat -D PREROUTING -p tcp -d ${_node_ip} --dport 80 -j DNAT --to-destination 127.0.0.1:18080" >/dev/null 2>&1 || true
+  ssh ubuntu "sudo iptables -t nat -A PREROUTING -p tcp -d ${_node_ip} --dport 80 -j DNAT --to-destination 127.0.0.1:18080" >/dev/null 2>&1 || \
+    _warn "[acg-up] iptables DNAT rule for Keycloak failed — JWT auth from app cluster may be unavailable"
+
+  _coredns_corefile=$(kubectl get configmap coredns -n kube-system --context ubuntu-k3s \
+    -o jsonpath='{.data.Corefile}' 2>/dev/null || true)
+  if echo "${_coredns_corefile}" | grep -q "keycloak.shopping-cart.local"; then
+    _info "[acg-up] CoreDNS keycloak hosts entry already present — skipping"
+  else
+    _coredns_patch=$(cat <<COREDNS_PATCH
+    hosts {
+        ${_node_ip} keycloak.shopping-cart.local
+        fallthrough
+    }
+COREDNS_PATCH
+)
+    _new_corefile=$(echo "${_coredns_corefile}" | sed "/^    prometheus/i\\
+${_coredns_patch}")
+    kubectl patch configmap coredns -n kube-system --context ubuntu-k3s \
+      --type merge -p "{\"data\":{\"Corefile\":$(echo "${_new_corefile}" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}}" >/dev/null 2>&1 || \
+      _warn "[acg-up] CoreDNS patch for keycloak.shopping-cart.local failed"
+    kubectl rollout restart deployment/coredns -n kube-system --context ubuntu-k3s >/dev/null 2>&1 || true
+    _info "[acg-up] CoreDNS updated: keycloak.shopping-cart.local → ${_node_ip} (via port 80 DNAT → 127.0.0.1:18080 → SSH tunnel → Keycloak)"
+  fi
+fi
+
 if _is_mac; then
-  _info "[acg-up] Step 10e/14 — Installing Keycloak browser HTTP listener (keycloak.shopping-cart.local:80, auto-restart)..."
+  _info "[acg-up] Step 10e/14 — Installing Istio ingress HTTP listener (keycloak + frontend → 127.0.0.1:80, auto-restart)..."
   _keycloak_browser_label="com.k3d-manager.keycloak-browser-http"
   _keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"
   _keycloak_browser_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http.log"
@@ -776,10 +887,10 @@ if _is_mac; then
   _keycloak_browser_plist_tmp="${HOME}/.local/share/k3d-manager/keycloak-browser-http.plist"
   _keycloak_browser_kubeconfig="${HOME}/.kube/config"
   mkdir -p "$(dirname "${_keycloak_browser_log}")"
-  if curl -sf --max-time 1 http://127.0.0.1/health/ready >/dev/null 2>&1; then
-    _info "[acg-up] Keycloak browser HTTP listener already healthy at http://keycloak.shopping-cart.local — skipping launchd reinstall"
+  if curl -sf --max-time 1 http://keycloak.shopping-cart.local/health/ready >/dev/null 2>&1; then
+    _info "[acg-up] Istio ingress HTTP listener already healthy at http://keycloak.shopping-cart.local — skipping launchd reinstall"
   else
-    _argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl)" "$(command -v curl)" "identity" "k3d-k3d-cluster" "svc/keycloak" "80" "80" "http://127.0.0.1/health/ready" "${_keycloak_browser_kubeconfig}"
+    _argocd_write_port_forward_wrapper "${_keycloak_browser_wrapper}" "${_keycloak_browser_log}" "$(command -v kubectl)" "$(command -v curl)" "istio-system" "k3d-k3d-cluster" "svc/istio-ingressgateway" "80" "80" "http://keycloak.shopping-cart.local/health/ready" "${_keycloak_browser_kubeconfig}"
     cat > "${_keycloak_browser_plist_tmp}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -828,11 +939,31 @@ PLIST
       fi
       _err "[acg-up] failed to bootstrap Keycloak browser HTTP listener; see ${_keycloak_browser_launchctl_log}"
     fi
-    _info "[acg-up] Keycloak browser HTTP listener reachable at http://keycloak.shopping-cart.local (launchd: ${_keycloak_browser_label})"
+    _info "[acg-up] Istio ingress HTTP listener reachable at http://keycloak.shopping-cart.local and http://frontend.shopping-cart.local (launchd: ${_keycloak_browser_label})"
   fi
 fi
 
 _info "[acg-up] Step 10f/14 — Wiring ArgoCD SSO (Keycloak VirtualService + argocd-cm + secret patch)..."
+
+# Apply the default Istio Gateway (default-gateway) so IngressGateway envoy has an HTTP listener.
+# VirtualServices for Keycloak and ArgoCD both reference istio-system/default-gateway.
+kubectl apply --context k3d-k3d-cluster -f - <<'GATEWAY_EOF'
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: default-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
+GATEWAY_EOF
 
 # Apply Keycloak VirtualService so in-cluster pods reach keycloak.shopping-cart.local via Istio
 KEYCLOAK_VIRTUALSERVICE_HOST=keycloak.shopping-cart.local \
@@ -878,42 +1009,271 @@ kubectl apply --context k3d-k3d-cluster \
 kubectl patch secret argocd-secret -n cicd --context k3d-k3d-cluster \
   --type merge \
   --patch "{\"stringData\":{\"oidc.keycloak.clientSecret\":\"${_argocd_client_secret}\"}}"
-# Add /etc/hosts entries on the Mac host for local browser access
-_argocd_host_ip="127.0.0.1"
-_kc_browser_ip="127.0.0.1"
-_HOSTS_LIST=(
-  "argocd.shopping-cart.local|${_argocd_host_ip}"
-  "keycloak.shopping-cart.local|${_kc_browser_ip}"
-)
-for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
-  _h="${_host_ip_pair%%|*}"
-  _desired_ip="${_host_ip_pair#*|}"
-  if [[ -z "${_desired_ip}" ]]; then
-    _warn "[acg-up] could not determine the ingressgateway IP for ${_h} — browser login may fail"
-    continue
-  fi
-  _desired_host_entry="${_desired_ip} ${_h}"
-  _current_host_entry=$(grep -E "^[0-9.]+[[:space:]]+${_h//./\\.}$" /etc/hosts | tail -n 1 || true)
-  if [[ "${_current_host_entry}" != "${_desired_host_entry}" ]]; then
-    _info "[acg-up] Updating /etc/hosts for ${_h} → ${_desired_ip} (requires sudo)..."
-    if _run_command --prefer-sudo --soft -- \
-        sh -c "set -e
-tmp=\$(mktemp)
-grep -vE '^[0-9.]+[[:space:]]+${_h//./\\.}$' /etc/hosts > \"\$tmp\"
-printf '%s\n' '${_desired_host_entry}' >> \"\$tmp\"
-cat \"\$tmp\" > /etc/hosts
-rm -f \"\$tmp\""; then
-      _info "[acg-up] /etc/hosts: ${_h} → ${_desired_ip}"
-    else
-      _warn "could not update /etc/hosts for ${_h} — please add manually: ${_desired_host_entry}"
-    fi
-  fi
-done
 
 # Restart argocd-server to pick up the updated argocd-cm and argocd-secret
 kubectl rollout restart deployment/argocd-server -n cicd --context k3d-k3d-cluster
 kubectl rollout status deployment/argocd-server -n cicd --context k3d-k3d-cluster --timeout=120s
 _info "[acg-up] ArgoCD SSO wired: login at https://argocd.shopping-cart.local → Keycloak realm shopping-cart"
+
+if _is_mac; then
+  _info "[acg-up] Step 10g/14 — Installing frontend HTTP listener (frontend.shopping-cart.local → 127.0.0.2:80 → ubuntu-k3s, auto-restart)..."
+  _frontend_browser_label="com.k3d-manager.frontend-browser-http"
+  _frontend_browser_plist="${FRONTEND_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_frontend_browser_label}.plist}"
+  _frontend_browser_log="${HOME}/.local/share/k3d-manager/frontend-browser-http.log"
+  _frontend_browser_launchctl_log="${HOME}/.local/share/k3d-manager/frontend-browser-http-launchctl.log"
+  _frontend_browser_wrapper="${HOME}/.local/share/k3d-manager/frontend-browser-http.sh"
+  _frontend_browser_plist_tmp="${HOME}/.local/share/k3d-manager/frontend-browser-http.plist"
+  _frontend_browser_kubeconfig="${HOME}/.kube/config"
+  mkdir -p "$(dirname "${_frontend_browser_log}")"
+  # Ensure 127.0.0.2 loopback alias exists (macOS does not expose 127.0.0.0/8 automatically)
+  if ! ifconfig lo0 | grep -q '127\.0\.0\.2'; then
+    _run_command --interactive-sudo --quiet -- ifconfig lo0 alias 127.0.0.2 || \
+      _warn "[acg-up] failed to add 127.0.0.2 loopback alias — frontend port-forward will fail to bind"
+  fi
+
+  # Install persistent loopback alias launchd agent (survives reboots)
+  _loopback_label="com.k3d-manager.loopback-alias"
+  _loopback_plist="/Library/LaunchDaemons/${_loopback_label}.plist"
+  _loopback_plist_tmp="${HOME}/.local/share/k3d-manager/loopback-alias.plist"
+  _loopback_launchctl_log="${HOME}/.local/share/k3d-manager/loopback-alias-launchctl.log"
+  cat > "${_loopback_plist_tmp}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_loopback_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/sbin/ifconfig</string>
+    <string>lo0</string>
+    <string>alias</string>
+    <string>127.0.0.2</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/dev/null</string>
+  <key>StandardErrorPath</key>
+  <string>/dev/null</string>
+</dict>
+</plist>
+PLIST
+  : > "${_loopback_launchctl_log}"
+  _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_loopback_plist}" \
+    >"${_loopback_launchctl_log}" 2>&1 || true
+  : > "${_loopback_launchctl_log}"
+  if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_loopback_plist_tmp}" "${_loopback_plist}" \
+      >"${_loopback_launchctl_log}" 2>&1; then
+    _warn "[acg-up] failed to install loopback alias plist — frontend may fail after reboot"
+  else
+    rm -f "${_loopback_plist_tmp}"
+    : > "${_loopback_launchctl_log}"
+    _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_loopback_plist}" \
+      >"${_loopback_launchctl_log}" 2>&1 || \
+      _warn "[acg-up] failed to bootstrap loopback alias agent"
+  fi
+  # Write self-contained wrapper script; paths are baked in at write-time.
+  _kubectl_bin="$(command -v kubectl)"
+  cat > "${_frontend_browser_wrapper}" <<FRONTEND_WRAPPER
+#!/usr/bin/env bash
+set -euo pipefail
+export KUBECONFIG="${_frontend_browser_kubeconfig}"
+_log="${_frontend_browser_log}"
+while true; do
+  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.2:80" >> "\${_log}"
+  ${_kubectl_bin} --context ubuntu-k3s port-forward --address=127.0.0.2 \
+    svc/frontend 80:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
+  sleep 2
+done
+FRONTEND_WRAPPER
+  chmod +x "${_frontend_browser_wrapper}"
+  cat > "${_frontend_browser_plist_tmp}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_frontend_browser_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${_frontend_browser_wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_frontend_browser_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_frontend_browser_log}</string>
+</dict>
+</plist>
+PLIST
+  : > "${_frontend_browser_launchctl_log}"
+  if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
+      >"${_frontend_browser_launchctl_log}" 2>&1; then
+    _info "[acg-up] Stopped existing frontend browser HTTP listener"
+  elif [[ -s "${_frontend_browser_launchctl_log}" ]]; then
+    tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
+    _warn "[acg-up] existing frontend browser HTTP listener was not loaded; continuing"
+  fi
+  : > "${_frontend_browser_launchctl_log}"
+  if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" \
+      >"${_frontend_browser_launchctl_log}" 2>&1; then
+    if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
+      tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
+    fi
+    _err "[acg-up] failed to install frontend browser HTTP listener plist"
+  fi
+  rm -f "${_frontend_browser_plist_tmp}"
+  : > "${_frontend_browser_launchctl_log}"
+  if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_frontend_browser_plist}" \
+      >"${_frontend_browser_launchctl_log}" 2>&1; then
+    if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
+      tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
+    fi
+    _err "[acg-up] failed to bootstrap frontend browser HTTP listener"
+  fi
+  _info "[acg-up] Frontend HTTP listener active: http://frontend.shopping-cart.local → ubuntu-k3s svc/frontend via 127.0.0.2 (launchd: ${_frontend_browser_label})"
+fi
+
+if _is_mac; then
+  _info "[acg-up] Step 10h/14 — Installing Cloudflare Tunnels for public ArgoCD + frontend access..."
+  _tunnel_dir="${HOME}/.local/share/k3d-manager"
+  _tunnel_urls_file="${_tunnel_dir}/tunnel-urls.txt"
+  mkdir -p "${_tunnel_dir}"
+
+  if ! command -v cloudflared >/dev/null 2>&1; then
+    if command -v brew >/dev/null 2>&1; then
+      _info "[acg-up] Installing cloudflared via Homebrew..."
+      brew install cloudflared >/dev/null 2>&1 || _warn "[acg-up] cloudflared install failed — skipping tunnels"
+    else
+      _warn "[acg-up] cloudflared not found and brew unavailable — skipping tunnels"
+    fi
+  fi
+
+  if command -v cloudflared >/dev/null 2>&1; then
+    # ArgoCD tunnel: localhost:8080 (existing port-forward to k3d argocd-server)
+    _argocd_tunnel_label="com.k3d-manager.argocd-tunnel"
+    _argocd_tunnel_log="${_tunnel_dir}/argocd-tunnel.log"
+    _argocd_tunnel_plist="/Library/LaunchDaemons/${_argocd_tunnel_label}.plist"
+    _argocd_tunnel_plist_tmp="${_tunnel_dir}/argocd-tunnel.plist"
+    _cloudflared_bin="$(command -v cloudflared)"
+
+    cat > "${_argocd_tunnel_plist_tmp}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_argocd_tunnel_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${_cloudflared_bin}</string>
+    <string>tunnel</string>
+    <string>--url</string>
+    <string>http://localhost:8080</string>
+    <string>--logfile</string>
+    <string>${_argocd_tunnel_log}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_argocd_tunnel_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_argocd_tunnel_log}</string>
+</dict>
+</plist>
+PLIST
+
+    # Frontend tunnel: 127.0.0.2:80 (Step 10g port-forward to ubuntu-k3s)
+    _frontend_tunnel_label="com.k3d-manager.frontend-tunnel"
+    _frontend_tunnel_log="${_tunnel_dir}/frontend-tunnel.log"
+    _frontend_tunnel_plist="/Library/LaunchDaemons/${_frontend_tunnel_label}.plist"
+    _frontend_tunnel_plist_tmp="${_tunnel_dir}/frontend-tunnel.plist"
+
+    cat > "${_frontend_tunnel_plist_tmp}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_frontend_tunnel_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${_cloudflared_bin}</string>
+    <string>tunnel</string>
+    <string>--url</string>
+    <string>http://127.0.0.2:80</string>
+    <string>--logfile</string>
+    <string>${_frontend_tunnel_log}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_frontend_tunnel_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_frontend_tunnel_log}</string>
+</dict>
+</plist>
+PLIST
+
+    for _tunnel_label_plist in \
+        "${_argocd_tunnel_label}|${_argocd_tunnel_plist}|${_argocd_tunnel_plist_tmp}|${_argocd_tunnel_log}" \
+        "${_frontend_tunnel_label}|${_frontend_tunnel_plist}|${_frontend_tunnel_plist_tmp}|${_frontend_tunnel_log}"; do
+      _tl="${_tunnel_label_plist%%|*}"
+      _rest="${_tunnel_label_plist#*|}"
+      _tp="${_rest%%|*}"
+      _rest="${_rest#*|}"
+      _tpt="${_rest%%|*}"
+      _tlog="${_rest#*|}"
+      _tunnel_launchctl_log="${_tunnel_dir}/${_tl}-launchctl.log"
+
+      : > "${_tunnel_launchctl_log}"
+      _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_tp}" \
+        >"${_tunnel_launchctl_log}" 2>&1 || true
+      : > "${_tunnel_launchctl_log}"
+      if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_tpt}" "${_tp}" \
+          >"${_tunnel_launchctl_log}" 2>&1; then
+        _warn "[acg-up] failed to install tunnel plist for ${_tl}"
+        continue
+      fi
+      rm -f "${_tpt}"
+      : > "${_tunnel_launchctl_log}"
+      if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_tp}" \
+          >"${_tunnel_launchctl_log}" 2>&1; then
+        _warn "[acg-up] failed to bootstrap tunnel for ${_tl}"
+      fi
+    done
+
+    # Wait up to 30s for both tunnel URLs to appear in logs
+    _info "[acg-up] Waiting for Cloudflare tunnel URLs..."
+    : > "${_tunnel_urls_file}"
+    _tunnel_deadline=$(( $(date +%s) + 30 ))
+    while [[ $(date +%s) -lt "${_tunnel_deadline}" ]]; do
+      _argocd_url=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "${_argocd_tunnel_log}" 2>/dev/null | tail -1 || true)
+      _frontend_url=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "${_frontend_tunnel_log}" 2>/dev/null | tail -1 || true)
+      if [[ -n "${_argocd_url}" && -n "${_frontend_url}" ]]; then
+        break
+      fi
+      sleep 2
+    done
+    {
+      printf 'argocd=%s\n' "${_argocd_url:-unavailable}"
+      printf 'frontend=%s\n' "${_frontend_url:-unavailable}"
+    } > "${_tunnel_urls_file}"
+    _info "[acg-up] Cloudflare tunnel URLs written to ${_tunnel_urls_file}"
+    _info "[acg-up] ArgoCD public URL:  ${_argocd_url:-unavailable (check ${_argocd_tunnel_log})}"
+    _info "[acg-up] Frontend public URL: ${_frontend_url:-unavailable (check ${_frontend_tunnel_log})}"
+    _info "[acg-up] NOTE: ArgoCD SSO requires argocd.shopping-cart.local; use admin credentials via tunnel URL"
+  fi
+fi
 
 _info "[acg-up] Step 11/14 — Verifying ClusterSecretStore..."
 _css_ready=false
@@ -936,50 +1296,10 @@ fi
 _info "[acg-up] Step 12/14 — Installing sandbox TTL watcher (launchd)..."
 acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
 
-_info "[acg-up] Step 13/14 — Installing frontend port-forward launchd agent (localhost:3000, auto-restart)..."
-_frontend_pf_label="com.k3d-manager.frontend-port-forward"
-_frontend_pf_plist="${HOME}/Library/LaunchAgents/${_frontend_pf_label}.plist"
-_frontend_pf_log="${HOME}/.local/share/k3d-manager/frontend-pf.log"
-mkdir -p "$(dirname "${_frontend_pf_log}")" "$(dirname "${_frontend_pf_plist}")"
-cat > "${_frontend_pf_plist}" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>${_frontend_pf_label}</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/opt/homebrew/bin/kubectl</string>
-    <string>port-forward</string>
-    <string>svc/frontend</string>
-    <string>--namespace</string>
-    <string>shopping-cart-apps</string>
-    <string>--context</string>
-    <string>ubuntu-k3s</string>
-    <string>3000:80</string>
-  </array>
-  <key>KeepAlive</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>${_frontend_pf_log}</string>
-  <key>StandardErrorPath</key>
-  <string>${_frontend_pf_log}</string>
-</dict>
-</plist>
-PLIST
-if launchctl list "${_frontend_pf_label}" >/dev/null 2>&1; then
-  launchctl unload "${_frontend_pf_plist}" 2>/dev/null || true
-fi
-launchctl load "${_frontend_pf_plist}"
-sleep 2
-if curl -sf --max-time 5 http://localhost:3000 >/dev/null 2>&1; then
-  _info "[acg-up] Frontend reachable at http://localhost:3000 (launchd: ${_frontend_pf_label})"
-else
-  _info "[acg-up] Frontend launchd agent loaded — UI may take a moment to be ready at http://localhost:3000"
-fi
+_info "[acg-up] Step 13/14 — Frontend served via direct kubectl port-forward on 127.0.0.2:80 → ubuntu-k3s (Step 10g). URL: http://frontend.shopping-cart.local"
 
 _info "[acg-up] Cluster is up."
 kubectl get nodes --context ubuntu-k3s
 _info "[acg-up] ArgoCD browser login URL: https://argocd.shopping-cart.local"
-_info "[acg-up] Open that URL manually in your browser to continue SSO login."
+_info "[acg-up] Frontend URL: http://frontend.shopping-cart.local"
+_info "[acg-up] Open those URLs manually in your browser to continue SSO login."
