@@ -1010,6 +1010,11 @@ kubectl apply --context k3d-k3d-cluster \
   -f "${_infra_root}/argocd/config/argocd-cm.yaml" \
   -f "${_infra_root}/argocd/config/argocd-rbac-cm.yaml"
 
+# Override ArgoCD URL to Cloudflare public domain (argocd-cm.yaml has local URL)
+_argocd_public_url="${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}"
+kubectl patch configmap argocd-cm -n cicd --context k3d-k3d-cluster \
+  --type merge -p "{\"data\":{\"url\":\"${_argocd_public_url}\"}}"
+
 # Patch argocd-secret directly with the OIDC client secret generated earlier in this run.
 # The ExternalSecret (argocd-oidc-secret) will take over once ClusterSecretStore is Ready;
 # this immediate patch ensures ArgoCD SSO works on first boot before ESO syncs.
@@ -1020,7 +1025,30 @@ kubectl patch secret argocd-secret -n cicd --context k3d-k3d-cluster \
 # Restart argocd-server to pick up the updated argocd-cm and argocd-secret
 kubectl rollout restart deployment/argocd-server -n cicd --context k3d-k3d-cluster
 kubectl rollout status deployment/argocd-server -n cicd --context k3d-k3d-cluster --timeout=120s
-_info "[acg-up] ArgoCD SSO wired: login at https://argocd.shopping-cart.local → Keycloak realm shopping-cart"
+
+# Add Cloudflare public URL to Keycloak argocd client redirect URIs
+_keycloak_token=$(curl -sf \
+  -d "client_id=admin-cli&username=admin&password=${_kc_admin_pass}&grant_type=password" \
+  "http://keycloak.shopping-cart.local/realms/master/protocol/openid-connect/token" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])" 2>/dev/null || true)
+if [[ -n "${_keycloak_token}" ]]; then
+  _argocd_client_uuid=$(curl -sf \
+    -H "Authorization: Bearer ${_keycloak_token}" \
+    "http://keycloak.shopping-cart.local/admin/realms/shopping-cart/clients?clientId=argocd" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])" 2>/dev/null || true)
+  if [[ -n "${_argocd_client_uuid}" ]]; then
+    curl -sf -X PUT \
+      -H "Authorization: Bearer ${_keycloak_token}" \
+      -H "Content-Type: application/json" \
+      "http://keycloak.shopping-cart.local/admin/realms/shopping-cart/clients/${_argocd_client_uuid}" \
+      -d "{\"redirectUris\":[\"http://localhost:8080/*\",\"http://argocd.shopping-cart.local/*\",\"https://argocd.shopping-cart.local/*\",\"${_argocd_public_url}/*\"],\"webOrigins\":[\"+\"]}" \
+      >/dev/null 2>&1 \
+      && _info "[acg-up] Keycloak argocd client: added ${_argocd_public_url}/* to redirectUris" \
+      || _warn "[acg-up] Keycloak argocd client redirect URI update failed — SSO via public URL may not work"
+  fi
+fi
+
+_info "[acg-up] ArgoCD SSO wired: login at ${_argocd_public_url} → Keycloak realm shopping-cart"
 
 if _is_mac; then
   _info "[acg-up] Step 10g/14 — Installing frontend HTTP listener (frontend.shopping-cart.local → 127.0.0.2:80 → ubuntu-k3s, auto-restart)..."
@@ -1147,138 +1175,82 @@ PLIST
 fi
 
 if _is_mac; then
-  _info "[acg-up] Step 10h/14 — Installing Cloudflare Tunnels for public ArgoCD + frontend access..."
+  _info "[acg-up] Step 10h/14 — Installing Cloudflare named tunnel (argocd.3ai-talk.org + frontend.3ai-talk.org)..."
   _tunnel_dir="${HOME}/.local/share/k3d-manager"
   _tunnel_urls_file="${_tunnel_dir}/tunnel-urls.txt"
+  _cloudflared_config="${HOME}/.cloudflared/config.yml"
   mkdir -p "${_tunnel_dir}"
 
   if ! command -v cloudflared >/dev/null 2>&1; then
     if command -v brew >/dev/null 2>&1; then
       _info "[acg-up] Installing cloudflared via Homebrew..."
-      brew install cloudflared >/dev/null 2>&1 || _warn "[acg-up] cloudflared install failed — skipping tunnels"
+      brew install cloudflared >/dev/null 2>&1 || _warn "[acg-up] cloudflared install failed — skipping tunnel"
     else
-      _warn "[acg-up] cloudflared not found and brew unavailable — skipping tunnels"
+      _warn "[acg-up] cloudflared not found and brew unavailable — skipping tunnel"
     fi
   fi
 
-  if command -v cloudflared >/dev/null 2>&1; then
-    # ArgoCD tunnel: localhost:8080 (existing port-forward to k3d argocd-server)
-    _argocd_tunnel_label="com.k3d-manager.argocd-tunnel"
-    _argocd_tunnel_log="${_tunnel_dir}/argocd-tunnel.log"
-    _argocd_tunnel_plist="/Library/LaunchDaemons/${_argocd_tunnel_label}.plist"
-    _argocd_tunnel_plist_tmp="${_tunnel_dir}/argocd-tunnel.plist"
+  if command -v cloudflared >/dev/null 2>&1 && [[ -f "${_cloudflared_config}" ]]; then
+    _named_tunnel_label="com.k3d-manager.cloudflare-tunnel"
+    _named_tunnel_log="${_tunnel_dir}/cloudflare-tunnel.log"
+    _named_tunnel_plist="/Library/LaunchDaemons/${_named_tunnel_label}.plist"
+    _named_tunnel_plist_tmp="${_tunnel_dir}/cloudflare-tunnel.plist"
     _cloudflared_bin="$(command -v cloudflared)"
 
-    cat > "${_argocd_tunnel_plist_tmp}" <<PLIST
+    cat > "${_named_tunnel_plist_tmp}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>${_argocd_tunnel_label}</string>
+  <string>${_named_tunnel_label}</string>
   <key>ProgramArguments</key>
   <array>
     <string>${_cloudflared_bin}</string>
     <string>tunnel</string>
-    <string>--url</string>
-    <string>http://localhost:8080</string>
-    <string>--logfile</string>
-    <string>${_argocd_tunnel_log}</string>
+    <string>--config</string>
+    <string>${_cloudflared_config}</string>
+    <string>run</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>${_argocd_tunnel_log}</string>
+  <string>${_named_tunnel_log}</string>
   <key>StandardErrorPath</key>
-  <string>${_argocd_tunnel_log}</string>
+  <string>${_named_tunnel_log}</string>
 </dict>
 </plist>
 PLIST
 
-    # Frontend tunnel: 127.0.0.2:80 (Step 10g port-forward to ubuntu-k3s)
-    _frontend_tunnel_label="com.k3d-manager.frontend-tunnel"
-    _frontend_tunnel_log="${_tunnel_dir}/frontend-tunnel.log"
-    _frontend_tunnel_plist="/Library/LaunchDaemons/${_frontend_tunnel_label}.plist"
-    _frontend_tunnel_plist_tmp="${_tunnel_dir}/frontend-tunnel.plist"
-
-    cat > "${_frontend_tunnel_plist_tmp}" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key>
-  <string>${_frontend_tunnel_label}</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>${_cloudflared_bin}</string>
-    <string>tunnel</string>
-    <string>--url</string>
-    <string>http://127.0.0.2:80</string>
-    <string>--logfile</string>
-    <string>${_frontend_tunnel_log}</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>${_frontend_tunnel_log}</string>
-  <key>StandardErrorPath</key>
-  <string>${_frontend_tunnel_log}</string>
-</dict>
-</plist>
-PLIST
-
-    for _tunnel_label_plist in \
-        "${_argocd_tunnel_label}|${_argocd_tunnel_plist}|${_argocd_tunnel_plist_tmp}|${_argocd_tunnel_log}" \
-        "${_frontend_tunnel_label}|${_frontend_tunnel_plist}|${_frontend_tunnel_plist_tmp}|${_frontend_tunnel_log}"; do
-      _tl="${_tunnel_label_plist%%|*}"
-      _rest="${_tunnel_label_plist#*|}"
-      _tp="${_rest%%|*}"
-      _rest="${_rest#*|}"
-      _tpt="${_rest%%|*}"
-      _tlog="${_rest#*|}"
-      _tunnel_launchctl_log="${_tunnel_dir}/${_tl}-launchctl.log"
-
-      : > "${_tunnel_launchctl_log}"
-      _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_tp}" \
-        >"${_tunnel_launchctl_log}" 2>&1 || true
-      : > "${_tunnel_launchctl_log}"
-      if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_tpt}" "${_tp}" \
-          >"${_tunnel_launchctl_log}" 2>&1; then
-        _warn "[acg-up] failed to install tunnel plist for ${_tl}"
-        continue
-      fi
-      rm -f "${_tpt}"
-      : > "${_tunnel_launchctl_log}"
-      if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_tp}" \
-          >"${_tunnel_launchctl_log}" 2>&1; then
-        _warn "[acg-up] failed to bootstrap tunnel for ${_tl}"
-      fi
-    done
-
-    # Wait up to 30s for both tunnel URLs to appear in logs
-    _info "[acg-up] Waiting for Cloudflare tunnel URLs..."
+    _tunnel_launchctl_log="${_tunnel_dir}/cloudflare-tunnel-launchctl.log"
     : > "${_tunnel_urls_file}"
-    _tunnel_deadline=$(( $(date +%s) + 30 ))
-    while [[ $(date +%s) -lt "${_tunnel_deadline}" ]]; do
-      _argocd_url=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "${_argocd_tunnel_log}" 2>/dev/null | tail -1 || true)
-      _frontend_url=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' "${_frontend_tunnel_log}" 2>/dev/null | tail -1 || true)
-      if [[ -n "${_argocd_url}" && -n "${_frontend_url}" ]]; then
-        break
+    _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist}" \
+      >"${_tunnel_launchctl_log}" 2>&1 || true
+    : > "${_tunnel_launchctl_log}"
+    if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" \
+        >"${_tunnel_launchctl_log}" 2>&1; then
+      _warn "[acg-up] failed to install tunnel plist — skipping"
+    else
+      rm -f "${_named_tunnel_plist_tmp}"
+      : > "${_tunnel_launchctl_log}"
+      if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_named_tunnel_plist}" \
+          >"${_tunnel_launchctl_log}" 2>&1; then
+        _warn "[acg-up] failed to bootstrap cloudflare tunnel"
       fi
-      sleep 2
-    done
+    fi
+    _argocd_url="${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}"
+    _frontend_url="${FRONTEND_PUBLIC_URL:-https://frontend.3ai-talk.org}"
     {
-      printf 'argocd=%s\n' "${_argocd_url:-unavailable}"
-      printf 'frontend=%s\n' "${_frontend_url:-unavailable}"
+      printf 'argocd=%s\n' "${_argocd_url}"
+      printf 'frontend=%s\n' "${_frontend_url}"
     } > "${_tunnel_urls_file}"
     _info "[acg-up] Cloudflare tunnel URLs written to ${_tunnel_urls_file}"
-    _info "[acg-up] ArgoCD public URL:  ${_argocd_url:-unavailable (check ${_argocd_tunnel_log})}"
-    _info "[acg-up] Frontend public URL: ${_frontend_url:-unavailable (check ${_frontend_tunnel_log})}"
-    _info "[acg-up] NOTE: ArgoCD SSO requires argocd.shopping-cart.local; use admin credentials via tunnel URL"
+    _info "[acg-up] ArgoCD public URL:   ${_argocd_url}"
+    _info "[acg-up] Frontend public URL: ${_frontend_url}"
+  elif [[ ! -f "${_cloudflared_config}" ]]; then
+    _warn "[acg-up] ~/.cloudflared/config.yml not found — skipping named tunnel (run: cloudflared tunnel login && cloudflared tunnel create k3d-manager)"
   fi
 fi
 
