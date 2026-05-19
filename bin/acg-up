@@ -766,7 +766,7 @@ else
       -e "s/\${PRODUCT_CATALOG_CLIENT_SECRET}/${_product_client_secret}/g" \
       -e "s/\${GRAFANA_CLIENT_SECRET}/${_grafana_client_secret}/g" \
       -e "s/\${LDAP_BIND_CREDENTIAL}/${_ldap_admin_pass}/g" \
-      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/config/realm-shopping-cart.json")
+      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/keycloak/realm-shopping-cart.json")
     _realm_json_file="$(mktemp -t keycloak-realm.XXXXXX.json)"
     printf '%s\n' "${_realm_json}" > "${_realm_json_file}"
 
@@ -1279,6 +1279,9 @@ _info "[acg-up] Step 13/14 — Frontend served via direct kubectl port-forward o
 
 _info "[acg-up] Cluster is up."
 kubectl get nodes --context ubuntu-k3s
-_info "[acg-up] ArgoCD browser login URL: https://argocd.shopping-cart.local"
-_info "[acg-up] Frontend URL: http://frontend.shopping-cart.local"
-_info "[acg-up] Open those URLs manually in your browser to continue SSO login."
+_info "[acg-up] === Public URLs (Cloudflare — any device) ==="
+_info "[acg-up]   ArgoCD:   ${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}"
+_info "[acg-up]   Frontend: ${FRONTEND_PUBLIC_URL:-https://frontend.3ai-talk.org}"
+_info "[acg-up] === Local URLs (Mac only) ==="
+_info "[acg-up]   ArgoCD:   https://argocd.shopping-cart.local"
+_info "[acg-up]   Frontend: http://frontend.shopping-cart.local"
