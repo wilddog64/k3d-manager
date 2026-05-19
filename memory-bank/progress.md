@@ -1,8 +1,10 @@
 # Progress — k3d-manager
 
-## Status (v1.4.7 — PR #76 merged 2026-05-18 + shopping-cart-infra v0.5.0 released 2026-05-18 + lib post-merge 2026-05-19)
+## Status (v1.4.8 — PR #77 merged 2026-05-19 + post-merge complete)
+- **RELEASED:** k3d-manager v1.4.8 — PR #77 merged to main (SHA `8f08bd35`); enforce_admins restored; next branch: `k3d-manager-v1.4.9`; v1.4.8 retrospective committed `9946fa66` on k3d-manager-v1.4.9
+- **MERGED:** k3d-manager PR #77 — vault temp file leaks, CDP hang, Keycloak frontendUrl, Cloudflare tunnel; merge SHA `8f08bd35`; v1.4.8 retrospective committed on k3d-manager-v1.4.9
+- **POST-MERGE:** k3d-manager PR #77 housekeeping — enforce_admins restored ✓; next branch created ✓; retrospective committed ✓; memory-bank updated (in progress)
 - **COMPLETE:** Keycloak public URL follow-up landed across all four repos: `k3d-manager` commit `ea9977b4` sets Keycloak `frontendUrl` to `https://keycloak.3ai-talk.org` after realm import; `shopping-cart-basket` commit `cb5a294` sets `OAUTH2_ISSUER_URI` to the Cloudflare public issuer; `shopping-cart-order` commit `fb578ca` sets both `OAUTH2_ISSUER_URI` and `OAUTH2_JWK_SET_URI` to the Cloudflare public issuer; `shopping-cart-frontend` commit `cb348c4` sets both `VITE_KEYCLOAK_URL` occurrences to `https://keycloak.3ai-talk.org`; explicit feature refs were pushed to `origin/fix/keycloak-public-url` in each shopping-cart repo, and the upstream-push quirk was documented in `docs/issues/2026-05-19-git-push-upstream-default-targeted-main.md`.
-- **COMPLETE:** `acg-up` now patches ArgoCD to use `${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}`, updates the Keycloak `argocd` client redirect URIs for the public Cloudflare URL, and replaces the two `trycloudflare.com` quick tunnels with a single named tunnel from `~/.cloudflared/config.yml`; committed as `00d3a65f` and pushed to `origin/k3d-manager-v1.4.8`; validated with `shellcheck -S warning bin/acg-up`.
 - **RELEASED:** k3d-manager v1.4.7 — tag `v1.4.7` pushed, GitHub release created, enforce_admins restored, next branch: `k3d-manager-v1.4.8`
 - **MERGED:** k3d-manager PR #76 — Keycloak cross-cluster tunnel + CoreDNS on k3s-aws; merge SHA `0278e8d7`; v1.4.7 retrospective committed on k3d-manager-v1.4.8
 - **POST-MERGE:** lib-foundation PR #28 — fix: Copilot CLI auth + rigor scanner improvements; merge SHA `fee313ed`; branch `feat/v0.3.20` cut, retrospective committed `a64e2ad`; enforce_admins restored (pending)
