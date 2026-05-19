@@ -32,6 +32,7 @@
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
 ## In Progress (v1.4.9)
+- **SPEC WRITTEN:** sandbox TTL check before provision — spec: `docs/bugs/2026-05-19-acg-up-sandbox-ttl-check-before-provision.md`; depends on lib-acg `fix/acg-sandbox-ttl-check` merged + subtree pull; then Codex adds TTL check in `bin/acg-up` skip-extraction path
 - **COMPLETE:** Cloudflare tunnel missing Keycloak — spec: `docs/bugs/2026-05-19-acg-up-cloudflare-tunnel-missing-keycloak.md`; `scripts/etc/cloudflared-config.yml.tmpl` added and Step 10h now generates `~/.cloudflared/config.yml` when missing or missing the keycloak ingress; commit `d8f2ca47` pushed to `origin/k3d-manager-v1.4.9`.
 - **COMPLETE:** CoreDNS duplicate `hosts` plugin crash — spec: `docs/bugs/2026-05-19-acg-up-coredns-duplicate-hosts-plugin.md`; `bin/acg-up` now patches `data.NodeHosts` instead of injecting a second `hosts {}` block into Corefile; commit `5efe45e8` pushed to `origin/k3d-manager-v1.4.9`.
 - **COMPLETE:** CloudFormation IAM race condition — spec: `docs/bugs/2026-05-19-acg-up-cloudformation-race-after-credential-extraction.md`; `bin/acg-up` polls `aws cloudformation list-stacks` after fresh credential extraction (up to 12×15s); commit `2e46a4a2` pushed to `origin/k3d-manager-v1.4.9`.
