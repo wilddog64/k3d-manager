@@ -881,31 +881,31 @@ else
   ssh ubuntu "sudo iptables -t nat -A PREROUTING -p tcp -d ${_node_ip} --dport 80 -j DNAT --to-destination 127.0.0.1:18080" >/dev/null 2>&1 || \
     _warn "[acg-up] iptables DNAT rule for Keycloak failed — JWT auth from app cluster may be unavailable"
 
-  _coredns_corefile=$(kubectl get configmap coredns -n kube-system --context ubuntu-k3s \
-    -o jsonpath='{.data.Corefile}' 2>/dev/null || true)
-  if echo "${_coredns_corefile}" | grep -q "keycloak.shopping-cart.local"; then
+  _coredns_nodehosts=$(kubectl get configmap coredns -n kube-system --context ubuntu-k3s \
+    -o jsonpath='{.data.NodeHosts}' 2>/dev/null || true)
+  if echo "${_coredns_nodehosts}" | grep -q "keycloak.shopping-cart.local"; then
     _info "[acg-up] CoreDNS keycloak hosts entry already present — skipping"
   else
-    _coredns_patch=$(cat <<COREDNS_PATCH
-    hosts {
-        ${_node_ip} keycloak.shopping-cart.local
-        fallthrough
-    }
-COREDNS_PATCH
-)
-    _new_corefile=$(COREDNS_PATCH="${_coredns_patch}" python3 -c "
+    _new_nodehosts=$(NODE_IP="${_node_ip}" python3 -c "
 import sys, os
-patch = os.environ['COREDNS_PATCH']
-for line in sys.stdin:
-    if line.strip().startswith('prometheus'):
-        sys.stdout.write(patch + '\n')
-    sys.stdout.write(line)
-" <<< "${_coredns_corefile}")
+node_ip = os.environ['NODE_IP']
+lines = sys.stdin.read().splitlines()
+result = []
+appended = False
+for line in lines:
+    result.append(line)
+    if not appended and line.strip().startswith(node_ip):
+        result.append(node_ip + ' keycloak.shopping-cart.local')
+        appended = True
+if not appended:
+    result.append(node_ip + ' keycloak.shopping-cart.local')
+print('\n'.join(result))
+" <<< "${_coredns_nodehosts}")
     kubectl patch configmap coredns -n kube-system --context ubuntu-k3s \
-      --type merge -p "{\"data\":{\"Corefile\":$(echo "${_new_corefile}" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}}" >/dev/null 2>&1 || \
-      _warn "[acg-up] CoreDNS patch for keycloak.shopping-cart.local failed"
+      --type merge -p "{\"data\":{\"NodeHosts\":$(printf '%s' "${_new_nodehosts}" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}}" >/dev/null 2>&1 || \
+      _warn "[acg-up] CoreDNS NodeHosts patch for keycloak.shopping-cart.local failed"
     kubectl rollout restart deployment/coredns -n kube-system --context ubuntu-k3s >/dev/null 2>&1 || true
-    _info "[acg-up] CoreDNS updated: keycloak.shopping-cart.local → ${_node_ip} (via port 80 DNAT → 127.0.0.1:18080 → SSH tunnel → Keycloak)"
+    _info "[acg-up] CoreDNS updated: keycloak.shopping-cart.local → ${_node_ip} (NodeHosts entry)"
   fi
 fi
 
