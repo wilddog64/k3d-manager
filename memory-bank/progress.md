@@ -1,8 +1,14 @@
 # Progress — k3d-manager
 
-## Status
-- **product-catalog UUID PK fix (workaround applied 2026-05-17)** — products table dropped and recreated with UUID PK; SQLAlchemy now owns schema; permanent fix spec: `docs/bugs/2026-05-17-product-catalog-init-sql-serial-vs-uuid.md`; target repo: `shopping-cart-infra`, branch `fix/product-catalog-uuid-pk`; NOT YET IMPLEMENTED IN GIT.
-- **Keycloak JWT issuer mismatch spec written 2026-05-17** — spec: `docs/bugs/2026-05-17-keycloak-jwt-issuer-mismatch-app-cluster.md`; needs: `bin/acg-up` Step 10g.5 + `shopping-cart-order` + `shopping-cart-basket` configmap changes; NOT YET IMPLEMENTED.
+## Status (v1.4.6 — 5 PRs merged 2026-05-17 + shopping-cart-infra v0.5.0 released 2026-05-18)
+- **RELEASED:** shopping-cart-infra v0.5.0 — tag `v0.5.0` pushed, GitHub release created, enforce_admins restored, next branch: `shopping-cart-infra-v0.5.5`
+- **MERGED:** k3d-manager PR #75 — Keycloak cross-cluster reachability fix (SSH tunnel + iptables DNAT + CoreDNS patch); merge SHA `8cb5709b`; v1.4.6 retrospective committed on v1.4.7
+- **MERGED:** shopping-cart-order PR #30 — Keycloak JWT issuer URI fix; merge SHA `16640fd5`; `docs/next-improvements` branch created
+- **MERGED:** shopping-cart-basket PR #11 — Keycloak JWT issuer URI fix; merge SHA `c718c1cd`; `docs/next-improvements` branch created
+- **MERGED:** shopping-cart-infra PR #59 — products table DDL removed (SQLAlchemy now owns schema); merge SHA `475794c0`; `docs/next-improvements` branch created
+- **MERGED:** shopping-cart-frontend PR #16 — API response field mapping + customerId from Keycloak; merge SHA `674116b2`; `docs/next-improvements` branch created
+- **COMPLETE:** products ConfigMap schema mismatch fix — `shopping-cart-infra/data-layer/postgresql/products/configmap.yaml` now matches `init-db.sql` by keeping only categories schema + seed data; commit `eb05a3f`; branch `fix/products-db-schema` pushed to `origin`.
+- **NO-OP:** ArgoCD SSO `invalid_scope: groups` already absent from `shopping-cart-infra/argocd/config/argocd-cm.yaml` on `origin/main`; issue doc recorded the stale spec state at `docs/issues/2026-05-18-argocd-groups-scope-already-fixed.md`.
 - **acg-up Keycloak LDAP user passwords seeding completed** — `bin/acg-up` now seeds `keycloak/users/admin`, `keycloak/users/developer`, and `keycloak/users/operator` in Vault and applies the passwords to LDAP on every `make up`; committed as `34c6f8a9` (`fix(acg-up): seed Keycloak LDAP user passwords in Vault on every make up`) and pushed to `origin/k3d-manager-v1.4.6`; validated with `shellcheck -S warning bin/acg-up` and `bats scripts/tests/bin/acg_up.bats`; PR URL: not created (per repository instruction).
 - **shopping-cart PRs #20 + #29 post-merge completed** — `shopping-cart-product-catalog` PR #20 (SHA `12dfe79`) + `shopping-cart-order` PR #29 (SHA `8a2739d`) merged to main; enforce_admins restored on both; `docs/next-improvements` branch created on both repos; k3d-manager memory-bank updated
 - **acg-up credential extraction skip completed** — `bin/acg-up` now checks `_acg_check_credentials` before calling `acg_get_credentials` for `k3s-aws`, skipping Playwright extraction when the existing AWS credentials are valid and falling back to extraction otherwise; committed as `7d2be2e6` and pushed to `origin/k3d-manager-v1.4.6`; PR URL: not created (per repository instruction).

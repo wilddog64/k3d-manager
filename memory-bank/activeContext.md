@@ -1,7 +1,10 @@
 # Active Context — k3d-manager
 
-## Current Status
-- Current branch: `k3d-manager-v1.4.6` (created from k3d-manager PR #74 merge SHA `8f93df25`).
+## Current Status (Post-Merge 2026-05-18 — shopping-cart-infra v0.5.0 released)
+- Current branch: `k3d-manager-v1.4.7` (created from k3d-manager PR #75 merge SHA `8cb5709b`)
+- **shopping-cart-infra v0.5.0 released** — CHANGELOG versioned, tag `v0.5.0` pushed to origin, GitHub release created, enforce_admins restored on main, next branch `shopping-cart-infra-v0.5.5` created
+- **enforce_admins restored on all repos** — `true` ✓ (k3d-manager, shopping-cart-order, shopping-cart-basket, shopping-cart-infra, shopping-cart-frontend)
+- **v1.4.6 retrospective committed** — `docs/retro/2026-05-17-v1.4.6-retrospective.md` on k3d-manager-v1.4.7, commit `0a036f6a`, pushed to origin
 - **COMPLETE:** `acg-up` now seeds Keycloak LDAP user passwords for `admin`, `developer`, and `operator` into Vault at `keycloak/users/<user>` and updates the live LDAP passwords on every `make up`; committed as `34c6f8a9` (`fix(acg-up): seed Keycloak LDAP user passwords in Vault on every make up`) and pushed to `origin/k3d-manager-v1.4.6`; validated with `shellcheck -S warning bin/acg-up` and `bats scripts/tests/bin/acg_up.bats`.
 - **shopping-cart-product-catalog PR #20 merged** — `fix/argocd-shared-namespace` → `main`, merge SHA `12dfe79`. Service port fix (8082). enforce_admins restored. `docs/next-improvements` branch created.
 - **shopping-cart-order PR #29 merged** — `fix/argocd-shared-namespace` → `main`, merge SHA `8a2739d`. Service port + SecurityConfig.java health fixes (8081). enforce_admins restored. `docs/next-improvements` branch created.
@@ -13,6 +16,7 @@
 - **shopping-cart-infra PR #58 merged** — `shopping-cart-infra-v0.5.3` → `main`, merge SHA `67f8d228`. ArgoCD SSO OIDC callback fix (`url: http://` → `url: https://`). enforce_admins restored. v0.5.4 branch created with retrospective.
 - **shopping-cart-infra PR #57 merged** — `shopping-cart-infra-v0.5.2` → `main`, merge SHA `adbaec8`. Networking + mTLS fixes for SSO. enforce_admins restored. v0.5.3 branch created with retrospective and spec commits deleted.
 - **shopping-cart-infra PR #56 merged** — `shopping-cart-infra-v0.5.1` → `main`, merge SHA `79c42b71`. Keycloak reconcile hook python3 → kcadm.sh fix. enforce_admins restored. v0.5.2 branch created with retrospective.
+- **COMPLETE:** products ConfigMap schema mismatch fix — `shopping-cart-infra/data-layer/postgresql/products/configmap.yaml` now matches `init-db.sql` by keeping only the `categories` schema + seed data; committed as `eb05a3f` (`fix(products-db): sync configmap init SQL with init-db.sql — remove products DDL, let SQLAlchemy own schema`) on `fix/products-db-schema` and pushed to `origin/fix/products-db-schema`.
 - `k3d-manager` main branch protection is restored (`enforce_admins=true`).
 - `shopping-cart-infra` main branch protection is restored (`enforce_admins=true`).
 - **shopping-cart-frontend PR #15 merged** — `shopping-cart-frontend-v0.5.1` → `main`, merge SHA `19e47118`. Keycloak SSO wiring (CI build-args + nginx CSP). enforce_admins restored. v0.5.1 branch created with retrospective.
@@ -20,7 +24,10 @@
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
-## In Progress (v1.4.6)
+## In Progress (v1.4.7)
+- **NO-OP:** ArgoCD SSO `invalid_scope: groups` spec was already satisfied on `origin/main` in `shopping-cart-infra`; `requestedScopes` already contains only `openid`, `profile`, and `email`, so there was nothing to commit. Issue doc: `docs/issues/2026-05-18-argocd-groups-scope-already-fixed.md`.
+
+## Completed (v1.4.6)
 - **SPEC WRITTEN:** Frontend API contract mismatch — spec: `docs/bugs/2026-05-17-frontend-api-contract-mismatch.md`; products blank (backend `items/total/page_size/pages` → frontend needs `data/totalItems/pageSize/totalPages`; `quantity` → `stock`, `image_url` → `imageUrl`); orders 400 (missing `customerId`; backend returns plain array, frontend expects paginated shape); all fixes in `shopping-cart-frontend` on branch `fix/frontend-api-contract`.
 - **SPEC WRITTEN:** Keycloak JWT issuer mismatch (app cluster) — spec: `docs/bugs/2026-05-17-keycloak-jwt-issuer-mismatch-app-cluster.md`; OAUTH2_ISSUER_URI must change from `keycloak.identity.svc.cluster.local` to `keycloak.shopping-cart.local` (matches actual JWT iss); `bin/acg-up` Step 10g.5 adds SSH tunnel + iptables DNAT + CoreDNS patch on ubuntu-k3s; changes also in `shopping-cart-order/k8s/base/configmap.yaml` and `shopping-cart-basket/k8s/base/configmap.yaml`.
 - **SPEC WRITTEN:** product-catalog init SQL UUID/SERIAL mismatch — spec: `docs/bugs/2026-05-17-product-catalog-init-sql-serial-vs-uuid.md`; `shopping-cart-infra/data-layer/postgresql/products/init-db.sql` must remove the SERIAL products table DDL so SQLAlchemy owns the schema; workaround (table drop + restart) applied 2026-05-17 on live cluster.

@@ -766,7 +766,7 @@ else
       -e "s/\${PRODUCT_CATALOG_CLIENT_SECRET}/${_product_client_secret}/g" \
       -e "s/\${GRAFANA_CLIENT_SECRET}/${_grafana_client_secret}/g" \
       -e "s/\${LDAP_BIND_CREDENTIAL}/${_ldap_admin_pass}/g" \
-      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/keycloak/realm-shopping-cart.json")
+      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/config/realm-shopping-cart.json")
     _realm_json_file="$(mktemp -t keycloak-realm.XXXXXX.json)"
     printf '%s\n' "${_realm_json}" > "${_realm_json_file}"
 
@@ -841,6 +841,7 @@ fi
 
 _info "[acg-up] Step 10g.5/14 — Wiring Keycloak cross-cluster reachability on ubuntu-k3s..."
 _node_ip=$(kubectl get node --context ubuntu-k3s \
+  -l 'node-role.kubernetes.io/control-plane' \
   -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
 if [[ -z "${_node_ip}" ]]; then
   _warn "[acg-up] Could not determine ubuntu-k3s node IP — skipping Keycloak cross-cluster tunnel"
@@ -867,8 +868,14 @@ else
     }
 COREDNS_PATCH
 )
-    _new_corefile=$(echo "${_coredns_corefile}" | sed "/^    prometheus/i\\
-${_coredns_patch}")
+    _new_corefile=$(COREDNS_PATCH="${_coredns_patch}" python3 -c "
+import sys, os
+patch = os.environ['COREDNS_PATCH']
+for line in sys.stdin:
+    if line.strip().startswith('prometheus'):
+        sys.stdout.write(patch + '\n')
+    sys.stdout.write(line)
+" <<< "${_coredns_corefile}")
     kubectl patch configmap coredns -n kube-system --context ubuntu-k3s \
       --type merge -p "{\"data\":{\"Corefile\":$(echo "${_new_corefile}" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}}" >/dev/null 2>&1 || \
       _warn "[acg-up] CoreDNS patch for keycloak.shopping-cart.local failed"
