@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
-- `scripts/lib/vault.sh`: register cleanup traps immediately after mktemp to prevent temp file leaks on error paths
+- `scripts/plugins/vault.sh`: register cleanup traps immediately after mktemp to prevent temp file leaks on error paths
 - `scripts/lib/acg/playwright/acg_extend.js`: disconnect CDP browser connection on exit to prevent WebSocket hang and node process leak
 - `bin/acg-up`: set Keycloak frontendUrl to Cloudflare public domain after realm import (fixes redirect loops from non-public domain)
 - `bin/acg-up`: replace trycloudflare quick tunnels with named Cloudflare tunnel for stable public URLs across cluster restarts
