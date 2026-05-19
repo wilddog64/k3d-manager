@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- `bin/acg-up`: check sandbox TTL before provisioning and extend if below threshold
 - `bin/acg-up`: patch CoreDNS NodeHosts instead of injecting a duplicate hosts block into CoreDNS Corefile
 - `bin/acg-up`: generate cloudflared config from template and add keycloak to the Cloudflare tunnel
 

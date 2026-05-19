@@ -110,6 +110,21 @@ case "${_cluster_provider}" in
   k3s-aws)
     if _acg_check_credentials 2>/dev/null; then
       _info "[acg-up] AWS credentials are valid — skipping Playwright extraction"
+      _acg_sandbox_ref="${sandbox_url:-${_ACG_SANDBOX_URL:-}}"
+      if [[ -n "${_acg_sandbox_ref}" ]]; then
+        _acg_ttl_mins=$(acg_check_ttl "${_acg_sandbox_ref}" 2>/dev/null || true)
+        _acg_min_mins="${ACG_MIN_REMAINING_MINUTES:-120}"
+        if [[ -n "${_acg_ttl_mins}" ]] && [[ "${_acg_ttl_mins}" != "-1" ]] && \
+            (( _acg_ttl_mins < _acg_min_mins )); then
+          _info "[acg-up] Sandbox TTL: ${_acg_ttl_mins}m remaining (< ${_acg_min_mins}m threshold) — extending..."
+          acg_extend_playwright "${_acg_sandbox_ref}" || \
+            _warn "[acg-up] Sandbox extension failed — proceeding anyway"
+        elif [[ -n "${_acg_ttl_mins}" ]] && [[ "${_acg_ttl_mins}" != "-1" ]]; then
+          _info "[acg-up] Sandbox TTL: ${_acg_ttl_mins}m remaining — OK"
+        else
+          _warn "[acg-up] Could not read sandbox TTL — proceeding without TTL check"
+        fi
+      fi
     else
       acg_get_credentials ${sandbox_url:+"$sandbox_url"} || exit 1
       _info "[acg-up] Waiting for CloudFormation service to become accessible (up to 3 min)..."
