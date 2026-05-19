@@ -327,9 +327,10 @@ async function extendSandbox() {
     console.error(`ERROR: ${error.message}`);
     process.exit(1);
   } finally {
-    // Only close if we launched a persistent context (not if we attached via CDP — closing a CDP
-    // browser shuts down the entire Chrome process, disrupting other sessions)
-    if (!_cdpBrowser && browserContext) {
+    if (_cdpBrowser) {
+      // Disconnect from CDP without closing Chrome — closing would kill the entire process
+      await _cdpBrowser.disconnect().catch(() => {});
+    } else if (browserContext) {
       await browserContext.close().catch(() => {});
     }
   }
