@@ -805,6 +805,17 @@ else
       _acg_fail "[acg-up] Could not reconcile Keycloak client 'argocd' — SSO cannot proceed with a stale realm"
     fi
 
+    # Set Keycloak frontendUrl so tokens carry the public Cloudflare domain as issuer
+    _kc_frontend_url="${KEYCLOAK_PUBLIC_URL:-https://keycloak.3ai-talk.org}"
+    curl -sf -X PUT \
+      -H "Authorization: Bearer ${_kc_token}" \
+      -H "Content-Type: application/json" \
+      "http://localhost:${_kc_pf_port}/admin/realms/shopping-cart" \
+      -d "{\"frontendUrl\":\"${_kc_frontend_url}\"}" \
+      >/dev/null 2>&1 \
+      && _info "[acg-up] Keycloak frontendUrl set to ${_kc_frontend_url}" \
+      || _warn "[acg-up] Keycloak frontendUrl update failed — external SSO may not work"
+
     kill "${_kc_pf_pid}" 2>/dev/null || true
     rm -f "${_realm_json_file}"
   fi
