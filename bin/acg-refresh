@@ -14,7 +14,6 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT_DIR="${REPO_ROOT}/scripts"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
 source "${REPO_ROOT}/scripts/plugins/gemini.sh"
@@ -58,6 +57,17 @@ fi
 _info "[acg-refresh] Restarting tunnel..."
 tunnel_stop 2>/dev/null || true
 tunnel_start
+
+if _is_mac; then
+  _cloudflare_plist="/Library/LaunchDaemons/com.k3d-manager.cloudflare-tunnel.plist"
+  if [[ -f "${_cloudflare_plist}" ]]; then
+    _info "[acg-refresh] Restarting Cloudflare tunnel..."
+    _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_cloudflare_plist}" || true
+    _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_cloudflare_plist}" \
+      && _info "[acg-refresh] Cloudflare tunnel restarted" \
+      || _warn "[acg-refresh] Cloudflare tunnel restart failed — run: sudo launchctl bootstrap system ${_cloudflare_plist}"
+  fi
+fi
 
 _info "[acg-refresh] Done. Cluster should be reachable."
 kubectl get nodes --context ubuntu-k3s
