@@ -6,6 +6,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Fixed
+- `acg_extend.js`: add `--check` mode to print remaining sandbox TTL without extending
+- `scripts/plugins/acg.sh`: add `acg_check_ttl()` wrapper for sandbox TTL checks
+- `acg_extend.js`: disconnect CDP browser in finally block to release WebSocket and prevent Node event loop from hanging indefinitely after successful TTL extension
 - `acg_extend.js`: detect "Session extended" toast at startup — if already visible, extension already succeeded; exit 0 immediately instead of looping forever trying to dismiss via CDP mouse click
 - `_waitForSandboxEntry`: pass `null` as `waitForFunction` arg so the timeout option reaches the options slot (same arg-slot bug as `_waitForCredentials`)
 - `_waitForCredentials`: fix arg-slot bug (pass `null` as `waitForFunction` arg) and increase timeout from 60s to 180s — sandbox provisioning can take 60–120s
