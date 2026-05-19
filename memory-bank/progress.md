@@ -1,6 +1,12 @@
 # Progress — k3d-manager
 
-## Status (v1.4.6 — 5 PRs merged 2026-05-17 + shopping-cart-infra v0.5.0 released 2026-05-18)
+## Status (v1.4.7 — PR #76 merged 2026-05-18 + shopping-cart-infra v0.5.0 released 2026-05-18 + lib post-merge 2026-05-19)
+- **COMPLETE:** Keycloak public URL follow-up landed across all four repos: `k3d-manager` commit `ea9977b4` sets Keycloak `frontendUrl` to `https://keycloak.3ai-talk.org` after realm import; `shopping-cart-basket` commit `cb5a294` sets `OAUTH2_ISSUER_URI` to the Cloudflare public issuer; `shopping-cart-order` commit `fb578ca` sets both `OAUTH2_ISSUER_URI` and `OAUTH2_JWK_SET_URI` to the Cloudflare public issuer; `shopping-cart-frontend` commit `cb348c4` sets both `VITE_KEYCLOAK_URL` occurrences to `https://keycloak.3ai-talk.org`; explicit feature refs were pushed to `origin/fix/keycloak-public-url` in each shopping-cart repo, and the upstream-push quirk was documented in `docs/issues/2026-05-19-git-push-upstream-default-targeted-main.md`.
+- **COMPLETE:** `acg-up` now patches ArgoCD to use `${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}`, updates the Keycloak `argocd` client redirect URIs for the public Cloudflare URL, and replaces the two `trycloudflare.com` quick tunnels with a single named tunnel from `~/.cloudflared/config.yml`; committed as `00d3a65f` and pushed to `origin/k3d-manager-v1.4.8`; validated with `shellcheck -S warning bin/acg-up`.
+- **RELEASED:** k3d-manager v1.4.7 — tag `v1.4.7` pushed, GitHub release created, enforce_admins restored, next branch: `k3d-manager-v1.4.8`
+- **MERGED:** k3d-manager PR #76 — Keycloak cross-cluster tunnel + CoreDNS on k3s-aws; merge SHA `0278e8d7`; v1.4.7 retrospective committed on k3d-manager-v1.4.8
+- **POST-MERGE:** lib-foundation PR #28 — fix: Copilot CLI auth + rigor scanner improvements; merge SHA `fee313ed`; branch `feat/v0.3.20` cut, retrospective committed `a64e2ad`; enforce_admins restored (pending)
+- **POST-MERGE:** lib-acg PR #13 — docs: PR #12 retrospective and Phase 3 completion; merge SHA `1bdc663`; branch `docs/next-improvements` created, retrospective committed `4d93147`; enforce_admins restored (pending)
 - **RELEASED:** shopping-cart-infra v0.5.0 — tag `v0.5.0` pushed, GitHub release created, enforce_admins restored, next branch: `shopping-cart-infra-v0.5.5`
 - **MERGED:** k3d-manager PR #75 — Keycloak cross-cluster reachability fix (SSH tunnel + iptables DNAT + CoreDNS patch); merge SHA `8cb5709b`; v1.4.6 retrospective committed on v1.4.7
 - **MERGED:** shopping-cart-order PR #30 — Keycloak JWT issuer URI fix; merge SHA `16640fd5`; `docs/next-improvements` branch created

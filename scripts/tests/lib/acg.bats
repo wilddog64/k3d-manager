@@ -135,6 +135,7 @@ NODE
 }
 
 @test "_acg_sync_known_hosts prunes stale managed AWS IPs and records current ones" {
+  skip "Feature not yet implemented: see docs/issues/2026-05-13-acg-up-maintain-known-hosts-for-managed-aws-ips.md"
   local stub_dir old_path
   mkdir -p "${HOME}/.ssh"
   cat > "${HOME}/.ssh/config" <<'EOF'

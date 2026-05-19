@@ -98,7 +98,6 @@ source "$(dirname "$0")/lib/agent_rigor.sh"
 
 ```bash
 source scripts/lib/system.sh
-export K3DM_ENABLE_AI=1
 
 # Basic prompt
 _copilot_review --prompt "Explain the _agent_lint flow in this repo."
@@ -119,7 +118,7 @@ _copilot_review --prompt "Diagnose this pod failure:\n\n${context}"
 | `AI_REVIEW_FUNC` | `copilot` | AI backend to use. Currently only `copilot` is supported. |
 | `AI_REVIEW_MODEL` | `gpt-5.4-mini` | Default model passed to the backend. An explicit `--model` in args takes precedence over this env default. |
 
-**Using `_ai_agent_review` in another project via subtree:**
+**Using in another project via subtree:**
 
 ```bash
 # Pull lib-foundation
@@ -137,13 +136,11 @@ _ai_agent_review --prompt "Your prompt here."
 
 ```bash
 # In your pre-commit hook, before calling _agent_lint:
-export AGENT_LINT_AI_FUNC="_ai_agent_review"
-export K3DM_ENABLE_AI="${K3DM_ENABLE_AI:-0}"
+export AGENT_LINT_AI_FUNC="_copilot_review"
+export ENABLE_AGENT_LINT=1
 ```
 
-`_agent_lint` reads `AGENT_LINT_AI_FUNC` and calls it with staged `.sh`, `.js`, and `.md` files. In
-k3d-manager, `K3DM_ENABLE_AI` makes the AI step opt-in — users set `K3DM_ENABLE_AI=1` in their
-environment to activate it. In another project, choose a repo-local gate variable if you need one.
+`_agent_lint` reads `AGENT_LINT_AI_FUNC` and calls it with staged `.sh`, `.js`, and `.md` files. The AI step is skipped when `AGENT_LINT_AI_FUNC` is unset or the named function is not defined. The gate variable defaults to `ENABLE_AGENT_LINT`; set `AGENT_LINT_GATE_VAR` to use a different env var name.
 
 ### Utilities
 

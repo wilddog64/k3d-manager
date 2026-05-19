@@ -7,7 +7,11 @@
 - `scripts/lib/system.sh`: `_copilot_auth_check` — remove `K3DM_ENABLE_AI` gate; check env tokens (`COPILOT_GITHUB_TOKEN`/`GH_TOKEN`/`GITHUB_TOKEN`), then `~/.config/github-copilot/apps.json`, then `gh auth status`; `_err` on failure with clear message — Copilot v1.0.40 has no `auth status` subcommand (`f0e29d9`, `eede5c3`)
 
 ### Added
-- `scripts/tests/lib/copilot_auth.bats`: 5-test BATS suite covering all auth paths — env token (3 variants), `apps.json`, and failure with clear error message (`f0e29d9`)
+- `scripts/tests/lib/copilot_auth.bats`: 6-test BATS suite covering all auth paths — env token (3 variants), `apps.json`, `gh auth status` fallback, and failure with clear error message (`f0e29d9`)
+- `scripts/tests/lib/agent_rigor.bats`: 2 new tests — `_agent_lint` picks up staged `.js` and `.md` files via `AGENT_LINT_AI_FUNC` mock
+
+### Changed
+- `docs/api/functions.md`: remove stale `export K3DM_ENABLE_AI=1` from `_copilot_review` usage example; fix `_agent_lint` pre-commit hook example to use `ENABLE_AGENT_LINT=1` instead of `K3DM_ENABLE_AI`; correct gate variable description
 
 ## [v0.3.17] — 2026-05-01
 
