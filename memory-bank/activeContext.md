@@ -1,10 +1,10 @@
 # Active Context — k3d-manager
 
-## Current Status (Post-Merge 2026-05-18 — shopping-cart-infra v0.5.0 released)
-- Current branch: `k3d-manager-v1.4.7` (created from k3d-manager PR #75 merge SHA `8cb5709b`)
-- **shopping-cart-infra v0.5.0 released** — CHANGELOG versioned, tag `v0.5.0` pushed to origin, GitHub release created, enforce_admins restored on main, next branch `shopping-cart-infra-v0.5.5` created
-- **enforce_admins restored on all repos** — `true` ✓ (k3d-manager, shopping-cart-order, shopping-cart-basket, shopping-cart-infra, shopping-cart-frontend)
-- **v1.4.6 retrospective committed** — `docs/retro/2026-05-17-v1.4.6-retrospective.md` on k3d-manager-v1.4.7, commit `0a036f6a`, pushed to origin
+## Current Status (Post-Merge 2026-05-18 — k3d-manager v1.4.7 released)
+- Current branch: `k3d-manager-v1.4.8` (created from k3d-manager PR #76 merge SHA `0278e8d7`)
+- **k3d-manager v1.4.7 released** — CHANGELOG versioned, tag `v1.4.7` pushed to origin, GitHub release created, enforce_admins restored on main, next branch `k3d-manager-v1.4.8` created
+- **enforce_admins restored on k3d-manager main** — `true` ✓ + `required_approving_review_count=1` ✓
+- **v1.4.7 retrospective committed** — `docs/retro/2026-05-18-v1.4.7-retrospective.md` on k3d-manager-v1.4.8, commit `f6632b4f`, pushed to origin
 - **COMPLETE:** `acg-up` now seeds Keycloak LDAP user passwords for `admin`, `developer`, and `operator` into Vault at `keycloak/users/<user>` and updates the live LDAP passwords on every `make up`; committed as `34c6f8a9` (`fix(acg-up): seed Keycloak LDAP user passwords in Vault on every make up`) and pushed to `origin/k3d-manager-v1.4.6`; validated with `shellcheck -S warning bin/acg-up` and `bats scripts/tests/bin/acg_up.bats`.
 - **shopping-cart-product-catalog PR #20 merged** — `fix/argocd-shared-namespace` → `main`, merge SHA `12dfe79`. Service port fix (8082). enforce_admins restored. `docs/next-improvements` branch created.
 - **shopping-cart-order PR #29 merged** — `fix/argocd-shared-namespace` → `main`, merge SHA `8a2739d`. Service port + SecurityConfig.java health fixes (8081). enforce_admins restored. `docs/next-improvements` branch created.

@@ -1,6 +1,8 @@
 # Progress — k3d-manager
 
-## Status (v1.4.6 — 5 PRs merged 2026-05-17 + shopping-cart-infra v0.5.0 released 2026-05-18)
+## Status (v1.4.7 — PR #76 merged 2026-05-18 + shopping-cart-infra v0.5.0 released 2026-05-18)
+- **RELEASED:** k3d-manager v1.4.7 — tag `v1.4.7` pushed, GitHub release created, enforce_admins restored, next branch: `k3d-manager-v1.4.8`
+- **MERGED:** k3d-manager PR #76 — Keycloak cross-cluster tunnel + CoreDNS on k3s-aws; merge SHA `0278e8d7`; v1.4.7 retrospective committed on k3d-manager-v1.4.8
 - **RELEASED:** shopping-cart-infra v0.5.0 — tag `v0.5.0` pushed, GitHub release created, enforce_admins restored, next branch: `shopping-cart-infra-v0.5.5`
 - **MERGED:** k3d-manager PR #75 — Keycloak cross-cluster reachability fix (SSH tunnel + iptables DNAT + CoreDNS patch); merge SHA `8cb5709b`; v1.4.6 retrospective committed on v1.4.7
 - **MERGED:** shopping-cart-order PR #30 — Keycloak JWT issuer URI fix; merge SHA `16640fd5`; `docs/next-improvements` branch created
