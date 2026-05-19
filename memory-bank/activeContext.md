@@ -1,10 +1,12 @@
 # Active Context — k3d-manager
 
-## Current Status (Post-Merge 2026-05-18 — k3d-manager v1.4.7 released)
+## Current Status (Post-Merge 2026-05-19 — lib-foundation + lib-acg post-merge complete)
 - Current branch: `k3d-manager-v1.4.8` (created from k3d-manager PR #76 merge SHA `0278e8d7`)
 - **k3d-manager v1.4.7 released** — CHANGELOG versioned, tag `v1.4.7` pushed to origin, GitHub release created, enforce_admins restored on main, next branch `k3d-manager-v1.4.8` created
 - **enforce_admins restored on k3d-manager main** — `true` ✓ + `required_approving_review_count=1` ✓
 - **v1.4.7 retrospective committed** — `docs/retro/2026-05-18-v1.4.7-retrospective.md` on k3d-manager-v1.4.8, commit `f6632b4f`, pushed to origin
+- **lib-foundation PR #28 post-merge completed** — fix: Copilot CLI auth + rigor scanner improvements; merge SHA `fee313ed` synced locally; next branch `feat/v0.3.20` checked out; retrospective `2026-05-18-pr28-retrospective.md` created + committed `a64e2ad` + pushed to origin; enforce_admins restoration pending (API call)
+- **lib-acg PR #13 post-merge completed** — docs: PR #12 retrospective and Phase 3 completion; merge SHA `1bdc663` synced locally; next branch `docs/next-improvements` already existed + checked out; retrospective `2026-05-18-pr13-retrospective.md` created + committed `4d93147` + pushed to origin; enforce_admins restoration pending (API call)
 - **COMPLETE:** `acg-up` now seeds Keycloak LDAP user passwords for `admin`, `developer`, and `operator` into Vault at `keycloak/users/<user>` and updates the live LDAP passwords on every `make up`; committed as `34c6f8a9` (`fix(acg-up): seed Keycloak LDAP user passwords in Vault on every make up`) and pushed to `origin/k3d-manager-v1.4.6`; validated with `shellcheck -S warning bin/acg-up` and `bats scripts/tests/bin/acg_up.bats`.
 - **shopping-cart-product-catalog PR #20 merged** — `fix/argocd-shared-namespace` → `main`, merge SHA `12dfe79`. Service port fix (8082). enforce_admins restored. `docs/next-improvements` branch created.
 - **shopping-cart-order PR #29 merged** — `fix/argocd-shared-namespace` → `main`, merge SHA `8a2739d`. Service port + SecurityConfig.java health fixes (8081). enforce_admins restored. `docs/next-improvements` branch created.
