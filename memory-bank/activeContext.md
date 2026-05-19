@@ -29,6 +29,10 @@
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
+## In Progress (v1.4.9)
+- **SPEC WRITTEN:** CoreDNS duplicate `hosts` plugin crash — spec: `docs/bugs/2026-05-19-acg-up-coredns-duplicate-hosts-plugin.md`; `bin/acg-up` lines 884–909 inject a second `hosts {}` block into Corefile, crashing CoreDNS on `k3s-aws`; fix: patch `data.NodeHosts` key instead; assigned to Codex on `k3d-manager-v1.4.9`
+- **SPEC WRITTEN:** CloudFormation IAM race condition — spec: `docs/bugs/2026-05-19-acg-up-cloudformation-race-after-credential-extraction.md`; `bin/acg-up` polls `aws cloudformation list-stacks` after fresh credential extraction; assigned to Codex on `k3d-manager-v1.4.9`
+
 ## In Progress (v1.4.7)
 - **NO-OP:** ArgoCD SSO `invalid_scope: groups` spec was already satisfied on `origin/main` in `shopping-cart-infra`; `requestedScopes` already contains only `openid`, `profile`, and `email`, so there was nothing to commit. Issue doc: `docs/issues/2026-05-18-argocd-groups-scope-already-fixed.md`.
 

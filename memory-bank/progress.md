@@ -1,5 +1,9 @@
 # Progress — k3d-manager
 
+## Status (v1.4.9 — active)
+- **SPEC WRITTEN:** CoreDNS duplicate `hosts` plugin crash — `docs/bugs/2026-05-19-acg-up-coredns-duplicate-hosts-plugin.md`; Codex assigned; commit pending on `k3d-manager-v1.4.9`
+- **SPEC WRITTEN (earlier):** CloudFormation IAM race condition — `docs/bugs/2026-05-19-acg-up-cloudformation-race-after-credential-extraction.md`; Codex assigned; commit pending on `k3d-manager-v1.4.9`
+
 ## Status (v1.4.8 — PR #77 merged 2026-05-19 + post-merge complete)
 - **RELEASED:** k3d-manager v1.4.8 — PR #77 merged to main (SHA `8f08bd35`); enforce_admins restored; next branch: `k3d-manager-v1.4.9`; v1.4.8 retrospective committed `9946fa66` on k3d-manager-v1.4.9
 - **MERGED:** k3d-manager PR #77 — vault temp file leaks, CDP hang, Keycloak frontendUrl, Cloudflare tunnel; merge SHA `8f08bd35`; v1.4.8 retrospective committed on k3d-manager-v1.4.9
