@@ -25,7 +25,7 @@ source "${REPO_ROOT}/scripts/lib/system.sh"
 INFRA_CONTEXT="${INFRA_CONTEXT:-k3d-k3d-cluster}"
 APP_CONTEXT="${APP_CONTEXT:-ubuntu-k3s}"
 ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-cicd}"
-SHOPPING_CART_NS="shopping-cart"
+SHOPPING_CART_NS="shopping-cart-apps"
 
 PASS=0
 FAIL=0
