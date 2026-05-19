@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.4.8] - 2026-05-19
+
 ### Fixed
 - `scripts/plugins/vault.sh`: register cleanup traps immediately after mktemp to prevent temp file leaks on error paths
 - `scripts/lib/acg/playwright/acg_extend.js`: disconnect CDP browser connection on exit to prevent WebSocket hang and node process leak
