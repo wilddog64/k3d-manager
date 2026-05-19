@@ -291,11 +291,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-05-19 | [git push upstream default targeted main](docs/issues/2026-05-19-git-push-upstream-default-targeted-main.md) | shopping-cart repos — `git push --set-upstream origin fix/keycloak-public-url` pushed branch-default main instead of feature branch; workaround: explicit `git push origin fix/keycloak-public-url` after tracking. Upstream quirk documented for awareness |
 | 2026-05-15 | [Copilot PR #74 review findings](docs/issues/2026-05-15-copilot-pr74-review-findings.md) | acg_extend.js URL matching, keycloak.sh PGPASSWORD exposure, ldap.sh ESO dependency guard, vault.sh revoke error propagation |
 | 2026-05-15 | [frontend main push reverted](docs/issues/2026-05-15-frontend-main-push-reverted.md) | shopping-cart-frontend — accidental push to main during SSO wiring; reverted to 2872a4cd |
 | 2026-05-14 | [shopping-cart-infra v0.4.0 tag pointed before fix](docs/issues/2026-05-14-shopping-cart-infra-v0.4.0-tag-pointed-before-fix.md) | shopping-cart-infra release tag — v0.4.0 was initially on the commit before the Keycloak realm import fix; corrected to point at the merge commit |
 | 2026-05-13 | [acg-up stale shopping-cart-infra realm JSON path](docs/issues/2026-05-13-acg-up-uses-stale-realm-json-path-after-shopping-cart-infra-layout-change.md) | acg-up — reads deleted `identity/config/realm-shopping-cart.json` instead of `shopping-cart-infra/identity/keycloak/realm-shopping-cart.json`; path fixed in acg-up |
-| 2026-05-13 | [Argo CD VirtualService host default still dev-local-me](docs/issues/2026-05-13-argocd-virtualservice-host-default-still-dev-local-me.md) | argocd vars — defaults to stale `argocd.dev.local.me` instead of `argocd.shopping-cart.local`; fixed in vars.sh |
 
 [All issues →](docs/issues/)
 
@@ -305,9 +305,9 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.4.7](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.7) | 2026-05-18 | Keycloak public URL via Cloudflare + CoreDNS — `frontendUrl` set to Cloudflare domain after realm import; SSH tunnel + iptables DNAT + CoreDNS patch for cross-cluster Keycloak reachability; cross-cluster Keycloak JWT issuer URI aligned in all shopping-cart services |
+| [v1.4.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.4) | 2026-05-08 | Identity SSO fixes — Keycloak ExternalSecret bootstrapping, Keycloak KV seeding, shopping-cart-identity ArgoCD app, shopping-cart-infra OIDC realm; lib-foundation + lib-acg subtree pulls |
 | [v1.4.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.2) | 2026-05-07 | `_ai_agent_review` generic dispatch + ArgoCD bootstrap hardening + lib-acg cdp.sh fixes — `launchctl bootout`, dead Linux else-block removal, configurable `ARGOCD_SERVER_WAIT_TIMEOUT`, Hub bootstrap refresh |
-| [v1.4.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.0) | 2026-05-01 | Copilot CLI plugin — `copilot_triage_pod` + `copilot_draft_spec`; `_copilot_review` in lib-foundation; pre-commit `AGENT_LINT_AI_FUNC` wiring; how-to doc |
-| [v1.3.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.3.0) | 2026-05-01 | Sandbox rebuild hardening — GHCR PAT validation in `acg-up` + `rotate-ghcr-pat`; Makefile OAuth fallback removed; payment ESO postgres creds from Vault; `cdp.sh` subtree path fix; lib-acg extend timing sync |
 
 <details>
 <summary>Older releases</summary>
