@@ -1,0 +1,11 @@
+tunnel: ${CLOUDFLARE_TUNNEL_ID}
+credentials-file: ${CLOUDFLARE_CREDENTIALS_FILE}
+
+ingress:
+  - hostname: argocd.${CLOUDFLARE_DOMAIN}
+    service: http://localhost:8080
+  - hostname: frontend.${CLOUDFLARE_DOMAIN}
+    service: http://127.0.0.2:80
+  - hostname: keycloak.${CLOUDFLARE_DOMAIN}
+    service: http://localhost:80
+  - service: http_status:404

@@ -1200,10 +1200,12 @@ PLIST
 fi
 
 if _is_mac; then
-  _info "[acg-up] Step 10h/14 — Installing Cloudflare named tunnel (argocd.3ai-talk.org + frontend.3ai-talk.org)..."
+  _info "[acg-up] Step 10h/14 — Installing Cloudflare named tunnel (argocd + frontend + keycloak)..."
   _tunnel_dir="${HOME}/.local/share/k3d-manager"
   _tunnel_urls_file="${_tunnel_dir}/tunnel-urls.txt"
   _cloudflared_config="${HOME}/.cloudflared/config.yml"
+  _cf_domain="${CF_DOMAIN:-3ai-talk.org}"
+  _cf_template="${REPO_ROOT}/scripts/etc/cloudflared-config.yml.tmpl"
   mkdir -p "${_tunnel_dir}"
 
   if ! command -v cloudflared >/dev/null 2>&1; then
@@ -1212,6 +1214,32 @@ if _is_mac; then
       brew install cloudflared >/dev/null 2>&1 || _warn "[acg-up] cloudflared install failed — skipping tunnel"
     else
       _warn "[acg-up] cloudflared not found and brew unavailable — skipping tunnel"
+    fi
+  fi
+
+  if command -v cloudflared >/dev/null 2>&1; then
+    if [[ ! -f "${_cloudflared_config}" ]] || \
+        ! grep -q "keycloak.${_cf_domain}" "${_cloudflared_config}" 2>/dev/null; then
+      _cf_tunnel_id=""
+      _cf_creds_file=""
+      for _f in "${HOME}/.cloudflared/"*.json; do
+        [[ -f "${_f}" ]] || continue
+        _cf_tunnel_id="$(basename "${_f}" .json)"
+        _cf_creds_file="${_f}"
+        break
+      done
+      if [[ -n "${_cf_tunnel_id}" ]] && [[ -f "${_cf_template}" ]]; then
+        mkdir -p "$(dirname "${_cloudflared_config}")"
+        CLOUDFLARE_TUNNEL_ID="${_cf_tunnel_id}" \
+        CLOUDFLARE_CREDENTIALS_FILE="${_cf_creds_file}" \
+        CLOUDFLARE_DOMAIN="${_cf_domain}" \
+          envsubst < "${_cf_template}" > "${_cloudflared_config}"
+        _info "[acg-up] Generated ~/.cloudflared/config.yml (tunnel ${_cf_tunnel_id})"
+      elif [[ -z "${_cf_tunnel_id}" ]]; then
+        _warn "[acg-up] No Cloudflare tunnel credentials found in ~/.cloudflared/ — skipping config generation (run: cloudflared tunnel login && cloudflared tunnel create k3d-manager)"
+      else
+        _warn "[acg-up] ${_cf_template} not found — skipping config generation"
+      fi
     fi
   fi
 
@@ -1265,15 +1293,18 @@ PLIST
         _warn "[acg-up] failed to bootstrap cloudflare tunnel"
       fi
     fi
-    _argocd_url="${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}"
-    _frontend_url="${FRONTEND_PUBLIC_URL:-https://frontend.3ai-talk.org}"
+    _argocd_url="${ARGOCD_PUBLIC_URL:-https://argocd.${CF_DOMAIN:-3ai-talk.org}}"
+    _frontend_url="${FRONTEND_PUBLIC_URL:-https://frontend.${CF_DOMAIN:-3ai-talk.org}}"
+    _keycloak_public_url="${KEYCLOAK_PUBLIC_URL:-https://keycloak.${CF_DOMAIN:-3ai-talk.org}}"
     {
       printf 'argocd=%s\n' "${_argocd_url}"
       printf 'frontend=%s\n' "${_frontend_url}"
+      printf 'keycloak=%s\n' "${_keycloak_public_url}"
     } > "${_tunnel_urls_file}"
     _info "[acg-up] Cloudflare tunnel URLs written to ${_tunnel_urls_file}"
     _info "[acg-up] ArgoCD public URL:   ${_argocd_url}"
     _info "[acg-up] Frontend public URL: ${_frontend_url}"
+    _info "[acg-up] Keycloak public URL: ${_keycloak_public_url}"
   elif [[ ! -f "${_cloudflared_config}" ]]; then
     _warn "[acg-up] ~/.cloudflared/config.yml not found — skipping named tunnel (run: cloudflared tunnel login && cloudflared tunnel create k3d-manager)"
   fi
@@ -1305,8 +1336,9 @@ _info "[acg-up] Step 13/14 — Frontend served via direct kubectl port-forward o
 _info "[acg-up] Cluster is up."
 kubectl get nodes --context ubuntu-k3s
 _info "[acg-up] === Public URLs (Cloudflare — any device) ==="
-_info "[acg-up]   ArgoCD:   ${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}"
-_info "[acg-up]   Frontend: ${FRONTEND_PUBLIC_URL:-https://frontend.3ai-talk.org}"
+_info "[acg-up]   ArgoCD:   ${ARGOCD_PUBLIC_URL:-https://argocd.${CF_DOMAIN:-3ai-talk.org}}"
+_info "[acg-up]   Frontend: ${FRONTEND_PUBLIC_URL:-https://frontend.${CF_DOMAIN:-3ai-talk.org}}"
+_info "[acg-up]   Keycloak: ${KEYCLOAK_PUBLIC_URL:-https://keycloak.${CF_DOMAIN:-3ai-talk.org}}"
 _info "[acg-up] === Local URLs (Mac only) ==="
 _info "[acg-up]   ArgoCD:   https://argocd.shopping-cart.local"
 _info "[acg-up]   Frontend: http://frontend.shopping-cart.local"

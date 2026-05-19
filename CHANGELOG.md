@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - `bin/acg-up`: patch CoreDNS NodeHosts instead of injecting a duplicate hosts block into CoreDNS Corefile
+- `bin/acg-up`: generate cloudflared config from template and add keycloak to the Cloudflare tunnel
 
 ## [1.4.8] - 2026-05-19
 
