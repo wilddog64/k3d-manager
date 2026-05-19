@@ -841,6 +841,7 @@ fi
 
 _info "[acg-up] Step 10g.5/14 — Wiring Keycloak cross-cluster reachability on ubuntu-k3s..."
 _node_ip=$(kubectl get node --context ubuntu-k3s \
+  -l 'node-role.kubernetes.io/control-plane' \
   -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
 if [[ -z "${_node_ip}" ]]; then
   _warn "[acg-up] Could not determine ubuntu-k3s node IP — skipping Keycloak cross-cluster tunnel"
