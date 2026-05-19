@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status (v1.4.9 — active)
+- **SPEC WRITTEN:** Cloudflare tunnel missing Keycloak — `docs/bugs/2026-05-19-acg-up-cloudflare-tunnel-missing-keycloak.md`; Codex assigned; commit pending on `k3d-manager-v1.4.9`
 - **SPEC WRITTEN:** CoreDNS duplicate `hosts` plugin crash — `docs/bugs/2026-05-19-acg-up-coredns-duplicate-hosts-plugin.md`; Codex assigned; commit pending on `k3d-manager-v1.4.9`
 - **SPEC WRITTEN (earlier):** CloudFormation IAM race condition — `docs/bugs/2026-05-19-acg-up-cloudformation-race-after-credential-extraction.md`; Codex assigned; commit pending on `k3d-manager-v1.4.9`
 

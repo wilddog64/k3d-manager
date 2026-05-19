@@ -30,6 +30,7 @@
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
 ## In Progress (v1.4.9)
+- **SPEC WRITTEN:** Cloudflare tunnel missing Keycloak — spec: `docs/bugs/2026-05-19-acg-up-cloudflare-tunnel-missing-keycloak.md`; Step 10h doesn't generate config.yml, so keycloak.3ai-talk.org is missing on fresh machines; fix: add `scripts/etc/cloudflared-config.yml.tmpl` + Step 10h generation logic; assigned to Codex on `k3d-manager-v1.4.9`
 - **SPEC WRITTEN:** CoreDNS duplicate `hosts` plugin crash — spec: `docs/bugs/2026-05-19-acg-up-coredns-duplicate-hosts-plugin.md`; `bin/acg-up` lines 884–909 inject a second `hosts {}` block into Corefile, crashing CoreDNS on `k3s-aws`; fix: patch `data.NodeHosts` key instead; assigned to Codex on `k3d-manager-v1.4.9`
 - **SPEC WRITTEN:** CloudFormation IAM race condition — spec: `docs/bugs/2026-05-19-acg-up-cloudformation-race-after-credential-extraction.md`; `bin/acg-up` polls `aws cloudformation list-stacks` after fresh credential extraction; assigned to Codex on `k3d-manager-v1.4.9`
 
