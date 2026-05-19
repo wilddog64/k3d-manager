@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status (v1.4.7 — PR #76 merged 2026-05-18 + shopping-cart-infra v0.5.0 released 2026-05-18 + lib post-merge 2026-05-19)
+- **COMPLETE:** `acg-up` now patches ArgoCD to use `${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}`, updates the Keycloak `argocd` client redirect URIs for the public Cloudflare URL, and replaces the two `trycloudflare.com` quick tunnels with a single named tunnel from `~/.cloudflared/config.yml`; committed as `00d3a65f` and pushed to `origin/k3d-manager-v1.4.8`; validated with `shellcheck -S warning bin/acg-up`.
 - **RELEASED:** k3d-manager v1.4.7 — tag `v1.4.7` pushed, GitHub release created, enforce_admins restored, next branch: `k3d-manager-v1.4.8`
 - **MERGED:** k3d-manager PR #76 — Keycloak cross-cluster tunnel + CoreDNS on k3s-aws; merge SHA `0278e8d7`; v1.4.7 retrospective committed on k3d-manager-v1.4.8
 - **POST-MERGE:** lib-foundation PR #28 — fix: Copilot CLI auth + rigor scanner improvements; merge SHA `fee313ed`; branch `feat/v0.3.20` cut, retrospective committed `a64e2ad`; enforce_admins restored (pending)

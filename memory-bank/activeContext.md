@@ -2,6 +2,7 @@
 
 ## Current Status (Post-Merge 2026-05-19 — lib-foundation + lib-acg post-merge complete)
 - Current branch: `k3d-manager-v1.4.8` (created from k3d-manager PR #76 merge SHA `0278e8d7`)
+- **COMPLETE:** `acg-up` now patches ArgoCD to use `${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}`, adds the Cloudflare public URL to the Keycloak `argocd` client redirect URIs, and replaces the two `trycloudflare.com` quick tunnels with a single named tunnel driven by `~/.cloudflared/config.yml`; committed as `00d3a65f` (`fix(acg-up): replace trycloudflare quick tunnels with named cloudflare tunnel; wire ArgoCD URL + Keycloak redirect`) and pushed to `origin/k3d-manager-v1.4.8`; validated with `shellcheck -S warning bin/acg-up`.
 - **k3d-manager v1.4.7 released** — CHANGELOG versioned, tag `v1.4.7` pushed to origin, GitHub release created, enforce_admins restored on main, next branch `k3d-manager-v1.4.8` created
 - **enforce_admins restored on k3d-manager main** — `true` ✓ + `required_approving_review_count=1` ✓
 - **v1.4.7 retrospective committed** — `docs/retro/2026-05-18-v1.4.7-retrospective.md` on k3d-manager-v1.4.8, commit `f6632b4f`, pushed to origin
