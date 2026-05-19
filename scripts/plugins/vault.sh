@@ -788,6 +788,7 @@ function _deploy_vault_ha() {
    local release="${2:-$VAULT_RELEASE_DEFAULT}"
    local chart_version="${3:-$VAULT_CHART_VERSION}"
    local f="$(mktemp -t vault-ha-vaules.XXXXXX.yaml)"
+   trap '$(_cleanup_trap_command "$f")' EXIT TERM
 
    sc="${VAULT_SC:-local-path}"
    cat >"$f" <<YAML
@@ -812,7 +813,8 @@ YAML
    _helm "${args[@]}"
 
    _vault_ensure_data_path "$ns" "$release"
-   trap '$(_cleanup_trap_command "$f")' EXIT TERM
+   _cleanup_on_success "$f"
+   trap - EXIT TERM
 }
 
 # _vault_parse_deploy_opts
@@ -1094,6 +1096,7 @@ function _vault_operator_init() {
    local jsonfile
 
    jsonfile=$(mktemp -t vault-init.XXXXXX.json)
+   trap '$(_cleanup_trap_command "$jsonfile")' EXIT TERM
 
    local pod_deadline=$((SECONDS + 180))
    while (( SECONDS < pod_deadline )); do
@@ -1127,6 +1130,7 @@ function _vault_operator_init() {
       _err "[vault] failed to execute vault operator init"
    fi
 
+   trap - EXIT TERM
    printf '%s\n' "$jsonfile"
 }
 
@@ -1819,6 +1823,7 @@ function _vault_issue_pki_tls_secret() {
       cert_b64=$(printf '%s' "$secret_json" | jq -r '.data["tls.crt"] // empty')
       if [[ -n "$cert_b64" ]]; then
          existing_cert_file=$(mktemp -t vault-existing-cert.XXXXXX)
+         trap '$(_cleanup_trap_command "$existing_cert_file")' EXIT TERM
          if printf '%s' "$cert_b64" | base64 -d >"$existing_cert_file" 2>/dev/null; then
             if ! existing_serial=$(_vault_pki_extract_certificate_serial "$existing_cert_file"); then
                existing_serial=""
@@ -1842,7 +1847,7 @@ function _vault_issue_pki_tls_secret() {
 
    local manifest
    manifest="$(mktemp -t vault-pki-secret.XXXXXX)"
-   trap '$(_cleanup_trap_command "$manifest")' EXIT TERM
+   trap '$(_cleanup_trap_command "$manifest" "$existing_cert_file")' EXIT TERM
 
    {
       printf 'apiVersion: v1\n'
