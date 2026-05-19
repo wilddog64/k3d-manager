@@ -34,7 +34,7 @@
 ## In Progress (v1.4.9)
 - **COMPLETE:** Cloudflare tunnel missing Keycloak — spec: `docs/bugs/2026-05-19-acg-up-cloudflare-tunnel-missing-keycloak.md`; `scripts/etc/cloudflared-config.yml.tmpl` added and Step 10h now generates `~/.cloudflared/config.yml` when missing or missing the keycloak ingress; commit `d8f2ca47` pushed to `origin/k3d-manager-v1.4.9`.
 - **COMPLETE:** CoreDNS duplicate `hosts` plugin crash — spec: `docs/bugs/2026-05-19-acg-up-coredns-duplicate-hosts-plugin.md`; `bin/acg-up` now patches `data.NodeHosts` instead of injecting a second `hosts {}` block into Corefile; commit `5efe45e8` pushed to `origin/k3d-manager-v1.4.9`.
-- **SPEC WRITTEN:** CloudFormation IAM race condition — spec: `docs/bugs/2026-05-19-acg-up-cloudformation-race-after-credential-extraction.md`; `bin/acg-up` polls `aws cloudformation list-stacks` after fresh credential extraction; assigned to Codex on `k3d-manager-v1.4.9`
+- **COMPLETE:** CloudFormation IAM race condition — spec: `docs/bugs/2026-05-19-acg-up-cloudformation-race-after-credential-extraction.md`; `bin/acg-up` polls `aws cloudformation list-stacks` after fresh credential extraction (up to 12×15s); commit `2e46a4a2` pushed to `origin/k3d-manager-v1.4.9`.
 
 ## In Progress (v1.4.7)
 - **NO-OP:** ArgoCD SSO `invalid_scope: groups` spec was already satisfied on `origin/main` in `shopping-cart-infra`; `requestedScopes` already contains only `openid`, `profile`, and `email`, so there was nothing to commit. Issue doc: `docs/issues/2026-05-18-argocd-groups-scope-already-fixed.md`.
