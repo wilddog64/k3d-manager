@@ -1,7 +1,7 @@
 # Bugfix: Ghost State "Delete Sandbox" button not found after SPA navigation
 
 **Branch:** `fix/acg-extend-ghost-state-spa-wait`
-**Files:** `playwright/acg_extend.js`
+**Files:** `playwright/acg_extend.js`, `CHANGELOG.md`, `docs/bugs/2026-05-20-acg-extend-ghost-state-delete-btn-not-found-after-spa-nav.md`
 
 ---
 
@@ -77,13 +77,15 @@ node acg_extend.js <sandbox-url>
 | File | Change |
 |------|--------|
 | `playwright/acg_extend.js` | Add skeleton-loader wait after Ghost State re-navigation; increase deleteBtn isVisible timeout from 5s to 30s |
+| `CHANGELOG.md` | Add `[Unreleased]` entry under `### Fixed` |
+| `docs/bugs/2026-05-20-acg-extend-ghost-state-delete-btn-not-found-after-spa-nav.md` | This spec doc |
 
 ---
 
 ## Rules
 
 - `node --check playwright/acg_extend.js` — zero errors
-- No other files touched
+- Code change limited to `playwright/acg_extend.js`; CHANGELOG and this spec doc are required documentation
 
 ---
 
@@ -93,7 +95,7 @@ node acg_extend.js <sandbox-url>
 - [ ] Committed to `fix/acg-extend-ghost-state-spa-wait` (new branch from lib-acg main)
 - [ ] Pushed to `origin/fix/acg-extend-ghost-state-spa-wait`
 - [ ] CHANGELOG `[Unreleased]` updated with one-line entry under `### Fixed`
-- [ ] memory-bank/activeContext.md and memory-bank/progress.md updated with commit SHA and task status
+- [ ] `memory-bank/activeContext.md` and `memory-bank/progress.md` updated with commit SHA and task status
 
 **Commit message (exact):**
 ```
@@ -104,7 +106,6 @@ fix(acg-extend): wait for SPA render after Ghost State re-navigation; increase d
 
 ## What NOT to Do
 
-- Do NOT create a PR
 - Do NOT skip pre-commit hooks (`--no-verify`)
-- Do NOT modify any file other than `playwright/acg_extend.js` and `CHANGELOG.md`
+- Do NOT modify any file other than `playwright/acg_extend.js`, `CHANGELOG.md`, and this spec doc
 - Do NOT commit to `main` — work on `fix/acg-extend-ghost-state-spa-wait`
