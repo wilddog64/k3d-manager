@@ -79,8 +79,6 @@ async function extendSandbox() {
     process.exit(1);
   }
 
-  const checkMode = process.argv[3] === '--check';
-
   let targetUrl = process.argv[2];
   if (!targetUrl) {
     console.error('ERROR: No sandbox URL provided');
@@ -168,7 +166,7 @@ async function extendSandbox() {
     ];
 
     let clicked = false;
-    const immediateBtn = checkMode ? null : await _waitForVisibleExtendButton(page, extendSelectors, 0, 'immediately');
+    const immediateBtn = await _waitForVisibleExtendButton(page, extendSelectors, 0, 'immediately');
     if (immediateBtn) {
       await immediateBtn.click({ force: true });
       clicked = true;
@@ -202,29 +200,17 @@ async function extendSandbox() {
           const shutdownTime = new Date();
           shutdownTime.setHours(hours, mins, 0, 0);
           
-          // Midnight/Date-wrap fix: the UI shows times without a date, so "12:30AM" for a
-          // sandbox expiring tomorrow is constructed as today's 12:30AM (in the past).
-          // Only wrap to tomorrow when the resulting next-day time is ≤ 6 hours away —
-          // that covers the legitimate near-midnight case (e.g. 11:59PM→12:30AM = 31 min)
-          // while correctly treating truly-expired sandboxes (2:02PM expired → next-day
-          // 2:02PM is ~22h away) as expired rather than wrapping them.
-          if (shutdownTime < now) {
-            const minsUntilNextDay = Math.floor(
-              (shutdownTime.getTime() + 24 * 60 * 60 * 1000 - now.getTime()) / 60000
-            );
-            if (minsUntilNextDay > 0 && minsUntilNextDay < 360) {
-              shutdownTime.setDate(shutdownTime.getDate() + 1);
-            }
+          // Midnight/Date-wrap fix: only wrap when the time just ticked past midnight
+          // (gap ≤ 60 min). Larger gaps mean the sandbox truly expired today.
+          if (shutdownTime < now && (now.getTime() - shutdownTime.getTime()) < 60 * 60 * 1000) {
+            shutdownTime.setDate(shutdownTime.getDate() + 1);
           }
           
           const remainingMs = shutdownTime.getTime() - now.getTime();
           remainingMins = Math.floor(remainingMs / 60000);
           
           console.error(`INFO: Calculated remaining TTL: ~${remainingMins} minutes`);
-          if (checkMode) {
-            console.log(`REMAINING_MINS:${remainingMins}`);
-            process.exit(0);
-          }
+          
           if (remainingMins > 65) {
             console.log(`INFO: Extension window not open yet (${remainingMins}m remaining). Skipping extension.`);
             process.exit(0);
@@ -236,17 +222,16 @@ async function extendSandbox() {
     } else {
       console.error(`WARN: Auto Shutdown text not found. Proceeding anyway.`);
     }
-    if (checkMode) {
-      console.log(`REMAINING_MINS:${remainingMins !== null ? remainingMins : -1}`);
-      process.exit(0);
-    }
 
     // 3. Reveal the panel/modal if still not clicked
     // isPanelOpen: "Auto Shutdown" text appears on the listing-page card — not a reliable signal
     // that the extend panel is open. If step 1 found no extend button, the panel is NOT open.
     const isPanelOpen = clicked;
 
-    if (!isPanelOpen) {
+    // Skip "Open Sandbox" when sandbox is already expired — clicking it navigates Playwright
+    // away from the listing page where "Delete Sandbox" lives, causing Ghost State to fail.
+    const _isSandboxExpired = remainingMins !== null && remainingMins <= 0;
+    if (!isPanelOpen && !_isSandboxExpired) {
       // Click "Open Sandbox" on the card with the "Auto Shutdown" banner (the running sandbox),
       // not .first() which always picks the first card (AWS) regardless of provider.
       const _allOpenBtns = page.locator('button:has-text("Open Sandbox")');
@@ -283,7 +268,12 @@ async function extendSandbox() {
     // failure alone is not a strong enough signal to perform a destructive delete/restart action)
     if (!clicked && remainingMins !== null && remainingMins < 15) {
       console.error('INFO: Extend button missing in critical window. Attempting "Ghost State" recovery (Delete/Restart)...');
-      
+
+      // Re-navigate to listing page — Open Sandbox or other interactions may have navigated away.
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(
+        (e) => console.error(`WARN: Ghost State re-navigation failed: ${e.message}`)
+      );
+
       const deleteBtn = page.locator('button:has-text("Delete Sandbox")').first();
       if (await deleteBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
         console.error('INFO: Clicking Delete Sandbox...');

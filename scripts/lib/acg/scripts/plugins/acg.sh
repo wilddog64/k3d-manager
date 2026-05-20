@@ -428,31 +428,6 @@ _acg_extend_playwright() {
   echo "$output"
 }
 
-function acg_check_ttl() {
-  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    cat <<'HELP'
-Usage: acg_check_ttl <sandbox_url>
-
-Read the ACG sandbox auto-shutdown timestamp via Playwright and print the
-remaining minutes to stdout as a plain integer, or -1 if unparseable.
-HELP
-    return 0
-  fi
-  local sandbox_url="${1:?usage: acg_check_ttl <sandbox_url>}"
-  local playwright_script="${_LIB_ACG_ROOT}/playwright/acg_extend.js"
-  if ! command -v node >/dev/null 2>&1; then
-    _err "[acg] node is required — install Node.js"
-  fi
-  local output exit_code
-  output=$(node "$playwright_script" "$sandbox_url" --check 2>/dev/null)
-  exit_code=$?
-  if [[ $exit_code -ne 0 ]]; then
-    _warn "[acg] acg_check_ttl: node exited $exit_code"
-    return 1
-  fi
-  printf '%s\n' "$output" | grep '^REMAINING_MINS:' | cut -d: -f2
-}
-
 function acg_extend_playwright() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
