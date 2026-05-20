@@ -138,20 +138,20 @@ case "${_cluster_provider}" in
           acg_get_credentials ${sandbox_url:+"$sandbox_url"} || exit 1
         fi
       fi
-      _info "[acg-up] Waiting for CloudFormation service to become accessible (up to 3 min)..."
+      _info "[acg-up] Waiting for AWS credentials to become valid (up to 10 min)..."
       _cf_wait=0
-      until _run_command --soft --quiet -- aws cloudformation list-stacks \
+      until _run_command --soft --quiet -- aws sts get-caller-identity \
           --region "${ACG_REGION:-us-west-2}" >/dev/null 2>&1; do
         _cf_wait=$(( _cf_wait + 1 ))
-        if (( _cf_wait > 12 )); then
+        if (( _cf_wait > 40 )); then
           printf 'ERROR: %s\n' \
-            "[acg-up] CloudFormation not accessible after $(( 12 * 15 ))s — check credentials" >&2
+            "[acg-up] AWS credentials not valid after $(( 40 * 15 ))s — check credentials" >&2
           exit 1
         fi
-        _info "[acg-up] ... CloudFormation not yet accessible (attempt ${_cf_wait}/12) — sleeping 15s"
+        _info "[acg-up] ... credentials not yet valid (attempt ${_cf_wait}/40) — sleeping 15s"
         sleep 15
       done
-      _info "[acg-up] CloudFormation accessible."
+      _info "[acg-up] AWS credentials valid."
     fi
     ;;
   k3s-gcp)
