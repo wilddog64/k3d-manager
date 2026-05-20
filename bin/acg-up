@@ -131,7 +131,11 @@ case "${_cluster_provider}" in
       if [[ -n "${_acg_sandbox_ref}" ]]; then
         _acg_ttl_mins=$(acg_check_ttl "${_acg_sandbox_ref}" 2>/dev/null || true)
         if [[ -n "${_acg_ttl_mins}" ]] && (( _acg_ttl_mins <= 0 )); then
-          _err "[acg-up] Sandbox has expired (TTL: ${_acg_ttl_mins}m). Delete it and create a new sandbox at ${_ACG_SANDBOX_URL}, then re-run make up."
+          _info "[acg-up] Sandbox has expired (TTL: ${_acg_ttl_mins}m) — deleting and starting a new one..."
+          acg_extend_playwright "${_acg_sandbox_ref}" || \
+            _err "[acg-up] Failed to restart expired sandbox — delete it manually and re-run make up."
+          _info "[acg-up] New sandbox started — re-extracting credentials..."
+          acg_get_credentials ${sandbox_url:+"$sandbox_url"} || exit 1
         fi
       fi
       _info "[acg-up] Waiting for CloudFormation service to become accessible (up to 3 min)..."
