@@ -33,7 +33,7 @@
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
 ## In Progress (v1.4.9)
-- **ASSIGNED TO CODEX:** expired sandbox detection in else branch — spec: `docs/bugs/2026-05-19-acg-up-expired-sandbox-detection.md`; `bin/acg-up` must check TTL after `acg_get_credentials` in the else branch and `_err` immediately if TTL ≤ 0; prerequisite subtree pull `d81626e8` (lib-acg `04ffd365`) done.
+- **COMPLETE:** expired sandbox detection in else branch — spec: `docs/bugs/2026-05-19-acg-up-expired-sandbox-detection.md`; `bin/acg-up` now checks TTL after `acg_get_credentials` in the else branch and `_err`s immediately if TTL ≤ 0; commit `5962c514` pushed to `origin/k3d-manager-v1.4.9`.
 - **COMPLETE:** sandbox TTL check before provision — spec: `docs/bugs/2026-05-19-acg-up-sandbox-ttl-check-before-provision.md`; `bin/acg-up` now checks sandbox TTL in the AWS skip-extraction path, extending when below threshold; commit `a89cc2e5` pushed to `origin/k3d-manager-v1.4.9`.
 - **COMPLETE:** Cloudflare tunnel missing Keycloak — spec: `docs/bugs/2026-05-19-acg-up-cloudflare-tunnel-missing-keycloak.md`; `scripts/etc/cloudflared-config.yml.tmpl` added and Step 10h now generates `~/.cloudflared/config.yml` when missing or missing the keycloak ingress; commit `d8f2ca47` pushed to `origin/k3d-manager-v1.4.9`.
 - **COMPLETE:** CoreDNS duplicate `hosts` plugin crash — spec: `docs/bugs/2026-05-19-acg-up-coredns-duplicate-hosts-plugin.md`; `bin/acg-up` now patches `data.NodeHosts` instead of injecting a second `hosts {}` block into Corefile; commit `5efe45e8` pushed to `origin/k3d-manager-v1.4.9`.
