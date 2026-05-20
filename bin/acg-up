@@ -136,6 +136,13 @@ case "${_cluster_provider}" in
             _err "[acg-up] Failed to restart expired sandbox — delete it manually and re-run make up."
           _info "[acg-up] New sandbox started — re-extracting credentials..."
           acg_get_credentials ${sandbox_url:+"$sandbox_url"} || exit 1
+        elif ! _run_command --soft --quiet -- aws sts get-caller-identity \
+            --region "${ACG_REGION:-us-west-2}" >/dev/null 2>&1; then
+          _info "[acg-up] Credentials invalid despite running sandbox (TTL: ${_acg_ttl_mins:-unknown}m) — force-restarting sandbox..."
+          acg_extend_playwright "${_acg_sandbox_ref}" --force-restart || \
+            _err "[acg-up] Failed to force-restart sandbox — delete it manually and re-run make up."
+          _info "[acg-up] Sandbox restarted — re-extracting credentials..."
+          acg_get_credentials ${sandbox_url:+"$sandbox_url"} || exit 1
         fi
       fi
       _info "[acg-up] Waiting for AWS credentials to become valid (up to 10 min)..."
