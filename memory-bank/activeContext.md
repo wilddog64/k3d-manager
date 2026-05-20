@@ -33,6 +33,8 @@
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
 ## In Progress (v1.4.9)
+- **COMPLETE:** lib-acg PR #19 merged (`7a31eaf`) — docs/copilot-pr18-findings → main; 6 Copilot doc accuracy findings addressed (spec doc files header, Rules section, DoD memory-bank checkboxes, What NOT to Do); Apache 2.0 LICENSE added to lib-acg. enforce_admins restored on lib-acg main. lib-acg next branch: `docs/next-improvements` (commit `9262547`).
+- **IN PROGRESS:** shopping-cart-e2e-tests PR #1 open (`chore/add-apache-license`); adds Apache 2.0 LICENSE + `.github/copilot-instructions.md`; Copilot tagged; waiting for 2nd Copilot review before merge. No branch protection exists yet on e2e-tests main — will be added post-merge.
 - **COMPLETE:** Ghost State SPA render timing fix — lib-acg PR #18 merged (`0b40f42`); skeleton-loader wait + 30s deleteBtn timeout in acg_extend.js; subtree pull into k3d-manager pushed to origin/k3d-manager-v1.4.9.
 - **COMPLETE:** lib-acg Ghost State nav fix + acg_check_ttl regression — lib-acg PR #17 merged (`6a69232`): skip Open Sandbox when expired + re-navigate to listing before Ghost State delete; subtree pull from lib-acg main (`936fea39`) restored `acg_check_ttl` in `scripts/lib/acg/scripts/plugins/acg.sh` (had been regressed by prior pull from `docs/next-improvements`). enforce_admins restored on lib-acg.
 - **COMPLETE:** expired sandbox auto-restart — spec: `docs/bugs/2026-05-20-acg-up-expired-sandbox-auto-restart.md`; `bin/acg-up` now calls `acg_extend_playwright` (Ghost State Recovery: Delete→Start) + re-extracts credentials instead of `_err`; commit `0395cf8e` pushed to `origin/k3d-manager-v1.4.9`. Supersedes `5962c514` (abort-only approach was wrong).
