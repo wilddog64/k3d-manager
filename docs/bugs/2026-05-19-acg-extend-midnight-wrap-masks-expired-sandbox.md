@@ -81,7 +81,7 @@ can treat as expired (any value ≤ 0 means expired).
 ## Rules
 
 - `node --check playwright/acg_extend.js` — zero errors
-- No other files touched
+- Code change limited to `playwright/acg_extend.js`; CHANGELOG and memory-bank updates are required documentation
 
 ---
 
@@ -100,7 +100,6 @@ fix(acg-extend): narrow midnight-wrap guard to 60 min so expired sandboxes repor
 
 ## What NOT to Do
 
-- Do NOT create a PR
 - Do NOT skip pre-commit hooks (`--no-verify`)
 - Do NOT modify any file other than `playwright/acg_extend.js`
 - Do NOT commit to `main` — work on `fix/acg-extend-midnight-wrap`
