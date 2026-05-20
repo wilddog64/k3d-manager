@@ -6,9 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Fixed
-- `acg_extend.js`: narrow midnight-wrap guard to ≤ 60 min so expired sandboxes report a negative TTL instead of a large positive value
-- `acg_extend.js`: add `--check` mode to print remaining sandbox TTL without extending
-- `scripts/plugins/acg.sh`: add `acg_check_ttl()` wrapper for sandbox TTL checks
+- `acg_extend.js`: skip "Open Sandbox" click when sandbox is expired (TTL ≤ 0) so Ghost State Recovery can find the "Delete Sandbox" button on the listing page; re-navigate to listing URL at top of Ghost State as safety net
 - `acg_extend.js`: disconnect CDP browser in finally block to release WebSocket and prevent Node event loop from hanging indefinitely after successful TTL extension
 - `acg_extend.js`: detect "Session extended" toast at startup — if already visible, extension already succeeded; exit 0 immediately instead of looping forever trying to dismiss via CDP mouse click
 - `_waitForSandboxEntry`: pass `null` as `waitForFunction` arg so the timeout option reaches the options slot (same arg-slot bug as `_waitForCredentials`)
