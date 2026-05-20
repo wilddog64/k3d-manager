@@ -153,7 +153,6 @@ feat(acg): expose sandbox TTL via --check flag on acg_extend.js; add acg_check_t
 
 ## What NOT to Do
 
-- Do NOT create a PR
 - Do NOT skip pre-commit hooks (`--no-verify`)
 - Do NOT modify any file other than the listed targets
 - Do NOT commit to `main` — work on `fix/acg-sandbox-ttl-check`
