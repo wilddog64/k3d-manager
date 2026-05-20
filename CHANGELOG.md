@@ -6,6 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Fixed
+- `acg_extend.js`: wait for SPA render after Ghost State re-navigation and increase Delete Sandbox button visibility timeout to 30s so SPA re-navigation can find the button reliably
 - `acg_extend.js`: narrow midnight-wrap guard to ≤ 60 min so expired sandboxes report a negative TTL instead of a large positive value
 - `acg_extend.js`: add `--check` mode to print remaining sandbox TTL without extending
 - `scripts/plugins/acg.sh`: add `acg_check_ttl()` wrapper for sandbox TTL checks

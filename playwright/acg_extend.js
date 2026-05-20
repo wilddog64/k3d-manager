@@ -292,8 +292,14 @@ async function extendSandbox() {
         (e) => console.error(`WARN: Ghost State re-navigation failed: ${e.message}`)
       );
 
+      // Wait for SPA to render sandbox cards after navigation (domcontentloaded fires before React renders)
+      await page.waitForFunction(
+        () => !document.querySelector('[aria-busy="true"]'),
+        { timeout: 30000 }
+      ).catch(() => console.error('WARN: Skeleton loaders did not clear after Ghost State re-navigation — proceeding'));
+
       const deleteBtn = page.locator('button:has-text("Delete Sandbox")').first();
-      if (await deleteBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      if (await deleteBtn.isVisible({ timeout: 30000 }).catch(() => false)) {
         console.error('INFO: Clicking Delete Sandbox...');
         await deleteBtn.click({ force: true });
         
