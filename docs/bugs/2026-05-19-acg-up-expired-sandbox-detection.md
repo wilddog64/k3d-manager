@@ -6,7 +6,15 @@
 **Prerequisite:** lib-acg `fix/acg-extend-midnight-wrap` merged and subtree pulled into
 `scripts/lib/acg/` before this spec is implemented. The midnight-wrap fix makes
 `acg_check_ttl` return a negative/zero value for expired sandboxes; without it this
-spec's check is ineffective.
+spec's check is ineffective. ✅ Done — subtree pull `d81626e8` includes lib-acg `04ffd365`.
+
+---
+
+## Before You Start
+
+1. `git pull origin k3d-manager-v1.4.9` in the k3d-manager repo
+2. Read `memory-bank/activeContext.md` and `memory-bank/progress.md`
+3. Read `bin/acg-up` lines 125–135 to confirm the exact old block matches the spec
 
 ---
 
@@ -107,4 +115,4 @@ fix(acg-up): detect expired sandbox after credential extraction; fail fast with 
 - Do NOT skip pre-commit hooks (`--no-verify`)
 - Do NOT modify any file other than `bin/acg-up`
 - Do NOT commit to `main` — work on `k3d-manager-v1.4.9`
-- Do NOT run the subtree pull — it is already done (`036167f4`)
+- Do NOT run the subtree pull — it is already done (`d81626e8`)

@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status (v1.4.9 — active)
+- **ASSIGNED TO CODEX:** expired sandbox detection in else branch — spec: `docs/bugs/2026-05-19-acg-up-expired-sandbox-detection.md`; subtree pull `d81626e8` done (lib-acg PR #16 `04ffd365`).
 - **COMPLETE:** sandbox TTL check before provision — `docs/bugs/2026-05-19-acg-up-sandbox-ttl-check-before-provision.md`; `bin/acg-up` now checks sandbox TTL in the AWS skip-extraction path and extends when below threshold; commit `a89cc2e5` pushed to `origin/k3d-manager-v1.4.9`.
 - **COMPLETE:** Cloudflare tunnel missing Keycloak — `docs/bugs/2026-05-19-acg-up-cloudflare-tunnel-missing-keycloak.md`; `scripts/etc/cloudflared-config.yml.tmpl` added and Step 10h now generates `~/.cloudflared/config.yml` when missing or missing the keycloak ingress; commit `d8f2ca47` pushed to `origin/k3d-manager-v1.4.9`.
 - **COMPLETE:** CoreDNS duplicate `hosts` plugin crash — `docs/bugs/2026-05-19-acg-up-coredns-duplicate-hosts-plugin.md`; `bin/acg-up` now patches `data.NodeHosts` instead of injecting a second `hosts {}` block into Corefile; commit `5efe45e8` pushed to `origin/k3d-manager-v1.4.9`.
