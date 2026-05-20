@@ -33,6 +33,7 @@
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
 ## In Progress (v1.4.9)
+- **COMPLETE:** Ghost State SPA render timing fix — lib-acg PR #18 merged (`0b40f42`); skeleton-loader wait + 30s deleteBtn timeout in acg_extend.js; subtree pull into k3d-manager pushed to origin/k3d-manager-v1.4.9.
 - **COMPLETE:** lib-acg Ghost State nav fix + acg_check_ttl regression — lib-acg PR #17 merged (`6a69232`): skip Open Sandbox when expired + re-navigate to listing before Ghost State delete; subtree pull from lib-acg main (`936fea39`) restored `acg_check_ttl` in `scripts/lib/acg/scripts/plugins/acg.sh` (had been regressed by prior pull from `docs/next-improvements`). enforce_admins restored on lib-acg.
 - **COMPLETE:** expired sandbox auto-restart — spec: `docs/bugs/2026-05-20-acg-up-expired-sandbox-auto-restart.md`; `bin/acg-up` now calls `acg_extend_playwright` (Ghost State Recovery: Delete→Start) + re-extracts credentials instead of `_err`; commit `0395cf8e` pushed to `origin/k3d-manager-v1.4.9`. Supersedes `5962c514` (abort-only approach was wrong).
 - **COMPLETE:** sandbox TTL check before provision — spec: `docs/bugs/2026-05-19-acg-up-sandbox-ttl-check-before-provision.md`; `bin/acg-up` now checks sandbox TTL in the AWS skip-extraction path, extending when below threshold; commit `a89cc2e5` pushed to `origin/k3d-manager-v1.4.9`.
