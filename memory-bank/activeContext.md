@@ -1,11 +1,31 @@
 # Active Context — lib-acg
 
-## Current Branch: `fix/acg-sandbox-ttl-check`
+## Current Branch: `fix/acg-extend-midnight-wrap`
 
 - **COMPLETE:** `acg_extend.js` now exposes a `--check` mode that prints `REMAINING_MINS:<n>` without extending, and `scripts/plugins/acg.sh` now provides `acg_check_ttl()`; committed as `b2598bf` (`feat(acg): expose sandbox TTL via --check flag on acg_extend.js; add acg_check_ttl()`) and pushed to `origin/fix/acg-sandbox-ttl-check`.
 - **COMPLETE:** `acg_extend` now calls `_cdpBrowser.disconnect()` on exit instead of skipping cleanup for CDP-attached sessions, preventing the Node process from hanging after a successful extend; committed as `d5e1d07` (`fix(acg-extend): disconnect CDP browser on exit to prevent node process hang`) and pushed to `origin/docs/next-improvements`; PR: https://github.com/wilddog64/lib-acg/pull/14
 **Repo created:** 2026-04-25
-**Status:** Post-merge cleanup after PR #9 complete.
+**Status:** PR #14 merged to main (2026-05-19); PR #15 merged (2026-05-19); enforce_admins restored.
+
+- **COMPLETE:** `acg_extend.js` midnight-wrap guard now only rolls to tomorrow when the time gap is ≤ 60 minutes, so expired sandboxes report negative TTL instead of a wrapped next-day value; committed as `05ae7d1` (`fix(acg-extend): narrow midnight-wrap guard to 60 min so expired sandboxes report negative TTL`) and pushed to `origin/fix/acg-extend-midnight-wrap`.
+
+## Just Merged: PR #15 — Sandbox TTL Check
+
+- [x] `acg_extend.js`: add `--check` mode to probe remaining sandbox TTL without extending
+- [x] `acg.sh`: add `acg_check_ttl()` wrapper function for TTL queries
+- [x] Copilot review 2 findings: Button First click path running before flag check, help text mismatch
+- [x] Merged to main as `9c9b9b44` (2026-05-19)
+- [x] Branch protection enforce_admins re-enabled
+- [x] Retrospective: `docs/retro/2026-05-19-pr15-sandbox-ttl-check-retrospective.md`
+
+## Just Merged: PR #14 — acg_extend.js CDP disconnect hang fix
+
+- [x] `_cdpBrowser.disconnect()` in finally block to release WebSocket and prevent Node event loop hang
+- [x] Detect "Session extended" toast at startup; exit 0 if already visible instead of looping forever
+- [x] Copilot review 5 findings: memory-bank descriptions, bug spec wording clarity, "Do NOT create a PR" removed from bug docs
+- [x] Merged to main as `b7d1dd7` (2026-05-19)
+- [x] Branch protection enforce_admins re-enabled
+- [x] Retrospective: `docs/retro/2026-05-19-pr14-retrospective.md`
 
 ## Phase Status
 
@@ -75,10 +95,10 @@ Branch: `fix/post-merge-pr9-cleanup`
 - [x] Makefile, CI shellcheck, copilot-instructions, pre-commit hook
 - [x] PR #12 open: `feat/acg-multi-provider` — fix `acg_extend.js` hang on Session extended toast
 
-## In Progress: PR #12 — acg_extend.js startup toast hang fix
+## Next: Subtree pull into k3d-manager
 
-- [ ] Merge PR #12 (`feat/acg-multi-provider`) after Copilot review addressed
-- [ ] Subtree pull into k3d-manager after merge
+- k3d-manager `scripts/lib/acg/` is a git subtree of lib-acg main
+- PR #14 is now on main; subtree pull will bring in the CDP disconnect fix
 
 ## Consumed By
 

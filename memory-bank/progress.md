@@ -1,9 +1,15 @@
 # Progress — lib-acg
 
+## v0.1.0 Track — `fix/acg-extend-midnight-wrap` (active)
+
+- **MERGED PR #15:** `fix/acg-sandbox-ttl-check` → main (`9c9b9b44`). `acg_extend.js` `--check` flag + `acg_check_ttl()` in `acg.sh`. Copilot: fixed Button First click bypass + help text mismatch.
+
+- **COMPLETE:** `acg_extend.js` midnight-wrap guard now only rolls to tomorrow when the time gap is ≤ 60 minutes, so expired sandboxes report negative TTL instead of a wrapped next-day value; committed as `05ae7d1` (`fix(acg-extend): narrow midnight-wrap guard to 60 min so expired sandboxes report negative TTL`) and pushed to `origin/fix/acg-extend-midnight-wrap`.
+
 ## v0.1.0 Track (branch: `main`)
 
-- **COMPLETE:** `acg_extend.js` now exposes a `--check` mode that prints `REMAINING_MINS:<n>` without extending, and `scripts/plugins/acg.sh` now provides `acg_check_ttl()`; committed as `b2598bf` (`feat(acg): expose sandbox TTL via --check flag on acg_extend.js; add acg_check_ttl()`) and pushed to `origin/fix/acg-sandbox-ttl-check`.
-- **COMPLETE:** `acg_extend` now calls `_cdpBrowser.disconnect()` on exit instead of skipping cleanup for CDP-attached sessions, preventing the Node process from hanging after a successful extend; committed as `d5e1d07` (`fix(acg-extend): disconnect CDP browser on exit to prevent node process hang`) and pushed to `origin/docs/next-improvements`; PR: https://github.com/wilddog64/lib-acg/pull/14
+- **COMPLETE:** `acg_extend.js` now exposes a `--check` mode that prints `REMAINING_MINS:<n>` without extending, and `scripts/plugins/acg.sh` now provides `acg_check_ttl()`; merged to main as `9c9b9b44` (PR #15).
+- **COMPLETE:** `acg_extend` now calls `_cdpBrowser.disconnect()` on exit instead of skipping cleanup for CDP-attached sessions, preventing the Node process from hanging after a successful extend; merged to main as `b7d1dd7` (`fix(acg-extend): disconnect CDP browser on exit to prevent node process hang`); PR: https://github.com/wilddog64/lib-acg/pull/14
 - [x] **Repo skeleton** — COMPLETE. CLAUDE.md, README.md, package.json, placeholder
       scripts/lib/cdp.sh, scripts/plugins/acg.sh, scripts/plugins/gcp.sh, scripts/vars.sh,
       playwright/, memory-bank/.
