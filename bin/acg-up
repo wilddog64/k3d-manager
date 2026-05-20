@@ -127,6 +127,13 @@ case "${_cluster_provider}" in
       fi
     else
       acg_get_credentials ${sandbox_url:+"$sandbox_url"} || exit 1
+      _acg_sandbox_ref="${sandbox_url:-${_ACG_SANDBOX_URL:-}}"
+      if [[ -n "${_acg_sandbox_ref}" ]]; then
+        _acg_ttl_mins=$(acg_check_ttl "${_acg_sandbox_ref}" 2>/dev/null || true)
+        if [[ -n "${_acg_ttl_mins}" ]] && (( _acg_ttl_mins <= 0 )); then
+          _err "[acg-up] Sandbox has expired (TTL: ${_acg_ttl_mins}m). Delete it and create a new sandbox at ${_ACG_SANDBOX_URL}, then re-run make up."
+        fi
+      fi
       _info "[acg-up] Waiting for CloudFormation service to become accessible (up to 3 min)..."
       _cf_wait=0
       until _run_command --soft --quiet -- aws cloudformation list-stacks \
