@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status (v1.4.9 — active)
+- **COMPLETE:** lib-acg Ghost State nav fix + acg_check_ttl regression — lib-acg PR #17 (`6a69232`) merged; subtree pull (`936fea39`) restored `acg_check_ttl` in `scripts/lib/acg/scripts/plugins/acg.sh`. enforce_admins restored on lib-acg.
 - **COMPLETE:** expired sandbox auto-restart — `docs/bugs/2026-05-20-acg-up-expired-sandbox-auto-restart.md`; `bin/acg-up` calls `acg_extend_playwright` (Ghost State: Delete→Start) + re-extracts credentials when TTL ≤ 0; commit `0395cf8e`. Supersedes `5962c514` (abort-only was wrong).
 - **COMPLETE:** sandbox TTL check before provision — `docs/bugs/2026-05-19-acg-up-sandbox-ttl-check-before-provision.md`; `bin/acg-up` now checks sandbox TTL in the AWS skip-extraction path and extends when below threshold; commit `a89cc2e5` pushed to `origin/k3d-manager-v1.4.9`.
 - **COMPLETE:** Cloudflare tunnel missing Keycloak — `docs/bugs/2026-05-19-acg-up-cloudflare-tunnel-missing-keycloak.md`; `scripts/etc/cloudflared-config.yml.tmpl` added and Step 10h now generates `~/.cloudflared/config.yml` when missing or missing the keycloak ingress; commit `d8f2ca47` pushed to `origin/k3d-manager-v1.4.9`.
