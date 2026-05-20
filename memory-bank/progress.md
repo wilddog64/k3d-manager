@@ -1,7 +1,8 @@
 # Progress — k3d-manager
 
 ## Status (v1.4.9 — active)
-- **COMPLETE:** Ghost State SPA render timing fix — lib-acg PR #18 (`0b40f42`) merged; subtree pull restores fix in k3d-manager subtree.
+- **IN PROGRESS:** Ghost State Delete Sandbox still not clicking — `docs/bugs/v1.4.9-bugfix-ghost-state-delete-sandbox.md`; PR #18 `waitForFunction(aria-busy)` fix was insufficient; `waitForSelector` for sandbox card buttons needed.
+- **COMPLETE:** Ghost State SPA render timing fix (partial) — lib-acg PR #18 (`0b40f42`) merged; timeout extended 5s→30s + aria-busy wait added; but aria-busy unreliable — follow-up fix in progress.
 - **COMPLETE:** lib-acg Ghost State nav fix + acg_check_ttl regression — lib-acg PR #17 (`6a69232`) merged; subtree pull (`936fea39`) restored `acg_check_ttl` in `scripts/lib/acg/scripts/plugins/acg.sh`. enforce_admins restored on lib-acg.
 - **COMPLETE:** expired sandbox auto-restart — `docs/bugs/2026-05-20-acg-up-expired-sandbox-auto-restart.md`; `bin/acg-up` calls `acg_extend_playwright` (Ghost State: Delete→Start) + re-extracts credentials when TTL ≤ 0; commit `0395cf8e`. Supersedes `5962c514` (abort-only was wrong).
 - **COMPLETE:** sandbox TTL check before provision — `docs/bugs/2026-05-19-acg-up-sandbox-ttl-check-before-provision.md`; `bin/acg-up` now checks sandbox TTL in the AWS skip-extraction path and extends when below threshold; commit `a89cc2e5` pushed to `origin/k3d-manager-v1.4.9`.
