@@ -14,6 +14,9 @@ provider-specific credential flows (AWS, GCP). Consumed by `k3d-manager` as a gi
 - **CDP layer**: `scripts/lib/cdp.sh` — Chrome launch, session attach, port probe.
 - **Plugin scripts**: `scripts/plugins/acg.sh` (sandbox lifecycle), `scripts/plugins/gcp.sh`
   (GCP identity bridge). Public functions: no underscore prefix. Private: `_` prefix.
+  acg.sh public API: `acg_import_credentials()`, `acg_get_credentials()`, `acg_provision()`,
+  `acg_status()`, `acg_extend()`, `acg_check_ttl()`, `acg_watch()`, `acg_watch_start()`,
+  `acg_watch_stop()`, `acg_chrome_cdp_install()`, `acg_chrome_cdp_uninstall()`, `acg_teardown()`.
 - **Shared constants**: `scripts/vars.sh` — `PLAYWRIGHT_AUTH_DIR`, `PLAYWRIGHT_CDP_PORT`, URLs.
 - **Test harness**: `bin/acg-credential-test`, `bin/acg-extend-test` — CDP check + invoke
   Playwright scripts directly; no k3d-manager required.
