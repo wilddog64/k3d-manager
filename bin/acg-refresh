@@ -32,6 +32,11 @@ for arg in "$@"; do
 done
 sandbox_url="${sandbox_url:-${ACG_SANDBOX_URL:-}}"
 
+if _is_mac; then
+  _info "[acg-refresh] Pre-authorizing sudo for macOS host operations (launchd tunnel restart)..."
+  sudo -v
+fi
+
 if [[ "$login_prompt" -eq 1 ]]; then
   _acg_sandbox_url="${sandbox_url:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}"
   echo ""

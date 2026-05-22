@@ -42,6 +42,11 @@ fi
 
 _info "[acg-down] keep-hub=${_keep_hub} hub-cluster=${_HUB_CLUSTER}"
 
+if _is_mac; then
+  _info "[acg-down] Pre-authorizing sudo for macOS host operations (launchd cleanup)..."
+  sudo -v
+fi
+
 case "${_cluster_provider}" in
   k3s-aws)
     source "${REPO_ROOT}/scripts/plugins/aws.sh"

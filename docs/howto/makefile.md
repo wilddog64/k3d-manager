@@ -63,6 +63,15 @@ enabling headless credential automation without a manual browser launch.
 `make provision` is equivalent to `K3S_AWS_SSM_ENABLED=true scripts/k3d-manager acg_provision --confirm`.
 It installs the SSM plugin first via `make ssm` then provisions the full CloudFormation stack.
 
+## Host Setup
+
+| Target | When to use |
+|---|---|
+| `make sudoers` | One-time setup: install `/etc/sudoers.d/k3d-manager` so `make up/down/refresh` run without sudo password prompts |
+
+`make sudoers` delegates to `bin/install-sudoers.sh`. It validates the rules with
+`visudo -c` before installing. To remove: `bin/install-sudoers.sh --uninstall`.
+
 ---
 
 ## Help

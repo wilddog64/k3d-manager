@@ -7,7 +7,7 @@ URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL ?= 0
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-keycloak ssm provision help
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-keycloak ssm provision sudoers help
 
 ## Provision full stack: credentials → cluster → ESO → ArgoCD
 up:
@@ -95,6 +95,10 @@ ssm:
 provision: ssm
 	K3S_AWS_SSM_ENABLED=true scripts/k3d-manager acg_provision --confirm
 
+## Install passwordless sudo rules for k3d-manager macOS host operations (one-time setup)
+sudoers:
+	bin/install-sudoers.sh
+
 ## Show this help
 help:
 	@echo ""
@@ -111,6 +115,7 @@ help:
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
 	@echo "    make sync-keycloak         Patch argocd-cm + Keycloak configmap to external URL; restart pods"
+	@echo "    make sudoers               Install passwordless sudo rules (one-time macOS setup)"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
 	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
 	@echo ""
