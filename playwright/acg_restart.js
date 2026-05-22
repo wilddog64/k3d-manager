@@ -30,13 +30,13 @@ const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'prof
 
 async function _dismissExtendYourSessionDialog(page) {
   const visible = await page.evaluate(() =>
-    Array.from(document.querySelectorAll('[role="dialog"]'))
+    Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
       .some(d => (d.innerText || '').includes('Extend Your Session'))
   ).catch(() => false);
   if (!visible) return;
   console.error('INFO: "Extend Your Session" dialog detected — clicking Cancel via DOM...');
   await page.evaluate(() => {
-    const dialog = Array.from(document.querySelectorAll('[role="dialog"]'))
+    const dialog = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
       .find(d => (d.innerText || '').includes('Extend Your Session'));
     if (!dialog) return;
     const btns = Array.from(dialog.querySelectorAll('button'));
@@ -49,7 +49,7 @@ async function _dismissExtendYourSessionDialog(page) {
 
 async function _isExtendYourSessionVisible(page) {
   return page.evaluate(() =>
-    Array.from(document.querySelectorAll('[role="dialog"]'))
+    Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
       .some(d =>
         (d.innerText || '').includes('Extend Your Session') &&
         d.offsetParent !== null &&
@@ -352,12 +352,20 @@ async function restartSandbox() {
 }
 
 const TIMEOUT_MS = 240000;
-Promise.race([
-  restartSandbox(),
-  new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Script timed out after ${TIMEOUT_MS / 1000}s`)), TIMEOUT_MS)
-  )
-]).catch(err => {
-  console.error(`ERROR: ${err.message}`);
-  process.exit(1);
+let _timeoutHandle;
+const _timeoutPromise = new Promise((_, reject) => {
+  _timeoutHandle = setTimeout(
+    () => reject(new Error(`Script timed out after ${TIMEOUT_MS / 1000}s`)),
+    TIMEOUT_MS
+  );
 });
+Promise.race([restartSandbox(), _timeoutPromise])
+  .then(() => {
+    clearTimeout(_timeoutHandle);
+    process.exit(0);
+  })
+  .catch(err => {
+    clearTimeout(_timeoutHandle);
+    console.error(`ERROR: ${err.message}`);
+    process.exit(1);
+  });

@@ -9,6 +9,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `bin/acg-credential-test`: remove `2>&1` from `_extract_credentials()` so Playwright INFO/WARN/ERROR messages stream to the terminal in real time instead of being buffered until `$_tmpout` is printed
 - `bin/acg-credential-test`: add `_print_masked` helper using `sed 's/=.*/=***/'` to mask credential values in terminal output (e.g., `AWS_ACCESS_KEY_ID=***`); replace all `cat "$_tmpout" >&2` calls with `_print_masked` so key names are visible but values are never printed
 - `playwright/acg_credentials.js`: add `page.evaluate` fallback in `_waitForCredentials` when React-managed inputs return empty from `inputValue()` after CDP reconnect
+- `playwright/acg_credentials.js`: replace `EXTEND_DIALOG_BLOCKED` throw in `_waitForCredentials` with inline dismiss-and-retry loop — dialog reappears after sandbox restart and was incorrectly treated as a hard failure instead of a transient obstacle
+- `playwright/acg_credentials.js`: detect "Extend Your Session" dialog on page entry (before navigation logic) and force a hard `page.goto` reload to reset SPA timer state — React re-triggers the dialog from in-memory state after `acg_restart.js` dismisses it via DOM click, causing `acg_credentials.js` to see it again immediately on attach
+- `playwright/acg_restart.js`: add `clearTimeout` + explicit `process.exit(0)` on success — the 240s timeout timer kept the Node event loop alive after `RESTART_OK` was printed, causing `acg-credential-test` to hang indefinitely waiting for the node process to exit
+- `playwright/acg_restart.js`, `playwright/acg_credentials.js`: fix "Extend Your Session" dialog detection — Pluralsight renders it as `role="alertdialog"` (not `role="dialog"`), so all nine `querySelectorAll('[role="dialog"]')` calls silently matched nothing; updated to `[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]`
 
 ## [0.3.0] - 2026-05-21
 
