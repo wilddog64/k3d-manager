@@ -47,6 +47,10 @@ export ARGOCD_LDAP_VAULT_PATH="${ARGOCD_LDAP_VAULT_PATH:-ldap/openldap-admin}"
 export ARGOCD_LDAP_BINDDN_KEY="${ARGOCD_LDAP_BINDDN_KEY:-LDAP_BIND_DN}"
 export ARGOCD_LDAP_PASSWORD_KEY="${ARGOCD_LDAP_PASSWORD_KEY:-LDAP_ADMIN_PASSWORD}"
 
+# Keycloak OIDC integration
+export ARGOCD_KEYCLOAK_REALM_URL="${ARGOCD_KEYCLOAK_REALM_URL:-https://keycloak.3ai-talk.org/realms/shopping-cart}"
+export ARGOCD_KEYCLOAK_CLIENT_ID="${ARGOCD_KEYCLOAK_CLIENT_ID:-argocd}"
+
 # Argo CD server configuration
 export ARGOCD_SERVER_INSECURE="${ARGOCD_SERVER_INSECURE:-true}"  # Run behind Istio, so insecure=true
 export ARGOCD_SERVER_REPLICAS="${ARGOCD_SERVER_REPLICAS:-1}"
