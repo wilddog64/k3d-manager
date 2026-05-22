@@ -2,6 +2,7 @@
 
 ## Status (v1.5.0 — IN PROGRESS)
 - **ASSIGNED TO CODEX:** Passwordless sudo — spec `docs/plans/v1.5.0-sudo-passwordless.md`; 7 files: `bin/install-sudoers.sh` (new), prewarm in 3 bin scripts, Makefile `sudoers` target, howto doc, BATS test; commit message: `feat(sudo): passwordless sudo rules + prewarm for macOS host operations`
+- **COMPLETE:** Passwordless sudo rules + macOS host-operation prewarm implemented on `k3d-manager-v1.5.0`; committed as `0cbb1d89` (`feat(sudo): passwordless sudo rules + prewarm for macOS host operations`) and pushed to `origin/k3d-manager-v1.5.0`. Validation used `shellcheck -x bin/install-sudoers.sh`, `bats scripts/tests/test_install_sudoers.bats`, and the staged repo audit.
 
 ## Status (v1.4.9 — RELEASED 2026-05-22)
 - **RELEASED:** k3d-manager v1.4.9 — PR #79 merged to main (SHA `160a5edbac565ffc2a76a00b89bc7d1a3ac8735e`); enforce_admins restoration deferred (API endpoint pending); next branch: `k3d-manager-v1.5.0`; v1.4.9 retrospective committed `e1bf78fb` on k3d-manager-v1.5.0; v1.4.9 release row added to README + docs/releases.md

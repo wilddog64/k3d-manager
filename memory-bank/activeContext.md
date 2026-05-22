@@ -2,6 +2,7 @@
 
 ## Current Status (Post-Merge 2026-05-22 — k3d-manager PR #79 housekeeping complete)
 - Current branch: `k3d-manager-v1.5.0` (created from k3d-manager PR #79 merge SHA `160a5edbac565ffc2a76a00b89bc7d1a3ac8735e`)
+- **COMPLETE:** Passwordless sudo rules + macOS host-operation prewarm landed for `bin/acg-up`, `bin/acg-down`, `bin/acg-refresh`, `Makefile`, `docs/howto/makefile.md`, and `bin/install-sudoers.sh`; committed as `0cbb1d89` (`feat(sudo): passwordless sudo rules + prewarm for macOS host operations`) and pushed to `origin/k3d-manager-v1.5.0`.
 - **POST-MERGE v1.4.9 COMPLETE:** v1.4.9 tag created + pushed ✓, next branch `k3d-manager-v1.5.0` created ✓, retrospective committed (`e1bf78fb`) ✓, README releases table + `docs/releases.md` added (`ed343d17`) ✓, enforce_admins restoration deferred (API endpoint issue) ⏸, memory-bank updating (in progress)
 - **POST-MERGE shopping-cart-frontend PR #17 COMPLETE:** enforce_admins restored ✓, `docs/next-improvements` branch synced ✓, retrospective committed (`31f8c4e`) ✓, README releases table + `docs/releases.md` added (`2e11026`) ✓, memory-bank updated ✓
 - **COMPLETE:** sandbox TTL check before provision now runs in the AWS skip-extraction path and extends the sandbox when remaining time is below threshold; committed as `a89cc2e5` (`fix(acg-up): check sandbox TTL before provisioning; extend if below threshold`) and pushed to `origin/k3d-manager-v1.4.9`.
