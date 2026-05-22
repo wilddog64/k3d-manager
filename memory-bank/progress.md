@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status (v1.4.9 — active)
+- **COMPLETE:** shopping-cart-frontend PR #17 post-merge — fix/vite-keycloak-url merged to main (SHA `41fb0751`); enforce_admins restored; `docs/next-improvements` branch created; retrospective committed `31f8c4e`; README releases table + `docs/releases.md` added (`2e11026`); all pushed to origin.
 - **COMPLETE:** Ghost State Delete Sandbox — `--force-restart` flag added to `acg_extend.js` + arg pass-through in `acg.sh` + `elif` branch in `bin/acg-up` detects invalid creds on running sandbox and calls force-restart; lib-acg commit `f5bc18d` on `fix/ghost-state-waitForSelector` + k3d-manager commit `92c438ca` on `k3d-manager-v1.4.9`; both pushed to origin.
 - **COMPLETE:** Ghost State SPA render timing fix (partial) — lib-acg PR #18 (`0b40f42`) merged; timeout extended 5s→30s + aria-busy wait added; but aria-busy unreliable — follow-up fix in progress.
 - **COMPLETE:** lib-acg Ghost State nav fix + acg_check_ttl regression — lib-acg PR #17 (`6a69232`) merged; subtree pull (`936fea39`) restored `acg_check_ttl` in `scripts/lib/acg/scripts/plugins/acg.sh`. enforce_admins restored on lib-acg.
