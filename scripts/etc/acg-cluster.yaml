@@ -6,7 +6,6 @@ Parameters:
     Type: String
   AllowedCidr:
     Type: String
-    Default: 0.0.0.0/0
   InstanceType:
     Type: String
     Default: t3.medium
@@ -65,7 +64,7 @@ Resources:
   SSMInstanceRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: k3d-manager-ssm-role
+      RoleName: !Sub "${AWS::StackName}-ssm-role"
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -79,7 +78,7 @@ Resources:
   SSMInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
-      InstanceProfileName: k3d-manager-ssm-profile
+      InstanceProfileName: !Sub "${AWS::StackName}-ssm-profile"
       Roles:
         - !Ref SSMInstanceRole
 

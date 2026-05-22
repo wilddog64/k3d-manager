@@ -128,11 +128,18 @@ _acg_cf_deploy() {
   _run_command --soft -- aws ec2 import-key-pair --region "${ACG_REGION}" --key-name "${_ACG_KEY_NAME}" \
     --public-key-material "fileb://${_ACG_KEY_PEM%.pem}.pub" >/dev/null 2>&1
 
+  local _cfn_template="${ACG_CLUSTER_TEMPLATE:-${_LIB_ACG_ROOT}/scripts/etc/acg-cluster.yaml}"
+  if [[ ! -f "${_cfn_template}" ]]; then
+    _err "[acg] CloudFormation template not found: ${_cfn_template}" \
+         "(set ACG_CLUSTER_TEMPLATE to a valid path)"
+    return 1
+  fi
+
   _info "[acg] Deploying CloudFormation stack ${_ACG_CF_STACK_NAME} (3 nodes in parallel)..."
   _run_command -- aws cloudformation deploy \
     --region "${ACG_REGION}" \
     --stack-name "${_ACG_CF_STACK_NAME}" \
-    --template-file "${_LIB_ACG_ROOT}/scripts/etc/acg-cluster.yaml" \
+    --template-file "${_cfn_template}" \
     --parameter-overrides \
       "KeyName=${_ACG_KEY_NAME}" \
       "AllowedCidr=${ACG_ALLOWED_CIDR}" \
