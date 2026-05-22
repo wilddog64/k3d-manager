@@ -47,11 +47,6 @@ case "${_cluster_provider}" in
     ;;
 esac
 
-if _is_mac; then
-  _info "[acg-up] Pre-authorizing sudo for macOS host operations (launchd, keychain)..."
-  sudo -v
-fi
-
 function _argocd_open_browser_url() {
   local url="$1"
 
@@ -270,12 +265,7 @@ for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
   if [[ "${_current_host_entry}" != "${_desired_host_entry}" ]]; then
     _info "[acg-up] Updating /etc/hosts for ${_h} → ${_desired_ip} (requires sudo)..."
     if _run_command --interactive-sudo --soft -- \
-        sh -c "set -e
-tmp=\$(mktemp)
-grep -vE '^[0-9.]+[[:space:]]+${_h//./\\.}$' /etc/hosts > \"\$tmp\"
-printf '%s\n' '${_desired_host_entry}' >> \"\$tmp\"
-cat \"\$tmp\" > /etc/hosts
-rm -f \"\$tmp\""; then
+        /usr/local/bin/k3d-manager-update-hosts "$_h" "$_desired_ip"; then
       _info "[acg-up] /etc/hosts: ${_h} → ${_desired_ip}"
     else
       _warn "could not update /etc/hosts for ${_h} — please add manually: ${_desired_host_entry}"

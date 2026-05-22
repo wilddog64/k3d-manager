@@ -35,6 +35,9 @@ Defaults:%admin  timestamp_timeout=60
 %admin  ALL=(root) NOPASSWD: /usr/bin/install -m 644 * /Library/LaunchDaemons/com.k3d-manager.*.plist
 %admin  ALL=(root) NOPASSWD: /bin/rm -f /Library/LaunchDaemons/com.k3d-manager.*.plist *
 
+# /etc/hosts management — scoped helper only (no bare sh -c wildcard)
+%admin  ALL=(root) NOPASSWD: /usr/local/bin/k3d-manager-update-hosts *
+
 # Binary install to /usr/local/bin (k3s, kubectl, istioctl, vcluster, etc.)
 %admin  ALL=(root) NOPASSWD: /usr/bin/install -m [0-9][0-9][0-9] * /usr/local/bin/*
 %admin  ALL=(root) NOPASSWD: /bin/cp * /usr/local/bin/*
@@ -82,6 +85,10 @@ case "$_mode" in
     else
       echo "[install-sudoers] $_SUDOERS_FILE not present — nothing to remove"
     fi
+    if [[ -f /usr/local/bin/k3d-manager-update-hosts ]]; then
+      _run_command --interactive-sudo -- rm -f /usr/local/bin/k3d-manager-update-hosts
+      echo "[install-sudoers] Removed /usr/local/bin/k3d-manager-update-hosts"
+    fi
     ;;
   dry-run)
     echo "[install-sudoers] Would install to $_SUDOERS_FILE:"
@@ -102,9 +109,12 @@ case "$_mode" in
       echo "[install-sudoers] ERROR: sudoers syntax check failed — aborting" >&2
       exit 1
     fi
+    _run_command --interactive-sudo -- install -m 0755 \
+      "${REPO_ROOT}/bin/update-hosts-entry.sh" /usr/local/bin/k3d-manager-update-hosts
     _run_command --interactive-sudo -- install -m 0440 "$_tmpfile" "$_SUDOERS_FILE"
     rm -f "$_tmpfile"
     echo "[install-sudoers] Installed $_SUDOERS_FILE"
+    echo "[install-sudoers] Installed /usr/local/bin/k3d-manager-update-hosts"
     echo "[install-sudoers] Verify: admin rule listing should show launchctl, security, and k3d-manager"
     ;;
 esac
