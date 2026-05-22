@@ -120,8 +120,6 @@ See **[docs/providers/](docs/providers/)** for per-provider guides:
 
 ## Architecture
 
-![k3d-manager Framework](docs/architecture/k3d-framework.png)
-
 ```mermaid
 graph TD
   U[User CLI] --> KM[./scripts/k3d-manager]
