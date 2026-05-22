@@ -59,3 +59,19 @@ export ACG_CLUSTER_TEMPLATE="${ACG_CLUSTER_TEMPLATE:-${_k3dm_root}/scripts/etc/a
 value = await inputs.first().evaluate(el => el.value || '').catch(() => '');
 ```
 `element.evaluate()` is functionally equivalent to `page.evaluate()` scoped to the element. CHANGELOG entry is accurate — no fix needed.
+
+---
+
+## Finding 7 — package-lock.json version mismatch (DEFERRED to lib-acg)
+
+**File:** `scripts/lib/acg/package-lock.json:16` (subtree)
+**Finding:** `package-lock.json` declares root package `version` as `0.1.0` (both top-level and `packages[""].version`), while `package.json` declares `0.2.0`. Lockfile must be regenerated or edited to match.
+**Action:** Fix upstream in lib-acg: run `npm install` to regenerate the lockfile after aligning `package.json` version.
+
+---
+
+## Finding 8 — dismiss.click() in page.evaluate() may not trigger React handlers (DEFERRED to lib-acg)
+
+**File:** `scripts/lib/acg/playwright/acg_credentials.js:406` (subtree)
+**Finding:** The "Extend Your Session" dialog dismissal uses `dismiss.click()` inside `page.evaluate()`. For React-managed components, `click()` may not fire synthetic event handlers. The restart flow already uses `dispatchEvent(new MouseEvent('click', { bubbles: true }))` — the same pattern should be applied here for consistency and reliability.
+**Action:** Fix upstream in lib-acg: replace `dismiss.click()` with `dismiss.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))` inside the `page.evaluate()` callback.
