@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+- `scripts/lib/acg/scripts/etc/acg-cluster.yaml`: restore CloudFormation template removed from lib-acg in v0.2.0 without updating the `_LIB_ACG_ROOT/scripts/etc/acg-cluster.yaml` reference — broke `make up` with `Invalid template path`
+- `scripts/etc/agent/hardcoded-ip-allowlist`: add subtree copy of `acg-cluster.yaml` to bypass IP literal check for CloudFormation CIDR blocks
+
+### Added
 - `bin/acg-up`: check sandbox TTL before provisioning and extend if below threshold
 - `bin/acg-up`: patch CoreDNS NodeHosts instead of injecting a duplicate hosts block into CoreDNS Corefile
 - `bin/acg-up`: generate cloudflared config from template and add keycloak to the Cloudflare tunnel
