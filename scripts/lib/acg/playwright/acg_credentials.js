@@ -442,7 +442,10 @@ async function extractCredentials() {
           }
           const inputs = page.locator('input[aria-label="Copyable input"]');
           if (await inputs.count() > 0) {
-            const value = await inputs.first().inputValue().catch(() => '');
+            let value = await inputs.first().inputValue().catch(() => '');
+            if (!value.trim()) {
+              value = await inputs.first().evaluate(el => el.value || '').catch(() => '');
+            }
             if (value.trim().length > 0) {
               return;
             }
