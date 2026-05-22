@@ -1,5 +1,8 @@
 # Progress — k3d-manager
 
+## Status (v1.5.0 — IN PROGRESS)
+- **ASSIGNED TO CODEX:** Passwordless sudo — spec `docs/plans/v1.5.0-sudo-passwordless.md`; 7 files: `bin/install-sudoers.sh` (new), prewarm in 3 bin scripts, Makefile `sudoers` target, howto doc, BATS test; commit message: `feat(sudo): passwordless sudo rules + prewarm for macOS host operations`
+
 ## Status (v1.4.9 — RELEASED 2026-05-22)
 - **RELEASED:** k3d-manager v1.4.9 — PR #79 merged to main (SHA `160a5edbac565ffc2a76a00b89bc7d1a3ac8735e`); enforce_admins restoration deferred (API endpoint pending); next branch: `k3d-manager-v1.5.0`; v1.4.9 retrospective committed `e1bf78fb` on k3d-manager-v1.5.0; v1.4.9 release row added to README + docs/releases.md
 - **PENDING (next release cycle):** Node.js 20 → 22 upgrade across all shopping-cart CI workflows — GitHub Actions deprecated Node.js 20 runner; `node-version: '20'` must be bumped to `'22'` in all jobs in all shopping-cart repos (`frontend`, `basket`, `order`, `payment`, `product-catalog`); issue doc at `shopping-cart-frontend/docs/issues/2026-05-22-nodejs20-deprecation.md` (commit `e6cde03` on `docs/next-improvements`); also consider adding `NODE_VERSION` to workflow-level `env:` block and referencing everywhere.

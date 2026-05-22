@@ -36,6 +36,9 @@
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
+## In Progress (v1.5.0)
+- **ASSIGNED TO CODEX:** Passwordless sudo for macOS host operations — spec: `docs/plans/v1.5.0-sudo-passwordless.md` (commit `01d27232` on `k3d-manager-v1.5.0`); deliverables: `bin/install-sudoers.sh` (new), `sudo -v` prewarm in `bin/acg-up/down/refresh`, `Makefile` `sudoers` target, `docs/howto/makefile.md` Host Setup section, `scripts/tests/test_install_sudoers.bats`; commit message: `feat(sudo): passwordless sudo rules + prewarm for macOS host operations`
+
 ## Pending — Next Release Cycle
 - **Node.js 20 → 22:** All shopping-cart CI workflows use `node-version: '20'`; GitHub Actions has deprecated Node.js 20 runner. Bump to `'22'` in all 5 repos. Issue doc: `shopping-cart-frontend/docs/issues/2026-05-22-nodejs20-deprecation.md`. Write one Codex spec covering all repos, single-pass.
 
