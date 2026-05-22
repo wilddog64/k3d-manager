@@ -11,7 +11,7 @@ _acg_stub_load() {
     _k3dm_root="$(cd -P "$(dirname "${BASH_SOURCE[0]}")/../.." >/dev/null 2>&1 && pwd)"
   fi
 
-  export ACG_CLUSTER_TEMPLATE="${_k3dm_root}/scripts/etc/acg-cluster.yaml"
+  export ACG_CLUSTER_TEMPLATE="${ACG_CLUSTER_TEMPLATE:-${_k3dm_root}/scripts/etc/acg-cluster.yaml}"
   # shellcheck source=/dev/null
   source "${_k3dm_root}/scripts/plugins/aws.sh"
   # shellcheck source=/dev/null
