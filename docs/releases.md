@@ -2,6 +2,7 @@
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.4.9](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.9) | 2026-05-22 | ACG credential wait + extraction visibility fixes — sandbox TTL polling before provision, auto-extend before expiry, auto-restart expired; Cloudflare tunnel named config generation; CoreDNS duplicate `hosts` block patching; CloudFormation race condition polling after credential extraction |
 | [v1.4.8](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.8) | 2026-05-19 | vault.sh temp file leak fixes, acg_extend.js CDP disconnect hang, Keycloak frontendUrl + named Cloudflare tunnel in acg-up |
 | [v1.4.7](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.7) | 2026-05-18 | Keycloak public URL via Cloudflare + CoreDNS — `frontendUrl` set to Cloudflare domain after realm import; SSH tunnel + iptables DNAT + CoreDNS patch for cross-cluster Keycloak reachability |
 | [v1.4.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.4) | 2026-05-08 | Identity SSO fixes — Keycloak ExternalSecret bootstrapping, Keycloak KV seeding, shopping-cart-identity ArgoCD app, shopping-cart-infra OIDC realm; lib-foundation + lib-acg subtree pulls |
