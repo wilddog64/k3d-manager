@@ -27,6 +27,7 @@ make up URL=https://...      # provision with explicit sandbox URL
 |---|---|
 | `make sync-apps` | Sync `rollout-demo-default` in ArgoCD and show remote pod status |
 | `make argocd-registration` | Re-register the app cluster with ArgoCD after sandbox recreation or IP change |
+| `make sync-keycloak` | Patch `argocd-cm` configmap + sync `shopping-cart-identity` to fix Keycloak OIDC issuer URL |
 
 `sync-apps` delegates to `bin/acg-sync-apps` which manages the argocd-server port-forward
 automatically (reuses an existing one, starts a new one if needed).
@@ -79,6 +80,7 @@ make         # same as make help (DEFAULT_GOAL)
 |---|---|---|
 | `URL` | `https://app.pluralsight.com/cloud-playground/cloud-sandboxes` | Sandbox URL passed to `bin/acg-up` and `bin/acg-refresh` |
 | `GHCR_PAT` | `$(gh auth token)` | GitHub Container Registry token — used by `acg-up` to create the `ghcr-pull-secret` |
+| `KEEP_LOCAL` | `0` | Set to `1` to preserve the local Hub cluster when running `make down` |
 
 Set `GHCR_PAT` before running `make up`:
 

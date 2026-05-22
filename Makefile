@@ -7,7 +7,7 @@ URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL ?= 0
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision help
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-keycloak ssm provision help
 
 ## Provision full stack: credentials → cluster → ESO → ArgoCD
 up:
@@ -74,6 +74,10 @@ argocd-registration:
 sync-apps:
 	APP_CONTEXT=$(if $(filter k3s-gcp,$(CLUSTER_PROVIDER)),ubuntu-gcp,ubuntu-k3s) bin/acg-sync-apps
 
+## Patch argocd-cm + sync shopping-cart-identity via ArgoCD to fix Keycloak OIDC issuer
+sync-keycloak:
+	bin/sync-keycloak
+
 ## Ensure AWS Session Manager plugin is installed (required for SSM-based deployment)
 ssm:
 	@if command -v session-manager-plugin >/dev/null 2>&1; then \
@@ -106,6 +110,7 @@ help:
 	@echo "    make chrome-cdp-stop   Uninstall Chrome CDP launchd agent"
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
+	@echo "    make sync-keycloak         Patch argocd-cm + Keycloak configmap to external URL; restart pods"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
 	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
 	@echo ""
