@@ -1,13 +1,18 @@
 # Active Context — lib-acg
 
-## Current Branch: `fix/acg-extend-midnight-wrap`
+## Current Branch: `fix/stale-cred-restart`
 
 - **COMPLETE:** `acg_extend.js` now exposes a `--check` mode that prints `REMAINING_MINS:<n>` without extending, and `scripts/plugins/acg.sh` now provides `acg_check_ttl()`; committed as `b2598bf` (`feat(acg): expose sandbox TTL via --check flag on acg_extend.js; add acg_check_ttl()`) and pushed to `origin/fix/acg-sandbox-ttl-check`.
 - **COMPLETE:** `acg_extend` now calls `_cdpBrowser.disconnect()` on exit instead of skipping cleanup for CDP-attached sessions, preventing the Node process from hanging after a successful extend; committed as `d5e1d07` (`fix(acg-extend): disconnect CDP browser on exit to prevent node process hang`) and pushed to `origin/docs/next-improvements`; PR: https://github.com/wilddog64/lib-acg/pull/14
+- **COMPLETE:** `playwright/acg_credentials.js` now scopes the GCP credential visibility check and GCP input extraction to the Google Cloud provider card, and `playwright/acg_restart.js` now wraps `_cdpBrowser.disconnect()` in `try/catch`; committed as `b3195c3` (`fix(acg-credentials): scope GCP extraction to provider card; fix restart disconnect TypeError`) and pushed to `origin/fix/stale-cred-restart`.
+- **COMPLETE:** `playwright/acg_credentials.js` now reduces the provider-label DOM walk depth from 12 to 6, `playwright/acg_restart.js` now scopes Start Sandbox selection to the active provider card and uses provider-specific delete-confirmation text, and `bin/acg-credential-test` forwards `--provider` through restart; committed as `fc7b5e9` (`fix(acg-credentials): reduce DOM walk depth; provider-scope restart Start Sandbox`) and pushed to `origin/fix/stale-cred-restart`.
+- **COMPLETE:** `playwright/acg_credentials.js` now provider-scopes Open/Start button lookup and `_waitForCredentials` to the active provider card; committed as `ed054a6` (`fix(acg-credentials): provider-scope Open/Start buttons and waitForCredentials`) and pushed to `origin/fix/stale-cred-restart`.
 **Repo created:** 2026-04-25
 **Status:** PR #14 merged to main (2026-05-19); PR #15 merged (2026-05-19); enforce_admins restored.
 
 - **COMPLETE:** `acg_extend.js` midnight-wrap guard now only rolls to tomorrow when the time gap is ≤ 60 minutes, so expired sandboxes report negative TTL instead of a wrapped next-day value; committed as `05ae7d1` (`fix(acg-extend): narrow midnight-wrap guard to 60 min so expired sandboxes report negative TTL`) and pushed to `origin/fix/acg-extend-midnight-wrap`.
+
+- **COMPLETE:** `acg_extend.js` provider-scoped Open Sandbox selection now prefers the provider-specific heap id (`AWS Sandbox`, `Azure Sandbox`, `Google Cloud Sandbox`) and `bin/acg-extend-test` requires an existing CDP session so validation cannot spawn a second Chrome; `scripts/etc/acg-cluster.yaml` removed from lib-acg; committed as `80df13d` (`fix(acg-extend): provider-scoped button selection; remove misplaced CFn template`) and pushed to `origin/fix/stale-cred-restart`. Validation used `node --check playwright/acg_extend.js`, `shellcheck bin/acg-extend-test`, and a direct CDP websocket probe against the live page because Playwright's browser-level CDP attach failed on Chrome 147 (`Browser.setDownloadBehavior` unsupported). Issue doc: `docs/issues/2026-05-21-acg-extend-cdp-attach-fails-on-chrome-147.md`.
 
 ## Just Merged: PR #15 — Sandbox TTL Check
 
@@ -94,6 +99,13 @@ Branch: `fix/post-merge-pr9-cleanup`
 - [x] `playwright/acg_credentials.js`: Extend Your Session dialog — bringToFront+Enter WARN fallback
 - [x] Makefile, CI shellcheck, copilot-instructions, pre-commit hook
 - [x] PR #12 open: `feat/acg-multi-provider` — fix `acg_extend.js` hang on Session extended toast
+
+## In Progress: v0.2.0 pre-PR bugfixes — branch `fix/stale-cred-restart`
+
+- [x] **extend provider scope + CFn template removal** — COMPLETE. Spec: `docs/plans/v0.2.0-bugfix-extend-provider-scope.md`. Committed as `80df13d` and pushed to `origin/fix/stale-cred-restart`.
+  - `acg_extend.js`: add `--provider` arg, scope button lookup to provider card (no more `.first()`), fix `--check` positional detection, and prefer provider-specific heap ids for the Open Sandbox path
+  - `bin/acg-extend-test`: require an existing CDP session so validation does not launch a second Chrome
+  - `scripts/etc/acg-cluster.yaml`: deleted from lib-acg (CFn template belongs in k3d-manager)
 
 ## Next: Subtree pull into k3d-manager
 

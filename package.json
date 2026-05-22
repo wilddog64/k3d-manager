@@ -1,12 +1,16 @@
 {
   "name": "lib-acg",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "ACG browser automation — Chrome CDP, Playwright, credential extraction",
   "private": true,
   "scripts": {
-    "check": "node --check playwright/*.js"
+    "check": "node --check playwright/*.js",
+    "test": "npx playwright test"
   },
   "dependencies": {
     "playwright": "^1.58.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
   }
 }
