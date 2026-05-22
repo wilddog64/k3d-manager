@@ -36,6 +36,9 @@
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
+## Pending — Next Release Cycle
+- **Node.js 20 → 22:** All shopping-cart CI workflows use `node-version: '20'`; GitHub Actions has deprecated Node.js 20 runner. Bump to `'22'` in all 5 repos. Issue doc: `shopping-cart-frontend/docs/issues/2026-05-22-nodejs20-deprecation.md`. Write one Codex spec covering all repos, single-pass.
+
 ## In Progress (v1.4.9)
 - **IN PROGRESS:** acg-cluster.yaml subtree path restoration — lib-acg v0.2.0 removed `scripts/etc/acg-cluster.yaml` (CloudFormation template) without updating the reference in `acg.sh` (`_LIB_ACG_ROOT/scripts/etc/acg-cluster.yaml`), breaking `make up` with `Invalid template path`. Restored at subtree path `scripts/lib/acg/scripts/etc/acg-cluster.yaml` in k3d-manager; added to hardcoded-ip-allowlist for pre-commit IP literal check. CHANGELOG updated; PR to be created.
 - **COMPLETE:** lib-acg PR #19 merged (`7a31eaf`) — docs/copilot-pr18-findings → main; 6 Copilot doc accuracy findings addressed (spec doc files header, Rules section, DoD memory-bank checkboxes, What NOT to Do); Apache 2.0 LICENSE added to lib-acg. enforce_admins restored on lib-acg main. lib-acg next branch: `docs/next-improvements` (commit `9262547`).
