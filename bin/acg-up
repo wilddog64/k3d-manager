@@ -126,39 +126,10 @@ case "${_cluster_provider}" in
         fi
       fi
     else
-      acg_get_credentials ${sandbox_url:+"$sandbox_url"} || exit 1
-      _acg_sandbox_ref="${sandbox_url:-${_ACG_SANDBOX_URL:-}}"
-      if [[ -n "${_acg_sandbox_ref}" ]]; then
-        _acg_ttl_mins=$(acg_check_ttl "${_acg_sandbox_ref}" 2>/dev/null || true)
-        if [[ -n "${_acg_ttl_mins}" ]] && (( _acg_ttl_mins <= 0 )); then
-          _info "[acg-up] Sandbox has expired (TTL: ${_acg_ttl_mins}m) — deleting and starting a new one..."
-          acg_extend_playwright "${_acg_sandbox_ref}" || \
-            _err "[acg-up] Failed to restart expired sandbox — delete it manually and re-run make up."
-          _info "[acg-up] New sandbox started — re-extracting credentials..."
-          acg_get_credentials ${sandbox_url:+"$sandbox_url"} || exit 1
-        elif ! _run_command --soft --quiet -- aws sts get-caller-identity \
-            --region "${ACG_REGION:-us-west-2}" >/dev/null 2>&1; then
-          _info "[acg-up] Credentials invalid despite running sandbox (TTL: ${_acg_ttl_mins:-unknown}m) — force-restarting sandbox..."
-          acg_extend_playwright "${_acg_sandbox_ref}" --force-restart || \
-            _err "[acg-up] Failed to force-restart sandbox — delete it manually and re-run make up."
-          _info "[acg-up] Sandbox restarted — re-extracting credentials..."
-          acg_get_credentials ${sandbox_url:+"$sandbox_url"} || exit 1
-        fi
-      fi
-      _info "[acg-up] Waiting for AWS credentials to become valid (up to 10 min)..."
-      _cf_wait=0
-      until _run_command --soft --quiet -- aws sts get-caller-identity \
-          --region "${ACG_REGION:-us-west-2}" >/dev/null 2>&1; do
-        _cf_wait=$(( _cf_wait + 1 ))
-        if (( _cf_wait > 40 )); then
-          printf 'ERROR: %s\n' \
-            "[acg-up] AWS credentials not valid after $(( 40 * 15 ))s — check credentials" >&2
-          exit 1
-        fi
-        _info "[acg-up] ... credentials not yet valid (attempt ${_cf_wait}/40) — sleeping 15s"
-        sleep 15
-      done
-      _info "[acg-up] AWS credentials valid."
+      _acg_cred_test_url="${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
+      _info "[acg-up] Extracting and validating AWS credentials (will restart sandbox on ghost-state failure)..."
+      "${REPO_ROOT}/scripts/lib/acg/bin/acg-credential-test" "${_acg_cred_test_url}" || exit 1
+      _info "[acg-up] AWS credentials extracted and validated."
     fi
     ;;
   k3s-gcp)
