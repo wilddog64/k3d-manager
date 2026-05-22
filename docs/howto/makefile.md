@@ -27,7 +27,6 @@ make up URL=https://...      # provision with explicit sandbox URL
 |---|---|
 | `make sync-apps` | Sync `rollout-demo-default` in ArgoCD and show remote pod status |
 | `make argocd-registration` | Re-register the app cluster with ArgoCD after sandbox recreation or IP change |
-| `make sync-keycloak` | Patch `argocd-cm` configmap + sync `shopping-cart-identity` to fix Keycloak OIDC issuer URL |
 
 `sync-apps` delegates to `bin/acg-sync-apps` which manages the argocd-server port-forward
 automatically (reuses an existing one, starts a new one if needed).
@@ -67,10 +66,12 @@ It installs the SSM plugin first via `make ssm` then provisions the full CloudFo
 
 | Target | When to use |
 |---|---|
-| `make sudoers` | One-time setup: install `/etc/sudoers.d/k3d-manager` so `make up/down/refresh` run without sudo password prompts |
+| `make install-sudoers` | One-time setup: install `/etc/sudoers.d/k3d-manager` and the `/etc/hosts` helper so `make up/down/refresh` run without sudo password prompts |
 
-`make sudoers` delegates to `bin/install-sudoers.sh`. It validates the rules with
-`visudo -c` before installing. To remove: `bin/install-sudoers.sh --uninstall`.
+`make install-sudoers` delegates to `bin/install-sudoers.sh`. It validates the rules with
+`visudo -c` before installing, and copies `bin/update-hosts-entry.sh` to
+`/usr/local/bin/k3d-manager-update-hosts`. `make sudoers` is a backward-compatible alias.
+To remove: `bin/install-sudoers.sh --uninstall`.
 
 ---
 
