@@ -128,11 +128,18 @@ _acg_cf_deploy() {
   _run_command --soft -- aws ec2 import-key-pair --region "${ACG_REGION}" --key-name "${_ACG_KEY_NAME}" \
     --public-key-material "fileb://${_ACG_KEY_PEM%.pem}.pub" >/dev/null 2>&1
 
+  local _cfn_template="${ACG_CLUSTER_TEMPLATE:-${_LIB_ACG_ROOT}/scripts/etc/acg-cluster.yaml}"
+  if [[ ! -f "${_cfn_template}" ]]; then
+    _err "[acg] CloudFormation template not found: ${_cfn_template}" \
+         "(set ACG_CLUSTER_TEMPLATE to a valid path)"
+    return 1
+  fi
+
   _info "[acg] Deploying CloudFormation stack ${_ACG_CF_STACK_NAME} (3 nodes in parallel)..."
   _run_command -- aws cloudformation deploy \
     --region "${ACG_REGION}" \
     --stack-name "${_ACG_CF_STACK_NAME}" \
-    --template-file "${_LIB_ACG_ROOT}/scripts/etc/acg-cluster.yaml" \
+    --template-file "${_cfn_template}" \
     --parameter-overrides \
       "KeyName=${_ACG_KEY_NAME}" \
       "AllowedCidr=${ACG_ALLOWED_CIDR}" \
@@ -426,6 +433,31 @@ _acg_extend_playwright() {
   fi
 
   echo "$output"
+}
+
+function acg_check_ttl() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'HELP'
+Usage: acg_check_ttl <sandbox_url>
+
+Read the ACG sandbox auto-shutdown timestamp via Playwright and print the
+remaining minutes to stdout as a plain integer, or -1 if unparseable.
+HELP
+    return 0
+  fi
+  local sandbox_url="${1:?usage: acg_check_ttl <sandbox_url>}"
+  local playwright_script="${_LIB_ACG_ROOT}/playwright/acg_extend.js"
+  if ! command -v node >/dev/null 2>&1; then
+    _err "[acg] node is required — install Node.js"
+  fi
+  local output exit_code
+  output=$(node "$playwright_script" "$sandbox_url" --check 2>/dev/null)
+  exit_code=$?
+  if [[ $exit_code -ne 0 ]]; then
+    _warn "[acg] acg_check_ttl: node exited $exit_code"
+    return 1
+  fi
+  printf '%s\n' "$output" | grep '^REMAINING_MINS:' | cut -d: -f2
 }
 
 function acg_extend_playwright() {

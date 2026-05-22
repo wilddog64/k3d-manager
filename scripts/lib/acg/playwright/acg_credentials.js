@@ -240,6 +240,22 @@ async function extractCredentials() {
       console.error(`INFO: Found existing sandbox tab: ${page.url()}`);
     }
 
+    // If "Extend Your Session" dialog is blocking on entry, force a fresh page load to
+    // reset SPA timer state — this dialog re-triggers from React after a sandbox restart
+    // even when acg_restart.js already dismissed it via DOM click.
+    const _entryExtendDialog = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
+        .some(d => (d.innerText || '').includes('Extend Your Session') && d.offsetParent !== null)
+    ).catch(() => false);
+    if (_entryExtendDialog) {
+      console.error('INFO: "Extend Your Session" dialog on entry — reloading page to clear SPA state...');
+      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await page.waitForFunction(
+        () => !document.querySelector('[aria-busy="true"]'),
+        { timeout: 15000 }
+      ).catch(() => {});
+    }
+
     // Skip navigation entirely if sandbox panel is already loaded on the current page
     const _sandboxReady = await page.locator(
       'button:has-text("Start Sandbox"), input[aria-label="Copyable input"]'
@@ -355,7 +371,7 @@ async function extractCredentials() {
           const hasResume = buttons.some(b => b.textContent.trim().includes('Resume'));
           const inputs = document.querySelectorAll('input[aria-label="Copyable input"]');
           const hasCredentials = inputs.length > 0 && inputs[0].value.trim().length > 0;
-          const hasExtendDialog = Array.from(document.querySelectorAll('[role="dialog"]'))
+          const hasExtendDialog = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
             .some(d => (d.innerText || '').includes('Extend Your Session'));
           return hasStart || hasOpen || hasResume || hasCredentials || hasExtendDialog;
         }, null, { timeout });
@@ -372,21 +388,30 @@ async function extractCredentials() {
 
       const _dismissExtendYourSessionDialog = async () => {
         const _dialogVisible = await page.evaluate(() =>
-          Array.from(document.querySelectorAll('[role="dialog"]'))
+          Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
             .some(d => (d.innerText || '').includes('Extend Your Session'))
         ).catch(() => false);
         if (!_dialogVisible) return;
-        console.error('INFO: "Extend Your Session" dialog detected — activating tab and pressing Enter on focused close button...');
-        await page.bringToFront();
-        await page.keyboard.press('Enter').catch(() => {});
+        console.error('INFO: "Extend Your Session" dialog detected — clicking Cancel via DOM...');
+        // Use DOM click (not Playwright keyboard) — Escape closes the panel, not just the dialog
+        await page.evaluate(() => {
+          const dialog = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
+            .find(d => (d.innerText || '').includes('Extend Your Session'));
+          if (!dialog) return;
+          const btns = Array.from(dialog.querySelectorAll('button'));
+          // Prefer Cancel/close button; fall back to any non-Extend button
+          const dismiss = btns.find(b => /cancel|no thanks|close|dismiss/i.test(b.textContent || b.getAttribute('aria-label') || ''))
+            || btns.find(b => !/extend/i.test(b.textContent || ''));
+          if (dismiss) dismiss.click();
+        }).catch(() => {});
         await page.waitForTimeout(1000);
         const _dialogClosed = await page.waitForFunction(
-          () => !Array.from(document.querySelectorAll('[role="dialog"]'))
+          () => !Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
             .some(d => (d.innerText || '').includes('Extend Your Session')),
           { timeout: 5000 }
         ).then(() => true).catch(() => false);
         if (!_dialogClosed) {
-          console.error('WARN: "Extend Your Session" dialog still visible — credentials populate on either Cancel or Extend; continuing');
+          console.error('WARN: "Extend Your Session" dialog still visible — continuing anyway');
         }
       };
 
@@ -417,17 +442,36 @@ async function extractCredentials() {
         console.error('INFO: Waiting for credentials to populate (up to 420s)...');
         const deadline = Date.now() + 420000;
         while (Date.now() < deadline) {
-          await _dismissExtendYourSessionDialog();
+          // If "Extend Your Session" dialog is visibly blocking the page, dismiss and retry.
+          // Must check offsetParent/display to avoid matching hidden DOM elements.
+          const _dialogUp = await page.evaluate(() =>
+            Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
+              .some(d =>
+                (d.innerText || '').includes('Extend Your Session') &&
+                d.offsetParent !== null &&
+                getComputedStyle(d).display !== 'none' &&
+                getComputedStyle(d).visibility !== 'hidden'
+              )
+          ).catch(() => false);
+          if (_dialogUp) {
+            console.error('WARN: "Extend Your Session" dialog blocking credential wait — dismissing and retrying...');
+            await _dismissExtendYourSessionDialog();
+            await page.waitForTimeout(1000);
+            continue;
+          }
           const inputs = page.locator('input[aria-label="Copyable input"]');
           if (await inputs.count() > 0) {
-            const value = await inputs.first().inputValue().catch(() => '');
+            let value = await inputs.first().inputValue().catch(() => '');
+            if (!value.trim()) {
+              value = await inputs.first().evaluate(el => el.value || '').catch(() => '');
+            }
             if (value.trim().length > 0) {
               return;
             }
           }
           await page.waitForTimeout(2000);
         }
-        throw new Error('Locator polling timed out after 420000ms waiting for input[aria-label="Copyable input"] to have a non-empty value.');
+        throw new Error('Timed out waiting for credentials to populate');
       };
 
       // Pattern 1: Direct "Start Sandbox" button (in a modal or panel)

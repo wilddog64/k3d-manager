@@ -2,6 +2,9 @@
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.4.8](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.8) | 2026-05-19 | vault.sh temp file leak fixes, acg_extend.js CDP disconnect hang, Keycloak frontendUrl + named Cloudflare tunnel in acg-up |
+| [v1.4.7](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.7) | 2026-05-18 | Keycloak public URL via Cloudflare + CoreDNS — `frontendUrl` set to Cloudflare domain after realm import; SSH tunnel + iptables DNAT + CoreDNS patch for cross-cluster Keycloak reachability |
+| [v1.4.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.4) | 2026-05-08 | Identity SSO fixes — Keycloak ExternalSecret bootstrapping, Keycloak KV seeding, shopping-cart-identity ArgoCD app, shopping-cart-infra OIDC realm; lib-foundation + lib-acg subtree pulls |
 | [v1.4.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.2) | 2026-05-07 | `_ai_agent_review` generic dispatch + ArgoCD bootstrap hardening + lib-acg cdp.sh fixes — `launchctl bootout`, dead Linux else-block removal, configurable `ARGOCD_SERVER_WAIT_TIMEOUT`, Hub bootstrap refresh |
 | [v1.4.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.0) | 2026-05-01 | Copilot CLI plugin — `copilot_triage_pod` + `copilot_draft_spec`; `_copilot_review` in lib-foundation; pre-commit `AGENT_LINT_AI_FUNC` wiring; how-to doc |
 | [v1.3.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.3.0) | 2026-05-01 | Sandbox rebuild hardening — GHCR PAT validation in `acg-up` + `rotate-ghcr-pat`; Makefile OAuth fallback removed; payment ESO postgres creds from Vault; `cdp.sh` subtree path fix; lib-acg extend timing sync |

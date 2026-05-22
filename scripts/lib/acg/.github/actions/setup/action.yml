@@ -15,6 +15,10 @@ runs:
       with:
         node-version: '20'
 
+    - name: Install Node dependencies
+      shell: bash
+      run: npm install
+
     - name: Install yamllint
       shell: bash
       run: |

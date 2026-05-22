@@ -1,9 +1,12 @@
 # Active Context — lib-acg
 
-## Current Branch: `feat/acg-multi-provider`
+## Current Branch: `fix/next-improvements-2`
 
-**Repo created:** 2026-04-25
-**Status:** Post-merge cleanup after PR #9 complete.
+**Repo created:** 2026-04-25  
+**Status:** PR #23 merged to main (2026-05-22); enforce_admins restored; next branch active.
+
+- **MERGED PR #23** — `fix/next-improvements` → main (`48afc0a4`). Two usability fixes: credential masking in terminal output (`bin/acg-credential-test` + `sed 's/=.*/=***/'`); extraction progress visibility in `playwright/acg_credentials.js` (`inputs.first().evaluate()` guarantees same-node evaluation). Copilot review caught locator divergence (Playwright CDN vs file-based) and CHANGELOG wording precision. All threads resolved cleanly. Retrospective: `docs/retro/2026-05-22-fix-credential-masking-retrospective.md`.
+
 
 ## Phase Status
 
@@ -73,10 +76,10 @@ Branch: `fix/post-merge-pr9-cleanup`
 - [x] Makefile, CI shellcheck, copilot-instructions, pre-commit hook
 - [x] PR #12 open: `feat/acg-multi-provider` — fix `acg_extend.js` hang on Session extended toast
 
-## In Progress: PR #12 — acg_extend.js startup toast hang fix
+## Next: Subtree pull into k3d-manager
 
-- [ ] Merge PR #12 (`feat/acg-multi-provider`) after Copilot review addressed
-- [ ] Subtree pull into k3d-manager after merge
+- k3d-manager `scripts/lib/acg/` is a git subtree of lib-acg main
+- PR #23 is now on main; subtree pull will bring in credential masking + extraction visibility
 
 ## Consumed By
 

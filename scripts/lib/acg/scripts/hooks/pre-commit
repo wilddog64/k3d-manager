@@ -38,3 +38,15 @@ git diff --cached --name-only -z --diff-filter=ACM | \
     fi
   done | \
   xargs -0 -r -n 1 node --check
+
+# Dangling reference check: fail if a deleted file is still referenced by name
+# in any .sh or .js file that remains in the index after this commit.
+while IFS= read -r -d '' _deleted; do
+  _base="$(basename "$_deleted")"
+  _refs="$(git grep --cached -l "$_base" -- '*.sh' '*.js' 2>/dev/null || true)"
+  if [[ -n "$_refs" ]]; then
+    printf 'Pre-commit: deleting %s but it is still referenced in:\n' "$_deleted" >&2
+    printf '  %s\n' $_refs >&2
+    exit 1
+  fi
+done < <(git diff --cached --name-only -z --diff-filter=D)

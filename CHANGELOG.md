@@ -3,6 +3,25 @@
 ## [Unreleased]
 
 ### Fixed
+- `bin/acg-up`: replace broken 40-retry credential wait loop with delegation to `acg-credential-test`, which has proper ghost-state detection and STS validation with restart capability
+- `scripts/lib/acg/bin/acg-credential-test`: fix stderr swallowing — Playwright INFO/WARN/ERROR messages now reach terminal instead of being silently redirected to tmpfile
+- `scripts/lib/acg/playwright/acg_credentials.js`: add `page.evaluate` fallback in `_waitForCredentials` when React-managed inputs return empty from `inputValue()` after CDP reconnect
+- `scripts/lib/acg/scripts/etc/acg-cluster.yaml`: restore CloudFormation template removed from lib-acg in v0.2.0 without updating the `_LIB_ACG_ROOT/scripts/etc/acg-cluster.yaml` reference — broke `make up` with `Invalid template path`
+- `scripts/etc/agent/hardcoded-ip-allowlist`: add subtree copy of `acg-cluster.yaml` to bypass IP literal check for CloudFormation CIDR blocks
+- ArgoCD OIDC issuer: update to `keycloak.3ai-talk.org` in Helm values template
+
+### Changed
+- Pull lib-acg v0.3.0 subtree with `ACG_CLUSTER_TEMPLATE` env var support for CloudFormation template path
+
+### Added
+- `bin/acg-up`: check sandbox TTL before provisioning and extend if below threshold
+- `bin/acg-up`: patch CoreDNS NodeHosts instead of injecting a duplicate hosts block into CoreDNS Corefile
+- `bin/acg-up`: generate cloudflared config from template and add keycloak to the Cloudflare tunnel
+- `docs/bugs/` entries for OIDC issuer mismatch in product-catalog and payment services
+
+## [1.4.8] - 2026-05-19
+
+### Fixed
 - `scripts/plugins/vault.sh`: register cleanup traps immediately after mktemp to prevent temp file leaks on error paths
 - `scripts/lib/acg/playwright/acg_extend.js`: disconnect CDP browser connection on exit to prevent WebSocket hang and node process leak
 - `bin/acg-up`: set Keycloak frontendUrl to Cloudflare public domain after realm import (fixes redirect loops from non-public domain)
