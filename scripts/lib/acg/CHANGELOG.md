@@ -6,7 +6,38 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Fixed
+- `acg_restart.js`: provider-scope the "Start Sandbox" button lookup to the target provider card (AWS/GCP/Azure) — prevents restart from opening the wrong card when multiple providers are visible
+- `bin/acg-credential-test`: forward `--provider` argument through to `acg_restart.js` so the restart flow targets the correct sandbox card on credential extraction failure
+- `acg_credentials.js`: restore AWS-working credential extraction path (reverted to pre-GCP-scoping state); GCP-specific scoping work preserved on `fix/gcp-credentials-scoping` branch for follow-on work
 - `acg_extend.js`: wait for SPA render after Ghost State re-navigation and increase Delete Sandbox button visibility timeout to 30s so SPA re-navigation can find the button reliably
+
+## [0.2.0] - 2026-05-20
+
+### Fixed
+- `acg_restart.js`: use `dispatchEvent(new MouseEvent('click', {bubbles:true}))` instead of `.click()` to reliably trigger React's delegated event handlers on the `[role="alertdialog"]` confirm button
+- `acg_restart.js`: scope confirm button lookup to `document.querySelector('[role="alertdialog"]')` — prevents matching the listing-page "Delete Sandbox" button behind the modal (`role="dialog"` vs `role="alertdialog"` distinction)
+- `acg_restart.js`: add fast-path for already-deleted sandbox — if "Start Sandbox" is visible and neither "Delete" nor "Open" Sandbox are present, click Start directly without re-deleting
+- `acg_restart.js`: increase Start Sandbox wait from 120s → 180s; overall script timeout 120s → 240s — AWS backend deletion can exceed 2 minutes
+- `acg_restart.js`: add post-click alertdialog-still-open check with pointer-event sequence fallback
+- `acg_restart.js`: log button text found inside alertdialog for easier failure diagnosis
+- `bin/acg-credential-test`: add mandatory final `sts:GetCallerIdentity` gate that runs on all exit paths (first-try success, extraction-fail-restart, ghost-state-restart)
+- `bin/acg-credential-test`: refactor into `_extract_credentials` / `_sts_valid` helpers; previously the extraction-fail→restart path skipped sts validation entirely
+- `acg_extend.js`: add `--provider aws|gcp|azure` argument (default `aws`); scope extend button lookup to provider card by walking up the DOM — prevents always selecting the first (AWS) sandbox when multiple providers are visible
+- `acg_extend.js`: change `--check` flag detection from positional `process.argv[3]` to `process.argv.includes('--check')` — survives argument reordering
+
+### Added
+- `tests/fixtures/sandbox.html`: self-contained Pluralsight sandbox page fixture with document-level event delegation, `role="alertdialog"` confirm modal, state machine (card→panel→confirm→deleted→started), and "Extend Your Session" dialog
+- `tests/acg-restart.spec.js`: 7 Playwright fixture tests covering full delete flow, alertdialog dismiss via `dispatchEvent`, fast-path already-deleted state, extend dialog dismissal, and selector role scoping
+- `playwright.config.js`: `@playwright/test` configuration pointing at `tests/` directory
+- Makefile `test` target: runs fixture-based Playwright tests locally without a live Pluralsight session
+- CI `e2e` job: installs Chromium and runs fixture tests on every PR
+
+### Removed
+- `scripts/etc/acg-cluster.yaml`: CloudFormation template removed from lib-acg — it belongs in k3d-manager where it already exists at `scripts/etc/acg-cluster.yaml`
+
+## [0.1.0] - 2026-05-19
+
+### Fixed
 - `acg_extend.js`: narrow midnight-wrap guard to ≤ 60 min so expired sandboxes report a negative TTL instead of a large positive value
 - `acg_extend.js`: add `--check` mode to print remaining sandbox TTL without extending
 - `scripts/plugins/acg.sh`: add `acg_check_ttl()` wrapper for sandbox TTL checks

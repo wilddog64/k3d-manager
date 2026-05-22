@@ -12,4 +12,4 @@ fi
 sandbox_url="${1:?Usage: $0 <sandbox-url>}"
 shift
 
-exec node "$REPO_ROOT/playwright/acg_extend.js" "$sandbox_url" "$@"
+ACG_REQUIRE_CDP=1 exec node "$REPO_ROOT/playwright/acg_extend.js" "$sandbox_url" "$@"

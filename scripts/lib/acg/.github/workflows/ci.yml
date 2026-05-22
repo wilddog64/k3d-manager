@@ -15,6 +15,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  e2e:
+    if: >-
+      ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup dependencies
+        uses: ./.github/actions/setup
+
+      - name: Install Playwright Chromium
+        shell: bash
+        run: npx playwright install chromium --with-deps
+
+      - name: Run fixture tests
+        shell: bash
+        run: npx playwright test --config playwright.config.js
+
   lint:
     if: >-
       ${{ github.event.pull_request.head.repo.full_name == github.repository }}
