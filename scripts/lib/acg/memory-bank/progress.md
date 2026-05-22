@@ -1,8 +1,8 @@
 # Progress — lib-acg
 
-## v0.1.0 Track — `fix/acg-extend-midnight-wrap` (active)
+## v0.1.0 Track — `fix/next-improvements-2` (active)
 
-- **MERGED PR #15:** `fix/acg-sandbox-ttl-check` → main (`9c9b9b44`). `acg_extend.js` `--check` flag + `acg_check_ttl()` in `acg.sh`. Copilot: fixed Button First click bypass + help text mismatch.
+- **MERGED PR #23:** `fix/next-improvements` → main (`48afc0a4`). Credential masking in `bin/acg-credential-test`; extraction progress visibility in `playwright/acg_credentials.js`. Copilot: caught locator divergence + CHANGELOG wording.
 
 - **COMPLETE:** `acg_extend.js` midnight-wrap guard now only rolls to tomorrow when the time gap is ≤ 60 minutes, so expired sandboxes report negative TTL instead of a wrapped next-day value; committed as `05ae7d1` (`fix(acg-extend): narrow midnight-wrap guard to 60 min so expired sandboxes report negative TTL`) and pushed to `origin/fix/acg-extend-midnight-wrap`.
 

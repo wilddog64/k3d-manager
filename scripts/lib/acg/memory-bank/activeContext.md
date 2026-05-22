@@ -1,36 +1,12 @@
 # Active Context — lib-acg
 
-## Current Branch: `fix/stale-cred-restart`
+## Current Branch: `fix/next-improvements-2`
 
-- **COMPLETE:** `acg_extend.js` now exposes a `--check` mode that prints `REMAINING_MINS:<n>` without extending, and `scripts/plugins/acg.sh` now provides `acg_check_ttl()`; committed as `b2598bf` (`feat(acg): expose sandbox TTL via --check flag on acg_extend.js; add acg_check_ttl()`) and pushed to `origin/fix/acg-sandbox-ttl-check`.
-- **COMPLETE:** `acg_extend` now calls `_cdpBrowser.disconnect()` on exit instead of skipping cleanup for CDP-attached sessions, preventing the Node process from hanging after a successful extend; committed as `d5e1d07` (`fix(acg-extend): disconnect CDP browser on exit to prevent node process hang`) and pushed to `origin/docs/next-improvements`; PR: https://github.com/wilddog64/lib-acg/pull/14
-- **COMPLETE:** `playwright/acg_credentials.js` now scopes the GCP credential visibility check and GCP input extraction to the Google Cloud provider card, and `playwright/acg_restart.js` now wraps `_cdpBrowser.disconnect()` in `try/catch`; committed as `b3195c3` (`fix(acg-credentials): scope GCP extraction to provider card; fix restart disconnect TypeError`) and pushed to `origin/fix/stale-cred-restart`.
-- **COMPLETE:** `playwright/acg_credentials.js` now reduces the provider-label DOM walk depth from 12 to 6, `playwright/acg_restart.js` now scopes Start Sandbox selection to the active provider card and uses provider-specific delete-confirmation text, and `bin/acg-credential-test` forwards `--provider` through restart; committed as `fc7b5e9` (`fix(acg-credentials): reduce DOM walk depth; provider-scope restart Start Sandbox`) and pushed to `origin/fix/stale-cred-restart`.
-- **COMPLETE:** `playwright/acg_credentials.js` now provider-scopes Open/Start button lookup and `_waitForCredentials` to the active provider card; committed as `ed054a6` (`fix(acg-credentials): provider-scope Open/Start buttons and waitForCredentials`) and pushed to `origin/fix/stale-cred-restart`.
-**Repo created:** 2026-04-25
-**Status:** PR #14 merged to main (2026-05-19); PR #15 merged (2026-05-19); enforce_admins restored.
+**Repo created:** 2026-04-25  
+**Status:** PR #23 merged to main (2026-05-22); enforce_admins restored; next branch active.
 
-- **COMPLETE:** `acg_extend.js` midnight-wrap guard now only rolls to tomorrow when the time gap is ≤ 60 minutes, so expired sandboxes report negative TTL instead of a wrapped next-day value; committed as `05ae7d1` (`fix(acg-extend): narrow midnight-wrap guard to 60 min so expired sandboxes report negative TTL`) and pushed to `origin/fix/acg-extend-midnight-wrap`.
+- **MERGED PR #23** — `fix/next-improvements` → main (`48afc0a4`). Two usability fixes: credential masking in terminal output (`bin/acg-credential-test` + `sed 's/=.*/=***/'`); extraction progress visibility in `playwright/acg_credentials.js` (`inputs.first().evaluate()` guarantees same-node evaluation). Copilot review caught locator divergence (Playwright CDN vs file-based) and CHANGELOG wording precision. All threads resolved cleanly. Retrospective: `docs/retro/2026-05-22-fix-credential-masking-retrospective.md`.
 
-- **COMPLETE:** `acg_extend.js` provider-scoped Open Sandbox selection now prefers the provider-specific heap id (`AWS Sandbox`, `Azure Sandbox`, `Google Cloud Sandbox`) and `bin/acg-extend-test` requires an existing CDP session so validation cannot spawn a second Chrome; `scripts/etc/acg-cluster.yaml` removed from lib-acg; committed as `80df13d` (`fix(acg-extend): provider-scoped button selection; remove misplaced CFn template`) and pushed to `origin/fix/stale-cred-restart`. Validation used `node --check playwright/acg_extend.js`, `shellcheck bin/acg-extend-test`, and a direct CDP websocket probe against the live page because Playwright's browser-level CDP attach failed on Chrome 147 (`Browser.setDownloadBehavior` unsupported). Issue doc: `docs/issues/2026-05-21-acg-extend-cdp-attach-fails-on-chrome-147.md`.
-
-## Just Merged: PR #15 — Sandbox TTL Check
-
-- [x] `acg_extend.js`: add `--check` mode to probe remaining sandbox TTL without extending
-- [x] `acg.sh`: add `acg_check_ttl()` wrapper function for TTL queries
-- [x] Copilot review 2 findings: Button First click path running before flag check, help text mismatch
-- [x] Merged to main as `9c9b9b44` (2026-05-19)
-- [x] Branch protection enforce_admins re-enabled
-- [x] Retrospective: `docs/retro/2026-05-19-pr15-sandbox-ttl-check-retrospective.md`
-
-## Just Merged: PR #14 — acg_extend.js CDP disconnect hang fix
-
-- [x] `_cdpBrowser.disconnect()` in finally block to release WebSocket and prevent Node event loop hang
-- [x] Detect "Session extended" toast at startup; exit 0 if already visible instead of looping forever
-- [x] Copilot review 5 findings: memory-bank descriptions, bug spec wording clarity, "Do NOT create a PR" removed from bug docs
-- [x] Merged to main as `b7d1dd7` (2026-05-19)
-- [x] Branch protection enforce_admins re-enabled
-- [x] Retrospective: `docs/retro/2026-05-19-pr14-retrospective.md`
 
 ## Phase Status
 
@@ -100,17 +76,10 @@ Branch: `fix/post-merge-pr9-cleanup`
 - [x] Makefile, CI shellcheck, copilot-instructions, pre-commit hook
 - [x] PR #12 open: `feat/acg-multi-provider` — fix `acg_extend.js` hang on Session extended toast
 
-## In Progress: v0.2.0 pre-PR bugfixes — branch `fix/stale-cred-restart`
-
-- [x] **extend provider scope + CFn template removal** — COMPLETE. Spec: `docs/plans/v0.2.0-bugfix-extend-provider-scope.md`. Committed as `80df13d` and pushed to `origin/fix/stale-cred-restart`.
-  - `acg_extend.js`: add `--provider` arg, scope button lookup to provider card (no more `.first()`), fix `--check` positional detection, and prefer provider-specific heap ids for the Open Sandbox path
-  - `bin/acg-extend-test`: require an existing CDP session so validation does not launch a second Chrome
-  - `scripts/etc/acg-cluster.yaml`: deleted from lib-acg (CFn template belongs in k3d-manager)
-
 ## Next: Subtree pull into k3d-manager
 
 - k3d-manager `scripts/lib/acg/` is a git subtree of lib-acg main
-- PR #14 is now on main; subtree pull will bring in the CDP disconnect fix
+- PR #23 is now on main; subtree pull will bring in credential masking + extraction visibility
 
 ## Consumed By
 
