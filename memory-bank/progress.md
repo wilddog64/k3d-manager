@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
-## Status (v1.4.9 — active)
+## Status (v1.4.9 — RELEASED 2026-05-22)
+- **RELEASED:** k3d-manager v1.4.9 — PR #79 merged to main (SHA `160a5edbac565ffc2a76a00b89bc7d1a3ac8735e`); enforce_admins restoration deferred (API endpoint pending); next branch: `k3d-manager-v1.5.0`; v1.4.9 retrospective committed `e1bf78fb` on k3d-manager-v1.5.0; v1.4.9 release row added to README + docs/releases.md
 - **PENDING (next release cycle):** Node.js 20 → 22 upgrade across all shopping-cart CI workflows — GitHub Actions deprecated Node.js 20 runner; `node-version: '20'` must be bumped to `'22'` in all jobs in all shopping-cart repos (`frontend`, `basket`, `order`, `payment`, `product-catalog`); issue doc at `shopping-cart-frontend/docs/issues/2026-05-22-nodejs20-deprecation.md` (commit `e6cde03` on `docs/next-improvements`); also consider adding `NODE_VERSION` to workflow-level `env:` block and referencing everywhere.
 - **COMPLETE:** shopping-cart-frontend PR #17 post-merge — fix/vite-keycloak-url merged to main (SHA `41fb0751`); enforce_admins restored; `docs/next-improvements` branch created; retrospective committed `31f8c4e`; README releases table + `docs/releases.md` added (`2e11026`); all pushed to origin.
 - **COMPLETE:** Ghost State Delete Sandbox — `--force-restart` flag added to `acg_extend.js` + arg pass-through in `acg.sh` + `elif` branch in `bin/acg-up` detects invalid creds on running sandbox and calls force-restart; lib-acg commit `f5bc18d` on `fix/ghost-state-waitForSelector` + k3d-manager commit `92c438ca` on `k3d-manager-v1.4.9`; both pushed to origin.
