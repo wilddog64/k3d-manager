@@ -15,6 +15,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `playwright/acg_restart.js`, `playwright/acg_credentials.js`: fix "Extend Your Session" dialog detection — Pluralsight renders it as `role="alertdialog"` (not `role="dialog"`), so all nine `querySelectorAll('[role="dialog"]')` calls silently matched nothing; updated to `[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]`
 - `playwright/acg_credentials.js`: hoist `_dismissExtendYourSessionDialog` before the SPA navigation block and call it before `navLink.click()` — fixes timeout when modal intercepts pointer events on the nav link
 - `playwright/acg_restart.js`: call `_dismissExtendYourSessionDialog` after `openBtn.click()` and before `waitForSelector('Delete Sandbox')` — fixes timeout when modal appears during panel expand
+- `playwright/acg_restart.js`: add visibility guard to `_dismissExtendYourSessionDialog` to prevent false-positive "Extend Your Session" dialog detection — check `offsetParent !== null && getComputedStyle(d).display !== 'none'` before attempting dismiss
 
 ## [0.3.0] - 2026-05-21
 

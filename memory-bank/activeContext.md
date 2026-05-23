@@ -1,9 +1,9 @@
 # Active Context — lib-acg
 
-## Current Branch: `fix/next-improvements-2`
+## Current Branch: `fix/next-improvements-4`
 
 **Repo created:** 2026-04-25  
-**Status:** PR #23 merged to main (2026-05-22); enforce_admins restored; next branch active.
+**Status:** PR #25 merged to main (2026-05-22, `2e698cf`); enforce_admins restored; next branch active.
 
 - **MERGED PR #23** — `fix/next-improvements` → main (`48afc0a4`). Two usability fixes: credential masking in terminal output (`bin/acg-credential-test` + `sed 's/=.*/=***/'`); extraction progress visibility in `playwright/acg_credentials.js` (`inputs.first().evaluate()` guarantees same-node evaluation). Copilot review caught locator divergence (Playwright CDN vs file-based) and CHANGELOG wording precision. All threads resolved cleanly. Retrospective: `docs/retro/2026-05-22-fix-credential-masking-retrospective.md`.
 

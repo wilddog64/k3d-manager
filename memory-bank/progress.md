@@ -1,6 +1,8 @@
 # Progress — lib-acg
 
-## v0.1.0 Track — `fix/next-improvements-2` (active)
+## v0.1.0 Track — `fix/next-improvements-4` (active)
+
+- **MERGED PR #25:** `fix/next-improvements-3` → main (`2e698cf`). Extend Your Session modal robustness (background watcher + point-in-time dismissals) + LaunchDaemon plist idempotency. Retro: `docs/retro/2026-05-22-fix-next-improvements-3-retrospective.md`.
 
 - **MERGED PR #23:** `fix/next-improvements` → main (`48afc0a4`). Credential masking in `bin/acg-credential-test`; extraction progress visibility in `playwright/acg_credentials.js`. Copilot: caught locator divergence + CHANGELOG wording.
 
