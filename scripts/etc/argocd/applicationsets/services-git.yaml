@@ -7,6 +7,9 @@ metadata:
     managed-by: k3d-manager
     app-type: services
 spec:
+  ignoreApplicationDifferences:
+    - jsonPointers:
+        - /spec/source/kustomize/images
   generators:
     - git:
         repoURL: https://github.com/wilddog64/k3d-manager
@@ -24,6 +27,13 @@ spec:
       labels:
         app-type: service
         discovered-from: git
+      annotations:
+        argocd-image-updater.argoproj.io/image-list: >-
+          {{- if eq .path.basename "shopping-cart-product-catalog"}}catalog=ghcr.io/wilddog64/shopping-cart-product-catalog:latest{{end}}
+        argocd-image-updater.argoproj.io/catalog.update-strategy: >-
+          {{- if eq .path.basename "shopping-cart-product-catalog"}}digest{{end}}
+        argocd-image-updater.argoproj.io/write-back-method: >-
+          {{- if eq .path.basename "shopping-cart-product-catalog"}}argocd{{end}}
     spec:
       project: platform
       destination:
