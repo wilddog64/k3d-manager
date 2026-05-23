@@ -1,7 +1,9 @@
 # Active Context — k3d-manager
 
-## Current Status (Post-Merge 2026-05-22 — shopping-cart-product-catalog PR #22 housekeeping complete)
+## Current Status (Post-Merge 2026-05-23 — shopping-cart milestone 2 PRs #62, #23, #20 housekeeping complete)
 - Current branch: `k3d-manager-v1.4.9` (created from k3d-manager PR #77 merge SHA `8f08bd35`)
+- **COMPLETE:** shopping-cart-infra PR #62 merged (d61eb707), shopping-cart-product-catalog PR #23 merged (4802a2fc), shopping-cart-frontend PR #20 merged (7847244e); enforce_admins restored on all 3; `docs/next-improvements-3` branch created on all 3; retrospective committed on product-catalog (e22f009); memory-bank updated.
+- **COMPLETE:** MinIO object-store plumbing landed in `shopping-cart-infra` (`54c1d54`), the 1,000-product seed + FTS search update landed in `shopping-cart-product-catalog` (`3cecff7`), and the frontend MinIO proxy/search-param wiring landed in `shopping-cart-frontend` (`3511754`); all commits were pushed to their requested branches on origin.
 - **POST-MERGE v1.4.8 COMPLETE:** enforce_admins restored ✓, next branch created ✓, retrospective committed ✓, memory-bank updated ✓
 - **POST-MERGE shopping-cart-product-catalog PR #22 COMPLETE:** enforce_admins restored ✓, `docs/next-improvements` branch already exists ✓, README releases table verified current ✓, `copilot-instructions.md` verified present ✓, memory-bank updated ✓
 - **POST-MERGE shopping-cart-frontend PR #17 COMPLETE:** enforce_admins restored ✓, `docs/next-improvements` branch synced ✓, retrospective committed (`31f8c4e`) ✓, README releases table + `docs/releases.md` added (`2e11026`) ✓, memory-bank updated ✓
