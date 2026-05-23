@@ -256,6 +256,41 @@ async function extractCredentials() {
       ).catch(() => {});
     }
 
+    const _dismissExtendYourSessionDialog = async () => {
+      const _dialogVisible = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
+          .some(d => (d.innerText || '').includes('Extend Your Session'))
+      ).catch(() => false);
+      if (!_dialogVisible) return;
+      console.error('INFO: "Extend Your Session" dialog detected — clicking Cancel via DOM...');
+      // Use DOM click (not Playwright keyboard) — Escape closes the panel, not just the dialog
+      await page.evaluate(() => {
+        const dialog = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
+          .find(d => (d.innerText || '').includes('Extend Your Session'));
+        if (!dialog) return;
+        const btns = Array.from(dialog.querySelectorAll('button'));
+        // Prefer Cancel/close button; fall back to any non-Extend button
+        const dismiss = btns.find(b => /cancel|no thanks|close|dismiss/i.test(b.textContent || b.getAttribute('aria-label') || ''))
+          || btns.find(b => !/extend/i.test(b.textContent || ''));
+        if (dismiss) dismiss.click();
+      }).catch(() => {});
+      await page.waitForTimeout(1000);
+      const _dialogClosed = await page.waitForFunction(
+        () => !Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
+          .some(d => (d.innerText || '').includes('Extend Your Session')),
+        { timeout: 5000 }
+      ).then(() => true).catch(() => false);
+      if (!_dialogClosed) {
+        console.error('WARN: "Extend Your Session" dialog still visible — continuing anyway');
+      }
+    };
+
+    const _startExtendDialogWatcher = () => {
+      const _poll = async () => { while (true) { await _dismissExtendYourSessionDialog(); await page.waitForTimeout(2000); } };
+      _poll().catch(() => {});
+    };
+    _startExtendDialogWatcher();
+
     // Skip navigation entirely if sandbox panel is already loaded on the current page
     const _sandboxReady = await page.locator(
       'button:has-text("Start Sandbox"), input[aria-label="Copyable input"]'
@@ -283,6 +318,7 @@ async function extractCredentials() {
         const navLink = page.locator('a[href*="cloud-sandboxes"]').first();
         const navVisible = await navLink.isVisible({ timeout: 5000 }).catch(() => false);
         if (navVisible) {
+          await _dismissExtendYourSessionDialog();
           await navLink.click();
         } else {
           await page.evaluate(url => window.location.assign(url), targetUrl);
@@ -383,35 +419,6 @@ async function extractCredentials() {
           return true;
         } catch {
           return false;
-        }
-      };
-
-      const _dismissExtendYourSessionDialog = async () => {
-        const _dialogVisible = await page.evaluate(() =>
-          Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
-            .some(d => (d.innerText || '').includes('Extend Your Session'))
-        ).catch(() => false);
-        if (!_dialogVisible) return;
-        console.error('INFO: "Extend Your Session" dialog detected — clicking Cancel via DOM...');
-        // Use DOM click (not Playwright keyboard) — Escape closes the panel, not just the dialog
-        await page.evaluate(() => {
-          const dialog = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
-            .find(d => (d.innerText || '').includes('Extend Your Session'));
-          if (!dialog) return;
-          const btns = Array.from(dialog.querySelectorAll('button'));
-          // Prefer Cancel/close button; fall back to any non-Extend button
-          const dismiss = btns.find(b => /cancel|no thanks|close|dismiss/i.test(b.textContent || b.getAttribute('aria-label') || ''))
-            || btns.find(b => !/extend/i.test(b.textContent || ''));
-          if (dismiss) dismiss.click();
-        }).catch(() => {});
-        await page.waitForTimeout(1000);
-        const _dialogClosed = await page.waitForFunction(
-          () => !Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
-            .some(d => (d.innerText || '').includes('Extend Your Session')),
-          { timeout: 5000 }
-        ).then(() => true).catch(() => false);
-        if (!_dialogClosed) {
-          console.error('WARN: "Extend Your Session" dialog still visible — continuing anyway');
         }
       };
 

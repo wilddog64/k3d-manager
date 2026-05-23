@@ -58,6 +58,11 @@ async function _isExtendYourSessionVisible(page) {
   ).catch(() => false);
 }
 
+function _startExtendDialogWatcher(page) {
+  const _poll = async () => { while (true) { await _dismissExtendYourSessionDialog(page); await page.waitForTimeout(2000); } };
+  _poll().catch(() => {});
+}
+
 async function _findScopedButton(page, buttonText, providerLabel, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() <= deadline) {
@@ -181,6 +186,7 @@ async function restartSandbox() {
       try { return new URL(p.url()).hostname.endsWith('.pluralsight.com'); } catch { return false; }
     }) || allPages[0];
     if (!page) throw new Error('No page found in browser context');
+    _startExtendDialogWatcher(page);
 
     // Navigate to sandbox listing if not already there
     const currentUrl = page.url();
@@ -248,6 +254,7 @@ async function restartSandbox() {
         throw new Error(`Neither Delete Sandbox nor Open Sandbox visible. URL: ${url} | Buttons: ${JSON.stringify(btns)}`);
       }
       await openBtn.click({ force: true });
+      await _dismissExtendYourSessionDialog(page);
       await page.waitForSelector('button:has-text("Delete Sandbox")', { timeout: 15000 });
     }
 

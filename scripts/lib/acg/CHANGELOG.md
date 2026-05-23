@@ -13,6 +13,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `playwright/acg_credentials.js`: detect "Extend Your Session" dialog on page entry (before navigation logic) and force a hard `page.goto` reload to reset SPA timer state — React re-triggers the dialog from in-memory state after `acg_restart.js` dismisses it via DOM click, causing `acg_credentials.js` to see it again immediately on attach
 - `playwright/acg_restart.js`: add `clearTimeout` + explicit `process.exit(0)` on success — the 240s timeout timer kept the Node event loop alive after `RESTART_OK` was printed, causing `acg-credential-test` to hang indefinitely waiting for the node process to exit
 - `playwright/acg_restart.js`, `playwright/acg_credentials.js`: fix "Extend Your Session" dialog detection — Pluralsight renders it as `role="alertdialog"` (not `role="dialog"`), so all nine `querySelectorAll('[role="dialog"]')` calls silently matched nothing; updated to `[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]`
+- `playwright/acg_credentials.js`: hoist `_dismissExtendYourSessionDialog` before the SPA navigation block and call it before `navLink.click()` — fixes timeout when modal intercepts pointer events on the nav link
+- `playwright/acg_restart.js`: call `_dismissExtendYourSessionDialog` after `openBtn.click()` and before `waitForSelector('Delete Sandbox')` — fixes timeout when modal appears during panel expand
 
 ## [0.3.0] - 2026-05-21
 
