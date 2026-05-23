@@ -4,13 +4,44 @@ kind: Kustomization
 namespace: cicd
 
 resources:
-  - https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/stable/manifests/install.yaml
+  - https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/v0.15.0/manifests/install.yaml
+  - pull-secret-rbac.yaml
 
 patches:
   - patch: |-
       - op: replace
-        path: /spec/template/spec/containers/0/args/0
-        value: run
+        path: /subjects/0/namespace
+        value: cicd
+    target:
+      kind: ClusterRoleBinding
+      name: argocd-image-updater
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: argocd-image-updater
+      spec:
+        template:
+          metadata:
+            annotations:
+              proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
     target:
       kind: Deployment
       name: argocd-image-updater
+  - patch: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: argocd-image-updater-config
+      data:
+        registries.conf: |
+          registries:
+          - name: GitHub Container Registry
+            api_url: https://ghcr.io
+            prefix: ghcr.io
+            credentials: pullsecret:shopping-cart-apps/ghcr-pull-secret
+            defaultns: wilddog64
+            insecure: false
+    target:
+      kind: ConfigMap
+      name: argocd-image-updater-config
