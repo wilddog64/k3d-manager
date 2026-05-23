@@ -3,15 +3,15 @@
 **Date:** 2026-05-23
 **Repos:**
 - `shopping-cart-infra` — branch `docs/next-improvements-2` (MinIO data layer + image upload)
-- `shopping-cart-frontend` — branch `docs/next-improvements` (nginx proxy for /minio/)
+
+> **Note:** The frontend nginx `/minio/` proxy is covered in `2026-05-23-product-seed-1000-fts.md` (Milestone 2) on `docs/next-improvements-2`. Do NOT touch shopping-cart-frontend in this spec.
 
 **Architecture doc:** `shopping-cart-infra/docs/minio-image-pipeline.md`
 
 ## Before You Start
 
 1. `git -C ~/src/gitrepo/personal/shopping-carts/shopping-cart-infra pull origin docs/next-improvements-2`
-2. `git -C ~/src/gitrepo/personal/shopping-carts/shopping-cart-frontend pull origin docs/next-improvements`
-3. Read `shopping-cart-infra/docs/minio-image-pipeline.md` in full — it defines the architecture
+2. Read `shopping-cart-infra/docs/minio-image-pipeline.md` in full — it defines the architecture
 4. Read `shopping-cart-infra/data-layer/postgresql/products/statefulset.yaml` — follow this pattern for the MinIO StatefulSet
 5. Read `shopping-cart-infra/data-layer/secrets/postgres-products-externalsecret.yaml` — follow this pattern for the ESO ExternalSecret
 6. Confirm `shopping-cart-infra/argocd/applications/data-layer.yaml` has `directory.recurse: true` — no Application manifest update needed
@@ -542,21 +542,6 @@ data:
         main()
 ```
 
-## File 6: frontend nginx proxy (shopping-cart-frontend)
-
-Find the nginx ConfigMap or nginx.conf in the frontend k8s manifests. Add a `location /minio/` block that proxies to MinIO.
-
-First read all files under `k8s/` in shopping-cart-frontend to find the nginx config location. Then add:
-
-```nginx
-location /minio/ {
-    proxy_pass http://minio.shopping-cart-data.svc.cluster.local:9000/;
-    proxy_set_header Host minio.shopping-cart-data.svc.cluster.local;
-}
-```
-
-If no nginx ConfigMap exists and nginx config is baked into the image, add a ConfigMap + volumeMount to inject the proxy config. Follow existing patterns in the frontend k8s directory.
-
 ## Definition of Done
 
 ### shopping-cart-infra (branch: `docs/next-improvements-2`)
@@ -569,15 +554,9 @@ If no nginx ConfigMap exists and nginx config is baked into the image, add a Con
 - [ ] Committed with message: `feat(data-layer): add MinIO object store with product image pipeline`
 - [ ] Pushed to `origin docs/next-improvements-2`
 
-### shopping-cart-frontend (branch: `docs/next-improvements`)
-- [ ] nginx config updated with `/minio/` proxy location
-- [ ] `kubectl apply --dry-run=client -k k8s/base/` or equivalent passes
-- [ ] Committed with message: `feat(nginx): proxy /minio/ to MinIO for product images`
-- [ ] Pushed to `origin docs/next-improvements`
-
 ### Both
 - [ ] Tag Copilot on PRs after creation
-- [ ] Report commit SHAs for all repos
+- [ ] Report commit SHA
 
 ## What NOT to Do
 
