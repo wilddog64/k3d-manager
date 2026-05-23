@@ -101,9 +101,9 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"Wiring ArgoCD SSO"* ]]
 
-  run grep -nF 'ArgoCD browser login URL: https://argocd.shopping-cart.local' bin/acg-up
+  run grep -nF '_info "[acg-up] ArgoCD reachable at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local} (launchd: ${_argocd_browser_label})"' bin/acg-up
   [ "$status" -eq 0 ]
-  [[ "$output" == *"ArgoCD browser login URL"* ]]
+  [[ "$output" == *"ArgoCD reachable at"* ]]
 
   run grep -nF 'realm import is required for SSO and cannot be skipped' bin/acg-up
   [ "$status" -eq 0 ]
