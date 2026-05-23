@@ -1,7 +1,8 @@
 # Active Context — k3d-manager
 
-## Current Status (Post-Merge 2026-05-23 — shopping-cart-infra PR #64 housekeeping complete)
+## Current Status (Post-Merge 2026-05-23 — shopping-cart-product-catalog PR #24 housekeeping complete)
 - Current branch: `k3d-manager-v1.4.9` (created from k3d-manager PR #77 merge SHA `8f08bd35`)
+- **COMPLETE:** shopping-cart-product-catalog PR #24 merged (28955c89); enforce_admins restored ✓; `docs/next-improvements` branch synced ✓; retrospective committed (ff4846e) ✓; memory-bank updated ✓
 - **COMPLETE:** shopping-cart-infra PR #64 merged (dd7496b); enforce_admins restored ✓; `docs/next-improvements` branch synced ✓; retrospective committed (7dbf80c) ✓; memory-bank updated ✓
 - **COMPLETE:** shopping-cart-infra PR #63 merged (8fff691); enforce_admins restored ✓; `docs/next-improvements` branch synced ✓; retrospective committed (b9c4cf0) ✓; memory-bank updated ✓
 - **COMPLETE:** shopping-cart-infra PR #62 merged (d61eb707), shopping-cart-product-catalog PR #23 merged (4802a2fc), shopping-cart-frontend PR #20 merged (7847244e); enforce_admins restored on all 3; `docs/next-improvements-3` branch created on all 3; retrospective committed on product-catalog (e22f009); memory-bank updated.
@@ -46,6 +47,8 @@
 - **Node.js 20 → 22:** All shopping-cart CI workflows use `node-version: '20'`; GitHub Actions has deprecated Node.js 20 runner. Bump to `'22'` in all 5 repos. Issue doc: `shopping-cart-frontend/docs/issues/2026-05-22-nodejs20-deprecation.md`. Write one Codex spec covering all repos, single-pass.
 
 ## In Progress (v1.4.9)
+- **ASSIGNED TO CODEX:** ArgoCD Image Updater — spec: `docs/plans/v1.4.9-argocd-image-updater.md`; installs image updater in `cicd` ns, adds `ignoreApplicationDifferences` to `services-git` ApplicationSet, adds conditional image-list annotations for product-catalog; fixes the CI→kustomize tag update loop that was blocked by branch protection.
+
 - **IN PROGRESS:** acg-cluster.yaml subtree path restoration — lib-acg v0.2.0 removed `scripts/etc/acg-cluster.yaml` (CloudFormation template) without updating the reference in `acg.sh` (`_LIB_ACG_ROOT/scripts/etc/acg-cluster.yaml`), breaking `make up` with `Invalid template path`. Restored at subtree path `scripts/lib/acg/scripts/etc/acg-cluster.yaml` in k3d-manager; added to hardcoded-ip-allowlist for pre-commit IP literal check. CHANGELOG updated; PR to be created.
 - **COMPLETE:** lib-acg PR #19 merged (`7a31eaf`) — docs/copilot-pr18-findings → main; 6 Copilot doc accuracy findings addressed (spec doc files header, Rules section, DoD memory-bank checkboxes, What NOT to Do); Apache 2.0 LICENSE added to lib-acg. enforce_admins restored on lib-acg main. lib-acg next branch: `docs/next-improvements` (commit `9262547`).
 - **IN PROGRESS:** shopping-cart-e2e-tests PR #1 open (`chore/add-apache-license`); adds Apache 2.0 LICENSE + copilot-instructions.md + README/package.json license field; 8 Copilot findings fixed in `ca25f79` (PaymentClient, generateTestId, 60s timeout, localhost scope, MIT→Apache 2.0 in README/package.json); all 8 threads resolved; waiting for 3rd Copilot review. No branch protection on e2e-tests main yet.
