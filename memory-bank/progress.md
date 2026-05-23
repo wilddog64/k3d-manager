@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status (v1.4.9 — active)
+- **COMPLETE:** shopping-cart-infra PR #63 post-merge — minio/mc image tag fix merged to main (SHA 8fff691); enforce_admins restored ✓; `docs/next-improvements` branch synced ✓; retrospective committed (b9c4cf0) ✓; no release tag (Unreleased CHANGELOG).
 - **COMPLETE:** shopping-cart-infra PR #62 post-merge — MinIO pipeline + image-upload merged to main (SHA d61eb707); enforce_admins restored ✓; `docs/next-improvements-3` branch created ✓; no release tag (Unreleased CHANGELOG).
 - **COMPLETE:** shopping-cart-product-catalog PR #23 post-merge — 1,000-product seed + FTS search merged to main (SHA 4802a2fc); enforce_admins restored ✓; `docs/next-improvements-3` branch created ✓; retrospective committed (e22f009) ✓; no release tag (Unreleased CHANGELOG).
 - **COMPLETE:** shopping-cart-frontend PR #20 post-merge — MinIO proxy + search-param wiring merged to main (SHA 7847244e); enforce_admins restored ✓; `docs/next-improvements-3` branch created ✓; no release tag (Unreleased CHANGELOG).
