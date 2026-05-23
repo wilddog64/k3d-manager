@@ -549,6 +549,7 @@ data:
 - [ ] `data-layer/minio/statefulset.yaml` created
 - [ ] `data-layer/minio/service.yaml` created (ClusterIP + NodePort)
 - [ ] `data-layer/minio/bucket-init-job.yaml` created
+- [ ] `data-layer/minio/image-upload-configmap.yaml` created (Python Pillow script)
 - [ ] `data-layer/minio/image-upload-job.yaml` created
 - [ ] `kubectl apply --dry-run=client -f data-layer/minio/` passes
 - [ ] Committed with message: `feat(data-layer): add MinIO object store with product image pipeline`
