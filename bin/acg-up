@@ -1450,7 +1450,8 @@ if [[ "${_product_count:-0}" -eq 0 ]]; then
       sleep 10
     done
     _final_count=$(kubectl exec -n shopping-cart-data --context ubuntu-k3s postgresql-products-0 -- \
-      psql -U postgres -d products -tAc "SELECT COUNT(*) FROM products;" 2>/dev/null | tr -d '[:space:]')
+      psql -U postgres -d products -tAc "SELECT COUNT(*) FROM products;" 2>/dev/null | tr -d '[:space:]') \
+      || _final_count=0
     if [[ "${_seed_done}" == "true" ]]; then
       _info "[acg-up] Product catalog seeded: ${_final_count:-0} products"
     else
