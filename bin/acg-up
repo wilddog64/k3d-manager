@@ -1394,6 +1394,71 @@ else
   _info "[acg-up] ClusterSecretStore not Ready after 180s — check vault-bridge connectivity"
 fi
 
+_info "[acg-up] Step 11b/14 — Reconciling PostgreSQL products password with Vault and seeding catalog..."
+_pg_intended_pw=$(kubectl get secret postgres-products-admin \
+  -n shopping-cart-data --context ubuntu-k3s \
+  -o jsonpath='{.data.password}' 2>/dev/null | base64 -d)
+if [[ -n "${_pg_intended_pw}" ]]; then
+  kubectl exec -n shopping-cart-data --context ubuntu-k3s postgresql-products-0 -- \
+    psql -U postgres -c "ALTER USER postgres PASSWORD '${_pg_intended_pw}';" >/dev/null 2>&1 \
+    && _info "[acg-up] PostgreSQL products password reconciled with Vault" \
+    || _info "[acg-up] WARN: could not reconcile PostgreSQL products password"
+
+  _pc_db_pw=$(kubectl exec -n shopping-cart-apps --context ubuntu-k3s \
+    deploy/product-catalog -- sh -c 'echo $DB_PASSWORD' 2>/dev/null | tr -d '[:space:]')
+  if [[ "${_pc_db_pw}" != "${_pg_intended_pw}" ]]; then
+    _info "[acg-up] product-catalog DB_PASSWORD mismatch — restarting to pick up ESO secret..."
+    kubectl rollout restart deployment/product-catalog \
+      -n shopping-cart-apps --context ubuntu-k3s >/dev/null
+    kubectl rollout status deployment/product-catalog \
+      -n shopping-cart-apps --context ubuntu-k3s --timeout=120s 2>/dev/null \
+      || _info "[acg-up] WARN: product-catalog rollout did not finish within 120s"
+  fi
+fi
+
+_product_count=$(kubectl exec -n shopping-cart-data --context ubuntu-k3s postgresql-products-0 -- \
+  psql -U postgres -d products -tAc "SELECT COUNT(*) FROM products;" 2>/dev/null | tr -d '[:space:]')
+if [[ "${_product_count:-0}" -eq 0 ]]; then
+  _info "[acg-up] Product DB is empty — running seed job..."
+  _pc_kustomize_dir="${REPO_ROOT}/../shopping-carts/shopping-cart-product-catalog"
+  if [[ -d "${_pc_kustomize_dir}/k8s/base" ]]; then
+    kubectl delete job product-catalog-seed \
+      -n shopping-cart-apps --context ubuntu-k3s --ignore-not-found >/dev/null 2>&1
+    kubectl kustomize "${_pc_kustomize_dir}/k8s/base" \
+      | kubectl apply --context ubuntu-k3s \
+          --selector app.kubernetes.io/component=seed -f - >/dev/null
+    _seed_done=false
+    for _seed_i in $(seq 1 30); do
+      _seed_complete=$(kubectl get job product-catalog-seed \
+        -n shopping-cart-apps --context ubuntu-k3s \
+        -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null)
+      _seed_failed=$(kubectl get job product-catalog-seed \
+        -n shopping-cart-apps --context ubuntu-k3s \
+        -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null)
+      if [[ "${_seed_complete}" == "True" ]]; then
+        _seed_done=true
+        break
+      fi
+      if [[ "${_seed_failed}" == "True" ]]; then
+        _info "[acg-up] WARN: product-catalog seed job failed — check: kubectl logs -n shopping-cart-apps --context ubuntu-k3s -l app.kubernetes.io/component=seed"
+        break
+      fi
+      sleep 10
+    done
+    _final_count=$(kubectl exec -n shopping-cart-data --context ubuntu-k3s postgresql-products-0 -- \
+      psql -U postgres -d products -tAc "SELECT COUNT(*) FROM products;" 2>/dev/null | tr -d '[:space:]')
+    if [[ "${_seed_done}" == "true" ]]; then
+      _info "[acg-up] Product catalog seeded: ${_final_count:-0} products"
+    else
+      _info "[acg-up] WARN: seed did not complete within 300s — ${_final_count:-0} products in DB"
+    fi
+  else
+    _info "[acg-up] WARN: shopping-cart-product-catalog not found at ${_pc_kustomize_dir} — skipping seed"
+  fi
+else
+  _info "[acg-up] Product catalog already has ${_product_count} products — skipping seed"
+fi
+
 _info "[acg-up] Step 12/14 — Installing sandbox TTL watcher (launchd)..."
 acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
 
