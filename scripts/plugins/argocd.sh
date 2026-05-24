@@ -1062,7 +1062,7 @@ function _argocd_deploy_appproject() {
    rendered=$(mktemp -t argocd-appproject.XXXXXX.yaml)
    trap '$(_cleanup_trap_command "$rendered")' EXIT
    envsubst '$ARGOCD_NAMESPACE' < "$appproject_tmpl" > "$rendered"
-   _kubectl apply -f "$rendered" >/dev/null
+   _kubectl apply --server-side -f "$rendered" >/dev/null
    trap '$(_cleanup_trap_command "$rendered")' RETURN
 
    _info "[argocd] AppProject deployed: platform"
