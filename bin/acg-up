@@ -1420,7 +1420,8 @@ else
 fi
 
 _product_count=$(kubectl exec -n shopping-cart-data --context ubuntu-k3s postgresql-products-0 -- \
-  psql -U postgres -d products -tAc "SELECT COUNT(*) FROM products;" 2>/dev/null | tr -d '[:space:]')
+  psql -U postgres -d products -tAc "SELECT COUNT(*) FROM products;" 2>/dev/null | tr -d '[:space:]') \
+  || _product_count=0
 if [[ "${_product_count:-0}" -eq 0 ]]; then
   _info "[acg-up] Product DB is empty — running seed job..."
   _pc_kustomize_dir="${REPO_ROOT}/../shopping-carts/shopping-cart-product-catalog"
