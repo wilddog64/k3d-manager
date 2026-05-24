@@ -129,9 +129,15 @@ function deploy_shopping_cart_data() {
   done
   if kubectl get secret redis-cart-secret -n shopping-cart-data --context ubuntu-k3s &>/dev/null; then
     _info "[shopping_cart] Copying redis-cart-secret to shopping-cart-apps namespace..."
-    kubectl get secret redis-cart-secret -n shopping-cart-data --context ubuntu-k3s -o json \
-      | python3 -c "import sys,json; d=json.load(sys.stdin); d['metadata']={'name':'redis-cart-secret','namespace':'shopping-cart-apps'}; print(json.dumps(d))" \
-      | kubectl apply --context ubuntu-k3s -f -
+    local _redis_json
+    if _redis_json=$(kubectl get secret redis-cart-secret -n shopping-cart-data --context ubuntu-k3s -o json 2>/dev/null) && [[ -n "${_redis_json}" ]]; then
+      echo "${_redis_json}" \
+        | python3 -c "import sys,json; d=json.load(sys.stdin); d['metadata']={'name':'redis-cart-secret','namespace':'shopping-cart-apps'}; print(json.dumps(d))" \
+        | kubectl apply --context ubuntu-k3s -f - \
+        || _info "[shopping_cart] WARN: redis-cart-secret copy to shopping-cart-apps failed (non-fatal)"
+    else
+      _info "[shopping_cart] WARN: redis-cart-secret disappeared before copy — ESO ExternalSecret will sync shopping-cart-apps directly"
+    fi
   fi
 
   _info "[shopping_cart] Data layer deployed."
