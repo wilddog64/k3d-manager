@@ -37,22 +37,42 @@ async function _dismissExtendYourSessionDialog(page) {
         getComputedStyle(d).display !== 'none'
       )
   ).catch(() => false);
-  if (!visible) return;
-  console.error('INFO: "Extend Your Session" dialog detected — clicking Cancel via DOM...');
-  await page.evaluate(() => {
-    const dialog = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
-      .find(d =>
-        (d.innerText || '').includes('Extend Your Session') &&
-        d.offsetParent !== null &&
-        getComputedStyle(d).display !== 'none'
-      );
-    if (!dialog) return;
-    const btns = Array.from(dialog.querySelectorAll('button'));
-    const dismiss = btns.find(b => /cancel|no thanks|close|dismiss/i.test(b.textContent || b.getAttribute('aria-label') || ''))
-      || btns.find(b => !/extend/i.test(b.textContent || ''));
-    if (dismiss) dismiss.click();
-  }).catch(() => {});
-  await page.waitForTimeout(1000);
+  if (visible) {
+    console.error('INFO: "Extend Your Session" dialog detected — clicking Cancel via DOM...');
+    await page.evaluate(() => {
+      const dialog = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
+        .find(d =>
+          (d.innerText || '').includes('Extend Your Session') &&
+          d.offsetParent !== null &&
+          getComputedStyle(d).display !== 'none'
+        );
+      if (!dialog) return;
+      const btns = Array.from(dialog.querySelectorAll('button'));
+      const dismiss = btns.find(b => /cancel|no thanks|close|dismiss/i.test(b.textContent || b.getAttribute('aria-label') || ''))
+        || btns.find(b => !/extend/i.test(b.textContent || ''));
+      if (dismiss) dismiss.click();
+    }).catch(() => {});
+    await page.waitForTimeout(1000);
+  }
+  // Also dismiss "Session extended" success toast — it uses role="alertdialog" and
+  // intercepts pointer events on the Open Sandbox button.
+  const toastVisible = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="alertdialog"], [role="alert"]'))
+      .some(d => (d.innerText || '').match(/session extended|sandbox has been extended/i) && d.offsetParent !== null)
+  ).catch(() => false);
+  if (toastVisible) {
+    console.error('INFO: "Session extended" toast detected — dismissing...');
+    await page.evaluate(() => {
+      const toast = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="alertdialog"], [role="alert"]'))
+        .find(d => (d.innerText || '').match(/session extended|sandbox has been extended/i) && d.offsetParent !== null);
+      if (!toast) return;
+      const closeBtn = Array.from(toast.querySelectorAll('button'))
+        .find(b => /close|dismiss/i.test(b.getAttribute('aria-label') || b.textContent || ''))
+        || toast.querySelector('button');
+      if (closeBtn) closeBtn.click();
+    }).catch(() => {});
+    await page.waitForTimeout(500);
+  }
 }
 
 async function _isExtendYourSessionVisible(page) {
@@ -137,7 +157,7 @@ async function restartSandbox() {
           req.end();
         });
         await new Promise(r => setTimeout(r, 500));
-        try { await _cdpBrowser.disconnect(); } catch {}
+        try { await _cdpBrowser.close(); } catch {}
         _cdpBrowser = await chromium.connectOverCDP(CDP_URL);
         _contexts = _cdpBrowser.contexts();
       }
@@ -145,7 +165,7 @@ async function restartSandbox() {
         browserContext = _contexts[0];
         console.error('INFO: Connected via CDP to existing browser session.');
       } else {
-        try { await _cdpBrowser.disconnect(); } catch {}
+        try { await _cdpBrowser.close(); } catch {}
         _cdpBrowser = null;
       }
     } catch {
@@ -195,6 +215,14 @@ async function restartSandbox() {
     }) || allPages[0];
     if (!page) throw new Error('No page found in browser context');
     _startExtendDialogWatcher(page);
+    // Auto-dismiss "Session extended" toast whenever it blocks an action — fires on-demand, not a poll loop.
+    await page.addLocatorHandler(
+      page.getByText('Your sandbox has been extended.').first(),
+      async () => {
+        await page.keyboard.press('Escape').catch(() => {});
+        await page.waitForTimeout(300);
+      }
+    );
 
     // Navigate to sandbox listing if not already there
     const currentUrl = page.url();
@@ -262,15 +290,41 @@ async function restartSandbox() {
         throw new Error(`Neither Delete Sandbox nor Open Sandbox visible. URL: ${url} | Buttons: ${JSON.stringify(btns)}`);
       }
       await openBtn.click({ force: true });
-      await _dismissExtendYourSessionDialog(page);
-      await page.waitForSelector('button:has-text("Delete Sandbox")', { timeout: 15000 });
+      // Poll for Delete Sandbox — dismiss Extend dialog on every tick so a late-appearing
+      // dialog cannot block for more than one 500 ms interval.
+      const _deletePollDeadline = Date.now() + 15000;
+      let _deleteBtnReady = false;
+      while (Date.now() < _deletePollDeadline) {
+        await _dismissExtendYourSessionDialog(page);
+        _deleteBtnReady = await deleteBtn.isVisible({ timeout: 500 }).catch(() => false);
+        if (_deleteBtnReady) break;
+        await page.waitForTimeout(500).catch(() => {});
+      }
+      if (!_deleteBtnReady) {
+        const _url = page.url();
+        const _btns = await page.evaluate(() =>
+          Array.from(document.querySelectorAll('button'))
+            .map(b => (b.innerText || b.textContent || '').trim())
+            .filter(t => t.length > 0)
+        ).catch(() => []);
+        throw new Error(`Delete Sandbox button did not appear within 15s after Open Sandbox click. URL: ${_url} | Buttons: ${JSON.stringify(_btns)}`);
+      }
     }
 
     // Click Delete Sandbox — up to 3 attempts to get past "Extend Your Session" interception.
     // The Extend dialog intercepts the first click; dismiss it and always re-click.
     // Stop early when the provider-specific delete confirmation dialog appears.
     console.error('INFO: Clicking Delete Sandbox...');
-    await deleteBtn.click({ force: true });
+    for (let _attempt = 0; _attempt < 3; _attempt++) {
+      await deleteBtn.scrollIntoViewIfNeeded().catch(() => {});
+      try {
+        await deleteBtn.click({ force: true });
+        break;
+      } catch (_clickErr) {
+        if (_attempt === 2) throw _clickErr;
+        await page.waitForTimeout(800).catch(() => {});
+      }
+    }
 
     const _confirmDialogVisible = async () =>
       page.locator('[role="alertdialog"]').first()
@@ -359,7 +413,7 @@ async function restartSandbox() {
     process.exit(1);
   } finally {
     if (_cdpBrowser) {
-      try { await _cdpBrowser.disconnect(); } catch {}
+      try { await _cdpBrowser.close(); } catch {}
     } else if (browserContext) {
       await browserContext.close().catch(() => {});
     }

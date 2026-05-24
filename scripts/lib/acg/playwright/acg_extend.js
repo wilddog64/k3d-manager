@@ -142,6 +142,14 @@ async function extendSandbox() {
       console.error('INFO: "Session extended" toast already visible — extension already succeeded. Exiting.');
       return;
     }
+    // Auto-dismiss "Session extended" toast whenever it blocks an action — fires on-demand, not a poll loop.
+    await page.addLocatorHandler(
+      page.getByText('Your sandbox has been extended.').first(),
+      async () => {
+        await page.keyboard.press('Escape').catch(() => {});
+        await page.waitForTimeout(300);
+      }
+    );
 
     // Wait for skeleton loaders to clear
     await page.waitForFunction(
@@ -176,6 +184,16 @@ async function extendSandbox() {
 
     if (clicked) {
       console.log('Extend action complete (Immediate).');
+      // Wait for the extend API response before checking — the toast is posted asynchronously.
+      await page.waitForTimeout(2000);
+      // Dismiss the "Session extended" toast — anchor on the leaf body text then walk up
+      // to the closest ancestor that owns a button (the toast card, not the whole page).
+      const _toastBody = page.getByText('Your sandbox has been extended.');
+      if (await _toastBody.isVisible({ timeout: 15000 }).catch(() => false)) {
+        console.error('INFO: Dismissing "Session extended" toast...');
+        await page.keyboard.press('Escape').catch(() => {});
+        await page.waitForTimeout(300);
+      }
       return;
     }
 
@@ -356,13 +374,21 @@ async function extendSandbox() {
 
     const expiryText = await page.locator('text=/expires/i').first().textContent().catch(() => 'unknown');
     console.log(`Extend action complete. Current expiry text: ${expiryText}`);
+    await page.waitForTimeout(2000);
+    // Dismiss "Session extended" toast — same anchor-on-leaf approach as immediate path.
+    const _toastBody = page.getByText('Your sandbox has been extended.');
+    if (await _toastBody.isVisible({ timeout: 10000 }).catch(() => false)) {
+      console.error('INFO: Dismissing "Session extended" toast...');
+      await page.keyboard.press('Escape').catch(() => {});
+      await page.waitForTimeout(300);
+    }
   } catch (error) {
     console.error(`ERROR: ${error.message}`);
     process.exit(1);
   } finally {
     if (_cdpBrowser) {
-      // Disconnect from CDP without closing Chrome; closing would kill the entire process
-      await _cdpBrowser.disconnect().catch(() => {});
+      // close() on a connectOverCDP browser disconnects Playwright without closing Chrome
+      await _cdpBrowser.close().catch(() => {});
     } else if (browserContext) {
       await browserContext.close().catch(() => {});
     }
