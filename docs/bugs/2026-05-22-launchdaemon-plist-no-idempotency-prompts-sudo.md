@@ -315,6 +315,44 @@ The existing block starts with `: > "${_..._launchctl_log}"`.
 
 ---
 
+---
+
+### Change 2 — `bin/acg-down`: pre-warm sudo before Mac launchd cleanup
+
+`bin/acg-down` runs CloudFormation teardown (can take several minutes) before the Mac
+launchd cleanup block. By the time lines 112–139 run, the sudo cache has expired, causing
+one or more `Password:` prompts mid-teardown.
+
+Fix: add a single `_run_command --interactive-sudo --quiet -- true` as the first statement
+inside `if _is_mac;` — this warms the cache once, and all five subsequent `--interactive-sudo`
+calls (bootout + rm × 3) stay within the 5-minute window.
+
+**Exact old block (line 105):**
+
+```bash
+if _is_mac; then
+  _info "[acg-down] Stopping Keycloak browser HTTP listener launchd daemon..."
+```
+
+**Exact new block:**
+
+```bash
+if _is_mac; then
+  _run_command --interactive-sudo --quiet -- true
+  _info "[acg-down] Stopping Keycloak browser HTTP listener launchd daemon..."
+```
+
+---
+
+## Files Changed (both changes)
+
+| File | Change |
+|------|--------|
+| `bin/acg-up` | 5 plist install blocks wrapped with `diff -q` idempotency guard |
+| `bin/acg-down` | `_run_command --interactive-sudo --quiet -- true` pre-warm added at top of `if _is_mac` block |
+
+---
+
 ## Before You Start
 
 1. `git -C /Users/cliang/src/gitrepo/personal/k3d-manager pull origin k3d-manager-v1.4.9`
@@ -331,15 +369,16 @@ The existing block starts with `: > "${_..._launchctl_log}"`.
 
 - [ ] All 5 blocks in `bin/acg-up` wrapped with the `diff -q` idempotency guard
 - [ ] Each skip branch: `rm -f "${_..._plist_tmp}"` + `_info` message
-- [ ] `shellcheck -S warning bin/acg-up` passes with zero new warnings
-- [ ] Commit on branch `k3d-manager-v1.4.9`: `fix(acg-up): skip LaunchDaemon plist reinstall when unchanged to avoid sudo prompt`
+- [ ] `bin/acg-down` — `_run_command --interactive-sudo --quiet -- true` inserted as first statement of `if _is_mac` block (before the `_info "[acg-down] Stopping Keycloak..."` line)
+- [ ] `shellcheck -S warning bin/acg-up bin/acg-down` passes with zero new warnings
+- [ ] Commit on branch `k3d-manager-v1.4.9`: `fix(acg-up,acg-down): skip LaunchDaemon plist reinstall when unchanged; pre-warm sudo in acg-down`
 - [ ] Push to origin before reporting done
 
 ## What NOT to Do
 
-- Do NOT change function body of any install block — only wrap with the idempotency guard
+- Do NOT change function body of any install block in `acg-up` — only wrap with the idempotency guard
 - Do NOT add a helper function — apply the pattern inline at each site
-- Do NOT modify any other files
+- Do NOT modify any files other than `bin/acg-up` and `bin/acg-down`
 - Do NOT create a PR
 - Do NOT skip pre-commit hooks (`--no-verify`)
 - Do NOT commit to `main` — work on `k3d-manager-v1.4.9`
