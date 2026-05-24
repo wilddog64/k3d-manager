@@ -1404,15 +1404,21 @@ if [[ -n "${_pg_intended_pw}" ]]; then
     && _info "[acg-up] PostgreSQL products password reconciled with Vault" \
     || _info "[acg-up] WARN: could not reconcile PostgreSQL products password"
 
-  _pc_db_pw=$(kubectl exec -n shopping-cart-apps --context ubuntu-k3s \
-    deploy/product-catalog -- sh -c 'echo $DB_PASSWORD' 2>/dev/null | tr -d '[:space:]')
-  if [[ "${_pc_db_pw}" != "${_pg_intended_pw}" ]]; then
-    _info "[acg-up] product-catalog DB_PASSWORD mismatch — restarting to pick up ESO secret..."
-    kubectl rollout restart deployment/product-catalog \
-      -n shopping-cart-apps --context ubuntu-k3s >/dev/null
-    kubectl rollout status deployment/product-catalog \
-      -n shopping-cart-apps --context ubuntu-k3s --timeout=120s 2>/dev/null \
-      || _info "[acg-up] WARN: product-catalog rollout did not finish within 120s"
+  if kubectl get deployment product-catalog \
+      -n shopping-cart-apps --context ubuntu-k3s >/dev/null 2>&1; then
+    _pc_db_pw=$(kubectl exec -n shopping-cart-apps --context ubuntu-k3s \
+      deploy/product-catalog -- sh -c 'echo $DB_PASSWORD' 2>/dev/null | tr -d '[:space:]')
+    if [[ "${_pc_db_pw}" != "${_pg_intended_pw}" ]]; then
+      _info "[acg-up] product-catalog DB_PASSWORD mismatch — restarting to pick up ESO secret..."
+      kubectl rollout restart deployment/product-catalog \
+        -n shopping-cart-apps --context ubuntu-k3s >/dev/null \
+        || _info "[acg-up] WARN: could not restart product-catalog"
+      kubectl rollout status deployment/product-catalog \
+        -n shopping-cart-apps --context ubuntu-k3s --timeout=120s 2>/dev/null \
+        || _info "[acg-up] WARN: product-catalog rollout did not finish within 120s"
+    fi
+  else
+    _info "[acg-up] product-catalog not yet deployed — skipping DB_PASSWORD mismatch check"
   fi
 fi
 
