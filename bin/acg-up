@@ -620,18 +620,36 @@ _vault_kv_get_field() {
     "http://localhost:${_vault_local_port}/v1/secret/data/${path}" \
     | jq -r --arg field "$field" '.data.data[$field] // empty'
 }
-_pg_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
-_pg_pass_products=$(openssl rand -base64 24 | tr -d '=+/')
-_pg_pass_payment=$(openssl rand -base64 24 | tr -d '=+/')
 _redis_pass_cart=$(openssl rand -base64 24 | tr -d '=+/')
 _redis_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
 _rabbitmq_pass=$(openssl rand -base64 24 | tr -d '=+/')
 
 _vault_kv_put "{\"password\":\"${_redis_pass_cart}\"}"                                           redis/cart
 _vault_kv_put "{\"password\":\"${_redis_pass_orders}\"}"                                         redis/orders-cache
-_vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_orders}\"}"                  postgres/orders
-_vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_products}\"}"                postgres/products
-_vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_payment}\"}"                 postgres/payment
+
+if _vault_kv_exists "postgres/orders"; then
+  _info "[acg-up] Reusing existing Vault secret postgres/orders"
+  _pg_pass_orders=$(_vault_kv_get_field "postgres/orders" "password")
+else
+  _pg_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
+  _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_orders}\"}"                postgres/orders
+fi
+
+if _vault_kv_exists "postgres/products"; then
+  _info "[acg-up] Reusing existing Vault secret postgres/products"
+  _pg_pass_products=$(_vault_kv_get_field "postgres/products" "password")
+else
+  _pg_pass_products=$(openssl rand -base64 24 | tr -d '=+/')
+  _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_products}\"}"              postgres/products
+fi
+
+if _vault_kv_exists "postgres/payment"; then
+  _info "[acg-up] Reusing existing Vault secret postgres/payment"
+  _pg_pass_payment=$(_vault_kv_get_field "postgres/payment" "password")
+else
+  _pg_pass_payment=$(openssl rand -base64 24 | tr -d '=+/')
+  _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_payment}\"}"               postgres/payment
+fi
 _vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}'                             payment/encryption
 _vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}'           payment/stripe
 _vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
