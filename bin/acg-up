@@ -1429,8 +1429,8 @@ kubectl annotate externalsecret product-catalog-secrets \
 if kubectl get deployment product-catalog \
     -n shopping-cart-apps --context ubuntu-k3s >/dev/null 2>&1; then
   _pc_db_pw=$(kubectl exec -n shopping-cart-apps --context ubuntu-k3s \
-    deploy/product-catalog -- sh -c 'echo $DB_PASSWORD' 2>/dev/null | tr -d '[:space:]')
-  if [[ "${_pc_db_pw}" != "${_pg_pass_products}" ]]; then
+    deploy/product-catalog -- sh -c 'echo $DB_PASSWORD' 2>/dev/null | tr -d '[:space:]') || _pc_db_pw=""
+  if [[ -n "${_pc_db_pw}" && "${_pc_db_pw}" != "${_pg_pass_products}" ]]; then
     _info "[acg-up] product-catalog DB_PASSWORD mismatch — restarting to pick up ESO secret..."
     kubectl rollout restart deployment/product-catalog \
       -n shopping-cart-apps --context ubuntu-k3s >/dev/null \
