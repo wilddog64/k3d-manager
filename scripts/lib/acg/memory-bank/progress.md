@@ -1,6 +1,8 @@
 # Progress — lib-acg
 
-## v0.1.0 Track — `fix/next-improvements-5` (active)
+## v0.1.0 Track — `fix/next-improvements-6` (active)
+
+- **MERGED PR #27** (`7c17da72`): 14 bug fixes on `fix/next-improvements-5` → main. Root cause: toast-dismiss block inside async polling loop was architecturally wrong. Fixed by removing dismiss block from `_waitForCredentials`, consolidating toast handling to `addLocatorHandler` in pointer-action paths, correcting CDP Browser lifecycle (`close()` not `disconnect()`), and extending toast detection windows to match async server response timing (15s/10s instead of 5s/3s). Retro: `docs/retro/2026-05-23-pr27-retrospective.md`.
 
 - **COMPLETE:** `playwright/acg_extend.js` now waits 2 seconds before checking for the "Session extended" toast and increases the visible window to 15s in the immediate path and 10s in the non-immediate path, matching the async server response timing; committed as `e635d1e` (`fix(acg-extend): increase toast detection timeout — async server response arrives after 5s window`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_extend.js`.
 

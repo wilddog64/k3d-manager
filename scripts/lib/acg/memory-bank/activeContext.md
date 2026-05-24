@@ -1,9 +1,9 @@
 # Active Context — lib-acg
 
-## Current Branch: `fix/next-improvements-5`
+## Current Branch: `fix/next-improvements-6`
 
 **Repo created:** 2026-04-25  
-**Status:** PR #26 merged to main (2026-05-23, `fbcecc24`); enforce_admins restored on main; next branch active.
+**Status:** PR #27 merged to main (2026-05-23, `7c17da72`); enforce_admins restored on main; next branch active (`fix/next-improvements-6`).
 
 - **COMPLETE:** `playwright/acg_extend.js` now waits 2 seconds before checking for the "Session extended" toast and increases the visible window to 15s in the immediate path and 10s in the non-immediate path, matching the async server response timing; committed as `e635d1e` (`fix(acg-extend): increase toast detection timeout — async server response arrives after 5s window`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_extend.js`.
 
@@ -26,6 +26,8 @@
 - **COMPLETE:** `playwright/acg_restart.js` now polls for `Delete Sandbox` after `Open Sandbox` and dismisses the "Extend Your Session" dialog on every 500 ms tick until the button appears, replacing the one-shot `waitForSelector` path that could stall behind a late modal; committed as `a9cb1c1` (`fix(acg-restart): poll + dismiss Extend dialog while waiting for Delete Sandbox button`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_restart.js`.
 
 - **COMPLETE:** `playwright/acg_restart.js` now scrolls the `Delete Sandbox` button back into view and retries the click up to 3 times with an 800 ms settle pause, preventing the panel animation viewport shift from leaving the element outside the viewport; committed as `fd50c7f` (`fix(acg-restart): scroll + retry Delete Sandbox click — panel animation causes viewport shift`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_restart.js`.
+
+- **MERGED PR #27** — `fix/next-improvements-5` → main (`7c17da72`). Playwright automation reliability: toast dismissal architecture fixed (removed blocking dismiss from polling loop, consolidated to `addLocatorHandler` handlers), CDP Browser lifecycle corrected (`close()` instead of `disconnect()`), credential re-validation added to extend-test. 14 inter-related toast/CDP bugs collapsed to single coherent fix. Copilot caught button-selection ambiguity + disconnect guard. Retrospective: `docs/retro/2026-05-23-pr27-retrospective.md`.
 
 - **MERGED PR #26** — `fix/next-improvements-4` → main (`fbcecc24`). Visibility guard fix for "Extend Your Session" dialog detection: added CSS check (`offsetParent !== null && getComputedStyle(d).display !== 'none'`) to `_dismissExtendYourSessionDialog`. Copilot caught incomplete fix (guard missing from `.find()` selection path). Retrospective: `docs/retro/2026-05-23-pr26-retrospective.md`.
 
