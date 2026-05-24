@@ -1420,6 +1420,12 @@ kubectl exec -n shopping-cart-data --context ubuntu-k3s postgresql-products-0 --
   && _info "[acg-up] PostgreSQL products password reconciled with Vault" \
   || _info "[acg-up] WARN: could not reconcile PostgreSQL products password"
 
+kubectl annotate externalsecret product-catalog-secrets \
+  -n shopping-cart-apps --context ubuntu-k3s \
+  force-sync="$(date +%s)" --overwrite >/dev/null 2>&1 \
+  && _info "[acg-up] ESO force-sync triggered for product-catalog-secrets" \
+  || _info "[acg-up] WARN: could not trigger ESO force-sync for product-catalog-secrets"
+
 if kubectl get deployment product-catalog \
     -n shopping-cart-apps --context ubuntu-k3s >/dev/null 2>&1; then
   _pc_db_pw=$(kubectl exec -n shopping-cart-apps --context ubuntu-k3s \
