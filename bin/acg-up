@@ -403,6 +403,24 @@ if [[ -z "$_ghcr_pat" ]]; then
     fi
   fi
   if [[ -z "$_ghcr_pat" ]]; then
+    if command -v gh >/dev/null 2>&1; then
+      _gh_token=$(gh auth token 2>/dev/null || true)
+      if [[ -n "$_gh_token" ]]; then
+        _gh_http=$(curl -s -o /dev/null -w "%{http_code}" -u "${_github_user}:${_gh_token}" "https://api.github.com/user" 2>/dev/null || true)
+        if [[ "$_gh_http" == "200" ]]; then
+          _ghcr_pat="$_gh_token"
+          _info "[acg-up] using gh CLI token for ghcr-pull-secret"
+          if [[ -n "${_vault_root_token:-}" ]]; then
+            curl -s -X POST -H "X-Vault-Token: ${_vault_root_token}" \
+              -d "{\"data\": {\"token\": \"${_ghcr_pat}\"}}" \
+              "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" >/dev/null || true
+            _info "[acg-up] gh CLI token saved to Vault for future runs"
+          fi
+        fi
+      fi
+    fi
+  fi
+  if [[ -z "$_ghcr_pat" ]]; then
     if [[ -t 0 && -t 1 ]]; then
       read -r -s -p "[acg-up] Paste GitHub PAT (repo + read:packages) and press Enter: " _ghcr_pat
       echo ""
