@@ -34,7 +34,8 @@ async function _dismissExtendYourSessionDialog(page) {
       .some(d =>
         (d.innerText || '').includes('Extend Your Session') &&
         d.offsetParent !== null &&
-        getComputedStyle(d).display !== 'none'
+        getComputedStyle(d).display !== 'none' &&
+        getComputedStyle(d).visibility !== 'hidden'
       )
   ).catch(() => false);
   if (visible) {
@@ -44,7 +45,8 @@ async function _dismissExtendYourSessionDialog(page) {
         .find(d =>
           (d.innerText || '').includes('Extend Your Session') &&
           d.offsetParent !== null &&
-          getComputedStyle(d).display !== 'none'
+          getComputedStyle(d).display !== 'none' &&
+          getComputedStyle(d).visibility !== 'hidden'
         );
       if (!dialog) return;
       const btns = Array.from(dialog.querySelectorAll('button'));
