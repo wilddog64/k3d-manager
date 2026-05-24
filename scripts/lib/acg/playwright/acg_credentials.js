@@ -245,7 +245,12 @@ async function extractCredentials() {
     // even when acg_restart.js already dismissed it via DOM click.
     const _entryExtendDialog = await page.evaluate(() =>
       Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
-        .some(d => (d.innerText || '').includes('Extend Your Session') && d.offsetParent !== null)
+        .some(d =>
+          (d.innerText || '').includes('Extend Your Session') &&
+          d.offsetParent !== null &&
+          getComputedStyle(d).display !== 'none' &&
+          getComputedStyle(d).visibility !== 'hidden'
+        )
     ).catch(() => false);
     if (_entryExtendDialog) {
       console.error('INFO: "Extend Your Session" dialog on entry — reloading page to clear SPA state...');
@@ -259,14 +264,24 @@ async function extractCredentials() {
     const _dismissExtendYourSessionDialog = async () => {
       const _dialogVisible = await page.evaluate(() =>
         Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
-          .some(d => (d.innerText || '').includes('Extend Your Session'))
+          .some(d =>
+            (d.innerText || '').includes('Extend Your Session') &&
+            d.offsetParent !== null &&
+            getComputedStyle(d).display !== 'none' &&
+            getComputedStyle(d).visibility !== 'hidden'
+          )
       ).catch(() => false);
       if (_dialogVisible) {
         console.error('INFO: "Extend Your Session" dialog detected — clicking Cancel via DOM...');
         // Use DOM click (not Playwright keyboard) — Escape closes the panel, not just the dialog
         await page.evaluate(() => {
           const dialog = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
-            .find(d => (d.innerText || '').includes('Extend Your Session'));
+            .find(d =>
+              (d.innerText || '').includes('Extend Your Session') &&
+              d.offsetParent !== null &&
+              getComputedStyle(d).display !== 'none' &&
+              getComputedStyle(d).visibility !== 'hidden'
+            );
           if (!dialog) return;
           const btns = Array.from(dialog.querySelectorAll('button'));
           // Prefer Cancel/close button; fall back to any non-Extend button
