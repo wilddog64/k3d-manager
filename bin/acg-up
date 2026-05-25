@@ -1471,7 +1471,7 @@ if [[ "${_product_count:-0}" -eq 0 ]]; then
   _pc_kustomize_dir="${REPO_ROOT}/../shopping-carts/shopping-cart-product-catalog"
   if [[ -d "${_pc_kustomize_dir}/k8s/base" ]]; then
     kubectl delete job product-catalog-seed \
-      -n shopping-cart-apps --context ubuntu-k3s --ignore-not-found >/dev/null 2>&1
+      -n shopping-cart-apps --context ubuntu-k3s --ignore-not-found --wait=false >/dev/null 2>&1
     kubectl kustomize "${_pc_kustomize_dir}/k8s/base" \
       | kubectl apply --context ubuntu-k3s \
           --selector app.kubernetes.io/component=seed -f - >/dev/null
