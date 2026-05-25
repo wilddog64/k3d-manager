@@ -4,7 +4,7 @@
 
 ### Fixed
 - `bin/acg-down`: move sudo pre-warm to top of script — prompt before any output to improve UX
-- `scripts/plugins/payment.sh`: remove redundant `payment-db-credentials-eso` ExternalSecret — `postgres-payment-app` (shopping-cart-infra) already owns the secret with all required keys; k3d-manager ESO caused `SecretSyncedError` due to ownership conflict
+- `services/shopping-cart-payment/kustomization.yaml`: remove redundant `payment-db-credentials-eso` ExternalSecret — `postgres-payment-app` (shopping-cart-infra) already owns the secret with all required keys; k3d-manager ESO caused `SecretSyncedError` due to ownership conflict
 - `bin/acg-up`: replace broken 40-retry credential wait loop with delegation to `acg-credential-test`, which has proper ghost-state detection and STS validation with restart capability
 - `scripts/lib/acg/bin/acg-credential-test`: fix stderr swallowing — Playwright INFO/WARN/ERROR messages now reach terminal instead of being silently redirected to tmpfile
 - `scripts/lib/acg/playwright/acg_credentials.js`: add `page.evaluate` fallback in `_waitForCredentials` when React-managed inputs return empty from `inputValue()` after CDP reconnect
