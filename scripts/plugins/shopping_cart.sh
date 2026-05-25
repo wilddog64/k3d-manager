@@ -117,10 +117,6 @@ function deploy_shopping_cart_data() {
     --from-literal=password=CHANGE_ME \
     --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f -
 
-  _info "[shopping_cart] Copying redis-cart-secret to shopping-cart-apps namespace..."
-  kubectl get secret redis-cart-secret -n shopping-cart-data --context ubuntu-k3s -o json \
-    | python3 -c "import sys,json; d=json.load(sys.stdin); d['metadata']={'name':'redis-cart-secret','namespace':'shopping-cart-apps'}; print(json.dumps(d))" \
-    | kubectl apply --context ubuntu-k3s -f -
 
   _info "[shopping_cart] Data layer deployed."
 }

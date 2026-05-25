@@ -72,7 +72,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `gemini_install` | `scripts/plugins/gemini.sh` | Verify full Gemini stack installed (Node.js, gemini CLI, IDE, Playwright MCP) |
 | `gemini_trigger_copilot_review` | `scripts/plugins/gemini.sh` | Trigger GitHub Copilot coding agent task via Playwright CDP automation |
 | `gemini_poll_task` | `scripts/plugins/gemini.sh` | Poll a Copilot coding agent task until complete; print full output verbatim |
-| `deploy_shopping_cart_data` | `scripts/plugins/shopping_cart.sh` | Deploy PostgreSQL (orders/payment/products), Redis cart, RabbitMQ; align passwords to `CHANGE_ME`; create `rabbitmq-credentials` and `redis-cart-secret` |
+| `deploy_shopping_cart_data` | `scripts/plugins/shopping_cart.sh` | Deploy PostgreSQL (orders/payment/products), Redis cart, RabbitMQ; align passwords to `CHANGE_ME`; create `rabbitmq-credentials` |
 | `acg_extend_playwright` | `scripts/plugins/acg.sh` | Extend ACG sandbox TTL via Playwright automation (public dispatcher entry point for `_acg_extend_playwright`) |
 | `ssm_wait` | `scripts/plugins/ssm.sh` | Wait until an EC2 instance is registered and reachable via SSM (polls `ssm describe-instance-information`) |
 | `ssm_exec` | `scripts/plugins/ssm.sh` | Run a shell command on an EC2 instance via SSM `send-command`; prints command output/results after execution |

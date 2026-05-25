@@ -40,6 +40,10 @@ if [[ "${_confirm}" -eq 0 ]]; then
   exit 1
 fi
 
+if _is_mac; then
+  _run_command --interactive-sudo --quiet -- true
+fi
+
 _info "[acg-down] keep-hub=${_keep_hub} hub-cluster=${_HUB_CLUSTER}"
 
 case "${_cluster_provider}" in

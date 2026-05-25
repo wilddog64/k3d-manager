@@ -449,6 +449,7 @@ HELP
   local playwright_script="${_LIB_ACG_ROOT}/playwright/acg_extend.js"
   if ! command -v node >/dev/null 2>&1; then
     _err "[acg] node is required — install Node.js"
+    return 1
   fi
   local output exit_code
   output=$(node "$playwright_script" "$sandbox_url" --check 2>/dev/null)
@@ -457,7 +458,9 @@ HELP
     _warn "[acg] acg_check_ttl: node exited $exit_code"
     return 1
   fi
-  printf '%s\n' "$output" | grep '^REMAINING_MINS:' | cut -d: -f2
+  local remaining
+  remaining=$(printf '%s\n' "$output" | grep '^REMAINING_MINS:' | cut -d: -f2)
+  printf '%s\n' "${remaining:--1}"
 }
 
 function acg_extend_playwright() {
