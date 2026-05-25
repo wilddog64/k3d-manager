@@ -825,7 +825,7 @@ else
       -e "s/\${PRODUCT_CATALOG_CLIENT_SECRET}/${_product_client_secret}/g" \
       -e "s/\${GRAFANA_CLIENT_SECRET}/${_grafana_client_secret}/g" \
       -e "s/\${LDAP_BIND_CREDENTIAL}/${_ldap_admin_pass}/g" \
-      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/config/realm-shopping-cart.json")
+      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/keycloak/realm-shopping-cart.json")
     _realm_json_file="$(mktemp -t keycloak-realm.XXXXXX.json)"
     printf '%s\n' "${_realm_json}" > "${_realm_json_file}"
 
