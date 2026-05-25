@@ -1,6 +1,10 @@
 # Progress — lib-acg
 
-## v0.1.0 Track — `fix/next-improvements-6` (active)
+## v0.1.0 Track — `fix/next-improvements-7` (active)
+
+- **COMPLETE:** v0.3.1 bugfix sweep on `fix/next-improvements-7` finished. `scripts/hooks/pre-commit` now iterates deleted references safely with `read` instead of unquoted `$_refs`; `scripts/plugins/acg.sh` now returns `1` on missing `node` and `-1` when TTL output is unparseable; `package.json` and `package-lock.json` now both report `0.3.0`. Commits: `4e55392`, `4f7a1f3`, `7f1261c`. Pushed to `origin/fix/next-improvements-7`. Validation: `shellcheck -S warning scripts/hooks/pre-commit`, `shellcheck -S warning scripts/plugins/acg.sh`, `node --check playwright/*.js`.
+
+- **MERGED PR #28** (`ee87aeb2`): Visibility guard — three-part check (`offsetParent !== null && getComputedStyle(d).display !== 'none' && getComputedStyle(d).visibility !== 'hidden'`) across `acg_credentials.js` and `acg_restart.js` to fix false-positive "Extend Your Session" detection. Bug doc: `docs/bugs/2026-05-24-acg-credentials-false-positive-extend-dialog.md`. Retro: `docs/retro/2026-05-24-pr28-retrospective.md`.
 
 - **MERGED PR #27** (`7c17da72`): 14 bug fixes on `fix/next-improvements-5` → main. Root cause: toast-dismiss block inside async polling loop was architecturally wrong. Fixed by removing dismiss block from `_waitForCredentials`, consolidating toast handling to `addLocatorHandler` in pointer-action paths, correcting CDP Browser lifecycle (`close()` not `disconnect()`), and extending toast detection windows to match async server response timing (15s/10s instead of 5s/3s). Retro: `docs/retro/2026-05-23-pr27-retrospective.md`.
 
