@@ -1,6 +1,10 @@
 # Progress — k3d-manager
 
 ## Status (v1.4.10 — active)
+- **COMPLETE — shopping-cart-frontend PR #22 POST-MERGE:** `fix/product-detail-field-mapping` → `main` merged (SHA `bef902a1`); enforce_admins restored ✓; `docs/next-improvements` branch checked out locally ✓; CHANGELOG confirmed `[Unreleased]` (no version bump) ✓; retrospective created (`2026-05-25-pr22-product-detail-fix-retrospective.md`) + committed (`1581e93`) + pushed to origin ✓
+- **COMPLETE — shopping-cart-payment PR #21 POST-MERGE:** `fix/payment-remove-placeholder-secret` → `main` merged (SHA `9f9701bb`); enforce_admins restored ✓; `docs/next-improvements` branch checked out locally ✓; CHANGELOG confirmed `[Unreleased]` (no version bump) ✓; retrospective created (`2026-05-25-pr21-placeholder-secret-removal-retrospective.md`) + committed (`a36179e`) + pushed to origin ✓
+- **COMPLETE:** `shopping-cart-payment` branch `fix/payment-remove-placeholder-secret` now removes `k8s/base/secret.yaml` from `k8s/base/kustomization.yaml` and deletes the placeholder secret manifest so ESO owns `payment-db-credentials` and `payment-encryption-secret`; committed as `f3f3817` (`fix(payment): remove placeholder secret.yaml — ESO owns payment-db-credentials and payment-encryption-secret`) and pushed to `origin/fix/payment-remove-placeholder-secret`. Validation passed for `kubectl kustomize k8s/base`.
+- **COMPLETE:** `shopping-cart-frontend` branch `fix/product-detail-field-mapping` now maps `quantity`→`stock` and `image_url`→`imageUrl` in `src/services/productService.ts:getProductById`, and adds the `/minio/` nginx proxy in `nginx.conf`; committed as `66b9007` (`fix(product-detail): map quantity→stock and image_url→imageUrl in getProductById; add /minio/ nginx proxy`) and pushed to `origin/fix/product-detail-field-mapping`. Validation passed for `npm run build` and `npm run lint`.
 - **MERGED PR #80:** v1.4.9 release merged to main (`a294dfc2`); enforce_admins restored ✓; retrospective committed (`b285331a`) to k3d-manager-v1.4.10 ✓; next branch k3d-manager-v1.4.10 created ✓; memory-bank updated ✓
 
 ## Status (v1.4.9 — COMPLETE)
