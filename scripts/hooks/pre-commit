@@ -43,10 +43,12 @@ git diff --cached --name-only -z --diff-filter=ACM | \
 # in any .sh or .js file that remains in the index after this commit.
 while IFS= read -r -d '' _deleted; do
   _base="$(basename "$_deleted")"
-  _refs="$(git grep --cached -l "$_base" -- '*.sh' '*.js' 2>/dev/null || true)"
+  _refs="$(git grep -F --cached -l "$_base" -- '*.sh' '*.js' 2>/dev/null || true)"
   if [[ -n "$_refs" ]]; then
     printf 'Pre-commit: deleting %s but it is still referenced in:\n' "$_deleted" >&2
-    printf '  %s\n' $_refs >&2
+    while IFS= read -r _ref; do
+      printf '  %s\n' "$_ref" >&2
+    done <<< "$_refs"
     exit 1
   fi
 done < <(git diff --cached --name-only -z --diff-filter=D)
