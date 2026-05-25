@@ -1,5 +1,9 @@
 # Active Context — k3d-manager
 
+## Current Status (2026-05-25 — product-catalog schema mismatch bugfix handed to Codex)
+- **OPEN (Codex):** `shopping-cart-product-catalog` branch `fix/product-catalog-schema-mismatch` — add `_recreate_products_if_schema_mismatch()` to `src/product_catalog/database.py`; add `tests/unit/test_database.py` with 4 unit tests (no-op when table missing, no-op when schema correct, drops table on mismatch in sandbox, skips drop in production). Spec: `k3d-manager/docs/bugs/2026-05-25-product-catalog-schema-mismatch-on-fresh-cluster.md`. Commit message: `fix(db): recreate products table on schema mismatch in non-production environments`.
+- **COMPLETE (operational):** products table on ubuntu-k3s cluster fixed — dropped old INTEGER PK table, restarted product-catalog (triggered `create_all()` with correct UUID schema), re-ran seed job → 1000 products seeded ✓
+
 ## Current Status (Post-Merge 2026-05-24 — shopping-cart-product-catalog PR #30 housekeeping complete)
 - Current branch: `k3d-manager-v1.4.9` (created from k3d-manager PR #77 merge SHA `8f08bd35`)
 - **COMPLETE:** `shopping-cart-infra` PR #68 merged (`6f37459d`) — keycloak reconcile job now captures `partialImport` exit code and continues to LDAP setup; PKCE restored on frontend client; enforce_admins restored ✓; `docs/next-improvements` branch synced ✓; retrospective committed (`e18f97d`) ✓
