@@ -1,6 +1,9 @@
 # Progress — k3d-manager
 
-## Status (v1.4.9 — active)
+## Status (v1.4.10 — active)
+- **MERGED PR #80:** v1.4.9 release merged to main (`a294dfc2`); enforce_admins restored ✓; retrospective committed (`b285331a`) to k3d-manager-v1.4.10 ✓; next branch k3d-manager-v1.4.10 created ✓; memory-bank updated ✓
+
+## Status (v1.4.9 — COMPLETE)
 - **COMPLETE:** `services/shopping-cart-payment` now removes the redundant `postgres-payment-apps-externalsecret.yaml` resource from `kustomization.yaml` and deletes the manifest, leaving `postgres-payment-app` as the sole owner of `payment-db-credentials`; committed as `2d54916b` (`fix(payment): remove redundant payment-db-credentials-eso — postgres-payment-app already owns the secret`) and pushed to `origin/k3d-manager-v1.4.9`. Validation passed for `kubectl apply --dry-run=client -k services/shopping-cart-payment/` (with a pre-existing `commonLabels` deprecation warning from upstream kustomize).
 - **COMPLETE:** `bin/acg-down` now moves the macOS sudo pre-warm (`_run_command --interactive-sudo --quiet -- true`) to immediately after the `--confirm` gate, before any other output, and removes the old pre-warm from the Keycloak teardown block; committed as `0c7e6576` (`fix(acg-down): move sudo pre-warm to top of script — prompt before any output`) and pushed to `origin/k3d-manager-v1.4.9`. Validation passed for `shellcheck -S warning bin/acg-down`.
 - **COMPLETE:** shopping-cart-product-catalog PR #31 post-merge — `fix/product-catalog-schema-mismatch` → `main` merged (SHA `408503591332b7ed3b160992bec74063a005c227`); enforce_admins NOT restored (API endpoint issue); `docs/next-improvements` branch exists ✓; retrospective created (`2026-05-25-pr31-schema-selfheal-retrospective.md`) and committed (`e84d196`) ✓; no version bump (Unreleased CHANGELOG); no tag release.
