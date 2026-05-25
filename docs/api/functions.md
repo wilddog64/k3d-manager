@@ -74,6 +74,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `gemini_poll_task` | `scripts/plugins/gemini.sh` | Poll a Copilot coding agent task until complete; print full output verbatim |
 | `deploy_shopping_cart_data` | `scripts/plugins/shopping_cart.sh` | Deploy PostgreSQL (orders/payment/products), Redis cart, RabbitMQ; align passwords to `CHANGE_ME`; create `rabbitmq-credentials` |
 | `acg_extend_playwright` | `scripts/plugins/acg.sh` | Extend ACG sandbox TTL via Playwright automation (public dispatcher entry point for `_acg_extend_playwright`) |
+| `acg_check_ttl` | `scripts/lib/acg/scripts/plugins/acg.sh` | Read ACG sandbox TTL via Playwright and print remaining minutes; returns -1 if unparseable |
 | `ssm_wait` | `scripts/plugins/ssm.sh` | Wait until an EC2 instance is registered and reachable via SSM (polls `ssm describe-instance-information`) |
 | `ssm_exec` | `scripts/plugins/ssm.sh` | Run a shell command on an EC2 instance via SSM `send-command`; prints command output/results after execution |
 | `ssm_tunnel` | `scripts/plugins/ssm.sh` | Open an SSM port-forward tunnel to an EC2 instance (wraps `aws ssm start-session --document-name AWS-StartPortForwardingSession`) |
