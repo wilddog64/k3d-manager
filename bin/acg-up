@@ -1085,10 +1085,12 @@ kubectl apply --context k3d-k3d-cluster \
   -f "${_infra_root}/argocd/config/argocd-cm.yaml" \
   -f "${_infra_root}/argocd/config/argocd-rbac-cm.yaml"
 
-# Override ArgoCD URL to Cloudflare public domain (argocd-cm.yaml has local URL)
+# Override ArgoCD URL and OIDC issuer to Cloudflare public domain (argocd-cm.yaml has local URLs)
 _argocd_public_url="${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}"
+_kc_public_realm_url="${KEYCLOAK_PUBLIC_URL:-https://keycloak.3ai-talk.org}/realms/shopping-cart"
+_oidc_config="name: Keycloak\nissuer: ${_kc_public_realm_url}\nclientID: argocd\nclientSecret: \$oidc.keycloak.clientSecret\nrequestedScopes:\n  - openid\n  - profile\n  - email\nrequestedIDTokenClaims:\n  groups:\n    essential: true\n"
 kubectl patch configmap argocd-cm -n cicd --context k3d-k3d-cluster \
-  --type merge -p "{\"data\":{\"url\":\"${_argocd_public_url}\"}}"
+  --type merge -p "{\"data\":{\"url\":\"${_argocd_public_url}\",\"oidc.config\":\"${_oidc_config}\"}}"
 
 # Patch argocd-secret directly with the OIDC client secret generated earlier in this run.
 # The ExternalSecret (argocd-oidc-secret) will take over once ClusterSecretStore is Ready;
