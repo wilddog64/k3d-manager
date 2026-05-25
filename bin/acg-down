@@ -40,6 +40,10 @@ if [[ "${_confirm}" -eq 0 ]]; then
   exit 1
 fi
 
+if _is_mac; then
+  _run_command --interactive-sudo --quiet -- true
+fi
+
 _info "[acg-down] keep-hub=${_keep_hub} hub-cluster=${_HUB_CLUSTER}"
 
 case "${_cluster_provider}" in
@@ -103,7 +107,6 @@ fi
 rm -f "${_argocd_pf_plist}"
 
 if _is_mac; then
-  _run_command --interactive-sudo --quiet -- true
   _info "[acg-down] Stopping Keycloak browser HTTP listener launchd daemon..."
   _keycloak_browser_label="com.k3d-manager.keycloak-browser-http"
   _keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"
