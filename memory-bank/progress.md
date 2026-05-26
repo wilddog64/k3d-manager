@@ -11,6 +11,7 @@
 
 ## Planned (v1.4.10)
 - **COMPLETE:** services imagePullSecrets refactor — see Status above; commits `1f69b38d` + `b03de3bd`.
+- **IN PROGRESS — services-git ApplicationSet wrong project:** `scripts/etc/argocd/applicationsets/services-git.yaml` line 38: `project: platform` → `project: shopping-cart`; spec: `docs/bugs/2026-05-26-services-git-appset-wrong-project.md`; Codex handoff pending.
 
 ## Pending — Next Release Cycle
 - **PENDING:** Node.js 20 → 22 upgrade across all shopping-cart CI workflows — GitHub Actions deprecated Node.js 20 runner; `node-version: '20'` must be bumped to `'22'` in all jobs in all shopping-cart repos (`frontend`, `basket`, `order`, `payment`, `product-catalog`); issue doc at `shopping-cart-frontend/docs/issues/2026-05-22-nodejs20-deprecation.md` (commit `e6cde03` on `docs/next-improvements`); also consider adding `NODE_VERSION` to workflow-level `env:` block and referencing everywhere.
