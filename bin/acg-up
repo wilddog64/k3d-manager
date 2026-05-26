@@ -676,6 +676,16 @@ _vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placehol
 _vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
 _vault_kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbitmq_pass}\"}"                   rabbitmq/default
 
+if _vault_kv_exists "minio/credentials"; then
+  _info "[acg-up] Reusing existing Vault secret minio/credentials"
+  _minio_root_user=$(_vault_kv_get_field "minio/credentials" "root-user")
+  _minio_root_password=$(_vault_kv_get_field "minio/credentials" "root-password")
+else
+  _minio_root_user="minioadmin"
+  _minio_root_password=$(openssl rand -base64 24 | tr -d '=+/')
+  _vault_kv_put "{\"root-user\":\"${_minio_root_user}\",\"root-password\":\"${_minio_root_password}\"}" minio/credentials
+fi
+
 if _vault_kv_exists "ldap/admin"; then
   _info "[acg-up] Reusing existing Vault secret ldap/admin"
   _ldap_admin_pass=$(_vault_kv_get_field "ldap/admin" "admin_password")
@@ -712,7 +722,7 @@ else
   _grafana_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
   _vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
 fi
-_info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq, ldap, keycloak sandbox secrets)"
+_info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq, minio, ldap, keycloak sandbox secrets)"
 
 _info "[acg-up] Step 10/12 — Registering app cluster with ArgoCD..."
 _argocd_sa_token=$(kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s \
