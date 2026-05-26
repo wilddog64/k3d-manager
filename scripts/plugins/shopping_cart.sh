@@ -93,18 +93,23 @@ function deploy_shopping_cart_data() {
     return 1
   fi
 
-  _info "[shopping_cart] Deploying data layer (PostgreSQL, Redis, RabbitMQ)..."
+  _info "[shopping_cart] Deploying data layer (PostgreSQL, Redis, RabbitMQ, MinIO)..."
   for pg_dir in orders payment products; do
     _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/postgresql/${pg_dir}/"
   done
   _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/redis/cart/"
   _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/rabbitmq/"
+  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/minio/"
 
   _info "[shopping_cart] Waiting for PostgreSQL instances to be Ready..."
   for pg in postgresql-orders postgresql-payment postgresql-products; do
     kubectl rollout status statefulset/"${pg}" \
       -n shopping-cart-data --context ubuntu-k3s --timeout=120s
   done
+
+  _info "[shopping_cart] Waiting for MinIO to be Ready..."
+  kubectl rollout status statefulset/minio \
+    -n shopping-cart-data --context ubuntu-k3s --timeout=120s
 
   _info "[shopping_cart] Aligning PostgreSQL passwords to match app secrets (CHANGE_ME)..."
   for pg_pod in postgresql-orders-0 postgresql-products-0; do
@@ -121,6 +126,57 @@ function deploy_shopping_cart_data() {
 
 
   _info "[shopping_cart] Data layer deployed."
+}
+
+function shopping_cart_sync_vault_backed_secrets() {
+  local repo_root
+  if ! repo_root=$(git rev-parse --show-toplevel 2>/dev/null); then
+    _err "[shopping_cart] Unable to determine repository root"
+    return 1
+  fi
+
+  local infra_root="${repo_root}/../shopping-carts/shopping-cart-infra/data-layer"
+  if [[ ! -d "${infra_root}" ]]; then
+    _err "[shopping_cart] shopping-cart-infra data-layer not found: ${infra_root}"
+    _err "[shopping_cart] Clone shopping-cart-infra under ../shopping-carts/"
+    return 1
+  fi
+
+  _info "[shopping_cart] Applying Vault-backed ExternalSecrets for data, app, payment, and MinIO..."
+  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/secrets/"
+  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/minio/secret.yaml"
+
+  _info "[shopping_cart] Waiting for Vault-backed ExternalSecrets to become Ready..."
+  local -a externalsecrets=(
+    "shopping-cart-data/redis-cart"
+    "shopping-cart-data/redis-orders-cache"
+    "shopping-cart-data/postgres-orders-readwrite"
+    "shopping-cart-data/postgres-products-app"
+    "shopping-cart-data/postgres-products-readwrite"
+    "shopping-cart-data/rabbitmq-credentials"
+    "shopping-cart-data/minio-credentials"
+    "shopping-cart-apps/redis-cart-apps"
+    "shopping-cart-apps/redis-orders-cache-apps"
+    "shopping-cart-apps/order-service-secrets"
+    "shopping-cart-apps/product-catalog-secrets"
+    "shopping-cart-payment/postgres-payment-app"
+    "shopping-cart-payment/payment-encryption-secret"
+    "shopping-cart-payment/payment-gateway-secrets"
+  )
+
+  local externalsecret namespace name
+  for externalsecret in "${externalsecrets[@]}"; do
+    namespace="${externalsecret%%/*}"
+    name="${externalsecret##*/}"
+    if ! kubectl get externalsecret "${name}" -n "${namespace}" --context ubuntu-k3s >/dev/null 2>&1; then
+      _warn "[shopping_cart] ExternalSecret ${namespace}/${name} not found — skipping wait"
+      continue
+    fi
+    kubectl wait --for=condition=Ready --timeout=180s \
+      externalsecret/"${name}" -n "${namespace}" --context ubuntu-k3s
+  done
+
+  _info "[shopping_cart] Vault-backed ExternalSecrets synced."
 }
 
 function shopping_cart_load_ghcr_pat_from_env() {
@@ -504,6 +560,7 @@ function shopping_cart_prepare_cluster_secrets_and_seed() {
   _info "[acg-up] Step 9/12 — Applying vault-token secret + ClusterSecretStore on remote cluster..."
   shopping_cart_apply_vault_token_and_cluster_secret_store
   shopping_cart_seed_sandbox_vault_kv
+  shopping_cart_sync_vault_backed_secrets
 }
 
 function shopping_cart_reconcile_product_catalog() {
