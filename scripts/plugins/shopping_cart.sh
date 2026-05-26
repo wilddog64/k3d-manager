@@ -107,6 +107,8 @@ function deploy_shopping_cart_data() {
       -n shopping-cart-data --context ubuntu-k3s --timeout=120s
   done
 
+  shopping_cart_reconcile_order_service
+
   _info "[shopping_cart] Waiting for MinIO to be Ready..."
   kubectl rollout status statefulset/minio \
     -n shopping-cart-data --context ubuntu-k3s --timeout=120s
@@ -638,6 +640,42 @@ function shopping_cart_reconcile_product_catalog() {
     fi
   else
     _info "[acg-up] Product catalog already has ${_product_count} products — skipping seed"
+  fi
+}
+
+function shopping_cart_reconcile_order_service() {
+  _info "[acg-up] Step 11a/14 — Reconciling PostgreSQL orders password with Vault..."
+  if [[ -z "${_pg_pass_orders:-}" ]]; then
+    _info "[acg-up] WARN: _pg_pass_orders is empty — skipping order-service password reconciliation"
+    return 0
+  fi
+
+  kubectl exec -n shopping-cart-data --context ubuntu-k3s postgresql-orders-0 -- \
+    psql -U postgres -c "ALTER USER postgres PASSWORD '${_pg_pass_orders}';" >/dev/null 2>&1 \
+    && _info "[acg-up] PostgreSQL orders password reconciled with Vault" \
+    || _info "[acg-up] WARN: could not reconcile PostgreSQL orders password"
+
+  kubectl annotate externalsecret order-service-secrets \
+    -n shopping-cart-apps --context ubuntu-k3s \
+    force-sync="$(date +%s)" --overwrite >/dev/null 2>&1 \
+    && _info "[acg-up] ESO force-sync triggered for order-service-secrets" \
+    || _info "[acg-up] WARN: could not trigger ESO force-sync for order-service-secrets"
+
+  if kubectl get deployment order-service \
+      -n shopping-cart-apps --context ubuntu-k3s >/dev/null 2>&1; then
+    _os_db_pw=$(kubectl exec -n shopping-cart-apps --context ubuntu-k3s \
+      deploy/order-service -- sh -c 'echo $DB_PASSWORD' 2>/dev/null | tr -d '[:space:]') || _os_db_pw=""
+    if [[ -n "${_os_db_pw}" && "${_os_db_pw}" != "${_pg_pass_orders}" ]]; then
+      _info "[acg-up] order-service DB_PASSWORD mismatch — restarting to pick up ESO secret..."
+      kubectl rollout restart deployment/order-service \
+        -n shopping-cart-apps --context ubuntu-k3s >/dev/null \
+        || _info "[acg-up] WARN: could not restart order-service"
+      kubectl rollout status deployment/order-service \
+        -n shopping-cart-apps --context ubuntu-k3s --timeout=120s 2>/dev/null \
+        || _info "[acg-up] WARN: order-service rollout did not finish within 120s"
+    fi
+  else
+    _info "[acg-up] order-service not yet deployed — skipping DB_PASSWORD mismatch check"
   fi
 }
 

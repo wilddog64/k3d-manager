@@ -57,6 +57,7 @@
     declare -F shopping_cart_prepare_infra_bootstrap >/dev/null
     declare -F shopping_cart_prepare_cluster_secrets_and_seed >/dev/null
     declare -F shopping_cart_sync_vault_backed_secrets >/dev/null
+    declare -F shopping_cart_reconcile_order_service >/dev/null
     declare -F shopping_cart_reconcile_product_catalog >/dev/null
   '
   [ "$status" -eq 0 ]
