@@ -467,10 +467,11 @@ for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
     -n "$ns" \
     --dry-run=client -o yaml \
     | kubectl apply --context ubuntu-k3s -f -
-  kubectl patch serviceaccount default -n shopping-cart-apps \
-    -p '{"imagePullSecrets": [{"name": "ghcr-pull-secret"}]}'
   _info "[acg-up] ghcr-pull-secret applied in namespace: ${ns}"
 done
+kubectl patch serviceaccount default -n shopping-cart-apps \
+  --context ubuntu-k3s \
+  -p '{"imagePullSecrets": [{"name": "ghcr-pull-secret"}]}'
 
 _info "[acg-up] Step 6/12 — Creating vault-bridge Endpoints + Service in secrets namespace..."
 _vault_node_ip=$(kubectl get nodes --context ubuntu-k3s \
