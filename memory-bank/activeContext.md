@@ -2,6 +2,7 @@
 
 ## Current Status (2026-05-25 — shopping-cart-frontend PR #23 merged; post-merge housekeeping complete)
 - Current branch: `k3d-manager-v1.4.10` (created from k3d-manager PR #80 merge SHA `a294dfc250cb1e6eecf1e07f478fa7c70c6b60d9`)
+- **COMPLETE:** services imagePullSecrets refactor — `bin/acg-up` patches `default` ServiceAccount in `shopping-cart-apps` after `ghcr-pull-secret` creation (SA patch moved outside namespace loop, `--context ubuntu-k3s` added); all 5 `services/shopping-cart-*/kustomization.yaml` have `imagePullSecrets` patches removed; order-service functional patches (probes + RabbitMQ ConfigMap/env) restored after Codex incorrectly deleted them; commits `1f69b38d` (Codex) + `b03de3bd` (Claude fix); shellcheck clean ✓.
 - **COMPLETE — shopping-cart-frontend PR #23 POST-MERGE:** `fix/cart-response-unwrap` → `main` merged (SHA `0ca35f0` / 2026-05-25); enforce_admins restored ✓; `docs/next-improvements` branch already existed on shopping-cart-frontend, checked out locally ✓; no version bump (Unreleased CHANGELOG only); retrospective (`2026-05-25-fix-cart-response-unwrap-retrospective.md`) created + committed (`4ebecfc`) + pushed to origin ✓; k3d-manager memory-bank updated ✓
 - **COMPLETE — shopping-cart-frontend PR #22 POST-MERGE:** `fix/product-detail-field-mapping` → `main` merged (SHA `bef902a1` / 2026-05-25); enforce_admins restored ✓; `docs/next-improvements` branch already existed, checked out locally ✓; no version bump (Unreleased CHANGELOG); retrospective (`2026-05-25-pr22-product-detail-fix-retrospective.md`) committed (`1581e93`) + pushed to origin ✓
 - **COMPLETE — shopping-cart-payment PR #21 POST-MERGE:** `fix/payment-remove-placeholder-secret` → `main` merged (SHA `9f9701bb` / 2026-05-25); enforce_admins restored ✓; `docs/next-improvements` branch already existed, checked out locally ✓; no version bump (Unreleased CHANGELOG); retrospective (`2026-05-25-pr21-placeholder-secret-removal-retrospective.md`) committed (`a36179e`) + pushed to origin ✓
@@ -22,7 +23,7 @@
 - **REMAINING BLOCKER — ArgoCD Image Updater ghcr-pull-secret:** `ghcr-pull-secret` in `shopping-cart-apps` needs credential rotation — current token gets `permission_denied: The token provided does not match expected scopes` from ghcr.io OAuth2 tag-list API. Rotate with a classic PAT (`read:packages`) and update the secret on `ubuntu-k3s`.
 
 ## Planned (v1.4.10)
-- **SPEC WRITTEN — services imagePullSecrets refactor:** spec: `docs/plans/v1.4.10-refactor-services-imagepullsecrets.md`; removes per-app `patches` block from all 5 `services/shopping-cart-*/kustomization.yaml` files; adds `kubectl patch serviceaccount default -n shopping-cart-apps` in `bin/acg-up` after ghcr-pull-secret creation; eliminates per-Deployment coupling in k3d-manager.
+- **COMPLETE:** services imagePullSecrets refactor — see Current Status above; commits `1f69b38d` + `b03de3bd`.
 
 ## Archived
 Entries for v1.4.2–v1.4.8 archived to `memory-bank/archive/activeContext-v1.4.2-v1.4.8.md`
