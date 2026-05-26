@@ -11,6 +11,7 @@
 - **MERGED PR #80:** v1.4.9 release merged to main (`a294dfc2`); enforce_admins restored ✓; retrospective committed (`b285331a`) to k3d-manager-v1.4.10 ✓; next branch k3d-manager-v1.4.10 created ✓; memory-bank updated ✓
 
 ## Planned (v1.4.10)
+- **IN PROGRESS — acg-down /tmp cleanup:** `bin/acg-down` spec written — add `rm -f` for `/tmp/argocd-*.sock`, `/tmp/k3d-config-tmp-*.yaml`, `/tmp/k3d-hostsfile-*`; spec: `docs/bugs/2026-05-26-acg-down-tmp-cleanup.md`; Codex handoff pending.
 - **COMPLETE:** services-git ApplicationSet project fix — `scripts/etc/argocd/applicationsets/services-git.yaml` now sets `project: shopping-cart` for shopping-cart service apps instead of `platform`; committed as `469a86a7` and pushed to `origin/k3d-manager-v1.4.10`. Validation note: `./scripts/k3d-manager _agent_audit` passed; `_agent_checkpoint` hit `.git/index.lock` permission errors and the failure was recorded in `docs/issues/2026-05-26-agent-checkpoint-index-lock-permission-error.md` (committed as `3c486d9f`).
 
 ## Pending — Next Release Cycle
