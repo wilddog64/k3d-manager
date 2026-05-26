@@ -1,8 +1,8 @@
 # Active Context — k3d-manager
 
-## Current Status (2026-05-26 — services-git ApplicationSet project bug spec written)
+## Current Status (2026-05-26 — services-git ApplicationSet project fix complete)
 - Current branch: `k3d-manager-v1.4.10` (created from k3d-manager PR #80 merge SHA `a294dfc250cb1e6eecf1e07f478fa7c70c6b60d9`)
-- **SPEC WRITTEN — services-git ApplicationSet wrong project:** `scripts/etc/argocd/applicationsets/services-git.yaml` line 38 hardcodes `project: platform`; ArgoCD reconciles individual app patches back immediately. Fix: change to `project: shopping-cart`. Spec: `docs/bugs/2026-05-26-services-git-appset-wrong-project.md`. Awaiting Codex handoff.
+- **COMPLETE:** `scripts/etc/argocd/applicationsets/services-git.yaml` now sets `project: shopping-cart` for the `services-git` ApplicationSet template so shopping-cart service apps land in the `shopping-cart` ArgoCD project instead of `platform`; committed as `469a86a7` (`fix(argocd): assign shopping-cart services to shopping-cart project in services-git ApplicationSet`) and pushed to `origin/k3d-manager-v1.4.10`. Validation: `./scripts/k3d-manager _agent_audit` passed; `./scripts/k3d-manager _agent_checkpoint` failed with `.git/index.lock` permission errors and the failure was recorded in `docs/issues/2026-05-26-agent-checkpoint-index-lock-permission-error.md` (committed as `3c486d9f`).
 - **CONTEXT:** ubuntu-k3s cluster restarted fresh (2026-05-26); cicd namespace empty; ArgoCD not yet deployed. Next `acg-up` run will apply the corrected ApplicationSet.
 - **COMPLETE:** services imagePullSecrets refactor — `bin/acg-up` patches `default` ServiceAccount in `shopping-cart-apps` after `ghcr-pull-secret` creation (SA patch moved outside namespace loop, `--context ubuntu-k3s` added); all 5 `services/shopping-cart-*/kustomization.yaml` have `imagePullSecrets` patches removed; order-service functional patches (probes + RabbitMQ ConfigMap/env) restored after Codex incorrectly deleted them; commits `1f69b38d` (Codex) + `b03de3bd` (Claude fix); shellcheck clean ✓.
 - **COMPLETE — shopping-cart-frontend PR #23 POST-MERGE:** `fix/cart-response-unwrap` → `main` merged (SHA `0ca35f0` / 2026-05-25); enforce_admins restored ✓; `docs/next-improvements` branch already existed on shopping-cart-frontend, checked out locally ✓; no version bump (Unreleased CHANGELOG only); retrospective (`2026-05-25-fix-cart-response-unwrap-retrospective.md`) created + committed (`4ebecfc`) + pushed to origin ✓; k3d-manager memory-bank updated ✓
@@ -25,7 +25,7 @@
 - **REMAINING BLOCKER — ArgoCD Image Updater ghcr-pull-secret:** `ghcr-pull-secret` in `shopping-cart-apps` needs credential rotation — current token gets `permission_denied: The token provided does not match expected scopes` from ghcr.io OAuth2 tag-list API. Rotate with a classic PAT (`read:packages`) and update the secret on `ubuntu-k3s`.
 
 ## Planned (v1.4.10)
-- **COMPLETE:** services imagePullSecrets refactor — see Current Status above; commits `1f69b38d` + `b03de3bd`.
+- **COMPLETE:** services-git ApplicationSet project fix — `scripts/etc/argocd/applicationsets/services-git.yaml` now sets `project: shopping-cart` for shopping-cart service apps; committed as `469a86a7` and pushed to `origin/k3d-manager-v1.4.10`. Validation note: `./scripts/k3d-manager _agent_audit` passed; `_agent_checkpoint` hit `.git/index.lock` permission errors and the failure was recorded in `docs/issues/2026-05-26-agent-checkpoint-index-lock-permission-error.md` (committed as `3c486d9f`).
 
 ## Archived
 Entries for v1.4.2–v1.4.8 archived to `memory-bank/archive/activeContext-v1.4.2-v1.4.8.md`
