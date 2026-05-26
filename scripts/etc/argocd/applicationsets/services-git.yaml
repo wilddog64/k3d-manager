@@ -35,7 +35,7 @@ spec:
         argocd-image-updater.argoproj.io/write-back-method: >-
           {{- if eq .path.basename "shopping-cart-product-catalog"}}argocd{{end}}
     spec:
-      project: platform
+      project: shopping-cart
       destination:
         name: ubuntu-k3s
         namespace: shopping-cart-apps
