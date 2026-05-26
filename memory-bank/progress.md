@@ -8,6 +8,9 @@
 - **COMPLETE:** `shopping-cart-frontend` branch `fix/product-detail-field-mapping` now maps `quantity`→`stock` and `image_url`→`imageUrl` in `src/services/productService.ts:getProductById`, and adds the `/minio/` nginx proxy in `nginx.conf`; committed as `66b9007` and pushed to `origin/fix/product-detail-field-mapping`.
 - **MERGED PR #80:** v1.4.9 release merged to main (`a294dfc2`); enforce_admins restored ✓; retrospective committed (`b285331a`) to k3d-manager-v1.4.10 ✓; next branch k3d-manager-v1.4.10 created ✓; memory-bank updated ✓
 
+## Planned (v1.4.10)
+- **SPEC WRITTEN:** services imagePullSecrets refactor — spec: `docs/plans/v1.4.10-refactor-services-imagepullsecrets.md`; removes per-app `patches` block from all 5 `services/shopping-cart-*/kustomization.yaml`; patches `default` ServiceAccount in `shopping-cart-apps` namespace in `bin/acg-up` instead; assign to Codex when ready.
+
 ## Pending — Next Release Cycle
 - **PENDING:** Node.js 20 → 22 upgrade across all shopping-cart CI workflows — GitHub Actions deprecated Node.js 20 runner; `node-version: '20'` must be bumped to `'22'` in all jobs in all shopping-cart repos (`frontend`, `basket`, `order`, `payment`, `product-catalog`); issue doc at `shopping-cart-frontend/docs/issues/2026-05-22-nodejs20-deprecation.md` (commit `e6cde03` on `docs/next-improvements`); also consider adding `NODE_VERSION` to workflow-level `env:` block and referencing everywhere.
 

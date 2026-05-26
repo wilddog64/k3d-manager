@@ -21,5 +21,8 @@
 - **IN PROGRESS — shopping-cart-infra PR #60 open** (`shopping-cart-infra-v0.5.5`); fixes Keycloak ERR_NAME_NOT_RESOLVED from office laptop — KC_HOSTNAME_URL→https://keycloak.3ai-talk.org, argocd-cm issuer+url→3ai-talk.org, realm argocd redirectUri→/auth/callback; CI green; 2 Copilot findings fixed in `6a9d128`; waiting for 2nd Copilot review. ArgoCD-cm and argocd-server already patched live.
 - **REMAINING BLOCKER — ArgoCD Image Updater ghcr-pull-secret:** `ghcr-pull-secret` in `shopping-cart-apps` needs credential rotation — current token gets `permission_denied: The token provided does not match expected scopes` from ghcr.io OAuth2 tag-list API. Rotate with a classic PAT (`read:packages`) and update the secret on `ubuntu-k3s`.
 
+## Planned (v1.4.10)
+- **SPEC WRITTEN — services imagePullSecrets refactor:** spec: `docs/plans/v1.4.10-refactor-services-imagepullsecrets.md`; removes per-app `patches` block from all 5 `services/shopping-cart-*/kustomization.yaml` files; adds `kubectl patch serviceaccount default -n shopping-cart-apps` in `bin/acg-up` after ghcr-pull-secret creation; eliminates per-Deployment coupling in k3d-manager.
+
 ## Archived
 Entries for v1.4.2–v1.4.8 archived to `memory-bank/archive/activeContext-v1.4.2-v1.4.8.md`
