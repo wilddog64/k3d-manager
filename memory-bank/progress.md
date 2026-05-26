@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status (v1.4.10 — active)
+- **COMPLETE:** services imagePullSecrets refactor — `bin/acg-up` patches `default` ServiceAccount in `shopping-cart-apps` after `ghcr-pull-secret` creation (SA patch moved outside the namespace loop); all 5 `services/shopping-cart-*/kustomization.yaml` have `patches` block removed; order-service functional patches (probes + RabbitMQ ConfigMap/env) restored after Codex incorrectly deleted them; committed as `1f69b38d` (Codex) + `b03de3bd` (Claude fix) and pushed to `origin/k3d-manager-v1.4.10`; shellcheck clean ✓.
 - **COMPLETE — shopping-cart-frontend PR #23 POST-MERGE:** `fix/cart-response-unwrap` → `main` merged (SHA `0ca35f0` / 2026-05-25); enforce_admins restored ✓; `docs/next-improvements` branch already existed on shopping-cart-frontend, checked out locally ✓; no version bump (Unreleased CHANGELOG only); retrospective (`2026-05-25-fix-cart-response-unwrap-retrospective.md`) created + committed (`4ebecfc`) + pushed to origin ✓; k3d-manager memory-bank updated ✓
 - **COMPLETE — shopping-cart-frontend PR #22 POST-MERGE:** `fix/product-detail-field-mapping` → `main` merged (SHA `bef902a1` / 2026-05-25); enforce_admins restored ✓; `docs/next-improvements` branch already existed, checked out locally ✓; no version bump (Unreleased CHANGELOG); retrospective (`2026-05-25-pr22-product-detail-fix-retrospective.md`) committed (`1581e93`) + pushed to origin ✓
 - **COMPLETE — shopping-cart-payment PR #21 POST-MERGE:** `fix/payment-remove-placeholder-secret` → `main` merged (SHA `9f9701bb` / 2026-05-25); enforce_admins restored ✓; `docs/next-improvements` branch already existed, checked out locally ✓; no version bump (Unreleased CHANGELOG); retrospective (`2026-05-25-pr21-placeholder-secret-removal-retrospective.md`) committed (`a36179e`) + pushed to origin ✓
@@ -9,7 +10,7 @@
 - **MERGED PR #80:** v1.4.9 release merged to main (`a294dfc2`); enforce_admins restored ✓; retrospective committed (`b285331a`) to k3d-manager-v1.4.10 ✓; next branch k3d-manager-v1.4.10 created ✓; memory-bank updated ✓
 
 ## Planned (v1.4.10)
-- **SPEC WRITTEN:** services imagePullSecrets refactor — spec: `docs/plans/v1.4.10-refactor-services-imagepullsecrets.md`; removes per-app `patches` block from all 5 `services/shopping-cart-*/kustomization.yaml`; patches `default` ServiceAccount in `shopping-cart-apps` namespace in `bin/acg-up` instead; assign to Codex when ready.
+- **COMPLETE:** services imagePullSecrets refactor — see Status above; commits `1f69b38d` + `b03de3bd`.
 
 ## Pending — Next Release Cycle
 - **PENDING:** Node.js 20 → 22 upgrade across all shopping-cart CI workflows — GitHub Actions deprecated Node.js 20 runner; `node-version: '20'` must be bumped to `'22'` in all jobs in all shopping-cart repos (`frontend`, `basket`, `order`, `payment`, `product-catalog`); issue doc at `shopping-cart-frontend/docs/issues/2026-05-22-nodejs20-deprecation.md` (commit `e6cde03` on `docs/next-improvements`); also consider adding `NODE_VERSION` to workflow-level `env:` block and referencing everywhere.
