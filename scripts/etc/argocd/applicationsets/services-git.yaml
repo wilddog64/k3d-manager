@@ -51,6 +51,18 @@ spec:
           jsonPointers:
             - /data/username
             - /data/password
+        - group: ""
+          kind: Secret
+          name: order-service-secrets
+          namespace: shopping-cart-apps
+          jsonPointers:
+            - /data
+        - group: ""
+          kind: ConfigMap
+          name: product-catalog-seed-script
+          namespace: shopping-cart-apps
+          jsonPointers:
+            - /data
       syncPolicy:
         automated:
           prune: true
