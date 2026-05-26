@@ -1,7 +1,7 @@
 # 2026-05-26 — `_agent_checkpoint` cannot create `.git/index.lock`
 
 **Repository:** `k3d-manager`
-**Context:** services-git ApplicationSet project fix validation
+**Context:** `bin/acg-down` /tmp cleanup change
 
 ## What was tested
 
@@ -9,12 +9,6 @@ Ran:
 
 ```bash
 ./scripts/k3d-manager _agent_checkpoint
-```
-
-Then checked for a stale lock file:
-
-```bash
-ls -l .git/index.lock
 ```
 
 ## Actual output
@@ -25,15 +19,11 @@ fatal: Unable to create '/Users/cliang/src/gitrepo/personal/k3d-manager/.git/ind
 ERROR: Failed to stage files for checkpoint
 ```
 
-```text
-ls: cannot access '.git/index.lock': No such file or directory
-```
-
 ## Root cause
 
-Likely a sandbox or filesystem permission restriction on creating the Git index lock file during `_agent_checkpoint`. The lock file was not left behind afterward.
+The helper could not create `.git/index.lock` in this environment. No stale lock file was left behind.
 
 ## Follow-up
 
-- Continue using the normal `git add` / `git commit` path for this task.
-- Revisit `_agent_checkpoint` environment assumptions if this happens again on the same machine.
+- Continue with the normal `git commit` path for this task.
+- Revisit `_agent_checkpoint` environment assumptions if the failure repeats on this machine.
