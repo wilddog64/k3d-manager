@@ -2,6 +2,7 @@
 
 ## Status (v1.4.10 — active)
 - **CONTEXT:** `k3d-manager-v1.4.10` now carries the ArgoCD ignoreDifferences fix for the expected drift on `shopping-cart-order` and `shopping-cart-product-catalog`.
+- **COMPLETE:** `shopping-cart-frontend` PR #24 merged into `main`; the frontend repo is synced to `origin/main`, `docs/next-improvements` was reset to the merged tip, and `main` protection on `wilddog64/shopping-cart-frontend` has been restored.
 - **COMPLETE:** `scripts/etc/argocd/applicationsets/services-git.yaml` now ignores expected drift for `Secret/order-service-secrets` and `ConfigMap/product-catalog-seed-script` in `shopping-cart-apps`, so ArgoCD no longer reports the healthy apps as OutOfSync on those data objects; committed as `898927eb` (`fix(argocd): ignore expected order and product-catalog drift`) and pushed to `origin/k3d-manager-v1.4.10`. Validation: `git diff --check` passed; `./scripts/k3d-manager _agent_audit` passed.
 - **COMPLETE:** `docs/issues/2026-05-26-argocd-expected-drift-order-and-product-catalog.md` records the OutOfSync/Healthy drift, the exact objects involved, and the recommended `services-git` ignoreDifferences policy. Committed as `450a72e3` (`docs: add argocd expected drift issue`).
 - **POINTER:** `shopping-cart-frontend/docs/issues/2026-05-26-minio-product-images-404-nginx-regex-order.md` tracks the broken product image RCA, and the frontend fix branch `fix/minio-image-proxy-regex-order` restores the `^~ /minio/product-images/` guard so the browser routes JPEGs to MinIO instead of the static-asset regex.
