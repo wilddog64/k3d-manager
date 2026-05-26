@@ -115,7 +115,12 @@ This is a bootstrap-gating problem, not a single service bug. The remote cluster
 
 ## Recommended prevention
 
+- Keep the local `k3d` cluster intact; the recovery path here is the remote ACG/`ubuntu-k3s` rebuild only.
 - Make the remote rebuild path idempotent and explicit: cluster, Vault, ESO, data-layer, then shopping-cart apps.
+- Teach `make up` / `bin/acg-up` to always re-run Vault secret reconciliation after the sandbox expires, even if the local cluster already exists.
+- Split that recovery step into two parts:
+  - seed or re-validate the required Vault KV entries
+  - wait for ESO to materialize the Kubernetes Secrets before app startup
 - Add a post-rebuild smoke gate that fails fast if any of these are missing:
   - `redis-cart-secret`
   - `payment-db-credentials`
@@ -126,5 +131,5 @@ This is a bootstrap-gating problem, not a single service bug. The remote cluster
 
 ## Follow-up
 
-- Update the `acg-up`/remote bootstrap flow to verify `shopping-cart-data`, `shopping-cart-apps`, and `shopping-cart-payment` are all healthy before returning success.
+- Update the `acg-up`/remote bootstrap flow to verify the Vault-backed secrets are present and then confirm `shopping-cart-data`, `shopping-cart-apps`, and `shopping-cart-payment` are all healthy before returning success.
 - Add or expand a smoke test that checks for the secrets and services listed above after a fresh remote rebuild.
