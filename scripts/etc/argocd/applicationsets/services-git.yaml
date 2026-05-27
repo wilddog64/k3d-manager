@@ -57,12 +57,15 @@ spec:
           namespace: shopping-cart-apps
           jsonPointers:
             - /data
+            - /metadata/labels
+            - /metadata/ownerReferences
         - group: ""
           kind: ConfigMap
           name: product-catalog-seed-script
           namespace: shopping-cart-apps
           jsonPointers:
             - /data
+            - /metadata/labels
       syncPolicy:
         automated:
           prune: true
