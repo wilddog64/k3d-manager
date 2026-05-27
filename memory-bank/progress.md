@@ -1,7 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
-- **v1.4.10 IN PROGRESS** (2026-05-26) — Finalizing OIDC and ArgoCD stability.
+- **v1.4.10 IN PROGRESS** (2026-05-27) — Finalizing OIDC and ArgoCD stability.
 - **v1.4.9 SHIPPED** — Credential extraction and OIDC issuer fixes.
 
 ## Milestone: v1.4.10 (ArgoCD Stability)
@@ -9,7 +9,7 @@
 - [x] Keycloak configuration conflict fix (\`hostname\` vs \`hostname-url\`).
 - [x] ArgoCD infinite sync loop fix for \`order-service-secrets\` (ignored label drift).
 - [x] ArgoCD sync drift fix for \`product-catalog-seed-script\`.
-- [x] DB password alignment for Keycloak/Postgres.
+- [x] Product seed race condition RCA and fix (see \`docs/bugs/2026-05-27-product-catalog-seed-race-condition.md\`).
 
 ## Milestone: v0.4.0 (Observability) — PLANNED
 - [ ] Prometheus ServiceMonitors for core services.
