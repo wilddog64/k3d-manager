@@ -6,13 +6,14 @@
 - **SSO FIX COMPLETE:** Aligned OIDC protocols by enforcing \`KC_HOSTNAME_STRICT: true\` and \`KC_HOSTNAME_URL\`.
 - **ARGOCD DRIFT FIX COMPLETE:** \`scripts/etc/argocd/applicationsets/services-git.yaml\` now ignores expected drift for \`Secret/order-service-secrets\` and \`ConfigMap/product-catalog-seed-script\`.
 - **PRODUCT SEED RACE CONDITION:** Fixed in \`shopping-cart-product-catalog\` PR #32; pointer in \`docs/bugs/2026-05-27-product-catalog-seed-race-condition.md\`.
-- **DB AUTH RECONCILIATION COMPLETE:** Implemented resilient SQL reconciliation in \`bin/acg-up\` and cleaned up legacy \`CHANGE_ME\` overrides in \`scripts/plugins/shopping_cart.sh\`. Spec: \`docs/plans/v1.4.10-resilient-db-password-reconciliation.md\`.
+- **DB AUTH RECONCILIATION COMPLETE:** Implemented resilient SQL reconciliation in \`bin/acg-up\`. Spec: \`docs/plans/v1.4.10-resilient-db-password-reconciliation.md\`.
+- **FRONTEND CHECKOUT BUG:** Identified a contractual mismatch preventing checkout (missing \`shippingAddress\`). RCA documented in \`docs/bugs/2026-05-27-frontend-checkout-contract-mismatch.md\`.
 
 ## Recent Changes
-- **fix(acg-up):** moved DB password reconciliation to end of bootstrap and removed legacy overrides.
-- **fix(argocd):** expand ignoreDifferences for order and product-catalog to include labels.
+- **docs(bugs):** added RCA for frontend checkout contract mismatch (commit \`4f2dac8a\`).
+- **fix(acg-up):** implemented resilient DB password reconciliation.
 - **bug(seed):** fixed product seed race condition via initContainer in app repo.
 
 ## Next Steps
-- Verify DB reconciliation during the next full \`make up\`.
+- Implement frontend checkout form to resolve the contract mismatch.
 - Proceed with v0.4.0 milestone (Observability).
