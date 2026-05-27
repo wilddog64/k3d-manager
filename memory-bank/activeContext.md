@@ -8,12 +8,15 @@
 - **PRODUCT SEED RACE CONDITION:** Fixed in \`shopping-cart-product-catalog\` PR #32; pointer in \`docs/bugs/2026-05-27-product-catalog-seed-race-condition.md\`.
 - **DB AUTH RECONCILIATION COMPLETE:** Implemented resilient SQL reconciliation in \`bin/acg-up\`. Spec: \`docs/plans/v1.4.10-resilient-db-password-reconciliation.md\`.
 - **FRONTEND CHECKOUT BUG:** Identified a contractual mismatch preventing checkout (missing \`shippingAddress\`). RCA documented in \`docs/bugs/2026-05-27-frontend-checkout-contract-mismatch.md\`.
+- **FRONTEND OIDC PUBLIC DOMAIN BUG:** Identified a domain whitelist mismatch preventing login via Cloudflare DNS. RCA documented in \`shopping-cart-frontend\` at \`docs/issues/2026-05-27-frontend-oidc-public-domain-mismatch.md\`.
 
 ## Recent Changes
-- **docs(bugs):** added RCA for frontend checkout contract mismatch (commit \`4f2dac8a\`).
+- **docs(bugs):** added RCA for frontend OIDC public domain mismatch.
+- **docs(bugs):** added RCA for frontend checkout contract mismatch.
 - **fix(acg-up):** implemented resilient DB password reconciliation.
 - **bug(seed):** fixed product seed race condition via initContainer in app repo.
 
 ## Next Steps
+- Add public domain to Keycloak realm config to resolve frontend login mismatch.
 - Implement frontend checkout form to resolve the contract mismatch.
 - Proceed with v0.4.0 milestone (Observability).

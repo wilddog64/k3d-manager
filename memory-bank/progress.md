@@ -12,6 +12,7 @@
 - [x] Product seed race condition fix (PR #32 in \`shopping-cart-product-catalog\`).
 - [x] Resilient DB password reconciliation.
 - [x] Frontend checkout contract mismatch investigation (see \`docs/bugs/2026-05-27-frontend-checkout-contract-mismatch.md\`).
+- [x] Frontend OIDC public domain mismatch investigation (see \`shopping-cart-frontend/docs/issues/2026-05-27-frontend-oidc-public-domain-mismatch.md\`).
 
 ## Milestone: v0.4.0 (Observability) — PLANNED
 - [ ] Prometheus ServiceMonitors for core services.
