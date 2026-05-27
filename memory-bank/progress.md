@@ -9,7 +9,8 @@
 - [x] Keycloak configuration conflict fix (\`hostname\` vs \`hostname-url\`).
 - [x] ArgoCD infinite sync loop fix for \`order-service-secrets\` (ignored label drift).
 - [x] ArgoCD sync drift fix for \`product-catalog-seed-script\`.
-- [x] Product seed race condition RCA and fix (see \`docs/bugs/2026-05-27-product-catalog-seed-race-condition.md\`).
+- [x] Product seed race condition fix (PR #32 in \`shopping-cart-product-catalog\`).
+- [x] Resilient DB password reconciliation (removed \`CHANGE_ME\` logic and moved to end of \`acg-up\`).
 
 ## Milestone: v0.4.0 (Observability) — PLANNED
 - [ ] Prometheus ServiceMonitors for core services.
