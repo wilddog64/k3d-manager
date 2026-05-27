@@ -1151,6 +1151,7 @@ else
   _info "[acg-up] ClusterSecretStore not Ready after 180s — check vault-bridge connectivity"
 fi
 
+shopping_cart_reconcile_order_service
 shopping_cart_reconcile_product_catalog
 
 _info "[acg-up] Step 12/14 — Installing sandbox TTL watcher (launchd)..."

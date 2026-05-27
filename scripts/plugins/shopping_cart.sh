@@ -107,17 +107,9 @@ function deploy_shopping_cart_data() {
       -n shopping-cart-data --context ubuntu-k3s --timeout=120s
   done
 
-  shopping_cart_reconcile_order_service
-
   _info "[shopping_cart] Waiting for MinIO to be Ready..."
   kubectl rollout status statefulset/minio \
     -n shopping-cart-data --context ubuntu-k3s --timeout=120s
-
-  _info "[shopping_cart] Aligning PostgreSQL passwords to match app secrets (CHANGE_ME)..."
-  for pg_pod in postgresql-orders-0 postgresql-products-0; do
-    kubectl exec "${pg_pod}" -n shopping-cart-data --context ubuntu-k3s -- \
-      psql -U postgres -c "ALTER USER postgres WITH PASSWORD 'CHANGE_ME';" 2>/dev/null || true
-  done
 
   _info "[shopping_cart] Creating rabbitmq-credentials secret..."
   kubectl create secret generic rabbitmq-credentials \
