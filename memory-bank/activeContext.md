@@ -8,14 +8,15 @@
 - **PRODUCT SEED RACE CONDITION:** Fixed in \`shopping-cart-product-catalog\` PR #32.
 - **DB AUTH RECONCILIATION COMPLETE:** Implemented resilient SQL reconciliation in \`bin/acg-up\`. Spec: \`docs/plans/v1.4.10-resilient-db-password-reconciliation.md\`.
 - **DATA LAYER GITOPS REFACTOR:** Identified visibility gap for MinIO/Databases in ArgoCD. Spec: \`docs/plans/v1.4.10-data-layer-gitops-consolidation.md\`.
-- **LIB-ACG PROVIDER REFACTOR:** Drafting architecture to support AWS, GCP, and Azure independently using a Dispatcher-Plugin pattern. Spec in \`lib-acg\` at \`docs/plans/v1.2.0-provider-plugin-architecture.md\`.
+- **LIB-ACG PROVIDER REFACTOR:** Drafting architecture to support AWS, GCP, and Azure independently. Spec in \`lib-acg\` at \`docs/plans/v1.2.0-provider-plugin-architecture.md\`.
+- **ARGOCD PERMISSION BUG:** Identified a naming mismatch in RBAC policies preventing manual sync for catalog admins. RCA documented in \`shopping-cart-product-catalog\` at \`docs/bugs/2026-05-28-argocd-permission-denied-catalog-admin.md\`.
 
 ## Recent Changes
-- **docs(plans):** added spec for lib-acg Provider-Plugin architecture (in \`lib-acg\` repo).
-- **docs(plans):** added spec for Data Layer GitOps consolidation.
-- **docs(cleanup):** relocated RCAs from k3d-manager to target repositories.
+- **docs(bugs):** added RCA for ArgoCD permission denied mismatch (in app repo).
+- **docs(plans):** added spec for lib-acg Provider-Plugin architecture.
+- **docs(cleanup):** relocated RCAs to target repositories.
 
 ## Next Steps
-- Implement Data Layer GitOps consolidation.
-- Execute lib-acg Phase 1 (AWS logic isolation).
+- Add public domain to Keycloak realm config.
+- Update ArgoCD RBAC to use correct application prefixes.
 - Proceed with v0.4.0 milestone (Observability).
