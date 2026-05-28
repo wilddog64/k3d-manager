@@ -9,10 +9,10 @@
 - [x] Keycloak configuration conflict fix (\`hostname\` vs \`hostname-url\`).
 - [x] ArgoCD infinite sync loop fix for \`order-service-secrets\`.
 - [x] ArgoCD sync drift fix for \`product-catalog-seed-script\`.
-- [x] Product seed race condition fix (PR #32 in \`shopping-cart-product-catalog\`).
+- [x] Product seed race condition fix (see RCA in \`shopping-cart-product-catalog/docs/bugs/2026-05-27-product-catalog-seed-race-condition.md\`).
 - [x] Resilient DB password reconciliation.
-- [x] Frontend checkout contract mismatch investigation (see \`docs/bugs/2026-05-27-frontend-checkout-contract-mismatch.md\`).
-- [x] Frontend OIDC public domain mismatch investigation (see \`shopping-cart-frontend/docs/issues/2026-05-27-frontend-oidc-public-domain-mismatch.md\`).
+- [x] Frontend checkout contract mismatch investigation (see RCA in \`shopping-cart-frontend/docs/issues/2026-05-27-frontend-checkout-contract-mismatch.md\`).
+- [x] Frontend OIDC public domain mismatch investigation (see RCA in \`shopping-cart-frontend/docs/issues/2026-05-27-frontend-oidc-public-domain-mismatch.md\`).
 
 ## Milestone: v0.4.0 (Observability) — PLANNED
 - [ ] Prometheus ServiceMonitors for core services.
