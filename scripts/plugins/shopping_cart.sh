@@ -181,7 +181,11 @@ function shopping_cart_load_ghcr_pat_from_env() {
     return 1
   fi
 
-  _pat_http=$(curl -s -o /dev/null -w "%{http_code}" -u "${_github_user}:${_ghcr_pat}" "https://api.github.com/user" 2>/dev/null || true)
+  local _netrc
+  _netrc=$(mktemp) && chmod 0600 "${_netrc}"
+  printf 'machine api.github.com login %s password %s\n' "${_github_user}" "${_ghcr_pat}" > "${_netrc}"
+  _pat_http=$(curl -s -o /dev/null -w "%{http_code}" --netrc-file "${_netrc}" "https://api.github.com/user" 2>/dev/null || true)
+  rm -f "${_netrc}"
   if [[ "${_pat_http}" != "200" ]]; then
     _info "[acg-up] GHCR_PAT env var is invalid (HTTP ${_pat_http}) — falling back to Vault"
     _ghcr_pat=""
@@ -204,7 +208,11 @@ function shopping_cart_load_ghcr_pat_from_vault() {
     return 1
   fi
 
-  _pat_http=$(curl -s -o /dev/null -w "%{http_code}" -u "${_github_user}:${_ghcr_pat}" "https://api.github.com/user" 2>/dev/null || true)
+  local _netrc
+  _netrc=$(mktemp) && chmod 0600 "${_netrc}"
+  printf 'machine api.github.com login %s password %s\n' "${_github_user}" "${_ghcr_pat}" > "${_netrc}"
+  _pat_http=$(curl -s -o /dev/null -w "%{http_code}" --netrc-file "${_netrc}" "https://api.github.com/user" 2>/dev/null || true)
+  rm -f "${_netrc}"
   if [[ "${_pat_http}" != "200" ]]; then
     _info "[acg-up] Vault PAT is expired (HTTP ${_pat_http}) — prompting for a new one"
     _ghcr_pat=""
@@ -225,8 +233,7 @@ function shopping_cart_load_ghcr_pat_from_gh() {
     return 1
   fi
 
-  _gh_http=$(curl -s -o /dev/null -w "%{http_code}" -u "${_github_user}:${_gh_token}" "https://api.github.com/user" 2>/dev/null || true)
-  if [[ "${_gh_http}" != "200" ]]; then
+  if ! GH_TOKEN="${_gh_token}" gh api user >/dev/null 2>&1; then
     return 1
   fi
 
@@ -314,9 +321,11 @@ function shopping_cart_create_ghcr_pull_secret() {
       | kubectl apply --context ubuntu-k3s -f -
     _info "[acg-up] ghcr-pull-secret applied in namespace: ${ns}"
   done
-  kubectl patch serviceaccount default -n shopping-cart-apps \
-    --context ubuntu-k3s \
-    -p '{"imagePullSecrets": [{"name": "ghcr-pull-secret"}]}'
+  for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
+    kubectl patch serviceaccount default -n "$ns" \
+      --context ubuntu-k3s \
+      -p '{"imagePullSecrets": [{"name": "ghcr-pull-secret"}]}'
+  done
 }
 
 function shopping_cart_create_vault_bridge() {
@@ -371,7 +380,7 @@ set -euo pipefail
 SUDO="sudo"
 if ! command -v helm >/dev/null 2>&1; then
   echo "[acg-up] helm not found — installing..."
-  curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash >/dev/null
+  curl -fsSL https://raw.githubusercontent.com/helm/helm/v3.17.3/scripts/get-helm-3 | DESIRED_VERSION=v3.17.3 bash >/dev/null
 fi
 if ! $SUDO KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm status external-secrets -n secrets >/dev/null 2>&1; then
   echo "[acg-up] ESO not installed — installing v${ESO_VERSION}..."
@@ -388,7 +397,7 @@ REMOTE
 
 function shopping_cart_apply_vault_token_and_cluster_secret_store() {
   _vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
-    -o jsonpath='{.data.root_token}' | base64 -d)
+    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d 2>/dev/null || true)
   if [[ -z "${_vault_root_token}" ]]; then
     _err "[acg-up] Could not read vault-root token from k3d-k3d-cluster — is Vault running?"
     return 1
