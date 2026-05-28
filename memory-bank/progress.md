@@ -1,19 +1,25 @@
 # Progress — k3d-manager
 
 ## Status
-- **v1.4.10 IN PROGRESS** (2026-05-28) — Finalizing OIDC and ArgoCD stability.
+- **v1.4.11 IN PROGRESS** (2026-05-28) — Data Layer GitOps consolidation + ArgoCD RBAC fix.
+- **v1.4.10 SHIPPED** — PR #81 merged (`f8bad52d`). ArgoCD stability, bootstrap reliability, /tmp cleanup.
 - **v1.4.9 SHIPPED** — Credential extraction and OIDC issuer fixes.
 
-## Milestone: v1.4.10 (ArgoCD Stability)
+## Milestone: v1.4.11 (Data Layer GitOps + RBAC)
+- [ ] Data Layer GitOps consolidation — spec: `docs/plans/v1.4.10-data-layer-gitops-consolidation.md`
+- [ ] ArgoCD RBAC fix: `product-catalog` → `shopping-cart-product-catalog` in `argocd-rbac-cm`
+- [ ] Node.js 20→22 upgrade (all 5 shopping-cart CI workflows)
+
+## Milestone: v1.4.10 (ArgoCD Stability) — SHIPPED
 - [x] OIDC Issuer protocol mismatch resolution.
 - [x] Keycloak configuration conflict fix.
 - [x] ArgoCD infinite sync loop fix for \`order-service-secrets\`.
 - [x] ArgoCD sync drift fix for \`product-catalog-seed-script\`.
 - [x] Product seed race condition fix.
 - [x] Resilient DB password reconciliation.
-- [x] ArgoCD permission denied mismatch investigation (see RCA in \`shopping-cart-product-catalog/docs/bugs/2026-05-28-argocd-permission-denied-catalog-admin.md\`).
-- [ ] Data Layer GitOps consolidation (Spec drafted).
-- [ ] lib-acg Provider-Plugin architecture (Spec drafted).
+- [x] ArgoCD permission denied mismatch investigation (RCA in \`shopping-cart-product-catalog/docs/bugs/\`).
+- [x] seed job \`--wait=false\` fix (\`c27611a5\`).
+- [x] PR #81 merged (\`f8bad52d\`). All Copilot findings addressed.
 
 ## Milestone: v0.4.0 (Observability) — PLANNED
 - [ ] Prometheus ServiceMonitors for core services.

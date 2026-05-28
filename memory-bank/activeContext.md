@@ -1,22 +1,23 @@
 # Active Context — k3d-manager
 
 ## Current Status
-- Current branch: \`k3d-manager-v1.4.10\` (created from merge SHA \`92ccaec1\`).
-- **v1.4.10 IN PROGRESS** — Resolving ArgoCD sync drift and bootstrap race conditions.
-- **SSO FIX COMPLETE:** Aligned OIDC protocols by enforcing \`KC_HOSTNAME_STRICT: true\` and \`KC_HOSTNAME_URL\`.
-- **ARGOCD DRIFT FIX COMPLETE:** \`scripts/etc/argocd/applicationsets/services-git.yaml\` now ignores expected drift for \`Secret/order-service-secrets\` and \`ConfigMap/product-catalog-seed-script\`.
-- **PRODUCT SEED RACE CONDITION:** Fixed in \`shopping-cart-product-catalog\` PR #32.
-- **DB AUTH RECONCILIATION COMPLETE:** Implemented resilient SQL reconciliation in \`bin/acg-up\`. Spec: \`docs/plans/v1.4.10-resilient-db-password-reconciliation.md\`.
-- **DATA LAYER GITOPS REFACTOR:** Identified visibility gap for MinIO/Databases in ArgoCD. Spec: \`docs/plans/v1.4.10-data-layer-gitops-consolidation.md\`.
-- **LIB-ACG PROVIDER REFACTOR:** Drafting architecture to support AWS, GCP, and Azure independently. Spec in \`lib-acg\` at \`docs/plans/v1.2.0-provider-plugin-architecture.md\`.
-- **ARGOCD PERMISSION BUG:** Identified a naming mismatch in RBAC policies preventing manual sync for catalog admins. RCA documented in \`shopping-cart-product-catalog\` at \`docs/bugs/2026-05-28-argocd-permission-denied-catalog-admin.md\`.
+- Current branch: \`k3d-manager-v1.4.11\` (created from merge SHA \`f8bad52d\`).
+- **v1.4.11 IN PROGRESS** — Data Layer GitOps consolidation and ArgoCD RBAC fix.
+- **v1.4.10 SHIPPED** — PR #81 merged (\`f8bad52d\`). ArgoCD stability, bootstrap reliability, /tmp cleanup.
+- **enforce_admins:** restored on k3d-manager main after v1.4.10 merge.
+
+## Carry-Forward Items
+- **Data Layer GitOps consolidation** — spec at \`docs/plans/v1.4.10-data-layer-gitops-consolidation.md\`; needs Codex implementation.
+- **ArgoCD RBAC fix** — \`argocd-rbac-cm\` in shopping-cart-infra: \`product-catalog\` → \`shopping-cart-product-catalog\`. RCA at \`shopping-cart-product-catalog/docs/bugs/2026-05-28-argocd-permission-denied-catalog-admin.md\`.
+- **lib-acg Provider-Plugin architecture** — spec at \`lib-acg/docs/plans/v1.2.0-provider-plugin-architecture.md\`.
 
 ## Recent Changes
-- **docs(bugs):** added RCA for ArgoCD permission denied mismatch (in app repo).
-- **docs(plans):** added spec for lib-acg Provider-Plugin architecture.
-- **docs(cleanup):** relocated RCAs to target repositories.
+- **PR #81 merged** — v1.4.10 ArgoCD stability + bootstrap reliability.
+- **Copilot findings addressed** — PAT hygiene (netrc), SA imagePullSecrets all namespaces, set -e guard, Helm pin v3.17.3, API doc update.
+- **Retro written** — \`docs/retro/2026-05-28-v1.4.10-retrospective.md\`.
 
 ## Next Steps
+- Codex: implement Data Layer GitOps consolidation (spec ready).
+- Gemini: apply ArgoCD RBAC fix in shopping-cart-infra.
 - Add public domain to Keycloak realm config.
-- Update ArgoCD RBAC to use correct application prefixes.
-- Proceed with v0.4.0 milestone (Observability).
+- Proceed with Node.js 20→22 upgrade (all 5 shopping-cart repos).
