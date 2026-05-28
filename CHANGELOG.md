@@ -11,9 +11,18 @@
 - `scripts/lib/acg/scripts/etc/acg-cluster.yaml`: restore CloudFormation template removed from lib-acg in v0.2.0 without updating the `_LIB_ACG_ROOT/scripts/etc/acg-cluster.yaml` reference — broke `make up` with `Invalid template path`
 - `scripts/etc/agent/hardcoded-ip-allowlist`: add subtree copy of `acg-cluster.yaml` to bypass IP literal check for CloudFormation CIDR blocks
 - ArgoCD OIDC issuer: update to `keycloak.3ai-talk.org` in Helm values template
+- `scripts/etc/argocd/applicationsets/services-git.yaml`: assign shopping-cart apps to `shopping-cart` ArgoCD project — ApplicationSet reconciliation was reverting manual project patches immediately
+- `bin/acg-down`: remove stale `/tmp/argocd-*.sock`, `/tmp/k3d-config-tmp-*.yaml`, `/tmp/k3d-hostsfile-*` on teardown
+- `scripts/plugins/shopping_cart.sh`: add `--wait=false` to seed job delete — ArgoCD hook finalizer blocked `kubectl delete` indefinitely on fresh clusters
+- `bin/acg-up`: resilient DB password reconciliation — re-aligns Vault KV and PostgreSQL auth on every run; removes one-shot legacy overrides
+- `bin/acg-up`: reconcile order-service postgres password after sandbox seed
+- `bin/acg-up`: sync vault-backed data-layer ExternalSecrets and MinIO on every run
+- `scripts/etc/argocd/applicationsets/services-git.yaml`: add `ignoreDifferences` for `order-service-secrets` and `product-catalog-seed-script` labels — prevents infinite sync loop from ArgoCD owner label injection
 
 ### Changed
 - Pull lib-acg v0.3.0 subtree with `ACG_CLUSTER_TEMPLATE` env var support for CloudFormation template path
+- `services/shopping-cart-*/kustomization.yaml`: move imagePullSecrets from per-app patches to `default` ServiceAccount in `shopping-cart-apps`
+- `bin/acg-up`: extract shopping-cart bootstrap logic into `scripts/plugins/shopping_cart.sh`
 
 ### Added
 - `bin/acg-up`: check sandbox TTL before provisioning and extend if below threshold
