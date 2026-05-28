@@ -35,7 +35,7 @@ spec:
         argocd-image-updater.argoproj.io/write-back-method: >-
           {{- if eq .path.basename "shopping-cart-product-catalog"}}argocd{{end}}
     spec:
-      project: platform
+      project: shopping-cart
       destination:
         name: ubuntu-k3s
         namespace: shopping-cart-apps
@@ -51,6 +51,21 @@ spec:
           jsonPointers:
             - /data/username
             - /data/password
+        - group: ""
+          kind: Secret
+          name: order-service-secrets
+          namespace: shopping-cart-apps
+          jsonPointers:
+            - /data
+            - /metadata/labels
+            - /metadata/ownerReferences
+        - group: ""
+          kind: ConfigMap
+          name: product-catalog-seed-script
+          namespace: shopping-cart-apps
+          jsonPointers:
+            - /data
+            - /metadata/labels
       syncPolicy:
         automated:
           prune: true

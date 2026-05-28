@@ -4,10 +4,6 @@ resources:
   - https://github.com/wilddog64/shopping-cart-order//k8s/base?ref=main
 patches:
   - patch: |-
-      - op: add
-        path: /spec/template/spec/imagePullSecrets
-        value:
-          - name: ghcr-pull-secret
       - op: replace
         path: /spec/template/spec/containers/0/readinessProbe
         value:
@@ -27,7 +23,7 @@ patches:
           periodSeconds: 10
           timeoutSeconds: 5
           successThreshold: 1
-          failureThreshold: 3
+          failureThreshold: 30
       - op: replace
         path: /spec/template/spec/containers/0/startupProbe
         value:

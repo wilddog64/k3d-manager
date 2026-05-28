@@ -155,6 +155,12 @@ else
   _info "[acg-down] --keep-hub set — local Hub cluster preserved"
 fi
 
+_info "[acg-down] Cleaning up stale /tmp files..."
+rm -f /tmp/argocd-*.sock
+rm -f /tmp/k3d-config-tmp-*.yaml
+rm -f /tmp/k3d-hostsfile-*
+_info "[acg-down] /tmp cleanup complete"
+
 if [[ "${_keep_hub}" -eq 1 ]]; then
   _info "[acg-down] Done. Remote cluster deleted; local Hub preserved."
 else
