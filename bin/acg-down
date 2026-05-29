@@ -40,10 +40,6 @@ if [[ "${_confirm}" -eq 0 ]]; then
   exit 1
 fi
 
-if _is_mac; then
-  _run_command --interactive-sudo --quiet -- true
-fi
-
 _info "[acg-down] keep-hub=${_keep_hub} hub-cluster=${_HUB_CLUSTER}"
 
 case "${_cluster_provider}" in
@@ -113,14 +109,14 @@ if _is_mac; then
   _keycloak_browser_wrapper="${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh"
   _keycloak_browser_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http.log"
   _keycloak_browser_launchctl_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log"
-  if _run_command --interactive-sudo --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
+  if _run_command --prefer-sudo --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
       >"${_keycloak_browser_launchctl_log}" 2>&1; then
     _info "[acg-down] Keycloak browser HTTP listener launchd daemon unloaded"
   elif [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
     tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
     _warn "[acg-down] existing Keycloak browser HTTP listener was not loaded; continuing"
   fi
-  _run_command --interactive-sudo --soft -- rm -f "${_keycloak_browser_plist}" "${_keycloak_browser_wrapper}" >/dev/null 2>&1 || true
+  _run_command --prefer-sudo --soft -- rm -f "${_keycloak_browser_plist}" "${_keycloak_browser_wrapper}" >/dev/null 2>&1 || true
 
   _info "[acg-down] Stopping ArgoCD browser HTTPS listener launchd daemon..."
   _argocd_browser_label="${ARGOCD_BROWSER_LISTENER_LABEL:-com.k3d-manager.argocd-browser-https}"
@@ -132,15 +128,15 @@ if _is_mac; then
   _argocd_browser_tls_ca="${ARGOCD_BROWSER_TLS_CA_FILE:-${_argocd_browser_tls_dir}/ca.crt}"
   _argocd_browser_launchctl_log="${HOME}/.local/share/k3d-manager/argocd-browser-https-launchctl.log"
   : > "${_argocd_browser_launchctl_log}"
-  if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
+  if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
       >"${_argocd_browser_launchctl_log}" 2>&1; then
     _info "[acg-down] ArgoCD browser HTTPS listener launchd daemon unloaded"
   elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
     tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
     _warn "[acg-down] existing ArgoCD browser HTTPS listener was not loaded; continuing"
   fi
-  _run_command --interactive-sudo --soft -- rm -f "${_argocd_browser_plist}" "${_argocd_browser_wrapper}" >/dev/null 2>&1 || true
-  _run_command --interactive-sudo --soft -- rm -f "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "${_argocd_browser_tls_ca}" "${_argocd_browser_tls_dir}/tls.crt" >/dev/null 2>&1 || true
+  _run_command --prefer-sudo --soft -- rm -f "${_argocd_browser_plist}" "${_argocd_browser_wrapper}" >/dev/null 2>&1 || true
+  _run_command --prefer-sudo --soft -- rm -f "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "${_argocd_browser_tls_ca}" "${_argocd_browser_tls_dir}/tls.crt" >/dev/null 2>&1 || true
 fi
 
 if [[ "${_keep_hub}" -eq 0 ]]; then

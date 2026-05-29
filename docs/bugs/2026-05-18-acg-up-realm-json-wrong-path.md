@@ -13,7 +13,7 @@
 sed: .../shopping-cart-infra/identity/keycloak/realm-shopping-cart.json: No such file or directory
 ```
 
-The realm JSON lives at `identity/config/realm-shopping-cart.json` but `bin/acg-up` references `identity/keycloak/realm-shopping-cart.json`.
+The realm JSON lives at `identity/keycloak/realm-shopping-cart.json` but `bin/acg-up` referenced `identity/config/realm-shopping-cart.json`.
 
 ---
 
@@ -23,12 +23,12 @@ The realm JSON lives at `identity/config/realm-shopping-cart.json` but `bin/acg-
 
 **Old:**
 ```bash
-      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/keycloak/realm-shopping-cart.json")
+      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/config/realm-shopping-cart.json")
 ```
 
 **New:**
 ```bash
-      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/config/realm-shopping-cart.json")
+      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/keycloak/realm-shopping-cart.json")
 ```
 
 ---

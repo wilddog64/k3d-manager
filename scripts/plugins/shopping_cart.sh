@@ -93,13 +93,22 @@ function deploy_shopping_cart_data() {
     return 1
   fi
 
-  _info "[shopping_cart] Deploying data layer (PostgreSQL, Redis, RabbitMQ, MinIO)..."
-  for pg_dir in orders payment products; do
-    _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/postgresql/${pg_dir}/"
+  _info "[shopping_cart] Data layer managed by ArgoCD — waiting for readiness..."
+
+  _info "[shopping_cart] Waiting for ArgoCD to create data-layer StatefulSets..."
+  local _sts_deadline
+  for pg in postgresql-orders postgresql-payment postgresql-products; do
+    _sts_deadline=$(( $(date +%s) + 300 ))
+    until kubectl get statefulset/"${pg}" \
+        -n shopping-cart-data --context ubuntu-k3s >/dev/null 2>&1; do
+      if [[ $(date +%s) -ge ${_sts_deadline} ]]; then
+        _err "[shopping_cart] Timed out waiting for StatefulSet ${pg} to be created by ArgoCD"
+        return 1
+      fi
+      _info "[shopping_cart] StatefulSet ${pg} not yet created — waiting..."
+      sleep 10
+    done
   done
-  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/redis/cart/"
-  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/rabbitmq/"
-  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/minio/"
 
   _info "[shopping_cart] Waiting for PostgreSQL instances to be Ready..."
   for pg in postgresql-orders postgresql-payment postgresql-products; do
@@ -136,9 +145,16 @@ function shopping_cart_sync_vault_backed_secrets() {
     return 1
   fi
 
+  _info "[shopping_cart] Waiting for ClusterSecretStore vault-backend to be Ready..."
+  kubectl wait --for=condition=Ready --timeout=120s \
+    clustersecretstore/vault-backend --context ubuntu-k3s \
+    || { _err "[shopping_cart] ClusterSecretStore vault-backend never became Ready"; return 1; }
+
   _info "[shopping_cart] Applying Vault-backed ExternalSecrets for data, app, payment, and MinIO..."
   _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/secrets/"
-  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/minio/secret.yaml"
+  if [[ -f "${infra_root}/minio/secret.yaml" ]]; then
+    _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/minio/secret.yaml"
+  fi
 
   _info "[shopping_cart] Waiting for Vault-backed ExternalSecrets to become Ready..."
   local -a externalsecrets=(
@@ -158,7 +174,9 @@ function shopping_cart_sync_vault_backed_secrets() {
     "shopping-cart-payment/payment-gateway-secrets"
   )
 
-  local externalsecret namespace name
+  local externalsecret namespace name _es_sync_ts
+  _es_sync_ts=$(date +%s)
+  local -a _existing_es=()
   for externalsecret in "${externalsecrets[@]}"; do
     namespace="${externalsecret%%/*}"
     name="${externalsecret##*/}"
@@ -166,8 +184,18 @@ function shopping_cart_sync_vault_backed_secrets() {
       _warn "[shopping_cart] ExternalSecret ${namespace}/${name} not found — skipping wait"
       continue
     fi
-    kubectl wait --for=condition=Ready --timeout=180s \
-      externalsecret/"${name}" -n "${namespace}" --context ubuntu-k3s
+    _existing_es+=("${externalsecret}")
+    kubectl annotate externalsecret "${name}" -n "${namespace}" --context ubuntu-k3s \
+      force-sync="${_es_sync_ts}" --overwrite >/dev/null \
+      || _warn "[shopping_cart] Failed to annotate ${namespace}/${name} — sync may not trigger"
+  done
+
+  for externalsecret in "${_existing_es[@]}"; do
+    namespace="${externalsecret%%/*}"
+    name="${externalsecret##*/}"
+    kubectl wait --for=condition=Ready --timeout=300s \
+      externalsecret/"${name}" -n "${namespace}" --context ubuntu-k3s \
+      || { _err "[shopping_cart] ExternalSecret ${namespace}/${name} did not become Ready"; return 1; }
   done
 
   _info "[shopping_cart] Vault-backed ExternalSecrets synced."
