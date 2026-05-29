@@ -8,7 +8,8 @@ and destroy. Unlike cloud-managed Kubernetes (EKS, GKE, AKS), k3d-manager target
 environments where you want full control at zero managed-service cost:
 
 - **Local** — k3d on OrbStack (M2/M4 Air, Mac Mini M5)
-- **Remote sandbox** — k3s via k3sup on ACG EC2
+- **Remote sandbox** — k3s via k3sup on ACG EC2 (ephemeral; CI/validation gate)
+- **Permanent cloud** — k3s on OCI Always Free Ampere A1 (ARM64; zero ongoing cost)
 - **Home lab** — k3s on Mac Mini M5 (planned October 2026)
 
 The plugin layer (Vault, ESO, Istio, ArgoCD, Jenkins, OpenLDAP, Keycloak) deploys
@@ -290,6 +291,55 @@ function aws_provision() {
 
 ---
 
+## v1.0.8 — OCI Provider + Istio Ambient Mesh
+*Focus: `CLUSTER_PROVIDER=k3s-oci` on OCI Always Free Ampere A1 (ARM64); Istio ambient mesh as default for memory-constrained nodes*
+
+**New `CLUSTER_PROVIDER` value:** `k3s-oci`
+
+OCI Always Free provides 4 OCPU + 24 GB RAM across Ampere A1 instances — permanently free,
+not trial-gated. This is k3d-manager's first permanent cloud deployment target.
+
+**Provisioning:**
+- `oci_provision` in `scripts/plugins/oci.sh` — creates Ampere A1 instance via OCI CLI (`oci compute instance launch`)
+- k3sup install over SSH (same pattern as `k3s-aws`)
+- `destroy_cluster` calls `oci_teardown` → removes instance + block volume
+
+**ARM64 constraints:**
+- All container images must be multi-arch (`linux/amd64` + `linux/arm64`) or ARM64-native
+- Vault, ESO, ArgoCD, Keycloak all publish multi-arch images — no blockers
+- Any custom images in shopping-cart repos must add `linux/arm64` build targets before OCI deploy
+
+**Istio ambient mesh (replaces sidecar mode for this provider):**
+
+OCI nodes cannot afford per-pod Envoy sidecars (50–100 MB each × 10+ pods = 1 GB+).
+Ambient mode reduces this to a single ~50 MB `ztunnel` DaemonSet shared across all pods.
+
+```bash
+# deploy_istio routes to ambient profile when CLUSTER_PROVIDER=k3s-oci
+CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager deploy_istio
+```
+
+k3s install flags required for ambient CNI chaining (added to `oci_provision`):
+```bash
+--disable-network-policy --flannel-backend=none
+```
+Cilium replaces Flannel — Istio ambient requires a CNI that supports eBPF and CNI chaining.
+
+**mTLS between payment and order (via ztunnel, no waypoint needed):**
+- Label namespaces: `istio.io/dataplane-mode: ambient`
+- ztunnel handles L4 mTLS automatically for all TCP in labelled namespaces
+- `AuthorizationPolicy` restricts `order-service → payment-service` to `/api/payments` path only
+- Waypoint proxy deployed per-namespace only if L7 (retries, circuit breaking) is required later
+
+**Milestone gate:**
+- Ampere A1 node Ready, `kubectl get nodes` from M4 Air via tunnel
+- `istio-system` ztunnel DaemonSet Running (1 pod per node)
+- `curl` from order-service pod to payment-service port returns HTTP 200
+- `tcpdump` on payment pod shows TLS handshake (mTLS verified)
+- Istio ambient profile does NOT need sidecar injection labels
+
+---
+
 ## v1.1.0 — Full Stack Provisioning (Single Command)
 *Focus: One command brings up k3s cluster + complete plugin stack*
 
@@ -302,6 +352,69 @@ CLUSTER_PROVIDER=k3s-remote ./scripts/k3d-manager provision_full_stack
 - `provision_full_stack` orchestrates the complete lifecycle in sequence
 - Idempotent — safe to re-run after partial failure
 - `teardown_full_stack` — inverse: destroy apps → deregister → destroy cluster → acg_teardown × N
+
+---
+
+## v1.1.1 — k3d-console CI/CD Pipeline
+*Focus: three-stage validation pipeline — ACG ephemeral gate → vCluster ARM64 gate → OCI permanent deploy*
+
+**Gate:** v1.0.8 (OCI provider) shipped.
+
+**Pipeline overview:**
+
+```
+PR open  ──► Gate 1: ACG (x86 ephemeral)  ──► merge to main
+                  make up + kubectl checks          │
+                  make down (teardown)              ▼
+                                          Gate 2: vCluster on OCI (ARM64)
+                                              spin up vCluster
+                                              deploy shopping-cart stack
+                                              Playwright e2e + stress tests
+                                              destroy vCluster
+                                                    │
+                                                    ▼ Gate 2 green
+                                          Deploy: OCI full cluster (permanent)
+                                              CLUSTER_PROVIDER=k3s-oci
+                                              make up (idempotent)
+```
+
+**Gate 1 — ACG ephemeral (x86), PR trigger:**
+- `.github/workflows/ci-acg-gate.yml` — triggered on `pull_request`
+- Steps: `acg_provision` → `make up` → kubectl integration checks (all pods Running, ArgoCD Synced) → `make down` → `acg_teardown`
+- ACG TTL guard: `acg_watch` runs in background; extends if gate takes > 3.5h
+- Pass condition: exit 0 from `make up` + all health checks green
+
+**Gate 2 — vCluster on OCI (ARM64), post-merge trigger:**
+- `.github/workflows/ci-vcluster-gate.yml` — triggered on `push` to `main`
+- Uses existing `vcluster_create` / `vcluster_destroy` plugin functions
+- Steps:
+  1. `vcluster_create shopping-cart-test` on OCI cluster
+  2. Deploy shopping-cart stack into vCluster namespace (ArgoCD sync or `kubectl apply`)
+  3. Expose ingress via NodePort on OCI host IP (MetalLB not available inside vCluster)
+  4. Run `shopping-cart-e2e-tests` Playwright suite against NodePort endpoint
+  5. Run stress scenarios: concurrent cart/checkout flows, payment→order load, circuit breaker trigger
+  6. `vcluster_destroy shopping-cart-test` (always, even on failure)
+- Pass condition: Playwright exit 0 + no HTTP 5xx during stress run
+
+**Gate 2 — Playwright stress scenarios (new, in `shopping-cart-e2e-tests`):**
+- `tests/stress/concurrent-checkout.spec.ts` — 10 parallel cart + checkout flows; assert < 1% failure rate
+- `tests/stress/payment-order-load.spec.ts` — sustained order→payment traffic for 60s; assert p99 < 2s
+- `tests/stress/circuit-breaker.spec.ts` — kill payment pod mid-run; assert order-service returns 503 (not hang)
+
+**OCI deploy — `push` to main, Gate 2 green:**
+- `.github/workflows/deploy-oci.yml` — triggered after `ci-vcluster-gate` succeeds
+- `CLUSTER_PROVIDER=k3s-oci make up` — idempotent; only applies diff
+- ArgoCD sync confirms all apps Synced + Healthy
+- Post-deploy smoke: `curl` to OCI public IP returns HTTP 200 on shopping-cart frontend
+
+**New k3d-manager helpers for CI use (non-interactive mode):**
+- `_ci_mode` flag: disables TTY prompts, forces JSON log output, sets `CI=true`
+- `acg_provision` + `oci_provision` respect `CI=true` — no interactive confirmations
+- `make up` / `make down` get `--ci` flag that sets `_ci_mode` and caps retries to 2
+
+**Milestone gate:**
+- PR on feature branch → ACG gate green → merge → vCluster gate green → OCI deploy green
+- End-to-end: code change merged and running on OCI permanent cluster within 30 minutes
 
 ---
 
