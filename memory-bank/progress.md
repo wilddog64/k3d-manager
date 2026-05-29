@@ -2,6 +2,7 @@
 
 ## Status
 - **v1.4.11 SHIPPED** — PR #82 merged (57cd3bc3). ESO sync, acg-down macOS Tahoe fix, data-layer StatefulSet race, Keycloak group-ldap-mapper, ArgoCD RBAC, legacy app removal.
+- **pre-push main-guard hook rollout completed** (2026-05-29) — shopping-cart-basket `c54c148`, shopping-cart-e2e-tests `0f398ab`, shopping-cart-frontend `4d0c8d3`, shopping-cart-infra `24e65f9`, shopping-cart-payment `c87f8b5`, shopping-cart-product-catalog `7b2fa2a`.
 - **v1.4.10 SHIPPED** — PR #81 merged (`f8bad52d`). ArgoCD stability, bootstrap reliability, /tmp cleanup.
 - **v1.4.9 SHIPPED** — Credential extraction and OIDC issuer fixes.
 
@@ -16,7 +17,7 @@
 - [x] acg-down password prompt on macOS Tahoe — commit `b1b5e599`; spec: `docs/bugs/v1.4.11-bugfix-acg-down-interactive-sudo-password-prompt.md`
 - [x] ArgoCD RBAC fix: `product-catalog` → `shopping-cart-product-catalog` in `argocd-rbac-cm` (shopping-cart-infra: `8768955`)
 - [x] order-service fix — PR #32 merged (`3e78feab`) — actuator NPE + Lombok processor + pre-push hook
-- [x] pre-push main-guard hook — k3d-manager (`2c0589ac`) + shopping-cart-order (`bd2a169`) + all remaining shopping-cart repos on `chore/add-pre-push-hook`
+- [x] pre-push main-guard hook rollout — shopping-cart-basket `c54c148`, shopping-cart-e2e-tests `0f398ab`, shopping-cart-frontend `4d0c8d3`, shopping-cart-infra `24e65f9`, shopping-cart-payment `c87f8b5`, shopping-cart-product-catalog `7b2fa2a`; spec: `docs/plans/v1.4.11-pre-push-main-guard-hook.md`
 - [x] Remove legacy ArgoCD app definitions (basket-service/frontend/order-service/payment-service/product-catalog yamls) — shopping-cart-infra `c852bca`; spec: `docs/bugs/v1.4.11-bugfix-remove-legacy-argocd-app-definitions.md`
 - [ ] Node.js 20→22 upgrade (all 5 shopping-cart CI workflows)
 
