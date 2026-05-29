@@ -2,6 +2,7 @@
 
 ## Current Status
 - Current branch: `k3d-manager-v1.4.11` (created from merge SHA `f8bad52d`).
+- **Keycloak group-ldap-mapper fix committed and pushed** — shopping-cart-infra branch `chore/add-group-ldap-mapper`, commit `a3a88ee`; k3d-manager commit `ba391a7f` on `k3d-manager-v1.4.11`.
 - **shopping-cart-order actuator NPE fix committed and pushed** — branch `fix/order-actuator-security-npe`, commit `6b8888c` (`fix(security): add dedicated actuator filter chain to prevent ExceptionTranslationFilter NPE`).
 - **v1.4.11 DATA LAYER COMPLETE** — shopping-cart-infra PR #70 merged (`7840441`). ArgoCD `prune: false` for data layer.
 - **v1.4.11 KEYCLOAK MFA COMPLETE** — shopping-cart-infra PR #71 merged (`0f13c0b`). Role-based TOTP for platform-admin/platform-developer.
@@ -18,6 +19,7 @@
 - **lib-acg Provider-Plugin architecture** — spec at `lib-acg/docs/plans/v1.2.0-provider-plugin-architecture.md`.
 
 ## Recent Changes
+- **Keycloak group-ldap-mapper fix completed** — added `group-ldap-mapper` reconciliation to `identity/keycloak/keycloak-reconcile-hook-job.yaml` in shopping-cart-infra and Step 10d.7 to `bin/acg-up` in k3d-manager; commits `a3a88ee` and `ba391a7f` pushed to origin.
 - **shopping-cart-order actuator NPE fix** — added dedicated `@Order(0)` actuator filter chain in `SecurityConfig.java`, moved the main chain to `@Order(1)`, and bumped `OAuth2SecurityConfig` to `@Order(2)`; commit `6b8888c` pushed on `fix/order-actuator-security-npe`. `mvn compile` timed out in this environment after 180s (`exit 124`).
 - **shopping-cart-infra PR #72 merged** (`4c7c6ec`) — reconcile sub-flow endpoint fix complete; enforce_admins restored on main.
 - **data-layer StatefulSet race fix** — `deploy_shopping_cart_data()` now polls for StatefulSet existence (300s timeout each) before `kubectl rollout status`; spec at `docs/bugs/v1.4.11-bugfix-data-layer-statefulset-not-found.md`.
@@ -30,7 +32,6 @@
 - Commit data-layer StatefulSet race fix + spec + acg-down pre-auth removal on `k3d-manager-v1.4.11`.
 - Codex: Node.js 20→22 upgrade across all 5 shopping-cart repos (workflows).
 - Add public domain to Keycloak realm config.
-- Permanent fix: add group-ldap-mapper to `keycloak-reconcile-hook-job.yaml` (shopping-cart-infra) + `bin/acg-up` Step 10d.7; spec at `docs/bugs/v1.4.11-bugfix-keycloak-missing-ldap-group-mapper.md`.
 - **shopping-cart-order PR #32 MERGED** (`3e78feab`) — actuator NPE + Lombok processor + pre-push hook. enforce_admins restored. Next branch: `docs/next-improvements`.
 - **pre-push main-guard hook** — `scripts/hooks/pre-push` committed to k3d-manager (`2c0589ac`); `.githooks/pre-push` committed to shopping-cart-order; Codex to add to remaining 6 shopping-cart repos on `chore/add-pre-push-hook` branches; spec at `docs/plans/v1.4.11-pre-push-main-guard-hook.md`.
 
