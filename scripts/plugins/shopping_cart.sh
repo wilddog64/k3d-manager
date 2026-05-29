@@ -95,6 +95,21 @@ function deploy_shopping_cart_data() {
 
   _info "[shopping_cart] Data layer managed by ArgoCD — waiting for readiness..."
 
+  _info "[shopping_cart] Waiting for ArgoCD to create data-layer StatefulSets..."
+  local _sts_deadline
+  for pg in postgresql-orders postgresql-payment postgresql-products; do
+    _sts_deadline=$(( $(date +%s) + 300 ))
+    until kubectl get statefulset/"${pg}" \
+        -n shopping-cart-data --context ubuntu-k3s >/dev/null 2>&1; do
+      if [[ $(date +%s) -ge ${_sts_deadline} ]]; then
+        _err "[shopping_cart] Timed out waiting for StatefulSet ${pg} to be created by ArgoCD"
+        return 1
+      fi
+      _info "[shopping_cart] StatefulSet ${pg} not yet created — waiting..."
+      sleep 10
+    done
+  done
+
   _info "[shopping_cart] Waiting for PostgreSQL instances to be Ready..."
   for pg in postgresql-orders postgresql-payment postgresql-products; do
     kubectl rollout status statefulset/"${pg}" \
