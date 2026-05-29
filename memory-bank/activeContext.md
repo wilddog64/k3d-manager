@@ -1,8 +1,9 @@
 # Active Context — k3d-manager
 
 ## Current Status
-- Current branch: `k3d-manager-v1.4.11` (created from merge SHA `f8bad52d`).
-- **ESO sync saturation timeout fix committed and pushed** — commit `a4398fb4` on `k3d-manager-v1.4.11` (`fix(shopping_cart): annotate all ESOs before waiting to prevent sync saturation timeout`).
+- Current branch: `k3d-manager-v1.4.12` (created from merge SHA `57cd3bc3`).
+- **v1.4.11 SHIPPED** — PR #82 merged (57cd3bc3); enforce_admins restored; k3d-manager-v1.4.12 branch created.
+- **ESO sync saturation timeout fix shipped** — commit `a4398fb4` on `k3d-manager-v1.4.11` (`fix(shopping_cart): annotate all ESOs before waiting to prevent sync saturation timeout`).
 - **Keycloak group-ldap-mapper fix committed and pushed** — shopping-cart-infra branch `chore/add-group-ldap-mapper`, commit `a3a88ee`; k3d-manager commit `ba391a7f` on `k3d-manager-v1.4.11`.
 - **shopping-cart-order actuator NPE fix committed and pushed** — branch `fix/order-actuator-security-npe`, commit `6b8888c` (`fix(security): add dedicated actuator filter chain to prevent ExceptionTranslationFilter NPE`).
 - **Remove legacy ArgoCD app definitions committed and pushed** — shopping-cart-infra branch `fix/remove-legacy-argocd-apps`, commit `c852bca` (`fix(argocd): remove legacy app definitions superseded by services-git ApplicationSet`).
@@ -17,6 +18,7 @@
 - **enforce_admins:** restored on k3d-manager main after v1.4.10 merge; restored on shopping-cart-infra main after PR #73 merge.
 
 ## Carry-Forward Items
+- **ExternalSecret/product-catalog-secrets SharedResourceWarning** — claimed by both cicd/product-catalog and data-layer ArgoCD apps; requires follow-on fix in v1.4.12
 - **Data Layer GitOps consolidation** — complete; commit SHAs: k3d-manager `18be9e09`, shopping-cart-infra `0e7e2a6`.
 - **Keycloak role-based MFA** — complete; commit SHA: shopping-cart-infra `d8603dd`.
 - **ArgoCD RBAC fix** — complete; commit SHA: shopping-cart-infra `8768955`.
