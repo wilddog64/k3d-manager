@@ -6,8 +6,9 @@
 - **v1.4.11 KEYCLOAK MFA COMPLETE** — shopping-cart-infra PR #71 merged (`0f13c0b`). Role-based TOTP for platform-admin/platform-developer.
 - **v1.4.11 RECONCILE SUBFLOW FIX MERGED** — shopping-cart-infra PR #72 merged (`4c7c6ec`). Keycloak reconcile sub-flow endpoint now correctly targets update operation.
 - **v1.4.11 ARGOCD RBAC COMPLETE** — shopping-cart-infra commit `8768955`. `catalog-admin` now references `shopping-cart-product-catalog`.
+- **shopping-cart-infra PR #73 MERGED** (2026-05-29) — merge SHA `eccb4872`. Accumulated infra improvements (OIDC issuer URL, LDAP staging path, Keycloak secret templates). Retrospective: `docs/retro/2026-05-29-pr73-retrospective.md`. enforce_admins restored on shopping-cart-infra main. Next branch `docs/next-improvements` created.
 - **v1.4.10 SHIPPED** — PR #81 merged (`f8bad52d`). ArgoCD stability, bootstrap reliability, /tmp cleanup.
-- **enforce_admins:** restored on k3d-manager main after v1.4.10 merge; restored on shopping-cart-infra main after v1.4.11 reconcile subflow merge.
+- **enforce_admins:** restored on k3d-manager main after v1.4.10 merge; restored on shopping-cart-infra main after PR #73 merge.
 
 ## Carry-Forward Items
 - **Data Layer GitOps consolidation** — complete; commit SHAs: k3d-manager `18be9e09`, shopping-cart-infra `0e7e2a6`.
