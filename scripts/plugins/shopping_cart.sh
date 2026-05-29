@@ -147,7 +147,9 @@ function shopping_cart_sync_vault_backed_secrets() {
 
   _info "[shopping_cart] Applying Vault-backed ExternalSecrets for data, app, payment, and MinIO..."
   _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/secrets/"
-  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/minio/secret.yaml"
+  if [[ -f "${infra_root}/minio/secret.yaml" ]]; then
+    _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/minio/secret.yaml"
+  fi
 
   _info "[shopping_cart] Waiting for Vault-backed ExternalSecrets to become Ready..."
   local -a externalsecrets=(
