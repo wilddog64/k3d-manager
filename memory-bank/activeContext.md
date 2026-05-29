@@ -34,7 +34,7 @@
 - **ArgoCD RBAC fix completed** — updated `catalog-admin` policies in `argocd/config/argocd-rbac-cm.yaml` to reference `shopping-cart/shopping-cart-product-catalog`.
 
 ## Assigned to Codex
-- None.
+- **acg-down password prompt fix** — spec: `docs/bugs/v1.4.11-bugfix-acg-down-interactive-sudo-password-prompt.md`; replace `--interactive-sudo` → `--prefer-sudo` on 5 calls in `bin/acg-down` mac block
 
 ## Next Steps
 - Commit data-layer StatefulSet race fix + spec + acg-down pre-auth removal on `k3d-manager-v1.4.11`.
