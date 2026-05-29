@@ -628,6 +628,36 @@ else
   _info "[acg-up] Retrieve passwords: bin/vault-exec --namespace secrets -- vault kv get -field=password secret/keycloak/users/<user>"
 fi
 
+_info "[acg-up] Step 10d.6/14 — Reconciling Keycloak LDAP federation bind credential..."
+_kc_pod=$(kubectl get pod -n identity --context k3d-k3d-cluster \
+  -l app.kubernetes.io/name=keycloak \
+  -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+if [[ -z "${_kc_pod}" ]]; then
+  _warn "[acg-up] Keycloak pod not found — skipping LDAP bind credential reconciliation"
+else
+  _ldap_component_id=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+    sh -c "/opt/keycloak/bin/kcadm.sh config credentials \
+      --server http://localhost:8080 --realm master \
+      --user admin --password '${_kc_admin_pass}' >/dev/null 2>&1 && \
+    /opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
+      --fields id,providerId 2>/dev/null | \
+    grep -B1 'ldap' | grep '\"id\"' | head -1 | \
+    sed 's/.*: \"//;s/\".*//' " 2>/dev/null || true)
+  if [[ -n "${_ldap_component_id}" ]]; then
+    kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+      sh -c "/opt/keycloak/bin/kcadm.sh update components/${_ldap_component_id} \
+        -r shopping-cart \
+        -s 'config.bindCredential=[\"${_ldap_admin_pass}\"]' >/dev/null 2>&1 && \
+      /opt/keycloak/bin/kcadm.sh create \
+        'user-storage/${_ldap_component_id}/sync?action=triggerFullSync' \
+        -r shopping-cart >/dev/null 2>&1" 2>/dev/null && \
+      _info "[acg-up] LDAP federation bind credential reconciled and full sync triggered" || \
+      _warn "[acg-up] LDAP bind credential reconciliation failed — SSO login may be broken"
+  else
+    _warn "[acg-up] Could not find LDAP federation component ID — skipping bind credential update"
+  fi
+fi
+
 _info "[acg-up] Step 10g.5/14 — Wiring Keycloak cross-cluster reachability on ubuntu-k3s..."
 _node_ip=$(kubectl get node --context ubuntu-k3s \
   -l 'node-role.kubernetes.io/control-plane' \
