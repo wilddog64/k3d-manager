@@ -1,9 +1,10 @@
 # Progress — k3d-manager
 
 ## Status
-- **Keycloak group-ldap-mapper fix committed/pushed** (2026-05-29) — shopping-cart-infra commit `a3a88ee` on `chore/add-group-ldap-mapper`; k3d-manager commit `ba391a7f` on `k3d-manager-v1.4.11`.
+- **shopping-cart-infra PR #74 merged & housekeeping complete** (2026-05-29) — merge SHA `fd234094`; enforce_admins restored; docs/next-improvements branch with retrospective created; no versioned CHANGELOG entry (Unreleased only).
+- **Keycloak group-ldap-mapper fix merged** (2026-05-29) — shopping-cart-infra commit `a3a88ee` on `chore/add-group-ldap-mapper` (now in PR #74, merged SHA `fd234094`); k3d-manager commit `ba391a7f` on `k3d-manager-v1.4.11`.
 - **shopping-cart-order actuator NPE fix committed/pushed** (2026-05-29) — branch `fix/order-actuator-security-npe`, commit `6b8888c`; compile verification timed out in this environment (`timeout 180s mvn compile`, exit `124`).
-- **v1.4.11 PARTIALLY COMPLETE** (2026-05-29) — Keycloak sub-flow fix merged (`4c7c6ec`); ArgoCD RBAC fix merged (`8768955`); shopping-cart-infra PR #73 merged (`eccb487`); post-merge housekeeping complete; data-layer StatefulSet race fix pending commit; Node.js 20→22 upgrade pending.
+- **v1.4.11 PARTIALLY COMPLETE** (2026-05-29) — Keycloak sub-flow fix merged (`4c7c6ec`); ArgoCD RBAC fix merged (`8768955`); shopping-cart-infra PR #73 merged (`eccb487`); shopping-cart-infra PR #74 merged (`fd234094`); post-merge housekeeping complete; data-layer StatefulSet race fix pending commit; Node.js 20→22 upgrade pending.
 - **v1.4.10 SHIPPED** — PR #81 merged (`f8bad52d`). ArgoCD stability, bootstrap reliability, /tmp cleanup.
 - **v1.4.9 SHIPPED** — Credential extraction and OIDC issuer fixes.
 

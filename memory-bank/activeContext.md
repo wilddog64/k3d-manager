@@ -9,6 +9,7 @@
 - **v1.4.11 RECONCILE SUBFLOW FIX MERGED** — shopping-cart-infra PR #72 merged (`4c7c6ec`). Keycloak reconcile sub-flow endpoint now correctly targets update operation.
 - **v1.4.11 ARGOCD RBAC COMPLETE** — shopping-cart-infra commit `8768955`. `catalog-admin` now references `shopping-cart-product-catalog`.
 - **shopping-cart-infra PR #73 MERGED** (2026-05-29) — merge SHA `eccb4872`. Accumulated infra improvements (OIDC issuer URL, LDAP staging path, Keycloak secret templates). Retrospective: `docs/retro/2026-05-29-pr73-retrospective.md`. enforce_admins restored on shopping-cart-infra main. Next branch `docs/next-improvements` created.
+- **shopping-cart-infra PR #74 MERGED** (2026-05-29) — merge SHA `fd234094`. Keycloak LDAP group-mapper reconciliation fix. Retrospective: `docs/retro/2026-05-29-pr74-retrospective.md`. enforce_admins restored on shopping-cart-infra main. docs/next-improvements branch synced.
 - **v1.4.10 SHIPPED** — PR #81 merged (`f8bad52d`). ArgoCD stability, bootstrap reliability, /tmp cleanup.
 - **enforce_admins:** restored on k3d-manager main after v1.4.10 merge; restored on shopping-cart-infra main after PR #73 merge.
 
