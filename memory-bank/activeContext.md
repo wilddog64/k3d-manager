@@ -31,7 +31,8 @@
 - Codex: Node.js 20→22 upgrade across all 5 shopping-cart repos (workflows).
 - Add public domain to Keycloak realm config.
 - Permanent fix: add group-ldap-mapper to `keycloak-reconcile-hook-job.yaml` (shopping-cart-infra) + `bin/acg-up` Step 10d.7; spec at `docs/bugs/v1.4.11-bugfix-keycloak-missing-ldap-group-mapper.md`.
-- **order-service actuator NPE fix** — spec `docs/bugs/v1.4.11-bugfix-order-service-actuator-npe.md`; Codex to implement on `fix/order-actuator-security-npe` in shopping-cart-order.
+- **shopping-cart-order PR #32 MERGED** (`3e78feab`) — actuator NPE + Lombok processor + pre-push hook. enforce_admins restored. Next branch: `docs/next-improvements`.
+- **pre-push main-guard hook** — `scripts/hooks/pre-push` committed to k3d-manager (`2c0589ac`); `.githooks/pre-push` committed to shopping-cart-order; Codex to add to remaining 6 shopping-cart repos on `chore/add-pre-push-hook` branches; spec at `docs/plans/v1.4.11-pre-push-main-guard-hook.md`.
 
 ## Cluster State Note (2026-05-29)
 - Keycloak `otp-conditional-subflow` manually repaired via kcadm.sh — was DISABLED+empty due to reconcile bug.
