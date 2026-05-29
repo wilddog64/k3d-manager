@@ -32,7 +32,7 @@
 - **ArgoCD RBAC fix completed** — updated `catalog-admin` policies in `argocd/config/argocd-rbac-cm.yaml` to reference `shopping-cart/shopping-cart-product-catalog`.
 
 ## Assigned to Codex
-- None
+- **Remove legacy ArgoCD app definitions** — spec: `docs/bugs/v1.4.11-bugfix-remove-legacy-argocd-app-definitions.md`; branch: `fix/remove-legacy-argocd-apps` on `shopping-cart-infra`; cascade-delete finalizers already stripped from cluster (2026-05-29)
 
 ## Next Steps
 - Commit data-layer StatefulSet race fix + spec + acg-down pre-auth removal on `k3d-manager-v1.4.11`.
