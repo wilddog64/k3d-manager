@@ -147,7 +147,8 @@ function shopping_cart_sync_vault_backed_secrets() {
 
   _info "[shopping_cart] Waiting for ClusterSecretStore vault-backend to be Ready..."
   kubectl wait --for=condition=Ready --timeout=120s \
-    clustersecretstore/vault-backend --context ubuntu-k3s
+    clustersecretstore/vault-backend --context ubuntu-k3s \
+    || { _err "[shopping_cart] ClusterSecretStore vault-backend never became Ready"; return 1; }
 
   _info "[shopping_cart] Applying Vault-backed ExternalSecrets for data, app, payment, and MinIO..."
   _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/secrets/"
@@ -185,14 +186,16 @@ function shopping_cart_sync_vault_backed_secrets() {
     fi
     _existing_es+=("${externalsecret}")
     kubectl annotate externalsecret "${name}" -n "${namespace}" --context ubuntu-k3s \
-      force-sync="${_es_sync_ts}" --overwrite >/dev/null
+      force-sync="${_es_sync_ts}" --overwrite >/dev/null \
+      || _warn "[shopping_cart] Failed to annotate ${namespace}/${name} — sync may not trigger"
   done
 
   for externalsecret in "${_existing_es[@]}"; do
     namespace="${externalsecret%%/*}"
     name="${externalsecret##*/}"
     kubectl wait --for=condition=Ready --timeout=300s \
-      externalsecret/"${name}" -n "${namespace}" --context ubuntu-k3s
+      externalsecret/"${name}" -n "${namespace}" --context ubuntu-k3s \
+      || { _err "[shopping_cart] ExternalSecret ${namespace}/${name} did not become Ready"; return 1; }
   done
 
   _info "[shopping_cart] Vault-backed ExternalSecrets synced."

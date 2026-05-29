@@ -1,4 +1,4 @@
-# Bug: acg-up step 10d reads non-existent identity/keycloak/realm-shopping-cart.json
+# Bug: acg-up step 10d reads non-existent identity/config/realm-shopping-cart.json
 
 > **STALE — DO NOT USE AS A FIX REFERENCE.**
 > The correct path is `identity/keycloak/realm-shopping-cart.json`. Any reference in this doc

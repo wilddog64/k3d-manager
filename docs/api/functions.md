@@ -55,7 +55,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `configure_vault_argocd_repos` | `scripts/plugins/argocd.sh` | Configure Vault-managed deploy keys for ArgoCD repos |
 | `deploy_cert_manager` | `scripts/plugins/cert-manager.sh` | Install cert-manager and configure ACME ClusterIssuers |
 | `add_ubuntu_k3s_cluster` | `scripts/plugins/shopping_cart.sh` | Export Ubuntu kubeconfig and register cluster in ArgoCD |
-| `deploy_shopping_cart_data` | `scripts/plugins/shopping_cart.sh` | Deploy PostgreSQL, Redis, RabbitMQ, and MinIO; apply Vault-backed ExternalSecrets; wait for readiness |
+| `deploy_shopping_cart_data` | `scripts/plugins/shopping_cart.sh` | Wait for ArgoCD to create data-layer StatefulSets; poll PostgreSQL/MinIO readiness; apply and wait for Vault-backed ExternalSecrets |
 | `shopping_cart_sync_vault_backed_secrets` | `scripts/plugins/shopping_cart.sh` | Sync Vault-managed credentials to Kubernetes ExternalSecrets for data services |
 | `shopping_cart_resolve_ghcr_pat` | `scripts/plugins/shopping_cart.sh` | Resolve GitHub Container Registry PAT from env, Vault, or gh CLI |
 | `shopping_cart_create_ghcr_pull_secret` | `scripts/plugins/shopping_cart.sh` | Create Kubernetes image pull secret for GHCR in all required namespaces |
