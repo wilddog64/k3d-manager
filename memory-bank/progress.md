@@ -1,7 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
-- **v1.4.11 PARTIALLY COMPLETE** (2026-05-29) — Keycloak sub-flow fix merged (`4c7c6ec`); data-layer StatefulSet race fix applied locally; ArgoCD RBAC fix and Node.js 20→22 upgrade pending.
+- **v1.4.11 PARTIALLY COMPLETE** (2026-05-29) — Keycloak sub-flow fix merged (`4c7c6ec`); data-layer StatefulSet race fix applied locally; ArgoCD RBAC fix merged (`8768955`); Node.js 20→22 upgrade pending.
 - **v1.4.10 SHIPPED** — PR #81 merged (`f8bad52d`). ArgoCD stability, bootstrap reliability, /tmp cleanup.
 - **v1.4.9 SHIPPED** — Credential extraction and OIDC issuer fixes.
 
@@ -10,7 +10,7 @@
 - [x] Keycloak role-based MFA — spec: `docs/plans/v1.4.11-keycloak-mfa.md` (shopping-cart-infra PR #71: `0f13c0b`)
 - [x] Keycloak reconcile sub-flow endpoint fix — spec: `docs/plans/v1.4.11-bugfix-reconcile-subflow-update-endpoint.md` (shopping-cart-infra PR #72 merged: `4c7c6ec`)
 - [ ] data-layer StatefulSet not-found race on fresh cluster — spec: `docs/bugs/v1.4.11-bugfix-data-layer-statefulset-not-found.md`; fix applied in `shopping_cart.sh` on `k3d-manager-v1.4.11`
-- [ ] ArgoCD RBAC fix: `product-catalog` → `shopping-cart-product-catalog` in `argocd-rbac-cm`
+- [x] ArgoCD RBAC fix: `product-catalog` → `shopping-cart-product-catalog` in `argocd-rbac-cm` (shopping-cart-infra: `8768955`)
 - [ ] Keycloak group-ldap-mapper permanent fix — spec: `docs/bugs/v1.4.11-bugfix-keycloak-missing-ldap-group-mapper.md`; live fix applied 2026-05-29 (mapper ID `a54709dc`)
 - [ ] Node.js 20→22 upgrade (all 5 shopping-cart CI workflows)
 

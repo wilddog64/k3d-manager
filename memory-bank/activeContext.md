@@ -5,13 +5,14 @@
 - **v1.4.11 DATA LAYER COMPLETE** — shopping-cart-infra PR #70 merged (`7840441`). ArgoCD `prune: false` for data layer.
 - **v1.4.11 KEYCLOAK MFA COMPLETE** — shopping-cart-infra PR #71 merged (`0f13c0b`). Role-based TOTP for platform-admin/platform-developer.
 - **v1.4.11 RECONCILE SUBFLOW FIX MERGED** — shopping-cart-infra PR #72 merged (`4c7c6ec`). Keycloak reconcile sub-flow endpoint now correctly targets update operation.
+- **v1.4.11 ARGOCD RBAC COMPLETE** — shopping-cart-infra commit `8768955`. `catalog-admin` now references `shopping-cart-product-catalog`.
 - **v1.4.10 SHIPPED** — PR #81 merged (`f8bad52d`). ArgoCD stability, bootstrap reliability, /tmp cleanup.
 - **enforce_admins:** restored on k3d-manager main after v1.4.10 merge; restored on shopping-cart-infra main after v1.4.11 reconcile subflow merge.
 
 ## Carry-Forward Items
 - **Data Layer GitOps consolidation** — complete; commit SHAs: k3d-manager `18be9e09`, shopping-cart-infra `0e7e2a6`.
 - **Keycloak role-based MFA** — complete; commit SHA: shopping-cart-infra `d8603dd`.
-- **ArgoCD RBAC fix** — `argocd-rbac-cm` in shopping-cart-infra: `product-catalog` → `shopping-cart-product-catalog`. RCA at `shopping-cart-product-catalog/docs/bugs/2026-05-28-argocd-permission-denied-catalog-admin.md`.
+- **ArgoCD RBAC fix** — complete; commit SHA: shopping-cart-infra `8768955`.
 - **lib-acg Provider-Plugin architecture** — spec at `lib-acg/docs/plans/v1.2.0-provider-plugin-architecture.md`.
 
 ## Recent Changes
@@ -20,10 +21,10 @@
 - **bin/acg-down pre-auth removed** — dropped `_run_command --interactive-sudo --quiet -- true` block; caused `sudo: unable to allocate pty` on macOS Tahoe; NOPASSWD sudoers rules cover all actual privileged commands.
 - **Keycloak role-based MFA completed** — conditional OTP browser flow in `keycloak-reconcile-hook-job.yaml`.
 - **Data Layer GitOps consolidation completed** — removed imperative data-layer `kubectl apply`; set `prune: false` in `argocd/applications/data-layer.yaml`.
+- **ArgoCD RBAC fix completed** — updated `catalog-admin` policies in `argocd/config/argocd-rbac-cm.yaml` to reference `shopping-cart/shopping-cart-product-catalog`.
 
 ## Next Steps
 - Commit data-layer StatefulSet race fix + spec + acg-down pre-auth removal on `k3d-manager-v1.4.11`.
-- Gemini: apply ArgoCD RBAC fix in shopping-cart-infra (`product-catalog` → `shopping-cart-product-catalog` in argocd-rbac-cm).
 - Codex: Node.js 20→22 upgrade across all 5 shopping-cart repos (workflows).
 - Add public domain to Keycloak realm config.
 - Permanent fix: add group-ldap-mapper to `keycloak-reconcile-hook-job.yaml` (shopping-cart-infra) + `bin/acg-up` Step 10d.7; spec at `docs/bugs/v1.4.11-bugfix-keycloak-missing-ldap-group-mapper.md`.
