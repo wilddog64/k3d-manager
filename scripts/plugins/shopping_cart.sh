@@ -93,13 +93,7 @@ function deploy_shopping_cart_data() {
     return 1
   fi
 
-  _info "[shopping_cart] Deploying data layer (PostgreSQL, Redis, RabbitMQ, MinIO)..."
-  for pg_dir in orders payment products; do
-    _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/postgresql/${pg_dir}/"
-  done
-  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/redis/cart/"
-  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/rabbitmq/"
-  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/minio/"
+  _info "[shopping_cart] Data layer managed by ArgoCD — waiting for readiness..."
 
   _info "[shopping_cart] Waiting for PostgreSQL instances to be Ready..."
   for pg in postgresql-orders postgresql-payment postgresql-products; do
