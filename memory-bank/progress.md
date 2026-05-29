@@ -6,8 +6,8 @@
 - **v1.4.9 SHIPPED** — Credential extraction and OIDC issuer fixes.
 
 ## Milestone: v1.4.11 (Data Layer GitOps + RBAC)
-- [x] Data Layer GitOps consolidation — spec: `docs/plans/v1.4.10-data-layer-gitops-consolidation.md` (`18be9e09`, `0e7e2a6`)
-- [x] Keycloak role-based MFA — spec: `docs/plans/v1.4.11-keycloak-mfa.md` (`d8603dd`)
+- [x] Data Layer GitOps consolidation — spec: `docs/plans/v1.4.10-data-layer-gitops-consolidation.md` (shopping-cart-infra PR #70: `7840441`)
+- [x] Keycloak role-based MFA — spec: `docs/plans/v1.4.11-keycloak-mfa.md` (shopping-cart-infra PR #71: `0f13c0b`)
 - [ ] ArgoCD RBAC fix: `product-catalog` → `shopping-cart-product-catalog` in `argocd-rbac-cm`
 - [ ] Node.js 20→22 upgrade (all 5 shopping-cart CI workflows)
 

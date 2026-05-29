@@ -2,11 +2,12 @@
 
 ## Current Status
 - Current branch: \`k3d-manager-v1.4.11\` (created from merge SHA \`f8bad52d\`).
-- **v1.4.11 DATA LAYER COMPLETE** — Data Layer GitOps consolidation pushed in k3d-manager (\`18be9e09\`) and shopping-cart-infra (\`0e7e2a6\`).
-- **v1.4.11 KEYCLOAK MFA COMPLETE** — Role-based MFA pushed in shopping-cart-infra (\`d8603dd\`).
+- **v1.4.11 DATA LAYER COMPLETE** — shopping-cart-infra PR #70 merged (\`7840441\`). ArgoCD \`prune: false\` for data layer.
+- **v1.4.11 KEYCLOAK MFA COMPLETE** — shopping-cart-infra PR #71 merged (\`0f13c0b\`). Role-based TOTP for platform-admin/platform-developer.
 - **v1.4.11 REMAINS OPEN** — ArgoCD RBAC fix still pending.
 - **v1.4.10 SHIPPED** — PR #81 merged (\`f8bad52d\`). ArgoCD stability, bootstrap reliability, /tmp cleanup.
-- **enforce_admins:** restored on k3d-manager main after v1.4.10 merge.
+- **enforce_admins:** restored on k3d-manager main after v1.4.10 merge; restored on shopping-cart-infra main after v1.4.11 partial merge.
+- **shopping-cart-infra docs/next-improvements:** created and synced; retrospective added (\`295a83a\`).
 
 ## Carry-Forward Items
 - **Data Layer GitOps consolidation** — complete; commit SHAs: k3d-manager \`18be9e09\`, shopping-cart-infra \`0e7e2a6\`.
