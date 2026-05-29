@@ -1,12 +1,13 @@
 # Progress — k3d-manager
 
 ## Status
-- **v1.4.11 PARTIALLY COMPLETE** (2026-05-28) — Data Layer GitOps consolidation complete; ArgoCD RBAC fix still pending.
+- **v1.4.11 PARTIALLY COMPLETE** (2026-05-28) — Data Layer GitOps consolidation and Keycloak MFA complete; ArgoCD RBAC fix still pending.
 - **v1.4.10 SHIPPED** — PR #81 merged (`f8bad52d`). ArgoCD stability, bootstrap reliability, /tmp cleanup.
 - **v1.4.9 SHIPPED** — Credential extraction and OIDC issuer fixes.
 
 ## Milestone: v1.4.11 (Data Layer GitOps + RBAC)
 - [x] Data Layer GitOps consolidation — spec: `docs/plans/v1.4.10-data-layer-gitops-consolidation.md` (`18be9e09`, `0e7e2a6`)
+- [x] Keycloak role-based MFA — spec: `docs/plans/v1.4.11-keycloak-mfa.md` (`d8603dd`)
 - [ ] ArgoCD RBAC fix: `product-catalog` → `shopping-cart-product-catalog` in `argocd-rbac-cm`
 - [ ] Node.js 20→22 upgrade (all 5 shopping-cart CI workflows)
 
