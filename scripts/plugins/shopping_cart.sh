@@ -145,6 +145,10 @@ function shopping_cart_sync_vault_backed_secrets() {
     return 1
   fi
 
+  _info "[shopping_cart] Waiting for ClusterSecretStore vault-backend to be Ready..."
+  kubectl wait --for=condition=Ready --timeout=120s \
+    clustersecretstore/vault-backend --context ubuntu-k3s
+
   _info "[shopping_cart] Applying Vault-backed ExternalSecrets for data, app, payment, and MinIO..."
   _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/secrets/"
   if [[ -f "${infra_root}/minio/secret.yaml" ]]; then
@@ -169,7 +173,8 @@ function shopping_cart_sync_vault_backed_secrets() {
     "shopping-cart-payment/payment-gateway-secrets"
   )
 
-  local externalsecret namespace name
+  local externalsecret namespace name _es_sync_ts
+  _es_sync_ts=$(date +%s)
   for externalsecret in "${externalsecrets[@]}"; do
     namespace="${externalsecret%%/*}"
     name="${externalsecret##*/}"
@@ -177,6 +182,8 @@ function shopping_cart_sync_vault_backed_secrets() {
       _warn "[shopping_cart] ExternalSecret ${namespace}/${name} not found — skipping wait"
       continue
     fi
+    kubectl annotate externalsecret "${name}" -n "${namespace}" --context ubuntu-k3s \
+      force-sync="${_es_sync_ts}" --overwrite >/dev/null
     kubectl wait --for=condition=Ready --timeout=180s \
       externalsecret/"${name}" -n "${namespace}" --context ubuntu-k3s
   done
