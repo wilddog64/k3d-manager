@@ -175,6 +175,7 @@ function shopping_cart_sync_vault_backed_secrets() {
 
   local externalsecret namespace name _es_sync_ts
   _es_sync_ts=$(date +%s)
+  local -a _existing_es=()
   for externalsecret in "${externalsecrets[@]}"; do
     namespace="${externalsecret%%/*}"
     name="${externalsecret##*/}"
@@ -182,9 +183,15 @@ function shopping_cart_sync_vault_backed_secrets() {
       _warn "[shopping_cart] ExternalSecret ${namespace}/${name} not found — skipping wait"
       continue
     fi
+    _existing_es+=("${externalsecret}")
     kubectl annotate externalsecret "${name}" -n "${namespace}" --context ubuntu-k3s \
       force-sync="${_es_sync_ts}" --overwrite >/dev/null
-    kubectl wait --for=condition=Ready --timeout=180s \
+  done
+
+  for externalsecret in "${_existing_es[@]}"; do
+    namespace="${externalsecret%%/*}"
+    name="${externalsecret##*/}"
+    kubectl wait --for=condition=Ready --timeout=300s \
       externalsecret/"${name}" -n "${namespace}" --context ubuntu-k3s
   done
 
