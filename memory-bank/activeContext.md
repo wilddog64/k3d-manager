@@ -2,6 +2,7 @@
 
 ## Current Status
 - Current branch: `k3d-manager-v1.4.11` (created from merge SHA `f8bad52d`).
+- **ESO sync saturation timeout fix committed and pushed** — commit `a4398fb4` on `k3d-manager-v1.4.11` (`fix(shopping_cart): annotate all ESOs before waiting to prevent sync saturation timeout`).
 - **Keycloak group-ldap-mapper fix committed and pushed** — shopping-cart-infra branch `chore/add-group-ldap-mapper`, commit `a3a88ee`; k3d-manager commit `ba391a7f` on `k3d-manager-v1.4.11`.
 - **shopping-cart-order actuator NPE fix committed and pushed** — branch `fix/order-actuator-security-npe`, commit `6b8888c` (`fix(security): add dedicated actuator filter chain to prevent ExceptionTranslationFilter NPE`).
 - **v1.4.11 DATA LAYER COMPLETE** — shopping-cart-infra PR #70 merged (`7840441`). ArgoCD `prune: false` for data layer.
@@ -20,6 +21,7 @@
 - **lib-acg Provider-Plugin architecture** — spec at `lib-acg/docs/plans/v1.2.0-provider-plugin-architecture.md`.
 
 ## Recent Changes
+- **ESO sync saturation timeout fix completed** — split annotate and wait loops in `shopping_cart_sync_vault_backed_secrets`, captured existing ESOs before waiting, and increased `kubectl wait` timeout to 300s; commit `a4398fb4` pushed to origin.
 - **Keycloak group-ldap-mapper fix completed** — added `group-ldap-mapper` reconciliation to `identity/keycloak/keycloak-reconcile-hook-job.yaml` in shopping-cart-infra and Step 10d.7 to `bin/acg-up` in k3d-manager; commits `a3a88ee` and `ba391a7f` pushed to origin.
 - **shopping-cart-order actuator NPE fix** — added dedicated `@Order(0)` actuator filter chain in `SecurityConfig.java`, moved the main chain to `@Order(1)`, and bumped `OAuth2SecurityConfig` to `@Order(2)`; commit `6b8888c` pushed on `fix/order-actuator-security-npe`. `mvn compile` timed out in this environment after 180s (`exit 124`).
 - **shopping-cart-infra PR #72 merged** (`4c7c6ec`) — reconcile sub-flow endpoint fix complete; enforce_admins restored on main.
@@ -30,7 +32,7 @@
 - **ArgoCD RBAC fix completed** — updated `catalog-admin` policies in `argocd/config/argocd-rbac-cm.yaml` to reference `shopping-cart/shopping-cart-product-catalog`.
 
 ## Assigned to Codex
-- **ESO sync saturation timeout** — spec `docs/bugs/v1.4.11-bugfix-eso-sync-saturation-timeout.md`; split annotate+wait loop in `shopping_cart_sync_vault_backed_secrets`; increase timeout 180s → 300s; commit message: `fix(shopping_cart): annotate all ESOs before waiting to prevent sync saturation timeout`
+- None
 
 ## Next Steps
 - Commit data-layer StatefulSet race fix + spec + acg-down pre-auth removal on `k3d-manager-v1.4.11`.

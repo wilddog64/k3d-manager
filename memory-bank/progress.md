@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
+- **ESO sync saturation timeout fix committed/pushed** (2026-05-29) — commit `a4398fb4` on `k3d-manager-v1.4.11`.
 - **shopping-cart-infra PR #74 merged & housekeeping complete** (2026-05-29) — merge SHA `fd234094`; enforce_admins restored; docs/next-improvements branch with retrospective created; no versioned CHANGELOG entry (Unreleased only).
 - **Keycloak group-ldap-mapper fix merged** (2026-05-29) — shopping-cart-infra commit `a3a88ee` on `chore/add-group-ldap-mapper` (now in PR #74, merged SHA `fd234094`); k3d-manager commit `ba391a7f` on `k3d-manager-v1.4.11`.
 - **shopping-cart-order actuator NPE fix committed/pushed** (2026-05-29) — branch `fix/order-actuator-security-npe`, commit `6b8888c`; compile verification timed out in this environment (`timeout 180s mvn compile`, exit `124`).
@@ -9,6 +10,7 @@
 - **v1.4.9 SHIPPED** — Credential extraction and OIDC issuer fixes.
 
 ## Milestone: v1.4.11 (Data Layer GitOps + RBAC)
+- [x] ESO sync saturation timeout fix — commit `a4398fb4`; spec: `docs/bugs/v1.4.11-bugfix-eso-sync-saturation-timeout.md`
 - [x] Keycloak group-ldap-mapper permanent fix — shopping-cart-infra `a3a88ee`, k3d-manager `ba391a7f`; spec: `docs/bugs/v1.4.11-bugfix-keycloak-missing-ldap-group-mapper.md`
 - [x] shopping-cart-order actuator NPE fix — branch `fix/order-actuator-security-npe`, commit `6b8888c`; compile check timed out in this environment.
 - [x] Data Layer GitOps consolidation — spec: `docs/plans/v1.4.10-data-layer-gitops-consolidation.md` (shopping-cart-infra PR #70: `7840441`)
@@ -18,7 +20,6 @@
 - [x] ArgoCD RBAC fix: `product-catalog` → `shopping-cart-product-catalog` in `argocd-rbac-cm` (shopping-cart-infra: `8768955`)
 - [x] order-service fix — PR #32 merged (`3e78feab`) — actuator NPE + Lombok processor + pre-push hook
 - [ ] pre-push main-guard hook — k3d-manager (`2c0589ac`) + shopping-cart-order (`bd2a169`) done; Codex: 6 remaining shopping-cart repos on `chore/add-pre-push-hook`
-- [ ] ESO sync saturation timeout fix — spec: `docs/bugs/v1.4.11-bugfix-eso-sync-saturation-timeout.md`; ASSIGNED to Codex
 - [ ] Node.js 20→22 upgrade (all 5 shopping-cart CI workflows)
 
 ## Milestone: v1.4.10 (ArgoCD Stability) — SHIPPED
