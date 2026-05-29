@@ -25,7 +25,11 @@
 - **Retro written** — \`docs/retro/2026-05-28-v1.4.10-retrospective.md\`.
 
 ## Next Steps
-- Codex: implement Data Layer GitOps consolidation (spec ready).
+- Codex: fix reconcile sub-flow endpoint (spec: `docs/plans/v1.4.11-bugfix-reconcile-subflow-update-endpoint.md`).
 - Gemini: apply ArgoCD RBAC fix in shopping-cart-infra.
 - Add public domain to Keycloak realm config.
+
+## Cluster State Note (2026-05-28)
+- Keycloak `otp-conditional-subflow` manually repaired via kcadm.sh — was DISABLED+empty due to reconcile bug.
+- Duplicate ArgoCD apps identified: `basket-service`/`shopping-cart-basket`, `product-catalog`/`shopping-cart-product-catalog`, etc. — root cause: k3d-manager `services/` kustomize wrappers vs `shopping-cart-infra/argocd/applications/` direct apps.
 - Proceed with Node.js 20→22 upgrade (all 5 shopping-cart repos).
