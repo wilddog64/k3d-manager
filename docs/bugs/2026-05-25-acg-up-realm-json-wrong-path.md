@@ -1,4 +1,4 @@
-# Bug: acg-up step 10d reads non-existent identity/config/realm-shopping-cart.json
+# Bug: acg-up step 10d reads non-existent identity/keycloak/realm-shopping-cart.json
 
 > **STALE — DO NOT USE AS A FIX REFERENCE.**
 > The correct path is `identity/keycloak/realm-shopping-cart.json`. Any reference in this doc
@@ -15,7 +15,7 @@
 `acg-up` step 10d reads the Keycloak realm JSON from:
 
 ```
-identity/config/realm-shopping-cart.json
+identity/keycloak/realm-shopping-cart.json
 ```
 
 This path does not exist in shopping-cart-infra. The `identity/config/` directory was never
@@ -42,7 +42,7 @@ via `_keycloak_reconcile_realm_client`, and `frontendUrl` is never set on the re
 **Exact old line (line 828):**
 
 ```bash
-      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/config/realm-shopping-cart.json")
+      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/keycloak/realm-shopping-cart.json")
 ```
 
 **Exact new line:**

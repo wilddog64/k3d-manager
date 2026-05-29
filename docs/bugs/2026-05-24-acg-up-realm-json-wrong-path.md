@@ -19,7 +19,7 @@ ${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/keycloak/realm-shopp
 
 The file lives at:
 ```
-identity/config/realm-shopping-cart.json
+identity/keycloak/realm-shopping-cart.json
 ```
 
 `sed` exits non-zero → `make up` exits at step 10d.
@@ -41,7 +41,7 @@ The realm JSON was moved from `identity/keycloak/` to `identity/config/` at some
 
 **New:**
 ```bash
-      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/config/realm-shopping-cart.json")
+      "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/identity/keycloak/realm-shopping-cart.json")
 ```
 
 Applied directly (one-line path fix). Shellcheck clean.
