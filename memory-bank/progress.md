@@ -17,7 +17,7 @@
 - [x] Keycloak role-based MFA — spec: `docs/plans/v1.4.11-keycloak-mfa.md` (shopping-cart-infra PR #71: `0f13c0b`)
 - [x] Keycloak reconcile sub-flow endpoint fix — spec: `docs/plans/v1.4.11-bugfix-reconcile-subflow-update-endpoint.md` (shopping-cart-infra PR #72 merged: `4c7c6ec`)
 - [ ] data-layer StatefulSet not-found race on fresh cluster — spec: `docs/bugs/v1.4.11-bugfix-data-layer-statefulset-not-found.md`; fix applied in `shopping_cart.sh` on `k3d-manager-v1.4.11`
-- [ ] acg-down password prompt on macOS Tahoe — spec: `docs/bugs/v1.4.11-bugfix-acg-down-interactive-sudo-password-prompt.md`; ASSIGNED to Codex
+- [x] acg-down password prompt on macOS Tahoe — commit `b1b5e599`; spec: `docs/bugs/v1.4.11-bugfix-acg-down-interactive-sudo-password-prompt.md`
 - [x] ArgoCD RBAC fix: `product-catalog` → `shopping-cart-product-catalog` in `argocd-rbac-cm` (shopping-cart-infra: `8768955`)
 - [x] order-service fix — PR #32 merged (`3e78feab`) — actuator NPE + Lombok processor + pre-push hook
 - [ ] pre-push main-guard hook — k3d-manager (`2c0589ac`) + shopping-cart-order (`bd2a169`) done; Codex: 6 remaining shopping-cart repos on `chore/add-pre-push-hook`
