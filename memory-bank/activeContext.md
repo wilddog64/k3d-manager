@@ -26,8 +26,11 @@
 - Gemini: apply ArgoCD RBAC fix in shopping-cart-infra (`product-catalog` → `shopping-cart-product-catalog` in argocd-rbac-cm).
 - Codex: Node.js 20→22 upgrade across all 5 shopping-cart repos (workflows).
 - Add public domain to Keycloak realm config.
+- Permanent fix: add group-ldap-mapper to `keycloak-reconcile-hook-job.yaml` (shopping-cart-infra) + `bin/acg-up` Step 10d.7; spec at `docs/bugs/v1.4.11-bugfix-keycloak-missing-ldap-group-mapper.md`.
 
-## Cluster State Note (2026-05-28)
+## Cluster State Note (2026-05-29)
 - Keycloak `otp-conditional-subflow` manually repaired via kcadm.sh — was DISABLED+empty due to reconcile bug.
 - Duplicate ArgoCD apps identified: `basket-service`/`shopping-cart-basket`, `product-catalog`/`shopping-cart-product-catalog`, etc. — root cause: k3d-manager `services/` kustomize wrappers vs `shopping-cart-infra/argocd/applications/` direct apps.
+- Keycloak LDAP group mapper added manually: `group-ldap-mapper` (ID `a54709dc`) on LDAP federation `ee968f21`; 10 groups imported. Permanent fix spec at `docs/bugs/v1.4.11-bugfix-keycloak-missing-ldap-group-mapper.md`.
+- ArgoCD RBAC permission denied root cause: missing group mapper → empty groups JWT claim → falls through to `role:readonly`. Fixed by adding group mapper + triggering LDAP group sync.
 - Proceed with Node.js 20→22 upgrade (all 5 shopping-cart repos).
