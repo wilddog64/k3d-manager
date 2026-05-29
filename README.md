@@ -305,9 +305,9 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
-| [v1.4.8](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.8) | 2026-05-19 | vault.sh temp file leak fixes, acg_extend.js CDP disconnect hang, Keycloak frontendUrl + named Cloudflare tunnel in acg-up |
-| [v1.4.7](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.7) | 2026-05-18 | Keycloak public URL via Cloudflare + CoreDNS — `frontendUrl` set to Cloudflare domain after realm import; SSH tunnel + iptables DNAT + CoreDNS patch for cross-cluster Keycloak reachability; cross-cluster Keycloak JWT issuer URI aligned in all shopping-cart services |
-| [v1.4.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.4) | 2026-05-08 | Identity SSO fixes — Keycloak ExternalSecret bootstrapping, Keycloak KV seeding, shopping-cart-identity ArgoCD app, shopping-cart-infra OIDC realm; lib-foundation + lib-acg subtree pulls |
+| [v1.4.11](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.11) | 2026-05-29 | ESO sync saturation fix, acg-down macOS Tahoe password prompt fix, data-layer StatefulSet race fix, Keycloak group-ldap-mapper reconciliation, ArgoCD RBAC product-catalog reference fix, legacy ArgoCD app definition removal |
+| [v1.4.10](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.10) | 2026-05-29 | ArgoCD stability, bootstrap reliability, /tmp cleanup |
+| [v1.4.9](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.9) | 2026-05-20 | Credential extraction and OIDC issuer fixes |
 
 <details>
 <summary>Older releases</summary>
