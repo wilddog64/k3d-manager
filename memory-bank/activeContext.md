@@ -3,6 +3,7 @@
 ## Current Status
 - Current branch: `k3d-manager-v1.4.12` (created from merge SHA `57cd3bc3`).
 - **v1.4.11 SHIPPED** — PR #82 merged (57cd3bc3); enforce_admins restored; k3d-manager-v1.4.12 branch created.
+- **Post-merge housekeeping completed** (2026-05-29) — shopping-cart-basket PR #12 (`a01e146`), shopping-cart-e2e-tests PR #4 (`2f048ba`), shopping-cart-frontend PR #26 (`9b9c2c2`), shopping-cart-infra PR #75 (`475d7c1`), shopping-cart-payment PR #22 (`3e25b8b`), shopping-cart-product-catalog PR #33 (`f425a9a`) all merged; enforce_admins restored on all 6 repos; docs/next-improvements branches created on all 6 repos.
 - **ESO sync saturation timeout fix shipped** — commit `a4398fb4` on `k3d-manager-v1.4.11` (`fix(shopping_cart): annotate all ESOs before waiting to prevent sync saturation timeout`).
 - **Keycloak group-ldap-mapper fix committed and pushed** — shopping-cart-infra branch `chore/add-group-ldap-mapper`, commit `a3a88ee`; k3d-manager commit `ba391a7f` on `k3d-manager-v1.4.11`.
 - **shopping-cart-order actuator NPE fix committed and pushed** — branch `fix/order-actuator-security-npe`, commit `6b8888c` (`fix(security): add dedicated actuator filter chain to prevent ExceptionTranslationFilter NPE`).
