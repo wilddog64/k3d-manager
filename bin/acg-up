@@ -272,7 +272,7 @@ for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
   _current_host_entry=$(grep -E "^[0-9.]+[[:space:]]+${_h//./\\.}$" /etc/hosts | tail -n 1 || true)
   if [[ "${_current_host_entry}" != "${_desired_host_entry}" ]]; then
     _info "[acg-up] Updating /etc/hosts for ${_h} → ${_desired_ip} (requires sudo)..."
-    if _run_command --interactive-sudo --soft -- \
+    if _run_command --prefer-sudo --soft -- \
         sh -c "set -e
 tmp=\$(mktemp)
 grep -vE '^[0-9.]+[[:space:]]+${_h//./\\.}$' /etc/hosts > \"\$tmp\"
@@ -307,7 +307,7 @@ if _is_mac; then
     _argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}" || exit 1
     if [[ "$(uname)" == "Darwin" ]]; then
       _info "[acg-up] Trusting Vault CA cert in macOS System Keychain (may prompt for sudo password)..."
-      _run_command --interactive-sudo --soft -- \
+      _run_command --prefer-sudo --soft -- \
         security add-trusted-cert -d -r trustRoot \
           -k /Library/Keychains/System.keychain \
           "${_argocd_browser_tls_dir}/ca.crt"
@@ -341,7 +341,7 @@ PLIST
       _info "[acg-up] ArgoCD browser HTTPS listener LaunchDaemon unchanged — skipping reinstall"
     else
       : > "${_argocd_browser_launchctl_log}"
-      if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
+      if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
           >"${_argocd_browser_launchctl_log}" 2>&1; then
         _info "[acg-up] Stopped existing ArgoCD browser HTTPS listener"
       elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
@@ -349,7 +349,7 @@ PLIST
         _warn "[acg-up] existing ArgoCD browser HTTPS listener was not loaded; continuing"
       fi
       : > "${_argocd_browser_launchctl_log}"
-      if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" \
+      if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" \
           >"${_argocd_browser_launchctl_log}" 2>&1; then
         if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
           tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
@@ -358,7 +358,7 @@ PLIST
       fi
       rm -f "${_argocd_browser_plist_tmp}"
       : > "${_argocd_browser_launchctl_log}"
-      if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_argocd_browser_plist}" \
+      if ! _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_argocd_browser_plist}" \
           >"${_argocd_browser_launchctl_log}" 2>&1; then
         if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
           tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
@@ -715,7 +715,7 @@ PLIST
       _info "[acg-up] Keycloak browser HTTP listener LaunchDaemon unchanged — skipping reinstall"
     else
       : > "${_keycloak_browser_launchctl_log}"
-      if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
+      if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
           >"${_keycloak_browser_launchctl_log}" 2>&1; then
         _info "[acg-up] Stopped existing Keycloak browser HTTP listener"
       elif [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
@@ -723,7 +723,7 @@ PLIST
         _warn "[acg-up] existing Keycloak browser HTTP listener was not loaded; continuing"
       fi
       : > "${_keycloak_browser_launchctl_log}"
-      if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" \
+      if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" \
           >"${_keycloak_browser_launchctl_log}" 2>&1; then
         if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
           tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
@@ -732,7 +732,7 @@ PLIST
       fi
       rm -f "${_keycloak_browser_plist_tmp}"
       : > "${_keycloak_browser_launchctl_log}"
-      if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_keycloak_browser_plist}" \
+      if ! _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_keycloak_browser_plist}" \
           >"${_keycloak_browser_launchctl_log}" 2>&1; then
         if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
           tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
@@ -858,7 +858,7 @@ if _is_mac; then
   mkdir -p "$(dirname "${_frontend_browser_log}")"
   # Ensure 127.0.0.2 loopback alias exists (macOS does not expose 127.0.0.0/8 automatically)
   if ! ifconfig lo0 | grep -q '127\.0\.0\.2'; then
-    _run_command --interactive-sudo --quiet -- ifconfig lo0 alias 127.0.0.2 || \
+    _run_command --prefer-sudo --quiet -- ifconfig lo0 alias 127.0.0.2 || \
       _warn "[acg-up] failed to add 127.0.0.2 loopback alias — frontend port-forward will fail to bind"
   fi
 
@@ -895,16 +895,16 @@ PLIST
     _info "[acg-up] Loopback alias LaunchDaemon unchanged — skipping reinstall"
   else
     : > "${_loopback_launchctl_log}"
-    _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_loopback_plist}" \
+    _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_loopback_plist}" \
       >"${_loopback_launchctl_log}" 2>&1 || true
     : > "${_loopback_launchctl_log}"
-    if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_loopback_plist_tmp}" "${_loopback_plist}" \
+    if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_loopback_plist_tmp}" "${_loopback_plist}" \
         >"${_loopback_launchctl_log}" 2>&1; then
       _warn "[acg-up] failed to install loopback alias plist — frontend may fail after reboot"
     else
       rm -f "${_loopback_plist_tmp}"
       : > "${_loopback_launchctl_log}"
-      _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_loopback_plist}" \
+      _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_loopback_plist}" \
         >"${_loopback_launchctl_log}" 2>&1 || \
         _warn "[acg-up] failed to bootstrap loopback alias agent"
     fi
@@ -952,7 +952,7 @@ PLIST
     _info "[acg-up] frontend browser HTTP listener LaunchDaemon unchanged — skipping reinstall"
   else
     : > "${_frontend_browser_launchctl_log}"
-    if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
+    if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
         >"${_frontend_browser_launchctl_log}" 2>&1; then
       _info "[acg-up] Stopped existing frontend browser HTTP listener"
     elif [[ -s "${_frontend_browser_launchctl_log}" ]]; then
@@ -960,7 +960,7 @@ PLIST
       _warn "[acg-up] existing frontend browser HTTP listener was not loaded; continuing"
     fi
     : > "${_frontend_browser_launchctl_log}"
-    if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" \
+    if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" \
         >"${_frontend_browser_launchctl_log}" 2>&1; then
       if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
         tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
@@ -969,7 +969,7 @@ PLIST
     fi
     rm -f "${_frontend_browser_plist_tmp}"
     : > "${_frontend_browser_launchctl_log}"
-    if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_frontend_browser_plist}" \
+    if ! _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_frontend_browser_plist}" \
         >"${_frontend_browser_launchctl_log}" 2>&1; then
       if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
         tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
@@ -1101,16 +1101,16 @@ PLIST
       _info "[acg-up] Cloudflare named tunnel LaunchDaemon unchanged — skipping reinstall"
     else
       : > "${_tunnel_launchctl_log}"
-      _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist}" \
+      _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist}" \
         >"${_tunnel_launchctl_log}" 2>&1 || true
       : > "${_tunnel_launchctl_log}"
-      if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" \
+      if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" \
           >"${_tunnel_launchctl_log}" 2>&1; then
         _warn "[acg-up] failed to install tunnel plist — skipping"
       else
         rm -f "${_named_tunnel_plist_tmp}"
         : > "${_tunnel_launchctl_log}"
-        if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_named_tunnel_plist}" \
+        if ! _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_named_tunnel_plist}" \
             >"${_tunnel_launchctl_log}" 2>&1; then
           _warn "[acg-up] failed to bootstrap cloudflare tunnel"
         fi
