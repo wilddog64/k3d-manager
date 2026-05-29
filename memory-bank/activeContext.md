@@ -3,6 +3,7 @@
 ## Current Status
 - Current branch: `k3d-manager-v1.4.12` (created from merge SHA `57cd3bc3`).
 - **v1.4.11 SHIPPED** — PR #82 merged (57cd3bc3); enforce_admins restored; k3d-manager-v1.4.12 branch created.
+- **shopping-cart-infra PR #76 post-merge housekeeping completed** (2026-05-29) — PR #76 merged SHA `1e7044b7`. Removed legacy ArgoCD app definitions (basket-service, frontend, order-service, payment-service, product-catalog YAMLs). Updated Makefile and docs/architecture.md for ApplicationSet model. enforce_admins restored on shopping-cart-infra main. docs/next-improvements branch synced. README and architecture.md docs audited — no stale references found (PR #76 updated architecture.md correctly).
 - **Post-merge housekeeping completed** (2026-05-29) — shopping-cart-basket PR #12 (`a01e146`), shopping-cart-e2e-tests PR #4 (`2f048ba`), shopping-cart-frontend PR #26 (`9b9c2c2`), shopping-cart-infra PR #75 (`475d7c1`), shopping-cart-payment PR #22 (`3e25b8b`), shopping-cart-product-catalog PR #33 (`f425a9a`) all merged; enforce_admins restored on all 6 repos; docs/next-improvements branches created on all 6 repos.
 - **ESO sync saturation timeout fix shipped** — commit `a4398fb4` on `k3d-manager-v1.4.11` (`fix(shopping_cart): annotate all ESOs before waiting to prevent sync saturation timeout`).
 - **Keycloak group-ldap-mapper fix committed and pushed** — shopping-cart-infra branch `chore/add-group-ldap-mapper`, commit `a3a88ee`; k3d-manager commit `ba391a7f` on `k3d-manager-v1.4.11`.
@@ -41,6 +42,7 @@
 - **Keycloak role-based MFA completed** — conditional OTP browser flow in `keycloak-reconcile-hook-job.yaml`.
 - **Data Layer GitOps consolidation completed** — removed imperative data-layer `kubectl apply`; set `prune: false` in `argocd/applications/data-layer.yaml`.
 - **ArgoCD RBAC fix completed** — updated `catalog-admin` policies in `argocd/config/argocd-rbac-cm.yaml` to reference `shopping-cart/shopping-cart-product-catalog`.
+- **shopping-cart-infra PR #76 merged** (2026-05-29) — removed legacy ArgoCD app definitions; switched to ApplicationSet model; updated Makefile and docs/architecture.md. Docs audit: README and architecture.md checked — no stale app-of-apps references remained (PR #76 updated architecture.md correctly to describe ApplicationSet deployment model).
 
 ## Assigned to Codex
 - None.

@@ -2,8 +2,9 @@
 
 ## Status
 - **v1.4.11 SHIPPED** — PR #82 merged (57cd3bc3). ESO sync, acg-down macOS Tahoe fix, data-layer StatefulSet race, Keycloak group-ldap-mapper, ArgoCD RBAC, legacy app removal.
+- **shopping-cart-infra PR #76 MERGED** (2026-05-29) — merge SHA `1e7044b7`. Removes legacy ArgoCD app definitions; switches to ApplicationSet model; updates Makefile and architecture.md. enforce_admins restored; docs/next-improvements branches remain active.
 - **pre-push main-guard hook rollout completed** (2026-05-29) — shopping-cart-basket PR #12 merged (`a01e146`), shopping-cart-e2e-tests PR #4 merged (`2f048ba`), shopping-cart-frontend PR #26 merged (`9b9c2c2`), shopping-cart-infra PR #75 merged (`475d7c1`), shopping-cart-payment PR #22 merged (`3e25b8b`), shopping-cart-product-catalog PR #33 merged (`f425a9a`); enforce_admins restored on all 6; docs/next-improvements branches created.
-- **infra ArgoCD stale refs fix committed/pushed** (2026-05-29) — shopping-cart-infra commit `407e489` on `fix/remove-legacy-argocd-apps`.
+- **infra ArgoCD stale refs fix committed/pushed** (2026-05-29) — shopping-cart-infra PR #76 now merged with commit `407e489` (stale refs fix part of PR #76).
 - **v1.4.10 SHIPPED** — PR #81 merged (`f8bad52d`). ArgoCD stability, bootstrap reliability, /tmp cleanup.
 - **v1.4.9 SHIPPED** — Credential extraction and OIDC issuer fixes.
 
