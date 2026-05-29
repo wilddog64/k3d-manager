@@ -1,11 +1,13 @@
 # Progress — k3d-manager
 
 ## Status
+- **shopping-cart-order actuator NPE fix committed/pushed** (2026-05-29) — branch `fix/order-actuator-security-npe`, commit `6b8888c`; compile verification timed out in this environment (`timeout 180s mvn compile`, exit `124`).
 - **v1.4.11 PARTIALLY COMPLETE** (2026-05-29) — Keycloak sub-flow fix merged (`4c7c6ec`); ArgoCD RBAC fix merged (`8768955`); shopping-cart-infra PR #73 merged (`eccb487`); post-merge housekeeping complete; data-layer StatefulSet race fix pending commit; Node.js 20→22 upgrade pending.
 - **v1.4.10 SHIPPED** — PR #81 merged (`f8bad52d`). ArgoCD stability, bootstrap reliability, /tmp cleanup.
 - **v1.4.9 SHIPPED** — Credential extraction and OIDC issuer fixes.
 
 ## Milestone: v1.4.11 (Data Layer GitOps + RBAC)
+- [x] shopping-cart-order actuator NPE fix — branch `fix/order-actuator-security-npe`, commit `6b8888c`; compile check timed out in this environment.
 - [x] Data Layer GitOps consolidation — spec: `docs/plans/v1.4.10-data-layer-gitops-consolidation.md` (shopping-cart-infra PR #70: `7840441`)
 - [x] Keycloak role-based MFA — spec: `docs/plans/v1.4.11-keycloak-mfa.md` (shopping-cart-infra PR #71: `0f13c0b`)
 - [x] Keycloak reconcile sub-flow endpoint fix — spec: `docs/plans/v1.4.11-bugfix-reconcile-subflow-update-endpoint.md` (shopping-cart-infra PR #72 merged: `4c7c6ec`)
