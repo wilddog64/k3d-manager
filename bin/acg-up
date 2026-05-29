@@ -658,6 +658,43 @@ else
   fi
 fi
 
+_info "[acg-up] Step 10d.7/14 — Reconciling Keycloak LDAP group mapper..."
+if [[ -z "${_kc_pod:-}" ]] || [[ -z "${_ldap_component_id:-}" ]]; then
+  _warn "[acg-up] Keycloak pod or LDAP component ID unavailable — skipping group mapper reconciliation"
+else
+  _gm_existing=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+    sh -c "/opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
+      -q parent=${_ldap_component_id} \
+      -q type=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
+      -q name=group-mapper \
+      --fields id 2>/dev/null | grep -c '\"id\"' || true" 2>/dev/null || echo "0")
+  if [[ "${_gm_existing}" -gt 0 ]]; then
+    _info "[acg-up] LDAP group mapper already exists"
+  else
+    _gm_json='{"parentId":"'"${_ldap_component_id}"'","providerType":"org.keycloak.storage.ldap.mappers.LDAPStorageMapper","providerId":"group-ldap-mapper","name":"group-mapper","config":{"groups.dn":["ou=groups,dc=shopping-cart,dc=local"],"group.name.ldap.attribute":["cn"],"group.object.classes":["groupOfNames"],"preserve.group.inheritance":["true"],"ignore.missing.groups":["false"],"membership.ldap.attribute":["member"],"membership.attribute.type":["DN"],"membership.user.ldap.attribute":["uid"],"mode":["READ_ONLY"],"user.roles.retrieve.strategy":["LOAD_GROUPS_BY_MEMBER_ATTRIBUTE"],"memberof.ldap.attribute":["memberOf"],"drop.non.existing.groups.during.sync":["false"]}}'
+    kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+      sh -c "echo '${_gm_json}' > /tmp/gm.json && \
+        /opt/keycloak/bin/kcadm.sh create components -r shopping-cart -f /tmp/gm.json >/dev/null && \
+        rm -f /tmp/gm.json" 2>/dev/null && \
+      _info "[acg-up] LDAP group mapper created" || \
+      _warn "[acg-up] LDAP group mapper creation failed"
+  fi
+  _gm_id=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+    sh -c "/opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
+      -q parent=${_ldap_component_id} \
+      -q type=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
+      -q name=group-mapper \
+      --fields id 2>/dev/null | grep '\"id\"' | head -1 | sed 's/.*: \"//;s/\".*//' " 2>/dev/null || true)
+  if [[ -n "${_gm_id}" ]]; then
+    kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+      sh -c "/opt/keycloak/bin/kcadm.sh create \
+        'user-storage/${_ldap_component_id}/mappers/${_gm_id}/sync?direction=fedToKeycloak' \
+        -r shopping-cart >/dev/null 2>&1" 2>/dev/null && \
+      _info "[acg-up] LDAP group sync complete" || \
+      _warn "[acg-up] LDAP group sync failed"
+  fi
+fi
+
 _info "[acg-up] Step 10g.5/14 — Wiring Keycloak cross-cluster reachability on ubuntu-k3s..."
 _node_ip=$(kubectl get node --context ubuntu-k3s \
   -l 'node-role.kubernetes.io/control-plane' \
