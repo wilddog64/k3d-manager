@@ -12,6 +12,7 @@
 - [ ] data-layer StatefulSet not-found race on fresh cluster — spec: `docs/bugs/v1.4.11-bugfix-data-layer-statefulset-not-found.md`; fix applied in `shopping_cart.sh` on `k3d-manager-v1.4.11`
 - [x] ArgoCD RBAC fix: `product-catalog` → `shopping-cart-product-catalog` in `argocd-rbac-cm` (shopping-cart-infra: `8768955`)
 - [ ] Keycloak group-ldap-mapper permanent fix — spec: `docs/bugs/v1.4.11-bugfix-keycloak-missing-ldap-group-mapper.md`; live fix applied 2026-05-29 (mapper ID `a54709dc`)
+- [ ] order-service actuator NPE (ExceptionTranslationFilter) — spec: `docs/bugs/v1.4.11-bugfix-order-service-actuator-npe.md`; branch `fix/order-actuator-security-npe` in shopping-cart-order
 - [ ] Node.js 20→22 upgrade (all 5 shopping-cart CI workflows)
 
 ## Milestone: v1.4.10 (ArgoCD Stability) — SHIPPED
