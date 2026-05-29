@@ -18,6 +18,7 @@
 - [x] ArgoCD RBAC fix: `product-catalog` → `shopping-cart-product-catalog` in `argocd-rbac-cm` (shopping-cart-infra: `8768955`)
 - [x] order-service fix — PR #32 merged (`3e78feab`) — actuator NPE + Lombok processor + pre-push hook
 - [ ] pre-push main-guard hook — k3d-manager (`2c0589ac`) + shopping-cart-order (`bd2a169`) done; Codex: 6 remaining shopping-cart repos on `chore/add-pre-push-hook`
+- [ ] ESO sync saturation timeout fix — spec: `docs/bugs/v1.4.11-bugfix-eso-sync-saturation-timeout.md`; ASSIGNED to Codex
 - [ ] Node.js 20→22 upgrade (all 5 shopping-cart CI workflows)
 
 ## Milestone: v1.4.10 (ArgoCD Stability) — SHIPPED

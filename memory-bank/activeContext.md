@@ -29,6 +29,9 @@
 - **Data Layer GitOps consolidation completed** — removed imperative data-layer `kubectl apply`; set `prune: false` in `argocd/applications/data-layer.yaml`.
 - **ArgoCD RBAC fix completed** — updated `catalog-admin` policies in `argocd/config/argocd-rbac-cm.yaml` to reference `shopping-cart/shopping-cart-product-catalog`.
 
+## Assigned to Codex
+- **ESO sync saturation timeout** — spec `docs/bugs/v1.4.11-bugfix-eso-sync-saturation-timeout.md`; split annotate+wait loop in `shopping_cart_sync_vault_backed_secrets`; increase timeout 180s → 300s; commit message: `fix(shopping_cart): annotate all ESOs before waiting to prevent sync saturation timeout`
+
 ## Next Steps
 - Commit data-layer StatefulSet race fix + spec + acg-down pre-auth removal on `k3d-manager-v1.4.11`.
 - Codex: Node.js 20→22 upgrade across all 5 shopping-cart repos (workflows).
