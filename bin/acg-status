@@ -53,6 +53,11 @@ echo "=== ArgoCD Apps ==="
 kubectl get applications.argoproj.io -A --context "${INFRA_CONTEXT}" 2>/dev/null \
   || echo "Cannot reach Hub cluster or ArgoCD CRDs not installed"
 
+echo ""
+echo "=== ArgoCD ApplicationSets ==="
+kubectl get applicationsets.argoproj.io -A --context "${INFRA_CONTEXT}" 2>/dev/null \
+  || echo "Cannot reach Hub cluster or ArgoCD CRDs not installed"
+
 if [[ "${CLUSTER_PROVIDER}" != "k3s-gcp" ]]; then
   echo ""
   echo "=== AWS Credentials ==="

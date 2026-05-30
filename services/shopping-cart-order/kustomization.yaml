@@ -62,3 +62,13 @@ patches:
     target:
       kind: Deployment
       name: order-service
+  - patch: |-
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: order-service
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+    target:
+      kind: ServiceAccount
+      name: order-service
