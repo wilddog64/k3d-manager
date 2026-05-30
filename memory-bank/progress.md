@@ -6,6 +6,9 @@
 ## Status (v1.5.0 — IN PROGRESS)
 - **SPEC WRITTEN:** platform-helm multi-env ArgoCD — `docs/plans/v1.5.0-platform-helm-argocd-multi-env.md`; 2 files: `platform-helm.yaml` (dev/infra/prod generators + per-cluster labels), `register_app_cluster` (add `argocd-chart-version`/`argocd-replicas` labels); prerequisite for OCI provider
 
+## Milestone: v1.7.0 (Observability — OCI)
+- **SPEC WRITTEN:** Prometheus + Grafana on OCI — `docs/plans/v1.7.0-observability-oci.md`; kube-prometheus-stack on OCI (ARM64, 1 replica); Prometheus agent mode on laptop + ACG with remote_write to OCI; Grafana via `grafana.3ai-talk.org` Cloudflare tunnel; gates on OCI cluster live (v1.5.0). Decision: monitoring on OCI outlives laptop reboots.
+
 ## Milestone: v1.6.0 (ArgoCD Automated Upgrade Pipeline)
 - **SPEC WRITTEN:** k3dm-webhook server — `docs/plans/v1.6.0-k3dm-webhook-server.md`; Python stdlib HTTP server on laptop; launchd LaunchAgent; exposed via Cloudflare tunnel; stage=acg triggers make up; stage=infra patches infra label; Bearer token auth
 - **SPEC WRITTEN:** ArgoCD upgrade notifications — `docs/plans/v1.6.0-argocd-upgrade-notification.md`; SendGrid email + PagerDuty; notify.sh bundled in ConfigMap; credentials in platform-ops-notifications Secret

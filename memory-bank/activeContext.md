@@ -43,6 +43,9 @@
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
+## Architectural Decision (2026-05-29)
+- **Observability → OCI, not laptop** — Prometheus + Grafana run on OCI so monitoring survives laptop reboots. Laptop/ACG use Prometheus agent mode with remote_write to OCI. Grafana exposed via `grafana.3ai-talk.org` Cloudflare tunnel. Spec: `docs/plans/v1.7.0-observability-oci.md`. Implementation gates on OCI cluster live (v1.5.0).
+
 ## In Progress (v1.5.0)
 - **ASSIGNED TO CODEX:** Passwordless sudo for macOS host operations — spec: `docs/plans/v1.5.0-sudo-passwordless.md` (commit `01d27232` on `k3d-manager-v1.5.0`); deliverables: `bin/install-sudoers.sh` (new), `sudo -v` prewarm in `bin/acg-up/down/refresh`, `Makefile` `sudoers` target, `docs/howto/makefile.md` Host Setup section, `scripts/tests/test_install_sudoers.bats`; commit message: `feat(sudo): passwordless sudo rules + prewarm for macOS host operations`
 
