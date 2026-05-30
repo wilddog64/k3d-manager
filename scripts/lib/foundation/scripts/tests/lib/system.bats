@@ -49,7 +49,7 @@ bats_require_minimum_version 1.5.0
 }
 
 @test "_run_command: --interactive-sudo flag is accepted without error" {
-  function sudo() { "$@"; }
+  function sudo() { while [[ $# -gt 0 && "$1" == -* ]]; do shift; done; "$@"; }
   export -f sudo
   run _run_command --interactive-sudo --soft -- echo hi
   [ "$status" -eq 0 ]
@@ -58,7 +58,7 @@ bats_require_minimum_version 1.5.0
 }
 
 @test "_run_command: --prefer-sudo flag is accepted without error" {
-  function sudo() { "$@"; }
+  function sudo() { while [[ $# -gt 0 && "$1" == -* ]]; do shift; done; "$@"; }
   export -f sudo
   run _run_command --prefer-sudo --soft -- echo hi
   [ "$status" -eq 0 ]
