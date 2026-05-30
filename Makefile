@@ -82,10 +82,11 @@ sync-apps:
 ##        make sync-branch BRANCH=k3d-manager-v1.4.12
 sync-branch:
 	@echo "[make] Patching services-git ApplicationSet → $(BRANCH)"
-	@kubectl patch applicationset services-git -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
+	@_b='$(BRANCH)'; \
+	kubectl patch applicationset services-git -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
 	  --type=json -p \
-	  '[{"op":"replace","path":"/spec/generators/0/git/revision","value":"$(BRANCH)"},{"op":"replace","path":"/spec/template/spec/source/targetRevision","value":"$(BRANCH)"}]'
-	@for app in shopping-cart-basket shopping-cart-order shopping-cart-payment shopping-cart-product-catalog; do \
+	  "[{\"op\":\"replace\",\"path\":\"/spec/generators/0/git/revision\",\"value\":\"$$_b\"},{\"op\":\"replace\",\"path\":\"/spec/template/spec/source/targetRevision\",\"value\":\"$$_b\"}]"
+	@for app in shopping-cart-basket shopping-cart-frontend shopping-cart-namespace shopping-cart-order shopping-cart-payment shopping-cart-product-catalog; do \
 	  kubectl annotate application "$$app" -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
 	    argocd.argoproj.io/refresh=normal --overwrite 2>/dev/null || true; \
 	done
@@ -97,7 +98,7 @@ sync-main:
 	@kubectl patch applicationset services-git -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
 	  --type=json -p \
 	  '[{"op":"replace","path":"/spec/generators/0/git/revision","value":"main"},{"op":"replace","path":"/spec/template/spec/source/targetRevision","value":"main"}]'
-	@for app in shopping-cart-basket shopping-cart-order shopping-cart-payment shopping-cart-product-catalog; do \
+	@for app in shopping-cart-basket shopping-cart-frontend shopping-cart-namespace shopping-cart-order shopping-cart-payment shopping-cart-product-catalog; do \
 	  kubectl annotate application "$$app" -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
 	    argocd.argoproj.io/refresh=normal --overwrite 2>/dev/null || true; \
 	done

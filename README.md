@@ -291,11 +291,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-05-29 | [Copilot PR #83 review findings](docs/issues/2026-05-29-copilot-pr83-review-findings.md) | Makefile shell injection in BRANCH interpolation fixed; sync-branch/sync-main missing 2 apps added; stale activeContext carry-forward items cleared |
 | 2026-05-19 | [Copilot PR #77 review findings](docs/issues/2026-05-19-copilot-pr77-review-findings.md) | CHANGELOG vault path typo fixed; pre-existing acg_credentials.js positional GCP extraction, navigation skip scope, and provider card selection flagged for follow-on specs |
 | 2026-05-19 | [git push upstream default targeted main](docs/issues/2026-05-19-git-push-upstream-default-targeted-main.md) | shopping-cart repos — `git push --set-upstream origin fix/keycloak-public-url` pushed branch-default main instead of feature branch; workaround: explicit `git push origin fix/keycloak-public-url` after tracking. Upstream quirk documented for awareness |
 | 2026-05-15 | [Copilot PR #74 review findings](docs/issues/2026-05-15-copilot-pr74-review-findings.md) | acg_extend.js URL matching, keycloak.sh PGPASSWORD exposure, ldap.sh ESO dependency guard, vault.sh revoke error propagation |
 | 2026-05-15 | [frontend main push reverted](docs/issues/2026-05-15-frontend-main-push-reverted.md) | shopping-cart-frontend — accidental push to main during SSO wiring; reverted to 2872a4cd |
-| 2026-05-14 | [shopping-cart-infra v0.4.0 tag pointed before fix](docs/issues/2026-05-14-shopping-cart-infra-v0.4.0-tag-pointed-before-fix.md) | shopping-cart-infra release tag — v0.4.0 was initially on the commit before the Keycloak realm import fix; corrected to point at the merge commit |
 
 [All issues →](docs/issues/)
 

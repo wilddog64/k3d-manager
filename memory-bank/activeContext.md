@@ -25,7 +25,7 @@
 - **enforce_admins:** restored on k3d-manager main after v1.4.10 merge; restored on shopping-cart-infra main after PR #73 merge.
 
 ## Carry-Forward Items
-- **ExternalSecret/product-catalog-secrets SharedResourceWarning** — claimed by both cicd/product-catalog and data-layer ArgoCD apps; requires follow-on fix in v1.4.12
+- **ExternalSecret/product-catalog-secrets SharedResourceWarning** — RESOLVED: shopping-cart-infra PR #78 merged (`7881f35`); data-layer duplicate deleted, sole ownership with cicd/product-catalog app
 - **Data Layer GitOps consolidation** — complete; commit SHAs: k3d-manager `18be9e09`, shopping-cart-infra `0e7e2a6`.
 - **Keycloak role-based MFA** — complete; commit SHA: shopping-cart-infra `d8603dd`.
 - **ArgoCD RBAC fix** — complete; commit SHA: shopping-cart-infra `8768955`.
@@ -57,7 +57,7 @@
 - Codex: Node.js 20→22 upgrade across all 5 shopping-cart repos (workflows).
 - Add public domain to Keycloak realm config.
 - **shopping-cart-order PR #32 MERGED** (`3e78feab`) — actuator NPE + Lombok processor + pre-push hook. enforce_admins restored. Next branch: `docs/next-improvements`.
-- ExternalSecret/product-catalog-secrets SharedResourceWarning follow-up.
+- ~~ExternalSecret/product-catalog-secrets SharedResourceWarning~~ — resolved by shopping-cart-infra PR #78.
 
 ## Cluster State Note (2026-05-29)
 - Keycloak `otp-conditional-subflow` manually repaired via kcadm.sh — was DISABLED+empty due to reconcile bug.
