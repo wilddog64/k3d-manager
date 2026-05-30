@@ -129,12 +129,19 @@ HELP
 
 # --- Private helpers ---
 
-function _oci_validate_prereqs() {
-  # OCI CLI must be installed — cannot auto-install
-  if ! command -v oci >/dev/null 2>&1; then
+function _oci_ensure_cli() {
+  command -v oci >/dev/null 2>&1 && return 0
+  if command -v brew >/dev/null 2>&1; then
+    _info "[k3s-oci] OCI CLI not found — installing via brew..."
+    _run_command -- brew install oci-cli
+  else
     _err "[k3s-oci] OCI CLI not found. Install: brew install oci-cli"
     return 1
   fi
+}
+
+function _oci_validate_prereqs() {
+  _oci_ensure_cli || return 1
 
   # ~/.oci/config — launch interactive setup once if missing
   if [[ ! -f "${HOME}/.oci/config" ]]; then

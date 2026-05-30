@@ -1,33 +1,45 @@
-# Makefile — k3d-manager ACG cluster lifecycle shortcuts
-# Usage: make [target] [URL=https://...]
+# Makefile — k3d-manager cluster lifecycle (provider-aware)
+# Usage: make [target] [CLUSTER_PROVIDER=k3s-aws|k3s-gcp|k3s-oci] [URL=https://...]
 
 .DEFAULT_GOAL := help
 
+CLUSTER_PROVIDER ?= k3s-aws
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL ?= 0
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision sudoers help oci-status oci-provision oci-teardown oci-teardown-infra
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision sudoers test help
 
-## Provision full stack: credentials → cluster → ESO → ArgoCD
+## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
-	@echo "[make] Running bin/acg-up..."
-	@GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)"
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager deploy_cluster --confirm ;; \
+	  *)       GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)" ;; \
+	esac
 
-## Tear down remote cluster and stop background processes (local Hub deleted by default)
-## Set KEEP_LOCAL=1 to preserve the local Hub cluster: make down KEEP_LOCAL=1
+## Tear down cluster (k3s-oci → destroy_cluster; others → bin/acg-down)
+## Set KEEP_LOCAL=1 to preserve the local Hub cluster (k3s-aws/k3s-gcp only)
 down:
-	bin/acg-down --confirm $(if $(filter 1,$(KEEP_LOCAL)),--keep-hub,)
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster ;; \
+	  *)       bin/acg-down --confirm $(if $(filter 1,$(KEEP_LOCAL)),--keep-hub,) ;; \
+	esac
 
-## Refresh AWS credentials and restart tunnel (use when creds expire)
+## Refresh credentials and restart tunnel (k3s-aws/k3s-gcp only)
 refresh:
 	bin/acg-refresh "$(URL)"
 
 ## Show cluster nodes, pod status, tunnel health
 status:
-	APP_CONTEXT=$(if $(filter k3s-gcp,$(CLUSTER_PROVIDER)),ubuntu-gcp,ubuntu-k3s) CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) bin/acg-status
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-oci) CLUSTER_PROVIDER=k3s-oci KUBECONFIG=$(HOME)/.kube/k3s-oci.yaml \
+	             kubectl get nodes,pods -A --no-headers 2>/dev/null \
+	             || echo "OCI cluster unreachable" ;; \
+	  k3s-gcp) APP_CONTEXT=ubuntu-gcp CLUSTER_PROVIDER=k3s-gcp bin/acg-status ;; \
+	  *)       APP_CONTEXT=ubuntu-k3s CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) bin/acg-status ;; \
+	esac
 
-## Extract AWS credentials only (no cluster changes)
+## Extract AWS credentials only (no cluster changes; k3s-aws only)
 creds:
 	scripts/k3d-manager acg_get_credentials "$(URL)"
 
@@ -39,7 +51,7 @@ chrome-cdp:
 chrome-cdp-stop:
 	scripts/k3d-manager acg_chrome_cdp_uninstall
 
-## Re-register ubuntu-k3s app cluster with ArgoCD (use after sandbox recreation or IP change)
+## Re-register ubuntu-k3s app cluster with ArgoCD (after sandbox recreation or IP change)
 argocd-registration:
 	@_token=$$(kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s \
 	  -o jsonpath='{.data.token}' 2>/dev/null | base64 -d | tr -d '\n'); \
@@ -87,52 +99,45 @@ ssm:
 	  exit 1; \
 	fi
 
-## Provision ACG CloudFormation stack with SSM support (credentials → acg_provision)
+## Provision ACG CloudFormation stack with SSM support (k3s-aws only)
 provision: ssm
 	K3S_AWS_SSM_ENABLED=true scripts/k3d-manager acg_provision --confirm
-
-## OCI cluster status
-oci-status:
-	@CLUSTER_PROVIDER=k3s-oci KUBECONFIG=$(HOME)/.kube/k3s-oci.yaml \
-	  kubectl get nodes,pods -A --no-headers 2>/dev/null \
-	  || echo "OCI cluster unreachable"
-
-## Provision OCI Always Free ARM64 k3s cluster
-oci-provision:
-	CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager deploy_cluster
-
-## Tear down OCI cluster only (preserve infrastructure by default)
-oci-teardown:
-	CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster
-
-## Tear down OCI cluster and infrastructure
-oci-teardown-infra:
-	CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster --destroy-infra
 
 ## Install passwordless sudo rules for k3d-manager macOS host operations (one-time setup)
 sudoers:
 	bin/install-sudoers.sh
 
+## Run all BATS test suites
+test:
+	./scripts/k3d-manager test all
+
 ## Show this help
 help:
 	@echo ""
-	@echo "  k3d-manager — ACG cluster lifecycle"
+	@echo "  k3d-manager — cluster lifecycle"
 	@echo ""
-	@echo "  Targets:"
-	@echo "    make up        Provision full stack (credentials → cluster → ESO → ArgoCD)"
-	@echo "    make down          Tear down remote cluster; local Hub deleted by default (set KEEP_LOCAL=1 to preserve Hub)"
-	@echo "    make refresh   Refresh AWS credentials and restart tunnel"
-	@echo "    make status    Show cluster nodes, pod status, tunnel health"
-	@echo "    make creds     Extract AWS credentials only"
-	@echo "    make chrome-cdp        Install Chrome CDP launchd agent (enables automated credentials)"
+	@echo "  Targets (set CLUSTER_PROVIDER=k3s-aws|k3s-gcp|k3s-oci; default: k3s-aws):"
+	@echo "    make up            Provision full stack"
+	@echo "    make down          Tear down cluster (set KEEP_LOCAL=1 to preserve Hub on k3s-aws/gcp)"
+	@echo "    make status        Show cluster nodes and pod status"
+	@echo "    make test          Run all BATS test suites"
+	@echo ""
+	@echo "  k3s-aws / k3s-gcp only:"
+	@echo "    make refresh       Refresh credentials and restart tunnel"
+	@echo "    make creds         Extract AWS credentials only"
+	@echo "    make chrome-cdp    Install Chrome CDP launchd agent (automated credentials)"
 	@echo "    make chrome-cdp-stop   Uninstall Chrome CDP launchd agent"
-	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
-	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
-	@echo "    make sudoers               Install passwordless sudo rules (one-time macOS setup)"
+	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD"
+	@echo "    make sync-apps             Sync ArgoCD data-layer and show pod status"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
 	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
+	@echo "    make sudoers               Install passwordless sudo rules (one-time macOS setup)"
 	@echo ""
-	@echo "  Override sandbox URL (falls back to default if omitted):"
+	@echo "  Examples:"
+	@echo "    make up                                          # k3s-aws (default)"
+	@echo "    make up CLUSTER_PROVIDER=k3s-gcp"
+	@echo "    make up CLUSTER_PROVIDER=k3s-oci"
+	@echo "    make down CLUSTER_PROVIDER=k3s-oci"
 	@echo "    make up URL=https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/..."
 	@echo ""
 	@echo "  Default URL: $(URL)"
