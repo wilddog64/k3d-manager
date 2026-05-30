@@ -7,6 +7,7 @@
 - **infra ArgoCD stale refs fix committed/pushed** (2026-05-29) — shopping-cart-infra PR #76 now merged with commit `407e489` (stale refs fix part of PR #76).
 - **networking directory.recurse fix committed/pushed** (2026-05-29) — shopping-cart-infra commit `1eeed15` on `docs/next-improvements`; spec-required PyYAML validation command was unavailable in this environment, so YAML was verified with Ruby's built-in parser instead.
 - **serviceaccount imagePullSecrets patch committed/pushed** (2026-05-29) — k3d-manager commit `a53c752b` on `k3d-manager-v1.4.12`.
+- **shopping-cart-infra PR #78 MERGED** (2026-05-29) — merge SHA `7881f35`. ExternalSecret/product-catalog-secrets SharedResourceWarning fix: data-layer duplicate removed; sole ownership with cicd/product-catalog app.
 - **v1.4.10 SHIPPED** — PR #81 merged (`f8bad52d`). ArgoCD stability, bootstrap reliability, /tmp cleanup.
 - **v1.4.9 SHIPPED** — Credential extraction and OIDC issuer fixes.
 
@@ -29,7 +30,7 @@
 - [ ] Node.js 20→22 upgrade (all 5 shopping-cart CI workflows)
 
 ## Milestone: v1.4.12 (Reliability Hardening)
-- [ ] ExternalSecret/product-catalog-secrets SharedResourceWarning resolution — claimed by both cicd/product-catalog and data-layer ArgoCD apps
+- [x] ExternalSecret/product-catalog-secrets SharedResourceWarning resolution — shopping-cart-infra PR #78 merged (`7881f35`); data-layer duplicate deleted
 - [ ] Node.js 20→22 upgrade (all 5 shopping-cart CI workflows)
 
 ## Milestone: v1.4.10 (ArgoCD Stability) — SHIPPED
