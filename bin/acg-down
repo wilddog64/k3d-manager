@@ -43,8 +43,10 @@ fi
 _info "[acg-down] keep-hub=${_keep_hub} hub-cluster=${_HUB_CLUSTER}"
 
 if _is_mac; then
-  _info "[acg-down] Pre-authorizing sudo for macOS host operations (launchd cleanup)..."
-  sudo -v
+  if [[ -t 0 && -t 1 ]]; then
+    _info "[acg-down] Pre-authorizing sudo for macOS host operations (launchd cleanup)..."
+    sudo -v
+  fi
 fi
 
 case "${_cluster_provider}" in
