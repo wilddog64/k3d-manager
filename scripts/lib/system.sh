@@ -59,7 +59,7 @@ function _run_command_resolve_sudo() {
   local -a sudo_flags=()
   if (( interactive_sudo == 0 )); then
     sudo_flags=(-n)
-  elif [[ ! -t 0 || ! -t 1 ]]; then
+  elif (( interactive_sudo == 1 )) && [[ ! -t 0 || ! -t 1 ]]; then
     sudo_flags=(-n)
   fi
 
