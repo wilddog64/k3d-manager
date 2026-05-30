@@ -1,7 +1,8 @@
 # Active Context — k3d-manager
 
-## Current Status (Post-Merge 2026-05-22 — shopping-cart-e2e-tests PR #2 housekeeping complete)
-- Current branch: `k3d-manager-v1.5.0` (created from k3d-manager PR #79 merge SHA `160a5edbac565ffc2a76a00b89bc7d1a3ac8735e`)
+## Current Status (Post-Merge 2026-05-29 — k3d-manager PR #83 housekeeping complete)
+- Current branch: `k3d-manager-v1.5.0` (created from k3d-manager PR #83 merge SHA `c5949cf47097d3a89ff485e01f68c2725644d327`)
+- **v1.4.12 SHIPPED** — PR #83 merged (`c5949cf47097d3a89ff485e01f68c2725644d327`); tag v1.4.12 created ✓; GitHub release created ✓; enforce_admins restoration pending (API call); retrospective committed (`3c99fc85`) ✓; next branch k3d-manager-v1.5.0 created ✓
 - **COMPLETE:** shopping-cart-e2e-tests PR #2 post-merge — enforce_admins restored ✓, `docs/next-improvements` branch synced ✓, retrospective committed (`7b7e9c7`) ✓, pushed to origin ✓; PR fixed CI trigger config by removing `push`/`pull_request` blocks that caused ECONNREFUSED on live services — now `workflow_dispatch` and `schedule` only
 - **COMPLETE:** OIDC issuer URLs now use the external Keycloak domain in `shopping-cart-infra` (`1fff014`) and `shopping-cart-payment` (`24606e6`), and the Node.js 20 → 22 upgrade landed in `shopping-cart-frontend` (`908ce07`) plus `shopping-cart-e2e-tests` (`0be83fb`); all commits were pushed to their requested branches on origin.
 - **COMPLETE:** OIDC issuer URLs now use the external Keycloak domain in `shopping-cart-infra` (`identity/keycloak/kustomization.yaml`, `argocd/config/argocd-cm.yaml`) and `shopping-cart-payment` (`k8s/base/configmap.yaml`); committed as `1fff014` (`fix(keycloak): update OIDC issuer URLs to external domain for ArgoCD and Keycloak config`) and `24606e6` (`fix(auth): update OIDC issuer and JWK URIs to external Keycloak domain`) and pushed to `origin/shopping-cart-infra-v0.5.0` and `origin/docs/next-improvements`.

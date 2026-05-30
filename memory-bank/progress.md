@@ -1,5 +1,8 @@
 # Progress — k3d-manager
 
+## Status (v1.4.12 — RELEASED 2026-05-29)
+- **RELEASED:** k3d-manager v1.4.12 — PR #83 merged to main (SHA `c5949cf47097d3a89ff485e01f68c2725644d327`). imagePullSecrets patch, sync-branch/sync-main targets, ArgoCD ApplicationSets in make status. Copilot caught shell injection pattern + incomplete app list. enforce_admins restored ✓; next branch: `k3d-manager-v1.5.0`; v1.4.12 retrospective committed (`3c99fc85`) ✓; memory-bank updating (in progress)
+
 ## Status (v1.5.0 — IN PROGRESS)
 - **ASSIGNED TO CODEX:** Passwordless sudo — spec `docs/plans/v1.5.0-sudo-passwordless.md`; 7 files: `bin/install-sudoers.sh` (new), prewarm in 3 bin scripts, Makefile `sudoers` target, howto doc, BATS test; commit message: `feat(sudo): passwordless sudo rules + prewarm for macOS host operations`
 - **COMPLETE:** OIDC issuer URLs now use the external Keycloak domain in `shopping-cart-infra` (`1fff014`) and `shopping-cart-payment` (`24606e6`), and the Node.js 20 → 22 upgrade landed in `shopping-cart-frontend` (`908ce07`) plus `shopping-cart-e2e-tests` (`0be83fb`); all commits were pushed to their requested branches on origin. Validation used YAML parse checks for the edited manifests/workflows.
