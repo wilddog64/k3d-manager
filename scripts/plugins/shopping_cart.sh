@@ -97,6 +97,18 @@ function deploy_shopping_cart_data() {
   done
   _info "[shopping_cart] Syncing data-layer ArgoCD app before Redis deploy (ensures ESO processes ExternalSecret)..."
   argocd app sync data-layer --server localhost:8080 --insecure --wait --timeout 120 2>/dev/null || true
+
+  _info "[shopping_cart] Force-refreshing all ExternalSecrets to ensure current Vault values..."
+  for ns in shopping-cart-data shopping-cart-apps; do
+    kubectl get externalsecret -n "${ns}" --context ubuntu-k3s \
+      --no-headers -o custom-columns=":metadata.name" 2>/dev/null \
+    | while read -r es; do
+        kubectl annotate externalsecret "${es}" -n "${ns}" --context ubuntu-k3s \
+          force-sync="$(date +%s)" --overwrite >/dev/null 2>&1 || true
+      done
+  done
+  _info "[shopping_cart] Waiting 10s for ESO force-refresh to propagate..."
+  sleep 10
   _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/redis/cart/"
   _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/rabbitmq/"
 
