@@ -7,7 +7,7 @@
 - **SPEC WRITTEN:** platform-helm multi-env ArgoCD — `docs/plans/v1.5.0-platform-helm-argocd-multi-env.md`; 2 files: `platform-helm.yaml` (dev/infra/prod generators + per-cluster labels), `register_app_cluster` (add `argocd-chart-version`/`argocd-replicas` labels); prerequisite for OCI provider
 
 ## Milestone: v1.9.0 (Blue/Green + Stress Testing)
-- **SPEC WRITTEN:** Argo Rollouts blue/green on OCI — `docs/plans/v1.9.0-blue-green-argo-rollouts.md`; Rollouts controller via ApplicationSet; AnalysisTemplate runs k6 Job (20 VUs, 120s) + Prometheus error rate check; `autoPromotionEnabled: false` (manual promote after analysis); `rollout_promote`/`rollout_abort` plugin functions; migration guide Deployment→Rollout for shopping-cart apps; gates on v1.5.0 + v1.7.0
+- **SPEC WRITTEN:** Argo Rollouts + vCluster blue/green on OCI — `docs/plans/v1.9.0-blue-green-argo-rollouts.md`; two-layer design: vCluster (ephemeral full-stack isolated test env) + Argo Rollouts (production traffic selector swap); stress-runner custom image (vcluster CLI + kubectl + k6 + kustomize, ARM64); AnalysisTemplate creates vCluster → deploys full shopping-cart stack → k6 (20 VUs, 120s) → `trap` cleanup; `autoPromotionEnabled: false`; gates on v1.5.0 + v1.7.0
 
 ## Milestone: v1.8.0 (Self-Healing)
 - **SPEC WRITTEN:** Alertmanager → k3dm-webhook self-healing — `docs/plans/v1.8.0-self-healing-alertmanager-webhook.md`; 5 handlers (VaultSealed, ArgoCDAppOutOfSync, ESOSecretStale, PodCrashLooping, ACGClusterUnreachable); cooldown per (alert, cluster); Alertmanager webhook receiver config; PrometheusRule CRDs; gates on v1.6.0 (webhook) + v1.7.0 (monitoring)

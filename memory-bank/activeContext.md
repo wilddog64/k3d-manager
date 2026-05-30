@@ -44,7 +44,7 @@
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
 ## Architectural Decision (2026-05-29)
-- **Blue/green + stress testing on OCI** — Argo Rollouts controller (ApplicationSet, OCI only); blue/green strategy with pre-promotion k6 analysis (20 VUs, 120s, thresholds: error rate <1%, p95 <500ms, throughput >50 RPS); `autoPromotionEnabled: false`; shopping-cart migration guide included; optional Istio traffic mirroring deferred to v1.10.0; spec: `docs/plans/v1.9.0-blue-green-argo-rollouts.md`
+- **Blue/green + vCluster stress testing on OCI** — two layers: vCluster (ephemeral full-stack isolated test env, `trap EXIT` cleanup) + Argo Rollouts (production selector swap); stress-runner custom Docker image (ARM64: vcluster CLI + kubectl + k6 + kustomize) in AnalysisTemplate Job; k6 hits vCluster endpoint (not preview-service); `autoPromotionEnabled: false`; Istio traffic mirroring deferred to v1.10.0; spec: `docs/plans/v1.9.0-blue-green-argo-rollouts.md`
 - **Self-healing pipeline** — Alertmanager fires PrometheusRule → POST to `k3dm-webhook /api/v1/remediate` → handler dispatch (Vault unseal, ArgoCD sync, ESO force-sync, pod restart, ACG make up); per-alert cooldown prevents hammer; spec: `docs/plans/v1.8.0-self-healing-alertmanager-webhook.md`; gates on v1.6.0 + v1.7.0
 - **Observability → OCI, not laptop** — Prometheus + Grafana run on OCI so monitoring survives laptop reboots. Laptop/ACG use Prometheus agent mode with remote_write to OCI. Grafana exposed via `grafana.3ai-talk.org` Cloudflare tunnel. Spec: `docs/plans/v1.7.0-observability-oci.md`. Implementation gates on OCI cluster live (v1.5.0).
 
