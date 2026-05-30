@@ -47,11 +47,6 @@ case "${_cluster_provider}" in
     ;;
 esac
 
-if _is_mac; then
-  _info "[acg-up] Pre-authorizing sudo for macOS host operations (launchd, keychain)..."
-  sudo -v
-fi
-
 function _argocd_open_browser_url() {
   local url="$1"
 

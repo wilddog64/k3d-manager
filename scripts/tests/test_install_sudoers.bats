@@ -26,6 +26,11 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "sudoers content includes k3d-manager-update-hosts NOPASSWD rule" {
+  run grep -F 'NOPASSWD: /usr/local/bin/k3d-manager-update-hosts' bin/install-sudoers.sh
+  [ "$status" -eq 0 ]
+}
+
 @test "install-sudoers.sh rejects unknown arguments" {
   run "$SCRIPT" --bogus-flag
   [ "$status" -ne 0 ]
