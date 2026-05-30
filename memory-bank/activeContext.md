@@ -43,6 +43,13 @@
 - The `shopping-cart-infra` release tag `v0.4.0` was corrected to point at `674b7b1` (`docs: consolidate v0.4.0 release notes`), which includes the Keycloak realm-import fix.
 - The live Keycloak realm JSON reconciliation spec now lives in `shopping-cart-infra` instead of `k3d-manager`.
 
+## Implementation Order (2026-05-29) — CRITICAL
+Deploy OCI with stable main BEFORE any v1.6.0+ work. Sequence:
+1. `v1.5.0-k3s-oci-provider.md` → OCI cluster + k3s + ArgoCD + full stack → known-good baseline
+2. `v1.5.0-platform-helm-argocd-multi-env.md` → multi-env ArgoCD versioning
+3. v1.6.0 webhook + notifications + CVE scan (on proven OCI)
+4. v1.7.0+ monitoring / self-healing / blue-green
+
 ## Architectural Decision (2026-05-29)
 - **Blue/green + vCluster stress testing on OCI** — two layers: vCluster (ephemeral full-stack isolated test env, `trap EXIT` cleanup) + Argo Rollouts (production selector swap); stress-runner custom Docker image (ARM64: vcluster CLI + kubectl + k6 + kustomize) in AnalysisTemplate Job; k6 hits vCluster endpoint (not preview-service); `autoPromotionEnabled: false`; Istio traffic mirroring deferred to v1.10.0; spec: `docs/plans/v1.9.0-blue-green-argo-rollouts.md`
 - **Self-healing pipeline** — Alertmanager fires PrometheusRule → POST to `k3dm-webhook /api/v1/remediate` → handler dispatch (Vault unseal, ArgoCD sync, ESO force-sync, pod restart, ACG make up); per-alert cooldown prevents hammer; spec: `docs/plans/v1.8.0-self-healing-alertmanager-webhook.md`; gates on v1.6.0 + v1.7.0

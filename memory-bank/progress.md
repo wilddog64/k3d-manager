@@ -4,6 +4,7 @@
 - **RELEASED:** k3d-manager v1.4.12 — PR #83 merged to main (SHA `c5949cf47097d3a89ff485e01f68c2725644d327`). imagePullSecrets patch, sync-branch/sync-main targets, ArgoCD ApplicationSets in make status. Copilot caught shell injection pattern + incomplete app list. enforce_admins restored ✓; next branch: `k3d-manager-v1.5.0`; v1.4.12 retrospective committed (`3c99fc85`) ✓; memory-bank updating (in progress)
 
 ## Status (v1.5.0 — IN PROGRESS)
+- **SPEC WRITTEN:** OCI provider — `docs/plans/v1.5.0-k3s-oci-provider.md`; `CLUSTER_PROVIDER=k3s-oci`; `scripts/lib/providers/k3s-oci.sh`; idempotent infrastructure provision (VCN, subnet, security list, Ampere A1 instance); k3s ARM64 install; kubeconfig merge; ArgoCD cluster secret (environment=prod, argocd-replicas=1); bootstrap app-of-apps; smoke test; known-good baseline checklist; **implement first before any v1.6.0+ work**
 - **SPEC WRITTEN:** platform-helm multi-env ArgoCD — `docs/plans/v1.5.0-platform-helm-argocd-multi-env.md`; 2 files: `platform-helm.yaml` (dev/infra/prod generators + per-cluster labels), `register_app_cluster` (add `argocd-chart-version`/`argocd-replicas` labels); prerequisite for OCI provider
 
 ## Milestone: v1.9.0 (Blue/Green + Stress Testing)
