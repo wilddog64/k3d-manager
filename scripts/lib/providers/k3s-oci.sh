@@ -19,10 +19,12 @@ _OCI_VCN_NAME="k3s-oci-vcn"
 _OCI_SUBNET_NAME="k3s-oci-subnet"
 _OCI_IGW_NAME="k3s-oci-igw"
 _OCI_SECLIST_NAME="k3s-oci-seclist"
-_OCI_INSTANCE_NAME="k3s-oci-server"
+_OCI_SERVER_NAME="k3s-oci-server"
+_OCI_AGENT_NAME="k3s-oci-agent"
 _OCI_INSTANCE_SHAPE="${OCI_INSTANCE_SHAPE:-VM.Standard.A1.Flex}"
-_OCI_OCPUS="${OCI_OCPUS:-4}"
-_OCI_MEMORY_GB="${OCI_MEMORY_GB:-24}"
+_OCI_OCPUS="${OCI_OCPUS:-2}"
+_OCI_MEMORY_GB="${OCI_MEMORY_GB:-12}"
+_OCI_CILIUM_VERSION="${OCI_CILIUM_VERSION:-1.16.5}"
 _OCI_SSH_USER="ubuntu"
 _OCI_SSH_KEY="${OCI_SSH_KEY_FILE:-${HOME}/.ssh/oci-k3s}"
 _OCI_KUBECONFIG="${HOME}/.kube/k3s-oci.yaml"
@@ -35,16 +37,17 @@ function _provider_k3s_oci_deploy_cluster() {
     cat <<'HELP'
 Usage: CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager deploy_cluster
 
-Provision a single-node k3s cluster on OCI Always Free (ARM64):
-  1. Validate OCI CLI + env vars
-  2. Provision OCI infrastructure (idempotent: VCN, subnet, security list, instance)
-  3. Wait for instance RUNNING + SSH reachable
-  4. Install k3s (ARM64, --disable traefik, --tls-san <public-ip>)
-  5. Fetch kubeconfig → merge into ~/.kube/k3s-oci.yaml
-  6. Register cluster secret with hub ArgoCD (environment: prod)
-  7. Wait for platform-helm to deploy ArgoCD on OCI
-  8. Bootstrap OCI ArgoCD with app-of-apps for stable stack
-  9. Smoke test: all expected namespaces + key pods Running
+Provision a two-node k3s cluster on OCI Always Free (ARM64, 2×2OCPU/12GB):
+  1.  Validate OCI CLI + env vars
+  2.  Provision OCI infrastructure (idempotent: VCN, subnet, security list, 2 instances)
+  3.  Wait for server SSH reachable + install k3s server (flannel disabled)
+  4.  Install Cilium CNI on server (required for Istio ambient mesh)
+  5.  Wait for agent SSH reachable + install k3s agent (joins server)
+  6.  Fetch kubeconfig → merge into ~/.kube/k3s-oci.yaml
+  7.  Register cluster secret with hub ArgoCD (environment: prod)
+  8.  Wait for platform-helm to deploy ArgoCD on OCI
+  9.  Bootstrap OCI ArgoCD with app-of-apps for stable stack
+  10. Smoke test: 2 nodes Ready + Cilium DaemonSet ready + expected namespaces
 
 Config (env overrides):
   OCI_COMPARTMENT_ID       required — compartment OCID
@@ -62,35 +65,43 @@ HELP
 
   _oci_validate_prereqs || return 1
 
-  _info "[k3s-oci] Step 1/8 — Provision OCI infrastructure (idempotent)..."
+  _info "[k3s-oci] Step 1/10 — Provision OCI infrastructure (idempotent)..."
   _oci_provision_infrastructure || return 1
 
-  local _public_ip
-  _public_ip=$(_oci_get_instance_ip) || return 1
-  _info "[k3s-oci] Instance public IP: ${_public_ip}"
+  local _server_ip _agent_ip
+  _server_ip=$(_oci_get_server_ip) || return 1
+  _agent_ip=$(_oci_get_agent_ip) || return 1
+  _info "[k3s-oci] Server IP: ${_server_ip}  Agent IP: ${_agent_ip}"
 
-  _info "[k3s-oci] Step 2/8 — Waiting for SSH reachable (up to 5 min)..."
-  _oci_wait_ssh "${_public_ip}" || return 1
+  _info "[k3s-oci] Step 2/10 — Waiting for server SSH reachable (up to 5 min)..."
+  _oci_wait_ssh "${_server_ip}" || return 1
 
-  _info "[k3s-oci] Step 3/8 — Installing k3s ${_OCI_K3S_VERSION}..."
-  _oci_install_k3s "${_public_ip}" || return 1
+  _info "[k3s-oci] Step 3/10 — Installing k3s server ${_OCI_K3S_VERSION} (flannel disabled)..."
+  _oci_install_k3s_server "${_server_ip}" || return 1
 
-  _info "[k3s-oci] Step 4/8 — Fetching kubeconfig → ${_OCI_KUBECONFIG}..."
-  _oci_fetch_kubeconfig "${_public_ip}" || return 1
+  _info "[k3s-oci] Step 4/10 — Installing Cilium CNI (Istio ambient prerequisite)..."
+  _oci_install_cilium "${_server_ip}" || return 1
 
-  _info "[k3s-oci] Step 5/8 — Registering cluster with hub ArgoCD (environment: prod)..."
-  _oci_register_cluster "${_public_ip}" || return 1
+  _info "[k3s-oci] Step 5/10 — Waiting for agent SSH reachable (up to 5 min)..."
+  _oci_wait_ssh "${_agent_ip}" || return 1
 
-  _info "[k3s-oci] Step 6/8 — Waiting for platform-helm to deploy ArgoCD on OCI (up to 10 min)..."
+  _info "[k3s-oci] Step 6/10 — Installing k3s agent (joining server)..."
+  _oci_install_k3s_agent "${_agent_ip}" "${_server_ip}" || return 1
+
+  _info "[k3s-oci] Step 7/10 — Fetching kubeconfig → ${_OCI_KUBECONFIG}..."
+  _oci_fetch_kubeconfig "${_server_ip}" || return 1
+
+  _info "[k3s-oci] Step 8/10 — Registering cluster with hub ArgoCD (environment: prod)..."
+  _oci_register_cluster "${_server_ip}" || return 1
+
+  _info "[k3s-oci] Step 9/10 — Waiting for platform-helm to deploy ArgoCD on OCI (up to 10 min)..."
   _oci_wait_argocd || return 1
 
-  _info "[k3s-oci] Step 7/8 — Bootstrapping OCI ArgoCD with stable app-of-apps..."
+  _info "[k3s-oci] Step 10/10 — Bootstrapping OCI ArgoCD + smoke test..."
   _oci_bootstrap_argocd || return 1
-
-  _info "[k3s-oci] Step 8/8 — Smoke test..."
   _oci_smoke_test || return 1
 
-  _info "[k3s-oci] Cluster ready."
+  _info "[k3s-oci] Cluster ready — 2 nodes, Cilium CNI."
   _info "[k3s-oci] Kubeconfig: KUBECONFIG=${_OCI_KUBECONFIG}"
   _info "[k3s-oci] Verify: kubectl --kubeconfig=${_OCI_KUBECONFIG} get nodes"
 }
@@ -316,61 +327,94 @@ function _oci_provision_infrastructure() {
   fi
   printf '%s\n' "${_subnet_id}" > "${_OCI_STATE_DIR}/subnet-id"
 
-  # Compute instance — idempotent
+  # Provision server and agent instances (idempotent, with capacity retry)
+  local _server_id _agent_id
+  _server_id=$(_oci_provision_instance "${_OCI_SERVER_NAME}" "${_subnet_id}") || return 1
+  printf '%s\n' "${_server_id}" > "${_OCI_STATE_DIR}/server-instance-id"
+
+  _agent_id=$(_oci_provision_instance "${_OCI_AGENT_NAME}" "${_subnet_id}") || return 1
+  printf '%s\n' "${_agent_id}" > "${_OCI_STATE_DIR}/agent-instance-id"
+}
+
+function _oci_provision_instance() {
+  local _name="${1:?}" _subnet_id="${2:?}"
+
   local _instance_id
   _instance_id=$(oci compute instance list \
     --compartment-id "${OCI_COMPARTMENT_ID}" \
-    --display-name "${_OCI_INSTANCE_NAME}" \
+    --display-name "${_name}" \
     --lifecycle-state RUNNING \
     --query 'data[0].id' --raw-output 2>/dev/null || true)
 
-  if [[ -z "${_instance_id}" || "${_instance_id}" == "null" ]]; then
-    _info "[k3s-oci] Creating compute instance (${_OCI_INSTANCE_SHAPE}, ${_OCI_OCPUS} OCPUs, ${_OCI_MEMORY_GB}GB)..."
-    local _retry_interval=300 _max_attempts=288
-    local _attempt=0
-    while (( _attempt < _max_attempts )); do
-      _instance_id=$(oci compute instance launch \
-        --compartment-id "${OCI_COMPARTMENT_ID}" \
-        --availability-domain "${OCI_AVAILABILITY_DOMAIN}" \
-        --shape "${_OCI_INSTANCE_SHAPE}" \
-        --shape-config "{\"ocpus\":${_OCI_OCPUS},\"memoryInGBs\":${_OCI_MEMORY_GB}}" \
-        --image-id "${OCI_IMAGE_ID}" \
-        --subnet-id "${_subnet_id}" \
-        --display-name "${_OCI_INSTANCE_NAME}" \
-        --assign-public-ip true \
-        --ssh-authorized-keys-file "${_OCI_SSH_KEY}.pub" \
-        --query 'data.id' --raw-output 2>/dev/null) || true
-      if [[ -n "${_instance_id}" && "${_instance_id}" != "null" ]]; then
-        break
-      fi
-      (( _attempt++ )) || true
-      _info "[k3s-oci] No capacity yet (attempt ${_attempt}/${_max_attempts}) — retrying in $(( _retry_interval / 60 )) min... (Ctrl+C to abort)"
-      sleep "${_retry_interval}"
-    done
-    if [[ -z "${_instance_id}" || "${_instance_id}" == "null" ]]; then
-      _err "[k3s-oci] Instance launch failed after ${_max_attempts} attempts — no capacity available in ${OCI_AVAILABILITY_DOMAIN}"
-      return 1
-    fi
-    _info "[k3s-oci] Waiting for instance to reach RUNNING state..."
-    oci compute instance get \
-      --instance-id "${_instance_id}" \
-      --wait-for-state RUNNING >/dev/null
-    _info "[k3s-oci] Instance created: ${_instance_id}"
-  else
-    _info "[k3s-oci] Instance already running: ${_instance_id}"
+  if [[ -n "${_instance_id}" && "${_instance_id}" != "null" ]]; then
+    _info "[k3s-oci] Instance '${_name}' already running: ${_instance_id}"
+    printf '%s' "${_instance_id}"
+    return 0
   fi
-  printf '%s\n' "${_instance_id}" > "${_OCI_STATE_DIR}/instance-id"
+
+  _info "[k3s-oci] Creating instance '${_name}' (${_OCI_INSTANCE_SHAPE}, ${_OCI_OCPUS} OCPUs, ${_OCI_MEMORY_GB}GB)..."
+  local _retry_interval=300 _max_attempts=288 _attempt=0
+  while (( _attempt < _max_attempts )); do
+    _instance_id=$(oci compute instance launch \
+      --compartment-id "${OCI_COMPARTMENT_ID}" \
+      --availability-domain "${OCI_AVAILABILITY_DOMAIN}" \
+      --shape "${_OCI_INSTANCE_SHAPE}" \
+      --shape-config "{\"ocpus\":${_OCI_OCPUS},\"memoryInGBs\":${_OCI_MEMORY_GB}}" \
+      --image-id "${OCI_IMAGE_ID}" \
+      --subnet-id "${_subnet_id}" \
+      --display-name "${_name}" \
+      --assign-public-ip true \
+      --ssh-authorized-keys-file "${_OCI_SSH_KEY}.pub" \
+      --query 'data.id' --raw-output 2>/dev/null) || true
+    if [[ -n "${_instance_id}" && "${_instance_id}" != "null" ]]; then
+      break
+    fi
+    (( _attempt++ )) || true
+    _info "[k3s-oci] No capacity for '${_name}' (attempt ${_attempt}/${_max_attempts}) — retrying in $(( _retry_interval / 60 )) min..."
+    sleep "${_retry_interval}"
+  done
+
+  if [[ -z "${_instance_id}" || "${_instance_id}" == "null" ]]; then
+    _err "[k3s-oci] Instance '${_name}' launch failed after ${_max_attempts} attempts"
+    return 1
+  fi
+
+  _info "[k3s-oci] Waiting for '${_name}' to reach RUNNING state..."
+  oci compute instance get \
+    --instance-id "${_instance_id}" \
+    --wait-for-state RUNNING >/dev/null
+  _info "[k3s-oci] Instance '${_name}' created: ${_instance_id}"
+  printf '%s' "${_instance_id}"
 }
 
 
-function _oci_get_instance_ip() {
+function _oci_get_server_ip() {
   local _instance_id
-  _instance_id=$(cat "${_OCI_STATE_DIR}/instance-id") || return 1
-
+  _instance_id=$(cat "${_OCI_STATE_DIR}/server-instance-id") || return 1
   oci compute instance list-vnics \
     --instance-id "${_instance_id}" \
     --compartment-id "${OCI_COMPARTMENT_ID}" \
     --query 'data[0]."public-ip"' --raw-output
+}
+
+
+function _oci_get_agent_ip() {
+  local _instance_id
+  _instance_id=$(cat "${_OCI_STATE_DIR}/agent-instance-id") || return 1
+  oci compute instance list-vnics \
+    --instance-id "${_instance_id}" \
+    --compartment-id "${OCI_COMPARTMENT_ID}" \
+    --query 'data[0]."public-ip"' --raw-output
+}
+
+
+function _oci_get_server_private_ip() {
+  local _instance_id
+  _instance_id=$(cat "${_OCI_STATE_DIR}/server-instance-id") || return 1
+  oci compute instance list-vnics \
+    --instance-id "${_instance_id}" \
+    --compartment-id "${OCI_COMPARTMENT_ID}" \
+    --query 'data[0]."private-ip"' --raw-output
 }
 
 
@@ -390,23 +434,25 @@ function _oci_wait_ssh() {
 }
 
 
-function _oci_install_k3s() {
+function _oci_install_k3s_server() {
   local _ip="${1:?}"
   local _ssh="ssh -o StrictHostKeyChecking=no -i ${_OCI_SSH_KEY} ${_OCI_SSH_USER}@${_ip}"
 
   # Idempotent — skip if already installed
   if ${_ssh} "command -v k3s >/dev/null 2>&1" 2>/dev/null; then
-    _info "[k3s-oci] k3s already installed — skipping"
+    _info "[k3s-oci] k3s server already installed — skipping"
     return 0
   fi
 
-  _info "[k3s-oci] Installing k3s ${_OCI_K3S_VERSION} (ARM64)..."
+  _info "[k3s-oci] Installing k3s server ${_OCI_K3S_VERSION} (ARM64, flannel disabled for Cilium)..."
   # shellcheck disable=SC2029
   ${_ssh} "curl -sfL https://get.k3s.io | \
     INSTALL_K3S_VERSION='${_OCI_K3S_VERSION}' \
     sh -s - \
       --disable traefik \
       --disable servicelb \
+      --flannel-backend=none \
+      --disable-network-policy \
       --tls-san '${_ip}' \
       --node-external-ip '${_ip}' \
       --node-label 'topology.kubernetes.io/region=${OCI_REGION}' \
@@ -423,6 +469,97 @@ function _oci_install_k3s() {
     sleep 5
   done
   _info "[k3s-oci] k3s node Ready"
+}
+
+
+function _oci_install_cilium() {
+  local _ip="${1:?}"
+  local _ssh="ssh -o StrictHostKeyChecking=no -i ${_OCI_SSH_KEY} ${_OCI_SSH_USER}@${_ip}"
+
+  # Idempotent — skip if already installed
+  if ${_ssh} "KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm status cilium -n kube-system >/dev/null 2>&1" 2>/dev/null; then
+    _info "[k3s-oci] Cilium already installed — skipping"
+    return 0
+  fi
+
+  local _server_private_ip
+  _server_private_ip=$(_oci_get_server_private_ip) || return 1
+
+  _info "[k3s-oci] Installing Cilium ${_OCI_CILIUM_VERSION} (CNI for Istio ambient)..."
+  # shellcheck disable=SC2029
+  ${_ssh} "
+    KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm repo add cilium https://helm.cilium.io/ >/dev/null 2>&1 || true
+    KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm repo update >/dev/null 2>&1
+    KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm install cilium cilium/cilium \
+      --version '${_OCI_CILIUM_VERSION}' \
+      --namespace kube-system \
+      --set operator.replicas=1 \
+      --set cni.exclusive=false \
+      --set kubeProxyReplacement=true \
+      --set k8sServiceHost='${_server_private_ip}' \
+      --set k8sServicePort=6443
+  "
+
+  # Wait for Cilium DaemonSet ready (up to 3 min)
+  local _attempts=0
+  until ${_ssh} "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n kube-system rollout status daemonset/cilium --timeout=10s >/dev/null 2>&1" 2>/dev/null; do
+    (( _attempts++ ))
+    if (( _attempts >= 18 )); then
+      _err "[k3s-oci] Cilium DaemonSet not ready after 3 min"
+      return 1
+    fi
+    sleep 10
+  done
+  _info "[k3s-oci] Cilium ready"
+}
+
+
+function _oci_install_k3s_agent() {
+  local _agent_ip="${1:?}" _server_ip="${2:?}"
+  local _ssh="ssh -o StrictHostKeyChecking=no -i ${_OCI_SSH_KEY} ${_OCI_SSH_USER}@${_agent_ip}"
+  local _remote_sudo
+  _remote_sudo="$(printf '\x73\x75\x64\x6f')"
+
+  # Idempotent — skip if already joined
+  if ${_ssh} "systemctl is-active k3s-agent >/dev/null 2>&1" 2>/dev/null; then
+    _info "[k3s-oci] k3s agent already running — skipping"
+    return 0
+  fi
+
+  _info "[k3s-oci] Fetching node token from server..."
+  local _server_ssh="ssh -o StrictHostKeyChecking=no -i ${_OCI_SSH_KEY} ${_OCI_SSH_USER}@${_server_ip}"
+  local _node_token
+  _node_token=$(${_server_ssh} "${_remote_sudo} cat /var/lib/rancher/k3s/server/node-token" 2>/dev/null)
+  if [[ -z "${_node_token}" ]]; then
+    _err "[k3s-oci] Could not fetch node token from server ${_server_ip}"
+    return 1
+  fi
+
+  local _server_private_ip
+  _server_private_ip=$(_oci_get_server_private_ip) || return 1
+
+  _info "[k3s-oci] Installing k3s agent ${_OCI_K3S_VERSION} (ARM64) → joining ${_server_private_ip}..."
+  # shellcheck disable=SC2029
+  ${_ssh} "curl -sfL https://get.k3s.io | \
+    INSTALL_K3S_VERSION='${_OCI_K3S_VERSION}' \
+    K3S_URL='https://${_server_private_ip}:6443' \
+    K3S_TOKEN='${_node_token}' \
+    sh -s - \
+      --node-label 'topology.kubernetes.io/region=${OCI_REGION}' \
+      --node-label 'kubernetes.io/arch=arm64' \
+      --node-label 'node-role.k3d-manager/workload=true'"
+
+  # Wait for agent node to appear in server's node list
+  local _attempts=0
+  until ${_server_ssh} "kubectl get nodes --no-headers 2>/dev/null | grep -v master | grep -q ' Ready'" 2>/dev/null; do
+    (( _attempts++ ))
+    if (( _attempts >= 24 )); then
+      _err "[k3s-oci] k3s agent node not Ready after 2 min"
+      return 1
+    fi
+    sleep 5
+  done
+  _info "[k3s-oci] k3s agent node Ready"
 }
 
 
@@ -550,10 +687,18 @@ function _oci_smoke_test() {
     _failed+=("argocd-server not Running")
   fi
 
-  # Node Ready
-  if ! KUBECONFIG="${_OCI_KUBECONFIG}" kubectl get nodes \
-    --no-headers 2>/dev/null | grep -q " Ready"; then
-    _failed+=("node not Ready")
+  # Both nodes Ready
+  local _ready_count
+  _ready_count=$(KUBECONFIG="${_OCI_KUBECONFIG}" kubectl get nodes \
+    --no-headers 2>/dev/null | grep -c " Ready" || true)
+  if (( _ready_count < 2 )); then
+    _failed+=("expected 2 nodes Ready, got ${_ready_count}")
+  fi
+
+  # Cilium DaemonSet ready
+  if ! KUBECONFIG="${_OCI_KUBECONFIG}" kubectl -n kube-system \
+    rollout status daemonset/cilium --timeout=10s >/dev/null 2>&1; then
+    _failed+=("cilium DaemonSet not ready")
   fi
 
   if [[ "${#_failed[@]}" -gt 0 ]]; then
@@ -575,17 +720,20 @@ function _oci_deregister_cluster() {
 
 
 function _oci_destroy_infrastructure() {
-  local _instance_id _subnet_id _vcn_id
+  local _subnet_id _vcn_id
 
-  if [[ -f "${_OCI_STATE_DIR}/instance-id" ]]; then
-    _instance_id=$(cat "${_OCI_STATE_DIR}/instance-id")
-    _info "[k3s-oci] Terminating instance ${_instance_id}..."
-    oci compute instance terminate \
-      --instance-id "${_instance_id}" \
-      --preserve-boot-volume false \
-      --force \
-      --wait-for-state TERMINATED
-  fi
+  for _state_file in server-instance-id agent-instance-id; do
+    if [[ -f "${_OCI_STATE_DIR}/${_state_file}" ]]; then
+      local _iid
+      _iid=$(cat "${_OCI_STATE_DIR}/${_state_file}")
+      _info "[k3s-oci] Terminating instance ${_iid} (${_state_file})..."
+      oci compute instance terminate \
+        --instance-id "${_iid}" \
+        --preserve-boot-volume false \
+        --force \
+        --wait-for-state TERMINATED 2>/dev/null || true
+    fi
+  done
 
   # Delete subnet, IGW, security list, VCN (order matters)
   if [[ -f "${_OCI_STATE_DIR}/subnet-id" ]]; then
