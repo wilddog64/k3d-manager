@@ -31,7 +31,7 @@
 
 ## Milestone: v1.4.12 (Reliability Hardening)
 - [x] ExternalSecret/product-catalog-secrets SharedResourceWarning resolution — shopping-cart-infra PR #78 merged (`7881f35`); data-layer duplicate deleted
-- [ ] Node.js 20→22 upgrade (all 5 shopping-cart CI workflows)
+- [x] Node.js 20→22 upgrade — frontend already on 22; other repos (basket/order/payment/product-catalog) are Go/Java/Python, no Node.js in CI
 
 ## Milestone: v1.4.10 (ArgoCD Stability) — SHIPPED
 - [x] OIDC Issuer protocol mismatch resolution.
