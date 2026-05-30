@@ -10,10 +10,13 @@ spec:
   generators:
     - clusters:
         selector:
-          matchLabels:
-            environment: dev
+          matchExpressions:
+            - key: environment
+              operator: In
+              values: [dev, infra, prod]
         values:
-          revision: HEAD
+          chartVersion: '{{index .metadata.labels "argocd-chart-version"}}'
+          replicas: '{{index .metadata.labels "argocd-replicas"}}'
   goTemplate: true
   goTemplateOptions:
     - missingkey=error
@@ -36,14 +39,14 @@ spec:
       source:
         repoURL: https://argoproj.github.io/argo-helm
         chart: argo-cd
-        targetRevision: '{{.values.revision}}'
+        targetRevision: '{{.values.chartVersion}}'
         helm:
           releaseName: argocd-{{.name}}
           parameters:
             - name: server.replicas
-              value: "2"
+              value: '{{.values.replicas}}'
             - name: repoServer.replicas
-              value: "2"
+              value: '{{.values.replicas}}'
       syncPolicy:
         automated:
           prune: false
