@@ -25,7 +25,7 @@ spec:
         app-type: service
         discovered-from: git
     spec:
-      project: platform
+      project: shopping-cart
       destination:
         name: ubuntu-k3s
         namespace: shopping-cart-apps
