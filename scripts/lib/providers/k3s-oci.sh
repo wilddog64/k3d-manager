@@ -21,8 +21,8 @@ _OCI_IGW_NAME="k3s-oci-igw"
 _OCI_SECLIST_NAME="k3s-oci-seclist"
 _OCI_INSTANCE_NAME="k3s-oci-server"
 _OCI_INSTANCE_SHAPE="${OCI_INSTANCE_SHAPE:-VM.Standard.A1.Flex}"
-_OCI_OCPUS="${OCI_OCPUS:-2}"
-_OCI_MEMORY_GB="${OCI_MEMORY_GB:-12}"
+_OCI_OCPUS="${OCI_OCPUS:-4}"
+_OCI_MEMORY_GB="${OCI_MEMORY_GB:-24}"
 _OCI_SSH_USER="ubuntu"
 _OCI_SSH_KEY="${OCI_SSH_KEY_FILE:-${HOME}/.ssh/oci-k3s}"
 _OCI_KUBECONFIG="${HOME}/.kube/k3s-oci.yaml"
@@ -326,18 +326,35 @@ function _oci_provision_infrastructure() {
 
   if [[ -z "${_instance_id}" || "${_instance_id}" == "null" ]]; then
     _info "[k3s-oci] Creating compute instance (${_OCI_INSTANCE_SHAPE}, ${_OCI_OCPUS} OCPUs, ${_OCI_MEMORY_GB}GB)..."
-    _instance_id=$(oci compute instance launch \
-      --compartment-id "${OCI_COMPARTMENT_ID}" \
-      --availability-domain "${OCI_AVAILABILITY_DOMAIN}" \
-      --shape "${_OCI_INSTANCE_SHAPE}" \
-      --shape-config "{\"ocpus\":${_OCI_OCPUS},\"memoryInGBs\":${_OCI_MEMORY_GB}}" \
-      --image-id "${OCI_IMAGE_ID}" \
-      --subnet-id "${_subnet_id}" \
-      --display-name "${_OCI_INSTANCE_NAME}" \
-      --assign-public-ip true \
-      --ssh-authorized-keys-file "${_OCI_SSH_KEY}.pub" \
-      --wait-for-state RUNNING \
-      --query 'data.id' --raw-output)
+    local _retry_interval=300 _max_attempts=288
+    local _attempt=0
+    while (( _attempt < _max_attempts )); do
+      _instance_id=$(oci compute instance launch \
+        --compartment-id "${OCI_COMPARTMENT_ID}" \
+        --availability-domain "${OCI_AVAILABILITY_DOMAIN}" \
+        --shape "${_OCI_INSTANCE_SHAPE}" \
+        --shape-config "{\"ocpus\":${_OCI_OCPUS},\"memoryInGBs\":${_OCI_MEMORY_GB}}" \
+        --image-id "${OCI_IMAGE_ID}" \
+        --subnet-id "${_subnet_id}" \
+        --display-name "${_OCI_INSTANCE_NAME}" \
+        --assign-public-ip true \
+        --ssh-authorized-keys-file "${_OCI_SSH_KEY}.pub" \
+        --query 'data.id' --raw-output 2>/dev/null) || true
+      if [[ -n "${_instance_id}" && "${_instance_id}" != "null" ]]; then
+        break
+      fi
+      (( _attempt++ )) || true
+      _info "[k3s-oci] No capacity yet (attempt ${_attempt}/${_max_attempts}) — retrying in $(( _retry_interval / 60 )) min... (Ctrl+C to abort)"
+      sleep "${_retry_interval}"
+    done
+    if [[ -z "${_instance_id}" || "${_instance_id}" == "null" ]]; then
+      _err "[k3s-oci] Instance launch failed after ${_max_attempts} attempts — no capacity available in ${OCI_AVAILABILITY_DOMAIN}"
+      return 1
+    fi
+    _info "[k3s-oci] Waiting for instance to reach RUNNING state..."
+    oci compute instance get \
+      --instance-id "${_instance_id}" \
+      --wait-for-state RUNNING >/dev/null
     _info "[k3s-oci] Instance created: ${_instance_id}"
   else
     _info "[k3s-oci] Instance already running: ${_instance_id}"
@@ -352,6 +369,7 @@ function _oci_get_instance_ip() {
 
   oci compute instance list-vnics \
     --instance-id "${_instance_id}" \
+    --compartment-id "${OCI_COMPARTMENT_ID}" \
     --query 'data[0]."public-ip"' --raw-output
 }
 
