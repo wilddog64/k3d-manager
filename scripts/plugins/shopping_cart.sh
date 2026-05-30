@@ -95,6 +95,8 @@ function deploy_shopping_cart_data() {
   for pg_dir in orders payment products; do
     _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/postgresql/${pg_dir}/"
   done
+  _info "[shopping_cart] Syncing data-layer ArgoCD app before Redis deploy (ensures ESO processes ExternalSecret)..."
+  argocd app sync data-layer --server localhost:8080 --insecure --wait --timeout 120 2>/dev/null || true
   _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/redis/cart/"
   _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/rabbitmq/"
 
