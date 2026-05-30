@@ -59,6 +59,8 @@ function _run_command_resolve_sudo() {
   local -a sudo_flags=()
   if (( interactive_sudo == 0 )); then
     sudo_flags=(-n)
+  elif [[ ! -t 0 || ! -t 1 ]]; then
+    sudo_flags=(-n)
   fi
 
   if (( require_sudo )); then
@@ -817,6 +819,93 @@ function _orbstack_cli_ready() {
    return 1
 }
 
+function _antigravity_mcp_config_path() {
+   if _is_mac; then
+      printf '%s\n' "${HOME}/Library/Application Support/Antigravity/mcp_config.json"
+      return 0
+   fi
+   local config_dir="${XDG_CONFIG_HOME:-${HOME}/.config}"
+   printf '%s\n' "${config_dir}/Antigravity/mcp_config.json"
+}
+
+function _ensure_antigravity_ide() {
+   if _command_exist agy || _command_exist antigravity; then
+      return 0
+   fi
+
+   if _is_mac && _command_exist brew; then
+      _run_command -- brew install --cask antigravity
+      if _command_exist agy || _command_exist antigravity; then
+         return 0
+      fi
+   fi
+
+   if _is_debian_family && _command_exist apt-get && _sudo_available; then
+      _run_command --interactive-sudo -- apt-get update
+      _run_command --prefer-sudo -- apt-get install -y antigravity
+      if _command_exist agy || _command_exist antigravity; then
+         return 0
+      fi
+   fi
+
+   if _is_redhat_family && _command_exist dnf && _sudo_available; then
+      _run_command --prefer-sudo -- dnf install -y antigravity
+      if _command_exist agy || _command_exist antigravity; then
+         return 0
+      fi
+   fi
+
+   _err "Cannot install Antigravity IDE: no supported package manager found or install failed"
+}
+
+function _ensure_antigravity_mcp_playwright() {
+   if ! _command_exist jq; then
+      _err "_ensure_antigravity_mcp_playwright requires jq"
+   fi
+
+   local config_path
+   config_path="$(_antigravity_mcp_config_path)"
+
+   local config_dir
+   config_dir="$(dirname "$config_path")"
+   if [[ ! -d "$config_dir" ]]; then
+      mkdir -p "$config_dir"
+   fi
+   if [[ ! -f "$config_path" ]]; then
+      printf '{"mcpServers":{}}\n' > "$config_path"
+   fi
+
+   if jq -e '.mcpServers.playwright' "$config_path" >/dev/null 2>&1; then
+      return 0
+   fi
+
+   local playwright_mcp_version="${PLAYWRIGHT_MCP_VERSION:-0.0.26}"
+   local tmp
+   tmp="$(mktemp -t antigravity-mcp.XXXXXX)"
+   jq --arg ver "$playwright_mcp_version" \
+      '.mcpServers.playwright = {"command":"npx","args":["-y",("@playwright/mcp@" + $ver)]}' \
+      "$config_path" > "$tmp" && mv "$tmp" "$config_path"
+}
+
+function _antigravity_browser_ready() {
+   local timeout="${1:-10}"
+   local elapsed=0
+
+   if ! _command_exist curl; then
+      _err "curl is required for Antigravity browser probe — install curl and retry"
+   fi
+
+   while [[ "$elapsed" -lt "$timeout" ]]; do
+      if _run_command --soft -- curl --max-time "${CURL_MAX_TIME:-30}" -sf http://localhost:9222/json >/dev/null 2>&1; then
+         return 0
+      fi
+      sleep 2
+      elapsed=$(( elapsed + 2 ))
+   done
+
+   _err "Antigravity browser not ready on port 9222 after ${timeout}s — launch Antigravity with --remote-debugging-port=9222"
+}
+
 function _install_orbstack() {
    if ! _is_mac; then
       _err "_install_orbstack is only supported on macOS"
@@ -1502,15 +1591,21 @@ function _install_copilot_from_release() {
 }
 
 function _copilot_auth_check() {
-   if [[ "${K3DM_ENABLE_AI:-0}" != "1" ]]; then
+   if [[ -n "${COPILOT_GITHUB_TOKEN:-}" || -n "${GH_TOKEN:-}" || -n "${GITHUB_TOKEN:-}" ]]; then
+     return 0
+   fi
+
+   local _apps_json="${HOME}/.config/github-copilot/apps.json"
+   if [[ -f "$_apps_json" ]] && grep -q '"oauth_token"' "$_apps_json" 2>/dev/null; then
       return 0
    fi
 
-   if _run_command --soft --quiet -- copilot auth status >/dev/null 2>&1; then
+   # gh CLI auth as final fallback — copilot v1.0.40 uses gh OAuth tokens
+   if _run_command --soft --quiet -- gh auth status >/dev/null 2>&1; then
       return 0
    fi
 
-   _err "Error: AI features enabled, but Copilot CLI authentication failed. Please verify your GitHub Copilot subscription or unset K3DM_ENABLE_AI."
+   _err "Copilot CLI is not authenticated. Set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN, or run 'copilot /login' for interactive use."
 }
 
 function _ensure_copilot_cli() {
@@ -1566,10 +1661,6 @@ function _copilot_prompt_guard() {
 }
 
 function _copilot_review() {
-   if [[ "${K3DM_ENABLE_AI:-0}" != "1" ]]; then
-      _err "Copilot CLI is disabled. Set K3DM_ENABLE_AI=1 to enable AI tooling."
-   fi
-
    _safe_path
    _ensure_copilot_cli
 
@@ -1611,14 +1702,15 @@ function _copilot_review() {
    done
 
    local -a guard_args=(
+      "--allow-all-tools"
       "--deny-tool" "shell(cd ..)"
       "--deny-tool" "shell(git push)"
       "--deny-tool" "shell(git push --force)"
       "--deny-tool" "shell(rm -rf)"
-      "--deny-tool" "shell(sudo"
-      "--deny-tool" "shell(eval"
-      "--deny-tool" "shell(curl"
-      "--deny-tool" "shell(wget"
+      "--deny-tool" "shell(sudo)"
+      "--deny-tool" "shell(eval)"
+      "--deny-tool" "shell(curl)"
+      "--deny-tool" "shell(wget)"
    )
    local -a processed_args=("${guard_args[@]}" "${final_args[@]}")
 
@@ -1632,6 +1724,25 @@ function _copilot_review() {
    return "$rc"
 }
 
+function _ai_agent_review() {
+   local ai_func="${AI_REVIEW_FUNC:-copilot}"
+   local model="${AI_REVIEW_MODEL:-gpt-5.4-mini}"
+   local arg has_model=0
+   for arg in "$@"; do
+      [[ "$arg" == "--model" || "$arg" == "-m" ]] && { has_model=1; break; }
+   done
+
+   case "$ai_func" in
+      copilot)
+         if [[ "$has_model" -eq 1 ]]; then
+            _copilot_review "$@"
+         else
+            _copilot_review --model "$model" "$@"
+         fi
+         ;;
+      *) _err "Unknown AI_REVIEW_FUNC: ${ai_func}. Supported: copilot" ;;
+   esac
+}
 
 function _ensure_cargo() {
    if _command_exist cargo ; then

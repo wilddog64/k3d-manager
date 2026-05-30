@@ -1,236 +1,104 @@
-# Progress — k3d-manager
+# Progress — lib-foundation
 
-## Status (v1.4.7 — PR #76 merged 2026-05-18 + shopping-cart-infra v0.5.0 released 2026-05-18 + lib post-merge 2026-05-19)
-- **COMPLETE:** Keycloak public URL follow-up landed across all four repos: `k3d-manager` commit `ea9977b4` sets Keycloak `frontendUrl` to `https://keycloak.3ai-talk.org` after realm import; `shopping-cart-basket` commit `cb5a294` sets `OAUTH2_ISSUER_URI` to the Cloudflare public issuer; `shopping-cart-order` commit `fb578ca` sets both `OAUTH2_ISSUER_URI` and `OAUTH2_JWK_SET_URI` to the Cloudflare public issuer; `shopping-cart-frontend` commit `cb348c4` sets both `VITE_KEYCLOAK_URL` occurrences to `https://keycloak.3ai-talk.org`; explicit feature refs were pushed to `origin/fix/keycloak-public-url` in each shopping-cart repo, and the upstream-push quirk was documented in `docs/issues/2026-05-19-git-push-upstream-default-targeted-main.md`.
-- **COMPLETE:** `acg-up` now patches ArgoCD to use `${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}`, updates the Keycloak `argocd` client redirect URIs for the public Cloudflare URL, and replaces the two `trycloudflare.com` quick tunnels with a single named tunnel from `~/.cloudflared/config.yml`; committed as `00d3a65f` and pushed to `origin/k3d-manager-v1.4.8`; validated with `shellcheck -S warning bin/acg-up`.
-- **RELEASED:** k3d-manager v1.4.7 — tag `v1.4.7` pushed, GitHub release created, enforce_admins restored, next branch: `k3d-manager-v1.4.8`
-- **MERGED:** k3d-manager PR #76 — Keycloak cross-cluster tunnel + CoreDNS on k3s-aws; merge SHA `0278e8d7`; v1.4.7 retrospective committed on k3d-manager-v1.4.8
-- **POST-MERGE:** lib-foundation PR #28 — fix: Copilot CLI auth + rigor scanner improvements; merge SHA `fee313ed`; branch `feat/v0.3.20` cut, retrospective committed `a64e2ad`; enforce_admins restored (pending)
-- **POST-MERGE:** lib-acg PR #13 — docs: PR #12 retrospective and Phase 3 completion; merge SHA `1bdc663`; branch `docs/next-improvements` created, retrospective committed `4d93147`; enforce_admins restored (pending)
-- **RELEASED:** shopping-cart-infra v0.5.0 — tag `v0.5.0` pushed, GitHub release created, enforce_admins restored, next branch: `shopping-cart-infra-v0.5.5`
-- **MERGED:** k3d-manager PR #75 — Keycloak cross-cluster reachability fix (SSH tunnel + iptables DNAT + CoreDNS patch); merge SHA `8cb5709b`; v1.4.6 retrospective committed on v1.4.7
-- **MERGED:** shopping-cart-order PR #30 — Keycloak JWT issuer URI fix; merge SHA `16640fd5`; `docs/next-improvements` branch created
-- **MERGED:** shopping-cart-basket PR #11 — Keycloak JWT issuer URI fix; merge SHA `c718c1cd`; `docs/next-improvements` branch created
-- **MERGED:** shopping-cart-infra PR #59 — products table DDL removed (SQLAlchemy now owns schema); merge SHA `475794c0`; `docs/next-improvements` branch created
-- **MERGED:** shopping-cart-frontend PR #16 — API response field mapping + customerId from Keycloak; merge SHA `674116b2`; `docs/next-improvements` branch created
-- **COMPLETE:** products ConfigMap schema mismatch fix — `shopping-cart-infra/data-layer/postgresql/products/configmap.yaml` now matches `init-db.sql` by keeping only categories schema + seed data; commit `eb05a3f`; branch `fix/products-db-schema` pushed to `origin`.
-- **NO-OP:** ArgoCD SSO `invalid_scope: groups` already absent from `shopping-cart-infra/argocd/config/argocd-cm.yaml` on `origin/main`; issue doc recorded the stale spec state at `docs/issues/2026-05-18-argocd-groups-scope-already-fixed.md`.
-- **acg-up Keycloak LDAP user passwords seeding completed** — `bin/acg-up` now seeds `keycloak/users/admin`, `keycloak/users/developer`, and `keycloak/users/operator` in Vault and applies the passwords to LDAP on every `make up`; committed as `34c6f8a9` (`fix(acg-up): seed Keycloak LDAP user passwords in Vault on every make up`) and pushed to `origin/k3d-manager-v1.4.6`; validated with `shellcheck -S warning bin/acg-up` and `bats scripts/tests/bin/acg_up.bats`; PR URL: not created (per repository instruction).
-- **shopping-cart PRs #20 + #29 post-merge completed** — `shopping-cart-product-catalog` PR #20 (SHA `12dfe79`) + `shopping-cart-order` PR #29 (SHA `8a2739d`) merged to main; enforce_admins restored on both; `docs/next-improvements` branch created on both repos; k3d-manager memory-bank updated
-- **acg-up credential extraction skip completed** — `bin/acg-up` now checks `_acg_check_credentials` before calling `acg_get_credentials` for `k3s-aws`, skipping Playwright extraction when the existing AWS credentials are valid and falling back to extraction otherwise; committed as `7d2be2e6` and pushed to `origin/k3d-manager-v1.4.6`; PR URL: not created (per repository instruction).
-- **frontend 504 fix for shared namespace services completed** — `shopping-cart-product-catalog/k8s/base/service.yaml` now sets the ClusterIP port to `8082`, and `shopping-cart-order/k8s/base/service.yaml` now sets the ClusterIP port to `8081`, matching the frontend nginx upstream config; committed as `345d89a` and `0edba5b` on `fix/argocd-shared-namespace` and pushed to origin in both repos; PR URL: not created (per repository instruction).
-- **k3s-aws CloudFormation stack status-aware provisioning completed** — `scripts/lib/providers/k3s-aws.sh` now checks the existing CloudFormation stack status before provisioning, reuses healthy stacks without `--recreate`, recreates only broken stacks, and creates missing/unknown stacks without forcing recreation; committed as `25f867f0` and pushed to `origin/k3d-manager-v1.4.6`; PR URL: not created (per repository instruction).
-- **127.0.0.2 loopback alias launchd agent completed** — `bin/acg-up` now ensures `127.0.0.2` exists on `lo0` with a best-effort `ifconfig lo0 alias 127.0.0.2` call, then installs a persistent `com.k3d-manager.loopback-alias` launchd daemon at `/Library/LaunchDaemons` so the alias survives reboots before the frontend-browser-http wrapper starts; committed as `8066f35e` and pushed to `origin/k3d-manager-v1.4.6`; PR URL: not created (per repository instruction).
-- **frontend-browser-http wrapper kubectl path fix completed** — `bin/acg-up` now captures `kubectl` with `command -v` before writing the Step 10g frontend-browser-http wrapper heredoc, then expands that absolute path inside the launchd script so the root daemon does not depend on `PATH`; committed as `4b0509ff` and pushed to `origin/k3d-manager-v1.4.6`; PR URL: not created (per repository instruction).
-- **Cloudflare Tunnel launchd agents completed** — `bin/acg-up` now installs macOS launchd agents for `cloudflared tunnel --url http://localhost:8080` and `cloudflared tunnel --url http://127.0.0.2:80`, logs the random `trycloudflare.com` URLs to `~/.local/share/k3d-manager/tunnel-urls.txt`, and prints the public ArgoCD/frontend URLs at the end of `acg-up`; committed as `e45a6b22` and pushed to `origin/k3d-manager-v1.4.6`; PR URL: not created (per repository instruction).
-- **frontend.shopping-cart.local direct port-forward fix completed** — `bin/acg-up` now binds `frontend.shopping-cart.local` to `127.0.0.2` and starts a launchd-managed `kubectl port-forward --address=127.0.0.2 svc/frontend 80:80` listener instead of the blocked ServiceEntry path; committed as `84cb5a21` and pushed to `origin/k3d-manager-v1.4.6`; PR URL: not created (per repository instruction).
-- **Cloudflare Tunnel task completed** — the pending tunnel spec is now implemented in `bin/acg-up` with launchd agents and `trycloudflare.com` URL logging; commit `e45a6b22` supersedes the pending note.
-- **frontend.shopping-cart.local NodePort/ServiceEntry/VirtualService wiring completed** — `bin/acg-up` now creates the `frontend-nodeport` NodePort 30080 service on ubuntu-k3s, derives the ubuntu-k3s IP from kubeconfig, applies the `frontend-ubuntu-k3s` ServiceEntry and `frontend` VirtualService in k3d, and updates the Step 13 URL text; committed as `14e7b8b0` and pushed to `origin/k3d-manager-v1.4.6`; PR URL: not created (per repository instruction).
-- **Keycloak empty-admin-secret hard-fail fix completed** — `scripts/plugins/keycloak.sh` now hard-fails if the admin ExternalSecret never becomes Ready or the decoded secret is empty, and `bin/acg-up` now fails fast when Vault returns an empty `keycloak/admin` password field; committed as `1ab96ed1` and pushed to `origin/k3d-manager-v1.4.6`; PR URL: not created (per repository instruction).
-- **lib-acg extend dialog AppleScript native click fix completed** — `playwright/acg_credentials.js` now computes screen coordinates in `page.evaluate()` and uses `osascript` via `child_process.execSync` to native-click the close button; committed as `7874e9d` and pushed to `origin/fix/acg-credentials-extend-dialog`; PR URL: not created (per repository instruction).
-- **lib-acg extend dialog bringToFront/Enter attempt superseded** — `1e7f2ff` used `page.bringToFront()` plus `Enter`, but that dismissed iTerm2 hotkey focus and reset the page before the key event arrived; superseded by the AppleScript native-click fix.
-- **lib-acg extend dialog selector fix completed** — `playwright/acg_credentials.js` now uses `getByRole('button', { name: 'Cancel' })` and logs click errors instead of swallowing them; committed as `787cab8` and pushed to `origin/fix/acg-credentials-extend-dialog`; PR URL: not created (per repository instruction).
-- **lib-acg extend dialog locator-click attempt superseded** — the earlier `locator('button', { hasText: 'Cancel' })` fix was superseded by the new `getByRole('button', { name: 'Cancel' })` selector and error logging; prior commit `98bbf59` is no longer the branch tip.
-- **k3d-manager validation follow-up docs committed** — recorded the `.git/index.lock` permission note and the unrelated-suite `./scripts/k3d-manager test all` failures in `docs/issues/2026-05-16-git-commit-index-lock-permission-error.md` and `docs/issues/2026-05-17-repo-test-all-existing-failures.md`; committed as `65582d0c` (`docs: record validation follow-up notes`); PR URL: not created (per repository instruction).
-- **lib-acg extend dialog and credential write fixes completed** — the prior escape-key fallback spec is superseded by the committed locator-click and credential-write fixes on `fix/acg-credentials-extend-dialog`; remote SHAs are `98bbf59` and `217609a`; PR URL: not created (per repository instruction).
-- **k3d-manager v1.4.6 addLocatorHandler post-handler wait loop (acg_extend.js + acg_credentials.js) — completed** — spec: `docs/bugs/2026-05-16-acg-extend-locator-handler-no-wait-after.md` (updated to cover both files); implemented `{ noWaitAfter: true }` in `acg_extend.js` + `{ times: 1, noWaitAfter: true }` in `acg_credentials.js`; committed as `5a638912` (`fix(acg): add noWaitAfter: true to both addLocatorHandler calls`) and pushed to `origin/k3d-manager-v1.4.6`; `node --check scripts/lib/acg/playwright/acg_extend.js`, `node --check scripts/lib/acg/playwright/acg_credentials.js`, `_agent_audit`, and `_agent_lint` passed; `./scripts/k3d-manager test all` failed in unrelated existing suites (`scripts/tests/plugins/eso.bats`, `scripts/tests/plugins/gcp.bats`, `scripts/tests/plugins/keycloak.bats`), recorded in `docs/issues/2026-05-17-repo-test-all-existing-failures.md`
-- **k3d-manager v1.4.6 acg "Session extended" toast × — mouse.click bounding-rect + addLocatorHandler — STILL FAILING (new issue)** — spec: `docs/bugs/2026-05-16-session-extended-mouse-click-and-locator-handler.md`; committed as `718562b9`; × click works but addLocatorHandler fires in infinite loop; superseded by noWaitAfter spec
-- **k3d-manager v1.4.6 acg "Session extended" toast × — page.evaluate DOM traversal — STILL FAILING** — spec: `docs/bugs/2026-05-16-session-extended-evaluate-close-button.md`; element.click() in evaluate does not trigger React synthetic event handler; committed as `ebd3a985`; superseded by mouse-click-bounding-rect spec
-- **k3d-manager v1.4.6 acg "Session extended" toast never dismissed — STILL FAILING** — spec: `docs/bugs/2026-05-16-session-extended-text-locator-page-level-close.md`; `[role="alert"]` fallback hangs 30s (no role on toast container); committed as `70ce5ca9`; superseded by evaluate spec
-- **k3d-manager v1.4.6 acg-credentials Start Sandbox outside viewport — completed** — spec: `docs/bugs/2026-05-16-acg-credentials-start-sandbox-outside-viewport.md`; added 3× retry loop to `_clickStartSandbox` scroll+click; committed as `7b828419` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg "Session extended" × close fallback — completed** — spec: `docs/bugs/2026-05-16-session-extended-close-fallback-button-last.md`; added count-check + `button.last()` fallback at all 7 dismiss sites in `acg_credentials.js` + `acg_extend.js`; committed as `e464bafa` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg "Session extended" × button[aria-label="Close"] — STILL FAILING** — spec: `docs/bugs/2026-05-16-session-extended-button-aria-label.md`; `button[aria-label="Close"]` silently finds 0 elements inside container (.catch swallows), card stays visible; committed as `fd9b2fe7` but still fails
-- **k3d-manager v1.4.6 acg-up return outside function — completed** — spec: `docs/bugs/2026-05-16-acg-up-return-outside-function.md`; changed `bin/acg-up` `|| return 1` to `|| exit 1`; committed as `fd9b2fe7`
-- **k3d-manager v1.4.6 acg-credentials _clickStartSandbox blocked by Session extended — completed** — spec: `docs/bugs/2026-05-16-acg-credentials-click-start-sandbox-blocked-by-session-extended.md`; `_clickStartSandbox` now dismisses the "Your sandbox has been extended." card before scrolling/clicking Start Sandbox; committed as `644ec725` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg-credentials isEnabled() gate skips Start Sandbox — completed** — spec: `docs/bugs/2026-05-16-acg-credentials-start-sandbox-isenabled-gate.md`; `scripts/lib/acg/playwright/acg_credentials.js` Pattern 1 now always clicks Start Sandbox when visible; committed as `ee8be3ca` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg-up credential shortcut skips extraction — completed** — spec: `docs/bugs/2026-05-16-acg-up-credential-shortcut-skips-extraction.md`; `bin/acg-up` now always calls `acg_get_credentials ${sandbox_url:+"$sandbox_url"} || return 1` for `k3s-aws`; committed as `b1da7ef4` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg-credentials Escape does not dismiss Extend Your Session dialog — completed** — spec: `docs/bugs/2026-05-16-acg-credentials-escape-does-not-dismiss-extend-session-dialog.md`; `scripts/lib/acg/playwright/acg_credentials.js` line 392 now clicks `_extendSessionPrompt.locator('button[aria-label="Close"]').first().click({ force: true })`; committed as `c66e8bc5` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg Session extended modal wrong-button completed** — spec: `docs/bugs/2026-05-16-acg-session-extended-modal-wrong-button.md`; 6 single-line locator changes in acg_extend.js (3) + acg_credentials.js (3); committed as `8eb6fd02` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 k3s-aws CloudFormation rollback-state completed** — spec: `docs/bugs/2026-05-16-k3s-aws-cloudformation-rollback-state.md`; `scripts/lib/providers/k3s-aws.sh` now calls `acg_provision --confirm --recreate`; committed as `bc4485d8` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg Session extended modal escape-unreliable completed** — spec: `docs/bugs/2026-05-16-acg-session-extended-modal-escape-unreliable.md`; `scripts/lib/acg/playwright/acg_extend.js` and `scripts/lib/acg/playwright/acg_credentials.js` now click the dialog's scoped button instead of Escape; implementation committed as `f39adc25`; validation note committed as `43dc422a`; both pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 agent rigor helper validation note** — direct `_agent_checkpoint` / `_agent_lint` / `_agent_audit` invocation in this shell emitted `.git/index.lock` permission errors and missing `_err` helper output; recorded in `docs/issues/2026-05-16-git-commit-index-lock-permission-error.md`
-- **k3d-manager v1.4.6 acg-up step-number grep drift — completed** — updated `scripts/tests/bin/acg_up.bats` to expect `Step 10e/14 — Installing Istio ingress HTTP listener`, matching current `bin/acg-up`
-- **k3d-manager v1.4.6 acg-credentials credential-wait-escape-closes-panel completed** — spec: `docs/bugs/2026-05-16-acg-credentials-credential-wait-escape-closes-panel.md`; `scripts/lib/acg/playwright/acg_credentials.js` now removes fallback Escape from the handler callback and `_waitForCredentials` inline dismiss, only presses Escape when "Session extended" is confirmed visible, waits for each dialog to hide, and was committed as `b7f0d0a5` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg-credentials handler-times-1-click-helper completed** — `scripts/lib/acg/playwright/acg_credentials.js` now adds `{ times: 1 }` to the "Extend Your Session" handler, waits 1000ms to settle after dismiss, adds `_clickStartSandbox(page, buttonLocator)` with hidden-prompt wait + scroll + force-click, and routes both Start Sandbox call sites through the helper; committed as `982d551e` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg-credentials handler-times-1-click-helper ASSIGNED** — spec: `docs/bugs/2026-05-16-acg-credentials-handler-times-1-click-helper.md`; adds `{ times: 1 }` + 1000ms settle to handler; adds `_clickStartSandbox` helper with waitFor(hidden)+scrollIntoView+force-click; replaces both Start Sandbox `.click()` calls
-- **k3d-manager v1.4.6 acg-credentials addlocatorhandler-extend-session-button STILL FAILING** — spec: `docs/bugs/2026-05-16-acg-credentials-addlocatorhandler-extend-session-button.md`; committed as `6154b0df`; handler fires 3× due to SPA re-render flicker on `data-open`; superseded by handler-times-1-click-helper spec
-- **k3d-manager v1.4.6 acg-credentials remove-addlocatorhandler SUPERSEDED** — `02d792a4`; superseded — live dialog screenshot confirmed button text is "Extend Session"; re-adding handler with exact label
-- **k3d-manager v1.4.6 acg-credentials extend-session-via-filled-button SUPERSEDED** — `452fee93`; pando-button--usage_filled also doesn't extend session; Extend button selector unknown after 5+ attempts
-- **k3d-manager v1.4.6 acg-credentials start-sandbox-detached SUPERSEDED** — `7d2faaba`; still failing — Cancel in handler causes dialog to loop; button hidden behind reappearing modal; force:true doesn't bypass true visibility block
-- **k3d-manager v1.4.6 acg-credentials handler-nonblocking-250ms completed** — `e2d4bb1b`; handler now ~350ms/cycle; still failing post-dismiss due to React re-render detaching button — new bug filed
-- **k3d-manager v1.4.6 acg-credentials handler-dismiss-waitfor SUPERSEDED** — `73660e6a`; waitFor still burns entire 30s in one cycle (redundant with Playwright built-in); replaced by nonblocking-250ms spec
-- **k3d-manager v1.4.6 acg-credentials extend-not-cancel completed** — `scripts/lib/acg/playwright/acg_credentials.js` now clicks `Extend` first in the `addLocatorHandler` callback, falls back to `Cancel`/Escape, and keeps the 500ms Escape plus 1s settle wait; committed as `a07c3c10` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg-credentials handler animation settle completed** — `scripts/lib/acg/playwright/acg_credentials.js` now waits 1s at the end of the `addLocatorHandler` callback so the modal animation and React re-render settle before Playwright resumes the intercepted click; committed as `0fbdba3079b8c1e183e8cb1b72fdbf1429a3f3ff` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg-credentials addLocatorHandler animation wait loop completed** — `scripts/lib/acg/playwright/acg_credentials.js` now scopes `page.addLocatorHandler()` to `[data-open="true"]` so the post-handler wait exits immediately when Cancel sets `data-open="false"`; committed as `1026389cdbb4353ec4a4dba6b402f0ec5e9bcb88` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg-credentials Extend Modal addLocatorHandler completed** — `scripts/lib/acg/playwright/acg_credentials.js` now registers `page.addLocatorHandler()` immediately after page establishment to auto-dismiss the modal at any point; committed as `4cbe3b7e26e41eee1a2e05897a75c1d030557ef8` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 frontend.shopping-cart.local automation completed** — `bin/acg-up` now adds `frontend.shopping-cart.local` to `_HOSTS_LIST`, points Step 10e at `svc/istio-ingressgateway` in `istio-system`, removes the localhost:3000 frontend port-forward, and prints the frontend URL in the final summary; committed as `e701139a17eb4acb19bb84976db5e4a14e795a8f` and pushed to `origin/k3d-manager-v1.4.6`
-- Current branch: `k3d-manager-v1.4.6` (created from k3d-manager PR #74 merge SHA `8f93df25`)
-- **k3d-manager v1.4.6 acg-credentials Extend Your Session modal fix completed** — `scripts/lib/acg/playwright/acg_credentials.js` now dismisses the lingering "Extend Your Session" prompt before the Start/Open flow; committed as `69204c91e5e060df6e2ca230c1180d6055f1d91d` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg-credentials GCP reads AWS inputs fix completed** — `scripts/lib/acg/playwright/acg_credentials.js` now waits for GCP JSON content and extracts by content instead of position; committed as `1ba5c5ac66d5493cdfa8ca661c0372ca518c6882` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager PR #74 merged** — k3d-manager-v1.4.5 → main (SHA: `8f93df25`); ACG extend navigation fix + frontend SSO wiring; v1.4.6 branch created with retrospective
-- **k3d-manager v1.4.6 acg-credentials "Extend Your Session" modal fix ASSIGNED** — spec: `docs/plans/v1.4.6-bugfix-acg-credentials-extend-session-modal.md`; apply first
-- **k3d-manager v1.4.6 acg-credentials GCP reads AWS inputs fix ASSIGNED** — spec: `docs/plans/v1.4.6-bugfix-acg-credentials-gcp-reads-aws-inputs.md`; apply after extend-session-modal fix
-- **k3d-manager v1.4.6 acg-credentials Session extended modal fix completed** — `scripts/lib/acg/playwright/acg_credentials.js` now dismisses the lingering "Session extended" modal before the Start/Open flow; committed as `3444c171d4797e4cc305b4fc9c1bc707b6a9fb5c` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg-credentials wrong sandbox provider fix completed** — `scripts/lib/acg/playwright/acg_credentials.js` now selects the provider-specific "Open Sandbox" card by walking ancestors before clicking; committed as `5dfbdf44c2f3dce49e53f1e3f245b5c8e3a470fd` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 acg-extend Start Sandbox race fix completed** — `scripts/lib/acg/playwright/acg_extend.js` now exits 0 when the fallback button text is `Start Sandbox` instead of waiting for an extend button that never appears; committed as `bae89aafae42aeea7b7d71cd65eed4c24ca84962` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 auto-trust Vault CA fix completed** — `bin/acg-up` now trusts the Vault CA cert in the macOS System Keychain via `_run_command --interactive-sudo --soft` after `_argocd_issue_browser_tls_material`, and `scripts/tests/bin/acg_up.bats` asserts the `security add-trusted-cert -d -r trustRoot` call; committed as `42d9941306658c259f367916bc68ea69573a3085` and pushed to `origin/k3d-manager-v1.4.6`
-- **k3d-manager v1.4.6 follow-up completed** — `scripts/lib/acg/playwright/acg_extend.js` commit `34c41ced492f37525f170feed6664156b5647634`; `bin/acg-up` final fix commit `0ea4cc9f89649a3a5ca7d8a2da4df4f6b39fb4b9` (interactive sudo + 120s listener timeout); both pushed to `origin/k3d-manager-v1.4.6`
-- **shopping-cart-infra PR #58 merged** — shopping-cart-infra-v0.5.3 → main (SHA: `67f8d228`); ArgoCD SSO OIDC callback fix (`url: http://` → `url: https://`); v0.5.4 next branch created; retrospective added and pushed
-- **shopping-cart-frontend PR #15 merged** — shopping-cart-frontend-v0.5.1 → main (SHA: `19e47118`); Keycloak SSO wiring (CI build-args + nginx CSP); v0.5.1 branch created with retrospective
-- **shopping-cart-infra PR #57 merged** — shopping-cart-infra-v0.5.2 → main (SHA: `adbaec8`); networking + mTLS fixes; v0.5.3 branch created with retrospective
-- **shopping-cart-infra PR #56 merged** — shopping-cart-infra-v0.5.1 → main (SHA: `79c42b7`); python3 → kcadm.sh bugfix + retrospective on v0.5.2
-- **shopping-cart-infra PR #55 merged** — bug/keycloak-ldap-mappers-missing → main; v0.5.1 next branch created with retrospective
-- **rigor-cli PR #10 merged** — rigor-cli-v0.1.6 → main; v0.1.6 tagged and released; v0.1.7 next branch created with retrospective
-- Branch protection (`enforce_admins=true`) restored on all repos after merge
-- v1.4.4, v1.4.3, and v1.4.2 remain shipped; branch protection was restored after each merge.
+## v0.3.18 Track (branch: `feat/v0.3.18`)
 
-## Completed (v1.4.6 partial — lib-acg PR #12)
-- [x] **lib-acg PR #12 merged** — feat/acg-multi-provider → main; exit 0 on stale "Session extended" toast at startup; SHA `8fe35fa1`
-- [x] enforce_admins + required_approving_review_count=1 restored on lib-acg
-- [x] feat/acg-gcp-credentials branch created from merge SHA
-- [x] Retrospective: `docs/retro/2026-05-17-pr12-retrospective.md` (on lib-acg feat/acg-gcp-credentials, commit `0b9c224`)
-- [x] k3d-manager memory-bank updated (activeContext.md + progress.md)
+- [x] **Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate** — DONE (`f0e29d9`). Spec: `docs/plans/v0.3.18-bugfix-copilot-auth-preflight.md`. Assigned to Codex.
+- [x] **`_copilot_review` combined fix: `--allow-all-tools` + malformed `--deny-tool` patterns** — DONE (`713c18e`). Branch: `fix/copilot-deny-tool-patterns`. Combined spec: `docs/bugs/2026-05-02-copilot-review-noninteractive-combined-fix.md`. Supersedes deny-tool-only spec. Fixes both missing `--allow-all-tools` (non-interactive mode) and 4 patterns missing `)`. Commit: `fix(system): add --allow-all-tools and close malformed --deny-tool patterns in _copilot_review`
 
-## Completed (v1.4.6 partial — lib-acg PR #11)
-- [x] **lib-acg PR #11 merged** — fix/acg-credentials-extend-dialog → main; AWS credential extraction + dialog handling; SHA `feeb8e80`
-- [x] enforce_admins restored on lib-acg (required_approving_review_count=1)
-- [x] feat/acg-multi-provider branch created from merge SHA
-- [x] Retrospective: `docs/retro/2026-05-17-pr11-retrospective.md` (on lib-acg feat/acg-multi-provider, commit `d2e3e48`)
+---
 
-## Completed (v1.4.5 partial — shopping-cart-frontend #15)
-- [x] **shopping-cart-frontend PR #15 merged** — Keycloak SSO wiring (CI build-args + nginx CSP); SHA `19e47118`
-- [x] enforce_admins restored on shopping-cart-frontend
-- [x] v0.5.1 branch created from merge SHA
-- [x] Retrospective: `docs/retro/2026-05-15-v0.5.1-retrospective.md` (on shopping-cart-frontend-v0.5.1, commit `60e660f`)
+## Overall Status
 
+**v0.3.3 SHIPPED** — PR #8 squash-merged (b9f1fda), tagged, GitHub release created 2026-03-16.
+**v0.3.4 SHIPPED** — PR #11 merged to main (`dbfafe9`), tagged v0.3.4, GitHub release created 2026-03-22.
+**v0.3.5 SHIPPED** — PR #10 squash-merged to main (`2f895a99`) 2026-03-23.
+**v0.3.6 SHIPPED** — PR #12 merged to main (`d8b4c48`) 2026-03-23. Tagged v0.3.6, released.
+**v0.3.7 SHIPPED** — PR #13 merged to main (`071c270`) 2026-03-24. Tagged v0.3.7 retroactively, GitHub release created.
+**v0.3.8 SHIPPED** — PR #14 merged to main (`a669a63`) 2026-03-24. Tagged v0.3.8 retroactively, GitHub release created.
+**v0.3.9 SHIPPED** — PR #15 merged to main (`fb09921`) 2026-03-24. No tag (docs-only, no version bump).
+**v0.3.10 SHIPPED** — PR #16 merged to main (`c5662c9`) 2026-03-24. No tag (docs-only, `.clinerules` fix).
+**v0.3.11 SHIPPED** — PR #17 merged to main (`2625683`) 2026-03-25. Tagged v0.3.11, GitHub release created. `enforce_admins` restored.
+**v0.3.12 SHIPPED** — PR #18 squash-merged to main (`91340d62`) 2026-03-25. Tagged v0.3.12, GitHub release created. `enforce_admins` restored.
+**v0.3.13 SHIPPED** — PR #19 squash-merged to main (`e870c6d9`) 2026-03-25. Tagged v0.3.13, GitHub release created. `enforce_admins` restored.
+**v0.3.14 SHIPPED** — PR #20 squash-merged to main (`bbbaf053`) 2026-03-27. Tagged v0.3.14, GitHub release created. `enforce_admins` restored.
+**v0.3.15 SHIPPED** — PR #21 merged to main. Tagged v0.3.15.
+**v0.3.16 SHIPPED** — PR #22 merged to main. Tagged v0.3.16.
+**v0.3.17 SHIPPED** — PR #24 merged to main (`108924b9`). Tagged v0.3.17, GitHub release created 2026-05-01.
+**v0.3.18 IN PROGRESS** — branch `feat/v0.3.18`. PR #25 open.
 
-## Completed (v1.4.5 — k3d-manager PR #74)
-- [x] **k3d-manager PR #74 merged** — merge SHA `8f93df25`; branch `k3d-manager-v1.4.5`; next branch `k3d-manager-v1.4.6` cut
-- [x] enforce_admins restored on k3d-manager main
-- [x] Retrospective: `docs/retro/2026-05-15-v1.4.5-retrospective.md` (on k3d-manager-v1.4.6, commit `b6b9f15e`)
+## v0.3.14 — Shipped
 
-## Completed (v1.4.5 partial — shopping-cart-infra #57)
-- [x] **shopping-cart-infra PR #57 merged** — networking + mTLS fixes (appproject + keycloak-destinationrule); SHA `adbaec8`
-- [x] enforce_admins restored on shopping-cart-infra
-- [x] v0.5.3 branch created from merge SHA
-- [x] Retrospective: `docs/retro/2026-05-15-v0.5.2-retrospective.md` (on shopping-cart-infra-v0.5.3)
-- [x] Branch cleanup — deleted v0.4.0, v0.5.0, v0.5.2; retained v0.5.3
+**Dependency:** k3d-manager PR #51 (Copilot) deferred 5 findings here. Fix these before k3d-manager can subtree-pull v0.3.14.
 
-## Completed (v1.4.4)
-- [x] **Keycloak ExternalSecret files missing** — spec: `docs/bugs/2026-05-08-keycloak-externalsecret-files-missing.md`
-- [x] **Identity SSO fixes** — spec: `docs/plans/v1.4.4-identity-sso-fixes.md`
-- [x] PR #73 merged, v1.4.4 tagged + released
-- [x] enforce_admins restored on both repos
-- [x] Retrospective: `docs/retro/2026-05-08-v1.4.4-retrospective.md`
-- [x] Next branch created: `k3d-manager-v1.4.5`
+- [x] **`_ensure_antigravity_ide` binary detection** — commit `e52b819` adds `agy`-first detection so macOS installs succeed post-brew
+- [x] **`_antigravity_browser_ready` curl fast-fail** — commit `e52b819` hard-fails when `curl` missing before the polling loop
+- [x] **`agent_rigor.sh` tab-scan NUL-delimited loop** — commit `e52b819` rewrites the tab scan to iterate staged `.sh` files via `-z` for filenames with spaces
+- [x] **`docs/api/functions.md` @latest inaccuracy** — commit `e52b819` documents the `PLAYWRIGHT_MCP_VERSION` env var + pinned version, not `@latest`
+- [x] **`CHANGE.md` version labels** — commit `e52b819` marks the shipped v0.3.12/v0.3.13 entries with release dates
 
-## Completed (v1.4.3)
-- [x] **Keycloak Vault KV seeding** — bin/acg-up provisions keycloak/admin and keycloak/clients KV paths
-- [x] **shopping-cart-identity ArgoCD app** — services/shopping-cart-identity kustomization wires Keycloak stack from shopping-cart-infra
-- [x] **shopping-cart-infra PR #36** — Keycloak frontend OIDC client + ESO migration merged
-- [x] `enforce_admins` restored on both repos (shopping-cart-infra + k3d-manager)
-- [x] Retrospective: `docs/retro/2026-05-08-v1.4.3-retrospective.md`
-- [x] Next branch created: `k3d-manager-v1.4.4`
+## v0.3.13 — Shipped
 
-## Completed (v1.4.2)
-- [x] `_ai_agent_review` dispatch layer in lib-foundation
-- [x] `K3DM_ENABLE_AI` gate removed from lib-foundation backend
-- [x] `ARGOCD_SERVER_WAIT_TIMEOUT` configurable (default 600s)
-- [x] `bin/acg-up` bootstrap refresh on existing Hub
-- [x] `bin/acg-up` `--confirm` flag
-- [x] lib-acg PR #10 subtree pull (`launchctl bootout`, dead else-block)
-- [x] Copilot plugin BATS suite (`scripts/tests/plugins/copilot.bats`)
-- [x] All 8 Copilot PR #71 review threads resolved
-- [x] `enforce_admins` restored on `main`
-- [x] v1.4.2 tag + GitHub release created
-- [x] Retrospective: `docs/retro/2026-05-07-v1.4.2-retrospective.md`
+- [x] **`_antigravity_browser_ready` curl probe fix** — PR #19 merged (`e870c6d9`); `_run_command --soft -- curl --max-time "${CURL_MAX_TIME:-30}"` replaces `_curl` probe; BATS stubs updated to target `_run_command`; Copilot `--max-time` finding addressed
 
-## Next Steps (v1.4.5)
-- [x] **multi-repo SSO wiring follow-up** — COMPLETE. `k3d-manager` ACG sandbox navigation fix: `3bb7aa817983948cd426bc6a96525a811b2bd7ff`; `shopping-cart-infra` SSO ingress/workflow update: `8c581840b904f21459fa225c80ddfe54f93ed9aa`; `shopping-cart-frontend` CI/CSP update: `6120783b8af124abebca7f242f5b905a29734836`; frontend issue-doc commit: `64c943e5b39ec1468c1de8f0a7e6768a1d4cb6b1`; frontend `main` reverted to `2872a4cd9b120b55673b0c2633ab8e6270cb6b8c` after an accidental remote update. Issue doc: `docs/issues/2026-05-15-frontend-main-push-reverted.md`.
-- [x] **networking ArgoCD project + Keycloak mTLS fix** — COMPLETE (`6c70fee99baa2c2f29330113e4f1c96b2b94cf75`). `argocd/applications/networking.yaml` now uses `project: platform`; added `networking/istio/keycloak-destinationrule.yaml` with `tls.mode: DISABLE`. Spec: `docs/bugs/2026-05-15-networking-app-project-and-mtls.md`.
-- [x] **ArgoCD SSO via Keycloak** — COMPLETE. shopping-cart-infra PR #38 (`d314c34`, feat: ArgoCD SSO) + PR #39 (`afaf109`, fix: ldap duplicate) merged to main. enforce_admins restored. spec: `docs/plans/v1.4.5-argocd-sso-keycloak.md`; retro: `docs/retro/2026-05-09-pr38-pr39-argocd-sso-kustomize-fix.md` (on `docs/next-improvements`)
-- [x] **pyjenkinsapi rigor-cli v0.1.6 subtree pull** — COMPLETE (subtree: `7d8a894b`, ci-fix: `0c479c99`); branch `docs/next-improvements`; BATS re-enabled
-- [x] **acg-up /etc/hosts --soft** — COMPLETE (`3c096f6`). `_run_command --prefer-sudo` missing `--soft` causes `exit 1` instead of warning when EPERM. spec: `docs/bugs/v1.4.5-bugfix-etc-hosts-soft.md`.
-- [x] **acg-up Step 10e bugs** — COMPLETE (`d6a31c5`). Fixed CoreDNS awk pattern + /etc/hosts sudo hard-fail. spec: `docs/plans/v1.4.5-bugfix-gemini.md`
-- [x] **eso-ldap-directory Vault policy missing keycloak/* paths** — COMPLETE (`48938dea`). Extended `LDAP_VAULT_POLICY_PREFIX` default to `ldap,keycloak`. spec: `docs/bugs/v1.4.5-bugfix-eso-ldap-policy-missing-keycloak.md`
-- [x] **shopping-cart-identity AppProject missing** — COMPLETE (`771ba5cf`). `project: shopping-cart` → `project: platform`; removed dead kustomization. spec: `docs/bugs/v1.4.5-bugfix-identity-appproject-missing.md`
-- [x] **identity ESO bootstrap Bug 1** — COMPLETE (`f969b299`). `_eso_apply_vault_cluster_store` added to `eso.sh`; `ldap.sh` source guard + `deploy_ldap()` call added. Verified by Claude.
-- [x] **identity ESO bootstrap Bugs 2+3** — spec: `docs/bugs/v1.4.5-bugfix-identity-externalsecret-bootstrap.md`; shopping-cart-infra PR #40 merged (`dfe00df1`); enforce_admins restored
-- [x] **identity ESO bootstrap Bugs 4+5** — spec: `docs/bugs/2026-05-08-pr41-keycloak-postgresql-driver-ldap-ldif-chown-fixes.md`; shopping-cart-infra PR #41 merged (`180f5f89`); Bug 4: Keycloak `--db=postgres` in args, KC_DB removed from ConfigMap; Bug 5: LDAP LDIF chown fix via initContainer + emptyDir; enforce_admins restored
-- [x] **LDAP CrashLoopBackOff Bug 6** — PR #42 merged (`11aa8d7d`); enforce_admins restored. Spec: `docs/bugs/2026-05-09-ldap-emptydir-mountpoint-rm-fails.md`
-- [x] **LDAP CrashLoopBackOff Bug 7** — PR #43 merged (`dcd18af7`). enforce_admins restored. Fix: `enableServiceLinks: false` in pod spec. Retro: `docs/retro/2026-05-09-pr43-ldap-service-links-retrospective.md`
-- [x] **deploy_eso unpinned chart version** — spec: `docs/bugs/v1.4.5-bugfix-deploy-eso-no-version-pin.md`; pinned to `1.0.0` via `ESO_HELM_CHART_VERSION` (SHA: `50851f0e`)
-- [x] **Bug 8 — CoreDNS keycloak.shopping-cart.local → Keycloak ClusterIP** — `34e0101f`. Corefile patched with `hosts` block; NodeHosts/IngressGateway approach removed.
-- [x] **Bug 9 — acg-up frontend port-forward launchd agent** — `fb56a443`. Step 13 launchd plist added (`localhost:3000 → ubuntu-k3s/shopping-cart-apps/frontend:80`).
-- [x] **Bug 10 — acg-up ArgoCD localhost:8080 readiness gate** — `bin/acg-up` now waits for the Argo CD launchd listener to answer `localhost:8080/healthz` and fails fast with the log tail when it never becomes reachable.
-- [x] **Bug 11 — acg-down keep-hub preservation trust gap** — `bin/acg-down` now logs the resolved Hub cluster and the `Makefile` wrapper exposes `KEEP_LOCAL` directly, making `--keep-hub` unambiguous to operators.
-- [x] **Bug 12 — acg-up missing Argo CD plugin source** — `bin/acg-up` now sources `scripts/plugins/argocd.sh` before Step 4b calls `_argocd_wait_for_local_port_forward` (SHA: `6052786a`).
-- [x] **Bug 13 — acg-up PLUGINS_DIR unbound before plugin sourcing** — `bin/acg-up` now initializes `PLUGINS_DIR="${SCRIPT_DIR}/plugins"` before sourcing `scripts/plugins/argocd.sh` (SHA: `5d4b9b1e`).
-- [x] **Bug 14 — Keycloak `argocd` client redirect reconciliation** — `bin/acg-up` now reconciles the existing `argocd` client redirect URIs even when the realm already exists, so rebuilds do not preserve stale OIDC callbacks. Spec: `docs/bugs/2026-05-11-keycloak-argocd-client-redirect-reconciliation.md`.
-- [x] **Bug 15 — Argo CD port-forward flaps after sandbox rebuild** — `bin/acg-up` now renders a self-healing launchd wrapper that restarts the Argo CD port-forward whenever `localhost:8080/healthz` stops responding. Spec: `docs/issues/2026-05-11-acg-up-argocd-port-forward-flapping.md`; commit `18f8d884`.
-- [ ] **Follow-up — `scripts/plugins/argocd.sh:_argocd_write_port_forward_wrapper` Agent Audit mismatch** — the helper is temporarily allowlisted because the audit counter reports 11 `if` blocks even though the rendered function body only contains one. Spec: `docs/issues/2026-05-11-argocd-port-forward-wrapper-if-count-mismatch.md`.
-- [ ] **Follow-up — `deploy_keycloak` if-count refactor** — temporary allowlist entry added for `scripts/plugins/keycloak.sh:deploy_keycloak`; separate refactor needed. Spec: `docs/issues/2026-05-11-keycloak-deploy_keycloak-if-count.md`.
-- [x] **Keycloak admin token mismatch after rebuild** — `bin/acg-up` now preserves existing Vault identity secrets on rebuild, the live Vault `secret/keycloak/admin` secret was restored to the historical working password version, and admin token requests return `200` again. Specs: `docs/bugs/2026-05-11-keycloak-admin-password-reseed-on-rebuild.md` and `docs/issues/2026-05-11-keycloak-admin-token-reconciliation-failure.md`.
-- [ ] **Argo CD rejects localhost return URLs during SSO login** — `/auth/login` rejects `return_url=http://localhost:8080/...` even though the Keycloak client redirect URIs are present. Spec: `docs/issues/2026-05-11-argocd-localhost-return-url-rejected.md`.
-- [x] **Argo CD canonical HTTPS hostname is backed by a Vault PKI-issued local TLS listener** — `bin/acg-up` now installs a root-owned `launchd` daemon that terminates TLS for `argocd.shopping-cart.local:443` and proxies to the existing `localhost:8080` Argo CD port-forward, and `bin/acg-down` removes it. Spec: `docs/issues/2026-05-11-argocd-canonical-https-listener-missing.md` (fixed).
-- [x] **Argo CD browser TLS role creation now uses a parent-domain allowed_domains shape** — `scripts/plugins/argocd.sh` derives `allowed_domains=shopping-cart.local` for `argocd.shopping-cart.local`, allowing Vault to accept the PKI role write on rebuild. Spec: `docs/issues/2026-05-11-argocd-browser-tls-role-allowed-domains.md` (fixed).
-- [x] **Argo CD browser TLS role write now authenticates to Vault before upserting the PKI role** — `scripts/plugins/argocd.sh` now calls `_vault_login` before the browser TLS role write, avoiding `403 permission denied` on rebuild. Spec: `docs/issues/2026-05-11-argocd-browser-tls-vault-login-permission-denied.md`.
-- [x] **Argo CD browser TLS cleanup skips revoke when prior cert is already gone** — `scripts/plugins/vault.sh` now treats a missing browser TLS serial as best-effort cleanup only, so stale certs no longer abort `make up`. Fixed in `f2942bf9`. Issue: `docs/issues/2026-05-11-argocd-browser-tls-revoke-missing-cert.md`.
-- [ ] **Planned — `make up TRUST_CA=1` host CA trust bootstrap** — spec `docs/plans/v1.4.5-trust-ca-auto-import.md`. This should keep the trust-store flow opt-in while letting the helper select macOS or Linux behavior automatically.
-- [x] **Argo CD browser `launchctl` stderr visibility** — `bin/acg-up` now captures stderr from the macOS browser listener install/bootstrap path in `argocd-browser-https-launchctl.log` and prints it on failure. Commit `8d18e18c`.
-- [x] **Argo CD browser `launchctl bootout` best-effort** — `bin/acg-up` now ignores the expected `launchctl bootout system` failure when no listener is loaded, preventing the missing-listener case from aborting bootstrap. Commit `8d18e18c`.
-- [x] **Recorded launchctl bootout edge case** — `docs/issues/2026-05-12-acg-up-argocd-browser-bootout-fails-when-listener-missing.md` captures the `Boot-out failed: 5: Input/output error` rebuild case.
-- [x] **Stopped advertising localhost as browser entrypoint** — `bin/acg-up` now labels `http://localhost:8080` as terminal-only and `docs/howto/argocd.md` directs browser users to `https://argocd.shopping-cart.local`. Commit `b086aef2`. Issue doc: `docs/issues/2026-05-12-argocd-localhost-browser-entrypoint-misleading.md`.
-- [x] **Argo CD browser HTTPS preflight skips sudo when already healthy** — `bin/acg-up` now checks `https://argocd.shopping-cart.local:443/healthz` before touching launchd, so repeated `make up` runs avoid the sudo prompt when the listener is already up. Commit `d5be3d0e`.
-- [x] **Keycloak browser HTTP listener on localhost:80** — `bin/acg-up` now installs a local launchd-managed HTTP listener for `keycloak.shopping-cart.local:80` and keeps `/etc/hosts` on `127.0.0.1`, so Safari can reach the Keycloak auth endpoint without a certificate prompt. Commit `bca8a30c`. Issue doc: `docs/issues/2026-05-12-keycloak-browser-http-listener-missing.md`. Supersedes the earlier ingress-gateway mapping (`99581cc7`).
-- [x] **Argo CD port-forward context fallback** — the generated wrapper now prefers the requested `k3d-k3d-cluster` context only when it exists, otherwise it falls back to `kubectl config current-context` and then the kubeconfig default. Commit `3f8d5150`. Issue doc: `docs/issues/2026-05-12-argocd-port-forward-context-fallback.md`.
-- [x] **Argo CD browser auto-open removed from bootstrap** — `bin/acg-up` no longer opens Safari at the end of bootstrap, so `make up` finishes cleanly on both macOS and Linux without a GUI dependency, then prints `https://argocd.shopping-cart.local` for manual navigation. Issue doc: `docs/issues/2026-05-12-acg-up-browser-auto-open-removed-for-noninteractive-flows.md`.
-- [ ] **Argo CD Safari stale localhost session follow-up** — old browser tabs can still exist if opened manually, but `make up` no longer drives Safari. Issue doc: `docs/issues/2026-05-12-argocd-safari-stale-localhost-tab-keeps-reopening.md`.
-- [ ] **Argo CD port-forward wrapper scalar context follow-up** — the first fallback patch still rendered `_kubectl_context_args[@]` under `set -u` and quoted an empty kubeconfig value; current fix switches to a scalar context argument and leaves kubeconfig empty when unset. Issue doc: `docs/issues/2026-05-12-argocd-port-forward-wrapper-empty-array-unbound.md`.
-- [ ] **Keycloak browser launchd plist path fix** — the Keycloak browser listener was staged under `~/Library/LaunchDaemons`, which does not exist on this machine; current fix moves it to `/Library/LaunchDaemons` and keeps teardown aligned. Issue doc: `docs/issues/2026-05-12-keycloak-browser-launchd-plist-installed-under-home-dir.md`.
-- [x] **Keycloak realm import is mandatory** — `bin/acg-up` now fails if the Keycloak realm import does not happen, so bootstrap cannot silently report success with stale SSO state. Issue doc: `docs/issues/2026-05-12-acg-up-silent-keycloak-realm-import-skip.md`.
-- [x] **Keycloak realm import status capture no longer concatenates fallback output** — a real `409` from Keycloak is now preserved instead of becoming `409000`. Issue doc: `docs/issues/2026-05-12-acg-up-keycloak-realm-import-status-concatenated-fallback.md`.
-- [x] **Keycloak readiness gate reports deployment availability instead of a dead tunnel** — `bin/acg-up` now waits on `deployment/keycloak` becoming `Available` and prints deployment/pod status on timeout, so the loop no longer counts against a stale port-forward. Issue doc: `docs/issues/2026-05-12-keycloak-readiness-loop-watched-dead-port-forward.md`.
-- [ ] **Live LDAP bind credentials still mismatch the running directory** — `bin/ldap-search` against the live `openldap-admin` secret returns `ldap_bind: Invalid credentials (49)` even though the cluster is up and Keycloak can reach the LDAP service. Issue doc: `docs/issues/2026-05-12-live-ldap-bind-secret-invalid-credentials.md`.
-- [ ] **LDAP username attribute re-aligned to `uid`** — shopping-cart-infra bugfix branch `fix/keycloak-ldap-username-attribute-uid` now sets `LDAP_USERNAME_ATTRIBUTE` and `usernameLDAPAttribute` to `uid` to match the stable directory identifier. Issue doc: `docs/issues/2026-05-13-keycloak-ldap-username-attribute-uid.md`.
-- [x] **shopping-cart-infra realm sync moved out of startup** — the Keycloak deployment no longer imports `shopping-cart` on pod boot; `acg-up` owns the live realm sync after Keycloak is healthy. Issue doc: `docs/issues/2026-05-14-keycloak-realm-sync-moved-out-of-startup.md`.
-- [x] **shopping-cart-infra realm import placeholders were an intermediate step** — historical notes kept for the old initContainer renderer work and Copilot follow-ups. Issue docs: `docs/issues/2026-05-13-keycloak-realm-import-placeholders-not-rendered.md`, `docs/issues/2026-05-13-kustomize-cross-directory-realm-file-disallowed.md`, `docs/issues/2026-05-13-keycloak-realm-import-invalid-dn-literal-binddn.md`.
-- [x] **shopping-cart-infra PR #51 Copilot review addressed** — wired `keycloak-client-secrets` into the Keycloak initContainer env so the renderer sees the required client secret variables, aligned the bug doc to the actual mounted realm import source, and resolved both Copilot review threads via `gh api graphql`. Commit: `1ffaf46`.
-- [x] **shopping-cart-infra PR #52 Copilot review addressed** — kept `identity/keycloak/realm-shopping-cart.json` as the single realm import source, added `KC_DB_USERNAME` to the generated `keycloak-config`, removed the stale `identity/keycloak/configmap.yaml`, rendered the realm import with `--db=postgres --override=true`, and resolved the Copilot review threads via `gh api graphql`. Commit: `17e965c`.
-- [x] **shopping-cart-infra main/v0.4.0 sync completed** — merged `origin/main` into `shopping-cart-infra-v0.4.0` while preserving the existing branch tip, pushed merge commit `9d1778c`, and restored `enforce_admins=true` on `main`.
-- [x] **bin helper filename normalization** — renamed the `bin/*.sh` helpers to extensionless `bin/*` scripts and updated the live caller paths plus active docs to match.
-- [x] **make down preserves Hub only when explicitly requested** — default `KEEP_LOCAL` is now `0`, so local Hub deletion is the default teardown and preservation is opt-in via `KEEP_LOCAL=1`. Issue doc: `docs/issues/2026-05-12-make-down-default-preserved-local-hub-was-counterintuitive.md`.
-- [ ] **Follow-up — Agent Audit if-count budget in `scripts/lib/test.sh`** — `test_jenkins` and `test_cert_rotation` still exceed the threshold; temporary allowlist entries were added and the failure was recorded in `docs/issues/2026-05-12-scripts-lib-test-if-count-allowlist.md`.
-- [x] **Vault troubleshooting helper auth** — `bin/vault-exec` now auto-authenticates `vault ...` commands with the live root token before running them. Issue doc: `docs/issues/2026-05-12-vault-exec-403-unauthenticated-root-token.md`.
-- [x] **acg-down browser launchd bootout is best-effort** — already-removed Keycloak and ArgoCD browser listeners now warn instead of failing `make down`. Issue doc: `docs/issues/2026-05-12-acg-down-browser-launchd-bootout-missing-listener-aborted.md`.
-- [x] **Argo CD invalid scope `groups`** — Argo CD OIDC config requested `groups` in `requestedScopes`, but Keycloak rejected it with `invalid_scope: Invalid scopes: openid profile email groups`. Fixed by removing `groups` from `shopping-cart-infra/argocd/config/argocd-cm.yaml` while keeping the groups claim mapper. Shopping-cart-infra commit: `09fbb7da14b447ccdbed17bd4a422eebeaa2811d`. Issue doc: `docs/issues/2026-05-12-argocd-invalid-scope-groups-requested.md`.
-- [x] **Keycloak LDAP login now keys on email** — shopping-cart-infra Keycloak LDAP federation was aligned to use `mail` as the username attribute, matching the email-style login the browser flow presents. Shopping-cart-infra PR #47 (`https://github.com/wilddog64/shopping-cart-infra/pull/47`) opened from commit `eed0b01`. Issue doc: `docs/issues/2026-05-12-keycloak-ldap-login-username-mail.md`.
-- [x] **Shopping-cart-infra Copilot review thread resolved** — clarified the issue-doc heading on PR #47, pushed commit `ea491dd`, and resolved the Copilot review thread with `gh api graphql`.
-- [x] **Shopping-cart-infra admin override enabled** — disabled `enforce_admins` on `main` so admins can bypass branch protection when needed. Confirmed the LDAP username change is realm-wide shopping-cart identity config, not Argo CD-only.
-- [x] **Keycloak client attribute merge preserves stale PKCE** — live admin `PUT` left `pkce.code.challenge.method` behind in `client_attributes`; `bin/acg-up` now deletes the stale row directly after client reconciliation. Issue doc: `docs/issues/2026-05-12-keycloak-client-attributes-merge-preserves-pkce.md`.
-- [ ] **New finding — Keycloak LDAP null username with mail mapping** — live Keycloak log shows `User returned from LDAP has null username!` when `usernameLDAPAttribute=mail`; the live LDAP entry does contain `mail: admin@shopping-cart.local`, so the runtime mapping/import path is still broken. Issue doc: `docs/issues/2026-05-12-keycloak-ldap-null-username-mail-mapping.md`.
-- [x] **shopping-cart-infra PR #49 merged and synced** — branch `fix/keycloak-ldap-username-attribute-uid` merged to `shopping-cart-infra-v0.4.0`, `main` updated to merge commit `1fb43a4`, and `enforce_admins=true` restored on `main`.
-- [x] **shopping-cart-infra main/v0.4.0 sync no-op** — `origin/shopping-cart-infra-v0.4.0` and `origin/main` are already aligned at `1fb43a4` (`rev-list --left-right --count` returned `0 0`), so there was nothing to merge. Branch protection on `main` is already enabled.
-- [x] **shopping-cart-infra v0.3.0 already contains the realm-import fix** — branch `shopping-cart-v0.3.0` includes `0dd3b55` (`fix(keycloak): import realm on startup`) and `5da2560` (`fix(keycloak): restore ldap root dn admin`); `main` has no additional commits to merge into that branch.
-- [x] **shopping-cart-infra realm import removed from startup path** — `identity/keycloak/deployment.yaml` no longer imports the `shopping-cart` realm on pod boot; the live `acg-up` reconciliation path owns realm sync after Keycloak is healthy. Issue docs: `docs/issues/2026-05-13-keycloak-realm-import-should-skip-existing-shopping-cart-realm.md` and `docs/issues/2026-05-14-keycloak-realm-sync-moved-out-of-startup.md`.
-- [x] **shopping-cart-infra v0.4.0 release note / PR follow-up** — added a short README release-notes bullet linking the idempotent realm-import bug doc, tagged the branch tip as `v0.4.0`, opened PR #53, and requested Copilot review via `gh api`.
-- [x] **shopping-cart-infra v0.4.0 release material refresh** — consolidated the README release-note entry into the existing CI/CD Integration `### Release Notes` section and removed the duplicate top-level section; PR #54 (`https://github.com/wilddog64/shopping-cart-infra/pull/54`) still carries the release-note material. Release note commit: `2e97ec6`; release tag `v0.4.0` already exists on `128ab3f`.
-- [x] **shopping-cart-infra v0.4.0 tag correction** — `v0.4.0` had pointed at `128ab3f` before the Keycloak fix; it now points at `674b7b1` so the release tag includes the functional fix.
-- [x] **shopping-cart-infra PR #53 YAML lint fix** — wrapped the long `sed` command in `identity/keycloak/deployment.yaml` so the CI line-length check passes; pushed commit `272f5d2`.
-- [x] **shopping-cart-infra PR #53 fresh-DB precheck fix** — guarded the realm existence lookup with `to_regclass('public.realm')` before querying `realm`, so a new Keycloak database falls through to import without a false startup error.
-- [x] **shopping-cart-infra main admin enforcement disabled temporarily** — set `enforce_admins=false` on `main` so PR #53 can be merged; verified the change.
-- [x] **shopping-cart-infra v0.5.0 branch cut** — advanced `shopping-cart-infra-v0.5.0` to the current `main` tip (`4a6c14f`) after PR #54 merged, then restored `enforce_admins=true` on `main`.
-- [x] **shopping-cart-infra v0.5.0 branch cleanup** — deleted and re-created the local `shopping-cart-infra-v0.5.0` ref from the current `main` tip (`4a6c14f`) so the release branch is clean again.
-- [x] **shopping-cart-infra v0.4.0 release published** — created the GitHub release object on the verified `v0.4.0` tag with notes describing the Argo CD PostSync live-reconcile fix. Release URL: `https://github.com/wilddog64/shopping-cart-infra/releases/tag/v0.4.0`.
-- [x] **Identity troubleshooting helpers** — added `bin/vault-exec`, `bin/ldap-search`, `bin/keycloak-logs`, and `bin/ldap-logs` with shared `_run_command`-backed wrappers in `scripts/lib/identity_tools.sh`. Added `docs/howto/identity-troubleshooting.md` for quick operator reference.
-- [x] **Historical branch prune recommendation documented** — `docs/next-improvements` and `k3d-manager-v1.1.0` through `k3d-manager-v1.4.4` are not ancestors of current `main` or `k3d-manager-v1.4.5`. Recommendation: keep for auditability unless the team explicitly decides to prune branch refs. Issue doc: `docs/issues/2026-05-13-k3d-manager-historical-branches-prune-recommendation.md`.
-- [ ] **acg-up known_hosts sync** — managed AWS host IPs in `~/.ssh/config` are now tracked so stale public IP entries can be pruned from `~/.ssh/known_hosts` while current entries remain. Issue doc: `docs/issues/2026-05-13-acg-up-maintain-known-hosts-for-managed-aws-ips.md`.
-- [x] **Keycloak intermittent startup timeout documented** — `make up` still occasionally times out at the Keycloak readiness gate because the live deployment remains in `ContainerCreating`/unavailable. Current manifest shows `startupProbe.failureThreshold: 30` with 10s periods. Issue doc: `docs/issues/2026-05-13-keycloak-intermittent-startup-never-reaches-available.md`.
-- [x] **Keycloak deployment NotFound readiness gate fix** — `bin/acg-up` now polls for `deployment/keycloak` to appear before it waits for `Available`, so an Argo CD sync delay no longer fails immediately with `NotFound`. Issue doc: `docs/issues/2026-05-13-keycloak-deployment-notfound-should-poll-for-creation.md`.
-- [x] **Argo CD VirtualService host default moved to canonical browser URL** — `scripts/etc/argocd/vars.sh` now defaults `ARGOCD_VIRTUALSERVICE_HOST` to `argocd.shopping-cart.local` instead of `argocd.dev.local.me`, so fresh deployments stop writing a stale browser URL into `argocd-cm`. Issue doc: `docs/issues/2026-05-13-argocd-virtualservice-host-default-still-dev-local-me.md`.
-- [x] **acg-up stale shopping-cart-infra realm JSON path fixed** — `bin/acg-up` now reads `shopping-cart-infra/identity/keycloak/realm-shopping-cart.json` instead of the deleted `identity/config/realm-shopping-cart.json`, and the Keycloak fixture test was updated to match. Issue doc: `docs/issues/2026-05-13-acg-up-uses-stale-realm-json-path-after-shopping-cart-infra-layout-change.md`. Commit: `c0566cb4`.
-- [ ] **Refactor shopping_cart.sh → k3s_remote.sh** — spec: `docs/plans/v1.4.3-refactor-k3s-remote-plugin.md`; assign to Codex (spec updated to also rename source line in `k3s-aws.sh` and `k3s-gcp.sh`)
-- [ ] **Service mesh + LB for k3s-aws and k3s-gcp** — spec: `docs/plans/v1.4.3-service-mesh-lb-k3s-remote.md`; assign to Codex AFTER refactor is done
-- [ ] **chisel HTTPS tunnel** — spec: `docs/plans/v1.4.3-chisel-tunnel.md`; replaces autossh+socat with HTTPS WebSocket; `TUNNEL_PROVIDER=chisel` gate; depends on refactor spec
-- [ ] Restore `deploy_argocd_bootstrap "$@"` passthrough — lib-foundation flag-filtering approach; fix callers that depended on it (esp. `provision-tomcat`)
-- [ ] lib-foundation upstream: remove `K3DM_ENABLE_AI=1` from `_copilot_review` usage snippet in `docs/api/functions.md`
+## v0.3.12 — Shipped
+
+- [x] **`_ensure_antigravity_ide` + MCP helpers** — Antigravity IDE install + Playwright MCP config helpers; Copilot PR #18 findings addressed in `9f28d88` (apt-get update, mktemp template, PLAYWRIGHT_MCP_VERSION, _curl wrapper, 7 BATS)
+
+---
+
+## What Is Complete
+
+- [x] GitHub repo + CI + branch protection (v0.1.0)
+- [x] `core.sh` + `system.sh` extracted from k3d-manager (v0.1.0)
+- [x] `_resolve_script_dir` — portable symlink-aware locator + BATS (v0.1.1)
+- [x] Drop Colima support (v0.1.2)
+- [x] `agent_rigor.sh` — `_agent_checkpoint`, `_agent_audit`, `_agent_lint`, pre-commit hook, 13 BATS (v0.2.0)
+- [x] k3d-manager subtree wired at `scripts/lib/foundation/` (k3d-manager v0.7.0)
+- [x] `_run_command` if-count refactor — `_run_command_resolve_sudo` extracted, both < 8 if-blocks (v0.3.0)
+- [x] Bash 3.2 compat — `_RCRS_RUNNER` global temp (v0.3.0)
+- [x] Route bare `sudo` in install helpers through `_run_command --interactive-sudo` (v0.3.1)
+- [x] Fix `_ensure_cargo` WSL redhat branch (v0.3.1)
+- [x] AGENTS.md, GEMINI.md, CLAUDE.md, copilot-instructions.md overhaul (v0.3.1)
+- [x] Sync `deploy_cluster` helpers from k3d-manager; TTY fix (`_DCRS_PROVIDER` global); BATS 36 tests (v0.3.2)
+- [x] Repo flipped **public** (v0.3.2)
+- [x] API reference — `docs/api/functions.md` (v0.3.3)
+- [x] README releases table split — top 3 + `docs/releases.md` full history (v0.3.3)
+
+---
+
+## What Is Pending
+
+### v0.3.4 — SHIPPED (`dbfafe9`)
+
+- [x] **Fix `docs/api/functions.md`** — 12 Copilot findings from PR #8 resolved in commit `7bb60c2`; spec `docs/plans/v0.3.4-api-doc-fixes.md`.
+- [x] **Upstream lib sync** — `system.sh` TTY fix (`_run_command_resolve_sudo` + remove `_run_command_has_tty`); `agent_rigor.sh` if-count allowlist + staged-only audit; `statusline.sh` cost display fix.
+- [x] **PR #11 Copilot review** — 8 findings addressed in `08cfbc8`, all threads resolved.
+- [x] **Retro** — `docs/retro/2026-03-22-v0.3.4-retrospective.md`
+
+### v0.3.5 — SHIPPED (`2f895a99`)
+
+- [x] **PR #10 doc-hygiene hook** — `doc_hygiene.sh` + pre-commit hook + BATS 14 tests; staged-only `_agent_audit` BATS test (`bdd60e7`); spec `docs/plans/v0.3.5-agent-audit-staged-only-test.md`.
+- [x] **Doc hygiene staged-content read** — commit `d00bccb` adds `_dh_grep` index reader + new BATS (spec `docs/plans/v0.3.5-doc-hygiene-staged-content-read.md`).
+- [x] **Doc hygiene staged-mode follow-ups** — commit `aeb1396` localizes `_DHC_STAGED`, adds staged `git cat-file` guard, and replaces staged-mode BATS per `docs/plans/v0.3.5-doc-hygiene-copilot-pr10-round2.md`.
+- [x] **PR #10 merged** — squash-merged to main (`2f895a99`) 2026-03-23.
+
+### v0.3.6 — SHIPPED (`d8b4c48`)
+
+- [x] **Check 2 code-fence exclusion** — commit `7751068` adds `_dh_strip_fences`, `_dh_grep --strip-fences`, and 3 BATS covering fenced + tilde blocks (`docs/plans/v0.3.6-doc-hygiene-codefence-exclusion.md`).
+- [x] **CoreDNS Check 4** — commit `c352c1b` adds warn-only `<svc>.<ns>.svc(.cluster.local)` detection and 4 BATS per `docs/plans/v0.3.5-doc-hygiene-coredns-check.md`.
+- [x] **Indented fence fix** — commit `02e7418` updates `_dh_strip_fences` for indented fenced blocks + indented BATS (`docs/plans/v0.3.6-doc-hygiene-indented-fence-fix.md`).
+- [x] `rigor-cli` — repo bootstrapped (commit `a1c034f`, branch feat/init); mapfile compat fix (`8ae57bc`) + gist installer (`310fd16`).
+- [ ] Consumer integration: `shopping-carts`
+
+---
+
+## Known Constraints
+
+| Item | Notes |
+|---|---|
+| `SCRIPT_DIR` dependency | `system.sh` sources `agent_rigor.sh` via `$SCRIPT_DIR` at load time |
+| Contract stability | `_run_command`, `_detect_platform`, `_cluster_provider` — signature changes require all-consumer coordination |
+| Clean env testing | BATS must run with `env -i` — ambient `SCRIPT_DIR` causes false passes |
+| bash 3.2 compat | No `local -n`, no `declare -A`, no `mapfile` in lib code |
+| `--interactive-sudo` for installs | Install helpers use `--interactive-sudo`; `--prefer-sudo` is for non-interactive contexts only |
+| Global temp vars | `_RCRS_RUNNER` (sudo runner), `_DCRS_PROVIDER` (deploy provider) — never use `$()` for functions that check TTY |
