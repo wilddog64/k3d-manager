@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if ! curl -sf http://localhost:9222/json >/dev/null 2>&1; then
+  printf 'ERROR: Chrome CDP not running on port 9222\n' >&2
+  printf 'Start with: open -a "Google Chrome" --args --remote-debugging-port=9222\n' >&2
+  exit 1
+fi
+
+sandbox_url="${1:?Usage: $0 <sandbox-url>}"
+shift
+
+ACG_REQUIRE_CDP=1 node "$REPO_ROOT/playwright/acg_extend.js" "$sandbox_url" "$@"
+
+# Parse --provider from remaining args (default: aws)
+_provider="aws"
+_rest=("$@")
+for (( _i=0; _i<${#_rest[@]}-1; _i++ )); do
+  if [[ "${_rest[_i]}" == "--provider" ]]; then
+    _provider="${_rest[$(( _i + 1 ))]}"
+    break
+  fi
+done
+
+if [[ "$_provider" == "aws" ]]; then
+  if aws sts get-caller-identity --output text >/dev/null 2>&1; then
+    printf 'INFO: AWS credentials re-validated after extend (sts:GetCallerIdentity OK)\n' >&2
+  else
+    printf 'ERROR: AWS credential re-validation failed after extend\n' >&2
+    exit 1
+  fi
+fi
