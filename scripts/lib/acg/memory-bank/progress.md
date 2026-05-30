@@ -1,6 +1,43 @@
 # Progress — lib-acg
 
-## v0.1.0 Track — `fix/next-improvements-2` (active)
+## v0.3.1 Track — `fix/next-improvements-8` (active)
+
+- **IN FLIGHT PR #30**: `playwright/acg_credentials.js` — JS navigation fix (`window.location.assign` + `waitForNavigation`) for cloud-sandboxes SPA nav; bypasses "Extend Your Session" pointer-event interception. CI green. PRs open: https://github.com/wilddog64/lib-acg/pull/30
+- **MERGED PR #29** (`a32b46ec`): v0.3.1 bugfix sweep — `git grep -F` fixed-string dangling-ref, `acg_check_ttl` return 1 + -1 sentinel, package.json/package-lock.json version alignment to 0.3.0. Copilot findings addressed. enforce_admins restored. Subtree pulled into k3d-manager at `3af3a4e3`.
+
+## v0.3.0 Track — `fix/next-improvements-7` (merged)
+
+- **COMPLETE:** v0.3.1 bugfix sweep on `fix/next-improvements-7` finished. `scripts/hooks/pre-commit` now iterates deleted references safely with `read` instead of unquoted `$_refs`; `scripts/plugins/acg.sh` now returns `1` on missing `node` and `-1` when TTL output is unparseable; `package.json` and `package-lock.json` now both report `0.3.0`. Commits: `4e55392`, `4f7a1f3`, `7f1261c`. Pushed to `origin/fix/next-improvements-7`. Validation: `shellcheck -S warning scripts/hooks/pre-commit`, `shellcheck -S warning scripts/plugins/acg.sh`, `node --check playwright/*.js`.
+
+- **MERGED PR #28** (`ee87aeb2`): Visibility guard — three-part check (`offsetParent !== null && getComputedStyle(d).display !== 'none' && getComputedStyle(d).visibility !== 'hidden'`) across `acg_credentials.js` and `acg_restart.js` to fix false-positive "Extend Your Session" detection. Bug doc: `docs/bugs/2026-05-24-acg-credentials-false-positive-extend-dialog.md`. Retro: `docs/retro/2026-05-24-pr28-retrospective.md`.
+
+- **MERGED PR #27** (`7c17da72`): 14 bug fixes on `fix/next-improvements-5` → main. Root cause: toast-dismiss block inside async polling loop was architecturally wrong. Fixed by removing dismiss block from `_waitForCredentials`, consolidating toast handling to `addLocatorHandler` in pointer-action paths, correcting CDP Browser lifecycle (`close()` not `disconnect()`), and extending toast detection windows to match async server response timing (15s/10s instead of 5s/3s). Retro: `docs/retro/2026-05-23-pr27-retrospective.md`.
+
+- **COMPLETE:** `playwright/acg_extend.js` now waits 2 seconds before checking for the "Session extended" toast and increases the visible window to 15s in the immediate path and 10s in the non-immediate path, matching the async server response timing; committed as `e635d1e` (`fix(acg-extend): increase toast detection timeout — async server response arrives after 5s window`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_extend.js`.
+
+- **COMPLETE:** `playwright/acg_credentials.js` now removes the toast-dismiss block from `_waitForCredentials`, leaving only the credential-input polling and preserving the `addLocatorHandler` toast handling for pointer actions; committed as `08f322e` (`fix(acg-credentials): remove toast dismiss from _waitForCredentials — DOM queries are never blocked by overlays`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_credentials.js`.
+
+- **COMPLETE:** `playwright/acg_extend.js`, `playwright/acg_credentials.js`, and `playwright/acg_restart.js` now anchor the "Session extended" toast dismiss on the leaf text node and closest button-bearing ancestor, fixing the broad `:has-text()` selector that could click the wrong button; committed as `bf57ee1` (`fix(acg): anchor toast dismiss on leaf text + XPath ancestor — broad :has-text selector clicked wrong button`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_extend.js`, `node --check playwright/acg_credentials.js`, and `node --check playwright/acg_restart.js`.
+
+- **COMPLETE:** `bin/acg-extend-test` now runs `node` normally, parses `--provider` from the remaining args, and re-validates AWS credentials with `aws sts get-caller-identity` after extend for AWS runs so broken sessions fail fast before `make all`/`make up` continue; committed as `0344eb3` (`fix(acg-extend-test): drop exec — add AWS credential re-validation after extend`) and pushed to `origin/fix/next-improvements-5`. Validation used `shellcheck -S warning bin/acg-extend-test`.
+
+- **COMPLETE:** `playwright/acg_extend.js`, `playwright/acg_credentials.js`, and `playwright/acg_restart.js` now use Playwright locator handlers to dismiss the "Session extended" toast, and `acg_extend.js` now replaces the DOM evaluate dismiss path with a locator-based close button click in both immediate and non-immediate exit paths; committed as `e66d028` (`fix(acg): replace DOM evaluate toast dismiss with Playwright locator + addLocatorHandler`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_extend.js`, `node --check playwright/acg_credentials.js`, and `node --check playwright/acg_restart.js`.
+
+- **COMPLETE:** `playwright/acg_extend.js` now waits for the "Session extended" toast to appear and dismisses it before exiting in both the immediate and non-immediate paths, preventing the toast from persisting into the next CDP-backed script run; committed as `97fca3c` (`fix(acg-extend): dismiss Session extended toast before exit — it persists and blocks next script`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_extend.js`.
+
+- **COMPLETE:** `playwright/acg_credentials.js` now re-opens the panel inside `_waitForCredentials` when `Open Sandbox` becomes visible again, dismissing any dialog and re-clicking `Open Sandbox` so the credential wait no longer hangs after the panel closes; committed as `7d04391` (`fix(acg-credentials): re-open panel inside waitForCredentials when Open Sandbox button reappears`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_credentials.js`.
+
+- **COMPLETE:** `playwright/acg_credentials.js` and `playwright/acg_restart.js` now dismiss the "Session extended" success toast in addition to the existing "Extend Your Session" dialog, and `acg_credentials.js` now pre-dismisses plus `force: true` clicks `Open Sandbox` so the toast no longer blocks pointer events; committed as `e5e38d6` (`fix(acg): dismiss Session extended toast — it shares alertdialog role and blocks Open Sandbox click`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_credentials.js` and `node --check playwright/acg_restart.js`.
+
+- **COMPLETE:** `playwright/acg_extend.js` now uses `_cdpBrowser.close()` instead of `_cdpBrowser.disconnect()` for the CDP cleanup path, matching Playwright's connectOverCDP behavior and avoiding the `disconnect is not a function` error; committed as `52dffbc` (`fix(acg-extend): replace .disconnect() with .close() — CDP Browser has no disconnect method`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_extend.js`.
+
+- **COMPLETE:** `playwright/acg_restart.js` now polls for `Delete Sandbox` after `Open Sandbox` and dismisses the "Extend Your Session" dialog on every 500 ms tick until the button appears, replacing the one-shot `waitForSelector` path that could stall behind a late modal; committed as `a9cb1c1` (`fix(acg-restart): poll + dismiss Extend dialog while waiting for Delete Sandbox button`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_restart.js`.
+
+- **COMPLETE:** `playwright/acg_restart.js` now scrolls the `Delete Sandbox` button back into view and retries the click up to 3 times with an 800 ms settle pause, preventing the panel animation viewport shift from leaving the element outside the viewport; committed as `fd50c7f` (`fix(acg-restart): scroll + retry Delete Sandbox click — panel animation causes viewport shift`) and pushed to `origin/fix/next-improvements-5`. Validation used `node --check playwright/acg_restart.js`.
+
+- **MERGED PR #26:** `fix/next-improvements-4` → main (`fbcecc24`). Visibility guard fix for "Extend Your Session" dialog: `offsetParent !== null && getComputedStyle(d).display !== 'none'` added to both detection and selection paths. Copilot caught incomplete fix (guard missing from `.find()` path). Retro: `docs/retro/2026-05-23-pr26-retrospective.md`.
+
+- **MERGED PR #25:** `fix/next-improvements-3` → main (`2e698cf`). Extend Your Session modal robustness (background watcher + point-in-time dismissals) + LaunchDaemon plist idempotency. Retro: `docs/retro/2026-05-22-fix-next-improvements-3-retrospective.md`.
 
 - **MERGED PR #23:** `fix/next-improvements` → main (`48afc0a4`). Credential masking in `bin/acg-credential-test`; extraction progress visibility in `playwright/acg_credentials.js`. Copilot: caught locator divergence + CHANGELOG wording.
 

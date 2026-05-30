@@ -198,7 +198,7 @@ async function extractCredentials() {
             req.end();
           });
           await new Promise(r => setTimeout(r, 500));
-          try { await _cdpBrowser.disconnect(); } catch {}
+          try { await _cdpBrowser.close(); } catch {}
           _cdpBrowser = await chromium.connectOverCDP(CDP_URL);
           const _refreshedContexts = _cdpBrowser.contexts();
           if (_refreshedContexts.length > 0) {
@@ -207,7 +207,7 @@ async function extractCredentials() {
           }
         } catch { /* fall through if blank tab fails */ }
         if (!browserContext) {
-          try { await _cdpBrowser.disconnect(); } catch {}
+          try { await _cdpBrowser.close(); } catch {}
           _cdpBrowser = null;
         }
       }
@@ -245,7 +245,12 @@ async function extractCredentials() {
     // even when acg_restart.js already dismissed it via DOM click.
     const _entryExtendDialog = await page.evaluate(() =>
       Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
-        .some(d => (d.innerText || '').includes('Extend Your Session') && d.offsetParent !== null)
+        .some(d =>
+          (d.innerText || '').includes('Extend Your Session') &&
+          d.offsetParent !== null &&
+          getComputedStyle(d).display !== 'none' &&
+          getComputedStyle(d).visibility !== 'hidden'
+        )
     ).catch(() => false);
     if (_entryExtendDialog) {
       console.error('INFO: "Extend Your Session" dialog on entry — reloading page to clear SPA state...');
@@ -255,6 +260,81 @@ async function extractCredentials() {
         { timeout: 15000 }
       ).catch(() => {});
     }
+
+    const _dismissExtendYourSessionDialog = async () => {
+      const _dialogVisible = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
+          .some(d =>
+            (d.innerText || '').includes('Extend Your Session') &&
+            d.offsetParent !== null &&
+            getComputedStyle(d).display !== 'none' &&
+            getComputedStyle(d).visibility !== 'hidden'
+          )
+      ).catch(() => false);
+      if (_dialogVisible) {
+        console.error('INFO: "Extend Your Session" dialog detected — clicking Cancel via DOM...');
+        // Use DOM click (not Playwright keyboard) — Escape closes the panel, not just the dialog
+        await page.evaluate(() => {
+          const dialog = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
+            .find(d =>
+              (d.innerText || '').includes('Extend Your Session') &&
+              d.offsetParent !== null &&
+              getComputedStyle(d).display !== 'none' &&
+              getComputedStyle(d).visibility !== 'hidden'
+            );
+          if (!dialog) return;
+          const btns = Array.from(dialog.querySelectorAll('button'));
+          // Prefer Cancel/close button; fall back to any non-Extend button
+          const dismiss = btns.find(b => /cancel|no thanks|close|dismiss/i.test(b.textContent || b.getAttribute('aria-label') || ''))
+            || btns.find(b => !/extend/i.test(b.textContent || ''));
+          if (dismiss) dismiss.click();
+        }).catch(() => {});
+        await page.waitForTimeout(1000);
+        const _dialogClosed = await page.waitForFunction(
+          () => !Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
+            .some(d => (d.innerText || '').includes('Extend Your Session')),
+          { timeout: 5000 }
+        ).then(() => true).catch(() => false);
+        if (!_dialogClosed) {
+          console.error('WARN: "Extend Your Session" dialog still visible — continuing anyway');
+        }
+      }
+      // Also dismiss "Session extended" success toast — it shares role="alertdialog" and
+      // intercepts pointer events on the Open Sandbox button.
+      const _toastVisible = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="alertdialog"], [role="alert"]'))
+          .some(d => (d.innerText || '').match(/session extended|sandbox has been extended/i) && d.offsetParent !== null)
+      ).catch(() => false);
+      if (_toastVisible) {
+        console.error('INFO: "Session extended" toast detected — dismissing...');
+        await page.evaluate(() => {
+          const toast = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="alertdialog"], [role="alert"]'))
+            .find(d => (d.innerText || '').match(/session extended|sandbox has been extended/i) && d.offsetParent !== null);
+          if (!toast) return;
+          const closeBtn = Array.from(toast.querySelectorAll('button'))
+            .find(b => /close|dismiss/i.test(b.getAttribute('aria-label') || b.textContent || ''))
+            || toast.querySelector('button');
+          if (closeBtn) closeBtn.click();
+        }).catch(() => {});
+        await page.waitForTimeout(500);
+      }
+    };
+
+    const _startExtendDialogWatcher = () => {
+      const _poll = async () => { while (true) { await _dismissExtendYourSessionDialog(); await page.waitForTimeout(2000); } };
+      _poll().catch(() => {});
+    };
+    _startExtendDialogWatcher();
+    // Auto-dismiss "Session extended" toast whenever it blocks an action — fires on-demand, not a poll loop.
+    await page.addLocatorHandler(
+      page.getByText('Your sandbox has been extended.').first(),
+      async () => {
+        const _tb = page.getByText('Your sandbox has been extended.');
+        await _tb.locator('xpath=ancestor::*[.//button][1]').locator('button').first()
+          .click({ force: true }).catch(() => {});
+        await page.waitForTimeout(300);
+      }
+    );
 
     // Skip navigation entirely if sandbox panel is already loaded on the current page
     const _sandboxReady = await page.locator(
@@ -280,13 +360,12 @@ async function extractCredentials() {
         console.error(`INFO: Already on ${currentUrl} — skipping navigation`);
       } else if (targetPathname.includes('cloud-sandboxes')) {
         console.error(`INFO: SPA-navigating to cloud-sandboxes from ${currentUrl}...`);
-        const navLink = page.locator('a[href*="cloud-sandboxes"]').first();
-        const navVisible = await navLink.isVisible({ timeout: 5000 }).catch(() => false);
-        if (navVisible) {
-          await navLink.click();
-        } else {
-          await page.evaluate(url => window.location.assign(url), targetUrl);
-        }
+        // Use JS navigation — "Extend Your Session" dialog intercepts pointer events so
+        // navLink.click() times out if the dialog reappears between dismiss and click.
+        // waitForNavigation must be registered before the evaluate call to avoid a race.
+        const _nav = page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 60000 });
+        await page.evaluate(url => window.location.assign(url), targetUrl);
+        await _nav;
       } else {
         console.error(`INFO: Navigating to ${targetUrl}...`);
         await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -372,7 +451,12 @@ async function extractCredentials() {
           const inputs = document.querySelectorAll('input[aria-label="Copyable input"]');
           const hasCredentials = inputs.length > 0 && inputs[0].value.trim().length > 0;
           const hasExtendDialog = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
-            .some(d => (d.innerText || '').includes('Extend Your Session'));
+            .some(d =>
+              (d.innerText || '').includes('Extend Your Session') &&
+              d.offsetParent !== null &&
+              getComputedStyle(d).display !== 'none' &&
+              getComputedStyle(d).visibility !== 'hidden'
+            );
           return hasStart || hasOpen || hasResume || hasCredentials || hasExtendDialog;
         }, null, { timeout });
       };
@@ -383,35 +467,6 @@ async function extractCredentials() {
           return true;
         } catch {
           return false;
-        }
-      };
-
-      const _dismissExtendYourSessionDialog = async () => {
-        const _dialogVisible = await page.evaluate(() =>
-          Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
-            .some(d => (d.innerText || '').includes('Extend Your Session'))
-        ).catch(() => false);
-        if (!_dialogVisible) return;
-        console.error('INFO: "Extend Your Session" dialog detected — clicking Cancel via DOM...');
-        // Use DOM click (not Playwright keyboard) — Escape closes the panel, not just the dialog
-        await page.evaluate(() => {
-          const dialog = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
-            .find(d => (d.innerText || '').includes('Extend Your Session'));
-          if (!dialog) return;
-          const btns = Array.from(dialog.querySelectorAll('button'));
-          // Prefer Cancel/close button; fall back to any non-Extend button
-          const dismiss = btns.find(b => /cancel|no thanks|close|dismiss/i.test(b.textContent || b.getAttribute('aria-label') || ''))
-            || btns.find(b => !/extend/i.test(b.textContent || ''));
-          if (dismiss) dismiss.click();
-        }).catch(() => {});
-        await page.waitForTimeout(1000);
-        const _dialogClosed = await page.waitForFunction(
-          () => !Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
-            .some(d => (d.innerText || '').includes('Extend Your Session')),
-          { timeout: 5000 }
-        ).then(() => true).catch(() => false);
-        if (!_dialogClosed) {
-          console.error('WARN: "Extend Your Session" dialog still visible — continuing anyway');
         }
       };
 
@@ -491,8 +546,9 @@ async function extractCredentials() {
         }
         await _waitForCredentials();
       } else if (await openButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await _dismissExtendYourSessionDialog();
         console.error('INFO: Clicking Open Sandbox...');
-        await openButton.click();
+        await openButton.click({ force: true });
         await page.waitForTimeout(3000);
 
         // After Open, there might be a Start Sandbox button in the slide-over
@@ -526,8 +582,8 @@ async function extractCredentials() {
     throw error;
   } finally {
     if (_cdpBrowser) {
-      // CDP attach: detach only — leave the user's Chrome running with tabs intact.
-      try { await _cdpBrowser.disconnect(); } catch {}
+      // close() on a connectOverCDP browser detaches Playwright without closing Chrome.
+      try { await _cdpBrowser.close(); } catch {}
       console.error('INFO: Detached from Chrome CDP session.');
     } else if (browserContext) {
       await browserContext.close();
