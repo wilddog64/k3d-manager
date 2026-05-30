@@ -305,15 +305,16 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.4.12](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.12) | 2026-05-29 | imagePullSecrets patch for named ServiceAccounts (ghcr.io 401 fix), Makefile sync-branch/sync-main targets, ArgoCD ApplicationSets in make status, shopping-cart-payment ExternalSecret SharedResourceWarning fix |
 | [v1.4.11](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.11) | 2026-05-29 | ESO sync saturation fix, acg-down macOS Tahoe password prompt fix, data-layer StatefulSet race fix, Keycloak group-ldap-mapper reconciliation, ArgoCD RBAC product-catalog reference fix, legacy ArgoCD app definition removal |
 | [v1.4.10](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.10) | 2026-05-29 | ArgoCD stability, bootstrap reliability, /tmp cleanup |
-| [v1.4.9](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.9) | 2026-05-20 | Credential extraction and OIDC issuer fixes |
 
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.4.9](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.9) | 2026-05-20 | Credential extraction and OIDC issuer fixes |
 | [v1.4.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.2) | 2026-05-07 | `_ai_agent_review` generic dispatch + ArgoCD bootstrap hardening + lib-acg cdp.sh fixes — `launchctl bootout`, dead Linux else-block removal, configurable `ARGOCD_SERVER_WAIT_TIMEOUT`, Hub bootstrap refresh |
 | [v1.2.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.2.0) | 2026-04-30 | lib-acg extraction + shopping-cart bootstrap + GHCR hardening — ACG/GCP automation extracted to `scripts/lib/acg/` subtree; `deploy_shopping_cart_data()` in `acg-up`; Vault-first GHCR fail-closed; ArgoCD launchd port-forward; ApplicationSet branch var; Vault sealed-state recovery |
 | [v1.1.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.1.0) | 2026-04-24 | Unified ACG automation AWS + GCP — GCP provider (`k3s-gcp`), OAuth automation, CDP headless Linux, `bin/acg-sync-apps` port-forward hardening, Hub auto-create + bootstrap, provider-aware teardown |

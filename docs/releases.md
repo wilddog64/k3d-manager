@@ -2,6 +2,7 @@
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.4.12](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.12) | 2026-05-29 | imagePullSecrets patch for named ServiceAccounts (ghcr.io 401 fix), Makefile sync-branch/sync-main targets, ArgoCD ApplicationSets in make status, shopping-cart-payment ExternalSecret SharedResourceWarning fix |
 | [v1.4.11](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.11) | 2026-05-29 | ESO sync saturation fix, acg-down macOS Tahoe password prompt fix, data-layer StatefulSet race fix, Keycloak group-ldap-mapper reconciliation, ArgoCD RBAC product-catalog reference fix, legacy ArgoCD app definition removal |
 | [v1.4.10](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.10) | 2026-05-29 | ArgoCD stability, bootstrap reliability, /tmp cleanup |
 | [v1.4.9](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.9) | 2026-05-20 | Credential extraction and OIDC issuer fixes |
