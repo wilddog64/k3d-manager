@@ -66,11 +66,6 @@ PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 
 # load our library functions
 source "${SCRIPT_DIR}/lib/provider.sh"
-# Shared variable defaults (including OCI provider config).
-if [[ -r "${SCRIPT_DIR}/etc/vars.sh" ]]; then
-   # shellcheck disable=SC1091
-   source "${SCRIPT_DIR}/etc/vars.sh"
-fi
 # lib-foundation subtree — prefer subtree copy; fall back to local for transition
 if [[ -f "${SCRIPT_DIR}/lib/foundation/scripts/lib/system.sh" ]]; then
    source "${SCRIPT_DIR}/lib/foundation/scripts/lib/system.sh"

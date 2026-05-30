@@ -7,6 +7,14 @@
 #                     → deploy stable stack → smoke test
 #   destroy_cluster — deregister from ArgoCD; --destroy-infra also deletes OCI resources
 
+# load OCI variables
+_OCI_VARS="${SCRIPT_DIR}/etc/oci/vars.sh"
+if [[ ! -r "${_OCI_VARS}" ]]; then
+  _err "OCI vars file not found: ${_OCI_VARS}"
+fi
+# shellcheck source=/dev/null
+source "${_OCI_VARS}"
+
 _OCI_VCN_NAME="k3s-oci-vcn"
 _OCI_SUBNET_NAME="k3s-oci-subnet"
 _OCI_IGW_NAME="k3s-oci-igw"
