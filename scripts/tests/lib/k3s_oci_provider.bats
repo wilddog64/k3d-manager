@@ -101,17 +101,13 @@ _BOOTSTRAP='
     HOME=\"\$(mktemp -d)\"
     mkdir -p \"\${HOME}/.oci\"
     touch \"\${HOME}/.oci/config\"
-    # SSH key already exists to skip keygen
     mkdir -p \"\${HOME}/.ssh\"
     touch \"\${HOME}/.ssh/oci-k3s\"
     _OCI_SSH_KEY=\"\${HOME}/.ssh/oci-k3s\"
     _OCI_STATE_DIR=\"\${HOME}/.local/share/k3d-manager/oci\"
     unset OCI_COMPARTMENT_ID OCI_REGION OCI_AVAILABILITY_DOMAIN OCI_IMAGE_ID
-    # Pipe non-interactive input to avoid hanging on read prompts
     printf 'ocid1.compartment.oc1..test\nus-ashburn-1\nAD-1\n' | _oci_validate_prereqs
   "
-  # exits 0 because prompts are answered — state file written; IMAGE_ID resolution fails
-  # We only assert the prompts were consumed (no hang) and the state file was created
   [[ "$output" != *"brew install oci-cli"* ]]
 }
 
@@ -136,44 +132,395 @@ _BOOTSTRAP='
 }
 
 # ---------------------------------------------------------------------------
-# _provider_k3s_oci_deploy_cluster — step sequencing (stubbed)
+# _provider_k3s_oci_deploy_cluster — step sequencing (two-node, stubbed)
 # ---------------------------------------------------------------------------
 
-@test "_provider_k3s_oci_deploy_cluster calls steps in order" {
+@test "_provider_k3s_oci_deploy_cluster calls all ten steps in order" {
   run bash -c "
     ${_BOOTSTRAP}
-    _oci_validate_prereqs()       { echo '[1] validate_prereqs'; return 0; }
-    _oci_provision_infrastructure() { echo '[2] provision_infra'; return 0; }
-    _oci_get_instance_ip()        { echo '1.2.3.4'; }
-    _oci_wait_ssh()               { echo '[3] wait_ssh'; return 0; }
-    _oci_install_k3s()            { echo '[4] install_k3s'; return 0; }
-    _oci_fetch_kubeconfig()       { echo '[5] fetch_kubeconfig'; return 0; }
-    _oci_register_cluster()       { echo '[6] register_cluster'; return 0; }
-    _oci_wait_argocd()            { echo '[7] wait_argocd'; return 0; }
-    _oci_bootstrap_argocd()       { echo '[8] bootstrap_argocd'; return 0; }
-    _oci_smoke_test()             { echo '[9] smoke_test'; return 0; }
+    _oci_validate_prereqs()          { echo '[1] validate_prereqs'; return 0; }
+    _oci_provision_infrastructure()  { echo '[2] provision_infra'; return 0; }
+    _oci_get_server_ip()             { echo '1.2.3.4'; }
+    _oci_get_agent_ip()              { echo '1.2.3.5'; }
+    _oci_wait_ssh()                  { echo \"[wait_ssh] \$1\"; return 0; }
+    _oci_install_k3s_server()        { echo '[3] install_k3s_server'; return 0; }
+    _oci_install_cilium()            { echo '[4] install_cilium'; return 0; }
+    _oci_install_k3s_agent()         { echo '[5] install_k3s_agent'; return 0; }
+    _oci_fetch_kubeconfig()          { echo '[6] fetch_kubeconfig'; return 0; }
+    _oci_register_cluster()          { echo '[7] register_cluster'; return 0; }
+    _oci_wait_argocd()               { echo '[8] wait_argocd'; return 0; }
+    _oci_bootstrap_argocd()          { echo '[9] bootstrap_argocd'; return 0; }
+    _oci_smoke_test()                { echo '[10] smoke_test'; return 0; }
     _provider_k3s_oci_deploy_cluster
   "
   [ "$status" -eq 0 ]
   [[ "$output" == *"[1] validate_prereqs"* ]]
   [[ "$output" == *"[2] provision_infra"* ]]
-  [[ "$output" == *"[3] wait_ssh"* ]]
-  [[ "$output" == *"[4] install_k3s"* ]]
-  [[ "$output" == *"[5] fetch_kubeconfig"* ]]
-  [[ "$output" == *"[6] register_cluster"* ]]
-  [[ "$output" == *"[7] wait_argocd"* ]]
-  [[ "$output" == *"[8] bootstrap_argocd"* ]]
-  [[ "$output" == *"[9] smoke_test"* ]]
+  [[ "$output" == *"[3] install_k3s_server"* ]]
+  [[ "$output" == *"[4] install_cilium"* ]]
+  [[ "$output" == *"[5] install_k3s_agent"* ]]
+  [[ "$output" == *"[6] fetch_kubeconfig"* ]]
+  [[ "$output" == *"[7] register_cluster"* ]]
+  [[ "$output" == *"[8] wait_argocd"* ]]
+  [[ "$output" == *"[9] bootstrap_argocd"* ]]
+  [[ "$output" == *"[10] smoke_test"* ]]
 }
 
 @test "_provider_k3s_oci_deploy_cluster aborts when validate_prereqs fails" {
   run bash -c "
     ${_BOOTSTRAP}
-    _oci_validate_prereqs()         { return 1; }
-    _oci_provision_infrastructure() { echo '[stub] should not run'; return 0; }
-    _oci_get_instance_ip()          { echo '1.2.3.4'; }
+    _oci_validate_prereqs()          { return 1; }
+    _oci_provision_infrastructure()  { echo '[stub] should not run'; return 0; }
+    _oci_get_server_ip()             { echo '1.2.3.4'; }
     _provider_k3s_oci_deploy_cluster
   "
   [ "$status" -ne 0 ]
   [[ "$output" != *"[stub] should not run"* ]]
+}
+
+@test "_provider_k3s_oci_deploy_cluster aborts when install_cilium fails" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _oci_validate_prereqs()          { return 0; }
+    _oci_provision_infrastructure()  { return 0; }
+    _oci_get_server_ip()             { echo '1.2.3.4'; }
+    _oci_get_agent_ip()              { echo '1.2.3.5'; }
+    _oci_wait_ssh()                  { return 0; }
+    _oci_install_k3s_server()        { return 0; }
+    _oci_install_cilium()            { return 1; }
+    _oci_install_k3s_agent()         { echo '[stub] should not run'; return 0; }
+    _provider_k3s_oci_deploy_cluster
+  "
+  [ "$status" -ne 0 ]
+  [[ "$output" != *"[stub] should not run"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# _oci_provision_instance — idempotent skip + first launch
+# ---------------------------------------------------------------------------
+
+@test "_oci_provision_instance skips launch when instance already running" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    OCI_COMPARTMENT_ID='ocid1.compartment.test'
+    OCI_AVAILABILITY_DOMAIN='AD-1'
+    oci() {
+      if [[ \"\$*\" == *'lifecycle-state RUNNING'* ]]; then
+        echo 'ocid1.instance.existing'
+        return 0
+      fi
+      echo 'null'
+      return 0
+    }
+    result=\$(_oci_provision_instance 'k3s-oci-server' 'ocid1.subnet.test')
+    [[ \"\${result}\" == 'ocid1.instance.existing' ]] || exit 1
+    echo 'idempotent-ok'
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"idempotent-ok"* ]]
+  [[ "$output" == *"already running"* ]]
+}
+
+@test "_oci_provision_instance launches instance when not running" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    OCI_COMPARTMENT_ID='ocid1.compartment.test'
+    OCI_AVAILABILITY_DOMAIN='AD-1'
+    OCI_IMAGE_ID='ocid1.image.test'
+    _OCI_INSTANCE_SHAPE='VM.Standard.A1.Flex'
+    _OCI_OCPUS=2
+    _OCI_MEMORY_GB=12
+    _OCI_SSH_KEY=\"\$(mktemp)\"
+    touch \"\${_OCI_SSH_KEY}.pub\"
+    _launch_count=0
+    oci() {
+      # list call — not running
+      if [[ \"\$*\" == *'lifecycle-state RUNNING'* ]]; then echo 'null'; return 0; fi
+      # launch call — return new ID
+      if [[ \"\$*\" == *'instance launch'* ]]; then
+        echo 'ocid1.instance.new'
+        return 0
+      fi
+      # wait for RUNNING state
+      if [[ \"\$*\" == *'instance get'* ]]; then return 0; fi
+      return 0
+    }
+    result=\$(_oci_provision_instance 'k3s-oci-server' 'ocid1.subnet.test')
+    [[ \"\${result}\" == 'ocid1.instance.new' ]] || exit 1
+    echo 'launch-ok'
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"launch-ok"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# _oci_provision_infrastructure — writes both state files
+# ---------------------------------------------------------------------------
+
+@test "_oci_provision_infrastructure writes server-instance-id and agent-instance-id" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _state=\"\$(mktemp -d)\"
+    _OCI_STATE_DIR=\"\${_state}\"
+    OCI_COMPARTMENT_ID='ocid1.compartment.test'
+    OCI_AVAILABILITY_DOMAIN='AD-1'
+    OCI_IMAGE_ID='ocid1.image.test'
+    OCI_REGION='us-ashburn-1'
+    oci() {
+      # All oci network/vcn/subnet/seclist calls
+      if [[ \"\$*\" == *'vcn list'* || \"\$*\" == *'internet-gateway list'* || \"\$*\" == *'security-list list'* || \"\$*\" == *'subnet list'* ]]; then
+        echo 'ocid1.existing.test'; return 0
+      fi
+      if [[ \"\$*\" == *'route-table list'* ]]; then echo 'ocid1.rt.test'; return 0; fi
+      if [[ \"\$*\" == *'route-table update'* ]]; then return 0; fi
+      echo 'null'; return 0
+    }
+    _oci_provision_instance() {
+      local _name=\"\$1\"
+      if [[ \"\${_name}\" == *'server'* ]]; then echo 'ocid1.instance.server'; return 0; fi
+      if [[ \"\${_name}\" == *'agent'* ]];  then echo 'ocid1.instance.agent';  return 0; fi
+    }
+    _oci_provision_infrastructure
+    [[ \"\$(cat \"\${_state}/server-instance-id\")\" == 'ocid1.instance.server' ]] || exit 1
+    [[ \"\$(cat \"\${_state}/agent-instance-id\")\"  == 'ocid1.instance.agent'  ]] || exit 1
+    echo 'both-state-files-written'
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"both-state-files-written"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# _oci_install_k3s_server — idempotent skip + flannel flags
+# ---------------------------------------------------------------------------
+
+@test "_oci_install_k3s_server skips when k3s already installed" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_USER='ubuntu'
+    ssh() {
+      if [[ \"\$*\" == *'command -v k3s'* ]]; then return 0; fi
+      return 1
+    }
+    _oci_install_k3s_server '1.2.3.4'
+    echo 'skip-ok'
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"skip-ok"* ]]
+  [[ "$output" == *"already installed"* ]]
+}
+
+@test "_oci_install_k3s_server sends --flannel-backend=none and --disable-network-policy" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _CMD_LOG=\"\$(mktemp)\"
+    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_USER='ubuntu'
+    OCI_REGION='us-ashburn-1'
+    _OCI_K3S_VERSION='v1.32.0+k3s1'
+    ssh() {
+      local _args=\"\$*\"
+      echo \"\${_args}\" >> \"\${_CMD_LOG}\"
+      if [[ \"\${_args}\" == *'command -v k3s'* ]]; then return 1; fi
+      if [[ \"\${_args}\" == *'kubectl get nodes'* ]]; then return 0; fi
+      return 0
+    }
+    _oci_install_k3s_server '1.2.3.4'
+    grep -q -- '--flannel-backend=none' \"\${_CMD_LOG}\" || exit 1
+    grep -q -- '--disable-network-policy' \"\${_CMD_LOG}\" || exit 1
+    echo 'flannel-flags-ok'
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"flannel-flags-ok"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# _oci_install_cilium — idempotent skip + cni.exclusive=false
+# ---------------------------------------------------------------------------
+
+@test "_oci_install_cilium skips when Cilium already installed" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_USER='ubuntu'
+    _OCI_STATE_DIR=\"\$(mktemp -d)\"
+    echo 'ocid1.instance.server' > \"\${_OCI_STATE_DIR}/server-instance-id\"
+    ssh() {
+      if [[ \"\$*\" == *'helm status cilium'* ]]; then return 0; fi
+      return 1
+    }
+    OCI_COMPARTMENT_ID='test'
+    oci() { echo '10.0.0.5'; return 0; }
+    _oci_install_cilium '1.2.3.4'
+    echo 'skip-ok'
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"skip-ok"* ]]
+  [[ "$output" == *"already installed"* ]]
+}
+
+@test "_oci_install_cilium includes cni.exclusive=false and kubeProxyReplacement=true" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _CMD_LOG=\"\$(mktemp)\"
+    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_USER='ubuntu'
+    _OCI_CILIUM_VERSION='1.16.5'
+    _oci_get_server_private_ip() { echo '10.0.0.5'; }
+    ssh() {
+      local _args=\"\$*\"
+      echo \"\${_args}\" >> \"\${_CMD_LOG}\"
+      if [[ \"\${_args}\" == *'helm status cilium'* ]]; then return 1; fi
+      if [[ \"\${_args}\" == *'rollout status daemonset/cilium'* ]]; then return 0; fi
+      return 0
+    }
+    _oci_install_cilium '1.2.3.4'
+    grep -q 'cni.exclusive=false' \"\${_CMD_LOG}\" || exit 1
+    grep -q 'kubeProxyReplacement=true' \"\${_CMD_LOG}\" || exit 1
+    echo 'cilium-flags-ok'
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"cilium-flags-ok"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# _oci_install_k3s_agent — idempotent skip + private IP + 2-node wait
+# ---------------------------------------------------------------------------
+
+@test "_oci_install_k3s_agent skips when k3s-agent already active" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_USER='ubuntu'
+    ssh() {
+      if [[ \"\$*\" == *'systemctl is-active k3s-agent'* ]]; then return 0; fi
+      return 1
+    }
+    _oci_install_k3s_agent '1.2.3.99' '1.2.3.4'
+    echo 'skip-ok'
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"skip-ok"* ]]
+  [[ "$output" == *"already running"* ]]
+}
+
+@test "_oci_install_k3s_agent joins via server private IP, not public IP" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _CMD_LOG=\"\$(mktemp)\"
+    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_USER='ubuntu'
+    OCI_REGION='us-ashburn-1'
+    _OCI_K3S_VERSION='v1.32.0+k3s1'
+    _oci_get_server_private_ip() { echo '10.0.0.5'; }
+    ssh() {
+      local _args=\"\$*\"
+      echo \"\${_args}\" >> \"\${_CMD_LOG}\"
+      if [[ \"\${_args}\" == *'systemctl is-active k3s-agent'* ]]; then return 1; fi
+      if [[ \"\${_args}\" == *'node-token'* ]]; then echo 'K1030abc::server:secret'; return 0; fi
+      if [[ \"\${_args}\" == *'grep -c'* ]]; then echo '2'; return 0; fi
+      return 0
+    }
+    _oci_install_k3s_agent '1.2.3.99' '1.2.3.4'
+    grep -q \"K3S_URL='https://10.0.0.5:6443'\" \"\${_CMD_LOG}\" || exit 1
+    grep -q \"K3S_URL='https://1.2.3.4:6443'\" \"\${_CMD_LOG}\" && exit 1 || true
+    echo 'private-ip-ok'
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"private-ip-ok"* ]]
+}
+
+@test "_oci_install_k3s_agent wait loop counts Ready nodes (not grep -v master)" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _CMD_LOG=\"\$(mktemp)\"
+    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_USER='ubuntu'
+    OCI_REGION='us-ashburn-1'
+    _OCI_K3S_VERSION='v1.32.0+k3s1'
+    _oci_get_server_private_ip() { echo '10.0.0.5'; }
+    ssh() {
+      local _args=\"\$*\"
+      echo \"\${_args}\" >> \"\${_CMD_LOG}\"
+      if [[ \"\${_args}\" == *'systemctl is-active k3s-agent'* ]]; then return 1; fi
+      if [[ \"\${_args}\" == *'node-token'* ]]; then echo 'K1030abc::server:secret'; return 0; fi
+      if [[ \"\${_args}\" == *'grep -c'* ]]; then echo '2'; return 0; fi
+      return 0
+    }
+    _oci_install_k3s_agent '1.2.3.99' '1.2.3.4'
+    grep -q 'grep -v master' \"\${_CMD_LOG}\" && exit 1 || true
+    grep -q 'grep -c' \"\${_CMD_LOG}\" || exit 1
+    echo 'wait-loop-ok'
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"wait-loop-ok"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# _oci_smoke_test — node count + Cilium DaemonSet
+# ---------------------------------------------------------------------------
+
+@test "_oci_smoke_test fails when fewer than 2 nodes are Ready" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _OCI_KUBECONFIG='/dev/null'
+    kubectl() {
+      local _cmd=\"\$*\"
+      if [[ \"\${_cmd}\" == *'get namespace'* ]]; then echo 'Active'; return 0; fi
+      if [[ \"\${_cmd}\" == *'get pods'* ]]; then echo 'argocd-server Running'; return 0; fi
+      if [[ \"\${_cmd}\" == *'get nodes'* ]]; then
+        printf 'k3s-oci-server   Ready\n'
+        return 0
+      fi
+      if [[ \"\${_cmd}\" == *'rollout status'* ]]; then return 0; fi
+      return 0
+    }
+    _oci_smoke_test
+  "
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"expected 2 nodes Ready"* ]]
+}
+
+@test "_oci_smoke_test fails when Cilium DaemonSet is not ready" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _OCI_KUBECONFIG='/dev/null'
+    kubectl() {
+      local _cmd=\"\$*\"
+      if [[ \"\${_cmd}\" == *'get namespace'* ]]; then echo 'Active'; return 0; fi
+      if [[ \"\${_cmd}\" == *'get pods'* ]]; then echo 'argocd-server Running'; return 0; fi
+      if [[ \"\${_cmd}\" == *'get nodes'* ]]; then
+        printf 'k3s-oci-server   Ready\nk3s-oci-agent   Ready\n'
+        return 0
+      fi
+      if [[ \"\${_cmd}\" == *'rollout status'*'cilium'* ]]; then return 1; fi
+      return 0
+    }
+    _oci_smoke_test
+  "
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"cilium"* ]]
+}
+
+# ---------------------------------------------------------------------------
+# _oci_destroy_infrastructure — terminates both instances
+# ---------------------------------------------------------------------------
+
+@test "_oci_destroy_infrastructure terminates both server and agent instances" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _state=\"\$(mktemp -d)\"
+    _OCI_STATE_DIR=\"\${_state}\"
+    printf '%s' 'ocid1.instance.server' > \"\${_state}/server-instance-id\"
+    printf '%s' 'ocid1.instance.agent'  > \"\${_state}/agent-instance-id\"
+    _OCI_LOG=\"\$(mktemp)\"
+    OCI_COMPARTMENT_ID='ocid1.compartment.test'
+    oci() { echo \"\$*\" >> \"\${_OCI_LOG}\"; return 0; }
+    _oci_destroy_infrastructure
+    grep -q 'ocid1.instance.server' \"\${_OCI_LOG}\" || exit 1
+    grep -q 'ocid1.instance.agent'  \"\${_OCI_LOG}\" || exit 1
+    echo 'both-terminated'
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"both-terminated"* ]]
 }

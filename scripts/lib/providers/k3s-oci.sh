@@ -551,7 +551,8 @@ function _oci_install_k3s_agent() {
 
   # Wait for agent node to appear in server's node list
   local _attempts=0
-  until ${_server_ssh} "kubectl get nodes --no-headers 2>/dev/null | grep -v master | grep -q ' Ready'" 2>/dev/null; do
+  # shellcheck disable=SC2016
+  until ${_server_ssh} 'c=$(kubectl get nodes --no-headers 2>/dev/null | grep -c " Ready"); (( c >= 2 ))' 2>/dev/null; do
     (( _attempts++ ))
     if (( _attempts >= 24 )); then
       _err "[k3s-oci] k3s agent node not Ready after 2 min"
