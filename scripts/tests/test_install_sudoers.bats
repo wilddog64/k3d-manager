@@ -21,8 +21,8 @@ setup() {
   [[ "$output" == *"Syntax OK"* ]]
 }
 
-@test "sudoers content includes k3d-manager-update-hosts NOPASSWD rule" {
-  run grep -F 'NOPASSWD: /usr/local/bin/k3d-manager-update-hosts' bin/install-sudoers.sh
+@test "sudoers content includes launchctl NOPASSWD rule" {
+  run grep -F 'NOPASSWD: /bin/launchctl bootstrap system /Library/LaunchDaemons/com.k3d-manager.*.plist' bin/install-sudoers.sh
   [ "$status" -eq 0 ]
 }
 
