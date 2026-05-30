@@ -60,6 +60,9 @@ setup() {
 @test "_argocd_ensure_logged_in uses plaintext non-interactive login" {
   : > "$KUBECTL_LOG"
   : > "$ARGOCD_LOG"
+  curl() { return 1; }
+  sleep() { :; }
+  export -f curl sleep
   run _argocd_ensure_logged_in
   [ "$status" -eq 0 ]
   read_lines "$KUBECTL_LOG" kubectl_calls

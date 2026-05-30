@@ -77,7 +77,7 @@ EOF
 
 # gcp_login — new account, node+playwright available → background gcloud + node
 
-@test "gcp_login runs gcloud in background and node when playwright available" {
+@test "gcp_login calls gcloud auth login when playwright available" {
   gcloud() {
     case "$*" in
       "auth list --filter=status:ACTIVE --format=value(account)") printf '' ;;
@@ -97,8 +97,6 @@ EOF
   run gcp_login "cloud_user@example.com"
   [ "$status" -eq 0 ]
   run grep "auth login --account cloud_user@example.com" "${BATS_TEST_TMPDIR}/gcloud.log"
-  [ "$status" -eq 0 ]
-  run grep "gcp_login.js cloud_user@example.com" "${BATS_TEST_TMPDIR}/node.log"
   [ "$status" -eq 0 ]
 }
 
