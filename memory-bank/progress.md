@@ -6,6 +6,9 @@
 ## Status (v1.5.0 — IN PROGRESS)
 - **SPEC WRITTEN:** platform-helm multi-env ArgoCD — `docs/plans/v1.5.0-platform-helm-argocd-multi-env.md`; 2 files: `platform-helm.yaml` (dev/infra/prod generators + per-cluster labels), `register_app_cluster` (add `argocd-chart-version`/`argocd-replicas` labels); prerequisite for OCI provider
 
+## Milestone: v1.8.0 (Self-Healing)
+- **SPEC WRITTEN:** Alertmanager → k3dm-webhook self-healing — `docs/plans/v1.8.0-self-healing-alertmanager-webhook.md`; 5 handlers (VaultSealed, ArgoCDAppOutOfSync, ESOSecretStale, PodCrashLooping, ACGClusterUnreachable); cooldown per (alert, cluster); Alertmanager webhook receiver config; PrometheusRule CRDs; gates on v1.6.0 (webhook) + v1.7.0 (monitoring)
+
 ## Milestone: v1.7.0 (Observability — OCI)
 - **SPEC WRITTEN:** Prometheus + Grafana on OCI — `docs/plans/v1.7.0-observability-oci.md`; kube-prometheus-stack on OCI (ARM64, 1 replica); Prometheus agent mode on laptop + ACG with remote_write to OCI; Grafana via `grafana.3ai-talk.org` Cloudflare tunnel; gates on OCI cluster live (v1.5.0). Decision: monitoring on OCI outlives laptop reboots.
 
