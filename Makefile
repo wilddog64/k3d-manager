@@ -7,7 +7,7 @@ URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL ?= 0
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision sudoers help
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision sudoers help oci-status oci-provision oci-teardown oci-teardown-infra
 
 ## Provision full stack: credentials → cluster → ESO → ArgoCD
 up:
@@ -90,6 +90,24 @@ ssm:
 ## Provision ACG CloudFormation stack with SSM support (credentials → acg_provision)
 provision: ssm
 	K3S_AWS_SSM_ENABLED=true scripts/k3d-manager acg_provision --confirm
+
+## OCI cluster status
+oci-status:
+	@CLUSTER_PROVIDER=k3s-oci KUBECONFIG=$(HOME)/.kube/k3s-oci.yaml \
+	  kubectl get nodes,pods -A --no-headers 2>/dev/null \
+	  || echo "OCI cluster unreachable"
+
+## Provision OCI Always Free ARM64 k3s cluster
+oci-provision:
+	CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager deploy_cluster
+
+## Tear down OCI cluster only (preserve infrastructure by default)
+oci-teardown:
+	CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster
+
+## Tear down OCI cluster and infrastructure
+oci-teardown-infra:
+	CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster --destroy-infra
 
 ## Install passwordless sudo rules for k3d-manager macOS host operations (one-time setup)
 sudoers:

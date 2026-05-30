@@ -779,7 +779,7 @@ EOF
    fi
 
    case "$provider" in
-      k3d|orbstack|k3s|k3s-aws|k3s-gcp)
+      k3d|orbstack|k3s|k3s-aws|k3s-gcp|k3s-oci)
          ;;
       "")
          _err "Failed to determine cluster provider."
