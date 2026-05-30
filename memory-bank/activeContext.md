@@ -65,6 +65,7 @@ Deploy OCI with stable main BEFORE any v1.6.0+ work. Sequence:
 - **Observability → OCI, not laptop** — Prometheus + Grafana run on OCI so monitoring survives laptop reboots. Laptop/ACG use Prometheus agent mode with remote_write to OCI. Grafana exposed via `grafana.3ai-talk.org` Cloudflare tunnel. Spec: `docs/plans/v1.7.0-observability-oci.md`. Implementation gates on OCI cluster live (v1.5.0).
 
 ## In Progress (v1.5.0)
+- **ASSIGNED TO CODEX:** ArgoCD sync before redis deploy — spec: `docs/bugs/v1.5.0-bugfix-deploy-data-layer-argocd-sync-before-redis.md` (commit `e0a74abe` on `k3d-manager-v1.5.0`); adds `argocd app sync data-layer --wait` before `kubectl apply -f redis/cart/` in `deploy_shopping_cart_data()` to prevent ESO race on fresh sandbox
 - **ASSIGNED TO CODEX:** Passwordless sudo for macOS host operations — spec: `docs/plans/v1.5.0-sudo-passwordless.md` (commit `01d27232` on `k3d-manager-v1.5.0`); deliverables: `bin/install-sudoers.sh` (new), `sudo -v` prewarm in `bin/acg-up/down/refresh`, `Makefile` `sudoers` target, `docs/howto/makefile.md` Host Setup section, `scripts/tests/test_install_sudoers.bats`; commit message: `feat(sudo): passwordless sudo rules + prewarm for macOS host operations`
 
 ## Pending — Next Release Cycle
