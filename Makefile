@@ -1,8 +1,9 @@
-# Makefile — k3d-manager ACG cluster lifecycle shortcuts
-# Usage: make [target] [URL=https://...]
+# Makefile — k3d-manager cluster lifecycle (provider-aware)
+# Usage: make [target] [CLUSTER_PROVIDER=k3s-aws|k3s-gcp|k3s-oci] [URL=https://...]
 
 .DEFAULT_GOAL := help
 
+CLUSTER_PROVIDER ?= k3s-aws
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL    ?= 0
@@ -10,27 +11,41 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision help
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers cloudflared-backup alertmanager-secret test help observability observability-acg observability-status vuln-scan show-service-passwords
 
-## Provision full stack: credentials → cluster → ESO → ArgoCD
+## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
-	@echo "[make] Running bin/acg-up..."
-	@GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)"
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-oci) mkdir -p "$(HOME)/.local/share/k3d-manager/logs" && \
+	           CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager deploy_cluster --confirm 2>&1 | \
+	           tee "$(HOME)/.local/share/k3d-manager/logs/k3s-oci-up.log" ;; \
+	  *)       GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)" ;; \
+	esac
+	@$(MAKE) --no-print-directory observability
 
-## Tear down remote cluster and stop background processes (local Hub deleted by default)
-## Set KEEP_LOCAL=1 to preserve the local Hub cluster: make down KEEP_LOCAL=1
+## Tear down cluster (k3s-oci → destroy_cluster; others → bin/acg-down)
+## Set KEEP_LOCAL=1 to preserve the local Hub cluster (k3s-aws/k3s-gcp only)
 down:
-	bin/acg-down --confirm $(if $(filter 1,$(KEEP_LOCAL)),--keep-hub,)
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster ;; \
+	  *)       bin/acg-down --confirm $(if $(filter 1,$(KEEP_LOCAL)),--keep-hub,) ;; \
+	esac
 
-## Refresh AWS credentials and restart tunnel (use when creds expire)
+## Refresh credentials and restart tunnel (k3s-aws/k3s-gcp only)
 refresh:
 	bin/acg-refresh "$(URL)"
 
 ## Show cluster nodes, pod status, tunnel health
 status:
-	APP_CONTEXT=$(if $(filter k3s-gcp,$(CLUSTER_PROVIDER)),ubuntu-gcp,ubuntu-k3s) CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) bin/acg-status
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-oci) CLUSTER_PROVIDER=k3s-oci KUBECONFIG=$(HOME)/.kube/k3s-oci.yaml \
+	             kubectl get nodes,pods -A --no-headers 2>/dev/null \
+	             || echo "OCI cluster unreachable" ;; \
+	  k3s-gcp) APP_CONTEXT=ubuntu-gcp CLUSTER_PROVIDER=k3s-gcp bin/acg-status ;; \
+	  *)       APP_CONTEXT=ubuntu-k3s CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) bin/acg-status ;; \
+	esac
 
-## Extract AWS credentials only (no cluster changes)
+## Extract AWS credentials only (no cluster changes; k3s-aws only)
 creds:
 	scripts/k3d-manager acg_get_credentials "$(URL)"
 
@@ -42,7 +57,7 @@ chrome-cdp:
 chrome-cdp-stop:
 	scripts/k3d-manager acg_chrome_cdp_uninstall
 
-## Re-register ubuntu-k3s app cluster with ArgoCD (use after sandbox recreation or IP change)
+## Re-register ubuntu-k3s app cluster with ArgoCD (after sandbox recreation or IP change)
 argocd-registration:
 	@_token=$$(kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s \
 	  -o jsonpath='{.data.token}' 2>/dev/null | base64 -d | tr -d '\n'); \
@@ -117,22 +132,107 @@ ssm:
 	  exit 1; \
 	fi
 
-## Provision ACG CloudFormation stack with SSM support (credentials → acg_provision)
+## Provision ACG CloudFormation stack with SSM support (k3s-aws only)
 provision: ssm
 	K3S_AWS_SSM_ENABLED=true scripts/k3d-manager acg_provision --confirm
+
+## Install passwordless sudo rules for k3d-manager macOS host operations (one-time setup)
+install-sudoers:
+	bin/install-sudoers.sh
+
+## Backup Cloudflare tunnel credentials to macOS Keychain + Vault (run after rotating credentials)
+cloudflared-backup:
+	@_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
+	  -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
+	_creds=$$(cat "$$HOME/.cloudflared/bb7ece59-8680-4310-9437-232f862e2773.json"); \
+	_cert=$$(cat "$$HOME/.cloudflared/cert.pem"); \
+	security add-generic-password -a cloudflared -s k3d-manager-cloudflared-credentials -w "$$_creds" -U && \
+	security add-generic-password -a cloudflared -s k3d-manager-cloudflared-cert -w "$$_cert" -U && \
+	echo "[cloudflared-backup] Keychain updated" && \
+	curl -sf -X POST \
+	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
+	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/cloudflared" \
+	  -d "$$(python3 -c "import json,sys; print(json.dumps({'data':{'credentials_json':sys.argv[1],'cert_pem':sys.argv[2],'tunnel_id':'bb7ece59-8680-4310-9437-232f862e2773','tunnel_name':'k3d-manager'}}))" "$$_creds" "$$_cert")" >/dev/null && \
+	echo "[cloudflared-backup] Vault updated"
+
+## Show all service login credentials (Hub k3d cluster must be running)
+show-service-passwords:
+	@echo ""
+	@echo "  === Service Credentials ==="
+	@echo ""
+	@_argocd=$$(kubectl get secret argocd-initial-admin-secret -n cicd \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 -d); \
+	echo "  ArgoCD      https://argocd.3ai-talk.org";\
+	echo "    user:     admin";\
+	echo "    password: $${_argocd:-N/A}";\
+	echo ""
+	@_grafana=$$(kubectl get secret kube-prometheus-stack-grafana -n monitoring \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d); \
+	echo "  Grafana     https://grafana.3ai-talk.org";\
+	echo "    user:     admin";\
+	echo "    password: $${_grafana:-N/A}";\
+	echo ""
+	@echo "  Prometheus  https://prometheus.3ai-talk.org";\
+	echo "    (no login required)";\
+	echo ""
+	@_kc=$$(kubectl get secret keycloak-secrets -n identity \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.KEYCLOAK_ADMIN_PASSWORD}' 2>/dev/null | base64 -d); \
+	echo "  Frontend    https://frontend.3ai-talk.org  (login via Keycloak SSO)";\
+	echo "  Keycloak    https://keycloak.3ai-talk.org";\
+	echo "    admin user:     admin / $${_kc:-N/A}";\
+	echo "    dev users:      alice / test1234  |  developer / test1234  |  operator / test1234";\
+	echo ""
+
+## Store Alertmanager credentials in Vault (run once; requires Hub Vault + port-forward)
+alertmanager-secret:
+	@_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
+	  -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
+	read -r -p "Gmail from address: " _gmail; \
+	read -r -s -p "Gmail app password: " _pw; echo; \
+	read -r -p "T-Mobile SMS gateway (10digits@tmomail.net): " _sms; \
+	curl -sf -X POST \
+	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
+	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager" \
+	  -d "$$(python3 -c "import json,sys; \
+	    print(json.dumps({'data':{'gmail_from':sys.argv[1],'gmail_app_pw':sys.argv[2],'sms_gateway':sys.argv[3]}}))" \
+	    "$$_gmail" "$$_pw" "$$_sms")" >/dev/null && \
+	echo "[alertmanager-secret] Credentials stored in Vault"
+
+## Deploy observability stack (Prometheus+Grafana+Trivy) to Hub k3d
+observability:
+	./scripts/k3d-manager deploy_observability --confirm
+
+## Deploy observability stack (Prometheus+Trivy) to ACG ubuntu-k3s
+observability-acg:
+	./scripts/k3d-manager deploy_observability_acg --confirm
+
+## Show pod status for monitoring/trivy-system on both clusters
+observability-status:
+	./scripts/k3d-manager observability_status
+
+## Print VulnerabilityReport summary for both clusters
+vuln-scan:
+	./scripts/k3d-manager trivy_scan_report
+
+## Run all BATS test suites
+test:
+	./scripts/k3d-manager test all
 
 ## Show this help
 help:
 	@echo ""
-	@echo "  k3d-manager — ACG cluster lifecycle"
+	@echo "  k3d-manager — cluster lifecycle"
 	@echo ""
-	@echo "  Targets:"
-	@echo "    make up        Provision full stack (credentials → cluster → ESO → ArgoCD)"
-	@echo "    make down          Tear down remote cluster; local Hub deleted by default (set KEEP_LOCAL=1 to preserve Hub)"
-	@echo "    make refresh   Refresh AWS credentials and restart tunnel"
-	@echo "    make status    Show cluster nodes, pod status, tunnel health"
-	@echo "    make creds     Extract AWS credentials only"
-	@echo "    make chrome-cdp        Install Chrome CDP launchd agent (enables automated credentials)"
+	@echo "  Targets (set CLUSTER_PROVIDER=k3s-aws|k3s-gcp|k3s-oci; default: k3s-aws):"
+	@echo "    make up            Provision full stack"
+	@echo "    make down          Tear down cluster (set KEEP_LOCAL=1 to preserve Hub on k3s-aws/gcp)"
+	@echo "    make status        Show cluster nodes and pod status"
+	@echo "    make test          Run all BATS test suites"
+	@echo ""
+	@echo "  k3s-aws / k3s-gcp only:"
+	@echo "    make refresh       Refresh credentials and restart tunnel"
+	@echo "    make creds         Extract AWS credentials only"
+	@echo "    make chrome-cdp    Install Chrome CDP launchd agent (automated credentials)"
 	@echo "    make chrome-cdp-stop   Uninstall Chrome CDP launchd agent"
 	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
@@ -140,8 +240,22 @@ help:
 	@echo "    make sync-main             Revert services-git to main and refresh"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
 	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
+	@echo "    make install-sudoers       Install passwordless sudo rules (one-time macOS setup)"
 	@echo ""
-	@echo "  Override sandbox URL (falls back to default if omitted):"
+	@echo "  Observability / credentials:"
+	@echo "    make observability              Deploy Prometheus+Grafana+Trivy to Hub k3d"
+	@echo "    make observability-acg          Deploy Prometheus+Trivy to ACG ubuntu-k3s"
+	@echo "    make observability-status       Show monitoring pod status on both clusters"
+	@echo "    make vuln-scan                  Print VulnerabilityReport summary"
+	@echo "    make show-service-passwords     Show all service login credentials"
+	@echo "    make alertmanager-secret        Store Alertmanager Gmail+SMS creds in Vault (run once)"
+	@echo "    make cloudflared-backup         Backup Cloudflare tunnel creds to Keychain+Vault"
+	@echo ""
+	@echo "  Examples:"
+	@echo "    make up                                          # k3s-aws (default)"
+	@echo "    make up CLUSTER_PROVIDER=k3s-gcp"
+	@echo "    make up CLUSTER_PROVIDER=k3s-oci"
+	@echo "    make down CLUSTER_PROVIDER=k3s-oci"
 	@echo "    make up URL=https://app.pluralsight.com/hands-on/playground/cloud-sandboxes/..."
 	@echo ""
 	@echo "  Default URL: $(URL)"

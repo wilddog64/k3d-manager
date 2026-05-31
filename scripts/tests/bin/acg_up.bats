@@ -64,6 +64,8 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *"Wiring ArgoCD SSO"* ]]
 
+
+
   run grep -nF 'realm import is required for SSO and cannot be skipped' bin/acg-up
   [ "$status" -eq 0 ]
   [[ "$output" == *"realm import is required for SSO and cannot be skipped"* ]]

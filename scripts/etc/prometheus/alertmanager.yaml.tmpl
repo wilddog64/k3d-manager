@@ -1,0 +1,33 @@
+global:
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: '${ALERTMANAGER_GMAIL_FROM}'
+  smtp_auth_username: '${ALERTMANAGER_GMAIL_FROM}'
+  smtp_auth_password: '${ALERTMANAGER_GMAIL_APP_PW}'
+  smtp_require_tls: true
+
+route:
+  receiver: 'null'
+  group_wait: 5m
+  group_interval: 2h
+  repeat_interval: 24h
+  routes:
+    - matchers:
+        - severity = critical
+      receiver: sms-critical
+
+receivers:
+  - name: 'null'
+  - name: sms-critical
+    email_configs:
+      - to: '${ALERTMANAGER_SMS_GATEWAY}'
+        send_resolved: false
+        headers:
+          Subject: '[ALERT] {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+
+inhibit_rules:
+  - source_matchers:
+      - alertname = ServiceDown
+    target_matchers:
+      - alertname =~ "PodCrashLooping|HighErrorRate|TargetDown"
+    equal: [namespace]

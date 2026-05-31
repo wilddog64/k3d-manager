@@ -94,6 +94,22 @@ function register_shopping_cart_apps() {
   _try_load_plugin register_shopping_cart_apps "$@"
 }
 
+function deploy_observability() {
+  _try_load_plugin deploy_observability "$@"
+}
+
+function deploy_observability_acg() {
+  _try_load_plugin deploy_observability_acg "$@"
+}
+
+function observability_status() {
+  _try_load_plugin observability_status "$@"
+}
+
+function trivy_scan_report() {
+  _try_load_plugin trivy_scan_report "$@"
+}
+
 function tunnel_start() {
   _try_load_plugin tunnel_start "$@"
 }

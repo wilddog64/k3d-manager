@@ -72,7 +72,7 @@ function _browser_launch() {
   if [[ "$(uname)" == "Darwin" ]]; then
     local _chrome_app_bin="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     if [[ -x "${_chrome_app_bin}" ]]; then
-      local _chrome_cdp_log="${HOME}/.local/share/k3d-manager/chrome-cdp.log"
+      local _chrome_cdp_log="${HOME}/.local/share/k3d-manager/logs/chrome-cdp.log"
       mkdir -p "$(dirname "${_chrome_cdp_log}")"
       "${_chrome_app_bin}" \
         --remote-debugging-port=9222 \

@@ -11,7 +11,7 @@
 #   _ensure_session_manager_plugin               — auto-install session-manager-plugin
 #   _ssm_get_instance_id <alias>                 — map ubuntu/ubuntu-1/ubuntu-2 → instance ID
 
-_SSM_TUNNEL_FWD_PID_FILE="${HOME}/.local/share/k3d-manager/ssm-tunnel-fwd.pid"
+_SSM_TUNNEL_FWD_PID_FILE="${HOME}/.local/share/k3d-manager/run/ssm-tunnel-fwd.pid"
 
 function _ensure_session_manager_plugin() {
   if command -v session-manager-plugin >/dev/null 2>&1; then
@@ -143,7 +143,7 @@ function ssm_tunnel() {
 Usage: ssm_tunnel <instance-id> <remote-port> <local-port>
 
 Start a background SSM port-forwarding session (AWS-StartPortForwardingSession).
-PID stored in ~/.local/share/k3d-manager/ssm-tunnel-fwd.pid.
+PID stored in ~/.local/share/k3d-manager/run/ssm-tunnel-fwd.pid.
 
 Note: SSM only supports local→remote forwarding. Vault reverse bridge
 (EC2→Mac) requires the SSH tunnel and is not available in SSM mode.

@@ -13,7 +13,7 @@ spec:
   generators:
     - git:
         repoURL: https://github.com/wilddog64/k3d-manager
-        revision: main
+        revision: '${K3D_MANAGER_BRANCH}'
         directories:
           - path: services/*
           - path: services/shopping-cart-identity
@@ -41,7 +41,7 @@ spec:
         namespace: shopping-cart-apps
       source:
         repoURL: https://github.com/wilddog64/k3d-manager
-        targetRevision: main
+        targetRevision: '${K3D_MANAGER_BRANCH}'
         path: '{{.path.path}}'
       ignoreDifferences:
         - group: ""
@@ -51,6 +51,10 @@ spec:
           jsonPointers:
             - /data/username
             - /data/password
+        - group: external-secrets.io
+          kind: ExternalSecret
+          jqPathExpressions:
+            - .spec.refreshInterval
         - group: ""
           kind: Secret
           name: order-service-secrets

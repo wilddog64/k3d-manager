@@ -50,6 +50,7 @@ fi
 : "${ARGOCD_HELM_REPO_URL:=https://argoproj.github.io/argo-helm}"
 : "${ARGOCD_HELM_CHART_REF:=argo/argo-cd}"
 : "${ARGOCD_VIRTUALSERVICE_HOST:=argocd.dev.local.me}"
+: "${ARGOCD_CHART_VERSION:=7.8.1}"
 : "${ARGOCD_SERVER_WAIT_TIMEOUT:=600s}"
 : "${ARGOCD_PORT_FORWARD_WAIT_TIMEOUT:=30}"
 : "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:=30}"
@@ -65,8 +66,8 @@ fi
 : "${ARGOCD_BROWSER_VAULT_PKI_ROLE_TTL:=${VAULT_PKI_ROLE_TTL:-720h}}"
 : "${ARGOCD_BROWSER_LISTENER_LABEL:=com.k3d-manager.argocd-browser-https}"
 : "${ARGOCD_BROWSER_LISTENER_PLIST:=/Library/LaunchDaemons/${ARGOCD_BROWSER_LISTENER_LABEL}.plist}"
-: "${ARGOCD_BROWSER_LISTENER_WRAPPER:=${HOME}/.local/share/k3d-manager/argocd-browser-https.sh}"
-: "${ARGOCD_BROWSER_LISTENER_LOG:=${HOME}/.local/share/k3d-manager/argocd-browser-https.log}"
+: "${ARGOCD_BROWSER_LISTENER_WRAPPER:=${HOME}/.local/share/k3d-manager/bin/argocd-browser-https.sh}"
+: "${ARGOCD_BROWSER_LISTENER_LOG:=${HOME}/.local/share/k3d-manager/logs/argocd-browser-https.log}"
 : "${ARGOCD_DEPLOY_KEY_SECRETSTORE:=argocd-deploy-key-store}"
 : "${ARGOCD_DEPLOY_KEY_ESO_SA:=eso-argocd-deploy-keys-sa}"
 : "${ARGOCD_DEPLOY_KEY_VAULT_ROLE:=argocd-deploy-key-reader}"
@@ -1072,6 +1073,9 @@ function _argocd_deploy_appproject() {
 function _argocd_deploy_applicationsets() {
    _info "[argocd] Deploying sample ApplicationSets"
 
+   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+   export K3D_MANAGER_BRANCH
+
    local appsets_dir="$ARGOCD_CONFIG_DIR/applicationsets"
 
    if [[ ! -d "$appsets_dir" ]]; then
@@ -1130,12 +1134,6 @@ HELP
     return 0
   fi
 
-  local tmpl="${SCRIPT_DIR}/etc/argocd/cluster-secret.yaml.tmpl"
-  if [[ ! -f "$tmpl" ]]; then
-    _err "[argocd] cluster secret template not found: $tmpl"
-    return 1
-  fi
-
   if [[ -z "${ARGOCD_APP_CLUSTER_TOKEN:-}" ]]; then
     _err "[argocd] ARGOCD_APP_CLUSTER_TOKEN is required — get it with:"
     _err "  ssh ubuntu kubectl create token argocd-manager -n kube-system --duration=8760h"
@@ -1144,15 +1142,43 @@ HELP
 
   _info "[argocd] registering app cluster '${ARGOCD_APP_CLUSTER_NAME}' -> ${ARGOCD_APP_CLUSTER_SERVER}"
 
+  local app_cluster_environment="${ARGOCD_APP_CLUSTER_ENVIRONMENT:-dev}"
+  if [[ "${ARGOCD_APP_CLUSTER_SERVER}" == "https://kubernetes.default.svc" ]]; then
+    app_cluster_environment="${ARGOCD_APP_CLUSTER_ENVIRONMENT:-infra}"
+  fi
+
+  local rendered
+  rendered="$(mktemp -t argocd-cluster-secret.XXXXXX.yaml)"
+  trap '$(_cleanup_trap_command "$rendered")' RETURN
+
   local _wasx=0
   case $- in *x*) _wasx=1; set +x;; esac
-  ARGOCD_APP_CLUSTER_SECRET_NAME="${ARGOCD_APP_CLUSTER_SECRET_NAME}" \
-  ARGOCD_APP_CLUSTER_NAME="${ARGOCD_APP_CLUSTER_NAME}" \
-  ARGOCD_APP_CLUSTER_SERVER="${ARGOCD_APP_CLUSTER_SERVER}" \
-  ARGOCD_APP_CLUSTER_INSECURE="${ARGOCD_APP_CLUSTER_INSECURE}" \
-  ARGOCD_APP_CLUSTER_TOKEN="${ARGOCD_APP_CLUSTER_TOKEN}" \
-  ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE}" \
-    envsubst < "$tmpl" | _kubectl apply -f -
+  cat > "$rendered" <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${ARGOCD_APP_CLUSTER_SECRET_NAME}
+  namespace: ${ARGOCD_NAMESPACE}
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+    environment: "${app_cluster_environment}"
+    argocd-chart-version: "${ARGOCD_CHART_VERSION}"
+    argocd-replicas: "2"
+type: Opaque
+stringData:
+  name: ${ARGOCD_APP_CLUSTER_NAME}
+  server: ${ARGOCD_APP_CLUSTER_SERVER}
+  config: |
+    {
+      "bearerToken": "${ARGOCD_APP_CLUSTER_TOKEN}",
+      "tlsClientConfig": {
+        "insecure": ${ARGOCD_APP_CLUSTER_INSECURE}
+      }
+    }
+EOF
+  _kubectl apply -f "$rendered"
+  rm -f "$rendered"
+  trap - RETURN
   (( _wasx )) && set -x
 
   _info "[argocd] cluster secret applied — verify with: kubectl get secret ${ARGOCD_APP_CLUSTER_SECRET_NAME} -n ${ARGOCD_NAMESPACE}"

@@ -82,7 +82,7 @@ setup() {
   read_lines "$HELM_LOG" helm_calls
   [ "${helm_calls[0]}" = "repo add external-secrets https://charts.external-secrets.io" ]
   [ "${helm_calls[1]}" = "repo update" ]
-  [[ "${helm_calls[2]}" == upgrade\ --install\ -n\ sample-ns\ external-secrets\ external-secrets/external-secrets\ --create-namespace\ --set\ installCRDs=true ]]
+  [[ "${helm_calls[2]}" == upgrade\ --install\ -n\ sample-ns\ external-secrets\ external-secrets/external-secrets\ --create-namespace\ --set\ installCRDs=true\ --version\ 1.0.0 ]]
   read_lines "$KUBECTL_LOG" kubectl_calls
   local rollout_found=0
   for cmd in "${kubectl_calls[@]}"; do
@@ -105,7 +105,7 @@ setup() {
   [ "$status" -eq 0 ]
   read_lines "$HELM_LOG" helm_calls
   [ "${#helm_calls[@]}" -eq 1 ]
-  local expected="upgrade --install -n airgap-ns external-secrets ${ESO_HELM_CHART_REF} --create-namespace --set installCRDs=true"
+  local expected="upgrade --install -n airgap-ns external-secrets ${ESO_HELM_CHART_REF} --create-namespace --set installCRDs=true --version 1.0.0"
   [ "${helm_calls[0]}" = "$expected" ]
   for call in "${helm_calls[@]}"; do
     [[ "$call" != repo\ add* ]]

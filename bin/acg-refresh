@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # bin/acg-refresh
 #
-# Daily driver — refresh AWS credentials and restart the SSH tunnel.
-# Use this when the ACG sandbox is already provisioned but creds expired.
+# Daily driver — refresh AWS credentials, restart SSH tunnel, and ensure
+# all port-forward services are running.
 #
 # Usage:
-#   bin/acg-refresh [sandbox-url]
+#   bin/acg-refresh [sandbox-url] [--login-prompt]
 #
 # Environment:
 #   ACG_SANDBOX_URL   Override default sandbox listing URL
@@ -21,6 +21,8 @@ source "${REPO_ROOT}/scripts/plugins/aws.sh"
 source "${REPO_ROOT}/scripts/plugins/acg.sh"
 source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
 
+_ACG_STATE_DIR="${HOME}/.local/share/k3d-manager"
+
 login_prompt=0
 sandbox_url=""
 for arg in "$@"; do
@@ -31,6 +33,80 @@ for arg in "$@"; do
   esac
 done
 sandbox_url="${sandbox_url:-${ACG_SANDBOX_URL:-}}"
+
+# Ensure PID file service is alive; restart if not.
+# Usage: _pf_ensure <label> <pid-file> <log-file> <kubectl-args...>
+_pf_ensure() {
+  local label="$1" pid_file="$2" log_file="$3"
+  shift 3
+  local pid=""
+  if [[ -f "${pid_file}" ]]; then
+    pid="$(cat "${pid_file}")"
+  fi
+  if [[ -n "${pid}" ]] && kill -0 "${pid}" 2>/dev/null; then
+    _info "[acg-refresh] ${label}: running (pid ${pid})"
+    return 0
+  fi
+  _info "[acg-refresh] ${label}: not running — restarting..."
+  rm -f "${pid_file}"
+  kubectl "$@" >>"${log_file}" 2>&1 &
+  local new_pid=$!
+  disown "${new_pid}"
+  echo "${new_pid}" > "${pid_file}"
+  _info "[acg-refresh] ${label}: started (pid ${new_pid})"
+}
+
+# Ensure launchd agent/daemon is loaded; bootstrap if not.
+# Usage: _launchd_ensure <label> <plist-path> <domain: user|system>
+_launchd_ensure() {
+  local label="$1" plist="$2" domain="${3:-user}"
+  [[ -f "${plist}" ]] || return 0
+  if launchctl list "${label}" >/dev/null 2>&1; then
+    _info "[acg-refresh] launchd ${label}: loaded"
+  else
+    _info "[acg-refresh] launchd ${label}: not loaded — bootstrapping..."
+    local _wrapper
+    _wrapper=$(grep -A1 "ProgramArguments" "${plist}" 2>/dev/null | \
+      grep -v "ProgramArguments\|array" | sed 's/.*<string>//;s/<\/string>//' | grep -v "^/bin/" | head -1 || true)
+    if [[ -n "${_wrapper}" ]]; then
+      pkill -f "${_wrapper}" 2>/dev/null || true
+      sleep 1
+    fi
+    if [[ "${domain}" == "system" ]]; then
+      _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${plist}" \
+        && _info "[acg-refresh] launchd ${label}: bootstrapped" \
+        || _warn "[acg-refresh] launchd ${label}: bootstrap failed (plist exists but service could not start — check wrapper script and TLS certs)"
+    else
+      launchctl load "${plist}" 2>/dev/null \
+        && _info "[acg-refresh] launchd ${label}: loaded" \
+        || _warn "[acg-refresh] launchd ${label}: load failed"
+    fi
+  fi
+}
+
+# Restart a launchd daemon (bootout + bootstrap). Used for Cloudflare tunnel
+# where a full restart is needed to pick up config changes.
+_launchd_restart() {
+  local label="$1" plist="$2" domain="${3:-system}"
+  [[ -f "${plist}" ]] || return 0
+  _info "[acg-refresh] Restarting launchd ${label}..."
+  if [[ "${domain}" == "system" ]]; then
+    _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${plist}" || true
+    _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${plist}" \
+      && _info "[acg-refresh] launchd ${label}: restarted" \
+      || _warn "[acg-refresh] launchd ${label}: restart failed"
+  else
+    launchctl unload "${plist}" 2>/dev/null || true
+    launchctl load "${plist}" 2>/dev/null \
+      && _info "[acg-refresh] launchd ${label}: restarted" \
+      || _warn "[acg-refresh] launchd ${label}: restart failed"
+  fi
+}
+
+if _is_mac; then
+  _info "[acg-refresh] Pre-authorizing sudo for macOS host operations..."
+  sudo -v
+fi
 
 if [[ "$login_prompt" -eq 1 ]]; then
   _acg_sandbox_url="${sandbox_url:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}"
@@ -46,6 +122,7 @@ if [[ "$login_prompt" -eq 1 ]]; then
   echo ""
 fi
 
+# ── 1. AWS credentials ────────────────────────────────────────────────────────
 _info "[acg-refresh] Checking AWS credentials..."
 if _acg_check_credentials 2>/dev/null; then
   _info "[acg-refresh] Credentials still valid — skipping extraction"
@@ -54,20 +131,65 @@ else
   acg_get_credentials ${sandbox_url:+"$sandbox_url"}
 fi
 
-_info "[acg-refresh] Restarting tunnel..."
+# ── 2. SSH tunnel ─────────────────────────────────────────────────────────────
+_info "[acg-refresh] Restarting SSH tunnel..."
 tunnel_stop 2>/dev/null || true
 tunnel_start
 
+# ── 3. PID-file port-forwards ─────────────────────────────────────────────────
+_info "[acg-refresh] Checking PID-file port-forwards..."
+mkdir -p "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
+
+_pf_ensure "Vault port-forward" \
+  "${_ACG_STATE_DIR}/run/vault-pf.pid" \
+  "${_ACG_STATE_DIR}/logs/vault-pf.log" \
+  port-forward svc/vault -n secrets --context k3d-k3d-cluster 18200:8200
+
+_pf_ensure "ACG Prometheus port-forward" \
+  "${_ACG_STATE_DIR}/run/acg-prom-pf.pid" \
+  "${_ACG_STATE_DIR}/logs/acg-prom-pf.log" \
+  port-forward svc/prometheus-operated 19090:9090 \
+  -n monitoring --context ubuntu-k3s --address 0.0.0.0
+
+# ── 4. launchd agents (user-domain, self-heal via KeepAlive) ──────────────────
 if _is_mac; then
-  _cloudflare_plist="/Library/LaunchDaemons/com.k3d-manager.cloudflare-tunnel.plist"
-  if [[ -f "${_cloudflare_plist}" ]]; then
-    _info "[acg-refresh] Restarting Cloudflare tunnel..."
-    _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_cloudflare_plist}" || true
-    _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_cloudflare_plist}" \
-      && _info "[acg-refresh] Cloudflare tunnel restarted" \
-      || _warn "[acg-refresh] Cloudflare tunnel restart failed — run: sudo launchctl bootstrap system ${_cloudflare_plist}"
-  fi
+  _info "[acg-refresh] Checking launchd port-forward agents..."
+
+  _launchd_ensure \
+    "com.k3d-manager.argocd-port-forward" \
+    "${HOME}/Library/LaunchAgents/com.k3d-manager.argocd-port-forward.plist" \
+    user
+
+  _launchd_ensure \
+    "com.k3d-manager.keycloak-port-forward" \
+    "${HOME}/Library/LaunchAgents/com.k3d-manager.keycloak-port-forward.plist" \
+    user
+
+  # ── 5. launchd daemons (system-domain) ───────────────────────────────────────
+  _info "[acg-refresh] Checking launchd system daemons..."
+
+  _launchd_ensure \
+    "com.k3d-manager.argocd-browser-https" \
+    "/Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist" \
+    system
+
+  _launchd_ensure \
+    "com.k3d-manager.keycloak-browser-http" \
+    "/Library/LaunchDaemons/com.k3d-manager.keycloak-browser-http.plist" \
+    system
+
+  _launchd_ensure \
+    "com.k3d-manager.frontend-browser-http" \
+    "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
+    system
+
+  # ── 6. Cloudflare tunnel (always restart to pick up config changes) ───────────
+  _launchd_restart \
+    "com.k3d-manager.cloudflare-tunnel" \
+    "/Library/LaunchDaemons/com.k3d-manager.cloudflare-tunnel.plist" \
+    system
 fi
 
-_info "[acg-refresh] Done. Cluster should be reachable."
+# ── 7. Summary ────────────────────────────────────────────────────────────────
+_info "[acg-refresh] Done. Remote cluster nodes:"
 kubectl get nodes --context ubuntu-k3s

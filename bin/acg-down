@@ -18,6 +18,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCRIPT_DIR="${REPO_ROOT}/scripts"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
+_ACG_STATE_DIR="${HOME}/.local/share/k3d-manager"
+mkdir -p "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
 
 : "${SCRIPT_DIR}"
 
@@ -41,6 +43,13 @@ if [[ "${_confirm}" -eq 0 ]]; then
 fi
 
 _info "[acg-down] keep-hub=${_keep_hub} hub-cluster=${_HUB_CLUSTER}"
+
+if _is_mac; then
+  if [[ -t 0 && -t 1 ]] && ! sudo -n true 2>/dev/null; then
+    _info "[acg-down] Pre-authorizing sudo for macOS host operations (launchd cleanup)..."
+    sudo -v
+  fi
+fi
 
 case "${_cluster_provider}" in
   k3s-aws)
@@ -78,7 +87,7 @@ _info "[acg-down] Stopping tunnel..."
 esac
 
 _info "[acg-down] Stopping Vault port-forward..."
-_vault_pf_pid_file="${HOME}/.local/share/k3d-manager/vault-pf.pid"
+_vault_pf_pid_file="${_ACG_STATE_DIR}/run/vault-pf.pid"
 if [[ -f "${_vault_pf_pid_file}" ]]; then
   kill "$(cat "${_vault_pf_pid_file}")" 2>/dev/null || true
   rm -f "${_vault_pf_pid_file}"
@@ -86,11 +95,19 @@ if [[ -f "${_vault_pf_pid_file}" ]]; then
 fi
 
 _info "[acg-down] Stopping frontend port-forward..."
-_frontend_pf_pid_file="${HOME}/.local/share/k3d-manager/frontend-pf.pid"
+_frontend_pf_pid_file="${_ACG_STATE_DIR}/run/frontend-pf.pid"
 if [[ -f "${_frontend_pf_pid_file}" ]]; then
   kill "$(cat "${_frontend_pf_pid_file}")" 2>/dev/null || true
   rm -f "${_frontend_pf_pid_file}"
   _info "[acg-down] Frontend port-forward stopped"
+fi
+
+_info "[acg-down] Stopping ACG Prometheus port-forward..."
+_acg_prom_pf_pid_file="${_ACG_STATE_DIR}/run/acg-prom-pf.pid"
+if [[ -f "${_acg_prom_pf_pid_file}" ]]; then
+  kill "$(cat "${_acg_prom_pf_pid_file}")" 2>/dev/null || true
+  rm -f "${_acg_prom_pf_pid_file}"
+  _info "[acg-down] ACG Prometheus port-forward stopped"
 fi
 
 _info "[acg-down] Stopping ArgoCD port-forward launchd agent..."
@@ -121,12 +138,12 @@ if _is_mac; then
   _info "[acg-down] Stopping ArgoCD browser HTTPS listener launchd daemon..."
   _argocd_browser_label="${ARGOCD_BROWSER_LISTENER_LABEL:-com.k3d-manager.argocd-browser-https}"
   _argocd_browser_plist="${ARGOCD_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_argocd_browser_label}.plist}"
-  _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${HOME}/.local/share/k3d-manager/argocd-browser-https.sh}"
-  _argocd_browser_tls_dir="${ARGOCD_BROWSER_TLS_DIR:-${HOME}/.local/share/k3d-manager/argocd-browser-https-tls}"
+  _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${_ACG_STATE_DIR}/bin/argocd-browser-https.sh}"
+  _argocd_browser_tls_dir="${ARGOCD_BROWSER_TLS_DIR:-${_ACG_STATE_DIR}/argocd-browser-https-tls}"
   _argocd_browser_tls_cert="${ARGOCD_BROWSER_TLS_CERT_FILE:-${_argocd_browser_tls_dir}/fullchain.crt}"
   _argocd_browser_tls_key="${ARGOCD_BROWSER_TLS_KEY_FILE:-${_argocd_browser_tls_dir}/tls.key}"
   _argocd_browser_tls_ca="${ARGOCD_BROWSER_TLS_CA_FILE:-${_argocd_browser_tls_dir}/ca.crt}"
-  _argocd_browser_launchctl_log="${HOME}/.local/share/k3d-manager/argocd-browser-https-launchctl.log"
+  _argocd_browser_launchctl_log="${_ACG_STATE_DIR}/logs/argocd-browser-https-launchctl.log"
   : > "${_argocd_browser_launchctl_log}"
   if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
       >"${_argocd_browser_launchctl_log}" 2>&1; then

@@ -120,6 +120,7 @@ function deploy_shopping_cart_data() {
   kubectl rollout status statefulset/minio \
     -n shopping-cart-data --context ubuntu-k3s --timeout=120s
 
+
   _info "[shopping_cart] Creating rabbitmq-credentials secret..."
   kubectl create secret generic rabbitmq-credentials \
     --context ubuntu-k3s -n shopping-cart-data \
