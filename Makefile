@@ -8,7 +8,7 @@ URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL ?= 0
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision install-sudoers cloudflared-backup alertmanager-secret test help observability observability-acg observability-status vuln-scan
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision install-sudoers cloudflared-backup alertmanager-secret test help observability observability-acg observability-status vuln-scan show-service-passwords
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -124,6 +124,34 @@ cloudflared-backup:
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/cloudflared" \
 	  -d "$$(python3 -c "import json,sys; print(json.dumps({'data':{'credentials_json':sys.argv[1],'cert_pem':sys.argv[2],'tunnel_id':'bb7ece59-8680-4310-9437-232f862e2773','tunnel_name':'k3d-manager'}}))" "$$_creds" "$$_cert")" >/dev/null && \
 	echo "[cloudflared-backup] Vault updated"
+
+## Show all service login credentials (Hub k3d cluster must be running)
+show-service-passwords:
+	@echo ""
+	@echo "  === Service Credentials ==="
+	@echo ""
+	@_argocd=$$(kubectl get secret argocd-initial-admin-secret -n cicd \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.password}' 2>/dev/null | base64 -d); \
+	echo "  ArgoCD      https://argocd.3ai-talk.org";\
+	echo "    user:     admin";\
+	echo "    password: $${_argocd:-N/A}";\
+	echo ""
+	@_grafana=$$(kubectl get secret kube-prometheus-stack-grafana -n monitoring \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d); \
+	echo "  Grafana     https://grafana.3ai-talk.org";\
+	echo "    user:     admin";\
+	echo "    password: $${_grafana:-N/A}";\
+	echo ""
+	@echo "  Prometheus  https://prometheus.3ai-talk.org";\
+	echo "    (no login required)";\
+	echo ""
+	@_kc=$$(kubectl get secret keycloak-secrets -n identity \
+	  --context k3d-k3d-cluster -o jsonpath='{.data.KEYCLOAK_ADMIN_PASSWORD}' 2>/dev/null | base64 -d); \
+	echo "  Frontend    https://frontend.3ai-talk.org  (login via Keycloak SSO)";\
+	echo "  Keycloak    https://keycloak.3ai-talk.org";\
+	echo "    admin user:     admin / $${_kc:-N/A}";\
+	echo "    dev users:      alice / test1234  |  developer / test1234  |  operator / test1234";\
+	echo ""
 
 ## Store Alertmanager credentials in Vault (run once; requires Hub Vault + port-forward)
 alertmanager-secret:
