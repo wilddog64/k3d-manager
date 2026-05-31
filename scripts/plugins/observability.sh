@@ -39,49 +39,28 @@ function deploy_observability() {
     export ALERTMANAGER_GMAIL_APP_PW="${_rest%%|*}"
     export ALERTMANAGER_SMS_GATEWAY="${_rest##*|}"
 
+    local _am_tmpl="${SCRIPT_DIR}/etc/prometheus/alertmanager.yaml.tmpl"
     local _am_config
-    _am_config=$(cat <<AMEOF
-global:
-  smtp_smarthost: 'smtp.gmail.com:587'
-  smtp_from: '${ALERTMANAGER_GMAIL_FROM}'
-  smtp_auth_username: '${ALERTMANAGER_GMAIL_FROM}'
-  smtp_auth_password: '${ALERTMANAGER_GMAIL_APP_PW}'
-  smtp_require_tls: true
-
-route:
-  receiver: 'null'
-  group_wait: 5m
-  group_interval: 2h
-  repeat_interval: 24h
-  routes:
-    - matchers:
-        - severity = critical
-      receiver: sms-critical
-
-receivers:
-  - name: 'null'
-  - name: sms-critical
-    email_configs:
-      - to: '${ALERTMANAGER_SMS_GATEWAY}'
-        send_resolved: false
-        headers:
-          Subject: '[ALERT] {{ .GroupLabels.alertname }}'
-        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
-
-inhibit_rules:
-  - source_matchers:
-      - alertname = ServiceDown
-    target_matchers:
-      - alertname =~ "PodCrashLooping|HighErrorRate|TargetDown"
-    equal: [namespace]
-AMEOF
-)
+    # shellcheck disable=SC2016
+    _am_config=$(envsubst '${ALERTMANAGER_GMAIL_FROM} ${ALERTMANAGER_GMAIL_APP_PW} ${ALERTMANAGER_SMS_GATEWAY}' \
+      < "${_am_tmpl}")
     _kubectl create secret generic alertmanager-smtp-secret \
       --context k3d-k3d-cluster \
       -n monitoring \
       --from-literal=alertmanager.yaml="${_am_config}" \
       --dry-run=client -o yaml | _kubectl apply -f -
     _info "[observability] Alertmanager config secret created"
+  fi
+
+  local _rules_dir="${SCRIPT_DIR}/etc/prometheus/rules"
+  if [[ -d "${_rules_dir}" ]]; then
+    _kubectl apply -f "${_rules_dir}/" >/dev/null \
+      && _info "[observability] PrometheusRules applied from ${_rules_dir}/"
+  fi
+
+  if _kubectl get application shopping-cart-rules -n cicd >/dev/null 2>&1; then
+    _kubectl delete application shopping-cart-rules -n cicd >/dev/null \
+      && _info "[observability] Removed stale shopping-cart-rules ArgoCD Application"
   fi
 
   local _istio_manifest="${SCRIPT_DIR}/etc/observability/istio.yaml"
