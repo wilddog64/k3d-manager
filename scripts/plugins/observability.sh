@@ -26,7 +26,7 @@ function deploy_observability() {
       -H "X-Vault-Token: ${_vault_token}" \
       "${_vault_addr}/v1/secret/data/k3d-manager/alertmanager" 2>/dev/null \
       | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
-        print(d['gmail_from']+'|'+d['gmail_app_pw']+'|'+d['sms_gateway'])"); then
+        print(d['gmail_from']+'|'+d['gmail_app_pw']+'|'+d['sms_gateway'])" 2>/dev/null); then
     _am_creds=""
   fi
 
@@ -58,7 +58,7 @@ function deploy_observability() {
       && _info "[observability] PrometheusRules applied from ${_rules_dir}/"
   fi
 
-  if _kubectl get application shopping-cart-rules -n cicd >/dev/null 2>&1; then
+  if ( _kubectl get application shopping-cart-rules -n cicd >/dev/null 2>&1 ); then
     _kubectl delete application shopping-cart-rules -n cicd >/dev/null \
       && _info "[observability] Removed stale shopping-cart-rules ArgoCD Application"
   fi
