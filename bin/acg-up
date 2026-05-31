@@ -1259,13 +1259,14 @@ PLIST
 fi
 
 if _is_mac; then
-  _info "[acg-up] Step 10h/14 — Installing Cloudflare named tunnel (argocd + frontend + keycloak)..."
+  _info "[acg-up] Step 10h/14 — Installing Cloudflare named tunnel (argocd + frontend + keycloak + prometheus + grafana)..."
   _tunnel_dir="${_ACG_STATE_DIR}"
   _tunnel_urls_file="${_tunnel_dir}/tunnel-urls.txt"
   _cloudflared_config="${HOME}/.cloudflared/config.yml"
-  _cf_domain="${CF_DOMAIN:-3ai-talk.org}"
-  _cf_template="${REPO_ROOT}/scripts/etc/cloudflared-config.yml.tmpl"
-  mkdir -p "${_tunnel_dir}/logs" "${_tunnel_dir}/run"
+  _cf_static_config="${REPO_ROOT}/scripts/etc/cloudflared/config.yml"
+  _cf_tunnel_creds_id="bb7ece59-8680-4310-9437-232f862e2773"
+  _cf_tunnel_creds_file="${HOME}/.cloudflared/${_cf_tunnel_creds_id}.json"
+  mkdir -p "${_tunnel_dir}/logs" "${_tunnel_dir}/run" "${HOME}/.cloudflared"
 
   if ! command -v cloudflared >/dev/null 2>&1; then
     if command -v brew >/dev/null 2>&1; then
@@ -1277,28 +1278,30 @@ if _is_mac; then
   fi
 
   if command -v cloudflared >/dev/null 2>&1; then
-    if [[ ! -f "${_cloudflared_config}" ]] || \
-        ! grep -q "keycloak.${_cf_domain}" "${_cloudflared_config}" 2>/dev/null; then
-      _cf_tunnel_id=""
-      _cf_creds_file=""
-      for _f in "${HOME}/.cloudflared/"*.json; do
-        [[ -f "${_f}" ]] || continue
-        _cf_tunnel_id="$(basename "${_f}" .json)"
-        _cf_creds_file="${_f}"
-        break
-      done
-      if [[ -n "${_cf_tunnel_id}" ]] && [[ -f "${_cf_template}" ]]; then
-        mkdir -p "$(dirname "${_cloudflared_config}")"
-        CLOUDFLARE_TUNNEL_ID="${_cf_tunnel_id}" \
-        CLOUDFLARE_CREDENTIALS_FILE="${_cf_creds_file}" \
-        CLOUDFLARE_DOMAIN="${_cf_domain}" \
-          envsubst < "${_cf_template}" > "${_cloudflared_config}"
-        _info "[acg-up] Generated ~/.cloudflared/config.yml (tunnel ${_cf_tunnel_id})"
-      elif [[ -z "${_cf_tunnel_id}" ]]; then
-        _warn "[acg-up] No Cloudflare tunnel credentials found in ~/.cloudflared/ — skipping config generation (run: cloudflared tunnel login && cloudflared tunnel create k3d-manager)"
+    if [[ ! -f "${_cf_tunnel_creds_file}" ]]; then
+      _info "[acg-up] Restoring cloudflared credentials from Keychain..."
+      _kc_creds=$(security find-generic-password -a cloudflared \
+        -s k3d-manager-cloudflared-credentials -w 2>/dev/null || true)
+      if [[ -n "${_kc_creds}" ]]; then
+        printf '%s' "${_kc_creds}" > "${_cf_tunnel_creds_file}"
+        _info "[acg-up] Cloudflare tunnel credentials restored from Keychain"
       else
-        _warn "[acg-up] ${_cf_template} not found — skipping config generation"
+        _warn "[acg-up] No cloudflared credentials in Keychain — tunnel may not authenticate (run: cloudflared tunnel login)"
       fi
+    fi
+    if [[ ! -f "${HOME}/.cloudflared/cert.pem" ]]; then
+      _kc_cert=$(security find-generic-password -a cloudflared \
+        -s k3d-manager-cloudflared-cert -w 2>/dev/null || true)
+      if [[ -n "${_kc_cert}" ]]; then
+        printf '%s' "${_kc_cert}" > "${HOME}/.cloudflared/cert.pem"
+        _info "[acg-up] Cloudflare cert.pem restored from Keychain"
+      fi
+    fi
+    if [[ -f "${_cf_static_config}" ]]; then
+      cp "${_cf_static_config}" "${_cloudflared_config}"
+      _info "[acg-up] Cloudflare config installed from repo (prometheus + grafana + argocd + frontend + keycloak)"
+    else
+      _warn "[acg-up] ${_cf_static_config} not found — skipping config install"
     fi
   fi
 
