@@ -14,6 +14,12 @@ function deploy_observability() {
     _err "[observability] Failed to apply Hub observability ApplicationSet"
     return 1
   fi
+
+  local _istio_manifest="${SCRIPT_DIR}/etc/observability/istio.yaml"
+  if [[ -f "${_istio_manifest}" ]]; then
+    _kubectl apply -f "${_istio_manifest}" >/dev/null \
+      && _info "[observability] Istio Gateway + VirtualServices applied (prometheus/grafana.shopping-cart.local)"
+  fi
 }
 
 function deploy_observability_acg() {
