@@ -96,7 +96,7 @@ function deploy_shopping_cart_data() {
     _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/postgresql/${pg_dir}/"
   done
   _info "[shopping_cart] Syncing data-layer ArgoCD app before Redis deploy (ensures ESO processes ExternalSecret)..."
-  argocd app sync data-layer --server localhost:8080 --insecure --wait --timeout 120 2>/dev/null || true
+  argocd app sync data-layer --server localhost:8080 --insecure --timeout 120 2>/dev/null || true
 
   _info "[shopping_cart] Force-refreshing all ExternalSecrets to ensure current Vault values..."
   for ns in shopping-cart-data shopping-cart-apps; do
