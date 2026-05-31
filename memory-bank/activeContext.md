@@ -1,7 +1,8 @@
 # Active Context — k3d-manager
 
-## Current Status (Post-Merge 2026-05-29 — k3d-manager PR #83 housekeeping complete)
-- Current branch: `k3d-manager-v1.5.0` (created from k3d-manager PR #83 merge SHA `c5949cf47097d3a89ff485e01f68c2725644d327`)
+## Current Status (Post-Merge 2026-05-31 — k3d-manager PR #84 v1.5.0 housekeeping complete)
+- **v1.5.0 SHIPPED** — PR #84 merged to main (SHA `faa00331214626982fd99d65b3764bca9f4c63ce`); tag v1.5.0 created ✓; GitHub release created ✓; enforce_admins restored ✓; retrospective committed (`cf94879f`) ✓; next branch `k3d-manager-v1.5.1` created ✓; memory-bank updating (in progress)
+- Current branch: `k3d-manager-v1.5.1` (created from k3d-manager PR #84 merge SHA `faa00331214626982fd99d65b3764bca9f4c63ce`)
 - **lib-foundation interactive sudo no-TTY fix committed and pushed** — lib-foundation branch `feat/v0.3.20`, commit `00309de`; k3d-manager subtree merge `2501ba97` on `k3d-manager-v1.5.0`.
 - **Vault CA PTY fix committed and pushed** — commit `7b7a8ea2` on `k3d-manager-v1.5.0` (`fix(acg-up): skip add-trusted-cert when Vault CA already trusted — no PTY needed`); `bin/acg-up` now skips `security add-trusted-cert` when `security verify-cert` says the Vault CA is already trusted.
 - **redis-cart-secret race fix committed and pushed** — commit `780930ac` on `k3d-manager-v1.5.0` (`fix(shopping-cart): wait for redis-cart-secret before copy — prevents race on fresh sandbox`); `scripts/plugins/shopping_cart.sh` now waits for `redis-cart-secret` before copying it into `shopping-cart-apps`.
