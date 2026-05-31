@@ -1390,6 +1390,23 @@ acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
 
 _info "[acg-up] Step 13/14 — Frontend served via direct kubectl port-forward on 127.0.0.2:80 → ubuntu-k3s (Step 10g). URL: http://frontend.shopping-cart.local"
 
+_info "[acg-up] Step 14/14 — Deploying ACG observability (Prometheus + Trivy)..."
+source "${REPO_ROOT}/scripts/plugins/observability.sh"
+deploy_observability_acg
+
+_info "[acg-up] Step 14b/14 — Starting ACG Prometheus port-forward (ubuntu-k3s → localhost:19090)..."
+_acg_prom_pf_pid_file="${_ACG_STATE_DIR}/run/acg-prom-pf.pid"
+if [[ -f "${_acg_prom_pf_pid_file}" ]]; then
+  kill "$(cat "${_acg_prom_pf_pid_file}")" 2>/dev/null || true
+  rm -f "${_acg_prom_pf_pid_file}"
+fi
+kubectl port-forward svc/prometheus-operated 19090:9090 \
+  -n monitoring --context ubuntu-k3s --address 0.0.0.0 \
+  >>"${_ACG_STATE_DIR}/logs/acg-prom-pf.log" 2>&1 &
+_acg_prom_pf_pid=$!
+echo "${_acg_prom_pf_pid}" > "${_acg_prom_pf_pid_file}"
+_info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:19090 → ubuntu-k3s, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
+
 _info "[acg-up] Cluster is up."
 kubectl get nodes --context ubuntu-k3s
 _info "[acg-up] === Public URLs (Cloudflare — any device) ==="

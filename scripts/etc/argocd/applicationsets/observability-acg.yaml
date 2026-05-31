@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: observability-acg
+  namespace: ${ARGOCD_NAMESPACE}
+  labels:
+    managed-by: k3d-manager
+    app-type: observability
+spec:
+  generators:
+    - list:
+        elements:
+          - name: acg-kube-prometheus-stack
+            namespace: monitoring
+            chart: kube-prometheus-stack
+            repoURL: https://prometheus-community.github.io/helm-charts
+            targetRevision: 67.9.0
+            valuesFile: scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml
+          - name: acg-trivy-operator
+            namespace: trivy-system
+            chart: trivy-operator
+            repoURL: https://aquasecurity.github.io/helm-charts
+            targetRevision: 0.24.1
+            valuesFile: scripts/etc/helm/observability/trivy-operator-values.yaml
+  goTemplate: true
+  template:
+    metadata:
+      name: '{{.name}}'
+    spec:
+      project: platform
+      destination:
+        name: ubuntu-k3s
+        namespace: '{{.namespace}}'
+      sources:
+        - repoURL: https://github.com/wilddog64/k3d-manager
+          targetRevision: '${K3D_MANAGER_BRANCH}'
+          ref: values
+        - repoURL: '{{.repoURL}}'
+          chart: '{{.chart}}'
+          targetRevision: '{{.targetRevision}}'
+          helm:
+            valueFiles:
+              - '$values/{{.valuesFile}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true

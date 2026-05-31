@@ -1,0 +1,58 @@
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    resources:
+      requests:
+        memory: 256Mi
+        cpu: 100m
+      limits:
+        memory: 512Mi
+        cpu: 500m
+    additionalScrapeConfigs:
+      - job_name: istiod
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names: [istio-system]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: istiod
+      - job_name: federate-acg
+        scrape_interval: 30s
+        honor_labels: true
+        metrics_path: /federate
+        params:
+          match[]:
+            - '{job!=""}'
+        static_configs:
+          - targets:
+              - 'host.internal:19090'
+            labels:
+              cluster: acg
+
+grafana:
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 50m
+    limits:
+      memory: 192Mi
+      cpu: 200m
+  additionalDataSources:
+    - name: acg-prometheus
+      type: prometheus
+      url: http://host.internal:19090
+      access: proxy
+      jsonData:
+        timeInterval: 30s
+
+alertmanager:
+  enabled: false
+
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false

@@ -1,0 +1,22 @@
+trivy:
+  ignoreUnfixed: true
+  severity: CRITICAL,HIGH
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 50m
+    limits:
+      memory: 256Mi
+      cpu: 500m
+
+operator:
+  scanJobTTL: 1h
+  vulnerabilityReportsPlugin: Trivy
+  configAuditScannerEnabled: true
+  resources:
+    requests:
+      memory: 32Mi
+      cpu: 20m
+    limits:
+      memory: 96Mi
+      cpu: 100m

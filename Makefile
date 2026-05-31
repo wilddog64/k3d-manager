@@ -8,7 +8,7 @@ URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL ?= 0
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision install-sudoers test help
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision install-sudoers test help observability observability-acg observability-status vuln-scan
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -108,6 +108,22 @@ provision: ssm
 ## Install passwordless sudo rules for k3d-manager macOS host operations (one-time setup)
 install-sudoers:
 	bin/install-sudoers.sh
+
+## Deploy observability stack (Prometheus+Grafana+Trivy) to Hub k3d
+observability:
+	./scripts/k3d-manager deploy_observability
+
+## Deploy observability stack (Prometheus+Trivy) to ACG ubuntu-k3s
+observability-acg:
+	./scripts/k3d-manager deploy_observability_acg
+
+## Show pod status for monitoring/trivy-system on both clusters
+observability-status:
+	./scripts/k3d-manager observability_status
+
+## Print VulnerabilityReport summary for both clusters
+vuln-scan:
+	./scripts/k3d-manager trivy_scan_report
 
 ## Run all BATS test suites
 test:

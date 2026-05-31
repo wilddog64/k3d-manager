@@ -1,0 +1,36 @@
+grafana:
+  enabled: false
+
+alertmanager:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    retention: 2h
+    resources:
+      requests:
+        memory: 128Mi
+        cpu: 50m
+      limits:
+        memory: 256Mi
+        cpu: 200m
+    additionalScrapeConfigs:
+      - job_name: istiod
+        kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names: [istio-system]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: istiod
+  service:
+    type: NodePort
+    nodePort: 30090
+
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
