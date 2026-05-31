@@ -138,6 +138,7 @@ case "${_cluster_provider}" in
     else
       _acg_cred_test_url="${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
       _info "[acg-up] Extracting and validating AWS credentials (will restart sandbox on ghost-state failure)..."
+      _browser_launch
       "${REPO_ROOT}/scripts/lib/acg/bin/acg-credential-test" "${_acg_cred_test_url}" || exit 1
       _info "[acg-up] AWS credentials extracted and validated."
     fi
