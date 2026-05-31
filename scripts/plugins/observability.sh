@@ -3,9 +3,10 @@
 
 function deploy_observability() {
   _info "[observability] Deploying Hub observability stack..."
-  local _appset="${REPO_ROOT}/scripts/etc/argocd/applicationsets/observability.yaml"
-  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
-  export K3D_MANAGER_BRANCH
+  local _appset="${SCRIPT_DIR}/etc/argocd/applicationsets/observability.yaml"
+  : "${ARGOCD_NAMESPACE:=cicd}"
+  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+  export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE
   # shellcheck disable=SC2016
   if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_appset}" | _kubectl apply -f -; then
     _info "[observability] Hub ApplicationSet applied — ArgoCD will sync monitoring/trivy-system"
@@ -17,9 +18,10 @@ function deploy_observability() {
 
 function deploy_observability_acg() {
   _info "[observability] Deploying ACG observability stack..."
-  local _appset="${REPO_ROOT}/scripts/etc/argocd/applicationsets/observability-acg.yaml"
-  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
-  export K3D_MANAGER_BRANCH
+  local _appset="${SCRIPT_DIR}/etc/argocd/applicationsets/observability-acg.yaml"
+  : "${ARGOCD_NAMESPACE:=cicd}"
+  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+  export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE
   # shellcheck disable=SC2016
   if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_appset}" | _kubectl apply -f -; then
     _info "[observability] ACG ApplicationSet applied — ArgoCD will sync monitoring/trivy-system on ubuntu-k3s"
