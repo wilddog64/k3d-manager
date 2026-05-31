@@ -22,6 +22,7 @@ Use the rules below to shape all code suggestions and PR reviews.
 - **Tunnel**: `scripts/plugins/tunnel.sh` — `tunnel_start`, `tunnel_stop`, `tunnel_status`. autossh + launchd; forward tunnel (k3s API :6443) + reverse tunnel (Vault :8200).
 - **AWS helpers**: `scripts/plugins/aws.sh` — `aws_import_credentials`. `scripts/plugins/shopping_cart.sh` — `deploy_app_cluster`, `_ensure_k3sup`, `_k3sup_join_agent`.
 - **Copilot plugin**: `scripts/plugins/copilot.sh` — `copilot_triage_pod <ns> <pod>` (collects kubectl describe + logs → Copilot diagnosis), `copilot_draft_spec '<desc>'` (collects git context → scaffolds a `docs/bugs/` spec). Both require `K3DM_ENABLE_AI=1`. Route through `_ai_agent_review` in `scripts/lib/system.sh` and keep `_copilot_review` as the backend implementation.
+- **Observability plugin**: `scripts/plugins/observability.sh` — `deploy_observability` (Hub kube-prometheus-stack + Trivy via ArgoCD), `deploy_observability_acg` (ACG minimal Prometheus + Trivy via ArgoCD), `observability_status`, `trivy_scan_report`. Hub Grafana federates ACG Prometheus via `host.internal:19090`; `bin/acg-up` Step 14 starts the port-forward (`acg-prom-pf.pid`); `bin/acg-down` kills it. ApplicationSets: `scripts/etc/argocd/applicationsets/observability.yaml` (Hub) and `observability-acg.yaml` (ACG). Helm values under `scripts/etc/helm/observability/`.
 - **Convenience scripts**: `bin/acg-up`, `bin/acg-down`, `bin/acg-refresh`, `bin/acg-status`, `bin/acg-sync-apps`, `bin/rotate-ghcr-pat` — orchestrate plugin calls for common one-shot operations.
 
 ---
