@@ -213,6 +213,7 @@ docs/
 | **Shopping Cart** | `register_shopping_cart_apps`, `deploy_app_cluster` | Demo app cluster bootstrap — k3sup EC2 install + ArgoCD app registration |
 | **Copilot** | `copilot_triage_pod`, `copilot_draft_spec` | AI-assisted pod failure diagnosis and bug spec drafting via `_ai_agent_review`; backend selected by `AI_REVIEW_FUNC`; requires `K3DM_ENABLE_AI=1` |
 | **SSM** | `ssm_wait`, `ssm_exec`, `ssm_tunnel` | AWS Systems Manager helpers — wait for SSM registration, run commands on EC2, open SSM port-forward tunnel; opt-in via `K3S_AWS_SSM_ENABLED=true` |
+| **Observability** | `deploy_observability`, `deploy_observability_acg`, `observability_status`, `trivy_scan_report` | Prometheus+Grafana+Trivy on Hub k3d + ACG ubuntu-k3s; Hub Grafana federates ACG metrics via `host.internal:19090`; `make observability` / `make vuln-scan` |
 | **Hello** | `hello` | Minimal example plugin — Hello World; reference for new plugin authors |
 
 ### Guides

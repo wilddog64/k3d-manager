@@ -217,6 +217,39 @@ re-commit on their behalf.
 writing the next task. This is where inaccuracies, overclaiming, and stale entries are
 caught — not by blocking agent writes.
 
+## 17) Observability Architecture — Hub+ACG Dual-Cluster
+
+```
+Hub k3d (permanent, M4 OrbStack VM)
+├── monitoring/    kube-prometheus-stack 67.9.0
+│   ├── prometheus   scrapes Hub + federates ACG via host.internal:19090
+│   └── grafana      two datasources: hub-prometheus (in-cluster) + acg-prometheus (host.internal:19090)
+└── trivy-system/  Trivy Operator 0.24.1  ← scans Hub workloads
+
+ACG ubuntu-k3s (ephemeral, EC2)
+├── monitoring/    kube-prometheus-stack minimal (no Grafana, NodePort 30090)
+│   └── prometheus   scrapes ACG workloads + Trivy metrics
+└── trivy-system/  Trivy Operator 0.24.1  ← scans shopping cart images
+
+M4 host (managed by acg-up / acg-down)
+└── kubectl port-forward svc/prometheus-operated 19090:9090 -n monitoring \
+      --context ubuntu-k3s --address 0.0.0.0
+    PID → ~/.local/share/k3d-manager/run/acg-prom-pf.pid
+```
+
+**Why this design:**
+- Observability stack lives inside OrbStack's VM — zero extra macOS RSS
+- ACG Prometheus runs on EC2; only a lightweight port-forward runs on M4 host
+- When ACG tears down, last-scraped metrics persist in Hub (7-day retention)
+- `host.internal` is OrbStack's hostname for the M4 host, reachable from inside k3d pods
+- Loki and Tempo deferred; AlertManager disabled
+
+**Key files:**
+- ApplicationSets: `scripts/etc/argocd/applicationsets/observability.yaml` (Hub), `observability-acg.yaml` (ACG)
+- Helm values: `scripts/etc/helm/observability/` (3 files)
+- Plugin: `scripts/plugins/observability.sh` — `deploy_observability`, `deploy_observability_acg`, `observability_status`, `trivy_scan_report`
+- Makefile targets: `observability`, `observability-acg`, `observability-status`, `vuln-scan`
+
 ## 16) Antigravity Browser Automation Pattern
 
 - The `antigravity` plugin handles browser-based automation (e.g., ACG sandbox TTL extension).
