@@ -31,6 +31,14 @@ spec:
       name: ubuntu-k3s
     - namespace: cicd
       name: ubuntu-k3s
+    - namespace: monitoring
+      server: https://kubernetes.default.svc
+    - namespace: trivy-system
+      server: https://kubernetes.default.svc
+    - namespace: monitoring
+      name: ubuntu-k3s
+    - namespace: trivy-system
+      name: ubuntu-k3s
   clusterResourceWhitelist:
     - group: ''
       kind: Namespace
@@ -50,6 +58,12 @@ spec:
       kind: Gateway
     - group: argoproj.io
       kind: Rollout
+    - group: aquasecurity.github.io
+      kind: ClusterComplianceReport
+    - group: aquasecurity.github.io
+      kind: ClusterVulnerabilityReport
+    - group: aquasecurity.github.io
+      kind: ClusterConfigAuditReport
   namespaceResourceWhitelist:
     - group: '*'
       kind: '*'
