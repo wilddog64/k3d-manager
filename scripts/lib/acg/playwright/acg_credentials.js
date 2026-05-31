@@ -382,39 +382,12 @@ async function extractCredentials() {
     ).catch(() => console.error('WARN: Skeleton loaders did not clear within 30s — proceeding anyway'));
 
     // 2b. Handle unauthenticated state — covers three cases:
-    //   (a) login link visible on app.pluralsight.com
-    //   (b) redirected to id.pluralsight.com login page
-    //   (c) redirected to s2.pluralsight.com 404 (no sign-in button — navigate directly to signin)
-    const _currentUrl = page.url();
-    const _isOffAppHost = (() => { try { return new URL(_currentUrl).hostname !== 'app.pluralsight.com'; } catch { return true; } })();
-    const _isOnLoginPath = /\/id[\/?]|id\.pluralsight\.com/.test(_currentUrl);
-    if (_isOffAppHost || _isOnLoginPath) {
-      console.error(`INFO: Session expired or off-site (${_currentUrl}) — navigating to sign-in...`);
-      await page.goto('https://app.pluralsight.com/id/signin', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-      console.error('INFO: Please sign in to Pluralsight to continue (up to 300s)...');
-      const _loginDone = await page.waitForURL(
-        u => { try { return new URL(u).hostname === 'app.pluralsight.com' && !/\/id[\/?]/.test(u); } catch { return false; } },
-        { timeout: 300000 }
-      ).then(() => true).catch(() => false);
-      if (_loginDone) {
-        console.error('INFO: Sign-in complete — resuming credential extraction...');
-        await page.waitForFunction(
-          () => !document.querySelector('[aria-busy="true"]'),
-          { timeout: 30000 }
-        ).catch(() => console.error('WARN: Skeleton loaders did not clear after login — proceeding anyway'));
-      } else {
-        console.error('ERROR: Pluralsight login timed out after 300s');
-        process.exit(1);
-      }
-    }
-    const signInLink = page.locator('a[href*="id.pluralsight.com"], a:has-text("Sign In"), button:has-text("Sign In")').first();
-    const isSignInVisible = await signInLink.isVisible({ timeout: 10000 }).catch(() => false);
-    if (isSignInVisible) {
-      console.error('INFO: Not signed in — clicking Sign In...');
-      await signInLink.click();
-      await page.waitForURL('**id.pluralsight.com**', { timeout: 300000 }); // "Patient Bridge"
+    //   (a) redirected to s2.pluralsight.com 404 (no sign-in button on page)
+    //   (b) redirected to id.pluralsight.com or app.pluralsight.com/id login page
+    //   (c) sign-in link visible on the current page
 
-      // Fill email field — set PLURALSIGHT_EMAIL env var to assist Google Password Manager
+    // Automate the Pluralsight sign-in form (assumes page is already on a login page).
+    const _doSignIn = async () => {
       const emailInput = page.locator('input[type="email"], input[name="email"], input[id*="email"]').first();
       await emailInput.waitFor({ timeout: 30000 });
       await emailInput.click();
@@ -423,22 +396,26 @@ async function extractCredentials() {
         await emailInput.fill(email);
         console.error('INFO: Filled email from PLURALSIGHT_EMAIL');
       } else {
-        console.error('INFO: Clicked email field — waiting for Google Password Manager auto-fill (set PLURALSIGHT_EMAIL to assist)');
+        console.error('INFO: Clicked email field — waiting for Password Manager auto-fill (set PLURALSIGHT_EMAIL to assist)');
         await page.waitForTimeout(5000);
       }
 
-      // Click Continue if the form uses a two-step email-then-password flow
       const continueBtn = page.locator('button[type="submit"], button:has-text("Continue")').first();
       if (await continueBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
         await continueBtn.click();
         await page.waitForTimeout(3000);
       }
 
-      // Wait for password field and let Google Password Manager auto-fill it
       const passwordInput = page.locator('input[type="password"]').first();
       if (await passwordInput.isVisible({ timeout: 10000 }).catch(() => false)) {
         await passwordInput.click();
-        await page.waitForTimeout(5000); // allow Password Manager to populate
+        const password = process.env.PLURALSIGHT_PASSWORD || '';
+        if (password) {
+          await passwordInput.fill(password);
+          console.error('INFO: Filled password from PLURALSIGHT_PASSWORD');
+        } else {
+          await page.waitForTimeout(5000); // allow Password Manager to populate
+        }
         const submitBtn = page.locator('button[type="submit"], button:has-text("Sign in"), button:has-text("Log in")').first();
         if (await submitBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
           await submitBtn.click();
@@ -446,15 +423,29 @@ async function extractCredentials() {
         }
       }
 
-      // Wait for redirect back to Pluralsight after successful auth
       await page.waitForURL('**app.pluralsight.com**', { timeout: 300000 });
       console.error('INFO: Sign-in complete — resuming credential extraction...');
-
-      // Re-wait for SPA content to settle after auth redirect
       await page.waitForFunction(
         () => !document.querySelector('[aria-busy="true"]'),
         { timeout: 30000 }
       ).catch(() => console.error('WARN: Skeleton loaders did not clear after login — proceeding anyway'));
+    };
+
+    const _isOffAppHost = (() => { try { return new URL(page.url()).hostname !== 'app.pluralsight.com'; } catch { return true; } })();
+    const _isOnLoginPath = /\/id[\/?]|id\.pluralsight\.com/.test(page.url());
+    if (_isOffAppHost || _isOnLoginPath) {
+      console.error(`INFO: Session expired or off-site (${page.url()}) — navigating to sign-in and automating login...`);
+      await page.goto('https://app.pluralsight.com/id/signin', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+      await _doSignIn();
+    } else {
+      const signInLink = page.locator('a[href*="id.pluralsight.com"], a:has-text("Sign In"), button:has-text("Sign In")').first();
+      const isSignInVisible = await signInLink.isVisible({ timeout: 10000 }).catch(() => false);
+      if (isSignInVisible) {
+        console.error('INFO: Not signed in — clicking Sign In and automating login...');
+        await signInLink.click();
+        await page.waitForURL('**id.pluralsight.com**', { timeout: 30000 }).catch(() => {});
+        await _doSignIn();
+      }
     }
 
     // 3. Handle Sandbox Start/Open Flow
@@ -512,33 +503,22 @@ async function extractCredentials() {
         }, { timeout: 15000 }).catch(() => console.error('WARN: Hands-on route did not settle before sandbox retry'));
 
         // Session may have expired — hands-on redirect can land on the login page
-        // OR on a Pluralsight 404 (s2.pluralsight.com/404.html) with no sign-in button.
-        // In either case, navigate directly to signin and wait for the user.
-        const _isLoginUrl = (u) => /\/id[\/?]|id\.pluralsight\.com/.test(u);
-        const _isOffApp = (u) => { try { return new URL(u).hostname !== 'app.pluralsight.com'; } catch { return true; } };
-        const _needsLogin = (u) => _isLoginUrl(u) || _isOffApp(u);
-        const _afterHandsOnUrl = page.url();
-        if (_needsLogin(_afterHandsOnUrl)) {
-          console.error(`INFO: Session expired (${_afterHandsOnUrl}) — navigating to Pluralsight sign-in...`);
+        // OR on a Pluralsight 404 (s2.pluralsight.com/404.html). Automate sign-in either way.
+        const _isOffApp2 = (u) => { try { return new URL(u).hostname !== 'app.pluralsight.com'; } catch { return true; } };
+        const _needsLogin2 = (u) => /\/id[\/?]|id\.pluralsight\.com/.test(u) || _isOffApp2(u);
+        if (_needsLogin2(page.url())) {
+          console.error(`INFO: Session expired (${page.url()}) — navigating to sign-in and automating login...`);
           await page.goto('https://app.pluralsight.com/id/signin', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-          console.error('INFO: Please sign in to Pluralsight to continue (up to 300s)...');
-          await page.waitForURL(u => !_needsLogin(u), { timeout: 300000 });
-          console.error('INFO: Sign-in complete — resuming...');
-          await page.waitForFunction(
-            () => !document.querySelector('[aria-busy="true"]'),
-            { timeout: 30000 }
-          ).catch(() => {});
+          await _doSignIn();
         }
 
         try {
           await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
         } catch (_navErr) {
-          if (_navErr.message && _navErr.message.includes('ERR_ABORTED') && _needsLogin(page.url())) {
-            console.error('INFO: Navigation aborted — navigating to Pluralsight sign-in...');
+          if (_navErr.message && _navErr.message.includes('ERR_ABORTED') && _needsLogin2(page.url())) {
+            console.error('INFO: Navigation aborted — automating sign-in and retrying...');
             await page.goto('https://app.pluralsight.com/id/signin', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-            console.error('INFO: Please sign in to Pluralsight to continue (up to 300s)...');
-            await page.waitForURL(u => !_needsLogin(u), { timeout: 300000 });
-            console.error('INFO: Sign-in complete — retrying navigation...');
+            await _doSignIn();
             await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
           } else {
             throw _navErr;
