@@ -145,7 +145,7 @@ if _is_mac; then
     _warn "[acg-down] existing ArgoCD browser HTTPS listener was not loaded; continuing"
   fi
   _run_command --interactive-sudo --soft -- rm -f "${_argocd_browser_plist}" "${_argocd_browser_wrapper}" >/dev/null 2>&1 || true
-  _run_command --interactive-sudo --soft -- rm -f "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "${_argocd_browser_tls_ca}" "${_argocd_browser_tls_dir}/tls.crt" >/dev/null 2>&1 || true
+  rm -f "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "${_argocd_browser_tls_ca}" "${_argocd_browser_tls_dir}/tls.crt" 2>/dev/null || true
 fi
 
 if [[ "${_keep_hub}" -eq 0 ]]; then
