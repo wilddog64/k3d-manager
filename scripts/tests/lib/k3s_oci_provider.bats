@@ -135,7 +135,7 @@ _BOOTSTRAP='
 # _provider_k3s_oci_deploy_cluster — step sequencing (two-node, stubbed)
 # ---------------------------------------------------------------------------
 
-@test "_provider_k3s_oci_deploy_cluster calls all ten steps in order" {
+@test "_provider_k3s_oci_deploy_cluster calls all twelve steps in order" {
   run bash -c "
     ${_BOOTSTRAP}
     _oci_validate_prereqs()          { echo '[1] validate_prereqs'; return 0; }
@@ -151,6 +151,8 @@ _BOOTSTRAP='
     _oci_wait_argocd()               { echo '[8] wait_argocd'; return 0; }
     _oci_bootstrap_argocd()          { echo '[9] bootstrap_argocd'; return 0; }
     _oci_smoke_test()                { echo '[10] smoke_test'; return 0; }
+    _oci_storage_ensure_bucket()     { echo '[11] ensure_bucket'; return 0; }
+    oci_backup()                     { echo '[12] backup'; return 0; }
     _provider_k3s_oci_deploy_cluster
   "
   [ "$status" -eq 0 ]
@@ -164,6 +166,8 @@ _BOOTSTRAP='
   [[ "$output" == *"[8] wait_argocd"* ]]
   [[ "$output" == *"[9] bootstrap_argocd"* ]]
   [[ "$output" == *"[10] smoke_test"* ]]
+  [[ "$output" == *"[11] ensure_bucket"* ]]
+  [[ "$output" == *"[12] backup"* ]]
 }
 
 @test "_provider_k3s_oci_deploy_cluster aborts when validate_prereqs fails" {
