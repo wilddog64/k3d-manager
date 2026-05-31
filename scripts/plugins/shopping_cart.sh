@@ -125,20 +125,13 @@ function deploy_shopping_cart_data() {
     --from-literal=password=CHANGE_ME \
     --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f -
 
-  _info "[shopping_cart] Waiting for redis-cart-secret to be available in shopping-cart-data (up to 120s)..."
-  kubectl wait secret/redis-cart-secret \
-    -n shopping-cart-data --context ubuntu-k3s \
-    --for=jsonpath='{.metadata.name}'=redis-cart-secret \
-    --timeout=120s 2>/dev/null \
-  || {
-    # kubectl wait --for=jsonpath not available in older k8s — fall back to poll
-    local _i=0
-    until kubectl get secret redis-cart-secret -n shopping-cart-data --context ubuntu-k3s \
-        >/dev/null 2>&1; do
-      (( _i++ )); (( _i >= 24 )) && { _err "[shopping_cart] redis-cart-secret not found after 120s"; return 1; }
-      sleep 5
-    done
-  }
+  _info "[shopping_cart] Waiting for redis-cart-secret to be available in shopping-cart-data (up to 300s)..."
+  local _i=0
+  until kubectl get secret redis-cart-secret -n shopping-cart-data --context ubuntu-k3s \
+      >/dev/null 2>&1; do
+    (( _i++ )); (( _i >= 60 )) && { _err "[shopping_cart] redis-cart-secret not found after 300s"; return 1; }
+    sleep 5
+  done
 
   _info "[shopping_cart] Copying redis-cart-secret to shopping-cart-apps namespace..."
   kubectl get secret redis-cart-secret -n shopping-cart-data --context ubuntu-k3s -o json \
