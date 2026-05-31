@@ -152,7 +152,7 @@ cloudflared-backup:
 	curl -sf -X POST \
 	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/cloudflared" \
-	  -d "$$(python3 -c "import json,sys; print(json.dumps({'data':{'credentials_json':sys.argv[1],'cert_pem':sys.argv[2],'tunnel_id':'bb7ece59-8680-4310-9437-232f862e2773','tunnel_name':'k3d-manager'}}))" "$$_creds" "$$_cert")" >/dev/null && \
+	  -d "$$(CREDS="$$_creds" CERT="$$_cert" python3 -c 'import json,os; print(json.dumps({"data":{"credentials_json":os.environ["CREDS"],"cert_pem":os.environ["CERT"],"tunnel_id":"bb7ece59-8680-4310-9437-232f862e2773","tunnel_name":"k3d-manager"}}))')" >/dev/null && \
 	echo "[cloudflared-backup] Vault updated"
 
 ## Backup k3s etcd snapshot + kubeconfig to OCI object storage (k3s-oci only)
@@ -207,9 +207,7 @@ alertmanager-secret:
 	curl -sf -X POST \
 	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager" \
-	  -d "$$(python3 -c "import json,sys; \
-	    print(json.dumps({'data':{'gmail_from':sys.argv[1],'gmail_app_pw':sys.argv[2],'sms_gateway':sys.argv[3]}}))" \
-	    "$$_gmail" "$$_pw" "$$_sms")" >/dev/null && \
+	  -d "$$(GMAIL_FROM="$$_gmail" GMAIL_PW="$$_pw" SMS_GW="$$_sms" python3 -c 'import json,os; print(json.dumps({"data":{"gmail_from":os.environ["GMAIL_FROM"],"gmail_app_pw":os.environ["GMAIL_PW"],"sms_gateway":os.environ["SMS_GW"]}}))')" >/dev/null && \
 	echo "[alertmanager-secret] Credentials stored in Vault"
 
 ## Deploy observability stack (Prometheus+Grafana+Trivy) to Hub k3d
