@@ -112,11 +112,11 @@ install-sudoers:
 
 ## Deploy observability stack (Prometheus+Grafana+Trivy) to Hub k3d
 observability:
-	./scripts/k3d-manager deploy_observability
+	./scripts/k3d-manager deploy_observability --confirm
 
 ## Deploy observability stack (Prometheus+Trivy) to ACG ubuntu-k3s
 observability-acg:
-	./scripts/k3d-manager deploy_observability_acg
+	./scripts/k3d-manager deploy_observability_acg --confirm
 
 ## Show pod status for monitoring/trivy-system on both clusters
 observability-status:
