@@ -8,7 +8,7 @@ URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL ?= 0
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision sudoers test help
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision install-sudoers test help
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -106,7 +106,7 @@ provision: ssm
 	K3S_AWS_SSM_ENABLED=true scripts/k3d-manager acg_provision --confirm
 
 ## Install passwordless sudo rules for k3d-manager macOS host operations (one-time setup)
-sudoers:
+install-sudoers:
 	bin/install-sudoers.sh
 
 ## Run all BATS test suites
@@ -133,7 +133,7 @@ help:
 	@echo "    make sync-apps             Sync ArgoCD data-layer and show pod status"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
 	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
-	@echo "    make sudoers               Install passwordless sudo rules (one-time macOS setup)"
+	@echo "    make install-sudoers       Install passwordless sudo rules (one-time macOS setup)"
 	@echo ""
 	@echo "  Examples:"
 	@echo "    make up                                          # k3s-aws (default)"

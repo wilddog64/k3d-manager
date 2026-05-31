@@ -1073,6 +1073,9 @@ function _argocd_deploy_appproject() {
 function _argocd_deploy_applicationsets() {
    _info "[argocd] Deploying sample ApplicationSets"
 
+   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+   export K3D_MANAGER_BRANCH
+
    local appsets_dir="$ARGOCD_CONFIG_DIR/applicationsets"
 
    if [[ ! -d "$appsets_dir" ]]; then

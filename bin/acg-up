@@ -696,6 +696,22 @@ kubectl rollout status statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster --timeout=300s
 _info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → ${_cp_server}"
 
+_info "[acg-up] Ensuring argocd-redis secret on ubuntu-k3s (Helm chart hook skipped when ArgoCD manages ArgoCD)..."
+_redis_deadline=$(( $(date +%s) + 120 ))
+while (( $(date +%s) < _redis_deadline )); do
+  if kubectl get namespace cicd --context ubuntu-k3s >/dev/null 2>&1; then
+    break
+  fi
+  sleep 5
+done
+if ! kubectl get secret argocd-redis -n cicd --context ubuntu-k3s >/dev/null 2>&1; then
+  kubectl create secret generic argocd-redis -n cicd --context ubuntu-k3s \
+    --from-literal=auth="$(openssl rand -base64 32)"
+  _info "[acg-up] argocd-redis secret created on ubuntu-k3s"
+else
+  _info "[acg-up] argocd-redis secret already exists on ubuntu-k3s"
+fi
+
 _info "[acg-up] Step 10b/14 — Deploying shopping-cart data layer (PostgreSQL, Redis, RabbitMQ)..."
 deploy_shopping_cart_data
 
