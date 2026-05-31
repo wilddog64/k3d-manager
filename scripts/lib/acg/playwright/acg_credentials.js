@@ -485,7 +485,32 @@ async function extractCredentials() {
             Boolean(document.querySelector('a[href*="cloud-sandboxes"]')) ||
             document.body.innerText.includes('Cloud Sandboxes');
         }, { timeout: 15000 }).catch(() => console.error('WARN: Hands-on route did not settle before sandbox retry'));
-        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+        // Session may have expired — hands-on redirect can land on the login page
+        const _isLoginUrl = (u) => /\/id[\/?]|id\.pluralsight\.com/.test(u);
+        const _afterHandsOnUrl = page.url();
+        if (_isLoginUrl(_afterHandsOnUrl)) {
+          console.error(`INFO: Session expired — Pluralsight login required (${_afterHandsOnUrl}). Please sign in to continue (up to 300s)...`);
+          await page.waitForURL(u => !_isLoginUrl(u), { timeout: 300000 });
+          console.error('INFO: Sign-in complete — resuming...');
+          await page.waitForFunction(
+            () => !document.querySelector('[aria-busy="true"]'),
+            { timeout: 30000 }
+          ).catch(() => {});
+        }
+
+        try {
+          await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        } catch (_navErr) {
+          if (_navErr.message && _navErr.message.includes('ERR_ABORTED') && _isLoginUrl(page.url())) {
+            console.error('INFO: Navigation aborted to login — waiting for sign-in (up to 300s)...');
+            await page.waitForURL(u => !_isLoginUrl(u), { timeout: 300000 });
+            console.error('INFO: Sign-in complete — retrying navigation...');
+            await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+          } else {
+            throw _navErr;
+          }
+        }
         sandboxEntryReady = await _waitForSandboxEntrySoft(30000);
       }
       await _dismissExtendYourSessionDialog();
