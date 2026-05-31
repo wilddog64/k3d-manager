@@ -13,7 +13,9 @@ KEEP_LOCAL ?= 0
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
 	@case "$(CLUSTER_PROVIDER)" in \
-	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager deploy_cluster --confirm ;; \
+	  k3s-oci) mkdir -p "$(HOME)/.local/share/k3d-manager/logs" && \
+	           CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager deploy_cluster --confirm 2>&1 | \
+	           tee "$(HOME)/.local/share/k3d-manager/logs/k3s-oci-up.log" ;; \
 	  *)       GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)" ;; \
 	esac
 
