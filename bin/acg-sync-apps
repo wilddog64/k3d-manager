@@ -17,6 +17,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 source "${REPO_ROOT}/scripts/lib/system.sh"
+_ACG_STATE_DIR="${HOME}/.local/share/k3d-manager"
+mkdir -p "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
 
 INFRA_CONTEXT="${INFRA_CONTEXT:-k3d-k3d-cluster}"
 APP_CONTEXT="${APP_CONTEXT:-ubuntu-k3s}"
@@ -211,8 +213,8 @@ _info "[sync-apps] Pod status (${APP_CONTEXT}):"
 kubectl get pods -A --context "${APP_CONTEXT}"
 
 _info "[sync-apps] Starting frontend port-forward (localhost:${FRONTEND_PORT:-8081} → shopping-cart-apps/frontend:80)..."
-_frontend_pf_pid_file="${HOME}/.local/share/k3d-manager/frontend-pf.pid"
-_frontend_pf_log="${HOME}/.local/share/k3d-manager/frontend-pf.log"
+_frontend_pf_pid_file="${_ACG_STATE_DIR}/run/frontend-pf.pid"
+_frontend_pf_log="${_ACG_STATE_DIR}/logs/frontend-pf.log"
 mkdir -p "$(dirname "${_frontend_pf_pid_file}")"
 
 if [[ -f "${_frontend_pf_pid_file}" ]]; then
