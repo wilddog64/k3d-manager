@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan show-service-passwords
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -225,7 +225,7 @@ observability-status:
 	./scripts/k3d-manager observability_status
 
 ## Print VulnerabilityReport summary for both clusters
-vuln-scan:
+vuln-scan trivy-scan-report:
 	./scripts/k3d-manager trivy_scan_report
 
 ## Run all BATS test suites
