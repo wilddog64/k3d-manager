@@ -4,6 +4,7 @@
 - **RELEASED:** k3d-manager v1.4.12 — PR #83 merged to main (SHA `c5949cf47097d3a89ff485e01f68c2725644d327`). imagePullSecrets patch, sync-branch/sync-main targets, ArgoCD ApplicationSets in make status. Copilot caught shell injection pattern + incomplete app list. enforce_admins restored ✓; next branch: `k3d-manager-v1.5.0`; v1.4.12 retrospective committed (`3c99fc85`) ✓; memory-bank updating (in progress)
 
 ## Status (v1.5.0 — IN PROGRESS)
+- **ASSIGNED TO CODEX:** State-dir layout reorganization — spec: `docs/plans/v1.5.2-state-dir-layout.md` (commit `e66b3659` on `k3d-manager-v1.5.0`); 7 target files; moves runtime *.sh to `bin/`, *.pid/*.plist to `run/`, *.log to `logs/`; commit message: `refactor(state-dir): reorganize runtime files into bin/ run/ logs/ subdirectories`
 - **COMPLETE:** lib-foundation interactive sudo no-TTY fix — lib-foundation `00309de` on `feat/v0.3.20`; k3d-manager subtree merge `2501ba97` on `k3d-manager-v1.5.0`; spec: `docs/bugs/v1.5.0-bugfix-run-command-interactive-sudo-no-tty.md`
 - **COMPLETE:** Vault CA PTY fix — k3d-manager commit `7b7a8ea2` on `k3d-manager-v1.5.0`; spec: `docs/bugs/v1.5.0-bugfix-acg-up-vault-ca-pty-sudo.md`; `bin/acg-up` now skips `security add-trusted-cert` when the Vault CA is already trusted.
 - **COMPLETE:** redis-cart-secret race fix — k3d-manager commit `780930ac` on `k3d-manager-v1.5.0`; spec: `docs/bugs/v1.5.0-bugfix-redis-cart-secret-copy-race.md`; `scripts/plugins/shopping_cart.sh` now waits for `redis-cart-secret` before copying it into `shopping-cart-apps`.
