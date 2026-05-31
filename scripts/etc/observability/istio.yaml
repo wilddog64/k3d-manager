@@ -14,13 +14,13 @@ spec:
         name: http-prometheus
         protocol: HTTP
       hosts:
-        - prometheus.shopping-cart.local
+        - prometheus.3ai-talk.org
     - port:
         number: 80
         name: http-grafana
         protocol: HTTP
       hosts:
-        - grafana.shopping-cart.local
+        - grafana.3ai-talk.org
 ---
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
@@ -29,7 +29,7 @@ metadata:
   namespace: monitoring
 spec:
   hosts:
-    - prometheus.shopping-cart.local
+    - prometheus.3ai-talk.org
   gateways:
     - monitoring/observability-gateway
   http:
@@ -49,7 +49,7 @@ metadata:
   namespace: monitoring
 spec:
   hosts:
-    - grafana.shopping-cart.local
+    - grafana.3ai-talk.org
   gateways:
     - monitoring/observability-gateway
   http:

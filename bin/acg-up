@@ -254,8 +254,8 @@ _HOSTS_LIST=(
   "argocd.shopping-cart.local|${_argocd_host_ip}"
   "keycloak.shopping-cart.local|${_kc_browser_ip}"
   "frontend.shopping-cart.local|127.0.0.2"
-  "prometheus.shopping-cart.local|127.0.0.1"
-  "grafana.shopping-cart.local|127.0.0.1"
+  "prometheus.3ai-talk.org|127.0.0.1"
+  "grafana.3ai-talk.org|127.0.0.1"
 )
 for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
   _h="${_host_ip_pair%%|*}"
