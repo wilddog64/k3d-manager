@@ -56,3 +56,7 @@ kubeControllerManager:
   enabled: false
 kubeScheduler:
   enabled: false
+coreDns:
+  enabled: false
+kubeProxy:
+  enabled: false
