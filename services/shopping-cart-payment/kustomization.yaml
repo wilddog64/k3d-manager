@@ -4,9 +4,12 @@ resources:
   - https://github.com/wilddog64/shopping-cart-payment//k8s/base?ref=main
 patches:
   - patch: |-
-      - op: add
-        path: /spec/template/spec/imagePullSecrets
-        value:
-          - name: ghcr-pull-secret
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: payment-service
+      imagePullSecrets:
+        - name: ghcr-pull-secret
     target:
-      kind: Deployment
+      kind: ServiceAccount
+      name: payment-service

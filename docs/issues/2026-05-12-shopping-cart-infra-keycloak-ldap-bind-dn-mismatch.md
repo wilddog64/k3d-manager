@@ -39,4 +39,4 @@ Keycloak is binding to LDAP as `cn=admin,dc=shopping-cart,dc=local`, but the liv
 - `identity/keycloak/configmap.yaml`
 - `identity/ldap/bootstrap.yaml`
 - `identity/ldap/ldap-secrets-externalsecret.yaml`
-- `identity/config/realm-shopping-cart.json`
+- `identity/keycloak/realm-shopping-cart.json`

@@ -50,8 +50,8 @@ Recent GitHub Issues and findings:
 
 | Date | Issue | Notes |
 |------|-------|-------|
-| 2026-05-30 | [Extend Session Dialog Blocks Navigation Click](docs/issues/2026-05-30-extend-session-dialog-blocks-nav-click.md) | "Extend Your Session" alertdialog intercepts pointer events; fix: use `window.location.assign()` for SPA navigation instead of `navLink.click()` |
 | 2026-05-25 | [Copilot PR #29 Review](docs/issues/2026-05-25-copilot-pr29-review-findings.md) | `git grep -F` for fixed-string dangling-ref check; spec Rules wording clarified |
 | 2026-05-21 | [Copilot PR #22 Review](docs/issues/2026-05-21-copilot-pr22-review-findings.md) | Template preflight check, README link, spec path corrections |
 | 2026-05-21 | [Copilot PR #21 Review](docs/issues/2026-05-21-copilot-pr21-review-findings.md) | `AllowedCidr` default & hard-coded IAM role names in CloudFormation template |
 | 2026-05-21 | [ACG Extend CDP Attach Failure](docs/issues/2026-05-21-acg-extend-cdp-attach-fails-on-chrome-147.md) | Chrome 147 requires `--enable-automation` to accept CDP attach; Playwright script updated |
+| 2026-05-20 | [Copilot PR #18 Review](docs/issues/2026-05-20-copilot-pr18-review-findings.md) | ACG extend flow timing issues & SPA re-navigation challenges |

@@ -35,6 +35,14 @@ source "${REPO_ROOT}/scripts/plugins/argocd.sh"
 source "${REPO_ROOT}/scripts/plugins/keycloak.sh"
 source "${REPO_ROOT}/scripts/plugins/shopping_cart.sh"
 
+: "${_kc_admin_pass:=}"
+: "${_kc_db_pass:=}"
+: "${_argocd_client_secret:=}"
+: "${_order_client_secret:=}"
+: "${_product_client_secret:=}"
+: "${_grafana_client_secret:=}"
+: "${_ldap_admin_pass:=}"
+
 _cluster_provider="${CLUSTER_PROVIDER:-k3s-aws}"
 case "${_cluster_provider}" in
   k3s-aws)
@@ -308,8 +316,13 @@ for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
   _current_host_entry=$(grep -E "^[0-9.]+[[:space:]]+${_h//./\\.}$" /etc/hosts | tail -n 1 || true)
   if [[ "${_current_host_entry}" != "${_desired_host_entry}" ]]; then
     _info "[acg-up] Updating /etc/hosts for ${_h} → ${_desired_ip} (requires sudo)..."
-    if _run_command --interactive-sudo --soft -- \
-        /usr/local/bin/k3d-manager-update-hosts "$_h" "$_desired_ip"; then
+    if _run_command --prefer-sudo --soft -- \
+        sh -c "set -e
+tmp=\$(mktemp)
+grep -vE '^[0-9.]+[[:space:]]+${_h//./\\.}$' /etc/hosts > \"\$tmp\"
+printf '%s\n' '${_desired_host_entry}' >> \"\$tmp\"
+cat \"\$tmp\" > /etc/hosts
+rm -f \"\$tmp\""; then
       _info "[acg-up] /etc/hosts: ${_h} → ${_desired_ip}"
     else
       _warn "could not update /etc/hosts for ${_h} — please add manually: ${_desired_host_entry}"
@@ -337,15 +350,11 @@ if _is_mac; then
     _argocd_browser_ready=0
     _argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}" || exit 1
     if [[ "$(uname)" == "Darwin" ]]; then
-      if ! security verify-cert -c "${_argocd_browser_tls_dir}/ca.crt" >/dev/null 2>&1; then
-        _info "[acg-up] Trusting Vault CA cert in macOS System Keychain (may prompt for sudo password)..."
-        _run_command --interactive-sudo --soft -- \
-          security add-trusted-cert -d -r trustRoot \
-            -k /Library/Keychains/System.keychain \
-            "${_argocd_browser_tls_dir}/ca.crt"
-      else
-        _info "[acg-up] Vault CA cert already trusted in System Keychain — skipping"
-      fi
+      _info "[acg-up] Trusting Vault CA cert in macOS System Keychain (may prompt for sudo password)..."
+      _run_command --prefer-sudo --soft -- \
+        security add-trusted-cert -d -r trustRoot \
+          -k /Library/Keychains/System.keychain \
+          "${_argocd_browser_tls_dir}/ca.crt"
     fi
     _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz"
     cat > "${_argocd_browser_plist_tmp}" <<PLIST
@@ -371,30 +380,35 @@ if _is_mac; then
   </dict>
 </plist>
 PLIST
-    : > "${_argocd_browser_launchctl_log}"
-    if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
-        >"${_argocd_browser_launchctl_log}" 2>&1; then
-      _info "[acg-up] Stopped existing ArgoCD browser HTTPS listener"
-    elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
-      tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
-      _warn "[acg-up] existing ArgoCD browser HTTPS listener was not loaded; continuing"
-    fi
-    : > "${_argocd_browser_launchctl_log}"
-    if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" \
-        >"${_argocd_browser_launchctl_log}" 2>&1; then
-      if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
+    if [[ -f "${_argocd_browser_plist}" ]] && diff -q "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" >/dev/null 2>&1; then
+      rm -f "${_argocd_browser_plist_tmp}"
+      _info "[acg-up] ArgoCD browser HTTPS listener LaunchDaemon unchanged — skipping reinstall"
+    else
+      : > "${_argocd_browser_launchctl_log}"
+      if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
+          >"${_argocd_browser_launchctl_log}" 2>&1; then
+        _info "[acg-up] Stopped existing ArgoCD browser HTTPS listener"
+      elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
         tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+        _warn "[acg-up] existing ArgoCD browser HTTPS listener was not loaded; continuing"
       fi
-      _err "[acg-up] failed to install ArgoCD browser HTTPS listener plist; see ${_argocd_browser_launchctl_log}"
-    fi
-    rm -f "${_argocd_browser_plist_tmp}"
-    : > "${_argocd_browser_launchctl_log}"
-    if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_argocd_browser_plist}" \
-        >"${_argocd_browser_launchctl_log}" 2>&1; then
-      if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
-        tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+      : > "${_argocd_browser_launchctl_log}"
+      if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" \
+          >"${_argocd_browser_launchctl_log}" 2>&1; then
+        if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
+          tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+        fi
+        _err "[acg-up] failed to install ArgoCD browser HTTPS listener plist; see ${_argocd_browser_launchctl_log}"
       fi
-      _err "[acg-up] failed to bootstrap ArgoCD browser HTTPS listener; see ${_argocd_browser_launchctl_log}"
+      rm -f "${_argocd_browser_plist_tmp}"
+      : > "${_argocd_browser_launchctl_log}"
+      if ! _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_argocd_browser_plist}" \
+          >"${_argocd_browser_launchctl_log}" 2>&1; then
+        if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
+          tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+        fi
+        _err "[acg-up] failed to bootstrap ArgoCD browser HTTPS listener; see ${_argocd_browser_launchctl_log}"
+      fi
     fi
     if _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-120}"; then
       _info "[acg-up] ArgoCD reachable at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local} (launchd: ${_argocd_browser_label})"
@@ -412,122 +426,7 @@ if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
   exit 0
 fi
 
-_info "[acg-up] Step 5/12 — Creating ghcr-pull-secret in all app namespaces..."
-_ghcr_pat="${GHCR_PAT:-}"
-_github_user="${GITHUB_USERNAME:-wilddog64}"
-if [[ -n "$_ghcr_pat" ]]; then
-  _pat_http=$(curl -s -o /dev/null -w "%{http_code}" -u "${_github_user}:${_ghcr_pat}" "https://api.github.com/user" 2>/dev/null || true)
-  if [[ "$_pat_http" != "200" ]]; then
-    _info "[acg-up] GHCR_PAT env var is invalid (HTTP ${_pat_http}) — falling back to Vault"
-    _ghcr_pat=""
-  else
-    _info "[acg-up] using validated GHCR_PAT from env for ghcr-pull-secret"
-  fi
-fi
-if [[ -z "$_ghcr_pat" ]]; then
-  _info "[acg-up] GHCR_PAT not in env — checking Vault..."
-  _vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d 2>/dev/null || true)
-  if [[ -n "$_vault_root_token" ]]; then
-    _ghcr_pat=$(curl -s -H "X-Vault-Token: ${_vault_root_token}" "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" | jq -r '.data.data.token // empty' 2>/dev/null || true)
-  fi
-  
-  if [[ -n "$_ghcr_pat" ]]; then
-    _pat_http=$(curl -s -o /dev/null -w "%{http_code}" -u "${_github_user}:${_ghcr_pat}" "https://api.github.com/user" 2>/dev/null || true)
-    if [[ "$_pat_http" == "200" ]]; then
-      _info "[acg-up] using PAT from Vault for ghcr-pull-secret"
-    else
-      _info "[acg-up] Vault PAT is expired (HTTP ${_pat_http}) — prompting for a new one"
-      _ghcr_pat=""
-    fi
-  fi
-  if [[ -z "$_ghcr_pat" ]]; then
-    if [[ -t 0 && -t 1 ]]; then
-      read -r -s -p "[acg-up] Paste GitHub PAT (repo + read:packages) and press Enter: " _ghcr_pat
-      echo ""
-      if [[ -n "${_vault_root_token:-}" && -n "$_ghcr_pat" ]]; then
-        curl -s -X POST -H "X-Vault-Token: ${_vault_root_token}" \
-          -d "{\"data\": {\"token\": \"${_ghcr_pat}\"}}" \
-          "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" >/dev/null || true
-        _info "[acg-up] new PAT saved to Vault"
-      fi
-    else
-      _err "[acg-up] GHCR_PAT not set and no valid PAT in Vault — set GHCR_PAT env var or run: pbpaste | bin/rotate-ghcr-pat"
-    fi
-  fi
-fi
-if [[ -z "$_ghcr_pat" ]]; then
-  _err "[acg-up] GitHub PAT is empty — cannot create ghcr-pull-secret. Re-run with: GHCR_PAT=\$(pbpaste) make up"
-fi
-for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
-  kubectl create namespace "$ns" --context ubuntu-k3s \
-    --dry-run=client -o yaml \
-    | kubectl apply --context ubuntu-k3s -f - >/dev/null
-  case "$ns" in
-    shopping-cart-data)
-      kubectl label namespace "$ns" --context ubuntu-k3s \
-        app.kubernetes.io/component=data \
-        app.kubernetes.io/part-of=shopping-cart \
-        --overwrite >/dev/null ;;
-    shopping-cart-apps)
-      kubectl label namespace "$ns" --context ubuntu-k3s \
-        app.kubernetes.io/component=application \
-        app.kubernetes.io/part-of=shopping-cart \
-        --overwrite >/dev/null ;;
-    shopping-cart-payment)
-      kubectl label namespace "$ns" --context ubuntu-k3s \
-        app.kubernetes.io/component=payment \
-        app.kubernetes.io/part-of=shopping-cart \
-        --overwrite >/dev/null ;;
-  esac
-  kubectl create secret docker-registry ghcr-pull-secret \
-    --docker-server=ghcr.io \
-    --docker-username="${_github_user}" \
-    --docker-password="${_ghcr_pat}" \
-    --context ubuntu-k3s \
-    -n "$ns" \
-    --dry-run=client -o yaml \
-    | kubectl apply --context ubuntu-k3s -f -
-  _info "[acg-up] ghcr-pull-secret applied in namespace: ${ns}"
-done
-
-_info "[acg-up] Step 6/12 — Creating vault-bridge Endpoints + Service in secrets namespace..."
-_vault_node_ip=$(kubectl get nodes --context ubuntu-k3s \
-  -l node-role.kubernetes.io/control-plane \
-  --no-headers \
-  -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
-if [[ -z "${_vault_node_ip}" ]]; then
-  _err "[acg-up] Could not determine server node internal IP — vault-bridge Endpoints skipped"
-else
-  kubectl create namespace secrets --context ubuntu-k3s \
-    --dry-run=client -o yaml \
-    | kubectl apply --context ubuntu-k3s -f - >/dev/null
-  kubectl apply --context ubuntu-k3s -f - <<EOF
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: vault-bridge
-  namespace: secrets
-subsets:
-- addresses:
-  - ip: ${_vault_node_ip}
-  ports:
-  - port: 8201
-EOF
-  _info "[acg-up] vault-bridge Endpoints → ${_vault_node_ip}:8201"
-  kubectl apply --context ubuntu-k3s -f - <<'SVCEOF'
-apiVersion: v1
-kind: Service
-metadata:
-  name: vault-bridge
-  namespace: secrets
-spec:
-  ports:
-  - port: 8201
-    protocol: TCP
-    targetPort: 8201
-SVCEOF
-  _info "[acg-up] vault-bridge Service applied (DNS: vault-bridge.secrets.svc.cluster.local:8201)"
-fi
+shopping_cart_prepare_infra_bootstrap
 
 _info "[acg-up] Step 7/12 — Bootstrapping argocd-manager SA on remote cluster..."
 ssh ubuntu sudo kubectl apply -f - <<'SAEOF'
@@ -573,145 +472,7 @@ SAEOF
 sleep 5
 _info "[acg-up] argocd-manager SA + static token Secret ready"
 
-_info "[acg-up] Step 8/12 — Installing helm + ESO on remote cluster..."
-_eso_version="${ESO_VERSION:-1.0.0}"
-if ! ssh ubuntu command -v helm >/dev/null 2>&1; then
-  _info "[acg-up] helm not found — installing..."
-  ssh ubuntu "curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash" >/dev/null
-fi
-if ! ssh ubuntu "sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm status external-secrets -n secrets >/dev/null 2>&1"; then
-  _info "[acg-up] ESO not installed — installing v${_eso_version}..."
-  # shellcheck disable=SC2029
-  ssh ubuntu "sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm repo add external-secrets https://charts.external-secrets.io >/dev/null 2>&1 && \
-    sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm repo update >/dev/null 2>&1 && \
-    sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm install external-secrets external-secrets/external-secrets \
-      -n secrets --create-namespace --set installCRDs=true --version ${_eso_version}" >/dev/null
-  _info "[acg-up] ESO v${_eso_version} installed"
-else
-  _info "[acg-up] ESO already installed — skipping"
-fi
-
-_info "[acg-up] Step 9/12 — Applying vault-token secret + ClusterSecretStore on remote cluster..."
-_vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
-  -o jsonpath='{.data.root_token}' | base64 -d)
-if [[ -z "${_vault_root_token}" ]]; then
-  _err "[acg-up] Could not read vault-root token from k3d-k3d-cluster — is Vault running?"
-fi
-kubectl create namespace secrets --context ubuntu-k3s \
-  --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f - >/dev/null
-kubectl create secret generic vault-token \
-  -n secrets --context ubuntu-k3s \
-  --from-literal=token="${_vault_root_token}" \
-  --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f -
-_info "[acg-up] Waiting for ESO webhook to be ready..."
-for i in $(seq 1 18); do
-  _wh_ip=$(kubectl get endpoints external-secrets-webhook -n secrets --context ubuntu-k3s \
-    -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null || true)
-  if [[ -n "${_wh_ip}" ]]; then
-    _info "[acg-up] ESO webhook ready (${_wh_ip})"
-    break
-  fi
-  _info "[acg-up] ESO webhook not ready yet (attempt ${i}/18) — waiting 10s..."
-  sleep 10
-done
-kubectl apply --context ubuntu-k3s -f - <<'CSSEOF'
-apiVersion: external-secrets.io/v1
-kind: ClusterSecretStore
-metadata:
-  name: vault-backend
-spec:
-  provider:
-    vault:
-      server: "http://vault-bridge.secrets.svc.cluster.local:8201"
-      path: "secret"
-      version: "v2"
-      auth:
-        tokenSecretRef:
-          name: vault-token
-          namespace: secrets
-          key: token
-CSSEOF
-kubectl annotate clustersecretstore vault-backend --context ubuntu-k3s \
-  "k3d-manager/reconcile-at=$(date -u +%Y%m%dT%H%M%SZ)" \
-  --overwrite >/dev/null
-_info "[acg-up] vault-token secret + ClusterSecretStore applied"
-
-_info "[acg-up] Seeding Vault KV with sandbox static secrets..."
-_vault_kv_put() {
-  curl -sf -X POST \
-    -H "X-Vault-Token: ${_vault_root_token}" \
-    -H "Content-Type: application/json" \
-    -d "{\"data\":$1}" \
-    "http://localhost:${_vault_local_port}/v1/secret/data/$2" >/dev/null
-}
-_vault_kv_exists() {
-  local path="$1"
-  curl -sf \
-    -H "X-Vault-Token: ${_vault_root_token}" \
-    "http://localhost:${_vault_local_port}/v1/secret/data/${path}" >/dev/null 2>&1
-}
-_vault_kv_get_field() {
-  local path="$1"
-  local field="$2"
-  curl -sf \
-    -H "X-Vault-Token: ${_vault_root_token}" \
-    "http://localhost:${_vault_local_port}/v1/secret/data/${path}" \
-    | jq -r --arg field "$field" '.data.data[$field] // empty'
-}
-_pg_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
-_pg_pass_products=$(openssl rand -base64 24 | tr -d '=+/')
-_pg_pass_payment=$(openssl rand -base64 24 | tr -d '=+/')
-_redis_pass_cart=$(openssl rand -base64 24 | tr -d '=+/')
-_redis_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
-_rabbitmq_pass=$(openssl rand -base64 24 | tr -d '=+/')
-
-_vault_kv_put "{\"password\":\"${_redis_pass_cart}\"}"                                           redis/cart
-_vault_kv_put "{\"password\":\"${_redis_pass_orders}\"}"                                         redis/orders-cache
-_vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_orders}\"}"                  postgres/orders
-_vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_products}\"}"                postgres/products
-_vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_payment}\"}"                 postgres/payment
-_vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}'                             payment/encryption
-_vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}'           payment/stripe
-_vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
-_vault_kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbitmq_pass}\"}"                   rabbitmq/default
-
-if _vault_kv_exists "ldap/admin"; then
-  _info "[acg-up] Reusing existing Vault secret ldap/admin"
-  _ldap_admin_pass=$(_vault_kv_get_field "ldap/admin" "admin_password")
-  _ldap_readonly_pass=$(_vault_kv_get_field "ldap/admin" "readonly_password")
-else
-  _ldap_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
-  _ldap_readonly_pass=$(openssl rand -base64 24 | tr -d '=+/')
-  _vault_kv_put "{\"admin_password\":\"${_ldap_admin_pass}\",\"readonly_password\":\"${_ldap_readonly_pass}\"}" ldap/admin
-fi
-
-if _vault_kv_exists "keycloak/admin"; then
-  _info "[acg-up] Reusing existing Vault secret keycloak/admin"
-  _kc_admin_pass=$(_vault_kv_get_field "keycloak/admin" "admin_password")
-  _kc_db_pass=$(_vault_kv_get_field "keycloak/admin" "db_password")
-  if [[ -z "${_kc_admin_pass}" || -z "${_kc_db_pass}" ]]; then
-    _acg_fail "[acg-up] Vault secret keycloak/admin is missing admin_password or db_password — restore the secret before continuing"
-  fi
-else
-  _kc_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
-  _kc_db_pass=$(openssl rand -base64 24 | tr -d '=+/')
-  _vault_kv_put "{\"admin_password\":\"${_kc_admin_pass}\",\"db_password\":\"${_kc_db_pass}\"}" keycloak/admin
-fi
-
-if _vault_kv_exists "keycloak/clients"; then
-  _info "[acg-up] Reusing existing Vault secret keycloak/clients"
-  _argocd_client_secret=$(_vault_kv_get_field "keycloak/clients" "argocd_client_secret")
-  _order_client_secret=$(_vault_kv_get_field "keycloak/clients" "order_service_client_secret")
-  _product_client_secret=$(_vault_kv_get_field "keycloak/clients" "product_catalog_client_secret")
-  _grafana_client_secret=$(_vault_kv_get_field "keycloak/clients" "grafana_client_secret")
-else
-  _argocd_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-  _order_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-  _product_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-  _grafana_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-  _vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
-fi
-_info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq, ldap, keycloak sandbox secrets)"
+shopping_cart_prepare_cluster_secrets_and_seed
 
 _info "[acg-up] Step 10/12 — Registering app cluster with ArgoCD..."
 _argocd_sa_token=$(kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s \
@@ -730,7 +491,7 @@ fi
 kubectl config use-context k3d-k3d-cluster >/dev/null
 ARGOCD_APP_CLUSTER_TOKEN="${_argocd_sa_token}" \
 ARGOCD_APP_CLUSTER_SERVER="${_cp_server}" \
-  "${REPO_ROOT}/scripts/k3d-manager" register_app_cluster
+  register_app_cluster
 _info "[acg-up] Restarting ArgoCD application controller to pick up new cluster secret..."
 kubectl rollout restart statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster
@@ -927,6 +688,73 @@ else
   _info "[acg-up] Retrieve passwords: bin/vault-exec --namespace secrets -- vault kv get -field=password secret/keycloak/users/<user>"
 fi
 
+_info "[acg-up] Step 10d.6/14 — Reconciling Keycloak LDAP federation bind credential..."
+_kc_pod=$(kubectl get pod -n identity --context k3d-k3d-cluster \
+  -l app.kubernetes.io/name=keycloak \
+  -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+if [[ -z "${_kc_pod}" ]]; then
+  _warn "[acg-up] Keycloak pod not found — skipping LDAP bind credential reconciliation"
+else
+  _ldap_component_id=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+    sh -c "/opt/keycloak/bin/kcadm.sh config credentials \
+      --server http://localhost:8080 --realm master \
+      --user admin --password '${_kc_admin_pass}' >/dev/null 2>&1 && \
+    /opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
+      --fields id,providerId 2>/dev/null | \
+    grep -B1 'ldap' | grep '\"id\"' | head -1 | \
+    sed 's/.*: \"//;s/\".*//' " 2>/dev/null || true)
+  if [[ -n "${_ldap_component_id}" ]]; then
+    kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+      sh -c "/opt/keycloak/bin/kcadm.sh update components/${_ldap_component_id} \
+        -r shopping-cart \
+        -s 'config.bindCredential=[\"${_ldap_admin_pass}\"]' >/dev/null 2>&1 && \
+      /opt/keycloak/bin/kcadm.sh create \
+        'user-storage/${_ldap_component_id}/sync?action=triggerFullSync' \
+        -r shopping-cart >/dev/null 2>&1" 2>/dev/null && \
+      _info "[acg-up] LDAP federation bind credential reconciled and full sync triggered" || \
+      _warn "[acg-up] LDAP bind credential reconciliation failed — SSO login may be broken"
+  else
+    _warn "[acg-up] Could not find LDAP federation component ID — skipping bind credential update"
+  fi
+fi
+
+_info "[acg-up] Step 10d.7/14 — Reconciling Keycloak LDAP group mapper..."
+if [[ -z "${_kc_pod:-}" ]] || [[ -z "${_ldap_component_id:-}" ]]; then
+  _warn "[acg-up] Keycloak pod or LDAP component ID unavailable — skipping group mapper reconciliation"
+else
+  _gm_existing=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+    sh -c "/opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
+      -q parent=${_ldap_component_id} \
+      -q type=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
+      -q name=group-mapper \
+      --fields id 2>/dev/null | grep -c '\"id\"' || true" 2>/dev/null || echo "0")
+  if [[ "${_gm_existing}" -gt 0 ]]; then
+    _info "[acg-up] LDAP group mapper already exists"
+  else
+    _gm_json='{"parentId":"'"${_ldap_component_id}"'","providerType":"org.keycloak.storage.ldap.mappers.LDAPStorageMapper","providerId":"group-ldap-mapper","name":"group-mapper","config":{"groups.dn":["ou=groups,dc=shopping-cart,dc=local"],"group.name.ldap.attribute":["cn"],"group.object.classes":["groupOfNames"],"preserve.group.inheritance":["true"],"ignore.missing.groups":["false"],"membership.ldap.attribute":["member"],"membership.attribute.type":["DN"],"membership.user.ldap.attribute":["uid"],"mode":["READ_ONLY"],"user.roles.retrieve.strategy":["LOAD_GROUPS_BY_MEMBER_ATTRIBUTE"],"memberof.ldap.attribute":["memberOf"],"drop.non.existing.groups.during.sync":["false"]}}'
+    kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+      sh -c "echo '${_gm_json}' > /tmp/gm.json && \
+        /opt/keycloak/bin/kcadm.sh create components -r shopping-cart -f /tmp/gm.json >/dev/null && \
+        rm -f /tmp/gm.json" 2>/dev/null && \
+      _info "[acg-up] LDAP group mapper created" || \
+      _warn "[acg-up] LDAP group mapper creation failed"
+  fi
+  _gm_id=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+    sh -c "/opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
+      -q parent=${_ldap_component_id} \
+      -q type=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
+      -q name=group-mapper \
+      --fields id 2>/dev/null | grep '\"id\"' | head -1 | sed 's/.*: \"//;s/\".*//' " 2>/dev/null || true)
+  if [[ -n "${_gm_id}" ]]; then
+    kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+      sh -c "/opt/keycloak/bin/kcadm.sh create \
+        'user-storage/${_ldap_component_id}/mappers/${_gm_id}/sync?direction=fedToKeycloak' \
+        -r shopping-cart >/dev/null 2>&1" 2>/dev/null && \
+      _info "[acg-up] LDAP group sync complete" || \
+      _warn "[acg-up] LDAP group sync failed"
+  fi
+fi
+
 _info "[acg-up] Step 10g.5/14 — Wiring Keycloak cross-cluster reachability on ubuntu-k3s..."
 _node_ip=$(kubectl get node --context ubuntu-k3s \
   -l 'node-role.kubernetes.io/control-plane' \
@@ -1009,30 +837,35 @@ if _is_mac; then
 </dict>
 </plist>
 PLIST
-    : > "${_keycloak_browser_launchctl_log}"
-    if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
-        >"${_keycloak_browser_launchctl_log}" 2>&1; then
-      _info "[acg-up] Stopped existing Keycloak browser HTTP listener"
-    elif [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
-      tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
-      _warn "[acg-up] existing Keycloak browser HTTP listener was not loaded; continuing"
-    fi
-    : > "${_keycloak_browser_launchctl_log}"
-    if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" \
-        >"${_keycloak_browser_launchctl_log}" 2>&1; then
-      if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
+    if [[ -f "${_keycloak_browser_plist}" ]] && diff -q "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" >/dev/null 2>&1; then
+      rm -f "${_keycloak_browser_plist_tmp}"
+      _info "[acg-up] Keycloak browser HTTP listener LaunchDaemon unchanged — skipping reinstall"
+    else
+      : > "${_keycloak_browser_launchctl_log}"
+      if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
+          >"${_keycloak_browser_launchctl_log}" 2>&1; then
+        _info "[acg-up] Stopped existing Keycloak browser HTTP listener"
+      elif [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
         tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
+        _warn "[acg-up] existing Keycloak browser HTTP listener was not loaded; continuing"
       fi
-      _err "[acg-up] failed to install Keycloak browser HTTP listener plist; see ${_keycloak_browser_launchctl_log}"
-    fi
-    rm -f "${_keycloak_browser_plist_tmp}"
-    : > "${_keycloak_browser_launchctl_log}"
-    if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_keycloak_browser_plist}" \
-        >"${_keycloak_browser_launchctl_log}" 2>&1; then
-      if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
-        tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
+      : > "${_keycloak_browser_launchctl_log}"
+      if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" \
+          >"${_keycloak_browser_launchctl_log}" 2>&1; then
+        if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
+          tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
+        fi
+        _err "[acg-up] failed to install Keycloak browser HTTP listener plist; see ${_keycloak_browser_launchctl_log}"
       fi
-      _err "[acg-up] failed to bootstrap Keycloak browser HTTP listener; see ${_keycloak_browser_launchctl_log}"
+      rm -f "${_keycloak_browser_plist_tmp}"
+      : > "${_keycloak_browser_launchctl_log}"
+      if ! _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_keycloak_browser_plist}" \
+          >"${_keycloak_browser_launchctl_log}" 2>&1; then
+        if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
+          tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
+        fi
+        _err "[acg-up] failed to bootstrap Keycloak browser HTTP listener; see ${_keycloak_browser_launchctl_log}"
+      fi
     fi
     _info "[acg-up] Istio ingress HTTP listener reachable at http://keycloak.shopping-cart.local and http://frontend.shopping-cart.local (launchd: ${_keycloak_browser_label})"
   fi
@@ -1098,10 +931,12 @@ kubectl apply --context k3d-k3d-cluster \
   -f "${_infra_root}/argocd/config/argocd-cm.yaml" \
   -f "${_infra_root}/argocd/config/argocd-rbac-cm.yaml"
 
-# Override ArgoCD URL to Cloudflare public domain (argocd-cm.yaml has local URL)
+# Override ArgoCD URL and OIDC issuer to Cloudflare public domain (argocd-cm.yaml has local URLs)
 _argocd_public_url="${ARGOCD_PUBLIC_URL:-https://argocd.3ai-talk.org}"
+_kc_public_realm_url="${KEYCLOAK_PUBLIC_URL:-https://keycloak.3ai-talk.org}/realms/shopping-cart"
+_oidc_config="name: Keycloak\nissuer: ${_kc_public_realm_url}\nclientID: argocd\nclientSecret: \$oidc.keycloak.clientSecret\nrequestedScopes:\n  - openid\n  - profile\n  - email\nrequestedIDTokenClaims:\n  groups:\n    essential: true\n"
 kubectl patch configmap argocd-cm -n cicd --context k3d-k3d-cluster \
-  --type merge -p "{\"data\":{\"url\":\"${_argocd_public_url}\"}}"
+  --type merge -p "{\"data\":{\"url\":\"${_argocd_public_url}\",\"oidc.config\":\"${_oidc_config}\"}}"
 
 # Patch argocd-secret directly with the OIDC client secret generated earlier in this run.
 # The ExternalSecret (argocd-oidc-secret) will take over once ClusterSecretStore is Ready;
@@ -1150,7 +985,7 @@ if _is_mac; then
   mkdir -p "$(dirname "${_frontend_browser_log}")"
   # Ensure 127.0.0.2 loopback alias exists (macOS does not expose 127.0.0.0/8 automatically)
   if ! ifconfig lo0 | grep -q '127\.0\.0\.2'; then
-    _run_command --interactive-sudo --quiet -- ifconfig lo0 alias 127.0.0.2 || \
+    _run_command --prefer-sudo --quiet -- ifconfig lo0 alias 127.0.0.2 || \
       _warn "[acg-up] failed to add 127.0.0.2 loopback alias — frontend port-forward will fail to bind"
   fi
 
@@ -1182,19 +1017,24 @@ if _is_mac; then
 </dict>
 </plist>
 PLIST
-  : > "${_loopback_launchctl_log}"
-  _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_loopback_plist}" \
-    >"${_loopback_launchctl_log}" 2>&1 || true
-  : > "${_loopback_launchctl_log}"
-  if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_loopback_plist_tmp}" "${_loopback_plist}" \
-      >"${_loopback_launchctl_log}" 2>&1; then
-    _warn "[acg-up] failed to install loopback alias plist — frontend may fail after reboot"
-  else
+  if [[ -f "${_loopback_plist}" ]] && diff -q "${_loopback_plist_tmp}" "${_loopback_plist}" >/dev/null 2>&1; then
     rm -f "${_loopback_plist_tmp}"
+    _info "[acg-up] Loopback alias LaunchDaemon unchanged — skipping reinstall"
+  else
     : > "${_loopback_launchctl_log}"
-    _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_loopback_plist}" \
-      >"${_loopback_launchctl_log}" 2>&1 || \
-      _warn "[acg-up] failed to bootstrap loopback alias agent"
+    _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_loopback_plist}" \
+      >"${_loopback_launchctl_log}" 2>&1 || true
+    : > "${_loopback_launchctl_log}"
+    if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_loopback_plist_tmp}" "${_loopback_plist}" \
+        >"${_loopback_launchctl_log}" 2>&1; then
+      _warn "[acg-up] failed to install loopback alias plist — frontend may fail after reboot"
+    else
+      rm -f "${_loopback_plist_tmp}"
+      : > "${_loopback_launchctl_log}"
+      _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_loopback_plist}" \
+        >"${_loopback_launchctl_log}" 2>&1 || \
+        _warn "[acg-up] failed to bootstrap loopback alias agent"
+    fi
   fi
   # Write self-contained wrapper script; paths are baked in at write-time.
   _kubectl_bin="$(command -v kubectl)"
@@ -1234,30 +1074,35 @@ FRONTEND_WRAPPER
 </dict>
 </plist>
 PLIST
-  : > "${_frontend_browser_launchctl_log}"
-  if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
-      >"${_frontend_browser_launchctl_log}" 2>&1; then
-    _info "[acg-up] Stopped existing frontend browser HTTP listener"
-  elif [[ -s "${_frontend_browser_launchctl_log}" ]]; then
-    tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
-    _warn "[acg-up] existing frontend browser HTTP listener was not loaded; continuing"
-  fi
-  : > "${_frontend_browser_launchctl_log}"
-  if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" \
-      >"${_frontend_browser_launchctl_log}" 2>&1; then
-    if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
+  if [[ -f "${_frontend_browser_plist}" ]] && diff -q "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" >/dev/null 2>&1; then
+    rm -f "${_frontend_browser_plist_tmp}"
+    _info "[acg-up] frontend browser HTTP listener LaunchDaemon unchanged — skipping reinstall"
+  else
+    : > "${_frontend_browser_launchctl_log}"
+    if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
+        >"${_frontend_browser_launchctl_log}" 2>&1; then
+      _info "[acg-up] Stopped existing frontend browser HTTP listener"
+    elif [[ -s "${_frontend_browser_launchctl_log}" ]]; then
       tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
+      _warn "[acg-up] existing frontend browser HTTP listener was not loaded; continuing"
     fi
-    _err "[acg-up] failed to install frontend browser HTTP listener plist"
-  fi
-  rm -f "${_frontend_browser_plist_tmp}"
-  : > "${_frontend_browser_launchctl_log}"
-  if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_frontend_browser_plist}" \
-      >"${_frontend_browser_launchctl_log}" 2>&1; then
-    if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
-      tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
+    : > "${_frontend_browser_launchctl_log}"
+    if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" \
+        >"${_frontend_browser_launchctl_log}" 2>&1; then
+      if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
+        tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
+      fi
+      _err "[acg-up] failed to install frontend browser HTTP listener plist"
     fi
-    _err "[acg-up] failed to bootstrap frontend browser HTTP listener"
+    rm -f "${_frontend_browser_plist_tmp}"
+    : > "${_frontend_browser_launchctl_log}"
+    if ! _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_frontend_browser_plist}" \
+        >"${_frontend_browser_launchctl_log}" 2>&1; then
+      if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
+        tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
+      fi
+      _err "[acg-up] failed to bootstrap frontend browser HTTP listener"
+    fi
   fi
   _info "[acg-up] Frontend HTTP listener active: http://frontend.shopping-cart.local → ubuntu-k3s svc/frontend via 127.0.0.2 (launchd: ${_frontend_browser_label})"
 fi
@@ -1381,18 +1226,24 @@ PLIST
 
     _tunnel_launchctl_log="${_tunnel_dir}/logs/cloudflare-tunnel-launchctl.log"
     : > "${_tunnel_urls_file}"
-    _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist}" \
-      >"${_tunnel_launchctl_log}" 2>&1 || true
-    : > "${_tunnel_launchctl_log}"
-    if ! _run_command --interactive-sudo --quiet -- install -m 644 "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" \
-        >"${_tunnel_launchctl_log}" 2>&1; then
-      _warn "[acg-up] failed to install tunnel plist — skipping"
-    else
+    if [[ -f "${_named_tunnel_plist}" ]] && diff -q "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" >/dev/null 2>&1; then
       rm -f "${_named_tunnel_plist_tmp}"
+      _info "[acg-up] Cloudflare named tunnel LaunchDaemon unchanged — skipping reinstall"
+    else
       : > "${_tunnel_launchctl_log}"
-      if ! _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${_named_tunnel_plist}" \
+      _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist}" \
+        >"${_tunnel_launchctl_log}" 2>&1 || true
+      : > "${_tunnel_launchctl_log}"
+      if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" \
           >"${_tunnel_launchctl_log}" 2>&1; then
-        _warn "[acg-up] failed to bootstrap cloudflare tunnel"
+        _warn "[acg-up] failed to install tunnel plist — skipping"
+      else
+        rm -f "${_named_tunnel_plist_tmp}"
+        : > "${_tunnel_launchctl_log}"
+        if ! _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_named_tunnel_plist}" \
+            >"${_tunnel_launchctl_log}" 2>&1; then
+          _warn "[acg-up] failed to bootstrap cloudflare tunnel"
+        fi
       fi
     fi
     _argocd_url="${ARGOCD_PUBLIC_URL:-https://argocd.${CF_DOMAIN:-3ai-talk.org}}"
@@ -1429,6 +1280,9 @@ if [[ "${_css_ready}" == "true" ]]; then
 else
   _info "[acg-up] ClusterSecretStore not Ready after 180s — check vault-bridge connectivity"
 fi
+
+shopping_cart_reconcile_order_service
+shopping_cart_reconcile_product_catalog
 
 _info "[acg-up] Step 12/14 — Installing sandbox TTL watcher (launchd)..."
 acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"

@@ -55,12 +55,22 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `configure_vault_argocd_repos` | `scripts/plugins/argocd.sh` | Configure Vault-managed deploy keys for ArgoCD repos |
 | `deploy_cert_manager` | `scripts/plugins/cert-manager.sh` | Install cert-manager and configure ACME ClusterIssuers |
 | `add_ubuntu_k3s_cluster` | `scripts/plugins/shopping_cart.sh` | Export Ubuntu kubeconfig and register cluster in ArgoCD |
+| `deploy_shopping_cart_data` | `scripts/plugins/shopping_cart.sh` | Wait for ArgoCD to create data-layer StatefulSets; poll PostgreSQL/MinIO readiness; apply and wait for Vault-backed ExternalSecrets |
+| `shopping_cart_sync_vault_backed_secrets` | `scripts/plugins/shopping_cart.sh` | Sync Vault-managed credentials to Kubernetes ExternalSecrets for data services |
+| `shopping_cart_resolve_ghcr_pat` | `scripts/plugins/shopping_cart.sh` | Resolve GitHub Container Registry PAT from env, Vault, or gh CLI |
+| `shopping_cart_create_ghcr_pull_secret` | `scripts/plugins/shopping_cart.sh` | Create Kubernetes image pull secret for GHCR in all required namespaces |
+| `shopping_cart_create_vault_bridge` | `scripts/plugins/shopping_cart.sh` | Establish Vault connectivity bridge (reverse SSH tunnel) to app cluster |
+| `shopping_cart_install_helm_and_eso` | `scripts/plugins/shopping_cart.sh` | Install Helm and External Secrets Operator on app cluster |
+| `shopping_cart_apply_vault_token_and_cluster_secret_store` | `scripts/plugins/shopping_cart.sh` | Configure Vault token secret and SecretStore on app cluster for ESO |
+| `shopping_cart_seed_sandbox_vault_kv` | `scripts/plugins/shopping_cart.sh` | Seed Vault KV store with shopping-cart database and service credentials |
+| `shopping_cart_reconcile_product_catalog` | `scripts/plugins/shopping_cart.sh` | Reconcile ArgoCD ApplicationSet drift for product-catalog application |
+| `shopping_cart_reconcile_order_service` | `scripts/plugins/shopping_cart.sh` | Reconcile ArgoCD ApplicationSet drift for order-service application |
 | `register_shopping_cart_apps` | `scripts/plugins/shopping_cart.sh` | Apply shopping cart ArgoCD Application CRs |
+| `deploy_app_cluster` | `scripts/plugins/shopping_cart.sh` | Install k3s on EC2 via k3sup and merge kubeconfig |
 | `hello` | `scripts/plugins/hello.sh` | Example plugin |
 | `tunnel_start` | `scripts/plugins/tunnel.sh` | Start autossh SSH tunnel with launchd persistence |
 | `tunnel_stop` | `scripts/plugins/tunnel.sh` | Stop the SSH tunnel and unload launchd job |
 | `tunnel_status` | `scripts/plugins/tunnel.sh` | Show tunnel process and launchd status |
-| `deploy_app_cluster` | `scripts/plugins/shopping_cart.sh` | Install k3s on EC2 via k3sup and merge kubeconfig |
 | `acg_get_credentials` | `scripts/plugins/acg.sh` | Extract AWS credentials from Pluralsight Cloud Access via Playwright persistent context and write to `~/.aws/credentials` |
 | `acg_import_credentials` | `scripts/plugins/acg.sh` | Deprecated alias for `aws_import_credentials` — use `aws_import_credentials` instead |
 | `acg_provision` | `scripts/plugins/acg.sh` | Provision ACG sandbox 3-node cluster via CloudFormation (server + 2 agents); `--recreate` tears down and re-provisions |
@@ -72,8 +82,8 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `gemini_install` | `scripts/plugins/gemini.sh` | Verify full Gemini stack installed (Node.js, gemini CLI, IDE, Playwright MCP) |
 | `gemini_trigger_copilot_review` | `scripts/plugins/gemini.sh` | Trigger GitHub Copilot coding agent task via Playwright CDP automation |
 | `gemini_poll_task` | `scripts/plugins/gemini.sh` | Poll a Copilot coding agent task until complete; print full output verbatim |
-| `deploy_shopping_cart_data` | `scripts/plugins/shopping_cart.sh` | Deploy PostgreSQL (orders/payment/products), Redis cart, RabbitMQ; align passwords to `CHANGE_ME`; create `rabbitmq-credentials` and `redis-cart-secret` |
 | `acg_extend_playwright` | `scripts/plugins/acg.sh` | Extend ACG sandbox TTL via Playwright automation (public dispatcher entry point for `_acg_extend_playwright`) |
+| `acg_check_ttl` | `scripts/lib/acg/scripts/plugins/acg.sh` | Read ACG sandbox TTL via Playwright and print remaining minutes; returns -1 if unparseable |
 | `ssm_wait` | `scripts/plugins/ssm.sh` | Wait until an EC2 instance is registered and reachable via SSM (polls `ssm describe-instance-information`) |
 | `ssm_exec` | `scripts/plugins/ssm.sh` | Run a shell command on an EC2 instance via SSM `send-command`; prints command output/results after execution |
 | `ssm_tunnel` | `scripts/plugins/ssm.sh` | Open an SSM port-forward tunnel to an EC2 instance (wraps `aws ssm start-session --document-name AWS-StartPortForwardingSession`) |

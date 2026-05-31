@@ -13,6 +13,8 @@ spec:
   destinations:
     - namespace: secrets
       server: https://kubernetes.default.svc
+    - namespace: secrets
+      name: ubuntu-k3s
     - namespace: cicd
       server: https://kubernetes.default.svc
     - namespace: identity
@@ -64,6 +66,8 @@ spec:
       kind: ClusterVulnerabilityReport
     - group: aquasecurity.github.io
       kind: ClusterConfigAuditReport
+    - group: external-secrets.io
+      kind: ClusterSecretStore
   namespaceResourceWhitelist:
     - group: '*'
       kind: '*'

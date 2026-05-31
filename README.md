@@ -291,6 +291,7 @@ Recent entries:
 | Date | Issue | Component |
 |---|---|---|
 | 2026-05-31 | [Copilot PR #84 review findings](docs/issues/2026-05-31-copilot-pr84-review-findings.md) | Vault token + Gmail password in process args fixed; Prometheus auth deferred to v1.5.7 oauth2-proxy |
+| 2026-05-29 | [Copilot PR #83 review findings](docs/issues/2026-05-29-copilot-pr83-review-findings.md) | Makefile shell injection in BRANCH interpolation fixed; sync-branch/sync-main missing 2 apps added; stale activeContext carry-forward items cleared |
 | 2026-05-19 | [Copilot PR #77 review findings](docs/issues/2026-05-19-copilot-pr77-review-findings.md) | CHANGELOG vault path typo fixed; pre-existing acg_credentials.js positional GCP extraction, navigation skip scope, and provider card selection flagged for follow-on specs |
 | 2026-05-19 | [git push upstream default targeted main](docs/issues/2026-05-19-git-push-upstream-default-targeted-main.md) | shopping-cart repos — `git push --set-upstream origin fix/keycloak-public-url` pushed branch-default main instead of feature branch; workaround: explicit `git push origin fix/keycloak-public-url` after tracking. Upstream quirk documented for awareness |
 | 2026-05-15 | [Copilot PR #74 review findings](docs/issues/2026-05-15-copilot-pr74-review-findings.md) | acg_extend.js URL matching, keycloak.sh PGPASSWORD exposure, ldap.sh ESO dependency guard, vault.sh revoke error propagation |
@@ -305,16 +306,19 @@ Recent entries:
 | Version | Date | Highlights |
 |---|---|---|
 | [v1.5.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.5.0) | 2026-05-31 | OCI Always Free provider (k3s-oci single/two-node ARM64) with Cilium CNI; observability stack (Prometheus+Grafana+Trivy+Alertmanager with email-to-SMS) via ArgoCD ApplicationSet; observability.sh subshell guard fix; ACG memory limit fixes; credential wait loop + Playwright CDP improvements |
-| [v1.4.9](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.9) | 2026-05-22 | ACG credential wait + extraction visibility fixes — sandbox TTL polling before provision, auto-extend before expiry, auto-restart expired; Cloudflare tunnel named config generation; CoreDNS duplicate `hosts` block patching; CloudFormation race condition polling after credential extraction |
-| [v1.4.8](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.8) | 2026-05-19 | vault.sh temp file leak fixes, acg_extend.js CDP disconnect hang, Keycloak frontendUrl + named Cloudflare tunnel in acg-up |
+| [v1.4.12](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.12) | 2026-05-29 | imagePullSecrets patch for named ServiceAccounts (ghcr.io 401 fix), Makefile sync-branch/sync-main targets, ArgoCD ApplicationSets in make status, shopping-cart-payment ExternalSecret SharedResourceWarning fix |
+| [v1.4.11](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.11) | 2026-05-29 | ESO sync saturation fix, acg-down macOS Tahoe password prompt fix, data-layer StatefulSet race fix, Keycloak group-ldap-mapper reconciliation, ArgoCD RBAC product-catalog reference fix, legacy ArgoCD app definition removal |
 
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
-| [v1.4.7](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.7) | 2026-05-18 | Keycloak public URL via Cloudflare + CoreDNS — `frontendUrl` set to Cloudflare domain after realm import; SSH tunnel + iptables DNAT + CoreDNS patch for cross-cluster Keycloak reachability; cross-cluster Keycloak JWT issuer URI aligned in all shopping-cart services |
-| [v1.4.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.4) | 2026-05-08 | Identity SSO fixes — Keycloak ExternalSecret bootstrapping, Keycloak KV seeding, shopping-cart-identity ArgoCD app, shopping-cart-infra OIDC realm; lib-foundation + lib-acg subtree pulls |
+| [v1.4.10](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.10) | 2026-05-29 | ArgoCD stability, bootstrap reliability, /tmp cleanup |
+| [v1.4.9](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.9) | 2026-05-22 | ACG credential wait + extraction visibility fixes; Cloudflare tunnel named config; CoreDNS duplicate hosts patch |
+| [v1.4.8](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.8) | 2026-05-19 | vault.sh temp file leak fixes, acg_extend.js CDP disconnect hang, Keycloak frontendUrl + named Cloudflare tunnel |
+| [v1.4.7](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.7) | 2026-05-18 | Keycloak public URL via Cloudflare + CoreDNS; cross-cluster Keycloak JWT issuer URI alignment |
+| [v1.4.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.4) | 2026-05-08 | Identity SSO fixes — Keycloak ExternalSecret bootstrapping, KV seeding, OIDC realm; lib-foundation + lib-acg subtree pulls |
 | [v1.4.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.2) | 2026-05-07 | `_ai_agent_review` generic dispatch + ArgoCD bootstrap hardening + lib-acg cdp.sh fixes — `launchctl bootout`, dead Linux else-block removal, configurable `ARGOCD_SERVER_WAIT_TIMEOUT`, Hub bootstrap refresh |
 | [v1.2.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.2.0) | 2026-04-30 | lib-acg extraction + shopping-cart bootstrap + GHCR hardening — ACG/GCP automation extracted to `scripts/lib/acg/` subtree; `deploy_shopping_cart_data()` in `acg-up`; Vault-first GHCR fail-closed; ArgoCD launchd port-forward; ApplicationSet branch var; Vault sealed-state recovery |
 | [v1.1.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.1.0) | 2026-04-24 | Unified ACG automation AWS + GCP — GCP provider (`k3s-gcp`), OAuth automation, CDP headless Linux, `bin/acg-sync-apps` port-forward hardening, Hub auto-create + bootstrap, provider-aware teardown |

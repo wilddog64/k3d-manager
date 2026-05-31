@@ -6,9 +6,12 @@
 CLUSTER_PROVIDER ?= k3s-aws
 URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
-KEEP_LOCAL ?= 0
+KEEP_LOCAL    ?= 0
+BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
+INFRA_CONTEXT ?= k3d-k3d-cluster
+ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision install-sudoers cloudflared-backup alertmanager-secret test help observability observability-acg observability-status vuln-scan show-service-passwords
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers cloudflared-backup alertmanager-secret test help observability observability-acg observability-status vuln-scan show-service-passwords
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -88,6 +91,33 @@ argocd-registration:
 ## Sync ArgoCD data-layer and show remote pod status
 sync-apps:
 	APP_CONTEXT=$(if $(filter k3s-gcp,$(CLUSTER_PROVIDER)),ubuntu-gcp,ubuntu-k3s) bin/acg-sync-apps
+
+## Point services-git ApplicationSet at BRANCH (default: current branch) and force-refresh apps
+## Usage: make sync-branch            — uses current branch
+##        make sync-branch BRANCH=k3d-manager-v1.4.12
+sync-branch:
+	@echo "[make] Patching services-git ApplicationSet → $(BRANCH)"
+	@_b='$(BRANCH)'; \
+	kubectl patch applicationset services-git -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
+	  --type=json -p \
+	  "[{\"op\":\"replace\",\"path\":\"/spec/generators/0/git/revision\",\"value\":\"$$_b\"},{\"op\":\"replace\",\"path\":\"/spec/template/spec/source/targetRevision\",\"value\":\"$$_b\"}]"
+	@for app in shopping-cart-basket shopping-cart-frontend shopping-cart-namespace shopping-cart-order shopping-cart-payment shopping-cart-product-catalog; do \
+	  kubectl annotate application "$$app" -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
+	    argocd.argoproj.io/refresh=normal --overwrite 2>/dev/null || true; \
+	done
+	@echo "[make] Refresh triggered — run 'make status' in ~30s to verify pods"
+
+## Revert services-git ApplicationSet back to main and force-refresh apps
+sync-main:
+	@echo "[make] Reverting services-git ApplicationSet → main"
+	@kubectl patch applicationset services-git -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
+	  --type=json -p \
+	  '[{"op":"replace","path":"/spec/generators/0/git/revision","value":"main"},{"op":"replace","path":"/spec/template/spec/source/targetRevision","value":"main"}]'
+	@for app in shopping-cart-basket shopping-cart-frontend shopping-cart-namespace shopping-cart-order shopping-cart-payment shopping-cart-product-catalog; do \
+	  kubectl annotate application "$$app" -n $(ARGOCD_NS) --context $(INFRA_CONTEXT) \
+	    argocd.argoproj.io/refresh=normal --overwrite 2>/dev/null || true; \
+	done
+	@echo "[make] Refresh triggered — run 'make status' to confirm"
 
 ## Ensure AWS Session Manager plugin is installed (required for SSM-based deployment)
 ssm:
@@ -204,8 +234,10 @@ help:
 	@echo "    make creds         Extract AWS credentials only"
 	@echo "    make chrome-cdp    Install Chrome CDP launchd agent (automated credentials)"
 	@echo "    make chrome-cdp-stop   Uninstall Chrome CDP launchd agent"
-	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD"
-	@echo "    make sync-apps             Sync ArgoCD data-layer and show pod status"
+	@echo "    make argocd-registration   Re-register ubuntu-k3s with ArgoCD (after sandbox recreation)"
+	@echo "    make sync-apps             Sync ArgoCD data-layer and show remote pod status"
+	@echo "    make sync-branch           Point services-git at BRANCH (default: current branch) and refresh"
+	@echo "    make sync-main             Revert services-git to main and refresh"
 	@echo "    make ssm                   Ensure session-manager-plugin is installed"
 	@echo "    make provision             Provision ACG stack via SSM (depends on ssm)"
 	@echo "    make install-sudoers       Install passwordless sudo rules (one-time macOS setup)"
