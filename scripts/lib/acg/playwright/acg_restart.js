@@ -226,6 +226,61 @@ async function restartSandbox() {
       }
     );
 
+    // Automate Pluralsight sign-in when the session has expired.
+    // Navigates to the sign-in page, clicks "Sign in" button if needed (landing page vs form),
+    // then fills email + password from env vars. Requires PLURALSIGHT_EMAIL and PLURALSIGHT_PASSWORD.
+    const _doSignIn = async () => {
+      const emailCheck = page.locator('input[type="email"], input[name="email"]').first();
+      const emailVisible = await emailCheck.isVisible({ timeout: 3000 }).catch(() => false);
+      if (!emailVisible) {
+        const signInBtn = page.locator('button:has-text("Sign in"), button:has-text("Sign In"), a:has-text("Sign in"), a:has-text("Sign In")').first();
+        if (await signInBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+          console.error('INFO: Clicking Sign in button to reach the email form...');
+          await signInBtn.click();
+        }
+        await page.waitForSelector('input[type="email"], input[name="email"]', { timeout: 30000 });
+      }
+      const emailInput = page.locator('input[type="email"], input[name="email"]').first();
+      await emailInput.click();
+      const email = process.env.PLURALSIGHT_EMAIL || '';
+      if (email) {
+        await emailInput.fill(email);
+        console.error('INFO: Filled email from PLURALSIGHT_EMAIL');
+      } else {
+        console.error('WARN: PLURALSIGHT_EMAIL not set — waiting 5s for Password Manager (may fail)');
+        await page.waitForTimeout(5000);
+      }
+      const continueBtn = page.locator('button[type="submit"], button:has-text("Continue")').first();
+      if (await continueBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
+        await continueBtn.click();
+        await page.waitForTimeout(3000);
+      }
+      const passwordInput = page.locator('input[type="password"]').first();
+      if (await passwordInput.isVisible({ timeout: 10000 }).catch(() => false)) {
+        await passwordInput.click();
+        const password = process.env.PLURALSIGHT_PASSWORD || '';
+        if (password) {
+          await passwordInput.fill(password);
+          console.error('INFO: Filled password from PLURALSIGHT_PASSWORD');
+        } else {
+          console.error('WARN: PLURALSIGHT_PASSWORD not set — waiting 5s for Password Manager (may fail)');
+          await page.waitForTimeout(5000);
+        }
+        const submitBtn = page.locator('button[type="submit"], button:has-text("Sign in"), button:has-text("Log in")').first();
+        if (await submitBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
+          await submitBtn.click();
+          console.error('INFO: Submitted sign-in form — waiting for redirect...');
+        }
+      }
+      await page.waitForURL('**app.pluralsight.com**', { timeout: 120000 });
+      console.error('INFO: Sign-in complete.');
+    };
+
+    const _isLoginPage = (u) => {
+      try { const h = new URL(u).hostname; return h !== 'app.pluralsight.com' || /\/id[\/?]/.test(u); }
+      catch { return true; }
+    };
+
     // Navigate to sandbox listing if not already there
     const currentUrl = page.url();
     const isOnSandboxPage = currentUrl.includes('cloud-sandboxes') || currentUrl.includes('hands-on/playground') || currentUrl.includes('cloud-playground');
@@ -234,11 +289,20 @@ async function restartSandbox() {
       if (normalizedUrl.includes('cloud-playground/cloud-sandboxes')) {
         normalizedUrl = normalizedUrl.replace('cloud-playground/cloud-sandboxes', 'hands-on/playground/cloud-sandboxes');
       }
+      // Handle the case where we're already on a login page before navigating
+      if (_isLoginPage(currentUrl)) {
+        console.error(`INFO: Already on login page (${currentUrl}) — automating sign-in...`);
+        await page.goto('https://app.pluralsight.com/id/signin', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+        await _doSignIn();
+      }
       console.error(`INFO: Navigating to ${normalizedUrl}...`);
       await page.goto(normalizedUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-      const postNavUrl = page.url();
-      if (postNavUrl.includes('/id') || postNavUrl.includes('sign-in') || postNavUrl.includes('login')) {
-        throw new Error(`Pluralsight session expired — redirected to ${postNavUrl}. Re-login in Chrome and retry.`);
+      if (_isLoginPage(page.url())) {
+        console.error(`INFO: Redirected to login page — automating sign-in...`);
+        await page.goto('https://app.pluralsight.com/id/signin', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+        await _doSignIn();
+        console.error(`INFO: Navigating to ${normalizedUrl} after sign-in...`);
+        await page.goto(normalizedUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
       }
     } else {
       console.error(`INFO: Already on sandbox page: ${currentUrl}`);
