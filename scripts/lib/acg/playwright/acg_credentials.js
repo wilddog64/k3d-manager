@@ -386,69 +386,18 @@ async function extractCredentials() {
     //   (b) redirected to id.pluralsight.com or app.pluralsight.com/id login page
     //   (c) sign-in link visible on the current page
 
-    // Automate Pluralsight sign-in. May be called from any login-related page:
-    //   - app.pluralsight.com/id or /id/signin  → shows a "Sign in" button, not the form
-    //   - id.pluralsight.com/signin              → shows the email form directly
-    // Clicks the Sign in button first if the email form isn't already visible.
+    // Open the Pluralsight sign-in page in Chrome and wait for the user to log in manually.
+    // ACG uses a CAPTCHA on the sign-in form, so automated form-filling is not feasible.
+    // Chrome is already running with CDP — the user just needs to complete the login.
     const _doSignIn = async () => {
-      // Step 1: if we see a "Sign in" button but not an email input, click the button to reach the form
-      const emailInputCheck = page.locator('input[type="email"], input[name="email"], input[id*="email"]').first();
-      const emailAlreadyVisible = await emailInputCheck.isVisible({ timeout: 3000 }).catch(() => false);
-      if (!emailAlreadyVisible) {
-        const signInBtn = page.locator('button:has-text("Sign in"), button:has-text("Sign In"), a:has-text("Sign in"), a:has-text("Sign In")').first();
-        const btnVisible = await signInBtn.isVisible({ timeout: 5000 }).catch(() => false);
-        if (btnVisible) {
-          console.error('INFO: Clicking Sign in button to reach the email form...');
-          await signInBtn.click();
-        }
-        // Wait for the form page (id.pluralsight.com or app.pluralsight.com/id with email field)
-        await page.waitForSelector('input[type="email"], input[name="email"], input[id*="email"]', { timeout: 30000 });
-      }
-
-      // Step 2: fill email
-      const emailInput = page.locator('input[type="email"], input[name="email"], input[id*="email"]').first();
-      await emailInput.click();
-      const email = process.env.PLURALSIGHT_EMAIL || '';
-      if (email) {
-        await emailInput.fill(email);
-        console.error('INFO: Filled email from PLURALSIGHT_EMAIL');
-      } else {
-        console.error('WARN: PLURALSIGHT_EMAIL not set — waiting for Password Manager auto-fill');
-        await page.waitForTimeout(5000);
-      }
-
-      // Step 3: Continue (two-step flow)
-      const continueBtn = page.locator('button[type="submit"], button:has-text("Continue")').first();
-      if (await continueBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
-        await continueBtn.click();
-        await page.waitForTimeout(3000);
-      }
-
-      // Step 4: fill password
-      const passwordInput = page.locator('input[type="password"]').first();
-      if (await passwordInput.isVisible({ timeout: 10000 }).catch(() => false)) {
-        await passwordInput.click();
-        const password = process.env.PLURALSIGHT_PASSWORD || '';
-        if (password) {
-          await passwordInput.fill(password);
-          console.error('INFO: Filled password from PLURALSIGHT_PASSWORD');
-        } else {
-          console.error('WARN: PLURALSIGHT_PASSWORD not set — waiting for Password Manager auto-fill');
-          await page.waitForTimeout(5000);
-        }
-        const submitBtn = page.locator('button[type="submit"], button:has-text("Sign in"), button:has-text("Log in")').first();
-        if (await submitBtn.isVisible({ timeout: 10000 }).catch(() => false)) {
-          await submitBtn.click();
-          console.error('INFO: Submitted sign-in form — waiting for redirect...');
-        }
-      }
-
-      // Step 5: wait for redirect back to app.pluralsight.com (non-login path)
+      console.error('INFO: Session expired — opening Pluralsight sign-in page in Chrome...');
+      await page.goto('https://app.pluralsight.com/id/signin', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+      console.error('ACTION REQUIRED: Please sign in to Pluralsight in the Chrome window. Script will continue automatically after login...');
       await page.waitForURL(
         u => { try { const p = new URL(u); return p.hostname === 'app.pluralsight.com' && !/\/id[\/?]/.test(p.pathname); } catch { return false; } },
         { timeout: 300000 }
       );
-      console.error('INFO: Sign-in complete — resuming credential extraction...');
+      console.error('INFO: Sign-in detected — resuming credential extraction...');
       await page.waitForFunction(
         () => !document.querySelector('[aria-busy="true"]'),
         { timeout: 30000 }
