@@ -48,7 +48,16 @@ grafana:
         timeInterval: 30s
 
 alertmanager:
-  enabled: false
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests:
+        memory: 32Mi
+        cpu: 10m
+      limits:
+        memory: 64Mi
+        cpu: 50m
+  configSecret: alertmanager-smtp-secret
 
 kubeEtcd:
   enabled: false

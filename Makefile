@@ -8,7 +8,7 @@ URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL ?= 0
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision install-sudoers cloudflared-backup test help observability observability-acg observability-status vuln-scan
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision install-sudoers cloudflared-backup alertmanager-secret test help observability observability-acg observability-status vuln-scan
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -124,6 +124,21 @@ cloudflared-backup:
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/cloudflared" \
 	  -d "$$(python3 -c "import json,sys; print(json.dumps({'data':{'credentials_json':sys.argv[1],'cert_pem':sys.argv[2],'tunnel_id':'bb7ece59-8680-4310-9437-232f862e2773','tunnel_name':'k3d-manager'}}))" "$$_creds" "$$_cert")" >/dev/null && \
 	echo "[cloudflared-backup] Vault updated"
+
+## Store Alertmanager credentials in Vault (run once; requires Hub Vault + port-forward)
+alertmanager-secret:
+	@_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
+	  -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
+	read -r -p "Gmail from address: " _gmail; \
+	read -r -s -p "Gmail app password: " _pw; echo; \
+	read -r -p "T-Mobile SMS gateway (10digits@tmomail.net): " _sms; \
+	curl -sf -X POST \
+	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
+	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager" \
+	  -d "$$(python3 -c "import json,sys; \
+	    print(json.dumps({'data':{'gmail_from':sys.argv[1],'gmail_app_pw':sys.argv[2],'sms_gateway':sys.argv[3]}}))" \
+	    "$$_gmail" "$$_pw" "$$_sms")" >/dev/null && \
+	echo "[alertmanager-secret] Credentials stored in Vault"
 
 ## Deploy observability stack (Prometheus+Grafana+Trivy) to Hub k3d
 observability:
