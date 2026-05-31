@@ -65,10 +65,17 @@ _launchd_ensure() {
     _info "[acg-refresh] launchd ${label}: loaded"
   else
     _info "[acg-refresh] launchd ${label}: not loaded — bootstrapping..."
+    local _wrapper
+    _wrapper=$(grep -A1 "ProgramArguments" "${plist}" 2>/dev/null | \
+      grep -v "ProgramArguments\|array" | sed 's/.*<string>//;s/<\/string>//' | grep -v "^/bin/" | head -1 || true)
+    if [[ -n "${_wrapper}" ]]; then
+      pkill -f "${_wrapper}" 2>/dev/null || true
+      sleep 1
+    fi
     if [[ "${domain}" == "system" ]]; then
-      _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${plist}" \
+      _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${plist}" \
         && _info "[acg-refresh] launchd ${label}: bootstrapped" \
-        || _warn "[acg-refresh] launchd ${label}: bootstrap failed"
+        || _warn "[acg-refresh] launchd ${label}: bootstrap failed (plist exists but service could not start — check wrapper script and TLS certs)"
     else
       launchctl load "${plist}" 2>/dev/null \
         && _info "[acg-refresh] launchd ${label}: loaded" \
@@ -85,7 +92,7 @@ _launchd_restart() {
   _info "[acg-refresh] Restarting launchd ${label}..."
   if [[ "${domain}" == "system" ]]; then
     _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${plist}" || true
-    _run_command --interactive-sudo --quiet -- launchctl bootstrap system "${plist}" \
+    _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${plist}" \
       && _info "[acg-refresh] launchd ${label}: restarted" \
       || _warn "[acg-refresh] launchd ${label}: restart failed"
   else
