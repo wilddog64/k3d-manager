@@ -8,7 +8,7 @@ URL ?= https://app.pluralsight.com/cloud-playground/cloud-sandboxes
 GHCR_PAT ?=
 KEEP_LOCAL ?= 0
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision install-sudoers test help observability observability-acg observability-status vuln-scan
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps ssm provision install-sudoers cloudflared-backup test help observability observability-acg observability-status vuln-scan
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -109,6 +109,21 @@ provision: ssm
 ## Install passwordless sudo rules for k3d-manager macOS host operations (one-time setup)
 install-sudoers:
 	bin/install-sudoers.sh
+
+## Backup Cloudflare tunnel credentials to macOS Keychain + Vault (run after rotating credentials)
+cloudflared-backup:
+	@_tok=$$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
+	  -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d); \
+	_creds=$$(cat "$$HOME/.cloudflared/bb7ece59-8680-4310-9437-232f862e2773.json"); \
+	_cert=$$(cat "$$HOME/.cloudflared/cert.pem"); \
+	security add-generic-password -a cloudflared -s k3d-manager-cloudflared-credentials -w "$$_creds" -U && \
+	security add-generic-password -a cloudflared -s k3d-manager-cloudflared-cert -w "$$_cert" -U && \
+	echo "[cloudflared-backup] Keychain updated" && \
+	curl -sf -X POST \
+	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
+	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/cloudflared" \
+	  -d "$$(python3 -c "import json,sys; print(json.dumps({'data':{'credentials_json':sys.argv[1],'cert_pem':sys.argv[2],'tunnel_id':'bb7ece59-8680-4310-9437-232f862e2773','tunnel_name':'k3d-manager'}}))" "$$_creds" "$$_cert")" >/dev/null && \
+	echo "[cloudflared-backup] Vault updated"
 
 ## Deploy observability stack (Prometheus+Grafana+Trivy) to Hub k3d
 observability:

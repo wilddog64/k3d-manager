@@ -208,6 +208,46 @@ elif [[ "${_vault_sealed}" == "unknown" ]]; then
 fi
 _info "[acg-up] Vault is unsealed and reachable."
 
+_info "[acg-up] Step 4a.1/12 — Syncing Cloudflare tunnel credentials Keychain → Vault..."
+_cf_vault_path="secret/data/k3d-manager/cloudflared"
+_vault_token_b64=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
+  -o jsonpath='{.data.root_token}' 2>/dev/null || true)
+_vault_tok=$(printf '%s' "${_vault_token_b64}" | base64 -d 2>/dev/null || true)
+if [[ -n "${_vault_tok}" ]]; then
+  _vault_has_cf=$(curl -sf \
+    -H "X-Vault-Token: ${_vault_tok}" \
+    "http://127.0.0.1:${_vault_local_port}/v1/${_cf_vault_path}" 2>/dev/null | \
+    python3 -c "import sys,json; d=json.load(sys.stdin); print('ok' if d.get('data',{}).get('data',{}).get('credentials_json') else '')" 2>/dev/null || true)
+  if [[ -z "${_vault_has_cf}" ]]; then
+    _info "[acg-up] Vault missing cloudflared credentials — restoring from Keychain..."
+    _kc_creds=$(security find-generic-password -a cloudflared \
+      -s k3d-manager-cloudflared-credentials -w 2>/dev/null || true)
+    _kc_cert=$(security find-generic-password -a cloudflared \
+      -s k3d-manager-cloudflared-cert -w 2>/dev/null || true)
+    if [[ -n "${_kc_creds}" && -n "${_kc_cert}" ]]; then
+      _cf_payload=$(python3 -c "
+import json, sys
+print(json.dumps({'data': {
+  'credentials_json': sys.argv[1],
+  'cert_pem': sys.argv[2],
+  'tunnel_id': 'bb7ece59-8680-4310-9437-232f862e2773',
+  'tunnel_name': 'k3d-manager'
+}}))" "${_kc_creds}" "${_kc_cert}")
+      curl -sf -X POST \
+        -H "X-Vault-Token: ${_vault_tok}" \
+        -H "Content-Type: application/json" \
+        "http://127.0.0.1:${_vault_local_port}/v1/${_cf_vault_path}" \
+        -d "${_cf_payload}" >/dev/null \
+        && _info "[acg-up] Cloudflare credentials pushed to Vault from Keychain" \
+        || _warn "[acg-up] Failed to push cloudflared credentials to Vault"
+    else
+      _warn "[acg-up] Cloudflared credentials not found in Keychain — Vault sync skipped (run: make cloudflared-backup)"
+    fi
+  else
+    _info "[acg-up] Cloudflare credentials already in Vault — skipping sync"
+  fi
+fi
+
 _info "[acg-up] Step 4b/12 — Installing ArgoCD port-forward launchd agent (localhost:8080, auto-restart)..."
 _argocd_pf_label="com.k3d-manager.argocd-port-forward"
 _argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
