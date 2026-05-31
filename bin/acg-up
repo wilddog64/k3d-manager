@@ -1242,12 +1242,12 @@ fi
 
 if _is_mac; then
   _info "[acg-up] Step 10h/14 — Installing Cloudflare named tunnel (argocd + frontend + keycloak)..."
-  _tunnel_dir="${HOME}/.local/share/k3d-manager"
+  _tunnel_dir="${_ACG_STATE_DIR}"
   _tunnel_urls_file="${_tunnel_dir}/tunnel-urls.txt"
   _cloudflared_config="${HOME}/.cloudflared/config.yml"
   _cf_domain="${CF_DOMAIN:-3ai-talk.org}"
   _cf_template="${REPO_ROOT}/scripts/etc/cloudflared-config.yml.tmpl"
-  mkdir -p "${_tunnel_dir}"
+  mkdir -p "${_tunnel_dir}/logs" "${_tunnel_dir}/run"
 
   if ! command -v cloudflared >/dev/null 2>&1; then
     if command -v brew >/dev/null 2>&1; then
@@ -1286,9 +1286,9 @@ if _is_mac; then
 
   if command -v cloudflared >/dev/null 2>&1 && [[ -f "${_cloudflared_config}" ]]; then
     _named_tunnel_label="com.k3d-manager.cloudflare-tunnel"
-    _named_tunnel_log="${_tunnel_dir}/cloudflare-tunnel.log"
+    _named_tunnel_log="${_tunnel_dir}/logs/cloudflare-tunnel.log"
     _named_tunnel_plist="/Library/LaunchDaemons/${_named_tunnel_label}.plist"
-    _named_tunnel_plist_tmp="${_tunnel_dir}/cloudflare-tunnel.plist"
+    _named_tunnel_plist_tmp="${_tunnel_dir}/run/cloudflare-tunnel.plist"
     _cloudflared_bin="$(command -v cloudflared)"
 
     cat > "${_named_tunnel_plist_tmp}" <<PLIST
@@ -1318,7 +1318,7 @@ if _is_mac; then
 </plist>
 PLIST
 
-    _tunnel_launchctl_log="${_tunnel_dir}/cloudflare-tunnel-launchctl.log"
+    _tunnel_launchctl_log="${_tunnel_dir}/logs/cloudflare-tunnel-launchctl.log"
     : > "${_tunnel_urls_file}"
     _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist}" \
       >"${_tunnel_launchctl_log}" 2>&1 || true

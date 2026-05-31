@@ -30,6 +30,10 @@ Defaults:%admin  timestamp_timeout=60
 # macOS System Keychain — trust Vault PKI CA certificate
 %admin  ALL=(root) NOPASSWD: /usr/bin/security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain *
 
+# macOS loopback alias — 127.0.0.2 for frontend port-forward
+%admin  ALL=(root) NOPASSWD: /sbin/ifconfig lo0 alias *
+%admin  ALL=(root) NOPASSWD: /sbin/ifconfig lo0 -alias *
+
 # macOS launchd — system-scope daemon lifecycle for k3d-manager plists only
 %admin  ALL=(root) NOPASSWD: /bin/launchctl bootstrap system /Library/LaunchDaemons/com.k3d-manager.*.plist
 %admin  ALL=(root) NOPASSWD: /bin/launchctl bootout system /Library/LaunchDaemons/com.k3d-manager.*.plist
