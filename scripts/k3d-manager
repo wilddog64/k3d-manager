@@ -542,6 +542,11 @@ EOF
 function_name=$1
 shift  # Remove the function name from the arguments
 
+if [[ "$function_name" == "oci_backup" || "$function_name" == "oci_restore" ]]; then
+    # shellcheck source=/dev/null
+    source "${SCRIPT_DIR}/lib/providers/k3s-oci.sh"
+fi
+
 if [[ "$function_name" == deploy_* ]]; then
     __K3DM_DEPLOY_SANITIZED_ARGS=()
     __k3dm_deploy_guard_args "$function_name" "$@"

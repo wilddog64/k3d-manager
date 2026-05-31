@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers cloudflared-backup alertmanager-secret test help observability observability-acg observability-status vuln-scan show-service-passwords
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan show-service-passwords
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -154,6 +154,20 @@ cloudflared-backup:
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/cloudflared" \
 	  -d "$$(python3 -c "import json,sys; print(json.dumps({'data':{'credentials_json':sys.argv[1],'cert_pem':sys.argv[2],'tunnel_id':'bb7ece59-8680-4310-9437-232f862e2773','tunnel_name':'k3d-manager'}}))" "$$_creds" "$$_cert")" >/dev/null && \
 	echo "[cloudflared-backup] Vault updated"
+
+## Backup k3s etcd snapshot + kubeconfig to OCI object storage (k3s-oci only)
+backup:
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager oci_backup ;; \
+	  *)       echo "[make] backup only supported for CLUSTER_PROVIDER=k3s-oci" ; exit 1 ;; \
+	esac
+
+## Restore k3s etcd snapshot + kubeconfig from OCI object storage (k3s-oci only)
+restore:
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager oci_restore ;; \
+	  *)       echo "[make] restore only supported for CLUSTER_PROVIDER=k3s-oci" ; exit 1 ;; \
+	esac
 
 ## Show all service login credentials (Hub k3d cluster must be running)
 show-service-passwords:
