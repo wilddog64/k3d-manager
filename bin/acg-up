@@ -1290,6 +1290,9 @@ fi
 shopping_cart_reconcile_order_service
 shopping_cart_reconcile_product_catalog
 
+_info "[acg-up] Step 11b/14 — Registering shopping-cart ArgoCD Applications..."
+register_shopping_cart_apps
+
 _info "[acg-up] Step 12/14 — Installing sandbox TTL watcher (launchd)..."
 acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
 
