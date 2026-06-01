@@ -118,7 +118,7 @@ function deploy_shopping_cart_data() {
 
   _info "[shopping_cart] Waiting for MinIO to be Ready..."
   kubectl rollout status statefulset/minio \
-    -n shopping-cart-data --context ubuntu-k3s --timeout=120s
+    -n shopping-cart-data --context ubuntu-k3s --timeout=300s
 
 
   _info "[shopping_cart] Creating rabbitmq-credentials secret..."

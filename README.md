@@ -133,7 +133,9 @@ graph TD
     JENKINS[Jenkins]
     ISTIO[Istio]
     LDAP[LDAP / AD]
+    TRIVY[Trivy Operator]
     ESO -->|sync| VAULT
+    ARGOCD -->|deploys| TRIVY
   end
 
   subgraph AppCluster ["App Cluster — k3s-aws (EC2)"]
@@ -153,6 +155,7 @@ graph TD
   AWSC -->|auth| AppCluster
   PLUG -.->|tunnel.sh — autossh :6443| K3S
   ARGOCD -->|GitOps deploy| APPS
+  TRIVY -.->|vuln scan| APPS
   VAULT -.->|cross-cluster auth| K3S
   ESO -.->|sync| AKV[Azure Key Vault]
 ```
