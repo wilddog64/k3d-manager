@@ -100,6 +100,8 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `deploy_observability_acg` | `scripts/plugins/observability.sh` | Apply ACG `observability-acg` ApplicationSet — minimal Prometheus (NodePort 30090, no Grafana) + Trivy Operator to ubuntu-k3s |
 | `observability_status` | `scripts/plugins/observability.sh` | Show pod status for `monitoring` and `trivy-system` namespaces on both Hub (k3d) and ACG (ubuntu-k3s) |
 | `trivy_scan_report` | `scripts/plugins/observability.sh` | Print VulnerabilityReport summary (namespace, name, critical, high counts) for both Hub and ACG clusters |
+| `oci_backup` | `scripts/lib/providers/k3s-oci-storage.sh` | Create etcd snapshot via `kubectl exec` and push to OCI object storage; validates snapshot name format and runs automatically after `k3s-oci` deploy |
+| `oci_restore` | `scripts/lib/providers/k3s-oci-storage.sh` | Pull etcd snapshot from OCI object storage and restore to running k3s cluster via `kubectl exec`; verifies download and validates snapshot integrity before restore |
 
 ### `acg_get_credentials`
 
