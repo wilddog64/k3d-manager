@@ -240,9 +240,9 @@ async function extractCredentials() {
       console.error(`INFO: Found existing sandbox tab: ${page.url()}`);
     }
 
-    // If "Extend Your Session" dialog is blocking on entry, force a fresh page load to
-    // reset SPA timer state — this dialog re-triggers from React after a sandbox restart
-    // even when acg_restart.js already dismissed it via DOM click.
+    // If "Extend Your Session" dialog is blocking on entry, click "Extend Session" to
+    // extend the sandbox TTL before proceeding — this is the only chance to extend
+    // ("can only be done once per session"). Do NOT cancel or reload; that burns the opportunity.
     const _entryExtendDialog = await page.evaluate(() =>
       Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
         .some(d =>
@@ -253,12 +253,21 @@ async function extractCredentials() {
         )
     ).catch(() => false);
     if (_entryExtendDialog) {
-      console.error('INFO: "Extend Your Session" dialog on entry — reloading page to clear SPA state...');
-      await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-      await page.waitForFunction(
-        () => !document.querySelector('[aria-busy="true"]'),
-        { timeout: 15000 }
-      ).catch(() => {});
+      console.error('INFO: "Extend Your Session" dialog on entry — clicking Extend Session...');
+      await page.evaluate(() => {
+        const dialog = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
+          .find(d =>
+            (d.innerText || '').includes('Extend Your Session') &&
+            d.offsetParent !== null &&
+            getComputedStyle(d).display !== 'none' &&
+            getComputedStyle(d).visibility !== 'hidden'
+          );
+        if (!dialog) return;
+        const btns = Array.from(dialog.querySelectorAll('button'));
+        const extendBtn = btns.find(b => /extend session/i.test(b.textContent || ''));
+        if (extendBtn) extendBtn.click();
+      }).catch(() => {});
+      await page.waitForTimeout(1500);
     }
 
     const _dismissExtendYourSessionDialog = async () => {
@@ -272,8 +281,9 @@ async function extractCredentials() {
           )
       ).catch(() => false);
       if (_dialogVisible) {
-        console.error('INFO: "Extend Your Session" dialog detected — clicking Cancel via DOM...');
-        // Use DOM click (not Playwright keyboard) — Escape closes the panel, not just the dialog
+        console.error('INFO: "Extend Your Session" dialog detected — clicking Extend Session via DOM...');
+        // Use DOM click (not Playwright keyboard) — Escape closes the panel, not just the dialog.
+        // Always click "Extend Session" to preserve the TTL; never Cancel ("can only be done once").
         await page.evaluate(() => {
           const dialog = Array.from(document.querySelectorAll('[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]'))
             .find(d =>
@@ -284,10 +294,11 @@ async function extractCredentials() {
             );
           if (!dialog) return;
           const btns = Array.from(dialog.querySelectorAll('button'));
-          // Prefer Cancel/close button; fall back to any non-Extend button
-          const dismiss = btns.find(b => /cancel|no thanks|close|dismiss/i.test(b.textContent || b.getAttribute('aria-label') || ''))
-            || btns.find(b => !/extend/i.test(b.textContent || ''));
-          if (dismiss) dismiss.click();
+          const extendBtn = btns.find(b => /extend session/i.test(b.textContent || ''));
+          if (extendBtn) { extendBtn.click(); return; }
+          // Fallback: any button that isn't Cancel/close (should not reach here)
+          const fallback = btns.find(b => !/cancel|no thanks|close|dismiss/i.test(b.textContent || b.getAttribute('aria-label') || ''));
+          if (fallback) fallback.click();
         }).catch(() => {});
         await page.waitForTimeout(1000);
         const _dialogClosed = await page.waitForFunction(
