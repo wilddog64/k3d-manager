@@ -1,7 +1,8 @@
 # Active Context — k3d-manager
 
-## Current Status (Post-Merge 2026-06-01 — k3d-manager PR #87 housekeeping complete)
-- **v1.5.2 MERGED** — PR #87 merged to main (SHA `d11e7e78882c41278fd22b76420c98a619a44533`); docs-only (releases table + retro + memory-bank corrections); enforce_admins restored ✓; main synced ✓; v1.5.3 branch created and synced with main (merge SHA `f99a4a69`) ✓; v1.5.2 retrospective committed ✓; memory-bank updating ✓
+## Current Status (Post-Merge 2026-06-01 — shopping-cart-infra PR #81 merged)
+- **shopping-cart-infra PR #81 MERGED** — `fix(argocd): add RespectIgnoreDifferences to data-layer syncOptions`; merge SHA `1eaf1e47f266f8fc5e1b6d34b8e6ec7234e6c61d` (merged 2026-06-01T02:31:01Z); enforce_admins restored ✓; docs/next-improvements branch recreated from merge SHA ✓; retrospective committed (`4d487c4`) ✓; memory-bank updated ✓
+- **v1.5.2 MERGED** — PR #87 merged to main (SHA `d11e7e78882c41278fd22b76420c98a619a44533`); docs-only (releases table + retro + memory-bank corrections); enforce_admins restored ✓; main synced ✓; v1.5.3 branch created and synced with main (merge SHA `f99a4a69`) ✓; v1.5.2 retrospective committed ✓; memory-bank updated ✓
 - **v1.5.1 SHIPPED** — PR #86 merged to main (SHA `a33971244b6ee1414db872c44fa029399ae0daa9`); tag v1.5.1 created ✓; GitHub release created ✓; enforce_admins restored ✓; retrospective committed ✓; next branch `k3d-manager-v1.5.2` created ✓; memory-bank updated ✓
 - **shopping-cart-infra PR #80 MERGED** — ArgoCD data-layer sync fix; merge SHA `7c1e64ea18e2f5af967a3797d4138a90fac233cb`; enforce_admins restored ✓; docs/next-improvements branch updated ✓; retrospective committed (`b732fdb`) ✓; memory-bank updated ✓
 - Current branch: `k3d-manager-v1.5.3` (created from k3d-manager PR #87 merge SHA `d11e7e78882c41278fd22b76420c98a619a44533`)
