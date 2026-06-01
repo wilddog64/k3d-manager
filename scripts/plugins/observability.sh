@@ -101,7 +101,7 @@ function deploy_observability_acg() {
   _vault_hdr=$(mktemp)
   printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
   if ! _am_creds=$(curl -sf \
-      -H "@${_vault_hdr}" \
+      --header "@${_vault_hdr}" \
       "${_vault_addr}/v1/secret/data/k3d-manager/alertmanager" 2>/dev/null \
       | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
         print(d['gmail_from']+'|'+d['gmail_app_pw']+'|'+d['sms_gateway'])" 2>/dev/null); then
@@ -113,15 +113,19 @@ function deploy_observability_acg() {
     _warn "[observability] Alertmanager Vault secret not found — skipping SMS config on ACG"
     _warn "[observability] Run: make alertmanager-secret to configure"
   else
-    export ALERTMANAGER_GMAIL_FROM="${_am_creds%%|*}"
-    local _rest="${_am_creds#*|}"
-    export ALERTMANAGER_GMAIL_APP_PW="${_rest%%|*}"
-    export ALERTMANAGER_SMS_GATEWAY="${_rest##*|}"
+    local _gmail_from _gmail_app_pw _sms_gateway _rest
+    _gmail_from="${_am_creds%%|*}"
+    _rest="${_am_creds#*|}"
+    _gmail_app_pw="${_rest%%|*}"
+    _sms_gateway="${_rest##*|}"
 
     local _am_tmpl="${SCRIPT_DIR}/etc/prometheus/alertmanager.yaml.tmpl"
     local _am_config
     # shellcheck disable=SC2016
-    _am_config=$(envsubst '${ALERTMANAGER_GMAIL_FROM} ${ALERTMANAGER_GMAIL_APP_PW} ${ALERTMANAGER_SMS_GATEWAY}' \
+    _am_config=$(ALERTMANAGER_GMAIL_FROM="${_gmail_from}" \
+      ALERTMANAGER_GMAIL_APP_PW="${_gmail_app_pw}" \
+      ALERTMANAGER_SMS_GATEWAY="${_sms_gateway}" \
+      envsubst '${ALERTMANAGER_GMAIL_FROM} ${ALERTMANAGER_GMAIL_APP_PW} ${ALERTMANAGER_SMS_GATEWAY}' \
       < "${_am_tmpl}")
     local _am_tmpfile
     _am_tmpfile=$(mktemp)
@@ -130,7 +134,7 @@ function deploy_observability_acg() {
       --context ubuntu-k3s \
       -n monitoring \
       --from-file=alertmanager.yaml="${_am_tmpfile}" \
-      --dry-run=client -o yaml | _kubectl apply -f -
+      --dry-run=client -o yaml | _kubectl apply --context ubuntu-k3s -f -
     rm -f "${_am_tmpfile}"
     _info "[observability] Alertmanager config secret created on ACG (ubuntu-k3s)"
   fi
