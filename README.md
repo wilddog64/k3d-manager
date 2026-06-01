@@ -290,6 +290,7 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-05-31 | [Copilot PR #86 review findings](docs/issues/2026-05-31-copilot-pr86-review-findings.md) | OCI snapshot SSH injection, CHANGELOG accuracy, step label drift, empty download guard, error-path coverage added |
 | 2026-05-31 | [Copilot PR #84 review findings](docs/issues/2026-05-31-copilot-pr84-review-findings.md) | Vault token + Gmail password in process args fixed; Prometheus auth deferred to v1.5.7 oauth2-proxy |
 | 2026-05-29 | [Copilot PR #83 review findings](docs/issues/2026-05-29-copilot-pr83-review-findings.md) | Makefile shell injection in BRANCH interpolation fixed; sync-branch/sync-main missing 2 apps added; stale activeContext carry-forward items cleared |
 | 2026-05-19 | [Copilot PR #77 review findings](docs/issues/2026-05-19-copilot-pr77-review-findings.md) | CHANGELOG vault path typo fixed; pre-existing acg_credentials.js positional GCP extraction, navigation skip scope, and provider card selection flagged for follow-on specs |
@@ -305,15 +306,16 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.5.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.5.1) | 2026-05-31 | OCI object storage backup/restore for k3s-oci (etcd snapshot lifecycle); ACG credential automation improvements; SSH fail-fast and snapshot validation fixes; BATS error-path coverage |
 | [v1.5.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.5.0) | 2026-05-31 | OCI Always Free provider (k3s-oci single/two-node ARM64) with Cilium CNI; observability stack (Prometheus+Grafana+Trivy+Alertmanager with email-to-SMS) via ArgoCD ApplicationSet; observability.sh subshell guard fix; ACG memory limit fixes; credential wait loop + Playwright CDP improvements |
 | [v1.4.12](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.12) | 2026-05-29 | imagePullSecrets patch for named ServiceAccounts (ghcr.io 401 fix), Makefile sync-branch/sync-main targets, ArgoCD ApplicationSets in make status, shopping-cart-payment ExternalSecret SharedResourceWarning fix |
-| [v1.4.11](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.11) | 2026-05-29 | ESO sync saturation fix, acg-down macOS Tahoe password prompt fix, data-layer StatefulSet race fix, Keycloak group-ldap-mapper reconciliation, ArgoCD RBAC product-catalog reference fix, legacy ArgoCD app definition removal |
 
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.4.11](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.11) | 2026-05-29 | ESO sync saturation fix, acg-down macOS Tahoe password prompt fix, data-layer StatefulSet race fix, Keycloak group-ldap-mapper reconciliation, ArgoCD RBAC product-catalog reference fix, legacy ArgoCD app definition removal |
 | [v1.4.10](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.10) | 2026-05-29 | ArgoCD stability, bootstrap reliability, /tmp cleanup |
 | [v1.4.9](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.9) | 2026-05-22 | ACG credential wait + extraction visibility fixes; Cloudflare tunnel named config; CoreDNS duplicate hosts patch |
 | [v1.4.8](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.8) | 2026-05-19 | vault.sh temp file leak fixes, acg_extend.js CDP disconnect hang, Keycloak frontendUrl + named Cloudflare tunnel |
