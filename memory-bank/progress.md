@@ -1,7 +1,7 @@
 # Progress — k3d-manager
 
 ## Status (v1.4.12 — RELEASED 2026-05-29)
-- **RELEASED:** k3d-manager v1.4.12 — PR #83 merged to main (SHA `c5949cf47097d3a89ff485e01f68c2725644d327`). imagePullSecrets patch, sync-branch/sync-main targets, ArgoCD ApplicationSets in make status. Copilot caught shell injection pattern + incomplete app list. enforce_admins restored ✓; next branch: `k3d-manager-v1.5.0`; v1.4.12 retrospective committed (`3c99fc85`) ✓; memory-bank updating (in progress)
+- **RELEASED:** k3d-manager v1.4.12 — PR #83 merged to main (SHA `c5949cf47097d3a89ff485e01f68c2725644d327`). imagePullSecrets patch, sync-branch/sync-main targets, ArgoCD ApplicationSets in make status. Copilot caught shell injection pattern + incomplete app list. enforce_admins restored ✓; next branch: `k3d-manager-v1.5.0`; v1.4.12 retrospective committed (`3c99fc85`) ✓
 
 ## Status (v1.5.1 — RELEASED 2026-05-31)
 - **RELEASED:** k3d-manager v1.5.1 — PR #86 merged to main (SHA `a33971244b6ee1414db872c44fa029399ae0daa9`). OCI object storage backup/restore; ACG credential automation improvements; SSH fail-fast and snapshot validation fixes; BATS error-path coverage. Copilot review addressed (7 findings). enforce_admins restored ✓; next branch: `k3d-manager-v1.5.2`; v1.5.1 retrospective committed ✓; memory-bank updated ✓
