@@ -138,6 +138,7 @@ case "${_cluster_provider}" in
     else
       _acg_cred_test_url="${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
       _info "[acg-up] Extracting and validating AWS credentials (will restart sandbox on ghost-state failure)..."
+      _browser_launch
       "${REPO_ROOT}/scripts/lib/acg/bin/acg-credential-test" "${_acg_cred_test_url}" || exit 1
       _info "[acg-up] AWS credentials extracted and validated."
     fi
@@ -351,10 +352,11 @@ if _is_mac; then
     _argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}" || exit 1
     if [[ "$(uname)" == "Darwin" ]]; then
       _info "[acg-up] Trusting Vault CA cert in macOS System Keychain (may prompt for sudo password)..."
-      _run_command --prefer-sudo --soft -- \
+      _run_command --prefer-sudo -- \
         security add-trusted-cert -d -r trustRoot \
           -k /Library/Keychains/System.keychain \
-          "${_argocd_browser_tls_dir}/ca.crt"
+          "${_argocd_browser_tls_dir}/ca.crt" || \
+        _warn "[acg-up] Could not add Vault CA to System Keychain — browser may show TLS warning for ArgoCD HTTPS"
     fi
     _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz"
     cat > "${_argocd_browser_plist_tmp}" <<PLIST

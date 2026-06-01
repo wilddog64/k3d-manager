@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers cloudflared-backup alertmanager-secret test help observability observability-acg observability-status vuln-scan show-service-passwords
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -152,8 +152,22 @@ cloudflared-backup:
 	curl -sf -X POST \
 	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/cloudflared" \
-	  -d "$$(python3 -c "import json,sys; print(json.dumps({'data':{'credentials_json':sys.argv[1],'cert_pem':sys.argv[2],'tunnel_id':'bb7ece59-8680-4310-9437-232f862e2773','tunnel_name':'k3d-manager'}}))" "$$_creds" "$$_cert")" >/dev/null && \
+	  -d "$$(CREDS="$$_creds" CERT="$$_cert" python3 -c 'import json,os; print(json.dumps({"data":{"credentials_json":os.environ["CREDS"],"cert_pem":os.environ["CERT"],"tunnel_id":"bb7ece59-8680-4310-9437-232f862e2773","tunnel_name":"k3d-manager"}}))')" >/dev/null && \
 	echo "[cloudflared-backup] Vault updated"
+
+## Backup k3s etcd snapshot + kubeconfig to OCI object storage (k3s-oci only)
+backup:
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager oci_backup ;; \
+	  *)       echo "[make] backup only supported for CLUSTER_PROVIDER=k3s-oci" ; exit 1 ;; \
+	esac
+
+## Restore k3s etcd snapshot + kubeconfig from OCI object storage (k3s-oci only)
+restore:
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager oci_restore ;; \
+	  *)       echo "[make] restore only supported for CLUSTER_PROVIDER=k3s-oci" ; exit 1 ;; \
+	esac
 
 ## Show all service login credentials (Hub k3d cluster must be running)
 show-service-passwords:
@@ -193,9 +207,7 @@ alertmanager-secret:
 	curl -sf -X POST \
 	  -H "X-Vault-Token: $$_tok" -H "Content-Type: application/json" \
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/alertmanager" \
-	  -d "$$(python3 -c "import json,sys; \
-	    print(json.dumps({'data':{'gmail_from':sys.argv[1],'gmail_app_pw':sys.argv[2],'sms_gateway':sys.argv[3]}}))" \
-	    "$$_gmail" "$$_pw" "$$_sms")" >/dev/null && \
+	  -d "$$(GMAIL_FROM="$$_gmail" GMAIL_PW="$$_pw" SMS_GW="$$_sms" python3 -c 'import json,os; print(json.dumps({"data":{"gmail_from":os.environ["GMAIL_FROM"],"gmail_app_pw":os.environ["GMAIL_PW"],"sms_gateway":os.environ["SMS_GW"]}}))')" >/dev/null && \
 	echo "[alertmanager-secret] Credentials stored in Vault"
 
 ## Deploy observability stack (Prometheus+Grafana+Trivy) to Hub k3d
@@ -211,7 +223,7 @@ observability-status:
 	./scripts/k3d-manager observability_status
 
 ## Print VulnerabilityReport summary for both clusters
-vuln-scan:
+vuln-scan trivy-scan-report:
 	./scripts/k3d-manager trivy_scan_report
 
 ## Run all BATS test suites

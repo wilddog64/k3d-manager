@@ -15,6 +15,13 @@ fi
 # shellcheck source=/dev/null
 source "${_OCI_VARS}"
 
+_OCI_STORAGE_LIB="${SCRIPT_DIR}/lib/providers/k3s-oci-storage.sh"
+if [[ ! -r "${_OCI_STORAGE_LIB}" ]]; then
+  _err "OCI storage library not found: ${_OCI_STORAGE_LIB}"
+fi
+# shellcheck source=/dev/null
+source "${_OCI_STORAGE_LIB}"
+
 _OCI_VCN_NAME="k3s-oci-vcn"
 _OCI_SUBNET_NAME="k3s-oci-subnet"
 _OCI_IGW_NAME="k3s-oci-igw"
@@ -97,9 +104,15 @@ HELP
   _info "[k3s-oci] Step 9/10 — Waiting for platform-helm to deploy ArgoCD on OCI (up to 10 min)..."
   _oci_wait_argocd || return 1
 
-  _info "[k3s-oci] Step 10/10 — Bootstrapping OCI ArgoCD + smoke test..."
+  _info "[k3s-oci] Step 10/12 — Bootstrapping OCI ArgoCD + smoke test..."
   _oci_bootstrap_argocd || return 1
   _oci_smoke_test || return 1
+
+  _info "[k3s-oci] Step 11/12 — Ensuring OCI object storage bucket exists..."
+  _oci_storage_ensure_bucket || return 1
+
+  _info "[k3s-oci] Step 12/12 — Taking initial OCI object storage backup..."
+  oci_backup || return 1
 
   _info "[k3s-oci] Cluster ready — 2 nodes, Cilium CNI."
   _info "[k3s-oci] Kubeconfig: KUBECONFIG=${_OCI_KUBECONFIG}"

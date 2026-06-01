@@ -32,7 +32,7 @@ setup() {
       cat
     }
     _kubectl() {
-      printf "%s\n" "$*" > "${KUBE_STUB_LOG}"
+      printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
     kubectl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
@@ -69,7 +69,7 @@ setup() {
       cat
     }
     _kubectl() {
-      printf "%s\n" "$*" > "${KUBE_STUB_LOG}"
+      printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
     kubectl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
