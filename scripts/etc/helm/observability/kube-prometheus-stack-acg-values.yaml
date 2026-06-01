@@ -1,8 +1,44 @@
+defaultRules:
+  rules:
+    kubeApiserverAvailability: false
+    kubeApiserverBurnrate: false
+    kubeApiserverHistogram: false
+    kubeApiserverSlos: false
+    alertmanager: false
+    configReloaders: false
+
 grafana:
-  enabled: false
+  enabled: true
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 50m
+    limits:
+      memory: 192Mi
+      cpu: 200m
+  service:
+    type: NodePort
+    nodePort: 30030
+  adminPassword: admin
+  grafana.ini:
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer
 
 alertmanager:
-  enabled: false
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests:
+        memory: 32Mi
+        cpu: 10m
+      limits:
+        memory: 64Mi
+        cpu: 50m
+  configSecret: alertmanager-smtp-secret
+  service:
+    type: NodePort
+    nodePort: 30093
 
 prometheus:
   prometheusSpec:

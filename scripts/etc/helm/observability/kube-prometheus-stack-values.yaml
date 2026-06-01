@@ -1,3 +1,11 @@
+defaultRules:
+  rules:
+    kubeApiserverAvailability: false
+    kubeApiserverBurnrate: false
+    kubeApiserverHistogram: false
+    kubeApiserverSlos: false
+    configReloaders: false
+
 prometheus:
   prometheusSpec:
     retention: 7d
