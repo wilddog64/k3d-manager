@@ -1,5 +1,8 @@
 # Progress — k3d-manager
 
+## Status (v1.5.2 — RELEASED 2026-06-01)
+- **RELEASED:** k3d-manager v1.5.2 — PR #87 merged to main (SHA `d11e7e78882c41278fd22b76420c98a619a44533`). Docs-only release: releases table accuracy fixes (v1.4.11 missing), memory-bank cleanup, v1.5.1 retrospective added. enforce_admins restored ✓; next branch: `k3d-manager-v1.5.3`; v1.5.2 retrospective committed (`2791d011`) ✓; memory-bank updated ✓
+
 ## Status (v1.4.12 — RELEASED 2026-05-29)
 - **RELEASED:** k3d-manager v1.4.12 — PR #83 merged to main (SHA `c5949cf47097d3a89ff485e01f68c2725644d327`). imagePullSecrets patch, sync-branch/sync-main targets, ArgoCD ApplicationSets in make status. Copilot caught shell injection pattern + incomplete app list. enforce_admins restored ✓; next branch: `k3d-manager-v1.5.0`; v1.4.12 retrospective committed (`3c99fc85`) ✓
 
