@@ -2,8 +2,22 @@
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-05-31
+
+### Added
+- OCI object storage backup/restore: `oci_backup` and `oci_restore` commands for k3s-oci provider — auto-backup after deploy, Makefile `backup` and `restore` targets
+- ACG credential automation: auto-launch Chrome CDP, handle session-expired redirects and CAPTCHA fallback, automate sign-in form submission
+
 ### Fixed
 - Fix Python one-liner quoting in `cloudflared-backup` and `alertmanager-secret` Makefile targets — replace double-quoted `-c` arg and positional `sys.argv` with single-quoted `-c` and env-var injection to prevent shell brace expansion
+- BATS observability tests: fix `>>` stub in `test_deploy_observability` (append to log instead of overwrite)
+- `bin/acg-up`: make System Keychain cert trust non-fatal (warn on permission error instead of aborting)
+- ACG credential automation: handle session-expired login redirects, navigate to signin page on 404/off-site redirect
+- ACG credential automation: automate sign-in button click and sign-in form on session expiry
+- `k3s-oci-storage`: replace hex-encoded sudo with named `_OCI_SSH_SUDO` variable for clarity
+
+### Changed
+- `Makefile`: add `trivy-scan-report` alias for `vuln-scan` target
 
 ## [1.5.0] - 2026-05-31
 
