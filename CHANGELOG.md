@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [1.5.3] - 2026-06-01
+
+### Added
+- ACG Alertmanager: NodePort 30093, Vault-backed SMTP secret integration, email alert routing
+
+### Changed
+- Observability: prune ~40 noisy kube-prometheus-stack default alert rules not applicable to k3s (apiserver SLO burn-rates, alertmanager HA, config-reloaders); enable Grafana on ACG cluster (NodePort 30030)
+- README: add Trivy Operator to architecture diagram
+- Shopping Cart: increase MinIO rollout timeout 120s→300s for slow container registry pulls
+
+### Fixed
+- ACG credentials: click "Extend Session" button (not Cancel) on session-extension dialog, preserving the once-per-session session-extension opportunity
+
 ## [1.5.1] - 2026-05-31
 
 ### Added
