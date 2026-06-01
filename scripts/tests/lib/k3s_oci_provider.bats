@@ -528,3 +528,106 @@ _BOOTSTRAP='
   [ "$status" -eq 0 ]
   [[ "$output" == *"both-terminated"* ]]
 }
+
+# ---------------------------------------------------------------------------
+# oci_backup / oci_restore — error paths
+# ---------------------------------------------------------------------------
+
+@test "oci_backup fails when etcd-snapshot SSH command fails" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_USER='ubuntu'
+    _OCI_KUBECONFIG=\"\$(mktemp)\"
+    OCI_REGION='us-ashburn-1'
+    _oci_storage_ensure_bucket() { return 0; }
+    _oci_get_server_ip() { echo '1.2.3.4'; }
+    _oci_storage_namespace() { echo 'testns'; }
+    ssh() {
+      if [[ \"\$*\" == *'etcd-snapshot save'* ]]; then return 1; fi
+      return 0
+    }
+    oci_backup
+  "
+  [ "$status" -ne 0 ]
+}
+
+@test "oci_backup fails when snapshot download produces empty file" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_USER='ubuntu'
+    _OCI_KUBECONFIG=\"\$(mktemp)\"
+    OCI_REGION='us-ashburn-1'
+    _oci_storage_ensure_bucket() { return 0; }
+    _oci_get_server_ip() { echo '1.2.3.4'; }
+    _oci_storage_namespace() { echo 'testns'; }
+    ssh() {
+      if [[ \"\$*\" == *'etcd-snapshot save'* ]]; then return 0; fi
+      # cat produces no output — simulates missing remote file
+      return 0
+    }
+    oci_backup
+  "
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"empty"* ]]
+}
+
+@test "oci_restore fails when snapshot name has invalid format" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_USER='ubuntu'
+    _OCI_KUBECONFIG=\"\$(mktemp)\"
+    OCI_REGION='us-ashburn-1'
+    _oci_storage_ensure_bucket() { return 0; }
+    _oci_get_server_ip() { echo '1.2.3.4'; }
+    _oci_storage_namespace() { echo 'testns'; }
+    _oci_storage_list() { echo 'k3s-oci/etcd/k3s-etcd-20260101-120000.db'; }
+    oci_restore --snapshot '../etc/passwd'
+  "
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Invalid snapshot name"* ]]
+}
+
+@test "oci_restore fails when scp upload to server fails" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_USER='ubuntu'
+    _OCI_KUBECONFIG=\"\$(mktemp)\"
+    OCI_REGION='us-ashburn-1'
+    _tmp_snap=\"\$(mktemp)\"
+    printf 'data' > \"\${_tmp_snap}\"
+    _oci_storage_ensure_bucket() { return 0; }
+    _oci_get_server_ip() { echo '1.2.3.4'; }
+    _oci_storage_namespace() { echo 'testns'; }
+    _oci_storage_list() { echo 'k3s-oci/etcd/k3s-etcd-20260101-120000.db'; }
+    _oci_storage_download() { cp \"\${_tmp_snap}\" \"\${2}\"; }
+    _oci_wait_ssh() { return 0; }
+    _oci_storage_download() { printf 'data' > \"\${2}\"; }
+    scp() { return 1; }
+    oci_restore
+  "
+  [ "$status" -ne 0 ]
+}
+
+@test "oci_restore fails when remote restore SSH command fails" {
+  run bash -c "
+    ${_BOOTSTRAP}
+    _OCI_SSH_KEY=\"\$(mktemp)\"
+    _OCI_SSH_USER='ubuntu'
+    _OCI_KUBECONFIG=\"\$(mktemp)\"
+    OCI_REGION='us-ashburn-1'
+    _oci_storage_ensure_bucket() { return 0; }
+    _oci_get_server_ip() { echo '1.2.3.4'; }
+    _oci_storage_namespace() { echo 'testns'; }
+    _oci_storage_list() { echo 'k3s-oci/etcd/k3s-etcd-20260101-120000.db'; }
+    _oci_storage_download() { printf 'data' > \"\${2}\"; }
+    _oci_wait_ssh() { return 0; }
+    scp() { return 0; }
+    ssh() { return 1; }
+    oci_restore
+  "
+  [ "$status" -ne 0 ]
+}

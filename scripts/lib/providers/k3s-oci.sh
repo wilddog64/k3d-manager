@@ -104,14 +104,14 @@ HELP
   _info "[k3s-oci] Step 9/10 — Waiting for platform-helm to deploy ArgoCD on OCI (up to 10 min)..."
   _oci_wait_argocd || return 1
 
-  _info "[k3s-oci] Step 10/10 — Bootstrapping OCI ArgoCD + smoke test..."
+  _info "[k3s-oci] Step 10/12 — Bootstrapping OCI ArgoCD + smoke test..."
   _oci_bootstrap_argocd || return 1
   _oci_smoke_test || return 1
 
-  _info "[k3s-oci] Ensuring OCI object storage bucket exists..."
+  _info "[k3s-oci] Step 11/12 — Ensuring OCI object storage bucket exists..."
   _oci_storage_ensure_bucket || return 1
 
-  _info "[k3s-oci] Taking initial OCI object storage backup..."
+  _info "[k3s-oci] Step 12/12 — Taking initial OCI object storage backup..."
   oci_backup || return 1
 
   _info "[k3s-oci] Cluster ready — 2 nodes, Cilium CNI."

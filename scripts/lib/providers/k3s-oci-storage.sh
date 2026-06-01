@@ -119,12 +119,19 @@ HELP
   _info "[k3s-oci-storage] Creating etcd snapshot ${_snapshot_name} on ${_server_ip}..."
   ssh -o StrictHostKeyChecking=no -i "${_OCI_SSH_KEY}" \
     "${_OCI_SSH_USER}@${_server_ip}" \
-    "${_OCI_SSH_SUDO} k3s etcd-snapshot save --name '${_snapshot_base}'"
+    "${_OCI_SSH_SUDO} k3s etcd-snapshot save --name '${_snapshot_base}'" || return 1
 
   _info "[k3s-oci-storage] Downloading snapshot to ${_local_snapshot}..."
   ssh -o StrictHostKeyChecking=no -i "${_OCI_SSH_KEY}" \
     "${_OCI_SSH_USER}@${_server_ip}" \
-    "${_OCI_SSH_SUDO} cat '${_remote_snapshot}'" > "${_local_snapshot}"
+    "${_OCI_SSH_SUDO} cat '${_remote_snapshot}'" > "${_local_snapshot}" \
+    || { rm -f "${_local_snapshot}"; return 1; }
+
+  if [[ ! -s "${_local_snapshot}" ]]; then
+    _err "[k3s-oci-storage] Snapshot download is empty: ${_local_snapshot}"
+    rm -f "${_local_snapshot}"
+    return 1
+  fi
 
   _info "[k3s-oci-storage] Uploading snapshot to OCI object storage..."
   _oci_storage_upload "${_local_snapshot}" "k3s-oci/etcd/${_snapshot_name}" || return 1
@@ -191,6 +198,10 @@ HELP
 
   local _snapshot_name _local_snapshot _server_ip _remote_snapshot
   _snapshot_name="${_snapshot_object##*/}"
+  if [[ ! "${_snapshot_name}" =~ ^k3s-etcd-[0-9]{8}-[0-9]{6}\.db$ ]]; then
+    _err "[k3s-oci-storage] Invalid snapshot name format: ${_snapshot_name}"
+    return 1
+  fi
   _local_snapshot="/tmp/${_snapshot_name}"
   _remote_snapshot="/var/lib/rancher/k3s/server/db/snapshots/${_snapshot_name}"
   _server_ip=$(_oci_get_server_ip) || return 1
@@ -201,14 +212,14 @@ HELP
   _info "[k3s-oci-storage] Restoring snapshot on ${_server_ip}..."
   scp -o StrictHostKeyChecking=no -i "${_OCI_SSH_KEY}" \
     "${_local_snapshot}" \
-    "${_OCI_SSH_USER}@${_server_ip}:/tmp/${_snapshot_name}"
+    "${_OCI_SSH_USER}@${_server_ip}:/tmp/${_snapshot_name}" || return 1
   ssh -o StrictHostKeyChecking=no -i "${_OCI_SSH_KEY}" \
     "${_OCI_SSH_USER}@${_server_ip}" \
     "${_OCI_SSH_SUDO} systemctl stop k3s >/dev/null 2>&1 || true; \
      ${_OCI_SSH_SUDO} install -d -m 0755 /var/lib/rancher/k3s/server/db/snapshots; \
      ${_OCI_SSH_SUDO} cp '/tmp/${_snapshot_name}' '${_remote_snapshot}'; \
      ${_OCI_SSH_SUDO} k3s server --cluster-reset --cluster-reset-restore-path='${_remote_snapshot}'; \
-     ${_OCI_SSH_SUDO} systemctl start k3s"
+     ${_OCI_SSH_SUDO} systemctl start k3s" || return 1
 
   _oci_wait_ssh "${_server_ip}" || return 1
 
