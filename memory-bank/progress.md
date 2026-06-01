@@ -5,6 +5,7 @@
 
 ## Status (v1.5.1 — RELEASED 2026-05-31)
 - **RELEASED:** k3d-manager v1.5.1 — PR #86 merged to main (SHA `a33971244b6ee1414db872c44fa029399ae0daa9`). OCI object storage backup/restore; ACG credential automation improvements; SSH fail-fast and snapshot validation fixes; BATS error-path coverage. Copilot review addressed (7 findings). enforce_admins restored ✓; next branch: `k3d-manager-v1.5.2`; v1.5.1 retrospective committed ✓; memory-bank updated ✓
+- **COMPLETE:** shopping-cart-infra PR #80 post-merge — ArgoCD data-layer ignoreDifferences fix for StatefulSet volumeClaimTemplates; merge SHA `7c1e64ea18e2f5af967a3797d4138a90fac233cb`; enforce_admins restored ✓; docs/next-improvements branch updated ✓; retrospective committed (`b732fdb`) ✓; memory-bank updating ✓
 
 ## Status (v1.5.0 — RELEASED 2026-05-31)
 - **RELEASED:** k3d-manager v1.5.0 — PR #84 merged to main (SHA `faa00331214626982fd99d65b3764bca9f4c63ce`). OCI provider (single-node + two-node), observability stack (Prometheus+Grafana+Trivy+Alertmanager), multi-env ArgoCD, passwordless sudo, state-dir refactor, 12 bug fixes, 25 new BATS tests. Copilot review addressed (6 findings). enforce_admins restored ✓; next branch: `k3d-manager-v1.5.1`; v1.5.0 retrospective committed (`cf94879f`) ✓
