@@ -2,7 +2,7 @@
 
 | Version | Date | Highlights |
 |---|---|---|
-| [v1.5.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.5.1) | 2026-06-01 | OCI object storage backup/restore (`oci_backup`/`oci_restore`); ACG sign-in automation with CAPTCHA fallback; SSH fail-fast on connect error; 5 new BATS error-path tests; snapshot name injection guard |
+| [v1.5.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.5.1) | 2026-05-31 | OCI object storage backup/restore for k3s-oci (etcd snapshot lifecycle); ACG credential automation improvements; SSH fail-fast and snapshot validation fixes; BATS error-path coverage |
 | [v1.5.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.5.0) | 2026-05-31 | OCI Always Free provider (k3s-oci single/two-node ARM64) with Cilium CNI; observability stack (Prometheus+Grafana+Trivy+Alertmanager with email-to-SMS) via ArgoCD ApplicationSet; observability.sh subshell guard fix; ACG memory limit fixes; credential wait loop + Playwright CDP improvements |
 | [v1.4.12](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.12) | 2026-05-29 | imagePullSecrets patch for named ServiceAccounts (ghcr.io 401 fix), Makefile sync-branch/sync-main targets, ArgoCD ApplicationSets in make status, shopping-cart-payment ExternalSecret SharedResourceWarning fix |
 | [v1.4.11](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.11) | 2026-05-29 | ESO sync saturation fix, acg-down macOS Tahoe password prompt fix, data-layer StatefulSet race fix, Keycloak group-ldap-mapper reconciliation, ArgoCD RBAC product-catalog reference fix, legacy ArgoCD app definition removal |
