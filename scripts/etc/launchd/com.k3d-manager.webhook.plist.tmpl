@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.k3d-manager.webhook</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/python3</string>
+    <string>{{WEBHOOK_BIN}}</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>K3DM_REPO_ROOT</key>
+    <string>{{K3DM_REPO_ROOT}}</string>
+    <key>K3DM_WEBHOOK_TOKEN</key>
+    <string>{{K3DM_WEBHOOK_TOKEN}}</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>{{WEBHOOK_LOG}}</string>
+  <key>StandardErrorPath</key>
+  <string>{{WEBHOOK_LOG}}</string>
+</dict>
+</plist>

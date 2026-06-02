@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""k3dm-webhook — authenticated webhook server for k3d-manager laptop automation."""
+
+import http.server
+import json
+import os
+import subprocess
+import threading
+import uuid
+from pathlib import Path
+
+PORT = int(os.environ.get("K3DM_WEBHOOK_PORT", "7443"))
+REPO_ROOT = os.environ.get(
+    "K3DM_REPO_ROOT",
+    str(Path.home() / "src/gitrepo/personal/k3d-manager")
+)
+TOKEN_FILE = Path.home() / ".k3dm" / "webhook-token"
+JOB_DIR = Path("/tmp/k3dm-webhook-jobs")
+
+
+def _get_token():
+    token = os.environ.get("K3DM_WEBHOOK_TOKEN")
+    if token:
+        return token
+    if TOKEN_FILE.exists():
+        return TOKEN_FILE.read_text().strip()
+    return None
+
+
+def _current_label(env, key="argocd-chart-version"):
+    r = subprocess.run(
+        ["kubectl", "get", "secrets", "-n", "cicd",
+         "-l", f"argocd.argoproj.io/secret-type=cluster,environment={env}",
+         "-o", f"jsonpath={{.items[0].metadata.labels.{key}}}"],
+        capture_output=True, text=True
+    )
+    return r.stdout.strip()
+
+
+def _secret_name(env):
+    r = subprocess.run(
+        ["kubectl", "get", "secrets", "-n", "cicd",
+         "-l", f"argocd.argoproj.io/secret-type=cluster,environment={env}",
+         "-o", "jsonpath={.items[0].metadata.name}"],
+        capture_output=True, text=True
+    )
+    return r.stdout.strip()
+
+
+def _patch_label(secret, version):
+    subprocess.run(
+        ["kubectl", "patch", "secret", secret, "-n", "cicd",
+         "--type=merge", "-p",
+         f'{{"metadata":{{"labels":{{"argocd-chart-version":"{version}"}}}}}}'],
+        check=True
+    )
+
+
+def _run_upgrade(job_id, chart_version, stage):
+    job_dir = JOB_DIR / job_id
+    lines = []
+
+    def _log(msg):
+        lines.append(msg + "\n")
+
+    def _finish(status):
+        (job_dir / "status").write_text(status)
+        (job_dir / "output").write_text("".join(lines))
+
+    try:
+        (job_dir / "status").write_text("running")
+        env_label = "dev" if stage == "acg" else "infra"
+
+        # Idempotency check
+        current = _current_label(env_label)
+        if current == chart_version:
+            _log(f"{stage}: already at {chart_version} — no-op")
+            _finish("success")
+            return
+
+        if stage == "acg":
+            _log("Running make up...")
+            proc = subprocess.Popen(
+                ["make", "up"],
+                cwd=REPO_ROOT,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True
+            )
+            for line in proc.stdout:
+                lines.append(line)
+            proc.wait()
+            if proc.returncode != 0:
+                raise RuntimeError(f"make up exited {proc.returncode}")
+            _log("make up complete")
+
+        secret = _secret_name(env_label)
+        if not secret:
+            raise RuntimeError(f"No cluster secret found for environment={env_label}")
+
+        _patch_label(secret, chart_version)
+        _log(f"Patched {secret}: argocd-chart-version={chart_version}")
+        _finish("success")
+
+    except Exception as exc:
+        _log(f"ERROR: {exc}")
+        _finish("failed")
+
+
+class _Handler(http.server.BaseHTTPRequestHandler):
+    def _auth(self):
+        token = _get_token()
+        if not token:
+            return False
+        return self.headers.get("Authorization", "") == f"Bearer {token}"
+
+    def _json(self, code, body):
+        data = json.dumps(body).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_POST(self):
+        if not self._auth():
+            self._json(401, {"error": "unauthorized"})
+            return
+        if self.path != "/api/v1/argocd-upgrade":
+            self._json(404, {"error": "not found"})
+            return
+
+        length = int(self.headers.get("Content-Length", 0))
+        body = json.loads(self.rfile.read(length) or b"{}")
+        chart_version = body.get("chart_version", "")
+        stage = body.get("stage", "")
+
+        if not chart_version or stage not in ("acg", "infra"):
+            self._json(400, {"error": "chart_version and stage (acg|infra) required"})
+            return
+
+        job_id = str(uuid.uuid4())[:8]
+        (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
+        (JOB_DIR / job_id / "status").write_text("queued")
+
+        threading.Thread(
+            target=_run_upgrade,
+            args=(job_id, chart_version, stage),
+            daemon=True
+        ).start()
+
+        self._json(202, {"job_id": job_id, "status": "queued"})
+
+    def do_GET(self):
+        if not self._auth():
+            self._json(401, {"error": "unauthorized"})
+            return
+        if not self.path.startswith("/api/v1/status/"):
+            self._json(404, {"error": "not found"})
+            return
+
+        job_id = self.path.rsplit("/", 1)[-1]
+        job_dir = JOB_DIR / job_id
+        if not job_dir.exists():
+            self._json(404, {"error": "job not found"})
+            return
+
+        status = (job_dir / "status").read_text().strip()
+        output_file = job_dir / "output"
+        output = output_file.read_text()[-2000:] if output_file.exists() else ""
+        self._json(200, {"job_id": job_id, "status": status, "output": output})
+
+    def log_message(self, *_):
+        pass  # suppress access log noise
+
+
+if __name__ == "__main__":
+    JOB_DIR.mkdir(parents=True, exist_ok=True)
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), _Handler)
+    print(f"[k3dm-webhook] listening on 127.0.0.1:{PORT}")
+    server.serve_forever()
