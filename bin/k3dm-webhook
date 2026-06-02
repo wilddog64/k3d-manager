@@ -258,21 +258,49 @@ def _run_cluster_status(job_id, response_url):
             _finish("success")
             return
 
-        _log("✅ *ACG cluster nodes:*")
+        node_lines = [l for l in nodes.stdout.strip().splitlines() if l]
+        ready_count = sum(1 for l in node_lines if "Ready" in l and "NotReady" not in l)
+        total_count = len(node_lines)
+
+        header = f"✅ *ACG cluster* — {ready_count}/{total_count} nodes ready"
+        acg_state = subprocess.run(
+            ["kubectl", "get", "configmap", "acg-state", "-n", "platform-ops",
+             "--context", "ubuntu-k3s", "--request-timeout=5s",
+             "-o", "jsonpath={.data.provisioned-at} {.data.provider}"],
+            capture_output=True, text=True
+        )
+        if acg_state.returncode == 0 and acg_state.stdout.strip():
+            parts = acg_state.stdout.strip().split()
+            try:
+                age_min = int((datetime.datetime.utcnow().timestamp() - int(parts[0])) / 60)
+                provider = parts[1] if len(parts) > 1 else "aws"
+                header += f" | {provider} | up {age_min}m"
+            except (ValueError, IndexError):
+                pass
+        _log(header)
         _log(f"```{nodes.stdout.strip()}```")
 
         apps = subprocess.run(
             ["kubectl", "get", "applications", "-n", "cicd",
-             "--context", "ubuntu-k3s",
+             "--context", "k3d-k3d-cluster",
              "--no-headers",
              "-o", "custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status"],
-            capture_output=True, text=True
+            capture_output=True, text=True, timeout=10
         )
         if apps.returncode == 0 and apps.stdout.strip():
-            _log("\n*ArgoCD apps:*")
-            _log(f"```{apps.stdout.strip()}```")
+            acg_apps = [l for l in apps.stdout.strip().splitlines()
+                        if l.startswith("acg-") or "ubuntu-k3s" in l]
+            if acg_apps:
+                _log("\n*ACG ArgoCD apps:*")
+                _log(f"```{chr(10).join(acg_apps)}```")
+            all_apps = apps.stdout.strip().splitlines()
+            unhealthy = [l for l in all_apps
+                         if "Degraded" in l or "Missing" in l or "OutOfSync" in l]
+            if unhealthy:
+                _log("\n⚠️ *Unhealthy/OutOfSync apps:*")
+                _log(f"```{chr(10).join(unhealthy)}```")
         else:
-            _log("\n_ArgoCD app status unavailable_")
+            _log("\n_ArgoCD app status unavailable (Hub cluster unreachable)_")
 
         _finish("success")
     except Exception as exc:
