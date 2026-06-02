@@ -1241,6 +1241,25 @@ EOF
    envsubst '$SENDGRID_API_KEY $PAGERDUTY_ROUTING_KEY $NOTIFICATION_EMAIL $NOTIFICATION_FROM' \
      < "${_dir}/notification-secret.yaml.tmpl" | _kubectl apply -f -
 
-   _info "[argocd] platform-ops deployed — CronJob runs 1st and 15th of each month"
-   _info "[argocd] Next: kubectl create secret generic laptop-webhook-token --from-literal=token=<token> -n platform-ops"
+   _info "[argocd] Deploying ACG expiry ConfigMap script..."
+   _kubectl create configmap acg-expiry-script \
+      --from-file=acg-expiry.sh="${_dir}/acg-expiry.sh" \
+      --namespace platform-ops \
+      --dry-run=client -o yaml | _kubectl apply -f -
+
+   _info "[argocd] Deploying ACG expiry CronJob..."
+   _kubectl apply -f "${_dir}/acg-expiry-cronjob.yaml"
+
+   _info "[argocd] Deploying PrometheusRule..."
+   _kubectl apply -f "${_dir}/prometheusrule.yaml"
+
+   _info "[argocd] Deploying AlertmanagerConfig..."
+   _kubectl apply -f "${_dir}/alertmanager-config.yaml"
+
+   _info "[argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m"
+   _info "[argocd] Secrets to create manually:"
+   _info "[argocd]   kubectl create secret generic oci-kubeconfig --from-file=config=<path> -n platform-ops"
+   _info "[argocd]   kubectl create secret generic k3dm-webhook-token --from-literal=token=<token> -n cicd"
+   _info "[argocd]   kubectl patch secret platform-ops-notifications -n platform-ops --type=merge \\"
+   _info "[argocd]     -p '{\"data\":{\"slack-incoming-webhook-url\":\"<base64-url>\"}}'"
 }

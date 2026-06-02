@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """k3dm-webhook — authenticated webhook server for k3d-manager laptop automation."""
 
+import datetime
 import hmac
 import http.server
 import json
@@ -8,6 +9,7 @@ import os
 import re
 import subprocess
 import threading
+import urllib.request
 import uuid
 from pathlib import Path
 
@@ -20,6 +22,9 @@ REPO_ROOT = os.environ.get(
 )
 TOKEN_FILE = Path.home() / ".k3dm" / "webhook-token"
 JOB_DIR = Path("/tmp/k3dm-webhook-jobs")
+SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+ANALYSIS_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "claude-haiku-4-5-20251001")
 
 
 def _get_token():
@@ -111,9 +116,11 @@ def _run_upgrade(job_id, chart_version, stage):
         _finish("failed")
 
 
-def _run_cluster(job_id, action):
+def _run_cluster(job_id, action, provider="aws"):
     job_dir = JOB_DIR / job_id
     lines = []
+    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "azure": "k3s-azure"}
+    _cluster_provider = _provider_map.get(provider, "k3s-aws")
 
     def _log(msg):
         lines.append(msg + "\n")
@@ -121,11 +128,17 @@ def _run_cluster(job_id, action):
     def _finish(status):
         (job_dir / "status").write_text(status)
         (job_dir / "output").write_text("".join(lines))
+        _ru_file = job_dir / "response_url"
+        if _ru_file.exists():
+            _ru = _ru_file.read_text().strip()
+            if _ru:
+                emoji = "✅" if status == "success" else "❌"
+                _slack_post(_ru, f"{emoji} *{action}* ({provider}) — {status}\n```{''.join(lines)[-800:]}```")
 
     try:
         (job_dir / "status").write_text("running")
         if action == "up":
-            cmd = ["make", "up"]
+            cmd = ["make", "up", f"CLUSTER_PROVIDER={_cluster_provider}"]
         else:
             cmd = ["make", "down", "KEEP_LOCAL=1"]
         _log(f"Running {' '.join(cmd)}...")
@@ -142,6 +155,183 @@ def _run_cluster(job_id, action):
         if proc.returncode != 0:
             raise RuntimeError(f"{' '.join(cmd)} exited {proc.returncode}")
         _log(f"{action} complete")
+        if action == "up":
+            _record_acg_state(provider)
+        _finish("success")
+    except Exception as exc:
+        _log(f"ERROR: {exc}")
+        _finish("failed")
+
+
+def _record_acg_state(provider):
+    """Write provision timestamp to Hub platform-ops ConfigMap."""
+    ts = str(int(datetime.datetime.utcnow().timestamp()))
+    create = subprocess.run(
+        ["kubectl", "create", "configmap", "acg-state",
+         f"--from-literal=provisioned-at={ts}",
+         f"--from-literal=provider={provider}",
+         "-n", "platform-ops",
+         "--dry-run=client", "-o", "yaml"],
+        capture_output=True, text=True
+    )
+    if create.returncode == 0:
+        subprocess.run(
+            ["kubectl", "apply", "-f", "-"],
+            input=create.stdout,
+            capture_output=True
+        )
+
+
+def _slack_post(url, text):
+    """POST a text message to a Slack incoming webhook or response_url."""
+    if not url:
+        return
+    data = json.dumps({"text": text, "response_type": "in_channel"}).encode()
+    req = urllib.request.Request(url, data=data,
+                                 headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=10)
+    except Exception:
+        pass
+
+
+def _call_claude(prompt):
+    """Call Anthropic Messages API with stdlib urllib. Returns text or error string."""
+    if not ANTHROPIC_API_KEY:
+        return "ANTHROPIC_API_KEY not configured — skipping AI analysis"
+    data = json.dumps({
+        "model": ANALYSIS_MODEL,
+        "max_tokens": 1024,
+        "messages": [{"role": "user", "content": prompt}]
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=data,
+        headers={
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json"
+        }
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read())
+            return result["content"][0]["text"]
+    except Exception as exc:
+        return f"Claude API error: {exc}"
+
+
+def _run_cluster_status(job_id, response_url):
+    """Check ACG cluster reachability + ArgoCD app health; post result to response_url."""
+    job_dir = JOB_DIR / job_id
+    lines = []
+
+    def _log(msg):
+        lines.append(msg + "\n")
+
+    def _finish(status):
+        (job_dir / "status").write_text(status)
+        (job_dir / "output").write_text("".join(lines))
+        if response_url:
+            _slack_post(response_url, "".join(lines))
+
+    try:
+        (job_dir / "status").write_text("running")
+
+        nodes = subprocess.run(
+            ["kubectl", "get", "nodes", "--context", "ubuntu-k3s",
+             "--request-timeout=8s", "--no-headers"],
+            capture_output=True, text=True
+        )
+        if nodes.returncode != 0:
+            _log("❌ *ACG cluster unreachable* — sandbox may have expired.")
+            _finish("success")
+            return
+
+        _log("✅ *ACG cluster nodes:*")
+        _log(f"```{nodes.stdout.strip()}```")
+
+        apps = subprocess.run(
+            ["kubectl", "get", "applications", "-n", "cicd",
+             "--context", "ubuntu-k3s",
+             "--no-headers",
+             "-o", "custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status"],
+            capture_output=True, text=True
+        )
+        if apps.returncode == 0 and apps.stdout.strip():
+            _log("\n*ArgoCD apps:*")
+            _log(f"```{apps.stdout.strip()}```")
+        else:
+            _log("\n_ArgoCD app status unavailable_")
+
+        _finish("success")
+    except Exception as exc:
+        _log(f"ERROR: {exc}")
+        _finish("failed")
+
+
+def _run_analyze(job_id, alert_payload, response_url=""):
+    """Gather kubectl diagnostics for firing alerts; call Claude; post to Slack."""
+    job_dir = JOB_DIR / job_id
+    lines = []
+
+    def _log(msg):
+        lines.append(msg + "\n")
+
+    def _finish(status):
+        (job_dir / "status").write_text(status)
+        (job_dir / "output").write_text("".join(lines))
+
+    try:
+        (job_dir / "status").write_text("running")
+        alerts = alert_payload.get("alerts", [])
+        firing = [a for a in alerts if a.get("status") == "firing"]
+        if not firing:
+            _finish("success")
+            return
+
+        for alert in firing:
+            app_name = alert.get("labels", {}).get("name", "")
+            alert_name = alert.get("labels", {}).get("alertname", "unknown")
+            _log(f"=== {alert_name}: {app_name} ===\n")
+
+            diag_parts = []
+            if app_name:
+                desc = subprocess.run(
+                    ["kubectl", "describe", "application", app_name, "-n", "cicd"],
+                    capture_output=True, text=True
+                )
+                if desc.returncode == 0:
+                    diag_parts.append(f"ArgoCD Application:\n{desc.stdout[-3000:]}")
+
+            pods = subprocess.run(
+                ["kubectl", "get", "pods", "-A",
+                 "--field-selector=status.phase!=Running",
+                 "--no-headers"],
+                capture_output=True, text=True
+            )
+            if pods.returncode == 0 and pods.stdout.strip():
+                diag_parts.append(f"Non-running pods:\n{pods.stdout.strip()}")
+
+            if not diag_parts:
+                _log("No diagnostics gathered\n")
+                continue
+
+            diagnostics = "\n\n".join(diag_parts)
+            prompt = (
+                f"You are a Kubernetes operations expert. Analyze this alert and give a "
+                f"concise diagnosis (2-3 sentences) and the single most likely fix.\n\n"
+                f"Alert: {alert_name} on app '{app_name}'\n\n"
+                f"Diagnostics:\n{diagnostics}"
+            )
+            analysis = _call_claude(prompt)
+            _log(analysis + "\n")
+
+            notify_url = response_url or SLACK_WEBHOOK_URL
+            if notify_url:
+                _slack_post(notify_url,
+                    f"🔍 *{alert_name}* — `{app_name}`\n{analysis}")
+
         _finish("success")
     except Exception as exc:
         _log(f"ERROR: {exc}")
@@ -201,12 +391,44 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             if action not in ("up", "down"):
                 self._json(400, {"error": "action (up|down) required"})
                 return
+            provider = body.get("provider", "aws")
+            if provider not in ("aws", "gcp", "azure"):
+                provider = "aws"
+            response_url = body.get("response_url", "")
+            job_id = str(uuid.uuid4())[:8]
+            (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
+            (JOB_DIR / job_id / "status").write_text("queued")
+            if response_url:
+                (JOB_DIR / job_id / "response_url").write_text(response_url)
+            threading.Thread(
+                target=_run_cluster,
+                args=(job_id, action, provider),
+                daemon=True
+            ).start()
+            self._json(202, {"job_id": job_id, "status": "queued"})
+            return
+
+        if self.path == "/api/v1/cluster-status":
+            response_url = body.get("response_url", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
             threading.Thread(
-                target=_run_cluster,
-                args=(job_id, action),
+                target=_run_cluster_status,
+                args=(job_id, response_url),
+                daemon=True
+            ).start()
+            self._json(202, {"job_id": job_id, "status": "queued"})
+            return
+
+        if self.path == "/api/v1/analyze":
+            response_url = body.get("response_url", "")
+            job_id = str(uuid.uuid4())[:8]
+            (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
+            (JOB_DIR / job_id / "status").write_text("queued")
+            threading.Thread(
+                target=_run_analyze,
+                args=(job_id, body, response_url),
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})

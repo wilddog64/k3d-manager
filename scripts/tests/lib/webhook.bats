@@ -139,6 +139,83 @@ teardown_file() {
     [[ "$output" == *'"status":"queued"'* ]]
 }
 
+@test "POST /cluster with provider=gcp returns 202 and job_id" {
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d '{"action":"up","provider":"gcp"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"queued"'* ]]
+    [[ "$output" == *'"job_id"'* ]]
+}
+
+@test "POST /cluster with unknown provider defaults to aws (202)" {
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d '{"action":"up","provider":"unknown"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"queued"'* ]]
+}
+
+@test "POST /cluster-status with correct token returns 202 and job_id" {
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d '{"response_url":""}' \
+        "${_WEBHOOK_URL}/api/v1/cluster-status"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"queued"'* ]]
+    [[ "$output" == *'"job_id"'* ]]
+}
+
+@test "POST /cluster-status with wrong token returns 401" {
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer wrongtoken" \
+        -H "Content-Type: application/json" \
+        -d '{}' \
+        "${_WEBHOOK_URL}/api/v1/cluster-status"
+    [ "$status" -eq 0 ]
+    [ "$output" = "401" ]
+}
+
+@test "POST /analyze with correct token returns 202 and job_id" {
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d '{"alerts":[]}' \
+        "${_WEBHOOK_URL}/api/v1/analyze"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"queued"'* ]]
+    [[ "$output" == *'"job_id"'* ]]
+}
+
+@test "POST /analyze with wrong token returns 401" {
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer wrongtoken" \
+        -H "Content-Type: application/json" \
+        -d '{"alerts":[]}' \
+        "${_WEBHOOK_URL}/api/v1/analyze"
+    [ "$status" -eq 0 ]
+    [ "$output" = "401" ]
+}
+
+@test "POST /cluster with response_url stored in job dir" {
+    local response job_id job_file
+    response="$(curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d '{"action":"up","provider":"aws","response_url":"https://hooks.slack.com/test"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster")"
+    job_id="$(echo "$response" | python3 -c 'import sys,json; print(json.load(sys.stdin)["job_id"])')"
+    [[ -n "$job_id" ]]
+    job_file="/tmp/k3dm-webhook-jobs/${job_id}/response_url"
+    [ -f "$job_file" ]
+    [ "$(cat "$job_file")" = "https://hooks.slack.com/test" ]
+}
+
 @test "POST /cluster with wrong token returns 401" {
     run curl -s -o /dev/null -w "%{http_code}" -X POST \
         -H "Authorization: Bearer wrongtoken" \

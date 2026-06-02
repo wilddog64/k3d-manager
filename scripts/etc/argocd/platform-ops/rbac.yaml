@@ -30,3 +30,9 @@ subjects:
   - kind: ServiceAccount
     name: argocd-cve-scanner
     namespace: platform-ops
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: acg-expiry-checker
+  namespace: platform-ops

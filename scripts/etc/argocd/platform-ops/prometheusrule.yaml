@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: argocd-degraded
+  namespace: cicd
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: argocd.alerts
+      rules:
+        - alert: ArgoCDAppDegraded
+          expr: argocd_app_info{health_status="Degraded"} == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "ArgoCD app {{ $labels.name }} is Degraded"
+            description: "App {{ $labels.name }} in namespace {{ $labels.dest_namespace }} has been Degraded for 5 minutes"
