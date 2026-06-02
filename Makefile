@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -144,6 +144,16 @@ install-sudoers:
 setup-worker:
 	bin/k3dm-webhook-setup
 	bin/k3dm-worker-setup
+
+## Re-deploy Cloudflare Worker and sync secrets from Keychain (run after Worker code changes)
+deploy-worker:
+	@_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null) && \
+	_tok=$$(security find-generic-password -s k3dm-webhook-token -a k3dm -w 2>/dev/null) && \
+	_sig=$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null) && \
+	cd workers/slack-relay && \
+	CLOUDFLARE_API_TOKEN="$$_cf" printf '%s' "$$_tok" | npx --yes wrangler secret put WEBHOOK_TOKEN && \
+	CLOUDFLARE_API_TOKEN="$$_cf" printf '%s' "$$_sig" | npx --yes wrangler secret put SLACK_SIGNING_SECRET && \
+	CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler deploy
 
 ## Backup Cloudflare tunnel credentials to macOS Keychain + Vault (run after rotating credentials)
 cloudflared-backup:
