@@ -173,6 +173,20 @@ def _run_cluster(job_id, action, provider="aws"):
         _finish("failed")
 
 
+def _running_cluster_job():
+    """Return (job_id, action) if a cluster up/down job is already running, else None."""
+    try:
+        for entry in sorted(JOB_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+            status_file = entry / "status"
+            meta_file = entry / "action"
+            if status_file.exists() and status_file.read_text().strip() == "running":
+                if meta_file.exists():
+                    return (entry.name, meta_file.read_text().strip())
+    except Exception:
+        pass
+    return None
+
+
 def _record_acg_state(provider):
     """Write provision timestamp to Hub platform-ops ConfigMap."""
     ts = str(int(datetime.datetime.utcnow().timestamp()))
@@ -429,6 +443,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             if action not in ("up", "down"):
                 self._json(400, {"error": "action (up|down) required"})
                 return
+            running = _running_cluster_job()
+            if running:
+                self._json(409, {"error": f"cluster job already running: {running[0]} ({running[1]})"})
+                return
             provider = body.get("provider", "aws")
             if provider not in ("aws", "gcp", "azure"):
                 provider = "aws"
@@ -436,6 +454,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
+            (JOB_DIR / job_id / "action").write_text(action)
             if response_url:
                 (JOB_DIR / job_id / "response_url").write_text(response_url)
             threading.Thread(

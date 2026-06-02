@@ -31,9 +31,13 @@ async function relay(endpoint, payload) {
       },
       body: JSON.stringify(payload)
     })
-    return resp.ok
+    if (resp.status === 409) {
+      const data = await resp.json().catch(() => ({}))
+      return { ok: false, conflict: data.error || 'cluster job already running' }
+    }
+    return { ok: resp.ok, conflict: null }
   } catch (_) {
-    return false
+    return { ok: false, conflict: null }
   }
 }
 
@@ -61,19 +65,21 @@ async function handle(req) {
 
   if (command === '/acg-up') {
     const provider = VALID_PROVIDERS.has(text) ? text : 'aws'
-    const ok = await relay('/api/v1/cluster', { action: 'up', provider, response_url: responseUrl })
+    const { ok, conflict } = await relay('/api/v1/cluster', { action: 'up', provider, response_url: responseUrl })
+    if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
     return jsonReply(`⏳ Bringing up ACG cluster (${provider})…`)
   }
 
   if (command === '/acg-down') {
-    const ok = await relay('/api/v1/cluster', { action: 'down', response_url: responseUrl })
+    const { ok, conflict } = await relay('/api/v1/cluster', { action: 'down', response_url: responseUrl })
+    if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
     return jsonReply('⏳ Tearing down ACG cluster…')
   }
 
   if (command === '/acg-status') {
-    const ok = await relay('/api/v1/cluster-status', { response_url: responseUrl })
+    const { ok } = await relay('/api/v1/cluster-status', { response_url: responseUrl })
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
     return jsonReply('🔍 Checking ACG cluster status…')
   }
@@ -84,7 +90,7 @@ async function handle(req) {
     const stage   = parts[1] || 'infra'
     if (!version) return jsonReply('Usage: /argocd-upgrade <chart_version> [acg|infra]')
     if (!['acg', 'infra'].includes(stage)) return jsonReply('stage must be acg or infra')
-    const ok = await relay('/api/v1/argocd-upgrade',
+    const { ok } = await relay('/api/v1/argocd-upgrade',
       { chart_version: version, stage, response_url: responseUrl })
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
     return jsonReply(`⏳ Upgrading ArgoCD to chart ${version} on ${stage}…`)
