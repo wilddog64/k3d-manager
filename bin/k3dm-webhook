@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """k3dm-webhook — authenticated webhook server for k3d-manager laptop automation."""
 
+import hmac
 import http.server
 import json
 import os
+import re
 import subprocess
 import threading
 import uuid
 from pathlib import Path
 
 PORT = int(os.environ.get("K3DM_WEBHOOK_PORT", "7443"))
+MAX_BODY = 4096
+_JOB_ID_RE = re.compile(r'^[0-9a-f]{8}$')
 REPO_ROOT = os.environ.get(
     "K3DM_REPO_ROOT",
     str(Path.home() / "src/gitrepo/personal/k3d-manager")
@@ -48,10 +52,10 @@ def _secret_name(env):
 
 
 def _patch_label(secret, version):
+    patch = json.dumps({"metadata": {"labels": {"argocd-chart-version": version}}})
     subprocess.run(
         ["kubectl", "patch", "secret", secret, "-n", "cicd",
-         "--type=merge", "-p",
-         f'{{"metadata":{{"labels":{{"argocd-chart-version":"{version}"}}}}}}'],
+         "--type=merge", "-p", patch],
         check=True
     )
 
@@ -112,7 +116,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         token = _get_token()
         if not token:
             return False
-        return self.headers.get("Authorization", "") == f"Bearer {token}"
+        return hmac.compare_digest(
+            self.headers.get("Authorization", ""),
+            f"Bearer {token}"
+        )
 
     def _json(self, code, body):
         data = json.dumps(body).encode()
@@ -131,6 +138,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
 
         length = int(self.headers.get("Content-Length", 0))
+        if length > MAX_BODY:
+            self._json(413, {"error": "request too large"})
+            return
         body = json.loads(self.rfile.read(length) or b"{}")
         chart_version = body.get("chart_version", "")
         stage = body.get("stage", "")
@@ -160,6 +170,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
 
         job_id = self.path.rsplit("/", 1)[-1]
+        if not _JOB_ID_RE.match(job_id):
+            self._json(400, {"error": "invalid job id"})
+            return
         job_dir = JOB_DIR / job_id
         if not job_dir.exists():
             self._json(404, {"error": "job not found"})
