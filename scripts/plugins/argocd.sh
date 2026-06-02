@@ -1190,8 +1190,10 @@ function deploy_argocd_platform_ops() {
 Usage: deploy_argocd_platform_ops
 
 Deploy the platform-ops namespace, RBAC, CVE scan CronJob, and notification Secret
-for the ArgoCD CVE upgrade pipeline. All credentials are optional — missing vars
-disable that channel gracefully.
+for the ArgoCD CVE upgrade pipeline. CronJob runs on this Hub cluster (k3d) and
+patches cluster secrets directly — no webhook dependency.
+
+All credentials are optional — missing vars disable that channel gracefully.
 
 Required env vars (all optional — missing = channel disabled):
   SENDGRID_API_KEY        SendGrid v3 API key
@@ -1199,9 +1201,9 @@ Required env vars (all optional — missing = channel disabled):
   NOTIFICATION_EMAIL      Recipient email address
   NOTIFICATION_FROM       Sender address (default: argocd-cve@k3d-manager)
 
-After deploying, create the laptop webhook token Secret:
-  kubectl create secret generic laptop-webhook-token \
-    --from-literal=token=<token> -n platform-ops
+After deploying, optionally create the OCI kubeconfig Secret to enable OCI upgrades:
+  kubectl create secret generic oci-kubeconfig \
+    --from-file=config=/path/to/oci-kubeconfig -n platform-ops
 HELP
       return 0
    fi
