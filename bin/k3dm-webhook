@@ -129,15 +129,6 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def _request_target(self):
-        raw = getattr(self, "requestline", "")
-        if not raw and getattr(self, "raw_requestline", None):
-            raw = self.raw_requestline.decode("iso-8859-1", errors="ignore")
-        parts = raw.split(" ", 2)
-        if len(parts) >= 2:
-            return parts[1]
-        return self.path
-
     def do_POST(self):
         if not self._auth():
             self._json(401, {"error": "unauthorized"})
