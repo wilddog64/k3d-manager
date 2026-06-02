@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# bin/k3dm-worker-setup — ensure GitHub secrets required for Worker deploy exist.
+# Checks each secret; prompts interactively for any that are missing.
+
+set -euo pipefail
+
+_REPO="$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)" || {
+  echo "[k3dm-worker-setup] ERROR: gh not authenticated — run: gh auth login"
+  exit 1
+}
+
+_info()  { echo "[k3dm-worker-setup] $*"; }
+_error() { echo "[k3dm-worker-setup] ERROR: $*" >&2; exit 1; }
+
+_secret_exists() {
+  gh secret list --repo "${_REPO}" --json name -q '.[].name' \
+    | grep -qx "${1}" 2>/dev/null
+}
+
+_prompt_and_set() {
+  local name="$1"
+  local hint="$2"
+  echo ""
+  _info "Secret missing: ${name}"
+  _info "${hint}"
+  printf "[k3dm-worker-setup] Enter value (input hidden): "
+  local _val
+  read -rs _val
+  echo ""
+  [ -z "${_val}" ] && _error "Empty value — ${name} not set."
+  printf '%s' "${_val}" | gh secret set "${name}" --repo "${_REPO}"
+  _info "${name} set."
+}
+
+_info "Checking GitHub secrets for repo: ${_REPO}"
+echo ""
+
+_required=(
+  "CLOUDFLARE_API_TOKEN:Get from: dash.cloudflare.com → My Profile → API Tokens → 'Edit Cloudflare Workers' template"
+  "SLACK_SIGNING_SECRET:Get from: api.slack.com/apps → your app → Basic Information → Signing Secret"
+  "K3DM_WEBHOOK_TOKEN:Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
+)
+
+_all_present=true
+for _entry in "${_required[@]}"; do
+  _name="${_entry%%:*}"
+  _hint="${_entry#*:}"
+  if _secret_exists "${_name}"; then
+    _info "${_name}: already set ✓"
+  else
+    _all_present=false
+    _prompt_and_set "${_name}" "${_hint}"
+  fi
+done
+
+echo ""
+if [ "${_all_present}" = "true" ]; then
+  _info "All secrets already present — Worker deploy workflow is ready."
+else
+  _info "All secrets now set — Worker deploy workflow is ready."
+fi
