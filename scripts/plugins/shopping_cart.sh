@@ -118,7 +118,7 @@ function deploy_shopping_cart_data() {
 
   _info "[shopping_cart] Waiting for MinIO to be Ready..."
   kubectl rollout status statefulset/minio \
-    -n shopping-cart-data --context ubuntu-k3s --timeout=120s
+    -n shopping-cart-data --context ubuntu-k3s --timeout=300s
 
 
   _info "[shopping_cart] Creating rabbitmq-credentials secret..."
@@ -147,9 +147,21 @@ function shopping_cart_sync_vault_backed_secrets() {
   fi
 
   _info "[shopping_cart] Waiting for ClusterSecretStore vault-backend to be Ready..."
-  kubectl wait --for=condition=Ready --timeout=120s \
-    clustersecretstore/vault-backend --context ubuntu-k3s \
-    || { _err "[shopping_cart] ClusterSecretStore vault-backend never became Ready"; return 1; }
+  local _css_ready=0
+  for _css_try in 1 2 3; do
+    if kubectl wait --for=condition=Ready --timeout=90s \
+        clustersecretstore/vault-backend --context ubuntu-k3s 2>/dev/null; then
+      _css_ready=1
+      break
+    fi
+    _warn "[shopping_cart] ClusterSecretStore vault-backend not Ready after 90s (attempt ${_css_try}/3) — forcing reconcile..."
+    kubectl annotate clustersecretstore vault-backend --context ubuntu-k3s \
+      "k3d-manager/reconcile-at=$(date -u +%Y%m%dT%H%M%SZ)" --overwrite >/dev/null 2>&1 || true
+  done
+  if (( _css_ready == 0 )); then
+    _err "[shopping_cart] ClusterSecretStore vault-backend never became Ready after 3 attempts (270s total)"
+    return 1
+  fi
 
   _info "[shopping_cart] Applying Vault-backed ExternalSecrets for data, app, payment, and MinIO..."
   _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/secrets/"

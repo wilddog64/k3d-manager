@@ -90,6 +90,54 @@ function deploy_observability_acg() {
     _err "[observability] Failed to apply ACG observability ApplicationSet"
     return 1
   fi
+
+  _info "[observability] Reading Alertmanager credentials from Vault..."
+  local _vault_addr="http://127.0.0.1:18200"
+  local _vault_token
+  _vault_token=$(_kubectl get secret vault-root -n secrets \
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+
+  local _am_creds _vault_hdr
+  _vault_hdr=$(mktemp)
+  printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
+  if ! _am_creds=$(curl -sf \
+      --header "@${_vault_hdr}" \
+      "${_vault_addr}/v1/secret/data/k3d-manager/alertmanager" 2>/dev/null \
+      | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
+        print(d['gmail_from']+'|'+d['gmail_app_pw']+'|'+d['sms_gateway'])" 2>/dev/null); then
+    _am_creds=""
+  fi
+  rm -f "${_vault_hdr}"
+
+  if [[ -z "${_am_creds}" ]]; then
+    _warn "[observability] Alertmanager Vault secret not found — skipping SMS config on ACG"
+    _warn "[observability] Run: make alertmanager-secret to configure"
+  else
+    local _gmail_from _gmail_app_pw _sms_gateway _rest
+    _gmail_from="${_am_creds%%|*}"
+    _rest="${_am_creds#*|}"
+    _gmail_app_pw="${_rest%%|*}"
+    _sms_gateway="${_rest##*|}"
+
+    local _am_tmpl="${SCRIPT_DIR}/etc/prometheus/alertmanager.yaml.tmpl"
+    local _am_config
+    # shellcheck disable=SC2016
+    _am_config=$(ALERTMANAGER_GMAIL_FROM="${_gmail_from}" \
+      ALERTMANAGER_GMAIL_APP_PW="${_gmail_app_pw}" \
+      ALERTMANAGER_SMS_GATEWAY="${_sms_gateway}" \
+      envsubst '${ALERTMANAGER_GMAIL_FROM} ${ALERTMANAGER_GMAIL_APP_PW} ${ALERTMANAGER_SMS_GATEWAY}' \
+      < "${_am_tmpl}")
+    local _am_tmpfile
+    _am_tmpfile=$(mktemp)
+    printf '%s' "${_am_config}" > "${_am_tmpfile}"
+    _kubectl create secret generic alertmanager-smtp-secret \
+      --context ubuntu-k3s \
+      -n monitoring \
+      --from-file=alertmanager.yaml="${_am_tmpfile}" \
+      --dry-run=client -o yaml | _kubectl apply --context ubuntu-k3s -f -
+    rm -f "${_am_tmpfile}"
+    _info "[observability] Alertmanager config secret created on ACG (ubuntu-k3s)"
+  fi
 }
 
 function observability_status() {

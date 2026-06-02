@@ -47,7 +47,7 @@ _info "[acg-down] keep-hub=${_keep_hub} hub-cluster=${_HUB_CLUSTER}"
 if _is_mac; then
   if [[ -t 0 && -t 1 ]] && ! sudo -n true 2>/dev/null; then
     _info "[acg-down] Pre-authorizing sudo for macOS host operations (launchd cleanup)..."
-    sudo -v
+    _run_command --interactive-sudo --soft -- true
   fi
 fi
 
