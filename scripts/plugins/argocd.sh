@@ -1183,3 +1183,44 @@ EOF
 
   _info "[argocd] cluster secret applied — verify with: kubectl get secret ${ARGOCD_APP_CLUSTER_SECRET_NAME} -n ${ARGOCD_NAMESPACE}"
 }
+
+function deploy_argocd_platform_ops() {
+   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+      cat <<'HELP'
+Usage: deploy_argocd_platform_ops
+
+Deploy the platform-ops namespace and notification Secret scaffold for the ArgoCD CVE
+upgrade pipeline. Credentials are read from env vars; missing vars produce an empty
+Secret field — notify.sh skips that channel gracefully.
+
+Required env vars (all optional — missing = channel disabled):
+  SENDGRID_API_KEY        SendGrid v3 API key
+  PAGERDUTY_ROUTING_KEY   PagerDuty Events API v2 routing key
+  NOTIFICATION_EMAIL      Recipient email address
+  NOTIFICATION_FROM       Sender address (default: argocd-cve@k3d-manager)
+HELP
+      return 0
+   fi
+
+   local _dir="${ARGOCD_CONFIG_DIR}/platform-ops"
+
+   _info "[argocd] Ensuring platform-ops namespace..."
+   _kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-ops
+  labels:
+    managed-by: k3d-manager
+EOF
+
+   _info "[argocd] Deploying notification Secret scaffold..."
+   NOTIFICATION_FROM="${NOTIFICATION_FROM:-argocd-cve@k3d-manager}" \
+   SENDGRID_API_KEY="${SENDGRID_API_KEY:-}" \
+   PAGERDUTY_ROUTING_KEY="${PAGERDUTY_ROUTING_KEY:-}" \
+   NOTIFICATION_EMAIL="${NOTIFICATION_EMAIL:-}" \
+   envsubst '$SENDGRID_API_KEY $PAGERDUTY_ROUTING_KEY $NOTIFICATION_EMAIL $NOTIFICATION_FROM' \
+     < "${_dir}/notification-secret.yaml.tmpl" | _kubectl apply -f -
+
+   _info "[argocd] platform-ops notification scaffold deployed"
+}
