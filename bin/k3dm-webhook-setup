@@ -6,38 +6,55 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-TOKEN_DIR="${HOME}/.k3dm"
-TOKEN_FILE="${TOKEN_DIR}/webhook-token"
 PLIST_LABEL="com.k3d-manager.webhook"
 PLIST_DST="${HOME}/Library/LaunchAgents/${PLIST_LABEL}.plist"
+KEYCHAIN_SERVICE="k3dm-webhook-token"
+KEYCHAIN_ACCOUNT="k3dm"
 
 if [[ "${1:-}" == "--uninstall" ]]; then
   launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true
   rm -f "${PLIST_DST}"
+  security delete-generic-password -s "${KEYCHAIN_SERVICE}" -a "${KEYCHAIN_ACCOUNT}" 2>/dev/null || true
   echo "[k3dm-webhook-setup] uninstalled"
   exit 0
 fi
 
-# Generate token if not present
-mkdir -p "${TOKEN_DIR}"
-chmod 700 "${TOKEN_DIR}"
-if [[ ! -f "${TOKEN_FILE}" ]]; then
-  python3 -c "import secrets; print(secrets.token_hex(32))" > "${TOKEN_FILE}"
-  chmod 600 "${TOKEN_FILE}"
-  echo "[k3dm-webhook-setup] Generated token at ${TOKEN_FILE}"
+_rotate=false
+[[ "${1:-}" == "--rotate" ]] && _rotate=true
+
+# Generate token and store in Keychain
+if [[ "${_rotate}" == "true" ]] || ! security find-generic-password -s "${KEYCHAIN_SERVICE}" -a "${KEYCHAIN_ACCOUNT}" &>/dev/null; then
+  TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(32))')"
+  security add-generic-password -U -s "${KEYCHAIN_SERVICE}" -a "${KEYCHAIN_ACCOUNT}" -w "${TOKEN}"
+  echo "[k3dm-webhook-setup] Token generated and stored in Keychain"
 else
-  echo "[k3dm-webhook-setup] Token already exists at ${TOKEN_FILE}"
+  echo "[k3dm-webhook-setup] Token already exists in Keychain"
+  TOKEN="$(security find-generic-password -s "${KEYCHAIN_SERVICE}" -a "${KEYCHAIN_ACCOUNT}" -w)"
+fi
+
+# Update GitHub secret
+_REPO="$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)" || {
+  echo "[k3dm-webhook-setup] WARNING: gh not authenticated — skipping GitHub secret update"
+  _REPO=""
+}
+if [[ -n "${_REPO}" ]]; then
+  printf '%s' "${TOKEN}" | gh secret set K3DM_WEBHOOK_TOKEN --repo "${_REPO}"
+  echo "[k3dm-webhook-setup] GitHub secret K3DM_WEBHOOK_TOKEN updated for ${_REPO}"
+fi
+
+if [[ "${_rotate}" == "true" ]]; then
+  echo "[k3dm-webhook-setup] Token rotated — daemon picks up new token on next request"
+  echo "[k3dm-webhook-setup] To update the Cloudflare Worker: gh workflow run deploy-worker.yml"
+  exit 0
 fi
 
 # Render and install launchd plist
 WEBHOOK_BIN="${SCRIPT_DIR}/k3dm-webhook"
 WEBHOOK_LOG="${HOME}/Library/Logs/k3dm-webhook.log"
-TOKEN="$(cat "${TOKEN_FILE}")"
 
 sed \
   -e "s|{{WEBHOOK_BIN}}|${WEBHOOK_BIN}|g" \
   -e "s|{{K3DM_REPO_ROOT}}|${REPO_ROOT}|g" \
-  -e "s|{{K3DM_WEBHOOK_TOKEN}}|${TOKEN}|g" \
   -e "s|{{WEBHOOK_LOG}}|${WEBHOOK_LOG}|g" \
   "${REPO_ROOT}/scripts/etc/launchd/com.k3d-manager.webhook.plist.tmpl" \
   > "${PLIST_DST}"
@@ -45,13 +62,4 @@ sed \
 launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "${PLIST_DST}"
 echo "[k3dm-webhook-setup] LaunchAgent installed and started"
-
-# Print OCI Secret creation command
-echo ""
-echo "[k3dm-webhook-setup] Run this on OCI to store the token:"
-echo "  kubectl create secret generic laptop-webhook-token \\"
-echo "    --from-literal=token=$(cat "${TOKEN_FILE}") \\"
-echo "    --namespace platform-ops"
-echo ""
-echo "[k3dm-webhook-setup] Also add webhook.3ai-talk.org to cloudflared config, then:"
-echo "  launchctl kickstart -k gui/$(id -u)/com.k3d-manager.cloudflared"
+echo "[k3dm-webhook-setup] Webhook server running at 127.0.0.1:7443 via Keychain auth"

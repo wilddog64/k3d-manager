@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
-# bin/k3dm-worker-setup — ensure GitHub secrets required for Worker deploy exist.
+# bin/k3dm-worker-setup — ensure GitHub secrets + Keychain entries exist, then deploy Worker.
 # Checks each secret; prompts interactively for any that are missing.
+# Usage: bin/k3dm-worker-setup [--rotate]
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+WORKER_DIR="${REPO_ROOT}/workers/slack-relay"
 
 _REPO="$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)" || {
   echo "[k3dm-worker-setup] ERROR: gh not authenticated — run: gh auth login"
@@ -12,50 +17,87 @@ _REPO="$(gh repo view --json nameWithOwner -q '.nameWithOwner' 2>/dev/null)" || 
 _info()  { echo "[k3dm-worker-setup] $*"; }
 _error() { echo "[k3dm-worker-setup] ERROR: $*" >&2; exit 1; }
 
-_secret_exists() {
+_keychain_get() {
+  security find-generic-password -s "${1}" -a k3dm -w 2>/dev/null || true
+}
+
+_keychain_set() {
+  security add-generic-password -U -s "${1}" -a k3dm -w "${2}"
+}
+
+_github_secret_exists() {
   gh secret list --repo "${_REPO}" --json name -q '.[].name' \
     | grep -qx "${1}" 2>/dev/null
 }
 
-_prompt_and_set() {
-  local name="$1"
-  local hint="$2"
-  echo ""
-  _info "Secret missing: ${name}"
-  _info "${hint}"
-  printf "[k3dm-worker-setup] Enter value (input hidden): "
+_ensure_secret() {
+  local gh_name="$1"
+  local kc_name="$2"
+  local hint="$3"
+  local _rotate="${4:-false}"
+
   local _val
-  read -rs _val
-  echo ""
-  [ -z "${_val}" ] && _error "Empty value — ${name} not set."
-  printf '%s' "${_val}" | gh secret set "${name}" --repo "${_REPO}"
-  _info "${name} set."
+  _val="$(_keychain_get "${kc_name}")"
+
+  if [[ -n "${_val}" && "${_rotate}" != "true" ]]; then
+    _info "${gh_name}: found in Keychain ✓"
+  else
+    echo ""
+    _info "Secret needed: ${gh_name}"
+    _info "${hint}"
+    printf "[k3dm-worker-setup] Enter value (input hidden): "
+    read -rs _val
+    echo ""
+    [ -z "${_val}" ] && _error "Empty value — ${gh_name} not set."
+    _keychain_set "${kc_name}" "${_val}"
+    _info "Stored in Keychain: ${kc_name}"
+  fi
+
+  if ! _github_secret_exists "${gh_name}" || [[ "${_rotate}" == "true" ]]; then
+    printf '%s' "${_val}" | gh secret set "${gh_name}" --repo "${_REPO}"
+    _info "GitHub secret updated: ${gh_name}"
+  else
+    _info "GitHub secret already set: ${gh_name} ✓"
+  fi
 }
 
-_info "Checking GitHub secrets for repo: ${_REPO}"
+_rotate=false
+[[ "${1:-}" == "--rotate" ]] && _rotate=true
+
+_info "Checking secrets for repo: ${_REPO}"
 echo ""
 
-_required=(
-  "CLOUDFLARE_API_TOKEN:Get from: dash.cloudflare.com → My Profile → API Tokens → 'Edit Cloudflare Workers' template"
-  "SLACK_SIGNING_SECRET:Get from: api.slack.com/apps → your app → Basic Information → Signing Secret"
-  "K3DM_WEBHOOK_TOKEN:Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'"
-)
+_ensure_secret "CLOUDFLARE_API_TOKEN"  "k3dm-cloudflare-api-token" \
+  "Get from: dash.cloudflare.com → My Profile → API Tokens → 'Edit Cloudflare Workers' template" \
+  "${_rotate}"
 
-_all_present=true
-for _entry in "${_required[@]}"; do
-  _name="${_entry%%:*}"
-  _hint="${_entry#*:}"
-  if _secret_exists "${_name}"; then
-    _info "${_name}: already set ✓"
-  else
-    _all_present=false
-    _prompt_and_set "${_name}" "${_hint}"
-  fi
-done
+_ensure_secret "SLACK_SIGNING_SECRET" "k3dm-slack-signing-secret" \
+  "Get from: api.slack.com/apps → your app → Basic Information → Signing Secret" \
+  "${_rotate}"
 
-echo ""
-if [ "${_all_present}" = "true" ]; then
-  _info "All secrets already present — Worker deploy workflow is ready."
-else
-  _info "All secrets now set — Worker deploy workflow is ready."
+# K3DM_WEBHOOK_TOKEN is managed by bin/k3dm-webhook-setup (Keychain: k3dm-webhook-token)
+_webhook_token="$(_keychain_get "k3dm-webhook-token")"
+if [[ -z "${_webhook_token}" ]]; then
+  _error "WEBHOOK_TOKEN not found in Keychain — run: bin/k3dm-webhook-setup first"
 fi
+if ! _github_secret_exists "K3DM_WEBHOOK_TOKEN" || [[ "${_rotate}" == "true" ]]; then
+  printf '%s' "${_webhook_token}" | gh secret set K3DM_WEBHOOK_TOKEN --repo "${_REPO}"
+  _info "GitHub secret updated: K3DM_WEBHOOK_TOKEN"
+else
+  _info "K3DM_WEBHOOK_TOKEN: already set ✓"
+fi
+
+echo ""
+_info "Deploying Cloudflare Worker..."
+
+_cf_token="$(_keychain_get "k3dm-cloudflare-api-token")"
+_signing_secret="$(_keychain_get "k3dm-slack-signing-secret")"
+
+cd "${WORKER_DIR}"
+export CLOUDFLARE_API_TOKEN="${_cf_token}"
+printf '%s' "${_webhook_token}" | npx --yes wrangler secret put WEBHOOK_TOKEN
+printf '%s' "${_signing_secret}" | npx --yes wrangler secret put SLACK_SIGNING_SECRET
+npx --yes wrangler deploy
+
+echo ""
+_info "Worker deployed. Update slash command URLs in Slack to the URL shown above."

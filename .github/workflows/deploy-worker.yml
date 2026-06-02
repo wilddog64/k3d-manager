@@ -7,6 +7,7 @@ name: Deploy Cloudflare Worker
       - main
     paths:
       - 'workers/slack-relay/**'
+  workflow_dispatch:
 
 permissions:
   contents: read

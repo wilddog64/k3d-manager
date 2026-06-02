@@ -31,6 +31,16 @@ def _get_token():
     token = os.environ.get("K3DM_WEBHOOK_TOKEN")
     if token:
         return token
+    try:
+        r = subprocess.run(
+            ["security", "find-generic-password",
+             "-s", "k3dm-webhook-token", "-a", "k3dm", "-w"],
+            capture_output=True, text=True
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip()
+    except Exception:
+        pass
     if TOKEN_FILE.exists():
         return TOKEN_FILE.read_text().strip()
     return None
