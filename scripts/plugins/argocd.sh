@@ -1189,15 +1189,19 @@ function deploy_argocd_platform_ops() {
       cat <<'HELP'
 Usage: deploy_argocd_platform_ops
 
-Deploy the platform-ops namespace and notification Secret scaffold for the ArgoCD CVE
-upgrade pipeline. Credentials are read from env vars; missing vars produce an empty
-Secret field — notify.sh skips that channel gracefully.
+Deploy the platform-ops namespace, RBAC, CVE scan CronJob, and notification Secret
+for the ArgoCD CVE upgrade pipeline. All credentials are optional — missing vars
+disable that channel gracefully.
 
 Required env vars (all optional — missing = channel disabled):
   SENDGRID_API_KEY        SendGrid v3 API key
   PAGERDUTY_ROUTING_KEY   PagerDuty Events API v2 routing key
   NOTIFICATION_EMAIL      Recipient email address
   NOTIFICATION_FROM       Sender address (default: argocd-cve@k3d-manager)
+
+After deploying, create the laptop webhook token Secret:
+  kubectl create secret generic laptop-webhook-token \
+    --from-literal=token=<token> -n platform-ops
 HELP
       return 0
    fi
@@ -1214,6 +1218,19 @@ metadata:
     managed-by: k3d-manager
 EOF
 
+   _info "[argocd] Deploying RBAC..."
+   _kubectl apply -f "${_dir}/rbac.yaml"
+
+   _info "[argocd] Deploying CVE scan CronJob..."
+   _kubectl apply -f "${_dir}/cve-scan-cronjob.yaml"
+
+   _info "[argocd] Deploying scan script ConfigMap..."
+   _kubectl create configmap argocd-cve-scan-script \
+      --from-file=cve-scan.sh="${_dir}/cve-scan.sh" \
+      --from-file=notify.sh="${_dir}/notify.sh" \
+      --namespace platform-ops \
+      --dry-run=client -o yaml | _kubectl apply -f -
+
    _info "[argocd] Deploying notification Secret scaffold..."
    NOTIFICATION_FROM="${NOTIFICATION_FROM:-argocd-cve@k3d-manager}" \
    SENDGRID_API_KEY="${SENDGRID_API_KEY:-}" \
@@ -1222,5 +1239,6 @@ EOF
    envsubst '$SENDGRID_API_KEY $PAGERDUTY_ROUTING_KEY $NOTIFICATION_EMAIL $NOTIFICATION_FROM' \
      < "${_dir}/notification-secret.yaml.tmpl" | _kubectl apply -f -
 
-   _info "[argocd] platform-ops notification scaffold deployed"
+   _info "[argocd] platform-ops deployed — CronJob runs 1st and 15th of each month"
+   _info "[argocd] Next: kubectl create secret generic laptop-webhook-token --from-literal=token=<token> -n platform-ops"
 }
