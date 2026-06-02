@@ -139,6 +139,58 @@ teardown_file() {
     [[ "$output" == *'"status":"queued"'* ]]
 }
 
+@test "POST /cluster with wrong token returns 401" {
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer wrongtoken" \
+        -H "Content-Type: application/json" \
+        -d '{"action":"up"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster"
+    [ "$status" -eq 0 ]
+    [ "$output" = "401" ]
+}
+
+@test "POST /cluster with action=up returns 202 and job_id" {
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d '{"action":"up"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"queued"'* ]]
+    [[ "$output" == *'"job_id"'* ]]
+}
+
+@test "POST /cluster with action=down returns 202 and job_id" {
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d '{"action":"down"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"queued"'* ]]
+    [[ "$output" == *'"job_id"'* ]]
+}
+
+@test "POST /cluster with invalid action returns 400" {
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d '{"action":"restart"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster"
+    [ "$status" -eq 0 ]
+    [ "$output" = "400" ]
+}
+
+@test "POST /cluster with missing action returns 400" {
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d '{}' \
+        "${_WEBHOOK_URL}/api/v1/cluster"
+    [ "$status" -eq 0 ]
+    [ "$output" = "400" ]
+}
+
 # ── Level 1: localhost smoke — no cluster needed ───────────────────────────────
 
 @test "Level 1: POST queues job and GET /status returns job output" {

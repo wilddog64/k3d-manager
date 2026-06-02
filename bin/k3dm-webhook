@@ -111,6 +111,43 @@ def _run_upgrade(job_id, chart_version, stage):
         _finish("failed")
 
 
+def _run_cluster(job_id, action):
+    job_dir = JOB_DIR / job_id
+    lines = []
+
+    def _log(msg):
+        lines.append(msg + "\n")
+
+    def _finish(status):
+        (job_dir / "status").write_text(status)
+        (job_dir / "output").write_text("".join(lines))
+
+    try:
+        (job_dir / "status").write_text("running")
+        if action == "up":
+            cmd = ["make", "up"]
+        else:
+            cmd = ["make", "down", "KEEP_LOCAL=1"]
+        _log(f"Running {' '.join(cmd)}...")
+        proc = subprocess.Popen(
+            cmd,
+            cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+        for line in proc.stdout:
+            lines.append(line)
+        proc.wait()
+        if proc.returncode != 0:
+            raise RuntimeError(f"{' '.join(cmd)} exited {proc.returncode}")
+        _log(f"{action} complete")
+        _finish("success")
+    except Exception as exc:
+        _log(f"ERROR: {exc}")
+        _finish("failed")
+
+
 class _Handler(http.server.BaseHTTPRequestHandler):
     def _auth(self):
         token = _get_token()
@@ -136,33 +173,46 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if self.path.startswith("/api/") and not self.path.startswith("/api/v1/"):
             self._json(400, {"error": "invalid api path"})
             return
-        if self.path != "/api/v1/argocd-upgrade":
-            self._json(404, {"error": "not found"})
-            return
 
         length = int(self.headers.get("Content-Length", 0))
         if length > MAX_BODY:
             self._json(413, {"error": "request too large"})
             return
         body = json.loads(self.rfile.read(length) or b"{}")
-        chart_version = body.get("chart_version", "")
-        stage = body.get("stage", "")
-
-        if not chart_version or stage not in ("acg", "infra"):
-            self._json(400, {"error": "chart_version and stage (acg|infra) required"})
+        if self.path == "/api/v1/argocd-upgrade":
+            chart_version = body.get("chart_version", "")
+            stage = body.get("stage", "")
+            if not chart_version or stage not in ("acg", "infra"):
+                self._json(400, {"error": "chart_version and stage (acg|infra) required"})
+                return
+            job_id = str(uuid.uuid4())[:8]
+            (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
+            (JOB_DIR / job_id / "status").write_text("queued")
+            threading.Thread(
+                target=_run_upgrade,
+                args=(job_id, chart_version, stage),
+                daemon=True
+            ).start()
+            self._json(202, {"job_id": job_id, "status": "queued"})
             return
 
-        job_id = str(uuid.uuid4())[:8]
-        (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
-        (JOB_DIR / job_id / "status").write_text("queued")
+        if self.path == "/api/v1/cluster":
+            action = body.get("action", "")
+            if action not in ("up", "down"):
+                self._json(400, {"error": "action (up|down) required"})
+                return
+            job_id = str(uuid.uuid4())[:8]
+            (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
+            (JOB_DIR / job_id / "status").write_text("queued")
+            threading.Thread(
+                target=_run_cluster,
+                args=(job_id, action),
+                daemon=True
+            ).start()
+            self._json(202, {"job_id": job_id, "status": "queued"})
+            return
 
-        threading.Thread(
-            target=_run_upgrade,
-            args=(job_id, chart_version, stage),
-            daemon=True
-        ).start()
-
-        self._json(202, {"job_id": job_id, "status": "queued"})
+        self._json(404, {"error": "not found"})
 
     def do_GET(self):
         if not self._auth():
