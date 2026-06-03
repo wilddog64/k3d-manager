@@ -2,6 +2,7 @@
 
 ## Status (v1.6.0 — IN PROGRESS)
 - **COMPLETE:** acg_watch disown bugfix — k3d-manager commit `d0191b07` on `k3d-manager-v1.6.0`; spec: `docs/bugs/v1.6.0-bugfix-acg-watch-disown.md`; `scripts/lib/providers/k3s-aws.sh` now disowns the watcher immediately after `acg_watch &` so the webhook stdout pipe can close; validation used `shellcheck -S warning scripts/lib/providers/k3s-aws.sh` and `./scripts/k3d-manager _agent_audit` both passed.
+- **OPEN — ASSIGNED TO CODEX:** webhook stall detection — spec: `docs/plans/v1.6.0-webhook-stall-detection.md`; only `bin/k3dm-webhook` changes; commit message: `feat(webhook): stall detection — AI analysis + kill action for hung acg-up jobs`
 
 ## Status (shopping-cart-infra PR #83 — MERGED 2026-06-03)
 - **MERGED:** shopping-cart-infra PR #83 — `fix/product-images-keycloak-login` → `main` (SHA `28a58358347be5a229fdaa1b579f6696830ef4b8`). Fixed minio image upload (python:3.12-slim) and LDAP test user passwords (SSHA hashes in bootstrap.yaml). Two files changed, one follow-up commit (plaintext credential hygiene). Copilot caught credential exposure in comments; fixed in commit `9aba540`. enforce_admins restored ✓; docs/next-improvements branch created ✓; retrospective committed (`54b26a1`) ✓; memory-bank updated ✓
