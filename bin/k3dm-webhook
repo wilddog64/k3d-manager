@@ -25,6 +25,9 @@ JOB_DIR = Path("/tmp/k3dm-webhook-jobs")
 SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 ANALYSIS_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "claude-haiku-4-5-20251001")
+_STALL_TICKS_THRESHOLD = 3  # 3 ticks × 2 min = 6 min silence before stall analysis
+_running_procs: dict = {}
+_running_procs_lock = threading.Lock()
 
 
 def _get_token():
@@ -133,6 +136,9 @@ def _run_cluster(job_id, action, provider="aws"):
     _cluster_provider = _provider_map.get(provider, "k3s-aws")
     _start = datetime.datetime.utcnow().timestamp()
     _progress_timer = None
+    _last_line_count = 0
+    _stall_tick_count = 0
+    _stall_analyzed = False
 
     def _log(msg):
         lines.append(msg + "\n")
@@ -147,11 +153,26 @@ def _run_cluster(job_id, action, provider="aws"):
             _slack_post(url, text)
 
     def _post_progress():
-        nonlocal _progress_timer
+        nonlocal _progress_timer, _last_line_count, _stall_tick_count, _stall_analyzed
         elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
         tail = [l.rstrip() for l in lines[-3:] if l.strip()]
         tail_text = "\n".join(tail) if tail else "—"
         _notify(f"⏳ *acg-{action}* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
+        current_count = len(lines)
+        if current_count == _last_line_count:
+            _stall_tick_count += 1
+        else:
+            _stall_tick_count = 0
+            _stall_analyzed = False
+        _last_line_count = current_count
+        if _stall_tick_count >= _STALL_TICKS_THRESHOLD and not _stall_analyzed:
+            _stall_analyzed = True
+            analysis = _analyze_stall(lines)
+            _notify(
+                f"⚠️ *Stall detected* — no new output for {_stall_tick_count * 2}m "
+                f"(job `{job_id}`)\n*AI:* {analysis}\n"
+                f'To kill: POST `/api/v1/cluster` `{{"action":"kill","job_id":"{job_id}"}}`'
+            )
         _progress_timer = threading.Timer(120, _post_progress)
         _progress_timer.daemon = True
         _progress_timer.start()
@@ -159,6 +180,8 @@ def _run_cluster(job_id, action, provider="aws"):
     def _finish(status):
         if _progress_timer:
             _progress_timer.cancel()
+        with _running_procs_lock:
+            _running_procs.pop(job_id, None)
         (job_dir / "status").write_text(status)
         (job_dir / "output").write_text("".join(lines))
         emoji = "✅" if status == "success" else "❌"
@@ -182,6 +205,8 @@ def _run_cluster(job_id, action, provider="aws"):
             stderr=subprocess.STDOUT,
             text=True
         )
+        with _running_procs_lock:
+            _running_procs[job_id] = proc
         for line in proc.stdout:
             lines.append(line)
         proc.wait()
@@ -274,6 +299,21 @@ def _call_claude(prompt):
             return result["content"][0]["text"]
     except Exception as exc:
         return f"Claude API error: {exc}"
+
+
+def _analyze_stall(lines):
+    """Feed last 20 non-empty lines to Claude Haiku; return verdict string."""
+    last_20 = [l.rstrip() for l in lines[-20:] if l.strip()]
+    last_output = "\n".join(last_20)
+    prompt = (
+        "acg-up has been running and produced no new output for several minutes. "
+        f"Last 20 lines of output:\n\n{last_output}\n\n"
+        "Is this process genuinely stalled (no progress, waiting on something that "
+        "will not resolve), or is it still doing legitimate work (e.g. waiting for a "
+        "pod to become Ready)? "
+        "Reply with exactly: STALLED or PROGRESSING, then one sentence why. Be brief."
+    )
+    return _call_claude(prompt)
 
 
 def _run_cluster_status(job_id, response_url):
@@ -559,8 +599,23 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
         if self.path == "/api/v1/cluster":
             action = body.get("action", "")
+            if action == "kill":
+                job_id = body.get("job_id", "")
+                if not job_id or not _JOB_ID_RE.match(job_id):
+                    self._json(400, {"error": "job_id required"})
+                    return
+                with _running_procs_lock:
+                    proc = _running_procs.get(job_id)
+                if proc:
+                    proc.kill()
+                    job_dir = JOB_DIR / job_id
+                    (job_dir / "status").write_text("killed")
+                    self._json(200, {"status": "killed", "job_id": job_id})
+                else:
+                    self._json(404, {"error": "no running job", "job_id": job_id})
+                return
             if action not in ("up", "down"):
-                self._json(400, {"error": "action (up|down) required"})
+                self._json(400, {"error": "action (up|down|kill) required"})
                 return
             running = _running_cluster_job()
             if running:
