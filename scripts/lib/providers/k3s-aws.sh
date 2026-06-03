@@ -125,6 +125,7 @@ HELP
   if [[ ! -f "${_ACG_WATCH_PID_FILE}" ]]; then
     acg_watch &
     local _watcher_pid=$!
+    disown "${_watcher_pid}"
     mkdir -p "$(dirname "${_ACG_WATCH_PID_FILE}")"
     printf '%s\n' "${_watcher_pid}" > "${_ACG_WATCH_PID_FILE}"
     _info "[k3s-aws] Watcher PID: ${_watcher_pid} (stored in ${_ACG_WATCH_PID_FILE})"
