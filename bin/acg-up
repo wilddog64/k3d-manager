@@ -1013,8 +1013,8 @@ if _is_mac; then
   _frontend_browser_kubeconfig="${HOME}/.kube/config"
   mkdir -p "$(dirname "${_frontend_browser_log}")"
   # Ensure 127.0.0.2 loopback alias exists (macOS does not expose 127.0.0.0/8 automatically)
-  if ! ifconfig lo0 | grep -q '127\.0\.0\.2'; then
-    _run_command --prefer-sudo --quiet -- ifconfig lo0 alias 127.0.0.2 || \
+  if ! /sbin/ifconfig lo0 | grep -q '127\.0\.0\.2'; then
+    _run_command --prefer-sudo --quiet -- /sbin/ifconfig lo0 alias 127.0.0.2 || \
       _warn "[acg-up] failed to add 127.0.0.2 loopback alias — frontend port-forward will fail to bind"
   fi
 
