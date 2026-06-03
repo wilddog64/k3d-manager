@@ -59,6 +59,10 @@ chrome-cdp-stop:
 
 ## Re-register ubuntu-k3s app cluster with ArgoCD (after sandbox recreation or IP change)
 argocd-registration:
+	@kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s >/dev/null 2>&1 || { \
+	  echo "[argocd-registration] argocd-manager SA/token missing — bootstrapping on ubuntu-k3s..."; \
+	  kubectl apply --context ubuntu-k3s -f scripts/etc/argocd-manager.yaml && sleep 5; \
+	}
 	@_token=$$(kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s \
 	  -o jsonpath='{.data.token}' 2>/dev/null | base64 -d | tr -d '\n'); \
 	if [ -z "$$_token" ]; then \
