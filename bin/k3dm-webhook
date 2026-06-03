@@ -167,7 +167,6 @@ def _run_cluster(job_id, action, provider="aws"):
         _notify(summary)
 
     try:
-        (job_dir / "status").write_text("running")
         if action == "up":
             cmd = ["make", "up", f"CLUSTER_PROVIDER={_cluster_provider}"]
         else:
@@ -573,7 +572,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             response_url = body.get("response_url", "")
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
-            (JOB_DIR / job_id / "status").write_text("queued")
+            (JOB_DIR / job_id / "status").write_text("running")
             (JOB_DIR / job_id / "action").write_text(action)
             if response_url:
                 (JOB_DIR / job_id / "response_url").write_text(response_url)
