@@ -131,19 +131,38 @@ def _run_cluster(job_id, action, provider="aws"):
     lines = []
     _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "azure": "k3s-azure"}
     _cluster_provider = _provider_map.get(provider, "k3s-aws")
+    _start = datetime.datetime.utcnow().timestamp()
+    _progress_timer = None
 
     def _log(msg):
         lines.append(msg + "\n")
 
+    def _notify(text):
+        url = SLACK_WEBHOOK_URL
+        if not url:
+            _ru_file = job_dir / "response_url"
+            if _ru_file.exists():
+                url = _ru_file.read_text().strip()
+        if url:
+            _slack_post(url, text)
+
+    def _post_progress():
+        nonlocal _progress_timer
+        elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
+        _notify(f"⏳ *acg-{action}* ({provider}) still running — {elapsed}m elapsed")
+        _progress_timer = threading.Timer(300, _post_progress)
+        _progress_timer.daemon = True
+        _progress_timer.start()
+
     def _finish(status):
+        if _progress_timer:
+            _progress_timer.cancel()
         (job_dir / "status").write_text(status)
         (job_dir / "output").write_text("".join(lines))
-        _ru_file = job_dir / "response_url"
-        if _ru_file.exists():
-            _ru = _ru_file.read_text().strip()
-            if _ru:
-                emoji = "✅" if status == "success" else "❌"
-                _slack_post(_ru, f"{emoji} *{action}* ({provider}) — {status}\n```{''.join(lines)[-800:]}```")
+        emoji = "✅" if status == "success" else "❌"
+        elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
+        summary = f"{emoji} *acg-{action}* ({provider}) — {status} in {elapsed}m"
+        _notify(summary)
 
     try:
         (job_dir / "status").write_text("running")
@@ -152,6 +171,9 @@ def _run_cluster(job_id, action, provider="aws"):
         else:
             cmd = ["make", "down", "KEEP_LOCAL=1"]
         _log(f"Running {' '.join(cmd)}...")
+        _progress_timer = threading.Timer(300, _post_progress)
+        _progress_timer.daemon = True
+        _progress_timer.start()
         proc = subprocess.Popen(
             cmd,
             cwd=REPO_ROOT,
