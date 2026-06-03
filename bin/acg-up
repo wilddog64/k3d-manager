@@ -1365,6 +1365,7 @@ kubectl port-forward svc/prometheus-operated 19090:9090 \
   >>"${_ACG_STATE_DIR}/logs/acg-prom-pf.log" 2>&1 &
 _acg_prom_pf_pid=$!
 echo "${_acg_prom_pf_pid}" > "${_acg_prom_pf_pid_file}"
+disown "${_acg_prom_pf_pid}"
 _info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:19090 → ubuntu-k3s, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
 
 _info "[acg-up] Cluster is up."
