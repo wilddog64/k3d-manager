@@ -1,5 +1,8 @@
 # Progress — k3d-manager
 
+## Status (v1.6.0 — IN PROGRESS)
+- **ASSIGNED TO CODEX:** acg_watch disown bugfix — spec `docs/bugs/v1.6.0-bugfix-acg-watch-disown.md`; `scripts/lib/providers/k3s-aws.sh` line 127 — add `disown "${_watcher_pid}"` after `acg_watch &`; commit message: `fix(k3s-aws): disown acg_watch background process to release webhook stdout pipe`
+
 ## Status (shopping-cart-infra PR #83 — MERGED 2026-06-03)
 - **MERGED:** shopping-cart-infra PR #83 — `fix/product-images-keycloak-login` → `main` (SHA `28a58358347be5a229fdaa1b579f6696830ef4b8`). Fixed minio image upload (python:3.12-slim) and LDAP test user passwords (SSHA hashes in bootstrap.yaml). Two files changed, one follow-up commit (plaintext credential hygiene). Copilot caught credential exposure in comments; fixed in commit `9aba540`. enforce_admins restored ✓; docs/next-improvements branch created ✓; retrospective committed (`54b26a1`) ✓; memory-bank updated ✓
 
