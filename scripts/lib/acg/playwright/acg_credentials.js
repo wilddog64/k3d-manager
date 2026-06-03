@@ -166,6 +166,8 @@ async function extractCredentials() {
 
   let browserContext;
   let _cdpBrowser = null;
+  let page = null;
+  let _pageWasCreated = false;
   try {
     try {
       _cdpBrowser = await chromium.connectOverCDP(CDP_URL);
@@ -228,7 +230,7 @@ async function extractCredentials() {
     const allPages = context.pages();
 
     // Priority 1: Look for an existing sandbox page
-    let page = allPages.find(p => {
+    page = allPages.find(p => {
       try { return p.url().includes('cloud-playground/cloud-sandboxes') || p.url().includes('hands-on/playground/cloud-sandboxes'); } catch { return false; }
     });
 
@@ -236,6 +238,7 @@ async function extractCredentials() {
     if (!page) {
       console.error('INFO: No existing sandbox tab found — opening new extraction tab.');
       page = await context.newPage();
+      _pageWasCreated = true;
     } else {
       console.error(`INFO: Found existing sandbox tab: ${page.url()}`);
     }
@@ -594,6 +597,9 @@ async function extractCredentials() {
     console.error(`ERROR: ${error.message}`);
     throw error;
   } finally {
+    if (page && _pageWasCreated) {
+      try { await page.close(); } catch {}
+    }
     if (_cdpBrowser) {
       // close() on a connectOverCDP browser detaches Playwright without closing Chrome.
       try { await _cdpBrowser.close(); } catch {}
