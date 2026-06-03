@@ -265,7 +265,7 @@ def _run_cluster_status(job_id, response_url):
         nodes = subprocess.run(
             ["kubectl", "get", "nodes", "--context", "ubuntu-k3s",
              "--request-timeout=8s", "--no-headers"],
-            capture_output=True, text=True
+            capture_output=True, text=True, timeout=15
         )
         if nodes.returncode != 0:
             _log("❌ *ACG cluster unreachable* — sandbox may have expired.")
@@ -281,7 +281,7 @@ def _run_cluster_status(job_id, response_url):
             ["kubectl", "get", "configmap", "acg-state", "-n", "platform-ops",
              "--context", "ubuntu-k3s", "--request-timeout=5s",
              "-o", "jsonpath={.data.provisioned-at} {.data.provider}"],
-            capture_output=True, text=True
+            capture_output=True, text=True, timeout=10
         )
         if acg_state.returncode == 0 and acg_state.stdout.strip():
             parts = acg_state.stdout.strip().split()
