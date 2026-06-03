@@ -21,7 +21,6 @@ up:
 	           tee "$(HOME)/.local/share/k3d-manager/logs/k3s-oci-up.log" ;; \
 	  *)       GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)" ;; \
 	esac
-	@$(MAKE) --no-print-directory argocd-registration
 	@$(MAKE) --no-print-directory observability
 
 ## Tear down cluster (k3s-oci → destroy_cluster; others → bin/acg-down)
