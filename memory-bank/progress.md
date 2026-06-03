@@ -1,5 +1,8 @@
 # Progress — k3d-manager
 
+## Status (shopping-cart-infra PR #83 — MERGED 2026-06-03)
+- **MERGED:** shopping-cart-infra PR #83 — `fix/product-images-keycloak-login` → `main` (SHA `28a58358347be5a229fdaa1b579f6696830ef4b8`). Fixed minio image upload (python:3.12-slim) and LDAP test user passwords (SSHA hashes in bootstrap.yaml). Two files changed, one follow-up commit (plaintext credential hygiene). Copilot caught credential exposure in comments; fixed in commit `9aba540`. enforce_admins restored ✓; docs/next-improvements branch created ✓; retrospective committed (`54b26a1`) ✓; memory-bank updated ✓
+
 ## Status (v1.5.3 — RELEASED 2026-06-01)
 - **RELEASED:** k3d-manager v1.5.3 — PR #88 merged to main (SHA `6e6663027b598b6f392601313165c65a6a608d1a`). Four infrastructure reliability fixes + observability ACG stack (Alertmanager + Grafana). Copilot PR #88 review caught 4 valid findings (curl header injection, context scope leak, credential exposure in logs, Grafana password handling); all addressed in follow-up commits. enforce_admins restored ✓; next branch: `k3d-manager-v1.5.4` created ✓; v1.5.3 tag + GitHub release created ✓; retrospective committed (`011ddd5d`) ✓; memory-bank updated ✓
 
