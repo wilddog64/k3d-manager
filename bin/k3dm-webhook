@@ -262,6 +262,16 @@ def _run_cluster_status(job_id, response_url):
     try:
         (job_dir / "status").write_text("running")
 
+        active = _running_cluster_job()
+        if active:
+            active_id, active_action = active
+            active_dir = JOB_DIR / active_id
+            mtime = active_dir.stat().st_mtime
+            elapsed = int((datetime.datetime.utcnow().timestamp() - mtime) / 60)
+            _log(f"⏳ *acg-{active_action}* in progress (running {elapsed}m) — job `{active_id}`")
+            _finish("success")
+            return
+
         nodes = subprocess.run(
             ["kubectl", "get", "nodes", "--context", "ubuntu-k3s",
              "--request-timeout=8s", "--no-headers"],
