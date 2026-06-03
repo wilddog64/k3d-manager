@@ -159,13 +159,27 @@ fi
 _HUB_CLUSTER_CTX="k3d-${HUB_CLUSTER_NAME:-k3d-cluster}"
 _hub_newly_created=0
 _info "[acg-up] Step 3.5/12 — Verifying local Hub cluster (create if missing)..."
+if ! _command_exist k3d; then
+  _err "[acg-up] k3d binary not found in PATH — cannot manage Hub cluster. Check PATH includes ~/.local/bin."
+  exit 1
+fi
 if ! k3d cluster list 2>/dev/null | grep -q "^${HUB_CLUSTER_NAME:-k3d-cluster}[[:space:]]"; then
   _info "[acg-up] Local Hub cluster '${HUB_CLUSTER_NAME:-k3d-cluster}' not found — creating it now..."
   deploy_cluster --provider k3d "${HUB_CLUSTER_NAME:-k3d-cluster}"
   _hub_newly_created=1
-fi
-if ! kubectl get nodes --context "${_HUB_CLUSTER_CTX}" --request-timeout=10s >/dev/null 2>&1; then
-  _err "[acg-up] Local Hub cluster '${_HUB_CLUSTER_CTX}' is unreachable — OrbStack/k3d may be in a broken state after sleep. Check 'orbctl status'."
+elif ! kubectl get nodes --context "${_HUB_CLUSTER_CTX}" --request-timeout=10s >/dev/null 2>&1; then
+  _info "[acg-up] Local Hub cluster '${HUB_CLUSTER_NAME:-k3d-cluster}' is registered but not reachable — starting stopped containers..."
+  k3d cluster start "${HUB_CLUSTER_NAME:-k3d-cluster}"
+  _retry=0
+  until kubectl get nodes --context "${_HUB_CLUSTER_CTX}" --request-timeout=10s >/dev/null 2>&1 || [[ "${_retry}" -ge 12 ]]; do
+    _info "[acg-up] Waiting for Hub cluster API server... (${_retry}/12)"
+    sleep 5
+    ((_retry++)) || true
+  done
+  if ! kubectl get nodes --context "${_HUB_CLUSTER_CTX}" --request-timeout=10s >/dev/null 2>&1; then
+    _err "[acg-up] Hub cluster API server did not come up after cluster start. Check 'k3d cluster list' and 'docker ps'."
+    exit 1
+  fi
 fi
 _info "[acg-up] Local Hub cluster verified."
 
