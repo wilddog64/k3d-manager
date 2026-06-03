@@ -416,12 +416,14 @@ if _is_mac; then
   </dict>
 </plist>
 PLIST
+    _argocd_browser_install_skipped=0
     if [[ -f "${_argocd_browser_plist}" ]] && diff -q "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" >/dev/null 2>&1; then
       rm -f "${_argocd_browser_plist_tmp}"
       _info "[acg-up] ArgoCD browser HTTPS listener LaunchDaemon unchanged — skipping reinstall"
     elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
       rm -f "${_argocd_browser_plist_tmp}"
       _warn "[acg-up] no sudo in headless context — skipping argocd-browser-https LaunchDaemon install (run interactively or install /etc/sudoers.d/k3d-manager)"
+      _argocd_browser_install_skipped=1
     else
       : > "${_argocd_browser_launchctl_log}"
       if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
@@ -449,12 +451,12 @@ PLIST
         _err "[acg-up] failed to bootstrap ArgoCD browser HTTPS listener; see ${_argocd_browser_launchctl_log}"
       fi
     fi
-    if _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-120}"; then
+    if [[ "${_argocd_browser_install_skipped}" -eq 1 ]]; then
+      _warn "[acg-up] ArgoCD browser HTTPS listener not installed in headless context — skipping wait (Cloudflare tunnel path unaffected)"
+      _argocd_browser_ready=0
+    elif _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-120}"; then
       _info "[acg-up] ArgoCD reachable at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local} (launchd: ${_argocd_browser_label})"
       _argocd_browser_ready=1
-    elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
-      _warn "[acg-up] ArgoCD browser HTTPS listener not ready in headless context — continuing (Cloudflare tunnel path unaffected)"
-      _argocd_browser_ready=0
     else
       exit 1
     fi
