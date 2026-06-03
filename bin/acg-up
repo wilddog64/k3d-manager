@@ -436,6 +436,9 @@ PLIST
     if _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-120}"; then
       _info "[acg-up] ArgoCD reachable at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local} (launchd: ${_argocd_browser_label})"
       _argocd_browser_ready=1
+    elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+      _warn "[acg-up] ArgoCD browser HTTPS listener not ready in headless context — continuing (Cloudflare tunnel path unaffected)"
+      _argocd_browser_ready=0
     else
       exit 1
     fi
