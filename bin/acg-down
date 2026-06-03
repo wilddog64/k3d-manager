@@ -119,12 +119,16 @@ if _is_mac; then
   _keycloak_browser_wrapper="${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh"
   _keycloak_browser_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http.log"
   _keycloak_browser_launchctl_log="${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log"
-  if _run_command --prefer-sudo --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
-      >"${_keycloak_browser_launchctl_log}" 2>&1; then
-    _info "[acg-down] Keycloak browser HTTP listener launchd daemon unloaded"
-  elif [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
-    tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
-    _warn "[acg-down] existing Keycloak browser HTTP listener was not loaded; continuing"
+  if ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+    _warn "[acg-down] no sudo in headless context — skipping keycloak-browser-http LaunchDaemon bootout"
+  else
+    if _run_command --prefer-sudo --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
+        >"${_keycloak_browser_launchctl_log}" 2>&1; then
+      _info "[acg-down] Keycloak browser HTTP listener launchd daemon unloaded"
+    elif [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
+      tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
+      _warn "[acg-down] existing Keycloak browser HTTP listener was not loaded; continuing"
+    fi
   fi
   _run_command --prefer-sudo --soft -- rm -f "${_keycloak_browser_plist}" "${_keycloak_browser_wrapper}" >/dev/null 2>&1 || true
 
@@ -138,34 +142,49 @@ if _is_mac; then
   _argocd_browser_tls_ca="${ARGOCD_BROWSER_TLS_CA_FILE:-${_argocd_browser_tls_dir}/ca.crt}"
   _argocd_browser_launchctl_log="${_ACG_STATE_DIR}/logs/argocd-browser-https-launchctl.log"
   : > "${_argocd_browser_launchctl_log}"
-  if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
-      >"${_argocd_browser_launchctl_log}" 2>&1; then
-    _info "[acg-down] ArgoCD browser HTTPS listener launchd daemon unloaded"
-  elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
-    tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
-    _warn "[acg-down] existing ArgoCD browser HTTPS listener was not loaded; continuing"
+  if ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+    _warn "[acg-down] no sudo in headless context — skipping argocd-browser-https LaunchDaemon bootout"
+  else
+    if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
+        >"${_argocd_browser_launchctl_log}" 2>&1; then
+      _info "[acg-down] ArgoCD browser HTTPS listener launchd daemon unloaded"
+    elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
+      tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
+      _warn "[acg-down] existing ArgoCD browser HTTPS listener was not loaded; continuing"
+    fi
   fi
   _run_command --prefer-sudo --soft -- rm -f "${_argocd_browser_plist}" "${_argocd_browser_wrapper}" >/dev/null 2>&1 || true
   _run_command --prefer-sudo --soft -- rm -f "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "${_argocd_browser_tls_ca}" "${_argocd_browser_tls_dir}/tls.crt" >/dev/null 2>&1 || true
 
-  _info "[acg-down] Stopping Cloudflare named tunnel launchd daemon..."
-  _cf_tunnel_plist="/Library/LaunchDaemons/com.k3d-manager.cloudflare-tunnel.plist"
+  _info "[acg-down] Stopping Cloudflare named tunnel launchd agent..."
+  _cf_tunnel_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist"
   _cf_tunnel_launchctl_log="${_ACG_STATE_DIR}/logs/cloudflare-tunnel-launchctl.log"
   : > "${_cf_tunnel_launchctl_log}"
-  if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_cf_tunnel_plist}" \
+  if launchctl bootout "gui/$(id -u)" "${_cf_tunnel_plist}" \
       >"${_cf_tunnel_launchctl_log}" 2>&1; then
-    _info "[acg-down] Cloudflare named tunnel launchd daemon unloaded"
+    _info "[acg-down] Cloudflare named tunnel launchd agent unloaded"
   fi
-  _run_command --prefer-sudo --soft -- rm -f "${_cf_tunnel_plist}" >/dev/null 2>&1 || true
+  rm -f "${_cf_tunnel_plist}" || true
+  _cf_tunnel_plist_legacy="/Library/LaunchDaemons/com.k3d-manager.cloudflare-tunnel.plist"
+  if [[ -f "${_cf_tunnel_plist_legacy}" ]]; then
+    _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_cf_tunnel_plist_legacy}" \
+      >/dev/null 2>&1 || true
+    _run_command --prefer-sudo --quiet --soft -- rm -f "${_cf_tunnel_plist_legacy}" \
+      >/dev/null 2>&1 || true
+  fi
 
   _info "[acg-down] Stopping frontend browser HTTP listener launchd daemon..."
   _frontend_browser_plist="${FRONTEND_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist}"
   _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   _frontend_browser_launchctl_log="${_ACG_STATE_DIR}/logs/frontend-browser-http-launchctl.log"
   : > "${_frontend_browser_launchctl_log}"
-  if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
-      >"${_frontend_browser_launchctl_log}" 2>&1; then
-    _info "[acg-down] Frontend browser HTTP listener launchd daemon unloaded"
+  if ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+    _warn "[acg-down] no sudo in headless context — skipping frontend-browser-http LaunchDaemon bootout"
+  else
+    if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
+        >"${_frontend_browser_launchctl_log}" 2>&1; then
+      _info "[acg-down] Frontend browser HTTP listener launchd daemon unloaded"
+    fi
   fi
   _run_command --prefer-sudo --soft -- rm -f "${_frontend_browser_plist}" "${_frontend_browser_wrapper}" >/dev/null 2>&1 || true
 

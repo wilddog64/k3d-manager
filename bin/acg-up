@@ -403,6 +403,9 @@ PLIST
     if [[ -f "${_argocd_browser_plist}" ]] && diff -q "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" >/dev/null 2>&1; then
       rm -f "${_argocd_browser_plist_tmp}"
       _info "[acg-up] ArgoCD browser HTTPS listener LaunchDaemon unchanged — skipping reinstall"
+    elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+      rm -f "${_argocd_browser_plist_tmp}"
+      _warn "[acg-up] no sudo in headless context — skipping argocd-browser-https LaunchDaemon install (run interactively or install /etc/sudoers.d/k3d-manager)"
     else
       : > "${_argocd_browser_launchctl_log}"
       if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
@@ -860,6 +863,9 @@ PLIST
     if [[ -f "${_keycloak_browser_plist}" ]] && diff -q "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" >/dev/null 2>&1; then
       rm -f "${_keycloak_browser_plist_tmp}"
       _info "[acg-up] Keycloak browser HTTP listener LaunchDaemon unchanged — skipping reinstall"
+    elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+      rm -f "${_keycloak_browser_plist_tmp}"
+      _warn "[acg-up] no sudo in headless context — skipping keycloak-browser-http LaunchDaemon install"
     else
       : > "${_keycloak_browser_launchctl_log}"
       if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
@@ -1097,6 +1103,9 @@ PLIST
   if [[ -f "${_frontend_browser_plist}" ]] && diff -q "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" >/dev/null 2>&1; then
     rm -f "${_frontend_browser_plist_tmp}"
     _info "[acg-up] frontend browser HTTP listener LaunchDaemon unchanged — skipping reinstall"
+  elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+    rm -f "${_frontend_browser_plist_tmp}"
+    _warn "[acg-up] no sudo in headless context — skipping frontend-browser-http LaunchDaemon install"
   else
     : > "${_frontend_browser_launchctl_log}"
     if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
@@ -1213,7 +1222,7 @@ if _is_mac; then
   if command -v cloudflared >/dev/null 2>&1 && [[ -f "${_cloudflared_config}" ]]; then
     _named_tunnel_label="com.k3d-manager.cloudflare-tunnel"
     _named_tunnel_log="${_tunnel_dir}/logs/cloudflare-tunnel.log"
-    _named_tunnel_plist="/Library/LaunchDaemons/${_named_tunnel_label}.plist"
+    _named_tunnel_plist="${HOME}/Library/LaunchAgents/${_named_tunnel_label}.plist"
     _named_tunnel_plist_tmp="${_tunnel_dir}/run/cloudflare-tunnel.plist"
     _cloudflared_bin="$(command -v cloudflared)"
 
@@ -1248,19 +1257,27 @@ PLIST
     : > "${_tunnel_urls_file}"
     if [[ -f "${_named_tunnel_plist}" ]] && diff -q "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" >/dev/null 2>&1; then
       rm -f "${_named_tunnel_plist_tmp}"
-      _info "[acg-up] Cloudflare named tunnel LaunchDaemon unchanged — skipping reinstall"
+      _info "[acg-up] Cloudflare named tunnel LaunchAgent unchanged — skipping reinstall"
     else
       : > "${_tunnel_launchctl_log}"
-      _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist}" \
+      launchctl bootout "gui/$(id -u)" "${_named_tunnel_plist}" \
         >"${_tunnel_launchctl_log}" 2>&1 || true
+      _named_tunnel_plist_legacy="/Library/LaunchDaemons/${_named_tunnel_label}.plist"
+      if [[ -f "${_named_tunnel_plist_legacy}" ]]; then
+        _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist_legacy}" \
+          >/dev/null 2>&1 || true
+        _run_command --prefer-sudo --quiet --soft -- rm -f "${_named_tunnel_plist_legacy}" \
+          >/dev/null 2>&1 || true
+      fi
       : > "${_tunnel_launchctl_log}"
-      if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" \
+      mkdir -p "${HOME}/Library/LaunchAgents"
+      if ! install -m 644 "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" \
           >"${_tunnel_launchctl_log}" 2>&1; then
         _warn "[acg-up] failed to install tunnel plist — skipping"
       else
         rm -f "${_named_tunnel_plist_tmp}"
         : > "${_tunnel_launchctl_log}"
-        if ! _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_named_tunnel_plist}" \
+        if ! launchctl bootstrap "gui/$(id -u)" "${_named_tunnel_plist}" \
             >"${_tunnel_launchctl_log}" 2>&1; then
           _warn "[acg-up] failed to bootstrap cloudflare tunnel"
         fi
