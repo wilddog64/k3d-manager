@@ -49,6 +49,11 @@ prometheus:
       limits:
         memory: 512Mi
         cpu: 200m
+    secrets:
+      - prometheus-web-config
+    additionalArgs:
+      - name: web.config.file
+        value: /etc/prometheus/secrets/prometheus-web-config/web.yml
     additionalScrapeConfigs:
       - job_name: istiod
         kubernetes_sd_configs:

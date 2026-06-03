@@ -138,6 +138,50 @@ function deploy_observability_acg() {
     rm -f "${_am_tmpfile}"
     _info "[observability] Alertmanager config secret created on ACG (ubuntu-k3s)"
   fi
+  _prometheus_acg_web_config_secret
+}
+
+function _prometheus_acg_web_config_secret() {
+  local _vault_addr="http://127.0.0.1:18200"
+  local _vault_token
+  _vault_token=$(_kubectl get secret vault-root -n secrets \
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+
+  local _vault_hdr
+  _vault_hdr=$(mktemp)
+  printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
+
+  local _prom_creds
+  if ! _prom_creds=$(curl -sf \
+      --header "@${_vault_hdr}" \
+      "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" 2>/dev/null \
+      | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
+        print(d['user']+'|'+d['password_bcrypt'])" 2>/dev/null); then
+    _prom_creds=""
+  fi
+  rm -f "${_vault_hdr}"
+
+  if [[ -z "${_prom_creds}" ]]; then
+    _warn "[observability] Prometheus basic auth Vault secret not found — Prometheus is unauthenticated"
+    _warn "[observability] Store hash: vault kv put secret/k3d-manager/prometheus-basic-auth user=admin password_bcrypt='<bcrypt>'"
+    return 0
+  fi
+
+  local _prom_user _prom_hash
+  _prom_user="${_prom_creds%%|*}"
+  _prom_hash="${_prom_creds#*|}"
+
+  local _web_config _tmpfile
+  _web_config=$(printf 'basic_auth_users:\n  %s: %s\n' "${_prom_user}" "${_prom_hash}")
+  _tmpfile=$(mktemp)
+  printf '%s' "${_web_config}" > "${_tmpfile}"
+  _kubectl create secret generic prometheus-web-config \
+    --context ubuntu-k3s \
+    -n monitoring \
+    --from-file=web.yml="${_tmpfile}" \
+    --dry-run=client -o yaml | _kubectl apply --context ubuntu-k3s -f -
+  rm -f "${_tmpfile}"
+  _info "[observability] Prometheus basic auth secret applied (monitoring/prometheus-web-config)"
 }
 
 function observability_status() {
