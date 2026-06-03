@@ -149,8 +149,10 @@ def _run_cluster(job_id, action, provider="aws"):
     def _post_progress():
         nonlocal _progress_timer
         elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
-        _notify(f"⏳ *acg-{action}* ({provider}) still running — {elapsed}m elapsed")
-        _progress_timer = threading.Timer(300, _post_progress)
+        tail = [l.rstrip() for l in lines[-3:] if l.strip()]
+        tail_text = "\n".join(tail) if tail else "—"
+        _notify(f"⏳ *acg-{action}* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
+        _progress_timer = threading.Timer(120, _post_progress)
         _progress_timer.daemon = True
         _progress_timer.start()
 
@@ -171,7 +173,7 @@ def _run_cluster(job_id, action, provider="aws"):
         else:
             cmd = ["make", "down", "KEEP_LOCAL=1"]
         _log(f"Running {' '.join(cmd)}...")
-        _progress_timer = threading.Timer(300, _post_progress)
+        _progress_timer = threading.Timer(120, _post_progress)
         _progress_timer.daemon = True
         _progress_timer.start()
         proc = subprocess.Popen(
@@ -195,13 +197,21 @@ def _run_cluster(job_id, action, provider="aws"):
         _finish("failed")
 
 
+_MAX_JOB_AGE_SECS = 10800  # 3 hours — any older "running" job is stale
+
+
 def _running_cluster_job():
     """Return (job_id, action) if a cluster up/down job is already running, else None."""
     try:
+        now = datetime.datetime.utcnow().timestamp()
         for entry in sorted(JOB_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
             status_file = entry / "status"
             meta_file = entry / "action"
             if status_file.exists() and status_file.read_text().strip() == "running":
+                age = now - entry.stat().st_mtime
+                if age > _MAX_JOB_AGE_SECS:
+                    status_file.write_text("failed")
+                    continue
                 if meta_file.exists():
                     return (entry.name, meta_file.read_text().strip())
     except Exception:
@@ -281,6 +291,22 @@ def _run_cluster_status(job_id, response_url):
         if response_url:
             _slack_post(response_url, "".join(lines))
 
+    def _pod_is_ready(line):
+        parts = line.split()
+        if len(parts) < 4:
+            return False
+        ready_str = parts[2]
+        status_str = parts[3]
+        if status_str in ("Completed", "Succeeded"):
+            return True
+        if "/" in ready_str:
+            try:
+                n, m = ready_str.split("/", 1)
+                return n == m and int(m) > 0 and status_str == "Running"
+            except ValueError:
+                return False
+        return False
+
     try:
         (job_dir / "status").write_text("running")
 
@@ -294,13 +320,35 @@ def _run_cluster_status(job_id, response_url):
             _finish("success")
             return
 
+        # Hub cluster
+        hub_nodes = subprocess.run(
+            ["kubectl", "get", "nodes", "--context", "k3d-k3d-cluster",
+             "--request-timeout=5s", "--no-headers"],
+            capture_output=True, text=True, timeout=10
+        )
+        if hub_nodes.returncode == 0 and hub_nodes.stdout.strip():
+            hub_lines = [l for l in hub_nodes.stdout.strip().splitlines() if l]
+            hub_ready = sum(1 for l in hub_lines if "Ready" in l and "NotReady" not in l)
+            _log(f"🏠 *Hub cluster* — {hub_ready}/{len(hub_lines)} nodes ready")
+        else:
+            _log("🏠 *Hub cluster* — ❌ unreachable")
+
+        # SSH tunnel
+        tunnel = subprocess.run(
+            ["curl", "-sf", "--max-time", "3", "http://localhost:6443"],
+            capture_output=True, text=True, timeout=8
+        )
+        tunnel_ok = tunnel.returncode == 0 or tunnel.returncode == 22
+        _log(f"*SSH tunnel (6443):* {'UP ✅' if tunnel_ok else 'DOWN ❌'}")
+
+        # ACG app cluster
         nodes = subprocess.run(
             ["kubectl", "get", "nodes", "--context", "ubuntu-k3s",
              "--request-timeout=8s", "--no-headers"],
             capture_output=True, text=True, timeout=15
         )
         if nodes.returncode != 0:
-            _log("❌ *ACG cluster unreachable* — sandbox may have expired.")
+            _log("\n❌ *ACG cluster unreachable* — sandbox may have expired.")
             _finish("success")
             return
 
@@ -308,7 +356,7 @@ def _run_cluster_status(job_id, response_url):
         ready_count = sum(1 for l in node_lines if "Ready" in l and "NotReady" not in l)
         total_count = len(node_lines)
 
-        header = f"✅ *ACG cluster* — {ready_count}/{total_count} nodes ready"
+        header = f"\n✅ *ACG cluster* — {ready_count}/{total_count} nodes ready"
         acg_state = subprocess.run(
             ["kubectl", "get", "configmap", "acg-state", "-n", "platform-ops",
              "--context", "ubuntu-k3s", "--request-timeout=5s",
@@ -326,6 +374,35 @@ def _run_cluster_status(job_id, response_url):
         _log(header)
         _log(f"```{nodes.stdout.strip()}```")
 
+        # ACG pods (all namespaces, standard output)
+        pods = subprocess.run(
+            ["kubectl", "get", "pods", "-A", "--context", "ubuntu-k3s",
+             "--no-headers", "--request-timeout=10s"],
+            capture_output=True, text=True, timeout=20
+        )
+        if pods.returncode == 0 and pods.stdout.strip():
+            all_pod_lines = [l for l in pods.stdout.strip().splitlines() if l]
+            skip_ns = {"kube-system", "kube-public", "kube-node-lease", "trivy-system"}
+            app_pods = [l for l in all_pod_lines if l.split()[0] not in skip_ns]
+            if app_pods:
+                not_ready = [l for l in app_pods if not _pod_is_ready(l)]
+                ready_count_pods = len(app_pods) - len(not_ready)
+                _log(f"\n*Pods (ACG)* — {ready_count_pods}/{len(app_pods)} ready")
+                if not_ready:
+                    shown = not_ready[:10]
+                    snippet = "\n".join(
+                        f"{l.split()[0]}  {l.split()[1]}  {l.split()[2]}  {l.split()[3]}"
+                        for l in shown if len(l.split()) >= 4
+                    )
+                    _log(f"```{snippet}```")
+                    if len(not_ready) > 10:
+                        _log(f"_…and {len(not_ready) - 10} more not-ready pods_")
+            else:
+                _log("\n*Pods (ACG)* — no app pods deployed yet")
+        else:
+            _log("\n_Pod status unavailable_")
+
+        # ArgoCD apps
         apps = subprocess.run(
             ["kubectl", "get", "applications", "-n", "cicd",
              "--context", "k3d-k3d-cluster",
@@ -347,6 +424,17 @@ def _run_cluster_status(job_id, response_url):
                 _log(f"```{chr(10).join(unhealthy)}```")
         else:
             _log("\n_ArgoCD app status unavailable (Hub cluster unreachable)_")
+
+        # AWS credentials
+        aws_id = subprocess.run(
+            ["aws", "sts", "get-caller-identity",
+             "--query", "Arn", "--output", "text"],
+            capture_output=True, text=True, timeout=10
+        )
+        if aws_id.returncode == 0 and aws_id.stdout.strip():
+            _log(f"\n*AWS:* ✅ `{aws_id.stdout.strip()}`")
+        else:
+            _log("\n*AWS:* ❌ credentials invalid or expired — run `/acg-refresh`")
 
         _finish("success")
     except Exception as exc:
