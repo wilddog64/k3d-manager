@@ -82,37 +82,18 @@ def _patch_label(secret, version):
 
 
 def _run_cleanup(job_id, provider):
-    """Run make down KEEP_LOCAL=1 in the background after a failed acg-up."""
-    _notify_job(job_id, f"🧹 *Cleanup triggered* ({provider}) — running `make down KEEP_LOCAL=1`")
+    """Remove stale SSH tunnel and kubeconfig context after a failed acg-up."""
+    _notify_job(job_id, f"🧹 *Cleanup triggered* ({provider}) — removing stale SSH tunnel and kubeconfig context")
     try:
-        cmd = ["make", "down", "KEEP_LOCAL=1"]
-        proc = subprocess.Popen(
-            cmd,
-            cwd=REPO_ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            preexec_fn=os.setsid,
+        subprocess.run(
+            ["pkill", "-f", "autossh"],
+            capture_output=True,
         )
-        pgid = os.getpgid(proc.pid)
-        out_lines = []
-
-        def _drain():
-            for line in proc.stdout:
-                out_lines.append(line)
-
-        reader = threading.Thread(target=_drain, daemon=True)
-        reader.start()
-        proc.wait()
-        try:
-            os.killpg(pgid, signal.SIGTERM)
-        except (ProcessLookupError, OSError):
-            pass
-        reader.join(timeout=5)
-        if proc.returncode == 0:
-            _notify_job(job_id, f"✅ *Cleanup complete* ({provider}) — AWS resources removed")
-        else:
-            _notify_job(job_id, f"⚠️ *Cleanup failed* ({provider}) — `make down` exited {proc.returncode}; manual teardown may be needed")
+        subprocess.run(
+            ["kubectl", "config", "delete-context", "ubuntu-k3s"],
+            capture_output=True,
+        )
+        _notify_job(job_id, f"✅ *Cleanup complete* ({provider}) — stale connections removed")
     except Exception as exc:
         _notify_job(job_id, f"⚠️ *Cleanup error* ({provider}): {exc}")
 
