@@ -560,6 +560,9 @@ else
 fi
 
 _info "[acg-up] Step 10b/14 — Deploying shopping-cart data layer (PostgreSQL, Redis, RabbitMQ)..."
+_info "[acg-up] Applying data-layer ArgoCD Application so sync starts before wait loop..."
+_run_command -- kubectl apply --context k3d-k3d-cluster \
+  -f "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/argocd/applications/data-layer.yaml"
 deploy_shopping_cart_data
 
 _info "[acg-up] Step 10c/14 — Deploying identity stack (Keycloak + LDAP) via ArgoCD..."
