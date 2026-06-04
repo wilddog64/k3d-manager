@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -161,6 +161,21 @@ install-token-rotator:
 	launchctl bootstrap "gui/$$(id -u)" \
 	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook-token-rotate.plist"
 	@echo "Token rotator installed — fires every 6 hours"
+
+## Inject SLACK_BOT_TOKEN and SLACK_CHANNEL_ID into the webhook LaunchAgent plist and restart
+update-webhook-slack:
+	@[ -n "$(SLACK_BOT_TOKEN)" ] || (echo "ERROR: SLACK_BOT_TOKEN not set — export it first"; exit 1)
+	@[ -n "$(SLACK_CHANNEL_ID)" ] || (echo "ERROR: SLACK_CHANNEL_ID not set — export it first"; exit 1)
+	/usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:SLACK_BOT_TOKEN" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>/dev/null || true
+	/usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:SLACK_BOT_TOKEN string $(SLACK_BOT_TOKEN)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+	/usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:SLACK_CHANNEL_ID" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>/dev/null || true
+	/usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:SLACK_CHANNEL_ID string $(SLACK_CHANNEL_ID)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+	$(MAKE) restart-webhook
+	@echo "SLACK_BOT_TOKEN and SLACK_CHANNEL_ID injected — webhook restarted"
 
 ## Bootstrap Cloudflare Worker + webhook daemon (one-time per environment; safe to re-run)
 setup-worker:

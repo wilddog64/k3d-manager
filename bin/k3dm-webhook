@@ -24,6 +24,8 @@ REPO_ROOT = os.environ.get(
 TOKEN_FILE = Path.home() / ".k3dm" / "webhook-token"
 JOB_DIR = Path("/tmp/k3dm-webhook-jobs")
 SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
+SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
+SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID", "")
 GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-2.5-flash")
 _STALL_TICKS_THRESHOLD = 3  # 3 ticks × 2 min = 6 min silence before stall analysis
 _running_procs: dict = {}
@@ -78,9 +80,9 @@ def _patch_label(secret, version):
     )
 
 
-def _run_cleanup(provider):
+def _run_cleanup(job_id, provider):
     """Run make down KEEP_LOCAL=1 in the background after a failed acg-up."""
-    _notify(f"🧹 *Cleanup triggered* ({provider}) — running `make down KEEP_LOCAL=1`")
+    _notify_job(job_id, f"🧹 *Cleanup triggered* ({provider}) — running `make down KEEP_LOCAL=1`")
     try:
         cmd = ["make", "down", "KEEP_LOCAL=1"]
         proc = subprocess.Popen(
@@ -107,11 +109,11 @@ def _run_cleanup(provider):
             pass
         reader.join(timeout=5)
         if proc.returncode == 0:
-            _notify(f"✅ *Cleanup complete* ({provider}) — AWS resources removed")
+            _notify_job(job_id, f"✅ *Cleanup complete* ({provider}) — AWS resources removed")
         else:
-            _notify(f"⚠️ *Cleanup failed* ({provider}) — `make down` exited {proc.returncode}; manual teardown may be needed")
+            _notify_job(job_id, f"⚠️ *Cleanup failed* ({provider}) — `make down` exited {proc.returncode}; manual teardown may be needed")
     except Exception as exc:
-        _notify(f"⚠️ *Cleanup error* ({provider}): {exc}")
+        _notify_job(job_id, f"⚠️ *Cleanup error* ({provider}): {exc}")
 
 
 def _run_upgrade(job_id, chart_version, stage):
@@ -179,20 +181,14 @@ def _run_cluster(job_id, action, provider="aws"):
     def _log(msg):
         lines.append(msg + "\n")
 
-    def _notify(text):
-        _ru_file = job_dir / "response_url"
-        url = _ru_file.read_text().strip() if _ru_file.exists() else ""
-        if not url:
-            url = SLACK_WEBHOOK_URL
-        if url:
-            _slack_post(url, text)
+    _notify_job(job_id, f"🚀 *acg-{action}* ({provider}) started — job `{job_id}`")
 
     def _post_progress():
         nonlocal _progress_timer, _last_line_count, _stall_tick_count, _stall_analyzed
         elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
         tail = [l.rstrip() for l in lines[-3:] if l.strip()]
         tail_text = "\n".join(tail) if tail else "—"
-        _notify(f"⏳ *acg-{action}* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
+        _notify_job(job_id, f"⏳ *acg-{action}* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
         current_count = len(lines)
         if current_count == _last_line_count:
             _stall_tick_count += 1
@@ -203,7 +199,8 @@ def _run_cluster(job_id, action, provider="aws"):
         if _stall_tick_count >= _STALL_TICKS_THRESHOLD and not _stall_analyzed:
             _stall_analyzed = True
             analysis = _analyze_stall(lines)
-            _notify(
+            _notify_job(
+                job_id,
                 f"⚠️ *Stall detected* — no new output for {_stall_tick_count * 2}m "
                 f"(job `{job_id}`)\n*AI:* {analysis}\n"
                 f'To kill: POST `/api/v1/cluster` `{{"action":"kill","job_id":"{job_id}"}}`'
@@ -222,7 +219,7 @@ def _run_cluster(job_id, action, provider="aws"):
         emoji = "✅" if status == "success" else "❌"
         elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
         summary = f"{emoji} *acg-{action}* ({provider}) — {status} in {elapsed}m"
-        _notify(summary)
+        _notify_job(job_id, summary)
 
     try:
         if action == "up":
@@ -272,14 +269,14 @@ def _run_cluster(job_id, action, provider="aws"):
         _log(f"ERROR: {exc}")
         try:
             analysis = _analyze_failure(lines)
-            _notify(f"🔍 *Failure analysis* (job `{job_id}`)\n{analysis}")
+            _notify_job(job_id, f"🔍 *Failure analysis* (job `{job_id}`)\n{analysis}")
         except Exception as analysis_exc:
             _log(f"WARN: failure analysis skipped: {analysis_exc}")
         _finish("failed")
         if action == "up":
             threading.Thread(
                 target=_run_cleanup,
-                args=(provider,),
+                args=(job_id, provider),
                 daemon=True,
             ).start()
 
@@ -336,6 +333,47 @@ def _slack_post(url, text):
         urllib.request.urlopen(req, timeout=10)
     except Exception:
         pass
+
+
+def _post_slack_bot(text, thread_ts=None):
+    """POST to Slack chat.postMessage API. Returns ts on success, empty string on failure."""
+    if not SLACK_BOT_TOKEN or not SLACK_CHANNEL_ID:
+        return ""
+    payload = {"channel": SLACK_CHANNEL_ID, "text": text}
+    if thread_ts:
+        payload["thread_ts"] = thread_ts
+    data = json.dumps(payload).encode()
+    req = urllib.request.Request(
+        "https://slack.com/api/chat.postMessage",
+        data=data,
+        headers={
+            "Authorization": f"Bearer {SLACK_BOT_TOKEN}",
+            "Content-Type": "application/json; charset=utf-8",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read())
+            return result.get("ts", "") if result.get("ok") else ""
+    except Exception:
+        return ""
+
+
+def _notify_job(job_id, text):
+    """Post a Slack message in the thread for job_id.
+
+    First call per job creates the parent message and saves ts.
+    Subsequent calls reply in-thread. Falls back to webhook URL if bot token not set.
+    """
+    thread_ts_file = JOB_DIR / job_id / "thread_ts"
+    if SLACK_BOT_TOKEN and SLACK_CHANNEL_ID:
+        thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+        ts = _post_slack_bot(text, thread_ts=thread_ts)
+        if ts and not thread_ts:
+            thread_ts_file.write_text(ts)
+    elif SLACK_WEBHOOK_URL:
+        _slack_post(SLACK_WEBHOOK_URL, text)
 
 
 def _call_gemini(prompt):
@@ -499,15 +537,6 @@ def _run_post_provision_check(job_id, provider):
     import time
     time.sleep(_POST_PROVISION_DELAY_SECS)
 
-    def _notify(text):
-        url = SLACK_WEBHOOK_URL
-        if not url:
-            _ru_file = JOB_DIR / job_id / "response_url"
-            if _ru_file.exists():
-                url = _ru_file.read_text().strip()
-        if url:
-            _slack_post(url, text)
-
     lines = []
 
     # SSH tunnel
@@ -520,7 +549,7 @@ def _run_post_provision_check(job_id, provider):
 
     if not tunnel_ok:
         lines.append("⚠️ Tunnel is down — ACG cluster unreachable; skipping app health check.")
-        _notify(f"🏥 *Post-provision check* ({provider})\n" + "\n".join(lines))
+        _notify_job(job_id, f"🏥 *Post-provision check* ({provider})\n" + "\n".join(lines))
         return
 
     # ArgoCD degraded apps
@@ -532,7 +561,7 @@ def _run_post_provision_check(job_id, provider):
     )
     if apps.returncode != 0 or not apps.stdout.strip():
         lines.append("_ArgoCD app status unavailable_")
-        _notify(f"🏥 *Post-provision check* ({provider})\n" + "\n".join(lines))
+        _notify_job(job_id, f"🏥 *Post-provision check* ({provider})\n" + "\n".join(lines))
         return
 
     app_lines = [l for l in apps.stdout.strip().splitlines() if l]
@@ -542,11 +571,11 @@ def _run_post_provision_check(job_id, provider):
     lines.append(f"*ArgoCD:* {healthy_count}/{len(app_lines)} apps healthy")
 
     if not degraded:
-        _notify(f"🏥 *Post-provision check* ({provider}) — all clear ✅\n" + "\n".join(lines))
+        _notify_job(job_id, f"🏥 *Post-provision check* ({provider}) — all clear ✅\n" + "\n".join(lines))
         return
 
     lines.append(f"⚠️ Degraded: {', '.join(f'`{a}`' for a in degraded)}")
-    _notify(f"🏥 *Post-provision check* ({provider})\n" + "\n".join(lines))
+    _notify_job(job_id, f"🏥 *Post-provision check* ({provider})\n" + "\n".join(lines))
 
     # AI triage each degraded app
     for app_name in degraded[:5]:  # cap at 5 to limit API calls
@@ -583,7 +612,7 @@ def _run_post_provision_check(job_id, provider):
             "most likely cause and fix. Be brief."
         )
         analysis = _call_gemini(prompt)
-        _notify(f"🔍 *{app_name}* — {analysis}")
+        _notify_job(job_id, f"🔍 *{app_name}* — {analysis}")
 
 
 def _run_cluster_status(job_id, response_url):
