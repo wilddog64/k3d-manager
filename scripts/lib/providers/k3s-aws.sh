@@ -67,8 +67,15 @@ HELP
       ;;
   esac
 
-  _info "[k3s-aws] Installing k3s server + joining agents..."
-  UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" deploy_app_cluster --confirm || return 1
+  local _ready_nodes
+  _ready_nodes=$(kubectl get nodes --context ubuntu-k3s --no-headers 2>/dev/null \
+    | grep -c " Ready" || true)
+  if [[ "${_ready_nodes}" -ge 3 ]]; then
+    _info "[k3s-aws] k3s nodes already Ready (${_ready_nodes}/3) — skipping deploy_app_cluster"
+  else
+    _info "[k3s-aws] Installing k3s server + joining agents..."
+    UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" deploy_app_cluster --confirm || return 1
+  fi
 
   if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
     _info "[k3s-aws] Starting SSM port-forwarding tunnel (k3s API :6443)..."
