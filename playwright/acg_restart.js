@@ -296,11 +296,28 @@ async function restartSandbox() {
       // dialog cannot block for more than one 500 ms interval.
       const _deletePollDeadline = Date.now() + 15000;
       let _deleteBtnReady = false;
+      let _sandboxNotYetStarted = false;
+      const _startBtnPanel = page.locator('button:has-text("Start Sandbox")').first();
       while (Date.now() < _deletePollDeadline) {
         await _dismissExtendYourSessionDialog(page);
         _deleteBtnReady = await deleteBtn.isVisible({ timeout: 500 }).catch(() => false);
         if (_deleteBtnReady) break;
+        // Panel is open but sandbox not yet provisioned — Start Sandbox visible, Delete not.
+        // Skip delete flow and start directly.
+        if (await _startBtnPanel.isVisible({ timeout: 500 }).catch(() => false)) {
+          _sandboxNotYetStarted = true;
+          break;
+        }
         await page.waitForTimeout(500).catch(() => {});
+      }
+      if (_sandboxNotYetStarted) {
+        console.error('INFO: Sandbox panel open but not yet provisioned — clicking Start Sandbox directly...');
+        await _startBtnPanel.click({ force: true });
+        await page.waitForTimeout(3000);
+        await _dismissExtendYourSessionDialog(page);
+        console.error('INFO: Sandbox started. Ready for credential extraction.');
+        console.log('RESTART_OK');
+        return;
       }
       if (!_deleteBtnReady) {
         const _url = page.url();
