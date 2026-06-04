@@ -378,6 +378,18 @@ def _collect_cluster_state():
 
     try:
         result = subprocess.run(
+            ["kubectl", "get", "nodes", "--context", "ubuntu-k3s", "--no-headers"],
+            capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            sections.append("Remote cluster nodes (ubuntu-k3s):\n" + result.stdout.strip())
+        else:
+            sections.append("Remote cluster nodes (ubuntu-k3s): UNREACHABLE — cluster may not be provisioned")
+    except Exception:
+        sections.append("Remote cluster nodes (ubuntu-k3s): UNREACHABLE — cluster may not be provisioned")
+
+    try:
+        result = subprocess.run(
             ["kubectl", "get", "pods", "-A", "--context", "ubuntu-k3s", "--no-headers"],
             capture_output=True, text=True, timeout=15,
         )
@@ -438,18 +450,24 @@ def _analyze_failure(lines):
         f"Last 50 lines of output:\n\n{last_output}\n\n"
         f"{cluster_section}"
         "Diagnose the failure:\n"
-        "1. TRANSIENT or PERMANENT?\n"
+        "1. Failure mode — choose exactly one:\n"
+        "   CLUSTER_FAILURE = remote cluster nodes are UNREACHABLE or NotReady — "
+        "CloudFormation or k3s provisioning failed; full acg-up retry needed.\n"
+        "   APP_FAILURE = remote cluster nodes are Ready but ArgoCD sync timed out "
+        "or pods are CrashLooping — cluster exists, only app deployment failed.\n"
+        "2. TRANSIENT or PERMANENT?\n"
         "   TRANSIENT = a retry of acg-up is likely to fix it (e.g. ArgoCD sync lag, "
         "pod not ready yet, API server briefly unreachable).\n"
         "   PERMANENT = human action is required before a retry will work (e.g. "
         "misconfigured manifest, missing secret, quota exceeded, SSH key rejected, "
         "CloudFormation stack in ROLLBACK state).\n"
-        "2. Root cause: exactly what component failed and why (name the StatefulSet, "
+        "3. Root cause: exactly what component failed and why (name the StatefulSet, "
         "pod, ArgoCD app, or AWS resource if visible in the logs).\n"
-        "3. Fix: the single most actionable next step — e.g. 'Run acg-up again', "
+        "4. Fix: the single most actionable next step — e.g. 'Run acg-up again', "
         "or 'Check ArgoCD app: kubectl get application data-layer -n cicd --context k3d-k3d-cluster', "
         "or 'Inspect the CloudFormation stack events in the AWS console'.\n\n"
         "Reply in exactly this format:\n"
+        "CLUSTER_FAILURE|APP_FAILURE\n"
         "TRANSIENT|PERMANENT\n"
         "<root cause — one sentence>\n"
         "<next step — one sentence, include the exact command if possible>"
