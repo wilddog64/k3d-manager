@@ -321,6 +321,23 @@ def _analyze_stall(lines):
     return _call_claude(prompt)
 
 
+def _analyze_failure(lines):
+    """Feed last 30 non-empty lines to Claude Haiku; return failure diagnosis."""
+    last_30 = [l.rstrip() for l in lines[-30:] if l.strip()]
+    last_output = "\n".join(last_30)
+    prompt = (
+        "acg-up failed (make up exited non-zero). "
+        f"Last 30 lines of output:\n\n{last_output}\n\n"
+        "What failed and why? Is this TRANSIENT (a retry may succeed — e.g. timeout "
+        "waiting for a resource that wasn't ready) or PERMANENT (a configuration or "
+        "infrastructure problem that requires human action — e.g. permission denied, "
+        "missing secret, quota exceeded)?\n"
+        "Reply with TRANSIENT or PERMANENT, the root cause in one sentence, and the "
+        "recommended fix in one sentence. Be brief."
+    )
+    return _call_claude(prompt)
+
+
 _POST_PROVISION_DELAY_SECS = 90  # ESO sync + pod startup grace period
 
 
@@ -578,6 +595,8 @@ def _run_cluster_status(job_id, response_url):
         _finish("success")
     except Exception as exc:
         _log(f"ERROR: {exc}")
+        analysis = _analyze_failure(lines)
+        _notify(f"🔍 *Failure analysis* (job `{job_id}`)\n{analysis}")
         _finish("failed")
 
 
