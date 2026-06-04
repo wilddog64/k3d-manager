@@ -444,7 +444,7 @@ async function extractCredentials() {
       const isSignInVisible = await signInLink.isVisible({ timeout: 10000 }).catch(() => false);
       if (isSignInVisible) {
         console.error('INFO: Not signed in — clicking Sign In and automating login...');
-        await signInLink.click();
+        await signInLink.evaluate(el => el.click());
         await page.waitForURL('**id.pluralsight.com**', { timeout: 30000 }).catch(() => {});
         await _doSignIn();
       }
