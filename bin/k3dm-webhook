@@ -417,6 +417,16 @@ def _collect_cluster_state():
     """Collect live cluster state to enrich failure analysis. Returns a string or empty string."""
     sections = []
 
+    tunnel = subprocess.run(
+        ["curl", "-sf", "--max-time", "3", "http://localhost:6443"],
+        capture_output=True,
+    )
+    tunnel_ok = tunnel.returncode == 0 or tunnel.returncode == 22
+    sections.append(f"SSH tunnel (localhost:6443): {'UP' if tunnel_ok else 'DOWN — remote kubectl calls will be unreachable'}")
+
+    if not tunnel_ok:
+        return "\n\n".join(sections)
+
     try:
         result = subprocess.run(
             ["kubectl", "get", "nodes", "--context", "ubuntu-k3s", "--no-headers"],
