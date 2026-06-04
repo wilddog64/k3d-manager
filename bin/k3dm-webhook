@@ -372,10 +372,63 @@ def _analyze_stall(lines):
     return _call_gemini(prompt)
 
 
+def _collect_cluster_state():
+    """Collect live cluster state to enrich failure analysis. Returns a string or empty string."""
+    sections = []
+
+    try:
+        result = subprocess.run(
+            ["kubectl", "get", "pods", "-A", "--context", "ubuntu-k3s", "--no-headers"],
+            capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            bad = [
+                ln for ln in result.stdout.splitlines()
+                if any(s in ln for s in (
+                    "CrashLoopBackOff", "Error", "OOMKilled",
+                    "ImagePullBackOff", "ErrImagePull", "Pending",
+                ))
+                and "Completed" not in ln
+            ]
+            if bad:
+                sections.append("Unhealthy pods (ubuntu-k3s):\n" + "\n".join(bad))
+    except Exception:
+        pass
+
+    try:
+        result = subprocess.run(
+            [
+                "kubectl", "get", "applications", "-A",
+                "--context", "k3d-k3d-cluster",
+                "-o", (
+                    "custom-columns="
+                    "NAME:.metadata.name,"
+                    "HEALTH:.status.health.status,"
+                    "SYNC:.status.sync.status"
+                ),
+                "--no-headers",
+            ],
+            capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            sections.append(
+                "ArgoCD application state (k3d-k3d-cluster):\n" + result.stdout.strip()
+            )
+    except Exception:
+        pass
+
+    return "\n\n".join(sections)
+
+
 def _analyze_failure(lines):
-    """Feed last 50 non-empty lines to Gemini; return failure diagnosis."""
+    """Feed last 50 non-empty lines + live cluster state to Gemini; return failure diagnosis."""
     last_50 = [l.rstrip() for l in lines[-50:] if l.strip()]
     last_output = "\n".join(last_50)
+    cluster_state = _collect_cluster_state()
+    cluster_section = (
+        f"Live cluster state at time of failure:\n\n{cluster_state}\n\n"
+        if cluster_state else ""
+    )
     prompt = (
         "acg-up is a multi-step script that provisions a 3-node k3s cluster on AWS "
         "(via CloudFormation), installs ArgoCD on a local k3d hub cluster, registers "
@@ -383,6 +436,7 @@ def _analyze_failure(lines):
         "stack (PostgreSQL StatefulSets, Redis, RabbitMQ, Keycloak, Vault, ESO) via "
         "ArgoCD GitOps sync. It failed — make up exited non-zero.\n\n"
         f"Last 50 lines of output:\n\n{last_output}\n\n"
+        f"{cluster_section}"
         "Diagnose the failure:\n"
         "1. TRANSIENT or PERMANENT?\n"
         "   TRANSIENT = a retry of acg-up is likely to fix it (e.g. ArgoCD sync lag, "
