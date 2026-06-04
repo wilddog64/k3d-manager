@@ -340,6 +340,20 @@ def _analyze_failure(lines):
     return _call_claude(prompt)
 
 
+def _clear_stale_jobs():
+    """On startup, mark any job stuck in 'running' as 'failed' — they are orphaned."""
+    if not JOB_DIR.exists():
+        return
+    for entry in JOB_DIR.iterdir():
+        status_file = entry / "status"
+        try:
+            if status_file.exists() and status_file.read_text().strip() == "running":
+                status_file.write_text("failed")
+                print(f"[k3dm-webhook] cleared stale job {entry.name}")
+        except Exception:
+            pass
+
+
 _POST_PROVISION_DELAY_SECS = 90  # ESO sync + pod startup grace period
 
 
@@ -817,6 +831,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     JOB_DIR.mkdir(parents=True, exist_ok=True)
+    _clear_stale_jobs()
     server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), _Handler)
     print(f"[k3dm-webhook] listening on 127.0.0.1:{PORT}")
     server.serve_forever()
