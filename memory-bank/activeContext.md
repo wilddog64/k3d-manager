@@ -1,11 +1,10 @@
 # Active Context — lib-acg
 
-## Current Branch: `fix/next-improvements-8`
+## Current Branch: `fix/playwright-screenshot-diagnosis`
 
-## Current Status (2026-05-30 — PR #30 open; JS navigation fix for extend-session dialog)
-- **IN FLIGHT PR #30** (`fix/next-improvements-8`): `playwright/acg_credentials.js` — replace `navLink.click()` with `window.location.assign()` + `waitForNavigation` for cloud-sandboxes SPA navigation; bypasses "Extend Your Session" pointer-event interception. CI green, Copilot review in progress.
-- **MERGED PR #29** (`a32b46ec`): v0.3.1 bugfix sweep — `git grep -F` in pre-commit dangling-ref check, `acg_check_ttl` node sentinel fixes, package version alignment. enforce_admins restored. Next branch: `fix/next-improvements-8`.
-- **SUBTREE PULLED** into k3d-manager at `3af3a4e3` on `k3d-manager-v1.4.9`.
+## Current Status (2026-06-04 — Phase A screenshot diagnosis complete)
+- **COMPLETE:** playwright screenshot diagnosis phase A — lib-acg commit `77c7dcc` on `fix/playwright-screenshot-diagnosis`; spec: `docs/plans/v1.6.0-playwright-screenshot-diagnosis.md`; `playwright/acg_credentials.js` and `playwright/acg_restart.js` now save `/tmp/k3dm-acg-screenshot-<ts>.png` on unhandled errors and print `INFO: Screenshot saved to ...` to stderr, and `acg_restart.js` hoists `page` to outer scope so the catch block can capture screenshots; validation used `node --check playwright/acg_credentials.js` and `node --check playwright/acg_restart.js`; commit message: `feat(playwright): save screenshot on failure for AI diagnosis`
+- **PHASE B NOTE:** webhook screenshot ingestion remains a k3d-manager follow-on and is not part of this lib-acg branch.
 
 ## Previous Status (2026-05-25 — v0.3.1 bugfix sweep complete)
 - **COMPLETE:** `scripts/hooks/pre-commit` now prints deleted filename references through a `while IFS= read -r _ref` loop instead of expanding `$_refs` unquoted, preventing word-splitting and format-string surprises; committed as `4e55392` (`fix(pre-commit): quote $_refs in printf — prevent word-splitting on filenames with spaces`) and pushed to `origin/fix/next-improvements-7`. Validation passed for `shellcheck -S warning scripts/hooks/pre-commit`.
