@@ -180,11 +180,10 @@ def _run_cluster(job_id, action, provider="aws"):
         lines.append(msg + "\n")
 
     def _notify(text):
-        url = SLACK_WEBHOOK_URL
+        _ru_file = job_dir / "response_url"
+        url = _ru_file.read_text().strip() if _ru_file.exists() else ""
         if not url:
-            _ru_file = job_dir / "response_url"
-            if _ru_file.exists():
-                url = _ru_file.read_text().strip()
+            url = SLACK_WEBHOOK_URL
         if url:
             _slack_post(url, text)
 
