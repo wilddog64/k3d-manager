@@ -373,18 +373,32 @@ def _analyze_stall(lines):
 
 
 def _analyze_failure(lines):
-    """Feed last 30 non-empty lines to Claude Haiku; return failure diagnosis."""
-    last_30 = [l.rstrip() for l in lines[-30:] if l.strip()]
-    last_output = "\n".join(last_30)
+    """Feed last 50 non-empty lines to Gemini; return failure diagnosis."""
+    last_50 = [l.rstrip() for l in lines[-50:] if l.strip()]
+    last_output = "\n".join(last_50)
     prompt = (
-        "acg-up failed (make up exited non-zero). "
-        f"Last 30 lines of output:\n\n{last_output}\n\n"
-        "What failed and why? Is this TRANSIENT (a retry may succeed — e.g. timeout "
-        "waiting for a resource that wasn't ready) or PERMANENT (a configuration or "
-        "infrastructure problem that requires human action — e.g. permission denied, "
-        "missing secret, quota exceeded)?\n"
-        "Reply with TRANSIENT or PERMANENT, the root cause in one sentence, and the "
-        "recommended fix in one sentence. Be brief."
+        "acg-up is a multi-step script that provisions a 3-node k3s cluster on AWS "
+        "(via CloudFormation), installs ArgoCD on a local k3d hub cluster, registers "
+        "the remote k3s cluster with ArgoCD, then deploys a shopping-cart application "
+        "stack (PostgreSQL StatefulSets, Redis, RabbitMQ, Keycloak, Vault, ESO) via "
+        "ArgoCD GitOps sync. It failed — make up exited non-zero.\n\n"
+        f"Last 50 lines of output:\n\n{last_output}\n\n"
+        "Diagnose the failure:\n"
+        "1. TRANSIENT or PERMANENT?\n"
+        "   TRANSIENT = a retry of acg-up is likely to fix it (e.g. ArgoCD sync lag, "
+        "pod not ready yet, API server briefly unreachable).\n"
+        "   PERMANENT = human action is required before a retry will work (e.g. "
+        "misconfigured manifest, missing secret, quota exceeded, SSH key rejected, "
+        "CloudFormation stack in ROLLBACK state).\n"
+        "2. Root cause: exactly what component failed and why (name the StatefulSet, "
+        "pod, ArgoCD app, or AWS resource if visible in the logs).\n"
+        "3. Fix: the single most actionable next step — e.g. 'Run acg-up again', "
+        "or 'Check ArgoCD app: kubectl get application data-layer -n cicd --context k3d-k3d-cluster', "
+        "or 'Inspect the CloudFormation stack events in the AWS console'.\n\n"
+        "Reply in exactly this format:\n"
+        "TRANSIENT|PERMANENT\n"
+        "<root cause — one sentence>\n"
+        "<next step — one sentence, include the exact command if possible>"
     )
     return _call_gemini(prompt)
 
