@@ -639,8 +639,8 @@ def _run_post_provision_check(job_id, provider):
         _notify_job(job_id, f"🔍 *{app_name}* — {analysis}")
 
 
-def _run_cluster_status(job_id, response_url):
-    """Check ACG cluster reachability + ArgoCD app health; post result to response_url."""
+def _run_cluster_status(job_id, response_url, thread_ts=None):
+    """Check ACG cluster reachability + ArgoCD app health; post result to response_url or thread."""
     job_dir = JOB_DIR / job_id
     lines = []
 
@@ -650,8 +650,11 @@ def _run_cluster_status(job_id, response_url):
     def _finish(status):
         (job_dir / "status").write_text(status)
         (job_dir / "output").write_text("".join(lines))
-        if response_url:
-            _slack_post(response_url, "".join(lines))
+        text = "".join(lines)
+        if thread_ts:
+            _post_slack_bot(text, thread_ts=thread_ts)
+        elif response_url:
+            _slack_post(response_url, text)
 
     def _pod_is_ready(line):
         parts = line.split()
@@ -964,12 +967,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
         if self.path == "/api/v1/cluster-status":
             response_url = body.get("response_url", "")
+            thread_ts = body.get("thread_ts", None)
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
             threading.Thread(
                 target=_run_cluster_status,
                 args=(job_id, response_url),
+                kwargs={"thread_ts": thread_ts},
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
