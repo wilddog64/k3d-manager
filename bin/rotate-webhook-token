@@ -8,10 +8,6 @@ _err() { echo "[rotate-webhook-token] ERROR: $*" >&2; exit 1; }
 
 NEW_TOKEN="$(openssl rand -hex 32)"
 
-_log "Updating Keychain entry k3dm-webhook-token..."
-security add-generic-password -U -s k3dm-webhook-token -a k3dm -w "${NEW_TOKEN}" \
-  || _err "Failed to update Keychain"
-
 _log "Reading Cloudflare API token from Keychain..."
 CF_TOKEN="$(security find-generic-password -s cloudflare-api-token -a k3dm -w 2>/dev/null)" \
   || _err "cloudflare-api-token not found in Keychain — run make setup-worker first"
@@ -21,7 +17,11 @@ printf '%s' "${NEW_TOKEN}" | \
   CLOUDFLARE_API_TOKEN="${CF_TOKEN}" \
   npx --yes wrangler secret put WEBHOOK_TOKEN \
     --cwd "${REPO_ROOT}/workers/slack-relay" \
-  || _err "Failed to push WEBHOOK_TOKEN to Cloudflare"
+  || _err "Failed to push WEBHOOK_TOKEN to Cloudflare — Keychain and webhook unchanged"
+
+_log "Updating Keychain entry k3dm-webhook-token..."
+security add-generic-password -U -s k3dm-webhook-token -a k3dm -w "${NEW_TOKEN}" \
+  || _err "Failed to update Keychain — Cloudflare already has new token; re-run to resync"
 
 _log "Restarting webhook daemon..."
 make -C "${REPO_ROOT}" restart-webhook \
