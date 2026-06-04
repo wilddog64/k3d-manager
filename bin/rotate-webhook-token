@@ -27,4 +27,14 @@ _log "Restarting webhook daemon..."
 make -C "${REPO_ROOT}" restart-webhook \
   || _err "Failed to restart webhook"
 
+_log "Verifying new token works end-to-end via public URL..."
+sleep 2
+HTTP_CODE="$(curl -s -o /dev/null -w "%{http_code}" \
+  -H "Authorization: Bearer ${NEW_TOKEN}" \
+  "https://webhook.3ai-talk.org/api/v1/status" 2>/dev/null)"
+if [[ "${HTTP_CODE}" != "200" && "${HTTP_CODE}" != "404" ]]; then
+  _err "End-to-end token verification failed (HTTP ${HTTP_CODE}) — Cloudflare Worker and webhook may be out of sync; re-run rotate-webhook-token to resync"
+fi
+_log "Token verified end-to-end (HTTP ${HTTP_CODE})."
+
 _log "Token rotation complete."

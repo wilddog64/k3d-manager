@@ -370,7 +370,15 @@ def _call_gemini(prompt):
             timeout=120,
             env=env,
         )
-        return r.stdout.strip() or r.stderr.strip() or "gemini returned no output"
+        raw = r.stdout.strip() or r.stderr.strip() or "gemini returned no output"
+        # Strip Gemini CLI internal tool-call lines (e.g. "update_topic{...}")
+        # that leak into stdout when GEMINI_CLI_TRUST_WORKSPACE=true is set.
+        cleaned = "\n".join(
+            line for line in raw.splitlines()
+            if not line.startswith(("update_topic{", "update_topic ("))
+            and "<ctrl" not in line
+        ).strip()
+        return cleaned or raw
     except FileNotFoundError:
         return "gemini CLI not found — skipping AI analysis"
     except subprocess.TimeoutExpired:
