@@ -563,6 +563,18 @@ _info "[acg-up] Step 10b/14 — Deploying shopping-cart data layer (PostgreSQL, 
 _info "[acg-up] Applying data-layer ArgoCD Application so sync starts before wait loop..."
 _run_command -- kubectl apply --context k3d-k3d-cluster \
   -f "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/argocd/applications/data-layer.yaml"
+_info "[acg-up] Waiting for ArgoCD to sync data-layer Application (max 300s)..."
+_dl_sync_deadline=$(( $(date +%s) + 300 ))
+until kubectl get application data-layer -n cicd --context k3d-k3d-cluster \
+    -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
+  if [[ $(date +%s) -ge ${_dl_sync_deadline} ]]; then
+    _err "[acg-up] data-layer ArgoCD Application did not reach Synced within 300s — check: kubectl get application data-layer -n cicd --context k3d-k3d-cluster"
+    exit 1
+  fi
+  _info "[acg-up] data-layer not yet Synced — waiting..."
+  sleep 10
+done
+_info "[acg-up] data-layer Application Synced — proceeding to StatefulSet readiness check"
 deploy_shopping_cart_data
 
 _info "[acg-up] Step 10c/14 — Deploying identity stack (Keycloak + LDAP) via ArgoCD..."
