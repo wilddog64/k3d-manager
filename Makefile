@@ -144,6 +144,11 @@ provision: ssm
 install-sudoers:
 	bin/install-sudoers.sh
 
+## Restart the k3dm-webhook LaunchAgent (picks up code changes)
+restart-webhook:
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+
 ## Bootstrap Cloudflare Worker + webhook daemon (one-time per environment; safe to re-run)
 setup-worker:
 	bin/k3dm-webhook-setup
