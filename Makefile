@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-env
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -176,16 +176,6 @@ update-webhook-slack:
 	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
 	$(MAKE) restart-webhook
 	@echo "SLACK_BOT_TOKEN and SLACK_CHANNEL_ID injected — webhook restarted"
-
-## Inject ANTHROPIC_API_KEY into the webhook LaunchAgent plist and restart (run once after setting env var)
-update-webhook-env:
-	@[ -n "$(ANTHROPIC_API_KEY)" ] || (echo "ERROR: ANTHROPIC_API_KEY not set — export it first"; exit 1)
-	/usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:ANTHROPIC_API_KEY" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>/dev/null || true
-	/usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:ANTHROPIC_API_KEY string $(ANTHROPIC_API_KEY)" \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
-	$(MAKE) restart-webhook
-	@echo "ANTHROPIC_API_KEY injected — webhook restarted"
 
 ## Bootstrap Cloudflare Worker + webhook daemon (one-time per environment; safe to re-run)
 setup-worker:
