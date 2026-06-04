@@ -223,8 +223,11 @@ def _run_cluster(job_id, action, provider="aws"):
         _finish("success")
     except Exception as exc:
         _log(f"ERROR: {exc}")
-        analysis = _analyze_failure(lines)
-        _notify(f"🔍 *Failure analysis* (job `{job_id}`)\n{analysis}")
+        try:
+            analysis = _analyze_failure(lines)
+            _notify(f"🔍 *Failure analysis* (job `{job_id}`)\n{analysis}")
+        except Exception as analysis_exc:
+            _log(f"WARN: failure analysis skipped: {analysis_exc}")
         _finish("failed")
 
 
