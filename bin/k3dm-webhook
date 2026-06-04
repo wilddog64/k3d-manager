@@ -28,6 +28,7 @@ GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-2.5-flash")
 _STALL_TICKS_THRESHOLD = 3  # 3 ticks × 2 min = 6 min silence before stall analysis
 _running_procs: dict = {}
 _running_procs_lock = threading.Lock()
+_cleanup_notify = None
 
 
 def _get_token():
@@ -76,6 +77,47 @@ def _patch_label(secret, version):
          "--type=merge", "-p", patch],
         check=True
     )
+
+
+def _run_cleanup(provider):
+    """Run make down KEEP_LOCAL=1 in the background after a failed acg-up."""
+    notify = _cleanup_notify
+    if callable(notify):
+        notify(f"🧹 *Cleanup triggered* ({provider}) — running `make down KEEP_LOCAL=1`")
+    try:
+        cmd = ["make", "down", "KEEP_LOCAL=1"]
+        proc = subprocess.Popen(
+            cmd,
+            cwd=REPO_ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            preexec_fn=os.setsid,
+        )
+        pgid = os.getpgid(proc.pid)
+        out_lines = []
+
+        def _drain():
+            for line in proc.stdout:
+                out_lines.append(line)
+
+        reader = threading.Thread(target=_drain, daemon=True)
+        reader.start()
+        proc.wait()
+        try:
+            os.killpg(pgid, signal.SIGTERM)
+        except (ProcessLookupError, OSError):
+            pass
+        reader.join(timeout=5)
+        if proc.returncode == 0:
+            if callable(notify):
+                notify(f"✅ *Cleanup complete* ({provider}) — AWS resources removed")
+        else:
+            if callable(notify):
+                notify(f"⚠️ *Cleanup failed* ({provider}) — `make down` exited {proc.returncode}; manual teardown may be needed")
+    except Exception as exc:
+        if callable(notify):
+            notify(f"⚠️ *Cleanup error* ({provider}): {exc}")
 
 
 def _run_upgrade(job_id, chart_version, stage):
@@ -241,6 +283,14 @@ def _run_cluster(job_id, action, provider="aws"):
         except Exception as analysis_exc:
             _log(f"WARN: failure analysis skipped: {analysis_exc}")
         _finish("failed")
+        if action == "up":
+            global _cleanup_notify
+            _cleanup_notify = _notify
+            threading.Thread(
+                target=_run_cleanup,
+                args=(provider,),
+                daemon=True
+            ).start()
 
 
 _MAX_JOB_AGE_SECS = 10800  # 3 hours — any older "running" job is stale
