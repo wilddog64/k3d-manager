@@ -215,9 +215,10 @@ def _run_cluster(job_id, action, provider="aws"):
 
         _reader = threading.Thread(target=_drain, daemon=True)
         _reader.start()
+        pgid = os.getpgid(proc.pid)
         proc.wait()
         try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+            os.killpg(pgid, signal.SIGTERM)
         except (ProcessLookupError, OSError):
             pass
         _reader.join(timeout=5)
