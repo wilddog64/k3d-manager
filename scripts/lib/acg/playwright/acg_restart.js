@@ -138,6 +138,7 @@ async function restartSandbox() {
 
   let _cdpBrowser = null;
   let browserContext = null;
+  let page = null;
 
   try {
     // Connect via CDP. Chrome may have no open tabs — if so, open a blank tab via
@@ -210,7 +211,7 @@ async function restartSandbox() {
     console.error(`INFO: Open tabs (${allPages.length}): ${JSON.stringify(_tabUrls)}`);
 
     // Prefer sandbox tab; fall back to any Pluralsight tab; then first tab
-    let page = allPages.find(p => {
+    page = allPages.find(p => {
       try { const u = p.url(); return u.includes('cloud-sandboxes') || u.includes('hands-on/playground') || u.includes('cloud-playground'); } catch { return false; }
     }) || allPages.find(p => {
       try { return new URL(p.url()).hostname.endsWith('.pluralsight.com'); } catch { return false; }
@@ -456,6 +457,14 @@ async function restartSandbox() {
     console.log('RESTART_OK');
   } catch (err) {
     console.error(`ERROR: ${err.message}`);
+    if (page) {
+      try {
+        const _ssPath = `/tmp/k3dm-acg-screenshot-${Date.now()}.png`;
+        const _ssBuffer = await page.screenshot({ fullPage: false });
+        fs.writeFileSync(_ssPath, _ssBuffer, { mode: 0o600 });
+        console.error(`INFO: Screenshot saved to ${_ssPath}`);
+      } catch (_) {}
+    }
     process.exit(1);
   } finally {
     if (_cdpBrowser) {

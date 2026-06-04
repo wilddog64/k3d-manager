@@ -1,9 +1,8 @@
 # Progress — lib-acg
 
-## v0.3.1 Track — `fix/next-improvements-8` (active)
+## Playwright Screenshot Diagnosis Track — `fix/playwright-screenshot-diagnosis` (active)
 
-- **IN FLIGHT PR #30**: `playwright/acg_credentials.js` — JS navigation fix (`window.location.assign` + `waitForNavigation`) for cloud-sandboxes SPA nav; bypasses "Extend Your Session" pointer-event interception. CI green. PRs open: https://github.com/wilddog64/lib-acg/pull/30
-- **MERGED PR #29** (`a32b46ec`): v0.3.1 bugfix sweep — `git grep -F` fixed-string dangling-ref, `acg_check_ttl` return 1 + -1 sentinel, package.json/package-lock.json version alignment to 0.3.0. Copilot findings addressed. enforce_admins restored. Subtree pulled into k3d-manager at `3af3a4e3`.
+- **COMPLETE:** phase A screenshot diagnosis on `fix/playwright-screenshot-diagnosis` finished. `playwright/acg_credentials.js` and `playwright/acg_restart.js` now save `/tmp/k3dm-acg-screenshot-<ts>.png` on unhandled errors and print `INFO: Screenshot saved to ...` to stderr; `acg_restart.js` hoists `page` to outer scope so the catch block can capture screenshots. Commit: `77c7dcc` (`feat(playwright): save screenshot on failure for AI diagnosis`). Validation: `node --check playwright/acg_credentials.js`, `node --check playwright/acg_restart.js`.
 
 ## v0.3.0 Track — `fix/next-improvements-7` (merged)
 
