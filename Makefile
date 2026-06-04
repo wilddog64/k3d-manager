@@ -149,6 +149,19 @@ restart-webhook:
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true
 	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
 
+## Rotate webhook bearer token now (updates Keychain + Cloudflare Worker secret + restarts webhook)
+rotate-webhook-token:
+	bin/rotate-webhook-token
+
+## Install the 6-hour token rotation LaunchAgent (run once; safe to re-run)
+install-token-rotator:
+	cp scripts/etc/com.k3d-manager.webhook-token-rotate.plist \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook-token-rotate.plist"
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook-token-rotate" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook-token-rotate.plist"
+	@echo "Token rotator installed — fires every 6 hours"
+
 ## Bootstrap Cloudflare Worker + webhook daemon (one-time per environment; safe to re-run)
 setup-worker:
 	bin/k3dm-webhook-setup
