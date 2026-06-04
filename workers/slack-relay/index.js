@@ -60,6 +60,7 @@ async function handle(req) {
   const command     = p.get('command')    || ''
   const text        = (p.get('text')      || '').trim()
   const responseUrl = p.get('response_url') || ''
+  const threadTs    = p.get('thread_ts')  || ''
 
   if (!ALLOWED_COMMANDS.has(command)) return jsonReply(`Unknown command: ${command}`)
 
@@ -79,7 +80,9 @@ async function handle(req) {
   }
 
   if (command === '/acg-status') {
-    const { ok } = await relay('/api/v1/cluster-status', { response_url: responseUrl })
+    const payload = { response_url: responseUrl }
+    if (threadTs) payload.thread_ts = threadTs
+    const { ok } = await relay('/api/v1/cluster-status', payload)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
     return jsonReply('🔍 Checking ACG cluster status…')
   }
