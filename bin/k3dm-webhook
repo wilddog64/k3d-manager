@@ -24,8 +24,7 @@ REPO_ROOT = os.environ.get(
 TOKEN_FILE = Path.home() / ".k3dm" / "webhook-token"
 JOB_DIR = Path("/tmp/k3dm-webhook-jobs")
 SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-ANALYSIS_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "claude-haiku-4-5-20251001")
+GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-2.5-flash")
 _STALL_TICKS_THRESHOLD = 3  # 3 ticks × 2 min = 6 min silence before stall analysis
 _running_procs: dict = {}
 _running_procs_lock = threading.Lock()
@@ -209,13 +208,19 @@ def _run_cluster(job_id, action, provider="aws"):
         )
         with _running_procs_lock:
             _running_procs[job_id] = proc
-        for line in proc.stdout:
-            lines.append(line)
+
+        def _drain():
+            for line in proc.stdout:
+                lines.append(line)
+
+        _reader = threading.Thread(target=_drain, daemon=True)
+        _reader.start()
         proc.wait()
         try:
             os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
         except (ProcessLookupError, OSError):
             pass
+        _reader.join(timeout=5)
         if proc.returncode != 0:
             raise RuntimeError(f"{' '.join(cmd)} exited {proc.returncode}")
         _log(f"{action} complete")
@@ -291,30 +296,21 @@ def _slack_post(url, text):
         pass
 
 
-def _call_claude(prompt):
-    """Call Anthropic Messages API with stdlib urllib. Returns text or error string."""
-    if not ANTHROPIC_API_KEY:
-        return "ANTHROPIC_API_KEY not configured — skipping AI analysis"
-    data = json.dumps({
-        "model": ANALYSIS_MODEL,
-        "max_tokens": 1024,
-        "messages": [{"role": "user", "content": prompt}]
-    }).encode()
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=data,
-        headers={
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json"
-        }
-    )
+def _call_gemini(prompt):
+    """Shell out to the gemini CLI. Returns response text or error string."""
+    gemini_bin = os.environ.get("K3DM_GEMINI_BIN", "gemini")
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read())
-            return result["content"][0]["text"]
+        r = subprocess.run(
+            [gemini_bin, "--model", GEMINI_MODEL, "--prompt", prompt],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        return r.stdout.strip() or r.stderr.strip() or "gemini returned no output"
+    except FileNotFoundError:
+        return "gemini CLI not found — skipping AI analysis"
     except Exception as exc:
-        return f"Claude API error: {exc}"
+        return f"gemini error: {exc}"
 
 
 def _analyze_stall(lines):
@@ -329,7 +325,7 @@ def _analyze_stall(lines):
         "pod to become Ready)? "
         "Reply with exactly: STALLED or PROGRESSING, then one sentence why. Be brief."
     )
-    return _call_claude(prompt)
+    return _call_gemini(prompt)
 
 
 def _analyze_failure(lines):
@@ -346,7 +342,7 @@ def _analyze_failure(lines):
         "Reply with TRANSIENT or PERMANENT, the root cause in one sentence, and the "
         "recommended fix in one sentence. Be brief."
     )
-    return _call_claude(prompt)
+    return _call_gemini(prompt)
 
 
 def _clear_stale_jobs():
@@ -454,7 +450,7 @@ def _run_post_provision_check(job_id, provider):
             "Reply with TRANSIENT or REAL FAILURE, then one sentence with the "
             "most likely cause and fix. Be brief."
         )
-        analysis = _call_claude(prompt)
+        analysis = _call_gemini(prompt)
         _notify(f"🔍 *{app_name}* — {analysis}")
 
 
@@ -677,7 +673,7 @@ def _run_analyze(job_id, alert_payload, response_url=""):
                 f"Alert: {alert_name} on app '{app_name}'\n\n"
                 f"Diagnostics:\n{diagnostics}"
             )
-            analysis = _call_claude(prompt)
+            analysis = _call_gemini(prompt)
             _log(analysis + "\n")
 
             notify_url = response_url or SLACK_WEBHOOK_URL
