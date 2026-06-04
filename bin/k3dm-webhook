@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """k3dm-webhook — authenticated webhook server for k3d-manager laptop automation."""
 
+import base64
 import datetime
 import hmac
 import http.server
@@ -27,7 +28,9 @@ SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID", "")
 GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-2.5-flash")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 _STALL_TICKS_THRESHOLD = 3  # 3 ticks × 2 min = 6 min silence before stall analysis
+_SCREENSHOT_RE = re.compile(r"INFO: Screenshot saved to (/tmp/k3dm-acg-screenshot-\d+\.png)")
 _running_procs: dict = {}
 _running_procs_lock = threading.Lock()
 
@@ -397,6 +400,53 @@ def _call_gemini(prompt):
         return f"gemini error: {exc}"
 
 
+def _call_claude_vision(prompt, screenshot_path):
+    """Call Claude API with a PNG screenshot + text prompt. Returns description or error string."""
+    if not ANTHROPIC_API_KEY:
+        return "vision analysis skipped — ANTHROPIC_API_KEY not set in webhook environment"
+    try:
+        with open(screenshot_path, "rb") as f:
+            image_data = base64.b64encode(f.read()).decode("utf-8")
+    except OSError as exc:
+        return f"vision analysis skipped — could not read screenshot: {exc}"
+    payload = json.dumps({
+        "model": "claude-haiku-4-5-20251001",
+        "max_tokens": 256,
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": image_data,
+                        },
+                    },
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ],
+    }).encode()
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages",
+        data=payload,
+        headers={
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read())
+            return result["content"][0]["text"].strip()
+    except Exception as exc:
+        return f"vision analysis error: {exc}"
+
+
 def _analyze_stall(lines):
     """Feed last 20 non-empty lines to Claude Haiku; return verdict string."""
     last_20 = [l.rstrip() for l in lines[-20:] if l.strip()]
@@ -512,6 +562,21 @@ def _analyze_failure(lines):
         "<root cause — one sentence>\n"
         "<next step — one sentence, include the exact command if possible>"
     )
+    screenshot_path = None
+    for line in reversed(lines):
+        m = _SCREENSHOT_RE.search(line)
+        if m:
+            screenshot_path = m.group(1)
+            break
+    if screenshot_path and os.path.isfile(screenshot_path):
+        vision_prompt = (
+            "This is a screenshot of the Pluralsight ACG sandbox browser at the moment "
+            "a Playwright automation script failed. Describe what you see in 2-3 sentences: "
+            "which page or dialog is visible, what UI elements are present, and what "
+            "likely caused the automation script to fail."
+        )
+        visual_note = _call_claude_vision(vision_prompt, screenshot_path)
+        prompt = prompt.rstrip() + f"\n\nBrowser screenshot at time of failure: {visual_note}"
     return _call_gemini(prompt)
 
 
