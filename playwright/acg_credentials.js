@@ -415,7 +415,7 @@ async function extractCredentials() {
     const isSignInVisible = await signInLink.isVisible({ timeout: 10000 }).catch(() => false);
     if (isSignInVisible) {
       console.error('INFO: Not signed in — clicking Sign In...');
-      await signInLink.click();
+      await signInLink.evaluate(el => el.click());
       await page.waitForURL('**id.pluralsight.com**', { timeout: 300000 }); // "Patient Bridge"
 
       // Fill email field — set PLURALSIGHT_EMAIL env var to assist Google Password Manager
