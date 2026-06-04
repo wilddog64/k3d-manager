@@ -627,6 +627,13 @@ def _clear_stale_jobs():
             if status_file.exists() and status_file.read_text().strip() == "running":
                 status_file.write_text("failed")
                 print(f"[k3dm-webhook] cleared stale job {entry.name}")
+                action_file = entry / "action"
+                action = action_file.read_text().strip() if action_file.exists() else "job"
+                _notify_job(
+                    entry.name,
+                    f"❌ *acg-{action}* orphaned — webhook restarted mid-job; "
+                    f"check cluster state manually (job `{entry.name}`)",
+                )
         except Exception:
             pass
 
