@@ -7,6 +7,7 @@ import http.server
 import json
 import os
 import re
+import signal
 import subprocess
 import threading
 import urllib.request
@@ -203,13 +204,18 @@ def _run_cluster(job_id, action, provider="aws"):
             cwd=REPO_ROOT,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True
+            text=True,
+            preexec_fn=os.setsid,
         )
         with _running_procs_lock:
             _running_procs[job_id] = proc
         for line in proc.stdout:
             lines.append(line)
         proc.wait()
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except (ProcessLookupError, OSError):
+            pass
         if proc.returncode != 0:
             raise RuntimeError(f"{' '.join(cmd)} exited {proc.returncode}")
         _log(f"{action} complete")
