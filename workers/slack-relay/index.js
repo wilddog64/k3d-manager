@@ -53,6 +53,24 @@ addEventListener('fetch', event => {
 async function handle(req) {
   if (req.method !== 'POST') return new Response('Not Found', { status: 404 })
 
+  if (new URL(req.url).pathname === '/slack/events') {
+    const body = await req.text()
+    const upstream = await fetch(`${WEBHOOK_URL}/slack/events`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': req.headers.get('Content-Type') || 'application/json',
+        'X-Slack-Request-Timestamp': req.headers.get('X-Slack-Request-Timestamp') || '',
+        'X-Slack-Signature': req.headers.get('X-Slack-Signature') || '',
+      },
+      body,
+    })
+    const text = await upstream.text()
+    return new Response(text, {
+      status: upstream.status,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
   const body = await req.text()
   if (!await verifySlack(req, body)) return new Response('Unauthorized', { status: 401 })
 

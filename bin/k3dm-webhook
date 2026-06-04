@@ -26,6 +26,18 @@ JOB_DIR = Path("/tmp/k3dm-webhook-jobs")
 SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID", "")
+def _keychain_secret(service):
+    try:
+        r = subprocess.run(
+            ["security", "find-generic-password", "-s", service, "-a", "k3dm", "-w"],
+            capture_output=True, text=True,
+        )
+        return r.stdout.strip() if r.returncode == 0 else ""
+    except Exception:
+        return ""
+
+SLACK_SIGNING_SECRET = os.environ.get("SLACK_SIGNING_SECRET") or _keychain_secret("k3dm-slack-signing-secret")
+_seen_event_ids: set = set()
 GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-2.5-flash")
 _STALL_TICKS_THRESHOLD = 3  # 3 ticks × 2 min = 6 min silence before stall analysis
 _SCREENSHOT_RE = re.compile(r"INFO: Screenshot saved to (/tmp/k3dm-acg-screenshot-\d+\.png)")
@@ -315,6 +327,83 @@ def _slack_post(url, text):
         urllib.request.urlopen(req, timeout=10)
     except Exception:
         pass
+
+
+def _verify_slack_signature(raw_body, timestamp, signature):
+    """Return True if the Slack request signature is valid."""
+    if not SLACK_SIGNING_SECRET:
+        return False
+    import time
+    if abs(time.time() - int(timestamp)) > 300:
+        return False
+    base = f"v0:{timestamp}:{raw_body.decode()}"
+    expected = "v0=" + hmac.new(
+        SLACK_SIGNING_SECRET.encode(),
+        base.encode(),
+        digestmod="sha256",
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
+def _find_job_by_thread_ts(thread_ts):
+    """Return job_id whose thread_ts file matches, or None."""
+    if not JOB_DIR.exists():
+        return None
+    for ts_file in JOB_DIR.glob("*/thread_ts"):
+        try:
+            if ts_file.read_text().strip() == thread_ts:
+                return ts_file.parent.name
+        except OSError:
+            pass
+    return None
+
+
+def _handle_thread_command(job_id, command):
+    """Dispatch a thread command for job_id. Runs in a background thread."""
+    cmd = command.strip().lstrip("/").lower().split()[0] if command.strip() else ""
+
+    if cmd == "kill":
+        proc = _running_procs.get(job_id)
+        if proc:
+            try:
+                import os as _os
+                _os.killpg(_os.getpgid(proc.pid), __import__("signal").SIGTERM)
+            except Exception:
+                pass
+            _notify_job(job_id, f"🛑 *Kill requested* — job `{job_id}` signal sent")
+        else:
+            _notify_job(job_id, f"⚠️ Job `{job_id}` is not running — nothing to kill")
+
+    elif cmd == "diagnosis":
+        log_file = JOB_DIR / job_id / "log"
+        if log_file.exists():
+            lines = log_file.read_text().splitlines(keepends=True)
+            try:
+                result = _analyze_failure(lines)
+                _notify_job(job_id, f"🔍 *Re-diagnosis* (job `{job_id}`)\n{result}")
+            except Exception as exc:
+                _notify_job(job_id, f"⚠️ Diagnosis failed: {exc}")
+        else:
+            _notify_job(job_id, f"⚠️ No log found for job `{job_id}`")
+
+    elif cmd == "status":
+        status_file = JOB_DIR / job_id / "status"
+        status = status_file.read_text().strip() if status_file.exists() else "unknown"
+        _notify_job(job_id, f"ℹ️ *Job `{job_id}`* status: `{status}`")
+
+    elif cmd == "logs":
+        log_file = JOB_DIR / job_id / "log"
+        if log_file.exists():
+            last = [l.rstrip() for l in log_file.read_text().splitlines() if l.strip()][-20:]
+            _notify_job(job_id, f"📋 *Last 20 lines* (job `{job_id}`)\n```{''.join(last)}```")
+        else:
+            _notify_job(job_id, f"⚠️ No log found for job `{job_id}`")
+
+    else:
+        _notify_job(
+            job_id,
+            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`",
+        )
 
 
 def _post_slack_bot(text, thread_ts=None):
@@ -883,6 +972,48 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_POST(self):
+        if self.path == "/slack/events":
+            length = int(self.headers.get("Content-Length", 0))
+            raw_body = self.rfile.read(min(length, MAX_BODY))
+            timestamp = self.headers.get("X-Slack-Request-Timestamp", "0")
+            signature = self.headers.get("X-Slack-Signature", "")
+            if not _verify_slack_signature(raw_body, timestamp, signature):
+                self._json(401, {"error": "invalid signature"})
+                return
+            try:
+                event = json.loads(raw_body)
+            except Exception:
+                self._json(400, {"error": "bad json"})
+                return
+            if event.get("type") == "url_verification":
+                self._json(200, {"challenge": event.get("challenge", "")})
+                return
+            event_id = event.get("event_id", "")
+            if event_id and event_id in _seen_event_ids:
+                self._json(200, {"ok": True})
+                return
+            if event_id:
+                _seen_event_ids.add(event_id)
+            ev = event.get("event", {})
+            if (
+                ev.get("type") == "message"
+                and not ev.get("bot_id")
+                and not ev.get("subtype")
+                and ev.get("thread_ts")
+                and ev.get("thread_ts") != ev.get("ts")
+            ):
+                thread_ts = ev["thread_ts"]
+                text = ev.get("text", "").strip()
+                job_id = _find_job_by_thread_ts(thread_ts)
+                if job_id and text:
+                    threading.Thread(
+                        target=_handle_thread_command,
+                        args=(job_id, text),
+                        daemon=True,
+                    ).start()
+            self._json(200, {"ok": True})
+            return
+
         if not self._auth():
             self._json(401, {"error": "unauthorized"})
             return
