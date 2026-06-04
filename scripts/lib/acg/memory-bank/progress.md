@@ -1,6 +1,11 @@
 # Progress — lib-acg
 
-## v0.1.0 Track — `fix/next-improvements-7` (active)
+## v0.3.1 Track — `fix/next-improvements-8` (active)
+
+- **IN FLIGHT PR #30**: `playwright/acg_credentials.js` — JS navigation fix (`window.location.assign` + `waitForNavigation`) for cloud-sandboxes SPA nav; bypasses "Extend Your Session" pointer-event interception. CI green. PRs open: https://github.com/wilddog64/lib-acg/pull/30
+- **MERGED PR #29** (`a32b46ec`): v0.3.1 bugfix sweep — `git grep -F` fixed-string dangling-ref, `acg_check_ttl` return 1 + -1 sentinel, package.json/package-lock.json version alignment to 0.3.0. Copilot findings addressed. enforce_admins restored. Subtree pulled into k3d-manager at `3af3a4e3`.
+
+## v0.3.0 Track — `fix/next-improvements-7` (merged)
 
 - **COMPLETE:** v0.3.1 bugfix sweep on `fix/next-improvements-7` finished. `scripts/hooks/pre-commit` now iterates deleted references safely with `read` instead of unquoted `$_refs`; `scripts/plugins/acg.sh` now returns `1` on missing `node` and `-1` when TTL output is unparseable; `package.json` and `package-lock.json` now both report `0.3.0`. Commits: `4e55392`, `4f7a1f3`, `7f1261c`. Pushed to `origin/fix/next-improvements-7`. Validation: `shellcheck -S warning scripts/hooks/pre-commit`, `shellcheck -S warning scripts/plugins/acg.sh`, `node --check playwright/*.js`.
 
