@@ -86,6 +86,15 @@ if [[ -f "${_vault_pf_pid_file}" ]]; then
   rm -f "${_vault_pf_pid_file}"
   _info "[acg-down] Vault port-forward stopped"
 fi
+if _is_mac; then
+  _vault_pf_label="com.k3d-manager.vault-port-forward"
+  _vault_pf_plist="${HOME}/Library/LaunchAgents/${_vault_pf_label}.plist"
+  if launchctl list "${_vault_pf_label}" >/dev/null 2>&1; then
+    launchctl unload "${_vault_pf_plist}" 2>/dev/null || true
+    _info "[acg-down] Vault port-forward LaunchAgent unloaded"
+  fi
+  rm -f "${_vault_pf_plist}"
+fi
 
 _info "[acg-down] Stopping frontend port-forward..."
 _frontend_pf_pid_file="${_ACG_STATE_DIR}/run/frontend-pf.pid"

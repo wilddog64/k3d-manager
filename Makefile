@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -164,6 +164,24 @@ install-token-rotator:
 	launchctl bootstrap "gui/$$(id -u)" \
 	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook-token-rotate.plist"
 	@echo "Token rotator installed — fires every 6 hours"
+
+## Install the Vault port-forward LaunchAgent — keeps kubectl port-forward vault-0 18200:8200 alive
+install-vault-port-forward:
+	sed \
+	  -e "s|{{KUBECTL_PATH}}|$$(command -v kubectl)|g" \
+	  -e "s|{{HOME}}|$(HOME)|g" \
+	  scripts/etc/launchd/com.k3d-manager.vault-port-forward.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.vault-port-forward.plist"
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.vault-port-forward" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.vault-port-forward.plist"
+	@echo "Vault port-forward agent installed — port 18200 will stay open while k3d-cluster is running"
+
+## Stop and remove the Vault port-forward LaunchAgent
+uninstall-vault-port-forward:
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.vault-port-forward" 2>/dev/null || true
+	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.vault-port-forward.plist"
+	@echo "Vault port-forward agent removed"
 
 ## Inject SLACK_BOT_TOKEN and SLACK_CHANNEL_ID into the webhook LaunchAgent plist and restart
 update-webhook-slack:

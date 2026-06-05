@@ -810,7 +810,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
         )
         acg_reachable = nodes.returncode == 0 and nodes.stdout.strip()
         if not acg_reachable:
-            _log("\n❌ *ACG cluster unreachable* — sandbox may have expired.")
+            _log("\n❌ *ACG cluster unreachable* — cluster may be rebuilding or sandbox may have expired.")
         else:
             node_lines = [l for l in nodes.stdout.strip().splitlines() if l]
             ready_count = sum(1 for l in node_lines if "Ready" in l and "NotReady" not in l)
@@ -874,7 +874,9 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
             acg_apps = [l for l in apps.stdout.strip().splitlines()
                         if l.startswith("acg-") or "ubuntu-k3s" in l]
             if acg_apps:
-                _log("\n*ACG ArgoCD apps:*")
+                _log(f"\n*ACG ArgoCD apps:*")
+                if not acg_reachable:
+                    _log("_(cached — ACG cluster was unreachable)_")
                 _log(f"```{chr(10).join(acg_apps)}```")
             all_apps = apps.stdout.strip().splitlines()
             unhealthy = [l for l in all_apps

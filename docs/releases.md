@@ -2,6 +2,8 @@
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.6.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.1) | 2026-06-05 | ACG LaunchAgent self-healing — `acg-refresh` auto-reinstalls missing system daemon plists (argocd/keycloak/frontend port-forwards); Vault port-forward LaunchAgent install during `acg-up`; Prometheus web.config.file conflict fix; acg-status stale display caveat labels |
+| [v1.6.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.0) | 2026-06-04 | Webhook Slack threading + thread commands; ArgoCD CVE scan CronJob; AI-powered failure analysis (Gemini triage + Claude vision); webhook token auto-rotation; Python 3.13 SIGSEGV fix; ArgoCD/Keycloak OIDC hardening; ACG observability stack (Prometheus + Grafana + Alertmanager) |
 | [v1.5.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.5.1) | 2026-05-31 | OCI object storage backup/restore for k3s-oci (etcd snapshot lifecycle); ACG credential automation improvements; SSH fail-fast and snapshot validation fixes; BATS error-path coverage |
 | [v1.5.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.5.0) | 2026-05-31 | OCI Always Free provider (k3s-oci single/two-node ARM64) with Cilium CNI; observability stack (Prometheus+Grafana+Trivy+Alertmanager with email-to-SMS) via ArgoCD ApplicationSet; observability.sh subshell guard fix; ACG memory limit fixes; credential wait loop + Playwright CDP improvements |
 | [v1.4.12](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.12) | 2026-05-29 | imagePullSecrets patch for named ServiceAccounts (ghcr.io 401 fix), Makefile sync-branch/sync-main targets, ArgoCD ApplicationSets in make status, shopping-cart-payment ExternalSecret SharedResourceWarning fix |

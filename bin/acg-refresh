@@ -103,7 +103,46 @@ _launchd_restart() {
   fi
 }
 
-if _is_mac; then
+# Regenerate a system daemon plist from its wrapper script when the plist is missing.
+# Writes plist to a temp path, then sudo-copies it to /Library/LaunchDaemons/.
+# No-op if plist already exists or wrapper is absent.
+# Usage: _system_daemon_install_if_missing <label> <wrapper> <log> <plist-dst>
+_system_daemon_install_if_missing() {
+  local label="$1" wrapper="$2" log="$3" plist_dst="$4"
+  local plist_tmp="${_ACG_STATE_DIR}/run/${label}.plist"
+  [[ -f "${plist_dst}" ]] && return 0
+  [[ -f "${wrapper}" ]] || return 0
+  _info "[acg-refresh] ${label} plist missing — regenerating from wrapper..."
+  mkdir -p "$(dirname "${log}")" "$(dirname "${plist_tmp}")"
+  cat > "${plist_tmp}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${log}</string>
+  <key>StandardErrorPath</key>
+  <string>${log}</string>
+</dict>
+</plist>
+PLIST
+  _run_command --prefer-sudo --quiet --soft -- cp "${plist_tmp}" "${plist_dst}" \
+    && _info "[acg-refresh] ${label} plist installed" \
+    || _warn "[acg-refresh] ${label} plist install failed — sudo may be required"
+}
+
+if _is_mac && ! sudo -n true 2>/dev/null; then
   _info "[acg-refresh] Pre-authorizing sudo for macOS host operations..."
   sudo -v
 fi
@@ -135,6 +174,18 @@ fi
 _info "[acg-refresh] Restarting SSH tunnel..."
 tunnel_stop 2>/dev/null || true
 tunnel_start
+_tunnel_port="${TUNNEL_LOCAL_PORT:-6443}"
+_tunnel_ready=0
+for _i in $(seq 1 15); do
+  if nc -z localhost "${_tunnel_port}" 2>/dev/null; then
+    _tunnel_ready=1
+    break
+  fi
+  sleep 1
+done
+if [[ "${_tunnel_ready}" -eq 0 ]]; then
+  _warn "[acg-refresh] Tunnel port ${_tunnel_port} not ready after 15s — nodes check may fail"
+fi
 
 # ── 3. PID-file port-forwards ─────────────────────────────────────────────────
 _info "[acg-refresh] Checking PID-file port-forwards..."
@@ -160,24 +211,83 @@ if _is_mac; then
     "${HOME}/Library/LaunchAgents/com.k3d-manager.argocd-port-forward.plist" \
     user
 
+  _kc_pf_label="com.k3d-manager.keycloak-port-forward"
+  _kc_pf_plist="${HOME}/Library/LaunchAgents/${_kc_pf_label}.plist"
+  _kc_pf_log="${_ACG_STATE_DIR}/logs/keycloak-pf.log"
+  _kc_pf_wrapper=""
+  if [[ -f "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh" ]]; then
+    _kc_pf_wrapper="${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
+  elif [[ -f "${_ACG_STATE_DIR}/keycloak-port-forward.sh" ]]; then
+    _kc_pf_wrapper="${_ACG_STATE_DIR}/keycloak-port-forward.sh"
+  fi
+  if [[ ! -f "${_kc_pf_plist}" && -n "${_kc_pf_wrapper}" ]]; then
+    _info "[acg-refresh] Keycloak port-forward plist missing — regenerating from wrapper..."
+    mkdir -p "$(dirname "${_kc_pf_log}")"
+    cat > "${_kc_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_kc_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${_kc_pf_wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_kc_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_kc_pf_log}</string>
+</dict>
+</plist>
+PLIST
+  fi
   _launchd_ensure \
-    "com.k3d-manager.keycloak-port-forward" \
-    "${HOME}/Library/LaunchAgents/com.k3d-manager.keycloak-port-forward.plist" \
+    "${_kc_pf_label}" \
+    "${_kc_pf_plist}" \
     user
 
   # ── 5. launchd daemons (system-domain) ───────────────────────────────────────
   _info "[acg-refresh] Checking launchd system daemons..."
 
+  _system_daemon_install_if_missing \
+    "com.k3d-manager.argocd-browser-https" \
+    "${_ACG_STATE_DIR}/bin/argocd-browser-https.sh" \
+    "${_ACG_STATE_DIR}/logs/argocd-browser-https.log" \
+    "/Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist"
   _launchd_ensure \
     "com.k3d-manager.argocd-browser-https" \
     "/Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist" \
     system
 
+  _system_daemon_install_if_missing \
+    "com.k3d-manager.keycloak-browser-http" \
+    "${_ACG_STATE_DIR}/bin/keycloak-browser-http.sh" \
+    "${_ACG_STATE_DIR}/logs/keycloak-browser-http.log" \
+    "/Library/LaunchDaemons/com.k3d-manager.keycloak-browser-http.plist"
   _launchd_ensure \
     "com.k3d-manager.keycloak-browser-http" \
     "/Library/LaunchDaemons/com.k3d-manager.keycloak-browser-http.plist" \
     system
 
+  _frontend_browser_wrapper=""
+  if [[ -f "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh" ]]; then
+    _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
+  elif [[ -f "${_ACG_STATE_DIR}/frontend-browser-http.sh" ]]; then
+    _frontend_browser_wrapper="${_ACG_STATE_DIR}/frontend-browser-http.sh"
+  fi
+  if [[ -n "${_frontend_browser_wrapper}" ]]; then
+    _system_daemon_install_if_missing \
+      "com.k3d-manager.frontend-browser-http" \
+      "${_frontend_browser_wrapper}" \
+      "${_ACG_STATE_DIR}/logs/frontend-browser-http.log" \
+      "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist"
+  fi
   _launchd_ensure \
     "com.k3d-manager.frontend-browser-http" \
     "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
