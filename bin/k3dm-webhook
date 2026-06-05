@@ -410,6 +410,21 @@ def _handle_thread_command(job_id, command):
         else:
             _notify_job(job_id, f"⚠️ No log found for job `{job_id}`")
 
+    elif cmd in ("acg-status", "cluster-status"):
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("queued")
+        thread_ts_file = JOB_DIR / job_id / "thread_ts"
+        thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+        threading.Thread(
+            target=_run_cluster_status,
+            args=(new_job_id, ""),
+            kwargs={"thread_ts": thread_ts},
+            daemon=True,
+        ).start()
+        _notify_job(job_id, f"🔎 *acg-status* queued — job `{new_job_id}`")
+
     elif cmd in ("acg-down", "down"):
         running = _running_cluster_job()
         if running:
@@ -453,7 +468,7 @@ def _handle_thread_command(job_id, command):
     else:
         _notify_job(
             job_id,
-            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `acg-up`, `acg-down`",
+            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `acg-up`, `acg-down`, `acg-status`",
         )
 
 
