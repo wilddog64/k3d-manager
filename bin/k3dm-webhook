@@ -516,7 +516,7 @@ def _notify_job(job_id, text):
 def _call_gemini(prompt):
     """Shell out to the gemini CLI. Returns response text or error string."""
     gemini_bin = os.environ.get("K3DM_GEMINI_BIN", "gemini")
-    env = {**os.environ, "GEMINI_CLI_TRUST_WORKSPACE": "true"}
+    env = {k: v for k, v in os.environ.items() if k != "GEMINI_CLI_TRUST_WORKSPACE"}
     try:
         r = subprocess.run(
             [gemini_bin, "--model", GEMINI_MODEL, "--prompt", prompt],
@@ -674,10 +674,9 @@ def _analyze_failure(lines):
             if os.path.isfile(screenshot_path):
                 prompt = (
                     prompt.rstrip()
-                    + f"\n\nA browser screenshot was captured at the moment of failure: {screenshot_path}"
-                    "\nPlease read this image file and describe in 2-3 sentences what the browser "
-                    "was showing — which page or dialog is visible, what UI elements are present, "
-                    "and how this visual state relates to the failure."
+                    + "\n\nA browser screenshot was captured at the moment of failure."
+                    " Based on the log context above, describe in 1-2 sentences what the browser"
+                    " was likely showing and how it relates to the failure."
                 )
             break
     return _call_gemini(prompt)
