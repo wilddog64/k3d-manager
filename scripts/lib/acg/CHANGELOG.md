@@ -6,6 +6,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Changed
+- `playwright/acg_credentials.js`: refactored from 672-line monolith into provider pattern — `lib/browser.js` (CDP connect), `lib/sandbox.js` (navigation/sign-in/sandbox start/extend-dialog), `lib/output.js` (credential output), `providers/aws.js`, `providers/gcp.js`, `providers/azure.js` (stub); AWS and GCP behavior unchanged; Jest unit tests added (`npm test` — 7/7 pass)
 - `package.json` + `package-lock.json`: align version fields to `0.3.0` (were `0.2.0` and `0.1.0` respectively)
 
 ### Fixed
