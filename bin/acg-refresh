@@ -135,6 +135,18 @@ fi
 _info "[acg-refresh] Restarting SSH tunnel..."
 tunnel_stop 2>/dev/null || true
 tunnel_start
+_tunnel_port="${TUNNEL_LOCAL_PORT:-6443}"
+_tunnel_ready=0
+for _i in $(seq 1 15); do
+  if nc -z localhost "${_tunnel_port}" 2>/dev/null; then
+    _tunnel_ready=1
+    break
+  fi
+  sleep 1
+done
+if [[ "${_tunnel_ready}" -eq 0 ]]; then
+  _warn "[acg-refresh] Tunnel port ${_tunnel_port} not ready after 15s — nodes check may fail"
+fi
 
 # ── 3. PID-file port-forwards ─────────────────────────────────────────────────
 _info "[acg-refresh] Checking PID-file port-forwards..."
