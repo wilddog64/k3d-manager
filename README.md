@@ -295,13 +295,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-06-04 | [Slack slash commands pointed to tunnel URL — bypassed Worker auth relay](docs/issues/2026-06-04-slack-slash-commands-wrong-url.md) | Slack slash commands — Request URL must point to k3dm-slack-relay Worker (not direct tunnel); prevents 401 errors and auth bypass |
+| 2026-06-01 | [Webhook BATS path normalization mismatch](docs/issues/2026-06-01-webhook-bats-mismatch-path-normalization.md) | Webhook temp path normalization — `.` vs `/tmp` symlink resolution; update BATS test paths to match webhook behavior |
 | 2026-06-01 | [Observability: PyYAML missing in Codex env](docs/issues/2026-06-01-observability-values-pyyaml-missing.md) | observability.sh alert rules YAML validation — PyYAML not installed; workaround: Ruby YAML parser fallback |
 | 2026-05-31 | [Copilot PR #86 review findings](docs/issues/2026-05-31-copilot-pr86-review-findings.md) | OCI snapshot SSH injection, CHANGELOG accuracy, step label drift, empty download guard, error-path coverage added |
 | 2026-05-31 | [Copilot PR #84 review findings](docs/issues/2026-05-31-copilot-pr84-review-findings.md) | Vault token + Gmail password in process args fixed; Prometheus auth deferred to v1.5.7 oauth2-proxy |
-| 2026-05-29 | [Copilot PR #83 review findings](docs/issues/2026-05-29-copilot-pr83-review-findings.md) | Makefile shell injection in BRANCH interpolation fixed; sync-branch/sync-main missing 2 apps added; stale activeContext carry-forward items cleared |
-| 2026-05-19 | [Copilot PR #77 review findings](docs/issues/2026-05-19-copilot-pr77-review-findings.md) | CHANGELOG vault path typo fixed; pre-existing acg_credentials.js positional GCP extraction, navigation skip scope, and provider card selection flagged for follow-on specs |
-| 2026-05-15 | [Copilot PR #74 review findings](docs/issues/2026-05-15-copilot-pr74-review-findings.md) | acg_extend.js URL matching, keycloak.sh PGPASSWORD exposure, ldap.sh ESO dependency guard, vault.sh revoke error propagation |
-| 2026-05-15 | [frontend main push reverted](docs/issues/2026-05-15-frontend-main-push-reverted.md) | shopping-cart-frontend — accidental push to main during SSO wiring; reverted to 2872a4cd |
 
 [All issues →](docs/issues/)
 
