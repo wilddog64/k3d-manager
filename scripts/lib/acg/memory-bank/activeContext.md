@@ -1,6 +1,11 @@
 # Active Context — lib-acg
 
-## Current Branch: `fix/playwright-screenshot-diagnosis`
+## Current Branch: `feat/v0.1.1`
+
+## Current Status (2026-06-05 — sandbox navLink.click() regression fix)
+- **COMPLETE:** `playwright/lib/sandbox.js` `navigateToSandbox()` — removed `navLink.click()` conditional path that caused navigation to `s2.pluralsight.com/404.html`; always uses `window.location.assign()` for cloud-sandboxes SPA navigation, matching pre-refactor behavior; committed as `21d6e27` (`fix(sandbox): remove navLink.click() path — always use window.location.assign()`) and pushed to `origin/feat/v0.1.1`. Validation: `node --check playwright/lib/sandbox.js`. PR #36 open, CI green, Copilot findings fixed (`e0057c3`), all threads resolved.
+
+## Previous Branch: `fix/playwright-screenshot-diagnosis`
 
 ## Current Status (2026-06-04 — Phase A screenshot diagnosis complete)
 - **COMPLETE:** playwright screenshot diagnosis phase A — lib-acg commit `77c7dcc` on `fix/playwright-screenshot-diagnosis`; spec: `docs/plans/v1.6.0-playwright-screenshot-diagnosis.md`; `playwright/acg_credentials.js` and `playwright/acg_restart.js` now save `/tmp/k3dm-acg-screenshot-<ts>.png` on unhandled errors and print `INFO: Screenshot saved to ...` to stderr, and `acg_restart.js` hoists `page` to outer scope so the catch block can capture screenshots; validation used `node --check playwright/acg_credentials.js` and `node --check playwright/acg_restart.js`; commit message: `feat(playwright): save screenshot on failure for AI diagnosis`
