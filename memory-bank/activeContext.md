@@ -1,9 +1,10 @@
 # Active Context — lib-acg
 
-## Current Branch: `feat/v0.1.1`
+## Current Branch: `feat/v0.1.2`
 
-## Current Status (2026-06-05 — sandbox navLink.click() regression fix)
-- **COMPLETE:** `playwright/lib/sandbox.js` `navigateToSandbox()` — removed `navLink.click()` conditional path that caused navigation to `s2.pluralsight.com/404.html`; always uses `window.location.assign()` for cloud-sandboxes SPA navigation, matching pre-refactor behavior; committed as `21d6e27` (`fix(sandbox): remove navLink.click() path — always use window.location.assign()`) and pushed to `origin/feat/v0.1.1`. Validation: `node --check playwright/lib/sandbox.js`. PR #36 open, CI green, Copilot findings fixed (`e0057c3`), all threads resolved.
+## Current Status (2026-06-05 — v0.1.2 viewport fix)
+- **COMPLETE:** PR #36 merged to main (`f63b7ca3`); enforce_admins restored; retrospective written to `docs/retro/2026-06-05-v0.1.1-retrospective.md`; next feature branch `feat/v0.1.2` created and active.
+- **IN PROGRESS:** `playwright/lib/sandbox.js` `startSandbox()` — `scrollIntoViewIfNeeded()` added before `startButton`, `startButton2`, and `resumeButton` clicks to fix `locator.click: Element is outside of the viewport`; commit `86472da` on `feat/v0.1.2`; PR #37 open, CI green, Copilot findings being addressed.
 
 ## Previous Branch: `fix/playwright-screenshot-diagnosis`
 

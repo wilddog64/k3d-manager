@@ -223,6 +223,7 @@ async function startSandbox(page, targetUrl) {
     const startEnabled = await startButton.isEnabled({ timeout: 1000 }).catch(() => false);
     if (startEnabled) {
       console.error('INFO: Clicking Start Sandbox...');
+      await startButton.scrollIntoViewIfNeeded().catch(() => {});
       await startButton.click();
     } else {
       console.error('INFO: Start Sandbox button is disabled — sandbox already running; waiting for credentials...');
@@ -236,11 +237,13 @@ async function startSandbox(page, targetUrl) {
     const startButton2 = page.locator('button:has-text("Start Sandbox")').first();
     if (await startButton2.isVisible({ timeout: 5000 }).catch(() => false)) {
       console.error('INFO: Clicking Start Sandbox (Step 2)...');
+      await startButton2.scrollIntoViewIfNeeded().catch(() => {});
       await startButton2.click();
     }
     await _waitForCredentials(page);
   } else if (await resumeButton.isVisible({ timeout: 5000 }).catch(() => false)) {
     console.error('INFO: Clicking Resume Sandbox...');
+    await resumeButton.scrollIntoViewIfNeeded().catch(() => {});
     await resumeButton.click();
     await _waitForCredentials(page);
   }
