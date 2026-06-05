@@ -2,7 +2,7 @@
 
 ## Status (v1.6.1 — IN PROGRESS)
 - **COMPLETE:** Prometheus ACG web.config.file conflict — commit `c21b7cc9` on `k3d-manager-v1.6.1`; removed `additionalArgs` + `secrets` from `kube-prometheus-stack-acg-values.yaml`; prometheus-operator v0.79.2 blocks `web.config.file` in `additionalArgs`; all 18 ArgoCD apps now Synced/Healthy; bug doc: `docs/bugs/v1.6.1-bugfix-prometheus-acg-web-config-arg.md`
-- **ASSIGNED TO CODEX:** Vault port-forward LaunchAgent — spec: `docs/plans/v1.6.1-vault-port-forward-launchagent.md`; new template + two Makefile targets; commit message: `feat(launchd): add Vault port-forward LaunchAgent to keep port 18200 alive`
+- **COMPLETE:** Vault port-forward LaunchAgent — k3d-manager commit `8046537f` on `k3d-manager-v1.6.1`; spec: `docs/plans/v1.6.1-vault-port-forward-launchagent.md`; added `scripts/etc/launchd/com.k3d-manager.vault-port-forward.plist.tmpl` plus `Makefile` targets `install-vault-port-forward` and `uninstall-vault-port-forward` so `kubectl port-forward vault-0 18200:8200 -n secrets --context k3d-k3d-cluster` stays alive on mac; validation used `make -n install-vault-port-forward`, `./scripts/k3d-manager _agent_checkpoint`, `./scripts/k3d-manager _agent_lint`, and `./scripts/k3d-manager _agent_audit`; commit message: `feat(launchd): add Vault port-forward LaunchAgent to keep port 18200 alive`
 - **OPEN:** PR #89 merge post-housekeeping complete
   - enforce_admins restored ✓ (2026-06-04 15:22 UTC)
   - main synced ✓
