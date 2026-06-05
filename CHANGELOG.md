@@ -1,177 +1,91 @@
 # Changelog
 
+All notable changes to lib-acg will be documented here.
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
 ## [Unreleased]
 
-## [1.6.0] - 2026-06-04
-
-### Added
-- Webhook Slack threading — all job notifications grouped into a single thread with thread-aware replies
-- Slack thread commands — `/kill`, `/diagnosis`, `/status`, `/logs` commands reply directly in job thread
-- ArgoCD CVE scan CronJob (bi-weekly, Hub cluster) — direct kubectl invocation, no webhook dependency
-- ArgoCD upgrade pipeline notifications via SendGrid + PagerDuty integration
-- Cloudflare Worker deploy workflow — `bin/k3dm-worker-setup` and `make deploy-worker` for slash command relay deployment
-- AI-powered failure analysis on webhook job failures — Gemini triage + visual diagnosis (Claude vision on Playwright screenshots)
-- Post-provision health check — Claude Haiku AI triage of degraded apps after `acg-up`
-- Webhook token auto-rotation every 6 hours via LaunchAgent — `bin/rotate-webhook-token` keeps token in sync with Cloudflare Worker
-- Stall detection for long-running ACG jobs — AI analysis + automatic kill action with Slack notification
-- Python 3.13 interpreter in webhook plist template — fixes SIGSEGV on macOS 26.5.1 Beta
+### Changed
+- `playwright/acg_credentials.js`: refactored from 672-line monolith into provider pattern — `lib/browser.js` (CDP connect), `lib/sandbox.js` (navigation/sign-in/sandbox start/extend-dialog), `lib/output.js` (credential output), `providers/aws.js`, `providers/gcp.js`, `providers/azure.js` (stub); AWS and GCP behavior unchanged; Jest unit tests added (`npm test` — 7/7 pass)
+- `package.json` + `package-lock.json`: align version fields to `0.3.0` (were `0.2.0` and `0.1.0` respectively)
 
 ### Fixed
-- Slack slash command Request URLs now point to `https://k3dm-slack-relay.k3dm.workers.dev` (Cloudflare Worker relay with auth) instead of direct tunnel endpoint — fixes 401 errors and prevents auth bypass
-- Webhook restart-orphan handling — notify Slack when a restart kills a running job
-- Webhook e2e token verification on rotation — verify new token before committing to Keychain
-- Webhook SSH tunnel check before remote kubectl in failure analysis — prevents hung diagnosis waits
-- Webhook TimeoutExpired exception handling — catch separately to prevent prompt leak in Slack message
-- k3s-aws idempotency — skip `deploy_app_cluster` when nodes already Ready
-- Keycloak group-ldap-mapper reconciliation — LDAP group sync persists across reprovisioning
-- Install sudoers script — use `--interactive-sudo` + `NOPASSWD` rules for safe self-update
+- `playwright/acg_credentials.js`: replace `navLink.click()` with `window.location.assign()` for cloud-sandboxes SPA navigation — "Extend Your Session" dialog intercepts pointer events and caused `navLink.click()` to timeout when the dialog reappeared between dismiss and click
+- `scripts/hooks/pre-commit`: replace unquoted `$_refs` in `printf` with a `read` loop — prevents word-splitting on filenames with spaces
+- `scripts/plugins/acg.sh` (`acg_check_ttl`): add `return 1` after missing-node error; return `-1` sentinel instead of empty string when TTL is unparseable
+- `bin/acg-credential-test`: remove `2>&1` from `_extract_credentials()` so Playwright INFO/WARN/ERROR messages stream to the terminal in real time instead of being buffered until `$_tmpout` is printed
+- `bin/acg-credential-test`: add `_print_masked` helper using `sed 's/=.*/=***/'` to mask credential values in terminal output (e.g., `AWS_ACCESS_KEY_ID=***`); replace all `cat "$_tmpout" >&2` calls with `_print_masked` so key names are visible but values are never printed
+- `playwright/acg_credentials.js`: add `page.evaluate` fallback in `_waitForCredentials` when React-managed inputs return empty from `inputValue()` after CDP reconnect
+- `playwright/acg_credentials.js`: replace `EXTEND_DIALOG_BLOCKED` throw in `_waitForCredentials` with inline dismiss-and-retry loop — dialog reappears after sandbox restart and was incorrectly treated as a hard failure instead of a transient obstacle
+- `playwright/acg_credentials.js`: detect "Extend Your Session" dialog on page entry (before navigation logic) and force a hard `page.goto` reload to reset SPA timer state — React re-triggers the dialog from in-memory state after `acg_restart.js` dismisses it via DOM click, causing `acg_credentials.js` to see it again immediately on attach
+- `playwright/acg_restart.js`: add `clearTimeout` + explicit `process.exit(0)` on success — the 240s timeout timer kept the Node event loop alive after `RESTART_OK` was printed, causing `acg-credential-test` to hang indefinitely waiting for the node process to exit
+- `playwright/acg_restart.js`, `playwright/acg_credentials.js`: fix "Extend Your Session" dialog detection — Pluralsight renders it as `role="alertdialog"` (not `role="dialog"`), so all nine `querySelectorAll('[role="dialog"]')` calls silently matched nothing; updated to `[data-testid="extend-sandbox-modal"], [role="dialog"], [role="alertdialog"]`
+- `playwright/acg_credentials.js`: hoist `_dismissExtendYourSessionDialog` before the SPA navigation block and call it before `navLink.click()` — fixes timeout when modal intercepts pointer events on the nav link
+- `playwright/acg_restart.js`: call `_dismissExtendYourSessionDialog` after `openBtn.click()` and before `waitForSelector('Delete Sandbox')` — fixes timeout when modal appears during panel expand
+- `playwright/acg_restart.js`: add visibility guard to `_dismissExtendYourSessionDialog` to prevent false-positive "Extend Your Session" dialog detection — check `offsetParent !== null && getComputedStyle(d).display !== 'none'` before attempting dismiss
+
+## [0.3.0] - 2026-05-21
 
 ### Changed
-- Webhook output — visual diagnosis via Gemini CLI with Playwright failure screenshots
-- Webhook failure analysis — enrich with live pod and ArgoCD app state + node state distinction (cluster vs app failure)
-
-## [1.5.3] - 2026-06-01
-
-### Added
-- ACG Alertmanager: NodePort 30093, Vault-backed SMTP secret integration, email alert routing
-
-### Changed
-- Observability: prune ~40 noisy kube-prometheus-stack default alert rules not applicable to k3s (apiserver SLO burn-rates, alertmanager HA, config-reloaders); enable Grafana on ACG cluster (NodePort 30030)
-- README: add Trivy Operator to architecture diagram
-- Shopping Cart: increase MinIO rollout timeout 120s→300s for slow container registry pulls
+- `scripts/plugins/acg.sh`: make CloudFormation template path configurable via `ACG_CLUSTER_TEMPLATE` env var (default: `${_LIB_ACG_ROOT}/scripts/etc/acg-cluster.yaml`); callers (e.g. k3d-manager) can set `ACG_CLUSTER_TEMPLATE` to a repo-local template instead of relying on the bundled copy
 
 ### Fixed
-- ACG credentials: click "Extend Session" button (not Cancel) on session-extension dialog, preserving the once-per-session session-extension opportunity
+- `scripts/etc/acg-cluster.yaml`: restore CloudFormation template deleted in v0.2.0 without updating the `_LIB_ACG_ROOT/scripts/etc/acg-cluster.yaml` reference in `acg.sh` — broke `make up` with `Invalid template path`
+- `scripts/hooks/pre-commit`: add dangling-reference gate — fails if a file staged for deletion is still referenced by name in any `.sh` or `.js` file remaining in the index; prevents the class of bug where a file is deleted without updating its reference in code
+- `acg_restart.js`: provider-scope the "Start Sandbox" button lookup to the target provider card (AWS/GCP/Azure) — prevents restart from opening the wrong card when multiple providers are visible
+- `bin/acg-credential-test`: forward `--provider` argument through to `acg_restart.js` so the restart flow targets the correct sandbox card on credential extraction failure
+- `acg_credentials.js`: restore AWS-working credential extraction path (reverted to pre-GCP-scoping state); GCP-specific scoping work preserved on `fix/gcp-credentials-scoping` branch for follow-on work
+- `acg_extend.js`: wait for SPA render after Ghost State re-navigation and increase Delete Sandbox button visibility timeout to 30s so SPA re-navigation can find the button reliably
 
-## [1.5.1] - 2026-05-31
-
-### Added
-- OCI object storage backup/restore: `oci_backup` and `oci_restore` commands for k3s-oci provider — auto-backup after deploy, Makefile `backup` and `restore` targets
-- ACG credential automation: auto-launch Chrome CDP, handle session-expired redirects; open sign-in page for manual completion when CAPTCHA is required
-
-### Fixed
-- Fix Python one-liner quoting in `cloudflared-backup` and `alertmanager-secret` Makefile targets — replace double-quoted `-c` arg and positional `sys.argv` with single-quoted `-c` and env-var injection to prevent shell brace expansion
-- BATS observability tests: fix `>>` stub in `test_deploy_observability` (append to log instead of overwrite)
-- `bin/acg-up`: make System Keychain cert trust non-fatal (warn on permission error instead of aborting)
-- ACG credential automation: handle session-expired login redirects, navigate to signin page on 404/off-site redirect
-- ACG credential automation: click sign-in button and navigate to sign-in form; user completes CAPTCHA manually when required
-- `k3s-oci-storage`: replace hex-encoded sudo with named `_OCI_SSH_SUDO` variable for clarity
-
-### Changed
-- `Makefile`: add `trivy-scan-report` alias for `vuln-scan` target
-
-## [1.5.0] - 2026-05-31
-
-### Added
-- `CLUSTER_PROVIDER=k3s-oci`: new OCI Always Free provider — single-node ARM64 k3s cluster on Oracle Cloud (2OCPU/12GB); Cilium CNI; Cloudflare Tunnel ingress
-- `CLUSTER_PROVIDER=k3s-oci` two-node cluster: server + agent (4OCPU/24GB total); automated agent wait loop in BATS coverage
-- `scripts/plugins/observability.sh`: deploy Prometheus+Grafana+Trivy to Hub k3d via ArgoCD ApplicationSet; Alertmanager with email-to-SMS via Vault-backed config
-- `scripts/etc/prometheus/rules/shopping-cart-apps.yaml`: PrometheusRule CRDs (ServiceDown, PodCrashLooping, HighErrorRate)
-- `scripts/etc/prometheus/alertmanager.yaml.tmpl`: envsubst-rendered Alertmanager config template
-- `scripts/etc/observability/istio.yaml`: Istio Gateway + VirtualServices for prometheus.3ai-talk.org and grafana.3ai-talk.org
-- `Makefile`: `observability`, `observability-acg`, `observability-status`, `vuln-scan`, `show-service-passwords`, `alertmanager-secret`, `cloudflared-backup` targets
-- `bin/acg-up`: check sandbox TTL before provisioning and extend if below threshold
-- `bin/acg-up`: patch CoreDNS NodeHosts instead of injecting a duplicate hosts block into CoreDNS Corefile
-- `bin/acg-up`: generate cloudflared config from template and add keycloak to the Cloudflare tunnel
-- `docs/bugs/` entries for OIDC issuer mismatch in product-catalog and payment services
-- `bin/acg-up`: add prometheus/grafana URLs to public URL summary after `make up`
-- `feat/cloudflared`: persist tunnel config to repo + restore credentials from Keychain on Hub rebuild; auto-sync credentials Keychain→Vault
-
-### Changed
-- Pull lib-acg v0.3.0 subtree with `ACG_CLUSTER_TEMPLATE` env var support for CloudFormation template path
-- `scripts/etc/observability/`: rename observability DNS from `shopping-cart.local` to `3ai-talk.org`
-- `scripts/plugins/observability.sh`: replace Alertmanager heredoc + hardcoded PrometheusRule with template files under `scripts/etc/prometheus/`
+## [0.2.0] - 2026-05-20
 
 ### Fixed
-- `scripts/plugins/observability.sh`: subshell guard on `_kubectl get application` check — `_err()` calls `exit 1` not `return 1`; wrapping in `( )` prevents script abort on missing app
-- `scripts/plugins/observability.sh`: silence Python traceback when Vault alertmanager secret not yet configured
-- `scripts/plugins/observability.sh`: raise ACG Prometheus memory limit 256Mi→512Mi (OOMKilled)
-- `scripts/plugins/observability.sh`: raise trivy scan job memory limit to 512Mi (OOMKilled)
-- `Makefile`: add missing observability + credentials targets to `make help` output
-- `bin/acg-up`: replace broken 40-retry credential wait loop with delegation to `acg-credential-test`, which has proper ghost-state detection and STS validation with restart capability
-- `scripts/lib/acg/bin/acg-credential-test`: fix stderr swallowing — Playwright INFO/WARN/ERROR messages now reach terminal instead of being silently redirected to tmpfile
-- `scripts/lib/acg/playwright/acg_credentials.js`: add `page.evaluate` fallback in `_waitForCredentials` when React-managed inputs return empty from `inputValue()` after CDP reconnect
-- `scripts/lib/acg/scripts/etc/acg-cluster.yaml`: restore CloudFormation template removed from lib-acg in v0.2.0 without updating reference — broke `make up` with `Invalid template path`
-- `scripts/etc/agent/hardcoded-ip-allowlist`: add subtree copy of `acg-cluster.yaml` to bypass IP literal check for CloudFormation CIDR blocks
-- ArgoCD OIDC issuer: update to `keycloak.3ai-talk.org` in Helm values template
-- `bin/acg-refresh`: non-fatal launchd bootstrap + kill orphans before bootstrap
-- `bin/acg-refresh`: manage all port-forward services (PID + launchd)
+- `acg_restart.js`: use `dispatchEvent(new MouseEvent('click', {bubbles:true}))` instead of `.click()` to reliably trigger React's delegated event handlers on the `[role="alertdialog"]` confirm button
+- `acg_restart.js`: scope confirm button lookup to `document.querySelector('[role="alertdialog"]')` — prevents matching the listing-page "Delete Sandbox" button behind the modal (`role="dialog"` vs `role="alertdialog"` distinction)
+- `acg_restart.js`: add fast-path for already-deleted sandbox — if "Start Sandbox" is visible and neither "Delete" nor "Open" Sandbox are present, click Start directly without re-deleting
+- `acg_restart.js`: increase Start Sandbox wait from 120s → 180s; overall script timeout 120s → 240s — AWS backend deletion can exceed 2 minutes
+- `acg_restart.js`: add post-click alertdialog-still-open check with pointer-event sequence fallback
+- `acg_restart.js`: log button text found inside alertdialog for easier failure diagnosis
+- `bin/acg-credential-test`: add mandatory final `sts:GetCallerIdentity` gate that runs on all exit paths (first-try success, extraction-fail-restart, ghost-state-restart)
+- `bin/acg-credential-test`: refactor into `_extract_credentials` / `_sts_valid` helpers; previously the extraction-fail→restart path skipped sts validation entirely
+- `acg_extend.js`: add `--provider aws|gcp|azure` argument (default `aws`); scope extend button lookup to provider card by walking up the DOM — prevents always selecting the first (AWS) sandbox when multiple providers are visible
+- `acg_extend.js`: change `--check` flag detection from positional `process.argv[3]` to `process.argv.includes('--check')` — survives argument reordering
 
-## [1.4.12] - 2026-05-29
+### Added
+- `tests/fixtures/sandbox.html`: self-contained Pluralsight sandbox page fixture with document-level event delegation, `role="alertdialog"` confirm modal, state machine (card→panel→confirm→deleted→started), and "Extend Your Session" dialog
+- `tests/acg-restart.spec.js`: 7 Playwright fixture tests covering full delete flow, alertdialog dismiss via `dispatchEvent`, fast-path already-deleted state, extend dialog dismissal, and selector role scoping
+- `playwright.config.js`: `@playwright/test` configuration pointing at `tests/` directory
+- Makefile `test` target: runs fixture-based Playwright tests locally without a live Pluralsight session
+- CI `e2e` job: installs Chromium and runs fixture tests on every PR
+
+### Removed
+- `scripts/etc/acg-cluster.yaml`: CloudFormation template removed from lib-acg — it belongs in k3d-manager where it already exists at `scripts/etc/acg-cluster.yaml`
+
+## [0.1.0] - 2026-05-19
 
 ### Fixed
-- `scripts/plugins/services.sh`: add imagePullSecrets patch to all named ServiceAccounts during cluster bootstrap — resolves ghcr.io 401 errors when non-default SAs pull images
+- `acg_extend.js`: narrow midnight-wrap guard to ≤ 60 min so expired sandboxes report a negative TTL instead of a large positive value
+- `acg_extend.js`: add `--check` mode to print remaining sandbox TTL without extending
+- `scripts/plugins/acg.sh`: add `acg_check_ttl()` wrapper for sandbox TTL checks
+- `acg_extend.js`: skip "Open Sandbox" click when sandbox is expired (TTL ≤ 0) so Ghost State Recovery can find the "Delete Sandbox" button on the listing page; re-navigate to listing URL at top of Ghost State as safety net
+- `acg_extend.js`: disconnect CDP browser in finally block to release WebSocket and prevent Node event loop from hanging indefinitely after successful TTL extension
+- `acg_extend.js`: detect "Session extended" toast at startup — if already visible, extension already succeeded; exit 0 immediately instead of looping forever trying to dismiss via CDP mouse click
+- `_waitForSandboxEntry`: pass `null` as `waitForFunction` arg so the timeout option reaches the options slot (same arg-slot bug as `_waitForCredentials`)
+- `_waitForCredentials`: fix arg-slot bug (pass `null` as `waitForFunction` arg) and increase timeout from 60s to 180s — sandbox provisioning can take 60–120s
+- `OVERALL_TIMEOUT_MS`: simplify redundant conditional to a single 300s constant — both first-run and non-first-run now use the same deadline
+- `_waitForCredentials`: replace unreliable `waitForFunction` (in-page DOM query broken in CDP mode) with Playwright locator polling loop; increase credential wait from 180s to 420s to handle slower sandbox provisioning
+- `OVERALL_TIMEOUT_MS`: increase from 300s to 780s (300s waitForURL + 420s credential polling + 60s buffer) to accommodate worst-case first-run flows
+- CDP empty-contexts: open blank tab via `/json/new` HTTP API when `_cdpBrowser.contexts()` returns `[]` (Chrome has no open tabs); re-query after 500ms to expose the profile context and avoid falling through to `launchPersistentContext` which fails with a profile-lock error
+- CDP disconnect guard: wrap `_cdpBrowser.disconnect()` in `if (!browserContext)` so the browser is only disconnected when the blank-tab recovery also fails — prevents disconnecting a context that was successfully recovered
+- CDP blank-tab reconnect: after PUT `/json/new`, disconnect and reconnect via `connectOverCDP` instead of re-querying the stale `contexts()` list — Playwright does not materialize BrowserContext from `Target.targetCreated` events post-connect, so a fresh connection is required to see the new tab
+- Chrome SingletonLock collision: stop the `chrome-cdp` launchd agent before taking over the shared profile and remove stale `SingletonLock` files only when the profile is not in use
+- `_cdp_stop_chrome_cdp_agent`: replace deprecated `launchctl unload <plist>` with `launchctl bootout "gui/$(id -u)/<label>"` — required on macOS 15+ (Darwin 25); `2>/dev/null` was silently masking failures from the deprecated call; also removed redundant plist-file existence check since `launchctl list` already confirms service state
+- `_browser_launch`: remove 17-line dead Linux else-block; library is macOS-only by design — non-Darwin callers now get a clear `_err` instead of silently entering unreachable code
 
 ### Added
-- `Makefile`: `sync-branch` and `sync-main` targets for pre-merge ArgoCD branch verification
-- `make status`: new ArgoCD ApplicationSets section (ArgoCD v3.4.2 removed UI sidebar — CLI is now the primary status view)
-
-### Changed
-- `services/shopping-cart-payment/kustomization.yaml`: remove redundant `payment-db-credentials-eso` ExternalSecret to fix SharedResourceWarning; sole ownership assigned to cicd/product-catalog app in shopping-cart-infra
-
-## [1.4.11] - 2026-05-29
-
-### Fixed
-- `scripts/plugins/shopping_cart.sh`: annotate all ExternalSecrets before waiting to prevent ESO controller saturation on fresh clusters
-- `scripts/plugins/shopping_cart.sh`: poll for StatefulSet existence before `kubectl rollout status` to fix data-layer race on fresh clusters
-- `scripts/plugins/shopping_cart.sh`: add explicit `|| return 1` on `kubectl wait` and `|| _warn` on `kubectl annotate` — silent continuation on timeout was a reliability bug
-- `bin/acg-down`: replace `--interactive-sudo` with `--prefer-sudo` on all LaunchDaemon teardown calls — eliminates `Password:` prompt and PTY allocation error on macOS Tahoe
-- `bin/acg-up`: add Keycloak group-ldap-mapper reconciliation step — LDAP group sync now persists across reprovisioning
-- ArgoCD RBAC: correct `catalog-admin` policy to reference `shopping-cart/shopping-cart-product-catalog` (was `shopping-cart/product-catalog`)
-- `bin/acg-down`: move sudo pre-warm to top of script — prompt before any output to improve UX
-- `services/shopping-cart-payment/kustomization.yaml`: remove redundant `payment-db-credentials-eso` ExternalSecret — `postgres-payment-app` (shopping-cart-infra) already owns the secret; k3d-manager ESO caused `SecretSyncedError` due to ownership conflict
-- `bin/acg-up`: replace broken 40-retry credential wait loop with delegation to `acg-credential-test`
-- `scripts/lib/acg/bin/acg-credential-test`: fix stderr swallowing — Playwright messages silently redirected to tmpfile
-- `scripts/lib/acg/playwright/acg_credentials.js`: add `page.evaluate` fallback in `_waitForCredentials` after CDP reconnect
-- `scripts/lib/acg/scripts/etc/acg-cluster.yaml`: restore CloudFormation template removed from lib-acg in v0.2.0 — broke `make up` with `Invalid template path`
-- `scripts/etc/agent/hardcoded-ip-allowlist`: add subtree copy of `acg-cluster.yaml` to bypass IP literal check
-- ArgoCD OIDC issuer: update to `keycloak.3ai-talk.org` in Helm values template
-- `scripts/etc/argocd/applicationsets/services-git.yaml`: assign shopping-cart apps to `shopping-cart` ArgoCD project
-- `bin/acg-down`: remove stale `/tmp/argocd-*.sock`, `/tmp/k3d-config-tmp-*.yaml`, `/tmp/k3d-hostsfile-*` on teardown
-- `scripts/plugins/shopping_cart.sh`: add `--wait=false` to seed job delete — ArgoCD hook finalizer blocked `kubectl delete` indefinitely
-- `bin/acg-up`: resilient DB password reconciliation — re-aligns Vault KV and PostgreSQL auth on every run
-- `bin/acg-up`: reconcile order-service postgres password after sandbox seed
-- `bin/acg-up`: sync vault-backed data-layer ExternalSecrets and MinIO on every run
-- `scripts/etc/argocd/applicationsets/services-git.yaml`: add `ignoreDifferences` for `order-service-secrets` and `product-catalog-seed-script` labels
-
-### Changed
-- Pull lib-acg v0.3.0 subtree with `ACG_CLUSTER_TEMPLATE` env var support for CloudFormation template path
-- `services/shopping-cart-*/kustomization.yaml`: move imagePullSecrets from per-app patches to `default` ServiceAccount in `shopping-cart-apps`
-- `bin/acg-up`: extract shopping-cart bootstrap logic into `scripts/plugins/shopping_cart.sh`
-
-### Added
-- `bin/acg-up`: check sandbox TTL before provisioning and extend if below threshold
-- `bin/acg-up`: patch CoreDNS NodeHosts instead of injecting a duplicate hosts block into CoreDNS Corefile
-- `bin/acg-up`: generate cloudflared config from template and add keycloak to the Cloudflare tunnel
-- `docs/bugs/` entries for OIDC issuer mismatch in product-catalog and payment services
-
-## [1.4.8] - 2026-05-19
-
-### Fixed
-- `scripts/plugins/vault.sh`: register cleanup traps immediately after mktemp to prevent temp file leaks on error paths
-- `scripts/lib/acg/playwright/acg_extend.js`: disconnect CDP browser connection on exit to prevent WebSocket hang and node process leak
-- `bin/acg-up`: set Keycloak frontendUrl to Cloudflare public domain after realm import (fixes redirect loops from non-public domain)
-- `bin/acg-up`: replace trycloudflare quick tunnels with named Cloudflare tunnel for stable public URLs across cluster restarts
-- `bin/acg-up`: correct realm JSON path from identity/config to identity/keycloak in import payload
-- `bin/acg-refresh`: restart Cloudflare tunnel on refresh to clear stale tunnel routes
-
-### Changed
-- `bin/acg-refresh`: drop unused SCRIPT_DIR variable
-
-### Added
-- `bin/get-keycloak-password`: new script to query Keycloak SSO user passwords from Vault
-
-## [1.4.5] - 2026-05-10
-
-### Added
-- ACG AWS sandbox provisioning (`acg_provision`, `acg_extend`, `acg_teardown`)
-- LoadBalancer ingress for ArgoCD, Keycloak, Jenkins
-- Plugin architecture with lazy loading
-
-### Fixed
-- Vault PKI bootstrap on cluster up
-
-## [1.4.0] - 2026-05-01
-
-### Added
-- Initial release
+- `bin/acg-credential-test`: AWS credential extraction with write to `~/.aws/credentials [default]`, validation via `sts:GetCallerIdentity`, credential value suppression from terminal
+- `playwright/acg_credentials.js`: "Extend Your Session" dialog handling via bringToFront+Enter with best-effort dismiss (WARN logged if dismiss fails; credentials still populate via Extend path)
+- Makefile `setup`, `check`, `lint` targets for local development
+- CI workflow: shellcheck, node --check, yamllint on PRs to main
+- Pre-commit hook: subtree guard + shellcheck + node --check on staged files
+- Phase 3 migration: acg.sh, gcp.sh, cdp.sh, vars.sh, playwright scripts, acg-cluster.yaml
