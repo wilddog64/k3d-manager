@@ -1,6 +1,16 @@
 # Progress — k3d-manager
 
-## Status (v1.6.0 — IN PROGRESS)
+## Status (v1.6.1 — IN PROGRESS)
+- **OPEN:** PR #89 merge post-housekeeping complete
+  - enforce_admins restored ✓ (2026-06-04 15:22 UTC)
+  - main synced ✓
+  - v1.6.0 tag created + pushed ✓
+  - GitHub release created ✓
+  - v1.6.1 branch created ✓
+  - retrospective committed (`0781337f`) ✓
+  - memory-bank updating (in progress)
+
+## Status (v1.6.0 — RELEASED 2026-06-04)
 - **COMPLETE:** Slack slash commands + Worker secrets fixed — Slack app slash command Request URLs updated from `webhook.3ai-talk.org/slack/command` to `https://k3dm-slack-relay.k3dm.workers.dev`; `SLACK_SIGNING_SECRET` and `WEBHOOK_TOKEN` re-synced in Cloudflare Worker; Worker HMAC verify now succeeds; issue doc: `docs/issues/2026-06-04-slack-slash-commands-wrong-url.md`
 - **COMPLETE:** webhook plist Python 3.13 fix — changed `~/Library/LaunchAgents/com.k3d-manager.webhook.plist` interpreter from `/usr/bin/python3` (Python 3.9, SIGSEGV on macOS 26.5.1 Beta) to `/opt/homebrew/bin/python3` (Python 3.13); updated `scripts/etc/launchd/com.k3d-manager.webhook.plist.tmpl` to match; bug doc: `docs/bugs/v1.6.0-bugfix-webhook-python39-sigsegv.md`
 - **COMPLETE:** webhook restart-orphan Slack notify — k3d-manager commit `1549f4c4` on `k3d-manager-v1.6.0`; spec: `docs/plans/v1.6.0-bugfix-webhook-restart-orphan.md`; `_clear_stale_jobs()` now calls `_notify_job` after marking an orphaned job `failed`, reading the `action` file to name the job in the message; validation: `python3 -m py_compile` clean, BATS pass; commit message: `fix(webhook): notify Slack when restart orphans a running job`
