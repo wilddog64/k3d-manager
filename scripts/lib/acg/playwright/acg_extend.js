@@ -56,7 +56,7 @@ function _sanitizePhaseLabel(phaseLabel) {
 }
 
 async function _captureExtendFailure(page, phaseLabel) {
-  const diagnosticsDir = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'logs');
+  const diagnosticsDir = path.join(os.homedir(), '.local', 'share', 'k3d-manager');
   const safePhaseLabel = _sanitizePhaseLabel(phaseLabel);
   const screenshotPath = path.join(
     diagnosticsDir,

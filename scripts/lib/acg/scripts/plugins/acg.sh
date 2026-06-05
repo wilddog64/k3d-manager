@@ -22,10 +22,10 @@ _ACG_VPC_CIDR="10.0.0.0/16"
 _ACG_SUBNET_CIDR="10.0.1.0/24"
 _ACG_SANDBOX_URL="https://app.pluralsight.com/hands-on/playground/cloud-sandboxes"
 _ACG_SANDBOX_LIST_URL="${ACG_SANDBOX_LIST_URL:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}"
-_ACG_WATCH_PID_FILE="${HOME}/.local/share/k3d-manager/run/acg-watch.pid"
+_ACG_WATCH_PID_FILE="${HOME}/.local/share/k3d-manager/acg-watch.pid"
 _ACG_WATCH_LAUNCHD_LABEL="com.k3d-manager.acg-watch"
 _ACG_WATCH_PLIST_PATH="${HOME}/Library/LaunchAgents/${_ACG_WATCH_LAUNCHD_LABEL}.plist"
-_ACG_WATCH_WRAPPER="${HOME}/.local/share/k3d-manager/bin/acg-watch-run.sh"
+_ACG_WATCH_WRAPPER="${HOME}/.local/share/k3d-manager/acg-watch-run.sh"
 _ACG_CF_STACK_NAME="k3d-manager-cluster"
 _ACG_CHROME_CDP_LABEL="com.k3d-manager.chrome-cdp"
 _ACG_CHROME_CDP_PLIST="${HOME}/Library/LaunchAgents/${_ACG_CHROME_CDP_LABEL}.plist"
@@ -184,7 +184,6 @@ _acg_check_k3s() {
 
 _acg_watch_write_wrapper() {
   local sandbox_url="$1"
-  mkdir -p "$(dirname "${_ACG_WATCH_PID_FILE}")"
   mkdir -p "$(dirname "${_ACG_WATCH_WRAPPER}")"
   cat > "${_ACG_WATCH_WRAPPER}" <<WRAPPER
 #!/usr/bin/env bash

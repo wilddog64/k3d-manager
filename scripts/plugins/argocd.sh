@@ -1183,3 +1183,83 @@ EOF
 
   _info "[argocd] cluster secret applied — verify with: kubectl get secret ${ARGOCD_APP_CLUSTER_SECRET_NAME} -n ${ARGOCD_NAMESPACE}"
 }
+
+function deploy_argocd_platform_ops() {
+   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+      cat <<'HELP'
+Usage: deploy_argocd_platform_ops
+
+Deploy the platform-ops namespace, RBAC, CVE scan CronJob, and notification Secret
+for the ArgoCD CVE upgrade pipeline. CronJob runs on this Hub cluster (k3d) and
+patches cluster secrets directly — no webhook dependency.
+
+All credentials are optional — missing vars disable that channel gracefully.
+
+Required env vars (all optional — missing = channel disabled):
+  SENDGRID_API_KEY        SendGrid v3 API key
+  PAGERDUTY_ROUTING_KEY   PagerDuty Events API v2 routing key
+  NOTIFICATION_EMAIL      Recipient email address
+  NOTIFICATION_FROM       Sender address (default: argocd-cve@k3d-manager)
+
+After deploying, optionally create the OCI kubeconfig Secret to enable OCI upgrades:
+  kubectl create secret generic oci-kubeconfig \
+    --from-file=config=/path/to/oci-kubeconfig -n platform-ops
+HELP
+      return 0
+   fi
+
+   local _dir="${ARGOCD_CONFIG_DIR}/platform-ops"
+
+   _info "[argocd] Ensuring platform-ops namespace..."
+   _kubectl apply -f - <<'EOF'
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-ops
+  labels:
+    managed-by: k3d-manager
+EOF
+
+   _info "[argocd] Deploying RBAC..."
+   _kubectl apply -f "${_dir}/rbac.yaml"
+
+   _info "[argocd] Deploying CVE scan CronJob..."
+   _kubectl apply -f "${_dir}/cve-scan-cronjob.yaml"
+
+   _info "[argocd] Deploying scan script ConfigMap..."
+   _kubectl create configmap argocd-cve-scan-script \
+      --from-file=cve-scan.sh="${_dir}/cve-scan.sh" \
+      --from-file=notify.sh="${_dir}/notify.sh" \
+      --namespace platform-ops \
+      --dry-run=client -o yaml | _kubectl apply -f -
+
+   _info "[argocd] Deploying notification Secret scaffold..."
+   NOTIFICATION_FROM="${NOTIFICATION_FROM:-argocd-cve@k3d-manager}" \
+   SENDGRID_API_KEY="${SENDGRID_API_KEY:-}" \
+   PAGERDUTY_ROUTING_KEY="${PAGERDUTY_ROUTING_KEY:-}" \
+   NOTIFICATION_EMAIL="${NOTIFICATION_EMAIL:-}" \
+   envsubst '$SENDGRID_API_KEY $PAGERDUTY_ROUTING_KEY $NOTIFICATION_EMAIL $NOTIFICATION_FROM' \
+     < "${_dir}/notification-secret.yaml.tmpl" | _kubectl apply -f -
+
+   _info "[argocd] Deploying ACG expiry ConfigMap script..."
+   _kubectl create configmap acg-expiry-script \
+      --from-file=acg-expiry.sh="${_dir}/acg-expiry.sh" \
+      --namespace platform-ops \
+      --dry-run=client -o yaml | _kubectl apply -f -
+
+   _info "[argocd] Deploying ACG expiry CronJob..."
+   _kubectl apply -f "${_dir}/acg-expiry-cronjob.yaml"
+
+   _info "[argocd] Deploying PrometheusRule..."
+   _kubectl apply -f "${_dir}/prometheusrule.yaml"
+
+   _info "[argocd] Deploying AlertmanagerConfig..."
+   _kubectl apply -f "${_dir}/alertmanager-config.yaml"
+
+   _info "[argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m"
+   _info "[argocd] Secrets to create manually:"
+   _info "[argocd]   kubectl create secret generic oci-kubeconfig --from-file=config=<path> -n platform-ops"
+   _info "[argocd]   kubectl create secret generic k3dm-webhook-token --from-literal=token=<token> -n cicd"
+   _info "[argocd]   kubectl patch secret platform-ops-notifications -n platform-ops --type=merge \\"
+   _info "[argocd]     -p '{\"data\":{\"slack-incoming-webhook-url\":\"<base64-url>\"}}'"
+}

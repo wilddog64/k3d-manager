@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-06-04
+
+### Added
+- Webhook Slack threading — all job notifications grouped into a single thread with thread-aware replies
+- Slack thread commands — `/kill`, `/diagnosis`, `/status`, `/logs` commands reply directly in job thread
+- ArgoCD CVE scan CronJob (bi-weekly, Hub cluster) — direct kubectl invocation, no webhook dependency
+- ArgoCD upgrade pipeline notifications via SendGrid + PagerDuty integration
+- Cloudflare Worker deploy workflow — `bin/k3dm-worker-setup` and `make deploy-worker` for slash command relay deployment
+- AI-powered failure analysis on webhook job failures — Gemini triage + visual diagnosis (Claude vision on Playwright screenshots)
+- Post-provision health check — Claude Haiku AI triage of degraded apps after `acg-up`
+- Webhook token auto-rotation every 6 hours via LaunchAgent — `bin/rotate-webhook-token` keeps token in sync with Cloudflare Worker
+- Stall detection for long-running ACG jobs — AI analysis + automatic kill action with Slack notification
+- Python 3.13 interpreter in webhook plist template — fixes SIGSEGV on macOS 26.5.1 Beta
+
+### Fixed
+- Slack slash command Request URLs now point to `https://k3dm-slack-relay.k3dm.workers.dev` (Cloudflare Worker relay with auth) instead of direct tunnel endpoint — fixes 401 errors and prevents auth bypass
+- Webhook restart-orphan handling — notify Slack when a restart kills a running job
+- Webhook e2e token verification on rotation — verify new token before committing to Keychain
+- Webhook SSH tunnel check before remote kubectl in failure analysis — prevents hung diagnosis waits
+- Webhook TimeoutExpired exception handling — catch separately to prevent prompt leak in Slack message
+- k3s-aws idempotency — skip `deploy_app_cluster` when nodes already Ready
+- Keycloak group-ldap-mapper reconciliation — LDAP group sync persists across reprovisioning
+- Install sudoers script — use `--interactive-sudo` + `NOPASSWD` rules for safe self-update
+
+### Changed
+- Webhook output — visual diagnosis via Gemini CLI with Playwright failure screenshots
+- Webhook failure analysis — enrich with live pod and ArgoCD app state + node state distinction (cluster vs app failure)
+
 ## [1.5.3] - 2026-06-01
 
 ### Added

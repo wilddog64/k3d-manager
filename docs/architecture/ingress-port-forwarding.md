@@ -14,81 +14,58 @@ The ingress forwarding system solves a key challenge in k3s deployments: exposin
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Client Machine (e.g., M4 Mac)                               │
-│                                                             │
-│  Browser/CLI → https://jenkins.dev.local.me:443             │
-│                https://argocd.dev.local.me:443              │
-│                                                             │
-│  /etc/hosts:                                                │
-│    10.211.55.14 jenkins.dev.local.me                        │
-│    10.211.55.14 argocd.dev.local.me                         │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       │ TLS ClientHello with SNI
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────────────┐
-│ k3s Host (e.g., M2 Ubuntu)                                  │
-│                                                             │
-│  ┌──────────────────────────────────────┐                  │
-│  │ systemd: k3s-ingress-forward         │                  │
-│  │                                      │                  │
-│  │  ExecStart: socat                   │                  │
-│  │    TCP-LISTEN:443,fork,reuseaddr   │                  │
-│  │    TCP:localhost:32653              │                  │
-│  │                                      │                  │
-│  │  Forwards raw TCP (no decryption)   │                  │
-│  └────────────┬─────────────────────────┘                  │
-│               │                                             │
-│               │ Raw TCP stream with encrypted TLS           │
-│               │                                             │
-│               ▼                                             │
-│  ┌──────────────────────────────────────┐                  │
-│  │ Istio IngressGateway                 │                  │
-│  │ (Service: istio-ingressgateway)      │                  │
-│  │                                      │                  │
-│  │  Port: 32653 (NodePort)             │                  │
-│  │                                      │                  │
-│  │  SNI Inspection:                     │                  │
-│  │    Read SNI from TLS ClientHello     │                  │
-│  │    Match to Gateway configuration    │                  │
-│  │    Select correct TLS certificate    │                  │
-│  │    Complete TLS handshake            │                  │
-│  │    Decrypt HTTPS → HTTP              │                  │
-│  └────────────┬─────────────────────────┘                  │
-│               │                                             │
-│               │ Decrypted HTTP                              │
-│               │                                             │
-│      ┌────────┴─────────┐                                  │
-│      │                  │                                   │
-│      ▼                  ▼                                   │
-│  ┌────────────────┐ ┌──────────────────┐                  │
-│  │ Gateway:       │ │ Gateway:         │                  │
-│  │ jenkins-gw     │ │ argocd-gateway   │                  │
-│  │                │ │                  │                  │
-│  │ Hosts:         │ │ Hosts:           │                  │
-│  │ jenkins.dev... │ │ argocd.dev...    │                  │
-│  │                │ │                  │                  │
-│  │ TLS Cert:      │ │ TLS Cert:        │                  │
-│  │ jenkins-tls    │ │ argocd-tls       │                  │
-│  └───────┬────────┘ └────────┬─────────┘                  │
-│          │                   │                             │
-│          ▼                   ▼                             │
-│  ┌────────────────┐ ┌──────────────────┐                  │
-│  │ VirtualService │ │ VirtualService   │                  │
-│  │ jenkins/jenkins│ │ argocd/argocd    │                  │
-│  │                │ │                  │                  │
-│  │ Route →        │ │ Route →          │                  │
-│  │ jenkins:8081   │ │ argocd-server:443│                  │
-│  └───────┬────────┘ └────────┬─────────┘                  │
-│          │                   │                             │
-│          ▼                   ▼                             │
-│  ┌────────────────┐ ┌──────────────────┐                  │
-│  │ Jenkins Pod    │ │ ArgoCD Pod       │                  │
-│  └────────────────┘ └──────────────────┘                  │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph client["Client Machine (M4 Mac)"]
+        browser["Browser / CLI\nhttps://jenkins.dev.local.me\nhttps://argocd.dev.local.me"]
+        hosts["/etc/hosts\n10.211.55.14 → jenkins.dev.local.me\n10.211.55.14 → argocd.dev.local.me"]
+    end
+
+    subgraph k3s_host["k3s Host (Ubuntu)"]
+        subgraph socat_svc["systemd: k3s-ingress-forward"]
+            socat["socat\nTCP-LISTEN:443,fork,reuseaddr\n→ TCP:localhost:32653\n(raw TCP — no TLS inspection)"]
+        end
+
+        subgraph istio["Istio IngressGateway (NodePort 32653)"]
+            sni["SNI Inspection\nRead SNI from TLS ClientHello\nMatch → Gateway config\nSelect TLS cert\nComplete handshake\nDecrypt HTTPS → HTTP"]
+        end
+
+        subgraph gateways["Istio Gateways (istio-system)"]
+            gw_jenkins["jenkins-gw\nhost: jenkins.dev.local.me\ntls: jenkins-tls"]
+            gw_argocd["argocd-gateway\nhost: argocd.dev.local.me\ntls: argocd-tls"]
+        end
+
+        subgraph virtualservices["VirtualServices"]
+            vs_jenkins["jenkins/jenkins\n→ jenkins:8081"]
+            vs_argocd["argocd/argocd\n→ argocd-server:443"]
+        end
+
+        subgraph pods["Pods"]
+            pod_jenkins["Jenkins Pod\n(ns: jenkins)"]
+            pod_argocd["ArgoCD Pod\n(ns: argocd)"]
+        end
+
+        subgraph vault["Vault PKI"]
+            cert_j["jenkins-tls Secret"]
+            cert_a["argocd-tls Secret"]
+        end
+    end
+
+    browser -->|"DNS lookup"| hosts
+    hosts -->|"TLS ClientHello + SNI :443"| socat
+    socat -->|"Raw TCP stream → :32653"| sni
+
+    sni -->|"SNI: jenkins.dev.local.me"| gw_jenkins
+    sni -->|"SNI: argocd.dev.local.me"| gw_argocd
+
+    cert_j -.->|"TLS cert"| gw_jenkins
+    cert_a -.->|"TLS cert"| gw_argocd
+
+    gw_jenkins -->|"Decrypted HTTP"| vs_jenkins
+    gw_argocd -->|"Decrypted HTTP"| vs_argocd
+
+    vs_jenkins --> pod_jenkins
+    vs_argocd --> pod_argocd
 ```
 
 ## How Multiple Services Share Port 443

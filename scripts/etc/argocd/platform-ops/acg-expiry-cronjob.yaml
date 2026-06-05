@@ -1,0 +1,51 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: acg-expiry-check
+  namespace: platform-ops
+  labels:
+    managed-by: k3d-manager
+spec:
+  schedule: "*/30 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: acg-expiry-checker
+          restartPolicy: Never
+          containers:
+            - name: expiry-checker
+              image: curlimages/curl:8.7.1
+              command: ["/bin/sh", "/scripts/acg-expiry.sh"]
+              env:
+                - name: K3DM_SLACK_WEBHOOK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: platform-ops-notifications
+                      key: slack-incoming-webhook-url
+                      optional: true
+                - name: ACG_EXPIRY_WARNING_SECONDS
+                  value: "12600"
+                - name: ACG_EXPIRY_MAX_SECONDS
+                  value: "28800"
+              volumeMounts:
+                - name: acg-state
+                  mountPath: /config/acg-state
+                  readOnly: true
+                - name: expiry-script
+                  mountPath: /scripts
+          volumes:
+            - name: acg-state
+              configMap:
+                name: acg-state
+                optional: true
+            - name: expiry-script
+              configMap:
+                name: acg-expiry-script
+                defaultMode: 0755
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534

@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -59,6 +59,10 @@ chrome-cdp-stop:
 
 ## Re-register ubuntu-k3s app cluster with ArgoCD (after sandbox recreation or IP change)
 argocd-registration:
+	@kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s >/dev/null 2>&1 || { \
+	  echo "[argocd-registration] argocd-manager SA/token missing — bootstrapping on ubuntu-k3s..."; \
+	  kubectl apply --context ubuntu-k3s -f scripts/etc/argocd-manager.yaml && sleep 5; \
+	}
 	@_token=$$(kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s \
 	  -o jsonpath='{.data.token}' 2>/dev/null | base64 -d | tr -d '\n'); \
 	if [ -z "$$_token" ]; then \
@@ -139,6 +143,68 @@ provision: ssm
 ## Install passwordless sudo rules for k3d-manager macOS host operations (one-time setup)
 install-sudoers:
 	bin/install-sudoers.sh
+
+## Restart the k3dm-webhook LaunchAgent (picks up code changes)
+restart-webhook:
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+
+## Rotate webhook bearer token now (updates Keychain + Cloudflare Worker secret + restarts webhook)
+rotate-webhook-token:
+	bin/rotate-webhook-token
+
+## Install the 6-hour token rotation LaunchAgent (run once; safe to re-run)
+install-token-rotator:
+	sed \
+	  -e "s|{{K3DM_REPO_ROOT}}|$$(pwd)|g" \
+	  -e "s|{{HOME}}|$(HOME)|g" \
+	  scripts/etc/launchd/com.k3d-manager.webhook-token-rotate.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook-token-rotate.plist"
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook-token-rotate" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook-token-rotate.plist"
+	@echo "Token rotator installed — fires every 6 hours"
+
+## Inject SLACK_BOT_TOKEN and SLACK_CHANNEL_ID into the webhook LaunchAgent plist and restart
+update-webhook-slack:
+	@[ -n "$(SLACK_BOT_TOKEN)" ] || (echo "ERROR: SLACK_BOT_TOKEN not set — export it first"; exit 1)
+	@[ -n "$(SLACK_CHANNEL_ID)" ] || (echo "ERROR: SLACK_CHANNEL_ID not set — export it first"; exit 1)
+	/usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:SLACK_BOT_TOKEN" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>/dev/null || true
+	/usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:SLACK_BOT_TOKEN string $(SLACK_BOT_TOKEN)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+	/usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:SLACK_CHANNEL_ID" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>/dev/null || true
+	/usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:SLACK_CHANNEL_ID string $(SLACK_CHANNEL_ID)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+	$(MAKE) restart-webhook
+	@echo "SLACK_BOT_TOKEN and SLACK_CHANNEL_ID injected — webhook restarted"
+
+## Inject SLACK_SIGNING_SECRET from Keychain into the webhook LaunchAgent plist and restart
+update-webhook-slack-secret:
+	@_sig=$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null) || \
+	  (echo "ERROR: k3dm-slack-signing-secret not in Keychain — run: security add-generic-password -s k3dm-slack-signing-secret -a k3dm -w <secret>"; exit 1); \
+	/usr/libexec/PlistBuddy -c "Delete :EnvironmentVariables:SLACK_SIGNING_SECRET" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist" 2>/dev/null || true; \
+	/usr/libexec/PlistBuddy -c "Add :EnvironmentVariables:SLACK_SIGNING_SECRET string $$_sig" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+	$(MAKE) restart-webhook
+	@echo "SLACK_SIGNING_SECRET injected from Keychain — webhook restarted"
+
+## Bootstrap Cloudflare Worker + webhook daemon (one-time per environment; safe to re-run)
+setup-worker:
+	bin/k3dm-webhook-setup
+	bin/k3dm-worker-setup
+
+## Re-deploy Cloudflare Worker and sync secrets from Keychain (run after Worker code changes)
+deploy-worker:
+	@_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null) && \
+	_tok=$$(security find-generic-password -s k3dm-webhook-token -a k3dm -w 2>/dev/null) && \
+	_sig=$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null) && \
+	cd workers/slack-relay && \
+	printf '%s' "$$_tok" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put WEBHOOK_TOKEN && \
+	printf '%s' "$$_sig" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put SLACK_SIGNING_SECRET && \
+	CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler deploy
 
 ## Backup Cloudflare tunnel credentials to macOS Keychain + Vault (run after rotating credentials)
 cloudflared-backup:

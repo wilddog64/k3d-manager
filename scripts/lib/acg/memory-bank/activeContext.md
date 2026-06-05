@@ -1,8 +1,12 @@
 # Active Context — lib-acg
 
-## Current Branch: `fix/next-improvements-7`
+## Current Branch: `fix/playwright-screenshot-diagnosis`
 
-## Current Status (2026-05-25 — v0.3.1 bugfix sweep complete)
+## Current Status (2026-06-04 — Phase A screenshot diagnosis complete)
+- **COMPLETE:** playwright screenshot diagnosis phase A — lib-acg commit `77c7dcc` on `fix/playwright-screenshot-diagnosis`; spec: `docs/plans/v1.6.0-playwright-screenshot-diagnosis.md`; `playwright/acg_credentials.js` and `playwright/acg_restart.js` now save `/tmp/k3dm-acg-screenshot-<ts>.png` on unhandled errors and print `INFO: Screenshot saved to ...` to stderr, and `acg_restart.js` hoists `page` to outer scope so the catch block can capture screenshots; validation used `node --check playwright/acg_credentials.js` and `node --check playwright/acg_restart.js`; commit message: `feat(playwright): save screenshot on failure for AI diagnosis`
+- **PHASE B NOTE:** webhook screenshot ingestion remains a k3d-manager follow-on and is not part of this lib-acg branch.
+
+## Previous Status (2026-05-25 — v0.3.1 bugfix sweep complete)
 - **COMPLETE:** `scripts/hooks/pre-commit` now prints deleted filename references through a `while IFS= read -r _ref` loop instead of expanding `$_refs` unquoted, preventing word-splitting and format-string surprises; committed as `4e55392` (`fix(pre-commit): quote $_refs in printf — prevent word-splitting on filenames with spaces`) and pushed to `origin/fix/next-improvements-7`. Validation passed for `shellcheck -S warning scripts/hooks/pre-commit`.
 - **COMPLETE:** `scripts/plugins/acg.sh` now returns `1` immediately when `node` is missing in `acg_check_ttl`, and emits `-1` when `REMAINING_MINS:` is absent by storing the parse result in `remaining`; committed as `4f7a1f3` (`fix(acg): acg_check_ttl — return 1 on missing node; return -1 sentinel when TTL unparseable`) and pushed to `origin/fix/next-improvements-7`. Validation passed for `shellcheck -S warning scripts/plugins/acg.sh`.
 - **COMPLETE:** `package.json` and `package-lock.json` now both report version `0.3.0`, matching the shipped release; committed as `7f1261c` (`chore(package): align package.json and package-lock.json version to 0.3.0`) and pushed to `origin/fix/next-improvements-7`. Validation passed for `node --check playwright/*.js`.

@@ -86,6 +86,22 @@ function _acg_fail() {
   exit 1
 }
 
+function _acg_up_cleanup() {
+  local _exit_code=$?
+  [[ "${_exit_code}" -eq 0 ]] && return
+  _warn "[acg-up] failed (exit ${_exit_code}) — cleaning up local processes..."
+  for _pid_file in vault-pf frontend-pf acg-prom-pf; do
+    local _f="${_ACG_STATE_DIR}/run/${_pid_file}.pid"
+    if [[ -f "${_f}" ]]; then
+      kill "$(cat "${_f}")" 2>/dev/null || true
+      rm -f "${_f}"
+    fi
+  done
+  launchctl unload "${HOME}/Library/LaunchAgents/com.k3d-manager.argocd-port-forward.plist" 2>/dev/null || true
+  launchctl bootout "gui/$(id -u)" "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" 2>/dev/null || true
+}
+trap _acg_up_cleanup EXIT
+
 login_prompt=0
 sandbox_url=""
 for arg in "$@"; do
@@ -159,13 +175,27 @@ fi
 _HUB_CLUSTER_CTX="k3d-${HUB_CLUSTER_NAME:-k3d-cluster}"
 _hub_newly_created=0
 _info "[acg-up] Step 3.5/12 — Verifying local Hub cluster (create if missing)..."
+if ! _command_exist k3d; then
+  _err "[acg-up] k3d binary not found in PATH — cannot manage Hub cluster. Check PATH includes ~/.local/bin."
+  exit 1
+fi
 if ! k3d cluster list 2>/dev/null | grep -q "^${HUB_CLUSTER_NAME:-k3d-cluster}[[:space:]]"; then
   _info "[acg-up] Local Hub cluster '${HUB_CLUSTER_NAME:-k3d-cluster}' not found — creating it now..."
   deploy_cluster --provider k3d "${HUB_CLUSTER_NAME:-k3d-cluster}"
   _hub_newly_created=1
-fi
-if ! kubectl get nodes --context "${_HUB_CLUSTER_CTX}" --request-timeout=10s >/dev/null 2>&1; then
-  _err "[acg-up] Local Hub cluster '${_HUB_CLUSTER_CTX}' is unreachable — OrbStack/k3d may be in a broken state after sleep. Check 'orbctl status'."
+elif ! kubectl get nodes --context "${_HUB_CLUSTER_CTX}" --request-timeout=10s >/dev/null 2>&1; then
+  _info "[acg-up] Local Hub cluster '${HUB_CLUSTER_NAME:-k3d-cluster}' is registered but not reachable — starting stopped containers..."
+  k3d cluster start "${HUB_CLUSTER_NAME:-k3d-cluster}"
+  _retry=0
+  until kubectl get nodes --context "${_HUB_CLUSTER_CTX}" --request-timeout=10s >/dev/null 2>&1 || [[ "${_retry}" -ge 12 ]]; do
+    _info "[acg-up] Waiting for Hub cluster API server... (${_retry}/12)"
+    sleep 5
+    ((_retry++)) || true
+  done
+  if ! kubectl get nodes --context "${_HUB_CLUSTER_CTX}" --request-timeout=10s >/dev/null 2>&1; then
+    _err "[acg-up] Hub cluster API server did not come up after cluster start. Check 'k3d cluster list' and 'docker ps'."
+    exit 1
+  fi
 fi
 _info "[acg-up] Local Hub cluster verified."
 
@@ -386,9 +416,14 @@ if _is_mac; then
   </dict>
 </plist>
 PLIST
+    _argocd_browser_install_skipped=0
     if [[ -f "${_argocd_browser_plist}" ]] && diff -q "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" >/dev/null 2>&1; then
       rm -f "${_argocd_browser_plist_tmp}"
       _info "[acg-up] ArgoCD browser HTTPS listener LaunchDaemon unchanged — skipping reinstall"
+    elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+      rm -f "${_argocd_browser_plist_tmp}"
+      _warn "[acg-up] no sudo in headless context — skipping argocd-browser-https LaunchDaemon install (run interactively or install /etc/sudoers.d/k3d-manager)"
+      _argocd_browser_install_skipped=1
     else
       : > "${_argocd_browser_launchctl_log}"
       if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
@@ -416,7 +451,10 @@ PLIST
         _err "[acg-up] failed to bootstrap ArgoCD browser HTTPS listener; see ${_argocd_browser_launchctl_log}"
       fi
     fi
-    if _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-120}"; then
+    if [[ "${_argocd_browser_install_skipped}" -eq 1 ]]; then
+      _warn "[acg-up] ArgoCD browser HTTPS listener not installed in headless context — skipping wait (Cloudflare tunnel path unaffected)"
+      _argocd_browser_ready=0
+    elif _argocd_wait_for_browser_https "${_argocd_browser_log}" "${ARGOCD_BROWSER_LISTENER_WAIT_TIMEOUT:-120}"; then
       _info "[acg-up] ArgoCD reachable at https://${ARGOCD_BROWSER_HOST:-argocd.shopping-cart.local} (launchd: ${_argocd_browser_label})"
       _argocd_browser_ready=1
     else
@@ -522,6 +560,21 @@ else
 fi
 
 _info "[acg-up] Step 10b/14 — Deploying shopping-cart data layer (PostgreSQL, Redis, RabbitMQ)..."
+_info "[acg-up] Applying data-layer ArgoCD Application so sync starts before wait loop..."
+_run_command -- kubectl apply --context k3d-k3d-cluster \
+  -f "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/argocd/applications/data-layer.yaml"
+_info "[acg-up] Waiting for ArgoCD to sync data-layer Application (max 300s)..."
+_dl_sync_deadline=$(( $(date +%s) + 300 ))
+until kubectl get application data-layer -n cicd --context k3d-k3d-cluster \
+    -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
+  if [[ $(date +%s) -ge ${_dl_sync_deadline} ]]; then
+    _err "[acg-up] data-layer ArgoCD Application did not reach Synced within 300s — check: kubectl get application data-layer -n cicd --context k3d-k3d-cluster"
+    exit 1
+  fi
+  _info "[acg-up] data-layer not yet Synced — waiting..."
+  sleep 10
+done
+_info "[acg-up] data-layer Application Synced — proceeding to StatefulSet readiness check"
 deploy_shopping_cart_data
 
 _info "[acg-up] Step 10c/14 — Deploying identity stack (Keycloak + LDAP) via ArgoCD..."
@@ -846,6 +899,9 @@ PLIST
     if [[ -f "${_keycloak_browser_plist}" ]] && diff -q "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" >/dev/null 2>&1; then
       rm -f "${_keycloak_browser_plist_tmp}"
       _info "[acg-up] Keycloak browser HTTP listener LaunchDaemon unchanged — skipping reinstall"
+    elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+      rm -f "${_keycloak_browser_plist_tmp}"
+      _warn "[acg-up] no sudo in headless context — skipping keycloak-browser-http LaunchDaemon install"
     else
       : > "${_keycloak_browser_launchctl_log}"
       if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
@@ -990,8 +1046,8 @@ if _is_mac; then
   _frontend_browser_kubeconfig="${HOME}/.kube/config"
   mkdir -p "$(dirname "${_frontend_browser_log}")"
   # Ensure 127.0.0.2 loopback alias exists (macOS does not expose 127.0.0.0/8 automatically)
-  if ! ifconfig lo0 | grep -q '127\.0\.0\.2'; then
-    _run_command --prefer-sudo --quiet -- ifconfig lo0 alias 127.0.0.2 || \
+  if ! /sbin/ifconfig lo0 | grep -q '127\.0\.0\.2'; then
+    _run_command --prefer-sudo --quiet -- /sbin/ifconfig lo0 alias 127.0.0.2 || \
       _warn "[acg-up] failed to add 127.0.0.2 loopback alias — frontend port-forward will fail to bind"
   fi
 
@@ -1083,6 +1139,9 @@ PLIST
   if [[ -f "${_frontend_browser_plist}" ]] && diff -q "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" >/dev/null 2>&1; then
     rm -f "${_frontend_browser_plist_tmp}"
     _info "[acg-up] frontend browser HTTP listener LaunchDaemon unchanged — skipping reinstall"
+  elif ! sudo -n true 2>/dev/null && ! [[ -t 0 && -t 1 ]]; then
+    rm -f "${_frontend_browser_plist_tmp}"
+    _warn "[acg-up] no sudo in headless context — skipping frontend-browser-http LaunchDaemon install"
   else
     : > "${_frontend_browser_launchctl_log}"
     if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
@@ -1199,7 +1258,7 @@ if _is_mac; then
   if command -v cloudflared >/dev/null 2>&1 && [[ -f "${_cloudflared_config}" ]]; then
     _named_tunnel_label="com.k3d-manager.cloudflare-tunnel"
     _named_tunnel_log="${_tunnel_dir}/logs/cloudflare-tunnel.log"
-    _named_tunnel_plist="/Library/LaunchDaemons/${_named_tunnel_label}.plist"
+    _named_tunnel_plist="${HOME}/Library/LaunchAgents/${_named_tunnel_label}.plist"
     _named_tunnel_plist_tmp="${_tunnel_dir}/run/cloudflare-tunnel.plist"
     _cloudflared_bin="$(command -v cloudflared)"
 
@@ -1234,19 +1293,27 @@ PLIST
     : > "${_tunnel_urls_file}"
     if [[ -f "${_named_tunnel_plist}" ]] && diff -q "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" >/dev/null 2>&1; then
       rm -f "${_named_tunnel_plist_tmp}"
-      _info "[acg-up] Cloudflare named tunnel LaunchDaemon unchanged — skipping reinstall"
+      _info "[acg-up] Cloudflare named tunnel LaunchAgent unchanged — skipping reinstall"
     else
       : > "${_tunnel_launchctl_log}"
-      _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist}" \
+      launchctl bootout "gui/$(id -u)" "${_named_tunnel_plist}" \
         >"${_tunnel_launchctl_log}" 2>&1 || true
+      _named_tunnel_plist_legacy="/Library/LaunchDaemons/${_named_tunnel_label}.plist"
+      if [[ -f "${_named_tunnel_plist_legacy}" ]]; then
+        _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist_legacy}" \
+          >/dev/null 2>&1 || true
+        _run_command --prefer-sudo --quiet --soft -- rm -f "${_named_tunnel_plist_legacy}" \
+          >/dev/null 2>&1 || true
+      fi
       : > "${_tunnel_launchctl_log}"
-      if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" \
+      mkdir -p "${HOME}/Library/LaunchAgents"
+      if ! install -m 644 "${_named_tunnel_plist_tmp}" "${_named_tunnel_plist}" \
           >"${_tunnel_launchctl_log}" 2>&1; then
         _warn "[acg-up] failed to install tunnel plist — skipping"
       else
         rm -f "${_named_tunnel_plist_tmp}"
         : > "${_tunnel_launchctl_log}"
-        if ! _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_named_tunnel_plist}" \
+        if ! launchctl bootstrap "gui/$(id -u)" "${_named_tunnel_plist}" \
             >"${_tunnel_launchctl_log}" 2>&1; then
           _warn "[acg-up] failed to bootstrap cloudflare tunnel"
         fi
@@ -1313,6 +1380,7 @@ kubectl port-forward svc/prometheus-operated 19090:9090 \
   >>"${_ACG_STATE_DIR}/logs/acg-prom-pf.log" 2>&1 &
 _acg_prom_pf_pid=$!
 echo "${_acg_prom_pf_pid}" > "${_acg_prom_pf_pid_file}"
+disown "${_acg_prom_pf_pid}"
 _info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:19090 → ubuntu-k3s, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
 
 _info "[acg-up] Cluster is up."
@@ -1323,6 +1391,8 @@ _info "[acg-up]   Frontend:    ${FRONTEND_PUBLIC_URL:-https://frontend.${CF_DOMA
 _info "[acg-up]   Keycloak:    ${KEYCLOAK_PUBLIC_URL:-https://keycloak.${CF_DOMAIN:-3ai-talk.org}}"
 _info "[acg-up]   Prometheus:  https://prometheus.${CF_DOMAIN:-3ai-talk.org}"
 _info "[acg-up]   Grafana:     https://grafana.${CF_DOMAIN:-3ai-talk.org}"
+echo "{\"provisioned_at\": $(date +%s), \"provider\": \"${CLUSTER_PROVIDER:-k3s-aws}\"}" \
+  > "${_ACG_STATE_DIR}/acg-state.json"
 _info "[acg-up] === Local URLs (Mac only) ==="
 _info "[acg-up]   ArgoCD:   https://argocd.shopping-cart.local"
 _info "[acg-up]   Frontend: http://frontend.shopping-cart.local"

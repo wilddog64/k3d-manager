@@ -12,4 +12,6 @@ ingress:
     service: http://localhost:80
   - hostname: grafana.3ai-talk.org
     service: http://localhost:80
+  - hostname: webhook.3ai-talk.org
+    service: http://127.0.0.1:7443
   - service: http_status:404

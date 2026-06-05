@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+_log() { echo "[rotate-webhook-token] $*"; }
+_err() { echo "[rotate-webhook-token] ERROR: $*" >&2; exit 1; }
+
+NEW_TOKEN="$(openssl rand -hex 32)"
+
+_log "Reading Cloudflare API token from Keychain..."
+CF_TOKEN="$(security find-generic-password -s cloudflare-api-token -a k3dm -w 2>/dev/null)" \
+  || _err "cloudflare-api-token not found in Keychain — run make setup-worker first"
+
+_log "Pushing new WEBHOOK_TOKEN to Cloudflare Worker..."
+printf '%s' "${NEW_TOKEN}" | \
+  CLOUDFLARE_API_TOKEN="${CF_TOKEN}" \
+  npx --yes wrangler secret put WEBHOOK_TOKEN \
+    --cwd "${REPO_ROOT}/workers/slack-relay" \
+  || _err "Failed to push WEBHOOK_TOKEN to Cloudflare — Keychain and webhook unchanged"
+
+_log "Updating Keychain entry k3dm-webhook-token..."
+security add-generic-password -U -s k3dm-webhook-token -a k3dm -w "${NEW_TOKEN}" \
+  || _err "Failed to update Keychain — Cloudflare already has new token; re-run to resync"
+
+_log "Restarting webhook daemon..."
+make -C "${REPO_ROOT}" restart-webhook \
+  || _err "Failed to restart webhook"
+
+_log "Verifying new token works end-to-end via public URL..."
+sleep 2
+HTTP_CODE="$(curl -s -o /dev/null -w "%{http_code}" \
+  -H "Authorization: Bearer ${NEW_TOKEN}" \
+  "https://webhook.3ai-talk.org/api/v1/status" 2>/dev/null)"
+if [[ "${HTTP_CODE}" != "200" && "${HTTP_CODE}" != "404" ]]; then
+  _err "End-to-end token verification failed (HTTP ${HTTP_CODE}) — Cloudflare Worker and webhook may be out of sync; re-run rotate-webhook-token to resync"
+fi
+_log "Token verified end-to-end (HTTP ${HTTP_CODE})."
+
+_log "Token rotation complete."

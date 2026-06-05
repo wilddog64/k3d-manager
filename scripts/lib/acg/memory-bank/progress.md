@@ -1,6 +1,10 @@
 # Progress — lib-acg
 
-## v0.1.0 Track — `fix/next-improvements-7` (active)
+## Playwright Screenshot Diagnosis Track — `fix/playwright-screenshot-diagnosis` (active)
+
+- **COMPLETE:** phase A screenshot diagnosis on `fix/playwright-screenshot-diagnosis` finished. `playwright/acg_credentials.js` and `playwright/acg_restart.js` now save `/tmp/k3dm-acg-screenshot-<ts>.png` on unhandled errors and print `INFO: Screenshot saved to ...` to stderr; `acg_restart.js` hoists `page` to outer scope so the catch block can capture screenshots. Commit: `77c7dcc` (`feat(playwright): save screenshot on failure for AI diagnosis`). Validation: `node --check playwright/acg_credentials.js`, `node --check playwright/acg_restart.js`.
+
+## v0.3.0 Track — `fix/next-improvements-7` (merged)
 
 - **COMPLETE:** v0.3.1 bugfix sweep on `fix/next-improvements-7` finished. `scripts/hooks/pre-commit` now iterates deleted references safely with `read` instead of unquoted `$_refs`; `scripts/plugins/acg.sh` now returns `1` on missing `node` and `-1` when TTL output is unparseable; `package.json` and `package-lock.json` now both report `0.3.0`. Commits: `4e55392`, `4f7a1f3`, `7f1261c`. Pushed to `origin/fix/next-improvements-7`. Validation: `shellcheck -S warning scripts/hooks/pre-commit`, `shellcheck -S warning scripts/plugins/acg.sh`, `node --check playwright/*.js`.
 
