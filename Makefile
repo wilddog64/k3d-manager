@@ -168,7 +168,7 @@ install-token-rotator:
 ## Install the Vault port-forward LaunchAgent — keeps kubectl port-forward vault-0 18200:8200 alive
 install-vault-port-forward:
 	sed \
-	  -e "s|{{KUBECTL_PATH}}|$$(which kubectl)|g" \
+	  -e "s|{{KUBECTL_PATH}}|$$(command -v kubectl)|g" \
 	  -e "s|{{HOME}}|$(HOME)|g" \
 	  scripts/etc/launchd/com.k3d-manager.vault-port-forward.plist.tmpl \
 	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.vault-port-forward.plist"
