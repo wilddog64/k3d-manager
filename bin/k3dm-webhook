@@ -10,6 +10,7 @@ import re
 import signal
 import subprocess
 import threading
+import traceback
 import urllib.request
 import uuid
 from pathlib import Path
@@ -271,7 +272,8 @@ def _run_cluster(job_id, action, provider="aws"):
             ).start()
         _finish("success")
     except Exception as exc:
-        _log(f"ERROR: {exc}")
+        tb = traceback.format_exc()
+        _log(f"ERROR: {exc}\n{tb}")
         try:
             analysis = _analyze_failure(lines)
             _notify_job(job_id, f"🔍 *Failure analysis* (job `{job_id}`)\n{analysis}")
@@ -323,7 +325,8 @@ def _record_acg_state(provider):
         subprocess.run(
             ["kubectl", "apply", "-f", "-"],
             input=create.stdout,
-            capture_output=True
+            capture_output=True,
+            text=True,
         )
 
 
