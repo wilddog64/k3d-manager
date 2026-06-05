@@ -711,7 +711,7 @@ _SMOKE_ENDPOINTS = [
     ("ArgoCD",     "https://argocd.shopping-cart.local/healthz",      [200, 307]),
     ("Frontend",   "http://frontend.shopping-cart.local/",             [200]),
     ("Prometheus", "http://localhost:19090/-/ready",                   [200]),
-    ("Grafana",    "https://grafana.3ai-talk.org/api/health",          [200]),
+    ("Grafana",    "https://grafana.3ai-talk.org/login",                [200]),
 ]
 _SMOKE_RETRIES = 3
 _SMOKE_RETRY_SLEEP = 10
