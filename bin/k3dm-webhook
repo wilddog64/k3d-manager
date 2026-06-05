@@ -17,6 +17,14 @@ from pathlib import Path
 PORT = int(os.environ.get("K3DM_WEBHOOK_PORT", "7443"))
 MAX_BODY = 4096
 _JOB_ID_RE = re.compile(r'^[0-9a-f]{8}$')
+
+
+def _safe_job_dir(job_id):
+    """Return resolved job directory only if it is a direct child of JOB_DIR."""
+    candidate = (JOB_DIR / job_id).resolve()
+    if candidate.parent.resolve() != JOB_DIR.resolve():
+        raise ValueError(f"invalid job_id: {job_id!r}")
+    return candidate
 REPO_ROOT = os.environ.get(
     "K3DM_REPO_ROOT",
     str(Path.home() / "src/gitrepo/personal/k3d-manager")
@@ -119,7 +127,10 @@ def _run_upgrade(job_id, chart_version, stage):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        (job_dir / "output").write_text("".join(lines))
+        out_path = job_dir / "output"
+        fd = os.open(str(out_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as _f:
+            _f.write("".join(lines))
 
     try:
         (job_dir / "status").write_text("running")
@@ -1060,7 +1071,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                     proc = _running_procs.get(job_id)
                 if proc:
                     proc.kill()
-                    job_dir = JOB_DIR / job_id
+                    job_dir = _safe_job_dir(job_id)
                     (job_dir / "status").write_text("killed")
                     self._json(200, {"status": "killed", "job_id": job_id})
                 else:
@@ -1136,7 +1147,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         if not _JOB_ID_RE.match(job_id):
             self._json(400, {"error": "invalid job id"})
             return
-        job_dir = JOB_DIR / job_id
+        try:
+            job_dir = _safe_job_dir(job_id)
+        except ValueError:
+            self._json(400, {"error": "invalid job id"})
+            return
         if not job_dir.exists():
             self._json(404, {"error": "job not found"})
             return
@@ -1151,7 +1166,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    JOB_DIR.mkdir(parents=True, exist_ok=True)
+    JOB_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
     _clear_stale_jobs()
     server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), _Handler)
     print(f"[k3dm-webhook] listening on 127.0.0.1:{PORT}")

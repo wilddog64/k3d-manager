@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.k3d-manager.webhook-token-rotate</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{K3DM_REPO_ROOT}}/bin/rotate-webhook-token</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>21600</integer>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>StandardOutPath</key>
+  <string>{{HOME}}/Library/Logs/k3dm-webhook-token-rotate.log</string>
+  <key>StandardErrorPath</key>
+  <string>{{HOME}}/Library/Logs/k3dm-webhook-token-rotate.log</string>
+</dict>
+</plist>

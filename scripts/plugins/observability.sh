@@ -161,27 +161,28 @@ function _prometheus_acg_web_config_secret() {
   fi
   rm -f "${_vault_hdr}"
 
+  local _web_config _tmpfile
+  _tmpfile=$(mktemp)
+
   if [[ -z "${_prom_creds}" ]]; then
-    _warn "[observability] Prometheus basic auth Vault secret not found — Prometheus is unauthenticated"
+    _warn "[observability] Prometheus basic auth Vault secret not found — applying empty config (unauthenticated)"
     _warn "[observability] Store hash: vault kv put secret/k3d-manager/prometheus-basic-auth user=admin password_bcrypt='<bcrypt>'"
-    return 0
+    printf '{}' > "${_tmpfile}"
+  else
+    local _prom_user _prom_hash
+    _prom_user="${_prom_creds%%|*}"
+    _prom_hash="${_prom_creds#*|}"
+    _web_config=$(printf 'basic_auth_users:\n  %s: %s\n' "${_prom_user}" "${_prom_hash}")
+    printf '%s' "${_web_config}" > "${_tmpfile}"
   fi
 
-  local _prom_user _prom_hash
-  _prom_user="${_prom_creds%%|*}"
-  _prom_hash="${_prom_creds#*|}"
-
-  local _web_config _tmpfile
-  _web_config=$(printf 'basic_auth_users:\n  %s: %s\n' "${_prom_user}" "${_prom_hash}")
-  _tmpfile=$(mktemp)
-  printf '%s' "${_web_config}" > "${_tmpfile}"
   _kubectl create secret generic prometheus-web-config \
     --context ubuntu-k3s \
     -n monitoring \
     --from-file=web.yml="${_tmpfile}" \
     --dry-run=client -o yaml | _kubectl apply --context ubuntu-k3s -f -
   rm -f "${_tmpfile}"
-  _info "[observability] Prometheus basic auth secret applied (monitoring/prometheus-web-config)"
+  _info "[observability] Prometheus web config secret applied (monitoring/prometheus-web-config)"
 }
 
 function observability_status() {

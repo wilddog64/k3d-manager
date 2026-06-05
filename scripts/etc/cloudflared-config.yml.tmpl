@@ -9,6 +9,6 @@ ingress:
   - hostname: keycloak.${CLOUDFLARE_DOMAIN}
     service: http://localhost:8880
   # k3dm-webhook — ArgoCD CVE upgrade pipeline trigger
-  - hostname: webhook.3ai-talk.org
+  - hostname: webhook.${CLOUDFLARE_DOMAIN}
     service: http://localhost:7443
   - service: http_status:404

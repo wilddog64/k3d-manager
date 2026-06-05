@@ -155,8 +155,11 @@ rotate-webhook-token:
 
 ## Install the 6-hour token rotation LaunchAgent (run once; safe to re-run)
 install-token-rotator:
-	cp scripts/etc/com.k3d-manager.webhook-token-rotate.plist \
-	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook-token-rotate.plist"
+	sed \
+	  -e "s|{{K3DM_REPO_ROOT}}|$$(pwd)|g" \
+	  -e "s|{{HOME}}|$(HOME)|g" \
+	  scripts/etc/launchd/com.k3d-manager.webhook-token-rotate.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook-token-rotate.plist"
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook-token-rotate" 2>/dev/null || true
 	launchctl bootstrap "gui/$$(id -u)" \
 	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook-token-rotate.plist"
@@ -199,8 +202,8 @@ deploy-worker:
 	_tok=$$(security find-generic-password -s k3dm-webhook-token -a k3dm -w 2>/dev/null) && \
 	_sig=$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null) && \
 	cd workers/slack-relay && \
-	CLOUDFLARE_API_TOKEN="$$_cf" printf '%s' "$$_tok" | npx --yes wrangler secret put WEBHOOK_TOKEN && \
-	CLOUDFLARE_API_TOKEN="$$_cf" printf '%s' "$$_sig" | npx --yes wrangler secret put SLACK_SIGNING_SECRET && \
+	printf '%s' "$$_tok" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put WEBHOOK_TOKEN && \
+	printf '%s' "$$_sig" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put SLACK_SIGNING_SECRET && \
 	CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler deploy
 
 ## Backup Cloudflare tunnel credentials to macOS Keychain + Vault (run after rotating credentials)

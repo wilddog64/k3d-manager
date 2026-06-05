@@ -55,6 +55,7 @@ async function handle(req) {
 
   if (new URL(req.url).pathname === '/slack/events') {
     const body = await req.text()
+    if (!await verifySlack(req, body)) return new Response('Unauthorized', { status: 401 })
     const upstream = await fetch(`${WEBHOOK_URL}/slack/events`, {
       method: 'POST',
       headers: {
