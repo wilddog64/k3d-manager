@@ -707,6 +707,64 @@ def _clear_stale_jobs():
 
 
 _POST_PROVISION_DELAY_SECS = 90  # ESO sync + pod startup grace period
+_SMOKE_ENDPOINTS = [
+    ("ArgoCD",     "https://argocd.shopping-cart.local/healthz",      [200, 307]),
+    ("Frontend",   "http://frontend.shopping-cart.local/",             [200]),
+    ("Prometheus", "http://localhost:19090/-/ready",                   [200]),
+    ("Grafana",    "https://grafana.3ai-talk.org/api/health",          [200]),
+]
+_SMOKE_RETRIES = 3
+_SMOKE_RETRY_SLEEP = 10
+
+
+def _smoke_test_services():
+    """HTTP smoke test for each service. Returns list of (name, ok, detail) tuples."""
+    import ssl
+    import time
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    results = []
+    for name, url, ok_codes in _SMOKE_ENDPOINTS:
+        last_err = ""
+        passed = False
+        for attempt in range(_SMOKE_RETRIES):
+            try:
+                req = urllib.request.Request(url, headers={"User-Agent": "k3dm-smoketest/1"})
+                with urllib.request.urlopen(req, timeout=8, context=ctx) as resp:
+                    code = resp.status
+                    if code in ok_codes:
+                        passed = True
+                        last_err = f"HTTP {code}"
+                        break
+                    last_err = f"HTTP {code}"
+            except Exception as exc:
+                last_err = str(exc)
+            if attempt < _SMOKE_RETRIES - 1:
+                time.sleep(_SMOKE_RETRY_SLEEP)
+        results.append((name, passed, last_err))
+
+    # Product catalog: verify at least one product has a non-empty imageUrl
+    try:
+        req = urllib.request.Request(
+            "http://frontend.shopping-cart.local/api/products",
+            headers={"User-Agent": "k3dm-smoketest/1"},
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            products = json.loads(resp.read())
+            if isinstance(products, list) and products:
+                with_images = sum(1 for p in products if p.get("imageUrl") or p.get("image_url"))
+                if with_images > 0:
+                    results.append(("Product images", True, f"{with_images}/{len(products)} have imageUrl"))
+                else:
+                    results.append(("Product images", False, f"0/{len(products)} have imageUrl"))
+            else:
+                results.append(("Product images", False, "empty or non-list response"))
+    except Exception as exc:
+        results.append(("Product images", False, str(exc)))
+
+    return results
 
 
 def _run_post_provision_check(job_id, provider):
@@ -748,48 +806,102 @@ def _run_post_provision_check(job_id, provider):
     lines.append(f"*ArgoCD:* {healthy_count}/{len(app_lines)} apps healthy")
 
     if not degraded:
-        _notify_job(job_id, f"🏥 *Post-provision check* ({provider}) — all clear ✅\n" + "\n".join(lines))
-        return
+        lines.append("*ArgoCD apps:* all healthy ✅")
+    else:
+        lines.append(f"⚠️ Degraded: {', '.join(f'`{a}`' for a in degraded)}")
 
-    lines.append(f"⚠️ Degraded: {', '.join(f'`{a}`' for a in degraded)}")
-    _notify_job(job_id, f"🏥 *Post-provision check* ({provider})\n" + "\n".join(lines))
+    smoke = _smoke_test_services()
+    for svc_name, ok, detail in smoke:
+        icon = "✅" if ok else "❌"
+        lines.append(f"*{svc_name}:* {icon} {detail}")
 
-    # AI triage each degraded app
-    for app_name in degraded[:5]:  # cap at 5 to limit API calls
-        diag_parts = []
+    all_ok = not degraded and all(ok for _, ok, _ in smoke)
+    header = f"🏥 *Post-provision check* ({provider}){' — all clear ✅' if all_ok else ''}"
+    _notify_job(job_id, header + "\n" + "\n".join(lines))
 
-        desc = subprocess.run(
-            ["kubectl", "describe", "application", app_name, "-n", "cicd",
-             "--context", "k3d-k3d-cluster"],
-            capture_output=True, text=True, timeout=15
-        )
-        if desc.returncode == 0 and desc.stdout.strip():
-            diag_parts.append(f"ArgoCD Application:\n{desc.stdout[-2000:]}")
+    if degraded:
+        # AI triage each degraded app
+        for app_name in degraded[:5]:  # cap at 5 to limit API calls
+            diag_parts = []
 
-        pods = subprocess.run(
-            ["kubectl", "get", "pods", "-A", "--context", "ubuntu-k3s",
-             "--no-headers", "--request-timeout=8s",
-             "--field-selector=status.phase!=Running"],
-            capture_output=True, text=True, timeout=15
-        )
-        if pods.returncode == 0 and pods.stdout.strip():
-            diag_parts.append(f"Non-running pods:\n{pods.stdout.strip()[:1000]}")
+            desc = subprocess.run(
+                ["kubectl", "describe", "application", app_name, "-n", "cicd",
+                 "--context", "k3d-k3d-cluster"],
+                capture_output=True, text=True, timeout=15
+            )
+            if desc.returncode == 0 and desc.stdout.strip():
+                diag_parts.append(f"ArgoCD Application:\n{desc.stdout[-2000:]}")
 
-        if not diag_parts:
-            continue
+            pods = subprocess.run(
+                ["kubectl", "get", "pods", "-A", "--context", "ubuntu-k3s",
+                 "--no-headers", "--request-timeout=8s",
+                 "--field-selector=status.phase!=Running"],
+                capture_output=True, text=True, timeout=15
+            )
+            if pods.returncode == 0 and pods.stdout.strip():
+                diag_parts.append(f"Non-running pods:\n{pods.stdout.strip()[:1000]}")
+
+            if not diag_parts:
+                continue
+
+            prompt = (
+                f"A Kubernetes ArgoCD application named '{app_name}' is Degraded "
+                f"90 seconds after a fresh cluster provision.\n\n"
+                f"Diagnostics:\n" + "\n\n".join(diag_parts) + "\n\n"
+                "Is this a TRANSIENT issue (ESO not synced yet, pod still starting — "
+                "will resolve in a few minutes) or a REAL FAILURE (misconfiguration, "
+                "missing secret, crash loop — needs human action)?\n"
+                "Reply with TRANSIENT or REAL FAILURE, then one sentence with the "
+                "most likely cause and fix. Be brief."
+            )
+            analysis = _call_gemini(prompt)
+            _notify_job(job_id, f"🔍 *{app_name}* — {analysis}")
+
+    # Gemini triage for failed smoke checks
+    failed_smoke = [(name, detail) for name, ok, detail in smoke if not ok]
+    for svc_name, err_detail in failed_smoke[:3]:  # cap at 3
+        diag_parts = [f"Service `{svc_name}` failed smoke test: {err_detail}"]
+
+        # Gather relevant pod state from ubuntu-k3s
+        ns_map = {
+            "Frontend":       ("shopping-cart-apps", "app=frontend"),
+            "Product images": ("shopping-cart-apps", "app=product-catalog"),
+            "Prometheus":     ("monitoring",          "app.kubernetes.io/name=prometheus"),
+            "Grafana":        ("monitoring",          "app.kubernetes.io/name=grafana"),
+            "ArgoCD":         ("cicd",                "app.kubernetes.io/name=argocd-server"),
+        }
+        ns, label_sel = ns_map.get(svc_name, ("shopping-cart-apps", ""))
+        if label_sel:
+            pod_state = subprocess.run(
+                ["kubectl", "get", "pods", "-n", ns, "-l", label_sel,
+                 "--context", "ubuntu-k3s", "--no-headers",
+                 "--request-timeout=8s"],
+                capture_output=True, text=True, timeout=15,
+            )
+            if pod_state.returncode == 0 and pod_state.stdout.strip():
+                diag_parts.append(f"Pod state ({ns}):\n{pod_state.stdout.strip()[:800]}")
+
+            pod_logs = subprocess.run(
+                ["kubectl", "logs", "-n", ns, "-l", label_sel,
+                 "--context", "ubuntu-k3s", "--tail=30",
+                 "--request-timeout=8s"],
+                capture_output=True, text=True, timeout=15,
+            )
+            if pod_logs.returncode == 0 and pod_logs.stdout.strip():
+                diag_parts.append(f"Recent logs ({ns}):\n{pod_logs.stdout.strip()[-1000:]}")
 
         prompt = (
-            f"A Kubernetes ArgoCD application named '{app_name}' is Degraded "
-            f"90 seconds after a fresh cluster provision.\n\n"
-            f"Diagnostics:\n" + "\n\n".join(diag_parts) + "\n\n"
-            "Is this a TRANSIENT issue (ESO not synced yet, pod still starting — "
-            "will resolve in a few minutes) or a REAL FAILURE (misconfiguration, "
-            "missing secret, crash loop — needs human action)?\n"
-            "Reply with TRANSIENT or REAL FAILURE, then one sentence with the "
-            "most likely cause and fix. Be brief."
+            f"Service `{svc_name}` failed an HTTP smoke test 90 seconds after a fresh "
+            f"Kubernetes cluster provision. Error: {err_detail}\n\n"
+            "Diagnostics:\n" + "\n\n".join(diag_parts) + "\n\n"
+            "Is this a TRANSIENT issue (pod still starting, port-forward not ready — "
+            "will resolve in a few minutes) or a REAL FAILURE (crash loop, missing secret, "
+            "misconfiguration — needs human action)?\n"
+            "Reply with TRANSIENT or REAL FAILURE, then one sentence with the most likely "
+            "cause and what to check or fix. Be brief."
         )
         analysis = _call_gemini(prompt)
-        _notify_job(job_id, f"🔍 *{app_name}* — {analysis}")
+        _notify_job(job_id, f"🔍 *{svc_name} smoke failure* — {analysis}")
 
 
 def _run_cluster_status(job_id, response_url, thread_ts=None):
