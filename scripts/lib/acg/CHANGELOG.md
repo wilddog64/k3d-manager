@@ -10,6 +10,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `package.json` + `package-lock.json`: align version fields to `0.3.0` (were `0.2.0` and `0.1.0` respectively)
 
 ### Fixed
+- `startSandbox()`: add `scrollIntoViewIfNeeded()` before `Start Sandbox`, `Start Sandbox (Step 2)`, and `Resume Sandbox` clicks to prevent `Element is outside of the viewport` failures
 - `playwright/acg_credentials.js`: replace `navLink.click()` with `window.location.assign()` for cloud-sandboxes SPA navigation — "Extend Your Session" dialog intercepts pointer events and caused `navLink.click()` to timeout when the dialog reappeared between dismiss and click
 - `scripts/hooks/pre-commit`: replace unquoted `$_refs` in `printf` with a `read` loop — prevents word-splitting on filenames with spaces
 - `scripts/plugins/acg.sh` (`acg_check_ttl`): add `return 1` after missing-node error; return `-1` sentinel instead of empty string when TTL is unparseable

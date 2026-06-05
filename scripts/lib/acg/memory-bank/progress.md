@@ -1,8 +1,12 @@
 # Progress — lib-acg
 
-## v0.1.1 Track — `feat/v0.1.1` (PR #36 open)
+## v0.1.2 Track — `feat/v0.1.2` (PR #37 open)
 
-- **COMPLETE:** `playwright/lib/sandbox.js` — removed `navLink.click()` conditional in `navigateToSandbox()` that navigated to `s2.pluralsight.com/404.html`; always uses `window.location.assign()`. Commit: `21d6e27` (`fix(sandbox): remove navLink.click() path — always use window.location.assign()`). Bug spec: `docs/bugs/2026-06-05-sandbox-navlink-click-regression.md`. PR #36 open, CI green, Copilot 2 findings fixed (`e0057c3`), all threads resolved, enforce_admins disabled — ready to merge.
+- **IN PROGRESS:** `playwright/lib/sandbox.js` — `scrollIntoViewIfNeeded()` added before `startButton`, `startButton2`, and `resumeButton` clicks; commit `86472da` (`fix(sandbox): scrollIntoViewIfNeeded before Start/Resume Sandbox clicks`). Bug spec: `docs/bugs/2026-06-05-sandbox-start-button-outside-viewport.md`. PR #37 open, CI green, Copilot findings being addressed.
+
+## v0.1.1 Track — `feat/v0.1.1` (MERGED PR #36)
+
+- **MERGED PR #36** (`f63b7ca3`): `playwright/lib/sandbox.js` — removed `navLink.click()` conditional in `navigateToSandbox()` that navigated to `s2.pluralsight.com/404.html`; always uses `window.location.assign()`. Commit: `21d6e27` (`fix(sandbox): remove navLink.click() path — always use window.location.assign()`). Bug spec: `docs/bugs/2026-06-05-sandbox-navlink-click-regression.md`. Retrospective: `docs/retro/2026-06-05-v0.1.1-retrospective.md`. Enforce_admins restored.
 
 ## Playwright Screenshot Diagnosis Track — `fix/playwright-screenshot-diagnosis` (merged to main)
 
