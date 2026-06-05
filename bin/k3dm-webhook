@@ -516,7 +516,7 @@ def _notify_job(job_id, text):
 def _call_gemini(prompt):
     """Shell out to the gemini CLI. Returns response text or error string."""
     gemini_bin = os.environ.get("K3DM_GEMINI_BIN", "gemini")
-    env = {k: v for k, v in os.environ.items() if k != "GEMINI_CLI_TRUST_WORKSPACE"}
+    env = {**os.environ, "GEMINI_CLI_TRUST_WORKSPACE": "true"}
     try:
         r = subprocess.run(
             [gemini_bin, "--model", GEMINI_MODEL, "--prompt", prompt],
