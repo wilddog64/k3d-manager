@@ -410,10 +410,50 @@ def _handle_thread_command(job_id, command):
         else:
             _notify_job(job_id, f"⚠️ No log found for job `{job_id}`")
 
+    elif cmd in ("acg-down", "down"):
+        running = _running_cluster_job()
+        if running:
+            _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
+            return
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("running")
+        (new_job_dir / "action").write_text("down")
+        thread_ts_file = JOB_DIR / job_id / "thread_ts"
+        if thread_ts_file.exists():
+            (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
+        threading.Thread(
+            target=_run_cluster,
+            args=(new_job_id, "down", "aws"),
+            daemon=True,
+        ).start()
+        _notify_job(job_id, f"⬇️ *acg-down* queued — job `{new_job_id}`")
+
+    elif cmd in ("acg-up", "up"):
+        running = _running_cluster_job()
+        if running:
+            _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
+            return
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("running")
+        (new_job_dir / "action").write_text("up")
+        thread_ts_file = JOB_DIR / job_id / "thread_ts"
+        if thread_ts_file.exists():
+            (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
+        threading.Thread(
+            target=_run_cluster,
+            args=(new_job_id, "up", "aws"),
+            daemon=True,
+        ).start()
+        _notify_job(job_id, f"🚀 *acg-up* queued — job `{new_job_id}`")
+
     else:
         _notify_job(
             job_id,
-            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`",
+            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `acg-up`, `acg-down`",
         )
 
 
