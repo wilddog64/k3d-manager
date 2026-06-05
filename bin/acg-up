@@ -247,6 +247,22 @@ elif [[ "${_vault_sealed}" == "unknown" ]]; then
 fi
 _info "[acg-up] Vault is unsealed and reachable."
 
+if _is_mac; then
+  _info "[acg-up] Step 4.1/12 — Installing Vault port-forward LaunchAgent (localhost:18200, auto-restart)..."
+  _vault_pf_label="com.k3d-manager.vault-port-forward"
+  _vault_pf_plist="${HOME}/Library/LaunchAgents/${_vault_pf_label}.plist"
+  _vault_pf_tmpl="${REPO_ROOT}/scripts/etc/launchd/${_vault_pf_label}.plist.tmpl"
+  _vault_pf_kubectl="$(command -v kubectl)"
+  mkdir -p "$(dirname "${_vault_pf_plist}")"
+  sed \
+    -e "s|{{KUBECTL_PATH}}|${_vault_pf_kubectl}|g" \
+    -e "s|{{HOME}}|${HOME}|g" \
+    "${_vault_pf_tmpl}" > "${_vault_pf_plist}"
+  launchctl bootout "gui/$(id -u)/${_vault_pf_label}" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "${_vault_pf_plist}"
+  _info "[acg-up] Vault port-forward LaunchAgent installed (launchd: ${_vault_pf_label})"
+fi
+
 _info "[acg-up] Step 4a.1/12 — Syncing Cloudflare tunnel credentials Keychain → Vault..."
 _cf_vault_path="secret/data/k3d-manager/cloudflared"
 _vault_token_b64=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
