@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-06-05
+
+### Fixed
+- `bin/acg-refresh` now auto-reinstalls missing system daemon plists (`argocd-browser-https`, `keycloak-browser-http`, `frontend-browser-http`) from their wrapper scripts when detected missing on refresh — prevents dark ports 80/443/8880 after partial `acg-up` failures
+- `bin/acg-refresh` regenerates Keycloak port-forward LaunchAgent plist when missing on refresh
+- `bin/acg-refresh` waits for SSH tunnel port to be ready before proceeding after launchctl restart
+- `bin/acg-refresh` skips sudo pre-auth prompt when credentials already cached, improving UX on repeated runs
+- `bin/acg-up` installs Vault port-forward LaunchAgent (`com.k3d-manager.vault-port-forward`) during provisioning and keeps port 18200 alive across cluster restarts
+- `bin/acg-up` adds `RunAtLoad` and generator script to all LaunchAgent plists for reliability
+- `/acg-status` now displays caveat labels for stale ArgoCD display when ACG cluster unreachable
+- Prometheus `web.config.file` additionalArg conflict with prometheus-operator v0.79.2 fixed (removed arg)
+
 ## [1.6.0] - 2026-06-04
 
 ### Added
