@@ -165,6 +165,18 @@ install-token-rotator:
 	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook-token-rotate.plist"
 	@echo "Token rotator installed — fires every 6 hours"
 
+## Install the daily state dir cleanup LaunchAgent (run once; safe to re-run)
+install-cleanup:
+	sed \
+	  -e "s|{{K3DM_REPO_ROOT}}|$$(pwd)|g" \
+	  -e "s|{{HOME}}|$(HOME)|g" \
+	  scripts/etc/launchd/com.k3d-manager.cleanup.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.cleanup" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.cleanup.plist"
+	@echo "Cleanup agent installed — fires daily at 03:00"
+
 ## Install the Vault port-forward LaunchAgent — keeps kubectl port-forward vault-0 18200:8200 alive
 install-vault-port-forward:
 	sed \
