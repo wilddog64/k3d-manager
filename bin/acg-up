@@ -306,6 +306,8 @@ cat > "${_argocd_pf_plist}" <<PLIST
     <string>/bin/bash</string>
     <string>${_argocd_pf_wrapper}</string>
   </array>
+  <key>RunAtLoad</key>
+  <true/>
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
@@ -1192,6 +1194,8 @@ if _is_mac; then
     <string>/bin/bash</string>
     <string>${_kc_pf_wrapper}</string>
   </array>
+  <key>RunAtLoad</key>
+  <true/>
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
@@ -1206,6 +1210,55 @@ PLIST
   fi
   launchctl load "${_kc_pf_plist}"
   _info "[acg-up] Keycloak port-forward agent loaded (launchd: ${_kc_pf_label})"
+fi
+
+if _is_mac; then
+  _info "[acg-up] Step 10g.10/14 — Installing frontend port-forward launchd agent (localhost:3000 → ubuntu-k3s svc/frontend, auto-restart)..."
+  _frontend_pf_label="com.k3d-manager.frontend-port-forward"
+  _frontend_pf_plist="${HOME}/Library/LaunchAgents/${_frontend_pf_label}.plist"
+  _frontend_pf_log="${_ACG_STATE_DIR}/logs/frontend-pf.log"
+  _frontend_pf_kubectl="$(command -v kubectl)"
+  _frontend_pf_kubeconfig="${HOME}/.kube/config:${HOME}/.kube/ubuntu-k3s.yaml:${HOME}/.kube/k3s-ubuntu.yaml"
+  mkdir -p "$(dirname "${_frontend_pf_log}")"
+  cat > "${_frontend_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_frontend_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${_frontend_pf_kubectl}</string>
+    <string>port-forward</string>
+    <string>svc/frontend</string>
+    <string>--namespace</string>
+    <string>shopping-cart-apps</string>
+    <string>--context</string>
+    <string>ubuntu-k3s</string>
+    <string>3000:80</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>KUBECONFIG</key>
+    <string>${_frontend_pf_kubeconfig}</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_frontend_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_frontend_pf_log}</string>
+</dict>
+</plist>
+PLIST
+  if launchctl list "${_frontend_pf_label}" >/dev/null 2>&1; then
+    launchctl unload "${_frontend_pf_plist}" 2>/dev/null || true
+  fi
+  launchctl load "${_frontend_pf_plist}"
+  _info "[acg-up] Frontend port-forward agent loaded (launchd: ${_frontend_pf_label})"
 fi
 
 if _is_mac; then
