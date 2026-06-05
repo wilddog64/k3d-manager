@@ -797,60 +797,59 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
              "--request-timeout=8s", "--no-headers"],
             capture_output=True, text=True, timeout=15
         )
-        if nodes.returncode != 0:
+        acg_reachable = nodes.returncode == 0 and nodes.stdout.strip()
+        if not acg_reachable:
             _log("\n❌ *ACG cluster unreachable* — sandbox may have expired.")
-            _finish("success")
-            return
-
-        node_lines = [l for l in nodes.stdout.strip().splitlines() if l]
-        ready_count = sum(1 for l in node_lines if "Ready" in l and "NotReady" not in l)
-        total_count = len(node_lines)
-
-        header = f"\n✅ *ACG cluster* — {ready_count}/{total_count} nodes ready"
-        acg_state = subprocess.run(
-            ["kubectl", "get", "configmap", "acg-state", "-n", "platform-ops",
-             "--context", "ubuntu-k3s", "--request-timeout=5s",
-             "-o", "jsonpath={.data.provisioned-at} {.data.provider}"],
-            capture_output=True, text=True, timeout=10
-        )
-        if acg_state.returncode == 0 and acg_state.stdout.strip():
-            parts = acg_state.stdout.strip().split()
-            try:
-                age_min = int((datetime.datetime.utcnow().timestamp() - int(parts[0])) / 60)
-                provider = parts[1] if len(parts) > 1 else "aws"
-                header += f" | {provider} | up {age_min}m"
-            except (ValueError, IndexError):
-                pass
-        _log(header)
-        _log(f"```{nodes.stdout.strip()}```")
-
-        # ACG pods (all namespaces, standard output)
-        pods = subprocess.run(
-            ["kubectl", "get", "pods", "-A", "--context", "ubuntu-k3s",
-             "--no-headers", "--request-timeout=10s"],
-            capture_output=True, text=True, timeout=20
-        )
-        if pods.returncode == 0 and pods.stdout.strip():
-            all_pod_lines = [l for l in pods.stdout.strip().splitlines() if l]
-            skip_ns = {"kube-system", "kube-public", "kube-node-lease", "trivy-system"}
-            app_pods = [l for l in all_pod_lines if l.split()[0] not in skip_ns]
-            if app_pods:
-                not_ready = [l for l in app_pods if not _pod_is_ready(l)]
-                ready_count_pods = len(app_pods) - len(not_ready)
-                _log(f"\n*Pods (ACG)* — {ready_count_pods}/{len(app_pods)} ready")
-                if not_ready:
-                    shown = not_ready[:10]
-                    snippet = "\n".join(
-                        f"{l.split()[0]}  {l.split()[1]}  {l.split()[2]}  {l.split()[3]}"
-                        for l in shown if len(l.split()) >= 4
-                    )
-                    _log(f"```{snippet}```")
-                    if len(not_ready) > 10:
-                        _log(f"_…and {len(not_ready) - 10} more not-ready pods_")
-            else:
-                _log("\n*Pods (ACG)* — no app pods deployed yet")
         else:
-            _log("\n_Pod status unavailable_")
+            node_lines = [l for l in nodes.stdout.strip().splitlines() if l]
+            ready_count = sum(1 for l in node_lines if "Ready" in l and "NotReady" not in l)
+            total_count = len(node_lines)
+
+            header = f"\n✅ *ACG cluster* — {ready_count}/{total_count} nodes ready"
+            acg_state = subprocess.run(
+                ["kubectl", "get", "configmap", "acg-state", "-n", "platform-ops",
+                 "--context", "ubuntu-k3s", "--request-timeout=5s",
+                 "-o", "jsonpath={.data.provisioned-at} {.data.provider}"],
+                capture_output=True, text=True, timeout=10
+            )
+            if acg_state.returncode == 0 and acg_state.stdout.strip():
+                parts = acg_state.stdout.strip().split()
+                try:
+                    age_min = int((datetime.datetime.utcnow().timestamp() - int(parts[0])) / 60)
+                    provider = parts[1] if len(parts) > 1 else "aws"
+                    header += f" | {provider} | up {age_min}m"
+                except (ValueError, IndexError):
+                    pass
+            _log(header)
+            _log(f"```{nodes.stdout.strip()}```")
+
+            # ACG pods (all namespaces, standard output)
+            pods = subprocess.run(
+                ["kubectl", "get", "pods", "-A", "--context", "ubuntu-k3s",
+                 "--no-headers", "--request-timeout=10s"],
+                capture_output=True, text=True, timeout=20
+            )
+            if pods.returncode == 0 and pods.stdout.strip():
+                all_pod_lines = [l for l in pods.stdout.strip().splitlines() if l]
+                skip_ns = {"kube-system", "kube-public", "kube-node-lease", "trivy-system"}
+                app_pods = [l for l in all_pod_lines if l.split()[0] not in skip_ns]
+                if app_pods:
+                    not_ready = [l for l in app_pods if not _pod_is_ready(l)]
+                    ready_count_pods = len(app_pods) - len(not_ready)
+                    _log(f"\n*Pods (ACG)* — {ready_count_pods}/{len(app_pods)} ready")
+                    if not_ready:
+                        shown = not_ready[:10]
+                        snippet = "\n".join(
+                            f"{l.split()[0]}  {l.split()[1]}  {l.split()[2]}  {l.split()[3]}"
+                            for l in shown if len(l.split()) >= 4
+                        )
+                        _log(f"```{snippet}```")
+                        if len(not_ready) > 10:
+                            _log(f"_…and {len(not_ready) - 10} more not-ready pods_")
+                else:
+                    _log("\n*Pods (ACG)* — no app pods deployed yet")
+            else:
+                _log("\n_Pod status unavailable_")
 
         # ArgoCD apps
         apps = subprocess.run(
