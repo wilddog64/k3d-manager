@@ -172,9 +172,45 @@ if _is_mac; then
     "${HOME}/Library/LaunchAgents/com.k3d-manager.argocd-port-forward.plist" \
     user
 
+  _kc_pf_label="com.k3d-manager.keycloak-port-forward"
+  _kc_pf_plist="${HOME}/Library/LaunchAgents/${_kc_pf_label}.plist"
+  _kc_pf_log="${_ACG_STATE_DIR}/logs/keycloak-pf.log"
+  _kc_pf_wrapper=""
+  if [[ -f "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh" ]]; then
+    _kc_pf_wrapper="${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
+  elif [[ -f "${_ACG_STATE_DIR}/keycloak-port-forward.sh" ]]; then
+    _kc_pf_wrapper="${_ACG_STATE_DIR}/keycloak-port-forward.sh"
+  fi
+  if [[ ! -f "${_kc_pf_plist}" && -n "${_kc_pf_wrapper}" ]]; then
+    _info "[acg-refresh] Keycloak port-forward plist missing — regenerating from wrapper..."
+    mkdir -p "$(dirname "${_kc_pf_log}")"
+    cat > "${_kc_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_kc_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${_kc_pf_wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_kc_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_kc_pf_log}</string>
+</dict>
+</plist>
+PLIST
+  fi
   _launchd_ensure \
-    "com.k3d-manager.keycloak-port-forward" \
-    "${HOME}/Library/LaunchAgents/com.k3d-manager.keycloak-port-forward.plist" \
+    "${_kc_pf_label}" \
+    "${_kc_pf_plist}" \
     user
 
   # ── 5. launchd daemons (system-domain) ───────────────────────────────────────
