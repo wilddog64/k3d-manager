@@ -103,7 +103,7 @@ _launchd_restart() {
   fi
 }
 
-if _is_mac; then
+if _is_mac && ! sudo -n true 2>/dev/null; then
   _info "[acg-refresh] Pre-authorizing sudo for macOS host operations..."
   sudo -v
 fi
