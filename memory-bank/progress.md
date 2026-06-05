@@ -2,7 +2,9 @@
 
 ## Status (v1.6.1 — RELEASED 2026-06-05)
 - **RELEASED:** k3d-manager v1.6.1 — PR #90 merged to main (SHA `d2a8615e282b9103a20649dac9a49c64886299fe`); enforce_admins restored ✓; v1.6.1 tag created + pushed ✓; GitHub release created ✓; v1.6.2 branch created ✓; retrospective committed (`f5f1d6bc`) ✓; memory-bank updated ✓
-- **COMPLETE:** lib-acg sandbox navLink.click() regression fix — lib-acg PR #36 merged (`f63b7ca3`); fix commit `21d6e27`; subtree pulled into k3d-manager on `k3d-manager-v1.6.2`; lib-acg next: `feat/v0.1.2`; retro: `docs/retro/2026-06-05-v0.1.1-retrospective.md` ✓
+- **COMPLETE:** lib-acg v0.1.2 viewport fix — PR #37 merged (`4d5aa477`); subtree pulled into k3d-manager ✓
+- **COMPLETE:** lib-acg v0.1.1 navLink fix — PR #36 merged (`f63b7ca3`); subtree pulled ✓
+- **OPEN:** Gemini duplicate analysis — spec: `docs/bugs/v1.6.2-bugfix-gemini-duplicate-analysis-output.md`
 - **COMPLETE:** lib-acg provider pattern refactor — lib-acg PR #35 merged (SHA `2f0a39c0`); 8 Copilot findings fixed (`145bee4`); subtree pulled into k3d-manager (`8742438a` on `k3d-manager-v1.6.2`) ✓
 - **COMPLETE:** System daemon plists not reinstalled by acg-refresh — k3d-manager commit on `k3d-manager-v1.6.1`; spec: `docs/bugs/v1.6.1-bugfix-system-daemon-plists-not-reinstalled-by-acg-refresh.md`; `bin/acg-refresh` now calls `_system_daemon_install_if_missing` for each of argocd-browser-https, keycloak-browser-http, frontend-browser-http before `_launchd_ensure`, checking plist existence and regenerating from wrapper script when missing; validation used `shellcheck -S warning bin/acg-refresh`
 - **COMPLETE:** Prometheus ACG web.config.file conflict — commit `c21b7cc9` on `k3d-manager-v1.6.1`; removed `additionalArgs` + `secrets` from `kube-prometheus-stack-acg-values.yaml`; prometheus-operator v0.79.2 blocks `web.config.file` in `additionalArgs`; all 18 ArgoCD apps now Synced/Healthy; bug doc: `docs/bugs/v1.6.1-bugfix-prometheus-acg-web-config-arg.md`
