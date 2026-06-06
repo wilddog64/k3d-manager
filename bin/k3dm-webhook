@@ -52,6 +52,7 @@ _STALL_TICKS_THRESHOLD = 3  # 3 ticks × 2 min = 6 min silence before stall anal
 _SCREENSHOT_RE = re.compile(r"INFO: Screenshot saved to (/tmp/k3dm-acg-screenshot-\d+\.png)")
 _running_procs: dict = {}
 _running_procs_lock = threading.Lock()
+_ask_semaphore = threading.Semaphore(2)
 
 
 def _get_token():
@@ -1505,45 +1506,54 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None):
         "Plain text or Slack mrkdwn only. No ANSI codes. No markdown headers."
     )
 
-    if agent == "gemini":
-        gemini_prompt = (
-            "You are a Kubernetes troubleshooting assistant. "
-            "The cluster runs Vault, ArgoCD, Istio, ESO, Keycloak (local k3d) and shopping-cart "
-            "apps with PostgreSQL, Redis, RabbitMQ (remote k3s). "
-            "Answer from your knowledge — you cannot run kubectl in this context. "
-            "Be concise — your answer will be posted to Slack. Plain text or Slack mrkdwn only.\n\n"
-            f"Question: {question}"
-        )
-        answer = _call_gemini(gemini_prompt)
-        _finish(f"🤖 *gemini:* {answer}")
+    if not _ask_semaphore.acquire(blocking=False):
+        _finish("⏳ Two agent asks are already running — try again in a moment.", status="failed")
         return
 
-    env = None
-    if agent == "claude":
-        prompt = f"{system}\nUse kubectl commands to investigate.\n\nUser question: {question}"
-        cmd = ["claude", "-p", prompt, "--allowedTools", "Bash"]
-    else:
-        prompt = (
-            "You are a code assistant for the k3d-manager repository — a modular Bash utility "
-            "for managing local Kubernetes dev clusters (Istio, Vault, Jenkins, OpenLDAP, ESO). "
-            "Entry point: scripts/k3d-manager. Plugins in scripts/plugins/. "
-            "Be concise — your answer will be posted to Slack.\n\n"
-            f"Question: {question}"
-        )
-        cmd = ["codex", "exec", "--skip-git-repo-check", prompt]
-
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env, cwd=REPO_ROOT)
-        answer = _ANSI.sub("", result.stdout).strip()
-        if not answer:
-            answer = _ANSI.sub("", result.stderr).strip() or f"No output from {agent}."
-        _finish(f"🤖 *{agent}:* {answer}")
-    except subprocess.TimeoutExpired:
-        _finish(f"❌ *{agent}* timed out after 120s — try a more specific question", status="failed")
-    except FileNotFoundError:
-        _finish(f"❌ `{agent}` CLI not found — ensure it is installed and on PATH", status="failed")
-    except Exception as exc:
-        _finish(f"❌ *{agent} error:* {exc}", status="failed")
+        if agent == "gemini":
+            gemini_prompt = (
+                "You are a Kubernetes troubleshooting assistant. "
+                "The cluster runs Vault, ArgoCD, Istio, ESO, Keycloak (local k3d) and shopping-cart "
+                "apps with PostgreSQL, Redis, RabbitMQ (remote k3s). "
+                "Answer from your knowledge — you cannot run kubectl in this context. "
+                "Be concise — your answer will be posted to Slack. Plain text or Slack mrkdwn only.\n\n"
+                f"Question: {question}"
+            )
+            answer = _call_gemini(gemini_prompt)
+            _finish(f"🤖 *gemini:* {answer}")
+            return
+
+        env = None
+        if agent == "claude":
+            prompt = f"{system}\nUse kubectl commands to investigate.\n\nUser question: {question}"
+            cmd = ["claude", "-p", prompt, "--allowedTools", "Bash", "--max-turns", "5"]
+            timeout = 300
+        else:
+            prompt = (
+                "You are a code assistant for the k3d-manager repository — a modular Bash utility "
+                "for managing local Kubernetes dev clusters (Istio, Vault, Jenkins, OpenLDAP, ESO). "
+                "Entry point: scripts/k3d-manager. Plugins in scripts/plugins/. "
+                "Be concise — your answer will be posted to Slack.\n\n"
+                f"Question: {question}"
+            )
+            cmd = ["codex", "exec", "--skip-git-repo-check", prompt]
+            timeout = 120
+
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env, cwd=REPO_ROOT)
+            answer = _ANSI.sub("", result.stdout).strip()
+            if not answer:
+                answer = _ANSI.sub("", result.stderr).strip() or f"No output from {agent}."
+            _finish(f"🤖 *{agent}:* {answer}")
+        except subprocess.TimeoutExpired:
+            _finish(f"❌ *{agent}* timed out after {timeout}s — try a more specific question", status="failed")
+        except FileNotFoundError:
+            _finish(f"❌ `{agent}` CLI not found — ensure it is installed and on PATH", status="failed")
+        except Exception as exc:
+            _finish(f"❌ *{agent} error:* {exc}", status="failed")
+    finally:
+        _ask_semaphore.release()
 
 
 class _Handler(http.server.BaseHTTPRequestHandler):
