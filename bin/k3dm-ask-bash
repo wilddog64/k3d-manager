@@ -44,6 +44,11 @@ if echo "$CMD" | grep -qE '\b(curl|wget)\b.*(-X\s*(POST|PUT|DELETE|PATCH)|--requ
   _deny "$CMD"
 fi
 
+# git: allow add/commit/push for docs/issues/ filing only; block destructive git ops
+if echo "$CMD" | grep -qE '\bgit\b.*(reset\s+--hard|clean\s+-f|push\s+--force|push\s+-f|branch\s+-[Dd]|rebase|cherry-pick|stash\s+drop|reflog\s+delete)'; then
+  _deny "$CMD"
+fi
+
 # Block file access outside allowed repos.
 # Extract absolute paths from the command and verify they're within scope.
 # Only checks arguments that look like absolute paths (start with /).
