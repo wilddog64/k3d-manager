@@ -1,6 +1,7 @@
 # Progress — k3d-manager
 
 ## Status (v1.6.3 — IN PROGRESS)
+- **OPEN (Codex):** auto-install acg npm deps — spec: `docs/plans/v1.6.3-bugfix-acg-npm-deps.md`; add npm dep guard in `bin/acg-refresh` and `bin/acg-up` after `REPO_ROOT` is set; guard: `[[ ! -d "${REPO_ROOT}/scripts/lib/acg/node_modules/playwright" ]]` → `npm --prefix ... install --prefer-offline`; commit: `fix(acg-refresh,acg-up): auto-install acg npm deps when node_modules missing`
 - **OPEN (Codex):** `/acg-resume` Slack command — spec: `docs/plans/v1.6.3-slack-resume-command.md`; 13 changes across `bin/acg-up` (6 checkpoint guards + helpers + clear block), `Makefile`, `bin/k3dm-webhook` (`_run_cluster_resume` + endpoint + thread command), `workers/slack-relay/index.js`; commit: `feat(acg-up,webhook,worker): add /acg-resume Slack command — checkpoint-based pipeline re-entry`
 
 ## Status (v1.6.2 — RELEASED 2026-06-05)
