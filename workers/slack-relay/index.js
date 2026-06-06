@@ -1,4 +1,4 @@
-const ALLOWED_COMMANDS = new Set(['/acg-up', '/acg-down', '/acg-status', '/argocd-upgrade'])
+const ALLOWED_COMMANDS = new Set(['/acg-up', '/acg-down', '/acg-status', '/acg-refresh', '/argocd-upgrade'])
 const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'azure'])
 
 async function verifySlack(request, body) {
@@ -104,6 +104,14 @@ async function handle(req) {
     const { ok } = await relay('/api/v1/cluster-status', payload)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
     return jsonReply('🔍 Checking ACG cluster status…')
+  }
+
+  if (command === '/acg-refresh') {
+    const payload = { response_url: responseUrl }
+    if (threadTs) payload.thread_ts = threadTs
+    const { ok } = await relay('/api/v1/cluster-refresh', payload)
+    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
+    return jsonReply('🔄 Refreshing ACG credentials + tunnel…')
   }
 
   if (command === '/argocd-upgrade') {
