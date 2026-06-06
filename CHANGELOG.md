@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-06-05
+
+### Added
+- `/acg-refresh` Slack slash command — routes through `workers/slack-relay` → `bin/k3dm-webhook` → `bin/acg-refresh` for on-demand credential and SSH tunnel refresh from Slack
+
+### Fixed
+- `bin/acg-refresh` now removes pre-auth sudo block for headless webhook execution (no TTY in Cloudflare Worker)
+- `bin/acg-refresh` makes summary `kubectl get nodes` non-fatal (webhook has no `ubuntu-k3s` kubeconfig context)
+- `bin/acg-up` adds 5-attempt retry loop with 15s sleeps for Keycloak admin token fetch to handle slow startup during provision
+
 ## [1.6.1] - 2026-06-05
 
 ### Fixed
