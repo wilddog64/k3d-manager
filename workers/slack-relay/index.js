@@ -1,4 +1,4 @@
-const ALLOWED_COMMANDS = new Set(['/acg-up', '/acg-down', '/acg-status', '/acg-refresh', '/argocd-upgrade'])
+const ALLOWED_COMMANDS = new Set(['/acg-up', '/acg-down', '/acg-status', '/acg-refresh', '/acg-resume', '/argocd-upgrade'])
 const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'azure'])
 
 async function verifySlack(request, body) {
@@ -112,6 +112,14 @@ async function handle(req) {
     const { ok } = await relay('/api/v1/cluster-refresh', payload)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
     return jsonReply('🔄 Refreshing ACG credentials + tunnel…')
+  }
+
+  if (command === '/acg-resume') {
+    const provider = VALID_PROVIDERS.has(text) ? text : 'aws'
+    const { ok, conflict } = await relay('/api/v1/cluster-resume', { provider, response_url: responseUrl })
+    if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`)
+    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
+    return jsonReply(`🔄 Resuming ACG provision (${provider}) from last checkpoint…`)
   }
 
   if (command === '/argocd-upgrade') {
