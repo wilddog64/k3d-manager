@@ -789,13 +789,15 @@ def _smoke_test_services():
             headers={"User-Agent": "k3dm-smoketest/1"},
         )
         with urllib.request.urlopen(req, timeout=8) as resp:
-            products = json.loads(resp.read())
+            body = json.loads(resp.read())
+            # API returns {"items": [...]} or a plain list
+            products = body.get("items", body) if isinstance(body, dict) else body
             if isinstance(products, list) and products:
                 with_images = sum(1 for p in products if p.get("imageUrl") or p.get("image_url"))
                 if with_images > 0:
-                    results.append(("Product images", True, f"{with_images}/{len(products)} have imageUrl"))
+                    results.append(("Product images", True, f"{with_images}/{len(products)} have image_url"))
                 else:
-                    results.append(("Product images", False, f"0/{len(products)} have imageUrl"))
+                    results.append(("Product images", False, f"0/{len(products)} have image_url"))
             else:
                 results.append(("Product images", False, "empty or non-list response"))
     except Exception as exc:
