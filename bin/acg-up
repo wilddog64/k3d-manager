@@ -19,6 +19,9 @@ set -euo pipefail
 
 # shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ ! -d "${REPO_ROOT}/scripts/lib/acg/node_modules/playwright" ]]; then
+  npm --prefix "${REPO_ROOT}/scripts/lib/acg" install --prefer-offline 2>&1
+fi
 # shellcheck disable=SC2034
 SCRIPT_DIR="${REPO_ROOT}/scripts"
 # shellcheck disable=SC2034

@@ -14,6 +14,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ ! -d "${REPO_ROOT}/scripts/lib/acg/node_modules/playwright" ]]; then
+  npm --prefix "${REPO_ROOT}/scripts/lib/acg" install --prefer-offline 2>&1
+fi
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
 source "${REPO_ROOT}/scripts/plugins/gemini.sh"
