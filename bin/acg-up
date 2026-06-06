@@ -510,6 +510,12 @@ if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
   exit 0
 fi
 
+# ── 3c. ubuntu-k3s kubeconfig guard ──────────────────────────────────────────
+if ! kubectl config get-contexts ubuntu-k3s &>/dev/null; then
+  _info "[acg-up] ubuntu-k3s context missing — re-fetching kubeconfig via SSH tunnel..."
+  add_ubuntu_k3s_cluster
+fi
+
 shopping_cart_prepare_infra_bootstrap
 
 _info "[acg-up] Step 7/12 — Bootstrapping argocd-manager SA on remote cluster..."

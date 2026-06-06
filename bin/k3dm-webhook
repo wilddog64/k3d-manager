@@ -752,6 +752,16 @@ def _collect_cluster_state():
 
 def _analyze_failure(lines):
     """Feed last 50 non-empty lines + live cluster state to Gemini; return failure diagnosis."""
+    for _l in lines:
+        if 'context "ubuntu-k3s" does not exist' in _l:
+            return (
+                "CLUSTER_FAILURE\n"
+                "PERMANENT\n"
+                "ubuntu-k3s kubeconfig context is missing — cluster is provisioned but kubeconfig "
+                "was not restored after machine restart or kubeconfig reset.\n"
+                "Fix: run /acg-refresh to re-fetch the kubeconfig and restore the ubuntu-k3s "
+                "context, then retry /acg-resume"
+            )
     last_50 = [l.rstrip() for l in lines[-50:] if l.strip()]
     last_output = "\n".join(last_50)
     cluster_state = _collect_cluster_state()
