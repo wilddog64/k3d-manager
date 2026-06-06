@@ -1530,10 +1530,10 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None):
             "Be concise — your answer will be posted to Slack.\n\n"
             f"Question: {question}"
         )
-        cmd = ["codex", "exec", prompt]
+        cmd = ["codex", "--skip-git-repo-check", "exec", prompt]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env, cwd=REPO_ROOT)
         answer = _ANSI.sub("", result.stdout).strip()
         if not answer:
             answer = _ANSI.sub("", result.stderr).strip() or f"No output from {agent}."
