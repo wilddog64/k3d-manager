@@ -710,8 +710,9 @@ _POST_PROVISION_DELAY_SECS = 90  # ESO sync + pod startup grace period
 _SMOKE_ENDPOINTS = [
     ("ArgoCD",     "https://argocd.shopping-cart.local/healthz",      [200, 307]),
     ("Frontend",   "http://frontend.shopping-cart.local/",             [200]),
+    ("Keycloak",   "http://keycloak.shopping-cart.local/health/live",  [200]),
     ("Prometheus", "http://localhost:19090/-/ready",                   [200]),
-    ("Grafana",    "https://grafana.3ai-talk.org/login",                [200]),
+    ("Grafana",    "https://grafana.3ai-talk.org/",                    [200]),
 ]
 _SMOKE_RETRIES = 3
 _SMOKE_RETRY_SLEEP = 10
@@ -866,6 +867,7 @@ def _run_post_provision_check(job_id, provider):
         ns_map = {
             "Frontend":       ("shopping-cart-apps", "app=frontend"),
             "Product images": ("shopping-cart-apps", "app=product-catalog"),
+            "Keycloak":       ("identity",            "app.kubernetes.io/name=keycloak"),
             "Prometheus":     ("monitoring",          "app.kubernetes.io/name=prometheus"),
             "Grafana":        ("monitoring",          "app.kubernetes.io/name=grafana"),
             "ArgoCD":         ("cicd",                "app.kubernetes.io/name=argocd-server"),
