@@ -291,13 +291,18 @@ the agent switches to **filing mode**:
 If the question contains phrasing like *"fix this"*, *"restart the pod"*, or *"sync the app"*,
 the agent switches to **fix mode** (`K3DM_FIX_MODE=1`):
 
-- The bash sandbox unlocks a narrow set of recovery operations:
+- Claude first runs `make fix-list` to discover available fix targets, then invokes the
+  appropriate `make fix-*` target. Named targets encode the safe operation sequence
+  (e.g., `fix-restart` does `rollout restart` + `rollout status --timeout=120s`).
+- Raw kubectl (`rollout restart`, `delete pod`) and `argocd app sync` remain available
+  as a fallback when no make target fits — and are required internally by make sub-processes.
 
   | Allowed in fix mode | Purpose |
   |---------------------|---------|
-  | `kubectl rollout restart` | Bounce a deployment or statefulset |
-  | `kubectl delete pod` | Force-replace a stuck pod |
-  | `argocd app sync` | Trigger an ArgoCD sync |
+  | `make fix-*` | Named recovery targets (preferred) |
+  | `kubectl rollout restart` | Fallback / used by `make fix-restart` internally |
+  | `kubectl delete pod` | Fallback / used by `make fix-delete-pod` internally |
+  | `argocd app sync` | Fallback / used by `make fix-sync` internally |
 
 - All other kubectl writes, Helm writes, and ArgoCD mutations remain blocked.
 - If fix + file modes are both detected, Claude runs the fix **and** writes a bug doc
@@ -305,6 +310,18 @@ the agent switches to **fix mode** (`K3DM_FIX_MODE=1`):
   `## Fix Applied` section.
 
 Fix mode uses the same timeout and turn limit as standard ask mode (300 s / 5 turns).
+
+**Available `make fix-*` targets** (run `make fix-list` in the repo to see current list):
+
+| Target | Arguments | What it does |
+|--------|-----------|--------------|
+| `fix-list` | — | Print all fix targets with descriptions |
+| `fix-restart` | `APP NS` | `kubectl rollout restart` + `rollout status --timeout=120s` |
+| `fix-delete-pod` | `APP NS` | `kubectl delete pod -l app=<APP>` with grace-period=0 |
+| `fix-sync` | `APP` | `argocd app sync --timeout 120` |
+| `fix-force-sync` | `APP` | `argocd app sync --force --timeout 180` |
+| `fix-eso-refresh` | — | `kubectl annotate clustersecretstore vault-backend` with reconcile timestamp |
+| `fix-status` | `NS` | `kubectl get nodes` and `kubectl get pods -n <NS>` |
 
 ---
 

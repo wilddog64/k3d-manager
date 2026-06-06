@@ -338,6 +338,51 @@ observability-status:
 vuln-scan trivy-scan-report:
 	./scripts/k3d-manager trivy_scan_report
 
+## ── Agent Fix Targets ────────────────────────────────────────────────────────
+## Callable by /ask agents in fix mode. Use 'make fix-list' to discover targets.
+## All targets accept CONTEXT (default: ubuntu-k3s) and NS (namespace).
+
+FIX_CONTEXT ?= ubuntu-k3s
+
+## List all available fix targets with descriptions
+fix-list:
+	@grep -E '^fix-[a-z].*:.*##' Makefile | sort | awk -F':.*##' '{printf "  make %-30s %s\n", $$1, $$2}'
+
+## Rollout restart a deployment and wait for rollout (APP=<name> NS=<namespace>)
+fix-restart: ## APP and NS are required
+	@test -n "$(APP)" || { echo "Usage: make fix-restart APP=<deployment> NS=<namespace>"; exit 1; }
+	@test -n "$(NS)"  || { echo "Usage: make fix-restart APP=<deployment> NS=<namespace>"; exit 1; }
+	kubectl rollout restart deployment/$(APP) -n $(NS) --context $(FIX_CONTEXT)
+	kubectl rollout status  deployment/$(APP) -n $(NS) --context $(FIX_CONTEXT) --timeout=120s
+
+## Delete all pods matching label app=<APP> (forces pod restart via ReplicaSet)
+fix-delete-pod: ## APP and NS are required
+	@test -n "$(APP)" || { echo "Usage: make fix-delete-pod APP=<label> NS=<namespace>"; exit 1; }
+	@test -n "$(NS)"  || { echo "Usage: make fix-delete-pod APP=<label> NS=<namespace>"; exit 1; }
+	kubectl delete pod -l app=$(APP) -n $(NS) --context $(FIX_CONTEXT) --grace-period=0
+
+## ArgoCD app sync with 120s timeout (APP=<argocd-app-name>)
+fix-sync: ## APP is required
+	@test -n "$(APP)" || { echo "Usage: make fix-sync APP=<argocd-app-name>"; exit 1; }
+	argocd app sync $(APP) --timeout 120 --server localhost:8080 --insecure
+
+## ArgoCD force sync — discards local state (APP=<argocd-app-name>)
+fix-force-sync: ## APP is required
+	@test -n "$(APP)" || { echo "Usage: make fix-force-sync APP=<argocd-app-name>"; exit 1; }
+	argocd app sync $(APP) --force --timeout 180 --server localhost:8080 --insecure
+
+## Force ESO ClusterSecretStore reconcile (annotates vault-backend to trigger re-sync)
+fix-eso-refresh: ## No arguments needed
+	kubectl annotate clustersecretstore vault-backend \
+	  k3d-manager/reconcile-at="$$(date -u +%Y-%m-%dT%H:%M:%SZ)" --overwrite \
+	  --context $(FIX_CONTEXT)
+
+## Print node + pod status for a namespace (NS=<namespace>)
+fix-status: ## NS is required
+	@test -n "$(NS)" || { echo "Usage: make fix-status NS=<namespace>"; exit 1; }
+	kubectl get nodes --context $(FIX_CONTEXT) --no-headers
+	kubectl get pods -n $(NS) --context $(FIX_CONTEXT)
+
 ## Run all BATS test suites
 test:
 	./scripts/k3d-manager test all

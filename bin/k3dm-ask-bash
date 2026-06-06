@@ -22,7 +22,16 @@ _deny_scope() {
 CMD="$*"
 
 if [[ "$FIX_MODE" == "1" ]]; then
-  # ── Fix mode: allow specific recovery operations, block everything else ──────
+  # ── Fix mode: allow make fix-* targets + narrow kubectl/argocd ops ───────────
+  # make fix-* targets are the preferred path; raw kubectl ops remain in the
+  # allowlist because make targets call kubectl in sub-processes via this sandbox.
+
+  # make: only fix-* targets allowed; all other make invocations are blocked
+  if echo "$CMD" | grep -qE '\bmake\b'; then
+    if ! echo "$CMD" | grep -qE '\bmake\b.*\bfix-[a-z]'; then
+      _deny "$CMD"
+    fi
+  fi
 
   # kubectl: allow rollout restart and delete pod only
   if echo "$CMD" | grep -qE '\bkubectl\b'; then

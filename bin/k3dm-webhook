@@ -1645,11 +1645,20 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None):
             today = datetime.date.today().isoformat()
 
             _fix_rules = (
-                "ALLOWED FIX OPERATIONS (use only when needed to resolve the issue):\n"
-                "- kubectl rollout restart deployment/<name> -n <namespace> --context <ctx>\n"
-                "- kubectl delete pod <name> -n <namespace> --context <ctx>  (forces pod restart)\n"
-                "- argocd app sync <app-name> --server localhost:8080 --insecure\n"
-                "All other kubectl/helm/argocd write operations remain blocked.\n"
+                "ALLOWED FIX OPERATIONS:\n"
+                "1. Run `make fix-list` first to see all available fix targets.\n"
+                "2. Prefer make fix-* targets over raw kubectl for named, safe operations:\n"
+                "   - make fix-restart APP=<deployment> NS=<namespace>   (restart + wait)\n"
+                "   - make fix-delete-pod APP=<label> NS=<namespace>     (force pod restart)\n"
+                "   - make fix-sync APP=<argocd-app>                     (argocd sync + 120s)\n"
+                "   - make fix-force-sync APP=<argocd-app>               (force sync + 180s)\n"
+                "   - make fix-eso-refresh                               (ESO ClusterSecretStore)\n"
+                "   - make fix-status NS=<namespace>                     (node + pod status)\n"
+                "3. Raw kubectl fallback (only if no make target fits):\n"
+                "   - kubectl rollout restart deployment/<name> -n <namespace> --context <ctx>\n"
+                "   - kubectl delete pod <name> -n <namespace> --context <ctx>\n"
+                "   - argocd app sync <app> --server localhost:8080 --insecure\n"
+                "All other kubectl/helm/argocd write operations remain blocked by the sandbox.\n"
             ) if fixing else (
                 "RULES: Read-only kubectl commands only for investigation. "
                 "No kubectl/helm/argocd write operations.\n"
