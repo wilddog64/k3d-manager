@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 # Read-only bash wrapper for /ask agent invocations.
-# Blocks destructive kubectl/helm/system commands before exec.
+# Blocks destructive kubectl/helm/system commands and out-of-scope path access.
 set -euo pipefail
+
+K3DM_REPO="${K3DM_REPO_ROOT:-${HOME}/src/gitrepo/personal/k3d-manager}"
+SHOPPING_CARTS_ROOT="${K3DM_SHOPPING_CARTS_ROOT:-${HOME}/src/gitrepo/personal/shopping-carts}"
 
 _deny() {
   echo "❌ Blocked: '$*' — /ask agents are read-only. Use a specific troubleshooting command." >&2
+  exit 1
+}
+
+_deny_scope() {
+  echo "❌ Out of scope: '$*' — agents are limited to k3d-manager and shopping-cart repos." >&2
   exit 1
 }
 
@@ -35,5 +43,19 @@ fi
 if echo "$CMD" | grep -qE '\b(curl|wget)\b.*(-X\s*(POST|PUT|DELETE|PATCH)|--request\s*(POST|PUT|DELETE|PATCH)|--data|--upload-file)'; then
   _deny "$CMD"
 fi
+
+# Block file access outside allowed repos.
+# Extract absolute paths from the command and verify they're within scope.
+# Only checks arguments that look like absolute paths (start with /).
+for arg in "$@"; do
+  if [[ "$arg" == /* ]]; then
+    real_arg="$(realpath -m "$arg" 2>/dev/null || echo "$arg")"
+    if [[ "$real_arg" != "${K3DM_REPO}"* && "$real_arg" != "${SHOPPING_CARTS_ROOT}"* \
+       && "$real_arg" != /tmp/* && "$real_arg" != /var/tmp/* \
+       && "$real_arg" != /proc/* && "$real_arg" != /sys/* ]]; then
+      _deny_scope "$arg"
+    fi
+  fi
+done
 
 exec /bin/bash "$@"
