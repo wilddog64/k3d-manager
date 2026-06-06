@@ -622,8 +622,24 @@ else
   until kubectl get application data-layer -n cicd --context k3d-k3d-cluster \
       -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
     if [[ $(date +%s) -ge ${_dl_sync_deadline} ]]; then
-      _err "[acg-up] data-layer ArgoCD Application did not reach Synced within 300s — check: kubectl get application data-layer -n cicd --context k3d-k3d-cluster"
-      exit 1
+      _warn "[acg-up] data-layer did not reach Synced within 300s — force-syncing and retrying (one attempt)..."
+      argocd app sync data-layer \
+        --server localhost:8080 --insecure \
+        --force \
+        --timeout 180 \
+        2>/dev/null \
+        || true
+      _dl_retry_deadline=$(( $(date +%s) + 180 ))
+      until kubectl get application data-layer -n cicd --context k3d-k3d-cluster \
+          -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
+        if [[ $(date +%s) -ge ${_dl_retry_deadline} ]]; then
+          _err "[acg-up] data-layer ArgoCD Application did not reach Synced after force-sync + 180s retry — check: kubectl get application data-layer -n cicd --context k3d-k3d-cluster"
+          exit 1
+        fi
+        _info "[acg-up] data-layer not yet Synced after force-sync — waiting..."
+        sleep 10
+      done
+      break
     fi
     _info "[acg-up] data-layer not yet Synced — waiting..."
     sleep 10
