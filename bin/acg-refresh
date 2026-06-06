@@ -297,4 +297,4 @@ fi
 
 # ── 7. Summary ────────────────────────────────────────────────────────────────
 _info "[acg-refresh] Done. Remote cluster nodes:"
-kubectl get nodes --context ubuntu-k3s
+kubectl get nodes --context ubuntu-k3s 2>&1 || _warn "[acg-refresh] Could not reach ubuntu-k3s nodes — tunnel may still be settling"
