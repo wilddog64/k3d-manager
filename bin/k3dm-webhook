@@ -791,7 +791,7 @@ def _analyze_failure(lines):
         "CloudFormation stack in ROLLBACK state).\n"
         "3. Root cause: exactly what component failed and why (name the StatefulSet, "
         "pod, ArgoCD app, or AWS resource if visible in the logs).\n"
-        "4. Fix: the single most actionable next step — e.g. 'Run acg-up again', "
+        "4. Fix: the single most actionable next step — e.g. 'Retry by sending /acg-resume in Slack', "
         "or 'Check ArgoCD app: kubectl get application data-layer -n cicd --context k3d-k3d-cluster', "
         "or 'Inspect the CloudFormation stack events in the AWS console'.\n\n"
         "Reply in exactly this format:\n"

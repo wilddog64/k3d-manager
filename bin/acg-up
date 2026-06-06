@@ -513,7 +513,18 @@ fi
 # ── 3c. ubuntu-k3s kubeconfig guard ──────────────────────────────────────────
 if ! kubectl config get-contexts ubuntu-k3s &>/dev/null; then
   _info "[acg-up] ubuntu-k3s context missing — re-fetching kubeconfig via SSH tunnel..."
-  add_ubuntu_k3s_cluster
+  _k3s_kubeconfig_fetched=0
+  for _attempt in 1 2 3; do
+    if add_ubuntu_k3s_cluster; then
+      _k3s_kubeconfig_fetched=1
+      break
+    fi
+    _warn "[acg-up] kubeconfig fetch attempt ${_attempt}/3 failed — waiting 5s before retry..."
+    sleep 5
+  done
+  if [[ "${_k3s_kubeconfig_fetched}" -eq 0 ]]; then
+    _err "[acg-up] Failed to fetch ubuntu-k3s kubeconfig after 3 attempts — SSH tunnel may not be fully up. Retry via /acg-resume in Slack."
+  fi
 fi
 
 shopping_cart_prepare_infra_bootstrap
