@@ -529,13 +529,12 @@ def _call_gemini(prompt):
             env=env,
         )
         raw = r.stdout.strip() or r.stderr.strip() or "gemini returned no output"
-        # Strip Gemini CLI internal tool-call lines (e.g. "update_topic{...}")
-        # that leak into stdout when GEMINI_CLI_TRUST_WORKSPACE=true is set.
-        cleaned = "\n".join(
-            line for line in raw.splitlines()
-            if not line.startswith(("update_topic{", "update_topic ("))
-            and "<ctrl" not in line
-        ).strip()
+        # Strip Gemini CLI internal tool-call artifacts that leak into stdout.
+        # Only removes at line-start or string-start to avoid false positives
+        # in prose. Handles both "update_topic(...)" and "<ctrl...>" forms.
+        import re
+        cleaned = re.sub(r'(?:^|\n)\s*\w+\([^)]{0,500}\)\s*', ' ', raw, flags=re.MULTILINE)
+        cleaned = re.sub(r'<ctrl[^>]*>', '', cleaned).strip()
         return cleaned or raw
     except FileNotFoundError:
         return "gemini CLI not found — skipping AI analysis"
