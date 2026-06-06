@@ -594,6 +594,13 @@ until kubectl get application data-layer -n cicd --context k3d-k3d-cluster \
 done
 _info "[acg-up] data-layer Application Synced — proceeding to StatefulSet readiness check"
 deploy_shopping_cart_data
+_info "[acg-up] Force-syncing data-layer to trigger PostSync hooks (MinIO bucket init + image upload)..."
+argocd app sync data-layer \
+  --server localhost:8080 --insecure \
+  --force \
+  --timeout 180 \
+  2>/dev/null \
+  || _info "[acg-up] data-layer force-sync returned non-zero — PostSync hooks may still complete"
 
 _info "[acg-up] Step 10c/14 — Deploying identity stack (Keycloak + LDAP) via ArgoCD..."
 # Force ArgoCD to pick up the identity Application from shopping-cart-infra
