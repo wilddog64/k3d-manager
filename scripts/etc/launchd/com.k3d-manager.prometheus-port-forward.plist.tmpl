@@ -16,6 +16,11 @@
     <string>--context</string>
     <string>ubuntu-k3s</string>
   </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>KUBECONFIG</key>
+    <string>{{HOME}}/.kube/config:{{HOME}}/.kube/ubuntu-k3s.yaml:{{HOME}}/.kube/k3s-ubuntu.yaml</string>
+  </dict>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
