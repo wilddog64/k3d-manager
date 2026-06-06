@@ -595,13 +595,8 @@ kubectl rollout status statefulset/argocd-application-controller \
 _info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → https://host.k3d.internal:6443"
 
 _info "[acg-up] Ensuring argocd-redis secret on ubuntu-k3s (Helm chart hook skipped when ArgoCD manages ArgoCD)..."
-_redis_deadline=$(( $(date +%s) + 120 ))
-while (( $(date +%s) < _redis_deadline )); do
-  if kubectl get namespace cicd --context ubuntu-k3s >/dev/null 2>&1; then
-    break
-  fi
-  sleep 5
-done
+kubectl create namespace cicd --context ubuntu-k3s \
+  --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f - >/dev/null
 if ! kubectl get secret argocd-redis -n cicd --context ubuntu-k3s >/dev/null 2>&1; then
   kubectl create secret generic argocd-redis -n cicd --context ubuntu-k3s \
     --from-literal=auth="$(openssl rand -base64 32)"
