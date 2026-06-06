@@ -707,6 +707,43 @@ def _clear_stale_jobs():
 
 
 _POST_PROVISION_DELAY_SECS = 90  # ESO sync + pod startup grace period
+
+_ARCH_CONTEXT = """
+Architecture context (k3d-manager shopping-cart stack on ubuntu-k3s / ACG AWS):
+
+Cluster topology:
+  - ubuntu-k3s (ACG EC2, 3 nodes): runs ALL production services
+  - k3d-k3d-cluster (local Mac): runs Vault + Keycloak only (dev tools)
+
+Namespaces on ubuntu-k3s:
+  - shopping-cart-apps:   frontend, product-catalog, order-service, basket-service, payment-service
+  - shopping-cart-data:   PostgreSQL (order/basket/product), Redis, RabbitMQ
+  - shopping-cart-payment: payment-service (PCI isolation)
+  - secrets:              Vault (token/secret store); ESO syncs secrets from Vault into app namespaces
+  - cicd:                 ArgoCD (GitOps controller)
+  - monitoring:           Prometheus (kube-prometheus-stack), Grafana, Alertmanager
+
+Service dependencies:
+  - Frontend → product-catalog:8080 (product list + imageUrl)
+  - Frontend → order-service:8080, basket-service:8080
+  - product-catalog, order-service, basket-service → PostgreSQL in shopping-cart-data
+  - payment-service → RabbitMQ in shopping-cart-data; emits payment events
+  - All app secrets (DB passwords, API keys) sourced from Vault via ESO ClusterSecretStore
+
+Local port-forwards (Mac → ubuntu-k3s, managed by LaunchAgents):
+  - ArgoCD UI: localhost:18080 → cicd/argocd-server:80
+  - Frontend:  frontend.shopping-cart.local → shopping-cart-apps/frontend:80
+  - Prometheus: localhost:19090 → monitoring/prometheus-operated:9090 (NOT on ubuntu-k3s ingress)
+  - Grafana: grafana.3ai-talk.org → monitoring/grafana via Cloudflare tunnel; only root path "/" is exposed
+
+Local-only services (NOT on ubuntu-k3s, only on k3d-k3d-cluster):
+  - Keycloak: keycloak.shopping-cart.local → identity/keycloak:80 (port-forward: localhost:8880)
+    NOTE: if Keycloak smoke fails, check k3d-k3d-cluster health, NOT ubuntu-k3s pods
+
+Ingress (ubuntu-k3s): Istio IngressGateway handles *.shopping-cart.local routing
+ArgoCD manages all app deployments via ApplicationSets in shopping-cart-infra repo
+ESO sync failure is the most common root cause of "pod Running but app broken" scenarios
+"""
 _SMOKE_ENDPOINTS = [
     ("ArgoCD",     "https://argocd.shopping-cart.local/healthz",      [200, 307]),
     ("Frontend",   "http://frontend.shopping-cart.local/",             [200]),
@@ -893,12 +930,14 @@ def _run_post_provision_check(job_id, provider):
                 diag_parts.append(f"Recent logs ({ns}):\n{pod_logs.stdout.strip()[-1000:]}")
 
         prompt = (
+            _ARCH_CONTEXT + "\n"
             f"Service `{svc_name}` failed an HTTP smoke test 90 seconds after a fresh "
             f"Kubernetes cluster provision. Error: {err_detail}\n\n"
             "Diagnostics:\n" + "\n\n".join(diag_parts) + "\n\n"
-            "Is this a TRANSIENT issue (pod still starting, port-forward not ready — "
-            "will resolve in a few minutes) or a REAL FAILURE (crash loop, missing secret, "
-            "misconfiguration — needs human action)?\n"
+            "Is this a TRANSIENT issue (pod still starting, port-forward not ready, "
+            "ESO secret not yet synced — will resolve in a few minutes) or a REAL FAILURE "
+            "(crash loop, missing secret, misconfiguration — needs human action)?\n"
+            "Use the architecture context above to reason about upstream dependencies. "
             "Reply with TRANSIENT or REAL FAILURE, then one sentence with the most likely "
             "cause and what to check or fix. Be brief."
         )
