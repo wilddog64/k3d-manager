@@ -1,7 +1,10 @@
 # Progress — k3d-manager
 
-## Status (v1.6.2 — IN PROGRESS)
+## Status (v1.6.3 — IN PROGRESS)
 - **DEFERRED to v1.6.3:** `/resume` Slack thread command — resume `bin/acg-up` pipeline from the step that failed, skipping completed steps; primary use case: tunnel goes DOWN mid-provision → `/acg-refresh` restores it → `/resume` continues from the failed step without re-running from scratch; design requires: (1) checkpoint file written after each major step boundary in `bin/acg-up`, (2) `resume` branch in `_handle_thread_command` in `bin/k3dm-webhook` reads checkpoint + invokes `make up RESUME_FROM=<step>`; distinct from retry (in-place recovery) — resume stops the pipeline and re-enters at a known-good boundary; step granularity TBD (top-level vs sub-step)
+
+## Status (v1.6.2 — RELEASED 2026-06-05)
+- **RELEASED:** k3d-manager v1.6.2 — PR #91 merged to main (SHA `74b320c37cddfaff561d74dd96972713edb559b0`); enforce_admins restored ✓; v1.6.2 tag created + pushed ✓; GitHub release created ✓; v1.6.3 branch created ✓; retrospective committed (`40609b28`) ✓; memory-bank updated ✓
 
 ## Status (v1.6.1 — RELEASED 2026-06-05)
 - **COMPLETE:** /acg-refresh Slack slash command — k3d-manager commit `ba66f049` on `k3d-manager-v1.6.2`; spec: `docs/bugs/v1.6.2-bugfix-acg-refresh-slack-command.md`; `bin/k3dm-webhook` now accepts `/acg-refresh` and routes it to `/api/v1/cluster-refresh`, while `workers/slack-relay/index.js` relays the slash command to the webhook and preserves thread context; validation used `python3 -m py_compile bin/k3dm-webhook`, `node --check workers/slack-relay/index.js`, `make restart-webhook`, and `cd workers/slack-relay && npx wrangler deploy`; commit message: `feat(webhook,worker): add /acg-refresh Slack slash command to restore tunnel + credentials`
