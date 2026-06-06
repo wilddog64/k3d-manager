@@ -259,11 +259,52 @@ The first word after `ask` is the agent name. If omitted, defaults to `claude`.
 
 ### Agent capabilities
 
-| Agent | Best for | kubectl access | File scope |
-|-------|----------|---------------|------------|
-| `claude` | Live cluster troubleshooting — runs its own kubectl | Yes (read-only) | k3d-manager + shopping-carts only |
-| `gemini` | Analysis and diagnosis from knowledge | No (text-only) | n/a |
-| `codex` | Code questions about the k3d-manager repo | No | k3d-manager only (`cwd`) |
+| Agent | Best for | kubectl access | File scope | Thread context |
+|-------|----------|---------------|------------|----------------|
+| `claude` | Live cluster troubleshooting — runs its own kubectl | Yes (read-only; fix mode: rollout restart, delete pod, argocd sync) | k3d-manager + shopping-carts only | Yes (last 20 messages) |
+| `gemini` | Analysis and diagnosis from knowledge | No (text-only) | n/a | Yes (last 20 messages) |
+| `codex` | Code questions about the k3d-manager repo | No | k3d-manager only (`cwd`) | Yes (last 20 messages) |
+
+### Thread context
+
+When `/ask` is issued in a thread (or as a thread reply via `ask`), the last 20 messages
+from that thread are automatically fetched via `conversations.replies` and prepended to the
+agent's prompt. This lets agents see the full conversation history — error messages, prior
+agent responses, prior diagnoses — without the user having to paste them manually.
+
+Bot status and ANSI control sequences are stripped before injection.
+
+### Filing mode
+
+If the question contains phrasing like *"file a bug"*, *"open an issue"*, or *"write this up"*,
+the agent switches to **filing mode**:
+
+- Claude is granted the `Write` tool (in addition to `Bash`) so it can write files.
+- Claude writes `docs/issues/YYYY-MM-DD-<slug>.md` with the issue title, symptom,
+  reproduction steps, and fix/workaround recommendation.
+- Claude commits and pushes the doc to `k3d-manager-v1.6.3` automatically.
+- Timeout extends to 400 s; turn limit expands to `--max-turns 10`.
+- The Slack reply includes the commit SHA and file path.
+
+### Fix mode
+
+If the question contains phrasing like *"fix this"*, *"restart the pod"*, or *"sync the app"*,
+the agent switches to **fix mode** (`K3DM_FIX_MODE=1`):
+
+- The bash sandbox unlocks a narrow set of recovery operations:
+
+  | Allowed in fix mode | Purpose |
+  |---------------------|---------|
+  | `kubectl rollout restart` | Bounce a deployment or statefulset |
+  | `kubectl delete pod` | Force-replace a stuck pod |
+  | `argocd app sync` | Trigger an ArgoCD sync |
+
+- All other kubectl writes, Helm writes, and ArgoCD mutations remain blocked.
+- If fix + file modes are both detected, Claude runs the fix **and** writes a bug doc
+  in a single pass. The Slack reply posts a `Status: Fixed` block followed by the
+  `## Fix Applied` section.
+
+Fix mode uses the same timeout and turn limit as standard ask mode (300 s / 5 turns).
 
 ---
 
@@ -331,7 +372,11 @@ subprocess `PATH`.
 | Filesystem / process | `rm`, `rmdir`, `dd`, `mkfs`, `shred`, `truncate`, `mv`, `chmod`, `chown`, `kill`, `killall`, `pkill` |
 | curl/wget writes | `-X POST`, `-X PUT`, `-X DELETE`, `-X PATCH`, `--data`, `--upload-file` |
 
-Blocked commands exit 1 with `❌ Blocked: '...' — /ask agents are read-only.`
+Blocked commands exit 1 with `❌ Blocked: '...' — operation not permitted for /ask agents.`
+
+**Fix mode** (`K3DM_FIX_MODE=1`): when the webhook detects a fix intent, the sandbox
+switches from the deny-list above to a narrow allow-list — `kubectl rollout restart`,
+`kubectl delete pod`, and `argocd app sync` only. All other writes remain blocked.
 
 Gemini and Codex are not affected by the bash sandbox (Gemini runs text-only via
 `_call_gemini`; Codex receives read-only prompt instructions).
@@ -381,11 +426,12 @@ again in a moment.` reply without spawning a subprocess.
 
 ### 7. Per-agent timeouts and turn limits
 
-| Agent | Timeout | Turn limit |
-|-------|---------|-----------|
-| `claude` | 300 s | `--max-turns 5` (caps kubectl round-trips) |
-| `gemini` | 120 s (via `_call_gemini`) | n/a (text-only) |
-| `codex` | 120 s | n/a |
+| Agent | Mode | Timeout | Turn limit |
+|-------|------|---------|-----------|
+| `claude` | standard / fix | 300 s | `--max-turns 5` |
+| `claude` | filing (or fix+file) | 400 s | `--max-turns 10` |
+| `gemini` | all | 120 s (via `_call_gemini`) | n/a (text-only) |
+| `codex` | all | 120 s | n/a |
 
 ### Guardrail summary
 
