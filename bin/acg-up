@@ -567,21 +567,15 @@ fi
 kubectl create namespace cicd --context k3d-k3d-cluster \
   --dry-run=client -o yaml | kubectl apply --context k3d-k3d-cluster -f - >/dev/null
 kubectl label namespace cicd istio-injection=enabled --overwrite --context k3d-k3d-cluster >/dev/null
-_cp_server=$(kubectl config view \
-  -o jsonpath='{.clusters[?(@.name=="ubuntu-k3s")].cluster.server}' 2>/dev/null || echo "")
-if [[ -z "${_cp_server}" ]]; then
-  _err "[acg-up] Could not determine ubuntu-k3s API server URL — is the kubeconfig set up?"
-fi
 kubectl config use-context k3d-k3d-cluster >/dev/null
 ARGOCD_APP_CLUSTER_TOKEN="${_argocd_sa_token}" \
-ARGOCD_APP_CLUSTER_SERVER="${_cp_server}" \
   register_app_cluster
 _info "[acg-up] Restarting ArgoCD application controller to pick up new cluster secret..."
 kubectl rollout restart statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster
 kubectl rollout status statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster --timeout=300s
-_info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → ${_cp_server}"
+_info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → https://host.k3d.internal:6443"
 
 _info "[acg-up] Ensuring argocd-redis secret on ubuntu-k3s (Helm chart hook skipped when ArgoCD manages ArgoCD)..."
 _redis_deadline=$(( $(date +%s) + 120 ))
