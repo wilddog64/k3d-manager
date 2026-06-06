@@ -344,8 +344,7 @@ vuln-scan trivy-scan-report:
 
 FIX_CONTEXT ?= ubuntu-k3s
 
-## List all available fix targets with descriptions
-fix-list:
+fix-list: ## List all fix targets with descriptions
 	@grep -E '^fix-[a-z].*:.*##' Makefile | sort | awk -F':.*##' '{printf "  make %-30s %s\n", $$1, $$2}'
 
 ## Rollout restart a deployment and wait for rollout (APP=<name> NS=<namespace>)
