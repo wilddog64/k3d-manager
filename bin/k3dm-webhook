@@ -1505,15 +1505,23 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None):
         "Plain text or Slack mrkdwn only. No ANSI codes. No markdown headers."
     )
 
+    if agent == "gemini":
+        gemini_prompt = (
+            "You are a Kubernetes troubleshooting assistant. "
+            "The cluster runs Vault, ArgoCD, Istio, ESO, Keycloak (local k3d) and shopping-cart "
+            "apps with PostgreSQL, Redis, RabbitMQ (remote k3s). "
+            "Answer from your knowledge — you cannot run kubectl in this context. "
+            "Be concise — your answer will be posted to Slack. Plain text or Slack mrkdwn only.\n\n"
+            f"Question: {question}"
+        )
+        answer = _call_gemini(gemini_prompt)
+        _finish(f"🤖 *gemini:* {answer}")
+        return
+
     env = None
     if agent == "claude":
         prompt = f"{system}\nUse kubectl commands to investigate.\n\nUser question: {question}"
         cmd = ["claude", "-p", prompt, "--allowedTools", "Bash"]
-    elif agent == "gemini":
-        gemini_bin = os.environ.get("K3DM_GEMINI_BIN", "gemini")
-        prompt = f"{system}\n\nUser question: {question}"
-        cmd = [gemini_bin, "--model", os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-2.5-flash"), "--prompt", prompt]
-        env = {**os.environ, "GEMINI_CLI_TRUST_WORKSPACE": "true"}
     else:
         prompt = (
             "You are a code assistant for the k3d-manager repository — a modular Bash utility "
