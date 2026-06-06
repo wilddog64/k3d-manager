@@ -259,11 +259,11 @@ The first word after `ask` is the agent name. If omitted, defaults to `claude`.
 
 ### Agent capabilities
 
-| Agent | Best for | kubectl access |
-|-------|----------|---------------|
-| `claude` | Live cluster troubleshooting — runs its own kubectl | Yes (read-only) |
-| `gemini` | Analysis and diagnosis from knowledge | No |
-| `codex` | Code questions about the k3d-manager repo | Repo files only |
+| Agent | Best for | kubectl access | File scope |
+|-------|----------|---------------|------------|
+| `claude` | Live cluster troubleshooting — runs its own kubectl | Yes (read-only) | k3d-manager + shopping-carts only |
+| `gemini` | Analysis and diagnosis from knowledge | No (text-only) | n/a |
+| `codex` | Code questions about the k3d-manager repo | No | k3d-manager only (`cwd`) |
 
 ---
 
@@ -334,15 +334,52 @@ subprocess `PATH`.
 Blocked commands exit 1 with `❌ Blocked: '...' — /ask agents are read-only.`
 
 Gemini and Codex are not affected by the bash sandbox (Gemini runs text-only via
-`_call_gemini`; Codex receives read-only instructions in the prompt).
+`_call_gemini`; Codex receives read-only prompt instructions).
 
-### 5. Agent concurrency cap (semaphore)
+### 5. Repository scope enforcement
+
+Agents are constrained to the k3d-manager and shopping-cart repositories at three levels:
+
+**Claude — `--add-dir` (Claude CLI file tool restriction)**
+Claude's file access tools (`Read`, `Glob`, etc.) are restricted via:
+```
+--add-dir <REPO_ROOT> --add-dir <SHOPPING_CARTS_ROOT>
+```
+Attempts to read files outside these directories are refused by the Claude CLI itself.
+
+**Bash sandbox — absolute path guard (`bin/k3dm-ask-bash`)**
+Every argument that looks like an absolute path is resolved with `realpath -m` and checked
+against the allowed roots. Paths outside the following are blocked with
+`❌ Out of scope: '...' — agents are limited to k3d-manager and shopping-cart repos.`:
+
+| Allowed | Purpose |
+|---------|---------|
+| `$K3DM_REPO_ROOT` | k3d-manager repo (default: `~/src/gitrepo/personal/k3d-manager`) |
+| `$K3DM_SHOPPING_CARTS_ROOT` | shopping-cart apps (default: `~/src/gitrepo/personal/shopping-carts`) |
+| `/tmp`, `/var/tmp` | Ephemeral scratch space |
+| `/proc`, `/sys` | Read-only kernel interfaces |
+
+**Prompt scope (all three agents)**
+All system prompts explicitly state the allowed repos and instruct the agent not to access
+or reference files or systems outside them. Example:
+> *"Scope: k3d-manager repo and shopping-cart-\*. Do not access, read, or reference files
+> or systems outside these repos."*
+
+Configuring alternate repo paths:
+
+```bash
+# In LaunchAgent plist or shell env before make restart-webhook:
+export K3DM_REPO_ROOT=/path/to/k3d-manager
+export K3DM_SHOPPING_CARTS_ROOT=/path/to/shopping-carts
+```
+
+### 6. Agent concurrency cap (semaphore)
 
 A `threading.Semaphore(2)` limits concurrent `/ask` agent jobs to two. A third request
 while two are running receives an immediate `⏳ Two agent asks are already running — try
 again in a moment.` reply without spawning a subprocess.
 
-### 6. Per-agent timeouts and turn limits
+### 7. Per-agent timeouts and turn limits
 
 | Agent | Timeout | Turn limit |
 |-------|---------|-----------|
@@ -354,11 +391,12 @@ again in a moment.` reply without spawning a subprocess.
 
 ```
 Internet request
-  └─ Cloudflare Worker: Slack HMAC-SHA256 signature check ──── drop if invalid
-       └─ webhook Bearer token check ──────────────────────── 401 if invalid
-            └─ _sanitize_question: length + injection patterns ── reject if matched
-                 └─ structural separation: --system-prompt vs -p ── injection can't override rules
-                      └─ bash sandbox (k3dm-ask-bash): OS deny-list ── hard block destructive cmds
-                           └─ semaphore(2): max 2 concurrent asks ── busy reply if cap hit
-                                └─ timeout + --max-turns 5 ──────── hard kill if runaway
+  └─ Cloudflare Worker: Slack HMAC-SHA256 signature check ──────── drop if invalid
+       └─ webhook Bearer token check ────────────────────────────── 401 if invalid
+            └─ _sanitize_question: length + injection patterns ───── reject if matched
+                 └─ structural separation: --system-prompt vs -p ─── injection can't override rules
+                      └─ repo scope: --add-dir + path guard + prompt ── block out-of-scope file access
+                           └─ bash sandbox (k3dm-ask-bash): deny-list ─ hard block destructive cmds
+                                └─ semaphore(2): max 2 concurrent asks ─ busy reply if cap hit
+                                     └─ timeout + --max-turns 5 ──────── hard kill if runaway
 ```

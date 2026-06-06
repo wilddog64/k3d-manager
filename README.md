@@ -283,7 +283,7 @@ docs/
 
 **AI Tooling**
 - **[Copilot CLI Integration](docs/howto/copilot.md)** — Setup, `copilot_triage_pod` / `copilot_draft_spec` examples, pre-commit AI lint, cross-project adoption via lib-foundation subtree
-- **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Architecture, one-time bootstrap (`make setup-worker`), token rotation, `/acg-up` / `/acg-down` / `/acg-status` / `/acg-resume` / `/ask [claude|gemini|codex]`; webhook server guardrails (auth, prompt-injection guard, read-only bash sandbox, concurrency cap)
+- **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Architecture, one-time bootstrap (`make setup-worker`), token rotation, `/acg-up` / `/acg-down` / `/acg-status` / `/acg-resume` / `/ask [claude|gemini|codex]`; webhook server guardrails (auth, prompt-injection guard, repo-scoped file access, read-only bash sandbox, concurrency cap)
 
 ---
 
