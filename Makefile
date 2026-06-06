@@ -382,6 +382,15 @@ fix-status: ## NS is required
 	kubectl get nodes --context $(FIX_CONTEXT) --no-headers
 	kubectl get pods -n $(NS) --context $(FIX_CONTEXT)
 
+file-bug: ## FILE_TITLE and FILE_BODY required — write docs/bugs/<date>-<slug>.md
+	@test -n "$(FILE_TITLE)" || { echo "Usage: make file-bug FILE_TITLE=<title> FILE_BODY=<body>"; exit 1; }
+	@test -n "$(FILE_BODY)"  || { echo "Usage: make file-bug FILE_TITLE=<title> FILE_BODY=<body>"; exit 1; }
+	@slug=$$(echo "$(FILE_TITLE)" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-'); \
+	 fname="docs/bugs/$$(date +%Y-%m-%d)-$$slug.md"; \
+	 printf '# Bug: %s\n\n**Filed:** %s\n**Source:** /ask agent observation\n\n## Description\n\n%s\n' \
+	   "$(FILE_TITLE)" "$$(date +%Y-%m-%d)" "$(FILE_BODY)" > "$$fname"; \
+	 echo "$$fname"
+
 ## Run all BATS test suites
 test:
 	./scripts/k3d-manager test all

@@ -28,7 +28,7 @@ if [[ "$FIX_MODE" == "1" ]]; then
 
   # make: only fix-* targets allowed; all other make invocations are blocked
   if echo "$CMD" | grep -qE '\bmake\b'; then
-    if ! echo "$CMD" | grep -qE '\bmake\b.*\bfix-[a-z]'; then
+    if ! echo "$CMD" | grep -qE '\bmake\b.*(fix-[a-z]|file-bug)'; then
       _deny "$CMD"
     fi
   fi
