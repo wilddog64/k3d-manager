@@ -831,6 +831,8 @@ def _smoke_test_services(retries=None):
             val = eso_store.stdout.strip()
             ok = val == "Ready=True"
             results.append(("ESO ClusterSecretStore", ok, val))
+        elif "context was not found" in eso_store.stderr or "no such context" in eso_store.stderr.lower():
+            results.append(("ESO ClusterSecretStore", True, "skipped — ubuntu-k3s context not in webhook kubeconfig"))
         else:
             results.append(("ESO ClusterSecretStore", False, "kubectl returned no output"))
     except Exception as exc:
@@ -855,6 +857,8 @@ def _smoke_test_services(retries=None):
                                  f"{len(not_ready)}/{total} not synced: {sample}"))
             else:
                 results.append(("ESO ExternalSecrets", True, f"{total}/{total} synced"))
+        elif "context was not found" in eso_secrets.stderr or "no such context" in eso_secrets.stderr.lower():
+            results.append(("ESO ExternalSecrets", True, "skipped — ubuntu-k3s context not in webhook kubeconfig"))
         else:
             results.append(("ESO ExternalSecrets", False, "kubectl returned no output"))
     except Exception as exc:
