@@ -762,6 +762,14 @@ def _analyze_failure(lines):
                 "Fix: run /acg-refresh to re-fetch the kubeconfig and restore the ubuntu-k3s "
                 "context, then retry /acg-resume"
             )
+        if 'host.k3d.internal' in _l and 'no such host' in _l:
+            return (
+                "CLUSTER_FAILURE\n"
+                "TRANSIENT\n"
+                "ArgoCD cannot resolve host.k3d.internal — the k3d CoreDNS host injection "
+                "was lost (cluster restart or CoreDNS update).\n"
+                "Fix: run /acg-refresh to re-register the ArgoCD cluster secret, then retry /acg-resume"
+            )
     last_50 = [l.rstrip() for l in lines[-50:] if l.strip()]
     last_output = "\n".join(last_50)
     cluster_state = _collect_cluster_state()
