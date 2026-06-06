@@ -185,14 +185,40 @@ if [[ "${_tunnel_ready}" -eq 0 ]]; then
   _warn "[acg-refresh] Tunnel port ${_tunnel_port} not ready after 15s — nodes check may fail"
 fi
 
-# ── 2b-pre. CoreDNS restart on hub cluster ───────────────────────────────────
-_info "[acg-refresh] Restarting CoreDNS on hub cluster to restore host.k3d.internal resolution..."
-if kubectl rollout restart deployment/coredns -n kube-system --context k3d-k3d-cluster >/dev/null 2>&1; then
-  kubectl rollout status deployment/coredns -n kube-system --context k3d-k3d-cluster --timeout=30s >/dev/null 2>&1 \
-    && _info "[acg-refresh] CoreDNS restarted — host.k3d.internal resolution restored" \
-    || _warn "[acg-refresh] CoreDNS rollout status timed out — DNS may still be recovering"
+# ── 2b-pre. CoreDNS NodeHosts patch + restart ────────────────────────────────
+_info "[acg-refresh] Detecting host IP for host.k3d.internal..."
+_coredns_host_ip=$(docker exec k3d-k3d-cluster-server-0 sh -c \
+  "getent hosts host.docker.internal 2>/dev/null | awk '{print \$1}'" 2>/dev/null || echo "")
+if [[ -z "${_coredns_host_ip}" ]]; then
+  _warn "[acg-refresh] Could not detect host IP from host.docker.internal — CoreDNS patch skipped"
 else
-  _warn "[acg-refresh] CoreDNS restart failed — hub cluster may not be running"
+  _info "[acg-refresh] Patching CoreDNS NodeHosts: host.k3d.internal → ${_coredns_host_ip}"
+  _existing_nodes=$(kubectl get configmap coredns -n kube-system \
+    --context k3d-k3d-cluster \
+    -o jsonpath='{.data.NodeHosts}' 2>/dev/null \
+    | grep -v "host\.k3d\.internal" || true)
+  _new_node_hosts="${_coredns_host_ip} host.k3d.internal"
+  if [[ -n "${_existing_nodes}" ]]; then
+    _new_node_hosts="${_new_node_hosts}"$'\n'"${_existing_nodes}"
+  fi
+  _patch_json=$(python3 -c \
+    "import json,sys; print(json.dumps({'data':{'NodeHosts':sys.argv[1]}}))" \
+    "${_new_node_hosts}")
+  if kubectl patch configmap coredns -n kube-system \
+      --context k3d-k3d-cluster --type merge -p "${_patch_json}" >/dev/null 2>&1; then
+    _info "[acg-refresh] CoreDNS ConfigMap patched — host.k3d.internal → ${_coredns_host_ip}"
+  else
+    _warn "[acg-refresh] CoreDNS ConfigMap patch failed — DNS may not resolve"
+  fi
+  if kubectl rollout restart deployment/coredns -n kube-system \
+      --context k3d-k3d-cluster >/dev/null 2>&1; then
+    kubectl rollout status deployment/coredns -n kube-system \
+      --context k3d-k3d-cluster --timeout=30s >/dev/null 2>&1 \
+      && _info "[acg-refresh] CoreDNS restarted — host.k3d.internal resolution restored" \
+      || _warn "[acg-refresh] CoreDNS rollout status timed out — DNS may still be recovering"
+  else
+    _warn "[acg-refresh] CoreDNS restart failed — hub cluster may not be running"
+  fi
 fi
 
 # ── 2b. ArgoCD cluster secret ────────────────────────────────────────────────
