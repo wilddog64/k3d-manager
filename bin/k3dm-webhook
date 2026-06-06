@@ -1505,6 +1505,7 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None):
         "Plain text or Slack mrkdwn only. No ANSI codes. No markdown headers."
     )
 
+    env = None
     if agent == "claude":
         prompt = f"{system}\nUse kubectl commands to investigate.\n\nUser question: {question}"
         cmd = ["claude", "-p", prompt, "--allowedTools", "Bash"]
@@ -1512,6 +1513,7 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None):
         gemini_bin = os.environ.get("K3DM_GEMINI_BIN", "gemini")
         prompt = f"{system}\n\nUser question: {question}"
         cmd = [gemini_bin, "--model", os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-2.5-flash"), "--prompt", prompt]
+        env = {**os.environ, "GEMINI_CLI_TRUST_WORKSPACE": "true"}
     else:
         prompt = (
             "You are a code assistant for the k3d-manager repository — a modular Bash utility "
@@ -1523,7 +1525,7 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None):
         cmd = ["codex", "exec", prompt]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env)
         answer = _ANSI.sub("", result.stdout).strip()
         if not answer:
             answer = _ANSI.sub("", result.stderr).strip() or f"No output from {agent}."
