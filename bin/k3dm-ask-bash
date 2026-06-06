@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Read-only bash wrapper for /ask agent invocations.
+# Blocks destructive kubectl/helm/system commands before exec.
+set -euo pipefail
+
+_deny() {
+  echo "❌ Blocked: '$*' — /ask agents are read-only. Use a specific troubleshooting command." >&2
+  exit 1
+}
+
+# Reconstruct the command string for pattern matching
+CMD="$*"
+
+# kubectl write operations
+if echo "$CMD" | grep -qE '\bkubectl\b.*(delete|apply|create|edit|patch|replace|rollout restart|scale|cordon|drain|taint|label|annotate|expose|run|cp|exec|port-forward|auth can-i --list)'; then
+  _deny "$CMD"
+fi
+
+# helm write operations
+if echo "$CMD" | grep -qE '\bhelm\b.*(install|uninstall|upgrade|rollback|delete|push|repo add|repo remove)'; then
+  _deny "$CMD"
+fi
+
+# argocd write operations
+if echo "$CMD" | grep -qE '\bargocd\b.*(app (sync|delete|create|update|set|patch)|repo (add|rm)|cluster (add|rm)|proj (create|delete))'; then
+  _deny "$CMD"
+fi
+
+# Destructive filesystem / process commands
+if echo "$CMD" | grep -qE '\b(rm|rmdir|dd|mkfs|shred|truncate|mv|chmod|chown|kill|killall|pkill)\b'; then
+  _deny "$CMD"
+fi
+
+# curl/wget write operations
+if echo "$CMD" | grep -qE '\b(curl|wget)\b.*(-X\s*(POST|PUT|DELETE|PATCH)|--request\s*(POST|PUT|DELETE|PATCH)|--data|--upload-file)'; then
+  _deny "$CMD"
+fi
+
+exec /bin/bash "$@"

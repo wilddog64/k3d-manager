@@ -1497,11 +1497,14 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None):
         elif response_url:
             _slack_post(response_url, text)
 
+    _ask_bash = str(Path(__file__).resolve().parent / "k3dm-ask-bash")
     system = (
         "You are troubleshooting a Kubernetes environment. "
         "Available kubectl contexts:\n"
         "  - k3d-k3d-cluster: local k3d cluster (Vault, ArgoCD, Istio, ESO, Keycloak)\n"
         "  - ubuntu-k3s: remote k3s on ACG EC2 (shopping-cart apps, PostgreSQL, Redis, RabbitMQ)\n\n"
+        "IMPORTANT: Read-only commands only. Never run kubectl delete/apply/create/edit/patch, "
+        "helm install/uninstall/upgrade, argocd app sync/delete, rm, or any command that modifies state. "
         "Be concise — your answer will be posted to Slack. "
         "Plain text or Slack mrkdwn only. No ANSI codes. No markdown headers."
     )
@@ -1526,14 +1529,17 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None):
 
         env = None
         if agent == "claude":
-            prompt = f"{system}\nUse kubectl commands to investigate.\n\nUser question: {question}"
+            prompt = f"{system}\nUse read-only kubectl commands to investigate.\n\nUser question: {question}"
             cmd = ["claude", "-p", prompt, "--allowedTools", "Bash", "--max-turns", "5"]
+            sandbox_bin = str(Path(_ask_bash).parent / ".ask-sandbox")
+            env = {**os.environ, "PATH": f"{sandbox_bin}:{os.environ.get('PATH', '')}"}
             timeout = 300
         else:
             prompt = (
-                "You are a code assistant for the k3d-manager repository — a modular Bash utility "
+                "You are a read-only code assistant for the k3d-manager repository — a modular Bash utility "
                 "for managing local Kubernetes dev clusters (Istio, Vault, Jenkins, OpenLDAP, ESO). "
                 "Entry point: scripts/k3d-manager. Plugins in scripts/plugins/. "
+                "Do NOT suggest or run any command that modifies files or cluster state. "
                 "Be concise — your answer will be posted to Slack.\n\n"
                 f"Question: {question}"
             )
