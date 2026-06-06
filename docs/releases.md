@@ -2,6 +2,7 @@
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.6.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.2) | 2026-06-05 | `/acg-refresh` Slack slash command via Cloudflare Worker relay; Keycloak admin token retry on slow startup; headless webhook fixes (no TTY, non-fatal kubectl) |
 | [v1.6.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.1) | 2026-06-05 | ACG LaunchAgent self-healing — `acg-refresh` auto-reinstalls missing system daemon plists (argocd/keycloak/frontend port-forwards); Vault port-forward LaunchAgent install during `acg-up`; Prometheus web.config.file conflict fix; acg-status stale display caveat labels |
 | [v1.6.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.0) | 2026-06-04 | Webhook Slack threading + thread commands; ArgoCD CVE scan CronJob; AI-powered failure analysis (Gemini triage + Claude vision); webhook token auto-rotation; Python 3.13 SIGSEGV fix; ArgoCD/Keycloak OIDC hardening; ACG observability stack (Prometheus + Grafana + Alertmanager) |
 | [v1.5.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.5.1) | 2026-05-31 | OCI object storage backup/restore for k3s-oci (etcd snapshot lifecycle); ACG credential automation improvements; SSH fail-fast and snapshot validation fixes; BATS error-path coverage |

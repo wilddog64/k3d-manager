@@ -1,6 +1,12 @@
 # Active Context — lib-acg
 
-## Current Branch: `fix/playwright-screenshot-diagnosis`
+## Current Branch: `feat/v0.1.2`
+
+## Current Status (2026-06-05 — v0.1.2 viewport fix)
+- **COMPLETE:** PR #36 merged to main (`f63b7ca3`); enforce_admins restored; retrospective written to `docs/retro/2026-06-05-v0.1.1-retrospective.md`; next feature branch `feat/v0.1.2` created and active.
+- **IN PROGRESS:** `playwright/lib/sandbox.js` `startSandbox()` — `scrollIntoViewIfNeeded()` added before `startButton`, `startButton2`, and `resumeButton` clicks to fix `locator.click: Element is outside of the viewport`; commit `86472da` on `feat/v0.1.2`; PR #37 open, CI green, Copilot findings being addressed.
+
+## Previous Branch: `fix/playwright-screenshot-diagnosis`
 
 ## Current Status (2026-06-04 — Phase A screenshot diagnosis complete)
 - **COMPLETE:** playwright screenshot diagnosis phase A — lib-acg commit `77c7dcc` on `fix/playwright-screenshot-diagnosis`; spec: `docs/plans/v1.6.0-playwright-screenshot-diagnosis.md`; `playwright/acg_credentials.js` and `playwright/acg_restart.js` now save `/tmp/k3dm-acg-screenshot-<ts>.png` on unhandled errors and print `INFO: Screenshot saved to ...` to stderr, and `acg_restart.js` hoists `page` to outer scope so the catch block can capture screenshots; validation used `node --check playwright/acg_credentials.js` and `node --check playwright/acg_restart.js`; commit message: `feat(playwright): save screenshot on failure for AI diagnosis`

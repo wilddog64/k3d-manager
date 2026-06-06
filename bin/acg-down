@@ -220,6 +220,12 @@ else
   _info "[acg-down] --keep-hub set — local Hub cluster preserved"
 fi
 
+_info "[acg-down] Pruning Docker build cache and unused images..."
+if command -v docker >/dev/null 2>&1; then
+  docker system prune --force >/dev/null
+  _info "[acg-down] Docker prune complete"
+fi
+
 _info "[acg-down] Cleaning up stale /tmp files..."
 rm -f /tmp/argocd-*.sock
 rm -f /tmp/k3d-config-tmp-*.yaml

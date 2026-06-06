@@ -1,6 +1,14 @@
 # Progress — lib-acg
 
-## Playwright Screenshot Diagnosis Track — `fix/playwright-screenshot-diagnosis` (active)
+## v0.1.2 Track — `feat/v0.1.2` (PR #37 open)
+
+- **IN PROGRESS:** `playwright/lib/sandbox.js` — `scrollIntoViewIfNeeded()` added before `startButton`, `startButton2`, and `resumeButton` clicks; commit `86472da` (`fix(sandbox): scrollIntoViewIfNeeded before Start/Resume Sandbox clicks`). Bug spec: `docs/bugs/2026-06-05-sandbox-start-button-outside-viewport.md`. PR #37 open, CI green, Copilot findings being addressed.
+
+## v0.1.1 Track — `feat/v0.1.1` (MERGED PR #36)
+
+- **MERGED PR #36** (`f63b7ca3`): `playwright/lib/sandbox.js` — removed `navLink.click()` conditional in `navigateToSandbox()` that navigated to `s2.pluralsight.com/404.html`; always uses `window.location.assign()`. Commit: `21d6e27` (`fix(sandbox): remove navLink.click() path — always use window.location.assign()`). Bug spec: `docs/bugs/2026-06-05-sandbox-navlink-click-regression.md`. Retrospective: `docs/retro/2026-06-05-v0.1.1-retrospective.md`. Enforce_admins restored.
+
+## Playwright Screenshot Diagnosis Track — `fix/playwright-screenshot-diagnosis` (merged to main)
 
 - **COMPLETE:** phase A screenshot diagnosis on `fix/playwright-screenshot-diagnosis` finished. `playwright/acg_credentials.js` and `playwright/acg_restart.js` now save `/tmp/k3dm-acg-screenshot-<ts>.png` on unhandled errors and print `INFO: Screenshot saved to ...` to stderr; `acg_restart.js` hoists `page` to outer scope so the catch block can capture screenshots. Commit: `77c7dcc` (`feat(playwright): save screenshot on failure for AI diagnosis`). Validation: `node --check playwright/acg_credentials.js`, `node --check playwright/acg_restart.js`.
 

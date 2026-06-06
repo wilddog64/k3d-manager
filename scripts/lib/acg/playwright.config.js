@@ -3,6 +3,7 @@ const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
   testDir: './tests',
+  testIgnore: ['**/providers/**'],
   timeout: 15000,
   retries: 0,
   reporter: 'list',

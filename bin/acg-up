@@ -594,6 +594,13 @@ until kubectl get application data-layer -n cicd --context k3d-k3d-cluster \
 done
 _info "[acg-up] data-layer Application Synced — proceeding to StatefulSet readiness check"
 deploy_shopping_cart_data
+_info "[acg-up] Force-syncing data-layer to trigger PostSync hooks (MinIO bucket init + image upload)..."
+argocd app sync data-layer \
+  --server localhost:8080 --insecure \
+  --force \
+  --timeout 180 \
+  2>/dev/null \
+  || _info "[acg-up] data-layer force-sync returned non-zero — PostSync hooks may still complete"
 
 _info "[acg-up] Step 10c/14 — Deploying identity stack (Keycloak + LDAP) via ArgoCD..."
 # Force ArgoCD to pick up the identity Application from shopping-cart-infra
@@ -664,16 +671,23 @@ else
     >>"${_ACG_STATE_DIR}/logs/keycloak-pf.log" 2>&1 &
   _kc_pf_pid=$!
   disown "${_kc_pf_pid}"
-  sleep 3
 
-  _kc_token=$(curl -sf -X POST \
-    "http://localhost:${_kc_pf_port}/realms/master/protocol/openid-connect/token" \
-    -d "client_id=admin-cli&grant_type=password&username=admin&password=${_kc_admin_pass}" \
-    | grep -o '"access_token":"[^"]*"' | sed 's/"access_token":"//;s/"//') || _kc_token=""
+  _kc_token=""
+  for _kc_attempt in 1 2 3 4 5; do
+    sleep 15
+    _kc_token=$(curl -sf -X POST \
+      "http://localhost:${_kc_pf_port}/realms/master/protocol/openid-connect/token" \
+      -d "client_id=admin-cli&grant_type=password&username=admin&password=${_kc_admin_pass}" \
+      | grep -o '"access_token":"[^"]*"' | sed 's/"access_token":"//;s/"//') || _kc_token=""
+    if [[ -n "${_kc_token}" ]]; then
+      break
+    fi
+    _info "[acg-up] Keycloak admin token not ready (attempt ${_kc_attempt}/5) — retrying in 15s..."
+  done
 
   if [[ -z "${_kc_token}" ]]; then
     kill "${_kc_pf_pid}" 2>/dev/null || true
-    _acg_fail "[acg-up] Could not get Keycloak admin token — realm import is required for SSO and cannot be skipped"
+    _acg_fail "[acg-up] Could not get Keycloak admin token after 5 attempts — realm import is required for SSO and cannot be skipped"
   else
     _realm_json=$(sed \
       -e "s/\${ARGOCD_CLIENT_SECRET}/${_argocd_client_secret}/g" \

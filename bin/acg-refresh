@@ -142,11 +142,6 @@ PLIST
     || _warn "[acg-refresh] ${label} plist install failed — sudo may be required"
 }
 
-if _is_mac && ! sudo -n true 2>/dev/null; then
-  _info "[acg-refresh] Pre-authorizing sudo for macOS host operations..."
-  sudo -v
-fi
-
 if [[ "$login_prompt" -eq 1 ]]; then
   _acg_sandbox_url="${sandbox_url:-https://app.pluralsight.com/hands-on/playground/cloud-sandboxes}"
   echo ""
@@ -302,4 +297,4 @@ fi
 
 # ── 7. Summary ────────────────────────────────────────────────────────────────
 _info "[acg-refresh] Done. Remote cluster nodes:"
-kubectl get nodes --context ubuntu-k3s
+kubectl get nodes --context ubuntu-k3s 2>&1 || _warn "[acg-refresh] Could not reach ubuntu-k3s nodes — tunnel may still be settling"

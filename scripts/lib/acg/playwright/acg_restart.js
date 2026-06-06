@@ -227,24 +227,6 @@ async function restartSandbox() {
       }
     );
 
-    // Open the Pluralsight sign-in page and wait for the user to log in manually.
-    // ACG uses a CAPTCHA — automated form-filling is not feasible.
-    const _doSignIn = async () => {
-      console.error('INFO: Session expired — opening Pluralsight sign-in page in Chrome...');
-      await page.goto('https://app.pluralsight.com/id/signin', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-      console.error('ACTION REQUIRED: Please sign in to Pluralsight in the Chrome window. Script will continue automatically after login...');
-      await page.waitForURL(
-        u => { try { const p = new URL(u); return p.hostname === 'app.pluralsight.com' && !/\/id[\/?]/.test(p.pathname); } catch { return false; } },
-        { timeout: 300000 }
-      );
-      console.error('INFO: Sign-in detected — resuming...');
-    };
-
-    const _isLoginPage = (u) => {
-      try { const h = new URL(u).hostname; return h !== 'app.pluralsight.com' || /\/id[\/?]/.test(u); }
-      catch { return true; }
-    };
-
     // Navigate to sandbox listing if not already there
     const currentUrl = page.url();
     const isOnSandboxPage = currentUrl.includes('cloud-sandboxes') || currentUrl.includes('hands-on/playground') || currentUrl.includes('cloud-playground');
@@ -253,20 +235,11 @@ async function restartSandbox() {
       if (normalizedUrl.includes('cloud-playground/cloud-sandboxes')) {
         normalizedUrl = normalizedUrl.replace('cloud-playground/cloud-sandboxes', 'hands-on/playground/cloud-sandboxes');
       }
-      // Handle the case where we're already on a login page before navigating
-      if (_isLoginPage(currentUrl)) {
-        console.error(`INFO: Already on login page (${currentUrl}) — automating sign-in...`);
-        await page.goto('https://app.pluralsight.com/id/signin', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-        await _doSignIn();
-      }
       console.error(`INFO: Navigating to ${normalizedUrl}...`);
       await page.goto(normalizedUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-      if (_isLoginPage(page.url())) {
-        console.error(`INFO: Redirected to login page — automating sign-in...`);
-        await page.goto('https://app.pluralsight.com/id/signin', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-        await _doSignIn();
-        console.error(`INFO: Navigating to ${normalizedUrl} after sign-in...`);
-        await page.goto(normalizedUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      const postNavUrl = page.url();
+      if (postNavUrl.includes('/id') || postNavUrl.includes('sign-in') || postNavUrl.includes('login')) {
+        throw new Error(`Pluralsight session expired — redirected to ${postNavUrl}. Re-login in Chrome and retry.`);
       }
     } else {
       console.error(`INFO: Already on sandbox page: ${currentUrl}`);
