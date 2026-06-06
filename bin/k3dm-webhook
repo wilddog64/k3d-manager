@@ -589,10 +589,38 @@ def _handle_thread_command(job_id, command):
         ).start()
         _notify_job(job_id, f"🚀 *acg-up* queued — job `{new_job_id}`")
 
+    elif cmd == "ask":
+        _VALID_AGENTS = {"claude", "gemini", "codex"}
+        parts = command.strip().split()
+        if len(parts) >= 3 and parts[1].lower() in _VALID_AGENTS:
+            agent = parts[1].lower()
+            question = " ".join(parts[2:]).strip()
+        elif len(parts) >= 2 and parts[1].lower() not in _VALID_AGENTS:
+            agent = "claude"
+            question = " ".join(parts[1:]).strip()
+        else:
+            _notify_job(job_id, "Usage: `ask [claude|gemini|codex] <question>`")
+            return
+        thread_ts_file = JOB_DIR / job_id / "thread_ts"
+        thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("queued")
+        if thread_ts:
+            (new_job_dir / "thread_ts").write_text(thread_ts)
+        threading.Thread(
+            target=_run_cluster_ask,
+            args=(new_job_id, agent, question, ""),
+            kwargs={"thread_ts": thread_ts},
+            daemon=True,
+        ).start()
+        _notify_job(job_id, f"🤖 Asking *{agent}*…")
+
     else:
         _notify_job(
             job_id,
-            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `acg-up`, `acg-down`, `acg-status`, `acg-refresh`, `acg-resume`",
+            f"❓ Unknown command `{command.strip()}` — available: `kill`, `diagnosis`, `status`, `logs`, `ask`, `acg-up`, `acg-down`, `acg-status`, `acg-refresh`, `acg-resume`",
         )
 
 
