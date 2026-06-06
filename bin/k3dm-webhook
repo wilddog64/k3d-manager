@@ -835,9 +835,11 @@ def _analyze_failure(lines):
             return (
                 "CLUSTER_FAILURE\n"
                 "TRANSIENT\n"
-                "ArgoCD cannot resolve host.k3d.internal — the k3d CoreDNS host injection "
-                "was lost (cluster restart or CoreDNS update).\n"
-                "Fix: run /acg-refresh to re-register the ArgoCD cluster secret, then retry /acg-resume"
+                "ArgoCD cannot resolve host.k3d.internal — CoreDNS NodeHosts cache is stale "
+                "(pod restart or update flushed the host.k3d.internal entry from /etc/hosts).\n"
+                "Fix: run /acg-refresh — it now restarts CoreDNS on the hub cluster to restore "
+                "host.k3d.internal resolution, then re-registers the ArgoCD cluster secret; "
+                "then retry /acg-resume"
             )
     last_50 = [l.rstrip() for l in lines[-50:] if l.strip()]
     last_output = "\n".join(last_50)

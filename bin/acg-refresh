@@ -185,6 +185,16 @@ if [[ "${_tunnel_ready}" -eq 0 ]]; then
   _warn "[acg-refresh] Tunnel port ${_tunnel_port} not ready after 15s — nodes check may fail"
 fi
 
+# ── 2b-pre. CoreDNS restart on hub cluster ───────────────────────────────────
+_info "[acg-refresh] Restarting CoreDNS on hub cluster to restore host.k3d.internal resolution..."
+if kubectl rollout restart deployment/coredns -n kube-system --context k3d-k3d-cluster >/dev/null 2>&1; then
+  kubectl rollout status deployment/coredns -n kube-system --context k3d-k3d-cluster --timeout=30s >/dev/null 2>&1 \
+    && _info "[acg-refresh] CoreDNS restarted — host.k3d.internal resolution restored" \
+    || _warn "[acg-refresh] CoreDNS rollout status timed out — DNS may still be recovering"
+else
+  _warn "[acg-refresh] CoreDNS restart failed — hub cluster may not be running"
+fi
+
 # ── 2b. ArgoCD cluster secret ────────────────────────────────────────────────
 _info "[acg-refresh] Refreshing ArgoCD cluster secret (ubuntu-k3s SA token)..."
 _argocd_tracing=0; case $- in *x*) _argocd_tracing=1; set +x;; esac
