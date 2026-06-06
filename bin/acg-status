@@ -67,3 +67,26 @@ if [[ "${CLUSTER_PROVIDER}" != "k3s-gcp" ]]; then
     echo "AWS credentials invalid or expired — run bin/acg-refresh"
   fi
 fi
+
+echo ""
+echo "=== Service Health ==="
+_WEBHOOK_TOKEN="${K3DM_WEBHOOK_TOKEN:-$(security find-generic-password -s k3dm-webhook-token -w 2>/dev/null || true)}"
+_WEBHOOK_PORT="${K3DM_WEBHOOK_PORT:-7443}"
+if [[ -n "${_WEBHOOK_TOKEN}" ]]; then
+  _health_json=$(curl -sf --max-time 35 \
+    -H "Authorization: Bearer ${_WEBHOOK_TOKEN}" \
+    "http://localhost:${_WEBHOOK_PORT}/api/v1/health" 2>/dev/null || true)
+  if [[ -n "${_health_json}" ]]; then
+    echo "${_health_json}" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for s in data.get('services', []):
+    icon = '✅' if s['ok'] else '❌'
+    print(f'  {icon} {s[\"name\"]}: {s[\"detail\"]}')
+"
+  else
+    echo "  (webhook unreachable at localhost:${_WEBHOOK_PORT} — run: make restart-webhook)"
+  fi
+else
+  echo "  (webhook token not in Keychain — set K3DM_WEBHOOK_TOKEN or run: make install-webhook)"
+fi
