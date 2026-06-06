@@ -386,6 +386,8 @@ file-bug: ## FILE_TITLE and FILE_BODY required — write docs/bugs/<date>-<slug>
 	@test -n "$(FILE_TITLE)" || { echo "Usage: make file-bug FILE_TITLE=<title> FILE_BODY=<body>"; exit 1; }
 	@test -n "$(FILE_BODY)"  || { echo "Usage: make file-bug FILE_TITLE=<title> FILE_BODY=<body>"; exit 1; }
 	@slug=$$(echo "$(FILE_TITLE)" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-'); \
+	 existing=$$(ls docs/bugs/*-$$slug.md 2>/dev/null | head -1); \
+	 if [ -n "$$existing" ]; then echo "already filed: $$existing"; exit 0; fi; \
 	 fname="docs/bugs/$$(date +%Y-%m-%d)-$$slug.md"; \
 	 printf '# Bug: %s\n\n**Filed:** %s\n**Source:** /ask agent observation\n\n## Description\n\n%s\n' \
 	   "$(FILE_TITLE)" "$$(date +%Y-%m-%d)" "$(FILE_BODY)" > "$$fname"; \

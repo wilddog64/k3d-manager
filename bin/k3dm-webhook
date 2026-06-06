@@ -1603,7 +1603,12 @@ def _parse_gemini_observations(raw):
             continue
         slug = re.sub(r"[^a-z0-9-]", "", title.lower().replace(" ", "-"))
         today = __import__("datetime").date.today().isoformat()
-        fname = Path(REPO_ROOT) / "docs" / "bugs" / f"{today}-{slug}.md"
+        bugs_dir = Path(REPO_ROOT) / "docs" / "bugs"
+        existing = list(bugs_dir.glob(f"*-{slug}.md"))
+        if existing:
+            filed.append(str(existing[0].relative_to(REPO_ROOT)))
+            continue
+        fname = bugs_dir / f"{today}-{slug}.md"
         try:
             fname.parent.mkdir(parents=True, exist_ok=True)
             fname.write_text(
