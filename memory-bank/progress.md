@@ -1,7 +1,7 @@
 # Progress — k3d-manager
 
 ## Status (v1.6.3 — IN PROGRESS)
-- **DEFERRED to v1.6.3:** `/resume` Slack thread command — resume `bin/acg-up` pipeline from the step that failed, skipping completed steps; primary use case: tunnel goes DOWN mid-provision → `/acg-refresh` restores it → `/resume` continues from the failed step without re-running from scratch; design requires: (1) checkpoint file written after each major step boundary in `bin/acg-up`, (2) `resume` branch in `_handle_thread_command` in `bin/k3dm-webhook` reads checkpoint + invokes `make up RESUME_FROM=<step>`; distinct from retry (in-place recovery) — resume stops the pipeline and re-enters at a known-good boundary; step granularity TBD (top-level vs sub-step)
+- **OPEN (Codex):** `/acg-resume` Slack command — spec: `docs/plans/v1.6.3-slack-resume-command.md`; 13 changes across `bin/acg-up` (6 checkpoint guards + helpers + clear block), `Makefile`, `bin/k3dm-webhook` (`_run_cluster_resume` + endpoint + thread command), `workers/slack-relay/index.js`; commit: `feat(acg-up,webhook,worker): add /acg-resume Slack command — checkpoint-based pipeline re-entry`
 
 ## Status (v1.6.2 — RELEASED 2026-06-05)
 - **RELEASED:** k3d-manager v1.6.2 — PR #91 merged to main (SHA `74b320c37cddfaff561d74dd96972713edb559b0`); enforce_admins restored ✓; v1.6.2 tag created + pushed ✓; GitHub release created ✓; v1.6.3 branch created ✓; retrospective committed (`40609b28`) ✓; memory-bank updated ✓
