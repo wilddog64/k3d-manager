@@ -2126,6 +2126,12 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     JOB_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+    _ask_bash_path = Path(__file__).resolve().parent / "k3dm-ask-bash"
+    _sandbox_dir = _ask_bash_path.parent / ".ask-sandbox"
+    _sandbox_dir.mkdir(exist_ok=True)
+    _sandbox_link = _sandbox_dir / "bash"
+    if not _sandbox_link.exists():
+        _sandbox_link.symlink_to(_ask_bash_path)
     _clear_stale_jobs()
     server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), _Handler)
     print(f"[k3dm-webhook] listening on 127.0.0.1:{PORT}")
