@@ -186,16 +186,32 @@ if [[ "${_tunnel_ready}" -eq 0 ]]; then
 fi
 
 # ── 2b. ArgoCD cluster secret ────────────────────────────────────────────────
-_info "[acg-refresh] Refreshing ArgoCD cluster secret..."
-_argocd_sa_token=$(kubectl get secret argocd-manager-token -n kube-system --context ubuntu-k3s \
-  -o jsonpath='{.data.token}' 2>/dev/null | base64 -d | tr -d '\n')
-if [[ -z "${_argocd_sa_token}" ]]; then
-  _warn "[acg-refresh] argocd-manager-token secret not yet populated — skipping cluster secret refresh"
+_info "[acg-refresh] Refreshing ArgoCD cluster secret (ubuntu-k3s SA token)..."
+_argocd_tracing=0; case $- in *x*) _argocd_tracing=1; set +x;; esac
+_argocd_token=$(kubectl get secret argocd-manager-token -n kube-system \
+  --context ubuntu-k3s -o jsonpath='{.data.token}' 2>/dev/null | base64 -d | tr -d '\n' || echo "")
+(( _argocd_tracing )) && set -x || true
+if [[ -n "${_argocd_token}" ]]; then
+  _argocd_server="${ARGOCD_APP_CLUSTER_SERVER:-https://host.k3d.internal:6443}"
+  _argocd_patch="$(mktemp -t argocd-cluster-patch.XXXXXX.yaml)"
+  _argocd_tracing=0; case $- in *x*) _argocd_tracing=1; set +x;; esac
+  cat > "${_argocd_patch}" <<PATCH
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-ubuntu-k3s
+  namespace: cicd
+stringData:
+  server: "${_argocd_server}"
+  config: |
+    {"bearerToken":"${_argocd_token}","tlsClientConfig":{"insecure":true}}
+PATCH
+  (( _argocd_tracing )) && set -x || true
+  kubectl apply -f "${_argocd_patch}" --context k3d-k3d-cluster >/dev/null
+  rm -f "${_argocd_patch}"
+  _info "[acg-refresh] ArgoCD cluster secret refreshed: ${_argocd_server}"
 else
-  kubectl config use-context k3d-k3d-cluster >/dev/null
-  ARGOCD_APP_CLUSTER_TOKEN="${_argocd_sa_token}" \
-    register_app_cluster
-  _info "[acg-refresh] ArgoCD cluster registered: ubuntu-k3s → https://host.k3d.internal:6443"
+  _warn "[acg-refresh] argocd-manager-token not readable on ubuntu-k3s — cluster secret not refreshed"
 fi
 
 # ── 3. PID-file port-forwards ─────────────────────────────────────────────────
