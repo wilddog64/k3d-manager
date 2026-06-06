@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Bash wrapper for /ask agent invocations.
 # Read-only by default; fix mode (K3DM_FIX_MODE=1) unlocks specific recovery operations.
 # Blocks destructive commands and out-of-scope path access in both modes.
