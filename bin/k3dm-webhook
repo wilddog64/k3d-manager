@@ -1283,6 +1283,30 @@ def _smoke_test_services(retries=None):
         except Exception as _exc:
             results.append(("ESO ExternalSecrets", False, str(_exc)[:200]))
 
+    # Data-layer StatefulSet readiness (ubuntu-k3s) — uses posix_spawn, safe after NEF load
+    _dl_names = ["postgresql-orders", "postgresql-payment", "postgresql-products", "minio"]
+    _dl_ready = 0
+    _dl_not_ready = []
+    for _ss in _dl_names:
+        _dl_out, _dl_timeout = _posix_spawn_capture(
+            ["kubectl", "get", "statefulset", _ss,
+             "-n", "shopping-cart-data", "--context", "ubuntu-k3s",
+             "-o", "jsonpath={.status.readyReplicas}",
+             "--request-timeout=5s"],
+            timeout=8,
+        )
+        if not _dl_timeout and _dl_out.strip().isdigit() and int(_dl_out.strip()) >= 1:
+            _dl_ready += 1
+        else:
+            _dl_not_ready.append(_ss)
+    _dl_ok = _dl_ready == len(_dl_names)
+    _dl_detail = (
+        f"{_dl_ready}/{len(_dl_names)} ready"
+        if _dl_ok
+        else f"{len(_dl_not_ready)} not ready: {', '.join(_dl_not_ready[:2])}"
+    )
+    results.append(("Data layer", _dl_ok, _dl_detail))
+
     return results
 
 
