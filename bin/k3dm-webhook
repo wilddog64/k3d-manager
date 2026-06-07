@@ -1302,9 +1302,7 @@ def _run_post_provision_check(job_id, provider):
     lines.append(f"*SSH tunnel (6443):* {'UP ✅' if tunnel_ok else 'DOWN ❌'}")
 
     if not tunnel_ok:
-        lines.append("⚠️ Tunnel is down — ACG cluster unreachable; skipping app health check.")
-        _notify_job(job_id, f"🏥 *Post-provision check* ({provider})\n" + "\n".join(lines))
-        return
+        lines.append("⚠️ SSH tunnel down — ACG cluster API unreachable. Service endpoints may still be accessible via port-forwards.")
 
     # ArgoCD degraded apps
     apps = subprocess.run(
@@ -1598,6 +1596,8 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
         for svc_name, ok, detail in smoke:
             icon = "✅" if ok else "❌"
             _log(f"  {icon} {svc_name}: {detail}")
+        if all_smoke_ok and not tunnel_ok:
+            _log("\nℹ️ _Hub/tunnel checks DOWN but service endpoints responding — port-forwards or Cloudflare tunnel still active. Run `/acg-refresh` to restore kubectl access._")
 
         failed_smoke = [(name, detail) for name, ok, detail in smoke if not ok]
         for svc_name, err_detail in failed_smoke[:3]:
