@@ -257,6 +257,14 @@ ask codex how does the tunnel plugin work?
 
 The first word after `ask` is the agent name. If omitted, defaults to `claude`.
 
+**Adjusting the turn limit for a single call** — append `turns=N` anywhere in the question:
+```
+/ask claude turns=20 why is the payment pod crashing?
+/ask claude turns=3 what namespace is redis in?
+```
+
+The `turns=N` token is stripped from the question before it reaches the agent.
+
 ### Agent capabilities
 
 | Agent | Best for | kubectl access | File scope | Thread context |
@@ -309,7 +317,7 @@ the agent switches to **fix mode** (`K3DM_FIX_MODE=1`):
   in a single pass. The Slack reply posts a `Status: Fixed` block followed by the
   `## Fix Applied` section.
 
-Fix mode uses the same timeout and turn limit as standard ask mode (300 s / 5 turns).
+Fix mode uses the same timeout and turn limit as standard ask mode (300 s / 10 turns default).
 
 **Available `make fix-*` targets** (run `make fix-list` in the repo to see current list):
 
@@ -445,10 +453,16 @@ again in a moment.` reply without spawning a subprocess.
 
 | Agent | Mode | Timeout | Turn limit |
 |-------|------|---------|-----------|
-| `claude` | standard / fix | 300 s | `--max-turns 5` |
-| `claude` | filing (or fix+file) | 400 s | `--max-turns 10` |
+| `claude` | all modes | 300 s (400 s when filing) | `--max-turns` = `K3DM_ASK_MAX_TURNS` (default 10) |
 | `gemini` | all | 120 s (via `_call_gemini`) | n/a (text-only) |
 | `codex` | all | 120 s | n/a |
+
+**Cluster-wide default** — set `K3DM_ASK_MAX_TURNS` in `.envrc` and run `make restart-webhook`:
+```bash
+export K3DM_ASK_MAX_TURNS=15
+```
+
+**Per-call override** — append `turns=N` to the Slack question (see [Usage](#usage) above).
 
 ### Guardrail summary
 
@@ -461,5 +475,5 @@ Internet request
                       └─ repo scope: --add-dir + path guard + prompt ── block out-of-scope file access
                            └─ bash sandbox (k3dm-ask-bash): deny-list ─ hard block destructive cmds
                                 └─ semaphore(2): max 2 concurrent asks ─ busy reply if cap hit
-                                     └─ timeout + --max-turns 5 ──────── hard kill if runaway
+                                     └─ timeout + --max-turns N ─────── hard kill if runaway (default 10, K3DM_ASK_MAX_TURNS)
 ```
