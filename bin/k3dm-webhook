@@ -623,8 +623,14 @@ def _handle_thread_command(job_id, command):
             question = (
                 f"Job output context (last 80 lines of job `{job_id}`):\n"
                 f"```\n{_ctx_text}\n```\n\n"
+                f"Investigation task: focus only on what failed in the output above. "
+                f"Run targeted kubectl commands against the specific failing service/namespace — "
+                f"do not explore unrelated namespaces or services. "
+                f"Report root cause and fix in under 5 tool calls.\n\n"
                 f"User question: {question}"
             )
+            if not _turns_match:
+                ask_max_turns = max(ask_max_turns, 40)
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
         thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
         new_job_id = str(uuid.uuid4())[:8]
