@@ -1313,19 +1313,17 @@ def _run_post_provision_check(job_id, provider):
     )
     if apps.returncode != 0 or not apps.stdout.strip():
         lines.append("_ArgoCD app status unavailable_")
-        _notify_job(job_id, f"🏥 *Post-provision check* ({provider})\n" + "\n".join(lines))
-        return
-
-    app_lines = [l for l in apps.stdout.strip().splitlines() if l]
-    degraded = [l.split()[0] for l in app_lines
-                if len(l.split()) >= 2 and l.split()[1] == "Degraded"]
-    healthy_count = len(app_lines) - len(degraded)
-    lines.append(f"*ArgoCD:* {healthy_count}/{len(app_lines)} apps healthy")
-
-    if not degraded:
-        lines.append("*ArgoCD apps:* all healthy ✅")
+        degraded = []
     else:
-        lines.append(f"⚠️ Degraded: {', '.join(f'`{a}`' for a in degraded)}")
+        app_lines = [l for l in apps.stdout.strip().splitlines() if l]
+        degraded = [l.split()[0] for l in app_lines
+                    if len(l.split()) >= 2 and l.split()[1] == "Degraded"]
+        healthy_count = len(app_lines) - len(degraded)
+        lines.append(f"*ArgoCD:* {healthy_count}/{len(app_lines)} apps healthy")
+        if not degraded:
+            lines.append("*ArgoCD apps:* all healthy ✅")
+        else:
+            lines.append(f"⚠️ Degraded: {', '.join(f'`{a}`' for a in degraded)}")
 
     smoke = _smoke_test_services()
     for svc_name, ok, detail in smoke:
