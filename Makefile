@@ -362,24 +362,24 @@ fix-list: ## List all fix targets with descriptions
 fix-restart: ## APP and NS are required
 	@test -n "$(APP)" || { echo "Usage: make fix-restart APP=<deployment> NS=<namespace>"; exit 1; }
 	@test -n "$(NS)"  || { echo "Usage: make fix-restart APP=<deployment> NS=<namespace>"; exit 1; }
-	kubectl rollout restart deployment/$(APP) -n $(NS) --context $(FIX_CONTEXT)
-	kubectl rollout status  deployment/$(APP) -n $(NS) --context $(FIX_CONTEXT) --timeout=120s
+	kubectl rollout restart 'deployment/$(APP)' -n '$(NS)' --context '$(FIX_CONTEXT)'
+	kubectl rollout status  'deployment/$(APP)' -n '$(NS)' --context '$(FIX_CONTEXT)' --timeout=120s
 
 ## Delete all pods matching label app=<APP> (forces pod restart via ReplicaSet)
 fix-delete-pod: ## APP and NS are required
 	@test -n "$(APP)" || { echo "Usage: make fix-delete-pod APP=<label> NS=<namespace>"; exit 1; }
 	@test -n "$(NS)"  || { echo "Usage: make fix-delete-pod APP=<label> NS=<namespace>"; exit 1; }
-	kubectl delete pod -l app=$(APP) -n $(NS) --context $(FIX_CONTEXT) --grace-period=0
+	kubectl delete pod -l 'app=$(APP)' -n '$(NS)' --context '$(FIX_CONTEXT)' --grace-period=0
 
 ## ArgoCD app sync with 120s timeout (APP=<argocd-app-name>)
 fix-sync: ## APP is required
 	@test -n "$(APP)" || { echo "Usage: make fix-sync APP=<argocd-app-name>"; exit 1; }
-	argocd app sync $(APP) --timeout 120 --server localhost:8080 --insecure
+	argocd app sync '$(APP)' --timeout 120 --server localhost:8080 --insecure
 
 ## ArgoCD force sync — discards local state (APP=<argocd-app-name>)
 fix-force-sync: ## APP is required
 	@test -n "$(APP)" || { echo "Usage: make fix-force-sync APP=<argocd-app-name>"; exit 1; }
-	argocd app sync $(APP) --force --timeout 180 --server localhost:8080 --insecure
+	argocd app sync '$(APP)' --force --timeout 180 --server localhost:8080 --insecure
 
 ## Force ESO ClusterSecretStore reconcile (annotates vault-backend to trigger re-sync)
 fix-eso-refresh: ## No arguments needed
@@ -390,8 +390,8 @@ fix-eso-refresh: ## No arguments needed
 ## Print node + pod status for a namespace (NS=<namespace>)
 fix-status: ## NS is required
 	@test -n "$(NS)" || { echo "Usage: make fix-status NS=<namespace>"; exit 1; }
-	kubectl get nodes --context $(FIX_CONTEXT) --no-headers
-	kubectl get pods -n $(NS) --context $(FIX_CONTEXT)
+	kubectl get nodes --context '$(FIX_CONTEXT)' --no-headers
+	kubectl get pods -n '$(NS)' --context '$(FIX_CONTEXT)'
 
 file-bug: ## FILE_TITLE and FILE_BODY required — write docs/bugs/<date>-<slug>.md
 	@test -n "$(FILE_TITLE)" || { echo "Usage: make file-bug FILE_TITLE=<title> FILE_BODY=<body>"; exit 1; }

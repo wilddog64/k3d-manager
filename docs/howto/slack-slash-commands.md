@@ -303,14 +303,16 @@ the agent switches to **fix mode** (`K3DM_FIX_MODE=1`):
   appropriate `make fix-*` target. Named targets encode the safe operation sequence
   (e.g., `fix-restart` does `rollout restart` + `rollout status --timeout=120s`).
 - Raw kubectl (`rollout restart`, `delete pod`) and `argocd app sync` remain available
-  as a fallback when no make target fits — and are required internally by make sub-processes.
+  as a fallback when no make target fits. Note: Makefile recipes execute via `/bin/sh` and
+  bypass the `bin/k3dm-ask-bash` bash-wrapper filters — prefer `make fix-*` targets over
+  raw kubectl to stay within the guarded execution path.
 
   | Allowed in fix mode | Purpose |
   |---------------------|---------|
-  | `make fix-*` | Named recovery targets (preferred) |
-  | `kubectl rollout restart` | Fallback / used by `make fix-restart` internally |
-  | `kubectl delete pod` | Fallback / used by `make fix-delete-pod` internally |
-  | `argocd app sync` | Fallback / used by `make fix-sync` internally |
+  | `make fix-*` | Named recovery targets (preferred — input-quoted, guarded) |
+  | `kubectl rollout restart` | Fallback only — bypasses bash-wrapper when run from Make |
+  | `kubectl delete pod` | Fallback only — bypasses bash-wrapper when run from Make |
+  | `argocd app sync` | Fallback only — bypasses bash-wrapper when run from Make |
 
 - All other kubectl writes, Helm writes, and ArgoCD mutations remain blocked.
 - If fix + file modes are both detected, Claude runs the fix **and** writes a bug doc
