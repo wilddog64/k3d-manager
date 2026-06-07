@@ -482,8 +482,10 @@ def _handle_thread_command(job_id, command):
 
     elif cmd == "diagnosis":
         log_file = JOB_DIR / job_id / "log"
-        if log_file.exists():
-            lines = log_file.read_text().splitlines(keepends=True)
+        output_file = JOB_DIR / job_id / "output"
+        source_file = log_file if log_file.exists() else (output_file if output_file.exists() else None)
+        if source_file:
+            lines = source_file.read_text().splitlines(keepends=True)
             try:
                 result = _analyze_failure(lines)
                 _notify_job(job_id, f"🔍 *Re-diagnosis* (job `{job_id}`)\n{result}")
