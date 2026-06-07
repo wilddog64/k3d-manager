@@ -593,6 +593,23 @@ kubectl rollout status statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster --timeout=300s
 _info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → https://host.k3d.internal:6443"
 
+_info "[acg-up] Waiting for ArgoCD controller to reconnect to ubuntu-k3s (max 120s)..."
+_argocd_conn_deadline=$(( $(date +%s) + 120 ))
+until argocd cluster list -o json \
+    --server localhost:8080 --insecure 2>/dev/null \
+    | python3 -c "import sys,json; clusters=json.load(sys.stdin); \
+      print(next((c['connectionState']['status'] for c in clusters \
+        if 'ubuntu-k3s' in c.get('name','') or 'host.k3d.internal' in c.get('server','')), \
+        'Unknown'))" 2>/dev/null | grep -q "Successful"; do
+  if [[ $(date +%s) -ge ${_argocd_conn_deadline} ]]; then
+    _warn "[acg-up] ArgoCD controller did not reconnect to ubuntu-k3s within 120s — proceeding anyway"
+    break
+  fi
+  _info "[acg-up] ArgoCD controller not yet connected to ubuntu-k3s — waiting..."
+  sleep 5
+done
+_info "[acg-up] ArgoCD controller connected to ubuntu-k3s — proceeding"
+
 _info "[acg-up] Ensuring argocd-redis secret on ubuntu-k3s (Helm chart hook skipped when ArgoCD manages ArgoCD)..."
 kubectl create namespace cicd --context ubuntu-k3s \
   --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f - >/dev/null
