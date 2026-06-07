@@ -1,10 +1,12 @@
 # Active Context — lib-acg
 
-## Current Branch: `feat/v0.1.2`
+## Current Branch: `feat/v0.1.3`
 
-## Current Status (2026-06-05 — v0.1.2 viewport fix)
-- **COMPLETE:** PR #36 merged to main (`f63b7ca3`); enforce_admins restored; retrospective written to `docs/retro/2026-06-05-v0.1.1-retrospective.md`; next feature branch `feat/v0.1.2` created and active.
-- **IN PROGRESS:** `playwright/lib/sandbox.js` `startSandbox()` — `scrollIntoViewIfNeeded()` added before `startButton`, `startButton2`, and `resumeButton` clicks to fix `locator.click: Element is outside of the viewport`; commit `86472da` on `feat/v0.1.2`; PR #37 open, CI green, Copilot findings being addressed.
+## Current Status (2026-06-07 — v0.1.3 force:true fix in PR #38)
+- **IN PROGRESS:** PR #38 open — `fix(sandbox): restore force:true on Start/Resume Sandbox clicks`; fix commit `07a9b29`; CI green; Copilot review in progress. Bug spec: `docs/bugs/2026-06-07-sandbox-start-button-click-force-missing.md`. Root cause: v0.1.2 added `scrollIntoViewIfNeeded()` but omitted `{ force: true }`, so post-scroll layout shift from `addLocatorHandler` still fails the click.
+
+## Previous Status (2026-06-05 — v0.1.2 viewport fix complete)
+- **COMPLETE:** PR #37 merged to main (`4d5aa477`); `playwright/lib/sandbox.js` `startSandbox()` — `scrollIntoViewIfNeeded()` added before `startButton`, `startButton2`, and `resumeButton` clicks to fix `locator.click: Element is outside of the viewport`; retrospective written to `docs/retro/2026-06-05-v0.1.2-retrospective.md`; next feature branch `feat/v0.1.3` created and active; enforcement on main could not be configured (no branch protection rules on lib-acg).
 
 ## Previous Branch: `fix/playwright-screenshot-diagnosis`
 

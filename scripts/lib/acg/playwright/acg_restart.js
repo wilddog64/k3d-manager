@@ -270,6 +270,7 @@ async function restartSandbox() {
     ) {
       console.error('INFO: Sandbox already deleted — Start Sandbox visible, skipping delete flow.');
       console.error('INFO: Clicking Start Sandbox...');
+      await _startBtnEarly.scrollIntoViewIfNeeded().catch(() => {});
       await _startBtnEarly.click({ force: true });
       await page.waitForTimeout(3000);
       await _dismissExtendYourSessionDialog(page);
@@ -313,6 +314,7 @@ async function restartSandbox() {
       }
       if (_sandboxNotYetStarted) {
         console.error('INFO: Sandbox panel open but not yet provisioned — clicking Start Sandbox directly...');
+        await _startBtnPanel.scrollIntoViewIfNeeded().catch(() => {});
         await _startBtnPanel.click({ force: true });
         await page.waitForTimeout(3000);
         await _dismissExtendYourSessionDialog(page);

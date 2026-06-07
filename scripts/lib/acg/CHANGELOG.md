@@ -10,6 +10,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `package.json` + `package-lock.json`: align version fields to `0.3.0` (were `0.2.0` and `0.1.0` respectively)
 
 ### Fixed
+- `playwright/lib/sandbox.js`: add `{ force: true }` to `startButton`, `startButton2`, and `resumeButton` clicks in `startSandbox()` — prevents `locator.click: Element is outside of the viewport` regression introduced in v0.1.2 where `scrollIntoViewIfNeeded()` was added but `{ force: true }` was omitted, so a post-scroll layout shift (triggered by the `addLocatorHandler` for "sandbox has been extended") still fails the click; `openButton` already had the correct pattern
+- `playwright/acg_restart.js`: add `scrollIntoViewIfNeeded()` before `_startBtnEarly.click({ force: true })` and `_startBtnPanel.click({ force: true })` in the restart flow to prevent `Element is outside of the viewport` failures when the sandbox panel renders below the fold
 - `startSandbox()`: add `scrollIntoViewIfNeeded()` before `Start Sandbox`, `Start Sandbox (Step 2)`, and `Resume Sandbox` clicks to prevent `Element is outside of the viewport` failures
 - `playwright/acg_credentials.js`: replace `navLink.click()` with `window.location.assign()` for cloud-sandboxes SPA navigation — "Extend Your Session" dialog intercepts pointer events and caused `navLink.click()` to timeout when the dialog reappeared between dismiss and click
 - `scripts/hooks/pre-commit`: replace unquoted `$_refs` in `printf` with a `read` loop — prevents word-splitting on filenames with spaces
