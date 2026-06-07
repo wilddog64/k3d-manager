@@ -979,7 +979,7 @@ ArgoCD manages all app deployments via ApplicationSets in shopping-cart-infra re
 ESO sync failure is the most common root cause of "pod Running but app broken" scenarios
 """
 _SMOKE_ENDPOINTS = [
-    ("ArgoCD",     "https://argocd.shopping-cart.local/healthz",      [200, 307]),
+    ("ArgoCD",     "http://localhost:8080/healthz",                    [200]),
     ("Frontend",   "http://frontend.shopping-cart.local/",             [200]),
     ("Keycloak",   "http://keycloak.shopping-cart.local/health/live",  [200]),
     ("Prometheus", "http://localhost:19090/-/ready",                   [200]),
@@ -1039,11 +1039,11 @@ def _smoke_test_services(retries=None):
     except Exception as exc:
         results.append(("Product images", False, str(exc)))
 
-    # ESO: ClusterSecretStore vault-backend
+    # ESO: ClusterSecretStore vault-backend (use local k3d cluster — ubuntu-k3s remote TLS causes SIGSEGV in subprocess)
     try:
         eso_store = subprocess.run(
             ["kubectl", "get", "clustersecretstore", "vault-backend",
-             "--context", "ubuntu-k3s", "--no-headers",
+             "--context", "k3d-k3d-cluster", "--no-headers",
              "-o", "jsonpath={.status.conditions[0].type}={.status.conditions[0].status}"],
             capture_output=True, text=True, timeout=8,
         )
@@ -1052,17 +1052,18 @@ def _smoke_test_services(retries=None):
             ok = val == "Ready=True"
             results.append(("ESO ClusterSecretStore", ok, val))
         elif "context was not found" in eso_store.stderr or "no such context" in eso_store.stderr.lower():
-            results.append(("ESO ClusterSecretStore", True, "skipped — ubuntu-k3s context not in webhook kubeconfig"))
+            results.append(("ESO ClusterSecretStore", True, "skipped — k3d-k3d-cluster context not in webhook kubeconfig"))
         else:
-            results.append(("ESO ClusterSecretStore", False, "kubectl returned no output"))
+            detail = f"rc={eso_store.returncode} stdout={repr(eso_store.stdout.strip())} stderr={repr(eso_store.stderr.strip()[:200])}"
+            results.append(("ESO ClusterSecretStore", False, detail))
     except Exception as exc:
         results.append(("ESO ClusterSecretStore", False, str(exc)))
 
-    # ESO: ExternalSecrets not in Ready=True state
+    # ESO: ExternalSecrets not in Ready=True state (use local k3d cluster — ubuntu-k3s remote TLS causes SIGSEGV in subprocess)
     try:
         eso_secrets = subprocess.run(
             ["kubectl", "get", "externalsecrets", "-A",
-             "--context", "ubuntu-k3s", "--no-headers",
+             "--context", "k3d-k3d-cluster", "--no-headers",
              "-o", "custom-columns=NS:.metadata.namespace,NAME:.metadata.name,"
                    "READY:.status.conditions[0].status"],
             capture_output=True, text=True, timeout=10,
@@ -1078,9 +1079,10 @@ def _smoke_test_services(retries=None):
             else:
                 results.append(("ESO ExternalSecrets", True, f"{total}/{total} synced"))
         elif "context was not found" in eso_secrets.stderr or "no such context" in eso_secrets.stderr.lower():
-            results.append(("ESO ExternalSecrets", True, "skipped — ubuntu-k3s context not in webhook kubeconfig"))
+            results.append(("ESO ExternalSecrets", True, "skipped — k3d-k3d-cluster context not in webhook kubeconfig"))
         else:
-            results.append(("ESO ExternalSecrets", False, "kubectl returned no output"))
+            detail = f"rc={eso_secrets.returncode} stdout={repr(eso_secrets.stdout.strip()[:100])} stderr={repr(eso_secrets.stderr.strip()[:200])}"
+            results.append(("ESO ExternalSecrets", False, detail))
     except Exception as exc:
         results.append(("ESO ExternalSecrets", False, str(exc)))
 
