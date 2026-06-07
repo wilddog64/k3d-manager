@@ -110,7 +110,6 @@ function _acg_up_cleanup() {
       rm -f "${_f}"
     fi
   done
-  launchctl unload "${HOME}/Library/LaunchAgents/com.k3d-manager.argocd-port-forward.plist" 2>/dev/null || true
   launchctl bootout "gui/$(id -u)" "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" 2>/dev/null || true
 }
 trap _acg_up_cleanup EXIT
