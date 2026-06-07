@@ -134,7 +134,8 @@ HELP
   fi
 
   _info "[k3s-oci-storage] Uploading snapshot to OCI object storage..."
-  _oci_storage_upload "${_local_snapshot}" "k3s-oci/etcd/${_snapshot_name}" || return 1
+  _oci_storage_upload "${_local_snapshot}" "k3s-oci/etcd/${_snapshot_name}" \
+    || { rm -f "${_local_snapshot}"; return 1; }
 
   _info "[k3s-oci-storage] Uploading kubeconfig to OCI object storage..."
   _oci_storage_upload "${_OCI_KUBECONFIG}" "k3s-oci/kubeconfig/k3s-oci.yaml" || return 1

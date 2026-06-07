@@ -230,6 +230,11 @@ _info "[acg-down] Cleaning up stale /tmp files..."
 rm -f /tmp/argocd-*.sock
 rm -f /tmp/k3d-config-tmp-*.yaml
 rm -f /tmp/k3d-hostsfile-*
+rm -f /tmp/k3d-manager-tunnel.out
+rm -f /tmp/k3d-manager-tunnel.err
+rm -f /tmp/k3d-manager-acg-watch.out
+rm -f /tmp/k3d-manager-acg-watch.err
+rm -f /tmp/k3dm-acg-screenshot-*.png
 _info "[acg-down] /tmp cleanup complete"
 
 if [[ "${_keep_hub}" -eq 1 ]]; then

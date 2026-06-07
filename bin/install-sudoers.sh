@@ -14,6 +14,9 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null
 source "${REPO_ROOT}/scripts/lib/system.sh"
 
+_tmpfile=""
+trap 'rm -f "${_tmpfile:-}"' EXIT
+
 _SUDOERS_FILE="/etc/sudoers.d/k3d-manager"
 _SUDO_PREFIX="su"
 _SUDO_SUFFIX="do"

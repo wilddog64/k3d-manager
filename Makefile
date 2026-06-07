@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward clean-tmp
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -148,6 +148,17 @@ install-sudoers:
 restart-webhook:
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true
 	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+
+## Remove k3d-manager-owned /tmp files
+clean-tmp:
+	rm -f /tmp/k3d-manager-sudoers.*
+	rm -f /tmp/k3dm-gcp-creds.*
+	rm -f /tmp/k3d-manager-tunnel.out /tmp/k3d-manager-tunnel.err
+	rm -f /tmp/k3d-manager-acg-watch.out /tmp/k3d-manager-acg-watch.err
+	rm -f /tmp/k3dm-acg-screenshot-*.png
+	rm -f /tmp/k3s-etcd-*.db
+	find /tmp -maxdepth 1 -name 'playwright-artifacts-*' -type d -exec rm -rf {} + 2>/dev/null || true
+	@echo "clean-tmp: done"
 
 ## Rotate webhook bearer token now (updates Keychain + Cloudflare Worker secret + restarts webhook)
 rotate-webhook-token:
