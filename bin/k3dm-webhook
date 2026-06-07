@@ -789,6 +789,9 @@ def _call_gemini(prompt):
         raw = Path(tmp_path).read_text(errors="replace").strip()
         Path(tmp_path).unlink(missing_ok=True)
         raw = raw or "gemini returned no output"
+        # Strip Gemini CLI startup banners (Warning: lines)
+        raw = re.sub(r'(?m)^Warning:.*\n?', '', raw).strip()
+        raw = raw or "gemini returned no output"
         cleaned = re.sub(r'(?:^|\n)\s*\w+\([^)]{0,500}\)\s*', ' ', raw, flags=re.MULTILINE)
         cleaned = re.sub(r'<ctrl[^>]*>', '', cleaned).strip()
         return cleaned or raw
