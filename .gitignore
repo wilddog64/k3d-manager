@@ -1,5 +1,4 @@
-storage/
-scratch/
-.claude/
-.envrc
 node_modules/
+scratch/
+*.log
+test-results/
