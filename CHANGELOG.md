@@ -2,6 +2,61 @@
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-06-07
+
+### Added
+- `/acg-resume` Slack command — checkpoint-based pipeline re-entry for interrupted ACG provisioning workflows
+- `/ask` Slack command — multi-agent troubleshooting with Claude, Gemini, and Codex from job thread replies
+- `make fix-*` agent fix targets — named, discoverable cluster recovery operations for agent fix mode
+- Webhook Slack thread context injection — fetch thread history and inject into agent prompts for better context
+- Gemini side-observation bug filing — structured OBSERVATIONS block in sandbox for automatic issue creation
+- Webhook read-only bash sandbox for `/ask` agents — deny destructive kubectl/helm/rm commands
+- Webhook prompt injection guard and structural system/user separation for `/ask` agents
+- Webhook semaphore and timeout protection for ask jobs (5 max turns, 300s timeout)
+- Webhook job context prepend injection from parent job output tail (reduce wasted turns)
+- Keycloak group-ldap-mapper reconciliation during reprovisioning
+
+### Fixed
+- NEF atfork SIGSEGV: replace all post-NEF subprocess.run calls with `os.posix_spawn` for job execution, `/ask claude`, `/ask codex`
+- Replace subprocess kubeconfig parse with file-based parser (no fork) to avoid NEF child crashes
+- Move k8s API context initialization to webhook startup to avoid macOS NEF atfork SIGSEGV
+- Use `shlex.quote()` not `shutil.quote()` in webhook job execution
+- Add data-layer StatefulSet readiness check to post-provision smoke test
+- Always run post-provision smoke test unconditionally (remove ArgoCD early-return gate); add reconciliation note when hub is down but services are up
+- Demote data-layer sync timeout to warning when StatefulSets are already Ready (skip wait on ubuntu-k3s refresh)
+- Skip data-layer sync wait when StatefulSets already ready on ubuntu-k3s
+- Remove ArgoCD port-forward unload from EXIT trap in acg-up
+- Fix Gemini NEF fork bug and Keycloak port 18080 conflict
+- Keycloak port-forward now kills existing listener before starting (fixes port conflict on resume)
+- ArgoCD controller reconnection wait before data-layer sync (ensure ArgoCD is ready on ubuntu-k3s)
+- Suppress Gemini CLI startup warnings at source
+- Strip Gemini CLI Warning banners from failure analysis output
+- Webhook diagnosis fallback to output file for acg-resume jobs
+- Webhook ask-agent sanitize (sanitize user question before job context prepend to fix ask-agent rejection)
+- `/tmp` file leaks from install-sudoers, k3s-oci-storage, and session teardown (add EXIT traps)
+- Remove invalid cwd kwarg from posix_spawn Gemini call
+- Add 5-attempt retry loop with 15s sleeps for Keycloak admin token fetch during ACG provision
+- Auto-reinstall missing system daemon plists (argocd-browser-https, keycloak-browser-http, frontend-browser-http) on acg-refresh
+- Auto-install ACG npm dependencies when node_modules missing in acg-up/acg-refresh
+- Patch CoreDNS NodeHosts ConfigMap with host.k3d.internal before restart in acg-refresh
+- Refresh ArgoCD cluster secret with host.k3d.internal on each sandbox rotation
+- Restore ubuntu-k3s kubeconfig on resume with targeted Slack advice
+- Auto force-sync data-layer on ArgoCD sync timeout before failing
+- Retry kubeconfig fetch on SSH delay in acg-up
+- ACG credentials: click "Extend Session" button (not Cancel) on session-extension dialog
+- Keycloak group-ldap-mapper reconciliation persists across reprovisioning
+- Install sudoers script — use `--interactive-sudo` + NOPASSWD rules for safe self-update
+- k3s-aws idempotency — skip `deploy_app_cluster` when nodes already Ready
+
+### Changed
+- Webhook output — visual diagnosis via Gemini CLI with Playwright failure screenshots
+- Webhook failure analysis — enrich with live pod and ArgoCD app state + node state distinction
+- Observability: prune ~40 noisy kube-prometheus-stack default alert rules; enable Grafana on ACG cluster
+- Prometheus 2Gi memory limit + narrow federation scope
+- Keycloak port-forward now bypasses Istio sidecar for reliability
+- Health check curl timeout increased from 35s to 90s (cover full smoke test duration)
+- Make `/ask` max-turns adjustable via `K3DM_ASK_MAX_TURNS` env var and `turns=N` inline token
+
 ## [1.6.2] - 2026-06-05
 
 ### Added
