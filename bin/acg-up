@@ -654,6 +654,16 @@ else
         until kubectl get application data-layer -n cicd --context k3d-k3d-cluster \
             -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
           if [[ $(date +%s) -ge ${_dl_retry_deadline} ]]; then
+            _dl_pods_ready=0
+            for _ss in postgresql-orders postgresql-payment postgresql-products minio; do
+              _rr=$(kubectl get statefulset/"${_ss}" -n shopping-cart-data --context ubuntu-k3s \
+                -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+              [[ "${_rr:-0}" -ge 1 ]] && (( _dl_pods_ready++ )) || true
+            done
+            if [[ ${_dl_pods_ready} -eq 4 ]]; then
+              _warn "[acg-up] data-layer ArgoCD sync timed out but all 4 StatefulSets are Ready — writing checkpoint and continuing"
+              break
+            fi
             _err "[acg-up] data-layer ArgoCD Application did not reach Synced after force-sync + 180s retry — check: kubectl get application data-layer -n cicd --context k3d-k3d-cluster"
             exit 1
           fi
