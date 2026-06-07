@@ -182,9 +182,40 @@ def _run_upgrade(job_id, chart_version, stage):
         _finish("failed")
 
 
+def _posix_spawn_job(cmd, output_path, cwd=None, env=None):
+    """Launch cmd via os.posix_spawn — no fork(), safe after macOS NEF is loaded.
+    stdout+stderr redirected to output_path (appended). Returns child PID.
+    posix_spawn uses posix_spawn(2) syscall which does NOT trigger atfork handlers."""
+    import shutil as _sh
+    _env = dict(os.environ) if env is None else dict(env)
+    _out = str(output_path)
+    _file_actions = [
+        (os.POSIX_SPAWN_OPEN, 1, _out,
+         os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600),
+        (os.POSIX_SPAWN_DUP2, 1, 2),
+    ]
+    if cwd:
+        cmd_str = " ".join(_sh.quote(str(c)) for c in cmd)
+        cmd = ["/bin/bash", "-c", f"cd {_sh.quote(str(cwd))} && {cmd_str}"]
+    exe = cmd[0]
+    if not os.path.isabs(exe):
+        exe = _sh.which(exe) or exe
+    return os.posix_spawn(exe, cmd, _env, file_actions=_file_actions, setsid=True)
+
+
+def _read_job_tail(output_path, n=3):
+    """Read last n non-empty lines from a job output file (safe for concurrent writes)."""
+    try:
+        with open(output_path, errors="replace") as _f:
+            _lines = _f.readlines()
+        return [l.rstrip() for l in _lines[-n:] if l.strip()]
+    except OSError:
+        return []
+
+
 def _run_cluster(job_id, action, provider="aws"):
     job_dir = JOB_DIR / job_id
-    lines = []
+    _out_file = job_dir / "output"
     _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "azure": "k3s-azure"}
     _cluster_provider = _provider_map.get(provider, "k3s-aws")
     _start = datetime.datetime.utcnow().timestamp()
@@ -194,17 +225,21 @@ def _run_cluster(job_id, action, provider="aws"):
     _stall_analyzed = False
 
     def _log(msg):
-        lines.append(msg + "\n")
+        with open(_out_file, "a") as _f:
+            _f.write(msg + "\n")
 
     _notify_job(job_id, f"🚀 *acg-{action}* ({provider}) started — job `{job_id}`")
 
     def _post_progress():
         nonlocal _progress_timer, _last_line_count, _stall_tick_count, _stall_analyzed
         elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
-        tail = [l.rstrip() for l in lines[-3:] if l.strip()]
+        tail = _read_job_tail(_out_file)
         tail_text = "\n".join(tail) if tail else "—"
         _notify_job(job_id, f"⏳ *acg-{action}* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
-        current_count = len(lines)
+        try:
+            current_count = sum(1 for _ in open(_out_file))
+        except OSError:
+            current_count = 0
         if current_count == _last_line_count:
             _stall_tick_count += 1
         else:
@@ -213,7 +248,11 @@ def _run_cluster(job_id, action, provider="aws"):
         _last_line_count = current_count
         if _stall_tick_count >= _STALL_TICKS_THRESHOLD and not _stall_analyzed:
             _stall_analyzed = True
-            analysis = _analyze_stall(lines)
+            try:
+                _all_lines = _out_file.read_text(errors="replace").splitlines()
+            except OSError:
+                _all_lines = []
+            analysis = _analyze_stall(_all_lines)
             _notify_job(
                 job_id,
                 f"⚠️ *Stall detected* — no new output for {_stall_tick_count * 2}m "
@@ -230,7 +269,6 @@ def _run_cluster(job_id, action, provider="aws"):
         with _running_procs_lock:
             _running_procs.pop(job_id, None)
         (job_dir / "status").write_text(status)
-        (job_dir / "output").write_text("".join(lines))
         emoji = "✅" if status == "success" else "❌"
         elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
         summary = f"{emoji} *acg-{action}* ({provider}) — {status} in {elapsed}m"
@@ -245,32 +283,17 @@ def _run_cluster(job_id, action, provider="aws"):
         _progress_timer = threading.Timer(120, _post_progress)
         _progress_timer.daemon = True
         _progress_timer.start()
-        proc = subprocess.Popen(
-            cmd,
-            cwd=REPO_ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            preexec_fn=os.setsid,
-        )
+        pid = _posix_spawn_job(cmd, _out_file, cwd=REPO_ROOT)
         with _running_procs_lock:
-            _running_procs[job_id] = proc
-
-        def _drain():
-            for line in proc.stdout:
-                lines.append(line)
-
-        _reader = threading.Thread(target=_drain, daemon=True)
-        _reader.start()
-        pgid = os.getpgid(proc.pid)
-        proc.wait()
+            _running_procs[job_id] = pid
+        _, _status = os.waitpid(pid, 0)
+        _rc = os.WEXITSTATUS(_status) if os.WIFEXITED(_status) else -os.WTERMSIG(_status)
         try:
-            os.killpg(pgid, signal.SIGTERM)
+            os.killpg(pid, signal.SIGTERM)
         except (ProcessLookupError, OSError):
             pass
-        _reader.join(timeout=5)
-        if proc.returncode != 0:
-            raise RuntimeError(f"{' '.join(cmd)} exited {proc.returncode}")
+        if _rc != 0:
+            raise RuntimeError(f"{' '.join(cmd)} exited {_rc}")
         _log(f"{action} complete")
         if action == "up":
             _record_acg_state(provider)
@@ -284,7 +307,8 @@ def _run_cluster(job_id, action, provider="aws"):
         tb = traceback.format_exc()
         _log(f"ERROR: {exc}\n{tb}")
         try:
-            analysis = _analyze_failure(lines)
+            _all_lines = _out_file.read_text(errors="replace").splitlines() if _out_file.exists() else []
+            analysis = _analyze_failure(_all_lines)
             _notify_job(job_id, f"🔍 *Failure analysis* (job `{job_id}`)\n{analysis}")
         except Exception as analysis_exc:
             _log(f"WARN: failure analysis skipped: {analysis_exc}")
@@ -303,21 +327,22 @@ _MAX_JOB_AGE_SECS = 10800  # 3 hours — any older "running" job is stale
 def _run_cluster_resume(job_id, provider="aws"):
     """Re-run make up with K3DM_RESUME=1 to skip completed checkpoints."""
     job_dir = JOB_DIR / job_id
-    lines = []
+    _out_file = job_dir / "output"
     _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "azure": "k3s-azure"}
     _cluster_provider = _provider_map.get(provider, "k3s-aws")
     _start = datetime.datetime.utcnow().timestamp()
     _progress_timer = None
 
     def _log(msg):
-        lines.append(msg + "\n")
+        with open(_out_file, "a") as _f:
+            _f.write(msg + "\n")
 
     _notify_job(job_id, f"🔄 *acg-resume* ({provider}) started — job `{job_id}`")
 
     def _post_progress():
         nonlocal _progress_timer
         elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
-        tail = [l.rstrip() for l in lines[-3:] if l.strip()]
+        tail = _read_job_tail(_out_file)
         tail_text = "\n".join(tail) if tail else "—"
         _notify_job(job_id, f"⏳ *acg-resume* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
         _progress_timer = threading.Timer(120, _post_progress)
@@ -330,7 +355,6 @@ def _run_cluster_resume(job_id, provider="aws"):
         with _running_procs_lock:
             _running_procs.pop(job_id, None)
         (job_dir / "status").write_text(status)
-        (job_dir / "output").write_text("".join(lines))
         emoji = "✅" if status == "success" else "❌"
         elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
         _notify_job(job_id, f"{emoji} *acg-resume* ({provider}) — {status} in {elapsed}m")
@@ -341,32 +365,17 @@ def _run_cluster_resume(job_id, provider="aws"):
         _progress_timer = threading.Timer(120, _post_progress)
         _progress_timer.daemon = True
         _progress_timer.start()
-        proc = subprocess.Popen(
-            cmd,
-            cwd=REPO_ROOT,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            preexec_fn=os.setsid,
-        )
+        pid = _posix_spawn_job(cmd, _out_file, cwd=REPO_ROOT)
         with _running_procs_lock:
-            _running_procs[job_id] = proc
-
-        def _drain():
-            for line in proc.stdout:
-                lines.append(line)
-
-        _reader = threading.Thread(target=_drain, daemon=True)
-        _reader.start()
-        pgid = os.getpgid(proc.pid)
-        proc.wait()
+            _running_procs[job_id] = pid
+        _, _status = os.waitpid(pid, 0)
+        _rc = os.WEXITSTATUS(_status) if os.WIFEXITED(_status) else -os.WTERMSIG(_status)
         try:
-            os.killpg(pgid, signal.SIGTERM)
+            os.killpg(pid, signal.SIGTERM)
         except (ProcessLookupError, OSError):
             pass
-        _reader.join(timeout=5)
-        if proc.returncode != 0:
-            raise RuntimeError(f"{' '.join(cmd)} exited {proc.returncode}")
+        if _rc != 0:
+            raise RuntimeError(f"{' '.join(cmd)} exited {_rc}")
         _log("resume complete")
         _record_acg_state(provider)
         threading.Thread(
@@ -379,7 +388,8 @@ def _run_cluster_resume(job_id, provider="aws"):
         tb = traceback.format_exc()
         _log(f"ERROR: {exc}\n{tb}")
         try:
-            analysis = _analyze_failure(lines)
+            _all_lines = _out_file.read_text(errors="replace").splitlines() if _out_file.exists() else []
+            analysis = _analyze_failure(_all_lines)
             _notify_job(job_id, f"🔍 *Failure analysis* (job `{job_id}`)\n{analysis}")
         except Exception as analysis_exc:
             _log(f"WARN: failure analysis skipped: {analysis_exc}")
@@ -475,8 +485,8 @@ def _handle_thread_command(job_id, command):
         proc = _running_procs.get(job_id)
         if proc:
             try:
-                import os as _os
-                _os.killpg(_os.getpgid(proc.pid), __import__("signal").SIGTERM)
+                _pid = proc if isinstance(proc, int) else proc.pid
+                os.killpg(_pid, signal.SIGTERM)
             except Exception:
                 pass
             _notify_job(job_id, f"🛑 *Kill requested* — job `{job_id}` signal sent")
@@ -2097,7 +2107,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 with _running_procs_lock:
                     proc = _running_procs.get(job_id)
                 if proc:
-                    proc.kill()
+                    try:
+                        _pid = proc if isinstance(proc, int) else proc.pid
+                        os.killpg(_pid, signal.SIGTERM)
+                    except Exception:
+                        pass
                     job_dir = _safe_job_dir(job_id)
                     (job_dir / "status").write_text("killed")
                     self._json(200, {"status": "killed", "job_id": job_id})
