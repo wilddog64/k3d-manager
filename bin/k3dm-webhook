@@ -417,22 +417,16 @@ def _running_cluster_job():
 
 def _record_acg_state(provider):
     """Write provision timestamp to Hub platform-ops ConfigMap."""
+    import shlex as _shlex_state
     ts = str(int(datetime.datetime.utcnow().timestamp()))
-    create = subprocess.run(
-        ["kubectl", "create", "configmap", "acg-state",
-         f"--from-literal=provisioned-at={ts}",
-         f"--from-literal=provider={provider}",
-         "-n", "platform-ops",
-         "--dry-run=client", "-o", "yaml"],
-        capture_output=True, text=True
+    _posix_spawn_capture(
+        ["/bin/bash", "-c",
+         "kubectl create configmap acg-state"
+         f" --from-literal=provisioned-at={_shlex_state.quote(ts)}"
+         f" --from-literal=provider={_shlex_state.quote(provider)}"
+         " -n platform-ops --dry-run=client -o yaml | kubectl apply -f -"],
+        timeout=15,
     )
-    if create.returncode == 0:
-        subprocess.run(
-            ["kubectl", "apply", "-f", "-"],
-            input=create.stdout,
-            capture_output=True,
-            text=True,
-        )
 
 
 def _slack_post(url, text):
@@ -871,71 +865,64 @@ def _posix_spawn_capture(cmd, timeout, cwd=None, env=None):
 
 
 def _collect_cluster_state():
-    """Collect live cluster state to enrich failure analysis. Returns a string or empty string."""
+    """Collect live cluster state to enrich failure analysis. Returns a string or empty string.
+    Uses posix_spawn (no fork) throughout — safe after macOS NEF is loaded."""
+    import socket as _socket
     sections = []
 
-    tunnel = subprocess.run(
-        ["curl", "-sf", "--max-time", "3", "http://localhost:6443"],
-        capture_output=True,
-    )
-    tunnel_ok = tunnel.returncode == 0 or tunnel.returncode == 22
+    try:
+        with _socket.create_connection(("localhost", 6443), timeout=3):
+            tunnel_ok = True
+    except OSError:
+        tunnel_ok = False
     sections.append(f"SSH tunnel (localhost:6443): {'UP' if tunnel_ok else 'DOWN — remote kubectl calls will be unreachable'}")
 
     if not tunnel_ok:
         return "\n\n".join(sections)
 
-    try:
-        result = subprocess.run(
-            ["kubectl", "get", "nodes", "--context", "ubuntu-k3s", "--no-headers"],
-            capture_output=True, text=True, timeout=15,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            sections.append("Remote cluster nodes (ubuntu-k3s):\n" + result.stdout.strip())
-        else:
-            sections.append("Remote cluster nodes (ubuntu-k3s): UNREACHABLE — cluster may not be provisioned")
-    except Exception:
+    nodes_out, nodes_timeout = _posix_spawn_capture(
+        ["kubectl", "get", "nodes", "--context", "ubuntu-k3s", "--no-headers"],
+        timeout=15,
+    )
+    if not nodes_timeout and nodes_out.strip() and not nodes_out.lstrip().startswith("Error"):
+        sections.append("Remote cluster nodes (ubuntu-k3s):\n" + nodes_out.strip())
+    else:
         sections.append("Remote cluster nodes (ubuntu-k3s): UNREACHABLE — cluster may not be provisioned")
 
-    try:
-        result = subprocess.run(
-            ["kubectl", "get", "pods", "-A", "--context", "ubuntu-k3s", "--no-headers"],
-            capture_output=True, text=True, timeout=15,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            bad = [
-                ln for ln in result.stdout.splitlines()
-                if any(s in ln for s in (
-                    "CrashLoopBackOff", "Error", "OOMKilled",
-                    "ImagePullBackOff", "ErrImagePull", "Pending",
-                ))
-                and "Completed" not in ln
-            ]
-            if bad:
-                sections.append("Unhealthy pods (ubuntu-k3s):\n" + "\n".join(bad))
-    except Exception:
-        pass
+    pods_out, pods_timeout = _posix_spawn_capture(
+        ["kubectl", "get", "pods", "-A", "--context", "ubuntu-k3s", "--no-headers"],
+        timeout=15,
+    )
+    if not pods_timeout and pods_out.strip():
+        bad = [
+            ln for ln in pods_out.splitlines()
+            if any(s in ln for s in (
+                "CrashLoopBackOff", "Error", "OOMKilled",
+                "ImagePullBackOff", "ErrImagePull", "Pending",
+            ))
+            and "Completed" not in ln
+        ]
+        if bad:
+            sections.append("Unhealthy pods (ubuntu-k3s):\n" + "\n".join(bad))
 
-    try:
-        result = subprocess.run(
-            [
-                "kubectl", "get", "applications", "-A",
-                "--context", "k3d-k3d-cluster",
-                "-o", (
-                    "custom-columns="
-                    "NAME:.metadata.name,"
-                    "HEALTH:.status.health.status,"
-                    "SYNC:.status.sync.status"
-                ),
-                "--no-headers",
-            ],
-            capture_output=True, text=True, timeout=15,
+    apps_out, apps_timeout = _posix_spawn_capture(
+        [
+            "kubectl", "get", "applications", "-A",
+            "--context", "k3d-k3d-cluster",
+            "-o", (
+                "custom-columns="
+                "NAME:.metadata.name,"
+                "HEALTH:.status.health.status,"
+                "SYNC:.status.sync.status"
+            ),
+            "--no-headers",
+        ],
+        timeout=15,
+    )
+    if not apps_timeout and apps_out.strip() and not apps_out.lstrip().startswith("Error"):
+        sections.append(
+            "ArgoCD application state (k3d-k3d-cluster):\n" + apps_out.strip()
         )
-        if result.returncode == 0 and result.stdout.strip():
-            sections.append(
-                "ArgoCD application state (k3d-k3d-cluster):\n" + result.stdout.strip()
-            )
-    except Exception:
-        pass
 
     return "\n\n".join(sections)
 
@@ -1317,29 +1304,30 @@ def _run_post_provision_check(job_id, provider):
 
     lines = []
 
-    # SSH tunnel
-    tunnel = subprocess.run(
-        ["curl", "-sf", "--max-time", "3", "http://localhost:6443"],
-        capture_output=True, text=True, timeout=8
-    )
-    tunnel_ok = tunnel.returncode == 0 or tunnel.returncode == 22
+    # SSH tunnel — Python socket, no subprocess
+    import socket as _socket
+    try:
+        with _socket.create_connection(("localhost", 6443), timeout=3):
+            tunnel_ok = True
+    except OSError:
+        tunnel_ok = False
     lines.append(f"*SSH tunnel (6443):* {'UP ✅' if tunnel_ok else 'DOWN ❌'}")
 
     if not tunnel_ok:
         lines.append("⚠️ SSH tunnel down — ACG cluster API unreachable. Service endpoints may still be accessible via port-forwards.")
 
-    # ArgoCD degraded apps
-    apps = subprocess.run(
+    # ArgoCD degraded apps — posix_spawn avoids NEF atfork SIGSEGV
+    apps_out, apps_timeout = _posix_spawn_capture(
         ["kubectl", "get", "applications", "-n", "cicd",
          "--context", "k3d-k3d-cluster", "--no-headers",
          "-o", "custom-columns=NAME:.metadata.name,HEALTH:.status.health.status"],
-        capture_output=True, text=True, timeout=10
+        timeout=10,
     )
-    if apps.returncode != 0 or not apps.stdout.strip():
+    if apps_timeout or not apps_out.strip() or apps_out.lstrip().startswith("Error"):
         lines.append("_ArgoCD app status unavailable_")
         degraded = []
     else:
-        app_lines = [l for l in apps.stdout.strip().splitlines() if l]
+        app_lines = [l for l in apps_out.strip().splitlines() if l]
         degraded = [l.split()[0] for l in app_lines
                     if len(l.split()) >= 2 and l.split()[1] == "Degraded"]
         healthy_count = len(app_lines) - len(degraded)
@@ -1363,22 +1351,22 @@ def _run_post_provision_check(job_id, provider):
         for app_name in degraded[:5]:  # cap at 5 to limit API calls
             diag_parts = []
 
-            desc = subprocess.run(
+            desc_out, desc_timeout = _posix_spawn_capture(
                 ["kubectl", "describe", "application", app_name, "-n", "cicd",
                  "--context", "k3d-k3d-cluster"],
-                capture_output=True, text=True, timeout=15
+                timeout=15,
             )
-            if desc.returncode == 0 and desc.stdout.strip():
-                diag_parts.append(f"ArgoCD Application:\n{desc.stdout[-2000:]}")
+            if not desc_timeout and desc_out.strip():
+                diag_parts.append(f"ArgoCD Application:\n{desc_out[-2000:]}")
 
-            pods = subprocess.run(
+            pods_out, pods_timeout = _posix_spawn_capture(
                 ["kubectl", "get", "pods", "-A", "--context", "ubuntu-k3s",
                  "--no-headers", "--request-timeout=8s",
                  "--field-selector=status.phase!=Running"],
-                capture_output=True, text=True, timeout=15
+                timeout=15,
             )
-            if pods.returncode == 0 and pods.stdout.strip():
-                diag_parts.append(f"Non-running pods:\n{pods.stdout.strip()[:1000]}")
+            if not pods_timeout and pods_out.strip():
+                diag_parts.append(f"Non-running pods:\n{pods_out.strip()[:1000]}")
 
             if not diag_parts:
                 continue
@@ -1414,23 +1402,23 @@ def _run_post_provision_check(job_id, provider):
         }
         ns, label_sel = ns_map.get(svc_name, ("shopping-cart-apps", ""))
         if label_sel:
-            pod_state = subprocess.run(
+            pod_state_out, pod_state_timeout = _posix_spawn_capture(
                 ["kubectl", "get", "pods", "-n", ns, "-l", label_sel,
                  "--context", "ubuntu-k3s", "--no-headers",
                  "--request-timeout=8s"],
-                capture_output=True, text=True, timeout=15,
+                timeout=15,
             )
-            if pod_state.returncode == 0 and pod_state.stdout.strip():
-                diag_parts.append(f"Pod state ({ns}):\n{pod_state.stdout.strip()[:800]}")
+            if not pod_state_timeout and pod_state_out.strip():
+                diag_parts.append(f"Pod state ({ns}):\n{pod_state_out.strip()[:800]}")
 
-            pod_logs = subprocess.run(
+            pod_logs_out, pod_logs_timeout = _posix_spawn_capture(
                 ["kubectl", "logs", "-n", ns, "-l", label_sel,
                  "--context", "ubuntu-k3s", "--tail=30",
                  "--request-timeout=8s"],
-                capture_output=True, text=True, timeout=15,
+                timeout=15,
             )
-            if pod_logs.returncode == 0 and pod_logs.stdout.strip():
-                diag_parts.append(f"Recent logs ({ns}):\n{pod_logs.stdout.strip()[-1000:]}")
+            if not pod_logs_timeout and pod_logs_out.strip():
+                diag_parts.append(f"Recent logs ({ns}):\n{pod_logs_out.strip()[-1000:]}")
 
         prompt = (
             _ARCH_CONTEXT + "\n"
@@ -1494,50 +1482,51 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
             _finish("success")
             return
 
-        # Hub cluster
-        hub_nodes = subprocess.run(
+        # Hub cluster — posix_spawn avoids NEF atfork SIGSEGV
+        hub_out, hub_timeout = _posix_spawn_capture(
             ["kubectl", "get", "nodes", "--context", "k3d-k3d-cluster",
              "--request-timeout=5s", "--no-headers"],
-            capture_output=True, text=True, timeout=10
+            timeout=10,
         )
-        if hub_nodes.returncode == 0 and hub_nodes.stdout.strip():
-            hub_lines = [l for l in hub_nodes.stdout.strip().splitlines() if l]
+        if not hub_timeout and hub_out.strip() and not hub_out.lstrip().startswith("Error"):
+            hub_lines = [l for l in hub_out.strip().splitlines() if l]
             hub_ready = sum(1 for l in hub_lines if "Ready" in l and "NotReady" not in l)
             _log(f"🏠 *Hub cluster* — {hub_ready}/{len(hub_lines)} nodes ready")
         else:
             _log("🏠 *Hub cluster* — ❌ unreachable")
 
-        # SSH tunnel
-        tunnel = subprocess.run(
-            ["curl", "-sf", "--max-time", "3", "http://localhost:6443"],
-            capture_output=True, text=True, timeout=8
-        )
-        tunnel_ok = tunnel.returncode == 0 or tunnel.returncode == 22
+        # SSH tunnel — Python socket, no subprocess
+        import socket as _socket
+        try:
+            with _socket.create_connection(("localhost", 6443), timeout=3):
+                tunnel_ok = True
+        except OSError:
+            tunnel_ok = False
         _log(f"*SSH tunnel (6443):* {'UP ✅' if tunnel_ok else 'DOWN ❌'}")
 
         # ACG app cluster
-        nodes = subprocess.run(
+        nodes_out, nodes_timeout = _posix_spawn_capture(
             ["kubectl", "get", "nodes", "--context", "ubuntu-k3s",
              "--request-timeout=8s", "--no-headers"],
-            capture_output=True, text=True, timeout=15
+            timeout=15,
         )
-        acg_reachable = nodes.returncode == 0 and nodes.stdout.strip()
+        acg_reachable = not nodes_timeout and nodes_out.strip() and not nodes_out.lstrip().startswith("Error")
         if not acg_reachable:
             _log("\n❌ *ACG cluster unreachable* — cluster may be rebuilding or sandbox may have expired.")
         else:
-            node_lines = [l for l in nodes.stdout.strip().splitlines() if l]
+            node_lines = [l for l in nodes_out.strip().splitlines() if l]
             ready_count = sum(1 for l in node_lines if "Ready" in l and "NotReady" not in l)
             total_count = len(node_lines)
 
             header = f"\n✅ *ACG cluster* — {ready_count}/{total_count} nodes ready"
-            acg_state = subprocess.run(
+            acg_state_out, _ = _posix_spawn_capture(
                 ["kubectl", "get", "configmap", "acg-state", "-n", "platform-ops",
                  "--context", "ubuntu-k3s", "--request-timeout=5s",
                  "-o", "jsonpath={.data.provisioned-at} {.data.provider}"],
-                capture_output=True, text=True, timeout=10
+                timeout=10,
             )
-            if acg_state.returncode == 0 and acg_state.stdout.strip():
-                parts = acg_state.stdout.strip().split()
+            if acg_state_out.strip() and not acg_state_out.lstrip().startswith("Error"):
+                parts = acg_state_out.strip().split()
                 try:
                     age_min = int((datetime.datetime.utcnow().timestamp() - int(parts[0])) / 60)
                     provider = parts[1] if len(parts) > 1 else "aws"
@@ -1545,16 +1534,16 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
                 except (ValueError, IndexError):
                     pass
             _log(header)
-            _log(f"```{nodes.stdout.strip()}```")
+            _log(f"```{nodes_out.strip()}```")
 
             # ACG pods (all namespaces, standard output)
-            pods = subprocess.run(
+            pods_out, pods_timeout = _posix_spawn_capture(
                 ["kubectl", "get", "pods", "-A", "--context", "ubuntu-k3s",
                  "--no-headers", "--request-timeout=10s"],
-                capture_output=True, text=True, timeout=20
+                timeout=20,
             )
-            if pods.returncode == 0 and pods.stdout.strip():
-                all_pod_lines = [l for l in pods.stdout.strip().splitlines() if l]
+            if not pods_timeout and pods_out.strip():
+                all_pod_lines = [l for l in pods_out.strip().splitlines() if l]
                 skip_ns = {"kube-system", "kube-public", "kube-node-lease", "trivy-system"}
                 app_pods = [l for l in all_pod_lines if l.split()[0] not in skip_ns]
                 if app_pods:
@@ -1576,22 +1565,22 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
                 _log("\n_Pod status unavailable_")
 
         # ArgoCD apps
-        apps = subprocess.run(
+        apps_out, apps_timeout = _posix_spawn_capture(
             ["kubectl", "get", "applications", "-n", "cicd",
              "--context", "k3d-k3d-cluster",
              "--no-headers",
              "-o", "custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status"],
-            capture_output=True, text=True, timeout=10
+            timeout=10,
         )
-        if apps.returncode == 0 and apps.stdout.strip():
-            acg_apps = [l for l in apps.stdout.strip().splitlines()
+        if not apps_timeout and apps_out.strip() and not apps_out.lstrip().startswith("Error"):
+            acg_apps = [l for l in apps_out.strip().splitlines()
                         if l.startswith("acg-") or "ubuntu-k3s" in l]
             if acg_apps:
                 _log(f"\n*ACG ArgoCD apps:*")
                 if not acg_reachable:
                     _log("_(cached — ACG cluster was unreachable)_")
                 _log(f"```{chr(10).join(acg_apps)}```")
-            all_apps = apps.stdout.strip().splitlines()
+            all_apps = apps_out.strip().splitlines()
             unhealthy = [l for l in all_apps
                          if "Degraded" in l or "Missing" in l or "OutOfSync" in l]
             if unhealthy:
@@ -1601,13 +1590,12 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
             _log("\n_ArgoCD app status unavailable (Hub cluster unreachable)_")
 
         # AWS credentials
-        aws_id = subprocess.run(
-            ["aws", "sts", "get-caller-identity",
-             "--query", "Arn", "--output", "text"],
-            capture_output=True, text=True, timeout=10
+        aws_out, aws_timeout = _posix_spawn_capture(
+            ["aws", "sts", "get-caller-identity", "--query", "Arn", "--output", "text"],
+            timeout=10,
         )
-        if aws_id.returncode == 0 and aws_id.stdout.strip():
-            _log(f"\n*AWS:* ✅ `{aws_id.stdout.strip()}`")
+        if not aws_timeout and aws_out.strip() and "arn:" in aws_out.lower():
+            _log(f"\n*AWS:* ✅ `{aws_out.strip()}`")
         else:
             _log("\n*AWS:* ❌ credentials invalid or expired — run `/acg-refresh`")
 
@@ -1636,13 +1624,13 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
             }
             ns, label_sel = ns_map.get(svc_name, ("shopping-cart-apps", ""))
             if label_sel:
-                pod_state = subprocess.run(
+                pod_state_out, pod_state_timeout = _posix_spawn_capture(
                     ["kubectl", "get", "pods", "-n", ns, "-l", label_sel,
                      "--context", "ubuntu-k3s", "--no-headers", "--request-timeout=8s"],
-                    capture_output=True, text=True, timeout=15,
+                    timeout=15,
                 )
-                if pod_state.returncode == 0 and pod_state.stdout.strip():
-                    diag_parts.append(f"Pod state ({ns}):\n{pod_state.stdout.strip()[:800]}")
+                if not pod_state_timeout and pod_state_out.strip():
+                    diag_parts.append(f"Pod state ({ns}):\n{pod_state_out.strip()[:800]}")
             prompt = (
                 _ARCH_CONTEXT + "\n"
                 f"Service `{svc_name}` failed an HTTP smoke test. Error: {err_detail}\n\n"
@@ -1682,23 +1670,26 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
 
     try:
         _log("🔄 *ACG Refresh* — refreshing credentials + SSH tunnel…")
+        import shlex as _shlex_ref
         repo_root = Path(__file__).resolve().parent.parent
         refresh_bin = repo_root / "bin" / "acg-refresh"
-        result = subprocess.run(
-            [str(refresh_bin), "--no-login-prompt"],
-            capture_output=True, text=True, timeout=300,
+        refresh_out, refresh_timeout = _posix_spawn_capture(
+            ["/bin/bash", "-c",
+             f"{_shlex_ref.quote(str(refresh_bin))} --no-login-prompt && echo __WEBHOOK_SUCCESS__"],
+            timeout=300,
         )
-        if result.returncode == 0:
+        if refresh_timeout:
+            _log("\n❌ *Refresh timed out* after 300s — run `bin/acg-refresh` manually")
+            _finish("failed")
+            return
+        if "__WEBHOOK_SUCCESS__" in refresh_out:
             _log("\n✅ *Refresh complete* — tunnel and credentials restored")
         else:
-            stderr_tail = result.stderr.strip().splitlines()[-5:] if result.stderr.strip() else []
-            _log("\n❌ *Refresh failed* (exit {})".format(result.returncode))
-            if stderr_tail:
-                _log("```\n{}\n```".format("\n".join(stderr_tail)))
+            tail_lines = [l for l in refresh_out.strip().splitlines()[-5:] if l]
+            _log("\n❌ *Refresh failed*")
+            if tail_lines:
+                _log("```\n{}\n```".format("\n".join(tail_lines)))
         _finish("success")
-    except subprocess.TimeoutExpired:
-        _log("\n❌ *Refresh timed out* after 300s — run `bin/acg-refresh` manually")
-        _finish("failed")
     except Exception as exc:
         _log(f"ERROR: {exc}")
         _finish("failed")
@@ -1731,21 +1722,21 @@ def _run_analyze(job_id, alert_payload, response_url=""):
 
             diag_parts = []
             if app_name:
-                desc = subprocess.run(
+                desc_out, desc_timeout = _posix_spawn_capture(
                     ["kubectl", "describe", "application", app_name, "-n", "cicd"],
-                    capture_output=True, text=True
+                    timeout=15,
                 )
-                if desc.returncode == 0:
-                    diag_parts.append(f"ArgoCD Application:\n{desc.stdout[-3000:]}")
+                if not desc_timeout and desc_out.strip():
+                    diag_parts.append(f"ArgoCD Application:\n{desc_out[-3000:]}")
 
-            pods = subprocess.run(
+            pods_out, pods_timeout = _posix_spawn_capture(
                 ["kubectl", "get", "pods", "-A",
                  "--field-selector=status.phase!=Running",
                  "--no-headers"],
-                capture_output=True, text=True
+                timeout=15,
             )
-            if pods.returncode == 0 and pods.stdout.strip():
-                diag_parts.append(f"Non-running pods:\n{pods.stdout.strip()}")
+            if not pods_timeout and pods_out.strip():
+                diag_parts.append(f"Non-running pods:\n{pods_out.strip()}")
 
             if not diag_parts:
                 _log("No diagnostics gathered\n")
