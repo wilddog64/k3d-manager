@@ -14,6 +14,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ ! -d "${REPO_ROOT}/scripts/lib/acg/node_modules/playwright" ]]; then
+  npm --prefix "${REPO_ROOT}/scripts/lib/acg" install --prefer-offline 2>&1
+fi
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
 source "${REPO_ROOT}/scripts/plugins/gemini.sh"
@@ -180,6 +183,71 @@ for _i in $(seq 1 15); do
 done
 if [[ "${_tunnel_ready}" -eq 0 ]]; then
   _warn "[acg-refresh] Tunnel port ${_tunnel_port} not ready after 15s — nodes check may fail"
+fi
+
+# ── 2b-pre. CoreDNS NodeHosts patch + restart ────────────────────────────────
+_info "[acg-refresh] Detecting host IP for host.k3d.internal..."
+_coredns_host_ip=$(docker exec k3d-k3d-cluster-server-0 sh -c \
+  "getent hosts host.docker.internal 2>/dev/null | awk '{print \$1}'" 2>/dev/null || echo "")
+if [[ -z "${_coredns_host_ip}" ]]; then
+  _warn "[acg-refresh] Could not detect host IP from host.docker.internal — CoreDNS patch skipped"
+else
+  _info "[acg-refresh] Patching CoreDNS NodeHosts: host.k3d.internal → ${_coredns_host_ip}"
+  _existing_nodes=$(kubectl get configmap coredns -n kube-system \
+    --context k3d-k3d-cluster \
+    -o jsonpath='{.data.NodeHosts}' 2>/dev/null \
+    | grep -v "host\.k3d\.internal" || true)
+  _new_node_hosts="${_coredns_host_ip} host.k3d.internal"
+  if [[ -n "${_existing_nodes}" ]]; then
+    _new_node_hosts="${_new_node_hosts}"$'\n'"${_existing_nodes}"
+  fi
+  _patch_json=$(python3 -c \
+    "import json,sys; print(json.dumps({'data':{'NodeHosts':sys.argv[1]}}))" \
+    "${_new_node_hosts}")
+  if kubectl patch configmap coredns -n kube-system \
+      --context k3d-k3d-cluster --type merge -p "${_patch_json}" >/dev/null 2>&1; then
+    _info "[acg-refresh] CoreDNS ConfigMap patched — host.k3d.internal → ${_coredns_host_ip}"
+  else
+    _warn "[acg-refresh] CoreDNS ConfigMap patch failed — DNS may not resolve"
+  fi
+  if kubectl rollout restart deployment/coredns -n kube-system \
+      --context k3d-k3d-cluster >/dev/null 2>&1; then
+    kubectl rollout status deployment/coredns -n kube-system \
+      --context k3d-k3d-cluster --timeout=30s >/dev/null 2>&1 \
+      && _info "[acg-refresh] CoreDNS restarted — host.k3d.internal resolution restored" \
+      || _warn "[acg-refresh] CoreDNS rollout status timed out — DNS may still be recovering"
+  else
+    _warn "[acg-refresh] CoreDNS restart failed — hub cluster may not be running"
+  fi
+fi
+
+# ── 2b. ArgoCD cluster secret ────────────────────────────────────────────────
+_info "[acg-refresh] Refreshing ArgoCD cluster secret (ubuntu-k3s SA token)..."
+_argocd_tracing=0; case $- in *x*) _argocd_tracing=1; set +x;; esac
+_argocd_token=$(kubectl get secret argocd-manager-token -n kube-system \
+  --context ubuntu-k3s -o jsonpath='{.data.token}' 2>/dev/null | base64 -d | tr -d '\n' || echo "")
+(( _argocd_tracing )) && set -x || true
+if [[ -n "${_argocd_token}" ]]; then
+  _argocd_server="${ARGOCD_APP_CLUSTER_SERVER:-https://host.k3d.internal:6443}"
+  _argocd_patch="$(mktemp -t argocd-cluster-patch.XXXXXX.yaml)"
+  _argocd_tracing=0; case $- in *x*) _argocd_tracing=1; set +x;; esac
+  cat > "${_argocd_patch}" <<PATCH
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cluster-ubuntu-k3s
+  namespace: cicd
+stringData:
+  server: "${_argocd_server}"
+  config: |
+    {"bearerToken":"${_argocd_token}","tlsClientConfig":{"insecure":true}}
+PATCH
+  (( _argocd_tracing )) && set -x || true
+  kubectl apply -f "${_argocd_patch}" --context k3d-k3d-cluster >/dev/null
+  rm -f "${_argocd_patch}"
+  _info "[acg-refresh] ArgoCD cluster secret refreshed: ${_argocd_server}"
+else
+  _warn "[acg-refresh] argocd-manager-token not readable on ubuntu-k3s — cluster secret not refreshed"
 fi
 
 # ── 3. PID-file port-forwards ─────────────────────────────────────────────────

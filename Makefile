@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward
+.PHONY: up down refresh status creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward clean-tmp
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/acg-up; k3s-oci → deploy_cluster)
 up:
@@ -19,7 +19,7 @@ up:
 	  k3s-oci) mkdir -p "$(HOME)/.local/share/k3d-manager/logs" && \
 	           CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager deploy_cluster --confirm 2>&1 | \
 	           tee "$(HOME)/.local/share/k3d-manager/logs/k3s-oci-up.log" ;; \
-	  *)       GHCR_PAT="$(GHCR_PAT)" bin/acg-up "$(URL)" ;; \
+	  *)       GHCR_PAT="$(GHCR_PAT)" K3DM_RESUME="$(K3DM_RESUME)" bin/acg-up "$(URL)" ;; \
 	esac
 	@$(MAKE) --no-print-directory observability
 
@@ -148,6 +148,17 @@ install-sudoers:
 restart-webhook:
 	launchctl bootout "gui/$$(id -u)/com.k3d-manager.webhook" 2>/dev/null || true
 	launchctl bootstrap "gui/$$(id -u)" "$(HOME)/Library/LaunchAgents/com.k3d-manager.webhook.plist"
+
+## Remove k3d-manager-owned /tmp files
+clean-tmp:
+	rm -f /tmp/k3d-manager-sudoers.*
+	rm -f /tmp/k3dm-gcp-creds.*
+	rm -f /tmp/k3d-manager-tunnel.out /tmp/k3d-manager-tunnel.err
+	rm -f /tmp/k3d-manager-acg-watch.out /tmp/k3d-manager-acg-watch.err
+	rm -f /tmp/k3dm-acg-screenshot-*.png
+	rm -f /tmp/k3s-etcd-*.db
+	find /tmp -maxdepth 1 -name 'playwright-artifacts-*' -type d -exec rm -rf {} + 2>/dev/null || true
+	@echo "clean-tmp: done"
 
 ## Rotate webhook bearer token now (updates Keychain + Cloudflare Worker secret + restarts webhook)
 rotate-webhook-token:
@@ -337,6 +348,61 @@ observability-status:
 ## Print VulnerabilityReport summary for both clusters
 vuln-scan trivy-scan-report:
 	./scripts/k3d-manager trivy_scan_report
+
+## ── Agent Fix Targets ────────────────────────────────────────────────────────
+## Callable by /ask agents in fix mode. Use 'make fix-list' to discover targets.
+## All targets accept CONTEXT (default: ubuntu-k3s) and NS (namespace).
+
+FIX_CONTEXT ?= ubuntu-k3s
+
+fix-list: ## List all fix targets with descriptions
+	@grep -E '^fix-[a-z].*:.*##' Makefile | sort | awk -F':.*##' '{printf "  make %-30s %s\n", $$1, $$2}'
+
+## Rollout restart a deployment and wait for rollout (APP=<name> NS=<namespace>)
+fix-restart: ## APP and NS are required
+	@test -n "$(APP)" || { echo "Usage: make fix-restart APP=<deployment> NS=<namespace>"; exit 1; }
+	@test -n "$(NS)"  || { echo "Usage: make fix-restart APP=<deployment> NS=<namespace>"; exit 1; }
+	kubectl rollout restart 'deployment/$(APP)' -n '$(NS)' --context '$(FIX_CONTEXT)'
+	kubectl rollout status  'deployment/$(APP)' -n '$(NS)' --context '$(FIX_CONTEXT)' --timeout=120s
+
+## Delete all pods matching label app=<APP> (forces pod restart via ReplicaSet)
+fix-delete-pod: ## APP and NS are required
+	@test -n "$(APP)" || { echo "Usage: make fix-delete-pod APP=<label> NS=<namespace>"; exit 1; }
+	@test -n "$(NS)"  || { echo "Usage: make fix-delete-pod APP=<label> NS=<namespace>"; exit 1; }
+	kubectl delete pod -l 'app=$(APP)' -n '$(NS)' --context '$(FIX_CONTEXT)' --grace-period=0
+
+## ArgoCD app sync with 120s timeout (APP=<argocd-app-name>)
+fix-sync: ## APP is required
+	@test -n "$(APP)" || { echo "Usage: make fix-sync APP=<argocd-app-name>"; exit 1; }
+	argocd app sync '$(APP)' --timeout 120 --server localhost:8080 --insecure
+
+## ArgoCD force sync — discards local state (APP=<argocd-app-name>)
+fix-force-sync: ## APP is required
+	@test -n "$(APP)" || { echo "Usage: make fix-force-sync APP=<argocd-app-name>"; exit 1; }
+	argocd app sync '$(APP)' --force --timeout 180 --server localhost:8080 --insecure
+
+## Force ESO ClusterSecretStore reconcile (annotates vault-backend to trigger re-sync)
+fix-eso-refresh: ## No arguments needed
+	kubectl annotate clustersecretstore vault-backend \
+	  k3d-manager/reconcile-at="$$(date -u +%Y-%m-%dT%H:%M:%SZ)" --overwrite \
+	  --context $(FIX_CONTEXT)
+
+## Print node + pod status for a namespace (NS=<namespace>)
+fix-status: ## NS is required
+	@test -n "$(NS)" || { echo "Usage: make fix-status NS=<namespace>"; exit 1; }
+	kubectl get nodes --context '$(FIX_CONTEXT)' --no-headers
+	kubectl get pods -n '$(NS)' --context '$(FIX_CONTEXT)'
+
+file-bug: ## FILE_TITLE and FILE_BODY required — write docs/bugs/<date>-<slug>.md
+	@test -n "$(FILE_TITLE)" || { echo "Usage: make file-bug FILE_TITLE=<title> FILE_BODY=<body>"; exit 1; }
+	@test -n "$(FILE_BODY)"  || { echo "Usage: make file-bug FILE_TITLE=<title> FILE_BODY=<body>"; exit 1; }
+	@slug=$$(echo "$(FILE_TITLE)" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9-'); \
+	 existing=$$(ls docs/bugs/*-$$slug.md 2>/dev/null | head -1); \
+	 if [ -n "$$existing" ]; then echo "already filed: $$existing"; exit 0; fi; \
+	 fname="docs/bugs/$$(date +%Y-%m-%d)-$$slug.md"; \
+	 printf '# Bug: %s\n\n**Filed:** %s\n**Source:** /ask agent observation\n\n## Description\n\n%s\n' \
+	   "$(FILE_TITLE)" "$$(date +%Y-%m-%d)" "$(FILE_BODY)" > "$$fname"; \
+	 echo "$$fname"
 
 ## Run all BATS test suites
 test:

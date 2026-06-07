@@ -1,4 +1,4 @@
-const ALLOWED_COMMANDS = new Set(['/acg-up', '/acg-down', '/acg-status', '/acg-refresh', '/argocd-upgrade'])
+const ALLOWED_COMMANDS = new Set(['/acg-up', '/acg-down', '/acg-status', '/acg-refresh', '/acg-resume', '/ask', '/argocd-upgrade'])
 const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'azure'])
 
 async function verifySlack(request, body) {
@@ -112,6 +112,27 @@ async function handle(req) {
     const { ok } = await relay('/api/v1/cluster-refresh', payload)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
     return jsonReply('🔄 Refreshing ACG credentials + tunnel…')
+  }
+
+  if (command === '/acg-resume') {
+    const provider = VALID_PROVIDERS.has(text) ? text : 'aws'
+    const { ok, conflict } = await relay('/api/v1/cluster-resume', { provider, response_url: responseUrl })
+    if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`)
+    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
+    return jsonReply(`🔄 Resuming ACG provision (${provider}) from last checkpoint…`)
+  }
+
+  if (command === '/ask') {
+    const VALID_AGENTS = new Set(['claude', 'gemini', 'codex'])
+    const parts = text.split(/\s+/)
+    const agent = VALID_AGENTS.has(parts[0]) ? parts[0] : 'claude'
+    const question = VALID_AGENTS.has(parts[0]) ? parts.slice(1).join(' ').trim() : text
+    if (!question) return jsonReply('Usage: /ask [claude|gemini|codex] <question>')
+    const payload = { agent, question, response_url: responseUrl }
+    if (threadTs) payload.thread_ts = threadTs
+    const { ok } = await relay('/api/v1/ask', payload)
+    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
+    return jsonReply(`🤖 Asking ${agent}…`)
   }
 
   if (command === '/argocd-upgrade') {

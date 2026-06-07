@@ -283,7 +283,7 @@ docs/
 
 **AI Tooling**
 - **[Copilot CLI Integration](docs/howto/copilot.md)** — Setup, `copilot_triage_pod` / `copilot_draft_spec` examples, pre-commit AI lint, cross-project adoption via lib-foundation subtree
-- **[Slack Slash Commands](docs/howto/slack-slash-commands.md)** — Architecture, one-time bootstrap (`make setup-worker`), token rotation, `/acg-up` / `/acg-down` / `/acg-status` / `/argocd-upgrade`
+- **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Architecture, one-time bootstrap (`make setup-worker`), token rotation, `/acg-up` / `/acg-down` / `/acg-status` / `/acg-resume` / `/ask [claude|gemini|codex]`; webhook server guardrails (auth, prompt-injection guard, repo-scoped file access, read-only bash sandbox, concurrency cap)
 
 ---
 
@@ -295,11 +295,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-06-07 | [Webhook macOS NEF atfork SIGSEGV](docs/issues/2026-06-07-webhook-macos-nef-atfork-sigsegv.md) | `import ssl`/`urllib` loads NEF; any `fork()` after that crashes child — fixed via file-based kubeconfig parser + `os.posix_spawn` for job execution |
 | 2026-06-05 | [Copilot PR #91 review findings](docs/issues/2026-06-05-copilot-pr91-review-findings.md) | gcp.js logs partial GCP username — fix is lib-acg upstream debt; use `[set]`/`[empty]` like other providers |
 | 2026-06-04 | [Slack slash commands pointed to tunnel URL — bypassed Worker auth relay](docs/issues/2026-06-04-slack-slash-commands-wrong-url.md) | Slack slash commands — Request URL must point to k3dm-slack-relay Worker (not direct tunnel); prevents 401 errors and auth bypass |
 | 2026-06-01 | [Webhook BATS path normalization mismatch](docs/issues/2026-06-01-webhook-bats-mismatch-path-normalization.md) | Webhook temp path normalization — `.` vs `/tmp` symlink resolution; update BATS test paths to match webhook behavior |
 | 2026-06-01 | [Observability: PyYAML missing in Codex env](docs/issues/2026-06-01-observability-values-pyyaml-missing.md) | observability.sh alert rules YAML validation — PyYAML not installed; workaround: Ruby YAML parser fallback |
-| 2026-05-31 | [Copilot PR #86 review findings](docs/issues/2026-05-31-copilot-pr86-review-findings.md) | OCI snapshot SSH injection, CHANGELOG accuracy, step label drift, empty download guard, error-path coverage added |
 
 [All issues →](docs/issues/)
 
@@ -309,9 +309,9 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.6.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.2) | 2026-06-05 | `/acg-refresh` Slack slash command with worker relay; ACG LaunchAgent self-healing; Prometheus web.config.file conflict fix; acg-status stale display caveat labels |
 | [v1.6.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.1) | 2026-06-05 | ACG LaunchAgent self-healing — `acg-refresh` auto-reinstalls missing system daemon plists (argocd/keycloak/frontend port-forwards); Vault port-forward LaunchAgent install during `acg-up`; Prometheus web.config.file conflict fix; acg-status stale display caveat labels |
 | [v1.6.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.0) | 2026-06-04 | Webhook Slack threading + thread commands; ArgoCD CVE scan CronJob; AI-powered failure analysis (Gemini triage + Claude vision); webhook token auto-rotation; Python 3.13 SIGSEGV fix; ArgoCD/Keycloak OIDC hardening; ACG observability stack (Prometheus + Grafana + Alertmanager) |
-| [v1.5.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.5.1) | 2026-05-31 | OCI object storage backup/restore for k3s-oci (etcd snapshot lifecycle); ACG credential automation improvements; SSH fail-fast and snapshot validation fixes; BATS error-path coverage |
 
 <details>
 <summary>Older releases</summary>

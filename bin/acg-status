@@ -73,7 +73,7 @@ echo "=== Service Health ==="
 _WEBHOOK_TOKEN="${K3DM_WEBHOOK_TOKEN:-$(security find-generic-password -s k3dm-webhook-token -w 2>/dev/null || true)}"
 _WEBHOOK_PORT="${K3DM_WEBHOOK_PORT:-7443}"
 if [[ -n "${_WEBHOOK_TOKEN}" ]]; then
-  _health_json=$(curl -sf --max-time 35 \
+  _health_json=$(curl -sf --max-time 90 \
     -H "Authorization: Bearer ${_WEBHOOK_TOKEN}" \
     "http://localhost:${_WEBHOOK_PORT}/api/v1/health" 2>/dev/null || true)
   if [[ -n "${_health_json}" ]]; then

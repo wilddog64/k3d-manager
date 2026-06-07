@@ -9,12 +9,13 @@ defaultRules:
 prometheus:
   prometheusSpec:
     retention: 7d
+    retentionSize: 1800MB
     resources:
       requests:
         memory: 512Mi
         cpu: 100m
       limits:
-        memory: 1Gi
+        memory: 2Gi
         cpu: 500m
     additionalScrapeConfigs:
       - job_name: istiod
@@ -32,7 +33,7 @@ prometheus:
         metrics_path: /federate
         params:
           match[]:
-            - '{job!=""}'
+            - '{job=~"node-exporter|kubelet|kube-state-metrics|istiod|envoy"}'
         static_configs:
           - targets:
               - 'host.internal:19090'

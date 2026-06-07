@@ -19,12 +19,25 @@ set -euo pipefail
 
 # shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ ! -d "${REPO_ROOT}/scripts/lib/acg/node_modules/playwright" ]]; then
+  npm --prefix "${REPO_ROOT}/scripts/lib/acg" install --prefer-offline 2>&1
+fi
 # shellcheck disable=SC2034
 SCRIPT_DIR="${REPO_ROOT}/scripts"
 # shellcheck disable=SC2034
 PLUGINS_DIR="${SCRIPT_DIR}/plugins"
 _ACG_STATE_DIR="${HOME}/.local/share/k3d-manager"
 mkdir -p "${_ACG_STATE_DIR}/bin" "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
+_ACG_CHECKPOINT_DIR="${_ACG_STATE_DIR}/checkpoints"
+
+_cp_skip() {
+  [[ -f "${_ACG_CHECKPOINT_DIR}/${1}.done" ]]
+}
+
+_cp_write() {
+  mkdir -p "${_ACG_CHECKPOINT_DIR}"
+  touch "${_ACG_CHECKPOINT_DIR}/${1}.done"
+}
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
@@ -97,7 +110,6 @@ function _acg_up_cleanup() {
       rm -f "${_f}"
     fi
   done
-  launchctl unload "${HOME}/Library/LaunchAgents/com.k3d-manager.argocd-port-forward.plist" 2>/dev/null || true
   launchctl bootout "gui/$(id -u)" "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" 2>/dev/null || true
 }
 trap _acg_up_cleanup EXIT
@@ -129,6 +141,10 @@ if [[ "$login_prompt" -eq 1 ]]; then
   echo ""
   read -r -p "Press Enter once you are signed in and the sandbox is Running... "
   echo ""
+fi
+
+if [[ "${K3DM_RESUME:-0}" != "1" ]]; then
+  rm -rf "${_ACG_CHECKPOINT_DIR}"
 fi
 
 _info "[acg-up] Step 1/12 — Getting ${_cluster_provider} credentials..."
@@ -165,7 +181,12 @@ case "${_cluster_provider}" in
 esac
 
 _info "[acg-up] Step 2/12 — Provisioning 3-node cluster..."
-deploy_cluster --provider "${_cluster_provider}" --confirm
+if _cp_skip "step-2-cluster"; then
+  _info "[acg-up] Step 2/12 — cluster already provisioned (checkpoint), skipping"
+else
+  deploy_cluster --provider "${_cluster_provider}" --confirm
+  _cp_write "step-2-cluster"
+fi
 
 if [[ "${_cluster_provider}" != "k3s-gcp" ]]; then
   _info "[acg-up] Step 3/12 — Starting SSH tunnel..."
@@ -488,6 +509,23 @@ if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
   exit 0
 fi
 
+# ── 3c. ubuntu-k3s kubeconfig guard ──────────────────────────────────────────
+if ! kubectl config get-contexts ubuntu-k3s &>/dev/null; then
+  _info "[acg-up] ubuntu-k3s context missing — re-fetching kubeconfig via SSH tunnel..."
+  _k3s_kubeconfig_fetched=0
+  for _attempt in 1 2 3; do
+    if add_ubuntu_k3s_cluster; then
+      _k3s_kubeconfig_fetched=1
+      break
+    fi
+    _warn "[acg-up] kubeconfig fetch attempt ${_attempt}/3 failed — waiting 5s before retry..."
+    sleep 5
+  done
+  if [[ "${_k3s_kubeconfig_fetched}" -eq 0 ]]; then
+    _err "[acg-up] Failed to fetch ubuntu-k3s kubeconfig after 3 attempts — SSH tunnel may not be fully up. Retry via /acg-resume in Slack."
+  fi
+fi
+
 shopping_cart_prepare_infra_bootstrap
 
 _info "[acg-up] Step 7/12 — Bootstrapping argocd-manager SA on remote cluster..."
@@ -545,30 +583,36 @@ fi
 kubectl create namespace cicd --context k3d-k3d-cluster \
   --dry-run=client -o yaml | kubectl apply --context k3d-k3d-cluster -f - >/dev/null
 kubectl label namespace cicd istio-injection=enabled --overwrite --context k3d-k3d-cluster >/dev/null
-_cp_server=$(kubectl config view \
-  -o jsonpath='{.clusters[?(@.name=="ubuntu-k3s")].cluster.server}' 2>/dev/null || echo "")
-if [[ -z "${_cp_server}" ]]; then
-  _err "[acg-up] Could not determine ubuntu-k3s API server URL — is the kubeconfig set up?"
-fi
 kubectl config use-context k3d-k3d-cluster >/dev/null
 ARGOCD_APP_CLUSTER_TOKEN="${_argocd_sa_token}" \
-ARGOCD_APP_CLUSTER_SERVER="${_cp_server}" \
   register_app_cluster
 _info "[acg-up] Restarting ArgoCD application controller to pick up new cluster secret..."
 kubectl rollout restart statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster
 kubectl rollout status statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster --timeout=300s
-_info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → ${_cp_server}"
+_info "[acg-up] ArgoCD cluster registered: ubuntu-k3s → https://host.k3d.internal:6443"
 
-_info "[acg-up] Ensuring argocd-redis secret on ubuntu-k3s (Helm chart hook skipped when ArgoCD manages ArgoCD)..."
-_redis_deadline=$(( $(date +%s) + 120 ))
-while (( $(date +%s) < _redis_deadline )); do
-  if kubectl get namespace cicd --context ubuntu-k3s >/dev/null 2>&1; then
+_info "[acg-up] Waiting for ArgoCD controller to reconnect to ubuntu-k3s (max 120s)..."
+_argocd_conn_deadline=$(( $(date +%s) + 120 ))
+until argocd cluster list -o json \
+    --server localhost:8080 --insecure 2>/dev/null \
+    | python3 -c "import sys,json; clusters=json.load(sys.stdin); \
+      print(next((c['connectionState']['status'] for c in clusters \
+        if 'ubuntu-k3s' in c.get('name','') or 'host.k3d.internal' in c.get('server','')), \
+        'Unknown'))" 2>/dev/null | grep -q "Successful"; do
+  if [[ $(date +%s) -ge ${_argocd_conn_deadline} ]]; then
+    _warn "[acg-up] ArgoCD controller did not reconnect to ubuntu-k3s within 120s — proceeding anyway"
     break
   fi
+  _info "[acg-up] ArgoCD controller not yet connected to ubuntu-k3s — waiting..."
   sleep 5
 done
+_info "[acg-up] ArgoCD controller connected to ubuntu-k3s — proceeding"
+
+_info "[acg-up] Ensuring argocd-redis secret on ubuntu-k3s (Helm chart hook skipped when ArgoCD manages ArgoCD)..."
+kubectl create namespace cicd --context ubuntu-k3s \
+  --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f - >/dev/null
 if ! kubectl get secret argocd-redis -n cicd --context ubuntu-k3s >/dev/null 2>&1; then
   kubectl create secret generic argocd-redis -n cicd --context ubuntu-k3s \
     --from-literal=auth="$(openssl rand -base64 32)"
@@ -578,29 +622,71 @@ else
 fi
 
 _info "[acg-up] Step 10b/14 — Deploying shopping-cart data layer (PostgreSQL, Redis, RabbitMQ)..."
-_info "[acg-up] Applying data-layer ArgoCD Application so sync starts before wait loop..."
-_run_command -- kubectl apply --context k3d-k3d-cluster \
-  -f "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/argocd/applications/data-layer.yaml"
-_info "[acg-up] Waiting for ArgoCD to sync data-layer Application (max 300s)..."
-_dl_sync_deadline=$(( $(date +%s) + 300 ))
-until kubectl get application data-layer -n cicd --context k3d-k3d-cluster \
-    -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
-  if [[ $(date +%s) -ge ${_dl_sync_deadline} ]]; then
-    _err "[acg-up] data-layer ArgoCD Application did not reach Synced within 300s — check: kubectl get application data-layer -n cicd --context k3d-k3d-cluster"
-    exit 1
+if _cp_skip "step-10b-data-layer"; then
+  _info "[acg-up] Step 10b/14 — data layer already deployed (checkpoint), skipping"
+else
+  _dl_ready=0
+  for _ss in postgresql-orders postgresql-payment postgresql-products minio; do
+    _rr=$(kubectl get statefulset/"${_ss}" -n shopping-cart-data --context ubuntu-k3s \
+      -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+    [[ "${_rr:-0}" -ge 1 ]] && (( _dl_ready++ )) || true
+  done
+  if [[ ${_dl_ready} -eq 4 ]]; then
+    _info "[acg-up] data-layer StatefulSets already ready on ubuntu-k3s — writing checkpoint and skipping sync wait"
+    _cp_write "step-10b-data-layer"
+  else
+    _info "[acg-up] Applying data-layer ArgoCD Application so sync starts before wait loop..."
+    _run_command -- kubectl apply --context k3d-k3d-cluster \
+      -f "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/argocd/applications/data-layer.yaml"
+    _info "[acg-up] Waiting for ArgoCD to sync data-layer Application (max 300s)..."
+    _dl_sync_deadline=$(( $(date +%s) + 300 ))
+    until kubectl get application data-layer -n cicd --context k3d-k3d-cluster \
+        -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
+      if [[ $(date +%s) -ge ${_dl_sync_deadline} ]]; then
+        _warn "[acg-up] data-layer did not reach Synced within 300s — force-syncing and retrying (one attempt)..."
+        argocd app sync data-layer \
+          --server localhost:8080 --insecure \
+          --force \
+          --timeout 180 \
+          2>/dev/null \
+          || true
+        _dl_retry_deadline=$(( $(date +%s) + 180 ))
+        until kubectl get application data-layer -n cicd --context k3d-k3d-cluster \
+            -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
+          if [[ $(date +%s) -ge ${_dl_retry_deadline} ]]; then
+            _dl_pods_ready=0
+            for _ss in postgresql-orders postgresql-payment postgresql-products minio; do
+              _rr=$(kubectl get statefulset/"${_ss}" -n shopping-cart-data --context ubuntu-k3s \
+                -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+              [[ "${_rr:-0}" -ge 1 ]] && (( _dl_pods_ready++ )) || true
+            done
+            if [[ ${_dl_pods_ready} -eq 4 ]]; then
+              _warn "[acg-up] data-layer ArgoCD sync timed out but all 4 StatefulSets are Ready — writing checkpoint and continuing"
+              break
+            fi
+            _err "[acg-up] data-layer ArgoCD Application did not reach Synced after force-sync + 180s retry — check: kubectl get application data-layer -n cicd --context k3d-k3d-cluster"
+            exit 1
+          fi
+          _info "[acg-up] data-layer not yet Synced after force-sync — waiting..."
+          sleep 10
+        done
+        break
+      fi
+      _info "[acg-up] data-layer not yet Synced — waiting..."
+      sleep 10
+    done
+    _info "[acg-up] data-layer Application Synced — proceeding to StatefulSet readiness check"
+    deploy_shopping_cart_data
+    _info "[acg-up] Force-syncing data-layer to trigger PostSync hooks (MinIO bucket init + image upload)..."
+    argocd app sync data-layer \
+      --server localhost:8080 --insecure \
+      --force \
+      --timeout 180 \
+      2>/dev/null \
+      || _info "[acg-up] data-layer force-sync returned non-zero — PostSync hooks may still complete"
+    _cp_write "step-10b-data-layer"
   fi
-  _info "[acg-up] data-layer not yet Synced — waiting..."
-  sleep 10
-done
-_info "[acg-up] data-layer Application Synced — proceeding to StatefulSet readiness check"
-deploy_shopping_cart_data
-_info "[acg-up] Force-syncing data-layer to trigger PostSync hooks (MinIO bucket init + image upload)..."
-argocd app sync data-layer \
-  --server localhost:8080 --insecure \
-  --force \
-  --timeout 180 \
-  2>/dev/null \
-  || _info "[acg-up] data-layer force-sync returned non-zero — PostSync hooks may still complete"
+fi
 
 _info "[acg-up] Step 10c/14 — Deploying identity stack (Keycloak + LDAP) via ArgoCD..."
 # Force ArgoCD to pick up the identity Application from shopping-cart-infra
@@ -667,7 +753,13 @@ if ! kubectl --context k3d-k3d-cluster -n identity get deployment/keycloak >/dev
 else
   _info "[acg-up] Step 10d/14 — Importing Keycloak realm shopping-cart..."
   # Re-establish port-forward for actual import
-  kubectl port-forward svc/keycloak -n identity --context k3d-k3d-cluster "${_kc_pf_port}:80" \
+  _existing_pf_pids=$(lsof -ti :"${_kc_pf_port}" 2>/dev/null || true)
+  if [[ -n "${_existing_pf_pids}" ]]; then
+    _info "[acg-up] Port ${_kc_pf_port} in use — killing all holders before Keycloak port-forward"
+    echo "${_existing_pf_pids}" | xargs kill 2>/dev/null || true
+    sleep 2
+  fi
+  kubectl port-forward deployment/keycloak -n identity --context k3d-k3d-cluster "${_kc_pf_port}:8080" \
     >>"${_ACG_STATE_DIR}/logs/keycloak-pf.log" 2>&1 &
   _kc_pf_pid=$!
   disown "${_kc_pf_pid}"
@@ -751,99 +843,129 @@ else
 fi
 
 _info "[acg-up] Step 10d.5/14 — Seeding Keycloak LDAP user passwords in LDAP + Vault..."
-_ldap_pod=$(kubectl get pod -n identity --context k3d-k3d-cluster \
-  -l app.kubernetes.io/name=ldap \
-  -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-if [[ -z "${_ldap_pod}" ]]; then
-  _warn "[acg-up] LDAP pod not found in identity namespace — skipping user password seed"
+if _cp_skip "step-10d5-ldap-passwords"; then
+  _info "[acg-up] Step 10d.5/14 — LDAP passwords already seeded (checkpoint), skipping"
 else
-  for _ldap_user in admin developer operator; do
-    _ldap_user_vault_path="keycloak/users/${_ldap_user}"
-    if _vault_kv_exists "${_ldap_user_vault_path}"; then
-      _ldap_user_pass=$(_vault_kv_get_field "${_ldap_user_vault_path}" "password")
-    else
-      _ldap_user_pass=$(openssl rand -base64 18 | tr -d '=+/')
-      _vault_kv_put "{\"username\":\"${_ldap_user}\",\"password\":\"${_ldap_user_pass}\"}" "${_ldap_user_vault_path}"
-    fi
-    if kubectl exec -n identity --context k3d-k3d-cluster "${_ldap_pod}" -- \
-        ldappasswd -x -H ldap://localhost:389 \
-        -D "cn=admin,dc=shopping-cart,dc=local" \
-        -w "${_ldap_admin_pass}" \
-        -s "${_ldap_user_pass}" \
-        "uid=${_ldap_user},ou=users,dc=shopping-cart,dc=local" >/dev/null 2>&1; then
-      _info "[acg-up] LDAP password set for user '${_ldap_user}'"
-    else
-      _warn "[acg-up] Failed to set LDAP password for user '${_ldap_user}' — login may fail"
-    fi
-  done
-  _info "[acg-up] Retrieve passwords: bin/vault-exec --namespace secrets -- vault kv get -field=password secret/keycloak/users/<user>"
+  _ldap_pod=$(kubectl get pod -n identity --context k3d-k3d-cluster \
+    -l app.kubernetes.io/name=ldap \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+  if [[ -z "${_ldap_pod}" ]]; then
+    _warn "[acg-up] LDAP pod not found in identity namespace — skipping user password seed"
+  else
+    for _ldap_user in admin developer operator; do
+      _ldap_user_vault_path="keycloak/users/${_ldap_user}"
+      if _vault_kv_exists "${_ldap_user_vault_path}"; then
+        _ldap_user_pass=$(_vault_kv_get_field "${_ldap_user_vault_path}" "password")
+      else
+        _ldap_user_pass=$(openssl rand -base64 18 | tr -d '=+/')
+        _vault_kv_put "{\"username\":\"${_ldap_user}\",\"password\":\"${_ldap_user_pass}\"}" "${_ldap_user_vault_path}"
+      fi
+      if kubectl exec -n identity --context k3d-k3d-cluster "${_ldap_pod}" -- \
+          ldappasswd -x -H ldap://localhost:389 \
+          -D "cn=admin,dc=shopping-cart,dc=local" \
+          -w "${_ldap_admin_pass}" \
+          -s "${_ldap_user_pass}" \
+          "uid=${_ldap_user},ou=users,dc=shopping-cart,dc=local" >/dev/null 2>&1; then
+        _info "[acg-up] LDAP password set for user '${_ldap_user}'"
+      else
+        _warn "[acg-up] Failed to set LDAP password for user '${_ldap_user}' — login may fail"
+      fi
+    done
+    _info "[acg-up] Retrieve passwords: bin/vault-exec --namespace secrets -- vault kv get -field=password secret/keycloak/users/<user>"
+  fi
+  _cp_write "step-10d5-ldap-passwords"
 fi
 
 _info "[acg-up] Step 10d.6/14 — Reconciling Keycloak LDAP federation bind credential..."
-_kc_pod=$(kubectl get pod -n identity --context k3d-k3d-cluster \
-  -l app.kubernetes.io/name=keycloak \
-  -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-if [[ -z "${_kc_pod}" ]]; then
-  _warn "[acg-up] Keycloak pod not found — skipping LDAP bind credential reconciliation"
+if _cp_skip "step-10d6-ldap-bind"; then
+  _info "[acg-up] Step 10d.6/14 — LDAP bind already reconciled (checkpoint), skipping"
 else
-  _ldap_component_id=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
-    sh -c "/opt/keycloak/bin/kcadm.sh config credentials \
-      --server http://localhost:8080 --realm master \
-      --user admin --password '${_kc_admin_pass}' >/dev/null 2>&1 && \
-    /opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
-      --fields id,providerId 2>/dev/null | \
-    grep -B1 'ldap' | grep '\"id\"' | head -1 | \
-    sed 's/.*: \"//;s/\".*//' " 2>/dev/null || true)
-  if [[ -n "${_ldap_component_id}" ]]; then
-    kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
-      sh -c "/opt/keycloak/bin/kcadm.sh update components/${_ldap_component_id} \
-        -r shopping-cart \
-        -s 'config.bindCredential=[\"${_ldap_admin_pass}\"]' >/dev/null 2>&1 && \
-      /opt/keycloak/bin/kcadm.sh create \
-        'user-storage/${_ldap_component_id}/sync?action=triggerFullSync' \
-        -r shopping-cart >/dev/null 2>&1" 2>/dev/null && \
-      _info "[acg-up] LDAP federation bind credential reconciled and full sync triggered" || \
-      _warn "[acg-up] LDAP bind credential reconciliation failed — SSO login may be broken"
+  _kc_pod=$(kubectl get pod -n identity --context k3d-k3d-cluster \
+    -l app.kubernetes.io/name=keycloak \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+  if [[ -z "${_kc_pod}" ]]; then
+    _warn "[acg-up] Keycloak pod not found — skipping LDAP bind credential reconciliation"
   else
-    _warn "[acg-up] Could not find LDAP federation component ID — skipping bind credential update"
+    _ldap_component_id=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+      sh -c "/opt/keycloak/bin/kcadm.sh config credentials \
+        --server http://localhost:8080 --realm master \
+        --user admin --password '${_kc_admin_pass}' >/dev/null 2>&1 && \
+      /opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
+        --fields id,providerId 2>/dev/null | \
+      grep -B1 'ldap' | grep '\"id\"' | head -1 | \
+      sed 's/.*: \"//;s/\".*//' " 2>/dev/null || true)
+    if [[ -n "${_ldap_component_id}" ]]; then
+      kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+        sh -c "/opt/keycloak/bin/kcadm.sh update components/${_ldap_component_id} \
+          -r shopping-cart \
+          -s 'config.bindCredential=[\"${_ldap_admin_pass}\"]' >/dev/null 2>&1 && \
+        /opt/keycloak/bin/kcadm.sh create \
+          'user-storage/${_ldap_component_id}/sync?action=triggerFullSync' \
+          -r shopping-cart >/dev/null 2>&1" 2>/dev/null && \
+        _info "[acg-up] LDAP federation bind credential reconciled and full sync triggered" || \
+        _warn "[acg-up] LDAP bind credential reconciliation failed — SSO login may be broken"
+    else
+      _warn "[acg-up] Could not find LDAP federation component ID — skipping bind credential update"
+    fi
   fi
+  _cp_write "step-10d6-ldap-bind"
 fi
 
 _info "[acg-up] Step 10d.7/14 — Reconciling Keycloak LDAP group mapper..."
-if [[ -z "${_kc_pod:-}" ]] || [[ -z "${_ldap_component_id:-}" ]]; then
-  _warn "[acg-up] Keycloak pod or LDAP component ID unavailable — skipping group mapper reconciliation"
+if _cp_skip "step-10d7-group-mapper"; then
+  _info "[acg-up] Step 10d.7/14 — group mapper already reconciled (checkpoint), skipping"
 else
-  _gm_existing=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
-    sh -c "/opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
-      -q parent=${_ldap_component_id} \
-      -q type=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
-      -q name=group-mapper \
-      --fields id 2>/dev/null | grep -c '\"id\"' || true" 2>/dev/null || echo "0")
-  if [[ "${_gm_existing}" -gt 0 ]]; then
-    _info "[acg-up] LDAP group mapper already exists"
+  if [[ -z "${_kc_pod:-}" ]]; then
+    _kc_pod=$(kubectl get pod -n identity --context k3d-k3d-cluster \
+      -l app.kubernetes.io/name=keycloak \
+      -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+  fi
+  if [[ -z "${_ldap_component_id:-}" && -n "${_kc_pod:-}" ]]; then
+    _ldap_component_id=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+      sh -c "/opt/keycloak/bin/kcadm.sh config credentials \
+        --server http://localhost:8080 --realm master \
+        --user admin --password '${_kc_admin_pass}' >/dev/null 2>&1 && \
+      /opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
+        --fields id,providerId 2>/dev/null | \
+      grep -B1 'ldap' | grep '\"id\"' | head -1 | \
+      sed 's/.*: \"//;s/\".*//' " 2>/dev/null || true)
+  fi
+  if [[ -z "${_kc_pod:-}" ]] || [[ -z "${_ldap_component_id:-}" ]]; then
+    _warn "[acg-up] Keycloak pod or LDAP component ID unavailable — skipping group mapper reconciliation"
   else
-    _gm_json='{"parentId":"'"${_ldap_component_id}"'","providerType":"org.keycloak.storage.ldap.mappers.LDAPStorageMapper","providerId":"group-ldap-mapper","name":"group-mapper","config":{"groups.dn":["ou=groups,dc=shopping-cart,dc=local"],"group.name.ldap.attribute":["cn"],"group.object.classes":["groupOfNames"],"preserve.group.inheritance":["true"],"ignore.missing.groups":["false"],"membership.ldap.attribute":["member"],"membership.attribute.type":["DN"],"membership.user.ldap.attribute":["uid"],"mode":["READ_ONLY"],"user.roles.retrieve.strategy":["LOAD_GROUPS_BY_MEMBER_ATTRIBUTE"],"memberof.ldap.attribute":["memberOf"],"drop.non.existing.groups.during.sync":["false"]}}'
-    kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
-      sh -c "echo '${_gm_json}' > /tmp/gm.json && \
-        /opt/keycloak/bin/kcadm.sh create components -r shopping-cart -f /tmp/gm.json >/dev/null && \
-        rm -f /tmp/gm.json" 2>/dev/null && \
-      _info "[acg-up] LDAP group mapper created" || \
-      _warn "[acg-up] LDAP group mapper creation failed"
+    _gm_existing=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+      sh -c "/opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
+        -q parent=${_ldap_component_id} \
+        -q type=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
+        -q name=group-mapper \
+        --fields id 2>/dev/null | grep -c '\"id\"' || true" 2>/dev/null || echo "0")
+    if [[ "${_gm_existing}" -gt 0 ]]; then
+      _info "[acg-up] LDAP group mapper already exists"
+    else
+      _gm_json='{"parentId":"'"${_ldap_component_id}"'","providerType":"org.keycloak.storage.ldap.mappers.LDAPStorageMapper","providerId":"group-ldap-mapper","name":"group-mapper","config":{"groups.dn":["ou=groups,dc=shopping-cart,dc=local"],"group.name.ldap.attribute":["cn"],"group.object.classes":["groupOfNames"],"preserve.group.inheritance":["true"],"ignore.missing.groups":["false"],"membership.ldap.attribute":["member"],"membership.attribute.type":["DN"],"membership.user.ldap.attribute":["uid"],"mode":["READ_ONLY"],"user.roles.retrieve.strategy":["LOAD_GROUPS_BY_MEMBER_ATTRIBUTE"],"memberof.ldap.attribute":["memberOf"],"drop.non.existing.groups.during.sync":["false"]}}'
+      kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+        sh -c "echo '${_gm_json}' > /tmp/gm.json && \
+          /opt/keycloak/bin/kcadm.sh create components -r shopping-cart -f /tmp/gm.json >/dev/null && \
+          rm -f /tmp/gm.json" 2>/dev/null && \
+        _info "[acg-up] LDAP group mapper created" || \
+        _warn "[acg-up] LDAP group mapper creation failed"
+    fi
+    _gm_id=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+      sh -c "/opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
+        -q parent=${_ldap_component_id} \
+        -q type=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
+        -q name=group-mapper \
+        --fields id 2>/dev/null | grep '\"id\"' | head -1 | sed 's/.*: \"//;s/\".*//' " 2>/dev/null || true)
+    if [[ -n "${_gm_id}" ]]; then
+      kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+        sh -c "/opt/keycloak/bin/kcadm.sh create \
+          'user-storage/${_ldap_component_id}/mappers/${_gm_id}/sync?direction=fedToKeycloak' \
+          -r shopping-cart >/dev/null 2>&1" 2>/dev/null && \
+        _info "[acg-up] LDAP group sync complete" || \
+        _warn "[acg-up] LDAP group sync failed"
+    fi
   fi
-  _gm_id=$(kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
-    sh -c "/opt/keycloak/bin/kcadm.sh get components -r shopping-cart \
-      -q parent=${_ldap_component_id} \
-      -q type=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
-      -q name=group-mapper \
-      --fields id 2>/dev/null | grep '\"id\"' | head -1 | sed 's/.*: \"//;s/\".*//' " 2>/dev/null || true)
-  if [[ -n "${_gm_id}" ]]; then
-    kubectl exec -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
-      sh -c "/opt/keycloak/bin/kcadm.sh create \
-        'user-storage/${_ldap_component_id}/mappers/${_gm_id}/sync?direction=fedToKeycloak' \
-        -r shopping-cart >/dev/null 2>&1" 2>/dev/null && \
-      _info "[acg-up] LDAP group sync complete" || \
-      _warn "[acg-up] LDAP group sync failed"
-  fi
+  _cp_write "step-10d7-group-mapper"
 fi
 
 _info "[acg-up] Step 10g.5/14 — Wiring Keycloak cross-cluster reachability on ubuntu-k3s..."
@@ -1441,7 +1563,12 @@ shopping_cart_reconcile_order_service
 shopping_cart_reconcile_product_catalog
 
 _info "[acg-up] Step 11b/14 — Registering shopping-cart ArgoCD Applications..."
-register_shopping_cart_apps
+if _cp_skip "step-11b-argocd-apps"; then
+  _info "[acg-up] Step 11b/14 — ArgoCD apps already registered (checkpoint), skipping"
+else
+  register_shopping_cart_apps
+  _cp_write "step-11b-argocd-apps"
+fi
 
 _info "[acg-up] Step 12/14 — Installing sandbox TTL watcher (launchd)..."
 acg_watch_start "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"

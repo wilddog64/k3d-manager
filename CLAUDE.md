@@ -78,6 +78,16 @@ Do NOT call `sudo` directly. Do NOT use `command sudo`. Route through `_run_comm
 
 ---
 
+## Docs Conventions
+
+- **`docs/bugs/`** — unplanned bug fix specs filed by agents or Claude during a session.
+- **`docs/issues/`** — Copilot PR findings and post-incident notes.
+- **Dedup before filing** — before writing to either directory, check for an existing file with the same slug:
+  - Shell: `ls docs/bugs/*-<slug>.md 2>/dev/null` or `ls docs/issues/*-<slug>.md 2>/dev/null`
+  - Python: `list(Path("docs/bugs").glob(f"*-{slug}.md"))`
+  - If any match exists, use the existing path — do NOT create a second file.
+
+---
 
 ## Security Rules (treat violations as bugs — catch before commit)
 

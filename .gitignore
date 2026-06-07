@@ -3,3 +3,4 @@ scratch/
 .claude/
 .envrc
 node_modules/
+bin/.ask-sandbox/

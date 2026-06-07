@@ -40,4 +40,15 @@ _prune_pngs "${K3DM_STATE_DIR}/logs"
 _prune_chromium_cache "${K3DM_STATE_DIR}/profile"
 _prune_chromium_cache "${K3DM_STATE_DIR}/playwright-auth"
 
+# /tmp screenshots — keep most recent 5; delete older ones
+_tmp_ss_count=$(ls -1t /tmp/k3dm-acg-screenshot-*.png 2>/dev/null | wc -l | tr -d ' ')
+if [[ "${_tmp_ss_count}" -gt 5 ]]; then
+  ls -1t /tmp/k3dm-acg-screenshot-*.png | tail -n "+6" | xargs rm -f
+  echo "k3dm-cleanup: pruned $(( _tmp_ss_count - 5 )) screenshot(s) from /tmp"
+fi
+
+# Playwright artifact dirs — delete any older than 1 day
+find /tmp -maxdepth 1 -name 'playwright-artifacts-*' -type d -mtime +1 -exec rm -rf {} + 2>/dev/null || true
+echo "k3dm-cleanup: pruned stale playwright-artifacts dirs from /tmp"
+
 echo "k3dm-cleanup: done"
