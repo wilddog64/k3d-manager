@@ -716,7 +716,7 @@ if ! kubectl --context k3d-k3d-cluster -n identity get deployment/keycloak >/dev
 else
   _info "[acg-up] Step 10d/14 — Importing Keycloak realm shopping-cart..."
   # Re-establish port-forward for actual import
-  kubectl port-forward svc/keycloak -n identity --context k3d-k3d-cluster "${_kc_pf_port}:80" \
+  kubectl port-forward deployment/keycloak -n identity --context k3d-k3d-cluster "${_kc_pf_port}:8080" \
     >>"${_ACG_STATE_DIR}/logs/keycloak-pf.log" 2>&1 &
   _kc_pf_pid=$!
   disown "${_kc_pf_pid}"
