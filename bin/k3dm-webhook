@@ -53,6 +53,9 @@ def _keychain_secret(service):
 SLACK_SIGNING_SECRET = os.environ.get("SLACK_SIGNING_SECRET") or _keychain_secret("k3dm-slack-signing-secret")
 _seen_event_ids: set = set()
 GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-2.5-flash")
+# k8s API context for ESO checks — initialized at startup before NEF loads (see _init_k8s_ctx)
+_k3d_ssl_ctx = None
+_k3d_server = None
 _STALL_TICKS_THRESHOLD = 3  # 3 ticks × 2 min = 6 min silence before stall analysis
 _SCREENSHOT_RE = re.compile(r"INFO: Screenshot saved to (/tmp/k3dm-acg-screenshot-\d+\.png)")
 _running_procs: dict = {}
@@ -919,6 +922,48 @@ def _analyze_failure(lines):
     return _call_gemini(prompt)
 
 
+def _init_k8s_ctx():
+    """Initialize k8s SSL context at startup — must run before any HTTP/urllib call that loads NEF.
+    Caches global _k3d_ssl_ctx + _k3d_server so _smoke_test_services never calls subprocess."""
+    global _k3d_ssl_ctx, _k3d_server
+    try:
+        import base64, ssl as _ssl, tempfile as _tf, json as _json
+        r = subprocess.run(
+            ["kubectl", "config", "view", "--raw", "--minify",
+             "--context", "k3d-k3d-cluster", "-o", "json"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if r.returncode != 0:
+            return
+        cfg = _json.loads(r.stdout)
+        cl = cfg["clusters"][0]["cluster"]
+        usr = cfg["users"][0]["user"]
+        _k3d_server = cl["server"]
+        ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
+        for _data, _attr in [
+            (base64.b64decode(cl["certificate-authority-data"]), "cafile"),
+            (base64.b64decode(usr["client-certificate-data"]), "certfile"),
+            (base64.b64decode(usr["client-key-data"]), "keyfile"),
+        ]:
+            with _tf.NamedTemporaryFile(suffix=".pem", delete=False) as _f:
+                _f.write(_data)
+                if _attr == "cafile":
+                    _ca = _f.name
+                elif _attr == "certfile":
+                    _crt = _f.name
+                else:
+                    _key = _f.name
+        ctx.load_verify_locations(_ca)
+        ctx.load_cert_chain(_crt, _key)
+        import os as _os
+        for _p in (_ca, _crt, _key):
+            _os.unlink(_p)
+        _k3d_ssl_ctx = ctx
+        print(f"[k3dm-webhook] k8s API context initialized: {_k3d_server}")
+    except Exception as exc:
+        print(f"[k3dm-webhook] k8s API context init failed: {exc}")
+
+
 def _clear_stale_jobs():
     """On startup, mark any job stuck in 'running' as 'failed' — they are orphaned."""
     if not JOB_DIR.exists():
@@ -1039,52 +1084,52 @@ def _smoke_test_services(retries=None):
     except Exception as exc:
         results.append(("Product images", False, str(exc)))
 
-    # ESO: ClusterSecretStore vault-backend (use local k3d cluster — ubuntu-k3s remote TLS causes SIGSEGV in subprocess)
-    try:
-        eso_store = subprocess.run(
-            ["kubectl", "get", "clustersecretstore", "vault-backend",
-             "--context", "k3d-k3d-cluster", "--no-headers",
-             "-o", "jsonpath={.status.conditions[0].type}={.status.conditions[0].status}"],
-            capture_output=True, text=True, timeout=8,
-        )
-        if eso_store.returncode == 0 and eso_store.stdout.strip():
-            val = eso_store.stdout.strip()
-            ok = val == "Ready=True"
-            results.append(("ESO ClusterSecretStore", ok, val))
-        elif "context was not found" in eso_store.stderr or "no such context" in eso_store.stderr.lower():
-            results.append(("ESO ClusterSecretStore", True, "skipped — k3d-k3d-cluster context not in webhook kubeconfig"))
-        else:
-            detail = f"rc={eso_store.returncode} stdout={repr(eso_store.stdout.strip())} stderr={repr(eso_store.stderr.strip()[:200])}"
-            results.append(("ESO ClusterSecretStore", False, detail))
-    except Exception as exc:
-        results.append(("ESO ClusterSecretStore", False, str(exc)))
+    # ESO checks via pre-cached k8s REST API context (_k3d_ssl_ctx / _k3d_server).
+    # The context is built at startup BEFORE any urllib HTTPS call loads the macOS Network
+    # Extension Framework. Calling subprocess here would fork after NEF is loaded and crash
+    # (SIGSEGV rc=-11 — nw_settings_child_has_forked atfork handler). Use globals only.
+    if _k3d_ssl_ctx is None or _k3d_server is None:
+        results.append(("ESO ClusterSecretStore", False, "k8s ctx unavailable (startup init failed)"))
+        results.append(("ESO ExternalSecrets", False, "k8s ctx unavailable (startup init failed)"))
+    else:
+        # ClusterSecretStore vault-backend
+        try:
+            with urllib.request.urlopen(
+                f"{_k3d_server}/apis/external-secrets.io/v1/clustersecretstores/vault-backend",
+                context=_k3d_ssl_ctx, timeout=8,
+            ) as _resp:
+                _data = json.loads(_resp.read())
+            _conds = _data.get("status", {}).get("conditions", [])
+            _ready = next((c for c in _conds if c.get("type") == "Ready"), None)
+            _val = f"Ready={_ready.get('status', 'Unknown')}" if _ready else "no conditions"
+            results.append(("ESO ClusterSecretStore", _val == "Ready=True", _val))
+        except Exception as _exc:
+            results.append(("ESO ClusterSecretStore", False, str(_exc)[:200]))
 
-    # ESO: ExternalSecrets not in Ready=True state (use local k3d cluster — ubuntu-k3s remote TLS causes SIGSEGV in subprocess)
-    try:
-        eso_secrets = subprocess.run(
-            ["kubectl", "get", "externalsecrets", "-A",
-             "--context", "k3d-k3d-cluster", "--no-headers",
-             "-o", "custom-columns=NS:.metadata.namespace,NAME:.metadata.name,"
-                   "READY:.status.conditions[0].status"],
-            capture_output=True, text=True, timeout=10,
-        )
-        if eso_secrets.returncode == 0 and eso_secrets.stdout.strip():
-            es_lines = [l for l in eso_secrets.stdout.strip().splitlines() if l]
-            not_ready = [l for l in es_lines if not l.strip().endswith("True")]
-            total = len(es_lines)
-            if not_ready:
-                sample = ", ".join(l.split()[1] for l in not_ready[:3] if len(l.split()) >= 2)
+        # ExternalSecrets (all namespaces)
+        try:
+            with urllib.request.urlopen(
+                f"{_k3d_server}/apis/external-secrets.io/v1/externalsecrets",
+                context=_k3d_ssl_ctx, timeout=10,
+            ) as _resp:
+                _es_data = json.loads(_resp.read())
+            _items = _es_data.get("items", [])
+            _not_ready = [
+                it["metadata"]["name"]
+                for it in _items
+                if not any(
+                    c.get("type") == "Ready" and c.get("status") == "True"
+                    for c in it.get("status", {}).get("conditions", [])
+                )
+            ]
+            _total = len(_items)
+            if _not_ready:
                 results.append(("ESO ExternalSecrets", False,
-                                 f"{len(not_ready)}/{total} not synced: {sample}"))
+                                 f"{len(_not_ready)}/{_total} not synced: {', '.join(_not_ready[:3])}"))
             else:
-                results.append(("ESO ExternalSecrets", True, f"{total}/{total} synced"))
-        elif "context was not found" in eso_secrets.stderr or "no such context" in eso_secrets.stderr.lower():
-            results.append(("ESO ExternalSecrets", True, "skipped — k3d-k3d-cluster context not in webhook kubeconfig"))
-        else:
-            detail = f"rc={eso_secrets.returncode} stdout={repr(eso_secrets.stdout.strip()[:100])} stderr={repr(eso_secrets.stderr.strip()[:200])}"
-            results.append(("ESO ExternalSecrets", False, detail))
-    except Exception as exc:
-        results.append(("ESO ExternalSecrets", False, str(exc)))
+                results.append(("ESO ExternalSecrets", True, f"{_total}/{_total} synced"))
+        except Exception as _exc:
+            results.append(("ESO ExternalSecrets", False, str(_exc)[:200]))
 
     return results
 
@@ -2161,6 +2206,7 @@ if __name__ == "__main__":
     _sandbox_link = _sandbox_dir / "bash"
     if not _sandbox_link.exists():
         _sandbox_link.symlink_to(_ask_bash_path)
+    _init_k8s_ctx()
     _clear_stale_jobs()
     server = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), _Handler)
     print(f"[k3dm-webhook] listening on 127.0.0.1:{PORT}")
