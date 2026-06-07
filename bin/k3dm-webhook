@@ -923,43 +923,102 @@ def _analyze_failure(lines):
 
 
 def _init_k8s_ctx():
-    """Initialize k8s SSL context at startup — must run before any HTTP/urllib call that loads NEF.
-    Caches global _k3d_ssl_ctx + _k3d_server so _smoke_test_services never calls subprocess."""
+    """Initialize k8s SSL context — NO subprocess, reads kubeconfig file directly.
+    import ssl/urllib at module top already loads macOS NEF before __main__ runs,
+    so any subprocess.run/fork here would crash (SIGSEGV rc=-11). File parsing only."""
     global _k3d_ssl_ctx, _k3d_server
+    import os as _os, base64 as _b64, ssl as _ssl, tempfile as _tf
+
+    def _parse_kubeconfig(context_name):
+        """Return (server, ca_b64, cert_b64, key_b64) by parsing kubeconfig text, no subprocess."""
+        kc_env = _os.environ.get("KUBECONFIG", _os.path.expanduser("~/.kube/config"))
+        for kc_path in kc_env.split(":"):
+            if not _os.path.exists(kc_path):
+                continue
+            with open(kc_path) as _f:
+                lines = [ln.rstrip("\n") for ln in _f]
+
+            # Pass 1 — find context_name → cluster_name, user_name
+            cluster_name = user_name = None
+            i = 0
+            while i < len(lines):
+                if lines[i].strip() == "- context:":
+                    j, _cl, _us, _nm = i + 1, None, None, None
+                    while j < len(lines) and lines[j].startswith("    "):
+                        s = lines[j].strip()
+                        if s.startswith("cluster: "):
+                            _cl = s[9:]
+                        elif s.startswith("user: "):
+                            _us = s[6:]
+                        j += 1
+                    if j < len(lines) and lines[j].strip().startswith("name: "):
+                        _nm = lines[j].strip()[6:]
+                    if _nm == context_name:
+                        cluster_name, user_name = _cl, _us
+                        break
+                i += 1
+            if not cluster_name:
+                continue
+
+            # Pass 2 — find cluster entry → server, ca_b64
+            server = ca_b64 = None
+            i = 0
+            while i < len(lines):
+                if lines[i].strip() == "- cluster:":
+                    j, _sv, _ca = i + 1, None, None
+                    while j < len(lines) and lines[j].startswith("    "):
+                        s = lines[j].strip()
+                        if s.startswith("certificate-authority-data: "):
+                            _ca = s[28:]
+                        elif s.startswith("server: "):
+                            _sv = s[8:]
+                        j += 1
+                    if j < len(lines) and lines[j].strip().startswith("name: "):
+                        if lines[j].strip()[6:] == cluster_name:
+                            server, ca_b64 = _sv, _ca
+                            break
+                i += 1
+            if not server:
+                continue
+
+            # Pass 3 — find user entry → cert_b64, key_b64
+            cert_b64 = key_b64 = None
+            i = 0
+            while i < len(lines):
+                if lines[i].strip() == f"- name: {user_name}":
+                    j = i + 1
+                    while j < len(lines) and lines[j].startswith("  "):
+                        s = lines[j].strip()
+                        if s.startswith("client-certificate-data: "):
+                            cert_b64 = s[25:]
+                        elif s.startswith("client-key-data: "):
+                            key_b64 = s[17:]
+                        j += 1
+                    if cert_b64 and key_b64:
+                        break
+                i += 1
+
+            if server and ca_b64 and cert_b64 and key_b64:
+                return server, ca_b64, cert_b64, key_b64
+        return None
+
     try:
-        import base64, ssl as _ssl, tempfile as _tf, json as _json
-        r = subprocess.run(
-            ["kubectl", "config", "view", "--raw", "--minify",
-             "--context", "k3d-k3d-cluster", "-o", "json"],
-            capture_output=True, text=True, timeout=5,
-        )
-        if r.returncode != 0:
+        result = _parse_kubeconfig("k3d-k3d-cluster")
+        if result is None:
+            print("[k3dm-webhook] k8s API context: k3d-k3d-cluster not found in kubeconfig")
             return
-        cfg = _json.loads(r.stdout)
-        cl = cfg["clusters"][0]["cluster"]
-        usr = cfg["users"][0]["user"]
-        _k3d_server = cl["server"]
+        server, ca_b64, cert_b64, key_b64 = result
         ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_CLIENT)
-        for _data, _attr in [
-            (base64.b64decode(cl["certificate-authority-data"]), "cafile"),
-            (base64.b64decode(usr["client-certificate-data"]), "certfile"),
-            (base64.b64decode(usr["client-key-data"]), "keyfile"),
-        ]:
-            with _tf.NamedTemporaryFile(suffix=".pem", delete=False) as _f:
-                _f.write(_data)
-                if _attr == "cafile":
-                    _ca = _f.name
-                elif _attr == "certfile":
-                    _crt = _f.name
-                else:
-                    _key = _f.name
-        ctx.load_verify_locations(_ca)
-        ctx.load_cert_chain(_crt, _key)
-        import os as _os
-        for _p in (_ca, _crt, _key):
-            _os.unlink(_p)
+        ctx.load_verify_locations(cadata=_b64.b64decode(ca_b64).decode("ascii"))
+        crt_f = _tf.NamedTemporaryFile(suffix=".pem", delete=False)
+        crt_f.write(_b64.b64decode(cert_b64)); crt_f.close()
+        key_f = _tf.NamedTemporaryFile(suffix=".pem", delete=False)
+        key_f.write(_b64.b64decode(key_b64)); key_f.close()
+        ctx.load_cert_chain(crt_f.name, key_f.name)
+        _os.unlink(crt_f.name); _os.unlink(key_f.name)
         _k3d_ssl_ctx = ctx
-        print(f"[k3dm-webhook] k8s API context initialized: {_k3d_server}")
+        _k3d_server = server
+        print(f"[k3dm-webhook] k8s API context initialized: {server}")
     except Exception as exc:
         print(f"[k3dm-webhook] k8s API context init failed: {exc}")
 
