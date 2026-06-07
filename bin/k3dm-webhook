@@ -186,7 +186,7 @@ def _posix_spawn_job(cmd, output_path, cwd=None, env=None):
     """Launch cmd via os.posix_spawn — no fork(), safe after macOS NEF is loaded.
     stdout+stderr redirected to output_path (appended). Returns child PID.
     posix_spawn uses posix_spawn(2) syscall which does NOT trigger atfork handlers."""
-    import shutil as _sh
+    import shlex as _shlex, shutil as _sh
     _env = dict(os.environ) if env is None else dict(env)
     _out = str(output_path)
     _file_actions = [
@@ -195,8 +195,8 @@ def _posix_spawn_job(cmd, output_path, cwd=None, env=None):
         (os.POSIX_SPAWN_DUP2, 1, 2),
     ]
     if cwd:
-        cmd_str = " ".join(_sh.quote(str(c)) for c in cmd)
-        cmd = ["/bin/bash", "-c", f"cd {_sh.quote(str(cwd))} && {cmd_str}"]
+        cmd_str = " ".join(_shlex.quote(str(c)) for c in cmd)
+        cmd = ["/bin/bash", "-c", f"cd {_shlex.quote(str(cwd))} && {cmd_str}"]
     exe = cmd[0]
     if not os.path.isabs(exe):
         exe = _sh.which(exe) or exe
