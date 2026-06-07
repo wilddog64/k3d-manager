@@ -627,6 +627,10 @@ def _handle_thread_command(job_id, command):
         ask_max_turns = int(_turns_match.group(1)) if _turns_match else _ASK_MAX_TURNS_DEFAULT
         if _turns_match:
             question = _re.sub(r'\s*turns=\d+\s*', ' ', question).strip()
+        question = _sanitize_question(question)
+        if not question:
+            _notify_job(job_id, "❌ Question rejected — too long or contains disallowed patterns.")
+            return
         _job_log = JOB_DIR / job_id / "log"
         _job_out = JOB_DIR / job_id / "output"
         _ctx_file = _job_log if _job_log.exists() else (_job_out if _job_out.exists() else None)
@@ -1807,10 +1811,12 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
         elif response_url:
             _slack_post(response_url, text)
 
-    question = _sanitize_question(question)
-    if not question:
-        _finish("❌ Question rejected — too long or contains disallowed patterns.", status="failed")
+    # Injection check only — length was validated on the raw user input before context was added
+    _q_stripped = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', question.strip())
+    if _INJECTION_RE.search(_q_stripped):
+        _finish("❌ Question rejected — contains disallowed patterns.", status="failed")
         return
+    question = _q_stripped
 
     _ask_bash = str(Path(__file__).resolve().parent / "k3dm-ask-bash")
     _scope = (
