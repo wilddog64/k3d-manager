@@ -768,7 +768,7 @@ def _call_gemini(prompt):
         cmd = [resolved, "--model", GEMINI_MODEL, "--prompt", prompt]
         child_pid = os.posix_spawn(
             resolved, cmd, dict(env),
-            file_actions=file_actions, setsid=True, cwd=REPO_ROOT,
+            file_actions=file_actions, setsid=True,
         )
         deadline = time.monotonic() + 120
         while True:
