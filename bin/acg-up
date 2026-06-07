@@ -716,11 +716,11 @@ if ! kubectl --context k3d-k3d-cluster -n identity get deployment/keycloak >/dev
 else
   _info "[acg-up] Step 10d/14 — Importing Keycloak realm shopping-cart..."
   # Re-establish port-forward for actual import
-  _existing_pf_pid=$(lsof -ti :"${_kc_pf_port}" 2>/dev/null | head -1 || true)
-  if [[ -n "${_existing_pf_pid}" ]]; then
-    _info "[acg-up] Port ${_kc_pf_port} in use by PID ${_existing_pf_pid} — killing before Keycloak port-forward"
-    kill "${_existing_pf_pid}" 2>/dev/null || true
-    sleep 1
+  _existing_pf_pids=$(lsof -ti :"${_kc_pf_port}" 2>/dev/null || true)
+  if [[ -n "${_existing_pf_pids}" ]]; then
+    _info "[acg-up] Port ${_kc_pf_port} in use — killing all holders before Keycloak port-forward"
+    echo "${_existing_pf_pids}" | xargs kill 2>/dev/null || true
+    sleep 2
   fi
   kubectl port-forward deployment/keycloak -n identity --context k3d-k3d-cluster "${_kc_pf_port}:8080" \
     >>"${_ACG_STATE_DIR}/logs/keycloak-pf.log" 2>&1 &

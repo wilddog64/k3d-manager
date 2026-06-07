@@ -745,29 +745,53 @@ def _notify_job(job_id, text):
 
 
 def _call_gemini(prompt):
-    """Shell out to the gemini CLI. Returns response text or error string."""
+    """Shell out to the gemini CLI. Returns response text or error string.
+
+    Uses os.posix_spawn (no fork) to avoid macOS NEF atfork SIGSEGV.
+    Output is captured via a temp file rather than a pipe.
+    """
+    import shutil, tempfile, time
     gemini_bin = os.environ.get("K3DM_GEMINI_BIN", "gemini")
+    resolved = shutil.which(gemini_bin) or gemini_bin
+    if not os.path.isfile(resolved):
+        return "gemini CLI not found — skipping AI analysis"
     env = {**os.environ, "GEMINI_CLI_TRUST_WORKSPACE": "true"}
     try:
-        r = subprocess.run(
-            [gemini_bin, "--model", GEMINI_MODEL, "--prompt", prompt],
-            capture_output=True,
-            text=True,
-            timeout=120,
-            env=env,
+        with tempfile.NamedTemporaryFile(
+            prefix="k3dm-gemini-", suffix=".out", delete=False, mode="w"
+        ) as tmp:
+            tmp_path = tmp.name
+        file_actions = [
+            (os.POSIX_SPAWN_OPEN, 1, tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
+            (os.POSIX_SPAWN_DUP2, 1, 2),
+        ]
+        cmd = [resolved, "--model", GEMINI_MODEL, "--prompt", prompt]
+        child_pid = os.posix_spawn(
+            resolved, cmd, dict(env),
+            file_actions=file_actions, setsid=True,
         )
-        raw = r.stdout.strip() or r.stderr.strip() or "gemini returned no output"
-        # Strip Gemini CLI internal tool-call artifacts that leak into stdout.
-        # Only removes at line-start or string-start to avoid false positives
-        # in prose. Handles both "update_topic(...)" and "<ctrl...>" forms.
-        import re
+        deadline = time.monotonic() + 120
+        while True:
+            if time.monotonic() > deadline:
+                try:
+                    os.kill(child_pid, 9)
+                    os.waitpid(child_pid, 0)
+                except OSError:
+                    pass
+                return "gemini analysis timed out after 120s — cluster state may be too large"
+            try:
+                done_pid, _ = os.waitpid(child_pid, os.WNOHANG)
+                if done_pid != 0:
+                    break
+            except ChildProcessError:
+                break
+            time.sleep(0.5)
+        raw = Path(tmp_path).read_text(errors="replace").strip()
+        Path(tmp_path).unlink(missing_ok=True)
+        raw = raw or "gemini returned no output"
         cleaned = re.sub(r'(?:^|\n)\s*\w+\([^)]{0,500}\)\s*', ' ', raw, flags=re.MULTILINE)
         cleaned = re.sub(r'<ctrl[^>]*>', '', cleaned).strip()
         return cleaned or raw
-    except FileNotFoundError:
-        return "gemini CLI not found — skipping AI analysis"
-    except subprocess.TimeoutExpired:
-        return "gemini analysis timed out after 120s — cluster state may be too large"
     except Exception as exc:
         return f"gemini error: {exc}"
 
