@@ -295,11 +295,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-06-07 | [Webhook macOS NEF atfork SIGSEGV](docs/issues/2026-06-07-webhook-macos-nef-atfork-sigsegv.md) | `import ssl`/`urllib` loads NEF; any `fork()` after that crashes child — fixed via file-based kubeconfig parser + `os.posix_spawn` for job execution |
 | 2026-06-05 | [Copilot PR #91 review findings](docs/issues/2026-06-05-copilot-pr91-review-findings.md) | gcp.js logs partial GCP username — fix is lib-acg upstream debt; use `[set]`/`[empty]` like other providers |
 | 2026-06-04 | [Slack slash commands pointed to tunnel URL — bypassed Worker auth relay](docs/issues/2026-06-04-slack-slash-commands-wrong-url.md) | Slack slash commands — Request URL must point to k3dm-slack-relay Worker (not direct tunnel); prevents 401 errors and auth bypass |
 | 2026-06-01 | [Webhook BATS path normalization mismatch](docs/issues/2026-06-01-webhook-bats-mismatch-path-normalization.md) | Webhook temp path normalization — `.` vs `/tmp` symlink resolution; update BATS test paths to match webhook behavior |
 | 2026-06-01 | [Observability: PyYAML missing in Codex env](docs/issues/2026-06-01-observability-values-pyyaml-missing.md) | observability.sh alert rules YAML validation — PyYAML not installed; workaround: Ruby YAML parser fallback |
-| 2026-05-31 | [Copilot PR #86 review findings](docs/issues/2026-05-31-copilot-pr86-review-findings.md) | OCI snapshot SSH injection, CHANGELOG accuracy, step label drift, empty download guard, error-path coverage added |
 
 [All issues →](docs/issues/)
 
