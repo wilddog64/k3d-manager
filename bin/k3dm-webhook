@@ -983,7 +983,7 @@ _SMOKE_ENDPOINTS = [
     ("Frontend",   "http://frontend.shopping-cart.local/",             [200]),
     ("Keycloak",   "http://keycloak.shopping-cart.local/health/live",  [200]),
     ("Prometheus", "http://localhost:19090/-/ready",                   [200]),
-    ("Grafana",    "https://grafana.3ai-talk.org/",                    [200]),
+    ("Grafana",    "http://grafana.3ai-talk.org/api/health",           [200]),
 ]
 _SMOKE_RETRIES = 3
 _SMOKE_RETRY_SLEEP = 10
