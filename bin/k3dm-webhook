@@ -614,6 +614,17 @@ def _handle_thread_command(job_id, command):
         ask_max_turns = int(_turns_match.group(1)) if _turns_match else _ASK_MAX_TURNS_DEFAULT
         if _turns_match:
             question = _re.sub(r'\s*turns=\d+\s*', ' ', question).strip()
+        _job_log = JOB_DIR / job_id / "log"
+        _job_out = JOB_DIR / job_id / "output"
+        _ctx_file = _job_log if _job_log.exists() else (_job_out if _job_out.exists() else None)
+        if _ctx_file:
+            _ctx_lines = [l.rstrip() for l in _ctx_file.read_text().splitlines() if l.strip()][-80:]
+            _ctx_text = "\n".join(_ctx_lines)
+            question = (
+                f"Job output context (last 80 lines of job `{job_id}`):\n"
+                f"```\n{_ctx_text}\n```\n\n"
+                f"User question: {question}"
+            )
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
         thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
         new_job_id = str(uuid.uuid4())[:8]
