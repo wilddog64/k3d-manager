@@ -36,6 +36,7 @@ SHOPPING_CARTS_ROOT = os.environ.get(
 )
 TOKEN_FILE = Path.home() / ".k3dm" / "webhook-token"
 JOB_DIR = Path("/tmp/k3dm-webhook-jobs")
+_ASK_MAX_TURNS_DEFAULT = int(os.environ.get("K3DM_ASK_MAX_TURNS", "10"))
 SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID", "")
@@ -606,6 +607,11 @@ def _handle_thread_command(job_id, command):
         else:
             _notify_job(job_id, "Usage: `ask [claude|gemini|codex] <question>`")
             return
+        import re as _re
+        _turns_match = _re.search(r'\bturns=(\d+)\b', question)
+        ask_max_turns = int(_turns_match.group(1)) if _turns_match else _ASK_MAX_TURNS_DEFAULT
+        if _turns_match:
+            question = _re.sub(r'\s*turns=\d+\s*', ' ', question).strip()
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
         thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
         new_job_id = str(uuid.uuid4())[:8]
@@ -617,7 +623,7 @@ def _handle_thread_command(job_id, command):
         threading.Thread(
             target=_run_cluster_ask,
             args=(new_job_id, agent, question, ""),
-            kwargs={"thread_ts": thread_ts},
+            kwargs={"thread_ts": thread_ts, "max_turns": ask_max_turns},
             daemon=True,
         ).start()
         _notify_job(job_id, f"🤖 Asking *{agent}*…")
@@ -1623,8 +1629,10 @@ def _parse_gemini_observations(raw):
     return answer, filed
 
 
-def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None):
+def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_turns=None):
     """Spawn claude/gemini/codex with the user's question; post the answer to Slack."""
+    if max_turns is None:
+        max_turns = _ASK_MAX_TURNS_DEFAULT
     job_dir = JOB_DIR / job_id
     _ANSI = re.compile(r'\x1b\[[0-9;]*[mK]')
     thread_context = _fetch_thread_context(thread_ts) if thread_ts else ""
@@ -1793,7 +1801,7 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None):
                     "--allowedTools", "Bash,Write" if filing else "Bash",
                     "--add-dir", REPO_ROOT,
                     "--add-dir", SHOPPING_CARTS_ROOT,
-                    "--max-turns", "10",
+                    "--max-turns", str(max_turns),
                 ]
                 timeout = 400
             else:
@@ -1803,7 +1811,7 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None):
                     "--allowedTools", "Bash",
                     "--add-dir", REPO_ROOT,
                     "--add-dir", SHOPPING_CARTS_ROOT,
-                    "--max-turns", "5",
+                    "--max-turns", str(max_turns),
                 ]
                 timeout = 300
                 _observe = True
