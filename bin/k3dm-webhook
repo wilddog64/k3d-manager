@@ -755,7 +755,7 @@ def _call_gemini(prompt):
     resolved = shutil.which(gemini_bin) or gemini_bin
     if not os.path.isfile(resolved):
         return "gemini CLI not found — skipping AI analysis"
-    env = {**os.environ, "GEMINI_CLI_TRUST_WORKSPACE": "true"}
+    env = {**os.environ, "GEMINI_CLI_TRUST_WORKSPACE": "true", "TERM": "xterm-256color"}
     try:
         with tempfile.NamedTemporaryFile(
             prefix="k3dm-gemini-", suffix=".out", delete=False, mode="w"
@@ -768,7 +768,7 @@ def _call_gemini(prompt):
         cmd = [resolved, "--model", GEMINI_MODEL, "--prompt", prompt]
         child_pid = os.posix_spawn(
             resolved, cmd, dict(env),
-            file_actions=file_actions, setsid=True,
+            file_actions=file_actions, setsid=True, cwd=REPO_ROOT,
         )
         deadline = time.monotonic() + 120
         while True:
