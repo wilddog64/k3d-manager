@@ -818,6 +818,58 @@ def _analyze_stall(lines):
     return _call_gemini(prompt)
 
 
+def _posix_spawn_capture(cmd, timeout, cwd=None, env=None):
+    """Run cmd via os.posix_spawn (no fork) and return stdout+stderr as a string.
+
+    Uses posix_spawn(2) which does NOT trigger macOS NEF atfork handlers.
+    cwd is handled by wrapping cmd in a bash -c cd && ... invocation.
+    Returns (output_text, timed_out_bool).
+    """
+    import shlex as _shlex, shutil as _shutil, tempfile as _tmp, time as _time
+    _env = dict(os.environ) if env is None else dict(env)
+    exe = cmd[0]
+    if not os.path.isabs(exe):
+        exe = _shutil.which(exe) or exe
+    if cwd:
+        cmd_str = " ".join(_shlex.quote(str(c)) for c in cmd)
+        spawn_cmd = ["/bin/bash", "-c", f"cd {_shlex.quote(str(cwd))} && {cmd_str}"]
+        spawn_exe = "/bin/bash"
+    else:
+        spawn_cmd = list(cmd)
+        spawn_exe = exe
+    try:
+        with _tmp.NamedTemporaryFile(
+            prefix="k3dm-ask-", suffix=".out", delete=False, mode="w"
+        ) as _f:
+            tmp_path = _f.name
+        file_actions = [
+            (os.POSIX_SPAWN_OPEN, 1, tmp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
+            (os.POSIX_SPAWN_DUP2, 1, 2),
+        ]
+        child_pid = os.posix_spawn(spawn_exe, spawn_cmd, _env, file_actions=file_actions, setsid=True)
+        deadline = _time.monotonic() + timeout
+        while True:
+            if _time.monotonic() > deadline:
+                try:
+                    os.kill(child_pid, 9)
+                    os.waitpid(child_pid, 0)
+                except OSError:
+                    pass
+                return Path(tmp_path).read_text(errors="replace").strip(), True
+            try:
+                done_pid, _ = os.waitpid(child_pid, os.WNOHANG)
+                if done_pid != 0:
+                    break
+            except ChildProcessError:
+                break
+            _time.sleep(0.5)
+        output = Path(tmp_path).read_text(errors="replace").strip()
+        Path(tmp_path).unlink(missing_ok=True)
+        return output, False
+    except Exception as exc:
+        return f"spawn error: {exc}", False
+
+
 def _collect_cluster_state():
     """Collect live cluster state to enrich failure analysis. Returns a string or empty string."""
     sections = []
@@ -2020,20 +2072,17 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
             _observe = True
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, env=env, cwd=REPO_ROOT)
-            answer = _ANSI.sub("", result.stdout).strip()
-            if not answer:
-                answer = _ANSI.sub("", result.stderr).strip() or f"No output from {agent}."
+            raw, timed_out = _posix_spawn_capture(cmd, timeout, cwd=REPO_ROOT, env=env)
+            if timed_out:
+                _finish(f"❌ *{agent}* timed out after {timeout}s — try a more specific question", status="failed")
+                return
+            answer = _ANSI.sub("", raw).strip() or f"No output from {agent}."
             if _observe:
                 answer, filed = _parse_gemini_observations(answer)
                 suffix = "\n" + "\n".join(f"Also filed: `{f}`" for f in filed) if filed else ""
             else:
                 suffix = ""
             _finish(f"🤖 *{agent}:* {answer}{suffix}")
-        except subprocess.TimeoutExpired:
-            _finish(f"❌ *{agent}* timed out after {timeout}s — try a more specific question", status="failed")
-        except FileNotFoundError:
-            _finish(f"❌ `{agent}` CLI not found — ensure it is installed and on PATH", status="failed")
         except Exception as exc:
             _finish(f"❌ *{agent} error:* {exc}", status="failed")
     finally:
