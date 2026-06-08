@@ -10,6 +10,7 @@ data:
     {
       "title": "k3dm Deployment Metrics",
       "uid": "k3dm-deployments",
+      "tags": ["k3dm"],
       "schemaVersion": 38,
       "version": 1,
       "refresh": "30s",
