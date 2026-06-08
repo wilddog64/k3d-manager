@@ -40,6 +40,7 @@ TOKEN_FILE = Path.home() / ".k3dm" / "webhook-token"
 JOB_DIR = Path(os.environ.get("K3DM_JOB_DIR", Path.home() / ".local/share/k3d-manager/webhook-jobs"))
 _ASK_MAX_TURNS_DEFAULT = int(os.environ.get("K3DM_ASK_MAX_TURNS", "10"))
 SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
+PUSHGATEWAY_URL = os.environ.get("K3DM_PUSHGATEWAY_URL", "http://localhost:9091")
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID", "")
 def _keychain_secret(service):
@@ -272,9 +273,11 @@ def _run_cluster(job_id, action, provider="aws"):
             _running_procs.pop(job_id, None)
         (job_dir / "status").write_text(status)
         emoji = "✅" if status == "success" else "❌"
-        elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
+        elapsed_secs = int(datetime.datetime.utcnow().timestamp() - _start)
+        elapsed = elapsed_secs // 60
         summary = f"{emoji} *acg-{action}* ({provider}) — {status} in {elapsed}m"
         _notify_job(job_id, summary)
+        _push_metrics(action, provider, status, elapsed_secs, job_id)
 
     try:
         if action == "up":
@@ -358,8 +361,10 @@ def _run_cluster_resume(job_id, provider="aws"):
             _running_procs.pop(job_id, None)
         (job_dir / "status").write_text(status)
         emoji = "✅" if status == "success" else "❌"
-        elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
+        elapsed_secs = int(datetime.datetime.utcnow().timestamp() - _start)
+        elapsed = elapsed_secs // 60
         _notify_job(job_id, f"{emoji} *acg-resume* ({provider}) — {status} in {elapsed}m")
+        _push_metrics("resume", provider, status, elapsed_secs, job_id)
 
     try:
         cmd = ["make", "up", f"CLUSTER_PROVIDER={_cluster_provider}", "K3DM_RESUME=1"]
@@ -1145,6 +1150,40 @@ def _clear_stale_jobs():
                 print(f"[k3dm-webhook] purged old job {entry.name} (status={status})")
         except Exception:
             pass
+
+
+def _push_metrics(action, provider, status, duration_secs, job_id):
+    """Push deployment completion metrics to Prometheus Pushgateway (non-fatal)."""
+    if not PUSHGATEWAY_URL:
+        return
+    ts = int(time.time())
+    success_val = "1" if status == "success" else "0"
+    metric_text = (
+        "# HELP k3dm_deployment_duration_seconds Duration of the deployment job in seconds\n"
+        "# TYPE k3dm_deployment_duration_seconds gauge\n"
+        f'k3dm_deployment_duration_seconds{{action="{action}",provider="{provider}",'
+        f'status="{status}",job_id="{job_id}"}} {duration_secs}\n'
+        "# HELP k3dm_deployment_last_timestamp_seconds Unix timestamp of last job completion\n"
+        "# TYPE k3dm_deployment_last_timestamp_seconds gauge\n"
+        f'k3dm_deployment_last_timestamp_seconds{{action="{action}",provider="{provider}",'
+        f'status="{status}"}} {ts}\n'
+        "# HELP k3dm_deployment_success 1 if last job succeeded, 0 if failed\n"
+        "# TYPE k3dm_deployment_success gauge\n"
+        f'k3dm_deployment_success{{action="{action}",provider="{provider}",'
+        f'job_id="{job_id}"}} {success_val}\n'
+    )
+    try:
+        url = f"{PUSHGATEWAY_URL}/metrics/job/k3dm-webhook/instance/{action}-{provider}"
+        req = urllib.request.Request(
+            url,
+            data=metric_text.encode(),
+            method="POST",
+            headers={"Content-Type": "text/plain; charset=utf-8"},
+        )
+        urllib.request.urlopen(req, timeout=5)
+        print(f"[k3dm-webhook] metrics pushed: {action}/{provider}/{status} {duration_secs}s")
+    except Exception as exc:
+        print(f"[k3dm-webhook] metrics push skipped (non-fatal): {exc}")
 
 
 _POST_PROVISION_DELAY_SECS = 90  # ESO sync + pod startup grace period

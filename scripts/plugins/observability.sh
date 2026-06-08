@@ -139,6 +139,31 @@ function deploy_observability_acg() {
     _info "[observability] Alertmanager config secret created on ACG (ubuntu-k3s)"
   fi
   _prometheus_acg_web_config_secret
+  _deploy_pushgateway_acg
+}
+
+function _deploy_pushgateway_acg() {
+  _info "[observability] Deploying Prometheus Pushgateway on ubuntu-k3s..."
+  if ! command -v helm >/dev/null 2>&1; then
+    _warn "[observability] helm not found — skipping Pushgateway install"
+    return 0
+  fi
+  helm upgrade --install prometheus-pushgateway prometheus-community/prometheus-pushgateway \
+    --kube-context ubuntu-k3s \
+    --namespace monitoring \
+    --create-namespace \
+    --version "2.14.0" \
+    --set service.type=ClusterIP \
+    --set replicaCount=1 \
+    --wait --timeout 120s >/dev/null \
+    && _info "[observability] Pushgateway installed (monitoring/prometheus-pushgateway)" \
+    || { _warn "[observability] Pushgateway install failed — deployment metrics disabled"; return 0; }
+
+  local _dashboard_cm="${SCRIPT_DIR}/etc/grafana/dashboards/k3dm-deployments-configmap.yaml"
+  if [[ -f "${_dashboard_cm}" ]]; then
+    _kubectl apply --context ubuntu-k3s -f "${_dashboard_cm}" >/dev/null \
+      && _info "[observability] k3dm deployment metrics dashboard applied"
+  fi
 }
 
 function _prometheus_acg_web_config_secret() {

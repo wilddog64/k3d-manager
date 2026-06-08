@@ -1640,6 +1640,53 @@ echo "${_acg_prom_pf_pid}" > "${_acg_prom_pf_pid_file}"
 disown "${_acg_prom_pf_pid}"
 _info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:19090 → ubuntu-k3s, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
 
+_info "[acg-up] Step 14c/14 — Installing Pushgateway port-forward LaunchAgent (localhost:9091 → ubuntu-k3s)..."
+_pgw_pf_label="com.k3d-manager.pushgateway-port-forward"
+_pgw_pf_plist="${HOME}/Library/LaunchAgents/${_pgw_pf_label}.plist"
+_pgw_pf_log="${_ACG_STATE_DIR}/logs/pushgateway-pf.log"
+_pgw_kubectl_bin="$(command -v kubectl)"
+_pgw_pf_kubeconfig="${HOME}/.kube/config:${HOME}/.kube/ubuntu-k3s.yaml:${HOME}/.kube/k3s-ubuntu.yaml"
+mkdir -p "$(dirname "${_pgw_pf_log}")"
+cat > "${_pgw_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_pgw_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${_pgw_kubectl_bin}</string>
+    <string>port-forward</string>
+    <string>svc/prometheus-pushgateway</string>
+    <string>--namespace</string>
+    <string>monitoring</string>
+    <string>--context</string>
+    <string>ubuntu-k3s</string>
+    <string>9091:9091</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>KUBECONFIG</key>
+    <string>${_pgw_pf_kubeconfig}</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_pgw_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_pgw_pf_log}</string>
+</dict>
+</plist>
+PLIST
+if launchctl list "${_pgw_pf_label}" >/dev/null 2>&1; then
+  launchctl unload "${_pgw_pf_plist}" 2>/dev/null || true
+fi
+launchctl load "${_pgw_pf_plist}"
+_info "[acg-up] Pushgateway port-forward agent loaded (launchd: ${_pgw_pf_label}, localhost:9091)"
+
 _info "[acg-up] Cluster is up."
 kubectl get nodes --context ubuntu-k3s
 _info "[acg-up] === Public URLs (Cloudflare — any device) ==="

@@ -75,6 +75,10 @@ prometheus:
           - source_labels: [__meta_kubernetes_service_name]
             action: keep
             regex: istiod
+      - job_name: pushgateway
+        honor_labels: true
+        static_configs:
+          - targets: ['prometheus-pushgateway.monitoring:9091']
   service:
     type: NodePort
     nodePort: 30090

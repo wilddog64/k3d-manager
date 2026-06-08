@@ -31,6 +31,7 @@ flowchart LR
             FE["Frontend HTTP listener\n127.0.0.2:80"]
             PROM["Prometheus port-forward\nlocalhost:19090"]
             GRAF["Grafana port-forward\nlocalhost:3001"]
+            PGW["Pushgateway port-forward\nlocalhost:9091"]
         end
     end
 
@@ -44,6 +45,7 @@ flowchart LR
     CFD -->|"frontend.3ai-talk.org"| FE
     CFD -->|"prometheus.3ai-talk.org"| PROM
     CFD -->|"grafana.3ai-talk.org"| GRAF
+    WH -->|"POST /metrics/job/k3dm-webhook\n(deployment metrics)"| PGW
 ```
 
 ### Key files
@@ -53,8 +55,9 @@ flowchart LR
 | `scripts/etc/cloudflared/config.yml` | Static ingress rules (hostname → local service) |
 | `~/.cloudflared/<tunnel-id>.json` | Tunnel credentials (restored from Keychain by `acg-up`) |
 | `~/.cloudflared/cert.pem` | Cloudflare origin cert (restored from Keychain) |
-| `bin/acg-up` Step 10h | Installs/updates the LaunchAgent plist |
-| `bin/acg-down` | Unloads and removes the LaunchAgent plist |
+| `bin/acg-up` Step 10h | Installs/updates the Cloudflare tunnel LaunchAgent plist |
+| `bin/acg-up` Step 14c | Installs Pushgateway port-forward LaunchAgent (localhost:9091) |
+| `bin/acg-down` | Unloads and removes all LaunchAgent plists |
 
 ---
 
@@ -139,3 +142,47 @@ Webhook token     macOS Keychain (k3dm-webhook-token) read by bin/k3dm-webhook a
 already running. The Worker surfaces this to Slack as:
 
 > ⚠️ cluster job already running — use /acg-status to check progress
+
+---
+
+## 3 — Deployment Metrics (Prometheus Pushgateway)
+
+After every `acg-up`, `acg-down`, or `acg-resume` job completes, `k3dm-webhook`
+pushes metrics to the Prometheus Pushgateway running in the cluster.
+
+```
+k3dm-webhook (Mac) ──POST──► localhost:9091 (LaunchAgent port-forward)
+                                     │
+                              Pushgateway pod (monitoring ns, ubuntu-k3s)
+                                     │
+                              Prometheus scrapes /metrics
+                                     │
+                              Grafana dashboard "k3dm Deployment Metrics"
+```
+
+### Metrics pushed
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `k3dm_deployment_duration_seconds` | gauge | `action`, `provider`, `status`, `job_id` | Wall-clock seconds for the job |
+| `k3dm_deployment_last_timestamp_seconds` | gauge | `action`, `provider`, `status` | Unix timestamp of last completion |
+| `k3dm_deployment_success` | gauge | `action`, `provider`, `job_id` | `1` = success, `0` = failed |
+
+Push group key: `/metrics/job/k3dm-webhook/instance/{action}-{provider}` — one entry per
+action+provider pair; the latest completed job overwrites the previous.
+
+### Environment override
+
+`K3DM_PUSHGATEWAY_URL` (default: `http://localhost:9091`) — set to `""` to disable metric
+pushes without changing code.
+
+### Key files
+
+| File | Purpose |
+|------|---------|
+| `bin/k3dm-webhook` | `_push_metrics()` — pushes after each job `_finish()` |
+| `bin/acg-up` Step 14c | Installs Pushgateway port-forward LaunchAgent (localhost:9091) |
+| `bin/acg-down` | Unloads Pushgateway port-forward LaunchAgent |
+| `scripts/plugins/observability.sh` | `_deploy_pushgateway_acg()` — Helm install + dashboard ConfigMap |
+| `scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml` | Adds `pushgateway` scrape job |
+| `scripts/etc/grafana/dashboards/k3dm-deployments-configmap.yaml` | Grafana dashboard ConfigMap |
