@@ -1917,7 +1917,11 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
         "- TITLE: <short title> | BODY: <one paragraph describing the issue>\n\n"
         "Rules for OBSERVATIONS: only include issues you are confident are real bugs or "
         "misconfigurations. Do not speculate. Each observation must be a distinct issue "
-        "unrelated to the question. Limit to 2 observations maximum."
+        "unrelated to the question. Limit to 2 observations maximum.\n"
+        "Pod-state rule: if you notice a pod not in Running/Completed state "
+        "(ContainerCreating, CrashLoopBackOff, Pending, Error, OOMKilled), run "
+        "`kubectl describe pod <name> -n <namespace> --context <ctx>` first and include "
+        "the Events section in the BODY. Never guess the cause from status alone."
     )
 
     if not _ask_semaphore.acquire(blocking=False):
@@ -1946,7 +1950,11 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
                 "- TITLE: <short title> | BODY: <one paragraph describing the issue>\n\n"
                 "Rules for OBSERVATIONS: only include issues you are confident are real bugs or "
                 "misconfigurations. Do not speculate. Each observation must be a distinct issue "
-                "unrelated to the question. Limit to 2 observations maximum."
+                "unrelated to the question. Limit to 2 observations maximum.\n"
+                "Pod-state rule: if you notice a pod not in Running/Completed state "
+                "(ContainerCreating, CrashLoopBackOff, Pending, Error, OOMKilled), run "
+                "`kubectl describe pod <name> -n <namespace> --context <ctx>` first and include "
+                "the Events section in the BODY. Never guess the cause from status alone."
             )
             gemini_prompt = (
                 f"{gemini_system}{_ctx_block}\n\n"
@@ -2084,7 +2092,11 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
                 "- TITLE: <short title> | BODY: <one paragraph describing the issue>\n\n"
                 "Rules for OBSERVATIONS: only include issues you are confident are real bugs or "
                 "misconfigurations. Do not speculate. Each observation must be a distinct issue "
-                "unrelated to the question. Limit to 2 observations maximum."
+                "unrelated to the question. Limit to 2 observations maximum.\n"
+                "Pod-state rule: if you notice a pod not in Running/Completed state "
+                "(ContainerCreating, CrashLoopBackOff, Pending, Error, OOMKilled), run "
+                "`kubectl describe pod <name> -n <namespace> --context <ctx>` first and include "
+                "the Events section in the BODY. Never guess the cause from status alone."
             )
             user_prompt = (
                 f"{_ctx_block}\n\n---USER QUESTION START---\n{question}\n---USER QUESTION END---"
