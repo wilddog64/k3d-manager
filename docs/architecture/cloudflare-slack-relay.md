@@ -7,7 +7,7 @@ internet and accept Slack slash commands that drive cluster lifecycle.
 
 ## 1 — Cloudflare Named Tunnel (ingress)
 
-`cloudflared` runs as a macOS LaunchDaemon (`com.k3d-manager.cloudflare-tunnel`)
+`cloudflared` runs as a macOS LaunchAgent (`com.k3d-manager.cloudflare-tunnel`)
 installed by `bin/acg-up` Step 10h. It dials outbound to the Cloudflare edge
 (no inbound firewall holes required) and routes public hostnames to local
 port-forwarded services on the Mac.
@@ -21,7 +21,7 @@ flowchart LR
         Edge["Cloudflare Edge\n(TLS termination)"]
     end
 
-    subgraph Mac["Mac (LaunchDaemon)"]
+    subgraph Mac["Mac (LaunchAgent)"]
         CFD["cloudflared\ncom.k3d-manager.cloudflare-tunnel\n~/.cloudflared/config.yml"]
 
         subgraph Locals["Local Listeners"]
@@ -29,8 +29,8 @@ flowchart LR
             ARGO["ArgoCD port-forward\nlocalhost:8080"]
             KC["Keycloak port-forward\nlocalhost:8880"]
             FE["Frontend HTTP listener\n127.0.0.2:80"]
-            PROM["Prometheus port-forward\nlocalhost:80"]
-            GRAF["Grafana port-forward\nlocalhost:80"]
+            PROM["Prometheus port-forward\nlocalhost:19090"]
+            GRAF["Grafana port-forward\nlocalhost:3001"]
         end
     end
 
@@ -53,17 +53,17 @@ flowchart LR
 | `scripts/etc/cloudflared/config.yml` | Static ingress rules (hostname → local service) |
 | `~/.cloudflared/<tunnel-id>.json` | Tunnel credentials (restored from Keychain by `acg-up`) |
 | `~/.cloudflared/cert.pem` | Cloudflare origin cert (restored from Keychain) |
-| `bin/acg-up` Step 10h | Installs/updates the LaunchDaemon plist |
-| `bin/acg-down` | Unloads and removes the LaunchDaemon plist |
+| `bin/acg-up` Step 10h | Installs/updates the LaunchAgent plist |
+| `bin/acg-down` | Unloads and removes the LaunchAgent plist |
 
 ---
 
 ## 2 — Slack Relay → Webhook Server (command path)
 
-Slack slash commands travel through a Cloudflare Worker that verifies the
-Slack signature and forwards to the local webhook server. The webhook server
-runs each command as a background job and posts the result back to Slack via
-`response_url`.
+There are two inbound paths from Slack to the webhook:
+
+- **Slash commands** — user types `/acg-up` etc. in any channel; Slack sends a form POST to the Cloudflare Worker which verifies and forwards.
+- **Thread replies** — user types in an active job thread; Slack sends a `message` event via the Events API; the Worker forwards it to `/slack/events` on the webhook.
 
 ```mermaid
 sequenceDiagram
@@ -73,30 +73,46 @@ sequenceDiagram
     participant Tunnel as Cloudflare Tunnel<br/>webhook.3ai-talk.org
     participant WH as k3dm-webhook<br/>bin/k3dm-webhook<br/>127.0.0.1:7443
     participant Job as Background Thread<br/>/tmp/k3dm-webhook-jobs/<id>/
-    participant Bin as bin/acg-up<br/>bin/acg-down<br/>bin/acg-status
+    participant Bin as bin/acg-up etc.
 
+    note over User,Bin: Path A — Slash command
     User->>Slack: /acg-up aws
-    Slack->>Worker: POST (X-Slack-Signature, response_url)
+    Slack->>Worker: POST /slack/commands<br/>(X-Slack-Signature, response_url)
     Note over Worker: HMAC-SHA256 verify<br/>timestamp ±300s replay guard
-    Worker->>Slack: 200 ⏳ Bringing up ACG cluster (aws)…
+    Worker->>Slack: 200 ⏳ Bringing up ACG cluster…
     Worker->>Tunnel: POST /api/v1/cluster<br/>Authorization: Bearer <token><br/>{action:"up", provider:"aws", response_url}
     Tunnel->>WH: HTTP POST 127.0.0.1:7443
     Note over WH: Bearer token auth<br/>409 if cluster job already running
-    WH->>Job: spawn thread, write status=queued
+    WH->>Job: spawn thread, write status=running
     WH->>Worker: 202 {job_id}
-    Job->>Bin: subprocess (make up / make down)
+    Job->>Bin: subprocess (make up)
     Bin-->>Job: stdout/stderr → output file
     Job->>Slack: POST response_url ✅/❌ result
+
+    note over User,Bin: Path B — Thread reply (Events API)
+    User->>Slack: ask claude why is basket crashing?
+    Slack->>Worker: POST /slack/events<br/>(message event, thread_ts)
+    Worker->>Tunnel: POST /slack/events<br/>Authorization: Bearer <token>
+    Tunnel->>WH: HTTP POST 127.0.0.1:7443/slack/events
+    Note over WH: dedupe event_id<br/>match thread_ts → job_id<br/>ignore non-command text silently
+    WH->>Job: _handle_thread_command(job_id, "ask claude ...")
+    Job->>Bin: claude --allowedTools Bash -p "..."
+    Bin-->>Job: agent output
+    Job->>Slack: POST chat.postMessage (thread reply)
 ```
 
 ### Routes handled by k3dm-webhook
 
 | Method | Path | Action |
 |--------|------|--------|
-| `POST` | `/api/v1/cluster` | `bin/acg-up` or `bin/acg-down` (action: up\|down) |
+| `POST` | `/api/v1/cluster` | `bin/acg-up` or `bin/acg-down` (action: up\|down\|kill) |
 | `POST` | `/api/v1/cluster-status` | cluster health check → Slack |
+| `POST` | `/api/v1/cluster-refresh` | `bin/acg-refresh` — restore tunnel + credentials |
+| `POST` | `/api/v1/cluster-resume` | `bin/acg-up` from last checkpoint |
+| `POST` | `/api/v1/ask` | AI agent question (claude / gemini / codex) → Slack |
 | `POST` | `/api/v1/argocd-upgrade` | ArgoCD helm upgrade (chart_version, stage: acg\|infra) |
-| `POST` | `/api/v1/analyze` | Claude AI log analysis → Slack |
+| `POST` | `/slack/events` | Slack Events API — thread replies, URL verification |
+| `GET`  | `/api/v1/health` | JSON smoke-test report (used by `bin/acg-status`) |
 | `GET`  | `/api/v1/status/<job_id>` | Poll job status + last 2 KB of output |
 
 ### Auth chain
@@ -115,7 +131,7 @@ Webhook token     macOS Keychain (k3dm-webhook-token) read by bin/k3dm-webhook a
 | `bin/k3dm-webhook` | Python HTTP server — auth, job dispatch, Slack reply |
 | `bin/k3dm-webhook-setup` | One-time setup: generate token, install LaunchAgent plist |
 | `~/Library/LaunchAgents/com.k3d-manager.webhook.plist` | LaunchAgent keeping webhook server alive |
-| `/tmp/k3dm-webhook-jobs/<id>/` | Job state: `status`, `output`, `action`, `response_url` |
+| `/tmp/k3dm-webhook-jobs/<id>/` | Job state: `status`, `output`, `action`, `response_url`, `thread_ts` |
 
 ### Concurrent job guard
 

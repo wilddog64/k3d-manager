@@ -1,33 +1,41 @@
 # Slack Slash Commands & Webhook Server
 
-Slack slash commands (`/acg-up`, `/acg-down`, `/acg-status`, `/acg-resume`, `/ask`,
-`/argocd-upgrade`) that control the k3d-manager cluster from any Slack channel, plus
-thread-based AI troubleshooting via the `/ask` command.
+Slack slash commands (`/acg-up`, `/acg-down`, `/acg-status`, `/acg-refresh`, `/acg-resume`,
+`/ask`, `/argocd-upgrade`) that control the k3d-manager cluster from any Slack channel, plus
+thread-based AI troubleshooting and job control via thread replies.
 
 ---
 
 ## Architecture
 
+Two paths from Slack to the webhook — slash commands and thread replies:
+
 ```mermaid
 sequenceDiagram
-    participant U as User (Slack)
+    actor U as User (Slack)
     participant S as Slack API
     participant W as Cloudflare Worker<br/>k3dm-slack-relay.k3dm.workers.dev
-    participant H as k3dm-webhook server<br/>webhook.3ai-talk.org (Mac)
-    participant C as k3d-manager<br/>(make up / make down)
+    participant H as k3dm-webhook<br/>webhook.3ai-talk.org
 
-    U->>S: /acg-up
-    S->>W: POST /slack/commands<br/>X-Slack-Signature: hmac(signing_secret)
-    W->>W: Verify HMAC-SHA256 signature
-    W->>H: POST /api/v1/cluster<br/>Authorization: Bearer <webhook_token>
-    H->>H: Verify Bearer token
-    H->>C: make up CLUSTER_PROVIDER=k3s-aws
-    C-->>H: stdout (streamed)
-    H-->>W: 202 Accepted {job_id}
-    W-->>S: 200 "ACG cluster provisioning started..."
-    S-->>U: ACG cluster provisioning started...
-    H-->>S: POST response_url (job complete ✅/❌)
+    note over U,H: Path A — Slash command (any channel)
+    U->>S: /acg-up aws
+    S->>W: POST /slack/commands<br/>X-Slack-Signature + response_url
+    W->>W: HMAC-SHA256 verify
+    W->>H: POST /api/v1/cluster {action:up, provider:aws}
+    H->>H: Bearer token auth + spawn job thread
+    H-->>W: 202 {job_id}
+    W-->>S: 200 ⏳ Acknowledged
+    H-->>S: POST response_url ✅/❌ when done
+
+    note over U,H: Path B — Thread reply (Events API)
+    U->>S: ask claude why is basket crashing?
+    S->>W: POST /slack/events (message event, thread_ts)
+    W->>H: POST /slack/events {event, thread_ts}
+    H->>H: match thread_ts → job_id<br/>ignore non-command text silently
+    H-->>S: chat.postMessage (thread reply)
 ```
+
+See `docs/architecture/cloudflare-slack-relay.md` for the full component diagram.
 
 ### Components
 
@@ -223,7 +231,8 @@ bin/k3dm-webhook-setup --uninstall
 |---------|--------|-------|
 | `/acg-up` | Provision ACG k3s cluster | Runs `make up CLUSTER_PROVIDER=k3s-aws` |
 | `/acg-down` | Tear down ACG cluster | Runs `make down KEEP_LOCAL=1` |
-| `/acg-status` | Check cluster health | kubectl nodes + ArgoCD app status |
+| `/acg-status` | Check cluster health | kubectl nodes + ArgoCD app status + smoke test |
+| `/acg-refresh` | Restore tunnel + credentials | Re-establishes SSH tunnel, refreshes kubeconfig |
 | `/acg-resume [aws]` | Resume provision from last checkpoint | Skips completed steps |
 | `/ask [claude\|gemini\|codex] <question>` | Multi-agent cluster troubleshooting | See [/ask command](#ask-command) below |
 | `/argocd-upgrade` | Upgrade ArgoCD platform-ops | Requires `chart_version` and `stage` params |
@@ -247,7 +256,7 @@ Ask a live AI agent a cluster or code question directly from Slack.
 /ask codex how does the acg_get_credentials function work?
 ```
 
-**As a thread reply** (in an active job thread — Slack does not allow slash commands in threads):
+**As a thread reply** (in an active job thread — type in the thread, not a new message):
 ```
 ask what's the issue with the data-layer?
 ask claude check the ArgoCD app health
@@ -255,7 +264,17 @@ ask gemini explain the ESO sync failure
 ask codex how does the tunnel plugin work?
 ```
 
+Or use the short slash aliases (leading `/` works in thread replies):
+```
+/claude why is the order-service crashing?
+/gemini what could cause ESO sync failures?
+/codex how does the tunnel plugin work?
+```
+
 The first word after `ask` is the agent name. If omitted, defaults to `claude`.
+
+**Non-command replies are silently ignored** — normal conversation in a job thread
+("thanks", "got it", "ok") produces no webhook response.
 
 **Adjusting the turn limit for a single call** — append `turns=N` anywhere in the question:
 ```
@@ -269,8 +288,8 @@ The `turns=N` token is stripped from the question before it reaches the agent.
 
 | Agent | Best for | kubectl access | File scope | Thread context |
 |-------|----------|---------------|------------|----------------|
-| `claude` | Live cluster troubleshooting — runs its own kubectl | Yes (read-only; fix mode: rollout restart, delete pod, argocd sync) | k3d-manager + shopping-carts only | Yes (last 20 messages) |
-| `gemini` | Analysis and diagnosis from knowledge | No (text-only) | n/a | Yes (last 20 messages) |
+| `claude` | Live cluster troubleshooting — runs kubectl, grep, curl GET, dig, etc. | Yes — read-only (get/describe/logs/top/events); fix mode adds rollout restart, delete pod, argocd sync | k3d-manager + shopping-carts + diagnostic paths | Yes (last 20 messages) |
+| `gemini` | Root cause analysis and remediation steps from knowledge | No (text-only via `_call_gemini`) | n/a | Yes (last 20 messages) |
 | `codex` | Code questions about the k3d-manager repo | No | k3d-manager only (`cwd`) | Yes (last 20 messages) |
 
 ### Thread context
@@ -290,7 +309,7 @@ the agent switches to **filing mode**:
 - Claude is granted the `Write` tool (in addition to `Bash`) so it can write files.
 - Claude writes `docs/issues/YYYY-MM-DD-<slug>.md` with the issue title, symptom,
   reproduction steps, and fix/workaround recommendation.
-- Claude commits and pushes the doc to `k3d-manager-v1.6.3` automatically.
+- Claude commits and pushes the doc to the current feature branch automatically.
 - Timeout extends to 400 s; turn limit expands to `--max-turns 10`.
 - The Slack reply includes the commit SHA and file path.
 
@@ -430,6 +449,13 @@ against the allowed roots. Paths outside the following are blocked with
 | `$K3DM_SHOPPING_CARTS_ROOT` | shopping-cart apps (default: `~/src/gitrepo/personal/shopping-carts`) |
 | `/tmp`, `/var/tmp` | Ephemeral scratch space |
 | `/proc`, `/sys` | Read-only kernel interfaces |
+| `/etc` | System config — `/etc/hosts`, CoreDNS, etc. |
+| `/Library/LaunchDaemons`, `/Library/LaunchAgents` | macOS service plists |
+| `~/.kube` | kubeconfig files |
+| `~/.local/share/k3d-manager` | k3d-manager state directory |
+| `~/.cloudflared` | Cloudflare tunnel credentials and config |
+| `/var/log` | System logs |
+| `/usr/local/bin`, `/usr/bin`, `/bin`, `/opt/homebrew` | CLI tool paths |
 
 **Prompt scope (all three agents)**
 All system prompts explicitly state the allowed repos and instruct the agent not to access
