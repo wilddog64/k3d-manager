@@ -237,6 +237,9 @@ kind: Secret
 metadata:
   name: cluster-ubuntu-k3s
   namespace: cicd
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+    argocd.argoproj.io/cluster-name: ubuntu-k3s
 stringData:
   server: "${_argocd_server}"
   config: |
@@ -359,8 +362,8 @@ PLIST
   # ── 6. Cloudflare tunnel (always restart to pick up config changes) ───────────
   _launchd_restart \
     "com.k3d-manager.cloudflare-tunnel" \
-    "/Library/LaunchDaemons/com.k3d-manager.cloudflare-tunnel.plist" \
-    system
+    "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" \
+    user
 fi
 
 # ── 7. Summary ────────────────────────────────────────────────────────────────
