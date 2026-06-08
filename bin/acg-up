@@ -471,7 +471,7 @@ PLIST
         _warn "[acg-up] existing ArgoCD browser HTTPS listener was not loaded; continuing"
       fi
       : > "${_argocd_browser_launchctl_log}"
-      if ! _run_command --prefer-sudo --quiet --soft -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" \
+      if ! _run_command --interactive-sudo --quiet --soft -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" \
           >"${_argocd_browser_launchctl_log}" 2>&1; then
         if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
           tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
@@ -480,7 +480,7 @@ PLIST
       fi
       rm -f "${_argocd_browser_plist_tmp}"
       : > "${_argocd_browser_launchctl_log}"
-      if ! _run_command --prefer-sudo --quiet --soft -- launchctl bootstrap system "${_argocd_browser_plist}" \
+      if ! _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${_argocd_browser_plist}" \
           >"${_argocd_browser_launchctl_log}" 2>&1; then
         if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
           tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
@@ -1064,7 +1064,7 @@ PLIST
         _warn "[acg-up] existing Keycloak browser HTTP listener was not loaded; continuing"
       fi
       : > "${_keycloak_browser_launchctl_log}"
-      if ! _run_command --prefer-sudo --quiet --soft -- install -m 644 "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" \
+      if ! _run_command --interactive-sudo --quiet --soft -- install -m 644 "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" \
           >"${_keycloak_browser_launchctl_log}" 2>&1; then
         if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
           tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
@@ -1073,7 +1073,7 @@ PLIST
       fi
       rm -f "${_keycloak_browser_plist_tmp}"
       : > "${_keycloak_browser_launchctl_log}"
-      if ! _run_command --prefer-sudo --quiet --soft -- launchctl bootstrap system "${_keycloak_browser_plist}" \
+      if ! _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${_keycloak_browser_plist}" \
           >"${_keycloak_browser_launchctl_log}" 2>&1; then
         if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
           tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
@@ -1239,13 +1239,13 @@ PLIST
     _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_loopback_plist}" \
       >"${_loopback_launchctl_log}" 2>&1 || true
     : > "${_loopback_launchctl_log}"
-    if ! _run_command --prefer-sudo --quiet --soft -- install -m 644 "${_loopback_plist_tmp}" "${_loopback_plist}" \
+    if ! _run_command --interactive-sudo --quiet --soft -- install -m 644 "${_loopback_plist_tmp}" "${_loopback_plist}" \
         >"${_loopback_launchctl_log}" 2>&1; then
       _warn "[acg-up] failed to install loopback alias plist — frontend may fail after reboot"
     else
       rm -f "${_loopback_plist_tmp}"
       : > "${_loopback_launchctl_log}"
-      _run_command --prefer-sudo --quiet --soft -- launchctl bootstrap system "${_loopback_plist}" \
+      _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${_loopback_plist}" \
         >"${_loopback_launchctl_log}" 2>&1 || \
         _warn "[acg-up] failed to bootstrap loopback alias agent"
     fi
@@ -1304,7 +1304,7 @@ PLIST
       _warn "[acg-up] existing frontend browser HTTP listener was not loaded; continuing"
     fi
     : > "${_frontend_browser_launchctl_log}"
-    if ! _run_command --prefer-sudo --quiet --soft -- install -m 644 "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" \
+    if ! _run_command --interactive-sudo --quiet --soft -- install -m 644 "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" \
         >"${_frontend_browser_launchctl_log}" 2>&1; then
       if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
         tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
@@ -1313,7 +1313,7 @@ PLIST
     fi
     rm -f "${_frontend_browser_plist_tmp}"
     : > "${_frontend_browser_launchctl_log}"
-    if ! _run_command --prefer-sudo --quiet --soft -- launchctl bootstrap system "${_frontend_browser_plist}" \
+    if ! _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${_frontend_browser_plist}" \
         >"${_frontend_browser_launchctl_log}" 2>&1; then
       if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
         tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
