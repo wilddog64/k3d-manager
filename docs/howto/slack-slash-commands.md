@@ -240,6 +240,24 @@ bin/k3dm-webhook-setup --uninstall
 All commands respond immediately with an acknowledgement, then post results back to the
 channel via `response_url` when the job completes.
 
+### Service smoke test
+
+`/acg-status` and the post-provision check both run HTTP health probes against all
+services. Pushgateway is included — if the port-forward LaunchAgent is not running the
+probe fails and Gemini triages it automatically.
+
+| Service | Probe URL | Expected |
+|---------|-----------|----------|
+| ArgoCD | `http://localhost:8080/healthz` | 200 |
+| Frontend | `http://frontend.shopping-cart.local/` | 200 |
+| Keycloak | `http://keycloak.shopping-cart.local/health/live` | 200 |
+| Prometheus | `http://localhost:19090/-/ready` | 200 |
+| Grafana | `https://grafana.3ai-talk.org/api/health` | 200 |
+| **Pushgateway** | `http://localhost:9091/-/healthy` | 200 |
+
+On failure, the webhook fetches pod state for the matching `monitoring` pod and asks
+Gemini to classify it as TRANSIENT or REAL FAILURE before posting to Slack.
+
 ---
 
 ## /ask Command

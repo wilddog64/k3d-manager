@@ -115,7 +115,7 @@ sequenceDiagram
 | `POST` | `/api/v1/ask` | AI agent question (claude / gemini / codex) → Slack |
 | `POST` | `/api/v1/argocd-upgrade` | ArgoCD helm upgrade (chart_version, stage: acg\|infra) |
 | `POST` | `/slack/events` | Slack Events API — thread replies, URL verification |
-| `GET`  | `/api/v1/health` | JSON smoke-test report (used by `bin/acg-status`) |
+| `GET`  | `/api/v1/health` | JSON smoke-test report (used by `bin/acg-status`) — includes Pushgateway |
 | `GET`  | `/api/v1/status/<job_id>` | Poll job status + last 2 KB of output |
 
 ### Auth chain
