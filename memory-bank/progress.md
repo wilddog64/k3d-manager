@@ -1,5 +1,8 @@
 # Progress — k3d-manager
 
+## Status (v1.6.4 — PENDING)
+- **COMPLETE:** webhook slash command aliases + diagnostic tool access + Gemini prompt fix — k3d-manager commit `c29f2662` on `k3d-manager-v1.6.4`; spec: `docs/bugs/v1.6.4-bugfix-combined.md`; `bin/k3dm-webhook` now normalizes `/gemini`, `/claude`, and `/codex` into `ask` dispatch, shows the alias list in the unknown-command help text, spells out allowed diagnostic tools for Claude, and replaces Gemini's "cannot run kubectl" wording with analysis-oriented guidance; `bin/k3dm-ask-bash` now allows read-only diagnostic paths under `/etc`, `/Library/LaunchDaemons`, `/Library/LaunchAgents`, `${HOME}/.kube`, `${HOME}/.local/share/k3d-manager`, `${HOME}/.cloudflared`, `/var/log`, `/usr/local/bin`, `/usr/bin`, `/bin`, and `/opt/homebrew` while still blocking out-of-scope paths; validation used `shellcheck -S warning bin/k3dm-ask-bash` and `python3 -m py_compile bin/k3dm-webhook`; commit message: `feat(webhook): slash command aliases, expanded agent diagnostic tools, Gemini prompt fix`
+
 ## Status (v1.6.3 — RELEASED 2026-06-07)
 - **RELEASED:** k3d-manager v1.6.3 — PR #92 merged to main (SHA `0d8d24024eeeb6cf2a0701d78d7dbc9acbb719d4`); enforce_admins restored ✓; v1.6.3 tag created + pushed ✓; GitHub release created ✓; v1.6.4 branch created ✓; retrospective committed (`3b0eb93c`) ✓; memory-bank updated ✓
 
