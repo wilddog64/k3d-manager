@@ -1,3 +1,6 @@
+admissionWebhooks:
+  enabled: false
+
 defaultRules:
   rules:
     kubeApiserverAvailability: false
