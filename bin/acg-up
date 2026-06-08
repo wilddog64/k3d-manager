@@ -1412,6 +1412,55 @@ PLIST
 fi
 
 if _is_mac; then
+  _info "[acg-up] Step 10g.11/14 — Installing Grafana port-forward launchd agent (localhost:3001 → ubuntu-k3s svc/acg-kube-prometheus-stack-grafana, auto-restart)..."
+  _grafana_pf_label="com.k3d-manager.grafana-port-forward"
+  _grafana_pf_plist="${HOME}/Library/LaunchAgents/${_grafana_pf_label}.plist"
+  _grafana_pf_log="${_ACG_STATE_DIR}/logs/grafana-pf.log"
+  _grafana_pf_kubectl="$(command -v kubectl)"
+  _grafana_pf_kubeconfig="${HOME}/.kube/config:${HOME}/.kube/ubuntu-k3s.yaml:${HOME}/.kube/k3s-ubuntu.yaml"
+  mkdir -p "$(dirname "${_grafana_pf_log}")"
+  cat > "${_grafana_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_grafana_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${_grafana_pf_kubectl}</string>
+    <string>port-forward</string>
+    <string>svc/acg-kube-prometheus-stack-grafana</string>
+    <string>--namespace</string>
+    <string>monitoring</string>
+    <string>--context</string>
+    <string>ubuntu-k3s</string>
+    <string>3001:80</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>KUBECONFIG</key>
+    <string>${_grafana_pf_kubeconfig}</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_grafana_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_grafana_pf_log}</string>
+</dict>
+</plist>
+PLIST
+  if launchctl list "${_grafana_pf_label}" >/dev/null 2>&1; then
+    launchctl unload "${_grafana_pf_plist}" 2>/dev/null || true
+  fi
+  launchctl load "${_grafana_pf_plist}"
+  _info "[acg-up] Grafana port-forward agent loaded (launchd: ${_grafana_pf_label})"
+fi
+
+if _is_mac; then
   _info "[acg-up] Step 10h/14 — Installing Cloudflare named tunnel (argocd + frontend + keycloak + prometheus + grafana)..."
   _tunnel_dir="${_ACG_STATE_DIR}"
   _tunnel_urls_file="${_tunnel_dir}/tunnel-urls.txt"

@@ -11,7 +11,7 @@ ingress:
   - hostname: prometheus.3ai-talk.org
     service: http://localhost:19090
   - hostname: grafana.3ai-talk.org
-    service: http://localhost:3000
+    service: http://localhost:3001
   - hostname: webhook.3ai-talk.org
     service: http://127.0.0.1:7443
   - service: http_status:404
