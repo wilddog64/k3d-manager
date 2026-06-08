@@ -12,6 +12,15 @@ defaultRules:
 
 grafana:
   enabled: true
+  additionalDataSources:
+    - name: prometheus-acg
+      type: prometheus
+      uid: P5A1115AEDF367D43
+      url: http://acg-kube-prometheus-stack-prometheus.monitoring:9090/
+      access: proxy
+      jsonData:
+        httpMethod: POST
+        timeInterval: 30s
   resources:
     requests:
       memory: 64Mi
