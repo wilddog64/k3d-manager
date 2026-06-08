@@ -1,6 +1,10 @@
 admissionWebhooks:
   enabled: false
 
+prometheusOperator:
+  tls:
+    enabled: false
+
 defaultRules:
   rules:
     kubeApiserverAvailability: false

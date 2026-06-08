@@ -40,13 +40,18 @@ the TLS backing secret is absent.
 
 ## Fix Options
 
-### Option A — Disable admission webhooks in Helm values (recommended for dev clusters)
+### Option A — Disable admission webhooks AND operator TLS in Helm values (recommended for dev clusters)
 
-Add to the `kube-prometheus-stack` Helm values:
+`admissionWebhooks.enabled: false` alone is insufficient — the operator pod still mounts
+the TLS secret for its own HTTPS endpoint. Both keys are required:
 
 ```yaml
 admissionWebhooks:
   enabled: false
+
+prometheusOperator:
+  tls:
+    enabled: false
 ```
 
 This removes the dependency on the admission secret entirely. The admission webhook
