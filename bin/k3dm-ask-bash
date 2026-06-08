@@ -93,12 +93,33 @@ if echo "$CMD" | grep -qE '\bgit\b.*(reset\s+--hard|clean\s+-f|push\s+--force|pu
 fi
 
 # Block file access outside allowed repos (absolute path arguments only)
+# Read-only system paths allowed for cluster diagnosis
+_DIAG_PATHS=(
+  /etc
+  /Library/LaunchDaemons
+  /Library/LaunchAgents
+  "${HOME}/.kube"
+  "${HOME}/.local/share/k3d-manager"
+  "${HOME}/.cloudflared"
+  /var/log
+  /usr/local/bin
+  /usr/bin
+  /bin
+  /opt/homebrew
+)
+
+# Block file access outside allowed repos and diagnosis paths (absolute path arguments only)
 for arg in "$@"; do
   if [[ "$arg" == /* ]]; then
     real_arg="$(realpath -m "$arg" 2>/dev/null || echo "$arg")"
-    if [[ "$real_arg" != "${K3DM_REPO}"* && "$real_arg" != "${SHOPPING_CARTS_ROOT}"* \
-       && "$real_arg" != /tmp/* && "$real_arg" != /var/tmp/* \
-       && "$real_arg" != /proc/* && "$real_arg" != /sys/* ]]; then
+    _allowed=0
+    for _p in "${K3DM_REPO}" "${SHOPPING_CARTS_ROOT}" /tmp /var/tmp /proc /sys "${_DIAG_PATHS[@]}"; do
+      if [[ "$real_arg" == "${_p}"* ]]; then
+        _allowed=1
+        break
+      fi
+    done
+    if [[ "$_allowed" -eq 0 ]]; then
       _deny_scope "$arg"
     fi
   fi
