@@ -7,9 +7,11 @@ import http.server
 import json
 import os
 import re
+import shutil
 import signal
 import subprocess
 import threading
+import time
 import traceback
 import urllib.request
 import uuid
@@ -35,7 +37,7 @@ SHOPPING_CARTS_ROOT = os.environ.get(
     str(Path.home() / "src/gitrepo/personal/shopping-carts")
 )
 TOKEN_FILE = Path.home() / ".k3dm" / "webhook-token"
-JOB_DIR = Path("/tmp/k3dm-webhook-jobs")
+JOB_DIR = Path(os.environ.get("K3DM_JOB_DIR", Path.home() / ".local/share/k3d-manager/webhook-jobs"))
 _ASK_MAX_TURNS_DEFAULT = int(os.environ.get("K3DM_ASK_MAX_TURNS", "10"))
 SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
@@ -1115,14 +1117,20 @@ def _init_k8s_ctx():
         print(f"[k3dm-webhook] k8s API context init failed: {exc}")
 
 
+_JOB_RETENTION_SECS = 7 * 24 * 3600  # keep completed/failed jobs for 7 days
+
 def _clear_stale_jobs():
-    """On startup, mark any job stuck in 'running' as 'failed' — they are orphaned."""
+    """On startup: orphan running jobs; purge terminal jobs older than retention."""
     if not JOB_DIR.exists():
         return
+    now = time.time()
     for entry in JOB_DIR.iterdir():
+        if not entry.is_dir():
+            continue
         status_file = entry / "status"
         try:
-            if status_file.exists() and status_file.read_text().strip() == "running":
+            status = status_file.read_text().strip() if status_file.exists() else ""
+            if status == "running":
                 status_file.write_text("failed")
                 print(f"[k3dm-webhook] cleared stale job {entry.name}")
                 action_file = entry / "action"
@@ -1132,6 +1140,9 @@ def _clear_stale_jobs():
                     f"❌ *acg-{action}* orphaned — webhook restarted mid-job; "
                     f"check cluster state manually (job `{entry.name}`)",
                 )
+            elif status in {"success", "failed"} and (now - entry.stat().st_mtime) > _JOB_RETENTION_SECS:
+                shutil.rmtree(entry, ignore_errors=True)
+                print(f"[k3dm-webhook] purged old job {entry.name} (status={status})")
         except Exception:
             pass
 

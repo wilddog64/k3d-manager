@@ -72,7 +72,7 @@ sequenceDiagram
     participant Worker as Cloudflare Worker<br/>workers/slack-relay/index.js
     participant Tunnel as Cloudflare Tunnel<br/>webhook.3ai-talk.org
     participant WH as k3dm-webhook<br/>bin/k3dm-webhook<br/>127.0.0.1:7443
-    participant Job as Background Thread<br/>/tmp/k3dm-webhook-jobs/<id>/
+    participant Job as Background Thread<br/>~/.local/share/k3d-manager/webhook-jobs/<id>/
     participant Bin as bin/acg-up etc.
 
     note over User,Bin: Path A — Slash command
@@ -131,7 +131,7 @@ Webhook token     macOS Keychain (k3dm-webhook-token) read by bin/k3dm-webhook a
 | `bin/k3dm-webhook` | Python HTTP server — auth, job dispatch, Slack reply |
 | `bin/k3dm-webhook-setup` | One-time setup: generate token, install LaunchAgent plist |
 | `~/Library/LaunchAgents/com.k3d-manager.webhook.plist` | LaunchAgent keeping webhook server alive |
-| `/tmp/k3dm-webhook-jobs/<id>/` | Job state: `status`, `output`, `action`, `response_url`, `thread_ts` |
+| `~/.local/share/k3d-manager/webhook-jobs/<id>/` | Job state: `status`, `output`, `action`, `response_url`, `thread_ts` |
 
 ### Concurrent job guard
 
