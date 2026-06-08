@@ -463,7 +463,7 @@ PLIST
       _argocd_browser_install_skipped=1
     else
       : > "${_argocd_browser_launchctl_log}"
-      if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
+      if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
           >"${_argocd_browser_launchctl_log}" 2>&1; then
         _info "[acg-up] Stopped existing ArgoCD browser HTTPS listener"
       elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
@@ -1056,7 +1056,7 @@ PLIST
       _warn "[acg-up] no sudo in headless context — skipping keycloak-browser-http LaunchDaemon install"
     else
       : > "${_keycloak_browser_launchctl_log}"
-      if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
+      if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
           >"${_keycloak_browser_launchctl_log}" 2>&1; then
         _info "[acg-up] Stopped existing Keycloak browser HTTP listener"
       elif [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
@@ -1236,7 +1236,7 @@ PLIST
     _info "[acg-up] Loopback alias LaunchDaemon unchanged — skipping reinstall"
   else
     : > "${_loopback_launchctl_log}"
-    _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_loopback_plist}" \
+    _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_loopback_plist}" \
       >"${_loopback_launchctl_log}" 2>&1 || true
     : > "${_loopback_launchctl_log}"
     if ! _run_command --interactive-sudo --quiet --soft -- install -m 644 "${_loopback_plist_tmp}" "${_loopback_plist}" \
@@ -1296,7 +1296,7 @@ PLIST
     _warn "[acg-up] no sudo in headless context — skipping frontend-browser-http LaunchDaemon install"
   else
     : > "${_frontend_browser_launchctl_log}"
-    if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
+    if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
         >"${_frontend_browser_launchctl_log}" 2>&1; then
       _info "[acg-up] Stopped existing frontend browser HTTP listener"
     elif [[ -s "${_frontend_browser_launchctl_log}" ]]; then
@@ -1552,7 +1552,7 @@ PLIST
         >"${_tunnel_launchctl_log}" 2>&1 || true
       _named_tunnel_plist_legacy="/Library/LaunchDaemons/${_named_tunnel_label}.plist"
       if [[ -f "${_named_tunnel_plist_legacy}" ]]; then
-        _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist_legacy}" \
+        _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist_legacy}" \
           >/dev/null 2>&1 || true
         _run_command --prefer-sudo --quiet --soft -- rm -f "${_named_tunnel_plist_legacy}" \
           >/dev/null 2>&1 || true
