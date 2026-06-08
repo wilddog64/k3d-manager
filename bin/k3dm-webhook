@@ -471,9 +471,17 @@ def _find_job_by_thread_ts(thread_ts):
     return None
 
 
+_THREAD_COMMANDS = {
+    "kill", "diagnosis", "status", "logs", "ask",
+    "acg-up", "acg-down", "acg-status", "acg-refresh", "acg-resume",
+    "cluster-status", "gemini", "claude", "codex",
+}
+
 def _handle_thread_command(job_id, command):
     """Dispatch a thread command for job_id. Runs in a background thread."""
     cmd = command.strip().lstrip("/").lower().split()[0] if command.strip() else ""
+    if not command.strip().startswith("/") and cmd not in _THREAD_COMMANDS:
+        return
     if cmd in {"gemini", "claude", "codex"}:
         _alias_parts = command.strip().lstrip("/").split(None, 1)
         command = f"ask {cmd} {_alias_parts[1]}" if len(_alias_parts) > 1 else f"ask {cmd}"
