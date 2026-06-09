@@ -1,7 +1,7 @@
 # Slack Slash Commands & Webhook Server
 
 Slack slash commands (`/acg-up`, `/acg-down`, `/acg-status`, `/acg-refresh`, `/acg-resume`,
-`/ask`, `/argocd-upgrade`) that control the k3d-manager cluster from any Slack channel, plus
+`/claude`, `/gemini`, `/codex`, `/argocd-upgrade`) that control the k3d-manager cluster from any Slack channel, plus
 thread-based AI troubleshooting and job control via thread replies.
 
 ---
@@ -110,9 +110,21 @@ Run once per machine. Safe to re-run.
         "should_escape": false
       },
       {
-        "command": "/ask",
+        "command": "/claude",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
-        "description": "Ask claude/gemini/codex a cluster question",
+        "description": "Ask Claude a cluster question",
+        "should_escape": false
+      },
+      {
+        "command": "/gemini",
+        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
+        "description": "Ask Gemini a cluster question",
+        "should_escape": false
+      },
+      {
+        "command": "/codex",
+        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
+        "description": "Ask Codex a cluster question",
         "should_escape": false
       },
       {
@@ -234,8 +246,10 @@ bin/k3dm-webhook-setup --uninstall
 | `/acg-status` | Check cluster health | kubectl nodes + ArgoCD app status + smoke test |
 | `/acg-refresh` | Restore tunnel + credentials | Re-establishes SSH tunnel, refreshes kubeconfig |
 | `/acg-resume [aws]` | Resume provision from last checkpoint | Skips completed steps |
-| `/ask [claude\|gemini\|codex] <question>` | Multi-agent cluster troubleshooting | See [/ask command](#ask-command) below |
-| `/argocd-upgrade` | Upgrade ArgoCD platform-ops | Requires `chart_version` and `stage` params |
+| `/claude <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
+| `/gemini <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
+| `/codex <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
+| `/argocd-upgrade` | Upgrade ArgoCD platform-ops | `/argocd-upgrade <chart_version> [acg\|infra]`; defaults to `infra`; `acg` runs `make up` first, `infra` patches the infra label directly |
 
 All commands respond immediately with an acknowledgement, then post results back to the
 channel via `response_url` when the job completes.
@@ -260,7 +274,7 @@ Gemini to classify it as TRANSIENT or REAL FAILURE before posting to Slack.
 
 ---
 
-## /ask Command
+## /claude / /gemini / /codex Commands
 
 Ask a live AI agent a cluster or code question directly from Slack.
 
@@ -268,36 +282,30 @@ Ask a live AI agent a cluster or code question directly from Slack.
 
 **As a slash command** (in any channel):
 ```
-/ask what pods are failing in the ubuntu-k3s context?
-/ask claude what's the ArgoCD sync status?
-/ask gemini what could cause data-layer sync failures?
-/ask codex how does the acg_get_credentials function work?
+/claude what pods are failing in the ubuntu-k3s context?
+/gemini what could cause data-layer sync failures?
+/codex how does the acg_get_credentials function work?
 ```
 
 **As a thread reply** (in an active job thread — type in the thread, not a new message):
 ```
-ask what's the issue with the data-layer?
-ask claude check the ArgoCD app health
-ask gemini explain the ESO sync failure
-ask codex how does the tunnel plugin work?
-```
-
-Or use the short slash aliases (leading `/` works in thread replies):
-```
-/claude why is the order-service crashing?
-/gemini what could cause ESO sync failures?
+/claude what's the issue with the data-layer?
+/claude check the ArgoCD app health
+/gemini explain the ESO sync failure
 /codex how does the tunnel plugin work?
 ```
 
-The first word after `ask` is the agent name. If omitted, defaults to `claude`.
+The first word after the slash is the agent name. `/claude`, `/gemini`, and `/codex`
+are the public Slack commands. The legacy `/ask` syntax is still accepted in thread
+replies for compatibility, but it is no longer the primary user-facing command.
 
 **Non-command replies are silently ignored** — normal conversation in a job thread
 ("thanks", "got it", "ok") produces no webhook response.
 
 **Adjusting the turn limit for a single call** — append `turns=N` anywhere in the question:
 ```
-/ask claude turns=20 why is the payment pod crashing?
-/ask claude turns=3 what namespace is redis in?
+/claude turns=20 why is the payment pod crashing?
+/claude turns=3 what namespace is redis in?
 ```
 
 The `turns=N` token is stripped from the question before it reaches the agent.
@@ -312,7 +320,7 @@ The `turns=N` token is stripped from the question before it reaches the agent.
 
 ### Thread context
 
-When `/ask` is issued in a thread (or as a thread reply via `ask`), the last 20 messages
+When `/claude`, `/gemini`, or `/codex` is issued in a thread, the last 20 messages
 from that thread are automatically fetched via `conversations.replies` and prepended to the
 agent's prompt. This lets agents see the full conversation history — error messages, prior
 agent responses, prior diagnoses — without the user having to paste them manually.
@@ -392,7 +400,7 @@ Direct calls to `webhook.3ai-talk.org` without a valid Bearer token receive `401
 
 ### 2. Input sanitization (`_sanitize_question`)
 
-All user-supplied `/ask` questions are passed through `_sanitize_question` before reaching
+All user-supplied agent questions are passed through `_sanitize_question` before reaching
 any agent. A question is rejected (`❌ Question rejected`) if it:
 
 - Exceeds **500 characters**
@@ -436,7 +444,7 @@ subprocess `PATH`.
 | Filesystem / process | `rm`, `rmdir`, `dd`, `mkfs`, `shred`, `truncate`, `mv`, `chmod`, `chown`, `kill`, `killall`, `pkill` |
 | curl/wget writes | `-X POST`, `-X PUT`, `-X DELETE`, `-X PATCH`, `--data`, `--upload-file` |
 
-Blocked commands exit 1 with `❌ Blocked: '...' — operation not permitted for /ask agents.`
+Blocked commands exit 1 with `❌ Blocked: '...' — operation not permitted for agent runs.`
 
 **Fix mode** (`K3DM_FIX_MODE=1`): when the webhook detects a fix intent, the sandbox
 switches from the deny-list above to a narrow allow-list — `kubectl rollout restart`,
@@ -491,7 +499,7 @@ export K3DM_SHOPPING_CARTS_ROOT=/path/to/shopping-carts
 
 ### 6. Agent concurrency cap (semaphore)
 
-A `threading.Semaphore(2)` limits concurrent `/ask` agent jobs to two. A third request
+A `threading.Semaphore(2)` limits concurrent agent jobs to two. A third request
 while two are running receives an immediate `⏳ Two agent asks are already running — try
 again in a moment.` reply without spawning a subprocess.
 

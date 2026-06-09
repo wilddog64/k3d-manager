@@ -93,12 +93,12 @@ sequenceDiagram
     Job->>Slack: POST response_url ✅/❌ result
 
     note over User,Bin: Path B — Thread reply (Events API)
-    User->>Slack: ask claude why is basket crashing?
+    User->>Slack: /claude why is basket crashing?
     Slack->>Worker: POST /slack/events<br/>(message event, thread_ts)
     Worker->>Tunnel: POST /slack/events<br/>Authorization: Bearer <token>
     Tunnel->>WH: HTTP POST 127.0.0.1:7443/slack/events
     Note over WH: dedupe event_id<br/>match thread_ts → job_id<br/>ignore non-command text silently
-    WH->>Job: _handle_thread_command(job_id, "ask claude ...")
+    WH->>Job: _handle_thread_command(job_id, "/claude ...")
     Job->>Bin: claude --allowedTools Bash -p "..."
     Bin-->>Job: agent output
     Job->>Slack: POST chat.postMessage (thread reply)
@@ -113,7 +113,7 @@ sequenceDiagram
 | `POST` | `/api/v1/cluster-refresh` | `bin/acg-refresh` — restore tunnel + credentials |
 | `POST` | `/api/v1/cluster-resume` | `bin/acg-up` from last checkpoint |
 | `POST` | `/api/v1/ask` | AI agent question (claude / gemini / codex) → Slack |
-| `POST` | `/api/v1/argocd-upgrade` | ArgoCD helm upgrade (chart_version, stage: acg\|infra) |
+| `POST` | `/api/v1/argocd-upgrade` | ArgoCD label-patch workflow (`chart_version`, stage: `acg` \| `infra`) |
 | `POST` | `/slack/events` | Slack Events API — thread replies, URL verification |
 | `GET`  | `/api/v1/health` | JSON smoke-test report (used by `bin/acg-status`) — includes Pushgateway |
 | `GET`  | `/api/v1/status/<job_id>` | Poll job status + last 2 KB of output |
