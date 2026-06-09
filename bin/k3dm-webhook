@@ -43,6 +43,8 @@ SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
 PUSHGATEWAY_URL = os.environ.get("K3DM_PUSHGATEWAY_URL", "http://localhost:9091")
 SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID", "")
+_PUSHGATEWAY_PUSH_RETRIES = 6
+_PUSHGATEWAY_PUSH_SLEEP_SECS = 5
 def _keychain_secret(service):
     try:
         r = subprocess.run(
@@ -1176,18 +1178,33 @@ def _push_metrics(action, provider, status, duration_secs, job_id):
         f'k3dm_deployment_success{{action="{action}",provider="{provider}",'
         f'job_id="{job_id}"}} {success_val}\n'
     )
-    try:
-        url = f"{PUSHGATEWAY_URL}/metrics/job/k3dm-webhook/instance/{action}-{provider}"
-        req = urllib.request.Request(
-            url,
-            data=metric_text.encode(),
-            method="POST",
-            headers={"Content-Type": "text/plain; charset=utf-8"},
-        )
-        urllib.request.urlopen(req, timeout=5)
-        print(f"[k3dm-webhook] metrics pushed: {action}/{provider}/{status} {duration_secs}s")
-    except Exception as exc:
-        print(f"[k3dm-webhook] metrics push skipped (non-fatal): {exc}")
+    url = f"{PUSHGATEWAY_URL}/metrics/job/k3dm-webhook/instance/{action}-{provider}"
+    healthy_url = f"{PUSHGATEWAY_URL}/-/healthy"
+    metric_bytes = metric_text.encode()
+    for attempt in range(1, _PUSHGATEWAY_PUSH_RETRIES + 1):
+        try:
+            with urllib.request.urlopen(healthy_url, timeout=2) as resp:
+                if resp.status != 200:
+                    raise RuntimeError(f"Pushgateway unhealthy (HTTP {resp.status})")
+            req = urllib.request.Request(
+                url,
+                data=metric_bytes,
+                method="POST",
+                headers={"Content-Type": "text/plain; charset=utf-8"},
+            )
+            urllib.request.urlopen(req, timeout=5)
+            print(f"[k3dm-webhook] metrics pushed: {action}/{provider}/{status} {duration_secs}s")
+            return
+        except Exception as exc:
+            if attempt < _PUSHGATEWAY_PUSH_RETRIES:
+                print(
+                    f"[k3dm-webhook] metrics push attempt {attempt}/"
+                    f"{_PUSHGATEWAY_PUSH_RETRIES} failed: {exc} — retrying in "
+                    f"{_PUSHGATEWAY_PUSH_SLEEP_SECS}s"
+                )
+                time.sleep(_PUSHGATEWAY_PUSH_SLEEP_SECS)
+            else:
+                print(f"[k3dm-webhook] metrics push skipped (non-fatal): {exc}")
 
 
 _POST_PROVISION_DELAY_SECS = 90  # ESO sync + pod startup grace period

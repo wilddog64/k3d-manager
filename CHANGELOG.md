@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+- Pushgateway deployment metrics now retry briefly before skipping so transient
+  Pushgateway readiness gaps do not drop the last deployment sample
+
 ## [1.6.3] - 2026-06-07
 
 ### Added
