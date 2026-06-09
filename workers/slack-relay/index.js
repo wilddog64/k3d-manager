@@ -1,4 +1,4 @@
-const ALLOWED_COMMANDS = new Set(['/acg-up', '/acg-down', '/acg-status', '/acg-refresh', '/acg-resume', '/ask', '/argocd-upgrade'])
+const ALLOWED_COMMANDS = new Set(['/acg-up', '/acg-down', '/acg-status', '/acg-refresh', '/acg-resume', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade'])
 const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'azure'])
 
 async function verifySlack(request, body) {
@@ -41,8 +41,10 @@ async function relay(endpoint, payload) {
   }
 }
 
-function jsonReply(text) {
-  return new Response(JSON.stringify({ text, response_type: 'in_channel' }),
+function jsonReply(text, threadTs, ephemeral = false) {
+  const body = { text, response_type: ephemeral ? 'ephemeral' : 'in_channel' }
+  if (threadTs && !ephemeral) body.thread_ts = threadTs
+  return new Response(JSON.stringify(body),
     { status: 200, headers: { 'Content-Type': 'application/json' } })
 }
 
@@ -81,71 +83,77 @@ async function handle(req) {
   const responseUrl = p.get('response_url') || ''
   const threadTs    = p.get('thread_ts')  || ''
 
-  if (!ALLOWED_COMMANDS.has(command)) return jsonReply(`Unknown command: ${command}`)
+  if (!ALLOWED_COMMANDS.has(command)) return jsonReply(`Unknown command: ${command}`, threadTs)
 
   if (command === '/acg-up') {
     const provider = VALID_PROVIDERS.has(text) ? text : 'aws'
     const { ok, conflict } = await relay('/api/v1/cluster', { action: 'up', provider, response_url: responseUrl })
-    if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`)
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
-    return jsonReply(`⏳ Bringing up ACG cluster (${provider})…`)
+    if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`, threadTs)
+    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    return jsonReply(`⏳ Bringing up ACG cluster (${provider})…`, threadTs, true)
   }
 
   if (command === '/acg-down') {
     const { ok, conflict } = await relay('/api/v1/cluster', { action: 'down', response_url: responseUrl })
-    if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`)
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
-    return jsonReply('⏳ Tearing down ACG cluster…')
+    if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`, threadTs)
+    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    return jsonReply('⏳ Tearing down ACG cluster…', threadTs, true)
   }
 
   if (command === '/acg-status') {
     const payload = { response_url: responseUrl }
     if (threadTs) payload.thread_ts = threadTs
     const { ok } = await relay('/api/v1/cluster-status', payload)
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
-    return jsonReply('🔍 Checking ACG cluster status…')
+    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    return jsonReply('🔍 Checking ACG cluster status…', threadTs, true)
   }
 
   if (command === '/acg-refresh') {
     const payload = { response_url: responseUrl }
     if (threadTs) payload.thread_ts = threadTs
     const { ok } = await relay('/api/v1/cluster-refresh', payload)
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
-    return jsonReply('🔄 Refreshing ACG credentials + tunnel…')
+    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    return jsonReply('🔄 Refreshing ACG credentials + tunnel…', threadTs, true)
   }
 
   if (command === '/acg-resume') {
     const provider = VALID_PROVIDERS.has(text) ? text : 'aws'
     const { ok, conflict } = await relay('/api/v1/cluster-resume', { provider, response_url: responseUrl })
-    if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`)
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
-    return jsonReply(`🔄 Resuming ACG provision (${provider}) from last checkpoint…`)
+    if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`, threadTs)
+    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    return jsonReply(`🔄 Resuming ACG provision (${provider}) from last checkpoint…`, threadTs, true)
   }
 
-  if (command === '/ask') {
+  if (command === '/ask' || command === '/claude' || command === '/gemini' || command === '/codex') {
     const VALID_AGENTS = new Set(['claude', 'gemini', 'codex'])
-    const parts = text.split(/\s+/)
-    const agent = VALID_AGENTS.has(parts[0]) ? parts[0] : 'claude'
-    const question = VALID_AGENTS.has(parts[0]) ? parts.slice(1).join(' ').trim() : text
-    if (!question) return jsonReply('Usage: /ask [claude|gemini|codex] <question>')
+    let agent, question
+    if (command === '/ask') {
+      const parts = text.split(/\s+/)
+      agent = VALID_AGENTS.has(parts[0]) ? parts[0] : 'claude'
+      question = VALID_AGENTS.has(parts[0]) ? parts.slice(1).join(' ').trim() : text
+    } else {
+      agent = command.slice(1)
+      question = text
+    }
+    if (!question) return jsonReply(`Usage: ${command} <question>`, threadTs)
     const payload = { agent, question, response_url: responseUrl }
     if (threadTs) payload.thread_ts = threadTs
     const { ok } = await relay('/api/v1/ask', payload)
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
-    return jsonReply(`🤖 Asking ${agent}…`)
+    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    return jsonReply(`🤖 Asking ${agent}…`, threadTs, true)
   }
 
   if (command === '/argocd-upgrade') {
     const parts   = text.split(/\s+/)
     const version = parts[0] || ''
     const stage   = parts[1] || 'infra'
-    if (!version) return jsonReply('Usage: /argocd-upgrade <chart_version> [acg|infra]')
-    if (!['acg', 'infra'].includes(stage)) return jsonReply('stage must be acg or infra')
+    if (!version) return jsonReply('Usage: /argocd-upgrade <chart_version> [acg|infra]', threadTs)
+    if (!['acg', 'infra'].includes(stage)) return jsonReply('stage must be acg or infra', threadTs)
     const { ok } = await relay('/api/v1/argocd-upgrade',
       { chart_version: version, stage, response_url: responseUrl })
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment')
-    return jsonReply(`⏳ Upgrading ArgoCD to chart ${version} on ${stage}…`)
+    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    return jsonReply(`⏳ Upgrading ArgoCD to chart ${version} on ${stage}…`, threadTs, true)
   }
 
-  return jsonReply('Unhandled command')
+  return jsonReply('Unhandled command', threadTs)
 }

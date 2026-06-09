@@ -57,6 +57,8 @@ alertmanager:
 
 prometheus:
   prometheusSpec:
+    externalLabels:
+      cluster: ubuntu-k3s
     retention: 2h
     resources:
       requests:

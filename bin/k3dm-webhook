@@ -483,6 +483,10 @@ _THREAD_COMMANDS = {
     "acg-up", "acg-down", "acg-status", "acg-refresh", "acg-resume",
     "cluster-status", "gemini", "claude", "codex",
 }
+_STANDALONE_CMDS = {
+    "acg-status", "cluster-status", "acg-refresh", "refresh",
+    "ask", "claude", "gemini", "codex",
+}
 
 def _handle_thread_command(job_id, command):
     """Dispatch a thread command for job_id. Runs in a background thread."""
@@ -1503,6 +1507,8 @@ def _run_post_provision_check(job_id, provider):
 def _run_cluster_status(job_id, response_url, thread_ts=None):
     """Check ACG cluster reachability + ArgoCD app health; post result to response_url or thread."""
     job_dir = JOB_DIR / job_id
+    if thread_ts:
+        (job_dir / "thread_ts").write_text(thread_ts)
     lines = []
 
     def _log(msg):
@@ -1510,12 +1516,12 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        (job_dir / "output").write_text("".join(lines))
-        text = "".join(lines)
-        if thread_ts:
-            _post_slack_bot(text, thread_ts=thread_ts)
-        elif response_url:
-            _slack_post(response_url, text)
+        output = "".join(lines)
+        (job_dir / "output").write_text(output)
+        if response_url:
+            _slack_post(response_url, output)
+        else:
+            _notify_job(job_id, output)
 
     def _pod_is_ready(line):
         parts = line.split()
@@ -1719,6 +1725,8 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
 def _run_cluster_refresh(job_id, response_url, thread_ts=None):
     """Run bin/acg-refresh --no-login-prompt; post result to response_url or thread."""
     job_dir = JOB_DIR / job_id
+    if thread_ts:
+        (job_dir / "thread_ts").write_text(thread_ts)
     lines = []
 
     def _log(msg):
@@ -1726,12 +1734,12 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        (job_dir / "output").write_text("".join(lines))
-        text = "".join(lines)
-        if thread_ts:
-            _post_slack_bot(text, thread_ts=thread_ts)
-        elif response_url:
-            _slack_post(response_url, text)
+        output = "".join(lines)
+        (job_dir / "output").write_text(output)
+        if response_url:
+            _slack_post(response_url, output)
+        else:
+            _notify_job(job_id, output)
 
     try:
         _log("🔄 *ACG Refresh* — refreshing credentials + SSH tunnel…")
@@ -1930,16 +1938,18 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
     if max_turns is None:
         max_turns = _ASK_MAX_TURNS_DEFAULT
     job_dir = JOB_DIR / job_id
+    if thread_ts:
+        (job_dir / "thread_ts").write_text(thread_ts)
     _ANSI = re.compile(r'\x1b\[[0-9;]*[mK]')
     thread_context = _fetch_thread_context(thread_ts) if thread_ts else ""
 
     def _finish(text, status="success"):
         (job_dir / "status").write_text(status)
         (job_dir / "output").write_text(text)
-        if thread_ts:
-            _post_slack_bot(text, thread_ts=thread_ts)
-        elif response_url:
+        if response_url:
             _slack_post(response_url, text)
+        else:
+            _notify_job(job_id, text)
 
     # Injection check only — length was validated on the raw user input before context was added
     _q_stripped = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', question.strip())
@@ -2228,20 +2238,59 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             if event_id:
                 _seen_event_ids.add(event_id)
             ev = event.get("event", {})
+            ev_type = ev.get("type", "")
+            ev_thread_ts = ev.get("thread_ts", "")
+            ev_ts = ev.get("ts", "")
+            ev_bot_id = ev.get("bot_id", "")
+            ev_subtype = ev.get("subtype", "")
+            ev_text = ev.get("text", "").strip()
+            print(
+                f"[slack/events] type={ev_type!r} thread_ts={ev_thread_ts!r} "
+                f"ts={ev_ts!r} bot_id={ev_bot_id!r} subtype={ev_subtype!r} text={ev_text[:60]!r}",
+                flush=True,
+            )
             if (
-                ev.get("type") == "message"
-                and not ev.get("bot_id")
-                and not ev.get("subtype")
-                and ev.get("thread_ts")
-                and ev.get("thread_ts") != ev.get("ts")
+                ev_type == "message"
+                and not ev_bot_id
+                and not ev_subtype
+                and ev_text
             ):
-                thread_ts = ev["thread_ts"]
-                text = ev.get("text", "").strip()
-                job_id = _find_job_by_thread_ts(thread_ts)
-                if job_id and text:
+                is_thread_reply = bool(ev_thread_ts and ev_thread_ts != ev_ts)
+                thread_ts = ev_thread_ts if is_thread_reply else None
+                text = ev_text
+                cmd = text.lstrip("/").lower().split()[0] if text else ""
+                if is_thread_reply:
+                    job_id = _find_job_by_thread_ts(thread_ts)
+                    print(f"[slack/events] thread reply — thread_ts={thread_ts!r} job_id={job_id!r} cmd={cmd!r}", flush=True)
+                    if job_id:
+                        threading.Thread(
+                            target=_handle_thread_command,
+                            args=(job_id, text),
+                            daemon=True,
+                        ).start()
+                    elif cmd in _STANDALONE_CMDS:
+                        anchor_id = str(uuid.uuid4())[:8]
+                        anchor_dir = JOB_DIR / anchor_id
+                        anchor_dir.mkdir(parents=True, exist_ok=True)
+                        (anchor_dir / "status").write_text("thread-anchor")
+                        (anchor_dir / "thread_ts").write_text(thread_ts)
+                        print(f"[slack/events] orphan thread — anchor_id={anchor_id!r} cmd={cmd!r}", flush=True)
+                        threading.Thread(
+                            target=_handle_thread_command,
+                            args=(anchor_id, text),
+                            daemon=True,
+                        ).start()
+                elif cmd in _STANDALONE_CMDS:
+                    print(f"[slack/events] top-level cmd={cmd!r} ev_ts={ev_ts!r}", flush=True)
+                    anchor_id = str(uuid.uuid4())[:8]
+                    anchor_dir = JOB_DIR / anchor_id
+                    anchor_dir.mkdir(parents=True, exist_ok=True)
+                    (anchor_dir / "status").write_text("thread-anchor")
+                    if ev_ts:
+                        (anchor_dir / "thread_ts").write_text(ev_ts)
                     threading.Thread(
                         target=_handle_thread_command,
-                        args=(job_id, text),
+                        args=(anchor_id, text),
                         daemon=True,
                     ).start()
             self._json(200, {"ok": True})
