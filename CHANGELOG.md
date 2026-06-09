@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
+- `/claude`, `/gemini`, and `/codex` agent prompts now keep raw probe commands and verbose kubectl output out of the Slack `ANSWER:` while preserving concise diagnostic conclusions
 - Pushgateway deployment metrics now retry briefly before skipping so transient
   Pushgateway readiness gaps do not drop the last deployment sample
 
