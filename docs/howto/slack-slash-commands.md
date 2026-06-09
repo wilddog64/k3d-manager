@@ -320,10 +320,11 @@ The `turns=N` token is stripped from the question before it reaches the agent.
 
 ### Thread context
 
-When `/claude`, `/gemini`, or `/codex` is issued in a thread, the last 20 messages
-from that thread are automatically fetched via `conversations.replies` and prepended to the
-agent's prompt. This lets agents see the full conversation history — error messages, prior
-agent responses, prior diagnoses — without the user having to paste them manually.
+When replying in a thread, use the bare command name `claude`, `gemini`, or `codex`
+(do **not** prefix it with `/`). The last 20 messages from that thread are automatically
+fetched via `conversations.replies` and prepended to the agent's prompt. This lets agents
+see the full conversation history — error messages, prior agent responses, prior diagnoses —
+without the user having to paste them manually.
 
 Bot status and ANSI control sequences are stripped before injection.
 
