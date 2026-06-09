@@ -533,8 +533,10 @@ def _handle_thread_command(job_id, command):
 
     elif cmd == "logs":
         log_file = JOB_DIR / job_id / "log"
-        if log_file.exists():
-            last = [l.rstrip() for l in log_file.read_text().splitlines() if l.strip()][-20:]
+        output_file = JOB_DIR / job_id / "output"
+        source_file = log_file if log_file.exists() else (output_file if output_file.exists() else None)
+        if source_file:
+            last = [l.rstrip() for l in source_file.read_text().splitlines() if l.strip()][-20:]
             _notify_job(job_id, f"📋 *Last 20 lines* (job `{job_id}`)\n```{''.join(last)}```")
         else:
             _notify_job(job_id, f"⚠️ No log found for job `{job_id}`")
