@@ -316,7 +316,7 @@ The `turns=N` token is stripped from the question before it reaches the agent.
 |-------|----------|---------------|------------|----------------|
 | `claude` | Live cluster troubleshooting — runs kubectl, grep, curl GET, dig, etc. | Yes — read-only (get/describe/logs/top/events); fix mode adds rollout restart, delete pod, argocd sync | k3d-manager + shopping-carts + diagnostic paths | Yes (last 20 messages) |
 | `gemini` | Root cause analysis and remediation steps from knowledge | No (text-only via `_call_gemini`) | n/a | Yes (last 20 messages) |
-| `codex` | Code questions about the k3d-manager repo | No | k3d-manager only (`cwd`) | Yes (last 20 messages) |
+| `codex` | Code questions about the k3d-manager repo and read-only kubectl diagnostics for pod investigation | Yes — read-only diagnostics only (`kubectl describe` when a pod is not Running/Completed) | k3d-manager only (`cwd`) | Yes (last 20 messages) |
 
 ### Thread context
 
