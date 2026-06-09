@@ -45,13 +45,78 @@ SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID", "")
 _PUSHGATEWAY_PUSH_RETRIES = 6
 _PUSHGATEWAY_PUSH_SLEEP_SECS = 5
+
+def _spawn_capture_text(cmd, cwd=None, env=None, timeout=15):
+    """Run cmd via os.posix_spawn and return (rc, output, timed_out).
+
+    This avoids fork()/atfork crashes on macOS after NEF/urllib/ssl load."""
+    import tempfile as _tmp
+    import shlex as _shlex, shutil as _shutil
+
+    _env = dict(os.environ) if env is None else dict(env)
+    with _tmp.NamedTemporaryFile(delete=False) as _out:
+        _out_path = _out.name
+    try:
+        _file_actions = [
+            (os.POSIX_SPAWN_OPEN, 1, _out_path,
+             os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600),
+            (os.POSIX_SPAWN_DUP2, 1, 2),
+        ]
+        if cwd:
+            cmd_str = " ".join(_shlex.quote(str(c)) for c in cmd)
+            cmd = ["/bin/bash", "-c", f"cd {_shlex.quote(str(cwd))} && {cmd_str}"]
+        exe = cmd[0]
+        if not os.path.isabs(exe):
+            exe = _shutil.which(exe) or exe
+        child_pid = os.posix_spawn(exe, cmd, _env, file_actions=_file_actions, setsid=True)
+        deadline = time.time() + timeout
+        status = None
+        timed_out = False
+        while time.time() < deadline:
+            try:
+                waited_pid, status = os.waitpid(child_pid, os.WNOHANG)
+                if waited_pid == child_pid:
+                    break
+            except ChildProcessError:
+                status = 0
+                break
+            time.sleep(0.1)
+        else:
+            timed_out = True
+            try:
+                os.killpg(child_pid, signal.SIGTERM)
+            except (ProcessLookupError, OSError):
+                pass
+            try:
+                os.waitpid(child_pid, 0)
+            except ChildProcessError:
+                pass
+        try:
+            output = Path(_out_path).read_text(errors="replace")
+        except OSError:
+            output = ""
+        if status is None:
+            rc = 124 if timed_out else 1
+        elif os.WIFEXITED(status):
+            rc = os.WEXITSTATUS(status)
+        elif os.WIFSIGNALED(status):
+            rc = -os.WTERMSIG(status)
+        else:
+            rc = 1
+        return rc, output, timed_out
+    finally:
+        try:
+            os.unlink(_out_path)
+        except OSError:
+            pass
+
 def _keychain_secret(service):
     try:
-        r = subprocess.run(
+        rc, output, timed_out = _spawn_capture_text(
             ["security", "find-generic-password", "-s", service, "-a", "k3dm", "-w"],
-            capture_output=True, text=True,
+            timeout=10,
         )
-        return r.stdout.strip() if r.returncode == 0 else ""
+        return output.strip() if rc == 0 and not timed_out else ""
     except Exception:
         return ""
 
@@ -73,13 +138,13 @@ def _get_token():
     if token:
         return token
     try:
-        r = subprocess.run(
+        rc, output, timed_out = _spawn_capture_text(
             ["security", "find-generic-password",
              "-s", "k3dm-webhook-token", "-a", "k3dm", "-w"],
-            capture_output=True, text=True
+            timeout=10,
         )
-        if r.returncode == 0 and r.stdout.strip():
-            return r.stdout.strip()
+        if rc == 0 and not timed_out and output.strip():
+            return output.strip()
     except Exception:
         pass
     if TOKEN_FILE.exists():
@@ -88,46 +153,42 @@ def _get_token():
 
 
 def _current_label(env, key="argocd-chart-version"):
-    r = subprocess.run(
+    rc, output, timed_out = _spawn_capture_text(
         ["kubectl", "get", "secrets", "-n", "cicd",
          "-l", f"argocd.argoproj.io/secret-type=cluster,environment={env}",
          "-o", f"jsonpath={{.items[0].metadata.labels.{key}}}"],
-        capture_output=True, text=True
+        timeout=20,
     )
-    return r.stdout.strip()
+    return output.strip() if rc == 0 and not timed_out else ""
 
 
 def _secret_name(env):
-    r = subprocess.run(
+    rc, output, timed_out = _spawn_capture_text(
         ["kubectl", "get", "secrets", "-n", "cicd",
          "-l", f"argocd.argoproj.io/secret-type=cluster,environment={env}",
          "-o", "jsonpath={.items[0].metadata.name}"],
-        capture_output=True, text=True
+        timeout=20,
     )
-    return r.stdout.strip()
+    return output.strip() if rc == 0 and not timed_out else ""
 
 
 def _patch_label(secret, version):
     patch = json.dumps({"metadata": {"labels": {"argocd-chart-version": version}}})
-    subprocess.run(
+    rc, output, timed_out = _spawn_capture_text(
         ["kubectl", "patch", "secret", secret, "-n", "cicd",
          "--type=merge", "-p", patch],
-        check=True
+        timeout=20,
     )
+    if timed_out or rc != 0:
+        raise RuntimeError(output.strip() or f"kubectl patch secret {secret} failed with rc={rc}")
 
 
 def _run_cleanup(job_id, provider):
     """Remove stale SSH tunnel and kubeconfig context after a failed acg-up."""
     _notify_job(job_id, f"🧹 *Cleanup triggered* ({provider}) — removing stale SSH tunnel and kubeconfig context")
     try:
-        subprocess.run(
-            ["pkill", "-f", "autossh"],
-            capture_output=True,
-        )
-        subprocess.run(
-            ["kubectl", "config", "delete-context", "ubuntu-k3s"],
-            capture_output=True,
-        )
+        _spawn_capture_text(["pkill", "-f", "autossh"], timeout=10)
+        _spawn_capture_text(["kubectl", "config", "delete-context", "ubuntu-k3s"], timeout=20)
         _notify_job(job_id, f"✅ *Cleanup complete* ({provider}) — stale connections removed")
     except Exception as exc:
         _notify_job(job_id, f"⚠️ *Cleanup error* ({provider}): {exc}")
@@ -135,17 +196,14 @@ def _run_cleanup(job_id, provider):
 
 def _run_upgrade(job_id, chart_version, stage):
     job_dir = JOB_DIR / job_id
-    lines = []
+    _out_file = job_dir / "output"
 
     def _log(msg):
-        lines.append(msg + "\n")
+        with open(_out_file, "a") as _f:
+            _f.write(msg + "\n")
 
     def _finish(status):
         (job_dir / "status").write_text(status)
-        out_path = job_dir / "output"
-        fd = os.open(str(out_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as _f:
-            _f.write("".join(lines))
 
     try:
         (job_dir / "status").write_text("running")
@@ -160,18 +218,15 @@ def _run_upgrade(job_id, chart_version, stage):
 
         if stage == "acg":
             _log("Running make up...")
-            proc = subprocess.Popen(
-                ["make", "up"],
-                cwd=REPO_ROOT,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True
-            )
-            for line in proc.stdout:
-                lines.append(line)
-            proc.wait()
-            if proc.returncode != 0:
-                raise RuntimeError(f"make up exited {proc.returncode}")
+            pid = _posix_spawn_job(["make", "up"], _out_file, cwd=REPO_ROOT)
+            _, _status = os.waitpid(pid, 0)
+            _rc = os.WEXITSTATUS(_status) if os.WIFEXITED(_status) else -os.WTERMSIG(_status)
+            try:
+                os.killpg(pid, signal.SIGTERM)
+            except (ProcessLookupError, OSError):
+                pass
+            if _rc != 0:
+                raise RuntimeError(f"make up exited {_rc}")
             _log("make up complete")
 
         secret = _secret_name(env_label)
