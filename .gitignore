@@ -5,3 +5,4 @@ scratch/
 node_modules/
 bin/.ask-sandbox/
 __pycache__/
+package-lock.json
