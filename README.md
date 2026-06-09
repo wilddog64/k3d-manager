@@ -251,6 +251,7 @@ docs/
 - **[ACG Sandbox](docs/howto/acg.md)** — Full lifecycle: provision → k3s install → extend TTL → teardown
 - **[Gemini Browser Automation](docs/howto/gemini.md)** — First-run setup, ACG extend, Copilot agent trigger
 - **[ACG Credentials Flow](docs/howto/acg-credentials-flow.md)** — Decision-by-decision flow reference for debugging `acg_get_credentials`
+- **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Slack command bootstrap, `/claude` / `/gemini` / `/codex`, `/acg-up` / `/acg-down` / `/acg-status` / `/acg-refresh` / `/acg-resume`, and `/argocd-upgrade`
 
 **Convenience Scripts** (`bin/` — also available as Claude `/skills`)
 
@@ -283,7 +284,6 @@ docs/
 
 **AI Tooling**
 - **[Copilot CLI Integration](docs/howto/copilot.md)** — Setup, `copilot_triage_pod` / `copilot_draft_spec` examples, pre-commit AI lint, cross-project adoption via lib-foundation subtree
-- **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Architecture, one-time bootstrap (`make setup-worker`), token rotation, `/acg-up` / `/acg-down` / `/acg-status` / `/acg-resume` / `/ask [claude|gemini|codex]`; webhook server guardrails (auth, prompt-injection guard, repo-scoped file access, read-only bash sandbox, concurrency cap)
 
 ---
 
