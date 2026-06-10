@@ -1,33 +1,41 @@
 # Slack Slash Commands & Webhook Server
 
-Slack slash commands (`/acg-up`, `/acg-down`, `/acg-status`, `/acg-resume`, `/ask`,
-`/argocd-upgrade`) that control the k3d-manager cluster from any Slack channel, plus
-thread-based AI troubleshooting via the `/ask` command.
+Slack slash commands (`/acg-up`, `/acg-down`, `/acg-status`, `/acg-refresh`, `/acg-resume`,
+`/claude`, `/gemini`, `/codex`, `/argocd-upgrade`) that control the k3d-manager cluster from any Slack channel, plus
+thread-based AI troubleshooting and job control via thread replies.
 
 ---
 
 ## Architecture
 
+Two paths from Slack to the webhook — slash commands and thread replies:
+
 ```mermaid
 sequenceDiagram
-    participant U as User (Slack)
+    actor U as User (Slack)
     participant S as Slack API
     participant W as Cloudflare Worker<br/>k3dm-slack-relay.k3dm.workers.dev
-    participant H as k3dm-webhook server<br/>webhook.3ai-talk.org (Mac)
-    participant C as k3d-manager<br/>(make up / make down)
+    participant H as k3dm-webhook<br/>webhook.3ai-talk.org
 
-    U->>S: /acg-up
-    S->>W: POST /slack/commands<br/>X-Slack-Signature: hmac(signing_secret)
-    W->>W: Verify HMAC-SHA256 signature
-    W->>H: POST /api/v1/cluster<br/>Authorization: Bearer <webhook_token>
-    H->>H: Verify Bearer token
-    H->>C: make up CLUSTER_PROVIDER=k3s-aws
-    C-->>H: stdout (streamed)
-    H-->>W: 202 Accepted {job_id}
-    W-->>S: 200 "ACG cluster provisioning started..."
-    S-->>U: ACG cluster provisioning started...
-    H-->>S: POST response_url (job complete ✅/❌)
+    note over U,H: Path A — Slash command (any channel)
+    U->>S: /acg-up aws
+    S->>W: POST /slack/commands<br/>X-Slack-Signature + response_url
+    W->>W: HMAC-SHA256 verify
+    W->>H: POST /api/v1/cluster {action:up, provider:aws}
+    H->>H: Bearer token auth + spawn job thread
+    H-->>W: 202 {job_id}
+    W-->>S: 200 ⏳ Acknowledged
+    H-->>S: POST response_url ✅/❌ when done
+
+    note over U,H: Path B — Thread reply (Events API)
+    U->>S: ask claude why is basket crashing?
+    S->>W: POST /slack/events (message event, thread_ts)
+    W->>H: POST /slack/events {event, thread_ts}
+    H->>H: match thread_ts → job_id<br/>ignore non-command text silently
+    H-->>S: chat.postMessage (thread reply)
 ```
+
+See `docs/architecture/cloudflare-slack-relay.md` for the full component diagram.
 
 ### Components
 
@@ -102,9 +110,21 @@ Run once per machine. Safe to re-run.
         "should_escape": false
       },
       {
-        "command": "/ask",
+        "command": "/claude",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
-        "description": "Ask claude/gemini/codex a cluster question",
+        "description": "Ask Claude a cluster question",
+        "should_escape": false
+      },
+      {
+        "command": "/gemini",
+        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
+        "description": "Ask Gemini a cluster question",
+        "should_escape": false
+      },
+      {
+        "command": "/codex",
+        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
+        "description": "Ask Codex a cluster question",
         "should_escape": false
       },
       {
@@ -223,17 +243,38 @@ bin/k3dm-webhook-setup --uninstall
 |---------|--------|-------|
 | `/acg-up` | Provision ACG k3s cluster | Runs `make up CLUSTER_PROVIDER=k3s-aws` |
 | `/acg-down` | Tear down ACG cluster | Runs `make down KEEP_LOCAL=1` |
-| `/acg-status` | Check cluster health | kubectl nodes + ArgoCD app status |
+| `/acg-status` | Check cluster health | kubectl nodes + ArgoCD app status + smoke test |
+| `/acg-refresh` | Restore tunnel + credentials | Re-establishes SSH tunnel, refreshes kubeconfig |
 | `/acg-resume [aws]` | Resume provision from last checkpoint | Skips completed steps |
-| `/ask [claude\|gemini\|codex] <question>` | Multi-agent cluster troubleshooting | See [/ask command](#ask-command) below |
-| `/argocd-upgrade` | Upgrade ArgoCD platform-ops | Requires `chart_version` and `stage` params |
+| `/claude <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
+| `/gemini <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
+| `/codex <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
+| `/argocd-upgrade` | Upgrade ArgoCD platform-ops | `/argocd-upgrade <chart_version> [acg\|infra]`; defaults to `infra`; `acg` runs `make up` first, `infra` patches the infra label directly |
 
 All commands respond immediately with an acknowledgement, then post results back to the
 channel via `response_url` when the job completes.
 
+### Service smoke test
+
+`/acg-status` and the post-provision check both run HTTP health probes against all
+services. Pushgateway is included — if the port-forward LaunchAgent is not running the
+probe fails and Gemini triages it automatically.
+
+| Service | Probe URL | Expected |
+|---------|-----------|----------|
+| ArgoCD | `http://localhost:8080/healthz` | 200 |
+| Frontend | `http://frontend.shopping-cart.local/` | 200 |
+| Keycloak | `http://keycloak.shopping-cart.local/health/live` | 200 |
+| Prometheus | `http://localhost:19090/-/ready` | 200 |
+| Grafana | `https://grafana.3ai-talk.org/api/health` | 200 |
+| **Pushgateway** | `http://localhost:9091/-/healthy` | 200 |
+
+On failure, the webhook fetches pod state for the matching `monitoring` pod and asks
+Gemini to classify it as TRANSIENT or REAL FAILURE before posting to Slack.
+
 ---
 
-## /ask Command
+## /claude / /gemini / /codex Commands
 
 Ask a live AI agent a cluster or code question directly from Slack.
 
@@ -241,26 +282,31 @@ Ask a live AI agent a cluster or code question directly from Slack.
 
 **As a slash command** (in any channel):
 ```
-/ask what pods are failing in the ubuntu-k3s context?
-/ask claude what's the ArgoCD sync status?
-/ask gemini what could cause data-layer sync failures?
-/ask codex how does the acg_get_credentials function work?
+/claude what pods are failing in the ubuntu-k3s context?
+/gemini what could cause data-layer sync failures?
+/codex how does the acg_get_credentials function work?
 ```
 
-**As a thread reply** (in an active job thread — Slack does not allow slash commands in threads):
+**As a thread reply** (in an active job thread — type in the thread, not a new message):
 ```
-ask what's the issue with the data-layer?
-ask claude check the ArgoCD app health
-ask gemini explain the ESO sync failure
-ask codex how does the tunnel plugin work?
+claude what's the issue with the data-layer?
+claude check the ArgoCD app health
+gemini explain the ESO sync failure
+codex how does the tunnel plugin work?
 ```
 
-The first word after `ask` is the agent name. If omitted, defaults to `claude`.
+Thread replies use bare command names without a leading `/` — Slack does not support
+slash commands in thread reply boxes. In the main channel, use `/claude`, `/gemini`,
+or `/codex` as slash commands. The legacy `ask <agent>` syntax is still accepted in
+thread replies for compatibility.
+
+**Non-command replies are silently ignored** — normal conversation in a job thread
+("thanks", "got it", "ok") produces no webhook response.
 
 **Adjusting the turn limit for a single call** — append `turns=N` anywhere in the question:
 ```
-/ask claude turns=20 why is the payment pod crashing?
-/ask claude turns=3 what namespace is redis in?
+/claude turns=20 why is the payment pod crashing?
+/claude turns=3 what namespace is redis in?
 ```
 
 The `turns=N` token is stripped from the question before it reaches the agent.
@@ -269,16 +315,17 @@ The `turns=N` token is stripped from the question before it reaches the agent.
 
 | Agent | Best for | kubectl access | File scope | Thread context |
 |-------|----------|---------------|------------|----------------|
-| `claude` | Live cluster troubleshooting — runs its own kubectl | Yes (read-only; fix mode: rollout restart, delete pod, argocd sync) | k3d-manager + shopping-carts only | Yes (last 20 messages) |
-| `gemini` | Analysis and diagnosis from knowledge | No (text-only) | n/a | Yes (last 20 messages) |
-| `codex` | Code questions about the k3d-manager repo | No | k3d-manager only (`cwd`) | Yes (last 20 messages) |
+| `claude` | Live cluster troubleshooting — runs kubectl, grep, curl GET, dig, etc. | Yes — read-only (get/describe/logs/top/events); fix mode adds rollout restart, delete pod, argocd sync | k3d-manager + shopping-carts + diagnostic paths | Yes (last 20 messages) |
+| `gemini` | Root cause analysis and remediation steps from knowledge | No (text-only via `_call_gemini`) | n/a | Yes (last 20 messages) |
+| `codex` | Code questions about the k3d-manager repo and read-only kubectl diagnostics for pod investigation | Yes — read-only diagnostics only (`kubectl describe` when a pod is not Running/Completed) | k3d-manager only (`cwd`) | Yes (last 20 messages) |
 
 ### Thread context
 
-When `/ask` is issued in a thread (or as a thread reply via `ask`), the last 20 messages
-from that thread are automatically fetched via `conversations.replies` and prepended to the
-agent's prompt. This lets agents see the full conversation history — error messages, prior
-agent responses, prior diagnoses — without the user having to paste them manually.
+When replying in a thread, use the bare command name `claude`, `gemini`, or `codex`
+(do **not** prefix it with `/`). The last 20 messages from that thread are automatically
+fetched via `conversations.replies` and prepended to the agent's prompt. This lets agents
+see the full conversation history — error messages, prior agent responses, prior diagnoses —
+without the user having to paste them manually.
 
 Bot status and ANSI control sequences are stripped before injection.
 
@@ -290,7 +337,7 @@ the agent switches to **filing mode**:
 - Claude is granted the `Write` tool (in addition to `Bash`) so it can write files.
 - Claude writes `docs/issues/YYYY-MM-DD-<slug>.md` with the issue title, symptom,
   reproduction steps, and fix/workaround recommendation.
-- Claude commits and pushes the doc to `k3d-manager-v1.6.3` automatically.
+- Claude commits and pushes the doc to the current feature branch automatically.
 - Timeout extends to 400 s; turn limit expands to `--max-turns 10`.
 - The Slack reply includes the commit SHA and file path.
 
@@ -355,7 +402,7 @@ Direct calls to `webhook.3ai-talk.org` without a valid Bearer token receive `401
 
 ### 2. Input sanitization (`_sanitize_question`)
 
-All user-supplied `/ask` questions are passed through `_sanitize_question` before reaching
+All user-supplied agent questions are passed through `_sanitize_question` before reaching
 any agent. A question is rejected (`❌ Question rejected`) if it:
 
 - Exceeds **500 characters**
@@ -399,7 +446,7 @@ subprocess `PATH`.
 | Filesystem / process | `rm`, `rmdir`, `dd`, `mkfs`, `shred`, `truncate`, `mv`, `chmod`, `chown`, `kill`, `killall`, `pkill` |
 | curl/wget writes | `-X POST`, `-X PUT`, `-X DELETE`, `-X PATCH`, `--data`, `--upload-file` |
 
-Blocked commands exit 1 with `❌ Blocked: '...' — operation not permitted for /ask agents.`
+Blocked commands exit 1 with `❌ Blocked: '...' — operation not permitted for agent runs.`
 
 **Fix mode** (`K3DM_FIX_MODE=1`): when the webhook detects a fix intent, the sandbox
 switches from the deny-list above to a narrow allow-list — `kubectl rollout restart`,
@@ -430,6 +477,13 @@ against the allowed roots. Paths outside the following are blocked with
 | `$K3DM_SHOPPING_CARTS_ROOT` | shopping-cart apps (default: `~/src/gitrepo/personal/shopping-carts`) |
 | `/tmp`, `/var/tmp` | Ephemeral scratch space |
 | `/proc`, `/sys` | Read-only kernel interfaces |
+| `/etc` | System config — `/etc/hosts`, CoreDNS, etc. |
+| `/Library/LaunchDaemons`, `/Library/LaunchAgents` | macOS service plists |
+| `~/.kube` | kubeconfig files |
+| `~/.local/share/k3d-manager` | k3d-manager state directory |
+| `~/.cloudflared` | Cloudflare tunnel credentials and config |
+| `/var/log` | System logs |
+| `/usr/local/bin`, `/usr/bin`, `/bin`, `/opt/homebrew` | CLI tool paths |
 
 **Prompt scope (all three agents)**
 All system prompts explicitly state the allowed repos and instruct the agent not to access
@@ -447,7 +501,7 @@ export K3DM_SHOPPING_CARTS_ROOT=/path/to/shopping-carts
 
 ### 6. Agent concurrency cap (semaphore)
 
-A `threading.Semaphore(2)` limits concurrent `/ask` agent jobs to two. A third request
+A `threading.Semaphore(2)` limits concurrent agent jobs to two. A third request
 while two are running receives an immediate `⏳ Two agent asks are already running — try
 again in a moment.` reply without spawning a subprocess.
 

@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [1.6.4] - 2026-06-10
+
+### Added
+- Slack Events API text commands — `acg-status`, `acg-refresh`, `ask`, `claude`, `gemini`, `codex` now work from thread replies and top-level channel messages via Events API; slash commands continue to work as before
+- Slack thread context for text commands — orphan threads create anchor jobs so replies stay threaded
+- Prometheus observability stack: Pushgateway deployment metrics, Grafana dashboard with k3d tag, non-interactive auth bootstrap in webhook startup
+- `make show-service-passwords` target — display all basic-auth credentials including Prometheus admin user
+- ACG screenshot archival — restart failure screenshots now captured and archived to `~/.local/share/k3d-manager/screenshots/`
+
+### Fixed
+- `/claude`, `/gemini`, and `/codex` agent prompts now keep raw probe commands and verbose kubectl output out of the Slack `ANSWER:` while preserving concise diagnostic conclusions
+- Pushgateway deployment metrics now retry briefly before skipping so transient Pushgateway readiness gaps do not drop the last deployment sample
+- Remove remaining fork-based subprocess calls from webhook job execution — all subprocess calls now use `posix_spawn` for NEF safety
+- Webhook logs command falls back to output file for acg-up jobs when logs directory is unavailable
+
+### Changed
+- lib-acg subtree synced to v0.1.4 — Azure SP/CLI-first credential validation, screenshot archival support, sandbox retry hardening
+
 ## [1.6.3] - 2026-06-07
 
 ### Added

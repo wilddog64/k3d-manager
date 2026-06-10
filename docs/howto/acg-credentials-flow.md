@@ -6,99 +6,117 @@ This document traces every decision point in `acg_get_credentials` for debugging
 
 ## Full Flow
 
-```
-acg_get_credentials [sandbox-url]
-│
-├─ node installed?  ──── NO ──► ERROR: install Node.js
-│
-├─ playwright module installed?  ──── NO ──► ERROR: cd scripts/playwright && npm install
-│
-├─ curl 127.0.0.1:9222/json  ──── OK ──► Chrome already running, skip launch
-│
-└─ NOT OK ──► _antigravity_launch
-              │
-              ├─ macOS:  open -a "Google Chrome" --args
-              │            --remote-debugging-port=9222
-              │            --password-store=basic
-              │            --user-data-dir=~/.local/share/k3d-manager/profile
-              │
-              └─ Linux:  google-chrome / chromium --remote-debugging-port=9222
-                           --password-store=basic
-                           --user-data-dir=~/.local/share/k3d-manager/profile &
-                         │
-                         └─ Chrome binary not found?  ──► ERROR
+```mermaid
+sequenceDiagram
+    participant Bash as acg_get_credentials (bash)
+    participant Node as acg_credentials.js
+    participant Chrome as Chrome / Chromium
+    participant Tab as Pluralsight tab
+    participant UI as Pluralsight ACG sandbox UI
 
-              _antigravity_browser_ready 30
-              │
-              └─ polls 127.0.0.1:9222/json every 1s for up to 30s
-                 timeout?  ──► ERROR: Chrome did not become ready
+    Bash->>Bash: verify `node` is installed
+    alt Node missing
+        Bash-->>Bash: ERROR: install Node.js
+    end
 
-node scripts/playwright/acg_credentials.js <sandbox-url> --provider aws|gcp
-│
-├─ chromium.connectOverCDP('http://127.0.0.1:9222')
-│  └─ FAIL ──► ERROR: CDP connection refused (Chrome not on port 9222)
-│
-├─ Find Pluralsight tab
-│  ├─ search contexts()[0].pages() for hostname ending in .pluralsight.com
-│  └─ fallback: pages()[0]
-│     └─ no pages at all ──► ERROR
-│
-├─ Navigation decision
-│  ├─ not on app.pluralsight.com  ──► page.goto(targetUrl)
-│  ├─ already on exact targetUrl  ──► skip (SPA auth preserved)
-│  ├─ on pluralsight, target is cloud-sandboxes  ──► SPA navigate (link click or location.assign)
-│  └─ on pluralsight, other path  ──► page.goto(targetUrl)
-│
-├─ Wait for aria-busy to clear (30s timeout, non-fatal)
-│
-├─ Sign-in check
-│  ├─ "Sign In" button visible?  ──── NO ──► already authenticated, skip
-│  │
-│  └─ YES ──► click Sign In
-│             wait for id.pluralsight.com (15s)
-│             fill email from PLURALSIGHT_EMAIL env var (or wait for Password Manager)
-│             click Continue if visible
-│             wait for password field
-│             click password field → wait 2s for Google Password Manager auto-fill
-│             click Submit
-│             wait for redirect back to app.pluralsight.com (60s)
-│             └─ timeout ──► ERROR
-│             wait for aria-busy to clear again (30s, non-fatal)
-│
-├─ Credentials panel already open?
-│  ├─ input[aria-label="Copyable input"] visible (3s)  ──► skip Start/Open flow
-│  │
-│  └─ NOT visible ──► look for buttons in order:
-│                     1. "Start Sandbox" ──► click, wait 10s
-│                     2. "Open Sandbox"  ──► click, wait 10s
-│                        └─ then check for nested "Start Sandbox" ──► click, wait 10s
-│                     3. "Resume Sandbox" ──► click, wait 10s
-│                     (none found: proceed anyway — may already be on credentials page)
-│
-├─ Wait for input[aria-label="Copyable input"] (15s)
-│  └─ timeout ──► ERROR: credentials panel did not appear
-│
-├─ Extract values from all Copyable inputs
-│  ├─ primary: match parent element innerText for "access key id" / "secret access key" / "session token"
-│  └─ fallback (text match failed): positional — index 2=AccessKey, 3=SecretKey, 4=SessionToken
-│
-├─ accessKey AND secretKey found?  ──── NO ──► ERROR: Could not find AWS credentials
-│
-└─ stdout: AWS_ACCESS_KEY_ID=...
-           AWS_SECRET_ACCESS_KEY=...
-           AWS_SESSION_TOKEN=...   (omitted if not present)
+    Bash->>Bash: verify Playwright module is installed
+    alt Playwright missing
+        Bash-->>Bash: ERROR: cd scripts/playwright && npm install
+    end
 
-Back in acg_get_credentials (bash)
-│
-├─ perl extract AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN from node output
-│
-├─ access_key or secret_key empty?
-│  └─ YES ──► FALLBACK: manual paste
-│             "pbpaste | ./scripts/k3d-manager acg_import_credentials"
-│             return 1
-│
-└─ _aws_write_credentials access_key secret_key session_token
-   └─ writes [default] profile to ~/.aws/credentials
+    Bash->>Bash: probe 127.0.0.1:9222/json
+    alt Chrome already running
+        Bash-->>Node: continue with existing CDP session
+    else Chrome not running
+        Bash->>Chrome: _antigravity_launch
+        alt macOS
+            Chrome-->>Chrome: open -a "Google Chrome" --args<br/>--remote-debugging-port=9222<br/>--password-store=basic<br/>--user-data-dir=~/.local/share/k3d-manager/profile
+        else Linux
+            Chrome-->>Chrome: google-chrome / chromium<br/>--remote-debugging-port=9222<br/>--password-store=basic<br/>--user-data-dir=~/.local/share/k3d-manager/profile
+        end
+        Chrome->>Chrome: _antigravity_browser_ready 30
+        alt Chrome did not become ready
+            Chrome-->>Bash: ERROR: Chrome did not become ready
+        end
+    end
+
+    Node->>Chrome: chromium.connectOverCDP(http://127.0.0.1:9222)
+    alt CDP connection refused
+        Node-->>Bash: ERROR: CDP connection refused
+    end
+
+    Node->>Tab: locate Pluralsight page
+    alt no Pluralsight tab found
+        Tab-->>Node: ERROR: no browser page available
+    end
+
+    Node->>UI: normalize navigation to targetUrl
+    alt not on app.pluralsight.com
+        UI-->>UI: page.goto(targetUrl)
+    else already on exact targetUrl
+        UI-->>UI: skip navigation (SPA auth preserved)
+    else on pluralsight + cloud-sandboxes target
+        UI-->>UI: SPA navigate (link click or location.assign)
+    else on pluralsight + other path
+        UI-->>UI: page.goto(targetUrl)
+    end
+
+    UI->>UI: wait for aria-busy to clear (30s, non-fatal)
+
+    UI->>UI: check for "Sign In" button
+    alt Sign In visible
+        UI-->>UI: click Sign In
+        UI-->>UI: wait for id.pluralsight.com
+        UI-->>UI: fill email from PLURALSIGHT_EMAIL or wait for Password Manager
+        UI-->>UI: click Continue if visible
+        UI-->>UI: wait for password field
+        UI-->>UI: click password field and wait 2s
+        UI-->>UI: click Submit
+        UI-->>UI: wait for redirect back to app.pluralsight.com
+        alt redirect timeout
+            UI-->>Bash: ERROR
+        end
+        UI->>UI: wait for aria-busy to clear again (30s, non-fatal)
+    else already authenticated
+        UI-->>UI: skip sign-in
+    end
+
+    UI->>UI: check for input[aria-label="Copyable input"]
+    alt credentials panel already open
+        UI-->>UI: skip Start/Open flow
+    else credentials panel closed
+        UI-->>UI: try buttons in order: Start Sandbox → Open Sandbox → Resume Sandbox
+        alt Start Sandbox visible
+            UI-->>UI: click Start Sandbox and wait 10s
+        else Open Sandbox visible
+            UI-->>UI: click Open Sandbox and wait 10s
+            UI-->>UI: check nested Start Sandbox and click it if present
+        else Resume Sandbox visible
+            UI-->>UI: click Resume Sandbox and wait 10s
+        else no matching buttons
+            UI-->>UI: proceed anyway; credentials page may already be active
+        end
+    end
+
+    UI->>UI: wait for input[aria-label="Copyable input"] (15s)
+    alt credentials panel did not appear
+        UI-->>Bash: ERROR: credentials panel did not appear
+    end
+
+    UI->>UI: extract Copyable input values
+    alt access key and secret key found
+        UI-->>Bash: stdout with AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN
+    else could not find AWS credentials
+        UI-->>Bash: ERROR: Could not find AWS credentials
+    end
+
+    Bash->>Bash: perl extract AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN
+    alt access key or secret key empty
+        Bash-->>Bash: FALLBACK: manual paste via pbpaste | ./scripts/k3d-manager acg_import_credentials
+        Bash-->>Bash: return 1
+    else credentials extracted
+        Bash-->>Bash: _aws_write_credentials → ~/.aws/credentials
+    end
 ```
 
 ---

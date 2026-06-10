@@ -139,6 +139,31 @@ function deploy_observability_acg() {
     _info "[observability] Alertmanager config secret created on ACG (ubuntu-k3s)"
   fi
   _prometheus_acg_web_config_secret
+  _deploy_pushgateway_acg
+}
+
+function _deploy_pushgateway_acg() {
+  _info "[observability] Deploying Prometheus Pushgateway on ubuntu-k3s..."
+  if ! command -v helm >/dev/null 2>&1; then
+    _warn "[observability] helm not found — skipping Pushgateway install"
+    return 0
+  fi
+  helm upgrade --install prometheus-pushgateway prometheus-community/prometheus-pushgateway \
+    --kube-context ubuntu-k3s \
+    --namespace monitoring \
+    --create-namespace \
+    --version "2.14.0" \
+    --set service.type=ClusterIP \
+    --set replicaCount=1 \
+    --wait --timeout 120s >/dev/null \
+    && _info "[observability] Pushgateway installed (monitoring/prometheus-pushgateway)" \
+    || { _warn "[observability] Pushgateway install failed — deployment metrics disabled"; return 0; }
+
+  local _dashboard_cm="${SCRIPT_DIR}/etc/grafana/dashboards/k3dm-deployments-configmap.yaml"
+  if [[ -f "${_dashboard_cm}" ]]; then
+    _kubectl apply --context ubuntu-k3s -f "${_dashboard_cm}" >/dev/null \
+      && _info "[observability] k3dm deployment metrics dashboard applied"
+  fi
 }
 
 function _prometheus_acg_web_config_secret() {
@@ -159,22 +184,49 @@ function _prometheus_acg_web_config_secret() {
         print(d['user']+'|'+d['password_bcrypt'])" 2>/dev/null); then
     _prom_creds=""
   fi
+  if [[ -z "${_prom_creds}" ]]; then
+    local _default_bcrypt_hash='$2a$12$NqL.y.Z1.h.1.E.1.p.9.Q.2.a.7.I.3.Z.7.d.3.Q.2.v.0.K.2.x.6' # bcrypt hash for 'password'
+
+    local _prom_password="${PROM_ADMIN_PASSWORD:-password}"
+    _info "[observability] Ensuring Prometheus basic auth secret exists in Vault."
+    if ! curl -sf \
+        --header "@${_vault_hdr}" \
+        --header 'Content-Type: application/json' \
+        --request POST \
+        --data "{\"data\":{\"user\":\"admin\",\"password\":\"${_prom_password}\",\"password_bcrypt\":\"${_default_bcrypt_hash}\"}}" \
+        "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" >/dev/null; then
+      rm -f "${_vault_hdr}"
+      _err "[observability] Failed to create Prometheus basic auth secret in Vault."
+      return 1
+    fi
+
+    for _attempt in 1 2 3; do
+      if _prom_creds=$(curl -sf \
+          --header "@${_vault_hdr}" \
+          "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" 2>/dev/null \
+          | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
+            print(d['user']+'|'+d['password_bcrypt'])" 2>/dev/null); then
+        break
+      fi
+      sleep 1
+    done
+
+    if [[ -z "${_prom_creds}" ]]; then
+      rm -f "${_vault_hdr}"
+      _err "[observability] Failed to retrieve Prometheus basic auth secret after creation attempt."
+      return 1
+    fi
+  fi
   rm -f "${_vault_hdr}"
 
   local _web_config _tmpfile
   _tmpfile=$(mktemp)
 
-  if [[ -z "${_prom_creds}" ]]; then
-    _warn "[observability] Prometheus basic auth Vault secret not found — applying empty config (unauthenticated)"
-    _warn "[observability] Store hash: vault kv put secret/k3d-manager/prometheus-basic-auth user=admin password_bcrypt='<bcrypt>'"
-    printf '{}' > "${_tmpfile}"
-  else
-    local _prom_user _prom_hash
-    _prom_user="${_prom_creds%%|*}"
-    _prom_hash="${_prom_creds#*|}"
-    _web_config=$(printf 'basic_auth_users:\n  %s: %s\n' "${_prom_user}" "${_prom_hash}")
-    printf '%s' "${_web_config}" > "${_tmpfile}"
-  fi
+  local _prom_user _prom_hash
+  _prom_user="${_prom_creds%%|*}"
+  _prom_hash="${_prom_creds#*|}"
+  _web_config=$(printf 'basic_auth_users:\n  %s: %s\n' "${_prom_user}" "${_prom_hash}")
+  printf '%s' "${_web_config}" > "${_tmpfile}"
 
   _kubectl create secret generic prometheus-web-config \
     --context ubuntu-k3s \

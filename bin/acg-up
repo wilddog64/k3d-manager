@@ -372,8 +372,6 @@ _HOSTS_LIST=(
   "argocd.shopping-cart.local|${_argocd_host_ip}"
   "keycloak.shopping-cart.local|${_kc_browser_ip}"
   "frontend.shopping-cart.local|127.0.0.2"
-  "prometheus.3ai-talk.org|127.0.0.1"
-  "grafana.3ai-talk.org|127.0.0.1"
 )
 for _host_ip_pair in "${_HOSTS_LIST[@]}"; do
   _h="${_host_ip_pair%%|*}"
@@ -465,7 +463,7 @@ PLIST
       _argocd_browser_install_skipped=1
     else
       : > "${_argocd_browser_launchctl_log}"
-      if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
+      if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_argocd_browser_plist}" \
           >"${_argocd_browser_launchctl_log}" 2>&1; then
         _info "[acg-up] Stopped existing ArgoCD browser HTTPS listener"
       elif [[ -s "${_argocd_browser_launchctl_log}" ]]; then
@@ -473,7 +471,7 @@ PLIST
         _warn "[acg-up] existing ArgoCD browser HTTPS listener was not loaded; continuing"
       fi
       : > "${_argocd_browser_launchctl_log}"
-      if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" \
+      if ! _run_command --interactive-sudo --quiet --soft -- install -m 644 "${_argocd_browser_plist_tmp}" "${_argocd_browser_plist}" \
           >"${_argocd_browser_launchctl_log}" 2>&1; then
         if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
           tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
@@ -482,7 +480,7 @@ PLIST
       fi
       rm -f "${_argocd_browser_plist_tmp}"
       : > "${_argocd_browser_launchctl_log}"
-      if ! _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_argocd_browser_plist}" \
+      if ! _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${_argocd_browser_plist}" \
           >"${_argocd_browser_launchctl_log}" 2>&1; then
         if [[ -s "${_argocd_browser_launchctl_log}" ]]; then
           tail -n 20 "${_argocd_browser_launchctl_log}" >&2 || true
@@ -1058,7 +1056,7 @@ PLIST
       _warn "[acg-up] no sudo in headless context — skipping keycloak-browser-http LaunchDaemon install"
     else
       : > "${_keycloak_browser_launchctl_log}"
-      if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
+      if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_keycloak_browser_plist}" \
           >"${_keycloak_browser_launchctl_log}" 2>&1; then
         _info "[acg-up] Stopped existing Keycloak browser HTTP listener"
       elif [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
@@ -1066,7 +1064,7 @@ PLIST
         _warn "[acg-up] existing Keycloak browser HTTP listener was not loaded; continuing"
       fi
       : > "${_keycloak_browser_launchctl_log}"
-      if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" \
+      if ! _run_command --interactive-sudo --quiet --soft -- install -m 644 "${_keycloak_browser_plist_tmp}" "${_keycloak_browser_plist}" \
           >"${_keycloak_browser_launchctl_log}" 2>&1; then
         if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
           tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
@@ -1075,7 +1073,7 @@ PLIST
       fi
       rm -f "${_keycloak_browser_plist_tmp}"
       : > "${_keycloak_browser_launchctl_log}"
-      if ! _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_keycloak_browser_plist}" \
+      if ! _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${_keycloak_browser_plist}" \
           >"${_keycloak_browser_launchctl_log}" 2>&1; then
         if [[ -s "${_keycloak_browser_launchctl_log}" ]]; then
           tail -n 20 "${_keycloak_browser_launchctl_log}" >&2 || true
@@ -1238,16 +1236,16 @@ PLIST
     _info "[acg-up] Loopback alias LaunchDaemon unchanged — skipping reinstall"
   else
     : > "${_loopback_launchctl_log}"
-    _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_loopback_plist}" \
+    _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_loopback_plist}" \
       >"${_loopback_launchctl_log}" 2>&1 || true
     : > "${_loopback_launchctl_log}"
-    if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_loopback_plist_tmp}" "${_loopback_plist}" \
+    if ! _run_command --interactive-sudo --quiet --soft -- install -m 644 "${_loopback_plist_tmp}" "${_loopback_plist}" \
         >"${_loopback_launchctl_log}" 2>&1; then
       _warn "[acg-up] failed to install loopback alias plist — frontend may fail after reboot"
     else
       rm -f "${_loopback_plist_tmp}"
       : > "${_loopback_launchctl_log}"
-      _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_loopback_plist}" \
+      _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${_loopback_plist}" \
         >"${_loopback_launchctl_log}" 2>&1 || \
         _warn "[acg-up] failed to bootstrap loopback alias agent"
     fi
@@ -1298,7 +1296,7 @@ PLIST
     _warn "[acg-up] no sudo in headless context — skipping frontend-browser-http LaunchDaemon install"
   else
     : > "${_frontend_browser_launchctl_log}"
-    if _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
+    if _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_frontend_browser_plist}" \
         >"${_frontend_browser_launchctl_log}" 2>&1; then
       _info "[acg-up] Stopped existing frontend browser HTTP listener"
     elif [[ -s "${_frontend_browser_launchctl_log}" ]]; then
@@ -1306,7 +1304,7 @@ PLIST
       _warn "[acg-up] existing frontend browser HTTP listener was not loaded; continuing"
     fi
     : > "${_frontend_browser_launchctl_log}"
-    if ! _run_command --prefer-sudo --quiet -- install -m 644 "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" \
+    if ! _run_command --interactive-sudo --quiet --soft -- install -m 644 "${_frontend_browser_plist_tmp}" "${_frontend_browser_plist}" \
         >"${_frontend_browser_launchctl_log}" 2>&1; then
       if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
         tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
@@ -1315,7 +1313,7 @@ PLIST
     fi
     rm -f "${_frontend_browser_plist_tmp}"
     : > "${_frontend_browser_launchctl_log}"
-    if ! _run_command --prefer-sudo --quiet -- launchctl bootstrap system "${_frontend_browser_plist}" \
+    if ! _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${_frontend_browser_plist}" \
         >"${_frontend_browser_launchctl_log}" 2>&1; then
       if [[ -s "${_frontend_browser_launchctl_log}" ]]; then
         tail -n 20 "${_frontend_browser_launchctl_log}" >&2 || true
@@ -1414,6 +1412,55 @@ PLIST
 fi
 
 if _is_mac; then
+  _info "[acg-up] Step 10g.11/14 — Installing Grafana port-forward launchd agent (localhost:3001 → ubuntu-k3s svc/acg-kube-prometheus-stack-grafana, auto-restart)..."
+  _grafana_pf_label="com.k3d-manager.grafana-port-forward"
+  _grafana_pf_plist="${HOME}/Library/LaunchAgents/${_grafana_pf_label}.plist"
+  _grafana_pf_log="${_ACG_STATE_DIR}/logs/grafana-pf.log"
+  _grafana_pf_kubectl="$(command -v kubectl)"
+  _grafana_pf_kubeconfig="${HOME}/.kube/config:${HOME}/.kube/ubuntu-k3s.yaml:${HOME}/.kube/k3s-ubuntu.yaml"
+  mkdir -p "$(dirname "${_grafana_pf_log}")"
+  cat > "${_grafana_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_grafana_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${_grafana_pf_kubectl}</string>
+    <string>port-forward</string>
+    <string>svc/acg-kube-prometheus-stack-grafana</string>
+    <string>--namespace</string>
+    <string>monitoring</string>
+    <string>--context</string>
+    <string>ubuntu-k3s</string>
+    <string>3001:80</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>KUBECONFIG</key>
+    <string>${_grafana_pf_kubeconfig}</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_grafana_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_grafana_pf_log}</string>
+</dict>
+</plist>
+PLIST
+  if launchctl list "${_grafana_pf_label}" >/dev/null 2>&1; then
+    launchctl unload "${_grafana_pf_plist}" 2>/dev/null || true
+  fi
+  launchctl load "${_grafana_pf_plist}"
+  _info "[acg-up] Grafana port-forward agent loaded (launchd: ${_grafana_pf_label})"
+fi
+
+if _is_mac; then
   _info "[acg-up] Step 10h/14 — Installing Cloudflare named tunnel (argocd + frontend + keycloak + prometheus + grafana)..."
   _tunnel_dir="${_ACG_STATE_DIR}"
   _tunnel_urls_file="${_tunnel_dir}/tunnel-urls.txt"
@@ -1505,7 +1552,7 @@ PLIST
         >"${_tunnel_launchctl_log}" 2>&1 || true
       _named_tunnel_plist_legacy="/Library/LaunchDaemons/${_named_tunnel_label}.plist"
       if [[ -f "${_named_tunnel_plist_legacy}" ]]; then
-        _run_command --prefer-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist_legacy}" \
+        _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${_named_tunnel_plist_legacy}" \
           >/dev/null 2>&1 || true
         _run_command --prefer-sudo --quiet --soft -- rm -f "${_named_tunnel_plist_legacy}" \
           >/dev/null 2>&1 || true
@@ -1592,6 +1639,53 @@ _acg_prom_pf_pid=$!
 echo "${_acg_prom_pf_pid}" > "${_acg_prom_pf_pid_file}"
 disown "${_acg_prom_pf_pid}"
 _info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:19090 → ubuntu-k3s, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
+
+_info "[acg-up] Step 14c/14 — Installing Pushgateway port-forward LaunchAgent (localhost:9091 → ubuntu-k3s)..."
+_pgw_pf_label="com.k3d-manager.pushgateway-port-forward"
+_pgw_pf_plist="${HOME}/Library/LaunchAgents/${_pgw_pf_label}.plist"
+_pgw_pf_log="${_ACG_STATE_DIR}/logs/pushgateway-pf.log"
+_pgw_kubectl_bin="$(command -v kubectl)"
+_pgw_pf_kubeconfig="${HOME}/.kube/config:${HOME}/.kube/ubuntu-k3s.yaml:${HOME}/.kube/k3s-ubuntu.yaml"
+mkdir -p "$(dirname "${_pgw_pf_log}")"
+cat > "${_pgw_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_pgw_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${_pgw_kubectl_bin}</string>
+    <string>port-forward</string>
+    <string>svc/prometheus-pushgateway</string>
+    <string>--namespace</string>
+    <string>monitoring</string>
+    <string>--context</string>
+    <string>ubuntu-k3s</string>
+    <string>9091:9091</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>KUBECONFIG</key>
+    <string>${_pgw_pf_kubeconfig}</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_pgw_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_pgw_pf_log}</string>
+</dict>
+</plist>
+PLIST
+if launchctl list "${_pgw_pf_label}" >/dev/null 2>&1; then
+  launchctl unload "${_pgw_pf_plist}" 2>/dev/null || true
+fi
+launchctl load "${_pgw_pf_plist}"
+_info "[acg-up] Pushgateway port-forward agent loaded (launchd: ${_pgw_pf_label}, localhost:9091)"
 
 _info "[acg-up] Cluster is up."
 kubectl get nodes --context ubuntu-k3s

@@ -4,3 +4,5 @@ scratch/
 .envrc
 node_modules/
 bin/.ask-sandbox/
+__pycache__/
+package-lock.json

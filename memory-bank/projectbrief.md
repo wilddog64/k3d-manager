@@ -110,6 +110,8 @@ Solo developer or small platform team who needs to:
   runtimes without paying for managed Kubernetes.
 - Validate Vault PKI, LDAP/AD auth, Istio mTLS, and ESO secret sync before production.
 - Operate identically across providers — same commands, same plugin stack, different backend.
+- Troubleshoot infrastructure failures via multi-agent `/ask` (Claude, Gemini, Codex) from Slack threads.
+- Resume interrupted cluster provisioning via `/acg-resume` checkpoint-based re-entry.
 
 ## Repository Structure
 

@@ -251,6 +251,7 @@ docs/
 - **[ACG Sandbox](docs/howto/acg.md)** — Full lifecycle: provision → k3s install → extend TTL → teardown
 - **[Gemini Browser Automation](docs/howto/gemini.md)** — First-run setup, ACG extend, Copilot agent trigger
 - **[ACG Credentials Flow](docs/howto/acg-credentials-flow.md)** — Decision-by-decision flow reference for debugging `acg_get_credentials`
+- **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Slack command bootstrap, `/claude` / `/gemini` / `/codex`, `/acg-up` / `/acg-down` / `/acg-status` / `/acg-refresh` / `/acg-resume`, and `/argocd-upgrade`
 
 **Convenience Scripts** (`bin/` — also available as Claude `/skills`)
 
@@ -283,7 +284,6 @@ docs/
 
 **AI Tooling**
 - **[Copilot CLI Integration](docs/howto/copilot.md)** — Setup, `copilot_triage_pod` / `copilot_draft_spec` examples, pre-commit AI lint, cross-project adoption via lib-foundation subtree
-- **[Slack Slash Commands & Webhook Server](docs/howto/slack-slash-commands.md)** — Architecture, one-time bootstrap (`make setup-worker`), token rotation, `/acg-up` / `/acg-down` / `/acg-status` / `/acg-resume` / `/ask [claude|gemini|codex]`; webhook server guardrails (auth, prompt-injection guard, repo-scoped file access, read-only bash sandbox, concurrency cap)
 
 ---
 
@@ -295,11 +295,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
-| 2026-06-07 | [Webhook macOS NEF atfork SIGSEGV](docs/issues/2026-06-07-webhook-macos-nef-atfork-sigsegv.md) | `import ssl`/`urllib` loads NEF; any `fork()` after that crashes child — fixed via file-based kubeconfig parser + `os.posix_spawn` for job execution |
-| 2026-06-05 | [Copilot PR #91 review findings](docs/issues/2026-06-05-copilot-pr91-review-findings.md) | gcp.js logs partial GCP username — fix is lib-acg upstream debt; use `[set]`/`[empty]` like other providers |
-| 2026-06-04 | [Slack slash commands pointed to tunnel URL — bypassed Worker auth relay](docs/issues/2026-06-04-slack-slash-commands-wrong-url.md) | Slack slash commands — Request URL must point to k3dm-slack-relay Worker (not direct tunnel); prevents 401 errors and auth bypass |
-| 2026-06-01 | [Webhook BATS path normalization mismatch](docs/issues/2026-06-01-webhook-bats-mismatch-path-normalization.md) | Webhook temp path normalization — `.` vs `/tmp` symlink resolution; update BATS test paths to match webhook behavior |
-| 2026-06-01 | [Observability: PyYAML missing in Codex env](docs/issues/2026-06-01-observability-values-pyyaml-missing.md) | observability.sh alert rules YAML validation — PyYAML not installed; workaround: Ruby YAML parser fallback |
+| 2026-06-10 | [Copilot PR #93 Review Findings](docs/issues/2026-06-10-copilot-pr93-review-findings.md) | CodeQL variable naming taint, Prometheus bootstrap hardcoding, docs inconsistency — 5 findings fixed in 6c814019 |
+| 2026-06-10 | [lib-acg Azure credential-test prefers portal over SP](docs/issues/2026-06-10-lib-acg-azure-credential-test-prefers-portal-over-sp.md) | Azure credential validation — credential-test runs portal login first even when SP creds are available; should prefer CLI/SP validation |
+| 2026-06-08 | [Prometheus Operator requires Vault secret](docs/issues/2026-06-08-prometheus-operator-requires-vault-secret.md) | Prometheus Operator chart deployment — requires Vault secret during CRD bootstrap even when unauthenticated Prometheus is desired |
+| 2026-06-08 | [Grafana routing loop & port conflict (local vs tunnel)](docs/issues/2026-06-08-grafana-routing-loop-etc-hosts-conflict.md) | Grafana DNS/port conflict — tunnel routes grafana→localhost:3000 vs /etc/hosts+port-forward conflicts; loopback DNS resolution needed |
+| 2026-06-07 | [acg-refresh drops ArgoCD cluster labels](docs/issues/2026-06-07-acg-refresh-drops-argocd-cluster-labels.md) | ACG cluster sync — `acg-refresh` loses ArgoCD server labels during secret refresh; re-sync resolves but inconsistent behavior |
 
 [All issues →](docs/issues/)
 
@@ -309,9 +309,10 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.6.3](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.3) | 2026-06-07 | `/acg-resume` checkpoint re-entry; `/ask` multi-agent troubleshooting; Slack thread context injection for agents; Webhook NEF SIGSEGV fix (`posix_spawn`); Webhook read-only bash sandbox for `/ask` agents; Keycloak group-ldap-mapper reconciliation |
 | [v1.6.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.2) | 2026-06-05 | `/acg-refresh` Slack slash command with worker relay; ACG LaunchAgent self-healing; Prometheus web.config.file conflict fix; acg-status stale display caveat labels |
-| [v1.6.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.1) | 2026-06-05 | ACG LaunchAgent self-healing — `acg-refresh` auto-reinstalls missing system daemon plists (argocd/keycloak/frontend port-forwards); Vault port-forward LaunchAgent install during `acg-up`; Prometheus web.config.file conflict fix; acg-status stale display caveat labels |
-| [v1.6.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.0) | 2026-06-04 | Webhook Slack threading + thread commands; ArgoCD CVE scan CronJob; AI-powered failure analysis (Gemini triage + Claude vision); webhook token auto-rotation; Python 3.13 SIGSEGV fix; ArgoCD/Keycloak OIDC hardening; ACG observability stack (Prometheus + Grafana + Alertmanager) |
+| [v1.6.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.1) | 2026-06-05 | ACG LaunchAgent self-healing — `acg-refresh` auto-reinstalls missing system daemon plists (argocd/keycloak/frontend port-forwards); Vault port-forward LaunchAgent install during `acg-up` |
+| [v1.6.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.0) | 2026-06-04 | Webhook Slack threading + thread commands; AI-powered failure analysis (Gemini triage + Claude vision); webhook token auto-rotation; Python 3.13 SIGSEGV fix |
 
 <details>
 <summary>Older releases</summary>

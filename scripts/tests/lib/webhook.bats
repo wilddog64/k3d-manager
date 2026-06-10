@@ -211,7 +211,7 @@ teardown_file() {
         "${_WEBHOOK_URL}/api/v1/cluster")"
     job_id="$(echo "$response" | python3 -c 'import sys,json; print(json.load(sys.stdin)["job_id"])')"
     [[ -n "$job_id" ]]
-    job_file="/tmp/k3dm-webhook-jobs/${job_id}/response_url"
+    job_file="${HOME}/.local/share/k3d-manager/webhook-jobs/${job_id}/response_url"
     [ -f "$job_file" ]
     [ "$(cat "$job_file")" = "https://hooks.slack.com/test" ]
 }

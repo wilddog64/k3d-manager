@@ -1,3 +1,10 @@
+admissionWebhooks:
+  enabled: false
+
+prometheusOperator:
+  tls:
+    enabled: false
+
 defaultRules:
   rules:
     kubeApiserverAvailability: false
@@ -9,6 +16,15 @@ defaultRules:
 
 grafana:
   enabled: true
+  additionalDataSources:
+    - name: prometheus-acg
+      type: prometheus
+      uid: P5A1115AEDF367D43
+      url: http://acg-kube-prometheus-stack-prometheus.monitoring:9090/
+      access: proxy
+      jsonData:
+        httpMethod: POST
+        timeInterval: 30s
   resources:
     requests:
       memory: 64Mi
@@ -41,6 +57,8 @@ alertmanager:
 
 prometheus:
   prometheusSpec:
+    externalLabels:
+      cluster: ubuntu-k3s
     retention: 2h
     resources:
       requests:
@@ -59,6 +77,10 @@ prometheus:
           - source_labels: [__meta_kubernetes_service_name]
             action: keep
             regex: istiod
+      - job_name: pushgateway
+        honor_labels: true
+        static_configs:
+          - targets: ['prometheus-pushgateway.monitoring:9091']
   service:
     type: NodePort
     nodePort: 30090

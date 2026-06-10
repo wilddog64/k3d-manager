@@ -197,6 +197,15 @@ if _is_mac; then
   fi
   _run_command --prefer-sudo --soft -- rm -f "${_frontend_browser_plist}" "${_frontend_browser_wrapper}" >/dev/null 2>&1 || true
 
+  _info "[acg-down] Stopping Pushgateway port-forward launchd agent..."
+  _pgw_pf_label="com.k3d-manager.pushgateway-port-forward"
+  _pgw_pf_plist="${HOME}/Library/LaunchAgents/${_pgw_pf_label}.plist"
+  if launchctl list "${_pgw_pf_label}" >/dev/null 2>&1; then
+    launchctl unload "${_pgw_pf_plist}" 2>/dev/null || true
+    _info "[acg-down] Pushgateway port-forward launchd agent unloaded"
+  fi
+  rm -f "${_pgw_pf_plist}"
+
   _info "[acg-down] Stopping Keycloak port-forward launchd agent..."
   _kc_pf_label="com.k3d-manager.keycloak-port-forward"
   _kc_pf_plist="${HOME}/Library/LaunchAgents/${_kc_pf_label}.plist"
