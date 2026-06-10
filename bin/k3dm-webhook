@@ -528,11 +528,14 @@ def _verify_slack_signature(raw_body, timestamp, signature):
 
 
 def _find_job_by_thread_ts(thread_ts):
-    """Return job_id whose thread_ts file matches, or None."""
+    """Return job_id whose thread_ts file matches, or None. Skips ask sub-jobs."""
     if not JOB_DIR.exists():
         return None
     for ts_file in JOB_DIR.glob("*/thread_ts"):
         try:
+            action_file = ts_file.parent / "action"
+            if action_file.exists() and action_file.read_text().strip() == "ask":
+                continue
             if ts_file.read_text().strip() == thread_ts:
                 return ts_file.parent.name
         except OSError:
@@ -735,6 +738,7 @@ def _handle_thread_command(job_id, command):
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
         (new_job_dir / "status").write_text("queued")
+        (new_job_dir / "action").write_text("ask")
         if thread_ts:
             (new_job_dir / "thread_ts").write_text(thread_ts)
         threading.Thread(
