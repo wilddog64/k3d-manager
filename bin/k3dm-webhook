@@ -38,6 +38,7 @@ SHOPPING_CARTS_ROOT = os.environ.get(
 )
 TOKEN_FILE = Path.home() / ".k3dm" / "webhook-token"
 JOB_DIR = Path(os.environ.get("K3DM_JOB_DIR", Path.home() / ".local/share/k3d-manager/webhook-jobs"))
+SCREENSHOT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "screenshots"
 _ASK_MAX_TURNS_DEFAULT = int(os.environ.get("K3DM_ASK_MAX_TURNS", "10"))
 SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
 PUSHGATEWAY_URL = os.environ.get("K3DM_PUSHGATEWAY_URL", "http://localhost:9091")
@@ -127,7 +128,7 @@ GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-2.5-flash")
 _k3d_ssl_ctx = None
 _k3d_server = None
 _STALL_TICKS_THRESHOLD = 3  # 3 ticks × 2 min = 6 min silence before stall analysis
-_SCREENSHOT_RE = re.compile(r"INFO: Screenshot saved to (/tmp/k3dm-acg-screenshot-\d+\.png)")
+_SCREENSHOT_RE = re.compile(r"INFO: Screenshot saved to (.+?/k3dm-acg-screenshot-\d+\.png)")
 _running_procs: dict = {}
 _running_procs_lock = threading.Lock()
 _ask_semaphore = threading.Semaphore(2)
@@ -810,6 +811,22 @@ def _fetch_thread_context(thread_ts, limit=20):
         return ""
 
 
+def _archive_acg_screenshot(screenshot_path):
+    """Copy a failure screenshot into the shared screenshots directory."""
+    try:
+        src = Path(screenshot_path)
+        if not src.is_file():
+            return screenshot_path
+        SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        dest = SCREENSHOT_DIR / src.name
+        if src.resolve() == dest.resolve():
+            return str(dest)
+        shutil.copy2(src, dest)
+        return str(dest)
+    except Exception:
+        return screenshot_path
+
+
 def _notify_job(job_id, text):
     """Post a Slack message in the thread for job_id.
 
@@ -1074,7 +1091,7 @@ def _analyze_failure(lines):
     for line in reversed(lines):
         m = _SCREENSHOT_RE.search(line)
         if m:
-            screenshot_path = m.group(1)
+            screenshot_path = _archive_acg_screenshot(m.group(1))
             if os.path.isfile(screenshot_path):
                 prompt = (
                     prompt.rstrip()
