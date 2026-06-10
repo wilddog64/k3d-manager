@@ -1,3 +1,9 @@
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const SCREENSHOT_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'screenshots');
+
 async function findOrCreatePage(context) {
   const allPages = context.pages();
   let page = allPages.find(p => {
@@ -155,6 +161,43 @@ async function _dismissExtendYourSessionDialog(page) {
   }
 }
 
+async function _capturePageDebugState(page, label, reason) {
+  const safeLabel = String(label || 'page').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const screenshotPath = path.join(SCREENSHOT_DIR, `k3dm-${safeLabel}-${Date.now()}.png`);
+  let currentUrl = '';
+  let visibleText = '';
+
+  try { currentUrl = page.url(); } catch {}
+  try {
+    visibleText = await page.evaluate(() => (document.body && document.body.innerText) ? document.body.innerText : '');
+  } catch {
+    visibleText = '';
+  }
+
+  try {
+    await fs.promises.mkdir(SCREENSHOT_DIR, { recursive: true });
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+    console.error(`INFO: Screenshot saved to ${screenshotPath}`);
+  } catch (error) {
+    console.error(`WARN: Failed to capture screenshot for ${safeLabel}: ${error.message}`);
+  }
+
+  if (currentUrl) {
+    console.error(`INFO: Current URL: ${currentUrl}`);
+  }
+  if (visibleText) {
+    const summary = visibleText.replace(/\s+/g, ' ').trim().slice(0, 1200);
+    if (summary) {
+      console.error(`INFO: Visible text: ${summary}`);
+    }
+  }
+  if (reason) {
+    console.error(`WARN: ${reason}`);
+  }
+
+  return { screenshotPath, currentUrl, visibleText };
+}
+
 async function _waitForCredentials(page, providerLabel) {
   console.error(`INFO: Waiting for ${providerLabel} credentials to populate (up to 420s)...`);
   const deadline = Date.now() + 420000;
@@ -204,6 +247,7 @@ async function _waitForCredentials(page, providerLabel) {
     const reopenBtn = await _findScopedButton(page, 'Open Sandbox', providerLabel, 0);
     if (reopenBtn) {
       if (reopenAttempted) {
+        await _capturePageDebugState(page, providerLabel, `${providerLabel} panel stayed closed after reopen attempt — aborting instead of looping for 420s.`);
         throw new Error(`${providerLabel} panel stayed closed after reopen attempt — aborting instead of looping for 420s.`);
       }
       console.error(`INFO: ${providerLabel} panel closed — re-opening to retrieve credentials...`);
@@ -214,6 +258,7 @@ async function _waitForCredentials(page, providerLabel) {
     }
     await page.waitForTimeout(2000);
   }
+  await _capturePageDebugState(page, providerLabel, `Timed out after 420000ms waiting for ${providerLabel} credentials to populate.`);
   throw new Error(`Timed out after 420000ms waiting for ${providerLabel} credentials to populate.`);
 }
 
@@ -393,6 +438,7 @@ async function startSandbox(page, targetUrl, provider) {
     await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
     const postRetryUrl = page.url();
     if (postRetryUrl.includes('/id') || postRetryUrl.includes('sign-in') || postRetryUrl.includes('login')) {
+      await _capturePageDebugState(page, providerLabel, `Sandbox retry redirected to ${postRetryUrl}`);
       throw new Error(`Pluralsight session expired — redirected to ${postRetryUrl}. Re-open or re-create the sandbox and retry.`);
     }
     sandboxEntryReady = await _waitForSandboxEntrySoft(page, 30000);
@@ -512,4 +558,6 @@ module.exports = {
   waitForSkeleton,
   handleSignIn,
   startSandbox,
+  _findScopedButton,
+  _capturePageDebugState,
 };
