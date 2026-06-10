@@ -38,9 +38,9 @@ node --check playwright/*.js
 
 | Version | Date | Notes |
 |---------|------|-------|
+| [0.4.0](https://github.com/wilddog64/lib-acg/releases/tag/0.4.0) | 2026-06-10 | Azure sandbox provider; 25+ Playwright/credential extraction fixes; Azure SP/portal/TAP validation |
 | [0.3.0](https://github.com/wilddog64/lib-acg/releases/tag/0.3.0) | 2026-05-21 | Make CFn template path configurable; fix credential extraction & extend flows; add pre-commit dangling-reference gate |
 | [0.2.0](https://github.com/wilddog64/lib-acg/releases/tag/0.2.0) | 2026-05-20 | Fix ACG restart/extend Playwright scripts; add Playwright fixtures & CI e2e tests |
-| [0.1.0](https://github.com/wilddog64/lib-acg/releases/tag/0.1.0) | 2026-05-19 | Initial release: Chrome CDP, ACG session mgmt, credential extraction |
 
 See [docs/releases.md](docs/releases.md) for full release history.
 

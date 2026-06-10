@@ -5,6 +5,8 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-10
+
 ### Added
 - `playwright/lib/sandbox.js`: Azure provider support — add `_findScopedButton` and `_deleteConflictingSandbox`, scope `startSandbox(page, targetUrl, provider)` button lookups to the provider card, delete conflicting active sandboxes before opening Azure, and keep the yellow-band conflict warning as a retry safety net; `playwright/acg_credentials.js` now passes `provider` through to `startSandbox`; `playwright/providers/azure.js` now extracts Azure username/password/subscription/tenant credentials from copyable inputs
 
