@@ -24,9 +24,11 @@ _JOB_ID_RE = re.compile(r'^[0-9a-f]{8}$')
 
 def _safe_job_dir(job_id):
     """Return resolved job directory only if it is a valid hex job ID and a direct child of JOB_DIR."""
-    if not _JOB_ID_RE.match(job_id):
+    m = _JOB_ID_RE.match(job_id)
+    if not m:
         raise ValueError(f"invalid job_id: {job_id!r}")
-    candidate = (JOB_DIR / job_id).resolve()
+    safe_id = m.group(0)
+    candidate = (JOB_DIR / safe_id).resolve()
     if candidate.parent.resolve() != JOB_DIR.resolve():
         raise ValueError(f"invalid job_id: {job_id!r}")
     return candidate
