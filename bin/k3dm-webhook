@@ -167,7 +167,7 @@ def _current_label(env, key="argocd-chart-version"):
     return output.strip() if rc == 0 and not timed_out else ""
 
 
-def _secret_name(env):
+def _cluster_name(env):
     rc, output, timed_out = _spawn_capture_text(
         ["kubectl", "get", "secrets", "-n", "cicd",
          "-l", f"argocd.argoproj.io/secret-type=cluster,environment={env}",
@@ -177,15 +177,15 @@ def _secret_name(env):
     return output.strip() if rc == 0 and not timed_out else ""
 
 
-def _patch_label(secret, version):
+def _patch_label(cluster_name, version):
     patch = json.dumps({"metadata": {"labels": {"argocd-chart-version": version}}})
     rc, output, timed_out = _spawn_capture_text(
-        ["kubectl", "patch", "secret", secret, "-n", "cicd",
+        ["kubectl", "patch", "secret", cluster_name, "-n", "cicd",
          "--type=merge", "-p", patch],
         timeout=20,
     )
     if timed_out or rc != 0:
-        raise RuntimeError(output.strip() or f"kubectl patch secret {secret} failed with rc={rc}")
+        raise RuntimeError(output.strip() or f"kubectl patch secret {cluster_name} failed with rc={rc}")
 
 
 def _run_cleanup(job_id, provider):
@@ -234,7 +234,7 @@ def _run_upgrade(job_id, chart_version, stage):
                 raise RuntimeError(f"make up exited {_rc}")
             _log("make up complete")
 
-        cluster_ref = _secret_name(env_label)
+        cluster_ref = _cluster_name(env_label)
         if not cluster_ref:
             raise RuntimeError(f"No cluster secret found for environment={env_label}")
 
