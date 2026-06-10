@@ -314,11 +314,12 @@ show-service-passwords:
 	_prom_creds=$$(curl -sf \
 	  -H "X-Vault-Token: $$_vault_tok" \
 	  "http://127.0.0.1:18200/v1/secret/data/k3d-manager/prometheus-basic-auth" 2>/dev/null \
-	  | python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]["data"]; print(d["user"]+"|"+d["password_bcrypt"])' 2>/dev/null || true); \
+	  | python3 -c 'import json,sys; d=json.load(sys.stdin)["data"]["data"]; print(d.get("user","admin")+"|"+d.get("password","N/A"))' 2>/dev/null || true); \
 	_prom_user=$${_prom_creds%%|*}; \
+	_prom_pass=$${_prom_creds##*|}; \
 	echo "  Prometheus  https://prometheus.3ai-talk.org";\
 	echo "    user:     $${_prom_user:-admin}";\
-	echo "    password: password";\
+	echo "    password: $${_prom_pass:-N/A}";\
 	echo ""
 	@_kc=$$(kubectl get secret keycloak-secrets -n identity \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.KEYCLOAK_ADMIN_PASSWORD}' 2>/dev/null | base64 -d); \

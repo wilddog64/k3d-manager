@@ -187,12 +187,13 @@ function _prometheus_acg_web_config_secret() {
   if [[ -z "${_prom_creds}" ]]; then
     local _default_bcrypt_hash='$2a$12$NqL.y.Z1.h.1.E.1.p.9.Q.2.a.7.I.3.Z.7.d.3.Q.2.v.0.K.2.x.6' # bcrypt hash for 'password'
 
-    _info "[observability] Ensuring Prometheus basic auth secret exists in Vault (admin:password)."
+    local _prom_password="${PROM_ADMIN_PASSWORD:-password}"
+    _info "[observability] Ensuring Prometheus basic auth secret exists in Vault."
     if ! curl -sf \
         --header "@${_vault_hdr}" \
         --header 'Content-Type: application/json' \
         --request POST \
-        --data "{\"data\":{\"user\":\"admin\",\"password_bcrypt\":\"${_default_bcrypt_hash}\"}}" \
+        --data "{\"data\":{\"user\":\"admin\",\"password\":\"${_prom_password}\",\"password_bcrypt\":\"${_default_bcrypt_hash}\"}}" \
         "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" >/dev/null; then
       rm -f "${_vault_hdr}"
       _err "[observability] Failed to create Prometheus basic auth secret in Vault."

@@ -230,12 +230,12 @@ def _run_upgrade(job_id, chart_version, stage):
                 raise RuntimeError(f"make up exited {_rc}")
             _log("make up complete")
 
-        secret = _secret_name(env_label)
-        if not secret:
+        secret_ref = _secret_name(env_label)
+        if not secret_ref:
             raise RuntimeError(f"No cluster secret found for environment={env_label}")
 
-        _patch_label(secret, chart_version)
-        _log(f"Patched {secret}: argocd-chart-version={chart_version}")
+        _patch_label(secret_ref, chart_version)
+        _log(f"Patched {secret_ref}: argocd-chart-version={chart_version}")
         _finish("success")
 
     except Exception as exc:

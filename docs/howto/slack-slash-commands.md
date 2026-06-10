@@ -289,15 +289,16 @@ Ask a live AI agent a cluster or code question directly from Slack.
 
 **As a thread reply** (in an active job thread — type in the thread, not a new message):
 ```
-/claude what's the issue with the data-layer?
-/claude check the ArgoCD app health
-/gemini explain the ESO sync failure
-/codex how does the tunnel plugin work?
+claude what's the issue with the data-layer?
+claude check the ArgoCD app health
+gemini explain the ESO sync failure
+codex how does the tunnel plugin work?
 ```
 
-The first word after the slash is the agent name. `/claude`, `/gemini`, and `/codex`
-are the public Slack commands. The legacy `/ask` syntax is still accepted in thread
-replies for compatibility, but it is no longer the primary user-facing command.
+Thread replies use bare command names without a leading `/` — Slack does not support
+slash commands in thread reply boxes. In the main channel, use `/claude`, `/gemini`,
+or `/codex` as slash commands. The legacy `ask <agent>` syntax is still accepted in
+thread replies for compatibility.
 
 **Non-command replies are silently ignored** — normal conversation in a job thread
 ("thanks", "got it", "ok") produces no webhook response.
