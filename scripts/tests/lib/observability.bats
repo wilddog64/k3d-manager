@@ -74,7 +74,11 @@ setup() {
     kubectl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
-    export -f envsubst _kubectl kubectl
+    curl() {
+      # Mock curl to return Vault credentials
+      printf "{\"data\":{\"data\":{\"user\":\"admin\",\"password_bcrypt\":\"test_hash\"}}}"
+    }
+    export -f envsubst _kubectl kubectl curl
     export K3D_MANAGER_BRANCH=feature-branch
     deploy_observability_acg
   '
