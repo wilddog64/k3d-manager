@@ -1,16 +1,18 @@
 # GitHub Copilot Instructions — lib-acg
 
-lib-acg is a browser automation library for ACG/GCP sandbox credential extraction and
+lib-acg is a browser automation library for ACG/Pluralsight sandbox credential extraction and
 session management. It provides Chrome CDP bootstrap, Playwright scripts, and
-provider-specific credential flows (AWS, GCP). Consumed by `k3d-manager` as a git subtree.
+provider-specific credential flows (AWS, GCP, Azure). Consumed by `k3d-manager` as a git subtree.
 
 ---
 
 ## Architecture
 
-- **Playwright scripts**: `playwright/acg_credentials.js` (AWS/GCP credential extraction),
-  `playwright/acg_extend.js` (sandbox TTL extension), `playwright/gcp_login.js` (Google OAuth).
-  All connect to Chrome via CDP (`localhost:9222`).
+- **Playwright scripts**: `playwright/acg_credentials.js` (AWS/GCP/Azure credential extraction),
+  `playwright/acg_extend.js` (sandbox TTL extension), `playwright/gcp_login.js` (Google OAuth),
+  `playwright/providers/aws.js`, `playwright/providers/gcp.js`, `playwright/providers/azure.js`
+  (provider-specific credential flows), `playwright/lib/sandbox.js` (provider-scoped button lookup,
+  delete conflicting sandboxes, panel lifecycle). All connect to Chrome via CDP (`localhost:9222`).
 - **CDP layer**: `scripts/lib/cdp.sh` — Chrome launch, session attach, port probe.
 - **Plugin scripts**: `scripts/plugins/acg.sh` (sandbox lifecycle), `scripts/plugins/gcp.sh`
   (GCP identity bridge). Public functions: no underscore prefix. Private: `_` prefix.

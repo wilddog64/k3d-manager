@@ -159,7 +159,7 @@ fix(acg-extend,acg-restart): replace button.first() toast dismiss with Escape â€
 
 ## What NOT to Do
 
-- Do NOT create a PR
+- Do NOT create a PR yourself â€” Claude handles PR creation after verifying the commit
 - Do NOT skip pre-commit hooks (`--no-verify`)
 - Do NOT modify any file other than `playwright/acg_extend.js` and `playwright/acg_restart.js`
 - Do NOT commit to `main`

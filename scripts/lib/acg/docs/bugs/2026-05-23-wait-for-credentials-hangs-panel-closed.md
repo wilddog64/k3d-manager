@@ -113,7 +113,7 @@ fix(acg-credentials): re-open panel inside waitForCredentials when Open Sandbox 
 
 ## What NOT to Do
 
-- Do NOT create a PR
+- Do NOT create a PR yourself — Claude handles PR creation after verifying the commit
 - Do NOT skip pre-commit hooks (`--no-verify`)
 - Do NOT modify any file other than `playwright/acg_credentials.js`
 - Do NOT commit to `main`

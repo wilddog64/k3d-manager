@@ -153,7 +153,7 @@ fix(acg): open blank tab via HTTP API when CDP has no contexts
 
 ## What NOT to Do
 
-- Do NOT create a PR
+- Do NOT create a PR yourself — Claude handles PR creation after verifying the commit
 - Do NOT modify `acg.sh`, `cdp.sh`, or any file other than `playwright/acg_credentials.js`
 - Do NOT commit to `main` — work on `fix/acg-credentials-cdp-empty-contexts`
 - Do NOT add a `setTimeout` longer than 500ms — Chrome registers the new target quickly
