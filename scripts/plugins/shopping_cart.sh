@@ -29,7 +29,7 @@ function add_ubuntu_k3s_cluster() {
 
 # shellcheck disable=SC2029
   if ! ssh "${ssh_target}" "cat ${remote_kubeconfig}" 2>/dev/null \
-      | sed "s|127.0.0.1|${external_ip}|g" > "${local_kubeconfig}"; then
+      | sed -e "s|127.0.0.1|${external_ip}|g" -e "s|https://localhost:|https://${external_ip}:|g" > "${local_kubeconfig}"; then
     _err "[shopping_cart] Failed to export kubeconfig from ${ssh_target}:${remote_kubeconfig}"
     _err "[shopping_cart] Ensure ${ssh_user} can read ${remote_kubeconfig} on ${ssh_host}"
     return 1
@@ -50,6 +50,8 @@ function add_ubuntu_k3s_cluster() {
     kubectl config delete-context ubuntu-k3s &>/dev/null || true
     _info "[shopping_cart] Removed stale ubuntu-k3s context — will re-merge with fresh credentials"
   fi
+  kubectl config delete-cluster default &>/dev/null || true
+  kubectl config delete-user default &>/dev/null || true
   cp "${local_kubeconfig}" "${_tmp_kube}"
   chmod 600 "${_tmp_kube}"
   local _src_context
