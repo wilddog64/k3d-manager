@@ -639,6 +639,8 @@ def _handle_thread_command(job_id, command):
         if running:
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
+        _resume_parts = command.strip().split()
+        _resume_provider = _resume_parts[1].lower() if len(_resume_parts) >= 2 and _resume_parts[1].lower() in ("aws", "gcp", "azure") else "aws"
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -649,16 +651,18 @@ def _handle_thread_command(job_id, command):
             (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
         threading.Thread(
             target=_run_cluster_resume,
-            args=(new_job_id, "aws"),
+            args=(new_job_id, _resume_provider),
             daemon=True,
         ).start()
-        _notify_job(job_id, f"🔄 *acg-resume* queued — job `{new_job_id}`")
+        _notify_job(job_id, f"🔄 *acg-resume* ({_resume_provider}) queued — job `{new_job_id}`")
 
     elif cmd in ("acg-down", "down"):
         running = _running_cluster_job()
         if running:
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
+        _down_parts = command.strip().split()
+        _down_provider = _down_parts[1].lower() if len(_down_parts) >= 2 and _down_parts[1].lower() in ("aws", "gcp", "azure") else "aws"
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -669,16 +673,18 @@ def _handle_thread_command(job_id, command):
             (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
         threading.Thread(
             target=_run_cluster,
-            args=(new_job_id, "down", "aws"),
+            args=(new_job_id, "down", _down_provider),
             daemon=True,
         ).start()
-        _notify_job(job_id, f"⬇️ *acg-down* queued — job `{new_job_id}`")
+        _notify_job(job_id, f"⬇️ *acg-down* ({_down_provider}) queued — job `{new_job_id}`")
 
     elif cmd in ("acg-up", "up"):
         running = _running_cluster_job()
         if running:
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
+        _up_parts = command.strip().split()
+        _up_provider = _up_parts[1].lower() if len(_up_parts) >= 2 and _up_parts[1].lower() in ("aws", "gcp", "azure") else "aws"
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -689,10 +695,10 @@ def _handle_thread_command(job_id, command):
             (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
         threading.Thread(
             target=_run_cluster,
-            args=(new_job_id, "up", "aws"),
+            args=(new_job_id, "up", _up_provider),
             daemon=True,
         ).start()
-        _notify_job(job_id, f"🚀 *acg-up* queued — job `{new_job_id}`")
+        _notify_job(job_id, f"🚀 *acg-up* ({_up_provider}) queued — job `{new_job_id}`")
 
     elif cmd == "ask":
         _VALID_AGENTS = {"claude", "gemini", "codex"}
