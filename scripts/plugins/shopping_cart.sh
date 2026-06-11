@@ -66,26 +66,6 @@ function add_ubuntu_k3s_cluster() {
   chmod 600 "${HOME}/.kube/config"
   rm -f "${_tmp_kube}"
   _info "[shopping_cart] ubuntu-k3s context merged into ~/.kube/config"
-
-  local kube_context
-  if [[ -n "${UBUNTU_K3S_CONTEXT:-}" ]]; then
-    kube_context="${UBUNTU_K3S_CONTEXT}"
-  else
-    if ! kube_context=$(KUBECONFIG="${local_kubeconfig}" kubectl config current-context 2>/dev/null); then
-      _err "[shopping_cart] Failed to determine current context from ${local_kubeconfig}"
-      return 1
-    fi
-    if [[ -z "${kube_context}" ]]; then
-      _err "[shopping_cart] kubeconfig ${local_kubeconfig} has no current-context configured"
-      return 1
-    fi
-  fi
-
-  _argocd_ensure_logged_in
-  _info "[shopping_cart] Registering Ubuntu k3s cluster with ArgoCD using context ${kube_context}"
-  KUBECONFIG="${local_kubeconfig}" _run_command -- argocd cluster add "${kube_context}" \
-    --name ubuntu-k3s \
-    --kubeconfig "${local_kubeconfig}"
 }
 
 function deploy_shopping_cart_data() {
