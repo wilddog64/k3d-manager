@@ -6,7 +6,13 @@ set -euo pipefail
 function add_ubuntu_k3s_cluster() {
   local ssh_host="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
   local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
-  local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-${ssh_host}}"
+  local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-}"
+  if [[ -z "${external_ip}" ]] && _command_exist awk; then
+    external_ip=$(awk -v host="${ssh_host}" \
+      '$1=="Host" && $2==host {found=1; next} found && $1=="HostName" {print $2; exit}' \
+      "${HOME}/.ssh/config" 2>/dev/null)
+  fi
+  : "${external_ip:=${ssh_host}}"
   local remote_kubeconfig="${UBUNTU_K3S_REMOTE_KUBECONFIG:-/home/${ssh_user}/.kube/k3s.yaml}"
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
   local ssh_target="${ssh_user}@${ssh_host}"

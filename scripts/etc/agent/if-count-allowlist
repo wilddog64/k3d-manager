@@ -5,3 +5,4 @@ scripts/plugins/keycloak.sh:deploy_keycloak
 scripts/plugins/argocd.sh:_argocd_write_port_forward_wrapper
 scripts/lib/test.sh:test_jenkins
 scripts/lib/test.sh:test_cert_rotation
+scripts/plugins/shopping_cart.sh:add_ubuntu_k3s_cluster
