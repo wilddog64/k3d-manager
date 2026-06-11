@@ -5,6 +5,19 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-06-11
+
+### Fixed
+- `playwright/lib/sandbox.js`: scope `addLocatorHandler` trigger to `h3` and `h2` heading elements — broad text regex matched both heading and paragraph, causing Playwright strict-mode violation when the toast appeared
+- `playwright/lib/sandbox.js`: use `Escape` key in `addLocatorHandler` to dismiss "Session extended" toast — previous close-button click was unscoped and closed the credential panel instead of the toast
+- `playwright/lib/sandbox.js`: parse conflicting provider name from conflict warning text — previous detection used a broken "Auto Shutdown" selector that never matched AWS, so `_deleteConflictingSandbox` never ran and the warning loop spun forever
+- `playwright/lib/sandbox.js`: check for "Hang tight" / "Finalizing your playground" provisioning banner in `_waitForCredentials` before triggering reopen or throw — panel auto-closes during Azure sandbox startup; without this check the `reopenAttempted` guard fired immediately and aborted while the sandbox was still provisioning
+- `playwright/lib/sandbox.js`: remove `panelInStartState` heuristic — global DOM check caused bidirectional regression when both provider panels were visible
+- `playwright/lib/sandbox.js`: add unscoped `Start Sandbox` fallback in `acg_restart.js` for detached panel overlay flow
+- `bin/acg-credential-test`: remove portal-only restart loop — replace with fail-fast error so MFA failures surface immediately instead of looping
+- `bin/acg-credential-test`: automate Azure device code sign-in via CDP browser automation — when `az login --username --password` fails due to MFA enforcement, run `az login --use-device-code` in background, parse device URL and code from stderr, and drive sign-in via Playwright `acg_azure_device_login.js`; removes manual browser prompt entirely
+- `bin/acg-credential-test`: persist `az login` to `~/.azure` after SP validation
+
 ## [0.4.0] - 2026-06-10
 
 ### Added

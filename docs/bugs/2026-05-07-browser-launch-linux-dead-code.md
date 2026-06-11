@@ -119,7 +119,7 @@ fix(cdp): remove dead Linux else-block from _browser_launch
 
 ## What NOT to Do
 
-- Do NOT create a PR
+- Do NOT create a PR yourself — Claude handles PR creation after verifying the commit
 - Do NOT skip pre-commit hooks (`--no-verify`)
 - Do NOT modify any file other than `scripts/lib/cdp.sh`
 - Do NOT commit to `main` — work on `fix/post-merge-pr9-cleanup`

@@ -312,6 +312,18 @@ async function restartSandbox() {
         // Panel is open but sandbox not yet provisioned — Start Sandbox visible, Delete not.
         // Skip delete flow and start directly.
         _startBtnPanelScoped = await _findScopedButton(page, 'Start Sandbox', _providerCardLabel, 0);
+        if (!_startBtnPanelScoped) {
+          // Panel may render as a detached overlay — scoped ancestor walk cannot find provider
+          // label. Fall back to unscoped detection: Close button visible (panel open) + Start
+          // Sandbox visible means the open panel is in Start Sandbox state.
+          const _panelOpen = await page.locator('button:has-text("Close")').first()
+            .isVisible({ timeout: 0 }).catch(() => false);
+          if (_panelOpen) {
+            const _startGlobal = page.locator('button:has-text("Start Sandbox")').first();
+            const _startVis = await _startGlobal.isVisible({ timeout: 0 }).catch(() => false);
+            if (_startVis) _startBtnPanelScoped = _startGlobal;
+          }
+        }
         if (_startBtnPanelScoped) {
           _sandboxNotYetStarted = true;
           break;

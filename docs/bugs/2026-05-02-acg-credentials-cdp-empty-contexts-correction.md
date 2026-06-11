@@ -79,7 +79,7 @@ fix(acg): guard CDP disconnect behind missing browserContext check
 
 ## What NOT to Do
 
-- Do NOT create a PR
+- Do NOT create a PR yourself — Claude handles PR creation after verifying the commit
 - Do NOT skip pre-commit hooks (`--no-verify`)
 - Do NOT modify any code file other than `playwright/acg_credentials.js`
 - Do NOT commit to `main` — work on `fix/acg-credentials-cdp-empty-contexts`
