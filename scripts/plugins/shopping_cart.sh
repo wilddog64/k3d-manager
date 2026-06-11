@@ -79,6 +79,7 @@ function add_ubuntu_k3s_cluster() {
     fi
   fi
 
+  _argocd_ensure_logged_in
   _info "[shopping_cart] Registering Ubuntu k3s cluster with ArgoCD using context ${kube_context}"
   KUBECONFIG="${local_kubeconfig}" _run_command -- argocd cluster add "${kube_context}" \
     --name ubuntu-k3s \
