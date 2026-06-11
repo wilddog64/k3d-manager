@@ -881,6 +881,17 @@ HELP
     --context "${kube_context}" \
     --k3s-extra-args '--disable traefik --disable servicelb'
 
+  # Copy system kubeconfig to user home so add_ubuntu_k3s_cluster can read it without sudo
+  # SC2087: single-quoted heredoc intentionally prevents local expansion
+  # shellcheck disable=SC2087
+  _run_command -- ssh -i "${ssh_key}" "${ssh_user}@${external_ip}" bash <<'REMOTE'
+SUDO="sudo"
+mkdir -p "${HOME}/.kube"
+$SUDO cp /etc/rancher/k3s/k3s.yaml "${HOME}/.kube/k3s.yaml"
+$SUDO chown "$(id -u)":"$(id -g)" "${HOME}/.kube/k3s.yaml"
+chmod 600 "${HOME}/.kube/k3s.yaml"
+REMOTE
+
   _info "[shopping_cart] Waiting for node to be Ready..."
   local attempts=0
   until KUBECONFIG="${local_kubeconfig}" kubectl get nodes 2>/dev/null | grep -q " Ready"; do
