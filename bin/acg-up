@@ -65,8 +65,12 @@ case "${_cluster_provider}" in
   k3s-gcp)
     source "${REPO_ROOT}/scripts/plugins/gcp.sh"
     ;;
+  k3s-azure)
+    source "${REPO_ROOT}/scripts/plugins/azure.sh"
+    source "${REPO_ROOT}/scripts/lib/providers/k3s-azure.sh"
+    ;;
   *)
-    _err "[acg-up] Unsupported CLUSTER_PROVIDER: ${_cluster_provider} (supported: k3s-aws, k3s-gcp)"
+    _err "[acg-up] Unsupported CLUSTER_PROVIDER: ${_cluster_provider} (supported: k3s-aws, k3s-gcp, k3s-azure)"
     ;;
 esac
 
@@ -178,6 +182,8 @@ case "${_cluster_provider}" in
   k3s-gcp)
     gcp_get_credentials ${sandbox_url:+"$sandbox_url"}
     ;;
+  k3s-azure)
+    ;;
 esac
 
 _info "[acg-up] Step 2/12 — Provisioning 3-node cluster..."
@@ -188,7 +194,7 @@ else
   _cp_write "step-2-cluster"
 fi
 
-if [[ "${_cluster_provider}" != "k3s-gcp" ]]; then
+if [[ "${_cluster_provider}" != "k3s-gcp" && "${_cluster_provider}" != "k3s-azure" ]]; then
   _info "[acg-up] Step 3/12 — Starting SSH tunnel..."
   tunnel_start
 fi
@@ -504,6 +510,12 @@ if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
   _info "[acg-up] Steps 5–12 (ESO, ArgoCD registration, Vault bridge) not yet ported for GCP."
   _info "[acg-up] Hub cluster is up. GCP app cluster nodes:"
   kubectl get nodes --context ubuntu-gcp 2>/dev/null || true
+  exit 0
+fi
+if [[ "${_cluster_provider}" == "k3s-azure" ]]; then
+  _info "[acg-up] Steps 5–12 (ESO, ArgoCD registration, Vault bridge) not yet ported for Azure."
+  _info "[acg-up] Hub cluster is up. Azure app cluster nodes:"
+  kubectl get nodes --context ubuntu-azure 2>/dev/null || true
   exit 0
 fi
 

@@ -8,7 +8,7 @@
 #   bin/acg-down --confirm [--keep-hub]
 #
 # Environment:
-#   CLUSTER_PROVIDER   k3s-aws (default) or k3s-gcp
+#   CLUSTER_PROVIDER   k3s-aws (default), k3s-gcp, or k3s-azure
 #   ACG_REGION         AWS region (default: us-west-2)
 #   GCP_PROJECT        GCP project ID (required when CLUSTER_PROVIDER=k3s-gcp)
 
@@ -73,6 +73,12 @@ _info "[acg-down] Stopping tunnel..."
       fi
     fi
     _provider_k3s_gcp_destroy_cluster --confirm
+    ;;
+  k3s-azure)
+    source "${REPO_ROOT}/scripts/plugins/azure.sh"
+    source "${REPO_ROOT}/scripts/lib/providers/k3s-azure.sh"
+    _info "[acg-down] Tearing down Azure cluster..."
+    _provider_k3s_azure_destroy_cluster --confirm
     ;;
   *)
     _info "[acg-down] Unknown CLUSTER_PROVIDER '${_cluster_provider}' — skipping remote teardown"
