@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 
 # shellcheck disable=SC1090
-az_eso_vars="${SCRIPT_DIR}/etc/azure/azure-vars.sh"
-if [[ -r "${az_eso_vars}" ]]; then
-   source "${az_eso_vars}"
-fi
 
 function _ensure_azure_cli() {
    if _command_exist az ; then
