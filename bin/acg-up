@@ -183,19 +183,21 @@ case "${_cluster_provider}" in
     gcp_get_credentials ${sandbox_url:+"$sandbox_url"}
     ;;
   k3s-azure)
-    if _az_ok 2>/dev/null; then
+    _az_existing_rg=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
+    if _az_ok 2>/dev/null && [[ -n "${_az_existing_rg}" ]]; then
       _info "[acg-up] Azure credentials already valid — skipping Playwright extraction"
+      AZ_RESOURCE_GROUP="${_az_existing_rg}"
+      export AZ_RESOURCE_GROUP
     else
       _acg_cred_test_url="${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
       _info "[acg-up] Extracting and validating Azure credentials..."
       _browser_launch
       "${REPO_ROOT}/scripts/lib/acg/bin/acg-credential-test" "${_acg_cred_test_url}" --provider azure || exit 1
       _info "[acg-up] Azure credentials extracted and validated."
-    fi
-    if [[ -z "${AZ_RESOURCE_GROUP:-}" ]]; then
       AZ_RESOURCE_GROUP=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
       export AZ_RESOURCE_GROUP
     fi
+    [[ -n "${AZ_RESOURCE_GROUP:-}" ]] || { _err "[acg-up] Could not determine AZ_RESOURCE_GROUP after credential extraction — aborting"; exit 1; }
     ;;
 esac
 
