@@ -65,12 +65,12 @@ case "${_cluster_provider}" in
   k3s-gcp)
     source "${REPO_ROOT}/scripts/plugins/gcp.sh"
     ;;
-  k3s-azure)
+  k3s-az)
     source "${REPO_ROOT}/scripts/plugins/azure.sh"
-    source "${REPO_ROOT}/scripts/lib/providers/k3s-azure.sh"
+    source "${REPO_ROOT}/scripts/lib/providers/k3s-az.sh"
     ;;
   *)
-    _err "[acg-up] Unsupported CLUSTER_PROVIDER: ${_cluster_provider} (supported: k3s-aws, k3s-gcp, k3s-azure)"
+    _err "[acg-up] Unsupported CLUSTER_PROVIDER: ${_cluster_provider} (supported: k3s-aws, k3s-gcp, k3s-az)"
     ;;
 esac
 
@@ -182,7 +182,7 @@ case "${_cluster_provider}" in
   k3s-gcp)
     gcp_get_credentials ${sandbox_url:+"$sandbox_url"}
     ;;
-  k3s-azure)
+  k3s-az)
     _az_existing_rg=""
     if _az_ok 2>/dev/null; then
       _az_existing_rg=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
@@ -212,7 +212,7 @@ else
   _cp_write "step-2-cluster"
 fi
 
-if [[ "${_cluster_provider}" != "k3s-gcp" && "${_cluster_provider}" != "k3s-azure" ]]; then
+if [[ "${_cluster_provider}" != "k3s-gcp" && "${_cluster_provider}" != "k3s-az" ]]; then
   _info "[acg-up] Step 3/12 — Starting SSH tunnel..."
   tunnel_start
 fi
@@ -566,7 +566,7 @@ if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
   kubectl get nodes --context ubuntu-gcp 2>/dev/null || true
   exit 0
 fi
-if [[ "${_cluster_provider}" == "k3s-azure" ]]; then
+if [[ "${_cluster_provider}" == "k3s-az" ]]; then
   _info "[acg-up] Steps 5–12 (ESO, ArgoCD registration, Vault bridge) not yet ported for Azure."
   _info "[acg-up] Hub cluster is up. Azure app cluster nodes:"
   kubectl get nodes --context ubuntu-azure 2>/dev/null || true

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/lib/providers/k3s-azure.sh — k3s on ACG Azure sandbox (single-node)
+# scripts/lib/providers/k3s-az.sh — k3s on ACG Azure sandbox (single-node)
 #
 # Provider actions:
 #   deploy_cluster  — NSG rule → VM create → k3sup install → kubeconfig merge
@@ -16,7 +16,7 @@ _AZ_VM_IMAGE="${AZ_VM_IMAGE:-Ubuntu2204}"
 _AZ_NSG_RULE_NAME="${AZ_NSG_RULE_NAME:-k3d-manager-k3s-api}"
 _AZ_SSH_CONFIG_HOST="${AZ_SSH_CONFIG_HOST:-ubuntu-azure}"
 _AZ_KUBE_CONTEXT="${AZ_KUBE_CONTEXT:-ubuntu-azure}"
-_AZ_KUBECONFIG="${HOME}/.kube/k3s-azure.yaml"
+_AZ_KUBECONFIG="${HOME}/.kube/k3s-az.yaml"
 
 function _az_ssh_key() {
   printf '%s' "${AZ_SSH_KEY:-${HOME}/.ssh/k3d-manager-azure-key}"
@@ -34,35 +34,35 @@ function _az_ensure_ssh_key() {
   local ssh_key
   ssh_key="$(_az_ssh_key)"
   if [[ ! -f "${ssh_key}" ]]; then
-    _info "[k3s-azure] Generating SSH key pair at ${ssh_key}..."
+    _info "[k3s-az] Generating SSH key pair at ${ssh_key}..."
     ssh-keygen -t rsa -b 4096 -f "${ssh_key}" -N "" -q
     chmod 600 "${ssh_key}"
     chmod 644 "${ssh_key}.pub"
-    _info "[k3s-azure] SSH key pair created."
+    _info "[k3s-az] SSH key pair created."
   fi
 }
 
 function _az_open_k3s_port() {
   local rg="$1"
-  _info "[k3s-azure] Opening TCP 6443 for k3s API on VM ${_AZ_VM_NAME}..."
+  _info "[k3s-az] Opening TCP 6443 for k3s API on VM ${_AZ_VM_NAME}..."
   if az vm open-port \
       --port 6443 \
       --resource-group "${rg}" \
       --name "${_AZ_VM_NAME}" \
       --priority 1010 2>/dev/null; then
-    _info "[k3s-azure] NSG rule for port 6443 created."
+    _info "[k3s-az] NSG rule for port 6443 created."
   else
-    _info "[k3s-azure] Port 6443 rule may already exist — continuing."
+    _info "[k3s-az] Port 6443 rule may already exist — continuing."
   fi
 }
 
 function _az_create_vm() {
   local rg="$1" ssh_user="$2" ssh_key_pub="$3"
   if az vm show --resource-group "${rg}" --name "${_AZ_VM_NAME}" >/dev/null 2>&1; then
-    _info "[k3s-azure] VM ${_AZ_VM_NAME} already exists — skipping create."
+    _info "[k3s-az] VM ${_AZ_VM_NAME} already exists — skipping create."
     return 0
   fi
-  _info "[k3s-azure] Creating VM ${_AZ_VM_NAME} (${_AZ_VM_SIZE}, ${_AZ_VM_IMAGE}) in ${rg}..."
+  _info "[k3s-az] Creating VM ${_AZ_VM_NAME} (${_AZ_VM_SIZE}, ${_AZ_VM_IMAGE}) in ${rg}..."
   az vm create \
     --resource-group "${rg}" \
     --name "${_AZ_VM_NAME}" \
@@ -102,30 +102,30 @@ Host ${_AZ_SSH_CONFIG_HOST}
   StrictHostKeyChecking no
   UserKnownHostsFile /dev/null
 EOF
-  _info "[k3s-azure] SSH config updated: Host ${_AZ_SSH_CONFIG_HOST} → ${external_ip}"
+  _info "[k3s-az] SSH config updated: Host ${_AZ_SSH_CONFIG_HOST} → ${external_ip}"
 }
 
 function _az_wait_for_ssh() {
   local external_ip="$1" ssh_user="$2" ssh_key="$3"
-  _info "[k3s-azure] Waiting for SSH on ${external_ip} (up to 120s)..."
+  _info "[k3s-az] Waiting for SSH on ${external_ip} (up to 120s)..."
   local attempts=0
   until ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
       -o ConnectTimeout=5 "${ssh_user}@${external_ip}" true 2>/dev/null; do
     (( ++attempts ))
     if (( attempts >= 24 )); then
-      printf 'ERROR: %s\n' "[k3s-azure] SSH not ready after 120s" >&2
+      printf 'ERROR: %s\n' "[k3s-az] SSH not ready after 120s" >&2
       return 1
     fi
     sleep 5
   done
-  _info "[k3s-azure] SSH ready."
+  _info "[k3s-az] SSH ready."
 }
 
 function _az_k3sup_install() {
   local external_ip="$1" ssh_user="$2" ssh_key="$3"
   _ensure_k3sup
   mkdir -p "$(dirname "${_AZ_KUBECONFIG}")" "${HOME}/.kube"
-  _info "[k3s-azure] Installing k3s on ${ssh_user}@${external_ip} via k3sup..."
+  _info "[k3s-az] Installing k3s on ${ssh_user}@${external_ip} via k3sup..."
   _run_command -- k3sup install \
     --ip "${external_ip}" \
     --user "${ssh_user}" \
@@ -141,7 +141,7 @@ function _az_merge_kubeconfig() {
   tmp_merged="${HOME}/.kube/config.tmp"
   if kubectl config get-contexts "${_AZ_KUBE_CONTEXT}" >/dev/null 2>&1; then
     kubectl config delete-context "${_AZ_KUBE_CONTEXT}" >/dev/null 2>&1 || true
-    _info "[k3s-azure] Removed stale ${_AZ_KUBE_CONTEXT} context"
+    _info "[k3s-az] Removed stale ${_AZ_KUBE_CONTEXT} context"
   fi
   cp "${_AZ_KUBECONFIG}" "${tmp_kube}"
   chmod 600 "${tmp_kube}"
@@ -149,13 +149,13 @@ function _az_merge_kubeconfig() {
   mv "${tmp_merged}" "${HOME}/.kube/config"
   chmod 600 "${HOME}/.kube/config"
   rm -f "${tmp_kube}"
-  _info "[k3s-azure] ${_AZ_KUBE_CONTEXT} context merged into ~/.kube/config"
+  _info "[k3s-az] ${_AZ_KUBE_CONTEXT} context merged into ~/.kube/config"
 }
 
 function _provider_k3s_azure_deploy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
-Usage: CLUSTER_PROVIDER=k3s-azure ./scripts/k3d-manager deploy_cluster
+Usage: CLUSTER_PROVIDER=k3s-az ./scripts/k3d-manager deploy_cluster
 
 Provision a single-node k3s cluster on ACG Azure sandbox:
   1. az vm open-port 6443  — NSG rule for k3s API
@@ -180,17 +180,17 @@ HELP
   fi
 
   if ! _az_ok; then
-    printf 'ERROR: %s\n' "[k3s-azure] Not logged in to Azure — run: az login" >&2
+    printf 'ERROR: %s\n' "[k3s-az] Not logged in to Azure — run: az login" >&2
     return 1
   fi
 
   local rg ssh_key ssh_user
   rg="$(_az_resource_group)"
   if [[ -z "${rg}" ]]; then
-    printf 'ERROR: %s\n' "[k3s-azure] Could not determine resource group — set AZ_RESOURCE_GROUP" >&2
+    printf 'ERROR: %s\n' "[k3s-az] Could not determine resource group — set AZ_RESOURCE_GROUP" >&2
     return 1
   fi
-  _info "[k3s-azure] Using resource group: ${rg}"
+  _info "[k3s-az] Using resource group: ${rg}"
 
   ssh_key="$(_az_ssh_key)"
   ssh_user="$(_az_ssh_user)"
@@ -204,28 +204,28 @@ HELP
   local external_ip
   external_ip="$(_az_get_public_ip "${rg}")"
   if [[ -z "${external_ip}" ]]; then
-    printf 'ERROR: %s\n' "[k3s-azure] Could not get public IP for VM ${_AZ_VM_NAME}" >&2
+    printf 'ERROR: %s\n' "[k3s-az] Could not get public IP for VM ${_AZ_VM_NAME}" >&2
     return 1
   fi
-  _info "[k3s-azure] VM public IP: ${external_ip}"
+  _info "[k3s-az] VM public IP: ${external_ip}"
 
   _az_update_ssh_config "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
   _az_wait_for_ssh "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
   _az_k3sup_install "${external_ip}" "${ssh_user}" "${ssh_key}" || return 1
   _az_merge_kubeconfig || return 1
 
-  _info "[k3s-azure] Waiting for node to be Ready..."
+  _info "[k3s-az] Waiting for node to be Ready..."
   local attempts=0
   until KUBECONFIG="${_AZ_KUBECONFIG}" kubectl get nodes 2>/dev/null | grep -q " Ready"; do
     (( ++attempts ))
     if (( attempts >= 60 )); then
-      printf 'ERROR: %s\n' "[k3s-azure] Node did not become Ready after 300s" >&2
+      printf 'ERROR: %s\n' "[k3s-az] Node did not become Ready after 300s" >&2
       return 1
     fi
     sleep 5
   done
 
-  _info "[k3s-azure] Labeling node..."
+  _info "[k3s-az] Labeling node..."
   local node_name
   node_name=$(KUBECONFIG="${_AZ_KUBECONFIG}" kubectl get nodes \
     --no-headers -o custom-columns=NAME:.metadata.name 2>/dev/null | head -n1)
@@ -233,14 +233,14 @@ HELP
     KUBECONFIG="${_AZ_KUBECONFIG}" kubectl label node "${node_name}" \
       k3d-manager/node-type=server --overwrite >/dev/null 2>&1 || true
 
-  _info "[k3s-azure] Cluster ready."
-  _info "[k3s-azure] Verify: kubectl --context ${_AZ_KUBE_CONTEXT} get nodes"
+  _info "[k3s-az] Cluster ready."
+  _info "[k3s-az] Verify: kubectl --context ${_AZ_KUBE_CONTEXT} get nodes"
 }
 
 function _provider_k3s_azure_destroy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
-Usage: CLUSTER_PROVIDER=k3s-azure ./scripts/k3d-manager destroy_cluster --confirm
+Usage: CLUSTER_PROVIDER=k3s-az ./scripts/k3d-manager destroy_cluster --confirm
 
 Tear down the Azure k3s cluster:
   1. Delete VM
@@ -252,28 +252,28 @@ HELP
   fi
 
   if [[ "${1:-}" != "--confirm" ]]; then
-    printf 'ERROR: %s\n' "[k3s-azure] destroy_cluster requires --confirm" >&2
+    printf 'ERROR: %s\n' "[k3s-az] destroy_cluster requires --confirm" >&2
     return 1
   fi
 
   if ! _az_ok; then
-    printf 'ERROR: %s\n' "[k3s-azure] Not logged in to Azure — run: az login" >&2
+    printf 'ERROR: %s\n' "[k3s-az] Not logged in to Azure — run: az login" >&2
     return 1
   fi
 
   local rg
   rg="$(_az_resource_group)"
   if [[ -z "${rg}" ]]; then
-    printf 'ERROR: %s\n' "[k3s-azure] Could not determine resource group" >&2
+    printf 'ERROR: %s\n' "[k3s-az] Could not determine resource group" >&2
     return 1
   fi
 
-  _info "[k3s-azure] Deleting VM ${_AZ_VM_NAME}..."
+  _info "[k3s-az] Deleting VM ${_AZ_VM_NAME}..."
   az vm delete \
     --resource-group "${rg}" \
     --name "${_AZ_VM_NAME}" \
     --yes 2>/dev/null || \
-    _info "[k3s-azure] VM not found — skipping"
+    _info "[k3s-az] VM not found — skipping"
 
   # Remove SSH config entry
   local ssh_config="${HOME}/.ssh/config"
@@ -284,14 +284,14 @@ HELP
       "${ssh_config}" > "${tmp}"
     mv "${tmp}" "${ssh_config}"
     chmod 600 "${ssh_config}"
-    _info "[k3s-azure] Removed SSH config entry for ${_AZ_SSH_CONFIG_HOST}"
+    _info "[k3s-az] Removed SSH config entry for ${_AZ_SSH_CONFIG_HOST}"
   fi
 
   # Remove kubeconfig context
   if kubectl config get-contexts "${_AZ_KUBE_CONTEXT}" >/dev/null 2>&1; then
     kubectl config delete-context "${_AZ_KUBE_CONTEXT}" >/dev/null 2>&1 || true
-    _info "[k3s-azure] Removed kubeconfig context ${_AZ_KUBE_CONTEXT}"
+    _info "[k3s-az] Removed kubeconfig context ${_AZ_KUBE_CONTEXT}"
   fi
 
-  _info "[k3s-azure] Azure cluster destroyed."
+  _info "[k3s-az] Azure cluster destroyed."
 }

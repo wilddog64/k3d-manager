@@ -16,7 +16,7 @@ function _cluster_provider() {
    provider="$(printf '%s' "$provider" | tr '[:upper:]' '[:lower:]')"
 
    case "$provider" in
-      k3d|orbstack|k3s|k3s-aws|k3s-gcp|k3s-azure)
+      k3d|orbstack|k3s|k3s-aws|k3s-gcp|k3s-az)
          printf '%s' "$provider"
          ;;
       *)
@@ -779,7 +779,7 @@ EOF
    fi
 
    case "$provider" in
-      k3d|orbstack|k3s|k3s-aws|k3s-gcp|k3s-oci|k3s-azure)
+      k3d|orbstack|k3s|k3s-aws|k3s-gcp|k3s-oci|k3s-az)
          ;;
       "")
          _err "Failed to determine cluster provider."

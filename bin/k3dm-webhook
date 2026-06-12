@@ -281,7 +281,7 @@ def _read_job_tail(output_path, n=3):
 def _run_cluster(job_id, action, provider="aws"):
     job_dir = JOB_DIR / job_id
     _out_file = job_dir / "output"
-    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "azure": "k3s-azure"}
+    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az"}
     _cluster_provider = _provider_map.get(provider, "k3s-aws")
     _start = datetime.datetime.utcnow().timestamp()
     _progress_timer = None
@@ -395,7 +395,7 @@ def _run_cluster_resume(job_id, provider="aws"):
     """Re-run make up with K3DM_RESUME=1 to skip completed checkpoints."""
     job_dir = JOB_DIR / job_id
     _out_file = job_dir / "output"
-    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "azure": "k3s-azure"}
+    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az"}
     _cluster_provider = _provider_map.get(provider, "k3s-aws")
     _start = datetime.datetime.utcnow().timestamp()
     _progress_timer = None
@@ -640,7 +640,7 @@ def _handle_thread_command(job_id, command):
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
         _resume_parts = command.strip().split()
-        _resume_provider = _resume_parts[1].lower() if len(_resume_parts) >= 2 and _resume_parts[1].lower() in ("aws", "gcp", "azure") else "aws"
+        _resume_provider = _resume_parts[1].lower() if len(_resume_parts) >= 2 and _resume_parts[1].lower() in ("aws", "gcp", "az") else "aws"
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -662,7 +662,7 @@ def _handle_thread_command(job_id, command):
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
         _down_parts = command.strip().split()
-        _down_provider = _down_parts[1].lower() if len(_down_parts) >= 2 and _down_parts[1].lower() in ("aws", "gcp", "azure") else "aws"
+        _down_provider = _down_parts[1].lower() if len(_down_parts) >= 2 and _down_parts[1].lower() in ("aws", "gcp", "az") else "aws"
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -684,7 +684,7 @@ def _handle_thread_command(job_id, command):
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
         _up_parts = command.strip().split()
-        _up_provider = _up_parts[1].lower() if len(_up_parts) >= 2 and _up_parts[1].lower() in ("aws", "gcp", "azure") else "aws"
+        _up_provider = _up_parts[1].lower() if len(_up_parts) >= 2 and _up_parts[1].lower() in ("aws", "gcp", "az") else "aws"
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -2470,7 +2470,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 self._json(409, {"error": f"cluster job already running: {running[0]} ({running[1]})"})
                 return
             provider = body.get("provider", "aws")
-            if provider not in ("aws", "gcp", "azure"):
+            if provider not in ("aws", "gcp", "az"):
                 provider = "aws"
             response_url = body.get("response_url", "")
             job_id = str(uuid.uuid4())[:8]
@@ -2523,7 +2523,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 self._json(409, {"error": f"cluster job already running: {running[0]} ({running[1]})"})
                 return
             provider = body.get("provider", "aws")
-            if provider not in ("aws", "gcp", "azure"):
+            if provider not in ("aws", "gcp", "az"):
                 provider = "aws"
             response_url = body.get("response_url", "")
             job_id = str(uuid.uuid4())[:8]
