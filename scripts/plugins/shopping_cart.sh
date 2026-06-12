@@ -756,6 +756,24 @@ function _ensure_k3sup() {
   _err "[shopping_cart] k3sup not found and automatic installation failed — install manually: brew install k3sup"
 }
 
+function _ubuntu_k3s_trust_host() {
+  local host="$1" attempts=0 key
+  [[ -z "${host}" ]] && return 0
+  mkdir -p "${HOME}/.ssh"
+  touch "${HOME}/.ssh/known_hosts"
+  until key=$(ssh-keyscan -T 5 "${host}" 2>/dev/null) && [[ -n "${key}" ]]; do
+    (( ++attempts ))
+    if (( attempts >= 24 )); then
+      _warn "[shopping_cart] ssh-keyscan ${host} not ready after 120s — k3sup may prompt"
+      return 0
+    fi
+    sleep 5
+  done
+  ssh-keygen -R "${host}" >/dev/null 2>&1 || true
+  printf '%s\n' "${key}" >> "${HOME}/.ssh/known_hosts"
+  _info "[shopping_cart] Trusted host key for ${host}"
+}
+
 function _k3sup_join_agent() {
   local agent_host="$1" server_ip="$2"
   local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
@@ -768,6 +786,7 @@ function _k3sup_join_agent() {
   fi
   : "${agent_ip:=${agent_host}}"
   _info "[shopping_cart] Joining agent ${agent_host} (${agent_ip}) to server ${server_ip}..."
+  _ubuntu_k3s_trust_host "${agent_ip}"
   _run_command -- k3sup join \
     --ip "${agent_ip}" \
     --server-ip "${server_ip}" \
@@ -782,7 +801,7 @@ function _setup_vault_bridge() {
   _info "[shopping_cart] Installing socat and vault-bridge systemd unit on ${ssh_host}..."
   # SC2087: single-quoted heredoc intentionally prevents local expansion
   # shellcheck disable=SC2087
-_run_command -- ssh -i "${ssh_key}" "${ssh_host}" bash <<'REMOTE'
+_run_command -- ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${ssh_host}" bash <<'REMOTE'
 set -euo pipefail
 SUDO="sudo"
 if ! command -v socat >/dev/null 2>&1; then
@@ -868,6 +887,7 @@ HELP
   mkdir -p "${kubeconfig_dir}" "${HOME}/.kube"
 
   _info "[shopping_cart] Installing k3s on ${ssh_user}@${external_ip} via k3sup..."
+  _ubuntu_k3s_trust_host "${external_ip}"
   _run_command -- k3sup install \
     --ip "${external_ip}" \
     --user "${ssh_user}" \
@@ -879,7 +899,7 @@ HELP
   # Copy system kubeconfig to user home so add_ubuntu_k3s_cluster can read it without sudo
   # SC2087: single-quoted heredoc intentionally prevents local expansion
   # shellcheck disable=SC2087
-  _run_command -- ssh -i "${ssh_key}" "${ssh_user}@${external_ip}" bash <<'REMOTE'
+  _run_command -- ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${ssh_user}@${external_ip}" bash <<'REMOTE'
 SUDO="sudo"
 mkdir -p "${HOME}/.kube"
 $SUDO cp /etc/rancher/k3s/k3s.yaml "${HOME}/.kube/k3s.yaml"
