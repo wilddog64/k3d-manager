@@ -78,7 +78,7 @@ _info "[acg-down] Stopping tunnel..."
     source "${REPO_ROOT}/scripts/plugins/azure.sh"
     source "${REPO_ROOT}/scripts/lib/providers/k3s-az.sh"
     _info "[acg-down] Tearing down Azure cluster..."
-    _provider_k3s_azure_destroy_cluster --confirm
+    _provider_k3s_az_destroy_cluster --confirm
     ;;
   *)
     _info "[acg-down] Unknown CLUSTER_PROVIDER '${_cluster_provider}' — skipping remote teardown"

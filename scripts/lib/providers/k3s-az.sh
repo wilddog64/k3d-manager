@@ -152,7 +152,7 @@ function _az_merge_kubeconfig() {
   _info "[k3s-az] ${_AZ_KUBE_CONTEXT} context merged into ~/.kube/config"
 }
 
-function _provider_k3s_azure_deploy_cluster() {
+function _provider_k3s_az_deploy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
 Usage: CLUSTER_PROVIDER=k3s-az ./scripts/k3d-manager deploy_cluster
@@ -237,7 +237,7 @@ HELP
   _info "[k3s-az] Verify: kubectl --context ${_AZ_KUBE_CONTEXT} get nodes"
 }
 
-function _provider_k3s_azure_destroy_cluster() {
+function _provider_k3s_az_destroy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
 Usage: CLUSTER_PROVIDER=k3s-az ./scripts/k3d-manager destroy_cluster --confirm
