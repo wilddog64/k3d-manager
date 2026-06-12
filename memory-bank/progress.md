@@ -2,7 +2,7 @@
 
 ## Status (v1.6.5 — lib-acg v0.1.5 subtree sync complete 2026-06-11)
 - **lib-acg v0.1.5 post-merge COMPLETE:** PR #42 merged to lib-acg main (`180beb8`); enforce_admins restored ✓; v0.1.5 tag + release created ✓; feat/v0.1.6 branch created ✓; retrospective committed ✓; k3d-manager subtree sync complete (`0008c065`) ✓
-- **OPEN:** acg-up Docker daemon preflight — spec: `docs/bugs/v1.6.5-bugfix-acg-up-docker-daemon-precheck.md`; `bin/acg-up` has no preflight for Docker daemon availability; fix: OrbStack/Docker Desktop auto-start + 60s poll + clear error at top of script (line ~24); commit message: `fix(acg-up): add Docker daemon preflight — dismiss OrbStack update dialogs and recover before Hub cluster step`
+- **COMPLETE:** acg-up Docker daemon preflight — k3d-manager commit `4adf5a1a` on `k3d-manager-v1.6.5`; spec: `docs/bugs/v1.6.5-bugfix-acg-up-docker-daemon-precheck.md`; `bin/acg-up` now runs a Docker preflight immediately before Step 3.5, dismisses OrbStack update dialogs with `osascript`, waits up to 60s for `docker info` to recover, falls back to `open -a OrbStack` or `open -a Docker` if needed, and fails fast with a clear `_err` if the daemon still is unavailable; validation used `shellcheck -S warning bin/acg-up` and `./scripts/k3d-manager _agent_audit`; commit message: `fix(acg-up): add Docker daemon preflight — dismiss OrbStack update dialogs and recover before Hub cluster step`
 
 ## Status (v1.6.4 — RELEASED 2026-06-10)
 - **RELEASED:** k3d-manager v1.6.4 — PR #93 merged to main (SHA `e2820483a40ca49c17c3be64d37988bfd96fcdd0`); enforce_admins restored ✓; v1.6.4 tag created + pushed ✓; GitHub release created ✓; v1.6.5 branch created ✓; retrospective committed (`0ddd2006`) ✓; memory-bank updated ✓
