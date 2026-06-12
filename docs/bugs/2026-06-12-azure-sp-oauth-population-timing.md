@@ -1,4 +1,4 @@
-# Bug: Azure SP OAuth credentials populate slowly; 60s partial-creds threshold may delete-and-restart prematurely
+# Bug: Azure SP OAuth reprovision budget too small — deadline + cap allow ~2–3 cycles but worst case needs 5–6
 
 **Date:** 2026-06-12
 **Branch (lib-acg):** `feat/v0.1.7`
@@ -9,21 +9,40 @@
 
 ## Problem
 
-Azure Service-Principal credentials (clientId, clientSecret, subscription, tenant) populate
-into the Pluralsight sandbox panel **gradually** — some fields land early, the SP secret
-lands last. `_waitForCredentials` has an Azure-only recovery path that deletes the sandbox
-and restarts it if credentials are only **partially** populated for more than **60s**
-(`sandbox.js` lines 217–247).
+Pluralsight's Azure Service-Principal sometimes provisions **without a usable secret** — the
+clientId/subscription/tenant fields fill but the SP secret never lands. The only recovery is
+to **delete the sandbox and reprovision**, and under certain conditions this must repeat
+**5–6 times** before a good SP is issued. (Confirmed by operator: a clean run often succeeds
+on the first try, but the bad case genuinely needs 5–6 reprovision cycles.)
 
-**Suspected root cause:** the 60s threshold is a guess, not measured. If the SP secret
-normally lands at, say, 70–110s, the code deletes the sandbox *right before it would have
-succeeded*, then pays the full deletion (up to 180s) + fresh-provision cost — up to 3 times.
-This turns a slow-but-working flow into a multi-cycle failure and is the likely reason the
-Azure path has churned across three releases.
+`_waitForCredentials` already implements the delete+reprovision recovery (Azure-only,
+`sandbox.js` lines 217–247), but its budget is too small to ever reach 5–6 cycles:
 
-We cannot fix the threshold correctly without **real per-field population timing data**.
-This spec covers (1) a diagnostic probe to capture that data, then (2) the threshold fix
-informed by it.
+| Constant | Value | Effect |
+|----------|-------|--------|
+| `deadline` | `420000` (420s) | total wall-clock for the whole wait loop |
+| delete trigger | `60000` (60s) | wait on partial creds before deleting |
+| delete→restart wait | `180000` (180s) | `_findScopedButton('Start Sandbox', …, 180000)` after delete |
+| cap | `deleteCycleCount < 3` | max delete cycles |
+
+**Root cause (arithmetic):** one cycle costs ~60s (partial wait) + ~180s (delete+reprovision)
+≈ **240s**. A single 420s deadline fits only **~1.5 cycles** before `while (Date.now() <
+deadline)` exits — so `deleteCycleCount < 3` is almost never even reached; the **deadline is
+the real limiter**. The outer `acg-credential-test` restarts once (one more 420s window), so
+end-to-end the flow attempts only **~2–3 reprovisions**. When the bad case needs 5–6, failure
+is mathematically guaranteed — no path through the current code can reach 6 cycles. This is
+why the Azure flow has churned across three releases: the previous fixes tuned mechanics
+around a budget that can't span the worst case.
+
+**Secondary suspicion (still worth measuring):** the 60s partial-creds trigger may also be
+too aggressive on the *good* runs — if the SP secret normally lands at 70–110s, the code
+deletes a sandbox that was about to succeed, manufacturing the multi-cycle path. The probe
+below captures both: per-field population timing AND per-cycle counts.
+
+We cannot size the deadline/cap correctly without **real data on (a) how long the SP secret
+takes when it does land, and (b) how many reprovision cycles the bad case actually needs.**
+A single clean run is insufficient — it only samples the happy path. We need per-cycle
+instrumentation across repeated real runs.
 
 ---
 
@@ -44,52 +63,76 @@ ERROR: Credential extraction still failing after restart.
 
 ---
 
-## Part 1 — Diagnostic probe (gather data first)
+## Part 1 — Instrumentation (gather data across cycles, not one clean run)
 
-### New file — `playwright/diag/azure-field-timing.js`
+A single clean observation is **not enough** — it samples whichever outcome happened that
+run, usually the happy path. We must capture the **bad case** (5–6 reprovisions) and count
+cycles. Two complementary instruments:
 
-A standalone, read-only probe. It connects to the existing Chrome over CDP (does **not**
-launch its own browser, does **not** delete or restart anything), finds the Pluralsight tab,
-and polls the Azure-scoped copyable inputs once per second. It records, relative to a `t0`
-captured at first poll:
+### 1a — Read-only CDP probe — `playwright/diag/azure-field-timing.js` (NEW)
 
-- the elapsed time at which **each** Azure field first becomes non-empty (by detected label:
-  clientId / clientSecret / subscription / tenant / username / password)
-- the elapsed time at which **all** four SP fields are simultaneously non-empty
-- a final summary table
+Standalone, read-only. Connects to existing Chrome over CDP (does **not** launch a browser,
+does **not** delete/restart/navigate), finds the Pluralsight tab, polls Azure-scoped copyable
+inputs once per second. Records, relative to a `t0` at first poll:
 
-It logs only field **labels and value lengths** — never the secret values themselves
-(secret hygiene; same posture as the production extractor).
+- elapsed time each Azure field first becomes non-empty (clientId / clientSecret /
+  subscription / tenant / username / password)
+- elapsed time all four SP fields are simultaneously non-empty
+- transitions back to empty (a reprovision wiped the panel) — so the probe also **counts
+  reprovision cycles it witnesses** and the secret-population time within each cycle
+- final summary table
+
+Logs only field **labels and value lengths** — never secret values (secret hygiene).
 
 **Connection + scan mirror the production extractor exactly:**
 - CDP URL: `http://127.0.0.1:9222` (honor `PLAYWRIGHT_CDP_HOST` / `PLAYWRIGHT_CDP_PORT`)
 - Page selection: first context page whose hostname ends with `.pluralsight.com`
 - Field selector: `input[aria-label="Copyable input"]`
 - Azure scoping + label detection: copy `_scanAzurePage`'s walk-up logic from
-  `playwright/providers/azure.js` (12-ancestor scope check excluding AWS/GCP; 6-then-20
-  ancestor label detection)
+  `playwright/providers/azure.js` (12-ancestor scope excluding AWS/GCP; 6-then-20 label walk)
+- Run budget: default 1800s, 1s poll, `--deadline <sec>`; exit 0 when all four SP land
 
-**Run budget:** default 600s deadline, 1s poll, configurable via `--deadline <sec>`.
-Exit 0 and print the summary when all four SP fields land; exit non-zero on deadline.
+### 1b — Per-cycle logging in the production delete-cycle — `playwright/lib/sandbox.js`
 
-### Run procedure
+Add structured per-cycle log lines (no behavior change yet) so **every real run** records
+how many cycles it needed and the timing of each. At the existing delete-cycle (line ~226)
+and on success (the `vals.every(...) return` at line 215), emit:
 
-1. Ensure Chrome CDP is up on 9222 with an active Pluralsight session.
-2. Start a **fresh** Azure sandbox (the running sandbox, if any, must be deleted first so we
-   measure provisioning from t0). Either click Start in the browser, or let the operator
-   trigger it — the probe only observes.
-3. In a second terminal: `node playwright/diag/azure-field-timing.js`
-4. Capture the full summary table. Repeat 3–5 times to get a distribution.
+```
+AZURE-TIMING cycle=<n> partialAt=<ms> deletedAt=<ms> reason=secret-empty
+AZURE-TIMING success cycle=<n> allFourAt=<ms>
+```
+
+This turns ordinary usage into a data collector — over a handful of real
+`make credential-test PROVIDER=azure` runs we get the true cycle-count distribution.
+
+### Run procedure (capture the BAD case, not just one run)
+
+1. Chrome CDP up on 9222, active Pluralsight session.
+2. Run `make credential-test PROVIDER=azure` **repeatedly** (≥5–8 runs), optionally with the
+   1a probe attached in a second terminal. Keep going until at least one run exhibits the
+   5–6-cycle bad case.
+3. Collect from each run: cycles needed, per-cycle duration, secret-population time.
+4. Record the distribution in the "Measured Data" section below before touching Part 2.
+
+### Measured Data (fill in — required before Part 2)
+
+| Run | Outcome | Cycles needed | Secret landed at (in final cycle) | Total wall-clock |
+|-----|---------|---------------|-----------------------------------|------------------|
+| 1   |         |               |                                   |                  |
+| 2   |         |               |                                   |                  |
+| …   |         |               |                                   |                  |
+
+**Observed worst-case cycles:** ___  **p95 secret-population time:** ___
 
 ---
 
-## Part 2 — Threshold fix (informed by Part 1 data)
+## Part 2 — Resize the reprovision budget (informed by Part 1 data)
 
-**Do NOT change the threshold until Part 1 data is captured.** Once we have the observed
-distribution of "time until all four SP fields populate", set the threshold to
-**observed p95 + 30s margin** (and document the sample in this file).
+**Do NOT change any constant until the Measured Data table is filled.** The fix is to make
+the budget span the observed worst case. Three constants move together; size them from data:
 
-### Change (placeholder — exact value TBD from data) — `sandbox.js` line 220
+### Change A — raise the cycle cap — `sandbox.js` line ~221
 
 **Exact old block:**
 
@@ -102,20 +145,41 @@ distribution of "time until all four SP fields populate", set the threshold to
       ) {
 ```
 
-**Exact new block (value `<TBD_MS>` filled from measurement):**
+**Exact new block (`<MAX_CYCLES>` = observed worst-case + 2 margin; `<TRIGGER_MS>` from 1a
+secret-population p95 + margin, or keep `60000` if data shows the secret never lands without
+a reprovision):**
 
 ```js
       if (
         providerLabel === 'Azure' &&
         partialCredsFirstSeen > 0 &&
-        Date.now() - partialCredsFirstSeen > <TBD_MS> &&
-        deleteCycleCount < 3
+        Date.now() - partialCredsFirstSeen > <TRIGGER_MS> &&
+        deleteCycleCount < <MAX_CYCLES>
       ) {
 ```
 
-Open question for the data to settle: if SP population is reliably slow-but-eventual, the
-delete-cycle may be the wrong mechanism entirely — a longer plain wait may beat
-delete+reprovision. Record the recommendation in this file after measuring.
+### Change B — raise the wait-loop deadline so the cap is reachable — `sandbox.js` line ~203
+
+The deadline must exceed `<MAX_CYCLES> × (TRIGGER + 180s reprovision)`. With the current 420s
+it caps out at ~1.5 cycles regardless of `<MAX_CYCLES>`.
+
+**Exact old block:**
+
+```js
+  const deadline = Date.now() + 420000;
+```
+
+**Exact new block (`<DEADLINE_MS>` = `<MAX_CYCLES>` × ~240000 + margin):**
+
+```js
+  const deadline = Date.now() + <DEADLINE_MS>;
+```
+
+### Change C (consider) — outer restart count — `bin/acg-credential-test`
+
+The outer `_do_restart` fires once. If Part 1 shows the inner loop now spans the worst case on
+its own, leave it. If not, document here whether the outer restart needs a counter. **Decide
+from data; do not change blindly.**
 
 ---
 
@@ -123,46 +187,64 @@ delete+reprovision. Record the recommendation in this file after measuring.
 
 | File | Change |
 |------|--------|
-| `playwright/diag/azure-field-timing.js` | NEW — read-only CDP probe; logs per-field population timestamps |
-| `playwright/lib/sandbox.js` | Part 2 only, after data — tune the `60000` Azure partial-creds threshold |
+| `playwright/diag/azure-field-timing.js` | NEW — read-only CDP probe; per-field + per-cycle timing |
+| `playwright/lib/sandbox.js` | Part 1b: per-cycle `AZURE-TIMING` logs. Part 2: raise cap (`<3`→`<MAX_CYCLES>`) + deadline (`420000`→`<DEADLINE_MS>`), retune trigger |
+| `bin/acg-credential-test` | Part 2 Change C only, if data shows it is needed |
 
 ---
 
 ## Rules
 
 - `node --check playwright/diag/azure-field-timing.js` — must pass
-- `node --check playwright/lib/sandbox.js` — must pass (if Part 2 applied)
-- Probe is **read-only**: no `click`, no delete, no restart, no navigation
-- Probe must never log credential values — labels and lengths only
-- Part 2 must not be committed until measured data is recorded in this file
+- `node --check playwright/lib/sandbox.js` — must pass (Part 1b and Part 2)
+- `shellcheck -S warning bin/acg-credential-test` — must pass (only if Change C applied)
+- Probe (1a) is **read-only**: no `click`, no delete, no restart, no navigation
+- No credential values in any output — labels and lengths only (probe and `AZURE-TIMING` logs)
+- Part 1b logging must NOT change delete-cycle behavior — log lines only
+- Part 2 must not be committed until the "Measured Data" table is filled in this file
 
 ---
 
 ## Definition of Done
 
-### Part 1 (probe)
+### Part 1a (probe — separate commit)
 - [ ] `playwright/diag/azure-field-timing.js` created; mirrors production CDP connect + Azure scan
 - [ ] Read-only — no mutation of page/sandbox state
-- [ ] Logs per-field first-populated elapsed times + all-four-populated elapsed time
+- [ ] Logs per-field first-populated elapsed times, all-four-populated time, and witnessed
+  reprovision-cycle count (panel-empty transitions)
 - [ ] No secret values in output
-- [ ] `node --check` passes
-- [ ] Committed and pushed to `feat/v0.1.7`
+- [ ] `node --check` passes; committed and pushed to `feat/v0.1.7`
 
-### Part 2 (fix — separate commit, after data)
-- [ ] Measurement sample (≥3 runs) recorded in this file
-- [ ] Threshold set to observed p95 + 30s (or alternative mechanism justified here)
-- [ ] `node --check playwright/lib/sandbox.js` passes
-- [ ] Committed and pushed to `feat/v0.1.7`
-- [ ] memory-bank in k3d-manager updated with both commit SHAs and task status
+### Part 1b (per-cycle logging — same or separate commit)
+- [ ] `AZURE-TIMING` per-cycle + success log lines added in `_waitForCredentials`
+- [ ] No behavior change — verified by reading the diff (only `console.error` additions)
+- [ ] `node --check playwright/lib/sandbox.js` passes; committed and pushed
 
-**Commit message (Part 1, exact):**
+### Data gate
+- [ ] ≥5 real runs collected; at least one run reproduced the 5–6-cycle bad case
+- [ ] "Measured Data" table filled; worst-case cycles + p95 secret time recorded
+
+### Part 2 (fix — separate commit, after data gate)
+- [ ] Change A: cap `deleteCycleCount < <MAX_CYCLES>` (worst-case + 2)
+- [ ] Change B: `deadline` raised to span `<MAX_CYCLES>` cycles
+- [ ] Change C: outer restart decision documented (changed only if data requires it)
+- [ ] `node --check playwright/lib/sandbox.js` passes (+ shellcheck if Change C)
+- [ ] Committed and pushed to `feat/v0.1.7`
+- [ ] memory-bank in k3d-manager updated with all commit SHAs and task status
+
+**Commit message (Part 1a, exact):**
 ```
 feat(diag): add read-only Azure SP credential field-population timing probe
 ```
 
+**Commit message (Part 1b, exact):**
+```
+chore(sandbox): add AZURE-TIMING per-cycle logging to _waitForCredentials
+```
+
 **Commit message (Part 2, exact — after data):**
 ```
-fix(sandbox): retune Azure partial-credential threshold from measured SP population timing
+fix(sandbox): resize Azure reprovision budget (cap + deadline) to span measured worst case
 ```
 
 ---
@@ -171,7 +253,8 @@ fix(sandbox): retune Azure partial-credential threshold from measured SP populat
 
 - Do NOT create a PR
 - Do NOT skip pre-commit hooks (`--no-verify`)
-- Do NOT modify any file other than the two listed targets
+- Do NOT modify any file other than the listed targets
 - Do NOT commit to `main` — work on `feat/v0.1.7` in lib-acg
-- Do NOT change the threshold before the measurement data is captured and recorded here
-- Do NOT make the probe mutate sandbox state — it must be read-only
+- Do NOT change cap/deadline/trigger before the Measured Data table is filled
+- Do NOT make the probe (1a) mutate sandbox state — it must be read-only
+- Do NOT let Part 1b logging alter delete-cycle timing or control flow
