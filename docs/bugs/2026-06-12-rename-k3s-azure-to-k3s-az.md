@@ -22,6 +22,17 @@ point-in-time records — leave them untouched.
 
 ---
 
+## Before You Start
+
+- Repo: `k3d-manager` (single repo — all work here; NOT the `scripts/lib/acg/` subtree)
+- Branch: `k3d-manager-v1.6.5`
+- Run: `git pull origin k3d-manager-v1.6.5`
+- Read: `memory-bank/activeContext.md` (the "Rename CLUSTER_PROVIDER" task entry)
+- Read in full before editing: `scripts/lib/core.sh` (lines 19, 782), `scripts/lib/providers/k3s-azure.sh`, `bin/acg-up`, `bin/acg-down`, `bin/k3dm-webhook` (lines 284, 398, 643, 665, 687)
+- Confirm: `git grep -c 'k3s-azure' -- scripts/lib/core.sh scripts/lib/providers bin/` matches the occurrence counts in Change Set A before you start replacing
+
+---
+
 ## Change Set A — rename CLI value `k3s-azure` → `k3s-az`
 
 In each file below, replace **every literal occurrence of `k3s-azure` with `k3s-az`**. These
