@@ -82,14 +82,20 @@ function deploy_shopping_cart_data() {
     return 1
   fi
 
-  _info "[shopping_cart] Data layer managed by ArgoCD — verifying StatefulSet presence..."
+  _info "[shopping_cart] Data layer managed by ArgoCD — waiting for StatefulSets to appear (max 300s)..."
 
+  local _sts_deadline
+  _sts_deadline=$(( $(date +%s) + 300 ))
   for pg in postgresql-orders postgresql-payment postgresql-products; do
-    if ! kubectl get statefulset/"${pg}" \
-        -n shopping-cart-data --context ubuntu-k3s >/dev/null 2>&1; then
-      _err "[shopping_cart] StatefulSet ${pg} not found in shopping-cart-data after ArgoCD sync — check: kubectl get application data-layer -n cicd --context k3d-k3d-cluster"
-      return 1
-    fi
+    until kubectl get statefulset/"${pg}" \
+        -n shopping-cart-data --context ubuntu-k3s >/dev/null 2>&1; do
+      if [[ $(date +%s) -ge ${_sts_deadline} ]]; then
+        _err "[shopping_cart] StatefulSet ${pg} not created in shopping-cart-data within 300s of ArgoCD sync — check: kubectl get application data-layer -n cicd --context k3d-k3d-cluster"
+        return 1
+      fi
+      _info "[shopping_cart] ${pg} not yet created by ArgoCD — waiting..."
+      sleep 10
+    done
   done
 
   _info "[shopping_cart] Waiting for PostgreSQL instances to be Ready..."
