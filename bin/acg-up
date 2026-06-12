@@ -183,8 +183,11 @@ case "${_cluster_provider}" in
     gcp_get_credentials ${sandbox_url:+"$sandbox_url"}
     ;;
   k3s-azure)
-    _az_existing_rg=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
-    if _az_ok 2>/dev/null && [[ -n "${_az_existing_rg}" ]]; then
+    _az_existing_rg=""
+    if _az_ok 2>/dev/null; then
+      _az_existing_rg=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
+    fi
+    if [[ -n "${_az_existing_rg}" ]]; then
       _info "[acg-up] Azure credentials already valid — skipping Playwright extraction"
       AZ_RESOURCE_GROUP="${_az_existing_rg}"
       export AZ_RESOURCE_GROUP
