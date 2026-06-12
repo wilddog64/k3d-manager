@@ -1,5 +1,13 @@
 # Rename CLUSTER_PROVIDER `k3s-azure` → `k3s-az` (hard rename) + slack param `azure` → `az`
 
+> **⚠️ SUPERSEDED (2026-06-12).** This spec told Codex to edit the **subtree** `scripts/lib/core.sh`
+> directly (Change Set A1) — a lib-foundation subtree-discipline violation. The resulting commit
+> `976a9617` was backed out. The rename is now done correctly via two specs:
+> - `2026-06-12-cluster-provider-extensibility-libfoundation.md` (lib-foundation hook)
+> - `2026-06-12-cluster-provider-local-registration-and-rename.md` (k3d-manager local registration + rename, no core.sh edit)
+>
+> Do NOT implement this file. Kept as a record.
+
 **Date:** 2026-06-12
 **Branch (k3d-manager):** `k3d-manager-v1.6.5`
 **Files:** `scripts/lib/core.sh`, `scripts/lib/providers/k3s-azure.sh` (→ `k3s-az.sh`), `bin/acg-up`, `bin/acg-down`, `bin/k3dm-webhook`
