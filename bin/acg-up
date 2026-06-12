@@ -199,6 +199,53 @@ if [[ "${_cluster_provider}" != "k3s-gcp" && "${_cluster_provider}" != "k3s-azur
   tunnel_start
 fi
 
+if ! docker info >/dev/null 2>&1; then
+  _info "[acg-up] Docker daemon not responding — dismissing any OrbStack update dialogs..."
+  osascript 2>/dev/null <<'APPLESCRIPT' || true
+tell application "System Events"
+  if exists process "OrbStack" then
+    tell process "OrbStack"
+      repeat with w in windows
+        if exists button "Remind Me Later" of w then
+          click button "Remind Me Later" of w
+        end if
+        if exists button "Cancel Update" of w then
+          click button "Cancel Update" of w
+        end if
+      end repeat
+    end tell
+  end if
+end tell
+APPLESCRIPT
+  _docker_wait=0
+  until docker info >/dev/null 2>&1 || [[ "${_docker_wait}" -ge 30 ]]; do
+    sleep 2
+    ((_docker_wait++)) || true
+  done
+  if ! docker info >/dev/null 2>&1; then
+    _docker_app=""
+    if [[ -d "/Applications/OrbStack.app" ]]; then
+      _docker_app="OrbStack"
+    elif [[ -d "/Applications/Docker.app" ]]; then
+      _docker_app="Docker"
+    fi
+    if [[ -n "${_docker_app}" ]]; then
+      _info "[acg-up] Docker still unavailable — launching ${_docker_app}..."
+      open -a "${_docker_app}"
+      _docker_wait=0
+      until docker info >/dev/null 2>&1 || [[ "${_docker_wait}" -ge 30 ]]; do
+        sleep 2
+        ((_docker_wait++)) || true
+      done
+    fi
+  fi
+  if ! docker info >/dev/null 2>&1; then
+    _err "[acg-up] Docker daemon unavailable after recovery — check OrbStack/Docker Desktop status and dismiss any update dialogs, then re-run"
+    exit 1
+  fi
+  _info "[acg-up] Docker daemon is up."
+fi
+
 _HUB_CLUSTER_CTX="k3d-${HUB_CLUSTER_NAME:-k3d-cluster}"
 _hub_newly_created=0
 _info "[acg-up] Step 3.5/12 — Verifying local Hub cluster (create if missing)..."
