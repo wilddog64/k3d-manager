@@ -5,6 +5,10 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `playwright/lib/sandbox.js`: replace `reopenAttempted` boolean with `reopenCount` counter — allow 3 reopen attempts with 8s wait per attempt; single 3s attempt was too tight for Azure panel render after click
+- `playwright/lib/sandbox.js`: delete+restart Azure sandbox when credential fields are partially populated (at least one field has a value but not all are filled) after 60s — up to 3 delete+restart cycles; timer starts only once the panel has loaded enough to show some credentials, preventing premature deletion during initial field loading
+
 ## [0.1.5] - 2026-06-11
 
 ### Fixed
