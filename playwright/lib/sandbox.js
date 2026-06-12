@@ -255,6 +255,8 @@ async function _waitForCredentials(page, providerLabel) {
         const btn = allStart.nth(i);
         const visible = await btn.isVisible({ timeout: 300 }).catch(() => false);
         if (!visible) continue;
+        const disabled = await btn.isDisabled({ timeout: 300 }).catch(() => false);
+        if (disabled) continue;
         const inTargetPanel = await btn.evaluate((el, pLabel) => {
           const others = ['AWS', 'Google Cloud', 'GCP', 'Azure'].filter(
             p => !new RegExp(p, 'i').test(pLabel)
@@ -277,6 +279,8 @@ async function _waitForCredentials(page, providerLabel) {
         await page.waitForTimeout(5000);
         continue;
       }
+      await page.waitForTimeout(2000);
+      continue;
     }
     const reopenBtn = await _findScopedButton(page, 'Open Sandbox', providerLabel, 0);
     if (reopenBtn) {
@@ -363,6 +367,16 @@ async function _deleteConflictingSandbox(page, targetProvider) {
   const targetLabel = _providerLabels[targetProvider] || targetProvider;
 
   const conflictingLabel = await page.evaluate((tLabel) => {
+    // Primary: conflict banner is always visible when another sandbox is running,
+    // regardless of whether that provider's panel is open.
+    const bodyText = document.body ? (document.body.innerText || '') : '';
+    const bannerMatch = bodyText.match(/shut down your current ([A-Za-z ]+?) sandbox/i);
+    if (bannerMatch) {
+      const label = bannerMatch[1].trim();
+      if (!tLabel.toLowerCase().includes(label.toLowerCase())) return label;
+    }
+
+    // Fallback: Auto Shutdown text — only present when the provider panel is open.
     const candidates = [
       { label: 'AWS', keywords: ['AWS'] },
       { label: 'Google Cloud', keywords: ['Google Cloud', 'GCP'] },
@@ -389,6 +403,7 @@ async function _deleteConflictingSandbox(page, targetProvider) {
   if (!conflictingLabel) return;
 
   console.error(`INFO: Running ${conflictingLabel} sandbox detected — deleting before starting ${targetLabel}...`);
+  await _closeOpenPanel(page, targetLabel);
 
   let deleteBtn = await _findScopedButton(page, 'Delete Sandbox', conflictingLabel, 2000);
   if (!deleteBtn) {
@@ -504,7 +519,21 @@ async function startSandbox(page, targetUrl, provider) {
       await startButton.scrollIntoViewIfNeeded().catch(() => {});
       await startButton.click({ force: true });
     } else {
-      console.error('INFO: Start Sandbox button is disabled — sandbox already running; waiting for credentials...');
+      const conflictBanner = await page.evaluate(() => {
+        const t = document.body ? (document.body.innerText || '') : '';
+        return t.includes('You may have only one active sandbox at a time');
+      }).catch(() => false);
+      if (conflictBanner) {
+        console.error('INFO: Start Sandbox disabled due to active conflict — deleting conflicting sandbox...');
+        await _deleteConflictingSandbox(page, provider);
+        const retryStart = await _findScopedButton(page, 'Start Sandbox', providerLabel, 10000);
+        if (retryStart && await retryStart.isEnabled({ timeout: 1000 }).catch(() => false)) {
+          await retryStart.scrollIntoViewIfNeeded().catch(() => {});
+          await retryStart.click({ force: true });
+        }
+      } else {
+        console.error('INFO: Start Sandbox button is disabled — sandbox already running; waiting for credentials...');
+      }
     }
     await _waitForCredentials(page, providerLabel);
   } else if (openButton) {
