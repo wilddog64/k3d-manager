@@ -205,6 +205,7 @@ if ! docker info >/dev/null 2>&1; then
     _orb_status=$(orbctl status 2>/dev/null || true)
     if [[ "${_orb_status}" == "Stopped" ]]; then
       _info "[acg-up] OrbStack VM is stopped — starting it now..."
+      _info "[acg-up] OrbStack may show a GUI dialog asking for admin password — approve it to start the VM..."
       orbctl start 2>/dev/null || true
     fi
   elif [[ -d "/Applications/OrbStack.app" ]]; then
@@ -276,6 +277,12 @@ mkdir -p "$(dirname "${_vault_pf_pid_file}")"
 if [[ -f "${_vault_pf_pid_file}" ]]; then
   kill "$(cat "${_vault_pf_pid_file}")" 2>/dev/null || true
   rm -f "${_vault_pf_pid_file}"
+fi
+_stale_vault_pf=$(lsof -ti:"${_vault_local_port}" 2>/dev/null || true)
+if [[ -n "${_stale_vault_pf}" ]]; then
+  _info "[acg-up] Port ${_vault_local_port} in use — killing stale vault port-forward holders..."
+  echo "${_stale_vault_pf}" | xargs kill 2>/dev/null || true
+  sleep 1
 fi
 kubectl port-forward svc/vault -n secrets --context k3d-k3d-cluster "${_vault_local_port}:8200" \
   >>"${_ACG_STATE_DIR}/logs/vault-pf.log" 2>&1 &
