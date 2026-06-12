@@ -201,7 +201,9 @@ async function _capturePageDebugState(page, label, reason) {
 async function _waitForCredentials(page, providerLabel) {
   console.error(`INFO: Waiting for ${providerLabel} credentials to populate (up to 420s)...`);
   const deadline = Date.now() + 420000;
-  let reopenAttempted = false;
+  let reopenCount = 0;
+  let partialCredsFirstSeen = 0;
+  let deleteCycleCount = 0;
   while (Date.now() < deadline) {
     await _dismissExtendYourSessionDialog(page);
     const inputs = page.locator('input[aria-label="Copyable input"]');
@@ -211,6 +213,38 @@ async function _waitForCredentials(page, providerLabel) {
         Array.from({ length: inputCount }, (_, i) => inputs.nth(i).inputValue().catch(() => ''))
       );
       if (vals.every(v => v.trim().length > 0)) return;
+      if (partialCredsFirstSeen === 0 && vals.some(v => v.trim().length > 0)) partialCredsFirstSeen = Date.now();
+      if (
+        providerLabel === 'Azure' &&
+        partialCredsFirstSeen > 0 &&
+        Date.now() - partialCredsFirstSeen > 60000 &&
+        deleteCycleCount < 3
+      ) {
+        const deleteBtn = await _findScopedButton(page, 'Delete Sandbox', providerLabel, 5000);
+        if (deleteBtn) {
+          deleteCycleCount++;
+          console.error(`INFO: Azure SP credentials not populated after 60s — deleting sandbox and starting fresh (cycle ${deleteCycleCount}/3)...`);
+          await deleteBtn.click({ force: true }).catch(() => {});
+          const confirmBtn = page.locator('[role="alertdialog"] button', { hasText: /delete sandbox/i }).first();
+          if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await confirmBtn.click({ force: true }).catch(() => {});
+          }
+          console.error(`INFO: Waiting for Azure sandbox deletion (up to 180s)...`);
+          const startAfterDelete = await _findScopedButton(page, 'Start Sandbox', providerLabel, 180000);
+          if (startAfterDelete) {
+            console.error('INFO: Azure sandbox deleted — clicking Start Sandbox...');
+            await startAfterDelete.click({ force: true }).catch(() => {});
+          } else {
+            console.error('WARN: Start Sandbox not found after deletion — continuing to wait...');
+          }
+        } else {
+          console.error('WARN: Delete Sandbox button not found — cannot restart sandbox automatically');
+        }
+        partialCredsFirstSeen = 0;
+        reopenCount = 0;
+        await page.waitForTimeout(5000);
+        continue;
+      }
       // Panel open but credentials not yet populated — check for provider-scoped Start Sandbox.
       // Walk up to 20 ancestors with provider-exclusion: stops when a node contains providerLabel
       // but not any other provider keyword, to avoid matching shared card-grid ancestors.
@@ -255,14 +289,14 @@ async function _waitForCredentials(page, providerLabel) {
         await page.waitForTimeout(5000);
         continue;
       }
-      if (reopenAttempted) {
-        await _capturePageDebugState(page, providerLabel, `${providerLabel} panel stayed closed after reopen attempt — aborting instead of looping for 420s.`);
-        throw new Error(`${providerLabel} panel stayed closed after reopen attempt — aborting instead of looping for 420s.`);
+      if (reopenCount >= 3) {
+        await _capturePageDebugState(page, providerLabel, `${providerLabel} panel stayed closed after ${reopenCount} reopen attempts — aborting.`);
+        throw new Error(`${providerLabel} panel stayed closed after ${reopenCount} reopen attempts — aborting.`);
       }
-      console.error(`INFO: ${providerLabel} panel closed — re-opening to retrieve credentials...`);
+      reopenCount++;
+      console.error(`INFO: ${providerLabel} panel closed — re-opening to retrieve credentials (attempt ${reopenCount})...`);
       await reopenBtn.click({ force: true }).catch(() => {});
-      await page.waitForTimeout(3000);
-      reopenAttempted = true;
+      await page.waitForTimeout(8000);
       continue;
     }
     await page.waitForTimeout(2000);
