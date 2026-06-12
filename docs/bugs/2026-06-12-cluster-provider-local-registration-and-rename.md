@@ -3,9 +3,14 @@
 **Date:** 2026-06-12
 **Repo (work):** `k3d-manager`
 **Branch:** `k3d-manager-v1.6.5`
-**Status:** **GATED** — blocked on the lib-foundation hook (companion spec
-`docs/bugs/2026-06-12-cluster-provider-extensibility-libfoundation.md`) being merged + the
-subtree pulled into k3d-manager. See "Prerequisites" — do NOT start until Claude confirms them.
+**Status:** **WITHDRAWN (2026-06-12).** Built on a false premise — that `scripts/lib/core.sh` is
+the lib-foundation subtree. It is not: the subtree lives at `scripts/lib/foundation/`, and the
+local `scripts/lib/core.sh` (sourced last by `scripts/k3d-manager`) shadows the foundation
+`_cluster_provider` at runtime. So registering `_cluster_provider_is_extra_supported` would never
+be consulted, and the prerequisite gate (`git grep 'k3s-aws…' -- scripts/lib/core.sh` → empty)
+can never be met by a subtree pull. The rename is done instead via the local-edit spec
+`docs/bugs/2026-06-12-rename-k3s-azure-to-k3s-az.md` (REINSTATED). The lib-foundation hook shipped
+separately as PR #30 (library improvement only). **Do NOT implement this file.**
 
 ---
 

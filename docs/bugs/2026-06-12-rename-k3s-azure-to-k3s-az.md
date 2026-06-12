@@ -1,12 +1,19 @@
 # Rename CLUSTER_PROVIDER `k3s-azure` → `k3s-az` (hard rename) + slack param `azure` → `az`
 
-> **⚠️ SUPERSEDED (2026-06-12).** This spec told Codex to edit the **subtree** `scripts/lib/core.sh`
-> directly (Change Set A1) — a lib-foundation subtree-discipline violation. The resulting commit
-> `976a9617` was backed out. The rename is now done correctly via two specs:
-> - `2026-06-12-cluster-provider-extensibility-libfoundation.md` (lib-foundation hook)
-> - `2026-06-12-cluster-provider-local-registration-and-rename.md` (k3d-manager local registration + rename, no core.sh edit)
+> **✅ REINSTATED (2026-06-12).** The earlier "subtree-discipline violation" was a misdiagnosis.
+> `scripts/lib/core.sh` is **not** the lib-foundation subtree — the subtree lives at
+> `scripts/lib/foundation/` (lib-foundation's `scripts/lib/core.sh` maps to
+> `scripts/lib/foundation/scripts/lib/core.sh`). The dispatcher `scripts/k3d-manager` sources the
+> foundation copy first, then sources this **local** `scripts/lib/core.sh` last — so the local
+> `_cluster_provider` (with the cloud-provider allowlist) is what actually runs. Editing
+> `scripts/lib/core.sh` directly is correct; it is the intended place for the allowlist. Commit
+> `976a9617` was backed out on a false premise. **This spec is the right approach — implement it.**
 >
-> Do NOT implement this file. Kept as a record.
+> The two replacement specs are withdrawn:
+> - `2026-06-12-cluster-provider-extensibility-libfoundation.md` — shipped anyway as lib-foundation
+>   PR #30 (a fine library improvement, but the foundation hook is shadowed by the local
+>   `_cluster_provider`, so it is NOT wired into k3d-manager's runtime).
+> - `2026-06-12-cluster-provider-local-registration-and-rename.md` — WITHDRAWN (premise wrong).
 
 **Date:** 2026-06-12
 **Branch (k3d-manager):** `k3d-manager-v1.6.5`
@@ -77,8 +84,9 @@ log prefixes, and the two `CLUSTER_PROVIDER=k3s-azure` usage strings.
 
 ## Change Set B — rename slack arg `azure` → `az`
 
-Scoped to **exactly these 5 lines** in `bin/k3dm-webhook`. Do NOT blanket-replace `azure`
-elsewhere — other `azure` text comes from the `provider` variable in f-strings and must stay.
+Scoped to **exactly these 7 lines** in `bin/k3dm-webhook` (2 map + 5 validation tuples). Do NOT
+blanket-replace `azure` elsewhere — other `azure` text comes from the `provider` variable in
+f-strings and must stay.
 
 ### B1 — provider map (lines 284 and 398, identical)
 **Old:**
@@ -90,14 +98,22 @@ elsewhere — other `azure` text comes from the `provider` variable in f-strings
     _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az"}
 ```
 
-### B2 — slack arg validation tuples (lines 643, 665, 687)
-On each of the three lines, change the membership tuple `("aws", "gcp", "azure")` to
-`("aws", "gcp", "az")`. The surrounding code differs per line (`_resume_parts`,
-`_down_parts`, `_up_parts`) — change only the tuple, leave the rest:
+### B2 — provider validation tuples (lines 643, 665, 687, 2473, 2526)
+On each of these **five** lines, change the membership tuple `("aws", "gcp", "azure")` to
+`("aws", "gcp", "az")`. Change only the tuple, leave the rest of each line intact:
+
+- **643 / 665 / 687** — slack arg parse (`_resume_parts`, `_down_parts`, `_up_parts`):
 ```python
 ... if len(_X_parts) >= 2 and _X_parts[1].lower() in ("aws", "gcp", "azure") else "aws"
                                                     → ("aws", "gcp", "az")
 ```
+- **2473 / 2526** — REST endpoint provider guards (`/api/v1/cluster`, `/api/v1/cluster-resume`):
+```python
+            if provider not in ("aws", "gcp", "azure"):   → ("aws", "gcp", "az")
+                provider = "aws"
+```
+These two were missed in the original draft; without them, `provider: "az"` to those REST
+endpoints would silently fall back to `aws`, and the `"azure"` residual check below would fail.
 
 ---
 
@@ -109,7 +125,7 @@ On each of the three lines, change the membership tuple `("aws", "gcp", "azure")
 | `scripts/lib/providers/k3s-azure.sh` → `k3s-az.sh` | `git mv` + literal `k3s-azure` → `k3s-az` throughout |
 | `bin/acg-up` | `k3s-azure` → `k3s-az` (6×, incl. `source` path) |
 | `bin/acg-down` | `k3s-azure` → `k3s-az` (3×, incl. `source` path) |
-| `bin/k3dm-webhook` | map value + slack arg key `azure` → `az` (5 lines) |
+| `bin/k3dm-webhook` | map value + provider arg `azure` → `az` (7 lines: 2 map + 5 tuples) |
 
 ---
 
@@ -128,7 +144,7 @@ On each of the three lines, change the membership tuple `("aws", "gcp", "azure")
 ## Definition of Done
 
 - [ ] Change Set A applied; provider file renamed via `git mv` (history preserved)
-- [ ] Change Set B applied (5 lines only)
+- [ ] Change Set B applied (7 lines only: 2 map + 5 tuples)
 - [ ] `shellcheck -S warning` passes on all 4 shell targets
 - [ ] `python3 -m py_compile bin/k3dm-webhook` passes
 - [ ] Both residual `git grep` checks return empty
@@ -152,5 +168,5 @@ refactor(provider): rename k3s-azure → k3s-az and slack arg azure → az
 - Do NOT skip pre-commit hooks (`--no-verify`)
 - Do NOT add an alias for `k3s-azure` / `azure` — this is a hard rename
 - Do NOT modify `plugins/azure.sh`, `ubuntu-azure` context, VM/SSH/key names, or any historical doc
-- Do NOT blanket-replace `azure` in `bin/k3dm-webhook` — only the 5 specified lines
+- Do NOT blanket-replace `azure` in `bin/k3dm-webhook` — only the 7 specified lines (284, 398, 643, 665, 687, 2473, 2526)
 - Do NOT commit to `main` — work on `k3d-manager-v1.6.5`
