@@ -75,9 +75,10 @@ function _hostinger_k3sup_install() {
 }
 
 function _hostinger_merge_kubeconfig() {
-  local tmp_kube tmp_merged
+  local tmp_kube tmp_merged prev_ctx
   tmp_kube="${HOME}/.kube/ubuntu-hostinger.tmp"
   tmp_merged="${HOME}/.kube/config.tmp"
+  prev_ctx="$(kubectl config current-context 2>/dev/null || true)"
   if kubectl config get-contexts "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null 2>&1; then
     kubectl config delete-context "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null 2>&1 || true
     _info "[k3s-hostinger] Removed stale ${_HOSTINGER_KUBE_CONTEXT} context"
@@ -88,7 +89,67 @@ function _hostinger_merge_kubeconfig() {
   mv "${tmp_merged}" "${HOME}/.kube/config"
   chmod 600 "${HOME}/.kube/config"
   rm -f "${tmp_kube}"
-  _info "[k3s-hostinger] ${_HOSTINGER_KUBE_CONTEXT} context merged into ~/.kube/config"
+  if [[ -n "${prev_ctx}" ]] && kubectl config get-contexts "${prev_ctx}" >/dev/null 2>&1; then
+    kubectl config use-context "${prev_ctx}" >/dev/null 2>&1 || true
+  fi
+  _info "[k3s-hostinger] ${_HOSTINGER_KUBE_CONTEXT} merged into ~/.kube/config (current-context preserved: ${prev_ctx:-none})"
+}
+
+function _hostinger_register_cluster() {
+  local argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
+  local secret_name="cluster-${_HOSTINGER_KUBE_CONTEXT}"
+  local server ca_data cert_data key_data
+  server="$(kubectl config view --raw -o jsonpath="{.clusters[?(@.name==\"${_HOSTINGER_KUBE_CONTEXT}\")].cluster.server}" 2>/dev/null)"
+  ca_data="$(kubectl config view --raw -o jsonpath="{.clusters[?(@.name==\"${_HOSTINGER_KUBE_CONTEXT}\")].cluster.certificate-authority-data}" 2>/dev/null)"
+  cert_data="$(kubectl config view --raw -o jsonpath="{.users[?(@.name==\"${_HOSTINGER_KUBE_CONTEXT}\")].user.client-certificate-data}" 2>/dev/null)"
+  key_data="$(kubectl config view --raw -o jsonpath="{.users[?(@.name==\"${_HOSTINGER_KUBE_CONTEXT}\")].user.client-key-data}" 2>/dev/null)"
+  if [[ -z "${server}" || -z "${ca_data}" || -z "${cert_data}" || -z "${key_data}" ]]; then
+    printf 'ERROR: %s\n' "[k3s-hostinger] could not read ${_HOSTINGER_KUBE_CONTEXT} credentials from ~/.kube/config" >&2
+    return 1
+  fi
+
+  _info "[k3s-hostinger] Registering '${_HOSTINGER_KUBE_CONTEXT}' (${server}) with hub ArgoCD ns ${argocd_ns}..."
+  local rendered rc=0
+  rendered="$(mktemp -t k3s-hostinger-cluster.XXXXXX.yaml)"
+  local wasx=0
+  case $- in *x*) wasx=1; set +x;; esac
+  cat > "${rendered}" <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ${secret_name}
+  namespace: ${argocd_ns}
+  labels:
+    argocd.argoproj.io/secret-type: cluster
+    argocd.argoproj.io/cluster-name: ${_HOSTINGER_KUBE_CONTEXT}
+type: Opaque
+stringData:
+  name: ${_HOSTINGER_KUBE_CONTEXT}
+  server: ${server}
+  config: |
+    {
+      "tlsClientConfig": {
+        "caData": "${ca_data}",
+        "certData": "${cert_data}",
+        "keyData": "${key_data}"
+      }
+    }
+EOF
+  _kubectl apply -f "${rendered}" || rc=$?
+  rm -f "${rendered}"
+  (( wasx )) && set -x
+  if (( rc != 0 )); then
+    printf 'ERROR: %s\n' "[k3s-hostinger] failed to apply cluster secret ${secret_name} to hub ArgoCD" >&2
+    return 1
+  fi
+  _info "[k3s-hostinger] Registered — verify: kubectl get secret ${secret_name} -n ${argocd_ns}"
+}
+
+function _hostinger_deregister_cluster() {
+  local argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
+  local secret_name="cluster-${_HOSTINGER_KUBE_CONTEXT}"
+  _kubectl delete secret "${secret_name}" -n "${argocd_ns}" --ignore-not-found=true >/dev/null 2>&1 || true
+  _info "[k3s-hostinger] Deregistered ${secret_name} from hub ArgoCD"
 }
 
 function _provider_k3s_hostinger_deploy_cluster() {
@@ -145,8 +206,12 @@ HELP
     KUBECONFIG="${_HOSTINGER_KUBECONFIG}" kubectl label node "${node_name}" \
       k3d-manager/node-type=server --overwrite >/dev/null 2>&1 || true
 
+  _info "[k3s-hostinger] Registering cluster with hub ArgoCD..."
+  _hostinger_register_cluster || return 1
+
   _info "[k3s-hostinger] Cluster ready."
   _info "[k3s-hostinger] Verify: kubectl --context ${_HOSTINGER_KUBE_CONTEXT} get nodes"
+  _info "[k3s-hostinger] ArgoCD:  kubectl get secret cluster-${_HOSTINGER_KUBE_CONTEXT} -n ${ARGOCD_NAMESPACE:-cicd}"
 }
 
 function _provider_k3s_hostinger_destroy_cluster() {
@@ -174,6 +239,8 @@ HELP
   _info "[k3s-hostinger] Uninstalling k3s on ${ssh_user}@${host}..."
   _run_command -- ssh -i "${ssh_key}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new "${ssh_user}@${host}" 'sudo /usr/local/bin/k3s-uninstall.sh' 2>/dev/null || \
     _info "[k3s-hostinger] k3s-uninstall.sh not present — skipping"
+
+  _hostinger_deregister_cluster || true
 
   if kubectl config get-contexts "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null 2>&1; then
     kubectl config delete-context "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null 2>&1 || true
