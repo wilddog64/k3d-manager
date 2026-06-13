@@ -295,11 +295,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-06-13 | [Copilot PR #94 Review Findings](docs/issues/2026-06-13-copilot-pr94-review-findings.md) | slack-relay provider alias case-fold fix (`eb0dfca2`); acg_restart case-sensitive exclusion deferred upstream to lib-acg |
 | 2026-06-10 | [Copilot PR #93 Review Findings](docs/issues/2026-06-10-copilot-pr93-review-findings.md) | CodeQL variable naming taint, Prometheus bootstrap hardcoding, docs inconsistency — 5 findings fixed in 6c814019 |
 | 2026-06-10 | [lib-acg Azure credential-test prefers portal over SP](docs/issues/2026-06-10-lib-acg-azure-credential-test-prefers-portal-over-sp.md) | Azure credential validation — credential-test runs portal login first even when SP creds are available; should prefer CLI/SP validation |
 | 2026-06-08 | [Prometheus Operator requires Vault secret](docs/issues/2026-06-08-prometheus-operator-requires-vault-secret.md) | Prometheus Operator chart deployment — requires Vault secret during CRD bootstrap even when unauthenticated Prometheus is desired |
 | 2026-06-08 | [Grafana routing loop & port conflict (local vs tunnel)](docs/issues/2026-06-08-grafana-routing-loop-etc-hosts-conflict.md) | Grafana DNS/port conflict — tunnel routes grafana→localhost:3000 vs /etc/hosts+port-forward conflicts; loopback DNS resolution needed |
-| 2026-06-07 | [acg-refresh drops ArgoCD cluster labels](docs/issues/2026-06-07-acg-refresh-drops-argocd-cluster-labels.md) | ACG cluster sync — `acg-refresh` loses ArgoCD server labels during secret refresh; re-sync resolves but inconsistent behavior |
 
 [All issues →](docs/issues/)
 
