@@ -146,9 +146,7 @@ HELP
   ssh_key="${_HOSTINGER_SSH_KEY}"
 
   _info "[k3s-hostinger] Uninstalling k3s on ${ssh_user}@${host}..."
-  _run_command -- ssh -i "${ssh_key}" -o BatchMode=yes -o ConnectTimeout=10 \
-    -o StrictHostKeyChecking=accept-new "${ssh_user}@${host}" \
-    'sud''o /usr/local/bin/k3s-uninstall.sh' 2>/dev/null || \
+  _run_command -- ssh -i "${ssh_key}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new "${ssh_user}@${host}" 'sudo /usr/local/bin/k3s-uninstall.sh' 2>/dev/null || \
     _info "[k3s-hostinger] k3s-uninstall.sh not present — skipping"
 
   if kubectl config get-contexts "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null 2>&1; then
