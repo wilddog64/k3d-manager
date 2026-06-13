@@ -6,6 +6,8 @@
 
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/shopping_cart.sh"
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/etc/hostinger/vars.sh"
 
 _HOSTINGER_SSH_USER="${HOSTINGER_SSH_USER:-ubuntu}"
 _HOSTINGER_SSH_KEY="${HOSTINGER_SSH_KEY:-${HOME}/.ssh/hostinger}"
@@ -165,8 +167,8 @@ Install a single-node k3s app cluster on a pre-existing Hostinger VPS:
 The VPS is provisioned out-of-band (Hostinger panel) and is permanent; this
 provider never creates or deletes the VM.
 
-Config (env overrides):
-  HOSTINGER_HOST       VPS public IP (REQUIRED)
+Config (env overrides; defaults in scripts/etc/hostinger/vars.sh):
+  HOSTINGER_HOST       VPS host (default: srv1754834.hstgr.cloud)
   HOSTINGER_SSH_USER   SSH user (default: ubuntu)
   HOSTINGER_SSH_KEY    SSH private key path (default: ~/.ssh/hostinger)
 HELP
