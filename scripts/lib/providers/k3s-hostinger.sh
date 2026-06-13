@@ -4,6 +4,9 @@
 # The VPS is provisioned out-of-band (Hostinger panel); this provider never creates or
 # deletes the VM — it only installs/uninstalls k3s over SSH and registers the context.
 
+# shellcheck source=/dev/null
+source "${SCRIPT_DIR}/plugins/shopping_cart.sh"
+
 _HOSTINGER_SSH_USER="${HOSTINGER_SSH_USER:-ubuntu}"
 _HOSTINGER_SSH_KEY="${HOSTINGER_SSH_KEY:-${HOME}/.ssh/hostinger}"
 _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
@@ -34,13 +37,36 @@ function _hostinger_wait_for_ssh() {
   done
 }
 
+function _hostinger_resolve_ip() {
+  local host="$1" ip=""
+  if [[ "${host}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf '%s' "${host}"
+    return 0
+  fi
+  if command -v dig >/dev/null 2>&1; then
+    ip="$(dig +short "${host}" 2>/dev/null | grep -Em1 '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$')"
+  fi
+  if [[ -z "${ip}" ]] && command -v getent >/dev/null 2>&1; then
+    ip="$(getent ahostsv4 "${host}" 2>/dev/null | awk '{print $1; exit}')"
+  fi
+  if [[ -z "${ip}" ]] && command -v python3 >/dev/null 2>&1; then
+    ip="$(python3 -c 'import socket,sys; print(socket.gethostbyname(sys.argv[1]))' "${host}" 2>/dev/null)"
+  fi
+  if [[ -z "${ip}" ]]; then
+    printf 'ERROR: %s\n' "[k3s-hostinger] could not resolve ${host} to an IPv4 address" >&2
+    return 1
+  fi
+  printf '%s' "${ip}"
+}
+
 function _hostinger_k3sup_install() {
-  local host="$1" ssh_user="$2" ssh_key="$3"
+  local host="$1" ssh_user="$2" ssh_key="$3" ip
+  ip="$(_hostinger_resolve_ip "${host}")" || return 1
   _ensure_k3sup
   mkdir -p "$(dirname "${_HOSTINGER_KUBECONFIG}")" "${HOME}/.kube"
-  _info "[k3s-hostinger] Installing k3s on ${ssh_user}@${host} via k3sup..."
+  _info "[k3s-hostinger] Installing k3s on ${ssh_user}@${host} (${ip}) via k3sup..."
   _run_command -- k3sup install \
-    --ip "${host}" \
+    --ip "${ip}" \
     --user "${ssh_user}" \
     --ssh-key "${ssh_key}" \
     --local-path "${_HOSTINGER_KUBECONFIG}" \
