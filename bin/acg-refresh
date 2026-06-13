@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # bin/acg-refresh
 #
-# Daily driver — refresh AWS credentials, restart SSH tunnel, and ensure
+# Daily driver — refresh provider credentials, restart SSH tunnel, and ensure
 # all port-forward services are running.
 #
 # Usage:
@@ -19,6 +19,7 @@ if [[ ! -d "${REPO_ROOT}/scripts/lib/acg/node_modules/playwright" ]]; then
 fi
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
+source "${REPO_ROOT}/scripts/lib/provider.sh"
 source "${REPO_ROOT}/scripts/plugins/gemini.sh"
 source "${REPO_ROOT}/scripts/plugins/aws.sh"
 source "${REPO_ROOT}/scripts/plugins/acg.sh"
@@ -159,14 +160,66 @@ if [[ "$login_prompt" -eq 1 ]]; then
   echo ""
 fi
 
-# ── 1. AWS credentials ────────────────────────────────────────────────────────
-_info "[acg-refresh] Checking AWS credentials..."
-if _acg_check_credentials 2>/dev/null; then
-  _info "[acg-refresh] Credentials still valid — skipping extraction"
-else
-  _info "[acg-refresh] Credentials expired — extracting..."
-  acg_get_credentials ${sandbox_url:+"$sandbox_url"}
-fi
+_cluster_provider="$(_acg_resolve_provider)"
+_app_context="$(_acg_provider_context "${_cluster_provider}")"
+case "${_cluster_provider}" in
+  k3s-aws) _provider_kubeconfig="${HOME}/.kube/k3s-ubuntu.yaml" ;;
+  k3s-az)  _provider_kubeconfig="${HOME}/.kube/k3s-az.yaml" ;;
+  k3s-gcp) _provider_kubeconfig="${HOME}/.kube/k3s-gcp.yaml" ;;
+  *)       _provider_kubeconfig="${HOME}/.kube/k3s-ubuntu.yaml" ;;
+esac
+_info "[acg-refresh] Active provider: ${_cluster_provider} (context ${_app_context})"
+
+case "${_cluster_provider}" in
+  k3s-az)
+    source "${REPO_ROOT}/scripts/plugins/azure.sh"
+    ;;
+  k3s-gcp)
+    source "${REPO_ROOT}/scripts/plugins/gcp.sh"
+    ;;
+esac
+
+# ── 1. Credentials ────────────────────────────────────────────────────────────
+case "${_cluster_provider}" in
+  k3s-aws)
+    _info "[acg-refresh] Checking AWS credentials..."
+    if _acg_check_credentials 2>/dev/null; then
+      _info "[acg-refresh] Credentials still valid — skipping extraction"
+    else
+      _info "[acg-refresh] Credentials expired — extracting..."
+      acg_get_credentials ${sandbox_url:+"$sandbox_url"}
+    fi
+    ;;
+  k3s-az)
+    _info "[acg-refresh] Checking Azure credentials..."
+    _az_existing_rg=""
+    if _az_ok 2>/dev/null; then
+      _az_existing_rg=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
+      _info "[acg-refresh] Azure credentials still valid — skipping extraction"
+    else
+      _info "[acg-refresh] Azure credentials expired — extracting..."
+      _browser_launch
+      "${REPO_ROOT}/scripts/lib/acg/bin/acg-credential-test" \
+        "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}" --provider azure || exit 1
+      _az_existing_rg=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
+    fi
+    if [[ -n "${_az_existing_rg}" ]]; then
+      export AZ_RESOURCE_GROUP="${_az_existing_rg}"
+    fi
+    ;;
+  k3s-gcp)
+    _info "[acg-refresh] Checking GCP credentials..."
+    gcp_get_credentials ${sandbox_url:+"$sandbox_url"}
+    ;;
+esac
+
+case "${_cluster_provider}" in
+  k3s-aws) TUNNEL_SSH_HOST="ubuntu" ;;
+  k3s-az)  TUNNEL_SSH_HOST="ubuntu-azure" ;;
+  k3s-gcp) TUNNEL_SSH_HOST="ubuntu-gcp" ;;
+  *)       TUNNEL_SSH_HOST="ubuntu" ;;
+esac
+export TUNNEL_SSH_HOST
 
 # ── 2. SSH tunnel ─────────────────────────────────────────────────────────────
 _info "[acg-refresh] Restarting SSH tunnel..."
@@ -222,10 +275,10 @@ else
 fi
 
 # ── 2b. ArgoCD cluster secret ────────────────────────────────────────────────
-_info "[acg-refresh] Refreshing ArgoCD cluster secret (ubuntu-k3s SA token)..."
+_info "[acg-refresh] Refreshing ArgoCD cluster secret (${_app_context} SA token)..."
 _argocd_tracing=0; case $- in *x*) _argocd_tracing=1; set +x;; esac
 _argocd_token=$(kubectl get secret argocd-manager-token -n kube-system \
-  --context ubuntu-k3s -o jsonpath='{.data.token}' 2>/dev/null | base64 -d | tr -d '\n' || echo "")
+  --context "${_app_context}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d | tr -d '\n' || echo "")
 (( _argocd_tracing )) && set -x || true
 if [[ -n "${_argocd_token}" ]]; then
   _argocd_server="${ARGOCD_APP_CLUSTER_SERVER:-https://host.k3d.internal:6443}"
@@ -235,11 +288,11 @@ if [[ -n "${_argocd_token}" ]]; then
 apiVersion: v1
 kind: Secret
 metadata:
-  name: cluster-ubuntu-k3s
+  name: cluster-${_app_context}
   namespace: cicd
   labels:
     argocd.argoproj.io/secret-type: cluster
-    argocd.argoproj.io/cluster-name: ubuntu-k3s
+    argocd.argoproj.io/cluster-name: ${_app_context}
 stringData:
   server: "${_argocd_server}"
   config: |
@@ -250,7 +303,7 @@ PATCH
   rm -f "${_argocd_patch}"
   _info "[acg-refresh] ArgoCD cluster secret refreshed: ${_argocd_server}"
 else
-  _warn "[acg-refresh] argocd-manager-token not readable on ubuntu-k3s — cluster secret not refreshed"
+  _warn "[acg-refresh] argocd-manager-token not readable on ${_app_context} — cluster secret not refreshed"
 fi
 
 # ── 3. PID-file port-forwards ─────────────────────────────────────────────────
@@ -266,7 +319,7 @@ _pf_ensure "ACG Prometheus port-forward" \
   "${_ACG_STATE_DIR}/run/acg-prom-pf.pid" \
   "${_ACG_STATE_DIR}/logs/acg-prom-pf.log" \
   port-forward svc/prometheus-operated 19090:9090 \
-  -n monitoring --context ubuntu-k3s --address 0.0.0.0
+  -n monitoring --context "${_app_context}" --address 0.0.0.0
 
 # ── 4. launchd agents (user-domain, self-heal via KeepAlive) ──────────────────
 if _is_mac; then
@@ -324,7 +377,7 @@ PLIST
   if [[ ! -f "${_grafana_pf_plist}" ]]; then
     _info "[acg-refresh] Grafana port-forward plist missing — regenerating..."
     _grafana_pf_kubectl="$(command -v kubectl)"
-    _grafana_pf_kubeconfig="${HOME}/.kube/config:${HOME}/.kube/ubuntu-k3s.yaml:${HOME}/.kube/k3s-ubuntu.yaml"
+    _grafana_pf_kubeconfig="${HOME}/.kube/config:${HOME}/.kube/${_app_context}.yaml:${_provider_kubeconfig}"
     mkdir -p "$(dirname "${_grafana_pf_log}")"
     cat > "${_grafana_pf_plist}" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -341,7 +394,7 @@ PLIST
     <string>--namespace</string>
     <string>monitoring</string>
     <string>--context</string>
-    <string>ubuntu-k3s</string>
+    <string>${_app_context}</string>
     <string>3001:80</string>
   </array>
   <key>EnvironmentVariables</key>
@@ -416,4 +469,4 @@ fi
 
 # ── 7. Summary ────────────────────────────────────────────────────────────────
 _info "[acg-refresh] Done. Remote cluster nodes:"
-kubectl get nodes --context ubuntu-k3s 2>&1 || _warn "[acg-refresh] Could not reach ubuntu-k3s nodes — tunnel may still be settling"
+kubectl get nodes --context "${_app_context}" 2>&1 || _warn "[acg-refresh] Could not reach ${_app_context} nodes — tunnel may still be settling"

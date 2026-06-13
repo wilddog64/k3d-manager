@@ -1792,7 +1792,8 @@ _info "[acg-up]   Frontend:    ${FRONTEND_PUBLIC_URL:-https://frontend.${CF_DOMA
 _info "[acg-up]   Keycloak:    ${KEYCLOAK_PUBLIC_URL:-https://keycloak.${CF_DOMAIN:-3ai-talk.org}}"
 _info "[acg-up]   Prometheus:  https://prometheus.${CF_DOMAIN:-3ai-talk.org}"
 _info "[acg-up]   Grafana:     https://grafana.${CF_DOMAIN:-3ai-talk.org}"
-echo "{\"provisioned_at\": $(date +%s), \"provider\": \"${CLUSTER_PROVIDER:-k3s-aws}\"}" \
+_acg_record_provider "${_cluster_provider}"
+echo "{\"provisioned_at\": $(date +%s), \"provider\": \"${_cluster_provider}\"}" \
   > "${_ACG_STATE_DIR}/acg-state.json"
 _info "[acg-up] === Local URLs (Mac only) ==="
 _info "[acg-up]   ArgoCD:   https://argocd.shopping-cart.local"

@@ -75,3 +75,53 @@ function _cluster_provider_call() {
 
     "$func" "$@"
 }
+
+_ACG_ACTIVE_PROVIDER_FILE="${_ACG_ACTIVE_PROVIDER_FILE:-${HOME}/.local/share/k3d-manager/active-provider}"
+
+function _acg_normalize_provider() {
+    case "${1:-}" in
+        aws|k3s-aws)       printf 'k3s-aws\n' ;;
+        az|azure|k3s-az)   printf 'k3s-az\n' ;;
+        gcp|k3s-gcp)       printf 'k3s-gcp\n' ;;
+        oci|k3s-oci)       printf 'k3s-oci\n' ;;
+        *)                 printf '%s\n' "${1:-}" ;;
+    esac
+}
+
+function _acg_provider_context() {
+    case "$(_acg_normalize_provider "${1:-}")" in
+        k3s-aws) printf 'ubuntu-k3s\n' ;;
+        k3s-az)  printf 'ubuntu-azure\n' ;;
+        k3s-gcp) printf 'ubuntu-gcp\n' ;;
+        *)       printf 'ubuntu-k3s\n' ;;
+    esac
+}
+
+function _acg_record_provider() {
+    local provider
+    provider="$(_acg_normalize_provider "${1:-}")"
+    [[ -z "${provider}" ]] && return 0
+    mkdir -p "$(dirname "${_ACG_ACTIVE_PROVIDER_FILE}")"
+    printf '%s\n' "${provider}" > "${_ACG_ACTIVE_PROVIDER_FILE}"
+}
+
+function _acg_resolve_provider() {
+    local provider="${CLUSTER_PROVIDER:-}"
+    if [[ -z "${provider}" && -f "${_ACG_ACTIVE_PROVIDER_FILE}" ]]; then
+        provider="$(cat "${_ACG_ACTIVE_PROVIDER_FILE}" 2>/dev/null || true)"
+    fi
+    if [[ -z "${provider}" ]]; then
+        local ctx
+        for ctx in ubuntu-k3s ubuntu-azure ubuntu-gcp; do
+            if kubectl --context "${ctx}" --request-timeout=5s get --raw=/readyz >/dev/null 2>&1; then
+                case "${ctx}" in
+                    ubuntu-k3s)  provider=k3s-aws ;;
+                    ubuntu-azure) provider=k3s-az ;;
+                    ubuntu-gcp)  provider=k3s-gcp ;;
+                esac
+                break
+            fi
+        done
+    fi
+    _acg_normalize_provider "${provider:-k3s-aws}"
+}

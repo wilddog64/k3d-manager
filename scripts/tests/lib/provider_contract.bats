@@ -6,8 +6,10 @@
 
 # Setup providers directory path
 setup() {
+  REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)"
   PROVIDERS_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../lib/providers" && pwd)"
   SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)/scripts"
+  source "${REPO_ROOT}/scripts/lib/provider.sh"
   export SCRIPT_DIR
 }
 
@@ -17,6 +19,22 @@ teardown_file() {
 }
 
 # --- K3D Provider Contract ---
+
+@test "_acg_normalize_provider normalizes short aliases" {
+  [[ "$(_acg_normalize_provider aws)" == "k3s-aws" ]]
+  [[ "$(_acg_normalize_provider az)" == "k3s-az" ]]
+  [[ "$(_acg_normalize_provider azure)" == "k3s-az" ]]
+  [[ "$(_acg_normalize_provider gcp)" == "k3s-gcp" ]]
+  [[ "$(_acg_normalize_provider oci)" == "k3s-oci" ]]
+  [[ "$(_acg_normalize_provider foo)" == "foo" ]]
+}
+
+@test "_acg_provider_context maps providers to app contexts" {
+  [[ "$(_acg_provider_context k3s-aws)" == "ubuntu-k3s" ]]
+  [[ "$(_acg_provider_context k3s-az)" == "ubuntu-azure" ]]
+  [[ "$(_acg_provider_context k3s-gcp)" == "ubuntu-gcp" ]]
+  [[ "$(_acg_provider_context foo)" == "ubuntu-k3s" ]]
+}
 
 @test "_provider_k3d_exec is defined" {
   source "${PROVIDERS_DIR}/k3d.sh"

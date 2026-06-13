@@ -85,6 +85,8 @@ _info "[acg-down] Stopping tunnel..."
     ;;
 esac
 
+rm -f "${HOME}/.local/share/k3d-manager/active-provider"
+
 _info "[acg-down] Stopping Vault port-forward..."
 _vault_pf_pid_file="${_ACG_STATE_DIR}/run/vault-pf.pid"
 if [[ -f "${_vault_pf_pid_file}" ]]; then
