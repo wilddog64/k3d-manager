@@ -19,6 +19,7 @@ up:
 	  k3s-oci) mkdir -p "$(HOME)/.local/share/k3d-manager/logs" && \
 	           CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager deploy_cluster --confirm 2>&1 | \
 	           tee "$(HOME)/.local/share/k3d-manager/logs/k3s-oci-up.log" ;; \
+	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager deploy_cluster ;; \
 	  *)       GHCR_PAT="$(GHCR_PAT)" K3DM_RESUME="$(K3DM_RESUME)" bin/acg-up "$(URL)" ;; \
 	esac
 	@$(MAKE) --no-print-directory observability
@@ -28,6 +29,7 @@ up:
 down:
 	@case "$(CLUSTER_PROVIDER)" in \
 	  k3s-oci) CLUSTER_PROVIDER=k3s-oci ./scripts/k3d-manager destroy_cluster ;; \
+	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager destroy_cluster --confirm ;; \
 	  *)       bin/acg-down --confirm $(if $(filter 1,$(KEEP_LOCAL)),--keep-hub,) ;; \
 	esac
 
@@ -41,6 +43,8 @@ status:
 	  k3s-oci) CLUSTER_PROVIDER=k3s-oci KUBECONFIG=$(HOME)/.kube/k3s-oci.yaml \
 	             kubectl get nodes,pods -A --no-headers 2>/dev/null \
 	             || echo "OCI cluster unreachable" ;; \
+	  k3s-hostinger) kubectl --context ubuntu-hostinger get nodes,pods -A --no-headers 2>/dev/null \
+	             || echo "Hostinger cluster unreachable" ;; \
 	  *)       $(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/acg-status ;; \
 	esac
 

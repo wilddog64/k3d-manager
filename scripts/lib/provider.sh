@@ -80,20 +80,22 @@ _ACG_ACTIVE_PROVIDER_FILE="${_ACG_ACTIVE_PROVIDER_FILE:-${HOME}/.local/share/k3d
 
 function _acg_normalize_provider() {
     case "${1:-}" in
-        aws|k3s-aws)       printf 'k3s-aws\n' ;;
-        az|azure|k3s-az)   printf 'k3s-az\n' ;;
-        gcp|k3s-gcp)       printf 'k3s-gcp\n' ;;
-        oci|k3s-oci)       printf 'k3s-oci\n' ;;
-        *)                 printf '%s\n' "${1:-}" ;;
+        aws|k3s-aws)                 printf 'k3s-aws\n' ;;
+        az|azure|k3s-az)             printf 'k3s-az\n' ;;
+        gcp|k3s-gcp)                 printf 'k3s-gcp\n' ;;
+        oci|k3s-oci)                 printf 'k3s-oci\n' ;;
+        hostinger|k3s-hostinger)     printf 'k3s-hostinger\n' ;;
+        *)                           printf '%s\n' "${1:-}" ;;
     esac
 }
 
 function _acg_provider_context() {
     case "$(_acg_normalize_provider "${1:-}")" in
-        k3s-aws) printf 'ubuntu-k3s\n' ;;
-        k3s-az)  printf 'ubuntu-azure\n' ;;
-        k3s-gcp) printf 'ubuntu-gcp\n' ;;
-        *)       printf 'ubuntu-k3s\n' ;;
+        k3s-aws)       printf 'ubuntu-k3s\n' ;;
+        k3s-az)        printf 'ubuntu-azure\n' ;;
+        k3s-gcp)       printf 'ubuntu-gcp\n' ;;
+        k3s-hostinger) printf 'ubuntu-hostinger\n' ;;
+        *)             printf 'ubuntu-k3s\n' ;;
     esac
 }
 
@@ -112,12 +114,13 @@ function _acg_resolve_provider() {
     fi
     if [[ -z "${provider}" ]]; then
         local ctx
-        for ctx in ubuntu-k3s ubuntu-azure ubuntu-gcp; do
+        for ctx in ubuntu-k3s ubuntu-azure ubuntu-gcp ubuntu-hostinger; do
             if kubectl --context "${ctx}" --request-timeout=5s get --raw=/readyz >/dev/null 2>&1; then
                 case "${ctx}" in
-                    ubuntu-k3s)  provider=k3s-aws ;;
-                    ubuntu-azure) provider=k3s-az ;;
-                    ubuntu-gcp)  provider=k3s-gcp ;;
+                    ubuntu-k3s)       provider=k3s-aws ;;
+                    ubuntu-azure)     provider=k3s-az ;;
+                    ubuntu-gcp)       provider=k3s-gcp ;;
+                    ubuntu-hostinger) provider=k3s-hostinger ;;
                 esac
                 break
             fi
