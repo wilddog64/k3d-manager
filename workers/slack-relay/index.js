@@ -87,7 +87,8 @@ async function handle(req) {
   if (!ALLOWED_COMMANDS.has(command)) return jsonReply(`Unknown command: ${command}`, threadTs)
 
   if (command === '/acg-up') {
-    const _p = PROVIDER_ALIASES[text] || text
+    const _t = text.toLowerCase()
+    const _p = PROVIDER_ALIASES[_t] || _t
     const provider = VALID_PROVIDERS.has(_p) ? _p : 'aws'
     const { ok, conflict } = await relay('/api/v1/cluster', { action: 'up', provider, response_url: responseUrl })
     if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`, threadTs)
@@ -119,7 +120,8 @@ async function handle(req) {
   }
 
   if (command === '/acg-resume') {
-    const _p = PROVIDER_ALIASES[text] || text
+    const _t = text.toLowerCase()
+    const _p = PROVIDER_ALIASES[_t] || _t
     const provider = VALID_PROVIDERS.has(_p) ? _p : 'aws'
     const { ok, conflict } = await relay('/api/v1/cluster-resume', { provider, response_url: responseUrl })
     if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`, threadTs)
