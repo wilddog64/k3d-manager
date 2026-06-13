@@ -1,5 +1,14 @@
 # Releases
 
+## [0.4.0] - 2026-06-10
+
+### Added
+- `playwright/lib/sandbox.js`: Azure sandbox provider support — scoped button lookups, conflict deletion, provider-specific credential extraction
+
+### Fixed
+- Azure credential validation — SP, portal TAP, and CLI auth paths with exclusive auth-branch logic; OIDC tenant discovery; screenshot archival
+- 25+ Playwright/sandbox.js fixes — expired-sandbox fast-fail, force:true on clicks, provider-scoped credential checks, dismiss-and-retry dialog handling
+
 ## [0.3.0] - 2026-05-21
 
 ### Changed

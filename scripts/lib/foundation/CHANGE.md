@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Make `_cluster_provider` validation extensible via optional `_cluster_provider_is_extra_supported` consumer hook
+
 ### Fixed
 - `scripts/lib/system.sh`: `_run_command_resolve_sudo` — fall back to `sudo -n` when no TTY is present; fixes `sudo: unable to allocate pty: Device not configured` failures when non-interactive shells call `_run_command --interactive-sudo` (e.g., `make up` from a terminal with cached sudo credentials)
 - `scripts/lib/system.sh`: `_copilot_review` — add `--allow-all-tools` flag and close malformed `--deny-tool` patterns (`shell(sudo`, `shell(eval`, `shell(curl`, `shell(wget` were missing closing `)`) — Copilot CLI exits 1 on malformed patterns, blocking all `_ai_agent_review` callers (`713c18e`)

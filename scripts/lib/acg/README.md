@@ -38,9 +38,10 @@ node --check playwright/*.js
 
 | Version | Date | Notes |
 |---------|------|-------|
+| [0.4.0](https://github.com/wilddog64/lib-acg/releases/tag/0.4.0) | 2026-06-10 | Azure sandbox provider; 25+ Playwright/credential extraction fixes; Azure SP/portal/TAP validation |
 | [0.3.0](https://github.com/wilddog64/lib-acg/releases/tag/0.3.0) | 2026-05-21 | Make CFn template path configurable; fix credential extraction & extend flows; add pre-commit dangling-reference gate |
+| [0.1.4](https://github.com/wilddog64/lib-acg/releases/tag/0.1.4) | 2026-06-10 | Azure credential validation (SP/CLI-first auth), screenshot archival, toast + panel lifecycle fixes |
 | [0.2.0](https://github.com/wilddog64/lib-acg/releases/tag/0.2.0) | 2026-05-20 | Fix ACG restart/extend Playwright scripts; add Playwright fixtures & CI e2e tests |
-| [0.1.0](https://github.com/wilddog64/lib-acg/releases/tag/0.1.0) | 2026-05-19 | Initial release: Chrome CDP, ACG session mgmt, credential extraction |
 
 See [docs/releases.md](docs/releases.md) for full release history.
 
@@ -50,8 +51,8 @@ Recent GitHub Issues and findings:
 
 | Date | Issue | Notes |
 |------|-------|-------|
+| 2026-06-08 | [Copilot PR #39 Review](docs/issues/2026-06-08-copilot-pr39-review-findings.md) | Dialog selector coverage, toast locator width, dead detectLabel(), unused value truncation fields, CHANGELOG attribution fixes |
 | 2026-05-30 | [Extend Session Dialog Blocks Navigation Click](docs/issues/2026-05-30-extend-session-dialog-blocks-nav-click.md) | "Extend Your Session" alertdialog intercepts pointer events; fix: use `window.location.assign()` for SPA navigation instead of `navLink.click()` |
 | 2026-05-25 | [Copilot PR #29 Review](docs/issues/2026-05-25-copilot-pr29-review-findings.md) | `git grep -F` for fixed-string dangling-ref check; spec Rules wording clarified |
 | 2026-05-21 | [Copilot PR #22 Review](docs/issues/2026-05-21-copilot-pr22-review-findings.md) | Template preflight check, README link, spec path corrections |
 | 2026-05-21 | [Copilot PR #21 Review](docs/issues/2026-05-21-copilot-pr21-review-findings.md) | `AllowedCidr` default & hard-coded IAM role names in CloudFormation template |
-| 2026-05-21 | [ACG Extend CDP Attach Failure](docs/issues/2026-05-21-acg-extend-cdp-attach-fails-on-chrome-147.md) | Chrome 147 requires `--enable-automation` to accept CDP attach; Playwright script updated |

@@ -103,10 +103,14 @@ async function _findScopedButton(page, buttonText, providerLabel, timeoutMs) {
       const visible = await btn.isVisible({ timeout: 300 }).catch(() => false);
       if (!visible) continue;
       const inCard = await btn.evaluate((el, label) => {
+        const others = ['AWS', 'Google Cloud', 'GCP', 'Azure'].filter(
+          p => !new RegExp(p, 'i').test(label)
+        );
         let node = el.parentElement;
         for (let j = 0; j < 8; j++) {
           if (!node) break;
-          if (new RegExp(label, 'i').test(node.innerText || '')) return true;
+          const t = node.innerText || '';
+          if (new RegExp(label, 'i').test(t) && !others.some(p => t.includes(p))) return true;
           node = node.parentElement;
         }
         return false;
@@ -280,11 +284,11 @@ async function restartSandbox() {
     }
 
     // If Delete Sandbox is not immediately visible, click Open Sandbox to reveal the panel
-    const deleteBtn = page.locator('button:has-text("Delete Sandbox")').first();
-    if (!await deleteBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+    let deleteBtn = await _findScopedButton(page, 'Delete Sandbox', _providerCardLabel, 3000);
+    if (!deleteBtn) {
       console.error('INFO: Delete Sandbox not visible — clicking Open Sandbox to reveal panel...');
-      const openBtn = page.locator('button:has-text("Open Sandbox")').first();
-      if (!await openBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
+      const openBtn = await _findScopedButton(page, 'Open Sandbox', _providerCardLabel, 5000);
+      if (!openBtn) {
         const url = page.url();
         const btns = await page.evaluate(() =>
           Array.from(document.querySelectorAll('button'))
@@ -299,14 +303,28 @@ async function restartSandbox() {
       const _deletePollDeadline = Date.now() + 15000;
       let _deleteBtnReady = false;
       let _sandboxNotYetStarted = false;
-      const _startBtnPanel = page.locator('button:has-text("Start Sandbox")').first();
+      let _startBtnPanelScoped = null;
       while (Date.now() < _deletePollDeadline) {
         await _dismissExtendYourSessionDialog(page);
-        _deleteBtnReady = await deleteBtn.isVisible({ timeout: 500 }).catch(() => false);
+        deleteBtn = await _findScopedButton(page, 'Delete Sandbox', _providerCardLabel, 0);
+        _deleteBtnReady = deleteBtn !== null;
         if (_deleteBtnReady) break;
         // Panel is open but sandbox not yet provisioned — Start Sandbox visible, Delete not.
         // Skip delete flow and start directly.
-        if (await _startBtnPanel.isVisible({ timeout: 500 }).catch(() => false)) {
+        _startBtnPanelScoped = await _findScopedButton(page, 'Start Sandbox', _providerCardLabel, 0);
+        if (!_startBtnPanelScoped) {
+          // Panel may render as a detached overlay — scoped ancestor walk cannot find provider
+          // label. Fall back to unscoped detection: Close button visible (panel open) + Start
+          // Sandbox visible means the open panel is in Start Sandbox state.
+          const _panelOpen = await page.locator('button:has-text("Close")').first()
+            .isVisible({ timeout: 0 }).catch(() => false);
+          if (_panelOpen) {
+            const _startGlobal = page.locator('button:has-text("Start Sandbox")').first();
+            const _startVis = await _startGlobal.isVisible({ timeout: 0 }).catch(() => false);
+            if (_startVis) _startBtnPanelScoped = _startGlobal;
+          }
+        }
+        if (_startBtnPanelScoped) {
           _sandboxNotYetStarted = true;
           break;
         }
@@ -314,8 +332,8 @@ async function restartSandbox() {
       }
       if (_sandboxNotYetStarted) {
         console.error('INFO: Sandbox panel open but not yet provisioned — clicking Start Sandbox directly...');
-        await _startBtnPanel.scrollIntoViewIfNeeded().catch(() => {});
-        await _startBtnPanel.click({ force: true });
+        await _startBtnPanelScoped.scrollIntoViewIfNeeded().catch(() => {});
+        await _startBtnPanelScoped.click({ force: true });
         await page.waitForTimeout(3000);
         await _dismissExtendYourSessionDialog(page);
         console.error('INFO: Sandbox started. Ready for credential extraction.');

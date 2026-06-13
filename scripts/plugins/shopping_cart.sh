@@ -5,8 +5,14 @@ set -euo pipefail
 
 function add_ubuntu_k3s_cluster() {
   local ssh_host="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
-  local ssh_user="${UBUNTU_K3S_SSH_USER:-parallels}"
-  local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-${ssh_host}}"
+  local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
+  local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-}"
+  if [[ -z "${external_ip}" ]] && _command_exist awk; then
+    external_ip=$(awk -v host="${ssh_host}" \
+      '$1=="Host" && $2==host {found=1; next} found && $1=="HostName" {print $2; exit}' \
+      "${HOME}/.ssh/config" 2>/dev/null)
+  fi
+  : "${external_ip:=${ssh_host}}"
   local remote_kubeconfig="${UBUNTU_K3S_REMOTE_KUBECONFIG:-/home/${ssh_user}/.kube/k3s.yaml}"
   local local_kubeconfig="${UBUNTU_K3S_LOCAL_KUBECONFIG:-${HOME}/.kube/k3s-ubuntu.yaml}"
   local ssh_target="${ssh_user}@${ssh_host}"
@@ -23,7 +29,7 @@ function add_ubuntu_k3s_cluster() {
 
 # shellcheck disable=SC2029
   if ! ssh "${ssh_target}" "cat ${remote_kubeconfig}" 2>/dev/null \
-      | sed "s|127.0.0.1|${external_ip}|g" > "${local_kubeconfig}"; then
+      | sed -e "s|127.0.0.1|${external_ip}|g" -e "s|https://localhost:|https://${external_ip}:|g" > "${local_kubeconfig}"; then
     _err "[shopping_cart] Failed to export kubeconfig from ${ssh_target}:${remote_kubeconfig}"
     _err "[shopping_cart] Ensure ${ssh_user} can read ${remote_kubeconfig} on ${ssh_host}"
     return 1
@@ -44,6 +50,8 @@ function add_ubuntu_k3s_cluster() {
     kubectl config delete-context ubuntu-k3s &>/dev/null || true
     _info "[shopping_cart] Removed stale ubuntu-k3s context — will re-merge with fresh credentials"
   fi
+  kubectl config delete-cluster default &>/dev/null || true
+  kubectl config delete-user default &>/dev/null || true
   cp "${local_kubeconfig}" "${_tmp_kube}"
   chmod 600 "${_tmp_kube}"
   local _src_context
@@ -58,25 +66,6 @@ function add_ubuntu_k3s_cluster() {
   chmod 600 "${HOME}/.kube/config"
   rm -f "${_tmp_kube}"
   _info "[shopping_cart] ubuntu-k3s context merged into ~/.kube/config"
-
-  local kube_context
-  if [[ -n "${UBUNTU_K3S_CONTEXT:-}" ]]; then
-    kube_context="${UBUNTU_K3S_CONTEXT}"
-  else
-    if ! kube_context=$(KUBECONFIG="${local_kubeconfig}" kubectl config current-context 2>/dev/null); then
-      _err "[shopping_cart] Failed to determine current context from ${local_kubeconfig}"
-      return 1
-    fi
-    if [[ -z "${kube_context}" ]]; then
-      _err "[shopping_cart] kubeconfig ${local_kubeconfig} has no current-context configured"
-      return 1
-    fi
-  fi
-
-  _info "[shopping_cart] Registering Ubuntu k3s cluster with ArgoCD using context ${kube_context}"
-  KUBECONFIG="${local_kubeconfig}" _run_command -- argocd cluster add "${kube_context}" \
-    --name ubuntu-k3s \
-    --kubeconfig "${local_kubeconfig}"
 }
 
 function deploy_shopping_cart_data() {
@@ -93,14 +82,20 @@ function deploy_shopping_cart_data() {
     return 1
   fi
 
-  _info "[shopping_cart] Data layer managed by ArgoCD — verifying StatefulSet presence..."
+  _info "[shopping_cart] Data layer managed by ArgoCD — waiting for StatefulSets to appear (max 300s)..."
 
+  local _sts_deadline
+  _sts_deadline=$(( $(date +%s) + 300 ))
   for pg in postgresql-orders postgresql-payment postgresql-products; do
-    if ! kubectl get statefulset/"${pg}" \
-        -n shopping-cart-data --context ubuntu-k3s >/dev/null 2>&1; then
-      _err "[shopping_cart] StatefulSet ${pg} not found in shopping-cart-data after ArgoCD sync — check: kubectl get application data-layer -n cicd --context k3d-k3d-cluster"
-      return 1
-    fi
+    until kubectl get statefulset/"${pg}" \
+        -n shopping-cart-data --context ubuntu-k3s >/dev/null 2>&1; do
+      if [[ $(date +%s) -ge ${_sts_deadline} ]]; then
+        _err "[shopping_cart] StatefulSet ${pg} not created in shopping-cart-data within 300s of ArgoCD sync — check: kubectl get application data-layer -n cicd --context k3d-k3d-cluster"
+        return 1
+      fi
+      _info "[shopping_cart] ${pg} not yet created by ArgoCD — waiting..."
+      sleep 10
+    done
   done
 
   _info "[shopping_cart] Waiting for PostgreSQL instances to be Ready..."
@@ -640,7 +635,7 @@ function shopping_cart_reconcile_product_catalog() {
     _pc_kustomize_dir="${REPO_ROOT}/../shopping-carts/shopping-cart-product-catalog"
     if [[ -d "${_pc_kustomize_dir}/k8s/base" ]]; then
       kubectl delete job product-catalog-seed \
-        -n shopping-cart-apps --context ubuntu-k3s --ignore-not-found --wait=false >/dev/null 2>&1
+        -n shopping-cart-apps --context ubuntu-k3s --ignore-not-found >/dev/null 2>&1
       kubectl kustomize "${_pc_kustomize_dir}/k8s/base" \
         | kubectl apply --context ubuntu-k3s \
             --selector app.kubernetes.io/component=seed -f - >/dev/null
@@ -761,6 +756,24 @@ function _ensure_k3sup() {
   _err "[shopping_cart] k3sup not found and automatic installation failed — install manually: brew install k3sup"
 }
 
+function _ubuntu_k3s_trust_host() {
+  local host="$1" attempts=0 key
+  [[ -z "${host}" ]] && return 0
+  mkdir -p "${HOME}/.ssh"
+  touch "${HOME}/.ssh/known_hosts"
+  until key=$(ssh-keyscan -T 5 "${host}" 2>/dev/null) && [[ -n "${key}" ]]; do
+    (( ++attempts ))
+    if (( attempts >= 24 )); then
+      _warn "[shopping_cart] ssh-keyscan ${host} not ready after 120s — k3sup may prompt"
+      return 0
+    fi
+    sleep 5
+  done
+  ssh-keygen -R "${host}" >/dev/null 2>&1 || true
+  printf '%s\n' "${key}" >> "${HOME}/.ssh/known_hosts"
+  _info "[shopping_cart] Trusted host key for ${host}"
+}
+
 function _k3sup_join_agent() {
   local agent_host="$1" server_ip="$2"
   local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
@@ -773,6 +786,7 @@ function _k3sup_join_agent() {
   fi
   : "${agent_ip:=${agent_host}}"
   _info "[shopping_cart] Joining agent ${agent_host} (${agent_ip}) to server ${server_ip}..."
+  _ubuntu_k3s_trust_host "${agent_ip}"
   _run_command -- k3sup join \
     --ip "${agent_ip}" \
     --server-ip "${server_ip}" \
@@ -787,7 +801,7 @@ function _setup_vault_bridge() {
   _info "[shopping_cart] Installing socat and vault-bridge systemd unit on ${ssh_host}..."
   # SC2087: single-quoted heredoc intentionally prevents local expansion
   # shellcheck disable=SC2087
-_run_command -- ssh -i "${ssh_key}" "${ssh_host}" bash <<'REMOTE'
+_run_command -- ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${ssh_host}" bash <<'REMOTE'
 set -euo pipefail
 SUDO="sudo"
 if ! command -v socat >/dev/null 2>&1; then
@@ -873,6 +887,7 @@ HELP
   mkdir -p "${kubeconfig_dir}" "${HOME}/.kube"
 
   _info "[shopping_cart] Installing k3s on ${ssh_user}@${external_ip} via k3sup..."
+  _ubuntu_k3s_trust_host "${external_ip}"
   _run_command -- k3sup install \
     --ip "${external_ip}" \
     --user "${ssh_user}" \
@@ -880,6 +895,17 @@ HELP
     --local-path "${local_kubeconfig}" \
     --context "${kube_context}" \
     --k3s-extra-args '--disable traefik --disable servicelb'
+
+  # Copy system kubeconfig to user home so add_ubuntu_k3s_cluster can read it without sudo
+  # SC2087: single-quoted heredoc intentionally prevents local expansion
+  # shellcheck disable=SC2087
+  _run_command -- ssh -i "${ssh_key}" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "${ssh_user}@${external_ip}" bash <<'REMOTE'
+SUDO="sudo"
+mkdir -p "${HOME}/.kube"
+$SUDO cp /etc/rancher/k3s/k3s.yaml "${HOME}/.kube/k3s.yaml"
+$SUDO chown "$(id -u)":"$(id -g)" "${HOME}/.kube/k3s.yaml"
+chmod 600 "${HOME}/.kube/k3s.yaml"
+REMOTE
 
   _info "[shopping_cart] Waiting for node to be Ready..."
   local attempts=0

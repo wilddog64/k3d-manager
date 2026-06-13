@@ -1,5 +1,5 @@
 # Makefile — k3d-manager cluster lifecycle (provider-aware)
-# Usage: make [target] [CLUSTER_PROVIDER=k3s-aws|k3s-gcp|k3s-oci] [URL=https://...]
+# Usage: make [target] [CLUSTER_PROVIDER=k3s-aws|k3s-az|k3s-gcp|k3s-oci] [URL=https://...]
 
 .DEFAULT_GOAL := help
 
@@ -31,9 +31,9 @@ down:
 	  *)       bin/acg-down --confirm $(if $(filter 1,$(KEEP_LOCAL)),--keep-hub,) ;; \
 	esac
 
-## Refresh credentials and restart tunnel (k3s-aws/k3s-gcp only)
+## Refresh credentials and restart tunnel (provider-aware)
 refresh:
-	bin/acg-refresh "$(URL)"
+	$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/acg-refresh "$(URL)"
 
 ## Show cluster nodes, pod status, tunnel health
 status:
@@ -41,8 +41,7 @@ status:
 	  k3s-oci) CLUSTER_PROVIDER=k3s-oci KUBECONFIG=$(HOME)/.kube/k3s-oci.yaml \
 	             kubectl get nodes,pods -A --no-headers 2>/dev/null \
 	             || echo "OCI cluster unreachable" ;; \
-	  k3s-gcp) APP_CONTEXT=ubuntu-gcp CLUSTER_PROVIDER=k3s-gcp bin/acg-status ;; \
-	  *)       APP_CONTEXT=ubuntu-k3s CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) bin/acg-status ;; \
+	  *)       $(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/acg-status ;; \
 	esac
 
 ## Extract AWS credentials only (no cluster changes; k3s-aws only)

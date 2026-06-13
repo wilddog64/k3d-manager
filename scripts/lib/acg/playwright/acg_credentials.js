@@ -41,7 +41,7 @@ async function extractCredentials() {
     await navigateToSandbox(page, targetUrl);
     await waitForSkeleton(page);
     await handleSignIn(page, targetUrl);
-    await startSandbox(page, targetUrl);
+    await startSandbox(page, targetUrl, provider);
 
     console.error('INFO: Extracting credentials...');
     await providers[provider].extractCredentials(page, _outputCredentials);

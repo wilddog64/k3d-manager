@@ -141,6 +141,46 @@ SCRIPT
   [ "$output" = "k3s" ]
 }
 
+@test "_cluster_provider: rejects extra providers without consumer hook" {
+  run bash -c '
+    source "$1"
+    _err() { echo "ERROR: $*"; return 1; }
+    K3D_MANAGER_PROVIDER=k3s-foo _cluster_provider
+  ' _ "${BATS_TEST_DIRNAME}/../../lib/core.sh"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Unsupported cluster provider: k3s-foo"* ]]
+}
+
+@test "_cluster_provider: accepts extra providers via consumer hook" {
+  run bash -c '
+    source "$1"
+    _cluster_provider_is_extra_supported() { [[ "$1" == "k3s-foo" ]]; }
+    K3D_MANAGER_PROVIDER=k3s-foo _cluster_provider
+  ' _ "${BATS_TEST_DIRNAME}/../../lib/core.sh"
+  [ "$status" -eq 0 ]
+  [ "$output" = "k3s-foo" ]
+}
+
+@test "_cluster_provider: still accepts base providers with consumer hook" {
+  run bash -c '
+    source "$1"
+    _cluster_provider_is_extra_supported() { [[ "$1" == "k3s-foo" ]]; }
+    CLUSTER_PROVIDER=orbstack _cluster_provider
+  ' _ "${BATS_TEST_DIRNAME}/../../lib/core.sh"
+  [ "$status" -eq 0 ]
+  [ "$output" = "orbstack" ]
+}
+
+@test "_cluster_provider: noisy consumer hook does not corrupt provider output" {
+  run bash -c '
+    source "$1"
+    _cluster_provider_is_extra_supported() { echo "hook debug noise"; [[ "$1" == "k3s-foo" ]]; }
+    K3D_MANAGER_PROVIDER=k3s-foo _cluster_provider
+  ' _ "${BATS_TEST_DIRNAME}/../../lib/core.sh"
+  [ "$status" -eq 0 ]
+  [ "$output" = "k3s-foo" ]
+}
+
 # ── _deploy_cluster_resolve_provider ─────────────────────────────────────────
 
 @test "_deploy_cluster_resolve_provider: CLI flag takes precedence" {

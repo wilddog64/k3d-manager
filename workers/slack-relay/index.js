@@ -1,5 +1,6 @@
 const ALLOWED_COMMANDS = new Set(['/acg-up', '/acg-down', '/acg-status', '/acg-refresh', '/acg-resume', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade'])
-const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'azure'])
+const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'az'])
+const PROVIDER_ALIASES  = { azure: 'az' }
 
 async function verifySlack(request, body) {
   const ts  = request.headers.get('X-Slack-Request-Timestamp') || ''
@@ -86,7 +87,9 @@ async function handle(req) {
   if (!ALLOWED_COMMANDS.has(command)) return jsonReply(`Unknown command: ${command}`, threadTs)
 
   if (command === '/acg-up') {
-    const provider = VALID_PROVIDERS.has(text) ? text : 'aws'
+    const _t = text.toLowerCase()
+    const _p = PROVIDER_ALIASES[_t] || _t
+    const provider = VALID_PROVIDERS.has(_p) ? _p : 'aws'
     const { ok, conflict } = await relay('/api/v1/cluster', { action: 'up', provider, response_url: responseUrl })
     if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`, threadTs)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
@@ -117,7 +120,9 @@ async function handle(req) {
   }
 
   if (command === '/acg-resume') {
-    const provider = VALID_PROVIDERS.has(text) ? text : 'aws'
+    const _t = text.toLowerCase()
+    const _p = PROVIDER_ALIASES[_t] || _t
+    const provider = VALID_PROVIDERS.has(_p) ? _p : 'aws'
     const { ok, conflict } = await relay('/api/v1/cluster-resume', { provider, response_url: responseUrl })
     if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`, threadTs)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)

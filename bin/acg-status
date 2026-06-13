@@ -8,7 +8,7 @@
 #   bin/acg-status
 #
 # Environment:
-#   APP_CONTEXT    kubectl context for app cluster (default: ubuntu-k3s)
+#   APP_CONTEXT    kubectl context for app cluster (auto-resolved if unset)
 #   INFRA_CONTEXT  kubectl context for infra cluster (default: k3d-k3d-cluster)
 
 set -euo pipefail
@@ -16,10 +16,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 source "${REPO_ROOT}/scripts/lib/system.sh"
+source "${REPO_ROOT}/scripts/lib/provider.sh"
 
-APP_CONTEXT="${APP_CONTEXT:-ubuntu-k3s}"
+CLUSTER_PROVIDER="$(_acg_resolve_provider)"
+APP_CONTEXT="${APP_CONTEXT:-$(_acg_provider_context "${CLUSTER_PROVIDER}")}"
 INFRA_CONTEXT="${INFRA_CONTEXT:-k3d-k3d-cluster}"
-CLUSTER_PROVIDER="${CLUSTER_PROVIDER:-k3d}"
 
 echo "=== Hub Cluster (${INFRA_CONTEXT}) ==="
 kubectl get nodes --context "${INFRA_CONTEXT}" 2>/dev/null \
@@ -58,7 +59,7 @@ echo "=== ArgoCD ApplicationSets ==="
 kubectl get applicationsets.argoproj.io -A --context "${INFRA_CONTEXT}" 2>/dev/null \
   || echo "Cannot reach Hub cluster or ArgoCD CRDs not installed"
 
-if [[ "${CLUSTER_PROVIDER}" != "k3s-gcp" ]]; then
+if [[ "${CLUSTER_PROVIDER}" == "k3s-aws" ]]; then
   echo ""
   echo "=== AWS Credentials ==="
   if aws sts get-caller-identity --output table 2>/dev/null; then

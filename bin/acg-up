@@ -65,8 +65,12 @@ case "${_cluster_provider}" in
   k3s-gcp)
     source "${REPO_ROOT}/scripts/plugins/gcp.sh"
     ;;
+  k3s-az)
+    source "${REPO_ROOT}/scripts/plugins/azure.sh"
+    source "${REPO_ROOT}/scripts/lib/providers/k3s-az.sh"
+    ;;
   *)
-    _err "[acg-up] Unsupported CLUSTER_PROVIDER: ${_cluster_provider} (supported: k3s-aws, k3s-gcp)"
+    _err "[acg-up] Unsupported CLUSTER_PROVIDER: ${_cluster_provider} (supported: k3s-aws, k3s-gcp, k3s-az)"
     ;;
 esac
 
@@ -147,6 +151,37 @@ if [[ "${K3DM_RESUME:-0}" != "1" ]]; then
   rm -rf "${_ACG_CHECKPOINT_DIR}"
 fi
 
+_info "[acg-up] Step 0/12 — Pruning stale public IPs from ~/.ssh/known_hosts..."
+_kh="${HOME}/.ssh/known_hosts"
+if [[ -f "${_kh}" ]]; then
+  cp -p "${_kh}" "${_kh}.bak"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - "${_kh}" <<'PY'
+import sys, ipaddress, re
+path = sys.argv[1]
+kept, removed = [], 0
+for line in open(path):
+    s = line.strip()
+    if not s or s.startswith('#') or s.startswith('|1|'):
+        kept.append(line); continue
+    host = s.split()[0].split(',')[0]
+    m = re.match(r'^\[(.+)\](?::\d+)?$', host)
+    h = m.group(1) if m else host
+    try:
+        ip = ipaddress.ip_address(h)
+        if ip.version == 4 and ip.is_global:
+            removed += 1; continue
+    except ValueError:
+        pass
+    kept.append(line)
+open(path, 'w').writelines(kept)
+print(f"INFO: [acg-up] known_hosts pruned {removed} public-IP entries, kept {len(kept)}")
+PY
+  else
+    _warn "[acg-up] python3 not found — skipping known_hosts prune"
+  fi
+fi
+
 _info "[acg-up] Step 1/12 — Getting ${_cluster_provider} credentials..."
 case "${_cluster_provider}" in
   k3s-aws)
@@ -178,6 +213,26 @@ case "${_cluster_provider}" in
   k3s-gcp)
     gcp_get_credentials ${sandbox_url:+"$sandbox_url"}
     ;;
+  k3s-az)
+    _az_existing_rg=""
+    if _az_ok 2>/dev/null; then
+      _az_existing_rg=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
+    fi
+    if [[ -n "${_az_existing_rg}" ]]; then
+      _info "[acg-up] Azure credentials already valid — skipping Playwright extraction"
+      AZ_RESOURCE_GROUP="${_az_existing_rg}"
+      export AZ_RESOURCE_GROUP
+    else
+      _acg_cred_test_url="${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
+      _info "[acg-up] Extracting and validating Azure credentials..."
+      _browser_launch
+      "${REPO_ROOT}/scripts/lib/acg/bin/acg-credential-test" "${_acg_cred_test_url}" --provider azure || exit 1
+      _info "[acg-up] Azure credentials extracted and validated."
+      AZ_RESOURCE_GROUP=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
+      export AZ_RESOURCE_GROUP
+    fi
+    [[ -n "${AZ_RESOURCE_GROUP:-}" ]] || { _err "[acg-up] Could not determine AZ_RESOURCE_GROUP after credential extraction — aborting"; exit 1; }
+    ;;
 esac
 
 _info "[acg-up] Step 2/12 — Provisioning 3-node cluster..."
@@ -188,9 +243,39 @@ else
   _cp_write "step-2-cluster"
 fi
 
-if [[ "${_cluster_provider}" != "k3s-gcp" ]]; then
+if [[ "${_cluster_provider}" != "k3s-gcp" && "${_cluster_provider}" != "k3s-az" ]]; then
   _info "[acg-up] Step 3/12 — Starting SSH tunnel..."
   tunnel_start
+fi
+
+if ! docker info >/dev/null 2>&1; then
+  _info "[acg-up] Docker daemon not responding — checking OrbStack VM state..."
+  if command -v orbctl >/dev/null 2>&1; then
+    _orb_status=$(orbctl status 2>/dev/null || true)
+    if [[ "${_orb_status}" == "Stopped" ]]; then
+      _info "[acg-up] OrbStack VM is stopped — starting it now..."
+      _info "[acg-up] OrbStack may show a GUI dialog asking for admin password — approve it to start the VM..."
+      orbctl start 2>/dev/null || true
+    fi
+  elif [[ -d "/Applications/OrbStack.app" ]]; then
+    _info "[acg-up] orbctl not found — opening OrbStack.app..."
+    open -a "OrbStack"
+  elif [[ -d "/Applications/Docker.app" ]]; then
+    _info "[acg-up] orbctl not found — opening Docker.app..."
+    open -a "Docker"
+  fi
+  _orbstack_sock="${HOME}/.orbstack/run/docker.sock"
+  _docker_wait=0
+  until (docker info >/dev/null 2>&1 && [[ -S "${_orbstack_sock}" ]]) || \
+        [[ "${_docker_wait}" -ge 60 ]]; do
+    sleep 2
+    ((_docker_wait++)) || true
+  done
+  if ! docker info >/dev/null 2>&1; then
+    _err "[acg-up] Docker daemon unavailable after recovery — run 'orbctl start' and retry"
+    exit 1
+  fi
+  _info "[acg-up] Docker daemon is up."
 fi
 
 _HUB_CLUSTER_CTX="k3d-${HUB_CLUSTER_NAME:-k3d-cluster}"
@@ -241,6 +326,12 @@ mkdir -p "$(dirname "${_vault_pf_pid_file}")"
 if [[ -f "${_vault_pf_pid_file}" ]]; then
   kill "$(cat "${_vault_pf_pid_file}")" 2>/dev/null || true
   rm -f "${_vault_pf_pid_file}"
+fi
+_stale_vault_pf=$(lsof -ti:"${_vault_local_port}" 2>/dev/null || true)
+if [[ -n "${_stale_vault_pf}" ]]; then
+  _info "[acg-up] Port ${_vault_local_port} in use — killing stale vault port-forward holders..."
+  echo "${_stale_vault_pf}" | xargs kill 2>/dev/null || true
+  sleep 1
 fi
 kubectl port-forward svc/vault -n secrets --context k3d-k3d-cluster "${_vault_local_port}:8200" \
   >>"${_ACG_STATE_DIR}/logs/vault-pf.log" 2>&1 &
@@ -504,6 +595,12 @@ if [[ "${_cluster_provider}" == "k3s-gcp" ]]; then
   _info "[acg-up] Steps 5–12 (ESO, ArgoCD registration, Vault bridge) not yet ported for GCP."
   _info "[acg-up] Hub cluster is up. GCP app cluster nodes:"
   kubectl get nodes --context ubuntu-gcp 2>/dev/null || true
+  exit 0
+fi
+if [[ "${_cluster_provider}" == "k3s-az" ]]; then
+  _info "[acg-up] Steps 5–12 (ESO, ArgoCD registration, Vault bridge) not yet ported for Azure."
+  _info "[acg-up] Hub cluster is up. Azure app cluster nodes:"
+  kubectl get nodes --context ubuntu-azure 2>/dev/null || true
   exit 0
 fi
 
@@ -1695,7 +1792,8 @@ _info "[acg-up]   Frontend:    ${FRONTEND_PUBLIC_URL:-https://frontend.${CF_DOMA
 _info "[acg-up]   Keycloak:    ${KEYCLOAK_PUBLIC_URL:-https://keycloak.${CF_DOMAIN:-3ai-talk.org}}"
 _info "[acg-up]   Prometheus:  https://prometheus.${CF_DOMAIN:-3ai-talk.org}"
 _info "[acg-up]   Grafana:     https://grafana.${CF_DOMAIN:-3ai-talk.org}"
-echo "{\"provisioned_at\": $(date +%s), \"provider\": \"${CLUSTER_PROVIDER:-k3s-aws}\"}" \
+_acg_record_provider "${_cluster_provider}"
+echo "{\"provisioned_at\": $(date +%s), \"provider\": \"${_cluster_provider}\"}" \
   > "${_ACG_STATE_DIR}/acg-state.json"
 _info "[acg-up] === Local URLs (Mac only) ==="
 _info "[acg-up]   ArgoCD:   https://argocd.shopping-cart.local"

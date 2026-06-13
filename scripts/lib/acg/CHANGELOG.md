@@ -5,6 +5,28 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `playwright/lib/sandbox.js`: replace `reopenAttempted` boolean with `reopenCount` counter — allow 3 reopen attempts with 8s wait per attempt; single 3s attempt was too tight for Azure panel render after click
+- `playwright/lib/sandbox.js`: delete+restart Azure sandbox when credential fields are partially populated (at least one field has a value but not all are filled) after 60s — up to 3 delete+restart cycles; timer starts only once the panel has loaded enough to show some credentials, preventing premature deletion during initial field loading
+- `bin/acg-credential-test`: restart sandbox on Azure service-principal validation failure — mirror the AWS restart pattern by calling `_do_restart`, waiting for CDP readiness, re-extracting credentials, and re-validating before falling back to the existing Azure auth failure message
+- `playwright/lib/sandbox.js`: detect sandbox conflict from the always-visible "shut down your current X sandbox" banner text — the prior Auto Shutdown selector only matched when the provider panel was open, so a closed-panel conflicting sandbox was never deleted; also skip disabled Start Sandbox buttons during credential wait and re-check the conflict banner before treating a disabled Start Sandbox as "already running"
+- `playwright/lib/sandbox.js`: close the target provider panel before searching for the conflicting provider's Delete/Open buttons — the full-screen credential modal hid them, so conflict deletion silently no-op'd; also stop `_waitForCredentials` from falling through to the reopen loop when credential inputs are visible but no panel-scoped Start Sandbox was found
+
+## [0.1.5] - 2026-06-11
+
+### Fixed
+- `playwright/lib/sandbox.js`: scope `addLocatorHandler` trigger to `h3` and `h2` heading elements — broad text regex matched both heading and paragraph, causing Playwright strict-mode violation when the toast appeared
+- `playwright/lib/sandbox.js`: use `Escape` key in `addLocatorHandler` to dismiss "Session extended" toast — previous close-button click was unscoped and closed the credential panel instead of the toast
+- `playwright/lib/sandbox.js`: parse conflicting provider name from conflict warning text — previous detection used a broken "Auto Shutdown" selector that never matched AWS, so `_deleteConflictingSandbox` never ran and the warning loop spun forever
+- `playwright/lib/sandbox.js`: check for "Hang tight" / "Finalizing your playground" provisioning banner in `_waitForCredentials` before triggering reopen or throw — panel auto-closes during Azure sandbox startup; without this check the `reopenAttempted` guard fired immediately and aborted while the sandbox was still provisioning
+- `playwright/lib/sandbox.js`: remove `panelInStartState` heuristic — global DOM check caused bidirectional regression when both provider panels were visible
+- `playwright/lib/sandbox.js`: add unscoped `Start Sandbox` fallback in `acg_restart.js` for detached panel overlay flow
+- `bin/acg-credential-test`: remove portal-only restart loop — replace with fail-fast error so MFA failures surface immediately instead of looping
+- `bin/acg-credential-test`: automate Azure device code sign-in via CDP browser automation — when `az login --username --password` fails due to MFA enforcement, run `az login --use-device-code` in background, parse device URL and code from stderr, and drive sign-in via Playwright `acg_azure_device_login.js`; removes manual browser prompt entirely
+- `bin/acg-credential-test`: persist `az login` to `~/.azure` after SP validation
+
+## [0.4.0] - 2026-06-10
+
 ### Added
 - `playwright/lib/sandbox.js`: Azure provider support — add `_findScopedButton` and `_deleteConflictingSandbox`, scope `startSandbox(page, targetUrl, provider)` button lookups to the provider card, delete conflicting active sandboxes before opening Azure, and keep the yellow-band conflict warning as a retry safety net; `playwright/acg_credentials.js` now passes `provider` through to `startSandbox`; `playwright/providers/azure.js` now extracts Azure username/password/subscription/tenant credentials from copyable inputs
 
@@ -21,6 +43,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `bin/acg-credential-test`: add OIDC tenant discovery when Azure tenant is not visible in Pluralsight UI — query `https://login.microsoftonline.com/<domain>/.well-known/openid-configuration` to extract tenant ID from username domain
 - `bin/acg-credential-test`: mask tenant ID and subscription ID in terminal output; expose `az login` error messages to stderr
 - `bin/acg-credential-test`: validate Azure portal username/password with `az login --username ... --password ...`, discover tenant from the username domain when missing, and keep service-principal validation as a fallback when `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` are present
+- `playwright/lib/sandbox.js`: add `.first()` to the `addLocatorHandler` trigger locator in `startSandbox` so Playwright strict mode does not raise a "resolved to 2 elements" error when both the toast heading and body text match the regex — brings sandbox.js into line with the `.first()` pattern already used in `acg_extend.js` and `acg_restart.js`
 - `playwright/lib/sandbox.js`: add `addLocatorHandler` in `startSandbox` to dismiss "Session extended" / "sandbox has been extended" toast by clicking its close button, re-opening the credential panel if toast dismissal collapsed it
 - `playwright/lib/sandbox.js` and `playwright/providers/azure.js`: exclude shared-container DOM elements from conflicting sandbox detection — walk stops at provider-keyword ancestor to prevent false-positive matches on containers visible in multiple provider cards
 - `playwright/lib/sandbox.js` and `playwright/acg_restart.js`: scope the post-Open-Sandbox `startButton2` fallback and the restart-flow Delete/Open/Start button lookups to the target provider card so AWS no longer wins the DOM-first fallback when Azure is the intended sandbox

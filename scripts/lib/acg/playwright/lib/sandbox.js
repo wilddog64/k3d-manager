@@ -201,7 +201,9 @@ async function _capturePageDebugState(page, label, reason) {
 async function _waitForCredentials(page, providerLabel) {
   console.error(`INFO: Waiting for ${providerLabel} credentials to populate (up to 420s)...`);
   const deadline = Date.now() + 420000;
-  let reopenAttempted = false;
+  let reopenCount = 0;
+  let partialCredsFirstSeen = 0;
+  let deleteCycleCount = 0;
   while (Date.now() < deadline) {
     await _dismissExtendYourSessionDialog(page);
     const inputs = page.locator('input[aria-label="Copyable input"]');
@@ -211,6 +213,38 @@ async function _waitForCredentials(page, providerLabel) {
         Array.from({ length: inputCount }, (_, i) => inputs.nth(i).inputValue().catch(() => ''))
       );
       if (vals.every(v => v.trim().length > 0)) return;
+      if (partialCredsFirstSeen === 0 && vals.some(v => v.trim().length > 0)) partialCredsFirstSeen = Date.now();
+      if (
+        providerLabel === 'Azure' &&
+        partialCredsFirstSeen > 0 &&
+        Date.now() - partialCredsFirstSeen > 60000 &&
+        deleteCycleCount < 3
+      ) {
+        const deleteBtn = await _findScopedButton(page, 'Delete Sandbox', providerLabel, 5000);
+        if (deleteBtn) {
+          deleteCycleCount++;
+          console.error(`INFO: Azure SP credentials not populated after 60s — deleting sandbox and starting fresh (cycle ${deleteCycleCount}/3)...`);
+          await deleteBtn.click({ force: true }).catch(() => {});
+          const confirmBtn = page.locator('[role="alertdialog"] button', { hasText: /delete sandbox/i }).first();
+          if (await confirmBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await confirmBtn.click({ force: true }).catch(() => {});
+          }
+          console.error(`INFO: Waiting for Azure sandbox deletion (up to 180s)...`);
+          const startAfterDelete = await _findScopedButton(page, 'Start Sandbox', providerLabel, 180000);
+          if (startAfterDelete) {
+            console.error('INFO: Azure sandbox deleted — clicking Start Sandbox...');
+            await startAfterDelete.click({ force: true }).catch(() => {});
+          } else {
+            console.error('WARN: Start Sandbox not found after deletion — continuing to wait...');
+          }
+        } else {
+          console.error('WARN: Delete Sandbox button not found — cannot restart sandbox automatically');
+        }
+        partialCredsFirstSeen = 0;
+        reopenCount = 0;
+        await page.waitForTimeout(5000);
+        continue;
+      }
       // Panel open but credentials not yet populated — check for provider-scoped Start Sandbox.
       // Walk up to 20 ancestors with provider-exclusion: stops when a node contains providerLabel
       // but not any other provider keyword, to avoid matching shared card-grid ancestors.
@@ -221,6 +255,8 @@ async function _waitForCredentials(page, providerLabel) {
         const btn = allStart.nth(i);
         const visible = await btn.isVisible({ timeout: 300 }).catch(() => false);
         if (!visible) continue;
+        const disabled = await btn.isDisabled({ timeout: 300 }).catch(() => false);
+        if (disabled) continue;
         const inTargetPanel = await btn.evaluate((el, pLabel) => {
           const others = ['AWS', 'Google Cloud', 'GCP', 'Azure'].filter(
             p => !new RegExp(p, 'i').test(pLabel)
@@ -243,17 +279,28 @@ async function _waitForCredentials(page, providerLabel) {
         await page.waitForTimeout(5000);
         continue;
       }
+      await page.waitForTimeout(2000);
+      continue;
     }
     const reopenBtn = await _findScopedButton(page, 'Open Sandbox', providerLabel, 0);
     if (reopenBtn) {
-      if (reopenAttempted) {
-        await _capturePageDebugState(page, providerLabel, `${providerLabel} panel stayed closed after reopen attempt — aborting instead of looping for 420s.`);
-        throw new Error(`${providerLabel} panel stayed closed after reopen attempt — aborting instead of looping for 420s.`);
+      const provisioning = await page.evaluate(() => {
+        const t = document.body ? (document.body.innerText || '') : '';
+        return t.includes('Hang tight') || t.includes('Finalizing your playground');
+      }).catch(() => false);
+      if (provisioning) {
+        console.error(`INFO: ${providerLabel} sandbox is provisioning — waiting before reopening panel...`);
+        await page.waitForTimeout(5000);
+        continue;
       }
-      console.error(`INFO: ${providerLabel} panel closed — re-opening to retrieve credentials...`);
+      if (reopenCount >= 3) {
+        await _capturePageDebugState(page, providerLabel, `${providerLabel} panel stayed closed after ${reopenCount} reopen attempts — aborting.`);
+        throw new Error(`${providerLabel} panel stayed closed after ${reopenCount} reopen attempts — aborting.`);
+      }
+      reopenCount++;
+      console.error(`INFO: ${providerLabel} panel closed — re-opening to retrieve credentials (attempt ${reopenCount})...`);
       await reopenBtn.click({ force: true }).catch(() => {});
-      await page.waitForTimeout(3000);
-      reopenAttempted = true;
+      await page.waitForTimeout(8000);
       continue;
     }
     await page.waitForTimeout(2000);
@@ -320,6 +367,16 @@ async function _deleteConflictingSandbox(page, targetProvider) {
   const targetLabel = _providerLabels[targetProvider] || targetProvider;
 
   const conflictingLabel = await page.evaluate((tLabel) => {
+    // Primary: conflict banner is always visible when another sandbox is running,
+    // regardless of whether that provider's panel is open.
+    const bodyText = document.body ? (document.body.innerText || '') : '';
+    const bannerMatch = bodyText.match(/shut down your current ([A-Za-z ]+?) sandbox/i);
+    if (bannerMatch) {
+      const label = bannerMatch[1].trim();
+      if (!tLabel.toLowerCase().includes(label.toLowerCase())) return label;
+    }
+
+    // Fallback: Auto Shutdown text — only present when the provider panel is open.
     const candidates = [
       { label: 'AWS', keywords: ['AWS'] },
       { label: 'Google Cloud', keywords: ['Google Cloud', 'GCP'] },
@@ -345,23 +402,8 @@ async function _deleteConflictingSandbox(page, targetProvider) {
 
   if (!conflictingLabel) return;
 
-  // If the conflicting panel is already open in "Start Sandbox" state (not running —
-  // no Delete Sandbox button), just close it and return. Nothing to delete.
-  const panelInStartState = await page.evaluate(() => {
-    const btns = Array.from(document.querySelectorAll('button'));
-    const hasStart = btns.some(b => (b.innerText || '').trim() === 'Start Sandbox' && !b.disabled);
-    const hasDelete = btns.some(b => (b.innerText || '').includes('Delete Sandbox'));
-    const inputs = document.querySelectorAll('input[aria-label="Copyable input"]');
-    return hasStart && !hasDelete && inputs.length > 0;
-  }).catch(() => false);
-
-  if (panelInStartState) {
-    console.error(`INFO: ${conflictingLabel} panel open in Start Sandbox state (not running) — closing panel...`);
-    await _closeOpenPanel(page, conflictingLabel);
-    return;
-  }
-
   console.error(`INFO: Running ${conflictingLabel} sandbox detected — deleting before starting ${targetLabel}...`);
+  await _closeOpenPanel(page, targetLabel);
 
   let deleteBtn = await _findScopedButton(page, 'Delete Sandbox', conflictingLabel, 2000);
   if (!deleteBtn) {
@@ -405,16 +447,9 @@ async function startSandbox(page, targetUrl, provider) {
 
   console.error(`INFO: Looking for ${providerLabel} sandbox buttons...`);
   await page.addLocatorHandler(
-    page.locator('text=/sandbox has been extended|session extended/i'),
+    page.locator('h3, h2').filter({ hasText: /sandbox has been extended|session extended/i }).first(),
     async () => {
-      const closeBtn = page.locator(
-        'button[aria-label="close"], button[aria-label="Close"], button[aria-label="Dismiss"]'
-      ).first();
-      if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await closeBtn.click({ force: true }).catch(() => {});
-      } else {
-        await page.keyboard.press('Escape').catch(() => {});
-      }
+      await page.keyboard.press('Escape').catch(() => {});
       await page.waitForTimeout(800);
       // If the toast dismissal closed the credential panel, re-open it
       const inputsVisible = await page.locator('input[aria-label="Copyable input"]').first().isVisible({ timeout: 500 }).catch(() => false);
@@ -484,7 +519,21 @@ async function startSandbox(page, targetUrl, provider) {
       await startButton.scrollIntoViewIfNeeded().catch(() => {});
       await startButton.click({ force: true });
     } else {
-      console.error('INFO: Start Sandbox button is disabled — sandbox already running; waiting for credentials...');
+      const conflictBanner = await page.evaluate(() => {
+        const t = document.body ? (document.body.innerText || '') : '';
+        return t.includes('You may have only one active sandbox at a time');
+      }).catch(() => false);
+      if (conflictBanner) {
+        console.error('INFO: Start Sandbox disabled due to active conflict — deleting conflicting sandbox...');
+        await _deleteConflictingSandbox(page, provider);
+        const retryStart = await _findScopedButton(page, 'Start Sandbox', providerLabel, 10000);
+        if (retryStart && await retryStart.isEnabled({ timeout: 1000 }).catch(() => false)) {
+          await retryStart.scrollIntoViewIfNeeded().catch(() => {});
+          await retryStart.click({ force: true });
+        }
+      } else {
+        console.error('INFO: Start Sandbox button is disabled — sandbox already running; waiting for credentials...');
+      }
     }
     await _waitForCredentials(page, providerLabel);
   } else if (openButton) {
@@ -492,13 +541,40 @@ async function startSandbox(page, targetUrl, provider) {
     await openButton.click({ force: true });
     await page.waitForTimeout(3000);
 
-    const conflictWarning = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('*'))
-        .some(el => (el.innerText || '').includes('You may have only one active sandbox at a time'))
-    ).catch(() => false);
-    if (conflictWarning) {
-      console.error('WARN: Conflict warning still visible after Open Sandbox — retrying conflict deletion...');
-      await _deleteConflictingSandbox(page, provider);
+    const conflictWarningText = await page.evaluate(() => {
+      const el = Array.from(document.querySelectorAll('*'))
+        .find(el => (el.innerText || '').includes('You may have only one active sandbox at a time'));
+      return el ? (el.innerText || '') : '';
+    }).catch(() => '');
+    if (conflictWarningText) {
+      const _conflictMatch = conflictWarningText.match(/shut down your current ([A-Za-z ]+?) sandbox/i);
+      const _conflictingProvider = _conflictMatch ? _conflictMatch[1].trim() : null;
+      console.error(`WARN: Conflict warning detected — conflicting provider: ${_conflictingProvider || 'unknown'}`);
+      await _closeOpenPanel(page, providerLabel);
+      if (_conflictingProvider) {
+        let _conflictDeleteBtn = await _findScopedButton(page, 'Delete Sandbox', _conflictingProvider, 2000);
+        if (!_conflictDeleteBtn) {
+          const _conflictOpenBtn = await _findScopedButton(page, 'Open Sandbox', _conflictingProvider, 5000);
+          if (_conflictOpenBtn) {
+            await _conflictOpenBtn.click({ force: true });
+            _conflictDeleteBtn = await _findScopedButton(page, 'Delete Sandbox', _conflictingProvider, 15000);
+          }
+        }
+        if (_conflictDeleteBtn) {
+          await _conflictDeleteBtn.scrollIntoViewIfNeeded().catch(() => {});
+          await _conflictDeleteBtn.click({ force: true });
+          await page.waitForTimeout(1500);
+          const _conflictConfirm = page.locator('[role="alertdialog"] button', { hasText: /delete sandbox/i });
+          if (await _conflictConfirm.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await _conflictConfirm.click({ force: true });
+          }
+          console.error(`INFO: Waiting for ${_conflictingProvider} sandbox deletion (up to 180s)...`);
+          await _findScopedButton(page, 'Start Sandbox', _conflictingProvider, 180000);
+          await _closeOpenPanel(page, _conflictingProvider);
+        } else {
+          console.error(`WARN: Could not find Delete Sandbox for ${_conflictingProvider} — proceeding anyway`);
+        }
+      }
       const retryOpen = await _findScopedButton(page, 'Open Sandbox', providerLabel, 10000);
       if (retryOpen) {
         await retryOpen.click({ force: true });

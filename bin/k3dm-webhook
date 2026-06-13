@@ -281,7 +281,7 @@ def _read_job_tail(output_path, n=3):
 def _run_cluster(job_id, action, provider="aws"):
     job_dir = JOB_DIR / job_id
     _out_file = job_dir / "output"
-    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "azure": "k3s-azure"}
+    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az"}
     _cluster_provider = _provider_map.get(provider, "k3s-aws")
     _start = datetime.datetime.utcnow().timestamp()
     _progress_timer = None
@@ -395,7 +395,7 @@ def _run_cluster_resume(job_id, provider="aws"):
     """Re-run make up with K3DM_RESUME=1 to skip completed checkpoints."""
     job_dir = JOB_DIR / job_id
     _out_file = job_dir / "output"
-    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "azure": "k3s-azure"}
+    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az"}
     _cluster_provider = _provider_map.get(provider, "k3s-aws")
     _start = datetime.datetime.utcnow().timestamp()
     _progress_timer = None
@@ -528,11 +528,14 @@ def _verify_slack_signature(raw_body, timestamp, signature):
 
 
 def _find_job_by_thread_ts(thread_ts):
-    """Return job_id whose thread_ts file matches, or None."""
+    """Return job_id whose thread_ts file matches, or None. Skips ask sub-jobs."""
     if not JOB_DIR.exists():
         return None
     for ts_file in JOB_DIR.glob("*/thread_ts"):
         try:
+            action_file = ts_file.parent / "action"
+            if action_file.exists() and action_file.read_text().strip() == "ask":
+                continue
             if ts_file.read_text().strip() == thread_ts:
                 return ts_file.parent.name
         except OSError:
@@ -636,6 +639,8 @@ def _handle_thread_command(job_id, command):
         if running:
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
+        _resume_parts = command.strip().split()
+        _resume_provider = _resume_parts[1].lower() if len(_resume_parts) >= 2 and _resume_parts[1].lower() in ("aws", "gcp", "az") else "aws"
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -646,16 +651,18 @@ def _handle_thread_command(job_id, command):
             (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
         threading.Thread(
             target=_run_cluster_resume,
-            args=(new_job_id, "aws"),
+            args=(new_job_id, _resume_provider),
             daemon=True,
         ).start()
-        _notify_job(job_id, f"🔄 *acg-resume* queued — job `{new_job_id}`")
+        _notify_job(job_id, f"🔄 *acg-resume* ({_resume_provider}) queued — job `{new_job_id}`")
 
     elif cmd in ("acg-down", "down"):
         running = _running_cluster_job()
         if running:
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
+        _down_parts = command.strip().split()
+        _down_provider = _down_parts[1].lower() if len(_down_parts) >= 2 and _down_parts[1].lower() in ("aws", "gcp", "az") else "aws"
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -666,16 +673,18 @@ def _handle_thread_command(job_id, command):
             (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
         threading.Thread(
             target=_run_cluster,
-            args=(new_job_id, "down", "aws"),
+            args=(new_job_id, "down", _down_provider),
             daemon=True,
         ).start()
-        _notify_job(job_id, f"⬇️ *acg-down* queued — job `{new_job_id}`")
+        _notify_job(job_id, f"⬇️ *acg-down* ({_down_provider}) queued — job `{new_job_id}`")
 
     elif cmd in ("acg-up", "up"):
         running = _running_cluster_job()
         if running:
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
+        _up_parts = command.strip().split()
+        _up_provider = _up_parts[1].lower() if len(_up_parts) >= 2 and _up_parts[1].lower() in ("aws", "gcp", "az") else "aws"
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -686,10 +695,10 @@ def _handle_thread_command(job_id, command):
             (new_job_dir / "thread_ts").write_text(thread_ts_file.read_text())
         threading.Thread(
             target=_run_cluster,
-            args=(new_job_id, "up", "aws"),
+            args=(new_job_id, "up", _up_provider),
             daemon=True,
         ).start()
-        _notify_job(job_id, f"🚀 *acg-up* queued — job `{new_job_id}`")
+        _notify_job(job_id, f"🚀 *acg-up* ({_up_provider}) queued — job `{new_job_id}`")
 
     elif cmd == "ask":
         _VALID_AGENTS = {"claude", "gemini", "codex"}
@@ -735,6 +744,7 @@ def _handle_thread_command(job_id, command):
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
         (new_job_dir / "status").write_text("queued")
+        (new_job_dir / "action").write_text("ask")
         if thread_ts:
             (new_job_dir / "thread_ts").write_text(thread_ts)
         threading.Thread(
@@ -2460,7 +2470,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 self._json(409, {"error": f"cluster job already running: {running[0]} ({running[1]})"})
                 return
             provider = body.get("provider", "aws")
-            if provider not in ("aws", "gcp", "azure"):
+            if provider not in ("aws", "gcp", "az"):
                 provider = "aws"
             response_url = body.get("response_url", "")
             job_id = str(uuid.uuid4())[:8]
@@ -2513,7 +2523,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 self._json(409, {"error": f"cluster job already running: {running[0]} ({running[1]})"})
                 return
             provider = body.get("provider", "aws")
-            if provider not in ("aws", "gcp", "azure"):
+            if provider not in ("aws", "gcp", "az"):
                 provider = "aws"
             response_url = body.get("response_url", "")
             job_id = str(uuid.uuid4())[:8]

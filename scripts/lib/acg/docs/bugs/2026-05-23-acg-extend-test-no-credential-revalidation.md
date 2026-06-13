@@ -116,7 +116,7 @@ fix(acg-extend-test): drop exec — add AWS credential re-validation after exten
 
 ## What NOT to Do
 
-- Do NOT create a PR
+- Do NOT create a PR yourself — Claude handles PR creation after verifying the commit
 - Do NOT skip pre-commit hooks (`--no-verify`)
 - Do NOT modify any file other than `bin/acg-extend-test`
 - Do NOT commit to `main`

@@ -98,7 +98,7 @@ fix(acg-restart): scroll + retry Delete Sandbox click — panel animation causes
 
 ## What NOT to Do
 
-- Do NOT create a PR
+- Do NOT create a PR yourself — Claude handles PR creation after verifying the commit
 - Do NOT skip pre-commit hooks (`--no-verify`)
 - Do NOT modify any file other than `playwright/acg_restart.js`
 - Do NOT commit to `main`

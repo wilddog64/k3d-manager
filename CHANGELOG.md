@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+## [1.6.5] - 2026-06-13
+
+### Added
+- `k3s-az` Azure provider — VM provision, k3sup install, and shopping-cart deploy; wired into `bin/acg-up` and `bin/acg-down`
+- Optional `provider` argument for `/acg-up`, `/acg-down`, and `/acg-resume` Slack commands
+- Provider-aware `make refresh` / `make status` / `acg-refresh` / `acg-status` — active provider is recorded at provision time (state file primary, kube-context probe fallback, explicit env override) so Azure/GCP clusters no longer fall through to AWS defaults
+
+### Fixed
+- Slack relay accepts `az` as the canonical provider token (with `azure` alias) for `/acg-up` and `/acg-resume`
+- SSH: non-interactive host keys in shopping-cart deploy + known_hosts prune during `acg-up` preflight
+- shopping-cart cross-cluster deploy: poll for data-layer StatefulSet presence instead of one-shot check; re-login ArgoCD before cluster add; purge stale default cluster/user before kubeconfig flatten; resolve SSH alias to IP; copy k3s kubeconfig to user home for sudo-free re-export; wait for product-catalog-seed job deletion before re-apply; default SSH user to `ubuntu`
+- `acg-up` Azure path: gate `az group list` behind `_az_ok` (no spurious device-code auth); require non-empty resource group in the fast-path so stale creds don't skip extraction; guard `KV_NAME` in `azure-vars.sh`; extract Azure creds in Step 1 via `acg-credential-test`
+- `acg-up` OrbStack/Docker preflight: recover a stopped OrbStack VM via `orbctl start`; dismiss OrbStack update dialogs; kill stale Vault port-forward via `lsof` before rebind
+- `azure.sh` no longer sources `azure-vars.sh` at top level — `az ad app create` no longer runs on every plugin load
+- Webhook skips `ask` sub-jobs in `_find_job_by_thread_ts` so Codex no longer repeats prior answers
+
+### Changed
+- lib-acg subtree synced to v0.1.7 (PR #44) — Azure SP/CLI-first credential validation, extend/restart hardening
+- lib-foundation subtree synced — extensible cluster-provider hook (PR #30)
+
 ## [1.6.4] - 2026-06-10
 
 ### Added

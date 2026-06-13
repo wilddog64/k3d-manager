@@ -295,11 +295,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-06-13 | [Copilot PR #94 Review Findings](docs/issues/2026-06-13-copilot-pr94-review-findings.md) | slack-relay provider alias case-fold fix (`eb0dfca2`); acg_restart case-sensitive exclusion deferred upstream to lib-acg |
 | 2026-06-10 | [Copilot PR #93 Review Findings](docs/issues/2026-06-10-copilot-pr93-review-findings.md) | CodeQL variable naming taint, Prometheus bootstrap hardcoding, docs inconsistency — 5 findings fixed in 6c814019 |
 | 2026-06-10 | [lib-acg Azure credential-test prefers portal over SP](docs/issues/2026-06-10-lib-acg-azure-credential-test-prefers-portal-over-sp.md) | Azure credential validation — credential-test runs portal login first even when SP creds are available; should prefer CLI/SP validation |
 | 2026-06-08 | [Prometheus Operator requires Vault secret](docs/issues/2026-06-08-prometheus-operator-requires-vault-secret.md) | Prometheus Operator chart deployment — requires Vault secret during CRD bootstrap even when unauthenticated Prometheus is desired |
 | 2026-06-08 | [Grafana routing loop & port conflict (local vs tunnel)](docs/issues/2026-06-08-grafana-routing-loop-etc-hosts-conflict.md) | Grafana DNS/port conflict — tunnel routes grafana→localhost:3000 vs /etc/hosts+port-forward conflicts; loopback DNS resolution needed |
-| 2026-06-07 | [acg-refresh drops ArgoCD cluster labels](docs/issues/2026-06-07-acg-refresh-drops-argocd-cluster-labels.md) | ACG cluster sync — `acg-refresh` loses ArgoCD server labels during secret refresh; re-sync resolves but inconsistent behavior |
 
 [All issues →](docs/issues/)
 
@@ -309,16 +309,17 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.6.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.4) | 2026-06-10 | Slack Events API text commands (`acg-status`/`acg-refresh`/`ask`/`claude`/`gemini`/`codex` from thread replies + channel messages); Slack thread context for text commands; Prometheus deploy metrics + Grafana dashboard + non-interactive auth bootstrap; `make show-service-passwords`; ACG restart-failure screenshot archival; webhook `posix_spawn` NEF-safety; lib-acg subtree v0.1.4 |
 | [v1.6.3](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.3) | 2026-06-07 | `/acg-resume` checkpoint re-entry; `/ask` multi-agent troubleshooting; Slack thread context injection for agents; Webhook NEF SIGSEGV fix (`posix_spawn`); Webhook read-only bash sandbox for `/ask` agents; Keycloak group-ldap-mapper reconciliation |
 | [v1.6.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.2) | 2026-06-05 | `/acg-refresh` Slack slash command with worker relay; ACG LaunchAgent self-healing; Prometheus web.config.file conflict fix; acg-status stale display caveat labels |
-| [v1.6.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.1) | 2026-06-05 | ACG LaunchAgent self-healing — `acg-refresh` auto-reinstalls missing system daemon plists (argocd/keycloak/frontend port-forwards); Vault port-forward LaunchAgent install during `acg-up` |
-| [v1.6.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.0) | 2026-06-04 | Webhook Slack threading + thread commands; AI-powered failure analysis (Gemini triage + Claude vision); webhook token auto-rotation; Python 3.13 SIGSEGV fix |
 
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.6.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.1) | 2026-06-05 | ACG LaunchAgent self-healing — `acg-refresh` auto-reinstalls missing system daemon plists (argocd/keycloak/frontend port-forwards); Vault port-forward LaunchAgent install during `acg-up` |
+| [v1.6.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.0) | 2026-06-04 | Webhook Slack threading + thread commands; AI-powered failure analysis (Gemini triage + Claude vision); webhook token auto-rotation; Python 3.13 SIGSEGV fix |
 | [v1.4.11](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.11) | 2026-05-29 | ESO sync saturation fix, acg-down macOS Tahoe password prompt fix, data-layer StatefulSet race fix, Keycloak group-ldap-mapper reconciliation, ArgoCD RBAC product-catalog reference fix, legacy ArgoCD app definition removal |
 | [v1.4.10](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.10) | 2026-05-29 | ArgoCD stability, bootstrap reliability, /tmp cleanup |
 | [v1.4.9](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.9) | 2026-05-22 | ACG credential wait + extraction visibility fixes; Cloudflare tunnel named config; CoreDNS duplicate hosts patch |
