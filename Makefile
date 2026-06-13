@@ -43,8 +43,7 @@ status:
 	  k3s-oci) CLUSTER_PROVIDER=k3s-oci KUBECONFIG=$(HOME)/.kube/k3s-oci.yaml \
 	             kubectl get nodes,pods -A --no-headers 2>/dev/null \
 	             || echo "OCI cluster unreachable" ;; \
-	  k3s-hostinger) kubectl --context ubuntu-hostinger get nodes,pods -A --no-headers 2>/dev/null \
-	             || echo "Hostinger cluster unreachable" ;; \
+	  k3s-hostinger) bin/hostinger-status ;; \
 	  *)       $(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/acg-status ;; \
 	esac
 
