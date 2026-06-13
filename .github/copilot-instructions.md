@@ -13,7 +13,7 @@ Use the rules below to shape all code suggestions and PR reviews.
 - **Privilege escalation**: always via `_run_command --prefer-sudo` or `--require-sudo` — never bare `sudo`.
 - **OS detection**: always via `_detect_platform` — never inline `_is_mac`/`_is_debian_family` dispatch chains.
 - **Secret backends**: interface in `scripts/lib/secret_backends/` — Vault is complete, others stubbed.
-- **Cluster providers**: `scripts/lib/providers/` — `k3d`, `orbstack`, `k3s-aws`, `k3s-oci`, `k3s-gcp`.
+- **Cluster providers**: `scripts/lib/providers/` — `k3d`, `orbstack`, `k3s-aws`, `k3s-oci`, `k3s-gcp`, `k3s-az`. Active provider is recorded to `${_ACG_STATE_DIR}/active-provider` at provision time; `bin/acg-refresh` and `bin/acg-status` self-resolve provider/context (explicit env > active-provider file > reachable-context probe > default `k3s-aws`).
 - **ACG plugin**: `scripts/plugins/acg.sh` — `acg_get_credentials`, `acg_provision`, `acg_status`, `acg_extend`, `acg_watch`, `acg_teardown`. Manages Pluralsight ACG sandbox lifecycle via CloudFormation + k3sup (AWS) or GCP.
 - **GCP plugin**: `scripts/plugins/gcp.sh` — `gcp_login`, `gcp_get_credentials`. OAuth automation via CDP; GCE cluster provisioning via k3sup.
 - **Playwright**: `scripts/lib/acg/playwright/` — static Node.js scripts: `acg_credentials.js` (AWS/GCP credential extraction), `acg_extend.js` (sandbox TTL extend), `gcp_login.js` (Google OAuth flow automation). All connect to Chrome via CDP (`localhost:9222`). Source of truth is `wilddog64/lib-acg`; pulled into k3d-manager as a git subtree under `scripts/lib/acg/`.

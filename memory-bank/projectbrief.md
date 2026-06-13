@@ -3,8 +3,8 @@
 ## What It Is
 
 k3d-manager is a multi-cloud k3s cluster lifecycle framework built in Bash. It provisions,
-configures, and tears down lightweight Kubernetes clusters on AWS EC2 (live), GCP and Azure
-(planned), and local runtimes (k3d, OrbStack) — all from a single entry point with a
+configures, and tears down lightweight Kubernetes clusters on AWS EC2 (live), GCP, Azure, and
+OCI (live), plus local runtimes (k3d, OrbStack) — all from a single entry point with a
 consistent command interface.
 
 It is **not** a general-purpose cluster tool and is **not** a local-only dev environment.
@@ -44,7 +44,7 @@ and two functions — nothing else changes.
 | `orbstack`         | `orbstack`    | Active (local OrbStack VM) |
 | `k3s-oci`          | `k3s_oci`     | Active (OCI Always Free; single-node + two-node; shipped v1.5.0) |
 | `k3s-gcp`          | `k3s_gcp`     | Active (GCP ACG sandbox via GCE + k3sup; shipped v1.1.0) |
-| `k3s-azure`        | `k3s_azure`   | Planned (v1.0.6) |
+| `k3s-az`           | `k3s_az`      | Active (Azure ACG sandbox via CloudFormation + k3sup; shipped v1.6.5) |
 
 ### Plugin System
 
@@ -82,7 +82,6 @@ directory integration plugin, mirroring the same pattern as cluster providers.
 **Out of scope:**
 - Production cluster management.
 - Cloud-managed Kubernetes (EKS, GKE, AKS) — k3d-manager is kops-for-k3s only.
-- GCP and Azure provisioning — planned for v1.0.5 and v1.0.6 respectively.
 
 ## Why This Stack (Component Origin Story)
 
