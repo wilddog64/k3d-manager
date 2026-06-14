@@ -1,4 +1,4 @@
-const ALLOWED_COMMANDS = new Set(['/acg-up', '/acg-down', '/acg-status', '/acg-refresh', '/acg-resume', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade'])
+const ALLOWED_COMMANDS = new Set(['/acg-up', '/acg-down', '/acg-status', '/acg-refresh', '/acg-resume', '/hostinger-status', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade'])
 const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'az'])
 const PROVIDER_ALIASES  = { azure: 'az' }
 
@@ -93,14 +93,14 @@ async function handle(req) {
     const { ok, conflict } = await relay('/api/v1/cluster', { action: 'up', provider, response_url: responseUrl })
     if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`, threadTs)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
-    return jsonReply(`⏳ Bringing up ACG cluster (${provider})…`, threadTs, true)
+    return jsonReply(`⏳ Bringing up ACG *lab sandbox* (${provider})… — learning sandbox only; the permanent app cluster is Hostinger (use /hostinger-status)`, threadTs, true)
   }
 
   if (command === '/acg-down') {
     const { ok, conflict } = await relay('/api/v1/cluster', { action: 'down', response_url: responseUrl })
     if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`, threadTs)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
-    return jsonReply('⏳ Tearing down ACG cluster…', threadTs, true)
+    return jsonReply('⏳ Tearing down ACG *lab sandbox*… — learning sandbox only (does not affect the permanent Hostinger app cluster)', threadTs, true)
   }
 
   if (command === '/acg-status') {
@@ -109,6 +109,14 @@ async function handle(req) {
     const { ok } = await relay('/api/v1/cluster-status', payload)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
     return jsonReply('🔍 Checking ACG cluster status…', threadTs, true)
+  }
+
+  if (command === '/hostinger-status') {
+    const payload = { response_url: responseUrl }
+    if (threadTs) payload.thread_ts = threadTs
+    const { ok } = await relay('/api/v1/hostinger-status', payload)
+    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    return jsonReply('🖥️ Checking Hostinger app cluster status…', threadTs, true)
   }
 
   if (command === '/acg-refresh') {

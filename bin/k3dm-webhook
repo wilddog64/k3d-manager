@@ -546,10 +546,10 @@ def _find_job_by_thread_ts(thread_ts):
 _THREAD_COMMANDS = {
     "kill", "diagnosis", "status", "logs", "ask",
     "acg-up", "acg-down", "acg-status", "acg-refresh", "acg-resume",
-    "cluster-status", "gemini", "claude", "codex",
+    "cluster-status", "hostinger-status", "gemini", "claude", "codex",
 }
 _STANDALONE_CMDS = {
-    "acg-status", "cluster-status", "acg-refresh", "refresh",
+    "acg-status", "cluster-status", "hostinger-status", "acg-refresh", "refresh",
     "ask", "claude", "gemini", "codex",
 }
 
@@ -619,6 +619,21 @@ def _handle_thread_command(job_id, command):
         ).start()
         _notify_job(job_id, f"🔎 *acg-status* queued — job `{new_job_id}`")
 
+    elif cmd == "hostinger-status":
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("queued")
+        thread_ts_file = JOB_DIR / job_id / "thread_ts"
+        thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+        threading.Thread(
+            target=_run_hostinger_status,
+            args=(new_job_id, ""),
+            kwargs={"thread_ts": thread_ts},
+            daemon=True,
+        ).start()
+        _notify_job(job_id, f"🖥️ *hostinger-status* queued — job `{new_job_id}`")
+
     elif cmd in ("acg-refresh", "refresh"):
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
@@ -676,7 +691,7 @@ def _handle_thread_command(job_id, command):
             args=(new_job_id, "down", _down_provider),
             daemon=True,
         ).start()
-        _notify_job(job_id, f"⬇️ *acg-down* ({_down_provider}) queued — job `{new_job_id}`")
+        _notify_job(job_id, f"⬇️ *acg-down* ({_down_provider}) — ACG lab sandbox only — queued — job `{new_job_id}`")
 
     elif cmd in ("acg-up", "up"):
         running = _running_cluster_job()
@@ -698,7 +713,7 @@ def _handle_thread_command(job_id, command):
             args=(new_job_id, "up", _up_provider),
             daemon=True,
         ).start()
-        _notify_job(job_id, f"🚀 *acg-up* ({_up_provider}) queued — job `{new_job_id}`")
+        _notify_job(job_id, f"🚀 *acg-up* ({_up_provider}) — ACG lab sandbox only — queued — job `{new_job_id}`")
 
     elif cmd == "ask":
         _VALID_AGENTS = {"claude", "gemini", "codex"}
@@ -1875,6 +1890,52 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
         _finish("failed")
 
 
+def _run_hostinger_status(job_id, response_url, thread_ts=None):
+    """Run bin/hostinger-status (read-only); post result to response_url or thread."""
+    job_dir = JOB_DIR / job_id
+    if thread_ts:
+        (job_dir / "thread_ts").write_text(thread_ts)
+    lines = []
+
+    def _log(msg):
+        lines.append(msg + "\n")
+
+    def _finish(status):
+        (job_dir / "status").write_text(status)
+        output = "".join(lines)
+        (job_dir / "output").write_text(output)
+        if response_url:
+            _slack_post(response_url, output)
+        else:
+            _notify_job(job_id, output)
+
+    try:
+        (job_dir / "status").write_text("running")
+        import shlex as _shlex_hs
+        repo_root = Path(__file__).resolve().parent.parent
+        status_bin = repo_root / "bin" / "hostinger-status"
+        status_out, status_timeout = _posix_spawn_capture(
+            ["/bin/bash", "-c",
+             f"{_shlex_hs.quote(str(status_bin))} && echo __WEBHOOK_SUCCESS__"],
+            timeout=180,
+        )
+        if status_timeout:
+            _log("\n❌ *Hostinger status timed out* after 180s — run `bin/hostinger-status` manually")
+            _finish("failed")
+            return
+        if "__WEBHOOK_SUCCESS__" in status_out:
+            _log("\n✅ *Hostinger status complete* — report gathered")
+        else:
+            tail_lines = [l for l in status_out.strip().splitlines()[-8:] if l]
+            _log("\n❌ *Hostinger status failed*")
+            if tail_lines:
+                _log("```\n{}\n```".format("\n".join(tail_lines)))
+        _finish("success")
+    except Exception as exc:
+        _log(f"ERROR: {exc}")
+        _finish("failed")
+
+
 def _run_analyze(job_id, alert_payload, response_url=""):
     """Gather kubectl diagnostics for firing alerts; call Claude; post to Slack."""
     job_dir = JOB_DIR / job_id
@@ -2495,6 +2556,21 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             (JOB_DIR / job_id / "status").write_text("queued")
             threading.Thread(
                 target=_run_cluster_status,
+                args=(job_id, response_url),
+                kwargs={"thread_ts": thread_ts},
+                daemon=True
+            ).start()
+            self._json(202, {"job_id": job_id, "status": "queued"})
+            return
+
+        if self.path == "/api/v1/hostinger-status":
+            response_url = body.get("response_url", "")
+            thread_ts = body.get("thread_ts", None)
+            job_id = str(uuid.uuid4())[:8]
+            (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
+            (JOB_DIR / job_id / "status").write_text("queued")
+            threading.Thread(
+                target=_run_hostinger_status,
                 args=(job_id, response_url),
                 kwargs={"thread_ts": thread_ts},
                 daemon=True
