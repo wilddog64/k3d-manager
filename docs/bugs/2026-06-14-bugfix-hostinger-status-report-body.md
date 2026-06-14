@@ -35,7 +35,7 @@ command — its entire purpose is to deliver the report, like its shell-script c
 # In Slack: /hostinger-status
 #   -> ack: "🖥️ Checking Hostinger app cluster status…"
 #   -> thread: "✅ Hostinger status complete — report gathered"   (NO report content)
-# Expected: the full 6-section bin/hostinger-status report in the thread.
+# Expected: the full `make status CLUSTER_PROVIDER=k3s-hostinger` (bin/cluster-status) report in the thread.
 ```
 
 ---
@@ -48,11 +48,11 @@ Keep `timeout=180` (intentional — `bin/hostinger-status` reaches a remote clus
 only the success/failure logging block so the captured report is posted, matching the spec's
 Change-7 intent.
 
-**Exact old block (lines 1922–1933):**
+**Exact old block (success/failure logging in `_run_hostinger_status`, post-consolidation `19e2ea71`):**
 
 ```python
         if status_timeout:
-            _log("\n❌ *Hostinger status timed out* after 180s — run `bin/hostinger-status` manually")
+            _log("\n❌ *Hostinger status timed out* after 180s — run `make status CLUSTER_PROVIDER=k3s-hostinger` manually")
             _finish("failed")
             return
         if "__WEBHOOK_SUCCESS__" in status_out:
@@ -69,7 +69,7 @@ Change-7 intent.
 
 ```python
         if status_timeout:
-            _log("\n❌ *Hostinger status timed out* after 180s — run `bin/hostinger-status` manually")
+            _log("\n❌ *Hostinger status timed out* after 180s — run `make status CLUSTER_PROVIDER=k3s-hostinger` manually")
             _finish("failed")
             return
         report = status_out.replace("__WEBHOOK_SUCCESS__", "").rstrip()
