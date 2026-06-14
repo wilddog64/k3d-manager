@@ -37,7 +37,7 @@ spec:
     spec:
       project: shopping-cart
       destination:
-        name: ubuntu-k3s
+        name: ${APP_CLUSTER_NAME}
         namespace: shopping-cart-apps
       source:
         repoURL: https://github.com/wilddog64/k3d-manager

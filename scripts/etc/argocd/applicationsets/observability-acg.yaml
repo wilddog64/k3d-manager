@@ -29,7 +29,7 @@ spec:
     spec:
       project: platform
       destination:
-        name: ubuntu-k3s
+        name: ${APP_CLUSTER_NAME}
         namespace: '{{.namespace}}'
       sources:
         - repoURL: https://github.com/wilddog64/k3d-manager
