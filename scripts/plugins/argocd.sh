@@ -1076,6 +1076,9 @@ function _argocd_deploy_applicationsets() {
    K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
    export K3D_MANAGER_BRANCH
 
+   APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-ubuntu-hostinger}"
+   export APP_CLUSTER_NAME
+
    local appsets_dir="$ARGOCD_CONFIG_DIR/applicationsets"
 
    if [[ ! -d "$appsets_dir" ]]; then
@@ -1103,7 +1106,7 @@ function _argocd_deploy_applicationsets() {
       filename=$(basename "$file")
       _info "[argocd] Deploying ApplicationSet: $filename"
 
-      if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
+      if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME' < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
          ((deployed_count++))
       else
          _warn "[argocd] Failed to deploy ApplicationSet: $filename"

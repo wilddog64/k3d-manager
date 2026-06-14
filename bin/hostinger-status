@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+#
+# One-shot status for the k3s-hostinger app cluster and its hub ArgoCD registration.
+# Read-only. Safe to run at any time.
+#
+# Usage:
+#   bin/hostinger-status
+#
+# Environment:
+#   APP_CONTEXT       kubectl context for the Hostinger app cluster (default: ubuntu-hostinger)
+#   INFRA_CONTEXT     kubectl context for the hub cluster (default: k3d-k3d-cluster)
+#   ARGOCD_NAMESPACE  hub ArgoCD namespace (default: cicd)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck source=/dev/null
+source "${REPO_ROOT}/scripts/lib/system.sh"
+
+APP_CONTEXT="${APP_CONTEXT:-ubuntu-hostinger}"
+INFRA_CONTEXT="${INFRA_CONTEXT:-k3d-k3d-cluster}"
+ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-cicd}"
+CLUSTER_SECRET="cluster-${APP_CONTEXT}"
+
+echo "=== App Cluster Nodes (${APP_CONTEXT}) ==="
+kubectl get nodes -o wide --context "${APP_CONTEXT}" 2>/dev/null \
+  || echo "Cannot reach app cluster '${APP_CONTEXT}'"
+
+echo ""
+echo "=== App Cluster Pods — all namespaces (${APP_CONTEXT}) ==="
+kubectl get pods -A --context "${APP_CONTEXT}" 2>/dev/null \
+  || echo "Cannot reach app cluster '${APP_CONTEXT}'"
+
+echo ""
+echo "=== API Health (${APP_CONTEXT}) ==="
+if kubectl get --raw='/healthz' --context "${APP_CONTEXT}" >/dev/null 2>&1; then
+  echo "API server: UP (/healthz ok)"
+else
+  echo "API server: DOWN (/healthz unreachable)"
+fi
+
+echo ""
+echo "=== Hub ArgoCD Registration (${INFRA_CONTEXT}, ns ${ARGOCD_NAMESPACE}) ==="
+if kubectl get secret "${CLUSTER_SECRET}" -n "${ARGOCD_NAMESPACE}" \
+     --context "${INFRA_CONTEXT}" >/dev/null 2>&1; then
+  echo "Registered: secret ${CLUSTER_SECRET} present"
+else
+  echo "NOT registered: secret ${CLUSTER_SECRET} missing — run make up CLUSTER_PROVIDER=k3s-hostinger"
+fi
+
+echo ""
+echo "=== ArgoCD Apps (${INFRA_CONTEXT}) ==="
+kubectl get applications.argoproj.io -A --context "${INFRA_CONTEXT}" 2>/dev/null \
+  || echo "Cannot reach hub cluster or ArgoCD CRDs not installed"
+
+echo ""
+echo "=== ArgoCD ApplicationSets (${INFRA_CONTEXT}) ==="
+kubectl get applicationsets.argoproj.io -A --context "${INFRA_CONTEXT}" 2>/dev/null \
+  || echo "Cannot reach hub cluster or ArgoCD CRDs not installed"
