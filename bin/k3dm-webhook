@@ -1912,7 +1912,7 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
 
 
 def _run_hostinger_status(job_id, response_url, thread_ts=None):
-    """Run bin/hostinger-status (read-only); post result to response_url or thread."""
+    """Run bin/cluster-status for k3s-hostinger (read-only); post result to response_url or thread."""
     job_dir = JOB_DIR / job_id
     if thread_ts:
         (job_dir / "thread_ts").write_text(thread_ts)
@@ -1934,14 +1934,14 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None):
         (job_dir / "status").write_text("running")
         import shlex as _shlex_hs
         repo_root = Path(__file__).resolve().parent.parent
-        status_bin = repo_root / "bin" / "hostinger-status"
+        status_bin = repo_root / "bin" / "cluster-status"
         status_out, status_timeout = _posix_spawn_capture(
             ["/bin/bash", "-c",
-             f"{_shlex_hs.quote(str(status_bin))} && echo __WEBHOOK_SUCCESS__"],
+             f"CLUSTER_PROVIDER=k3s-hostinger {_shlex_hs.quote(str(status_bin))} && echo __WEBHOOK_SUCCESS__"],
             timeout=180,
         )
         if status_timeout:
-            _log("\n❌ *Hostinger status timed out* after 180s — run `bin/hostinger-status` manually")
+            _log("\n❌ *Hostinger status timed out* after 180s — run `make status CLUSTER_PROVIDER=k3s-hostinger` manually")
             _finish("failed")
             return
         if "__WEBHOOK_SUCCESS__" in status_out:

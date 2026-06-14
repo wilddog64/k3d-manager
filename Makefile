@@ -40,13 +40,12 @@ refresh:
 	  *)       $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-refresh "$(URL)" ;; \
 	esac
 
-## Show cluster nodes, pod status, tunnel health
+## Show cluster nodes, pods, endpoint + ESO health (provider-aware)
 status:
 	@case "$(CLUSTER_PROVIDER)" in \
 	  k3s-oci) CLUSTER_PROVIDER=k3s-oci KUBECONFIG=$(HOME)/.kube/k3s-oci.yaml \
 	             kubectl get nodes,pods -A --no-headers 2>/dev/null \
 	             || echo "OCI cluster unreachable" ;; \
-	  k3s-hostinger) bin/hostinger-status ;; \
 	  *)       $(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-status ;; \
 	esac
 
