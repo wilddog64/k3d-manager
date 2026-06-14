@@ -110,6 +110,7 @@ CLUSTER_PROVIDER=k3s ./scripts/k3d-manager deploy_cluster -f   # k3s, non-intera
 | `k3s` | Linux bare-metal | `CLUSTER_PROVIDER=k3s` |
 | `k3s-aws` | AWS EC2 via ACG sandbox | `CLUSTER_PROVIDER=k3s-aws` |
 | `k3s-gcp` | GCP compute instance via ACG sandbox | `CLUSTER_PROVIDER=k3s-gcp` |
+| `k3s-hostinger` | Permanent single-node app cluster on a Hostinger KVM VPS | `CLUSTER_PROVIDER=k3s-hostinger` |
 
 See **[docs/providers/](docs/providers/)** for per-provider guides:
 - [OrbStack](docs/providers/orbstack.md)
@@ -309,15 +310,16 @@ Recent entries:
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.6.5](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.5) | 2026-06-13 | `k3s-az` Azure provider (VM provision + k3sup + shopping-cart deploy); provider argument for `/acg-up`/`/acg-down`/`/acg-resume`; provider-aware `make refresh`/`make status` via recorded active-provider state; Azure credential-path hardening; lib-acg subtree v0.1.7; lib-foundation extensible cluster-provider hook |
 | [v1.6.4](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.4) | 2026-06-10 | Slack Events API text commands (`acg-status`/`acg-refresh`/`ask`/`claude`/`gemini`/`codex` from thread replies + channel messages); Slack thread context for text commands; Prometheus deploy metrics + Grafana dashboard + non-interactive auth bootstrap; `make show-service-passwords`; ACG restart-failure screenshot archival; webhook `posix_spawn` NEF-safety; lib-acg subtree v0.1.4 |
 | [v1.6.3](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.3) | 2026-06-07 | `/acg-resume` checkpoint re-entry; `/ask` multi-agent troubleshooting; Slack thread context injection for agents; Webhook NEF SIGSEGV fix (`posix_spawn`); Webhook read-only bash sandbox for `/ask` agents; Keycloak group-ldap-mapper reconciliation |
-| [v1.6.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.2) | 2026-06-05 | `/acg-refresh` Slack slash command with worker relay; ACG LaunchAgent self-healing; Prometheus web.config.file conflict fix; acg-status stale display caveat labels |
 
 <details>
 <summary>Older releases</summary>
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v1.6.2](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.2) | 2026-06-05 | `/acg-refresh` Slack slash command with worker relay; ACG LaunchAgent self-healing; Prometheus web.config.file conflict fix; acg-status stale display caveat labels |
 | [v1.6.1](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.1) | 2026-06-05 | ACG LaunchAgent self-healing — `acg-refresh` auto-reinstalls missing system daemon plists (argocd/keycloak/frontend port-forwards); Vault port-forward LaunchAgent install during `acg-up` |
 | [v1.6.0](https://github.com/wilddog64/k3d-manager/releases/tag/v1.6.0) | 2026-06-04 | Webhook Slack threading + thread commands; AI-powered failure analysis (Gemini triage + Claude vision); webhook token auto-rotation; Python 3.13 SIGSEGV fix |
 | [v1.4.11](https://github.com/wilddog64/k3d-manager/releases/tag/v1.4.11) | 2026-05-29 | ESO sync saturation fix, acg-down macOS Tahoe password prompt fix, data-layer StatefulSet race fix, Keycloak group-ldap-mapper reconciliation, ArgoCD RBAC product-catalog reference fix, legacy ArgoCD app definition removal |

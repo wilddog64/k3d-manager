@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-06-13
+
+### Added
+- `k3s-hostinger` cluster provider — single-node k3s app cluster on a permanent Hostinger KVM VPS via SSH/k3sup (no VM lifecycle); env-overridable `HOSTINGER_HOST` default via `scripts/etc/hostinger/vars.sh`
+- `k3s-hostinger` app cluster registration with the hub ArgoCD via mTLS cluster secret (`cluster-ubuntu-hostinger` in `cicd`)
+- `bin/hostinger-status` — read-only full status report (app nodes/pods, API health, hub ArgoCD registration, ArgoCD apps/applicationsets); wired into `make status CLUSTER_PROVIDER=k3s-hostinger`
+- `APP_CLUSTER_NAME` envsubst parameter for ApplicationSet destination (default `ubuntu-hostinger`) — retargets shopping-cart + observability workloads off the retired ACG `ubuntu-k3s` cluster
+
+### Fixed
+- `k3s-hostinger` make `up` arm passes `--confirm` so the deploy gate accepts non-interactive provision
+- `k3s-hostinger` provider sources `shopping_cart.sh` for `_ensure_k3sup`; resolves host to IP for k3sup load
+- `k3s-hostinger` remote sudo written via a single `_run_command` line (de-obfuscate the bare-sudo guard)
+
 ## [1.6.5] - 2026-06-13
 
 ### Added
