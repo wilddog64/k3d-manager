@@ -35,7 +35,10 @@ down:
 
 ## Refresh credentials and restart tunnel (provider-aware)
 refresh:
-	$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-refresh "$(URL)"
+	@case "$(CLUSTER_PROVIDER)" in \
+	  k3s-hostinger) CLUSTER_PROVIDER=k3s-hostinger ./scripts/k3d-manager refresh_cluster ;; \
+	  *)       $(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-refresh "$(URL)" ;; \
+	esac
 
 ## Show cluster nodes, pod status, tunnel health
 status:

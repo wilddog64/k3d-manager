@@ -281,7 +281,7 @@ def _read_job_tail(output_path, n=3):
 def _run_cluster(job_id, action, provider="aws"):
     job_dir = JOB_DIR / job_id
     _out_file = job_dir / "output"
-    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az"}
+    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az", "hostinger": "k3s-hostinger"}
     _cluster_provider = _provider_map.get(provider, "k3s-aws")
     _start = datetime.datetime.utcnow().timestamp()
     _progress_timer = None
@@ -344,6 +344,8 @@ def _run_cluster(job_id, action, provider="aws"):
     try:
         if action == "up":
             cmd = ["make", "up", f"CLUSTER_PROVIDER={_cluster_provider}"]
+        elif _cluster_provider == "k3s-hostinger":
+            cmd = ["make", "down", f"CLUSTER_PROVIDER={_cluster_provider}"]
         else:
             cmd = ["make", "down", "KEEP_LOCAL=1"]
         _log(f"Running {' '.join(cmd)}...")
@@ -395,7 +397,7 @@ def _run_cluster_resume(job_id, provider="aws"):
     """Re-run make up with K3DM_RESUME=1 to skip completed checkpoints."""
     job_dir = JOB_DIR / job_id
     _out_file = job_dir / "output"
-    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az"}
+    _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az", "hostinger": "k3s-hostinger"}
     _cluster_provider = _provider_map.get(provider, "k3s-aws")
     _start = datetime.datetime.utcnow().timestamp()
     _progress_timer = None
@@ -611,8 +613,10 @@ def _handle_thread_command(job_id, command):
         (new_job_dir / "status").write_text("queued")
         thread_ts_file = JOB_DIR / job_id / "thread_ts"
         thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+        _status_parts = command.strip().split()
+        _status_provider = _status_parts[1].lower() if len(_status_parts) >= 2 and _status_parts[1].lower() in ("aws", "gcp", "az", "hostinger") else "hostinger"
         threading.Thread(
-            target=_run_cluster_status,
+            target=_run_hostinger_status if _status_provider == "hostinger" else _run_cluster_status,
             args=(new_job_id, ""),
             kwargs={"thread_ts": thread_ts},
             daemon=True,
@@ -634,7 +638,24 @@ def _handle_thread_command(job_id, command):
         ).start()
         _notify_job(job_id, f"🖥️ *hostinger-status* queued — job `{new_job_id}`")
 
-    elif cmd in ("cluster-refresh", "refresh"):
+    elif cmd == "cluster-refresh":
+        new_job_id = str(uuid.uuid4())[:8]
+        new_job_dir = JOB_DIR / new_job_id
+        new_job_dir.mkdir(parents=True, exist_ok=True)
+        (new_job_dir / "status").write_text("queued")
+        thread_ts_file = JOB_DIR / job_id / "thread_ts"
+        thread_ts = thread_ts_file.read_text().strip() if thread_ts_file.exists() else None
+        _refresh_parts = command.strip().split()
+        _refresh_provider = _refresh_parts[1].lower() if len(_refresh_parts) >= 2 and _refresh_parts[1].lower() in ("aws", "gcp", "az", "hostinger") else "hostinger"
+        threading.Thread(
+            target=_run_hostinger_refresh if _refresh_provider == "hostinger" else _run_cluster_refresh,
+            args=(new_job_id, ""),
+            kwargs={"thread_ts": thread_ts},
+            daemon=True,
+        ).start()
+        _notify_job(job_id, f"🔄 *cluster-refresh* queued — job `{new_job_id}`")
+
+    elif cmd == "refresh":
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -1936,6 +1957,52 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None):
         _finish("failed")
 
 
+def _run_hostinger_refresh(job_id, response_url, thread_ts=None):
+    """Run make refresh for k3s-hostinger (restore kubeconfig + ArgoCD); post result."""
+    job_dir = JOB_DIR / job_id
+    if thread_ts:
+        (job_dir / "thread_ts").write_text(thread_ts)
+    lines = []
+
+    def _log(msg):
+        lines.append(msg + "\n")
+
+    def _finish(status):
+        (job_dir / "status").write_text(status)
+        output = "".join(lines)
+        (job_dir / "output").write_text(output)
+        if response_url:
+            _slack_post(response_url, output)
+        else:
+            _notify_job(job_id, output)
+
+    try:
+        (job_dir / "status").write_text("running")
+        import shlex as _shlex_hr
+        repo_root = Path(__file__).resolve().parent.parent
+        _log("🔄 *Hostinger refresh* — restoring kubeconfig + ArgoCD registration…")
+        refresh_out, refresh_timeout = _posix_spawn_capture(
+            ["/bin/bash", "-c",
+             f"cd {_shlex_hr.quote(str(repo_root))} && make refresh CLUSTER_PROVIDER=k3s-hostinger && echo __WEBHOOK_SUCCESS__"],
+            timeout=180,
+        )
+        if refresh_timeout:
+            _log("\n❌ *Hostinger refresh timed out* after 180s — run `make refresh CLUSTER_PROVIDER=k3s-hostinger` manually")
+            _finish("failed")
+            return
+        if "__WEBHOOK_SUCCESS__" in refresh_out:
+            _log("\n✅ *Hostinger refresh complete* — `ubuntu-hostinger` context restored")
+        else:
+            tail_lines = [l for l in refresh_out.strip().splitlines()[-8:] if l]
+            _log("\n❌ *Hostinger refresh failed*")
+            if tail_lines:
+                _log("```\n{}\n```".format("\n".join(tail_lines)))
+        _finish("success")
+    except Exception as exc:
+        _log(f"ERROR: {exc}")
+        _finish("failed")
+
+
 def _run_analyze(job_id, alert_payload, response_url=""):
     """Gather kubectl diagnostics for firing alerts; call Claude; post to Slack."""
     job_dir = JOB_DIR / job_id
@@ -2531,7 +2598,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 self._json(409, {"error": f"cluster job already running: {running[0]} ({running[1]})"})
                 return
             provider = body.get("provider", "aws")
-            if provider not in ("aws", "gcp", "az"):
+            if provider not in ("aws", "gcp", "az", "hostinger"):
                 provider = "aws"
             response_url = body.get("response_url", "")
             job_id = str(uuid.uuid4())[:8]
@@ -2549,13 +2616,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
 
         if self.path == "/api/v1/cluster-status":
+            provider = body.get("provider", "hostinger")
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
             threading.Thread(
-                target=_run_cluster_status,
+                target=_run_hostinger_status if provider == "hostinger" else _run_cluster_status,
                 args=(job_id, response_url),
                 kwargs={"thread_ts": thread_ts},
                 daemon=True
@@ -2579,13 +2647,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
 
         if self.path == "/api/v1/cluster-refresh":
+            provider = body.get("provider", "hostinger")
             response_url = body.get("response_url", "")
             thread_ts = body.get("thread_ts", None)
             job_id = str(uuid.uuid4())[:8]
             (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
             (JOB_DIR / job_id / "status").write_text("queued")
             threading.Thread(
-                target=_run_cluster_refresh,
+                target=_run_hostinger_refresh if provider == "hostinger" else _run_cluster_refresh,
                 args=(job_id, response_url),
                 kwargs={"thread_ts": thread_ts},
                 daemon=True
