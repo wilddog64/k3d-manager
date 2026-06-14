@@ -17,7 +17,7 @@ _HOSTINGER_KUBECONFIG="${HOME}/.kube/hostinger.config"
 function _hostinger_require_host() {
   local host="${HOSTINGER_HOST:-}"
   if [[ -z "${host}" ]]; then
-    printf 'ERROR: %s\n' "[k3s-hostinger] HOSTINGER_HOST is not set — export HOSTINGER_HOST=<vps-ip>" >&2
+    printf 'ERROR: %s\n' "[k3s-hostinger] HOSTINGER_HOST is not set — export HOSTINGER_HOST=<vps-host-or-ip>" >&2
     return 1
   fi
   printf '%s' "${host}"
@@ -85,10 +85,13 @@ function _hostinger_merge_kubeconfig() {
     kubectl config delete-context "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null 2>&1 || true
     _info "[k3s-hostinger] Removed stale ${_HOSTINGER_KUBE_CONTEXT} context"
   fi
-  cp "${_HOSTINGER_KUBECONFIG}" "${tmp_kube}"
+  cp "${_HOSTINGER_KUBECONFIG}" "${tmp_kube}" || return 1
   chmod 600 "${tmp_kube}"
-  KUBECONFIG="${tmp_kube}:${HOME}/.kube/config" kubectl config view --flatten > "${tmp_merged}"
-  mv "${tmp_merged}" "${HOME}/.kube/config"
+  if ! KUBECONFIG="${tmp_kube}:${HOME}/.kube/config" kubectl config view --flatten > "${tmp_merged}"; then
+    rm -f "${tmp_kube}" "${tmp_merged}"
+    return 1
+  fi
+  mv "${tmp_merged}" "${HOME}/.kube/config" || { rm -f "${tmp_kube}" "${tmp_merged}"; return 1; }
   chmod 600 "${HOME}/.kube/config"
   rm -f "${tmp_kube}"
   if [[ -n "${prev_ctx}" ]] && kubectl config get-contexts "${prev_ctx}" >/dev/null 2>&1; then
@@ -239,8 +242,14 @@ HELP
   ssh_key="${_HOSTINGER_SSH_KEY}"
 
   _info "[k3s-hostinger] Uninstalling k3s on ${ssh_user}@${host}..."
-  _run_command -- ssh -i "${ssh_key}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new "${ssh_user}@${host}" 'sudo /usr/local/bin/k3s-uninstall.sh' 2>/dev/null || \
-    _info "[k3s-hostinger] k3s-uninstall.sh not present — skipping"
+  local _uninstall_rc=0
+  _run_command -- ssh -i "${ssh_key}" -o BatchMode=yes -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new "${ssh_user}@${host}" 'sudo sh -c "test -x /usr/local/bin/k3s-uninstall.sh && /usr/local/bin/k3s-uninstall.sh"' || _uninstall_rc=$?
+  if [[ "${_uninstall_rc}" -eq 255 ]]; then
+    printf 'ERROR: %s\n' "[k3s-hostinger] SSH to ${ssh_user}@${host} failed — cannot uninstall k3s" >&2
+    return 1
+  elif [[ "${_uninstall_rc}" -ne 0 ]]; then
+    _info "[k3s-hostinger] k3s-uninstall.sh not present or returned ${_uninstall_rc} — skipping"
+  fi
 
   _hostinger_deregister_cluster || true
 
