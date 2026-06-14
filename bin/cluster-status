@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# bin/acg-status
+# bin/cluster-status
 #
 # One-shot cluster status — nodes, pods, ArgoCD apps, tunnel health.
 # Read-only. Safe to run at any time.
 #
 # Usage:
-#   bin/acg-status
+#   bin/cluster-status
 #
 # Environment:
 #   APP_CONTEXT    kubectl context for app cluster (auto-resolved if unset)
@@ -42,7 +42,7 @@ fi
 echo ""
 echo "=== Nodes (${APP_CONTEXT}) ==="
 kubectl get nodes --context "${APP_CONTEXT}" 2>/dev/null \
-  || echo "Cannot reach app cluster — run bin/acg-refresh"
+  || echo "Cannot reach app cluster — run bin/cluster-refresh"
 
 echo ""
 echo "=== Pods — all namespaces (${APP_CONTEXT}) ==="
@@ -65,7 +65,7 @@ if [[ "${CLUSTER_PROVIDER}" == "k3s-aws" ]]; then
   if aws sts get-caller-identity --output table 2>/dev/null; then
     : # printed inline
   else
-    echo "AWS credentials invalid or expired — run bin/acg-refresh"
+    echo "AWS credentials invalid or expired — run bin/cluster-refresh"
   fi
 fi
 

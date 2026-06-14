@@ -80,7 +80,7 @@ SYNC_APPS_PF_LOG=${BATS_TEST_TMPDIR}/logs/managed.log
 EOF
   : > "${BATS_TEST_TMPDIR}/pf_ready"
 
-  run "${BATS_TEST_DIRNAME}/../../../bin/acg-sync-apps"
+  run "${BATS_TEST_DIRNAME}/../../../bin/cluster-sync-apps"
   [ "$status" -eq 0 ]
   [[ "$output" == *"Reusing existing argocd-server port-forward on 8080"* ]]
   ! grep -q "port-forward svc/argocd-server" "${BATS_TEST_TMPDIR}/kubectl.log"
@@ -92,7 +92,7 @@ EOF
   local old_listener_pid=$!
   export LSOF_PIDS="${old_listener_pid}"
 
-  run "${BATS_TEST_DIRNAME}/../../../bin/acg-sync-apps"
+  run "${BATS_TEST_DIRNAME}/../../../bin/cluster-sync-apps"
   local rc=$?
   kill "${old_listener_pid}" 2>/dev/null || true
   wait "${old_listener_pid}" 2>/dev/null || true
@@ -107,7 +107,7 @@ EOF
   export LSOF_EXIT_CODE=1
   export PF_SHOULD_FAIL=1
 
-  run "${BATS_TEST_DIRNAME}/../../../bin/acg-sync-apps"
+  run "${BATS_TEST_DIRNAME}/../../../bin/cluster-sync-apps"
   [ "$status" -eq 1 ]
   [[ "$output" == *"port-forward exited early"* ]]
   [[ "$output" == *"boom from port-forward"* ]]
@@ -134,7 +134,7 @@ SYNC_APPS_PF_LOG=${SYNC_APPS_LOG_DIR}/managed.log
 EOF
   : > "${BATS_TEST_TMPDIR}/pf_ready"
 
-  run "${BATS_TEST_DIRNAME}/../../../bin/acg-sync-apps"
+  run "${BATS_TEST_DIRNAME}/../../../bin/cluster-sync-apps"
   local rc=$?
   kill "${managed_listener_pid}" 2>/dev/null || true
   wait "${managed_listener_pid}" 2>/dev/null || true

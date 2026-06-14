@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# bin/acg-refresh
+# bin/cluster-refresh
 #
 # Daily driver — refresh provider credentials, restart SSH tunnel, and ensure
 # all port-forward services are running.
 #
 # Usage:
-#   bin/acg-refresh [sandbox-url] [--login-prompt]
+#   bin/cluster-refresh [sandbox-url] [--login-prompt]
 #
 # Environment:
 #   ACG_SANDBOX_URL   Override default sandbox listing URL
@@ -199,7 +199,7 @@ case "${_cluster_provider}" in
     else
       _info "[acg-refresh] Azure credentials expired — extracting..."
       _browser_launch
-      "${REPO_ROOT}/scripts/lib/acg/bin/acg-credential-test" \
+      "${REPO_ROOT}/scripts/lib/acg/bin/"acg-credential-test \
         "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}" --provider azure || exit 1
       _az_existing_rg=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
     fi

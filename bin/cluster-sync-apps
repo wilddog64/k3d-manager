@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# bin/acg-sync-apps
+# bin/cluster-sync-apps
 #
 # Trigger ArgoCD sync for data-layer, then show all remote pod status.
 # Handles argocd-server port-forward and login automatically.
 #
 # Usage:
-#   bin/acg-sync-apps
+#   bin/cluster-sync-apps
 #
 # Environment:
 #   INFRA_CONTEXT  kubectl context for infra cluster (default: k3d-k3d-cluster)

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# bin/acg-down
+# bin/cluster-down
 #
 # Tear down the ACG cluster — stop tunnel (AWS), delete remote cluster, stop Vault PF.
 # Requires --confirm to prevent accidental teardown.
 #
 # Usage:
-#   bin/acg-down --confirm [--keep-hub]
+#   bin/cluster-down --confirm [--keep-hub]
 #
 # Environment:
 #   CLUSTER_PROVIDER   k3s-aws (default), k3s-gcp, or k3s-az
@@ -35,7 +35,7 @@ for _arg in "$@"; do
 done
 
 if [[ "${_confirm}" -eq 0 ]]; then
-  echo "Usage: bin/acg-down --confirm [--keep-hub]"
+  echo "Usage: bin/cluster-down --confirm [--keep-hub]"
   echo ""
   echo "  --confirm    Required. Tears down remote cluster and local Hub cluster."
   echo "  --keep-hub   Optional. Skip local Hub (k3d-cluster) teardown."

@@ -1845,7 +1845,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
 
 
 def _run_cluster_refresh(job_id, response_url, thread_ts=None):
-    """Run bin/acg-refresh --no-login-prompt; post result to response_url or thread."""
+    """Run bin/cluster-refresh --no-login-prompt; post result to response_url or thread."""
     job_dir = JOB_DIR / job_id
     if thread_ts:
         (job_dir / "thread_ts").write_text(thread_ts)
@@ -1867,14 +1867,14 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
         _log("🔄 *ACG Refresh* — refreshing credentials + SSH tunnel…")
         import shlex as _shlex_ref
         repo_root = Path(__file__).resolve().parent.parent
-        refresh_bin = repo_root / "bin" / "acg-refresh"
+        refresh_bin = repo_root / "bin" / "cluster-refresh"
         refresh_out, refresh_timeout = _posix_spawn_capture(
             ["/bin/bash", "-c",
              f"{_shlex_ref.quote(str(refresh_bin))} --no-login-prompt && echo __WEBHOOK_SUCCESS__"],
             timeout=300,
         )
         if refresh_timeout:
-            _log("\n❌ *Refresh timed out* after 300s — run `bin/acg-refresh` manually")
+            _log("\n❌ *Refresh timed out* after 300s — run `bin/cluster-refresh` manually")
             _finish("failed")
             return
         if "__WEBHOOK_SUCCESS__" in refresh_out:

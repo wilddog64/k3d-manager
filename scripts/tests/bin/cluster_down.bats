@@ -14,6 +14,7 @@ setup() {
   : > "${BATS_TEST_TMPDIR}/pkill.log"
   : > "${BATS_TEST_TMPDIR}/kill.log"
   : > "${BATS_TEST_TMPDIR}/lsof.log"
+  : > "${BATS_TEST_TMPDIR}/docker.log"
 
   cat <<'STUB' > "${BATS_TEST_TMPDIR}/bin/aws"
 #!/usr/bin/env bash
@@ -125,10 +126,18 @@ echo "lsof $*" >> "${BATS_TEST_TMPDIR}/lsof.log"
 exit 0
 STUB
   chmod +x "${BATS_TEST_TMPDIR}/bin/lsof"
+
+  cat <<'STUB' > "${BATS_TEST_TMPDIR}/bin/docker"
+#!/usr/bin/env bash
+set -euo pipefail
+echo "docker $*" >> "${BATS_TEST_TMPDIR}/docker.log"
+exit 0
+STUB
+  chmod +x "${BATS_TEST_TMPDIR}/bin/docker"
 }
 
 @test "acg-down keeps the local hub when --keep-hub is set" {
-  run bash -c 'bin/acg-down --confirm --keep-hub 2>&1'
+  run bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"keep-hub=1 hub-cluster=k3d-cluster"* ]]
   [[ "$output" == *"--keep-hub set — local Hub cluster preserved"* ]]
@@ -137,7 +146,7 @@ STUB
 }
 
 @test "acg-down deletes the local hub by default" {
-  run bash -c 'bin/acg-down --confirm 2>&1'
+  run bash -c 'bin/cluster-down --confirm 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"keep-hub=0 hub-cluster=k3d-cluster"* ]]
   [[ "$output" == *"Local Hub cluster deleted"* ]]
@@ -152,7 +161,7 @@ STUB
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.key" \
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/ca.crt" \
     "${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.crt"
-  run bash -c 'bin/acg-down --confirm --keep-hub 2>&1'
+  run bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"Stopping ArgoCD browser HTTPS listener launchd daemon"* ]]
   run grep -F 'launchctl bootout system /Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist' "${BATS_TEST_TMPDIR}/launchctl.log"
@@ -165,7 +174,7 @@ STUB
 
 @test "acg-down warns and continues when the ArgoCD browser listener is not loaded" {
   export STUB_LAUNCHCTL_BOOTOUT_FAIL=1
-  run bash -c 'bin/acg-down --confirm --keep-hub 2>&1'
+  run bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"existing ArgoCD browser HTTPS listener was not loaded; continuing"* ]]
 }
@@ -175,10 +184,10 @@ STUB
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh" \
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http.log" \
     "${HOME}/.local/share/k3d-manager/keycloak-browser-http-launchctl.log"
-  run bash -c 'bin/acg-down --confirm --keep-hub 2>&1'
+  run bash -c 'bin/cluster-down --confirm --keep-hub 2>&1'
   [ "$status" -eq 0 ]
   [[ "$output" == *"Stopping Keycloak browser HTTP listener launchd daemon"* ]]
-  run grep -F '_keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"' bin/acg-down
+  run grep -F '_keycloak_browser_plist="${KEYCLOAK_BROWSER_LISTENER_PLIST:-/Library/LaunchDaemons/${_keycloak_browser_label}.plist}"' bin/cluster-down
   [ "$status" -eq 0 ]
   [ ! -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http.sh" ]
   [ -e "${HOME}/.local/share/k3d-manager/keycloak-browser-http.log" ]
