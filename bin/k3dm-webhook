@@ -1945,7 +1945,9 @@ def _run_hostinger_status(job_id, response_url, thread_ts=None):
             _finish("failed")
             return
         if "__WEBHOOK_SUCCESS__" in status_out:
-            _log("\n✅ *Hostinger status complete* — report gathered")
+            _log("\n✅ *Hostinger app cluster status*")
+            report = status_out.replace("__WEBHOOK_SUCCESS__", "")
+            _log(report[-3500:].rstrip())
         else:
             tail_lines = [l for l in status_out.strip().splitlines()[-8:] if l]
             _log("\n❌ *Hostinger status failed*")
