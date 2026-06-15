@@ -5,10 +5,12 @@ VCLUSTER_NAMESPACE="${VCLUSTER_NAMESPACE:-vclusters}"
 VCLUSTER_VERSION="${VCLUSTER_VERSION:-0.32.1}"
 VCLUSTER_KUBECONFIG_DIR="${VCLUSTER_KUBECONFIG_DIR:-${HOME}/.kube/vclusters}"
 VCLUSTER_INSTALL_DIR="${VCLUSTER_INSTALL_DIR:-/usr/local/bin}"
+VCLUSTER_VALUES_FILE="${VCLUSTER_VALUES_FILE:-}"
 export VCLUSTER_NAMESPACE
 export VCLUSTER_VERSION
 export VCLUSTER_KUBECONFIG_DIR
 export VCLUSTER_INSTALL_DIR
+export VCLUSTER_VALUES_FILE
 
 function vcluster_create() {
   local name="${1:-}"
@@ -168,8 +170,12 @@ function _vcluster_check_prerequisites() {
     _info "vcluster CLI not found — installing automatically"
     _vcluster_install_cli
   fi
-  if ! _kubectl --no-exit --quiet cluster-info >/dev/null 2>&1; then
-    _err "Host cluster context not available; kubectl cluster-info failed"
+  local host_context="${VCLUSTER_HOST_CONTEXT:-$(_kubectl config current-context 2>/dev/null || true)}"
+  if [[ -z "${host_context}" ]]; then
+    _err "Host cluster context not available; set VCLUSTER_HOST_CONTEXT or configure a current kubectl context"
+  fi
+  if ! _kubectl --no-exit --quiet -- --context "${host_context}" get nodes >/dev/null 2>&1; then
+    _err "Host cluster context not available: ${host_context}"
   fi
 }
 
@@ -197,7 +203,7 @@ function _vcluster_export_kubeconfig() {
 }
 
 function _vcluster_values_file() {
-  local file="${SCRIPT_DIR}/etc/vcluster/values.yaml"
+  local file="${VCLUSTER_VALUES_FILE:-${SCRIPT_DIR}/etc/vcluster/values.yaml}"
   if [[ ! -f "$file" ]]; then
     _err "vCluster values file not found at $file"
   fi
