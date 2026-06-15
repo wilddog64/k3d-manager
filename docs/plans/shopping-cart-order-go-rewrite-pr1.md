@@ -50,7 +50,7 @@ the Java source is the reference.
 
 ## Scope — PR1
 
-**IN:** Go module replacing the Java service; identical HTTP contract; Postgres persistence
+**IN:** Go module added alongside the Java service (under `go/`); identical HTTP contract; Postgres persistence
 against the existing schema; RabbitMQ event publishing; order status state machine; security
 response headers; `/actuator/health*` + `/actuator/prometheus` endpoints; per-IP rate limiting;
 Dockerfile; Go CI workflow; unit + integration tests.
@@ -62,25 +62,35 @@ credentials (PR1 uses static `RABBITMQ_USERNAME`/`PASSWORD`, `VAULT_ENABLED=fals
 
 ---
 
-## Target Layout
+## Target Layout — Java and Go SIDE BY SIDE (decided with user 2026-06-15)
 
-A single Go module (mirror basket's simplicity; do not over-package):
+**Keep the Java tree intact.** Do NOT delete `src/`, `pom.xml`, or the existing Java CI.
+The Go service lives in a new `go/` subdirectory as its own module so the two builds never
+collide. The deployed artifact stays Java until the preflight proves the Go e2e (see
+Sequencing); the cutover (and any eventual promotion of `go/` to repo root + Java removal)
+is a **later** PR, not this one.
+
+A single Go module under `go/` (mirror basket's simplicity; do not over-package):
 
 ```
-go.mod  go.sum
-cmd/server/main.go              # wire config, db, rabbit, router, http server; graceful shutdown
-internal/config/config.go       # env -> Config struct (all vars below)
-internal/order/model.go         # Order, OrderItem, OrderStatus, ShippingAddress
-internal/order/store.go         # Postgres CRUD via pgx (maps to existing schema)
-internal/order/service.go       # createOrder/getOrder/listByCustomer/updateStatus/cancel + transitions
-internal/order/handler.go       # gin handlers + request/response DTOs + error mapping
-internal/events/publisher.go    # amqp091-go publisher: envelope + 5 event types
-internal/httpx/middleware.go    # security headers, rate limiter, request logging
-internal/health/health.go       # /actuator/health, /liveness, /readiness, /info, /prometheus
-Dockerfile  Dockerfile.local
-.github/workflows/ci.yml        # replace Java CI with Go CI
+go/go.mod  go/go.sum
+go/cmd/server/main.go           # wire config, db, rabbit, router, http server; graceful shutdown
+go/internal/config/config.go    # env -> Config struct (all vars below)
+go/internal/order/model.go      # Order, OrderItem, OrderStatus, ShippingAddress
+go/internal/order/store.go      # Postgres CRUD via pgx (maps to existing schema)
+go/internal/order/service.go    # createOrder/getOrder/listByCustomer/updateStatus/cancel + transitions
+go/internal/order/handler.go    # gin handlers + request/response DTOs + error mapping
+go/internal/events/publisher.go # amqp091-go publisher: envelope + 5 event types
+go/internal/httpx/middleware.go # security headers, rate limiter, request logging
+go/internal/health/health.go    # /actuator/health, /liveness, /readiness, /info, /prometheus
+go/Dockerfile  go/Dockerfile.local
+.github/workflows/go-ci.yml     # NEW additive Go workflow — do NOT touch the existing Java ci.yml
 CHANGELOG.md                    # add [Unreleased] entry
 ```
+
+**Untouched (Java side stays green):** `src/main/**`, `src/test/**`, `pom.xml`, the existing
+`Dockerfile`, and the existing `.github/workflows/*.yml` Java/Maven workflow. They keep building
+and the deployed image stays Java for now.
 
 Pinned deps: `github.com/gin-gonic/gin`, `github.com/jackc/pgx/v5` (+ `/pgxpool`),
 `github.com/rabbitmq/amqp091-go`, `github.com/google/uuid`, `github.com/shopspring/decimal`,
@@ -249,13 +259,16 @@ Listen on port **8080**. Keep the container image name `shopping-cart-order` so 
 
 ## Dockerfile + CI
 
-- **Dockerfile**: multi-stage `golang:1.21-alpine` builder → `alpine:3.19` runtime; `CGO_ENABLED=0`;
+- **`go/Dockerfile`**: multi-stage `golang:1.21-alpine` builder → `alpine:3.19` runtime; `CGO_ENABLED=0`;
   non-root uid/gid 1000; `EXPOSE 8080`; healthcheck `wget --spider http://localhost:8080/actuator/health`;
-  `ENTRYPOINT ["./order-service"]`. (Mirror basket's Dockerfile; no GitHub-Packages Maven secret needed.)
-- **`.github/workflows/ci.yml`**: replace the Java/Maven workflow with Go — `gofmt -l` (fail on diff),
-  `go vet ./...`, `golangci-lint run`, `go test ./... -race -cover`, then `docker build`. Pin all
-  actions to version tags (`actions/checkout@v4`, `actions/setup-go@v5`, etc.) — never `@main`/`@latest`.
-  `permissions: contents: read` unless elevation is required.
+  `ENTRYPOINT ["./order-service"]`; build context `go/`. (Mirror basket's Dockerfile; no GitHub-Packages
+  Maven secret needed.) Leave the existing root Java `Dockerfile` untouched.
+- **`.github/workflows/go-ci.yml`** (NEW — additive; do NOT modify the existing Java `ci.yml`): runs on
+  changes under `go/**`; steps `gofmt -l` (fail on diff), `go vet ./...`, `golangci-lint run`,
+  `go test ./... -race -cover`, then `docker build -f go/Dockerfile go`. Set `working-directory: go`
+  (or `cd go`) for the Go steps. Pin all actions to version tags (`actions/checkout@v4`,
+  `actions/setup-go@v5`, etc.) — never `@main`/`@latest`. `permissions: contents: read` unless elevation
+  is required.
 
 ---
 
@@ -277,17 +290,20 @@ Listen on port **8080**. Keep the container image name `shopping-cart-order` so 
 PR1 can be built and unit/integration-tested **now**, but its **final acceptance** — the
 Playwright `shopping-cart-e2e-tests` passing unchanged against the full stack — gates on the
 vCluster preflight (Phase 1b of `docs/plans/v1.1.1-vcluster-preflight-webhook.md`), which deploys
-the stack + runs e2e. **Do NOT merge the Go service as the deployed artifact until e2e is green
-through the preflight.** Land PR1 as the Go implementation + CI + tests; the cutover (ArgoCD/image
-pointing at the Go build) happens only after the preflight proves e2e. State this dependency in the
-PR description.
+the stack + runs e2e. Because Java and Go ship **side by side**, PR1 carries **zero deployment
+risk**: the Java service remains the deployed artifact, its CI stays green, and the Go module is
+inert until a later cutover PR repoints the image/ArgoCD. **Do NOT cut the deployed artifact to Go
+in this PR.** Land PR1 as the Go implementation + Go CI + tests, living alongside Java; the cutover
+(and any eventual Java removal / promotion of `go/` to root) happens only after the preflight proves
+e2e green against the Go build. State this dependency in the PR description.
 
 ---
 
 ## Definition of Done
 
-- [ ] `feat/go-rewrite` branched from `origin/main`; Java `src/main` + `pom.xml` + Maven CI removed,
-      Go module in their place; `k8s/base/*` and `Dockerfile` image name unchanged-compatible.
+- [ ] `feat/go-rewrite` branched from `origin/main`; Java tree (`src/**`, `pom.xml`, root `Dockerfile`,
+      existing `ci.yml`) **left intact**; new Go module added under `go/` alongside it; `k8s/base/*`
+      unchanged.
 - [ ] HTTP contract, DB schema mapping, status machine, and 5 events reproduced exactly (verified
       against the Java source, field names copied verbatim from `event/*.java`).
 - [ ] `gofmt -l` clean · `go vet ./...` clean · `golangci-lint run` clean · `go test ./... -race` green.
@@ -305,6 +321,8 @@ feat(order): Go rewrite PR1 — functional core (HTTP + Postgres + RabbitMQ even
 
 ## What NOT to Do
 
+- Do NOT remove, move, or modify the Java tree (`src/**`, `pom.xml`, root `Dockerfile`) or the
+  existing Java `ci.yml` — Java and Go ship side by side; Go goes under `go/` only.
 - Do NOT implement Keycloak JWT/JWKS or role checks — that is PR2.
 - Do NOT create/migrate/drop DB tables — map to the existing schema; live schema wins on conflict.
 - Do NOT change `k8s/base/deployment.yaml`/`configmap.yaml`/`service.yaml` (keep paths/port/image
