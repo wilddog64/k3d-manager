@@ -18,7 +18,10 @@ make: *** [up] Terminated: 15
 RuntimeError: make up CLUSTER_PROVIDER=k3s-aws exited -15
 ```
 
-The same misrouting affects `cluster-down hostinger`.
+The same misrouting affects `cluster-down hostinger`. Job `4570a5e0` is a
+second observation of this bug — same misroute, same AWS sandbox timeout —
+confirming that any `/cluster-up <unsupported>` (including `hostinger`)
+silently kicks off an ACG AWS sandbox run.
 
 ## Investigation
 
@@ -46,11 +49,22 @@ limited to `cluster-up` / `cluster-down`.
 
 ## Root Cause
 
-Provider allowlist drift in the `cluster-up` / `cluster-down` branches of
-the Slack command dispatcher. The dispatcher was updated to accept
-`hostinger` for status/refresh, but the up/down parsing was not updated to
-match. Result: unknown providers (including `hostinger`) silently fall back
-to `aws` instead of being rejected.
+Two related defects in the `cluster-up` / `cluster-down` branches of the
+Slack command dispatcher:
+
+1. **Provider allowlist drift.** The dispatcher was updated to accept
+   `hostinger` for status/refresh, but the up/down parsing was not updated
+   to match. The membership check on lines 701/723 only allows
+   `("aws", "gcp", "az")`, so `hostinger` (and any other unknown value)
+   silently falls back to the default.
+
+2. **Default provider is `aws`.** Lines 701 and 723 default the provider
+   to `"aws"` when the argument is missing or unrecognized. This is what
+   turns a typo or unsupported provider into a real ACG AWS sandbox
+   credential-extraction run (the failure seen in job `4570a5e0`). The
+   default should not be `aws`: either reject the command with a Slack
+   error, or pick a provider that does not depend on a live AWS sandbox
+   session (e.g. `hostinger`, which targets the always-on lab VPS).
 
 ## Fix Applied
 
@@ -65,9 +79,12 @@ In `bin/k3dm-webhook`:
 
 - Line 701: change tuple to `("aws", "gcp", "az", "hostinger")`.
 - Line 723: change tuple to `("aws", "gcp", "az", "hostinger")`.
-- Consider rejecting unknown providers with a Slack error instead of
-  silently defaulting to `"aws"` — the silent default is what made this
-  bug user-invisible until the AWS sandbox flow ran on the wrong host.
+- Change the fallback default at lines 701/723 from `"aws"` to either
+  (a) a hard error returned to Slack, or (b) `"hostinger"`. A typo or
+  unknown provider must not silently kick off an ACG AWS sandbox run.
+  The current `"aws"` default is what caused job `4570a5e0` to spend
+  ~12 minutes timing out in `acg-up` credential extraction when the
+  user asked for hostinger.
 
 After the fix, `/cluster-up hostinger` will reach `_run_cluster` with
 `provider="hostinger"`, which the existing `_provider_map` already routes
@@ -80,9 +97,12 @@ to `make up CLUSTER_PROVIDER=k3s-hostinger`.
   - `bin/k3dm-webhook:347` down-path hostinger branch (already correct)
   - `bin/k3dm-webhook:617,649` status/refresh allowlists (already include hostinger)
   - `bin/k3dm-webhook:701,723` up/down allowlists (missing hostinger — the bug)
+  - `bin/k3dm-webhook:701,723` fallback default `"aws"` (the silent-misroute amplifier)
 - Per repo convention, the code change should land via a `docs/bugs/` spec
   and Codex handoff on a feature branch, then `make restart-webhook` after
   verifying the `bin/k3dm-webhook` change is on `main`.
 - The ACG AWS extraction timeout in the job output is unrelated to this
   bug — it is the natural failure mode of running the AWS provider when
   the user did not expect to.
+- Recurrences: job `4570a5e0` (2026-06-15) — same symptom, confirms the
+  bug is reproducible and not a one-off.
