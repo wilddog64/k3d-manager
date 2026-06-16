@@ -14,7 +14,7 @@ function _cluster_preflight_usage() {
   cat <<'EOF'
 Usage: cluster-preflight <name> [--keep|--destroy|--reuse]
   --keep     create the vCluster, deploy the stack, leave it running (default)
-  --destroy  create, deploy, then tear down + prune ArgoCD resources on exit
+  --destroy  create, deploy, then tear down on success; keep on failure for investigation
   --reuse    skip create/register; deploy into an already-registered vCluster, keep it
 EOF
 }
@@ -71,7 +71,9 @@ function _cluster_preflight_cleanup() {
 
   rm -rf "${PREFLIGHT_RENDER_DIR}" >/dev/null 2>&1 || true
 
-  if [[ "${PREFLIGHT_MODE}" == "--destroy" ]]; then
+  if [[ "${PREFLIGHT_MODE}" == "--destroy" && "${rc}" -ne 0 ]]; then
+    _info "[preflight] --destroy: run FAILED (rc=${rc}) — keeping ${PREFLIGHT_NAME} and its ArgoCD resources for investigation. Clean up manually with: ${REPO_ROOT}/scripts/k3d-manager vcluster_destroy ${PREFLIGHT_NAME}"
+  elif [[ "${PREFLIGHT_MODE}" == "--destroy" ]]; then
     _info "[preflight] Destroying ${PREFLIGHT_NAME} and pruning preflight ArgoCD resources..."
     _cluster_preflight_remove_platform_destination
     _kubectl delete application "${PREFLIGHT_NAME}-platform" \
