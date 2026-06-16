@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-15
 **Component:** bin/k3dm-webhook (Slack command dispatcher)
-**Status:** Fixed
+**Status:** Filed — fix spec written: `docs/bugs/v1.7.1-bugfix-webhook-cluster-dispatch.md` (consolidated with the standalone-command issue; default → hostinger; also covers cluster-resume line 679)
 
 ## Symptom
 

@@ -551,6 +551,7 @@ _THREAD_COMMANDS = {
     "cluster-status", "hostinger-status", "gemini", "claude", "codex",
 }
 _STANDALONE_CMDS = {
+    "cluster-up", "cluster-down", "cluster-resume",
     "cluster-status", "hostinger-status", "cluster-refresh", "refresh",
     "ask", "claude", "gemini", "codex",
 }
@@ -676,7 +677,7 @@ def _handle_thread_command(job_id, command):
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
         _resume_parts = command.strip().split()
-        _resume_provider = _resume_parts[1].lower() if len(_resume_parts) >= 2 and _resume_parts[1].lower() in ("aws", "gcp", "az") else "aws"
+        _resume_provider = _resume_parts[1].lower() if len(_resume_parts) >= 2 and _resume_parts[1].lower() in ("aws", "gcp", "az", "hostinger") else "hostinger"
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -698,7 +699,7 @@ def _handle_thread_command(job_id, command):
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
         _down_parts = command.strip().split()
-        _down_provider = _down_parts[1].lower() if len(_down_parts) >= 2 and _down_parts[1].lower() in ("aws", "gcp", "az") else "aws"
+        _down_provider = _down_parts[1].lower() if len(_down_parts) >= 2 and _down_parts[1].lower() in ("aws", "gcp", "az", "hostinger") else "hostinger"
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
@@ -720,7 +721,7 @@ def _handle_thread_command(job_id, command):
             _notify_job(job_id, f"⚠️ Cluster job already running: `{running[0]}` ({running[1]}) — wait for it to finish")
             return
         _up_parts = command.strip().split()
-        _up_provider = _up_parts[1].lower() if len(_up_parts) >= 2 and _up_parts[1].lower() in ("aws", "gcp", "az") else "aws"
+        _up_provider = _up_parts[1].lower() if len(_up_parts) >= 2 and _up_parts[1].lower() in ("aws", "gcp", "az", "hostinger") else "hostinger"
         new_job_id = str(uuid.uuid4())[:8]
         new_job_dir = JOB_DIR / new_job_id
         new_job_dir.mkdir(parents=True, exist_ok=True)
