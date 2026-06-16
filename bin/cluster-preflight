@@ -12,7 +12,10 @@ source "${REPO_ROOT}/scripts/plugins/eso.sh"
 
 function _cluster_preflight_usage() {
   cat <<'EOF'
-Usage: cluster-preflight <name> [--keep|--destroy]
+Usage: cluster-preflight <name> [--keep|--destroy|--reuse]
+  --keep     create the vCluster, deploy the stack, leave it running (default)
+  --destroy  create, deploy, then tear down + prune ArgoCD resources on exit
+  --reuse    skip create/register; deploy into an already-registered vCluster, keep it
 EOF
 }
 
@@ -31,6 +34,10 @@ fi
 
 case "${PREFLIGHT_MODE}" in
   --keep|--destroy)
+    ;;
+  --reuse)
+    PREFLIGHT_REUSE=1
+    PREFLIGHT_MODE="--keep"
     ;;
   *)
     _cluster_preflight_usage
@@ -57,6 +64,7 @@ PREFLIGHT_SERVICES_APPSET_NAME="${PREFLIGHT_NAME}-preflight-services-git"
 PREFLIGHT_OBSERVABILITY_APPSET_NAME="${PREFLIGHT_NAME}-preflight-observability-acg"
 PREFLIGHT_VCLUSTER_VALUES_FILE="${REPO_ROOT}/scripts/etc/vcluster/values-preflight.yaml"
 VCLUSTER_HOST_CONTEXT="${VCLUSTER_HOST_CONTEXT:-${HOST_CONTEXT}}"
+PREFLIGHT_REUSE="${PREFLIGHT_REUSE:-0}"
 
 function _cluster_preflight_cleanup() {
   local rc=$?
@@ -527,43 +535,65 @@ function _cluster_preflight_apply_argocd_resources() {
   _kubectl apply -f "$observability_render" >/dev/null
 }
 
-_info "[preflight] Creating vCluster ${PREFLIGHT_NAME}..."
-VCLUSTER_VALUES_FILE="${PREFLIGHT_VCLUSTER_VALUES_FILE}" \
-VCLUSTER_HOST_CONTEXT="${VCLUSTER_HOST_CONTEXT}" \
-  _run_command -- "${REPO_ROOT}/scripts/k3d-manager" vcluster_create "${PREFLIGHT_NAME}"
+if [[ "${PREFLIGHT_REUSE}" -eq 1 ]]; then
+  _info "[preflight] --reuse: skipping create/register for existing vCluster ${PREFLIGHT_NAME}..."
+  if [[ ! -f "${VC_KCFG}" ]]; then
+    _err "[preflight] --reuse requires an existing vCluster kubeconfig: ${VC_KCFG} (run --keep first)"
+  fi
+  _info "[preflight] Deriving ${PREFLIGHT_NAME} API URL from NodePort..."
+  _cluster_preflight_resolve_app_cluster_server
+  _info "[preflight] Verifying ${APP_CLUSTER_SERVER}/healthz from this host..."
+  _cluster_preflight_verify_app_cluster_server
+else
+  _info "[preflight] Creating vCluster ${PREFLIGHT_NAME}..."
+  VCLUSTER_VALUES_FILE="${PREFLIGHT_VCLUSTER_VALUES_FILE}" \
+  VCLUSTER_HOST_CONTEXT="${VCLUSTER_HOST_CONTEXT}" \
+    _run_command -- "${REPO_ROOT}/scripts/k3d-manager" vcluster_create "${PREFLIGHT_NAME}"
 
-if [[ ! -f "${VC_KCFG}" ]]; then
-  _err "[preflight] Expected vCluster kubeconfig not found: ${VC_KCFG}"
+  if [[ ! -f "${VC_KCFG}" ]]; then
+    _err "[preflight] Expected vCluster kubeconfig not found: ${VC_KCFG}"
+  fi
+
+  _info "[preflight] Applying argocd-manager RBAC inside ${PREFLIGHT_NAME}..."
+  KUBECONFIG="${VC_KCFG}" _kubectl apply -f "${REPO_ROOT}/scripts/etc/vcluster/argocd-manager-rbac.yaml" >/dev/null
+
+  _info "[preflight] Minting argocd-manager token inside ${PREFLIGHT_NAME}..."
+  VC_TOKEN="$(KUBECONFIG="${VC_KCFG}" _kubectl create token argocd-manager -n kube-system --duration=8760h)"
+  if [[ -z "${VC_TOKEN}" ]]; then
+    _err "[preflight] Failed to mint argocd-manager token inside ${PREFLIGHT_NAME}"
+  fi
+
+  _info "[preflight] Deriving ${PREFLIGHT_NAME} API URL from NodePort..."
+  _cluster_preflight_resolve_app_cluster_server
+  _info "[preflight] Verifying ${APP_CLUSTER_SERVER}/healthz from this host..."
+  _cluster_preflight_verify_app_cluster_server
+
+  _info "[preflight] Registering ${PREFLIGHT_NAME} with hub ArgoCD..."
+  if [[ -n "${REGISTER_KUBE_CONTEXT}" && "${REGISTER_KUBE_CONTEXT}" != "$(_kubectl config current-context 2>/dev/null || true)" ]]; then
+    _info "[preflight] Switching kubectl context to ${REGISTER_KUBE_CONTEXT} for ArgoCD registration..."
+    _kubectl config use-context "${REGISTER_KUBE_CONTEXT}" >/dev/null
+  fi
+  ARGOCD_APP_CLUSTER_NAME="${APP_CLUSTER_NAME}" \
+  ARGOCD_APP_CLUSTER_SECRET_NAME="${APP_CLUSTER_SECRET_NAME}" \
+  ARGOCD_APP_CLUSTER_SERVER="${APP_CLUSTER_SERVER}" \
+  ARGOCD_APP_CLUSTER_TOKEN="${VC_TOKEN}" \
+    _run_command -- "${REPO_ROOT}/scripts/k3d-manager" register_app_cluster
 fi
 
-_info "[preflight] Applying argocd-manager RBAC inside ${PREFLIGHT_NAME}..."
-KUBECONFIG="${VC_KCFG}" _kubectl apply -f "${REPO_ROOT}/scripts/etc/vcluster/argocd-manager-rbac.yaml" >/dev/null
-
-_info "[preflight] Minting argocd-manager token inside ${PREFLIGHT_NAME}..."
-VC_TOKEN="$(KUBECONFIG="${VC_KCFG}" _kubectl create token argocd-manager -n kube-system --duration=8760h)"
-if [[ -z "${VC_TOKEN}" ]]; then
-  _err "[preflight] Failed to mint argocd-manager token inside ${PREFLIGHT_NAME}"
-fi
-
-_info "[preflight] Deriving ${PREFLIGHT_NAME} API URL from NodePort..."
-_cluster_preflight_resolve_app_cluster_server
-_info "[preflight] Verifying ${APP_CLUSTER_SERVER}/healthz from this host..."
-_cluster_preflight_verify_app_cluster_server
-
-_info "[preflight] Registering ${PREFLIGHT_NAME} with hub ArgoCD..."
 if [[ -n "${REGISTER_KUBE_CONTEXT}" && "${REGISTER_KUBE_CONTEXT}" != "$(_kubectl config current-context 2>/dev/null || true)" ]]; then
-  _info "[preflight] Switching kubectl context to ${REGISTER_KUBE_CONTEXT} for ArgoCD registration..."
+  _info "[preflight] Switching kubectl context to ${REGISTER_KUBE_CONTEXT} for ArgoCD deploy..."
   _kubectl config use-context "${REGISTER_KUBE_CONTEXT}" >/dev/null
 fi
-ARGOCD_APP_CLUSTER_NAME="${APP_CLUSTER_NAME}" \
-ARGOCD_APP_CLUSTER_SECRET_NAME="${APP_CLUSTER_SECRET_NAME}" \
-ARGOCD_APP_CLUSTER_SERVER="${APP_CLUSTER_SERVER}" \
-ARGOCD_APP_CLUSTER_TOKEN="${VC_TOKEN}" \
-  _run_command -- "${REPO_ROOT}/scripts/k3d-manager" register_app_cluster
+
+_info "[preflight] Deploying preflight stack (prefixed-clone ArgoCD resources) for ${PREFLIGHT_NAME}..."
+_cluster_preflight_apply_argocd_resources "${APP_CLUSTER_NAME}"
+
+_info "[preflight] Waiting up to ${PREFLIGHT_WAIT_TIMEOUT}s for preflight apps to become Synced/Healthy..."
+_cluster_preflight_wait_for_apps "${APP_CLUSTER_NAME}" "${PREFLIGHT_WAIT_TIMEOUT}"
 
 if [[ "${PREFLIGHT_MODE}" == "--keep" ]]; then
-  _info "[preflight] Phase 1a spike reached registration stop point; vCluster ${PREFLIGHT_NAME} is left running"
+  _info "[preflight] Preflight stack deployed; vCluster ${PREFLIGHT_NAME} is left running"
 else
-  _info "[preflight] Phase 1a spike reached registration stop point; vCluster ${PREFLIGHT_NAME} will be destroyed on exit"
+  _info "[preflight] Preflight stack deployed and verified; vCluster ${PREFLIGHT_NAME} will be destroyed on exit"
 fi
 exit 0
