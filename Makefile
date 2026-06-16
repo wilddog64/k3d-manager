@@ -49,7 +49,7 @@ status:
 	  *)       $(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-status ;; \
 	esac
 
-## Spin up a vCluster and deploy the full stack via ArgoCD (NAME=<name>; MODE=--keep|--destroy)
+## Spin up a vCluster and deploy the full stack via ArgoCD (NAME=<name>; MODE=--auto|--keep, default --auto)
 preflight:
 	@bin/cluster-preflight "$(NAME)" "$(MODE)"
 
