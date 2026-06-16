@@ -55,6 +55,7 @@ REGISTER_KUBE_CONTEXT="${REGISTER_KUBE_CONTEXT:-k3d-k3d-cluster}"
 APP_CLUSTER_NAME="${PREFLIGHT_NAME}"
 APP_CLUSTER_SECRET_NAME="cluster-${PREFLIGHT_NAME}"
 APP_CLUSTER_SERVER=""
+APP_CLUSTER_ENVIRONMENT="${APP_CLUSTER_ENVIRONMENT:-preflight}"
 VC_KCFG="${VCLUSTER_KUBECONFIG_DIR}/${PREFLIGHT_NAME}.yaml"
 PREFLIGHT_WAIT_TIMEOUT="${PREFLIGHT_WAIT_TIMEOUT:-300}"
 PREFLIGHT_RENDER_DIR="$(mktemp -d)"
@@ -237,6 +238,7 @@ function _cluster_preflight_render_platform_appset() {
     -e "s/^  name: platform-helm$/  name: ${cluster_name}-preflight-platform-helm/" \
     -e "s/^      name: '{{.name}}-platform'$/      name: '${cluster_name}-preflight-platform'/" \
     -e "s/^      project: platform$/      project: ${cluster_name}-preflight-platform/" \
+    -e "s/^              values: \\[dev, infra, prod\\]$/              values: [${APP_CLUSTER_ENVIRONMENT}]/" \
     -e "s/^        namespace: cicd$/        namespace: cicd/" \
     "$tmp" | awk -v cluster="$cluster_name" '
     /^[[:space:]]*matchExpressions:$/ {
@@ -578,6 +580,7 @@ else
   ARGOCD_APP_CLUSTER_NAME="${APP_CLUSTER_NAME}" \
   ARGOCD_APP_CLUSTER_SECRET_NAME="${APP_CLUSTER_SECRET_NAME}" \
   ARGOCD_APP_CLUSTER_SERVER="${APP_CLUSTER_SERVER}" \
+  ARGOCD_APP_CLUSTER_ENVIRONMENT="${APP_CLUSTER_ENVIRONMENT}" \
   ARGOCD_APP_CLUSTER_TOKEN="${VC_TOKEN}" \
     _run_command -- "${REPO_ROOT}/scripts/k3d-manager" register_app_cluster
 fi
