@@ -583,6 +583,9 @@ else
   ARGOCD_APP_CLUSTER_ENVIRONMENT="${APP_CLUSTER_ENVIRONMENT}" \
   ARGOCD_APP_CLUSTER_TOKEN="${VC_TOKEN}" \
     _run_command -- "${REPO_ROOT}/scripts/k3d-manager" register_app_cluster
+  _info "[preflight] Labeling ${APP_CLUSTER_SECRET_NAME} with argocd.argoproj.io/cluster-name=${APP_CLUSTER_NAME} (platform clone selector guard)..."
+  _kubectl -n "${ARGOCD_NAMESPACE}" label secret "${APP_CLUSTER_SECRET_NAME}" \
+    "argocd.argoproj.io/cluster-name=${APP_CLUSTER_NAME}" --overwrite >/dev/null
 fi
 
 if [[ -n "${REGISTER_KUBE_CONTEXT}" && "${REGISTER_KUBE_CONTEXT}" != "$(_kubectl config current-context 2>/dev/null || true)" ]]; then
