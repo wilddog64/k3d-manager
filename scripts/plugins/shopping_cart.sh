@@ -358,6 +358,11 @@ function shopping_cart_create_ghcr_pull_secret() {
   done
 }
 
+function shopping_cart_provision_ghcr_pull_secret() {
+  shopping_cart_resolve_ghcr_pat
+  shopping_cart_create_ghcr_pull_secret
+}
+
 function shopping_cart_create_vault_bridge() {
   if [[ -z "${_vault_node_ip:-}" ]]; then
     _vault_node_ip=$(kubectl get nodes --context ubuntu-k3s \

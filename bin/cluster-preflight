@@ -567,6 +567,11 @@ else
     _err "[preflight] Failed to mint argocd-manager token inside ${PREFLIGHT_NAME}"
   fi
 
+  _info "[preflight] Provisioning ghcr-pull-secret in ${PREFLIGHT_NAME} app namespaces..."
+  VC_CONTEXT="$(KUBECONFIG="${VC_KCFG}" _kubectl config current-context 2>/dev/null || true)"
+  KUBECONFIG="${VC_KCFG}" APP_CONTEXT="${VC_CONTEXT}" \
+    _run_command -- "${REPO_ROOT}/scripts/k3d-manager" shopping_cart_provision_ghcr_pull_secret
+
   _info "[preflight] Deriving ${PREFLIGHT_NAME} API URL from NodePort..."
   _cluster_preflight_resolve_app_cluster_server
   _info "[preflight] Verifying ${APP_CLUSTER_SERVER}/healthz from this host..."
