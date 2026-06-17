@@ -1,12 +1,15 @@
 controlPlane:
+  distro:
+    k3s:
+      enabled: true
   service:
     spec:
       type: NodePort
   statefulSet:
     resources:
       requests:
-        cpu: 200m
-        memory: 256Mi
+        cpu: 300m
+        memory: 384Mi
       limits:
-        cpu: 500m
-        memory: 512Mi
+        cpu: 1500m
+        memory: 1536Mi
