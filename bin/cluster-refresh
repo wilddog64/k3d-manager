@@ -79,6 +79,7 @@ _launchd_ensure() {
       sleep 1
     fi
     if [[ "${domain}" == "system" ]]; then
+      _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${plist}" || true
       _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${plist}" \
         && _info "[acg-refresh] launchd ${label}: bootstrapped" \
         || _warn "[acg-refresh] launchd ${label}: bootstrap failed (plist exists but service could not start — check wrapper script and TLS certs)"
