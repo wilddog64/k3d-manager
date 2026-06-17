@@ -24,6 +24,8 @@ source "${REPO_ROOT}/scripts/plugins/gemini.sh"
 source "${REPO_ROOT}/scripts/plugins/aws.sh"
 source "${REPO_ROOT}/scripts/plugins/acg.sh"
 source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
+PLUGINS_DIR="${PLUGINS_DIR:-${REPO_ROOT}/scripts/plugins}"
+source "${REPO_ROOT}/scripts/plugins/argocd.sh"
 
 _ACG_STATE_DIR="${HOME}/.local/share/k3d-manager"
 
@@ -421,6 +423,25 @@ PLIST
 
   # ── 5. launchd daemons (system-domain) ───────────────────────────────────────
   _info "[acg-refresh] Checking launchd system daemons..."
+
+  # Self-heal the argocd-browser-https listener before (re)bootstrapping it. The daemon
+  # socat-terminates TLS on :443 using a Vault-issued cert; if the cert material or the
+  # wrapper script is missing, socat crash-loops until launchd drops it, and a plain
+  # _launchd_ensure cannot recover it. Regenerate both here (mirrors bin/cluster-up).
+  _argocd_browser_tls_dir="${ARGOCD_BROWSER_TLS_DIR:-${_ACG_STATE_DIR}/argocd-browser-https-tls}"
+  _argocd_browser_tls_cert="${ARGOCD_BROWSER_TLS_CERT_FILE:-${_argocd_browser_tls_dir}/fullchain.crt}"
+  _argocd_browser_tls_key="${ARGOCD_BROWSER_TLS_KEY_FILE:-${_argocd_browser_tls_dir}/tls.key}"
+  _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${_ACG_STATE_DIR}/bin/argocd-browser-https.sh}"
+  _argocd_browser_log="${ARGOCD_BROWSER_LISTENER_LOG:-${_ACG_STATE_DIR}/logs/argocd-browser-https.log}"
+  if [[ ! -s "${_argocd_browser_tls_cert}" || ! -s "${_argocd_browser_tls_key}" ]]; then
+    _info "[acg-refresh] argocd-browser-https TLS material missing — re-issuing from Vault PKI..."
+    _argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}" \
+      || _warn "[acg-refresh] failed to re-issue argocd-browser TLS material — listener will not start"
+  fi
+  if [[ ! -f "${_argocd_browser_wrapper}" ]]; then
+    _info "[acg-refresh] argocd-browser-https wrapper missing — regenerating..."
+    _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz"
+  fi
 
   _system_daemon_install_if_missing \
     "com.k3d-manager.argocd-browser-https" \
