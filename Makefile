@@ -435,7 +435,7 @@ help:
 	@echo "    make down          Tear down cluster (set KEEP_LOCAL=1 to preserve Hub on k3s-aws/gcp)"
 	@echo "    make status        Show cluster nodes and pod status"
 	@echo "    make test          Run all BATS test suites"
-	@echo "    make preflight     Spin up a throwaway vCluster + deploy the full stack via ArgoCD (NAME=<name> MODE=--auto|--keep, default --auto)"
+	@echo "    make preflight     Spin up a throwaway vCluster + deploy the full stack via ArgoCD (NAME=<name> MODE=--auto|--keep|--reuse, default --auto)"
 	@echo ""
 	@echo "  k3s-aws / k3s-gcp only:"
 	@echo "    make refresh       Refresh credentials and restart tunnel"
