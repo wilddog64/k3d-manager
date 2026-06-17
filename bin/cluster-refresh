@@ -328,9 +328,40 @@ _pf_ensure "ACG Prometheus port-forward" \
 if _is_mac; then
   _info "[acg-refresh] Checking launchd port-forward agents..."
 
+  _argocd_pf_label="com.k3d-manager.argocd-port-forward"
+  _argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
+  _argocd_pf_log="${_ACG_STATE_DIR}/logs/argocd-pf.log"
+  _argocd_pf_wrapper="${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  if [[ ! -f "${_argocd_pf_plist}" && -f "${_argocd_pf_wrapper}" ]]; then
+    _info "[acg-refresh] ArgoCD port-forward plist missing — regenerating from wrapper..."
+    mkdir -p "$(dirname "${_argocd_pf_log}")"
+    cat > "${_argocd_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_argocd_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${_argocd_pf_wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_argocd_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_argocd_pf_log}</string>
+</dict>
+</plist>
+PLIST
+  fi
   _launchd_ensure \
-    "com.k3d-manager.argocd-port-forward" \
-    "${HOME}/Library/LaunchAgents/com.k3d-manager.argocd-port-forward.plist" \
+    "${_argocd_pf_label}" \
+    "${_argocd_pf_plist}" \
     user
 
   _kc_pf_label="com.k3d-manager.keycloak-port-forward"
