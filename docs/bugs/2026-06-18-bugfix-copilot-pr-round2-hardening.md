@@ -14,14 +14,14 @@ Copilot posted a second review on both Go-rewrite PRs (2026-06-19):
 - payment #23 review `4529362992` — 11 new inline findings against HEAD `e2adc72`
 - order #33 review `4529487112` — 6 new inline findings
 
-This spec implements the **FIX** items only. Three findings are **declined/deferred** with
-rationale (handled by Claude as PR-thread replies, NOT in this spec — do not touch that code):
+This spec implements **all 17 findings** (no deferrals — addressed now to avoid carrying tech
+debt). The three that were initially candidates for decline/defer are handled as follows:
 
 | Repo | File:line | Finding | Disposition |
 |------|-----------|---------|-------------|
-| payment | config.go:78 | MockGatewayEnabled default true | **DECLINE** — mock is the operating gateway for this stack; e2e acceptance suite drives payments through the mock; `PAYMENT_GATEWAY_DEFAULT=mock` + `MOCK_GATEWAY_ENABLED=true` are intentional. |
-| order | config.go:48 | DB_SSLMODE default `disable` | **DECLINE** — parity with payment (env-configurable `DB_SSLMODE`; `disable` is the in-cluster/local default; Istio mTLS secures transport; prod sets `DB_SSLMODE=require`). |
-| order | store.go:150 | `ListByCustomer` N+1 | **DEFER** — acknowledged perf; bounded data in this stack; tracked as a follow-up. |
+| payment | config.go:78 | MockGatewayEnabled default true | **FIX (A7)** — flip code default to `false`; the deployment explicitly enables the mock via configmap so the stack/e2e still work (mock is reachable only by opt-in). |
+| order | store.go:150 | `ListByCustomer` N+1 | **FIX (B6)** — single batched `WHERE order_id = ANY(...)` query + in-memory grouping. |
+| order | config.go:48 | DB_SSLMODE default `disable` | **FIX (B5) — documented, not flipped.** The in-cluster Postgres is stock `postgres:15-alpine` (NO native TLS), so `sslmode=require` cannot connect; transport is secured by Istio mTLS. The debt-free fix is to make the value **explicit** in the order configmap (`DB_SSLMODE: "disable"`) with a rationale comment, so it is a reviewed config decision, not a silent code default. Claude replies on the thread with this rationale. |
 
 ---
 
@@ -700,6 +700,74 @@ func (s *RefundService) ProcessRefund(ctx context.Context, paymentID uuid.UUID, 
 
 ---
 
+### A7 — disable the mock gateway by default; enable it explicitly in the deployment (Copilot 3439639768)
+
+Flip the code default to `false` so the mock is reachable only by explicit opt-in, then have the
+deployed stack opt in via configmap (the e2e suite drives payments through the mock).
+
+**A7a — `go/internal/config/config.go`. Exact old block (line 78):**
+
+```go
+		MockGatewayEnabled: boolEnv("MOCK_GATEWAY_ENABLED", true),
+```
+
+**Exact new block:**
+
+```go
+		MockGatewayEnabled: boolEnv("MOCK_GATEWAY_ENABLED", false),
+```
+
+**A7b — `k8s/base/configmap.yaml`: add the opt-in key. Exact old block (lines 16–19):**
+
+```yaml
+  # Payment Gateway Configuration
+  payment.gateway.default: "mock"
+  stripe.enabled: "false"
+  paypal.enabled: "false"
+```
+
+**Exact new block:**
+
+```yaml
+  # Payment Gateway Configuration
+  payment.gateway.default: "mock"
+  mock.gateway.enabled: "true"
+  stripe.enabled: "false"
+  paypal.enabled: "false"
+```
+
+**A7c — `k8s/base/deployment.yaml`: wire the env var. Exact old block (lines 87–92):**
+
+```yaml
+        - name: PAYMENT_GATEWAY_DEFAULT
+          valueFrom:
+            configMapKeyRef:
+              name: payment-service-config
+              key: payment.gateway.default
+        - name: STRIPE_ENABLED
+```
+
+**Exact new block:**
+
+```yaml
+        - name: PAYMENT_GATEWAY_DEFAULT
+          valueFrom:
+            configMapKeyRef:
+              name: payment-service-config
+              key: payment.gateway.default
+        - name: MOCK_GATEWAY_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: payment-service-config
+              key: mock.gateway.enabled
+        - name: STRIPE_ENABLED
+```
+
+> If a config test asserts `MockGatewayEnabled == true` as the default, update it to `false`.
+> Go unit tests that construct `NewMockGateway(true, …)` directly are unaffected.
+
+---
+
 # PART B — `shopping-cart-order` (branch `feat/go-rewrite`)
 
 ### B1 — `go/internal/config/config.go`: drop default RabbitMQ credentials (Copilot 3439740585)
@@ -876,6 +944,176 @@ Exact old block (line 31):**
 
 ---
 
+### B5 — make `DB_SSLMODE` an explicit, documented config value (Copilot 3439740560)
+
+Do **not** change the code default. The in-cluster Postgres is stock `postgres:15-alpine` with no
+native TLS, so `sslmode=require` would fail to connect; transport is secured by Istio mTLS. Make
+the value explicit in the configmap so it is a reviewed decision, not a silent default.
+
+**`k8s/base/configmap.yaml`: Exact old block (lines 15–19):**
+
+```yaml
+  # Database connection (host only, credentials from secret)
+  DB_HOST: "postgresql-orders.shopping-cart-data.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "orders"
+```
+
+**Exact new block:**
+
+```yaml
+  # Database connection (host only, credentials from secret)
+  DB_HOST: "postgresql-orders.shopping-cart-data.svc.cluster.local"
+  DB_PORT: "5432"
+  DB_NAME: "orders"
+  # In-cluster Postgres is non-TLS (stock image); transport is secured by Istio mTLS.
+  # Production overrides this to "require".
+  DB_SSLMODE: "disable"
+```
+
+> Do NOT touch `go/internal/config/config.go:47` — the code default already reads `DB_SSLMODE`
+> from env and `disable` is correct for the non-TLS in-cluster DB.
+
+---
+
+### B6 — `go/internal/order/store.go`: eliminate the `ListByCustomer` N+1 (Copilot 3439740615)
+
+**B6a — replace the `ListByCustomer` body. Exact old block (lines 133–158):**
+
+```go
+func (s *PostgresStore) ListByCustomer(ctx context.Context, customerID string) ([]*Order, error) {
+	rows, err := s.pool.Query(ctx, listOrdersByCustomerSQL, customerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	orders := make([]*Order, 0)
+	for rows.Next() {
+		order, err := scanOrderRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		items, err := s.listItems(ctx, order.ID)
+		if err != nil {
+			return nil, err
+		}
+		order.Items = items
+		order.RecalculateTotals()
+		orders = append(orders, order)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return orders, nil
+}
+```
+
+**Exact new block:**
+
+```go
+func (s *PostgresStore) ListByCustomer(ctx context.Context, customerID string) ([]*Order, error) {
+	rows, err := s.pool.Query(ctx, listOrdersByCustomerSQL, customerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	orders := make([]*Order, 0)
+	orderIDs := make([]uuid.UUID, 0)
+	for rows.Next() {
+		order, err := scanOrderRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		orders = append(orders, order)
+		orderIDs = append(orderIDs, order.ID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	itemsByOrder, err := s.listItemsByOrderIDs(ctx, orderIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, order := range orders {
+		order.Items = itemsByOrder[order.ID]
+		order.RecalculateTotals()
+	}
+	return orders, nil
+}
+
+func (s *PostgresStore) listItemsByOrderIDs(ctx context.Context, orderIDs []uuid.UUID) (map[uuid.UUID][]OrderItem, error) {
+	itemsByOrder := make(map[uuid.UUID][]OrderItem)
+	if len(orderIDs) == 0 {
+		return itemsByOrder, nil
+	}
+	ids := make([]string, len(orderIDs))
+	for i, id := range orderIDs {
+		ids[i] = id.String()
+	}
+	rows, err := s.pool.Query(ctx, listItemsByOrderIDsSQL, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var item OrderItem
+		var unitPrice string
+		if err := rows.Scan(&item.ID, &item.OrderID, &item.ProductID, &item.ProductName, &item.Quantity, &unitPrice); err != nil {
+			return nil, err
+		}
+		item.UnitPrice, err = decimal.NewFromString(unitPrice)
+		if err != nil {
+			return nil, err
+		}
+		item.RecalculateSubtotal()
+		itemsByOrder[item.OrderID] = append(itemsByOrder[item.OrderID], item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return itemsByOrder, nil
+}
+```
+
+**B6b — add the batched query constant next to `listItemsSQL`. Exact old block (lines 386–391):**
+
+```go
+const listItemsSQL = `
+SELECT id, order_id, product_id, product_name, quantity, unit_price
+FROM order_items
+WHERE order_id = $1
+ORDER BY id ASC
+`
+```
+
+**Exact new block:**
+
+```go
+const listItemsSQL = `
+SELECT id, order_id, product_id, product_name, quantity, unit_price
+FROM order_items
+WHERE order_id = $1
+ORDER BY id ASC
+`
+
+const listItemsByOrderIDsSQL = `
+SELECT id, order_id, product_id, product_name, quantity, unit_price
+FROM order_items
+WHERE order_id = ANY($1::uuid[])
+ORDER BY id ASC
+`
+```
+
+> `listItems` (single-order) is still used by `GetByID` — keep it. The `::uuid[]` cast lets us
+> pass `[]string` (robust regardless of uuid array codec registration). `GetByID` already returns
+> items in `id ASC` order; the batched path preserves that per order.
+
+---
+
 ## Rules
 
 - Format: `gofmt -l` must report no files (run `gofmt -w` on changed `.go` files).
@@ -883,15 +1121,26 @@ Exact old block (line 31):**
 - Tests: `cd go && go test ./...` green in both repos (unit; the Postgres-gated integration test
   runs in CI). Update any test that referenced removed/renamed symbols
   (`RateLimitPerMinute`, the old mock card literals, the old migration path).
+- For k8s manifest edits (A7b/A7c, B5): `kustomize build k8s/base` (or `kubectl kustomize k8s/base`)
+  must still render without error.
 - `./scripts/k3d-manager _agent_audit` clean (run from k3d-manager) before reporting done.
-- Touch ONLY the files listed per repo. Do NOT touch the declined/deferred code
-  (payment `config.go:78`, order `config.go:48`, order `store.go:150`).
+- Touch ONLY the files listed below. Do NOT change `go/internal/config/config.go:47`
+  (order DB_SSLMODE code default — addressed via configmap in B5).
+
+**Payment target files:** `go/internal/gateway/mock.go`, `go/internal/payment/service.go`,
+`go/internal/payment/errors.go`, `go/internal/payment/handler.go`, `go/internal/httpx/middleware.go`,
+`go/internal/config/config.go`, `go/internal/payment/store.go`, `go/internal/payment/refund.go`,
+`k8s/base/configmap.yaml`, `k8s/base/deployment.yaml` (+ any test files referencing changed symbols).
+
+**Order target files:** `go/internal/config/config.go`, `go/internal/events/publisher.go`,
+`go/internal/order/store.go`, `CHANGELOG.md`, `go/internal/order/store_integration_test.go`,
+`go/internal/order/testdata/V1__init_schema.sql` (moved), `k8s/base/configmap.yaml`.
 
 ## Definition of Done
 
-- [ ] Payment: A1–A6 applied; `go build ./...`, `go vet ./...`, `go test ./...` green.
-- [ ] Order: B1–B4 applied; `go build ./...`, `go vet ./...`, `go test ./...` green.
-- [ ] `git diff --stat` per repo shows only the files named in this spec.
+- [ ] Payment: A1–A7 applied; `go build ./...`, `go vet ./...`, `go test ./...` green; `kustomize build k8s/base` renders.
+- [ ] Order: B1–B6 applied; `go build ./...`, `go vet ./...`, `go test ./...` green; `kustomize build k8s/base` renders.
+- [ ] `git diff --stat` per repo shows only the files listed above.
 - [ ] Committed and pushed to `feat/go-rewrite` in BOTH repos.
 - [ ] memory-bank (`activeContext.md` + `progress.md`) updated with both commit SHAs and status.
 
@@ -906,4 +1155,4 @@ fix(go): address Copilot round-2 review findings (PR1 hardening)
 - Do NOT skip pre-commit hooks (`--no-verify`).
 - Do NOT modify files outside the per-repo target lists.
 - Do NOT commit to `main` — work on `feat/go-rewrite`.
-- Do NOT change the declined/deferred code paths (Claude replies to those threads separately).
+- Do NOT change `order go/internal/config/config.go:47` (DB_SSLMODE code default — B5 is configmap-only).
