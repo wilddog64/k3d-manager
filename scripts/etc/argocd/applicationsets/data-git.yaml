@@ -1,0 +1,56 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: data-git
+  namespace: ${ARGOCD_NAMESPACE}
+  labels:
+    managed-by: k3d-manager
+    app-type: data
+spec:
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            k3d-manager/role: app-cluster
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  template:
+    metadata:
+      name: data-layer
+      labels:
+        app-type: data
+        app.kubernetes.io/part-of: shopping-cart
+    spec:
+      project: shopping-cart
+      destination:
+        name: '{{.name}}'
+        namespace: shopping-cart-data
+      source:
+        repoURL: https://github.com/wilddog64/shopping-cart-infra.git
+        targetRevision: HEAD
+        path: data-layer
+        directory:
+          recurse: true
+      ignoreDifferences:
+        - group: apps
+          kind: StatefulSet
+          jqPathExpressions:
+            - .spec.volumeClaimTemplates[].spec.storageClassName
+            - .spec.volumeClaimTemplates[].spec.volumeMode
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: true
+          allowEmpty: false
+        syncOptions:
+          - CreateNamespace=true
+          - PrunePropagationPolicy=foreground
+          - PruneLast=true
+          - RespectIgnoreDifferences=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
