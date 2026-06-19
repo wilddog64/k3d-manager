@@ -45,15 +45,17 @@ done
 
 ## Target repos
 
+Verified live `origin/main` state 2026-06-19 (Claude) — still re-check at runtime, state can drift:
+
 | Repo | `.githooks/pre-push` on `origin/main`? | Action |
 |---|---|---|
-| shopping-cart-infra | check | skip if present on origin/main, else add |
-| shopping-cart-payment | check | skip if present on origin/main, else add |
-| shopping-cart-order | check | skip if present on origin/main, else add |
-| shopping-cart-frontend | needs | add |
-| shopping-cart-product-catalog | needs | add |
-| shopping-cart-basket | needs | add |
-| shopping-cart-e2e-tests | needs | add |
+| shopping-cart-infra | YES (already merged) | SKIP |
+| shopping-cart-payment | YES (already merged) | SKIP |
+| shopping-cart-order | YES (already merged) | SKIP |
+| shopping-cart-frontend | YES (already merged) | SKIP |
+| shopping-cart-product-catalog | YES (already merged) | SKIP |
+| shopping-cart-basket | YES (already merged) | SKIP |
+| shopping-cart-e2e-tests | YES (already merged) | SKIP |
 | observability-stack | needs | add |
 | rabbitmq-client-dotnet | needs | add |
 | rabbitmq-client-go | needs | add |
@@ -61,6 +63,10 @@ done
 | rabbitmq-client-library | needs | add |
 | rabbitmq-client-python | needs | add |
 | k3d-manager | needs (special — see below) | add + relocate pre-commit |
+
+So the real work is **observability-stack + the 5 rabbitmq-client-\* + k3d-manager**. Expect 7 SKIPs;
+they are not failures. Stale `chore/add-pre-push-hook` branches (no PR) linger on several skip repos —
+ignore them, do not touch.
 
 **Before adding, verify on origin:** `git show origin/main:.githooks/pre-push` — if it already
 exists there, SKIP that repo (do not open an empty PR).
@@ -95,10 +101,12 @@ On branch `k3d-manager-v1.7.1` (current milestone branch — do NOT branch off, 
    `SCRIPT_DIR=".../$(dirname BASH_SOURCE)/../../scripts"` which is correct from `.git/hooks/` but
    wrong from `.githooks/`. From `.githooks/` it must be `../scripts` (one level up), so the hook
    still resolves `scripts/lib/agent_rigor.sh` and the subtree guard fires. `chmod +x`.
-3. Verify BOTH hooks fire from `.githooks/`:
-   - `git config core.hooksPath .githooks` (local, this machine)
-   - confirm a staged edit under `scripts/lib/foundation/` is still rejected by pre-commit
-   - confirm `printf 'refs/heads/x x refs/heads/main 0\n' | .githooks/pre-push origin` exits 1
+3. Verify BOTH hooks work by **direct invocation** — do NOT set `core.hooksPath`
+   (that is Claude's post-merge job; see What NOT to do):
+   - pre-push: `printf 'refs/heads/x x refs/heads/main 0\n' | bash .githooks/pre-push origin` exits 1
+   - pre-commit subtree guard: stage an edit under `scripts/lib/foundation/`, run
+     `bash .githooks/pre-commit` directly, confirm it is rejected (non-zero), then unstage.
+     This proves the `../scripts` path fix resolves `scripts/lib/agent_rigor.sh` without activating hooks.
 4. Commit (verbatim):
    `chore(git): commit pre-push + pre-commit hooks under .githooks for durable activation`
 5. `git push origin k3d-manager-v1.7.1`.
