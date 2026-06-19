@@ -2418,7 +2418,10 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
                 if thread_context else
                 f"---USER QUESTION START---\n{question}\n---USER QUESTION END---"
             )
-            cmd = ["codex", "exec", "--skip-git-repo-check", f"{codex_system}\n\n{user_prompt}"]
+            _codex_last = job_dir / "codex_last_message.txt"
+            cmd = ["codex", "exec", "--skip-git-repo-check",
+                   "--output-last-message", str(_codex_last),
+                   f"{codex_system}\n\n{user_prompt}"]
             timeout = 120
             _observe = True
 
@@ -2427,6 +2430,11 @@ def _run_cluster_ask(job_id, agent, question, response_url, thread_ts=None, max_
             if timed_out:
                 _finish(f"❌ *{agent}* timed out after {timeout}s — try a more specific question", status="failed")
                 return
+            if agent == "codex":
+                try:
+                    raw = _codex_last.read_text()
+                except OSError:
+                    pass
             answer = _ANSI.sub("", raw).strip() or f"No output from {agent}."
             if _observe:
                 answer, filed = _parse_gemini_observations(answer)
