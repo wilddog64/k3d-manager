@@ -142,16 +142,19 @@ setup() {
   grep -q "kubernetes_host=https://10.211.55.14:6443" "$VAULT_EXEC_LOG"
   grep -q "kubernetes_ca_cert=@/tmp/app-cluster-ca.crt" "$VAULT_EXEC_LOG"
 
-  # Verify eso-reader policy ensure
+  # Verify policy ensure
   grep -q "vault_policy_exists secrets vault eso-reader" "$VAULT_EXEC_LOG"
   grep -q "vault_exec_stream --pod vault-0 secrets vault -- vault policy write eso-reader -" "$VAULT_EXEC_STREAM_LOG"
   grep -q "path \"secret/data/eso/\*\"      { capabilities = \[\"read\"\] }" "$VAULT_EXEC_STREAM_LOG"
+  grep -q "vault_policy_exists secrets vault eso-app-reader" "$VAULT_EXEC_LOG"
+  grep -q "vault_exec_stream --pod vault-0 secrets vault -- vault policy write eso-app-reader -" "$VAULT_EXEC_STREAM_LOG"
+  grep -q "path \"secret/data/payment/\*\"      { capabilities = \[\"read\"\] }" "$VAULT_EXEC_STREAM_LOG"
 
   # Verify vault write role
   grep -q "vault_exec secrets vault write auth/custom-mount/role/custom-role" "$VAULT_EXEC_LOG"
   grep -q "bound_service_account_names=custom-sa" "$VAULT_EXEC_LOG"
   grep -q "bound_service_account_namespaces=custom-ns" "$VAULT_EXEC_LOG"
-  grep -q "policies=eso-reader" "$VAULT_EXEC_LOG"
+  grep -q "policies=eso-app-reader" "$VAULT_EXEC_LOG"
 }
 
 @test "configure_vault_app_auth skips policy creation if it exists" {
@@ -166,7 +169,9 @@ setup() {
   [ "$status" -eq 0 ]
 
   grep -q "vault_policy_exists secrets vault eso-reader" "$VAULT_EXEC_LOG"
+  grep -q "vault_policy_exists secrets vault eso-app-reader" "$VAULT_EXEC_LOG"
   ! grep -q "vault policy write eso-reader" "$VAULT_EXEC_STREAM_LOG"
+  ! grep -q "vault policy write eso-app-reader" "$VAULT_EXEC_STREAM_LOG"
 }
 
 @test "configure_vault_app_auth is idempotent" {
@@ -181,4 +186,32 @@ setup() {
   # Second run
   run configure_vault_app_auth
   [ "$status" -eq 0 ]
+}
+
+@test "register_app_cluster_vault_auth returns 0 and warns when args are empty" {
+  run register_app_cluster_vault_auth
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"register_app_cluster_vault_auth needs <api_url> <ca_base64>; skipping app-cluster"* ]]
+}
+
+@test "register_app_cluster_vault_auth decodes CA and subshell-guards configure_vault_app_auth" {
+  local ca_file="$BATS_TEST_TMPDIR/app-cluster-ca.pem"
+  local ca_b64
+  printf 'FAKE-APP-CA\n' > "$ca_file"
+  ca_b64="$(base64 < "$ca_file" | tr -d '\n')"
+
+  configure_vault_app_auth() {
+    printf 'api=%s\n' "$APP_CLUSTER_API_URL" > "$BATS_TEST_TMPDIR/register.log"
+    printf 'ca_path=%s\n' "$APP_CLUSTER_CA_CERT_PATH" >> "$BATS_TEST_TMPDIR/register.log"
+    cat "$APP_CLUSTER_CA_CERT_PATH" > "$BATS_TEST_TMPDIR/decoded-ca.log"
+    return 7
+  }
+  export -f configure_vault_app_auth
+
+  run register_app_cluster_vault_auth "https://10.211.55.14:6443" "$ca_b64" "hostinger"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"WARN: app-auth registration failed (Vault down?) for hostinger"* ]]
+  grep -q '^api=https://10.211.55.14:6443$' "$BATS_TEST_TMPDIR/register.log"
+  grep -q '^ca_path=' "$BATS_TEST_TMPDIR/register.log"
+  cmp -s "$ca_file" "$BATS_TEST_TMPDIR/decoded-ca.log"
 }

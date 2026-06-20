@@ -1397,6 +1397,30 @@ HCL
   _info "[vault] app cluster auth configured successfully"
 }
 
+function register_app_cluster_vault_auth() {
+  local api_url="${1:-}"
+  local ca_b64="${2:-}"
+  local label="${3:-app-cluster}"
+  if [[ -z "${api_url}" || -z "${ca_b64}" ]]; then
+    _info "[vault] WARN: register_app_cluster_vault_auth needs <api_url> <ca_base64>; skipping ${label}"
+    return 0
+  fi
+  local app_ca
+  app_ca="$(mktemp -t app-cluster-ca.XXXXXX.crt)"
+  if printf '%s' "${ca_b64}" | base64 -d >"${app_ca}" 2>/dev/null; then
+    if ( APP_CLUSTER_API_URL="${api_url}" \
+         APP_CLUSTER_CA_CERT_PATH="${app_ca}" \
+         configure_vault_app_auth ); then
+      _info "[vault] app-auth registered for ${label}"
+    else
+      _info "[vault] WARN: app-auth registration failed (Vault down?) for ${label} — run configure_vault_app_auth later"
+    fi
+  else
+    _info "[vault] WARN: could not decode CA data for ${label}; skipping app-auth"
+  fi
+  rm -f "${app_ca}"
+}
+
 function _vault_set_eso_reader() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
   local release="${2:-$VAULT_RELEASE_DEFAULT}"

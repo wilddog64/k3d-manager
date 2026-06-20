@@ -150,23 +150,9 @@ EOF
   fi
   _info "[k3s-hostinger] Registered — verify: kubectl get secret ${secret_name} -n ${argocd_ns}"
 
-  # Phase 2 — register this app cluster's Kubernetes auth in the hub Vault for ESO.
-  # Subshell-guarded: configure_vault_app_auth calls _err (exit 1) on failure, so a Vault
-  # outage must be contained here or it would abort the whole registration flow.
-  local app_ca
-  app_ca="$(mktemp -t hostinger-app-ca.XXXXXX.crt)"
-  if printf '%s' "${ca_data}" | base64 -d >"${app_ca}" 2>/dev/null; then
-    if ( APP_CLUSTER_API_URL="${server}" \
-         APP_CLUSTER_CA_CERT_PATH="${app_ca}" \
-         configure_vault_app_auth ); then
-      _info "[k3s-hostinger] Vault app-auth registered for ${_HOSTINGER_KUBE_CONTEXT}"
-    else
-      _info "[k3s-hostinger] WARN: Vault app-auth registration failed (Vault down?) — run configure_vault_app_auth later"
-    fi
-  else
-    _info "[k3s-hostinger] WARN: could not decode CA data for Vault app-auth; skipping"
-  fi
-  rm -f "${app_ca}"
+  # Phase 2 — register this app cluster's Kubernetes auth in the hub Vault for ESO
+  # (provider-agnostic helper; subshell-guarded inside so a Vault outage cannot abort registration).
+  register_app_cluster_vault_auth "${server}" "${ca_data}" "${_HOSTINGER_KUBE_CONTEXT}"
 }
 
 function _hostinger_deregister_cluster() {
