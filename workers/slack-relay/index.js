@@ -146,9 +146,10 @@ async function handle(req) {
   }
 
   if (command === '/cluster-resume') {
-    const _t = text.toLowerCase()
-    const _p = PROVIDER_ALIASES[_t] || _t
-    const provider = VALID_PROVIDERS.has(_p) ? _p : 'aws'
+    const provider = resolveProvider(text, '')
+    if (!VALID_PROVIDERS.has(provider)) {
+      return jsonReply('Usage: /cluster-resume <aws|gcp|az> — resumes a lab sandbox provision from its last checkpoint', threadTs)
+    }
     const { ok, conflict } = await relay('/api/v1/cluster-resume', { provider, response_url: responseUrl })
     if (conflict) return jsonReply(`⚠️ ${conflict} — use /cluster-status to check progress`, threadTs)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)

@@ -6,7 +6,7 @@ setup() {
 }
 
 @test "argocd app cluster generator: no static ubuntu-k3s ApplicationSet destination remains" {
-  run rg -n -U "destination:\\n\\s+name: ubuntu-k3s" "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets"
+  run grep -rF -- "ubuntu-k3s" "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets"
   [ "$status" -eq 1 ]
 }
 
