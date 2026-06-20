@@ -1365,6 +1365,24 @@ function configure_vault_app_auth() {
 HCL
   fi
 
+  # d2. Ensure eso-app-reader policy exists (app-cluster data-layer secrets, least-privilege)
+  if ! _vault_policy_exists "$ns" "$release" "eso-app-reader"; then
+    _info "[vault] creating policy 'eso-app-reader'"
+    cat <<'HCL' | _vault_exec_stream --no-exit --pod "${release}-0" "$ns" "$release" -- \
+      vault policy write eso-app-reader -
+       # file: eso-app-reader.hcl
+       # app-cluster ExternalSecrets — least-privilege read of data-layer KV v2 paths
+       path "secret/data/payment/*"      { capabilities = ["read"] }
+       path "secret/data/postgres/*"     { capabilities = ["read"] }
+       path "secret/data/rabbitmq/*"     { capabilities = ["read"] }
+       path "secret/data/redis/*"        { capabilities = ["read"] }
+       path "secret/metadata/payment/*"  { capabilities = ["read","list"] }
+       path "secret/metadata/postgres/*" { capabilities = ["read","list"] }
+       path "secret/metadata/rabbitmq/*" { capabilities = ["read","list"] }
+       path "secret/metadata/redis/*"    { capabilities = ["read","list"] }
+HCL
+  fi
+
   # e. Create ESO role bound to app cluster ESO service account
   local safe_mount_role safe_eso_sa safe_eso_ns
   printf -v safe_mount_role '%s' "auth/${mount}/role/${role}"
@@ -1373,7 +1391,7 @@ HCL
   _vault_exec "$ns" "vault write ${safe_mount_role} \
     bound_service_account_names=${safe_eso_sa} \
     bound_service_account_namespaces=${safe_eso_ns} \
-    policies=eso-reader \
+    policies=eso-app-reader \
     ttl=1h" "$release"
 
   _info "[vault] app cluster auth configured successfully"

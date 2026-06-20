@@ -4,6 +4,8 @@ credentials-file: /Users/cliang/.cloudflared/bb7ece59-8680-4310-9437-232f862e277
 ingress:
   - hostname: argocd.3ai-talk.org
     service: http://localhost:8080
+  - hostname: vault.3ai-talk.org
+    service: http://localhost:18200
   - hostname: frontend.3ai-talk.org
     service: http://127.0.0.2:80
   - hostname: keycloak.3ai-talk.org
