@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: eso
+  namespace: ${ARGOCD_NAMESPACE}
+  labels:
+    managed-by: k3d-manager
+    app-type: platform
+spec:
+  generators:
+    - clusters:
+        selector:
+          matchLabels:
+            k3d-manager/role: app-cluster
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  template:
+    metadata:
+      name: '{{.name}}-eso'
+      labels:
+        cluster: '{{.name}}'
+        app-type: platform
+    spec:
+      project: platform
+      destination:
+        server: '{{.server}}'
+        namespace: secrets
+      source:
+        repoURL: https://charts.external-secrets.io
+        chart: external-secrets
+        targetRevision: 1.0.0
+        helm:
+          releaseName: external-secrets
+          parameters:
+            - name: installCRDs
+              value: 'true'
+      syncPolicy:
+        automated:
+          prune: false
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
