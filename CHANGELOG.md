@@ -5,9 +5,28 @@
 ### Added
 - ESO operator install on app clusters via an ArgoCD ApplicationSet cluster generator (`scripts/etc/argocd/applicationsets/eso.yaml`) — selects `k3d-manager/role: app-cluster`, installs the `external-secrets` chart `1.0.0` with CRDs into the `secrets` namespace using server-side apply; portable across host OS and CPU arch (install runs in-cluster, not from the local CLI)
 
+## [1.7.1] - 2026-06-19
+
+### Added
+- vCluster preflight runner (`bin/cluster-preflight`) — webhook-as-runner, ArgoCD-registered throwaway vCluster on the Hostinger host; Phase 1a NodePort spike + Phase 1b deploy path; `--auto` (smart teardown, default), `--keep`, `--reuse`, and `--destroy` (keep-on-failure / delete-on-success) modes; documented in `make help`
+- ArgoCD app-cluster label generator — routes shopping-cart apps and the data-layer StatefulSet via an app-cluster label generator instead of a static `ubuntu-k3s` ApplicationSet destination (finalizer-aware cutover)
+- Pre-push and pre-commit hooks committed under `.githooks/` for durable per-clone activation (`git config core.hooksPath .githooks`)
+
+### Changed
+- Renamed `bin/acg-*` cluster scripts to `bin/cluster-*` and Slack `/acg-*` commands to `/cluster-*` (hard cutover; `make`/Slack interface otherwise unchanged); `acg-up`/`acg-down` relabeled as ACG-lab-only
+- `/cluster-up`/`/cluster-status`/`/cluster-refresh` default to Hostinger (no longer ACG AWS); added Hostinger `refresh`
+- Consolidated `hostinger-status` into a provider-aware `cluster-status` (`make status CLUSTER_PROVIDER=k3s-hostinger`)
+- Tightened the pre-push main-guard to refuse **all** direct pushes to `main` (override with `ALLOW_MAIN_PUSH=1`)
+
 ### Fixed
 - shopping-cart data-layer routing: the app-cluster ArgoCD cluster secret now carries the `k3d-manager/role: app-cluster` label so the `data-git` ApplicationSet generator matches it (`scripts/lib/providers/k3s-hostinger.sh`, `scripts/etc/argocd/cluster-secret.yaml.tmpl`)
 - Slack webhook: `cluster-up`/`cluster-down`/`cluster-resume` are now accepted as top-level standalone commands (were thread-reply-only); provider allowlist on all three now includes `hostinger` and defaults to `hostinger` instead of `aws`, so a bare or unrecognized provider no longer silently starts an ACG AWS sandbox run (`bin/k3dm-webhook`)
+- `cluster-status`/`hostinger-status` posts the full report body inside a code fence under the `🖥️` header (was logging "complete" / raw text)
+- shopping-cart `ghcr-pull-secret` is provisioned on the active provider context instead of a hardcoded `ubuntu-k3s` context, fixing Hostinger pods stuck in `ImagePullBackOff` after the ACG→Hostinger migration
+- vCluster preflight convergence: isolate the throwaway cluster from production ApplicationSets via an `environment=preflight` label; label the cluster secret with `argocd.argoproj.io/cluster-name` so the platform clone generates; raise control-plane limits (drop the invalid `k3s` distro value for vcluster CLI 0.35.0); provision `ghcr-pull-secret` in the vcluster app namespaces; guard the wait-loop `read` so an empty status no longer trips `set -e`
+- `make refresh` self-heal: re-issue the `argocd-browser-https` Vault cert + regenerate its wrapper, boot out stale launchd records before bootstrap (error 5 fix), and regenerate the missing `argocd-port-forward` plist from its wrapper
+- `/codex` Slack command reads its final message via `--output-last-message` so it no longer echoes its prompt banner
+- `/cluster-resume` uses `resolveProvider` (no silent `aws` fallback); dropped the `rg` dependency from the app-cluster generator BATS test; documented the preflight ArgoCD RBAC justification (Copilot PR #96)
 
 ## [1.7.0] - 2026-06-13
 
