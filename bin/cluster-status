@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# bin/acg-status
+# bin/cluster-status
 #
 # One-shot cluster status — nodes, pods, ArgoCD apps, tunnel health.
 # Read-only. Safe to run at any time.
 #
 # Usage:
-#   bin/acg-status
+#   bin/cluster-status
 #
 # Environment:
 #   APP_CONTEXT    kubectl context for app cluster (auto-resolved if unset)
@@ -21,6 +21,7 @@ source "${REPO_ROOT}/scripts/lib/provider.sh"
 CLUSTER_PROVIDER="$(_acg_resolve_provider)"
 APP_CONTEXT="${APP_CONTEXT:-$(_acg_provider_context "${CLUSTER_PROVIDER}")}"
 INFRA_CONTEXT="${INFRA_CONTEXT:-k3d-k3d-cluster}"
+ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-cicd}"
 
 echo "=== Hub Cluster (${INFRA_CONTEXT}) ==="
 kubectl get nodes --context "${INFRA_CONTEXT}" 2>/dev/null \
@@ -31,23 +32,44 @@ echo "=== Hub Pods — all namespaces (${INFRA_CONTEXT}) ==="
 kubectl get pods -A --context "${INFRA_CONTEXT}" 2>/dev/null \
   || echo "Cannot reach Hub cluster"
 
-echo ""
-echo "=== Tunnel ==="
-if curl -sf --max-time 3 http://localhost:6443 >/dev/null 2>&1; then
-  echo "SSH tunnel: UP (port 6443 reachable)"
-else
-  echo "SSH tunnel: DOWN (port 6443 not reachable)"
-fi
+case "${CLUSTER_PROVIDER}" in
+  k3s-aws|k3s-gcp|k3s-az)
+    echo ""
+    echo "=== Tunnel ==="
+    if curl -sf --max-time 3 http://localhost:6443 >/dev/null 2>&1; then
+      echo "SSH tunnel: UP (port 6443 reachable)"
+    else
+      echo "SSH tunnel: DOWN (port 6443 not reachable)"
+    fi
+    ;;
+esac
 
 echo ""
 echo "=== Nodes (${APP_CONTEXT}) ==="
 kubectl get nodes --context "${APP_CONTEXT}" 2>/dev/null \
-  || echo "Cannot reach app cluster — run bin/acg-refresh"
+  || echo "Cannot reach app cluster — run bin/cluster-refresh"
 
 echo ""
 echo "=== Pods — all namespaces (${APP_CONTEXT}) ==="
 kubectl get pods -A --context "${APP_CONTEXT}" 2>/dev/null \
   || echo "Cannot reach app cluster"
+
+echo ""
+echo "=== API Health (${APP_CONTEXT}) ==="
+if kubectl get --raw='/healthz' --context "${APP_CONTEXT}" >/dev/null 2>&1; then
+  echo "API server: UP (/healthz ok)"
+else
+  echo "API server: DOWN (/healthz unreachable)"
+fi
+
+echo ""
+echo "=== Hub ArgoCD Registration (${INFRA_CONTEXT}, ns ${ARGOCD_NAMESPACE}) ==="
+if kubectl get secret "cluster-${APP_CONTEXT}" -n "${ARGOCD_NAMESPACE}" \
+     --context "${INFRA_CONTEXT}" >/dev/null 2>&1; then
+  echo "Registered: secret cluster-${APP_CONTEXT} present"
+else
+  echo "NOT registered: secret cluster-${APP_CONTEXT} missing"
+fi
 
 echo ""
 echo "=== ArgoCD Apps ==="
@@ -65,7 +87,7 @@ if [[ "${CLUSTER_PROVIDER}" == "k3s-aws" ]]; then
   if aws sts get-caller-identity --output table 2>/dev/null; then
     : # printed inline
   else
-    echo "AWS credentials invalid or expired — run bin/acg-refresh"
+    echo "AWS credentials invalid or expired — run bin/cluster-refresh"
   fi
 fi
 

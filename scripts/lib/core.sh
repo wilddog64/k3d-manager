@@ -542,6 +542,10 @@ function destroy_cluster() {
    _cluster_provider_call destroy_cluster "$@"
 }
 
+function refresh_cluster() {
+   _cluster_provider_call refresh_cluster "$@"
+}
+
 function destroy_k3d_cluster() {
    destroy_cluster "$@"
 }

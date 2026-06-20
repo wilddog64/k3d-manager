@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# bin/acg-refresh
+# bin/cluster-refresh
 #
 # Daily driver — refresh provider credentials, restart SSH tunnel, and ensure
 # all port-forward services are running.
 #
 # Usage:
-#   bin/acg-refresh [sandbox-url] [--login-prompt]
+#   bin/cluster-refresh [sandbox-url] [--login-prompt]
 #
 # Environment:
 #   ACG_SANDBOX_URL   Override default sandbox listing URL
@@ -24,6 +24,8 @@ source "${REPO_ROOT}/scripts/plugins/gemini.sh"
 source "${REPO_ROOT}/scripts/plugins/aws.sh"
 source "${REPO_ROOT}/scripts/plugins/acg.sh"
 source "${REPO_ROOT}/scripts/plugins/tunnel.sh"
+PLUGINS_DIR="${PLUGINS_DIR:-${REPO_ROOT}/scripts/plugins}"
+source "${REPO_ROOT}/scripts/plugins/argocd.sh"
 
 _ACG_STATE_DIR="${HOME}/.local/share/k3d-manager"
 
@@ -77,6 +79,7 @@ _launchd_ensure() {
       sleep 1
     fi
     if [[ "${domain}" == "system" ]]; then
+      _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${plist}" || true
       _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${plist}" \
         && _info "[acg-refresh] launchd ${label}: bootstrapped" \
         || _warn "[acg-refresh] launchd ${label}: bootstrap failed (plist exists but service could not start — check wrapper script and TLS certs)"
@@ -199,7 +202,7 @@ case "${_cluster_provider}" in
     else
       _info "[acg-refresh] Azure credentials expired — extracting..."
       _browser_launch
-      "${REPO_ROOT}/scripts/lib/acg/bin/acg-credential-test" \
+      "${REPO_ROOT}/scripts/lib/acg/bin/"acg-credential-test \
         "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}" --provider azure || exit 1
       _az_existing_rg=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
     fi
@@ -325,9 +328,40 @@ _pf_ensure "ACG Prometheus port-forward" \
 if _is_mac; then
   _info "[acg-refresh] Checking launchd port-forward agents..."
 
+  _argocd_pf_label="com.k3d-manager.argocd-port-forward"
+  _argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
+  _argocd_pf_log="${_ACG_STATE_DIR}/logs/argocd-pf.log"
+  _argocd_pf_wrapper="${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  if [[ ! -f "${_argocd_pf_plist}" && -f "${_argocd_pf_wrapper}" ]]; then
+    _info "[acg-refresh] ArgoCD port-forward plist missing — regenerating from wrapper..."
+    mkdir -p "$(dirname "${_argocd_pf_log}")"
+    cat > "${_argocd_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_argocd_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${_argocd_pf_wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_argocd_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_argocd_pf_log}</string>
+</dict>
+</plist>
+PLIST
+  fi
   _launchd_ensure \
-    "com.k3d-manager.argocd-port-forward" \
-    "${HOME}/Library/LaunchAgents/com.k3d-manager.argocd-port-forward.plist" \
+    "${_argocd_pf_label}" \
+    "${_argocd_pf_plist}" \
     user
 
   _kc_pf_label="com.k3d-manager.keycloak-port-forward"
@@ -421,6 +455,25 @@ PLIST
 
   # ── 5. launchd daemons (system-domain) ───────────────────────────────────────
   _info "[acg-refresh] Checking launchd system daemons..."
+
+  # Self-heal the argocd-browser-https listener before (re)bootstrapping it. The daemon
+  # socat-terminates TLS on :443 using a Vault-issued cert; if the cert material or the
+  # wrapper script is missing, socat crash-loops until launchd drops it, and a plain
+  # _launchd_ensure cannot recover it. Regenerate both here (mirrors bin/cluster-up).
+  _argocd_browser_tls_dir="${ARGOCD_BROWSER_TLS_DIR:-${_ACG_STATE_DIR}/argocd-browser-https-tls}"
+  _argocd_browser_tls_cert="${ARGOCD_BROWSER_TLS_CERT_FILE:-${_argocd_browser_tls_dir}/fullchain.crt}"
+  _argocd_browser_tls_key="${ARGOCD_BROWSER_TLS_KEY_FILE:-${_argocd_browser_tls_dir}/tls.key}"
+  _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${_ACG_STATE_DIR}/bin/argocd-browser-https.sh}"
+  _argocd_browser_log="${ARGOCD_BROWSER_LISTENER_LOG:-${_ACG_STATE_DIR}/logs/argocd-browser-https.log}"
+  if [[ ! -s "${_argocd_browser_tls_cert}" || ! -s "${_argocd_browser_tls_key}" ]]; then
+    _info "[acg-refresh] argocd-browser-https TLS material missing — re-issuing from Vault PKI..."
+    _argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}" \
+      || _warn "[acg-refresh] failed to re-issue argocd-browser TLS material — listener will not start"
+  fi
+  if [[ ! -f "${_argocd_browser_wrapper}" ]]; then
+    _info "[acg-refresh] argocd-browser-https wrapper missing — regenerating..."
+    _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz"
+  fi
 
   _system_daemon_install_if_missing \
     "com.k3d-manager.argocd-browser-https" \

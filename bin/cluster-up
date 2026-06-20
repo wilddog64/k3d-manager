@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# bin/acg-up
+# bin/cluster-up
 #
 # Full ACG provision — credentials → 3-node cluster → tunnel → background watcher.
 # Use this when starting from scratch (new sandbox or after acg-down).
 #
 # Usage:
-#   bin/acg-up [sandbox-url]
+#   bin/cluster-up [sandbox-url]
 #
 # Environment:
 #   ACG_SANDBOX_URL   Override default sandbox listing URL
@@ -206,7 +206,7 @@ case "${_cluster_provider}" in
       _acg_cred_test_url="${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
       _info "[acg-up] Extracting and validating AWS credentials (will restart sandbox on ghost-state failure)..."
       _browser_launch
-      "${REPO_ROOT}/scripts/lib/acg/bin/acg-credential-test" "${_acg_cred_test_url}" || exit 1
+      "${REPO_ROOT}/scripts/lib/acg/bin/"acg-credential-test "${_acg_cred_test_url}" || exit 1
       _info "[acg-up] AWS credentials extracted and validated."
     fi
     ;;
@@ -226,7 +226,7 @@ case "${_cluster_provider}" in
       _acg_cred_test_url="${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
       _info "[acg-up] Extracting and validating Azure credentials..."
       _browser_launch
-      "${REPO_ROOT}/scripts/lib/acg/bin/acg-credential-test" "${_acg_cred_test_url}" --provider azure || exit 1
+      "${REPO_ROOT}/scripts/lib/acg/bin/"acg-credential-test "${_acg_cred_test_url}" --provider azure || exit 1
       _info "[acg-up] Azure credentials extracted and validated."
       AZ_RESOURCE_GROUP=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
       export AZ_RESOURCE_GROUP

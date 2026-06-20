@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argocd-manager
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argocd-manager-role
+  annotations:
+    # JUSTIFICATION (CLAUDE.md: "new ClusterRoles must be justified"):
+    # Mirrors ArgoCD's standard `argocd-manager` cluster role (the same wildcard role that
+    # `argocd cluster add` installs). The application-controller must reconcile arbitrary GitOps
+    # manifests — Istio, Vault, ESO, cert-manager CRDs, etc. — that cannot be enumerated ahead of
+    # time, so a scoped role would silently break reconciliation. Blast radius is bounded
+    # operationally, not by RBAC: installed ONLY inside an ephemeral throwaway vCluster created for
+    # Phase 1 preflight and destroyed when the run ends. Never applied to the host or any production path.
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+- nonResourceURLs: ["*"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argocd-manager-role-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argocd-manager-role
+subjects:
+- kind: ServiceAccount
+  name: argocd-manager
+  namespace: kube-system

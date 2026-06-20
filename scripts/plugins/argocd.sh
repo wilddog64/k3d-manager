@@ -1078,6 +1078,12 @@ function _argocd_deploy_applicationsets() {
 
    APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-ubuntu-hostinger}"
    export APP_CLUSTER_NAME
+   local _active_app_cluster=""
+   if declare -f _acg_provider_context >/dev/null 2>&1 && declare -f _acg_resolve_provider >/dev/null 2>&1; then
+      _active_app_cluster="$(_acg_provider_context "$(_acg_resolve_provider)" 2>/dev/null)"
+   fi
+   _active_app_cluster="${_active_app_cluster:-${APP_CLUSTER_NAME}}"
+   _argocd_set_active_app_cluster "${_active_app_cluster}"
 
    local appsets_dir="$ARGOCD_CONFIG_DIR/applicationsets"
 
@@ -1115,6 +1121,26 @@ function _argocd_deploy_applicationsets() {
 
    _info "[argocd] Successfully deployed $deployed_count/${#appset_files[@]} ApplicationSet(s)"
    return 0
+}
+
+function _argocd_set_active_app_cluster() {
+   local _active="${1:-}"
+   if [[ -z "${_active}" ]]; then
+      _err "[argocd] _argocd_set_active_app_cluster: active cluster name required"
+      return 1
+   fi
+   local _ns="${ARGOCD_NAMESPACE:-cicd}"
+   local _s _cname
+   while IFS= read -r _s; do
+      [[ -z "${_s}" ]] && continue
+      _cname="$(_kubectl get "${_s}" -n "${_ns}" -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/cluster-name}' 2>/dev/null)"
+      if [[ "${_cname}" == "${_active}" ]]; then
+         _kubectl label "${_s}" -n "${_ns}" k3d-manager/role=app-cluster --overwrite >/dev/null 2>&1 || true
+      else
+         _kubectl label "${_s}" -n "${_ns}" k3d-manager/role- >/dev/null 2>&1 || true
+      fi
+   done < <(_kubectl get secrets -n "${_ns}" -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null)
+   _info "[argocd] app-cluster role label set on '${_active}' (cleared from others)"
 }
 function register_app_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
@@ -1164,6 +1190,7 @@ metadata:
   namespace: ${ARGOCD_NAMESPACE}
   labels:
     argocd.argoproj.io/secret-type: cluster
+    argocd.argoproj.io/cluster-name: "${ARGOCD_APP_CLUSTER_NAME}"
     environment: "${app_cluster_environment}"
     argocd-chart-version: "${ARGOCD_CHART_VERSION}"
     argocd-replicas: "2"
@@ -1185,6 +1212,7 @@ EOF
   (( _wasx )) && set -x
 
   _info "[argocd] cluster secret applied — verify with: kubectl get secret ${ARGOCD_APP_CLUSTER_SECRET_NAME} -n ${ARGOCD_NAMESPACE}"
+  _argocd_set_active_app_cluster "${ARGOCD_APP_CLUSTER_NAME}"
 }
 
 function deploy_argocd_platform_ops() {

@@ -7,6 +7,8 @@ setup() {
   mkdir -p "$HOME"
   export VCLUSTER_KUBECONFIG_DIR="${BATS_TEST_TMPDIR}/kubeconfigs"
   mkdir -p "$VCLUSTER_KUBECONFIG_DIR"
+  export VCLUSTER_HOST_CONTEXT="ubuntu-hostinger"
+  unset VCLUSTER_VALUES_FILE
   export PATH="${BATS_TEST_TMPDIR}/bin:$PATH"
   mkdir -p "${BATS_TEST_TMPDIR}/bin"
   VCLUSTER_STUB="${BATS_TEST_TMPDIR}/bin/vcluster"
@@ -36,6 +38,12 @@ STUB
 
 @test "vcluster_create: installs CLI when binary missing" {
   rm -f "$VCLUSTER_STUB"
+  _command_exist() {
+    if [[ "$1" == "vcluster" ]]; then
+      return 1
+    fi
+    command -v "$1" >/dev/null 2>&1
+  }
   _vcluster_install_cli() {
     cat <<'BIN' > "$VCLUSTER_STUB"
 #!/usr/bin/env bash
@@ -55,7 +63,18 @@ BIN
   [ "${run_calls[0]}" = "vcluster create demo -n vclusters --chart-version 0.32.1 --connect=false -f ${SCRIPT_DIR}/etc/vcluster/values.yaml" ]
 }
 
+@test "vcluster_create: honors VCLUSTER_VALUES_FILE override" {
+  local override_values="${BATS_TEST_TMPDIR}/values-preflight.yaml"
+  printf 'controlPlane:\n  service:\n    spec:\n      type: NodePort\n' > "$override_values"
+  VCLUSTER_VALUES_FILE="$override_values" run vcluster_create demo
+  [ "$status" -eq 0 ]
+  local -a run_calls
+  read_lines "$RUN_LOG" run_calls
+  [ "${run_calls[0]}" = "vcluster create demo -n vclusters --chart-version 0.32.1 --connect=false -f ${override_values}" ]
+}
+
 @test "vcluster_create: fails without active host context" {
+  unset VCLUSTER_HOST_CONTEXT
   KUBECTL_EXIT_CODES=(1)
   run vcluster_create demo
   [ "$status" -ne 0 ]

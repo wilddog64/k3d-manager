@@ -1,0 +1,12 @@
+controlPlane:
+  service:
+    spec:
+      type: NodePort
+  statefulSet:
+    resources:
+      requests:
+        cpu: 300m
+        memory: 384Mi
+      limits:
+        cpu: 1500m
+        memory: 1536Mi

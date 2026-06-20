@@ -318,24 +318,25 @@ function shopping_cart_resolve_ghcr_pat() {
 }
 
 function shopping_cart_create_ghcr_pull_secret() {
-  local ns
+  local ns _ctx
+  _ctx="${APP_CONTEXT:-$(_acg_provider_context "$(_acg_resolve_provider)")}"
   for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
-    kubectl create namespace "$ns" --context ubuntu-k3s \
+    kubectl create namespace "$ns" --context "${_ctx}" \
       --dry-run=client -o yaml \
-      | kubectl apply --context ubuntu-k3s -f - >/dev/null
+      | kubectl apply --context "${_ctx}" -f - >/dev/null
     case "$ns" in
       shopping-cart-data)
-        kubectl label namespace "$ns" --context ubuntu-k3s \
+        kubectl label namespace "$ns" --context "${_ctx}" \
           app.kubernetes.io/component=data \
           app.kubernetes.io/part-of=shopping-cart \
           --overwrite >/dev/null ;;
       shopping-cart-apps)
-        kubectl label namespace "$ns" --context ubuntu-k3s \
+        kubectl label namespace "$ns" --context "${_ctx}" \
           app.kubernetes.io/component=application \
           app.kubernetes.io/part-of=shopping-cart \
           --overwrite >/dev/null ;;
       shopping-cart-payment)
-        kubectl label namespace "$ns" --context ubuntu-k3s \
+        kubectl label namespace "$ns" --context "${_ctx}" \
           app.kubernetes.io/component=payment \
           app.kubernetes.io/part-of=shopping-cart \
           --overwrite >/dev/null ;;
@@ -344,17 +345,22 @@ function shopping_cart_create_ghcr_pull_secret() {
       --docker-server=ghcr.io \
       --docker-username="${_github_user}" \
       --docker-password="${_ghcr_pat}" \
-      --context ubuntu-k3s \
+      --context "${_ctx}" \
       -n "$ns" \
       --dry-run=client -o yaml \
-      | kubectl apply --context ubuntu-k3s -f -
-    _info "[acg-up] ghcr-pull-secret applied in namespace: ${ns}"
+      | kubectl apply --context "${_ctx}" -f -
+    _info "[acg-up] ghcr-pull-secret applied in namespace: ${ns} (context ${_ctx})"
   done
   for ns in shopping-cart-apps shopping-cart-payment shopping-cart-data; do
     kubectl patch serviceaccount default -n "$ns" \
-      --context ubuntu-k3s \
+      --context "${_ctx}" \
       -p '{"imagePullSecrets": [{"name": "ghcr-pull-secret"}]}'
   done
+}
+
+function shopping_cart_provision_ghcr_pull_secret() {
+  shopping_cart_resolve_ghcr_pat
+  shopping_cart_create_ghcr_pull_secret
 }
 
 function shopping_cart_create_vault_bridge() {

@@ -1,0 +1,612 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck source=/dev/null
+source "${REPO_ROOT}/scripts/lib/system.sh"
+# shellcheck source=/dev/null
+source "${REPO_ROOT}/scripts/etc/hostinger/vars.sh"
+# shellcheck source=/dev/null
+source "${REPO_ROOT}/scripts/plugins/eso.sh"
+
+function _cluster_preflight_usage() {
+  cat <<'EOF'
+Usage: cluster-preflight <name> [--auto|--keep|--reuse]
+  --auto     create, deploy, then tear down on success; keep on failure for investigation (default)
+  --keep     create the vCluster, deploy the stack, always leave it running
+  --reuse    skip create/register; deploy into an already-registered vCluster, keep it
+EOF
+}
+
+PREFLIGHT_NAME="${1:-}"
+PREFLIGHT_MODE="${2:---auto}"
+
+if [[ "${PREFLIGHT_NAME}" == "-h" || "${PREFLIGHT_NAME}" == "--help" ]]; then
+  _cluster_preflight_usage
+  exit 0
+fi
+
+if [[ -z "${PREFLIGHT_NAME}" ]]; then
+  _cluster_preflight_usage
+  exit 1
+fi
+
+case "${PREFLIGHT_MODE}" in
+  --auto|--keep)
+    ;;
+  --reuse)
+    PREFLIGHT_REUSE=1
+    PREFLIGHT_MODE="--keep"
+    ;;
+  *)
+    _cluster_preflight_usage
+    exit 1
+    ;;
+esac
+
+VCLUSTER_NAMESPACE="${VCLUSTER_NAMESPACE:-vclusters}"
+VCLUSTER_KUBECONFIG_DIR="${VCLUSTER_KUBECONFIG_DIR:-${HOME}/.kube/vclusters}"
+ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-cicd}"
+K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+HOST_CONTEXT="${HOST_CONTEXT:-ubuntu-hostinger}"
+PREVIOUS_KUBE_CONTEXT="${PREVIOUS_KUBE_CONTEXT:-}"
+REGISTER_KUBE_CONTEXT="${REGISTER_KUBE_CONTEXT:-k3d-k3d-cluster}"
+APP_CLUSTER_NAME="${PREFLIGHT_NAME}"
+APP_CLUSTER_SECRET_NAME="cluster-${PREFLIGHT_NAME}"
+APP_CLUSTER_SERVER=""
+APP_CLUSTER_ENVIRONMENT="${APP_CLUSTER_ENVIRONMENT:-preflight}"
+VC_KCFG="${VCLUSTER_KUBECONFIG_DIR}/${PREFLIGHT_NAME}.yaml"
+PREFLIGHT_WAIT_TIMEOUT="${PREFLIGHT_WAIT_TIMEOUT:-300}"
+PREFLIGHT_RENDER_DIR="$(mktemp -d)"
+PREFLIGHT_PROJECT_NAME="${PREFLIGHT_NAME}-preflight-platform"
+PREFLIGHT_PLATFORM_APPSET_NAME="${PREFLIGHT_NAME}-preflight-platform-helm"
+PREFLIGHT_SERVICES_APPSET_NAME="${PREFLIGHT_NAME}-preflight-services-git"
+PREFLIGHT_OBSERVABILITY_APPSET_NAME="${PREFLIGHT_NAME}-preflight-observability-acg"
+PREFLIGHT_VCLUSTER_VALUES_FILE="${REPO_ROOT}/scripts/etc/vcluster/values-preflight.yaml"
+VCLUSTER_HOST_CONTEXT="${VCLUSTER_HOST_CONTEXT:-${HOST_CONTEXT}}"
+PREFLIGHT_REUSE="${PREFLIGHT_REUSE:-0}"
+
+function _cluster_preflight_cleanup() {
+  local rc=$?
+
+  rm -rf "${PREFLIGHT_RENDER_DIR}" >/dev/null 2>&1 || true
+
+  if [[ "${PREFLIGHT_MODE}" == "--auto" && "${rc}" -ne 0 ]]; then
+    _info "[preflight] --auto: run FAILED (rc=${rc}) — keeping ${PREFLIGHT_NAME} and its ArgoCD resources for investigation. Clean up manually with: ${REPO_ROOT}/scripts/k3d-manager vcluster_destroy ${PREFLIGHT_NAME}"
+  elif [[ "${PREFLIGHT_MODE}" == "--auto" ]]; then
+    _info "[preflight] Destroying ${PREFLIGHT_NAME} and pruning preflight ArgoCD resources..."
+    _cluster_preflight_remove_platform_destination
+    _kubectl delete application "${PREFLIGHT_NAME}-platform" \
+      -n "${ARGOCD_NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+    _kubectl delete application "${PREFLIGHT_NAME}-preflight-platform" \
+      -n "${ARGOCD_NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+    _kubectl delete application "${PREFLIGHT_NAME}-preflight-data-layer" \
+      -n "${ARGOCD_NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+    _kubectl delete applicationset "${PREFLIGHT_PLATFORM_APPSET_NAME}" \
+      -n "${ARGOCD_NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+    _kubectl delete applicationset "${PREFLIGHT_SERVICES_APPSET_NAME}" \
+      -n "${ARGOCD_NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+    _kubectl delete applicationset "${PREFLIGHT_OBSERVABILITY_APPSET_NAME}" \
+      -n "${ARGOCD_NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+    _kubectl delete appproject "${PREFLIGHT_PROJECT_NAME}" \
+      -n "${ARGOCD_NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+    _kubectl delete secret "${APP_CLUSTER_SECRET_NAME}" \
+      -n "${ARGOCD_NAMESPACE}" --ignore-not-found >/dev/null 2>&1 || true
+    VCLUSTER_HOST_CONTEXT="${HOST_CONTEXT}" \
+      _run_command -- "${REPO_ROOT}/scripts/k3d-manager" vcluster_destroy "${PREFLIGHT_NAME}" \
+      >/dev/null 2>&1 || true
+  fi
+
+  if [[ -n "${PREVIOUS_KUBE_CONTEXT}" && "${PREVIOUS_KUBE_CONTEXT}" != "${HOST_CONTEXT}" ]]; then
+    _run_command -- kubectl config use-context "${PREVIOUS_KUBE_CONTEXT}" >/dev/null 2>&1 || true
+  fi
+
+  return "${rc}"
+}
+trap _cluster_preflight_cleanup EXIT INT TERM
+
+function _cluster_preflight_wait_for_apps() {
+  local cluster_name="${1:?cluster name required}"
+  local timeout_seconds="${2:-300}"
+  local deadline=$((SECONDS + timeout_seconds))
+  local -a app_names=()
+  local expected_server="https://${cluster_name}.${VCLUSTER_NAMESPACE}.svc:443"
+
+  while (( SECONDS < deadline )); do
+    mapfile -t app_names < <(
+      _kubectl -n "${ARGOCD_NAMESPACE}" get applications.argoproj.io -o json \
+        | python3 -c '
+import json
+import sys
+
+cluster_name = sys.argv[1]
+expected_server = sys.argv[2]
+payload = json.load(sys.stdin)
+for item in payload.get("items", []):
+    name = item.get("metadata", {}).get("name") or ""
+    destination = item.get("spec", {}).get("destination", {})
+    destination_name = destination.get("name")
+    destination_server = destination.get("server")
+    is_preflight = name.startswith(f"{cluster_name}-preflight-")
+    is_platform = name == f"{cluster_name}-platform"
+    if (is_preflight or is_platform) and (
+        destination_name == cluster_name or
+        destination_server == expected_server or
+        is_platform
+    ):
+        print(name)
+' "${cluster_name}" "${expected_server}"
+    )
+
+    if ((${#app_names[@]} == 0)); then
+      sleep 5
+      continue
+    fi
+
+    local app
+    local all_ready=1
+    for app in "${app_names[@]}"; do
+      local sync_status=""
+      local health_status=""
+      read -r sync_status health_status < <(
+        _kubectl -n "${ARGOCD_NAMESPACE}" get application "${app}" \
+          -o jsonpath='{.status.sync.status}{" "}{.status.health.status}' 2>/dev/null \
+          || printf 'Unknown Unknown'
+      )
+      if [[ "${sync_status}" != "Synced" || "${health_status}" != "Healthy" ]]; then
+        all_ready=0
+        break
+      fi
+    done
+
+    if (( all_ready )); then
+      _info "[preflight] ArgoCD applications for ${cluster_name} are Synced/Healthy"
+      return 0
+    fi
+
+    sleep 5
+  done
+
+  _err "[preflight] Timed out waiting for ArgoCD applications targeting ${cluster_name} to become Synced/Healthy"
+}
+
+function _cluster_preflight_render_platform_project() {
+  local rendered="$1"
+  local cluster_name="$2"
+  local template="${REPO_ROOT}/scripts/etc/argocd/projects/platform.yaml.tmpl"
+  local tmp="${rendered}.rendered"
+
+  ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE}" envsubst '$ARGOCD_NAMESPACE' < "$template" > "$tmp"
+  awk -v cluster="$cluster_name" '
+    BEGIN {
+      last_namespace = ""
+    }
+    /^  name: platform$/ {
+      print "  name: " cluster "-preflight-platform"
+      next
+    }
+    /^    - namespace: / {
+      last_namespace = $0
+      print
+      next
+    }
+    /^      server: https:\/\/kubernetes.default.svc$/ && last_namespace ~ /^    - namespace: cicd$/ {
+      print
+      print "    - namespace: cicd"
+      print "      server: https://" cluster ".vclusters.svc:443"
+      next
+    }
+    /^      name: ubuntu-k3s$/ {
+      print
+      print last_namespace
+      print "      name: " cluster
+      next
+    }
+    { print }
+  ' "$tmp" > "$rendered"
+  rm -f "$tmp"
+}
+
+function _cluster_preflight_render_services_appset() {
+  local rendered="$1"
+  local cluster_name="$2"
+  local template="${REPO_ROOT}/scripts/etc/argocd/applicationsets/services-git.yaml"
+  local tmp="${rendered}.rendered"
+
+  ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE}" \
+  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH}" \
+  APP_CLUSTER_NAME="${cluster_name}" \
+    envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME' < "$template" > "$tmp"
+  sed \
+    -e "s/^  name: services-git$/  name: ${cluster_name}-preflight-services-git/" \
+    -e "s/^      name: '{{.path.basename}}'$/      name: '${cluster_name}-preflight-{{.path.basename}}'/" \
+    "$tmp" > "$rendered"
+  rm -f "$tmp"
+}
+
+function _cluster_preflight_render_platform_appset() {
+  local rendered="$1"
+  local cluster_name="$2"
+  local template="${REPO_ROOT}/scripts/etc/argocd/applicationsets/platform-helm.yaml"
+  local tmp="${rendered}.rendered"
+
+  ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE}" \
+  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH}" \
+    envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "$template" > "$tmp"
+  sed \
+    -e "s/^  name: platform-helm$/  name: ${cluster_name}-preflight-platform-helm/" \
+    -e "s/^      name: '{{.name}}-platform'$/      name: '${cluster_name}-preflight-platform'/" \
+    -e "s/^      project: platform$/      project: ${cluster_name}-preflight-platform/" \
+    -e "s/^              values: \\[dev, infra, prod\\]$/              values: [${APP_CLUSTER_ENVIRONMENT}]/" \
+    -e "s/^        namespace: cicd$/        namespace: cicd/" \
+    "$tmp" | awk -v cluster="$cluster_name" '
+    /^[[:space:]]*matchExpressions:$/ {
+      print
+      print "            - key: argocd.argoproj.io/cluster-name"
+      print "              operator: In"
+      print "              values: [" cluster "]"
+        next
+      }
+      { print }
+    ' > "$rendered"
+  rm -f "$tmp"
+}
+
+function _cluster_preflight_render_observability_appset() {
+  local rendered="$1"
+  local cluster_name="$2"
+  local template="${REPO_ROOT}/scripts/etc/argocd/applicationsets/observability-acg.yaml"
+  local tmp="${rendered}.rendered"
+
+  ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE}" \
+  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH}" \
+  APP_CLUSTER_NAME="${cluster_name}" \
+    envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME' < "$template" > "$tmp"
+  sed \
+    -e "s/^  name: observability-acg$/  name: ${cluster_name}-preflight-observability-acg/" \
+    -e "s/^      project: platform$/      project: ${cluster_name}-preflight-platform/" \
+    -e "s/^      name: '{{.name}}'$/      name: '${cluster_name}-preflight-{{.name}}'/" \
+    "$tmp" > "$rendered"
+  rm -f "$tmp"
+}
+
+function _cluster_preflight_allow_platform_destination() {
+  if _kubectl -n "${ARGOCD_NAMESPACE}" get appproject platform -o json \
+      | python3 -c '
+import json
+import sys
+
+server = sys.argv[1]
+payload = json.load(sys.stdin)
+for dest in payload.get("spec", {}).get("destinations", []):
+    if dest.get("server") == server and dest.get("namespace") == "cicd":
+        raise SystemExit(0)
+raise SystemExit(1)
+' "${APP_CLUSTER_SERVER}"; then
+    return 0
+  fi
+
+  local patch
+  patch="$(printf '[{"op":"add","path":"/spec/destinations/-","value":{"namespace":"cicd","server":"%s"}}]' "${APP_CLUSTER_SERVER}")"
+  _kubectl patch appproject platform -n "${ARGOCD_NAMESPACE}" --type=json -p "${patch}" >/dev/null
+}
+
+function _cluster_preflight_remove_platform_destination() {
+  local idx=""
+  idx="$(
+    _kubectl -n "${ARGOCD_NAMESPACE}" get appproject platform -o json \
+      | python3 -c '
+import json
+import sys
+
+server = sys.argv[1]
+payload = json.load(sys.stdin)
+for i, dest in enumerate(payload.get("spec", {}).get("destinations", [])):
+    if dest.get("server") == server and dest.get("namespace") == "cicd":
+        print(i)
+        raise SystemExit(0)
+raise SystemExit(1)
+' "${APP_CLUSTER_SERVER}" 2>/dev/null || true
+  )"
+  if [[ -n "${idx}" ]]; then
+    _kubectl patch appproject platform -n "${ARGOCD_NAMESPACE}" --type=json \
+      -p "[{\"op\":\"remove\",\"path\":\"/spec/destinations/${idx}\"}]" >/dev/null 2>&1 || true
+  fi
+}
+
+function _cluster_preflight_vcluster_nodeport() {
+  local node_port
+  node_port="$(_kubectl --context "${HOST_CONTEXT}" -n "${VCLUSTER_NAMESPACE}" \
+    get svc "${PREFLIGHT_NAME}" \
+    -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || true)"
+  if [[ -z "${node_port}" ]]; then
+    _err "[preflight] Failed to read the vcluster NodePort from svc/${PREFLIGHT_NAME}"
+  fi
+  printf '%s\n' "${node_port}"
+}
+
+function _cluster_preflight_resolve_app_cluster_server() {
+  local node_port
+  node_port="$(_cluster_preflight_vcluster_nodeport)"
+  if [[ -z "${HOSTINGER_HOST:-}" ]]; then
+    _err "[preflight] HOSTINGER_HOST is not available — source scripts/etc/hostinger/vars.sh before running preflight"
+  fi
+  APP_CLUSTER_SERVER="https://${HOSTINGER_HOST}:${node_port}"
+}
+
+function _cluster_preflight_verify_app_cluster_server() {
+  if ! curl -ksS --max-time 10 "${APP_CLUSTER_SERVER}/healthz" >/dev/null 2>&1; then
+    _err "[preflight] vcluster NodePort ${APP_CLUSTER_SERVER} not reachable from this host — open the NodePort in the Hostinger VPS firewall before proceeding. STOPPING (do not guess)."
+  fi
+}
+
+if ! _kubectl config get-contexts "${HOST_CONTEXT}" >/dev/null 2>&1; then
+  _err "[preflight] host cluster context not available: ${HOST_CONTEXT}"
+fi
+
+PREVIOUS_KUBE_CONTEXT="$(_kubectl config current-context 2>/dev/null || true)"
+if [[ "${PREVIOUS_KUBE_CONTEXT}" != "${HOST_CONTEXT}" ]]; then
+  _info "[preflight] Switching kubectl context to ${HOST_CONTEXT}..."
+  _kubectl config use-context "${HOST_CONTEXT}" >/dev/null
+fi
+
+function _cluster_preflight_install_eso() {
+  local ns="${ESO_NAMESPACE:-secrets}"
+  local release="${ESO_HELM_RELEASE:-external-secrets}"
+  local repo_name="${ESO_HELM_REPO_NAME:-external-secrets}"
+  local repo_url="${ESO_HELM_REPO_URL:-https://charts.external-secrets.io}"
+  local chart_ref="${ESO_HELM_CHART_REF:-external-secrets/external-secrets}"
+  local chart_version="${ESO_HELM_CHART_VERSION:-1.0.0}"
+  local rendered="${PREFLIGHT_RENDER_DIR}/external-secrets.yaml"
+  local split_dir="${PREFLIGHT_RENDER_DIR}/external-secrets-split"
+  local crds_dir="${split_dir}/crds"
+  local manifests_dir="${split_dir}/manifests"
+  local max_attempts=12
+  local retry_delay=10
+
+  _info "[preflight] Rendering ESO chart for ${PREFLIGHT_NAME}..."
+  _run_command -- helm repo add --force-update "${repo_name}" "${repo_url}"
+  _run_command -- helm template "${release}" "${chart_ref}" \
+    --version "${chart_version}" \
+    --include-crds \
+    --namespace "${ns}" > "${rendered}"
+
+  mkdir -p "${crds_dir}" "${manifests_dir}"
+  python3 - "${rendered}" "${crds_dir}" "${manifests_dir}" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+source_path = Path(sys.argv[1])
+crds_dir = Path(sys.argv[2])
+manifests_dir = Path(sys.argv[3])
+
+raw = source_path.read_text(encoding="utf-8")
+documents = [doc.strip() for doc in re.split(r"^---\s*$", raw, flags=re.MULTILINE)]
+
+def classify(doc: str) -> str:
+    if re.search(r"^kind:\s*CustomResourceDefinition\s*$", doc, flags=re.MULTILINE) and re.search(r"^apiVersion:\s*apiextensions\.k8s\.io/v1\s*$", doc, flags=re.MULTILINE):
+        return "crd"
+    return "manifest"
+
+def write_docs(path: Path, docs):
+    with path.open("w", encoding="utf-8") as fh:
+        first = True
+        for doc in docs:
+            if not doc.strip():
+                continue
+            if not first:
+                fh.write("---\n")
+            fh.write(doc.rstrip() + "\n")
+            first = False
+
+crds = [doc for doc in documents if doc.strip() and classify(doc) == "crd"]
+manifests = [doc for doc in documents if doc.strip() and classify(doc) == "manifest"]
+for idx, doc in enumerate(crds, start=1):
+    write_docs(crds_dir / f"{idx:03d}.yaml", [doc])
+for idx, doc in enumerate(manifests, start=1):
+    write_docs(manifests_dir / f"{idx:03d}.yaml", [doc])
+PY
+
+  local crd_file
+  shopt -s nullglob
+  local -a crd_files=( "${crds_dir}"/*.yaml )
+  shopt -u nullglob
+
+  if (( ${#crd_files[@]} > 0 )); then
+    _info "[preflight] Applying ESO CRDs inside ${PREFLIGHT_NAME}..."
+    for crd_file in "${crd_files[@]}"; do
+      local attempt=1
+      local crd_output=""
+      while (( attempt <= max_attempts )); do
+        if crd_output="$(KUBECONFIG="${VC_KCFG}" _kubectl create --validate=false --request-timeout=120s -f "${crd_file}" 2>&1)"; then
+          sleep 2
+          break
+        fi
+        if grep -q "AlreadyExists" <<<"${crd_output}"; then
+          break
+        fi
+        if (( attempt >= max_attempts )); then
+          printf '%s\n' "${crd_output}" >&2
+          return 1
+        fi
+        _warn "[preflight] ESO CRD ${crd_file##*/} not ready yet; retrying..."
+        sleep "${retry_delay}"
+        attempt=$((attempt + 1))
+      done
+    done
+  fi
+
+  _info "[preflight] Ensuring ESO namespace ${ns} exists inside ${PREFLIGHT_NAME}..."
+  local namespace_output=""
+  local attempt=1
+  while (( attempt <= max_attempts )); do
+    if namespace_output="$(KUBECONFIG="${VC_KCFG}" _kubectl create namespace "${ns}" \
+      --dry-run=client -o yaml | KUBECONFIG="${VC_KCFG}" _kubectl apply --validate=false -f - 2>&1)"; then
+      sleep 2
+      break
+    fi
+    if (( attempt >= max_attempts )); then
+      printf '%s\n' "${namespace_output}" >&2
+      return 1
+    fi
+    _warn "[preflight] ESO namespace ${ns} not ready yet; retrying..."
+    sleep "${retry_delay}"
+    attempt=$((attempt + 1))
+  done
+
+  _info "[preflight] Applying ESO manifests inside ${PREFLIGHT_NAME}..."
+  local manifest_file
+  shopt -s nullglob
+  local -a manifest_files=( "${manifests_dir}"/*.yaml )
+  shopt -u nullglob
+
+  if (( ${#manifest_files[@]} > 0 )); then
+    for manifest_file in "${manifest_files[@]}"; do
+      local attempt=1
+      local manifest_output=""
+      while (( attempt <= max_attempts )); do
+        if manifest_output="$(KUBECONFIG="${VC_KCFG}" _kubectl apply --validate=false --request-timeout=120s -f "${manifest_file}" 2>&1)"; then
+          sleep 2
+          break
+        fi
+        if (( attempt >= max_attempts )); then
+          printf '%s\n' "${manifest_output}" >&2
+          return 1
+        fi
+        _warn "[preflight] ESO manifest ${manifest_file##*/} not ready yet; retrying..."
+        sleep "${retry_delay}"
+        attempt=$((attempt + 1))
+      done
+    done
+  fi
+
+  _info "[preflight] Waiting for ESO readiness inside ${PREFLIGHT_NAME}..."
+  KUBECONFIG="${VC_KCFG}" _eso_wait_for_crds
+  KUBECONFIG="${VC_KCFG}" _eso_wait_for_core_readiness "${ns}"
+}
+
+function _cluster_preflight_render_data_layer_app() {
+  local rendered="$1"
+  local cluster_name="$2"
+  local template="${REPO_ROOT}/../shopping-carts/shopping-cart-infra/argocd/applications/data-layer.yaml"
+  local tmp="${rendered}.rendered"
+
+  if [[ ! -f "$template" ]]; then
+    _err "[preflight] data-layer Application manifest not found: $template"
+  fi
+
+  sed \
+    -e "s/^  name: data-layer$/  name: ${cluster_name}-preflight-data-layer/" \
+    -e "s/^    name: ubuntu-k3s$/    name: ${cluster_name}/" \
+    "$template" > "$tmp"
+  awk -v cluster="$cluster_name" '
+    /^[[:space:]]*destination:$/ { print; in_dest=1; next }
+    in_dest && /^[[:space:]]*name: / {
+      print
+      next
+    }
+    { print }
+  ' "$tmp" > "$rendered"
+  rm -f "$tmp"
+}
+
+function _cluster_preflight_apply_argocd_resources() {
+  local cluster_name="$1"
+
+  local project_render="${PREFLIGHT_RENDER_DIR}/platform-project.yaml"
+  local data_layer_render="${PREFLIGHT_RENDER_DIR}/data-layer.yaml"
+  local platform_render="${PREFLIGHT_RENDER_DIR}/platform-helm.yaml"
+  local services_render="${PREFLIGHT_RENDER_DIR}/services-git.yaml"
+  local observability_render="${PREFLIGHT_RENDER_DIR}/observability-acg.yaml"
+
+  _cluster_preflight_render_platform_project "$project_render" "$cluster_name"
+  _cluster_preflight_render_data_layer_app "$data_layer_render" "$cluster_name"
+  _cluster_preflight_render_platform_appset "$platform_render" "$cluster_name"
+  _cluster_preflight_render_services_appset "$services_render" "$cluster_name"
+  _cluster_preflight_render_observability_appset "$observability_render" "$cluster_name"
+
+  _info "[preflight] Applying preflight AppProject clone..."
+  _kubectl apply -f "$project_render" >/dev/null
+
+  _info "[preflight] Applying preflight data-layer Application..."
+  _kubectl apply -f "$data_layer_render" >/dev/null
+
+  _info "[preflight] Applying preflight ApplicationSet clones..."
+  _kubectl apply -f "$platform_render" >/dev/null
+  _kubectl apply -f "$services_render" >/dev/null
+  _kubectl apply -f "$observability_render" >/dev/null
+}
+
+if [[ "${PREFLIGHT_REUSE}" -eq 1 ]]; then
+  _info "[preflight] --reuse: skipping create/register for existing vCluster ${PREFLIGHT_NAME}..."
+  if [[ ! -f "${VC_KCFG}" ]]; then
+    _err "[preflight] --reuse requires an existing vCluster kubeconfig: ${VC_KCFG} (run --keep first)"
+  fi
+  _info "[preflight] Deriving ${PREFLIGHT_NAME} API URL from NodePort..."
+  _cluster_preflight_resolve_app_cluster_server
+  _info "[preflight] Verifying ${APP_CLUSTER_SERVER}/healthz from this host..."
+  _cluster_preflight_verify_app_cluster_server
+else
+  _info "[preflight] Creating vCluster ${PREFLIGHT_NAME}..."
+  VCLUSTER_VALUES_FILE="${PREFLIGHT_VCLUSTER_VALUES_FILE}" \
+  VCLUSTER_HOST_CONTEXT="${VCLUSTER_HOST_CONTEXT}" \
+    _run_command -- "${REPO_ROOT}/scripts/k3d-manager" vcluster_create "${PREFLIGHT_NAME}"
+
+  if [[ ! -f "${VC_KCFG}" ]]; then
+    _err "[preflight] Expected vCluster kubeconfig not found: ${VC_KCFG}"
+  fi
+
+  _info "[preflight] Applying argocd-manager RBAC inside ${PREFLIGHT_NAME}..."
+  KUBECONFIG="${VC_KCFG}" _kubectl apply -f "${REPO_ROOT}/scripts/etc/vcluster/argocd-manager-rbac.yaml" >/dev/null
+
+  _info "[preflight] Minting argocd-manager token inside ${PREFLIGHT_NAME}..."
+  VC_TOKEN="$(KUBECONFIG="${VC_KCFG}" _kubectl create token argocd-manager -n kube-system --duration=8760h)"
+  if [[ -z "${VC_TOKEN}" ]]; then
+    _err "[preflight] Failed to mint argocd-manager token inside ${PREFLIGHT_NAME}"
+  fi
+
+  _info "[preflight] Provisioning ghcr-pull-secret in ${PREFLIGHT_NAME} app namespaces..."
+  VC_CONTEXT="$(KUBECONFIG="${VC_KCFG}" _kubectl config current-context 2>/dev/null || true)"
+  KUBECONFIG="${VC_KCFG}" APP_CONTEXT="${VC_CONTEXT}" \
+    _run_command -- "${REPO_ROOT}/scripts/k3d-manager" shopping_cart_provision_ghcr_pull_secret
+
+  _info "[preflight] Deriving ${PREFLIGHT_NAME} API URL from NodePort..."
+  _cluster_preflight_resolve_app_cluster_server
+  _info "[preflight] Verifying ${APP_CLUSTER_SERVER}/healthz from this host..."
+  _cluster_preflight_verify_app_cluster_server
+
+  _info "[preflight] Registering ${PREFLIGHT_NAME} with hub ArgoCD..."
+  if [[ -n "${REGISTER_KUBE_CONTEXT}" && "${REGISTER_KUBE_CONTEXT}" != "$(_kubectl config current-context 2>/dev/null || true)" ]]; then
+    _info "[preflight] Switching kubectl context to ${REGISTER_KUBE_CONTEXT} for ArgoCD registration..."
+    _kubectl config use-context "${REGISTER_KUBE_CONTEXT}" >/dev/null
+  fi
+  ARGOCD_APP_CLUSTER_NAME="${APP_CLUSTER_NAME}" \
+  ARGOCD_APP_CLUSTER_SECRET_NAME="${APP_CLUSTER_SECRET_NAME}" \
+  ARGOCD_APP_CLUSTER_SERVER="${APP_CLUSTER_SERVER}" \
+  ARGOCD_APP_CLUSTER_ENVIRONMENT="${APP_CLUSTER_ENVIRONMENT}" \
+  ARGOCD_APP_CLUSTER_TOKEN="${VC_TOKEN}" \
+    _run_command -- "${REPO_ROOT}/scripts/k3d-manager" register_app_cluster
+  _info "[preflight] Labeling ${APP_CLUSTER_SECRET_NAME} with argocd.argoproj.io/cluster-name=${APP_CLUSTER_NAME} (platform clone selector guard)..."
+  _kubectl -n "${ARGOCD_NAMESPACE}" label secret "${APP_CLUSTER_SECRET_NAME}" \
+    "argocd.argoproj.io/cluster-name=${APP_CLUSTER_NAME}" --overwrite >/dev/null
+fi
+
+if [[ -n "${REGISTER_KUBE_CONTEXT}" && "${REGISTER_KUBE_CONTEXT}" != "$(_kubectl config current-context 2>/dev/null || true)" ]]; then
+  _info "[preflight] Switching kubectl context to ${REGISTER_KUBE_CONTEXT} for ArgoCD deploy..."
+  _kubectl config use-context "${REGISTER_KUBE_CONTEXT}" >/dev/null
+fi
+
+_info "[preflight] Deploying preflight stack (prefixed-clone ArgoCD resources) for ${PREFLIGHT_NAME}..."
+_cluster_preflight_apply_argocd_resources "${APP_CLUSTER_NAME}"
+
+_info "[preflight] Waiting up to ${PREFLIGHT_WAIT_TIMEOUT}s for preflight apps to become Synced/Healthy..."
+_cluster_preflight_wait_for_apps "${APP_CLUSTER_NAME}" "${PREFLIGHT_WAIT_TIMEOUT}"
+
+if [[ "${PREFLIGHT_MODE}" == "--keep" ]]; then
+  _info "[preflight] Preflight stack deployed; vCluster ${PREFLIGHT_NAME} is left running"
+else
+  _info "[preflight] Preflight stack deployed and verified; vCluster ${PREFLIGHT_NAME} will be destroyed on exit"
+fi
+exit 0

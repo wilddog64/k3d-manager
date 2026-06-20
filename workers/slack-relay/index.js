@@ -1,6 +1,13 @@
-const ALLOWED_COMMANDS = new Set(['/acg-up', '/acg-down', '/acg-status', '/acg-refresh', '/acg-resume', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade'])
+const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade'])
 const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'az'])
+const ALL_PROVIDERS     = new Set(['aws', 'gcp', 'az', 'hostinger'])
 const PROVIDER_ALIASES  = { azure: 'az' }
+
+function resolveProvider(text, dflt) {
+  const t = (text || '').trim().toLowerCase()
+  const p = PROVIDER_ALIASES[t] || t
+  return ALL_PROVIDERS.has(p) ? p : dflt
+}
 
 async function verifySlack(request, body) {
   const ts  = request.headers.get('X-Slack-Request-Timestamp') || ''
@@ -86,47 +93,67 @@ async function handle(req) {
 
   if (!ALLOWED_COMMANDS.has(command)) return jsonReply(`Unknown command: ${command}`, threadTs)
 
-  if (command === '/acg-up') {
-    const _t = text.toLowerCase()
-    const _p = PROVIDER_ALIASES[_t] || _t
-    const provider = VALID_PROVIDERS.has(_p) ? _p : 'aws'
+  if (command === '/cluster-up') {
+    const provider = resolveProvider(text, 'hostinger')
     const { ok, conflict } = await relay('/api/v1/cluster', { action: 'up', provider, response_url: responseUrl })
-    if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`, threadTs)
+    if (conflict) return jsonReply(`⚠️ ${conflict} — use /cluster-status to check progress`, threadTs)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
-    return jsonReply(`⏳ Bringing up ACG cluster (${provider})…`, threadTs, true)
+    const _where = provider === 'hostinger'
+      ? 'the permanent *Hostinger* app cluster'
+      : `the *lab sandbox* (${provider}) — ephemeral learning sandbox`
+    return jsonReply(`⏳ Bringing up ${_where}…`, threadTs, true)
   }
 
-  if (command === '/acg-down') {
-    const { ok, conflict } = await relay('/api/v1/cluster', { action: 'down', response_url: responseUrl })
-    if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`, threadTs)
+  if (command === '/cluster-down') {
+    const provider = resolveProvider(text, 'aws')
+    const { ok, conflict } = await relay('/api/v1/cluster', { action: 'down', provider, response_url: responseUrl })
+    if (conflict) return jsonReply(`⚠️ ${conflict} — use /cluster-status to check progress`, threadTs)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
-    return jsonReply('⏳ Tearing down ACG cluster…', threadTs, true)
+    const _what = provider === 'hostinger'
+      ? '🛑 Tearing down the *permanent Hostinger* app cluster…'
+      : '⏳ Tearing down the *lab sandbox*… — ephemeral learning sandbox only (does not affect Hostinger)'
+    return jsonReply(_what, threadTs, true)
   }
 
-  if (command === '/acg-status') {
-    const payload = { response_url: responseUrl }
+  if (command === '/cluster-status') {
+    const provider = resolveProvider(text, 'hostinger')
+    const payload = { provider, response_url: responseUrl }
     if (threadTs) payload.thread_ts = threadTs
     const { ok } = await relay('/api/v1/cluster-status', payload)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
-    return jsonReply('🔍 Checking ACG cluster status…', threadTs, true)
+    const _where = provider === 'hostinger' ? 'Hostinger' : `lab sandbox (${provider})`
+    return jsonReply(`🔍 Checking ${_where} cluster status…`, threadTs, true)
   }
 
-  if (command === '/acg-refresh') {
+  if (command === '/hostinger-status') {
     const payload = { response_url: responseUrl }
+    if (threadTs) payload.thread_ts = threadTs
+    const { ok } = await relay('/api/v1/hostinger-status', payload)
+    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    return jsonReply('🖥️ Checking Hostinger app cluster status…', threadTs, true)
+  }
+
+  if (command === '/cluster-refresh') {
+    const provider = resolveProvider(text, 'hostinger')
+    const payload = { provider, response_url: responseUrl }
     if (threadTs) payload.thread_ts = threadTs
     const { ok } = await relay('/api/v1/cluster-refresh', payload)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
-    return jsonReply('🔄 Refreshing ACG credentials + tunnel…', threadTs, true)
+    const _msg = provider === 'hostinger'
+      ? '🔄 Refreshing Hostinger kubeconfig + ArgoCD registration…'
+      : '🔄 Refreshing lab sandbox credentials + tunnel…'
+    return jsonReply(_msg, threadTs, true)
   }
 
-  if (command === '/acg-resume') {
-    const _t = text.toLowerCase()
-    const _p = PROVIDER_ALIASES[_t] || _t
-    const provider = VALID_PROVIDERS.has(_p) ? _p : 'aws'
+  if (command === '/cluster-resume') {
+    const provider = resolveProvider(text, '')
+    if (!VALID_PROVIDERS.has(provider)) {
+      return jsonReply('Usage: /cluster-resume <aws|gcp|az> — resumes a lab sandbox provision from its last checkpoint', threadTs)
+    }
     const { ok, conflict } = await relay('/api/v1/cluster-resume', { provider, response_url: responseUrl })
-    if (conflict) return jsonReply(`⚠️ ${conflict} — use /acg-status to check progress`, threadTs)
+    if (conflict) return jsonReply(`⚠️ ${conflict} — use /cluster-status to check progress`, threadTs)
     if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
-    return jsonReply(`🔄 Resuming ACG provision (${provider}) from last checkpoint…`, threadTs, true)
+    return jsonReply(`🔄 Resuming lab sandbox provision (${provider}) from last checkpoint…`, threadTs, true)
   }
 
   if (command === '/ask' || command === '/claude' || command === '/gemini' || command === '/codex') {

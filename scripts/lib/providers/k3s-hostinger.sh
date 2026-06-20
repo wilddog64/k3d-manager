@@ -261,3 +261,21 @@ HELP
   rm -f "${_HOSTINGER_KUBECONFIG}"
   _info "[k3s-hostinger] k3s uninstalled; VPS preserved."
 }
+
+function _provider_k3s_hostinger_refresh_cluster() {
+  _hostinger_require_host >/dev/null || return 1
+  if [[ ! -f "${_HOSTINGER_KUBECONFIG}" ]]; then
+    printf 'ERROR: %s\n' "[k3s-hostinger] saved kubeconfig ${_HOSTINGER_KUBECONFIG} missing — run deploy_cluster (/cluster-up) first" >&2
+    return 1
+  fi
+  _info "[k3s-hostinger] Refreshing ${_HOSTINGER_KUBE_CONTEXT} kubeconfig + ArgoCD registration…"
+  _hostinger_merge_kubeconfig || return 1
+  _hostinger_register_cluster || return 1
+  if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" get --raw='/healthz' >/dev/null 2>&1; then
+    _info "[k3s-hostinger] Refresh complete — ${_HOSTINGER_KUBE_CONTEXT} reachable"
+    printf '%s\n' "__WEBHOOK_SUCCESS__"
+  else
+    printf 'ERROR: %s\n' "[k3s-hostinger] ${_HOSTINGER_KUBE_CONTEXT} still unreachable after refresh" >&2
+    return 1
+  fi
+}

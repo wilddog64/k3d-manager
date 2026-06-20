@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- Slack webhook: `cluster-up`/`cluster-down`/`cluster-resume` are now accepted as top-level standalone commands (were thread-reply-only); provider allowlist on all three now includes `hostinger` and defaults to `hostinger` instead of `aws`, so a bare or unrecognized provider no longer silently starts an ACG AWS sandbox run (`bin/k3dm-webhook`)
+
 ## [1.7.0] - 2026-06-13
 
 ### Added
