@@ -127,6 +127,7 @@ metadata:
   labels:
     argocd.argoproj.io/secret-type: cluster
     argocd.argoproj.io/cluster-name: ${_HOSTINGER_KUBE_CONTEXT}
+    k3d-manager/role: app-cluster
 type: Opaque
 stringData:
   name: ${_HOSTINGER_KUBE_CONTEXT}
