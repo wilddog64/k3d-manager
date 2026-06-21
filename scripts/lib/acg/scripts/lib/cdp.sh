@@ -12,6 +12,10 @@ if ! declare -f _antigravity_browser_ready >/dev/null 2>&1; then
   [[ -f "${_CDP_FOUNDATION}/system.sh" ]] && source "${_CDP_FOUNDATION}/system.sh"
 fi
 
+if [[ -z "${_LIB_ACG_ROOT:-}" ]]; then
+  _LIB_ACG_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+fi
+
 _CDP_CHROME_CDP_LABEL="${CDP_CHROME_CDP_LABEL:-com.k3d-manager.chrome-cdp}"
 
 function _cdp_profile_in_use() {
@@ -60,7 +64,7 @@ function _cdp_remove_stale_singleton_lock() {
 
 function _browser_launch() {
   if ! _command_exist curl; then
-    _err "curl is required for Gemini browser probe — install curl and retry"
+    _err "curl is required for Antigravity browser probe — install curl and retry"
   fi
   if _run_command --soft -- curl -sf http://localhost:9222/json >/dev/null 2>&1; then
     return 0
@@ -98,25 +102,11 @@ function _cdp_ensure_acg_session() {
     _info "K3DM_ACG_SKIP_SESSION_CHECK=1 — skipping ACG/Pluralsight session check"
     return 0
   fi
-  _info "Checking Pluralsight (ACG) session in Gemini browser..."
+  local _acg_session_check_script="${_LIB_ACG_ROOT}/../acg_session_check.js"
+  if [[ ! -r "${_acg_session_check_script}" ]]; then
+    _err "Missing ACG session check script: ${_acg_session_check_script}"
+  fi
 
-  local gemini_prompt
-  gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
-
-1. Connect to the running Gemini browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
-2. Use the first browser context and page (do NOT launch a new browser).
-3. Navigate to https://app.pluralsight.com/hands-on/playground/cloud-sandboxes and wait for the page to load.
-4. Check if the user is logged in by looking for user avatar, account menu, or sandbox list elements (e.g. [data-testid='user-menu'], [aria-label='User menu'], or a heading containing 'Cloud Sandboxes').
-5. If logged in: print ACG_SESSION_OK and exit with code 0.
-6. If NOT logged in:
-   a. Navigate to https://app.pluralsight.com/id/signin
-   b. Print: ACTION REQUIRED: Please log into Pluralsight in the Gemini browser window, then press Enter to continue.
-   c. Wait for the page URL to no longer contain '/signin' — poll every 5 seconds, timeout after 300 seconds.
-   d. Once URL is no longer '/signin', print ACG_SESSION_OK and exit with code 0.
-   e. If 300 seconds pass without login, print ERROR: Pluralsight login timeout and exit with code 1.
-
-Write the Playwright script to ${HOME}/.gemini/tmp/k3d-manager/ag_acg_session.js, execute with node, print the result.
-Exit code 1 if session cannot be confirmed."
-
-  _gemini_prompt "$gemini_prompt" --yolo
+  _info "Checking Pluralsight (ACG) session in Antigravity browser..."
+  NODE_PATH="${_LIB_ACG_ROOT}/node_modules" node "${_acg_session_check_script}"
 }
