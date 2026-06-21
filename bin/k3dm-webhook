@@ -125,7 +125,26 @@ def _keychain_secret(service):
     except Exception:
         return ""
 
-SLACK_SIGNING_SECRET = os.environ.get("SLACK_SIGNING_SECRET") or _keychain_secret("k3dm-slack-signing-secret")
+_SLACK_SIGNING_SECRET = None
+_SLACK_SIGNING_SECRET_LOADED = False
+
+
+def _slack_signing_secret():
+    """Lazily resolve the Slack signing secret.
+
+    Reading it at import time triggers a blocking Keychain lookup before the
+    HTTP socket binds; under a locked/non-interactive Keychain that stalls
+    startup past the test readiness window. The secret is only needed for
+    Slack signature verification, so defer the lookup to first use."""
+    global _SLACK_SIGNING_SECRET, _SLACK_SIGNING_SECRET_LOADED
+    if not _SLACK_SIGNING_SECRET_LOADED:
+        _SLACK_SIGNING_SECRET = (
+            os.environ.get("SLACK_SIGNING_SECRET")
+            or _keychain_secret("k3dm-slack-signing-secret")
+        )
+        _SLACK_SIGNING_SECRET_LOADED = True
+    return _SLACK_SIGNING_SECRET
+
 _seen_event_ids: set = set()
 GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-2.5-flash")
 # k8s API context for ESO checks — initialized at startup before NEF loads (see _init_k8s_ctx)
@@ -515,14 +534,15 @@ def _slack_post(url, text):
 
 def _verify_slack_signature(raw_body, timestamp, signature):
     """Return True if the Slack request signature is valid."""
-    if not SLACK_SIGNING_SECRET:
+    secret = _slack_signing_secret()
+    if not secret:
         return False
     import time
     if abs(time.time() - int(timestamp)) > 300:
         return False
     base = f"v0:{timestamp}:{raw_body.decode()}"
     expected = "v0=" + hmac.new(
-        SLACK_SIGNING_SECRET.encode(),
+        secret.encode(),
         base.encode(),
         digestmod="sha256",
     ).hexdigest()

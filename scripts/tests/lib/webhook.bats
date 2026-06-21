@@ -18,15 +18,30 @@ setup_file() {
     export K3DM_WEBHOOK_PORT="${_WEBHOOK_PORT}"
 
     REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
-    python3 "${REPO_ROOT}/bin/k3dm-webhook" &
+    export _BATS_WEBHOOK_LOG="${BATS_FILE_TMPDIR:-/tmp}/k3dm-webhook.log"
+    python3 "${REPO_ROOT}/bin/k3dm-webhook" >"${_BATS_WEBHOOK_LOG}" 2>&1 &
     export _BATS_WEBHOOK_PID=$!
 
     local i=0
-    while (( i < 10 )); do
-        curl -s -o /dev/null "http://127.0.0.1:${_WEBHOOK_PORT}/" && break
+    local ready=0
+    while (( i < 50 )); do
+        if ! kill -0 "${_BATS_WEBHOOK_PID}" 2>/dev/null; then
+            break
+        fi
+        if curl -s -o /dev/null "http://127.0.0.1:${_WEBHOOK_PORT}/"; then
+            ready=1
+            break
+        fi
         sleep 0.3
         (( i++ )) || true
     done
+
+    if (( ready == 0 )); then
+        echo "k3dm-webhook did not start on 127.0.0.1:${_WEBHOOK_PORT} within readiness window" >&2
+        echo "--- webhook log (${_BATS_WEBHOOK_LOG}) ---" >&2
+        cat "${_BATS_WEBHOOK_LOG}" >&2 || true
+        return 1
+    fi
 }
 
 teardown_file() {
