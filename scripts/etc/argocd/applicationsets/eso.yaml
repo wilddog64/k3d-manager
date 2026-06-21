@@ -24,7 +24,7 @@ spec:
     spec:
       project: platform
       destination:
-        server: '{{.server}}'
+        name: '{{.name}}'
         namespace: secrets
       source:
         repoURL: https://charts.external-secrets.io
