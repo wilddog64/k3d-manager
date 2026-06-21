@@ -153,6 +153,49 @@ bats_require_minimum_version 1.5.0
   unset -f _command_exist _is_mac _is_debian_family _is_redhat_family _sudo_available _run_command
 }
 
+@test "_ensure_agy_cli: returns 0 when agy exists" {
+  _command_exist() { [[ "$1" == agy ]]; }
+  export -f _command_exist
+
+  run _ensure_agy_cli
+  [ "$status" -eq 0 ]
+  unset -f _command_exist
+}
+
+@test "_ensure_agy_cli: installs via curl | bash into ~/.local/bin" {
+  installed_bin="${HOME}/.local/bin/agy"
+  stub_dir="${BATS_TEST_TMPDIR}/bin"
+  mkdir -p "${stub_dir}"
+  cat > "${stub_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+cat <<'SH'
+mkdir -p "$HOME/.local/bin"
+cat > "$HOME/.local/bin/agy" <<'AGY'
+#!/usr/bin/env bash
+printf 'agy CLI\n'
+AGY
+chmod +x "$HOME/.local/bin/agy"
+SH
+EOF
+  chmod +x "${stub_dir}/curl"
+
+  _command_exist() {
+    case "$1" in
+      curl) return 0 ;;
+      agy) [[ -x "${installed_bin}" ]] ;;
+      *) return 1 ;;
+    esac
+  }
+  export -f _command_exist
+  PATH="${stub_dir}:$PATH"
+
+  run _ensure_agy_cli
+  [ "$status" -eq 0 ]
+  [ -x "${installed_bin}" ]
+
+  unset -f _command_exist
+}
+
 @test "_ensure_antigravity_mcp_playwright: no-op when playwright entry already present" {
   config_file="$(mktemp -t ag-mcp-test.XXXXXX)"
   printf '{"mcpServers":{"playwright":{"command":"npx","args":["-y","@playwright/mcp@0.0.26"]}}}\n' > "$config_file"

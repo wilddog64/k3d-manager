@@ -858,6 +858,27 @@ function _ensure_antigravity_ide() {
    _err "Cannot install Antigravity IDE: no supported package manager found or install failed"
 }
 
+function _ensure_agy_cli() {
+   local agy_bin="${HOME}/.local/bin/agy"
+
+   if _command_exist agy || [[ -x "${agy_bin}" ]]; then
+      return 0
+   fi
+
+   if ! _command_exist curl; then
+      _err "curl is required to install agy CLI"
+   fi
+
+   mkdir -p "$(dirname "${agy_bin}")"
+   curl -fsSL https://antigravity.google/cli/install.sh | bash
+
+   if [[ -x "${agy_bin}" ]]; then
+      return 0
+   fi
+
+   _err "Cannot install agy CLI: ~/.local/bin/agy was not created"
+}
+
 function _ensure_antigravity_mcp_playwright() {
    if ! _command_exist jq; then
       _err "_ensure_antigravity_mcp_playwright requires jq"
