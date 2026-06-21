@@ -14,7 +14,7 @@ spec:
     - namespace: secrets
       server: https://kubernetes.default.svc
     - namespace: secrets
-      name: ubuntu-k3s
+      name: '*'
     - namespace: cicd
       server: https://kubernetes.default.svc
     - namespace: identity
@@ -26,21 +26,21 @@ spec:
     - namespace: staging
       server: https://kubernetes.default.svc
     - namespace: shopping-cart-apps
-      name: ubuntu-k3s
+      name: '*'
     - namespace: shopping-cart-payment
-      name: ubuntu-k3s
+      name: '*'
     - namespace: shopping-cart-data
-      name: ubuntu-k3s
+      name: '*'
     - namespace: cicd
-      name: ubuntu-k3s
+      name: '*'
     - namespace: monitoring
       server: https://kubernetes.default.svc
     - namespace: trivy-system
       server: https://kubernetes.default.svc
     - namespace: monitoring
-      name: ubuntu-k3s
+      name: '*'
     - namespace: trivy-system
-      name: ubuntu-k3s
+      name: '*'
   clusterResourceWhitelist:
     - group: ''
       kind: Namespace
