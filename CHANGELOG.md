@@ -4,6 +4,7 @@
 
 ### Added
 - ESO operator install on app clusters via an ArgoCD ApplicationSet cluster generator (`scripts/etc/argocd/applicationsets/eso.yaml`) — selects `k3d-manager/role: app-cluster`, installs the `external-secrets` chart `1.0.0` with CRDs into the `secrets` namespace using server-side apply; portable across host OS and CPU arch (install runs in-cluster, not from the local CLI)
+- ESO GitOps ClusterSecretStore (`vault-backend`) for app clusters (Phase 2) — `platform/eso-clustersecretstore/clustersecretstore.yaml` points at the external hub Vault (`vault.3ai-talk.org`) over Kubernetes auth, deployed via the `eso-clustersecretstore` ApplicationSet (`scripts/etc/argocd/applicationsets/eso-clustersecretstore.yaml`); provider-agnostic `register_app_cluster_vault_auth` helper (`scripts/plugins/vault.sh`) wires per-cluster Vault Kubernetes auth keyed by kubecontext; least-privilege `eso-app-reader` Vault policy grants read on the exact payment/postgres/rabbitmq/redis KV v2 paths only; cloudflared ingress exposes the hub Vault (`scripts/etc/cloudflared/config.yml`)
 
 ### Fixed
 - shopping-cart data-layer routing: the app-cluster ArgoCD cluster secret now carries the `k3d-manager/role: app-cluster` label so the `data-git` ApplicationSet generator matches it (`scripts/lib/providers/k3s-hostinger.sh`, `scripts/etc/argocd/cluster-secret.yaml.tmpl`)
