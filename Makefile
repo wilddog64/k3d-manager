@@ -102,7 +102,7 @@ argocd-registration:
 
 ## Sync ArgoCD data-layer and show remote pod status
 sync-apps:
-	APP_CONTEXT=$(if $(filter k3s-gcp,$(CLUSTER_PROVIDER)),ubuntu-gcp,ubuntu-k3s) bin/cluster-sync-apps
+	@$(if $(filter command line environment,$(origin APP_CONTEXT)),APP_CONTEXT=$(APP_CONTEXT) )$(if $(filter command line environment,$(origin CLUSTER_PROVIDER)),CLUSTER_PROVIDER=$(CLUSTER_PROVIDER) )bin/cluster-sync-apps
 
 ## Point services-git ApplicationSet at BRANCH (default: current branch) and force-refresh apps
 ## Usage: make sync-branch            — uses current branch

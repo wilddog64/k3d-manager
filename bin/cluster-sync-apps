@@ -8,22 +8,43 @@
 #   bin/cluster-sync-apps
 #
 # Environment:
-#   INFRA_CONTEXT  kubectl context for infra cluster (default: k3d-k3d-cluster)
-#   APP_CONTEXT    kubectl context for app cluster   (default: ubuntu-k3s)
-#   ARGOCD_NS      ArgoCD namespace                  (default: cicd)
+#   CLUSTER_PROVIDER  cluster provider; selects the app context when APP_CONTEXT is unset.
+#                     Auto-resolved (active-provider state file / live probe) when empty.
+#   INFRA_CONTEXT     kubectl context for infra/hub cluster (default: k3d-k3d-cluster)
+#   APP_CONTEXT       kubectl context for app cluster (default: resolved from CLUSTER_PROVIDER)
+#   ARGOCD_NS         ArgoCD namespace                (default: cicd)
+#   ARGOCD_APP        ArgoCD app(s) to sync; space-separated list (default: rollout-demo-default)
+#
+# Pass --resolve-only (or SYNC_APPS_RESOLVE_ONLY=1) to print the resolved
+# CLUSTER_PROVIDER / INFRA_CONTEXT / APP_CONTEXT / ARGOCD_APP and exit (no side effects).
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck disable=SC1091
 source "${REPO_ROOT}/scripts/lib/system.sh"
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/scripts/lib/provider.sh"
 _ACG_STATE_DIR="${HOME}/.local/share/k3d-manager"
 mkdir -p "${_ACG_STATE_DIR}/run" "${_ACG_STATE_DIR}/logs"
 
+CLUSTER_PROVIDER="$(_acg_resolve_provider)"
 INFRA_CONTEXT="${INFRA_CONTEXT:-k3d-k3d-cluster}"
-APP_CONTEXT="${APP_CONTEXT:-ubuntu-k3s}"
+APP_CONTEXT="${APP_CONTEXT:-$(_acg_provider_context "${CLUSTER_PROVIDER}")}"
 ARGOCD_NS="${ARGOCD_NS:-cicd}"
 ARGOCD_APP="${ARGOCD_APP:-rollout-demo-default}"
+
+if [[ "${1:-}" == "--resolve-only" || "${SYNC_APPS_RESOLVE_ONLY:-0}" == "1" ]]; then
+  printf 'CLUSTER_PROVIDER=%s\nINFRA_CONTEXT=%s\nAPP_CONTEXT=%s\nARGOCD_APP=%s\n' \
+    "${CLUSTER_PROVIDER}" "${INFRA_CONTEXT}" "${APP_CONTEXT}" "${ARGOCD_APP}"
+  exit 0
+fi
+
+if [[ "${CLUSTER_PROVIDER}" == "k3s-oci" ]]; then
+  _info "[sync-apps] k3s-oci runs its own in-cluster ArgoCD (not the hub); sync it directly with KUBECONFIG=\$HOME/.kube/k3s-oci.yaml argocd ... — nothing to sync from the hub."
+  exit 0
+fi
 
 if ! kubectl config get-contexts "${INFRA_CONTEXT}" >/dev/null 2>&1; then
   _info "[sync-apps] ERROR: Hub cluster context '${INFRA_CONTEXT}' not found — run 'make up' first"
@@ -184,30 +205,33 @@ _info "[sync-apps] Logging in to ArgoCD..."
 argocd login localhost:8080 --username admin --password "${_argocd_pass}" \
   --plaintext --skip-test-tls --insecure --grpc-web </dev/null >/dev/null
 
-if ! argocd app get "${ARGOCD_APP}" >/dev/null 2>&1; then
-  _info "[sync-apps] ERROR: ArgoCD app '${ARGOCD_APP}' not found — is bootstrap complete?"
-  _info "[sync-apps] Available apps (set ARGOCD_APP=<name> to target a different one):"
-  argocd app list --output name 2>/dev/null || true
-  exit 1
-fi
-
-_info "[sync-apps] Terminating any in-progress operation on ${ARGOCD_APP}..."
-argocd app terminate-op "${ARGOCD_APP}" 2>/dev/null || true
-
-_info "[sync-apps] Waiting for operation to clear..."
-for _i in $(seq 1 20); do
-  _phase=$(argocd app get "${ARGOCD_APP}" --output json 2>/dev/null \
-    | grep -o '"phase":"[^"]*"' | head -1 | grep -o '[^"]*$' || echo "none")
-  if [[ "$_phase" == "none" || "$_phase" == "Succeeded" || \
-        "$_phase" == "Failed"  || "$_phase" == "Error" ]]; then
-    break
+read -ra _argocd_apps <<< "${ARGOCD_APP}"
+for _argocd_app in "${_argocd_apps[@]}"; do
+  if ! argocd app get "${_argocd_app}" >/dev/null 2>&1; then
+    _info "[sync-apps] ERROR: ArgoCD app '${_argocd_app}' not found — is bootstrap complete?"
+    _info "[sync-apps] Available apps (set ARGOCD_APP=<name> to target a different one):"
+    argocd app list --output name 2>/dev/null || true
+    exit 1
   fi
-  _info "[sync-apps] Operation still ${_phase}, waiting... (${_i}/20)"
-  sleep 3
-done
 
-_info "[sync-apps] Syncing ${ARGOCD_APP} (async)..."
-argocd app sync "${ARGOCD_APP}" --async
+  _info "[sync-apps] Terminating any in-progress operation on ${_argocd_app}..."
+  argocd app terminate-op "${_argocd_app}" 2>/dev/null || true
+
+  _info "[sync-apps] Waiting for operation to clear..."
+  for _i in $(seq 1 20); do
+    _phase=$(argocd app get "${_argocd_app}" --output json 2>/dev/null \
+      | grep -o '"phase":"[^"]*"' | head -1 | grep -o '[^"]*$' || echo "none")
+    if [[ "$_phase" == "none" || "$_phase" == "Succeeded" || \
+          "$_phase" == "Failed"  || "$_phase" == "Error" ]]; then
+      break
+    fi
+    _info "[sync-apps] Operation still ${_phase}, waiting... (${_i}/20)"
+    sleep 3
+  done
+
+  _info "[sync-apps] Syncing ${_argocd_app} (async)..."
+  argocd app sync "${_argocd_app}" --async
+done
 
 _info "[sync-apps] Pod status (${APP_CONTEXT}):"
 kubectl get pods -A --context "${APP_CONTEXT}"

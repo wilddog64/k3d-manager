@@ -144,3 +144,36 @@ EOF
 
   grep -q "argocd login localhost:8080 --username admin --password fake-pass --plaintext --skip-test-tls --insecure --grpc-web" "${BATS_TEST_TMPDIR}/argocd.log"
 }
+
+@test "cluster-sync-apps resolves APP_CONTEXT from CLUSTER_PROVIDER=k3s-hostinger" {
+  run env CLUSTER_PROVIDER=k3s-hostinger "${BATS_TEST_DIRNAME}/../../../bin/cluster-sync-apps" --resolve-only
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"APP_CONTEXT=ubuntu-hostinger"* ]]
+}
+
+@test "cluster-sync-apps resolves APP_CONTEXT from CLUSTER_PROVIDER=k3s-gcp" {
+  run env CLUSTER_PROVIDER=k3s-gcp "${BATS_TEST_DIRNAME}/../../../bin/cluster-sync-apps" --resolve-only
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"APP_CONTEXT=ubuntu-gcp"* ]]
+}
+
+@test "cluster-sync-apps honors an explicit APP_CONTEXT override" {
+  run env CLUSTER_PROVIDER=k3s-hostinger APP_CONTEXT=my-ctx \
+    "${BATS_TEST_DIRNAME}/../../../bin/cluster-sync-apps" --resolve-only
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"APP_CONTEXT=my-ctx"* ]]
+}
+
+@test "cluster-sync-apps preserves a space-separated ARGOCD_APP list" {
+  run env CLUSTER_PROVIDER=k3s-aws ARGOCD_APP="app-a app-b" \
+    "${BATS_TEST_DIRNAME}/../../../bin/cluster-sync-apps" --resolve-only
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ARGOCD_APP=app-a app-b"* ]]
+}
+
+@test "cluster-sync-apps skips the hub for k3s-oci (own in-cluster ArgoCD)" {
+  run env CLUSTER_PROVIDER=k3s-oci "${BATS_TEST_DIRNAME}/../../../bin/cluster-sync-apps"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"own in-cluster ArgoCD"* ]]
+  ! grep -q "port-forward svc/argocd-server" "${BATS_TEST_TMPDIR}/kubectl.log"
+}

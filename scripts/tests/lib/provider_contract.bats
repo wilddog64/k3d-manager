@@ -33,6 +33,7 @@ teardown_file() {
   [[ "$(_acg_provider_context k3s-aws)" == "ubuntu-k3s" ]]
   [[ "$(_acg_provider_context k3s-az)" == "ubuntu-azure" ]]
   [[ "$(_acg_provider_context k3s-gcp)" == "ubuntu-gcp" ]]
+  [[ "$(_acg_provider_context k3s-hostinger)" == "ubuntu-hostinger" ]]
   [[ "$(_acg_provider_context foo)" == "ubuntu-k3s" ]]
 }
 
