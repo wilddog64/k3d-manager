@@ -142,7 +142,7 @@ setup() {
   grep -q "kubernetes_host=https://10.211.55.14:6443" "$VAULT_EXEC_LOG"
   grep -q "kubernetes_ca_cert=@/tmp/app-cluster-ca.crt" "$VAULT_EXEC_LOG"
 
-  # Verify policy ensure
+  # Verify both eso-reader and eso-app-reader policies are ensured (existence check, then write)
   grep -q "vault_policy_exists secrets vault eso-reader" "$VAULT_EXEC_LOG"
   grep -q "vault_exec_stream --pod vault-0 secrets vault -- vault policy write eso-reader -" "$VAULT_EXEC_STREAM_LOG"
   grep -q "path \"secret/data/eso/\*\"      { capabilities = \[\"read\"\] }" "$VAULT_EXEC_STREAM_LOG"
