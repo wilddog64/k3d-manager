@@ -5,6 +5,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `playwright/acg_restart.js`: Start Sandbox click no longer fails with `locator.click: Element is outside of the viewport`. Added `_robustClick` (centers the element via `scrollIntoView({block:'center'})` and dispatches a bubbling DOM `MouseEvent`, viewport-independent — the same technique already used for the Delete confirmation) and applied it to all three Start Sandbox click sites. Recurrence of the v0.1.3 fix, which used `scrollIntoViewIfNeeded()` + `{force:true}` — insufficient because `force` bypasses actionability but not the viewport requirement.
+
 ## [0.1.8] - 2026-06-21
 
 ### Changed
