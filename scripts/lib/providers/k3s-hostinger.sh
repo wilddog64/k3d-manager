@@ -7,6 +7,8 @@
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/shopping_cart.sh"
 # shellcheck source=/dev/null
+source "${SCRIPT_DIR}/plugins/vault.sh"
+# shellcheck source=/dev/null
 source "${SCRIPT_DIR}/etc/hostinger/vars.sh"
 
 _HOSTINGER_SSH_USER="${HOSTINGER_SSH_USER:-ubuntu}"
@@ -148,6 +150,24 @@ EOF
     printf 'ERROR: %s\n' "[k3s-hostinger] failed to apply cluster secret ${secret_name} to hub ArgoCD" >&2
     return 1
   fi
+
+  # Register this app cluster's Kubernetes auth in the hub Vault (Phase 2).
+  # Guarded: a Vault-down/unreachable hub must not hard-fail cluster registration.
+  if declare -f configure_vault_app_auth >/dev/null 2>&1; then
+    local app_ca_file
+    app_ca_file="$(mktemp -t app-cluster-ca.XXXXXX.crt)"
+    printf '%s' "${ca_data}" | base64 --decode > "${app_ca_file}" 2>/dev/null || true
+    if [[ -s "${app_ca_file}" ]]; then
+      APP_CLUSTER_API_URL="${server}" \
+      APP_CLUSTER_CA_CERT_PATH="${app_ca_file}" \
+        configure_vault_app_auth \
+        || _warn "[k3s-hostinger] Vault app-auth registration skipped (hub Vault unreachable?)"
+    else
+      _warn "[k3s-hostinger] could not decode CA for Vault app-auth; skipping"
+    fi
+    rm -f "${app_ca_file}"
+  fi
+
   _info "[k3s-hostinger] Registered — verify: kubectl get secret ${secret_name} -n ${argocd_ns}"
 }
 

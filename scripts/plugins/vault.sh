@@ -960,6 +960,7 @@ EOF
    _enable_kv2_k8s_auth "$ns" "$release"
    _vault_seed_ldap_service_accounts "$ns" "$release"
    _vault_setup_pki "$ns" "$release"
+   _vault_apply_virtualservice "$ns"
 
    if (( re_unseal )); then
       _vault_replay_cached_unseal "$ns" "$release"
@@ -1088,6 +1089,35 @@ Then:
   # For HA mode, use stored secret:
   export VAULT_TOKEN="\$(_kubectl -n ${ns} get secret vault-root -o jsonpath='{.data.root_token}' | base64 -d)"
 EOF
+}
+
+function _vault_apply_virtualservice() {
+  local ns="${1:-$VAULT_NS_DEFAULT}"
+  local wasx=0
+
+  if [[ ! -f "${SCRIPT_DIR}/etc/vault/virtualservice.yaml.tmpl" ]]; then
+    _warn "[vault] missing Vault VirtualService template; skipping"
+    return 0
+  fi
+
+  if ! _command_exist kubectl; then
+    _warn "[vault] kubectl not available; skipping Vault VirtualService apply"
+    return 0
+  fi
+
+  case $- in *x*) wasx=1; set +x;; esac
+  VAULT_NS="${ns}" \
+  envsubst '$VAULT_NS $VAULT_VIRTUALSERVICE_HOST $VAULT_VIRTUALSERVICE_GATEWAY' \
+    < "${SCRIPT_DIR}/etc/vault/virtualservice.yaml.tmpl" \
+    | _kubectl apply -f - >/dev/null
+  local rc=$?
+  (( wasx )) && set -x
+  if (( rc != 0 )); then
+    _warn "[vault] failed to apply Vault VirtualService"
+    return 1
+  fi
+
+  _info "[vault] Vault VirtualService applied"
 }
 
 function _vault_operator_init() {
@@ -1358,10 +1388,19 @@ function configure_vault_app_auth() {
     cat <<'HCL' | _vault_exec_stream --no-exit --pod "${release}-0" "$ns" "$release" -- \
       vault policy write eso-reader -
        # file: eso-reader.hcl
-       # read any keys under eso/*
-       path "secret/data/eso/*"      { capabilities = ["read"] }
-       path "secret/metadata/eso"    { capabilities = ["list"] }
-       path "secret/metadata/eso/*"  { capabilities = ["read","list"] }
+       # app-cluster ExternalSecret read paths (KV v2 mount: secret)
+       path "secret/data/postgres/*"   { capabilities = ["read"] }
+       path "secret/data/payment/*"    { capabilities = ["read"] }
+       path "secret/data/rabbitmq/*"   { capabilities = ["read"] }
+       path "secret/data/redis/*"      { capabilities = ["read"] }
+       path "secret/data/minio/*"      { capabilities = ["read"] }
+       path "secret/data/eso/*"        { capabilities = ["read"] }
+       path "secret/metadata/postgres/*" { capabilities = ["read","list"] }
+       path "secret/metadata/payment/*"  { capabilities = ["read","list"] }
+       path "secret/metadata/rabbitmq/*" { capabilities = ["read","list"] }
+       path "secret/metadata/redis/*"    { capabilities = ["read","list"] }
+       path "secret/metadata/minio/*"    { capabilities = ["read","list"] }
+       path "secret/metadata/eso/*"      { capabilities = ["read","list"] }
 HCL
   fi
 

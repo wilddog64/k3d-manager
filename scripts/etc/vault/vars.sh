@@ -11,3 +11,5 @@ export VAULT_PKI_ROLE_TTL="${VAULT_PKI_ROLE_TTL:-720h}"  # leaf max TTL
 export VAULT_PKI_ALLOWED="${VAULT_PKI_ALLOWED:-}"        # comma list (e.g. jenkins.dev.k3d.internal,*.svc)
 export VAULT_PKI_ENFORCE_HOSTNAMES="${VAULT_PKI_ENFORCE_HOSTNAMES:-true}"  # true/false
 export VAULT_ENDPOINT="${VAULT_ENDPOINT:-http://vault.${VAULT_NS}.svc:8200}"
+export VAULT_VIRTUALSERVICE_HOST="${VAULT_VIRTUALSERVICE_HOST:-vault.3ai-talk.org}"
+export VAULT_VIRTUALSERVICE_GATEWAY="${VAULT_VIRTUALSERVICE_GATEWAY:-istio-system/default-gateway}"

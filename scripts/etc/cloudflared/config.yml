@@ -14,4 +14,6 @@ ingress:
     service: http://localhost:3001
   - hostname: webhook.3ai-talk.org
     service: http://127.0.0.1:7443
+  - hostname: vault.3ai-talk.org
+    service: http://localhost:18080
   - service: http_status:404
