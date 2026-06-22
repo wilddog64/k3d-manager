@@ -1,5 +1,8 @@
 # Progress — lib-acg
 
+## v0.1.8 Track — `feat/v0.1.8` (ACTIVE)
+- **COMPLETE (2026-06-20):** Created task spec `docs/plans/v0.1.8-antigravity-migration.md` to migrate `gemini-cli` to `agy-cli` and refactor out `--deny-tool` and `--allow-tool` flags in favor of `agy` permissions.
+
 ## v0.1.5 Track — `feat/v0.1.5` (ACTIVE)
 - Retrospective written; memory-bank updated; next planning cycle open.
 - **COMPLETE:** Azure SP login persistence — lib-acg commit `37f0cc0` on `feat/v0.1.5`; spec: `docs/plans/v0.1.5-bugfix-azure-persist-login.md`; `bin/acg-credential-test` now writes validated Azure service-principal credentials into `~/.azure` after a successful `az login --service-principal` probe so downstream callers retain a usable Azure CLI session; validation used `shellcheck -S warning bin/acg-credential-test` and `git diff --check -- bin/acg-credential-test`; commit message: `fix(credentials): persist az login to ~/.azure after SP validation`

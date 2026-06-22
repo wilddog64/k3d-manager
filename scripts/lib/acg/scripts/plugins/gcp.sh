@@ -61,7 +61,7 @@ HELP
   local playwright_script="${_LIB_ACG_ROOT}/playwright/acg_credentials.js"
 
   _gcp_ensure_node || return 1
-  if ! node -e "require('playwright')" 2>/dev/null; then
+  if ! NODE_PATH="${_LIB_ACG_ROOT}/node_modules" node -e "require('playwright')" 2>/dev/null; then
     printf 'ERROR: %s\n' "[gcp] playwright npm module not found — run: cd ${_LIB_ACG_ROOT} && npm install" >&2
     return 1
   fi
@@ -151,7 +151,7 @@ function _gcp_perform_login_auth() {
   local account="$1"
   local playwright_dir="$2"
 
-  if ! command -v node >/dev/null 2>&1 || ! node -e "require('playwright')" 2>/dev/null; then
+  if ! command -v node >/dev/null 2>&1 || ! NODE_PATH="${_LIB_ACG_ROOT}/node_modules" node -e "require('playwright')" 2>/dev/null; then
     printf 'WARN: %s\n' "[gcp] node/playwright not available — gcloud auth login will require manual browser interaction" >&2
     gcloud auth login --account "${account}"
     return $?

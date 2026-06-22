@@ -1,5 +1,21 @@
 # Progress — lib-foundation
 
+## v0.3.20 Track (branch: `feat/v0.3.20`)
+
+- [x] **Bugfix: `_run_command_resolve_sudo` TTY fallback** — DONE (`2f46d4be`). Spec: `docs/bugs/2026-05-29-sudo-no-tty-fallback.md`. Adds `sudo -n` fallback when stdin/stdout TTY not available. PR #29 merged to main.
+- [x] **BATS mock sudo flag-stripping** — DONE. Test fix ensures `sudo` mock in `system.bats` properly strips flags before execution (pattern: `while [[ $# -gt 0 && "$1" == -* ]]; do shift; done; "$@"`).
+
+## v0.3.21 Track (branch: `feat/v0.3.21`)
+
+- [x] **Feature: extensible cluster-provider validation via optional consumer hook** — DONE (`f7a9178`). Spec: `docs/bugs/2026-06-12-cluster-provider-extensibility-libfoundation.md`. `scripts/lib/core.sh` now consults optional `_cluster_provider_is_extra_supported` hooks in both `_cluster_provider()` case blocks, `scripts/tests/lib/core.bats` now covers the no-hook, hook-accepts-extra-provider, and base-provider-with-hook contract cases, and `CHANGE.md` records the Unreleased changelog note.
+
+## v0.3.18 Track (branch: `feat/v0.3.18`)
+
+- [x] **Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate** — DONE (`f0e29d9`). Spec: `docs/plans/v0.3.18-bugfix-copilot-auth-preflight.md`. Assigned to Codex.
+- [x] **`_copilot_review` combined fix: `--allow-all-tools` + malformed `--deny-tool` patterns** — DONE (`713c18e`). Branch: `fix/copilot-deny-tool-patterns`. Combined spec: `docs/bugs/2026-05-02-copilot-review-noninteractive-combined-fix.md`. Supersedes deny-tool-only spec. Fixes both missing `--allow-all-tools` (non-interactive mode) and 4 patterns missing `)`. Commit: `fix(system): add --allow-all-tools and close malformed --deny-tool patterns in _copilot_review`
+
+---
+
 ## Overall Status
 
 **v0.3.3 SHIPPED** — PR #8 squash-merged (b9f1fda), tagged, GitHub release created 2026-03-16.
@@ -14,7 +30,11 @@
 **v0.3.12 SHIPPED** — PR #18 squash-merged to main (`91340d62`) 2026-03-25. Tagged v0.3.12, GitHub release created. `enforce_admins` restored.
 **v0.3.13 SHIPPED** — PR #19 squash-merged to main (`e870c6d9`) 2026-03-25. Tagged v0.3.13, GitHub release created. `enforce_admins` restored.
 **v0.3.14 SHIPPED** — PR #20 squash-merged to main (`bbbaf053`) 2026-03-27. Tagged v0.3.14, GitHub release created. `enforce_admins` restored.
-**v0.3.15 ACTIVE** — branch `feat/v0.3.15` cut from `bbbaf053` 2026-03-27.
+**v0.3.15 SHIPPED** — PR #21 merged to main. Tagged v0.3.15.
+**v0.3.16 SHIPPED** — PR #22 merged to main. Tagged v0.3.16.
+**v0.3.17 SHIPPED** — PR #24 merged to main (`108924b9`). Tagged v0.3.17, GitHub release created 2026-05-01.
+**v0.3.18 IN PROGRESS** — branch `feat/v0.3.18`. PR #25 open.
+**v0.3.20 SHIPPED** — PR #29 merged to main (`2f46d4be`) 2026-05-30. No tag (unreleased, in [Unreleased] section of CHANGE.md). Sudo no-TTY fallback + BATS mock fix.
 
 ## v0.3.14 — Shipped
 

@@ -367,3 +367,33 @@ SCRIPT
     [[ "$output" == *"hardcoded IP"* ]]
   )
 }
+
+@test "_agent_lint picks up staged .js files" {
+  mkdir -p "$TEST_REPO/etc/agent"
+  echo "No hardcoded secrets." > "$TEST_REPO/etc/agent/lint-rules.md"
+  echo 'console.log("hello");' > "$TEST_REPO/app.js"
+  git -C "$TEST_REPO" add app.js
+  local log
+  log="$(mktemp)"
+  _mock_ai() { printf '%s\n' "$@" >> "$log"; }
+  export -f _mock_ai
+  export ENABLE_AGENT_LINT=1
+  export AGENT_LINT_AI_FUNC="_mock_ai"
+  _agent_lint
+  grep -q "app.js" "$log"
+}
+
+@test "_agent_lint picks up staged .md files" {
+  mkdir -p "$TEST_REPO/etc/agent"
+  echo "No hardcoded secrets." > "$TEST_REPO/etc/agent/lint-rules.md"
+  echo "# Docs" > "$TEST_REPO/README.md"
+  git -C "$TEST_REPO" add README.md
+  local log
+  log="$(mktemp)"
+  _mock_ai() { printf '%s\n' "$@" >> "$log"; }
+  export -f _mock_ai
+  export ENABLE_AGENT_LINT=1
+  export AGENT_LINT_AI_FUNC="_mock_ai"
+  _agent_lint
+  grep -q "README.md" "$log"
+}

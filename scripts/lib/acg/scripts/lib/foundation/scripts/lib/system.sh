@@ -59,6 +59,8 @@ function _run_command_resolve_sudo() {
   local -a sudo_flags=()
   if (( interactive_sudo == 0 )); then
     sudo_flags=(-n)
+  elif (( interactive_sudo == 1 )) && [[ ! -t 0 || ! -t 1 ]]; then
+    sudo_flags=(-n)
   fi
 
   if (( require_sudo )); then
@@ -856,6 +858,28 @@ function _ensure_antigravity_ide() {
    _err "Cannot install Antigravity IDE: no supported package manager found or install failed"
 }
 
+function _ensure_agy_cli() {
+   local agy_bin="${HOME}/.local/bin/agy"
+
+   if _command_exist agy || [[ -x "${agy_bin}" ]]; then
+      return 0
+   fi
+
+   if ! _command_exist curl; then
+      _err "curl is required to install agy CLI"
+   fi
+
+   mkdir -p "$(dirname "${agy_bin}")"
+   _run_command -- curl -fsSL https://antigravity.google/cli/install.sh | bash
+
+   if [[ -x "${agy_bin}" ]]; then
+      hash -r 2>/dev/null || true
+      return 0
+   fi
+
+   _err "Cannot install agy CLI: ~/.local/bin/agy was not created"
+}
+
 function _ensure_antigravity_mcp_playwright() {
    if ! _command_exist jq; then
       _err "_ensure_antigravity_mcp_playwright requires jq"
@@ -1589,15 +1613,21 @@ function _install_copilot_from_release() {
 }
 
 function _copilot_auth_check() {
-   if [[ "${K3DM_ENABLE_AI:-0}" != "1" ]]; then
+   if [[ -n "${COPILOT_GITHUB_TOKEN:-}" || -n "${GH_TOKEN:-}" || -n "${GITHUB_TOKEN:-}" ]]; then
+     return 0
+   fi
+
+   local _apps_json="${HOME}/.config/github-copilot/apps.json"
+   if [[ -f "$_apps_json" ]] && grep -q '"oauth_token"' "$_apps_json" 2>/dev/null; then
       return 0
    fi
 
-   if _run_command --soft --quiet -- copilot auth status >/dev/null 2>&1; then
+   # gh CLI auth as final fallback — copilot v1.0.40 uses gh OAuth tokens
+   if _run_command --soft --quiet -- gh auth status >/dev/null 2>&1; then
       return 0
    fi
 
-   _err "Error: AI features enabled, but Copilot CLI authentication failed. Please verify your GitHub Copilot subscription or unset K3DM_ENABLE_AI."
+   _err "Copilot CLI is not authenticated. Set COPILOT_GITHUB_TOKEN, GH_TOKEN, or GITHUB_TOKEN, or run 'copilot /login' for interactive use."
 }
 
 function _ensure_copilot_cli() {
@@ -1652,11 +1682,7 @@ function _copilot_prompt_guard() {
    done
 }
 
-function _k3d_manager_copilot() {
-   if [[ "${K3DM_ENABLE_AI:-0}" != "1" ]]; then
-      _err "Copilot CLI is disabled. Set K3DM_ENABLE_AI=1 to enable AI tooling."
-   fi
-
+function _copilot_review() {
    _safe_path
    _ensure_copilot_cli
 
@@ -1682,7 +1708,7 @@ function _k3d_manager_copilot() {
                cd "$prev_pwd" >/dev/null 2>&1 || true
                CDPATH="$prev_cdpath"
                OLDPWD="$prev_oldpwd"
-               _err "_k3d_manager_copilot requires a prompt value"
+               _err "_copilot_review requires a prompt value"
             fi
             local scoped
             scoped="$(_copilot_scope_prompt "$2")"
@@ -1698,14 +1724,15 @@ function _k3d_manager_copilot() {
    done
 
    local -a guard_args=(
+      "--allow-all-tools"
       "--deny-tool" "shell(cd ..)"
       "--deny-tool" "shell(git push)"
       "--deny-tool" "shell(git push --force)"
       "--deny-tool" "shell(rm -rf)"
-      "--deny-tool" "shell(sudo"
-      "--deny-tool" "shell(eval"
-      "--deny-tool" "shell(curl"
-      "--deny-tool" "shell(wget"
+      "--deny-tool" "shell(sudo)"
+      "--deny-tool" "shell(eval)"
+      "--deny-tool" "shell(curl)"
+      "--deny-tool" "shell(wget)"
    )
    local -a processed_args=("${guard_args[@]}" "${final_args[@]}")
 
@@ -1719,6 +1746,25 @@ function _k3d_manager_copilot() {
    return "$rc"
 }
 
+function _ai_agent_review() {
+   local ai_func="${AI_REVIEW_FUNC:-copilot}"
+   local model="${AI_REVIEW_MODEL:-gpt-5.4-mini}"
+   local arg has_model=0
+   for arg in "$@"; do
+      [[ "$arg" == "--model" || "$arg" == "-m" ]] && { has_model=1; break; }
+   done
+
+   case "$ai_func" in
+      copilot)
+         if [[ "$has_model" -eq 1 ]]; then
+            _copilot_review "$@"
+         else
+            _copilot_review --model "$model" "$@"
+         fi
+         ;;
+      *) _err "Unknown AI_REVIEW_FUNC: ${ai_func}. Supported: copilot" ;;
+   esac
+}
 
 function _ensure_cargo() {
    if _command_exist cargo ; then

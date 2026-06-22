@@ -289,7 +289,7 @@ HELP
     printf 'ERROR: %s\n' "[acg] node is required for Playwright automation — install Node.js" >&2
     return 1
   fi
-  if ! node -e "require('playwright')" 2>/dev/null; then
+  if ! NODE_PATH="${_LIB_ACG_ROOT}/node_modules" node -e "require('playwright')" 2>/dev/null; then
     printf 'ERROR: %s\n' "[acg] playwright npm module not found — run: cd ${_LIB_ACG_ROOT} && npm install" >&2
     return 1
   fi

@@ -5,12 +5,31 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-06-21
+
+### Changed
+- `scripts/lib/cdp.sh`: `_cdp_ensure_acg_session` now runs a deterministic Playwright session check (`scripts/lib/acg_session_check.js`) over CDP instead of the retired gemini-cli agent prompt; `_browser_launch` probe message reworded from "Gemini" to "Antigravity". gemini-cli was retired by Google (replaced by the Antigravity `agy` CLI), so the old `_gemini_prompt ... --yolo` path was dead.
+
+### Added
+- `scripts/lib/acg_session_check.js`: standalone Playwright script that connects to the existing CDP browser, reuses the first context/page, verifies the Pluralsight (ACG) session, prints `ACG_SESSION_OK` on success, and never closes the shared browser.
+
 ### Fixed
-- `playwright/lib/sandbox.js`: replace `reopenAttempted` boolean with `reopenCount` counter — allow 3 reopen attempts with 8s wait per attempt; single 3s attempt was too tight for Azure panel render after click
-- `playwright/lib/sandbox.js`: delete+restart Azure sandbox when credential fields are partially populated (at least one field has a value but not all are filled) after 60s — up to 3 delete+restart cycles; timer starts only once the panel has loaded enough to show some credentials, preventing premature deletion during initial field loading
+- `scripts/lib/acg_session_check.js`: require both a successful signin navigation and a visible logged-in selector before printing `ACG_SESSION_OK` (closes a false-positive seam); create a page when the CDP context has no open tabs instead of throwing (Copilot PR #45).
+- `scripts/lib/cdp.sh`: add `node` and `node_modules/playwright` preflight checks with actionable `_err` messages before invoking the session check (Copilot PR #45).
+
+## [0.1.7] - 2026-06-12
+
+### Fixed
 - `bin/acg-credential-test`: restart sandbox on Azure service-principal validation failure — mirror the AWS restart pattern by calling `_do_restart`, waiting for CDP readiness, re-extracting credentials, and re-validating before falling back to the existing Azure auth failure message
 - `playwright/lib/sandbox.js`: detect sandbox conflict from the always-visible "shut down your current X sandbox" banner text — the prior Auto Shutdown selector only matched when the provider panel was open, so a closed-panel conflicting sandbox was never deleted; also skip disabled Start Sandbox buttons during credential wait and re-check the conflict banner before treating a disabled Start Sandbox as "already running"
 - `playwright/lib/sandbox.js`: close the target provider panel before searching for the conflicting provider's Delete/Open buttons — the full-screen credential modal hid them, so conflict deletion silently no-op'd; also stop `_waitForCredentials` from falling through to the reopen loop when credential inputs are visible but no panel-scoped Start Sandbox was found
+- `playwright/lib/sandbox.js`: bound `isDisabled()` to a 300ms timeout in the credential wait loop — the default 30s timeout could stall `_waitForCredentials` on a detached/loading Start Sandbox button and risk a premature 420s timeout (Copilot PR #44)
+
+## [0.1.6] - 2026-06-12
+
+### Fixed
+- `playwright/lib/sandbox.js`: replace `reopenAttempted` boolean with `reopenCount` counter — allow 3 reopen attempts with 8s wait per attempt; single 3s attempt was too tight for Azure panel render after click
+- `playwright/lib/sandbox.js`: delete+restart Azure sandbox when credential fields are partially populated (at least one field has a value but not all are filled) after 60s — up to 3 delete+restart cycles; timer starts only once the panel has loaded enough to show some credentials, preventing premature deletion during initial field loading
 
 ## [0.1.5] - 2026-06-11
 

@@ -1,6 +1,17 @@
 # Active Context — lib-acg
 
-## Current Branch: `feat/v0.1.5`
+## Current Branch: `feat/v0.1.8`
+
+## Current Status (2026-06-20 — Antigravity CLI migration planning active)
+- **COMPLETE (Antigravity, 2026-06-20):** Created task spec `docs/plans/v0.1.8-antigravity-migration.md` to migrate `gemini-cli` to `agy-cli` and refactor out the retired `--deny-tool`/`--allow-tool` flags in favor of `agy`'s centralized configuration and the `--dangerously-skip-permissions` flag for automated runs.
+- **PREVIOUS (2026-06-12 — v0.1.6 + v0.1.7 released; Azure provision verified):** v0.1.7 post-merge — PR #44 squash-merged to main (`f5e1f6a`): Azure SP validation restart (3b72a4a), conflict detection via banner text (b57131c), close-panel-before-delete + reopen fall-through (cdd9ba4), Copilot `isDisabled` 300ms timeout (87a7ff3). Tag `v0.1.7` + GitHub release (Latest) created. Issue doc `docs/issues/2026-06-12-copilot-pr44-review-findings.md`.
+- **COMPLETE:** v0.1.6 belatedly tagged — PR #43 (`696ca83`) merged without a tag; tag `v0.1.6` + release created this milestone. CHANGELOG split `[Unreleased]` → dated `[0.1.6]` + `[0.1.7]` on `feat/v0.1.8`.
+- **VERIFIED:** Azure sandbox provision succeeds end-to-end (user confirmed 2026-06-12). The Azure SP 5–6-cycle worst case did not recur.
+- enforce_admins restored on main ✓; `feat/v0.1.8` from `f5e1f6a`; retro `docs/retro/2026-06-12-v0.1.7-retrospective.md`.
+- **k3d-manager subtree:** synced to `f5e1f6a` via `git subtree pull --squash` (k3d-manager `1b80e3a9`), not yet pushed.
+- **FOLLOW-UP:** README releases table non-conformant (missing v0.1.5; not trimmed to 3-most-recent); `docs/releases.md` missing v0.1.5/0.1.6/0.1.7 sections — cleanup pass needed.
+
+## Prior Status (2026-06-10 — v0.4.0 / feat/v0.1.5)
 
 ## Current Status (2026-06-10 — v0.4.0 released and next branch created)
 - **COMPLETE:** v0.4.0 post-merge housekeeping — tag `v0.4.0` created and pushed (`adafde3c`); GitHub release created at https://github.com/wilddog64/lib-acg/releases/tag/v0.4.0; `feat/v0.1.5` branch created from merge SHA `adafde3c2a66bcd84d6163121b516c1cef2abdf3`; retrospective written to `docs/retro/2026-06-10-v0.4.0-retrospective.md`; enforce_admins re-enabled on main via `gh api` POST (correct syntax: no field params, just POST to the dedicated endpoint).

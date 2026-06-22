@@ -49,7 +49,7 @@ bats_require_minimum_version 1.5.0
 }
 
 @test "_run_command: --interactive-sudo flag is accepted without error" {
-  function sudo() { "$@"; }
+  function sudo() { while [[ $# -gt 0 && "$1" == -* ]]; do shift; done; "$@"; }
   export -f sudo
   run _run_command --interactive-sudo --soft -- echo hi
   [ "$status" -eq 0 ]
@@ -58,7 +58,7 @@ bats_require_minimum_version 1.5.0
 }
 
 @test "_run_command: --prefer-sudo flag is accepted without error" {
-  function sudo() { "$@"; }
+  function sudo() { while [[ $# -gt 0 && "$1" == -* ]]; do shift; done; "$@"; }
   export -f sudo
   run _run_command --prefer-sudo --soft -- echo hi
   [ "$status" -eq 0 ]
@@ -151,6 +151,63 @@ bats_require_minimum_version 1.5.0
   run _ensure_antigravity_ide
   [ "$status" -eq 0 ]
   unset -f _command_exist _is_mac _is_debian_family _is_redhat_family _sudo_available _run_command
+}
+
+@test "_ensure_agy_cli: returns 0 when agy exists" {
+  _command_exist() { [[ "$1" == agy ]]; }
+  export -f _command_exist
+
+  run _ensure_agy_cli
+  [ "$status" -eq 0 ]
+  unset -f _command_exist
+}
+
+@test "_ensure_agy_cli: errors when curl is missing" {
+  export HOME="${BATS_TEST_TMPDIR}"
+  _command_exist() { return 1; }
+  _err() { echo "$*"; exit 1; }
+  export -f _command_exist _err
+
+  run _ensure_agy_cli
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"curl is required"* ]]
+
+  unset -f _command_exist _err
+}
+
+@test "_ensure_agy_cli: installs via curl | bash into ~/.local/bin" {
+  export HOME="${BATS_TEST_TMPDIR}"
+  installed_bin="${HOME}/.local/bin/agy"
+  stub_dir="${BATS_TEST_TMPDIR}/bin"
+  mkdir -p "${stub_dir}"
+  cat > "${stub_dir}/curl" <<'EOF'
+#!/usr/bin/env bash
+cat <<'SH'
+mkdir -p "$HOME/.local/bin"
+cat > "$HOME/.local/bin/agy" <<'AGY'
+#!/usr/bin/env bash
+printf 'agy CLI\n'
+AGY
+chmod +x "$HOME/.local/bin/agy"
+SH
+EOF
+  chmod +x "${stub_dir}/curl"
+
+  _command_exist() {
+    case "$1" in
+      curl) return 0 ;;
+      agy) [[ -x "${installed_bin}" ]] ;;
+      *) return 1 ;;
+    esac
+  }
+  export -f _command_exist
+  PATH="${stub_dir}:$PATH"
+
+  run _ensure_agy_cli
+  [ "$status" -eq 0 ]
+  [ -x "${installed_bin}" ]
+
+  unset -f _command_exist
 }
 
 @test "_ensure_antigravity_mcp_playwright: no-op when playwright entry already present" {
