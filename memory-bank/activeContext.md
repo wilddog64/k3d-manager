@@ -600,3 +600,6 @@ Deploy OCI with stable main BEFORE any v1.6.0+ work. Sequence:
 - Retro (v1.4.4): `docs/retro/2026-05-08-v1.4.4-retrospective.md`
 - Retro (v1.4.3): `docs/retro/2026-05-08-v1.4.3-retrospective.md`
 - Retro (v1.4.2): `docs/retro/2026-05-07-v1.4.2-retrospective.md`
+
+
+- **PHASE 2 COMPLETE — Codex implemented and pushed (2026-06-22):** Commit `425faab7` is on `origin/feat/eso-phase2-clustersecretstore`. The branch now includes the CSS/ApplicationSet, Vault VirtualService template + vars + cloudflared ingress, Hostinger auth wiring, widened `eso-reader` policy, and the Vault auth BATS update. Validation used the repo BATS suites and client-only dry-run fallback (`kubectl create --dry-run=client --validate=false`) after sandbox openapi discovery was blocked; the blocker is recorded in `docs/issues/2026-06-22-eso-phase2-validation-sandbox-and-dirty-worktree.md`. The pre-existing dirty `system.sh` edits were left untouched.
