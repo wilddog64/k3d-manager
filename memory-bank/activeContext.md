@@ -27,9 +27,9 @@ Trunk = `origin/main` @ `e507f7be` (v1.7.1 `0c9b2707` #96 + PR #97 ESO operator 
 ## Open loose ends (need user go)
 
 - **webhook `/gemini`→agy retarget:** `_call_gemini` (`bin/k3dm-webhook:897`) still calls gemini-cli. Bugfix spec `docs/bugs/2026-06-21-webhook-call-gemini-agy-retarget.md`; lands on a k3d-manager branch then `make restart-webhook`.
-- **Delete bogus branches** `feat/v0.1.8` (`c84f6a5d`) + `feat/ensure-agy-cli` (`8c4e44dc`) on local **and** origin — commits preserved under salvage tags `salvage/agy-cdp-wrong-repo`, `salvage/agy-ensure-cli-wrong-repo`.
-- **Branch cleanup (every-5-releases prune):** 12 stale local release branches `k3d-manager-v1.5.1`…`v1.7.2` + `backup/v1.7.2-before-revert` + `docs/next-improvements`.
-- **14 old WIP stashes** — debris from prior release branches.
+- ~~Delete bogus branches `feat/v0.1.8` + `feat/ensure-agy-cli`~~ **DONE 2026-06-23** (local+origin; commits preserved under salvage tags `salvage/agy-cdp-wrong-repo` `c84f6a5d`, `salvage/agy-ensure-cli-wrong-repo` `8c4e44dc`).
+- ~~Branch cleanup: 12 tagged release branches~~ **DONE 2026-06-23** — deleted `k3d-manager-v1.5.0..1.5.3,1.6.0..1.6.5,1.7.0,1.7.1` (local+origin; all tagged, recoverable). **HELD (each has unique commits not on main):** `k3d-manager-v1.5.4` (2 ahead, never released), `k3d-manager-v1.7.2` (14 ahead, trunk-reset line), `docs/next-improvements` (162 ahead), `backup/v1.7.2-before-revert` (14 ahead). Review before deleting.
+- **15 git stashes** (`stash@{0}`–`{14}`) — mostly ancient WIP on shipped release branches, but `stash@{0}` is on the current branch + `{1}/{2}` relate to provider-generic/sync-apps. Unrecoverable once dropped — confirm before pruning.
 - **Rotate** hardcoded `SLACK_BOT_TOKEN`/`SLACK_SIGNING_SECRET`/webhook in `.claude/settings.local.json`.
 
 ---
