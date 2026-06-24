@@ -77,19 +77,50 @@ function deploy_observability() {
   fi
 }
 
+function _observability_acg_context() {
+  local context="${1:-}"
+
+  if [[ -n "${context}" ]]; then
+    printf '%s\n' "${context}"
+    return 0
+  fi
+
+  if declare -f _acg_provider_context >/dev/null 2>&1 && \
+      declare -f _acg_resolve_provider >/dev/null 2>&1; then
+    context="$(_acg_provider_context "$(_acg_resolve_provider)" 2>/dev/null || true)"
+  fi
+
+  printf '%s\n' "${context:-ubuntu-k3s}"
+}
+
+function _observability_ensure_namespace() {
+  local context
+  context="$(_observability_acg_context "${1:-}")"
+  local namespace="${2:-monitoring}"
+
+  _kubectl create namespace "${namespace}" \
+    --context "${context}" \
+    --dry-run=client -o yaml | _kubectl apply --context "${context}" -f - >/dev/null
+}
+
 function deploy_observability_acg() {
   _info "[observability] Deploying ACG observability stack..."
   local _appset="${SCRIPT_DIR}/etc/argocd/applicationsets/observability-acg.yaml"
   : "${ARGOCD_NAMESPACE:=cicd}"
   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
   export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
   # shellcheck disable=SC2016
   if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_appset}" | _kubectl apply -f -; then
-    _info "[observability] ACG ApplicationSet applied — ArgoCD will sync monitoring/trivy-system on ubuntu-k3s"
+    _info "[observability] ACG ApplicationSet applied — ArgoCD will sync monitoring/trivy-system on ${_app_context}"
   else
     _err "[observability] Failed to apply ACG observability ApplicationSet"
     return 1
   fi
+
+  _observability_ensure_namespace "${_app_context}" monitoring
+  _info "[observability] Ensured monitoring namespace exists on ${_app_context}"
 
   _info "[observability] Reading Alertmanager credentials from Vault..."
   local _vault_addr="http://127.0.0.1:18200"
@@ -131,42 +162,49 @@ function deploy_observability_acg() {
     _am_tmpfile=$(mktemp)
     printf '%s' "${_am_config}" > "${_am_tmpfile}"
     _kubectl create secret generic alertmanager-smtp-secret \
-      --context ubuntu-k3s \
+      --context "${_app_context}" \
       -n monitoring \
       --from-file=alertmanager.yaml="${_am_tmpfile}" \
-      --dry-run=client -o yaml | _kubectl apply --context ubuntu-k3s -f -
+      --dry-run=client -o yaml | _kubectl apply --context "${_app_context}" -f -
     rm -f "${_am_tmpfile}"
-    _info "[observability] Alertmanager config secret created on ACG (ubuntu-k3s)"
+    _info "[observability] Alertmanager config secret created on ACG (${_app_context})"
   fi
-  _prometheus_acg_web_config_secret
-  _deploy_pushgateway_acg
+  _prometheus_acg_web_config_secret "${_app_context}"
+  _deploy_pushgateway_acg "${_app_context}"
 }
 
 function _deploy_pushgateway_acg() {
-  _info "[observability] Deploying Prometheus Pushgateway on ubuntu-k3s..."
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
+  _info "[observability] Deploying Prometheus Pushgateway on ${_app_context}..."
   if ! command -v helm >/dev/null 2>&1; then
     _warn "[observability] helm not found — skipping Pushgateway install"
     return 0
   fi
-  helm upgrade --install prometheus-pushgateway prometheus-community/prometheus-pushgateway \
-    --kube-context ubuntu-k3s \
-    --namespace monitoring \
-    --create-namespace \
-    --version "2.14.0" \
-    --set service.type=ClusterIP \
-    --set replicaCount=1 \
-    --wait --timeout 120s >/dev/null \
-    && _info "[observability] Pushgateway installed (monitoring/prometheus-pushgateway)" \
-    || { _warn "[observability] Pushgateway install failed — deployment metrics disabled"; return 0; }
+  if helm upgrade --install prometheus-pushgateway prometheus-community/prometheus-pushgateway \
+      --kube-context "${_app_context}" \
+      --namespace monitoring \
+      --create-namespace \
+      --version "2.14.0" \
+      --set service.type=ClusterIP \
+      --set replicaCount=1 \
+      --wait --timeout 120s >/dev/null; then
+    _info "[observability] Pushgateway installed (monitoring/prometheus-pushgateway)"
+  else
+    _warn "[observability] Pushgateway install failed — deployment metrics disabled"
+    return 0
+  fi
 
   local _dashboard_cm="${SCRIPT_DIR}/etc/grafana/dashboards/k3dm-deployments-configmap.yaml"
   if [[ -f "${_dashboard_cm}" ]]; then
-    _kubectl apply --context ubuntu-k3s -f "${_dashboard_cm}" >/dev/null \
+    _kubectl apply --context "${_app_context}" -f "${_dashboard_cm}" >/dev/null \
       && _info "[observability] k3dm deployment metrics dashboard applied"
   fi
 }
 
 function _prometheus_acg_web_config_secret() {
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token
   _vault_token=$(_kubectl get secret vault-root -n secrets \
@@ -185,7 +223,7 @@ function _prometheus_acg_web_config_secret() {
     _prom_creds=""
   fi
   if [[ -z "${_prom_creds}" ]]; then
-    local _default_bcrypt_hash='$2a$12$NqL.y.Z1.h.1.E.1.p.9.Q.2.a.7.I.3.Z.7.d.3.Q.2.v.0.K.2.x.6' # bcrypt hash for 'password'
+    local _default_bcrypt_hash="\$2a\$12\$NqL.y.Z1.h.1.E.1.p.9.Q.2.a.7.I.3.Z.7.d.3.Q.2.v.0.K.2.x.6" # bcrypt hash for 'password'
 
     local _prom_password="${PROM_ADMIN_PASSWORD:-password}"
     _info "[observability] Ensuring Prometheus basic auth secret exists in Vault."
@@ -228,33 +266,38 @@ function _prometheus_acg_web_config_secret() {
   _web_config=$(printf 'basic_auth_users:\n  %s: %s\n' "${_prom_user}" "${_prom_hash}")
   printf '%s' "${_web_config}" > "${_tmpfile}"
 
+  _observability_ensure_namespace "${_app_context}" monitoring
   _kubectl create secret generic prometheus-web-config \
-    --context ubuntu-k3s \
+    --context "${_app_context}" \
     -n monitoring \
     --from-file=web.yml="${_tmpfile}" \
-    --dry-run=client -o yaml | _kubectl apply --context ubuntu-k3s -f -
+    --dry-run=client -o yaml | _kubectl apply --context "${_app_context}" -f -
   rm -f "${_tmpfile}"
-  _info "[observability] Prometheus web config secret applied (monitoring/prometheus-web-config)"
+  _info "[observability] Prometheus web config secret applied (monitoring/prometheus-web-config on ${_app_context})"
 }
 
 function observability_status() {
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
   _info "[observability] === Hub (k3d-cluster) ==="
   for _ns in monitoring trivy-system; do
     _info "[observability] --- ${_ns} ---"
     _kubectl get pods -n "${_ns}" --no-headers 2>/dev/null || true
   done
-  _info "[observability] === ACG (ubuntu-k3s) ==="
+  _info "[observability] === ACG (${_app_context}) ==="
   for _ns in monitoring trivy-system; do
     _info "[observability] --- ${_ns} ---"
-    _kubectl get pods -n "${_ns}" --context ubuntu-k3s --no-headers 2>/dev/null || true
+    _kubectl get pods -n "${_ns}" --context "${_app_context}" --no-headers 2>/dev/null || true
   done
 }
 
 function trivy_scan_report() {
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
   _info "[observability] VulnerabilityReport summary — Hub:"
   _kubectl get vulnerabilityreports -A --no-headers 2>/dev/null \
     | awk '{print $1, $2, $6, $7, $8}' | column -t | sort -k4 -rn || true
-  _info "[observability] VulnerabilityReport summary — ACG:"
-  _kubectl get vulnerabilityreports -A --context ubuntu-k3s --no-headers 2>/dev/null \
+  _info "[observability] VulnerabilityReport summary — ACG (${_app_context}):"
+  _kubectl get vulnerabilityreports -A --context "${_app_context}" --no-headers 2>/dev/null \
     | awk '{print $1, $2, $6, $7, $8}' | column -t | sort -k4 -rn || true
 }
