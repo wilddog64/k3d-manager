@@ -10,10 +10,14 @@ Use the rules below to shape all code suggestions and PR reviews.
 ## Architecture
 
 - **Core libraries**: `scripts/lib/system.sh`, `scripts/lib/core.sh`, `scripts/lib/agent_rigor.sh`
+- **Optional module**: `scripts/lib/acg/` for browser automation. Public shell API is `acg_*`
+  (AWS sandbox lifecycle) and `gcp_*` (GCP credential extraction).
 - **Privilege escalation**: always via `_run_command --prefer-sudo` or `--require-sudo` — never bare `sudo`
 - **OS detection**: always via `_detect_platform` — returns `mac | wsl | debian | redhat | linux`
 - **Unit tests**: `scripts/tests/lib/` — always run with `env -i` clean environment
 - **Consumers** pull this repo via `git subtree` — breaking changes require cross-consumer coordination
+- **Node/Playwright isolation**: the ACG module keeps its own `package-lock.json`; use `npm ci` in
+  `scripts/lib/acg/` and keep browser automation changes out of core shellcheck/BATS scope.
 
 ---
 
@@ -72,6 +76,13 @@ Flag any of the following as blocking issues:
 
 - Every public function must be safe to run more than once
 - "Resource already exists" → skip, not error
+
+### ACG Module Review
+
+- `scripts/lib/acg/` changes must keep `npm run check` and `npm test` green in the module dir.
+- `npm run test:e2e` / `make credential-test` are manual browser checks and are not required in CI.
+- Keep module Playwright code and fixtures isolated from the Bash core; do not add Node deps to
+  `scripts/lib/system.sh` or `scripts/lib/core.sh`.
 
 ---
 

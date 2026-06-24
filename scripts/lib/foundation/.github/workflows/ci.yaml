@@ -49,3 +49,31 @@ jobs:
             exit 0
           fi
           env -i HOME="$HOME" PATH="$PATH" bats scripts/tests/lib/
+
+  acg:
+    name: acg (node)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: scripts/lib/acg
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install deps (npm ci from lockfile)
+        run: npm ci
+
+      - name: Node syntax check
+        run: npm run check
+
+      - name: Unit tests (jest)
+        run: npm test
+
+      - name: shellcheck bin scripts
+        run: |
+          sudo apt-get install -y shellcheck
+          shellcheck -S warning bin/acg-credential-test bin/acg-extend-test
