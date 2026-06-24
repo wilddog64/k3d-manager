@@ -182,6 +182,41 @@ function _hostinger_refresh_access_layer() {
   fi
 
   _info "[k3s-hostinger] Refreshing local access layer listeners..."
+  local _argocd_pf_label="com.k3d-manager.argocd-port-forward"
+  local _argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
+  local _argocd_pf_log="${_ACG_STATE_DIR}/logs/argocd-pf.log"
+  local _argocd_pf_wrapper="${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  if [[ ! -f "${_argocd_pf_plist}" && -f "${_argocd_pf_wrapper}" ]]; then
+    _info "[k3s-hostinger] ArgoCD port-forward plist missing — regenerating from wrapper..."
+    mkdir -p "$(dirname "${_argocd_pf_log}")"
+    cat > "${_argocd_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_argocd_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${_argocd_pf_wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_argocd_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_argocd_pf_log}</string>
+</dict>
+</plist>
+PLIST
+  fi
+  _hostinger_restart_launchd \
+    "${_argocd_pf_label}" \
+    "${_argocd_pf_plist}" \
+    user
   _hostinger_restart_launchd \
     "com.k3d-manager.cloudflare-tunnel" \
     "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" \

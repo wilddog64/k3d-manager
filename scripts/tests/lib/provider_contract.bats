@@ -105,6 +105,35 @@ teardown_file() {
   [[ "$(_acg_resolve_provider)" == "k3s-hostinger" ]]
 }
 
+@test "_hostinger_refresh_access_layer restarts argocd port-forward before cloudflared" {
+  HOME="${BATS_TEST_TMPDIR}"
+  _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+  mkdir -p "${_ACG_STATE_DIR}/bin" "${HOME}/Library/LaunchAgents"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  chmod +x "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  : > "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist"
+
+  uname() {
+    printf '%s\n' Darwin
+  }
+
+  _info() {
+    :
+  }
+
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+  _hostinger_restart_launchd() {
+    printf '%s\n' "$1" >> "${BATS_TEST_TMPDIR}/restart.log"
+  }
+  _hostinger_refresh_access_layer
+
+  run cat "${BATS_TEST_TMPDIR}/restart.log"
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *"com.k3d-manager.argocd-port-forward"* ]]
+  [[ "${output}" == *"com.k3d-manager.cloudflare-tunnel"* ]]
+  [[ "${output}" == *"com.k3d-manager.argocd-browser-https"* ]]
+}
+
 @test "_provider_k3d_exec is defined" {
   source "${PROVIDERS_DIR}/k3d.sh"
   declare -f "_provider_k3d_exec" >/dev/null
