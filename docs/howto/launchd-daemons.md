@@ -18,7 +18,7 @@ Install via `make <target>` or via the plugin function noted below.
 | `com.k3d-manager.frontend-port-forward` | Frontend → `frontend.shopping-cart.local:80` (ubuntu-k3s) | ✅ | manual | `~/.local/share/k3d-manager/logs/frontend-pf.log` |
 | `com.k3d-manager.vault-port-forward` | Vault → `localhost:18200` (k3d-k3d-cluster) | ✅ | `make install-vault-port-forward` | `~/Library/Logs/k3dm-vault-port-forward.log` |
 | `com.k3d-manager.keycloak-port-forward` | Keycloak → `localhost:8880` / `keycloak.shopping-cart.local` (k3d-k3d-cluster) | ✅ | `keycloak_install` | `~/.local/share/k3d-manager/logs/keycloak-pf.log` |
-| `com.k3d-manager.prometheus-port-forward` | Prometheus → `localhost:19090` (ubuntu-k3s) | ✅ | `make install-prometheus-port-forward` | `~/Library/Logs/k3dm-prometheus-port-forward.log` |
+| `com.k3d-manager.prometheus-port-forward` | Prometheus → `localhost:19090` (k3d-k3d-cluster) | ✅ | `make install-prometheus-port-forward` | `~/Library/Logs/k3dm-prometheus-port-forward.log` |
 | `com.k3d-manager.cleanup` | Purges old job state dirs (`~/.local/share/k3d-manager/jobs/`) | ❌ (timer: daily 03:00) | `make install-cleanup` | `~/Library/Logs/k3dm-cleanup.log` |
 | `com.k3d-manager.acg-watch` | Watches ACG sandbox TTL; auto-extends or notifies | ❌ (on-demand) | `acg_watch_install` | `/tmp/k3d-manager-acg-watch.err` |
 
@@ -54,7 +54,7 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 - **Template:** none (installed by `keycloak_install` plugin function via wrapper script)
 
 ### `com.k3d-manager.prometheus-port-forward`
-- **Cluster:** `ubuntu-k3s` (ACG EC2)
+- **Cluster:** `k3d-k3d-cluster` (local hub)
 - **Mapping:** `localhost:19090` → `svc/prometheus-operated:9090` (namespace: `monitoring`)
 - **Health check:** `http://localhost:19090/-/ready`
 - **Template:** `scripts/etc/launchd/com.k3d-manager.prometheus-port-forward.plist.tmpl`
