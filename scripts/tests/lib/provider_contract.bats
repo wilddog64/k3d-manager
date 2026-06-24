@@ -128,6 +128,14 @@ teardown_file() {
     printf '%s\n' Darwin
   }
 
+  socat() {
+    :
+  }
+
+  curl() {
+    :
+  }
+
   _info() {
     :
   }
@@ -139,6 +147,12 @@ teardown_file() {
   _hostinger_refresh_access_layer
 
   run grep -F 'port 8080 still in use — clearing stale listener(s) before retry' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run test -x "${_ACG_STATE_DIR}/bin/argocd-browser-https.sh"
+  [ "$status" -eq 0 ]
+  run test -x "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- '--context "ubuntu-hostinger" port-forward --address=127.0.0.2' "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   [ "$status" -eq 0 ]
 
   run cat "${BATS_TEST_TMPDIR}/restart.log"

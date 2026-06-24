@@ -179,15 +179,18 @@ function _hostinger_restart_launchd() {
 
 function _hostinger_write_argocd_port_forward_wrapper() {
   local wrapper_path="$1" log_file="$2" template_path="${SCRIPT_DIR}/etc/argocd/port-forward-wrapper.sh.tmpl"
+  local kubectl_bin curl_bin
 
   if [[ ! -r "${template_path}" ]]; then
     _warn "[k3s-hostinger] ArgoCD port-forward template missing — leaving wrapper untouched"
     return 0
   fi
 
+  kubectl_bin="$(command -v kubectl 2>/dev/null || printf '%s' kubectl)"
+  curl_bin="$(command -v curl 2>/dev/null || printf '%s' curl)"
   mkdir -p "$(dirname "${wrapper_path}")"
-  KUBECTL_BIN="$(command -v kubectl)" \
-  CURL_BIN="$(command -v curl)" \
+  KUBECTL_BIN="${kubectl_bin}" \
+  CURL_BIN="${curl_bin}" \
   LOG_FILE="${log_file}" \
   KUBECONFIG_FILE="" \
   NAMESPACE="cicd" \
@@ -202,12 +205,63 @@ function _hostinger_write_argocd_port_forward_wrapper() {
   chmod 700 "${wrapper_path}"
 }
 
+function _hostinger_write_argocd_browser_https_wrapper() {
+  local wrapper_path="$1" log_file="$2" template_path="${SCRIPT_DIR}/etc/argocd/browser-https-wrapper.sh.tmpl"
+  local socat_bin curl_bin
+
+  if [[ ! -r "${template_path}" ]]; then
+    _warn "[k3s-hostinger] ArgoCD browser HTTPS template missing — leaving wrapper untouched"
+    return 0
+  fi
+
+  socat_bin="$(command -v socat 2>/dev/null || printf '%s' socat)"
+  curl_bin="$(command -v curl 2>/dev/null || printf '%s' curl)"
+  mkdir -p "$(dirname "${wrapper_path}")"
+  SOCAT_BIN="${socat_bin}" \
+  CURL_BIN="${curl_bin}" \
+  LOG_FILE="${log_file}" \
+  LOCAL_HOST="127.0.0.1" \
+  LOCAL_PORT="${ARGOCD_BROWSER_PORT:-443}" \
+  UPSTREAM_HOST="127.0.0.1" \
+  UPSTREAM_PORT="8080" \
+  CERT_FILE="${ARGOCD_BROWSER_TLS_CERT_FILE:-${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/fullchain.crt}" \
+  KEY_FILE="${ARGOCD_BROWSER_TLS_KEY_FILE:-${HOME}/.local/share/k3d-manager/argocd-browser-https-tls/tls.key}" \
+  HEALTHZ_URL="https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz" \
+  STARTUP_TIMEOUT="${ARGOCD_BROWSER_LISTENER_STARTUP_TIMEOUT:-30}" \
+    envsubst '$SOCAT_BIN $CURL_BIN $LOG_FILE $LOCAL_HOST $LOCAL_PORT $UPSTREAM_HOST $UPSTREAM_PORT $CERT_FILE $KEY_FILE $HEALTHZ_URL $STARTUP_TIMEOUT' \
+      < "${template_path}" > "${wrapper_path}"
+  chmod 700 "${wrapper_path}"
+}
+
+function _hostinger_write_frontend_browser_wrapper() {
+  local wrapper_path="$1" log_file="$2"
+  local kubectl_bin
+
+  kubectl_bin="$(command -v kubectl 2>/dev/null || printf '%s' kubectl)"
+  mkdir -p "$(dirname "${wrapper_path}")"
+  cat > "${wrapper_path}" <<FRONTEND_WRAPPER
+#!/usr/bin/env bash
+set -euo pipefail
+export KUBECONFIG="${HOME}/.kube/config"
+_log="${log_file}"
+while true; do
+  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.2:80" >> "\${_log}"
+  ${kubectl_bin} --context "${_HOSTINGER_KUBE_CONTEXT}" port-forward --address=127.0.0.2 \
+    svc/frontend 80:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
+  sleep 2
+done
+FRONTEND_WRAPPER
+  chmod 700 "${wrapper_path}"
+}
+
 function _hostinger_clear_port_listeners() {
   local port="$1" label="$2"
   local _listener_pids=()
 
   if command -v lsof >/dev/null 2>&1; then
-    mapfile -t _listener_pids < <(lsof -nP -iTCP:"${port}" -sTCP:LISTEN -t 2>/dev/null | sort -u)
+    while IFS= read -r _pid; do
+      [[ -n "${_pid}" ]] && _listener_pids+=("${_pid}")
+    done < <(lsof -nP -iTCP:"${port}" -sTCP:LISTEN -t 2>/dev/null | sort -u)
   fi
 
   if ((${#_listener_pids[@]} == 0)); then
@@ -234,6 +288,10 @@ function _hostinger_refresh_access_layer() {
   local _argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
   local _argocd_pf_log="${_ACG_STATE_DIR}/logs/argocd-pf.log"
   local _argocd_pf_wrapper="${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  local _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${_ACG_STATE_DIR}/bin/argocd-browser-https.sh}"
+  local _argocd_browser_log="${ARGOCD_BROWSER_LISTENER_LOG:-${_ACG_STATE_DIR}/logs/argocd-browser-https.log}"
+  local _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
+  local _frontend_browser_log="${_ACG_STATE_DIR}/logs/frontend-browser-http.log"
   if [[ ! -f "${_argocd_pf_plist}" && -f "${_argocd_pf_wrapper}" ]]; then
     _info "[k3s-hostinger] ArgoCD port-forward plist missing — regenerating from wrapper..."
     mkdir -p "$(dirname "${_argocd_pf_log}")"
@@ -262,6 +320,12 @@ function _hostinger_refresh_access_layer() {
 PLIST
   fi
   _hostinger_write_argocd_port_forward_wrapper "${_argocd_pf_wrapper}" "${_argocd_pf_log}"
+  _hostinger_write_argocd_browser_https_wrapper \
+    "${_argocd_browser_wrapper}" \
+    "${_argocd_browser_log}"
+  _hostinger_write_frontend_browser_wrapper \
+    "${_frontend_browser_wrapper}" \
+    "${_frontend_browser_log}"
   _hostinger_clear_port_listeners 8080 "ArgoCD port-forward"
   _hostinger_restart_launchd \
     "${_argocd_pf_label}" \

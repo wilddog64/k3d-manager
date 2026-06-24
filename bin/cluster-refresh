@@ -470,10 +470,8 @@ PLIST
     _argocd_issue_browser_tls_material "${_argocd_browser_tls_dir}" \
       || _warn "[acg-refresh] failed to re-issue argocd-browser TLS material — listener will not start"
   fi
-  if [[ ! -f "${_argocd_browser_wrapper}" ]]; then
-    _info "[acg-refresh] argocd-browser-https wrapper missing — regenerating..."
-    _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz"
-  fi
+  _info "[acg-refresh] regenerating argocd-browser-https wrapper..."
+  _argocd_write_browser_https_wrapper "${_argocd_browser_wrapper}" "${_argocd_browser_log}" "$(command -v socat)" "$(command -v curl)" "127.0.0.1" "${ARGOCD_BROWSER_PORT:-443}" "127.0.0.1" "8080" "${_argocd_browser_tls_cert}" "${_argocd_browser_tls_key}" "https://127.0.0.1:${ARGOCD_BROWSER_PORT:-443}/healthz"
 
   _system_daemon_install_if_missing \
     "com.k3d-manager.argocd-browser-https" \
@@ -495,19 +493,27 @@ PLIST
     "/Library/LaunchDaemons/com.k3d-manager.keycloak-browser-http.plist" \
     system
 
-  _frontend_browser_wrapper=""
-  if [[ -f "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh" ]]; then
-    _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
-  elif [[ -f "${_ACG_STATE_DIR}/frontend-browser-http.sh" ]]; then
-    _frontend_browser_wrapper="${_ACG_STATE_DIR}/frontend-browser-http.sh"
-  fi
-  if [[ -n "${_frontend_browser_wrapper}" ]]; then
-    _system_daemon_install_if_missing \
-      "com.k3d-manager.frontend-browser-http" \
-      "${_frontend_browser_wrapper}" \
-      "${_ACG_STATE_DIR}/logs/frontend-browser-http.log" \
-      "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist"
-  fi
+  _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
+  _frontend_browser_kubectl="$(command -v kubectl)"
+  mkdir -p "$(dirname "${_frontend_browser_wrapper}")"
+  cat > "${_frontend_browser_wrapper}" <<FRONTEND_WRAPPER
+#!/usr/bin/env bash
+set -euo pipefail
+export KUBECONFIG="${HOME}/.kube/config"
+_log="${_ACG_STATE_DIR}/logs/frontend-browser-http.log"
+while true; do
+  printf '%s\n' "[\$(date)] starting frontend port-forward: svc/frontend → 127.0.0.2:80" >> "\${_log}"
+  ${_frontend_browser_kubectl} --context ubuntu-k3s port-forward --address=127.0.0.2 \
+    svc/frontend 80:80 -n shopping-cart-apps >> "\${_log}" 2>&1 || true
+  sleep 2
+done
+FRONTEND_WRAPPER
+  chmod +x "${_frontend_browser_wrapper}"
+  _system_daemon_install_if_missing \
+    "com.k3d-manager.frontend-browser-http" \
+    "${_frontend_browser_wrapper}" \
+    "${_ACG_STATE_DIR}/logs/frontend-browser-http.log" \
+    "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist"
   _launchd_ensure \
     "com.k3d-manager.frontend-browser-http" \
     "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
