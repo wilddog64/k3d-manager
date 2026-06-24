@@ -14,6 +14,7 @@ import threading
 import time
 import traceback
 import urllib.request
+import urllib.parse
 import uuid
 from pathlib import Path
 
@@ -50,6 +51,53 @@ SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
 SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID", "")
 _PUSHGATEWAY_PUSH_RETRIES = 6
 _PUSHGATEWAY_PUSH_SLEEP_SECS = 5
+_ACTIVE_PROVIDER_FILE = Path.home() / ".local" / "share" / "k3d-manager" / "active-provider"
+
+
+def _normalize_provider(provider):
+    provider = (provider or "").strip().lower()
+    return {
+        "aws": "k3s-aws",
+        "k3s-aws": "k3s-aws",
+        "gcp": "k3s-gcp",
+        "k3s-gcp": "k3s-gcp",
+        "az": "k3s-az",
+        "azure": "k3s-az",
+        "k3s-az": "k3s-az",
+        "oci": "k3s-oci",
+        "k3s-oci": "k3s-oci",
+        "hostinger": "k3s-hostinger",
+        "hostiger": "k3s-hostinger",
+        "k3s-hostiger": "k3s-hostinger",
+        "k3s-hostinger": "k3s-hostinger",
+    }.get(provider, provider)
+
+
+def _resolve_provider(preferred=None):
+    provider = _normalize_provider(preferred)
+    if provider:
+        return provider
+    provider = _normalize_provider(os.environ.get("CLUSTER_PROVIDER") or os.environ.get("K3D_MANAGER_CLUSTER_PROVIDER"))
+    if provider:
+        return provider
+    try:
+        if _ACTIVE_PROVIDER_FILE.exists():
+            provider = _normalize_provider(_ACTIVE_PROVIDER_FILE.read_text())
+            if provider:
+                return provider
+    except OSError:
+        pass
+    return "k3s-aws"
+
+
+def _provider_context(provider=None):
+    provider = _resolve_provider(provider)
+    return {
+        "k3s-aws": "ubuntu-k3s",
+        "k3s-az": "ubuntu-azure",
+        "k3s-gcp": "ubuntu-gcp",
+        "k3s-hostinger": "ubuntu-hostinger",
+    }.get(provider, "ubuntu-k3s")
 
 def _spawn_capture_text(cmd, cwd=None, env=None, timeout=15):
     """Run cmd via os.posix_spawn and return (rc, output, timed_out).
@@ -1358,43 +1406,53 @@ Service dependencies:
   - payment-service → RabbitMQ in shopping-cart-data; emits payment events
   - All app secrets (DB passwords, API keys) sourced from Vault via ESO ClusterSecretStore
 
-Local port-forwards (Mac → ubuntu-k3s, managed by LaunchAgents):
+Local port-forwards (Mac → app-specific endpoints, managed by LaunchAgents):
   - ArgoCD UI: localhost:18080 → cicd/argocd-server:80
-  - Frontend:  frontend.shopping-cart.local → shopping-cart-apps/frontend:80
+  - Frontend:  frontend.shopping-cart.local on ACG, frontend.3ai-talk.org on Hostinger
   - Prometheus: localhost:19090 → monitoring/prometheus-operated:9090 (NOT on ubuntu-k3s ingress)
   - Grafana: grafana.3ai-talk.org → monitoring/grafana via Cloudflare tunnel; only root path "/" is exposed
 
 Local-only services (NOT on ubuntu-k3s, only on k3d-k3d-cluster):
-  - Keycloak: keycloak.shopping-cart.local → identity/keycloak:80 (port-forward: localhost:8880)
+  - Keycloak: keycloak.shopping-cart.local on ACG, keycloak.3ai-talk.org on Hostinger
     NOTE: if Keycloak smoke fails, check k3d-k3d-cluster health, NOT ubuntu-k3s pods
 
 Ingress (ubuntu-k3s): Istio IngressGateway handles *.shopping-cart.local routing
 ArgoCD manages all app deployments via ApplicationSets in shopping-cart-infra repo
 ESO sync failure is the most common root cause of "pod Running but app broken" scenarios
 """
-_SMOKE_ENDPOINTS = [
-    ("ArgoCD",       "http://localhost:8080/healthz",                    [200]),
-    ("Frontend",     "http://frontend.shopping-cart.local/",             [200]),
-    ("Keycloak",     "http://keycloak.shopping-cart.local/health/live",  [200]),
-    ("Prometheus",   "http://localhost:19090/-/ready",                   [200]),
-    ("Grafana",      "http://grafana.3ai-talk.org/api/health",           [200]),
-    ("Pushgateway",  "http://localhost:9091/-/healthy",                  [200]),
-]
 _SMOKE_RETRIES = 3
 _SMOKE_RETRY_SLEEP = 10
 
 
-def _smoke_test_services(retries=None):
+def _smoke_test_services(retries=None, provider=None):
     """HTTP smoke test for each service. Returns list of (name, ok, detail) tuples."""
     import ssl
     import time
     _retries = retries if retries is not None else _SMOKE_RETRIES
+    provider = _resolve_provider(provider)
+    app_context = _provider_context(provider)
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
 
+    if provider == "k3s-hostinger":
+        frontend_url = "https://frontend.3ai-talk.org/"
+        keycloak_url = "https://keycloak.3ai-talk.org/health/live"
+    else:
+        frontend_url = "http://frontend.shopping-cart.local/"
+        keycloak_url = "http://keycloak.shopping-cart.local/health/live"
+
     results = []
-    for name, url, ok_codes in _SMOKE_ENDPOINTS:
+    smoke_endpoints = [
+        ("ArgoCD", "http://localhost:8080/healthz", [200]),
+        ("Frontend", frontend_url, [200]),
+        ("Keycloak", keycloak_url, [200]),
+        ("Prometheus", "http://localhost:19090/-/ready", [200]),
+        ("Grafana", "https://grafana.3ai-talk.org/api/health", [200]),
+        ("Pushgateway", "http://localhost:9091/-/healthy", [200]),
+    ]
+
+    for name, url, ok_codes in smoke_endpoints:
         last_err = ""
         passed = False
         for attempt in range(_retries):
@@ -1409,14 +1467,15 @@ def _smoke_test_services(retries=None):
                     last_err = f"HTTP {code}"
             except Exception as exc:
                 last_err = str(exc)
-            if attempt < _SMOKE_RETRIES - 1:
+            if attempt < _retries - 1:
                 time.sleep(_SMOKE_RETRY_SLEEP)
         results.append((name, passed, last_err))
 
     # Product catalog: verify at least one product has a non-empty imageUrl
     try:
+        products_url = f"{frontend_url.rstrip('/')}/api/products"
         req = urllib.request.Request(
-            "http://frontend.shopping-cart.local/api/products",
+            products_url,
             headers={"User-Agent": "k3dm-smoketest/1"},
         )
         with urllib.request.urlopen(req, timeout=8) as resp:
@@ -1481,14 +1540,14 @@ def _smoke_test_services(retries=None):
         except Exception as _exc:
             results.append(("ESO ExternalSecrets", False, str(_exc)[:200]))
 
-    # Data-layer StatefulSet readiness (ubuntu-k3s) — uses posix_spawn, safe after NEF load
+    # Data-layer StatefulSet readiness for the active app cluster — uses posix_spawn, safe after NEF load
     _dl_names = ["postgresql-orders", "postgresql-payment", "postgresql-products", "minio"]
     _dl_ready = 0
     _dl_not_ready = []
     for _ss in _dl_names:
         _dl_out, _dl_timeout = _posix_spawn_capture(
             ["kubectl", "get", "statefulset", _ss,
-             "-n", "shopping-cart-data", "--context", "ubuntu-k3s",
+             "-n", "shopping-cart-data", "--context", app_context,
              "-o", "jsonpath={.status.readyReplicas}",
              "--request-timeout=5s"],
             timeout=8,
@@ -1548,7 +1607,7 @@ def _run_post_provision_check(job_id, provider):
         else:
             lines.append(f"⚠️ Degraded: {', '.join(f'`{a}`' for a in degraded)}")
 
-    smoke = _smoke_test_services()
+    smoke = _smoke_test_services(provider=provider)
     for svc_name, ok, detail in smoke:
         icon = "✅" if ok else "❌"
         lines.append(f"*{svc_name}:* {icon} {detail}")
@@ -1570,8 +1629,9 @@ def _run_post_provision_check(job_id, provider):
             if not desc_timeout and desc_out.strip():
                 diag_parts.append(f"ArgoCD Application:\n{desc_out[-2000:]}")
 
+            app_context = _provider_context(provider)
             pods_out, pods_timeout = _posix_spawn_capture(
-                ["kubectl", "get", "pods", "-A", "--context", "ubuntu-k3s",
+                ["kubectl", "get", "pods", "-A", "--context", app_context,
                  "--no-headers", "--request-timeout=8s",
                  "--field-selector=status.phase!=Running"],
                 timeout=15,
@@ -1600,23 +1660,23 @@ def _run_post_provision_check(job_id, provider):
     for svc_name, err_detail in failed_smoke[:3]:  # cap at 3
         diag_parts = [f"Service `{svc_name}` failed smoke test: {err_detail}"]
 
-        # Gather relevant pod state from ubuntu-k3s
+        # Gather relevant pod state from the active app cluster
         ns_map = {
-            "Frontend":       ("shopping-cart-apps", "app=frontend"),
+            "Frontend": ("shopping-cart-apps", "app=frontend"),
             "Product images": ("shopping-cart-apps", "app=product-catalog"),
-            "Keycloak":       ("identity",            "app.kubernetes.io/name=keycloak"),
-            "Prometheus":     ("monitoring",          "app.kubernetes.io/name=prometheus"),
-            "Grafana":        ("monitoring",          "app.kubernetes.io/name=grafana"),
-            "Pushgateway":    ("monitoring",          "app.kubernetes.io/name=prometheus-pushgateway"),
-            "ArgoCD":         ("cicd",                "app.kubernetes.io/name=argocd-server"),
-            "ESO ClusterSecretStore":("secrets",      "app.kubernetes.io/name=external-secrets"),
-            "ESO ExternalSecrets":   ("secrets",      "app.kubernetes.io/name=external-secrets"),
+            "Keycloak": ("identity", "app.kubernetes.io/name=keycloak"),
+            "Prometheus": ("monitoring", "app.kubernetes.io/name=prometheus"),
+            "Grafana": ("monitoring", "app.kubernetes.io/name=grafana"),
+            "Pushgateway": ("monitoring", "app.kubernetes.io/name=prometheus-pushgateway"),
+            "ArgoCD": ("cicd", "app.kubernetes.io/name=argocd-server"),
+            "ESO ClusterSecretStore": ("secrets", "app.kubernetes.io/name=external-secrets"),
+            "ESO ExternalSecrets": ("secrets", "app.kubernetes.io/name=external-secrets"),
         }
         ns, label_sel = ns_map.get(svc_name, ("shopping-cart-apps", ""))
         if label_sel:
             pod_state_out, pod_state_timeout = _posix_spawn_capture(
                 ["kubectl", "get", "pods", "-n", ns, "-l", label_sel,
-                 "--context", "ubuntu-k3s", "--no-headers",
+                 "--context", app_context, "--no-headers",
                  "--request-timeout=8s"],
                 timeout=15,
             )
@@ -1625,7 +1685,7 @@ def _run_post_provision_check(job_id, provider):
 
             pod_logs_out, pod_logs_timeout = _posix_spawn_capture(
                 ["kubectl", "logs", "-n", ns, "-l", label_sel,
-                 "--context", "ubuntu-k3s", "--tail=30",
+                 "--context", app_context, "--tail=30",
                  "--request-timeout=8s"],
                 timeout=15,
             )
@@ -1648,7 +1708,7 @@ def _run_post_provision_check(job_id, provider):
         _notify_job(job_id, f"🔍 *{svc_name} smoke failure* — {analysis}")
 
 
-def _run_cluster_status(job_id, response_url, thread_ts=None):
+def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
     """Check ACG cluster reachability + ArgoCD app health; post result to response_url or thread."""
     job_dir = JOB_DIR / job_id
     if thread_ts:
@@ -1685,6 +1745,8 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
 
     try:
         (job_dir / "status").write_text("running")
+        provider = _resolve_provider(provider)
+        app_context = _provider_context(provider)
 
         active = _running_cluster_job()
         if active:
@@ -1718,24 +1780,24 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
             tunnel_ok = False
         _log(f"*SSH tunnel (6443):* {'UP ✅' if tunnel_ok else 'DOWN ❌'}")
 
-        # ACG app cluster
+        # App cluster
         nodes_out, nodes_timeout = _posix_spawn_capture(
-            ["kubectl", "get", "nodes", "--context", "ubuntu-k3s",
+            ["kubectl", "get", "nodes", "--context", app_context,
              "--request-timeout=8s", "--no-headers"],
             timeout=15,
         )
         acg_reachable = not nodes_timeout and nodes_out.strip() and not nodes_out.lstrip().startswith("Error")
         if not acg_reachable:
-            _log("\n❌ *ACG cluster unreachable* — cluster may be rebuilding or sandbox may have expired.")
+            _log(f"\n❌ *{provider} cluster unreachable* — cluster may be rebuilding or unavailable.")
         else:
             node_lines = [l for l in nodes_out.strip().splitlines() if l]
             ready_count = sum(1 for l in node_lines if "Ready" in l and "NotReady" not in l)
             total_count = len(node_lines)
 
-            header = f"\n✅ *ACG cluster* — {ready_count}/{total_count} nodes ready"
+            header = f"\n✅ *{provider} cluster* — {ready_count}/{total_count} nodes ready"
             acg_state_out, _ = _posix_spawn_capture(
                 ["kubectl", "get", "configmap", "acg-state", "-n", "platform-ops",
-                 "--context", "ubuntu-k3s", "--request-timeout=5s",
+                 "--context", app_context, "--request-timeout=5s",
                  "-o", "jsonpath={.data.provisioned-at} {.data.provider}"],
                 timeout=10,
             )
@@ -1750,9 +1812,9 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
             _log(header)
             _log(f"```{nodes_out.strip()}```")
 
-            # ACG pods (all namespaces, standard output)
+            # App pods (all namespaces, standard output)
             pods_out, pods_timeout = _posix_spawn_capture(
-                ["kubectl", "get", "pods", "-A", "--context", "ubuntu-k3s",
+                ["kubectl", "get", "pods", "-A", "--context", app_context,
                  "--no-headers", "--request-timeout=10s"],
                 timeout=20,
             )
@@ -1763,7 +1825,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
                 if app_pods:
                     not_ready = [l for l in app_pods if not _pod_is_ready(l)]
                     ready_count_pods = len(app_pods) - len(not_ready)
-                    _log(f"\n*Pods (ACG)* — {ready_count_pods}/{len(app_pods)} ready")
+                    _log(f"\n*Pods* — {ready_count_pods}/{len(app_pods)} ready")
                     if not_ready:
                         shown = not_ready[:10]
                         snippet = "\n".join(
@@ -1774,7 +1836,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
                         if len(not_ready) > 10:
                             _log(f"_…and {len(not_ready) - 10} more not-ready pods_")
                 else:
-                    _log("\n*Pods (ACG)* — no app pods deployed yet")
+                    _log("\n*Pods* — no app pods deployed yet")
             else:
                 _log("\n_Pod status unavailable_")
 
@@ -1814,7 +1876,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
             _log("\n*AWS:* ❌ credentials invalid or expired — run `/cluster-refresh`")
 
         # Service smoke test (1 retry — fast path for on-demand status)
-        smoke = _smoke_test_services(retries=1)
+        smoke = _smoke_test_services(retries=1, provider=provider)
         all_smoke_ok = all(ok for _, ok, _ in smoke)
         _log(f"\n*Service smoke test:*{'  all clear ✅' if all_smoke_ok else ''}")
         for svc_name, ok, detail in smoke:
@@ -1841,7 +1903,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None):
             if label_sel:
                 pod_state_out, pod_state_timeout = _posix_spawn_capture(
                     ["kubectl", "get", "pods", "-n", ns, "-l", label_sel,
-                     "--context", "ubuntu-k3s", "--no-headers", "--request-timeout=8s"],
+                     "--context", app_context, "--no-headers", "--request-timeout=8s"],
                     timeout=15,
                 )
                 if not pod_state_timeout and pod_state_out.strip():
@@ -2633,7 +2695,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             threading.Thread(
                 target=_run_hostinger_status if provider == "hostinger" else _run_cluster_status,
                 args=(job_id, response_url),
-                kwargs={"thread_ts": thread_ts},
+                kwargs={"thread_ts": thread_ts, "provider": provider},
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
@@ -2739,6 +2801,14 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             return
         if self.path == "/api/v1/health":
             services = _smoke_test_services(retries=1)
+            result = [{"name": n, "ok": ok, "detail": d} for n, ok, d in services]
+            self._json(200, {"services": result, "all_ok": all(r["ok"] for r in result)})
+            return
+        if self.path.startswith("/api/v1/health?"):
+            parsed = urllib.parse.urlsplit(self.path)
+            params = urllib.parse.parse_qs(parsed.query)
+            provider = params.get("provider", [None])[0]
+            services = _smoke_test_services(retries=1, provider=provider)
             result = [{"name": n, "ok": ok, "detail": d} for n, ok, d in services]
             self._json(200, {"services": result, "all_ok": all(r["ok"] for r in result)})
             return

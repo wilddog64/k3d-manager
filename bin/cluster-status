@@ -98,7 +98,7 @@ _WEBHOOK_PORT="${K3DM_WEBHOOK_PORT:-7443}"
 if [[ -n "${_WEBHOOK_TOKEN}" ]]; then
   _health_json=$(curl -sf --max-time 90 \
     -H "Authorization: Bearer ${_WEBHOOK_TOKEN}" \
-    "http://localhost:${_WEBHOOK_PORT}/api/v1/health" 2>/dev/null || true)
+    "http://localhost:${_WEBHOOK_PORT}/api/v1/health?provider=${CLUSTER_PROVIDER}" 2>/dev/null || true)
   if [[ -n "${_health_json}" ]]; then
     echo "${_health_json}" | python3 -c "
 import sys, json

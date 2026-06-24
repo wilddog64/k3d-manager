@@ -84,7 +84,7 @@ function _acg_normalize_provider() {
         az|azure|k3s-az)             printf 'k3s-az\n' ;;
         gcp|k3s-gcp)                 printf 'k3s-gcp\n' ;;
         oci|k3s-oci)                 printf 'k3s-oci\n' ;;
-        hostinger|k3s-hostinger)     printf 'k3s-hostinger\n' ;;
+        hostinger|hostiger|k3s-hostinger|k3s-hostiger) printf 'k3s-hostinger\n' ;;
         *)                           printf '%s\n' "${1:-}" ;;
     esac
 }
