@@ -33,7 +33,59 @@ teardown_file() {
   [[ "$(_acg_provider_context k3s-aws)" == "ubuntu-k3s" ]]
   [[ "$(_acg_provider_context k3s-az)" == "ubuntu-azure" ]]
   [[ "$(_acg_provider_context k3s-gcp)" == "ubuntu-gcp" ]]
+  [[ "$(_acg_provider_context k3s-hostinger)" == "ubuntu-hostinger" ]]
   [[ "$(_acg_provider_context foo)" == "ubuntu-k3s" ]]
+}
+
+@test "_acg_resolve_provider prefers Hostinger when both providers are reachable" {
+  _ACG_ACTIVE_PROVIDER_FILE="${BATS_TEST_TMPDIR}/active-provider"
+  rm -f "${_ACG_ACTIVE_PROVIDER_FILE}"
+
+  kubectl() {
+    case "$*" in
+      --context\ ubuntu-hostinger\ --request-timeout=5s\ get\ --raw=/readyz*) return 0 ;;
+      --context\ ubuntu-k3s\ --request-timeout=5s\ get\ --raw=/readyz*) return 0 ;;
+      --context\ ubuntu-azure\ --request-timeout=5s\ get\ --raw=/readyz*) return 1 ;;
+      --context\ ubuntu-gcp\ --request-timeout=5s\ get\ --raw=/readyz*) return 1 ;;
+      *) return 1 ;;
+    esac
+  }
+
+  [[ "$(_acg_resolve_provider)" == "k3s-hostinger" ]]
+}
+
+@test "_acg_resolve_provider ignores a stale active-provider file" {
+  _ACG_ACTIVE_PROVIDER_FILE="${BATS_TEST_TMPDIR}/active-provider"
+  printf '%s\n' "k3s-hostinger" > "${_ACG_ACTIVE_PROVIDER_FILE}"
+
+  kubectl() {
+    case "$*" in
+      --context\ ubuntu-hostinger\ --request-timeout=5s\ get\ --raw=/readyz*) return 1 ;;
+      --context\ ubuntu-k3s\ --request-timeout=5s\ get\ --raw=/readyz*) return 0 ;;
+      --context\ ubuntu-azure\ --request-timeout=5s\ get\ --raw=/readyz*) return 1 ;;
+      --context\ ubuntu-gcp\ --request-timeout=5s\ get\ --raw=/readyz*) return 1 ;;
+      *) return 1 ;;
+    esac
+  }
+
+  [[ "$(_acg_resolve_provider)" == "k3s-aws" ]]
+}
+
+@test "_acg_resolve_provider honors a live Hostinger active-provider file" {
+  _ACG_ACTIVE_PROVIDER_FILE="${BATS_TEST_TMPDIR}/active-provider"
+  printf '%s\n' "k3s-hostinger" > "${_ACG_ACTIVE_PROVIDER_FILE}"
+
+  kubectl() {
+    case "$*" in
+      --context\ ubuntu-hostinger\ --request-timeout=5s\ get\ --raw=/readyz*) return 0 ;;
+      --context\ ubuntu-k3s\ --request-timeout=5s\ get\ --raw=/readyz*) return 0 ;;
+      --context\ ubuntu-azure\ --request-timeout=5s\ get\ --raw=/readyz*) return 1 ;;
+      --context\ ubuntu-gcp\ --request-timeout=5s\ get\ --raw=/readyz*) return 1 ;;
+      *) return 1 ;;
+    esac
+  }
+
+  [[ "$(_acg_resolve_provider)" == "k3s-hostinger" ]]
 }
 
 @test "_provider_k3d_exec is defined" {

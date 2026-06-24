@@ -264,6 +264,7 @@ HELP
 
   _info "[k3s-hostinger] Registering cluster with hub ArgoCD..."
   _hostinger_register_cluster || return 1
+  _acg_record_provider "k3s-hostinger"
 
   _info "[k3s-hostinger] Cluster ready."
   _info "[k3s-hostinger] Verify: kubectl --context ${_HOSTINGER_KUBE_CONTEXT} get nodes"
@@ -310,6 +311,7 @@ HELP
   fi
 
   rm -f "${_HOSTINGER_KUBECONFIG}"
+  rm -f "${_ACG_ACTIVE_PROVIDER_FILE}"
   _info "[k3s-hostinger] k3s uninstalled; VPS preserved."
 }
 
@@ -324,6 +326,7 @@ function _provider_k3s_hostinger_refresh_cluster() {
   _hostinger_register_cluster || return 1
   _hostinger_refresh_access_layer || return 1
   if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" get --raw='/healthz' >/dev/null 2>&1; then
+    _acg_record_provider "k3s-hostinger"
     _info "[k3s-hostinger] Refresh complete — ${_HOSTINGER_KUBE_CONTEXT} reachable"
     printf '%s\n' "__WEBHOOK_SUCCESS__"
   else
