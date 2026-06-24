@@ -158,6 +158,56 @@ function _hostinger_deregister_cluster() {
   _info "[k3s-hostinger] Deregistered ${secret_name} from hub ArgoCD"
 }
 
+function _hostinger_restart_launchd() {
+  local label="$1" plist="$2" domain="${3:-user}"
+
+  [[ -f "${plist}" ]] || return 0
+
+  if [[ "${domain}" == "system" ]]; then
+    _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${plist}" >/dev/null 2>&1 || true
+    _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${plist}" >/dev/null 2>&1 \
+      && _info "[k3s-hostinger] launchd ${label}: restarted" \
+      || _warn "[k3s-hostinger] launchd ${label}: restart failed"
+  else
+    launchctl bootout "gui/$(id -u)" "${plist}" >/dev/null 2>&1 || true
+    launchctl bootstrap "gui/$(id -u)" "${plist}" >/dev/null 2>&1 \
+      && _info "[k3s-hostinger] launchd ${label}: restarted" \
+      || _warn "[k3s-hostinger] launchd ${label}: restart failed"
+  fi
+}
+
+function _hostinger_refresh_access_layer() {
+  if [[ "$(uname)" != "Darwin" ]]; then
+    return 0
+  fi
+
+  _info "[k3s-hostinger] Refreshing local access layer listeners..."
+  _hostinger_restart_launchd \
+    "com.k3d-manager.cloudflare-tunnel" \
+    "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" \
+    user
+  _hostinger_restart_launchd \
+    "com.k3d-manager.argocd-browser-https" \
+    "/Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist" \
+    system
+  _hostinger_restart_launchd \
+    "com.k3d-manager.keycloak-browser-http" \
+    "/Library/LaunchDaemons/com.k3d-manager.keycloak-browser-http.plist" \
+    system
+  _hostinger_restart_launchd \
+    "com.k3d-manager.frontend-browser-http" \
+    "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
+    system
+  _hostinger_restart_launchd \
+    "com.k3d-manager.grafana-port-forward" \
+    "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist" \
+    user
+  _hostinger_restart_launchd \
+    "com.k3d-manager.pushgateway-port-forward" \
+    "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist" \
+    user
+}
+
 function _provider_k3s_hostinger_deploy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
@@ -272,6 +322,7 @@ function _provider_k3s_hostinger_refresh_cluster() {
   _info "[k3s-hostinger] Refreshing ${_HOSTINGER_KUBE_CONTEXT} kubeconfig + ArgoCD registration…"
   _hostinger_merge_kubeconfig || return 1
   _hostinger_register_cluster || return 1
+  _hostinger_refresh_access_layer || return 1
   if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" get --raw='/healthz' >/dev/null 2>&1; then
     _info "[k3s-hostinger] Refresh complete — ${_HOSTINGER_KUBE_CONTEXT} reachable"
     printf '%s\n' "__WEBHOOK_SUCCESS__"

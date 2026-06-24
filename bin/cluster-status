@@ -73,8 +73,27 @@ fi
 
 echo ""
 echo "=== ArgoCD Apps ==="
-kubectl get applications.argoproj.io -A --context "${INFRA_CONTEXT}" 2>/dev/null \
-  || echo "Cannot reach Hub cluster or ArgoCD CRDs not installed"
+_apps_raw="$(kubectl get applications.argoproj.io -A --context "${INFRA_CONTEXT}" 2>/dev/null || true)"
+if [[ -z "${_apps_raw}" ]]; then
+  echo "Cannot reach Hub cluster or ArgoCD CRDs not installed"
+else
+  _apps_body="$(printf '%s\n' "${_apps_raw}" | sed '1d')"
+  _core_apps="$(printf '%s\n' "${_apps_body}" | awk '$2 !~ /-preflight-/')"
+  _preflight_apps="$(printf '%s\n' "${_apps_body}" | awk '$2 ~ /-preflight-/')"
+
+  if [[ -n "${_core_apps}" ]]; then
+    printf '%s\n' "${_apps_raw}" | awk 'NR==1 || $2 !~ /-preflight-/'
+  else
+    echo "(no core ArgoCD apps)"
+  fi
+
+  if [[ -n "${_preflight_apps}" ]]; then
+    echo ""
+    echo "=== ArgoCD Preflight Apps ==="
+    echo "(shown separately so vCluster/preflight drift does not look like Hostinger app-cluster failure)"
+    printf '%s\n' "${_apps_raw}" | awk 'NR==1 || $2 ~ /-preflight-/'
+  fi
+fi
 
 echo ""
 echo "=== ArgoCD ApplicationSets ==="
