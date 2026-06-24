@@ -44,7 +44,40 @@ _cleanup() {
 }
 trap _cleanup EXIT INT TERM HUP
 
+_port_in_use() {
+   if command -v lsof >/dev/null 2>&1; then
+      lsof -nP -iTCP:"${LOCAL_PORT}" -sTCP:LISTEN >/dev/null 2>&1
+      return $?
+   fi
+
+   return 1
+}
+
+_clear_stale_listeners() {
+   local _listener_pids=()
+
+   if command -v lsof >/dev/null 2>&1; then
+      while IFS= read -r _listener_pid; do
+         [[ -n "${_listener_pid}" ]] && _listener_pids+=("${_listener_pid}")
+      done < <(lsof -nP -iTCP:"${LOCAL_PORT}" -sTCP:LISTEN -t 2>/dev/null | sort -u)
+   fi
+
+   if ((${#_listener_pids[@]} == 0)); then
+      return 0
+   fi
+
+   printf '%s\n' "[argocd-pf] port ${LOCAL_PORT} still in use — clearing stale listener(s) before retry" >> "${LOG_FILE}"
+   kill "${_listener_pids[@]}" 2>/dev/null || true
+   for (( _attempt=1; _attempt<=5; _attempt++ )); do
+      if ! _port_in_use; then
+         break
+      fi
+      sleep 1
+   done
+}
+
 while true; do
+   _clear_stale_listeners
    printf '%s\n' "[argocd-pf] starting port-forward: ${SERVICE} -> localhost:${LOCAL_PORT}" >> "${LOG_FILE}"
    if [[ -n "${_kubectl_context_arg}" ]]; then
       # shellcheck disable=SC2086
@@ -74,6 +107,7 @@ while true; do
          fi
          wait "${_pf_pid}" 2>/dev/null || true
          _pf_pid=""
+         _clear_stale_listeners
          sleep 2
          continue
          ;;
@@ -84,12 +118,13 @@ while true; do
       "${CURL_BIN}" -sf --max-time 1 "${HEALTHZ_URL}" >/dev/null 2>&1 || {
          printf '%s\n' "[argocd-pf] healthz lost — restarting" >> "${LOG_FILE}"
          kill "${_pf_pid}" 2>/dev/null || true
+         wait "${_pf_pid}" 2>/dev/null || true
+         _pf_pid=""
+         _clear_stale_listeners
          break
       }
       sleep 5
    done
 
-   wait "${_pf_pid}" 2>/dev/null || true
-   _pf_pid=""
    sleep 2
 done

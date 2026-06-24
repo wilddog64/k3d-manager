@@ -9,6 +9,7 @@ source "${SCRIPT_DIR}/plugins/shopping_cart.sh"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/etc/hostinger/vars.sh"
 
+_ACG_STATE_DIR="${_ACG_STATE_DIR:-${HOME}/.local/share/k3d-manager}"
 _HOSTINGER_SSH_USER="${HOSTINGER_SSH_USER:-ubuntu}"
 _HOSTINGER_SSH_KEY="${HOSTINGER_SSH_KEY:-${HOME}/.ssh/hostinger}"
 _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
@@ -176,6 +177,53 @@ function _hostinger_restart_launchd() {
   fi
 }
 
+function _hostinger_write_argocd_port_forward_wrapper() {
+  local wrapper_path="$1" log_file="$2" template_path="${SCRIPT_DIR}/etc/argocd/port-forward-wrapper.sh.tmpl"
+
+  if [[ ! -r "${template_path}" ]]; then
+    _warn "[k3s-hostinger] ArgoCD port-forward template missing — leaving wrapper untouched"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "${wrapper_path}")"
+  KUBECTL_BIN="$(command -v kubectl)" \
+  CURL_BIN="$(command -v curl)" \
+  LOG_FILE="${log_file}" \
+  KUBECONFIG_FILE="" \
+  NAMESPACE="cicd" \
+  CONTEXT="k3d-k3d-cluster" \
+  SERVICE="svc/argocd-server" \
+  LOCAL_PORT="8080" \
+  REMOTE_PORT="80" \
+  HEALTHZ_URL="http://localhost:8080/healthz" \
+  STARTUP_TIMEOUT="30" \
+    envsubst '$KUBECTL_BIN $CURL_BIN $LOG_FILE $KUBECONFIG_FILE $NAMESPACE $CONTEXT $SERVICE $LOCAL_PORT $REMOTE_PORT $HEALTHZ_URL $STARTUP_TIMEOUT' \
+      < "${template_path}" > "${wrapper_path}"
+  chmod 700 "${wrapper_path}"
+}
+
+function _hostinger_clear_port_listeners() {
+  local port="$1" label="$2"
+  local _listener_pids=()
+
+  if command -v lsof >/dev/null 2>&1; then
+    mapfile -t _listener_pids < <(lsof -nP -iTCP:"${port}" -sTCP:LISTEN -t 2>/dev/null | sort -u)
+  fi
+
+  if ((${#_listener_pids[@]} == 0)); then
+    return 0
+  fi
+
+  _info "[k3s-hostinger] Port ${port} is in use — killing stale ${label} listener(s)..."
+  kill "${_listener_pids[@]}" 2>/dev/null || true
+  for _i in $(seq 1 5); do
+    if ! command -v lsof >/dev/null 2>&1 || ! lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1; then
+      break
+    fi
+    sleep 1
+  done
+}
+
 function _hostinger_refresh_access_layer() {
   if [[ "$(uname)" != "Darwin" ]]; then
     return 0
@@ -213,6 +261,8 @@ function _hostinger_refresh_access_layer() {
 </plist>
 PLIST
   fi
+  _hostinger_write_argocd_port_forward_wrapper "${_argocd_pf_wrapper}" "${_argocd_pf_log}"
+  _hostinger_clear_port_listeners 8080 "ArgoCD port-forward"
   _hostinger_restart_launchd \
     "${_argocd_pf_label}" \
     "${_argocd_pf_plist}" \

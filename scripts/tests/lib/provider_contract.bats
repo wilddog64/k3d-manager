@@ -113,6 +113,17 @@ teardown_file() {
   chmod +x "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   : > "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist"
 
+  lsof() {
+    case "$*" in
+      *"-iTCP:8080"*) printf '%s\n' "41517" ;;
+      *) return 1 ;;
+    esac
+  }
+
+  kill() {
+    printf '%s\n' "kill $*" >> "${BATS_TEST_TMPDIR}/restart.log"
+  }
+
   uname() {
     printf '%s\n' Darwin
   }
@@ -127,8 +138,12 @@ teardown_file() {
   }
   _hostinger_refresh_access_layer
 
+  run grep -F 'port 8080 still in use — clearing stale listener(s) before retry' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  [ "$status" -eq 0 ]
+
   run cat "${BATS_TEST_TMPDIR}/restart.log"
   [ "$status" -eq 0 ]
+  [[ "${output}" == *"kill 41517"* ]]
   [[ "${output}" == *"com.k3d-manager.argocd-port-forward"* ]]
   [[ "${output}" == *"com.k3d-manager.cloudflare-tunnel"* ]]
   [[ "${output}" == *"com.k3d-manager.argocd-browser-https"* ]]
