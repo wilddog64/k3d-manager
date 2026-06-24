@@ -4,8 +4,8 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 
-const CDP_HOST = '127.0.0.1';
-const CDP_PORT = '9222';
+const CDP_HOST = process.env.PLAYWRIGHT_CDP_HOST || '127.0.0.1';
+const CDP_PORT = process.env.PLAYWRIGHT_CDP_PORT || '9222';
 const CDP_URL = `http://${CDP_HOST}:${CDP_PORT}`;
 
 /**
@@ -91,6 +91,13 @@ async function _isExtendYourSessionVisible(page) {
 function _startExtendDialogWatcher(page) {
   const _poll = async () => { while (true) { await _dismissExtendYourSessionDialog(page); await page.waitForTimeout(2000); } };
   _poll().catch(() => {});
+}
+
+async function _robustClick(locator) {
+  await locator.evaluate(el => {
+    el.scrollIntoView({ block: 'center', inline: 'center' });
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+  });
 }
 
 async function _findScopedButton(page, buttonText, providerLabel, timeoutMs) {
@@ -274,8 +281,7 @@ async function restartSandbox() {
     ) {
       console.error('INFO: Sandbox already deleted — Start Sandbox visible, skipping delete flow.');
       console.error('INFO: Clicking Start Sandbox...');
-      await _startBtnEarly.scrollIntoViewIfNeeded().catch(() => {});
-      await _startBtnEarly.click({ force: true });
+      await _robustClick(_startBtnEarly);
       await page.waitForTimeout(3000);
       await _dismissExtendYourSessionDialog(page);
       console.error('INFO: Sandbox restarted. Ready for credential extraction.');
@@ -332,8 +338,7 @@ async function restartSandbox() {
       }
       if (_sandboxNotYetStarted) {
         console.error('INFO: Sandbox panel open but not yet provisioned — clicking Start Sandbox directly...');
-        await _startBtnPanelScoped.scrollIntoViewIfNeeded().catch(() => {});
-        await _startBtnPanelScoped.click({ force: true });
+        await _robustClick(_startBtnPanelScoped);
         await page.waitForTimeout(3000);
         await _dismissExtendYourSessionDialog(page);
         console.error('INFO: Sandbox started. Ready for credential extraction.');
@@ -440,7 +445,7 @@ async function restartSandbox() {
       throw new Error(`Start Sandbox button did not appear after deletion. Buttons visible: ${JSON.stringify(_btns)}`);
     }
     console.error('INFO: Clicking Start Sandbox...');
-    await startBtn.click({ force: true });
+    await _robustClick(startBtn);
 
     // Dismiss "Extend Your Session" dialog if it appears after starting
     await page.waitForTimeout(3000);

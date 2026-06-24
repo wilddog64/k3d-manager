@@ -24,6 +24,7 @@ function _outputCredentials(data) {
 
   if (credsFile) {
     fs.writeFileSync(credsFile, output, { mode: 0o600 });
+    fs.chmodSync(credsFile, 0o600);
     console.error(`INFO: Credentials scrubbed to secure file: ${credsFile}`);
   } else {
     process.stdout.write(output + '\n');

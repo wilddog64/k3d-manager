@@ -15,6 +15,10 @@ const path = require('path');
 
 const AUTH_DIR = path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'profile');
 
+const CDP_HOST = process.env.PLAYWRIGHT_CDP_HOST || '127.0.0.1';
+const CDP_PORT = process.env.PLAYWRIGHT_CDP_PORT || '9222';
+const CDP_URL = `http://${CDP_HOST}:${CDP_PORT}`;
+
 function _isFirstRun() {
   try {
     return !fs.existsSync(AUTH_DIR) || fs.readdirSync(AUTH_DIR).length === 0;
@@ -96,7 +100,7 @@ async function extendSandbox() {
   try {
     // Try to connect via CDP first to catch already-open modals
     try {
-      _cdpBrowser = await chromium.connectOverCDP('http://localhost:9222');
+      _cdpBrowser = await chromium.connectOverCDP(CDP_URL);
       const _cdpContexts = _cdpBrowser.contexts();
       if (_cdpContexts.length > 0) {
         browserContext = _cdpContexts[0];
