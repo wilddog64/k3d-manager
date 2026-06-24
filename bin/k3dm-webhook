@@ -1258,7 +1258,9 @@ def _init_k8s_ctx():
 _JOB_RETENTION_SECS = 7 * 24 * 3600  # keep completed/failed jobs for 7 days
 
 def _clear_stale_jobs():
-    """On startup: orphan running jobs; purge terminal jobs older than retention."""
+    """On startup: orphan recently-running jobs (mtime within _MAX_JOB_AGE_SECS) with a
+    Slack notice; clear phantom older running jobs quietly (no alarm); purge terminal jobs
+    older than retention."""
     if not JOB_DIR.exists():
         return
     now = time.time()
@@ -1269,7 +1271,12 @@ def _clear_stale_jobs():
         try:
             status = status_file.read_text().strip() if status_file.exists() else ""
             if status == "running":
+                age = now - entry.stat().st_mtime
                 status_file.write_text("failed")
+                if age > _MAX_JOB_AGE_SECS:
+                    print(f"[k3dm-webhook] cleared phantom running job {entry.name} "
+                          f"(age {int(age)}s > {_MAX_JOB_AGE_SECS}s) — no orphan notice")
+                    continue
                 print(f"[k3dm-webhook] cleared stale job {entry.name}")
                 action_file = entry / "action"
                 action = action_file.read_text().strip() if action_file.exists() else "job"
