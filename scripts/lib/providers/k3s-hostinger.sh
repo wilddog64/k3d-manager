@@ -164,17 +164,93 @@ function _hostinger_restart_launchd() {
 
   [[ -f "${plist}" ]] || return 0
 
+  _hostinger_wait_for_port_free() {
+    local port="$1" timeout="${2:-30}" attempt=0
+    if ! command -v lsof >/dev/null 2>&1; then
+      return 0
+    fi
+    while lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1; do
+      (( ++attempt ))
+      if (( attempt >= timeout )); then
+        _warn "[k3s-hostinger] port ${port} still busy after ${timeout}s — continuing with launchd restart"
+        return 0
+      fi
+      sleep 1
+    done
+  }
+
   if [[ "${domain}" == "system" ]]; then
     _run_command --interactive-sudo --quiet --soft -- launchctl bootout system "${plist}" >/dev/null 2>&1 || true
+    if [[ "${label}" == "com.k3d-manager.argocd-port-forward" ]]; then
+      _hostinger_wait_for_port_free 8080 30
+    fi
     _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${plist}" >/dev/null 2>&1 \
       && _info "[k3s-hostinger] launchd ${label}: restarted" \
       || _warn "[k3s-hostinger] launchd ${label}: restart failed"
   else
     launchctl bootout "gui/$(id -u)" "${plist}" >/dev/null 2>&1 || true
+    if [[ "${label}" == "com.k3d-manager.argocd-port-forward" ]]; then
+      _hostinger_wait_for_port_free 8080 30
+    fi
     launchctl bootstrap "gui/$(id -u)" "${plist}" >/dev/null 2>&1 \
       && _info "[k3s-hostinger] launchd ${label}: restarted" \
       || _warn "[k3s-hostinger] launchd ${label}: restart failed"
   fi
+}
+
+function _hostinger_write_cloudflared_plist() {
+  local plist="$1" log_file="$2" config_file="$3" cloudflared_bin="$4"
+
+  mkdir -p "$(dirname "${plist}")"
+  cat > "${plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.k3d-manager.cloudflare-tunnel</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${cloudflared_bin}</string>
+    <string>tunnel</string>
+    <string>--config</string>
+    <string>${config_file}</string>
+    <string>run</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${log_file}</string>
+  <key>StandardErrorPath</key>
+  <string>${log_file}</string>
+</dict>
+</plist>
+PLIST
+}
+
+function _hostinger_restart_cloudflared() {
+  local plist="${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist"
+  local log_file="${_ACG_STATE_DIR}/logs/cloudflare-tunnel.log"
+  local config_file="${HOME}/.cloudflared/config.yml"
+  local cloudflared_bin
+
+  if [[ ! -f "${config_file}" ]]; then
+    _warn "[k3s-hostinger] ${config_file} missing — skipping cloudflared restart"
+    return 0
+  fi
+
+  if command -v brew >/dev/null 2>&1; then
+    if [[ "$(brew services list 2>/dev/null | awk '$1 == "cloudflared" { print $2; exit }')" != "" ]]; then
+      _info "[k3s-hostinger] Homebrew cloudflared service detected — stopping before loading repo-managed tunnel..."
+      brew services stop cloudflared >/dev/null 2>&1 || true
+    fi
+  fi
+
+  cloudflared_bin="$(command -v cloudflared 2>/dev/null || printf '%s' cloudflared)"
+  _hostinger_write_cloudflared_plist "${plist}" "${log_file}" "${config_file}" "${cloudflared_bin}"
+  _hostinger_restart_launchd "com.k3d-manager.cloudflare-tunnel" "${plist}" user
 }
 
 function _hostinger_write_argocd_port_forward_wrapper() {
@@ -270,12 +346,28 @@ function _hostinger_clear_port_listeners() {
 
   _info "[k3s-hostinger] Port ${port} is in use — killing stale ${label} listener(s)..."
   kill "${_listener_pids[@]}" 2>/dev/null || true
-  for _i in $(seq 1 5); do
+  for _i in $(seq 1 30); do
     if ! command -v lsof >/dev/null 2>&1 || ! lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1; then
       break
     fi
     sleep 1
   done
+  if command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1; then
+    _listener_pids=()
+    while IFS= read -r _pid; do
+      [[ -n "${_pid}" ]] && _listener_pids+=("${_pid}")
+    done < <(lsof -nP -iTCP:"${port}" -sTCP:LISTEN -t 2>/dev/null | sort -u)
+    if ((${#_listener_pids[@]} > 0)); then
+      _warn "[k3s-hostinger] Port ${port} still busy after graceful stop — force killing ${label} listener(s)..."
+      kill -9 "${_listener_pids[@]}" 2>/dev/null || true
+      for _i in $(seq 1 5); do
+        if ! lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1; then
+          break
+        fi
+        sleep 1
+      done
+    fi
+  fi
 }
 
 function _hostinger_refresh_access_layer() {
@@ -331,10 +423,7 @@ PLIST
     "${_argocd_pf_label}" \
     "${_argocd_pf_plist}" \
     user
-  _hostinger_restart_launchd \
-    "com.k3d-manager.cloudflare-tunnel" \
-    "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist" \
-    user
+  _hostinger_restart_cloudflared
   _hostinger_restart_launchd \
     "com.k3d-manager.argocd-browser-https" \
     "/Library/LaunchDaemons/com.k3d-manager.argocd-browser-https.plist" \

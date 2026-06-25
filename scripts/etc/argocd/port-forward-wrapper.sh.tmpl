@@ -12,6 +12,7 @@ LOCAL_PORT=${LOCAL_PORT}
 REMOTE_PORT=${REMOTE_PORT}
 HEALTHZ_URL=${HEALTHZ_URL}
 STARTUP_TIMEOUT=${STARTUP_TIMEOUT}
+LOCK_DIR="${LOG_FILE}.lock"
 
 if [[ -n "${KUBECONFIG_FILE}" ]]; then
    export KUBECONFIG="${KUBECONFIG_FILE}"
@@ -42,7 +43,31 @@ _cleanup() {
          ;;
    esac
 }
-trap _cleanup EXIT INT TERM HUP
+
+_release_lock() {
+   rm -rf "${LOCK_DIR}" 2>/dev/null || true
+}
+
+trap '_cleanup; _release_lock' EXIT INT TERM HUP
+
+_acquire_lock() {
+   local _lock_pid=""
+
+   while ! mkdir "${LOCK_DIR}" 2>/dev/null; do
+      if [[ -f "${LOCK_DIR}/pid" ]]; then
+         _lock_pid="$(cat "${LOCK_DIR}/pid" 2>/dev/null || true)"
+         if [[ -n "${_lock_pid}" ]] && kill -0 "${_lock_pid}" 2>/dev/null; then
+            sleep 2
+            continue
+         fi
+      fi
+      rm -rf "${LOCK_DIR}" 2>/dev/null || true
+   done
+
+   printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+}
+
+_acquire_lock
 
 _port_in_use() {
    if command -v lsof >/dev/null 2>&1; then
@@ -68,7 +93,7 @@ _clear_stale_listeners() {
 
    printf '%s\n' "[argocd-pf] port ${LOCAL_PORT} still in use — clearing stale listener(s) before retry" >> "${LOG_FILE}"
    kill "${_listener_pids[@]}" 2>/dev/null || true
-   for (( _attempt=1; _attempt<=5; _attempt++ )); do
+   for (( _attempt=1; _attempt<=30; _attempt++ )); do
       if ! _port_in_use; then
          break
       fi
@@ -108,7 +133,7 @@ while true; do
          wait "${_pf_pid}" 2>/dev/null || true
          _pf_pid=""
          _clear_stale_listeners
-         sleep 2
+         sleep 30
          continue
          ;;
    esac
@@ -126,5 +151,5 @@ while true; do
       sleep 5
    done
 
-   sleep 2
+   sleep 30
 done

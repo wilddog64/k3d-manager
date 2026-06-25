@@ -108,7 +108,8 @@ teardown_file() {
 @test "_hostinger_refresh_access_layer restarts argocd port-forward before cloudflared" {
   HOME="${BATS_TEST_TMPDIR}"
   _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
-  mkdir -p "${_ACG_STATE_DIR}/bin" "${HOME}/Library/LaunchAgents"
+  mkdir -p "${_ACG_STATE_DIR}/bin" "${HOME}/Library/LaunchAgents" "${HOME}/.cloudflared"
+  : > "${HOME}/.cloudflared/config.yml"
   printf '#!/usr/bin/env bash\nexit 0\n' > "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   chmod +x "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   : > "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist"
@@ -122,6 +123,20 @@ teardown_file() {
 
   kill() {
     printf '%s\n' "kill $*" >> "${BATS_TEST_TMPDIR}/restart.log"
+  }
+
+  brew() {
+    case "$*" in
+      services\ list)
+        printf '%s\n' "cloudflared error 1 cliang ~/Library/LaunchAgents/homebrew.mxcl.cloudflared.plist"
+        ;;
+      services\ stop\ cloudflared)
+        printf '%s\n' "brew $*" >> "${BATS_TEST_TMPDIR}/restart.log"
+        ;;
+      *)
+        return 1
+        ;;
+    esac
   }
 
   uname() {
@@ -140,6 +155,10 @@ teardown_file() {
     :
   }
 
+  _warn() {
+    :
+  }
+
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
   _hostinger_restart_launchd() {
     printf '%s\n' "$1" >> "${BATS_TEST_TMPDIR}/restart.log"
@@ -151,6 +170,18 @@ teardown_file() {
   run test -x "${_ACG_STATE_DIR}/bin/argocd-browser-https.sh"
   [ "$status" -eq 0 ]
   run test -x "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'for (( _attempt=1; _attempt<=30; _attempt++ ))' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'sleep 30' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'LOCK_DIR=' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run grep -F '_acquire_lock' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'tunnel' "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist"
+  [ "$status" -eq 0 ]
+  run grep -F 'services stop cloudflared' "${BATS_TEST_TMPDIR}/restart.log"
   [ "$status" -eq 0 ]
   run grep -F -- '--context "ubuntu-hostinger" port-forward --address=127.0.0.2' "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   [ "$status" -eq 0 ]
