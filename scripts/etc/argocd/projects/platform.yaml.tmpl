@@ -15,6 +15,12 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: secrets
       name: ubuntu-k3s
+    - namespace: secrets
+      name: ubuntu-hostinger
+    - namespace: secrets
+      name: ubuntu-gcp
+    - namespace: secrets
+      name: ubuntu-azure
     - namespace: cicd
       server: https://kubernetes.default.svc
     - namespace: identity
@@ -27,20 +33,56 @@ spec:
       server: https://kubernetes.default.svc
     - namespace: shopping-cart-apps
       name: ubuntu-k3s
+    - namespace: shopping-cart-apps
+      name: ubuntu-hostinger
+    - namespace: shopping-cart-apps
+      name: ubuntu-gcp
+    - namespace: shopping-cart-apps
+      name: ubuntu-azure
     - namespace: shopping-cart-payment
       name: ubuntu-k3s
+    - namespace: shopping-cart-payment
+      name: ubuntu-hostinger
+    - namespace: shopping-cart-payment
+      name: ubuntu-gcp
+    - namespace: shopping-cart-payment
+      name: ubuntu-azure
     - namespace: shopping-cart-data
       name: ubuntu-k3s
+    - namespace: shopping-cart-data
+      name: ubuntu-hostinger
+    - namespace: shopping-cart-data
+      name: ubuntu-gcp
+    - namespace: shopping-cart-data
+      name: ubuntu-azure
     - namespace: cicd
       name: ubuntu-k3s
+    - namespace: cicd
+      name: ubuntu-hostinger
+    - namespace: cicd
+      name: ubuntu-gcp
+    - namespace: cicd
+      name: ubuntu-azure
     - namespace: monitoring
       server: https://kubernetes.default.svc
     - namespace: trivy-system
       server: https://kubernetes.default.svc
     - namespace: monitoring
       name: ubuntu-k3s
+    - namespace: monitoring
+      name: ubuntu-hostinger
+    - namespace: monitoring
+      name: ubuntu-gcp
+    - namespace: monitoring
+      name: ubuntu-azure
     - namespace: trivy-system
       name: ubuntu-k3s
+    - namespace: trivy-system
+      name: ubuntu-hostinger
+    - namespace: trivy-system
+      name: ubuntu-gcp
+    - namespace: trivy-system
+      name: ubuntu-azure
   clusterResourceWhitelist:
     - group: ''
       kind: Namespace

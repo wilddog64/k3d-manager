@@ -105,6 +105,75 @@ teardown_file() {
   [[ "$(_acg_resolve_provider)" == "k3s-hostinger" ]]
 }
 
+@test "_hostinger_register_cluster clears app-cluster role from other ArgoCD cluster secrets" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
+  _HOSTINGER_KUBECONFIG="${BATS_TEST_TMPDIR}/hostinger.config"
+  : > "${_HOSTINGER_KUBECONFIG}"
+  ARGOCD_NAMESPACE="cicd"
+
+  kubectl() {
+    case "$*" in
+      config\ view\ --raw\ -o\ jsonpath=\{.clusters\[\?\(@.name==\"ubuntu-hostinger\"\)\].cluster.server\})
+        printf '%s' 'https://2.25.146.252:6443'
+        ;;
+      config\ view\ --raw\ -o\ jsonpath=\{.clusters\[\?\(@.name==\"ubuntu-hostinger\"\)\].cluster.certificate-authority-data\})
+        printf '%s' 'ca-data'
+        ;;
+      config\ view\ --raw\ -o\ jsonpath=\{.users\[\?\(@.name==\"ubuntu-hostinger\"\)\].user.client-certificate-data\})
+        printf '%s' 'cert-data'
+        ;;
+      config\ view\ --raw\ -o\ jsonpath=\{.users\[\?\(@.name==\"ubuntu-hostinger\"\)\].user.client-key-data\})
+        printf '%s' 'key-data'
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  _kubectl() {
+    printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log"
+    case "$*" in
+      apply\ -f\ *)
+        return 0
+        ;;
+      get\ secrets\ -n\ cicd\ -l\ argocd.argoproj.io/secret-type=cluster\ -o\ name)
+        printf '%s\n' 'secret/cluster-ubuntu-hostinger'
+        printf '%s\n' 'secret/cluster-ubuntu-k3s'
+        ;;
+      get\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.argocd\\.argoproj\\.io/cluster-name\})
+        printf '%s' 'ubuntu-hostinger'
+        ;;
+      get\ secret/cluster-ubuntu-k3s\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.argocd\\.argoproj\\.io/cluster-name\})
+        printf '%s' 'ubuntu-k3s'
+        ;;
+      label\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ k3d-manager/role=app-cluster\ --overwrite)
+        return 0
+        ;;
+      label\ secret/cluster-ubuntu-k3s\ -n\ cicd\ k3d-manager/role-)
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  _info() {
+    :
+  }
+
+  _hostinger_register_cluster
+
+  run cat "${BATS_TEST_TMPDIR}/kubectl.log"
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *"label secret/cluster-ubuntu-hostinger -n cicd k3d-manager/role=app-cluster --overwrite"* ]]
+  [[ "${output}" == *"label secret/cluster-ubuntu-k3s -n cicd k3d-manager/role-"* ]]
+}
+
 @test "_hostinger_refresh_access_layer restarts argocd port-forward before cloudflared" {
   HOME="${BATS_TEST_TMPDIR}"
   _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
@@ -168,6 +237,17 @@ teardown_file() {
     :
   }
 
+  kubectl() {
+    case "$*" in
+      --context\ ubuntu-hostinger\ -n\ monitoring\ get\ svc\ pushgateway)
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
   _info() {
     :
   }
@@ -212,6 +292,14 @@ teardown_file() {
   [ "$status" -eq 0 ]
   run grep -F -- '--context "ubuntu-hostinger" port-forward --address=127.0.0.2' "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   [ "$status" -eq 0 ]
+  run grep -F -- 'svc/acg-kube-prometheus-stack-grafana' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
+  [ "$status" -eq 0 ]
+  run grep -F -- '<string>ubuntu-hostinger</string>' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'svc/pushgateway' "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist"
+  [ "$status" -eq 0 ]
+  run grep -F -- '<string>9091:9091</string>' "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist"
+  [ "$status" -eq 0 ]
 
   run cat "${BATS_TEST_TMPDIR}/restart.log"
   [ "$status" -eq 0 ]
@@ -225,6 +313,52 @@ teardown_file() {
   [[ "${output}" == *"com.k3d-manager.keycloak-port-forward"* ]]
   [[ "${output}" == *"com.k3d-manager.cloudflare-tunnel"* ]]
   [[ "${output}" == *"com.k3d-manager.argocd-browser-https"* ]]
+}
+
+@test "_hostinger_reconcile_vault_cluster_store bootstraps vault-backend when ESO is present" {
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  kubectl() {
+    case "$*" in
+      --context\ ubuntu-hostinger\ get\ crd\ clustersecretstores.external-secrets.io)
+        return 0
+        ;;
+      --context\ ubuntu-hostinger\ -n\ secrets\ get\ deploy\ external-secrets)
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  _hostinger_require_host() {
+    printf '%s\n' "2.25.146.252"
+  }
+
+  _setup_vault_bridge() {
+    printf '%s\n' "setup-bridge" >> "${BATS_TEST_TMPDIR}/hostinger-css.log"
+  }
+
+  shopping_cart_create_vault_bridge() {
+    printf '%s\n' "create-bridge-svc" >> "${BATS_TEST_TMPDIR}/hostinger-css.log"
+  }
+
+  shopping_cart_apply_vault_token_and_cluster_secret_store() {
+    printf '%s\n' "bootstrap-css" >> "${BATS_TEST_TMPDIR}/hostinger-css.log"
+  }
+
+  _info() {
+    :
+  }
+
+  _hostinger_reconcile_vault_cluster_store
+
+  run cat "${BATS_TEST_TMPDIR}/hostinger-css.log"
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *"setup-bridge"* ]]
+  [[ "${output}" == *"create-bridge-svc"* ]]
+  [[ "${output}" == *"bootstrap-css"* ]]
 }
 
 @test "_provider_k3d_exec is defined" {

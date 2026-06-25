@@ -1424,6 +1424,10 @@ _SMOKE_RETRIES = 3
 _SMOKE_RETRY_SLEEP = 10
 
 
+def _provider_supports_pushgateway(provider):
+    return provider != "k3s-hostinger"
+
+
 def _smoke_test_services(retries=None, provider=None):
     """HTTP smoke test for each service. Returns list of (name, ok, detail) tuples."""
     import ssl
@@ -1449,8 +1453,9 @@ def _smoke_test_services(retries=None, provider=None):
         ("Keycloak", keycloak_url, [200]),
         ("Prometheus", "http://localhost:19090/-/ready", [200]),
         ("Grafana", "https://grafana.3ai-talk.org/api/health", [200]),
-        ("Pushgateway", "http://localhost:9091/-/healthy", [200]),
     ]
+    if _provider_supports_pushgateway(provider):
+        smoke_endpoints.append(("Pushgateway", "http://localhost:9091/-/healthy", [200]))
 
     for name, url, ok_codes in smoke_endpoints:
         last_err = ""
@@ -1493,52 +1498,48 @@ def _smoke_test_services(retries=None, provider=None):
     except Exception as exc:
         results.append(("Product images", False, str(exc)))
 
-    # ESO checks via pre-cached k8s REST API context (_k3d_ssl_ctx / _k3d_server).
-    # The context is built at startup BEFORE any urllib HTTPS call loads the macOS Network
-    # Extension Framework. Calling subprocess here would fork after NEF is loaded and crash
-    # (SIGSEGV rc=-11 — nw_settings_child_has_forked atfork handler). Use globals only.
-    if _k3d_ssl_ctx is None or _k3d_server is None:
-        results.append(("ESO ClusterSecretStore", False, "k8s ctx unavailable (startup init failed)"))
-        results.append(("ESO ExternalSecrets", False, "k8s ctx unavailable (startup init failed)"))
-    else:
-        # ClusterSecretStore vault-backend
-        try:
-            with urllib.request.urlopen(
-                f"{_k3d_server}/apis/external-secrets.io/v1/clustersecretstores/vault-backend",
-                context=_k3d_ssl_ctx, timeout=8,
-            ) as _resp:
-                _data = json.loads(_resp.read())
-            _conds = _data.get("status", {}).get("conditions", [])
-            _ready = next((c for c in _conds if c.get("type") == "Ready"), None)
-            _val = f"Ready={_ready.get('status', 'Unknown')}" if _ready else "no conditions"
-            results.append(("ESO ClusterSecretStore", _val == "Ready=True", _val))
-        except Exception as _exc:
-            results.append(("ESO ClusterSecretStore", False, str(_exc)[:200]))
+    try:
+        _css_out, _css_timeout = _posix_spawn_capture(
+            ["kubectl", "get", "clustersecretstore", "vault-backend",
+             "--context", app_context, "-o", "json"],
+            timeout=8,
+        )
+        if _css_timeout:
+            raise RuntimeError("kubectl clustersecretstore timed out")
+        _data = json.loads(_css_out)
+        _conds = _data.get("status", {}).get("conditions", [])
+        _ready = next((c for c in _conds if c.get("type") == "Ready"), None)
+        _val = f"Ready={_ready.get('status', 'Unknown')}" if _ready else "no conditions"
+        results.append(("ESO ClusterSecretStore", _val == "Ready=True", _val))
+    except Exception as _exc:
+        results.append(("ESO ClusterSecretStore", False, str(_exc)[:200]))
 
-        # ExternalSecrets (all namespaces)
-        try:
-            with urllib.request.urlopen(
-                f"{_k3d_server}/apis/external-secrets.io/v1/externalsecrets",
-                context=_k3d_ssl_ctx, timeout=10,
-            ) as _resp:
-                _es_data = json.loads(_resp.read())
-            _items = _es_data.get("items", [])
-            _not_ready = [
-                it["metadata"]["name"]
-                for it in _items
-                if not any(
-                    c.get("type") == "Ready" and c.get("status") == "True"
-                    for c in it.get("status", {}).get("conditions", [])
-                )
-            ]
-            _total = len(_items)
-            if _not_ready:
-                results.append(("ESO ExternalSecrets", False,
-                                 f"{len(_not_ready)}/{_total} not synced: {', '.join(_not_ready[:3])}"))
-            else:
-                results.append(("ESO ExternalSecrets", True, f"{_total}/{_total} synced"))
-        except Exception as _exc:
-            results.append(("ESO ExternalSecrets", False, str(_exc)[:200]))
+    try:
+        _es_out, _es_timeout = _posix_spawn_capture(
+            ["kubectl", "get", "externalsecret", "-A",
+             "--context", app_context, "-o", "json"],
+            timeout=10,
+        )
+        if _es_timeout:
+            raise RuntimeError("kubectl externalsecret timed out")
+        _es_data = json.loads(_es_out)
+        _items = _es_data.get("items", [])
+        _not_ready = [
+            it["metadata"]["name"]
+            for it in _items
+            if not any(
+                c.get("type") == "Ready" and c.get("status") == "True"
+                for c in it.get("status", {}).get("conditions", [])
+            )
+        ]
+        _total = len(_items)
+        if _not_ready:
+            results.append(("ESO ExternalSecrets", False,
+                             f"{len(_not_ready)}/{_total} not synced: {', '.join(_not_ready[:3])}"))
+        else:
+            results.append(("ESO ExternalSecrets", True, f"{_total}/{_total} synced"))
+    except Exception as _exc:
+        results.append(("ESO ExternalSecrets", False, str(_exc)[:200]))
 
     # Data-layer StatefulSet readiness for the active app cluster — uses posix_spawn, safe after NEF load
     _dl_names = ["postgresql-orders", "postgresql-payment", "postgresql-products", "minio"]

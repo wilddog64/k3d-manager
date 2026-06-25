@@ -149,7 +149,28 @@ EOF
     printf 'ERROR: %s\n' "[k3s-hostinger] failed to apply cluster secret ${secret_name} to hub ArgoCD" >&2
     return 1
   fi
+  _hostinger_set_active_app_cluster || return 1
   _info "[k3s-hostinger] Registered — verify: kubectl get secret ${secret_name} -n ${argocd_ns}"
+}
+
+function _hostinger_set_active_app_cluster() {
+  if declare -f _argocd_set_active_app_cluster >/dev/null 2>&1; then
+    _argocd_set_active_app_cluster "${_HOSTINGER_KUBE_CONTEXT}"
+    return $?
+  fi
+
+  local argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
+  local secret_name cluster_name
+  while IFS= read -r secret_name; do
+    [[ -z "${secret_name}" ]] && continue
+    cluster_name="$(_kubectl get "${secret_name}" -n "${argocd_ns}" -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/cluster-name}' 2>/dev/null)"
+    if [[ "${cluster_name}" == "${_HOSTINGER_KUBE_CONTEXT}" ]]; then
+      _kubectl label "${secret_name}" -n "${argocd_ns}" k3d-manager/role=app-cluster --overwrite >/dev/null 2>&1 || true
+    else
+      _kubectl label "${secret_name}" -n "${argocd_ns}" k3d-manager/role- >/dev/null 2>&1 || true
+    fi
+  done < <(_kubectl get secrets -n "${argocd_ns}" -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null)
+  _info "[k3s-hostinger] app-cluster role label set on '${_HOSTINGER_KUBE_CONTEXT}' (cleared from others)"
 }
 
 function _hostinger_deregister_cluster() {
@@ -358,6 +379,49 @@ FRONTEND_WRAPPER
   chmod 700 "${wrapper_path}"
 }
 
+function _hostinger_write_monitoring_port_forward_plist() {
+  local plist="$1" log_file="$2" service="$3" context_name="$4" local_port="$5" remote_port="$6"
+  local kubectl_bin kubeconfig_value
+
+  kubectl_bin="$(command -v kubectl 2>/dev/null || printf '%s' kubectl)"
+  kubeconfig_value="${HOME}/.kube/config:${_HOSTINGER_KUBECONFIG}"
+  mkdir -p "$(dirname "${plist}")" "$(dirname "${log_file}")"
+  cat > "${plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>$(basename "${plist}" .plist)</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${kubectl_bin}</string>
+    <string>port-forward</string>
+    <string>${service}</string>
+    <string>--namespace</string>
+    <string>monitoring</string>
+    <string>--context</string>
+    <string>${context_name}</string>
+    <string>${local_port}:${remote_port}</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>KUBECONFIG</key>
+    <string>${kubeconfig_value}</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${log_file}</string>
+  <key>StandardErrorPath</key>
+  <string>${log_file}</string>
+</dict>
+</plist>
+PLIST
+}
+
 function _hostinger_clear_port_listeners() {
   local port="$1" label="$2"
   local _listener_pids=()
@@ -447,6 +511,10 @@ function _hostinger_refresh_access_layer() {
   local _argocd_browser_log="${ARGOCD_BROWSER_LISTENER_LOG:-${_ACG_STATE_DIR}/logs/argocd-browser-https.log}"
   local _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   local _frontend_browser_log="${_ACG_STATE_DIR}/logs/frontend-browser-http.log"
+  local _grafana_pf_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
+  local _grafana_pf_log="${_ACG_STATE_DIR}/logs/grafana-pf.log"
+  local _pushgateway_pf_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist"
+  local _pushgateway_pf_log="${_ACG_STATE_DIR}/logs/pushgateway-pf.log"
   if [[ ! -f "${_argocd_pf_plist}" && -f "${_argocd_pf_wrapper}" ]]; then
     _info "[k3s-hostinger] ArgoCD port-forward plist missing — regenerating from wrapper..."
     mkdir -p "$(dirname "${_argocd_pf_log}")"
@@ -509,6 +577,24 @@ PLIST
   _hostinger_write_frontend_browser_wrapper \
     "${_frontend_browser_wrapper}" \
     "${_frontend_browser_log}"
+  _hostinger_write_monitoring_port_forward_plist \
+    "${_grafana_pf_plist}" \
+    "${_grafana_pf_log}" \
+    "svc/acg-kube-prometheus-stack-grafana" \
+    "${_HOSTINGER_KUBE_CONTEXT}" \
+    "3001" \
+    "80"
+  if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n monitoring get svc pushgateway >/dev/null 2>&1; then
+    _hostinger_write_monitoring_port_forward_plist \
+      "${_pushgateway_pf_plist}" \
+      "${_pushgateway_pf_log}" \
+      "svc/pushgateway" \
+      "${_HOSTINGER_KUBE_CONTEXT}" \
+      "9091" \
+      "9091"
+  else
+    rm -f "${_pushgateway_pf_plist}"
+  fi
   _hostinger_clear_matching_processes "${_argocd_pf_wrapper}" "ArgoCD port-forward wrapper"
   _hostinger_clear_matching_processes "${_kc_pf_wrapper}" "Keycloak port-forward wrapper"
   _hostinger_clear_port_listeners 8080 "ArgoCD port-forward"
@@ -536,12 +622,48 @@ PLIST
     system
   _hostinger_restart_launchd \
     "com.k3d-manager.grafana-port-forward" \
-    "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist" \
+    "${_grafana_pf_plist}" \
     user
-  _hostinger_restart_launchd \
-    "com.k3d-manager.pushgateway-port-forward" \
-    "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist" \
-    user
+  if [[ -f "${_pushgateway_pf_plist}" ]]; then
+    _hostinger_restart_launchd \
+      "com.k3d-manager.pushgateway-port-forward" \
+      "${_pushgateway_pf_plist}" \
+      user
+  fi
+}
+
+function _hostinger_reconcile_vault_cluster_store() {
+  local host ssh_target
+  host="$(_hostinger_require_host)" || return 1
+  ssh_target="${_HOSTINGER_SSH_USER}@${host}"
+
+  if ! kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" get crd clustersecretstores.external-secrets.io >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if ! kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n secrets get deploy external-secrets >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if declare -f tunnel_start >/dev/null 2>&1; then
+    local _prev_tunnel_host="${TUNNEL_SSH_HOST:-}"
+    TUNNEL_SSH_HOST="${ssh_target}"
+    _info "[k3s-hostinger] Ensuring reverse Vault tunnel to ${ssh_target}..."
+    if declare -f tunnel_stop >/dev/null 2>&1; then
+      tunnel_stop >/dev/null 2>&1 || true
+    fi
+    tunnel_start || return 1
+    TUNNEL_SSH_HOST="${_prev_tunnel_host}"
+  fi
+
+  _info "[k3s-hostinger] Ensuring vault-bridge on ${ssh_target}..."
+  _setup_vault_bridge "${ssh_target}" "${_HOSTINGER_SSH_KEY}" || return 1
+  _info "[k3s-hostinger] Ensuring vault-bridge Service/Endpoints on ${_HOSTINGER_KUBE_CONTEXT}..."
+  shopping_cart_create_vault_bridge || return 1
+  _info "[k3s-hostinger] Ensuring vault-token + ClusterSecretStore on ${_HOSTINGER_KUBE_CONTEXT}..."
+  shopping_cart_apply_vault_token_and_cluster_secret_store || return 1
+  _info "[k3s-hostinger] Forcing ExternalSecret reconcile on ${_HOSTINGER_KUBE_CONTEXT}..."
+  shopping_cart_force_vault_secret_reconcile "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null || return 1
 }
 
 function _provider_k3s_hostinger_deploy_cluster() {
@@ -660,6 +782,7 @@ function _provider_k3s_hostinger_refresh_cluster() {
   _info "[k3s-hostinger] Refreshing ${_HOSTINGER_KUBE_CONTEXT} kubeconfig + ArgoCD registration…"
   _hostinger_merge_kubeconfig || return 1
   _hostinger_register_cluster || return 1
+  _hostinger_reconcile_vault_cluster_store || return 1
   _hostinger_refresh_access_layer || return 1
   if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" get --raw='/healthz' >/dev/null 2>&1; then
     _acg_record_provider "k3s-hostinger"
