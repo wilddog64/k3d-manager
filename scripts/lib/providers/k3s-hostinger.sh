@@ -281,6 +281,34 @@ function _hostinger_write_argocd_port_forward_wrapper() {
   chmod 700 "${wrapper_path}"
 }
 
+function _hostinger_write_keycloak_port_forward_wrapper() {
+  local wrapper_path="$1" log_file="$2" template_path="${SCRIPT_DIR}/etc/argocd/port-forward-wrapper.sh.tmpl"
+  local kubectl_bin curl_bin
+
+  if [[ ! -r "${template_path}" ]]; then
+    _warn "[k3s-hostinger] Keycloak port-forward template missing — leaving wrapper untouched"
+    return 0
+  fi
+
+  kubectl_bin="$(command -v kubectl 2>/dev/null || printf '%s' kubectl)"
+  curl_bin="$(command -v curl 2>/dev/null || printf '%s' curl)"
+  mkdir -p "$(dirname "${wrapper_path}")"
+  KUBECTL_BIN="${kubectl_bin}" \
+  CURL_BIN="${curl_bin}" \
+  LOG_FILE="${log_file}" \
+  KUBECONFIG_FILE="" \
+  NAMESPACE="identity" \
+  CONTEXT="k3d-k3d-cluster" \
+  SERVICE="svc/keycloak" \
+  LOCAL_PORT="8880" \
+  REMOTE_PORT="80" \
+  HEALTHZ_URL="http://localhost:8880/health/live" \
+  STARTUP_TIMEOUT="30" \
+    envsubst '$KUBECTL_BIN $CURL_BIN $LOG_FILE $KUBECONFIG_FILE $NAMESPACE $CONTEXT $SERVICE $LOCAL_PORT $REMOTE_PORT $HEALTHZ_URL $STARTUP_TIMEOUT' \
+      < "${template_path}" > "${wrapper_path}"
+  chmod 700 "${wrapper_path}"
+}
+
 function _hostinger_write_argocd_browser_https_wrapper() {
   local wrapper_path="$1" log_file="$2" template_path="${SCRIPT_DIR}/etc/argocd/browser-https-wrapper.sh.tmpl"
   local socat_bin curl_bin
@@ -411,6 +439,10 @@ function _hostinger_refresh_access_layer() {
   local _argocd_pf_plist="${HOME}/Library/LaunchAgents/${_argocd_pf_label}.plist"
   local _argocd_pf_log="${_ACG_STATE_DIR}/logs/argocd-pf.log"
   local _argocd_pf_wrapper="${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  local _kc_pf_label="com.k3d-manager.keycloak-port-forward"
+  local _kc_pf_plist="${HOME}/Library/LaunchAgents/${_kc_pf_label}.plist"
+  local _kc_pf_log="${_ACG_STATE_DIR}/logs/keycloak-pf.log"
+  local _kc_pf_wrapper="${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
   local _argocd_browser_wrapper="${ARGOCD_BROWSER_LISTENER_WRAPPER:-${_ACG_STATE_DIR}/bin/argocd-browser-https.sh}"
   local _argocd_browser_log="${ARGOCD_BROWSER_LISTENER_LOG:-${_ACG_STATE_DIR}/logs/argocd-browser-https.log}"
   local _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
@@ -443,6 +475,34 @@ function _hostinger_refresh_access_layer() {
 PLIST
   fi
   _hostinger_write_argocd_port_forward_wrapper "${_argocd_pf_wrapper}" "${_argocd_pf_log}"
+  _hostinger_write_keycloak_port_forward_wrapper "${_kc_pf_wrapper}" "${_kc_pf_log}"
+  if [[ ! -f "${_kc_pf_plist}" && -f "${_kc_pf_wrapper}" ]]; then
+    _info "[k3s-hostinger] Keycloak port-forward plist missing — regenerating from wrapper..."
+    mkdir -p "$(dirname "${_kc_pf_log}")"
+    cat > "${_kc_pf_plist}" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${_kc_pf_label}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${_kc_pf_wrapper}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>${_kc_pf_log}</string>
+  <key>StandardErrorPath</key>
+  <string>${_kc_pf_log}</string>
+</dict>
+</plist>
+PLIST
+  fi
   _hostinger_write_argocd_browser_https_wrapper \
     "${_argocd_browser_wrapper}" \
     "${_argocd_browser_log}"
@@ -450,10 +510,16 @@ PLIST
     "${_frontend_browser_wrapper}" \
     "${_frontend_browser_log}"
   _hostinger_clear_matching_processes "${_argocd_pf_wrapper}" "ArgoCD port-forward wrapper"
+  _hostinger_clear_matching_processes "${_kc_pf_wrapper}" "Keycloak port-forward wrapper"
   _hostinger_clear_port_listeners 8080 "ArgoCD port-forward"
+  _hostinger_clear_port_listeners 8880 "Keycloak port-forward"
   _hostinger_restart_launchd \
     "${_argocd_pf_label}" \
     "${_argocd_pf_plist}" \
+    user
+  _hostinger_restart_launchd \
+    "${_kc_pf_label}" \
+    "${_kc_pf_plist}" \
     user
   _hostinger_restart_cloudflared
   _hostinger_restart_launchd \

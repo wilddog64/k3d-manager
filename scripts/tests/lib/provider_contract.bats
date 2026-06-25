@@ -111,12 +111,15 @@ teardown_file() {
   mkdir -p "${_ACG_STATE_DIR}/bin" "${HOME}/Library/LaunchAgents" "${HOME}/.cloudflared"
   : > "${HOME}/.cloudflared/config.yml"
   printf '#!/usr/bin/env bash\nexit 0\n' > "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
   chmod +x "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  chmod +x "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
   : > "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist"
 
   lsof() {
     case "$*" in
       *"-iTCP:8080"*) printf '%s\n' "41517" ;;
+      *"-iTCP:8880"*) printf '%s\n' "51518" ;;
       *) return 1 ;;
     esac
   }
@@ -143,6 +146,9 @@ teardown_file() {
     case "$*" in
       *"${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"*)
         printf '%s\n' "69478"
+        ;;
+      *"${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"*)
+        printf '%s\n' "79479"
         ;;
       *)
         return 1
@@ -196,6 +202,10 @@ teardown_file() {
   [ "$status" -eq 0 ]
   run grep -F '_pf_alive && {' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
+  run grep -F -- 'svc/keycloak' "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run grep -F -- '8880:80' "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
+  [ "$status" -eq 0 ]
   run grep -F 'tunnel' "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist"
   [ "$status" -eq 0 ]
   run grep -F 'services stop cloudflared' "${BATS_TEST_TMPDIR}/restart.log"
@@ -207,8 +217,12 @@ teardown_file() {
   [ "$status" -eq 0 ]
   [[ "${output}" == *"kill 69478"* ]]
   [[ "${output}" == *"kill -9 69478"* ]]
+  [[ "${output}" == *"kill 79479"* ]]
+  [[ "${output}" == *"kill -9 79479"* ]]
   [[ "${output}" == *"kill 41517"* ]]
+  [[ "${output}" == *"kill 51518"* ]]
   [[ "${output}" == *"com.k3d-manager.argocd-port-forward"* ]]
+  [[ "${output}" == *"com.k3d-manager.keycloak-port-forward"* ]]
   [[ "${output}" == *"com.k3d-manager.cloudflare-tunnel"* ]]
   [[ "${output}" == *"com.k3d-manager.argocd-browser-https"* ]]
 }
