@@ -370,6 +370,37 @@ function _hostinger_clear_port_listeners() {
   fi
 }
 
+function _hostinger_clear_matching_processes() {
+  local pattern="$1" label="$2"
+  local _matching_pids=()
+
+  if command -v pgrep >/dev/null 2>&1; then
+    while IFS= read -r _pid; do
+      [[ -n "${_pid}" ]] && _matching_pids+=("${_pid}")
+    done < <(pgrep -f "${pattern}" 2>/dev/null | sort -u)
+  fi
+
+  if ((${#_matching_pids[@]} == 0)); then
+    return 0
+  fi
+
+  _info "[k3s-hostinger] Killing stale ${label} process(es)..."
+  kill "${_matching_pids[@]}" 2>/dev/null || true
+  sleep 2
+
+  _matching_pids=()
+  if command -v pgrep >/dev/null 2>&1; then
+    while IFS= read -r _pid; do
+      [[ -n "${_pid}" ]] && _matching_pids+=("${_pid}")
+    done < <(pgrep -f "${pattern}" 2>/dev/null | sort -u)
+  fi
+  if ((${#_matching_pids[@]} > 0)); then
+    _warn "[k3s-hostinger] ${label} process(es) ignored TERM — force killing..."
+    kill -9 "${_matching_pids[@]}" 2>/dev/null || true
+    sleep 1
+  fi
+}
+
 function _hostinger_refresh_access_layer() {
   if [[ "$(uname)" != "Darwin" ]]; then
     return 0
@@ -418,6 +449,7 @@ PLIST
   _hostinger_write_frontend_browser_wrapper \
     "${_frontend_browser_wrapper}" \
     "${_frontend_browser_log}"
+  _hostinger_clear_matching_processes "${_argocd_pf_wrapper}" "ArgoCD port-forward wrapper"
   _hostinger_clear_port_listeners 8080 "ArgoCD port-forward"
   _hostinger_restart_launchd \
     "${_argocd_pf_label}" \

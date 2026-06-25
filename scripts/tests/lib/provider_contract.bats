@@ -139,6 +139,17 @@ teardown_file() {
     esac
   }
 
+  pgrep() {
+    case "$*" in
+      *"${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"*)
+        printf '%s\n' "69478"
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
   uname() {
     printf '%s\n' Darwin
   }
@@ -179,6 +190,12 @@ teardown_file() {
   [ "$status" -eq 0 ]
   run grep -F '_acquire_lock' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   [ "$status" -eq 0 ]
+  run grep -F '_pf_alive()' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run grep -F 'if ! _pf_alive; then' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  [ "$status" -eq 0 ]
+  run grep -F '_pf_alive && {' "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
+  [ "$status" -eq 0 ]
   run grep -F 'tunnel' "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist"
   [ "$status" -eq 0 ]
   run grep -F 'services stop cloudflared' "${BATS_TEST_TMPDIR}/restart.log"
@@ -188,6 +205,8 @@ teardown_file() {
 
   run cat "${BATS_TEST_TMPDIR}/restart.log"
   [ "$status" -eq 0 ]
+  [[ "${output}" == *"kill 69478"* ]]
+  [[ "${output}" == *"kill -9 69478"* ]]
   [[ "${output}" == *"kill 41517"* ]]
   [[ "${output}" == *"com.k3d-manager.argocd-port-forward"* ]]
   [[ "${output}" == *"com.k3d-manager.cloudflare-tunnel"* ]]

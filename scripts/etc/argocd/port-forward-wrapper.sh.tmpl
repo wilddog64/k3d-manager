@@ -78,6 +78,10 @@ _port_in_use() {
    return 1
 }
 
+_pf_alive() {
+   kill -0 "${_pf_pid}" 2>/dev/null
+}
+
 _clear_stale_listeners() {
    local _listener_pids=()
 
@@ -114,17 +118,19 @@ while true; do
 
    _ready=0
    for (( _attempt=1; _attempt<=STARTUP_TIMEOUT; _attempt++ )); do
-      "${CURL_BIN}" -sf --max-time 1 "${HEALTHZ_URL}" >/dev/null 2>&1 && {
+      if ! _pf_alive; then
+         break
+      fi
+      "${CURL_BIN}" -sf --max-time 1 "${HEALTHZ_URL}" >/dev/null 2>&1 && _pf_alive && {
          _ready=1
          break
       }
-      kill -0 "${_pf_pid}" 2>/dev/null || break
       sleep 1
    done
 
    case "${_ready}" in
       0)
-         if kill -0 "${_pf_pid}" 2>/dev/null; then
+         if _pf_alive; then
             printf '%s\n' "[argocd-pf] healthz did not become reachable — restarting" >> "${LOG_FILE}"
             kill "${_pf_pid}" 2>/dev/null || true
          else
@@ -139,7 +145,7 @@ while true; do
    esac
 
    printf '%s\n' "[argocd-pf] healthz reachable — monitoring backend availability" >> "${LOG_FILE}"
-   while kill -0 "${_pf_pid}" 2>/dev/null; do
+   while _pf_alive; do
       "${CURL_BIN}" -sf --max-time 1 "${HEALTHZ_URL}" >/dev/null 2>&1 || {
          printf '%s\n' "[argocd-pf] healthz lost — restarting" >> "${LOG_FILE}"
          kill "${_pf_pid}" 2>/dev/null || true

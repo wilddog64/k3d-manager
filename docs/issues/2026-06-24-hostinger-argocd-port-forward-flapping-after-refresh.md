@@ -52,13 +52,14 @@ curl: (7) Failed to connect to localhost port 8080 after 0 ms: Couldn't connect 
 
 ## Root cause
 
-The Hostinger refresh path was clearing `8080`, but the ArgoCD port-forward wrapper could
-still restart too quickly after a listener teardown on macOS. That left a narrow window where
-launchd would bring the service back while the socket was still being released, causing the
-`kubectl port-forward` bind conflict loop.
+The Hostinger refresh path was clearing `8080`, but there was still a stale
+`~/.local/share/k3d-manager/bin/argocd-port-forward.sh` wrapper process running outside the
+current launchd job. That orphan wrapper kept respawning `kubectl port-forward` on `8080`, so
+the freshly restarted `com.k3d-manager.argocd-port-forward` agent could bind briefly, lose the
+port again, and fall back into the same bind-conflict cycle.
 
 ## Follow-up
 
-- Increase the listener-free wait window after killing stale `8080` holders.
+- Kill stale `argocd-port-forward.sh` wrapper processes before restarting the Hostinger launchd job.
 - Keep the fix portable across the shared ArgoCD wrapper and the Hostinger provider path.
 - Re-run `make refresh CLUSTER_PROVIDER=k3s-hostinger` and confirm `curl -I http://localhost:8080/healthz` succeeds after the restart settles.
