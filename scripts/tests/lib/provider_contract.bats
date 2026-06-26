@@ -9,6 +9,8 @@ setup() {
   REPO_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)"
   PROVIDERS_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../lib/providers" && pwd)"
   SCRIPT_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../../.." && pwd)/scripts"
+  _info() { :; }
+  _warn() { :; }
   source "${REPO_ROOT}/scripts/lib/provider.sh"
   export SCRIPT_DIR
 }

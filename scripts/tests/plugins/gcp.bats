@@ -171,10 +171,10 @@ EOF
       local key_file="${BATS_TEST_TMPDIR}/fake-gcp-key.json"
       printf '{}\n' > "${key_file}"
       cat > "${creds_file}" <<EOF
-GCP_PROJECT="test-project"
-GOOGLE_APPLICATION_CREDENTIALS="${key_file}"
-GCP_USERNAME="cloud_user@example.com"
-GCP_PASSWORD="secret"
+GCP_PROJECT=test-project
+GOOGLE_APPLICATION_CREDENTIALS=${key_file}
+GCP_USERNAME=cloud_user@example.com
+GCP_PASSWORD=secret
 EOF
       return 0
     }

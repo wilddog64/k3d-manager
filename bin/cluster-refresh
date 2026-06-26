@@ -14,8 +14,8 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-if [[ ! -d "${REPO_ROOT}/scripts/lib/acg/node_modules/playwright" ]]; then
-  npm --prefix "${REPO_ROOT}/scripts/lib/acg" install --prefer-offline 2>&1
+if [[ ! -d "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg/node_modules/playwright" ]]; then
+  npm --prefix "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg" install --prefer-offline 2>&1
 fi
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/core.sh"
@@ -202,7 +202,7 @@ case "${_cluster_provider}" in
     else
       _info "[acg-refresh] Azure credentials expired — extracting..."
       _browser_launch
-      "${REPO_ROOT}/scripts/lib/acg/bin/"acg-credential-test \
+      "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg/bin/"acg-credential-test \
         "${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}" --provider azure || exit 1
       _az_existing_rg=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
     fi

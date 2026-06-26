@@ -19,8 +19,8 @@ set -euo pipefail
 
 # shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-if [[ ! -d "${REPO_ROOT}/scripts/lib/acg/node_modules/playwright" ]]; then
-  npm --prefix "${REPO_ROOT}/scripts/lib/acg" install --prefer-offline 2>&1
+if [[ ! -d "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg/node_modules/playwright" ]]; then
+  npm --prefix "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg" install --prefer-offline 2>&1
 fi
 # shellcheck disable=SC2034
 SCRIPT_DIR="${REPO_ROOT}/scripts"
@@ -206,7 +206,7 @@ case "${_cluster_provider}" in
       _acg_cred_test_url="${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
       _info "[acg-up] Extracting and validating AWS credentials (will restart sandbox on ghost-state failure)..."
       _browser_launch
-      "${REPO_ROOT}/scripts/lib/acg/bin/"acg-credential-test "${_acg_cred_test_url}" || exit 1
+      "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg/bin/"acg-credential-test "${_acg_cred_test_url}" || exit 1
       _info "[acg-up] AWS credentials extracted and validated."
     fi
     ;;
@@ -226,7 +226,7 @@ case "${_cluster_provider}" in
       _acg_cred_test_url="${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
       _info "[acg-up] Extracting and validating Azure credentials..."
       _browser_launch
-      "${REPO_ROOT}/scripts/lib/acg/bin/"acg-credential-test "${_acg_cred_test_url}" --provider azure || exit 1
+      "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg/bin/"acg-credential-test "${_acg_cred_test_url}" --provider azure || exit 1
       _info "[acg-up] Azure credentials extracted and validated."
       AZ_RESOURCE_GROUP=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
       export AZ_RESOURCE_GROUP

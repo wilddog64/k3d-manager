@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/plugins/acg.sh — stub: delegates to lib-acg subtree
+# scripts/plugins/acg.sh — stub: delegates to absorbed foundation ACG module
 
 _acg_stub_load() {
   local _k3dm_root
@@ -15,7 +15,9 @@ _acg_stub_load() {
   # shellcheck source=/dev/null
   source "${_k3dm_root}/scripts/plugins/aws.sh"
   # shellcheck source=/dev/null
-  source "${_k3dm_root}/scripts/lib/acg/scripts/plugins/acg.sh"
+  source "${_k3dm_root}/scripts/lib/foundation/scripts/lib/acg/acg.sh"
+  # shellcheck source=/dev/null
+  source "${_k3dm_root}/scripts/lib/foundation/scripts/lib/acg/gcp.sh"
 }
 
 _acg_stub_alias_function() {
