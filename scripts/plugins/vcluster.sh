@@ -12,6 +12,20 @@ export VCLUSTER_KUBECONFIG_DIR
 export VCLUSTER_INSTALL_DIR
 export VCLUSTER_VALUES_FILE
 
+function _vcluster_load_argocd_plugin() {
+  if declare -f _argocd_hub_kubectl_cmd >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local argocd_plugin="${SCRIPT_DIR}/plugins/argocd.sh"
+  if [[ ! -r "${argocd_plugin}" ]]; then
+    _err "ArgoCD plugin not found: ${argocd_plugin}"
+  fi
+
+  # shellcheck source=/dev/null
+  source "${argocd_plugin}"
+}
+
 function vcluster_create() {
   local name="${1:-}"
   if [[ -z "$name" ]]; then
@@ -51,14 +65,46 @@ function vcluster_destroy() {
   if [[ "${DRY_RUN:-0}" == "1" ]]; then
     printf 'DRY_RUN: vcluster delete %s in namespace %s\n' "$name" "$VCLUSTER_NAMESPACE"
     printf 'DRY_RUN: kubeconfig %s would be removed\n' "$kubeconfig_path"
+    printf 'DRY_RUN: deregister %s from hub ArgoCD (cluster-%s + %s-preflight-* appsets/apps)\n' "$name" "$name" "$name"
     return 0
   fi
 
+  _vcluster_deregister_from_hub "$name"
   _run_command -- vcluster delete "$name" -n "$VCLUSTER_NAMESPACE" --wait
   if [[ -f "$kubeconfig_path" ]]; then
     _run_command -- rm -f "$kubeconfig_path"
   fi
   _info "Deleted vCluster '$name'"
+}
+
+function _vcluster_deregister_from_hub() {
+  local name="${1:-}"
+  [[ -z "${name}" ]] && return 0
+
+  _vcluster_load_argocd_plugin || return 1
+
+  local ns="${ARGOCD_NAMESPACE:-cicd}"
+  local -a hub_kubectl=()
+  read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
+
+  "${hub_kubectl[@]}" -n "${ns}" delete applicationset \
+    -l "k3d-manager/preflight-cluster=${name}" --ignore-not-found >/dev/null 2>&1 || true
+
+  local resource=""
+  while IFS= read -r resource; do
+    [[ -z "${resource}" ]] && continue
+    "${hub_kubectl[@]}" -n "${ns}" delete "${resource}" --ignore-not-found >/dev/null 2>&1 || true
+  done < <("${hub_kubectl[@]}" -n "${ns}" get applicationset -o name 2>/dev/null | grep "/${name}-preflight-" || true)
+
+  while IFS= read -r resource; do
+    [[ -z "${resource}" ]] && continue
+    "${hub_kubectl[@]}" -n "${ns}" patch "${resource}" --type=merge \
+      -p '{"metadata":{"finalizers":null}}' >/dev/null 2>&1 || true
+    "${hub_kubectl[@]}" -n "${ns}" delete "${resource}" --ignore-not-found >/dev/null 2>&1 || true
+  done < <("${hub_kubectl[@]}" -n "${ns}" get application -o name 2>/dev/null | grep "/${name}-preflight-" || true)
+
+  "${hub_kubectl[@]}" -n "${ns}" delete secret "cluster-${name}" --ignore-not-found >/dev/null 2>&1 || true
+  _info "Deregistered '${name}' from hub ArgoCD (${ns})"
 }
 
 function vcluster_use() {
