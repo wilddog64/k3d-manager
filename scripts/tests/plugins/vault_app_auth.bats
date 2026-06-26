@@ -88,6 +88,39 @@ setup() {
   # Test defaults
   export VAULT_NS_DEFAULT="secrets"
   export VAULT_RELEASE_DEFAULT="vault"
+
+  KUBECTL_STUB_LOG="$BATS_TEST_TMPDIR/kubectl-stub.log"
+  KUBECTL_STUB_MODE=""
+  KUBECTL_STUB_SERVER=""
+  KUBECTL_STUB_CA_DATA=""
+  KUBECTL_STUB_CA_FILE=""
+  : >"$KUBECTL_STUB_LOG"
+
+  kubectl() {
+    printf 'kubectl %s\n' "$*" >>"$KUBECTL_STUB_LOG"
+    if [[ "${1:-}" == "--kubeconfig" ]]; then
+      shift 2
+    fi
+    if [[ "${1:-}" == "config" && "${2:-}" == "view" && "${3:-}" == "--raw" && "${4:-}" == "-o" ]]; then
+      case "${5:-}" in
+        *".cluster.server}")
+          printf '%s' "${KUBECTL_STUB_SERVER}"
+          return 0
+          ;;
+        *".cluster.certificate-authority-data}")
+          printf '%s' "${KUBECTL_STUB_CA_DATA}"
+          return 0
+          ;;
+        *".cluster.certificate-authority}")
+          printf '%s' "${KUBECTL_STUB_CA_FILE}"
+          return 0
+          ;;
+      esac
+    fi
+    return 1
+  }
+
+  export -f kubectl
 }
 
 @test "configure_vault_app_auth exits 1 when APP_CLUSTER_API_URL is unset" {
@@ -181,4 +214,69 @@ setup() {
   # Second run
   run configure_vault_app_auth
   [ "$status" -eq 0 ]
+}
+
+@test "configure_vault_app_auth_for_context exits 1 when context arg is missing" {
+  run configure_vault_app_auth_for_context
+  [ "$status" -eq 1 ]
+  [[ "$output" == *"requires an app cluster kube-context"* ]]
+}
+
+@test "configure_vault_app_auth_for_context skips when context has no server" {
+  KUBECTL_STUB_SERVER=""
+
+  run configure_vault_app_auth_for_context "ubuntu-hostinger"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"no API server for context 'ubuntu-hostinger'"* ]]
+}
+
+@test "configure_vault_app_auth_for_context returns non-zero when required and server missing" {
+  export APP_VAULT_AUTH_REQUIRED="true"
+  KUBECTL_STUB_SERVER=""
+
+  run configure_vault_app_auth_for_context "ubuntu-hostinger"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no API server for context 'ubuntu-hostinger'"* ]]
+}
+
+@test "configure_vault_app_auth_for_context returns non-zero when required and CA missing" {
+  export APP_VAULT_AUTH_REQUIRED="true"
+  KUBECTL_STUB_SERVER="https://10.0.0.5:6443"
+  KUBECTL_STUB_CA_DATA=""
+  KUBECTL_STUB_CA_FILE=""
+
+  run configure_vault_app_auth_for_context "ubuntu-hostinger"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no CA for context 'ubuntu-hostinger'"* ]]
+}
+
+@test "configure_vault_app_auth_for_context derives server and temp CA then cleans it up" {
+  KUBECTL_STUB_SERVER="https://10.0.0.5:6443"
+  KUBECTL_STUB_CA_DATA="Q0FfQ09OVEVOVA=="
+  HELPER_ENV_LOG="$BATS_TEST_TMPDIR/helper-env.log"
+  : >"$HELPER_ENV_LOG"
+
+  configure_vault_app_auth() {
+    printf 'api=%s\n' "${APP_CLUSTER_API_URL}" >>"$HELPER_ENV_LOG"
+    printf 'ca=%s\n' "${APP_CLUSTER_CA_CERT_PATH}" >>"$HELPER_ENV_LOG"
+    if [[ ! -f "${APP_CLUSTER_CA_CERT_PATH}" ]]; then
+      return 1
+    fi
+    printf 'ca_contents=%s\n' "$(cat "${APP_CLUSTER_CA_CERT_PATH}")" >>"$HELPER_ENV_LOG"
+    return 0
+  }
+  export -f configure_vault_app_auth
+
+  run configure_vault_app_auth_for_context "ubuntu-hostinger"
+  [ "$status" -eq 0 ]
+
+  run cat "$HELPER_ENV_LOG"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"api=https://10.0.0.5:6443"* ]]
+  [[ "$output" == *"ca_contents=CA_CONTENT"* ]]
+
+  local ca_path
+  ca_path="$(grep '^ca=' "$HELPER_ENV_LOG" | cut -d= -f2-)"
+  [ -n "$ca_path" ]
+  [ ! -f "$ca_path" ]
 }

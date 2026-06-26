@@ -166,6 +166,9 @@ function _hostinger_register_cluster() {
     register_app_cluster
   ) || return 1
   _info "[k3s-hostinger] Registered — verify: kubectl get secret ${secret_name} -n ${argocd_ns}"
+  if declare -f configure_vault_app_auth_for_context >/dev/null 2>&1; then
+    configure_vault_app_auth_for_context "${_HOSTINGER_KUBE_CONTEXT}" || true
+  fi
 }
 
 function _hostinger_set_active_app_cluster() {

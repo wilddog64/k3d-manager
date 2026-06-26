@@ -681,6 +681,9 @@ kubectl label namespace cicd istio-injection=enabled --overwrite --context k3d-k
 kubectl config use-context k3d-k3d-cluster >/dev/null
 ARGOCD_APP_CLUSTER_TOKEN="${_argocd_sa_token}" \
   register_app_cluster
+if declare -f configure_vault_app_auth_for_context >/dev/null 2>&1; then
+  configure_vault_app_auth_for_context "${ARGOCD_APP_CLUSTER_NAME:-ubuntu-k3s}" || true
+fi
 _info "[acg-up] Restarting ArgoCD application controller to pick up new cluster secret..."
 kubectl rollout restart statefulset/argocd-application-controller \
   -n cicd --context k3d-k3d-cluster

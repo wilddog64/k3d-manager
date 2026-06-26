@@ -1379,6 +1379,64 @@ HCL
   _info "[vault] app cluster auth configured successfully"
 }
 
+function configure_vault_app_auth_for_context() {
+  local app_context="${1:-}"
+  local app_kubeconfig="${2:-${KUBECONFIG:-}}"
+  if [[ -z "${app_context}" ]]; then
+    _err "[vault] configure_vault_app_auth_for_context requires an app cluster kube-context"
+  fi
+
+  local -a kctl=(kubectl)
+  [[ -n "${app_kubeconfig}" ]] && kctl=(kubectl --kubeconfig "${app_kubeconfig}")
+
+  local server ca_data ca_file
+  server="$("${kctl[@]}" config view --raw \
+    -o jsonpath="{.clusters[?(@.name==\"${app_context}\")].cluster.server}" 2>/dev/null)"
+  ca_data="$("${kctl[@]}" config view --raw \
+    -o jsonpath="{.clusters[?(@.name==\"${app_context}\")].cluster.certificate-authority-data}" 2>/dev/null)"
+  ca_file="$("${kctl[@]}" config view --raw \
+    -o jsonpath="{.clusters[?(@.name==\"${app_context}\")].cluster.certificate-authority}" 2>/dev/null)"
+
+  if [[ -z "${server}" ]]; then
+    _warn "[vault] no API server for context '${app_context}' — skipping app-cluster Vault auth"
+    [[ "${APP_VAULT_AUTH_REQUIRED:-false}" == "true" ]] && return 1
+    return 0
+  fi
+
+  local tmp_ca="" ca_path=""
+  if [[ -n "${ca_data}" ]]; then
+    tmp_ca="$(mktemp "${TMPDIR:-/tmp}/app-cluster-ca.XXXXXX")" || return 1
+    printf '%s' "${ca_data}" | base64 -d > "${tmp_ca}" 2>/dev/null || {
+      rm -f "${tmp_ca}"
+      _warn "[vault] could not decode CA data for '${app_context}' — skipping app-cluster Vault auth"
+      [[ "${APP_VAULT_AUTH_REQUIRED:-false}" == "true" ]] && return 1
+      return 0
+    }
+    ca_path="${tmp_ca}"
+  elif [[ -n "${ca_file}" && -f "${ca_file}" ]]; then
+    ca_path="${ca_file}"
+  else
+    _warn "[vault] no CA for context '${app_context}' — skipping app-cluster Vault auth"
+    [[ "${APP_VAULT_AUTH_REQUIRED:-false}" == "true" ]] && return 1
+    return 0
+  fi
+
+  local rc=0
+  (
+    APP_CLUSTER_API_URL="${server}" \
+    APP_CLUSTER_CA_CERT_PATH="${ca_path}" \
+    configure_vault_app_auth
+  ) || rc=$?
+
+  [[ -n "${tmp_ca}" ]] && rm -f "${tmp_ca}"
+
+  if (( rc != 0 )); then
+    _warn "[vault] app-cluster Vault auth for '${app_context}' did not complete (rc=${rc})"
+    [[ "${APP_VAULT_AUTH_REQUIRED:-false}" == "true" ]] && return "${rc}"
+  fi
+  return 0
+}
+
 function _vault_set_eso_reader() {
   local ns="${1:-$VAULT_NS_DEFAULT}"
   local release="${2:-$VAULT_RELEASE_DEFAULT}"
