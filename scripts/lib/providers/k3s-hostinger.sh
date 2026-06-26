@@ -116,15 +116,35 @@ function _hostinger_merge_kubeconfig() {
   _info "[k3s-hostinger] ${_HOSTINGER_KUBE_CONTEXT} merged into ~/.kube/config (current-context preserved: ${prev_ctx:-none})"
 }
 
+function _hostinger_ensure_argocd_manager_sa() {
+  local manifest="${SCRIPT_DIR}/etc/argocd-manager.yaml"
+  if [[ ! -r "${manifest}" ]]; then
+    printf 'ERROR: %s\n' "[k3s-hostinger] argocd-manager manifest not found: ${manifest}" >&2
+    return 1
+  fi
+  if ! kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" apply -f "${manifest}" >/dev/null 2>&1; then
+    printf 'ERROR: %s\n' "[k3s-hostinger] failed to ensure argocd-manager SA/RBAC on ${_HOSTINGER_KUBE_CONTEXT}" >&2
+    return 1
+  fi
+  _info "[k3s-hostinger] ensured argocd-manager SA/RBAC on ${_HOSTINGER_KUBE_CONTEXT}"
+}
+
 function _hostinger_register_cluster() {
   _hostinger_load_argocd_plugin || return 1
   local argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
   local secret_name="cluster-${_HOSTINGER_KUBE_CONTEXT}"
-  local server token
+  local insecure="${HOSTINGER_ARGOCD_APP_CLUSTER_INSECURE:-${ARGOCD_APP_CLUSTER_INSECURE:-false}}"
+  local server ca_data token
   server="$(kubectl config view --raw -o jsonpath="{.clusters[?(@.name==\"${_HOSTINGER_KUBE_CONTEXT}\")].cluster.server}" 2>/dev/null)"
+  ca_data="$(kubectl config view --raw -o jsonpath="{.clusters[?(@.name==\"${_HOSTINGER_KUBE_CONTEXT}\")].cluster.certificate-authority-data}" 2>/dev/null)"
+  _hostinger_ensure_argocd_manager_sa || return 1
   token="$(kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" create token argocd-manager -n kube-system --duration="${HOSTINGER_ARGOCD_MANAGER_TOKEN_DURATION:-8760h}" 2>/dev/null || true)"
   if [[ -z "${server}" || -z "${token}" ]]; then
     printf 'ERROR: %s\n' "[k3s-hostinger] could not read ${_HOSTINGER_KUBE_CONTEXT} server/token for ArgoCD registration" >&2
+    return 1
+  fi
+  if [[ -z "${ca_data}" && "${insecure}" != "true" ]]; then
+    printf 'ERROR: %s\n' "[k3s-hostinger] no certificate-authority-data for ${_HOSTINGER_KUBE_CONTEXT} in kubeconfig; refusing to register with insecure TLS (set HOSTINGER_ARGOCD_APP_CLUSTER_INSECURE=true to override)" >&2
     return 1
   fi
 
@@ -140,7 +160,8 @@ function _hostinger_register_cluster() {
     ARGOCD_APP_CLUSTER_NAME="${_HOSTINGER_KUBE_CONTEXT}" \
     ARGOCD_APP_CLUSTER_SERVER="${server}" \
     ARGOCD_APP_CLUSTER_ENVIRONMENT="${HOSTINGER_ARGOCD_APP_CLUSTER_ENVIRONMENT:-${ARGOCD_APP_CLUSTER_ENVIRONMENT:-dev}}" \
-    ARGOCD_APP_CLUSTER_INSECURE="${HOSTINGER_ARGOCD_APP_CLUSTER_INSECURE:-${ARGOCD_APP_CLUSTER_INSECURE:-true}}" \
+    ARGOCD_APP_CLUSTER_INSECURE="${insecure}" \
+    ARGOCD_APP_CLUSTER_CA_DATA="${ca_data}" \
     ARGOCD_APP_CLUSTER_TOKEN="${token}" \
     register_app_cluster
   ) || return 1

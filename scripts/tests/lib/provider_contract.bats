@@ -171,11 +171,17 @@ teardown_file() {
   _argocd_hub_kubectl_cmd() {
     printf '%s\n' "kubectl --context k3d-k3d-cluster"
   }
+  _hostinger_ensure_argocd_manager_sa() {
+    :
+  }
 
   kubectl() {
     case "$*" in
       config\ view\ --raw\ -o\ jsonpath=\{.clusters\[\?\(@.name==\"ubuntu-hostinger\"\)\].cluster.server\})
         printf '%s' 'https://2.25.146.252:6443'
+        ;;
+      config\ view\ --raw\ -o\ jsonpath=\{.clusters\[\?\(@.name==\"ubuntu-hostinger\"\)\].cluster.certificate-authority-data\})
+        printf '%s' 'ca-data'
         ;;
       --context\ ubuntu-hostinger\ create\ token\ argocd-manager\ -n\ kube-system\ --duration=8760h)
         printf '%s' 'hostinger-token'
@@ -214,6 +220,58 @@ teardown_file() {
   [[ "${output}" == *'environment: "dev"'* ]]
   [[ "${output}" == *'argocd-chart-version: "7.8.1"'* ]]
   [[ "${output}" == *'argocd-replicas: "2"'* ]]
+  [[ "${output}" == *'"caData": "ca-data"'* ]]
+  [[ "${output}" == *'"insecure": false'* ]]
+  [[ "${output}" != *'"insecure": true'* ]]
+}
+
+@test "register_app_cluster falls back to insecure tlsClientConfig when CA data is unset" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  export PLUGINS_DIR="${REPO_ROOT}/scripts/plugins"
+  _warn() { :; }
+  _err() { printf '%s\n' "$*" >&2; return 1; }
+  _cleanup_trap_command() { printf 'rm -f %q' "$1"; }
+  source "${REPO_ROOT}/scripts/plugins/argocd.sh"
+
+  ARGOCD_NAMESPACE="cicd"
+  ARGOCD_APP_CLUSTER_SECRET_NAME="cluster-ubuntu-k3s"
+  ARGOCD_APP_CLUSTER_NAME="ubuntu-k3s"
+  ARGOCD_APP_CLUSTER_SERVER="https://host.k3d.internal:6443"
+  ARGOCD_APP_CLUSTER_INSECURE="true"
+  ARGOCD_APP_CLUSTER_CA_DATA=""
+  ARGOCD_APP_CLUSTER_TOKEN="app-token"
+
+  _kubectl() {
+    case "$*" in
+      apply\ -f\ *)
+        local file="${*: -1}"
+        cp "${file}" "${BATS_TEST_TMPDIR}/fallback-secret.yaml"
+        return 0
+        ;;
+      get\ secret\ cluster-ubuntu-k3s\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.k3d-manager/role\})
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  _argocd_set_active_app_cluster() {
+    :
+  }
+
+  _info() {
+    :
+  }
+
+  run register_app_cluster
+  [ "$status" -eq 0 ]
+
+  run cat "${BATS_TEST_TMPDIR}/fallback-secret.yaml"
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *'"tlsClientConfig": { "insecure": true }'* ]]
+  [[ "${output}" != *'"caData":'* ]]
 }
 
 @test "_hostinger_refresh_access_layer restarts argocd port-forward before cloudflared" {
