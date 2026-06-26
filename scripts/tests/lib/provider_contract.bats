@@ -279,13 +279,23 @@ teardown_file() {
 @test "_hostinger_refresh_access_layer restarts argocd port-forward before cloudflared" {
   HOME="${BATS_TEST_TMPDIR}"
   _ACG_STATE_DIR="${BATS_TEST_TMPDIR}/state"
+  SCRIPT_DIR="${BATS_TEST_TMPDIR}/scripts"
   mkdir -p "${_ACG_STATE_DIR}/bin" "${HOME}/Library/LaunchAgents" "${HOME}/.cloudflared"
+  mkdir -p "${SCRIPT_DIR}/etc/launchd" "${SCRIPT_DIR}/etc/hostinger" "${SCRIPT_DIR}/etc/argocd" "${SCRIPT_DIR}/plugins"
   : > "${HOME}/.cloudflared/config.yml"
+  : > "${SCRIPT_DIR}/plugins/shopping_cart.sh"
+  : > "${SCRIPT_DIR}/etc/hostinger/vars.sh"
+  cp "${REPO_ROOT}/scripts/etc/argocd/port-forward-wrapper.sh.tmpl" "${SCRIPT_DIR}/etc/argocd/port-forward-wrapper.sh.tmpl"
+  cp "${REPO_ROOT}/scripts/etc/argocd/browser-https-wrapper.sh.tmpl" "${SCRIPT_DIR}/etc/argocd/browser-https-wrapper.sh.tmpl"
   printf '#!/usr/bin/env bash\nexit 0\n' > "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   printf '#!/usr/bin/env bash\nexit 0\n' > "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
   chmod +x "${_ACG_STATE_DIR}/bin/argocd-port-forward.sh"
   chmod +x "${_ACG_STATE_DIR}/bin/keycloak-port-forward.sh"
   : > "${HOME}/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist"
+  cat > "${SCRIPT_DIR}/etc/launchd/com.k3d-manager.vault-port-forward.plist.tmpl" <<'EOF'
+{{KUBECTL_PATH}}
+{{HOME}}
+EOF
 
   lsof() {
     case "$*" in
@@ -402,6 +412,10 @@ teardown_file() {
   [ "$status" -eq 0 ]
   run grep -F -- '<string>9091:9091</string>' "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist"
   [ "$status" -eq 0 ]
+  run grep -F -- "$(command -v kubectl)" "${HOME}/Library/LaunchAgents/com.k3d-manager.vault-port-forward.plist"
+  [ "$status" -eq 0 ]
+  run grep -F -- "${HOME}" "${HOME}/Library/LaunchAgents/com.k3d-manager.vault-port-forward.plist"
+  [ "$status" -eq 0 ]
 
   run cat "${BATS_TEST_TMPDIR}/restart.log"
   [ "$status" -eq 0 ]
@@ -415,6 +429,7 @@ teardown_file() {
   [[ "${output}" == *"com.k3d-manager.keycloak-port-forward"* ]]
   [[ "${output}" == *"com.k3d-manager.cloudflare-tunnel"* ]]
   [[ "${output}" == *"com.k3d-manager.argocd-browser-https"* ]]
+  [[ "${output}" == *"com.k3d-manager.vault-port-forward"* ]]
 }
 
 @test "_hostinger_reconcile_vault_cluster_store bootstraps vault-backend when ESO is present" {

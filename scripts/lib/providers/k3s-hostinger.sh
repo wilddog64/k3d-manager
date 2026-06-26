@@ -528,6 +528,9 @@ function _hostinger_refresh_access_layer() {
   local _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   local _frontend_browser_log="${_ACG_STATE_DIR}/logs/frontend-browser-http.log"
   local _grafana_pf_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
+  local _vault_pf_label="com.k3d-manager.vault-port-forward"
+  local _vault_pf_plist="${HOME}/Library/LaunchAgents/${_vault_pf_label}.plist"
+  local _vault_pf_tmpl="${SCRIPT_DIR}/etc/launchd/${_vault_pf_label}.plist.tmpl"
   local _grafana_pf_log="${_ACG_STATE_DIR}/logs/grafana-pf.log"
   local _pushgateway_pf_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist"
   local _pushgateway_pf_log="${_ACG_STATE_DIR}/logs/pushgateway-pf.log"
@@ -636,6 +639,20 @@ PLIST
     "com.k3d-manager.frontend-browser-http" \
     "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
     system
+  if [[ ! -f "${_vault_pf_plist}" && -f "${_vault_pf_tmpl}" ]]; then
+    _info "[k3s-hostinger] Vault port-forward plist missing — installing from template..."
+    local _vault_pf_kubectl
+    _vault_pf_kubectl="$(command -v kubectl)"
+    mkdir -p "$(dirname "${_vault_pf_plist}")"
+    sed \
+      -e "s|{{KUBECTL_PATH}}|${_vault_pf_kubectl}|g" \
+      -e "s|{{HOME}}|${HOME}|g" \
+      "${_vault_pf_tmpl}" > "${_vault_pf_plist}"
+  fi
+  _hostinger_restart_launchd \
+    "${_vault_pf_label}" \
+    "${_vault_pf_plist}" \
+    user
   _hostinger_restart_launchd \
     "com.k3d-manager.grafana-port-forward" \
     "${_grafana_pf_plist}" \
