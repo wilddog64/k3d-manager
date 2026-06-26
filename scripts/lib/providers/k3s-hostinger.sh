@@ -15,6 +15,21 @@ _HOSTINGER_SSH_KEY="${HOSTINGER_SSH_KEY:-${HOME}/.ssh/hostinger}"
 _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
 _HOSTINGER_KUBECONFIG="${HOME}/.kube/hostinger.config"
 
+function _hostinger_load_argocd_plugin() {
+  if declare -f register_app_cluster >/dev/null 2>&1 && declare -f _argocd_hub_kubectl_cmd >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local argocd_plugin="${SCRIPT_DIR}/plugins/argocd.sh"
+  if [[ ! -r "${argocd_plugin}" ]]; then
+    printf 'ERROR: %s\n' "[k3s-hostinger] ArgoCD plugin not found: ${argocd_plugin}" >&2
+    return 1
+  fi
+
+  # shellcheck source=/dev/null
+  source "${argocd_plugin}"
+}
+
 function _hostinger_require_host() {
   local host="${HOSTINGER_HOST:-}"
   if [[ -z "${host}" ]]; then
@@ -102,74 +117,54 @@ function _hostinger_merge_kubeconfig() {
 }
 
 function _hostinger_register_cluster() {
+  _hostinger_load_argocd_plugin || return 1
   local argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
   local secret_name="cluster-${_HOSTINGER_KUBE_CONTEXT}"
-  local server ca_data cert_data key_data
+  local server token
   server="$(kubectl config view --raw -o jsonpath="{.clusters[?(@.name==\"${_HOSTINGER_KUBE_CONTEXT}\")].cluster.server}" 2>/dev/null)"
-  ca_data="$(kubectl config view --raw -o jsonpath="{.clusters[?(@.name==\"${_HOSTINGER_KUBE_CONTEXT}\")].cluster.certificate-authority-data}" 2>/dev/null)"
-  cert_data="$(kubectl config view --raw -o jsonpath="{.users[?(@.name==\"${_HOSTINGER_KUBE_CONTEXT}\")].user.client-certificate-data}" 2>/dev/null)"
-  key_data="$(kubectl config view --raw -o jsonpath="{.users[?(@.name==\"${_HOSTINGER_KUBE_CONTEXT}\")].user.client-key-data}" 2>/dev/null)"
-  if [[ -z "${server}" || -z "${ca_data}" || -z "${cert_data}" || -z "${key_data}" ]]; then
-    printf 'ERROR: %s\n' "[k3s-hostinger] could not read ${_HOSTINGER_KUBE_CONTEXT} credentials from ~/.kube/config" >&2
+  token="$(kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" create token argocd-manager -n kube-system --duration="${HOSTINGER_ARGOCD_MANAGER_TOKEN_DURATION:-8760h}" 2>/dev/null || true)"
+  if [[ -z "${server}" || -z "${token}" ]]; then
+    printf 'ERROR: %s\n' "[k3s-hostinger] could not read ${_HOSTINGER_KUBE_CONTEXT} server/token for ArgoCD registration" >&2
     return 1
   fi
 
   _info "[k3s-hostinger] Registering '${_HOSTINGER_KUBE_CONTEXT}' (${server}) with hub ArgoCD ns ${argocd_ns}..."
-  local rendered rc=0
-  rendered="$(mktemp -t k3s-hostinger-cluster.XXXXXX.yaml)"
-  local wasx=0
-  case $- in *x*) wasx=1; set +x;; esac
-  cat > "${rendered}" <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: ${secret_name}
-  namespace: ${argocd_ns}
-  labels:
-    argocd.argoproj.io/secret-type: cluster
-    argocd.argoproj.io/cluster-name: ${_HOSTINGER_KUBE_CONTEXT}
-    k3d-manager/role: app-cluster
-type: Opaque
-stringData:
-  name: ${_HOSTINGER_KUBE_CONTEXT}
-  server: ${server}
-  config: |
-    {
-      "tlsClientConfig": {
-        "caData": "${ca_data}",
-        "certData": "${cert_data}",
-        "keyData": "${key_data}"
-      }
+  local -a hub_kubectl=()
+  read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
+  (
+    _kubectl() {
+      "${hub_kubectl[@]}" "$@"
     }
-EOF
-  _kubectl apply -f "${rendered}" || rc=$?
-  rm -f "${rendered}"
-  (( wasx )) && set -x
-  if (( rc != 0 )); then
-    printf 'ERROR: %s\n' "[k3s-hostinger] failed to apply cluster secret ${secret_name} to hub ArgoCD" >&2
-    return 1
-  fi
-  _hostinger_set_active_app_cluster || return 1
+    ARGOCD_NAMESPACE="${argocd_ns}" \
+    ARGOCD_APP_CLUSTER_SECRET_NAME="${secret_name}" \
+    ARGOCD_APP_CLUSTER_NAME="${_HOSTINGER_KUBE_CONTEXT}" \
+    ARGOCD_APP_CLUSTER_SERVER="${server}" \
+    ARGOCD_APP_CLUSTER_ENVIRONMENT="${HOSTINGER_ARGOCD_APP_CLUSTER_ENVIRONMENT:-${ARGOCD_APP_CLUSTER_ENVIRONMENT:-dev}}" \
+    ARGOCD_APP_CLUSTER_INSECURE="${HOSTINGER_ARGOCD_APP_CLUSTER_INSECURE:-${ARGOCD_APP_CLUSTER_INSECURE:-true}}" \
+    ARGOCD_APP_CLUSTER_TOKEN="${token}" \
+    register_app_cluster
+  ) || return 1
   _info "[k3s-hostinger] Registered — verify: kubectl get secret ${secret_name} -n ${argocd_ns}"
 }
 
 function _hostinger_set_active_app_cluster() {
-  if declare -f _argocd_set_active_app_cluster >/dev/null 2>&1; then
-    _argocd_set_active_app_cluster "${_HOSTINGER_KUBE_CONTEXT}"
-    return $?
-  fi
-
+  _hostinger_load_argocd_plugin || return 1
   local argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
+  local -a hub_kubectl=()
+  read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
   local secret_name cluster_name
   while IFS= read -r secret_name; do
     [[ -z "${secret_name}" ]] && continue
-    cluster_name="$(_kubectl get "${secret_name}" -n "${argocd_ns}" -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/cluster-name}' 2>/dev/null)"
+    cluster_name="$("${hub_kubectl[@]}" get "${secret_name}" -n "${argocd_ns}" -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/cluster-name}' 2>/dev/null)"
     if [[ "${cluster_name}" == "${_HOSTINGER_KUBE_CONTEXT}" ]]; then
-      _kubectl label "${secret_name}" -n "${argocd_ns}" k3d-manager/role=app-cluster --overwrite >/dev/null 2>&1 || true
+      if ! "${hub_kubectl[@]}" label "${secret_name}" -n "${argocd_ns}" k3d-manager/role=app-cluster --overwrite >/dev/null 2>&1; then
+        printf 'ERROR: %s\n' "[k3s-hostinger] failed to label ${secret_name} as the active app-cluster on the hub" >&2
+        return 1
+      fi
     else
-      _kubectl label "${secret_name}" -n "${argocd_ns}" k3d-manager/role- >/dev/null 2>&1 || true
+      "${hub_kubectl[@]}" label "${secret_name}" -n "${argocd_ns}" k3d-manager/role- >/dev/null 2>&1 || true
     fi
-  done < <(_kubectl get secrets -n "${argocd_ns}" -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null)
+  done < <("${hub_kubectl[@]}" get secrets -n "${argocd_ns}" -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null)
   _info "[k3s-hostinger] app-cluster role label set on '${_HOSTINGER_KUBE_CONTEXT}' (cleared from others)"
 }
 

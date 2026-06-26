@@ -105,55 +105,37 @@ teardown_file() {
   [[ "$(_acg_resolve_provider)" == "k3s-hostinger" ]]
 }
 
-@test "_hostinger_register_cluster clears app-cluster role from other ArgoCD cluster secrets" {
+@test "_hostinger_set_active_app_cluster targets the hub context for relabel" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
 
   _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
-  _HOSTINGER_KUBECONFIG="${BATS_TEST_TMPDIR}/hostinger.config"
-  : > "${_HOSTINGER_KUBECONFIG}"
   ARGOCD_NAMESPACE="cicd"
+  _argocd_hub_kubectl_cmd() {
+    printf '%s\n' "kubectl --context k3d-k3d-cluster"
+  }
+  _hostinger_load_argocd_plugin() {
+    :
+  }
 
   kubectl() {
     case "$*" in
-      config\ view\ --raw\ -o\ jsonpath=\{.clusters\[\?\(@.name==\"ubuntu-hostinger\"\)\].cluster.server\})
-        printf '%s' 'https://2.25.146.252:6443'
-        ;;
-      config\ view\ --raw\ -o\ jsonpath=\{.clusters\[\?\(@.name==\"ubuntu-hostinger\"\)\].cluster.certificate-authority-data\})
-        printf '%s' 'ca-data'
-        ;;
-      config\ view\ --raw\ -o\ jsonpath=\{.users\[\?\(@.name==\"ubuntu-hostinger\"\)\].user.client-certificate-data\})
-        printf '%s' 'cert-data'
-        ;;
-      config\ view\ --raw\ -o\ jsonpath=\{.users\[\?\(@.name==\"ubuntu-hostinger\"\)\].user.client-key-data\})
-        printf '%s' 'key-data'
-        ;;
-      *)
-        return 1
-        ;;
-    esac
-  }
-
-  _kubectl() {
-    printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log"
-    case "$*" in
-      apply\ -f\ *)
-        return 0
-        ;;
-      get\ secrets\ -n\ cicd\ -l\ argocd.argoproj.io/secret-type=cluster\ -o\ name)
+      --context\ k3d-k3d-cluster\ get\ secrets\ -n\ cicd\ -l\ argocd.argoproj.io/secret-type=cluster\ -o\ name)
         printf '%s\n' 'secret/cluster-ubuntu-hostinger'
         printf '%s\n' 'secret/cluster-ubuntu-k3s'
         ;;
-      get\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.argocd\\.argoproj\\.io/cluster-name\})
+      --context\ k3d-k3d-cluster\ get\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.argocd\\.argoproj\\.io/cluster-name\})
         printf '%s' 'ubuntu-hostinger'
         ;;
-      get\ secret/cluster-ubuntu-k3s\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.argocd\\.argoproj\\.io/cluster-name\})
+      --context\ k3d-k3d-cluster\ get\ secret/cluster-ubuntu-k3s\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.argocd\\.argoproj\\.io/cluster-name\})
         printf '%s' 'ubuntu-k3s'
         ;;
-      label\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ k3d-manager/role=app-cluster\ --overwrite)
+      --context\ k3d-k3d-cluster\ label\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ k3d-manager/role=app-cluster\ --overwrite)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log"
         return 0
         ;;
-      label\ secret/cluster-ubuntu-k3s\ -n\ cicd\ k3d-manager/role-)
+      --context\ k3d-k3d-cluster\ label\ secret/cluster-ubuntu-k3s\ -n\ cicd\ k3d-manager/role-)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log"
         return 0
         ;;
       *)
@@ -166,12 +148,72 @@ teardown_file() {
     :
   }
 
-  _hostinger_register_cluster
+  _hostinger_set_active_app_cluster
 
   run cat "${BATS_TEST_TMPDIR}/kubectl.log"
   [ "$status" -eq 0 ]
-  [[ "${output}" == *"label secret/cluster-ubuntu-hostinger -n cicd k3d-manager/role=app-cluster --overwrite"* ]]
-  [[ "${output}" == *"label secret/cluster-ubuntu-k3s -n cicd k3d-manager/role-"* ]]
+  [[ "${output}" == *"--context k3d-k3d-cluster label secret/cluster-ubuntu-hostinger -n cicd k3d-manager/role=app-cluster --overwrite"* ]]
+  [[ "${output}" == *"--context k3d-k3d-cluster label secret/cluster-ubuntu-k3s -n cicd k3d-manager/role-"* ]]
+}
+
+@test "_hostinger_register_cluster routes through register_app_cluster labels" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  export PLUGINS_DIR="${REPO_ROOT}/scripts/plugins"
+  _warn() { :; }
+  _err() { printf '%s\n' "$*" >&2; return 1; }
+  _cleanup_trap_command() { printf 'rm -f %q' "$1"; }
+  source "${REPO_ROOT}/scripts/plugins/argocd.sh"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
+  ARGOCD_NAMESPACE="cicd"
+  ARGOCD_CHART_VERSION="7.8.1"
+  _argocd_hub_kubectl_cmd() {
+    printf '%s\n' "kubectl --context k3d-k3d-cluster"
+  }
+
+  kubectl() {
+    case "$*" in
+      config\ view\ --raw\ -o\ jsonpath=\{.clusters\[\?\(@.name==\"ubuntu-hostinger\"\)\].cluster.server\})
+        printf '%s' 'https://2.25.146.252:6443'
+        ;;
+      --context\ ubuntu-hostinger\ create\ token\ argocd-manager\ -n\ kube-system\ --duration=8760h)
+        printf '%s' 'hostinger-token'
+        ;;
+      --context\ k3d-k3d-cluster\ apply\ -f\ *)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log"
+        local file="${*: -1}"
+        cp "${file}" "${BATS_TEST_TMPDIR}/rendered-secret.yaml"
+        return 0
+        ;;
+      --context\ k3d-k3d-cluster\ get\ secrets\ -n\ cicd\ -l\ argocd.argoproj.io/secret-type=cluster\ -o\ name)
+        printf '%s\n' 'secret/cluster-ubuntu-hostinger'
+        ;;
+      --context\ k3d-k3d-cluster\ get\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.argocd\\.argoproj\\.io/cluster-name\})
+        printf '%s' 'ubuntu-hostinger'
+        ;;
+      --context\ k3d-k3d-cluster\ label\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ k3d-manager/role=app-cluster\ --overwrite)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log"
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  _info() {
+    :
+  }
+
+  run _hostinger_register_cluster
+  [ "$status" -eq 0 ]
+
+  run cat "${BATS_TEST_TMPDIR}/rendered-secret.yaml"
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *'environment: "dev"'* ]]
+  [[ "${output}" == *'argocd-chart-version: "7.8.1"'* ]]
+  [[ "${output}" == *'argocd-replicas: "2"'* ]]
 }
 
 @test "_hostinger_refresh_access_layer restarts argocd port-forward before cloudflared" {

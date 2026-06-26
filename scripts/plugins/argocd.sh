@@ -1142,6 +1142,12 @@ function _argocd_set_active_app_cluster() {
    done < <(_kubectl get secrets -n "${_ns}" -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null)
    _info "[argocd] app-cluster role label set on '${_active}' (cleared from others)"
 }
+
+function _argocd_hub_kubectl_cmd() {
+   local _hub_context="${ARGOCD_HUB_CONTEXT:-k3d-k3d-cluster}"
+   printf 'kubectl --context %s\n' "${_hub_context}"
+}
+
 function register_app_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
