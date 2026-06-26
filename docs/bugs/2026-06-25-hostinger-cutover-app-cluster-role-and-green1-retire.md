@@ -155,12 +155,12 @@ silent `|| true` on the authoritative path so a failed relabel surfaces.
 > `scripts/plugins/argocd.sh:1126-1144` first. Provide exact old/new blocks. Do not change
 > the exclusivity semantics of `_argocd_set_active_app_cluster`.
 
-### Change 2 — preflight cleanup path
+### Change 2 — preflight cleanup path — MOVED
 
-Add (or extend) a `green1`/preflight teardown so a retired preflight vcluster removes its
-`*-preflight-*` ApplicationSets/Applications and `cluster-<name>` secret from the hub, so a
-dead preflight branch (`unable to resolve … to a commit SHA`) can never again front
-production hostnames.
+**Relocated to its own spec:** `docs/bugs/2026-06-25-retire-orphaned-green1-vcluster-host-cpu-ceiling.md`.
+The preflight hub-cleanup belongs in `scripts/plugins/vcluster.sh` (`vcluster_destroy`),
+alongside the host-side `vcluster delete`, not in the hostinger provider. Implement it there.
+**Do NOT implement Change 2 in this spec** — only Changes 1, 3, 4 below.
 
 ### Change 4 — stamp ALL appset-selector labels on the active app-cluster secret
 
@@ -171,19 +171,24 @@ every label the ApplicationSet generators select on — not just `k3d-manager/ro
 `argocd-chart-version` / `argocd-replicas`) never generates a platform app for
 `ubuntu-hostinger`.
 
-Codex: read the `platform-helm` ApplicationSet template under
-`scripts/etc/argocd/applicationsets/` and `register_app_cluster`
-(`scripts/plugins/argocd.sh:1145`). When registering/relabeling the active app-cluster
-secret, also apply `environment`, `argocd-chart-version`, and `argocd-replicas` labels
-(values sourced the same way the ACG sandbox secret was originally labelled — do not
-hardcode a single provider's values; derive from provider config/env). Provide exact
-old/new blocks. Do not change generator selectors.
+**Note (verified 2026-06-25):** `register_app_cluster` (`argocd.sh:1185-1196`) ALREADY stamps
+`environment` / `argocd-chart-version` / `argocd-replicas` on the cluster secret. So this is
+NOT a missing-label bug in `register_app_cluster` — `cluster-ubuntu-hostinger` was created
+through a path that bypassed it (it carries only `cluster-name` + the `role` label). The fix:
+ensure the Hostinger provider's app-cluster registration/relabel path goes through
+`register_app_cluster` (or otherwise stamps the same three labels) so the active app-cluster
+secret carries `environment In [dev,infra,prod]` and the `platform-helm` appset follows it.
+
+Codex: read `register_app_cluster` (`argocd.sh:1145-1216`) and the Hostinger registration/
+relabel path in `k3s-hostinger.sh:150-175`. Provide exact old/new blocks. Derive label values
+from provider config/env — do not hardcode a single provider's values. Do not change generator
+selectors.
 
 ### Change 3 — `scripts/tests/lib/provider_contract.bats`
 
-Add coverage: (a) the Hostinger refresh relabel targets the hub context; (b) preflight
-cleanup removes the preflight cluster secret + appsets; (c) the active app-cluster secret
-receives the `environment`/`argocd-chart-version`/`argocd-replicas` labels (Change 4).
+Add coverage: (a) the Hostinger refresh relabel targets the hub context; (b) the active
+app-cluster secret receives the `environment`/`argocd-chart-version`/`argocd-replicas` labels
+(Change 4). *(Preflight-cleanup coverage moved to the green1-vcluster spec.)*
 
 ---
 
