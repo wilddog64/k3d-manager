@@ -5,9 +5,25 @@
 ### Added
 - ESO operator install on app clusters via an ArgoCD ApplicationSet cluster generator (`scripts/etc/argocd/applicationsets/eso.yaml`) — selects `k3d-manager/role: app-cluster`, installs the `external-secrets` chart `1.0.0` with CRDs into the `secrets` namespace using server-side apply; portable across host OS and CPU arch (install runs in-cluster, not from the local CLI)
 
+### Changed
+- lib-foundation subtree synced to v0.4.0 — absorbed lib-acg, added `_ensure_agy_cli` and the extensible cluster-provider hook (`scripts/lib/foundation/`)
+- ACG module now sourced from lib-foundation: the `acg.sh`, `gcp.sh`, and `gemini.sh` stubs repoint to `scripts/lib/foundation/scripts/lib/acg/` (Phase 2 of the lib-acg absorption); `bin/cluster-up` / `bin/cluster-refresh` npm-prefix and `acg-credential-test` paths follow
+- `gemini.sh` browser automation retargeted from the retired `@google/gemini-cli` to the Go-based Antigravity CLI (`agy --dangerously-skip-permissions`); `_ensure_gemini` now provisions `agy` instead of npm-installing gemini-cli; public `gemini_*` function names retained (backend-only swap)
+
 ### Fixed
 - shopping-cart data-layer routing: the app-cluster ArgoCD cluster secret now carries the `k3d-manager/role: app-cluster` label so the `data-git` ApplicationSet generator matches it (`scripts/lib/providers/k3s-hostinger.sh`, `scripts/etc/argocd/cluster-secret.yaml.tmpl`)
 - Slack webhook: `cluster-up`/`cluster-down`/`cluster-resume` are now accepted as top-level standalone commands (were thread-reply-only); provider allowlist on all three now includes `hostinger` and defaults to `hostinger` instead of `aws`, so a bare or unrecognized provider no longer silently starts an ACG AWS sandbox run (`bin/k3dm-webhook`)
+- `k3s-hostinger` reconcile now provisions `ghcr-pull-secret` on the Hostinger context (best-effort with a warning), so shopping-cart pods stop sitting in `ImagePullBackOff` after a deploy/refresh
+- `k3s-hostinger` app-cluster registration uses CA-verified TLS and ensures the `argocd-manager` ServiceAccount exists before registering with the hub ArgoCD
+- `k3s-hostinger` provider-aware `refresh` restored — re-bootstraps ESO, restarts the keycloak public port-forward, restores the repo-managed cloudflared tunnel, and is now bash 3.2-safe with rebuilt browser wrappers
+- `k3s-hostinger` ArgoCD access layer hardened on refresh — kills stale argocd wrappers, clears stale 8080 listeners, and restarts the argocd port-forward
+- provider state precedence: a live Hostinger cluster now wins over a stale active-provider state file, and the active-provider state stays in sync across Hostinger switches (no more falling through to AWS defaults)
+- `make status` / smoke probes are provider-aware for Hostinger — preflight apps are reported separately and the Hostinger access layer is restarted
+- preflight vcluster is now deregistered from the hub ArgoCD on destroy; stale preflight stack retired and app-cluster role relabeled on the hub
+- observability: ACG monitoring secrets are created against the resolved active app-cluster instead of a stale context
+
+### Removed
+- standalone `lib-acg` subtree (`scripts/lib/acg/`) and its git remote — fully absorbed into lib-foundation
 
 ## [1.7.0] - 2026-06-13
 
