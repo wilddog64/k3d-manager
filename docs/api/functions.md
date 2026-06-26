@@ -79,11 +79,11 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `acg_watch` | `scripts/plugins/acg.sh` | Background TTL watcher — extends sandbox TTL every 3.5h while EC2 instance is alive |
 | `acg_teardown` | `scripts/plugins/acg.sh` | Delete ACG CloudFormation stack and remove ubuntu-k3s kubeconfig context |
 | `aws_import_credentials` | `scripts/plugins/aws.sh` | Write AWS credentials from stdin to `~/.aws/credentials`; supports CSV, quoted/unquoted export, Pluralsight label, and credentials file formats |
-| `gemini_install` | `scripts/plugins/gemini.sh` | Verify full Gemini stack installed (Node.js, gemini CLI, IDE, Playwright MCP) |
+| `gemini_install` | `scripts/plugins/gemini.sh` | Verify the browser-automation stack is installed (Antigravity CLI `agy`, IDE, Playwright MCP) — retargeted from the retired `@google/gemini-cli` in v1.8.0 |
 | `gemini_trigger_copilot_review` | `scripts/plugins/gemini.sh` | Trigger GitHub Copilot coding agent task via Playwright CDP automation |
 | `gemini_poll_task` | `scripts/plugins/gemini.sh` | Poll a Copilot coding agent task until complete; print full output verbatim |
 | `acg_extend_playwright` | `scripts/plugins/acg.sh` | Extend ACG sandbox TTL via Playwright automation (public dispatcher entry point for `_acg_extend_playwright`) |
-| `acg_check_ttl` | `scripts/lib/acg/scripts/plugins/acg.sh` | Read ACG sandbox TTL via Playwright and print remaining minutes; returns -1 if unparseable |
+| `acg_check_ttl` | `scripts/lib/foundation/scripts/lib/acg/scripts/plugins/acg.sh` | Read ACG sandbox TTL via Playwright and print remaining minutes; returns -1 if unparseable |
 | `ssm_wait` | `scripts/plugins/ssm.sh` | Wait until an EC2 instance is registered and reachable via SSM (polls `ssm describe-instance-information`) |
 | `ssm_exec` | `scripts/plugins/ssm.sh` | Run a shell command on an EC2 instance via SSM `send-command`; prints command output/results after execution |
 | `ssm_tunnel` | `scripts/plugins/ssm.sh` | Open an SSM port-forward tunnel to an EC2 instance (wraps `aws ssm start-session --document-name AWS-StartPortForwardingSession`) |

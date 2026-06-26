@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-06-26
+
 ### Added
 - ESO operator install on app clusters via an ArgoCD ApplicationSet cluster generator (`scripts/etc/argocd/applicationsets/eso.yaml`) — selects `k3d-manager/role: app-cluster`, installs the `external-secrets` chart `1.0.0` with CRDs into the `secrets` namespace using server-side apply; portable across host OS and CPU arch (install runs in-cluster, not from the local CLI)
 
