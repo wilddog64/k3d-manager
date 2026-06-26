@@ -680,6 +680,10 @@ function _hostinger_reconcile_vault_cluster_store() {
   shopping_cart_apply_vault_token_and_cluster_secret_store || return 1
   _info "[k3s-hostinger] Forcing ExternalSecret reconcile on ${_HOSTINGER_KUBE_CONTEXT}..."
   shopping_cart_force_vault_secret_reconcile "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null || return 1
+  _info "[k3s-hostinger] Ensuring ghcr-pull-secret on ${_HOSTINGER_KUBE_CONTEXT}..."
+  if ! APP_CONTEXT="${_HOSTINGER_KUBE_CONTEXT}" shopping_cart_provision_ghcr_pull_secret; then
+    _warn "[k3s-hostinger] ghcr-pull-secret not provisioned on ${_HOSTINGER_KUBE_CONTEXT} (no valid GHCR PAT?) — shopping-cart pods may stay in ImagePullBackOff; set GHCR_PAT or store a PAT in Vault and re-run"
+  fi
 }
 
 function _provider_k3s_hostinger_deploy_cluster() {
