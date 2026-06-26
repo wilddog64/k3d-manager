@@ -19,8 +19,8 @@ set -euo pipefail
 
 # shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-if [[ ! -d "${REPO_ROOT}/scripts/lib/acg/node_modules/playwright" ]]; then
-  npm --prefix "${REPO_ROOT}/scripts/lib/acg" install --prefer-offline 2>&1
+if [[ ! -d "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg/node_modules/playwright" ]]; then
+  npm --prefix "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg" install --prefer-offline 2>&1
 fi
 # shellcheck disable=SC2034
 SCRIPT_DIR="${REPO_ROOT}/scripts"
@@ -206,7 +206,7 @@ case "${_cluster_provider}" in
       _acg_cred_test_url="${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
       _info "[acg-up] Extracting and validating AWS credentials (will restart sandbox on ghost-state failure)..."
       _browser_launch
-      "${REPO_ROOT}/scripts/lib/acg/bin/"acg-credential-test "${_acg_cred_test_url}" || exit 1
+      "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg/bin/"acg-credential-test "${_acg_cred_test_url}" || exit 1
       _info "[acg-up] AWS credentials extracted and validated."
     fi
     ;;
@@ -226,7 +226,7 @@ case "${_cluster_provider}" in
       _acg_cred_test_url="${sandbox_url:-${_ACG_SANDBOX_LIST_URL}}"
       _info "[acg-up] Extracting and validating Azure credentials..."
       _browser_launch
-      "${REPO_ROOT}/scripts/lib/acg/bin/"acg-credential-test "${_acg_cred_test_url}" --provider azure || exit 1
+      "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg/bin/"acg-credential-test "${_acg_cred_test_url}" --provider azure || exit 1
       _info "[acg-up] Azure credentials extracted and validated."
       AZ_RESOURCE_GROUP=$(az group list --query '[0].name' -o tsv 2>/dev/null || true)
       export AZ_RESOURCE_GROUP
@@ -1721,23 +1721,24 @@ _info "[acg-up] Step 13/14 — Frontend served via direct kubectl port-forward o
 
 _info "[acg-up] Step 14/14 — Deploying ACG observability (Prometheus + Trivy)..."
 source "${REPO_ROOT}/scripts/plugins/observability.sh"
-deploy_observability_acg
+_acg_observability_context="$(_acg_provider_context "$(_acg_resolve_provider)")"
+deploy_observability_acg "${_acg_observability_context}"
 
-_info "[acg-up] Step 14b/14 — Starting ACG Prometheus port-forward (ubuntu-k3s → localhost:19090)..."
+_info "[acg-up] Step 14b/14 — Starting ACG Prometheus port-forward (${_acg_observability_context} → localhost:19090)..."
 _acg_prom_pf_pid_file="${_ACG_STATE_DIR}/run/acg-prom-pf.pid"
 if [[ -f "${_acg_prom_pf_pid_file}" ]]; then
   kill "$(cat "${_acg_prom_pf_pid_file}")" 2>/dev/null || true
   rm -f "${_acg_prom_pf_pid_file}"
 fi
 kubectl port-forward svc/prometheus-operated 19090:9090 \
-  -n monitoring --context ubuntu-k3s --address 0.0.0.0 \
+  -n monitoring --context "${_acg_observability_context}" --address 0.0.0.0 \
   >>"${_ACG_STATE_DIR}/logs/acg-prom-pf.log" 2>&1 &
 _acg_prom_pf_pid=$!
 echo "${_acg_prom_pf_pid}" > "${_acg_prom_pf_pid_file}"
 disown "${_acg_prom_pf_pid}"
-_info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:19090 → ubuntu-k3s, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
+_info "[acg-up] ACG Prometheus port-forward PID: ${_acg_prom_pf_pid} (localhost:19090 → ${_acg_observability_context}, log: ${_ACG_STATE_DIR}/logs/acg-prom-pf.log)"
 
-_info "[acg-up] Step 14c/14 — Installing Pushgateway port-forward LaunchAgent (localhost:9091 → ubuntu-k3s)..."
+_info "[acg-up] Step 14c/14 — Installing Pushgateway port-forward LaunchAgent (localhost:9091 → ${_acg_observability_context})..."
 _pgw_pf_label="com.k3d-manager.pushgateway-port-forward"
 _pgw_pf_plist="${HOME}/Library/LaunchAgents/${_pgw_pf_label}.plist"
 _pgw_pf_log="${_ACG_STATE_DIR}/logs/pushgateway-pf.log"
@@ -1759,7 +1760,7 @@ cat > "${_pgw_pf_plist}" <<PLIST
     <string>--namespace</string>
     <string>monitoring</string>
     <string>--context</string>
-    <string>ubuntu-k3s</string>
+    <string>${_acg_observability_context}</string>
     <string>9091:9091</string>
   </array>
   <key>EnvironmentVariables</key>

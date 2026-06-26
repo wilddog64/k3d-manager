@@ -32,7 +32,14 @@ setup() {
       cat
     }
     _kubectl() {
-      printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+      case "$*" in
+        *"get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}'"*)
+          printf "%s" "dG9rZW4="
+          ;;
+        *)
+          printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+          ;;
+      esac
     }
     kubectl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
@@ -56,39 +63,60 @@ setup() {
   envsubst_log="${BATS_TEST_TMPDIR}/envsubst-acg.log"
   kubectl_log="${BATS_TEST_TMPDIR}/kubectl-acg.log"
   export ENVSTUB_LOG="${envsubst_log}" KUBE_STUB_LOG="${kubectl_log}"
-  run bash -c '
-    set -e
-    REPO_ROOT="$(pwd)"
-    SCRIPT_DIR="${REPO_ROOT}/scripts"
-    source scripts/lib/system.sh
-    source scripts/lib/core.sh
-    source scripts/lib/provider.sh
-    source scripts/plugins/observability.sh
-    envsubst() {
-      printf "%s\n" "$*" > "${ENVSTUB_LOG}"
-      cat
-    }
-    _kubectl() {
-      printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
-    }
-    kubectl() {
-      printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
-    }
-    curl() {
-      # Mock curl to return Vault credentials
-      printf "{\"data\":{\"data\":{\"user\":\"admin\",\"password_bcrypt\":\"test_hash\"}}}"
-    }
-    export -f envsubst _kubectl kubectl curl
-    export K3D_MANAGER_BRANCH=feature-branch
-    deploy_observability_acg
-  '
+  _acg_resolve_provider() {
+    printf "%s\n" "k3s-hostinger"
+  }
+  _acg_provider_context() {
+    case "$1" in
+      k3s-hostinger) printf "%s\n" "ubuntu-hostinger" ;;
+      *)             printf "%s\n" "ubuntu-k3s" ;;
+    esac
+  }
+  envsubst() {
+    printf "%s\n" "$*" >> "${ENVSTUB_LOG}"
+    cat
+  }
+  _kubectl() {
+    case "$*" in
+      *"get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}'"*)
+        printf "%s" "dG9rZW4="
+        ;;
+      *)
+        printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+        ;;
+    esac
+  }
+  kubectl() {
+    printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+  }
+  helm() {
+    printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+    return 0
+  }
+  curl() {
+    case "$*" in
+      *"/v1/secret/data/k3d-manager/alertmanager"*)
+        printf '{"data":{"data":{"gmail_from":"alerts@example.com","gmail_app_pw":"app-password","sms_gateway":"12345"}}}'
+        ;;
+      *"/v1/secret/data/k3d-manager/prometheus-basic-auth"*)
+        printf '{"data":{"data":{"user":"admin","password_bcrypt":"test_hash"}}}'
+        ;;
+      *)
+        return 0
+        ;;
+      esac
+  }
+  run deploy_observability_acg
   [ "$status" -eq 0 ]
   [[ -f "${envsubst_log}" ]]
+  [[ "$output" == *"Alertmanager config secret created on ACG (ubuntu-hostinger)"* ]]
+  [[ "$output" == *"Prometheus web config secret applied (monitoring/prometheus-web-config on ubuntu-hostinger)"* ]]
   run cat "${envsubst_log}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"\$ARGOCD_NAMESPACE \$K3D_MANAGER_BRANCH"* ]]
   run cat "${kubectl_log}"
   [ "$status" -eq 0 ]
+  [[ "$output" == *"create namespace monitoring --context ubuntu-hostinger --dry-run=client -o yaml"* ]]
   [[ "$output" == *"apply -f -"* ]]
 }
 
@@ -103,13 +131,22 @@ setup() {
     source scripts/lib/core.sh
     source scripts/lib/provider.sh
     source scripts/plugins/observability.sh
+    _acg_resolve_provider() {
+      printf "%s\n" "k3s-aws"
+    }
+    _acg_provider_context() {
+      case "$1" in
+        k3s-aws) printf "%s\n" "ubuntu-k3s" ;;
+        *)       printf "%s\n" "ubuntu-k3s" ;;
+      esac
+    }
     _kubectl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
     kubectl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
-    export -f _kubectl kubectl
+    export -f _acg_resolve_provider _acg_provider_context _kubectl kubectl
     trivy_scan_report
   '
   [ "$status" -eq 0 ]
@@ -129,13 +166,22 @@ setup() {
     source scripts/lib/core.sh
     source scripts/lib/provider.sh
     source scripts/plugins/observability.sh
+    _acg_resolve_provider() {
+      printf "%s\n" "k3s-aws"
+    }
+    _acg_provider_context() {
+      case "$1" in
+        k3s-aws) printf "%s\n" "ubuntu-k3s" ;;
+        *)       printf "%s\n" "ubuntu-k3s" ;;
+      esac
+    }
     _kubectl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
     kubectl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
-    export -f _kubectl kubectl
+    export -f _acg_resolve_provider _acg_provider_context _kubectl kubectl
     trivy_scan_report
   '
   [ "$status" -eq 0 ]
@@ -155,13 +201,22 @@ setup() {
     source scripts/lib/core.sh
     source scripts/lib/provider.sh
     source scripts/plugins/observability.sh
+    _acg_resolve_provider() {
+      printf "%s\n" "k3s-aws"
+    }
+    _acg_provider_context() {
+      case "$1" in
+        k3s-aws) printf "%s\n" "ubuntu-k3s" ;;
+        *)       printf "%s\n" "ubuntu-k3s" ;;
+      esac
+    }
     _kubectl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
     kubectl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
-    export -f _kubectl kubectl
+    export -f _acg_resolve_provider _acg_provider_context _kubectl kubectl
     observability_status
   '
   [ "$status" -eq 0 ]

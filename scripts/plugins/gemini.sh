@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # scripts/plugins/gemini.sh
 #
-# Gemini plugin — browser automation via gemini CLI (@google/gemini-cli) + Playwright.
-# gemini CLI drives Playwright for interactive browser tasks (GitHub Copilot agent trigger,
+# Gemini plugin — browser automation via Antigravity CLI (`agy`) + Playwright.
+# agy drives Playwright for interactive browser tasks (GitHub Copilot agent trigger,
 # ACG sandbox TTL extend) and uses web_fetch for reading task output.
 #
-# Prerequisites: Node.js (via _ensure_node), gemini CLI, browser IDE
+# Prerequisites: Node.js (via _ensure_node), agy CLI, browser IDE
 #
 # Public functions:
 #   gemini_install                  — verify full stack installed
@@ -29,22 +29,22 @@ _GEMINI_MODELS=(
 )
 
 # shellcheck source=/dev/null
-source "${SCRIPT_DIR}/lib/acg/scripts/lib/cdp.sh"
+source "${SCRIPT_DIR}/lib/foundation/scripts/lib/acg/cdp.sh"
 
-function _gemini_prompt() {
+function _agy_prompt() {
   local prompt="$1"
-  local yolo_flag="${2:-}"
+  local permissions_flag="${2:-}"
   local output exit_code
 
   mkdir -p "${HOME}/.gemini/tmp/k3d-manager"
 
   for model in "${_GEMINI_MODELS[@]}"; do
-    _info "Trying gemini model: ${model}..."
+    _info "Trying agy model: ${model}..."
     sleep 2
-    if [[ "$yolo_flag" == "--yolo" ]]; then
-      output=$(gemini --model "$model" --approval-mode yolo --prompt "$prompt" 2>&1)
+    if [[ "$permissions_flag" == "--dangerously-skip-permissions" ]]; then
+      output=$(agy --model "$model" --prompt "$prompt" --dangerously-skip-permissions 2>&1)
     else
-      output=$(gemini --model "$model" --prompt "$prompt" 2>&1)
+      output=$(agy --model "$model" --prompt "$prompt" 2>&1)
     fi
     exit_code=$?
     if [[ $exit_code -eq 0 ]]; then
@@ -59,35 +59,28 @@ function _gemini_prompt() {
     return "$exit_code"
   done
 
-  _err "All gemini models exhausted (429). Models tried: ${_GEMINI_MODELS[*]}"
+  _err "All agy models exhausted (429). Models tried: ${_GEMINI_MODELS[*]}"
 }
 
 function _ensure_gemini() {
-  if _command_exist gemini; then
-    return 0
-  fi
-  _info "gemini CLI not found — installing @google/gemini-cli..."
   _ensure_node
-  _run_command -- npm install -g @google/gemini-cli
-  if ! _command_exist gemini; then
-    _err "gemini CLI install succeeded but binary not found in PATH"
-  fi
+  _ensure_agy_cli
 }
 
 function _gemini_ensure_github_session() {
-  _info "Checking GitHub session in Gemini browser..."
+  _info "Checking GitHub session in Antigravity browser..."
 
-  local gemini_prompt
-  gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
+  local agy_prompt
+  agy_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
 
-1. Connect to the running Gemini browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
+1. Connect to the running Antigravity browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
 2. Use the first browser context and page (do NOT launch a new browser).
 3. Navigate to https://github.com and wait for the page to load.
 4. Check if the user is logged in by looking for an element matching: [aria-label='View profile and more'] or [data-login].
 5. If logged in: print GITHUB_SESSION_OK and exit with code 0.
 6. If NOT logged in:
    a. Navigate to https://github.com/login
-   b. Print: ACTION REQUIRED: Please log into GitHub in the Gemini browser window, then press Enter to continue.
+   b. Print: ACTION REQUIRED: Please log into GitHub in the Antigravity browser window, then press Enter to continue.
    c. Wait for the page URL to no longer contain '/login' — poll every 5 seconds, timeout after 300 seconds.
    d. Once URL is no longer '/login', print GITHUB_SESSION_OK and exit with code 0.
    e. If 300 seconds pass without login, print ERROR: GitHub login timeout and exit with code 1.
@@ -95,7 +88,7 @@ function _gemini_ensure_github_session() {
 Write the Playwright script to ${HOME}/.gemini/tmp/k3d-manager/ag_github_session.js, execute with node, print the result.
 Exit code 1 if session cannot be confirmed."
 
-  _gemini_prompt "$gemini_prompt" --yolo
+  _agy_prompt "$agy_prompt" --dangerously-skip-permissions
 }
 
 function gemini_install() {
@@ -108,12 +101,12 @@ function gemini_install() {
   "$_ensure_ide_fn"
   "$_ensure_mcp_fn"
   _info "Node.js: $(node --version 2>&1)"
-  _info "gemini: $(gemini --version 2>&1 || echo 'version unknown')"
+  _info "agy: $(agy --version 2>&1 || echo 'version unknown')"
   local _ag_bin
   _ag_bin=$( (_command_exist agy && echo agy) || (_command_exist "$_legacy_ide_name" && echo "$_legacy_ide_name") || echo "")
   _info "browser_ide: $( [[ -n "$_ag_bin" ]] && "$_ag_bin" --version 2>&1 || echo 'version unknown')"
   _info "Playwright MCP: configured in browser IDE mcp_config.json"
-  _info "Run 'gemini_trigger_copilot_review <owner> <repo>' — Gemini will launch and prompt for GitHub login if needed."
+  _info "Run 'gemini_trigger_copilot_review <owner> <repo>' — Antigravity will launch and prompt for GitHub login if needed."
 }
 
 function gemini_trigger_copilot_review() {
@@ -135,8 +128,8 @@ function gemini_trigger_copilot_review() {
 
   _info "Triggering Copilot coding agent on ${owner}/${repo}..."
 
-  local gemini_prompt
-  gemini_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
+  local agy_prompt
+  agy_prompt="You are a browser automation agent. Use Playwright (Node.js) to do the following:
 
 1. Connect to the running browser via CDP: const browser = await chromium.connectOverCDP('http://localhost:9222');
 2. Use the first browser context and page (do NOT launch a new browser).
@@ -150,7 +143,7 @@ function gemini_trigger_copilot_review() {
 Write the Playwright script to ${HOME}/.gemini/tmp/k3d-manager/ag_trigger.js, execute with node, print the UUID.
 Exit code 1 if UUID not found within 60 seconds."
 
-  _gemini_prompt "$gemini_prompt" --yolo
+  _agy_prompt "$agy_prompt" --dangerously-skip-permissions
 }
 
 function gemini_poll_task() {
@@ -163,11 +156,11 @@ function gemini_poll_task() {
 
   _info "Polling task ${task_uuid} on ${owner}/${repo} (timeout: ${timeout}s)..."
 
-  local gemini_prompt
-  gemini_prompt="Use your web_fetch tool to fetch https://github.com/${owner}/${repo}/tasks/${task_uuid}
+  local agy_prompt
+  agy_prompt="Use your web_fetch tool to fetch https://github.com/${owner}/${repo}/tasks/${task_uuid}
 Poll every 30 seconds until the task status shows complete or done.
 Timeout after ${timeout} seconds — if not complete by then, print ERROR: timeout and exit.
 Once complete, extract and print the full review output verbatim. Do not summarize."
 
-  _gemini_prompt "$gemini_prompt"
+  _agy_prompt "$agy_prompt"
 }

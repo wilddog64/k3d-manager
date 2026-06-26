@@ -75,6 +75,7 @@ BIN
 
 @test "vcluster_create: fails without active host context" {
   unset VCLUSTER_HOST_CONTEXT
+  # shellcheck disable=SC2034
   KUBECTL_EXIT_CODES=(1)
   run vcluster_create demo
   [ "$status" -ne 0 ]
@@ -96,6 +97,7 @@ BIN
   DRY_RUN=1 run vcluster_destroy demo
   [ "$status" -eq 0 ]
   [[ "$output" == *"kubeconfig ${kubeconfig} would be removed"* ]]
+  [[ "$output" == *"deregister demo from hub ArgoCD (cluster-demo + demo-preflight-* appsets/apps)"* ]]
   [ ! -s "$RUN_LOG" ]
 }
 
@@ -144,4 +146,41 @@ BIN
 @test "vcluster_install_cli is a public function" {
   run grep -n "^function vcluster_install_cli" "${BATS_TEST_DIRNAME}/../../plugins/vcluster.sh"
   [ "$status" -eq 0 ]
+}
+
+@test "_vcluster_deregister_from_hub: deletes hub cluster secret and preflight resources" {
+  _argocd_hub_kubectl_cmd() {
+    printf '%s\n' "kubectl --context k3d-k3d-cluster"
+  }
+  _vcluster_load_argocd_plugin() {
+    :
+  }
+  kubectl() {
+    printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log"
+    case "$*" in
+      --context\ k3d-k3d-cluster\ -n\ cicd\ get\ applicationset\ -o\ name)
+        printf '%s\n' 'applicationset/green1-preflight-services-git'
+        ;;
+      --context\ k3d-k3d-cluster\ -n\ cicd\ get\ application\ -o\ name)
+        printf '%s\n' 'application/green1-preflight-data-layer'
+        ;;
+      *)
+        return 0
+        ;;
+    esac
+  }
+  _info() {
+    :
+  }
+
+  run _vcluster_deregister_from_hub green1
+  [ "$status" -eq 0 ]
+
+  run cat "${BATS_TEST_TMPDIR}/kubectl.log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--context k3d-k3d-cluster -n cicd delete applicationset -l k3d-manager/preflight-cluster=green1 --ignore-not-found"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster -n cicd delete applicationset/green1-preflight-services-git --ignore-not-found"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster -n cicd patch application/green1-preflight-data-layer --type=merge -p {\"metadata\":{\"finalizers\":null}}"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster -n cicd delete application/green1-preflight-data-layer --ignore-not-found"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster -n cicd delete secret cluster-green1 --ignore-not-found"* ]]
 }

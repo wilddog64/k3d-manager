@@ -134,16 +134,19 @@ function shopping_cart_sync_vault_backed_secrets() {
     return 1
   fi
 
-  _info "[shopping_cart] Waiting for ClusterSecretStore vault-backend to be Ready..."
+  local _app_context
+  _app_context="$(_shopping_cart_resolve_app_context)"
+
+  _info "[shopping_cart] Waiting for ClusterSecretStore vault-backend to be Ready on ${_app_context}..."
   local _css_ready=0
   for _css_try in 1 2 3; do
     if kubectl wait --for=condition=Ready --timeout=90s \
-        clustersecretstore/vault-backend --context ubuntu-k3s 2>/dev/null; then
+        clustersecretstore/vault-backend --context "${_app_context}" 2>/dev/null; then
       _css_ready=1
       break
     fi
     _warn "[shopping_cart] ClusterSecretStore vault-backend not Ready after 90s (attempt ${_css_try}/3) — forcing reconcile..."
-    kubectl annotate clustersecretstore vault-backend --context ubuntu-k3s \
+    kubectl annotate clustersecretstore vault-backend --context "${_app_context}" \
       "k3d-manager/reconcile-at=$(date -u +%Y%m%dT%H%M%SZ)" --overwrite >/dev/null 2>&1 || true
   done
   if (( _css_ready == 0 )); then
@@ -152,54 +155,62 @@ function shopping_cart_sync_vault_backed_secrets() {
   fi
 
   _info "[shopping_cart] Applying Vault-backed ExternalSecrets for data, app, payment, and MinIO..."
-  _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/secrets/"
+  _run_command -- kubectl apply --context "${_app_context}" -f "${infra_root}/secrets/"
   if [[ -f "${infra_root}/minio/secret.yaml" ]]; then
-    _run_command -- kubectl apply --context ubuntu-k3s -f "${infra_root}/minio/secret.yaml"
+    _run_command -- kubectl apply --context "${_app_context}" -f "${infra_root}/minio/secret.yaml"
   fi
 
   _info "[shopping_cart] Waiting for Vault-backed ExternalSecrets to become Ready..."
-  local -a externalsecrets=(
-    "shopping-cart-data/redis-cart"
-    "shopping-cart-data/redis-orders-cache"
-    "shopping-cart-data/postgres-orders-readwrite"
-    "shopping-cart-data/postgres-products-app"
-    "shopping-cart-data/postgres-products-readwrite"
-    "shopping-cart-data/rabbitmq-credentials"
-    "shopping-cart-data/minio-credentials"
-    "shopping-cart-apps/redis-cart-apps"
-    "shopping-cart-apps/redis-orders-cache-apps"
-    "shopping-cart-apps/order-service-secrets"
-    "shopping-cart-apps/product-catalog-secrets"
-    "shopping-cart-payment/postgres-payment-app"
-    "shopping-cart-payment/payment-encryption-secret"
-    "shopping-cart-payment/payment-gateway-secrets"
-  )
-
-  local externalsecret namespace name _es_sync_ts
-  _es_sync_ts=$(date +%s)
   local -a _existing_es=()
-  for externalsecret in "${externalsecrets[@]}"; do
-    namespace="${externalsecret%%/*}"
-    name="${externalsecret##*/}"
-    if ! kubectl get externalsecret "${name}" -n "${namespace}" --context ubuntu-k3s >/dev/null 2>&1; then
-      _warn "[shopping_cart] ExternalSecret ${namespace}/${name} not found — skipping wait"
-      continue
-    fi
-    _existing_es+=("${externalsecret}")
-    kubectl annotate externalsecret "${name}" -n "${namespace}" --context ubuntu-k3s \
-      force-sync="${_es_sync_ts}" --overwrite >/dev/null \
-      || _warn "[shopping_cart] Failed to annotate ${namespace}/${name} — sync may not trigger"
-  done
+  mapfile -t _existing_es < <(shopping_cart_force_vault_secret_reconcile "${_app_context}")
 
   for externalsecret in "${_existing_es[@]}"; do
     namespace="${externalsecret%%/*}"
     name="${externalsecret##*/}"
     kubectl wait --for=condition=Ready --timeout=300s \
-      externalsecret/"${name}" -n "${namespace}" --context ubuntu-k3s \
+      externalsecret/"${name}" -n "${namespace}" --context "${_app_context}" \
       || { _err "[shopping_cart] ExternalSecret ${namespace}/${name} did not become Ready"; return 1; }
   done
 
   _info "[shopping_cart] Vault-backed ExternalSecrets synced."
+}
+
+function _shopping_cart_vault_externalsecrets() {
+  printf '%s\n' \
+    "shopping-cart-data/redis-cart" \
+    "shopping-cart-data/redis-orders-cache" \
+    "shopping-cart-data/postgres-orders-readwrite" \
+    "shopping-cart-data/postgres-products-app" \
+    "shopping-cart-data/postgres-products-readwrite" \
+    "shopping-cart-data/rabbitmq-credentials" \
+    "shopping-cart-data/minio-credentials" \
+    "shopping-cart-apps/redis-cart-apps" \
+    "shopping-cart-apps/redis-orders-cache-apps" \
+    "shopping-cart-apps/order-service-secrets" \
+    "shopping-cart-apps/product-catalog-secrets" \
+    "shopping-cart-payment/postgres-payment-app" \
+    "shopping-cart-payment/payment-encryption-secret" \
+    "shopping-cart-payment/payment-gateway-secrets"
+}
+
+function shopping_cart_force_vault_secret_reconcile() {
+  local _app_context="${1:-$(_shopping_cart_resolve_app_context)}"
+  local externalsecret namespace name _es_sync_ts
+  _es_sync_ts=$(date +%s)
+
+  while IFS= read -r externalsecret; do
+    [[ -z "${externalsecret}" ]] && continue
+    namespace="${externalsecret%%/*}"
+    name="${externalsecret##*/}"
+    if ! kubectl get externalsecret "${name}" -n "${namespace}" --context "${_app_context}" >/dev/null 2>&1; then
+      _warn "[shopping_cart] ExternalSecret ${namespace}/${name} not found — skipping wait"
+      continue
+    fi
+    kubectl annotate externalsecret "${name}" -n "${namespace}" --context "${_app_context}" \
+      force-sync="${_es_sync_ts}" --overwrite >/dev/null \
+      || _warn "[shopping_cart] Failed to annotate ${namespace}/${name} — sync may not trigger"
+    printf '%s\n' "${externalsecret}"
+  done < <(_shopping_cart_vault_externalsecrets)
 }
 
 function shopping_cart_load_ghcr_pat_from_env() {
@@ -364,21 +375,24 @@ function shopping_cart_provision_ghcr_pull_secret() {
 }
 
 function shopping_cart_create_vault_bridge() {
+  local _app_context
+  _app_context="$(_shopping_cart_resolve_app_context)"
   if [[ -z "${_vault_node_ip:-}" ]]; then
-    _vault_node_ip=$(kubectl get nodes --context ubuntu-k3s \
+    _vault_node_ip=$(kubectl get nodes --context "${_app_context}" \
       -l node-role.kubernetes.io/control-plane \
       --no-headers \
-      -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
+      -o jsonpath='{range .items[0].status.addresses[?(@.type=="InternalIP")]}{.address}{"\n"}{end}' 2>/dev/null \
+      | awk 'NF { print $1; exit }' || true)
   fi
   if [[ -z "${_vault_node_ip}" ]]; then
     _err "[acg-up] Could not determine server node internal IP — vault-bridge Endpoints skipped"
     return 1
   fi
 
-  kubectl create namespace secrets --context ubuntu-k3s \
+  kubectl create namespace secrets --context "${_app_context}" \
     --dry-run=client -o yaml \
-    | kubectl apply --context ubuntu-k3s -f - >/dev/null
-  kubectl apply --context ubuntu-k3s -f - <<EOF
+    | kubectl apply --context "${_app_context}" -f - >/dev/null
+  kubectl apply --context "${_app_context}" -f - <<EOF
 apiVersion: v1
 kind: Endpoints
 metadata:
@@ -391,7 +405,7 @@ subsets:
   - port: 8201
 EOF
   _info "[acg-up] vault-bridge Endpoints → ${_vault_node_ip}:8201"
-  kubectl apply --context ubuntu-k3s -f - <<'SVCEOF'
+  kubectl apply --context "${_app_context}" -f - <<'SVCEOF'
 apiVersion: v1
 kind: Service
 metadata:
@@ -431,21 +445,24 @@ REMOTE
 }
 
 function shopping_cart_apply_vault_token_and_cluster_secret_store() {
+  local _app_context
+  _app_context="$(_shopping_cart_resolve_app_context)"
+
   _vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
     -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d 2>/dev/null || true)
   if [[ -z "${_vault_root_token}" ]]; then
     _err "[acg-up] Could not read vault-root token from k3d-k3d-cluster — is Vault running?"
     return 1
   fi
-  kubectl create namespace secrets --context ubuntu-k3s \
-    --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f - >/dev/null
+  kubectl create namespace secrets --context "${_app_context}" \
+    --dry-run=client -o yaml | kubectl apply --context "${_app_context}" -f - >/dev/null
   kubectl create secret generic vault-token \
-    -n secrets --context ubuntu-k3s \
+    -n secrets --context "${_app_context}" \
     --from-literal=token="${_vault_root_token}" \
-    --dry-run=client -o yaml | kubectl apply --context ubuntu-k3s -f -
-  _info "[acg-up] Waiting for ESO webhook to be ready..."
+    --dry-run=client -o yaml | kubectl apply --context "${_app_context}" -f -
+  _info "[acg-up] Waiting for ESO webhook to be ready on ${_app_context}..."
   for i in $(seq 1 18); do
-    _wh_ip=$(kubectl get endpoints external-secrets-webhook -n secrets --context ubuntu-k3s \
+    _wh_ip=$(kubectl get endpoints external-secrets-webhook -n secrets --context "${_app_context}" \
       -o jsonpath='{.subsets[0].addresses[0].ip}' 2>/dev/null || true)
     if [[ -n "${_wh_ip}" ]]; then
       _info "[acg-up] ESO webhook ready (${_wh_ip})"
@@ -454,7 +471,7 @@ function shopping_cart_apply_vault_token_and_cluster_secret_store() {
     _info "[acg-up] ESO webhook not ready yet (attempt ${i}/18) — waiting 10s..."
     sleep 10
   done
-  kubectl apply --context ubuntu-k3s -f - <<'CSSEOF'
+  kubectl apply --context "${_app_context}" -f - <<'CSSEOF'
 apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore
 metadata:
@@ -471,10 +488,22 @@ spec:
           namespace: secrets
           key: token
 CSSEOF
-  kubectl annotate clustersecretstore vault-backend --context ubuntu-k3s \
+  kubectl annotate clustersecretstore vault-backend --context "${_app_context}" \
     "k3d-manager/reconcile-at=$(date -u +%Y%m%dT%H%M%SZ)" \
     --overwrite >/dev/null
   _info "[acg-up] vault-token secret + ClusterSecretStore applied"
+}
+
+function _shopping_cart_resolve_app_context() {
+  local _provider="k3s-aws"
+  if declare -f _acg_resolve_provider >/dev/null 2>&1; then
+    _provider="$(_acg_resolve_provider 2>/dev/null || printf '%s' k3s-aws)"
+  fi
+  if declare -f _acg_provider_context >/dev/null 2>&1; then
+    _acg_provider_context "${_provider}"
+    return 0
+  fi
+  printf '%s\n' "ubuntu-k3s"
 }
 
 function shopping_cart_seed_sandbox_vault_kv() {

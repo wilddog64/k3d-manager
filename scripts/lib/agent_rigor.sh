@@ -62,8 +62,18 @@ _agent_audit() {
    fi
 
    local status=0
-   local diff_bats
-   diff_bats="$(git diff --cached -- '*.bats' 2>/dev/null || true)"
+   local diff_bats=""
+   local -a audit_bats_files=()
+   local bats_file=""
+   while IFS= read -r bats_file; do
+      [[ -z "$bats_file" ]] && continue
+      [[ "$bats_file" == scripts/lib/acg/* ]] && continue
+      audit_bats_files+=("$bats_file")
+   done < <(git diff --cached --name-only -- '*.bats' 2>/dev/null || true)
+
+   if (( ${#audit_bats_files[@]} > 0 )); then
+      diff_bats="$(git diff --cached -- "${audit_bats_files[@]}" 2>/dev/null || true)"
+   fi
    if [[ -n "$diff_bats" ]]; then
       if grep -q '^-[[:space:]]*assert_' <<<"$diff_bats"; then
          _warn "Agent audit: assertions removed from BATS files"

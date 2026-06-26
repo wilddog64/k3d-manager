@@ -9,10 +9,12 @@ Shared Bash foundation library extracted from [`k3d-manager`](https://github.com
 | `scripts/lib/core.sh` | Cluster lifecycle operations — create, destroy, deploy, provider abstraction |
 | `scripts/lib/system.sh` | System utilities — `_run_command` privilege model, package helpers, OS detection, BATS install |
 | `scripts/lib/agent_rigor.sh` | Agent audit tooling — `_agent_checkpoint`, `_agent_audit`, `_agent_lint`, pre-commit hook |
+| `scripts/lib/acg/` | Optional ACG module — `acg_*` AWS sandbox lifecycle, `gcp_*` credential extraction, Playwright/CDP helpers |
 
 ## Integration
 
-This library is embedded into consumers via **git subtree**:
+This library is embedded into consumers via **git subtree**. The core library stays zero-node; the
+optional `scripts/lib/acg/` module is opt-in and installs its own Node deps only when needed:
 
 ```bash
 # Add as subtree (first time)
@@ -29,6 +31,20 @@ git subtree pull --prefix=scripts/lib/foundation \
 - [`k3d-manager`](https://github.com/wilddog64/k3d-manager) — local Kubernetes platform manager
 - `rigor-cli` — agent audit tooling (planned)
 - `shopping-carts` — app cluster deployment (planned)
+
+## Optional ACG Module
+
+`scripts/lib/acg/` is the browser-automation module imported from lib-acg. Its public shell API is
+`acg_*` for AWS sandbox lifecycle and `gcp_*` for GCP credential extraction. The module sources
+`scripts/lib/system.sh` via `../system.sh`, keeps its Node/Playwright dependencies isolated in the
+module directory, and uses `npm ci` from `package-lock.json` when you want to run the acg CI/tests.
+
+- `npm run check` in `scripts/lib/acg/` runs `node --check` over the module JS files.
+- `npm test` in `scripts/lib/acg/` runs the Jest unit tests.
+- `npm run test:e2e` / `make credential-test` remain manual browser gates and are not part of core
+  shellcheck/BATS validation.
+- When reviewing changes under `scripts/lib/acg/playwright/**/*.js`, keep the Playwright helpers and
+  fixtures isolated from the core Bash library.
 
 ## Key Contracts
 

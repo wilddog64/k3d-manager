@@ -84,7 +84,7 @@ function _acg_normalize_provider() {
         az|azure|k3s-az)             printf 'k3s-az\n' ;;
         gcp|k3s-gcp)                 printf 'k3s-gcp\n' ;;
         oci|k3s-oci)                 printf 'k3s-oci\n' ;;
-        hostinger|k3s-hostinger)     printf 'k3s-hostinger\n' ;;
+        hostinger|hostiger|k3s-hostinger|k3s-hostiger) printf 'k3s-hostinger\n' ;;
         *)                           printf '%s\n' "${1:-}" ;;
     esac
 }
@@ -109,22 +109,22 @@ function _acg_record_provider() {
 
 function _acg_resolve_provider() {
     local provider="${CLUSTER_PROVIDER:-}"
-    if [[ -z "${provider}" && -f "${_ACG_ACTIVE_PROVIDER_FILE}" ]]; then
-        provider="$(cat "${_ACG_ACTIVE_PROVIDER_FILE}" 2>/dev/null || true)"
-    fi
     if [[ -z "${provider}" ]]; then
         local ctx
-        for ctx in ubuntu-k3s ubuntu-azure ubuntu-gcp ubuntu-hostinger; do
+        for ctx in ubuntu-hostinger ubuntu-k3s ubuntu-azure ubuntu-gcp; do
             if kubectl --context "${ctx}" --request-timeout=5s get --raw=/readyz >/dev/null 2>&1; then
                 case "${ctx}" in
+                    ubuntu-hostinger) provider=k3s-hostinger ;;
                     ubuntu-k3s)       provider=k3s-aws ;;
                     ubuntu-azure)     provider=k3s-az ;;
                     ubuntu-gcp)       provider=k3s-gcp ;;
-                    ubuntu-hostinger) provider=k3s-hostinger ;;
                 esac
                 break
             fi
         done
+    fi
+    if [[ -z "${provider}" && -f "${_ACG_ACTIVE_PROVIDER_FILE}" ]]; then
+        provider="$(cat "${_ACG_ACTIVE_PROVIDER_FILE}" 2>/dev/null || true)"
     fi
     _acg_normalize_provider "${provider:-k3s-aws}"
 }

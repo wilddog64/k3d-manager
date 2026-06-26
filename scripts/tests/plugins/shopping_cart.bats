@@ -63,6 +63,20 @@
   [ "$status" -eq 0 ]
 }
 
+@test "_shopping_cart_resolve_app_context follows the active provider context" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/plugins/shopping_cart.sh
+    _acg_resolve_provider() { printf "%s\n" "k3s-hostinger"; }
+    _shopping_cart_resolve_app_context
+  '
+  [ "$status" -eq 0 ]
+  [ "$output" = "ubuntu-hostinger" ]
+}
+
 @test "_ensure_k3sup returns 0 after successful brew install" {
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"

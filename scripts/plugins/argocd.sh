@@ -1142,6 +1142,12 @@ function _argocd_set_active_app_cluster() {
    done < <(_kubectl get secrets -n "${_ns}" -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null)
    _info "[argocd] app-cluster role label set on '${_active}' (cleared from others)"
 }
+
+function _argocd_hub_kubectl_cmd() {
+   local _hub_context="${ARGOCD_HUB_CONTEXT:-k3d-k3d-cluster}"
+   printf 'kubectl --context %s\n' "${_hub_context}"
+}
+
 function register_app_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
@@ -1158,6 +1164,7 @@ Config (override via env or scripts/etc/argocd/vars.sh):
   ARGOCD_APP_CLUSTER_NAME          Cluster name  (default: ubuntu-k3s)
   ARGOCD_APP_CLUSTER_SERVER        API server    (default: https://host.k3d.internal:6443)
   ARGOCD_APP_CLUSTER_INSECURE      Skip TLS      (default: true — dev only)
+  ARGOCD_APP_CLUSTER_CA_DATA       CA bundle     (optional, base64; when set forces insecure=false)
   ARGOCD_APP_CLUSTER_TOKEN         Bearer token  (required — no default)
 HELP
     return 0
@@ -1174,6 +1181,13 @@ HELP
   local app_cluster_environment="${ARGOCD_APP_CLUSTER_ENVIRONMENT:-dev}"
   if [[ "${ARGOCD_APP_CLUSTER_SERVER}" == "https://kubernetes.default.svc" ]]; then
     app_cluster_environment="${ARGOCD_APP_CLUSTER_ENVIRONMENT:-infra}"
+  fi
+
+  local _tls_client_config
+  if [[ -n "${ARGOCD_APP_CLUSTER_CA_DATA:-}" ]]; then
+    _tls_client_config="\"caData\": \"${ARGOCD_APP_CLUSTER_CA_DATA}\", \"insecure\": false"
+  else
+    _tls_client_config="\"insecure\": ${ARGOCD_APP_CLUSTER_INSECURE:-true}"
   fi
 
   local rendered
@@ -1201,9 +1215,7 @@ stringData:
   config: |
     {
       "bearerToken": "${ARGOCD_APP_CLUSTER_TOKEN}",
-      "tlsClientConfig": {
-        "insecure": ${ARGOCD_APP_CLUSTER_INSECURE}
-      }
+      "tlsClientConfig": { ${_tls_client_config} }
     }
 EOF
   _kubectl apply -f "$rendered"

@@ -1,0 +1,10 @@
+# Node dependencies (installed via `npm ci` in scripts/lib/acg/)
+node_modules/
+
+# Playwright run artifacts
+test-results/
+playwright-report/
+
+# Local scratch / logs
+scratch/
+*.log

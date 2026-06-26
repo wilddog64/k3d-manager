@@ -22,6 +22,7 @@ scripts/lib/
   core.sh            # Cluster lifecycle: create/destroy/deploy, provider abstraction
   system.sh          # _run_command privilege model, package helpers, OS detection, BATS install
   agent_rigor.sh     # _agent_checkpoint, _agent_audit, _agent_lint, pre-commit hook
+  acg/               # Optional ACG module: acg_* / gcp_* shell API, CDP helpers, Playwright tests
 scripts/tests/lib/
   system.bats        # Unit tests for system.sh
   core.bats          # Unit tests for core.sh
@@ -50,6 +51,10 @@ _run_command --soft -- <cmd>                # return 127 instead of exit on fail
 
 **`_resolve_script_dir` (core.sh)** — portable symlink-aware absolute path of calling script's directory
 
+**`scripts/lib/acg/`** — optional browser-automation module. Public shell API is `acg_*` for AWS
+sandbox lifecycle and `gcp_*` for GCP credential extraction. Node/Playwright dependencies live only
+under `scripts/lib/acg/`; core library changes must remain zero-node.
+
 ---
 
 ## Code Style
@@ -62,6 +67,9 @@ _run_command --soft -- <cmd>                # return 127 instead of exit on fail
 - LF line endings only — no CRLF
 - Minimal patches — no unsolicited refactors
 - **Comment on touch** — when modifying a function that lacks a header comment, add one as part of the same commit. One line is sufficient: purpose + key parameters. If a file has no comments at all, leave it alone unless you're already touching it.
+- ACG module review: `scripts/lib/acg/playwright/**/*.js` changes must keep `npm run check` and
+  `npm test` green; `npm run test:e2e` / `make credential-test` are manual browser gates and stay
+  out of core shellcheck/BATS validation.
 
 ---
 
