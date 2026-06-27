@@ -88,6 +88,24 @@ New:
   # 15m refresh: a transient Vault-bridge flap self-heals within ~15m (static KV, negligible read cost)
 ```
 
+### Change 7 — `CHANGELOG.md` (add the missing `[Unreleased]` entry)
+
+Add a new bullet as the **first** item under the `### Fixed` heading that sits directly
+under `## [Unreleased]` (the file has two `### Fixed` sections — target the FIRST one,
+immediately above the `data-layer/minio/image-upload-job.yaml` entry).
+
+Old:
+```markdown
+### Fixed
+- `data-layer/minio/image-upload-job.yaml`: replace `python:3.12-alpine` with `python:3.12-slim` — alpine uses musl-libc and cannot install Pillow manylinux wheels without a compiler, causing the image-upload job to fail silently (backoffLimit exhausted, no images uploaded)
+```
+New:
+```markdown
+### Fixed
+- ESO ExternalSecrets: lower `refreshInterval` from `24h` to `15m` across all 19 manifests so a transient hub-Vault bridge flap self-heals within ~15m instead of staying broken up to 24h (ESO retry cadence == refreshInterval); inline cadence comments updated to match
+- `data-layer/minio/image-upload-job.yaml`: replace `python:3.12-alpine` with `python:3.12-slim` — alpine uses musl-libc and cannot install Pillow manylinux wheels without a compiler, causing the image-upload job to fail silently (backoffLimit exhausted, no images uploaded)
+```
+
 ---
 
 ## Files Changed
@@ -100,9 +118,10 @@ New:
 | `data-layer/secrets/postgres-payment-externalsecret.yaml` | 1 comment line |
 | `data-layer/secrets/postgres-products-externalsecret.yaml` | 2 comment lines |
 | `data-layer/secrets/redis-cart-externalsecret.yaml` | 1 comment line |
+| `CHANGELOG.md` | 1 new `[Unreleased] ### Fixed` bullet |
 
-Total: 7 comment lines across 6 files. **Comments only — do NOT change any `refreshInterval`
-value, secret data, auth, path, or any other field.**
+Total: 7 comment lines across 6 manifests + 1 CHANGELOG bullet. **In the manifests, comments
+only — do NOT change any `refreshInterval` value, secret data, auth, path, or any other field.**
 
 ---
 
@@ -121,8 +140,8 @@ YAML must stay valid (yamllint via `validate.yml` must pass).
 
 ## Rules
 
-- Only the 6 listed files change — comments only.
-- Preserve exact indentation (`  #` — two spaces).
+- Only the 6 listed manifests + `CHANGELOG.md` change.
+- In manifests: comments only — preserve exact indentation (`  #` — two spaces).
 - No `refreshInterval` value changes, no data/auth/path changes.
 - Work on `fix/eso-refresh-interval-self-heal` (the open PR #86 branch), never `main`.
 
@@ -133,13 +152,14 @@ YAML must stay valid (yamllint via `validate.yml` must pass).
 - [ ] All 7 stale comment lines replaced (one each, two in postgres-products)
 - [ ] `git grep` for stale cadence comments returns nothing
 - [ ] `git grep -c 'self-heals within ~15m'` sums to 7
+- [ ] `CHANGELOG.md` `[Unreleased] ### Fixed` has the new ESO refreshInterval bullet
 - [ ] yamllint clean
 - [ ] Committed and pushed to `origin/fix/eso-refresh-interval-self-heal`
 - [ ] k3d-manager `memory-bank/activeContext.md` + `progress.md` updated with the commit SHA
 
 **Commit message (exact):**
 ```
-docs(eso): align ExternalSecret refreshInterval comments with 15m self-heal interval
+docs(eso): align refreshInterval comments + CHANGELOG with 15m self-heal interval
 ```
 
 ---
@@ -148,6 +168,6 @@ docs(eso): align ExternalSecret refreshInterval comments with 15m self-heal inte
 
 - Do NOT create a PR (the fix lands on existing PR #86)
 - Do NOT skip pre-commit hooks (`--no-verify`)
-- Do NOT modify any file other than the 6 listed manifests
-- Do NOT change any `refreshInterval` value or any non-comment field
+- Do NOT modify any file other than the 6 listed manifests + `CHANGELOG.md`
+- Do NOT change any `refreshInterval` value or any non-comment field in the manifests
 - Do NOT commit to `main` — work on `fix/eso-refresh-interval-self-heal`
