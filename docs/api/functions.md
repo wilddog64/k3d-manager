@@ -40,7 +40,9 @@ Use `-h` or `--help` with any function for a brief usage message:
 | Function | Location | Description |
 |---|---|---|
 | `deploy_vault` | `scripts/plugins/vault.sh` | Deploy HashiCorp Vault |
-| `configure_vault_app_auth` | `scripts/plugins/vault.sh` | Register app cluster Kubernetes auth mount in Vault |
+| `configure_vault_app_auth_for_context` | `scripts/plugins/vault.sh` | Provider-agnostic Kubernetes auth configuration for app cluster; resolves kubeconfig context to cluster name before CA/server lookup (v1.10.0+) |
+| `vault_install_unseal_watchdog` | `scripts/plugins/vault.sh` | Deploy in-cluster Vault auto-unseal watchdog CronJob (Tier 3 P2a); replays Shamir shard on `vault status` exit-code trigger |
+| `vault_deploy_hub_into_context` | `scripts/plugins/vault.sh` | Provision hub Vault inside an app cluster with least-privilege `app-cluster-reader` policy and kubernetes-auth ClusterSecretStore (v1.10.0+) |
 | `deploy_eso` | `scripts/plugins/eso.sh` | Deploy External Secrets Operator |
 | `deploy_argocd` | `scripts/plugins/argocd.sh` | Deploy ArgoCD |
 | `deploy_argocd_bootstrap` | `scripts/plugins/argocd.sh` | Bootstrap ArgoCD with initial apps |

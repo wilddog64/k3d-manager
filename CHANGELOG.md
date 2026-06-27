@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-06-27
+
 ### Added
 - Provider-agnostic app-cluster Vault auth keyed on kube-context (`configure_vault_app_auth_for_context`) — the Kubernetes auth wiring is now portable across providers (EKS/AKS/ACG/Azure/OCI/Hostinger) instead of being pinned to Hostinger (`scripts/plugins/vault.sh`)
 - `HUB_VAULT_PROFILE` endpoint seam (`laptop` | `hostinger`) selecting the hub-Vault `server:` URL written into the app-cluster ClusterSecretStore and whether the reverse-tunnel/socat bridge is stood up; default `laptop` keeps today's behavior byte-for-byte (Tier 3 P1, `scripts/etc/vault/vars.sh`)
