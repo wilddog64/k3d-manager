@@ -916,9 +916,11 @@ function vault_install_unseal_watchdog() {
    VAULT_ENDPOINT="${VAULT_ENDPOINT:-http://vault.${ns}.svc:8200}" \
    envsubst '$VAULT_NS $VAULT_UNSEAL_IMAGE $VAULT_ENDPOINT' < "$template" > "$rendered"
    if [[ -n "$app_context" ]]; then
-      kubectl apply --context "$app_context" -f "$rendered"
+      kubectl apply --context "$app_context" -f "$rendered" \
+         || _err "[vault] failed to apply unseal watchdog to context '$app_context'"
    else
-      _kubectl apply -f "$rendered"
+      _kubectl apply -f "$rendered" \
+         || _err "[vault] failed to apply unseal watchdog"
    fi
    _cleanup_on_success "$rendered"
    trap - EXIT TERM
@@ -1465,13 +1467,18 @@ function configure_vault_app_auth_for_context() {
   local -a kctl=(kubectl)
   [[ -n "${app_kubeconfig}" ]] && kctl=(kubectl --kubeconfig "${app_kubeconfig}")
 
+  local cluster_name
+  cluster_name="$("${kctl[@]}" config view --raw \
+    -o jsonpath="{.contexts[?(@.name==\"${app_context}\")].context.cluster}" 2>/dev/null)"
+  [[ -n "${cluster_name}" ]] || cluster_name="${app_context}"
+
   local server ca_data ca_file
   server="$("${kctl[@]}" config view --raw \
-    -o jsonpath="{.clusters[?(@.name==\"${app_context}\")].cluster.server}" 2>/dev/null)"
+    -o jsonpath="{.clusters[?(@.name==\"${cluster_name}\")].cluster.server}" 2>/dev/null)"
   ca_data="$("${kctl[@]}" config view --raw \
-    -o jsonpath="{.clusters[?(@.name==\"${app_context}\")].cluster.certificate-authority-data}" 2>/dev/null)"
+    -o jsonpath="{.clusters[?(@.name==\"${cluster_name}\")].cluster.certificate-authority-data}" 2>/dev/null)"
   ca_file="$("${kctl[@]}" config view --raw \
-    -o jsonpath="{.clusters[?(@.name==\"${app_context}\")].cluster.certificate-authority}" 2>/dev/null)"
+    -o jsonpath="{.clusters[?(@.name==\"${cluster_name}\")].cluster.certificate-authority}" 2>/dev/null)"
 
   if [[ -z "${server}" ]]; then
     _warn "[vault] no API server for context '${app_context}' — skipping app-cluster Vault auth"
@@ -1482,7 +1489,8 @@ function configure_vault_app_auth_for_context() {
   local tmp_ca="" ca_path=""
   if [[ -n "${ca_data}" ]]; then
     tmp_ca="$(mktemp "${TMPDIR:-/tmp}/app-cluster-ca.XXXXXX")" || return 1
-    printf '%s' "${ca_data}" | base64 -d > "${tmp_ca}" 2>/dev/null || {
+    printf '%s' "${ca_data}" | base64 --decode > "${tmp_ca}" 2>/dev/null \
+      || printf '%s' "${ca_data}" | base64 -D > "${tmp_ca}" 2>/dev/null || {
       rm -f "${tmp_ca}"
       _warn "[vault] could not decode CA data for '${app_context}' — skipping app-cluster Vault auth"
       [[ "${APP_VAULT_AUTH_REQUIRED:-false}" == "true" ]] && return 1
