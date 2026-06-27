@@ -81,7 +81,9 @@ Each profile resolves two things:
 
 **Phase 1 ships the seam with `default=laptop`, so it is behavior-preserving** — the
 `hostinger` branch is wired but inert (and not fully functional) until Phase 2 provisions the
-in-cluster Vault. The default flips to `hostinger` in Phase 2.
+in-cluster Vault. **The default does NOT flip in Phase 2** (revised 2026-06-27): the
+in-cluster Vault is empty until P3 seeds it, so flipping the default before seeding would point
+the CSS at an empty Vault. The flip is a dedicated **cutover** step, gated on P3 seeding.
 
 ### Secret continuity (re-seed on failover)
 
@@ -104,14 +106,33 @@ re-runs the Hostinger reconcile so the CSS repoints and ESO re-syncs.
 1. **P1 — endpoint seam (`HUB_VAULT_PROFILE`)** — `docs/plans/v1.11.0-hub-vault-profile-seam.md`
    (WRITTEN, Codex-ready). Pure code; `default=laptop` ⇒ no functional change. Unblocks all
    later phases.
-2. **P2 — provision in-cluster Hostinger Vault + auto-unseal** — deploy Vault into the
-   Hostinger cluster `secrets` ns, init/unseal (auto-unseal per `vault-resilience.md`), wire
-   the `hostinger` profile to it, flip the default to `hostinger`. (Spec written after P1 lands
-   + Vault-deploy mechanics read.)
+2. **P2 — in-cluster Hostinger Vault + auto-unseal.** Split into two specs (decided
+   2026-06-27 after grounding `deploy_vault` + the k8s-auth path):
+   - **P2a — auto-unseal watchdog** — `docs/plans/v1.11.0-hub-vault-incluster-unseal.md`
+     (WRITTEN, Codex-ready). Shamir `shard-1` (init is `-key-shares=1 -key-threshold=1`) stored
+     in the in-cluster `vault-unseal` Secret (already created by `_vault_process_init_artifacts`)
+     replayed by an in-cluster CronJob (`vault status` exit-code driven; pinned image;
+     namespace-scoped; no RBAC — optional secret volume). Self-contained, safe-anywhere,
+     behavior-preserving (nothing auto-calls it). No KMS, no Keychain, no laptop dependency.
+   - **P2b — provision + CSS k8s-auth cutover** — DEFERRED, needs a live grounding pass.
+     Blockers: (1) `deploy_vault`/`_vault_exec`/`_helm` operate on the **ambient kube-context**
+     and the Hostinger provider never calls `deploy_vault`, so provisioning into Hostinger needs
+     context-targeting (a `deploy_vault` context arg, or running it with the Hostinger context
+     active) — verifiable only live. (2) The `hostinger`-profile CSS uses **Kubernetes auth**
+     (v1.10.0 `configure_vault_app_auth_for_context`), but the `eso-reader` policy grants only
+     `secret/data/eso/*` while the app CSS reads `path: "secret"` root — reconciling the policy
+     paths against the shopping-cart-infra ExternalSecret `remoteRef`s is cross-repo and
+     live-only. Write P2b after P2a lands and the live Vault + ESO manifests are read.
 3. **P3 — idempotent canonical-source seeding** — make the seed scripts re-runnable and
-   driven from the canonical source so either Vault can be populated identically. (Spec next.)
+   driven from the canonical source so either Vault can be populated identically. The
+   **default-profile flip to `hostinger` (cutover) is gated on this.** (Spec next.)
 4. **P4 — assisted-failover watchdog** — health-probe-driven profile flip + reconcile. (Spec
    last; depends on P1–P3.)
+
+> **Release-scope note (CLAUDE.md max-5-plan-docs):** v1.11.0 already holds the design doc + P1
+> + P2a. Adding P2b + P3 + P4 to the same release would exceed 5. Plan: **v1.11.0 = seam (P1) +
+> auto-unseal (P2a) + provision/cutover (P2b)**; **v1.12.0 = canonical seeding (P3) +
+> assisted-failover (P4)**. Confirm the split before writing P3.
 
 ## Out of scope
 
