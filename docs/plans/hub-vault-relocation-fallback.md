@@ -1,6 +1,6 @@
 # Hub Vault Relocation with Laptop Fallback (Tier 3 — durable Vault-bridge stability)
 
-**Status:** decisions LOCKED 2026-06-27 (see "Locked decisions" below). Target release **v1.11.0**.
+**Status:** decisions LOCKED 2026-06-27 (see "Locked decisions" below). Target release **v1.10.0**.
 **Depends on:** v1.10.0 provider-agnostic Vault auth (`configure_vault_app_auth_for_context`).
 **Motivation:** two live Hostinger outages on 2026-06-26, both rooted in the hub Vault
 living on the Mac and being reached through a fragile reverse-SSH/socat bridge.
@@ -103,18 +103,18 @@ re-runs the Hostinger reconcile so the CSS repoints and ESO re-syncs.
 
 ## Phasing (each phase = one Codex spec)
 
-1. **P1 — endpoint seam (`HUB_VAULT_PROFILE`)** — `docs/plans/v1.11.0-hub-vault-profile-seam.md`
+1. **P1 — endpoint seam (`HUB_VAULT_PROFILE`)** — `docs/plans/v1.10.0-hub-vault-profile-seam.md`
    (WRITTEN, Codex-ready). Pure code; `default=laptop` ⇒ no functional change. Unblocks all
    later phases.
 2. **P2 — in-cluster Hostinger Vault + auto-unseal.** Split into two specs (decided
    2026-06-27 after grounding `deploy_vault` + the k8s-auth path):
-   - **P2a — auto-unseal watchdog** — `docs/plans/v1.11.0-hub-vault-incluster-unseal.md`
+   - **P2a — auto-unseal watchdog** — `docs/plans/v1.10.0-hub-vault-incluster-unseal.md`
      (WRITTEN, Codex-ready). Shamir `shard-1` (init is `-key-shares=1 -key-threshold=1`) stored
      in the in-cluster `vault-unseal` Secret (already created by `_vault_process_init_artifacts`)
      replayed by an in-cluster CronJob (`vault status` exit-code driven; pinned image;
      namespace-scoped; no RBAC — optional secret volume). Self-contained, safe-anywhere,
      behavior-preserving (nothing auto-calls it). No KMS, no Keychain, no laptop dependency.
-   - **P2b — provision + CSS k8s-auth cutover** — `docs/plans/v1.11.0-hub-vault-incluster-provision.md`
+   - **P2b — provision + CSS k8s-auth cutover** — `docs/plans/v1.10.0-hub-vault-incluster-provision.md`
      (WRITTEN, Codex-ready; live grounding pass done 2026-06-27). Both blockers resolved:
      (1) provisioning runs via a new `vault_deploy_hub_into_context` wrapper that
      saves/restores the current-context (k3s-hostinger.sh idiom) and runs `deploy_vault` with
@@ -131,9 +131,9 @@ re-runs the Hostinger reconcile so the CSS repoints and ESO re-syncs.
 4. **P4 — assisted-failover watchdog** — health-probe-driven profile flip + reconcile. (Spec
    last; depends on P1–P3.)
 
-> **Release-scope note (CLAUDE.md max-5-plan-docs):** v1.11.0 already holds the design doc + P1
-> + P2a. Adding P2b + P3 + P4 to the same release would exceed 5. Plan: **v1.11.0 = seam (P1) +
-> auto-unseal (P2a) + provision/cutover (P2b)**; **v1.12.0 = canonical seeding (P3) +
+> **Release-scope note (CLAUDE.md max-5-plan-docs):** v1.10.0 already holds the design doc + P1
+> + P2a. Adding P2b + P3 + P4 to the same release would exceed 5. Plan: **v1.10.0 = seam (P1) +
+> auto-unseal (P2a) + provision/cutover (P2b)**; **v1.11.0 = canonical seeding (P3) +
 > assisted-failover (P4)**. Confirm the split before writing P3.
 
 ## Out of scope
