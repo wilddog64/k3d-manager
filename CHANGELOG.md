@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+- Provider-agnostic app-cluster Vault auth keyed on kube-context (`configure_vault_app_auth_for_context`) — the Kubernetes auth wiring is now portable across providers (EKS/AKS/ACG/Azure/OCI/Hostinger) instead of being pinned to Hostinger (`scripts/plugins/vault.sh`)
+- `HUB_VAULT_PROFILE` endpoint seam (`laptop` | `hostinger`) selecting the hub-Vault `server:` URL written into the app-cluster ClusterSecretStore and whether the reverse-tunnel/socat bridge is stood up; default `laptop` keeps today's behavior byte-for-byte (Tier 3 P1, `scripts/etc/vault/vars.sh`)
+- In-cluster auto-unseal watchdog CronJob for a relocated hub Vault — replays the Shamir shard from the in-cluster `vault-unseal` Secret on a `vault status` exit-code trigger; pinned image, namespace-scoped, no RBAC; self-contained and behavior-preserving (nothing auto-calls it) (Tier 3 P2a, `scripts/plugins/vault.sh`)
+- `vault_deploy_hub_into_context` wrapper to provision the hub Vault inside an app cluster (current-context save/restore idiom; `HUB_VAULT_INCLUSTER=1` guard bypasses the `CLUSTER_ROLE=app` early-return), plus a least-privilege `app-cluster-reader` Vault policy (7 `secret/{data,metadata}/*` prefixes, no wildcard) and a kubernetes-auth ClusterSecretStore variant selected by `HUB_VAULT_CSS_AUTH` (`laptop`→token, `hostinger`→kubernetes); default profile stays `laptop` so the cutover is P3-gated (Tier 3 P2b, `scripts/plugins/vault.sh`, `scripts/plugins/shopping_cart.sh`)
+
+### Fixed
+- Hostinger `refresh` now ensures the `vault-port-forward` LaunchAgent is present so the laptop→Hostinger Vault bridge survives a refresh (`scripts/lib/providers/k3s-hostinger.sh`)
+- ArgoCD `data-layer` ApplicationSet ignores controller-injected `volumeClaimTemplates[]` fields (`.status`, `.apiVersion`, `.kind`) so StatefulSets stop showing a permanent cosmetic `OutOfSync` (`scripts/etc/argocd/applicationsets/data-git.yaml`)
+
 ## [1.8.0] - 2026-06-26
 
 ### Added
