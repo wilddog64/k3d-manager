@@ -38,6 +38,9 @@ spec:
           jqPathExpressions:
             - .spec.volumeClaimTemplates[].spec.storageClassName
             - .spec.volumeClaimTemplates[].spec.volumeMode
+            - .spec.volumeClaimTemplates[].status
+            - .spec.volumeClaimTemplates[].apiVersion
+            - .spec.volumeClaimTemplates[].kind
       syncPolicy:
         automated:
           prune: false

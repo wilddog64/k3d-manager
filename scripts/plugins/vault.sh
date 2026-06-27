@@ -899,6 +899,33 @@ function _vault_source_optional_vars() {
    source "$VAULT_VARS"
 }
 
+# vault_install_unseal_watchdog [ns] [context]
+# Renders + applies the in-cluster auto-unseal watchdog CronJob (Tier 3 P2a).
+# Idempotent; safe to apply before a Vault exists (optional secret mount + early exit).
+function vault_install_unseal_watchdog() {
+   local ns="${1:-${VAULT_NS:-$VAULT_NS_DEFAULT}}"
+   local app_context="${2:-}"
+   _vault_source_optional_vars
+   local template="$SCRIPT_DIR/etc/vault/unseal-watchdog.yaml.tmpl"
+   [[ -f "$template" ]] || _err "[vault] missing template: $template"
+   local rendered
+   rendered="$(mktemp -t vault-unseal-watchdog.XXXXXX.yaml)"
+   trap '$(_cleanup_trap_command "$rendered")' EXIT TERM
+   VAULT_NS="$ns" \
+   VAULT_UNSEAL_IMAGE="${VAULT_UNSEAL_IMAGE:-hashicorp/vault:1.18.3}" \
+   VAULT_ENDPOINT="${VAULT_ENDPOINT:-http://vault.${ns}.svc:8200}" \
+   envsubst '$VAULT_NS $VAULT_UNSEAL_IMAGE $VAULT_ENDPOINT' < "$template" > "$rendered"
+   if [[ -n "$app_context" ]]; then
+      kubectl apply --context "$app_context" -f "$rendered" \
+         || _err "[vault] failed to apply unseal watchdog to context '$app_context'"
+   else
+      _kubectl apply -f "$rendered" \
+         || _err "[vault] failed to apply unseal watchdog"
+   fi
+   _cleanup_on_success "$rendered"
+   trap - EXIT TERM
+}
+
 function deploy_vault() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
       cat <<EOF
@@ -916,7 +943,7 @@ EOF
       return 0
    fi
 
-   if [[ "${CLUSTER_ROLE:-infra}" == "app" ]]; then
+   if [[ "${CLUSTER_ROLE:-infra}" == "app" && "${HUB_VAULT_INCLUSTER:-0}" != "1" ]]; then
       _info "[vault] CLUSTER_ROLE=app — skipping deploy_vault"
       return 0
    fi
@@ -967,6 +994,33 @@ EOF
    fi
 
    return 0
+}
+
+function vault_deploy_hub_into_context() {
+   local app_context="${1:-}"
+   [[ -n "${app_context}" ]] || _err "[vault] vault_deploy_hub_into_context requires an app cluster kube-context"
+   shift || true
+   kubectl config get-contexts "${app_context}" >/dev/null 2>&1 \
+      || _err "[vault] kube-context '${app_context}' not found in kubeconfig"
+
+   local prev_ctx
+   prev_ctx="$(kubectl config current-context 2>/dev/null || true)"
+   _VAULT_DEPLOY_PREV_CTX="${prev_ctx}"
+   trap '[[ -n "${_VAULT_DEPLOY_PREV_CTX:-}" ]] && kubectl config use-context "${_VAULT_DEPLOY_PREV_CTX}" >/dev/null 2>&1 || true' EXIT TERM
+
+   kubectl config use-context "${app_context}" >/dev/null 2>&1 \
+      || _err "[vault] failed to switch to kube-context '${app_context}'"
+   _info "[vault] deploying hub Vault into '${app_context}' (in-cluster relocation)"
+
+   local rc=0
+   HUB_VAULT_INCLUSTER=1 CLUSTER_ROLE=infra deploy_vault "$@" || rc=$?
+
+   if [[ -n "${prev_ctx}" ]] && kubectl config get-contexts "${prev_ctx}" >/dev/null 2>&1; then
+      kubectl config use-context "${prev_ctx}" >/dev/null 2>&1 || true
+   fi
+   trap - EXIT TERM
+   unset _VAULT_DEPLOY_PREV_CTX
+   return "${rc}"
 }
 
 function _vault_wait_ready() {
@@ -1365,6 +1419,30 @@ function configure_vault_app_auth() {
 HCL
   fi
 
+  # d2. Ensure app-cluster-reader policy exists (least-privilege: app business paths only)
+  if ! _vault_policy_exists "$ns" "$release" "app-cluster-reader"; then
+    _info "[vault] creating policy 'app-cluster-reader'"
+    cat <<'HCL' | _vault_exec_stream --no-exit --pod "${release}-0" "$ns" "$release" -- \
+      vault policy write app-cluster-reader -
+       # file: app-cluster-reader.hcl
+       # least-privilege read for the app-cluster ESO ClusterSecretStore
+       path "secret/data/postgres/*"     { capabilities = ["read"] }
+       path "secret/data/payment/*"      { capabilities = ["read"] }
+       path "secret/data/redis/*"        { capabilities = ["read"] }
+       path "secret/data/rabbitmq/*"     { capabilities = ["read"] }
+       path "secret/data/keycloak/*"     { capabilities = ["read"] }
+       path "secret/data/ldap/*"         { capabilities = ["read"] }
+       path "secret/data/minio/*"        { capabilities = ["read"] }
+       path "secret/metadata/postgres/*" { capabilities = ["read","list"] }
+       path "secret/metadata/payment/*"  { capabilities = ["read","list"] }
+       path "secret/metadata/redis/*"    { capabilities = ["read","list"] }
+       path "secret/metadata/rabbitmq/*" { capabilities = ["read","list"] }
+       path "secret/metadata/keycloak/*" { capabilities = ["read","list"] }
+       path "secret/metadata/ldap/*"     { capabilities = ["read","list"] }
+       path "secret/metadata/minio/*"    { capabilities = ["read","list"] }
+HCL
+  fi
+
   # e. Create ESO role bound to app cluster ESO service account
   local safe_mount_role safe_eso_sa safe_eso_ns
   printf -v safe_mount_role '%s' "auth/${mount}/role/${role}"
@@ -1373,10 +1451,74 @@ HCL
   _vault_exec "$ns" "vault write ${safe_mount_role} \
     bound_service_account_names=${safe_eso_sa} \
     bound_service_account_namespaces=${safe_eso_ns} \
-    policies=eso-reader \
+    policies=app-cluster-reader \
     ttl=1h" "$release"
 
   _info "[vault] app cluster auth configured successfully"
+}
+
+function configure_vault_app_auth_for_context() {
+  local app_context="${1:-}"
+  local app_kubeconfig="${2:-${KUBECONFIG:-}}"
+  if [[ -z "${app_context}" ]]; then
+    _err "[vault] configure_vault_app_auth_for_context requires an app cluster kube-context"
+  fi
+
+  local -a kctl=(kubectl)
+  [[ -n "${app_kubeconfig}" ]] && kctl=(kubectl --kubeconfig "${app_kubeconfig}")
+
+  local cluster_name
+  cluster_name="$("${kctl[@]}" config view --raw \
+    -o jsonpath="{.contexts[?(@.name==\"${app_context}\")].context.cluster}" 2>/dev/null)"
+  [[ -n "${cluster_name}" ]] || cluster_name="${app_context}"
+
+  local server ca_data ca_file
+  server="$("${kctl[@]}" config view --raw \
+    -o jsonpath="{.clusters[?(@.name==\"${cluster_name}\")].cluster.server}" 2>/dev/null)"
+  ca_data="$("${kctl[@]}" config view --raw \
+    -o jsonpath="{.clusters[?(@.name==\"${cluster_name}\")].cluster.certificate-authority-data}" 2>/dev/null)"
+  ca_file="$("${kctl[@]}" config view --raw \
+    -o jsonpath="{.clusters[?(@.name==\"${cluster_name}\")].cluster.certificate-authority}" 2>/dev/null)"
+
+  if [[ -z "${server}" ]]; then
+    _warn "[vault] no API server for context '${app_context}' — skipping app-cluster Vault auth"
+    [[ "${APP_VAULT_AUTH_REQUIRED:-false}" == "true" ]] && return 1
+    return 0
+  fi
+
+  local tmp_ca="" ca_path=""
+  if [[ -n "${ca_data}" ]]; then
+    tmp_ca="$(mktemp "${TMPDIR:-/tmp}/app-cluster-ca.XXXXXX")" || return 1
+    printf '%s' "${ca_data}" | base64 --decode > "${tmp_ca}" 2>/dev/null \
+      || printf '%s' "${ca_data}" | base64 -D > "${tmp_ca}" 2>/dev/null || {
+      rm -f "${tmp_ca}"
+      _warn "[vault] could not decode CA data for '${app_context}' — skipping app-cluster Vault auth"
+      [[ "${APP_VAULT_AUTH_REQUIRED:-false}" == "true" ]] && return 1
+      return 0
+    }
+    ca_path="${tmp_ca}"
+  elif [[ -n "${ca_file}" && -f "${ca_file}" ]]; then
+    ca_path="${ca_file}"
+  else
+    _warn "[vault] no CA for context '${app_context}' — skipping app-cluster Vault auth"
+    [[ "${APP_VAULT_AUTH_REQUIRED:-false}" == "true" ]] && return 1
+    return 0
+  fi
+
+  local rc=0
+  (
+    APP_CLUSTER_API_URL="${server}" \
+    APP_CLUSTER_CA_CERT_PATH="${ca_path}" \
+    configure_vault_app_auth
+  ) || rc=$?
+
+  [[ -n "${tmp_ca}" ]] && rm -f "${tmp_ca}"
+
+  if (( rc != 0 )); then
+    _warn "[vault] app-cluster Vault auth for '${app_context}' did not complete (rc=${rc})"
+    [[ "${APP_VAULT_AUTH_REQUIRED:-false}" == "true" ]] && return "${rc}"
+  fi
+  return 0
 }
 
 function _vault_set_eso_reader() {

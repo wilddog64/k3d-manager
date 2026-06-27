@@ -645,6 +645,9 @@ function _oci_register_cluster() {
   | _kubectl apply -f -
 
   _info "[k3s-oci] Cluster secret created: environment=prod, argocd-replicas=1"
+  if declare -f configure_vault_app_auth_for_context >/dev/null 2>&1; then
+    configure_vault_app_auth_for_context "k3s-oci" "${_OCI_KUBECONFIG}" || true
+  fi
 }
 
 

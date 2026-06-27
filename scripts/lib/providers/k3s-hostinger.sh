@@ -166,6 +166,9 @@ function _hostinger_register_cluster() {
     register_app_cluster
   ) || return 1
   _info "[k3s-hostinger] Registered — verify: kubectl get secret ${secret_name} -n ${argocd_ns}"
+  if declare -f configure_vault_app_auth_for_context >/dev/null 2>&1; then
+    configure_vault_app_auth_for_context "${_HOSTINGER_KUBE_CONTEXT}" || true
+  fi
 }
 
 function _hostinger_set_active_app_cluster() {
@@ -528,6 +531,9 @@ function _hostinger_refresh_access_layer() {
   local _frontend_browser_wrapper="${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   local _frontend_browser_log="${_ACG_STATE_DIR}/logs/frontend-browser-http.log"
   local _grafana_pf_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
+  local _vault_pf_label="com.k3d-manager.vault-port-forward"
+  local _vault_pf_plist="${HOME}/Library/LaunchAgents/${_vault_pf_label}.plist"
+  local _vault_pf_tmpl="${SCRIPT_DIR}/etc/launchd/${_vault_pf_label}.plist.tmpl"
   local _grafana_pf_log="${_ACG_STATE_DIR}/logs/grafana-pf.log"
   local _pushgateway_pf_plist="${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist"
   local _pushgateway_pf_log="${_ACG_STATE_DIR}/logs/pushgateway-pf.log"
@@ -636,6 +642,20 @@ PLIST
     "com.k3d-manager.frontend-browser-http" \
     "/Library/LaunchDaemons/com.k3d-manager.frontend-browser-http.plist" \
     system
+  if [[ ! -f "${_vault_pf_plist}" && -f "${_vault_pf_tmpl}" ]]; then
+    _info "[k3s-hostinger] Vault port-forward plist missing — installing from template..."
+    local _vault_pf_kubectl
+    _vault_pf_kubectl="$(command -v kubectl)"
+    mkdir -p "$(dirname "${_vault_pf_plist}")"
+    sed \
+      -e "s|{{KUBECTL_PATH}}|${_vault_pf_kubectl}|g" \
+      -e "s|{{HOME}}|${HOME}|g" \
+      "${_vault_pf_tmpl}" > "${_vault_pf_plist}"
+  fi
+  _hostinger_restart_launchd \
+    "${_vault_pf_label}" \
+    "${_vault_pf_plist}" \
+    user
   _hostinger_restart_launchd \
     "com.k3d-manager.grafana-port-forward" \
     "${_grafana_pf_plist}" \
@@ -661,21 +681,25 @@ function _hostinger_reconcile_vault_cluster_store() {
     return 0
   fi
 
-  if declare -f tunnel_start >/dev/null 2>&1; then
-    local _prev_tunnel_host="${TUNNEL_SSH_HOST:-}"
-    TUNNEL_SSH_HOST="${ssh_target}"
-    _info "[k3s-hostinger] Ensuring reverse Vault tunnel to ${ssh_target}..."
-    if declare -f tunnel_stop >/dev/null 2>&1; then
-      tunnel_stop >/dev/null 2>&1 || true
+  if [[ "${HUB_VAULT_USE_BRIDGE:-1}" == "1" ]]; then
+    if declare -f tunnel_start >/dev/null 2>&1; then
+      local _prev_tunnel_host="${TUNNEL_SSH_HOST:-}"
+      TUNNEL_SSH_HOST="${ssh_target}"
+      _info "[k3s-hostinger] Ensuring reverse Vault tunnel to ${ssh_target}..."
+      if declare -f tunnel_stop >/dev/null 2>&1; then
+        tunnel_stop >/dev/null 2>&1 || true
+      fi
+      tunnel_start || return 1
+      TUNNEL_SSH_HOST="${_prev_tunnel_host}"
     fi
-    tunnel_start || return 1
-    TUNNEL_SSH_HOST="${_prev_tunnel_host}"
-  fi
 
-  _info "[k3s-hostinger] Ensuring vault-bridge on ${ssh_target}..."
-  _setup_vault_bridge "${ssh_target}" "${_HOSTINGER_SSH_KEY}" || return 1
-  _info "[k3s-hostinger] Ensuring vault-bridge Service/Endpoints on ${_HOSTINGER_KUBE_CONTEXT}..."
-  shopping_cart_create_vault_bridge || return 1
+    _info "[k3s-hostinger] Ensuring vault-bridge on ${ssh_target}..."
+    _setup_vault_bridge "${ssh_target}" "${_HOSTINGER_SSH_KEY}" || return 1
+    _info "[k3s-hostinger] Ensuring vault-bridge Service/Endpoints on ${_HOSTINGER_KUBE_CONTEXT}..."
+    shopping_cart_create_vault_bridge || return 1
+  else
+    _info "[k3s-hostinger] HUB_VAULT_PROFILE=${HUB_VAULT_PROFILE:-hostinger}: using in-cluster Vault, skipping reverse tunnel + socat bridge"
+  fi
   _info "[k3s-hostinger] Ensuring vault-token + ClusterSecretStore on ${_HOSTINGER_KUBE_CONTEXT}..."
   shopping_cart_apply_vault_token_and_cluster_secret_store || return 1
   _info "[k3s-hostinger] Forcing ExternalSecret reconcile on ${_HOSTINGER_KUBE_CONTEXT}..."
