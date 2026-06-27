@@ -941,7 +941,7 @@ EOF
       return 0
    fi
 
-   if [[ "${CLUSTER_ROLE:-infra}" == "app" ]]; then
+   if [[ "${CLUSTER_ROLE:-infra}" == "app" && "${HUB_VAULT_INCLUSTER:-0}" != "1" ]]; then
       _info "[vault] CLUSTER_ROLE=app — skipping deploy_vault"
       return 0
    fi
@@ -992,6 +992,33 @@ EOF
    fi
 
    return 0
+}
+
+function vault_deploy_hub_into_context() {
+   local app_context="${1:-}"
+   [[ -n "${app_context}" ]] || _err "[vault] vault_deploy_hub_into_context requires an app cluster kube-context"
+   shift || true
+   kubectl config get-contexts "${app_context}" >/dev/null 2>&1 \
+      || _err "[vault] kube-context '${app_context}' not found in kubeconfig"
+
+   local prev_ctx
+   prev_ctx="$(kubectl config current-context 2>/dev/null || true)"
+   _VAULT_DEPLOY_PREV_CTX="${prev_ctx}"
+   trap '[[ -n "${_VAULT_DEPLOY_PREV_CTX:-}" ]] && kubectl config use-context "${_VAULT_DEPLOY_PREV_CTX}" >/dev/null 2>&1 || true' EXIT TERM
+
+   kubectl config use-context "${app_context}" >/dev/null 2>&1 \
+      || _err "[vault] failed to switch to kube-context '${app_context}'"
+   _info "[vault] deploying hub Vault into '${app_context}' (in-cluster relocation)"
+
+   local rc=0
+   HUB_VAULT_INCLUSTER=1 CLUSTER_ROLE=infra deploy_vault "$@" || rc=$?
+
+   if [[ -n "${prev_ctx}" ]] && kubectl config get-contexts "${prev_ctx}" >/dev/null 2>&1; then
+      kubectl config use-context "${prev_ctx}" >/dev/null 2>&1 || true
+   fi
+   trap - EXIT TERM
+   unset _VAULT_DEPLOY_PREV_CTX
+   return "${rc}"
 }
 
 function _vault_wait_ready() {
@@ -1390,6 +1417,30 @@ function configure_vault_app_auth() {
 HCL
   fi
 
+  # d2. Ensure app-cluster-reader policy exists (least-privilege: app business paths only)
+  if ! _vault_policy_exists "$ns" "$release" "app-cluster-reader"; then
+    _info "[vault] creating policy 'app-cluster-reader'"
+    cat <<'HCL' | _vault_exec_stream --no-exit --pod "${release}-0" "$ns" "$release" -- \
+      vault policy write app-cluster-reader -
+       # file: app-cluster-reader.hcl
+       # least-privilege read for the app-cluster ESO ClusterSecretStore
+       path "secret/data/postgres/*"     { capabilities = ["read"] }
+       path "secret/data/payment/*"      { capabilities = ["read"] }
+       path "secret/data/redis/*"        { capabilities = ["read"] }
+       path "secret/data/rabbitmq/*"     { capabilities = ["read"] }
+       path "secret/data/keycloak/*"     { capabilities = ["read"] }
+       path "secret/data/ldap/*"         { capabilities = ["read"] }
+       path "secret/data/minio/*"        { capabilities = ["read"] }
+       path "secret/metadata/postgres/*" { capabilities = ["read","list"] }
+       path "secret/metadata/payment/*"  { capabilities = ["read","list"] }
+       path "secret/metadata/redis/*"    { capabilities = ["read","list"] }
+       path "secret/metadata/rabbitmq/*" { capabilities = ["read","list"] }
+       path "secret/metadata/keycloak/*" { capabilities = ["read","list"] }
+       path "secret/metadata/ldap/*"     { capabilities = ["read","list"] }
+       path "secret/metadata/minio/*"    { capabilities = ["read","list"] }
+HCL
+  fi
+
   # e. Create ESO role bound to app cluster ESO service account
   local safe_mount_role safe_eso_sa safe_eso_ns
   printf -v safe_mount_role '%s' "auth/${mount}/role/${role}"
@@ -1398,7 +1449,7 @@ HCL
   _vault_exec "$ns" "vault write ${safe_mount_role} \
     bound_service_account_names=${safe_eso_sa} \
     bound_service_account_namespaces=${safe_eso_ns} \
-    policies=eso-reader \
+    policies=app-cluster-reader \
     ttl=1h" "$release"
 
   _info "[vault] app cluster auth configured successfully"

@@ -444,22 +444,48 @@ fi
 REMOTE
 }
 
+function _shopping_cart_css_auth_block() {
+  local mode="${1:-token}"
+  if [[ "${mode}" == "kubernetes" ]]; then
+    cat <<K8SAUTH
+        kubernetes:
+          mountPath: "${APP_K8S_AUTH_MOUNT:-kubernetes-app}"
+          role: "${APP_ESO_VAULT_ROLE:-eso-app-cluster}"
+          serviceAccountRef:
+            name: "${APP_ESO_SA_NAME:-external-secrets}"
+            namespace: "${APP_ESO_SA_NS:-secrets}"
+K8SAUTH
+  else
+    cat <<TOKENAUTH
+        tokenSecretRef:
+          name: vault-token
+          namespace: secrets
+          key: token
+TOKENAUTH
+  fi
+}
+
 function shopping_cart_apply_vault_token_and_cluster_secret_store() {
   local _app_context
   _app_context="$(_shopping_cart_resolve_app_context)"
 
-  _vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
-    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d 2>/dev/null || true)
-  if [[ -z "${_vault_root_token}" ]]; then
-    _err "[acg-up] Could not read vault-root token from k3d-k3d-cluster — is Vault running?"
-    return 1
-  fi
+  local _css_auth="${HUB_VAULT_CSS_AUTH:-token}"
+
   kubectl create namespace secrets --context "${_app_context}" \
     --dry-run=client -o yaml | kubectl apply --context "${_app_context}" -f - >/dev/null
-  kubectl create secret generic vault-token \
-    -n secrets --context "${_app_context}" \
-    --from-literal=token="${_vault_root_token}" \
-    --dry-run=client -o yaml | kubectl apply --context "${_app_context}" -f -
+
+  if [[ "${_css_auth}" == "token" ]]; then
+    _vault_root_token=$(kubectl get secret vault-root -n secrets --context k3d-k3d-cluster \
+      -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d 2>/dev/null || true)
+    if [[ -z "${_vault_root_token}" ]]; then
+      _err "[acg-up] Could not read vault-root token from k3d-k3d-cluster — is Vault running?"
+      return 1
+    fi
+    kubectl create secret generic vault-token \
+      -n secrets --context "${_app_context}" \
+      --from-literal=token="${_vault_root_token}" \
+      --dry-run=client -o yaml | kubectl apply --context "${_app_context}" -f -
+  fi
   _info "[acg-up] Waiting for ESO webhook to be ready on ${_app_context}..."
   for i in $(seq 1 18); do
     _wh_ip=$(kubectl get endpoints external-secrets-webhook -n secrets --context "${_app_context}" \
@@ -472,6 +498,8 @@ function shopping_cart_apply_vault_token_and_cluster_secret_store() {
     sleep 10
   done
   local _css_vault_server="${HUB_VAULT_CSS_SERVER:-http://vault-bridge.secrets.svc.cluster.local:8201}"
+  local _css_auth_block
+  _css_auth_block="$(_shopping_cart_css_auth_block "${_css_auth}")"
   kubectl apply --context "${_app_context}" -f - <<CSSEOF
 apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore
@@ -484,10 +512,7 @@ spec:
       path: "secret"
       version: "v2"
       auth:
-        tokenSecretRef:
-          name: vault-token
-          namespace: secrets
-          key: token
+${_css_auth_block}
 CSSEOF
   kubectl annotate clustersecretstore vault-backend --context "${_app_context}" \
     "k3d-manager/reconcile-at=$(date -u +%Y%m%dT%H%M%SZ)" \

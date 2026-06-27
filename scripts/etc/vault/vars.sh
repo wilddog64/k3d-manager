@@ -20,10 +20,12 @@ case "${HUB_VAULT_PROFILE}" in
   hostinger)
     export HUB_VAULT_CSS_SERVER="${HUB_VAULT_CSS_SERVER:-http://vault.${VAULT_NS}.svc:8200}"
     export HUB_VAULT_USE_BRIDGE="${HUB_VAULT_USE_BRIDGE:-0}"
+    export HUB_VAULT_CSS_AUTH="${HUB_VAULT_CSS_AUTH:-kubernetes}"
     ;;
   *)
     export HUB_VAULT_CSS_SERVER="${HUB_VAULT_CSS_SERVER:-http://vault-bridge.secrets.svc.cluster.local:8201}"
     export HUB_VAULT_USE_BRIDGE="${HUB_VAULT_USE_BRIDGE:-1}"
+    export HUB_VAULT_CSS_AUTH="${HUB_VAULT_CSS_AUTH:-token}"
     ;;
 esac
 

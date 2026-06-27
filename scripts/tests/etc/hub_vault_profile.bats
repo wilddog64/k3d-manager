@@ -29,3 +29,18 @@ setup() {
   [ "${HUB_VAULT_CSS_SERVER}" = "http://example:8200" ]
   [ "${HUB_VAULT_USE_BRIDGE}" = "1" ]
 }
+
+@test "laptop profile derives token CSS auth" {
+  unset HUB_VAULT_PROFILE HUB_VAULT_CSS_AUTH VAULT_NS
+  # shellcheck disable=SC1090
+  source "${VARS_SH}"
+  [ "${HUB_VAULT_CSS_AUTH}" = "token" ]
+}
+
+@test "hostinger profile derives kubernetes CSS auth" {
+  unset HUB_VAULT_CSS_AUTH
+  export HUB_VAULT_PROFILE="hostinger" VAULT_NS="secrets"
+  # shellcheck disable=SC1090
+  source "${VARS_SH}"
+  [ "${HUB_VAULT_CSS_AUTH}" = "kubernetes" ]
+}
