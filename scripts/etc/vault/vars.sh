@@ -26,3 +26,6 @@ case "${HUB_VAULT_PROFILE}" in
     export HUB_VAULT_USE_BRIDGE="${HUB_VAULT_USE_BRIDGE:-1}"
     ;;
 esac
+
+# Auto-unseal watchdog (Tier 3 P2a) — pinned image for the in-cluster unseal CronJob.
+export VAULT_UNSEAL_IMAGE="${VAULT_UNSEAL_IMAGE:-hashicorp/vault:1.18.3}"

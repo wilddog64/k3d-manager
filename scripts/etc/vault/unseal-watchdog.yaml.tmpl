@@ -1,0 +1,72 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: vault-unseal-watchdog
+  namespace: ${VAULT_NS}
+  labels:
+    app.kubernetes.io/name: vault-unseal-watchdog
+    app.kubernetes.io/part-of: vault
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 50
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: vault-unseal-watchdog
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 100
+          containers:
+            - name: unseal
+              image: ${VAULT_UNSEAL_IMAGE}
+              imagePullPolicy: IfNotPresent
+              env:
+                - name: VAULT_ADDR
+                  value: "${VAULT_ENDPOINT}"
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -u
+                  SHARD_FILE=/etc/vault-unseal/shard-1
+                  if [ ! -f "$SHARD_FILE" ]; then
+                    echo "[unseal-watchdog] vault-unseal secret not mounted — nothing to do"
+                    exit 0
+                  fi
+                  vault status >/dev/null 2>&1
+                  rc=$?
+                  if [ "$rc" -eq 0 ]; then
+                    echo "[unseal-watchdog] vault already unsealed"
+                    exit 0
+                  fi
+                  if [ "$rc" -eq 1 ]; then
+                    echo "[unseal-watchdog] vault unreachable at $VAULT_ADDR — skipping"
+                    exit 0
+                  fi
+                  echo "[unseal-watchdog] vault sealed — replaying shard"
+                  vault operator unseal "$(cat "$SHARD_FILE")" >/dev/null 2>&1 || true
+                  if vault status >/dev/null 2>&1; then
+                    echo "[unseal-watchdog] unseal succeeded"
+                  else
+                    echo "[unseal-watchdog] unseal attempt complete (still sealed or unreachable)"
+                  fi
+              volumeMounts:
+                - name: vault-unseal
+                  mountPath: /etc/vault-unseal
+                  readOnly: true
+          volumes:
+            - name: vault-unseal
+              secret:
+                secretName: vault-unseal
+                optional: true
+                items:
+                  - key: shard-1
+                    path: shard-1

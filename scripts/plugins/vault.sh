@@ -899,6 +899,31 @@ function _vault_source_optional_vars() {
    source "$VAULT_VARS"
 }
 
+# vault_install_unseal_watchdog [ns] [context]
+# Renders + applies the in-cluster auto-unseal watchdog CronJob (Tier 3 P2a).
+# Idempotent; safe to apply before a Vault exists (optional secret mount + early exit).
+function vault_install_unseal_watchdog() {
+   local ns="${1:-${VAULT_NS:-$VAULT_NS_DEFAULT}}"
+   local app_context="${2:-}"
+   _vault_source_optional_vars
+   local template="$SCRIPT_DIR/etc/vault/unseal-watchdog.yaml.tmpl"
+   [[ -f "$template" ]] || _err "[vault] missing template: $template"
+   local rendered
+   rendered="$(mktemp -t vault-unseal-watchdog.XXXXXX.yaml)"
+   trap '$(_cleanup_trap_command "$rendered")' EXIT TERM
+   VAULT_NS="$ns" \
+   VAULT_UNSEAL_IMAGE="${VAULT_UNSEAL_IMAGE:-hashicorp/vault:1.18.3}" \
+   VAULT_ENDPOINT="${VAULT_ENDPOINT:-http://vault.${ns}.svc:8200}" \
+   envsubst '$VAULT_NS $VAULT_UNSEAL_IMAGE $VAULT_ENDPOINT' < "$template" > "$rendered"
+   if [[ -n "$app_context" ]]; then
+      kubectl apply --context "$app_context" -f "$rendered"
+   else
+      _kubectl apply -f "$rendered"
+   fi
+   _cleanup_on_success "$rendered"
+   trap - EXIT TERM
+}
+
 function deploy_vault() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
       cat <<EOF
