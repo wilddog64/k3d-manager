@@ -296,6 +296,7 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-06-27 | [Copilot PR #100 Review Findings](docs/issues/2026-06-27-copilot-pr100-review-findings.md) | Tier 3 vault.sh: unchecked watchdog `kubectl apply` rc, kubeconfig context≠cluster name lookup, `base64 -d` macOS portability — 3 findings fixed in `1fd01e24` |
 | 2026-06-20 | [Copilot PR #97 Review Findings](docs/issues/2026-06-20-copilot-pr97-review-findings.md) | `cluster-secret.yaml.tmpl` is dead config; data-layer label fix correctly targets the Hostinger heredoc + `_argocd_set_active_app_cluster` runtime path — no change needed |
 | 2026-06-13 | [Copilot PR #94 Review Findings](docs/issues/2026-06-13-copilot-pr94-review-findings.md) | slack-relay provider alias case-fold fix (`eb0dfca2`); acg_restart case-sensitive exclusion deferred upstream to lib-acg |
 | 2026-06-10 | [Copilot PR #93 Review Findings](docs/issues/2026-06-10-copilot-pr93-review-findings.md) | CodeQL variable naming taint, Prometheus bootstrap hardcoding, docs inconsistency — 5 findings fixed in 6c814019 |
