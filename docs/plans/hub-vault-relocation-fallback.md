@@ -114,15 +114,17 @@ re-runs the Hostinger reconcile so the CSS repoints and ESO re-syncs.
      replayed by an in-cluster CronJob (`vault status` exit-code driven; pinned image;
      namespace-scoped; no RBAC — optional secret volume). Self-contained, safe-anywhere,
      behavior-preserving (nothing auto-calls it). No KMS, no Keychain, no laptop dependency.
-   - **P2b — provision + CSS k8s-auth cutover** — DEFERRED, needs a live grounding pass.
-     Blockers: (1) `deploy_vault`/`_vault_exec`/`_helm` operate on the **ambient kube-context**
-     and the Hostinger provider never calls `deploy_vault`, so provisioning into Hostinger needs
-     context-targeting (a `deploy_vault` context arg, or running it with the Hostinger context
-     active) — verifiable only live. (2) The `hostinger`-profile CSS uses **Kubernetes auth**
-     (v1.10.0 `configure_vault_app_auth_for_context`), but the `eso-reader` policy grants only
-     `secret/data/eso/*` while the app CSS reads `path: "secret"` root — reconciling the policy
-     paths against the shopping-cart-infra ExternalSecret `remoteRef`s is cross-repo and
-     live-only. Write P2b after P2a lands and the live Vault + ESO manifests are read.
+   - **P2b — provision + CSS k8s-auth cutover** — `docs/plans/v1.11.0-hub-vault-incluster-provision.md`
+     (WRITTEN, Codex-ready; live grounding pass done 2026-06-27). Both blockers resolved:
+     (1) provisioning runs via a new `vault_deploy_hub_into_context` wrapper that
+     saves/restores the current-context (k3s-hostinger.sh idiom) and runs `deploy_vault` with
+     a `HUB_VAULT_INCLUSTER=1` guard bypassing the `CLUSTER_ROLE=app` early-return — chosen
+     over threading `--context` because `_kubectl`/`_helm` are lib-foundation subtree.
+     (2) the app's real `remoteRef` keys are `secret/data/{postgres,payment,redis,rabbitmq,keycloak,ldap,minio}/*`
+     (none under `eso/*`), so the k8s-auth CSS binds a new least-privilege `app-cluster-reader`
+     policy (those 7 prefixes), not `eso-reader`. CSS auth mode is derived per profile
+     (`HUB_VAULT_CSS_AUTH`: laptop→token, hostinger→kubernetes); default `laptop` stays
+     behavior-preserving. The default flip is the P3-gated cutover (runbook in the P2b spec).
 3. **P3 — idempotent canonical-source seeding** — make the seed scripts re-runnable and
    driven from the canonical source so either Vault can be populated identically. The
    **default-profile flip to `hostinger` (cutover) is gated on this.** (Spec next.)
