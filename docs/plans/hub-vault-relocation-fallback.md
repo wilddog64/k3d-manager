@@ -1,119 +1,129 @@
 # Hub Vault Relocation with Laptop Fallback (Tier 3 — durable Vault-bridge stability)
 
-**Status:** design / roadmap (post-v1.10.0). Assign a version when scheduled.
+**Status:** decisions LOCKED 2026-06-27 (see "Locked decisions" below). Target release **v1.11.0**.
 **Depends on:** v1.10.0 provider-agnostic Vault auth (`configure_vault_app_auth_for_context`).
 **Motivation:** two live Hostinger outages on 2026-06-26, both rooted in the hub Vault
 living on the Mac and being reached through a fragile reverse-SSH/socat bridge.
 
 ---
 
+## Locked decisions (2026-06-27)
+
+1. **Primary = Hostinger VPS (co-located, in-cluster Vault).** OCI Always Free is **dropped
+   entirely** — it could never be provisioned, so it is not a candidate.
+2. **Fallback = laptop** (today's reverse-tunnel + socat bridge, kept intact). Because the
+   primary is co-located with the app cluster, the laptop fallback is **load-bearing**: it is
+   the only hub Vault left if the Hostinger Vault dies. Therefore **seed continuity is
+   mandatory, not optional.**
+3. **Assisted failover up front** — a health probe detects the primary Vault unreachable and
+   automatically flips `HUB_VAULT_PROFILE` + reconciles. (No manual-only first cut.)
+4. **Re-seed on failover** — seeding scripts are made idempotent + canonical-source-driven
+   (source of truth lives outside Vault: seed scripts / Keychain). On failover, seed the
+   fallback Vault, then repoint the CSS. No periodic kv mirror.
+
+---
+
 ## Problem
 
 The hub Vault (`vault-0`) runs on the Mac k3d cluster (`k3d-k3d-cluster`, `secrets` ns). The
-Hostinger app cluster reaches it through:
+Hostinger app cluster reaches it through (verified in code):
 
 ```
-app CSS → vault-bridge:8201 (Svc) → Hostinger host socat → host:8200
-        → autossh reverse tunnel (-R) → Mac 127.0.0.1:18200 → vault-0:8200
+app ClusterSecretStore  server: http://vault-bridge.secrets.svc.cluster.local:8201
+  → vault-bridge Svc/Endpoints (manual Endpoints → <node IP>:8201)   shopping_cart_create_vault_bridge
+  → Hostinger host socat  TCP-LISTEN:8201 → localhost:8200            _setup_vault_bridge
+  → autossh reverse tunnel (-R 8200:127.0.0.1:18200)                 tunnel_start
+  → Mac LaunchAgent kubectl port-forward vault-0 18200:8200          com.k3d-manager.vault-port-forward
+  → vault-0:8200 on k3d-k3d-cluster
 ```
+
+The orchestrator is `_hostinger_reconcile_vault_cluster_store()`
+(`scripts/lib/providers/k3s-hostinger.sh:671`); the CSS itself is written by
+`shopping_cart_apply_vault_token_and_cluster_secret_store()`
+(`scripts/plugins/shopping_cart.sh:447`, server hardcoded at line 482, token read from the
+**laptop** `vault-root` at line 451).
 
 The Mac is therefore a **single point of failure** for the entire app cluster's secrets:
-- The Mac sleeps / roams / reboots → the tunnel drops → ESO store goes `Ready=False`.
-- The chain has four independent hops (socat, autossh, kubectl pf, Vault pod); any one
-  flapping breaks secret delivery.
-- Tier 1 (`docs/bugs/2026-06-26-eso-refresh-interval-self-heal.md`) makes ESO *recover*
-  faster, but does not remove the laptop dependency.
+the Mac sleeps / roams / reboots → the tunnel drops → ESO store goes `Ready=False`. The chain
+has four independent hops; any one flapping breaks secret delivery. Tier 1
+(`docs/bugs/2026-06-26-eso-refresh-interval-self-heal.md`) makes ESO *recover* faster but does
+not remove the laptop dependency.
 
 ## Goal
 
-Run the hub Vault on an **always-on node** as the primary, and **keep the laptop +
-reverse-tunnel path as a selectable fallback** so that losing the primary (or losing
-Hostinger) does not strand the platform. This is additive — the laptop code path stays.
+Run the hub Vault **in the Hostinger app cluster** as the primary (no bridge, no tunnel,
+in-cluster `http://vault.secrets.svc:8200`), and **keep the laptop + reverse-tunnel path as a
+selectable fallback** so that losing the in-cluster Vault does not strand the platform. The
+laptop code path is retained verbatim.
 
 ---
 
 ## Design
 
-### Make the Vault endpoint a selectable seam (not a relocation-in-place)
+### The Vault endpoint becomes a selectable seam: `HUB_VAULT_PROFILE`
 
-v1.10.0 already made Vault *auth* provider-agnostic (kube-context-keyed). This plan closes
-the remaining open seam: the Vault **endpoint** is currently hardcoded
-(`vault.3ai-talk.org` in the static CSS / `VAULT_ENDPOINT` default in `eso.sh`). Introduce a
-hub-Vault **profile** selected by env/config:
+v1.10.0 already made Vault *auth* provider-agnostic (kube-context-keyed). This plan closes the
+remaining open seam: the Vault **endpoint** is currently hardcoded to the laptop bridge.
+Introduce a profile selected by env/config:
 
 ```
-HUB_VAULT_PROFILE = oci | hostinger | laptop      # default: oci (or per-CLUSTER_PROVIDER)
+HUB_VAULT_PROFILE = hostinger | laptop      # default: laptop (today's behavior) until P2 lands
 ```
 
-Each profile resolves: Vault server address, the network path (direct vs. bridge), and the
-reconcile steps. The CSS/`VAULT_ENDPOINT` is rendered from the active profile instead of a
-constant. The laptop profile = today's reverse-tunnel bridge, kept intact.
+Each profile resolves two things:
+- `HUB_VAULT_CSS_SERVER` — the `server:` URL written into the app-cluster ClusterSecretStore.
+- `HUB_VAULT_USE_BRIDGE` — whether the reconcile path stands up the tunnel + socat + vault-bridge Svc.
 
-### Where the always-on Vault should live (decision needed)
+| Profile | CSS server | Bridge/tunnel | Token source |
+|---------|-----------|---------------|--------------|
+| `laptop` (fallback, = today byte-for-byte) | `http://vault-bridge.secrets.svc.cluster.local:8201` | yes | laptop `vault-root` |
+| `hostinger` (primary) | `http://vault.secrets.svc:8200` (in-cluster) | no | in-cluster Vault (P2) |
 
-| Candidate | Pro | Con |
-|-----------|-----|-----|
-| **OCI Always Free** (roadmap v1.0.8, ARM64) | Truly independent of Hostinger; survives losing Hostinger; zero cost | New node to provision + maintain; cross-cloud network path |
-| **Hostinger VPS itself** | Co-located with the app cluster → near-zero-latency, no bridge | If you lose Hostinger you lose Vault too — fallback to laptop becomes mandatory, not optional |
-| **Laptop (today)** | Already works; dev-friendly | The SPOF we are fixing — demote to fallback only |
+**Phase 1 ships the seam with `default=laptop`, so it is behavior-preserving** — the
+`hostinger` branch is wired but inert (and not fully functional) until Phase 2 provisions the
+in-cluster Vault. The default flips to `hostinger` in Phase 2.
 
-**Recommendation:** primary = **OCI Always Free** (independent failure domain), fallback =
-**laptop**. If primary = Hostinger is chosen for latency, the laptop fallback is load-bearing
-(it is the only Vault left when Hostinger dies), so seed-continuity (below) becomes mandatory.
+### Secret continuity (re-seed on failover)
 
-### Secret continuity across primary ↔ fallback
-
-The fallback Vault must serve the same secrets as the primary. Options (OSS Vault — no
-performance replication):
-1. **Re-seed on failover (recommended):** keep the existing seeding scripts idempotent and
-   canonical-source-driven; on failover, seed the fallback Vault then repoint the CSS. The
-   secrets' source of truth lives outside Vault (seed scripts / Keychain), so both Vaults can
-   be (re)populated identically.
-2. **Periodic export/import sync:** a scheduled `vault kv get`→`vault kv put` mirror from
-   primary to fallback. More moving parts; defer unless RTO requires it.
-
+The fallback (laptop) Vault must serve the same secrets as the primary. Source of truth lives
+**outside** Vault (seed scripts / Keychain), so either Vault can be (re)populated identically.
+On failover: seed the target Vault (idempotent), then repoint the CSS via the profile.
 Pair with `docs/plans/vault-resilience.md` (auto-unseal) so a relocated/fallback Vault comes
 back unsealed without manual shard entry.
 
-### Failover mechanism
+### Assisted failover
 
-- **Phase 1 (manual):** operator sets `HUB_VAULT_PROFILE=laptop` and runs the Hostinger
-  reconcile/refresh → CSS repoints to the laptop bridge, ESO re-syncs. Document as a runbook.
-- **Phase 2 (assisted):** a health probe (extend the Tier 2 watchdog idea) detects the
-  primary Vault unreachable and flips the profile + reconciles automatically.
+A health probe (extend the Tier 2 watchdog idea) periodically checks the active hub Vault. On
+sustained unreachability it flips `HUB_VAULT_PROFILE` to the fallback, re-seeds if needed, and
+re-runs the Hostinger reconcile so the CSS repoints and ESO re-syncs.
 
 ---
 
-## Scope / Phasing
+## Phasing (each phase = one Codex spec)
 
-1. **Endpoint seam** — render CSS/`VAULT_ENDPOINT` from `HUB_VAULT_PROFILE`; laptop profile
-   reproduces today's behavior byte-for-byte (no functional change when profile=laptop).
-2. **Provision always-on Vault** — stand up Vault on the chosen node (OCI Always Free first),
-   reachable by the app cluster over a stable path; wire auto-unseal (`vault-resilience.md`).
-3. **Seed continuity** — make seeding idempotent + canonical-source-driven; runbook to seed
-   either Vault from the same source.
-4. **Failover runbook (manual)** — switch profile → reconcile → verify CSS Valid + ES synced.
-5. **(Later) Assisted failover** — health-probe-driven profile flip.
+1. **P1 — endpoint seam (`HUB_VAULT_PROFILE`)** — `docs/plans/v1.11.0-hub-vault-profile-seam.md`
+   (WRITTEN, Codex-ready). Pure code; `default=laptop` ⇒ no functional change. Unblocks all
+   later phases.
+2. **P2 — provision in-cluster Hostinger Vault + auto-unseal** — deploy Vault into the
+   Hostinger cluster `secrets` ns, init/unseal (auto-unseal per `vault-resilience.md`), wire
+   the `hostinger` profile to it, flip the default to `hostinger`. (Spec written after P1 lands
+   + Vault-deploy mechanics read.)
+3. **P3 — idempotent canonical-source seeding** — make the seed scripts re-runnable and
+   driven from the canonical source so either Vault can be populated identically. (Spec next.)
+4. **P4 — assisted-failover watchdog** — health-probe-driven profile flip + reconcile. (Spec
+   last; depends on P1–P3.)
 
 ## Out of scope
 
-- Vault Enterprise replication (OSS only).
+- Vault Enterprise replication (OSS only) and periodic kv mirroring.
 - Removing the laptop code path — explicitly retained as the fallback.
-
-## Open decisions (for the user)
-
-1. Primary location: **OCI Always Free** (independent) vs **Hostinger VPS** (co-located, but
-   makes the laptop fallback load-bearing)?
-2. Failover: manual runbook first (Phase 1) or build assisted failover up front?
-3. Seed continuity: re-seed-on-failover (simpler) vs periodic mirror (lower RTO)?
+- OCI as a Vault host — dropped (cannot provision).
 
 ---
 
 ## Relationship to other work
 
-- **Tier 1** (`docs/bugs/2026-06-26-eso-refresh-interval-self-heal.md`) — ships now; makes
-  ESO self-heal regardless of where Vault lives.
-- **Tier 2** (tunnel chain watchdog) — optional belt-and-suspenders while the laptop bridge
-  exists; folds naturally into Phase 5 assisted failover.
+- **Tier 1** (`docs/bugs/2026-06-26-eso-refresh-interval-self-heal.md`) — SHIPPED (PR #86,
+  merge `4afa9dce`); makes ESO self-heal regardless of where Vault lives.
 - **v1.10.0** — the kube-context-keyed auth helper this builds on.
-- **`vault-resilience.md`** — auto-unseal, required for an always-on Vault.
+- **`vault-resilience.md`** — auto-unseal, required for an always-on in-cluster Vault (P2).
