@@ -681,21 +681,25 @@ function _hostinger_reconcile_vault_cluster_store() {
     return 0
   fi
 
-  if declare -f tunnel_start >/dev/null 2>&1; then
-    local _prev_tunnel_host="${TUNNEL_SSH_HOST:-}"
-    TUNNEL_SSH_HOST="${ssh_target}"
-    _info "[k3s-hostinger] Ensuring reverse Vault tunnel to ${ssh_target}..."
-    if declare -f tunnel_stop >/dev/null 2>&1; then
-      tunnel_stop >/dev/null 2>&1 || true
+  if [[ "${HUB_VAULT_USE_BRIDGE:-1}" == "1" ]]; then
+    if declare -f tunnel_start >/dev/null 2>&1; then
+      local _prev_tunnel_host="${TUNNEL_SSH_HOST:-}"
+      TUNNEL_SSH_HOST="${ssh_target}"
+      _info "[k3s-hostinger] Ensuring reverse Vault tunnel to ${ssh_target}..."
+      if declare -f tunnel_stop >/dev/null 2>&1; then
+        tunnel_stop >/dev/null 2>&1 || true
+      fi
+      tunnel_start || return 1
+      TUNNEL_SSH_HOST="${_prev_tunnel_host}"
     fi
-    tunnel_start || return 1
-    TUNNEL_SSH_HOST="${_prev_tunnel_host}"
-  fi
 
-  _info "[k3s-hostinger] Ensuring vault-bridge on ${ssh_target}..."
-  _setup_vault_bridge "${ssh_target}" "${_HOSTINGER_SSH_KEY}" || return 1
-  _info "[k3s-hostinger] Ensuring vault-bridge Service/Endpoints on ${_HOSTINGER_KUBE_CONTEXT}..."
-  shopping_cart_create_vault_bridge || return 1
+    _info "[k3s-hostinger] Ensuring vault-bridge on ${ssh_target}..."
+    _setup_vault_bridge "${ssh_target}" "${_HOSTINGER_SSH_KEY}" || return 1
+    _info "[k3s-hostinger] Ensuring vault-bridge Service/Endpoints on ${_HOSTINGER_KUBE_CONTEXT}..."
+    shopping_cart_create_vault_bridge || return 1
+  else
+    _info "[k3s-hostinger] HUB_VAULT_PROFILE=${HUB_VAULT_PROFILE:-hostinger}: using in-cluster Vault, skipping reverse tunnel + socat bridge"
+  fi
   _info "[k3s-hostinger] Ensuring vault-token + ClusterSecretStore on ${_HOSTINGER_KUBE_CONTEXT}..."
   shopping_cart_apply_vault_token_and_cluster_secret_store || return 1
   _info "[k3s-hostinger] Forcing ExternalSecret reconcile on ${_HOSTINGER_KUBE_CONTEXT}..."

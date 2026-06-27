@@ -471,7 +471,8 @@ function shopping_cart_apply_vault_token_and_cluster_secret_store() {
     _info "[acg-up] ESO webhook not ready yet (attempt ${i}/18) — waiting 10s..."
     sleep 10
   done
-  kubectl apply --context "${_app_context}" -f - <<'CSSEOF'
+  local _css_vault_server="${HUB_VAULT_CSS_SERVER:-http://vault-bridge.secrets.svc.cluster.local:8201}"
+  kubectl apply --context "${_app_context}" -f - <<CSSEOF
 apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore
 metadata:
@@ -479,7 +480,7 @@ metadata:
 spec:
   provider:
     vault:
-      server: "http://vault-bridge.secrets.svc.cluster.local:8201"
+      server: "${_css_vault_server}"
       path: "secret"
       version: "v2"
       auth:
