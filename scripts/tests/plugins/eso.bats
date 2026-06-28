@@ -7,6 +7,7 @@ setup() {
   RUN_LOG="$BATS_TEST_TMPDIR/run.log"
   : > "$RUN_LOG"
   RUN_EXIT_CODES=()
+  ESO_DEPLOY_EXISTS="${ESO_DEPLOY_EXISTS:-0}"
   ESO_WEBHOOK_ENDPOINT_IP="${ESO_WEBHOOK_ENDPOINT_IP:-10.42.0.10}"
   _run_command() {
     while [[ $# -gt 0 ]]; do
@@ -37,6 +38,14 @@ setup() {
     if [[ "$*" == *"get endpoints external-secrets-webhook"* ]]; then
       printf '%s\n' "$ESO_WEBHOOK_ENDPOINT_IP"
       return 0
+    fi
+
+    if [[ "$*" == *"get deploy/"* ]]; then
+      if [[ "$ESO_DEPLOY_EXISTS" == "1" ]]; then
+        printf 'deployment.apps/%s\n' "${*##*deploy/}"
+        return 0
+      fi
+      return 1
     fi
 
     local rc=0
@@ -95,6 +104,18 @@ setup() {
   [[ "${kubectl_calls[*]}" == *"-n sample-ns rollout status deploy/external-secrets-webhook --timeout=120s"* ]]
   [[ "${kubectl_calls[*]}" == *"-n sample-ns rollout status deploy/external-secrets-cert-controller --timeout=120s"* ]]
   [[ "${kubectl_calls[*]}" == *"-n sample-ns get endpoints external-secrets-webhook -o jsonpath={.subsets[0].addresses[0].ip}"* ]]
+}
+
+@test "Skips Helm install if ESO is externally managed" {
+  RUN_EXIT_CODES=(1)
+  ESO_DEPLOY_EXISTS=1
+  run deploy_eso test-ns test-release
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ESO already present in namespace test-ns (externally managed; skipping Helm install)"* ]]
+  [ ! -s "$HELM_LOG" ]
+  read_lines "$KUBECTL_LOG" kubectl_calls
+  [[ "${kubectl_calls[*]}" == *"-n test-ns get deploy/test-release"* ]]
+  [[ "${kubectl_calls[*]}" == *"-n test-ns rollout status deploy/external-secrets-webhook --timeout=120s"* ]]
 }
 
 @test "Local ESO chart skips repo add" {
