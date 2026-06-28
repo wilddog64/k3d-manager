@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Tier 3 P4 failover watchdog entrypoint: probe the active hub Vault and, on sustained
+# unreachability, flip HUB_VAULT_PROFILE + repoint the app-cluster ClusterSecretStore.
+# Invoked by the com.k3d-manager.vault-failover LaunchAgent, or run manually.
+# Usage: bin/k3dm-vault-failover [<app-kube-context>]
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+APP_CTX="${1:-${HUB_VAULT_FAILOVER_APP_CONTEXT:-ubuntu-hostinger}}"
+
+exec env CLUSTER_PROVIDER="${CLUSTER_PROVIDER:-k3s-hostinger}" \
+  "${REPO_ROOT}/scripts/k3d-manager" vault_failover_hub_into_context "${APP_CTX}"

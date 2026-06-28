@@ -1103,6 +1103,152 @@ function vault_seed_hub_into_context() {
   return 0
 }
 
+# Pure: given the active profile, echo the fallback profile (the other one).
+function _vault_hub_fallback_profile() {
+  case "${1:-laptop}" in
+    hostinger) printf 'laptop\n' ;;
+    *)         printf 'hostinger\n' ;;
+  esac
+}
+
+# Pure: 0 if the Vault /sys/health HTTP status means "reachable" (mirror _is_vault_health).
+function _vault_health_status_ok() {
+  case "${1:-}" in
+    200|429|472|473) return 0 ;;
+    *)               return 1 ;;
+  esac
+}
+
+# Probe the active hub Vault via a short-lived port-forward + curl /sys/health.
+# laptop ⇒ probe k3d-k3d-cluster; hostinger ⇒ probe the app context.
+# Returns 0 healthy, 1 unreachable. SC2064-safe RETURN trap (single-quoted, pre-expanded).
+function _vault_probe_hub_endpoint() {
+  local _profile="${1:-laptop}" _app_ctx="${2:-}"
+  local _vault_ns="${VAULT_NS:-secrets}"
+  local _probe_ctx
+  case "${_profile}" in
+    hostinger) _probe_ctx="${_app_ctx}" ;;
+    *)         _probe_ctx="k3d-k3d-cluster" ;;
+  esac
+  if [[ -z "${_probe_ctx}" ]]; then
+    _err "[vault] _vault_probe_hub_endpoint: hostinger profile requires an app kube-context"
+    return 1
+  fi
+  if ! _kubectl config get-contexts -o name 2>/dev/null | grep -qx "${_probe_ctx}"; then
+    return 1
+  fi
+  local _port=18260 _pid="" _code
+  _kubectl port-forward -n "${_vault_ns}" --context "${_probe_ctx}" svc/vault "${_port}:8200" >/dev/null 2>&1 &
+  _pid=$!
+  # shellcheck disable=SC2064
+  trap '[[ -n "'"${_pid}"'" ]] && kill "'"${_pid}"'" >/dev/null 2>&1 || true' RETURN
+  sleep 3
+  _code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${_port}/v1/sys/health" 2>/dev/null || true)
+  _vault_health_status_ok "${_code}"
+}
+
+# Assisted failover: probe the active hub Vault; on sustained unreachability flip
+# HUB_VAULT_PROFILE to the fallback (persisted), re-seed in-cluster when flipping to
+# hostinger, then re-run the Hostinger reconcile so the CSS repoints and ESO re-syncs.
+# Operator-dispatched only (no auto-caller). Drives the HUB_VAULT_PROFILE flip.
+# Usage: vault_failover_hub_into_context <app-kube-context> [--probe-only]
+function vault_failover_hub_into_context() {
+  local _app_ctx="" _probe_only=0 _arg
+  for _arg in "$@"; do
+    case "${_arg}" in
+      --probe-only) _probe_only=1 ;;
+      -*) _err "[vault] vault_failover_hub_into_context: unknown flag '${_arg}'"; return 1 ;;
+      *) [[ -z "${_app_ctx}" ]] && _app_ctx="${_arg}" ;;
+    esac
+  done
+  if [[ -z "${_app_ctx}" ]]; then
+    _err "[vault] vault_failover_hub_into_context requires an app cluster kube-context"
+    return 1
+  fi
+  if ! _kubectl config get-contexts -o name 2>/dev/null | grep -qx "${_app_ctx}"; then
+    _err "[vault] kube-context '${_app_ctx}' not found in kubeconfig"
+    return 1
+  fi
+
+  local _vault_ns="${VAULT_NS:-secrets}"
+  local _active="${HUB_VAULT_PROFILE:-laptop}"
+  local _threshold="${HUB_VAULT_FAILOVER_THRESHOLD:-3}"
+  local _interval="${HUB_VAULT_FAILOVER_INTERVAL:-10}"
+
+  local _attempt _healthy=0
+  for ((_attempt = 1; _attempt <= _threshold; _attempt++)); do
+    if _vault_probe_hub_endpoint "${_active}" "${_app_ctx}"; then
+      _healthy=1
+      break
+    fi
+    _warn "[vault] hub Vault probe ${_attempt}/${_threshold} failed (profile=${_active})"
+    (( _attempt < _threshold )) && sleep "${_interval}"
+  done
+
+  if (( _healthy )); then
+    _info "[vault] hub Vault healthy (profile=${_active}); no failover needed"
+    return 0
+  fi
+  if (( _probe_only )); then
+    _warn "[vault] hub Vault unreachable (profile=${_active}); --probe-only set, not flipping"
+    return 1
+  fi
+
+  local _fallback
+  _fallback="$(_vault_hub_fallback_profile "${_active}")"
+  _warn "[vault] hub Vault unreachable after ${_threshold} probes — failing over ${_active} -> ${_fallback}"
+
+  local _state_file="${HUB_VAULT_PROFILE_STATE_FILE:-${K3DM_STATE_DIR:-${HOME}/.local/share/k3d-manager}/hub-vault-profile}"
+  mkdir -p "$(dirname "${_state_file}")" 2>/dev/null || true
+  printf '%s\n' "${_fallback}" > "${_state_file}" \
+    || { _err "[vault] failed to persist failover profile to ${_state_file}"; return 1; }
+
+  if [[ "${_fallback}" == "hostinger" ]]; then
+    _info "[vault] re-seeding in-cluster Vault on ${_app_ctx} before repointing CSS"
+    vault_seed_hub_into_context "${_app_ctx}" \
+      || _warn "[vault] re-seed reported issues — relying on existing in-cluster data / DR backup; continuing"
+  fi
+
+  unset HUB_VAULT_CSS_SERVER HUB_VAULT_USE_BRIDGE HUB_VAULT_CSS_AUTH
+  export HUB_VAULT_PROFILE="${_fallback}"
+  # shellcheck disable=SC1091
+  [[ -r "${SCRIPT_DIR}/etc/vault/vars.sh" ]] && source "${SCRIPT_DIR}/etc/vault/vars.sh"
+
+  if declare -f _hostinger_reconcile_vault_cluster_store >/dev/null 2>&1; then
+    _info "[vault] re-running Hostinger reconcile to repoint CSS (profile=${_fallback})"
+    _hostinger_reconcile_vault_cluster_store \
+      || { _err "[vault] reconcile failed after failover to ${_fallback}"; return 1; }
+  else
+    _warn "[vault] _hostinger_reconcile_vault_cluster_store not loaded — CSS not repointed; run 'CLUSTER_PROVIDER=k3s-hostinger make refresh' to apply HUB_VAULT_PROFILE=${_fallback}"
+  fi
+
+  _info "[vault] failover complete: HUB_VAULT_PROFILE=${_fallback} (persisted to ${_state_file})"
+  return 0
+}
+
+# Install the periodic failover watchdog LaunchAgent (control-plane laptop, macOS).
+# Idempotent: re-render + bootout/bootstrap. Operator-dispatched.
+# Usage: vault_install_failover_watchdog [<app-kube-context>]
+function vault_install_failover_watchdog() {
+  local _app_ctx="${1:-${HUB_VAULT_FAILOVER_APP_CONTEXT:-ubuntu-hostinger}}"
+  local _label="com.k3d-manager.vault-failover"
+  local _tmpl="${SCRIPT_DIR}/etc/launchd/${_label}.plist.tmpl"
+  local _dst="${HOME}/Library/LaunchAgents/${_label}.plist"
+  local _repo_root
+  _repo_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
+  [[ -f "${_tmpl}" ]] || { _err "[vault] missing template: ${_tmpl}"; return 1; }
+  sed \
+    -e "s|{{K3DM_REPO_ROOT}}|${_repo_root}|g" \
+    -e "s|{{HOME}}|${HOME}|g" \
+    -e "s|{{HUB_VAULT_FAILOVER_APP_CONTEXT}}|${_app_ctx}|g" \
+    "${_tmpl}" > "${_dst}" \
+    || { _err "[vault] failed to render ${_dst}"; return 1; }
+  launchctl bootout "gui/$(id -u)/${_label}" >/dev/null 2>&1 || true
+  launchctl bootstrap "gui/$(id -u)" "${_dst}" \
+    || { _err "[vault] failed to bootstrap ${_label}"; return 1; }
+  _info "[vault] failover watchdog installed (${_label}); probes ${_app_ctx} every 300s"
+}
+
 function vault_deploy_hub_into_context() {
    local app_context="${1:-}"
    [[ -n "${app_context}" ]] || _err "[vault] vault_deploy_hub_into_context requires an app cluster kube-context"

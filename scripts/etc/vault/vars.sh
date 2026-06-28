@@ -15,6 +15,17 @@ export VAULT_ENDPOINT="${VAULT_ENDPOINT:-http://vault.${VAULT_NS}.svc:8200}"
 # Hub Vault location profile (Tier 3 relocation seam).
 #   laptop    — hub Vault on the Mac, reached via reverse-tunnel + socat bridge (default; today's path)
 #   hostinger — hub Vault in-cluster on the Hostinger app cluster (primary; functional after P2)
+# Persisted failover state (Tier 3 P4): vault_failover_hub_into_context writes the active
+# profile here so a flip survives across reconciles. Explicit env wins over the file; an
+# absent or invalid file leaves the default 'laptop' untouched (behavior-preserving).
+HUB_VAULT_PROFILE_STATE_FILE="${HUB_VAULT_PROFILE_STATE_FILE:-${K3DM_STATE_DIR:-${HOME}/.local/share/k3d-manager}/hub-vault-profile}"
+if [[ -z "${HUB_VAULT_PROFILE:-}" && -r "${HUB_VAULT_PROFILE_STATE_FILE}" ]]; then
+  _hub_persisted="$(tr -d '[:space:]' < "${HUB_VAULT_PROFILE_STATE_FILE}" 2>/dev/null || true)"
+  case "${_hub_persisted}" in
+    laptop|hostinger) HUB_VAULT_PROFILE="${_hub_persisted}" ;;
+  esac
+  unset _hub_persisted
+fi
 export HUB_VAULT_PROFILE="${HUB_VAULT_PROFILE:-laptop}"
 case "${HUB_VAULT_PROFILE}" in
   hostinger)
