@@ -224,6 +224,7 @@ function _hostinger_restart_launchd() {
     if [[ "${label}" == "com.k3d-manager.argocd-port-forward" ]]; then
       _hostinger_wait_for_port_free 8080 30
     fi
+    _run_command --interactive-sudo --quiet --soft -- launchctl enable "system/${label}" >/dev/null 2>&1 || true
     _run_command --interactive-sudo --quiet --soft -- launchctl bootstrap system "${plist}" >/dev/null 2>&1 \
       && _info "[k3s-hostinger] launchd ${label}: restarted" \
       || _warn "[k3s-hostinger] launchd ${label}: restart failed"
@@ -232,6 +233,7 @@ function _hostinger_restart_launchd() {
     if [[ "${label}" == "com.k3d-manager.argocd-port-forward" ]]; then
       _hostinger_wait_for_port_free 8080 30
     fi
+    launchctl enable "gui/$(id -u)/${label}" >/dev/null 2>&1 || true
     launchctl bootstrap "gui/$(id -u)" "${plist}" >/dev/null 2>&1 \
       && _info "[k3s-hostinger] launchd ${label}: restarted" \
       || _warn "[k3s-hostinger] launchd ${label}: restart failed"
