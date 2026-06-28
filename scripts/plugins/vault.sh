@@ -1697,13 +1697,16 @@ HCL
   fi
 
   # e. Create ESO role bound to app cluster ESO service account
-  local safe_mount_role safe_eso_sa safe_eso_ns
+  local audience="${APP_K8S_TOKEN_AUDIENCE:-https://kubernetes.default.svc.cluster.local}"
+  local safe_mount_role safe_eso_sa safe_eso_ns safe_audience
   printf -v safe_mount_role '%s' "auth/${mount}/role/${role}"
   printf -v safe_eso_sa '%q' "$eso_sa"
   printf -v safe_eso_ns '%q' "$eso_ns"
+  printf -v safe_audience '%q' "$audience"
   _vault_exec "$ns" "vault write ${safe_mount_role} \
     bound_service_account_names=${safe_eso_sa} \
     bound_service_account_namespaces=${safe_eso_ns} \
+    audience=${safe_audience} \
     policies=app-cluster-reader \
     ttl=1h" "$release"
 
