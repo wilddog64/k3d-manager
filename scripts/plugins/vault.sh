@@ -996,6 +996,113 @@ EOF
    return 0
 }
 
+# Mirror the canonical app-cluster secrets from the laptop (source-of-truth) Vault into the
+# in-cluster Vault of an app context, backing each up to the keyring and a native k8s Secret.
+# Operator-dispatched only (no auto-caller). Gates the HUB_VAULT_PROFILE default flip.
+# Usage: vault_seed_hub_into_context <app-kube-context>
+function vault_seed_hub_into_context() {
+  local _app_ctx="${1:-}"
+  if [[ -z "${_app_ctx}" ]]; then
+    _err "[vault] vault_seed_hub_into_context requires an app cluster kube-context"
+    return 1
+  fi
+  if ! _kubectl config get-contexts -o name 2>/dev/null | grep -qx "${_app_ctx}"; then
+    _err "[vault] kube-context '${_app_ctx}' not found in kubeconfig"
+    return 1
+  fi
+
+  local _hub_ctx="k3d-k3d-cluster"
+  local _vault_ns="${VAULT_NS:-secrets}"
+
+  # Source (laptop) root token — source of truth.
+  local _src_token
+  _src_token=$(_kubectl get secret vault-root -n "${_vault_ns}" --context "${_hub_ctx}" \
+    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null \
+    || _kubectl get secret vault-root -n "${_vault_ns}" --context "${_hub_ctx}" \
+    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -D 2>/dev/null || true)
+  if [[ -z "${_src_token}" ]]; then
+    _err "[vault] could not read source vault-root token from ${_hub_ctx}/${_vault_ns}"
+    return 1
+  fi
+
+  # Target (in-cluster) root token — provisioned by vault_deploy_hub_into_context (P2b).
+  local _dst_token
+  _dst_token=$(_kubectl get secret vault-root -n "${_vault_ns}" --context "${_app_ctx}" \
+    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null \
+    || _kubectl get secret vault-root -n "${_vault_ns}" --context "${_app_ctx}" \
+    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -D 2>/dev/null || true)
+  if [[ -z "${_dst_token}" ]]; then
+    _err "[vault] could not read target vault-root token from ${_app_ctx}/${_vault_ns} — run vault_deploy_hub_into_context first"
+    return 1
+  fi
+
+  # Local port-forwards to both Vaults (distinct local ports). SC2064-safe trap (single quotes).
+  local _src_port=18250 _dst_port=18251
+  local _src_pf_pid="" _dst_pf_pid=""
+  _kubectl port-forward -n "${_vault_ns}" --context "${_hub_ctx}" svc/vault "${_src_port}:8200" >/dev/null 2>&1 &
+  _src_pf_pid=$!
+  _kubectl port-forward -n "${_vault_ns}" --context "${_app_ctx}" svc/vault "${_dst_port}:8200" >/dev/null 2>&1 &
+  _dst_pf_pid=$!
+  # shellcheck disable=SC2064
+  trap '[[ -n "'"${_src_pf_pid}"'" ]] && kill "'"${_src_pf_pid}"'" >/dev/null 2>&1 || true; [[ -n "'"${_dst_pf_pid}"'" ]] && kill "'"${_dst_pf_pid}"'" >/dev/null 2>&1 || true' RETURN
+  sleep 3
+
+  local _keys=(
+    redis/cart redis/orders-cache
+    postgres/orders postgres/products postgres/payment
+    payment/encryption payment/stripe payment/paypal
+    rabbitmq/default minio/credentials
+    ldap/admin keycloak/admin keycloak/clients
+  )
+
+  local _k8s_args=()
+  local _key _json _missing=0
+  for _key in "${_keys[@]}"; do
+    # 1. canonical source Vault
+    _json=$(curl -sf -H "X-Vault-Token: ${_src_token}" \
+      "http://localhost:${_src_port}/v1/secret/data/${_key}" | jq -c '.data.data // empty' 2>/dev/null || true)
+    # 2. Keychain backup fallback
+    if [[ -z "${_json}" ]] && declare -f _secret_load_data >/dev/null 2>&1; then
+      _json=$(_secret_load_data "${SEED_KEYCHAIN_SERVICE:-k3d-manager-app-cluster-secrets}" "${_key}" 2>/dev/null || true)
+    fi
+    if [[ -z "${_json}" ]]; then
+      _warn "[vault] canonical secret '${_key}' absent in source Vault and keyring — skipping"
+      _missing=$((_missing + 1))
+      continue
+    fi
+    # write to target in-cluster Vault
+    if ! curl -sf -X POST -H "X-Vault-Token: ${_dst_token}" -H "Content-Type: application/json" \
+      -d "{\"data\":${_json}}" "http://localhost:${_dst_port}/v1/secret/data/${_key}" >/dev/null; then
+      _err "[vault] failed writing '${_key}' to target Vault on ${_app_ctx}"
+      return 1
+    fi
+    # back up to keyring
+    if declare -f _secret_store_data >/dev/null 2>&1; then
+      _secret_store_data "${SEED_KEYCHAIN_SERVICE:-k3d-manager-app-cluster-secrets}" "${_key}" "${_json}" >/dev/null 2>&1 \
+        || _warn "[vault] keyring backup failed for '${_key}' (continuing)"
+    fi
+    # accumulate for the native k8s Secret (key path '/' -> '__')
+    _k8s_args+=("--from-literal=${_key//\//__}=${_json}")
+  done
+
+  # native in-cluster disaster-recovery copy
+  _kubectl create namespace "${SEED_K8S_BACKUP_NS:-secrets}" --context "${_app_ctx}" \
+    --dry-run=client -o yaml | _kubectl apply --context "${_app_ctx}" -f - >/dev/null 2>&1 || true
+  if (( ${#_k8s_args[@]} > 0 )); then
+    _kubectl create secret generic "${SEED_K8S_BACKUP_NAME:-vault-seed-backup}" \
+      -n "${SEED_K8S_BACKUP_NS:-secrets}" --context "${_app_ctx}" \
+      "${_k8s_args[@]}" \
+      --dry-run=client -o yaml | _kubectl apply --context "${_app_ctx}" -f - >/dev/null
+  fi
+
+  if (( _missing > 0 )); then
+    _warn "[vault] seeded in-cluster Vault on ${_app_ctx} with ${_missing} canonical key(s) missing"
+  else
+    _info "[vault] seeded in-cluster Vault + keyring + k8s backup on ${_app_ctx} (all 13 canonical keys)"
+  fi
+  return 0
+}
+
 function vault_deploy_hub_into_context() {
    local app_context="${1:-}"
    [[ -n "${app_context}" ]] || _err "[vault] vault_deploy_hub_into_context requires an app cluster kube-context"

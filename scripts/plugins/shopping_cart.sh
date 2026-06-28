@@ -3,6 +3,18 @@ set -euo pipefail
 
 : "${_vault_local_port:=}"
 
+# --- Tier 3 P3: seed target / canonical source / backup targets ----------------------
+# Defaults preserve pre-P3 behavior: target == source == laptop Vault via local port-forward.
+: "${SEED_VAULT_ADDR:=http://localhost:${_vault_local_port}}"
+: "${SEED_VAULT_TOKEN:=${_vault_root_token:-}}"
+: "${SEED_VAULT_SOURCE_ADDR:=${SEED_VAULT_ADDR}}"
+: "${SEED_VAULT_SOURCE_TOKEN:=${SEED_VAULT_TOKEN}}"
+# Keychain (macOS) / secret-tool (Linux) backup service; per-key account = the Vault KV path.
+: "${SEED_KEYCHAIN_SERVICE:=k3d-manager-app-cluster-secrets}"
+# Native in-cluster disaster-recovery copy.
+: "${SEED_K8S_BACKUP_NS:=secrets}"
+: "${SEED_K8S_BACKUP_NAME:=vault-seed-backup}"
+
 function add_ubuntu_k3s_cluster() {
   local ssh_host="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
   local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
@@ -534,33 +546,55 @@ function _shopping_cart_resolve_app_context() {
 
 function shopping_cart_seed_sandbox_vault_kv() {
   _info "[acg-up] Seeding Vault KV with sandbox static secrets..."
+  local _seed_addr="${SEED_VAULT_ADDR:-http://localhost:${_vault_local_port}}"
+  local _seed_token="${SEED_VAULT_TOKEN:-${_vault_root_token}}"
+  local _src_addr="${SEED_VAULT_SOURCE_ADDR:-${_seed_addr}}"
+  local _src_token="${SEED_VAULT_SOURCE_TOKEN:-${_seed_token}}"
   _vault_kv_put() {
     curl -sf -X POST \
-      -H "X-Vault-Token: ${_vault_root_token}" \
+      -H "X-Vault-Token: ${_seed_token}" \
       -H "Content-Type: application/json" \
       -d "{\"data\":$1}" \
-      "http://localhost:${_vault_local_port}/v1/secret/data/$2" >/dev/null
+      "${_seed_addr}/v1/secret/data/$2" >/dev/null
   }
   _vault_kv_exists() {
     local path="$1"
     curl -sf \
-      -H "X-Vault-Token: ${_vault_root_token}" \
-      "http://localhost:${_vault_local_port}/v1/secret/data/${path}" >/dev/null 2>&1
+      -H "X-Vault-Token: ${_seed_token}" \
+      "${_seed_addr}/v1/secret/data/${path}" >/dev/null 2>&1
   }
   _vault_kv_get_field() {
     local path="$1"
     local field="$2"
     curl -sf \
-      -H "X-Vault-Token: ${_vault_root_token}" \
-      "http://localhost:${_vault_local_port}/v1/secret/data/${path}" \
+      -H "X-Vault-Token: ${_seed_token}" \
+      "${_seed_addr}/v1/secret/data/${path}" \
       | jq -r --arg field "$field" '.data.data[$field] // empty'
   }
-  _redis_pass_cart=$(openssl rand -base64 24 | tr -d '=+/')
-  _redis_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
-  _rabbitmq_pass=$(openssl rand -base64 24 | tr -d '=+/')
+  # Canonical source reader (Vault = source of truth). Returns the raw KV-v2 data object as JSON,
+  # empty string if the key is absent in the source Vault.
+  _seed_source_data() {
+    local path="$1"
+    curl -sf \
+      -H "X-Vault-Token: ${_src_token}" \
+      "${_src_addr}/v1/secret/data/${path}" \
+      | jq -c '.data.data // empty' 2>/dev/null || true
+  }
+  if _vault_kv_exists "redis/cart"; then
+    _info "[acg-up] Reusing existing Vault secret redis/cart"
+    _redis_pass_cart=$(_vault_kv_get_field "redis/cart" "password")
+  else
+    _redis_pass_cart=$(openssl rand -base64 24 | tr -d '=+/')
+    _vault_kv_put "{\"password\":\"${_redis_pass_cart}\"}"                                         redis/cart
+  fi
 
-  _vault_kv_put "{\"password\":\"${_redis_pass_cart}\"}"                                           redis/cart
-  _vault_kv_put "{\"password\":\"${_redis_pass_orders}\"}"                                         redis/orders-cache
+  if _vault_kv_exists "redis/orders-cache"; then
+    _info "[acg-up] Reusing existing Vault secret redis/orders-cache"
+    _redis_pass_orders=$(_vault_kv_get_field "redis/orders-cache" "password")
+  else
+    _redis_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
+    _vault_kv_put "{\"password\":\"${_redis_pass_orders}\"}"                                       redis/orders-cache
+  fi
 
   if _vault_kv_exists "postgres/orders"; then
     _info "[acg-up] Reusing existing Vault secret postgres/orders"
@@ -588,7 +622,13 @@ function shopping_cart_seed_sandbox_vault_kv() {
   _vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}'                             payment/encryption
   _vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}'           payment/stripe
   _vault_kv_put '{"client_id":"paypal_sandbox_client_id","client_secret":"paypal_sandbox_client_secret"}' payment/paypal
-  _vault_kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbitmq_pass}\"}"                   rabbitmq/default
+  if _vault_kv_exists "rabbitmq/default"; then
+    _info "[acg-up] Reusing existing Vault secret rabbitmq/default"
+    _rabbitmq_pass=$(_vault_kv_get_field "rabbitmq/default" "password")
+  else
+    _rabbitmq_pass=$(openssl rand -base64 24 | tr -d '=+/')
+    _vault_kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbitmq_pass}\"}"                 rabbitmq/default
+  fi
 
   if _vault_kv_exists "minio/credentials"; then
     _info "[acg-up] Reusing existing Vault secret minio/credentials"
