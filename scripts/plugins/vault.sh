@@ -1759,11 +1759,26 @@ function configure_vault_app_auth_for_context() {
   fi
 
   local rc=0
+  local _prev_ctx="" _switched_ctx=0
+  if [[ "${HUB_VAULT_USE_BRIDGE:-1}" == "0" ]]; then
+    _prev_ctx="$("${kctl[@]}" config current-context 2>/dev/null || true)"
+    if [[ -n "${_prev_ctx}" && "${_prev_ctx}" != "${app_context}" ]]; then
+      if "${kctl[@]}" config use-context "${app_context}" >/dev/null 2>&1; then
+        _switched_ctx=1
+        _info "[vault] in-cluster profile: configuring app-cluster auth on '${app_context}' Vault"
+      else
+        _warn "[vault] could not switch to context '${app_context}' for in-cluster Vault auth"
+      fi
+    fi
+  fi
   (
     APP_CLUSTER_API_URL="${server}" \
     APP_CLUSTER_CA_CERT_PATH="${ca_path}" \
     configure_vault_app_auth
   ) || rc=$?
+  if (( _switched_ctx )) && [[ -n "${_prev_ctx}" ]]; then
+    "${kctl[@]}" config use-context "${_prev_ctx}" >/dev/null 2>&1 || true
+  fi
 
   [[ -n "${tmp_ca}" ]] && rm -f "${tmp_ca}"
 
