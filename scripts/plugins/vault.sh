@@ -1036,6 +1036,14 @@ function vault_seed_hub_into_context() {
     return 1
   fi
 
+  # Token headers via curl --config files (mode 600) so the Vault tokens never appear in argv/ps.
+  local _src_hdr _dst_hdr
+  _src_hdr=$(mktemp) || { _err "[vault] could not create temp header file"; return 1; }
+  _dst_hdr=$(mktemp) || { rm -f "${_src_hdr}" 2>/dev/null || true; _err "[vault] could not create temp header file"; return 1; }
+  chmod 600 "${_src_hdr}" "${_dst_hdr}"
+  printf 'header = "X-Vault-Token: %s"\n' "${_src_token}" > "${_src_hdr}"
+  printf 'header = "X-Vault-Token: %s"\n' "${_dst_token}" > "${_dst_hdr}"
+
   # Local port-forwards to both Vaults (distinct local ports). SC2064-safe trap (single quotes).
   local _src_port=18250 _dst_port=18251
   local _src_pf_pid="" _dst_pf_pid=""
@@ -1044,7 +1052,7 @@ function vault_seed_hub_into_context() {
   _kubectl port-forward -n "${_vault_ns}" --context "${_app_ctx}" svc/vault "${_dst_port}:8200" >/dev/null 2>&1 &
   _dst_pf_pid=$!
   # shellcheck disable=SC2064
-  trap '[[ -n "'"${_src_pf_pid}"'" ]] && kill "'"${_src_pf_pid}"'" >/dev/null 2>&1 || true; [[ -n "'"${_dst_pf_pid}"'" ]] && kill "'"${_dst_pf_pid}"'" >/dev/null 2>&1 || true' RETURN
+  trap '[[ -n "'"${_src_pf_pid}"'" ]] && kill "'"${_src_pf_pid}"'" >/dev/null 2>&1 || true; [[ -n "'"${_dst_pf_pid}"'" ]] && kill "'"${_dst_pf_pid}"'" >/dev/null 2>&1 || true; rm -f "'"${_src_hdr}"'" "'"${_dst_hdr}"'" 2>/dev/null || true' RETURN
   sleep 3
 
   local _keys=(
@@ -1059,7 +1067,7 @@ function vault_seed_hub_into_context() {
   local _key _json _missing=0
   for _key in "${_keys[@]}"; do
     # 1. canonical source Vault
-    _json=$(curl -sf -H "X-Vault-Token: ${_src_token}" \
+    _json=$(curl -sf --config "${_src_hdr}" \
       "http://localhost:${_src_port}/v1/secret/data/${_key}" | jq -c '.data.data // empty' 2>/dev/null || true)
     # 2. Keychain backup fallback
     if [[ -z "${_json}" ]] && declare -f _secret_load_data >/dev/null 2>&1; then
@@ -1071,7 +1079,7 @@ function vault_seed_hub_into_context() {
       continue
     fi
     # write to target in-cluster Vault
-    if ! curl -sf -X POST -H "X-Vault-Token: ${_dst_token}" -H "Content-Type: application/json" \
+    if ! curl -sf -X POST --config "${_dst_hdr}" -H "Content-Type: application/json" \
       -d "{\"data\":${_json}}" "http://localhost:${_dst_port}/v1/secret/data/${_key}" >/dev/null; then
       _err "[vault] failed writing '${_key}' to target Vault on ${_app_ctx}"
       return 1
@@ -1173,7 +1181,6 @@ function vault_failover_hub_into_context() {
   # shellcheck disable=SC1091
   [[ -r "${SCRIPT_DIR}/etc/vault/vars.sh" ]] && source "${SCRIPT_DIR}/etc/vault/vars.sh"
 
-  local _vault_ns="${VAULT_NS:-secrets}"
   local _active="${HUB_VAULT_PROFILE:-laptop}"
   local _threshold="${HUB_VAULT_FAILOVER_THRESHOLD:-3}"
   local _interval="${HUB_VAULT_FAILOVER_INTERVAL:-10}"
