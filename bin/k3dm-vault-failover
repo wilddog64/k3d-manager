@@ -5,6 +5,11 @@
 # Usage: bin/k3dm-vault-failover [<app-kube-context>]
 set -euo pipefail
 
+# launchd runs with a minimal PATH (/usr/bin:/bin:/usr/sbin:/sbin); Homebrew tools
+# (kubectl, helm, jq) live outside it. Prepend the common Homebrew prefixes so the
+# watchdog finds them when launched by the LaunchAgent.
+export PATH="/opt/homebrew/bin:/usr/local/bin:${PATH}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 

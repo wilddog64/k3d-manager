@@ -1208,7 +1208,7 @@ function vault_failover_hub_into_context() {
 
   if [[ "${_fallback}" == "hostinger" ]]; then
     _info "[vault] re-seeding in-cluster Vault on ${_app_ctx} before repointing CSS"
-    vault_seed_hub_into_context "${_app_ctx}" \
+    ( vault_seed_hub_into_context "${_app_ctx}" ) \
       || _warn "[vault] re-seed reported issues — relying on existing in-cluster data / DR backup; continuing"
   fi
 
