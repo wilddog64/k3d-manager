@@ -550,9 +550,17 @@ function shopping_cart_seed_sandbox_vault_kv() {
   local _seed_token="${SEED_VAULT_TOKEN:-${_vault_root_token}}"
   local _src_addr="${SEED_VAULT_SOURCE_ADDR:-${_seed_addr}}"
   local _src_token="${SEED_VAULT_SOURCE_TOKEN:-${_seed_token}}"
+  # Token headers via curl --config files (mode 600) so the Vault tokens never appear in argv/ps.
+  local _seed_hdr _src_hdr _src_json
+  _seed_hdr=$(mktemp) || { _err "[acg-up] could not create temp header file"; return 1; }
+  _src_hdr=$(mktemp) || { rm -f "${_seed_hdr}" 2>/dev/null || true; _err "[acg-up] could not create temp header file"; return 1; }
+  chmod 600 "${_seed_hdr}" "${_src_hdr}"
+  printf 'header = "X-Vault-Token: %s"\n' "${_seed_token}" > "${_seed_hdr}"
+  printf 'header = "X-Vault-Token: %s"\n' "${_src_token}"  > "${_src_hdr}"
+  trap 'rm -f "'"${_seed_hdr}"'" "'"${_src_hdr}"'" 2>/dev/null || true' RETURN
   _vault_kv_put() {
     curl -sf -X POST \
-      -H "X-Vault-Token: ${_seed_token}" \
+      --config "${_seed_hdr}" \
       -H "Content-Type: application/json" \
       -d "{\"data\":$1}" \
       "${_seed_addr}/v1/secret/data/$2" >/dev/null
@@ -560,14 +568,14 @@ function shopping_cart_seed_sandbox_vault_kv() {
   _vault_kv_exists() {
     local path="$1"
     curl -sf \
-      -H "X-Vault-Token: ${_seed_token}" \
+      --config "${_seed_hdr}" \
       "${_seed_addr}/v1/secret/data/${path}" >/dev/null 2>&1
   }
   _vault_kv_get_field() {
     local path="$1"
     local field="$2"
     curl -sf \
-      -H "X-Vault-Token: ${_seed_token}" \
+      --config "${_seed_hdr}" \
       "${_seed_addr}/v1/secret/data/${path}" \
       | jq -r --arg field "$field" '.data.data[$field] // empty'
   }
@@ -576,7 +584,7 @@ function shopping_cart_seed_sandbox_vault_kv() {
   _seed_source_data() {
     local path="$1"
     curl -sf \
-      -H "X-Vault-Token: ${_src_token}" \
+      --config "${_src_hdr}" \
       "${_src_addr}/v1/secret/data/${path}" \
       | jq -c '.data.data // empty' 2>/dev/null || true
   }
@@ -584,40 +592,75 @@ function shopping_cart_seed_sandbox_vault_kv() {
     _info "[acg-up] Reusing existing Vault secret redis/cart"
     _redis_pass_cart=$(_vault_kv_get_field "redis/cart" "password")
   else
-    _redis_pass_cart=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"password\":\"${_redis_pass_cart}\"}"                                         redis/cart
+    _src_json=$(_seed_source_data "redis/cart")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying redis/cart from canonical source Vault"
+      _vault_kv_put "${_src_json}" redis/cart
+      _redis_pass_cart=$(printf '%s' "${_src_json}" | jq -r '.password // empty')
+    else
+      _redis_pass_cart=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"password\":\"${_redis_pass_cart}\"}"                                         redis/cart
+    fi
   fi
 
   if _vault_kv_exists "redis/orders-cache"; then
     _info "[acg-up] Reusing existing Vault secret redis/orders-cache"
     _redis_pass_orders=$(_vault_kv_get_field "redis/orders-cache" "password")
   else
-    _redis_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"password\":\"${_redis_pass_orders}\"}"                                       redis/orders-cache
+    _src_json=$(_seed_source_data "redis/orders-cache")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying redis/orders-cache from canonical source Vault"
+      _vault_kv_put "${_src_json}" redis/orders-cache
+      _redis_pass_orders=$(printf '%s' "${_src_json}" | jq -r '.password // empty')
+    else
+      _redis_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"password\":\"${_redis_pass_orders}\"}"                                       redis/orders-cache
+    fi
   fi
 
   if _vault_kv_exists "postgres/orders"; then
     _info "[acg-up] Reusing existing Vault secret postgres/orders"
     _pg_pass_orders=$(_vault_kv_get_field "postgres/orders" "password")
   else
-    _pg_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_orders}\"}"                postgres/orders
+    _src_json=$(_seed_source_data "postgres/orders")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying postgres/orders from canonical source Vault"
+      _vault_kv_put "${_src_json}" postgres/orders
+      _pg_pass_orders=$(printf '%s' "${_src_json}" | jq -r '.password // empty')
+    else
+      _pg_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_orders}\"}"                postgres/orders
+    fi
   fi
 
   if _vault_kv_exists "postgres/products"; then
     _info "[acg-up] Reusing existing Vault secret postgres/products"
     _pg_pass_products=$(_vault_kv_get_field "postgres/products" "password")
   else
-    _pg_pass_products=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_products}\"}"              postgres/products
+    _src_json=$(_seed_source_data "postgres/products")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying postgres/products from canonical source Vault"
+      _vault_kv_put "${_src_json}" postgres/products
+      _pg_pass_products=$(printf '%s' "${_src_json}" | jq -r '.password // empty')
+    else
+      _pg_pass_products=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_products}\"}"              postgres/products
+    fi
   fi
 
   if _vault_kv_exists "postgres/payment"; then
     _info "[acg-up] Reusing existing Vault secret postgres/payment"
     _pg_pass_payment=$(_vault_kv_get_field "postgres/payment" "password")
   else
-    _pg_pass_payment=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_payment}\"}"               postgres/payment
+    _src_json=$(_seed_source_data "postgres/payment")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying postgres/payment from canonical source Vault"
+      _vault_kv_put "${_src_json}" postgres/payment
+      _pg_pass_payment=$(printf '%s' "${_src_json}" | jq -r '.password // empty')
+    else
+      _pg_pass_payment=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_payment}\"}"               postgres/payment
+    fi
   fi
   _vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}'                             payment/encryption
   _vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}'           payment/stripe
@@ -626,8 +669,15 @@ function shopping_cart_seed_sandbox_vault_kv() {
     _info "[acg-up] Reusing existing Vault secret rabbitmq/default"
     _rabbitmq_pass=$(_vault_kv_get_field "rabbitmq/default" "password")
   else
-    _rabbitmq_pass=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbitmq_pass}\"}"                 rabbitmq/default
+    _src_json=$(_seed_source_data "rabbitmq/default")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying rabbitmq/default from canonical source Vault"
+      _vault_kv_put "${_src_json}" rabbitmq/default
+      _rabbitmq_pass=$(printf '%s' "${_src_json}" | jq -r '.password // empty')
+    else
+      _rabbitmq_pass=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbitmq_pass}\"}"                 rabbitmq/default
+    fi
   fi
 
   if _vault_kv_exists "minio/credentials"; then

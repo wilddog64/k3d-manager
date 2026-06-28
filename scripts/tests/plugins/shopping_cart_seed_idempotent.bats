@@ -19,6 +19,17 @@ setup() {
       return 0
     fi
 
+    if [[ -n "${TEST_SOURCE_ADDR:-}" && "$url" == "${TEST_SOURCE_ADDR}"* ]]; then
+      case "$path" in
+        redis/cart)
+          [[ "${TEST_SRC_REDIS_CART_EXISTS:-0}" == "1" ]] || return 1
+          printf '{"data":{"data":{"password":"cart-from-source"}}}\n'
+          ;;
+        *) return 1 ;;
+      esac
+      return 0
+    fi
+
     case "$path" in
       redis/cart)
         [[ "${TEST_REDIS_CART_EXISTS:-0}" == "1" ]] || return 1
@@ -62,8 +73,15 @@ setup() {
   jq() {
     local input
     input=$(cat)
+    if [[ "$1" == "-c" ]]; then
+      case "$input" in
+        *'"password":"cart-from-source"'*) printf '{"password":"cart-from-source"}\n' ;;
+      esac
+      return 0
+    fi
     if [[ "$1" == "-r" ]]; then
       case "$input" in
+        *'"password":"cart-from-source"'*) printf 'cart-from-source\n' ;;
         *'"password":"cart-existing"'*) printf 'cart-existing\n' ;;
         *'"password":"orders-existing"'*) printf 'orders-existing\n' ;;
         *'"password":"rabbit-existing"'*) printf 'rabbit-existing\n' ;;
@@ -143,4 +161,20 @@ setup() {
   [ "$status" -eq 0 ]
   grep -q 'http://example:9999/v1/secret/data/redis/cart' "$CURL_LOG"
   ! grep -q 'http://localhost:8200/v1/secret/data/redis/cart' "$CURL_LOG"
+}
+
+@test "copies redis/cart from canonical source Vault when absent in target" {
+  export _vault_local_port="8200"
+  export _vault_root_token="root-token"
+  export TEST_REDIS_CART_EXISTS="0"
+  export TEST_REDIS_ORDERS_EXISTS="0"
+  export TEST_RABBITMQ_EXISTS="0"
+  export SEED_VAULT_SOURCE_ADDR="http://source:8200"
+  export TEST_SOURCE_ADDR="http://source:8200"
+  export TEST_SRC_REDIS_CART_EXISTS="1"
+
+  run shopping_cart_seed_sandbox_vault_kv
+  [ "$status" -eq 0 ]
+  grep -q 'http://source:8200/v1/secret/data/redis/cart' "$CURL_LOG"
+  grep -Eq 'cart-from-source.*redis/cart$' "$CURL_LOG"
 }
