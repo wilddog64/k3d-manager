@@ -296,12 +296,12 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-06-28 | [Copilot PR #101 Review Findings](docs/issues/2026-06-28-copilot-pr101-review-findings.md) | v1.11.0: Vault tokens out of `curl` argv via `--config` mode-600 header files + unused `_vault_ns` removed + API docs (`b2ed5b80`); `_seed_source_data`-unused deferred to `docs/bugs/` |
 | 2026-06-27 | [v1.11.0 P4 live-verification gap](docs/issues/2026-06-27-v1-11-0-p4-live-verification-gap.md) | Tier 3 P4 failover watchdog: probe→flip→re-seed→reconcile path and LaunchAgent install not exercised live at merge; `ubuntu-hostinger` still lacked P2b in-cluster Vault objects (later closed by live verify on 2026-06-28) |
 | 2026-06-27 | [v1.11.0 P3 live-verification gap](docs/issues/2026-06-27-v1-11-0-p3-live-verification-gap.md) | Tier 3 P3 canonical seeding: `ubuntu-hostinger` `svc/vault` + `secret/vault-root` `NotFound`, so Change 4 kept the spec's assumed names |
 | 2026-06-27 | [vault-app-auth test stale policy assertion](docs/issues/2026-06-27-vault-app-auth-test-stale-policy-assertion.md) | `vault_app_auth.bats` updated to assert the P2b `app-cluster-reader` role binding (full-suite drift fix) |
 | 2026-06-27 | [v1.11.0 P3 if-count allowlist](docs/issues/2026-06-27-v1-11-0-p3-if-count-allowlist.md) | Two P3 functions temporarily listed in `scripts/etc/agent/if-count-allowlist` per the `_agent_audit` rule |
 | 2026-06-27 | [Copilot PR #100 Review Findings](docs/issues/2026-06-27-copilot-pr100-review-findings.md) | Tier 3 vault.sh: unchecked watchdog `kubectl apply` rc, kubeconfig context≠cluster name lookup, `base64 -d` macOS portability — 3 findings fixed in `1fd01e24` |
-| 2026-06-20 | [Copilot PR #97 Review Findings](docs/issues/2026-06-20-copilot-pr97-review-findings.md) | `cluster-secret.yaml.tmpl` is dead config; data-layer label fix correctly targets the Hostinger heredoc + `_argocd_set_active_app_cluster` runtime path — no change needed |
 
 [All issues →](docs/issues/)
 

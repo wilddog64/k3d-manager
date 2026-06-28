@@ -43,6 +43,9 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `configure_vault_app_auth_for_context` | `scripts/plugins/vault.sh` | Provider-agnostic Kubernetes auth configuration for app cluster; resolves kubeconfig context to cluster name before CA/server lookup (v1.10.0+) |
 | `vault_install_unseal_watchdog` | `scripts/plugins/vault.sh` | Deploy in-cluster Vault auto-unseal watchdog CronJob (Tier 3 P2a); replays Shamir shard on `vault status` exit-code trigger |
 | `vault_deploy_hub_into_context` | `scripts/plugins/vault.sh` | Provision hub Vault inside an app cluster with least-privilege `app-cluster-reader` policy and kubernetes-auth ClusterSecretStore (v1.10.0+) |
+| `vault_seed_hub_into_context` | `scripts/plugins/vault.sh` | Mirror the canonical app-cluster secrets from the source-of-truth Vault into an app context's in-cluster Vault, with keyring + native k8s Secret backups (Tier 3 P3, v1.11.0+) |
+| `vault_failover_hub_into_context` | `scripts/plugins/vault.sh` | Probe the active hub Vault and, on sustained failure, flip `HUB_VAULT_PROFILE`, re-seed the in-cluster Vault, and reconcile the app-cluster ClusterSecretStore; `--probe-only` checks health without flipping (Tier 3 P4, v1.11.0+) |
+| `vault_install_failover_watchdog` | `scripts/plugins/vault.sh` | Install the `com.k3d-manager.vault-failover` LaunchAgent (StartInterval 300s) that runs `vault_failover_hub_into_context` against an app context (Tier 3 P4, v1.11.0+) |
 | `deploy_eso` | `scripts/plugins/eso.sh` | Deploy External Secrets Operator |
 | `deploy_argocd` | `scripts/plugins/argocd.sh` | Deploy ArgoCD |
 | `deploy_argocd_bootstrap` | `scripts/plugins/argocd.sh` | Bootstrap ArgoCD with initial apps |
