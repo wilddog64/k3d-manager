@@ -35,11 +35,11 @@ spec:
         discovered-from: git
       annotations:
         argocd-image-updater.argoproj.io/image-list: >-
-          {{- if eq .path.basename "shopping-cart-product-catalog"}}catalog=ghcr.io/wilddog64/shopping-cart-product-catalog:latest{{end}}
-        argocd-image-updater.argoproj.io/catalog.update-strategy: >-
-          {{- if eq .path.basename "shopping-cart-product-catalog"}}digest{{end}}
+          {{- if or (eq .path.basename "shopping-cart-basket") (eq .path.basename "shopping-cart-order") (eq .path.basename "shopping-cart-product-catalog")}}app=ghcr.io/wilddog64/{{.path.basename}}:latest{{end}}
+        argocd-image-updater.argoproj.io/app.update-strategy: >-
+          {{- if or (eq .path.basename "shopping-cart-basket") (eq .path.basename "shopping-cart-order") (eq .path.basename "shopping-cart-product-catalog")}}digest{{end}}
         argocd-image-updater.argoproj.io/write-back-method: >-
-          {{- if eq .path.basename "shopping-cart-product-catalog"}}argocd{{end}}
+          {{- if or (eq .path.basename "shopping-cart-basket") (eq .path.basename "shopping-cart-order") (eq .path.basename "shopping-cart-product-catalog")}}argocd{{end}}
     spec:
       project: shopping-cart
       destination:
