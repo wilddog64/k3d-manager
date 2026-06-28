@@ -1170,6 +1170,9 @@ function vault_failover_hub_into_context() {
     return 1
   fi
 
+  # shellcheck disable=SC1091
+  [[ -r "${SCRIPT_DIR}/etc/vault/vars.sh" ]] && source "${SCRIPT_DIR}/etc/vault/vars.sh"
+
   local _vault_ns="${VAULT_NS:-secrets}"
   local _active="${HUB_VAULT_PROFILE:-laptop}"
   local _threshold="${HUB_VAULT_FAILOVER_THRESHOLD:-3}"
