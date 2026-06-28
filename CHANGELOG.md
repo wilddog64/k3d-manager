@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-06-28
+
+### Added
+- Tier 3 P3 canonical-source Vault seeding — `vault_seed_hub_into_context` operator plus idempotent seeding of `redis/*` and `rabbitmq/default` from a canonical source (re-runnable without drift), with retargeted inner seed helpers (`scripts/plugins/vault.sh`, `scripts/plugins/shopping_cart.sh`)
+- Tier 3 P4 assisted-failover watchdog — `vault_failover_hub_into_context` (probe the hub Vault → on sustained failure flip `HUB_VAULT_PROFILE` and persist it → re-seed the in-cluster Vault → reconcile the app-cluster ClusterSecretStore), the `vault_install_failover_watchdog` installer, a `com.k3d-manager.vault-failover` LaunchAgent (StartInterval 300s) with its plist template, and the `bin/k3dm-vault-failover` wrapper (`scripts/plugins/vault.sh`, `scripts/etc/launchd/com.k3d-manager.vault-failover.plist.tmpl`, `bin/k3dm-vault-failover`)
+
+### Fixed
+- Failover watchdog hardening — the wrapper prepends the Homebrew prefixes (`/opt/homebrew/bin:/usr/local/bin`) to PATH so it finds `kubectl`/`helm`/`jq` under launchd's minimal PATH, and the re-seed call runs in a subshell so an unreachable laptop source degrades to warn-and-continue instead of aborting the failover before the CSS reconcile (`bin/k3dm-vault-failover`, `scripts/plugins/vault.sh`)
+- Failover watchdog now sources `vars.sh` before reading the active profile, so the persisted `HUB_VAULT_PROFILE` from the state file is honored in the watchdog dispatch path while explicit env still wins (`scripts/plugins/vault.sh`)
+- App-cluster Vault auth targets the in-cluster Vault context under the `hostinger` profile instead of the laptop hub (`scripts/plugins/vault.sh`)
+- Audience bound on the app-cluster `eso-app-cluster` kubernetes-auth role so ESO token review succeeds (`scripts/plugins/vault.sh`)
+- `deploy_eso` skips the Helm install when ESO is externally managed (ArgoCD-owned), preventing an install conflict during the in-cluster cutover (`scripts/plugins/eso.sh`)
+- `k3s-hostinger` `refresh` now runs `launchctl enable` before `bootstrap` so it heals previously disabled launchd agents (`scripts/lib/providers/k3s-hostinger.sh`)
+
+### Changed
+- `.gitguardian.yaml` migrated to the v2 schema and the ggshield cache is now ignored (`.gitguardian.yaml`, `.gitignore`)
+
+## [1.10.0] - 2026-06-27
+
 ### Added
 - Provider-agnostic app-cluster Vault auth keyed on kube-context (`configure_vault_app_auth_for_context`) — the Kubernetes auth wiring is now portable across providers (EKS/AKS/ACG/Azure/OCI/Hostinger) instead of being pinned to Hostinger (`scripts/plugins/vault.sh`)
 - `HUB_VAULT_PROFILE` endpoint seam (`laptop` | `hostinger`) selecting the hub-Vault `server:` URL written into the app-cluster ClusterSecretStore and whether the reverse-tunnel/socat bridge is stood up; default `laptop` keeps today's behavior byte-for-byte (Tier 3 P1, `scripts/etc/vault/vars.sh`)

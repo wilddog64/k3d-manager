@@ -996,6 +996,269 @@ EOF
    return 0
 }
 
+# Mirror the canonical app-cluster secrets from the laptop (source-of-truth) Vault into the
+# in-cluster Vault of an app context, backing each up to the keyring and a native k8s Secret.
+# Operator-dispatched only (no auto-caller). Gates the HUB_VAULT_PROFILE default flip.
+# Usage: vault_seed_hub_into_context <app-kube-context>
+function vault_seed_hub_into_context() {
+  local _app_ctx="${1:-}"
+  if [[ -z "${_app_ctx}" ]]; then
+    _err "[vault] vault_seed_hub_into_context requires an app cluster kube-context"
+    return 1
+  fi
+  if ! _kubectl config get-contexts -o name 2>/dev/null | grep -qx "${_app_ctx}"; then
+    _err "[vault] kube-context '${_app_ctx}' not found in kubeconfig"
+    return 1
+  fi
+
+  local _hub_ctx="k3d-k3d-cluster"
+  local _vault_ns="${VAULT_NS:-secrets}"
+
+  # Source (laptop) root token — source of truth.
+  local _src_token
+  _src_token=$(_kubectl get secret vault-root -n "${_vault_ns}" --context "${_hub_ctx}" \
+    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null \
+    || _kubectl get secret vault-root -n "${_vault_ns}" --context "${_hub_ctx}" \
+    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -D 2>/dev/null || true)
+  if [[ -z "${_src_token}" ]]; then
+    _err "[vault] could not read source vault-root token from ${_hub_ctx}/${_vault_ns}"
+    return 1
+  fi
+
+  # Target (in-cluster) root token — provisioned by vault_deploy_hub_into_context (P2b).
+  local _dst_token
+  _dst_token=$(_kubectl get secret vault-root -n "${_vault_ns}" --context "${_app_ctx}" \
+    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 --decode 2>/dev/null \
+    || _kubectl get secret vault-root -n "${_vault_ns}" --context "${_app_ctx}" \
+    -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -D 2>/dev/null || true)
+  if [[ -z "${_dst_token}" ]]; then
+    _err "[vault] could not read target vault-root token from ${_app_ctx}/${_vault_ns} — run vault_deploy_hub_into_context first"
+    return 1
+  fi
+
+  # Token headers via curl --config files (mode 600) so the Vault tokens never appear in argv/ps.
+  local _src_hdr _dst_hdr
+  _src_hdr=$(mktemp) || { _err "[vault] could not create temp header file"; return 1; }
+  _dst_hdr=$(mktemp) || { rm -f "${_src_hdr}" 2>/dev/null || true; _err "[vault] could not create temp header file"; return 1; }
+  chmod 600 "${_src_hdr}" "${_dst_hdr}"
+  printf 'header = "X-Vault-Token: %s"\n' "${_src_token}" > "${_src_hdr}"
+  printf 'header = "X-Vault-Token: %s"\n' "${_dst_token}" > "${_dst_hdr}"
+
+  # Local port-forwards to both Vaults (distinct local ports). SC2064-safe trap (single quotes).
+  local _src_port=18250 _dst_port=18251
+  local _src_pf_pid="" _dst_pf_pid=""
+  _kubectl port-forward -n "${_vault_ns}" --context "${_hub_ctx}" svc/vault "${_src_port}:8200" >/dev/null 2>&1 &
+  _src_pf_pid=$!
+  _kubectl port-forward -n "${_vault_ns}" --context "${_app_ctx}" svc/vault "${_dst_port}:8200" >/dev/null 2>&1 &
+  _dst_pf_pid=$!
+  # shellcheck disable=SC2064
+  trap '[[ -n "'"${_src_pf_pid}"'" ]] && kill "'"${_src_pf_pid}"'" >/dev/null 2>&1 || true; [[ -n "'"${_dst_pf_pid}"'" ]] && kill "'"${_dst_pf_pid}"'" >/dev/null 2>&1 || true; rm -f "'"${_src_hdr}"'" "'"${_dst_hdr}"'" 2>/dev/null || true' RETURN
+  sleep 3
+
+  local _keys=(
+    redis/cart redis/orders-cache
+    postgres/orders postgres/products postgres/payment
+    payment/encryption payment/stripe payment/paypal
+    rabbitmq/default minio/credentials
+    ldap/admin keycloak/admin keycloak/clients
+  )
+
+  local _k8s_args=()
+  local _key _json _missing=0
+  for _key in "${_keys[@]}"; do
+    # 1. canonical source Vault
+    _json=$(curl -sf --config "${_src_hdr}" \
+      "http://localhost:${_src_port}/v1/secret/data/${_key}" | jq -c '.data.data // empty' 2>/dev/null || true)
+    # 2. Keychain backup fallback
+    if [[ -z "${_json}" ]] && declare -f _secret_load_data >/dev/null 2>&1; then
+      _json=$(_secret_load_data "${SEED_KEYCHAIN_SERVICE:-k3d-manager-app-cluster-secrets}" "${_key}" 2>/dev/null || true)
+    fi
+    if [[ -z "${_json}" ]]; then
+      _warn "[vault] canonical secret '${_key}' absent in source Vault and keyring — skipping"
+      _missing=$((_missing + 1))
+      continue
+    fi
+    # write to target in-cluster Vault
+    if ! curl -sf -X POST --config "${_dst_hdr}" -H "Content-Type: application/json" \
+      -d "{\"data\":${_json}}" "http://localhost:${_dst_port}/v1/secret/data/${_key}" >/dev/null; then
+      _err "[vault] failed writing '${_key}' to target Vault on ${_app_ctx}"
+      return 1
+    fi
+    # back up to keyring
+    if declare -f _secret_store_data >/dev/null 2>&1; then
+      _secret_store_data "${SEED_KEYCHAIN_SERVICE:-k3d-manager-app-cluster-secrets}" "${_key}" "${_json}" >/dev/null 2>&1 \
+        || _warn "[vault] keyring backup failed for '${_key}' (continuing)"
+    fi
+    # accumulate for the native k8s Secret (key path '/' -> '__')
+    _k8s_args+=("--from-literal=${_key//\//__}=${_json}")
+  done
+
+  # native in-cluster disaster-recovery copy
+  _kubectl create namespace "${SEED_K8S_BACKUP_NS:-secrets}" --context "${_app_ctx}" \
+    --dry-run=client -o yaml | _kubectl apply --context "${_app_ctx}" -f - >/dev/null 2>&1 || true
+  if (( ${#_k8s_args[@]} > 0 )); then
+    _kubectl create secret generic "${SEED_K8S_BACKUP_NAME:-vault-seed-backup}" \
+      -n "${SEED_K8S_BACKUP_NS:-secrets}" --context "${_app_ctx}" \
+      "${_k8s_args[@]}" \
+      --dry-run=client -o yaml | _kubectl apply --context "${_app_ctx}" -f - >/dev/null
+  fi
+
+  if (( _missing > 0 )); then
+    _warn "[vault] seeded in-cluster Vault on ${_app_ctx} with ${_missing} canonical key(s) missing"
+  else
+    _info "[vault] seeded in-cluster Vault + keyring + k8s backup on ${_app_ctx} (all 13 canonical keys)"
+  fi
+  return 0
+}
+
+# Pure: given the active profile, echo the fallback profile (the other one).
+function _vault_hub_fallback_profile() {
+  case "${1:-laptop}" in
+    hostinger) printf 'laptop\n' ;;
+    *)         printf 'hostinger\n' ;;
+  esac
+}
+
+# Pure: 0 if the Vault /sys/health HTTP status means "reachable" (mirror _is_vault_health).
+function _vault_health_status_ok() {
+  case "${1:-}" in
+    200|429|472|473) return 0 ;;
+    *)               return 1 ;;
+  esac
+}
+
+# Probe the active hub Vault via a short-lived port-forward + curl /sys/health.
+# laptop ⇒ probe k3d-k3d-cluster; hostinger ⇒ probe the app context.
+# Returns 0 healthy, 1 unreachable. SC2064-safe RETURN trap (single-quoted, pre-expanded).
+function _vault_probe_hub_endpoint() {
+  local _profile="${1:-laptop}" _app_ctx="${2:-}"
+  local _vault_ns="${VAULT_NS:-secrets}"
+  local _probe_ctx
+  case "${_profile}" in
+    hostinger) _probe_ctx="${_app_ctx}" ;;
+    *)         _probe_ctx="k3d-k3d-cluster" ;;
+  esac
+  if [[ -z "${_probe_ctx}" ]]; then
+    _err "[vault] _vault_probe_hub_endpoint: hostinger profile requires an app kube-context"
+    return 1
+  fi
+  if ! _kubectl config get-contexts -o name 2>/dev/null | grep -qx "${_probe_ctx}"; then
+    return 1
+  fi
+  local _port=18260 _pid="" _code
+  _kubectl port-forward -n "${_vault_ns}" --context "${_probe_ctx}" svc/vault "${_port}:8200" >/dev/null 2>&1 &
+  _pid=$!
+  # shellcheck disable=SC2064
+  trap '[[ -n "'"${_pid}"'" ]] && kill "'"${_pid}"'" >/dev/null 2>&1 || true' RETURN
+  sleep 3
+  _code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:${_port}/v1/sys/health" 2>/dev/null || true)
+  _vault_health_status_ok "${_code}"
+}
+
+# Assisted failover: probe the active hub Vault; on sustained unreachability flip
+# HUB_VAULT_PROFILE to the fallback (persisted), re-seed in-cluster when flipping to
+# hostinger, then re-run the Hostinger reconcile so the CSS repoints and ESO re-syncs.
+# Operator-dispatched only (no auto-caller). Drives the HUB_VAULT_PROFILE flip.
+# Usage: vault_failover_hub_into_context <app-kube-context> [--probe-only]
+function vault_failover_hub_into_context() {
+  local _app_ctx="" _probe_only=0 _arg
+  for _arg in "$@"; do
+    case "${_arg}" in
+      --probe-only) _probe_only=1 ;;
+      -*) _err "[vault] vault_failover_hub_into_context: unknown flag '${_arg}'"; return 1 ;;
+      *) [[ -z "${_app_ctx}" ]] && _app_ctx="${_arg}" ;;
+    esac
+  done
+  if [[ -z "${_app_ctx}" ]]; then
+    _err "[vault] vault_failover_hub_into_context requires an app cluster kube-context"
+    return 1
+  fi
+  if ! _kubectl config get-contexts -o name 2>/dev/null | grep -qx "${_app_ctx}"; then
+    _err "[vault] kube-context '${_app_ctx}' not found in kubeconfig"
+    return 1
+  fi
+
+  # shellcheck disable=SC1091
+  [[ -r "${SCRIPT_DIR}/etc/vault/vars.sh" ]] && source "${SCRIPT_DIR}/etc/vault/vars.sh"
+
+  local _active="${HUB_VAULT_PROFILE:-laptop}"
+  local _threshold="${HUB_VAULT_FAILOVER_THRESHOLD:-3}"
+  local _interval="${HUB_VAULT_FAILOVER_INTERVAL:-10}"
+
+  local _attempt _healthy=0
+  for ((_attempt = 1; _attempt <= _threshold; _attempt++)); do
+    if _vault_probe_hub_endpoint "${_active}" "${_app_ctx}"; then
+      _healthy=1
+      break
+    fi
+    _warn "[vault] hub Vault probe ${_attempt}/${_threshold} failed (profile=${_active})"
+    (( _attempt < _threshold )) && sleep "${_interval}"
+  done
+
+  if (( _healthy )); then
+    _info "[vault] hub Vault healthy (profile=${_active}); no failover needed"
+    return 0
+  fi
+  if (( _probe_only )); then
+    _warn "[vault] hub Vault unreachable (profile=${_active}); --probe-only set, not flipping"
+    return 1
+  fi
+
+  local _fallback
+  _fallback="$(_vault_hub_fallback_profile "${_active}")"
+  _warn "[vault] hub Vault unreachable after ${_threshold} probes — failing over ${_active} -> ${_fallback}"
+
+  local _state_file="${HUB_VAULT_PROFILE_STATE_FILE:-${K3DM_STATE_DIR:-${HOME}/.local/share/k3d-manager}/hub-vault-profile}"
+  mkdir -p "$(dirname "${_state_file}")" 2>/dev/null || true
+  printf '%s\n' "${_fallback}" > "${_state_file}" \
+    || { _err "[vault] failed to persist failover profile to ${_state_file}"; return 1; }
+
+  if [[ "${_fallback}" == "hostinger" ]]; then
+    _info "[vault] re-seeding in-cluster Vault on ${_app_ctx} before repointing CSS"
+    ( vault_seed_hub_into_context "${_app_ctx}" ) \
+      || _warn "[vault] re-seed reported issues — relying on existing in-cluster data / DR backup; continuing"
+  fi
+
+  unset HUB_VAULT_CSS_SERVER HUB_VAULT_USE_BRIDGE HUB_VAULT_CSS_AUTH
+  export HUB_VAULT_PROFILE="${_fallback}"
+  # shellcheck disable=SC1091
+  [[ -r "${SCRIPT_DIR}/etc/vault/vars.sh" ]] && source "${SCRIPT_DIR}/etc/vault/vars.sh"
+
+  if declare -f _hostinger_reconcile_vault_cluster_store >/dev/null 2>&1; then
+    _info "[vault] re-running Hostinger reconcile to repoint CSS (profile=${_fallback})"
+    _hostinger_reconcile_vault_cluster_store \
+      || { _err "[vault] reconcile failed after failover to ${_fallback}"; return 1; }
+  else
+    _warn "[vault] _hostinger_reconcile_vault_cluster_store not loaded — CSS not repointed; run 'CLUSTER_PROVIDER=k3s-hostinger make refresh' to apply HUB_VAULT_PROFILE=${_fallback}"
+  fi
+
+  _info "[vault] failover complete: HUB_VAULT_PROFILE=${_fallback} (persisted to ${_state_file})"
+  return 0
+}
+
+# Install the periodic failover watchdog LaunchAgent (control-plane laptop, macOS).
+# Idempotent: re-render + bootout/bootstrap. Operator-dispatched.
+# Usage: vault_install_failover_watchdog [<app-kube-context>]
+function vault_install_failover_watchdog() {
+  local _app_ctx="${1:-${HUB_VAULT_FAILOVER_APP_CONTEXT:-ubuntu-hostinger}}"
+  local _label="com.k3d-manager.vault-failover"
+  local _tmpl="${SCRIPT_DIR}/etc/launchd/${_label}.plist.tmpl"
+  local _dst="${HOME}/Library/LaunchAgents/${_label}.plist"
+  local _repo_root
+  _repo_root="$(cd "${SCRIPT_DIR}/.." && pwd)"
+  [[ -f "${_tmpl}" ]] || { _err "[vault] missing template: ${_tmpl}"; return 1; }
+  sed \
+    -e "s|{{K3DM_REPO_ROOT}}|${_repo_root}|g" \
+    -e "s|{{HOME}}|${HOME}|g" \
+    -e "s|{{HUB_VAULT_FAILOVER_APP_CONTEXT}}|${_app_ctx}|g" \
+    "${_tmpl}" > "${_dst}" \
+    || { _err "[vault] failed to render ${_dst}"; return 1; }
+  launchctl bootout "gui/$(id -u)/${_label}" >/dev/null 2>&1 || true
+  launchctl bootstrap "gui/$(id -u)" "${_dst}" \
+    || { _err "[vault] failed to bootstrap ${_label}"; return 1; }
+  _info "[vault] failover watchdog installed (${_label}); probes ${_app_ctx} every 300s"
+}
+
 function vault_deploy_hub_into_context() {
    local app_context="${1:-}"
    [[ -n "${app_context}" ]] || _err "[vault] vault_deploy_hub_into_context requires an app cluster kube-context"
@@ -1444,13 +1707,16 @@ HCL
   fi
 
   # e. Create ESO role bound to app cluster ESO service account
-  local safe_mount_role safe_eso_sa safe_eso_ns
+  local audience="${APP_K8S_TOKEN_AUDIENCE:-https://kubernetes.default.svc.cluster.local}"
+  local safe_mount_role safe_eso_sa safe_eso_ns safe_audience
   printf -v safe_mount_role '%s' "auth/${mount}/role/${role}"
   printf -v safe_eso_sa '%q' "$eso_sa"
   printf -v safe_eso_ns '%q' "$eso_ns"
+  printf -v safe_audience '%q' "$audience"
   _vault_exec "$ns" "vault write ${safe_mount_role} \
     bound_service_account_names=${safe_eso_sa} \
     bound_service_account_namespaces=${safe_eso_ns} \
+    audience=${safe_audience} \
     policies=app-cluster-reader \
     ttl=1h" "$release"
 
@@ -1506,11 +1772,26 @@ function configure_vault_app_auth_for_context() {
   fi
 
   local rc=0
+  local _prev_ctx="" _switched_ctx=0
+  if [[ "${HUB_VAULT_USE_BRIDGE:-1}" == "0" ]]; then
+    _prev_ctx="$("${kctl[@]}" config current-context 2>/dev/null || true)"
+    if [[ -n "${_prev_ctx}" && "${_prev_ctx}" != "${app_context}" ]]; then
+      if "${kctl[@]}" config use-context "${app_context}" >/dev/null 2>&1; then
+        _switched_ctx=1
+        _info "[vault] in-cluster profile: configuring app-cluster auth on '${app_context}' Vault"
+      else
+        _warn "[vault] could not switch to context '${app_context}' for in-cluster Vault auth"
+      fi
+    fi
+  fi
   (
     APP_CLUSTER_API_URL="${server}" \
     APP_CLUSTER_CA_CERT_PATH="${ca_path}" \
     configure_vault_app_auth
   ) || rc=$?
+  if (( _switched_ctx )) && [[ -n "${_prev_ctx}" ]]; then
+    "${kctl[@]}" config use-context "${_prev_ctx}" >/dev/null 2>&1 || true
+  fi
 
   [[ -n "${tmp_ca}" ]] && rm -f "${tmp_ca}"
 

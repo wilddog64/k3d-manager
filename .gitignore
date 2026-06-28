@@ -6,3 +6,6 @@ node_modules/
 bin/.ask-sandbox/
 __pycache__/
 package-lock.json
+
+# Added by ggshield
+.cache_ggshield

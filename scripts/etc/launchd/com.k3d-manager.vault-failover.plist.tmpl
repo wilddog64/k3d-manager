@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.k3d-manager.vault-failover</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{K3DM_REPO_ROOT}}/bin/k3dm-vault-failover</string>
+    <string>{{HUB_VAULT_FAILOVER_APP_CONTEXT}}</string>
+  </array>
+  <key>StartInterval</key>
+  <integer>300</integer>
+  <key>RunAtLoad</key>
+  <false/>
+  <key>StandardOutPath</key>
+  <string>{{HOME}}/Library/Logs/k3dm-vault-failover.log</string>
+  <key>StandardErrorPath</key>
+  <string>{{HOME}}/Library/Logs/k3dm-vault-failover.log</string>
+</dict>
+</plist>

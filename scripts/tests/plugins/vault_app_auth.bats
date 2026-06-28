@@ -184,7 +184,7 @@ setup() {
   grep -q "vault_exec secrets vault write auth/custom-mount/role/custom-role" "$VAULT_EXEC_LOG"
   grep -q "bound_service_account_names=custom-sa" "$VAULT_EXEC_LOG"
   grep -q "bound_service_account_namespaces=custom-ns" "$VAULT_EXEC_LOG"
-  grep -q "policies=eso-reader" "$VAULT_EXEC_LOG"
+  grep -q "policies=app-cluster-reader" "$VAULT_EXEC_LOG"
 }
 
 @test "configure_vault_app_auth skips policy creation if it exists" {

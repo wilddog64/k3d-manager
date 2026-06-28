@@ -134,15 +134,26 @@ function deploy_eso() {
 
   local -a missing_crds=()
   local release_exists=0
+  local deploy_exists=0
   mapfile -t missing_crds < <(_eso_missing_crds)
 
   if _run_command --no-exit -- helm -n "$ns" status "$release" > /dev/null 2>&1 ; then
       release_exists=1
   fi
 
+  if _kubectl --no-exit -n "$ns" get deploy/"$release" > /dev/null 2>&1 ; then
+      deploy_exists=1
+  fi
+
   if (( release_exists )) && (( ${#missing_crds[@]} == 0 )); then
       _eso_wait_for_core_readiness "$ns"
       echo "ESO already installed in namespace $ns"
+      return 0
+  fi
+
+  if (( ! release_exists )) && (( deploy_exists )) && (( ${#missing_crds[@]} == 0 )); then
+      _eso_wait_for_core_readiness "$ns"
+      echo "ESO already present in namespace $ns (externally managed; skipping Helm install)"
       return 0
   fi
 
