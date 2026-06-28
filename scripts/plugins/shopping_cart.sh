@@ -685,9 +685,17 @@ function shopping_cart_seed_sandbox_vault_kv() {
     _minio_root_user=$(_vault_kv_get_field "minio/credentials" "root-user")
     _minio_root_password=$(_vault_kv_get_field "minio/credentials" "root-password")
   else
-    _minio_root_user="minioadmin"
-    _minio_root_password=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"root-user\":\"${_minio_root_user}\",\"root-password\":\"${_minio_root_password}\"}" minio/credentials
+    _src_json=$(_seed_source_data "minio/credentials")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying minio/credentials from canonical source Vault"
+      _vault_kv_put "${_src_json}" minio/credentials
+      _minio_root_user=$(printf '%s' "${_src_json}" | jq -r '.["root-user"] // empty')
+      _minio_root_password=$(printf '%s' "${_src_json}" | jq -r '.["root-password"] // empty')
+    else
+      _minio_root_user="minioadmin"
+      _minio_root_password=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"root-user\":\"${_minio_root_user}\",\"root-password\":\"${_minio_root_password}\"}" minio/credentials
+    fi
   fi
 
   if _vault_kv_exists "ldap/admin"; then
@@ -695,9 +703,17 @@ function shopping_cart_seed_sandbox_vault_kv() {
     _ldap_admin_pass=$(_vault_kv_get_field "ldap/admin" "admin_password")
     _ldap_readonly_pass=$(_vault_kv_get_field "ldap/admin" "readonly_password")
   else
-    _ldap_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
-    _ldap_readonly_pass=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"admin_password\":\"${_ldap_admin_pass}\",\"readonly_password\":\"${_ldap_readonly_pass}\"}" ldap/admin
+    _src_json=$(_seed_source_data "ldap/admin")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying ldap/admin from canonical source Vault"
+      _vault_kv_put "${_src_json}" ldap/admin
+      _ldap_admin_pass=$(printf '%s' "${_src_json}" | jq -r '.admin_password // empty')
+      _ldap_readonly_pass=$(printf '%s' "${_src_json}" | jq -r '.readonly_password // empty')
+    else
+      _ldap_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
+      _ldap_readonly_pass=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"admin_password\":\"${_ldap_admin_pass}\",\"readonly_password\":\"${_ldap_readonly_pass}\"}" ldap/admin
+    fi
   fi
 
   if _vault_kv_exists "keycloak/admin"; then
@@ -708,9 +724,20 @@ function shopping_cart_seed_sandbox_vault_kv() {
       _acg_fail "[acg-up] Vault secret keycloak/admin is missing admin_password or db_password — restore the secret before continuing"
     fi
   else
-    _kc_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
-    _kc_db_pass=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"admin_password\":\"${_kc_admin_pass}\",\"db_password\":\"${_kc_db_pass}\"}" keycloak/admin
+    _src_json=$(_seed_source_data "keycloak/admin")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying keycloak/admin from canonical source Vault"
+      _vault_kv_put "${_src_json}" keycloak/admin
+      _kc_admin_pass=$(printf '%s' "${_src_json}" | jq -r '.admin_password // empty')
+      _kc_db_pass=$(printf '%s' "${_src_json}" | jq -r '.db_password // empty')
+      if [[ -z "${_kc_admin_pass}" || -z "${_kc_db_pass}" ]]; then
+        _acg_fail "[acg-up] Vault secret keycloak/admin is missing admin_password or db_password — restore the secret before continuing"
+      fi
+    else
+      _kc_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
+      _kc_db_pass=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"admin_password\":\"${_kc_admin_pass}\",\"db_password\":\"${_kc_db_pass}\"}" keycloak/admin
+    fi
   fi
 
   if _vault_kv_exists "keycloak/clients"; then
@@ -720,11 +747,21 @@ function shopping_cart_seed_sandbox_vault_kv() {
     _product_client_secret=$(_vault_kv_get_field "keycloak/clients" "product_catalog_client_secret")
     _grafana_client_secret=$(_vault_kv_get_field "keycloak/clients" "grafana_client_secret")
   else
-    _argocd_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-    _order_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-    _product_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-    _grafana_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
+    _src_json=$(_seed_source_data "keycloak/clients")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying keycloak/clients from canonical source Vault"
+      _vault_kv_put "${_src_json}" keycloak/clients
+      _argocd_client_secret=$(printf '%s' "${_src_json}" | jq -r '.argocd_client_secret // empty')
+      _order_client_secret=$(printf '%s' "${_src_json}" | jq -r '.order_service_client_secret // empty')
+      _product_client_secret=$(printf '%s' "${_src_json}" | jq -r '.product_catalog_client_secret // empty')
+      _grafana_client_secret=$(printf '%s' "${_src_json}" | jq -r '.grafana_client_secret // empty')
+    else
+      _argocd_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+      _order_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+      _product_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+      _grafana_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
+    fi
   fi
   _info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq, minio, ldap, keycloak sandbox secrets)"
 }

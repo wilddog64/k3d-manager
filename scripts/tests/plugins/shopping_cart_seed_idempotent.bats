@@ -25,6 +25,10 @@ setup() {
           [[ "${TEST_SRC_REDIS_CART_EXISTS:-0}" == "1" ]] || return 1
           printf '{"data":{"data":{"password":"cart-from-source"}}}\n'
           ;;
+        minio/credentials)
+          [[ "${TEST_SRC_MINIO_EXISTS:-0}" == "1" ]] || return 1
+          printf '{"data":{"data":{"root-user":"src-minio-user","root-password":"src-minio-pass"}}}\n'
+          ;;
         *) return 1 ;;
       esac
       return 0
@@ -53,6 +57,7 @@ setup() {
         printf '{"data":{"data":{"password":"pg-payment"}}}\n'
         ;;
       minio/credentials)
+        [[ "${TEST_MINIO_EXISTS:-1}" == "1" ]] || return 1
         printf '{"data":{"data":{"root-user":"minioadmin","root-password":"minio-pass"}}}\n'
         ;;
       ldap/admin)
@@ -76,12 +81,16 @@ setup() {
     if [[ "$1" == "-c" ]]; then
       case "$input" in
         *'"password":"cart-from-source"'*) printf '{"password":"cart-from-source"}\n' ;;
+        *'"root-user":"src-minio-user"'*) printf '{"root-user":"src-minio-user","root-password":"src-minio-pass"}\n' ;;
       esac
       return 0
     fi
     if [[ "$1" == "-r" ]]; then
       case "$input" in
         *'"password":"cart-from-source"'*) printf 'cart-from-source\n' ;;
+        *'"root-user":"src-minio-user"'*)
+          [[ "${*: -1}" == *"root-user"* ]] && printf 'src-minio-user\n' || printf 'src-minio-pass\n'
+          ;;
         *'"password":"cart-existing"'*) printf 'cart-existing\n' ;;
         *'"password":"orders-existing"'*) printf 'orders-existing\n' ;;
         *'"password":"rabbit-existing"'*) printf 'rabbit-existing\n' ;;
@@ -177,4 +186,21 @@ setup() {
   [ "$status" -eq 0 ]
   grep -q 'http://source:8200/v1/secret/data/redis/cart' "$CURL_LOG"
   grep -Eq 'cart-from-source.*redis/cart$' "$CURL_LOG"
+}
+
+@test "copies minio/credentials (multi-field) from canonical source Vault when absent in target" {
+  export _vault_local_port="8200"
+  export _vault_root_token="root-token"
+  export TEST_REDIS_CART_EXISTS="0"
+  export TEST_REDIS_ORDERS_EXISTS="0"
+  export TEST_RABBITMQ_EXISTS="0"
+  export TEST_MINIO_EXISTS="0"
+  export SEED_VAULT_SOURCE_ADDR="http://source:8200"
+  export TEST_SOURCE_ADDR="http://source:8200"
+  export TEST_SRC_MINIO_EXISTS="1"
+
+  run shopping_cart_seed_sandbox_vault_kv
+  [ "$status" -eq 0 ]
+  grep -q 'http://source:8200/v1/secret/data/minio/credentials' "$CURL_LOG"
+  grep -Eq 'src-minio-user.*minio/credentials$' "$CURL_LOG"
 }
