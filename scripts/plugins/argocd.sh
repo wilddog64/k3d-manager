@@ -1269,9 +1269,13 @@ EOF
    _info "[argocd] Deploying CVE scan CronJob..."
    _kubectl apply -f "${_dir}/cve-scan-cronjob.yaml"
 
+   _info "[argocd] Deploying app-image CVE scan CronJob..."
+   _kubectl apply -f "${_dir}/app-cve-scan-cronjob.yaml"
+
    _info "[argocd] Deploying scan script ConfigMap..."
    _kubectl create configmap argocd-cve-scan-script \
       --from-file=cve-scan.sh="${_dir}/cve-scan.sh" \
+      --from-file=app-cve-scan.sh="${_dir}/app-cve-scan.sh" \
       --from-file=notify.sh="${_dir}/notify.sh" \
       --namespace platform-ops \
       --dry-run=client -o yaml | _kubectl apply -f -
@@ -1302,6 +1306,7 @@ EOF
    _info "[argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m"
    _info "[argocd] Secrets to create manually:"
    _info "[argocd]   kubectl create secret generic oci-kubeconfig --from-file=config=<path> -n platform-ops"
+   _info "[argocd]   kubectl create secret generic platform-ops-app-rebuild --from-literal=gh-token=<token> -n platform-ops"
    _info "[argocd]   kubectl create secret generic k3dm-webhook-token --from-literal=token=<token> -n cicd"
    _info "[argocd]   kubectl patch secret platform-ops-notifications -n platform-ops --type=merge \\"
    _info "[argocd]     -p '{\"data\":{\"slack-incoming-webhook-url\":\"<base64-url>\"}}'"
