@@ -125,9 +125,14 @@ re-runs the Hostinger reconcile so the CSS repoints and ESO re-syncs.
      policy (those 7 prefixes), not `eso-reader`. CSS auth mode is derived per profile
      (`HUB_VAULT_CSS_AUTH`: laptop→token, hostinger→kubernetes); default `laptop` stays
      behavior-preserving. The default flip is the P3-gated cutover (runbook in the P2b spec).
-3. **P3 — idempotent canonical-source seeding** — make the seed scripts re-runnable and
-   driven from the canonical source so either Vault can be populated identically. The
-   **default-profile flip to `hostinger` (cutover) is gated on this.** (Spec next.)
+3. **P3 — idempotent canonical-source seeding** — `docs/plans/v1.11.0-hub-vault-canonical-seeding.md`
+   (WRITTEN 2026-06-27, Codex-ready). Makes the seed scripts re-runnable and canonical-source-driven
+   so either Vault can be populated identically. Locked model (user 2026-06-27): **Vault = source of
+   truth, Keychain = backup, also mirrored to a native k8s `vault-seed-backup` Secret**; per-key
+   resolution source-Vault → keyring → generate. Fixes the `redis/*`+`rabbitmq/default` clobber
+   (now reuse-if-exists) and adds operator `vault_seed_hub_into_context <ctx>` (laptop→in-cluster
+   mirror, no auto-caller). The **default-profile flip to `hostinger` (cutover) is gated on this.**
+   Target **v1.11.0**.
 4. **P4 — assisted-failover watchdog** — health-probe-driven profile flip + reconcile. (Spec
    last; depends on P1–P3.)
 
