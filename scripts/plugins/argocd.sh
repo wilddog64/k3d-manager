@@ -549,6 +549,7 @@ function _argocd_configure_post_deploy() {
 
    if (( enable_bootstrap )); then
       _info "[argocd] Deploying GitOps bootstrap resources"
+      _argocd_deploy_image_updater
       if (( ! skip_appproject )); then
          _argocd_deploy_appproject
       fi
@@ -1068,6 +1069,31 @@ function _argocd_deploy_appproject() {
 
    _info "[argocd] AppProject deployed: platform"
    return 0
+}
+
+function _argocd_deploy_image_updater() {
+   if [[ "${ARGOCD_SKIP_IMAGE_UPDATER:-0}" == "1" ]]; then
+      _info "[argocd] Skipping ArgoCD Image Updater install (ARGOCD_SKIP_IMAGE_UPDATER=1)"
+      return 0
+   fi
+
+   local updater_dir="$ARGOCD_CONFIG_DIR/image-updater"
+   if [[ ! -d "$updater_dir" ]]; then
+      _warn "[argocd] Image Updater config dir not found: $updater_dir"
+      return 0
+   fi
+
+   _info "[argocd] Installing ArgoCD Image Updater (v0.15.0)"
+   if ! _kubectl apply -k "$updater_dir" >/dev/null 2>&1; then
+      _warn "[argocd] Image Updater install failed (apply -k); continuing"
+      return 0
+   fi
+
+   _kubectl -n "$ARGOCD_NAMESPACE" rollout restart deploy/argocd-image-updater >/dev/null 2>&1 || true
+   if ! _kubectl --no-exit -n "$ARGOCD_NAMESPACE" rollout status deploy/argocd-image-updater --timeout=120s; then
+      _warn "[argocd] Image Updater not Ready within timeout; check: kubectl -n $ARGOCD_NAMESPACE get deploy argocd-image-updater"
+   fi
+   _info "[argocd] ArgoCD Image Updater install complete"
 }
 
 function _argocd_deploy_applicationsets() {
