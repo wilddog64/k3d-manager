@@ -126,6 +126,7 @@ function deploy_observability_acg() {
 
   _observability_ensure_namespace "${_app_context}" monitoring
   _info "[observability] Ensured monitoring namespace exists on ${_app_context}"
+  _observability_remove_argocd_dashboard "${_app_context}"
 
   _info "[observability] Reading Alertmanager credentials from Vault..."
   local _vault_addr="http://127.0.0.1:18200"
@@ -225,6 +226,15 @@ function _observability_apply_argocd_dashboard() {
   if [[ -f "${_dashboard_manifest}" ]]; then
     _kubectl apply --context "${_app_context}" -f "${_dashboard_manifest}" >/dev/null \
       && _info "[observability] ArgoCD/Image Updater dashboard applied on ${_app_context}"
+  fi
+}
+
+function _observability_remove_argocd_dashboard() {
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
+  if _kubectl --context "${_app_context}" -n monitoring get configmap grafana-dashboard-argocd >/dev/null 2>&1; then
+    _kubectl --context "${_app_context}" -n monitoring delete configmap grafana-dashboard-argocd >/dev/null \
+      && _info "[observability] Removed stale ArgoCD/Image Updater dashboard from ${_app_context}"
   fi
 }
 

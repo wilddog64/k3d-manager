@@ -118,6 +118,8 @@ setup() {
   [[ "$output" == *"\$ARGOCD_NAMESPACE \$K3D_MANAGER_BRANCH \$APP_CLUSTER_NAME"* ]]
   run cat "${kubectl_log}"
   [ "$status" -eq 0 ]
+  [[ "$output" == *"--context ubuntu-hostinger -n monitoring get configmap grafana-dashboard-argocd"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n monitoring delete configmap grafana-dashboard-argocd"* ]]
   [[ "$output" == *"create namespace monitoring --context ubuntu-hostinger --dry-run=client -o yaml"* ]]
   [[ "$output" == *"apply -f -"* ]]
 }
