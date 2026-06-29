@@ -604,8 +604,8 @@ PLIST
   _hostinger_write_monitoring_port_forward_plist \
     "${_grafana_pf_plist}" \
     "${_grafana_pf_log}" \
-    "svc/acg-kube-prometheus-stack-grafana" \
-    "${_HOSTINGER_KUBE_CONTEXT}" \
+    "svc/kube-prometheus-stack-grafana" \
+    "k3d-k3d-cluster" \
     "3001" \
     "80"
   if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n monitoring get svc pushgateway >/dev/null 2>&1; then

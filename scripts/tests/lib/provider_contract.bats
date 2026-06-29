@@ -553,9 +553,9 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F -- '--context "ubuntu-hostinger" port-forward --address=127.0.0.2' "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   [ "$status" -eq 0 ]
-  run grep -F -- 'svc/acg-kube-prometheus-stack-grafana' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
+  run grep -F -- 'svc/kube-prometheus-stack-grafana' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
   [ "$status" -eq 0 ]
-  run grep -F -- '<string>ubuntu-hostinger</string>' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
+  run grep -F -- '<string>k3d-k3d-cluster</string>' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
   [ "$status" -eq 0 ]
   run grep -F -- 'svc/pushgateway' "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist"
   [ "$status" -eq 0 ]
