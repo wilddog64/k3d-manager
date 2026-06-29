@@ -670,6 +670,62 @@ PLIST
   fi
 }
 
+function _hostinger_clear_stale_platform_tracking_ids() {
+  _hostinger_load_argocd_plugin || return 1
+
+  local stale_prefix="${_HOSTINGER_KUBE_CONTEXT}-platform:"
+  local namespace="shopping-cart-apps"
+  local resource tracking_id cleared_any=0
+  local -a resources=(
+    "deployment/product-catalog"
+    "service/product-catalog"
+    "service/product-catalog-nodeport"
+    "serviceaccount/product-catalog"
+    "configmap/product-catalog-seed-script"
+    "externalsecret.external-secrets.io/product-catalog-secrets"
+  )
+
+  for resource in "${resources[@]}"; do
+    tracking_id="$(kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" get "${resource}" \
+      -o jsonpath='{.metadata.annotations.argocd\.argoproj\.io/tracking-id}' 2>/dev/null || true)"
+    [[ "${tracking_id}" == "${stale_prefix}"* ]] || continue
+
+    kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" annotate "${resource}" \
+      argocd.argoproj.io/tracking-id- --overwrite >/dev/null
+    cleared_any=1
+    _info "[k3s-hostinger] cleared stale platform tracking-id from ${namespace}/${resource}"
+  done
+
+  if [[ "${cleared_any}" -eq 0 ]]; then
+    return 0
+  fi
+
+  local -a hub_kubectl=()
+  read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
+  "${hub_kubectl[@]}" annotate application shopping-cart-product-catalog -n "${ARGOCD_NAMESPACE:-cicd}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+  "${hub_kubectl[@]}" annotate application "${_HOSTINGER_KUBE_CONTEXT}-platform" -n "${ARGOCD_NAMESPACE:-cicd}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+}
+
+function _hostinger_reapply_data_applicationset() {
+  _hostinger_load_argocd_plugin || return 1
+
+  local appset="${SCRIPT_DIR}/etc/argocd/applicationsets/data-git.yaml"
+  if [[ ! -f "${appset}" ]]; then
+    _err "[k3s-hostinger] data-git ApplicationSet template not found: ${appset}"
+    return 1
+  fi
+
+  if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${appset}" | _kubectl apply -f - >/dev/null 2>&1; then
+    _info "[k3s-hostinger] reapplied data-git ApplicationSet for ${_HOSTINGER_KUBE_CONTEXT}"
+    return 0
+  fi
+
+  _err "[k3s-hostinger] failed to reapply data-git ApplicationSet"
+  return 1
+}
+
 function _hostinger_reconcile_vault_cluster_store() {
   local host ssh_target
   host="$(_hostinger_require_host)" || return 1
@@ -831,6 +887,8 @@ function _provider_k3s_hostinger_refresh_cluster() {
   if declare -f deploy_observability_acg >/dev/null 2>&1; then
     deploy_observability_acg "${_HOSTINGER_KUBE_CONTEXT}" || return 1
   fi
+  _hostinger_reapply_data_applicationset || return 1
+  _hostinger_clear_stale_platform_tracking_ids || return 1
   _hostinger_reconcile_vault_cluster_store || return 1
   _hostinger_refresh_access_layer || return 1
   if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" get --raw='/healthz' >/dev/null 2>&1; then

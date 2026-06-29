@@ -238,6 +238,8 @@ teardown_file() {
   _hostinger_merge_kubeconfig() { printf '%s\n' "merge" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _hostinger_register_cluster() { printf '%s\n' "register" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   deploy_observability_acg() { printf 'observability %s\n' "$1" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_reapply_data_applicationset() { printf '%s\n' "data-appset" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_clear_stale_platform_tracking_ids() { printf '%s\n' "tracking-fix" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _hostinger_reconcile_vault_cluster_store() { printf '%s\n' "vault" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _hostinger_refresh_access_layer() { printf '%s\n' "access" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _acg_record_provider() { printf 'provider %s\n' "$1" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
@@ -263,9 +265,101 @@ teardown_file() {
   [[ "$output" == *"merge"* ]]
   [[ "$output" == *"register"* ]]
   [[ "$output" == *"observability ubuntu-hostinger"* ]]
+  [[ "$output" == *"data-appset"* ]]
+  [[ "$output" == *"tracking-fix"* ]]
   [[ "$output" == *"vault"* ]]
   [[ "$output" == *"access"* ]]
   [[ "$output" == *"provider k3s-hostinger"* ]]
+}
+
+@test "_hostinger_reapply_data_applicationset reapplies data-git with the hostinger app-cluster name" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  SCRIPT_DIR="${REPO_ROOT}/scripts"
+  _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
+  ARGOCD_NAMESPACE="cicd"
+  K3D_MANAGER_BRANCH="k3d-manager-v1.12.0"
+  _hostinger_load_argocd_plugin() { :; }
+  _info() { :; }
+  _err() { printf '%s\n' "$*" >&2; return 1; }
+  _kubectl() {
+    printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/data-appset.log"
+    cat > "${BATS_TEST_TMPDIR}/data-appset-rendered.yaml"
+    return 0
+  }
+
+  run _hostinger_reapply_data_applicationset
+  [ "$status" -eq 0 ]
+
+  run cat "${BATS_TEST_TMPDIR}/data-appset.log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "apply -f -" ]]
+
+  run cat "${BATS_TEST_TMPDIR}/data-appset-rendered.yaml"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"name: data-layer"* ]]
+  [[ "$output" == *"k3d-manager/role: app-cluster"* ]]
+  [[ "$output" == *".spec.persistentVolumeClaimRetentionPolicy"* ]]
+}
+
+@test "_hostinger_clear_stale_platform_tracking_ids strips product-catalog ownership from platform app and refreshes both apps" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
+  ARGOCD_NAMESPACE="cicd"
+  _hostinger_load_argocd_plugin() { :; }
+  _argocd_hub_kubectl_cmd() {
+    printf '%s\n' "kubectl --context k3d-k3d-cluster"
+  }
+  _info() { :; }
+
+  kubectl() {
+    case "$*" in
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ deployment/product-catalog\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
+        printf '%s' 'ubuntu-hostinger-platform:apps/Deployment:shopping-cart-apps/product-catalog'
+        ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ service/product-catalog\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
+        printf '%s' 'ubuntu-hostinger-platform:/Service:shopping-cart-apps/product-catalog'
+        ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ service/product-catalog-nodeport\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
+        printf '%s' 'ubuntu-hostinger-platform:/Service:shopping-cart-apps/product-catalog-nodeport'
+        ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ serviceaccount/product-catalog\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
+        printf '%s' 'ubuntu-hostinger-platform:/ServiceAccount:shopping-cart-apps/product-catalog'
+        ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ configmap/product-catalog-seed-script\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
+        printf '%s' 'ubuntu-hostinger-platform:/ConfigMap:shopping-cart-apps/product-catalog-seed-script'
+        ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ externalsecret.external-secrets.io/product-catalog-secrets\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
+        printf '%s' 'ubuntu-hostinger-platform:external-secrets.io/ExternalSecret:shopping-cart-apps/product-catalog-secrets'
+        ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ configmap/product-catalog-config-8h4dfgdf4k\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
+        return 1
+        ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ annotate*)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/tracking.log"
+        ;;
+      --context\ k3d-k3d-cluster\ annotate\ application*)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/tracking.log"
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  run _hostinger_clear_stale_platform_tracking_ids
+  [ "$status" -eq 0 ]
+
+  run cat "${BATS_TEST_TMPDIR}/tracking.log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate deployment/product-catalog argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate service/product-catalog argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate externalsecret.external-secrets.io/product-catalog-secrets argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-product-catalog -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster annotate application ubuntu-hostinger-platform -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
 }
 
 @test "register_app_cluster falls back to insecure tlsClientConfig when CA data is unset" {
