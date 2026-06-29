@@ -15,7 +15,7 @@ data:
 
     [INPUT]
         Name              tail
-        Path              /var/log/pods/*/*/*.log
+        Path              /var/log/containers/*.log
         multiline.parser  cri
         Tag               kube.*
         Mem_Buf_Limit     5MB
@@ -25,6 +25,7 @@ data:
     [FILTER]
         Name                kubernetes
         Match               kube.*
+        Kube_Tag_Prefix     kube.var.log.containers.
         Kube_URL            https://kubernetes.default.svc.cluster.local:443
         Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
         Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
