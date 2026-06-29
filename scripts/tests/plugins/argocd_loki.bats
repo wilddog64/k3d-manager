@@ -58,7 +58,7 @@ PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
   run grep -nF -- 'uid: loki' "${PROM_VALUES}"
   [ "${status}" -eq 0 ]
 
-  run grep -nF -- 'url: http://hub-loki-gateway.monitoring.svc.cluster.local' "${PROM_VALUES}"
+  run grep -nF -- 'url: http://loki-gateway.monitoring.svc.cluster.local' "${PROM_VALUES}"
   [ "${status}" -eq 0 ]
 }
 
