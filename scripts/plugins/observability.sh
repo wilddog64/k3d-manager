@@ -4,6 +4,7 @@
 function deploy_observability() {
   _info "[observability] Deploying Hub observability stack..."
   local _appset="${SCRIPT_DIR}/etc/argocd/applicationsets/observability.yaml"
+  local _hub_context="k3d-k3d-cluster"
   : "${ARGOCD_NAMESPACE:=cicd}"
   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
   export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE
@@ -75,6 +76,9 @@ function deploy_observability() {
     _kubectl apply -f "${_istio_manifest}" >/dev/null \
       && _info "[observability] Istio Gateway + VirtualServices applied (prometheus/grafana.shopping-cart.local)"
   fi
+
+  _observability_apply_argocd_dashboard "${_hub_context}"
+  _deploy_promtail_acg "${_hub_context}"
 }
 
 function _observability_acg_context() {
@@ -211,6 +215,16 @@ function _deploy_promtail_acg() {
   if [[ -f "${_promtail_manifest}" ]]; then
     _kubectl apply --context "${_app_context}" -f "${_promtail_manifest}" >/dev/null \
       && _info "[observability] Loki/Promtail log shipper applied on ${_app_context}"
+  fi
+}
+
+function _observability_apply_argocd_dashboard() {
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
+  local _dashboard_manifest="${SCRIPT_DIR}/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml"
+  if [[ -f "${_dashboard_manifest}" ]]; then
+    _kubectl apply --context "${_app_context}" -f "${_dashboard_manifest}" >/dev/null \
+      && _info "[observability] ArgoCD/Image Updater dashboard applied on ${_app_context}"
   fi
 }
 

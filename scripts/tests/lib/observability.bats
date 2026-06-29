@@ -56,6 +56,8 @@ setup() {
   run cat "${kubectl_log}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"apply -f -"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster -f ${REPO_ROOT}/scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster -f ${REPO_ROOT}/scripts/etc/observability/promtail.yaml"* ]]
 }
 
 @test "deploy_observability_acg calls envsubst with \$ARGOCD_NAMESPACE, \$K3D_MANAGER_BRANCH, and \$APP_CLUSTER_NAME" {

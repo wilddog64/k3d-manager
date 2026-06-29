@@ -1,6 +1,7 @@
 #!/usr/bin/env bats
 
 APPSET="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/observability-acg.yaml"
+HUB_APPSET="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/observability.yaml"
 VALUES="${BATS_TEST_DIRNAME}/../../etc/helm/observability/loki-values.yaml"
 PROMTAIL="${BATS_TEST_DIRNAME}/../../etc/observability/promtail.yaml"
 PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
@@ -16,6 +17,20 @@ PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
   [ "${status}" -eq 0 ]
 
   run grep -nF -- 'loki-values.yaml' "${APPSET}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "loki: hub observability includes a loki application" {
+  run grep -nF -- 'name: hub-loki' "${HUB_APPSET}"
+  [ "${status}" -eq 0 ]
+
+  run grep -nF -- 'chart: loki' "${HUB_APPSET}"
+  [ "${status}" -eq 0 ]
+
+  run grep -nF -- 'grafana-community.github.io/helm-charts' "${HUB_APPSET}"
+  [ "${status}" -eq 0 ]
+
+  run grep -nF -- 'loki-values.yaml' "${HUB_APPSET}"
   [ "${status}" -eq 0 ]
 }
 
@@ -46,5 +61,13 @@ PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
   [ "${status}" -eq 0 ]
 
   run grep -nF -- 'Loki/Promtail log shipper applied' "${PLUGIN}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "loki: hub observability deploy applies the argocd image updater dashboard" {
+  run grep -nF -- '_observability_apply_argocd_dashboard "${_hub_context}"' "${PLUGIN}"
+  [ "${status}" -eq 0 ]
+
+  run grep -nF -- 'ArgoCD/Image Updater dashboard applied on' "${PLUGIN}"
   [ "${status}" -eq 0 ]
 }
