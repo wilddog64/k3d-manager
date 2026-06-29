@@ -35,6 +35,11 @@ PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
   [ "${status}" -eq 0 ]
 }
 
+@test "loki: hub observability forces the helm release name back to loki" {
+  run grep -nF -- "releaseName: '{{if eq .name \"hub-loki\"}}loki{{else}}{{.name}}{{end}}'" "${HUB_APPSET}"
+  [ "${status}" -eq 0 ]
+}
+
 @test "loki: values pin monolithic filesystem mode" {
   run grep -nF -- 'deploymentMode: Monolithic' "${VALUES}"
   [ "${status}" -eq 0 ]

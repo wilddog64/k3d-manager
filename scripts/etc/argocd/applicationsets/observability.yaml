@@ -45,6 +45,7 @@ spec:
           chart: '{{.chart}}'
           targetRevision: '{{.targetRevision}}'
           helm:
+            releaseName: '{{if eq .name "hub-loki"}}loki{{else}}{{.name}}{{end}}'
             valueFiles:
               - '$values/{{.valuesFile}}'
       syncPolicy:
