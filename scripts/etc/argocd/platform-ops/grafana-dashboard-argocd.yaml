@@ -7,7 +7,7 @@ metadata:
     grafana_dashboard: "1"
     release: kube-prometheus-stack
 data:
-  argocd-image-updater.json: |
+  argocd-image-updater-hub.json: |
     {
       "annotations": { "list": [] },
       "editable": true,
@@ -138,6 +138,6 @@ data:
       "templating": { "list": [] },
       "time": { "from": "now-6h", "to": "now" },
       "timezone": "",
-      "title": "ArgoCD Apps & Image Updater",
-      "uid": "argocd-image-updater"
+      "title": "ArgoCD Apps & Image Updater Hub",
+      "uid": "argocd-image-updater-hub"
     }

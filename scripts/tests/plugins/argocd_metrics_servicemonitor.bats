@@ -48,6 +48,15 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
 }
 
 @test "metrics: dashboard includes a loki log panel for image-updater processing results" {
+  run grep -F -- 'argocd-image-updater-hub.json' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'ArgoCD Apps & Image Updater Hub' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- '"uid": "argocd-image-updater-hub"' "${DASH}"
+  [ "${status}" -eq 0 ]
+
   run grep -F -- '"uid": "loki"' "${DASH}"
   [ "${status}" -eq 0 ]
 
