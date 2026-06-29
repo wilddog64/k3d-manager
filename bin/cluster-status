@@ -100,6 +100,43 @@ echo "=== ArgoCD ApplicationSets ==="
 kubectl get applicationsets.argoproj.io -A --context "${INFRA_CONTEXT}" 2>/dev/null \
   || echo "Cannot reach Hub cluster or ArgoCD CRDs not installed"
 
+echo ""
+echo "=== ArgoCD Image Updater ==="
+_iu_ready="$(kubectl get deploy argocd-image-updater -n "${ARGOCD_NAMESPACE}" \
+  --context "${INFRA_CONTEXT}" -o jsonpath='{.status.readyReplicas}/{.status.replicas}' 2>/dev/null || true)"
+if [[ -z "${_iu_ready}" || "${_iu_ready}" == "/" ]]; then
+  echo "Not installed (no argocd-image-updater deployment in ${ARGOCD_NAMESPACE})"
+else
+  echo "Deployment: ${_iu_ready} ready"
+
+  _iu_logs="$(kubectl logs deploy/argocd-image-updater -n "${ARGOCD_NAMESPACE}" \
+    --context "${INFRA_CONTEXT}" --tail=200 2>/dev/null || true)"
+
+  _iu_cycle="$(printf '%s\n' "${_iu_logs}" | grep -F 'Processing results:' | tail -1 \
+    | sed 's/.*Processing results: //; s/"$//' || true)"
+  if [[ -n "${_iu_cycle}" ]]; then
+    echo "Last cycle: ${_iu_cycle}"
+  else
+    echo "Last cycle: (no completed cycle in recent logs)"
+  fi
+
+  _iu_updates="$(printf '%s\n' "${_iu_logs}" | grep -c 'images_updated=[1-9]' || true)"
+  if [[ "${_iu_updates}" -ge 3 ]]; then
+    echo "WARN Flapping: ${_iu_updates} recent cycles wrote an update — an app may not be converging"
+  fi
+
+  echo "Watching:"
+  _iu_watch="$(kubectl get applications.argoproj.io -n "${ARGOCD_NAMESPACE}" \
+    --context "${INFRA_CONTEXT}" --no-headers \
+    -o custom-columns='N:.metadata.name,IL:.metadata.annotations.argocd-image-updater\.argoproj\.io/image-list' 2>/dev/null \
+    | awk '$2 != "<none>" && $2 != "" { printf "  %s -> %s\n", $1, $2 }' || true)"
+  if [[ -n "${_iu_watch}" ]]; then
+    printf '%s\n' "${_iu_watch}"
+  else
+    echo "  (no applications carry an image-list annotation)"
+  fi
+fi
+
 if [[ "${CLUSTER_PROVIDER}" == "k3s-aws" ]]; then
   echo ""
   echo "=== AWS Credentials ==="
