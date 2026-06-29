@@ -1,12 +1,12 @@
-# Hostinger Grafana no-data live validation pending
+# Hostinger Grafana no-data live validation record
 
 **Found:** 2026-06-29  
 **Branch:** `k3d-manager-v1.12.0`
 
 ## What was tested
 
-Implemented the Hostinger observability drift fix locally and ran repository
-validation only:
+Implemented the Hostinger observability drift fix locally, then completed the
+live Hostinger refresh/status validation:
 
 ```text
 $ bash -n scripts/lib/providers/k3s-hostinger.sh scripts/plugins/observability.sh bin/cluster-status
@@ -18,22 +18,37 @@ ok 49 cluster-status surfaces app-cluster Prometheus health and OOM evidence
 
 $ ./scripts/k3d-manager _agent_audit
 running under bash version 5.3.15(1)-release
+
+$ make refresh CLUSTER_PROVIDER=k3s-hostinger
+...
+INFO: [k3s-hostinger] Refresh complete — ubuntu-hostinger reachable
+__WEBHOOK_SUCCESS__
+
+$ make status CLUSTER_PROVIDER=k3s-hostinger
+...
+=== App Observability (ubuntu-hostinger) ===
+Prometheus: 1/1 available
+...
+=== ArgoCD Apps ===
+...
+cicd        data-layer                      Synced        Healthy
+...
+cicd        shopping-cart-product-catalog   Synced        Healthy
+...
+cicd        ubuntu-hostinger-platform       Synced        Healthy
+...
+  ✅ Grafana: HTTP 200
+  ✅ Prometheus: HTTP 200
+  ✅ Data layer: 4/4 ready
 ```
 
-## What was skipped
+## Result
 
-No live `make refresh CLUSTER_PROVIDER=k3s-hostinger` or live
-`make status CLUSTER_PROVIDER=k3s-hostinger` run was performed in this task.
+Live validation passed. The observability fix converged on Hostinger and the
+same refresh also left the previously drifted Hostinger ArgoCD apps synced.
 
-## Why
+## Follow-up note
 
-The code-path/root-cause was already confirmed from live cluster inspection, and
-this task focused on shipping the repo fix plus status visibility. The live
-refresh/status run remains the operator confirmation step.
-
-## Recommended follow-up
-
-1. Run `make refresh CLUSTER_PROVIDER=k3s-hostinger`.
-2. Run `make status CLUSTER_PROVIDER=k3s-hostinger`.
-3. Confirm the `=== App Observability ===` section no longer reports
-   `OOMKilled`, and that Grafana panels populate again.
+During the refresh, the Vault auth helper still logs a benign
+`path is already in use at kubernetes-app/` message before completing the
+existing auth configuration successfully. That noise did not block the refresh.
