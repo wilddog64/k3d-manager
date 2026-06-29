@@ -1071,6 +1071,59 @@ function _argocd_deploy_appproject() {
    return 0
 }
 
+function _argocd_ensure_ghcr_pull_secret() {
+   local user="${GITHUB_USERNAME:-wilddog64}"
+   local pat="" http netrc
+
+   _ghcr_pat_valid() {
+      [[ -z "$1" ]] && return 1
+      netrc=$(mktemp) && chmod 0600 "$netrc"
+      printf 'machine api.github.com login %s password %s\n' "$user" "$1" > "$netrc"
+      http=$(curl -s -o /dev/null -w "%{http_code}" --netrc-file "$netrc" "https://api.github.com/user" 2>/dev/null || true)
+      rm -f "$netrc"
+      [[ "$http" == "200" ]]
+   }
+
+   if _ghcr_pat_valid "${GHCR_PAT:-}"; then
+      pat="${GHCR_PAT}"
+      _info "[argocd] using validated GHCR_PAT from env for ghcr-pull-secret"
+   elif [[ -n "${_vault_local_port:-}" ]]; then
+      local vault_token vault_pat
+      vault_token=$(_kubectl -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d 2>/dev/null || true)
+      if [[ -n "$vault_token" ]]; then
+         vault_pat=$(curl -s -H "X-Vault-Token: ${vault_token}" "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" | jq -r '.data.data.token // empty' 2>/dev/null || true)
+         if _ghcr_pat_valid "$vault_pat"; then
+            pat="$vault_pat"
+            _info "[argocd] using PAT from Vault for ghcr-pull-secret"
+         fi
+      fi
+   fi
+
+   if [[ -z "$pat" ]] && command -v gh >/dev/null 2>&1; then
+      local gh_token
+      gh_token=$(gh auth token 2>/dev/null || true)
+      if [[ -n "$gh_token" ]] && GH_TOKEN="$gh_token" gh api user >/dev/null 2>&1; then
+         pat="$gh_token"
+         _info "[argocd] using gh CLI token for ghcr-pull-secret"
+      fi
+   fi
+
+   if [[ -z "$pat" ]]; then
+      _warn "[argocd] No valid GHCR PAT (env/Vault/gh) — skipping ghcr-pull-secret; Image Updater auth will fail until it exists. Set GHCR_PAT or run: gh auth login"
+      return 0
+   fi
+
+   kubectl create secret docker-registry ghcr-pull-secret \
+      --docker-server=ghcr.io \
+      --docker-username="$user" \
+      --docker-password="$pat" \
+      -n "$ARGOCD_NAMESPACE" \
+      --dry-run=client -o yaml \
+      | kubectl apply -n "$ARGOCD_NAMESPACE" -f - >/dev/null 2>&1 \
+      && _info "[argocd] ghcr-pull-secret ensured in namespace $ARGOCD_NAMESPACE" \
+      || _warn "[argocd] failed to apply ghcr-pull-secret in $ARGOCD_NAMESPACE"
+}
+
 function _argocd_deploy_image_updater() {
    if [[ "${ARGOCD_SKIP_IMAGE_UPDATER:-0}" == "1" ]]; then
       _info "[argocd] Skipping ArgoCD Image Updater install (ARGOCD_SKIP_IMAGE_UPDATER=1)"
@@ -1082,6 +1135,8 @@ function _argocd_deploy_image_updater() {
       _warn "[argocd] Image Updater config dir not found: $updater_dir"
       return 0
    fi
+
+   _argocd_ensure_ghcr_pull_secret
 
    _info "[argocd] Installing ArgoCD Image Updater (v0.15.0)"
    if ! _kubectl apply -k "$updater_dir" >/dev/null 2>&1; then
