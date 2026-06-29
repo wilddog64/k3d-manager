@@ -8,8 +8,8 @@ metadata:
     app-type: services
 spec:
   ignoreApplicationDifferences:
-    - jsonPointers:
-        - /spec/source/kustomize/images
+    - jqPathExpressions:
+        - .spec.source.kustomize.images
   generators:
     - matrix:
         generators:
