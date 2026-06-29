@@ -108,11 +108,12 @@ function deploy_observability_acg() {
   local _appset="${SCRIPT_DIR}/etc/argocd/applicationsets/observability-acg.yaml"
   : "${ARGOCD_NAMESPACE:=cicd}"
   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
-  export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE
   local _app_context
   _app_context="$(_observability_acg_context "${1:-}")"
+  APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-${_app_context}}"
+  export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE APP_CLUSTER_NAME
   # shellcheck disable=SC2016
-  if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_appset}" | _kubectl apply -f -; then
+  if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME' < "${_appset}" | _kubectl apply -f -; then
     _info "[observability] ACG ApplicationSet applied — ArgoCD will sync monitoring/trivy-system on ${_app_context}"
   else
     _err "[observability] Failed to apply ACG observability ApplicationSet"

@@ -828,6 +828,9 @@ function _provider_k3s_hostinger_refresh_cluster() {
   _info "[k3s-hostinger] Refreshing ${_HOSTINGER_KUBE_CONTEXT} kubeconfig + ArgoCD registration…"
   _hostinger_merge_kubeconfig || return 1
   _hostinger_register_cluster || return 1
+  if declare -f deploy_observability_acg >/dev/null 2>&1; then
+    deploy_observability_acg "${_HOSTINGER_KUBE_CONTEXT}" || return 1
+  fi
   _hostinger_reconcile_vault_cluster_store || return 1
   _hostinger_refresh_access_layer || return 1
   if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" get --raw='/healthz' >/dev/null 2>&1; then

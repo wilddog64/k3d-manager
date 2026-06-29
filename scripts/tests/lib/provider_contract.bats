@@ -227,6 +227,47 @@ teardown_file() {
   [[ "${output}" != *'"insecure": true'* ]]
 }
 
+@test "_provider_k3s_hostinger_refresh_cluster reapplies observability on the hostinger context" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  _HOSTINGER_KUBECONFIG="${BATS_TEST_TMPDIR}/hostinger.config"
+  : > "${_HOSTINGER_KUBECONFIG}"
+
+  _hostinger_require_host() { printf '%s\n' "srv1754834.hstgr.cloud"; }
+  _hostinger_merge_kubeconfig() { printf '%s\n' "merge" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_register_cluster() { printf '%s\n' "register" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  deploy_observability_acg() { printf 'observability %s\n' "$1" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_reconcile_vault_cluster_store() { printf '%s\n' "vault" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_refresh_access_layer() { printf '%s\n' "access" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _acg_record_provider() { printf 'provider %s\n' "$1" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _info() { :; }
+
+  kubectl() {
+    case "$*" in
+      --context\ ubuntu-hostinger\ get\ --raw=/healthz*)
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  run _provider_k3s_hostinger_refresh_cluster
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"__WEBHOOK_SUCCESS__"* ]]
+
+  run cat "${BATS_TEST_TMPDIR}/refresh.log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"merge"* ]]
+  [[ "$output" == *"register"* ]]
+  [[ "$output" == *"observability ubuntu-hostinger"* ]]
+  [[ "$output" == *"vault"* ]]
+  [[ "$output" == *"access"* ]]
+  [[ "$output" == *"provider k3s-hostinger"* ]]
+}
+
 @test "register_app_cluster falls back to insecure tlsClientConfig when CA data is unset" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   export PLUGINS_DIR="${REPO_ROOT}/scripts/plugins"
@@ -299,8 +340,22 @@ EOF
 
   lsof() {
     case "$*" in
-      *"-iTCP:8080"*) printf '%s\n' "41517" ;;
-      *"-iTCP:8880"*) printf '%s\n' "51518" ;;
+      *"-iTCP:8080"*)
+        if [[ ! -f "${BATS_TEST_TMPDIR}/lsof-8080-cleared" ]]; then
+          : > "${BATS_TEST_TMPDIR}/lsof-8080-cleared"
+          printf '%s\n' "41517"
+          return 0
+        fi
+        return 1
+        ;;
+      *"-iTCP:8880"*)
+        if [[ ! -f "${BATS_TEST_TMPDIR}/lsof-8880-cleared" ]]; then
+          : > "${BATS_TEST_TMPDIR}/lsof-8880-cleared"
+          printf '%s\n' "51518"
+          return 0
+        fi
+        return 1
+        ;;
       *) return 1 ;;
     esac
   }

@@ -58,7 +58,7 @@ setup() {
   [[ "$output" == *"apply -f -"* ]]
 }
 
-@test "deploy_observability_acg calls envsubst with \$ARGOCD_NAMESPACE and \$K3D_MANAGER_BRANCH" {
+@test "deploy_observability_acg calls envsubst with \$ARGOCD_NAMESPACE, \$K3D_MANAGER_BRANCH, and \$APP_CLUSTER_NAME" {
   local envsubst_log kubectl_log
   envsubst_log="${BATS_TEST_TMPDIR}/envsubst-acg.log"
   kubectl_log="${BATS_TEST_TMPDIR}/kubectl-acg.log"
@@ -113,7 +113,7 @@ setup() {
   [[ "$output" == *"Prometheus web config secret applied (monitoring/prometheus-web-config on ubuntu-hostinger)"* ]]
   run cat "${envsubst_log}"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"\$ARGOCD_NAMESPACE \$K3D_MANAGER_BRANCH"* ]]
+  [[ "$output" == *"\$ARGOCD_NAMESPACE \$K3D_MANAGER_BRANCH \$APP_CLUSTER_NAME"* ]]
   run cat "${kubectl_log}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"create namespace monitoring --context ubuntu-hostinger --dry-run=client -o yaml"* ]]

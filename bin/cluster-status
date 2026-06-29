@@ -63,6 +63,38 @@ else
 fi
 
 echo ""
+echo "=== App Observability (${APP_CONTEXT}) ==="
+_prom_cr="acg-kube-prometheus-stack-prometheus"
+_prom_available="$(kubectl --context "${APP_CONTEXT}" -n monitoring \
+  get prometheus "${_prom_cr}" -o jsonpath='{.status.availableReplicas}/{.spec.replicas}' 2>/dev/null || true)"
+if [[ -z "${_prom_available}" || "${_prom_available}" == "/" ]]; then
+  echo "Prometheus: not installed (no ${_prom_cr} resource in monitoring)"
+else
+  echo "Prometheus: ${_prom_available} available"
+  _prom_pod="$(kubectl --context "${APP_CONTEXT}" -n monitoring \
+    get pods -l "operator.prometheus.io/name=${_prom_cr}" \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)"
+  if [[ -n "${_prom_pod}" ]]; then
+    _prom_restarts="$(kubectl --context "${APP_CONTEXT}" -n monitoring \
+      get pod "${_prom_pod}" \
+      -o jsonpath='{.status.containerStatuses[?(@.name=="prometheus")].restartCount}' 2>/dev/null || true)"
+    _prom_reason="$(kubectl --context "${APP_CONTEXT}" -n monitoring \
+      get pod "${_prom_pod}" \
+      -o jsonpath='{.status.containerStatuses[?(@.name=="prometheus")].lastState.terminated.reason}' 2>/dev/null || true)"
+    _prom_mem_limit="$(kubectl --context "${APP_CONTEXT}" -n monitoring \
+      get statefulset prometheus-acg-kube-prometheus-stack-prometheus \
+      -o jsonpath='{.spec.template.spec.containers[?(@.name=="prometheus")].resources.limits.memory}' 2>/dev/null || true)"
+    if [[ "${_prom_reason}" == "OOMKilled" ]]; then
+      echo "WARN Prometheus backend unhealthy: ${_prom_pod} last terminated OOMKilled; restarts=${_prom_restarts:-0}; memory limit=${_prom_mem_limit:-unknown}"
+      echo "WARN Grafana panels may be blank until Prometheus stays ready"
+    elif [[ "${_prom_available}" != "1/1" ]]; then
+      echo "WARN Prometheus backend unhealthy: ${_prom_pod} not fully ready; restarts=${_prom_restarts:-0}; last termination=${_prom_reason:-unknown}"
+      echo "WARN Grafana panels may be blank until Prometheus stays ready"
+    fi
+  fi
+fi
+
+echo ""
 echo "=== Hub ArgoCD Registration (${INFRA_CONTEXT}, ns ${ARGOCD_NAMESPACE}) ==="
 if kubectl get secret "cluster-${APP_CONTEXT}" -n "${ARGOCD_NAMESPACE}" \
      --context "${INFRA_CONTEXT}" >/dev/null 2>&1; then

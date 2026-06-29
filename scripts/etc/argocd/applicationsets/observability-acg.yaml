@@ -16,6 +16,7 @@ spec:
             repoURL: https://prometheus-community.github.io/helm-charts
             targetRevision: 67.9.0
             valuesFile: scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml
+            clusterLabel: ${APP_CLUSTER_NAME}
           - name: acg-trivy-operator
             namespace: trivy-system
             chart: trivy-operator
@@ -41,6 +42,9 @@ spec:
           helm:
             valueFiles:
               - '$values/{{.valuesFile}}'
+            parameters:
+              - name: prometheus.prometheusSpec.externalLabels.cluster
+                value: '{{.clusterLabel}}'
       syncPolicy:
         automated:
           prune: true
