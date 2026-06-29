@@ -14,7 +14,7 @@ data:
       "graphTooltip": 0,
       "panels": [
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": {}, "overrides": [] },
           "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
           "id": 1,
@@ -40,7 +40,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": {}, "overrides": [] },
           "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
           "id": 2,
@@ -67,7 +67,7 @@ data:
           "type": "stat"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
           "id": 3,
@@ -81,7 +81,7 @@ data:
           ]
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": {}, "overrides": [] },
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
           "id": 4,
@@ -97,7 +97,7 @@ data:
           ]
         },
         {
-          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
           "id": 5,
@@ -111,7 +111,7 @@ data:
           ]
         },
         {
-          "datasource": { "type": "loki", "uid": "${logsource}" },
+          "datasource": { "type": "loki", "uid": "loki" },
           "fieldConfig": { "defaults": {}, "overrides": [] },
           "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
           "id": 6,
@@ -135,28 +135,7 @@ data:
       ],
       "schemaVersion": 39,
       "tags": ["argocd", "image-updater"],
-      "templating": {
-        "list": [
-          {
-            "current": {},
-            "hide": 0,
-            "label": "Datasource",
-            "name": "datasource",
-            "query": "prometheus",
-            "refresh": 1,
-            "type": "datasource"
-          },
-          {
-            "current": {},
-            "hide": 0,
-            "label": "Log Source",
-            "name": "logsource",
-            "query": "loki",
-            "refresh": 1,
-            "type": "datasource"
-          }
-        ]
-      },
+      "templating": { "list": [] },
       "time": { "from": "now-6h", "to": "now" },
       "timezone": "",
       "title": "ArgoCD Apps & Image Updater",

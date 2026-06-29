@@ -55,6 +55,12 @@ grafana:
       access: proxy
       jsonData:
         timeInterval: 30s
+    - name: Loki
+      uid: loki
+      type: loki
+      url: http://hub-loki-gateway.monitoring.svc.cluster.local
+      access: proxy
+      jsonData: {}
 
 alertmanager:
   enabled: true

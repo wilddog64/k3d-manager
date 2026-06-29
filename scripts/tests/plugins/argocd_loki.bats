@@ -3,6 +3,7 @@
 APPSET="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/observability-acg.yaml"
 HUB_APPSET="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/observability.yaml"
 VALUES="${BATS_TEST_DIRNAME}/../../etc/helm/observability/loki-values.yaml"
+PROM_VALUES="${BATS_TEST_DIRNAME}/../../etc/helm/observability/kube-prometheus-stack-values.yaml"
 PROMTAIL="${BATS_TEST_DIRNAME}/../../etc/observability/promtail.yaml"
 PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
 
@@ -42,6 +43,17 @@ PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
   [ "${status}" -eq 0 ]
 
   run grep -nF -- 'replication_factor: 1' "${VALUES}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "loki: hub grafana provisions a loki datasource" {
+  run grep -nF -- 'name: Loki' "${PROM_VALUES}"
+  [ "${status}" -eq 0 ]
+
+  run grep -nF -- 'uid: loki' "${PROM_VALUES}"
+  [ "${status}" -eq 0 ]
+
+  run grep -nF -- 'url: http://hub-loki-gateway.monitoring.svc.cluster.local' "${PROM_VALUES}"
   [ "${status}" -eq 0 ]
 }
 

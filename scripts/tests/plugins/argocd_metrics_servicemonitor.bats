@@ -48,12 +48,18 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
 }
 
 @test "metrics: dashboard includes a loki log panel for image-updater processing results" {
+  run grep -F -- '"uid": "loki"' "${DASH}"
+  [ "${status}" -eq 0 ]
+
   run grep -F -- 'type": "loki"' "${DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'Image Updater Processing Results' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'query": "loki"' "${DASH}"
+  run grep -F -- '"uid": "prometheus"' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- '"templating": { "list": [] }' "${DASH}"
   [ "${status}" -eq 0 ]
 }
