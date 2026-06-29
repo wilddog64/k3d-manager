@@ -16,23 +16,98 @@ data:
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "fieldConfig": { "defaults": {}, "overrides": [] },
-          "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
           "id": 1,
-          "title": "ArgoCD App Health / Sync",
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "expr": "kube_deployment_status_replicas_available{namespace=\"cicd\",deployment=\"argocd-image-updater\"}",
+              "refId": "A"
+            }
+          ],
+          "title": "Image Updater Ready Replicas",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "id": 2,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value_and_name"
+          },
+          "targets": [
+            {
+              "expr": "kube_deployment_spec_replicas{namespace=\"cicd\",deployment=\"argocd-image-updater\"}",
+              "refId": "A"
+            }
+          ]
+          ,
+          "title": "Image Updater Desired Replicas",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "id": 3,
+          "title": "Watched App Sync Activity (5m increase)",
+          "type": "timeseries",
+          "targets": [
+            {
+              "expr": "sum by (name) (increase(argocd_app_sync_total{name=~\"shopping-cart-(basket|order|product-catalog)\"}[5m]))",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "id": 4,
+          "title": "Watched App Health / Sync",
           "type": "table",
           "targets": [
-            { "expr": "argocd_app_info", "format": "table", "instant": true, "refId": "A" }
+            {
+              "expr": "argocd_app_info{name=~\"shopping-cart-(basket|order|product-catalog)\"}",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
           ]
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
-          "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
-          "id": 2,
-          "title": "App Sync Activity (5m increase) — image-updater commits trigger syncs",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "id": 5,
+          "title": "Possible Flapping (30m syncs)",
           "type": "timeseries",
           "targets": [
-            { "expr": "sum by (name) (increase(argocd_app_sync_total[5m]))", "refId": "A" }
+            {
+              "expr": "sum by (name) (increase(argocd_app_sync_total{name=~\"shopping-cart-(basket|order|product-catalog)\"}[30m]))",
+              "refId": "A"
+            }
           ]
         }
       ],

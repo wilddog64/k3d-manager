@@ -30,3 +30,19 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'grafana-dashboard-argocd.yaml' "${PLUGIN}"
   [ "${status}" -eq 0 ]
 }
+
+@test "metrics: dashboard includes image updater deployment readiness panels" {
+  run grep -F -- 'kube_deployment_status_replicas_available{namespace=\"cicd\",deployment=\"argocd-image-updater\"}' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'kube_deployment_spec_replicas{namespace=\"cicd\",deployment=\"argocd-image-updater\"}' "${DASH}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "metrics: dashboard focuses sync activity on watched image-updater apps" {
+  run grep -F -- 'argocd_app_sync_total{name=~\"shopping-cart-(basket|order|product-catalog)\"}' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'argocd_app_info{name=~\"shopping-cart-(basket|order|product-catalog)\"}' "${DASH}"
+  [ "${status}" -eq 0 ]
+}
