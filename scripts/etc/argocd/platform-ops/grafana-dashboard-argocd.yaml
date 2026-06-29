@@ -109,6 +109,28 @@ data:
               "refId": "A"
             }
           ]
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${logsource}" },
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+          "id": 6,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "showLabels": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": false
+          },
+          "targets": [
+            {
+              "expr": "{namespace=\"cicd\",pod=~\"argocd-image-updater.*\"} |= \"Processing results:\"",
+              "refId": "A"
+            }
+          ],
+          "title": "Image Updater Processing Results",
+          "type": "logs"
         }
       ],
       "schemaVersion": 39,
@@ -121,6 +143,15 @@ data:
             "label": "Datasource",
             "name": "datasource",
             "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          },
+          {
+            "current": {},
+            "hide": 0,
+            "label": "Log Source",
+            "name": "logsource",
+            "query": "loki",
             "refresh": 1,
             "type": "datasource"
           }

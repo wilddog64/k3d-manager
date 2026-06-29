@@ -46,3 +46,14 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'argocd_app_info{name=~\"shopping-cart-(basket|order|product-catalog)\"}' "${DASH}"
   [ "${status}" -eq 0 ]
 }
+
+@test "metrics: dashboard includes a loki log panel for image-updater processing results" {
+  run grep -F -- 'type": "loki"' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'Image Updater Processing Results' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'query": "loki"' "${DASH}"
+  [ "${status}" -eq 0 ]
+}

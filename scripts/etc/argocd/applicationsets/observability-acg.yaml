@@ -17,6 +17,12 @@ spec:
             targetRevision: 67.9.0
             valuesFile: scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml
             clusterLabel: ${APP_CLUSTER_NAME}
+          - name: loki
+            namespace: monitoring
+            chart: loki
+            repoURL: https://grafana-community.github.io/helm-charts
+            targetRevision: 18.2.0
+            valuesFile: scripts/etc/helm/observability/loki-values.yaml
           - name: acg-trivy-operator
             namespace: trivy-system
             chart: trivy-operator

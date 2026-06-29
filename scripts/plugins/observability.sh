@@ -172,6 +172,7 @@ function deploy_observability_acg() {
   fi
   _prometheus_acg_web_config_secret "${_app_context}"
   _deploy_pushgateway_acg "${_app_context}"
+  _deploy_promtail_acg "${_app_context}"
 }
 
 function _deploy_pushgateway_acg() {
@@ -200,6 +201,16 @@ function _deploy_pushgateway_acg() {
   if [[ -f "${_dashboard_cm}" ]]; then
     _kubectl apply --context "${_app_context}" -f "${_dashboard_cm}" >/dev/null \
       && _info "[observability] k3dm deployment metrics dashboard applied"
+  fi
+}
+
+function _deploy_promtail_acg() {
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
+  local _promtail_manifest="${SCRIPT_DIR}/etc/observability/promtail.yaml"
+  if [[ -f "${_promtail_manifest}" ]]; then
+    _kubectl apply --context "${_app_context}" -f "${_promtail_manifest}" >/dev/null \
+      && _info "[observability] Loki/Promtail log shipper applied on ${_app_context}"
   fi
 }
 
