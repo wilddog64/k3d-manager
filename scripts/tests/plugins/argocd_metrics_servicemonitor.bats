@@ -37,6 +37,10 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
 
   run grep -F -- 'kube_deployment_spec_replicas{namespace=\"cicd\",deployment=\"argocd-image-updater\"}' "${DASH}"
   [ "${status}" -eq 0 ]
+
+  run grep -cF -- '"textMode": "value"' "${DASH}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -ge 2 ]
 }
 
 @test "metrics: dashboard focuses sync activity on watched image-updater apps" {
