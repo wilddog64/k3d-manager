@@ -27,8 +27,14 @@ case "${_last}" in
   *shopping-cart-basket:sha-*)
     _count="${TEST_LATEST_CVES_shopping_cart_basket:-0}"
     ;;
+  *shopping-cart-frontend:sha-*)
+    _count="${TEST_LATEST_CVES_shopping_cart_frontend:-0}"
+    ;;
   *shopping-cart-order:sha-*)
     _count="${TEST_LATEST_CVES_shopping_cart_order:-0}"
+    ;;
+  *shopping-cart-payment:sha-*)
+    _count="${TEST_LATEST_CVES_shopping_cart_payment:-0}"
     ;;
   *shopping-cart-product-catalog:sha-*)
     _count="${TEST_LATEST_CVES_shopping_cart_product_catalog:-0}"
@@ -119,8 +125,16 @@ case "$*" in
     printf '%s' "${TEST_REPORT_DETAILS_basket_report:-}"
     exit 0
     ;;
+  "-n shopping-cart-apps get vulnerabilityreport.aquasecurity.github.io frontend-report -o go-template={{range .report.vulnerabilities}}{{if or (eq .severity \"CRITICAL\") (eq .severity \"HIGH\")}}{{.severity}}|{{.vulnerabilityID}}|{{.fixedVersion}}{{\"\\n\"}}{{end}}{{end}}")
+    printf '%s' "${TEST_REPORT_DETAILS_frontend_report:-}"
+    exit 0
+    ;;
   "-n shopping-cart-apps get vulnerabilityreport.aquasecurity.github.io order-report -o go-template={{range .report.vulnerabilities}}{{if or (eq .severity \"CRITICAL\") (eq .severity \"HIGH\")}}{{.severity}}|{{.vulnerabilityID}}|{{.fixedVersion}}{{\"\\n\"}}{{end}}{{end}}")
     printf '%s' "${TEST_REPORT_DETAILS_order_report:-}"
+    exit 0
+    ;;
+  "-n shopping-cart-apps get vulnerabilityreport.aquasecurity.github.io payment-report -o go-template={{range .report.vulnerabilities}}{{if or (eq .severity \"CRITICAL\") (eq .severity \"HIGH\")}}{{.severity}}|{{.vulnerabilityID}}|{{.fixedVersion}}{{\"\\n\"}}{{end}}{{end}}")
+    printf '%s' "${TEST_REPORT_DETAILS_payment_report:-}"
     exit 0
     ;;
   "-n shopping-cart-apps get vulnerabilityreport.aquasecurity.github.io product-catalog-report -o go-template={{range .report.vulnerabilities}}{{if or (eq .severity \"CRITICAL\") (eq .severity \"HIGH\")}}{{.severity}}|{{.vulnerabilityID}}|{{.fixedVersion}}{{\"\\n\"}}{{end}}{{end}}")
@@ -237,6 +251,56 @@ EOF
   grep -q 'patch application shopping-cart-basket' "${KUBECTL_LOG}"
   grep -q 'annotate application shopping-cart-basket argocd.argoproj.io/refresh=hard --overwrite' "${KUBECTL_LOG}"
   grep -q 'warning|App CVE Promotion: shopping-cart-basket|' "${NOTIFY_LOG}"
+}
+
+@test "clean frontend image is scanned and skipped" {
+  export APP_SERVICES="shopping-cart-frontend"
+  export TEST_REPORT_ROWS="shopping-cart-apps frontend-report ghcr.io/wilddog64/shopping-cart-frontend sha-old 0 0"
+  export TEST_REPORT_DETAILS_frontend_report=""
+  export TEST_LATEST_CVES_shopping_cart_frontend=0
+
+  run env -i \
+    PATH="${PATH}" \
+    TRIVY_LOG="${TRIVY_LOG}" \
+    CURL_LOG="${CURL_LOG}" \
+    NOTIFY_LOG="${NOTIFY_LOG}" \
+    KUBECTL_LOG="${KUBECTL_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
+    TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="${APP_SERVICES}" \
+    TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" \
+    TEST_REPORT_DETAILS_frontend_report="${TEST_REPORT_DETAILS_frontend_report}" \
+    TEST_LATEST_CVES_shopping_cart_frontend="${TEST_LATEST_CVES_shopping_cart_frontend}" \
+  /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"deployed image ghcr.io/wilddog64/shopping-cart-frontend:sha-old has no HIGH/CRITICAL findings"* ]]
+  run ! grep -q 'actions/workflows' "${CURL_LOG}"
+}
+
+@test "clean payment image is scanned and skipped" {
+  export APP_SERVICES="shopping-cart-payment"
+  export TEST_REPORT_ROWS="shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 0 0"
+  export TEST_REPORT_DETAILS_payment_report=""
+  export TEST_LATEST_CVES_shopping_cart_payment=0
+
+  run env -i \
+    PATH="${PATH}" \
+    TRIVY_LOG="${TRIVY_LOG}" \
+    CURL_LOG="${CURL_LOG}" \
+    NOTIFY_LOG="${NOTIFY_LOG}" \
+    KUBECTL_LOG="${KUBECTL_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
+    TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="${APP_SERVICES}" \
+    TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" \
+    TEST_REPORT_DETAILS_payment_report="${TEST_REPORT_DETAILS_payment_report}" \
+    TEST_LATEST_CVES_shopping_cart_payment="${TEST_LATEST_CVES_shopping_cart_payment}" \
+  /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"deployed image ghcr.io/wilddog64/shopping-cart-payment:sha-old has no HIGH/CRITICAL findings"* ]]
+  run ! grep -q 'actions/workflows' "${CURL_LOG}"
 }
 
 @test "rebuild path without GH token returns non-zero" {

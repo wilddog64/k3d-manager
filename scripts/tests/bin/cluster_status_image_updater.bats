@@ -34,6 +34,12 @@
   run grep -nF 'app-cve-scan' bin/cluster-status
   [ "$status" -eq 0 ]
 
+  run grep -nF 'shopping-cart-frontend' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'shopping-cart-payment' bin/cluster-status
+  [ "$status" -eq 0 ]
+
   run grep -nF 'PROMOTION' bin/cluster-status
   [ "$status" -eq 0 ]
 

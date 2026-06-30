@@ -199,7 +199,9 @@ else
     echo "Last Job: none"
     echo "Last Result:"
     echo "  shopping-cart-basket: no result in latest run"
+    echo "  shopping-cart-frontend: no result in latest run"
     echo "  shopping-cart-order: no result in latest run"
+    echo "  shopping-cart-payment: no result in latest run"
     echo "  shopping-cart-product-catalog: no result in latest run"
   else
     _app_cve_job_name="${_app_cve_job#job.batch/}"
@@ -220,7 +222,7 @@ else
     _app_cve_logs="$(kubectl logs -n platform-ops "${_app_cve_job}" \
       --context "${INFRA_CONTEXT}" --tail=200 2>/dev/null || true)"
     echo "Last Result:"
-    for _svc in shopping-cart-basket shopping-cart-order shopping-cart-product-catalog; do
+    for _svc in shopping-cart-basket shopping-cart-frontend shopping-cart-order shopping-cart-payment shopping-cart-product-catalog; do
       _app_cve_summary="no result in latest run"
       _promotion_line="$(printf '%s\n' "${_app_cve_logs}" | grep -F "PROMOTION ${_svc}:" | tail -1 || true)"
       if [[ -n "${_promotion_line}" ]]; then
