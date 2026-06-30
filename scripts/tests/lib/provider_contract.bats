@@ -282,13 +282,23 @@ teardown_file() {
   K3D_MANAGER_BRANCH="k3d-manager-v1.12.0"
   APP_CLUSTER_NAME="ubuntu-hostinger"
   _hostinger_load_argocd_plugin() { :; }
+  _argocd_hub_kubectl_cmd() {
+    printf '%s\n' "kubectl --context k3d-k3d-cluster"
+  }
   _info() { :; }
   _err() { printf '%s\n' "$*" >&2; return 1; }
-  _kubectl() {
-    printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/appsets.log"
-    printf '\n---\n' >> "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
-    cat >> "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
-    return 0
+  kubectl() {
+    case "$*" in
+      --context\ k3d-k3d-cluster\ apply\ -f\ -)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/appsets.log"
+        printf '\n---\n' >> "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
+        cat >> "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
   }
 
   run _hostinger_reapply_gitops_applicationsets
@@ -297,6 +307,7 @@ teardown_file() {
   run cat "${BATS_TEST_TMPDIR}/appsets.log"
   [ "$status" -eq 0 ]
   [[ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 3 ]]
+  [[ "$output" == *"--context k3d-k3d-cluster apply -f -"* ]]
 
   run cat "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
   [ "$status" -eq 0 ]
