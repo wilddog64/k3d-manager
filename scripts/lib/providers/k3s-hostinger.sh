@@ -708,22 +708,31 @@ function _hostinger_clear_stale_platform_tracking_ids() {
     argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
 }
 
-function _hostinger_reapply_data_applicationset() {
+function _hostinger_reapply_gitops_applicationsets() {
   _hostinger_load_argocd_plugin || return 1
 
-  local appset="${SCRIPT_DIR}/etc/argocd/applicationsets/data-git.yaml"
-  if [[ ! -f "${appset}" ]]; then
-    _err "[k3s-hostinger] data-git ApplicationSet template not found: ${appset}"
-    return 1
-  fi
+  local appset
+  local -a appsets=(
+    "data-git.yaml"
+    "services-git.yaml"
+    "platform-helm.yaml"
+  )
 
-  if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${appset}" | _kubectl apply -f - >/dev/null 2>&1; then
-    _info "[k3s-hostinger] reapplied data-git ApplicationSet for ${_HOSTINGER_KUBE_CONTEXT}"
-    return 0
-  fi
+  for appset in "${appsets[@]}"; do
+    local appset_path="${SCRIPT_DIR}/etc/argocd/applicationsets/${appset}"
+    if [[ ! -f "${appset_path}" ]]; then
+      _err "[k3s-hostinger] ApplicationSet template not found: ${appset_path}"
+      return 1
+    fi
 
-  _err "[k3s-hostinger] failed to reapply data-git ApplicationSet"
-  return 1
+    if ! envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME' < "${appset_path}" | _kubectl apply -f - >/dev/null 2>&1; then
+      _err "[k3s-hostinger] failed to reapply ApplicationSet ${appset}"
+      return 1
+    fi
+  done
+
+  _info "[k3s-hostinger] reapplied data-git, services-git, and platform-helm ApplicationSets for ${_HOSTINGER_KUBE_CONTEXT}"
+  return 0
 }
 
 function _hostinger_reconcile_vault_cluster_store() {
@@ -887,7 +896,9 @@ function _provider_k3s_hostinger_refresh_cluster() {
   if declare -f deploy_observability_acg >/dev/null 2>&1; then
     deploy_observability_acg "${_HOSTINGER_KUBE_CONTEXT}" || return 1
   fi
-  _hostinger_reapply_data_applicationset || return 1
+  APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-${_HOSTINGER_KUBE_CONTEXT}}"
+  export APP_CLUSTER_NAME
+  _hostinger_reapply_gitops_applicationsets || return 1
   _hostinger_clear_stale_platform_tracking_ids || return 1
   _hostinger_reconcile_vault_cluster_store || return 1
   _hostinger_refresh_access_layer || return 1

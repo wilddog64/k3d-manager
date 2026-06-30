@@ -238,7 +238,7 @@ teardown_file() {
   _hostinger_merge_kubeconfig() { printf '%s\n' "merge" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _hostinger_register_cluster() { printf '%s\n' "register" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   deploy_observability_acg() { printf 'observability %s\n' "$1" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
-  _hostinger_reapply_data_applicationset() { printf '%s\n' "data-appset" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_reapply_gitops_applicationsets() { printf '%s\n' "gitops-appsets" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _hostinger_clear_stale_platform_tracking_ids() { printf '%s\n' "tracking-fix" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _hostinger_reconcile_vault_cluster_store() { printf '%s\n' "vault" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _hostinger_refresh_access_layer() { printf '%s\n' "access" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
@@ -265,14 +265,14 @@ teardown_file() {
   [[ "$output" == *"merge"* ]]
   [[ "$output" == *"register"* ]]
   [[ "$output" == *"observability ubuntu-hostinger"* ]]
-  [[ "$output" == *"data-appset"* ]]
+  [[ "$output" == *"gitops-appsets"* ]]
   [[ "$output" == *"tracking-fix"* ]]
   [[ "$output" == *"vault"* ]]
   [[ "$output" == *"access"* ]]
   [[ "$output" == *"provider k3s-hostinger"* ]]
 }
 
-@test "_hostinger_reapply_data_applicationset reapplies data-git with the hostinger app-cluster name" {
+@test "_hostinger_reapply_gitops_applicationsets reapplies data, services, and platform appsets from the current branch" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
 
@@ -280,27 +280,33 @@ teardown_file() {
   _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
   ARGOCD_NAMESPACE="cicd"
   K3D_MANAGER_BRANCH="k3d-manager-v1.12.0"
+  APP_CLUSTER_NAME="ubuntu-hostinger"
   _hostinger_load_argocd_plugin() { :; }
   _info() { :; }
   _err() { printf '%s\n' "$*" >&2; return 1; }
   _kubectl() {
-    printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/data-appset.log"
-    cat > "${BATS_TEST_TMPDIR}/data-appset-rendered.yaml"
+    printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/appsets.log"
+    printf '\n---\n' >> "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
+    cat >> "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
     return 0
   }
 
-  run _hostinger_reapply_data_applicationset
+  run _hostinger_reapply_gitops_applicationsets
   [ "$status" -eq 0 ]
 
-  run cat "${BATS_TEST_TMPDIR}/data-appset.log"
+  run cat "${BATS_TEST_TMPDIR}/appsets.log"
   [ "$status" -eq 0 ]
-  [[ "$output" == "apply -f -" ]]
+  [[ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 3 ]]
 
-  run cat "${BATS_TEST_TMPDIR}/data-appset-rendered.yaml"
+  run cat "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
   [ "$status" -eq 0 ]
   [[ "$output" == *"name: data-layer"* ]]
   [[ "$output" == *"k3d-manager/role: app-cluster"* ]]
   [[ "$output" == *".spec.persistentVolumeClaimRetentionPolicy"* ]]
+  [[ "$output" == *"name: services-git"* ]]
+  [[ "$output" == *".spec.source.kustomize.images"* ]]
+  [[ "$output" == *"name: platform-helm"* ]]
+  [[ "$output" == *"name: '{{.name}}-platform'"* ]]
 }
 
 @test "_hostinger_clear_stale_platform_tracking_ids strips product-catalog ownership from platform app and refreshes both apps" {
