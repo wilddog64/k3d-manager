@@ -179,6 +179,69 @@ else
   fi
 fi
 
+echo ""
+echo "=== App CVE Scan ==="
+_app_cve_cron="$(kubectl get cronjob app-cve-scan -n platform-ops \
+  --context "${INFRA_CONTEXT}" \
+  -o jsonpath='{.spec.schedule}|{.spec.suspend}|{.status.lastScheduleTime}' 2>/dev/null || true)"
+if [[ -z "${_app_cve_cron}" ]]; then
+  echo "Not installed (no app-cve-scan CronJob in platform-ops)"
+else
+  IFS='|' read -r _app_cve_schedule _app_cve_suspend _app_cve_last <<<"${_app_cve_cron}"
+  echo "CronJob: schedule=${_app_cve_schedule:-unknown} suspend=${_app_cve_suspend:-unknown} lastSchedule=${_app_cve_last:-never}"
+
+  _app_cve_job="$(kubectl get jobs -n platform-ops \
+    --context "${INFRA_CONTEXT}" \
+    -l batch.kubernetes.io/cronjob-name=app-cve-scan \
+    --sort-by=.metadata.creationTimestamp \
+    -o name 2>/dev/null | tail -1 || true)"
+  if [[ -z "${_app_cve_job}" ]]; then
+    echo "Last Job: none"
+    echo "Last Result:"
+    echo "  shopping-cart-basket: no result in latest run"
+    echo "  shopping-cart-order: no result in latest run"
+    echo "  shopping-cart-product-catalog: no result in latest run"
+  else
+    _app_cve_job_name="${_app_cve_job#job.batch/}"
+    _app_cve_job_state="$(kubectl get job "${_app_cve_job_name}" -n platform-ops \
+      --context "${INFRA_CONTEXT}" \
+      -o jsonpath='{.status.succeeded}|{.status.failed}|{.status.active}' 2>/dev/null || true)"
+    IFS='|' read -r _app_cve_succeeded _app_cve_failed _app_cve_active <<<"${_app_cve_job_state}"
+    _app_cve_status="unknown"
+    if [[ "${_app_cve_succeeded:-0}" -ge 1 ]]; then
+      _app_cve_status="success"
+    elif [[ "${_app_cve_failed:-0}" -ge 1 ]]; then
+      _app_cve_status="failed"
+    elif [[ "${_app_cve_active:-0}" -ge 1 ]]; then
+      _app_cve_status="running"
+    fi
+    echo "Last Job: ${_app_cve_job_name} ${_app_cve_status}"
+
+    _app_cve_logs="$(kubectl logs -n platform-ops "${_app_cve_job}" \
+      --context "${INFRA_CONTEXT}" --tail=200 2>/dev/null || true)"
+    echo "Last Result:"
+    for _svc in shopping-cart-basket shopping-cart-order shopping-cart-product-catalog; do
+      _app_cve_summary="no result in latest run"
+      _promotion_line="$(printf '%s\n' "${_app_cve_logs}" | grep -F "PROMOTION ${_svc}:" | tail -1 || true)"
+      if [[ -n "${_promotion_line}" ]]; then
+        _app_cve_summary="$(printf '%s\n' "${_promotion_line}" | sed 's/.*PROMOTION [^:]*: /promoted /')"
+      else
+        _clean_line="$(printf '%s\n' "${_app_cve_logs}" | grep -F "STAGE ${_svc}: deployed image" | grep -F "has no HIGH/CRITICAL findings" | tail -1 || true)"
+        _rebuild_line="$(printf '%s\n' "${_app_cve_logs}" | grep -F "STAGE ${_svc}: rebuild dispatched" | tail -1 || true)"
+        _candidate_line="$(printf '%s\n' "${_app_cve_logs}" | grep -F "STAGE ${_svc}: failed to resolve immutable sha-* candidate" | tail -1 || true)"
+        if [[ -n "${_clean_line}" ]]; then
+          _app_cve_summary="clean"
+        elif [[ -n "${_rebuild_line}" ]]; then
+          _app_cve_summary="rebuild dispatched"
+        elif [[ -n "${_candidate_line}" ]]; then
+          _app_cve_summary="candidate missing"
+        fi
+      fi
+      echo "  ${_svc}: ${_app_cve_summary}"
+    done
+  fi
+fi
+
 if [[ "${CLUSTER_PROVIDER}" == "k3s-aws" ]]; then
   echo ""
   echo "=== AWS Credentials ==="

@@ -76,3 +76,23 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- '"templating": { "list": [] }' "${DASH}"
   [ "${status}" -eq 0 ]
 }
+
+@test "metrics: dashboard includes app-cve-scan job and decision visibility" {
+  run grep -F -- 'App CVE Scan Successful Jobs' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'App CVE Scan Failed Jobs' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'App CVE Scan Decisions' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'kube_job_status_succeeded{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'kube_job_status_failed{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- '{namespace=\"platform-ops\",pod=~\"app-cve-scan.*\"} |= \"[app-cve-scan]\"' "${DASH}"
+  [ "${status}" -eq 0 ]
+}

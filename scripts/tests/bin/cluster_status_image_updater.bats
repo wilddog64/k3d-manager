@@ -24,4 +24,22 @@
 
   run grep -nF 'historical update churn remains in recent logs' bin/cluster-status
   [ "$status" -eq 0 ]
+
+  run grep -nF '=== App CVE Scan ===' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'platform-ops' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'app-cve-scan' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'PROMOTION' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'rebuild dispatched' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'immutable sha-* candidate' bin/cluster-status
+  [ "$status" -eq 0 ]
 }
