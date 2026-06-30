@@ -28,7 +28,7 @@ SCAN="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/app-cve-scan.sh"
   [ "${status}" -eq 1 ]
 }
 
-@test "image-updater: app CVE scan logs controlled promotion requirement after rebuild dispatch" {
-  run grep -nF 'controlled promotion must apply the replacement image' "${SCAN}"
+@test "image-updater: app CVE scan logs rebuild wait for a clean candidate image" {
+  run grep -nF 'promotion waits for a clean candidate image' "${SCAN}"
   [ "${status}" -eq 0 ]
 }
