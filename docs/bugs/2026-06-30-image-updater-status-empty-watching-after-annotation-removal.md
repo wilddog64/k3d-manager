@@ -69,10 +69,31 @@ Mode:
 
 ## Definition of Done
 
-- [ ] `bin/cluster-status` no longer implies missing configuration when no
+- [x] `bin/cluster-status` no longer implies missing configuration when no
       `image-list` annotations are present by design
-- [ ] the status output clearly states that shopping-cart promotion is now
+- [x] the status output clearly states that shopping-cart promotion is now
       CVE-gated rather than annotation-driven
-- [ ] stale flapping warnings are not shown for an idle controller with
+- [x] stale flapping warnings are not shown for an idle controller with
       `applications=0`
-- [ ] BATS coverage proves the new status text and idle-controller behavior
+- [x] BATS coverage proves the new status text and idle-controller behavior
+
+## Result
+
+Implemented in:
+
+- `bin/cluster-status`
+- `scripts/tests/bin/cluster_status_image_updater.bats`
+
+The Image Updater status block now renders a mode-aware summary:
+
+- `Mode:` replaces the old unconditional `Watching:` header
+- idle controllers with recent historical churn now print:
+  `Note: historical update churn remains in recent logs, but the controller is currently idle`
+- when no applications carry `image-list` annotations by design, status now says:
+  `CVE-gated promotion controller active; no applications are statically enrolled via image-list annotations`
+
+Validation:
+
+- `bats scripts/tests/bin/cluster_status_image_updater.bats`
+- `shellcheck -S warning bin/cluster-status scripts/tests/bin/cluster_status_image_updater.bats`
+- `./scripts/k3d-manager _agent_audit`

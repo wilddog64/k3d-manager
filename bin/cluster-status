@@ -153,19 +153,29 @@ else
   fi
 
   _iu_updates="$(printf '%s\n' "${_iu_logs}" | grep -c 'images_updated=[1-9]' || true)"
-  if [[ "${_iu_updates}" -ge 3 ]]; then
+  _iu_idle_cycle=0
+  if [[ "${_iu_cycle}" == *"applications=0"* ]] && \
+     [[ "${_iu_cycle}" == *"images_considered=0"* ]] && \
+     [[ "${_iu_cycle}" == *"images_updated=0"* ]]; then
+    _iu_idle_cycle=1
+  fi
+  if [[ "${_iu_updates}" -ge 3 ]] && [[ "${_iu_idle_cycle}" -eq 0 ]]; then
     echo "WARN Flapping: ${_iu_updates} recent cycles wrote an update — an app may not be converging"
+  elif [[ "${_iu_updates}" -ge 3 ]] && [[ "${_iu_idle_cycle}" -eq 1 ]]; then
+    echo "Note: historical update churn remains in recent logs, but the controller is currently idle"
   fi
 
-  echo "Watching:"
+  echo "Mode:"
   _iu_watch="$(kubectl get applications.argoproj.io -n "${ARGOCD_NAMESPACE}" \
     --context "${INFRA_CONTEXT}" --no-headers \
     -o custom-columns='N:.metadata.name,IL:.metadata.annotations.argocd-image-updater\.argoproj\.io/image-list' 2>/dev/null \
     | awk '$2 != "<none>" && $2 != "" { printf "  %s -> %s\n", $1, $2 }' || true)"
   if [[ -n "${_iu_watch}" ]]; then
+    echo "  Annotation-driven enrollment active for the applications below"
+    echo "Watching:"
     printf '%s\n' "${_iu_watch}"
   else
-    echo "  (no applications carry an image-list annotation)"
+    echo "  CVE-gated promotion controller active; no applications are statically enrolled via image-list annotations"
   fi
 fi
 
