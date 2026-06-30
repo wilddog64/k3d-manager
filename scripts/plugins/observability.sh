@@ -232,8 +232,8 @@ function _observability_apply_argocd_dashboard() {
 function _observability_remove_argocd_dashboard() {
   local _app_context
   _app_context="$(_observability_acg_context "${1:-}")"
-  if _kubectl --context "${_app_context}" -n monitoring get configmap grafana-dashboard-argocd >/dev/null 2>&1; then
-    _kubectl --context "${_app_context}" -n monitoring delete configmap grafana-dashboard-argocd >/dev/null \
+  if _kubectl --no-exit --context "${_app_context}" -n monitoring get configmap grafana-dashboard-argocd >/dev/null 2>&1; then
+    _kubectl --no-exit --context "${_app_context}" -n monitoring delete configmap grafana-dashboard-argocd >/dev/null \
       && _info "[observability] Removed stale ArgoCD/Image Updater dashboard from ${_app_context}"
   fi
 }

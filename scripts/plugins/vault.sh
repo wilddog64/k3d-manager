@@ -1660,7 +1660,11 @@ function configure_vault_app_auth() {
   _kubectl -n "$ns" cp "$app_ca_path" "${release}-0:/tmp/app-cluster-ca.crt"
 
   # b. Enable kubernetes auth mount (idempotent)
-  _vault_exec "$ns" "vault auth enable -path=${mount} kubernetes" "$release" || true
+  local auth_json=""
+  auth_json=$(_vault_exec --no-exit "$ns" "vault auth list -format=json" "$release" 2>/dev/null || true)
+  if [[ -z "$auth_json" ]] || ! printf '%s' "$auth_json" | grep -qF "\"${mount}/\""; then
+     _vault_exec --no-exit "$ns" "vault auth enable -path=${mount} kubernetes" "$release" || true
+  fi
 
   # c. Configure mount with app cluster API server + CA cert
   #    Default local JWT validation — Vault verifies JWTs against the provided CA cert
