@@ -33,7 +33,7 @@ setup() {
     }
     _kubectl() {
       case "$*" in
-        *"get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}'"*)
+        *"get secret vault-root -n secrets --context k3d-k3d-cluster"*)
           printf "%s" "dG9rZW4="
           ;;
         *)
@@ -80,7 +80,7 @@ setup() {
   }
   _kubectl() {
     case "$*" in
-      *"get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}'"*)
+      *"get secret vault-root -n secrets --context k3d-k3d-cluster"*)
         printf "%s" "dG9rZW4="
         ;;
       *)
@@ -122,6 +122,63 @@ setup() {
   [[ "$output" == *"--context ubuntu-hostinger -n monitoring delete configmap grafana-dashboard-argocd"* ]]
   [[ "$output" == *"create namespace monitoring --context ubuntu-hostinger --dry-run=client -o yaml"* ]]
   [[ "$output" == *"apply -f -"* ]]
+}
+
+@test "deploy_observability_acg falls back to generated Prometheus config when Vault bootstrap write fails" {
+  local kubectl_log
+  kubectl_log="${BATS_TEST_TMPDIR}/kubectl-acg-prom-fallback.log"
+  export KUBE_STUB_LOG="${kubectl_log}"
+  _acg_resolve_provider() {
+    printf "%s\n" "k3s-hostinger"
+  }
+  _acg_provider_context() {
+    case "$1" in
+      k3s-hostinger) printf "%s\n" "ubuntu-hostinger" ;;
+      *)             printf "%s\n" "ubuntu-k3s" ;;
+    esac
+  }
+  envsubst() {
+    cat
+  }
+  _kubectl() {
+    case "$*" in
+      *"get secret vault-root -n secrets --context k3d-k3d-cluster"*)
+        printf "%s" "dG9rZW4="
+        ;;
+      *)
+        printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+        ;;
+    esac
+  }
+  kubectl() {
+    printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+  }
+  helm() {
+    return 0
+  }
+  curl() {
+    case "$*" in
+      *"/v1/secret/data/k3d-manager/alertmanager"*)
+        return 22
+        ;;
+      *"--request POST"*"/v1/secret/data/k3d-manager/prometheus-basic-auth"*)
+        return 22
+        ;;
+      *"/v1/secret/data/k3d-manager/prometheus-basic-auth"*)
+        return 22
+        ;;
+      *)
+        return 0
+        ;;
+    esac
+  }
+  run deploy_observability_acg
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Failed to create Prometheus basic auth secret in Vault — using generated web config for this run"* ]]
+  [[ "$output" == *"Prometheus web config secret applied (monitoring/prometheus-web-config on ubuntu-hostinger)"* ]]
+  run cat "${kubectl_log}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"create secret generic prometheus-web-config --context ubuntu-hostinger -n monitoring"* ]]
 }
 
 @test "trivy_scan_report calls kubectl get vulnerabilityreports -A for Hub context" {

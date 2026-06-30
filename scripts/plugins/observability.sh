@@ -238,6 +238,18 @@ function _observability_remove_argocd_dashboard() {
   fi
 }
 
+function _observability_prometheus_vault_payload() {
+  local _prom_password="${1}"
+  local _prom_hash="${2}"
+  PROM_ADMIN_PASSWORD="${_prom_password}" \
+  PROM_PASSWORD_BCRYPT="${_prom_hash}" \
+    python3 -c 'import json, os; print(json.dumps({"data": {
+      "user": "admin",
+      "password": os.environ["PROM_ADMIN_PASSWORD"],
+      "password_bcrypt": os.environ["PROM_PASSWORD_BCRYPT"],
+    }}))'
+}
+
 function _prometheus_acg_web_config_secret() {
   local _app_context
   _app_context="$(_observability_acg_context "${1:-}")"
@@ -260,35 +272,34 @@ function _prometheus_acg_web_config_secret() {
   fi
   if [[ -z "${_prom_creds}" ]]; then
     local _default_bcrypt_hash="\$2a\$12\$NqL.y.Z1.h.1.E.1.p.9.Q.2.a.7.I.3.Z.7.d.3.Q.2.v.0.K.2.x.6" # bcrypt hash for 'password'
-
     local _prom_password="${PROM_ADMIN_PASSWORD:-password}"
+    local _prom_payload
     _info "[observability] Ensuring Prometheus basic auth secret exists in Vault."
-    if ! curl -sf \
+    _prom_payload=$(_observability_prometheus_vault_payload "${_prom_password}" "${_default_bcrypt_hash}") || _prom_payload=""
+    if [[ -n "${_prom_payload}" ]] && curl -sf \
         --header "@${_vault_hdr}" \
         --header 'Content-Type: application/json' \
         --request POST \
-        --data "{\"data\":{\"user\":\"admin\",\"password\":\"${_prom_password}\",\"password_bcrypt\":\"${_default_bcrypt_hash}\"}}" \
+        --data "${_prom_payload}" \
         "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" >/dev/null; then
-      rm -f "${_vault_hdr}"
-      _err "[observability] Failed to create Prometheus basic auth secret in Vault."
-      return 1
+      for _attempt in 1 2 3; do
+        if _prom_creds=$(curl -sf \
+            --header "@${_vault_hdr}" \
+            "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" 2>/dev/null \
+            | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
+              print(d['user']+'|'+d['password_bcrypt'])" 2>/dev/null); then
+          break
+        fi
+        sleep 1
+      done
+    else
+      _warn "[observability] Failed to create Prometheus basic auth secret in Vault — using generated web config for this run"
+      _prom_creds="admin|${_default_bcrypt_hash}"
     fi
 
-    for _attempt in 1 2 3; do
-      if _prom_creds=$(curl -sf \
-          --header "@${_vault_hdr}" \
-          "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" 2>/dev/null \
-          | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
-            print(d['user']+'|'+d['password_bcrypt'])" 2>/dev/null); then
-        break
-      fi
-      sleep 1
-    done
-
     if [[ -z "${_prom_creds}" ]]; then
-      rm -f "${_vault_hdr}"
-      _err "[observability] Failed to retrieve Prometheus basic auth secret after creation attempt."
-      return 1
+      _warn "[observability] Failed to retrieve Prometheus basic auth secret after creation attempt — using generated web config for this run"
+      _prom_creds="admin|${_default_bcrypt_hash}"
     fi
   fi
   rm -f "${_vault_hdr}"

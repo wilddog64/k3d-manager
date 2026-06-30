@@ -47,13 +47,53 @@ could not be validated through the normal refresh flow in this run.
 
 ## Root Cause
 
-Unknown from this run. The failure is inside the observability bootstrap path that ensures the
-Prometheus basic-auth secret exists in Vault for the app cluster.
+`deploy_observability_acg()` treated Prometheus basic-auth Vault bootstrap as a hard precondition
+for the entire Hostinger refresh. When `secret/k3d-manager/prometheus-basic-auth` was absent,
+`_prometheus_acg_web_config_secret()` attempted to create it with a hand-built JSON payload and
+returned `_err` / exit 1 if the write failed for any reason. That made refresh abort even though
+the immediate requirement for the app cluster was only the generated Kubernetes secret
+`monitoring/prometheus-web-config`.
+
+Two fixes were required:
+
+1. Build the Vault payload with JSON serialization instead of shell-splicing the password into the
+   request body.
+2. Downgrade a failed bootstrap write/readback to a warning and fall back to the generated web
+   config for the current run, so refresh can continue.
+
+## Resolution
+
+Implemented in `scripts/plugins/observability.sh` with regression coverage in
+`scripts/tests/lib/observability.bats`:
+
+- Added `_observability_prometheus_vault_payload()` to serialize the bootstrap payload safely.
+- Changed `_prometheus_acg_web_config_secret()` so a failed Vault create/readback logs `WARN` and
+  continues with the generated `prometheus-web-config` secret instead of aborting refresh.
+
+## Live validation after fix
+
+Re-ran:
+
+```text
+make refresh CLUSTER_PROVIDER=k3s-hostinger
+```
+
+Observed the previously fatal segment complete as:
+
+```text
+INFO: [observability] Ensuring Prometheus basic auth secret exists in Vault.
+WARN: [observability] Failed to create Prometheus basic auth secret in Vault — using generated web config for this run
+secret/prometheus-web-config unchanged
+INFO: [observability] Prometheus web config secret applied (monitoring/prometheus-web-config on ubuntu-hostinger)
+...
+INFO: [k3s-hostinger] Refresh complete — ubuntu-hostinger reachable
+__WEBHOOK_SUCCESS__
+```
 
 ## Recommended follow-up
 
-1. Inspect `deploy_observability_acg` / the Prometheus basic-auth Vault write path in
-   `scripts/plugins/observability.sh`.
-2. Re-run `make refresh CLUSTER_PROVIDER=k3s-hostinger` after that Vault write failure is fixed.
-3. Keep this issue separate from the stale frontend DNS bug; it is a refresh pipeline blocker,
+1. Inspect why the local Vault bootstrap write still fails in this environment even though refresh
+   now continues safely; the remaining warning is non-blocking but still indicates missing
+   persistence in Vault.
+2. Keep this issue separate from the stale frontend DNS bug; it was a refresh pipeline blocker,
    not the frontend `/api/products` root cause.
