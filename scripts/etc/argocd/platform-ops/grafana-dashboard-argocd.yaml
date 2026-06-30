@@ -75,7 +75,7 @@ data:
           "type": "timeseries",
           "targets": [
             {
-              "expr": "sum by (name) (increase(argocd_app_sync_total{name=~\"shopping-cart-(basket|order|product-catalog)\"}[5m]))",
+              "expr": "sum by (name) (increase(argocd_app_sync_total{name=~\"shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)\"}[5m]))",
               "refId": "A"
             }
           ]
@@ -89,7 +89,7 @@ data:
           "type": "table",
           "targets": [
             {
-              "expr": "argocd_app_info{name=~\"shopping-cart-(basket|order|product-catalog)\"}",
+              "expr": "argocd_app_info{name=~\"shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)\"}",
               "format": "table",
               "instant": true,
               "refId": "A"
@@ -105,7 +105,7 @@ data:
           "type": "timeseries",
           "targets": [
             {
-              "expr": "sum by (name) (increase(argocd_app_sync_total{name=~\"shopping-cart-(basket|order|product-catalog)\"}[30m]))",
+              "expr": "sum by (name) (increase(argocd_app_sync_total{name=~\"shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)\"}[30m]))",
               "refId": "A"
             }
           ]

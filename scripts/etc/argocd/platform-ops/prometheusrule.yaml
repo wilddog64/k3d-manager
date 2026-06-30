@@ -10,10 +10,26 @@ spec:
     - name: argocd.alerts
       rules:
         - alert: ArgoCDAppDegraded
-          expr: argocd_app_info{health_status="Degraded"} == 1
+          expr: |
+            argocd_app_info{
+              name=~"shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)",
+              health_status="Degraded"
+            } == 1
           for: 5m
           labels:
             severity: warning
           annotations:
             summary: "ArgoCD app {{ $labels.name }} is Degraded"
             description: "App {{ $labels.name }} in namespace {{ $labels.dest_namespace }} has been Degraded for 5 minutes"
+        - alert: ArgoCDAppOutOfSync
+          expr: |
+            argocd_app_info{
+              name=~"shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)",
+              sync_status="OutOfSync"
+            } == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "ArgoCD app {{ $labels.name }} is OutOfSync"
+            description: "App {{ $labels.name }} in namespace {{ $labels.dest_namespace }} has been OutOfSync for 15 minutes"

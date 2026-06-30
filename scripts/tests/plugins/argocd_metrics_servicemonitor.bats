@@ -43,11 +43,37 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   [ "${output}" -ge 2 ]
 }
 
-@test "metrics: dashboard focuses sync activity on watched image-updater apps" {
-  run grep -F -- 'argocd_app_sync_total{name=~\"shopping-cart-(basket|order|product-catalog)\"}' "${DASH}"
+@test "metrics: dashboard focuses sync activity on watched apps and infra services" {
+  run grep -F -- 'argocd_app_sync_total{name=~\"shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)\"}' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'argocd_app_info{name=~\"shopping-cart-(basket|order|product-catalog)\"}' "${DASH}"
+  run grep -F -- 'argocd_app_info{name=~\"shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)\"}' "${DASH}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "alerts: argocd rules cover degraded and out-of-sync for watched apps" {
+  RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml"
+
+  run grep -F -- 'ArgoCDAppDegraded' "${RULE}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'ArgoCDAppOutOfSync' "${RULE}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'name=~"shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)"' "${RULE}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "alerts: alertmanager routes both argocd alert names to the webhook analyzer" {
+  ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.yaml"
+
+  run grep -F -- 'value: ArgoCDAppDegraded|ArgoCDAppOutOfSync' "${ROUTE}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'matchType: "=~"' "${ROUTE}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'https://webhook.3ai-talk.org/api/v1/analyze' "${ROUTE}"
   [ "${status}" -eq 0 ]
 }
 

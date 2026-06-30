@@ -10,8 +10,8 @@ spec:
     receiver: k3dm-analyze
     matchers:
       - name: alertname
-        value: ArgoCDAppDegraded
-        matchType: "="
+        value: ArgoCDAppDegraded|ArgoCDAppOutOfSync
+        matchType: "=~"
   receivers:
     - name: k3dm-analyze
       webhookConfigs:
