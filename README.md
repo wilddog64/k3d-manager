@@ -246,6 +246,7 @@ docs/
 
 **GitOps & CI/CD**
 - **[ArgoCD](docs/howto/argocd.md)** — Deploy, register app cluster, configure deploy keys
+- **[ArgoCD Alerts](docs/howto/argocd-alerts.md)** — ArgoCD Degraded/OutOfSync alert wiring, visibility, and test steps
 - **[cert-manager](docs/howto/cert-manager.md)** — Deploy, Vault + ACME issuers, certificate lifecycle
 
 **Cloud Sandbox**
