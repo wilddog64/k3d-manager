@@ -677,6 +677,10 @@ function _hostinger_clear_stale_platform_tracking_ids() {
   local namespace="shopping-cart-apps"
   local resource tracking_id cleared_any=0
   local -a resources=(
+    "deployment/basket-service"
+    "service/basket-service"
+    "serviceaccount/basket-service"
+    "configmap/basket-service-config"
     "deployment/product-catalog"
     "service/product-catalog"
     "service/product-catalog-nodeport"
@@ -704,8 +708,20 @@ function _hostinger_clear_stale_platform_tracking_ids() {
   read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
   "${hub_kubectl[@]}" annotate application shopping-cart-product-catalog -n "${ARGOCD_NAMESPACE:-cicd}" \
     argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+  "${hub_kubectl[@]}" annotate application shopping-cart-basket -n "${ARGOCD_NAMESPACE:-cicd}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
   "${hub_kubectl[@]}" annotate application "${_HOSTINGER_KUBE_CONTEXT}-platform" -n "${ARGOCD_NAMESPACE:-cicd}" \
     argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+
+  if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" get deployment/frontend >/dev/null 2>&1; then
+    if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" rollout restart deployment/frontend >/dev/null 2>&1; then
+      if ! kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" rollout status deployment/frontend --timeout=120s >/dev/null 2>&1; then
+        _warn "[k3s-hostinger] frontend rollout restart did not become ready within 120s after stale app ownership cleanup"
+      fi
+    else
+      _warn "[k3s-hostinger] failed to restart frontend after stale app ownership cleanup"
+    fi
+  fi
 }
 
 function _hostinger_reapply_gitops_applicationsets() {

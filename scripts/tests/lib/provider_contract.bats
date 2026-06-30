@@ -320,7 +320,7 @@ teardown_file() {
   [[ "$output" == *"name: '{{.name}}-platform'"* ]]
 }
 
-@test "_hostinger_clear_stale_platform_tracking_ids strips product-catalog ownership from platform app and refreshes both apps" {
+@test "_hostinger_clear_stale_platform_tracking_ids strips stale basket/product-catalog ownership, refreshes apps, and restarts frontend" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
 
@@ -331,9 +331,22 @@ teardown_file() {
     printf '%s\n' "kubectl --context k3d-k3d-cluster"
   }
   _info() { :; }
+  _warn() { :; }
 
   kubectl() {
     case "$*" in
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ deployment/basket-service\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
+        printf '%s' 'ubuntu-hostinger-platform:apps/Deployment:shopping-cart-apps/basket-service'
+        ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ service/basket-service\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
+        printf '%s' 'ubuntu-hostinger-platform:/Service:shopping-cart-apps/basket-service'
+        ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ serviceaccount/basket-service\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
+        printf '%s' 'ubuntu-hostinger-platform:/ServiceAccount:shopping-cart-apps/basket-service'
+        ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ configmap/basket-service-config\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
+        printf '%s' 'ubuntu-hostinger-platform:/ConfigMap:shopping-cart-apps/basket-service-config'
+        ;;
       --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ deployment/product-catalog\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
         printf '%s' 'ubuntu-hostinger-platform:apps/Deployment:shopping-cart-apps/product-catalog'
         ;;
@@ -358,6 +371,15 @@ teardown_file() {
       --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ annotate*)
         printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/tracking.log"
         ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ deployment/frontend)
+        return 0
+        ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ rollout\ restart\ deployment/frontend)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/tracking.log"
+        ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ rollout\ status\ deployment/frontend\ --timeout=120s)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/tracking.log"
+        ;;
       --context\ k3d-k3d-cluster\ annotate\ application*)
         printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/tracking.log"
         ;;
@@ -372,11 +394,16 @@ teardown_file() {
 
   run cat "${BATS_TEST_TMPDIR}/tracking.log"
   [ "$status" -eq 0 ]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate deployment/basket-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate service/basket-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
   [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate deployment/product-catalog argocd.argoproj.io/tracking-id- --overwrite"* ]]
   [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate service/product-catalog argocd.argoproj.io/tracking-id- --overwrite"* ]]
   [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate externalsecret.external-secrets.io/product-catalog-secrets argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-basket -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
   [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-product-catalog -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
   [[ "$output" == *"--context k3d-k3d-cluster annotate application ubuntu-hostinger-platform -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps rollout restart deployment/frontend"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps rollout status deployment/frontend --timeout=120s"* ]]
 }
 
 @test "register_app_cluster falls back to insecure tlsClientConfig when CA data is unset" {
