@@ -205,12 +205,12 @@ function _vault_exec() {
 
   local key="${ns}/${release}"
   local session_token="${_VAULT_SESSION_TOKENS[$key]:-}"
-  local shell_cmd="$cmd"
   if [[ -n "$session_token" ]]; then
-     printf -v shell_cmd 'VAULT_TOKEN=%q %s' "$session_token" "$cmd"
+     __vault_exec_kubectl "$use_container" "$ns" "$release" "${exec_args[@]}" -- env "VAULT_TOKEN=$session_token" sh -lc "$cmd"
+     return $?
   fi
 
-  __vault_exec_kubectl "$use_container" "$ns" "$release" "${exec_args[@]}" -- sh -lc "$shell_cmd"
+  __vault_exec_kubectl "$use_container" "$ns" "$release" "${exec_args[@]}" -- sh -lc "$cmd"
 }
 function _vault_ns_ensure() {
    ns="${1:-$VAULT_NS_DEFAULT}"
@@ -1662,7 +1662,7 @@ function configure_vault_app_auth() {
   # b. Enable kubernetes auth mount (idempotent)
   local auth_json=""
   auth_json=$(_vault_exec --no-exit "$ns" "vault auth list -format=json" "$release" 2>/dev/null || true)
-  if [[ -z "$auth_json" ]] || ! printf '%s' "$auth_json" | grep -qF "\"${mount}/\""; then
+  if ! printf '%s' "$auth_json" | jq -e --arg mount "${mount}/" 'has($mount)' >/dev/null 2>&1; then
      _vault_exec --no-exit "$ns" "vault auth enable -path=${mount} kubernetes" "$release" || true
   fi
 

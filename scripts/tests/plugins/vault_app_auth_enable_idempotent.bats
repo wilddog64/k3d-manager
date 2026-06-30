@@ -70,3 +70,44 @@ REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   [ "${status}" -eq 0 ]
   [ "${output}" -eq 0 ]
 }
+
+@test "_vault_exec: passes VAULT_TOKEN as env arg instead of embedding it in shell command" {
+  _err() {
+    printf '%s\n' "$*" >&2
+    return 1
+  }
+
+  _warn() {
+    :
+  }
+
+  _info() {
+    :
+  }
+
+  SCRIPT_DIR="${REPO_ROOT}/scripts"
+  PLUGINS_DIR="${BATS_TEST_TMPDIR}/plugins"
+  mkdir -p "${PLUGINS_DIR}"
+  printf '%s\n' '#!/usr/bin/env bash' > "${PLUGINS_DIR}/eso.sh"
+
+  source "${REPO_ROOT}/scripts/plugins/vault.sh"
+
+  _vault_container_name() {
+    printf '%s\n' "vault"
+  }
+
+  __vault_exec_kubectl() {
+    printf '%s\n' "$*" > "${BATS_TEST_TMPDIR}/exec.log"
+    return 0
+  }
+
+  _VAULT_SESSION_TOKENS["secrets/vault"]="hvs.test-token"
+
+  run _vault_exec "secrets" "vault status" "vault"
+  [ "${status}" -eq 0 ]
+
+  run cat "${BATS_TEST_TMPDIR}/exec.log"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"-- env VAULT_TOKEN=hvs.test-token sh -lc vault status"* ]]
+  [[ "${output}" != *"sh -lc VAULT_TOKEN="* ]]
+}
