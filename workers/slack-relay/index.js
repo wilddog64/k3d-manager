@@ -49,6 +49,16 @@ async function relay(endpoint, payload) {
   }
 }
 
+async function postResponseUrl(url, text, ephemeral = true) {
+  if (!url) return
+  const body = { text, response_type: ephemeral ? 'ephemeral' : 'in_channel' }
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).catch(() => {})
+}
+
 function jsonReply(text, threadTs, ephemeral = false) {
   const body = { text, response_type: ephemeral ? 'ephemeral' : 'in_channel' }
   if (threadTs && !ephemeral) body.thread_ts = threadTs
@@ -57,10 +67,10 @@ function jsonReply(text, threadTs, ephemeral = false) {
 }
 
 addEventListener('fetch', event => {
-  event.respondWith(handle(event.request))
+  event.respondWith(handle(event.request, event))
 })
 
-async function handle(req) {
+async function handle(req, event) {
   if (req.method !== 'POST') return new Response('Not Found', { status: 404 })
 
   if (new URL(req.url).pathname === '/slack/events') {
@@ -95,9 +105,12 @@ async function handle(req) {
 
   if (command === '/cluster-up') {
     const provider = resolveProvider(text, 'hostinger')
-    const { ok, conflict } = await relay('/api/v1/cluster', { action: 'up', provider, response_url: responseUrl })
-    if (conflict) return jsonReply(`⚠️ ${conflict} — use /cluster-status to check progress`, threadTs)
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    const payload = { action: 'up', provider, response_url: responseUrl }
+    event.waitUntil((async () => {
+      const { ok, conflict } = await relay('/api/v1/cluster', payload)
+      if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict} — use /cluster-status to check progress`)
+      else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+    })())
     const _where = provider === 'hostinger'
       ? 'the permanent *Hostinger* app cluster'
       : `the *lab sandbox* (${provider}) — ephemeral learning sandbox`
@@ -106,9 +119,12 @@ async function handle(req) {
 
   if (command === '/cluster-down') {
     const provider = resolveProvider(text, 'aws')
-    const { ok, conflict } = await relay('/api/v1/cluster', { action: 'down', provider, response_url: responseUrl })
-    if (conflict) return jsonReply(`⚠️ ${conflict} — use /cluster-status to check progress`, threadTs)
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    const payload = { action: 'down', provider, response_url: responseUrl }
+    event.waitUntil((async () => {
+      const { ok, conflict } = await relay('/api/v1/cluster', payload)
+      if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict} — use /cluster-status to check progress`)
+      else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+    })())
     const _what = provider === 'hostinger'
       ? '🛑 Tearing down the *permanent Hostinger* app cluster…'
       : '⏳ Tearing down the *lab sandbox*… — ephemeral learning sandbox only (does not affect Hostinger)'
@@ -119,8 +135,10 @@ async function handle(req) {
     const provider = resolveProvider(text, 'hostinger')
     const payload = { provider, response_url: responseUrl }
     if (threadTs) payload.thread_ts = threadTs
-    const { ok } = await relay('/api/v1/cluster-status', payload)
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    event.waitUntil((async () => {
+      const { ok } = await relay('/api/v1/cluster-status', payload)
+      if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+    })())
     const _where = provider === 'hostinger' ? 'Hostinger' : `lab sandbox (${provider})`
     return jsonReply(`🔍 Checking ${_where} cluster status…`, threadTs, true)
   }
@@ -128,8 +146,10 @@ async function handle(req) {
   if (command === '/hostinger-status') {
     const payload = { response_url: responseUrl }
     if (threadTs) payload.thread_ts = threadTs
-    const { ok } = await relay('/api/v1/hostinger-status', payload)
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    event.waitUntil((async () => {
+      const { ok } = await relay('/api/v1/hostinger-status', payload)
+      if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+    })())
     return jsonReply('🖥️ Checking Hostinger app cluster status…', threadTs, true)
   }
 
@@ -137,8 +157,10 @@ async function handle(req) {
     const provider = resolveProvider(text, 'hostinger')
     const payload = { provider, response_url: responseUrl }
     if (threadTs) payload.thread_ts = threadTs
-    const { ok } = await relay('/api/v1/cluster-refresh', payload)
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    event.waitUntil((async () => {
+      const { ok } = await relay('/api/v1/cluster-refresh', payload)
+      if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+    })())
     const _msg = provider === 'hostinger'
       ? '🔄 Refreshing Hostinger kubeconfig + ArgoCD registration…'
       : '🔄 Refreshing lab sandbox credentials + tunnel…'
@@ -150,9 +172,12 @@ async function handle(req) {
     if (!VALID_PROVIDERS.has(provider)) {
       return jsonReply('Usage: /cluster-resume <aws|gcp|az> — resumes a lab sandbox provision from its last checkpoint', threadTs)
     }
-    const { ok, conflict } = await relay('/api/v1/cluster-resume', { provider, response_url: responseUrl })
-    if (conflict) return jsonReply(`⚠️ ${conflict} — use /cluster-status to check progress`, threadTs)
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    const payload = { provider, response_url: responseUrl }
+    event.waitUntil((async () => {
+      const { ok, conflict } = await relay('/api/v1/cluster-resume', payload)
+      if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict} — use /cluster-status to check progress`)
+      else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+    })())
     return jsonReply(`🔄 Resuming lab sandbox provision (${provider}) from last checkpoint…`, threadTs, true)
   }
 
@@ -170,8 +195,10 @@ async function handle(req) {
     if (!question) return jsonReply(`Usage: ${command} <question>`, threadTs)
     const payload = { agent, question, response_url: responseUrl }
     if (threadTs) payload.thread_ts = threadTs
-    const { ok } = await relay('/api/v1/ask', payload)
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    event.waitUntil((async () => {
+      const { ok } = await relay('/api/v1/ask', payload)
+      if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+    })())
     return jsonReply(`🤖 Asking ${agent}…`, threadTs, true)
   }
 
@@ -181,9 +208,11 @@ async function handle(req) {
     const stage   = parts[1] || 'infra'
     if (!version) return jsonReply('Usage: /argocd-upgrade <chart_version> [acg|infra]', threadTs)
     if (!['acg', 'infra'].includes(stage)) return jsonReply('stage must be acg or infra', threadTs)
-    const { ok } = await relay('/api/v1/argocd-upgrade',
-      { chart_version: version, stage, response_url: responseUrl })
-    if (!ok) return jsonReply('❌ Webhook unreachable — try again in a moment', threadTs)
+    event.waitUntil((async () => {
+      const { ok } = await relay('/api/v1/argocd-upgrade',
+        { chart_version: version, stage, response_url: responseUrl })
+      if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+    })())
     return jsonReply(`⏳ Upgrading ArgoCD to chart ${version} on ${stage}…`, threadTs, true)
   }
 
