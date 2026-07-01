@@ -60,6 +60,9 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'ArgoCDAppOutOfSync' "${RULE}"
   [ "${status}" -eq 0 ]
 
+  run grep -F -- 'group: argocd' "${RULE}"
+  [ "${status}" -eq 0 ]
+
   run grep -F -- 'name=~"shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)"' "${RULE}"
   [ "${status}" -eq 0 ]
 }

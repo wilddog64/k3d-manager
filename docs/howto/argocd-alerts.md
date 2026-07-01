@@ -23,6 +23,9 @@ shopping-cart apps plus the supporting infrastructure services:
 - `ubuntu-hostinger-eso`
 - `ubuntu-hostinger-platform`
 
+Both rules carry the shared alert label `group=argocd` so they stay easy to
+filter and group in Alertmanager.
+
 ## Where To See Them
 
 ### Grafana

@@ -17,6 +17,7 @@ spec:
             } == 1
           for: 5m
           labels:
+            group: argocd
             severity: warning
           annotations:
             summary: "ArgoCD app {{ $labels.name }} is Degraded"
@@ -29,6 +30,7 @@ spec:
             } == 1
           for: 15m
           labels:
+            group: argocd
             severity: warning
           annotations:
             summary: "ArgoCD app {{ $labels.name }} is OutOfSync"
