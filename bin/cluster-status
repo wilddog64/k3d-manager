@@ -260,18 +260,73 @@ _ALERTMANAGER_HEALTH_URL="${K3DM_ALERTMANAGER_HEALTH_URL:-https://alertmanager.3
 _ALERTMANAGER_AUTH_FILE="${K3DM_ALERTMANAGER_AUTH_FILE:-${HOME}/.local/share/k3d-manager/alertmanager-basic-auth.env}"
 _ALERTMANAGER_AUTH_USER=""
 _ALERTMANAGER_AUTH_PASSWORD=""
+
+function _cluster_status_resolve_ipv4() {
+  local _host="$1"
+  local _resolver="${2:-1.1.1.1}"
+
+  if command -v nslookup >/dev/null 2>&1; then
+    nslookup "${_host}" "${_resolver}" 2>/dev/null \
+      | awk '/^Address: / { if ($2 !~ /#/) { print $2; exit } }'
+  fi
+}
+
+function _cluster_status_alertmanager_http_code() {
+  local _url="$1"
+  local _user="$2"
+  local _password="$3"
+  local _code="000"
+  local _ip
+
+  if [[ -n "${_user}" && -n "${_password}" ]]; then
+    _code="$(curl -sk --max-time 3 \
+      -u "${_user}:${_password}" \
+      -o /dev/null -w '%{http_code}' "${_url}" 2>/dev/null || echo 000)"
+  else
+    _code="$(curl -sk --max-time 3 -o /dev/null -w '%{http_code}' "${_url}" 2>/dev/null || echo 000)"
+  fi
+
+  if [[ ( "${_code}" =~ ^0+$ || "${_code}" == "404" ) && "${_url}" == "https://alertmanager.3ai-talk.org/api/v2/status" ]]; then
+    _ip="$(_cluster_status_resolve_ipv4 "alertmanager.3ai-talk.org")"
+    if [[ -n "${_ip}" ]]; then
+      if [[ -n "${_user}" && -n "${_password}" ]]; then
+        _code="$(curl -sk --max-time 3 \
+          --resolve "alertmanager.3ai-talk.org:443:${_ip}" \
+          -u "${_user}:${_password}" \
+          -o /dev/null -w '%{http_code}' "${_url}" 2>/dev/null || echo 000)"
+      else
+        _code="$(curl -sk --max-time 3 \
+          --resolve "alertmanager.3ai-talk.org:443:${_ip}" \
+          -o /dev/null -w '%{http_code}' "${_url}" 2>/dev/null || echo 000)"
+      fi
+    fi
+  fi
+
+  if [[ ( "${_code}" =~ ^0+$ || "${_code}" == "404" ) && "${_url}" == "https://alertmanager.3ai-talk.org/api/v2/status" ]]; then
+    if [[ -n "${_user}" && -n "${_password}" ]]; then
+      _code="$(curl -s --max-time 3 \
+        -u "${_user}:${_password}" \
+        -o /dev/null -w '%{http_code}' \
+        http://127.0.0.1:9093/api/v2/status 2>/dev/null || echo 000)"
+    else
+      _code="$(curl -s --max-time 3 \
+        -o /dev/null -w '%{http_code}' \
+        http://127.0.0.1:9093/api/v2/status 2>/dev/null || echo 000)"
+    fi
+  fi
+
+  printf '%s\n' "${_code}"
+}
+
 if [[ -r "${_ALERTMANAGER_AUTH_FILE}" ]]; then
   _ALERTMANAGER_AUTH_USER="$(grep -E '^ALERTMANAGER_BASIC_AUTH_USER=' "${_ALERTMANAGER_AUTH_FILE}" 2>/dev/null | head -1 | cut -d= -f2- || true)"
   _ALERTMANAGER_AUTH_PASSWORD="$(grep -E '^ALERTMANAGER_BASIC_AUTH_PASSWORD=' "${_ALERTMANAGER_AUTH_FILE}" 2>/dev/null | head -1 | cut -d= -f2- || true)"
 fi
 
-if [[ -n "${_ALERTMANAGER_AUTH_USER}" && -n "${_ALERTMANAGER_AUTH_PASSWORD}" ]]; then
-  _alertmanager_code="$(curl -sk --max-time 3 \
-    -u "${_ALERTMANAGER_AUTH_USER}:${_ALERTMANAGER_AUTH_PASSWORD}" \
-    -o /dev/null -w '%{http_code}' "${_ALERTMANAGER_HEALTH_URL}" 2>/dev/null || echo 000)"
-else
-  _alertmanager_code="$(curl -sk --max-time 3 -o /dev/null -w '%{http_code}' "${_ALERTMANAGER_HEALTH_URL}" 2>/dev/null || echo 000)"
-fi
+_alertmanager_code="$(_cluster_status_alertmanager_http_code \
+  "${_ALERTMANAGER_HEALTH_URL}" \
+  "${_ALERTMANAGER_AUTH_USER}" \
+  "${_ALERTMANAGER_AUTH_PASSWORD}")"
 if [[ "${_alertmanager_code}" == "200" ]]; then
   echo "  ✅ Alertmanager: HTTP 200"
 elif [[ "${_alertmanager_code}" == "401" ]]; then

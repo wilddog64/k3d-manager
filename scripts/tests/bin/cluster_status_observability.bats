@@ -21,6 +21,15 @@
   run grep -nF 'alertmanager-basic-auth.env' bin/cluster-status
   [ "$status" -eq 0 ]
 
+  run grep -nF '_cluster_status_resolve_ipv4' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF -e '--resolve "alertmanager.3ai-talk.org:443:' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'http://127.0.0.1:9093/api/v2/status' bin/cluster-status
+  [ "$status" -eq 0 ]
+
   run grep -nF 'login required' bin/cluster-status
   [ "$status" -eq 0 ]
 
