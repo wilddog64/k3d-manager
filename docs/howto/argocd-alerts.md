@@ -42,14 +42,14 @@ These panels show the same app set that the alerts watch.
 
 ### Alertmanager
 
-Alertmanager receives the fired alerts in the `monitoring` namespace. To view
-the alert list directly, port-forward the Alertmanager service and open the UI:
+Alertmanager receives the fired alerts in the `monitoring` namespace. The
+preferred browser path is the Cloudflare hostname:
 
-```bash
-kubectl -n monitoring port-forward svc/kube-prometheus-stack-alertmanager 9093:9093
-```
+- `https://alertmanager.3ai-talk.org`
 
-Then open `http://localhost:9093`.
+That hostname is backed by the local Alertmanager port-forward LaunchAgent.
+If you need to debug the local listener directly, you can still port-forward the
+service yourself and open `http://localhost:9093`.
 
 ### Cluster Objects
 
@@ -90,12 +90,7 @@ bats scripts/tests/plugins/argocd_metrics_servicemonitor.bats
 
 ### 2. Confirm the alert path is reachable
 
-Port-forward Alertmanager and verify the fired-alert list updates when a rule
-is active:
-
-```bash
-kubectl -n monitoring port-forward svc/kube-prometheus-stack-alertmanager 9093:9093
-```
+Open `https://alertmanager.3ai-talk.org` and verify the Alertmanager UI loads.
 
 ### 3. Trigger a real alert in a disposable environment
 
@@ -115,4 +110,3 @@ After that, verify:
 If you only want to smoke-test the downstream handler, you can POST a mock
 Alertmanager payload directly to the webhook analyzer endpoint. That validates
 the delivery target, but not the Prometheus firing path.
-

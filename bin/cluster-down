@@ -214,6 +214,15 @@ if _is_mac; then
   fi
   rm -f "${_pgw_pf_plist}"
 
+  _info "[acg-down] Stopping Alertmanager port-forward launchd agent..."
+  _am_pf_label="com.k3d-manager.alertmanager-port-forward"
+  _am_pf_plist="${HOME}/Library/LaunchAgents/${_am_pf_label}.plist"
+  if launchctl list "${_am_pf_label}" >/dev/null 2>&1; then
+    launchctl unload "${_am_pf_plist}" 2>/dev/null || true
+    _info "[acg-down] Alertmanager port-forward launchd agent unloaded"
+  fi
+  rm -f "${_am_pf_plist}"
+
   _info "[acg-down] Stopping Keycloak port-forward launchd agent..."
   _kc_pf_label="com.k3d-manager.keycloak-port-forward"
   _kc_pf_plist="${HOME}/Library/LaunchAgents/${_kc_pf_label}.plist"

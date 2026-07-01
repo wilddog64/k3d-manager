@@ -19,6 +19,7 @@ Install via `make <target>` or via the plugin function noted below.
 | `com.k3d-manager.vault-port-forward` | Vault → `localhost:18200` (k3d-k3d-cluster) | ✅ | `make install-vault-port-forward` | `~/Library/Logs/k3dm-vault-port-forward.log` |
 | `com.k3d-manager.keycloak-port-forward` | Keycloak → `localhost:8880` / `keycloak.shopping-cart.local` (k3d-k3d-cluster) | ✅ | `keycloak_install` | `~/.local/share/k3d-manager/logs/keycloak-pf.log` |
 | `com.k3d-manager.prometheus-port-forward` | Prometheus → `localhost:19090` (k3d-k3d-cluster) | ✅ | `make install-prometheus-port-forward` | `~/Library/Logs/k3dm-prometheus-port-forward.log` |
+| `com.k3d-manager.alertmanager-port-forward` | Alertmanager → `localhost:9093` (k3d-k3d-cluster) | ✅ | `make install-alertmanager-port-forward` | `~/Library/Logs/k3dm-alertmanager-port-forward.log` |
 | `com.k3d-manager.cleanup` | Purges old job state dirs (`~/.local/share/k3d-manager/jobs/`) | ❌ (timer: daily 03:00) | `make install-cleanup` | `~/Library/Logs/k3dm-cleanup.log` |
 | `com.k3d-manager.acg-watch` | Watches ACG sandbox TTL; auto-extends or notifies | ❌ (on-demand) | `acg_watch_install` | `/tmp/k3d-manager-acg-watch.err` |
 
@@ -60,6 +61,14 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 - **Template:** `scripts/etc/launchd/com.k3d-manager.prometheus-port-forward.plist.tmpl`
 - **Install:** `make install-prometheus-port-forward`
 
+### `com.k3d-manager.alertmanager-port-forward`
+- **Cluster:** `k3d-k3d-cluster` (local hub)
+- **Mapping:** `localhost:9093` → `svc/kube-prometheus-stack-alertmanager:9093` (namespace: `monitoring`)
+- **Browser access:** `https://alertmanager.3ai-talk.org/`
+- **Health check:** `https://alertmanager.3ai-talk.org/api/v2/status`
+- **Template:** `scripts/etc/launchd/com.k3d-manager.alertmanager-port-forward.plist.tmpl`
+- **Install:** `make install-alertmanager-port-forward`
+
 ---
 
 ## Network Daemons
@@ -75,7 +84,7 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 ### `com.k3d-manager.cloudflare-tunnel`
 - **Tool:** `cloudflared`
 - **Config:** `~/.cloudflared/config.yml`
-- **Exposes:** `grafana.3ai-talk.org`, `prometheus.3ai-talk.org` → services on ubuntu-k3s
+- **Exposes:** `grafana.3ai-talk.org`, `prometheus.3ai-talk.org` → services on ubuntu-k3s; `alertmanager.3ai-talk.org` → Alertmanager on the local hub
 - **Install:** via homebrew service (`brew services start cloudflared`) + plist at `~/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist`
 
 ---
@@ -127,6 +136,7 @@ launchctl print "gui/$(id -u)/com.k3d-manager.prometheus-port-forward"
 # View logs
 tail -f ~/Library/Logs/k3dm-webhook.log
 tail -f ~/Library/Logs/k3dm-prometheus-port-forward.log
+tail -f ~/Library/Logs/k3dm-alertmanager-port-forward.log
 
 # Manually unload/reload a specific agent
 launchctl bootout "gui/$(id -u)/com.k3d-manager.<label>"

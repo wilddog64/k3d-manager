@@ -44,7 +44,10 @@ setup() {
     kubectl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
-    export -f envsubst _kubectl kubectl
+    launchctl() {
+      printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+    }
+    export -f envsubst _kubectl kubectl launchctl
     export K3D_MANAGER_BRANCH=feature-branch
     deploy_observability
   '
@@ -58,6 +61,7 @@ setup() {
   [[ "$output" == *"apply -f -"* ]]
   [[ "$output" == *"--context k3d-k3d-cluster -f ${REPO_ROOT}/scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml"* ]]
   [[ "$output" == *"--context k3d-k3d-cluster -f ${REPO_ROOT}/scripts/etc/observability/promtail.yaml"* ]]
+  [[ "$output" == *"com.k3d-manager.alertmanager-port-forward"* ]]
 }
 
 @test "deploy_observability_acg calls envsubst with \$ARGOCD_NAMESPACE, \$K3D_MANAGER_BRANCH, and \$APP_CLUSTER_NAME" {
@@ -287,4 +291,15 @@ setup() {
   [[ "$output" == *"_kubectl get pods -n trivy-system --no-headers"* || "$output" == *"get pods -n trivy-system --no-headers"* ]]
   [[ "$output" == *"kubectl get pods -n monitoring --context ubuntu-k3s --no-headers"* || "$output" == *"get pods -n monitoring --context ubuntu-k3s --no-headers"* ]]
   [[ "$output" == *"kubectl get pods -n trivy-system --context ubuntu-k3s --no-headers"* || "$output" == *"get pods -n trivy-system --context ubuntu-k3s --no-headers"* ]]
+}
+
+@test "observability exposes alertmanager via cloudflared and make targets" {
+  run grep -F -- 'alertmanager.3ai-talk.org' scripts/etc/cloudflared/config.yml
+  [ "$status" -eq 0 ]
+
+  run grep -F -- 'install-alertmanager-port-forward' Makefile
+  [ "$status" -eq 0 ]
+
+  run grep -F -- 'uninstall-alertmanager-port-forward' Makefile
+  [ "$status" -eq 0 ]
 }

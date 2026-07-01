@@ -31,6 +31,7 @@ flowchart LR
             FE["Frontend HTTP listener\n127.0.0.2:80"]
             PROM["Prometheus port-forward\nlocalhost:19090"]
             GRAF["Grafana port-forward\nlocalhost:3001"]
+            AM["Alertmanager port-forward\nlocalhost:9093"]
             PGW["Pushgateway port-forward\nlocalhost:9091"]
         end
     end
@@ -45,6 +46,7 @@ flowchart LR
     CFD -->|"frontend.3ai-talk.org"| FE
     CFD -->|"prometheus.3ai-talk.org"| PROM
     CFD -->|"grafana.3ai-talk.org"| GRAF
+    CFD -->|"alertmanager.3ai-talk.org"| AM
     WH -->|"POST /metrics/job/k3dm-webhook\n(deployment metrics)"| PGW
 ```
 
@@ -53,6 +55,7 @@ flowchart LR
 | File | Purpose |
 |------|---------|
 | `scripts/etc/cloudflared/config.yml` | Static ingress rules (hostname → local service) |
+| `com.k3d-manager.alertmanager-port-forward` | LaunchAgent that keeps Alertmanager on `localhost:9093` available for Cloudflare |
 | `~/.cloudflared/<tunnel-id>.json` | Tunnel credentials (restored from Keychain by `acg-up`) |
 | `~/.cloudflared/cert.pem` | Cloudflare origin cert (restored from Keychain) |
 | `bin/acg-up` Step 10h | Installs/updates the Cloudflare tunnel LaunchAgent plist |

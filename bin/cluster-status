@@ -256,6 +256,14 @@ fi
 
 echo ""
 echo "=== Service Health ==="
+_ALERTMANAGER_HEALTH_URL="${K3DM_ALERTMANAGER_HEALTH_URL:-https://alertmanager.3ai-talk.org/api/v2/status}"
+_alertmanager_code="$(curl -sk --max-time 3 -o /dev/null -w '%{http_code}' "${_ALERTMANAGER_HEALTH_URL}" 2>/dev/null || echo 000)"
+if [[ "${_alertmanager_code}" == "200" ]]; then
+  echo "  ✅ Alertmanager: HTTP 200"
+else
+  echo "  ❌ Alertmanager: HTTP ${_alertmanager_code} (${_ALERTMANAGER_HEALTH_URL})"
+fi
+
 _WEBHOOK_TOKEN="${K3DM_WEBHOOK_TOKEN:-$(security find-generic-password -s k3dm-webhook-token -w 2>/dev/null || true)}"
 _WEBHOOK_PORT="${K3DM_WEBHOOK_PORT:-7443}"
 if [[ -n "${_WEBHOOK_TOKEN}" ]]; then

@@ -77,8 +77,36 @@ function deploy_observability() {
       && _info "[observability] Istio Gateway + VirtualServices applied (prometheus/grafana.shopping-cart.local)"
   fi
 
+  _observability_install_alertmanager_port_forward
   _observability_apply_argocd_dashboard "${_hub_context}"
   _deploy_promtail_acg "${_hub_context}"
+}
+
+function _observability_install_alertmanager_port_forward() {
+  if ! _is_mac; then
+    return 0
+  fi
+
+  if ! command -v launchctl >/dev/null 2>&1 || ! command -v kubectl >/dev/null 2>&1; then
+    _warn "[observability] launchctl or kubectl not available — skipping Alertmanager port-forward"
+    return 0
+  fi
+
+  local _plist_template="${SCRIPT_DIR}/etc/launchd/com.k3d-manager.alertmanager-port-forward.plist.tmpl"
+  local _plist="${HOME}/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist"
+  if [[ ! -f "${_plist_template}" ]]; then
+    _warn "[observability] Alertmanager port-forward template missing — skipping"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "${_plist}")"
+  sed \
+    -e "s|{{KUBECTL_PATH}}|$(command -v kubectl)|g" \
+    -e "s|{{HOME}}|${HOME}|g" \
+    "${_plist_template}" > "${_plist}"
+  launchctl bootout "gui/$(id -u)/com.k3d-manager.alertmanager-port-forward" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "${_plist}"
+  _info "[observability] Alertmanager port-forward agent installed — port 9093 will stay open for alert browsing"
 }
 
 function _observability_acg_context() {

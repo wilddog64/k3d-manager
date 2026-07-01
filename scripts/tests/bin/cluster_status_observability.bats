@@ -16,3 +16,11 @@
   run grep -nF 'Grafana panels may be blank until Prometheus stays ready' bin/cluster-status
   [ "$status" -eq 0 ]
 }
+
+@test "cluster-status surfaces Alertmanager Cloudflare health" {
+  run grep -nF 'https://alertmanager.3ai-talk.org/api/v2/status' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'Alertmanager: HTTP 200' bin/cluster-status
+  [ "$status" -eq 0 ]
+}
