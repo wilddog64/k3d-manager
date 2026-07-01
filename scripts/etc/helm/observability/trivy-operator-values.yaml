@@ -20,3 +20,8 @@ operator:
     limits:
       memory: 96Mi
       cpu: 100m
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: kube-prometheus-stack

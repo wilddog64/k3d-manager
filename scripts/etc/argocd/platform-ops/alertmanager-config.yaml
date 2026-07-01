@@ -10,7 +10,7 @@ spec:
     receiver: k3dm-analyze
     matchers:
       - name: alertname
-        value: ArgoCDAppDegraded|ArgoCDAppOutOfSync
+        value: ArgoCDAppDegraded|ArgoCDAppOutOfSync|TrivyOperatorScanJobFailures
         matchType: "=~"
   receivers:
     - name: k3dm-analyze

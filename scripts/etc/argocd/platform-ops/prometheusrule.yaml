@@ -35,3 +35,15 @@ spec:
           annotations:
             summary: "ArgoCD app {{ $labels.name }} is OutOfSync"
             description: "App {{ $labels.name }} in namespace {{ $labels.dest_namespace }} has been OutOfSync for 15 minutes"
+    - name: trivy-operator.alerts
+      rules:
+        - alert: TrivyOperatorScanJobFailures
+          expr: |
+            sum(increase(kube_job_status_failed{namespace="trivy-system",job_name=~"scan-.*"}[10m])) > 0
+          for: 5m
+          labels:
+            group: trivy-operator
+            severity: warning
+          annotations:
+            summary: "Trivy Operator scan jobs are failing"
+            description: "At least one Trivy Operator scan job in namespace trivy-system has failed within the last 10 minutes"

@@ -205,6 +205,54 @@ data:
           ],
           "title": "App CVE Scan Decisions",
           "type": "logs"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 36 },
+          "id": 10,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value"
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(kube_job_status_failed{namespace=\"trivy-system\",job_name=~\"scan-.*\"}[30m]))",
+              "refId": "A"
+            }
+          ],
+          "title": "Trivy Scan Job Failures (30m)",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
+          "id": 11,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "showLabels": true,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": false
+          },
+          "targets": [
+            {
+              "expr": "{namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | controller=\"job\" | msg=\"Reconciler error\"",
+              "refId": "A"
+            }
+          ],
+          "title": "Trivy Operator Job Reconcile Errors",
+          "type": "logs"
         }
       ],
       "schemaVersion": 39,
