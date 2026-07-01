@@ -1,8 +1,9 @@
 # Slack Slash Commands & Webhook Server
 
-Slack slash commands (`/acg-up`, `/acg-down`, `/acg-status`, `/acg-refresh`, `/acg-resume`,
-`/claude`, `/gemini`, `/codex`, `/argocd-upgrade`) that control the k3d-manager cluster from any Slack channel, plus
-thread-based AI troubleshooting and job control via thread replies.
+Slack slash commands (`/cluster-up`, `/cluster-down`, `/cluster-status`, `/cluster-refresh`,
+`/cluster-resume`, `/hostinger-status`, `/claude`, `/gemini`, `/codex`, `/argocd-upgrade`)
+that control the k3d-manager cluster from any Slack channel, plus thread-based AI troubleshooting
+and job control via thread replies.
 
 ---
 
@@ -18,7 +19,7 @@ sequenceDiagram
     participant H as k3dm-webhook<br/>webhook.3ai-talk.org
 
     note over U,H: Path A — Slash command (any channel)
-    U->>S: /acg-up aws
+    U->>S: /cluster-up aws
     S->>W: POST /slack/commands<br/>X-Slack-Signature + response_url
     W->>W: HMAC-SHA256 verify
     W->>H: POST /api/v1/cluster {action:up, provider:aws}
@@ -86,27 +87,39 @@ Run once per machine. Safe to re-run.
     },
     "slash_commands": [
       {
-        "command": "/acg-up",
+        "command": "/cluster-up",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
-        "description": "Start ACG sandbox cluster",
+        "description": "Start the lab sandbox cluster",
         "should_escape": false
       },
       {
-        "command": "/acg-down",
+        "command": "/cluster-down",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
-        "description": "Stop ACG sandbox cluster",
+        "description": "Stop the lab sandbox cluster",
         "should_escape": false
       },
       {
-        "command": "/acg-status",
+        "command": "/cluster-status",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
-        "description": "Check ACG cluster status",
+        "description": "Check cluster status",
         "should_escape": false
       },
       {
-        "command": "/acg-resume",
+        "command": "/cluster-refresh",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
-        "description": "Resume ACG provision from last checkpoint",
+        "description": "Refresh cluster credentials and tunnel",
+        "should_escape": false
+      },
+      {
+        "command": "/cluster-resume",
+        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
+        "description": "Resume cluster provision from last checkpoint",
+        "should_escape": false
+      },
+      {
+        "command": "/hostinger-status",
+        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
+        "description": "Check Hostinger app cluster status",
         "should_escape": false
       },
       {
@@ -241,11 +254,12 @@ bin/k3dm-webhook-setup --uninstall
 
 | Command | Action | Notes |
 |---------|--------|-------|
-| `/acg-up` | Provision ACG k3s cluster | Runs `make up CLUSTER_PROVIDER=k3s-aws` |
-| `/acg-down` | Tear down ACG cluster | Runs `make down KEEP_LOCAL=1` |
-| `/acg-status` | Check cluster health | kubectl nodes + ArgoCD app status + smoke test |
-| `/acg-refresh` | Restore tunnel + credentials | Re-establishes SSH tunnel, refreshes kubeconfig |
-| `/acg-resume [aws]` | Resume provision from last checkpoint | Skips completed steps |
+| `/cluster-up [aws\|gcp\|az\|hostinger]` | Provision cluster | Hostinger is the permanent app cluster; others are lab sandboxes |
+| `/cluster-down [aws\|gcp\|az\|hostinger]` | Tear down cluster | Hostinger tears down the permanent app cluster |
+| `/cluster-status [aws\|gcp\|az\|hostinger]` | Check cluster health | kubectl nodes + ArgoCD app status + smoke test |
+| `/cluster-refresh [aws\|gcp\|az\|hostinger]` | Restore tunnel + credentials | Re-establishes SSH tunnel, refreshes kubeconfig |
+| `/cluster-resume <aws\|gcp\|az>` | Resume provision from last checkpoint | Skips completed steps |
+| `/hostinger-status` | Check Hostinger app cluster status | Read-only status report for the permanent app cluster |
 | `/claude <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
 | `/gemini <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
 | `/codex <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
@@ -256,7 +270,7 @@ channel via `response_url` when the job completes.
 
 ### Service smoke test
 
-`/acg-status` and the post-provision check both run HTTP health probes against all
+`/cluster-status` and the post-provision check both run HTTP health probes against all
 services. Pushgateway is included — if the port-forward LaunchAgent is not running the
 probe fails and Gemini triages it automatically.
 
