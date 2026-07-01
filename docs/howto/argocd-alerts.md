@@ -47,9 +47,11 @@ preferred browser path is the Cloudflare hostname:
 
 - `https://alertmanager.3ai-talk.org`
 
-That hostname is backed by the local Alertmanager port-forward LaunchAgent.
-If you need to debug the local listener directly, you can still port-forward the
-service yourself and open `http://localhost:9093`.
+That hostname is backed by a local basic-auth proxy. The browser will prompt
+for a login. Use the credentials printed by `make show-service-passwords`.
+
+If you need to debug the raw listener directly, the backend port-forward stays
+open on `http://localhost:19093`.
 
 ### Cluster Objects
 

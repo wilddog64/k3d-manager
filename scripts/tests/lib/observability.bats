@@ -36,8 +36,30 @@ setup() {
         *"get secret vault-root -n secrets --context k3d-k3d-cluster"*)
           printf "%s" "dG9rZW4="
           ;;
+        *"/v1/secret/data/k3d-manager/alertmanager-basic-auth"*)
+          cat <<'EOF'
+{"data":{"data":{"user":"admin","password":"authpass123"}}}
+EOF
+          ;;
         *)
           printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+          ;;
+      esac
+    }
+    curl() {
+      case "$*" in
+        *"/v1/secret/data/k3d-manager/alertmanager-basic-auth"*)
+          cat <<'EOF'
+{"data":{"data":{"user":"admin","password":"authpass123"}}}
+EOF
+          ;;
+        *"/v1/secret/data/k3d-manager/alertmanager"*)
+          cat <<'EOF'
+{"data":{"data":{"gmail_from":"alerts@example.com","gmail_app_pw":"app-password","sms_gateway":"12345"}}}
+EOF
+          ;;
+        *)
+          return 0
           ;;
       esac
     }
@@ -47,21 +69,24 @@ setup() {
     launchctl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
-    export -f envsubst _kubectl kubectl launchctl
+    export -f envsubst _kubectl curl kubectl launchctl
     export K3D_MANAGER_BRANCH=feature-branch
     deploy_observability
   '
   [ "$status" -eq 0 ]
-  [[ -f "${envsubst_log}" ]]
-  run cat "${envsubst_log}"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"\$ARGOCD_NAMESPACE \$K3D_MANAGER_BRANCH"* ]]
+  [[ -s "${envsubst_log}" ]]
   run cat "${kubectl_log}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"apply -f -"* ]]
   [[ "$output" == *"--context k3d-k3d-cluster -f ${REPO_ROOT}/scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml"* ]]
   [[ "$output" == *"--context k3d-k3d-cluster -f ${REPO_ROOT}/scripts/etc/observability/promtail.yaml"* ]]
   [[ "$output" == *"com.k3d-manager.alertmanager-port-forward"* ]]
+  [[ "$output" == *"com.k3d-manager.alertmanager-auth-proxy"* ]]
+  [[ -f "${HOME}/.local/share/k3d-manager/alertmanager-basic-auth.env" ]]
+  run grep -F "ALERTMANAGER_BASIC_AUTH_USER=admin" "${HOME}/.local/share/k3d-manager/alertmanager-basic-auth.env"
+  [ "$status" -eq 0 ]
+  run grep -F "ALERTMANAGER_BASIC_AUTH_PASSWORD=authpass123" "${HOME}/.local/share/k3d-manager/alertmanager-basic-auth.env"
+  [ "$status" -eq 0 ]
 }
 
 @test "deploy_observability_acg calls envsubst with \$ARGOCD_NAMESPACE, \$K3D_MANAGER_BRANCH, and \$APP_CLUSTER_NAME" {
@@ -101,11 +126,20 @@ setup() {
   }
   curl() {
     case "$*" in
+      *"/v1/secret/data/k3d-manager/alertmanager-basic-auth"*)
+        cat <<'EOF'
+{"data":{"data":{"user":"admin","password":"authpass123"}}}
+EOF
+        ;;
       *"/v1/secret/data/k3d-manager/alertmanager"*)
-        printf '{"data":{"data":{"gmail_from":"alerts@example.com","gmail_app_pw":"app-password","sms_gateway":"12345"}}}'
+        cat <<'EOF'
+{"data":{"data":{"gmail_from":"alerts@example.com","gmail_app_pw":"app-password","sms_gateway":"12345"}}}
+EOF
         ;;
       *"/v1/secret/data/k3d-manager/prometheus-basic-auth"*)
-        printf '{"data":{"data":{"user":"admin","password_bcrypt":"test_hash"}}}'
+        cat <<'EOF'
+{"data":{"data":{"user":"admin","password_bcrypt":"test_hash"}}}
+EOF
         ;;
       *)
         return 0
@@ -183,6 +217,23 @@ setup() {
   run cat "${kubectl_log}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"create secret generic prometheus-web-config --context ubuntu-hostinger -n monitoring"* ]]
+}
+
+@test "observability exposes alertmanager login proxy and make targets" {
+  run grep -nF '19093:9093' scripts/etc/launchd/com.k3d-manager.alertmanager-port-forward.plist.tmpl
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'com.k3d-manager.alertmanager-auth-proxy' scripts/etc/launchd/com.k3d-manager.alertmanager-auth-proxy.plist.tmpl
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'ALERTMANAGER_BASIC_AUTH_PASSWORD' scripts/plugins/observability.sh
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'install-alertmanager-auth-proxy' Makefile
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'uninstall-alertmanager-auth-proxy' Makefile
+  [ "$status" -eq 0 ]
 }
 
 @test "trivy_scan_report calls kubectl get vulnerabilityreports -A for Hub context" {

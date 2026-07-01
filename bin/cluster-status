@@ -257,9 +257,25 @@ fi
 echo ""
 echo "=== Service Health ==="
 _ALERTMANAGER_HEALTH_URL="${K3DM_ALERTMANAGER_HEALTH_URL:-https://alertmanager.3ai-talk.org/api/v2/status}"
-_alertmanager_code="$(curl -sk --max-time 3 -o /dev/null -w '%{http_code}' "${_ALERTMANAGER_HEALTH_URL}" 2>/dev/null || echo 000)"
+_ALERTMANAGER_AUTH_FILE="${K3DM_ALERTMANAGER_AUTH_FILE:-${HOME}/.local/share/k3d-manager/alertmanager-basic-auth.env}"
+_ALERTMANAGER_AUTH_USER=""
+_ALERTMANAGER_AUTH_PASSWORD=""
+if [[ -r "${_ALERTMANAGER_AUTH_FILE}" ]]; then
+  _ALERTMANAGER_AUTH_USER="$(grep -E '^ALERTMANAGER_BASIC_AUTH_USER=' "${_ALERTMANAGER_AUTH_FILE}" 2>/dev/null | head -1 | cut -d= -f2- || true)"
+  _ALERTMANAGER_AUTH_PASSWORD="$(grep -E '^ALERTMANAGER_BASIC_AUTH_PASSWORD=' "${_ALERTMANAGER_AUTH_FILE}" 2>/dev/null | head -1 | cut -d= -f2- || true)"
+fi
+
+if [[ -n "${_ALERTMANAGER_AUTH_USER}" && -n "${_ALERTMANAGER_AUTH_PASSWORD}" ]]; then
+  _alertmanager_code="$(curl -sk --max-time 3 \
+    -u "${_ALERTMANAGER_AUTH_USER}:${_ALERTMANAGER_AUTH_PASSWORD}" \
+    -o /dev/null -w '%{http_code}' "${_ALERTMANAGER_HEALTH_URL}" 2>/dev/null || echo 000)"
+else
+  _alertmanager_code="$(curl -sk --max-time 3 -o /dev/null -w '%{http_code}' "${_ALERTMANAGER_HEALTH_URL}" 2>/dev/null || echo 000)"
+fi
 if [[ "${_alertmanager_code}" == "200" ]]; then
   echo "  ✅ Alertmanager: HTTP 200"
+elif [[ "${_alertmanager_code}" == "401" ]]; then
+  echo "  ❌ Alertmanager: HTTP 401 (login required) (${_ALERTMANAGER_HEALTH_URL})"
 else
   echo "  ❌ Alertmanager: HTTP ${_alertmanager_code} (${_ALERTMANAGER_HEALTH_URL})"
 fi

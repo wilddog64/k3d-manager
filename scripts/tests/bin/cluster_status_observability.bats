@@ -18,6 +18,12 @@
 }
 
 @test "cluster-status surfaces Alertmanager Cloudflare health" {
+  run grep -nF 'alertmanager-basic-auth.env' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'login required' bin/cluster-status
+  [ "$status" -eq 0 ]
+
   run grep -nF 'https://alertmanager.3ai-talk.org/api/v2/status' bin/cluster-status
   [ "$status" -eq 0 ]
 

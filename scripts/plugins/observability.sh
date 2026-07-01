@@ -77,7 +77,9 @@ function deploy_observability() {
       && _info "[observability] Istio Gateway + VirtualServices applied (prometheus/grafana.shopping-cart.local)"
   fi
 
+  _observability_ensure_alertmanager_login
   _observability_install_alertmanager_port_forward
+  _observability_install_alertmanager_auth_proxy
   _observability_apply_argocd_dashboard "${_hub_context}"
   _deploy_promtail_acg "${_hub_context}"
 }
@@ -106,7 +108,125 @@ function _observability_install_alertmanager_port_forward() {
     "${_plist_template}" > "${_plist}"
   launchctl bootout "gui/$(id -u)/com.k3d-manager.alertmanager-port-forward" 2>/dev/null || true
   launchctl bootstrap "gui/$(id -u)" "${_plist}"
-  _info "[observability] Alertmanager port-forward agent installed — port 9093 will stay open for alert browsing"
+  _info "[observability] Alertmanager port-forward agent installed — raw backend stays open on port 19093"
+}
+
+function _observability_alertmanager_auth_file() {
+  printf '%s/.local/share/k3d-manager/alertmanager-basic-auth.env\n' "${HOME}"
+}
+
+function _observability_ensure_alertmanager_login() {
+  local _auth_file
+  _auth_file="$(_observability_alertmanager_auth_file)"
+
+  local _vault_addr="http://127.0.0.1:18200"
+  local _vault_token
+  _vault_token=$(_kubectl get secret vault-root -n secrets \
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+
+  local _vault_hdr
+  _vault_hdr=$(mktemp)
+  printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
+
+  local _am_creds
+  if ! _am_creds=$(curl -sf \
+      --header "@${_vault_hdr}" \
+      "${_vault_addr}/v1/secret/data/k3d-manager/alertmanager-basic-auth" 2>/dev/null \
+      | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
+        print(d['user']+'|'+d['password'])" 2>/dev/null); then
+    _am_creds=""
+  fi
+
+  if [[ -z "${_am_creds}" ]]; then
+    local _am_user="admin"
+    local _am_password
+    _am_password=$(python3 -c 'import secrets; print(secrets.token_hex(16))')
+    local _am_payload
+    _info "[observability] Ensuring Alertmanager basic auth secret exists in Vault."
+    _am_payload=$(python3 - "$_am_user" "$_am_password" <<'PY'
+import json
+import sys
+user, password = sys.argv[1:3]
+print(json.dumps({"data": {"user": user, "password": password}}))
+PY
+) || _am_payload=""
+    if [[ -n "${_am_payload}" ]] && curl -sf \
+        --header "@${_vault_hdr}" \
+        --header 'Content-Type: application/json' \
+        --request POST \
+        --data "${_am_payload}" \
+        "${_vault_addr}/v1/secret/data/k3d-manager/alertmanager-basic-auth" >/dev/null; then
+      for _attempt in 1 2 3; do
+        if _am_creds=$(curl -sf \
+            --header "@${_vault_hdr}" \
+            "${_vault_addr}/v1/secret/data/k3d-manager/alertmanager-basic-auth" 2>/dev/null \
+            | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
+              print(d['user']+'|'+d['password'])" 2>/dev/null); then
+          break
+        fi
+        sleep 1
+      done
+    else
+      _warn "[observability] Failed to create Alertmanager login secret in Vault — using generated local credentials for this run"
+      _am_creds="${_am_user}|${_am_password}"
+    fi
+
+    if [[ -z "${_am_creds}" ]]; then
+      _warn "[observability] Failed to retrieve Alertmanager login secret after creation attempt — using generated local credentials for this run"
+      _am_creds="${_am_user}|${_am_password}"
+    fi
+  fi
+  rm -f "${_vault_hdr}"
+
+  local _am_user _am_password _rest
+  _am_user="${_am_creds%%|*}"
+  _rest="${_am_creds#*|}"
+  _am_password="${_rest}"
+
+  mkdir -p "$(dirname "${_auth_file}")"
+  cat > "${_auth_file}" <<EOF
+ALERTMANAGER_BASIC_AUTH_USER=${_am_user}
+ALERTMANAGER_BASIC_AUTH_PASSWORD=${_am_password}
+ALERTMANAGER_BACKEND_URL=http://127.0.0.1:19093
+EOF
+  chmod 600 "${_auth_file}"
+  _info "[observability] Alertmanager login credentials ready (${_auth_file})"
+}
+
+function _observability_install_alertmanager_auth_proxy() {
+  if ! _is_mac; then
+    return 0
+  fi
+
+  if ! command -v launchctl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+    _warn "[observability] launchctl or python3 not available — skipping Alertmanager auth proxy"
+    return 0
+  fi
+
+  local _auth_file
+  _auth_file="$(_observability_alertmanager_auth_file)"
+  if [[ ! -f "${_auth_file}" ]]; then
+    _warn "[observability] Alertmanager auth file missing — skipping auth proxy"
+    return 0
+  fi
+
+  local _plist_template="${SCRIPT_DIR}/etc/launchd/com.k3d-manager.alertmanager-auth-proxy.plist.tmpl"
+  local _plist="${HOME}/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
+  if [[ ! -f "${_plist_template}" ]]; then
+    _warn "[observability] Alertmanager auth proxy template missing — skipping"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "${_plist}")"
+  sed \
+    -e "s|{{PYTHON3_PATH}}|$(command -v python3)|g" \
+    -e "s|{{ALERTMANAGER_PROXY_BIN}}|${SCRIPT_DIR}/../bin/alertmanager-auth-proxy|g" \
+    -e "s|{{ALERTMANAGER_AUTH_FILE}}|${_auth_file}|g" \
+    -e "s|{{HOME}}|${HOME}|g" \
+    "${_plist_template}" > "${_plist}"
+  launchctl bootout "gui/$(id -u)/com.k3d-manager.alertmanager-auth-proxy" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "${_plist}"
+  _info "[observability] Alertmanager auth proxy installed — localhost:9093 now requires login"
 }
 
 function _observability_acg_context() {
