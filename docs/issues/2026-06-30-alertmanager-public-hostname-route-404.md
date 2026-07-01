@@ -36,10 +36,10 @@ make status CLUSTER_PROVIDER=k3s-hostinger
 
 ## Root cause
 
-The local Alertmanager login proxy is healthy, but the public `alertmanager.3ai-talk.org` hostname is not serving that proxy through Cloudflare yet. The repo now falls back to the local proxy for the status probe so `make status` stays useful, but the public edge route still needs follow-up.
+The local Alertmanager login proxy is healthy, but old `cloudflared` connectors were still running with the stale ingress config that lacked the Alertmanager hostname. Cloudflare was load-balancing requests across those stale connectors, which made the public hostname return `404` even after the repo config and the current connector were correct.
 
 ## Recommended follow-up
 
-- Recheck the Cloudflare tunnel hostname binding for `alertmanager.3ai-talk.org`
-- Confirm the tunnel is advertising the hostname from the active `cloudflared` session
-- Re-verify the public URL once the edge route is fixed
+- Rebuild or stop the stale `cloudflared` connectors before judging public hostname health
+- Keep `~/.cloudflared/config.yml` synced with `scripts/etc/cloudflared/config.yml`
+- Re-verify the public URL after any tunnel restart or config refresh
