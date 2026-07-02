@@ -179,6 +179,7 @@ setup() {
   grep -q "vault_policy_exists secrets vault eso-reader" "$VAULT_EXEC_LOG"
   grep -q "vault_exec_stream --pod vault-0 secrets vault -- vault policy write eso-reader -" "$VAULT_EXEC_STREAM_LOG"
   grep -q "path \"secret/data/eso/\*\"      { capabilities = \[\"read\"\] }" "$VAULT_EXEC_STREAM_LOG"
+  grep -q "vault_exec_stream --pod vault-0 secrets vault -- vault policy write app-cluster-reader -" "$VAULT_EXEC_STREAM_LOG"
 
   # Verify vault write role
   grep -q "vault_exec secrets vault write auth/custom-mount/role/custom-role" "$VAULT_EXEC_LOG"
