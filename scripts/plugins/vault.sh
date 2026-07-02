@@ -1061,6 +1061,7 @@ function vault_seed_hub_into_context() {
     payment/encryption payment/stripe payment/paypal
     rabbitmq/default minio/credentials
     ldap/admin keycloak/admin keycloak/clients
+    github/pat
   )
 
   local _k8s_args=()

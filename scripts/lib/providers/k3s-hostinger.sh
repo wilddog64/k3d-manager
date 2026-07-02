@@ -792,6 +792,12 @@ function _hostinger_reconcile_vault_cluster_store() {
   fi
   _info "[k3s-hostinger] Ensuring vault-token + ClusterSecretStore on ${_HOSTINGER_KUBE_CONTEXT}..."
   shopping_cart_apply_vault_token_and_cluster_secret_store || return 1
+  if declare -f vault_seed_hub_into_context >/dev/null 2>&1; then
+    _info "[k3s-hostinger] Seeding hub Vault data into ${_HOSTINGER_KUBE_CONTEXT}..."
+    vault_seed_hub_into_context "${_HOSTINGER_KUBE_CONTEXT}" || return 1
+  else
+    _warn "[k3s-hostinger] vault_seed_hub_into_context not available — github/pat may not seed into the app Vault"
+  fi
   _info "[k3s-hostinger] Forcing ExternalSecret reconcile on ${_HOSTINGER_KUBE_CONTEXT}..."
   shopping_cart_force_vault_secret_reconcile "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null || return 1
   _info "[k3s-hostinger] Ensuring ghcr-pull-secret on ${_HOSTINGER_KUBE_CONTEXT}..."

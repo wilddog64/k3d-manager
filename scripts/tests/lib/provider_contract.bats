@@ -406,6 +406,51 @@ teardown_file() {
   [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps rollout status deployment/frontend --timeout=120s"* ]]
 }
 
+@test "_hostinger_reconcile_vault_cluster_store seeds hub Vault data before ExternalSecret reconcile" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
+  _HOSTINGER_SSH_USER="ubuntu"
+  _HOSTINGER_SSH_KEY="${BATS_TEST_TMPDIR}/hostinger.key"
+  HUB_VAULT_USE_BRIDGE=0
+  touch "${_HOSTINGER_SSH_KEY}"
+
+  _hostinger_require_host() { printf '%s\n' "srv1754834.hstgr.cloud"; }
+  shopping_cart_apply_vault_token_and_cluster_secret_store() { printf '%s\n' "css" >> "${BATS_TEST_TMPDIR}/reconcile.log"; }
+  vault_seed_hub_into_context() { printf 'seed %s\n' "$1" >> "${BATS_TEST_TMPDIR}/reconcile.log"; }
+  shopping_cart_force_vault_secret_reconcile() { printf '%s\n' "force" >> "${BATS_TEST_TMPDIR}/reconcile.log"; printf '%s\n' "shopping-cart-apps/ghcr-pull-secret"; }
+  shopping_cart_provision_ghcr_pull_secret() { printf '%s\n' "provision" >> "${BATS_TEST_TMPDIR}/reconcile.log"; }
+  _setup_vault_bridge() { printf '%s\n' "bridge" >> "${BATS_TEST_TMPDIR}/reconcile.log"; }
+  shopping_cart_create_vault_bridge() { printf '%s\n' "create-bridge" >> "${BATS_TEST_TMPDIR}/reconcile.log"; }
+  _info() { :; }
+  _warn() { :; }
+
+  kubectl() {
+    case "$*" in
+      --context\ ubuntu-hostinger\ get\ crd\ clustersecretstores.external-secrets.io)
+        return 0
+        ;;
+      --context\ ubuntu-hostinger\ -n\ secrets\ get\ deploy\ external-secrets)
+        return 0
+        ;;
+      *)
+        return 0
+        ;;
+    esac
+  }
+
+  run _hostinger_reconcile_vault_cluster_store
+  [ "$status" -eq 0 ]
+
+  run cat "${BATS_TEST_TMPDIR}/reconcile.log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"css"* ]]
+  [[ "$output" == *"seed ubuntu-hostinger"* ]]
+  [[ "$output" == *"force"* ]]
+  [[ "$output" == *"provision"* ]]
+}
+
 @test "register_app_cluster falls back to insecure tlsClientConfig when CA data is unset" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   export PLUGINS_DIR="${REPO_ROOT}/scripts/plugins"
