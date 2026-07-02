@@ -1,6 +1,14 @@
 #!/usr/bin/env bats
 
 @test "acg-up sources the Argo CD plugin before readiness checks" {
+  run grep -nF 'NODE_PATH="${_ACG_DIR}/node_modules" node -e "require('\''playwright'\'')"' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"require('playwright')"* ]]
+
+  run grep -nF 'npm --prefix "${_ACG_DIR}" ci' bin/cluster-up
+  [ "$status" -eq 0 ]
+  [[ "$output" == *'npm --prefix "${_ACG_DIR}" ci'* ]]
+
   run grep -nF 'PLUGINS_DIR="${SCRIPT_DIR}/plugins"' bin/cluster-up
   [ "$status" -eq 0 ]
   [[ "$output" == *'PLUGINS_DIR="${SCRIPT_DIR}/plugins"'* ]]

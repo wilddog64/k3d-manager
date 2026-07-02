@@ -19,8 +19,11 @@ set -euo pipefail
 
 # shellcheck disable=SC2034
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-if [[ ! -d "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg/node_modules/playwright" ]]; then
-  npm --prefix "${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg" install --prefer-offline 2>&1
+_ACG_DIR="${REPO_ROOT}/scripts/lib/foundation/scripts/lib/acg"
+if ! NODE_PATH="${_ACG_DIR}/node_modules" node -e "require('playwright')" >/dev/null 2>&1; then
+  printf 'INFO: [acg-up] Bootstrapping ACG Playwright dependencies in %s...\n' "${_ACG_DIR}" >&2
+  npm --prefix "${_ACG_DIR}" ci 2>&1
+  npm --prefix "${_ACG_DIR}" exec -- playwright install chromium 2>&1
 fi
 # shellcheck disable=SC2034
 SCRIPT_DIR="${REPO_ROOT}/scripts"
