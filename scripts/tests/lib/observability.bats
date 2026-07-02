@@ -280,6 +280,46 @@ EOF
   [[ "$output" == *"get vulnerabilityreports -A --no-headers"* ]]
 }
 
+@test "trivy_scan_report prints an explicit no-report note when empty" {
+  local kubectl_log
+  kubectl_log="${BATS_TEST_TMPDIR}/kubectl-trivy-empty.log"
+  export KUBE_STUB_LOG="${kubectl_log}"
+  run bash -c '
+    REPO_ROOT="$(pwd)"
+    SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    _acg_resolve_provider() {
+      printf "%s\n" "k3s-aws"
+    }
+    _acg_provider_context() {
+      case "$1" in
+        k3s-aws) printf "%s\n" "ubuntu-k3s" ;;
+        *)       printf "%s\n" "ubuntu-k3s" ;;
+      esac
+    }
+    _kubectl() {
+      if [[ "$*" == *"get vulnerabilityreports -A"* ]]; then
+        return 0
+      fi
+      printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+    }
+    kubectl() {
+      if [[ "$*" == *"get vulnerabilityreports -A"* ]]; then
+        return 0
+      fi
+      printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+    }
+    export -f _acg_resolve_provider _acg_provider_context _kubectl kubectl
+    trivy_scan_report
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"VulnerabilityReport summary — Hub:"* ]]
+  [[ "$output" == *"(no VulnerabilityReports found)"* ]]
+}
+
 @test "trivy_scan_report calls kubectl get vulnerabilityreports -A --context ubuntu-k3s for ACG" {
   local kubectl_log
   kubectl_log="${BATS_TEST_TMPDIR}/kubectl-trivy-acg.log"

@@ -17,6 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 source "${REPO_ROOT}/scripts/lib/system.sh"
 source "${REPO_ROOT}/scripts/lib/provider.sh"
+source "${REPO_ROOT}/scripts/plugins/observability.sh"
 
 CLUSTER_PROVIDER="$(_acg_resolve_provider)"
 APP_CONTEXT="${APP_CONTEXT:-$(_acg_provider_context "${CLUSTER_PROVIDER}")}"
@@ -243,6 +244,10 @@ else
     done
   fi
 fi
+
+echo ""
+echo "=== Trivy Vulnerability Reports ==="
+trivy_scan_report "${APP_CONTEXT}"
 
 if [[ "${CLUSTER_PROVIDER}" == "k3s-aws" ]]; then
   echo ""

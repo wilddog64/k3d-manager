@@ -38,6 +38,14 @@
   [ "$status" -eq 0 ]
 }
 
+@test "cluster-status includes the Trivy Vulnerability Reports section" {
+  run grep -nF '=== Trivy Vulnerability Reports ===' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'trivy_scan_report' bin/cluster-status
+  [ "$status" -eq 0 ]
+}
+
 @test "cluster-status covers the watched shopping-cart apps in the CVE scan" {
   run grep -nF 'shopping-cart-frontend' bin/cluster-status
   [ "$status" -eq 0 ]

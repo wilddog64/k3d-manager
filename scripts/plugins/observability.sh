@@ -492,10 +492,21 @@ function observability_status() {
 function trivy_scan_report() {
   local _app_context
   _app_context="$(_observability_acg_context "${1:-}")"
+  local _hub_rows _app_rows
   _info "[observability] VulnerabilityReport summary — Hub:"
-  _kubectl get vulnerabilityreports -A --no-headers 2>/dev/null \
-    | awk '{print $1, $2, $6, $7, $8}' | column -t | sort -k4 -rn || true
+  _hub_rows="$(_kubectl get vulnerabilityreports -A --no-headers 2>/dev/null \
+    | awk '{print $1, $2, $6, $7, $8}' | column -t | sort -k4 -rn || true)"
+  if [[ -n "${_hub_rows}" ]]; then
+    printf '%s\n' "${_hub_rows}"
+  else
+    _info "[observability]   (no VulnerabilityReports found)"
+  fi
   _info "[observability] VulnerabilityReport summary — ACG (${_app_context}):"
-  _kubectl get vulnerabilityreports -A --context "${_app_context}" --no-headers 2>/dev/null \
-    | awk '{print $1, $2, $6, $7, $8}' | column -t | sort -k4 -rn || true
+  _app_rows="$(_kubectl get vulnerabilityreports -A --context "${_app_context}" --no-headers 2>/dev/null \
+    | awk '{print $1, $2, $6, $7, $8}' | column -t | sort -k4 -rn || true)"
+  if [[ -n "${_app_rows}" ]]; then
+    printf '%s\n' "${_app_rows}"
+  else
+    _info "[observability]   (no VulnerabilityReports found)"
+  fi
 }

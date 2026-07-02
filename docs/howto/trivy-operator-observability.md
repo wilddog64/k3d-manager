@@ -21,6 +21,9 @@ Look for the dashboard **ArgoCD Apps & Image Updater Hub**. The Trivy-specific p
 
 The Loki panel is the fastest way to confirm the `SuccessCriteriaMet` / job-controller reconcile issue.
 
+`make status` also includes a `=== Trivy Vulnerability Reports ===` section so you
+can see the current `VulnerabilityReport` summary without opening Grafana.
+
 ### Alertmanager
 
 Open Alertmanager through Cloudflare:
