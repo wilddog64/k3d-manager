@@ -27,7 +27,7 @@ spec:
             namespace: trivy-system
             chart: trivy-operator
             repoURL: https://aquasecurity.github.io/helm-charts
-            targetRevision: 0.31.2
+            targetRevision: 0.24.1
             valuesFile: scripts/etc/helm/observability/trivy-operator-values.yaml
   goTemplate: true
   template:

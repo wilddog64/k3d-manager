@@ -7,11 +7,11 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
 RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml"
 ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.yaml"
 
-@test "trivy observability: charts pin trivy-operator 0.31.2 in both application sets" {
-  run grep -F -- 'targetRevision: 0.31.2' "${HUB_APPSET}"
+@test "trivy observability: charts pin trivy-operator 0.24.1 in both application sets" {
+  run grep -F -- 'targetRevision: 0.24.1' "${HUB_APPSET}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'targetRevision: 0.31.2' "${ACG_APPSET}"
+  run grep -F -- 'targetRevision: 0.24.1' "${ACG_APPSET}"
   [ "${status}" -eq 0 ]
 }
 
