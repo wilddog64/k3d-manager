@@ -75,6 +75,7 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 - **Mapping:** `localhost:9093` → `localhost:19093`
 - **Browser access:** `https://alertmanager.3ai-talk.org/` or `http://localhost:9093/`
 - **Health check:** `https://alertmanager.3ai-talk.org/api/v2/status`
+- **Credential behavior:** rereads `~/.local/share/k3d-manager/alertmanager-basic-auth.env` on each request so password rotation and file regeneration stay in sync without a manual restart
 - **Template:** `scripts/etc/launchd/com.k3d-manager.alertmanager-auth-proxy.plist.tmpl`
 - **Install:** `make install-alertmanager-auth-proxy`
 
