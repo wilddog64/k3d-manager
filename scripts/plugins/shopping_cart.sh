@@ -200,6 +200,7 @@ function _shopping_cart_vault_externalsecrets() {
     "shopping-cart-apps/redis-orders-cache-apps" \
     "shopping-cart-apps/order-service-secrets" \
     "shopping-cart-apps/product-catalog-secrets" \
+    "shopping-cart-apps/ghcr-pull-secret" \
     "shopping-cart-payment/postgres-payment-app" \
     "shopping-cart-payment/payment-encryption-secret" \
     "shopping-cart-payment/payment-gateway-secrets"
