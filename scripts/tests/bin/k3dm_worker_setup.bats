@@ -31,6 +31,9 @@ MAKEFILE="${BATS_TEST_DIRNAME}/../../../Makefile"
   run grep -F -- 'python3 -c '\''import hmac,hashlib,os; body=os.environ["BODY"]; secret=os.environ["SECRET"].encode(); ts=os.environ["TS"]; msg=f"v0:{ts}:{body}".encode(); print("v0="+hmac.new(secret, msg, hashlib.sha256).hexdigest())'\''' "${MAKEFILE}"
   [ "${status}" -eq 0 ]
 
+  run grep -F -- 'k3dm-cloudflare-api-token missing from Keychain' "${MAKEFILE}"
+  [ "${status}" -eq 0 ]
+
   run grep -F -- 'X-Slack-Signature: $$_sig' "${MAKEFILE}"
   [ "${status}" -eq 0 ]
 
