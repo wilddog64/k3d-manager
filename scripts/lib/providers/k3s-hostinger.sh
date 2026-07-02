@@ -752,15 +752,21 @@ function _hostinger_clear_stale_platform_tracking_ids() {
     argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
   "${hub_kubectl[@]}" annotate application "${_HOSTINGER_KUBE_CONTEXT}-platform" -n "${ARGOCD_NAMESPACE:-cicd}" \
     argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+}
 
+function _hostinger_refresh_frontend_dns() {
+  local namespace="shopping-cart-apps"
   if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" get deployment/frontend >/dev/null 2>&1; then
+    _info "[k3s-hostinger] restarting frontend so nginx re-resolves product-catalog service DNS..."
     if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" rollout restart deployment/frontend >/dev/null 2>&1; then
       if ! kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" rollout status deployment/frontend --timeout=120s >/dev/null 2>&1; then
-        _warn "[k3s-hostinger] frontend rollout restart did not become ready within 120s after stale app ownership cleanup"
+        _warn "[k3s-hostinger] frontend rollout restart did not become ready within 120s after service DNS refresh"
       fi
     else
-      _warn "[k3s-hostinger] failed to restart frontend after stale app ownership cleanup"
+      _warn "[k3s-hostinger] failed to restart frontend after service DNS refresh"
     fi
+  else
+    _warn "[k3s-hostinger] frontend deployment missing — skipping DNS refresh restart"
   fi
 }
 
@@ -970,6 +976,7 @@ function _provider_k3s_hostinger_refresh_cluster() {
   _hostinger_reapply_gitops_applicationsets || return 1
   _hostinger_clear_stale_platform_tracking_ids || return 1
   _hostinger_reconcile_vault_cluster_store || return 1
+  _hostinger_refresh_frontend_dns || return 1
   _hostinger_refresh_access_layer || return 1
   if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" get --raw='/healthz' >/dev/null 2>&1; then
     _acg_record_provider "k3s-hostinger"

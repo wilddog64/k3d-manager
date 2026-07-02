@@ -64,3 +64,19 @@ The repeated flapping warning is separate: Image Updater is still continuously t
 - Inspect why `frontend.3ai-talk.org/api/products` is occasionally slower than the probe timeout.
 - If the timeout is acceptable noise, widen the probe or retry once before failing.
 - If the churn warning is the real concern, remove the `:latest` image-updater enrollment and switch to an immutable SHA/digest promotion path.
+
+## Resolution
+
+The Hostinger refresh path now always restarts `deployment/frontend` after the GitOps and Vault
+reconciliation steps so nginx re-resolves the current `product-catalog` Service DNS even when no
+stale ownership cleanup was needed.
+
+Live validation after the change showed:
+
+```text
+✅ Frontend: HTTP 200
+✅ Product images: 20/20 have image_url
+```
+
+The separate Image Updater flapping warning still remains because the three annotation-driven apps
+continue to be managed from `:latest`; that is a distinct issue from the product-image timeout.

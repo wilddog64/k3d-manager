@@ -228,7 +228,7 @@ teardown_file() {
   [[ "${output}" != *'"insecure": true'* ]]
 }
 
-@test "_provider_k3s_hostinger_refresh_cluster reapplies observability on the hostinger context" {
+@test "_provider_k3s_hostinger_refresh_cluster reapplies observability and refreshes frontend DNS on the hostinger context" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
 
@@ -242,6 +242,7 @@ teardown_file() {
   _hostinger_reapply_gitops_applicationsets() { printf '%s\n' "gitops-appsets" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _hostinger_clear_stale_platform_tracking_ids() { printf '%s\n' "tracking-fix" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _hostinger_reconcile_vault_cluster_store() { printf '%s\n' "vault" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_refresh_frontend_dns() { printf '%s\n' "frontend-dns" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _hostinger_refresh_access_layer() { printf '%s\n' "access" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _acg_record_provider() { printf 'provider %s\n' "$1" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
   _info() { :; }
@@ -269,6 +270,7 @@ teardown_file() {
   [[ "$output" == *"gitops-appsets"* ]]
   [[ "$output" == *"tracking-fix"* ]]
   [[ "$output" == *"vault"* ]]
+  [[ "$output" == *"frontend-dns"* ]]
   [[ "$output" == *"access"* ]]
   [[ "$output" == *"provider k3s-hostinger"* ]]
 }
@@ -321,7 +323,7 @@ teardown_file() {
   [[ "$output" == *"name: '{{.name}}-platform'"* ]]
 }
 
-@test "_hostinger_clear_stale_platform_tracking_ids strips stale basket/product-catalog ownership, refreshes apps, and restarts frontend" {
+@test "_hostinger_clear_stale_platform_tracking_ids strips stale basket/product-catalog ownership and refreshes apps" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
 
@@ -361,15 +363,6 @@ JSON
       --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ annotate*)
         printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/tracking.log"
         ;;
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ deployment/frontend)
-        return 0
-        ;;
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ rollout\ restart\ deployment/frontend)
-        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/tracking.log"
-        ;;
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ rollout\ status\ deployment/frontend\ --timeout=120s)
-        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/tracking.log"
-        ;;
       --context\ k3d-k3d-cluster\ annotate\ application*)
         printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/tracking.log"
         ;;
@@ -405,8 +398,6 @@ JSON
   [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-payment -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
   [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-product-catalog -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
   [[ "$output" == *"--context k3d-k3d-cluster annotate application ubuntu-hostinger-platform -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
-  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps rollout restart deployment/frontend"* ]]
-  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps rollout status deployment/frontend --timeout=120s"* ]]
 }
 
 @test "_hostinger_reconcile_vault_cluster_store seeds hub Vault data before ExternalSecret reconcile" {
