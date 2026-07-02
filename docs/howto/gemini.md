@@ -6,7 +6,7 @@ The `gemini` plugin handles browser automation tasks such as triggering GitHub C
 
 - Node.js 18+ (`_ensure_node` installs it if missing)
 - Browser IDE installed and available on PATH
-- gemini CLI authenticated (`gemini auth login`)
+- Antigravity CLI (`agy`) installed and available on PATH
 
 ## First-Time Setup
 
@@ -16,7 +16,7 @@ The `gemini` plugin handles browser automation tasks such as triggering GitHub C
 
 This verifies and installs (if missing):
 - Node.js
-- `@google/gemini-cli`
+- `agy`
 - Browser IDE binary
 - Playwright MCP entry in the browser IDE `mcp_config.json`
 
@@ -71,11 +71,11 @@ Polls the task URL every 30 seconds until complete (default timeout: 300s). Prin
 
 ```
 k3d-manager function
-    → gemini CLI (--model gemini-2.5-flash, fallback to 2.0/1.5)
+    → agy CLI (--model gemini-2.5-flash, fallback to 2.0/1.5)
         → Playwright MCP over CDP → Google Chrome (port 9222)
 ```
 
-gemini generates a Playwright Node.js script, writes it to `${HOME}/.gemini/tmp/k3d-manager/`, and executes it. The script connects to the running Chrome instance via CDP — it does not launch a new headless browser.
+agy generates a Playwright Node.js script, writes it to `${HOME}/.gemini/tmp/k3d-manager/`, and executes it. The script connects to the running Chrome instance via CDP — it does not launch a new headless browser.
 
 ## Troubleshoot
 
@@ -88,6 +88,6 @@ open -a "Google Chrome" --args --remote-debugging-port=9222 --password-store=bas
 google-chrome --remote-debugging-port=9222 --password-store=basic --user-data-dir=~/.local/share/k3d-manager/profile &                  # Linux
 ```
 
-# Check gemini CLI
-gemini --version
-gemini --model gemini-2.5-flash --prompt "say hello"
+# Check agy CLI
+agy --version
+agy --model gemini-2.5-flash --prompt "say hello"

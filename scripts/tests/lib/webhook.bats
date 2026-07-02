@@ -181,6 +181,14 @@ teardown_file() {
     [ "$output" = "401" ]
 }
 
+@test "webhook analysis defaults to agy CLI instead of gemini" {
+    run grep -F -- 'os.environ.get("K3DM_GEMINI_BIN", "agy")' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- 'return "agy CLI not found — skipping AI analysis"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+}
+
 @test "POST /analyze with correct token returns 202 and job_id" {
     run curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \

@@ -943,16 +943,16 @@ def _notify_job(job_id, text):
 
 
 def _call_gemini(prompt):
-    """Shell out to the gemini CLI. Returns response text or error string.
+    """Shell out to the Antigravity CLI. Returns response text or error string.
 
     Uses os.posix_spawn (no fork) to avoid macOS NEF atfork SIGSEGV.
     Output is captured via a temp file rather than a pipe.
     """
     import shutil, tempfile, time
-    gemini_bin = os.environ.get("K3DM_GEMINI_BIN", "gemini")
-    resolved = shutil.which(gemini_bin) or gemini_bin
+    analysis_bin = os.environ.get("K3DM_GEMINI_BIN", "agy")
+    resolved = shutil.which(analysis_bin) or analysis_bin
     if not os.path.isfile(resolved):
-        return "gemini CLI not found — skipping AI analysis"
+        return "agy CLI not found — skipping AI analysis"
     env = {**os.environ, "GEMINI_CLI_TRUST_WORKSPACE": "true", "TERM": "xterm-256color"}
     try:
         with tempfile.NamedTemporaryFile(
@@ -976,7 +976,7 @@ def _call_gemini(prompt):
                     os.waitpid(child_pid, 0)
                 except OSError:
                     pass
-                return "gemini analysis timed out after 120s — cluster state may be too large"
+                return "agy analysis timed out after 120s — cluster state may be too large"
             try:
                 done_pid, _ = os.waitpid(child_pid, os.WNOHANG)
                 if done_pid != 0:
@@ -986,15 +986,15 @@ def _call_gemini(prompt):
             time.sleep(0.5)
         raw = Path(tmp_path).read_text(errors="replace").strip()
         Path(tmp_path).unlink(missing_ok=True)
-        raw = raw or "gemini returned no output"
-        # Strip Gemini CLI startup banners (Warning: lines)
+        raw = raw or "agy returned no output"
+        # Strip CLI startup banners (Warning: lines)
         raw = re.sub(r'(?m)^Warning:.*\n?', '', raw).strip()
-        raw = raw or "gemini returned no output"
+        raw = raw or "agy returned no output"
         cleaned = re.sub(r'(?:^|\n)\s*\w+\([^)]{0,500}\)\s*', ' ', raw, flags=re.MULTILINE)
         cleaned = re.sub(r'<ctrl[^>]*>', '', cleaned).strip()
         return cleaned or raw
     except Exception as exc:
-        return f"gemini error: {exc}"
+        return f"agy error: {exc}"
 
 
 def _analyze_stall(lines):
