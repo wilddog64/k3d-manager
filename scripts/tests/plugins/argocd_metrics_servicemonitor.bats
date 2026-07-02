@@ -51,7 +51,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   [ "${status}" -eq 0 ]
 }
 
-@test "alerts: argocd rules cover degraded and out-of-sync for watched apps" {
+@test "alerts: argocd rules cover degraded, out-of-sync, and image flapping for watched apps" {
   RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml"
 
   run grep -F -- 'ArgoCDAppDegraded' "${RULE}"
@@ -60,17 +60,29 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'ArgoCDAppOutOfSync' "${RULE}"
   [ "${status}" -eq 0 ]
 
+  run grep -F -- 'ArgoCDImageUpdaterFlapping' "${RULE}"
+  [ "${status}" -eq 0 ]
+
   run grep -F -- 'group: argocd' "${RULE}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'group: image-updater' "${RULE}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'name=~"shopping-cart-(apps|basket|frontend|identity|namespace|networking|order|payment|product-catalog|rules)|data-layer|trivy-operator|ubuntu-hostinger-(eso|platform)"' "${RULE}"
   [ "${status}" -eq 0 ]
+
+  run grep -F -- 'increase(argocd_app_sync_total{' "${RULE}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'name=~"shopping-cart-(basket|order|product-catalog)"' "${RULE}"
+  [ "${status}" -eq 0 ]
 }
 
-@test "alerts: alertmanager routes both argocd alert names to the webhook analyzer" {
+@test "alerts: alertmanager routes argocd and image-updater alert names to the webhook analyzer" {
   ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.yaml"
 
-  run grep -F -- 'value: ArgoCDAppDegraded|ArgoCDAppOutOfSync' "${ROUTE}"
+  run grep -F -- 'value: ArgoCDAppDegraded|ArgoCDAppOutOfSync|ArgoCDImageUpdaterFlapping|TrivyOperatorScanJobFailures' "${ROUTE}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'matchType: "=~"' "${ROUTE}"

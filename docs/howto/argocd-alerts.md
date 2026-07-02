@@ -1,9 +1,15 @@
 # How-To: ArgoCD Alerts
 
-This repo currently wires two ArgoCD alerts through Prometheus and Alertmanager:
+This repo currently wires two ArgoCD health alerts and one Image Updater flapping
+alert through Prometheus and Alertmanager:
 
 - `ArgoCDAppDegraded`
 - `ArgoCDAppOutOfSync`
+
+It also wires an Image Updater flapping alert for the three apps that still use
+digest-based image promotion:
+
+- `ArgoCDImageUpdaterFlapping`
 
 Both alerts are scoped to the watched app set used by the dashboard and include
 shopping-cart apps plus the supporting infrastructure services:
@@ -23,8 +29,9 @@ shopping-cart apps plus the supporting infrastructure services:
 - `ubuntu-hostinger-eso`
 - `ubuntu-hostinger-platform`
 
-Both rules carry the shared alert label `group=argocd` so they stay easy to
-filter and group in Alertmanager.
+The ArgoCD health rules carry the shared alert label `group=argocd` so they
+stay easy to filter and group in Alertmanager. The flapping alert uses
+`group=image-updater` so it is easy to separate from plain ArgoCD health drift.
 
 ## Where To See Them
 
@@ -71,9 +78,12 @@ kubectl -n cicd get prometheusrule,alertmanagerconfig
 
 ## Where Alerts Send
 
-The current Alertmanager route sends both alert names to the analyzer webhook:
+The current Alertmanager route sends all of these alert names to the analyzer
+webhook:
 
 - `https://webhook.3ai-talk.org/api/v1/analyze`
+
+The Image Updater flapping alert uses the same webhook target.
 
 That webhook is served by the local `k3dm-webhook` process. If you need to
 inspect delivery, check the webhook log:
@@ -105,6 +115,8 @@ the rule `for:` window to elapse:
 
 - `ArgoCDAppDegraded` fires after 5 minutes
 - `ArgoCDAppOutOfSync` fires after 15 minutes
+- `ArgoCDImageUpdaterFlapping` fires after 10 minutes of at least 5 syncs in
+  30 minutes
 
 After that, verify:
 

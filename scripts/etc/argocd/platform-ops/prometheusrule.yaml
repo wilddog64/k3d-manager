@@ -35,6 +35,20 @@ spec:
           annotations:
             summary: "ArgoCD app {{ $labels.name }} is OutOfSync"
             description: "App {{ $labels.name }} in namespace {{ $labels.dest_namespace }} has been OutOfSync for 15 minutes"
+        - alert: ArgoCDImageUpdaterFlapping
+          expr: |
+            max by (name) (
+              increase(argocd_app_sync_total{
+                name=~"shopping-cart-(basket|order|product-catalog)"
+              }[30m])
+            ) >= 5
+          for: 10m
+          labels:
+            group: image-updater
+            severity: warning
+          annotations:
+            summary: "ArgoCD Image Updater is flapping on {{ $labels.name }}"
+            description: "App {{ $labels.name }} has synced at least 5 times in the last 30 minutes, which usually means Image Updater is writing a change that another controller keeps reverting"
     - name: trivy-operator.alerts
       rules:
         - alert: TrivyOperatorScanJobFailures
