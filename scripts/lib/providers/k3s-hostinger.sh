@@ -676,24 +676,58 @@ function _hostinger_clear_stale_platform_tracking_ids() {
   local stale_prefix="${_HOSTINGER_KUBE_CONTEXT}-platform:"
   local namespace="shopping-cart-apps"
   local resource tracking_id cleared_any=0
-  local -a resources=(
-    "deployment/basket-service"
-    "service/basket-service"
-    "serviceaccount/basket-service"
-    "configmap/basket-service-config"
-    "deployment/product-catalog"
-    "service/product-catalog"
-    "service/product-catalog-nodeport"
-    "serviceaccount/product-catalog"
-    "configmap/product-catalog-seed-script"
-    "externalsecret.external-secrets.io/product-catalog-secrets"
-  )
+  local resource_kind resource_name
+  local -a resources=()
+  local resources_json
+  resources_json="$(
+    kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" get \
+      deployment,service,serviceaccount,configmap,secret,externalsecret,statefulset \
+      -l app.kubernetes.io/part-of=shopping-cart \
+      -o json 2>/dev/null || true
+  )"
+
+  if [[ -n "${resources_json}" ]]; then
+    while IFS=$'\t' read -r resource_kind resource_name tracking_id; do
+      [[ -n "${resource_kind}" ]] || continue
+      [[ "${tracking_id}" == "${stale_prefix}"* ]] || continue
+      case "${resource_kind}" in
+        Deployment)
+          resource="deployment/${resource_name}"
+          ;;
+        Service)
+          resource="service/${resource_name}"
+          ;;
+        ServiceAccount)
+          resource="serviceaccount/${resource_name}"
+          ;;
+        ConfigMap)
+          resource="configmap/${resource_name}"
+          ;;
+        Secret)
+          resource="secret/${resource_name}"
+          ;;
+        StatefulSet)
+          resource="statefulset/${resource_name}"
+          ;;
+        ExternalSecret)
+          resource="externalsecret.external-secrets.io/${resource_name}"
+          ;;
+        *)
+          continue
+          ;;
+      esac
+      resources+=("${resource}")
+    done < <(
+      jq -r --arg prefix "${stale_prefix}" '
+        .items[]
+        | select((.metadata.annotations["argocd.argoproj.io/tracking-id"] // "") | startswith($prefix))
+        | [.kind, .metadata.name, (.metadata.annotations["argocd.argoproj.io/tracking-id"] // "")]
+        | @tsv
+      ' <<<"${resources_json}"
+    )
+  fi
 
   for resource in "${resources[@]}"; do
-    tracking_id="$(kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" get "${resource}" \
-      -o jsonpath='{.metadata.annotations.argocd\.argoproj\.io/tracking-id}' 2>/dev/null || true)"
-    [[ "${tracking_id}" == "${stale_prefix}"* ]] || continue
-
     kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" annotate "${resource}" \
       argocd.argoproj.io/tracking-id- --overwrite >/dev/null
     cleared_any=1
@@ -706,9 +740,15 @@ function _hostinger_clear_stale_platform_tracking_ids() {
 
   local -a hub_kubectl=()
   read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
-  "${hub_kubectl[@]}" annotate application shopping-cart-product-catalog -n "${ARGOCD_NAMESPACE:-cicd}" \
-    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
   "${hub_kubectl[@]}" annotate application shopping-cart-basket -n "${ARGOCD_NAMESPACE:-cicd}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+  "${hub_kubectl[@]}" annotate application shopping-cart-frontend -n "${ARGOCD_NAMESPACE:-cicd}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+  "${hub_kubectl[@]}" annotate application shopping-cart-order -n "${ARGOCD_NAMESPACE:-cicd}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+  "${hub_kubectl[@]}" annotate application shopping-cart-payment -n "${ARGOCD_NAMESPACE:-cicd}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+  "${hub_kubectl[@]}" annotate application shopping-cart-product-catalog -n "${ARGOCD_NAMESPACE:-cicd}" \
     argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
   "${hub_kubectl[@]}" annotate application "${_HOSTINGER_KUBE_CONTEXT}-platform" -n "${ARGOCD_NAMESPACE:-cicd}" \
     argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true

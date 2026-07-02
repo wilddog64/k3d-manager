@@ -51,3 +51,13 @@ Because `prune: false`, ArgoCD will not delete the stale shopping-cart objects e
 - explicitly prune/recreate the stale `shopping-cart-apps` objects after confirming they are no longer desired.
 
 The key point is that the 10-hour churn is not a pod failure; it is a mixed-ownership ArgoCD app that can never converge while stale tracked resources remain.
+
+## Resolution
+
+The cleanup path is now permanent in `scripts/lib/providers/k3s-hostinger.sh`:
+
+- it enumerates every `shopping-cart` resource in `shopping-cart-apps` by label,
+- clears only the ones whose tracking ID still starts with `ubuntu-hostinger-platform:`,
+- and hard-refreshes the affected hub ArgoCD applications after the stale ownership is removed.
+
+The helper no longer depends on a hardcoded basket/product-catalog list, so the stale ownership cleanup now covers current and future shopping-cart resources that carry the same bad platform tracking prefix.

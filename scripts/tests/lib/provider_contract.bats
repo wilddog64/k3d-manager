@@ -169,6 +169,7 @@ teardown_file() {
 
   _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
   ARGOCD_NAMESPACE="cicd"
+  # shellcheck disable=SC2034
   ARGOCD_CHART_VERSION="7.8.1"
   _argocd_hub_kubectl_cmd() {
     printf '%s\n' "kubectl --context k3d-k3d-cluster"
@@ -335,38 +336,27 @@ teardown_file() {
 
   kubectl() {
     case "$*" in
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ deployment/basket-service\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
-        printf '%s' 'ubuntu-hostinger-platform:apps/Deployment:shopping-cart-apps/basket-service'
-        ;;
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ service/basket-service\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
-        printf '%s' 'ubuntu-hostinger-platform:/Service:shopping-cart-apps/basket-service'
-        ;;
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ serviceaccount/basket-service\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
-        printf '%s' 'ubuntu-hostinger-platform:/ServiceAccount:shopping-cart-apps/basket-service'
-        ;;
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ configmap/basket-service-config\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
-        printf '%s' 'ubuntu-hostinger-platform:/ConfigMap:shopping-cart-apps/basket-service-config'
-        ;;
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ deployment/product-catalog\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
-        printf '%s' 'ubuntu-hostinger-platform:apps/Deployment:shopping-cart-apps/product-catalog'
-        ;;
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ service/product-catalog\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
-        printf '%s' 'ubuntu-hostinger-platform:/Service:shopping-cart-apps/product-catalog'
-        ;;
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ service/product-catalog-nodeport\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
-        printf '%s' 'ubuntu-hostinger-platform:/Service:shopping-cart-apps/product-catalog-nodeport'
-        ;;
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ serviceaccount/product-catalog\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
-        printf '%s' 'ubuntu-hostinger-platform:/ServiceAccount:shopping-cart-apps/product-catalog'
-        ;;
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ configmap/product-catalog-seed-script\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
-        printf '%s' 'ubuntu-hostinger-platform:/ConfigMap:shopping-cart-apps/product-catalog-seed-script'
-        ;;
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ externalsecret.external-secrets.io/product-catalog-secrets\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
-        printf '%s' 'ubuntu-hostinger-platform:external-secrets.io/ExternalSecret:shopping-cart-apps/product-catalog-secrets'
-        ;;
-      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ configmap/product-catalog-config-8h4dfgdf4k\ -o\ jsonpath=\{.metadata.annotations.argocd\\.argoproj\\.io/tracking-id\})
-        return 1
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ deployment,service,serviceaccount,configmap,secret,externalsecret,statefulset\ -l\ app.kubernetes.io/part-of=shopping-cart\ -o\ json)
+        cat <<'JSON'
+{"items":[
+  {"kind":"Deployment","metadata":{"name":"basket-service","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:apps/Deployment:shopping-cart-apps/basket-service"}}},
+  {"kind":"Service","metadata":{"name":"basket-service","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/Service:shopping-cart-apps/basket-service"}}},
+  {"kind":"ServiceAccount","metadata":{"name":"basket-service","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/ServiceAccount:shopping-cart-apps/basket-service"}}},
+  {"kind":"ConfigMap","metadata":{"name":"basket-service-config","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/ConfigMap:shopping-cart-apps/basket-service-config"}}},
+  {"kind":"Deployment","metadata":{"name":"order-service","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:apps/Deployment:shopping-cart-apps/order-service"}}},
+  {"kind":"Service","metadata":{"name":"order-service","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/Service:shopping-cart-apps/order-service"}}},
+  {"kind":"Service","metadata":{"name":"order-service-nodeport","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/Service:shopping-cart-apps/order-service-nodeport"}}},
+  {"kind":"ServiceAccount","metadata":{"name":"order-service","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/ServiceAccount:shopping-cart-apps/order-service"}}},
+  {"kind":"ConfigMap","metadata":{"name":"order-service-config","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/ConfigMap:shopping-cart-apps/order-service-config"}}},
+  {"kind":"Deployment","metadata":{"name":"product-catalog","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:apps/Deployment:shopping-cart-apps/product-catalog"}}},
+  {"kind":"Service","metadata":{"name":"product-catalog","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/Service:shopping-cart-apps/product-catalog"}}},
+  {"kind":"Service","metadata":{"name":"product-catalog-nodeport","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/Service:shopping-cart-apps/product-catalog-nodeport"}}},
+  {"kind":"ServiceAccount","metadata":{"name":"product-catalog","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/ServiceAccount:shopping-cart-apps/product-catalog"}}},
+  {"kind":"ConfigMap","metadata":{"name":"product-catalog-seed-script","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/ConfigMap:shopping-cart-apps/product-catalog-seed-script"}}},
+  {"kind":"ExternalSecret","metadata":{"name":"product-catalog-secrets","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:external-secrets.io/ExternalSecret:shopping-cart-apps/product-catalog-secrets"}}},
+  {"kind":"ConfigMap","metadata":{"name":"product-catalog-config-8h4dfgdf4k","annotations":{"argocd.argoproj.io/tracking-id":"someone-else:ConfigMap:shopping-cart-apps/product-catalog-config-8h4dfgdf4k"}}}
+]}
+JSON
         ;;
       --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ annotate*)
         printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/tracking.log"
@@ -396,10 +386,23 @@ teardown_file() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate deployment/basket-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
   [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate service/basket-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate serviceaccount/basket-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate configmap/basket-service-config argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate deployment/order-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate service/order-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate service/order-service-nodeport argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate serviceaccount/order-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate configmap/order-service-config argocd.argoproj.io/tracking-id- --overwrite"* ]]
   [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate deployment/product-catalog argocd.argoproj.io/tracking-id- --overwrite"* ]]
   [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate service/product-catalog argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate service/product-catalog-nodeport argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate serviceaccount/product-catalog argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate configmap/product-catalog-seed-script argocd.argoproj.io/tracking-id- --overwrite"* ]]
   [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate externalsecret.external-secrets.io/product-catalog-secrets argocd.argoproj.io/tracking-id- --overwrite"* ]]
   [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-basket -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-frontend -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-order -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-payment -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
   [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-product-catalog -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
   [[ "$output" == *"--context k3d-k3d-cluster annotate application ubuntu-hostinger-platform -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
   [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps rollout restart deployment/frontend"* ]]
@@ -460,11 +463,16 @@ teardown_file() {
   source "${REPO_ROOT}/scripts/plugins/argocd.sh"
 
   ARGOCD_NAMESPACE="cicd"
+  # shellcheck disable=SC2034
   ARGOCD_APP_CLUSTER_SECRET_NAME="cluster-ubuntu-k3s"
+  # shellcheck disable=SC2034
   ARGOCD_APP_CLUSTER_NAME="ubuntu-k3s"
+  # shellcheck disable=SC2034
   ARGOCD_APP_CLUSTER_SERVER="https://host.k3d.internal:6443"
   ARGOCD_APP_CLUSTER_INSECURE="true"
+  # shellcheck disable=SC2034
   ARGOCD_APP_CLUSTER_CA_DATA=""
+  # shellcheck disable=SC2034
   ARGOCD_APP_CLUSTER_TOKEN="app-token"
 
   _kubectl() {
