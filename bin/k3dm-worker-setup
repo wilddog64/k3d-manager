@@ -93,11 +93,45 @@ _info "Deploying Cloudflare Worker..."
 _cf_token="$(_keychain_get "k3dm-cloudflare-api-token")"
 _signing_secret="$(_keychain_get "k3dm-slack-signing-secret")"
 
+_worker_smoke_test() {
+  local _body="command=%2Fcluster-status&text=&response_url=https%3A%2F%2Fexample.com"
+  local _ts _sig _code
+
+  _ts="$(date +%s)"
+  _sig="$(
+    BODY="${_body}" SECRET="${_signing_secret}" TS="${_ts}" python3 - <<'PY'
+import hmac
+import hashlib
+import os
+
+body = os.environ["BODY"]
+secret = os.environ["SECRET"].encode()
+ts = os.environ["TS"]
+msg = f"v0:{ts}:{body}".encode()
+print("v0=" + hmac.new(secret, msg, hashlib.sha256).hexdigest())
+PY
+  )"
+
+  _code="$(
+    curl -sS -o /tmp/k3dm-worker-smoke.out -w '%{http_code}' \
+      -X POST 'https://k3dm-slack-relay.k3dm.workers.dev' \
+      -H "X-Slack-Request-Timestamp: ${_ts}" \
+      -H "X-Slack-Signature: ${_sig}" \
+      --data "${_body}" \
+      2>/dev/null || true
+  )"
+
+  if [[ "${_code}" != "200" ]]; then
+    _error "Worker smoke test failed (HTTP ${_code:-000}) — Slack relay is not accepting the current signing secret"
+  fi
+}
+
 cd "${WORKER_DIR}"
 export CLOUDFLARE_API_TOKEN="${_cf_token}"
 printf '%s' "${_webhook_token}" | npx --yes wrangler secret put WEBHOOK_TOKEN
 printf '%s' "${_signing_secret}" | npx --yes wrangler secret put SLACK_SIGNING_SECRET
 npx --yes wrangler deploy
+_worker_smoke_test
 
 echo ""
 _info "Worker deployed. Update slash command URLs in Slack to the URL shown above."

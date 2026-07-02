@@ -186,6 +186,7 @@ This will:
 - Prompt for `CLOUDFLARE_API_TOKEN` and `SLACK_SIGNING_SECRET` → store in Keychain
 - Set all three as GitHub Actions secrets
 - Deploy the Cloudflare Worker to `https://k3dm-slack-relay.k3dm.workers.dev`
+- Send a signed `/cluster-status` smoke request so secret drift fails fast
 
 ### 4. Verify tunnel config
 
@@ -210,7 +211,7 @@ brew services restart cloudflared
 
 ```bash
 ./bin/k3dm-webhook-setup --rotate   # rotates K3DM_WEBHOOK_TOKEN
-./bin/k3dm-worker-setup --rotate    # rotates CLOUDFLARE_API_TOKEN + SLACK_SIGNING_SECRET
+./bin/k3dm-worker-setup --rotate    # rotates CLOUDFLARE_API_TOKEN + SLACK_SIGNING_SECRET and redeploys the Worker
 ```
 
 After rotating `K3DM_WEBHOOK_TOKEN`, redeploy the Worker to pick up the new value:

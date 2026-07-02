@@ -303,7 +303,16 @@ deploy-worker:
 	cd workers/slack-relay && \
 	printf '%s' "$$_tok" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put WEBHOOK_TOKEN && \
 	printf '%s' "$$_sig" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put SLACK_SIGNING_SECRET && \
-	CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler deploy
+	CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler deploy && \
+	_ts=$$(date +%s) && \
+	_body='command=%2Fcluster-status&text=&response_url=https%3A%2F%2Fexample.com' && \
+	_sig=$$(BODY="$$_body" SECRET="$$_sig" TS="$$_ts" python3 -c 'import hmac,hashlib,os; body=os.environ["BODY"]; secret=os.environ["SECRET"].encode(); ts=os.environ["TS"]; msg=f"v0:{ts}:{body}".encode(); print("v0="+hmac.new(secret, msg, hashlib.sha256).hexdigest())') && \
+	_code=$$(curl -sS -o /dev/null -w '%{http_code}' \
+	  -X POST 'https://k3dm-slack-relay.k3dm.workers.dev' \
+	  -H "X-Slack-Request-Timestamp: $$_ts" \
+	  -H "X-Slack-Signature: $$_sig" \
+	  --data "$$_body" 2>/dev/null || true) && \
+	[ "$$_code" = "200" ]
 
 ## Backup Cloudflare tunnel credentials to macOS Keychain + Vault (run after rotating credentials)
 cloudflared-backup:
