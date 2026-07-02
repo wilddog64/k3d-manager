@@ -516,23 +516,53 @@ function _trivy_prom_query() {
   local _query="${2:-}"
   local _encoded
   local _prom_sts
+  local _prom_exec_rc=0
+  local _had_errexit=0
+
+  case $- in
+    *e*) _had_errexit=1 ;;
+  esac
+  set +e
+
   for _prom_sts in prometheus-kube-prometheus-stack-prometheus prometheus-acg-kube-prometheus-stack-prometheus; do
     if _kubectl --context "${_context}" -n monitoring get statefulset "${_prom_sts}" >/dev/null 2>&1; then
       break
     fi
   done
-  if [[ -z "${_prom_sts:-}" ]]; then
-    _prom_sts="prometheus-kube-prometheus-stack-prometheus"
+  if ! _kubectl --context "${_context}" -n monitoring get statefulset "${_prom_sts}" >/dev/null 2>&1; then
+    printf '\n'
+    if [[ "${_had_errexit}" -eq 1 ]]; then
+      set -e
+    fi
+    return 0
   fi
   _encoded="$(python3 -c 'import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "${_query}")"
   _kubectl --context "${_context}" -n monitoring exec "statefulset/${_prom_sts}" -- \
-    sh -lc "wget -qO- 'http://localhost:9090/api/v1/query?query=${_encoded}'"
+    sh -lc "wget -qO- 'http://localhost:9090/api/v1/query?query=${_encoded}'" \
+    || _prom_exec_rc=$?
+  if [[ "${_prom_exec_rc}" -ne 0 ]]; then
+    printf '\n'
+    if [[ "${_had_errexit}" -eq 1 ]]; then
+      set -e
+    fi
+    return 0
+  fi
+  if [[ "${_had_errexit}" -eq 1 ]]; then
+    set -e
+  fi
 }
 
 function _trivy_infra_security_report_for_context() {
   local _label="${1:-Hub}"
   local _context="${2:-k3d-k3d-cluster}"
   local _compliance_json _role_json _clusterrole_json
+  local _had_errexit=0
+
+  case $- in
+    *e*) _had_errexit=1 ;;
+  esac
+  set +e
+
   _info "[observability] Trivy infra security summary — ${_label} (${_context}):"
 
   _compliance_json="$(_trivy_prom_query "${_context}" 'sum by (title,status) (trivy_cluster_compliance)' 2>/dev/null || true)"
@@ -597,6 +627,10 @@ else:
 PY
   else
     _info "[observability]   (no High/Critical infra RBAC findings found)"
+  fi
+
+  if [[ "${_had_errexit}" -eq 1 ]]; then
+    set -e
   fi
 }
 

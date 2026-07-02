@@ -414,6 +414,34 @@ EOF
   [[ "$output" == *"sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})"* ]]
 }
 
+@test "trivy_infra_security_report tolerates unreachable Prometheus backends" {
+  run bash -c '
+    REPO_ROOT="$(pwd)"
+    SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    _acg_resolve_provider() {
+      printf "%s\n" "k3s-aws"
+    }
+    _acg_provider_context() {
+      case "$1" in
+        k3s-aws) printf "%s\n" "ubuntu-k3s" ;;
+        *)       printf "%s\n" "ubuntu-k3s" ;;
+      esac
+    }
+    _kubectl() {
+      return 1
+    }
+    export -f _acg_resolve_provider _acg_provider_context _kubectl
+    trivy_infra_security_report
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Trivy infra security summary — Hub (k3d-k3d-cluster):"* ]]
+  [[ "$output" == *"(no cluster compliance metrics found)"* ]]
+}
+
 @test "observability_status iterates over monitoring trivy-system for both contexts" {
   local kubectl_log
   kubectl_log="${BATS_TEST_TMPDIR}/kubectl-status.log"
