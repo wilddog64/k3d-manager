@@ -185,6 +185,7 @@ setup() {
   grep -q "bound_service_account_names=custom-sa" "$VAULT_EXEC_LOG"
   grep -q "bound_service_account_namespaces=custom-ns" "$VAULT_EXEC_LOG"
   grep -q "policies=app-cluster-reader" "$VAULT_EXEC_LOG"
+  grep -qF -- 'path "secret/data/github/pat"     { capabilities = ["read"] }' "$VAULT_EXEC_STREAM_LOG"
 }
 
 @test "configure_vault_app_auth skips policy creation if it exists" {

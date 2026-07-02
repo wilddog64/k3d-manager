@@ -32,4 +32,4 @@ The `shopping-cart-namespace` ArgoCD application owns only the namespace object.
 
 ## Follow-up
 
-Make the `shopping-cart-apps` namespace app own `ghcr-pull-secret` declaratively so namespace re-creation cannot strand private image pulls again.
+Make the `shopping-cart-apps` namespace app own `ghcr-pull-secret` declaratively so namespace re-creation cannot strand private image pulls again. That ExternalSecret also needs Vault read access to `secret/data/github/pat`; otherwise ESO cannot materialize the Docker registry secret even though the manifest exists.

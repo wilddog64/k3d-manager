@@ -1697,6 +1697,7 @@ HCL
        path "secret/data/payment/*"      { capabilities = ["read"] }
        path "secret/data/redis/*"        { capabilities = ["read"] }
        path "secret/data/rabbitmq/*"     { capabilities = ["read"] }
+       path "secret/data/github/pat"     { capabilities = ["read"] }
        path "secret/data/keycloak/*"     { capabilities = ["read"] }
        path "secret/data/ldap/*"         { capabilities = ["read"] }
        path "secret/data/minio/*"        { capabilities = ["read"] }
@@ -1704,6 +1705,7 @@ HCL
        path "secret/metadata/payment/*"  { capabilities = ["read","list"] }
        path "secret/metadata/redis/*"    { capabilities = ["read","list"] }
        path "secret/metadata/rabbitmq/*" { capabilities = ["read","list"] }
+       path "secret/metadata/github/pat" { capabilities = ["read","list"] }
        path "secret/metadata/keycloak/*" { capabilities = ["read","list"] }
        path "secret/metadata/ldap/*"     { capabilities = ["read","list"] }
        path "secret/metadata/minio/*"    { capabilities = ["read","list"] }
