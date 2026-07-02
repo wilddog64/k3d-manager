@@ -49,6 +49,8 @@ panels are:
 - `Possible Flapping (30m syncs)`
 
 These panels show the same app set that the alerts watch.
+The dashboard source is provisioned with a `5m` auto-refresh interval, so the
+Hub view stays current without manual reloads.
 
 ### Alertmanager
 
