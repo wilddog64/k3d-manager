@@ -151,6 +151,9 @@ EOF
   [[ -f "${envsubst_log}" ]]
   [[ "$output" == *"Alertmanager config secret created on ACG (ubuntu-hostinger)"* ]]
   [[ "$output" == *"Prometheus web config secret applied (monitoring/prometheus-web-config on ubuntu-hostinger)"* ]]
+  [[ "$output" == *"Alertmanager login credentials ready"* ]]
+  [[ "$output" == *"Alertmanager port-forward agent installed"* ]]
+  [[ "$output" == *"Alertmanager auth proxy installed"* ]]
   run cat "${envsubst_log}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"\$ARGOCD_NAMESPACE \$K3D_MANAGER_BRANCH \$APP_CLUSTER_NAME"* ]]
@@ -191,6 +194,9 @@ EOF
   kubectl() {
     printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
   }
+  launchctl() {
+    printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+  }
   helm() {
     return 0
   }
@@ -214,6 +220,9 @@ EOF
   [ "$status" -eq 0 ]
   [[ "$output" == *"Failed to create Prometheus basic auth secret in Vault — using generated web config for this run"* ]]
   [[ "$output" == *"Prometheus web config secret applied (monitoring/prometheus-web-config on ubuntu-hostinger)"* ]]
+  [[ "$output" == *"Alertmanager login credentials ready"* ]]
+  [[ "$output" == *"Alertmanager port-forward agent installed"* ]]
+  [[ "$output" == *"Alertmanager auth proxy installed"* ]]
   run cat "${kubectl_log}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"create secret generic prometheus-web-config --context ubuntu-hostinger -n monitoring"* ]]

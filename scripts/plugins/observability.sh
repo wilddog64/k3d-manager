@@ -326,6 +326,9 @@ function deploy_observability_acg() {
   _prometheus_acg_web_config_secret "${_app_context}"
   _deploy_pushgateway_acg "${_app_context}"
   _deploy_promtail_acg "${_app_context}"
+  _observability_ensure_alertmanager_login
+  _observability_install_alertmanager_port_forward
+  _observability_install_alertmanager_auth_proxy
 }
 
 function _deploy_pushgateway_acg() {
