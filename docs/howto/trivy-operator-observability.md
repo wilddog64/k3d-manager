@@ -5,6 +5,7 @@ This repo now exposes Trivy Operator in three places:
 - A Grafana Loki panel for `namespace="trivy-system"` controller=`job` reconcile errors
 - A Prometheus alert for failed Trivy scan jobs
 - A Trivy Operator `ServiceMonitor` so `/metrics` is scraped by `kube-prometheus-stack`
+- `make status` now prints both `VulnerabilityReport` summaries and an infra-security summary backed by Trivy Prometheus metrics
 
 ## Where To See It
 
@@ -18,6 +19,10 @@ Look for the dashboard **ArgoCD Apps & Image Updater Hub**. The Trivy-specific p
 
 - `Trivy Scan Job Failures (30m)`
 - `Trivy Operator Job Reconcile Errors`
+- `Trivy Infra High/Critical Findings`
+- `Trivy Cluster Compliance`
+- `Trivy Infra RBAC Findings`
+- `Trivy ClusterRole Findings`
 
 The Loki panel is the fastest way to confirm the `SuccessCriteriaMet` / job-controller reconcile issue.
 

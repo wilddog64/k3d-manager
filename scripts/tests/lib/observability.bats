@@ -355,6 +355,65 @@ EOF
   [[ "$output" == *"get vulnerabilityreports -A --context ubuntu-k3s --no-headers"* ]]
 }
 
+@test "trivy_infra_security_report queries Prometheus for compliance and RBAC findings" {
+  local kubectl_log
+  kubectl_log="${BATS_TEST_TMPDIR}/kubectl-trivy-infra.log"
+  export KUBE_STUB_LOG="${kubectl_log}"
+  run bash -c '
+    REPO_ROOT="$(pwd)"
+    SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    _acg_resolve_provider() {
+      printf "%s\n" "k3s-aws"
+    }
+    _acg_provider_context() {
+      case "$1" in
+        k3s-aws) printf "%s\n" "ubuntu-k3s" ;;
+        *)       printf "%s\n" "ubuntu-k3s" ;;
+      esac
+    }
+    _trivy_prom_query() {
+      printf "%s\n" "$2" >> "${KUBE_STUB_LOG}"
+      case "$2" in
+        *trivy_cluster_compliance*)
+          cat <<'EOF'
+{"data":{"result":[{"metric":{"title":"CIS Kubernetes Benchmarks v1.23","status":"Pass"},"value":[0,"111"]},{"metric":{"title":"CIS Kubernetes Benchmarks v1.23","status":"Fail"},"value":[0,"5"]}]}}
+EOF
+          ;;
+        *trivy_role_rbacassessments*)
+          cat <<'EOF'
+{"data":{"result":[{"metric":{"namespace":"identity","resource_name":"ldap-password-rotator","resource_kind":"Role","severity":"High"},"value":[0,"1"]}]}}
+EOF
+          ;;
+        *trivy_clusterrole_clusterrbacassessments*)
+          cat <<'EOF'
+{"data":{"result":[{"metric":{"name":"clusterrole-argocd-server","resource_kind":"ClusterRole","severity":"Critical"},"value":[0,"1"]}]}}
+EOF
+          ;;
+        *)
+          cat <<'EOF'
+{"data":{"result":[]}}
+EOF
+          ;;
+      esac
+    }
+    export -f _acg_resolve_provider _acg_provider_context _trivy_prom_query
+    trivy_infra_security_report
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Trivy infra security summary — Hub (k3d-k3d-cluster):"* ]]
+  [[ "$output" == *"Trivy infra security summary — ACG (ubuntu-k3s):"* ]]
+  [[ "$output" == *"CIS Kubernetes Benchmarks v1.23: pass=111 fail=5"* ]]
+  run cat "${kubectl_log}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"sum by (title,status) (trivy_cluster_compliance)"* ]]
+  [[ "$output" == *"sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"})"* ]]
+  [[ "$output" == *"sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})"* ]]
+}
+
 @test "observability_status iterates over monitoring trivy-system for both contexts" {
   local kubectl_log
   kubectl_log="${BATS_TEST_TMPDIR}/kubectl-status.log"

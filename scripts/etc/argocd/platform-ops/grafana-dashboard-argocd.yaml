@@ -254,6 +254,80 @@ data:
           ],
           "title": "Trivy Operator Job Reconcile Errors",
           "type": "logs"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 48 },
+          "id": 12,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value"
+          },
+          "targets": [
+            {
+              "expr": "sum(trivy_role_rbacassessments{severity=~\"High|Critical\"}) + sum(trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})",
+              "refId": "A"
+            }
+          ],
+          "title": "Trivy Infra High/Critical Findings",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 8, "w": 18, "x": 6, "y": 48 },
+          "id": 13,
+          "targets": [
+            {
+              "expr": "sum by (title,status) (trivy_cluster_compliance)",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Trivy Cluster Compliance",
+          "type": "table"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 56 },
+          "id": 14,
+          "targets": [
+            {
+              "expr": "sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"})",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Trivy Infra RBAC Findings",
+          "type": "table"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 56 },
+          "id": 15,
+          "targets": [
+            {
+              "expr": "sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Trivy ClusterRole Findings",
+          "type": "table"
         }
       ],
       "schemaVersion": 39,

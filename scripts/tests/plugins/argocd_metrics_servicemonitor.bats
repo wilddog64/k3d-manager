@@ -137,3 +137,29 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- '{namespace=\"platform-ops\",pod=~\"app-cve-scan.*\"} |= \"[app-cve-scan]\"' "${DASH}"
   [ "${status}" -eq 0 ]
 }
+
+@test "metrics: dashboard includes trivy infra security panels" {
+  run grep -F -- 'Trivy Infra High/Critical Findings' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'Trivy Cluster Compliance' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'Trivy Infra RBAC Findings' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'Trivy ClusterRole Findings' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'sum(trivy_role_rbacassessments{severity=~\"High|Critical\"}) + sum(trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'sum by (title,status) (trivy_cluster_compliance)' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"})' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})' "${DASH}"
+  [ "${status}" -eq 0 ]
+}

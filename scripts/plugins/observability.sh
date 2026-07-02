@@ -510,3 +510,99 @@ function trivy_scan_report() {
     _info "[observability]   (no VulnerabilityReports found)"
   fi
 }
+
+function _trivy_prom_query() {
+  local _context="${1:-k3d-k3d-cluster}"
+  local _query="${2:-}"
+  local _encoded
+  local _prom_sts
+  for _prom_sts in prometheus-kube-prometheus-stack-prometheus prometheus-acg-kube-prometheus-stack-prometheus; do
+    if _kubectl --context "${_context}" -n monitoring get statefulset "${_prom_sts}" >/dev/null 2>&1; then
+      break
+    fi
+  done
+  if [[ -z "${_prom_sts:-}" ]]; then
+    _prom_sts="prometheus-kube-prometheus-stack-prometheus"
+  fi
+  _encoded="$(python3 -c 'import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "${_query}")"
+  _kubectl --context "${_context}" -n monitoring exec "statefulset/${_prom_sts}" -- \
+    sh -lc "wget -qO- 'http://localhost:9090/api/v1/query?query=${_encoded}'"
+}
+
+function _trivy_infra_security_report_for_context() {
+  local _label="${1:-Hub}"
+  local _context="${2:-k3d-k3d-cluster}"
+  local _compliance_json _role_json _clusterrole_json
+  _info "[observability] Trivy infra security summary — ${_label} (${_context}):"
+
+  _compliance_json="$(_trivy_prom_query "${_context}" 'sum by (title,status) (trivy_cluster_compliance)' 2>/dev/null || true)"
+  if [[ -n "${_compliance_json}" ]]; then
+    python3 - "${_compliance_json}" <<'PY'
+import collections
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+rows = payload.get("data", {}).get("result", [])
+summary = collections.defaultdict(lambda: {"Pass": 0, "Fail": 0})
+for row in rows:
+    metric = row.get("metric", {})
+    title = metric.get("title", "unknown")
+    status = metric.get("status", "unknown")
+    value = int(float(row.get("value", [0, 0])[1]))
+    summary[title][status] = value
+
+if not summary:
+    print("  (no cluster compliance metrics found)")
+else:
+    for title in sorted(summary):
+        print(f"  {title}: pass={summary[title].get('Pass', 0)} fail={summary[title].get('Fail', 0)}")
+PY
+  else
+    _info "[observability]   (no cluster compliance metrics found)"
+  fi
+
+  _role_json="$(_trivy_prom_query "${_context}" 'sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~"High|Critical"})' 2>/dev/null || true)"
+  _clusterrole_json="$(_trivy_prom_query "${_context}" 'sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~"High|Critical"})' 2>/dev/null || true)"
+  if [[ -n "${_role_json}" || -n "${_clusterrole_json}" ]]; then
+    python3 - "${_role_json:-{}}" "${_clusterrole_json:-{}}" <<'PY'
+import json
+import sys
+
+def load(payload):
+    try:
+        return json.loads(payload).get("data", {}).get("result", [])
+    except Exception:
+        return []
+
+entries = []
+for result in (load(sys.argv[1]), load(sys.argv[2])):
+    for row in result:
+        metric = row.get("metric", {})
+        value = int(float(row.get("value", [0, 0])[1]))
+        if value <= 0:
+            continue
+        if "namespace" in metric:
+            name = f"{metric.get('namespace', 'unknown')}/{metric.get('resource_name', 'unknown')}"
+        else:
+            name = f"cluster/{metric.get('name', 'unknown')}"
+        entries.append((value, name, metric.get("resource_kind", "unknown"), metric.get("severity", "unknown")))
+
+if not entries:
+    print("  (no High/Critical infra RBAC findings found)")
+else:
+    print("  High/Critical infra RBAC findings:")
+    for value, name, kind, severity in sorted(entries, key=lambda item: (-item[0], item[1], item[3]))[:12]:
+        print(f"    {name} ({kind}, {severity}): {value}")
+PY
+  else
+    _info "[observability]   (no High/Critical infra RBAC findings found)"
+  fi
+}
+
+function trivy_infra_security_report() {
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
+  _trivy_infra_security_report_for_context "Hub" "k3d-k3d-cluster"
+  _trivy_infra_security_report_for_context "ACG" "${_app_context}"
+}

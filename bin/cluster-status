@@ -249,6 +249,10 @@ echo ""
 echo "=== Trivy Vulnerability Reports ==="
 trivy_scan_report "${APP_CONTEXT}"
 
+echo ""
+echo "=== Trivy Infra Security ==="
+trivy_infra_security_report
+
 if [[ "${CLUSTER_PROVIDER}" == "k3s-aws" ]]; then
   echo ""
   echo "=== AWS Credentials ==="
