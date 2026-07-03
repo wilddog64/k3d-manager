@@ -205,6 +205,45 @@ teardown_file() {
     [[ "$output" == *'"status":"queued"'* ]]
 }
 
+@test "POST /diagnostics with reader role returns 202" {
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: reader" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-diagnose" \
+        -H "Content-Type: application/json" \
+        -d '{"provider":"hostinger","action":"get-pods","namespace":"shopping-cart-apps"}' \
+        "${_WEBHOOK_URL}/api/v1/diagnostics"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"queued"'* ]]
+}
+
+@test "POST /diagnostics rejects non-approved namespaces" {
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: reader" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-diagnose" \
+        -H "Content-Type: application/json" \
+        -d '{"provider":"hostinger","action":"get-pods","namespace":"default"}' \
+        "${_WEBHOOK_URL}/api/v1/diagnostics"
+    [ "$status" -eq 0 ]
+    [ "$output" = "400" ]
+}
+
+@test "POST /diagnostics ArgoCD requests must target hub" {
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: reader" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-diagnose" \
+        -H "Content-Type: application/json" \
+        -d '{"provider":"hostinger","action":"get-apps"}' \
+        "${_WEBHOOK_URL}/api/v1/diagnostics"
+    [ "$status" -eq 0 ]
+    [ "$output" = "400" ]
+}
+
 @test "POST /cluster-refresh with reader role returns 403" {
     run curl -s -o /dev/null -w "%{http_code}" -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
@@ -255,6 +294,17 @@ teardown_file() {
     [ "$status" -eq 0 ]
 
     run grep -F -- 'return {"name": f"cluster-{action}", "min_role": "admin"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+}
+
+@test "webhook diagnostics endpoint is reader-scoped and namespace-guarded" {
+    run grep -F -- '"/api/v1/diagnostics": {"name": "diagnostics", "min_role": "reader"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- '"shopping-cart-apps",' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- 'allowed_actions = {"get-pods", "describe-pod", "logs", "get-apps", "describe-app", "get-appsets"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 }
 

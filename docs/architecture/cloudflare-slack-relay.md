@@ -116,8 +116,14 @@ sequenceDiagram
 |--------|------|--------|
 | `POST` | `/api/v1/cluster` | `bin/acg-up` or `bin/acg-down` (action: up\|down\|kill) |
 | `POST` | `/api/v1/cluster-status` | cluster health check → Slack |
+| `POST` | `/api/v1/diagnostics` | read-only kubectl / ArgoCD diagnostics against approved contexts |
 | `POST` | `/api/v1/cluster-refresh` | `bin/acg-refresh` — restore tunnel + credentials |
 | `POST` | `/api/v1/cluster-resume` | `bin/acg-up` from last checkpoint |
+| `POST` | `/api/v1/ask` | AI agent question (claude / gemini / codex) → Slack |
+| `POST` | `/api/v1/argocd-upgrade` | ArgoCD label-patch workflow (`chart_version`, stage: `acg` \| `infra`) |
+| `POST` | `/slack/events` | Slack Events API — thread replies, URL verification |
+| `GET`  | `/api/v1/health` | JSON smoke-test report (used by `bin/acg-status`) — includes Pushgateway |
+| `GET`  | `/api/v1/status/<job_id>` | Poll job status + last 2 KB of output |
 
 ### Remote-operator metadata
 
@@ -133,11 +139,17 @@ The webhook uses them to:
 - emit JSONL audit records under `~/.local/share/k3d-manager/audit/`
 - keep Slack/Cloudflare-triggered operator access scoped to explicit
   `k3d-manager` workflows rather than arbitrary shell
-| `POST` | `/api/v1/ask` | AI agent question (claude / gemini / codex) → Slack |
-| `POST` | `/api/v1/argocd-upgrade` | ArgoCD label-patch workflow (`chart_version`, stage: `acg` \| `infra`) |
-| `POST` | `/slack/events` | Slack Events API — thread replies, URL verification |
-| `GET`  | `/api/v1/health` | JSON smoke-test report (used by `bin/acg-status`) — includes Pushgateway |
-| `GET`  | `/api/v1/status/<job_id>` | Poll job status + last 2 KB of output |
+
+The new diagnostics path remains read-only by construction. It only accepts:
+
+- `get-pods`
+- `describe-pod`
+- `logs`
+- `get-apps`
+- `describe-app`
+- `get-appsets`
+
+and only for repo-owned contexts/namespaces.
 
 ### Auth chain
 

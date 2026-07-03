@@ -1,9 +1,10 @@
-const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade'])
+const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-diagnose', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade'])
 const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'az'])
 const ALL_PROVIDERS     = new Set(['aws', 'gcp', 'az', 'hostinger'])
 const PROVIDER_ALIASES  = { azure: 'az' }
 const COMMAND_ROLES     = Object.freeze({
   '/cluster-status': 'reader',
+  '/cluster-diagnose': 'reader',
   '/hostinger-status': 'reader',
   '/cluster-refresh': 'operator',
   '/cluster-up': 'admin',
@@ -20,6 +21,52 @@ function resolveProvider(text, dflt) {
   const t = (text || '').trim().toLowerCase()
   const p = PROVIDER_ALIASES[t] || t
   return ALL_PROVIDERS.has(p) ? p : dflt
+}
+
+function parseClusterDiagnose(text) {
+  const parts = (text || '').trim().split(/\s+/).filter(Boolean)
+  let target = 'hostinger'
+  let index = 0
+  if (parts[0] && ['hostinger', 'aws', 'gcp', 'az', 'azure', 'hub'].includes(parts[0].toLowerCase())) {
+    target = parts[0].toLowerCase() === 'azure' ? 'az' : parts[0].toLowerCase()
+    index = 1
+  }
+  const verb = parts[index] || ''
+  if (!verb) {
+    return { error: 'Usage: /cluster-diagnose [hostinger|aws|gcp|az|hub] <pods <namespace>|describe-pod <namespace> <pod>|logs <namespace> <pod> [container]|apps|app <name>|appsets>' }
+  }
+  if (verb === 'pods') {
+    const namespace = parts[index + 1] || ''
+    if (!namespace) return { error: 'Usage: /cluster-diagnose [provider|hub] pods <namespace>' }
+    return { payload: { provider: target, action: 'get-pods', namespace } }
+  }
+  if (verb === 'describe-pod') {
+    const namespace = parts[index + 1] || ''
+    const name = parts[index + 2] || ''
+    if (!namespace || !name) return { error: 'Usage: /cluster-diagnose [provider|hub] describe-pod <namespace> <pod>' }
+    return { payload: { provider: target, action: 'describe-pod', namespace, name } }
+  }
+  if (verb === 'logs') {
+    const namespace = parts[index + 1] || ''
+    const name = parts[index + 2] || ''
+    const container = parts[index + 3] || ''
+    if (!namespace || !name) return { error: 'Usage: /cluster-diagnose [provider|hub] logs <namespace> <pod> [container]' }
+    const payload = { provider: target, action: 'logs', namespace, name }
+    if (container) payload.container = container
+    return { payload }
+  }
+  if (verb === 'apps') {
+    return { payload: { provider: target, action: 'get-apps' } }
+  }
+  if (verb === 'app') {
+    const name = parts[index + 1] || ''
+    if (!name) return { error: 'Usage: /cluster-diagnose [hub] app <name>' }
+    return { payload: { provider: target, action: 'describe-app', name } }
+  }
+  if (verb === 'appsets') {
+    return { payload: { provider: target, action: 'get-appsets' } }
+  }
+  return { error: 'Unsupported diagnostic. Use pods, describe-pod, logs, apps, app, or appsets.' }
 }
 
 async function verifySlack(request, body) {
@@ -167,6 +214,19 @@ async function handle(req, event) {
     })())
     const _where = provider === 'hostinger' ? 'Hostinger' : `lab sandbox (${provider})`
     return jsonReply(`🔍 Checking ${_where} cluster status…`, threadTs, true)
+  }
+
+  if (command === '/cluster-diagnose') {
+    const parsed = parseClusterDiagnose(text)
+    if (parsed.error) return jsonReply(parsed.error, threadTs)
+    const payload = { ...parsed.payload, response_url: responseUrl }
+    if (threadTs) payload.thread_ts = threadTs
+    event.waitUntil((async () => {
+      const { ok, conflict } = await relay('/api/v1/diagnostics', payload, meta)
+      if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)
+      else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+    })())
+    return jsonReply(`🔎 Running \`${parsed.payload.action}\` against *${parsed.payload.provider}*…`, threadTs, true)
   }
 
   if (command === '/hostinger-status') {

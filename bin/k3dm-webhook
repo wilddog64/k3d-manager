@@ -187,9 +187,27 @@ _running_procs_lock = threading.Lock()
 _ask_semaphore = threading.Semaphore(2)
 _ROLE_LEVELS = {"reader": 1, "operator": 2, "admin": 3}
 _ROLE_DEFAULT = "admin"
+_DIAGNOSTIC_CONTEXTS = {
+    "k3d-k3d-cluster",
+    "ubuntu-hostinger",
+    "ubuntu-k3s",
+    "ubuntu-gcp",
+    "ubuntu-azure",
+}
+_DIAGNOSTIC_NAMESPACES = {
+    "cicd",
+    "identity",
+    "monitoring",
+    "platform-ops",
+    "secrets",
+    "shopping-cart-apps",
+    "trivy-system",
+}
+_RESOURCE_NAME_RE = re.compile(r"^[a-z0-9]([-.a-z0-9]*[a-z0-9])?$")
 _ACTION_POLICY = {
     "/api/v1/argocd-upgrade": {"name": "argocd-upgrade", "min_role": "admin"},
     "/api/v1/cluster-status": {"name": "cluster-status", "min_role": "reader"},
+    "/api/v1/diagnostics": {"name": "diagnostics", "min_role": "reader"},
     "/api/v1/hostinger-status": {"name": "hostinger-status", "min_role": "reader"},
     "/api/v1/cluster-refresh": {"name": "cluster-refresh", "min_role": "operator"},
     "/api/v1/cluster-resume": {"name": "cluster-resume", "min_role": "admin"},
@@ -250,6 +268,69 @@ def _audit_remote_action(path, action_name, actor, role, allowed, body=None, rea
             handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
     except OSError:
         pass
+
+
+def _resolve_diagnostics_context(provider="", context=""):
+    context = (context or "").strip()
+    if context:
+        return context
+    provider = (provider or "").strip().lower()
+    if provider == "hub":
+        return "k3d-k3d-cluster"
+    return _provider_context(provider)
+
+
+def _validate_namespace(namespace):
+    namespace = (namespace or "").strip()
+    if namespace not in _DIAGNOSTIC_NAMESPACES:
+        return ""
+    return namespace
+
+
+def _validate_resource_name(name):
+    name = (name or "").strip()
+    return name if _RESOURCE_NAME_RE.match(name) else ""
+
+
+def _validate_diagnostics_request(body):
+    action = (body.get("action", "") or "").strip()
+    allowed_actions = {"get-pods", "describe-pod", "logs", "get-apps", "describe-app", "get-appsets"}
+    if action not in allowed_actions:
+        return "unsupported diagnostics action"
+    context = _resolve_diagnostics_context(body.get("provider", ""), body.get("context", ""))
+    if context not in _DIAGNOSTIC_CONTEXTS:
+        return "unsupported diagnostics context"
+    body["context"] = context
+    provider = (body.get("provider", "") or "").strip().lower()
+    if not provider:
+        provider = "hostinger" if context != "k3d-k3d-cluster" else "hub"
+    body["provider"] = provider
+    if action in {"get-apps", "describe-app", "get-appsets"} and context != "k3d-k3d-cluster":
+        return "ArgoCD diagnostics must target the hub context"
+    if action == "get-pods":
+        if not _validate_namespace(body.get("namespace", "")):
+            return "namespace must be one of the approved repo-owned namespaces"
+        return None
+    if action in {"describe-pod", "logs"}:
+        if not _validate_namespace(body.get("namespace", "")):
+            return "namespace must be one of the approved repo-owned namespaces"
+        if not _validate_resource_name(body.get("name", "")):
+            return "resource name must be a Kubernetes-safe pod name"
+        if action == "logs":
+            container = (body.get("container", "") or "").strip()
+            if container and not _validate_resource_name(container):
+                return "container must be a Kubernetes-safe container name"
+            try:
+                tail_lines = int(body.get("tail_lines", 120))
+            except (TypeError, ValueError):
+                return "tail_lines must be an integer"
+            if tail_lines < 1 or tail_lines > 200:
+                return "tail_lines must be between 1 and 200"
+            body["tail_lines"] = tail_lines
+        return None
+    if action == "describe-app" and not _validate_resource_name(body.get("name", "")):
+        return "application name must be a Kubernetes-safe resource name"
+    return None
 
 
 def _get_token():
@@ -2132,6 +2213,100 @@ def _run_hostinger_refresh(job_id, response_url, thread_ts=None):
         _finish("failed")
 
 
+def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, request=None):
+    """Run an explicit read-only diagnostic command and post the result."""
+    job_dir = JOB_DIR / job_id
+    if thread_ts:
+        (job_dir / "thread_ts").write_text(thread_ts)
+    lines = []
+
+    def _log(msg):
+        lines.append(msg + "\n")
+
+    def _finish(status):
+        (job_dir / "status").write_text(status)
+        output = "".join(lines)
+        (job_dir / "output").write_text(output)
+        if response_url:
+            _slack_post(response_url, output)
+        else:
+            _notify_job(job_id, output)
+
+    try:
+        req = dict(request or {})
+        action = req["action"]
+        context = req["context"]
+        provider = req.get("provider", "hostinger")
+        namespace = req.get("namespace", "")
+        name = req.get("name", "")
+        tail_lines = req.get("tail_lines", 120)
+        cmd = []
+        title = ""
+
+        if action == "get-pods":
+            title = f"🔎 *Diagnostics* — pods in `{namespace}` on `{context}`"
+            cmd = [
+                "kubectl", "get", "pods", "-n", namespace,
+                "--context", context, "-o", "wide",
+                "--request-timeout=15s",
+            ]
+        elif action == "describe-pod":
+            title = f"🔎 *Diagnostics* — describe pod `{name}` in `{namespace}` on `{context}`"
+            cmd = [
+                "kubectl", "describe", "pod", name, "-n", namespace,
+                "--context", context, "--request-timeout=15s",
+            ]
+        elif action == "logs":
+            title = f"🔎 *Diagnostics* — logs for pod `{name}` in `{namespace}` on `{context}`"
+            cmd = [
+                "kubectl", "logs", f"pod/{name}", "-n", namespace,
+                "--context", context, f"--tail={tail_lines}",
+                "--request-timeout=15s",
+            ]
+            if req.get("container", ""):
+                cmd.extend(["-c", req["container"]])
+        elif action == "get-apps":
+            title = "🔎 *Diagnostics* — ArgoCD applications on `k3d-k3d-cluster`"
+            cmd = [
+                "kubectl", "get", "applications", "-n", "cicd",
+                "--context", "k3d-k3d-cluster", "--no-headers",
+                "-o", "custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status",
+                "--request-timeout=15s",
+            ]
+        elif action == "describe-app":
+            title = f"🔎 *Diagnostics* — describe ArgoCD app `{name}`"
+            cmd = [
+                "kubectl", "describe", "application", name, "-n", "cicd",
+                "--context", "k3d-k3d-cluster", "--request-timeout=15s",
+            ]
+        elif action == "get-appsets":
+            title = "🔎 *Diagnostics* — ArgoCD ApplicationSets on `k3d-k3d-cluster`"
+            cmd = [
+                "kubectl", "get", "applicationsets", "-n", "cicd",
+                "--context", "k3d-k3d-cluster", "-o", "wide",
+                "--request-timeout=15s",
+            ]
+
+        _log(title)
+        _log(f"_Target provider: `{provider}`_")
+        out, timed_out = _posix_spawn_capture(cmd, timeout=30)
+        if timed_out:
+            _log("\n❌ diagnostics command timed out after 30s")
+            _finish("failed")
+            return
+        if out.strip():
+            clipped = out.strip()
+            if len(clipped) > 3500:
+                clipped = clipped[-3500:]
+            _log(f"```{clipped}```")
+        else:
+            _log("_(no output returned)_")
+        _finish("success")
+    except Exception as exc:
+        _log(f"ERROR: {exc}")
+        _finish("failed")
+
+
 def _run_analyze(job_id, alert_payload, response_url=""):
     """Gather kubectl diagnostics for firing alerts; call Claude; post to Slack."""
     job_dir = JOB_DIR / job_id
@@ -2788,6 +2963,25 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 target=_run_hostinger_status if provider == "hostinger" else _run_cluster_status,
                 args=(job_id, response_url),
                 kwargs={"thread_ts": thread_ts, "provider": provider},
+                daemon=True
+            ).start()
+            self._json(202, {"job_id": job_id, "status": "queued"})
+            return
+
+        if self.path == "/api/v1/diagnostics":
+            validation_error = _validate_diagnostics_request(body)
+            if validation_error:
+                self._json(400, {"error": validation_error})
+                return
+            response_url = body.get("response_url", "")
+            thread_ts = body.get("thread_ts", None)
+            job_id = str(uuid.uuid4())[:8]
+            (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
+            (JOB_DIR / job_id / "status").write_text("queued")
+            threading.Thread(
+                target=_run_cluster_diagnostics,
+                args=(job_id, response_url),
+                kwargs={"thread_ts": thread_ts, "request": body},
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})

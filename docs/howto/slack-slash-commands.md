@@ -1,6 +1,6 @@
 # Slack Slash Commands & Webhook Server
 
-Slack slash commands (`/cluster-up`, `/cluster-down`, `/cluster-status`, `/cluster-refresh`,
+Slack slash commands (`/cluster-up`, `/cluster-down`, `/cluster-status`, `/cluster-diagnose`, `/cluster-refresh`,
 `/cluster-resume`, `/hostinger-status`, `/claude`, `/gemini`, `/codex`, `/argocd-upgrade`)
 that control the k3d-manager cluster from any Slack channel, plus thread-based AI troubleshooting
 and job control via thread replies.
@@ -64,7 +64,7 @@ remote-operator role. The webhook enforces that role before it queues work.
 
 | Role | Allowed commands |
 |------|------------------|
-| `reader` | `/cluster-status`, `/hostinger-status`, `/ask`, `/claude`, `/gemini`, `/codex` |
+| `reader` | `/cluster-status`, `/cluster-diagnose`, `/hostinger-status`, `/ask`, `/claude`, `/gemini`, `/codex` |
 | `operator` | `/cluster-refresh` plus everything in `reader` |
 | `admin` | `/cluster-up`, `/cluster-down`, `/cluster-resume`, `/argocd-upgrade` plus everything in `operator` |
 
@@ -124,6 +124,12 @@ Run once per machine. Safe to re-run.
         "command": "/cluster-status",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Check cluster status",
+        "should_escape": false
+      },
+      {
+        "command": "/cluster-diagnose",
+        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
+        "description": "Run read-only cluster diagnostics",
         "should_escape": false
       },
       {
@@ -280,6 +286,7 @@ bin/k3dm-webhook-setup --uninstall
 | `/cluster-up [aws\|gcp\|az\|hostinger]` | Provision cluster | Hostinger is the permanent app cluster; others are lab sandboxes |
 | `/cluster-down [aws\|gcp\|az\|hostinger]` | Tear down cluster | Hostinger tears down the permanent app cluster |
 | `/cluster-status [aws\|gcp\|az\|hostinger]` | Check cluster health | kubectl nodes + ArgoCD app status + smoke test |
+| `/cluster-diagnose [hostinger\|aws\|gcp\|az\|hub] ...` | Run read-only diagnostics | `pods`, `describe-pod`, `logs`, `apps`, `app`, `appsets` only |
 | `/cluster-refresh [aws\|gcp\|az\|hostinger]` | Restore tunnel + credentials | Re-establishes SSH tunnel, refreshes kubeconfig |
 | `/cluster-resume <aws\|gcp\|az>` | Resume provision from last checkpoint | Skips completed steps |
 | `/hostinger-status` | Check Hostinger app cluster status | Read-only status report for the permanent app cluster |
@@ -290,6 +297,20 @@ bin/k3dm-webhook-setup --uninstall
 
 All commands respond immediately with an acknowledgement, then post results back to the
 channel via `response_url` when the job completes.
+
+### `/cluster-diagnose` usage
+
+Examples:
+
+- `/cluster-diagnose hostinger pods shopping-cart-apps`
+- `/cluster-diagnose hostinger describe-pod shopping-cart-apps frontend-abc123`
+- `/cluster-diagnose hostinger logs shopping-cart-apps frontend-abc123`
+- `/cluster-diagnose hub apps`
+- `/cluster-diagnose hub app shopping-cart-apps`
+- `/cluster-diagnose hub appsets`
+
+This path is deliberately read-only and the webhook rejects any namespace or
+context outside the repo-owned allowlist.
 
 ### Service smoke test
 
@@ -446,6 +467,7 @@ minimum role and returns `403` if the caller is below that threshold.
 Examples:
 
 - `reader` may run `/cluster-status`
+- `reader` may run `/cluster-diagnose`
 - `reader` may not run `/cluster-refresh`
 - `operator` may run `/cluster-refresh`
 - `operator` may not run `/cluster-up`
