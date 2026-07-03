@@ -64,15 +64,43 @@ Toggling the repo wiki setting off and back on via `gh repo edit` did not materi
 
 GitHub reports `has_wiki=true`, but the backing wiki repository has not been created yet. The normal `.wiki.git` remote remains unavailable, and the available CLI/API tools in this environment do not provide a direct "create first wiki page" endpoint.
 
-In practice, this looks like a GitHub bootstrap condition where the first wiki page must be created through the GitHub web UI before the `.wiki.git` remote exists.
+In practice, this was a GitHub bootstrap condition where the first wiki page had to be created through the GitHub web UI before the `.wiki.git` remote existed.
 
-## Recommended follow-up
+## Resolution
 
-1. Open the repo wiki in the GitHub web UI and create a single placeholder page manually.
-2. Retry:
+The repo owner created the first placeholder `Home` page in the GitHub web UI. After that:
 
-```bash
-git -C /private/tmp/k3d-manager-wiki push -u origin master
+```text
+$ git ls-remote git@github.com:wilddog64/k3d-manager.wiki.git
+64f615da26fededfd12def105c5f95b6a77d93b3	HEAD
+64f615da26fededfd12def105c5f95b6a77d93b3	refs/heads/master
 ```
 
-3. Once the first web-created page materializes the wiki backend, push the prepared wiki content from `/private/tmp/k3d-manager-wiki`.
+The prepared starter wiki was then rebased on top of the UI-created `Home` page and pushed successfully:
+
+```text
+$ git -C /private/tmp/k3d-manager-wiki push -u origin master
+To github.com:wilddog64/k3d-manager.wiki.git
+   25c08f4..64f615d  master -> master
+branch 'master' set up to track 'origin/master' by rebasing.
+```
+
+A fresh verification clone showed the published pages:
+
+```text
+Architecture.md
+Home.md
+Observability.md
+Operations.md
+Slack-Commands.md
+Troubleshooting.md
+_Sidebar.md
+```
+
+## Follow-up
+
+No further bootstrap action is required. Future wiki edits can now use the normal wiki git remote:
+
+```bash
+git clone git@github.com:wilddog64/k3d-manager.wiki.git
+```
