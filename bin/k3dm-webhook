@@ -1180,6 +1180,7 @@ def _posix_spawn_capture(cmd, timeout, cwd=None, env=None):
         spawn_cmd = list(cmd)
         spawn_exe = exe
     try:
+        RUN_DIR.mkdir(parents=True, exist_ok=True)
         with _tmp.NamedTemporaryFile(
             prefix="k3dm-ask-", suffix=".out", delete=False, mode="w", dir=str(RUN_DIR)
         ) as _f:

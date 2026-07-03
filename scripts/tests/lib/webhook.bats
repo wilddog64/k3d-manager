@@ -324,6 +324,11 @@ teardown_file() {
     [ "$status" -eq 0 ]
 }
 
+@test "webhook ask subprocess ensures the run dir exists before capturing" {
+    run grep -F -- 'RUN_DIR.mkdir(parents=True, exist_ok=True)' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+}
+
 @test "POST /analyze with correct token returns 202 and job_id" {
     run curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \

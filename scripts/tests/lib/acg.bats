@@ -185,14 +185,26 @@ EOF
   PATH="$old_path"
 }
 
-@test "acg_watch_start rewrites generated launchd logs into the k3d-manager run dir" {
-  local plist_path
-  export K3DM_RUN_DIR="${HOME}/.local/share/k3d-manager/run"
-  plist_path="${HOME}/Library/LaunchAgents/com.k3d-manager.acg-watch.plist"
+@test "acg_watch_start reloads the agent so retargeted run-dir logs take effect" {
+  local old_path fake_bin capture plist_path
+  export K3DM_RUN_DIR="${BATS_TEST_TMPDIR}/run"
+  export _ACG_WATCH_PLIST_PATH="${BATS_TEST_TMPDIR}/com.k3d-manager.acg-watch.plist"
+  export _ACG_WATCH_LAUNCHD_LABEL="com.k3d-manager.acg-watch"
+  plist_path="${_ACG_WATCH_PLIST_PATH}"
+  fake_bin="${BATS_TEST_TMPDIR}/bin"
+  capture="${BATS_TEST_TMPDIR}/launchctl-loads.log"
+  mkdir -p "${fake_bin}" "${K3DM_RUN_DIR}"
+
+  cat > "${fake_bin}/launchctl" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = "list" ]; then exit 0; fi
+if [ "\$1" = "load" ]; then grep -F 'k3d-manager-acg-watch.err' "\$2" >> "${capture}" || true; fi
+exit 0
+EOF
+  chmod +x "${fake_bin}/launchctl"
 
   __acg_stub_acg_watch_start() {
-    mkdir -p "$(dirname "${plist_path}")"
-    cat > "${plist_path}" <<'PLIST'
+    cat > "${_ACG_WATCH_PLIST_PATH}" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -204,15 +216,19 @@ EOF
 </dict>
 </plist>
 PLIST
+    launchctl load "${_ACG_WATCH_PLIST_PATH}"
   }
   export -f __acg_stub_acg_watch_start
 
+  old_path="${PATH}"
+  export PATH="${fake_bin}:${PATH}"
   run acg_watch_start "https://example.com/sandbox"
-  [ "$status" -eq 0 ]
-
-  run grep -F -- "${K3DM_RUN_DIR}/k3d-manager-acg-watch.out" "${plist_path}"
+  export PATH="${old_path}"
   [ "$status" -eq 0 ]
 
   run grep -F -- "${K3DM_RUN_DIR}/k3d-manager-acg-watch.err" "${plist_path}"
   [ "$status" -eq 0 ]
+
+  run tail -n 1 "${capture}"
+  [[ "${output}" == *"${K3DM_RUN_DIR}/k3d-manager-acg-watch.err"* ]]
 }

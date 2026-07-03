@@ -43,9 +43,10 @@ _acg_stub_alias_function acg_chrome_cdp_uninstall __acg_stub_acg_chrome_cdp_unin
 _acg_stub_alias_function acg_teardown __acg_stub_acg_teardown
 
 _acg_watch_retarget_logs() {
-  local run_dir plist_path out_path err_path
+  local run_dir plist_path out_path err_path label
   run_dir="${K3DM_RUN_DIR:-${HOME}/.local/share/k3d-manager/run}"
   plist_path="${_ACG_WATCH_PLIST_PATH:-${HOME}/Library/LaunchAgents/com.k3d-manager.acg-watch.plist}"
+  label="${_ACG_WATCH_LAUNCHD_LABEL:-com.k3d-manager.acg-watch}"
   out_path="${run_dir}/k3d-manager-acg-watch.out"
   err_path="${run_dir}/k3d-manager-acg-watch.err"
 
@@ -70,6 +71,11 @@ data["StandardErrorPath"] = err_path
 with plist_path.open('wb') as handle:
     plistlib.dump(data, handle, sort_keys=False)
 PY
+
+  if command -v launchctl >/dev/null 2>&1 && launchctl list "${label}" >/dev/null 2>&1; then
+    launchctl unload "${plist_path}" 2>/dev/null || true
+    launchctl load "${plist_path}" 2>/dev/null || true
+  fi
 }
 
 function acg_import_credentials()   { __acg_stub_acg_import_credentials "$@"; }
