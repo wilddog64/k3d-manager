@@ -112,66 +112,77 @@ Run once per machine. Safe to re-run.
         "command": "/cluster-up",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Start the lab sandbox cluster",
+        "usage_hint": "[aws|gcp|az|hostinger]  e.g. hostinger",
         "should_escape": false
       },
       {
         "command": "/cluster-down",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Stop the lab sandbox cluster",
+        "usage_hint": "[aws|gcp|az|hostinger]  e.g. hostinger",
         "should_escape": false
       },
       {
         "command": "/cluster-status",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Check cluster status",
+        "usage_hint": "[aws|gcp|az|hostinger]  e.g. hostinger",
         "should_escape": false
       },
       {
         "command": "/cluster-diagnose",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Run read-only cluster diagnostics",
+        "usage_hint": "[hostinger|aws|gcp|az|hub] ...  e.g. hostinger pods shopping-cart-apps",
         "should_escape": false
       },
       {
         "command": "/cluster-refresh",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Refresh cluster credentials and tunnel",
+        "usage_hint": "[aws|gcp|az|hostinger]  e.g. hostinger",
         "should_escape": false
       },
       {
         "command": "/cluster-resume",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Resume cluster provision from last checkpoint",
+        "usage_hint": "[aws|gcp|az]  e.g. aws",
         "should_escape": false
       },
       {
         "command": "/hostinger-status",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Check Hostinger app cluster status",
+        "usage_hint": "e.g. no args",
         "should_escape": false
       },
       {
         "command": "/claude",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Ask Claude a cluster question",
+        "usage_hint": "<question>  e.g. why is frontend degraded?",
         "should_escape": false
       },
       {
         "command": "/gemini",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Ask Gemini a cluster question",
+        "usage_hint": "<question>  e.g. why is data-layer out of sync?",
         "should_escape": false
       },
       {
         "command": "/codex",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Ask Codex a cluster question",
+        "usage_hint": "<question>  e.g. explain this ArgoCD drift",
         "should_escape": false
       },
       {
         "command": "/argocd-upgrade",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Upgrade ArgoCD platform-ops",
+        "usage_hint": "<chart_version> [acg|infra]  e.g. 9.5.15 infra",
         "should_escape": false
       }
     ]
@@ -281,19 +292,19 @@ bin/k3dm-webhook-setup --uninstall
 
 ## Slash Commands Reference
 
-| Command | Action | Notes |
-|---------|--------|-------|
-| `/cluster-up [aws\|gcp\|az\|hostinger]` | Provision cluster | Hostinger is the permanent app cluster; others are lab sandboxes |
-| `/cluster-down [aws\|gcp\|az\|hostinger]` | Tear down cluster | Hostinger tears down the permanent app cluster |
-| `/cluster-status [aws\|gcp\|az\|hostinger]` | Check cluster health | kubectl nodes + ArgoCD app status + smoke test |
-| `/cluster-diagnose [hostinger\|aws\|gcp\|az\|hub] ...` | Run read-only diagnostics | `pods`, `describe-pod`, `logs`, `apps`, `app`, `appsets` only |
-| `/cluster-refresh [aws\|gcp\|az\|hostinger]` | Restore tunnel + credentials | Re-establishes SSH tunnel, refreshes kubeconfig |
-| `/cluster-resume <aws\|gcp\|az>` | Resume provision from last checkpoint | Skips completed steps |
-| `/hostinger-status` | Check Hostinger app cluster status | Read-only status report for the permanent app cluster |
-| `/claude <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
-| `/gemini <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
-| `/codex <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
-| `/argocd-upgrade` | Upgrade ArgoCD platform-ops | `/argocd-upgrade <chart_version> [acg\|infra]`; defaults to `infra`; `acg` runs `make up` first, `infra` patches the infra label directly |
+| Command | Action | Example | Notes |
+|---------|--------|---------|-------|
+| `/cluster-up [aws\|gcp\|az\|hostinger]` | Provision cluster | `/cluster-up hostinger` | Hostinger is the permanent app cluster; others are lab sandboxes |
+| `/cluster-down [aws\|gcp\|az\|hostinger]` | Tear down cluster | `/cluster-down hostinger` | Hostinger tears down the permanent app cluster |
+| `/cluster-status [aws\|gcp\|az\|hostinger]` | Check cluster health | `/cluster-status hostinger` | kubectl nodes + ArgoCD app status + smoke test |
+| `/cluster-diagnose [hostinger\|aws\|gcp\|az\|hub] ...` | Run read-only diagnostics | `/cluster-diagnose hostinger pods shopping-cart-apps` | `pods`, `describe-pod`, `logs`, `apps`, `app`, `appsets` only |
+| `/cluster-refresh [aws\|gcp\|az\|hostinger]` | Restore tunnel + credentials | `/cluster-refresh hostinger` | Re-establishes SSH tunnel, refreshes kubeconfig |
+| `/cluster-resume <aws\|gcp\|az>` | Resume provision from last checkpoint | `/cluster-resume aws` | Skips completed steps |
+| `/hostinger-status` | Check Hostinger app cluster status | `/hostinger-status` | Read-only status report for the permanent app cluster |
+| `/claude <question>` | Multi-agent cluster troubleshooting | `/claude why is frontend degraded?` | See [agent commands](#claude--gemini--codex-commands) below |
+| `/gemini <question>` | Multi-agent cluster troubleshooting | `/gemini why is data-layer out of sync?` | See [agent commands](#claude--gemini--codex-commands) below |
+| `/codex <question>` | Multi-agent cluster troubleshooting | `/codex explain this ArgoCD drift` | See [agent commands](#claude--gemini--codex-commands) below |
+| `/argocd-upgrade` | Upgrade ArgoCD platform-ops | `/argocd-upgrade 9.5.15 infra` | `/argocd-upgrade <chart_version> [acg\|infra]`; defaults to `infra`; `acg` runs `make up` first, `infra` patches the infra label directly |
 
 All commands respond immediately with an acknowledgement, then post results back to the
 channel via `response_url` when the job completes.
@@ -437,6 +448,8 @@ Fix mode uses the same timeout and turn limit as standard ask mode (300 s / 10 t
 | `fix-force-sync` | `APP` | `argocd app sync --force --timeout 180` |
 | `fix-eso-refresh` | — | `kubectl annotate clustersecretstore vault-backend` with reconcile timestamp |
 | `fix-status` | `NS` | `kubectl get nodes` and `kubectl get pods -n <NS>` |
+
+`FIX_CONTEXT` defaults to `ubuntu-k3s`. Override with `make fix-restart APP=x NS=y FIX_CONTEXT=k3d-k3d-cluster`.
 
 ---
 
