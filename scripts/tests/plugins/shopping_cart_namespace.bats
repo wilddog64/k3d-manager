@@ -21,3 +21,11 @@ setup() {
   run grep -qF -- "kubernetes.io/dockerconfigjson" "${BATS_TEST_DIRNAME}/../../../services/shopping-cart-namespace/ghcr-pull-secret-externalsecret.yaml"
   [ "$status" -eq 0 ]
 }
+
+@test "shopping-cart-frontend deployment uses ghcr pull secret" {
+  run grep -qF -- "imagePullSecrets:" "${BATS_TEST_DIRNAME}/../../../services/shopping-cart-frontend/kustomization.yaml"
+  [ "$status" -eq 0 ]
+
+  run grep -qF -- "- name: ghcr-pull-secret" "${BATS_TEST_DIRNAME}/../../../services/shopping-cart-frontend/kustomization.yaml"
+  [ "$status" -eq 0 ]
+}
