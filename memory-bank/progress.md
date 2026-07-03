@@ -1,6 +1,8 @@
 # Progress — k3d-manager
 
-## Status (v1.11.0 RELEASED 2026-06-28; v1.12.0 — next branch)
+## Status (v1.11.0 RELEASED 2026-06-28; v1.12.0 — PR in prep)
+
+- **[ ] IN PROGRESS (Claude, 2026-07-03) — v1.12.0 release PR:** branch `k3d-manager-v1.12.0` is 165 commits ahead of `main` (12 feat, 71 fix, 92 docs), all validated. CHANGELOG `[1.12.0] - 2026-07-03` written. Webhook modularization deferred to v1.13.0 (`docs/plans/v1.13.0-webhook-modularization.md`); remote-operator broker also deferred. Next: commit release docs, open PR, tag Copilot, monitor CI (fires on PR open). Do NOT merge without go-ahead. PR URL: pending.
 
 - **[x] COMPLETE (Codex, 2026-07-03) — acg-watch log retarget now reloads the live agent and the webhook capture path self-creates the run dir:** implemented on `k3d-manager-v1.12.0` as commit `02975e0a` (`fix(acg): reload watcher so retargeted run-dir logs take effect`). `scripts/plugins/acg.sh` now reloads the watcher after plist retargeting, `bin/k3dm-webhook` now creates `RUN_DIR` inside `_posix_spawn_capture()`, `scripts/tests/lib/acg.bats` replaces the old plist-only assertion with a reload-aware fake-`launchctl` regression, and `scripts/tests/lib/webhook.bats` now asserts the mkdir line. Validation passed with `shellcheck -S warning scripts/plugins/acg.sh scripts/tests/lib/acg.bats scripts/tests/lib/webhook.bats` (clean), `bash -n scripts/plugins/acg.sh` (clean), `PYTHONPYCACHEPREFIX=/tmp python3 -m py_compile bin/k3dm-webhook` (clean), `bats scripts/tests/lib/acg.bats scripts/tests/lib/webhook.bats` (`1..55`, all pass with expected skips), and `./scripts/k3d-manager _agent_audit` (exit 0). The new reload-aware ACG test was also verified to fail on the pre-fix implementation in `/tmp/k3dm-acg-prefx-check` (`not ok 13 ...` because the final load still used `/tmp`). Spec: `docs/bugs/v1.12.0-bugfix-acg-watch-log-retarget.md`.
 
