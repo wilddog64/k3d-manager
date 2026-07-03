@@ -192,6 +192,72 @@ teardown_file() {
     [ "$output" = "401" ]
 }
 
+@test "POST /cluster-status with reader role returns 202" {
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: reader" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-status" \
+        -H "Content-Type: application/json" \
+        -d '{"provider":"hostinger"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster-status"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"queued"'* ]]
+}
+
+@test "POST /cluster-refresh with reader role returns 403" {
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: reader" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-refresh" \
+        -H "Content-Type: application/json" \
+        -d '{"provider":"hostinger"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster-refresh"
+    [ "$status" -eq 0 ]
+    [ "$output" = "403" ]
+}
+
+@test "POST /cluster-refresh with operator role returns 202" {
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: operator" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-refresh" \
+        -H "Content-Type: application/json" \
+        -d '{"provider":"hostinger"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster-refresh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"queued"'* ]]
+}
+
+@test "POST /cluster up with operator role returns 403" {
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: operator" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-up" \
+        -H "Content-Type: application/json" \
+        -d '{"action":"up","provider":"hostinger"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster"
+    [ "$status" -eq 0 ]
+    [ "$output" = "403" ]
+}
+
+@test "webhook remote operator access defines policy and audit log" {
+    run grep -F -- '_ROLE_LEVELS = {"reader": 1, "operator": 2, "admin": 3}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- 'AUDIT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "audit"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- '"/api/v1/cluster-refresh": {"name": "cluster-refresh", "min_role": "operator"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- 'return {"name": f"cluster-{action}", "min_role": "admin"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+}
+
 @test "webhook analysis defaults to agy CLI instead of gemini" {
     run grep -F -- 'os.environ.get("K3DM_GEMINI_BIN", "agy")' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]

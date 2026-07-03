@@ -89,9 +89,9 @@ sequenceDiagram
     Slack->>Worker: POST /slack/commands<br/>(X-Slack-Signature, response_url)
     Note over Worker: HMAC-SHA256 verify<br/>timestamp ±300s replay guard
     Worker->>Slack: 200 ⏳ Bringing up ACG cluster…
-    Worker->>Tunnel: POST /api/v1/cluster<br/>Authorization: Bearer <token><br/>{action:"up", provider:"aws", response_url}
+    Worker->>Tunnel: POST /api/v1/cluster<br/>Authorization: Bearer <token><br/>X-K3DM-Role / Actor / Source-Command<br/>{action:"up", provider:"aws", response_url}
     Tunnel->>WH: HTTP POST 127.0.0.1:7443
-    Note over WH: Bearer token auth<br/>409 if cluster job already running
+    Note over WH: Bearer token auth<br/>role check + audit log<br/>409 if cluster job already running
     WH->>Job: spawn thread, write status=running
     WH->>Worker: 202 {job_id}
     Job->>Bin: subprocess (make up)
@@ -118,6 +118,21 @@ sequenceDiagram
 | `POST` | `/api/v1/cluster-status` | cluster health check → Slack |
 | `POST` | `/api/v1/cluster-refresh` | `bin/acg-refresh` — restore tunnel + credentials |
 | `POST` | `/api/v1/cluster-resume` | `bin/acg-up` from last checkpoint |
+
+### Remote-operator metadata
+
+The Worker now forwards three additional headers on brokered operator calls:
+
+- `X-K3DM-Role`
+- `X-K3DM-Actor`
+- `X-K3DM-Source-Command`
+
+The webhook uses them to:
+
+- authorize actions against a minimum-role policy
+- emit JSONL audit records under `~/.local/share/k3d-manager/audit/`
+- keep Slack/Cloudflare-triggered operator access scoped to explicit
+  `k3d-manager` workflows rather than arbitrary shell
 | `POST` | `/api/v1/ask` | AI agent question (claude / gemini / codex) → Slack |
 | `POST` | `/api/v1/argocd-upgrade` | ArgoCD label-patch workflow (`chart_version`, stage: `acg` \| `infra`) |
 | `POST` | `/slack/events` | Slack Events API — thread replies, URL verification |

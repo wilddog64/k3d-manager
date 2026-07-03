@@ -2,6 +2,19 @@ const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-stat
 const VALID_PROVIDERS   = new Set(['aws', 'gcp', 'az'])
 const ALL_PROVIDERS     = new Set(['aws', 'gcp', 'az', 'hostinger'])
 const PROVIDER_ALIASES  = { azure: 'az' }
+const COMMAND_ROLES     = Object.freeze({
+  '/cluster-status': 'reader',
+  '/hostinger-status': 'reader',
+  '/cluster-refresh': 'operator',
+  '/cluster-up': 'admin',
+  '/cluster-down': 'admin',
+  '/cluster-resume': 'admin',
+  '/argocd-upgrade': 'admin',
+  '/ask': 'reader',
+  '/claude': 'reader',
+  '/gemini': 'reader',
+  '/codex': 'reader',
+})
 
 function resolveProvider(text, dflt) {
   const t = (text || '').trim().toLowerCase()
@@ -29,19 +42,26 @@ async function verifySlack(request, body) {
   return diff === 0
 }
 
-async function relay(endpoint, payload) {
+async function relay(endpoint, payload, meta = {}) {
   try {
     const resp = await fetch(`${WEBHOOK_URL}${endpoint}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${WEBHOOK_TOKEN}`,
-        'Content-Type':  'application/json'
+        'Content-Type':  'application/json',
+        'X-K3DM-Role': meta.role || 'reader',
+        'X-K3DM-Actor': meta.actor || 'slack:unknown',
+        'X-K3DM-Source-Command': meta.sourceCommand || 'unknown',
       },
       body: JSON.stringify(payload)
     })
     if (resp.status === 409) {
       const data = await resp.json().catch(() => ({}))
       return { ok: false, conflict: data.error || 'cluster job already running' }
+    }
+    if (resp.status === 403) {
+      const data = await resp.json().catch(() => ({}))
+      return { ok: false, conflict: data.error || 'forbidden' }
     }
     return { ok: resp.ok, conflict: null }
   } catch (_) {
@@ -100,6 +120,11 @@ async function handle(req, event) {
   const text        = (p.get('text')      || '').trim()
   const responseUrl = p.get('response_url') || ''
   const threadTs    = p.get('thread_ts')  || ''
+  const userId      = p.get('user_id')    || ''
+  const userName    = p.get('user_name')  || ''
+  const role        = COMMAND_ROLES[command] || 'reader'
+  const actor       = userName ? `slack:${userName}${userId ? `:${userId}` : ''}` : `slack:${userId || 'unknown'}`
+  const meta        = { role, actor, sourceCommand: command }
 
   if (!ALLOWED_COMMANDS.has(command)) return jsonReply(`Unknown command: ${command}`, threadTs)
 
@@ -107,7 +132,7 @@ async function handle(req, event) {
     const provider = resolveProvider(text, 'hostinger')
     const payload = { action: 'up', provider, response_url: responseUrl }
     event.waitUntil((async () => {
-      const { ok, conflict } = await relay('/api/v1/cluster', payload)
+      const { ok, conflict } = await relay('/api/v1/cluster', payload, meta)
       if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict} — use /cluster-status to check progress`)
       else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
@@ -121,7 +146,7 @@ async function handle(req, event) {
     const provider = resolveProvider(text, 'aws')
     const payload = { action: 'down', provider, response_url: responseUrl }
     event.waitUntil((async () => {
-      const { ok, conflict } = await relay('/api/v1/cluster', payload)
+      const { ok, conflict } = await relay('/api/v1/cluster', payload, meta)
       if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict} — use /cluster-status to check progress`)
       else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
@@ -136,8 +161,9 @@ async function handle(req, event) {
     const payload = { provider, response_url: responseUrl }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
-      const { ok } = await relay('/api/v1/cluster-status', payload)
-      if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+      const { ok, conflict } = await relay('/api/v1/cluster-status', payload, meta)
+      if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)
+      else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
     const _where = provider === 'hostinger' ? 'Hostinger' : `lab sandbox (${provider})`
     return jsonReply(`🔍 Checking ${_where} cluster status…`, threadTs, true)
@@ -147,8 +173,9 @@ async function handle(req, event) {
     const payload = { response_url: responseUrl }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
-      const { ok } = await relay('/api/v1/hostinger-status', payload)
-      if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+      const { ok, conflict } = await relay('/api/v1/hostinger-status', payload, meta)
+      if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)
+      else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
     return jsonReply('🖥️ Checking Hostinger app cluster status…', threadTs, true)
   }
@@ -158,8 +185,9 @@ async function handle(req, event) {
     const payload = { provider, response_url: responseUrl }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
-      const { ok } = await relay('/api/v1/cluster-refresh', payload)
-      if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+      const { ok, conflict } = await relay('/api/v1/cluster-refresh', payload, meta)
+      if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)
+      else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
     const _msg = provider === 'hostinger'
       ? '🔄 Refreshing Hostinger kubeconfig + ArgoCD registration…'
@@ -174,7 +202,7 @@ async function handle(req, event) {
     }
     const payload = { provider, response_url: responseUrl }
     event.waitUntil((async () => {
-      const { ok, conflict } = await relay('/api/v1/cluster-resume', payload)
+      const { ok, conflict } = await relay('/api/v1/cluster-resume', payload, meta)
       if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict} — use /cluster-status to check progress`)
       else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
@@ -196,8 +224,9 @@ async function handle(req, event) {
     const payload = { agent, question, response_url: responseUrl }
     if (threadTs) payload.thread_ts = threadTs
     event.waitUntil((async () => {
-      const { ok } = await relay('/api/v1/ask', payload)
-      if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
+      const { ok, conflict } = await relay('/api/v1/ask', payload, meta)
+      if (conflict) await postResponseUrl(responseUrl, `⚠️ ${conflict}`)
+      else if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
     return jsonReply(`🤖 Asking ${agent}…`, threadTs, true)
   }
@@ -210,7 +239,7 @@ async function handle(req, event) {
     if (!['acg', 'infra'].includes(stage)) return jsonReply('stage must be acg or infra', threadTs)
     event.waitUntil((async () => {
       const { ok } = await relay('/api/v1/argocd-upgrade',
-        { chart_version: version, stage, response_url: responseUrl })
+        { chart_version: version, stage, response_url: responseUrl }, meta)
       if (!ok) await postResponseUrl(responseUrl, '❌ Webhook unreachable — try again in a moment')
     })())
     return jsonReply(`⏳ Upgrading ArgoCD to chart ${version} on ${stage}…`, threadTs, true)

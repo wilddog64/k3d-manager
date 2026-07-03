@@ -44,6 +44,7 @@ SHOPPING_CARTS_ROOT = os.environ.get(
 TOKEN_FILE = Path.home() / ".k3dm" / "webhook-token"
 JOB_DIR = Path(os.environ.get("K3DM_JOB_DIR", Path.home() / ".local/share/k3d-manager/webhook-jobs"))
 SCREENSHOT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "screenshots"
+AUDIT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "audit"
 _ASK_MAX_TURNS_DEFAULT = int(os.environ.get("K3DM_ASK_MAX_TURNS", "10"))
 SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
 PUSHGATEWAY_URL = os.environ.get("K3DM_PUSHGATEWAY_URL", "http://localhost:9091")
@@ -184,6 +185,71 @@ _SCREENSHOT_RE = re.compile(r"INFO: Screenshot saved to (.+?/k3dm-acg-screenshot
 _running_procs: dict = {}
 _running_procs_lock = threading.Lock()
 _ask_semaphore = threading.Semaphore(2)
+_ROLE_LEVELS = {"reader": 1, "operator": 2, "admin": 3}
+_ROLE_DEFAULT = "admin"
+_ACTION_POLICY = {
+    "/api/v1/argocd-upgrade": {"name": "argocd-upgrade", "min_role": "admin"},
+    "/api/v1/cluster-status": {"name": "cluster-status", "min_role": "reader"},
+    "/api/v1/hostinger-status": {"name": "hostinger-status", "min_role": "reader"},
+    "/api/v1/cluster-refresh": {"name": "cluster-refresh", "min_role": "operator"},
+    "/api/v1/cluster-resume": {"name": "cluster-resume", "min_role": "admin"},
+    "/api/v1/analyze": {"name": "analyze", "min_role": "operator"},
+    "/api/v1/ask": {"name": "ask", "min_role": "reader"},
+}
+
+
+def _normalize_role(role):
+    role = (role or "").strip().lower()
+    return role if role in _ROLE_LEVELS else _ROLE_DEFAULT
+
+
+def _request_role(headers):
+    return _normalize_role(headers.get("X-K3DM-Role", _ROLE_DEFAULT))
+
+
+def _request_actor(headers):
+    actor = (headers.get("X-K3DM-Actor", "") or "").strip()
+    return actor or "direct-token"
+
+
+def _request_source_command(headers):
+    source_command = (headers.get("X-K3DM-Source-Command", "") or "").strip()
+    return source_command or "direct-api"
+
+
+def _role_allows(actual_role, required_role):
+    return _ROLE_LEVELS[_normalize_role(actual_role)] >= _ROLE_LEVELS[_normalize_role(required_role)]
+
+
+def _action_policy(path, body):
+    if path == "/api/v1/cluster":
+        action = body.get("action", "")
+        if action == "kill":
+            return {"name": "cluster-kill", "min_role": "operator"}
+        if action in ("up", "down"):
+            return {"name": f"cluster-{action}", "min_role": "admin"}
+    return _ACTION_POLICY.get(path)
+
+
+def _audit_remote_action(path, action_name, actor, role, allowed, body=None, reason=""):
+    try:
+        AUDIT_DIR.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "path": path,
+            "action": action_name,
+            "actor": actor,
+            "role": _normalize_role(role),
+            "allowed": bool(allowed),
+            "reason": reason,
+            "provider": (body or {}).get("provider", ""),
+            "request_action": (body or {}).get("action", ""),
+            "source_command": (body or {}).get("_source_command", ""),
+        }
+        with open(AUDIT_DIR / "remote-operator.jsonl", "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    except OSError:
+        pass
 
 
 def _get_token():
@@ -2623,6 +2689,31 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(413, {"error": "request too large"})
             return
         body = json.loads(self.rfile.read(length) or b"{}")
+        body["_source_command"] = _request_source_command(self.headers)
+        request_role = _request_role(self.headers)
+        request_actor = _request_actor(self.headers)
+        action_policy = _action_policy(self.path, body)
+        if action_policy:
+            if not _role_allows(request_role, action_policy["min_role"]):
+                _audit_remote_action(
+                    self.path,
+                    action_policy["name"],
+                    request_actor,
+                    request_role,
+                    False,
+                    body=body,
+                    reason=f"requires {action_policy['min_role']}",
+                )
+                self._json(403, {"error": f"forbidden: {action_policy['name']} requires role {action_policy['min_role']}"})
+                return
+            _audit_remote_action(
+                self.path,
+                action_policy["name"],
+                request_actor,
+                request_role,
+                True,
+                body=body,
+            )
         if self.path == "/api/v1/argocd-upgrade":
             chart_version = body.get("chart_version", "")
             stage = body.get("stage", "")

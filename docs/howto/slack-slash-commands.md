@@ -57,6 +57,28 @@ See `docs/architecture/cloudflare-slack-relay.md` for the full component diagram
 
 ---
 
+## Remote Operator Roles
+
+The Slack relay stamps each forwarded cluster command with an explicit
+remote-operator role. The webhook enforces that role before it queues work.
+
+| Role | Allowed commands |
+|------|------------------|
+| `reader` | `/cluster-status`, `/hostinger-status`, `/ask`, `/claude`, `/gemini`, `/codex` |
+| `operator` | `/cluster-refresh` plus everything in `reader` |
+| `admin` | `/cluster-up`, `/cluster-down`, `/cluster-resume`, `/argocd-upgrade` plus everything in `operator` |
+
+The relay forwards these metadata headers to the webhook:
+
+- `X-K3DM-Role`
+- `X-K3DM-Actor`
+- `X-K3DM-Source-Command`
+
+Direct Bearer-token calls that do not provide a role header currently default
+to `admin` for backward compatibility with existing local automation.
+
+---
+
 ## One-time Bootstrap
 
 Run once per machine. Safe to re-run.
@@ -414,6 +436,19 @@ Every inbound request must pass both checks before any code runs:
   or does not match the value in macOS Keychain.
 
 Direct calls to `webhook.3ai-talk.org` without a valid Bearer token receive `401`.
+
+### 1.5. Role-aware command authorization
+
+For remote operator paths, the Cloudflare Worker attaches role and actor
+metadata to each forwarded request. The webhook maps each API action to its
+minimum role and returns `403` if the caller is below that threshold.
+
+Examples:
+
+- `reader` may run `/cluster-status`
+- `reader` may not run `/cluster-refresh`
+- `operator` may run `/cluster-refresh`
+- `operator` may not run `/cluster-up`
 
 ### 2. Input sanitization (`_sanitize_question`)
 

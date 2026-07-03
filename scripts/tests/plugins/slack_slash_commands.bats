@@ -38,3 +38,28 @@ WORKER="${BATS_TEST_DIRNAME}/../../../workers/slack-relay/index.js"
   run grep -F -- "const ALLOWED_COMMANDS = new Set(['/cluster-up', '/cluster-down', '/cluster-status', '/cluster-refresh', '/cluster-resume', '/hostinger-status', '/ask', '/claude', '/gemini', '/codex', '/argocd-upgrade'])" "${WORKER}"
   [ "${status}" -eq 0 ]
 }
+
+@test "slack relay assigns remote-operator roles to cluster commands" {
+  run grep -F -- "const COMMAND_ROLES     = Object.freeze({" "${WORKER}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- "'/cluster-status': 'reader'" "${WORKER}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- "'/cluster-refresh': 'operator'" "${WORKER}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- "'/cluster-up': 'admin'" "${WORKER}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "slack relay forwards remote-operator metadata headers" {
+  run grep -F -- "'X-K3DM-Role': meta.role || 'reader'" "${WORKER}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- "'X-K3DM-Actor': meta.actor || 'slack:unknown'" "${WORKER}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- "'X-K3DM-Source-Command': meta.sourceCommand || 'unknown'" "${WORKER}"
+  [ "${status}" -eq 0 ]
+}
