@@ -265,6 +265,7 @@ fi
 
 echo ""
 echo "=== Service Health ==="
+_observability_restore_alertmanager_access_layer >/dev/null 2>&1 || true
 _ALERTMANAGER_HEALTH_URL="${K3DM_ALERTMANAGER_HEALTH_URL:-https://alertmanager.3ai-talk.org/api/v2/status}"
 _ALERTMANAGER_AUTH_FILE="${K3DM_ALERTMANAGER_AUTH_FILE:-${HOME}/.local/share/k3d-manager/alertmanager-basic-auth.env}"
 _ALERTMANAGER_AUTH_USER=""

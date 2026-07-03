@@ -111,6 +111,32 @@ function _observability_install_alertmanager_port_forward() {
   _info "[observability] Alertmanager port-forward agent installed — raw backend stays open on port 19093"
 }
 
+function _observability_alertmanager_port_forward_plist() {
+  printf '%s/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist\n' "${HOME}"
+}
+
+function _observability_alertmanager_auth_proxy_plist() {
+  printf '%s/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist\n' "${HOME}"
+}
+
+function _observability_port_listening() {
+  local port="${1:-}"
+  command -v lsof >/dev/null 2>&1 \
+    && lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
+}
+
+function _observability_wait_for_port() {
+  local port="${1:-}"
+  local _attempt
+  for _attempt in 1 2 3 4 5; do
+    if _observability_port_listening "${port}"; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 function _observability_alertmanager_auth_file() {
   printf '%s/.local/share/k3d-manager/alertmanager-basic-auth.env\n' "${HOME}"
 }
@@ -227,6 +253,39 @@ function _observability_install_alertmanager_auth_proxy() {
   launchctl bootout "gui/$(id -u)/com.k3d-manager.alertmanager-auth-proxy" 2>/dev/null || true
   launchctl bootstrap "gui/$(id -u)" "${_plist}"
   _info "[observability] Alertmanager auth proxy installed — localhost:9093 now requires login"
+}
+
+function _observability_restore_alertmanager_access_layer() {
+  if ! _is_mac; then
+    return 0
+  fi
+
+  if ! command -v launchctl >/dev/null 2>&1 || ! command -v kubectl >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local _port_forward_plist _auth_proxy_plist _auth_file _needs_restore=0
+  _port_forward_plist="$(_observability_alertmanager_port_forward_plist)"
+  _auth_proxy_plist="$(_observability_alertmanager_auth_proxy_plist)"
+  _auth_file="$(_observability_alertmanager_auth_file)"
+
+  [[ -f "${_port_forward_plist}" ]] || _needs_restore=1
+  [[ -f "${_auth_proxy_plist}" ]] || _needs_restore=1
+  _observability_port_listening 19093 || _needs_restore=1
+  _observability_port_listening 9093 || _needs_restore=1
+
+  if [[ "${_needs_restore}" -eq 0 ]]; then
+    return 0
+  fi
+
+  _info "[observability] Alertmanager access layer missing — reinstalling local port-forward and auth proxy"
+  if [[ ! -f "${_auth_file}" ]]; then
+    _observability_ensure_alertmanager_login || true
+  fi
+  _observability_install_alertmanager_port_forward || true
+  _observability_install_alertmanager_auth_proxy || true
+  _observability_wait_for_port 19093 || true
+  _observability_wait_for_port 9093 || true
 }
 
 function _observability_acg_context() {

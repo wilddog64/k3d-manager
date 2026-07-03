@@ -18,6 +18,9 @@
 }
 
 @test "cluster-status surfaces Alertmanager Cloudflare health" {
+  run grep -nF '_observability_restore_alertmanager_access_layer' bin/cluster-status
+  [ "$status" -eq 0 ]
+
   run grep -nF 'alertmanager-basic-auth.env' bin/cluster-status
   [ "$status" -eq 0 ]
 

@@ -76,6 +76,7 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 - **Browser access:** `https://alertmanager.3ai-talk.org/` or `http://localhost:9093/`
 - **Health check:** `https://alertmanager.3ai-talk.org/api/v2/status`
 - **Credential behavior:** rereads `~/.local/share/k3d-manager/alertmanager-basic-auth.env` on each request so password rotation and file regeneration stay in sync without a manual restart
+- **Self-heal behavior:** `bin/cluster-status` now best-effort reinstalls the Alertmanager port-forward and auth-proxy LaunchAgents if the local plists or listeners (`19093`, `9093`) are missing, which covers the common post-reboot / unloaded-agent case before service health is checked
 - **Template:** `scripts/etc/launchd/com.k3d-manager.alertmanager-auth-proxy.plist.tmpl`
 - **Install:** `make install-alertmanager-auth-proxy`
 

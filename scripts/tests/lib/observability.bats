@@ -245,6 +245,52 @@ EOF
   [ "$status" -eq 0 ]
 }
 
+@test "observability restores alertmanager access layer when local agents are missing" {
+  local calls_log
+  calls_log="${BATS_TEST_TMPDIR}/alertmanager-restore.log"
+  export CALLS_LOG="${calls_log}"
+  run bash -c '
+    set -e
+    REPO_ROOT="$(pwd)"
+    SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    _is_mac() { return 0; }
+    command() { builtin command "$@"; }
+    launchctl() { return 0; }
+    kubectl() { return 0; }
+    _observability_port_listening() { return 1; }
+    _observability_wait_for_port() {
+      printf "wait:%s\n" "$1" >> "${CALLS_LOG}"
+    }
+    _observability_ensure_alertmanager_login() {
+      printf "login\n" >> "${CALLS_LOG}"
+    }
+    _observability_install_alertmanager_port_forward() {
+      printf "port-forward\n" >> "${CALLS_LOG}"
+    }
+    _observability_install_alertmanager_auth_proxy() {
+      printf "auth-proxy\n" >> "${CALLS_LOG}"
+    }
+    export -f _is_mac launchctl kubectl _observability_port_listening \
+      _observability_wait_for_port \
+      _observability_ensure_alertmanager_login \
+      _observability_install_alertmanager_port_forward \
+      _observability_install_alertmanager_auth_proxy
+    _observability_restore_alertmanager_access_layer
+  '
+  [ "$status" -eq 0 ]
+  run cat "${calls_log}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"login"* ]]
+  [[ "$output" == *"port-forward"* ]]
+  [[ "$output" == *"auth-proxy"* ]]
+  [[ "$output" == *"wait:19093"* ]]
+  [[ "$output" == *"wait:9093"* ]]
+}
+
 @test "trivy_scan_report calls kubectl get vulnerabilityreports -A for Hub context" {
   local kubectl_log
   kubectl_log="${BATS_TEST_TMPDIR}/kubectl-trivy-hub.log"
