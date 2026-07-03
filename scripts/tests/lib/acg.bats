@@ -184,3 +184,35 @@ EOF
 
   PATH="$old_path"
 }
+
+@test "acg_watch_start rewrites generated launchd logs into the k3d-manager run dir" {
+  local plist_path
+  export K3DM_RUN_DIR="${HOME}/.local/share/k3d-manager/run"
+  plist_path="${HOME}/Library/LaunchAgents/com.k3d-manager.acg-watch.plist"
+
+  __acg_stub_acg_watch_start() {
+    mkdir -p "$(dirname "${plist_path}")"
+    cat > "${plist_path}" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>StandardOutPath</key>
+  <string>/tmp/k3d-manager-acg-watch.out</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/k3d-manager-acg-watch.err</string>
+</dict>
+</plist>
+PLIST
+  }
+  export -f __acg_stub_acg_watch_start
+
+  run acg_watch_start "https://example.com/sandbox"
+  [ "$status" -eq 0 ]
+
+  run grep -F -- "${K3DM_RUN_DIR}/k3d-manager-acg-watch.out" "${plist_path}"
+  [ "$status" -eq 0 ]
+
+  run grep -F -- "${K3DM_RUN_DIR}/k3d-manager-acg-watch.err" "${plist_path}"
+  [ "$status" -eq 0 ]
+}

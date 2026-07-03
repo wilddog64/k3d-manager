@@ -45,6 +45,7 @@ TOKEN_FILE = Path.home() / ".k3dm" / "webhook-token"
 JOB_DIR = Path(os.environ.get("K3DM_JOB_DIR", Path.home() / ".local/share/k3d-manager/webhook-jobs"))
 SCREENSHOT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "screenshots"
 AUDIT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "audit"
+RUN_DIR = Path(os.environ.get("K3DM_RUN_DIR", Path.home() / ".local/share/k3d-manager/run"))
 _ASK_MAX_TURNS_DEFAULT = int(os.environ.get("K3DM_ASK_MAX_TURNS", "10"))
 SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
 PUSHGATEWAY_URL = os.environ.get("K3DM_PUSHGATEWAY_URL", "http://localhost:9091")
@@ -1180,7 +1181,7 @@ def _posix_spawn_capture(cmd, timeout, cwd=None, env=None):
         spawn_exe = exe
     try:
         with _tmp.NamedTemporaryFile(
-            prefix="k3dm-ask-", suffix=".out", delete=False, mode="w"
+            prefix="k3dm-ask-", suffix=".out", delete=False, mode="w", dir=str(RUN_DIR)
         ) as _f:
             tmp_path = _f.name
         file_actions = [
@@ -3126,6 +3127,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     JOB_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+    RUN_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
     _ask_bash_path = Path(__file__).resolve().parent / "k3dm-ask-bash"
     _sandbox_dir = _ask_bash_path.parent / ".ask-sandbox"
     _sandbox_dir.mkdir(exist_ok=True)

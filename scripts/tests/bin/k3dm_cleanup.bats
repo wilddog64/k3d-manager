@@ -5,7 +5,8 @@ setup() {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   TMP_ROOT="${BATS_TEST_TMPDIR}/tmp"
   HOME_ROOT="${BATS_TEST_TMPDIR}/home"
-  mkdir -p "${TMP_ROOT}" "${HOME_ROOT}/.local/share/k3d-manager/logs"
+  RUN_ROOT="${HOME_ROOT}/.local/share/k3d-manager/run"
+  mkdir -p "${TMP_ROOT}" "${RUN_ROOT}" "${HOME_ROOT}/.local/share/k3d-manager/logs"
 }
 
 _touch_old() {
@@ -40,6 +41,35 @@ _touch_old() {
   [ ! -e "${TMP_ROOT}/k3d-manager-acg-watch.out" ]
   [ ! -e "${TMP_ROOT}/k3dm-gcp-creds.old" ]
   [ -e "${TMP_ROOT}/k3dm-gcp-creds.new" ]
+}
+
+@test "k3dm-cleanup prunes old repo-owned run-dir leftovers and keeps recent ones" {
+  : > "${RUN_ROOT}/k3dm-ask-old.out"
+  : > "${RUN_ROOT}/k3dm-ask-new.out"
+  : > "${RUN_ROOT}/k3d-manager-acg-watch.err"
+  : > "${RUN_ROOT}/k3d-status.out"
+  : > "${RUN_ROOT}/alertmanager-local.html"
+  : > "${RUN_ROOT}/alertproxy-bats.log"
+  : > "${RUN_ROOT}/k3dm-products.json"
+
+  _touch_old "${RUN_ROOT}/k3dm-ask-old.out"
+  _touch_old "${RUN_ROOT}/k3d-manager-acg-watch.err"
+  _touch_old "${RUN_ROOT}/k3d-status.out"
+  _touch_old "${RUN_ROOT}/alertmanager-local.html"
+  _touch_old "${RUN_ROOT}/alertproxy-bats.log"
+  _touch_old "${RUN_ROOT}/k3dm-products.json"
+
+  run env HOME="${HOME_ROOT}" K3DM_TMP_ROOT="${TMP_ROOT}" K3DM_RUN_DIR="${RUN_ROOT}" "${REPO_ROOT}/bin/k3dm-cleanup"
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"${RUN_ROOT}"* ]]
+
+  [ ! -e "${RUN_ROOT}/k3dm-ask-old.out" ]
+  [ -e "${RUN_ROOT}/k3dm-ask-new.out" ]
+  [ ! -e "${RUN_ROOT}/k3d-manager-acg-watch.err" ]
+  [ ! -e "${RUN_ROOT}/k3d-status.out" ]
+  [ ! -e "${RUN_ROOT}/alertmanager-local.html" ]
+  [ ! -e "${RUN_ROOT}/alertproxy-bats.log" ]
+  [ ! -e "${RUN_ROOT}/k3dm-products.json" ]
 }
 
 @test "k3dm-cleanup prunes only placeholder TemporaryDirectory folders" {

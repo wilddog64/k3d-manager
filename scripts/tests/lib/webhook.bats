@@ -316,6 +316,14 @@ teardown_file() {
     [ "$status" -eq 0 ]
 }
 
+@test "webhook ask subprocess captures transcripts in the k3d-manager run dir" {
+    run grep -F -- 'RUN_DIR = Path(os.environ.get("K3DM_RUN_DIR", Path.home() / ".local/share/k3d-manager/run"))' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- 'prefix="k3dm-ask-", suffix=".out", delete=False, mode="w", dir=str(RUN_DIR)' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+}
+
 @test "POST /analyze with correct token returns 202 and job_id" {
     run curl -s -X POST \
         -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
