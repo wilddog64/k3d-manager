@@ -1,6 +1,6 @@
 image:
-  registry: ghcr.io
-  repository: aquasecurity/trivy-operator
+  registry: mirror.gcr.io
+  repository: aquasec/trivy-operator
   tag: "0.31.2"
 
 trivy:

@@ -16,10 +16,10 @@ ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.ya
 }
 
 @test "trivy observability: chart values enable serviceMonitor scraping" {
-  run grep -F -- 'registry: ghcr.io' "${SETTINGS}"
+  run grep -F -- 'registry: mirror.gcr.io' "${SETTINGS}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'repository: aquasecurity/trivy-operator' "${SETTINGS}"
+  run grep -F -- 'repository: aquasec/trivy-operator' "${SETTINGS}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'tag: "0.31.2"' "${SETTINGS}"
