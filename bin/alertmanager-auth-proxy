@@ -110,7 +110,9 @@ class AlertmanagerProxyHandler(BaseHTTPRequestHandler):
             for key, value in response.getheaders():
                 if key.lower() in HOP_BY_HOP_HEADERS:
                     continue
-                self.send_header(key, value)
+                safe_key = key.replace("\r", "").replace("\n", "")
+                safe_value = value.replace("\r", "").replace("\n", "")
+                self.send_header(safe_key, safe_value)
             self.send_header("Content-Length", str(len(payload)))
             self.end_headers()
             if self.command != "HEAD":

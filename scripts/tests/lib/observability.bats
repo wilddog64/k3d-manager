@@ -69,7 +69,8 @@ EOF
     launchctl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
-    export -f envsubst _kubectl curl kubectl launchctl
+    _is_mac() { return 0; }
+    export -f envsubst _kubectl curl kubectl launchctl _is_mac
     export K3D_MANAGER_BRANCH=feature-branch
     deploy_observability
   '
@@ -146,6 +147,10 @@ EOF
         ;;
       esac
   }
+  launchctl() {
+    printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+  }
+  _is_mac() { return 0; }
   run deploy_observability_acg
   [ "$status" -eq 0 ]
   [[ -f "${envsubst_log}" ]]
@@ -216,6 +221,7 @@ EOF
         ;;
     esac
   }
+  _is_mac() { return 0; }
   run deploy_observability_acg
   [ "$status" -eq 0 ]
   [[ "$output" == *"Failed to create Prometheus basic auth secret in Vault — using generated web config for this run"* ]]
