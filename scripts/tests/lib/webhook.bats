@@ -287,7 +287,7 @@ teardown_file() {
     run grep -F -- '_ROLE_LEVELS = {"reader": 1, "operator": 2, "admin": 3}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 
-    run grep -F -- 'AUDIT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "audit"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -F -- 'AUDIT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "audit"' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/config.py"
     [ "$status" -eq 0 ]
 
     run grep -F -- '"/api/v1/cluster-refresh": {"name": "cluster-refresh", "min_role": "operator"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
@@ -317,7 +317,7 @@ teardown_file() {
 }
 
 @test "webhook ask subprocess captures transcripts in the k3d-manager run dir" {
-    run grep -F -- 'RUN_DIR = Path(os.environ.get("K3DM_RUN_DIR", Path.home() / ".local/share/k3d-manager/run"))' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -F -- 'RUN_DIR = Path(os.environ.get("K3DM_RUN_DIR", Path.home() / ".local/share/k3d-manager/run"))' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/config.py"
     [ "$status" -eq 0 ]
 
     run grep -F -- 'prefix="k3dm-ask-", suffix=".out", delete=False, mode="w", dir=str(RUN_DIR)' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"

@@ -10,6 +10,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import threading
 import time
 import traceback
@@ -18,42 +19,28 @@ import urllib.parse
 import uuid
 from pathlib import Path
 
-PORT = int(os.environ.get("K3DM_WEBHOOK_PORT", "7443"))
-MAX_BODY = 4096
-_JOB_ID_RE = re.compile(r'^[0-9a-f]{8}$')
-
-
-def _safe_job_dir(job_id):
-    """Return resolved job directory only if it is a valid hex job ID and a direct child of JOB_DIR."""
-    m = _JOB_ID_RE.match(job_id)
-    if not m:
-        raise ValueError(f"invalid job_id: {job_id!r}")
-    safe_id = m.group(0)
-    candidate = (JOB_DIR / safe_id).resolve()
-    if candidate.parent.resolve() != JOB_DIR.resolve():
-        raise ValueError(f"invalid job_id: {job_id!r}")
-    return candidate
-REPO_ROOT = os.environ.get(
-    "K3DM_REPO_ROOT",
-    str(Path.home() / "src/gitrepo/personal/k3d-manager")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts" / "lib"))
+from webhook.config import (  # noqa: E402
+    PORT,
+    MAX_BODY,
+    _JOB_ID_RE,
+    REPO_ROOT,
+    SHOPPING_CARTS_ROOT,
+    TOKEN_FILE,
+    JOB_DIR,
+    SCREENSHOT_DIR,
+    AUDIT_DIR,
+    RUN_DIR,
+    _ASK_MAX_TURNS_DEFAULT,
+    SLACK_WEBHOOK_URL,
+    PUSHGATEWAY_URL,
+    SLACK_BOT_TOKEN,
+    SLACK_CHANNEL_ID,
+    _PUSHGATEWAY_PUSH_RETRIES,
+    _PUSHGATEWAY_PUSH_SLEEP_SECS,
+    _ACTIVE_PROVIDER_FILE,
+    _safe_job_dir,
 )
-SHOPPING_CARTS_ROOT = os.environ.get(
-    "K3DM_SHOPPING_CARTS_ROOT",
-    str(Path.home() / "src/gitrepo/personal/shopping-carts")
-)
-TOKEN_FILE = Path.home() / ".k3dm" / "webhook-token"
-JOB_DIR = Path(os.environ.get("K3DM_JOB_DIR", Path.home() / ".local/share/k3d-manager/webhook-jobs"))
-SCREENSHOT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "screenshots"
-AUDIT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "audit"
-RUN_DIR = Path(os.environ.get("K3DM_RUN_DIR", Path.home() / ".local/share/k3d-manager/run"))
-_ASK_MAX_TURNS_DEFAULT = int(os.environ.get("K3DM_ASK_MAX_TURNS", "10"))
-SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
-PUSHGATEWAY_URL = os.environ.get("K3DM_PUSHGATEWAY_URL", "http://localhost:9091")
-SLACK_BOT_TOKEN = os.environ.get("SLACK_BOT_TOKEN", "")
-SLACK_CHANNEL_ID = os.environ.get("SLACK_CHANNEL_ID", "")
-_PUSHGATEWAY_PUSH_RETRIES = 6
-_PUSHGATEWAY_PUSH_SLEEP_SECS = 5
-_ACTIVE_PROVIDER_FILE = Path.home() / ".local" / "share" / "k3d-manager" / "active-provider"
 
 
 def _normalize_provider(provider):
