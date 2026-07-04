@@ -55,6 +55,6 @@ setup() {
       }
     }
   ')
-  expected_keys=$'redis/cart\nredis/orders-cache\npostgres/orders\npostgres/products\npostgres/payment\npayment/encryption\npayment/stripe\npayment/paypal\nrabbitmq/default\nminio/credentials\nldap/admin\nkeycloak/admin\nkeycloak/clients'
+  expected_keys=$'redis/cart\nredis/orders-cache\npostgres/orders\npostgres/products\npostgres/payment\npayment/encryption\npayment/stripe\npayment/paypal\nrabbitmq/default\nminio/credentials\nldap/admin\nkeycloak/admin\nkeycloak/clients\ngithub/pat'
   [ "$actual_keys" = "$expected_keys" ]
 }

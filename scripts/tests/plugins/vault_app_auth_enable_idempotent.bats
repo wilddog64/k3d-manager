@@ -97,7 +97,9 @@ REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   }
 
   __vault_exec_kubectl() {
+    [[ "${1:-}" == "--exec-stdin" ]] && shift
     printf '%s\n' "$*" > "${BATS_TEST_TMPDIR}/exec.log"
+    cat > "${BATS_TEST_TMPDIR}/exec.stdin"
     return 0
   }
 
@@ -108,6 +110,13 @@ REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
 
   run cat "${BATS_TEST_TMPDIR}/exec.log"
   [ "${status}" -eq 0 ]
-  [[ "${output}" == *"-- env VAULT_TOKEN=hvs.test-token sh -lc vault status"* ]]
-  [[ "${output}" != *"sh -lc VAULT_TOKEN="* ]]
+  [[ "${output}" != *"VAULT_TOKEN=hvs.test-token"* ]]
+  [[ "${output}" == *"-- sh -lc "* ]]
+  [[ "${output}" == *"read -r __VAULT_TOKEN"* ]]
+  [[ "${output}" == *'export VAULT_TOKEN="$__VAULT_TOKEN"'* ]]
+  [[ "${output}" == *"vault status"* ]]
+
+  run cat "${BATS_TEST_TMPDIR}/exec.stdin"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "hvs.test-token" ]
 }
