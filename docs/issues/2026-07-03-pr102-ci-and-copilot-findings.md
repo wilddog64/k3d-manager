@@ -99,3 +99,27 @@ the logged command string but still visible in process argv (`ps`,
 
 **Follow-up:** Track a dedicated v1.13.0 bugfix to pass `VAULT_TOKEN` to
 `kubectl exec` via stdin/file instead of argv, across all `_vault_exec` paths.
+
+---
+
+## 6. GitGuardian check — 1 secret uncovered (RESOLVED — false positive)
+
+**Finding:** The server-side GitGuardian GitHub App check failed with
+"1 secret uncovered": a `generic_password` in
+`scripts/tests/plugins/shopping_cart_seed_idempotent.bats` (incident
+`34353947`, GitGuardian auto-tag `TEST_FILE`).
+
+**Root cause:** Dev-only test fixture. The repo `.gitguardian.yaml`
+(`ignored_paths: scripts/tests/`, plus an explicit SHA `ignored_matches`
+entry added via `ggshield secret ignore`) keeps the **ggshield CLI** clean, but
+the GitGuardian **GitHub App** does not read the repo config — it uses the
+workspace/dashboard state.
+
+**Resolution:** Incident `34353947` marked **IGNORED** with reason
+`test_credential` via the GitGuardian API (`POST /v1/incidents/secrets/34353947/ignore`),
+using the `incidents:write`-scoped ggshield token. Only this one incident was
+touched.
+
+**Process note:** GitGuardian is **not a required status check** on `main`, so
+this never blocked the merge. In-repo `.gitguardian.yaml` ignores cover the CLI
+only; server-side check state must be resolved on the dashboard/API.
