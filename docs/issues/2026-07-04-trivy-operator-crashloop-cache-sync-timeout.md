@@ -1,5 +1,16 @@
 # Trivy Operator CrashLoopBackOff due to Cache Sync Timeout
 
+> **CORRECTION (2026-07-04):** The CPU-throttling root cause below is **wrong**. The live
+> operator container runs with `resources: {}` (no CPU limit at all), the node is idle
+> (CPU 0–2%), and only 107 ConfigMaps exist cluster-wide — so it cannot be CPU-throttled.
+> The real trigger, from the **head** of the log (not the shutdown tail), is
+> `persistentvolumeclaims is forbidden` / `persistentvolumes is forbidden`: chart pin `0.24.1`
+> RBAC does not grant the PV/PVC informers that the overridden `0.31.2` image starts. When
+> one `WaitForCacheSync` fails, controller-runtime tears down the manager and reports
+> "cache did not sync" for every other informer — the ConfigMap timeout is the cascade, not
+> the cause. Fix and full analysis:
+> `docs/bugs/v1.13.0-bugfix-trivy-operator-rbac-version-skew.md`.
+
 ## What was checked
 
 1. The live pod status of `trivy-operator` in both contexts:
