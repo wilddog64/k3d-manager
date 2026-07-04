@@ -79,26 +79,32 @@ retargeting logs.
 
 ---
 
-## 5. Copilot — `scripts/plugins/vault.sh:210` Vault token in `kubectl exec` argv (DEFERRED — follow-up)
+## 5. Copilot — `scripts/plugins/vault.sh:210` Vault token in `kubectl exec` argv (RESOLVED in v1.13.0)
 
-**Finding:** `_vault_exec` passes the session token via
-`kubectl exec ... -- env "VAULT_TOKEN=..." sh -lc "$cmd"`. The token is out of
+**Finding:** `_vault_exec` previously injected the session token into the
+`kubectl exec` argument vector before `sh -lc "$cmd"` ran. The token was out of
 the logged command string but still visible in process argv (`ps`,
 `/proc/*/cmdline`).
 
-**Why deferred, not fixed in this PR:**
-- This is **pre-existing behavior on `main`** (same `env VAULT_TOKEN=` argv
-  pattern appears in three places in `main`'s `_vault_exec`).
-- The v1.12.0 commit `300009487` ("stop inlining vault tokens in refresh auth
-  commands") actually **improved** hygiene here — it removed the token from the
-  logged `sh -lc` command string.
-- Fully removing argv exposure (pass the token via stdin or a file inside the
-  pod) is a change to a core exec helper shared with `main` and warrants its own
-  spec, test coverage, and live verification rather than being folded into a
-  165-commit release PR.
+**Resolution:** Fixed on `k3d-manager-v1.13.0` in commit `fded6575`
+(`fix(vault): deliver VAULT_TOKEN via stdin, never process argv`).
 
-**Follow-up:** Track a dedicated v1.13.0 bugfix to pass `VAULT_TOKEN` to
-`kubectl exec` via stdin/file instead of argv, across all `_vault_exec` paths.
+**What changed:**
+- `_vault_exec` now sends the cached/session token as the first stdin line and
+  loads it inside the pod before `sh -lc` execs the real Vault command.
+- `_vault_exec_stream` now supports `--stdin` so policy writes and other piped
+  payloads receive the token first and the original payload second.
+- `_vault_login` now caches the token before verification so the standard
+  stdin-delivery path is exercised there too, and unsets the cache on failure.
+- `__vault_exec_kubectl` now supports `--exec-stdin` to buffer/replay stdin
+  across the existing "container not found" retry loop.
+
+**Validation:** `shellcheck -S warning scripts/plugins/vault.sh`, `bats
+scripts/tests/plugins/vault.bats scripts/tests/plugins/vault_app_auth.bats
+scripts/tests/plugins/vault_app_auth_enable_idempotent.bats
+scripts/tests/plugins/vault_token_stdin.bats scripts/tests/plugins/vault_failover.bats
+scripts/tests/plugins/vault_seed_hub.bats`, and `./scripts/k3d-manager
+_agent_audit` all passed on the fix branch before push.
 
 ---
 
