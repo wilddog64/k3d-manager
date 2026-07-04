@@ -88,7 +88,11 @@ function _acg_extend_playwright()   { __acg_stub__acg_extend_playwright "$@"; }
 function acg_extend()               { __acg_stub_acg_extend "$@"; }
 function acg_watch()                { __acg_stub_acg_watch "$@"; }
 function acg_watch_start()          {
-  __acg_stub_acg_watch_start "$@"
+  local _rc=0
+  __acg_stub_acg_watch_start "$@" || _rc=$?
+  if [[ "${_rc}" -ne 0 ]]; then
+    return "${_rc}"
+  fi
   _acg_watch_retarget_logs
   _info "[acg] Sandbox watcher logs redirected to ${K3DM_RUN_DIR:-${HOME}/.local/share/k3d-manager/run}/k3d-manager-acg-watch.err"
 }

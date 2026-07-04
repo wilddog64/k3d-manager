@@ -94,7 +94,7 @@ spec:
       serviceAccountName: promtail
       containers:
         - name: promtail
-          image: fluent/fluent-bit:latest
+          image: fluent/fluent-bit:3.1.9
           args:
             - -c
             - /fluent-bit/etc/fluent-bit.conf
