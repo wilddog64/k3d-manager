@@ -33,32 +33,64 @@ setup() {
     }
     _kubectl() {
       case "$*" in
-        *"get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}'"*)
+        *"get secret vault-root -n secrets --context k3d-k3d-cluster"*)
           printf "%s" "dG9rZW4="
+          ;;
+        *"/v1/secret/data/k3d-manager/alertmanager-basic-auth"*)
+          cat <<'EOF'
+{"data":{"data":{"user":"admin","password":"authpass123"}}}
+EOF
           ;;
         *)
           printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
           ;;
       esac
     }
+    curl() {
+      case "$*" in
+        *"/v1/secret/data/k3d-manager/alertmanager-basic-auth"*)
+          cat <<'EOF'
+{"data":{"data":{"user":"admin","password":"authpass123"}}}
+EOF
+          ;;
+        *"/v1/secret/data/k3d-manager/alertmanager"*)
+          cat <<'EOF'
+{"data":{"data":{"gmail_from":"alerts@example.com","gmail_app_pw":"app-password","sms_gateway":"12345"}}}
+EOF
+          ;;
+        *)
+          return 0
+          ;;
+      esac
+    }
     kubectl() {
       printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
     }
-    export -f envsubst _kubectl kubectl
+    launchctl() {
+      printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+    }
+    _is_mac() { return 0; }
+    export -f envsubst _kubectl curl kubectl launchctl _is_mac
     export K3D_MANAGER_BRANCH=feature-branch
     deploy_observability
   '
   [ "$status" -eq 0 ]
-  [[ -f "${envsubst_log}" ]]
-  run cat "${envsubst_log}"
-  [ "$status" -eq 0 ]
-  [[ "$output" == *"\$ARGOCD_NAMESPACE \$K3D_MANAGER_BRANCH"* ]]
+  [[ -s "${envsubst_log}" ]]
   run cat "${kubectl_log}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"apply -f -"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster -f ${REPO_ROOT}/scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster -f ${REPO_ROOT}/scripts/etc/observability/promtail.yaml"* ]]
+  [[ "$output" == *"com.k3d-manager.alertmanager-port-forward"* ]]
+  [[ "$output" == *"com.k3d-manager.alertmanager-auth-proxy"* ]]
+  [[ -f "${HOME}/.local/share/k3d-manager/alertmanager-basic-auth.env" ]]
+  run grep -F "ALERTMANAGER_BASIC_AUTH_USER=admin" "${HOME}/.local/share/k3d-manager/alertmanager-basic-auth.env"
+  [ "$status" -eq 0 ]
+  run grep -F "ALERTMANAGER_BASIC_AUTH_PASSWORD=authpass123" "${HOME}/.local/share/k3d-manager/alertmanager-basic-auth.env"
+  [ "$status" -eq 0 ]
 }
 
-@test "deploy_observability_acg calls envsubst with \$ARGOCD_NAMESPACE and \$K3D_MANAGER_BRANCH" {
+@test "deploy_observability_acg calls envsubst with \$ARGOCD_NAMESPACE, \$K3D_MANAGER_BRANCH, and \$APP_CLUSTER_NAME" {
   local envsubst_log kubectl_log
   envsubst_log="${BATS_TEST_TMPDIR}/envsubst-acg.log"
   kubectl_log="${BATS_TEST_TMPDIR}/kubectl-acg.log"
@@ -78,7 +110,7 @@ setup() {
   }
   _kubectl() {
     case "$*" in
-      *"get secret vault-root -n secrets --context k3d-k3d-cluster -o jsonpath='{.data.root_token}'"*)
+      *"get secret vault-root -n secrets --context k3d-k3d-cluster"*)
         printf "%s" "dG9rZW4="
         ;;
       *)
@@ -95,29 +127,174 @@ setup() {
   }
   curl() {
     case "$*" in
+      *"/v1/secret/data/k3d-manager/alertmanager-basic-auth"*)
+        cat <<'EOF'
+{"data":{"data":{"user":"admin","password":"authpass123"}}}
+EOF
+        ;;
       *"/v1/secret/data/k3d-manager/alertmanager"*)
-        printf '{"data":{"data":{"gmail_from":"alerts@example.com","gmail_app_pw":"app-password","sms_gateway":"12345"}}}'
+        cat <<'EOF'
+{"data":{"data":{"gmail_from":"alerts@example.com","gmail_app_pw":"app-password","sms_gateway":"12345"}}}
+EOF
         ;;
       *"/v1/secret/data/k3d-manager/prometheus-basic-auth"*)
-        printf '{"data":{"data":{"user":"admin","password_bcrypt":"test_hash"}}}'
+        cat <<'EOF'
+{"data":{"data":{"user":"admin","password_bcrypt":"test_hash"}}}
+EOF
         ;;
       *)
         return 0
         ;;
       esac
   }
+  launchctl() {
+    printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+  }
+  _is_mac() { return 0; }
   run deploy_observability_acg
   [ "$status" -eq 0 ]
   [[ -f "${envsubst_log}" ]]
   [[ "$output" == *"Alertmanager config secret created on ACG (ubuntu-hostinger)"* ]]
   [[ "$output" == *"Prometheus web config secret applied (monitoring/prometheus-web-config on ubuntu-hostinger)"* ]]
+  [[ "$output" == *"Alertmanager login credentials ready"* ]]
+  [[ "$output" == *"Alertmanager port-forward agent installed"* ]]
+  [[ "$output" == *"Alertmanager auth proxy installed"* ]]
   run cat "${envsubst_log}"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"\$ARGOCD_NAMESPACE \$K3D_MANAGER_BRANCH"* ]]
+  [[ "$output" == *"\$ARGOCD_NAMESPACE \$K3D_MANAGER_BRANCH \$APP_CLUSTER_NAME"* ]]
   run cat "${kubectl_log}"
   [ "$status" -eq 0 ]
+  [[ "$output" == *"--context ubuntu-hostinger -n monitoring get configmap grafana-dashboard-argocd"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n monitoring delete configmap grafana-dashboard-argocd"* ]]
   [[ "$output" == *"create namespace monitoring --context ubuntu-hostinger --dry-run=client -o yaml"* ]]
   [[ "$output" == *"apply -f -"* ]]
+}
+
+@test "deploy_observability_acg falls back to generated Prometheus config when Vault bootstrap write fails" {
+  local kubectl_log
+  kubectl_log="${BATS_TEST_TMPDIR}/kubectl-acg-prom-fallback.log"
+  export KUBE_STUB_LOG="${kubectl_log}"
+  _acg_resolve_provider() {
+    printf "%s\n" "k3s-hostinger"
+  }
+  _acg_provider_context() {
+    case "$1" in
+      k3s-hostinger) printf "%s\n" "ubuntu-hostinger" ;;
+      *)             printf "%s\n" "ubuntu-k3s" ;;
+    esac
+  }
+  envsubst() {
+    cat
+  }
+  _kubectl() {
+    case "$*" in
+      *"get secret vault-root -n secrets --context k3d-k3d-cluster"*)
+        printf "%s" "dG9rZW4="
+        ;;
+      *)
+        printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+        ;;
+    esac
+  }
+  kubectl() {
+    printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+  }
+  launchctl() {
+    printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+  }
+  helm() {
+    return 0
+  }
+  curl() {
+    case "$*" in
+      *"/v1/secret/data/k3d-manager/alertmanager"*)
+        return 22
+        ;;
+      *"--request POST"*"/v1/secret/data/k3d-manager/prometheus-basic-auth"*)
+        return 22
+        ;;
+      *"/v1/secret/data/k3d-manager/prometheus-basic-auth"*)
+        return 22
+        ;;
+      *)
+        return 0
+        ;;
+    esac
+  }
+  _is_mac() { return 0; }
+  run deploy_observability_acg
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Failed to create Prometheus basic auth secret in Vault — using generated web config for this run"* ]]
+  [[ "$output" == *"Prometheus web config secret applied (monitoring/prometheus-web-config on ubuntu-hostinger)"* ]]
+  [[ "$output" == *"Alertmanager login credentials ready"* ]]
+  [[ "$output" == *"Alertmanager port-forward agent installed"* ]]
+  [[ "$output" == *"Alertmanager auth proxy installed"* ]]
+  run cat "${kubectl_log}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"create secret generic prometheus-web-config --context ubuntu-hostinger -n monitoring"* ]]
+}
+
+@test "observability exposes alertmanager login proxy and make targets" {
+  run grep -nF '19093:9093' scripts/etc/launchd/com.k3d-manager.alertmanager-port-forward.plist.tmpl
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'com.k3d-manager.alertmanager-auth-proxy' scripts/etc/launchd/com.k3d-manager.alertmanager-auth-proxy.plist.tmpl
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'ALERTMANAGER_BASIC_AUTH_PASSWORD' scripts/plugins/observability.sh
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'install-alertmanager-auth-proxy' Makefile
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'uninstall-alertmanager-auth-proxy' Makefile
+  [ "$status" -eq 0 ]
+}
+
+@test "observability restores alertmanager access layer when local agents are missing" {
+  local calls_log
+  calls_log="${BATS_TEST_TMPDIR}/alertmanager-restore.log"
+  export CALLS_LOG="${calls_log}"
+  run bash -c '
+    set -e
+    REPO_ROOT="$(pwd)"
+    SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    _is_mac() { return 0; }
+    command() { builtin command "$@"; }
+    launchctl() { return 0; }
+    kubectl() { return 0; }
+    _observability_port_listening() { return 1; }
+    _observability_wait_for_port() {
+      printf "wait:%s\n" "$1" >> "${CALLS_LOG}"
+    }
+    _observability_ensure_alertmanager_login() {
+      printf "login\n" >> "${CALLS_LOG}"
+    }
+    _observability_install_alertmanager_port_forward() {
+      printf "port-forward\n" >> "${CALLS_LOG}"
+    }
+    _observability_install_alertmanager_auth_proxy() {
+      printf "auth-proxy\n" >> "${CALLS_LOG}"
+    }
+    export -f _is_mac launchctl kubectl _observability_port_listening \
+      _observability_wait_for_port \
+      _observability_ensure_alertmanager_login \
+      _observability_install_alertmanager_port_forward \
+      _observability_install_alertmanager_auth_proxy
+    _observability_restore_alertmanager_access_layer
+  '
+  [ "$status" -eq 0 ]
+  run cat "${calls_log}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"login"* ]]
+  [[ "$output" == *"port-forward"* ]]
+  [[ "$output" == *"auth-proxy"* ]]
+  [[ "$output" == *"wait:19093"* ]]
+  [[ "$output" == *"wait:9093"* ]]
 }
 
 @test "trivy_scan_report calls kubectl get vulnerabilityreports -A for Hub context" {
@@ -155,6 +332,46 @@ setup() {
   [[ "$output" == *"get vulnerabilityreports -A --no-headers"* ]]
 }
 
+@test "trivy_scan_report prints an explicit no-report note when empty" {
+  local kubectl_log
+  kubectl_log="${BATS_TEST_TMPDIR}/kubectl-trivy-empty.log"
+  export KUBE_STUB_LOG="${kubectl_log}"
+  run bash -c '
+    REPO_ROOT="$(pwd)"
+    SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    _acg_resolve_provider() {
+      printf "%s\n" "k3s-aws"
+    }
+    _acg_provider_context() {
+      case "$1" in
+        k3s-aws) printf "%s\n" "ubuntu-k3s" ;;
+        *)       printf "%s\n" "ubuntu-k3s" ;;
+      esac
+    }
+    _kubectl() {
+      if [[ "$*" == *"get vulnerabilityreports -A"* ]]; then
+        return 0
+      fi
+      printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+    }
+    kubectl() {
+      if [[ "$*" == *"get vulnerabilityreports -A"* ]]; then
+        return 0
+      fi
+      printf "%s\n" "$*" >> "${KUBE_STUB_LOG}"
+    }
+    export -f _acg_resolve_provider _acg_provider_context _kubectl kubectl
+    trivy_scan_report
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"VulnerabilityReport summary — Hub:"* ]]
+  [[ "$output" == *"(no VulnerabilityReports found)"* ]]
+}
+
 @test "trivy_scan_report calls kubectl get vulnerabilityreports -A --context ubuntu-k3s for ACG" {
   local kubectl_log
   kubectl_log="${BATS_TEST_TMPDIR}/kubectl-trivy-acg.log"
@@ -188,6 +405,93 @@ setup() {
   run cat "${kubectl_log}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"get vulnerabilityreports -A --context ubuntu-k3s --no-headers"* ]]
+}
+
+@test "trivy_infra_security_report queries Prometheus for compliance and RBAC findings" {
+  local kubectl_log
+  kubectl_log="${BATS_TEST_TMPDIR}/kubectl-trivy-infra.log"
+  export KUBE_STUB_LOG="${kubectl_log}"
+  run bash -c '
+    REPO_ROOT="$(pwd)"
+    SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    _acg_resolve_provider() {
+      printf "%s\n" "k3s-aws"
+    }
+    _acg_provider_context() {
+      case "$1" in
+        k3s-aws) printf "%s\n" "ubuntu-k3s" ;;
+        *)       printf "%s\n" "ubuntu-k3s" ;;
+      esac
+    }
+    _trivy_prom_query() {
+      printf "%s\n" "$2" >> "${KUBE_STUB_LOG}"
+      case "$2" in
+        *trivy_cluster_compliance*)
+          cat <<'EOF'
+{"data":{"result":[{"metric":{"title":"CIS Kubernetes Benchmarks v1.23","status":"Pass"},"value":[0,"111"]},{"metric":{"title":"CIS Kubernetes Benchmarks v1.23","status":"Fail"},"value":[0,"5"]}]}}
+EOF
+          ;;
+        *trivy_role_rbacassessments*)
+          cat <<'EOF'
+{"data":{"result":[{"metric":{"namespace":"identity","resource_name":"ldap-password-rotator","resource_kind":"Role","severity":"High"},"value":[0,"1"]}]}}
+EOF
+          ;;
+        *trivy_clusterrole_clusterrbacassessments*)
+          cat <<'EOF'
+{"data":{"result":[{"metric":{"name":"clusterrole-argocd-server","resource_kind":"ClusterRole","severity":"Critical"},"value":[0,"1"]}]}}
+EOF
+          ;;
+        *)
+          cat <<'EOF'
+{"data":{"result":[]}}
+EOF
+          ;;
+      esac
+    }
+    export -f _acg_resolve_provider _acg_provider_context _trivy_prom_query
+    trivy_infra_security_report
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Trivy infra security summary — Hub (k3d-k3d-cluster):"* ]]
+  [[ "$output" == *"Trivy infra security summary — ACG (ubuntu-k3s):"* ]]
+  [[ "$output" == *"CIS Kubernetes Benchmarks v1.23: pass=111 fail=5"* ]]
+  run cat "${kubectl_log}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"sum by (title,status) (trivy_cluster_compliance)"* ]]
+  [[ "$output" == *"sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"})"* ]]
+  [[ "$output" == *"sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})"* ]]
+}
+
+@test "trivy_infra_security_report tolerates unreachable Prometheus backends" {
+  run bash -c '
+    REPO_ROOT="$(pwd)"
+    SCRIPT_DIR="${REPO_ROOT}/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/lib/provider.sh
+    source scripts/plugins/observability.sh
+    _acg_resolve_provider() {
+      printf "%s\n" "k3s-aws"
+    }
+    _acg_provider_context() {
+      case "$1" in
+        k3s-aws) printf "%s\n" "ubuntu-k3s" ;;
+        *)       printf "%s\n" "ubuntu-k3s" ;;
+      esac
+    }
+    _kubectl() {
+      return 1
+    }
+    export -f _acg_resolve_provider _acg_provider_context _kubectl
+    trivy_infra_security_report
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Trivy infra security summary — Hub (k3d-k3d-cluster):"* ]]
+  [[ "$output" == *"(no cluster compliance metrics found)"* ]]
 }
 
 @test "observability_status iterates over monitoring trivy-system for both contexts" {
@@ -226,4 +530,15 @@ setup() {
   [[ "$output" == *"_kubectl get pods -n trivy-system --no-headers"* || "$output" == *"get pods -n trivy-system --no-headers"* ]]
   [[ "$output" == *"kubectl get pods -n monitoring --context ubuntu-k3s --no-headers"* || "$output" == *"get pods -n monitoring --context ubuntu-k3s --no-headers"* ]]
   [[ "$output" == *"kubectl get pods -n trivy-system --context ubuntu-k3s --no-headers"* || "$output" == *"get pods -n trivy-system --context ubuntu-k3s --no-headers"* ]]
+}
+
+@test "observability exposes alertmanager via cloudflared and make targets" {
+  run grep -F -- 'alertmanager.3ai-talk.org' scripts/etc/cloudflared/config.yml
+  [ "$status" -eq 0 ]
+
+  run grep -F -- 'install-alertmanager-port-forward' Makefile
+  [ "$status" -eq 0 ]
+
+  run grep -F -- 'uninstall-alertmanager-port-forward' Makefile
+  [ "$status" -eq 0 ]
 }

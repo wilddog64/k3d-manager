@@ -5,7 +5,6 @@ namespace: cicd
 
 resources:
   - https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/v0.15.0/manifests/install.yaml
-  - pull-secret-rbac.yaml
 
 patches:
   - patch: |-
@@ -39,7 +38,7 @@ patches:
           - name: GitHub Container Registry
             api_url: https://ghcr.io
             prefix: ghcr.io
-            credentials: pullsecret:shopping-cart-apps/ghcr-pull-secret
+            credentials: pullsecret:cicd/ghcr-pull-secret
             defaultns: wilddog64
             insecure: false
     target:

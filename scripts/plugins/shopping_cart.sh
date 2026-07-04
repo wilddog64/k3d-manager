@@ -200,6 +200,7 @@ function _shopping_cart_vault_externalsecrets() {
     "shopping-cart-apps/redis-orders-cache-apps" \
     "shopping-cart-apps/order-service-secrets" \
     "shopping-cart-apps/product-catalog-secrets" \
+    "shopping-cart-apps/ghcr-pull-secret" \
     "shopping-cart-payment/postgres-payment-app" \
     "shopping-cart-payment/payment-encryption-secret" \
     "shopping-cart-payment/payment-gateway-secrets"
@@ -550,9 +551,17 @@ function shopping_cart_seed_sandbox_vault_kv() {
   local _seed_token="${SEED_VAULT_TOKEN:-${_vault_root_token}}"
   local _src_addr="${SEED_VAULT_SOURCE_ADDR:-${_seed_addr}}"
   local _src_token="${SEED_VAULT_SOURCE_TOKEN:-${_seed_token}}"
+  # Token headers via curl --config files (mode 600) so the Vault tokens never appear in argv/ps.
+  local _seed_hdr _src_hdr _src_json
+  _seed_hdr=$(mktemp) || { _err "[acg-up] could not create temp header file"; return 1; }
+  _src_hdr=$(mktemp) || { rm -f "${_seed_hdr}" 2>/dev/null || true; _err "[acg-up] could not create temp header file"; return 1; }
+  chmod 600 "${_seed_hdr}" "${_src_hdr}"
+  printf 'header = "X-Vault-Token: %s"\n' "${_seed_token}" > "${_seed_hdr}"
+  printf 'header = "X-Vault-Token: %s"\n' "${_src_token}"  > "${_src_hdr}"
+  trap 'rm -f "'"${_seed_hdr}"'" "'"${_src_hdr}"'" 2>/dev/null || true' RETURN
   _vault_kv_put() {
     curl -sf -X POST \
-      -H "X-Vault-Token: ${_seed_token}" \
+      --config "${_seed_hdr}" \
       -H "Content-Type: application/json" \
       -d "{\"data\":$1}" \
       "${_seed_addr}/v1/secret/data/$2" >/dev/null
@@ -560,14 +569,14 @@ function shopping_cart_seed_sandbox_vault_kv() {
   _vault_kv_exists() {
     local path="$1"
     curl -sf \
-      -H "X-Vault-Token: ${_seed_token}" \
+      --config "${_seed_hdr}" \
       "${_seed_addr}/v1/secret/data/${path}" >/dev/null 2>&1
   }
   _vault_kv_get_field() {
     local path="$1"
     local field="$2"
     curl -sf \
-      -H "X-Vault-Token: ${_seed_token}" \
+      --config "${_seed_hdr}" \
       "${_seed_addr}/v1/secret/data/${path}" \
       | jq -r --arg field "$field" '.data.data[$field] // empty'
   }
@@ -576,7 +585,7 @@ function shopping_cart_seed_sandbox_vault_kv() {
   _seed_source_data() {
     local path="$1"
     curl -sf \
-      -H "X-Vault-Token: ${_src_token}" \
+      --config "${_src_hdr}" \
       "${_src_addr}/v1/secret/data/${path}" \
       | jq -c '.data.data // empty' 2>/dev/null || true
   }
@@ -584,40 +593,75 @@ function shopping_cart_seed_sandbox_vault_kv() {
     _info "[acg-up] Reusing existing Vault secret redis/cart"
     _redis_pass_cart=$(_vault_kv_get_field "redis/cart" "password")
   else
-    _redis_pass_cart=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"password\":\"${_redis_pass_cart}\"}"                                         redis/cart
+    _src_json=$(_seed_source_data "redis/cart")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying redis/cart from canonical source Vault"
+      _vault_kv_put "${_src_json}" redis/cart
+      _redis_pass_cart=$(printf '%s' "${_src_json}" | jq -r '.password // empty')
+    else
+      _redis_pass_cart=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"password\":\"${_redis_pass_cart}\"}"                                         redis/cart
+    fi
   fi
 
   if _vault_kv_exists "redis/orders-cache"; then
     _info "[acg-up] Reusing existing Vault secret redis/orders-cache"
     _redis_pass_orders=$(_vault_kv_get_field "redis/orders-cache" "password")
   else
-    _redis_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"password\":\"${_redis_pass_orders}\"}"                                       redis/orders-cache
+    _src_json=$(_seed_source_data "redis/orders-cache")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying redis/orders-cache from canonical source Vault"
+      _vault_kv_put "${_src_json}" redis/orders-cache
+      _redis_pass_orders=$(printf '%s' "${_src_json}" | jq -r '.password // empty')
+    else
+      _redis_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"password\":\"${_redis_pass_orders}\"}"                                       redis/orders-cache
+    fi
   fi
 
   if _vault_kv_exists "postgres/orders"; then
     _info "[acg-up] Reusing existing Vault secret postgres/orders"
     _pg_pass_orders=$(_vault_kv_get_field "postgres/orders" "password")
   else
-    _pg_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_orders}\"}"                postgres/orders
+    _src_json=$(_seed_source_data "postgres/orders")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying postgres/orders from canonical source Vault"
+      _vault_kv_put "${_src_json}" postgres/orders
+      _pg_pass_orders=$(printf '%s' "${_src_json}" | jq -r '.password // empty')
+    else
+      _pg_pass_orders=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_orders}\"}"                postgres/orders
+    fi
   fi
 
   if _vault_kv_exists "postgres/products"; then
     _info "[acg-up] Reusing existing Vault secret postgres/products"
     _pg_pass_products=$(_vault_kv_get_field "postgres/products" "password")
   else
-    _pg_pass_products=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_products}\"}"              postgres/products
+    _src_json=$(_seed_source_data "postgres/products")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying postgres/products from canonical source Vault"
+      _vault_kv_put "${_src_json}" postgres/products
+      _pg_pass_products=$(printf '%s' "${_src_json}" | jq -r '.password // empty')
+    else
+      _pg_pass_products=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_products}\"}"              postgres/products
+    fi
   fi
 
   if _vault_kv_exists "postgres/payment"; then
     _info "[acg-up] Reusing existing Vault secret postgres/payment"
     _pg_pass_payment=$(_vault_kv_get_field "postgres/payment" "password")
   else
-    _pg_pass_payment=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_payment}\"}"               postgres/payment
+    _src_json=$(_seed_source_data "postgres/payment")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying postgres/payment from canonical source Vault"
+      _vault_kv_put "${_src_json}" postgres/payment
+      _pg_pass_payment=$(printf '%s' "${_src_json}" | jq -r '.password // empty')
+    else
+      _pg_pass_payment=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"username\":\"postgres\",\"password\":\"${_pg_pass_payment}\"}"               postgres/payment
+    fi
   fi
   _vault_kv_put '{"key":"dmF1bHQtZGV2LXNhbmRib3gtZW5jcnlwdGlvbg=="}'                             payment/encryption
   _vault_kv_put '{"api_key":"sk_test_placeholder","webhook_secret":"whsec_placeholder"}'           payment/stripe
@@ -626,8 +670,15 @@ function shopping_cart_seed_sandbox_vault_kv() {
     _info "[acg-up] Reusing existing Vault secret rabbitmq/default"
     _rabbitmq_pass=$(_vault_kv_get_field "rabbitmq/default" "password")
   else
-    _rabbitmq_pass=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbitmq_pass}\"}"                 rabbitmq/default
+    _src_json=$(_seed_source_data "rabbitmq/default")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying rabbitmq/default from canonical source Vault"
+      _vault_kv_put "${_src_json}" rabbitmq/default
+      _rabbitmq_pass=$(printf '%s' "${_src_json}" | jq -r '.password // empty')
+    else
+      _rabbitmq_pass=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"username\":\"rabbitmq\",\"password\":\"${_rabbitmq_pass}\"}"                 rabbitmq/default
+    fi
   fi
 
   if _vault_kv_exists "minio/credentials"; then
@@ -635,9 +686,17 @@ function shopping_cart_seed_sandbox_vault_kv() {
     _minio_root_user=$(_vault_kv_get_field "minio/credentials" "root-user")
     _minio_root_password=$(_vault_kv_get_field "minio/credentials" "root-password")
   else
-    _minio_root_user="minioadmin"
-    _minio_root_password=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"root-user\":\"${_minio_root_user}\",\"root-password\":\"${_minio_root_password}\"}" minio/credentials
+    _src_json=$(_seed_source_data "minio/credentials")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying minio/credentials from canonical source Vault"
+      _vault_kv_put "${_src_json}" minio/credentials
+      _minio_root_user=$(printf '%s' "${_src_json}" | jq -r '.["root-user"] // empty')
+      _minio_root_password=$(printf '%s' "${_src_json}" | jq -r '.["root-password"] // empty')
+    else
+      _minio_root_user="minioadmin"
+      _minio_root_password=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"root-user\":\"${_minio_root_user}\",\"root-password\":\"${_minio_root_password}\"}" minio/credentials
+    fi
   fi
 
   if _vault_kv_exists "ldap/admin"; then
@@ -645,9 +704,17 @@ function shopping_cart_seed_sandbox_vault_kv() {
     _ldap_admin_pass=$(_vault_kv_get_field "ldap/admin" "admin_password")
     _ldap_readonly_pass=$(_vault_kv_get_field "ldap/admin" "readonly_password")
   else
-    _ldap_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
-    _ldap_readonly_pass=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"admin_password\":\"${_ldap_admin_pass}\",\"readonly_password\":\"${_ldap_readonly_pass}\"}" ldap/admin
+    _src_json=$(_seed_source_data "ldap/admin")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying ldap/admin from canonical source Vault"
+      _vault_kv_put "${_src_json}" ldap/admin
+      _ldap_admin_pass=$(printf '%s' "${_src_json}" | jq -r '.admin_password // empty')
+      _ldap_readonly_pass=$(printf '%s' "${_src_json}" | jq -r '.readonly_password // empty')
+    else
+      _ldap_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
+      _ldap_readonly_pass=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"admin_password\":\"${_ldap_admin_pass}\",\"readonly_password\":\"${_ldap_readonly_pass}\"}" ldap/admin
+    fi
   fi
 
   if _vault_kv_exists "keycloak/admin"; then
@@ -658,9 +725,20 @@ function shopping_cart_seed_sandbox_vault_kv() {
       _acg_fail "[acg-up] Vault secret keycloak/admin is missing admin_password or db_password — restore the secret before continuing"
     fi
   else
-    _kc_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
-    _kc_db_pass=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"admin_password\":\"${_kc_admin_pass}\",\"db_password\":\"${_kc_db_pass}\"}" keycloak/admin
+    _src_json=$(_seed_source_data "keycloak/admin")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying keycloak/admin from canonical source Vault"
+      _vault_kv_put "${_src_json}" keycloak/admin
+      _kc_admin_pass=$(printf '%s' "${_src_json}" | jq -r '.admin_password // empty')
+      _kc_db_pass=$(printf '%s' "${_src_json}" | jq -r '.db_password // empty')
+      if [[ -z "${_kc_admin_pass}" || -z "${_kc_db_pass}" ]]; then
+        _acg_fail "[acg-up] Vault secret keycloak/admin is missing admin_password or db_password — restore the secret before continuing"
+      fi
+    else
+      _kc_admin_pass=$(openssl rand -base64 24 | tr -d '=+/')
+      _kc_db_pass=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"admin_password\":\"${_kc_admin_pass}\",\"db_password\":\"${_kc_db_pass}\"}" keycloak/admin
+    fi
   fi
 
   if _vault_kv_exists "keycloak/clients"; then
@@ -670,11 +748,21 @@ function shopping_cart_seed_sandbox_vault_kv() {
     _product_client_secret=$(_vault_kv_get_field "keycloak/clients" "product_catalog_client_secret")
     _grafana_client_secret=$(_vault_kv_get_field "keycloak/clients" "grafana_client_secret")
   else
-    _argocd_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-    _order_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-    _product_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-    _grafana_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
-    _vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
+    _src_json=$(_seed_source_data "keycloak/clients")
+    if [[ -n "${_src_json}" ]]; then
+      _info "[acg-up] Copying keycloak/clients from canonical source Vault"
+      _vault_kv_put "${_src_json}" keycloak/clients
+      _argocd_client_secret=$(printf '%s' "${_src_json}" | jq -r '.argocd_client_secret // empty')
+      _order_client_secret=$(printf '%s' "${_src_json}" | jq -r '.order_service_client_secret // empty')
+      _product_client_secret=$(printf '%s' "${_src_json}" | jq -r '.product_catalog_client_secret // empty')
+      _grafana_client_secret=$(printf '%s' "${_src_json}" | jq -r '.grafana_client_secret // empty')
+    else
+      _argocd_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+      _order_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+      _product_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+      _grafana_client_secret=$(openssl rand -base64 24 | tr -d '=+/')
+      _vault_kv_put "{\"argocd_client_secret\":\"${_argocd_client_secret}\",\"order_service_client_secret\":\"${_order_client_secret}\",\"product_catalog_client_secret\":\"${_product_client_secret}\",\"grafana_client_secret\":\"${_grafana_client_secret}\"}" keycloak/clients
+    fi
   fi
   _info "[acg-up] Vault KV seeded (redis, postgres, payment, rabbitmq, minio, ldap, keycloak sandbox secrets)"
 }

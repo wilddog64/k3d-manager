@@ -9,8 +9,7 @@ if declare -f _run_command >/dev/null 2>&1 && ! declare -f __k3dm_base_run_comma
 
   _run_command() {
     local -a original_args=("$@")
-    local quiet=0 prefer_sudo=0 require_sudo=0 interactive_sudo=0 probe="" soft=0
-    local -a probe_args=()
+    local quiet=0 prefer_sudo=0 require_sudo=0 soft=0
 
     while [[ $# -gt 0 ]]; do
       case "$1" in
@@ -18,8 +17,8 @@ if declare -f _run_command >/dev/null 2>&1 && ! declare -f __k3dm_base_run_comma
         --quiet) quiet=1; shift;;
         --prefer-sudo) prefer_sudo=1; shift;;
         --require-sudo) require_sudo=1; shift;;
-        --interactive-sudo) interactive_sudo=1; prefer_sudo=1; shift;;
-        --probe) probe="$2"; shift 2;;
+        --interactive-sudo) prefer_sudo=1; shift;;
+        --probe) shift 2;;
         --) shift; break;;
         *) break;;
       esac
@@ -27,10 +26,6 @@ if declare -f _run_command >/dev/null 2>&1 && ! declare -f __k3dm_base_run_comma
 
     local prog="${1:-}"
     shift || true
-
-    if [[ -n "$probe" ]]; then
-      read -r -a probe_args <<< "$probe"
-    fi
 
     case "${K3DM_DEPLOY_DRY_RUN:-0}" in
       ''|0)
@@ -59,5 +54,58 @@ if declare -f _run_command >/dev/null 2>&1 && ! declare -f __k3dm_base_run_comma
         return 0
         ;;
     esac
+  }
+fi
+
+if declare -f _args_have_sensitive_flag >/dev/null 2>&1 && ! declare -f __k3dm_base_args_have_sensitive_flag >/dev/null 2>&1; then
+  eval "$(declare -f _args_have_sensitive_flag | sed '1s/_args_have_sensitive_flag/__k3dm_base_args_have_sensitive_flag/')"
+
+  _args_have_sensitive_flag() {
+    local arg
+    local expect_secret=0
+
+    for arg in "$@"; do
+      if (( expect_secret )); then
+        return 0
+      fi
+      case "$arg" in
+        --password|--token|--username)
+          expect_secret=1
+          ;;
+        --password=*|--token=*|--username=*|*VAULT_TOKEN=*)
+          return 0
+          ;;
+      esac
+    done
+
+    return 1
+  }
+fi
+
+if declare -f _run_command_handle_failure >/dev/null 2>&1 && ! declare -f __k3dm_base_run_command_handle_failure >/dev/null 2>&1; then
+  eval "$(declare -f _run_command_handle_failure | sed '1s/_run_command_handle_failure/__k3dm_base_run_command_handle_failure/')"
+
+  _run_command_handle_failure() {
+    local prog="$1" rc="$2" quiet="$3" soft="$4"
+    shift 4
+    local cmd_str=""
+    if _args_have_sensitive_flag "$@"; then
+      cmd_str="[redacted command containing secrets]"
+      quiet=1
+    else
+      printf -v cmd_str '%q ' "$@"
+    fi
+
+    if (( quiet == 0 )); then
+      printf '%s command failed (%d): ' "$prog" "$rc" >&2
+      printf '%q ' "$@" >&2
+      printf '\n' >&2
+    fi
+
+    if (( soft )); then
+      return "$rc"
+    else
+      _err "failed to execute ${cmd_str% }: $rc"
+    fi
   }
 fi

@@ -30,6 +30,8 @@ flowchart LR
             KC["Keycloak port-forward\nlocalhost:8880"]
             FE["Frontend HTTP listener\n127.0.0.2:80"]
             PROM["Prometheus port-forward\nlocalhost:19090"]
+            AMPROXY["Alertmanager auth proxy\nlocalhost:9093"]
+            AMRAW["Alertmanager backend\nlocalhost:19093"]
             GRAF["Grafana port-forward\nlocalhost:3001"]
             PGW["Pushgateway port-forward\nlocalhost:9091"]
         end
@@ -45,6 +47,8 @@ flowchart LR
     CFD -->|"frontend.3ai-talk.org"| FE
     CFD -->|"prometheus.3ai-talk.org"| PROM
     CFD -->|"grafana.3ai-talk.org"| GRAF
+    CFD -->|"alertmanager.3ai-talk.org"| AMPROXY
+    AMPROXY -->|"basic auth"| AMRAW
     WH -->|"POST /metrics/job/k3dm-webhook\n(deployment metrics)"| PGW
 ```
 
@@ -53,6 +57,8 @@ flowchart LR
 | File | Purpose |
 |------|---------|
 | `scripts/etc/cloudflared/config.yml` | Static ingress rules (hostname → local service) |
+| `com.k3d-manager.alertmanager-auth-proxy` | LaunchAgent that keeps the Alertmanager login proxy on `localhost:9093` available for Cloudflare |
+| `com.k3d-manager.alertmanager-port-forward` | LaunchAgent that keeps raw Alertmanager on `localhost:19093` available for the proxy |
 | `~/.cloudflared/<tunnel-id>.json` | Tunnel credentials (restored from Keychain by `acg-up`) |
 | `~/.cloudflared/cert.pem` | Cloudflare origin cert (restored from Keychain) |
 | `bin/acg-up` Step 10h | Installs/updates the Cloudflare tunnel LaunchAgent plist |
@@ -83,9 +89,9 @@ sequenceDiagram
     Slack->>Worker: POST /slack/commands<br/>(X-Slack-Signature, response_url)
     Note over Worker: HMAC-SHA256 verify<br/>timestamp ±300s replay guard
     Worker->>Slack: 200 ⏳ Bringing up ACG cluster…
-    Worker->>Tunnel: POST /api/v1/cluster<br/>Authorization: Bearer <token><br/>{action:"up", provider:"aws", response_url}
+    Worker->>Tunnel: POST /api/v1/cluster<br/>Authorization: Bearer <token><br/>X-K3DM-Role / Actor / Source-Command<br/>{action:"up", provider:"aws", response_url}
     Tunnel->>WH: HTTP POST 127.0.0.1:7443
-    Note over WH: Bearer token auth<br/>409 if cluster job already running
+    Note over WH: Bearer token auth<br/>role check + audit log<br/>409 if cluster job already running
     WH->>Job: spawn thread, write status=running
     WH->>Worker: 202 {job_id}
     Job->>Bin: subprocess (make up)
@@ -110,6 +116,7 @@ sequenceDiagram
 |--------|------|--------|
 | `POST` | `/api/v1/cluster` | `bin/acg-up` or `bin/acg-down` (action: up\|down\|kill) |
 | `POST` | `/api/v1/cluster-status` | cluster health check → Slack |
+| `POST` | `/api/v1/diagnostics` | read-only kubectl / ArgoCD diagnostics against approved contexts |
 | `POST` | `/api/v1/cluster-refresh` | `bin/acg-refresh` — restore tunnel + credentials |
 | `POST` | `/api/v1/cluster-resume` | `bin/acg-up` from last checkpoint |
 | `POST` | `/api/v1/ask` | AI agent question (claude / gemini / codex) → Slack |
@@ -117,6 +124,32 @@ sequenceDiagram
 | `POST` | `/slack/events` | Slack Events API — thread replies, URL verification |
 | `GET`  | `/api/v1/health` | JSON smoke-test report (used by `bin/acg-status`) — includes Pushgateway |
 | `GET`  | `/api/v1/status/<job_id>` | Poll job status + last 2 KB of output |
+
+### Remote-operator metadata
+
+The Worker now forwards three additional headers on brokered operator calls:
+
+- `X-K3DM-Role`
+- `X-K3DM-Actor`
+- `X-K3DM-Source-Command`
+
+The webhook uses them to:
+
+- authorize actions against a minimum-role policy
+- emit JSONL audit records under `~/.local/share/k3d-manager/audit/`
+- keep Slack/Cloudflare-triggered operator access scoped to explicit
+  `k3d-manager` workflows rather than arbitrary shell
+
+The new diagnostics path remains read-only by construction. It only accepts:
+
+- `get-pods`
+- `describe-pod`
+- `logs`
+- `get-apps`
+- `describe-app`
+- `get-appsets`
+
+and only for repo-owned contexts/namespaces.
 
 ### Auth chain
 

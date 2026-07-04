@@ -11,7 +11,7 @@ BRANCH        ?= $(shell git rev-parse --abbrev-ref HEAD)
 INFRA_CONTEXT ?= k3d-k3d-cluster
 ARGOCD_NS     ?= cicd
 
-.PHONY: up down refresh status preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward clean-tmp
+.PHONY: up down refresh status preflight creds chrome-cdp chrome-cdp-stop argocd-registration sync-apps sync-branch sync-main ssm provision install-sudoers setup-worker deploy-worker cloudflared-backup alertmanager-secret backup restore test help observability observability-acg observability-status vuln-scan trivy-scan-report show-service-passwords update-webhook-slack update-webhook-slack-secret install-vault-port-forward uninstall-vault-port-forward install-prometheus-port-forward uninstall-prometheus-port-forward install-alertmanager-port-forward uninstall-alertmanager-port-forward install-alertmanager-auth-proxy uninstall-alertmanager-auth-proxy clean-tmp
 
 ## Provision full stack (provider-aware: k3s-aws|k3s-gcp → bin/cluster-up; k3s-oci → deploy_cluster)
 up:
@@ -230,6 +230,40 @@ uninstall-prometheus-port-forward:
 	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.prometheus-port-forward.plist"
 	@echo "Prometheus port-forward agent removed"
 
+install-alertmanager-port-forward:
+	sed \
+	  -e "s|{{KUBECTL_PATH}}|$$(command -v kubectl)|g" \
+	  -e "s|{{HOME}}|$(HOME)|g" \
+	  scripts/etc/launchd/com.k3d-manager.alertmanager-port-forward.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist"
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.alertmanager-port-forward" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist"
+	@echo "Alertmanager port-forward agent installed — raw backend now stays open on port 19093"
+
+uninstall-alertmanager-port-forward:
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.alertmanager-port-forward" 2>/dev/null || true
+	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist"
+	@echo "Alertmanager port-forward agent removed"
+
+install-alertmanager-auth-proxy:
+	sed \
+	  -e "s|{{PYTHON3_PATH}}|$$(command -v python3)|g" \
+	  -e "s|{{ALERTMANAGER_PROXY_BIN}}|$(CURDIR)/bin/alertmanager-auth-proxy|g" \
+	  -e "s|{{ALERTMANAGER_AUTH_FILE}}|$(HOME)/.local/share/k3d-manager/alertmanager-basic-auth.env|g" \
+	  -e "s|{{HOME}}|$(HOME)|g" \
+	  scripts/etc/launchd/com.k3d-manager.alertmanager-auth-proxy.plist.tmpl \
+	  > "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.alertmanager-auth-proxy" 2>/dev/null || true
+	launchctl bootstrap "gui/$$(id -u)" \
+	  "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
+	@echo "Alertmanager auth proxy installed — localhost:9093 now requires basic auth"
+
+uninstall-alertmanager-auth-proxy:
+	launchctl bootout "gui/$$(id -u)/com.k3d-manager.alertmanager-auth-proxy" 2>/dev/null || true
+	rm -f "$(HOME)/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
+	@echo "Alertmanager auth proxy removed"
+
 ## Inject SLACK_BOT_TOKEN and SLACK_CHANNEL_ID into the webhook LaunchAgent plist and restart
 update-webhook-slack:
 	@[ -n "$(SLACK_BOT_TOKEN)" ] || (echo "ERROR: SLACK_BOT_TOKEN not set — export it first"; exit 1)
@@ -266,10 +300,22 @@ deploy-worker:
 	@_cf=$$(security find-generic-password -s k3dm-cloudflare-api-token -a k3dm -w 2>/dev/null) && \
 	_tok=$$(security find-generic-password -s k3dm-webhook-token -a k3dm -w 2>/dev/null) && \
 	_sig=$$(security find-generic-password -s k3dm-slack-signing-secret -a k3dm -w 2>/dev/null) && \
+	[ -n "$$_cf" ] || { echo "ERROR: k3dm-cloudflare-api-token missing from Keychain — run bin/k3dm-worker-setup"; exit 1; } && \
+	[ -n "$$_tok" ] || { echo "ERROR: k3dm-webhook-token missing from Keychain — run bin/k3dm-webhook-setup"; exit 1; } && \
+	[ -n "$$_sig" ] || { echo "ERROR: k3dm-slack-signing-secret missing from Keychain — run bin/k3dm-worker-setup"; exit 1; } && \
 	cd workers/slack-relay && \
 	printf '%s' "$$_tok" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put WEBHOOK_TOKEN && \
 	printf '%s' "$$_sig" | CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler secret put SLACK_SIGNING_SECRET && \
-	CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler deploy
+	CLOUDFLARE_API_TOKEN="$$_cf" npx --yes wrangler deploy && \
+	_ts=$$(date +%s) && \
+	_body='command=%2Fcluster-status&text=&response_url=https%3A%2F%2Fexample.com' && \
+	_sig=$$(BODY="$$_body" SECRET="$$_sig" TS="$$_ts" python3 -c 'import hmac,hashlib,os; body=os.environ["BODY"]; secret=os.environ["SECRET"].encode(); ts=os.environ["TS"]; msg=f"v0:{ts}:{body}".encode(); print("v0="+hmac.new(secret, msg, hashlib.sha256).hexdigest())') && \
+	_code=$$(curl -sS -o /dev/null -w '%{http_code}' \
+	  -X POST 'https://k3dm-slack-relay.k3dm.workers.dev' \
+	  -H "X-Slack-Request-Timestamp: $$_ts" \
+	  -H "X-Slack-Signature: $$_sig" \
+	  --data "$$_body" 2>/dev/null || true) && \
+	[ "$$_code" = "200" ]
 
 ## Backup Cloudflare tunnel credentials to macOS Keychain + Vault (run after rotating credentials)
 cloudflared-backup:
@@ -328,6 +374,18 @@ show-service-passwords:
 	echo "  Prometheus  https://prometheus.3ai-talk.org";\
 	echo "    user:     $${_prom_user:-admin}";\
 	echo "    password: $${_prom_pass:-N/A}";\
+	echo ""
+	@_am_auth_file="$${HOME}/.local/share/k3d-manager/alertmanager-basic-auth.env"; \
+	if [ -r "$$_am_auth_file" ]; then \
+	  _am_user=$$(grep -E '^ALERTMANAGER_BASIC_AUTH_USER=' "$$_am_auth_file" | head -1 | cut -d= -f2-); \
+	  _am_pass=$$(grep -E '^ALERTMANAGER_BASIC_AUTH_PASSWORD=' "$$_am_auth_file" | head -1 | cut -d= -f2-); \
+	else \
+	  _am_user="admin"; \
+	  _am_pass="N/A"; \
+	fi; \
+	echo "  Alertmanager https://alertmanager.3ai-talk.org";\
+	echo "    user:     $${_am_user:-admin}";\
+	echo "    password: $${_am_pass:-N/A}";\
 	echo ""
 	@_kc=$$(kubectl get secret keycloak-secrets -n identity \
 	  --context k3d-k3d-cluster -o jsonpath='{.data.KEYCLOAK_ADMIN_PASSWORD}' 2>/dev/null | base64 -d); \
@@ -457,6 +515,8 @@ help:
 	@echo "    make vuln-scan                  Print VulnerabilityReport summary"
 	@echo "    make show-service-passwords     Show all service login credentials"
 	@echo "    make alertmanager-secret        Store Alertmanager Gmail+SMS creds in Vault (run once)"
+	@echo "    make install-alertmanager-auth-proxy   Install Alertmanager auth proxy LaunchAgent"
+	@echo "    make install-alertmanager-port-forward   Install Alertmanager port-forward LaunchAgent"
 	@echo "    make cloudflared-backup         Backup Cloudflare tunnel creds to Keychain+Vault"
 	@echo ""
 	@echo "  Examples:"

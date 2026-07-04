@@ -6,6 +6,7 @@ node_modules/
 bin/.ask-sandbox/
 __pycache__/
 package-lock.json
+workers/slack-relay/.wrangler/
 
 # Added by ggshield
 .cache_ggshield

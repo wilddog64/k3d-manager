@@ -27,6 +27,8 @@ setup() {
 }
 
 @test "argocd app cluster generator: data-git ignores controller-injected volumeClaimTemplates fields" {
+  run grep -F -- ".spec.persistentVolumeClaimRetentionPolicy" "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/data-git.yaml"
+  [ "$status" -eq 0 ]
   run grep -F -- ".spec.volumeClaimTemplates[].status" "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/data-git.yaml"
   [ "$status" -eq 0 ]
   run grep -F -- ".spec.volumeClaimTemplates[].apiVersion" "${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/data-git.yaml"

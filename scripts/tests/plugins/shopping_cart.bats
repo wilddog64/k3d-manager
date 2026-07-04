@@ -77,6 +77,18 @@
   [ "$output" = "ubuntu-hostinger" ]
 }
 
+@test "_shopping_cart_vault_externalsecrets includes the GHCR pull secret" {
+  run bash -c '
+    SCRIPT_DIR="$(pwd)/scripts"
+    source scripts/lib/system.sh
+    source scripts/lib/core.sh
+    source scripts/plugins/shopping_cart.sh
+    _shopping_cart_vault_externalsecrets
+  '
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"shopping-cart-apps/ghcr-pull-secret"* ]]
+}
+
 @test "_ensure_k3sup returns 0 after successful brew install" {
   run bash -c '
     SCRIPT_DIR="$(pwd)/scripts"

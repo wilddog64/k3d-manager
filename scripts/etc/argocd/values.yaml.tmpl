@@ -41,14 +41,42 @@ server:
   extraArgs:
     - --insecure
 
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kube-prometheus-stack
+
 repoServer:
   replicas: ${ARGOCD_REPO_SERVER_REPLICAS}
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kube-prometheus-stack
 
 controller:
   replicas: 1
 
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kube-prometheus-stack
+
 applicationSet:
   replicas: ${ARGOCD_APPLICATIONSET_REPLICAS}
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kube-prometheus-stack
 
 dex:
   enabled: false

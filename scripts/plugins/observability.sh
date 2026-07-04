@@ -4,6 +4,7 @@
 function deploy_observability() {
   _info "[observability] Deploying Hub observability stack..."
   local _appset="${SCRIPT_DIR}/etc/argocd/applicationsets/observability.yaml"
+  local _hub_context="k3d-k3d-cluster"
   : "${ARGOCD_NAMESPACE:=cicd}"
   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
   export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE
@@ -75,6 +76,216 @@ function deploy_observability() {
     _kubectl apply -f "${_istio_manifest}" >/dev/null \
       && _info "[observability] Istio Gateway + VirtualServices applied (prometheus/grafana.shopping-cart.local)"
   fi
+
+  _observability_ensure_alertmanager_login
+  _observability_install_alertmanager_port_forward
+  _observability_install_alertmanager_auth_proxy
+  _observability_apply_argocd_dashboard "${_hub_context}"
+  _deploy_promtail_acg "${_hub_context}"
+}
+
+function _observability_install_alertmanager_port_forward() {
+  if ! _is_mac; then
+    return 0
+  fi
+
+  if ! command -v launchctl >/dev/null 2>&1 || ! command -v kubectl >/dev/null 2>&1; then
+    _warn "[observability] launchctl or kubectl not available — skipping Alertmanager port-forward"
+    return 0
+  fi
+
+  local _plist_template="${SCRIPT_DIR}/etc/launchd/com.k3d-manager.alertmanager-port-forward.plist.tmpl"
+  local _plist="${HOME}/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist"
+  if [[ ! -f "${_plist_template}" ]]; then
+    _warn "[observability] Alertmanager port-forward template missing — skipping"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "${_plist}")"
+  sed \
+    -e "s|{{KUBECTL_PATH}}|$(command -v kubectl)|g" \
+    -e "s|{{HOME}}|${HOME}|g" \
+    "${_plist_template}" > "${_plist}"
+  launchctl bootout "gui/$(id -u)/com.k3d-manager.alertmanager-port-forward" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "${_plist}"
+  _info "[observability] Alertmanager port-forward agent installed — raw backend stays open on port 19093"
+}
+
+function _observability_alertmanager_port_forward_plist() {
+  printf '%s/Library/LaunchAgents/com.k3d-manager.alertmanager-port-forward.plist\n' "${HOME}"
+}
+
+function _observability_alertmanager_auth_proxy_plist() {
+  printf '%s/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist\n' "${HOME}"
+}
+
+function _observability_port_listening() {
+  local port="${1:-}"
+  command -v lsof >/dev/null 2>&1 \
+    && lsof -nP -iTCP:"${port}" -sTCP:LISTEN >/dev/null 2>&1
+}
+
+function _observability_wait_for_port() {
+  local port="${1:-}"
+  local _attempt
+  for _attempt in 1 2 3 4 5; do
+    if _observability_port_listening "${port}"; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
+function _observability_alertmanager_auth_file() {
+  printf '%s/.local/share/k3d-manager/alertmanager-basic-auth.env\n' "${HOME}"
+}
+
+function _observability_ensure_alertmanager_login() {
+  local _auth_file
+  _auth_file="$(_observability_alertmanager_auth_file)"
+
+  local _vault_addr="http://127.0.0.1:18200"
+  local _vault_token
+  _vault_token=$(_kubectl get secret vault-root -n secrets \
+    --context k3d-k3d-cluster -o jsonpath='{.data.root_token}' | base64 -d)
+
+  local _vault_hdr
+  _vault_hdr=$(mktemp)
+  printf 'X-Vault-Token: %s\n' "${_vault_token}" > "${_vault_hdr}"
+
+  local _am_creds
+  if ! _am_creds=$(curl -sf \
+      --header "@${_vault_hdr}" \
+      "${_vault_addr}/v1/secret/data/k3d-manager/alertmanager-basic-auth" 2>/dev/null \
+      | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
+        print(d['user']+'|'+d['password'])" 2>/dev/null); then
+    _am_creds=""
+  fi
+
+  if [[ -z "${_am_creds}" ]]; then
+    local _am_user="admin"
+    local _am_password
+    _am_password=$(python3 -c 'import secrets; print(secrets.token_hex(16))')
+    local _am_payload
+    _info "[observability] Ensuring Alertmanager basic auth secret exists in Vault."
+    _am_payload=$(python3 - "$_am_user" "$_am_password" <<'PY'
+import json
+import sys
+user, password = sys.argv[1:3]
+print(json.dumps({"data": {"user": user, "password": password}}))
+PY
+) || _am_payload=""
+    if [[ -n "${_am_payload}" ]] && curl -sf \
+        --header "@${_vault_hdr}" \
+        --header 'Content-Type: application/json' \
+        --request POST \
+        --data "${_am_payload}" \
+        "${_vault_addr}/v1/secret/data/k3d-manager/alertmanager-basic-auth" >/dev/null; then
+      for _attempt in 1 2 3; do
+        if _am_creds=$(curl -sf \
+            --header "@${_vault_hdr}" \
+            "${_vault_addr}/v1/secret/data/k3d-manager/alertmanager-basic-auth" 2>/dev/null \
+            | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
+              print(d['user']+'|'+d['password'])" 2>/dev/null); then
+          break
+        fi
+        sleep 1
+      done
+    else
+      _warn "[observability] Failed to create Alertmanager login secret in Vault — using generated local credentials for this run"
+      _am_creds="${_am_user}|${_am_password}"
+    fi
+
+    if [[ -z "${_am_creds}" ]]; then
+      _warn "[observability] Failed to retrieve Alertmanager login secret after creation attempt — using generated local credentials for this run"
+      _am_creds="${_am_user}|${_am_password}"
+    fi
+  fi
+  rm -f "${_vault_hdr}"
+
+  local _am_user _am_password _rest
+  _am_user="${_am_creds%%|*}"
+  _rest="${_am_creds#*|}"
+  _am_password="${_rest}"
+
+  mkdir -p "$(dirname "${_auth_file}")"
+  cat > "${_auth_file}" <<EOF
+ALERTMANAGER_BASIC_AUTH_USER=${_am_user}
+ALERTMANAGER_BASIC_AUTH_PASSWORD=${_am_password}
+ALERTMANAGER_BACKEND_URL=http://127.0.0.1:19093
+EOF
+  chmod 600 "${_auth_file}"
+  _info "[observability] Alertmanager login credentials ready (${_auth_file})"
+}
+
+function _observability_install_alertmanager_auth_proxy() {
+  if ! _is_mac; then
+    return 0
+  fi
+
+  if ! command -v launchctl >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+    _warn "[observability] launchctl or python3 not available — skipping Alertmanager auth proxy"
+    return 0
+  fi
+
+  local _auth_file
+  _auth_file="$(_observability_alertmanager_auth_file)"
+  if [[ ! -f "${_auth_file}" ]]; then
+    _warn "[observability] Alertmanager auth file missing — skipping auth proxy"
+    return 0
+  fi
+
+  local _plist_template="${SCRIPT_DIR}/etc/launchd/com.k3d-manager.alertmanager-auth-proxy.plist.tmpl"
+  local _plist="${HOME}/Library/LaunchAgents/com.k3d-manager.alertmanager-auth-proxy.plist"
+  if [[ ! -f "${_plist_template}" ]]; then
+    _warn "[observability] Alertmanager auth proxy template missing — skipping"
+    return 0
+  fi
+
+  mkdir -p "$(dirname "${_plist}")"
+  sed \
+    -e "s|{{PYTHON3_PATH}}|$(command -v python3)|g" \
+    -e "s|{{ALERTMANAGER_PROXY_BIN}}|${SCRIPT_DIR}/../bin/alertmanager-auth-proxy|g" \
+    -e "s|{{ALERTMANAGER_AUTH_FILE}}|${_auth_file}|g" \
+    -e "s|{{HOME}}|${HOME}|g" \
+    "${_plist_template}" > "${_plist}"
+  launchctl bootout "gui/$(id -u)/com.k3d-manager.alertmanager-auth-proxy" 2>/dev/null || true
+  launchctl bootstrap "gui/$(id -u)" "${_plist}"
+  _info "[observability] Alertmanager auth proxy installed — localhost:9093 now requires login"
+}
+
+function _observability_restore_alertmanager_access_layer() {
+  if ! _is_mac; then
+    return 0
+  fi
+
+  if ! command -v launchctl >/dev/null 2>&1 || ! command -v kubectl >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local _port_forward_plist _auth_proxy_plist _auth_file _needs_restore=0
+  _port_forward_plist="$(_observability_alertmanager_port_forward_plist)"
+  _auth_proxy_plist="$(_observability_alertmanager_auth_proxy_plist)"
+  _auth_file="$(_observability_alertmanager_auth_file)"
+
+  [[ -f "${_port_forward_plist}" ]] || _needs_restore=1
+  [[ -f "${_auth_proxy_plist}" ]] || _needs_restore=1
+  _observability_port_listening 19093 || _needs_restore=1
+  _observability_port_listening 9093 || _needs_restore=1
+
+  if [[ "${_needs_restore}" -eq 0 ]]; then
+    return 0
+  fi
+
+  _info "[observability] Alertmanager access layer missing — reinstalling local port-forward and auth proxy"
+  if [[ ! -f "${_auth_file}" ]]; then
+    _observability_ensure_alertmanager_login || true
+  fi
+  _observability_install_alertmanager_port_forward || true
+  _observability_install_alertmanager_auth_proxy || true
+  _observability_wait_for_port 19093 || true
+  _observability_wait_for_port 9093 || true
 }
 
 function _observability_acg_context() {
@@ -108,11 +319,12 @@ function deploy_observability_acg() {
   local _appset="${SCRIPT_DIR}/etc/argocd/applicationsets/observability-acg.yaml"
   : "${ARGOCD_NAMESPACE:=cicd}"
   K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
-  export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE
   local _app_context
   _app_context="$(_observability_acg_context "${1:-}")"
+  APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-${_app_context}}"
+  export K3D_MANAGER_BRANCH ARGOCD_NAMESPACE APP_CLUSTER_NAME
   # shellcheck disable=SC2016
-  if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_appset}" | _kubectl apply -f -; then
+  if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME' < "${_appset}" | _kubectl apply -f -; then
     _info "[observability] ACG ApplicationSet applied — ArgoCD will sync monitoring/trivy-system on ${_app_context}"
   else
     _err "[observability] Failed to apply ACG observability ApplicationSet"
@@ -121,6 +333,7 @@ function deploy_observability_acg() {
 
   _observability_ensure_namespace "${_app_context}" monitoring
   _info "[observability] Ensured monitoring namespace exists on ${_app_context}"
+  _observability_remove_argocd_dashboard "${_app_context}"
 
   _info "[observability] Reading Alertmanager credentials from Vault..."
   local _vault_addr="http://127.0.0.1:18200"
@@ -171,6 +384,10 @@ function deploy_observability_acg() {
   fi
   _prometheus_acg_web_config_secret "${_app_context}"
   _deploy_pushgateway_acg "${_app_context}"
+  _deploy_promtail_acg "${_app_context}"
+  _observability_ensure_alertmanager_login
+  _observability_install_alertmanager_port_forward
+  _observability_install_alertmanager_auth_proxy
 }
 
 function _deploy_pushgateway_acg() {
@@ -202,6 +419,47 @@ function _deploy_pushgateway_acg() {
   fi
 }
 
+function _deploy_promtail_acg() {
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
+  local _promtail_manifest="${SCRIPT_DIR}/etc/observability/promtail.yaml"
+  if [[ -f "${_promtail_manifest}" ]]; then
+    _kubectl apply --context "${_app_context}" -f "${_promtail_manifest}" >/dev/null \
+      && _info "[observability] Loki/Promtail log shipper applied on ${_app_context}"
+  fi
+}
+
+function _observability_apply_argocd_dashboard() {
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
+  local _dashboard_manifest="${SCRIPT_DIR}/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml"
+  if [[ -f "${_dashboard_manifest}" ]]; then
+    _kubectl apply --context "${_app_context}" -f "${_dashboard_manifest}" >/dev/null \
+      && _info "[observability] ArgoCD/Image Updater dashboard applied on ${_app_context}"
+  fi
+}
+
+function _observability_remove_argocd_dashboard() {
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
+  if _kubectl --no-exit --context "${_app_context}" -n monitoring get configmap grafana-dashboard-argocd >/dev/null 2>&1; then
+    _kubectl --no-exit --context "${_app_context}" -n monitoring delete configmap grafana-dashboard-argocd >/dev/null \
+      && _info "[observability] Removed stale ArgoCD/Image Updater dashboard from ${_app_context}"
+  fi
+}
+
+function _observability_prometheus_vault_payload() {
+  local _prom_password="${1}"
+  local _prom_hash="${2}"
+  PROM_ADMIN_PASSWORD="${_prom_password}" \
+  PROM_PASSWORD_BCRYPT="${_prom_hash}" \
+    python3 -c 'import json, os; print(json.dumps({"data": {
+      "user": "admin",
+      "password": os.environ["PROM_ADMIN_PASSWORD"],
+      "password_bcrypt": os.environ["PROM_PASSWORD_BCRYPT"],
+    }}))'
+}
+
 function _prometheus_acg_web_config_secret() {
   local _app_context
   _app_context="$(_observability_acg_context "${1:-}")"
@@ -224,35 +482,34 @@ function _prometheus_acg_web_config_secret() {
   fi
   if [[ -z "${_prom_creds}" ]]; then
     local _default_bcrypt_hash="\$2a\$12\$NqL.y.Z1.h.1.E.1.p.9.Q.2.a.7.I.3.Z.7.d.3.Q.2.v.0.K.2.x.6" # bcrypt hash for 'password'
-
     local _prom_password="${PROM_ADMIN_PASSWORD:-password}"
+    local _prom_payload
     _info "[observability] Ensuring Prometheus basic auth secret exists in Vault."
-    if ! curl -sf \
+    _prom_payload=$(_observability_prometheus_vault_payload "${_prom_password}" "${_default_bcrypt_hash}") || _prom_payload=""
+    if [[ -n "${_prom_payload}" ]] && curl -sf \
         --header "@${_vault_hdr}" \
         --header 'Content-Type: application/json' \
         --request POST \
-        --data "{\"data\":{\"user\":\"admin\",\"password\":\"${_prom_password}\",\"password_bcrypt\":\"${_default_bcrypt_hash}\"}}" \
+        --data "${_prom_payload}" \
         "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" >/dev/null; then
-      rm -f "${_vault_hdr}"
-      _err "[observability] Failed to create Prometheus basic auth secret in Vault."
-      return 1
+      for _attempt in 1 2 3; do
+        if _prom_creds=$(curl -sf \
+            --header "@${_vault_hdr}" \
+            "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" 2>/dev/null \
+            | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
+              print(d['user']+'|'+d['password_bcrypt'])" 2>/dev/null); then
+          break
+        fi
+        sleep 1
+      done
+    else
+      _warn "[observability] Failed to create Prometheus basic auth secret in Vault — using generated web config for this run"
+      _prom_creds="admin|${_default_bcrypt_hash}"
     fi
 
-    for _attempt in 1 2 3; do
-      if _prom_creds=$(curl -sf \
-          --header "@${_vault_hdr}" \
-          "${_vault_addr}/v1/secret/data/k3d-manager/prometheus-basic-auth" 2>/dev/null \
-          | python3 -c "import json,sys; d=json.load(sys.stdin)['data']['data']; \
-            print(d['user']+'|'+d['password_bcrypt'])" 2>/dev/null); then
-        break
-      fi
-      sleep 1
-    done
-
     if [[ -z "${_prom_creds}" ]]; then
-      rm -f "${_vault_hdr}"
-      _err "[observability] Failed to retrieve Prometheus basic auth secret after creation attempt."
-      return 1
+      _warn "[observability] Failed to retrieve Prometheus basic auth secret after creation attempt — using generated web config for this run"
+      _prom_creds="admin|${_default_bcrypt_hash}"
     fi
   fi
   rm -f "${_vault_hdr}"
@@ -294,10 +551,151 @@ function observability_status() {
 function trivy_scan_report() {
   local _app_context
   _app_context="$(_observability_acg_context "${1:-}")"
+  local _hub_rows _app_rows
   _info "[observability] VulnerabilityReport summary — Hub:"
-  _kubectl get vulnerabilityreports -A --no-headers 2>/dev/null \
-    | awk '{print $1, $2, $6, $7, $8}' | column -t | sort -k4 -rn || true
+  _hub_rows="$(_kubectl get vulnerabilityreports -A --no-headers 2>/dev/null \
+    | awk '{print $1, $2, $6, $7, $8}' | column -t | sort -k4 -rn || true)"
+  if [[ -n "${_hub_rows}" ]]; then
+    printf '%s\n' "${_hub_rows}"
+  else
+    _info "[observability]   (no VulnerabilityReports found)"
+  fi
   _info "[observability] VulnerabilityReport summary — ACG (${_app_context}):"
-  _kubectl get vulnerabilityreports -A --context "${_app_context}" --no-headers 2>/dev/null \
-    | awk '{print $1, $2, $6, $7, $8}' | column -t | sort -k4 -rn || true
+  _app_rows="$(_kubectl get vulnerabilityreports -A --context "${_app_context}" --no-headers 2>/dev/null \
+    | awk '{print $1, $2, $6, $7, $8}' | column -t | sort -k4 -rn || true)"
+  if [[ -n "${_app_rows}" ]]; then
+    printf '%s\n' "${_app_rows}"
+  else
+    _info "[observability]   (no VulnerabilityReports found)"
+  fi
+}
+
+function _trivy_prom_query() {
+  local _context="${1:-k3d-k3d-cluster}"
+  local _query="${2:-}"
+  local _encoded
+  local _prom_sts
+  local _prom_exec_rc=0
+  local _had_errexit=0
+
+  case $- in
+    *e*) _had_errexit=1 ;;
+  esac
+  set +e
+
+  for _prom_sts in prometheus-kube-prometheus-stack-prometheus prometheus-acg-kube-prometheus-stack-prometheus; do
+    if _kubectl --context "${_context}" -n monitoring get statefulset "${_prom_sts}" >/dev/null 2>&1; then
+      break
+    fi
+  done
+  if ! _kubectl --context "${_context}" -n monitoring get statefulset "${_prom_sts}" >/dev/null 2>&1; then
+    printf '\n'
+    if [[ "${_had_errexit}" -eq 1 ]]; then
+      set -e
+    fi
+    return 0
+  fi
+  _encoded="$(python3 -c 'import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1], safe=""))' "${_query}")"
+  _kubectl --context "${_context}" -n monitoring exec "statefulset/${_prom_sts}" -- \
+    sh -lc "wget -qO- 'http://localhost:9090/api/v1/query?query=${_encoded}'" \
+    || _prom_exec_rc=$?
+  if [[ "${_prom_exec_rc}" -ne 0 ]]; then
+    printf '\n'
+    if [[ "${_had_errexit}" -eq 1 ]]; then
+      set -e
+    fi
+    return 0
+  fi
+  if [[ "${_had_errexit}" -eq 1 ]]; then
+    set -e
+  fi
+}
+
+function _trivy_infra_security_report_for_context() {
+  local _label="${1:-Hub}"
+  local _context="${2:-k3d-k3d-cluster}"
+  local _compliance_json _role_json _clusterrole_json
+  local _had_errexit=0
+
+  case $- in
+    *e*) _had_errexit=1 ;;
+  esac
+  set +e
+
+  _info "[observability] Trivy infra security summary — ${_label} (${_context}):"
+
+  _compliance_json="$(_trivy_prom_query "${_context}" 'sum by (title,status) (trivy_cluster_compliance)' 2>/dev/null || true)"
+  if [[ -n "${_compliance_json}" ]]; then
+    python3 - "${_compliance_json}" <<'PY'
+import collections
+import json
+import sys
+
+payload = json.loads(sys.argv[1])
+rows = payload.get("data", {}).get("result", [])
+summary = collections.defaultdict(lambda: {"Pass": 0, "Fail": 0})
+for row in rows:
+    metric = row.get("metric", {})
+    title = metric.get("title", "unknown")
+    status = metric.get("status", "unknown")
+    value = int(float(row.get("value", [0, 0])[1]))
+    summary[title][status] = value
+
+if not summary:
+    print("  (no cluster compliance metrics found)")
+else:
+    for title in sorted(summary):
+        print(f"  {title}: pass={summary[title].get('Pass', 0)} fail={summary[title].get('Fail', 0)}")
+PY
+  else
+    _info "[observability]   (no cluster compliance metrics found)"
+  fi
+
+  _role_json="$(_trivy_prom_query "${_context}" 'sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~"High|Critical"})' 2>/dev/null || true)"
+  _clusterrole_json="$(_trivy_prom_query "${_context}" 'sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~"High|Critical"})' 2>/dev/null || true)"
+  if [[ -n "${_role_json}" || -n "${_clusterrole_json}" ]]; then
+    python3 - "${_role_json:-{}}" "${_clusterrole_json:-{}}" <<'PY'
+import json
+import sys
+
+def load(payload):
+    try:
+        return json.loads(payload).get("data", {}).get("result", [])
+    except Exception:
+        return []
+
+entries = []
+for result in (load(sys.argv[1]), load(sys.argv[2])):
+    for row in result:
+        metric = row.get("metric", {})
+        value = int(float(row.get("value", [0, 0])[1]))
+        if value <= 0:
+            continue
+        if "namespace" in metric:
+            name = f"{metric.get('namespace', 'unknown')}/{metric.get('resource_name', 'unknown')}"
+        else:
+            name = f"cluster/{metric.get('name', 'unknown')}"
+        entries.append((value, name, metric.get("resource_kind", "unknown"), metric.get("severity", "unknown")))
+
+if not entries:
+    print("  (no High/Critical infra RBAC findings found)")
+else:
+    print("  High/Critical infra RBAC findings:")
+    for value, name, kind, severity in sorted(entries, key=lambda item: (-item[0], item[1], item[3]))[:12]:
+        print(f"    {name} ({kind}, {severity}): {value}")
+PY
+  else
+    _info "[observability]   (no High/Critical infra RBAC findings found)"
+  fi
+
+  if [[ "${_had_errexit}" -eq 1 ]]; then
+    set -e
+  fi
+}
+
+function trivy_infra_security_report() {
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
+  _trivy_infra_security_report_for_context "Hub" "k3d-k3d-cluster"
+  _trivy_infra_security_report_for_context "ACG" "${_app_context}"
 }

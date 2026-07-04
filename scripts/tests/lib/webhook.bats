@@ -171,6 +171,17 @@ teardown_file() {
     [[ "$output" == *'"job_id"'* ]]
 }
 
+@test "webhook hostinger status handler accepts provider dispatch" {
+    run grep -F -- 'def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- 'target=_run_hostinger_status if provider == "hostinger" else _run_cluster_status,' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- 'kwargs={"thread_ts": thread_ts, "provider": provider}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+}
+
 @test "POST /cluster-status with wrong token returns 401" {
     run curl -s -o /dev/null -w "%{http_code}" -X POST \
         -H "Authorization: Bearer wrongtoken" \
@@ -179,6 +190,143 @@ teardown_file() {
         "${_WEBHOOK_URL}/api/v1/cluster-status"
     [ "$status" -eq 0 ]
     [ "$output" = "401" ]
+}
+
+@test "POST /cluster-status with reader role returns 202" {
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: reader" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-status" \
+        -H "Content-Type: application/json" \
+        -d '{"provider":"hostinger"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster-status"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"queued"'* ]]
+}
+
+@test "POST /diagnostics with reader role returns 202" {
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: reader" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-diagnose" \
+        -H "Content-Type: application/json" \
+        -d '{"provider":"hostinger","action":"get-pods","namespace":"shopping-cart-apps"}' \
+        "${_WEBHOOK_URL}/api/v1/diagnostics"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"queued"'* ]]
+}
+
+@test "POST /diagnostics rejects non-approved namespaces" {
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: reader" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-diagnose" \
+        -H "Content-Type: application/json" \
+        -d '{"provider":"hostinger","action":"get-pods","namespace":"default"}' \
+        "${_WEBHOOK_URL}/api/v1/diagnostics"
+    [ "$status" -eq 0 ]
+    [ "$output" = "400" ]
+}
+
+@test "POST /diagnostics ArgoCD requests must target hub" {
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: reader" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-diagnose" \
+        -H "Content-Type: application/json" \
+        -d '{"provider":"hostinger","action":"get-apps"}' \
+        "${_WEBHOOK_URL}/api/v1/diagnostics"
+    [ "$status" -eq 0 ]
+    [ "$output" = "400" ]
+}
+
+@test "POST /cluster-refresh with reader role returns 403" {
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: reader" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-refresh" \
+        -H "Content-Type: application/json" \
+        -d '{"provider":"hostinger"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster-refresh"
+    [ "$status" -eq 0 ]
+    [ "$output" = "403" ]
+}
+
+@test "POST /cluster-refresh with operator role returns 202" {
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: operator" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-refresh" \
+        -H "Content-Type: application/json" \
+        -d '{"provider":"hostinger"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster-refresh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"status":"queued"'* ]]
+}
+
+@test "POST /cluster up with operator role returns 403" {
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "X-K3DM-Role: operator" \
+        -H "X-K3DM-Actor: slack:test-user:U123" \
+        -H "X-K3DM-Source-Command: /cluster-up" \
+        -H "Content-Type: application/json" \
+        -d '{"action":"up","provider":"hostinger"}' \
+        "${_WEBHOOK_URL}/api/v1/cluster"
+    [ "$status" -eq 0 ]
+    [ "$output" = "403" ]
+}
+
+@test "webhook remote operator access defines policy and audit log" {
+    run grep -F -- '_ROLE_LEVELS = {"reader": 1, "operator": 2, "admin": 3}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- 'AUDIT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "audit"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- '"/api/v1/cluster-refresh": {"name": "cluster-refresh", "min_role": "operator"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- 'return {"name": f"cluster-{action}", "min_role": "admin"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+}
+
+@test "webhook diagnostics endpoint is reader-scoped and namespace-guarded" {
+    run grep -F -- '"/api/v1/diagnostics": {"name": "diagnostics", "min_role": "reader"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- '"shopping-cart-apps",' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- 'allowed_actions = {"get-pods", "describe-pod", "logs", "get-apps", "describe-app", "get-appsets"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+}
+
+@test "webhook analysis defaults to agy CLI instead of gemini" {
+    run grep -F -- 'os.environ.get("K3DM_GEMINI_BIN", "agy")' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- 'return "agy CLI not found — skipping AI analysis"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+}
+
+@test "webhook ask subprocess captures transcripts in the k3d-manager run dir" {
+    run grep -F -- 'RUN_DIR = Path(os.environ.get("K3DM_RUN_DIR", Path.home() / ".local/share/k3d-manager/run"))' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- 'prefix="k3dm-ask-", suffix=".out", delete=False, mode="w", dir=str(RUN_DIR)' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+}
+
+@test "webhook ask subprocess ensures the run dir exists before capturing" {
+    run grep -F -- 'RUN_DIR.mkdir(parents=True, exist_ok=True)' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
 }
 
 @test "POST /analyze with correct token returns 202 and job_id" {

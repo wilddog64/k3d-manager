@@ -36,6 +36,7 @@ spec:
         - group: apps
           kind: StatefulSet
           jqPathExpressions:
+            - .spec.persistentVolumeClaimRetentionPolicy
             - .spec.volumeClaimTemplates[].spec.storageClassName
             - .spec.volumeClaimTemplates[].spec.volumeMode
             - .spec.volumeClaimTemplates[].status

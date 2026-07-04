@@ -169,6 +169,7 @@ teardown_file() {
 
   _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
   ARGOCD_NAMESPACE="cicd"
+  # shellcheck disable=SC2034
   ARGOCD_CHART_VERSION="7.8.1"
   _argocd_hub_kubectl_cmd() {
     printf '%s\n' "kubectl --context k3d-k3d-cluster"
@@ -227,6 +228,223 @@ teardown_file() {
   [[ "${output}" != *'"insecure": true'* ]]
 }
 
+@test "_provider_k3s_hostinger_refresh_cluster reapplies observability and refreshes frontend DNS on the hostinger context" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  _HOSTINGER_KUBECONFIG="${BATS_TEST_TMPDIR}/hostinger.config"
+  : > "${_HOSTINGER_KUBECONFIG}"
+
+  _hostinger_require_host() { printf '%s\n' "srv1754834.hstgr.cloud"; }
+  _hostinger_merge_kubeconfig() { printf '%s\n' "merge" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_register_cluster() { printf '%s\n' "register" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  deploy_observability_acg() { printf 'observability %s\n' "$1" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_reapply_gitops_applicationsets() { printf '%s\n' "gitops-appsets" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_clear_stale_platform_tracking_ids() { printf '%s\n' "tracking-fix" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_reconcile_vault_cluster_store() { printf '%s\n' "vault" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_refresh_frontend_dns() { printf '%s\n' "frontend-dns" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _hostinger_refresh_access_layer() { printf '%s\n' "access" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _acg_record_provider() { printf 'provider %s\n' "$1" >> "${BATS_TEST_TMPDIR}/refresh.log"; }
+  _info() { :; }
+
+  kubectl() {
+    case "$*" in
+      --context\ ubuntu-hostinger\ get\ --raw=/healthz*)
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  run _provider_k3s_hostinger_refresh_cluster
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"__WEBHOOK_SUCCESS__"* ]]
+
+  run cat "${BATS_TEST_TMPDIR}/refresh.log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"merge"* ]]
+  [[ "$output" == *"register"* ]]
+  [[ "$output" == *"observability ubuntu-hostinger"* ]]
+  [[ "$output" == *"gitops-appsets"* ]]
+  [[ "$output" == *"tracking-fix"* ]]
+  [[ "$output" == *"vault"* ]]
+  [[ "$output" == *"frontend-dns"* ]]
+  [[ "$output" == *"access"* ]]
+  [[ "$output" == *"provider k3s-hostinger"* ]]
+}
+
+@test "_hostinger_reapply_gitops_applicationsets reapplies data, services, and platform appsets from the current branch" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  SCRIPT_DIR="${REPO_ROOT}/scripts"
+  _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
+  ARGOCD_NAMESPACE="cicd"
+  K3D_MANAGER_BRANCH="k3d-manager-v1.12.0"
+  APP_CLUSTER_NAME="ubuntu-hostinger"
+  _hostinger_load_argocd_plugin() { :; }
+  _argocd_hub_kubectl_cmd() {
+    printf '%s\n' "kubectl --context k3d-k3d-cluster"
+  }
+  _info() { :; }
+  _err() { printf '%s\n' "$*" >&2; return 1; }
+  kubectl() {
+    case "$*" in
+      --context\ k3d-k3d-cluster\ apply\ -f\ -)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/appsets.log"
+        printf '\n---\n' >> "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
+        cat >> "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  run _hostinger_reapply_gitops_applicationsets
+  [ "$status" -eq 0 ]
+
+  run cat "${BATS_TEST_TMPDIR}/appsets.log"
+  [ "$status" -eq 0 ]
+  [[ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 3 ]]
+  [[ "$output" == *"--context k3d-k3d-cluster apply -f -"* ]]
+
+  run cat "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"name: data-layer"* ]]
+  [[ "$output" == *"k3d-manager/role: app-cluster"* ]]
+  [[ "$output" == *".spec.persistentVolumeClaimRetentionPolicy"* ]]
+  [[ "$output" == *"name: services-git"* ]]
+  [[ "$output" == *".spec.source.kustomize.images"* ]]
+  [[ "$output" == *"name: platform-helm"* ]]
+  [[ "$output" == *"name: '{{.name}}-platform'"* ]]
+}
+
+@test "_hostinger_clear_stale_platform_tracking_ids strips stale basket/product-catalog ownership and refreshes apps" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
+  ARGOCD_NAMESPACE="cicd"
+  _hostinger_load_argocd_plugin() { :; }
+  _argocd_hub_kubectl_cmd() {
+    printf '%s\n' "kubectl --context k3d-k3d-cluster"
+  }
+  _info() { :; }
+  _warn() { :; }
+
+  kubectl() {
+    case "$*" in
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ get\ deployment,service,serviceaccount,configmap,secret,externalsecret,statefulset\ -l\ app.kubernetes.io/part-of=shopping-cart\ -o\ json)
+        cat <<'JSON'
+{"items":[
+  {"kind":"Deployment","metadata":{"name":"basket-service","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:apps/Deployment:shopping-cart-apps/basket-service"}}},
+  {"kind":"Service","metadata":{"name":"basket-service","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/Service:shopping-cart-apps/basket-service"}}},
+  {"kind":"ServiceAccount","metadata":{"name":"basket-service","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/ServiceAccount:shopping-cart-apps/basket-service"}}},
+  {"kind":"ConfigMap","metadata":{"name":"basket-service-config","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/ConfigMap:shopping-cart-apps/basket-service-config"}}},
+  {"kind":"Deployment","metadata":{"name":"order-service","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:apps/Deployment:shopping-cart-apps/order-service"}}},
+  {"kind":"Service","metadata":{"name":"order-service","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/Service:shopping-cart-apps/order-service"}}},
+  {"kind":"Service","metadata":{"name":"order-service-nodeport","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/Service:shopping-cart-apps/order-service-nodeport"}}},
+  {"kind":"ServiceAccount","metadata":{"name":"order-service","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/ServiceAccount:shopping-cart-apps/order-service"}}},
+  {"kind":"ConfigMap","metadata":{"name":"order-service-config","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/ConfigMap:shopping-cart-apps/order-service-config"}}},
+  {"kind":"Deployment","metadata":{"name":"product-catalog","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:apps/Deployment:shopping-cart-apps/product-catalog"}}},
+  {"kind":"Service","metadata":{"name":"product-catalog","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/Service:shopping-cart-apps/product-catalog"}}},
+  {"kind":"Service","metadata":{"name":"product-catalog-nodeport","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/Service:shopping-cart-apps/product-catalog-nodeport"}}},
+  {"kind":"ServiceAccount","metadata":{"name":"product-catalog","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/ServiceAccount:shopping-cart-apps/product-catalog"}}},
+  {"kind":"ConfigMap","metadata":{"name":"product-catalog-seed-script","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:/ConfigMap:shopping-cart-apps/product-catalog-seed-script"}}},
+  {"kind":"ExternalSecret","metadata":{"name":"product-catalog-secrets","annotations":{"argocd.argoproj.io/tracking-id":"ubuntu-hostinger-platform:external-secrets.io/ExternalSecret:shopping-cart-apps/product-catalog-secrets"}}},
+  {"kind":"ConfigMap","metadata":{"name":"product-catalog-config-8h4dfgdf4k","annotations":{"argocd.argoproj.io/tracking-id":"someone-else:ConfigMap:shopping-cart-apps/product-catalog-config-8h4dfgdf4k"}}}
+]}
+JSON
+        ;;
+      --context\ ubuntu-hostinger\ -n\ shopping-cart-apps\ annotate*)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/tracking.log"
+        ;;
+      --context\ k3d-k3d-cluster\ annotate\ application*)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/tracking.log"
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  run _hostinger_clear_stale_platform_tracking_ids
+  [ "$status" -eq 0 ]
+
+  run cat "${BATS_TEST_TMPDIR}/tracking.log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate deployment/basket-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate service/basket-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate serviceaccount/basket-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate configmap/basket-service-config argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate deployment/order-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate service/order-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate service/order-service-nodeport argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate serviceaccount/order-service argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate configmap/order-service-config argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate deployment/product-catalog argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate service/product-catalog argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate service/product-catalog-nodeport argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate serviceaccount/product-catalog argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate configmap/product-catalog-seed-script argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context ubuntu-hostinger -n shopping-cart-apps annotate externalsecret.external-secrets.io/product-catalog-secrets argocd.argoproj.io/tracking-id- --overwrite"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-basket -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-frontend -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-order -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-payment -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster annotate application shopping-cart-product-catalog -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
+  [[ "$output" == *"--context k3d-k3d-cluster annotate application ubuntu-hostinger-platform -n cicd argocd.argoproj.io/refresh=hard --overwrite"* ]]
+}
+
+@test "_hostinger_reconcile_vault_cluster_store seeds hub Vault data before ExternalSecret reconcile" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
+  _HOSTINGER_SSH_USER="ubuntu"
+  _HOSTINGER_SSH_KEY="${BATS_TEST_TMPDIR}/hostinger.key"
+  HUB_VAULT_USE_BRIDGE=0
+  touch "${_HOSTINGER_SSH_KEY}"
+
+  _hostinger_require_host() { printf '%s\n' "srv1754834.hstgr.cloud"; }
+  shopping_cart_apply_vault_token_and_cluster_secret_store() { printf '%s\n' "css" >> "${BATS_TEST_TMPDIR}/reconcile.log"; }
+  vault_seed_hub_into_context() { printf 'seed %s\n' "$1" >> "${BATS_TEST_TMPDIR}/reconcile.log"; }
+  shopping_cart_force_vault_secret_reconcile() { printf '%s\n' "force" >> "${BATS_TEST_TMPDIR}/reconcile.log"; printf '%s\n' "shopping-cart-apps/ghcr-pull-secret"; }
+  shopping_cart_provision_ghcr_pull_secret() { printf '%s\n' "provision" >> "${BATS_TEST_TMPDIR}/reconcile.log"; }
+  _setup_vault_bridge() { printf '%s\n' "bridge" >> "${BATS_TEST_TMPDIR}/reconcile.log"; }
+  shopping_cart_create_vault_bridge() { printf '%s\n' "create-bridge" >> "${BATS_TEST_TMPDIR}/reconcile.log"; }
+  _info() { :; }
+  _warn() { :; }
+
+  kubectl() {
+    case "$*" in
+      --context\ ubuntu-hostinger\ get\ crd\ clustersecretstores.external-secrets.io)
+        return 0
+        ;;
+      --context\ ubuntu-hostinger\ -n\ secrets\ get\ deploy\ external-secrets)
+        return 0
+        ;;
+      *)
+        return 0
+        ;;
+    esac
+  }
+
+  run _hostinger_reconcile_vault_cluster_store
+  [ "$status" -eq 0 ]
+
+  run cat "${BATS_TEST_TMPDIR}/reconcile.log"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"css"* ]]
+  [[ "$output" == *"seed ubuntu-hostinger"* ]]
+  [[ "$output" == *"force"* ]]
+  [[ "$output" == *"provision"* ]]
+}
+
 @test "register_app_cluster falls back to insecure tlsClientConfig when CA data is unset" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   export PLUGINS_DIR="${REPO_ROOT}/scripts/plugins"
@@ -236,11 +454,16 @@ teardown_file() {
   source "${REPO_ROOT}/scripts/plugins/argocd.sh"
 
   ARGOCD_NAMESPACE="cicd"
+  # shellcheck disable=SC2034
   ARGOCD_APP_CLUSTER_SECRET_NAME="cluster-ubuntu-k3s"
+  # shellcheck disable=SC2034
   ARGOCD_APP_CLUSTER_NAME="ubuntu-k3s"
+  # shellcheck disable=SC2034
   ARGOCD_APP_CLUSTER_SERVER="https://host.k3d.internal:6443"
   ARGOCD_APP_CLUSTER_INSECURE="true"
+  # shellcheck disable=SC2034
   ARGOCD_APP_CLUSTER_CA_DATA=""
+  # shellcheck disable=SC2034
   ARGOCD_APP_CLUSTER_TOKEN="app-token"
 
   _kubectl() {
@@ -299,8 +522,22 @@ EOF
 
   lsof() {
     case "$*" in
-      *"-iTCP:8080"*) printf '%s\n' "41517" ;;
-      *"-iTCP:8880"*) printf '%s\n' "51518" ;;
+      *"-iTCP:8080"*)
+        if [[ ! -f "${BATS_TEST_TMPDIR}/lsof-8080-cleared" ]]; then
+          : > "${BATS_TEST_TMPDIR}/lsof-8080-cleared"
+          printf '%s\n' "41517"
+          return 0
+        fi
+        return 1
+        ;;
+      *"-iTCP:8880"*)
+        if [[ ! -f "${BATS_TEST_TMPDIR}/lsof-8880-cleared" ]]; then
+          : > "${BATS_TEST_TMPDIR}/lsof-8880-cleared"
+          printf '%s\n' "51518"
+          return 0
+        fi
+        return 1
+        ;;
       *) return 1 ;;
     esac
   }
@@ -404,9 +641,9 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F -- '--context "ubuntu-hostinger" port-forward --address=127.0.0.2' "${_ACG_STATE_DIR}/bin/frontend-browser-http.sh"
   [ "$status" -eq 0 ]
-  run grep -F -- 'svc/acg-kube-prometheus-stack-grafana' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
+  run grep -F -- 'svc/kube-prometheus-stack-grafana' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
   [ "$status" -eq 0 ]
-  run grep -F -- '<string>ubuntu-hostinger</string>' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
+  run grep -F -- '<string>k3d-k3d-cluster</string>' "${HOME}/Library/LaunchAgents/com.k3d-manager.grafana-port-forward.plist"
   [ "$status" -eq 0 ]
   run grep -F -- 'svc/pushgateway' "${HOME}/Library/LaunchAgents/com.k3d-manager.pushgateway-port-forward.plist"
   [ "$status" -eq 0 ]

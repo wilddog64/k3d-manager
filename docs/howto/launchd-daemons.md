@@ -19,8 +19,10 @@ Install via `make <target>` or via the plugin function noted below.
 | `com.k3d-manager.vault-port-forward` | Vault → `localhost:18200` (k3d-k3d-cluster) | ✅ | `make install-vault-port-forward` | `~/Library/Logs/k3dm-vault-port-forward.log` |
 | `com.k3d-manager.keycloak-port-forward` | Keycloak → `localhost:8880` / `keycloak.shopping-cart.local` (k3d-k3d-cluster) | ✅ | `keycloak_install` | `~/.local/share/k3d-manager/logs/keycloak-pf.log` |
 | `com.k3d-manager.prometheus-port-forward` | Prometheus → `localhost:19090` (k3d-k3d-cluster) | ✅ | `make install-prometheus-port-forward` | `~/Library/Logs/k3dm-prometheus-port-forward.log` |
-| `com.k3d-manager.cleanup` | Purges old job state dirs (`~/.local/share/k3d-manager/jobs/`) | ❌ (timer: daily 03:00) | `make install-cleanup` | `~/Library/Logs/k3dm-cleanup.log` |
-| `com.k3d-manager.acg-watch` | Watches ACG sandbox TTL; auto-extends or notifies | ❌ (on-demand) | `acg_watch_install` | `/tmp/k3d-manager-acg-watch.err` |
+| `com.k3d-manager.alertmanager-port-forward` | Alertmanager raw backend → `localhost:19093` (k3d-k3d-cluster) | ✅ | `make install-alertmanager-port-forward` | `~/Library/Logs/k3dm-alertmanager-port-forward.log` |
+| `com.k3d-manager.alertmanager-auth-proxy` | Alertmanager login proxy → `localhost:9093` | ✅ | `make install-alertmanager-auth-proxy` | `~/Library/Logs/k3dm-alertmanager-auth-proxy.log` |
+| `com.k3d-manager.cleanup` | Purges stale repo-owned temp files, Playwright artifacts, screenshots, and placeholder `TemporaryDirectory.*` dirs | ❌ (timer: daily 03:00) | `make install-cleanup` | `~/Library/Logs/k3dm-cleanup.log` |
+| `com.k3d-manager.acg-watch` | Watches ACG sandbox TTL; auto-extends or notifies | ❌ (on-demand) | `acg_watch_install` | `~/.local/share/k3d-manager/run/k3d-manager-acg-watch.err` |
 
 ---
 
@@ -60,6 +62,24 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 - **Template:** `scripts/etc/launchd/com.k3d-manager.prometheus-port-forward.plist.tmpl`
 - **Install:** `make install-prometheus-port-forward`
 
+### `com.k3d-manager.alertmanager-port-forward`
+- **Cluster:** `k3d-k3d-cluster` (local hub)
+- **Mapping:** `localhost:19093` → `svc/kube-prometheus-stack-alertmanager:9093` (namespace: `monitoring`)
+- **Browser access:** raw backend only; the login proxy fronts it
+- **Health check:** raw backend check only
+- **Template:** `scripts/etc/launchd/com.k3d-manager.alertmanager-port-forward.plist.tmpl`
+- **Install:** `make install-alertmanager-port-forward`
+
+### `com.k3d-manager.alertmanager-auth-proxy`
+- **Cluster:** local macOS login gate
+- **Mapping:** `localhost:9093` → `localhost:19093`
+- **Browser access:** `https://alertmanager.3ai-talk.org/` or `http://localhost:9093/`
+- **Health check:** `https://alertmanager.3ai-talk.org/api/v2/status`
+- **Credential behavior:** rereads `~/.local/share/k3d-manager/alertmanager-basic-auth.env` on each request so password rotation and file regeneration stay in sync without a manual restart
+- **Self-heal behavior:** `bin/cluster-status` now best-effort reinstalls the Alertmanager port-forward and auth-proxy LaunchAgents if the local plists or listeners (`19093`, `9093`) are missing, which covers the common post-reboot / unloaded-agent case before service health is checked
+- **Template:** `scripts/etc/launchd/com.k3d-manager.alertmanager-auth-proxy.plist.tmpl`
+- **Install:** `make install-alertmanager-auth-proxy`
+
 ---
 
 ## Network Daemons
@@ -75,7 +95,7 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 ### `com.k3d-manager.cloudflare-tunnel`
 - **Tool:** `cloudflared`
 - **Config:** `~/.cloudflared/config.yml`
-- **Exposes:** `grafana.3ai-talk.org`, `prometheus.3ai-talk.org` → services on ubuntu-k3s
+- **Exposes:** `grafana.3ai-talk.org`, `prometheus.3ai-talk.org` → services on ubuntu-k3s; `alertmanager.3ai-talk.org` → the local Alertmanager login proxy
 - **Install:** via homebrew service (`brew services start cloudflared`) + plist at `~/Library/LaunchAgents/com.k3d-manager.cloudflare-tunnel.plist`
 
 ---
@@ -97,7 +117,7 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 
 ### `com.k3d-manager.cleanup`
 - **Trigger:** `StartCalendarInterval` (daily at 03:00)
-- **Action:** Removes job state dirs older than 7 days from `~/.local/share/k3d-manager/jobs/`
+- **Action:** Prunes stale repo-owned temp files from `/tmp`, trims archived screenshots, clears old Playwright/BATS temp dirs, and removes stale placeholder `TemporaryDirectory.*` directories when they contain only `.keep-directory`
 - **Binary:** `bin/k3dm-cleanup`
 - **Template:** `scripts/etc/launchd/com.k3d-manager.cleanup.plist.tmpl`
 - **Install:** `make install-cleanup`
@@ -106,6 +126,7 @@ These use `KeepAlive=true` — launchd auto-restarts them if the process exits.
 - **Trigger:** `RunAtLoad=true` (one-shot on bootstrap, not KeepAlive)
 - **Action:** Monitors ACG sandbox TTL; sends Slack DM before expiry; optionally auto-extends session
 - **Script:** `~/.local/share/k3d-manager/acg-watch-run.sh` (generated by `acg_watch_install`)
+- **Logs:** `~/.local/share/k3d-manager/run/k3d-manager-acg-watch.out` and `~/.local/share/k3d-manager/run/k3d-manager-acg-watch.err`
 - **Install:** `acg_watch_install` plugin function
 
 ---
@@ -127,6 +148,7 @@ launchctl print "gui/$(id -u)/com.k3d-manager.prometheus-port-forward"
 # View logs
 tail -f ~/Library/Logs/k3dm-webhook.log
 tail -f ~/Library/Logs/k3dm-prometheus-port-forward.log
+tail -f ~/Library/Logs/k3dm-alertmanager-port-forward.log
 
 # Manually unload/reload a specific agent
 launchctl bootout "gui/$(id -u)/com.k3d-manager.<label>"

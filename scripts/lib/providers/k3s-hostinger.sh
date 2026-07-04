@@ -604,8 +604,8 @@ PLIST
   _hostinger_write_monitoring_port_forward_plist \
     "${_grafana_pf_plist}" \
     "${_grafana_pf_log}" \
-    "svc/acg-kube-prometheus-stack-grafana" \
-    "${_HOSTINGER_KUBE_CONTEXT}" \
+    "svc/kube-prometheus-stack-grafana" \
+    "k3d-k3d-cluster" \
     "3001" \
     "80"
   if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n monitoring get svc pushgateway >/dev/null 2>&1; then
@@ -670,6 +670,140 @@ PLIST
   fi
 }
 
+function _hostinger_clear_stale_platform_tracking_ids() {
+  _hostinger_load_argocd_plugin || return 1
+
+  local stale_prefix="${_HOSTINGER_KUBE_CONTEXT}-platform:"
+  local namespace="shopping-cart-apps"
+  local resource tracking_id cleared_any=0
+  local resource_kind resource_name
+  local -a resources=()
+  local resources_json
+  resources_json="$(
+    kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" get \
+      deployment,service,serviceaccount,configmap,secret,externalsecret,statefulset \
+      -l app.kubernetes.io/part-of=shopping-cart \
+      -o json 2>/dev/null || true
+  )"
+
+  if [[ -n "${resources_json}" ]]; then
+    while IFS=$'\t' read -r resource_kind resource_name tracking_id; do
+      [[ -n "${resource_kind}" ]] || continue
+      [[ "${tracking_id}" == "${stale_prefix}"* ]] || continue
+      case "${resource_kind}" in
+        Deployment)
+          resource="deployment/${resource_name}"
+          ;;
+        Service)
+          resource="service/${resource_name}"
+          ;;
+        ServiceAccount)
+          resource="serviceaccount/${resource_name}"
+          ;;
+        ConfigMap)
+          resource="configmap/${resource_name}"
+          ;;
+        Secret)
+          resource="secret/${resource_name}"
+          ;;
+        StatefulSet)
+          resource="statefulset/${resource_name}"
+          ;;
+        ExternalSecret)
+          resource="externalsecret.external-secrets.io/${resource_name}"
+          ;;
+        *)
+          continue
+          ;;
+      esac
+      resources+=("${resource}")
+    done < <(
+      jq -r --arg prefix "${stale_prefix}" '
+        .items[]
+        | select((.metadata.annotations["argocd.argoproj.io/tracking-id"] // "") | startswith($prefix))
+        | [.kind, .metadata.name, (.metadata.annotations["argocd.argoproj.io/tracking-id"] // "")]
+        | @tsv
+      ' <<<"${resources_json}"
+    )
+  fi
+
+  for resource in "${resources[@]}"; do
+    kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" annotate "${resource}" \
+      argocd.argoproj.io/tracking-id- --overwrite >/dev/null
+    cleared_any=1
+    _info "[k3s-hostinger] cleared stale platform tracking-id from ${namespace}/${resource}"
+  done
+
+  if [[ "${cleared_any}" -eq 0 ]]; then
+    return 0
+  fi
+
+  local -a hub_kubectl=()
+  read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
+  "${hub_kubectl[@]}" annotate application shopping-cart-basket -n "${ARGOCD_NAMESPACE:-cicd}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+  "${hub_kubectl[@]}" annotate application shopping-cart-frontend -n "${ARGOCD_NAMESPACE:-cicd}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+  "${hub_kubectl[@]}" annotate application shopping-cart-order -n "${ARGOCD_NAMESPACE:-cicd}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+  "${hub_kubectl[@]}" annotate application shopping-cart-payment -n "${ARGOCD_NAMESPACE:-cicd}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+  "${hub_kubectl[@]}" annotate application shopping-cart-product-catalog -n "${ARGOCD_NAMESPACE:-cicd}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+  "${hub_kubectl[@]}" annotate application "${_HOSTINGER_KUBE_CONTEXT}-platform" -n "${ARGOCD_NAMESPACE:-cicd}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null || true
+}
+
+function _hostinger_refresh_frontend_dns() {
+  local namespace="shopping-cart-apps"
+  if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" get deployment/frontend >/dev/null 2>&1; then
+    _info "[k3s-hostinger] restarting frontend so nginx re-resolves product-catalog service DNS..."
+    if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" rollout restart deployment/frontend >/dev/null 2>&1; then
+      if ! kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" -n "${namespace}" rollout status deployment/frontend --timeout=120s >/dev/null 2>&1; then
+        _warn "[k3s-hostinger] frontend rollout restart did not become ready within 120s after service DNS refresh"
+      fi
+    else
+      _warn "[k3s-hostinger] failed to restart frontend after service DNS refresh"
+    fi
+  else
+    _warn "[k3s-hostinger] frontend deployment missing — skipping DNS refresh restart"
+  fi
+}
+
+function _hostinger_reapply_gitops_applicationsets() {
+  _hostinger_load_argocd_plugin || return 1
+
+  K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
+  export K3D_MANAGER_BRANCH
+  APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-${_HOSTINGER_KUBE_CONTEXT}}"
+  export APP_CLUSTER_NAME
+
+  local -a hub_kubectl=()
+  read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
+  local appset
+  local -a appsets=(
+    "data-git.yaml"
+    "services-git.yaml"
+    "platform-helm.yaml"
+  )
+
+  for appset in "${appsets[@]}"; do
+    local appset_path="${SCRIPT_DIR}/etc/argocd/applicationsets/${appset}"
+    if [[ ! -f "${appset_path}" ]]; then
+      _err "[k3s-hostinger] ApplicationSet template not found: ${appset_path}"
+      return 1
+    fi
+
+    if ! envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME' < "${appset_path}" | "${hub_kubectl[@]}" apply -f - >/dev/null 2>&1; then
+      _err "[k3s-hostinger] failed to reapply ApplicationSet ${appset}"
+      return 1
+    fi
+  done
+
+  _info "[k3s-hostinger] reapplied data-git, services-git, and platform-helm ApplicationSets for ${_HOSTINGER_KUBE_CONTEXT}"
+  return 0
+}
+
 function _hostinger_reconcile_vault_cluster_store() {
   local host ssh_target
   host="$(_hostinger_require_host)" || return 1
@@ -704,6 +838,12 @@ function _hostinger_reconcile_vault_cluster_store() {
   fi
   _info "[k3s-hostinger] Ensuring vault-token + ClusterSecretStore on ${_HOSTINGER_KUBE_CONTEXT}..."
   shopping_cart_apply_vault_token_and_cluster_secret_store || return 1
+  if declare -f vault_seed_hub_into_context >/dev/null 2>&1; then
+    _info "[k3s-hostinger] Seeding hub Vault data into ${_HOSTINGER_KUBE_CONTEXT}..."
+    vault_seed_hub_into_context "${_HOSTINGER_KUBE_CONTEXT}" || return 1
+  else
+    _warn "[k3s-hostinger] vault_seed_hub_into_context not available — github/pat may not seed into the app Vault"
+  fi
   _info "[k3s-hostinger] Forcing ExternalSecret reconcile on ${_HOSTINGER_KUBE_CONTEXT}..."
   shopping_cart_force_vault_secret_reconcile "${_HOSTINGER_KUBE_CONTEXT}" >/dev/null || return 1
   _info "[k3s-hostinger] Ensuring ghcr-pull-secret on ${_HOSTINGER_KUBE_CONTEXT}..."
@@ -828,7 +968,15 @@ function _provider_k3s_hostinger_refresh_cluster() {
   _info "[k3s-hostinger] Refreshing ${_HOSTINGER_KUBE_CONTEXT} kubeconfig + ArgoCD registration…"
   _hostinger_merge_kubeconfig || return 1
   _hostinger_register_cluster || return 1
+  if declare -f deploy_observability_acg >/dev/null 2>&1; then
+    deploy_observability_acg "${_HOSTINGER_KUBE_CONTEXT}" || return 1
+  fi
+  APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-${_HOSTINGER_KUBE_CONTEXT}}"
+  export APP_CLUSTER_NAME
+  _hostinger_reapply_gitops_applicationsets || return 1
+  _hostinger_clear_stale_platform_tracking_ids || return 1
   _hostinger_reconcile_vault_cluster_store || return 1
+  _hostinger_refresh_frontend_dns || return 1
   _hostinger_refresh_access_layer || return 1
   if kubectl --context "${_HOSTINGER_KUBE_CONTEXT}" get --raw='/healthz' >/dev/null 2>&1; then
     _acg_record_provider "k3s-hostinger"

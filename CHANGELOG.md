@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-07-03
+
+### Added
+- App-image CVE auto-update pipeline — ArgoCD Image Updater watches shopping-cart app images (`basket`, `order`, `product-catalog`), gates promotion on Trivy vulnerability reports, writes back immutable SHAs (not `latest`), and dispatches rebuilds; Image Updater is installed during bootstrap so it survives cluster rebuilds, with a `ghcr-pull-secret` provisioned in `cicd` for GHCR auth (`scripts/etc/argocd/applicationsets/services-git.yaml`, `scripts/plugins/argocd.sh`)
+- App CVE visibility in `make status` and Grafana — status surfaces the app CVE scan plus Trivy VulnerabilityReport and infra-security summaries; a hub Grafana dashboard (auto-refresh 5m) shows Image Updater readiness, watched-app churn, and Loki-backed logs (`bin/cluster-status`, `scripts/plugins/observability.sh`, `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml`)
+- Remote operator access over Slack/Cloudflare — the relay assigns per-command roles and forwards `X-K3DM-Role`/`X-K3DM-Actor`/`X-K3DM-Source-Command`; `bin/k3dm-webhook` enforces minimum roles (returns `403`), writes a JSONL audit trail under `~/.local/share/k3d-manager/audit/`, and adds a read-only `/cluster-diagnose` path (allowlisted verbs, repo-owned namespaces only) (`workers/slack-relay/index.js`, `bin/k3dm-webhook`)
+- Public Alertmanager access — exposed via Cloudflare behind a credential-rereading basic-auth proxy (`feat(observability): add alertmanager basic auth proxy`, `expose alertmanager via cloudflare`) (`bin/alertmanager-auth-proxy`, `scripts/plugins/observability.sh`)
+- Trivy Operator observability — scan-job failures and infra-security findings surface in Grafana with new Prometheus alert rules routed to the analyzer webhook (`scripts/etc/argocd/applicationsets/observability*.yaml`, `scripts/etc/argocd/platform-ops/prometheusrule.yaml`, `alertmanager-config.yaml`)
+
+### Changed
+- Debug artifacts moved out of `/tmp` — script-owned output now lands in `~/.local/share/k3d-manager/run`; `bin/k3dm-cleanup` prunes those artifacts and age-prunes stale repo-owned `/tmp` leftovers safely (`bin/k3dm-webhook`, `scripts/plugins/acg.sh`, `bin/k3dm-cleanup`)
+- ArgoCD alerts grouped and broadened — rules carry a shared `group: argocd` label and cover watched apps; Image Updater flapping raises a dedicated `ArgoCDImageUpdaterFlapping` alert (`scripts/etc/argocd/platform-ops/prometheusrule.yaml`, `alertmanager-config.yaml`)
+- Webhook failure analysis defaults to the Antigravity CLI (`agy`) instead of the retired Gemini CLI (`bin/k3dm-webhook`)
+
+### Fixed
+- Hostinger `refresh` hardening — refresh is idempotent, reapplies GitOps/observability/data ApplicationSets to the hub context, clears stale `ubuntu-hostinger-platform` app ownership generically, restores the Alertmanager access layer, re-resolves frontend nginx upstream DNS, and self-heals the `shopping-cart-apps` GHCR pull secret (`scripts/lib/providers/k3s-hostinger.sh`, `scripts/plugins/shopping_cart.sh`, `scripts/plugins/vault.sh`)
+- Vault token hygiene — refresh no longer inlines Vault tokens in auth commands or logs; the app-cluster policy is rewritten every refresh, the GitHub PAT is seeded into the app Vault, and canonical secrets (redis/rabbitmq/minio/ldap/keycloak) seed from the source Vault for parity (`scripts/plugins/vault.sh`, `scripts/plugins/shopping_cart.sh`)
+- Slack `/cluster-status` reliability — the relay acks immediately and relays in the background; the webhook accepts the `provider` kwarg on the hostinger status path; the worker smoke-tests after deploy and fails fast when the Cloudflare token is missing (`workers/slack-relay/index.js`, `bin/k3dm-webhook`, `bin/k3dm-worker-setup`, `Makefile`)
+- Trivy operator rendering — pinned to a released chart version with a public operator image override after ArgoCD refused to render `0.31.2` on Kubernetes 1.36 (`scripts/etc/argocd/applicationsets/observability*.yaml`, `scripts/etc/helm/observability/trivy-operator-values.yaml`)
+- Loki/Grafana wiring — hub Loki release name kept promtail-compatible, simple-scalable targets disabled in monolithic mode, Fluent Bit ships container log paths, and Image Updater dashboard datasource UIDs pinned (`scripts/plugins/observability.sh`, `scripts/etc/argocd/platform-ops/*`)
+- ACG watcher and bootstrap — `make up` bootstraps the Playwright module before cluster-up, and the ACG watch LaunchAgent reloads after its log paths are retargeted to the run dir so the change takes effect on the live agent (`bin/cluster-up`, `bin/cluster-refresh`, `scripts/plugins/acg.sh`)
+- Frontend GHCR pulls — Deployment patched with `imagePullSecrets: [ghcr-pull-secret]` to fix anonymous GHCR `401 Unauthorized` (`services/shopping-cart-frontend/kustomization.yaml`)
+- Alertmanager status — `make status` self-heals missing local Alertmanager LaunchAgents and falls back to the local proxy, and the auth proxy rereads credentials on every request so rotation takes effect without a restart (`scripts/plugins/observability.sh`, `bin/cluster-status`, `bin/alertmanager-auth-proxy`)
+
 ## [1.11.0] - 2026-06-28
 
 ### Added

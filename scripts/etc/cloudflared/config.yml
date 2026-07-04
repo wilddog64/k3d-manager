@@ -10,6 +10,8 @@ ingress:
     service: http://localhost:8880
   - hostname: prometheus.3ai-talk.org
     service: http://localhost:19090
+  - hostname: alertmanager.3ai-talk.org
+    service: http://localhost:9093
   - hostname: grafana.3ai-talk.org
     service: http://localhost:3001
   - hostname: webhook.3ai-talk.org

@@ -205,12 +205,12 @@ function _vault_exec() {
 
   local key="${ns}/${release}"
   local session_token="${_VAULT_SESSION_TOKENS[$key]:-}"
-  local shell_cmd="$cmd"
   if [[ -n "$session_token" ]]; then
-     printf -v shell_cmd 'VAULT_TOKEN=%q %s' "$session_token" "$cmd"
+     __vault_exec_kubectl "$use_container" "$ns" "$release" "${exec_args[@]}" -- env "VAULT_TOKEN=$session_token" sh -lc "$cmd"
+     return $?
   fi
 
-  __vault_exec_kubectl "$use_container" "$ns" "$release" "${exec_args[@]}" -- sh -lc "$shell_cmd"
+  __vault_exec_kubectl "$use_container" "$ns" "$release" "${exec_args[@]}" -- sh -lc "$cmd"
 }
 function _vault_ns_ensure() {
    ns="${1:-$VAULT_NS_DEFAULT}"
@@ -1061,6 +1061,7 @@ function vault_seed_hub_into_context() {
     payment/encryption payment/stripe payment/paypal
     rabbitmq/default minio/credentials
     ldap/admin keycloak/admin keycloak/clients
+    github/pat
   )
 
   local _k8s_args=()
@@ -1660,7 +1661,11 @@ function configure_vault_app_auth() {
   _kubectl -n "$ns" cp "$app_ca_path" "${release}-0:/tmp/app-cluster-ca.crt"
 
   # b. Enable kubernetes auth mount (idempotent)
-  _vault_exec "$ns" "vault auth enable -path=${mount} kubernetes" "$release" || true
+  local auth_json=""
+  auth_json=$(_vault_exec --no-exit "$ns" "vault auth list -format=json" "$release" 2>/dev/null || true)
+  if ! printf '%s' "$auth_json" | jq -e --arg mount "${mount}/" 'has($mount)' >/dev/null 2>&1; then
+     _vault_exec --no-exit "$ns" "vault auth enable -path=${mount} kubernetes" "$release" || true
+  fi
 
   # c. Configure mount with app cluster API server + CA cert
   #    Default local JWT validation — Vault verifies JWTs against the provided CA cert
@@ -1683,28 +1688,28 @@ HCL
   fi
 
   # d2. Ensure app-cluster-reader policy exists (least-privilege: app business paths only)
-  if ! _vault_policy_exists "$ns" "$release" "app-cluster-reader"; then
-    _info "[vault] creating policy 'app-cluster-reader'"
-    cat <<'HCL' | _vault_exec_stream --no-exit --pod "${release}-0" "$ns" "$release" -- \
-      vault policy write app-cluster-reader -
-       # file: app-cluster-reader.hcl
-       # least-privilege read for the app-cluster ESO ClusterSecretStore
-       path "secret/data/postgres/*"     { capabilities = ["read"] }
-       path "secret/data/payment/*"      { capabilities = ["read"] }
-       path "secret/data/redis/*"        { capabilities = ["read"] }
-       path "secret/data/rabbitmq/*"     { capabilities = ["read"] }
-       path "secret/data/keycloak/*"     { capabilities = ["read"] }
-       path "secret/data/ldap/*"         { capabilities = ["read"] }
-       path "secret/data/minio/*"        { capabilities = ["read"] }
-       path "secret/metadata/postgres/*" { capabilities = ["read","list"] }
-       path "secret/metadata/payment/*"  { capabilities = ["read","list"] }
-       path "secret/metadata/redis/*"    { capabilities = ["read","list"] }
-       path "secret/metadata/rabbitmq/*" { capabilities = ["read","list"] }
-       path "secret/metadata/keycloak/*" { capabilities = ["read","list"] }
-       path "secret/metadata/ldap/*"     { capabilities = ["read","list"] }
-       path "secret/metadata/minio/*"    { capabilities = ["read","list"] }
+  _info "[vault] ensuring policy 'app-cluster-reader'"
+  cat <<'HCL' | _vault_exec_stream --no-exit --pod "${release}-0" "$ns" "$release" -- \
+    vault policy write app-cluster-reader -
+     # file: app-cluster-reader.hcl
+     # least-privilege read for the app-cluster ESO ClusterSecretStore
+     path "secret/data/postgres/*"     { capabilities = ["read"] }
+     path "secret/data/payment/*"      { capabilities = ["read"] }
+     path "secret/data/redis/*"        { capabilities = ["read"] }
+     path "secret/data/rabbitmq/*"     { capabilities = ["read"] }
+     path "secret/data/github/pat"     { capabilities = ["read"] }
+     path "secret/data/keycloak/*"     { capabilities = ["read"] }
+     path "secret/data/ldap/*"         { capabilities = ["read"] }
+     path "secret/data/minio/*"        { capabilities = ["read"] }
+     path "secret/metadata/postgres/*" { capabilities = ["read","list"] }
+     path "secret/metadata/payment/*"  { capabilities = ["read","list"] }
+     path "secret/metadata/redis/*"    { capabilities = ["read","list"] }
+     path "secret/metadata/rabbitmq/*" { capabilities = ["read","list"] }
+     path "secret/metadata/github/pat" { capabilities = ["read","list"] }
+     path "secret/metadata/keycloak/*" { capabilities = ["read","list"] }
+     path "secret/metadata/ldap/*"     { capabilities = ["read","list"] }
+     path "secret/metadata/minio/*"    { capabilities = ["read","list"] }
 HCL
-  fi
 
   # e. Create ESO role bound to app cluster ESO service account
   local audience="${APP_K8S_TOKEN_AUDIENCE:-https://kubernetes.default.svc.cluster.local}"

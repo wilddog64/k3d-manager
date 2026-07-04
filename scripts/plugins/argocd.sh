@@ -549,6 +549,7 @@ function _argocd_configure_post_deploy() {
 
    if (( enable_bootstrap )); then
       _info "[argocd] Deploying GitOps bootstrap resources"
+      _argocd_deploy_image_updater
       if (( ! skip_appproject )); then
          _argocd_deploy_appproject
       fi
@@ -1070,6 +1071,86 @@ function _argocd_deploy_appproject() {
    return 0
 }
 
+function _argocd_ensure_ghcr_pull_secret() {
+   local user="${GITHUB_USERNAME:-wilddog64}"
+   local pat="" http netrc
+
+   _ghcr_pat_valid() {
+      [[ -z "$1" ]] && return 1
+      netrc=$(mktemp) && chmod 0600 "$netrc"
+      printf 'machine api.github.com login %s password %s\n' "$user" "$1" > "$netrc"
+      http=$(curl -s -o /dev/null -w "%{http_code}" --netrc-file "$netrc" "https://api.github.com/user" 2>/dev/null || true)
+      rm -f "$netrc"
+      [[ "$http" == "200" ]]
+   }
+
+   if _ghcr_pat_valid "${GHCR_PAT:-}"; then
+      pat="${GHCR_PAT}"
+      _info "[argocd] using validated GHCR_PAT from env for ghcr-pull-secret"
+   elif [[ -n "${_vault_local_port:-}" ]]; then
+      local vault_token vault_pat
+      vault_token=$(_kubectl -n secrets get secret vault-root -o jsonpath='{.data.root_token}' 2>/dev/null | base64 -d 2>/dev/null || true)
+      if [[ -n "$vault_token" ]]; then
+         vault_pat=$(curl -s -H "X-Vault-Token: ${vault_token}" "http://localhost:${_vault_local_port}/v1/secret/data/github/pat" | jq -r '.data.data.token // empty' 2>/dev/null || true)
+         if _ghcr_pat_valid "$vault_pat"; then
+            pat="$vault_pat"
+            _info "[argocd] using PAT from Vault for ghcr-pull-secret"
+         fi
+      fi
+   fi
+
+   if [[ -z "$pat" ]] && command -v gh >/dev/null 2>&1; then
+      local gh_token
+      gh_token=$(gh auth token 2>/dev/null || true)
+      if [[ -n "$gh_token" ]] && GH_TOKEN="$gh_token" gh api user >/dev/null 2>&1; then
+         pat="$gh_token"
+         _info "[argocd] using gh CLI token for ghcr-pull-secret"
+      fi
+   fi
+
+   if [[ -z "$pat" ]]; then
+      _warn "[argocd] No valid GHCR PAT (env/Vault/gh) — skipping ghcr-pull-secret; Image Updater auth will fail until it exists. Set GHCR_PAT or run: gh auth login"
+      return 0
+   fi
+
+   kubectl create secret docker-registry ghcr-pull-secret \
+      --docker-server=ghcr.io \
+      --docker-username="$user" \
+      --docker-password="$pat" \
+      -n "$ARGOCD_NAMESPACE" \
+      --dry-run=client -o yaml \
+      | kubectl apply -n "$ARGOCD_NAMESPACE" -f - >/dev/null 2>&1 \
+      && _info "[argocd] ghcr-pull-secret ensured in namespace $ARGOCD_NAMESPACE" \
+      || _warn "[argocd] failed to apply ghcr-pull-secret in $ARGOCD_NAMESPACE"
+}
+
+function _argocd_deploy_image_updater() {
+   if [[ "${ARGOCD_SKIP_IMAGE_UPDATER:-0}" == "1" ]]; then
+      _info "[argocd] Skipping ArgoCD Image Updater install (ARGOCD_SKIP_IMAGE_UPDATER=1)"
+      return 0
+   fi
+
+   local updater_dir="$ARGOCD_CONFIG_DIR/image-updater"
+   if [[ ! -d "$updater_dir" ]]; then
+      _warn "[argocd] Image Updater config dir not found: $updater_dir"
+      return 0
+   fi
+
+   _argocd_ensure_ghcr_pull_secret
+
+   _info "[argocd] Installing ArgoCD Image Updater (v0.15.0)"
+   if ! _kubectl apply -k "$updater_dir" >/dev/null 2>&1; then
+      _warn "[argocd] Image Updater install failed (apply -k); continuing"
+      return 0
+   fi
+
+   _kubectl -n "$ARGOCD_NAMESPACE" rollout restart deploy/argocd-image-updater >/dev/null 2>&1 || true
+   if ! _kubectl --no-exit -n "$ARGOCD_NAMESPACE" rollout status deploy/argocd-image-updater --timeout=120s; then
+      _warn "[argocd] Image Updater not Ready within timeout; check: kubectl -n $ARGOCD_NAMESPACE get deploy argocd-image-updater"
+   fi
+   _info "[argocd] ArgoCD Image Updater install complete"
+}
+
 function _argocd_deploy_applicationsets() {
    _info "[argocd] Deploying sample ApplicationSets"
 
@@ -1269,9 +1350,13 @@ EOF
    _info "[argocd] Deploying CVE scan CronJob..."
    _kubectl apply -f "${_dir}/cve-scan-cronjob.yaml"
 
+   _info "[argocd] Deploying app-image CVE scan CronJob..."
+   _kubectl apply -f "${_dir}/app-cve-scan-cronjob.yaml"
+
    _info "[argocd] Deploying scan script ConfigMap..."
    _kubectl create configmap argocd-cve-scan-script \
       --from-file=cve-scan.sh="${_dir}/cve-scan.sh" \
+      --from-file=app-cve-scan.sh="${_dir}/app-cve-scan.sh" \
       --from-file=notify.sh="${_dir}/notify.sh" \
       --namespace platform-ops \
       --dry-run=client -o yaml | _kubectl apply -f -
@@ -1296,12 +1381,16 @@ EOF
    _info "[argocd] Deploying PrometheusRule..."
    _kubectl apply -f "${_dir}/prometheusrule.yaml"
 
+   _info "[argocd] Deploying Grafana dashboard (ArgoCD apps + image-updater sync)..."
+   _kubectl apply -f "${_dir}/grafana-dashboard-argocd.yaml"
+
    _info "[argocd] Deploying AlertmanagerConfig..."
    _kubectl apply -f "${_dir}/alertmanager-config.yaml"
 
    _info "[argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m"
    _info "[argocd] Secrets to create manually:"
    _info "[argocd]   kubectl create secret generic oci-kubeconfig --from-file=config=<path> -n platform-ops"
+   _info "[argocd]   kubectl create secret generic platform-ops-app-rebuild --from-literal=gh-token=<token> -n platform-ops"
    _info "[argocd]   kubectl create secret generic k3dm-webhook-token --from-literal=token=<token> -n cicd"
    _info "[argocd]   kubectl patch secret platform-ops-notifications -n platform-ops --type=merge \\"
    _info "[argocd]     -p '{\"data\":{\"slack-incoming-webhook-url\":\"<base64-url>\"}}'"

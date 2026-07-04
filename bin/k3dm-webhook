@@ -44,6 +44,8 @@ SHOPPING_CARTS_ROOT = os.environ.get(
 TOKEN_FILE = Path.home() / ".k3dm" / "webhook-token"
 JOB_DIR = Path(os.environ.get("K3DM_JOB_DIR", Path.home() / ".local/share/k3d-manager/webhook-jobs"))
 SCREENSHOT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "screenshots"
+AUDIT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "audit"
+RUN_DIR = Path(os.environ.get("K3DM_RUN_DIR", Path.home() / ".local/share/k3d-manager/run"))
 _ASK_MAX_TURNS_DEFAULT = int(os.environ.get("K3DM_ASK_MAX_TURNS", "10"))
 SLACK_WEBHOOK_URL = os.environ.get("K3DM_SLACK_WEBHOOK_URL", "")
 PUSHGATEWAY_URL = os.environ.get("K3DM_PUSHGATEWAY_URL", "http://localhost:9091")
@@ -184,6 +186,152 @@ _SCREENSHOT_RE = re.compile(r"INFO: Screenshot saved to (.+?/k3dm-acg-screenshot
 _running_procs: dict = {}
 _running_procs_lock = threading.Lock()
 _ask_semaphore = threading.Semaphore(2)
+_ROLE_LEVELS = {"reader": 1, "operator": 2, "admin": 3}
+_ROLE_DEFAULT = "admin"
+_DIAGNOSTIC_CONTEXTS = {
+    "k3d-k3d-cluster",
+    "ubuntu-hostinger",
+    "ubuntu-k3s",
+    "ubuntu-gcp",
+    "ubuntu-azure",
+}
+_DIAGNOSTIC_NAMESPACES = {
+    "cicd",
+    "identity",
+    "monitoring",
+    "platform-ops",
+    "secrets",
+    "shopping-cart-apps",
+    "trivy-system",
+}
+_RESOURCE_NAME_RE = re.compile(r"^[a-z0-9]([-.a-z0-9]*[a-z0-9])?$")
+_ACTION_POLICY = {
+    "/api/v1/argocd-upgrade": {"name": "argocd-upgrade", "min_role": "admin"},
+    "/api/v1/cluster-status": {"name": "cluster-status", "min_role": "reader"},
+    "/api/v1/diagnostics": {"name": "diagnostics", "min_role": "reader"},
+    "/api/v1/hostinger-status": {"name": "hostinger-status", "min_role": "reader"},
+    "/api/v1/cluster-refresh": {"name": "cluster-refresh", "min_role": "operator"},
+    "/api/v1/cluster-resume": {"name": "cluster-resume", "min_role": "admin"},
+    "/api/v1/analyze": {"name": "analyze", "min_role": "operator"},
+    "/api/v1/ask": {"name": "ask", "min_role": "reader"},
+}
+
+
+def _normalize_role(role):
+    role = (role or "").strip().lower()
+    return role if role in _ROLE_LEVELS else _ROLE_DEFAULT
+
+
+def _request_role(headers):
+    return _normalize_role(headers.get("X-K3DM-Role", _ROLE_DEFAULT))
+
+
+def _request_actor(headers):
+    actor = (headers.get("X-K3DM-Actor", "") or "").strip()
+    return actor or "direct-token"
+
+
+def _request_source_command(headers):
+    source_command = (headers.get("X-K3DM-Source-Command", "") or "").strip()
+    return source_command or "direct-api"
+
+
+def _role_allows(actual_role, required_role):
+    return _ROLE_LEVELS[_normalize_role(actual_role)] >= _ROLE_LEVELS[_normalize_role(required_role)]
+
+
+def _action_policy(path, body):
+    if path == "/api/v1/cluster":
+        action = body.get("action", "")
+        if action == "kill":
+            return {"name": "cluster-kill", "min_role": "operator"}
+        if action in ("up", "down"):
+            return {"name": f"cluster-{action}", "min_role": "admin"}
+    return _ACTION_POLICY.get(path)
+
+
+def _audit_remote_action(path, action_name, actor, role, allowed, body=None, reason=""):
+    try:
+        AUDIT_DIR.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "path": path,
+            "action": action_name,
+            "actor": actor,
+            "role": _normalize_role(role),
+            "allowed": bool(allowed),
+            "reason": reason,
+            "provider": (body or {}).get("provider", ""),
+            "request_action": (body or {}).get("action", ""),
+            "source_command": (body or {}).get("_source_command", ""),
+        }
+        with open(AUDIT_DIR / "remote-operator.jsonl", "a", encoding="utf-8") as handle:
+            handle.write(json.dumps(payload, separators=(",", ":")) + "\n")
+    except OSError:
+        pass
+
+
+def _resolve_diagnostics_context(provider="", context=""):
+    context = (context or "").strip()
+    if context:
+        return context
+    provider = (provider or "").strip().lower()
+    if provider == "hub":
+        return "k3d-k3d-cluster"
+    return _provider_context(provider)
+
+
+def _validate_namespace(namespace):
+    namespace = (namespace or "").strip()
+    if namespace not in _DIAGNOSTIC_NAMESPACES:
+        return ""
+    return namespace
+
+
+def _validate_resource_name(name):
+    name = (name or "").strip()
+    return name if _RESOURCE_NAME_RE.match(name) else ""
+
+
+def _validate_diagnostics_request(body):
+    action = (body.get("action", "") or "").strip()
+    allowed_actions = {"get-pods", "describe-pod", "logs", "get-apps", "describe-app", "get-appsets"}
+    if action not in allowed_actions:
+        return "unsupported diagnostics action"
+    context = _resolve_diagnostics_context(body.get("provider", ""), body.get("context", ""))
+    if context not in _DIAGNOSTIC_CONTEXTS:
+        return "unsupported diagnostics context"
+    body["context"] = context
+    provider = (body.get("provider", "") or "").strip().lower()
+    if not provider:
+        provider = "hostinger" if context != "k3d-k3d-cluster" else "hub"
+    body["provider"] = provider
+    if action in {"get-apps", "describe-app", "get-appsets"} and context != "k3d-k3d-cluster":
+        return "ArgoCD diagnostics must target the hub context"
+    if action == "get-pods":
+        if not _validate_namespace(body.get("namespace", "")):
+            return "namespace must be one of the approved repo-owned namespaces"
+        return None
+    if action in {"describe-pod", "logs"}:
+        if not _validate_namespace(body.get("namespace", "")):
+            return "namespace must be one of the approved repo-owned namespaces"
+        if not _validate_resource_name(body.get("name", "")):
+            return "resource name must be a Kubernetes-safe pod name"
+        if action == "logs":
+            container = (body.get("container", "") or "").strip()
+            if container and not _validate_resource_name(container):
+                return "container must be a Kubernetes-safe container name"
+            try:
+                tail_lines = int(body.get("tail_lines", 120))
+            except (TypeError, ValueError):
+                return "tail_lines must be an integer"
+            if tail_lines < 1 or tail_lines > 200:
+                return "tail_lines must be between 1 and 200"
+            body["tail_lines"] = tail_lines
+        return None
+    if action == "describe-app" and not _validate_resource_name(body.get("name", "")):
+        return "application name must be a Kubernetes-safe resource name"
+    return None
 
 
 def _get_token():
@@ -943,16 +1091,16 @@ def _notify_job(job_id, text):
 
 
 def _call_gemini(prompt):
-    """Shell out to the gemini CLI. Returns response text or error string.
+    """Shell out to the Antigravity CLI. Returns response text or error string.
 
     Uses os.posix_spawn (no fork) to avoid macOS NEF atfork SIGSEGV.
     Output is captured via a temp file rather than a pipe.
     """
     import shutil, tempfile, time
-    gemini_bin = os.environ.get("K3DM_GEMINI_BIN", "gemini")
-    resolved = shutil.which(gemini_bin) or gemini_bin
+    analysis_bin = os.environ.get("K3DM_GEMINI_BIN", "agy")
+    resolved = shutil.which(analysis_bin) or analysis_bin
     if not os.path.isfile(resolved):
-        return "gemini CLI not found — skipping AI analysis"
+        return "agy CLI not found — skipping AI analysis"
     env = {**os.environ, "GEMINI_CLI_TRUST_WORKSPACE": "true", "TERM": "xterm-256color"}
     try:
         with tempfile.NamedTemporaryFile(
@@ -976,7 +1124,7 @@ def _call_gemini(prompt):
                     os.waitpid(child_pid, 0)
                 except OSError:
                     pass
-                return "gemini analysis timed out after 120s — cluster state may be too large"
+                return "agy analysis timed out after 120s — cluster state may be too large"
             try:
                 done_pid, _ = os.waitpid(child_pid, os.WNOHANG)
                 if done_pid != 0:
@@ -986,15 +1134,15 @@ def _call_gemini(prompt):
             time.sleep(0.5)
         raw = Path(tmp_path).read_text(errors="replace").strip()
         Path(tmp_path).unlink(missing_ok=True)
-        raw = raw or "gemini returned no output"
-        # Strip Gemini CLI startup banners (Warning: lines)
+        raw = raw or "agy returned no output"
+        # Strip CLI startup banners (Warning: lines)
         raw = re.sub(r'(?m)^Warning:.*\n?', '', raw).strip()
-        raw = raw or "gemini returned no output"
+        raw = raw or "agy returned no output"
         cleaned = re.sub(r'(?:^|\n)\s*\w+\([^)]{0,500}\)\s*', ' ', raw, flags=re.MULTILINE)
         cleaned = re.sub(r'<ctrl[^>]*>', '', cleaned).strip()
         return cleaned or raw
     except Exception as exc:
-        return f"gemini error: {exc}"
+        return f"agy error: {exc}"
 
 
 def _analyze_stall(lines):
@@ -1032,8 +1180,9 @@ def _posix_spawn_capture(cmd, timeout, cwd=None, env=None):
         spawn_cmd = list(cmd)
         spawn_exe = exe
     try:
+        RUN_DIR.mkdir(parents=True, exist_ok=True)
         with _tmp.NamedTemporaryFile(
-            prefix="k3dm-ask-", suffix=".out", delete=False, mode="w"
+            prefix="k3dm-ask-", suffix=".out", delete=False, mode="w", dir=str(RUN_DIR)
         ) as _f:
             tmp_path = _f.name
         file_actions = [
@@ -1975,7 +2124,7 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
         _finish("failed")
 
 
-def _run_hostinger_status(job_id, response_url, thread_ts=None):
+def _run_hostinger_status(job_id, response_url, thread_ts=None, provider=None):
     """Run bin/cluster-status for k3s-hostinger (read-only); post result to response_url or thread."""
     job_dir = JOB_DIR / job_id
     if thread_ts:
@@ -2060,6 +2209,100 @@ def _run_hostinger_refresh(job_id, response_url, thread_ts=None):
             _log("\n❌ *Hostinger refresh failed*")
             if tail_lines:
                 _log("```\n{}\n```".format("\n".join(tail_lines)))
+        _finish("success")
+    except Exception as exc:
+        _log(f"ERROR: {exc}")
+        _finish("failed")
+
+
+def _run_cluster_diagnostics(job_id, response_url, thread_ts=None, request=None):
+    """Run an explicit read-only diagnostic command and post the result."""
+    job_dir = JOB_DIR / job_id
+    if thread_ts:
+        (job_dir / "thread_ts").write_text(thread_ts)
+    lines = []
+
+    def _log(msg):
+        lines.append(msg + "\n")
+
+    def _finish(status):
+        (job_dir / "status").write_text(status)
+        output = "".join(lines)
+        (job_dir / "output").write_text(output)
+        if response_url:
+            _slack_post(response_url, output)
+        else:
+            _notify_job(job_id, output)
+
+    try:
+        req = dict(request or {})
+        action = req["action"]
+        context = req["context"]
+        provider = req.get("provider", "hostinger")
+        namespace = req.get("namespace", "")
+        name = req.get("name", "")
+        tail_lines = req.get("tail_lines", 120)
+        cmd = []
+        title = ""
+
+        if action == "get-pods":
+            title = f"🔎 *Diagnostics* — pods in `{namespace}` on `{context}`"
+            cmd = [
+                "kubectl", "get", "pods", "-n", namespace,
+                "--context", context, "-o", "wide",
+                "--request-timeout=15s",
+            ]
+        elif action == "describe-pod":
+            title = f"🔎 *Diagnostics* — describe pod `{name}` in `{namespace}` on `{context}`"
+            cmd = [
+                "kubectl", "describe", "pod", name, "-n", namespace,
+                "--context", context, "--request-timeout=15s",
+            ]
+        elif action == "logs":
+            title = f"🔎 *Diagnostics* — logs for pod `{name}` in `{namespace}` on `{context}`"
+            cmd = [
+                "kubectl", "logs", f"pod/{name}", "-n", namespace,
+                "--context", context, f"--tail={tail_lines}",
+                "--request-timeout=15s",
+            ]
+            if req.get("container", ""):
+                cmd.extend(["-c", req["container"]])
+        elif action == "get-apps":
+            title = "🔎 *Diagnostics* — ArgoCD applications on `k3d-k3d-cluster`"
+            cmd = [
+                "kubectl", "get", "applications", "-n", "cicd",
+                "--context", "k3d-k3d-cluster", "--no-headers",
+                "-o", "custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status",
+                "--request-timeout=15s",
+            ]
+        elif action == "describe-app":
+            title = f"🔎 *Diagnostics* — describe ArgoCD app `{name}`"
+            cmd = [
+                "kubectl", "describe", "application", name, "-n", "cicd",
+                "--context", "k3d-k3d-cluster", "--request-timeout=15s",
+            ]
+        elif action == "get-appsets":
+            title = "🔎 *Diagnostics* — ArgoCD ApplicationSets on `k3d-k3d-cluster`"
+            cmd = [
+                "kubectl", "get", "applicationsets", "-n", "cicd",
+                "--context", "k3d-k3d-cluster", "-o", "wide",
+                "--request-timeout=15s",
+            ]
+
+        _log(title)
+        _log(f"_Target provider: `{provider}`_")
+        out, timed_out = _posix_spawn_capture(cmd, timeout=30)
+        if timed_out:
+            _log("\n❌ diagnostics command timed out after 30s")
+            _finish("failed")
+            return
+        if out.strip():
+            clipped = out.strip()
+            if len(clipped) > 3500:
+                clipped = clipped[-3500:]
+            _log(f"```{clipped}```")
+        else:
+            _log("_(no output returned)_")
         _finish("success")
     except Exception as exc:
         _log(f"ERROR: {exc}")
@@ -2623,6 +2866,31 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(413, {"error": "request too large"})
             return
         body = json.loads(self.rfile.read(length) or b"{}")
+        body["_source_command"] = _request_source_command(self.headers)
+        request_role = _request_role(self.headers)
+        request_actor = _request_actor(self.headers)
+        action_policy = _action_policy(self.path, body)
+        if action_policy:
+            if not _role_allows(request_role, action_policy["min_role"]):
+                _audit_remote_action(
+                    self.path,
+                    action_policy["name"],
+                    request_actor,
+                    request_role,
+                    False,
+                    body=body,
+                    reason=f"requires {action_policy['min_role']}",
+                )
+                self._json(403, {"error": f"forbidden: {action_policy['name']} requires role {action_policy['min_role']}"})
+                return
+            _audit_remote_action(
+                self.path,
+                action_policy["name"],
+                request_actor,
+                request_role,
+                True,
+                body=body,
+            )
         if self.path == "/api/v1/argocd-upgrade":
             chart_version = body.get("chart_version", "")
             stage = body.get("stage", "")
@@ -2697,6 +2965,25 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 target=_run_hostinger_status if provider == "hostinger" else _run_cluster_status,
                 args=(job_id, response_url),
                 kwargs={"thread_ts": thread_ts, "provider": provider},
+                daemon=True
+            ).start()
+            self._json(202, {"job_id": job_id, "status": "queued"})
+            return
+
+        if self.path == "/api/v1/diagnostics":
+            validation_error = _validate_diagnostics_request(body)
+            if validation_error:
+                self._json(400, {"error": validation_error})
+                return
+            response_url = body.get("response_url", "")
+            thread_ts = body.get("thread_ts", None)
+            job_id = str(uuid.uuid4())[:8]
+            (JOB_DIR / job_id).mkdir(parents=True, exist_ok=True)
+            (JOB_DIR / job_id / "status").write_text("queued")
+            threading.Thread(
+                target=_run_cluster_diagnostics,
+                args=(job_id, response_url),
+                kwargs={"thread_ts": thread_ts, "request": body},
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
@@ -2841,6 +3128,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     JOB_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+    RUN_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
     _ask_bash_path = Path(__file__).resolve().parent / "k3dm-ask-bash"
     _sandbox_dir = _ask_bash_path.parent / ".ask-sandbox"
     _sandbox_dir.mkdir(exist_ok=True)

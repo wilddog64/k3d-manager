@@ -1,4 +1,7 @@
-version: 2
 secret:
+  ignored_matches:
+  - match: 904c24736612f4b4ef25a4b3d32311596f132768d0fcfed1c7dfa86c722519a1
+    name: 'test fixture: shopping_cart_seed_idempotent.bats generic password (dev-only)'
   ignored_paths:
-    - scripts/tests/
+  - scripts/tests/
+version: 2

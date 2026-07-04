@@ -1,8 +1,9 @@
 # Slack Slash Commands & Webhook Server
 
-Slack slash commands (`/acg-up`, `/acg-down`, `/acg-status`, `/acg-refresh`, `/acg-resume`,
-`/claude`, `/gemini`, `/codex`, `/argocd-upgrade`) that control the k3d-manager cluster from any Slack channel, plus
-thread-based AI troubleshooting and job control via thread replies.
+Slack slash commands (`/cluster-up`, `/cluster-down`, `/cluster-status`, `/cluster-diagnose`, `/cluster-refresh`,
+`/cluster-resume`, `/hostinger-status`, `/claude`, `/gemini`, `/codex`, `/argocd-upgrade`)
+that control the k3d-manager cluster from any Slack channel, plus thread-based AI troubleshooting
+and job control via thread replies.
 
 ---
 
@@ -18,7 +19,7 @@ sequenceDiagram
     participant H as k3dm-webhook<br/>webhook.3ai-talk.org
 
     note over U,H: Path A — Slash command (any channel)
-    U->>S: /acg-up aws
+    U->>S: /cluster-up aws
     S->>W: POST /slack/commands<br/>X-Slack-Signature + response_url
     W->>W: HMAC-SHA256 verify
     W->>H: POST /api/v1/cluster {action:up, provider:aws}
@@ -56,6 +57,28 @@ See `docs/architecture/cloudflare-slack-relay.md` for the full component diagram
 
 ---
 
+## Remote Operator Roles
+
+The Slack relay stamps each forwarded cluster command with an explicit
+remote-operator role. The webhook enforces that role before it queues work.
+
+| Role | Allowed commands |
+|------|------------------|
+| `reader` | `/cluster-status`, `/cluster-diagnose`, `/hostinger-status`, `/ask`, `/claude`, `/gemini`, `/codex` |
+| `operator` | `/cluster-refresh` plus everything in `reader` |
+| `admin` | `/cluster-up`, `/cluster-down`, `/cluster-resume`, `/argocd-upgrade` plus everything in `operator` |
+
+The relay forwards these metadata headers to the webhook:
+
+- `X-K3DM-Role`
+- `X-K3DM-Actor`
+- `X-K3DM-Source-Command`
+
+Direct Bearer-token calls that do not provide a role header currently default
+to `admin` for backward compatibility with existing local automation.
+
+---
+
 ## One-time Bootstrap
 
 Run once per machine. Safe to re-run.
@@ -86,51 +109,80 @@ Run once per machine. Safe to re-run.
     },
     "slash_commands": [
       {
-        "command": "/acg-up",
+        "command": "/cluster-up",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
-        "description": "Start ACG sandbox cluster",
+        "description": "Start the lab sandbox cluster",
+        "usage_hint": "[aws|gcp|az|hostinger]  e.g. hostinger",
         "should_escape": false
       },
       {
-        "command": "/acg-down",
+        "command": "/cluster-down",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
-        "description": "Stop ACG sandbox cluster",
+        "description": "Stop the lab sandbox cluster",
+        "usage_hint": "[aws|gcp|az|hostinger]  e.g. hostinger",
         "should_escape": false
       },
       {
-        "command": "/acg-status",
+        "command": "/cluster-status",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
-        "description": "Check ACG cluster status",
+        "description": "Check cluster status",
+        "usage_hint": "[aws|gcp|az|hostinger]  e.g. hostinger",
         "should_escape": false
       },
       {
-        "command": "/acg-resume",
+        "command": "/cluster-diagnose",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
-        "description": "Resume ACG provision from last checkpoint",
+        "description": "Run read-only cluster diagnostics",
+        "usage_hint": "[hostinger|aws|gcp|az|hub] ...  e.g. hostinger pods shopping-cart-apps",
+        "should_escape": false
+      },
+      {
+        "command": "/cluster-refresh",
+        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
+        "description": "Refresh cluster credentials and tunnel",
+        "usage_hint": "[aws|gcp|az|hostinger]  e.g. hostinger",
+        "should_escape": false
+      },
+      {
+        "command": "/cluster-resume",
+        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
+        "description": "Resume cluster provision from last checkpoint",
+        "usage_hint": "[aws|gcp|az]  e.g. aws",
+        "should_escape": false
+      },
+      {
+        "command": "/hostinger-status",
+        "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
+        "description": "Check Hostinger app cluster status",
+        "usage_hint": "e.g. no args",
         "should_escape": false
       },
       {
         "command": "/claude",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Ask Claude a cluster question",
+        "usage_hint": "<question>  e.g. why is frontend degraded?",
         "should_escape": false
       },
       {
         "command": "/gemini",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Ask Gemini a cluster question",
+        "usage_hint": "<question>  e.g. why is data-layer out of sync?",
         "should_escape": false
       },
       {
         "command": "/codex",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Ask Codex a cluster question",
+        "usage_hint": "<question>  e.g. explain this ArgoCD drift",
         "should_escape": false
       },
       {
         "command": "/argocd-upgrade",
         "url": "https://k3dm-slack-relay.k3dm.workers.dev/slack/commands",
         "description": "Upgrade ArgoCD platform-ops",
+        "usage_hint": "<chart_version> [acg|infra]  e.g. 9.5.15 infra",
         "should_escape": false
       }
     ]
@@ -173,6 +225,7 @@ This will:
 - Prompt for `CLOUDFLARE_API_TOKEN` and `SLACK_SIGNING_SECRET` → store in Keychain
 - Set all three as GitHub Actions secrets
 - Deploy the Cloudflare Worker to `https://k3dm-slack-relay.k3dm.workers.dev`
+- Send a signed `/cluster-status` smoke request so secret drift fails fast
 
 ### 4. Verify tunnel config
 
@@ -197,7 +250,7 @@ brew services restart cloudflared
 
 ```bash
 ./bin/k3dm-webhook-setup --rotate   # rotates K3DM_WEBHOOK_TOKEN
-./bin/k3dm-worker-setup --rotate    # rotates CLOUDFLARE_API_TOKEN + SLACK_SIGNING_SECRET
+./bin/k3dm-worker-setup --rotate    # rotates CLOUDFLARE_API_TOKEN + SLACK_SIGNING_SECRET and redeploys the Worker
 ```
 
 After rotating `K3DM_WEBHOOK_TOKEN`, redeploy the Worker to pick up the new value:
@@ -239,24 +292,40 @@ bin/k3dm-webhook-setup --uninstall
 
 ## Slash Commands Reference
 
-| Command | Action | Notes |
-|---------|--------|-------|
-| `/acg-up` | Provision ACG k3s cluster | Runs `make up CLUSTER_PROVIDER=k3s-aws` |
-| `/acg-down` | Tear down ACG cluster | Runs `make down KEEP_LOCAL=1` |
-| `/acg-status` | Check cluster health | kubectl nodes + ArgoCD app status + smoke test |
-| `/acg-refresh` | Restore tunnel + credentials | Re-establishes SSH tunnel, refreshes kubeconfig |
-| `/acg-resume [aws]` | Resume provision from last checkpoint | Skips completed steps |
-| `/claude <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
-| `/gemini <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
-| `/codex <question>` | Multi-agent cluster troubleshooting | See [agent commands](#claude--gemini--codex-commands) below |
-| `/argocd-upgrade` | Upgrade ArgoCD platform-ops | `/argocd-upgrade <chart_version> [acg\|infra]`; defaults to `infra`; `acg` runs `make up` first, `infra` patches the infra label directly |
+| Command | Action | Example | Notes |
+|---------|--------|---------|-------|
+| `/cluster-up [aws\|gcp\|az\|hostinger]` | Provision cluster | `/cluster-up hostinger` | Hostinger is the permanent app cluster; others are lab sandboxes |
+| `/cluster-down [aws\|gcp\|az\|hostinger]` | Tear down cluster | `/cluster-down hostinger` | Hostinger tears down the permanent app cluster |
+| `/cluster-status [aws\|gcp\|az\|hostinger]` | Check cluster health | `/cluster-status hostinger` | kubectl nodes + ArgoCD app status + smoke test |
+| `/cluster-diagnose [hostinger\|aws\|gcp\|az\|hub] ...` | Run read-only diagnostics | `/cluster-diagnose hostinger pods shopping-cart-apps` | `pods`, `describe-pod`, `logs`, `apps`, `app`, `appsets` only |
+| `/cluster-refresh [aws\|gcp\|az\|hostinger]` | Restore tunnel + credentials | `/cluster-refresh hostinger` | Re-establishes SSH tunnel, refreshes kubeconfig |
+| `/cluster-resume <aws\|gcp\|az>` | Resume provision from last checkpoint | `/cluster-resume aws` | Skips completed steps |
+| `/hostinger-status` | Check Hostinger app cluster status | `/hostinger-status` | Read-only status report for the permanent app cluster |
+| `/claude <question>` | Multi-agent cluster troubleshooting | `/claude why is frontend degraded?` | See [agent commands](#claude--gemini--codex-commands) below |
+| `/gemini <question>` | Multi-agent cluster troubleshooting | `/gemini why is data-layer out of sync?` | See [agent commands](#claude--gemini--codex-commands) below |
+| `/codex <question>` | Multi-agent cluster troubleshooting | `/codex explain this ArgoCD drift` | See [agent commands](#claude--gemini--codex-commands) below |
+| `/argocd-upgrade` | Upgrade ArgoCD platform-ops | `/argocd-upgrade 9.5.15 infra` | `/argocd-upgrade <chart_version> [acg\|infra]`; defaults to `infra`; `acg` runs `make up` first, `infra` patches the infra label directly |
 
 All commands respond immediately with an acknowledgement, then post results back to the
 channel via `response_url` when the job completes.
 
+### `/cluster-diagnose` usage
+
+Examples:
+
+- `/cluster-diagnose hostinger pods shopping-cart-apps`
+- `/cluster-diagnose hostinger describe-pod shopping-cart-apps frontend-abc123`
+- `/cluster-diagnose hostinger logs shopping-cart-apps frontend-abc123`
+- `/cluster-diagnose hub apps`
+- `/cluster-diagnose hub app shopping-cart-apps`
+- `/cluster-diagnose hub appsets`
+
+This path is deliberately read-only and the webhook rejects any namespace or
+context outside the repo-owned allowlist.
+
 ### Service smoke test
 
-`/acg-status` and the post-provision check both run HTTP health probes against all
+`/cluster-status` and the post-provision check both run HTTP health probes against all
 services. Pushgateway is included — if the port-forward LaunchAgent is not running the
 probe fails and Gemini triages it automatically.
 
@@ -380,6 +449,8 @@ Fix mode uses the same timeout and turn limit as standard ask mode (300 s / 10 t
 | `fix-eso-refresh` | — | `kubectl annotate clustersecretstore vault-backend` with reconcile timestamp |
 | `fix-status` | `NS` | `kubectl get nodes` and `kubectl get pods -n <NS>` |
 
+`FIX_CONTEXT` defaults to `ubuntu-k3s`. Override with `make fix-restart APP=x NS=y FIX_CONTEXT=k3d-k3d-cluster`.
+
 ---
 
 ## Webhook Server Guardrails
@@ -399,6 +470,20 @@ Every inbound request must pass both checks before any code runs:
   or does not match the value in macOS Keychain.
 
 Direct calls to `webhook.3ai-talk.org` without a valid Bearer token receive `401`.
+
+### 1.5. Role-aware command authorization
+
+For remote operator paths, the Cloudflare Worker attaches role and actor
+metadata to each forwarded request. The webhook maps each API action to its
+minimum role and returns `403` if the caller is below that threshold.
+
+Examples:
+
+- `reader` may run `/cluster-status`
+- `reader` may run `/cluster-diagnose`
+- `reader` may not run `/cluster-refresh`
+- `operator` may run `/cluster-refresh`
+- `operator` may not run `/cluster-up`
 
 ### 2. Input sanitization (`_sanitize_question`)
 

@@ -42,6 +42,42 @@ _acg_stub_alias_function acg_chrome_cdp_install __acg_stub_acg_chrome_cdp_instal
 _acg_stub_alias_function acg_chrome_cdp_uninstall __acg_stub_acg_chrome_cdp_uninstall
 _acg_stub_alias_function acg_teardown __acg_stub_acg_teardown
 
+_acg_watch_retarget_logs() {
+  local run_dir plist_path out_path err_path label
+  run_dir="${K3DM_RUN_DIR:-${HOME}/.local/share/k3d-manager/run}"
+  plist_path="${_ACG_WATCH_PLIST_PATH:-${HOME}/Library/LaunchAgents/com.k3d-manager.acg-watch.plist}"
+  label="${_ACG_WATCH_LAUNCHD_LABEL:-com.k3d-manager.acg-watch}"
+  out_path="${run_dir}/k3d-manager-acg-watch.out"
+  err_path="${run_dir}/k3d-manager-acg-watch.err"
+
+  [[ -f "${plist_path}" ]] || return 0
+  mkdir -p "${run_dir}"
+
+  python3 - "${plist_path}" "${out_path}" "${err_path}" <<'PY'
+import plistlib
+import sys
+from pathlib import Path
+
+plist_path = Path(sys.argv[1])
+out_path = sys.argv[2]
+err_path = sys.argv[3]
+
+with plist_path.open('rb') as handle:
+    data = plistlib.load(handle)
+
+data["StandardOutPath"] = out_path
+data["StandardErrorPath"] = err_path
+
+with plist_path.open('wb') as handle:
+    plistlib.dump(data, handle, sort_keys=False)
+PY
+
+  if command -v launchctl >/dev/null 2>&1 && launchctl list "${label}" >/dev/null 2>&1; then
+    launchctl unload "${plist_path}" 2>/dev/null || true
+    launchctl load "${plist_path}" 2>/dev/null || true
+  fi
+}
+
 function acg_import_credentials()   { __acg_stub_acg_import_credentials "$@"; }
 function _acg_write_credentials()    { __acg_stub__acg_write_credentials "$@"; }
 function acg_get_credentials()      { __acg_stub_acg_get_credentials "$@"; }
@@ -51,7 +87,15 @@ function acg_extend_playwright()    { __acg_stub_acg_extend_playwright "$@"; }
 function _acg_extend_playwright()   { __acg_stub__acg_extend_playwright "$@"; }
 function acg_extend()               { __acg_stub_acg_extend "$@"; }
 function acg_watch()                { __acg_stub_acg_watch "$@"; }
-function acg_watch_start()         { __acg_stub_acg_watch_start "$@"; }
+function acg_watch_start()          {
+  local _rc=0
+  __acg_stub_acg_watch_start "$@" || _rc=$?
+  if [[ "${_rc}" -ne 0 ]]; then
+    return "${_rc}"
+  fi
+  _acg_watch_retarget_logs
+  _info "[acg] Sandbox watcher logs redirected to ${K3DM_RUN_DIR:-${HOME}/.local/share/k3d-manager/run}/k3d-manager-acg-watch.err"
+}
 function acg_watch_stop()          { __acg_stub_acg_watch_stop "$@"; }
 function acg_chrome_cdp_install()   { __acg_stub_acg_chrome_cdp_install "$@"; }
 function acg_chrome_cdp_uninstall() { __acg_stub_acg_chrome_cdp_uninstall "$@"; }

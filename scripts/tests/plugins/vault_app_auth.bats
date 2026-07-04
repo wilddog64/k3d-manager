@@ -90,7 +90,6 @@ setup() {
   export VAULT_RELEASE_DEFAULT="vault"
 
   KUBECTL_STUB_LOG="$BATS_TEST_TMPDIR/kubectl-stub.log"
-  KUBECTL_STUB_MODE=""
   KUBECTL_STUB_SERVER=""
   KUBECTL_STUB_CA_DATA=""
   KUBECTL_STUB_CA_FILE=""
@@ -167,8 +166,9 @@ setup() {
   # Verify kubectl cp
   grep -q "kubectl -n secrets cp $APP_CLUSTER_CA_CERT_PATH vault-0:/tmp/app-cluster-ca.crt" "$KUBECTL_LOG"
 
-  # Verify vault auth enable
-  grep -q "vault_exec secrets vault auth enable -path=custom-mount kubernetes vault" "$VAULT_EXEC_LOG"
+  # Verify vault auth list precheck + auth enable
+  grep -q "vault_exec --no-exit secrets vault auth list -format=json vault" "$VAULT_EXEC_LOG"
+  grep -q "vault_exec --no-exit secrets vault auth enable -path=custom-mount kubernetes vault" "$VAULT_EXEC_LOG"
 
   # Verify vault write config (local JWT validation — no disable_local_ca_jwt flag)
   grep -q "vault_exec secrets vault write auth/custom-mount/config" "$VAULT_EXEC_LOG"
@@ -179,12 +179,14 @@ setup() {
   grep -q "vault_policy_exists secrets vault eso-reader" "$VAULT_EXEC_LOG"
   grep -q "vault_exec_stream --pod vault-0 secrets vault -- vault policy write eso-reader -" "$VAULT_EXEC_STREAM_LOG"
   grep -q "path \"secret/data/eso/\*\"      { capabilities = \[\"read\"\] }" "$VAULT_EXEC_STREAM_LOG"
+  grep -q "vault_exec_stream --pod vault-0 secrets vault -- vault policy write app-cluster-reader -" "$VAULT_EXEC_STREAM_LOG"
 
   # Verify vault write role
   grep -q "vault_exec secrets vault write auth/custom-mount/role/custom-role" "$VAULT_EXEC_LOG"
   grep -q "bound_service_account_names=custom-sa" "$VAULT_EXEC_LOG"
   grep -q "bound_service_account_namespaces=custom-ns" "$VAULT_EXEC_LOG"
   grep -q "policies=app-cluster-reader" "$VAULT_EXEC_LOG"
+  grep -qF -- 'path "secret/data/github/pat"     { capabilities = ["read"] }' "$VAULT_EXEC_STREAM_LOG"
 }
 
 @test "configure_vault_app_auth skips policy creation if it exists" {

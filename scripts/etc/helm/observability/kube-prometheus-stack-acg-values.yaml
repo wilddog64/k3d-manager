@@ -65,7 +65,7 @@ prometheus:
         memory: 256Mi
         cpu: 50m
       limits:
-        memory: 512Mi
+        memory: 1Gi
         cpu: 200m
     additionalScrapeConfigs:
       - job_name: istiod
