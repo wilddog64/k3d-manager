@@ -21,6 +21,16 @@ setup_file() {
     # spawn the real agy CLI (which launches Chrome via ACG browser automation).
     export K3DM_GEMINI_BIN="/usr/bin/true"
 
+    # Stub make so queued /cluster jobs cannot run the real make up/down, which
+    # for the aws/gcp providers drives acg_extend_playwright -> Chromium (Chrome).
+    # _posix_spawn_job runs `bash -c "cd REPO && make ..."`, resolving make from
+    # PATH, so a no-op stub on PATH neutralizes every live cluster job.
+    export _BATS_STUB_BIN
+    _BATS_STUB_BIN="$(mktemp -d)"
+    printf '#!/bin/sh\nexit 0\n' > "${_BATS_STUB_BIN}/make"
+    chmod +x "${_BATS_STUB_BIN}/make"
+    export PATH="${_BATS_STUB_BIN}:${PATH}"
+
     REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
     python3 "${REPO_ROOT}/bin/k3dm-webhook" &
     export _BATS_WEBHOOK_PID=$!
@@ -35,6 +45,7 @@ setup_file() {
 
 teardown_file() {
     [[ -n "${_BATS_WEBHOOK_PID:-}" ]] && kill "${_BATS_WEBHOOK_PID}" 2>/dev/null || true
+    [[ -n "${_BATS_STUB_BIN:-}" ]] && rm -rf "${_BATS_STUB_BIN}" || true
 }
 
 # ── Unit / black-box HTTP tests ────────────────────────────────────────────────
