@@ -56,6 +56,7 @@ K3DM_WEBHOOK_TOKEN="${TOKEN}" \
 K3DM_WEBHOOK_PORT="${PORT}" \
 K3DM_JOB_DIR="${TMP_DIR}/jobs" \
 K3DM_RUN_DIR="${TMP_DIR}/run" \
+K3DM_GEMINI_BIN="/usr/bin/true" \
   python3 "${REPO_ROOT}/bin/k3dm-webhook" >"${SERVER_LOG}" 2>&1 &
 WEBHOOK_PID=$!
 

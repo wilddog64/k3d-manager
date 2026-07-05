@@ -17,6 +17,10 @@ setup_file() {
     K3DM_WEBHOOK_TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
     export K3DM_WEBHOOK_PORT="${_WEBHOOK_PORT}"
 
+    # Stub the analysis binary so queued /analyze and /diagnostics jobs cannot
+    # spawn the real agy CLI (which launches Chrome via ACG browser automation).
+    export K3DM_GEMINI_BIN="/usr/bin/true"
+
     REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
     python3 "${REPO_ROOT}/bin/k3dm-webhook" &
     export _BATS_WEBHOOK_PID=$!
