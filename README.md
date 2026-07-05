@@ -236,6 +236,7 @@ docs/
 - **[Strategic Roadmap v1.0](docs/plans/archive/roadmap-v1.md)** — v0.8.0 → v1.0.0 roadmap
 - **[Two-Cluster Architecture](docs/plans/two-cluster-infra.md)** — Infra + app cluster design
 - **[Cloudflare Tunnel + Slack Relay](docs/architecture/cloudflare-slack-relay.md)** — Ingress routing and Slack slash command dispatch with Mermaid diagrams
+- **[Webhook Server](docs/architecture/webhook-server.md)** — `bin/k3dm-webhook` + `scripts/lib/webhook/` module layout after the v1.13.0 modularization, request flow, and remaining phases
 
 ### How-To
 
