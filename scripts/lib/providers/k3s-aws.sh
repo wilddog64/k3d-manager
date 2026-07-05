@@ -17,6 +17,100 @@ source "${SCRIPT_DIR}/plugins/tunnel.sh"
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/plugins/ssm.sh"
 
+# Probe whether the current caller may create IAM roles (side-effect-free).
+# Returns 0 only when iam:CreateRole is explicitly allowed; any denial, error,
+# or inability to evaluate (e.g. iam:SimulatePrincipalPolicy itself denied)
+# returns non-zero so the caller falls back to the SSH tunnel.
+_provider_k3s_aws_ssm_permitted() {
+  local region="${ACG_REGION:-us-west-2}"
+  local caller_arn source_arn decision acct role_name
+  caller_arn=$(_run_command --soft -- aws sts get-caller-identity \
+    --region "${region}" --query 'Arn' --output text 2>/dev/null) || return 1
+  case "${caller_arn}" in
+    *:assumed-role/*)
+      acct=$(printf '%s' "${caller_arn}" | cut -d: -f5)
+      role_name=$(printf '%s' "${caller_arn}" | sed -E 's#.*:assumed-role/([^/]+)/.*#\1#')
+      source_arn="arn:aws:iam::${acct}:role/${role_name}"
+      ;;
+    *)
+      source_arn="${caller_arn}"
+      ;;
+  esac
+  decision=$(_run_command --soft -- aws iam simulate-principal-policy \
+    --region "${region}" \
+    --policy-source-arn "${source_arn}" \
+    --action-names iam:CreateRole \
+    --query 'EvaluationResults[0].EvalDecision' --output text 2>/dev/null) || return 1
+  [[ "${decision}" == "allowed" ]]
+}
+
+# Flip the already-deployed stack to EnableSsm=true (attaches the SSM instance
+# profile to running nodes with no interruption). Uses --use-previous-template
+# and UsePreviousValue so no AMI/key re-derivation is needed. Idempotent: if the
+# stack already has EnableSsm=true, returns 0 without an update.
+_provider_k3s_aws_enable_ssm_stack() {
+  local region="${ACG_REGION:-us-west-2}" current
+  current=$(_run_command --soft -- aws cloudformation describe-stacks \
+    --region "${region}" --stack-name "${_ACG_CF_STACK_NAME}" \
+    --query "Stacks[0].Parameters[?ParameterKey=='EnableSsm'].ParameterValue" \
+    --output text 2>/dev/null)
+  if [[ "${current}" == "true" ]]; then
+    _info "[k3s-aws] Stack already has EnableSsm=true — SSM profile present"
+    return 0
+  fi
+  _info "[k3s-aws] Updating stack ${_ACG_CF_STACK_NAME} with EnableSsm=true..."
+  _run_command --soft -- aws cloudformation update-stack \
+    --region "${region}" \
+    --stack-name "${_ACG_CF_STACK_NAME}" \
+    --use-previous-template \
+    --capabilities CAPABILITY_NAMED_IAM \
+    --parameters \
+      ParameterKey=EnableSsm,ParameterValue=true \
+      ParameterKey=KeyName,UsePreviousValue=true \
+      ParameterKey=AllowedCidr,UsePreviousValue=true \
+      ParameterKey=InstanceType,UsePreviousValue=true \
+      ParameterKey=AmiId,UsePreviousValue=true >/dev/null 2>&1 || return 1
+  _run_command --soft -- aws cloudformation wait stack-update-complete \
+    --region "${region}" --stack-name "${_ACG_CF_STACK_NAME}" || return 1
+}
+
+# Block until the SSM agent registers the instance (PingStatus Online), so the
+# subsequent ssm_tunnel does not race the profile attachment. Times out at 150s.
+_provider_k3s_aws_wait_ssm_registered() {
+  local instance_id="$1" region="${ACG_REGION:-us-west-2}" attempts=0
+  _info "[k3s-aws] Waiting for SSM agent to register ${instance_id}..."
+  until [[ "$(_run_command --soft -- aws ssm describe-instance-information \
+      --region "${region}" \
+      --filters "Key=InstanceIds,Values=${instance_id}" \
+      --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null)" == "Online" ]]; do
+    (( attempts++ ))
+    if (( attempts >= 30 )); then
+      _err "[k3s-aws] SSM agent did not register ${instance_id} within 150s"
+      return 1
+    fi
+    sleep 5
+  done
+  _info "[k3s-aws] SSM agent online for ${instance_id}"
+}
+
+# Decide tunnel mode once, after the stack exists. Honors an explicit
+# K3S_AWS_SSM_ENABLED; otherwise probes iam:CreateRole and, when permitted,
+# enables SSM on the stack. Any failure degrades to the SSH tunnel.
+_provider_k3s_aws_autoselect_tunnel_mode() {
+  if [[ -n "${K3S_AWS_SSM_ENABLED:-}" ]]; then
+    _info "[k3s-aws] Tunnel mode explicitly set (K3S_AWS_SSM_ENABLED=${K3S_AWS_SSM_ENABLED}) — skipping auto-detect"
+    return 0
+  fi
+  _info "[k3s-aws] Auto-detecting tunnel mode (probing iam:CreateRole)..."
+  if _provider_k3s_aws_ssm_permitted && _provider_k3s_aws_enable_ssm_stack; then
+    export K3S_AWS_SSM_ENABLED=true
+    _info "[k3s-aws] iam:CreateRole permitted + SSM profile attached — using SSM port-forwarding (no inbound SSH)"
+  else
+    export K3S_AWS_SSM_ENABLED=false
+    _info "[k3s-aws] SSM unavailable (iam:CreateRole denied/undetectable or stack update failed) — using SSH tunnel (autossh)"
+  fi
+}
+
 function _provider_k3s_aws_deploy_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
@@ -67,6 +161,8 @@ HELP
       ;;
   esac
 
+  _provider_k3s_aws_autoselect_tunnel_mode
+
   local _ready_nodes
   _ready_nodes=$(kubectl get nodes --context ubuntu-k3s --no-headers 2>/dev/null \
     | grep -c " Ready" || true)
@@ -81,6 +177,7 @@ HELP
     _info "[k3s-aws] Starting SSM port-forwarding tunnel (k3s API :6443)..."
     local _server_id
     _server_id=$(_ssm_get_instance_id "${UBUNTU_K3S_SSH_HOST:-ubuntu}") || return 1
+    _provider_k3s_aws_wait_ssm_registered "${_server_id}" || return 1
     ssm_tunnel "${_server_id}" "6443" "6443" || return 1
   else
     _info "[k3s-aws] Starting autossh tunnel..."
