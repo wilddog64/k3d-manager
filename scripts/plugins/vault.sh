@@ -33,7 +33,52 @@ command -v _warn >/dev/null 2>&1 || _warn() { printf '%s\n' "$*" >&2; }
 declare -Ag _VAULT_CONTAINER_CACHE=()
 declare -Ag _VAULT_SESSION_TOKENS=()
 
+function __vault_exec_kubectl_read_stdin() {
+   local stdin_payload=""
+   stdin_payload=$(cat; printf 'x')
+   stdin_payload=${stdin_payload%x}
+   printf '%s' "$stdin_payload"
+}
+
+function __vault_exec_kubectl_run() {
+   local buffer_stdin="${1:-0}" stdin_payload="${2-}"
+   shift 2
+   if (( buffer_stdin )); then
+      printf '%s' "$stdin_payload" | _kubectl "$@" 2>&1
+      return $?
+   fi
+   _kubectl "$@" 2>&1
+}
+
+function __vault_exec_kubectl_remove_container_arg() {
+   local -a current_args=("$@")
+   local -a fallback=()
+   local skip_next=0 past_double_dash=0 removed=0
+   local arg=""
+   for arg in "${current_args[@]}"; do
+      if (( skip_next )); then
+         skip_next=0
+         continue
+      fi
+      if (( !past_double_dash )) && [[ "$arg" == "--" ]]; then
+         past_double_dash=1
+      fi
+      if (( !past_double_dash )) && [[ "$arg" == "-c" ]] && (( !removed )); then
+         skip_next=1
+         removed=1
+         continue
+      fi
+      fallback+=("$arg")
+   done
+   printf '%s\0' "${fallback[@]}"
+}
+
 function __vault_exec_kubectl() {
+   local buffer_stdin=0
+   if [[ "${1:-}" == "--exec-stdin" ]]; then
+      buffer_stdin=1
+      shift
+   fi
    local use_container="${1:-0}" ns="${2:-$VAULT_NS_DEFAULT}" release="${3:-$VAULT_RELEASE_DEFAULT}"
    shift 3
    local -a cmd_args=("$@")
@@ -41,9 +86,13 @@ function __vault_exec_kubectl() {
    local retries=0
    local max_retries=5
    local container_removed=0
+   local stdin_payload
+   if (( buffer_stdin )); then
+      stdin_payload=$(__vault_exec_kubectl_read_stdin)
+   fi
 
    while :; do
-      output=$(_kubectl "${cmd_args[@]}" 2>&1)
+      output=$(__vault_exec_kubectl_run "$buffer_stdin" "$stdin_payload" "${cmd_args[@]}")
       rc=$?
       if (( rc == 0 )); then
          if (( container_removed )); then
@@ -56,22 +105,9 @@ function __vault_exec_kubectl() {
       if [[ "$output" == *"container not found"* ]]; then
          if (( use_container )) && (( !container_removed )); then
             local -a fallback=()
-            local skip_next=0 past_double_dash=0 removed=0
-            for arg in "${cmd_args[@]}"; do
-               if (( skip_next )); then
-                  skip_next=0
-                  continue
-               fi
-               if (( !past_double_dash )) && [[ "$arg" == "--" ]]; then
-                  past_double_dash=1
-               fi
-               if (( !past_double_dash )) && [[ "$arg" == "-c" ]] && (( !removed )); then
-                  skip_next=1
-                  removed=1
-                  continue
-               fi
+            while IFS= read -r -d '' arg; do
                fallback+=("$arg")
-            done
+            done < <(__vault_exec_kubectl_remove_container_arg "${cmd_args[@]}")
             cmd_args=("${fallback[@]}")
             use_container=0
             container_removed=1
@@ -125,10 +161,15 @@ function _vault_container_name() {
 function _vault_exec_stream() {
    local kflags=()
    local pod_override=""
+   local want_stdin=0
    while [[ $# -gt 0 ]]; do
       case "$1" in
          --no-exit|--prefer-sudo|--require-sudo)
             kflags+=("$1")
+            shift
+            ;;
+         --stdin)
+            want_stdin=1
             shift
             ;;
          --pod)
@@ -158,28 +199,41 @@ function _vault_exec_stream() {
    local key="${ns}/${release}"
    local session_token="${_VAULT_SESSION_TOKENS[$key]:-}"
    if [[ -n "$session_token" ]]; then
-      local -a cmd_args=()
-      local inserted=0
-      if (( $# == 0 )); then
-         cmd_args+=("env" "VAULT_TOKEN=$session_token")
-      else
-         while [[ $# -gt 0 ]]; do
-            local arg="$1"
-            shift
-            if (( !inserted )) && [[ "$arg" == "--" ]]; then
-               cmd_args+=("$arg" "env" "VAULT_TOKEN=$session_token")
-               inserted=1
-               continue
-            fi
-            cmd_args+=("$arg")
-         done
-         if (( !inserted )); then
-            cmd_args=("env" "VAULT_TOKEN=$session_token" "${cmd_args[@]}")
+      local -a pre_dd=() remote_cmd=()
+      local seen_dd=0
+      while [[ $# -gt 0 ]]; do
+         local arg="$1"
+         shift
+         if (( !seen_dd )) && [[ "$arg" == "--" ]]; then
+            seen_dd=1
+            continue
          fi
+         if (( seen_dd )); then
+            remote_cmd+=("$arg")
+         else
+            pre_dd+=("$arg")
+         fi
+      done
+      if (( !seen_dd )); then
+         remote_cmd=("${pre_dd[@]}")
+         pre_dd=()
       fi
-      __vault_exec_kubectl "$use_container" "$ns" "$release" "${args[@]}" "${cmd_args[@]}"
+      local reader='IFS= read -r __VAULT_TOKEN; export VAULT_TOKEN="$__VAULT_TOKEN"; unset __VAULT_TOKEN; exec "$@"'
+      if (( want_stdin )); then
+         { printf '%s\n' "$session_token"; cat; } | \
+            __vault_exec_kubectl --exec-stdin "$use_container" "$ns" "$release" \
+               "${args[@]}" "${pre_dd[@]}" -- sh -c "$reader" _ "${remote_cmd[@]}"
+      else
+         printf '%s\n' "$session_token" | \
+            __vault_exec_kubectl --exec-stdin "$use_container" "$ns" "$release" \
+               "${args[@]}" "${pre_dd[@]}" -- sh -c "$reader" _ "${remote_cmd[@]}"
+      fi
    else
-      __vault_exec_kubectl "$use_container" "$ns" "$release" "${args[@]}" "$@"
+      if (( want_stdin )); then
+         __vault_exec_kubectl --exec-stdin "$use_container" "$ns" "$release" "${args[@]}" "$@"
+      else
+         __vault_exec_kubectl "$use_container" "$ns" "$release" "${args[@]}" "$@"
+      fi
    fi
 }
 
@@ -206,7 +260,10 @@ function _vault_exec() {
   local key="${ns}/${release}"
   local session_token="${_VAULT_SESSION_TOKENS[$key]:-}"
   if [[ -n "$session_token" ]]; then
-     __vault_exec_kubectl "$use_container" "$ns" "$release" "${exec_args[@]}" -- env "VAULT_TOKEN=$session_token" sh -lc "$cmd"
+     local remote_cmd
+     remote_cmd='IFS= read -r __VAULT_TOKEN; export VAULT_TOKEN="$__VAULT_TOKEN"; unset __VAULT_TOKEN; '"$cmd"
+     printf '%s\n' "$session_token" | \
+        __vault_exec_kubectl --exec-stdin "$use_container" "$ns" "$release" "${exec_args[@]}" -- sh -lc "$remote_cmd"
      return $?
   fi
 
@@ -1597,14 +1654,14 @@ function _vault_login() {
 
   local login_rc=0
   local login_output=""
-  login_output=$(_no_trace _vault_exec_stream --no-exit "$ns" "$release" -- env VAULT_TOKEN="$token" vault token lookup -format=json 2>&1) || login_rc=$?
+  _VAULT_SESSION_TOKENS["${ns}/${release}"]="$token"
+  login_output=$(_no_trace _vault_exec_stream --no-exit "$ns" "$release" -- vault token lookup -format=json 2>&1) || login_rc=$?
   if (( login_rc != 0 )); then
+      unset _VAULT_SESSION_TOKENS["${ns}/${release}"]
       login_output=${login_output//$'\n'/ }
       login_output=${login_output//$'\r'/ }
       _err "[vault] failed to login to ${release} in namespace ${ns}: ${login_output:-unknown error}"
   fi
-
-  _VAULT_SESSION_TOKENS["${ns}/${release}"]="$token"
 }
 
 function _vault_policy_exists() {
@@ -1677,7 +1734,7 @@ function configure_vault_app_auth() {
   # d. Ensure eso-reader policy exists
   if ! _vault_policy_exists "$ns" "$release" "eso-reader"; then
     _info "[vault] creating policy 'eso-reader'"
-    cat <<'HCL' | _vault_exec_stream --no-exit --pod "${release}-0" "$ns" "$release" -- \
+    cat <<'HCL' | _vault_exec_stream --no-exit --stdin --pod "${release}-0" "$ns" "$release" -- \
       vault policy write eso-reader -
        # file: eso-reader.hcl
        # read any keys under eso/*
@@ -1689,7 +1746,7 @@ HCL
 
   # d2. Ensure app-cluster-reader policy exists (least-privilege: app business paths only)
   _info "[vault] ensuring policy 'app-cluster-reader'"
-  cat <<'HCL' | _vault_exec_stream --no-exit --pod "${release}-0" "$ns" "$release" -- \
+  cat <<'HCL' | _vault_exec_stream --no-exit --stdin --pod "${release}-0" "$ns" "$release" -- \
     vault policy write app-cluster-reader -
      # file: app-cluster-reader.hcl
      # least-privilege read for the app-cluster ESO ClusterSecretStore
@@ -1821,7 +1878,7 @@ function _vault_set_eso_reader() {
 
   _vault_login "$ns" "$release"
   # kubernetes auth so no token stored in k8s
-  cat <<'SH' | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+  cat <<'SH' | _no_trace _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" -- \
     sh -
 set -e
 vault secrets enable -path=secret kv-v2 || true
@@ -1839,7 +1896,7 @@ SH
     --dry-run=client -o yaml | _kubectl apply -f -
 
   # create a policy -- eso-reader
-  cat <<'HCL' | _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+  cat <<'HCL' | _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" -- \
     vault policy write eso-reader -
      # file: eso-reader.hcl
      # read any keys under eso/*
@@ -1871,7 +1928,7 @@ function _vault_set_eso_writer() {
   fi
 
   # create a policy -- eso-writer
-  cat <<'HCL' | _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- sh - \
+  cat <<'HCL' | _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" -- sh - \
     vault policy write eso-writer
      # file: eso-writer.hcl
      path "secret/data/eso/*"      { capabilities = ["create","update","read"] }
@@ -1903,7 +1960,7 @@ function _vault_set_eso_init_jenkins_writer() {
 
   # create a policy -- eso-writer
   _vault_login "$ns" "$release"
-  cat <<'HCL' | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- \
+  cat <<'HCL' | _no_trace _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" -- \
     vault policy write eso-init-jenkins-writer -
      # file: eso-writer.hcl
      path "secret/data/eso/jenkins-admin"     { capabilities = ["create","update","read"] }
@@ -2013,7 +2070,7 @@ function _vault_configure_secret_reader_role() {
      _vault_exec "$ns" "vault auth enable kubernetes" "$release" ||         _err "[vault] failed to enable kubernetes auth method"
   fi
 
-  cat <<'SH' | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- sh -
+  cat <<'SH' | _no_trace _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" -- sh -
 set -e
 vault write auth/kubernetes/config   token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"   kubernetes_host="https://kubernetes.default.svc:443"   kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 SH
@@ -2023,7 +2080,7 @@ SH
   _vault_build_policy_hcl "$mount_path" "${secret_prefixes[@]}"
   local policy_hcl="$_VAULT_POLICY_HCL"
 
-  if ! printf '%s\n' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" --     vault policy write "${policy}" -; then
+  if ! printf '%s\n' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" --     vault policy write "${policy}" -; then
      _err "[vault] failed to apply policy ${policy}"
   fi
 
@@ -2133,7 +2190,7 @@ EOF
    _vault_build_parent_metadata_policy "$mount_trim" "$secret_trim" "$metadata_path"
    policy_hcl+="$_VAULT_PARENT_POLICY_HCL"
 
-   if ! printf '%s\n' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --pod "$pod" "$ns" "$release" -- vault policy write "$policy" -; then
+   if ! printf '%s\n' "$policy_hcl" | _no_trace _vault_exec_stream --no-exit --stdin --pod "$pod" "$ns" "$release" -- vault policy write "$policy" -; then
       _err "[vault] failed to write policy ${policy}"
    fi
    _info "[vault] ensured policy ${policy} for ${data_path}"

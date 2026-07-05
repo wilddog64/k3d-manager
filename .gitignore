@@ -7,6 +7,13 @@ bin/.ask-sandbox/
 __pycache__/
 package-lock.json
 workers/slack-relay/.wrangler/
+.wrangler/
+
+# Agent/CLI runtime state accidentally written into the repo root — never track.
+# antigravity-cli/ holds live oauth tokens + conversation logs; gemini-config is a
+# stray clone/gitlink that must never be committed here.
+antigravity-cli/
+gemini-config/
 
 # Added by ggshield
 .cache_ggshield

@@ -56,13 +56,13 @@ setup() {
     local pod_override=""
     while [[ $# -gt 0 ]]; do
       case "$1" in
-        --no-exit|--prefer-sudo|--require-sudo) kflags+=("$1"); shift ;;
+        --no-exit|--prefer-sudo|--require-sudo|--stdin) kflags+=("$1"); shift ;;
         --pod) pod_override="${2:-}"; shift 2 ;;
         --pod=*) pod_override="${1#*=}"; shift ;;
         *) break ;;
       esac
     done
-    echo "vault_exec_stream --pod $pod_override $*" >>"$VAULT_EXEC_STREAM_LOG"
+    echo "vault_exec_stream ${kflags[*]} --pod $pod_override $*" >>"$VAULT_EXEC_STREAM_LOG"
     # Capture stdin if possible (bats 'run' can pipe to this mock)
     cat >> "$VAULT_EXEC_STREAM_LOG"
     return 0
@@ -177,9 +177,9 @@ setup() {
 
   # Verify eso-reader policy ensure
   grep -q "vault_policy_exists secrets vault eso-reader" "$VAULT_EXEC_LOG"
-  grep -q "vault_exec_stream --pod vault-0 secrets vault -- vault policy write eso-reader -" "$VAULT_EXEC_STREAM_LOG"
+  grep -q "vault_exec_stream --no-exit --stdin --pod vault-0 secrets vault -- vault policy write eso-reader -" "$VAULT_EXEC_STREAM_LOG"
   grep -q "path \"secret/data/eso/\*\"      { capabilities = \[\"read\"\] }" "$VAULT_EXEC_STREAM_LOG"
-  grep -q "vault_exec_stream --pod vault-0 secrets vault -- vault policy write app-cluster-reader -" "$VAULT_EXEC_STREAM_LOG"
+  grep -q "vault_exec_stream --no-exit --stdin --pod vault-0 secrets vault -- vault policy write app-cluster-reader -" "$VAULT_EXEC_STREAM_LOG"
 
   # Verify vault write role
   grep -q "vault_exec secrets vault write auth/custom-mount/role/custom-role" "$VAULT_EXEC_LOG"

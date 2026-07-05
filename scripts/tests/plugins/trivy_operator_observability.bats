@@ -1,17 +1,18 @@
 #!/usr/bin/env bats
 
 SETTINGS="${BATS_TEST_DIRNAME}/../../etc/helm/observability/trivy-operator-values.yaml"
+ACG_SETTINGS="${BATS_TEST_DIRNAME}/../../etc/helm/observability/trivy-operator-acg-values.yaml"
 HUB_APPSET="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/observability.yaml"
 ACG_APPSET="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/observability-acg.yaml"
 DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argocd.yaml"
 RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml"
 ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.yaml"
 
-@test "trivy observability: charts pin trivy-operator 0.24.1 in both application sets" {
-  run grep -F -- 'targetRevision: 0.24.1' "${HUB_APPSET}"
+@test "trivy observability: charts pin trivy-operator 0.33.2 in both application sets" {
+  run grep -F -- 'targetRevision: 0.33.2' "${HUB_APPSET}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'targetRevision: 0.24.1' "${ACG_APPSET}"
+  run grep -F -- 'targetRevision: 0.33.2' "${ACG_APPSET}"
   [ "${status}" -eq 0 ]
 }
 
@@ -32,6 +33,14 @@ ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.ya
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'release: kube-prometheus-stack' "${SETTINGS}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'release: acg-kube-prometheus-stack' "${ACG_SETTINGS}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "trivy observability: acg trivy application set uses the acg-specific values file" {
+  run grep -F -- 'valuesFile: scripts/etc/helm/observability/trivy-operator-acg-values.yaml' "${ACG_APPSET}"
   [ "${status}" -eq 0 ]
 }
 

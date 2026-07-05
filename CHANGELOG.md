@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-07-05
+
+### Added
+- Isolated webhook-server smoke gate — `bin/smoke-test-webhook` boots a throwaway `k3dm-webhook` instance against an overridden `K3DM_JOB_DIR`/`K3DM_RUN_DIR` and smoke-tests `/api/v1/health`, so CI and pre-restart checks can exercise the server without clobbering the live `:7443` job dirs (`bin/smoke-test-webhook`)
+- Post-refactor webhook-server architecture doc — documents the `bin/k3dm-webhook` monolith plus the `scripts/lib/webhook/` module layout after the v1.13.0 modularization, the request flow, and the remaining extraction phases (`docs/architecture/webhook-server.md`)
+
+### Changed
+- Webhook modularization Phase 1 — pure, low-risk helpers extracted verbatim from the `bin/k3dm-webhook` monolith into an importable `scripts/lib/webhook/` package: `config.py` (constants, paths, `_safe_job_dir`), `render.py` (Slack output helpers), `proc.py` (the fork-safe `os.posix_spawn` capture primitive), and `auth.py` (Keychain lookup, bearer-token resolution, Slack signature verification). No change to command behavior or the external Slack/Worker contract (`bin/k3dm-webhook`, `scripts/lib/webhook/config.py`, `render.py`, `proc.py`, `auth.py`)
+
+### Fixed
+- Vault token hygiene — `VAULT_TOKEN` is delivered to Vault commands via stdin instead of process argv, so it can no longer leak through the process table or shell history (`scripts/plugins/vault.sh`)
+- Trivy Operator RBAC — chart pin realigned with the `0.31.2` operator image to restore the PV/PVC RBAC the version skew had dropped, ending the reconciler crashloop (`scripts/etc/argocd/applicationsets/observability.yaml`, `scripts/etc/argocd/applicationsets/observability-acg.yaml`)
+- Trivy ServiceMonitor — the acg Trivy release gets its own `release` label so its ServiceMonitor stops colliding with the platform Trivy and Grafana scrapes both (`scripts/etc/argocd/applicationsets/observability-acg.yaml`, `scripts/etc/helm/observability/trivy-operator-acg-values.yaml`)
+- Webhook BATS isolation — the suite now stubs `make`, `K3DM_GEMINI_BIN`, and `kubectl` in `setup_file`, isolates `K3DM_JOB_DIR`/`K3DM_RUN_DIR`, and serializes cluster-queue tests on a per-test cluster-idle wait, so running tests no longer launches live `make up`/Chrome/`agy`, mutates a live cluster, pollutes the live run dir (false Slack orphan-job alerts), or flakes with `409 cluster job already running` on fast CI runners (`scripts/tests/lib/webhook.bats`)
+
 ## [1.12.0] - 2026-07-03
 
 ### Added

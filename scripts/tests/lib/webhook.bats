@@ -17,6 +17,35 @@ setup_file() {
     K3DM_WEBHOOK_TOKEN="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
     export K3DM_WEBHOOK_PORT="${_WEBHOOK_PORT}"
 
+    # Stub the analysis binary so queued /analyze and /diagnostics jobs cannot
+    # spawn the real agy CLI (which launches Chrome via ACG browser automation).
+    export K3DM_GEMINI_BIN="/usr/bin/true"
+
+    # Stub make so queued /cluster jobs cannot run the real make up/down, which
+    # for the aws/gcp providers drives acg_extend_playwright -> Chromium (Chrome).
+    # _posix_spawn_job runs `bash -c "cd REPO && make ..."`, resolving make from
+    # PATH, so a no-op stub on PATH neutralizes every live cluster job.
+    export _BATS_STUB_BIN
+    _BATS_STUB_BIN="$(mktemp -d)"
+    printf '#!/bin/sh\nexit 0\n' > "${_BATS_STUB_BIN}/make"
+    chmod +x "${_BATS_STUB_BIN}/make"
+    # Stub kubectl so the queued /cluster "up" success path's _record_acg_state
+    # (kubectl create configmap | kubectl apply) returns instantly. On CI runners
+    # kubectl exists but no cluster is reachable, so the real apply blocks up to
+    # the 15s _posix_spawn_capture timeout, holding the job "running" and 409ing
+    # the next /cluster test.
+    printf '#!/bin/sh\nexit 0\n' > "${_BATS_STUB_BIN}/kubectl"
+    chmod +x "${_BATS_STUB_BIN}/kubectl"
+    export PATH="${_BATS_STUB_BIN}:${PATH}"
+
+    # Isolate job/run dirs so queued /cluster jobs never write into the live
+    # :7443 instance's dir. Without this, a job left "running" when teardown_file
+    # kills the webhook is orphaned in the live dir and fires a false Slack
+    # "cluster-<action> orphaned" alert on the next live webhook restart.
+    export K3DM_JOB_DIR K3DM_RUN_DIR
+    K3DM_JOB_DIR="$(mktemp -d)"
+    K3DM_RUN_DIR="$(mktemp -d)"
+
     REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
     python3 "${REPO_ROOT}/bin/k3dm-webhook" &
     export _BATS_WEBHOOK_PID=$!
@@ -31,6 +60,37 @@ setup_file() {
 
 teardown_file() {
     [[ -n "${_BATS_WEBHOOK_PID:-}" ]] && kill "${_BATS_WEBHOOK_PID}" 2>/dev/null || true
+    [[ -n "${_BATS_STUB_BIN:-}" ]] && rm -rf "${_BATS_STUB_BIN}" || true
+    [[ -n "${K3DM_JOB_DIR:-}" ]] && rm -rf "${K3DM_JOB_DIR}" || true
+    [[ -n "${K3DM_RUN_DIR:-}" ]] && rm -rf "${K3DM_RUN_DIR}" || true
+}
+
+# Wait until no cluster up/down job is still marked "running" in JOB_DIR.
+# A queued "up" job stays "running" until _run_cluster's success path finishes
+# _record_acg_state and _finish; on a fast host consecutive /cluster tests can
+# fire before the prior job clears, and the handler answers 409 (cluster job
+# already running) instead of 202 queued. Waiting here makes the sequence
+# deterministic regardless of that timing (mirrors _running_cluster_job).
+_wait_cluster_idle() {
+    local i=0 s
+    while (( i < 100 )); do
+        local running=0
+        for s in "${K3DM_JOB_DIR}"/*/status; do
+            [[ -f "$s" ]] || continue
+            if [[ "$(cat "$s" 2>/dev/null)" == "running" && -f "${s%/status}/action" ]]; then
+                running=1
+                break
+            fi
+        done
+        (( running == 0 )) && return 0
+        sleep 0.1
+        (( i++ )) || true
+    done
+    return 0
+}
+
+setup() {
+    _wait_cluster_idle
 }
 
 # ── Unit / black-box HTTP tests ────────────────────────────────────────────────
@@ -287,7 +347,7 @@ teardown_file() {
     run grep -F -- '_ROLE_LEVELS = {"reader": 1, "operator": 2, "admin": 3}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
     [ "$status" -eq 0 ]
 
-    run grep -F -- 'AUDIT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "audit"' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -F -- 'AUDIT_DIR = Path.home() / ".local" / "share" / "k3d-manager" / "audit"' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/config.py"
     [ "$status" -eq 0 ]
 
     run grep -F -- '"/api/v1/cluster-refresh": {"name": "cluster-refresh", "min_role": "operator"}' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
@@ -317,7 +377,7 @@ teardown_file() {
 }
 
 @test "webhook ask subprocess captures transcripts in the k3d-manager run dir" {
-    run grep -F -- 'RUN_DIR = Path(os.environ.get("K3DM_RUN_DIR", Path.home() / ".local/share/k3d-manager/run"))' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    run grep -F -- 'RUN_DIR = Path(os.environ.get("K3DM_RUN_DIR", Path.home() / ".local/share/k3d-manager/run"))' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/config.py"
     [ "$status" -eq 0 ]
 
     run grep -F -- 'prefix="k3dm-ask-", suffix=".out", delete=False, mode="w", dir=str(RUN_DIR)' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
@@ -359,7 +419,7 @@ teardown_file() {
         "${_WEBHOOK_URL}/api/v1/cluster")"
     job_id="$(echo "$response" | python3 -c 'import sys,json; print(json.load(sys.stdin)["job_id"])')"
     [[ -n "$job_id" ]]
-    job_file="${HOME}/.local/share/k3d-manager/webhook-jobs/${job_id}/response_url"
+    job_file="${K3DM_JOB_DIR}/${job_id}/response_url"
     [ -f "$job_file" ]
     [ "$(cat "$job_file")" = "https://hooks.slack.com/test" ]
 }
