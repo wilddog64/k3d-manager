@@ -13,8 +13,8 @@
 
 ### Fixed
 - Vault token hygiene — `VAULT_TOKEN` is delivered to Vault commands via stdin instead of process argv, so it can no longer leak through the process table or shell history (`scripts/plugins/vault.sh`)
-- Trivy Operator RBAC — chart pin realigned with the `0.31.2` operator image to restore the PV/PVC RBAC the version skew had dropped, ending the reconciler crashloop (`scripts/etc/argocd/applicationsets/observability*.yaml`, `scripts/etc/helm/observability/trivy-operator-values.yaml`)
-- Trivy ServiceMonitor — the acg Trivy release gets its own `release` label so its ServiceMonitor stops colliding with the platform Trivy and Grafana scrapes both (`scripts/plugins/observability.sh`)
+- Trivy Operator RBAC — chart pin realigned with the `0.31.2` operator image to restore the PV/PVC RBAC the version skew had dropped, ending the reconciler crashloop (`scripts/etc/argocd/applicationsets/observability.yaml`, `scripts/etc/argocd/applicationsets/observability-acg.yaml`)
+- Trivy ServiceMonitor — the acg Trivy release gets its own `release` label so its ServiceMonitor stops colliding with the platform Trivy and Grafana scrapes both (`scripts/etc/argocd/applicationsets/observability-acg.yaml`, `scripts/etc/helm/observability/trivy-operator-acg-values.yaml`)
 - Webhook BATS isolation — the suite now stubs `make`, `K3DM_GEMINI_BIN`, and `kubectl` in `setup_file`, isolates `K3DM_JOB_DIR`/`K3DM_RUN_DIR`, and serializes cluster-queue tests on a per-test cluster-idle wait, so running tests no longer launches live `make up`/Chrome/`agy`, mutates a live cluster, pollutes the live run dir (false Slack orphan-job alerts), or flakes with `409 cluster job already running` on fast CI runners (`scripts/tests/lib/webhook.bats`)
 
 ## [1.12.0] - 2026-07-03
