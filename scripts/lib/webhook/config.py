@@ -44,7 +44,8 @@ def _safe_job_dir(job_id):
     if not m:
         raise ValueError(f"invalid job_id: {job_id!r}")
     safe_id = m.group(0)
-    candidate = (JOB_DIR / safe_id).resolve()
-    if candidate.parent.resolve() != JOB_DIR.resolve():
+    base = os.path.realpath(str(JOB_DIR))
+    candidate = os.path.realpath(os.path.join(base, safe_id))
+    if not candidate.startswith(base + os.sep) or os.path.dirname(candidate) != base:
         raise ValueError(f"invalid job_id: {job_id!r}")
-    return candidate
+    return Path(candidate)
