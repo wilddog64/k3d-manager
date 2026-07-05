@@ -29,6 +29,13 @@ setup_file() {
     _BATS_STUB_BIN="$(mktemp -d)"
     printf '#!/bin/sh\nexit 0\n' > "${_BATS_STUB_BIN}/make"
     chmod +x "${_BATS_STUB_BIN}/make"
+    # Stub kubectl so the queued /cluster "up" success path's _record_acg_state
+    # (kubectl create configmap | kubectl apply) returns instantly. On CI runners
+    # kubectl exists but no cluster is reachable, so the real apply blocks up to
+    # the 15s _posix_spawn_capture timeout, holding the job "running" and 409ing
+    # the next /cluster test.
+    printf '#!/bin/sh\nexit 0\n' > "${_BATS_STUB_BIN}/kubectl"
+    chmod +x "${_BATS_STUB_BIN}/kubectl"
     export PATH="${_BATS_STUB_BIN}:${PATH}"
 
     # Isolate job/run dirs so queued /cluster jobs never write into the live
@@ -56,6 +63,34 @@ teardown_file() {
     [[ -n "${_BATS_STUB_BIN:-}" ]] && rm -rf "${_BATS_STUB_BIN}" || true
     [[ -n "${K3DM_JOB_DIR:-}" ]] && rm -rf "${K3DM_JOB_DIR}" || true
     [[ -n "${K3DM_RUN_DIR:-}" ]] && rm -rf "${K3DM_RUN_DIR}" || true
+}
+
+# Wait until no cluster up/down job is still marked "running" in JOB_DIR.
+# A queued "up" job stays "running" until _run_cluster's success path finishes
+# _record_acg_state and _finish; on a fast host consecutive /cluster tests can
+# fire before the prior job clears, and the handler answers 409 (cluster job
+# already running) instead of 202 queued. Waiting here makes the sequence
+# deterministic regardless of that timing (mirrors _running_cluster_job).
+_wait_cluster_idle() {
+    local i=0 s
+    while (( i < 100 )); do
+        local running=0
+        for s in "${K3DM_JOB_DIR}"/*/status; do
+            [[ -f "$s" ]] || continue
+            if [[ "$(cat "$s" 2>/dev/null)" == "running" && -f "${s%/status}/action" ]]; then
+                running=1
+                break
+            fi
+        done
+        (( running == 0 )) && return 0
+        sleep 0.1
+        (( i++ )) || true
+    done
+    return 0
+}
+
+setup() {
+    _wait_cluster_idle
 }
 
 # ── Unit / black-box HTTP tests ────────────────────────────────────────────────
