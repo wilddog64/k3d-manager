@@ -117,5 +117,12 @@ function _cdp_ensure_acg_session() {
   fi
 
   _info "Checking Pluralsight (ACG) session in Antigravity browser..."
-  NODE_PATH="${_LIB_ACG_ROOT}/node_modules" node "${_acg_session_check_script}"
+  local _acg_user _acg_pass
+  _acg_user="$(_secret_load_data k3dm-acg-pluralsight username 2>/dev/null || true)"
+  _acg_pass="$(_secret_load_data k3dm-acg-pluralsight password 2>/dev/null || true)"
+  NODE_PATH="${_LIB_ACG_ROOT}/node_modules" \
+  ACG_USERNAME="${_acg_user}" \
+  ACG_PASSWORD="${_acg_pass}" \
+  K3DM_NONINTERACTIVE="${K3DM_NONINTERACTIVE:-0}" \
+    node "${_acg_session_check_script}"
 }

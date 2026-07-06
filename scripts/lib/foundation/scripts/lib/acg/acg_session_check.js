@@ -2,31 +2,35 @@
 'use strict';
 
 const { chromium } = require('playwright');
+const {
+  SANDBOX_URL,
+  SIGNIN_URL,
+  loginWithPage,
+  pageLooksLoggedIn,
+} = require('./playwright/lib/pluralsight_login');
 
 const CDP_HOST = process.env.PLAYWRIGHT_CDP_HOST || '127.0.0.1';
 const CDP_PORT = process.env.PLAYWRIGHT_CDP_PORT || '9222';
 const CDP_URL = `http://${CDP_HOST}:${CDP_PORT}`;
-const SANDBOX_URL = 'https://app.pluralsight.com/hands-on/playground/cloud-sandboxes';
-const SIGNIN_URL = 'https://app.pluralsight.com/id/signin';
 const POLL_INTERVAL_MS = 5000;
 const LOGIN_TIMEOUT_MS = 300000;
 
-const LOGIN_SELECTORS = [
-  '[data-testid="user-menu"]',
-  '[aria-label="User menu"]',
-  '[aria-label*="account" i]',
-  'img[alt*="avatar" i]',
-  'text=/Cloud Sandboxes/i',
-];
-
-async function _pageLooksLoggedIn(page) {
-  for (const selector of LOGIN_SELECTORS) {
-    const locator = page.locator(selector).first();
-    if (await locator.isVisible({ timeout: 1500 }).catch(() => false)) {
-      return true;
-    }
+async function _autoLogin(browser) {
+  if (!process.env.ACG_USERNAME || !process.env.ACG_PASSWORD) {
+    return false;
   }
-  return false;
+
+  const context = browser.contexts()[0];
+  if (!context) {
+    throw new Error('No browser context found via CDP');
+  }
+
+  const page = context.pages()[0] || await context.newPage();
+  const result = await loginWithPage(page, process.env.ACG_USERNAME, process.env.ACG_PASSWORD);
+  if (result.reason === 'mfa_required') {
+    console.error('ACG_LOGIN_MFA_REQUIRED: MFA challenge detected — unsupported for unattended login');
+  }
+  return result.ok;
 }
 
 async function _main() {
@@ -42,9 +46,27 @@ async function _main() {
     const page = pages.length > 0 ? pages[0] : await context.newPage();
 
     await page.goto(SANDBOX_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-    if (await _pageLooksLoggedIn(page)) {
+    if (await pageLooksLoggedIn(page)) {
       process.stdout.write('ACG_SESSION_OK\n');
       return;
+    }
+
+    if (process.env.ACG_USERNAME && process.env.ACG_PASSWORD) {
+      console.error('INFO: Session not authenticated — attempting headless Pluralsight login...');
+      const loginOk = await _autoLogin(browser).catch(err => {
+        console.error(`INFO: auto-login error: ${err.message}`);
+        return false;
+      });
+      if (loginOk && await pageLooksLoggedIn(page)) {
+        process.stdout.write('ACG_SESSION_OK\n');
+        return;
+      }
+      console.error('INFO: headless auto-login did not succeed.');
+    }
+
+    if (process.env.K3DM_NONINTERACTIVE === '1' || !process.stdout.isTTY) {
+      console.error(`ACG_SESSION_EXPIRED: Pluralsight session not authenticated and auto-login unavailable — sign in on the host CDP Chrome (${CDP_URL}) and re-run.`);
+      throw new Error('ACG_SESSION_EXPIRED');
     }
 
     console.error('ACTION REQUIRED: Please log into Pluralsight in the browser, then wait for the signin page to clear.');
@@ -57,7 +79,7 @@ async function _main() {
 
     const deadline = Date.now() + LOGIN_TIMEOUT_MS;
     while (Date.now() < deadline) {
-      if (!page.url().includes('/signin') && await _pageLooksLoggedIn(page)) {
+      if (!page.url().includes('/signin') && await pageLooksLoggedIn(page)) {
         process.stdout.write('ACG_SESSION_OK\n');
         return;
       }
@@ -66,13 +88,20 @@ async function _main() {
 
     throw new Error('Pluralsight login timeout');
   } finally {
-    try {
-      await browser.disconnect();
-    } catch {}
+    await browser.close().catch(() => {});
   }
 }
 
-_main().catch(err => {
-  console.error(`ERROR: ${err.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  _main().catch(err => {
+    console.error(`ERROR: ${err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  LOGIN_TIMEOUT_MS,
+  POLL_INTERVAL_MS,
+  _autoLogin,
+  _main,
+};
