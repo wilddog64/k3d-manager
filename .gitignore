@@ -1,8 +1,10 @@
-storage/
-scratch/
-.claude/
-.envrc
+# Node dependencies (installed via `npm ci` in scripts/lib/acg/)
 node_modules/
-bin/.ask-sandbox/
-__pycache__/
-package-lock.json
+
+# Playwright run artifacts
+test-results/
+playwright-report/
+
+# Local scratch / logs
+scratch/
+*.log
