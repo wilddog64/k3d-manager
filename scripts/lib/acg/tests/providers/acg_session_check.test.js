@@ -22,6 +22,7 @@ function makePage() {
       currentUrl = url;
     }),
     url: jest.fn(() => currentUrl),
+    waitForLoadState: jest.fn().mockResolvedValue(undefined),
     waitForTimeout: jest.fn().mockResolvedValue(undefined),
   };
 }

@@ -1,4 +1,4 @@
-const { loginWithPage } = require('../../playwright/lib/pluralsight_login');
+const { loginWithPage, pageLooksLoggedIn } = require('../../playwright/lib/pluralsight_login');
 
 function makeLocator(visible) {
   return {
@@ -40,5 +40,41 @@ describe('pluralsight login helper', () => {
     expect(result).toEqual({ ok: false, reason: 'mfa_required' });
     expect(page.goto).toHaveBeenNthCalledWith(1, 'https://app.pluralsight.com/id/signin', expect.any(Object));
     expect(page.goto).toHaveBeenCalledTimes(1);
+  });
+});
+
+function makeSlowRenderPage({ loggedInVisibleFromAttempt = 1 } = {}) {
+  let renderAttempt = 0;
+  const locators = new Map();
+  return {
+    goto: jest.fn().mockResolvedValue(undefined),
+    locator: jest.fn((selector) => {
+      const isLoggedInSelector = selector.includes('Cloud Sandboxes') || selector.includes('Open Sandbox');
+      if (!locators.has(selector)) {
+        locators.set(selector, {
+          first: jest.fn().mockReturnThis(),
+          isVisible: jest.fn(async () => isLoggedInSelector && renderAttempt >= loggedInVisibleFromAttempt),
+        });
+      }
+      return locators.get(selector);
+    }),
+    url: jest.fn(() => 'https://app.pluralsight.com/hands-on/playground/cloud-sandboxes'),
+    waitForLoadState: jest.fn(async () => { renderAttempt += 1; }),
+    waitForTimeout: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
+describe('pageLooksLoggedIn render-race hardening', () => {
+  test('single attempt misses a slow-rendering logged-in page (reproduces the false negative)', async () => {
+    const page = makeSlowRenderPage({ loggedInVisibleFromAttempt: 1 });
+    const result = await pageLooksLoggedIn(page, { attempts: 1, settleMs: 0 });
+    expect(result).toBe(false);
+  });
+
+  test('retrying across settle waits detects the logged-in page once it renders', async () => {
+    const page = makeSlowRenderPage({ loggedInVisibleFromAttempt: 1 });
+    const result = await pageLooksLoggedIn(page, { attempts: 4, settleMs: 0 });
+    expect(result).toBe(true);
+    expect(page.waitForLoadState).toHaveBeenCalled();
   });
 });

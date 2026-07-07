@@ -45,8 +45,16 @@ async function _main() {
     const pages = context.pages();
     const page = pages.length > 0 ? pages[0] : await context.newPage();
 
-    await page.goto(SANDBOX_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-    if (await pageLooksLoggedIn(page)) {
+    const navigatedToSandbox = await page.goto(SANDBOX_URL, { waitUntil: 'domcontentloaded', timeout: 30000 })
+      .then(() => true)
+      .catch((err) => {
+        console.error(`INFO: sandbox navigation issue (will still probe session): ${err.message}`);
+        return false;
+      });
+    if (navigatedToSandbox) {
+      await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+    }
+    if (await pageLooksLoggedIn(page, { attempts: 4 })) {
       process.stdout.write('ACG_SESSION_OK\n');
       return;
     }
@@ -57,7 +65,7 @@ async function _main() {
         console.error(`INFO: auto-login error: ${err.message}`);
         return false;
       });
-      if (loginOk && await pageLooksLoggedIn(page)) {
+      if (loginOk && await pageLooksLoggedIn(page, { attempts: 3 })) {
         process.stdout.write('ACG_SESSION_OK\n');
         return;
       }

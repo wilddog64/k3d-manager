@@ -21,17 +21,38 @@ const MFA_SELECTORS = [
 ];
 
 async function anyVisible(page, selectors, timeoutMs) {
-  for (const selector of selectors) {
-    const locator = page.locator(selector).first();
-    if (await locator.isVisible({ timeout: timeoutMs }).catch(() => false)) {
+  const checks = selectors.map((selector) =>
+    page.locator(selector).first().isVisible({ timeout: timeoutMs }).catch(() => false),
+  );
+  if (checks.length === 0) {
+    return false;
+  }
+  return new Promise((resolve) => {
+    let pending = checks.length;
+    for (const check of checks) {
+      check.then((visible) => {
+        if (visible) {
+          resolve(true);
+        } else if ((pending -= 1) === 0) {
+          resolve(false);
+        }
+      });
+    }
+  });
+}
+
+async function pageLooksLoggedIn(page, options) {
+  const { attempts = 1, perSelectorTimeoutMs = 1500, settleMs = 1000 } = options || {};
+  for (let i = 0; i < attempts; i += 1) {
+    if (await anyVisible(page, LOGGED_IN_SELECTORS, perSelectorTimeoutMs)) {
       return true;
+    }
+    if (i < attempts - 1) {
+      await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      await page.waitForTimeout(settleMs);
     }
   }
   return false;
-}
-
-async function pageLooksLoggedIn(page) {
-  return anyVisible(page, LOGGED_IN_SELECTORS, 1500);
 }
 
 async function fillIfVisible(page, selector, value, timeoutMs) {
