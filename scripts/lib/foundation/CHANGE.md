@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [v0.4.3] — 2026-07-07
+
+Harden the ACG session-check against a render-timing race that produced false "logged out" negatives when reusing an already-signed-in CDP browser (PR #35, merged `b7d08b3`).
+
+### Fixed
+- `scripts/lib/acg/playwright/lib/pluralsight_login.js`, `scripts/lib/acg/acg_session_check.js`: harden the ACG session-check against a render-timing race that produced false "logged out" negatives when reusing an already-signed-in CDP browser. `pageLooksLoggedIn` now retries across a short settle window (backward-compatible optional `{ attempts, perSelectorTimeoutMs, settleMs }` — no options = single-shot as before); the initial sandbox probe waits for `networkidle` then retries (`attempts: 4`), logs nav failures instead of silently swallowing them, and the post-auto-login re-check retries (`attempts: 3`). `LOGGED_IN_SELECTORS` and the credential/auto-login gating are unchanged. Covered by new render-race regression tests (`d803a00`).
+
+### Performance
+- `scripts/lib/acg/playwright/lib/pluralsight_login.js`: parallelize `anyVisible` so each logged-in probe is bounded by one per-selector timeout instead of `selectors.length × perSelectorTimeoutMs`. Resolves `true` on the first visible selector (fast happy path unchanged) and `false` only once all resolve, keeping the `{ attempts }` retry worst case from ballooning into tens of seconds on a genuinely logged-out page (`487b2f9`, Copilot PR #35 finding).
+
 ## [v0.4.2] — 2026-07-06
 
 Headless CDP auto-login with stale-browser reclaim/reuse on the AWS-sandbox credential-test path (PR #34, merged `ae9fc73`).
