@@ -20,7 +20,7 @@ fi
 _CDP_CHROME_CDP_LABEL="${CDP_CHROME_CDP_LABEL:-com.k3d-manager.chrome-cdp}"
 
 function _cdp_profile_in_use() {
-  local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/profile}"
+  local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/pw-profile}"
   local _profile_arg="--user-data-dir=${_cdp_profile_dir}"
 
   ps -ax -o command= | awk -v profile="${_profile_arg}" '
@@ -48,7 +48,7 @@ function _cdp_stop_chrome_cdp_agent() {
 }
 
 function _cdp_remove_stale_singleton_lock() {
-  local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/profile}"
+  local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/pw-profile}"
   local _singleton_lock="${_cdp_profile_dir}/SingletonLock"
 
   if [[ ! -e "${_singleton_lock}" ]]; then
@@ -63,41 +63,89 @@ function _cdp_remove_stale_singleton_lock() {
   rm -f "${_singleton_lock}"
 }
 
+function _cdp_connectable() {
+  local _cdp_host="${PLAYWRIGHT_CDP_HOST:-127.0.0.1}"
+  local _cdp_port="${PLAYWRIGHT_CDP_PORT:-9222}"
+  if ! _command_exist node; then
+    return 1
+  fi
+  if [[ ! -d "${_LIB_ACG_ROOT}/node_modules/playwright" ]]; then
+    return 1
+  fi
+  # shellcheck disable=SC2016
+  CDP_HOST="${_cdp_host}" CDP_PORT="${_cdp_port}" \
+  NODE_PATH="${_LIB_ACG_ROOT}/node_modules" \
+    node -e 'const{chromium}=require("playwright");chromium.connectOverCDP(`http://${process.env.CDP_HOST}:${process.env.CDP_PORT}`,{timeout:10000}).then(b=>b.close()).then(()=>process.exit(0)).catch(()=>process.exit(1));' >/dev/null 2>&1
+}
+
+function _cdp_kill_port_listener() {
+  local _cdp_port="${PLAYWRIGHT_CDP_PORT:-9222}"
+  if ! _command_exist lsof; then
+    _warn "[acg] lsof unavailable — cannot reclaim :${_cdp_port} automatically; quit the browser holding it and re-run"
+    return 0
+  fi
+  local _pids
+  _pids="$(lsof -nP -iTCP:"${_cdp_port}" -sTCP:LISTEN -t 2>/dev/null || true)"
+  if [[ -z "${_pids}" ]]; then
+    return 0
+  fi
+  _info "[acg] Reclaiming :${_cdp_port} — terminating the CDP browser holding it (pid(s): ${_pids//$'\n'/ })"
+  # shellcheck disable=SC2086
+  kill ${_pids} 2>/dev/null || true
+  local _w=0
+  while lsof -nP -iTCP:"${_cdp_port}" -sTCP:LISTEN -t >/dev/null 2>&1 && [[ ${_w} -lt 8 ]]; do
+    sleep 1
+    _w=$((_w + 1))
+  done
+  if lsof -nP -iTCP:"${_cdp_port}" -sTCP:LISTEN -t >/dev/null 2>&1; then
+    _pids="$(lsof -nP -iTCP:"${_cdp_port}" -sTCP:LISTEN -t 2>/dev/null || true)"
+    if [[ -n "${_pids}" ]]; then
+      # shellcheck disable=SC2086
+      kill -9 ${_pids} 2>/dev/null || true
+      sleep 1
+    fi
+  fi
+}
+
 function _browser_launch() {
   local _cdp_host="${PLAYWRIGHT_CDP_HOST:-127.0.0.1}"
   local _cdp_port="${PLAYWRIGHT_CDP_PORT:-9222}"
+  local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/pw-profile}"
   if ! _command_exist curl; then
     _err "curl is required for Antigravity browser probe — install curl and retry"
   fi
   if _run_command --soft -- curl -sf "http://${_cdp_host}:${_cdp_port}/json" >/dev/null 2>&1; then
-    return 0
+    if _cdp_connectable; then
+      _info "[acg] Reusing existing CDP browser on :${_cdp_port}"
+      _cdp_ensure_acg_session
+      return $?
+    fi
+    _info "[acg] A browser is on :${_cdp_port} but Playwright cannot drive it (stale/zombie or version-mismatched) — reclaiming the port and relaunching the managed Chromium."
+    _cdp_kill_port_listener
   fi
   _cdp_stop_chrome_cdp_agent
   _cdp_remove_stale_singleton_lock
   _info "Chrome not running — launching with --remote-debugging-port=${_cdp_port}..."
-  local _cdp_profile_dir="${PLAYWRIGHT_AUTH_DIR:-${HOME}/.local/share/k3d-manager/profile}"
   if [[ "$(uname)" == "Darwin" ]]; then
-    local _chrome_app_bin="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-    if [[ -x "${_chrome_app_bin}" ]]; then
-      local _chrome_cdp_log="${HOME}/.local/share/k3d-manager/chrome-cdp.log"
-      mkdir -p "$(dirname "${_chrome_cdp_log}")"
-      "${_chrome_app_bin}" \
-        --remote-debugging-port="${_cdp_port}" \
-        --password-store=basic \
-        --user-data-dir="${_cdp_profile_dir}" \
-        --no-first-run \
-        --no-default-browser-check \
-        >>"${_chrome_cdp_log}" 2>&1 &
-    else
-      open -a "Google Chrome" --args \
-        --remote-debugging-port="${_cdp_port}" \
-        --password-store=basic \
-        --user-data-dir="${_cdp_profile_dir}"
+    local _pw_chrome_bin
+    _pw_chrome_bin="$(NODE_PATH="${_LIB_ACG_ROOT}/node_modules" node -e 'process.stdout.write(require("playwright").chromium.executablePath())' 2>/dev/null || true)"
+    if [[ -z "${_pw_chrome_bin}" || ! -x "${_pw_chrome_bin}" ]]; then
+      _err "[acg] Playwright-managed Chromium not found — run 'npm install' (or 'npx playwright install chromium') in ${_LIB_ACG_ROOT}"
     fi
+    local _chrome_cdp_log="${HOME}/.local/share/k3d-manager/chrome-cdp.log"
+    mkdir -p "$(dirname "${_chrome_cdp_log}")"
+    "${_pw_chrome_bin}" \
+      --remote-debugging-port="${_cdp_port}" \
+      --password-store=basic \
+      --user-data-dir="${_cdp_profile_dir}" \
+      --no-first-run \
+      --no-default-browser-check \
+      >>"${_chrome_cdp_log}" 2>&1 &
   else
     _err "[acg] _browser_launch is macOS-only — $(uname) is not supported"
   fi
   _antigravity_browser_ready 30
+  _cdp_ensure_acg_session
 }
 
 function _cdp_ensure_acg_session() {
