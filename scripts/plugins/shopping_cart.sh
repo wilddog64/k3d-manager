@@ -561,11 +561,18 @@ function shopping_cart_seed_sandbox_vault_kv() {
   printf 'header = "X-Vault-Token: %s"\n' "${_src_token}"  > "${_src_hdr}"
   trap 'rm -f "'"${_seed_hdr}"'" "'"${_src_hdr}"'" 2>/dev/null || true' RETURN
   _vault_kv_put() {
-    curl -sf -X POST \
+    local _kv_path="$2" _kv_out _kv_code _kv_body
+    _kv_out=$(curl -s -w $'\n%{http_code}' -X POST \
       --config "${_seed_hdr}" \
       -H "Content-Type: application/json" \
       -d "{\"data\":$1}" \
-      "${_seed_addr}/v1/secret/data/$2" >/dev/null
+      "${_seed_addr}/v1/secret/data/${_kv_path}") || _kv_out=$'\n000'
+    _kv_code="${_kv_out##*$'\n'}"
+    _kv_body="${_kv_out%$'\n'*}"
+    if [[ "${_kv_code}" != 2* ]]; then
+      _err "[acg-up] Vault KV write to ${_kv_path} failed: HTTP ${_kv_code} (addr ${_seed_addr}) — ${_kv_body:-<empty response>}"
+      return 1
+    fi
   }
   _vault_kv_exists() {
     local path="$1"

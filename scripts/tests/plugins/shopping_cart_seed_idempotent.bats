@@ -6,7 +6,7 @@ setup() {
 
   _info() { printf '%s\n' "$*" >&2; }
   _warn() { printf '%s\n' "$*" >&2; }
-  _err() { printf '%s\n' "$*" >&2; return 1; }
+  _err() { printf '%s\n' "$*" >&2; exit 1; }
   _acg_fail() { printf '%s\n' "$*" >&2; return 1; }
   export -f _info _warn _err _acg_fail
 
@@ -16,6 +16,9 @@ setup() {
     local path="${url#*/v1/secret/data/}"
 
     if [[ "$*" == *"-X POST"* ]]; then
+      # Emulate curl -w '\n%{http_code}': body then newline then status.
+      # TEST_PUT_HTTP_CODE lets a test force a failure status for one run.
+      printf '\n%s' "${TEST_PUT_HTTP_CODE:-200}"
       return 0
     fi
 
@@ -214,4 +217,16 @@ setup() {
   [ "$status" -eq 0 ]
   grep -q 'http://localhost:8200/v1/secret/data/redis/cart' "$CURL_LOG"
   ! grep -q 'http://localhost:/v1/secret/data/' "$CURL_LOG"
+}
+
+@test "put surfaces HTTP status and path on a non-2xx write, then fails" {
+  export _vault_local_port="8200"
+  export _vault_root_token="root-token"
+  export TEST_REDIS_CART_EXISTS="0"
+  export TEST_PUT_HTTP_CODE="403"
+
+  run shopping_cart_seed_sandbox_vault_kv
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Vault KV write to redis/cart failed"* ]]
+  [[ "$output" == *"HTTP 403"* ]]
 }
