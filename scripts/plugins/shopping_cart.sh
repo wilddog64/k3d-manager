@@ -4,11 +4,12 @@ set -euo pipefail
 : "${_vault_local_port:=}"
 
 # --- Tier 3 P3: seed target / canonical source / backup targets ----------------------
-# Defaults preserve pre-P3 behavior: target == source == laptop Vault via local port-forward.
-: "${SEED_VAULT_ADDR:=http://localhost:${_vault_local_port}}"
-: "${SEED_VAULT_TOKEN:=${_vault_root_token:-}}"
-: "${SEED_VAULT_SOURCE_ADDR:=${SEED_VAULT_ADDR}}"
-: "${SEED_VAULT_SOURCE_TOKEN:=${SEED_VAULT_TOKEN}}"
+# SEED_VAULT_ADDR/TOKEN and SEED_VAULT_SOURCE_ADDR/TOKEN are resolved at call time inside
+# shopping_cart_seed_sandbox_vault_kv, defaulting to the laptop Vault port-forward on
+# ${_vault_local_port}. They are intentionally NOT given ':=' defaults here: this plugin is
+# sourced before bin/cluster-up assigns _vault_local_port, so a source-time default would
+# freeze an empty port into the URL (curl → :80 → HTTP 404 → exit 22). Any exported override
+# is still honored by the ':-' fallbacks at the call site.
 # Keychain (macOS) / secret-tool (Linux) backup service; per-key account = the Vault KV path.
 : "${SEED_KEYCHAIN_SERVICE:=k3d-manager-app-cluster-secrets}"
 # Native in-cluster disaster-recovery copy.

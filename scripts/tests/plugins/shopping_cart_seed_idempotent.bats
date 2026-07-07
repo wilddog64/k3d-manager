@@ -204,3 +204,14 @@ setup() {
   grep -q 'http://source:8200/v1/secret/data/minio/credentials' "$CURL_LOG"
   grep -Eq 'src-minio-user.*minio/credentials$' "$CURL_LOG"
 }
+
+@test "seed URL carries _vault_local_port set after the plugin was sourced (no empty-port freeze)" {
+  export _vault_local_port="8200"
+  export _vault_root_token="root-token"
+  export TEST_REDIS_CART_EXISTS="0"
+
+  run shopping_cart_seed_sandbox_vault_kv
+  [ "$status" -eq 0 ]
+  grep -q 'http://localhost:8200/v1/secret/data/redis/cart' "$CURL_LOG"
+  ! grep -q 'http://localhost:/v1/secret/data/' "$CURL_LOG"
+}
