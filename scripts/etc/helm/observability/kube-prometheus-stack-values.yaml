@@ -9,7 +9,14 @@ defaultRules:
 prometheus:
   prometheusSpec:
     retention: 7d
-    retentionSize: 1800MB
+    retentionSize: 20GB
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 25Gi
     resources:
       requests:
         memory: 512Mi
