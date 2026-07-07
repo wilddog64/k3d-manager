@@ -7,10 +7,12 @@ const CDP_ENDPOINT = new URL(CDP_URL);
 async function connectBrowser() {
   let browserContext;
   let cdpBrowser = null;
+  let cdpReachable = false;
 
   try {
     try {
       cdpBrowser = await chromium.connectOverCDP(CDP_URL);
+      cdpReachable = true;
       const cdpContexts = cdpBrowser.contexts();
       if (cdpContexts.length > 0) {
         const cdpContext = cdpContexts[0];
@@ -61,6 +63,13 @@ async function connectBrowser() {
     }
 
     if (!browserContext) {
+      if (cdpReachable) {
+        throw new Error(
+          'CDP Chrome is running but exposes no usable browser context — the profile is ' +
+          'locked by the live CDP instance, so launchPersistentContext cannot open it. ' +
+          'Ensure the CDP Chrome is signed into Pluralsight (run the session gate) and retry.'
+        );
+      }
       browserContext = await chromium.launchPersistentContext(AUTH_DIR, {
         headless: false,
         channel: 'chrome',
