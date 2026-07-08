@@ -80,7 +80,18 @@ setup() {
 
   jq() {
     local input
+    local field_arg=""
+    local -a args=("$@")
     input=$(cat)
+    if [[ "$1" == "-r" ]]; then
+      local i
+      for ((i = 0; i < ${#args[@]}; i++)); do
+        if [[ "${args[i]}" == "field" && $((i + 1)) -lt ${#args[@]} ]]; then
+          field_arg="${args[i + 1]}"
+          break
+        fi
+      done
+    fi
     if [[ "$1" == "-c" ]]; then
       case "$input" in
         *'"password":"cart-from-source"'*) printf '{"password":"cart-from-source"}\n' ;;
@@ -101,19 +112,19 @@ setup() {
         *'"password":"pg-products"'*) printf 'pg-products\n' ;;
         *'"password":"pg-payment"'*) printf 'pg-payment\n' ;;
         *'"root-user":"minioadmin"'*)
-          [[ "${*: -1}" == *"root-user"* ]] && printf 'minioadmin\n' || printf 'minio-pass\n'
+          [[ "${field_arg}" == "root-user" ]] && printf 'minioadmin\n' || printf 'minio-pass\n'
           ;;
         *'"admin_password":"ldap-admin"'*)
-          [[ "${*: -1}" == *"admin_password"* ]] && printf 'ldap-admin\n' || printf 'ldap-readonly\n'
+          [[ "${field_arg}" == "admin_password" ]] && printf 'ldap-admin\n' || printf 'ldap-readonly\n'
           ;;
         *'"admin_password":"kc-admin"'*)
-          [[ "${*: -1}" == *"admin_password"* ]] && printf 'kc-admin\n' || printf 'kc-db\n'
+          [[ "${field_arg}" == "admin_password" ]] && printf 'kc-admin\n' || printf 'kc-db\n'
           ;;
         *'"argocd_client_secret":"argo"'*)
-          case "${*: -1}" in
-            *argocd_client_secret*) printf 'argo\n' ;;
-            *order_service_client_secret*) printf 'order\n' ;;
-            *product_catalog_client_secret*) printf 'product\n' ;;
+          case "${field_arg}" in
+            argocd_client_secret) printf 'argo\n' ;;
+            order_service_client_secret) printf 'order\n' ;;
+            product_catalog_client_secret) printf 'product\n' ;;
             *) printf 'grafana\n' ;;
           esac
           ;;
@@ -142,9 +153,9 @@ setup() {
 
   run shopping_cart_seed_sandbox_vault_kv
   [ "$status" -eq 0 ]
-  ! grep -q 'POST .*redis/cart$' "$CURL_LOG"
-  ! grep -q 'POST .*redis/orders-cache$' "$CURL_LOG"
-  ! grep -q 'POST .*rabbitmq/default$' "$CURL_LOG"
+  [ "$(grep -c 'POST .*redis/cart$' "$CURL_LOG")" -eq 0 ]
+  [ "$(grep -c 'POST .*redis/orders-cache$' "$CURL_LOG")" -eq 0 ]
+  [ "$(grep -c 'POST .*rabbitmq/default$' "$CURL_LOG")" -eq 0 ]
 }
 
 @test "puts redis and rabbitmq secrets when absent" {
@@ -216,7 +227,19 @@ setup() {
   run shopping_cart_seed_sandbox_vault_kv
   [ "$status" -eq 0 ]
   grep -q 'http://localhost:8200/v1/secret/data/redis/cart' "$CURL_LOG"
-  ! grep -q 'http://localhost:/v1/secret/data/' "$CURL_LOG"
+  [ "$(grep -c 'http://localhost:/v1/secret/data/' "$CURL_LOG")" -eq 0 ]
+}
+
+@test "vault helpers work without prior seed-local temp state" {
+  export _vault_local_port="8200"
+  export _vault_root_token="root-token"
+
+  run _vault_kv_exists "keycloak/admin"
+  [ "$status" -eq 0 ]
+
+  run _vault_kv_get_field "keycloak/admin" "admin_password"
+  [ "$status" -eq 0 ]
+  [ "$output" = "kc-admin" ]
 }
 
 @test "put surfaces HTTP status and path on a non-2xx write, then fails" {
