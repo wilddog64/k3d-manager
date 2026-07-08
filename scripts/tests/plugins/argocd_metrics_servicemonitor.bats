@@ -128,14 +128,21 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'App CVE Scan Decisions' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'kube_job_status_succeeded{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}' "${DASH}"
+  run grep -F -- 'sum(increase(kube_job_status_succeeded{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}[30d])) or vector(0)' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'kube_job_status_failed{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}' "${DASH}"
+  run grep -F -- '"instant": true' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'sum(increase(kube_job_status_failed{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}[30d])) or vector(0)' "${DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- '{namespace=\"platform-ops\",pod=~\"app-cve-scan.*\"} |= \"[app-cve-scan]\"' "${DASH}"
   [ "${status}" -eq 0 ]
+
+  run grep -cF -- '"timeFrom": "30d"' "${DASH}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -ge 3 ]
 }
 
 @test "metrics: dashboard includes trivy infra security panels" {

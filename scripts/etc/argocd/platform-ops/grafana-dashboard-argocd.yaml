@@ -152,11 +152,13 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(increase(kube_job_status_succeeded{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}[30d]))",
+              "expr": "sum(increase(kube_job_status_succeeded{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}[30d])) or vector(0)",
+              "instant": true,
               "refId": "A"
             }
           ],
           "title": "App CVE Scan Successful Jobs",
+          "timeFrom": "30d",
           "type": "stat"
         },
         {
@@ -178,11 +180,13 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(increase(kube_job_status_failed{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}[30d]))",
+              "expr": "sum(increase(kube_job_status_failed{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}[30d])) or vector(0)",
+              "instant": true,
               "refId": "A"
             }
           ],
           "title": "App CVE Scan Failed Jobs",
+          "timeFrom": "30d",
           "type": "stat"
         },
         {
@@ -205,6 +209,7 @@ data:
             }
           ],
           "title": "App CVE Scan Decisions",
+          "timeFrom": "30d",
           "type": "logs"
         },
         {

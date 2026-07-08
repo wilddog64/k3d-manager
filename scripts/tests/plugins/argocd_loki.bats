@@ -49,6 +49,15 @@ PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
 
   run grep -nF -- 'replication_factor: 1' "${VALUES}"
   [ "${status}" -eq 0 ]
+
+  run grep -nF -- 'enabled: true' "${VALUES}"
+  [ "${status}" -eq 0 ]
+
+  run grep -nF -- 'storageClassName: local-path' "${VALUES}"
+  [ "${status}" -eq 0 ]
+
+  run grep -nF -- 'size: 10Gi' "${VALUES}"
+  [ "${status}" -eq 0 ]
 }
 
 @test "loki: hub grafana provisions a loki datasource" {
@@ -63,7 +72,7 @@ PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
 }
 
 @test "loki: promtail ships pod logs to Loki" {
-  run grep -nF -- 'fluent/fluent-bit:latest' "${PROMTAIL}"
+  run grep -nF -- 'fluent/fluent-bit:3.1.9' "${PROMTAIL}"
   [ "${status}" -eq 0 ]
 
   run grep -nF -- 'Host          loki.monitoring.svc.cluster.local' "${PROMTAIL}"
