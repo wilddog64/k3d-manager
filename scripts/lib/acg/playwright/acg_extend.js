@@ -19,6 +19,29 @@ const CDP_HOST = process.env.PLAYWRIGHT_CDP_HOST || '127.0.0.1';
 const CDP_PORT = process.env.PLAYWRIGHT_CDP_PORT || '9222';
 const CDP_URL = `http://${CDP_HOST}:${CDP_PORT}`;
 
+function _normalizeSandboxUrl(targetUrl) {
+  if (targetUrl.includes('cloud-playground/cloud-sandboxes')) {
+    return targetUrl.replace('cloud-playground/cloud-sandboxes', 'hands-on/playground/cloud-sandboxes');
+  }
+  return targetUrl;
+}
+
+function _isSandboxPageUrl(url) {
+  try {
+    return url.includes('cloud-sandboxes') || url.includes('hands-on/playground') || url.includes('cloud-playground');
+  } catch {
+    return false;
+  }
+}
+
+function _selectExtendPage(allPages) {
+  return allPages.find(p => {
+    try { return _isSandboxPageUrl(p.url()); } catch { return false; }
+  }) || allPages.find(p => {
+    try { return new URL(p.url()).hostname.endsWith('.pluralsight.com'); } catch { return false; }
+  }) || allPages[0] || null;
+}
+
 function _isFirstRun() {
   try {
     return !fs.existsSync(AUTH_DIR) || fs.readdirSync(AUTH_DIR).length === 0;
@@ -90,10 +113,7 @@ async function extendSandbox() {
     console.error('ERROR: No sandbox URL provided');
     process.exit(1);
   }
-  // Standardize URL to minimize SPA redirects
-  if (targetUrl.includes('cloud-playground/cloud-sandboxes')) {
-    targetUrl = targetUrl.replace('cloud-playground/cloud-sandboxes', 'hands-on/playground/cloud-sandboxes');
-  }
+  targetUrl = _normalizeSandboxUrl(targetUrl);
 
   let browserContext;
   let _cdpBrowser = null;
@@ -120,25 +140,22 @@ async function extendSandbox() {
     }
 
     const allPages = browserContext.pages();
-    let page = allPages.find(p => {
-      try { return new URL(p.url()).hostname.endsWith('.pluralsight.com'); } catch { return false; }
-    });
+    let page = _selectExtendPage(allPages);
     if (!page) {
-      page = allPages[0];
-      if (!page) throw new Error('No page found in the browser context');
+      throw new Error('No page found in the browser context');
     }
 
     const currentUrl = page.url();
-    let isPluralsight = false;
-    try {
-      const parsedUrl = new URL(currentUrl);
-      isPluralsight = parsedUrl.hostname === 'pluralsight.com' || parsedUrl.hostname.endsWith('.pluralsight.com');
-    } catch { isPluralsight = false; }
-    if (isPluralsight) {
-      console.error(`INFO: Already on Pluralsight page: ${currentUrl}`);
-    } else {
-      console.error(`INFO: Navigating to ${targetUrl}...`);
+    const isOnSandboxPage = _isSandboxPageUrl(currentUrl);
+    if (!isOnSandboxPage) {
+      console.error(`INFO: Current tab is not on the sandbox page (${currentUrl}) — navigating to ${targetUrl}...`);
       await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      const postNavUrl = page.url();
+      if (postNavUrl.includes('/id') || postNavUrl.includes('sign-in') || postNavUrl.includes('login')) {
+        throw new Error(`Pluralsight session expired — redirected to ${postNavUrl}. Re-login in Chrome and retry.`);
+      }
+    } else {
+      console.error(`INFO: Already on sandbox page: ${currentUrl}`);
     }
 
     // If "Session extended" toast is already visible, extension already succeeded — return so finally runs.
@@ -399,13 +416,21 @@ async function extendSandbox() {
   }
 }
 
-const OVERALL_TIMEOUT_MS = 90000;
-Promise.race([
-  extendSandbox(),
-  new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Script timed out after ${OVERALL_TIMEOUT_MS / 1000}s`)), OVERALL_TIMEOUT_MS)
-  )
-]).catch(err => {
-  console.error(`ERROR: ${err.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  const OVERALL_TIMEOUT_MS = 90000;
+  Promise.race([
+    extendSandbox(),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Script timed out after ${OVERALL_TIMEOUT_MS / 1000}s`)), OVERALL_TIMEOUT_MS)
+    )
+  ]).catch(err => {
+    console.error(`ERROR: ${err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  _isSandboxPageUrl,
+  _normalizeSandboxUrl,
+  _selectExtendPage,
+};
