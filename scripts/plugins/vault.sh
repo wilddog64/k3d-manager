@@ -1237,7 +1237,7 @@ function vault_failover_hub_into_context() {
   fi
 
   # shellcheck disable=SC1091
-  [[ -r "${SCRIPT_DIR}/etc/vault/vars.sh" ]] && source "${SCRIPT_DIR}/etc/vault/vars.sh"
+  [[ -r "${SCRIPT_DIR}/etc/vault/vars.sh" ]] && APP_CONTEXT="${_app_ctx}" source "${SCRIPT_DIR}/etc/vault/vars.sh"
 
   local _active="${HUB_VAULT_PROFILE:-laptop}"
   local _threshold="${HUB_VAULT_FAILOVER_THRESHOLD:-3}"
@@ -1280,7 +1280,7 @@ function vault_failover_hub_into_context() {
   unset HUB_VAULT_CSS_SERVER HUB_VAULT_USE_BRIDGE HUB_VAULT_CSS_AUTH
   export HUB_VAULT_PROFILE="${_fallback}"
   # shellcheck disable=SC1091
-  [[ -r "${SCRIPT_DIR}/etc/vault/vars.sh" ]] && source "${SCRIPT_DIR}/etc/vault/vars.sh"
+  [[ -r "${SCRIPT_DIR}/etc/vault/vars.sh" ]] && APP_CONTEXT="${_app_ctx}" source "${SCRIPT_DIR}/etc/vault/vars.sh"
 
   if declare -f _hostinger_reconcile_vault_cluster_store >/dev/null 2>&1; then
     _info "[vault] re-running Hostinger reconcile to repoint CSS (profile=${_fallback})"

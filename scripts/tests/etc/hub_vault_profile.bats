@@ -67,3 +67,26 @@ setup() {
   [ "${HUB_VAULT_PROFILE}" = "laptop" ]
   [ "${HUB_VAULT_USE_BRIDGE}" = "1" ]
 }
+
+@test "app context uses its own persisted profile instead of the legacy global file" {
+  unset HUB_VAULT_PROFILE HUB_VAULT_CSS_SERVER HUB_VAULT_USE_BRIDGE HUB_VAULT_CSS_AUTH HUB_VAULT_PROFILE_STATE_FILE
+  export K3DM_STATE_DIR="${BATS_TEST_TMPDIR}"
+  export APP_CONTEXT="ubuntu-k3s"
+  printf 'hostinger\n' > "${BATS_TEST_TMPDIR}/hub-vault-profile"
+  printf 'laptop\n' > "${BATS_TEST_TMPDIR}/hub-vault-profile-ubuntu-k3s"
+  # shellcheck disable=SC1090
+  source "${VARS_SH}"
+  [ "${HUB_VAULT_PROFILE}" = "laptop" ]
+  [ "${HUB_VAULT_PROFILE_STATE_FILE}" = "${BATS_TEST_TMPDIR}/hub-vault-profile-ubuntu-k3s" ]
+}
+
+@test "hostinger context falls back to the legacy global file for backward compatibility" {
+  unset HUB_VAULT_PROFILE HUB_VAULT_CSS_SERVER HUB_VAULT_USE_BRIDGE HUB_VAULT_CSS_AUTH HUB_VAULT_PROFILE_STATE_FILE
+  export K3DM_STATE_DIR="${BATS_TEST_TMPDIR}"
+  export APP_CONTEXT="ubuntu-hostinger"
+  printf 'hostinger\n' > "${BATS_TEST_TMPDIR}/hub-vault-profile"
+  # shellcheck disable=SC1090
+  source "${VARS_SH}"
+  [ "${HUB_VAULT_PROFILE}" = "hostinger" ]
+  [ "${HUB_VAULT_PROFILE_STATE_FILE}" = "${BATS_TEST_TMPDIR}/hub-vault-profile" ]
+}
