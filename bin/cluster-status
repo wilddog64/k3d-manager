@@ -24,6 +24,41 @@ APP_CONTEXT="${APP_CONTEXT:-$(_acg_provider_context "${CLUSTER_PROVIDER}")}"
 INFRA_CONTEXT="${INFRA_CONTEXT:-k3d-k3d-cluster}"
 ARGOCD_NAMESPACE="${ARGOCD_NAMESPACE:-cicd}"
 
+function _cluster_status_acg_stack_probe() {
+  local _region="${ACG_REGION:-us-west-2}"
+  local _stack_name="${_ACG_CF_STACK_NAME:-k3d-manager-acg}"
+  local _arn _stack_output
+
+  _arn="$(aws sts get-caller-identity --region "${_region}" --query 'Arn' --output text 2>&1 || true)"
+  if [[ -z "${_arn}" || "${_arn}" == *"Unable to locate credentials"* || "${_arn}" == *"ExpiredToken"* || "${_arn}" == *"InvalidClientTokenId"* || "${_arn}" == *"AccessDenied"* || "${_arn}" == *"error"* ]]; then
+    printf 'credentials-unavailable|%s|\n' "${_arn}"
+    return 0
+  fi
+
+  _stack_output="$(aws cloudformation describe-stacks \
+    --region "${_region}" \
+    --stack-name "${_stack_name}" \
+    --query 'Stacks[0].StackStatus' \
+    --output text 2>&1 || true)"
+  case "${_stack_output}" in
+    CREATE_COMPLETE|UPDATE_COMPLETE|UPDATE_ROLLBACK_COMPLETE)
+      printf 'present-healthy|%s|%s\n' "${_arn}" "${_stack_output}"
+      ;;
+    CREATE_IN_PROGRESS|UPDATE_IN_PROGRESS|UPDATE_COMPLETE_CLEANUP_IN_PROGRESS|UPDATE_ROLLBACK_IN_PROGRESS|UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS|REVIEW_IN_PROGRESS)
+      printf 'present-transitioning|%s|%s\n' "${_arn}" "${_stack_output}"
+      ;;
+    ROLLBACK_COMPLETE|CREATE_FAILED|ROLLBACK_FAILED|UPDATE_ROLLBACK_FAILED|DELETE_FAILED|DELETE_IN_PROGRESS)
+      printf 'present-unhealthy|%s|%s\n' "${_arn}" "${_stack_output}"
+      ;;
+    *"does not exist"*|*"ValidationError"*|*"Stack with id"*)
+      printf 'absent|%s|\n' "${_arn}"
+      ;;
+    *)
+      printf 'unknown|%s|%s\n' "${_arn}" "${_stack_output}"
+      ;;
+  esac
+}
+
 echo "=== Hub Cluster (${INFRA_CONTEXT}) ==="
 kubectl get nodes --context "${INFRA_CONTEXT}" 2>/dev/null \
   || echo "Cannot reach Hub cluster"
@@ -45,10 +80,42 @@ case "${CLUSTER_PROVIDER}" in
     ;;
 esac
 
+if [[ "${CLUSTER_PROVIDER}" == "k3s-aws" ]]; then
+  echo ""
+  echo "=== ACG Sandbox ==="
+  IFS='|' read -r _acg_probe_class _acg_probe_arn _acg_probe_stack <<<"$(_cluster_status_acg_stack_probe)"
+  case "${_acg_probe_class}" in
+    credentials-unavailable)
+      echo "AWS identity: unavailable (${_acg_probe_arn})"
+      echo "ACG stack: unknown until AWS credentials are restored"
+      ;;
+    present-healthy)
+      echo "AWS identity: ${_acg_probe_arn}"
+      echo "ACG stack: present and healthy (${_acg_probe_stack})"
+      ;;
+    present-transitioning)
+      echo "AWS identity: ${_acg_probe_arn}"
+      echo "ACG stack: present and changing state (${_acg_probe_stack})"
+      ;;
+    present-unhealthy)
+      echo "AWS identity: ${_acg_probe_arn}"
+      echo "ACG stack: present but unhealthy (${_acg_probe_stack})"
+      ;;
+    absent)
+      echo "AWS identity: ${_acg_probe_arn}"
+      echo "ACG stack: absent (sandbox likely expired or was torn down)"
+      ;;
+    *)
+      echo "AWS identity: ${_acg_probe_arn}"
+      echo "ACG stack: unknown (${_acg_probe_stack:-probe failed})"
+      ;;
+  esac
+fi
+
 echo ""
 echo "=== Nodes (${APP_CONTEXT}) ==="
 kubectl get nodes --context "${APP_CONTEXT}" 2>/dev/null \
-  || echo "Cannot reach app cluster — run bin/cluster-refresh"
+  || echo "Cannot reach app cluster — inspect the access layer above; on k3s-aws an absent ACG stack will not be fixed by bin/cluster-refresh alone"
 
 echo ""
 echo "=== Pods — all namespaces (${APP_CONTEXT}) ==="

@@ -376,6 +376,20 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
+@test "webhook cluster status classifies absent ACG sandboxes explicitly" {
+    run grep -F -- 'def _acg_stack_probe(provider):' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- '"status_line": "*ACG sandbox:* absent — sandbox likely expired or was torn down",' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- 'ACG sandbox appears absent/expired. `/cluster-refresh` will not recreate it; reprovision the cluster instead.' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+
+    run grep -F -- '"refresh_line": "\n⚠️ *Refresh completed* — credentials refreshed, but the ACG sandbox is still absent and must be reprovisioned",' "${BATS_TEST_DIRNAME}/../../../bin/k3dm-webhook"
+    [ "$status" -eq 0 ]
+}
+
 @test "webhook ask subprocess captures transcripts in the k3d-manager run dir" {
     run grep -F -- 'RUN_DIR = Path(os.environ.get("K3DM_RUN_DIR", Path.home() / ".local/share/k3d-manager/run"))' "${BATS_TEST_DIRNAME}/../../../scripts/lib/webhook/config.py"
     [ "$status" -eq 0 ]

@@ -42,3 +42,17 @@
   run grep -nF 'Alertmanager: HTTP 200' bin/cluster-status
   [ "$status" -eq 0 ]
 }
+
+@test "cluster-status classifies ACG sandbox absence separately from tunnel loss" {
+  run grep -nF '=== ACG Sandbox ===' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF '_cluster_status_acg_stack_probe()' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'ACG stack: absent (sandbox likely expired or was torn down)' bin/cluster-status
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'Cannot reach app cluster — inspect the access layer above; on k3s-aws an absent ACG stack will not be fixed by bin/cluster-refresh alone' bin/cluster-status
+  [ "$status" -eq 0 ]
+}

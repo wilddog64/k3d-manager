@@ -98,6 +98,112 @@ def _provider_context(provider=None):
         "k3s-hostinger": "ubuntu-hostinger",
     }.get(provider, "ubuntu-k3s")
 
+
+def _acg_stack_probe(provider):
+    provider = _resolve_provider(provider)
+    if provider != "k3s-aws":
+        return None
+
+    region = os.environ.get("ACG_REGION", "us-west-2")
+    stack_name = os.environ.get("_ACG_CF_STACK_NAME", "k3d-manager-acg")
+    healthy = {"CREATE_COMPLETE", "UPDATE_COMPLETE", "UPDATE_ROLLBACK_COMPLETE"}
+    transitioning = {
+        "CREATE_IN_PROGRESS",
+        "UPDATE_IN_PROGRESS",
+        "UPDATE_COMPLETE_CLEANUP_IN_PROGRESS",
+        "UPDATE_ROLLBACK_IN_PROGRESS",
+        "UPDATE_ROLLBACK_COMPLETE_CLEANUP_IN_PROGRESS",
+        "REVIEW_IN_PROGRESS",
+    }
+    unhealthy = {
+        "ROLLBACK_COMPLETE",
+        "CREATE_FAILED",
+        "ROLLBACK_FAILED",
+        "UPDATE_ROLLBACK_FAILED",
+        "DELETE_FAILED",
+        "DELETE_IN_PROGRESS",
+    }
+
+    aws_out, aws_timeout = _posix_spawn_capture(
+        ["aws", "sts", "get-caller-identity", "--region", region, "--query", "Arn", "--output", "text"],
+        timeout=10,
+    )
+    arn = aws_out.strip()
+    if aws_timeout or not arn or "arn:" not in arn.lower():
+        return {
+            "class": "credentials-unavailable",
+            "arn": arn,
+            "stack_status": "",
+            "status_line": "*ACG sandbox:* AWS credentials unavailable — stack state unknown until `/cluster-refresh` restores credentials",
+            "unreachable_line": f"\n❌ *{provider} cluster unreachable* — AWS credentials are unavailable, so sandbox state could not be confirmed.",
+            "refresh_line": "\n⚠️ *Refresh completed* — credentials/access layer refreshed as far as possible, but AWS identity still looks unavailable",
+        }
+
+    stack_out, stack_timeout = _posix_spawn_capture(
+        [
+            "aws",
+            "cloudformation",
+            "describe-stacks",
+            "--region",
+            region,
+            "--stack-name",
+            stack_name,
+            "--query",
+            "Stacks[0].StackStatus",
+            "--output",
+            "text",
+        ],
+        timeout=15,
+    )
+    stack_status = stack_out.strip()
+    if not stack_timeout and stack_status in healthy:
+        return {
+            "class": "present-healthy",
+            "arn": arn,
+            "stack_status": stack_status,
+            "status_line": f"*ACG sandbox:* present and healthy ({stack_status})",
+            "unreachable_line": f"\n❌ *{provider} cluster unreachable* — ACG stack is still present ({stack_status}), so the cluster is likely rebuilding or the access layer is down.",
+            "refresh_line": "\n✅ *Refresh complete* — credentials and access layer refreshed; rerun `/cluster-status` if the cluster is still converging",
+        }
+    if not stack_timeout and stack_status in transitioning:
+        return {
+            "class": "present-transitioning",
+            "arn": arn,
+            "stack_status": stack_status,
+            "status_line": f"*ACG sandbox:* present and changing state ({stack_status})",
+            "unreachable_line": f"\n❌ *{provider} cluster unreachable* — ACG stack is currently transitioning ({stack_status}).",
+            "refresh_line": "\n✅ *Refresh complete* — credentials refreshed; the ACG stack is still transitioning",
+        }
+    if not stack_timeout and stack_status in unhealthy:
+        return {
+            "class": "present-unhealthy",
+            "arn": arn,
+            "stack_status": stack_status,
+            "status_line": f"*ACG sandbox:* present but unhealthy ({stack_status})",
+            "unreachable_line": f"\n❌ *{provider} cluster unreachable* — ACG stack is present but unhealthy ({stack_status}). `/cluster-refresh` will not repair CloudFormation state.",
+            "refresh_line": f"\n⚠️ *Refresh completed* — credentials/access layer refreshed, but the ACG stack is still unhealthy ({stack_status})",
+        }
+
+    missing_markers = ("does not exist", "ValidationError", "Stack with id")
+    if stack_timeout or any(marker in stack_status for marker in missing_markers):
+        return {
+            "class": "absent",
+            "arn": arn,
+            "stack_status": stack_status,
+            "status_line": "*ACG sandbox:* absent — sandbox likely expired or was torn down",
+            "unreachable_line": f"\n❌ *{provider} cluster unreachable* — ACG sandbox appears absent/expired. `/cluster-refresh` will not recreate it; reprovision the cluster instead.",
+            "refresh_line": "\n⚠️ *Refresh completed* — credentials refreshed, but the ACG sandbox is still absent and must be reprovisioned",
+        }
+
+    return {
+        "class": "unknown",
+        "arn": arn,
+        "stack_status": stack_status,
+        "status_line": f"*ACG sandbox:* state unknown ({stack_status or 'probe failed'})",
+        "unreachable_line": f"\n❌ *{provider} cluster unreachable* — AWS is reachable, but sandbox state could not be classified ({stack_status or 'probe failed'}).",
+        "refresh_line": "\n⚠️ *Refresh completed* — credentials/access layer refreshed, but ACG sandbox state is still unclear",
+    }
+
 _seen_event_ids: set = set()
 GEMINI_MODEL = os.environ.get("K3DM_ANALYSIS_MODEL", "gemini-2.5-flash")
 # k8s API context for ESO checks — initialized at startup before NEF loads (see _init_k8s_ctx)
@@ -1708,6 +1814,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
         (job_dir / "status").write_text("running")
         provider = _resolve_provider(provider)
         app_context = _provider_context(provider)
+        acg_probe = _acg_stack_probe(provider)
 
         active = _running_cluster_job()
         if active:
@@ -1740,6 +1847,8 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
         except OSError:
             tunnel_ok = False
         _log(f"*SSH tunnel (6443):* {'UP ✅' if tunnel_ok else 'DOWN ❌'}")
+        if acg_probe:
+            _log(acg_probe["status_line"])
 
         # App cluster
         nodes_out, nodes_timeout = _posix_spawn_capture(
@@ -1749,7 +1858,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
         )
         acg_reachable = not nodes_timeout and nodes_out.strip() and not nodes_out.lstrip().startswith("Error")
         if not acg_reachable:
-            _log(f"\n❌ *{provider} cluster unreachable* — cluster may be rebuilding or unavailable.")
+            _log(acg_probe["unreachable_line"] if acg_probe else f"\n❌ *{provider} cluster unreachable* — cluster may be rebuilding or unavailable.")
         else:
             node_lines = [l for l in nodes_out.strip().splitlines() if l]
             ready_count = sum(1 for l in node_lines if "Ready" in l and "NotReady" not in l)
@@ -1923,7 +2032,8 @@ def _run_cluster_refresh(job_id, response_url, thread_ts=None):
             _finish("failed")
             return
         if "__WEBHOOK_SUCCESS__" in refresh_out:
-            _log("\n✅ *Refresh complete* — tunnel and credentials restored")
+            acg_probe = _acg_stack_probe("k3s-aws")
+            _log(acg_probe["refresh_line"] if acg_probe else "\n✅ *Refresh complete* — credentials and access layer refreshed")
         else:
             tail_lines = [l for l in refresh_out.strip().splitlines()[-5:] if l]
             _log("\n❌ *Refresh failed*")
