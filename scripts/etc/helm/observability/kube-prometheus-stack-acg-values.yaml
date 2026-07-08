@@ -59,7 +59,15 @@ prometheus:
   prometheusSpec:
     externalLabels:
       cluster: ubuntu-k3s
-    retention: 2h
+    retention: 15d
+    retentionSize: 8GB
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
     resources:
       requests:
         memory: 256Mi
