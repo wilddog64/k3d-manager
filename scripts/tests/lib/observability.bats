@@ -459,11 +459,12 @@ EOF
   [[ "$output" == *"Trivy infra security summary — Hub (k3d-k3d-cluster):"* ]]
   [[ "$output" == *"Trivy infra security summary — ACG (ubuntu-k3s):"* ]]
   [[ "$output" == *"CIS Kubernetes Benchmarks v1.23: pass=111 fail=5"* ]]
-  run cat "${kubectl_log}"
+  run grep -F -- 'sum by (title,status) (trivy_cluster_compliance)' "${kubectl_log}"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"sum by (title,status) (trivy_cluster_compliance)"* ]]
-  [[ "$output" == *"sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"})"* ]]
-  [[ "$output" == *"sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})"* ]]
+  run grep -F -- 'sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~"High|Critical"}) > 0' "${kubectl_log}"
+  [ "$status" -eq 0 ]
+  run grep -F -- 'sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassments{severity=~"High|Critical"}) > 0' "${kubectl_log}"
+  [ "$status" -eq 0 ]
 }
 
 @test "trivy_infra_security_report tolerates unreachable Prometheus backends" {
