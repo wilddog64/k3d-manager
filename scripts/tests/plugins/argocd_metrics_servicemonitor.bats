@@ -111,6 +111,9 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'Image Updater Processing Results' "${DASH}"
   [ "${status}" -eq 0 ]
 
+  run grep -F -- '| json | line_format \"{{.log}}\" | logfmt | msg=\"Processing results:\" | line_format \"applications={{.applications}} images_considered={{.images_considered}} images_skipped={{.images_skipped}} images_updated={{.images_updated}} errors={{.errors}}\"' "${DASH}"
+  [ "${status}" -eq 0 ]
+
   run grep -F -- '"uid": "prometheus"' "${DASH}"
   [ "${status}" -eq 0 ]
 
@@ -149,24 +152,30 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'Trivy Infra High/Critical Findings' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'Trivy Cluster Compliance' "${DASH}"
+  run grep -F -- 'Trivy Cluster Compliance Failures' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'Trivy Infra RBAC Findings' "${DASH}"
+  run grep -F -- 'Trivy Infra RBAC Drilldown' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'Trivy ClusterRole Findings' "${DASH}"
+  run grep -F -- 'Trivy ClusterRole Drilldown' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'sum(trivy_role_rbacassessments{severity=~\"High|Critical\"}) + sum(trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})' "${DASH}"
+  run grep -F -- 'Trivy Infra Findings Drilldown' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'sum by (title,status) (trivy_cluster_compliance)' "${DASH}"
+  run grep -F -- 'sort_desc(sum by (title,status) (trivy_cluster_compliance{status=\"Fail\"}))' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"})' "${DASH}"
+  run grep -F -- 'sort_desc(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}))' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})' "${DASH}"
+  run grep -F -- 'sort_desc(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}))' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'label_replace(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}), \"source\", \"rbac\", \"\", \"\")' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'label_replace(label_replace(label_replace(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}), \"resource_name\", \"$1\", \"name\", \"(.*)\"), \"namespace\", \"cluster\", \"\", \"\"), \"source\", \"clusterrole\", \"\", \"\")' "${DASH}"
   [ "${status}" -eq 0 ]
 }
