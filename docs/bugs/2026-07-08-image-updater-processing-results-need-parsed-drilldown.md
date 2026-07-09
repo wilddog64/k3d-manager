@@ -30,7 +30,7 @@ Grafana renders the same prefix over and over.
 Update the panel query so it:
 
 1. extracts the inner log line,
-2. parses the logfmt fields,
+2. regex-parses the `msg=` payload into the counters we care about,
 3. formats the row as a compact per-cycle summary.
 
 The panel should still allow log-details drilldown, but the main view should now
@@ -47,7 +47,7 @@ show the actual counters instead of the repeated prefix.
 
 **NEW**
 ```logql
-{namespace="cicd",pod=~"argocd-image-updater.*"} | json | line_format "{{.log}}" | logfmt | msg="Processing results:" | line_format "applications={{.applications}} images_considered={{.images_considered}} images_skipped={{.images_skipped}} images_updated={{.images_updated}} errors={{.errors}}"
+{namespace="cicd",pod=~"argocd-image-updater.*"} | json | line_format "{{.log}}" | regexp "Processing results: applications=(?P<applications>\\d+) images_considered=(?P<images_considered>\\d+) images_skipped=(?P<images_skipped>\\d+) images_updated=(?P<images_updated>\\d+) errors=(?P<errors>\\d+)" | line_format "applications={{.applications}} images_considered={{.images_considered}} images_skipped={{.images_skipped}} images_updated={{.images_updated}} errors={{.errors}}"
 ```
 
 ## Expected Outcome

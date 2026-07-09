@@ -111,7 +111,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'Image Updater Processing Results' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- '| json | line_format \"{{.log}}\" | logfmt | msg=\"Processing results:\" | line_format \"applications={{.applications}} images_considered={{.images_considered}} images_skipped={{.images_skipped}} images_updated={{.images_updated}} errors={{.errors}}\"' "${DASH}"
+  run grep -F -- '| json | line_format \"{{.log}}\" | regexp \"Processing results: applications=(?P<applications>\\\\d+) images_considered=(?P<images_considered>\\\\d+) images_skipped=(?P<images_skipped>\\\\d+) images_updated=(?P<images_updated>\\\\d+) errors=(?P<errors>\\\\d+)\" | line_format \"applications={{.applications}} images_considered={{.images_considered}} images_skipped={{.images_skipped}} images_updated={{.images_updated}} errors={{.errors}}\"' "${DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- '"uid": "prometheus"' "${DASH}"
