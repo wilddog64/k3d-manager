@@ -167,7 +167,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'Trivy Cluster Compliance Failures' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'sort_desc(sum by (title,description,status) (trivy_cluster_compliance{status=\"Fail\"}))' "${DASH}"
+  run grep -F -- 'sort_desc(sum by (title,description,status) (trivy_cluster_compliance{status=\"Fail\"}) > 0)' "${DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'description' "${DASH}"

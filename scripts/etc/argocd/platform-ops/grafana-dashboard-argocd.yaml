@@ -311,7 +311,7 @@ data:
           "id": 14,
           "targets": [
             {
-              "expr": "sort_desc(sum by (title,description,status) (trivy_cluster_compliance{status=\"Fail\"}))",
+              "expr": "sort_desc(sum by (title,description,status) (trivy_cluster_compliance{status=\"Fail\"}) > 0)",
               "format": "table",
               "instant": true,
               "refId": "A"
