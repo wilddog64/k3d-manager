@@ -328,10 +328,21 @@ data:
           "type": "table"
         },
         {
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 60 },
+          "id": 15,
+          "options": {
+            "content": "### Trivy drilldown\\n\\nThe next row is the object-level drilldown. The panels above summarize the current security posture.",
+            "mode": "markdown"
+          },
+          "title": "Trivy Drilldown Banner",
+          "type": "text"
+        },
+        {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": {}, "overrides": [] },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 60 },
-          "id": 15,
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 64 },
+          "id": 16,
           "targets": [
             {
               "expr": "sort_desc(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}))",
@@ -353,8 +364,8 @@ data:
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": {}, "overrides": [] },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 60 },
-          "id": 16,
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 64 },
+          "id": 17,
           "targets": [
             {
               "expr": "sort_desc(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}))",
@@ -376,8 +387,8 @@ data:
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": {}, "overrides": [] },
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 68 },
-          "id": 17,
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 72 },
+          "id": 18,
           "targets": [
             {
               "expr": "sort_desc((label_replace(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}), \"source\", \"rbac\", \"\", \"\") or label_replace(label_replace(label_replace(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}), \"resource_name\", \"$1\", \"name\", \"(.*)\"), \"namespace\", \"cluster\", \"\", \"\"), \"source\", \"clusterrole\", \"\", \"\")))",
