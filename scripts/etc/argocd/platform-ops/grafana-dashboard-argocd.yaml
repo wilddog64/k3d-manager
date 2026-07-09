@@ -283,6 +283,13 @@ data:
               "refId": "A"
             }
           ],
+          "links": [
+            {
+              "title": "Open Trivy findings drilldown",
+              "url": "?viewPanel=16",
+              "targetBlank": false
+            }
+          ],
           "title": "Trivy Infra High/Critical Findings",
           "type": "stat"
         },
@@ -297,6 +304,13 @@ data:
               "format": "table",
               "instant": true,
               "refId": "A"
+            }
+          ],
+          "links": [
+            {
+              "title": "Open Trivy findings drilldown",
+              "url": "?viewPanel=16",
+              "targetBlank": false
             }
           ],
           "title": "Trivy Cluster Compliance Failures",
@@ -315,6 +329,13 @@ data:
               "refId": "A"
             }
           ],
+          "links": [
+            {
+              "title": "Open Trivy findings drilldown",
+              "url": "?viewPanel=16",
+              "targetBlank": false
+            }
+          ],
           "title": "Trivy Infra RBAC Drilldown",
           "type": "table"
         },
@@ -329,6 +350,13 @@ data:
               "format": "table",
               "instant": true,
               "refId": "A"
+            }
+          ],
+          "links": [
+            {
+              "title": "Open Trivy findings drilldown",
+              "url": "?viewPanel=16",
+              "targetBlank": false
             }
           ],
           "title": "Trivy ClusterRole Drilldown",

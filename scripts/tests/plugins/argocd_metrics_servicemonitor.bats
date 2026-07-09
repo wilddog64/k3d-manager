@@ -152,6 +152,12 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'Trivy Infra High/Critical Findings' "${DASH}"
   [ "${status}" -eq 0 ]
 
+  run grep -F -- '"title": "Open Trivy findings drilldown"' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- '"url": "?viewPanel=16"' "${DASH}"
+  [ "${status}" -eq 0 ]
+
   run grep -F -- 'Trivy Cluster Compliance Failures' "${DASH}"
   [ "${status}" -eq 0 ]
 

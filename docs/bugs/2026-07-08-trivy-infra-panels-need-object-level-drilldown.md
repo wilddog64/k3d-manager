@@ -31,7 +31,8 @@ Add a drilldown-oriented Trivy view that:
 
 1. keeps the aggregate count for a quick glance,
 2. adds a combined finding table with exact object identity,
-3. limits compliance visibility to failing checks.
+3. limits compliance visibility to failing checks,
+4. adds a click-through link from the summary panels to the drilldown panel.
 
 The drilldown should preserve the existing Trivy signal, but make the current
 offenders obvious without manual cross-reading.
@@ -52,6 +53,10 @@ sort_desc(sum by (title,status) (trivy_cluster_compliance{status="Fail"}))
 
 Add a new drilldown table panel that combines RBAC and ClusterRole findings
 with a normalized `resource_name` column and a `source` label.
+
+Also add a panel link on the summary panels so the operator can jump straight
+to the combined drilldown view instead of reading the whole dashboard top to
+bottom.
 
 ## Expected Outcome
 
