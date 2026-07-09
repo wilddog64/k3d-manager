@@ -149,6 +149,12 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
 }
 
 @test "metrics: dashboard includes trivy infra security panels" {
+  run grep -F -- 'Trivy Drilldown' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'The panels below show the current security posture and include a focused findings drilldown at the bottom of the dashboard.' "${DASH}"
+  [ "${status}" -eq 0 ]
+
   run grep -F -- 'Trivy Infra High/Critical Findings' "${DASH}"
   [ "${status}" -eq 0 ]
 
