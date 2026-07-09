@@ -311,7 +311,7 @@ data:
           "id": 14,
           "targets": [
             {
-              "expr": "sort_desc(sum by (title,status) (trivy_cluster_compliance{status=\"Fail\"}))",
+              "expr": "sort_desc(sum by (title,description,status) (trivy_cluster_compliance{status=\"Fail\"}))",
               "format": "table",
               "instant": true,
               "refId": "A"
@@ -332,7 +332,7 @@ data:
           "gridPos": { "h": 4, "w": 24, "x": 0, "y": 60 },
           "id": 15,
           "options": {
-            "content": "### Trivy drilldown\\n\\nThe next row is the object-level drilldown. The panels above summarize the current security posture.",
+            "content": "### Trivy drilldown\\n\\nThe tables below now include a description/reason column for each High or Critical finding, so the dashboard explains why each row is present.",
             "mode": "markdown"
           },
           "title": "Trivy Drilldown Banner",
@@ -345,7 +345,7 @@ data:
           "id": 16,
           "targets": [
             {
-              "expr": "sort_desc(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}))",
+              "expr": "sort_desc(label_replace(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}), \"reason\", \"Trivy RBAC finding: review namespace-scoped permissions for this Role\", \"resource_name\", \".*\"))",
               "format": "table",
               "instant": true,
               "refId": "A"
@@ -368,7 +368,7 @@ data:
           "id": 17,
           "targets": [
             {
-              "expr": "sort_desc(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}))",
+              "expr": "sort_desc(label_replace(label_replace(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}), \"resource_name\", \"$1\", \"name\", \"(.*)\"), \"reason\", \"Trivy RBAC finding: review cluster-wide permissions for this ClusterRole\", \"name\", \".*\"))",
               "format": "table",
               "instant": true,
               "refId": "A"
@@ -391,7 +391,7 @@ data:
           "id": 18,
           "targets": [
             {
-              "expr": "sort_desc((label_replace(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}), \"source\", \"rbac\", \"\", \"\") or label_replace(label_replace(label_replace(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}), \"resource_name\", \"$1\", \"name\", \"(.*)\"), \"namespace\", \"cluster\", \"\", \"\"), \"source\", \"clusterrole\", \"\", \"\")))",
+              "expr": "sort_desc((label_replace(label_replace(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}), \"source\", \"rbac\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review namespace-scoped permissions for this Role\", \"resource_name\", \".*\") or label_replace(label_replace(label_replace(label_replace(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}), \"resource_name\", \"$1\", \"name\", \"(.*)\"), \"namespace\", \"cluster\", \"\", \"\"), \"source\", \"clusterrole\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review cluster-wide permissions for this ClusterRole\", \"resource_name\", \".*\")))",
               "format": "table",
               "instant": true,
               "refId": "A"
