@@ -152,7 +152,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'Trivy Drilldown Banner' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'The tables below now include a description/reason column for each High or Critical finding, and they only show active non-zero findings once, so the dashboard explains why each row is present.' "${DASH}"
+  run grep -F -- 'One row per High/Critical RBAC finding. The `source` column separates namespaced Roles (`rbac`) from cluster-scoped ClusterRoles (`clusterrole`). `Value` is the number of failing checks at that severity for that object, not the number of findings.' "${DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'Trivy Infra High/Critical Findings' "${DASH}"
@@ -161,7 +161,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- '"title": "Open Trivy findings drilldown"' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- '"url": "?viewPanel=16"' "${DASH}"
+  run grep -F -- '"url": "?viewPanel=18"' "${DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'Trivy Cluster Compliance Failures' "${DASH}"
@@ -173,19 +173,7 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'description' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'Trivy Infra RBAC Drilldown' "${DASH}"
-  [ "${status}" -eq 0 ]
-
-  run grep -F -- 'Trivy ClusterRole Drilldown' "${DASH}"
-  [ "${status}" -eq 0 ]
-
   run grep -F -- 'Trivy Infra Findings Drilldown' "${DASH}"
-  [ "${status}" -eq 0 ]
-
-  run grep -F -- 'sort_desc(label_replace(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}) > 0, \"reason\", \"Trivy RBAC finding: review namespace-scoped permissions for this Role\", \"resource_name\", \".*\"))' "${DASH}"
-  [ "${status}" -eq 0 ]
-
-  run grep -F -- 'sort_desc(label_replace(label_replace(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}) > 0, \"resource_name\", \"$1\", \"name\", \"(.*)\"), \"reason\", \"Trivy RBAC finding: review cluster-wide permissions for this ClusterRole\", \"name\", \".*\"))' "${DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'sort_desc((label_replace(label_replace(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}) > 0, \"source\", \"rbac\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review namespace-scoped permissions for this Role\", \"resource_name\", \".*\") or label_replace(label_replace(label_replace(label_replace(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}) > 0, \"resource_name\", \"$1\", \"name\", \"(.*)\"), \"namespace\", \"cluster\", \"\", \"\"), \"source\", \"clusterrole\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review cluster-wide permissions for this ClusterRole\", \"resource_name\", \".*\")))' "${DASH}"
