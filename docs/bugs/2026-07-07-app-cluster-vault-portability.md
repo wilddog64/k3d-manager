@@ -3,7 +3,7 @@
 **Filed:** 2026-07-07
 **Source:** /ask agent observations, verified live 2026-07-07
 **Branch:** `k3d-manager-v1.14.0`
-**Status:** DESIGN — needs decision sign-off before handoff (not a copy-paste bugfix)
+**Status:** DESIGN — decisions signed off 2026-07-10. Still NOT a copy-paste bugfix: the Phase 1 implementation spec must be written before any handoff.
 **Tracked project:** App-cluster Vault auth portability (kubecontext-keyed helper per provider; "Vault endpoint is the open seam")
 
 ## Why these three are one bug
@@ -60,15 +60,47 @@ Replace the single `HUB_VAULT_PROFILE` global with a per-context lookup (state f
 **Phase 3 — De-hardcode `ubuntu-k3s` (#4).**
 Introduce `APP_CLUSTER_CONTEXT` (resolved from provider, default preserves today's behavior) and thread it through the 25+ sites. This is mechanical but large — split by subsystem (provider/lib, bin/, argocd, launchd, values) into separate commits.
 
-## Open decisions (must resolve before handoff)
+## Decisions — RESOLVED 2026-07-10 (user sign-off)
 
-1. **Is the `k3s-aws`/`ubuntu-k3s` cluster retired, or coming back?** If retired → Phase 3 becomes a rename to the Hostinger identity. If it may return → keep the mapping but make it non-default. This gates Phase 3 entirely.
-2. **Mount naming scheme** — `kubernetes-<context>` vs `kubernetes-app-<cluster>`? Affects every existing ESO SecretStore already bound to `kubernetes-app`; needs a migration note so live clusters don't break on redeploy.
-3. **Do we need >1 app cluster live *today*, or is this hardening for a known-future need?** Determines whether Phase 1 ships now or waits.
+1. **`k3s-aws`/`ubuntu-k3s` may return — keep the mapping, but demote it.**
+   Do NOT rename it to the Hostinger identity and do NOT delete `provider.sh:94`. Instead:
+   - make `k3s-aws` **non-default** wherever it is currently reachable as a default,
+   - add a **reachability preflight** so selecting the context fails fast instead of hanging.
+
+   This is now a hard requirement, not a nicety. Per the correction above, the `ubuntu-k3s`
+   kubeconfig entry resolves but does not answer, so today the failure mode is a timeout, not a
+   clean "context not found." The preflight is what makes "keep but demote" safe.
+
+   Separately and independently of this spec: **delete the dangling `ubuntu-k3s` kubeconfig
+   entry** pointing at `https://52.37.60.119:6443`.
+
+2. **Mount naming: `kubernetes-<sanitized-context>`.**
+   Chosen over `kubernetes-app-<cluster>` — the kube-context is already the keying dimension this
+   spec argues for, and `configure_vault_app_auth_for_context` already has it in scope
+   (`vault.sh:1798-1809`). The `-app-` infix carries no information once every mount is per-cluster.
+
+   Requires a **sanitizer** for characters invalid in a Vault mount path. Requires a **migration
+   path** for live ESO SecretStores already bound to `kubernetes-app` — they must not break on
+   redeploy. `kubernetes-app` remains the default for the legacy single-cluster
+   `configure_vault_app_auth` path.
+
+3. **>1 live app cluster is a known-future need, not a today need.**
+   Phase 1 is therefore **queued behind current v1.14.0 work** — it gets written as a proper
+   implementation spec (exact old/new blocks, `## Before You Start`, `## Definition of Done`,
+   migration path), but it is **not handed off yet**.
+
+## Status
+
+- **Phase 1** — unblocked by the decisions above; needs a proper implementation spec written. **Queued.**
+- **Phase 2** — unblocked; follows Phase 1.
+- **Phase 3** — scope changed by decision #1: this is now "demote `k3s-aws` + add reachability preflight," **not** a mass rename. Re-scope before writing.
 
 ## What NOT to Do
 
-- Do NOT blind find-replace `ubuntu-k3s` — resolve open decision #1 first.
-- Do NOT rename the existing `kubernetes-app` mount without a migration path for live ESO stores (open decision #2).
-- Do NOT hand this to Codex as a single spec — Phase 1 is the only self-contained unit; Phases 2–3 need the decisions above.
+- Do NOT blind find-replace `ubuntu-k3s`. Decision #1 keeps the mapping. A resolvable-but-unreachable
+  context means a wrong replace hangs instead of erroring, and could silently retarget a *reachable* cluster.
+- Do NOT rename the existing `kubernetes-app` mount without a migration path for live ESO stores.
+- Do NOT hand **this** document to Codex — it is a design doc, not an implementation spec. It has no
+  exact old/new code blocks, no `## Before You Start`, and no `## Definition of Done`. Write the
+  Phase 1 spec first, then hand that off.
 - Do NOT create a PR, skip hooks, or commit to `main`.
