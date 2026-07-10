@@ -170,12 +170,47 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'sort_desc(sum by (title,description,status) (trivy_cluster_compliance{status=\"Fail\"}) > 0)' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'description' "${DASH}"
-  [ "${status}" -eq 0 ]
-
   run grep -F -- 'Trivy Infra Findings Drilldown' "${DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'sort_desc((label_replace(label_replace(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}) > 0, \"source\", \"rbac\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review namespace-scoped permissions for this Role\", \"resource_name\", \".*\") or label_replace(label_replace(label_replace(label_replace(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}) > 0, \"resource_name\", \"$1\", \"name\", \"(.*)\"), \"namespace\", \"cluster\", \"\", \"\"), \"source\", \"clusterrole\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review cluster-wide permissions for this ClusterRole\", \"resource_name\", \".*\")))' "${DASH}"
   [ "${status}" -eq 0 ]
+}
+
+@test "metrics: dashboard has exactly one trivy drilldown table and banner" {
+  run grep -cF -- '### Trivy drilldown' "${DASH}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 1 ]
+
+  run grep -F -- '"title": "Trivy Drilldown",' "${DASH}"
+  [ "${status}" -ne 0 ]
+
+  run grep -F -- 'Trivy Infra RBAC Drilldown' "${DASH}"
+  [ "${status}" -ne 0 ]
+
+  run grep -F -- 'Trivy ClusterRole Drilldown' "${DASH}"
+  [ "${status}" -ne 0 ]
+
+  run grep -F -- '"url": "?viewPanel=16"' "${DASH}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "metrics: dashboard banner uses real newlines not literal backslash-n" {
+  run grep -F -- '\\n' "${DASH}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "metrics: loki logs panels filter their streams and format their lines" {
+  run grep -F -- '{namespace=\"cicd\",pod=~\"argocd-image-updater.*\"} |= \"Processing results\" | json' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- '| line_format \"{{.msg}}: {{.namespace}}/{{.name}} controller={{.controller}} error={{.error}}\"' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- '"showLabels": true' "${DASH}"
+  [ "${status}" -ne 0 ]
+
+  run grep -cF -- '"showLabels": false' "${DASH}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 3 ]
 }

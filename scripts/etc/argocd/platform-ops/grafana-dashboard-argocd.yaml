@@ -119,14 +119,14 @@ data:
           "options": {
             "dedupStrategy": "none",
             "enableLogDetails": true,
-            "showLabels": true,
+            "showLabels": false,
             "showTime": true,
             "sortOrder": "Descending",
             "wrapLogMessage": false
           },
           "targets": [
             {
-              "expr": "{namespace=\"cicd\",pod=~\"argocd-image-updater.*\"} | json | line_format \"{{.log}}\" | regexp \"Processing results: applications=(?P<applications>\\\\d+) images_considered=(?P<images_considered>\\\\d+) images_skipped=(?P<images_skipped>\\\\d+) images_updated=(?P<images_updated>\\\\d+) errors=(?P<errors>\\\\d+)\" | line_format \"applications={{.applications}} images_considered={{.images_considered}} images_skipped={{.images_skipped}} images_updated={{.images_updated}} errors={{.errors}}\"",
+              "expr": "{namespace=\"cicd\",pod=~\"argocd-image-updater.*\"} |= \"Processing results\" | json | line_format \"{{.log}}\" | regexp \"Processing results: applications=(?P<applications>\\\\d+) images_considered=(?P<images_considered>\\\\d+) images_skipped=(?P<images_skipped>\\\\d+) images_updated=(?P<images_updated>\\\\d+) errors=(?P<errors>\\\\d+)\" | line_format \"applications={{.applications}} images_considered={{.images_considered}} images_skipped={{.images_skipped}} images_updated={{.images_updated}} errors={{.errors}}\"",
               "refId": "A"
             }
           ],
@@ -197,7 +197,7 @@ data:
           "options": {
             "dedupStrategy": "none",
             "enableLogDetails": true,
-            "showLabels": true,
+            "showLabels": false,
             "showTime": true,
             "sortOrder": "Descending",
             "wrapLogMessage": false
@@ -246,14 +246,14 @@ data:
           "options": {
             "dedupStrategy": "none",
             "enableLogDetails": true,
-            "showLabels": true,
+            "showLabels": false,
             "showTime": true,
             "sortOrder": "Descending",
             "wrapLogMessage": false
           },
           "targets": [
             {
-              "expr": "{namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | controller=\"job\" | msg=\"Reconciler error\"",
+              "expr": "{namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | controller=\"job\" | msg=\"Reconciler error\" | line_format \"{{.msg}}: {{.namespace}}/{{.name}} controller={{.controller}} error={{.error}}\"",
               "refId": "A"
             }
           ],
