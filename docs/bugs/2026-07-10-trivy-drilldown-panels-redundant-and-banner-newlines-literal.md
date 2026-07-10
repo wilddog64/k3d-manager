@@ -5,6 +5,17 @@
 
 ---
 
+## Before You Start
+
+1. `git pull origin k3d-manager-v1.14.0` — work on this branch, never `main`.
+2. Read `memory-bank/activeContext.md` and `memory-bank/progress.md`.
+3. Read both target files in full before editing:
+   - `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml` (Trivy panel region, panels `10`–`18`)
+   - `scripts/tests/plugins/argocd_metrics_servicemonitor.bats` (the `trivy infra security panels` test)
+4. Confirm the starting state matches the Reproduction block below. If `grep -c '### Trivy drilldown'` does not return `2`, **stop** — someone has already changed this region and the exact old blocks in this spec will not apply.
+
+---
+
 ## Problem
 
 Three defects in the Trivy section of the hub dashboard, all visible in one screenshot:

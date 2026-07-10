@@ -28,7 +28,18 @@ vault write auth/${mount}/config kubernetes_host=... kubernetes_ca_cert=@...
 
 Configuring a second app cluster overwrites the first cluster's API server + CA on the same mount, invalidating the first cluster's ESO auth path. `configure_vault_app_auth_for_context` already derives per-context `server`/`ca_data` (`:1804-1809`) — it just writes them to a non-per-context mount.
 
-**#4 — `ubuntu-k3s` hardcoded across 25+ files.** The current fleet has no `ubuntu-k3s` context (`kubectl config get-contexts` → `k3d-k3d-cluster`, `k3s-gcp`, `ubuntu-azure`, `ubuntu-gcp`, `ubuntu-hostinger`). But `ubuntu-k3s` is not a typo — `provider.sh:94` maps provider `k3s-aws` → context `ubuntu-k3s`. That AWS cluster was migrated to Hostinger, so every `ubuntu-k3s` reference is stale **for this machine's current fleet**. Footprint includes `provider.sh:94/98/114/118`, `bin/k3dm-webhook:95/99/116/295/1044/1048`, `bin/cluster-up:611/676/688/695/697/703/706`, `argocd/vars.sh`, launchd plist templates, and the `cluster: ubuntu-k3s` Prometheus external label.
+**#4 — `ubuntu-k3s` hardcoded across 25+ files.** `provider.sh:94` maps provider `k3s-aws` → context `ubuntu-k3s`. That AWS cluster was migrated to Hostinger. Footprint includes `provider.sh:94/98/114/118`, `bin/k3dm-webhook:95/99/116/295/1044/1048`, `bin/cluster-up:611/676/688/695/697/703/706`, `argocd/vars.sh`, launchd plist templates, and the `cluster: ubuntu-k3s` Prometheus external label.
+
+> **Correction (2026-07-10).** This finding originally claimed *"the current fleet has no `ubuntu-k3s` context."* That is **wrong** and the conclusion drawn from it was unsafe. Re-verified live:
+>
+> ```
+> $ kubectl config get-contexts -o name
+> k3d-k3d-cluster  k3s-gcp  ubuntu-azure  ubuntu-gcp  ubuntu-hostinger  ubuntu-k3s
+> ```
+>
+> The context **does exist**, bound to cluster `ubuntu-k3s` at `https://52.37.60.119:6443` (an AWS address). `kubectl --context ubuntu-k3s get nodes` does not answer — the kubeconfig entry outlived the cluster it points at.
+>
+> This changes the risk profile of Phase 3. The original reasoning was "the context is absent, so the references are dead and safe to purge." In fact a **live, resolvable, unreachable** context is present: any code path that selects `ubuntu-k3s` will not fail fast with "context not found," it will hang or time out against a dead endpoint. A blind find-replace could also silently retarget an operation at a *reachable* cluster. Open decision #1 must be resolved first — and the dangling kubeconfig entry should be removed independently of this spec.
 
 ## The seam
 
