@@ -463,7 +463,7 @@ EOF
   [ "$status" -eq 0 ]
   run grep -F -- 'sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~"High|Critical"}) > 0' "${kubectl_log}"
   [ "$status" -eq 0 ]
-  run grep -F -- 'sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassments{severity=~"High|Critical"}) > 0' "${kubectl_log}"
+  run grep -F -- 'sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~"High|Critical"}) > 0' "${kubectl_log}"
   [ "$status" -eq 0 ]
 }
 

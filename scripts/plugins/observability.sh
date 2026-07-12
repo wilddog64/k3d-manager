@@ -652,7 +652,7 @@ PY
   fi
 
   _role_json="$(_trivy_prom_query "${_context}" 'sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~"High|Critical"}) > 0' 2>/dev/null || true)"
-  _clusterrole_json="$(_trivy_prom_query "${_context}" 'sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassments{severity=~"High|Critical"}) > 0' 2>/dev/null || true)"
+  _clusterrole_json="$(_trivy_prom_query "${_context}" 'sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~"High|Critical"}) > 0' 2>/dev/null || true)"
   if [[ -n "${_role_json}" || -n "${_clusterrole_json}" ]]; then
     python3 - "${_role_json:-{}}" "${_clusterrole_json:-{}}" <<'PY'
 import json

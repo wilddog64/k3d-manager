@@ -18,7 +18,7 @@ The current observability stack has alerting for Trivy Operator scan job failure
 In practice:
 
 - the dashboard queries `trivy_role_rbacassessments`
-- the dashboard queries `trivy_clusterrole_clusterrbacassments`
+- the dashboard queries `trivy_clusterrole_clusterrbacassessments`
 - the dashboard queries `trivy_cluster_compliance`
 
 but there is no alert rule that turns those findings into operator action.
