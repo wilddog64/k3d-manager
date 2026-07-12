@@ -86,11 +86,11 @@ Profile-state scoping shipped. Per user decision 2026-07-12 the per-context auth
 |---|---|---|
 | `2026-07-07-global-hub-vault-profile-is-shared-across-clusters` | ✅ | `e7fc432e` scope profile state by app context |
 | `2026-07-07-stale-kube-context-assumptions` | ✅ | addressed via `80ac1ba0`/`e7fc432e` |
-| `2026-07-12-vault-per-context-auth-mount-phase1` | 🔨 handed to Codex | Phase 1: mount `kubernetes-<sanitized-context>`, all 3 mount sites + migration; helper locked to `scripts/lib/core.sh`; handed off 2026-07-12 |
+| `2026-07-12-vault-per-context-auth-mount-phase1` | ✅ shipped | `6f74303a` mount `kubernetes-<sanitized-context>`, all 3 mount sites + `APP_K8S_AUTH_MOUNT` migration; helper in `scripts/lib/core.sh`; Claude-verified on origin + BATS 15/15 + css 5/5 |
 | `2026-07-07-app-cluster-vault-portability` | 🎨 design | signed-off design doc behind the Phase 1 spec above (do NOT hand off directly) |
 | `2026-07-07-vault-kubernetes-auth-mount-is-single-target` | 🎨 design | consolidated into the design doc; single-target root cause |
-| Phase 2 — per-context hub-Vault profile | ⏳ queued | follows Phase 1; not yet specced |
-| Phase 3 — `ubuntu-k3s` demote + reachability preflight | ⏳ queued | re-scoped by decision #1; not a mass rename |
+| Phase 2 — per-context hub-Vault profile | ⏭️ split to v1.15.0 | follows Phase 1; not yet specced — deferred at v1.14.0 close (2026-07-12) |
+| Phase 3 — `ubuntu-k3s` demote + reachability preflight | ⏭️ split to v1.15.0 | re-scoped by decision #1; not a mass rename — deferred at v1.14.0 close (2026-07-12) |
 
 ### Closing condition for v1.14.0
 - [x] Workstream 1 (observability) verified live on hub **and** app cluster (2026-07-12): Grafana
@@ -98,11 +98,12 @@ Profile-state scoping shipped. Per user decision 2026-07-12 the per-context auth
       app-cluster Prometheus PVC 10Gi Bound / 15d-8GB; trivy dedupe + loki panels deployed.
 - [ ] Workstream 2 (ACG lifecycle) is shell-logic — covered by BATS; live verification requires
       exercising an `acg-up`/refresh cycle, deferred (not triggered casually).
-- [x] Decision recorded on Workstream 3 (2026-07-12): **pulled into v1.14.0.** Phase 1 spec written
-      (`docs/bugs/2026-07-12-vault-per-context-auth-mount-phase1.md`). Remaining: implement Phase 1
-      (handoff pending review) + decide whether Phases 2–3 land in v1.14.0 or split to v1.15.0.
-- [ ] Untracked `docs/bugs/2026-07-08-refresh-output-is-healthy.md` triaged — commit it as a real
-      spec or delete it; do not ship the milestone with it dangling in the working tree.
+- [x] Workstream 3 resolved (2026-07-12): **Phase 1 shipped** (`6f74303a`, Claude-verified on origin).
+      **Decision: Phases 2–3 split to v1.15.0** — v1.14.0 is already a large reactive-hardening sprint;
+      Phase 1 closes the acute last-cluster-wins bug, while Phases 2–3 are net-new scoped work that
+      reads cleaner as its own milestone.
+- [x] Untracked `docs/bugs/2026-07-08-refresh-output-is-healthy.md` triaged (2026-07-12): deleted — it
+      was a non-bug stub (no root cause / repro / fix / target files), so it could not become a real spec.
 - [ ] `/create-pr` gate met, PR merged, tag `v1.14.0`, retro written.
 
 ---
