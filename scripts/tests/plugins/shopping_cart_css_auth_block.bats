@@ -2,6 +2,8 @@
 
 setup() {
   # shellcheck disable=SC1090
+  source "${BATS_TEST_DIRNAME}/../../lib/core.sh"
+  # shellcheck disable=SC1090
   source "${BATS_TEST_DIRNAME}/../../plugins/shopping_cart.sh"
 }
 
@@ -36,4 +38,12 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"mountPath: \"kubernetes-hostinger\""* ]]
   [[ "$output" == *"role: \"eso-hostinger\""* ]]
+}
+
+@test "kubernetes mode reflects derived per-context mount when override unset" {
+  unset APP_K8S_AUTH_MOUNT APP_ESO_VAULT_ROLE APP_ESO_SA_NAME APP_ESO_SA_NS
+  export APP_K8S_AUTH_MOUNT="$(_vault_app_auth_mount "ubuntu-hostinger")"
+  run _shopping_cart_css_auth_block kubernetes
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"mountPath: \"kubernetes-ubuntu-hostinger\""* ]]
 }

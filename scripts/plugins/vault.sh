@@ -1846,9 +1846,13 @@ function configure_vault_app_auth_for_context() {
       fi
     fi
   fi
+  local app_mount
+  app_mount="$(_vault_app_auth_mount "${cluster_name}")"
+  _info "[vault] app-cluster auth mount for '${app_context}': ${app_mount}"
   (
     APP_CLUSTER_API_URL="${server}" \
     APP_CLUSTER_CA_CERT_PATH="${ca_path}" \
+    APP_K8S_AUTH_MOUNT="${app_mount}" \
     configure_vault_app_auth
   ) || rc=$?
   if (( _switched_ctx )) && [[ -n "${_prev_ctx}" ]]; then

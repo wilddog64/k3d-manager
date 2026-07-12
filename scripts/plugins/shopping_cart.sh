@@ -512,8 +512,10 @@ function shopping_cart_apply_vault_token_and_cluster_secret_store() {
     sleep 10
   done
   local _css_vault_server="${HUB_VAULT_CSS_SERVER:-http://vault-bridge.secrets.svc.cluster.local:8201}"
+  local _app_mount
+  _app_mount="$(_vault_app_auth_mount "${_app_context}")"
   local _css_auth_block
-  _css_auth_block="$(_shopping_cart_css_auth_block "${_css_auth}")"
+  _css_auth_block="$(APP_K8S_AUTH_MOUNT="${_app_mount}" _shopping_cart_css_auth_block "${_css_auth}")"
   kubectl apply --context "${_app_context}" -f - <<CSSEOF
 apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore

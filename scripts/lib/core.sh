@@ -176,6 +176,24 @@ function _k3s_cluster_exists() {
    [[ -f "$K3S_SERVICE_FILE" ]] && return 0 || return 1
 }
 
+# _vault_app_auth_mount CONTEXT
+# Derive the per-cluster Vault Kubernetes auth mount path from a kube-context.
+# Honors an explicit APP_K8S_AUTH_MOUNT override (migration pin / legacy single-cluster).
+# Otherwise: kubernetes-<sanitized-context>, sanitized to a Vault-path-safe segment.
+function _vault_app_auth_mount() {
+  local ctx="${1:-}"
+  if [[ -n "${APP_K8S_AUTH_MOUNT:-}" ]]; then
+    printf '%s' "${APP_K8S_AUTH_MOUNT}"
+    return 0
+  fi
+  local seg
+  seg="$(printf '%s' "${ctx}" \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed -E 's/[^a-z0-9-]+/-/g; s/-+/-/g; s/^-+//; s/-+$//')"
+  [[ -n "${seg}" ]] || seg="app"
+  printf '%s' "kubernetes-${seg}"
+}
+
 function _install_k3s() {
    local cluster_name="${1:-${CLUSTER_NAME:-k3s-cluster}}"
 
