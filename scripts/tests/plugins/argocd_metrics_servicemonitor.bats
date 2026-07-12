@@ -111,6 +111,9 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'Image Updater Processing Results' "${DASH}"
   [ "${status}" -eq 0 ]
 
+  run grep -F -- '| json | line_format \"{{.log}}\" | regexp \"Processing results: applications=(?P<applications>\\\\d+) images_considered=(?P<images_considered>\\\\d+) images_skipped=(?P<images_skipped>\\\\d+) images_updated=(?P<images_updated>\\\\d+) errors=(?P<errors>\\\\d+)\" | line_format \"applications={{.applications}} images_considered={{.images_considered}} images_skipped={{.images_skipped}} images_updated={{.images_updated}} errors={{.errors}}\"' "${DASH}"
+  [ "${status}" -eq 0 ]
+
   run grep -F -- '"uid": "prometheus"' "${DASH}"
   [ "${status}" -eq 0 ]
 
@@ -128,38 +131,86 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
   run grep -F -- 'App CVE Scan Decisions' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'kube_job_status_succeeded{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}' "${DASH}"
+  run grep -F -- 'sum(increase(kube_job_status_succeeded{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}[30d])) or vector(0)' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'kube_job_status_failed{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}' "${DASH}"
+  run grep -F -- '"instant": true' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'sum(increase(kube_job_status_failed{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}[30d])) or vector(0)' "${DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- '{namespace=\"platform-ops\",pod=~\"app-cve-scan.*\"} |= \"[app-cve-scan]\"' "${DASH}"
   [ "${status}" -eq 0 ]
+
+  run grep -cF -- '"timeFrom": "30d"' "${DASH}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -ge 3 ]
 }
 
 @test "metrics: dashboard includes trivy infra security panels" {
+  run grep -F -- 'Trivy Drilldown Banner' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'One row per High/Critical RBAC finding. The `source` column separates namespaced Roles (`rbac`) from cluster-scoped ClusterRoles (`clusterrole`). `Value` is the number of failing checks at that severity for that object, not the number of findings.' "${DASH}"
+  [ "${status}" -eq 0 ]
+
   run grep -F -- 'Trivy Infra High/Critical Findings' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'Trivy Cluster Compliance' "${DASH}"
+  run grep -F -- '"title": "Open Trivy findings drilldown"' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'Trivy Infra RBAC Findings' "${DASH}"
+  run grep -F -- '"url": "?viewPanel=18"' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'Trivy ClusterRole Findings' "${DASH}"
+  run grep -F -- 'Trivy Cluster Compliance Failures' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'sum(trivy_role_rbacassessments{severity=~\"High|Critical\"}) + sum(trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})' "${DASH}"
+  run grep -F -- 'sort_desc(sum by (title,description,status) (trivy_cluster_compliance{status=\"Fail\"}) > 0)' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'sum by (title,status) (trivy_cluster_compliance)' "${DASH}"
+  run grep -F -- 'Trivy Infra Findings Drilldown' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"})' "${DASH}"
+  run grep -F -- 'sort_desc((label_replace(label_replace(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}) > 0, \"source\", \"rbac\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review namespace-scoped permissions for this Role\", \"resource_name\", \".*\") or label_replace(label_replace(label_replace(label_replace(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}) > 0, \"resource_name\", \"$1\", \"name\", \"(.*)\"), \"namespace\", \"cluster\", \"\", \"\"), \"source\", \"clusterrole\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review cluster-wide permissions for this ClusterRole\", \"resource_name\", \".*\")))' "${DASH}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "metrics: dashboard has exactly one trivy drilldown table and banner" {
+  run grep -cF -- '### Trivy drilldown' "${DASH}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 1 ]
+
+  run grep -F -- '"title": "Trivy Drilldown",' "${DASH}"
+  [ "${status}" -ne 0 ]
+
+  run grep -F -- 'Trivy Infra RBAC Drilldown' "${DASH}"
+  [ "${status}" -ne 0 ]
+
+  run grep -F -- 'Trivy ClusterRole Drilldown' "${DASH}"
+  [ "${status}" -ne 0 ]
+
+  run grep -F -- '"url": "?viewPanel=16"' "${DASH}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "metrics: dashboard banner uses real newlines not literal backslash-n" {
+  run grep -F -- '\\n' "${DASH}"
+  [ "${status}" -ne 0 ]
+}
+
+@test "metrics: loki logs panels filter their streams and format their lines" {
+  run grep -F -- '{namespace=\"cicd\",pod=~\"argocd-image-updater.*\"} |= \"Processing results\" | json' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})' "${DASH}"
+  run grep -F -- '| line_format \"{{.msg}}: {{.namespace}}/{{.name}} controller={{.controller}} error={{.error}}\"' "${DASH}"
   [ "${status}" -eq 0 ]
+
+  run grep -F -- '"showLabels": true' "${DASH}"
+  [ "${status}" -ne 0 ]
+
+  run grep -cF -- '"showLabels": false' "${DASH}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" -eq 3 ]
 }

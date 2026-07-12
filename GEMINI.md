@@ -127,6 +127,7 @@ kubectl config use-context k3d-k3d-cluster
 ```bash
 # Copy kubeconfig from VM and merge
 scp ubuntu:~/.kube/config ~/.kube/ubuntu-k3s.yaml
+chmod 600 ~/.kube/ubuntu-k3s.yaml
 # Edit ubuntu-k3s.yaml: rename context/cluster/user from 'default' to 'ubuntu-k3s'
 sed -i 's/: default/: ubuntu-k3s/g' ~/.kube/ubuntu-k3s.yaml
 KUBECONFIG=~/.kube/config:~/.kube/ubuntu-k3s.yaml kubectl config view --flatten > /tmp/merged.yaml

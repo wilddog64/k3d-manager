@@ -4,11 +4,12 @@ set -euo pipefail
 : "${_vault_local_port:=}"
 
 # --- Tier 3 P3: seed target / canonical source / backup targets ----------------------
-# Defaults preserve pre-P3 behavior: target == source == laptop Vault via local port-forward.
-: "${SEED_VAULT_ADDR:=http://localhost:${_vault_local_port}}"
-: "${SEED_VAULT_TOKEN:=${_vault_root_token:-}}"
-: "${SEED_VAULT_SOURCE_ADDR:=${SEED_VAULT_ADDR}}"
-: "${SEED_VAULT_SOURCE_TOKEN:=${SEED_VAULT_TOKEN}}"
+# SEED_VAULT_ADDR/TOKEN and SEED_VAULT_SOURCE_ADDR/TOKEN are resolved at call time inside
+# shopping_cart_seed_sandbox_vault_kv, defaulting to the laptop Vault port-forward on
+# ${_vault_local_port}. They are intentionally NOT given ':=' defaults here: this plugin is
+# sourced before bin/cluster-up assigns _vault_local_port, so a source-time default would
+# freeze an empty port into the URL (curl → :80 → HTTP 404 → exit 22). Any exported override
+# is still honored by the ':-' fallbacks at the call site.
 # Keychain (macOS) / secret-tool (Linux) backup service; per-key account = the Vault KV path.
 : "${SEED_KEYCHAIN_SERVICE:=k3d-manager-app-cluster-secrets}"
 # Native in-cluster disaster-recovery copy.
@@ -511,8 +512,10 @@ function shopping_cart_apply_vault_token_and_cluster_secret_store() {
     sleep 10
   done
   local _css_vault_server="${HUB_VAULT_CSS_SERVER:-http://vault-bridge.secrets.svc.cluster.local:8201}"
+  local _app_mount
+  _app_mount="$(_vault_app_auth_mount "${_app_context}")"
   local _css_auth_block
-  _css_auth_block="$(_shopping_cart_css_auth_block "${_css_auth}")"
+  _css_auth_block="$(APP_K8S_AUTH_MOUNT="${_app_mount}" _shopping_cart_css_auth_block "${_css_auth}")"
   kubectl apply --context "${_app_context}" -f - <<CSSEOF
 apiVersion: external-secrets.io/v1
 kind: ClusterSecretStore
@@ -545,41 +548,73 @@ function _shopping_cart_resolve_app_context() {
   printf '%s\n' "ubuntu-k3s"
 }
 
+function _seed_vault_header_file() {
+  local _token="${1:?vault token required}" _hdr=""
+  _hdr=$(mktemp) || return 1
+  chmod 600 "${_hdr}"
+  printf 'header = "X-Vault-Token: %s"\n' "${_token}" > "${_hdr}"
+  printf '%s\n' "${_hdr}"
+}
+
+function _vault_kv_put() {
+  local _payload="${1:?vault payload required}" _kv_path="${2:?vault path required}"
+  local _seed_addr="${SEED_VAULT_ADDR:-http://localhost:${_vault_local_port}}"
+  local _seed_token="${SEED_VAULT_TOKEN:-${_vault_root_token}}"
+  local _seed_hdr="" _kv_out="" _kv_code="" _kv_body="" _rc=0
+  _seed_hdr=$(_seed_vault_header_file "${_seed_token}") || { _err "[acg-up] could not create temp header file"; return 1; }
+  _kv_out=$(curl -s -w $'\n%{http_code}' -X POST \
+    --config "${_seed_hdr}" \
+    -H "Content-Type: application/json" \
+    -d "{\"data\":${_payload}}" \
+    "${_seed_addr}/v1/secret/data/${_kv_path}") || _kv_out=$'\n000'
+  _rc=$?
+  rm -f "${_seed_hdr}" 2>/dev/null || true
+  _kv_code="${_kv_out##*$'\n'}"
+  _kv_body="${_kv_out%$'\n'*}"
+  if (( _rc != 0 )) || [[ "${_kv_code}" != 2* ]]; then
+    _err "[acg-up] Vault KV write to ${_kv_path} failed: HTTP ${_kv_code} (addr ${_seed_addr}) — ${_kv_body:-<empty response>}"
+    return 1
+  fi
+}
+
+function _vault_kv_exists() {
+  local _path="${1:?vault path required}"
+  local _seed_addr="${SEED_VAULT_ADDR:-http://localhost:${_vault_local_port}}"
+  local _seed_token="${SEED_VAULT_TOKEN:-${_vault_root_token}}"
+  local _seed_hdr=""
+  _seed_hdr=$(_seed_vault_header_file "${_seed_token}") || { _err "[acg-up] could not create temp header file"; return 1; }
+  curl -sf \
+    --config "${_seed_hdr}" \
+    "${_seed_addr}/v1/secret/data/${_path}" >/dev/null 2>&1
+  local _rc=$?
+  rm -f "${_seed_hdr}" 2>/dev/null || true
+  return "${_rc}"
+}
+
+function _vault_kv_get_field() {
+  local _path="${1:?vault path required}" _field="${2:?vault field required}"
+  local _seed_addr="${SEED_VAULT_ADDR:-http://localhost:${_vault_local_port}}"
+  local _seed_token="${SEED_VAULT_TOKEN:-${_vault_root_token}}"
+  local _seed_hdr="" _output=""
+  _seed_hdr=$(_seed_vault_header_file "${_seed_token}") || { _err "[acg-up] could not create temp header file"; return 1; }
+  _output=$(curl -sf \
+    --config "${_seed_hdr}" \
+    "${_seed_addr}/v1/secret/data/${_path}" \
+    | jq -r --arg field "${_field}" '.data.data[$field] // empty')
+  local _rc=$?
+  rm -f "${_seed_hdr}" 2>/dev/null || true
+  (( _rc == 0 )) && printf '%s\n' "${_output}"
+  return "${_rc}"
+}
+
 function shopping_cart_seed_sandbox_vault_kv() {
   _info "[acg-up] Seeding Vault KV with sandbox static secrets..."
   local _seed_addr="${SEED_VAULT_ADDR:-http://localhost:${_vault_local_port}}"
   local _seed_token="${SEED_VAULT_TOKEN:-${_vault_root_token}}"
   local _src_addr="${SEED_VAULT_SOURCE_ADDR:-${_seed_addr}}"
   local _src_token="${SEED_VAULT_SOURCE_TOKEN:-${_seed_token}}"
-  # Token headers via curl --config files (mode 600) so the Vault tokens never appear in argv/ps.
-  local _seed_hdr _src_hdr _src_json
-  _seed_hdr=$(mktemp) || { _err "[acg-up] could not create temp header file"; return 1; }
-  _src_hdr=$(mktemp) || { rm -f "${_seed_hdr}" 2>/dev/null || true; _err "[acg-up] could not create temp header file"; return 1; }
-  chmod 600 "${_seed_hdr}" "${_src_hdr}"
-  printf 'header = "X-Vault-Token: %s"\n' "${_seed_token}" > "${_seed_hdr}"
-  printf 'header = "X-Vault-Token: %s"\n' "${_src_token}"  > "${_src_hdr}"
-  trap 'rm -f "'"${_seed_hdr}"'" "'"${_src_hdr}"'" 2>/dev/null || true' RETURN
-  _vault_kv_put() {
-    curl -sf -X POST \
-      --config "${_seed_hdr}" \
-      -H "Content-Type: application/json" \
-      -d "{\"data\":$1}" \
-      "${_seed_addr}/v1/secret/data/$2" >/dev/null
-  }
-  _vault_kv_exists() {
-    local path="$1"
-    curl -sf \
-      --config "${_seed_hdr}" \
-      "${_seed_addr}/v1/secret/data/${path}" >/dev/null 2>&1
-  }
-  _vault_kv_get_field() {
-    local path="$1"
-    local field="$2"
-    curl -sf \
-      --config "${_seed_hdr}" \
-      "${_seed_addr}/v1/secret/data/${path}" \
-      | jq -r --arg field "$field" '.data.data[$field] // empty'
-  }
+  local _src_hdr="" _src_json=""
+  _src_hdr=$(_seed_vault_header_file "${_src_token}") || { _err "[acg-up] could not create temp header file"; return 1; }
   # Canonical source reader (Vault = source of truth). Returns the raw KV-v2 data object as JSON,
   # empty string if the key is absent in the source Vault.
   _seed_source_data() {
@@ -589,6 +624,7 @@ function shopping_cart_seed_sandbox_vault_kv() {
       "${_src_addr}/v1/secret/data/${path}" \
       | jq -c '.data.data // empty' 2>/dev/null || true
   }
+  trap 'rm -f "'"${_src_hdr}"'" 2>/dev/null || true' RETURN
   if _vault_kv_exists "redis/cart"; then
     _info "[acg-up] Reusing existing Vault secret redis/cart"
     _redis_pass_cart=$(_vault_kv_get_field "redis/cart" "password")

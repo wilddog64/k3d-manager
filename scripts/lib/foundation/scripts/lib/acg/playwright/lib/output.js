@@ -8,7 +8,7 @@ const CDP_URL = `http://${CDP_HOST}:${CDP_PORT}`;
 const AUTH_DIR_OVERRIDE = process.env.PLAYWRIGHT_AUTH_DIR;
 
 const AUTH_DIR = AUTH_DIR_OVERRIDE ||
-  path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'profile');
+  path.join(os.homedir(), '.local', 'share', 'k3d-manager', 'pw-profile');
 
 function _isFirstRun() {
   try {

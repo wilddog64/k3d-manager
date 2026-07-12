@@ -119,14 +119,14 @@ data:
           "options": {
             "dedupStrategy": "none",
             "enableLogDetails": true,
-            "showLabels": true,
+            "showLabels": false,
             "showTime": true,
             "sortOrder": "Descending",
             "wrapLogMessage": false
           },
           "targets": [
             {
-              "expr": "{namespace=\"cicd\",pod=~\"argocd-image-updater.*\"} |= \"Processing results:\"",
+              "expr": "{namespace=\"cicd\",pod=~\"argocd-image-updater.*\"} |= \"Processing results\" | json | line_format \"{{.log}}\" | regexp \"Processing results: applications=(?P<applications>\\\\d+) images_considered=(?P<images_considered>\\\\d+) images_skipped=(?P<images_skipped>\\\\d+) images_updated=(?P<images_updated>\\\\d+) errors=(?P<errors>\\\\d+)\" | line_format \"applications={{.applications}} images_considered={{.images_considered}} images_skipped={{.images_skipped}} images_updated={{.images_updated}} errors={{.errors}}\"",
               "refId": "A"
             }
           ],
@@ -152,11 +152,13 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(increase(kube_job_status_succeeded{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}[30d]))",
+              "expr": "sum(increase(kube_job_status_succeeded{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}[30d])) or vector(0)",
+              "instant": true,
               "refId": "A"
             }
           ],
           "title": "App CVE Scan Successful Jobs",
+          "timeFrom": "30d",
           "type": "stat"
         },
         {
@@ -178,11 +180,13 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(increase(kube_job_status_failed{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}[30d]))",
+              "expr": "sum(increase(kube_job_status_failed{namespace=\"platform-ops\",job_name=~\"app-cve-scan.*\"}[30d])) or vector(0)",
+              "instant": true,
               "refId": "A"
             }
           ],
           "title": "App CVE Scan Failed Jobs",
+          "timeFrom": "30d",
           "type": "stat"
         },
         {
@@ -193,7 +197,7 @@ data:
           "options": {
             "dedupStrategy": "none",
             "enableLogDetails": true,
-            "showLabels": true,
+            "showLabels": false,
             "showTime": true,
             "sortOrder": "Descending",
             "wrapLogMessage": false
@@ -205,13 +209,14 @@ data:
             }
           ],
           "title": "App CVE Scan Decisions",
+          "timeFrom": "30d",
           "type": "logs"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": {}, "overrides": [] },
           "gridPos": { "h": 4, "w": 6, "x": 0, "y": 36 },
-          "id": 10,
+          "id": 11,
           "options": {
             "colorMode": "value",
             "graphMode": "none",
@@ -237,18 +242,18 @@ data:
           "datasource": { "type": "loki", "uid": "loki" },
           "fieldConfig": { "defaults": {}, "overrides": [] },
           "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
-          "id": 11,
+          "id": 12,
           "options": {
             "dedupStrategy": "none",
             "enableLogDetails": true,
-            "showLabels": true,
+            "showLabels": false,
             "showTime": true,
             "sortOrder": "Descending",
             "wrapLogMessage": false
           },
           "targets": [
             {
-              "expr": "{namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | controller=\"job\" | msg=\"Reconciler error\"",
+              "expr": "{namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | controller=\"job\" | msg=\"Reconciler error\" | line_format \"{{.msg}}: {{.namespace}}/{{.name}} controller={{.controller}} error={{.error}}\"",
               "refId": "A"
             }
           ],
@@ -259,7 +264,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": {}, "overrides": [] },
           "gridPos": { "h": 4, "w": 6, "x": 0, "y": 48 },
-          "id": 12,
+          "id": 13,
           "options": {
             "colorMode": "value",
             "graphMode": "none",
@@ -278,6 +283,13 @@ data:
               "refId": "A"
             }
           ],
+          "links": [
+            {
+              "title": "Open Trivy findings drilldown",
+              "url": "?viewPanel=18",
+              "targetBlank": false
+            }
+          ],
           "title": "Trivy Infra High/Critical Findings",
           "type": "stat"
         },
@@ -285,48 +297,50 @@ data:
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": {}, "overrides": [] },
           "gridPos": { "h": 8, "w": 18, "x": 6, "y": 48 },
-          "id": 13,
-          "targets": [
-            {
-              "expr": "sum by (title,status) (trivy_cluster_compliance)",
-              "format": "table",
-              "instant": true,
-              "refId": "A"
-            }
-          ],
-          "title": "Trivy Cluster Compliance",
-          "type": "table"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "fieldConfig": { "defaults": {}, "overrides": [] },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 56 },
           "id": 14,
           "targets": [
             {
-              "expr": "sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"})",
+              "expr": "sort_desc(sum by (title,description,status) (trivy_cluster_compliance{status=\"Fail\"}) > 0)",
               "format": "table",
               "instant": true,
               "refId": "A"
             }
           ],
-          "title": "Trivy Infra RBAC Findings",
+          "links": [
+            {
+              "title": "Open Trivy findings drilldown",
+              "url": "?viewPanel=18",
+              "targetBlank": false
+            }
+          ],
+          "title": "Trivy Cluster Compliance Failures",
           "type": "table"
+        },
+        {
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 56 },
+          "id": 15,
+          "options": {
+            "content": "### Trivy drilldown\n\nOne row per High/Critical RBAC finding. The `source` column separates namespaced Roles (`rbac`) from cluster-scoped ClusterRoles (`clusterrole`). `Value` is the number of failing checks at that severity for that object, not the number of findings.",
+            "mode": "markdown"
+          },
+          "title": "Trivy Drilldown Banner",
+          "type": "text"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
           "fieldConfig": { "defaults": {}, "overrides": [] },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 56 },
-          "id": 15,
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 60 },
+          "id": 18,
           "targets": [
             {
-              "expr": "sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})",
+              "expr": "sort_desc((label_replace(label_replace(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}) > 0, \"source\", \"rbac\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review namespace-scoped permissions for this Role\", \"resource_name\", \".*\") or label_replace(label_replace(label_replace(label_replace(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}) > 0, \"resource_name\", \"$1\", \"name\", \"(.*)\"), \"namespace\", \"cluster\", \"\", \"\"), \"source\", \"clusterrole\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review cluster-wide permissions for this ClusterRole\", \"resource_name\", \".*\")))",
               "format": "table",
               "instant": true,
               "refId": "A"
             }
           ],
-          "title": "Trivy ClusterRole Findings",
+          "title": "Trivy Infra Findings Drilldown",
           "type": "table"
         }
       ],

@@ -22,6 +22,8 @@ setup() {
   touch "$SCRIPT_DIR/lib/vault_pki.sh"
   
   # shellcheck disable=SC1090
+  source "${SCRIPT_DIR}/lib/core.sh"
+  # shellcheck disable=SC1090
   source "${SCRIPT_DIR}/plugins/vault.sh"
 
   KUBECTL_LOG="$BATS_TEST_TMPDIR/kubectl.log"
@@ -218,6 +220,35 @@ setup() {
   [ "$status" -eq 0 ]
 }
 
+@test "_vault_app_auth_mount derives mount from context" {
+  run _vault_app_auth_mount "ubuntu-hostinger"
+  [ "$status" -eq 0 ]
+  [ "$output" = "kubernetes-ubuntu-hostinger" ]
+
+  run _vault_app_auth_mount "k3s-oci"
+  [ "$status" -eq 0 ]
+  [ "$output" = "kubernetes-k3s-oci" ]
+}
+
+@test "_vault_app_auth_mount sanitizes uppercase and invalid chars" {
+  run _vault_app_auth_mount "Foo/Bar_1"
+  [ "$status" -eq 0 ]
+  [ "$output" = "kubernetes-foo-bar-1" ]
+}
+
+@test "_vault_app_auth_mount falls back to kubernetes-app for empty context" {
+  run _vault_app_auth_mount ""
+  [ "$status" -eq 0 ]
+  [ "$output" = "kubernetes-app" ]
+}
+
+@test "_vault_app_auth_mount honors APP_K8S_AUTH_MOUNT override" {
+  export APP_K8S_AUTH_MOUNT="custom-mount"
+  run _vault_app_auth_mount "ubuntu-hostinger"
+  [ "$status" -eq 0 ]
+  [ "$output" = "custom-mount" ]
+}
+
 @test "configure_vault_app_auth_for_context exits 1 when context arg is missing" {
   run configure_vault_app_auth_for_context
   [ "$status" -eq 1 ]
@@ -261,6 +292,7 @@ setup() {
   configure_vault_app_auth() {
     printf 'api=%s\n' "${APP_CLUSTER_API_URL}" >>"$HELPER_ENV_LOG"
     printf 'ca=%s\n' "${APP_CLUSTER_CA_CERT_PATH}" >>"$HELPER_ENV_LOG"
+    printf 'mount=%s\n' "${APP_K8S_AUTH_MOUNT}" >>"$HELPER_ENV_LOG"
     if [[ ! -f "${APP_CLUSTER_CA_CERT_PATH}" ]]; then
       return 1
     fi
@@ -276,6 +308,7 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"api=https://10.0.0.5:6443"* ]]
   [[ "$output" == *"ca_contents=CA_CONTENT"* ]]
+  [[ "$output" == *"mount=kubernetes-ubuntu-hostinger"* ]]
 
   local ca_path
   ca_path="$(grep '^ca=' "$HELPER_ENV_LOG" | cut -d= -f2-)"

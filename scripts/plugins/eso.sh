@@ -212,7 +212,11 @@ function _eso_configure_remote_vault() {
   local service_account="${2:-external-secrets}"
   local service_account_ns="${3:-${ESO_NAMESPACE:-secrets}}"
   local remote_addr="${REMOTE_VAULT_ADDR:-}"
-  local mount_path="${REMOTE_VAULT_K8S_MOUNT:-kubernetes-app}"
+  local mount_path="${REMOTE_VAULT_K8S_MOUNT:-}"
+  if [[ -z "${mount_path}" ]] && declare -f _shopping_cart_resolve_app_context >/dev/null 2>&1; then
+    mount_path="$(_vault_app_auth_mount "$(_shopping_cart_resolve_app_context)")"
+  fi
+  [[ -n "${mount_path}" ]] || mount_path="kubernetes-app"
   local vault_role="${REMOTE_VAULT_K8S_ROLE:-eso-app-cluster}"
   local vault_path="${REMOTE_VAULT_KV_PATH:-secret}"
   local store_kind="${ESO_REMOTE_SECRETSTORE_KIND:-ClusterSecretStore}"

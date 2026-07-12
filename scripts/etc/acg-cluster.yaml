@@ -11,6 +11,20 @@ Parameters:
     Default: t3.medium
   AmiId:
     Type: String
+  EnableSsm:
+    Type: String
+    Default: "false"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: >-
+      When "true", create the SSM IAM role + instance profile and attach it to
+      every node (enables SSM port-forwarding without inbound SSH). Left "false"
+      by default so the stack deploys on IAM-restricted sandboxes that deny
+      iam:CreateRole. The k3s-aws provider flips this automatically.
+
+Conditions:
+  SsmEnabled: !Equals [!Ref EnableSsm, "true"]
 
 Resources:
   VPC:
@@ -63,6 +77,7 @@ Resources:
 
   SSMInstanceRole:
     Type: AWS::IAM::Role
+    Condition: SsmEnabled
     Properties:
       RoleName: !Sub "${AWS::StackName}-ssm-role"
       AssumeRolePolicyDocument:
@@ -77,6 +92,7 @@ Resources:
 
   SSMInstanceProfile:
     Type: AWS::IAM::InstanceProfile
+    Condition: SsmEnabled
     Properties:
       InstanceProfileName: !Sub "${AWS::StackName}-ssm-profile"
       Roles:
@@ -111,7 +127,7 @@ Resources:
       SubnetId: !Ref Subnet
       SecurityGroupIds:
         - !Ref SecurityGroup
-      IamInstanceProfile: !Ref SSMInstanceProfile
+      IamInstanceProfile: !If [SsmEnabled, !Ref SSMInstanceProfile, !Ref "AWS::NoValue"]
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
@@ -130,7 +146,7 @@ Resources:
       SubnetId: !Ref Subnet
       SecurityGroupIds:
         - !Ref SecurityGroup
-      IamInstanceProfile: !Ref SSMInstanceProfile
+      IamInstanceProfile: !If [SsmEnabled, !Ref SSMInstanceProfile, !Ref "AWS::NoValue"]
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
@@ -149,7 +165,7 @@ Resources:
       SubnetId: !Ref Subnet
       SecurityGroupIds:
         - !Ref SecurityGroup
-      IamInstanceProfile: !Ref SSMInstanceProfile
+      IamInstanceProfile: !If [SsmEnabled, !Ref SSMInstanceProfile, !Ref "AWS::NoValue"]
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:

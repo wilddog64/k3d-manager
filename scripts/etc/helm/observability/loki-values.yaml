@@ -19,7 +19,9 @@ loki:
 singleBinary:
   replicas: 1
   persistence:
-    enabled: false
+    enabled: true
+    storageClassName: local-path
+    size: 10Gi
 
 write:
   enabled: false

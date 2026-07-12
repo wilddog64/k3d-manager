@@ -95,6 +95,7 @@ function _acg_provider_context() {
         k3s-az)        printf 'ubuntu-azure\n' ;;
         k3s-gcp)       printf 'ubuntu-gcp\n' ;;
         k3s-hostinger) printf 'ubuntu-hostinger\n' ;;
+        k3s-oci)       printf 'k3s-oci\n' ;;
         *)             printf 'ubuntu-k3s\n' ;;
     esac
 }

@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-07-12
+
+**Theme: observability & multi-cluster reliability hardening.** A reactive hardening sprint from operating the observability stack and the multi-cluster (laptop / Hostinger / OCI / ACG) fleet under real load — 21 bug specs in `docs/bugs/`, of which 19 shipped as `fix(...)` commits.
+
+### Changed
+- Vault per-context app-cluster auth mount (Workstream 3 Phase 1) — `configure_vault_app_auth_for_context` now derives a per-cluster Kubernetes auth mount `kubernetes-<sanitized-context>` via a new `_vault_app_auth_mount` helper and threads it through all three env-driven mount sites (`configure_vault_app_auth`, the shopping-cart ClusterSecretStore auth block, and the ESO remote-Vault SecretStore), so registering a second app cluster no longer overwrites the single shared `kubernetes-app` mount and invalidate the prior cluster's ESO auth (last-cluster-wins). An explicit `APP_K8S_AUTH_MOUNT` override pins the legacy single-cluster path for migration (`scripts/lib/core.sh`, `scripts/plugins/vault.sh`, `scripts/plugins/shopping_cart.sh`, `scripts/plugins/eso.sh`)
+- lib-foundation subtree synced to v0.4.3 (v0.4.1/v0.4.2 pulled en route — ACG headless CDP auto-login + reclaim/reuse) (`scripts/lib/foundation/`)
+
+### Fixed
+- Grafana stability — raised the Grafana memory limit to stop frequent restarts and liveness-probe kills (`1af49f44`) (`scripts/plugins/observability.sh`)
+- Prometheus durability — hub Prometheus TSDB moved off `emptyDir` onto a PVC with a raised `retentionSize` (`6ae2f758`); app-cluster Prometheus given its own PVC and 15d retention so it no longer keeps only 2h (`23e5d67f`) (`scripts/plugins/observability.sh`)
+- Grafana public route — `grafana.3ai-talk.org` routed back to the hub Grafana so hub CVE/Trivy/Image-Updater dashboards resolve to the hub instance (`65dcf6e8`)
+- Trivy hub dashboard correctness — object-level drilldown links + visible in-viewport banner (`f4560d56`/`d0a2d92f`/`76752337`), finding explanations (`44488f88`), actionable alert summaries (`a95fda82`), ownership classification and fixed-state (`215a4157`/`68b71222`/`44488f88`), active-finding + zero-value compliance-row dedupe (`215a4157`/`68b71222`/`ae088b34`), and Image Updater processing-log counter parsing (`06813683`) (`scripts/plugins/observability.sh`, `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml`)
+- Loki logs panels — filtered and formatted so they no longer render empty or raw JSON (`7e39ffaa`) (`scripts/plugins/observability.sh`)
+- Trivy scan-job OOMKills — raised the scan-job scanner memory limit 512Mi→1Gi and request 64Mi→256Mi in both hub and ACG values files to stop `exit 137` OOMKills on heavier Standalone-mode scans (`d434e289`); `operator.resources` unchanged (`scripts/etc/helm/observability/trivy-operator-values.yaml`, `trivy-operator-acg-values.yaml`)
+- Hostinger Grafana port-forward regenerated for the ACG service (`14fd68b2`) (`scripts/lib/providers/k3s-hostinger.sh`)
+- ACG sandbox lifecycle — seed Vault address resolved at call time to stop the `exit-22` empty-port freeze (`ac5e3fde`); `_vault_kv_put` surfaces the KV write HTTP status on seed failure instead of swallowing it (`44c1aec8`); an absent sandbox is classified separately from tunnel loss (`e2c79595`); `k3s-oci` mapped to its own kube context (`80ac1ba0`); tunnel mode auto-selects SSM vs SSH by probing `iam:CreateRole` (`2834e1d3`) (`scripts/plugins/acg.sh`, `scripts/plugins/vault.sh`, `scripts/lib/cluster_provider.sh`)
+- Hub-Vault profile state scoped by app context so a per-cluster profile is no longer shared across clusters (`e7fc432e`); the shopping-cart rerun Vault helper scope resolved for LDAP password seeding (`df74e754`) (`scripts/plugins/vault.sh`, `scripts/plugins/shopping_cart.sh`)
+
 ## [1.13.0] - 2026-07-05
 
 ### Added
