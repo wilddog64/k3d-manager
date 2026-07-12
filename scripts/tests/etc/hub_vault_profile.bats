@@ -90,3 +90,46 @@ setup() {
   [ "${HUB_VAULT_PROFILE}" = "hostinger" ]
   [ "${HUB_VAULT_PROFILE_STATE_FILE}" = "${BATS_TEST_TMPDIR}/hub-vault-profile" ]
 }
+
+@test "per-context CSS override applies when base env is unset" {
+  unset HUB_VAULT_PROFILE HUB_VAULT_CSS_SERVER HUB_VAULT_USE_BRIDGE HUB_VAULT_CSS_AUTH HUB_VAULT_PROFILE_STATE_FILE
+  export K3DM_STATE_DIR="${BATS_TEST_TMPDIR}"
+  export APP_CONTEXT="ubuntu-hostinger"
+  export HUB_VAULT_CSS_SERVER__ubuntu_hostinger="http://percontext:8200"
+  # shellcheck disable=SC1090
+  source "${VARS_SH}"
+  [ "${HUB_VAULT_CSS_SERVER}" = "http://percontext:8200" ]
+}
+
+@test "explicit base env CSS wins over a per-context override" {
+  unset HUB_VAULT_PROFILE HUB_VAULT_USE_BRIDGE HUB_VAULT_CSS_AUTH HUB_VAULT_PROFILE_STATE_FILE
+  export K3DM_STATE_DIR="${BATS_TEST_TMPDIR}"
+  export APP_CONTEXT="ubuntu-hostinger"
+  export HUB_VAULT_CSS_SERVER="http://baseenv:8200"
+  export HUB_VAULT_CSS_SERVER__ubuntu_hostinger="http://percontext:8200"
+  # shellcheck disable=SC1090
+  source "${VARS_SH}"
+  [ "${HUB_VAULT_CSS_SERVER}" = "http://baseenv:8200" ]
+}
+
+@test "without a per-context override the profile default is used" {
+  unset HUB_VAULT_PROFILE HUB_VAULT_CSS_SERVER HUB_VAULT_USE_BRIDGE HUB_VAULT_CSS_AUTH HUB_VAULT_PROFILE_STATE_FILE
+  export K3DM_STATE_DIR="${BATS_TEST_TMPDIR}"
+  export APP_CONTEXT="ubuntu-hostinger"
+  export VAULT_NS="secrets"
+  # shellcheck disable=SC1090
+  source "${VARS_SH}"
+  [ "${HUB_VAULT_CSS_SERVER}" = "http://vault-bridge.secrets.svc.cluster.local:8201" ]
+}
+
+@test "per-context overrides apply to bridge and auth with a sanitized context key" {
+  unset HUB_VAULT_PROFILE HUB_VAULT_CSS_SERVER HUB_VAULT_USE_BRIDGE HUB_VAULT_CSS_AUTH HUB_VAULT_PROFILE_STATE_FILE
+  export K3DM_STATE_DIR="${BATS_TEST_TMPDIR}"
+  export APP_CONTEXT="k3s-gcp"
+  export HUB_VAULT_USE_BRIDGE__k3s_gcp="0"
+  export HUB_VAULT_CSS_AUTH__k3s_gcp="kubernetes"
+  # shellcheck disable=SC1090
+  source "${VARS_SH}"
+  [ "${HUB_VAULT_USE_BRIDGE}" = "0" ]
+  [ "${HUB_VAULT_CSS_AUTH}" = "kubernetes" ]
+}

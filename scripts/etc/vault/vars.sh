@@ -34,10 +34,35 @@ function _hub_vault_profile_context() {
   printf '\n'
 }
 
+# Resolve a hub-Vault CSS connectivity value with per-context precedence:
+#   1. explicit base env (e.g. HUB_VAULT_CSS_SERVER)          — operator escape hatch, unchanged
+#   2. per-context override (HUB_VAULT_CSS_SERVER__<context>) — coexisting multi-cluster connectivity
+#   3. profile-derived default                                — today's single-cluster behavior
+# The context is sanitized to a shell-variable-safe key (any char outside [A-Za-z0-9_] -> _).
+function _hub_vault_css_resolve() {
+  local _base_var="$1" _default="$2" _ctx="${3:-}"
+  local _base_val="${!_base_var:-}"
+  if [[ -n "${_base_val}" ]]; then
+    printf '%s\n' "${_base_val}"
+    return 0
+  fi
+  if [[ -n "${_ctx}" ]]; then
+    local _ctx_key _ctx_var
+    _ctx_key="$(printf '%s' "${_ctx}" | tr -c 'A-Za-z0-9_' '_')"
+    _ctx_var="${_base_var}__${_ctx_key}"
+    if [[ -n "${!_ctx_var:-}" ]]; then
+      printf '%s\n' "${!_ctx_var}"
+      return 0
+    fi
+  fi
+  printf '%s\n' "${_default}"
+}
+
+_hub_profile_context="$(_hub_vault_profile_context)"
+
 if [[ -z "${HUB_VAULT_PROFILE_STATE_FILE:-}" ]]; then
   _hub_state_dir="${K3DM_STATE_DIR:-${HOME}/.local/share/k3d-manager}"
   _hub_legacy_state_file="${_hub_state_dir}/hub-vault-profile"
-  _hub_profile_context="$(_hub_vault_profile_context)"
   if [[ -n "${_hub_profile_context}" ]]; then
     _hub_profile_key="$(printf '%s' "${_hub_profile_context}" | tr -c 'A-Za-z0-9_.-' '_')"
     HUB_VAULT_PROFILE_STATE_FILE="${_hub_state_dir}/hub-vault-profile-${_hub_profile_key}"
@@ -51,7 +76,7 @@ if [[ -z "${HUB_VAULT_PROFILE_STATE_FILE:-}" ]]; then
   else
     HUB_VAULT_PROFILE_STATE_FILE="${_hub_legacy_state_file}"
   fi
-  unset _hub_profile_key _hub_profile_context _hub_legacy_state_file _hub_state_dir
+  unset _hub_profile_key _hub_legacy_state_file _hub_state_dir
 fi
 export HUB_VAULT_PROFILE_STATE_FILE
 
@@ -65,16 +90,21 @@ fi
 export HUB_VAULT_PROFILE="${HUB_VAULT_PROFILE:-laptop}"
 case "${HUB_VAULT_PROFILE}" in
   hostinger)
-    export HUB_VAULT_CSS_SERVER="${HUB_VAULT_CSS_SERVER:-http://vault.${VAULT_NS}.svc:8200}"
-    export HUB_VAULT_USE_BRIDGE="${HUB_VAULT_USE_BRIDGE:-0}"
-    export HUB_VAULT_CSS_AUTH="${HUB_VAULT_CSS_AUTH:-kubernetes}"
+    _hub_css_server_default="http://vault.${VAULT_NS}.svc:8200"
+    _hub_use_bridge_default="0"
+    _hub_css_auth_default="kubernetes"
     ;;
   *)
-    export HUB_VAULT_CSS_SERVER="${HUB_VAULT_CSS_SERVER:-http://vault-bridge.secrets.svc.cluster.local:8201}"
-    export HUB_VAULT_USE_BRIDGE="${HUB_VAULT_USE_BRIDGE:-1}"
-    export HUB_VAULT_CSS_AUTH="${HUB_VAULT_CSS_AUTH:-token}"
+    _hub_css_server_default="http://vault-bridge.secrets.svc.cluster.local:8201"
+    _hub_use_bridge_default="1"
+    _hub_css_auth_default="token"
     ;;
 esac
+HUB_VAULT_CSS_SERVER="$(_hub_vault_css_resolve HUB_VAULT_CSS_SERVER "${_hub_css_server_default}" "${_hub_profile_context}")"
+HUB_VAULT_USE_BRIDGE="$(_hub_vault_css_resolve HUB_VAULT_USE_BRIDGE "${_hub_use_bridge_default}" "${_hub_profile_context}")"
+HUB_VAULT_CSS_AUTH="$(_hub_vault_css_resolve HUB_VAULT_CSS_AUTH "${_hub_css_auth_default}" "${_hub_profile_context}")"
+export HUB_VAULT_CSS_SERVER HUB_VAULT_USE_BRIDGE HUB_VAULT_CSS_AUTH
+unset _hub_css_server_default _hub_use_bridge_default _hub_css_auth_default _hub_profile_context
 
 # Auto-unseal watchdog (Tier 3 P2a) — pinned image for the in-cluster unseal CronJob.
 export VAULT_UNSEAL_IMAGE="${VAULT_UNSEAL_IMAGE:-hashicorp/vault:1.18.3}"
