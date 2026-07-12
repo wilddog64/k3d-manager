@@ -77,16 +77,20 @@ hub dashboard.
 | `v1.14.0-bugfix-acg-pluralsight-autologin` | ✅ | shipped |
 | `v1.14.0-bugfix-acg-tunnel-mode-autoselect` | ✅ | `2834e1d3` probe iam:CreateRole to pick SSM vs SSH |
 
-### Workstream 3 — Vault multi-cluster portability — **partial**
-Profile-state scoping shipped; the deeper per-context auth-mount work is **queued behind v1.14.0**
-by explicit decision (do not hand off until the milestone closes).
+### Workstream 3 — Vault multi-cluster portability — **pulled into v1.14.0 (2026-07-12)**
+Profile-state scoping shipped. Per user decision 2026-07-12 the per-context auth-mount work is now
+**in scope for v1.14.0**. Phase 1 implementation spec written; Phases 2–3 are the milestone tail
+(ship within v1.14.0 or split — see closing condition).
 
 | Spec | Status | Note |
 |---|---|---|
 | `2026-07-07-global-hub-vault-profile-is-shared-across-clusters` | ✅ | `e7fc432e` scope profile state by app context |
 | `2026-07-07-stale-kube-context-assumptions` | ✅ | addressed via `80ac1ba0`/`e7fc432e` |
-| `2026-07-07-app-cluster-vault-portability` | ⏳ queued | Phase 1: per-context mounts `kubernetes-<sanitized-context>` |
-| `2026-07-07-vault-kubernetes-auth-mount-is-single-target` | ⏳ queued | same Phase-1 spec; ESO SecretStore migration off `kubernetes-app` |
+| `2026-07-12-vault-per-context-auth-mount-phase1` | 📝 spec written | Phase 1: mount `kubernetes-<sanitized-context>`, all 3 mount sites + migration; awaiting review then handoff |
+| `2026-07-07-app-cluster-vault-portability` | 🎨 design | signed-off design doc behind the Phase 1 spec above (do NOT hand off directly) |
+| `2026-07-07-vault-kubernetes-auth-mount-is-single-target` | 🎨 design | consolidated into the design doc; single-target root cause |
+| Phase 2 — per-context hub-Vault profile | ⏳ queued | follows Phase 1; not yet specced |
+| Phase 3 — `ubuntu-k3s` demote + reachability preflight | ⏳ queued | re-scoped by decision #1; not a mass rename |
 
 ### Closing condition for v1.14.0
 - [x] Workstream 1 (observability) verified live on hub **and** app cluster (2026-07-12): Grafana
@@ -94,8 +98,9 @@ by explicit decision (do not hand off until the milestone closes).
       app-cluster Prometheus PVC 10Gi Bound / 15d-8GB; trivy dedupe + loki panels deployed.
 - [ ] Workstream 2 (ACG lifecycle) is shell-logic — covered by BATS; live verification requires
       exercising an `acg-up`/refresh cycle, deferred (not triggered casually).
-- [ ] Decision recorded on Workstream 3: either pull the per-context Vault work **into** v1.14.0,
-      or explicitly defer it to v1.15.0 and cut the release without it.
+- [x] Decision recorded on Workstream 3 (2026-07-12): **pulled into v1.14.0.** Phase 1 spec written
+      (`docs/bugs/2026-07-12-vault-per-context-auth-mount-phase1.md`). Remaining: implement Phase 1
+      (handoff pending review) + decide whether Phases 2–3 land in v1.14.0 or split to v1.15.0.
 - [ ] Untracked `docs/bugs/2026-07-08-refresh-output-is-healthy.md` triaged — commit it as a real
       spec or delete it; do not ship the milestone with it dangling in the working tree.
 - [ ] `/create-pr` gate met, PR merged, tag `v1.14.0`, retro written.
