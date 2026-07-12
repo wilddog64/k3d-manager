@@ -86,7 +86,7 @@ Profile-state scoping shipped. Per user decision 2026-07-12 the per-context auth
 |---|---|---|
 | `2026-07-07-global-hub-vault-profile-is-shared-across-clusters` | ✅ | `e7fc432e` scope profile state by app context |
 | `2026-07-07-stale-kube-context-assumptions` | ✅ | addressed via `80ac1ba0`/`e7fc432e` |
-| `2026-07-12-vault-per-context-auth-mount-phase1` | 📝 spec written | Phase 1: mount `kubernetes-<sanitized-context>`, all 3 mount sites + migration; awaiting review then handoff |
+| `2026-07-12-vault-per-context-auth-mount-phase1` | 🔨 handed to Codex | Phase 1: mount `kubernetes-<sanitized-context>`, all 3 mount sites + migration; helper locked to `scripts/lib/core.sh`; handed off 2026-07-12 |
 | `2026-07-07-app-cluster-vault-portability` | 🎨 design | signed-off design doc behind the Phase 1 spec above (do NOT hand off directly) |
 | `2026-07-07-vault-kubernetes-auth-mount-is-single-target` | 🎨 design | consolidated into the design doc; single-target root cause |
 | Phase 2 — per-context hub-Vault profile | ⏳ queued | follows Phase 1; not yet specced |

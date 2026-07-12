@@ -1,13 +1,26 @@
 # Bugfix: v1.14.0 — Vault per-context auth mount (Phase 1)
 
 **Branch:** `k3d-manager-v1.14.0`
-**Files:** `scripts/plugins/vault.sh`, `scripts/plugins/shopping_cart.sh`, `scripts/plugins/eso.sh`,
-`scripts/tests/plugins/vault_app_auth.bats`, `scripts/tests/plugins/shopping_cart_css_auth_block.bats`
+**Files:** `scripts/lib/core.sh`, `scripts/plugins/vault.sh`, `scripts/plugins/shopping_cart.sh`,
+`scripts/plugins/eso.sh`, `scripts/tests/plugins/vault_app_auth.bats`,
+`scripts/tests/plugins/shopping_cart_css_auth_block.bats`
 
 Implements **Phase 1** of the design doc
 [`2026-07-07-app-cluster-vault-portability.md`](./2026-07-07-app-cluster-vault-portability.md)
 (decisions signed off 2026-07-10). That doc is design-only and must NOT be handed off — this is the
 copy-paste implementation spec it calls for.
+
+---
+
+## Before You Start
+
+1. `git pull origin k3d-manager-v1.14.0` — get the latest spec + code (includes the trivy fix).
+2. Read `memory-bank/activeContext.md` and `memory-bank/progress.md` — confirm this task
+   (WS3 Phase 1 per-context auth mount) is the active assignment.
+3. Read the target files at the referenced lines before editing:
+   `scripts/lib/core.sh` (helper family), `scripts/plugins/vault.sh:1788-1855`,
+   `scripts/plugins/shopping_cart.sh:482-536`, `scripts/plugins/eso.sh:210-220`, and both BATS suites.
+4. Work on branch `k3d-manager-v1.14.0` — never `main`.
 
 ---
 
@@ -54,31 +67,29 @@ breaks after the k3s-oci run.
 
 ---
 
-## Open implementation decision — helper location (resolve before handoff)
+## Resolved: helper location — `scripts/lib/core.sh` (always-sourced, option B)
 
-`_vault_app_auth_mount` must be visible to `vault.sh`, `shopping_cart.sh`, and `eso.sh`, which are
-lazy-loaded plugins. Two options:
+`_vault_app_auth_mount` must be visible to `vault.sh`, `shopping_cart.sh`, and `eso.sh` (lazy-loaded
+plugins). The helper is the **single agreed derivation** the whole fix depends on, so it must never
+fall back to `kubernetes-app` under a plugin load race. It therefore lives in **`scripts/lib/core.sh`**,
+which the dispatcher sources **unconditionally** at `scripts/k3d-manager:86` (the local core.sh, kept
+separate from the `foundation/` subtree by design). This means:
 
-- **(A) Define in `vault.sh`; guard callers with `declare -f _vault_app_auth_mount` and lazy-load the
-  vault plugin first.** Matches the existing `declare -f`-guard pattern (`vars.sh:26`,
-  `k3s-oci.sh:648`). Risk: if a consumer runs without vault loaded, the guard's fallback to
-  `kubernetes-app` silently reintroduces the mismatch this fix removes.
-- **(B) Define in an always-sourced lib** (`scripts/lib/core.sh` or equivalent) so all three see it
-  with no lazy-load race. Cleaner; slightly wider blast radius.
+- The helper is always defined before any plugin runs — no `declare -f` guard needed on its callers.
+- `scripts/lib/core.sh` is a **local, non-subtree** file — edit it directly (do NOT touch
+  `scripts/lib/foundation/` — that is the subtree).
 
-**Recommendation: (B).** The whole point is a single agreed derivation — a fallback that diverges
-under a load race defeats it. Confirm the correct always-sourced lib before writing the helper block,
-then adjust the "Change 1" file target accordingly. The blocks below are written for placement in
-`vault.sh` (option A); if (B) is chosen, move the helper block verbatim to the chosen lib and drop
-the `declare -f` guards in the two consumers.
+`kubernetes-app` remains the legacy default **only** via the `APP_K8S_AUTH_MOUNT` override inside the
+helper (the migration pin), never via a load-race fallback.
 
 ---
 
 ## Fix
 
-### Change 1 — `scripts/plugins/vault.sh`: add the derivation helper
+### Change 1 — `scripts/lib/core.sh`: add the derivation helper
 
-Insert immediately **before** `function configure_vault_app_auth_for_context() {` (currently line 1788):
+Append this function to `scripts/lib/core.sh` (end of file is fine — it joins the existing
+`_`-prefixed helper family there, e.g. `_cluster_provider`, `_ensure_path_exists`):
 
 **Exact new block:**
 
@@ -143,15 +154,14 @@ function _vault_app_auth_mount() {
 
 ```bash
   local _css_vault_server="${HUB_VAULT_CSS_SERVER:-http://vault-bridge.secrets.svc.cluster.local:8201}"
-  local _app_mount="${APP_K8S_AUTH_MOUNT:-kubernetes-app}"
-  if declare -f _vault_app_auth_mount >/dev/null 2>&1; then
-    _app_mount="$(_vault_app_auth_mount "${_app_context}")"
-  fi
+  local _app_mount
+  _app_mount="$(_vault_app_auth_mount "${_app_context}")"
   local _css_auth_block
   _css_auth_block="$(APP_K8S_AUTH_MOUNT="${_app_mount}" _shopping_cart_css_auth_block "${_css_auth}")"
 ```
 
-> If option (B) is chosen, drop the `declare -f` guard and call `_vault_app_auth_mount` directly.
+> `_vault_app_auth_mount` is defined in the always-sourced `scripts/lib/core.sh`, so no `declare -f`
+> guard is needed — call it directly. It honors an explicit `APP_K8S_AUTH_MOUNT` override internally.
 
 ### Change 4 — `scripts/plugins/eso.sh`: derive the remote mount from context
 
@@ -168,12 +178,16 @@ a context is resolvable, default it to the per-context mount instead of `kuberne
 
 ```bash
   local mount_path="${REMOTE_VAULT_K8S_MOUNT:-}"
-  if [[ -z "${mount_path}" ]] && declare -f _vault_app_auth_mount >/dev/null 2>&1 \
-     && declare -f _shopping_cart_resolve_app_context >/dev/null 2>&1; then
+  if [[ -z "${mount_path}" ]] && declare -f _shopping_cart_resolve_app_context >/dev/null 2>&1; then
     mount_path="$(_vault_app_auth_mount "$(_shopping_cart_resolve_app_context)")"
   fi
   [[ -n "${mount_path}" ]] || mount_path="kubernetes-app"
 ```
+
+> `_vault_app_auth_mount` (core.sh) is always available, so it needs no guard here. The remaining
+> `declare -f _shopping_cart_resolve_app_context` guard stays — that resolver lives in the
+> lazy-loaded `shopping_cart.sh` plugin and may be absent when eso.sh runs standalone; if it is,
+> `mount_path` falls through to the `kubernetes-app` legacy default.
 
 ---
 
@@ -198,6 +212,14 @@ This is Claude's live step, not the agent's — the agent ships code + BATS only
 
 ## Tests
 
+> The helper now lives in `scripts/lib/core.sh`. `vault_app_auth.bats:25` sources
+> `"${SCRIPT_DIR}/plugins/vault.sh"` but NOT core.sh, so `_vault_app_auth_mount` is out of scope.
+> Add this line to its `setup()` (before or after the vault.sh source) so the helper is defined:
+>
+> ```bash
+> source "${SCRIPT_DIR}/lib/core.sh"
+> ```
+
 - Extend `scripts/tests/plugins/vault_app_auth.bats`:
   - `_vault_app_auth_mount "ubuntu-hostinger"` → `kubernetes-ubuntu-hostinger`.
   - `_vault_app_auth_mount "k3s-oci"` → `kubernetes-k3s-oci`.
@@ -217,7 +239,8 @@ scripts/tests/plugins/shopping_cart_css_auth_block.bats`.
 
 | File | Change |
 |------|--------|
-| `scripts/plugins/vault.sh` | add `_vault_app_auth_mount`; export derived mount into the auth subshell |
+| `scripts/lib/core.sh` | add `_vault_app_auth_mount` derivation helper |
+| `scripts/plugins/vault.sh` | export derived mount into the auth subshell |
 | `scripts/plugins/shopping_cart.sh` | derive per-context mount for the ESO `ClusterSecretStore` |
 | `scripts/plugins/eso.sh` | default remote `SecretStore` mount to per-context |
 | `scripts/tests/plugins/vault_app_auth.bats` | mount-derivation + sanitizer + override cases |
@@ -227,7 +250,8 @@ scripts/tests/plugins/shopping_cart_css_auth_block.bats`.
 
 ## Rules
 
-- `shellcheck -S warning scripts/plugins/vault.sh scripts/plugins/shopping_cart.sh scripts/plugins/eso.sh` — zero new warnings.
+- `shellcheck -S warning scripts/lib/core.sh scripts/plugins/vault.sh scripts/plugins/shopping_cart.sh scripts/plugins/eso.sh` — zero new warnings.
+- Edit `scripts/lib/core.sh` directly — it is the LOCAL core.sh, not the subtree. Do NOT edit `scripts/lib/foundation/`.
 - BATS suites above pass in a clean env.
 - Do NOT change `configure_vault_app_auth`'s default (`kubernetes-app` stays the legacy default at `:1695`).
 - Do NOT touch the `provider.sh:94` `ubuntu-k3s` mapping — that is Phase 3, out of scope here.
@@ -257,7 +281,7 @@ fix(vault): derive per-context app-cluster auth mount
 
 - Do NOT create a PR.
 - Do NOT skip pre-commit hooks (`--no-verify`).
-- Do NOT modify any file outside the five listed targets.
+- Do NOT modify any file outside the six listed targets.
 - Do NOT commit to `main` — work on `k3d-manager-v1.14.0`.
 - Do NOT apply/sync anything against a live cluster — Claude runs the migration (steps 1–5 above)
   and verifies ESO stays `Valid`. The agent ships code + BATS only.
