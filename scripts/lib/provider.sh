@@ -108,12 +108,22 @@ function _acg_record_provider() {
     printf '%s\n' "${provider}" > "${_ACG_ACTIVE_PROVIDER_FILE}"
 }
 
+# Reachability preflight: true only if the kube-context answers /readyz within a
+# short timeout. Selecting a resolvable-but-dead context (e.g. an expired ACG
+# sandbox whose kubeconfig entry outlived the cluster) then fails fast instead of
+# hanging against a dead endpoint.
+function _acg_context_reachable() {
+    local ctx="${1:-}"
+    [[ -z "${ctx}" ]] && return 1
+    kubectl --context "${ctx}" --request-timeout=5s get --raw=/readyz >/dev/null 2>&1
+}
+
 function _acg_resolve_provider() {
     local provider="${CLUSTER_PROVIDER:-}"
     if [[ -z "${provider}" ]]; then
         local ctx
         for ctx in ubuntu-hostinger ubuntu-k3s ubuntu-azure ubuntu-gcp; do
-            if kubectl --context "${ctx}" --request-timeout=5s get --raw=/readyz >/dev/null 2>&1; then
+            if _acg_context_reachable "${ctx}"; then
                 case "${ctx}" in
                     ubuntu-hostinger) provider=k3s-hostinger ;;
                     ubuntu-k3s)       provider=k3s-aws ;;
@@ -127,5 +137,5 @@ function _acg_resolve_provider() {
     if [[ -z "${provider}" && -f "${_ACG_ACTIVE_PROVIDER_FILE}" ]]; then
         provider="$(cat "${_ACG_ACTIVE_PROVIDER_FILE}" 2>/dev/null || true)"
     fi
-    _acg_normalize_provider "${provider:-k3s-aws}"
+    _acg_normalize_provider "${provider:-k3s-hostinger}"
 }

@@ -109,6 +109,43 @@ teardown_file() {
   [[ "$(_acg_resolve_provider)" == "k3s-hostinger" ]]
 }
 
+@test "_acg_context_reachable is true when the context answers /readyz" {
+  kubectl() {
+    case "$*" in
+      --context\ ubuntu-hostinger\ --request-timeout=5s\ get\ --raw=/readyz*) return 0 ;;
+      *) return 1 ;;
+    esac
+  }
+
+  run _acg_context_reachable ubuntu-hostinger
+  [ "$status" -eq 0 ]
+}
+
+@test "_acg_context_reachable is false for an unreachable context" {
+  kubectl() {
+    return 1
+  }
+
+  run _acg_context_reachable ubuntu-k3s
+  [ "$status" -eq 1 ]
+}
+
+@test "_acg_context_reachable is false for an empty context" {
+  run _acg_context_reachable ""
+  [ "$status" -eq 1 ]
+}
+
+@test "_acg_resolve_provider falls back to k3s-hostinger when nothing is reachable and no file exists" {
+  _ACG_ACTIVE_PROVIDER_FILE="${BATS_TEST_TMPDIR}/no-such-active-provider"
+  rm -f "${_ACG_ACTIVE_PROVIDER_FILE}"
+
+  kubectl() {
+    return 1
+  }
+
+  [[ "$(_acg_resolve_provider)" == "k3s-hostinger" ]]
+}
+
 @test "_hostinger_set_active_app_cluster targets the hub context for relabel" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
