@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-07-13
+
+**Theme: security & multi-cluster provider hardening.** Close a dev-dependency DoS advisory via the lib-foundation subtree, end Trivy Standalone scan-job cache-lock failures by moving to a shared built-in Trivy server, and harden multi-cluster registration (per-context hub-Vault connectivity, safer default provider with a reachability preflight).
+
+### Changed
+- Per-context hub-Vault ClusterSecretStore connectivity — hub-Vault CSS overrides are now keyed per app context so registering a second app cluster no longer clobbers the first cluster's connectivity profile (`46f400b9`) (`scripts/etc/vault/vars.sh`)
+- Default cluster provider demoted off `k3s-aws` with an added reachability preflight, so a bare invocation no longer defaults to an AWS cluster and an unreachable target fails fast instead of hanging (`2f74acf3`) (`scripts/lib/provider.sh`)
+- lib-foundation subtree synced to v0.4.4 — ACG Extend sandbox-tab routing fix plus the js-yaml advisory bump below (`999edb81`) (`scripts/lib/foundation/`)
+
+### Fixed
+- Trivy scan-job cache-lock — migrated the Trivy Operator from Standalone to ClientServer mode via the chart's built-in shared Trivy server, eliminating the per-job vuln-DB `cache may be in use by another process: timeout` failures under concurrent scans (`855a06e4`) (`scripts/etc/helm/observability/trivy-operator-values.yaml`, `trivy-operator-acg-values.yaml`)
+
+### Security
+- js-yaml DoS advisory closed — dev-only transitive `js-yaml` bumped `3.14.2`→`3.15.0` via the lib-foundation v0.4.4 subtree, resolving Dependabot GHSA-h67p-54hq-rp68 (medium) once merged to the default branch (`scripts/lib/foundation/`)
+
 ## [1.14.0] - 2026-07-12
 
 **Theme: observability & multi-cluster reliability hardening.** A reactive hardening sprint from operating the observability stack and the multi-cluster (laptop / Hostinger / OCI / ACG) fleet under real load — 21 bug specs in `docs/bugs/`, of which 19 shipped as `fix(...)` commits.
