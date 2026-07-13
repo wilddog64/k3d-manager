@@ -1,6 +1,14 @@
 # Changes - lib-foundation
 
-## [Unreleased]
+## [v0.4.4] — 2026-07-13
+
+Close the dev-only js-yaml DoS advisory (GHSA-h67p-54hq-rp68) on the ACG test toolchain and fix ACG Extend sandbox-tab routing (PR #36, merged `ce421a4`).
+
+### Security
+- `scripts/lib/acg/package-lock.json`: bump the dev-only transitive `js-yaml` from `3.14.2` to `3.15.0` to close Dependabot advisory GHSA-h67p-54hq-rp68 (medium — quadratic-complexity DoS in merge-key handling via repeated aliases). `js-yaml` is pulled in only by the jest/babel test toolchain; `3.15.0` satisfies the existing `^3.13.1` range so `package.json` is unchanged.
+
+### Fixed
+- `scripts/lib/acg/playwright/acg_extend.js`: route the sandbox Extend flow through sandbox-page checks instead of adopting a stale Pluralsight CDP tab. The old logic picked the first `.pluralsight.com` tab and treated any Pluralsight hostname as "already on the right page," so a reused CDP tab at `s2.pluralsight.com/404.html` skipped navigation to Cloud Sandboxes and failed with "Extend button not found." Now normalizes sandbox URLs, prefers actual sandbox tabs, forces navigation when the reused tab is a non-sandbox page, and fails explicitly on sign-in redirect. Covered by a new `s2.pluralsight.com/404.html` regression test (`scripts/lib/acg/tests/providers/acg_extend.test.js`).
 
 ## [v0.4.3] — 2026-07-07
 

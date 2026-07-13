@@ -28,7 +28,7 @@ function _normalizeSandboxUrl(targetUrl) {
 
 function _isSandboxPageUrl(url) {
   try {
-    return url.includes('cloud-sandboxes') || url.includes('hands-on/playground') || url.includes('cloud-playground');
+    return url.includes('cloud-sandboxes');
   } catch {
     return false;
   }
