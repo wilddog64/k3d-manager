@@ -1,7 +1,7 @@
 # Copilot PR #105 review findings — v1.15.0
 
 **PR:** [#105](https://github.com/wilddog64/k3d-manager/pull/105) — `feat: v1.15.0 — security & multi-cluster provider hardening`
-**Fix commit:** `<fill after commit>`
+**Fix commit:** `a41f8987`
 **Date:** 2026-07-13
 
 ---
