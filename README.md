@@ -299,11 +299,11 @@ Recent entries:
 
 | Date | Issue | Component |
 |---|---|---|
+| 2026-07-13 | [Copilot PR #105 Review Findings](docs/issues/2026-07-13-copilot-pr105-review-findings.md) | v1.15.0: new BATS tests under `scripts/tests/etc` + `scripts/tests/plugins` weren't run by CI (only `scripts/tests/lib` was scanned); CI unit step expanded to add the green `etc` dir + the specific trivy plugin file — whole `plugins` dir deferred (pre-existing stub-vs-real-`kubectl` failures) |
 | 2026-07-12 | [Copilot PR #104 Review Findings](docs/issues/2026-07-12-copilot-pr104-review-findings.md) | v1.14.0: Trivy ClusterRole metric typo (`clusterrbacassments`→`clusterrbacassessments`) fixed in code/test/doc — was emptying the ClusterRole RBAC report; WS3 Phase 1 auth mount rederived from context not cluster entry for EKS/AKS/GKE parity with ESO/CSS sites |
 | 2026-07-05 | [Copilot/CodeQL PR #103 Review Findings](docs/issues/2026-07-05-copilot-pr103-review-findings.md) | v1.13.0: CHANGELOG Trivy file refs corrected; 2 CodeQL `_safe_job_dir` path-injection false positives and 1 `_vault_exec_stream` non-tty suggestion declined with rationale |
 | 2026-06-28 | [Copilot PR #101 Review Findings](docs/issues/2026-06-28-copilot-pr101-review-findings.md) | v1.11.0: Vault tokens out of `curl` argv via `--config` mode-600 header files + unused `_vault_ns` removed + API docs (`b2ed5b80`); `_seed_source_data`-unused deferred to `docs/bugs/` |
 | 2026-06-27 | [v1.11.0 P4 live-verification gap](docs/issues/2026-06-27-v1-11-0-p4-live-verification-gap.md) | Tier 3 P4 failover watchdog: probe→flip→re-seed→reconcile path and LaunchAgent install not exercised live at merge; `ubuntu-hostinger` still lacked P2b in-cluster Vault objects (later closed by live verify on 2026-06-28) |
-| 2026-06-27 | [v1.11.0 P3 live-verification gap](docs/issues/2026-06-27-v1-11-0-p3-live-verification-gap.md) | Tier 3 P3 canonical seeding: `ubuntu-hostinger` `svc/vault` + `secret/vault-root` `NotFound`, so Change 4 kept the spec's assumed names |
 
 [All issues →](docs/issues/)
 

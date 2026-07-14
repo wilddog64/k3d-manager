@@ -68,7 +68,7 @@ jobs:
           set -euo pipefail
           yamllint .github/workflows/*.yml
 
-      - name: Run lib unit BATS
+      - name: Run unit BATS (lib + etc + trivy plugin)
         shell: bash
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
@@ -76,7 +76,10 @@ jobs:
           K3DM_COPILOT_LIVE_TESTS: "1"
         run: |
           set -euo pipefail
-          bats scripts/tests/lib
+          bats \
+            scripts/tests/lib \
+            scripts/tests/etc \
+            scripts/tests/plugins/trivy_operator_observability.bats
 
   detect:
     needs: lint
