@@ -16,6 +16,7 @@ trivy:
 
 operator:
   scanJobTTL: 1h
+  builtInTrivyServer: true
   vulnerabilityReportsPlugin: Trivy
   configAuditScannerEnabled: true
   resources:

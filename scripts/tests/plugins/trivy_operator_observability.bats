@@ -39,6 +39,14 @@ ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.ya
   [ "${status}" -eq 0 ]
 }
 
+@test "trivy observability: both values files enable the built-in trivy server (ClientServer mode)" {
+  run grep -F -- 'builtInTrivyServer: true' "${SETTINGS}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'builtInTrivyServer: true' "${ACG_SETTINGS}"
+  [ "${status}" -eq 0 ]
+}
+
 @test "trivy observability: acg trivy application set uses the acg-specific values file" {
   run grep -F -- 'valuesFile: scripts/etc/helm/observability/trivy-operator-acg-values.yaml' "${ACG_APPSET}"
   [ "${status}" -eq 0 ]
