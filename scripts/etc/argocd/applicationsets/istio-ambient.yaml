@@ -1,0 +1,68 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: istio-ambient
+  namespace: ${ARGOCD_NAMESPACE}
+  labels:
+    managed-by: k3d-manager
+    app-type: mesh
+spec:
+  goTemplate: true
+  generators:
+    - list:
+        elements:
+          - name: istio-base
+            chart: base
+            wave: "0"
+            values: |
+              defaultRevision: default
+          - name: istiod
+            chart: istiod
+            wave: "1"
+            values: |
+              profile: ambient
+          - name: istio-cni
+            chart: cni
+            wave: "2"
+            values: |
+              profile: ambient
+              cni:
+                cniConfDir: /var/lib/rancher/k3s/agent/etc/cni/net.d
+                cniBinDir: /var/lib/rancher/k3s/data/current/bin
+          - name: ztunnel
+            chart: ztunnel
+            wave: "3"
+            values: ""
+  template:
+    metadata:
+      name: '{{ .name }}-${APP_CLUSTER_NAME}'
+      namespace: ${ARGOCD_NAMESPACE}
+      annotations:
+        argocd.argoproj.io/sync-wave: '{{ .wave }}'
+      labels:
+        managed-by: k3d-manager
+        app-type: mesh
+    spec:
+      project: platform
+      destination:
+        name: ${APP_CLUSTER_NAME}
+        namespace: istio-system
+      source:
+        repoURL: https://istio-release.storage.googleapis.com/charts
+        chart: '{{ .chart }}'
+        targetRevision: ${AMBIENT_ISTIO_VERSION}
+        helm:
+          releaseName: '{{ .name }}'
+          values: '{{ .values }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 10
+          backoff:
+            duration: 15s
+            maxDuration: 3m
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
