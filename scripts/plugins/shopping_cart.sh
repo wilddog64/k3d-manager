@@ -1059,10 +1059,11 @@ _AMBIENT_ISTIO_VERSION="${AMBIENT_ISTIO_VERSION:-1.24.2}"
 function _ambient_install_cilium() {
   local ssh_user="$1" external_ip="$2" ssh_key="$3"
   local ssh_cmd
+  local remote_kubeconfig="/home/${ssh_user}/.kube/k3s.yaml"
   ssh_cmd="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${ssh_key} ${ssh_user}@${external_ip}"
 
   # Idempotent — skip if already installed
-  if ${ssh_cmd} "KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm status cilium -n kube-system >/dev/null 2>&1" 2>/dev/null; then
+  if ${ssh_cmd} "KUBECONFIG=${remote_kubeconfig} helm status cilium -n kube-system >/dev/null 2>&1" 2>/dev/null; then
     _info "[shopping_cart] Cilium already installed — skipping"
     return 0
   fi
@@ -1073,9 +1074,9 @@ function _ambient_install_cilium() {
     if ! command -v helm >/dev/null 2>&1; then
       curl -fsSL https://raw.githubusercontent.com/helm/helm/v3.17.3/scripts/get-helm-3 | DESIRED_VERSION=v3.17.3 bash >/dev/null
     fi
-    KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm repo add cilium https://helm.cilium.io/ >/dev/null 2>&1 || true
-    KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm repo update >/dev/null 2>&1
-    KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install cilium cilium/cilium \
+    KUBECONFIG=${remote_kubeconfig} helm repo add cilium https://helm.cilium.io/ >/dev/null 2>&1 || true
+    KUBECONFIG=${remote_kubeconfig} helm repo update >/dev/null 2>&1
+    KUBECONFIG=${remote_kubeconfig} helm upgrade --install cilium cilium/cilium \
       --version '${_AMBIENT_CILIUM_VERSION}' \
       --namespace kube-system \
       --set operator.replicas=1 \
@@ -1085,7 +1086,7 @@ function _ambient_install_cilium() {
       --set k8sServicePort=6443
   "
   local attempts=0
-  until ${ssh_cmd} "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n kube-system rollout status daemonset/cilium --timeout=10s >/dev/null 2>&1" 2>/dev/null; do
+  until ${ssh_cmd} "KUBECONFIG=${remote_kubeconfig} kubectl -n kube-system rollout status daemonset/cilium --timeout=10s >/dev/null 2>&1" 2>/dev/null; do
     (( attempts++ ))
     if (( attempts >= 18 )); then
       _err "[shopping_cart] Cilium DaemonSet not ready after 3 min"
