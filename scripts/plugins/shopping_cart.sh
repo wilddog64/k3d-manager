@@ -1054,6 +1054,7 @@ REMOTE
 }
 
 _AMBIENT_CILIUM_VERSION="${AMBIENT_CILIUM_VERSION:-1.16.5}"
+_AMBIENT_POD_CIDR="${AMBIENT_POD_CIDR:-10.42.0.0/16}"
 _AMBIENT_ISTIO_VERSION="${AMBIENT_ISTIO_VERSION:-1.24.2}"
 
 function _ambient_install_cilium() {
@@ -1082,6 +1083,7 @@ function _ambient_install_cilium() {
       --set operator.replicas=1 \
       --set cni.exclusive=false \
       --set kubeProxyReplacement=true \
+      --set ipam.operator.clusterPoolIPv4PodCIDRList='{${_AMBIENT_POD_CIDR}}' \
       --set k8sServiceHost='${external_ip}' \
       --set k8sServicePort=6443
   "
