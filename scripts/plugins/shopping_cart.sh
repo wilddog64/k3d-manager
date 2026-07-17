@@ -1053,6 +1053,49 @@ REMOTE
   _info "[shopping_cart] vault-bridge active on ${ssh_host}:8201"
 }
 
+_AMBIENT_CILIUM_VERSION="${AMBIENT_CILIUM_VERSION:-1.16.5}"
+_AMBIENT_ISTIO_VERSION="${AMBIENT_ISTIO_VERSION:-1.24.2}"
+
+function _ambient_install_cilium() {
+  local ssh_user="$1" external_ip="$2" ssh_key="$3"
+  local ssh_cmd
+  ssh_cmd="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${ssh_key} ${ssh_user}@${external_ip}"
+
+  # Idempotent — skip if already installed
+  if ${ssh_cmd} "KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm status cilium -n kube-system >/dev/null 2>&1" 2>/dev/null; then
+    _info "[shopping_cart] Cilium already installed — skipping"
+    return 0
+  fi
+
+  _info "[shopping_cart] Installing Cilium ${_AMBIENT_CILIUM_VERSION} (CNI for Istio ambient)..."
+  # shellcheck disable=SC2029
+  ${ssh_cmd} "
+    if ! command -v helm >/dev/null 2>&1; then
+      curl -fsSL https://raw.githubusercontent.com/helm/helm/v3.17.3/scripts/get-helm-3 | DESIRED_VERSION=v3.17.3 bash >/dev/null
+    fi
+    KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm repo add cilium https://helm.cilium.io/ >/dev/null 2>&1 || true
+    KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm repo update >/dev/null 2>&1
+    KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm upgrade --install cilium cilium/cilium \
+      --version '${_AMBIENT_CILIUM_VERSION}' \
+      --namespace kube-system \
+      --set operator.replicas=1 \
+      --set cni.exclusive=false \
+      --set kubeProxyReplacement=true \
+      --set k8sServiceHost='${external_ip}' \
+      --set k8sServicePort=6443
+  "
+  local attempts=0
+  until ${ssh_cmd} "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl -n kube-system rollout status daemonset/cilium --timeout=10s >/dev/null 2>&1" 2>/dev/null; do
+    (( attempts++ ))
+    if (( attempts >= 18 )); then
+      _err "[shopping_cart] Cilium DaemonSet not ready after 3 min"
+      return 1
+    fi
+    sleep 10
+  done
+  _info "[shopping_cart] Cilium ready"
+}
+
 function deploy_app_cluster() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<'HELP'
@@ -1090,13 +1133,10 @@ HELP
   local ssh_host="${UBUNTU_K3S_SSH_HOST:-ubuntu}"
   local ssh_user="${UBUNTU_K3S_SSH_USER:-ubuntu}"
   local external_ip="${UBUNTU_K3S_EXTERNAL_IP:-}"
-  if [[ -z "$external_ip" ]]; then
-    if _command_exist awk; then
-      external_ip=$(awk -v host="${ssh_host}" \
-        '$1=="Host" && $2==host {found=1; next} found && $1=="HostName" {print $2; exit}' \
-        "${HOME}/.ssh/config" 2>/dev/null)
-    fi
-  fi
+  [[ -z "${external_ip}" ]] && _command_exist awk && \
+    external_ip=$(awk -v host="${ssh_host}" \
+      '$1=="Host" && $2==host {found=1; next} found && $1=="HostName" {print $2; exit}' \
+      "${HOME}/.ssh/config" 2>/dev/null)
   : "${external_ip:=${ssh_host}}"
   local ssh_key="${UBUNTU_K3S_SSH_KEY:-${HOME}/.ssh/k3d-manager-key.pem}"
   local kube_context="ubuntu-k3s"
@@ -1104,22 +1144,27 @@ HELP
 
   _ensure_k3sup
 
-  if [[ ! -f "${ssh_key}" ]]; then
+  [[ -f "${ssh_key}" ]] || {
     _err "[shopping_cart] SSH key not found: ${ssh_key}"
     return 1
-  fi
+  }
 
   mkdir -p "${kubeconfig_dir}" "${HOME}/.kube"
 
   _info "[shopping_cart] Installing k3s on ${ssh_user}@${external_ip} via k3sup..."
   _ubuntu_k3s_trust_host "${external_ip}"
+  local _k3s_extra_args='--disable traefik --disable servicelb'
+  if [[ "${K3S_AMBIENT_MESH:-false}" == "true" ]]; then
+    _k3s_extra_args="${_k3s_extra_args} --flannel-backend=none --disable-network-policy"
+    _info "[shopping_cart] K3S_AMBIENT_MESH=true — flannel disabled; Cilium will be installed as CNI"
+  fi
   _run_command -- k3sup install \
     --ip "${external_ip}" \
     --user "${ssh_user}" \
     --ssh-key "${ssh_key}" \
     --local-path "${local_kubeconfig}" \
     --context "${kube_context}" \
-    --k3s-extra-args '--disable traefik --disable servicelb'
+    --k3s-extra-args "${_k3s_extra_args}"
 
   # Copy system kubeconfig to user home so add_ubuntu_k3s_cluster can read it without sudo
   # SC2087: single-quoted heredoc intentionally prevents local expansion
@@ -1131,6 +1176,9 @@ $SUDO cp /etc/rancher/k3s/k3s.yaml "${HOME}/.kube/k3s.yaml"
 $SUDO chown "$(id -u)":"$(id -g)" "${HOME}/.kube/k3s.yaml"
 chmod 600 "${HOME}/.kube/k3s.yaml"
 REMOTE
+
+  [[ "${K3S_AMBIENT_MESH:-false}" != "true" ]] || \
+    _ambient_install_cilium "${ssh_user}" "${external_ip}" "${ssh_key}" || return 1
 
   _info "[shopping_cart] Waiting for node to be Ready..."
   local attempts=0
@@ -1191,8 +1239,13 @@ function _ssm_bootstrap_k3s() {
   ssm_wait "${server_id}" || return 1
 
   _info "[shopping_cart] Installing k3s server on ${server_alias} via SSM..."
+  local _k3s_exec='--disable traefik --disable servicelb'
+  if [[ "${K3S_AMBIENT_MESH:-false}" == "true" ]]; then
+    _err "[shopping_cart] K3S_AMBIENT_MESH=true with K3S_AWS_SSM_ENABLED=true is unsupported in this release — ambient requires Cilium before the SSM node-Ready wait"
+    return 1
+  fi
   ssm_exec "${server_id}" \
-    "curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='--disable traefik --disable servicelb' sh -" \
+    "curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC='${_k3s_exec}' sh -" \
     || return 1
 
   _info "[shopping_cart] Waiting for k3s node to be Ready..."
