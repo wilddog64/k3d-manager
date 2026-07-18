@@ -62,22 +62,31 @@ file's metadata/label structure verbatim, only change `name:` and the embedded J
   - id `15` **Trivy Drilldown Banner** (text panel)
   - id `18` **Trivy Infra Findings Drilldown** (the `label_replace(...)` rbac/clusterrole table)
   - id `11` **Trivy Scan Job Failures (30m)** (`sum(increase(kube_job_status_failed{namespace="trivy-system",job_name=~"scan-.*"}[30m]))`)
-- **Loki panel handling — VERIFY BEFORE INCLUDING:** panel id `12` **Trivy Operator Job Reconcile
-  Errors** is a Loki `logs` panel (`{namespace="trivy-system",pod=~"trivy-operator.*"} | json | ...`).
-  Only include it if the app-cluster Grafana has a working `loki` datasource with trivy-system logs
-  (check: `kubectl --context ubuntu-k3s get datasources` via the Grafana API, or the acg values
-  `additionalDataSources`). If no app-cluster Loki datasource exists, OMIT panel 12 and note it in
-  the commit body — do NOT ship a panel that renders "Datasource loki not found".
+- **Loki panel id `12` — OMIT (confirmed 2026-07-18).** Panel id `12` **Trivy Operator Job Reconcile
+  Errors** is a Loki `logs` panel. The app-cluster (ubuntu-k3s) Grafana has **NO `loki` datasource**
+  — only `prometheus` (uid `prometheus`, default) + `alertmanager` (verified via
+  `/api/datasources`). So a Loki panel would render "Datasource loki not found". **Do NOT include
+  panel 12** in the new dashboard. (Follow-up, OUT of scope here: the app-cluster Grafana is missing
+  a `loki` datasource entirely — every log panel is dead there; file separately if log panels are
+  wanted on the app cluster.)
+- **Datasource uid — verified present:** the moved metric panels hard-code
+  `datasource: { type: prometheus, uid: "prometheus" }`, and the app-cluster Grafana's default
+  Prometheus datasource uid is exactly `prometheus` — so the panels resolve and return data
+  (verified live: Trivy Infra High/Critical = 45, Cluster Compliance Fail = 4, RBAC findings = 38).
 - Reuse the panels' existing `datasource` uids exactly (`prometheus` for the metric panels). Do not
   invent new uids.
 
 ### Change 2 — `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml`: remove the moved panels
 
-Delete panel objects `id 11, 12, 13, 14, 15, 18` (the Trivy panels) from the embedded
-`argocd-image-updater-hub.json`. **Keep** panels `1–9` (Image Updater + Watched App + App CVE Scan) —
-those query hub-only metrics (`argocd_app_info`, `argocd_app_sync_total`, image-updater deployment,
-`app-cve-scan` jobs) and stay on the hub dashboard. Ensure the resulting JSON is still valid
-(no dangling commas) and the dashboard `uid`/`title` are unchanged.
+Delete panel objects `id 11, 13, 14, 15, 18` (the Prometheus-based Trivy panels — the ones being
+moved to the app cluster) from the embedded `argocd-image-updater-hub.json`.
+
+**KEEP** panel `id 12` (**Trivy Operator Job Reconcile Errors**) on the hub dashboard — it is a Loki
+panel and the hub Grafana has a Loki datasource (the app cluster does not), so it works on the hub
+and would be lost if removed. **KEEP** panels `1–9` (Image Updater + Watched App + App CVE Scan) —
+hub-only metrics (`argocd_app_info`, `argocd_app_sync_total`, image-updater deployment, `app-cve-scan`
+jobs). Ensure the resulting JSON is still valid (no dangling commas) and the dashboard `uid`/`title`
+are unchanged.
 
 ### Change 3 — `scripts/plugins/observability.sh`: apply the trivy dashboard to the app cluster
 
@@ -124,8 +133,8 @@ restart — acceptable because these dashboards are configmap-managed and stable
 
 | File | Change |
 |------|--------|
-| `scripts/etc/grafana/dashboards/trivy-security-configmap.yaml` | NEW app-cluster trivy dashboard (panels 11,13,14,15,18[,12 if loki]) |
-| `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml` | remove trivy panels 11,12,13,14,15,18 (keep 1–9) |
+| `scripts/etc/grafana/dashboards/trivy-security-configmap.yaml` | NEW app-cluster trivy dashboard (Prometheus panels 11,13,14,15,18; NO loki panel — app cluster has no loki datasource) |
+| `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml` | remove trivy panels 11,13,14,15,18 (KEEP panel 12 loki + panels 1–9) |
 | `scripts/plugins/observability.sh` | add `_observability_apply_trivy_dashboard` + call it for the app cluster |
 | `scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml` | `grafana.sidecar.dashboards.provider.disableDelete: true` |
 | `scripts/tests/plugins/trivy_operator_observability.bats` | move the trivy-panel assertions to the new dashboard file; assert the argocd dashboard no longer contains them |
