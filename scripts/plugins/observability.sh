@@ -417,6 +417,7 @@ function _deploy_pushgateway_acg() {
     _kubectl apply --context "${_app_context}" -f "${_dashboard_cm}" >/dev/null \
       && _info "[observability] k3dm deployment metrics dashboard applied"
   fi
+  _observability_apply_trivy_dashboard "${_app_context}"
 }
 
 function _deploy_promtail_acg() {
@@ -436,6 +437,16 @@ function _observability_apply_argocd_dashboard() {
   if [[ -f "${_dashboard_manifest}" ]]; then
     _kubectl apply --context "${_app_context}" -f "${_dashboard_manifest}" >/dev/null \
       && _info "[observability] ArgoCD/Image Updater dashboard applied on ${_app_context}"
+  fi
+}
+
+function _observability_apply_trivy_dashboard() {
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
+  local _dashboard_cm="${SCRIPT_DIR}/etc/grafana/dashboards/trivy-security-configmap.yaml"
+  if [[ -f "${_dashboard_cm}" ]]; then
+    _kubectl apply --context "${_app_context}" -f "${_dashboard_cm}" >/dev/null \
+      && _info "[observability] Trivy security dashboard applied on ${_app_context}"
   fi
 }
 

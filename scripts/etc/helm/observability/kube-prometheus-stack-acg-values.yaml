@@ -16,6 +16,10 @@ defaultRules:
 
 grafana:
   enabled: true
+  sidecar:
+    dashboards:
+      provider:
+        disableDelete: true
   additionalDataSources:
     - name: prometheus-acg
       type: prometheus
