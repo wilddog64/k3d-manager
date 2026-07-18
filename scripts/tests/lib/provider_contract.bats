@@ -492,7 +492,8 @@ teardown_file() {
 
   run cat "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"name: data-layer"* ]]
+  [[ "$output" == *"name: '{{.name}}-data-layer'"* ]]
+  [[ "$output" != *"name: data-layer"* ]]
   [[ "$output" == *"k3d-manager/role: app-cluster"* ]]
   [[ "$output" == *".spec.persistentVolumeClaimRetentionPolicy"* ]]
   [[ "$output" == *"name: services-git"* ]]
