@@ -111,10 +111,11 @@ if not isinstance(services, list) or not services:
     sys.exit(1)
 
 for svc in services:
-    icon = "OK " if svc.get("ok") else "ERR"
+    _st = svc.get("ok")
+    icon = "OK " if _st is True else ("--" if _st is None else "ERR")
     print(f"  [{icon}] {svc.get('name')}: {svc.get('detail')}")
 
-not_ok = [svc.get("name") for svc in services if not svc.get("ok")]
+not_ok = [svc.get("name") for svc in services if svc.get("ok") is False]
 print(f"[PASS] health response valid — {len(services)} services reported")
 
 if require_all_ok and not_ok:

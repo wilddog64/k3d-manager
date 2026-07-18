@@ -423,7 +423,8 @@ if [[ -n "${_WEBHOOK_TOKEN}" ]]; then
 import sys, json
 data = json.load(sys.stdin)
 for s in data.get('services', []):
-    icon = '✅' if s['ok'] else '❌'
+    _st = s.get('ok')
+    icon = '✅' if _st is True else ('⚪' if _st is None else '❌')
     print(f'  {icon} {s[\"name\"]}: {s[\"detail\"]}')
 "
   else
