@@ -176,6 +176,7 @@ function _hostinger_set_active_app_cluster() {
   local argocd_ns="${ARGOCD_NAMESPACE:-cicd}"
   local -a hub_kubectl=()
   read -r -a hub_kubectl <<< "$(_argocd_hub_kubectl_cmd)"
+  local exclusive="${K3DM_EXCLUSIVE_APP_CLUSTER:-false}"
   local secret_name cluster_name
   while IFS= read -r secret_name; do
     [[ -z "${secret_name}" ]] && continue
@@ -185,11 +186,15 @@ function _hostinger_set_active_app_cluster() {
         printf 'ERROR: %s\n' "[k3s-hostinger] failed to label ${secret_name} as the active app-cluster on the hub" >&2
         return 1
       fi
-    else
+    elif [[ "${exclusive}" == "true" ]]; then
       "${hub_kubectl[@]}" label "${secret_name}" -n "${argocd_ns}" k3d-manager/role- >/dev/null 2>&1 || true
     fi
   done < <("${hub_kubectl[@]}" get secrets -n "${argocd_ns}" -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null)
-  _info "[k3s-hostinger] app-cluster role label set on '${_HOSTINGER_KUBE_CONTEXT}' (cleared from others)"
+  if [[ "${exclusive}" == "true" ]]; then
+    _info "[k3s-hostinger] app-cluster role label set on '${_HOSTINGER_KUBE_CONTEXT}' (exclusive: cleared from others)"
+  else
+    _info "[k3s-hostinger] app-cluster role label set on '${_HOSTINGER_KUBE_CONTEXT}' (additive: other app-clusters keep their role)"
+  fi
 }
 
 function _hostinger_deregister_cluster() {

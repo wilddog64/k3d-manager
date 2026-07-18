@@ -1211,17 +1211,22 @@ function _argocd_set_active_app_cluster() {
       return 1
    fi
    local _ns="${ARGOCD_NAMESPACE:-cicd}"
+   local _exclusive="${K3DM_EXCLUSIVE_APP_CLUSTER:-false}"
    local _s _cname
    while IFS= read -r _s; do
       [[ -z "${_s}" ]] && continue
       _cname="$(_kubectl get "${_s}" -n "${_ns}" -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/cluster-name}' 2>/dev/null)"
       if [[ "${_cname}" == "${_active}" ]]; then
          _kubectl label "${_s}" -n "${_ns}" k3d-manager/role=app-cluster --overwrite >/dev/null 2>&1 || true
-      else
+      elif [[ "${_exclusive}" == "true" ]]; then
          _kubectl label "${_s}" -n "${_ns}" k3d-manager/role- >/dev/null 2>&1 || true
       fi
    done < <(_kubectl get secrets -n "${_ns}" -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null)
-   _info "[argocd] app-cluster role label set on '${_active}' (cleared from others)"
+   if [[ "${_exclusive}" == "true" ]]; then
+      _info "[argocd] app-cluster role label set on '${_active}' (exclusive: cleared from others)"
+   else
+      _info "[argocd] app-cluster role label set on '${_active}' (additive: other app-clusters keep their role)"
+   fi
 }
 
 function _argocd_hub_kubectl_cmd() {
