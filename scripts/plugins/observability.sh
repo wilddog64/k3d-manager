@@ -16,6 +16,15 @@ function deploy_observability() {
     return 1
   fi
 
+  local _dash_appset="${SCRIPT_DIR}/etc/argocd/applicationsets/grafana-dashboards-hub.yaml"
+  # shellcheck disable=SC2016
+  if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_dash_appset}" | _kubectl apply -f -; then
+    _info "[observability] Hub Grafana dashboard ApplicationSet applied"
+  else
+    _err "[observability] Failed to apply Hub Grafana dashboard ApplicationSet"
+    return 1
+  fi
+
   _info "[observability] Reading Alertmanager credentials from Vault..."
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token
@@ -328,6 +337,15 @@ function deploy_observability_acg() {
     _info "[observability] ACG ApplicationSet applied — ArgoCD will sync monitoring/trivy-system on ${_app_context}"
   else
     _err "[observability] Failed to apply ACG observability ApplicationSet"
+    return 1
+  fi
+
+  local _dash_appset="${SCRIPT_DIR}/etc/argocd/applicationsets/grafana-dashboards-acg.yaml"
+  # shellcheck disable=SC2016
+  if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_dash_appset}" | _kubectl apply -f -; then
+    _info "[observability] App-cluster Grafana dashboard ApplicationSet applied"
+  else
+    _err "[observability] Failed to apply app-cluster Grafana dashboard ApplicationSet"
     return 1
   fi
 
