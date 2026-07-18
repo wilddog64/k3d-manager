@@ -3,6 +3,7 @@
 VALUES="${BATS_TEST_DIRNAME}/../../etc/argocd/values.yaml.tmpl"
 PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
 DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argocd.yaml"
+TRIVY_DASH="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/trivy-security-configmap.yaml"
 
 @test "metrics: serviceMonitor enabled for all four components" {
   run grep -cF -- 'serviceMonitor:' "${VALUES}"
@@ -149,54 +150,66 @@ DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argoc
 }
 
 @test "metrics: dashboard includes trivy infra security panels" {
-  run grep -F -- 'Trivy Drilldown Banner' "${DASH}"
+  run grep -F -- 'Trivy Drilldown Banner' "${TRIVY_DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'One row per High/Critical RBAC finding. The `source` column separates namespaced Roles (`rbac`) from cluster-scoped ClusterRoles (`clusterrole`). `Value` is the number of failing checks at that severity for that object, not the number of findings.' "${DASH}"
+  run grep -F -- 'One row per High/Critical RBAC finding. The `source` column separates namespaced Roles (`rbac`) from cluster-scoped ClusterRoles (`clusterrole`). `Value` is the number of failing checks at that severity for that object, not the number of findings.' "${TRIVY_DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'Trivy Infra High/Critical Findings' "${TRIVY_DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- '"title": "Open Trivy findings drilldown"' "${TRIVY_DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- '"url": "?viewPanel=18"' "${TRIVY_DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'Trivy Cluster Compliance Failures' "${TRIVY_DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'sort_desc(sum by (title,description,status) (trivy_cluster_compliance{status=\"Fail\"}) > 0)' "${TRIVY_DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'Trivy Infra Findings Drilldown' "${TRIVY_DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'sort_desc((label_replace(label_replace(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}) > 0, \"source\", \"rbac\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review namespace-scoped permissions for this Role\", \"resource_name\", \".*\") or label_replace(label_replace(label_replace(label_replace(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}) > 0, \"resource_name\", \"$1\", \"name\", \"(.*)\"), \"namespace\", \"cluster\", \"\", \"\"), \"source\", \"clusterrole\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review cluster-wide permissions for this ClusterRole\", \"resource_name\", \".*\")))' "${TRIVY_DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'Trivy Infra High/Critical Findings' "${DASH}"
-  [ "${status}" -eq 0 ]
-
-  run grep -F -- '"title": "Open Trivy findings drilldown"' "${DASH}"
-  [ "${status}" -eq 0 ]
-
-  run grep -F -- '"url": "?viewPanel=18"' "${DASH}"
-  [ "${status}" -eq 0 ]
+  [ "${status}" -ne 0 ]
 
   run grep -F -- 'Trivy Cluster Compliance Failures' "${DASH}"
-  [ "${status}" -eq 0 ]
-
-  run grep -F -- 'sort_desc(sum by (title,description,status) (trivy_cluster_compliance{status=\"Fail\"}) > 0)' "${DASH}"
-  [ "${status}" -eq 0 ]
-
-  run grep -F -- 'Trivy Infra Findings Drilldown' "${DASH}"
-  [ "${status}" -eq 0 ]
-
-  run grep -F -- 'sort_desc((label_replace(label_replace(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}) > 0, \"source\", \"rbac\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review namespace-scoped permissions for this Role\", \"resource_name\", \".*\") or label_replace(label_replace(label_replace(label_replace(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}) > 0, \"resource_name\", \"$1\", \"name\", \"(.*)\"), \"namespace\", \"cluster\", \"\", \"\"), \"source\", \"clusterrole\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review cluster-wide permissions for this ClusterRole\", \"resource_name\", \".*\")))' "${DASH}"
-  [ "${status}" -eq 0 ]
+  [ "${status}" -ne 0 ]
 }
 
 @test "metrics: dashboard has exactly one trivy drilldown table and banner" {
-  run grep -cF -- '### Trivy drilldown' "${DASH}"
+  run grep -cF -- '### Trivy drilldown' "${TRIVY_DASH}"
   [ "${status}" -eq 0 ]
   [ "${output}" -eq 1 ]
 
-  run grep -F -- '"title": "Trivy Drilldown",' "${DASH}"
+  run grep -F -- '### Trivy drilldown' "${DASH}"
   [ "${status}" -ne 0 ]
 
-  run grep -F -- 'Trivy Infra RBAC Drilldown' "${DASH}"
+  run grep -F -- '"title": "Trivy Drilldown",' "${TRIVY_DASH}"
   [ "${status}" -ne 0 ]
 
-  run grep -F -- 'Trivy ClusterRole Drilldown' "${DASH}"
+  run grep -F -- 'Trivy Infra RBAC Drilldown' "${TRIVY_DASH}"
   [ "${status}" -ne 0 ]
 
-  run grep -F -- '"url": "?viewPanel=16"' "${DASH}"
+  run grep -F -- 'Trivy ClusterRole Drilldown' "${TRIVY_DASH}"
+  [ "${status}" -ne 0 ]
+
+  run grep -F -- '"url": "?viewPanel=16"' "${TRIVY_DASH}"
   [ "${status}" -ne 0 ]
 }
 
 @test "metrics: dashboard banner uses real newlines not literal backslash-n" {
   run grep -F -- '\\n' "${DASH}"
+  [ "${status}" -ne 0 ]
+
+  run grep -F -- '\\n' "${TRIVY_DASH}"
   [ "${status}" -ne 0 ]
 }
 
