@@ -282,7 +282,7 @@ def _audit_remote_action(path, action_name, actor, role, allowed, body=None, rea
     try:
         AUDIT_DIR.mkdir(parents=True, exist_ok=True)
         payload = {
-            "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "ts": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
             "path": path,
             "action": action_name,
             "actor": actor,
@@ -488,7 +488,7 @@ def _run_cluster(job_id, action, provider="aws"):
     _out_file = job_dir / "output"
     _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az", "hostinger": "k3s-hostinger"}
     _cluster_provider = _provider_map.get(provider, "k3s-aws")
-    _start = datetime.datetime.utcnow().timestamp()
+    _start = datetime.datetime.now(datetime.timezone.utc).timestamp()
     _progress_timer = None
     _last_line_count = 0
     _stall_tick_count = 0
@@ -502,7 +502,7 @@ def _run_cluster(job_id, action, provider="aws"):
 
     def _post_progress():
         nonlocal _progress_timer, _last_line_count, _stall_tick_count, _stall_analyzed
-        elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
+        elapsed = int((datetime.datetime.now(datetime.timezone.utc).timestamp() - _start) / 60)
         tail = _read_job_tail(_out_file)
         tail_text = "\n".join(tail) if tail else "—"
         _notify_job(job_id, f"⏳ *cluster-{action}* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
@@ -540,7 +540,7 @@ def _run_cluster(job_id, action, provider="aws"):
             _running_procs.pop(job_id, None)
         (job_dir / "status").write_text(status)
         emoji = "✅" if status == "success" else "❌"
-        elapsed_secs = int(datetime.datetime.utcnow().timestamp() - _start)
+        elapsed_secs = int(datetime.datetime.now(datetime.timezone.utc).timestamp() - _start)
         elapsed = elapsed_secs // 60
         summary = f"{emoji} *cluster-{action}* ({provider}) — {status} in {elapsed}m"
         _notify_job(job_id, summary)
@@ -604,7 +604,7 @@ def _run_cluster_resume(job_id, provider="aws"):
     _out_file = job_dir / "output"
     _provider_map = {"aws": "k3s-aws", "gcp": "k3s-gcp", "az": "k3s-az", "hostinger": "k3s-hostinger"}
     _cluster_provider = _provider_map.get(provider, "k3s-aws")
-    _start = datetime.datetime.utcnow().timestamp()
+    _start = datetime.datetime.now(datetime.timezone.utc).timestamp()
     _progress_timer = None
 
     def _log(msg):
@@ -615,7 +615,7 @@ def _run_cluster_resume(job_id, provider="aws"):
 
     def _post_progress():
         nonlocal _progress_timer
-        elapsed = int((datetime.datetime.utcnow().timestamp() - _start) / 60)
+        elapsed = int((datetime.datetime.now(datetime.timezone.utc).timestamp() - _start) / 60)
         tail = _read_job_tail(_out_file)
         tail_text = "\n".join(tail) if tail else "—"
         _notify_job(job_id, f"⏳ *cluster-resume* ({provider}) still running — {elapsed}m elapsed\n```{tail_text}```")
@@ -630,7 +630,7 @@ def _run_cluster_resume(job_id, provider="aws"):
             _running_procs.pop(job_id, None)
         (job_dir / "status").write_text(status)
         emoji = "✅" if status == "success" else "❌"
-        elapsed_secs = int(datetime.datetime.utcnow().timestamp() - _start)
+        elapsed_secs = int(datetime.datetime.now(datetime.timezone.utc).timestamp() - _start)
         elapsed = elapsed_secs // 60
         _notify_job(job_id, f"{emoji} *cluster-resume* ({provider}) — {status} in {elapsed}m")
         _push_metrics("resume", provider, status, elapsed_secs, job_id)
@@ -675,7 +675,7 @@ def _run_cluster_resume(job_id, provider="aws"):
 def _running_cluster_job():
     """Return (job_id, action) if a cluster up/down job is already running, else None."""
     try:
-        now = datetime.datetime.utcnow().timestamp()
+        now = datetime.datetime.now(datetime.timezone.utc).timestamp()
         for entry in sorted(JOB_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
             status_file = entry / "status"
             meta_file = entry / "action"
@@ -694,7 +694,7 @@ def _running_cluster_job():
 def _record_acg_state(provider):
     """Write provision timestamp to Hub platform-ops ConfigMap."""
     import shlex as _shlex_state
-    ts = str(int(datetime.datetime.utcnow().timestamp()))
+    ts = str(int(datetime.datetime.now(datetime.timezone.utc).timestamp()))
     _posix_spawn_capture(
         ["/bin/bash", "-c",
          "kubectl create configmap acg-state"
@@ -1821,7 +1821,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
             active_id, active_action = active
             active_dir = JOB_DIR / active_id
             mtime = active_dir.stat().st_mtime
-            elapsed = int((datetime.datetime.utcnow().timestamp() - mtime) / 60)
+            elapsed = int((datetime.datetime.now(datetime.timezone.utc).timestamp() - mtime) / 60)
             _log(f"⏳ *cluster-{active_action}* in progress (running {elapsed}m) — job `{active_id}`")
             _finish("success")
             return
@@ -1874,7 +1874,7 @@ def _run_cluster_status(job_id, response_url, thread_ts=None, provider=None):
             if acg_state_out.strip() and not acg_state_out.lstrip().startswith("Error"):
                 parts = acg_state_out.strip().split()
                 try:
-                    age_min = int((datetime.datetime.utcnow().timestamp() - int(parts[0])) / 60)
+                    age_min = int((datetime.datetime.now(datetime.timezone.utc).timestamp() - int(parts[0])) / 60)
                     provider = parts[1] if len(parts) > 1 else "aws"
                     header += f" | {provider} | up {age_min}m"
                 except (ValueError, IndexError):
