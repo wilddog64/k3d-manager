@@ -10,6 +10,21 @@
 
 ---
 
+## Before You Start
+
+- Read `memory-bank/activeContext.md` and `memory-bank/progress.md` — this task is the
+  "trivy dashboard split + k3dm flicker" item on branch `k3d-manager-v1.16.0`.
+- `git pull origin k3d-manager-v1.16.0` — work on that branch, never `main`.
+- Read every target file listed above IN FULL before editing:
+  - `scripts/etc/grafana/dashboards/k3dm-deployments-configmap.yaml` (the model for Change 1's structure)
+  - `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml` (source of the panels to copy/remove)
+  - `scripts/plugins/observability.sh` (lines ~336 remove-call, ~415 k3dm apply block)
+  - `scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml` (the `grafana:` block, line ~17)
+  - `scripts/tests/plugins/trivy_operator_observability.bats`
+- Implement exactly what is written — no interpretation, no extra refactors.
+
+---
+
 ## Problem
 
 The public Grafana that users actually reach on `k3s-aws` is the **app-cluster (ubuntu-k3s)**
@@ -166,8 +181,8 @@ restart — acceptable because these dashboards are configmap-managed and stable
 
 ## Definition of Done
 
-- [ ] New app-cluster trivy dashboard configmap created; panels copied verbatim (loki panel 12 only
-      if an app-cluster loki datasource exists — else omitted and noted in commit body).
+- [ ] New app-cluster trivy dashboard configmap created; Prometheus panels 11,13,14,15,18 copied
+      verbatim; loki panel 12 OMITTED (confirmed 2026-07-18 — app cluster has no loki datasource).
 - [ ] Trivy panels removed from the hub dashboard; ArgoCD/Image-Updater/App-CVE panels retained;
       both embedded JSONs still valid.
 - [ ] `observability.sh` applies the trivy dashboard to the app cluster (idempotent `apply`).
