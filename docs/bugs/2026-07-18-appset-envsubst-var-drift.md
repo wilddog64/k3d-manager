@@ -84,8 +84,18 @@ applied instead of a hand-maintained constant.
 
 ### Change 2 — NEW `scripts/tests/plugins/appset_envsubst_coverage.bats`
 
-A guard that fails when any ApplicationSet references a variable the deploy path cannot
-substitute. Write exactly this file:
+A guard against future drift. Write exactly this file.
+
+**Note on what each test does and does not catch** (verified by running this file against
+both the unfixed and fixed code on 2026-07-18):
+
+- **Test 1 is the real gate.** It fails on the current unfixed `argocd.sh` and passes once
+  Change 1 lands — confirmed in both directions, so it is not vacuous.
+- **Test 2 would NOT have caught this bug**, and is not claimed to. `AMBIENT_ISTIO_VERSION`
+  *is* exported (by `istio_ambient.sh`), so test 2 passes even on the unfixed code. It
+  catches a different, complementary failure: an appset variable exported nowhere at all.
+  The defect fixed here — a variable exported by a targeted path but absent from the generic
+  loop's hardcoded list — is made structurally impossible by Change 1, not by test 2.
 
 ```bash
 #!/usr/bin/env bats
@@ -126,8 +136,19 @@ ARGOCD="${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
 - `bash -n scripts/plugins/argocd.sh` — clean
 - `shellcheck -S warning scripts/plugins/argocd.sh` — zero NEW warnings
 - `bats scripts/tests/plugins/appset_envsubst_coverage.bats` — 2/2 pass
-- `bats scripts/tests/plugins/argocd_metrics_servicemonitor.bats` — `15/15`, unchanged
-- `bats scripts/tests/plugins/grafana_dashboard_appsets.bats` — `5/5`, unchanged
+- The full set of suites touching this code path (derived from
+  `grep -rln '_argocd_deploy_applicationsets\|applicationsets' scripts/tests/`), all must
+  pass unchanged:
+  `argocd.bats`, `argocd_app_cluster_generator.bats`, `argocd_image_updater_flap_fix.bats`,
+  `argocd_image_updater_annotations.bats`, `argocd_loki.bats`,
+  `trivy_operator_observability.bats`, `grafana_dashboard_appsets.bats`,
+  `argocd_metrics_servicemonitor.bats` (`15/15`)
+- `bats scripts/tests/lib/provider_contract.bats` — **KNOWN PRE-EXISTING FAILURE, NOT YOURS.**
+  Expected result is **exactly `51/52`, failing ONLY test 17**
+  (`_hostinger_reapply_gitops_applicationsets reapplies data, services, and platform appsets
+  from the current branch`). Verified 2026-07-18 on a clean tree at `4b3b6381` with no patch
+  applied. If any OTHER test in this suite fails, that IS yours — revert it.
+  - Do NOT fix test 17. Do NOT edit that file.
 - `./scripts/k3d-manager _agent_audit` — exit 0
 - Disappearance gate:
   `grep -c "envsubst '\$ARGOCD_NAMESPACE \$K3D_MANAGER_BRANCH \$APP_CLUSTER_NAME'" scripts/plugins/argocd.sh` → **`0`**
