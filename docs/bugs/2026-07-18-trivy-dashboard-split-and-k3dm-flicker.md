@@ -230,6 +230,35 @@ restart — acceptable because these dashboards are configmap-managed and stable
   `grep -c 'Trivy Cluster Compliance Failures' scripts/etc/grafana/dashboards/trivy-security-configmap.yaml` → **1**.
 - Kept-panel gate (hub keeps ArgoCD panels):
   `grep -c 'Watched App Health / Sync' scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml` → **1**.
+- **Structural panel-split gate (authoritative — run this; the greps above are only a smoke check).**
+  Verifies exact panel ids AND the prescribed `gridPos.y` in both files:
+
+  ```bash
+  python3 - <<'PY'
+  import json,subprocess,sys
+  def load(f,k):
+      return json.loads(subprocess.run(['yq','-r','.data["%s"]'%k,f],
+                        capture_output=True,text=True,check=True).stdout)
+  hub=load('scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml','argocd-image-updater-hub.json')
+  new=load('scripts/etc/grafana/dashboards/trivy-security-configmap.yaml','trivy-security.json')
+  hub_ids=sorted(p['id'] for p in hub['panels'])
+  new_ids=sorted(p['id'] for p in new['panels'])
+  hub_y={p['id']:p['gridPos']['y'] for p in hub['panels']}
+  new_y={p['id']:p['gridPos']['y'] for p in new['panels']}
+  ok=True
+  if hub_ids!=[1,2,3,4,5,6,7,8,9,12]: print("FAIL hub ids",hub_ids);ok=False
+  if new_ids!=[11,13,14,15,18]:       print("FAIL new ids",new_ids);ok=False
+  if hub_y.get(12)!=36:               print("FAIL hub panel12 y",hub_y.get(12));ok=False
+  if new_y!={11:0,13:4,14:4,15:12,18:16}: print("FAIL new y",new_y);ok=False
+  if hub['uid']!='argocd-image-updater-hub': print("FAIL hub uid changed");ok=False
+  if new['uid']!='trivy-security':    print("FAIL new uid",new.get('uid'));ok=False
+  bad=[p['id'] for p in new['panels']
+       if isinstance(p.get('datasource'),dict) and p['datasource'].get('uid')!='prometheus']
+  if bad: print("FAIL non-prometheus datasource on panels",bad);ok=False
+  print("PASS" if ok else "FAILED"); sys.exit(0 if ok else 1)
+  PY
+  ```
+  Must print `PASS` and exit 0.
 - `grep -c '_observability_apply_trivy_dashboard' scripts/plugins/observability.sh` → **2** (definition + call).
 - `grep -c 'disableDelete: true' scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml` → **1**.
 - `bats scripts/tests/plugins/trivy_operator_observability.bats` — passes.
