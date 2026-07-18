@@ -17,7 +17,7 @@ spec:
     - missingkey=error
   template:
     metadata:
-      name: data-layer
+      name: '{{.name}}-data-layer'
       labels:
         app-type: data
         app.kubernetes.io/part-of: shopping-cart
