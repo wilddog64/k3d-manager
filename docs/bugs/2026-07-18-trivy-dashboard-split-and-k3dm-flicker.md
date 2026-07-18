@@ -69,9 +69,21 @@ file's metadata/label structure verbatim, only change `name:` and the embedded J
   label `grafana_dashboard: "1"`.
 - Data key: `trivy-security.json`.
 - Dashboard `uid: trivy-security`, `title: "Trivy Security"`, `tags: ["trivy","security"]`.
-- **Panels:** copy these panel objects VERBATIM (JSON, exprs, datasources, gridPos) from
-  `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml`'s embedded
-  `argocd-image-updater-hub.json`, renumbering `y` positions from 0 so they stack cleanly:
+- **Panels:** copy these panel objects VERBATIM (JSON, exprs, `datasource`, and `gridPos`
+  `h`/`w`/`x`) from `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml`'s embedded
+  `argocd-image-updater-hub.json`. **The ONLY field you may change is `gridPos.y`** — set it to
+  these exact values so the panels stack from the top with no gap (the originals start at y=36
+  and straddle the removed loki panel):
+
+  | panel id | title | keep h/w/x | NEW `gridPos.y` |
+  |---|---|---|---|
+  | 11 | Trivy Scan Job Failures (30m) | h=4 w=6 x=0 | **0** |
+  | 13 | Trivy Infra High/Critical Findings | h=4 w=6 x=0 | **4** |
+  | 14 | Trivy Cluster Compliance Failures | h=8 w=18 x=6 | **4** |
+  | 15 | Trivy Drilldown Banner | h=4 w=24 x=0 | **12** |
+  | 18 | Trivy Infra Findings Drilldown | h=8 w=24 x=0 | **16** |
+
+  (13 and 14 share y=4 side-by-side, exactly as they do today.) Panel list, for reference:
   - id `13` **Trivy Infra High/Critical Findings** (`sum(trivy_role_rbacassessments{severity=~"High|Critical"}) + sum(trivy_clusterrole_clusterrbacassessments{severity=~"High|Critical"})`)
   - id `14` **Trivy Cluster Compliance Failures** (`sort_desc(sum by (title,description,status) (trivy_cluster_compliance{status="Fail"}) > 0)`)
   - id `15` **Trivy Drilldown Banner** (text panel)
@@ -88,8 +100,15 @@ file's metadata/label structure verbatim, only change `name:` and the embedded J
   `datasource: { type: prometheus, uid: "prometheus" }`, and the app-cluster Grafana's default
   Prometheus datasource uid is exactly `prometheus` — so the panels resolve and return data
   (verified live: Trivy Infra High/Critical = 45, Cluster Compliance Fail = 4, RBAC findings = 38).
-- Reuse the panels' existing `datasource` uids exactly (`prometheus` for the metric panels). Do not
-  invent new uids.
+- Reuse the panels' existing `datasource` uids exactly (`prometheus` for the metric panels; panel
+  15 is a text panel with `"datasource": null` — keep it null). Do not invent new uids.
+- **⚠️ TRAP — do NOT retarget to `prometheus-acg`.** `kube-prometheus-stack-acg-values.yaml`
+  defines an `additionalDataSources` entry named `prometheus-acg` with uid `P5A1115AEDF367D43`.
+  That is an *additional* datasource, NOT the default. The app-cluster Grafana's **default**
+  Prometheus uid is `prometheus` (verified live via `/api/datasources`), which is what these
+  panels already reference and what returns data. Because the new dashboard targets the "acg"
+  cluster it is tempting to switch the uid to `prometheus-acg` — **do not.** Leave every
+  `datasource.uid` exactly as copied.
 
 ### Change 2 — `scripts/etc/argocd/platform-ops/grafana-dashboard-argocd.yaml`: remove the moved panels
 
@@ -101,7 +120,12 @@ panel and the hub Grafana has a Loki datasource (the app cluster does not), so i
 and would be lost if removed. **KEEP** panels `1–9` (Image Updater + Watched App + App CVE Scan) —
 hub-only metrics (`argocd_app_info`, `argocd_app_sync_total`, image-updater deployment, `app-cve-scan`
 jobs). Ensure the resulting JSON is still valid (no dangling commas) and the dashboard `uid`/`title`
-are unchanged.
+are unchanged (`uid: argocd-image-updater-hub`, `title: ArgoCD Apps & Image Updater Hub`).
+
+**Close the layout gap:** panel 11 currently occupies `y=36..40` and panel 12 sits at `y=40`.
+Once panel 11 is removed, panels 1–9 end at `y=36` and panel 12 leaves a 4-row hole. Set the
+retained panel 12's `gridPos.y` from `40` → **`36`**. This is the ONLY gridPos edit permitted in
+this file; leave panels 1–9 untouched.
 
 ### Change 3 — `scripts/plugins/observability.sh`: apply the trivy dashboard to the app cluster
 
@@ -123,6 +147,40 @@ function _observability_apply_trivy_dashboard() {
 
 Call it in the app-cluster deploy path (same `_app_context` used by
 `_observability_remove_argocd_dashboard`). Use `apply` (idempotent) — do NOT add any delete step.
+
+### Change 3b — `scripts/tests/plugins/trivy_operator_observability.bats`: retarget the moved assertions
+
+**This test WILL FAIL if not updated** — it currently asserts panel 11's title and expr live in the
+hub dashboard, and panel 11 is being moved out. Exact required changes to the
+`@test "trivy observability: dashboard exposes log and metric panels for trivy-system"` block
+(lines ~55–67):
+
+Add a second path var next to the existing `DASH` (line 7):
+
+```bash
+TRIVY_DASH="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/trivy-security-configmap.yaml"
+```
+
+Then, within that test:
+
+| line | assertion | action |
+|---|---|---|
+| 56 | `'Trivy Scan Job Failures (30m)'` | **retarget** `"${DASH}"` → `"${TRIVY_DASH}"` (panel 11 moved) |
+| 59 | `'Trivy Operator Job Reconcile Errors'` | **leave on `"${DASH}"`** (panel 12 stays on hub) |
+| 62 | the `controller=\"job\" \| msg=\"Reconciler error\"` loki expr | **leave on `"${DASH}"`** (panel 12) |
+| 65 | the `kube_job_status_failed{namespace=\"trivy-system\",...}` expr | **retarget** → `"${TRIVY_DASH}"` (panel 11 moved) |
+
+Also add one new disappearance assertion in the same test, proving the split actually happened:
+
+```bash
+  run grep -F -- 'Trivy Cluster Compliance Failures' "${DASH}"
+  [ "$status" -ne 0 ]
+  run grep -F -- 'Trivy Cluster Compliance Failures' "${TRIVY_DASH}"
+  [ "$status" -eq 0 ]
+```
+
+Do NOT touch any other test in this file (the chart-pin, serviceMonitor, builtInTrivyServer,
+appset, and prometheus-rule tests are all out of scope).
 
 ### Change 4 — `scripts/etc/helm/observability/kube-prometheus-stack-acg-values.yaml`: stop the flicker
 
