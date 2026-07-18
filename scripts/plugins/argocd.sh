@@ -1193,7 +1193,10 @@ function _argocd_deploy_applicationsets() {
       filename=$(basename "$file")
       _info "[argocd] Deploying ApplicationSet: $filename"
 
-      if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME' < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
+      local _vars
+      _vars="$(grep -oh '\${[A-Za-z_][A-Za-z0-9_]*}' "$file" 2>/dev/null \
+         | tr -d '${}' | sort -u | sed 's/^/$/' | tr '\n' ' ')"
+      if envsubst "${_vars}" < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
          ((deployed_count++))
       else
          _warn "[argocd] Failed to deploy ApplicationSet: $filename"
