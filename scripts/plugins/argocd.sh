@@ -1162,12 +1162,12 @@ function _argocd_deploy_applicationsets() {
    K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
    export K3D_MANAGER_BRANCH
 
-   APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-ubuntu-hostinger}"
-   export APP_CLUSTER_NAME
    local _active_app_cluster=""
    if declare -f _acg_provider_context >/dev/null 2>&1 && declare -f _acg_resolve_provider >/dev/null 2>&1; then
       _active_app_cluster="$(_acg_provider_context "$(_acg_resolve_provider)" 2>/dev/null)"
    fi
+   APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-${_active_app_cluster:-ubuntu-k3s}}"
+   export APP_CLUSTER_NAME
    _active_app_cluster="${_active_app_cluster:-${APP_CLUSTER_NAME}}"
    _argocd_set_active_app_cluster "${_active_app_cluster}"
 
