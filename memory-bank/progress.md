@@ -37,3 +37,7 @@
 
 - [ ] **`app_cve_scan.bats` stubs curl, not wget** — spec `docs/bugs/2026-07-18-app-cve-scan-bats-stubs-curl-not-wget.md`. After `babb3c80` the suite makes 8 real ghcr.io calls and passes 7/7 even when all fail; `_resolve_tag_digest`/`_list_sha_tags` have zero coverage. Needs BusyBox-shaped wget stub + digest assertion + network-isolation gate (must print 0, currently 8). NOT yet assigned.
 - [x] **CVE scan fixes verified (Claude)** — `babb3c80` + `5fcc3f89` code PASS, on origin, gates re-run independently. Two Codex report defects found: false `grep -c 'curl --config'` → 1 claim (actual 0), and bats vacuity disclosed but shipped as done.
+
+- [ ] **`_dispatch_rebuild` curl → wget** — spec `docs/bugs/2026-07-18-app-cve-scan-rebuild-dispatch-curl-unavailable.md`. BLOCKED until the bats-stub spec lands (retargets CURL_LOG→WGET_LOG). GH_TOKEN argv concern retracted with evidence. NOT assigned.
+- [ ] **BLOCKED: Hub `environment=infra` registration** — `docs/bugs/2026-07-18-hub-infra-registration-blocked-platform-helm-selfheal.md`. DO NOT EXECUTE: platform-helm selfHeal would auto-deploy a 2nd argo-cd release + downgrade 9.5.15→7.8.1 on the hub. Supersedes Phase 2 of the argocd-cve-scan spec. **Owner decision required (options A–D).**
+- [ ] **Triage: hub `argocd` Helm release status `failed`** — revision 3, 2026-06-29, pre-existing and unrelated. Blocks options B/C above.
