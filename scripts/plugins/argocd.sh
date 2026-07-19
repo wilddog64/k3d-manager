@@ -1193,9 +1193,17 @@ function _argocd_deploy_applicationsets() {
       filename=$(basename "$file")
       _info "[argocd] Deploying ApplicationSet: $filename"
 
-      local _vars
+      local _vars _v _name _unset=""
       _vars="$(grep -oh '\${[A-Za-z_][A-Za-z0-9_]*}' "$file" 2>/dev/null \
          | tr -d '${}' | sort -u | sed 's/^/$/' | tr '\n' ' ')"
+      for _v in ${_vars}; do
+         _name="${_v#\$}"
+         [[ -z "${!_name:-}" ]] && _unset="${_unset} ${_name}"
+      done
+      if [[ -n "${_unset}" ]]; then
+         _err "[argocd] Refusing to apply ${filename}: unset variable(s):${_unset}"
+         continue
+      fi
       if envsubst "${_vars}" < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
          ((deployed_count++))
       else

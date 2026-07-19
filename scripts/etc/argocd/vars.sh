@@ -66,3 +66,8 @@ export ARGOCD_APP_CLUSTER_NAME="${ARGOCD_APP_CLUSTER_NAME:-ubuntu-k3s}"
 export ARGOCD_APP_CLUSTER_SERVER="${ARGOCD_APP_CLUSTER_SERVER:-https://host.k3d.internal:6443}"
 export ARGOCD_APP_CLUSTER_INSECURE="${ARGOCD_APP_CLUSTER_INSECURE:-true}"
 export ARGOCD_APP_CLUSTER_TOKEN="${ARGOCD_APP_CLUSTER_TOKEN:-}"
+
+# Istio ambient mesh chart version (consumed by istio-ambient.yaml ApplicationSet).
+# Must be defaulted here, not only in istio_ambient.sh — the ArgoCD bootstrap path
+# applies that ApplicationSet without loading the istio_ambient plugin.
+export AMBIENT_ISTIO_VERSION="${AMBIENT_ISTIO_VERSION:-1.24.2}"
