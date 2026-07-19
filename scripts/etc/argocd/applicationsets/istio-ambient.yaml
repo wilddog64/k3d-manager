@@ -21,6 +21,11 @@ spec:
             wave: "1"
             values: |
               profile: ambient
+              pilot:
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 512Mi
           - name: istio-cni
             chart: cni
             wave: "2"
@@ -32,7 +37,11 @@ spec:
           - name: ztunnel
             chart: ztunnel
             wave: "3"
-            values: ""
+            values: |
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
   template:
     metadata:
       name: '{{ .name }}-${APP_CLUSTER_NAME}'
