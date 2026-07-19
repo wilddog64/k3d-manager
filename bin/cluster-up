@@ -736,23 +736,21 @@ else
     _info "[acg-up] data-layer StatefulSets already ready on ubuntu-k3s — writing checkpoint and skipping sync wait"
     _cp_write "step-10b-data-layer"
   else
-    _info "[acg-up] Applying data-layer ArgoCD Application so sync starts before wait loop..."
-    _run_command -- kubectl apply --context k3d-k3d-cluster \
-      -f "${REPO_ROOT}/../shopping-carts/shopping-cart-infra/argocd/applications/data-layer.yaml"
-    _info "[acg-up] Waiting for ArgoCD to sync data-layer Application (max 300s)..."
+    _dl_app_name="${APP_CLUSTER_NAME:-ubuntu-k3s}-data-layer"
+    _info "[acg-up] data-layer is delivered by the data-git ApplicationSet — waiting for ${_dl_app_name} (max 300s)..."
     _dl_sync_deadline=$(( $(date +%s) + 300 ))
-    until kubectl get application data-layer -n cicd --context k3d-k3d-cluster \
+    until kubectl get application "${_dl_app_name}" -n cicd --context k3d-k3d-cluster \
         -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
       if [[ $(date +%s) -ge ${_dl_sync_deadline} ]]; then
         _warn "[acg-up] data-layer did not reach Synced within 300s — force-syncing and retrying (one attempt)..."
-        argocd app sync data-layer \
+        argocd app sync "${_dl_app_name}" \
           --server localhost:8080 --insecure \
           --force \
           --timeout 180 \
           2>/dev/null \
           || true
         _dl_retry_deadline=$(( $(date +%s) + 180 ))
-        until kubectl get application data-layer -n cicd --context k3d-k3d-cluster \
+        until kubectl get application "${_dl_app_name}" -n cicd --context k3d-k3d-cluster \
             -o jsonpath='{.status.sync.status}' 2>/dev/null | grep -q "Synced"; do
           if [[ $(date +%s) -ge ${_dl_retry_deadline} ]]; then
             _dl_pods_ready=0
@@ -765,7 +763,7 @@ else
               _warn "[acg-up] data-layer ArgoCD sync timed out but all 4 StatefulSets are Ready — writing checkpoint and continuing"
               break
             fi
-            _err "[acg-up] data-layer ArgoCD Application did not reach Synced after force-sync + 180s retry — check: kubectl get application data-layer -n cicd --context k3d-k3d-cluster"
+            _err "[acg-up] data-layer ArgoCD Application did not reach Synced after force-sync + 180s retry — check: kubectl get application ${_dl_app_name} -n cicd --context k3d-k3d-cluster"
             exit 1
           fi
           _info "[acg-up] data-layer not yet Synced after force-sync — waiting..."
@@ -779,7 +777,7 @@ else
     _info "[acg-up] data-layer Application Synced — proceeding to StatefulSet readiness check"
     deploy_shopping_cart_data
     _info "[acg-up] Force-syncing data-layer to trigger PostSync hooks (MinIO bucket init + image upload)..."
-    argocd app sync data-layer \
+    argocd app sync "${_dl_app_name}" \
       --server localhost:8080 --insecure \
       --force \
       --timeout 180 \
