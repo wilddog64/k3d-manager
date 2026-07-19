@@ -30,3 +30,7 @@
 - **[x] v1.14.0 RELEASED (2026-07-12):** PR #104 → `main` `5c412e15`; tag + release + retro done. WS3 Phase 1 per-context Kubernetes auth mount.
 
 > **Older milestones (v1.6.5 → v1.15.0) archived 2026-07-17** → `memory-bank/archive/progress-v1.6.5-v1.15.0.md`. Earlier: `progress-v1.6.x-v1.6.4.md`, `progress-v1.4.2-v1.4.8.md`.
+
+- [ ] **`app-cve-scan` curl missing in trivy image** — spec `docs/bugs/2026-07-18-app-cve-scan-curl-missing-in-trivy-image.md`; curl→BusyBox wget (8 sites) + digest sed re-anchor (2 sites); line 254 `--config` dispatch OUT OF SCOPE (GH_TOKEN argv leak). Assigned to Codex, not yet started.
+- [ ] **`argocd-cve-scan` silent exit-0** — spec `docs/bugs/2026-07-18-argocd-cve-scan-silent-exit-missing-infra-secret.md`; Phase 1 (Codex) fail loudly; Phase 2 (Claude-only) register Hub as `environment=infra` in-cluster Secret. Assigned to Codex for Phase 1, not yet started.
+- [ ] **appset envsubst empty-var guard** — spec `19216447`; Codex has NOT implemented it (verified on origin). Live e2e apply-half blocked until it lands; render-half done and reproduces the bug.
