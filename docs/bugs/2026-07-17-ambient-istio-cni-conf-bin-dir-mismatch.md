@@ -5,6 +5,22 @@
 
 ---
 
+## Before You Start
+
+- Read `memory-bank/activeContext.md` and `memory-bank/progress.md` — this is the
+  "istio-cni conf/bin dir mismatch" OPEN blocker on branch `k3d-manager-v1.16.0` (the last
+  blocker before the ambient dataplane is fully green on `k3s-aws`).
+- `git pull origin k3d-manager-v1.16.0` — work on that branch, never `main`.
+- Read IN FULL before editing:
+  - `scripts/etc/argocd/applicationsets/istio-ambient.yaml` — the whole istio-cni list element,
+    especially the `helm.values` block scalar and the `cni:` sub-block (currently lines ~34–36).
+  - `scripts/plugins/shopping_cart.sh` — `_ambient_install_cilium`: confirm it sets **no**
+    `cni.confPath` / `cni.binPath` overrides, so Cilium uses its defaults (`/etc/cni/net.d`,
+    `/opt/cni/bin`). This is why istio-cni must be aligned to those same paths.
+- Implement exactly what is written — no interpretation, no scope expansion.
+
+---
+
 ## Problem
 
 On the multi-node `k3s-aws` ambient sandbox (after the Cilium pod-CIDR fix `bcc87f1c`), the
@@ -71,7 +87,7 @@ Expected: istio-cni `1/1` on all nodes; ambient pods schedule.
 
 ### Change 1 — `scripts/etc/argocd/applicationsets/istio-ambient.yaml`: point istio-cni at Cilium's actual CNI paths
 
-**Exact old block (lines 29–31):**
+**Exact old block (lines 34–36):**
 
 ```yaml
               cni:
