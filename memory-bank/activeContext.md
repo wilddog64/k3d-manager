@@ -14,11 +14,10 @@ v1.14.0 RELEASED 2026-07-12 · v1.15.0 RELEASED 2026-07-14 · **v1.16.0 active b
 
 ## Current live cluster state (2026-07-19)
 Fresh hub `k3d-cluster` on **v1.32.0+k3s1** (pin `1cc55252` verified live); ArgoCD in `cicd` + all 10 appsets deployed. `ubuntu-k3s` spoke: 3 nodes Ready, `ubuntu-k3s-data-layer` **Synced/Healthy**, all 7 data-layer pods Running (minio, postgresql-orders/payment/products, rabbitmq, redis-cart, redis-orders-cache), app tier lands on ubuntu-k3s.
-- ⚠️ The data-layer sync is healthy via an **EPHEMERAL live AppProject patch** (added 4 `secrets` destinations). Permanent fix is specced + handed to Codex — until that SHA lands and is verified, a fresh rebuild re-introduces the blocker.
+- `64168cc7` is now on `origin/k3d-manager-v1.16.0`, adding the permanent 4× `secrets` destinations to `shopping-cart.yaml.tmpl` exactly as live-proved earlier; the next fresh rebuild should no longer need the temporary AppProject patch.
 
 ## OPEN blockers
-1. **`shopping-cart` AppProject missing `secrets` destination** — SPEC HANDED TO CODEX (2026-07-19). `docs/bugs/2026-07-19-shopping-cart-appproject-secrets-destination.md`, single file `scripts/etc/argocd/projects/shopping-cart.yaml.tmpl`, add 4 `secrets` destinations mirroring `platform.yaml.tmpl:16-23`. Commit `fix(argocd): permit secrets namespace in shopping-cart AppProject for vault-bridge`. Gates: yq clean · `grep -c 'namespace: secrets'`→4 · `grep -c 'namespace: shopping-cart-'`→12 · bats 15/15 · `_agent_audit` 0 · one file. Live-proved by Claude already; k3s-aws-only (does NOT touch parked Hostinger). **Awaiting Codex SHA → Claude verify on origin.**
-2. **istio-ambient dest validation** — `no clusters with this name: ubuntu-hostinger (and 3 more)` blocks the pod-level istiod/ztunnel verify of `1af15217`. **NOT yet specced.**
+1. **istio-ambient dest validation** — `no clusters with this name: ubuntu-hostinger (and 3 more)` blocks the pod-level istiod/ztunnel verify of `1af15217`. **NOT yet specced.**
 
 ## Hostinger (PARKED — do not investigate without go)
 App tier DOWN. Root cause = **CPU-request over-subscription on the 2-CPU node `srv1754834`** (requests 1710m/85%, istiod needs 500m, actual usage only 16%); istiod Pending 13h → sidecar-injector webhook dead → no injected pod can recreate. Second breakage: `istio-cni` plugin binary missing from the node. `1af15217` already right-sized istiod→100m/ztunnel→100m in-repo but is untested live (blocker 2). LESSON: `preserveResourcesOnDeletion` does NOT protect resources whose Applications predate the flag — the first appset rename still cascade-deletes; strip `resources-finalizer` first.
