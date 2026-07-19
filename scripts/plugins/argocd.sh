@@ -1051,23 +1051,28 @@ EOF
 }
 
 function _argocd_deploy_appproject() {
-   _info "[argocd] Deploying platform AppProject"
+   local -a appprojects=(platform shopping-cart)
+   local -a rendered_files=()
+   local proj appproject_tmpl rendered
 
-   local appproject_tmpl="$ARGOCD_CONFIG_DIR/projects/platform.yaml.tmpl"
+   for proj in "${appprojects[@]}"; do
+      _info "[argocd] Deploying ${proj} AppProject"
 
-   if [[ ! -f "$appproject_tmpl" ]]; then
-      _err "[argocd] AppProject file not found: $appproject_tmpl"
-      return 1
-   fi
+      appproject_tmpl="$ARGOCD_CONFIG_DIR/projects/${proj}.yaml.tmpl"
+      if [[ ! -f "$appproject_tmpl" ]]; then
+         _err "[argocd] AppProject file not found: $appproject_tmpl"
+         return 1
+      fi
 
-   local rendered
-   rendered=$(mktemp -t argocd-appproject.XXXXXX.yaml)
-   trap '$(_cleanup_trap_command "$rendered")' EXIT
-   envsubst '$ARGOCD_NAMESPACE' < "$appproject_tmpl" > "$rendered"
-   _kubectl apply --server-side -f "$rendered" >/dev/null
-   trap '$(_cleanup_trap_command "$rendered")' RETURN
+      rendered=$(mktemp -t argocd-appproject.XXXXXX.yaml)
+      rendered_files+=("$rendered")
+      trap '$(_cleanup_trap_command "${rendered_files[@]}")' EXIT RETURN
+      envsubst '$ARGOCD_NAMESPACE' < "$appproject_tmpl" > "$rendered"
+      _kubectl apply --server-side -f "$rendered" >/dev/null
 
-   _info "[argocd] AppProject deployed: platform"
+      _info "[argocd] AppProject deployed: ${proj}"
+   done
+
    return 0
 }
 

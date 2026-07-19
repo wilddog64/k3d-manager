@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: shopping-cart
+  namespace: ${ARGOCD_NAMESPACE}
+  labels:
+    managed-by: k3d-manager
+    project-type: shopping-cart
+spec:
+  description: Shopping-cart application workloads managed by k3d-manager
+  sourceRepos:
+    - '*'
+  destinations:
+    - namespace: shopping-cart-apps
+      name: ubuntu-k3s
+    - namespace: shopping-cart-apps
+      name: ubuntu-hostinger
+    - namespace: shopping-cart-apps
+      name: ubuntu-gcp
+    - namespace: shopping-cart-apps
+      name: ubuntu-azure
+    - namespace: shopping-cart-data
+      name: ubuntu-k3s
+    - namespace: shopping-cart-data
+      name: ubuntu-hostinger
+    - namespace: shopping-cart-data
+      name: ubuntu-gcp
+    - namespace: shopping-cart-data
+      name: ubuntu-azure
+    - namespace: shopping-cart-payment
+      name: ubuntu-k3s
+    - namespace: shopping-cart-payment
+      name: ubuntu-hostinger
+    - namespace: shopping-cart-payment
+      name: ubuntu-gcp
+    - namespace: shopping-cart-payment
+      name: ubuntu-azure
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: ''
+      kind: PersistentVolume
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: false
