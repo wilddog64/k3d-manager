@@ -8,11 +8,11 @@ setup() {
   export PATH="${TEST_BIN_DIR}:$PATH"
 
   export TRIVY_LOG="${BATS_TEST_TMPDIR}/trivy.log"
-  export CURL_LOG="${BATS_TEST_TMPDIR}/curl.log"
+  export WGET_LOG="${BATS_TEST_TMPDIR}/wget.log"
   export NOTIFY_LOG="${BATS_TEST_TMPDIR}/notify.log"
   export KUBECTL_LOG="${BATS_TEST_TMPDIR}/kubectl.log"
   : >"${TRIVY_LOG}"
-  : >"${CURL_LOG}"
+  : >"${WGET_LOG}"
   : >"${NOTIFY_LOG}"
   : >"${KUBECTL_LOG}"
 
@@ -51,44 +51,94 @@ done
 EOF
   chmod +x "${TEST_BIN_DIR}/trivy"
 
-  cat >"${TEST_BIN_DIR}/curl" <<'EOF'
+  cat >"${TEST_BIN_DIR}/wget" <<'EOF'
 #!/bin/sh
-printf '%s\n' "$*" >>"${CURL_LOG}"
-_last=""
-for _arg in "$@"; do
-  _last="${_arg}"
+printf '%s\n' "$*" >>"${WGET_LOG}"
+
+_out_mode=""
+_out_file=""
+_post_data=""
+_spider="false"
+_url=""
+_auth_header=""
+_accept_header=""
+_content_type_header=""
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -qO)
+      _out_mode="file"
+      shift
+      _out_file="$1"
+      ;;
+    -qO-)
+      _out_mode="stdout"
+      ;;
+    -S)
+      ;;
+    --spider)
+      _spider="true"
+      ;;
+    --post-data=*)
+      _post_data="${1#--post-data=}"
+      ;;
+    --header=Authorization:*)
+      _auth_header="${1#--header=}"
+      ;;
+    --header=Accept:*)
+      _accept_header="${1#--header=}"
+      ;;
+    --header=Content-Type:*)
+      _content_type_header="${1#--header=}"
+      ;;
+    http*)
+      _url="$1"
+      ;;
+  esac
+  shift
 done
-case "${_last}" in
+
+case "${_url}" in
   https://ghcr.io/token*)
-    printf '{"token":"registry-token"}'
+    [ "${_out_mode}" = "file" ] || exit 1
+    printf '{"token":"registry-token"}' >"${_out_file}"
     exit 0
     ;;
   https://ghcr.io/v2/*/tags/list)
-    printf '{"name":"repo","tags":["latest","%s","sha-old"]}\n' "${TEST_SHA_TAG:-sha-new}"
+    [ "${_out_mode}" = "file" ] || exit 1
+    printf '{"name":"repo","tags":["latest","%s","sha-old"]}\n' "${TEST_SHA_TAG:-sha-new}" >"${_out_file}"
     exit 0
     ;;
-  https://ghcr.io/v2/*/manifests/latest)
-    printf 'HTTP/1.1 200 OK\r\nDocker-Content-Digest: %s\r\n' "${TEST_LATEST_DIGEST:-sha256:testdigest}"
-    exit 0
-    ;;
-  https://ghcr.io/v2/*/manifests/sha-*)
-    case "${_last}" in
-      *"${TEST_SHA_TAG:-sha-new}")
-        printf 'HTTP/1.1 200 OK\r\nDocker-Content-Digest: %s\r\n' "${TEST_LATEST_DIGEST:-sha256:testdigest}"
+  https://ghcr.io/v2/*/manifests/latest|https://ghcr.io/v2/*/manifests/sha-*)
+    [ "${_spider}" = "true" ] || exit 1
+    case "${_url}" in
+      *"/manifests/latest")
+        _digest="${TEST_LATEST_DIGEST:-sha256:testdigest}"
+        ;;
+      *"/manifests/${TEST_SHA_TAG:-sha-new}")
+        _digest="${TEST_LATEST_DIGEST:-sha256:testdigest}"
         ;;
       *)
-        printf 'HTTP/1.1 200 OK\r\nDocker-Content-Digest: sha256:olderdigest\r\n'
+        _digest="sha256:olderdigest"
         ;;
     esac
+    printf '  docker-content-digest: %s\r\n' "${_digest}" >&2
+    printf '  HTTP/1.1 200 OK\r\n' >&2
     exit 0
     ;;
   *actions/workflows/*/dispatches)
+    [ "${_out_mode}" = "stdout" ] || exit 1
+    [ "${_post_data}" = '{"ref":"main"}' ] || exit 1
+    [ "${_accept_header}" = 'Accept: application/vnd.github+json' ] || exit 1
+    [ "${_content_type_header}" = 'Content-Type: application/json' ] || exit 1
+    [ "${_auth_header}" = "Authorization: Bearer ${GH_TOKEN}" ] || exit 1
     exit 0
     ;;
 esac
-exit 0
+
+exit 1
 EOF
-  chmod +x "${TEST_BIN_DIR}/curl"
+  chmod +x "${TEST_BIN_DIR}/wget"
 
   cat >"${TEST_BIN_DIR}/kubectl" <<'EOF'
 #!/bin/sh
@@ -177,7 +227,7 @@ EOF
   run env -i \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
-    CURL_LOG="${CURL_LOG}" \
+    WGET_LOG="${WGET_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" \
     KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
@@ -187,7 +237,7 @@ EOF
 
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"no VulnerabilityReport found"* ]]
-  [ ! -s "${CURL_LOG}" ]
+  [ ! -s "${WGET_LOG}" ]
 }
 
 @test "vulnerable deployed image with vulnerable latest dispatches rebuild instead of promotion" {
@@ -202,7 +252,7 @@ EOF
   run env -i \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
-    CURL_LOG="${CURL_LOG}" \
+    WGET_LOG="${WGET_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" \
     KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
@@ -217,7 +267,7 @@ EOF
     /bin/sh "${TEST_SCAN_SCRIPT}"
 
   [ "${status}" -eq 0 ]
-  grep -q 'shopping-cart-order/actions/workflows/ci.yml/dispatches' "${CURL_LOG}"
+  grep -q 'shopping-cart-order/actions/workflows/ci.yml/dispatches' "${WGET_LOG}"
   run ! grep -q 'patch application shopping-cart-order' "${KUBECTL_LOG}"
   grep -q 'warning|App CVE: shopping-cart-order|' "${NOTIFY_LOG}"
 }
@@ -233,7 +283,7 @@ EOF
   run env -i \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
-    CURL_LOG="${CURL_LOG}" \
+    WGET_LOG="${WGET_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" \
     KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
@@ -253,6 +303,20 @@ EOF
   grep -q 'warning|App CVE Promotion: shopping-cart-basket|' "${NOTIFY_LOG}"
 }
 
+@test "digest resolution reads busybox-style indented lowercase headers" {
+  export APP_SERVICES="shopping-cart-basket"
+  export TEST_LATEST_DIGEST="sha256:feedbeef"
+
+  run env -i \
+    PATH="${PATH}" \
+    WGET_LOG="${WGET_LOG}" \
+    TEST_LATEST_DIGEST="${TEST_LATEST_DIGEST}" \
+    /bin/sh -c 'tmp="$(mktemp)"; awk '"'"'/^# === MAIN ===/ { exit } { print }'"'"' "$1" >"$tmp"; . "$tmp"; rm -f "$tmp"; _resolve_tag_digest ghcr.io/wilddog64/shopping-cart-basket latest' _ "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "${TEST_LATEST_DIGEST}" ]
+}
+
 @test "clean frontend image is scanned and skipped" {
   export APP_SERVICES="shopping-cart-frontend"
   export TEST_REPORT_ROWS="shopping-cart-apps frontend-report ghcr.io/wilddog64/shopping-cart-frontend sha-old 0 0"
@@ -262,7 +326,7 @@ EOF
   run env -i \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
-    CURL_LOG="${CURL_LOG}" \
+    WGET_LOG="${WGET_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" \
     KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
@@ -275,7 +339,7 @@ EOF
 
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"deployed image ghcr.io/wilddog64/shopping-cart-frontend:sha-old has no HIGH/CRITICAL findings"* ]]
-  run ! grep -q 'actions/workflows' "${CURL_LOG}"
+  run ! grep -q 'actions/workflows' "${WGET_LOG}"
 }
 
 @test "clean payment image is scanned and skipped" {
@@ -287,7 +351,7 @@ EOF
   run env -i \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
-    CURL_LOG="${CURL_LOG}" \
+    WGET_LOG="${WGET_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" \
     KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
@@ -300,7 +364,7 @@ EOF
 
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"deployed image ghcr.io/wilddog64/shopping-cart-payment:sha-old has no HIGH/CRITICAL findings"* ]]
-  run ! grep -q 'actions/workflows' "${CURL_LOG}"
+  run ! grep -q 'actions/workflows' "${WGET_LOG}"
 }
 
 @test "rebuild path without GH token returns non-zero" {
@@ -314,7 +378,7 @@ EOF
   run env -i \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
-    CURL_LOG="${CURL_LOG}" \
+    WGET_LOG="${WGET_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" \
     KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
@@ -338,39 +402,65 @@ EOF
   export TEST_REPORT_ROWS="shopping-cart-apps product-catalog-report ghcr.io/wilddog64/shopping-cart-product-catalog sha-old 0 1"
   export TEST_REPORT_DETAILS_product_catalog_report="HIGH|CVE-4|9.9.9"
 
-  cat >"${TEST_BIN_DIR}/curl" <<'EOF'
+  cat >"${TEST_BIN_DIR}/wget" <<'EOF'
 #!/bin/sh
-printf '%s\n' "$*" >>"${CURL_LOG}"
-_last=""
-for _arg in "$@"; do
-  _last="${_arg}"
+printf '%s\n' "$*" >>"${WGET_LOG}"
+
+_out_mode=""
+_out_file=""
+_spider="false"
+_url=""
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -qO)
+      _out_mode="file"
+      shift
+      _out_file="$1"
+      ;;
+    -S)
+      ;;
+    --spider)
+      _spider="true"
+      ;;
+    http*)
+      _url="$1"
+      ;;
+  esac
+  shift
 done
-case "${_last}" in
+
+case "${_url}" in
   https://ghcr.io/token*)
-    printf '{"token":"registry-token"}'
+    printf '{"token":"registry-token"}' >"${_out_file}"
     exit 0
     ;;
   https://ghcr.io/v2/*/tags/list)
-    printf '{"name":"repo","tags":["latest","sha-other"]}\n'
+    printf '{"name":"repo","tags":["latest","sha-other"]}\n' >"${_out_file}"
     exit 0
     ;;
   https://ghcr.io/v2/*/manifests/latest)
-    printf 'HTTP/1.1 200 OK\r\nDocker-Content-Digest: sha256:feedbeef\r\n'
+    [ "${_spider}" = "true" ] || exit 1
+    printf '  docker-content-digest: sha256:feedbeef\r\n' >&2
+    printf '  HTTP/1.1 200 OK\r\n' >&2
     exit 0
     ;;
   https://ghcr.io/v2/*/manifests/sha-*)
-    printf 'HTTP/1.1 200 OK\r\nDocker-Content-Digest: sha256:olderdigest\r\n'
+    [ "${_spider}" = "true" ] || exit 1
+    printf '  docker-content-digest: sha256:olderdigest\r\n' >&2
+    printf '  HTTP/1.1 200 OK\r\n' >&2
     exit 0
     ;;
 esac
-exit 0
+
+exit 1
 EOF
-  chmod +x "${TEST_BIN_DIR}/curl"
+  chmod +x "${TEST_BIN_DIR}/wget"
 
   run env -i \
     PATH="${PATH}" \
     TRIVY_LOG="${TRIVY_LOG}" \
-    CURL_LOG="${CURL_LOG}" \
+    WGET_LOG="${WGET_LOG}" \
     NOTIFY_LOG="${NOTIFY_LOG}" \
     KUBECTL_LOG="${KUBECTL_LOG}" \
     TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
