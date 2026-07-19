@@ -41,3 +41,5 @@
 - [ ] **`_dispatch_rebuild` curl → wget** — spec `docs/bugs/2026-07-18-app-cve-scan-rebuild-dispatch-curl-unavailable.md`. BLOCKED until the bats-stub spec lands (retargets CURL_LOG→WGET_LOG). GH_TOKEN argv concern retracted with evidence. NOT assigned.
 - [ ] **BLOCKED: Hub `environment=infra` registration** — `docs/bugs/2026-07-18-hub-infra-registration-blocked-platform-helm-selfheal.md`. DO NOT EXECUTE: platform-helm selfHeal would auto-deploy a 2nd argo-cd release + downgrade 9.5.15→7.8.1 on the hub. Supersedes Phase 2 of the argocd-cve-scan spec. **Owner decision required (options A–D).**
 - [ ] **Triage: hub `argocd` Helm release status `failed`** — revision 3, 2026-06-29, pre-existing and unrelated. Blocks options B/C above.
+
+- [ ] **app-cve-scan wget harness + dispatch (COMBINED)** — spec `docs/bugs/2026-07-18-app-cve-scan-wget-harness-and-dispatch.md`; supersedes the bats-stub and dispatch specs (both banner-marked, do not implement separately). ONE commit, TWO files, 2 mutation checks + network-isolation gate (must print 0, currently 8). **Assigned to Codex 2026-07-18, not started.**
