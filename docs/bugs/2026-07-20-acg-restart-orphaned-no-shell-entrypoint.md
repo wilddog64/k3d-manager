@@ -9,6 +9,33 @@
 
 ## Before You Start
 
+**Branch (all work repos) — create and work on these, never `main`:**
+
+| Repo | Path | Branch |
+|------|------|--------|
+| lib-foundation (do this FIRST) | `~/src/gitrepo/personal/lib-foundation` | `feat/v0.4.5` — create from `origin/main` |
+| k3d-manager (spec source + subtree pull) | `~/src/gitrepo/personal/k3d-manager` | `k3d-manager-v1.16.0` — already exists |
+
+Create the lib-foundation branch explicitly so it does not track `main`:
+```bash
+git -C ~/src/gitrepo/personal/lib-foundation fetch origin
+git -C ~/src/gitrepo/personal/lib-foundation checkout -b feat/v0.4.5 origin/main
+git -C ~/src/gitrepo/personal/lib-foundation push -u origin feat/v0.4.5
+```
+
+**Gate baselines recorded by Claude on this machine 2026-07-20** (upstream `scripts/lib/acg/acg.sh`
+was verified byte-identical to the vendored copy in k3d-manager before these were taken):
+
+| Gate | Baseline | Must become |
+|------|----------|-------------|
+| `grep -c '^_acg_restart_playwright()' scripts/lib/acg/acg.sh` | `0` | `1` |
+| `grep -c '^function acg_restart()' scripts/lib/acg/acg.sh` | `0` | `1` |
+| `grep -c 'acg_restart.js' scripts/lib/acg/acg.sh` | `0` | `1` |
+| `grep -c '1. Start a new sandbox at' scripts/lib/acg/acg.sh` | `1` | `0` |
+| `grep -c 'If the sandbox is still running' scripts/lib/acg/acg.sh` | `1` | `1` (stays 1 — add then de-dup) |
+| `shellcheck -S warning scripts/lib/acg/acg.sh` | 0 warnings | 0 warnings |
+| `grep -c 'acg_restart' scripts/plugins/acg.sh` (k3d-manager) | `0` | `2` |
+
 - Read `memory-bank/activeContext.md` and `memory-bank/progress.md`.
 - **Do NOT edit `scripts/lib/foundation/**` directly in k3d-manager** — it is a subtree.
   The fix lands in the lib-foundation repo first, then arrives here via subtree pull.
