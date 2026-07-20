@@ -416,6 +416,8 @@ HELP
 _acg_extend_playwright() {
   local sandbox_url="${1:?usage: _acg_extend_playwright <sandbox_url>}"
 
+  _acg_sweep_stale_artifacts
+
   local playwright_script="${_LIB_ACG_ROOT}/playwright/acg_extend.js"
 
   if ! command -v node >/dev/null 2>&1; then
@@ -435,9 +437,20 @@ _acg_extend_playwright() {
   echo "$output"
 }
 
+_acg_sweep_stale_artifacts() {
+  # Best-effort: Playwright's connectOverCDP leaves playwright-artifacts-* dirs that
+  # a disconnect-style browser.close() never removes. Sweep ones older than 2h so a
+  # concurrent run's live artifacts are never touched. Never fails the caller.
+  local tmpdir="${TMPDIR:-/tmp}"
+  find "${tmpdir%/}" -maxdepth 1 -name 'playwright-artifacts-*' -type d -mmin +120 \
+    -exec rm -rf {} + 2>/dev/null || true
+}
+
 _acg_restart_playwright() {
   local sandbox_url="${1:?usage: _acg_restart_playwright <sandbox_url> [provider]}"
   local provider="${2:-aws}"
+
+  _acg_sweep_stale_artifacts
 
   local playwright_script="${_LIB_ACG_ROOT}/playwright/acg_restart.js"
 
