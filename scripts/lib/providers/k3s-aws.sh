@@ -170,7 +170,12 @@ HELP
     _info "[k3s-aws] k3s nodes already Ready (${_ready_nodes}/3) — skipping deploy_app_cluster"
   else
     _info "[k3s-aws] Installing k3s server + joining agents..."
-    UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" deploy_app_cluster --confirm || return 1
+    local _ambient_mesh="${K3S_AMBIENT_MESH:-true}"
+    [[ "${_ambient_mesh}" == "true" && "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]] && {
+      _info "[k3s-aws] SSM tunnel mode active — ambient mesh (Cilium) unsupported this release; provisioning with flannel"
+      _ambient_mesh="false"
+    }
+    UBUNTU_K3S_AGENT_HOSTS="ubuntu-1,ubuntu-2" K3S_AMBIENT_MESH="${_ambient_mesh}" deploy_app_cluster --confirm || return 1
   fi
 
   if [[ "${K3S_AWS_SSM_ENABLED:-false}" == "true" ]]; then
