@@ -1016,7 +1016,8 @@ function _k3sup_join_agent() {
     --ip "${agent_ip}" \
     --server-ip "${server_ip}" \
     --user "${ssh_user}" \
-    --ssh-key "${ssh_key}"
+    --ssh-key "${ssh_key}" \
+    --k3s-version "${K3S_VERSION:-v1.32.0+k3s1}"
   _info "[shopping_cart] Agent ${agent_host} joined."
 }
 
@@ -1167,6 +1168,7 @@ HELP
     --ssh-key "${ssh_key}" \
     --local-path "${local_kubeconfig}" \
     --context "${kube_context}" \
+    --k3s-version "${K3S_VERSION:-v1.32.0+k3s1}" \
     --k3s-extra-args "${_k3s_extra_args}"
 
   # Copy system kubeconfig to user home so add_ubuntu_k3s_cluster can read it without sudo
