@@ -10,13 +10,13 @@
 
 | Repo | Branch | Why |
 |---|---|---|
-| lib-foundation | `feat/v0.4.6` from `origin/main` | Change 1 lives in the ACG subtree — **must land upstream first**, then subtree-pull into k3d-manager. Do NOT hand-edit `scripts/lib/foundation/**`. |
+| lib-foundation | `feat/v0.4.6` from `origin/feat/v0.4.5` | Change 1 lives in the ACG subtree — **must land upstream first**, then subtree-pull into k3d-manager. Do NOT hand-edit `scripts/lib/foundation/**`. |
 | k3d-manager | `k3d-manager-v1.16.0` | Change 2 (shell `mktemp` traps) + the Change-1 subtree pull + the `scripts/plugins/acg.sh` side (none needed here). |
 
-`feat/v0.4.5` just merged (`03312ae`); the next upstream branch is `feat/v0.4.6`. Create it with the mistrack guard:
+**⚠️ Base branch is `feat/v0.4.5`, NOT `main`.** `feat/v0.4.5` (`03312ae`, the `acg_restart` shell wiring) is **NOT yet merged to `origin/main`** — it was subtree-pulled into k3d-manager as `78af86e8` while still on its feature branch. Change 1's sweep helper is called from `_acg_restart_playwright`, which exists **only** on `feat/v0.4.5`. Branch `feat/v0.4.6` from `origin/feat/v0.4.5` so the sweep stacks on top of that wiring. Do NOT branch from `origin/main` (missing the restart wrapper) and do NOT re-add the `03312ae` wiring here (that would duplicate it and conflict when both land on main). Create with the mistrack guard:
 ```bash
 git -C ~/src/gitrepo/personal/lib-foundation fetch origin
-git -C ~/src/gitrepo/personal/lib-foundation checkout -b feat/v0.4.6 origin/main
+git -C ~/src/gitrepo/personal/lib-foundation checkout -b feat/v0.4.6 origin/feat/v0.4.5
 git -C ~/src/gitrepo/personal/lib-foundation push -u origin feat/v0.4.6
 ```
 
@@ -24,7 +24,7 @@ git -C ~/src/gitrepo/personal/lib-foundation push -u origin feat/v0.4.6
 
 ## Before You Start
 
-**Branch (all work repos):** lib-foundation → `feat/v0.4.6` (from `origin/main`); k3d-manager → `k3d-manager-v1.16.0` (existing).
+**Branch (all work repos):** lib-foundation → `feat/v0.4.6` (from `origin/feat/v0.4.5` — see the ⚠️ note above; NOT from `main`); k3d-manager → `k3d-manager-v1.16.0` (existing).
 
 1. Machine check: `hostname && uname -n`.
 2. Read `memory-bank/activeContext.md` + `memory-bank/progress.md` in k3d-manager.
