@@ -223,10 +223,26 @@ In `scripts/plugins/acg.sh`, add the stub alongside the existing ones:
 - **Duplicate gate:** `grep -c 'If the sandbox is still running' scripts/lib/acg/acg.sh` → **`1`**
 - **k3d-manager gates (after subtree pull):**
   - `grep -c 'acg_restart' scripts/plugins/acg.sh` → **`2`**
-  - `./scripts/k3d-manager acg_restart --help` prints the usage block and exits 0
-- `shellcheck -S warning scripts/lib/acg/acg.sh` — 0 warnings (record baseline + after)
+  - `./scripts/k3d-manager acg_restart --help` — capture the exit code on its OWN line:
+    ```bash
+    ./scripts/k3d-manager acg_restart --help
+    echo "HELP_RC=$?"
+    ```
+    `HELP_RC=0` required. Do NOT use `; echo` on the same line — that reports the echo's status.
+- `shellcheck -S warning scripts/lib/acg/acg.sh` — 0 warnings. Run it **BEFORE the first edit**
+  (baseline) and again after. A post-edit-only run cannot distinguish a clean file from a
+  pre-existing warning you introduced.
 - `npm run check` in `scripts/lib/acg/` — passes (proves `acg_restart.js` still parses; it must NOT be modified)
-- `git show --stat` — lib-foundation commit touches exactly ONE file
+- `git diff --stat` BEFORE committing; `git show --stat` only AFTER the commit exists.
+  `git show --stat` run before the commit reports the PREVIOUS commit — a false pass.
+- lib-foundation commit touches exactly ONE file: `scripts/lib/acg/acg.sh`.
+- **Subtree-pull scope gate (k3d-manager):** after the pull, run
+  `git diff --stat HEAD~1 -- . ':(exclude)scripts/lib/foundation'` → must be EMPTY.
+  Anything outside `scripts/lib/foundation/**` means the pull was hand-edited.
+- **Push verification (both repos):** after each push, confirm the SHA landed on the remote:
+  `git log origin/<branch> --oneline -1`. A local commit is not a done task.
+- **Before the memory-bank commit:** run `git diff --cached --name-only` and confirm only the
+  two memory-bank files are staged — no code files bundled in.
 - Do NOT modify `playwright/acg_restart.js` or `tests/acg-restart.spec.js`
 
 ---
@@ -238,10 +254,14 @@ In `scripts/plugins/acg.sh`, add the stub alongside the existing ones:
 - [ ] All appearance/disappearance/duplicate gates recorded with real output
 - [ ] `shellcheck -S warning` — 0 warnings (baseline + after)
 - [ ] `npm run check` passes
-- [ ] lib-foundation committed and pushed; version bumped per lib-foundation convention
-- [ ] k3d-manager: subtree pull committed, `scripts/plugins/acg.sh` stub added
-- [ ] `./scripts/k3d-manager acg_restart --help` exits 0 (record output)
-- [ ] memory-bank updated with both commit SHAs and task status **(separate commit)**
+- [ ] lib-foundation committed and pushed; SHA confirmed on `origin/feat/v0.4.5`
+- [ ] **No version bump / no `CHANGE.md` edit in this commit.** lib-foundation stamps the version
+      header in a separate `docs(changelog): stamp vX.Y.Z release header` commit at release time
+      (see `57dd60e`, `5a9bfbe`). Touching `CHANGE.md` here would break the one-file gate.
+- [ ] k3d-manager: subtree pull committed, `scripts/plugins/acg.sh` stub added; SHA confirmed on
+      `origin/k3d-manager-v1.16.0`
+- [ ] `HELP_RC=0` for `./scripts/k3d-manager acg_restart --help` (record output)
+- [ ] memory-bank updated with both commit SHAs and task status **(separate commit, also pushed)**
 
 **Commit message — lib-foundation (exact):**
 ```
