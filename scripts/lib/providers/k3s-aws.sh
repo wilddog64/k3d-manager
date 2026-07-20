@@ -83,7 +83,7 @@ _provider_k3s_aws_wait_ssm_registered() {
       --region "${region}" \
       --filters "Key=InstanceIds,Values=${instance_id}" \
       --query 'InstanceInformationList[0].PingStatus' --output text 2>/dev/null)" == "Online" ]]; do
-    (( attempts++ ))
+    attempts=$(( attempts + 1 ))
     if (( attempts >= 30 )); then
       _err "[k3s-aws] SSM agent did not register ${instance_id} within 150s"
       return 1
@@ -195,7 +195,7 @@ HELP
   _info "[k3s-aws] Waiting for all ${total_nodes} nodes to be Ready..."
   local node_attempts=0
   until [[ "$(KUBECONFIG="${local_kubeconfig}" kubectl get nodes --no-headers 2>/dev/null | grep -c " Ready")" -ge "${total_nodes}" ]]; do
-    (( node_attempts++ ))
+    node_attempts=$(( node_attempts + 1 ))
     if (( node_attempts >= 60 )); then
       _info "[k3s-aws] WARNING: not all nodes Ready after 300s — skipping label step"
       break
