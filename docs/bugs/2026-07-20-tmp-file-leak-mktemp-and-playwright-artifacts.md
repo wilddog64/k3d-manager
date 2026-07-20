@@ -22,6 +22,24 @@ git -C ~/src/gitrepo/personal/lib-foundation push -u origin feat/v0.4.6
 
 ---
 
+## Before You Start
+
+**Branch (all work repos):** lib-foundation → `feat/v0.4.6` (from `origin/main`); k3d-manager → `k3d-manager-v1.16.0` (existing).
+
+1. Machine check: `hostname && uname -n`.
+2. Read `memory-bank/activeContext.md` + `memory-bank/progress.md` in k3d-manager.
+3. `git -C ~/src/gitrepo/personal/k3d-manager pull origin k3d-manager-v1.16.0` and read THIS spec in full.
+4. Read the target files before editing:
+   - lib-foundation: `~/src/gitrepo/personal/lib-foundation/scripts/lib/acg/acg.sh`
+     (find `_acg_extend_playwright` and `_acg_restart_playwright`).
+   - k3d-manager: `scripts/plugins/shopping_cart.sh` (lines ~242, ~266, ~970) and
+     `scripts/plugins/argocd.sh` (lines ~734, ~905, ~1085).
+5. Capture the shellcheck baseline for EVERY file you will edit **before the first edit**:
+   `shellcheck -S warning <file>` and record 0 (or the pre-existing count).
+6. **Do this as a SEPARATE Codex session** — do not bundle with any other in-flight spec.
+
+---
+
 ## Problem
 
 `$TMPDIR` (`/private/tmp` on this machine) accumulates two families of orphaned entries created by k3d-manager tooling:
