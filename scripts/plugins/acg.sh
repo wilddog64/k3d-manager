@@ -41,6 +41,7 @@ _acg_stub_alias_function acg_watch_stop __acg_stub_acg_watch_stop
 _acg_stub_alias_function acg_chrome_cdp_install __acg_stub_acg_chrome_cdp_install
 _acg_stub_alias_function acg_chrome_cdp_uninstall __acg_stub_acg_chrome_cdp_uninstall
 _acg_stub_alias_function acg_teardown __acg_stub_acg_teardown
+_acg_stub_alias_function acg_restart __acg_stub_acg_restart
 
 _acg_watch_retarget_logs() {
   local run_dir plist_path out_path err_path label
@@ -100,3 +101,4 @@ function acg_watch_stop()          { __acg_stub_acg_watch_stop "$@"; }
 function acg_chrome_cdp_install()   { __acg_stub_acg_chrome_cdp_install "$@"; }
 function acg_chrome_cdp_uninstall() { __acg_stub_acg_chrome_cdp_uninstall "$@"; }
 function acg_teardown()             { __acg_stub_acg_teardown "$@"; }
+function acg_restart()              { __acg_stub_acg_restart "$@"; }
