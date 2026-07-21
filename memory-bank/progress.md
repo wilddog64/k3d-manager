@@ -37,5 +37,6 @@ v1.14.0 RELEASED 2026-07-12 · v1.15.0 RELEASED 2026-07-14 · **v1.16.0 active �
 - [ ] **app-cluster Vault portability** — `docs/bugs/2026-07-07-app-cluster-vault-portability.md` (hub-vault-profile global-file leak; `_hub_vault_profile_context()` returns empty on k3s-aws path). Unassigned.
 
 ## Releases
+- [x] **lib-foundation v0.4.6** (2026-07-21): PR #37 → `main` `db336a6f`; stamp `ae4616f`, annotated tag `v0.4.6`→`ae4616f`, GitHub release Latest (acg_restart entrypoint + playwright-artifacts sweep; v0.4.5 folded in). PR #38 (v0.4.7, acg_check_ttl set -e fix) still OPEN → its own release when merged.
 - [x] v1.15.0 (2026-07-14): PR #105 → `main` `14cdaea6`. Post-merge tag/release/retro deferred.
 - [x] v1.14.0 (2026-07-12): PR #104 → `main` `5c412e15`. Tag + release + retro done.
