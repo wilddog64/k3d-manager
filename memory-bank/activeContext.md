@@ -209,8 +209,18 @@ switching would break the harness.
    Static gates PASS on this machine: `shellcheck -S warning` exit 0 with zero output, `bash -n` exit 0,
    render gate prints `data-git residual=0`, `services-git residual=0`, `platform-helm residual=0`,
    `istio-ambient residual=0`, and `grep -c 'export AMBIENT_' scripts/lib/providers/k3s-hostinger.sh` prints
-   `0`. `git show --stat 470ef7d8` lists exactly one file. Claude still owes the live `make refresh` re-verify,
-   but on the git side this closes the last ambient-milestone durability hole.
+   `0`. `git show --stat 470ef7d8` lists exactly one file. **CLAUDE-VERIFIED LIVE PASS (2026-07-22):**
+   `make refresh CLUSTER_PROVIDER=k3s-hostinger` → RC=0; log line now reads "reapplied data-git, services-git,
+   platform-helm, and istio-ambient ApplicationSets for ubuntu-hostinger"; hub `k3d-k3d-cluster` ns `cicd`
+   carries the `istio-ambient` ApplicationSet; generated `istio-cni-ubuntu-hostinger` renders concrete rancher
+   paths (`cniConfDir /var/lib/rancher/k3s/agent/etc/cni/net.d`, `cniBinDir /var/lib/rancher/k3s/data/cni`,
+   istio `1.24.2`) with **0** literal `${AMBIENT_` placeholders in both istio-cni + ztunnel apps. Ambient
+   dataplane live (istiod+ztunnel 22h Healthy; cni-agent actively enrolling `shopping-cart-apps` pods into
+   ztunnel). **This closes the last ambient-milestone durability hole.** CAVEAT (NOT a spec-(e) regression):
+   `istio-cni-ubuntu-hostinger` stays `OutOfSync/Progressing` because its cni-node `/readyz` returns 503 and
+   won't flip Ready — root cause is node CPU at **98% requests (1960m/2000m)** (`Insufficient cpu` FailedScheduling),
+   i.e. item 2 below. Mesh is functional (cni-agent enrolling, restarts=0, no error logs); only the readiness
+   *report* lags under CPU starvation. Belongs to the v1.17.0 capacity work, not spec (e).
 4. `istio-ambient` single-appset design limit — keyed to one `${APP_CLUSTER_NAME}`, so only one cluster can hold
    ambient at a time. Low priority now that OCI is de-scoped (hostinger is the only ambient host).
 
