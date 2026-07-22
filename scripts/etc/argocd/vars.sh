@@ -71,3 +71,9 @@ export ARGOCD_APP_CLUSTER_TOKEN="${ARGOCD_APP_CLUSTER_TOKEN:-}"
 # Must be defaulted here, not only in istio_ambient.sh — the ArgoCD bootstrap path
 # applies that ApplicationSet without loading the istio_ambient plugin.
 export AMBIENT_ISTIO_VERSION="${AMBIENT_ISTIO_VERSION:-1.24.2}"
+
+# istio-cni host paths, same rule as above — the bootstrap path derives its envsubst
+# allowlist from the ApplicationSet file and refuses to apply it if either is unset.
+# Defaults are the Cilium paths; bare k3s flannel needs the /var/lib/rancher pair.
+export AMBIENT_CNI_CONF_DIR="${AMBIENT_CNI_CONF_DIR:-/etc/cni/net.d}"
+export AMBIENT_CNI_BIN_DIR="${AMBIENT_CNI_BIN_DIR:-/opt/cni/bin}"
