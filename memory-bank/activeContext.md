@@ -74,8 +74,20 @@ Full `make down` (`DOWN_EXIT=0`, hub + CFN stack deleted) → `make up CLUSTER_P
   override still beats the default — then reverted so Codex does the edit (spec-before-implement). **Codex landed the
   real fix as `a08911b3` on `origin/k3d-manager-v1.16.0` (2026-07-22)**: `scripts/etc/argocd/vars.sh` now defaults and
   exports both `AMBIENT_CNI_*` vars with the same Cilium defaults as `istio_ambient.sh`, so the bootstrap refusal gate
-  no longer prints `UNSET:` lines for the ambient appset. Claude still owes the live `deploy_argocd_bootstrap` verify
-  from git.
+  no longer prints `UNSET:` lines for the ambient appset. **CLAUDE-VERIFIED LIVE PASS 2026-07-22:**
+  `deploy_argocd_bootstrap --confirm` (hub `k3d-k3d-cluster`, rancher paths exported) → `APPLY_RC=0`,
+  `Successfully deployed 10/10 ApplicationSet(s)`, zero `Refusing` lines. Applied appset on the hub renders
+  `cniConfDir: /var/lib/rancher/k3s/agent/etc/cni/net.d` / `cniBinDir: /var/lib/rancher/k3s/data/cni` with
+  `grep -c '${'` → **0** literal placeholders, and the generated `istio-cni-ubuntu-hostinger` Application inherits
+  them. The rancher paths are now DURABLE FROM GIT — before this they were a live-only hub override that the next
+  bootstrap would have clobbered back to the Cilium defaults.
+- **⚠️ MY SPEC UNDERSTATED THIS BUG — the failure is an ABORT, not a silent drop.** Negative control run in a
+  throwaway worktree at pre-fix `7226e7ea` with both vars unset: `PREFIX_RC=1` and the loop **terminated** at
+  `istio-ambient.yaml`, so the FIVE appsets ordered after it (`eso`, `demo-rollout`, `services-git`,
+  `grafana-dashboards-acg`, `observability-acg`) were never applied at all. The spec's Problem section claimed
+  `_argocd_deploy_applicationsets` `continue`s past the bad file and still `return 0`s — it does not. Blast radius
+  was mid-bootstrap collateral across unrelated appsets, including `services-git`, which is what carries the
+  shopping-cart manifests. Correct the Problem text if that spec is ever reused as a template.
 - **PRE-EXISTING, NOT A REGRESSION — separate spec needed.** `scripts/lib/providers/k3s-oci.sh:678-683` globs every
   appset through `envsubst '$ARGOCD_NAMESPACE'`, a one-var allowlist against a file with FIVE placeholders, so
   `${APP_CLUSTER_NAME}` and `${AMBIENT_ISTIO_VERSION}` were ALREADY reaching OCI's ArgoCD literally before `9c0e336a`
@@ -87,7 +99,29 @@ Full `make down` (`DOWN_EXIT=0`, hub + CFN stack deleted) → `make up CLUSTER_P
   Spec `docs/bugs/2026-07-21-shopping-cart-ns-sidecar-blocks-ambient.md`. **Codex landed that manifest fix as
   `ebf27de3` on `origin/k3d-manager-v1.16.0` (2026-07-22)**: `services/shopping-cart-namespace/namespace.yaml` now
   removes `istio-injection` entirely and declares `istio.io/dataplane-mode: ambient`, leaving the sync-wave annotation
-  and both `app.kubernetes.io/*` labels untouched. Claude still owes the live resync/restart/HBONE proof from git.
+  and both `app.kubernetes.io/*` labels untouched. **CLAUDE-VERIFIED LIVE PASS 2026-07-22 — AMBIENT DATAPLANE IS
+  CARRYING APP TRAFFIC ON HOSTINGER.** ArgoCD had already synced `ebf27de3`; live ns shows
+  `istio.io/dataplane-mode=ambient` with no `istio-injection` key. Deleted all pods in `shopping-cart-apps` (ArgoCD-
+  neutral — no Application/appset edit, so nothing to revert); every replacement came back **`1/1`, zero
+  `istio-proxy` containers**. ztunnel config_dump: all 3 running `shopping-cart-apps` workloads report
+  `protocol: HBONE`, while `shopping-cart-data` and `shopping-cart-payment` still report `TCP` — the exact
+  in-scope/out-of-scope split the spec defined, and a clean enrollment discriminator for future checks.
+  **HBONE + mutual SPIFFE proof captured** on `frontend → basket-service:8083`:
+  `src.identity="spiffe://cluster.local/ns/shopping-cart-apps/sa/default"` →
+  `dst.identity="spiffe://cluster.local/ns/shopping-cart-apps/sa/basket-service"`,
+  `dst.addr=10.42.0.97:15008 dst.hbone_addr=10.42.0.97:8083`, logged from BOTH `direction="outbound"` and
+  `direction="inbound"` — same bar `k3s-aws` met.
+- **⚠️ MY SPEC'S CPU CLAIM WAS WRONG — sidecar injection was NOT the cause of hostinger's CPU pressure.** The spec
+  asserted the "hostinger is CPU-starved" reading was a SYMPTOM OF SIDECAR INJECTION and that removing injection
+  would reclaim ~100m/pod and let the `Pending` pods schedule. Measured reality after every sidecar was gone:
+  requests went **1910m (95%) → 1960m (98%) of 2000m allocatable — UP, not down** — and `order-service`
+  (2nd ReplicaSet) + `product-catalog` are STILL `Pending` on `Insufficient cpu`. Only `frontend` (50m) converted
+  Pending → Running. Actual usage stayed ~19%. The node is genuinely oversubscribed at the REQUESTS layer by
+  non-app workloads: `trivy-server-0` 200m, `payment-service` 200m, `rabbitmq-0` 200m, 4× data-tier pods 400m,
+  istio control plane 300m (istiod+ztunnel+istio-cni), monitoring ~110m. Requests went up because freed capacity
+  was immediately consumed by a pod that previously could not schedule. **The 2-CPU hostinger box is a real
+  capacity constraint, not a mesh artifact** — do not carry the "sidecars caused it" story forward. Right-sizing
+  requests (or dropping trivy-server from this node) is a separate piece of work needing its own spec.
 - **LIVE REMEDIATION IS IMPOSSIBLE HERE — the ApplicationSet controller wins.** Removing the ns label was reverted in ~15s;
   setting `selfHeal:false` was reverted; removing `automated` entirely was ALSO reverted, because the `services-git`
   ApplicationSet regenerates the Application `.spec` from its template. Only the git manifest is durable.
@@ -112,11 +146,26 @@ review of Codex's plan: (c) no longer asks Codex to run `make status` live (Code
 static gates + `bash -n` only; Claude runs the live check); all sessions require push proof via
 `git log origin/k3d-manager-v1.16.0 --oneline -1` and an explicit **separate** memory-bank commit.
 
-**NEXT:** Claude re-runs `deploy_argocd_bootstrap` to confirm the ambient appset is no longer refused, then re-runs
-`deploy_istio_ambient` with the rancher paths exported, restarts the app deployments, and captures the ambient
-dataplane proof (HBONE `dst.hbone_addr=…:80` on :15008 + mutual SPIFFE mTLS both ends) — same bar `k3s-aws` met.
-Only after that live verify should Codex take the `cluster-status` mesh section spec. Codex is never given a
-live-cluster verify.
+**LIVE VERIFY DONE 2026-07-22 — (a)+(d)+(b) ALL CLAUDE-VERIFIED PASS, git AND live.** The ambient milestone's
+functional goal is MET on hostinger: bootstrap applies 10/10 appsets from git with substrate-correct CNI paths,
+the app namespace is ambient-enrolled, all app pods run sidecar-free `1/1`, and `frontend → basket-service`
+traffic rides HBONE on :15008 with mutual SPIFFE identities both directions. Nothing on the git side is
+outstanding for (a)/(d)/(b).
+
+**NEXT:** spec (c) `docs/bugs/2026-07-21-cluster-status-no-mesh-cni-health.md` is now UNBLOCKED and ready to hand
+to Codex as its own session (`feat(status): report service mesh, CNI substrate, and ambient enrollment`). Static
+gates only — Codex is never given a live-cluster verify; Claude runs `make status CLUSTER_PROVIDER=k3s-hostinger`
+after it lands. Note the CONFLICT line that spec adds will NOT fire anymore — `istio-injection` is gone as of
+`ebf27de3`, so exercise that branch against a synthetic fixture, not hostinger.
+
+**OPEN AFTER THIS MILESTONE (each needs its own spec, none blocking (c)):**
+1. `k3s-oci.sh:678-683` one-var `envsubst` allowlist leaking 5 placeholders (pre-existing).
+2. Hostinger 2-CPU requests oversubscription — 1960m/2000m with zero sidecars; 2 pods permanently `Pending`.
+   NOT a mesh problem (see corrected bullet above).
+3. `_hostinger_reapply_gitops_applicationsets` (`k3s-hostinger.sh:791-794`) uses an explicit 3-appset list that
+   EXCLUDES `istio-ambient.yaml` — a `make refresh` will not reapply the ambient appset.
+4. `istio-ambient` single-appset design limit — keyed to one `${APP_CLUSTER_NAME}`, so only one cluster can hold
+   ambient at a time.
 
 **PRE-REBUILD diagnosis (2026-07-21, superseded above — kept for the retracted-hypothesis trail):**
 - **PRIMARY WALL = flannel pod-IP exhaustion.** `/var/lib/cni/networks/cbr0/` holds **253/254 allocated IPs but only 40 pods run** — ~213 LEAKED host-local IPAM reservations from 2d20h of orphaned-app churn. `10.42.0.0/24` full → every new pod (istiod, ztunnel, postgresql-orders-0, monitoring admission) stuck `ContainerCreating` with `flannel failed (add): no IP addresses available`. istiod's *separate* CPU-Pending (500m won't fit 290m free) is secondary — even at 100m it can't get an IP.
