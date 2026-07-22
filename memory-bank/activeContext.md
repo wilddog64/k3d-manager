@@ -202,11 +202,15 @@ switching would break the harness.
    envsubst leak is real but unreachable; leave it filed, do not fix.
 2. Hostinger 2-CPU requests oversubscription — 1960m/2000m with zero sidecars; 2 pods permanently `Pending`.
    NOT a mesh problem (see corrected bullet above). Still live on hostinger — candidate v1.17.0 spec.
-3. `_hostinger_reapply_gitops_applicationsets` (`k3s-hostinger.sh:789-793`) uses an explicit 3-appset list that
-   EXCLUDES `istio-ambient.yaml` — a `make refresh` will not reapply the ambient appset. **SPEC (e) WRITTEN
-   2026-07-22:** `docs/bugs/2026-07-22-hostinger-refresh-drops-istio-ambient-appset.md` — adds the appset +
-   widens the envsubst allowlist with the three `AMBIENT_*` vars; render gate PASS (all 4 appsets `residual=0`).
-   Ready to hand off to Codex. This is the last durability hole in the ambient milestone.
+3. `_hostinger_reapply_gitops_applicationsets` hostinger ambient reapply gap is **CLOSED in `470ef7d8` on
+   `origin/k3d-manager-v1.16.0` (2026-07-22)** — `scripts/lib/providers/k3s-hostinger.sh` now appends
+   `istio-ambient.yaml` to the reapply list, widens the `envsubst` allowlist with
+   `AMBIENT_ISTIO_VERSION`/`AMBIENT_CNI_CONF_DIR`/`AMBIENT_CNI_BIN_DIR`, and updates the summary log line.
+   Static gates PASS on this machine: `shellcheck -S warning` exit 0 with zero output, `bash -n` exit 0,
+   render gate prints `data-git residual=0`, `services-git residual=0`, `platform-helm residual=0`,
+   `istio-ambient residual=0`, and `grep -c 'export AMBIENT_' scripts/lib/providers/k3s-hostinger.sh` prints
+   `0`. `git show --stat 470ef7d8` lists exactly one file. Claude still owes the live `make refresh` re-verify,
+   but on the git side this closes the last ambient-milestone durability hole.
 4. `istio-ambient` single-appset design limit — keyed to one `${APP_CLUSTER_NAME}`, so only one cluster can hold
    ambient at a time. Low priority now that OCI is de-scoped (hostinger is the only ambient host).
 
