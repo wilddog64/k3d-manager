@@ -152,11 +152,28 @@ the app namespace is ambient-enrolled, all app pods run sidecar-free `1/1`, and 
 traffic rides HBONE on :15008 with mutual SPIFFE identities both directions. Nothing on the git side is
 outstanding for (a)/(d)/(b).
 
-**NEXT:** spec (c) `docs/bugs/2026-07-21-cluster-status-no-mesh-cni-health.md` is now UNBLOCKED and ready to hand
-to Codex as its own session (`feat(status): report service mesh, CNI substrate, and ambient enrollment`). Static
-gates only — Codex is never given a live-cluster verify; Claude runs `make status CLUSTER_PROVIDER=k3s-hostinger`
-after it lands. Note the CONFLICT line that spec adds will NOT fire anymore — `istio-injection` is gone as of
-`ebf27de3`, so exercise that branch against a synthetic fixture, not hostinger.
+**NEXT / IN FLIGHT:** spec (c) `docs/bugs/2026-07-21-cluster-status-no-mesh-cni-health.md` — **REVISED and HANDED
+OFF to Codex 2026-07-22** as its own session (`feat(status): report service mesh, CNI substrate, and ambient
+enrollment`). Static gates only — Codex is never given a live-cluster verify; Claude runs
+`make status CLUSTER_PROVIDER=k3s-hostinger` after it lands.
+
+**⚠️ CLAUDE DOES NOT EDIT memory-bank UNTIL CODEX REPORTS BACK** — session in flight, same lines, guaranteed conflict.
+
+**Three corrections Claude made to spec (c) before handoff (revision commit below):**
+1. **The spec's own code block was `set -e`-unsafe** — it omitted `|| true` on all six command substitutions
+   while `bin/cluster-status:14` runs `set -euo pipefail` at top level, so one unreachable `kubectl` would have
+   killed the WHOLE status tool. That directly contradicted the spec's own "What NOT to Do" bullet. Block now
+   matches the App Observability convention (`2>/dev/null || true`, lines 136–154).
+2. **CONFLICT branch is unreachable live** — `ebf27de3` removed `istio-injection`, so hostinger correctly prints
+   no CONFLICT line. Added a REQUIRED stub-`kubectl` harness (4 modes: `normal`/`conflict`/`nomesh`/`flaky`) as
+   the only proof of that branch. **Claude built and ran the harness first** — all 4 modes RC=0 — and confirmed
+   via negative control that stripping `|| true` makes `flaky` exit **RC=1** with truncated output. The gate
+   bites; it is not a rubber stamp.
+3. **Retracted the CPU causation** from the spec's Problem section so the wrong story is not propagated.
+
+Also pinned the insert anchor to exact line numbers (after 163, before the `echo ""` on 165) and forbade
+`_kubectl` conversion — the file deliberately uses bare `kubectl --context` at all 5 existing call sites, and
+switching would break the harness.
 
 **OPEN AFTER THIS MILESTONE (each needs its own spec, none blocking (c)):**
 1. `k3s-oci.sh:678-683` one-var `envsubst` allowlist leaking 5 placeholders (pre-existing).
