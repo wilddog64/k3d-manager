@@ -790,6 +790,7 @@ function _hostinger_reapply_gitops_applicationsets() {
     "data-git.yaml"
     "services-git.yaml"
     "platform-helm.yaml"
+    "istio-ambient.yaml"
   )
 
   for appset in "${appsets[@]}"; do
@@ -799,13 +800,13 @@ function _hostinger_reapply_gitops_applicationsets() {
       return 1
     fi
 
-    if ! envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME' < "${appset_path}" | "${hub_kubectl[@]}" apply -f - >/dev/null 2>&1; then
+    if ! envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME $AMBIENT_ISTIO_VERSION $AMBIENT_CNI_CONF_DIR $AMBIENT_CNI_BIN_DIR' < "${appset_path}" | "${hub_kubectl[@]}" apply -f - >/dev/null 2>&1; then
       _err "[k3s-hostinger] failed to reapply ApplicationSet ${appset}"
       return 1
     fi
   done
 
-  _info "[k3s-hostinger] reapplied data-git, services-git, and platform-helm ApplicationSets for ${_HOSTINGER_KUBE_CONTEXT}"
+  _info "[k3s-hostinger] reapplied data-git, services-git, platform-helm, and istio-ambient ApplicationSets for ${_HOSTINGER_KUBE_CONTEXT}"
   return 0
 }
 
