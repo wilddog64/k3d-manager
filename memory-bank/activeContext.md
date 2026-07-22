@@ -50,7 +50,12 @@ Full `make down` (`DOWN_EXIT=0`, hub + CFN stack deleted) → `make up CLUSTER_P
   istio-cni went `1/1` within ~2min after overriding to `cniConfDir=/var/lib/rancher/k3s/agent/etc/cni/net.d` +
   `cniBinDir=/var/lib/rancher/k3s/data/cni`. **This override is LIVE-ONLY on the hub appset — the next
   `deploy_istio_ambient` reverts it.** `ce4d83f0`'s standard paths are correct for Cilium, wrong for bare flannel →
-  the appset needs to be substrate-aware, spec `docs/bugs/2026-07-21-istio-ambient-cni-dirs-not-substrate-aware.md`.
+  the appset needed to be substrate-aware. **Codex Session 1 landed as `9c0e336a` on
+  `origin/k3d-manager-v1.16.0` (2026-07-22)**: `scripts/etc/argocd/applicationsets/istio-ambient.yaml` now
+  parameterizes `cniConfDir`/`cniBinDir`, and `scripts/plugins/istio_ambient.sh` defaults/export/envsubst them while
+  preserving the Cilium defaults (`/etc/cni/net.d`, `/opt/cni/bin`) byte-for-byte when unset. **Claude still must
+  live re-run `deploy_istio_ambient` against hostinger with the rancher paths exported to verify `istio-cni-node`
+  stays `1/1` from git.**
 - **APP TIER IS STILL SIDECAR-ENROLLED — the real CPU story.** `services/shopping-cart-namespace/namespace.yaml:10` sets
   `istio-injection: enabled`, so istiod injects a 100m `istio-proxy` into every pod → node hit **1860m (93%) requests**
   and pods went `Pending` on `Insufficient cpu` while **actual usage was only 408m (20%)**. The historical
@@ -67,19 +72,20 @@ Full `make down` (`DOWN_EXIT=0`, hub + CFN stack deleted) → `make up CLUSTER_P
   `docs/bugs/2026-07-21-cluster-status-no-mesh-cni-health.md` (filed under docs/bugs, NOT docs/plans — v1.16.0 already
   holds 4 plan docs and the limit is 5 on an unshipped release).
 
-**HANDOFF STATE (2026-07-21):** branch `k3d-manager-v1.16.0` PUSHED to origin — tip `35cf743d`, specs commit
-`fd3be7f7`; all three spec files verified present via `git ls-tree origin/k3d-manager-v1.16.0 docs/bugs/`. The 3 specs
-are handed to Codex, **one SEPARATE session each**, in order: (a) CNI-substrate-aware appset → (b) namespace ambient
-label → (c) `cluster-status` mesh section. (a) must land before (b) is verifiable, since the app tier cannot enter the
-ambient dataplane while istio-cni is broken on a fresh deploy. **Spec gates tightened in `a242ec67`** after review of
-Codex's plan: (c) no longer asks Codex to run `make status` live (Codex has NO live-cluster verify role — static gates
-+ `bash -n` only; Claude runs the live check); all three now require push proof via
-`git log origin/k3d-manager-v1.16.0 --oneline -1` and an explicit **separate** memory-bank commit. Claude must NOT edit
-memory-bank while a Codex session is in flight — same lines, guaranteed conflict.
+**HANDOFF STATE (2026-07-22):** branch `k3d-manager-v1.16.0` PUSHED to origin — prior specs commit `fd3be7f7`, then
+Session 1 code commit **`9c0e336a`** (`fix(mesh): make ambient istio-cni conf/bin dirs CNI-substrate aware`) verified via
+`git log origin/k3d-manager-v1.16.0 --oneline -1`. The 3 specs remain **one SEPARATE Codex session each**, in order:
+(a) CNI-substrate-aware appset **DONE** → (b) namespace ambient label **NEXT** → (c) `cluster-status` mesh section
+**WAITING ON CLAUDE VERIFICATION OF (a)+(b)**. (a) had to land before (b) became verifiable, since the app tier cannot
+enter the ambient dataplane while istio-cni is broken on a fresh deploy. **Spec gates tightened in `a242ec67`** after
+review of Codex's plan: (c) no longer asks Codex to run `make status` live (Codex has NO live-cluster verify role —
+static gates + `bash -n` only; Claude runs the live check); all three require push proof via
+`git log origin/k3d-manager-v1.16.0 --oneline -1` and an explicit **separate** memory-bank commit.
 
-**NEXT after Codex lands (a)+(b):** Claude re-runs `deploy_istio_ambient` with the rancher paths exported, restarts the
-app deployments, and captures the ambient dataplane proof (HBONE `dst.hbone_addr=…:80` on :15008 + mutual SPIFFE mTLS
-both ends) — same bar `k3s-aws` met. Claude runs all live verification; Codex is never given a live-cluster verify.
+**NEXT after Claude verifies (a), and after Codex lands (b):** Claude re-runs `deploy_istio_ambient` with the rancher
+paths exported, restarts the app deployments, and captures the ambient dataplane proof (HBONE
+`dst.hbone_addr=…:80` on :15008 + mutual SPIFFE mTLS both ends) — same bar `k3s-aws` met. Claude runs all live
+verification; Codex is never given a live-cluster verify.
 
 **PRE-REBUILD diagnosis (2026-07-21, superseded above — kept for the retracted-hypothesis trail):**
 - **PRIMARY WALL = flannel pod-IP exhaustion.** `/var/lib/cni/networks/cbr0/` holds **253/254 allocated IPs but only 40 pods run** — ~213 LEAKED host-local IPAM reservations from 2d20h of orphaned-app churn. `10.42.0.0/24` full → every new pod (istiod, ztunnel, postgresql-orders-0, monitoring admission) stuck `ContainerCreating` with `flannel failed (add): no IP addresses available`. istiod's *separate* CPU-Pending (500m won't fit 290m free) is secondary — even at 100m it can't get an IP.
