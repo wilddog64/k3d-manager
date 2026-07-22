@@ -159,8 +159,25 @@ with one insertion after line 163; no `_kubectl` conversion; no live-cluster run
 required 4-mode stub-`kubectl` harness passed all modes with `RC=0`, including `MODE=flaky` printing
 `ambient ns:       <none>`. `git show --stat da67e2bf` lists exactly one file (`bin/cluster-status`, +45), and
 push proof is `git log origin/k3d-manager-v1.16.0 --oneline -3` showing `da67e2bf` at the tip. PR URL not created
-per repo rule. Claude still owes the post-push live verify:
-`make status CLUSTER_PROVIDER=k3s-hostinger`.
+per repo rule.
+
+**CLAUDE-VERIFIED PASS (2026-07-22) — spec (c) closed, nothing outstanding.** Every gate re-run independently
+rather than trusting Codex's paste. Git side: both `da67e2bf` and memory-bank commit `66683150` confirmed on
+`origin/k3d-manager-v1.16.0`; `git show --stat da67e2bf` = exactly one file, `bin/cluster-status`, +45/−0;
+commit message byte-exact; `git status` clean with **0** untracked files, so the harness was never committed and
+`scripts/tests/` was never touched. Content side: the landed block was `diff`ed against the spec's `Exact new
+block to insert` and is **byte-identical** (the only delta is the required trailing blank separator); placement
+confirmed `fi`(163) → blank → block(165–209) → blank → `echo ""` → Hub ArgoCD header, i.e. no existing section
+reordered. Static gates on this machine: `shellcheck -S warning bin/cluster-status` `SC_RC=0` / `SC_LINES=0`
+(baseline was also 0, so zero new warnings is exact, not approximate); `bash -n` `BN_RC=0`. Harness re-run by
+Claude against the LANDED file, all four modes `RC=0` and matching the spec's required-results table.
+**Negative control re-proved the gate bites:** stripping `|| true` from all six substitutions flips `MODE=flaky`
+to `RC=1` with output truncating after the `istiod:` line — the `ambient ns:` line never prints. **Live verify
+`make status CLUSTER_PROVIDER=k3s-hostinger` → `STATUS_RC=0`** (RC captured on its own line, not through `tee`),
+printing `CNI substrate: flannel (no cilium daemonset)`, `istio-cni-node: 1/1 ready`, `ztunnel: 1/1 ready`,
+`istiod: 1/1 ready`, `ambient ns: shopping-cart-apps`, and `grep -c CONFLICT` → **0**, which is the expected
+result post-`ebf27de3`, not a coverage gap. Unrelated pre-existing finding surfaced by the same run:
+`Product images: HTTP Error 502` in Service Health — not caused by this change, needs its own spec.
 
 **Three corrections Claude made to spec (c) before handoff (revision commit below):**
 1. **The spec's own code block was `set -e`-unsafe** — it omitted `|| true` on all six command substitutions
