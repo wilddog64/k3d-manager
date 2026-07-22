@@ -56,6 +56,26 @@ Full `make down` (`DOWN_EXIT=0`, hub + CFN stack deleted) → `make up CLUSTER_P
   preserving the Cilium defaults (`/etc/cni/net.d`, `/opt/cni/bin`) byte-for-byte when unset. **Claude still must
   live re-run `deploy_istio_ambient` against hostinger with the rancher paths exported to verify `istio-cni-node`
   stays `1/1` from git.**
+- **`9c0e336a` VERIFIED PASS on all 8 DoD boxes (Claude, 2026-07-22)** — SHA on `origin/k3d-manager-v1.16.0`; scope
+  exactly the 2 target files (9+/4-); commit message verbatim; memory-bank a separate commit (`87cb4eba`); all FOUR
+  spec changes applied incl. Change 4 (stale Cilium help precondition); only one `envsubst` call exists in the file
+  and both vars are in it; `shellcheck -S warning` 0; `yaml.safe_load_all` 0; `ce4d83f0` defaults intact. Byte-identical
+  render proven by full-file `diff` of the `9c0e336a^` render vs the new render (md5 `bedeb363…` both sides), not a
+  `grep -A2` spot check.
+- **REGRESSION FOUND OUTSIDE THE SPEC'S 2-FILE SCOPE (Claude's spec-scoping miss, not Codex's).**
+  `_argocd_deploy_applicationsets` (`scripts/plugins/argocd.sh:1206-1220`) derives its `envsubst` allowlist by grepping
+  `${VAR}` out of each appset file and **refuses to apply** any file with an unset var (`_err` + `continue`, then still
+  `return 0`). `AMBIENT_CNI_CONF_DIR`/`AMBIENT_CNI_BIN_DIR` are defaulted ONLY in `istio_ambient.sh`, which that path
+  never loads → `deploy_argocd_bootstrap` now **silently drops `istio-ambient.yaml`** and reports success.
+  `scripts/etc/argocd/vars.sh:70-72` already documents this exact trap for the sibling `AMBIENT_ISTIO_VERSION`
+  ("Must be defaulted here, not only in istio_ambient.sh"). Fix spec filed: **`be422467`** →
+  `docs/bugs/2026-07-21-ambient-cni-vars-missing-from-argocd-vars.md` (one file, `scripts/etc/argocd/vars.sh`).
+  Claude dry-ran the fix locally before filing: post-fix refusal gate prints nothing, `shellcheck`/`bash -n` 0, env
+  override still beats the default — then reverted so Codex does the edit (spec-before-implement).
+- **PRE-EXISTING, NOT A REGRESSION — separate spec needed.** `scripts/lib/providers/k3s-oci.sh:678-683` globs every
+  appset through `envsubst '$ARGOCD_NAMESPACE'`, a one-var allowlist against a file with FIVE placeholders, so
+  `${APP_CLUSTER_NAME}` and `${AMBIENT_ISTIO_VERSION}` were ALREADY reaching OCI's ArgoCD literally before `9c0e336a`
+  (now 5 leaked vars). `k3s-hostinger.sh:791-794` uses an explicit 3-appset list excluding istio-ambient — unaffected.
 - **APP TIER IS STILL SIDECAR-ENROLLED — the real CPU story.** `services/shopping-cart-namespace/namespace.yaml:10` sets
   `istio-injection: enabled`, so istiod injects a 100m `istio-proxy` into every pod → node hit **1860m (93%) requests**
   and pods went `Pending` on `Insufficient cpu` while **actual usage was only 408m (20%)**. The historical
@@ -75,8 +95,9 @@ Full `make down` (`DOWN_EXIT=0`, hub + CFN stack deleted) → `make up CLUSTER_P
 **HANDOFF STATE (2026-07-22):** branch `k3d-manager-v1.16.0` PUSHED to origin — prior specs commit `fd3be7f7`, then
 Session 1 code commit **`9c0e336a`** (`fix(mesh): make ambient istio-cni conf/bin dirs CNI-substrate aware`) verified via
 `git log origin/k3d-manager-v1.16.0 --oneline -1`. The 3 specs remain **one SEPARATE Codex session each**, in order:
-(a) CNI-substrate-aware appset **DONE** → (b) namespace ambient label **NEXT** → (c) `cluster-status` mesh section
-**WAITING ON CLAUDE VERIFICATION OF (a)+(b)**. (a) had to land before (b) became verifiable, since the app tier cannot
+(a) CNI-substrate-aware appset **DONE + CLAUDE-VERIFIED PASS** → (b) namespace ambient label **NEXT, now bundled with
+the (d) `vars.sh` regression fix as a 2-file session** → (c) `cluster-status` mesh section **WAITING ON CLAUDE
+VERIFICATION OF (a)+(b)**. (a) had to land before (b) became verifiable, since the app tier cannot
 enter the ambient dataplane while istio-cni is broken on a fresh deploy. **Spec gates tightened in `a242ec67`** after
 review of Codex's plan: (c) no longer asks Codex to run `make status` live (Codex has NO live-cluster verify role —
 static gates + `bash -n` only; Claude runs the live check); all three require push proof via
