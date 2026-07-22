@@ -9,7 +9,9 @@ Usage: [APP_CLUSTER_NAME=<ctx>] [ARGOCD_CONTEXT=<hub-ctx>] ./scripts/k3d-manager
 Applies the istio-ambient ApplicationSet to the hub ArgoCD (ARGOCD_CONTEXT, default
 k3d-k3d-cluster), targeting APP_CLUSTER_NAME (default ubuntu-k3s). Preconditions:
   - The target cluster is registered with the hub ArgoCD (register_app_cluster).
-  - The target cluster's CNI is Cilium with cni.exclusive=false (deploy with K3S_AMBIENT_MESH=true).
+  - AMBIENT_CNI_CONF_DIR/AMBIENT_CNI_BIN_DIR match the target cluster's CNI substrate.
+    Defaults suit Cilium (/etc/cni/net.d, /opt/cni/bin); for bare k3s flannel use
+    /var/lib/rancher/k3s/agent/etc/cni/net.d and /var/lib/rancher/k3s/data/cni.
   - The platform AppProject permits istio-system as a destination for the target cluster.
 HELP
     return 0
@@ -20,7 +22,10 @@ HELP
   : "${ARGOCD_CONTEXT:=k3d-k3d-cluster}"
   : "${APP_CLUSTER_NAME:=${ARGOCD_APP_CLUSTER_NAME:-ubuntu-k3s}}"
   : "${AMBIENT_ISTIO_VERSION:=1.24.2}"
+  : "${AMBIENT_CNI_CONF_DIR:=/etc/cni/net.d}"
+  : "${AMBIENT_CNI_BIN_DIR:=/opt/cni/bin}"
   export ARGOCD_NAMESPACE APP_CLUSTER_NAME AMBIENT_ISTIO_VERSION
+  export AMBIENT_CNI_CONF_DIR AMBIENT_CNI_BIN_DIR
 
   if [[ ! -f "${_appset}" ]]; then
     _err "[istio_ambient] ApplicationSet not found: ${_appset}"
@@ -29,7 +34,7 @@ HELP
 
   _info "[istio_ambient] Applying istio-ambient ApplicationSet (hub: ${ARGOCD_CONTEXT}, target: ${APP_CLUSTER_NAME})..."
   # shellcheck disable=SC2016
-  if envsubst '$ARGOCD_NAMESPACE $APP_CLUSTER_NAME $AMBIENT_ISTIO_VERSION' < "${_appset}" \
+  if envsubst '$ARGOCD_NAMESPACE $APP_CLUSTER_NAME $AMBIENT_ISTIO_VERSION $AMBIENT_CNI_CONF_DIR $AMBIENT_CNI_BIN_DIR' < "${_appset}" \
       | _kubectl apply --context "${ARGOCD_CONTEXT}" -f -; then
     _info "[istio_ambient] Applied — ArgoCD will sync istio-system on ${APP_CLUSTER_NAME}"
   else

@@ -32,8 +32,8 @@ spec:
             values: |
               profile: ambient
               cni:
-                cniConfDir: /etc/cni/net.d
-                cniBinDir: /opt/cni/bin
+                cniConfDir: ${AMBIENT_CNI_CONF_DIR}
+                cniBinDir: ${AMBIENT_CNI_BIN_DIR}
           - name: ztunnel
             chart: ztunnel
             wave: "3"
