@@ -163,6 +163,51 @@ else
 fi
 
 echo ""
+echo "=== Service Mesh / CNI (${APP_CONTEXT}) ==="
+if kubectl --context "${APP_CONTEXT}" get ns istio-system >/dev/null 2>&1; then
+  if kubectl --context "${APP_CONTEXT}" -n kube-system get daemonset cilium >/dev/null 2>&1; then
+    _mesh_cni_ready="$(kubectl --context "${APP_CONTEXT}" -n kube-system get daemonset cilium \
+      -o jsonpath='{.status.numberReady}/{.status.desiredNumberScheduled}' 2>/dev/null || true)"
+    echo "CNI substrate:    cilium (${_mesh_cni_ready:-unknown} ready)"
+  else
+    echo "CNI substrate:    flannel (no cilium daemonset)"
+  fi
+
+  for _mesh_ds in istio-cni-node ztunnel; do
+    if kubectl --context "${APP_CONTEXT}" -n istio-system get daemonset "${_mesh_ds}" >/dev/null 2>&1; then
+      _mesh_ready="$(kubectl --context "${APP_CONTEXT}" -n istio-system get daemonset "${_mesh_ds}" \
+        -o jsonpath='{.status.numberReady}/{.status.desiredNumberScheduled}' 2>/dev/null || true)"
+      printf '%-18s%s ready\n' "${_mesh_ds}:" "${_mesh_ready:-unknown}"
+    else
+      printf '%-18s%s\n' "${_mesh_ds}:" "ABSENT"
+    fi
+  done
+
+  if kubectl --context "${APP_CONTEXT}" -n istio-system get deployment istiod >/dev/null 2>&1; then
+    _mesh_istiod="$(kubectl --context "${APP_CONTEXT}" -n istio-system get deployment istiod \
+      -o jsonpath='{.status.readyReplicas}/{.spec.replicas}' 2>/dev/null || true)"
+    printf '%-18s%s ready\n' "istiod:" "${_mesh_istiod:-unknown}"
+  else
+    printf '%-18s%s\n' "istiod:" "ABSENT"
+  fi
+
+  _mesh_ambient_ns="$(kubectl --context "${APP_CONTEXT}" get ns \
+    -l istio.io/dataplane-mode=ambient \
+    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{end}' 2>/dev/null || true)"
+  echo "ambient ns:       ${_mesh_ambient_ns:-<none>}"
+
+  _mesh_conflict="$(kubectl --context "${APP_CONTEXT}" get ns \
+    -l istio.io/dataplane-mode=ambient,istio-injection=enabled \
+    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{end}' 2>/dev/null || true)"
+  if [[ -n "${_mesh_conflict}" ]]; then
+    echo "CONFLICT:         ${_mesh_conflict}— has BOTH istio-injection=enabled and dataplane-mode=ambient"
+    echo "                  sidecars are still being injected; ambient will not take effect"
+  fi
+else
+  echo "istio-system namespace absent — service mesh not deployed"
+fi
+
+echo ""
 echo "=== Hub ArgoCD Registration (${INFRA_CONTEXT}, ns ${ARGOCD_NAMESPACE}) ==="
 if kubectl get secret "cluster-${APP_CONTEXT}" -n "${ARGOCD_NAMESPACE}" \
      --context "${INFRA_CONTEXT}" >/dev/null 2>&1; then
