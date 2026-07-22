@@ -19,8 +19,65 @@ Full `make down` (`DOWN_EXIT=0`, hub + CFN stack deleted) → `make up CLUSTER_P
 ## OPEN blockers
 1. **Ambient k3s-aws cold-rebuild blocker is CLOSED, `acg_restart` is wired, and tmp-hygiene code fixes are now landed (2026-07-20).** `ce4d83f0` (istio-cni CNI paths), `bca7d59a` (default `K3S_AMBIENT_MESH=true` on k3s-aws), `5be42ae4` (pin k3sup version), and **`520621a9` (replace both `(( var++ ))` wait-loop post-increments with assignment form so `set -e` no longer aborts the first SSM/node-ready iteration)** are all on `k3d-manager-v1.16.0`, and the former manual-sandbox-restart regression is fixed end-to-end: upstream lib-foundation commit **`03312ae`** on `origin/feat/v0.4.5` adds `_acg_restart_playwright` + `acg_restart`, the subtree pull landed as **`78af86e8`**, and the local dispatcher stub landed as **`4332431f`**. Claude already proved the orphaned `acg_restart.js` recovered a dead sandbox with zero manual clicks, and the cold rebuild plus ambient dataplane verify are complete (`DOWN_RC=0`, `UP_RC=0`, Cilium/istio green, HBONE+mTLS capture PASS). **TMP-HYGIENE follow-through is now code-complete too:** upstream lib-foundation commit **`84d5b27`** on `origin/feat/v0.4.6` adds `_acg_sweep_stale_artifacts` plus the two wrapper call sites; the subtree pull landed as **`381cdf03`** on `k3d-manager-v1.16.0` with scope gate `git diff --stat HEAD~1 -- . ':(exclude)scripts/lib/foundation'` → EMPTY; and local trap guards for the six bare-`mktemp` sites landed as **`319762b9`**. Prior live tmp diagnosis still stands: 54 stale `/private/tmp` entries were swept on 2026-07-20 (44 `playwright-artifacts-*` + 10 `tmp.*`, all >24h; 32 within-24h kept; operator files untouched). Remaining follow-up is operational verification on future real runs/interrupts; no code blocker remains. **lib-foundation PR #37 MERGED** 2026-07-21 (`feat/v0.4.6` → `main`, merge commit `db336a6f`) — bundled `03312ae` (acg_restart wiring) + `84d5b27` (artifact sweep) + CI-fix `1c0dc51` (SC2119/2120) + Copilot-fix `330083b` (TMPDIR=/ guard + set -e-safe node exit) + issue doc `4a537c9`; cleared the feat/v0.4.5 upstream debt. **Released as lib-foundation v0.4.6** (2026-07-21): stamp commit `ae4616f` on main (`docs(changelog): stamp v0.4.6 release header`), annotated tag `v0.4.6`→`ae4616f`, GitHub release marked Latest — https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.6 (v0.4.5 folded in, never separately tagged). **Follow-up PR #38 OPEN** (`feat/v0.4.7` → `main`, https://github.com/wilddog64/lib-foundation/pull/38, tip `f45c464`) — the documented out-of-scope follow-up: `acg_check_ttl` (was `acg.sh:517`) had the same pre-existing `output=$(...)`/`$?` set -e pattern; fixed to `|| exit_code=$?` matching the sibling wrappers. All 3 CI checks green (shellcheck/bats/acg-node), `mergeStateStatus=CLEAN`, Copilot review clean (0 inline findings, 0 threads), main unprotected so no enforce_admins gate — awaiting owner merge, do NOT auto-merge. **Pending after #38 merges (owner-chosen order = fix-upstream-first-then-one-pull):** single `git subtree pull` into k3d-manager carrying the whole merged lib-foundation acg.sh state (03312ae + 84d5b27 + 1c0dc51 + 330083b + f45c464) so `scripts/lib/foundation/scripts/lib/acg/acg.sh` matches lib-foundation main — vendored copy currently reflects `84d5b276` only.
 
-## Hostinger (PARKED — do not investigate without go)
-App tier DOWN. Root cause = **CPU-request over-subscription on the 2-CPU node `srv1754834`** (requests 1710m/85%, istiod needs 500m, actual usage only 16%); istiod Pending 13h → sidecar-injector webhook dead → no injected pod can recreate. Second breakage: `istio-cni` plugin binary missing from the node. `1af15217` already right-sized istiod→100m/ztunnel→100m in-repo but is untested live (blocker 2). LESSON: `preserveResourcesOnDeletion` does NOT protect resources whose Applications predate the flag — the first appset rename still cascade-deletes; strip `resources-finalizer` first.
+## Hostinger (REBUILT 2026-07-21 — Path B executed; ambient control plane GREEN, app-tier enrollment pending 2 Codex specs)
+
+**REBUILD RESULT (2026-07-21, owner chose Path B = clean rebuild):** executed `make down` → `make up` →
+`vault_deploy_hub_into_context` → `make refresh` → `deploy_istio_ambient` on `k3s-hostinger`.
+- **`make down`** — k3s-uninstall ran; verified ON THE BOX: `k3s` binary gone, **`/var/lib/cni/networks/cbr0` gone** (the
+  213-IP flannel leak is physically eliminated), deregistered from hub, context removed, VPS preserved.
+  ⚠️ my `DOWN_RC=${PIPESTATUS[0]}` capture came back EMPTY (var didn't survive the pipeline) — outcome was
+  verified by direct SSH inspection instead. Do not trust that capture idiom through `| tee`.
+- **`make up`** `UP_RC=0` — fresh k3s **v1.36.2+k3s1**, node Ready, `cluster-ubuntu-hostinger` secret recreated on hub.
+  Expected warn: app-cluster Vault auth failed (`vault-root missing`) — fresh cluster has no Vault yet.
+- **ORDERING GAP:** first `make refresh` **FAILED `RC=2`** at Vault seeding — `could not read target vault-root token …
+  run vault_deploy_hub_into_context first`. `deploy_cluster` for hostinger is BARE (ssh→k3sup→kubeconfig→node-ready→
+  label→register only); it does NOT deploy Vault, and `refresh` assumes Vault already exists. Fix sequence is
+  down → up → **`vault_deploy_hub_into_context ubuntu-hostinger`** (RC=0) → refresh (`RC=0` on 2nd run).
+- **Data tier fully restored 7/7** (minio, postgres orders/payment/products, rabbitmq, redis-cart, redis-orders-cache).
+  data-layer app had failed sync (`namespaces "shopping-cart-payment" not found`, retry limit 5 exhausted); recovered by
+  forcing sync via `kubectl patch application … --type merge -p '{"operation":{...,"sync":{...}}}'` (the `refresh=hard`
+  annotation alone does NOT re-trigger a sync past an exhausted retry budget).
+- **VAULT WAS NEVER AT RISK (verified before destroying):** hostinger's Vault is a DOWNSTREAM replica. Canonical source =
+  **hub Vault** (unsealed, alive) with **macOS Keychain** fallback (`k3d-manager-app-cluster-secrets`; confirmed present for
+  `postgres/orders`, `keycloak/admin`, `github/pat`, `payment/stripe`). The in-cluster `vault-seed-backup` secret is a
+  write-only DR **output** of seeding, never an input. `make backup` does NOT support hostinger (k3s-oci only).
+
+**AMBIENT STATUS — control plane GREEN, dataplane NOT yet carrying app traffic:**
+- `istio-cni-node 1/1`, `istiod 1/1`, `ztunnel 1/1` (stable ~50m); ztunnel receiving `istio.workload.Address` XDS from istiod.
+- **istio-cni required the RANCHER CNI paths** — this REVERSES the stale note below. On fresh k3s+flannel:
+  `/etc/cni/net.d` is EMPTY, the only conflist is `/var/lib/rancher/k3s/agent/etc/cni/net.d/10-flannel.conflist`,
+  `/opt/cni/bin` holds only istio's own binary, and real CNI bins live in `/var/lib/rancher/k3s/data/cni`.
+  istio-cni went `1/1` within ~2min after overriding to `cniConfDir=/var/lib/rancher/k3s/agent/etc/cni/net.d` +
+  `cniBinDir=/var/lib/rancher/k3s/data/cni`. **This override is LIVE-ONLY on the hub appset — the next
+  `deploy_istio_ambient` reverts it.** `ce4d83f0`'s standard paths are correct for Cilium, wrong for bare flannel →
+  the appset needs to be substrate-aware, spec `docs/bugs/2026-07-21-istio-ambient-cni-dirs-not-substrate-aware.md`.
+- **APP TIER IS STILL SIDECAR-ENROLLED — the real CPU story.** `services/shopping-cart-namespace/namespace.yaml:10` sets
+  `istio-injection: enabled`, so istiod injects a 100m `istio-proxy` into every pod → node hit **1860m (93%) requests**
+  and pods went `Pending` on `Insufficient cpu` while **actual usage was only 408m (20%)**. The historical
+  "hostinger is CPU-starved" reading was a SYMPTOM OF SIDECAR INJECTION, not real capacity pressure.
+  Spec `docs/bugs/2026-07-21-shopping-cart-ns-sidecar-blocks-ambient.md`.
+- **LIVE REMEDIATION IS IMPOSSIBLE HERE — the ApplicationSet controller wins.** Removing the ns label was reverted in ~15s;
+  setting `selfHeal:false` was reverted; removing `automated` entirely was ALSO reverted, because the `services-git`
+  ApplicationSet regenerates the Application `.spec` from its template. Only the git manifest is durable.
+- **`istio-ambient` is a SINGLE appset** whose generator is keyed to one `${APP_CLUSTER_NAME}` — applying it for
+  hostinger re-pointed it off `ubuntu-k3s`. Only one cluster can hold ambient at a time (design limit worth fixing).
+  (No collateral damage this time: `ubuntu-k3s` apps show `Unknown` because the ACG sandbox has EXPIRED/unreachable.)
+- **`make status` is BLIND to all of this** — `bin/cluster-status` (435 lines) has zero istio/cilium/ztunnel/ambient
+  checks, which is why the mesh sat broken ~3 days unnoticed. Spec
+  `docs/bugs/2026-07-21-cluster-status-no-mesh-cni-health.md` (filed under docs/bugs, NOT docs/plans — v1.16.0 already
+  holds 4 plan docs and the limit is 5 on an unshipped release).
+
+**NEXT:** hand the 3 specs to Codex (separate sessions), then Claude re-runs `deploy_istio_ambient` with the rancher
+paths exported and captures the ambient dataplane proof (HBONE `dst.hbone_addr=…:80` on :15008 + mutual SPIFFE mTLS).
+
+**PRE-REBUILD diagnosis (2026-07-21, superseded above — kept for the retracted-hypothesis trail):**
+- **PRIMARY WALL = flannel pod-IP exhaustion.** `/var/lib/cni/networks/cbr0/` holds **253/254 allocated IPs but only 40 pods run** — ~213 LEAKED host-local IPAM reservations from 2d20h of orphaned-app churn. `10.42.0.0/24` full → every new pod (istiod, ztunnel, postgresql-orders-0, monitoring admission) stuck `ContainerCreating` with `flannel failed (add): no IP addresses available`. istiod's *separate* CPU-Pending (500m won't fit 290m free) is secondary — even at 100m it can't get an IP.
+- **istio-cni IS HEALTHY (1/1 Running on flannel, 2d20h)** — the old "istio-cni binary missing" note is STALE/WRONG. No Cilium needed; ambient runs on flannel here. istio-cni conf/bin dirs `/etc/cni/net.d`+`/opt/cni/bin` (post-`ce4d83f0`) work on this k3s v1.36.
+- **GitOps owner is broken both ways:** laptop hub (`k3d-k3d-cluster`, rebuilt 24h ago by k3s-aws e2e `make down/up`) has hostinger **UNREGISTERED** (no `cluster-ubuntu-hostinger` secret, no apps); the spoke's OWN ArgoCD (9 `argocd-ubuntu-hostinger-*` pods in `cicd`) has **ZERO applications**. Nothing reconciles hostinger. COUPLING: every k3s-aws e2e cycle rebuilds the laptop hub → de-registers hostinger → orphans its mesh.
+- ESO/Vault HEALTHY (vault-0 23d, all ExternalSecrets synced 15m). `shopping-cart-apps` ns EMPTY (app tier never got IPs). `payment-service` stuck Terminating (no finalizers — wedged sandbox teardown). Data tier = `local-path` demo PVCs (reseedable, not authoritative).
+- **CODE GAP (Codex spec pending):** `_hostinger_reapply_gitops_applicationsets` reapplies data/services/platform but NOT `istio-ambient.yaml`, so `refresh` never reconciles ambient after a hub rebuild. `1af15217` (istiod→100m/ztunnel→100m) lives inline in the appset (istio-ambient.yaml:26-28,42-44); delivered ONLY via `deploy_istio_ambient` (plugins/istio_ambient.sh), which was last applied pre-fix → live istiod still 500m.
+- **Two repair paths (decision pending):** (A) surgical in-place — SSH-flush the flannel IPAM leak (stop k3s → rm /var/lib/cni/networks/cbr0/* + del cni0/flannel.1 → start k3s), force-delete wedged pods, register w/ hub, `deploy_istio_ambient` (100m), verify HBONE/mTLS, redeploy app tier (preserves data); vs (B) clean rebuild — `make down/up CLUSTER_PROVIDER=k3s-hostinger` (wipes local-path demo data, clears leak+orphan ArgoCD), then `deploy_istio_ambient` + verify. Both converge on the same ambient dataplane verify; rebuild does NOT auto-install ambient (provider is bare flannel k3sup — appset applied after either way).
+- LESSON (still valid): `preserveResourcesOnDeletion` does NOT protect resources whose Applications predate the flag — the first appset rename still cascade-deletes; strip `resources-finalizer` first.
 
 ## CVE-scan (hub) — owner decisions pending
 - `app-cve-scan` (`babb3c80`/`89c2efd6`) now runs exit-0, but **skips all services**: MAIN loop matches `ghcr.io/wilddog64/...` vs trivy-operator's prefix-less `.report.artifact.repository` → spec `docs/bugs/2026-07-18-app-cve-scan-report-repository-registry-prefix-mismatch.md` (unassigned).
