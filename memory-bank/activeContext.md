@@ -139,8 +139,8 @@ followed by the 2-file Session 2 code commits **`a08911b3`** (`fix(argocd): defa
 argocd/vars.sh for the bootstrap path`) and **`ebf27de3`** (`fix(mesh): enroll shopping-cart namespace in ambient
 instead of sidecar injection`), all confirmed on `origin/k3d-manager-v1.16.0`. The sequence is now:
 (a) CNI-substrate-aware appset **DONE + CLAUDE-VERIFIED PASS** → (d) bootstrap ambient-CNI defaults in `vars.sh`
-**DONE** → (b) namespace ambient label **DONE** → (c) `cluster-status` mesh section **NEXT, after Claude's live
-verification of the landed mesh fixes**. (a) had to land before (b) became verifiable, since the app tier could not
+**DONE** → (b) namespace ambient label **DONE** → (c) `cluster-status` mesh section **DONE in `da67e2bf`**
+(`feat(status): report service mesh, CNI substrate, and ambient enrollment`; PR URL not created per repo rule). (a) had to land before (b) became verifiable, since the app tier could not
 enter the ambient dataplane while istio-cni was broken on a fresh deploy. **Spec gates tightened in `a242ec67`** after
 review of Codex's plan: (c) no longer asks Codex to run `make status` live (Codex has NO live-cluster verify role —
 static gates + `bash -n` only; Claude runs the live check); all sessions require push proof via
@@ -152,12 +152,15 @@ the app namespace is ambient-enrolled, all app pods run sidecar-free `1/1`, and 
 traffic rides HBONE on :15008 with mutual SPIFFE identities both directions. Nothing on the git side is
 outstanding for (a)/(d)/(b).
 
-**NEXT / IN FLIGHT:** spec (c) `docs/bugs/2026-07-21-cluster-status-no-mesh-cni-health.md` — **REVISED and HANDED
-OFF to Codex 2026-07-22** as its own session (`feat(status): report service mesh, CNI substrate, and ambient
-enrollment`). Static gates only — Codex is never given a live-cluster verify; Claude runs
-`make status CLUSTER_PROVIDER=k3s-hostinger` after it lands.
-
-**⚠️ CLAUDE DOES NOT EDIT memory-bank UNTIL CODEX REPORTS BACK** — session in flight, same lines, guaranteed conflict.
+**SESSION RESULT (2026-07-22):** spec (c) `docs/bugs/2026-07-21-cluster-status-no-mesh-cni-health.md` is
+**DONE in `da67e2bf` on `origin/k3d-manager-v1.16.0`**. Scope held to exactly one file, `bin/cluster-status`,
+with one insertion after line 163; no `_kubectl` conversion; no live-cluster run. Static gates PASS:
+`shellcheck -S warning bin/cluster-status` exit 0 with zero output, `bash -n bin/cluster-status` exit 0, and the
+required 4-mode stub-`kubectl` harness passed all modes with `RC=0`, including `MODE=flaky` printing
+`ambient ns:       <none>`. `git show --stat da67e2bf` lists exactly one file (`bin/cluster-status`, +45), and
+push proof is `git log origin/k3d-manager-v1.16.0 --oneline -3` showing `da67e2bf` at the tip. PR URL not created
+per repo rule. Claude still owes the post-push live verify:
+`make status CLUSTER_PROVIDER=k3s-hostinger`.
 
 **Three corrections Claude made to spec (c) before handoff (revision commit below):**
 1. **The spec's own code block was `set -e`-unsafe** — it omitted `|| true` on all six command substitutions
