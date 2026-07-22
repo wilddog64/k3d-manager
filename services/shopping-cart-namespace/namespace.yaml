@@ -7,4 +7,4 @@ metadata:
   labels:
     app.kubernetes.io/part-of: shopping-cart
     app.kubernetes.io/managed-by: argocd
-    istio-injection: enabled
+    istio.io/dataplane-mode: ambient
