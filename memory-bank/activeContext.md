@@ -196,13 +196,19 @@ Also pinned the insert anchor to exact line numbers (after 163, before the `echo
 switching would break the harness.
 
 **OPEN AFTER THIS MILESTONE (each needs its own spec, none blocking (c)):**
-1. `k3s-oci.sh:678-683` one-var `envsubst` allowlist leaking 5 placeholders (pre-existing).
+1. ~~`k3s-oci.sh:678-683` one-var `envsubst` allowlist leaking 5 placeholders~~ — **DE-SCOPED 2026-07-22
+   (owner): OCI is crossed out — the Always-Free A1 capacity never yields an instance, so the k3s-oci
+   provider path is dead. Do NOT spend session time on OCI bugs. Focus is ACG/hostinger only.** The
+   envsubst leak is real but unreachable; leave it filed, do not fix.
 2. Hostinger 2-CPU requests oversubscription — 1960m/2000m with zero sidecars; 2 pods permanently `Pending`.
-   NOT a mesh problem (see corrected bullet above).
-3. `_hostinger_reapply_gitops_applicationsets` (`k3s-hostinger.sh:791-794`) uses an explicit 3-appset list that
-   EXCLUDES `istio-ambient.yaml` — a `make refresh` will not reapply the ambient appset.
+   NOT a mesh problem (see corrected bullet above). Still live on hostinger — candidate v1.17.0 spec.
+3. `_hostinger_reapply_gitops_applicationsets` (`k3s-hostinger.sh:789-793`) uses an explicit 3-appset list that
+   EXCLUDES `istio-ambient.yaml` — a `make refresh` will not reapply the ambient appset. **SPEC (e) WRITTEN
+   2026-07-22:** `docs/bugs/2026-07-22-hostinger-refresh-drops-istio-ambient-appset.md` — adds the appset +
+   widens the envsubst allowlist with the three `AMBIENT_*` vars; render gate PASS (all 4 appsets `residual=0`).
+   Ready to hand off to Codex. This is the last durability hole in the ambient milestone.
 4. `istio-ambient` single-appset design limit — keyed to one `${APP_CLUSTER_NAME}`, so only one cluster can hold
-   ambient at a time.
+   ambient at a time. Low priority now that OCI is de-scoped (hostinger is the only ambient host).
 
 **PRE-REBUILD diagnosis (2026-07-21, superseded above — kept for the retracted-hypothesis trail):**
 - **PRIMARY WALL = flannel pod-IP exhaustion.** `/var/lib/cni/networks/cbr0/` holds **253/254 allocated IPs but only 40 pods run** — ~213 LEAKED host-local IPAM reservations from 2d20h of orphaned-app churn. `10.42.0.0/24` full → every new pod (istiod, ztunnel, postgresql-orders-0, monitoring admission) stuck `ContainerCreating` with `flannel failed (add): no IP addresses available`. istiod's *separate* CPU-Pending (500m won't fit 290m free) is secondary — even at 100m it can't get an IP.
