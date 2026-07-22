@@ -67,8 +67,15 @@ Full `make down` (`DOWN_EXIT=0`, hub + CFN stack deleted) → `make up CLUSTER_P
   `docs/bugs/2026-07-21-cluster-status-no-mesh-cni-health.md` (filed under docs/bugs, NOT docs/plans — v1.16.0 already
   holds 4 plan docs and the limit is 5 on an unshipped release).
 
-**NEXT:** hand the 3 specs to Codex (separate sessions), then Claude re-runs `deploy_istio_ambient` with the rancher
-paths exported and captures the ambient dataplane proof (HBONE `dst.hbone_addr=…:80` on :15008 + mutual SPIFFE mTLS).
+**HANDOFF STATE (2026-07-21):** branch `k3d-manager-v1.16.0` PUSHED to origin — tip `35cf743d`, specs commit
+`fd3be7f7`; all three spec files verified present via `git ls-tree origin/k3d-manager-v1.16.0 docs/bugs/`. The 3 specs
+are handed to Codex, **one SEPARATE session each**, in order: (a) CNI-substrate-aware appset → (b) namespace ambient
+label → (c) `cluster-status` mesh section. (a) must land before (b) is verifiable, since the app tier cannot enter the
+ambient dataplane while istio-cni is broken on a fresh deploy.
+
+**NEXT after Codex lands (a)+(b):** Claude re-runs `deploy_istio_ambient` with the rancher paths exported, restarts the
+app deployments, and captures the ambient dataplane proof (HBONE `dst.hbone_addr=…:80` on :15008 + mutual SPIFFE mTLS
+both ends) — same bar `k3s-aws` met. Claude runs all live verification; Codex is never given a live-cluster verify.
 
 **PRE-REBUILD diagnosis (2026-07-21, superseded above — kept for the retracted-hypothesis trail):**
 - **PRIMARY WALL = flannel pod-IP exhaustion.** `/var/lib/cni/networks/cbr0/` holds **253/254 allocated IPs but only 40 pods run** — ~213 LEAKED host-local IPAM reservations from 2d20h of orphaned-app churn. `10.42.0.0/24` full → every new pod (istiod, ztunnel, postgresql-orders-0, monitoring admission) stuck `ContainerCreating` with `flannel failed (add): no IP addresses available`. istiod's *separate* CPU-Pending (500m won't fit 290m free) is secondary — even at 100m it can't get an IP.
