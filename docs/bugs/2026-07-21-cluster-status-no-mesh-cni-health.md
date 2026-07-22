@@ -133,8 +133,9 @@ fi
   `grep -n '_mesh' bin/cluster-status` that no prior variable of that name exists.
 - No other section touched; no reordering of existing output.
 - Must not change `bin/cluster-status` exit status in any scenario.
-- Run against a live cluster before reporting done:
-  `make status CLUSTER_PROVIDER=k3s-hostinger` must print the new section without error.
+- `bash -n bin/cluster-status` — the file must still parse.
+- Do NOT run `bin/cluster-status` or `make status` against a live cluster. Codex has no
+  live-cluster verification role here; static gates only. Claude runs the live check (below).
 
 ---
 
@@ -145,15 +146,24 @@ fi
 - [ ] Lists ambient-enrolled namespaces; prints `<none>` when there are none.
 - [ ] Prints the CONFLICT warning when a namespace has both labels.
 - [ ] Degrades cleanly (`ABSENT` / note) when istio-system or a component is missing.
-- [ ] `shellcheck -S warning bin/cluster-status` clean.
+- [ ] `shellcheck -S warning bin/cluster-status` clean; `bash -n bin/cluster-status` clean.
 - [ ] Exit status unchanged; existing sections untouched.
-- [ ] Committed and pushed to `k3d-manager-v1.16.0`.
-- [ ] memory-bank updated with commit SHA and task status.
+- [ ] Committed and pushed to `k3d-manager-v1.16.0`; push verified with
+      `git log origin/k3d-manager-v1.16.0 --oneline -1` (paste the output).
+- [ ] memory-bank updated with commit SHA and task status — as a **separate commit**, never
+      bundled with `bin/cluster-status`.
 
 **Commit message (exact):**
 ```
 feat(status): report service mesh, CNI substrate, and ambient enrollment
 ```
+
+### Live re-verify — Claude runs this after the push (NOT Codex)
+
+`make status CLUSTER_PROVIDER=k3s-hostinger` must print the new section without error, report
+`flannel` as the substrate, show `istio-cni-node`/`ztunnel`/`istiod` ready counts, and — until spec
+`2026-07-21-shopping-cart-ns-sidecar-blocks-ambient.md` lands — is expected to print the CONFLICT
+line for `shopping-cart-apps`.
 
 ---
 

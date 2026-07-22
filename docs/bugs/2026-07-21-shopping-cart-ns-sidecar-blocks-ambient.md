@@ -134,8 +134,10 @@ ztunnel handles L4 for the namespace.
 - [ ] `namespace.yaml` has `istio.io/dataplane-mode: ambient` and **no** `istio-injection` key.
 - [ ] Sync-wave annotation and the two `app.kubernetes.io/*` labels untouched.
 - [ ] YAML parses clean.
-- [ ] Committed and pushed to `k3d-manager-v1.16.0`.
-- [ ] memory-bank updated with commit SHA and task status.
+- [ ] Committed and pushed to `k3d-manager-v1.16.0`; push verified with
+      `git log origin/k3d-manager-v1.16.0 --oneline -1` (paste the output).
+- [ ] memory-bank updated with commit SHA and task status — as a **separate commit**, never
+      bundled with `namespace.yaml`.
 
 **Commit message (exact):**
 ```

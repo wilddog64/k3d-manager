@@ -199,8 +199,10 @@ flannel. Replace the Cilium precondition line:
 - [ ] Help text no longer claims Cilium is a precondition.
 - [ ] Unset-var render is byte-identical to today's output (checked per Rules).
 - [ ] `shellcheck -S warning` clean; YAML parses.
-- [ ] Committed and pushed to `k3d-manager-v1.16.0`.
-- [ ] memory-bank updated with commit SHA and task status.
+- [ ] Committed and pushed to `k3d-manager-v1.16.0`; push verified with
+      `git log origin/k3d-manager-v1.16.0 --oneline -1` (paste the output).
+- [ ] memory-bank updated with commit SHA and task status — as a **separate commit**, never
+      bundled with the two code files.
 
 **Commit message (exact):**
 ```
