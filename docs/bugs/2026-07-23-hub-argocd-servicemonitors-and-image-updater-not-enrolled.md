@@ -72,22 +72,52 @@ and is order-independent w.r.t. the monitoring CRD.
 Behavior:
 - If the `servicemonitors.monitoring.coreos.com` CRD is absent → log and `return 0` (no-op; a
   mesh/monitoring-less install must not fail).
-- Render: `_helm template "$ARGOCD_HELM_RELEASE" "$ARGOCD_HELM_CHART_REF" --version <pinned> -n
-  "$ARGOCD_NAMESPACE" -f <rendered argocd values> --api-versions monitoring.coreos.com/v1`, filter to
-  `kind == ServiceMonitor` (use `yq`, matching the existing repo pattern), and `_kubectl apply -f -`.
-  Reuse the same values source the deploy already builds (do not hardcode a second values path).
-- Call it from `deploy_argocd` **after** the helm upgrade/install step, gated the same way the rest of
-  the metrics wiring is (only when monitoring is expected).
+- Render: `_helm template "$ARGOCD_HELM_RELEASE" "$ARGOCD_HELM_CHART_REF" -n "$ARGOCD_NAMESPACE"
+  --api-versions monitoring.coreos.com/v1` plus the same values/version args the install used, filter
+  to `kind == ServiceMonitor` (use `yq`, matching the existing repo pattern), and `_kubectl apply -f -`.
 
-Pin the chart version to the same variable the deploy already uses for `ARGOCD_HELM_CHART_REF`
-(do not float it).
+**Chart version — read this carefully, there are two decoy variables:**
+
+- `ARGOCD_CHART_VERSION` (`scripts/plugins/argocd.sh:53`, default `7.8.1`) is **NOT** the install
+  version. It is used only as an annotation at line 1317. **Do NOT use it here.**
+- `ARGOCD_HELM_CHART_VERSION` (`scripts/plugins/argocd.sh:465-467`) is the real one. It is **unset by
+  default**, so the install floats — which is why the live hub release is chart `10.1.4`, not `7.8.1`.
+
+The render MUST mirror the install's version logic exactly, or you will render ServiceMonitors from a
+different chart version than the release that is actually deployed (wrong label/port selectors):
+
+```bash
+   local -a sm_args=()
+   if [[ -n "${ARGOCD_HELM_CHART_VERSION:-}" ]]; then
+      sm_args+=(--version "$ARGOCD_HELM_CHART_VERSION")
+   fi
+```
+
+Do NOT hardcode a version. Do NOT substitute `ARGOCD_CHART_VERSION`.
+
+**Call site — `deploy_argocd` cannot see the values file:**
+
+The values file is a `local` built inside `_argocd_helm_deploy_release` and is `rm -f`'d at the end of
+that function (`scripts/plugins/argocd.sh:559-561`). Therefore call `_argocd_ensure_servicemonitors`
+**from inside `_argocd_helm_deploy_release`, after the `helm upgrade --install` block and BEFORE the
+`rm -f "$values_file"` cleanup**, passing it the same `helm_args`/values the install used. Do NOT add a
+second values path, and do NOT call it from `deploy_argocd` — the file is gone by then.
 
 ### Change 2 — ensure image-updater (+ ghcr-pull-secret) is deployed on the standard hub bootstrap
 
 `_argocd_deploy_image_updater` already calls `_argocd_ensure_ghcr_pull_secret` and `apply -k`s the
-kustomization. The gap is that it only runs in the `enable_bootstrap` branch. Ensure the standard hub
-deploy path reaches it (hub role only — keep the existing `CLUSTER_ROLE=app` skip). Do not change the
-`ARGOCD_SKIP_IMAGE_UPDATER=1` opt-out.
+kustomization. The gap is that its only call site is inside the `if (( enable_bootstrap ))` block at
+`scripts/plugins/argocd.sh:550`.
+
+**The fix is exactly one thing: hoist that call out of the `enable_bootstrap` block** so it runs on
+every hub `deploy_argocd`, placed immediately before the `if (( enable_bootstrap ))` line. Leave the
+rest of the bootstrap block untouched — do NOT restructure it.
+
+**Do NOT add a `CLUSTER_ROLE` guard.** `deploy_argocd` already returns early for app clusters at
+`scripts/plugins/argocd.sh:408`, so anything reached inside it is hub-only by construction. A second
+guard inside `_argocd_deploy_image_updater` is redundant scope creep.
+
+Do not change the `ARGOCD_SKIP_IMAGE_UPDATER=1` opt-out — it already lives at the top of the function.
 
 Keep both changes minimal and hub-scoped; do not alter app-cluster behavior.
 
@@ -109,12 +139,17 @@ Keep both changes minimal and hub-scoped; do not alter app-cluster behavior.
 
 ## Definition of Done
 
-- [ ] `_argocd_ensure_servicemonitors` added (CRD-guarded, `--api-versions`, applies only SM kinds) and
-      called from `deploy_argocd` after the helm step.
-- [ ] Standard hub deploy path reaches `_argocd_deploy_image_updater` (hub role only).
-- [ ] New/extended BATS test passes standalone and is wired into CI; `shellcheck` clean (warning+error).
-- [ ] `git show <sha> --stat` shows only `scripts/plugins/argocd.sh`, the new test file, and
-      `.github/workflows/ci.yml`.
+- [ ] `_argocd_ensure_servicemonitors` added (CRD-guarded, `--api-versions`, applies only SM kinds).
+- [ ] It is called from **inside `_argocd_helm_deploy_release`**, after the `helm upgrade --install`
+      block and before the `rm -f "$values_file"` cleanup — NOT from `deploy_argocd`.
+- [ ] Version logic mirrors the install: `--version` only when `ARGOCD_HELM_CHART_VERSION` is set.
+      `ARGOCD_CHART_VERSION` (7.8.1) is NOT referenced anywhere in the new code.
+- [ ] `_argocd_deploy_image_updater` call hoisted out of the `if (( enable_bootstrap ))` block; no new
+      `CLUSTER_ROLE` guard added.
+- [ ] New/extended BATS test passes standalone and is wired into CI; `shellcheck` clean (warning+error)
+      — paste the actual output of `shellcheck -S warning`, `shellcheck -S error`, and the `bats` run.
+- [ ] `git show <sha> --stat` shows **exactly three files** — `scripts/plugins/argocd.sh`, the new test
+      file, and `.github/workflows/ci.yml` — and nothing else.
 - [ ] Committed + pushed to `k3d-manager-v1.16.0`; push verified with
       `git log origin/k3d-manager-v1.16.0 --oneline -1`.
 - [ ] memory-bank updated with the commit SHA and task status — as a **separate commit**.
