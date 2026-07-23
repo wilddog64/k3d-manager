@@ -200,16 +200,26 @@ switching would break the harness.
    (owner): OCI is crossed out — the Always-Free A1 capacity never yields an instance, so the k3s-oci
    provider path is dead. Do NOT spend session time on OCI bugs. Focus is ACG/hostinger only.** The
    envsubst leak is real but unreachable; leave it filed, do not fix.
-2. Hostinger 2-CPU requests oversubscription git-side fix is **DONE in `7345b24a` on
-   `origin/k3d-manager-v1.16.0` (2026-07-22)** — `scripts/etc/helm/observability/trivy-operator-values.yaml`
-   now adds a nested `trivy.server.resources` block under the existing top-level `trivy:` key, trimming the
-   built-in Trivy server request from `200m` to `50m` while keeping limits at the chart defaults (`cpu: "1"`,
-   `memory: 1Gi`). Static gates PASS on this machine: YAML parse prints `OK`; Helm-render gate against
-   `aqua/trivy-operator` `0.33.2` prints `50m` for the rendered `trivy-server` StatefulSet request; and
-   `grep -c '^trivy:' scripts/etc/helm/observability/trivy-operator-values.yaml` prints `1`. `git show --stat
-   7345b24a` lists exactly one file. Claude still owes the live verify that node requested CPU drops by ~150m,
-   `product-catalog` schedules, the "Product images" 502 clears, and the 2 stray Pending rollout duplicates from
-   the earlier `make refresh` are reconciled.
+2. Hostinger 2-CPU requests oversubscription → product-catalog 502. **CLAUDE LIVE VERIFY 2026-07-22
+   FOUND THE FIX TARGETED THE WRONG FILE.** `7345b24a` (spec `…-hostinger-trivy-cpu-oversubscription-502.md`)
+   is correct-to-spec and passes all gates, but the GitOps file→cluster mapping is the INVERSE of what that
+   spec assumed: `trivy-operator-values.yaml` → appset `observability.yaml` → **hub laptop**
+   (`https://kubernetes.default.svc`, not CPU-starved); `trivy-operator-acg-values.yaml` → appset
+   `observability-acg.yaml` → **`${APP_CLUSTER_NAME}` = ubuntu-hostinger** (the starved node). The `acg-`
+   prefix is a misnomer — that appset is the app-cluster observability path and runs on hostinger. So
+   `7345b24a` trimmed the hub server; hostinger `trivy-server-0` is still `200m` (chart default, verified
+   live) and node is still `1960m/2000m` with `product-catalog` (100m) Pending 21h (`Insufficient cpu` ×254).
+   Owner: KEEP `7345b24a` (harmless hub hygiene) AND add the identical `trivy.server.resources` block to the
+   ACG file. **SPEC WRITTEN + ASSIGNED TO CODEX (2026-07-22):**
+   `docs/bugs/2026-07-22-hostinger-trivy-acg-values-cpu-oversubscription-502.md` on `k3d-manager-v1.16.0` —
+   commit msg `fix(observability): trim acg trivy-server CPU request to relieve hostinger node`. Render gate
+   PROVEN by Claude on the ACG file (`helm template … -f …acg-values.yaml | yq … .requests.cpu` → `200m`
+   before / `50m` after, anchor unique). The `acg-trivy-operator` values source tracks
+   `targetRevision: k3d-manager-v1.16.0`, so once Codex pushes, ArgoCD auto-syncs to hostinger — no
+   merge-to-main, no manual patch. Then Claude live-verifies product-catalog schedules + 502 clears and
+   reconciles the 2 stray Pending rollout dups (`frontend-8bbdc8599`, `order-service-75c5b998b7`) from the
+   earlier `make refresh`. NOTE: my selfHeal-disable probe on `acg-trivy-operator` was a no-op (appset owns
+   the Application spec and reverted it) — cluster left untouched.
 3. `_hostinger_reapply_gitops_applicationsets` hostinger ambient reapply gap is **CLOSED in `470ef7d8` on
    `origin/k3d-manager-v1.16.0` (2026-07-22)** — `scripts/lib/providers/k3s-hostinger.sh` now appends
    `istio-ambient.yaml` to the reapply list, widens the `envsubst` allowlist with
