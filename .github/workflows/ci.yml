@@ -84,6 +84,7 @@ jobs:
             scripts/tests/plugins/trivy_operator_observability.bats \
             scripts/tests/plugins/grafana_dashboard_appsets.bats \
             scripts/tests/plugins/argocd_metrics_servicemonitor.bats \
+            scripts/tests/plugins/argocd_servicemonitors_ensure.bats \
             scripts/tests/plugins/appset_envsubst_coverage.bats \
             scripts/tests/plugins/app_cve_scan.bats
 

@@ -495,9 +495,53 @@ function _argocd_helm_deploy_release() {
          "${helm_args[@]}"
    fi
 
+   _argocd_ensure_servicemonitors "$values_file"
+
    if [[ -n "$values_file" && -f "$values_file" ]]; then
       rm -f "$values_file"
    fi
+}
+
+function _argocd_ensure_servicemonitors() {
+   local values_file="${1:-}"
+   local rendered_servicemonitors=""
+   local -a sm_args=(
+      -n "$ARGOCD_NAMESPACE"
+      --api-versions monitoring.coreos.com/v1
+   )
+
+   if ! _kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
+      _info "[argocd] ServiceMonitor CRD absent; skipping argocd ServiceMonitor ensure"
+      return 0
+   fi
+
+   if [[ -n "${ARGOCD_HELM_CHART_VERSION:-}" ]]; then
+      sm_args+=(--version "$ARGOCD_HELM_CHART_VERSION")
+   fi
+
+   if [[ -n "$values_file" ]]; then
+      sm_args+=(--values "$values_file")
+   else
+      sm_args+=(
+         --set "server.insecure=true"
+         --set "server.service.type=ClusterIP"
+      )
+   fi
+
+   rendered_servicemonitors="$(
+      _helm template \
+         "$ARGOCD_HELM_RELEASE" \
+         "$ARGOCD_HELM_CHART_REF" \
+         "${sm_args[@]}" \
+         | yq eval-all 'select(.kind == "ServiceMonitor")' -
+   )"
+
+   if [[ -z "$rendered_servicemonitors" ]]; then
+      _info "[argocd] No argocd ServiceMonitors rendered; skipping apply"
+      return 0
+   fi
+
+   printf '%s\n' "$rendered_servicemonitors" | _kubectl apply -f - >/dev/null
 }
 
 function _argocd_configure_vault_eso() {
@@ -547,9 +591,10 @@ function _argocd_configure_post_deploy() {
       _info "[argocd] Argo CD UI accessible at: https://$ARGOCD_VIRTUALSERVICE_HOST"
    fi
 
+   _argocd_deploy_image_updater
+
    if (( enable_bootstrap )); then
       _info "[argocd] Deploying GitOps bootstrap resources"
-      _argocd_deploy_image_updater
       if (( ! skip_appproject )); then
          _argocd_deploy_appproject
       fi
