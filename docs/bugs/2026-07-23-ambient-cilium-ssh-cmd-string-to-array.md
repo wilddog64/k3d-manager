@@ -102,7 +102,7 @@ wait) are the word-splitting hazard. An array form removes the hazard and the SC
 
 | File | Change |
 |------|--------|
-| `scripts/plugins/shopping_cart.sh` | `ssh_cmd` string → array; four call sites updated to `"${ssh_cmd[@]}"` |
+| `scripts/plugins/shopping_cart.sh` | `ssh_cmd` string → array (1 declaration) + three invocation sites updated to `"${ssh_cmd[@]}"` |
 
 ---
 
