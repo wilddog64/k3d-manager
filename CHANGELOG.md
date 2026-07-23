@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+## [1.16.0] - 2026-07-23
+
+**Theme: ambient mesh comes to the app tier.** Migrate the hostinger shopping-cart workloads from sidecar injection to Istio **ambient** (ztunnel + istio-cni, HBONE/mTLS with zero sidecar containers), make the ambient path durable across `make refresh` and cold `k3s-aws` rebuilds, harden multi-cluster ArgoCD so a second app cluster no longer clobbers the first, and right-size control-plane/observability CPU for the 2-CPU hostinger node. Ships lib-foundation **v0.4.7** via subtree.
+
+### Added
+- Ambient dataplane on the app tier — the `shopping-cart-apps` namespace is enrolled via `istio.io/dataplane-mode=ambient` (ztunnel HBONE + mTLS, no `istio-proxy` sidecars); verified live carrying real traffic on hostinger (`ebf27de3`) (`services/shopping-cart-namespace/namespace.yaml`)
+- `cluster-status` now reports service-mesh mode, CNI substrate, and ambient-namespace enrollment so mesh/CNI health is visible at a glance (`da67e2bf`) (`bin/cluster-status`)
+- Ambient CNI conf/bin dir variables defaulted and exported in the ArgoCD bootstrap path (`AMBIENT_CNI_CONF_DIR`/`AMBIENT_CNI_BIN_DIR`) (`a08911b3`) (`scripts/etc/argocd/vars.sh`)
+- shopping-cart `AppProject` so data-layer and services Applications can sync, including the `secrets` namespace for the vault-bridge (`e118f664`, `64168cc7`) (`scripts/etc/argocd/`)
+
+### Changed
+- istio-cni conf/bin dirs are now CNI-substrate aware — resolve to the Cilium defaults (`/etc/cni/net.d`, `/opt/cni/bin`) or the k3s/rancher paths as appropriate instead of a single hardcoded assumption (`9c0e336a`, `ce4d83f0`) (`scripts/etc/argocd/applicationsets/istio-ambient.yaml`, `scripts/plugins/istio_ambient.sh`)
+- `istiod` and `ztunnel` CPU requests right-sized for the 2-CPU hostinger node (`1af15217`); the built-in Trivy server scheduling reservation trimmed `200m`→`50m` on both the hub and the app-cluster (`acg`) observability values so `product-catalog` can schedule (`7345b24a`, `45381c7d`) (`scripts/etc/helm/observability/`)
+- ArgoCD appsets derive `APP_CLUSTER_NAME` from the active cluster instead of hardcoded hostinger, and `services-git` Application names are keyed by cluster, so a second app cluster no longer collides with the first (`896d08ad`, `18b92cd2`) (`scripts/etc/argocd/applicationsets/`)
+- lib-foundation subtree synced to **v0.4.7** — `acg_restart` shell entrypoint for the orphaned recovery script, stale `playwright-artifacts-*` temp-dir sweep, and `acg_check_ttl`/wrapper node-exit captures made `set -e`-safe (`40d4c42d`) (`scripts/lib/foundation/`)
+
+### Fixed
+- hostinger `make refresh` now reapplies the `istio-ambient` ApplicationSet instead of dropping it, so the ambient dataplane survives a refresh (`470ef7d8`) (`scripts/lib/providers/k3s-hostinger.sh`)
+- `k3s-aws` cold rebuild — node-ready and SSM-register wait loops made `set -e`-safe (assignment form, not `(( var++ ))`), `k3sup --k3s-version` pinned so provisioning survives an `update.k3s.io` channel outage, and `K3S_AMBIENT_MESH=true` defaulted in the up flow so Cilium installs for ambient (`520621a9`, `5be42ae4`, `bca7d59a`) (`scripts/lib/providers/k3s-aws.sh`)
+- ArgoCD appset `envsubst` now fails loudly on an unset variable instead of substituting an empty string that silently mis-renders a manifest (`2966a3b9`) (`scripts/lib/providers/`)
+- app CVE scan dispatches via `wget` (with matching bats coverage) and fails loudly when the infra cluster secret is absent instead of scanning nothing (`89c2efd6`, `5fcc3f89`) (`scripts/plugins/`)
+- trap-guarded the bare `mktemp` sites in `shopping_cart.sh`/`argocd.sh` so temp files are cleaned on RETURN even without an interrupt (`319762b9`) (`scripts/plugins/`)
+- hub k3d k3s image pinned to `v1.32.0-k3s1` to satisfy the istioctl precheck floor (`1cc55252`) (`scripts/lib/cluster.sh`)
+
 ## [1.15.0] - 2026-07-13
 
 **Theme: security & multi-cluster provider hardening.** Close a dev-dependency DoS advisory via the lib-foundation subtree, end Trivy Standalone scan-job cache-lock failures by moving to a shared built-in Trivy server, and harden multi-cluster registration (per-context hub-Vault connectivity, safer default provider with a reachability preflight).
