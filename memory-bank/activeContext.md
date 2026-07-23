@@ -218,11 +218,20 @@ switching would break the harness.
    `python3 -c "import yaml; yaml.safe_load(open('scripts/etc/helm/observability/trivy-operator-acg-values.yaml'))" && echo OK`
    → `OK`; helm render of the `trivy-server` StatefulSet request CPU → `50m`; `grep -c '^trivy:' …acg-values.yaml`
    → `1`. `git show --stat 45381c7d` = exactly one file (`trivy-operator-acg-values.yaml`, +8). The
-   `acg-trivy-operator` values source tracks `targetRevision: k3d-manager-v1.16.0`, so ArgoCD should now
-   auto-sync this to hostinger with no merge-to-main and no manual patch. Claude still must live-verify
-   `trivy-server-0` requests `50m`, `product-catalog` leaves `Pending`, the 502 clears, and the 2 stray
-   rollout duplicates (`frontend-8bbdc8599`, `order-service-75c5b998b7`) are reconciled.
-   earlier `make refresh`. NOTE: my selfHeal-disable probe on `acg-trivy-operator` was a no-op (appset owns
+   `acg-trivy-operator` values source tracks `targetRevision: k3d-manager-v1.16.0`, so ArgoCD auto-synced
+   this to hostinger with no merge-to-main and no manual patch. **CLAUDE-VERIFIED LIVE PASS 2026-07-22:**
+   ArgoCD `acg-trivy-operator` Synced/Healthy; hostinger `trivy-system/trivy-server-0` request now `50m`
+   (was `200m`); node `srv1754834` CPU requests `1960m/2000m (98%)` → `1910m (95%)`; **0 Pending pods** — all
+   four `shopping-cart-apps` pods `1/1 Running` incl. `product-catalog` and BOTH former stray dups
+   (`frontend-8bbdc8599`, `order-service-75c5b998b7`), so the reconcile happened naturally. **502 CLEARED:**
+   live `https://frontend.3ai-talk.org/` → `HTTP 200` and `…/api/products` → `HTTP 200` (both were the
+   symptom). ⚠️ **The `make status` "Frontend 502 / Product images 502" I first saw was STALE** — captured
+   before the sync scheduled product-catalog; live probes are 200. Caught it by probing live, nearly
+   mis-reported a stale symptom. **NEW RESIDUAL (separate item, NOT the 502, NOT CPU):** `/api/products`
+   returns `{"items":[],"total":0}` — product-catalog serves `200 OK` end-to-end (frontend→catalog→postgres,
+   `postgresql-products-0` Running) but the catalog DB has **0 products seeded**. The webhook "Product images"
+   check will still show ❌ but now as `0/0 have image_url` (empty catalog), a data-seeding problem — needs
+   its own spec. NOTE: my selfHeal-disable probe on `acg-trivy-operator` was a no-op (appset owns
    the Application spec and reverted it) — cluster left untouched.
 3. `_hostinger_reapply_gitops_applicationsets` hostinger ambient reapply gap is **CLOSED in `470ef7d8` on
    `origin/k3d-manager-v1.16.0` (2026-07-22)** — `scripts/lib/providers/k3s-hostinger.sh` now appends
