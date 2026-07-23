@@ -227,12 +227,20 @@ switching would break the harness.
    live `https://frontend.3ai-talk.org/` → `HTTP 200` and `…/api/products` → `HTTP 200` (both were the
    symptom). ⚠️ **The `make status` "Frontend 502 / Product images 502" I first saw was STALE** — captured
    before the sync scheduled product-catalog; live probes are 200. Caught it by probing live, nearly
-   mis-reported a stale symptom. **NEW RESIDUAL (separate item, NOT the 502, NOT CPU):** `/api/products`
-   returns `{"items":[],"total":0}` — product-catalog serves `200 OK` end-to-end (frontend→catalog→postgres,
-   `postgresql-products-0` Running) but the catalog DB has **0 products seeded**. The webhook "Product images"
-   check will still show ❌ but now as `0/0 have image_url` (empty catalog), a data-seeding problem — needs
-   its own spec. NOTE: my selfHeal-disable probe on `acg-trivy-operator` was a no-op (appset owns
-   the Application spec and reverted it) — cluster left untouched.
+   mis-reported a stale symptom. **RESIDUAL = APP BUG, ALREADY TRACKED (not k3d-manager, not 502, not CPU):**
+   `/api/products` returned `{"items":[],"total":0}` — catalog serves `200 OK` end-to-end but the DB had
+   **0 seeded products**. This is `wilddog64/shopping-cart-product-catalog` **Issue #34** ("PostSync seed hook
+   never runs against a fresh volume") — a one-shot ArgoCD `PostSync` hook (`k8s/base/seed-job.yaml`,
+   `hook-delete-policy: HookSucceeded` + `ttl 300`) that doesn't re-fire against a fresh/empty Postgres PVC;
+   app reads Healthy because the deleted hook Job isn't a managed resource. **CLAUDE LIVE 2026-07-22:** newer
+   failed sync than the issue body (`operationState.phase=Failed 2026-07-22T01:41:03Z`); ran the
+   kustomize-built seed Job one-off → `1000 inserted, 0 skipped` (seed.py + idempotency guard PROVEN healthy,
+   defect is purely the hook not re-firing); **re-seeded live → `/api/products` total=1000 with images, so the
+   "Product images" check passes again.** Diagnostic Jobs cleaned up, no non-GitOps artifacts left. Posted the
+   confirmation to Issue #34 (comment `5053261290`). Durable fix (options 1 startup-seed / 2 resilient-Job /
+   3 health-surfacing) is an OWNER DECISION before any product-catalog PR — do NOT write a k3d-manager spec
+   for this; app fix goes in that repo per bug-tracking-ownership. NOTE: my selfHeal-disable probe on
+   `acg-trivy-operator` was a no-op (appset owns the Application spec and reverted it) — cluster left untouched.
 3. `_hostinger_reapply_gitops_applicationsets` hostinger ambient reapply gap is **CLOSED in `470ef7d8` on
    `origin/k3d-manager-v1.16.0` (2026-07-22)** — `scripts/lib/providers/k3s-hostinger.sh` now appends
    `istio-ambient.yaml` to the reapply list, widens the `envsubst` allowlist with
