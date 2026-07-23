@@ -175,3 +175,199 @@ Grafana dashboard populates.
 - Do NOT modify files other than `scripts/plugins/argocd.sh`, the new test, and `.github/workflows/ci.yml`.
 - Do NOT commit to `main` — work on `k3d-manager-v1.16.0`.
 - Do NOT change app-cluster (`CLUSTER_ROLE=app`) behavior.
+
+---
+---
+
+# ROUND 2 — required follow-up to `aef82f5a` (READ THIS, it supersedes Change 2 above)
+
+Round 1 landed as `aef82f5a`. Claude verified it independently: every mechanical gate passed
+(shellcheck warning+error 0, bats 2/2, `_agent_audit` 0, exactly 3 files, exact commit message,
+memory-bank in a separate commit `aa5690bd`), and all three amendments in Change 1 were honored
+correctly. **But two defects make the fix inert in production.** Round 2 fixes both.
+
+Round 1's `_argocd_ensure_servicemonitors` function body is **correct and stays** — do not rewrite it.
+Only the two changes below are in scope.
+
+## Blocker A — Change 2 edited dead code; image-updater is still never deployed
+
+`aef82f5a` hoisted `_argocd_deploy_image_updater` out of the `enable_bootstrap` block inside
+`_argocd_configure_post_deploy`. **That function has zero callers anywhere in the repo:**
+
+```
+$ grep -rn '_argocd_configure_post_deploy' scripts/     # excluding scripts/lib/foundation
+scripts/plugins/argocd.sh:576:function _argocd_configure_post_deploy() {     ← definition only
+```
+
+The live path is `deploy_argocd` → `_argocd_helm_deploy_release` → wait → `_argocd_ensure_logged_in`
+→ `deploy_argocd_bootstrap`, and `deploy_argocd_bootstrap` deploys only AppProject +
+ApplicationSets. So the hoist changed nothing.
+
+(Round 1's spec text said the bootstrap branch "was not exercised on this hub." That was wrong —
+the whole containing function is orphaned, which is why image-updater was never deployed anywhere.)
+
+### A1 — revert the Round 1 hoist (put the dead-code hunk back exactly as it was)
+
+`_argocd_configure_post_deploy` is dead; do not leave a stray call in it. Pure revert of that hunk.
+
+**Exact old block:**
+
+```bash
+   _argocd_deploy_image_updater
+
+   if (( enable_bootstrap )); then
+      _info "[argocd] Deploying GitOps bootstrap resources"
+      if (( ! skip_appproject )); then
+```
+
+**Exact new block:**
+
+```bash
+   if (( enable_bootstrap )); then
+      _info "[argocd] Deploying GitOps bootstrap resources"
+      _argocd_deploy_image_updater
+      if (( ! skip_appproject )); then
+```
+
+Do NOT delete `_argocd_configure_post_deploy` in this round — dead-code removal is a separate
+owner decision, flagged below.
+
+### A2 — add the call to the LIVE path: `deploy_argocd_bootstrap`
+
+`deploy_argocd_bootstrap` already has its own `CLUSTER_ROLE=app` early return at the top of the
+function, so this stays hub-only. Place the call after the two "ArgoCD must already be deployed"
+precondition checks and before the AppProject block.
+
+**Exact old block:**
+
+```bash
+   # Deploy AppProject
+   if (( ! skip_appproject )); then
+      _argocd_deploy_appproject
+   fi
+```
+
+**Exact new block:**
+
+```bash
+   _argocd_deploy_image_updater
+
+   # Deploy AppProject
+   if (( ! skip_appproject )); then
+      _argocd_deploy_appproject
+   fi
+```
+
+Do NOT add a `CLUSTER_ROLE` guard. Do NOT touch the `ARGOCD_SKIP_IMAGE_UPDATER=1` opt-out.
+
+## Blocker B — the CRD guard aborts the deploy instead of skipping
+
+```bash
+if ! _kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
+```
+
+`_kubectl` → `_run_command` → non-zero exit → `_run_command_handle_failure` → `soft=0` → `_err` →
+**`exit 1`**. On a cluster without the ServiceMonitor CRD, `deploy_argocd` dies instead of no-op'ing
+— the opposite of the requirement above ("a mesh/monitoring-less install must not fail"). The `if !`
+never gets to evaluate. `--no-exit` is what sets `soft=1`; every sibling guard in this file already
+uses it (`scripts/plugins/argocd.sh:417`, `:421`, `:443`).
+
+**Exact old block:**
+
+```bash
+   if ! _kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
+```
+
+**Exact new block:**
+
+```bash
+   if ! _kubectl --no-exit get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
+```
+
+## Blocker B2 — the Round 1 test locks the bug in and must be updated
+
+`scripts/tests/plugins/argocd_servicemonitors_ensure.bats` stubs `_kubectl` with a plain function
+that `return 1`s, so `_run_command`/`_err` are never reached — the test passes while production
+would `exit 1`. Worse, both tests assert the exact argv **without** `--no-exit`, so they will FAIL
+once Blocker B is fixed.
+
+In **both** test cases, update the stub matcher and the assertion:
+
+**Exact old (stub, appears twice — once per test):**
+
+```bash
+    if [[ "$*" == "get crd servicemonitors.monitoring.coreos.com" ]]; then
+```
+
+**Exact new (both sites):**
+
+```bash
+    if [[ "$*" == "--no-exit get crd servicemonitors.monitoring.coreos.com" ]]; then
+```
+
+**Exact old (assertion, appears twice — once per test):**
+
+```bash
+  [ "${kubectl_calls[0]}" = "get crd servicemonitors.monitoring.coreos.com" ]
+```
+
+**Exact new (both sites):**
+
+```bash
+  [ "${kubectl_calls[0]}" = "--no-exit get crd servicemonitors.monitoring.coreos.com" ]
+```
+
+### B3 — add a regression test that the call site is LIVE, not orphaned
+
+The entire Round 1 failure was an unverified call site. Add one more test to the same bats file that
+asserts `_argocd_deploy_image_updater` is invoked from inside the body of `deploy_argocd_bootstrap`
+— extract the function body statically and grep it, so it cannot pass against dead code:
+
+```bash
+@test "deploy_argocd_bootstrap calls _argocd_deploy_image_updater" {
+  run awk '/^function deploy_argocd_bootstrap\(\)/,/^}$/' \
+    "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"_argocd_deploy_image_updater"* ]]
+}
+```
+
+Use `${BATS_TEST_DIRNAME}/../../plugins/argocd.sh` — that is the exact path form `setup()` already
+uses at line 6 of this file. Do NOT introduce a new repo-root variable or path helper.
+
+## Round 2 Rules
+
+- Do NOT rewrite `_argocd_ensure_servicemonitors` — its body is correct as landed in `aef82f5a`.
+- Do NOT delete `_argocd_configure_post_deploy` (dead-code removal = separate owner decision).
+- `shellcheck -S warning` AND `-S error` on `scripts/plugins/argocd.sh` → zero warnings; paste output.
+- `bats scripts/tests/plugins/argocd_servicemonitors_ensure.bats` → must pass standalone (3 tests
+  now); paste output. Capture the exit code on its OWN line, never after `; echo`.
+- `./scripts/k3d-manager _agent_audit` → exit 0; paste it.
+- No live `helm`/`kubectl`/`argocd` against any cluster — static/stub only.
+
+## Round 2 Definition of Done
+
+- [ ] A1 — Round 1 hoist reverted inside `_argocd_configure_post_deploy` (hunk restored verbatim).
+- [ ] A2 — `_argocd_deploy_image_updater` called from `deploy_argocd_bootstrap` before the AppProject
+      block; no new `CLUSTER_ROLE` guard.
+- [ ] B — `--no-exit` added to the `get crd` guard in `_argocd_ensure_servicemonitors`.
+- [ ] B2 — both stub matchers and both assertions in the bats file updated to expect `--no-exit`.
+- [ ] B3 — new "deploy_argocd_bootstrap calls _argocd_deploy_image_updater" test added and passing.
+- [ ] `grep -c '_argocd_deploy_image_updater' scripts/plugins/argocd.sh` → **3**
+      (the function definition, the dead-code call restored by A1, the new live call from A2).
+- [ ] `git show <sha> --stat` shows **exactly two files** — `scripts/plugins/argocd.sh` and
+      `scripts/tests/plugins/argocd_servicemonitors_ensure.bats`. `.github/workflows/ci.yml` is
+      already wired from Round 1 — do NOT touch it again.
+- [ ] Pushed to `k3d-manager-v1.16.0`; verified with `git log origin/k3d-manager-v1.16.0 --oneline -1`.
+- [ ] memory-bank updated with the SHA — as a **separate commit**.
+
+**Round 2 commit message (exact):**
+```
+fix(argocd): call image-updater from live bootstrap path + no-exit CRD guard
+```
+
+## Flagged for owner — NOT in scope for Round 2
+
+`_argocd_configure_post_deploy` (`scripts/plugins/argocd.sh:576`) has been orphaned since
+`aef115a0`/`e013d23b`. It still contains Istio VirtualService creation and the Vault/ESO
+configuration call, none of which run. Worth a separate audit: either wire it back in or delete it.
