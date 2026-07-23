@@ -210,14 +210,18 @@ switching would break the harness.
    `7345b24a` trimmed the hub server; hostinger `trivy-server-0` is still `200m` (chart default, verified
    live) and node is still `1960m/2000m` with `product-catalog` (100m) Pending 21h (`Insufficient cpu` ×254).
    Owner: KEEP `7345b24a` (harmless hub hygiene) AND add the identical `trivy.server.resources` block to the
-   ACG file. **SPEC WRITTEN + ASSIGNED TO CODEX (2026-07-22):**
-   `docs/bugs/2026-07-22-hostinger-trivy-acg-values-cpu-oversubscription-502.md` on `k3d-manager-v1.16.0` —
-   commit msg `fix(observability): trim acg trivy-server CPU request to relieve hostinger node`. Render gate
-   PROVEN by Claude on the ACG file (`helm template … -f …acg-values.yaml | yq … .requests.cpu` → `200m`
-   before / `50m` after, anchor unique). The `acg-trivy-operator` values source tracks
-   `targetRevision: k3d-manager-v1.16.0`, so once Codex pushes, ArgoCD auto-syncs to hostinger — no
-   merge-to-main, no manual patch. Then Claude live-verifies product-catalog schedules + 502 clears and
-   reconciles the 2 stray Pending rollout dups (`frontend-8bbdc8599`, `order-service-75c5b998b7`) from the
+   ACG file. **CODE FIX LANDED 2026-07-23 in `45381c7d` on `origin/k3d-manager-v1.16.0`:**
+   `docs/bugs/2026-07-22-hostinger-trivy-acg-values-cpu-oversubscription-502.md` was implemented exactly in
+   `scripts/etc/helm/observability/trivy-operator-acg-values.yaml` only; the nested
+   `trivy.server.resources` block now sets requests `cpu: 50m` / `memory: 256Mi` and preserves chart-default
+   limits `cpu: "1"` / `memory: 1Gi`. Static gates recorded by Codex: YAML validity
+   `python3 -c "import yaml; yaml.safe_load(open('scripts/etc/helm/observability/trivy-operator-acg-values.yaml'))" && echo OK`
+   → `OK`; helm render of the `trivy-server` StatefulSet request CPU → `50m`; `grep -c '^trivy:' …acg-values.yaml`
+   → `1`. `git show --stat 45381c7d` = exactly one file (`trivy-operator-acg-values.yaml`, +8). The
+   `acg-trivy-operator` values source tracks `targetRevision: k3d-manager-v1.16.0`, so ArgoCD should now
+   auto-sync this to hostinger with no merge-to-main and no manual patch. Claude still must live-verify
+   `trivy-server-0` requests `50m`, `product-catalog` leaves `Pending`, the 502 clears, and the 2 stray
+   rollout duplicates (`frontend-8bbdc8599`, `order-service-75c5b998b7`) are reconciled.
    earlier `make refresh`. NOTE: my selfHeal-disable probe on `acg-trivy-operator` was a no-op (appset owns
    the Application spec and reverted it) — cluster left untouched.
 3. `_hostinger_reapply_gitops_applicationsets` hostinger ambient reapply gap is **CLOSED in `470ef7d8` on
