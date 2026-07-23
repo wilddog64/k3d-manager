@@ -422,7 +422,6 @@ HELP
    fi
 
    local enable_ldap=1  # Default to smart enabled
-   local enable_vault=1 # Default to smart enabled
    # ... option parsing ...
 
    # 2. Helm Installation
@@ -572,6 +571,7 @@ function _argocd_configure_vault_eso() {
 
    _info "[argocd] Vault/ESO integration configured"
 }
+
 function _argocd_seed_vault_admin_secret() {
    local ns="${VAULT_NS_DEFAULT:-vault}"
    local release="${VAULT_RELEASE_DEFAULT:-vault}"
