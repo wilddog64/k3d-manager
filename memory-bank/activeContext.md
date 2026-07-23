@@ -200,8 +200,16 @@ switching would break the harness.
    (owner): OCI is crossed out — the Always-Free A1 capacity never yields an instance, so the k3s-oci
    provider path is dead. Do NOT spend session time on OCI bugs. Focus is ACG/hostinger only.** The
    envsubst leak is real but unreachable; leave it filed, do not fix.
-2. Hostinger 2-CPU requests oversubscription — 1960m/2000m with zero sidecars; 2 pods permanently `Pending`.
-   NOT a mesh problem (see corrected bullet above). Still live on hostinger — candidate v1.17.0 spec.
+2. Hostinger 2-CPU requests oversubscription — 1960m/2000m; `product-catalog` (100m) permanently `Pending`
+   → "Product images" **HTTP 502** in Service Health. NOT a mesh problem; root cause is that the v1.16.0
+   ambient rollout added istiod+ztunnel+istio-cni (300m) tipping the node from ~1660m to ~1960m. **SPEC
+   WRITTEN + ASSIGNED TO CODEX (2026-07-22):** `docs/bugs/2026-07-22-hostinger-trivy-cpu-oversubscription-502.md`
+   on `k3d-manager-v1.16.0` — trims the built-in Trivy server request via `trivy.server.resources` in
+   `scripts/etc/helm/observability/trivy-operator-values.yaml` (200m→50m, frees 150m; limits kept at chart
+   default so scans still burst). Helm-render gate PROVEN by Claude against chart 0.33.2 (`helm template … | yq …
+   .resources.requests.cpu` → `200m` before, `50m` after). Awaiting Codex commit + push; then Claude live-verifies
+   product-catalog schedules and the 502 clears, and reconciles the 2 stray Pending rollout dups from the earlier
+   `make refresh`.
 3. `_hostinger_reapply_gitops_applicationsets` hostinger ambient reapply gap is **CLOSED in `470ef7d8` on
    `origin/k3d-manager-v1.16.0` (2026-07-22)** — `scripts/lib/providers/k3s-hostinger.sh` now appends
    `istio-ambient.yaml` to the reapply list, widens the `envsubst` allowlist with
