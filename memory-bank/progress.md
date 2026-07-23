@@ -1,7 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
-v1.14.0 RELEASED 2026-07-12 · v1.15.0 RELEASED 2026-07-14 · **v1.16.0 active — Istio ambient mesh**.
+v1.14.0 RELEASED 2026-07-12 · v1.15.0 RELEASED 2026-07-14 · **v1.16.0 RELEASED 2026-07-23** — Istio ambient mesh · PR #106 merged `4c5d3556`.
 
 > Full per-item detail (gate dumps, live-verify logs) archived 2026-07-19 → `memory-bank/archive/progress-v1.16.0-detail-thru-2026-07-19.md`. Older: `progress-v1.6.5-v1.15.0.md`, `-v1.6.x-v1.6.4.md`, `-v1.4.2-v1.4.8.md`.
 

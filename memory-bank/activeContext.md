@@ -1,7 +1,7 @@
 # Active Context — k3d-manager
 
 ## Status
-v1.14.0 RELEASED 2026-07-12 · v1.15.0 RELEASED 2026-07-14 · **v1.16.0 active branch — Istio ambient mesh**.
+v1.14.0 RELEASED 2026-07-12 · v1.15.0 RELEASED 2026-07-14 · **v1.16.0 RELEASED 2026-07-23** — Istio ambient mesh · PR #106 merged `4c5d3556` · enforce_admins restored on main · next branch k3d-manager-v1.17.0 open.
 
 > Verbose per-item narrative (full gate dumps, live-verify logs, retracted-diagnosis trails) archived 2026-07-19 → `memory-bank/archive/activeContext-v1.16.0-detail-thru-2026-07-19.md`. Earlier windows: `activeContext-v1.8.0-v1.15.0.md`, `-v1.6.x-v1.7.1.md`, `-v1.4.2-v1.4.8.md`.
 
