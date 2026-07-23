@@ -453,7 +453,7 @@ teardown_file() {
   [[ "$output" == *"provider k3s-hostinger"* ]]
 }
 
-@test "_hostinger_reapply_gitops_applicationsets reapplies data, services, and platform appsets from the current branch" {
+@test "_hostinger_reapply_gitops_applicationsets reapplies data, services, platform, and istio-ambient appsets from the current branch" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
 
@@ -487,7 +487,7 @@ teardown_file() {
 
   run cat "${BATS_TEST_TMPDIR}/appsets.log"
   [ "$status" -eq 0 ]
-  [[ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 3 ]]
+  [[ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 4 ]]
   [[ "$output" == *"--context k3d-k3d-cluster apply -f -"* ]]
 
   run cat "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
@@ -500,6 +500,8 @@ teardown_file() {
   [[ "$output" == *".spec.source.kustomize.images"* ]]
   [[ "$output" == *"name: platform-helm"* ]]
   [[ "$output" == *"name: '{{.name}}-platform'"* ]]
+  [[ "$output" == *"name: istio-ambient"* ]]
+  [[ "$output" == *"name: ztunnel"* ]]
 }
 
 @test "_hostinger_clear_stale_platform_tracking_ids strips stale basket/product-catalog ownership and refreshes apps" {
