@@ -2,6 +2,10 @@ secret:
   ignored_matches:
   - match: 904c24736612f4b4ef25a4b3d32311596f132768d0fcfed1c7dfa86c722519a1
     name: 'test fixture: shopping_cart_seed_idempotent.bats generic password (dev-only)'
+  - match: 78c7cbe360540621eaba785104e0be459b8e630083bbd00ca37ad0d1c91ce324
+    name: 'false positive: bin/k3dm-webhook smoke-test env-var read (K3DM_SMOKE_KC_PASS)'
+  - match: 029f875b10d148ca7b6a9bd31054b2853ac77c66e32645aa913935914cdf001d
+    name: 'false positive: bin/k3dm-webhook smoke-test env-var read (K3DM_SMOKE_GRAFANA_PASS)'
   ignored_paths:
   - scripts/tests/
 version: 2
