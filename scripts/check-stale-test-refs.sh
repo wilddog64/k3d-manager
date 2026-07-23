@@ -25,7 +25,7 @@ while IFS= read -r _file; do
     _consumers="$(grep -rlF -- "${_frag}" scripts/tests/ 2>/dev/null || true)"
     [[ -z "${_consumers}" ]] && continue
     if grep -rqF -- "${_frag}" scripts/etc/ 2>/dev/null; then
-      _tied="$(printf '%s\n' "${_consumers}" | xargs -r grep -lF -- "${_base}" 2>/dev/null || true)"
+      _tied="$(printf '%s\n' "${_consumers}" | xargs grep -lF -- "${_base}" 2>/dev/null || true)"
       [[ -n "${_tied}" ]] && _report "MOVED OUT OF ${_base}: ${_frag}" "${_file}" "${_tied}"
     else
       _report "REMOVED: ${_frag}" "${_file}" "${_consumers}"

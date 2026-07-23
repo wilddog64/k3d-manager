@@ -733,7 +733,7 @@ function _argocd_apply_deploy_key_externalsecrets() {
    local rendered
    rendered=$(mktemp)
    # shellcheck disable=SC2064
-   trap 'rm -f "'"${rendered}"'" 2>/dev/null || true' RETURN
+   trap 'trap - RETURN; rm -f "'"${rendered}"'" 2>/dev/null || true' RETURN
    ARGOCD_REPO_NAME="$repo_name" \
    ARGOCD_REPO_SSH_URL="$repo_url" \
    envsubst '$ARGOCD_NAMESPACE $ARGOCD_DEPLOY_KEY_SECRETSTORE $ARGOCD_REPO_NAME $ARGOCD_REPO_SSH_URL' \
@@ -906,7 +906,7 @@ EOF
    local secretstore_render
    secretstore_render=$(mktemp)
    # shellcheck disable=SC2064
-   trap 'rm -f "'"${secretstore_render}"'" 2>/dev/null || true' RETURN
+   trap 'trap - RETURN; rm -f "'"${secretstore_render}"'" 2>/dev/null || true' RETURN
    ARGOCD_NAMESPACE="$ns" \
    envsubst '$ARGOCD_NAMESPACE $ARGOCD_DEPLOY_KEY_SECRETSTORE $VAULT_ENDPOINT $ARGOCD_VAULT_KV_MOUNT $ARGOCD_DEPLOY_KEY_VAULT_ROLE $ARGOCD_DEPLOY_KEY_ESO_SA' \
       < "$secretstore_tmpl" > "$secretstore_render"
@@ -1088,7 +1088,7 @@ function _argocd_ensure_ghcr_pull_secret() {
       [[ -z "$1" ]] && return 1
       netrc=$(mktemp) && chmod 0600 "$netrc"
       # shellcheck disable=SC2064
-      trap 'rm -f "'"${netrc}"'" 2>/dev/null || true' RETURN
+      trap 'trap - RETURN; rm -f "'"${netrc}"'" 2>/dev/null || true' RETURN
       printf 'machine api.github.com login %s password %s\n' "$user" "$1" > "$netrc"
       http=$(curl -s -o /dev/null -w "%{http_code}" --netrc-file "$netrc" "https://api.github.com/user" 2>/dev/null || true)
       rm -f "$netrc"

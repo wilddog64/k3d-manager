@@ -85,6 +85,12 @@ while [ "$#" -gt 0 ]; do
     --header=Authorization:*)
       _auth_header="${1#--header=}"
       ;;
+    --config=*)
+      _wgetrc_file="${1#--config=}"
+      if [ -f "${_wgetrc_file}" ]; then
+        _auth_header="$(sed -n 's/^header = //p' "${_wgetrc_file}")"
+      fi
+      ;;
     --header=Accept:*)
       _accept_header="${1#--header=}"
       ;;

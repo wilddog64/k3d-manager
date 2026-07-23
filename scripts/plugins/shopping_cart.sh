@@ -238,7 +238,7 @@ function shopping_cart_load_ghcr_pat_from_env() {
   local _netrc
   _netrc=$(mktemp) && chmod 0600 "${_netrc}"
   # shellcheck disable=SC2064
-  trap 'rm -f "'"${_netrc}"'" 2>/dev/null || true' RETURN
+  trap 'trap - RETURN; rm -f "'"${_netrc}"'" 2>/dev/null || true' RETURN
   printf 'machine api.github.com login %s password %s\n' "${_github_user}" "${_ghcr_pat}" > "${_netrc}"
   _pat_http=$(curl -s -o /dev/null -w "%{http_code}" --netrc-file "${_netrc}" "https://api.github.com/user" 2>/dev/null || true)
   rm -f "${_netrc}"
@@ -267,7 +267,7 @@ function shopping_cart_load_ghcr_pat_from_vault() {
   local _netrc
   _netrc=$(mktemp) && chmod 0600 "${_netrc}"
   # shellcheck disable=SC2064
-  trap 'rm -f "'"${_netrc}"'" 2>/dev/null || true' RETURN
+  trap 'trap - RETURN; rm -f "'"${_netrc}"'" 2>/dev/null || true' RETURN
   printf 'machine api.github.com login %s password %s\n' "${_github_user}" "${_ghcr_pat}" > "${_netrc}"
   _pat_http=$(curl -s -o /dev/null -w "%{http_code}" --netrc-file "${_netrc}" "https://api.github.com/user" 2>/dev/null || true)
   rm -f "${_netrc}"
@@ -973,7 +973,7 @@ function _ensure_k3sup() {
     local _k3sup_installer
     _k3sup_installer="$(mktemp)"
     # shellcheck disable=SC2064
-    trap 'rm -f "'"${_k3sup_installer}"'" 2>/dev/null || true' RETURN
+    trap 'trap - RETURN; rm -f "'"${_k3sup_installer}"'" 2>/dev/null || true' RETURN
     if ! curl -fsSL -o "${_k3sup_installer}" https://get.k3sup.dev; then
       rm -f "${_k3sup_installer}"
       _err "[shopping_cart] Failed to download k3sup installer from https://get.k3sup.dev"
@@ -1096,7 +1096,7 @@ function _ambient_install_cilium() {
   "
   local attempts=0
   until ${ssh_cmd} "KUBECONFIG=${remote_kubeconfig} kubectl -n kube-system rollout status daemonset/cilium --timeout=10s >/dev/null 2>&1" 2>/dev/null; do
-    (( attempts++ ))
+    attempts=$(( attempts + 1 ))
     if (( attempts >= 18 )); then
       _err "[shopping_cart] Cilium DaemonSet not ready after 3 min"
       return 1
