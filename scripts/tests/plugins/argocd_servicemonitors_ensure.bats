@@ -32,7 +32,7 @@ EOF
 
   _kubectl() {
     echo "$*" >> "$KUBECTL_LOG"
-    if [[ "$*" == "get crd servicemonitors.monitoring.coreos.com" ]]; then
+    if [[ "$*" == "--no-exit get crd servicemonitors.monitoring.coreos.com" ]]; then
       return 0
     fi
     if [[ "$*" == "apply -f -" ]]; then
@@ -56,7 +56,7 @@ EOF
 
   local -a kubectl_calls=()
   read_lines "$KUBECTL_LOG" kubectl_calls
-  [ "${kubectl_calls[0]}" = "get crd servicemonitors.monitoring.coreos.com" ]
+  [ "${kubectl_calls[0]}" = "--no-exit get crd servicemonitors.monitoring.coreos.com" ]
   [ "${kubectl_calls[1]}" = "apply -f -" ]
 
   run grep -c '^kind: ServiceMonitor$' "$applied"
@@ -78,7 +78,7 @@ EOF
 
   _kubectl() {
     echo "$*" >> "$KUBECTL_LOG"
-    if [[ "$*" == "get crd servicemonitors.monitoring.coreos.com" ]]; then
+    if [[ "$*" == "--no-exit get crd servicemonitors.monitoring.coreos.com" ]]; then
       return 1
     fi
     return 0
@@ -97,5 +97,12 @@ EOF
   local -a kubectl_calls=()
   read_lines "$KUBECTL_LOG" kubectl_calls
   [ "${#kubectl_calls[@]}" -eq 1 ]
-  [ "${kubectl_calls[0]}" = "get crd servicemonitors.monitoring.coreos.com" ]
+  [ "${kubectl_calls[0]}" = "--no-exit get crd servicemonitors.monitoring.coreos.com" ]
+}
+
+@test "deploy_argocd_bootstrap calls _argocd_deploy_image_updater" {
+  run awk '/^function deploy_argocd_bootstrap\(\)/,/^}$/' \
+    "${BATS_TEST_DIRNAME}/../../plugins/argocd.sh"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"_argocd_deploy_image_updater"* ]]
 }

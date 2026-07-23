@@ -510,7 +510,7 @@ function _argocd_ensure_servicemonitors() {
       --api-versions monitoring.coreos.com/v1
    )
 
-   if ! _kubectl get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
+   if ! _kubectl --no-exit get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
       _info "[argocd] ServiceMonitor CRD absent; skipping argocd ServiceMonitor ensure"
       return 0
    fi
@@ -591,10 +591,9 @@ function _argocd_configure_post_deploy() {
       _info "[argocd] Argo CD UI accessible at: https://$ARGOCD_VIRTUALSERVICE_HOST"
    fi
 
-   _argocd_deploy_image_updater
-
    if (( enable_bootstrap )); then
       _info "[argocd] Deploying GitOps bootstrap resources"
+      _argocd_deploy_image_updater
       if (( ! skip_appproject )); then
          _argocd_deploy_appproject
       fi
@@ -1080,6 +1079,8 @@ EOF
       _err "[argocd] ArgoCD server deployment not found. Deploy ArgoCD first with: deploy_argocd"
       return 1
    fi
+
+   _argocd_deploy_image_updater
 
    # Deploy AppProject
    if (( ! skip_appproject )); then
