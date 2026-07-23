@@ -146,12 +146,60 @@ teardown_file() {
   [[ "$(_acg_resolve_provider)" == "k3s-hostinger" ]]
 }
 
-@test "_hostinger_set_active_app_cluster targets the hub context for relabel" {
+@test "_hostinger_set_active_app_cluster is additive by default" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
 
   _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
   ARGOCD_NAMESPACE="cicd"
+  _argocd_hub_kubectl_cmd() {
+    printf '%s\n' "kubectl --context k3d-k3d-cluster"
+  }
+  _hostinger_load_argocd_plugin() {
+    :
+  }
+
+  kubectl() {
+    case "$*" in
+      --context\ k3d-k3d-cluster\ get\ secrets\ -n\ cicd\ -l\ argocd.argoproj.io/secret-type=cluster\ -o\ name)
+        printf '%s\n' 'secret/cluster-ubuntu-hostinger'
+        printf '%s\n' 'secret/cluster-ubuntu-k3s'
+        ;;
+      --context\ k3d-k3d-cluster\ get\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.argocd\\.argoproj\\.io/cluster-name\})
+        printf '%s' 'ubuntu-hostinger'
+        ;;
+      --context\ k3d-k3d-cluster\ get\ secret/cluster-ubuntu-k3s\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.argocd\\.argoproj\\.io/cluster-name\})
+        printf '%s' 'ubuntu-k3s'
+        ;;
+      --context\ k3d-k3d-cluster\ label\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ k3d-manager/role=app-cluster\ --overwrite)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log"
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  _info() {
+    :
+  }
+
+  _hostinger_set_active_app_cluster
+
+  run cat "${BATS_TEST_TMPDIR}/kubectl.log"
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *"--context k3d-k3d-cluster label secret/cluster-ubuntu-hostinger -n cicd k3d-manager/role=app-cluster --overwrite"* ]]
+  [[ "${output}" != *"secret/cluster-ubuntu-k3s -n cicd k3d-manager/role-"* ]]
+}
+
+@test "_hostinger_set_active_app_cluster strips other labels in exclusive mode" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
+
+  _HOSTINGER_KUBE_CONTEXT="ubuntu-hostinger"
+  ARGOCD_NAMESPACE="cicd"
+  K3DM_EXCLUSIVE_APP_CLUSTER="true"
   _argocd_hub_kubectl_cmd() {
     printf '%s\n' "kubectl --context k3d-k3d-cluster"
   }
@@ -195,6 +243,97 @@ teardown_file() {
   [ "$status" -eq 0 ]
   [[ "${output}" == *"--context k3d-k3d-cluster label secret/cluster-ubuntu-hostinger -n cicd k3d-manager/role=app-cluster --overwrite"* ]]
   [[ "${output}" == *"--context k3d-k3d-cluster label secret/cluster-ubuntu-k3s -n cicd k3d-manager/role-"* ]]
+}
+
+@test "_argocd_set_active_app_cluster is additive by default" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  export PLUGINS_DIR="${REPO_ROOT}/scripts/plugins"
+  _warn() { :; }
+  _err() { printf '%s\n' "$*" >&2; return 1; }
+  _cleanup_trap_command() { printf 'rm -f %q' "$1"; }
+  source "${REPO_ROOT}/scripts/plugins/argocd.sh"
+
+  ARGOCD_NAMESPACE="cicd"
+  _kubectl() {
+    case "$*" in
+      get\ secrets\ -n\ cicd\ -l\ argocd.argoproj.io/secret-type=cluster\ -o\ name)
+        printf '%s\n' 'secret/cluster-ubuntu-hostinger'
+        printf '%s\n' 'secret/cluster-ubuntu-k3s'
+        ;;
+      get\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.argocd\\.argoproj\\.io/cluster-name\})
+        printf '%s' 'ubuntu-hostinger'
+        ;;
+      get\ secret/cluster-ubuntu-k3s\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.argocd\\.argoproj\\.io/cluster-name\})
+        printf '%s' 'ubuntu-k3s'
+        ;;
+      label\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ k3d-manager/role=app-cluster\ --overwrite)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log"
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  _info() {
+    :
+  }
+
+  _argocd_set_active_app_cluster "ubuntu-hostinger"
+
+  run cat "${BATS_TEST_TMPDIR}/kubectl.log"
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *"label secret/cluster-ubuntu-hostinger -n cicd k3d-manager/role=app-cluster --overwrite"* ]]
+  [[ "${output}" != *"secret/cluster-ubuntu-k3s -n cicd k3d-manager/role-"* ]]
+}
+
+@test "_argocd_set_active_app_cluster strips other labels in exclusive mode" {
+  REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
+  export PLUGINS_DIR="${REPO_ROOT}/scripts/plugins"
+  _warn() { :; }
+  _err() { printf '%s\n' "$*" >&2; return 1; }
+  _cleanup_trap_command() { printf 'rm -f %q' "$1"; }
+  source "${REPO_ROOT}/scripts/plugins/argocd.sh"
+
+  ARGOCD_NAMESPACE="cicd"
+  K3DM_EXCLUSIVE_APP_CLUSTER="true"
+  _kubectl() {
+    case "$*" in
+      get\ secrets\ -n\ cicd\ -l\ argocd.argoproj.io/secret-type=cluster\ -o\ name)
+        printf '%s\n' 'secret/cluster-ubuntu-hostinger'
+        printf '%s\n' 'secret/cluster-ubuntu-k3s'
+        ;;
+      get\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.argocd\\.argoproj\\.io/cluster-name\})
+        printf '%s' 'ubuntu-hostinger'
+        ;;
+      get\ secret/cluster-ubuntu-k3s\ -n\ cicd\ -o\ jsonpath=\{.metadata.labels.argocd\\.argoproj\\.io/cluster-name\})
+        printf '%s' 'ubuntu-k3s'
+        ;;
+      label\ secret/cluster-ubuntu-hostinger\ -n\ cicd\ k3d-manager/role=app-cluster\ --overwrite)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log"
+        return 0
+        ;;
+      label\ secret/cluster-ubuntu-k3s\ -n\ cicd\ k3d-manager/role-)
+        printf '%s\n' "$*" >> "${BATS_TEST_TMPDIR}/kubectl.log"
+        return 0
+        ;;
+      *)
+        return 1
+        ;;
+    esac
+  }
+
+  _info() {
+    :
+  }
+
+  _argocd_set_active_app_cluster "ubuntu-hostinger"
+
+  run cat "${BATS_TEST_TMPDIR}/kubectl.log"
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *"label secret/cluster-ubuntu-hostinger -n cicd k3d-manager/role=app-cluster --overwrite"* ]]
+  [[ "${output}" == *"label secret/cluster-ubuntu-k3s -n cicd k3d-manager/role-"* ]]
 }
 
 @test "_hostinger_register_cluster routes through register_app_cluster labels" {
@@ -314,7 +453,7 @@ teardown_file() {
   [[ "$output" == *"provider k3s-hostinger"* ]]
 }
 
-@test "_hostinger_reapply_gitops_applicationsets reapplies data, services, and platform appsets from the current branch" {
+@test "_hostinger_reapply_gitops_applicationsets reapplies data, services, platform, and istio-ambient appsets from the current branch" {
   REPO_ROOT="$(cd "${BATS_TEST_DIRNAME}/../../.." && pwd)"
   source "${REPO_ROOT}/scripts/lib/providers/k3s-hostinger.sh"
 
@@ -348,18 +487,21 @@ teardown_file() {
 
   run cat "${BATS_TEST_TMPDIR}/appsets.log"
   [ "$status" -eq 0 ]
-  [[ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 3 ]]
+  [[ "$(printf '%s\n' "$output" | wc -l | tr -d ' ')" -eq 4 ]]
   [[ "$output" == *"--context k3d-k3d-cluster apply -f -"* ]]
 
   run cat "${BATS_TEST_TMPDIR}/rendered-appsets.yaml"
   [ "$status" -eq 0 ]
-  [[ "$output" == *"name: data-layer"* ]]
+  [[ "$output" == *"name: '{{.name}}-data-layer'"* ]]
+  [[ "$output" != *"name: data-layer"* ]]
   [[ "$output" == *"k3d-manager/role: app-cluster"* ]]
   [[ "$output" == *".spec.persistentVolumeClaimRetentionPolicy"* ]]
   [[ "$output" == *"name: services-git"* ]]
   [[ "$output" == *".spec.source.kustomize.images"* ]]
   [[ "$output" == *"name: platform-helm"* ]]
   [[ "$output" == *"name: '{{.name}}-platform'"* ]]
+  [[ "$output" == *"name: istio-ambient"* ]]
+  [[ "$output" == *"name: ztunnel"* ]]
 }
 
 @test "_hostinger_clear_stale_platform_tracking_ids strips stale basket/product-catalog ownership and refreshes apps" {

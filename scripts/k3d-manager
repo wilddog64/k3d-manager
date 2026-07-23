@@ -102,6 +102,10 @@ function deploy_observability_acg() {
   _try_load_plugin deploy_observability_acg "$@"
 }
 
+function deploy_istio_ambient() {
+  _try_load_plugin deploy_istio_ambient "$@"
+}
+
 function observability_status() {
   _try_load_plugin observability_status "$@"
 }

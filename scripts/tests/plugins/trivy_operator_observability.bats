@@ -5,6 +5,7 @@ ACG_SETTINGS="${BATS_TEST_DIRNAME}/../../etc/helm/observability/trivy-operator-a
 HUB_APPSET="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/observability.yaml"
 ACG_APPSET="${BATS_TEST_DIRNAME}/../../etc/argocd/applicationsets/observability-acg.yaml"
 DASH="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/grafana-dashboard-argocd.yaml"
+TRIVY_DASH="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/trivy-security-configmap.yaml"
 RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml"
 ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.yaml"
 
@@ -53,7 +54,7 @@ ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.ya
 }
 
 @test "trivy observability: dashboard exposes log and metric panels for trivy-system" {
-  run grep -F -- 'Trivy Scan Job Failures (30m)' "${DASH}"
+  run grep -F -- 'Trivy Scan Job Failures (30m)' "${TRIVY_DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'Trivy Operator Job Reconcile Errors' "${DASH}"
@@ -62,7 +63,13 @@ ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.ya
   run grep -F -- '{namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | controller=\"job\" | msg=\"Reconciler error\"' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'sum(increase(kube_job_status_failed{namespace=\"trivy-system\",job_name=~\"scan-.*\"}[30m]))' "${DASH}"
+  run grep -F -- 'sum(increase(kube_job_status_failed{namespace=\"trivy-system\",job_name=~\"scan-.*\"}[30m]))' "${TRIVY_DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'Trivy Cluster Compliance Failures' "${DASH}"
+  [ "${status}" -ne 0 ]
+
+  run grep -F -- 'Trivy Cluster Compliance Failures' "${TRIVY_DASH}"
   [ "${status}" -eq 0 ]
 }
 

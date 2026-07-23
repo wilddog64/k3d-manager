@@ -13,6 +13,14 @@ trivy:
     limits:
       memory: 1Gi
       cpu: 500m
+  server:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 1Gi
 
 operator:
   scanJobTTL: 1h

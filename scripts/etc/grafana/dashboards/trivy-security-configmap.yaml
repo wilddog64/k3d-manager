@@ -1,0 +1,130 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trivy-security-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  trivy-security.json: |
+    {
+      "title": "Trivy Security",
+      "uid": "trivy-security",
+      "tags": ["trivy", "security"],
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "5m",
+      "time": { "from": "now-6h", "to": "now" },
+      "panels": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "id": 11,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value"
+          },
+          "targets": [
+            {
+              "expr": "sum(increase(kube_job_status_failed{namespace=\"trivy-system\",job_name=~\"scan-.*\"}[30m]))",
+              "refId": "A"
+            }
+          ],
+          "title": "Trivy Scan Job Failures (30m)",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 4 },
+          "id": 13,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value"
+          },
+          "targets": [
+            {
+              "expr": "sum(trivy_role_rbacassessments{severity=~\"High|Critical\"}) + sum(trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"})",
+              "refId": "A"
+            }
+          ],
+          "links": [
+            {
+              "title": "Open Trivy findings drilldown",
+              "url": "?viewPanel=18",
+              "targetBlank": false
+            }
+          ],
+          "title": "Trivy Infra High/Critical Findings",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 8, "w": 18, "x": 6, "y": 4 },
+          "id": 14,
+          "targets": [
+            {
+              "expr": "sort_desc(sum by (title,description,status) (trivy_cluster_compliance{status=\"Fail\"}) > 0)",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "links": [
+            {
+              "title": "Open Trivy findings drilldown",
+              "url": "?viewPanel=18",
+              "targetBlank": false
+            }
+          ],
+          "title": "Trivy Cluster Compliance Failures",
+          "type": "table"
+        },
+        {
+          "datasource": null,
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 4, "w": 24, "x": 0, "y": 12 },
+          "id": 15,
+          "options": {
+            "content": "### Trivy drilldown\n\nOne row per High/Critical RBAC finding. The `source` column separates namespaced Roles (`rbac`) from cluster-scoped ClusterRoles (`clusterrole`). `Value` is the number of failing checks at that severity for that object, not the number of findings.",
+            "mode": "markdown"
+          },
+          "title": "Trivy Drilldown Banner",
+          "type": "text"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+          "id": 18,
+          "targets": [
+            {
+              "expr": "sort_desc((label_replace(label_replace(sum by (namespace,resource_name,resource_kind,severity) (trivy_role_rbacassessments{severity=~\"High|Critical\"}) > 0, \"source\", \"rbac\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review namespace-scoped permissions for this Role\", \"resource_name\", \".*\") or label_replace(label_replace(label_replace(label_replace(sum by (name,resource_kind,severity) (trivy_clusterrole_clusterrbacassessments{severity=~\"High|Critical\"}) > 0, \"resource_name\", \"$1\", \"name\", \"(.*)\"), \"namespace\", \"cluster\", \"\", \"\"), \"source\", \"clusterrole\", \"\", \"\"), \"reason\", \"Trivy RBAC finding: review cluster-wide permissions for this ClusterRole\", \"resource_name\", \".*\")))",
+              "format": "table",
+              "instant": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Trivy Infra Findings Drilldown",
+          "type": "table"
+        }
+      ]
+    }

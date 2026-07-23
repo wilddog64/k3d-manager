@@ -27,9 +27,11 @@ spec:
   goTemplate: true
   goTemplateOptions:
     - missingkey=error
+  syncPolicy:
+    preserveResourcesOnDeletion: true
   template:
     metadata:
-      name: '{{.path.basename}}'
+      name: '{{.name}}-{{.path.basename}}'
       labels:
         app-type: service
         discovered-from: git

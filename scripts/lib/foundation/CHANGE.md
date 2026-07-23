@@ -1,5 +1,26 @@
 # Changes - lib-foundation
 
+## [v0.4.7] — 2026-07-23
+
+Make the `acg_check_ttl` node exit-code capture `set -e`-safe — the last remaining instance of the non-set-e-safe idiom in `acg.sh` (PR #38, merged `a36cf79`). Documented PR #37 follow-up.
+
+### Fixed
+- `scripts/lib/acg/acg.sh`: `acg_check_ttl` captured the node `--check` exit code with a separate `exit_code=$?` line; under `set -euo pipefail` a non-zero node exit aborted the caller at the assignment, leaving the graceful `node exited N → return 1` path dead. Moved the capture into `output=$(node …) || exit_code=$?`, matching the sibling `_acg_extend_playwright` / `_acg_restart_playwright` wrappers. Happy path unchanged; only the failure path is now reachable (`a36cf79`).
+
+## [v0.4.6] — 2026-07-21
+
+Restore the `acg_restart` shell entrypoint for the orphaned `acg_restart.js` and stop the ACG browser wrappers from leaking stale `playwright-artifacts-*` temp dirs (PR #37, merged `db336a6f`). Folds in the never-released v0.4.5 `acg_restart` wiring.
+
+### Added
+- `scripts/lib/acg/acg.sh`: `acg_restart` public function + `_acg_restart_playwright` helper wire the previously orphaned `playwright/acg_restart.js` (delete dead sandbox → Start Sandbox → re-extract credentials) to a shell entrypoint, so an expired/dead ACG sandbox is recovered with zero manual clicks. `_acg_check_credentials` now points operators at `acg_restart` instead of the manual "Start a new sandbox" instructions (`03312ae`, folded-in v0.4.5).
+
+### Fixed
+- `scripts/lib/acg/acg.sh`: `_acg_sweep_stale_artifacts` removes `playwright-artifacts-*` directories older than 120 minutes from `$TMPDIR`, called from both `_acg_extend_playwright` and `_acg_restart_playwright`, so repeated ACG runs no longer leak Playwright scratch dirs into `/tmp` (`84d5b27`). Guards against an empty sweep path when `TMPDIR=/` via `${tmpdir:-/}` (Copilot PR #37 finding, `330083b`).
+- `scripts/lib/acg/acg.sh`: make the node exit-code capture in `_acg_extend_playwright` and `_acg_restart_playwright` `set -e`-safe — `output=$(node …) || exit_code=$?` instead of a separate `exit_code=$?` line that aborts the caller under `set -euo pipefail` before the graceful `return 1` path is reached (Copilot PR #37 finding, `330083b`).
+
+### CI
+- `scripts/lib/acg/acg.sh`: silence SC2119/SC2120 on the intentional argless internal `acg_get_credentials` call surfaced by CI's newer shellcheck build (`1c0dc51`).
+
 ## [v0.4.4] — 2026-07-13
 
 Close the dev-only js-yaml DoS advisory (GHSA-h67p-54hq-rp68) on the ACG test toolchain and fix ACG Extend sandbox-tab routing (PR #36, merged `ce421a4`).

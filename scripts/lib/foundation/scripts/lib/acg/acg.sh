@@ -40,10 +40,9 @@ _acg_check_credentials() {
   local arn
   if ! arn=$(_run_command --soft -- aws sts get-caller-identity --region "${ACG_REGION}" --query 'Arn' --output text 2>/dev/null); then
     printf 'ERROR: %s\n' "[acg] AWS credentials invalid or expired." >&2
-    printf 'ERROR: %s\n' "[acg] If the sandbox was removed (expired TTL):" >&2
-    printf 'ERROR: %s\n' "[acg]   1. Start a new sandbox at ${_ACG_SANDBOX_URL}" >&2
-    printf 'ERROR: %s\n' "[acg]   2. Run: acg_get_credentials" >&2
-    printf 'ERROR: %s\n' "[acg]   3. Re-run: make up" >&2
+    printf 'ERROR: %s\n' "[acg] If the sandbox was removed (expired TTL), recover automatically:" >&2
+    printf 'ERROR: %s\n' "[acg]   Run: acg_restart      # deletes the dead sandbox, starts a new one, re-extracts creds" >&2
+    printf 'ERROR: %s\n' "[acg] Then re-run: make up" >&2
     printf 'ERROR: %s\n' "[acg] If the sandbox is still running: update ~/.aws/credentials from the ACG console." >&2
     return 1
   fi
@@ -261,6 +260,7 @@ function acg_import_credentials() {
   aws_import_credentials "$@"
 }
 
+# shellcheck disable=SC2120  # [sandbox-url] is optional; acg_restart calls this argless by design
 function acg_get_credentials() {
   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
     cat <<HELP
@@ -417,6 +417,8 @@ HELP
 _acg_extend_playwright() {
   local sandbox_url="${1:?usage: _acg_extend_playwright <sandbox_url>}"
 
+  _acg_sweep_stale_artifacts
+
   local playwright_script="${_LIB_ACG_ROOT}/playwright/acg_extend.js"
 
   if ! command -v node >/dev/null 2>&1; then
@@ -424,9 +426,8 @@ _acg_extend_playwright() {
   fi
 
   _info "[acg] Extending ACG sandbox TTL at ${sandbox_url}..."
-  local output exit_code
-  output=$(node "$playwright_script" "$sandbox_url" 2>&1)
-  exit_code=$?
+  local output exit_code=0
+  output=$(node "$playwright_script" "$sandbox_url" 2>&1) || exit_code=$?
 
   if [[ $exit_code -ne 0 ]]; then
     _info "[acg] acg_extend failed: ${output}"
@@ -434,6 +435,65 @@ _acg_extend_playwright() {
   fi
 
   echo "$output"
+}
+
+_acg_sweep_stale_artifacts() {
+  # Best-effort: Playwright's connectOverCDP leaves playwright-artifacts-* dirs that
+  # a disconnect-style browser.close() never removes. Sweep ones older than 2h so a
+  # concurrent run's live artifacts are never touched. Never fails the caller.
+  local tmpdir="${TMPDIR:-/tmp}"
+  tmpdir="${tmpdir%/}"
+  find "${tmpdir:-/}" -maxdepth 1 -name 'playwright-artifacts-*' -type d -mmin +120 \
+    -exec rm -rf {} + 2>/dev/null || true
+}
+
+_acg_restart_playwright() {
+  local sandbox_url="${1:?usage: _acg_restart_playwright <sandbox_url> [provider]}"
+  local provider="${2:-aws}"
+
+  _acg_sweep_stale_artifacts
+
+  local playwright_script="${_LIB_ACG_ROOT}/playwright/acg_restart.js"
+
+  if ! command -v node >/dev/null 2>&1; then
+    _err "[acg] node is required — install Node.js"
+    return 1
+  fi
+
+  _info "[acg] Restarting ACG ${provider} sandbox at ${sandbox_url}..."
+  local output exit_code=0
+  output=$(node "$playwright_script" "$sandbox_url" --provider "$provider" 2>&1) || exit_code=$?
+
+  if [[ $exit_code -ne 0 ]]; then
+    _info "[acg] acg_restart failed: ${output}"
+    return 1
+  fi
+
+  echo "$output"
+}
+
+function acg_restart() {
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'HELP'
+Usage: acg_restart [sandbox_url] [provider]
+
+Delete the expired ACG sandbox and start a fresh one via Playwright/CDP automation,
+then extract credentials. Recovers from an expired sandbox with no manual clicks.
+
+Arguments:
+  sandbox_url   Pluralsight sandbox URL (default: the built-in sandbox list URL)
+  provider      aws | gcp | azure (default: aws)
+HELP
+    return 0
+  fi
+
+  local sandbox_url="${1:-${_ACG_SANDBOX_URL}}"
+  local provider="${2:-aws}"
+
+  _acg_restart_playwright "${sandbox_url}" "${provider}" || return 1
+  # shellcheck disable=SC2119  # intentional argless call — acg_get_credentials arg is optional
+  acg_get_credentials || return 1
+  _acg_check_credentials
 }
 
 function acg_check_ttl() {
@@ -452,9 +512,8 @@ HELP
     _err "[acg] node is required — install Node.js"
     return 1
   fi
-  local output exit_code
-  output=$(node "$playwright_script" "$sandbox_url" --check 2>/dev/null)
-  exit_code=$?
+  local output exit_code=0
+  output=$(node "$playwright_script" "$sandbox_url" --check 2>/dev/null) || exit_code=$?
   if [[ $exit_code -ne 0 ]]; then
     _warn "[acg] acg_check_ttl: node exited $exit_code"
     return 1

@@ -495,9 +495,53 @@ function _argocd_helm_deploy_release() {
          "${helm_args[@]}"
    fi
 
+   _argocd_ensure_servicemonitors "$values_file"
+
    if [[ -n "$values_file" && -f "$values_file" ]]; then
       rm -f "$values_file"
    fi
+}
+
+function _argocd_ensure_servicemonitors() {
+   local values_file="${1:-}"
+   local rendered_servicemonitors=""
+   local -a sm_args=(
+      -n "$ARGOCD_NAMESPACE"
+      --api-versions monitoring.coreos.com/v1
+   )
+
+   if ! _kubectl --no-exit get crd servicemonitors.monitoring.coreos.com >/dev/null 2>&1; then
+      _info "[argocd] ServiceMonitor CRD absent; skipping argocd ServiceMonitor ensure"
+      return 0
+   fi
+
+   if [[ -n "${ARGOCD_HELM_CHART_VERSION:-}" ]]; then
+      sm_args+=(--version "$ARGOCD_HELM_CHART_VERSION")
+   fi
+
+   if [[ -n "$values_file" ]]; then
+      sm_args+=(--values "$values_file")
+   else
+      sm_args+=(
+         --set "server.insecure=true"
+         --set "server.service.type=ClusterIP"
+      )
+   fi
+
+   rendered_servicemonitors="$(
+      _helm template \
+         "$ARGOCD_HELM_RELEASE" \
+         "$ARGOCD_HELM_CHART_REF" \
+         "${sm_args[@]}" \
+         | yq eval-all 'select(.kind == "ServiceMonitor")' -
+   )"
+
+   if [[ -z "$rendered_servicemonitors" ]]; then
+      _info "[argocd] No argocd ServiceMonitors rendered; skipping apply"
+      return 0
+   fi
+
+   printf '%s\n' "$rendered_servicemonitors" | _kubectl apply -f - >/dev/null
 }
 
 function _argocd_configure_vault_eso() {
@@ -732,6 +776,8 @@ function _argocd_apply_deploy_key_externalsecrets() {
 
    local rendered
    rendered=$(mktemp)
+   # shellcheck disable=SC2064
+   trap 'trap - RETURN; rm -f "'"${rendered}"'" 2>/dev/null || true' RETURN
    ARGOCD_REPO_NAME="$repo_name" \
    ARGOCD_REPO_SSH_URL="$repo_url" \
    envsubst '$ARGOCD_NAMESPACE $ARGOCD_DEPLOY_KEY_SECRETSTORE $ARGOCD_REPO_NAME $ARGOCD_REPO_SSH_URL' \
@@ -903,6 +949,8 @@ EOF
 
    local secretstore_render
    secretstore_render=$(mktemp)
+   # shellcheck disable=SC2064
+   trap 'trap - RETURN; rm -f "'"${secretstore_render}"'" 2>/dev/null || true' RETURN
    ARGOCD_NAMESPACE="$ns" \
    envsubst '$ARGOCD_NAMESPACE $ARGOCD_DEPLOY_KEY_SECRETSTORE $VAULT_ENDPOINT $ARGOCD_VAULT_KV_MOUNT $ARGOCD_DEPLOY_KEY_VAULT_ROLE $ARGOCD_DEPLOY_KEY_ESO_SA' \
       < "$secretstore_tmpl" > "$secretstore_render"
@@ -1032,6 +1080,8 @@ EOF
       return 1
    fi
 
+   _argocd_deploy_image_updater
+
    # Deploy AppProject
    if (( ! skip_appproject )); then
       _argocd_deploy_appproject
@@ -1051,23 +1101,28 @@ EOF
 }
 
 function _argocd_deploy_appproject() {
-   _info "[argocd] Deploying platform AppProject"
+   local -a appprojects=(platform shopping-cart)
+   local -a rendered_files=()
+   local proj appproject_tmpl rendered
 
-   local appproject_tmpl="$ARGOCD_CONFIG_DIR/projects/platform.yaml.tmpl"
+   for proj in "${appprojects[@]}"; do
+      _info "[argocd] Deploying ${proj} AppProject"
 
-   if [[ ! -f "$appproject_tmpl" ]]; then
-      _err "[argocd] AppProject file not found: $appproject_tmpl"
-      return 1
-   fi
+      appproject_tmpl="$ARGOCD_CONFIG_DIR/projects/${proj}.yaml.tmpl"
+      if [[ ! -f "$appproject_tmpl" ]]; then
+         _err "[argocd] AppProject file not found: $appproject_tmpl"
+         return 1
+      fi
 
-   local rendered
-   rendered=$(mktemp -t argocd-appproject.XXXXXX.yaml)
-   trap '$(_cleanup_trap_command "$rendered")' EXIT
-   envsubst '$ARGOCD_NAMESPACE' < "$appproject_tmpl" > "$rendered"
-   _kubectl apply --server-side -f "$rendered" >/dev/null
-   trap '$(_cleanup_trap_command "$rendered")' RETURN
+      rendered=$(mktemp -t argocd-appproject.XXXXXX.yaml)
+      rendered_files+=("$rendered")
+      trap '$(_cleanup_trap_command "${rendered_files[@]}")' EXIT RETURN
+      envsubst '$ARGOCD_NAMESPACE' < "$appproject_tmpl" > "$rendered"
+      _kubectl apply --server-side -f "$rendered" >/dev/null
 
-   _info "[argocd] AppProject deployed: platform"
+      _info "[argocd] AppProject deployed: ${proj}"
+   done
+
    return 0
 }
 
@@ -1078,6 +1133,8 @@ function _argocd_ensure_ghcr_pull_secret() {
    _ghcr_pat_valid() {
       [[ -z "$1" ]] && return 1
       netrc=$(mktemp) && chmod 0600 "$netrc"
+      # shellcheck disable=SC2064
+      trap 'trap - RETURN; rm -f "'"${netrc}"'" 2>/dev/null || true' RETURN
       printf 'machine api.github.com login %s password %s\n' "$user" "$1" > "$netrc"
       http=$(curl -s -o /dev/null -w "%{http_code}" --netrc-file "$netrc" "https://api.github.com/user" 2>/dev/null || true)
       rm -f "$netrc"
@@ -1157,12 +1214,12 @@ function _argocd_deploy_applicationsets() {
    K3D_MANAGER_BRANCH="${K3D_MANAGER_BRANCH:-$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)}"
    export K3D_MANAGER_BRANCH
 
-   APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-ubuntu-hostinger}"
-   export APP_CLUSTER_NAME
    local _active_app_cluster=""
    if declare -f _acg_provider_context >/dev/null 2>&1 && declare -f _acg_resolve_provider >/dev/null 2>&1; then
       _active_app_cluster="$(_acg_provider_context "$(_acg_resolve_provider)" 2>/dev/null)"
    fi
+   APP_CLUSTER_NAME="${APP_CLUSTER_NAME:-${_active_app_cluster:-ubuntu-k3s}}"
+   export APP_CLUSTER_NAME
    _active_app_cluster="${_active_app_cluster:-${APP_CLUSTER_NAME}}"
    _argocd_set_active_app_cluster "${_active_app_cluster}"
 
@@ -1193,7 +1250,18 @@ function _argocd_deploy_applicationsets() {
       filename=$(basename "$file")
       _info "[argocd] Deploying ApplicationSet: $filename"
 
-      if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH $APP_CLUSTER_NAME' < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
+      local _vars _v _name _unset=""
+      _vars="$(grep -oh '\${[A-Za-z_][A-Za-z0-9_]*}' "$file" 2>/dev/null \
+         | tr -d '${}' | sort -u | sed 's/^/$/' | tr '\n' ' ')"
+      for _v in ${_vars}; do
+         _name="${_v#\$}"
+         [[ -z "${!_name:-}" ]] && _unset="${_unset} ${_name}"
+      done
+      if [[ -n "${_unset}" ]]; then
+         _err "[argocd] Refusing to apply ${filename}: unset variable(s):${_unset}"
+         continue
+      fi
+      if envsubst "${_vars}" < "$file" | _kubectl apply -f - >/dev/null 2>&1; then
          ((deployed_count++))
       else
          _warn "[argocd] Failed to deploy ApplicationSet: $filename"
@@ -1211,17 +1279,22 @@ function _argocd_set_active_app_cluster() {
       return 1
    fi
    local _ns="${ARGOCD_NAMESPACE:-cicd}"
+   local _exclusive="${K3DM_EXCLUSIVE_APP_CLUSTER:-false}"
    local _s _cname
    while IFS= read -r _s; do
       [[ -z "${_s}" ]] && continue
       _cname="$(_kubectl get "${_s}" -n "${_ns}" -o jsonpath='{.metadata.labels.argocd\.argoproj\.io/cluster-name}' 2>/dev/null)"
       if [[ "${_cname}" == "${_active}" ]]; then
          _kubectl label "${_s}" -n "${_ns}" k3d-manager/role=app-cluster --overwrite >/dev/null 2>&1 || true
-      else
+      elif [[ "${_exclusive}" == "true" ]]; then
          _kubectl label "${_s}" -n "${_ns}" k3d-manager/role- >/dev/null 2>&1 || true
       fi
    done < <(_kubectl get secrets -n "${_ns}" -l argocd.argoproj.io/secret-type=cluster -o name 2>/dev/null)
-   _info "[argocd] app-cluster role label set on '${_active}' (cleared from others)"
+   if [[ "${_exclusive}" == "true" ]]; then
+      _info "[argocd] app-cluster role label set on '${_active}' (exclusive: cleared from others)"
+   else
+      _info "[argocd] app-cluster role label set on '${_active}' (additive: other app-clusters keep their role)"
+   fi
 }
 
 function _argocd_hub_kubectl_cmd() {

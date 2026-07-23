@@ -16,6 +16,15 @@ function deploy_observability() {
     return 1
   fi
 
+  local _dash_appset="${SCRIPT_DIR}/etc/argocd/applicationsets/grafana-dashboards-hub.yaml"
+  # shellcheck disable=SC2016
+  if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_dash_appset}" | _kubectl apply -f -; then
+    _info "[observability] Hub Grafana dashboard ApplicationSet applied"
+  else
+    _err "[observability] Failed to apply Hub Grafana dashboard ApplicationSet"
+    return 1
+  fi
+
   _info "[observability] Reading Alertmanager credentials from Vault..."
   local _vault_addr="http://127.0.0.1:18200"
   local _vault_token
@@ -331,6 +340,15 @@ function deploy_observability_acg() {
     return 1
   fi
 
+  local _dash_appset="${SCRIPT_DIR}/etc/argocd/applicationsets/grafana-dashboards-acg.yaml"
+  # shellcheck disable=SC2016
+  if envsubst '$ARGOCD_NAMESPACE $K3D_MANAGER_BRANCH' < "${_dash_appset}" | _kubectl apply -f -; then
+    _info "[observability] App-cluster Grafana dashboard ApplicationSet applied"
+  else
+    _err "[observability] Failed to apply app-cluster Grafana dashboard ApplicationSet"
+    return 1
+  fi
+
   _observability_ensure_namespace "${_app_context}" monitoring
   _info "[observability] Ensured monitoring namespace exists on ${_app_context}"
   _observability_remove_argocd_dashboard "${_app_context}"
@@ -417,6 +435,7 @@ function _deploy_pushgateway_acg() {
     _kubectl apply --context "${_app_context}" -f "${_dashboard_cm}" >/dev/null \
       && _info "[observability] k3dm deployment metrics dashboard applied"
   fi
+  _observability_apply_trivy_dashboard "${_app_context}"
 }
 
 function _deploy_promtail_acg() {
@@ -436,6 +455,16 @@ function _observability_apply_argocd_dashboard() {
   if [[ -f "${_dashboard_manifest}" ]]; then
     _kubectl apply --context "${_app_context}" -f "${_dashboard_manifest}" >/dev/null \
       && _info "[observability] ArgoCD/Image Updater dashboard applied on ${_app_context}"
+  fi
+}
+
+function _observability_apply_trivy_dashboard() {
+  local _app_context
+  _app_context="$(_observability_acg_context "${1:-}")"
+  local _dashboard_cm="${SCRIPT_DIR}/etc/grafana/dashboards/trivy-security-configmap.yaml"
+  if [[ -f "${_dashboard_cm}" ]]; then
+    _kubectl apply --context "${_app_context}" -f "${_dashboard_cm}" >/dev/null \
+      && _info "[observability] Trivy security dashboard applied on ${_app_context}"
   fi
 }
 
