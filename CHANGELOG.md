@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+**Theme: the smoke test proves real logins.** `make status` used to false-green because the health smoke only fetched health URLs — a Keycloak stale-session page returns HTTP 200 and counted as a pass. The smoke now performs credentialed logins (token mint / authed request) against Keycloak, the frontend, ArgoCD and Grafana, seeding its own Keycloak client and user so it never depends on app-owned client configuration.
+
+### Added
+- k3d-manager seeds its own `k3dm-smoke` Keycloak client + user via `keycloak_seed_smoke_user`, storing the generated credential in the `identity/k3dm-smoke-user` Secret — the app-owned `frontend` client has `directAccessGrantsEnabled=false`, so a password grant can never succeed against it (`647b4181`) (`scripts/plugins/keycloak.sh`)
+- Login smoke auto-discovers ArgoCD and Grafana admin credentials from their in-cluster Secrets instead of requiring the operator to export env vars (`cdeebfa6`) (`bin/k3dm-webhook`)
+
+### Changed
+- Health smoke verifies **real logins** rather than health pages — a credentialed token POST for Keycloak, an authed request for the frontend, and credentialed logins for ArgoCD/Grafana, so a stale-session page can no longer report green (`843e643a`) (`bin/k3dm-webhook`)
+
+### Fixed
+- Seeded smoke user now receives the Keycloak 24+ declarative User Profile attributes that are required by default (`email`, `firstName`, `lastName`, `emailVerified`), and repairs them idempotently on re-run, so the direct-access-grant token mint no longer fails `invalid_grant "Account is not fully set up"` on a fresh cluster (`950998aa`) (`scripts/plugins/keycloak.sh`)
+- Frontend login smoke attempts the authed `/api/cart` request when falling back to the `k3dm-smoke` client instead of unconditionally skipping it — 2xx passes, a smoke-client `401`/`403` skips (audience-strict deployment), anything else fails (`2a55f0be`) (`bin/k3dm-webhook`)
+- `_ambient_install_cilium` builds `ssh_cmd` as an array instead of a string, so all three remote invocations quote the key path and user@host correctly (`05d74f6c`) (`scripts/plugins/shopping_cart.sh`)
+
+### Removed
+- Dead `_argocd_configure_post_deploy` — orphaned since the deploy path was restructured — along with the `enable_vault` local it was the only consumer of (`ac729e14`, `db26dd61`) (`scripts/plugins/argocd.sh`)
+
 ## [1.16.0] - 2026-07-23
 
 **Theme: ambient mesh comes to the app tier.** Migrate the hostinger shopping-cart workloads from sidecar injection to Istio **ambient** (ztunnel + istio-cni, HBONE/mTLS with zero sidecar containers), make the ambient path durable across `make refresh` and cold `k3s-aws` rebuilds, harden multi-cluster ArgoCD so a second app cluster no longer clobbers the first, and right-size control-plane/observability CPU for the 2-CPU hostinger node. Ships lib-foundation **v0.4.7** via subtree.

@@ -31,6 +31,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `test_jenkins` | `scripts/lib/test.sh` | Run Jenkins smoke tests |
 | `test_jenkins_smoke` | `scripts/lib/test.sh` | Run full Jenkins smoke test suite |
 | `test_keycloak` | `scripts/plugins/keycloak.sh` | Run Keycloak smoke tests |
+| `keycloak_seed_smoke_user` | `scripts/plugins/keycloak.sh` | Seed the k3d-manager-owned `k3dm-smoke` Keycloak client + user (direct-access-grant enabled) and store the generated credential in the `identity/k3dm-smoke-user` Secret, so the health smoke can verify a real login without depending on app-owned client config; idempotent — re-run to restore after a realm reconcile (v1.17.0+) |
 | `test_cert_rotation` | `scripts/lib/test.sh` | Validate TLS certificate rotation |
 | `test_nfs_connectivity` | `scripts/lib/test.sh` | Check network connectivity to NFS |
 | `test_nfs_direct` | `scripts/lib/test.sh` | Directly mount NFS for troubleshooting |
