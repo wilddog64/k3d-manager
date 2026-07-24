@@ -1598,8 +1598,6 @@ def _smoke_test_logins(provider, app_context):
     fe_path = os.environ.get("K3DM_SMOKE_FRONTEND_AUTHED_PATH", "/api/cart")
     if kc_token is None:
         results.append(("Frontend login", None, "skipped (no Keycloak token)"))
-    elif kc_via_smoke_client:
-        results.append(("Frontend login", None, "skipped (smoke-client token not scoped for frontend audience)"))
     else:
         try:
             req = urllib.request.Request(
@@ -1611,7 +1609,10 @@ def _smoke_test_logins(provider, app_context):
                 ok = 200 <= resp.status < 300
                 results.append(("Frontend login", ok, f"HTTP {resp.status} on {fe_path}"))
         except urllib.error.HTTPError as exc:
-            results.append(("Frontend login", False, f"HTTP {exc.code} on {fe_path}"))
+            if kc_via_smoke_client and exc.code in (401, 403):
+                results.append(("Frontend login", None, f"skipped (smoke-client token rejected: HTTP {exc.code} on {fe_path})"))
+            else:
+                results.append(("Frontend login", False, f"HTTP {exc.code} on {fe_path}"))
         except Exception as exc:
             results.append(("Frontend login", False, str(exc)[:200]))
 
