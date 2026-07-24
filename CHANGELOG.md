@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.17.0] - 2026-07-24
+
 **Theme: the smoke test proves real logins.** `make status` used to false-green because the health smoke only fetched health URLs — a Keycloak stale-session page returns HTTP 200 and counted as a pass. The smoke now performs credentialed logins (token mint / authed request) against Keycloak, the frontend, ArgoCD and Grafana, seeding its own Keycloak client and user so it never depends on app-owned client configuration.
 
 ### Added
