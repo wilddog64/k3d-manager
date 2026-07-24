@@ -78,15 +78,34 @@ This spec makes that self-healing so a rebuild never reproduces the outage.
    whole job — **before** it can reach its own `else "No LDAP component found"` branch, which
    is therefore dead code. So the hook dies exactly when it most needs to report the problem.
 
-3. **Bind-credential drift.** The LDAP bind credential the hook renders
-   (`LDAP_BIND_CREDENTIAL`, sourced from `envFrom secretRef: keycloak-secrets`) had drifted
-   from the live OpenLDAP admin password (`cn=admin,dc=shopping-cart,dc=local`). Measured:
-   the rendered credential was 23 chars and **failed** to bind; the live LDAP admin password
-   was 32 chars and bound successfully. Even if the component had been created from the
-   rendered config, its `triggerFullSync` would have failed `AuthenticationFailure` and no
-   users would federate. `bin/cluster-up` Step 10d.6 already force-corrects the *existing*
-   component's `bindCredential` to `_ldap_admin_pass` (the live value) — but it **warns and
-   skips** when the component is absent (~1006-1007), which is exactly the failure state.
+3. **A stale bind credential baked into the mounted realm template (NOT an ExternalSecret
+   drift).** During remediation the credential taken from the hook's mounted
+   `keycloak-realm-import` realm JSON was 23 chars and **failed** to bind; the live LDAP
+   admin password was 32 chars and bound. Investigation 2026-07-24 established where the 23
+   came from — and it is **not** the live secrets:
+   - The live LDAP **server** (`ldap` deployment, `envFrom secretRef: ldap-secrets`) and the
+     live **Keycloak bind** secret (`keycloak-secrets.LDAP_BIND_CREDENTIAL`) are
+     **byte-identical** (same sha256, 32 chars) and both resolve the **same** Vault key
+     `secret/data/ldap/admin` property `admin_password`. **There is no live drift between the
+     two secrets that matter.**
+   - The 23-char value is a **pre-rendered literal baked into the mounted realm template**
+     (`keycloak-realm-import` configMap in shopping-cart-infra). The hook's `render_realm()`
+     does `sed 's/${LDAP_BIND_CREDENTIAL}/.../'`, but the mounted file no longer contains the
+     `${LDAP_BIND_CREDENTIAL}` placeholder — it already holds a stale literal — so the
+     substitution is a no-op and the stale value flows through.
+   - Consequence for the fix: any create-when-missing MUST take `bindCredential` from the
+     **live `${LDAP_BIND_CREDENTIAL}` env** (from `keycloak-secrets`, currently correct), not
+     from the mounted template. `bin/cluster-up` Step 10d.6 already force-corrects an
+     *existing* component's `bindCredential` — but it **warns and skips** when the component
+     is absent (~1006-1007), which is exactly the failure state.
+
+   **Separate latent hazard (owner-gated — see Change 3):** a *third* secret `openldap-admin`
+   reads a **different** Vault path `ldap/openldap-admin` and holds a **different** value.
+   That is the path the `ldap.sh` generator writes and `keycloak.sh` (`KEYCLOAK_LDAP_VAULT_PATH`)
+   defaults to, so two parallel Vault representations of the LDAP admin password coexist.
+   They do not break login today (the live consumers use `secret/data/ldap/admin`), but they
+   can drift on a future rebuild. Converging them needs one Vault read to confirm values and
+   is left as an owner decision.
 
 ---
 
@@ -187,22 +206,32 @@ instead of `set -e` killing the job):
 
 **2b — create the component in the `else` branch instead of only logging.** The existing
 `else` prints `echo "No LDAP component found; skipping mapper setup"` (~269-270). Replace that
-skip with: create the `UserStorageProvider` from the realm JSON's `components` block (rendered
-`bindCredential` = `${LDAP_BIND_CREDENTIAL}`), re-resolve `ldap_id`, and fall through into the
+skip with: create the `UserStorageProvider`, re-resolve `ldap_id`, and fall through into the
 existing mapper + `triggerFullSync` logic. Use the same `kcadm create components -f <file>`
 pattern the mapper block already uses. Do NOT duplicate the mapper code — set `ldap_id` and
 let the existing `if [ -n "${ldap_id}" ]` body run.
 
-### Change 3 (both repos, credential single-source) — stop the drift at its root
+**Critical (Root cause 3):** set the new component's `bindCredential` from the **live
+`${LDAP_BIND_CREDENTIAL}` env** (injected via `envFrom secretRef: keycloak-secrets`), NOT
+from the mounted realm template — the mounted `/realm/realm-shopping-cart.json` may carry a
+**stale baked literal** with no `${LDAP_BIND_CREDENTIAL}` placeholder left to substitute, and
+reusing it reproduces the `AuthenticationFailure` this bug is about. Build the component JSON
+inline (as Change 1 does) with `bindCredential=["${LDAP_BIND_CREDENTIAL}"]`.
 
-Root cause 3 is that `keycloak-secrets` (hook's `LDAP_BIND_CREDENTIAL`) and the live OpenLDAP
-admin password diverged. The two Changes above make the system *self-heal* the symptom, but
-the drift should be eliminated at the source: **the OpenLDAP admin password and the value
-ESO syncs into `keycloak-secrets` must derive from one Vault path.** This likely needs an
-ESO/Vault wiring change and is called out here so it is not forgotten — **treat the exact
-wiring as an open owner decision** (which Vault path is canonical, and whether OpenLDAP reads
-its admin password from that same path on deploy). Do NOT guess a new Vault path in this spec;
-raise it for the owner. Changes 1 and 2 are safe and complete without Change 3.
+### Change 3 (OUT OF SCOPE for this handoff — owner-gated) — collapse the parallel Vault paths
+
+Investigation 2026-07-24 showed the live consumers do **not** drift (Root cause 3), so
+Changes 1 and 2 fully fix the login outage. The remaining hazard is a **latent** one: the
+LDAP admin password is represented under two Vault paths with different values —
+`secret/data/ldap/admin`/`admin_password` (what `ldap-secrets` + `keycloak-secrets` consume)
+vs `ldap/openldap-admin`/`LDAP_ADMIN_PASSWORD` (what the `ldap.sh` generator writes and
+`keycloak.sh` `KEYCLOAK_LDAP_VAULT_PATH` defaults to). A rebuild that (re)generates into one
+path while consumers read the other will reintroduce the drift.
+
+**Do NOT implement Change 3 in this handoff.** It requires a Vault read (owner-only) to
+confirm which path is canonical and whether the generator or the consumers should move. Once
+the owner picks the canonical path, a follow-up spec repoints the minority side. Recorded here
+so it is not lost; Changes 1 and 2 are complete and verifiable without it.
 
 ---
 
