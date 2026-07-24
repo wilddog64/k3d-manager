@@ -9,12 +9,18 @@ TRIVY_DASH="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/trivy-security-con
 RULE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/prometheusrule.yaml"
 ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.yaml"
 
-@test "trivy observability: charts pin trivy-operator 0.33.2 in both application sets" {
-  run grep -F -- 'targetRevision: 0.33.2' "${HUB_APPSET}"
+@test "trivy observability: charts pin trivy-operator 0.34.0 in both application sets" {
+  run grep -F -- 'targetRevision: 0.34.0' "${HUB_APPSET}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'targetRevision: 0.33.2' "${ACG_APPSET}"
+  run grep -F -- 'targetRevision: 0.34.0' "${ACG_APPSET}"
   [ "${status}" -eq 0 ]
+
+  run grep -F -- 'targetRevision: 0.33.2' "${HUB_APPSET}"
+  [ "${status}" -ne 0 ]
+
+  run grep -F -- 'targetRevision: 0.33.2' "${ACG_APPSET}"
+  [ "${status}" -ne 0 ]
 }
 
 @test "trivy observability: chart values enable serviceMonitor scraping" {
@@ -24,8 +30,17 @@ ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.ya
   run grep -F -- 'repository: aquasec/trivy-operator' "${SETTINGS}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'tag: "0.31.2"' "${SETTINGS}"
+  run grep -F -- 'tag: "0.32.0"' "${SETTINGS}"
   [ "${status}" -eq 0 ]
+
+  run grep -F -- 'tag: "0.32.0"' "${ACG_SETTINGS}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'tag: "0.31.2"' "${SETTINGS}"
+  [ "${status}" -ne 0 ]
+
+  run grep -F -- 'tag: "0.31.2"' "${ACG_SETTINGS}"
+  [ "${status}" -ne 0 ]
 
   run grep -F -- 'serviceMonitor:' "${SETTINGS}"
   [ "${status}" -eq 0 ]
@@ -37,6 +52,14 @@ ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.ya
   [ "${status}" -eq 0 ]
 
   run grep -F -- 'release: acg-kube-prometheus-stack' "${ACG_SETTINGS}"
+  [ "${status}" -eq 0 ]
+}
+
+@test "trivy observability: scanner image tag is explicitly pinned in both values files" {
+  run grep -F -- 'tag: "0.72.0"' "${SETTINGS}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'tag: "0.72.0"' "${ACG_SETTINGS}"
   [ "${status}" -eq 0 ]
 }
 
