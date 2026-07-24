@@ -1566,9 +1566,18 @@ def _smoke_test_logins(provider, app_context):
     kc_pass = os.environ.get("K3DM_SMOKE_KC_PASS")
     kc_realm = os.environ.get("K3DM_SMOKE_KC_REALM", "shopping-cart")
     kc_client = os.environ.get("K3DM_SMOKE_KC_CLIENT", "frontend")
+    kc_via_smoke_client = False
+    if not (kc_user and kc_pass):
+        seeded_user = _smoke_secret("identity", "username", "k3dm-smoke-user")
+        seeded_pass = _smoke_secret("identity", "password", "k3dm-smoke-user")
+        if seeded_user and seeded_pass:
+            kc_user, kc_pass = seeded_user, seeded_pass
+            if "K3DM_SMOKE_KC_CLIENT" not in os.environ:
+                kc_client = "k3dm-smoke"
+            kc_via_smoke_client = True
     kc_token = None
     if not (kc_user and kc_pass):
-        results.append(("Keycloak login", None, "no credentials (set K3DM_SMOKE_KC_USER/PASS)"))
+        results.append(("Keycloak login", None, "no credentials (k3dm-smoke-user Secret absent; set K3DM_SMOKE_KC_USER/PASS)"))
     else:
         try:
             url = f"{keycloak_base}/realms/{kc_realm}/protocol/openid-connect/token"
@@ -1589,6 +1598,8 @@ def _smoke_test_logins(provider, app_context):
     fe_path = os.environ.get("K3DM_SMOKE_FRONTEND_AUTHED_PATH", "/api/cart")
     if kc_token is None:
         results.append(("Frontend login", None, "skipped (no Keycloak token)"))
+    elif kc_via_smoke_client:
+        results.append(("Frontend login", None, "skipped (smoke-client token not scoped for frontend audience)"))
     else:
         try:
             req = urllib.request.Request(
