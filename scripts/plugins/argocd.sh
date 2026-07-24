@@ -1040,6 +1040,10 @@ EOF
 
    _argocd_deploy_image_updater
 
+   # Deploy the platform-ops CVE/observability tier (namespace, CronJobs, dashboards).
+   # Deployed here so it survives a hub rebuild instead of needing a manual one-shot.
+   deploy_argocd_platform_ops || _warn "[argocd] platform-ops deploy reported a problem — CVE scan/dashboards may be incomplete"
+
    # Deploy AppProject
    if (( ! skip_appproject )); then
       _argocd_deploy_appproject
