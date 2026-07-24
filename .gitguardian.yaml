@@ -6,6 +6,8 @@ secret:
     name: 'false positive: bin/k3dm-webhook smoke-test env-var read (K3DM_SMOKE_KC_PASS)'
   - match: 029f875b10d148ca7b6a9bd31054b2853ac77c66e32645aa913935914cdf001d
     name: 'false positive: bin/k3dm-webhook smoke-test env-var read (K3DM_SMOKE_GRAFANA_PASS)'
+  - match: 39cb7c1deeef82609cc30204dbf31a362cbd4b6ac5b26257cb4001faf1dc8c02
+    name: 'false positive: bin/k3dm-webhook grafana Secret name in jsonpath (acg-kube-prometheus-stack-grafana)'
   ignored_paths:
   - scripts/tests/
 version: 2
