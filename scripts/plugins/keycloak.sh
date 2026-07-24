@@ -420,13 +420,22 @@ function _keycloak_smoke_ensure_user() {
       if ! _curl -sf -X POST \
             -H "Authorization: Bearer ${token}" \
             -H "Content-Type: application/json" \
-            --data-binary "$(jq -n --arg u "$username" '{username:$u, enabled:true}')" \
+            --data-binary "$(jq -n --arg u "$username" '{username:$u, enabled:true, emailVerified:true, email:($u + "@k3dm.local"), firstName:$u, lastName:"smoke", requiredActions:[]}')" \
             "${base_url}/admin/realms/${realm}/users" >/dev/null; then
          return 1
       fi
       user_uuid=$(_curl -sf -H "Authorization: Bearer ${token}" \
          "${base_url}/admin/realms/${realm}/users?username=${username}&exact=true" \
          | jq -r '.[0].id // empty' 2>/dev/null || true)
+   fi
+   if [[ -n "$user_uuid" ]]; then
+      if ! _curl -sf -X PUT \
+            -H "Authorization: Bearer ${token}" \
+            -H "Content-Type: application/json" \
+            --data-binary "$(jq -n --arg u "$username" '{enabled:true, emailVerified:true, email:($u + "@k3dm.local"), firstName:$u, lastName:"smoke", requiredActions:[]}')" \
+            "${base_url}/admin/realms/${realm}/users/${user_uuid}" >/dev/null; then
+         return 1
+      fi
    fi
    printf '%s' "$user_uuid"
 }
