@@ -227,7 +227,7 @@ data:
           },
           "targets": [
             {
-              "expr": "{namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | controller=\"job\" | msg=\"Reconciler error\" | line_format \"{{.msg}}: {{.namespace}}/{{.name}} controller={{.controller}} error={{.error}}\"",
+              "expr": "{namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | level=\"error\" | line_format \"{{.logger}}: {{.msg}} job={{.job_extracted}} container={{.container_extracted}} reason={{.status_reason}}\"",
               "refId": "A"
             }
           ],

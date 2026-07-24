@@ -60,8 +60,11 @@ ROUTE="${BATS_TEST_DIRNAME}/../../etc/argocd/platform-ops/alertmanager-config.ya
   run grep -F -- 'Trivy Operator Job Reconcile Errors' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- '{namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | controller=\"job\" | msg=\"Reconciler error\"' "${DASH}"
+  run grep -F -- '{namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | level=\"error\"' "${DASH}"
   [ "${status}" -eq 0 ]
+
+  run grep -F -- 'msg=\"Reconciler error\"' "${DASH}"
+  [ "${status}" -ne 0 ]
 
   run grep -F -- 'sum(increase(kube_job_status_failed{namespace=\"trivy-system\",job_name=~\"scan-.*\"}[30m]))' "${TRIVY_DASH}"
   [ "${status}" -eq 0 ]
