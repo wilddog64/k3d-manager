@@ -63,6 +63,12 @@ k3d-manager-v1.16.0
 …while the working branch is `k3d-manager-v1.18.0` and the values file it reads has been
 changed on that branch. There is no command that reports this. That is the bug.
 
+**Note (2026-07-24, after this spec was written):** Claude has since reapplied both
+ApplicationSets, so the live clusters now report `k3d-manager-v1.18.0` and this command no
+longer reproduces the drift. That does not change the task — the missing *detector* is the
+bug, and the drift will recur on the next release if nothing reports it. Do not try to
+reproduce the stale value, and do not touch a cluster to create one.
+
 ---
 
 ## Fix
@@ -356,9 +362,10 @@ cannot be read at all so an unreachable cluster cannot read as a pass.
 
 ## Out of Scope (do NOT fix here)
 
-1. **The ACG half is still on `k3d-manager-v1.16.0`.** `acg-kube-prometheus-stack`,
-   `acg-trivy-operator`, and `loki` still read stale values. Rolling that out is Claude's
-   live step and is deliberately not bundled with adding the detector.
+1. **The ACG rollout — already done by Claude on 2026-07-24.** `acg-kube-prometheus-stack`,
+   `acg-trivy-operator`, and `loki` now read `k3d-manager-v1.18.0`; all six Applications
+   are drift-free. That was Claude's live step and is deliberately not bundled with adding
+   the detector. Nothing for you to do here.
 2. **The ACG Application named `loki` is inconsistently named.** The `observability-acg`
    ApplicationSet names two elements `acg-kube-prometheus-stack` and `acg-trivy-operator`
    but the third just `loki`, so it sits next to the hub's `hub-loki` and is
