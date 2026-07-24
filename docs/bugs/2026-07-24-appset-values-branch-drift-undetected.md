@@ -296,17 +296,37 @@ a deviation means you changed something.
 
 ## Rules
 
-- `shellcheck -S warning scripts/plugins/argocd.sh` — **zero new warnings** (compare
-  against the pre-change run; the file may already have findings you did not introduce)
+- **Baseline first, before you edit anything:** run
+  `shellcheck -S warning scripts/plugins/argocd.sh` on the **unmodified** file and record
+  the finding count. Expected: `0`. You cannot prove "zero *new* warnings" without it.
+- `shellcheck -S warning scripts/plugins/argocd.sh` after the append — **zero new
+  warnings** relative to the baseline you just recorded
 - `bats scripts/tests/plugins/argocd_values_branch_drift.bats` — prints `1..5`, all pass.
   **Paste the `1..5` line.**
 - The existing argocd suites must not regress:
   `bats scripts/tests/plugins/argocd.bats scripts/tests/plugins/argocd_servicemonitors_ensure.bats`
 - `bash -n scripts/plugins/argocd.sh` — parses clean
-- Run `_agent_audit` before reporting done — capture its exit code on its **own line**,
-  never after `; echo`, and never through a pipe (`${PIPESTATUS[0]}` comes back empty
-  through `| tee` / `| tail`). **Report it as `rc=<n>`, not as its stdout** — quoting
-  `running under bash version …` is not evidence the gate passed.
+- **`_agent_audit` — you MUST `git add` the three target files BEFORE running it.**
+  Every check inside `_agent_audit` (`scripts/lib/agent_rigor.sh:44`) reads
+  `git diff --cached` / `git show :<file>` — **staged content only**. Run on an unstaged
+  tree it audits nothing, prints only the dispatcher banner, and returns 0. That is a
+  false green, not a pass. Correct order:
+
+  ```
+  git add scripts/plugins/argocd.sh \
+          scripts/tests/plugins/argocd_values_branch_drift.bats \
+          docs/api/functions.md
+  git diff --cached --name-only
+  ./scripts/k3d-manager _agent_audit
+  rc=$?
+  echo "rc=$rc"
+  ```
+
+  Capture the exit code on its **own line** — never after `; echo`, never through a pipe
+  (`${PIPESTATUS[0]}` comes back empty through `| tee` / `| tail`). **Report it as
+  `rc=<n>`, not as its stdout.** `running under bash version …` is the dispatcher's
+  startup banner, not audit output — quoting it is not evidence the gate ran.
+  Also paste the `git diff --cached --name-only` output: it must list exactly three files.
 
 ---
 
