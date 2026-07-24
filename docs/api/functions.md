@@ -31,6 +31,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `test_jenkins` | `scripts/lib/test.sh` | Run Jenkins smoke tests |
 | `test_jenkins_smoke` | `scripts/lib/test.sh` | Run full Jenkins smoke test suite |
 | `test_keycloak` | `scripts/plugins/keycloak.sh` | Run Keycloak smoke tests |
+| `keycloak_seed_smoke_user` | `scripts/plugins/keycloak.sh` | Seed the k3d-manager-owned `k3dm-smoke` Keycloak client + user (direct-access-grant enabled) and store the generated credential in the `identity/k3dm-smoke-user` Secret, so the health smoke can verify a real login without depending on app-owned client config; idempotent — re-run to restore after a realm reconcile (v1.17.0+) |
 | `test_cert_rotation` | `scripts/lib/test.sh` | Validate TLS certificate rotation |
 | `test_nfs_connectivity` | `scripts/lib/test.sh` | Check network connectivity to NFS |
 | `test_nfs_direct` | `scripts/lib/test.sh` | Directly mount NFS for troubleshooting |
@@ -49,6 +50,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `deploy_eso` | `scripts/plugins/eso.sh` | Deploy External Secrets Operator |
 | `deploy_argocd` | `scripts/plugins/argocd.sh` | Deploy ArgoCD |
 | `deploy_argocd_bootstrap` | `scripts/plugins/argocd.sh` | Bootstrap ArgoCD with initial apps |
+| `deploy_istio_ambient` | `scripts/plugins/istio_ambient.sh` | Deploy Istio ambient mesh on the app cluster via ArgoCD ApplicationSet; applies ztunnel + istio-cni with substrate-aware CNI directory configuration (Cilium or k3s flannel) (v1.16.0+) |
 | `deploy_keycloak` | `scripts/plugins/keycloak.sh` | Deploy Keycloak identity provider |
 | `deploy_jenkins` | `scripts/plugins/jenkins.sh` | Deploy Jenkins |
 | `deploy_ldap` | `scripts/plugins/ldap.sh` | Deploy OpenLDAP directory service |
@@ -88,7 +90,8 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `gemini_trigger_copilot_review` | `scripts/plugins/gemini.sh` | Trigger GitHub Copilot coding agent task via Playwright CDP automation |
 | `gemini_poll_task` | `scripts/plugins/gemini.sh` | Poll a Copilot coding agent task until complete; print full output verbatim |
 | `acg_extend_playwright` | `scripts/plugins/acg.sh` | Extend ACG sandbox TTL via Playwright automation (public dispatcher entry point for `_acg_extend_playwright`) |
-| `acg_check_ttl` | `scripts/lib/foundation/scripts/lib/acg/scripts/plugins/acg.sh` | Read ACG sandbox TTL via Playwright and print remaining minutes; returns -1 if unparseable |
+| `acg_restart` | `scripts/plugins/acg.sh` | Delete the expired ACG sandbox and start a fresh one via Playwright/CDP automation, then extract credentials; recovers from an expired sandbox with no manual clicks (v1.16.0+) |
+| `acg_check_ttl` | `scripts/lib/foundation/scripts/lib/acg/acg.sh` | Read ACG sandbox TTL via Playwright and print remaining minutes; returns -1 if unparseable |
 | `ssm_wait` | `scripts/plugins/ssm.sh` | Wait until an EC2 instance is registered and reachable via SSM (polls `ssm describe-instance-information`) |
 | `ssm_exec` | `scripts/plugins/ssm.sh` | Run a shell command on an EC2 instance via SSM `send-command`; prints command output/results after execution |
 | `ssm_tunnel` | `scripts/plugins/ssm.sh` | Open an SSM port-forward tunnel to an EC2 instance (wraps `aws ssm start-session --document-name AWS-StartPortForwardingSession`) |

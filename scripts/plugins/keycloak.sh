@@ -52,6 +52,11 @@ fi
 : "${KEYCLOAK_LDAP_USERS_DN:=ou=users,dc=home,dc=org}"
 : "${KEYCLOAK_REALM_NAME:=home}"
 : "${KEYCLOAK_REALM_DISPLAY_NAME:=Home}"
+: "${KEYCLOAK_MASTER_ADMIN_SECRET_NAME:=keycloak-secrets}"
+: "${KEYCLOAK_SMOKE_REALM:=shopping-cart}"
+: "${KEYCLOAK_SMOKE_CLIENT_ID:=k3dm-smoke}"
+: "${KEYCLOAK_SMOKE_USERNAME:=k3dm-smoke}"
+: "${KEYCLOAK_SMOKE_SECRET_NAME:=k3dm-smoke-user}"
 
 function deploy_keycloak() {
    if [[ "$1" == "-h" || "$1" == "--help" ]]; then
@@ -110,7 +115,7 @@ HELP
       fi
       local _admin_pw
       _admin_pw=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_ADMIN_SECRET_NAME" \
-         -o jsonpath="{.data.${KEYCLOAK_ADMIN_PASSWORD_KEY}}" | base64 -d)
+         -o jsonpath="{.data.${KEYCLOAK_ADMIN_PASSWORD_KEY}}" | base64 --decode)
       if [[ -z "${_admin_pw}" ]]; then
          _err "[keycloak] Secret '$KEYCLOAK_ADMIN_SECRET_NAME' has an empty '${KEYCLOAK_ADMIN_PASSWORD_KEY}'"
          return 1
@@ -246,8 +251,8 @@ function _keycloak_apply_realm_configmap() {
    trap '$(_cleanup_trap_command "$rendered")' RETURN
 
    local bind_dn bind_pw
-   bind_dn=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_LDAP_SECRET_NAME" -o jsonpath="{.data.${KEYCLOAK_LDAP_BINDDN_KEY}}" | base64 -d)
-   bind_pw=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_LDAP_SECRET_NAME" -o jsonpath="{.data.${KEYCLOAK_LDAP_PASSWORD_KEY}}" | base64 -d)
+   bind_dn=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_LDAP_SECRET_NAME" -o jsonpath="{.data.${KEYCLOAK_LDAP_BINDDN_KEY}}" | base64 --decode)
+   bind_pw=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_LDAP_SECRET_NAME" -o jsonpath="{.data.${KEYCLOAK_LDAP_PASSWORD_KEY}}" | base64 --decode)
 
    KEYCLOAK_LDAP_BIND_DN="$bind_dn" KEYCLOAK_LDAP_PASSWORD="$bind_pw" \
   envsubst '$KEYCLOAK_REALM_NAME $KEYCLOAK_REALM_DISPLAY_NAME $KEYCLOAK_LDAP_HOST $KEYCLOAK_LDAP_PORT $KEYCLOAK_LDAP_BASE_DN $KEYCLOAK_LDAP_USERS_DN $KEYCLOAK_LDAP_BIND_DN $KEYCLOAK_LDAP_PASSWORD' \
@@ -325,7 +330,7 @@ function _keycloak_remove_client_attribute() {
 
    local db_secret_name db_secret
    for db_secret_name in keycloak-secrets "$KEYCLOAK_ADMIN_SECRET_NAME"; do
-      db_secret=$(_kubectl -n "$ns" get secret "$db_secret_name" -o jsonpath="{.data.KC_DB_PASSWORD}" 2>/dev/null | base64 -d 2>/dev/null || true)
+      db_secret=$(_kubectl -n "$ns" get secret "$db_secret_name" -o jsonpath="{.data.KC_DB_PASSWORD}" 2>/dev/null | base64 --decode 2>/dev/null || true)
       if [[ -n "$db_secret" ]]; then
          break
       fi
@@ -353,6 +358,174 @@ psql -U keycloak -d keycloak -v ON_ERROR_STOP=1 -c "delete from client_attribute
 KEYCLOAK_PSQL
 
    _info "[keycloak] Removed client attribute '$attribute_name' from '$client_id' in realm '$realm_name' if present"
+}
+
+function _keycloak_smoke_base_url() {
+   if [[ -n "${KEYCLOAK_BASE_URL:-}" ]]; then
+      printf '%s' "$KEYCLOAK_BASE_URL"
+   elif [[ "${CLUSTER_PROVIDER:-}" == "k3s-hostinger" ]]; then
+      printf '%s' "https://keycloak.3ai-talk.org"
+   else
+      printf '%s' "http://keycloak.shopping-cart.local"
+   fi
+}
+
+function _keycloak_smoke_admin_token() {
+   local base_url="$1" ns="$2" admin_secret="$3" wd="$4"
+   local admin_user admin_pass
+   admin_user=$(_kubectl --no-exit -n "$ns" get secret "$admin_secret" -o jsonpath='{.data.KEYCLOAK_ADMIN}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+   admin_pass=$(_kubectl --no-exit -n "$ns" get secret "$admin_secret" -o jsonpath='{.data.KEYCLOAK_ADMIN_PASSWORD}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+   if [[ -z "$admin_user" || -z "$admin_pass" ]]; then
+      _warn "[keycloak] master admin creds not found in secret '$admin_secret'; skipping smoke seed"
+      return 0
+   fi
+   printf '%s' "$admin_user" > "$wd/u"
+   printf '%s' "$admin_pass" > "$wd/p"
+   _curl -sf \
+      --data-urlencode grant_type=password \
+      --data-urlencode client_id=admin-cli \
+      --data-urlencode "username@$wd/u" \
+      --data-urlencode "password@$wd/p" \
+      "${base_url}/realms/master/protocol/openid-connect/token" \
+      | jq -r '.access_token // empty' 2>/dev/null || true
+}
+
+function _keycloak_smoke_ensure_client() {
+   local base_url="$1" token="$2" realm="$3" client_id="$4"
+   local client_uuid
+   client_uuid=$(_curl -sf -H "Authorization: Bearer ${token}" \
+      "${base_url}/admin/realms/${realm}/clients?clientId=${client_id}" \
+      | jq -r '.[0].id // empty' 2>/dev/null || true)
+   if [[ -n "$client_uuid" ]]; then
+      return 0
+   fi
+   if ! _curl -sf -X POST \
+         -H "Authorization: Bearer ${token}" \
+         -H "Content-Type: application/json" \
+         --data-binary "$(jq -n --arg cid "$client_id" '{clientId:$cid, enabled:true, protocol:"openid-connect", publicClient:true, directAccessGrantsEnabled:true, standardFlowEnabled:false, serviceAccountsEnabled:false}')" \
+         "${base_url}/admin/realms/${realm}/clients" >/dev/null; then
+      return 1
+   fi
+   _info "[keycloak] created smoke client '${client_id}' in realm '${realm}'"
+   return 0
+}
+
+function _keycloak_smoke_ensure_user() {
+   local base_url="$1" token="$2" realm="$3" username="$4"
+   local user_uuid
+   user_uuid=$(_curl -sf -H "Authorization: Bearer ${token}" \
+      "${base_url}/admin/realms/${realm}/users?username=${username}&exact=true" \
+      | jq -r '.[0].id // empty' 2>/dev/null || true)
+   if [[ -z "$user_uuid" ]]; then
+      if ! _curl -sf -X POST \
+            -H "Authorization: Bearer ${token}" \
+            -H "Content-Type: application/json" \
+            --data-binary "$(jq -n --arg u "$username" '{username:$u, enabled:true, emailVerified:true, email:($u + "@k3dm.local"), firstName:$u, lastName:"smoke", requiredActions:[]}')" \
+            "${base_url}/admin/realms/${realm}/users" >/dev/null; then
+         return 1
+      fi
+      user_uuid=$(_curl -sf -H "Authorization: Bearer ${token}" \
+         "${base_url}/admin/realms/${realm}/users?username=${username}&exact=true" \
+         | jq -r '.[0].id // empty' 2>/dev/null || true)
+   fi
+   if [[ -n "$user_uuid" ]]; then
+      if ! _curl -sf -X PUT \
+            -H "Authorization: Bearer ${token}" \
+            -H "Content-Type: application/json" \
+            --data-binary "$(jq -n --arg u "$username" '{enabled:true, emailVerified:true, email:($u + "@k3dm.local"), firstName:$u, lastName:"smoke", requiredActions:[]}')" \
+            "${base_url}/admin/realms/${realm}/users/${user_uuid}" >/dev/null; then
+         return 1
+      fi
+   fi
+   printf '%s' "$user_uuid"
+}
+
+function _keycloak_smoke_set_password() {
+   local base_url="$1" token="$2" realm="$3" uuid="$4" password="$5" wd="$6"
+   jq -n --arg p "$password" '{type:"password", value:$p, temporary:false}' > "$wd/reset.json"
+   if ! _curl -sf -X PUT \
+         -H "Authorization: Bearer ${token}" \
+         -H "Content-Type: application/json" \
+         --data-binary "@$wd/reset.json" \
+         "${base_url}/admin/realms/${realm}/users/${uuid}/reset-password" >/dev/null; then
+      return 1
+   fi
+   return 0
+}
+
+function _keycloak_smoke_write_secret() {
+   local ns="$1" secret_name="$2" username="$3" password="$4" wd="$5"
+   printf '%s' "$username" > "$wd/uname"
+   printf '%s' "$password" > "$wd/pword"
+   _kubectl -n "$ns" create secret generic "$secret_name" \
+      --from-file=username="$wd/uname" \
+      --from-file=password="$wd/pword" \
+      --dry-run=client -o yaml | _kubectl apply -f - >/dev/null
+}
+
+function keycloak_seed_smoke_user() {
+   if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+      cat <<'HELP'
+Usage: keycloak_seed_smoke_user
+
+Idempotently seed a dedicated smoke client + local user in the app realm so the
+login smoke test (make status) can prove real realm-user auth without touching the
+app-owned 'frontend' client. Warns and returns 0 if Keycloak or the app realm is
+not reachable.
+HELP
+      return 0
+   fi
+
+   local realm="${KEYCLOAK_SMOKE_REALM:-shopping-cart}"
+   local client_id="${KEYCLOAK_SMOKE_CLIENT_ID:-k3dm-smoke}"
+   local username="${KEYCLOAK_SMOKE_USERNAME:-k3dm-smoke}"
+   local secret_name="${KEYCLOAK_SMOKE_SECRET_NAME:-k3dm-smoke-user}"
+   local ns="${KEYCLOAK_NAMESPACE:-identity}"
+   local admin_secret="${KEYCLOAK_MASTER_ADMIN_SECRET_NAME:-keycloak-secrets}"
+
+   local wd
+   wd=$(mktemp -d -t kc-smoke.XXXXXX)
+   trap 'rm -rf "$wd"' RETURN
+
+   local base_url token
+   base_url=$(_keycloak_smoke_base_url)
+   token=$(_keycloak_smoke_admin_token "$base_url" "$ns" "$admin_secret" "$wd")
+   if [[ -z "$token" ]]; then
+      _warn "[keycloak] could not mint master admin token at ${base_url}; skipping smoke seed"
+      return 0
+   fi
+
+   if ! _curl -sf -o /dev/null -H "Authorization: Bearer ${token}" \
+        "${base_url}/admin/realms/${realm}"; then
+      _warn "[keycloak] realm '${realm}' not present yet; skipping smoke seed"
+      return 0
+   fi
+
+   local password
+   password=$(_kubectl --no-exit -n "$ns" get secret "$secret_name" -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+   if [[ -z "$password" ]]; then
+      password=$(openssl rand -hex 24)
+   fi
+
+   if ! _keycloak_smoke_ensure_client "$base_url" "$token" "$realm" "$client_id"; then
+      _warn "[keycloak] failed to create smoke client '${client_id}'"
+      return 0
+   fi
+
+   local user_uuid
+   user_uuid=$(_keycloak_smoke_ensure_user "$base_url" "$token" "$realm" "$username")
+   if [[ -z "$user_uuid" ]]; then
+      _warn "[keycloak] smoke user '${username}' not resolvable after create; skipping"
+      return 0
+   fi
+
+   if ! _keycloak_smoke_set_password "$base_url" "$token" "$realm" "$user_uuid" "$password" "$wd"; then
+      _warn "[keycloak] failed to set smoke user password"
+      return 0
+   fi
+
+   _keycloak_smoke_write_secret "$ns" "$secret_name" "$username" "$password" "$wd"
+   _info "[keycloak] smoke user '${username}' seeded in realm '${realm}' (secret ${ns}/${secret_name})"
 }
 
 function test_keycloak() {

@@ -422,7 +422,6 @@ HELP
    fi
 
    local enable_ldap=1  # Default to smart enabled
-   local enable_vault=1 # Default to smart enabled
    # ... option parsing ...
 
    # 2. Helm Installation
@@ -571,47 +570,6 @@ function _argocd_configure_vault_eso() {
    fi
 
    _info "[argocd] Vault/ESO integration configured"
-}
-
-function _argocd_configure_post_deploy() {
-   local enable_vault="$1"
-   local enable_ldap="$2"
-   local skip_istio="$3"
-   local enable_bootstrap="$4"
-   local skip_appproject="$5"
-   local skip_applicationsets="$6"
-
-   if (( enable_vault )); then
-      _argocd_configure_vault_eso "$enable_ldap"
-   fi
-
-   if (( ! skip_istio )); then
-      _info "[argocd] Creating Istio VirtualService"
-      envsubst < "$ARGOCD_CONFIG_DIR/virtualservice.yaml.tmpl" | _kubectl apply -f - >/dev/null
-      _info "[argocd] Argo CD UI accessible at: https://$ARGOCD_VIRTUALSERVICE_HOST"
-   fi
-
-   if (( enable_bootstrap )); then
-      _info "[argocd] Deploying GitOps bootstrap resources"
-      _argocd_deploy_image_updater
-      if (( ! skip_appproject )); then
-         _argocd_deploy_appproject
-      fi
-      if (( ! skip_applicationsets )); then
-         _argocd_deploy_applicationsets
-      fi
-      _info "[argocd] Bootstrap deployment complete!"
-      _info "[argocd] View AppProjects: kubectl -n $ARGOCD_NAMESPACE get appproject"
-      _info "[argocd] View ApplicationSets: kubectl -n $ARGOCD_NAMESPACE get applicationset"
-      _info "[argocd] View Applications: kubectl -n $ARGOCD_NAMESPACE get application"
-   fi
-
-   _info "[argocd] Deployment complete!"
-   if (( enable_vault )); then
-      _info "[argocd] Retrieve admin password: kubectl -n $ARGOCD_NAMESPACE get secret $ARGOCD_ADMIN_SECRET_NAME -o jsonpath='{.data.password}' | base64 -d"
-   else
-      _info "[argocd] Retrieve initial admin password: kubectl -n $ARGOCD_NAMESPACE get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d"
-   fi
 }
 
 function _argocd_seed_vault_admin_secret() {
