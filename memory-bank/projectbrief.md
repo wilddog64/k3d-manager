@@ -41,8 +41,9 @@ and two functions — nothing else changes.
 |--------------------|---------------|--------|
 | `k3s-aws`          | `k3s_aws`     | Active (AWS ACG sandbox via CloudFormation + k3sup) |
 | `k3d`              | `k3d`         | Active (local Docker-based) |
+| `k3s`              | `k3s`         | Active (Linux bare-metal, systemd-based) |
 | `orbstack`         | `orbstack`    | Active (local OrbStack VM) |
-| `k3s-oci`          | `k3s_oci`     | Active (OCI Always Free; single-node + two-node; shipped v1.5.0) |
+| `k3s-oci`          | `k3s_oci`     | **DE-SCOPED** — code shipped v1.5.0 but no Always-Free instance was ever obtained; do not invest further effort |
 | `k3s-gcp`          | `k3s_gcp`     | Active (GCP ACG sandbox via GCE + k3sup; shipped v1.1.0) |
 | `k3s-az`           | `k3s_az`      | Active (Azure ACG sandbox via CloudFormation + k3sup; shipped v1.6.5) |
 | `k3s-hostinger`    | `k3s_hostinger` | Active (permanent app cluster on Hostinger KVM2 VPS via SSH/k3sup; shipped v1.7.0) |
