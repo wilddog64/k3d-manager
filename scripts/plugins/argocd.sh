@@ -1426,3 +1426,68 @@ EOF
    _info "[argocd]   kubectl patch secret platform-ops-notifications -n platform-ops --type=merge \\"
    _info "[argocd]     -p '{\"data\":{\"slack-incoming-webhook-url\":\"<base64-url>\"}}'"
 }
+
+function argocd_check_values_branch() {
+   local _expected="${1:-${K3D_MANAGER_BRANCH:-}}"
+   local _context="${2:-k3d-k3d-cluster}"
+   local _namespace="${ARGOCD_NAMESPACE:-cicd}"
+   local _apps
+   local _drift
+
+   if [[ -z "${_expected}" ]]; then
+      _expected="$(git -C "${SCRIPT_DIR}/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo main)"
+   fi
+
+   _apps="$(_kubectl get application -n "${_namespace}" --context "${_context}" -o json 2>/dev/null)"
+   if [[ -z "${_apps}" ]]; then
+      _warn "[argocd] Could not read Applications from ${_context}/${_namespace}"
+      return 2
+   fi
+
+   _info "[argocd] Expected values branch: ${_expected}"
+   _drift="$(printf '%s' "${_apps}" | _argocd_values_branch_drift "${_expected}")"
+
+   if [[ -z "${_drift}" ]]; then
+      _info "[argocd] All Applications reference values branch ${_expected}"
+      return 0
+   fi
+
+   _warn "[argocd] Applications on a stale values branch:"
+   printf '%s\n' "${_drift}" >&2
+   _warn "[argocd] Fix: reapply the ApplicationSets with K3D_MANAGER_BRANCH=${_expected}"
+   return 1
+}
+
+function _argocd_values_branch_drift() {
+   local _expected="$1"
+   local _repo="https://github.com/wilddog64/k3d-manager"
+
+   python3 -c '
+import json
+import sys
+
+expected = sys.argv[1]
+repo = sys.argv[2]
+
+try:
+    doc = json.load(sys.stdin)
+except ValueError:
+    sys.exit(3)
+
+checked = 0
+for app in doc.get("items", []):
+    spec = app.get("spec", {})
+    sources = spec.get("sources") or ([spec["source"]] if "source" in spec else [])
+    for src in sources:
+        if src.get("ref") != "values":
+            continue
+        if repo not in src.get("repoURL", ""):
+            continue
+        checked += 1
+        revision = src.get("targetRevision", "")
+        if revision != expected:
+            print("  {} {}".format(app.get("metadata", {}).get("name", "?"), revision))
+
+print("[argocd] checked {} values references".format(checked), file=sys.stderr)
+' "${_expected}" "${_repo}"
+}

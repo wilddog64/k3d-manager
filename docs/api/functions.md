@@ -50,6 +50,7 @@ Use `-h` or `--help` with any function for a brief usage message:
 | `deploy_eso` | `scripts/plugins/eso.sh` | Deploy External Secrets Operator |
 | `deploy_argocd` | `scripts/plugins/argocd.sh` | Deploy ArgoCD |
 | `deploy_argocd_bootstrap` | `scripts/plugins/argocd.sh` | Bootstrap ArgoCD with initial apps |
+| `argocd_check_values_branch` | `scripts/plugins/argocd.sh` | Report ArgoCD Applications whose `$values` source `targetRevision` has drifted from the expected k3d-manager branch; returns 1 on drift, 2 if Applications cannot be read (v1.18.0+) |
 | `deploy_istio_ambient` | `scripts/plugins/istio_ambient.sh` | Deploy Istio ambient mesh on the app cluster via ArgoCD ApplicationSet; applies ztunnel + istio-cni with substrate-aware CNI directory configuration (Cilium or k3s flannel) (v1.16.0+) |
 | `deploy_keycloak` | `scripts/plugins/keycloak.sh` | Deploy Keycloak identity provider |
 | `deploy_jenkins` | `scripts/plugins/jenkins.sh` | Deploy Jenkins |
