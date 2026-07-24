@@ -5,6 +5,14 @@
 
 ---
 
+## Before You Start
+
+1. `git pull origin k3d-manager-v1.17.0` — get the latest branch state (this spec + prior spec-5 work).
+2. Read `memory-bank/activeContext.md` and `memory-bank/progress.md` — the live-smoke findings that produced this bug.
+3. Read `scripts/plugins/keycloak.sh` around `_keycloak_smoke_ensure_user` (currently lines 413–432) so the old block matches exactly before you edit.
+
+---
+
 ## Problem
 
 The spec-5 smoke user seed (`647b4181`) creates the `k3dm-smoke` user with only
