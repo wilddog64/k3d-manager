@@ -115,7 +115,7 @@ HELP
       fi
       local _admin_pw
       _admin_pw=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_ADMIN_SECRET_NAME" \
-         -o jsonpath="{.data.${KEYCLOAK_ADMIN_PASSWORD_KEY}}" | base64 -d)
+         -o jsonpath="{.data.${KEYCLOAK_ADMIN_PASSWORD_KEY}}" | base64 --decode)
       if [[ -z "${_admin_pw}" ]]; then
          _err "[keycloak] Secret '$KEYCLOAK_ADMIN_SECRET_NAME' has an empty '${KEYCLOAK_ADMIN_PASSWORD_KEY}'"
          return 1
@@ -251,8 +251,8 @@ function _keycloak_apply_realm_configmap() {
    trap '$(_cleanup_trap_command "$rendered")' RETURN
 
    local bind_dn bind_pw
-   bind_dn=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_LDAP_SECRET_NAME" -o jsonpath="{.data.${KEYCLOAK_LDAP_BINDDN_KEY}}" | base64 -d)
-   bind_pw=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_LDAP_SECRET_NAME" -o jsonpath="{.data.${KEYCLOAK_LDAP_PASSWORD_KEY}}" | base64 -d)
+   bind_dn=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_LDAP_SECRET_NAME" -o jsonpath="{.data.${KEYCLOAK_LDAP_BINDDN_KEY}}" | base64 --decode)
+   bind_pw=$(_kubectl -n "$KEYCLOAK_NAMESPACE" get secret "$KEYCLOAK_LDAP_SECRET_NAME" -o jsonpath="{.data.${KEYCLOAK_LDAP_PASSWORD_KEY}}" | base64 --decode)
 
    KEYCLOAK_LDAP_BIND_DN="$bind_dn" KEYCLOAK_LDAP_PASSWORD="$bind_pw" \
   envsubst '$KEYCLOAK_REALM_NAME $KEYCLOAK_REALM_DISPLAY_NAME $KEYCLOAK_LDAP_HOST $KEYCLOAK_LDAP_PORT $KEYCLOAK_LDAP_BASE_DN $KEYCLOAK_LDAP_USERS_DN $KEYCLOAK_LDAP_BIND_DN $KEYCLOAK_LDAP_PASSWORD' \
@@ -330,7 +330,7 @@ function _keycloak_remove_client_attribute() {
 
    local db_secret_name db_secret
    for db_secret_name in keycloak-secrets "$KEYCLOAK_ADMIN_SECRET_NAME"; do
-      db_secret=$(_kubectl -n "$ns" get secret "$db_secret_name" -o jsonpath="{.data.KC_DB_PASSWORD}" 2>/dev/null | base64 -d 2>/dev/null || true)
+      db_secret=$(_kubectl -n "$ns" get secret "$db_secret_name" -o jsonpath="{.data.KC_DB_PASSWORD}" 2>/dev/null | base64 --decode 2>/dev/null || true)
       if [[ -n "$db_secret" ]]; then
          break
       fi
@@ -373,8 +373,8 @@ function _keycloak_smoke_base_url() {
 function _keycloak_smoke_admin_token() {
    local base_url="$1" ns="$2" admin_secret="$3" wd="$4"
    local admin_user admin_pass
-   admin_user=$(_kubectl --no-exit -n "$ns" get secret "$admin_secret" -o jsonpath='{.data.KEYCLOAK_ADMIN}' 2>/dev/null | base64 -d 2>/dev/null || true)
-   admin_pass=$(_kubectl --no-exit -n "$ns" get secret "$admin_secret" -o jsonpath='{.data.KEYCLOAK_ADMIN_PASSWORD}' 2>/dev/null | base64 -d 2>/dev/null || true)
+   admin_user=$(_kubectl --no-exit -n "$ns" get secret "$admin_secret" -o jsonpath='{.data.KEYCLOAK_ADMIN}' 2>/dev/null | base64 --decode 2>/dev/null || true)
+   admin_pass=$(_kubectl --no-exit -n "$ns" get secret "$admin_secret" -o jsonpath='{.data.KEYCLOAK_ADMIN_PASSWORD}' 2>/dev/null | base64 --decode 2>/dev/null || true)
    if [[ -z "$admin_user" || -z "$admin_pass" ]]; then
       _warn "[keycloak] master admin creds not found in secret '$admin_secret'; skipping smoke seed"
       return 0
@@ -502,7 +502,7 @@ HELP
    fi
 
    local password
-   password=$(_kubectl --no-exit -n "$ns" get secret "$secret_name" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null || true)
+   password=$(_kubectl --no-exit -n "$ns" get secret "$secret_name" -o jsonpath='{.data.password}' 2>/dev/null | base64 --decode 2>/dev/null || true)
    if [[ -z "$password" ]]; then
       password=$(openssl rand -hex 24)
    fi
