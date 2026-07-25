@@ -1,296 +1,142 @@
-# Active Context — k3d-manager
+# Active Context — lib-foundation
 
-## Status
-v1.14.0 RELEASED 2026-07-12 · v1.15.0 RELEASED 2026-07-14 · **v1.16.0 active branch — Istio ambient mesh**.
+## Current State: `feat/v0.4.4` (as of 2026-07-13)
 
-> Verbose per-item narrative (full gate dumps, live-verify logs, retracted-diagnosis trails) archived 2026-07-19 → `memory-bank/archive/activeContext-v1.16.0-detail-thru-2026-07-19.md`. Earlier windows: `activeContext-v1.8.0-v1.15.0.md`, `-v1.6.x-v1.7.1.md`, `-v1.4.2-v1.4.8.md`.
+**v0.4.4 js-yaml advisory fix COMPLETE (Codex, 2026-07-13):** Dependabot advisory **GHSA-h67p-54hq-rp68** is fixed on `origin/feat/v0.4.4` by commit **`db9f5b2`** (`fix(acg): bump js-yaml to 3.15.0 to close DoS advisory GHSA-h67p-54hq-rp68`). Scope held to the exact 2 files from `docs/plans/v0.4.4-bugfix-js-yaml-dos.md`: `scripts/lib/acg/package-lock.json` now updates the dev-only transitive `js-yaml` node `3.14.2` → `3.15.0` with the expected 3-line lockfile diff only (`version`/`resolved`/`integrity`), and `CHANGE.md` adds the `### Security` note under `[Unreleased]`. `scripts/lib/acg/package.json` remained unchanged. Validation passed with `npm ci --prefix scripts/lib/acg` and `npm audit --prefix scripts/lib/acg` (`found 0 vulnerabilities`). Repo proof gates also passed: clean-env BATS `scripts/tests/lib/system.bats scripts/tests/lib/core.bats scripts/tests/lib/agent_rigor.bats` (`1..69`, all pass) and `AGENT_AUDIT_MAX_IF=8 bash scripts/lib/agent_rigor.sh scripts/lib/system.sh` (exit 0). **Follow-up remains Claude’s:** patch release/tag, then subtree-pull into `k3d-manager` to clear the downstream Dependabot alert.
 
-## Standing constraints (IN EFFECT)
-- **Hostinger is the DEFAULT permanent host; the ACG AWS sandbox (`k3s-aws`) is the e2e test rig** (user, 2026-07-19). Current sprint focus: get `k3s-aws` green in the sandbox (reproducible proof of the ambient mesh) before un-parking hostinger — hostinger is not deprecated, just not the active debugging target this sprint.
-- **Spec before implement** — Claude does NOT edit plugin/config/app code directly; write a `docs/bugs/` spec for Codex (exception: `gcp.sh` exact-match). Memory-bank editing IS Claude's own job (mandatory + immediate after every completed action, both files).
-- **Verify before trust** — never trust a SHA/BATS/"done"; confirm on `origin/<branch>` via `gh`/`git log`. Code commit = spec files only; memory-bank in a SEPARATE commit.
-- **False-pass trap:** always capture the exit code of the command under test on its OWN line (never after `; echo`). For `make up`/`down`, read `UP_EXIT=`/`DOWN_EXIT=` in the log — the wrapper block always exits 0.
-- Branch always `k3d-manager-v<version>`; never commit to `main`; no `--no-verify`; route privileged cmds through `_run_command`. Never blind-close warm CDP tabs (cold nav → Cloudflare challenge). Never create a hub `environment=infra` cluster Secret without the owner decision (below). Vault reads are user-only via `! ./bin/vault-exec …`.
+**v0.4.3 SHIPPED — PR #35 squash-merged to main (`b7d08b3`, 2026-07-07).** ACG session-check render-race false-negative fix. Post-merge done: main fast-forwarded, release stamped `## [v0.4.3] — 2026-07-07` in CHANGE.md via direct-to-main commit `5a9bfbe` (matches v0.4.0–v0.4.2 pattern), **TAGGED v0.4.3** (annotated tag at `5a9bfbe`; GitHub release published https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.3), `feat/v0.4.4` cut from the stamp commit, retro `docs/retro/2026-07-07-v0.4.3-retrospective.md` written. No branch protection on main → no enforce_admins to restore. **Downstream: k3d-manager subtree-pulled v0.4.3** into `scripts/lib/foundation/` (merge `f39b2282`, squash split `8cd7cee5`, `0ce4d0b8..5a9bfbe0`) on branch `k3d-manager-v1.14.0`, pushed; parallel-`anyVisible` + v0.4.3 changelog verified present in the subtree copy. **Follow-up still open:** `gcp_login.js:157` latent no-op `disconnect()` → `close()` in a separate change. Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]].
 
-## Current live cluster state (2026-07-19) — FRESH-REBUILD e2e PASS for `64168cc7`
-Full `make down` (`DOWN_EXIT=0`, hub + CFN stack deleted) → `make up CLUSTER_PROVIDER=k3s-aws` (`UP_EXIT=0`, exit on own line) on a brand-new sandbox (acct `739527292320`). Fresh hub `k3d-cluster` on **v1.32.0+k3s1**; `_argocd_deploy_appproject` deployed BOTH `platform` + `shopping-cart` AppProjects. `ubuntu-k3s` spoke: 3 nodes Ready.
-- **`64168cc7` proven live WITHOUT any manual patch** (fresh hub rendered the committed template): the `shopping-cart` AppProject now permits `secrets` for all 4 clusters; `secrets/Service/vault-bridge` = **Synced** (was `SyncFailed: namespace secrets is not permitted` pre-fix); `ubuntu-k3s-data-layer` = **Synced/Healthy**; all 7 data-layer pods 1/1 (minio, postgresql-orders/payment/products, rabbitmq, redis-cart, redis-orders-cache); full app tier 1/1 (basket/frontend/order/product-catalog in `shopping-cart-apps` + payment in `shopping-cart-payment`). Step 10b took the early-exit ("StatefulSets already ready") because ArgoCD had already synced the data-layer. The ephemeral AppProject patch is now retired — permanent fix confirmed end-to-end.
+### v0.4.3 history (feat/v0.4.3, shipped)
 
-## OPEN blockers
-1. **Ambient k3s-aws cold-rebuild blocker is CLOSED, `acg_restart` is wired, and tmp-hygiene code fixes are now landed (2026-07-20).** `ce4d83f0` (istio-cni CNI paths), `bca7d59a` (default `K3S_AMBIENT_MESH=true` on k3s-aws), `5be42ae4` (pin k3sup version), and **`520621a9` (replace both `(( var++ ))` wait-loop post-increments with assignment form so `set -e` no longer aborts the first SSM/node-ready iteration)** are all on `k3d-manager-v1.16.0`, and the former manual-sandbox-restart regression is fixed end-to-end: upstream lib-foundation commit **`03312ae`** on `origin/feat/v0.4.5` adds `_acg_restart_playwright` + `acg_restart`, the subtree pull landed as **`78af86e8`**, and the local dispatcher stub landed as **`4332431f`**. Claude already proved the orphaned `acg_restart.js` recovered a dead sandbox with zero manual clicks, and the cold rebuild plus ambient dataplane verify are complete (`DOWN_RC=0`, `UP_RC=0`, Cilium/istio green, HBONE+mTLS capture PASS). **TMP-HYGIENE follow-through is now code-complete too:** upstream lib-foundation commit **`84d5b27`** on `origin/feat/v0.4.6` adds `_acg_sweep_stale_artifacts` plus the two wrapper call sites; the subtree pull landed as **`381cdf03`** on `k3d-manager-v1.16.0` with scope gate `git diff --stat HEAD~1 -- . ':(exclude)scripts/lib/foundation'` → EMPTY; and local trap guards for the six bare-`mktemp` sites landed as **`319762b9`**. Prior live tmp diagnosis still stands: 54 stale `/private/tmp` entries were swept on 2026-07-20 (44 `playwright-artifacts-*` + 10 `tmp.*`, all >24h; 32 within-24h kept; operator files untouched). Remaining follow-up is operational verification on future real runs/interrupts; no code blocker remains. **lib-foundation PR #37 MERGED** 2026-07-21 (`feat/v0.4.6` → `main`, merge commit `db336a6f`) — bundled `03312ae` (acg_restart wiring) + `84d5b27` (artifact sweep) + CI-fix `1c0dc51` (SC2119/2120) + Copilot-fix `330083b` (TMPDIR=/ guard + set -e-safe node exit) + issue doc `4a537c9`; cleared the feat/v0.4.5 upstream debt. **Released as lib-foundation v0.4.6** (2026-07-21): stamp commit `ae4616f` on main (`docs(changelog): stamp v0.4.6 release header`), annotated tag `v0.4.6`→`ae4616f`, GitHub release marked Latest — https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.6 (v0.4.5 folded in, never separately tagged). **Follow-up PR #38 OPEN** (`feat/v0.4.7` → `main`, https://github.com/wilddog64/lib-foundation/pull/38, tip `f45c464`) — the documented out-of-scope follow-up: `acg_check_ttl` (was `acg.sh:517`) had the same pre-existing `output=$(...)`/`$?` set -e pattern; fixed to `|| exit_code=$?` matching the sibling wrappers. **PR #38 MERGED 2026-07-23 (merge commit `a36cf79` on main); released as lib-foundation v0.4.7** (stamp `21fdb9b`, tag `v0.4.7`→`21fdb9b`, GitHub release Latest — https://github.com/wilddog64/lib-foundation/releases/tag/v0.4.7). **Subtree pull DONE (owner-chosen order):** `K3DM_SUBTREE_SYNC=1 git subtree pull --prefix=scripts/lib/foundation lib-foundation v0.4.7 --squash` landed on `k3d-manager-v1.16.0` (ort, no conflicts); CLAUDE-VERIFIED vendored `scripts/lib/foundation/scripts/lib/acg/acg.sh` = IDENTICAL to `git show v0.4.7:scripts/lib/acg/acg.sh`, fix at line 516, CHANGE.md top `[v0.4.7]`. v1.16.0 now carries the full merged lib-foundation state; next = create the v1.16.0 release PR.
+**[x] COMPLETE (Claude applied directly, 2026-07-07) — commit `d803a00` on `origin/feat/v0.4.3`. 4 files: Change 4 = `tests/providers/acg_session_check.test.js` mock gains `waitForLoadState` so `_main`'s new `networkidle` settle doesn't crash the two existing tests (spec gap Codex correctly flagged mid-task rather than silently expanding scope; spec amended in `92180ee` to list the 4th file). Gates green (`node --check acg_session_check.js`, `npm run check`, `npm test` 15/15); regression proven — reverting only Change 1 turns the `attempts:4` test red while `attempts:1` stays green. **PR #35 OPEN** (main ← feat/v0.4.3), CHANGE.md stamped under `[Unreleased]` (`d84937d`). Copilot raised 4 threads (3× worst-case probe timing, 1× `.catch` can't catch a sync `TypeError` on a mock lacking `waitForLoadState`): timing **fixed** by parallelizing `anyVisible` with early-return so each attempt is bounded by one `perSelectorTimeoutMs` (`487b2f9`, npm test still 15/15); the `.catch` one resolved by-design (real Page always has the method; the mock was fixed by Change 4). All 4 threads replied + resolved; findings doc `docs/issues/2026-07-07-copilot-pr35-review-findings.md` (`fa291b2`). CI green. enforce_admins disabled for merge. NEXT: user merges PR #35, then tag v0.4.3 + subtree-pull into k3d-manager `scripts/lib/foundation/`. — ACG session check false-negatives on a slow-rendering sandbox page:** `docs/bugs/2026-07-07-acg-session-check-render-race-false-negative.md`, branch `feat/v0.4.3`. Diagnosed live from a `CLUSTER_PROVIDER=k3s-aws make up` run that reused an already-signed-in CDP browser yet still prompted `ACTION REQUIRED: Please log into Pluralsight`. Tab 0 was already at `SANDBOX_URL` and logged in; probing the six `LOGGED_IN_SELECTORS` moments later showed `Cloud Sandboxes`/`Open Sandbox` VISIBLE — so selectors + session are fine. Root cause = render-timing race: `acg_session_check.js` navigates with `waitUntil:'domcontentloaded'` (fires before the SPA paints), swallows nav failure with `.catch(()=>{})`, then runs the **single-shot** `pageLooksLoggedIn` (1.5s/selector, no retry) → all six miss on a not-yet-painted page → false logged-out. Creds unset so headless auto-login was skipped → dropped to manual prompt. Fix (3 files): `pageLooksLoggedIn` gains a backward-compatible `{attempts,perSelectorTimeoutMs,settleMs}` retry loop; `acg_session_check.js` waits for `networkidle` + retries the initial probe with `{attempts:4}` and logs (not swallows) nav failure; jest regression test proves single-shot misses a slow render and retry detects it. NO selector or credential-gating changes. Commit msg: `fix(acg): retry logged-in detection to stop session-check render-race false negative`. Gates: `node --check scripts/lib/acg/acg_session_check.js` (NOT covered by `npm run check`), `npm run check`, `npm test`. Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]].
 
-## Hub Grafana "ArgoCD Apps & Image Updater Hub" No-data — LIVE-FIXED 2026-07-23, durable git fix landed
-Owner reported the dashboard all "No data" + a frontend login error. **Two independent hub issues, NOT the v1.16.0 release (unmerged).**
-- **Grafana root cause:** hub Prometheus healthy (52 targets) but scraped **no `argocd` job** (`argocd_app_info`=0) — the argocd Helm release (rev 1, 2026-07-20) has `metrics.serviceMonitor.enabled: true` + `release: kube-prometheus-stack` label yet **zero argocd ServiceMonitors existed**; and **argocd-image-updater was never deployed** on this hub (defined at `scripts/etc/argocd/image-updater/kustomization.yaml`, deployed only by `_argocd_deploy_image_updater` argocd.sh:1138 in `deploy_argocd`'s bootstrap branch, argocd.sh:552 — not exercised here). `ghcr-pull-secret` absent in cicd.
-- **LIVE FIX (owner: "do 2 and 3" = run live + spec):** (a) `kubectl apply -k scripts/etc/argocd/image-updater/` → deployment `2/2 Running`; (b) full `helm upgrade` FAILED on field-ownership conflict (argocd-cm/rbac-cm `.data.oidc.config`/`url`/`policy.csv`/`scopes` owned by kubectl-patch — do NOT force, would clobber OIDC/RBAC), so instead rendered ONLY the SMs: `helm template argocd argo/argo-cd --version 10.1.4 -f <helm get values> --api-versions monitoring.coreos.com/v1 | yq 'select(.kind=="ServiceMonitor")' | kubectl apply`. **VERIFIED:** 4 argocd SMs created, 4 targets `up=1`, `argocd_app_info` 0→**40 series**, image-updater `ready=1/desired=1`. Panels populate on refresh (rate panels need a few min history). NOT durable across a hub rebuild.
-- **Durable git fix landed by Codex as `aef82f5a` on `origin/k3d-manager-v1.16.0` (2026-07-23)** from `docs/bugs/2026-07-23-hub-argocd-servicemonitors-and-image-updater-not-enrolled.md`: `scripts/plugins/argocd.sh` now adds CRD-guarded `_argocd_ensure_servicemonitors` inside `_argocd_helm_deploy_release` after the argocd `helm upgrade --install` and before `rm -f "$values_file"`, mirroring the real install version logic by using `ARGOCD_HELM_CHART_VERSION` only when set and rendering with `--api-versions monitoring.coreos.com/v1`; it also hoists `_argocd_deploy_image_updater` out of the `enable_bootstrap` block. Test coverage landed in `scripts/tests/plugins/argocd_servicemonitors_ensure.bats` and was wired into `.github/workflows/ci.yml`.
-- **CLAUDE-VERIFIED `aef82f5a` = FAIL (2026-07-23) — every gate green, fix inert in production.** Gates independently re-run and confirmed: SHA on origin, exact commit message, exactly 3 files, memory-bank separate (`aa5690bd`), `shellcheck -S warning`/`-S error` on argocd.sh → RC=0/RC=0, `bats argocd_servicemonitors_ensure.bats` → 2/2 `BATS_RC=0`, `_agent_audit` → `AUDIT_RC=0`. All three Round-1 spec amendments honored; **Change 1's `_argocd_ensure_servicemonitors` body is correct and kept.** Two blockers: **(A) Change 2 is a no-op — Codex edited dead code.** `_argocd_configure_post_deploy` (argocd.sh:576) has **zero callers repo-wide** (`grep -rn` → definition only; orphaned since `aef115a0`/`e013d23b`). Live path is `deploy_argocd` → `_argocd_helm_deploy_release` → wait → `_argocd_ensure_logged_in` → `deploy_argocd_bootstrap`, and `deploy_argocd_bootstrap` deploys ONLY AppProject + ApplicationSets — image-updater still never deployed. *This also corrects Round 1's own diagnosis: the spec said "the bootstrap branch was not exercised on this hub"; the truth is the containing function is dead, which is why image-updater was never deployed anywhere.* **(B) CRD guard aborts instead of skipping** — `_kubectl get crd …` lacks `--no-exit`, so `_run_command` → `_run_command_handle_failure` (soft=0) → `_err` → **`exit 1`**; on a cluster without the SM CRD `deploy_argocd` dies rather than no-op'ing (spec required a no-op). Siblings at argocd.sh:417/:421/:443 all use `--no-exit`. The bats stub replaces `_kubectl` with a plain `return 1` function so `_run_command` is never reached — and both tests assert the argv WITHOUT `--no-exit`, so they lock the bug in and would fail once fixed.
-- **ROUND 2 spec written + pushed: `d908ffd0`** — appended to the same `docs/bugs/` file (dedup). Exact old/new blocks for: A1 revert the dead-code hoist, A2 call `_argocd_deploy_image_updater` from `deploy_argocd_bootstrap` (which has its own `CLUSTER_ROLE=app` guard), B add `--no-exit`, B2 update both stub matchers + both assertions, B3 add a static call-site regression test using `awk '/^function deploy_argocd_bootstrap\(\)/,/^}$/'`. Scope gate: exactly 2 files (argocd.sh + the bats file — ci.yml already wired, do not touch). Post-state gate `grep -c '_argocd_deploy_image_updater' scripts/plugins/argocd.sh` → **3**. Commit msg: `fix(argocd): call image-updater from live bootstrap path + no-exit CRD guard`. Unassigned (ready to hand off).
-- **ROUND 2 landed by Codex as `9ec7469b` on `origin/k3d-manager-v1.16.0` (2026-07-23)** exactly per the appended Round 2 section: A1 restored the dead-code hunk inside `_argocd_configure_post_deploy` verbatim; A2 added the real live-path call to `_argocd_deploy_image_updater` inside `deploy_argocd_bootstrap` after the two ArgoCD precondition checks and before the AppProject block; B added `--no-exit` to the ServiceMonitor CRD guard in `_argocd_ensure_servicemonitors` without rewriting the rest of that function; B2 updated both stub matchers and both assertions in `scripts/tests/plugins/argocd_servicemonitors_ensure.bats`; B3 added the static `awk` regression test that `deploy_argocd_bootstrap` contains `_argocd_deploy_image_updater`. Scope held to exactly two files (`scripts/plugins/argocd.sh`, `scripts/tests/plugins/argocd_servicemonitors_ensure.bats`); `grep -c '_argocd_deploy_image_updater' scripts/plugins/argocd.sh` now returns **3**. Static gates recorded by Codex: `shellcheck -S warning` RC=0, `shellcheck -S error` RC=0, `bats scripts/tests/plugins/argocd_servicemonitors_ensure.bats` → 3/3 `RC=0`, `_agent_audit` `RC=0`. **Claude still owes the next live hub rebuild/deploy verify** that image-updater and the 4 argocd ServiceMonitors now come up from git without the manual remediation.
-- **Flagged for owner, NOT in Round 2 scope:** `_argocd_configure_post_deploy` is dead code that still contains Istio VirtualService creation + the Vault/ESO configuration call — none of it runs. Needs a separate audit: wire back in or delete.
-- **Claude still owes the next live hub rebuild/deploy verify** (after Round 2 lands) that the 4 argocd ServiceMonitors and image-updater come up from git without the manual remediation.
-- **Spec amended `a0121c94`** after reviewing Codex's plan — three traps that would have produced a wrong implementation: (a) **chart version decoy** — `ARGOCD_CHART_VERSION` (argocd.sh:53, `7.8.1`) is annotation-only (used at :1317); the install actually uses `ARGOCD_HELM_CHART_VERSION` (:465-467) which is **unset by default**, so the release floats — that's why live is chart `10.1.4`. Render must mirror the install (`--version` only if that var is set), or SMs render from the wrong chart version. (b) **call site** — `values_file` is `local` to `_argocd_helm_deploy_release` and `rm -f`'d at :559-561, so the ensure step must be called from *inside* that function before cleanup, NOT from `deploy_argocd`. (c) **no new role guard** — `deploy_argocd` already returns early for `CLUSTER_ROLE=app` at :408; Change 2 is purely hoisting the `_argocd_deploy_image_updater` call out of the `if (( enable_bootstrap ))` block at :550.
-- **Frontend login:** single `LOGIN_ERROR clientId=null error=invalid_code` (1 in 300 log lines) = stale auth session, NOT a config regression. Told owner to retry incognito; if it recurs → Keycloak proxy/cookie spec. (Old `keycloak-realm-reconcile` jobs Error exit=1 on a 2-day-old `duplicate key uk_orvsdmla...` realm partial-import conflict — unrelated to today's login.)
+**v0.4.2 SHIPPED — PR #34 merged to main (`ae9fc73`, 2026-07-06).** ACG headless CDP auto-login + stale-browser reclaim/reuse (BUG #1–#5). Post-merge done: main synced, **TAGGED v0.4.2** (annotated tag at merge `ae9fc73`; GitHub release published, targetCommitish main, not draft/prerelease), CHANGE.md stamped `## [v0.4.2] — 2026-07-06` (`0ce4d0b`), `feat/v0.4.3` cut from main, retro `docs/retro/2026-07-06-v0.4.2-retrospective.md` written. No branch protection on main → no enforce_admins to restore. Standing docs: `copilot-instructions.md` current (acg already covered), acg API lives in `docs/api/acg.md` (no new public shell functions — `_cdp_connectable`/`_cdp_kill_port_listener` are `_`-private), `projectbrief.md` n/a for lib-foundation. **Downstream: k3d-manager subtree-pulled v0.4.2** into `scripts/lib/foundation/` (merge `c116e655`, split `b6141505`, 14 files under prefix; cdp.sh verified diff-identical to upstream, `bash -n` clean). Two process rules from the milestone (retro): run default-severity shellcheck before push (CI catches `info`-level SC2016 that local `-S warning` hides); update `acg_cdp.bats` in the same commit as any `_browser_launch`/CDP behavior change. **Follow-up still open:** `gcp_login.js:157` latent no-op `disconnect()` → replace with `close()` in a separate change. Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]].
 
-## Hostinger (REBUILT 2026-07-21 — Path B executed; ambient control plane GREEN, app-tier enrollment pending 2 Codex specs)
+**PR #34 — v0.4.2 ACG headless-gate line (BUG #1–#5), merged (2026-07-06):** https://github.com/wilddog64/lib-foundation/pull/34, `feat/v0.4.2` → `main`, head `9be232a`, merge `ae9fc73`. **Operator ran the live acceptance gate — `make credential-test PROVIDER=aws` works headlessly (user-confirmed).** CI first ran the `acg_cdp.bats` + shellcheck jobs on this PR and surfaced accumulated debt across the whole line: (1) two `_browser_launch` BATS tests had drifted (test 2 broke at BUG #3's managed-Chromium launch, test 1 at BUG #5's `_cdp_connectable` gate) — fixed test-only in **`d9ff95e`** (mock `_cdp_connectable`, stub `node`, drop dead `open` mock, + new reclaim/relaunch-branch test); (2) CI shellcheck runs at default severity and flagged SC2016 (info) on the `_cdp_connectable` node `-e` template literal — added a `# shellcheck disable=SC2016` directive; also reworded the Unreleased CHANGE.md bullet that still described BUG #4's superseded profile-identity hard-reject — both in **`9be232a`**. **CI green on `9be232a`.** Copilot round: 6 findings — 4 fixed (3 test-drift → `d9ff95e`, 1 changelog → `9be232a`), 2 declined-with-rationale (node validation already handled by the empty-`_pw_chrome_bin` `_err`; `lsof`-unavailable is unreachable on the macOS-only launch path); all 6 threads resolved. `main` has no branch protection → no `enforce_admins` to disable. **Next: user merges PR #34 → tag v0.4.2 → subtree-pull into k3d-manager → confirm `CLUSTER_PROVIDER=k3s-aws make up`.** Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]].
 
-**REBUILD RESULT (2026-07-21, owner chose Path B = clean rebuild):** executed `make down` → `make up` →
-`vault_deploy_hub_into_context` → `make refresh` → `deploy_istio_ambient` on `k3s-hostinger`.
-- **`make down`** — k3s-uninstall ran; verified ON THE BOX: `k3s` binary gone, **`/var/lib/cni/networks/cbr0` gone** (the
-  213-IP flannel leak is physically eliminated), deregistered from hub, context removed, VPS preserved.
-  ⚠️ my `DOWN_RC=${PIPESTATUS[0]}` capture came back EMPTY (var didn't survive the pipeline) — outcome was
-  verified by direct SSH inspection instead. Do not trust that capture idiom through `| tee`.
-- **`make up`** `UP_RC=0` — fresh k3s **v1.36.2+k3s1**, node Ready, `cluster-ubuntu-hostinger` secret recreated on hub.
-  Expected warn: app-cluster Vault auth failed (`vault-root missing`) — fresh cluster has no Vault yet.
-- **ORDERING GAP:** first `make refresh` **FAILED `RC=2`** at Vault seeding — `could not read target vault-root token …
-  run vault_deploy_hub_into_context first`. `deploy_cluster` for hostinger is BARE (ssh→k3sup→kubeconfig→node-ready→
-  label→register only); it does NOT deploy Vault, and `refresh` assumes Vault already exists. Fix sequence is
-  down → up → **`vault_deploy_hub_into_context ubuntu-hostinger`** (RC=0) → refresh (`RC=0` on 2nd run).
-- **Data tier fully restored 7/7** (minio, postgres orders/payment/products, rabbitmq, redis-cart, redis-orders-cache).
-  data-layer app had failed sync (`namespaces "shopping-cart-payment" not found`, retry limit 5 exhausted); recovered by
-  forcing sync via `kubectl patch application … --type merge -p '{"operation":{...,"sync":{...}}}'` (the `refresh=hard`
-  annotation alone does NOT re-trigger a sync past an exhausted retry budget).
-- **VAULT WAS NEVER AT RISK (verified before destroying):** hostinger's Vault is a DOWNSTREAM replica. Canonical source =
-  **hub Vault** (unsealed, alive) with **macOS Keychain** fallback (`k3d-manager-app-cluster-secrets`; confirmed present for
-  `postgres/orders`, `keycloak/admin`, `github/pat`, `payment/stripe`). The in-cluster `vault-seed-backup` secret is a
-  write-only DR **output** of seeding, never an input. `make backup` does NOT support hostinger (k3s-oci only).
+**BUG #5 COMPLETE (Codex, 2026-07-06) — reuse a healthy CDP browser; reclaim a stale/zombie one instead of erroring:** `docs/bugs/2026-07-06-cdp-reclaim-unhealthy-browser-instead-of-error.md`, branch `feat/v0.4.2`. Root cause after BUG #4 was NOT version drift: the same managed CFT binary/version (`Chrome/148.0.7778.96`, `chromium-1223`, Playwright 1.60.0) on the same `pw-profile` failed `connectOverCDP` as a lingering zombie process but succeeded when freshly launched. BUG #4's profile-identity guard therefore used the wrong signal: it adopted an undriveable zombie when the profile matched, and hard-errored on a foreign listener instead of reclaiming the port. **Implemented as `db5b8e23dc2f33ea6a2be36636266cec03806a70`** (`fix(acg): reclaim stale CDP browser and reuse healthy one instead of erroring`), pushed to `origin/feat/v0.4.2`. Scope held to the 2 listed files: `scripts/lib/acg/cdp.sh` now adds `_cdp_connectable` (Playwright `connectOverCDP` connect+close health probe) and `_cdp_kill_port_listener` (`lsof -t` TERM→KILL reclaim), and rewrites `_browser_launch` to reuse an existing `:9222` browser only when Playwright can actually drive it, otherwise reclaim the port and fall through to the existing managed-Chromium relaunch path; `CHANGE.md` `[Unreleased]` gained the required `### Fixed` entry. `_cdp_profile_in_use` remains defined and is still used by the agent-stop and singleton-lock helpers, but `_browser_launch` no longer hard-`_err`s on the reuse path. Gates passed: `shellcheck -S warning scripts/lib/acg/cdp.sh`, `npm run check`, `npm test`, and sourcing probe `bash -c 'source scripts/lib/acg/cdp.sh; declare -f _browser_launch _cdp_connectable _cdp_kill_port_listener >/dev/null'`. **USER acceptance remains operator-run only:** with a healthy managed browser on `:9222`, `make credential-test PROVIDER=aws` must reuse it; with a stale or zombie listener on `:9222`, it must reclaim the port, relaunch managed CFT, and continue without a manual `kill`. Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]].
 
-**AMBIENT STATUS — control plane GREEN, dataplane NOT yet carrying app traffic:**
-- `istio-cni-node 1/1`, `istiod 1/1`, `ztunnel 1/1` (stable ~50m); ztunnel receiving `istio.workload.Address` XDS from istiod.
-- **istio-cni required the RANCHER CNI paths** — this REVERSES the stale note below. On fresh k3s+flannel:
-  `/etc/cni/net.d` is EMPTY, the only conflist is `/var/lib/rancher/k3s/agent/etc/cni/net.d/10-flannel.conflist`,
-  `/opt/cni/bin` holds only istio's own binary, and real CNI bins live in `/var/lib/rancher/k3s/data/cni`.
-  istio-cni went `1/1` within ~2min after overriding to `cniConfDir=/var/lib/rancher/k3s/agent/etc/cni/net.d` +
-  `cniBinDir=/var/lib/rancher/k3s/data/cni`. **This override is LIVE-ONLY on the hub appset — the next
-  `deploy_istio_ambient` reverts it.** `ce4d83f0`'s standard paths are correct for Cilium, wrong for bare flannel →
-  the appset needed to be substrate-aware. **Codex Session 1 landed as `9c0e336a` on
-  `origin/k3d-manager-v1.16.0` (2026-07-22)**: `scripts/etc/argocd/applicationsets/istio-ambient.yaml` now
-  parameterizes `cniConfDir`/`cniBinDir`, and `scripts/plugins/istio_ambient.sh` defaults/export/envsubst them while
-  preserving the Cilium defaults (`/etc/cni/net.d`, `/opt/cni/bin`) byte-for-byte when unset. **Claude still must
-  live re-run `deploy_istio_ambient` against hostinger with the rancher paths exported to verify `istio-cni-node`
-  stays `1/1` from git.**
-- **`9c0e336a` VERIFIED PASS on all 8 DoD boxes (Claude, 2026-07-22)** — SHA on `origin/k3d-manager-v1.16.0`; scope
-  exactly the 2 target files (9+/4-); commit message verbatim; memory-bank a separate commit (`87cb4eba`); all FOUR
-  spec changes applied incl. Change 4 (stale Cilium help precondition); only one `envsubst` call exists in the file
-  and both vars are in it; `shellcheck -S warning` 0; `yaml.safe_load_all` 0; `ce4d83f0` defaults intact. Byte-identical
-  render proven by full-file `diff` of the `9c0e336a^` render vs the new render (md5 `bedeb363…` both sides), not a
-  `grep -A2` spot check.
-- **REGRESSION FOUND OUTSIDE THE SPEC'S 2-FILE SCOPE (Claude's spec-scoping miss, not Codex's).**
-  `_argocd_deploy_applicationsets` (`scripts/plugins/argocd.sh:1206-1220`) derives its `envsubst` allowlist by grepping
-  `${VAR}` out of each appset file and **refuses to apply** any file with an unset var (`_err` + `continue`, then still
-  `return 0`). `AMBIENT_CNI_CONF_DIR`/`AMBIENT_CNI_BIN_DIR` are defaulted ONLY in `istio_ambient.sh`, which that path
-  never loads → `deploy_argocd_bootstrap` now **silently drops `istio-ambient.yaml`** and reports success.
-  `scripts/etc/argocd/vars.sh:70-72` already documents this exact trap for the sibling `AMBIENT_ISTIO_VERSION`
-  ("Must be defaulted here, not only in istio_ambient.sh"). Fix spec filed: **`be422467`** →
-  `docs/bugs/2026-07-21-ambient-cni-vars-missing-from-argocd-vars.md` (one file, `scripts/etc/argocd/vars.sh`).
-  Claude dry-ran the fix locally before filing: post-fix refusal gate prints nothing, `shellcheck`/`bash -n` 0, env
-  override still beats the default — then reverted so Codex does the edit (spec-before-implement). **Codex landed the
-  real fix as `a08911b3` on `origin/k3d-manager-v1.16.0` (2026-07-22)**: `scripts/etc/argocd/vars.sh` now defaults and
-  exports both `AMBIENT_CNI_*` vars with the same Cilium defaults as `istio_ambient.sh`, so the bootstrap refusal gate
-  no longer prints `UNSET:` lines for the ambient appset. **CLAUDE-VERIFIED LIVE PASS 2026-07-22:**
-  `deploy_argocd_bootstrap --confirm` (hub `k3d-k3d-cluster`, rancher paths exported) → `APPLY_RC=0`,
-  `Successfully deployed 10/10 ApplicationSet(s)`, zero `Refusing` lines. Applied appset on the hub renders
-  `cniConfDir: /var/lib/rancher/k3s/agent/etc/cni/net.d` / `cniBinDir: /var/lib/rancher/k3s/data/cni` with
-  `grep -c '${'` → **0** literal placeholders, and the generated `istio-cni-ubuntu-hostinger` Application inherits
-  them. The rancher paths are now DURABLE FROM GIT — before this they were a live-only hub override that the next
-  bootstrap would have clobbered back to the Cilium defaults.
-- **⚠️ MY SPEC UNDERSTATED THIS BUG — the failure is an ABORT, not a silent drop.** Negative control run in a
-  throwaway worktree at pre-fix `7226e7ea` with both vars unset: `PREFIX_RC=1` and the loop **terminated** at
-  `istio-ambient.yaml`, so the FIVE appsets ordered after it (`eso`, `demo-rollout`, `services-git`,
-  `grafana-dashboards-acg`, `observability-acg`) were never applied at all. The spec's Problem section claimed
-  `_argocd_deploy_applicationsets` `continue`s past the bad file and still `return 0`s — it does not. Blast radius
-  was mid-bootstrap collateral across unrelated appsets, including `services-git`, which is what carries the
-  shopping-cart manifests. Correct the Problem text if that spec is ever reused as a template.
-- **PRE-EXISTING, NOT A REGRESSION — separate spec needed.** `scripts/lib/providers/k3s-oci.sh:678-683` globs every
-  appset through `envsubst '$ARGOCD_NAMESPACE'`, a one-var allowlist against a file with FIVE placeholders, so
-  `${APP_CLUSTER_NAME}` and `${AMBIENT_ISTIO_VERSION}` were ALREADY reaching OCI's ArgoCD literally before `9c0e336a`
-  (now 5 leaked vars). `k3s-hostinger.sh:791-794` uses an explicit 3-appset list excluding istio-ambient — unaffected.
-- **APP TIER IS STILL SIDECAR-ENROLLED — the real CPU story.** `services/shopping-cart-namespace/namespace.yaml:10` sets
-  `istio-injection: enabled`, so istiod injects a 100m `istio-proxy` into every pod → node hit **1860m (93%) requests**
-  and pods went `Pending` on `Insufficient cpu` while **actual usage was only 408m (20%)**. The historical
-  "hostinger is CPU-starved" reading was a SYMPTOM OF SIDECAR INJECTION, not real capacity pressure.
-  Spec `docs/bugs/2026-07-21-shopping-cart-ns-sidecar-blocks-ambient.md`. **Codex landed that manifest fix as
-  `ebf27de3` on `origin/k3d-manager-v1.16.0` (2026-07-22)**: `services/shopping-cart-namespace/namespace.yaml` now
-  removes `istio-injection` entirely and declares `istio.io/dataplane-mode: ambient`, leaving the sync-wave annotation
-  and both `app.kubernetes.io/*` labels untouched. **CLAUDE-VERIFIED LIVE PASS 2026-07-22 — AMBIENT DATAPLANE IS
-  CARRYING APP TRAFFIC ON HOSTINGER.** ArgoCD had already synced `ebf27de3`; live ns shows
-  `istio.io/dataplane-mode=ambient` with no `istio-injection` key. Deleted all pods in `shopping-cart-apps` (ArgoCD-
-  neutral — no Application/appset edit, so nothing to revert); every replacement came back **`1/1`, zero
-  `istio-proxy` containers**. ztunnel config_dump: all 3 running `shopping-cart-apps` workloads report
-  `protocol: HBONE`, while `shopping-cart-data` and `shopping-cart-payment` still report `TCP` — the exact
-  in-scope/out-of-scope split the spec defined, and a clean enrollment discriminator for future checks.
-  **HBONE + mutual SPIFFE proof captured** on `frontend → basket-service:8083`:
-  `src.identity="spiffe://cluster.local/ns/shopping-cart-apps/sa/default"` →
-  `dst.identity="spiffe://cluster.local/ns/shopping-cart-apps/sa/basket-service"`,
-  `dst.addr=10.42.0.97:15008 dst.hbone_addr=10.42.0.97:8083`, logged from BOTH `direction="outbound"` and
-  `direction="inbound"` — same bar `k3s-aws` met.
-- **⚠️ MY SPEC'S CPU CLAIM WAS WRONG — sidecar injection was NOT the cause of hostinger's CPU pressure.** The spec
-  asserted the "hostinger is CPU-starved" reading was a SYMPTOM OF SIDECAR INJECTION and that removing injection
-  would reclaim ~100m/pod and let the `Pending` pods schedule. Measured reality after every sidecar was gone:
-  requests went **1910m (95%) → 1960m (98%) of 2000m allocatable — UP, not down** — and `order-service`
-  (2nd ReplicaSet) + `product-catalog` are STILL `Pending` on `Insufficient cpu`. Only `frontend` (50m) converted
-  Pending → Running. Actual usage stayed ~19%. The node is genuinely oversubscribed at the REQUESTS layer by
-  non-app workloads: `trivy-server-0` 200m, `payment-service` 200m, `rabbitmq-0` 200m, 4× data-tier pods 400m,
-  istio control plane 300m (istiod+ztunnel+istio-cni), monitoring ~110m. Requests went up because freed capacity
-  was immediately consumed by a pod that previously could not schedule. **The 2-CPU hostinger box is a real
-  capacity constraint, not a mesh artifact** — do not carry the "sidecars caused it" story forward. Right-sizing
-  requests (or dropping trivy-server from this node) is a separate piece of work needing its own spec.
-- **LIVE REMEDIATION IS IMPOSSIBLE HERE — the ApplicationSet controller wins.** Removing the ns label was reverted in ~15s;
-  setting `selfHeal:false` was reverted; removing `automated` entirely was ALSO reverted, because the `services-git`
-  ApplicationSet regenerates the Application `.spec` from its template. Only the git manifest is durable.
-- **`istio-ambient` is a SINGLE appset** whose generator is keyed to one `${APP_CLUSTER_NAME}` — applying it for
-  hostinger re-pointed it off `ubuntu-k3s`. Only one cluster can hold ambient at a time (design limit worth fixing).
-  (No collateral damage this time: `ubuntu-k3s` apps show `Unknown` because the ACG sandbox has EXPIRED/unreachable.)
-- **`make status` is BLIND to all of this** — `bin/cluster-status` (435 lines) has zero istio/cilium/ztunnel/ambient
-  checks, which is why the mesh sat broken ~3 days unnoticed. Spec
-  `docs/bugs/2026-07-21-cluster-status-no-mesh-cni-health.md` (filed under docs/bugs, NOT docs/plans — v1.16.0 already
-  holds 4 plan docs and the limit is 5 on an unshipped release).
+**BUG #4 COMPLETE (Codex, 2026-07-06) — credential-test now launches the managed browser and `_browser_launch` rejects a foreign CDP browser:** `docs/bugs/2026-07-06-credential-test-launch-and-browser-identity-guard.md`, branch `feat/v0.4.2`. Root cause was the two residual gaps after `e136f55`: (A) `_browser_launch` (cdp.sh:72–75) adopted ANY browser already on `:9222` without checking identity, so a stale system Chrome 150 on the old `profile` dir could be adopted and reintroduce CDP drift; (B) `bin/acg-credential-test` never called `_browser_launch` at all — after `36c3bb1` it curl-guarded `:9222` then only `_cdp_ensure_acg_session` (connect-only, never launches), so the managed-Chromium launch path was unreachable from `make credential-test`. **Implemented as `2918d5c0d818b73ebdde6ba3a5c18a12af604c10`** (`fix(acg): route credential-test through _browser_launch and guard CDP browser identity`), pushed to `origin/feat/v0.4.2`. Scope held to the 3 listed files: `scripts/lib/acg/cdp.sh` now hoists `_cdp_profile_dir` and rejects an existing `:9222` listener unless `_cdp_profile_in_use` confirms the Playwright-managed `pw-profile`; `scripts/lib/acg/bin/acg-credential-test` now sources `cdp.sh` and calls `_browser_launch`, removing the stale `open -a "Google Chrome"` guidance and restoring the managed-browser self-launch path; `CHANGE.md` `[Unreleased]` gained the required `### Fixed` entry. Gates passed: `shellcheck -S warning scripts/lib/acg/cdp.sh scripts/lib/acg/bin/acg-credential-test`, `npm run check`, `npm test`, and sourcing probe `bash -c 'source scripts/lib/acg/cdp.sh; declare -f _browser_launch >/dev/null'`. **USER acceptance remains operator-run only:** with `:9222` free, `make credential-test PROVIDER=aws` must launch Chrome-for-Testing, sign in headlessly, and extract creds; with a foreign Chrome on `:9222`, it must fail fast with the new guard message. Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]].
 
-**HANDOFF STATE (2026-07-22):** branch `k3d-manager-v1.16.0` PUSHED to origin — prior specs commit `fd3be7f7`, then
-Session 1 code commit **`9c0e336a`** (`fix(mesh): make ambient istio-cni conf/bin dirs CNI-substrate aware`) verified,
-followed by the 2-file Session 2 code commits **`a08911b3`** (`fix(argocd): default ambient CNI dir vars in
-argocd/vars.sh for the bootstrap path`) and **`ebf27de3`** (`fix(mesh): enroll shopping-cart namespace in ambient
-instead of sidecar injection`), all confirmed on `origin/k3d-manager-v1.16.0`. The sequence is now:
-(a) CNI-substrate-aware appset **DONE + CLAUDE-VERIFIED PASS** → (d) bootstrap ambient-CNI defaults in `vars.sh`
-**DONE** → (b) namespace ambient label **DONE** → (c) `cluster-status` mesh section **DONE in `da67e2bf`**
-(`feat(status): report service mesh, CNI substrate, and ambient enrollment`; PR URL not created per repo rule). (a) had to land before (b) became verifiable, since the app tier could not
-enter the ambient dataplane while istio-cni was broken on a fresh deploy. **Spec gates tightened in `a242ec67`** after
-review of Codex's plan: (c) no longer asks Codex to run `make status` live (Codex has NO live-cluster verify role —
-static gates + `bash -n` only; Claude runs the live check); all sessions require push proof via
-`git log origin/k3d-manager-v1.16.0 --oneline -1` and an explicit **separate** memory-bank commit.
+**BUG #3 COMPLETE (Codex, 2026-07-06) — CDP now launches Playwright-managed Chromium, not system Chrome:** `docs/bugs/2026-07-06-cdp-use-playwright-managed-chromium.md`, branch `feat/v0.4.2`. **Root cause (diagnosed live this session):** `_browser_launch` (`scripts/lib/acg/cdp.sh`) launched system `/Applications/Google Chrome.app`; every ACG node script then `chromium.connectOverCDP`ed to it. System Chrome auto-updated independently and drifted past the pinned Playwright's DevTools-protocol support — observed Chrome 150 vs Playwright 1.60 (→ Chromium 148) failing `browserType.connectOverCDP: Protocol error (Browser.setDownloadBehavior): Browser context management is not supported`, dead-ending BOTH `make credential-test PROVIDER=aws` and the `make up` ACG path before the headless gate ran. **Empirically proven this session:** upgrading Playwright to 1.61.1 did NOT durably fix it (same failure — Chrome updates again); launching Playwright's own version-locked Chromium (`require('playwright').chromium.executablePath()` → `…/ms-playwright/chromium-1223/chrome-mac-arm64/Google Chrome for Testing.app/...`, confirmed EXISTS) and connecting over CDP returned `CONNECT_OK contexts=1`. **Implemented `e136f55ea39ea590c5ddccfa9fa4d064c42f4402`** (`fix(acg): launch Playwright-managed Chromium for CDP instead of system Chrome`), pushed to `origin/feat/v0.4.2`. Scope held exactly to the 3 listed files: `scripts/lib/acg/cdp.sh` now resolves the binary via `require('playwright').chromium.executablePath()` and hard-fails with an `npm install` message if absent (NO system-Chrome fallback), all 3 `cdp.sh` profile defaults now use `…/k3d-manager/pw-profile`, and `scripts/lib/acg/playwright/lib/output.js` `AUTH_DIR` now matches `pw-profile`. Gates passed: `shellcheck -S warning scripts/lib/acg/cdp.sh`, `npm run check`, `npm test`, sourcing probe `bash -c 'source scripts/lib/acg/cdp.sh; declare -f _browser_launch >/dev/null'`, and negative grep confirmed no `open -a "Google Chrome"` or `/Applications/Google Chrome.app` remained in `cdp.sh`. **USER acceptance gate (not Codex):** quit any stale system Chrome on `:9222`, then `make credential-test PROVIDER=aws` must launch Chrome-for-Testing, sign in headlessly, and extract creds before any subtree-pull. Relates to [[feedback_lib_acg_subtree_discipline]], [[feedback_lib_edits_upstream_first]], [[project_antigravity_migration]].
 
-**LIVE VERIFY DONE 2026-07-22 — (a)+(d)+(b) ALL CLAUDE-VERIFIED PASS, git AND live.** The ambient milestone's
-functional goal is MET on hostinger: bootstrap applies 10/10 appsets from git with substrate-correct CNI paths,
-the app namespace is ambient-enrolled, all app pods run sidecar-free `1/1`, and `frontend → basket-service`
-traffic rides HBONE on :15008 with mutual SPIFFE identities both directions. Nothing on the git side is
-outstanding for (a)/(d)/(b).
+**v0.4.1 SHIPPED — PR #33 merged to main (`b7c849c`, 2026-07-06T02:56Z).** Headless Pluralsight auto-login + non-interactive fast-fail for unattended AWS-sandbox provisioning. Post-merge done: main synced, **TAGGED v0.4.1** (annotated tag at merge `b7c849c`; GitHub release published), `feat/v0.4.2` cut from the merge SHA, retro `docs/retro/2026-07-06-v0.4.1-retrospective.md` written, CHANGE.md `[Unreleased]` → `## [v0.4.1] — 2026-07-06`. No branch protection on main → no enforce_admins to restore. Standing docs current (change is JS-internal + a 9-line `cdp.sh` cred-load; no new public shell functions → `docs/api/functions.md` unaffected). Copilot round on PR #33: 4 findings, 3 fixed + 1 declined-with-evidence (`browser.close()` kept; `Browser.disconnect()` does not exist in Playwright 1.60.0) — triage `docs/issues/2026-07-05-copilot-pr33-review-findings.md`. **Downstream:** k3d-manager subtree-pull of v0.4.1 into `scripts/lib/foundation/` now unblocked (tag exists) — DONE (merge `67b466db`). **v0.4.2 BUG FILED (2026-07-06):** the v0.4.1 headless gate `_cdp_ensure_acg_session`→`acg_session_check.js`→`loginWithPage` shipped but is **never called** in any production path — `_browser_launch` only ensures CDP Chrome is up, not that Pluralsight is signed in. `make up`'s only sign-in (`sandbox.js:handleSignIn`) relies on Google Password Manager autofill, which can't fire in the `--password-store=basic` dedicated profile → no sign-in / no sandbox / no AWS env → CloudFormation `InvalidClientTokenId`. **Fix (spec `docs/bugs/2026-07-06-acg-session-gate-not-wired-into-browser-launch.md`):** call `_cdp_ensure_acg_session` on both `_browser_launch` paths; reuses tested v0.4.1 code, preserves fast-fail + `K3DM_ACG_SKIP_SESSION_CHECK` opt-out; no JS change. **IMPLEMENTED `96bea46`** (pushed `origin/feat/v0.4.2`; cdp.sh + acg_cdp.bats + CHANGE.md; shellcheck clean, 3 BATS cases). **v0.4.2 BUG #2 COMPLETE (Codex, 2026-07-06) — credential-test path now reuses the same gate and avoids the locked-profile fallback:** spec `docs/bugs/2026-07-06-acg-session-gate-not-wired-into-credential-test.md` implemented as commit **`36c3bb16ee832f09223693f59d25aa57c9ab0210`** (`fix(acg): wire _cdp_ensure_acg_session into acg-credential-test + guard connectBrowser CDP fallback`), pushed to `origin/feat/v0.4.2`. Scope held exactly to the 3 listed files: `scripts/lib/acg/bin/acg-credential-test` now sources `cdp.sh` and calls `_cdp_ensure_acg_session` after the CDP-alive check; `scripts/lib/acg/playwright/lib/browser.js` now throws a clear error instead of attempting `launchPersistentContext` when CDP is reachable but exposes no usable context; `CHANGE.md` `[Unreleased]` gained the required `### Fixed` entry. Required gates passed: `shellcheck -S warning scripts/lib/acg/bin/acg-credential-test`, `npm run check`, `npm test`, and the sourcing probe `bash -c 'source scripts/lib/acg/cdp.sh; declare -f _cdp_ensure_acg_session >/dev/null'` exited 0. **Acceptance gate remains user-run only:** `make credential-test PROVIDER=aws` in lib-foundation must be exercised by the operator before any subtree-pull or downstream claim. **Follow-up:** correct latent no-op `disconnect()` idiom in `gcp_login.js:157`.
 
-**SESSION RESULT (2026-07-22):** spec (c) `docs/bugs/2026-07-21-cluster-status-no-mesh-cni-health.md` is
-**DONE in `da67e2bf` on `origin/k3d-manager-v1.16.0`**. Scope held to exactly one file, `bin/cluster-status`,
-with one insertion after line 163; no `_kubectl` conversion; no live-cluster run. Static gates PASS:
-`shellcheck -S warning bin/cluster-status` exit 0 with zero output, `bash -n bin/cluster-status` exit 0, and the
-required 4-mode stub-`kubectl` harness passed all modes with `RC=0`, including `MODE=flaky` printing
-`ambient ns:       <none>`. `git show --stat da67e2bf` lists exactly one file (`bin/cluster-status`, +45), and
-push proof is `git log origin/k3d-manager-v1.16.0 --oneline -3` showing `da67e2bf` at the tip. PR URL not created
-per repo rule.
+## Current State: `feat/v0.4.1` (as of 2026-06-22)
 
-**CLAUDE-VERIFIED PASS (2026-07-22) — spec (c) closed, nothing outstanding.** Every gate re-run independently
-rather than trusting Codex's paste. Git side: both `da67e2bf` and memory-bank commit `66683150` confirmed on
-`origin/k3d-manager-v1.16.0`; `git show --stat da67e2bf` = exactly one file, `bin/cluster-status`, +45/−0;
-commit message byte-exact; `git status` clean with **0** untracked files, so the harness was never committed and
-`scripts/tests/` was never touched. Content side: the landed block was `diff`ed against the spec's `Exact new
-block to insert` and is **byte-identical** (the only delta is the required trailing blank separator); placement
-confirmed `fi`(163) → blank → block(165–209) → blank → `echo ""` → Hub ArgoCD header, i.e. no existing section
-reordered. Static gates on this machine: `shellcheck -S warning bin/cluster-status` `SC_RC=0` / `SC_LINES=0`
-(baseline was also 0, so zero new warnings is exact, not approximate); `bash -n` `BN_RC=0`. Harness re-run by
-Claude against the LANDED file, all four modes `RC=0` and matching the spec's required-results table.
-**Negative control re-proved the gate bites:** stripping `|| true` from all six substitutions flips `MODE=flaky`
-to `RC=1` with output truncating after the `istiod:` line — the `ambient ns:` line never prints. **Live verify
-`make status CLUSTER_PROVIDER=k3s-hostinger` → `STATUS_RC=0`** (RC captured on its own line, not through `tee`),
-printing `CNI substrate: flannel (no cilium daemonset)`, `istio-cni-node: 1/1 ready`, `ztunnel: 1/1 ready`,
-`istiod: 1/1 ready`, `ambient ns: shopping-cart-apps`, and `grep -c CONFLICT` → **0**, which is the expected
-result post-`ebf27de3`, not a coverage gap. Unrelated pre-existing finding surfaced by the same run:
-`Product images: HTTP Error 502` in Service Health — not caused by this change, needs its own spec.
+**v0.4.0 SHIPPED — PR #32 merged to main (`aed8c56`, 2026-06-23T01:14Z).** lib-acg absorbed as optional module `scripts/lib/acg/` (9 commits, 44 files). Post-merge done: main fast-forwarded, `feat/v0.4.1` cut from merge SHA, retro `docs/retro/2026-06-22-v0.4.0-retrospective.md` written. **TAGGED v0.4.0** (`647408a` on feat/v0.4.1 split `[Unreleased]` → `## [v0.4.0]` + back-filled `## [v0.3.19]`; tag at merge `aed8c56`; GitHub release published). Drift resolved: tag v0.3.19 (`45040e2`) had been cut with no section; v0.3.18 + v0.3.20 never existed as tags. No branch protection on main → no enforce_admins to restore. Standing docs current (`copilot-instructions.md` has acg; acg API in `docs/api/acg.md`). **Next:** Phase 2 = rewire k3d-manager (scoping now); pre-existing `_sts_valid` bug + agy-cli/Antigravity CDP retarget tracked. History below.
 
-**Three corrections Claude made to spec (c) before handoff (revision commit below):**
-1. **The spec's own code block was `set -e`-unsafe** — it omitted `|| true` on all six command substitutions
-   while `bin/cluster-status:14` runs `set -euo pipefail` at top level, so one unreachable `kubectl` would have
-   killed the WHOLE status tool. That directly contradicted the spec's own "What NOT to Do" bullet. Block now
-   matches the App Observability convention (`2>/dev/null || true`, lines 136–154).
-2. **CONFLICT branch is unreachable live** — `ebf27de3` removed `istio-injection`, so hostinger correctly prints
-   no CONFLICT line. Added a REQUIRED stub-`kubectl` harness (4 modes: `normal`/`conflict`/`nomesh`/`flaky`) as
-   the only proof of that branch. **Claude built and ran the harness first** — all 4 modes RC=0 — and confirmed
-   via negative control that stripping `|| true` makes `flaky` exit **RC=1** with truncated output. The gate
-   bites; it is not a rubber stamp.
-3. **Retracted the CPU causation** from the spec's Problem section so the wrong story is not propagated.
+**feat/v0.4.0 — Phase 1 follow-up + regression fix complete (`cf3ad7a`, 2026-06-22)** — absorb lib-acg into lib-foundation as optional module `scripts/lib/acg/`. REGRESSION FIX (`cf3ad7a`): `e6cecef`'s repo-root `bin/` hoist broke the live `make credential-test PROVIDER=aws` Playwright sandbox-delete flow ("Element is outside of the viewport"). A byte-for-byte lib-acg copy experiment isolated the cause — both layouts resolve `REPO_ROOT` to the same absolute path, so the only runtime difference is the **working directory at launch** (repo root vs `scripts/lib/acg`). Reverted: `bin/` is module-local again (`scripts/lib/acg/bin/`, `REPO_ROOT=".."`), Makefile `cd`s into the module first, CI shellcheck override dropped, `.gitignore` added (node_modules/, test-results/). **Live `make credential-test PROVIDER=aws` PASSED**; PR pending. Phase 0 done (lib-acg `v0.1.9` tagged; migration source SHA `7708ae31`). Decisions locked: v0.4.0 / clean tree-copy / `npm ci`. Spec: `docs/plans/v0.4.0-phase1-import-acg-module.md` (overview: `v0.4.0-absorb-lib-acg.md`). Phase 1 follow-up delivered: `scripts/lib/acg/playwright.config.js` imported, `bin/acg-credential-test` + `bin/acg-extend-test` moved to repo-root `bin/`, root `Makefile` added, `REPO_ROOT` repointed to `../scripts/lib/acg`, `acg` CI shellcheck path fixed, and docs/CHANGE updated. Validation passed (`npm ci`, `npm run check`, `npm test`, `shellcheck -S warning bin/acg-credential-test bin/acg-extend-test`, `make help`, `make lint`, `make test`, `git diff --check`). The first Playwright run hit a sandbox-only `EPERM` mkdir on `scripts/lib/acg/test-results`; the rerun with elevated access passed and is recorded in `docs/issues/2026-06-22-lib-foundation-playwright-test-results-permission.md`. Phase 2 = rewire k3d-manager; Phase 3 = archive lib-acg.
 
-Also pinned the insert anchor to exact line numbers (after 163, before the `echo ""` on 165) and forbade
-`_kubectl` conversion — the file deliberately uses bare `kubectl --context` at all 5 existing call sites, and
-switching would break the harness.
+## Current State: `feat/v0.3.21` (as of 2026-05-30)
 
-**OPEN AFTER THIS MILESTONE (each needs its own spec, none blocking (c)):**
-1. ~~`k3s-oci.sh:678-683` one-var `envsubst` allowlist leaking 5 placeholders~~ — **DE-SCOPED 2026-07-22
-   (owner): OCI is crossed out — the Always-Free A1 capacity never yields an instance, so the k3s-oci
-   provider path is dead. Do NOT spend session time on OCI bugs. Focus is ACG/hostinger only.** The
-   envsubst leak is real but unreachable; leave it filed, do not fix.
-2. Hostinger 2-CPU requests oversubscription → product-catalog 502. **CLAUDE LIVE VERIFY 2026-07-22
-   FOUND THE FIX TARGETED THE WRONG FILE.** `7345b24a` (spec `…-hostinger-trivy-cpu-oversubscription-502.md`)
-   is correct-to-spec and passes all gates, but the GitOps file→cluster mapping is the INVERSE of what that
-   spec assumed: `trivy-operator-values.yaml` → appset `observability.yaml` → **hub laptop**
-   (`https://kubernetes.default.svc`, not CPU-starved); `trivy-operator-acg-values.yaml` → appset
-   `observability-acg.yaml` → **`${APP_CLUSTER_NAME}` = ubuntu-hostinger** (the starved node). The `acg-`
-   prefix is a misnomer — that appset is the app-cluster observability path and runs on hostinger. So
-   `7345b24a` trimmed the hub server; hostinger `trivy-server-0` is still `200m` (chart default, verified
-   live) and node is still `1960m/2000m` with `product-catalog` (100m) Pending 21h (`Insufficient cpu` ×254).
-   Owner: KEEP `7345b24a` (harmless hub hygiene) AND add the identical `trivy.server.resources` block to the
-   ACG file. **CODE FIX LANDED 2026-07-23 in `45381c7d` on `origin/k3d-manager-v1.16.0`:**
-   `docs/bugs/2026-07-22-hostinger-trivy-acg-values-cpu-oversubscription-502.md` was implemented exactly in
-   `scripts/etc/helm/observability/trivy-operator-acg-values.yaml` only; the nested
-   `trivy.server.resources` block now sets requests `cpu: 50m` / `memory: 256Mi` and preserves chart-default
-   limits `cpu: "1"` / `memory: 1Gi`. Static gates recorded by Codex: YAML validity
-   `python3 -c "import yaml; yaml.safe_load(open('scripts/etc/helm/observability/trivy-operator-acg-values.yaml'))" && echo OK`
-   → `OK`; helm render of the `trivy-server` StatefulSet request CPU → `50m`; `grep -c '^trivy:' …acg-values.yaml`
-   → `1`. `git show --stat 45381c7d` = exactly one file (`trivy-operator-acg-values.yaml`, +8). The
-   `acg-trivy-operator` values source tracks `targetRevision: k3d-manager-v1.16.0`, so ArgoCD auto-synced
-   this to hostinger with no merge-to-main and no manual patch. **CLAUDE-VERIFIED LIVE PASS 2026-07-22:**
-   ArgoCD `acg-trivy-operator` Synced/Healthy; hostinger `trivy-system/trivy-server-0` request now `50m`
-   (was `200m`); node `srv1754834` CPU requests `1960m/2000m (98%)` → `1910m (95%)`; **0 Pending pods** — all
-   four `shopping-cart-apps` pods `1/1 Running` incl. `product-catalog` and BOTH former stray dups
-   (`frontend-8bbdc8599`, `order-service-75c5b998b7`), so the reconcile happened naturally. **502 CLEARED:**
-   live `https://frontend.3ai-talk.org/` → `HTTP 200` and `…/api/products` → `HTTP 200` (both were the
-   symptom). ⚠️ **The `make status` "Frontend 502 / Product images 502" I first saw was STALE** — captured
-   before the sync scheduled product-catalog; live probes are 200. Caught it by probing live, nearly
-   mis-reported a stale symptom. **RESIDUAL = APP BUG, ALREADY TRACKED (not k3d-manager, not 502, not CPU):**
-   `/api/products` returned `{"items":[],"total":0}` — catalog serves `200 OK` end-to-end but the DB had
-   **0 seeded products**. This is `wilddog64/shopping-cart-product-catalog` **Issue #34** ("PostSync seed hook
-   never runs against a fresh volume") — a one-shot ArgoCD `PostSync` hook (`k8s/base/seed-job.yaml`,
-   `hook-delete-policy: HookSucceeded` + `ttl 300`) that doesn't re-fire against a fresh/empty Postgres PVC;
-   app reads Healthy because the deleted hook Job isn't a managed resource. **CLAUDE LIVE 2026-07-22:** newer
-   failed sync than the issue body (`operationState.phase=Failed 2026-07-22T01:41:03Z`); ran the
-   kustomize-built seed Job one-off → `1000 inserted, 0 skipped` (seed.py + idempotency guard PROVEN healthy,
-   defect is purely the hook not re-firing); **re-seeded live → `/api/products` total=1000 with images, so the
-   "Product images" check passes again.** Diagnostic Jobs cleaned up, no non-GitOps artifacts left. Posted the
-   confirmation to Issue #34 (comment `5053261290`). Durable fix (options 1 startup-seed / 2 resilient-Job /
-   3 health-surfacing) is an OWNER DECISION before any product-catalog PR — do NOT write a k3d-manager spec
-   for this; app fix goes in that repo per bug-tracking-ownership. NOTE: my selfHeal-disable probe on
-   `acg-trivy-operator` was a no-op (appset owns the Application spec and reverted it) — cluster left untouched.
-3. `_hostinger_reapply_gitops_applicationsets` hostinger ambient reapply gap is **CLOSED in `470ef7d8` on
-   `origin/k3d-manager-v1.16.0` (2026-07-22)** — `scripts/lib/providers/k3s-hostinger.sh` now appends
-   `istio-ambient.yaml` to the reapply list, widens the `envsubst` allowlist with
-   `AMBIENT_ISTIO_VERSION`/`AMBIENT_CNI_CONF_DIR`/`AMBIENT_CNI_BIN_DIR`, and updates the summary log line.
-   Static gates PASS on this machine: `shellcheck -S warning` exit 0 with zero output, `bash -n` exit 0,
-   render gate prints `data-git residual=0`, `services-git residual=0`, `platform-helm residual=0`,
-   `istio-ambient residual=0`, and `grep -c 'export AMBIENT_' scripts/lib/providers/k3s-hostinger.sh` prints
-   `0`. `git show --stat 470ef7d8` lists exactly one file. **CLAUDE-VERIFIED LIVE PASS (2026-07-22):**
-   `make refresh CLUSTER_PROVIDER=k3s-hostinger` → RC=0; log line now reads "reapplied data-git, services-git,
-   platform-helm, and istio-ambient ApplicationSets for ubuntu-hostinger"; hub `k3d-k3d-cluster` ns `cicd`
-   carries the `istio-ambient` ApplicationSet; generated `istio-cni-ubuntu-hostinger` renders concrete rancher
-   paths (`cniConfDir /var/lib/rancher/k3s/agent/etc/cni/net.d`, `cniBinDir /var/lib/rancher/k3s/data/cni`,
-   istio `1.24.2`) with **0** literal `${AMBIENT_` placeholders in both istio-cni + ztunnel apps. Ambient
-   dataplane live (istiod+ztunnel 22h Healthy; cni-agent actively enrolling `shopping-cart-apps` pods into
-   ztunnel). **This closes the last ambient-milestone durability hole.** CAVEAT (NOT a spec-(e) regression):
-   `istio-cni-ubuntu-hostinger` stays `OutOfSync/Progressing` because its cni-node `/readyz` returns 503 and
-   won't flip Ready — root cause is node CPU at **98% requests (1960m/2000m)** (`Insufficient cpu` FailedScheduling),
-   i.e. item 2 below. Mesh is functional (cni-agent enrolling, restarts=0, no error logs); only the readiness
-   *report* lags under CPU starvation. Belongs to the v1.17.0 capacity work, not spec (e).
-4. `istio-ambient` single-appset design limit — keyed to one `${APP_CLUSTER_NAME}`, so only one cluster can hold
-   ambient at a time. Low priority now that OCI is de-scoped (hostinger is the only ambient host).
+**v0.3.11 SHIPPED** — PR #17 merged to main (`2625683`) 2026-03-25. Tagged v0.3.11, GitHub release created. `enforce_admins` restored.
+**v0.3.12 SHIPPED** — PR #18 squash-merged to main (`91340d62`) 2026-03-25. Tagged v0.3.12, GitHub release created. `enforce_admins` restored. Antigravity IDE install + Playwright MCP config helpers.
+**v0.3.13 SHIPPED** — PR #19 squash-merged to main (`e870c6d9`) 2026-03-25. Tagged v0.3.13, GitHub release created. `enforce_admins` restored. Fix `_antigravity_browser_ready` curl probe (`_run_command --soft`).
+**v0.3.14 SHIPPED** — PR #20 squash-merged to main (`bbbaf053`) 2026-03-27. Tagged v0.3.14, GitHub release created. `enforce_admins` restored. 5 deferred Copilot PR #51 findings: agy binary detection, curl fast-fail, NUL audit loops, doc fix, CHANGE.md versioning.
+**v0.3.19 SHIPPED** — tag `45040e2` (2026-05-03). `_copilot_auth_check` rewrite (orig. planned as v0.3.18, never tagged) + `_copilot_review` --allow-all-tools/deny-tool fix. CHANGE.md section back-filled 2026-06-22 (`647408a`).
+**PR #29 (sudo no-TTY fallback, `2f46d4be`, 2026-05-30)** — merged to main; NOT a v0.3.20 (no such tag). Folded into v0.4.0 CHANGE.md section.
+**feat/v0.3.21 COMPLETE** — commit `f7a9178` merged and pushed to `origin/feat/v0.3.21`; `scripts/lib/core.sh` now consults optional `_cluster_provider_is_extra_supported` hooks in both provider validation case blocks, the contract BATS coverage was extended, and `CHANGE.md` records the change under `[Unreleased]`; next step is the k3d-manager consumer-side registration spec.
 
-**PRE-REBUILD diagnosis (2026-07-21, superseded above — kept for the retracted-hypothesis trail):**
-- **PRIMARY WALL = flannel pod-IP exhaustion.** `/var/lib/cni/networks/cbr0/` holds **253/254 allocated IPs but only 40 pods run** — ~213 LEAKED host-local IPAM reservations from 2d20h of orphaned-app churn. `10.42.0.0/24` full → every new pod (istiod, ztunnel, postgresql-orders-0, monitoring admission) stuck `ContainerCreating` with `flannel failed (add): no IP addresses available`. istiod's *separate* CPU-Pending (500m won't fit 290m free) is secondary — even at 100m it can't get an IP.
-- **istio-cni IS HEALTHY (1/1 Running on flannel, 2d20h)** — the old "istio-cni binary missing" note is STALE/WRONG. No Cilium needed; ambient runs on flannel here. istio-cni conf/bin dirs `/etc/cni/net.d`+`/opt/cni/bin` (post-`ce4d83f0`) work on this k3s v1.36.
-- **GitOps owner is broken both ways:** laptop hub (`k3d-k3d-cluster`, rebuilt 24h ago by k3s-aws e2e `make down/up`) has hostinger **UNREGISTERED** (no `cluster-ubuntu-hostinger` secret, no apps); the spoke's OWN ArgoCD (9 `argocd-ubuntu-hostinger-*` pods in `cicd`) has **ZERO applications**. Nothing reconciles hostinger. COUPLING: every k3s-aws e2e cycle rebuilds the laptop hub → de-registers hostinger → orphans its mesh.
-- ESO/Vault HEALTHY (vault-0 23d, all ExternalSecrets synced 15m). `shopping-cart-apps` ns EMPTY (app tier never got IPs). `payment-service` stuck Terminating (no finalizers — wedged sandbox teardown). Data tier = `local-path` demo PVCs (reseedable, not authoritative).
-- **CODE GAP (Codex spec pending):** `_hostinger_reapply_gitops_applicationsets` reapplies data/services/platform but NOT `istio-ambient.yaml`, so `refresh` never reconciles ambient after a hub rebuild. `1af15217` (istiod→100m/ztunnel→100m) lives inline in the appset (istio-ambient.yaml:26-28,42-44); delivered ONLY via `deploy_istio_ambient` (plugins/istio_ambient.sh), which was last applied pre-fix → live istiod still 500m.
-- **Two repair paths (decision pending):** (A) surgical in-place — SSH-flush the flannel IPAM leak (stop k3s → rm /var/lib/cni/networks/cbr0/* + del cni0/flannel.1 → start k3s), force-delete wedged pods, register w/ hub, `deploy_istio_ambient` (100m), verify HBONE/mTLS, redeploy app tier (preserves data); vs (B) clean rebuild — `make down/up CLUSTER_PROVIDER=k3s-hostinger` (wipes local-path demo data, clears leak+orphan ArgoCD), then `deploy_istio_ambient` + verify. Both converge on the same ambient dataplane verify; rebuild does NOT auto-install ambient (provider is bare flannel k3sup — appset applied after either way).
-- LESSON (still valid): `preserveResourcesOnDeletion` does NOT protect resources whose Applications predate the flag — the first appset rename still cascade-deletes; strip `resources-finalizer` first.
+---
 
-## CVE-scan (hub) — owner decisions pending
-- `app-cve-scan` (`babb3c80`/`89c2efd6`) now runs exit-0, but **skips all services**: MAIN loop matches `ghcr.io/wilddog64/...` vs trivy-operator's prefix-less `.report.artifact.repository` → spec `docs/bugs/2026-07-18-app-cve-scan-report-repository-registry-prefix-mismatch.md` (unassigned).
-- **Hub `environment=infra` registration — DO NOT EXECUTE.** `platform-helm` selfHeal would auto-deploy a 2nd argo-cd release + downgrade 9.5.15→7.8.1. Blocker doc `docs/bugs/2026-07-18-hub-infra-registration-blocked-platform-helm-selfheal.md`, options A–D, owner decision required. Also: hub `argocd` Helm release status `failed` (rev 3, 2026-06-29) needs triage before any Helm-touching option.
+## Purpose
 
-## Facts worth keeping (cost several wrong turns each)
-- **ArgoCD installs into `cicd`, NOT `argocd`** — checking for an `argocd` namespace produces a false "it's gone".
-- Frontend `shopping-cart` realm has exactly `admin`/`developer`/`operator` (LDAP-federated, `ou=users,dc=shopping-cart,dc=local`); **`alice` does not exist**; passwords generated per-run into Vault (`secret/keycloak/users/<user>`, `bin/cluster-up:957`) — doc values are stale.
-- `payment` deploys into its OWN `shopping-cart-payment` namespace (not `shopping-cart-apps`). Always confirm a service's real target namespace before concluding it produced nothing.
-- ACG sandbox creds expire ~4h independent of cluster age; `make up` auto-restarts the sandbox on ghost-state failure. Makefile ACG URL default was stale (`cloud-playground` → `hands-on/playground`) — spec `docs/bugs/2026-07-19-makefile-stale-acg-sandbox-url-default.md` (unassigned).
+Shared Bash foundation library. Contains:
+- `scripts/lib/core.sh` — cluster lifecycle, provider abstraction, `_resolve_script_dir`
+- `scripts/lib/system.sh` — `_run_command`, `_run_command_resolve_sudo`, `_detect_platform`, package helpers, BATS install
+- `scripts/lib/agent_rigor.sh` — `_agent_checkpoint`, `_agent_audit`, `_agent_lint`
+
+Consumed by downstream repos via git subtree pull.
+API reference: `docs/api/functions.md`
+
+---
+
+## Version Roadmap
+
+| Version | Status | Notes |
+|---|---|---|
+| v0.1.0–v0.3.3 | released | See `docs/releases.md` |
+| v0.3.4 | **SHIPPED** | PR #11 merged (`dbfafe9`) — doc fixes + upstream lib sync; tagged + released 2026-03-22 |
+| v0.3.5 | **SHIPPED** | PR #10 merged (`2f895a99`) — doc-hygiene hook; 2026-03-23 |
+| v0.3.6 | **SHIPPED** | PR #12 merged (`d8b4c48`) — code-fence exclusion + CoreDNS Check 4; 2026-03-23 |
+| v0.3.7 | **SHIPPED** | PR #13 merged (`071c270`) — system.sh if-count cleanup; 2026-03-24; tagged v0.3.7 retroactively |
+| v0.3.8 | **SHIPPED** | PR #14 merged (`a669a63`) — tab indentation enforcement in `_agent_audit`; 2026-03-24; tagged v0.3.8 retroactively |
+| v0.3.9 | **SHIPPED** | PR #15 merged (`fb09921`) — release history backfill + memory-bank reconciliation; 2026-03-24; no tag (docs-only) |
+| v0.3.10 | **SHIPPED** | PR #16 merged (`c5662c9`) — `.clinerules` fix; 2026-03-24; no tag (docs-only) |
+| v0.3.11 | **SHIPPED** | PR #17 merged (`2625683`) — YAML IP check in `_agent_audit`; 2026-03-25; tagged v0.3.11 |
+| v0.3.12 | **SHIPPED** | PR #18 merged (`91340d62`) — Antigravity IDE + MCP helpers; 7 BATS; 2026-03-25; tagged v0.3.12 |
+| v0.3.13 | **SHIPPED** | PR #19 merged (`e870c6d9`) — `_antigravity_browser_ready` curl probe fix; 2026-03-25; tagged v0.3.13 |
+| v0.3.14 | **SHIPPED** | PR #20 merged (`bbbaf053`) 2026-03-27 |
+| v0.3.15–v0.3.17 | **SHIPPED** | PRs #21–#24 merged; v0.3.17 at `108924b9` 2026-05-01 |
+| v0.3.18 | **IN PROGRESS** | branch `feat/v0.3.18`; PR #25 open |
+| v0.3.20 | **SHIPPED** | PR #29 merged to main (`2f46d4be`) 2026-05-30; unreleased |
+
+---
+
+## v0.3.18 Open Items
+
+- [x] **Bugfix: `_copilot_auth_check` K3DM_ENABLE_AI gate** — DONE (`f0e29d9`, `eede5c3`). Spec: `docs/plans/v0.3.18-bugfix-copilot-auth-preflight.md`. Removed `K3DM_ENABLE_AI` gate; checks env tokens → `~/.config/github-copilot/apps.json` → `gh auth status`; clear error on failure. New `scripts/tests/lib/copilot_auth.bats` (6 tests).
+- [ ] **Copilot review non-interactive permissions** — OPEN. `docs/issues/2026-05-02-copilot-review-noninteractive-permissions.md`. `_copilot_review` still emits a non-interactive Copilot call without the CLI permission mode the help text describes as required.
+
+---
+
+## Pre-v0.3.18 Open Items
+
+- [x] **PR #10 doc-hygiene hook** — staged-only `_agent_audit` BATS test added in commit `bdd60e7`; spec `docs/plans/v0.3.5-agent-audit-staged-only-test.md`. Branch: `feat/doc-hygiene-hook`.
+- [x] **Doc hygiene staged-content read** — commit `d00bccb` implements `_dh_grep` index reader per `docs/plans/v0.3.5-doc-hygiene-staged-content-read.md`; branch pushed `feat/doc-hygiene-hook`.
+- [x] **Doc hygiene staged-mode follow-ups** — commit `aeb1396` localizes `_DHC_STAGED`, gates staged file existence via `git cat-file`, and replaces staged-mode BATS per `docs/plans/v0.3.5-doc-hygiene-copilot-pr10-round2.md`.
+- [ ] **k3d-manager subtree pull** — pull v0.3.5 into k3d-manager (PR #10 now merged)
+- [x] **v0.3.6: Check 2 code-fence exclusion** — commit `7751068` adds `_dh_strip_fences`, optional `_dh_grep --strip-fences`, and 3 BATS tests per `docs/plans/v0.3.6-doc-hygiene-codefence-exclusion.md`.
+- [x] **v0.3.6: CoreDNS Check 4** — commit `c352c1b` adds YAML-only warn on `<svc>.<ns>.svc(.cluster.local)` + 4 BATS tests per `docs/plans/v0.3.5-doc-hygiene-coredns-check.md`.
+- [x] **v0.3.6: indented fence fix** — commit `02e7418` updates `_dh_strip_fences` to handle indented fences + adds indented BATS per `docs/plans/v0.3.6-doc-hygiene-indented-fence-fix.md`.
+- [x] **v0.3.11: YAML hardcoded IP check** — commit `11e653b` adds staged `.yaml/.yml` IP detection to `_agent_audit` per `docs/plans/v0.3.11-agent-audit-yaml-ip-check.md`.
+- [x] `rigor-cli` — repo bootstrapped (commit `a1c034f`), bash 3.2 fix (`8ae57bc`), gist installer (`310fd16`); lib-foundation spec: `docs/plans/v0.3.10-rigor-cli-init.md`; rigor-cli specs tracked in that repo (`plans/v0.1.1-mapfile-compat.md`, `plans/v0.1.1-gist-install-script.md`).
+- [x] **v0.3.12: Antigravity helpers** — commit `ae0e8b9` adds `_ensure_antigravity_ide`, `_ensure_antigravity_mcp_playwright`, `_antigravity_browser_ready` per `docs/plans/v0.3.12-ensure-antigravity.md`.
+- [x] **v0.3.13: antigravity browser probe fix** — commit `9350ecd` switches `_antigravity_browser_ready` to `_run_command --soft -- curl` per `docs/plans/v0.3.13-antigravity-browser-ready-fix.md`.
+- [x] **v0.3.14: k3d-manager Copilot PR #51 deferred findings** — `e52b819` fixes all 5 upstream gaps per `docs/plans/v0.3.14-copilot-pr51-deferred-fixes.md`:
+  - `_ensure_antigravity_ide` now detects `agy` binaries first
+  - `_antigravity_browser_ready` fails fast when `curl` missing
+  - `_agent_audit` tab scan iterates staged files via NUL-delimited loop
+  - `docs/api/functions.md` explains `PLAYWRIGHT_MCP_VERSION` pinned MCP default
+  - `CHANGE.md` versions the v0.3.12/v0.3.13 release notes
+- [ ] `shopping-carts` as consumer (future)
+
+---
+
+## Key Contracts (must not change without coordinating all consumers)
+
+- `_run_command [--prefer-sudo|--require-sudo|--interactive-sudo|--probe '<subcmd>'|--quiet|--soft] -- <cmd>`
+- `_detect_platform` → `mac | wsl | debian | redhat | linux`
+- `_cluster_provider` → `k3d | k3s | orbstack`
+- `_resolve_script_dir` → absolute canonical path of calling script's real directory
+- `_DCRS_PROVIDER` — global temp set by `_deploy_cluster_resolve_provider` (no command substitution — preserves TTY)
+- `_RCRS_RUNNER` — global temp set by `_run_command_resolve_sudo`
+
+---
+
+## Consumers
+
+| Repo | Integration | Status |
+|---|---|---|
+| `k3d-manager` | git subtree at `scripts/lib/foundation/` | subtree pull to v0.3.13 pending |
+| `rigor-cli` | git subtree at `scripts/lib/foundation/` | subtree pull to v0.3.13 pending |
+| `shopping-carts` | git subtree (planned) | future |
+
+---
+
+## Engineering Protocol
+
+- **Tests**: always run with `env -i PATH="/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin" HOME="$HOME" TMPDIR="$TMPDIR" bash --norc --noprofile -c 'bats scripts/tests/lib/'`
+- **shellcheck**: run on every touched `.sh` file before commit
+- **No bare sudo**: always `_run_command --interactive-sudo` for install helpers, `--prefer-sudo` for non-interactive
+- **All changes originate here** — never edit consumer subtree copies directly
+- **Release flow**: PR → merge → tag → GitHub release → consumers run `git subtree pull`
+
+## Lessons Learned
+
+- `local -n` nameref requires bash 4.3+ — use global temp vars (`_RCRS_RUNNER`, `_DCRS_PROVIDER`) for output from helpers
+- Command substitution `$()` creates a subshell — `[[ -t 0 && -t 1 ]]` is always false inside; use global temp vars instead
+- `--prefer-sudo` silently drops to non-root when password sudo required — use `--interactive-sudo` for install helpers
+- `git subtree add --squash` creates a merge commit that blocks GitHub rebase-merge — use squash-merge with admin override in consumers
+- BATS must run with `env -i` — ambient `SCRIPT_DIR` causes false passes
