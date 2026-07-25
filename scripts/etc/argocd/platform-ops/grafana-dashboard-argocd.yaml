@@ -232,6 +232,7 @@ data:
             }
           ],
           "title": "Trivy Operator Job Reconcile Errors",
+          "timeFrom": "30d",
           "type": "logs"
         }
       ],
