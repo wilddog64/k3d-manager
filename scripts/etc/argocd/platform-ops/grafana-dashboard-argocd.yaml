@@ -113,25 +113,108 @@ data:
         },
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "fieldConfig": { "defaults": {}, "overrides": [] },
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
           "id": 6,
           "options": {
-            "dedupStrategy": "none",
-            "enableLogDetails": true,
-            "showLabels": false,
-            "showTime": true,
-            "sortOrder": "Descending",
-            "wrapLogMessage": false
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value"
           },
           "targets": [
             {
-              "expr": "{namespace=\"cicd\",pod=~\"argocd-image-updater.*\"} |= \"Processing results\" | json | line_format \"{{.log}}\" | regexp \"Processing results: applications=(?P<applications>\\\\d+) images_considered=(?P<images_considered>\\\\d+) images_skipped=(?P<images_skipped>\\\\d+) images_updated=(?P<images_updated>\\\\d+) errors=(?P<errors>\\\\d+)\" | line_format \"applications={{.applications}} images_considered={{.images_considered}} images_skipped={{.images_skipped}} images_updated={{.images_updated}} errors={{.errors}}\"",
+              "expr": "max(last_over_time({namespace=\"cicd\",pod=~\"argocd-image-updater.*\"} |= \"Processing results\" | regexp \"applications=(?P<applications>\\\\d+)\" | unwrap applications [30d]))",
+              "instant": true,
+              "queryType": "instant",
               "refId": "A"
             }
           ],
-          "title": "Image Updater Processing Results",
-          "type": "logs"
+          "title": "Image Updater Apps Watched",
+          "timeFrom": "30d",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+          "id": 13,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value"
+          },
+          "targets": [
+            {
+              "expr": "sum(sum_over_time({namespace=\"cicd\",pod=~\"argocd-image-updater.*\"} |= \"Processing results\" | regexp \"images_updated=(?P<images_updated>\\\\d+)\" | unwrap images_updated [30d]))",
+              "instant": true,
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ],
+          "title": "Images Updated (30d)",
+          "timeFrom": "30d",
+          "type": "stat"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+          "id": 14,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "center",
+            "orientation": "auto",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "textMode": "value"
+          },
+          "targets": [
+            {
+              "expr": "sum(sum_over_time({namespace=\"cicd\",pod=~\"argocd-image-updater.*\"} |= \"Processing results\" | regexp \"errors=(?P<errors>\\\\d+)\" | unwrap errors [30d]))",
+              "instant": true,
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ],
+          "title": "Image Updater Errors (30d)",
+          "timeFrom": "30d",
+          "type": "stat"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
