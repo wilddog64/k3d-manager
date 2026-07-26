@@ -214,26 +214,29 @@ data:
         },
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "fieldConfig": { "defaults": {}, "overrides": [] },
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
           "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
           "id": 12,
           "options": {
-            "dedupStrategy": "none",
-            "enableLogDetails": true,
-            "showLabels": false,
-            "showTime": true,
-            "sortOrder": "Descending",
-            "wrapLogMessage": false
+            "displayMode": "gradient",
+            "orientation": "horizontal",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "showUnfilled": true
           },
           "targets": [
             {
-              "expr": "{namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | level=\"error\" | line_format \"{{.logger}}: {{.msg}} job={{.job_extracted}} container={{.container_extracted}} reason={{.status_reason}}\"",
+              "expr": "sum by (container_extracted) (count_over_time({namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | level=\"error\" [30d]))",
+              "instant": true,
               "refId": "A"
             }
           ],
           "title": "Trivy Operator Job Reconcile Errors",
           "timeFrom": "30d",
-          "type": "logs"
+          "type": "bargauge"
         }
       ],
       "schemaVersion": 39,
