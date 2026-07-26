@@ -214,30 +214,34 @@ data:
         },
         {
           "datasource": { "type": "loki", "uid": "loki" },
-          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "never",
+                "spanNulls": false
+              }
+            },
+            "overrides": []
+          },
           "gridPos": { "h": 8, "w": 24, "x": 0, "y": 36 },
           "id": 12,
           "options": {
-            "displayMode": "gradient",
-            "orientation": "horizontal",
-            "reduceOptions": {
-              "calcs": ["lastNotNull"],
-              "fields": "",
-              "values": false
-            },
-            "showUnfilled": true
+            "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+            "tooltip": { "mode": "single", "sort": "none" }
           },
           "targets": [
             {
-              "expr": "sum by (container_extracted) (count_over_time({namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | level=\"error\" [30d]))",
-              "instant": true,
-              "queryType": "instant",
+              "expr": "sum(count_over_time({namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | level=\"error\" [$__interval]))",
               "refId": "A"
             }
           ],
           "title": "Trivy Operator Job Reconcile Errors",
           "timeFrom": "30d",
-          "type": "bargauge"
+          "type": "timeseries"
         }
       ],
       "schemaVersion": 39,
