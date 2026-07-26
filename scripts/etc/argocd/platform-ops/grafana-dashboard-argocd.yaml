@@ -231,6 +231,7 @@ data:
             {
               "expr": "sum by (container_extracted) (count_over_time({namespace=\"trivy-system\",pod=~\"trivy-operator.*\"} | json | level=\"error\" [30d]))",
               "instant": true,
+              "queryType": "instant",
               "refId": "A"
             }
           ],
