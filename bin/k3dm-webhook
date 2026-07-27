@@ -233,8 +233,11 @@ _DIAGNOSTIC_NAMESPACES = {
     "trivy-system",
 }
 _RESOURCE_NAME_RE = re.compile(r"^[a-z0-9]([-.a-z0-9]*[a-z0-9])?$")
+_CVE_COOLDOWN_DIR = Path.home() / ".k3dm" / "cooldowns" / "cve-remediate"
+_CVE_COOLDOWN_SECS = 24 * 60 * 60
 _ACTION_POLICY = {
     "/api/v1/argocd-upgrade": {"name": "argocd-upgrade", "min_role": "admin"},
+    "/api/v1/cve-remediate": {"name": "cve-remediate", "min_role": "operator"},
     "/api/v1/cluster-status": {"name": "cluster-status", "min_role": "reader"},
     "/api/v1/diagnostics": {"name": "diagnostics", "min_role": "reader"},
     "/api/v1/hostinger-status": {"name": "hostinger-status", "min_role": "reader"},
@@ -319,6 +322,63 @@ def _validate_namespace(namespace):
 def _validate_resource_name(name):
     name = (name or "").strip()
     return name if _RESOURCE_NAME_RE.match(name) else ""
+
+
+def _cve_cooldown_key(labels):
+    namespace = re.sub(r"[^a-z0-9._-]+", "_", (labels.get("namespace", "") or "").strip().lower())
+    repository = re.sub(r"[^a-z0-9._-]+", "_", (labels.get("image_repository", "") or "").strip().lower())
+    namespace = namespace.strip("._-") or "unknown"
+    repository = repository.strip("._-") or "unknown"
+    return f"{namespace}__{repository}"
+
+
+def _cve_cooldown_file(key):
+    return _CVE_COOLDOWN_DIR / key
+
+
+def _cve_cooldown_active(path, now=None):
+    now = time.time() if now is None else now
+    try:
+        return now - path.stat().st_mtime < _CVE_COOLDOWN_SECS
+    except OSError:
+        return False
+
+
+def _cve_touch_cooldown(path):
+    _CVE_COOLDOWN_DIR.mkdir(parents=True, exist_ok=True)
+    path.touch()
+
+
+def _active_cve_scan_job():
+    rc, output, timed_out = _spawn_capture_text(
+        [
+            "kubectl", "--context", "k3d-k3d-cluster", "-n", "platform-ops",
+            "get", "jobs",
+            "-o", 'jsonpath={range .items[*]}{.metadata.name}{"\\t"}{.status.active}{"\\n"}{end}',
+        ],
+        timeout=20,
+    )
+    if timed_out or rc != 0:
+        raise RuntimeError(output.strip() or f"kubectl get jobs failed with rc={rc}")
+    for line in output.splitlines():
+        name, _, active = line.partition("\t")
+        if active.strip() not in {"", "0"} and (name == "app-cve-scan" or name.startswith("cve-auto-")):
+            return name.strip()
+    return ""
+
+
+def _create_cve_scan_job():
+    job_name = f"cve-auto-{int(time.time())}"
+    rc, output, timed_out = _spawn_capture_text(
+        [
+            "kubectl", "--context", "k3d-k3d-cluster", "-n", "platform-ops",
+            "create", "job", "--from=cronjob/app-cve-scan", job_name,
+        ],
+        timeout=20,
+    )
+    if timed_out or rc != 0:
+        raise RuntimeError(output.strip() or f"kubectl create job failed with rc={rc}")
+    return job_name
 
 
 def _validate_diagnostics_request(body):
@@ -3027,6 +3087,51 @@ class _Handler(http.server.BaseHTTPRequestHandler):
                 daemon=True
             ).start()
             self._json(202, {"job_id": job_id, "status": "queued"})
+            return
+
+        if self.path == "/api/v1/cve-remediate":
+            alerts = body.get("alerts", [])
+            if not isinstance(alerts, list):
+                self._json(400, {"error": "alerts[] required"})
+                return
+            triggered = []
+            skipped_on_cooldown = []
+            skipped_running = []
+            active_job = _active_cve_scan_job()
+            for alert in alerts:
+                if not isinstance(alert, dict) or alert.get("status") != "firing":
+                    continue
+                labels = alert.get("labels", {})
+                if not isinstance(labels, dict):
+                    labels = {}
+                namespace = (labels.get("namespace", "") or "").strip()
+                image_repository = (labels.get("image_repository", "") or "").strip()
+                key = _cve_cooldown_key(labels)
+                entry = {
+                    "key": key,
+                    "namespace": namespace,
+                    "image_repository": image_repository,
+                }
+                cooldown_file = _cve_cooldown_file(key)
+                if _cve_cooldown_active(cooldown_file):
+                    print(f"[cve-remediate] cooldown skip ns={namespace} repo={image_repository} key={key}", flush=True)
+                    skipped_on_cooldown.append(entry)
+                    continue
+                if active_job:
+                    print(f"[cve-remediate] scan already running job={active_job} ns={namespace} repo={image_repository}", flush=True)
+                    skipped_running.append({**entry, "active_job": active_job})
+                    continue
+                _cve_touch_cooldown(cooldown_file)
+                job_name = _create_cve_scan_job()
+                active_job = job_name
+                print(f"[cve-remediate] triggered ns={namespace} repo={image_repository} job={job_name}", flush=True)
+                triggered.append({**entry, "job_name": job_name})
+            self._json(200, {
+                "status": "ok",
+                "triggered": triggered,
+                "skipped_on_cooldown": skipped_on_cooldown,
+                "skipped_running": skipped_running,
+            })
             return
 
         if self.path == "/api/v1/cluster":
