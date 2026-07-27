@@ -72,6 +72,8 @@ grafana:
 alertmanager:
   enabled: true
   alertmanagerSpec:
+    alertmanagerConfigMatcherStrategy:
+      type: None
     resources:
       requests:
         memory: 32Mi
