@@ -1,6 +1,6 @@
 # Bug: `Makefile` default ACG sandbox URL is stale — 404s and misreports as "no sandbox"
 
-**Branch:** `k3d-manager-v1.16.0`
+**Branch:** `k3d-manager-v1.18.0`
 **Files:** `Makefile` (ONLY)
 
 ---
@@ -8,8 +8,8 @@
 ## Before You Start
 
 - Read `memory-bank/activeContext.md` and `memory-bank/progress.md` — this is the
-  "stale ACG sandbox URL default" item on branch `k3d-manager-v1.16.0`.
-- `git pull origin k3d-manager-v1.16.0` — work on that branch, never `main`.
+  "stale ACG sandbox URL default" item on branch `k3d-manager-v1.18.0`.
+- `git pull origin k3d-manager-v1.18.0` — work on that branch, never `main`.
 - Read IN FULL before editing:
   - `Makefile` — line 7 (`URL ?=`) and every target that consumes `$(URL)`
   - `scripts/playwright/acg_credentials.js` — lines ~200-255, the tab-discovery and
@@ -109,7 +109,7 @@ must keep accepting both, so a warm tab on either route is still discovered.
 - [ ] `acg_credentials.js` untouched (gate recorded)
 - [ ] `git show --stat` shows exactly ONE file changed
 - [ ] `_agent_audit` exit 0
-- [ ] Committed and pushed to `k3d-manager-v1.16.0`
+- [ ] Committed and pushed to `k3d-manager-v1.18.0`
 - [ ] memory-bank updated with commit SHA and task status
 
 **Commit message (exact):**
@@ -128,7 +128,7 @@ fix(makefile): point ACG sandbox URL default at the current Pluralsight route
 - Do NOT create a PR
 - Do NOT skip pre-commit hooks (`--no-verify`)
 - Do NOT modify files outside the single listed target
-- Do NOT commit to `main` — work on `k3d-manager-v1.16.0`
+- Do NOT commit to `main` — work on `k3d-manager-v1.18.0`
 
 ---
 

@@ -1004,7 +1004,31 @@ else
         _info "[acg-up] LDAP federation bind credential reconciled and full sync triggered" || \
         _warn "[acg-up] LDAP bind credential reconciliation failed — SSO login may be broken"
     else
-      _warn "[acg-up] Could not find LDAP federation component ID — skipping bind credential update"
+      _info "[acg-up] LDAP federation component absent — creating it from canonical config"
+      if kubectl exec -i -n identity --context k3d-k3d-cluster "${_kc_pod}" -- \
+          env KC_ADMIN_PASS="${_kc_admin_pass}" LDAP_BIND="${_ldap_admin_pass}" sh -c '
+            K=/opt/keycloak/bin/kcadm.sh
+            "$K" config credentials --server http://localhost:8080 --realm master \
+              --user admin --password "$KC_ADMIN_PASS" >/dev/null 2>&1 || exit 1
+            RID="$("$K" get realms/shopping-cart --fields id 2>/dev/null \
+              | sed "s/.*: \"//;s/\".*//" | head -1)"
+            [ -n "$RID" ] || exit 1
+            F="$(mktemp)"
+            cat > "$F" <<JSON
+            {"name":"ldap","providerId":"ldap","providerType":"org.keycloak.storage.UserStorageProvider","parentId":"$RID","config":{"enabled":["true"],"priority":["0"],"fullSyncPeriod":["604800"],"changedSyncPeriod":["86400"],"cachePolicy":["DEFAULT"],"editMode":["READ_ONLY"],"syncRegistrations":["false"],"vendor":["other"],"usernameLDAPAttribute":["uid"],"rdnLDAPAttribute":["uid"],"uuidLDAPAttribute":["entryUUID"],"userObjectClasses":["inetOrgPerson, organizationalPerson"],"connectionUrl":["ldap://ldap.identity.svc.cluster.local:389"],"usersDn":["ou=users,dc=shopping-cart,dc=local"],"authType":["simple"],"bindDn":["cn=admin,dc=shopping-cart,dc=local"],"bindCredential":["$LDAP_BIND"],"searchScope":["2"],"validatePasswordPolicy":["false"],"trustEmail":["true"],"useTruststoreSpi":["ldapsOnly"],"connectionPooling":["true"],"pagination":["true"],"batchSizeForSync":["1000"]}}
+            JSON
+            "$K" create components -r shopping-cart -f "$F" >/dev/null 2>&1 || { rm -f "$F"; exit 1; }
+            rm -f "$F"
+            NID="$("$K" get components -r shopping-cart \
+              -q type=org.keycloak.storage.UserStorageProvider --fields id 2>/dev/null \
+              | grep "\"id\"" | head -1 | sed "s/.*: \"//;s/\".*//")"
+            [ -n "$NID" ] || exit 1
+            "$K" create "user-storage/$NID/sync?action=triggerFullSync" -r shopping-cart >/dev/null 2>&1
+          ' 2>/dev/null; then
+        _info "[acg-up] LDAP federation component created and full sync triggered"
+      else
+        _warn "[acg-up] Failed to create LDAP federation component — SSO login may be broken"
+      fi
     fi
   fi
   _cp_write "step-10d6-ldap-bind"

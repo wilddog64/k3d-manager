@@ -392,7 +392,7 @@ show-service-passwords:
 	echo "  Frontend    https://frontend.3ai-talk.org  (login via Keycloak SSO)";\
 	echo "  Keycloak    https://keycloak.3ai-talk.org";\
 	echo "    admin user:     admin / $${_kc:-N/A}";\
-	echo "    dev users:      alice / test1234  |  developer / test1234  |  operator / test1234";\
+	echo "    dev users:      admin / Shopping1!  |  developer / Dev1234!  |  operator / Ops5678!";\
 	echo ""
 
 ## Store Alertmanager credentials in Vault (run once; requires Hub Vault + port-forward)

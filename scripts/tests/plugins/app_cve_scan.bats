@@ -226,7 +226,7 @@ EOF
   chmod +x "${TEST_SCAN_SCRIPT}"
 }
 
-@test "no vulnerability report skips service and exits 0" {
+@test "all-skipped run exits 1 with the fatal zero-match diagnostic" {
   export APP_SERVICES="shopping-cart-basket"
   export TEST_REPORT_ROWS=""
 
@@ -241,8 +241,9 @@ EOF
     APP_SERVICES="${APP_SERVICES}" \
     /bin/sh "${TEST_SCAN_SCRIPT}"
 
-  [ "${status}" -eq 0 ]
-  [[ "${output}" == *"no VulnerabilityReport found"* ]]
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"no VulnerabilityReport found for ghcr.io/wilddog64/shopping-cart-basket"* ]]
+  [[ "${output}" == *"ZERO VulnerabilityReports matched"* ]]
   [ ! -s "${WGET_LOG}" ]
 }
 
@@ -307,6 +308,35 @@ EOF
   grep -q 'patch application shopping-cart-basket' "${KUBECTL_LOG}"
   grep -q 'annotate application shopping-cart-basket argocd.argoproj.io/refresh=hard --overwrite' "${KUBECTL_LOG}"
   grep -q 'warning|App CVE Promotion: shopping-cart-basket|' "${NOTIFY_LOG}"
+}
+
+@test "registry-less trivy-operator repository form still matches and promotes" {
+  export APP_SERVICES="shopping-cart-basket"
+  export TEST_SHA_TAG="sha-basket-new"
+  export TEST_REPORT_ROWS="shopping-cart-apps basket-report wilddog64/shopping-cart-basket sha-old 1 0"
+  export TEST_REPORT_DETAILS_basket_report="HIGH|CVE-2|1.4.0"
+  export TEST_LATEST_CVES_shopping_cart_basket=0
+  export TEST_LATEST_DIGEST="sha256:feedbeef"
+
+  run env -i \
+    PATH="${PATH}" \
+    TRIVY_LOG="${TRIVY_LOG}" \
+    WGET_LOG="${WGET_LOG}" \
+    NOTIFY_LOG="${NOTIFY_LOG}" \
+    KUBECTL_LOG="${KUBECTL_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
+    TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="${APP_SERVICES}" \
+    TEST_SHA_TAG="${TEST_SHA_TAG}" \
+    TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" \
+    TEST_REPORT_DETAILS_basket_report="${TEST_REPORT_DETAILS_basket_report}" \
+    TEST_LATEST_CVES_shopping_cart_basket="${TEST_LATEST_CVES_shopping_cart_basket}" \
+    TEST_LATEST_DIGEST="${TEST_LATEST_DIGEST}" \
+    /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"PROMOTION shopping-cart-basket: from ghcr.io/wilddog64/shopping-cart-basket:sha-old to ghcr.io/wilddog64/shopping-cart-basket:sha-basket-new@sha256:feedbeef"* ]]
+  grep -q 'patch application shopping-cart-basket' "${KUBECTL_LOG}"
 }
 
 @test "digest resolution reads busybox-style indented lowercase headers" {

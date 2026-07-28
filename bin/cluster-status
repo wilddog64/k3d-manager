@@ -246,6 +246,19 @@ kubectl get applicationsets.argoproj.io -A --context "${INFRA_CONTEXT}" 2>/dev/n
   || echo "Cannot reach Hub cluster or ArgoCD CRDs not installed"
 
 echo ""
+echo "=== ArgoCD Values-Branch Drift (${INFRA_CONTEXT}) ==="
+_vb_out=""
+_vb_rc=0
+_vb_out="$("${REPO_ROOT}/scripts/k3d-manager" argocd_check_values_branch '' "${INFRA_CONTEXT}" 2>&1)" || _vb_rc=$?
+printf '%s\n' "${_vb_out}" | grep -vF 'running under bash version' || true
+case "${_vb_rc}" in
+  0) : ;;
+  1) echo "WARN ApplicationSet values-branch drift — reapply the sets with the current K3D_MANAGER_BRANCH (see above)" ;;
+  2) echo "Cannot read Applications — values-branch check skipped" ;;
+  *) echo "values-branch check exited ${_vb_rc}" ;;
+esac
+
+echo ""
 echo "=== ArgoCD Image Updater ==="
 _iu_ready="$(kubectl get deploy argocd-image-updater -n "${ARGOCD_NAMESPACE}" \
   --context "${INFRA_CONTEXT}" -o jsonpath='{.status.readyReplicas}/{.status.replicas}' 2>/dev/null || true)"

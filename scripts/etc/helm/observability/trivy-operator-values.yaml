@@ -1,9 +1,13 @@
 image:
   registry: mirror.gcr.io
   repository: aquasec/trivy-operator
-  tag: "0.31.2"
+  tag: "0.32.0"
 
 trivy:
+  image:
+    registry: mirror.gcr.io
+    repository: aquasec/trivy
+    tag: "0.72.0"
   ignoreUnfixed: true
   severity: CRITICAL,HIGH
   resources:

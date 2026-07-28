@@ -15,9 +15,9 @@ PLUGIN="${BATS_TEST_DIRNAME}/../../plugins/observability.sh"
   [ "$output" = "scripts/etc/grafana/dashboards" ]
 }
 
-@test "hub dashboard appset includes only the argocd dashboard" {
+@test "hub dashboard appset includes all grafana-dashboard configmaps" {
   run yq -r '.spec.template.spec.source.directory.include' "${HUB}"
-  [ "$output" = "grafana-dashboard-argocd.yaml" ]
+  [ "$output" = "grafana-dashboard-*.yaml" ]
 }
 
 @test "both dashboard appsets self-heal" {

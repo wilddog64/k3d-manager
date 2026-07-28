@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+## [1.18.0] - 2026-07-28
+
+**Theme: close the first-mile CVE gap.** A Trivy vulnerability report on a running app now drives an automatic patch end-to-end: the Trivy alert fires a webhook that re-runs `app-cve-scan`, and — for the app dependencies Trivy can't rebuild — Dependabot is enabled on all five shopping-cart repos so dependency CVEs self-heal into PRs. The platform-ops stack (CVE scan + dashboards + webhook-token sync) now deploys from bootstrap so it survives a rebuild, a hub Grafana dashboard makes the auto-patch loop observable, and the webhook token has a Keychain→Secret disaster-recovery path. Ships lib-foundation **v0.4.8** via subtree (brace-expansion CVE fix).
+
+### Added
+- Event-driven CVE auto-patch — a Trivy vulnerability alert fires the k3dm webhook, which re-runs `app-cve-scan` for the affected workload, closing the detect→patch loop without manual intervention (`1684190c`) (`bin/k3dm-webhook`, `scripts/plugins/`)
+- Hub Grafana dashboard visualizing the event-driven CVE auto-patch loop — Trivy reconcile health, alert dispatch, and scan outcomes (`29a087cf`) (`scripts/etc/helm/observability/`)
+- Webhook-token disaster recovery — the `k3dm-webhook-token` Secret auto-syncs from the macOS Keychain on every platform-ops deploy, and the Keychain→Secret sync is generalized so the app-rebuild `gh-token` follows the same DR path (`b0bc5a21`, `907f6259`) (`scripts/plugins/argocd.sh`)
+- `make status` reports ApplicationSet values-branch drift so a set frozen on a stale release branch is visible instead of silently inert (`3e847b26`, `c704d669`) (`scripts/plugins/argocd.sh`, `Makefile`)
+- Dependabot version + security updates enabled on all five shopping-cart repos (`basket`, `frontend`, `order`, `payment`, `product-catalog`) so app-dependency CVEs self-heal into PRs, with branch protection made Dependabot-mergeable (real required checks replacing the phantom `Go CI`, `required_approving_review_count: 0`) (`595f6750`, `b6df96af`, `0df2b0a5`)
+
+### Changed
+- platform-ops (CVE scan, dashboards, webhook-token sync) now deploys from the ArgoCD bootstrap path so it survives a cold rebuild instead of needing a manual reapply (`8537f27e`) (`scripts/plugins/argocd.sh`)
+- Alertmanager `matcherStrategy: None` so a cluster-wide CVE alert routes to the webhook receiver regardless of namespace labels (`5af5e3a7`) (`scripts/etc/helm/observability/`)
+- Every Trivy version pinned explicitly on the newest matched values set — no floating tags (`f428225f`) (`scripts/etc/helm/observability/`)
+- lib-foundation subtree synced to **v0.4.8** (`79294e89`) (`scripts/lib/foundation/`)
+
+### Fixed
+- `app-cve-scan` authenticates ghcr reads with `GH_TOKEN`, so it can pull vulnerability reports for private packages instead of silently seeing nothing (`191d9f4a`) (`scripts/plugins/`)
+- CVE scan matches Trivy vulnerability reports on the registry-less repository path, so reports keyed without the registry prefix are no longer missed (`43e63b53`) (`scripts/plugins/`)
+- Keycloak LDAP federation component is created when absent, so login self-heals on a cluster rebuild instead of staying broken (`989dc8e4`) (`scripts/plugins/keycloak.sh`)
+- `make show-service-passwords` displays the correct dev users (`admin`/`Shopping1!`, …) instead of the stale `alice`/`test1234` (`ad96c028`) (`Makefile`)
+- Trivy reconcile Grafana panel — fixed a query that matched zero lines, corrected `timeFrom`, and converted the render to a per-container bar gauge on an instant Loki query so it actually shows data (`9fde2c43`, `a7d230f2`, `1d33df99`, `cf0901e6`, `67f018a7`, `bf32a000`) (`scripts/etc/helm/observability/`)
+
+### Security
+- brace-expansion bumped to 1.1.16 via the lib-foundation v0.4.8 subtree, clearing the transitive DoS advisory (`79294e89`) (`scripts/lib/foundation/`)
+
 ## [1.17.0] - 2026-07-24
 
 **Theme: the smoke test proves real logins.** `make status` used to false-green because the health smoke only fetched health URLs — a Keycloak stale-session page returns HTTP 200 and counted as a pass. The smoke now performs credentialed logins (token mint / authed request) against Keycloak, the frontend, ArgoCD and Grafana, seeding its own Keycloak client and user so it never depends on app-owned client configuration.

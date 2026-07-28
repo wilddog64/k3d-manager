@@ -61,3 +61,16 @@ spec:
           annotations:
             summary: "Trivy Operator scan jobs are failing"
             description: "At least one Trivy Operator scan job in namespace trivy-system has failed within the last 10 minutes"
+        - alert: TrivyCriticalVulnerabilityDetected
+          expr: |
+            sum by (namespace, image_repository) (
+              trivy_image_vulnerabilities{severity="Critical"}
+            ) > 0
+          for: 15m
+          labels:
+            severity: critical
+            group: trivy-operator
+            remediation: cve-auto-patch
+          annotations:
+            summary: "Critical CVE(s) detected in a running image"
+            description: "{{ $value }} critical vulnerabilities in {{ $labels.image_repository }} (ns {{ $labels.namespace }}); event-driven app-cve-scan will attempt promotion/rebuild."

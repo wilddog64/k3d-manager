@@ -27,6 +27,11 @@ setup_file() {
     # PATH, so a no-op stub on PATH neutralizes every live cluster job.
     export _BATS_STUB_BIN
     _BATS_STUB_BIN="$(mktemp -d)"
+    export _BATS_WEBHOOK_HOME
+    _BATS_WEBHOOK_HOME="$(mktemp -d)"
+    export HOME="${_BATS_WEBHOOK_HOME}"
+    export K3DM_TEST_KUBECTL_LOG
+    K3DM_TEST_KUBECTL_LOG="${_BATS_STUB_BIN}/kubectl.log"
     printf '#!/bin/sh\nexit 0\n' > "${_BATS_STUB_BIN}/make"
     chmod +x "${_BATS_STUB_BIN}/make"
     # Stub kubectl so the queued /cluster "up" success path's _record_acg_state
@@ -34,7 +39,26 @@ setup_file() {
     # kubectl exists but no cluster is reachable, so the real apply blocks up to
     # the 15s _posix_spawn_capture timeout, holding the job "running" and 409ing
     # the next /cluster test.
-    printf '#!/bin/sh\nexit 0\n' > "${_BATS_STUB_BIN}/kubectl"
+    cat > "${_BATS_STUB_BIN}/kubectl" <<'EOF'
+#!/bin/sh
+log_file="${K3DM_TEST_KUBECTL_LOG:-/dev/null}"
+printf '%s\n' "$*" >> "${log_file}"
+case "$*" in
+  *" get jobs "*)
+    if [ -f "${HOME}/active-cve-job" ]; then
+      active_job="$(cat "${HOME}/active-cve-job")"
+      printf '%s\t1\n' "${active_job}"
+    fi
+    exit 0
+    ;;
+  *" create job "*)
+    for last_arg in "$@"; do :; done
+    printf 'job.batch/%s created\n' "${last_arg}"
+    exit 0
+    ;;
+esac
+exit 0
+EOF
     chmod +x "${_BATS_STUB_BIN}/kubectl"
     export PATH="${_BATS_STUB_BIN}:${PATH}"
 
@@ -61,6 +85,7 @@ setup_file() {
 teardown_file() {
     [[ -n "${_BATS_WEBHOOK_PID:-}" ]] && kill "${_BATS_WEBHOOK_PID}" 2>/dev/null || true
     [[ -n "${_BATS_STUB_BIN:-}" ]] && rm -rf "${_BATS_STUB_BIN}" || true
+    [[ -n "${_BATS_WEBHOOK_HOME:-}" ]] && rm -rf "${_BATS_WEBHOOK_HOME}" || true
     [[ -n "${K3DM_JOB_DIR:-}" ]] && rm -rf "${K3DM_JOB_DIR}" || true
     [[ -n "${K3DM_RUN_DIR:-}" ]] && rm -rf "${K3DM_RUN_DIR}" || true
 }
@@ -229,6 +254,44 @@ setup() {
     [ "$status" -eq 0 ]
     [[ "$output" == *'"status":"queued"'* ]]
     [[ "$output" == *'"job_id"'* ]]
+}
+
+@test "POST /cve-remediate requires auth, creates one job, and cooldown-skips repeat" {
+    rm -f "${HOME}/active-cve-job"
+    : > "${K3DM_TEST_KUBECTL_LOG}"
+
+    run curl -s -o /dev/null -w "%{http_code}" -X POST \
+        -H "Authorization: Bearer wrongtoken" \
+        -H "Content-Type: application/json" \
+        -d '{"alerts":[]}' \
+        "${_WEBHOOK_URL}/api/v1/cve-remediate"
+    [ "$status" -eq 0 ]
+    [ "$output" = "401" ]
+
+    local payload
+    payload='{"alerts":[{"status":"firing","labels":{"namespace":"shopping-cart-apps","image_repository":"ghcr.io/wilddog64/shopping-cart-basket"}}]}'
+
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "${payload}" \
+        "${_WEBHOOK_URL}/api/v1/cve-remediate"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"job_name":"cve-auto-'* ]]
+    [[ "$output" == *'"skipped_on_cooldown":[]'* ]]
+
+    run curl -s -X POST \
+        -H "Authorization: Bearer ${K3DM_WEBHOOK_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "${payload}" \
+        "${_WEBHOOK_URL}/api/v1/cve-remediate"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"triggered":[]'* ]]
+    [[ "$output" == *'"skipped_on_cooldown":[{'* ]]
+
+    run grep -c 'create job --from=cronjob/app-cve-scan' "${K3DM_TEST_KUBECTL_LOG}"
+    [ "$status" -eq 0 ]
+    [ "$output" = "1" ]
 }
 
 @test "webhook hostinger status handler accepts provider dispatch" {

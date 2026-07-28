@@ -93,7 +93,7 @@ TRIVY_DASH="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/trivy-security-con
   [ "${status}" -eq 0 ]
 }
 
-@test "metrics: dashboard includes a loki log panel for image-updater processing results" {
+@test "metrics: dashboard includes image-updater stat tiles from loki processing results" {
   run grep -F -- 'argocd-image-updater-hub.json' "${DASH}"
   [ "${status}" -eq 0 ]
 
@@ -109,10 +109,19 @@ TRIVY_DASH="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/trivy-security-con
   run grep -F -- 'type": "loki"' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- 'Image Updater Processing Results' "${DASH}"
+  run grep -F -- 'Image Updater Apps Watched' "${DASH}"
   [ "${status}" -eq 0 ]
 
-  run grep -F -- '| json | line_format \"{{.log}}\" | regexp \"Processing results: applications=(?P<applications>\\\\d+) images_considered=(?P<images_considered>\\\\d+) images_skipped=(?P<images_skipped>\\\\d+) images_updated=(?P<images_updated>\\\\d+) errors=(?P<errors>\\\\d+)\" | line_format \"applications={{.applications}} images_considered={{.images_considered}} images_skipped={{.images_skipped}} images_updated={{.images_updated}} errors={{.errors}}\"' "${DASH}"
+  run grep -F -- 'Images Updated (30d)' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- 'Image Updater Errors (30d)' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- '| regexp \"applications=(?P<applications>\\\\d+)\" | unwrap applications [30d]' "${DASH}"
+  [ "${status}" -eq 0 ]
+
+  run grep -F -- '| regexp \"errors=(?P<errors>\\\\d+)\" | unwrap errors [30d]' "${DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- '"uid": "prometheus"' "${DASH}"
@@ -213,11 +222,8 @@ TRIVY_DASH="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/trivy-security-con
   [ "${status}" -ne 0 ]
 }
 
-@test "metrics: loki logs panels filter their streams and format their lines" {
-  run grep -F -- '{namespace=\"cicd\",pod=~\"argocd-image-updater.*\"} |= \"Processing results\" | json' "${DASH}"
-  [ "${status}" -eq 0 ]
-
-  run grep -F -- '| line_format \"{{.msg}}: {{.namespace}}/{{.name}} controller={{.controller}} error={{.error}}\"' "${DASH}"
+@test "metrics: loki logs panel filters the app-cve-scan stream; other loki panels are stat/graph" {
+  run grep -F -- '{namespace=\"platform-ops\",pod=~\"app-cve-scan.*\"} |= \"[app-cve-scan]\"' "${DASH}"
   [ "${status}" -eq 0 ]
 
   run grep -F -- '"showLabels": true' "${DASH}"
@@ -225,5 +231,8 @@ TRIVY_DASH="${BATS_TEST_DIRNAME}/../../etc/grafana/dashboards/trivy-security-con
 
   run grep -cF -- '"showLabels": false' "${DASH}"
   [ "${status}" -eq 0 ]
-  [ "${output}" -eq 3 ]
+  [ "${output}" -eq 1 ]
+
+  run grep -F -- '| unwrap applications [30d]' "${DASH}"
+  [ "${status}" -eq 0 ]
 }
