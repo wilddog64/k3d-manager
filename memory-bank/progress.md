@@ -3,6 +3,11 @@
 ## Status
 v1.15.0 RELEASED 2026-07-14 · v1.16.0 RELEASED 2026-07-23 — Istio ambient mesh · PR #106 merged `4c5d3556` · **v1.17.0 RELEASED 2026-07-24** — real login verification in health smoke · PR #107 merged `b5d401b6` · tag `v1.17.0` + GitHub release published (Latest) · **v1.18.0 RELEASED 2026-07-28** — first-mile CVE gap closure · PR #108 merged `85742ef7` · tag + GitHub release published (Latest) · enforce_admins restored on main (verified `true`) · k3d-manager-v1.19.0 branch cut.
 
+## v1.19.0 — shopping-cart Dependabot auto-merge DONE (2026-07-28)
+- [x] Spec `docs/plans/v1.19.0-shopping-cart-dependabot-automerge.md` implemented exactly in the 5 shopping-cart repos only; no k3d-manager code changes. Added exactly one new file per repo, `.github/workflows/dependabot-automerge.yml`, byte-identical to the spec, on branch `feat/dependabot-automerge`.
+- [x] Remote SHAs: basket `227c5b0`, frontend `5b4411f`, order `adc5a85`, payment `62d899b`, product-catalog `a56f699`. Exact commit message in all 5 repos: `ci(dependabot): auto-merge minor/patch and security updates on green CI`.
+- [x] Gate recorded on this machine for each repo: `actionlint .github/workflows/dependabot-automerge.yml` → clean (0 errors). Scope check before commit: `git status --short` showed only `?? .github/workflows/dependabot-automerge.yml` in each repo. All 5 branches pushed successfully to `origin/feat/dependabot-automerge`.
+
 ## v1.18.0 — PR #108 OPEN (2026-07-28)
 - [x] CHANGELOG `[1.18.0]`, README releases table (v1.15.0→`<details>`), `docs/releases.md` row — committed `f5597796`.
 - [x] 8 BATS suites pass locally, 0 failures (`app_cve_scan`, `argocd_values_branch_drift`, `argocd_platform_ops_bootstrap`, `grafana_dashboard_appsets`, `trivy_operator_observability`, `argocd_metrics_servicemonitor`, `cluster_status_values_branch`, `webhook`).
