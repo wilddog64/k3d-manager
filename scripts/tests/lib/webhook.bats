@@ -287,7 +287,7 @@ setup() {
         "${_WEBHOOK_URL}/api/v1/cve-remediate"
     [ "$status" -eq 0 ]
     [[ "$output" == *'"triggered":[]'* ]]
-    [[ "$output" == *'"skipped_on_cooldown":[{'* || "$output" == *'"skipped_on_cooldown":[{'* ]]
+    [[ "$output" == *'"skipped_on_cooldown":[{'* ]]
 
     run grep -c 'create job --from=cronjob/app-cve-scan' "${K3DM_TEST_KUBECTL_LOG}"
     [ "$status" -eq 0 ]

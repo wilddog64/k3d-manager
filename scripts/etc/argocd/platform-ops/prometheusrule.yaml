@@ -73,4 +73,4 @@ spec:
             remediation: cve-auto-patch
           annotations:
             summary: "Critical CVE(s) detected in a running image"
-            description: "{{ $value }} Critical vulnerabilit(y/ies) in {{ $labels.image_repository }} (ns {{ $labels.namespace }}); event-driven app-cve-scan will attempt promotion/rebuild."
+            description: "{{ $value }} critical vulnerabilities in {{ $labels.image_repository }} (ns {{ $labels.namespace }}); event-driven app-cve-scan will attempt promotion/rebuild."
