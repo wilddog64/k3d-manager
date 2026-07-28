@@ -1343,6 +1343,36 @@ EOF
   _argocd_set_active_app_cluster "${ARGOCD_APP_CLUSTER_NAME}"
 }
 
+function _argocd_apply_token_secret() {
+   local _token="${1:?token required}"
+   local _ns="${2:?namespace required}"
+   local _name="${3:?secret name required}"
+   printf '%s' "${_token}" \
+      | _kubectl -n "${_ns}" create secret generic "${_name}" \
+           --from-file=token=/dev/stdin --dry-run=client -o yaml \
+      | _kubectl apply -f -
+}
+
+function argocd_sync_webhook_token_secret() {
+   local _ns="${1:-cicd}"
+   local _service="k3dm-webhook-token"
+   local _account="k3dm"
+   local _token=""
+
+   if _is_mac; then
+      # shellcheck disable=SC2016
+      _token=$(_no_trace bash -c 'security find-generic-password -s "$1" -a "$2" -w' _ "${_service}" "${_account}" 2>/dev/null || true)
+   fi
+
+   if [[ -z "${_token}" ]]; then
+      _warn "[argocd] ${_service} not found in Keychain (${_service}/${_account}) — run bin/k3dm-webhook-setup to create it, then re-run; skipping cluster Secret sync"
+      return 0
+   fi
+
+   _info "[argocd] Syncing ${_service} Secret into namespace ${_ns} from Keychain..."
+   _no_trace _argocd_apply_token_secret "${_token}" "${_ns}" "${_service}"
+}
+
 function deploy_argocd_platform_ops() {
    if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
       cat <<'HELP'
@@ -1422,11 +1452,13 @@ EOF
    _info "[argocd] Deploying AlertmanagerConfig..."
    _kubectl apply -f "${_dir}/alertmanager-config.yaml"
 
+   _info "[argocd] Syncing webhook token Secret from Keychain (DR — see argocd_sync_webhook_token_secret)..."
+   argocd_sync_webhook_token_secret cicd
+
    _info "[argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m"
-   _info "[argocd] Secrets to create manually:"
+   _info "[argocd] Secrets still to create manually (no durable local source):"
    _info "[argocd]   kubectl create secret generic oci-kubeconfig --from-file=config=<path> -n platform-ops"
    _info "[argocd]   kubectl create secret generic platform-ops-app-rebuild --from-literal=gh-token=<token> -n platform-ops"
-   _info "[argocd]   kubectl create secret generic k3dm-webhook-token --from-literal=token=<token> -n cicd"
    _info "[argocd]   kubectl patch secret platform-ops-notifications -n platform-ops --type=merge \\"
    _info "[argocd]     -p '{\"data\":{\"slack-incoming-webhook-url\":\"<base64-url>\"}}'"
 }
