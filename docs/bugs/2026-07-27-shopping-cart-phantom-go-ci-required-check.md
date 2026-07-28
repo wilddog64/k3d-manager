@@ -152,10 +152,25 @@ admin bypass once approved.
 
 ## Definition of Done
 
-- [ ] No repo's `required_status_checks.contexts` contains `"Go CI"`
-- [ ] Each repo requires the confirmed real check contexts from the table
+- [x] No repo's `required_status_checks.contexts` contains `"Go CI"` — **APPLIED 2026-07-28**
+- [x] Each repo requires the confirmed real check contexts from the table — **APPLIED 2026-07-28**
+- [x] `required_approving_review_count: 0` on all 5 (Change 2) — **APPLIED 2026-07-28**
 - [ ] A subsequent PR shows the required checks reporting (not "expected" forever)
-- [ ] memory-bank updated with the applied contexts per repo and completion status
+- [x] memory-bank updated with the applied contexts per repo and completion status
+
+### Applied contexts (verified live 2026-07-28, `enforce_admins` kept `true`)
+
+| Repo | `contexts` | review |
+|------|-----------|--------|
+| basket | `Lint`, `Test`, `Security Scan` | 0 |
+| frontend | `Lint`, `Test`, `Type Check`, `Build`, `E2E Tests`, `Security Scan` | 0 |
+| order | `Build & Test`, `Checkstyle` | 0 |
+| payment | `Build and Test`, `Checkstyle & SpotBugs`, `Integration Tests`, `Security Scan` | 0 |
+| product-catalog | `Lint & Type Check`, `Lint, Test & Build`, `Integration Test — Schema Self-Heal`, `Security Scan` | 0 |
+
+All required contexts confirmed **green on `main`** before requiring (every CI failure was a
+deploy job — `Publish`, `Build, Scan, Push & Deploy` — correctly excluded). Change 3 (auto-merge)
+remains for v1.19.0.
 
 ---
 
