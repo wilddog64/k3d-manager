@@ -28,7 +28,7 @@ spec:
         path: scripts/etc/argocd/platform-ops
         directory:
           recurse: false
-          include: 'grafana-dashboard-argocd.yaml'
+          include: 'grafana-dashboard-*.yaml'
       syncPolicy:
         automated:
           prune: true
