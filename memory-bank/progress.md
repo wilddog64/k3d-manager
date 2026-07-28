@@ -11,8 +11,8 @@ v1.15.0 RELEASED 2026-07-14 · v1.16.0 RELEASED 2026-07-23 — Istio ambient mes
 - [x] CI green on PR (lint/detect/CodeQL/Analyze all pass)
 - [x] Copilot review addressed — 2 fixed (`bb294f6e`: prometheusrule alert text, webhook.bats redundant `||`), 1 declined (Makefile dev-cred print, dev-only helper); 3 threads replied + resolved
 - [x] **Live smoke PASS (2026-07-28, Claude-run `make status`)** — all credentialed logins green (Keycloak token minted, Frontend `/api/cart` 200, ArgoCD/Grafana login 200), ESO 18/18, data layer 4/4; values-branch drift detector reports `k3d-manager-v1.18.0` correctly (v1.18.0 feature verified live). Pre-existing non-blockers: keycloak-realm-reconcile Error (login still works), argocd-cve-scan Error (infra scan), ubuntu-k3s Unknown (dead ACG ctx).
-- [ ] **GitGuardian check** — FAILS on verified false positive (incident 35165473, LDAP `bindCredential:["$LDAP_BIND"]` var, not a literal). Classifier blocks Claude from reading the Keychain-stored PAT or mutating the incident → **user must resolve in dashboard as false_positive**, then Claude re-runs the check.
-- [ ] User go → merge (never auto-merge) → `/post-merge` (tag v1.18.0, restore enforce_admins, cut v1.19.0)
+- [x] **GitGuardian check GREEN** — incident 35165473 (LDAP `bindCredential:["$LDAP_BIND"]` var, not a literal) resolved as false_positive by user; `.gitguardian.yaml` also carries the match SHA `d519…` for local pre-commit hygiene (commit `4143a72e`). Note: GitGuardian **App** check reads workspace incident state — `.gitguardian.yaml` alone does NOT clear it (confirms PR #107 finding); re-triggered via empty commit `7d079d76`.
+- [ ] **User go → merge** (never auto-merge). ALL gates green. On go: Claude `enforce_admins` DELETE → user merges → `/post-merge` (tag v1.18.0, restore enforce_admins, cut k3d-manager-v1.19.0 from merge SHA, drop drafted auto-merge spec).
 
 > Full per-item detail (gate dumps, live-verify logs) archived 2026-07-19 → `memory-bank/archive/progress-v1.16.0-detail-thru-2026-07-19.md`. Older: `progress-v1.6.5-v1.15.0.md`, `-v1.6.x-v1.6.4.md`, `-v1.4.2-v1.4.8.md`.
 
