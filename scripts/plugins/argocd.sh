@@ -1343,14 +1343,23 @@ EOF
   _argocd_set_active_app_cluster "${ARGOCD_APP_CLUSTER_NAME}"
 }
 
-function _argocd_apply_token_secret() {
-   local _token="${1:?token required}"
+function _argocd_apply_secret_from_stdin() {
+   local _value="${1:?value required}"
    local _ns="${2:?namespace required}"
    local _name="${3:?secret name required}"
-   printf '%s' "${_token}" \
+   local _key="${4:-token}"
+   printf '%s' "${_value}" \
       | _kubectl -n "${_ns}" create secret generic "${_name}" \
-           --from-file=token=/dev/stdin --dry-run=client -o yaml \
+           --from-file="${_key}=/dev/stdin" --dry-run=client -o yaml \
       | _kubectl apply -f -
+}
+
+function _argocd_keychain_value() {
+   local _service="${1:?service required}"
+   local _account="${2:?account required}"
+   [[ "$(uname -s)" == "Darwin" ]] || return 0
+   # shellcheck disable=SC2016
+   _no_trace bash -c 'security find-generic-password -s "$1" -a "$2" -w' _ "${_service}" "${_account}" 2>/dev/null || true
 }
 
 function argocd_sync_webhook_token_secret() {
@@ -1359,10 +1368,7 @@ function argocd_sync_webhook_token_secret() {
    local _account="k3dm"
    local _token=""
 
-   if _is_mac; then
-      # shellcheck disable=SC2016
-      _token=$(_no_trace bash -c 'security find-generic-password -s "$1" -a "$2" -w' _ "${_service}" "${_account}" 2>/dev/null || true)
-   fi
+   _token=$(_argocd_keychain_value "${_service}" "${_account}")
 
    if [[ -z "${_token}" ]]; then
       _warn "[argocd] ${_service} not found in Keychain (${_service}/${_account}) — run bin/k3dm-webhook-setup to create it, then re-run; skipping cluster Secret sync"
@@ -1370,7 +1376,25 @@ function argocd_sync_webhook_token_secret() {
    fi
 
    _info "[argocd] Syncing ${_service} Secret into namespace ${_ns} from Keychain..."
-   _no_trace _argocd_apply_token_secret "${_token}" "${_ns}" "${_service}"
+   _no_trace _argocd_apply_secret_from_stdin "${_token}" "${_ns}" "${_service}" token
+}
+
+function argocd_sync_app_rebuild_secret() {
+   local _ns="${1:-platform-ops}"
+   local _service="platform-ops-app-rebuild"
+   local _account="k3dm"
+   local _name="platform-ops-app-rebuild"
+   local _token=""
+
+   _token=$(_argocd_keychain_value "${_service}" "${_account}")
+
+   if [[ -z "${_token}" ]]; then
+      _info "[argocd] ${_service} not in Keychain (${_service}/${_account}) — optional app-rebuild gh-token; skipping (store a dedicated PAT there to enable auto-sync — do NOT reuse a broad gh CLI token)"
+      return 0
+   fi
+
+   _info "[argocd] Syncing ${_name} Secret (gh-token) into namespace ${_ns} from Keychain..."
+   _no_trace _argocd_apply_secret_from_stdin "${_token}" "${_ns}" "${_name}" gh-token
 }
 
 function deploy_argocd_platform_ops() {
@@ -1452,13 +1476,13 @@ EOF
    _info "[argocd] Deploying AlertmanagerConfig..."
    _kubectl apply -f "${_dir}/alertmanager-config.yaml"
 
-   _info "[argocd] Syncing webhook token Secret from Keychain (DR — see argocd_sync_webhook_token_secret)..."
+   _info "[argocd] Syncing secrets from Keychain (DR — see argocd_sync_webhook_token_secret / argocd_sync_app_rebuild_secret)..."
    argocd_sync_webhook_token_secret cicd
+   argocd_sync_app_rebuild_secret platform-ops
 
    _info "[argocd] platform-ops deployed — CVE scan: 1st+15th, expiry check: every 30m"
    _info "[argocd] Secrets still to create manually (no durable local source):"
    _info "[argocd]   kubectl create secret generic oci-kubeconfig --from-file=config=<path> -n platform-ops"
-   _info "[argocd]   kubectl create secret generic platform-ops-app-rebuild --from-literal=gh-token=<token> -n platform-ops"
    _info "[argocd]   kubectl patch secret platform-ops-notifications -n platform-ops --type=merge \\"
    _info "[argocd]     -p '{\"data\":{\"slack-incoming-webhook-url\":\"<base64-url>\"}}'"
 }
