@@ -103,6 +103,35 @@ JSON
 
 ---
 
+## Change 2 — set `required_approving_review_count: 0` (solo maintainer)
+
+**Decision 2026-07-28:** these repos have a single maintainer who cannot approve their own
+PRs, so `required_approving_review_count: 1` guarantees a permanent block (the second half of
+why every merge needed an admin bypass — the first is the phantom "Go CI"). Set it to 0. Real
+CI checks (Change 1) remain the quality gate; `enforce_admins` can then stay `true` and normal
+merges succeed on green CI with no bypass.
+
+```bash
+# per repo — run with ! (classifier may block the PATCH; single bare command per repo)
+gh api repos/wilddog64/shopping-cart-<repo>/branches/main/protection/required_pull_request_reviews \
+  -X PATCH -F required_approving_review_count=0
+```
+
+## Change 3 — Dependabot auto-merge (minor/patch + security; majors reviewed)
+
+**Decision 2026-07-28:** after the first scan, Dependabot opens a version-update PR per stale
+dep — mostly majors (each its own PR by design). Merging each by hand is untenable. Add an
+auto-merge workflow so minor/patch and security PRs merge themselves on green CI, while majors
+stay open for review. This is **repo source** → **Codex spec + handoff**, not a settings edit.
+**Deferred to v1.19.0** — v1.18.0 is already at the 5-plan-doc limit, so the auto-merge workflow
+opens the next release rather than growing this one. Spec: `docs/plans/v1.19.0-shopping-cart-dependabot-automerge.md`
+(to be written on the v1.19.0 branch).
+
+> Changes 1 and 2 (branch-protection: real required checks + review-count 0) are settings-only
+> and can be applied now, post-merge, independent of the v1.19.0 auto-merge work.
+
+---
+
 ## Verification
 
 After each PATCH, confirm the contexts took:
