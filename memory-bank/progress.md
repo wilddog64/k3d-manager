@@ -8,9 +8,10 @@ v1.15.0 RELEASED 2026-07-14 · v1.16.0 RELEASED 2026-07-23 — Istio ambient mes
 - [x] 8 BATS suites pass locally, 0 failures (`app_cve_scan`, `argocd_values_branch_drift`, `argocd_platform_ops_bootstrap`, `grafana_dashboard_appsets`, `trivy_operator_observability`, `argocd_metrics_servicemonitor`, `cluster_status_values_branch`, `webhook`).
 - [x] Scope check — 50 files, all on-theme; no stray secrets, no `default`-ns.
 - [x] PR #108 created, base `main`, Copilot requested. `mergeable:true` / state `blocked` (checks pending).
-- [ ] CI green on PR
-- [ ] Copilot review comments addressed
-- [ ] Gemini live smoke (manual)
+- [x] CI green on PR (lint/detect/CodeQL/Analyze all pass)
+- [x] Copilot review addressed — 2 fixed (`bb294f6e`: prometheusrule alert text, webhook.bats redundant `||`), 1 declined (Makefile dev-cred print, dev-only helper); 3 threads replied + resolved
+- [x] **Live smoke PASS (2026-07-28, Claude-run `make status`)** — all credentialed logins green (Keycloak token minted, Frontend `/api/cart` 200, ArgoCD/Grafana login 200), ESO 18/18, data layer 4/4; values-branch drift detector reports `k3d-manager-v1.18.0` correctly (v1.18.0 feature verified live). Pre-existing non-blockers: keycloak-realm-reconcile Error (login still works), argocd-cve-scan Error (infra scan), ubuntu-k3s Unknown (dead ACG ctx).
+- [ ] **GitGuardian check** — FAILS on verified false positive (incident 35165473, LDAP `bindCredential:["$LDAP_BIND"]` var, not a literal). Classifier blocks Claude from reading the Keychain-stored PAT or mutating the incident → **user must resolve in dashboard as false_positive**, then Claude re-runs the check.
 - [ ] User go → merge (never auto-merge) → `/post-merge` (tag v1.18.0, restore enforce_admins, cut v1.19.0)
 
 > Full per-item detail (gate dumps, live-verify logs) archived 2026-07-19 → `memory-bank/archive/progress-v1.16.0-detail-thru-2026-07-19.md`. Older: `progress-v1.6.5-v1.15.0.md`, `-v1.6.x-v1.6.4.md`, `-v1.4.2-v1.4.8.md`.
