@@ -1,7 +1,17 @@
 # Progress — k3d-manager
 
 ## Status
-v1.15.0 RELEASED 2026-07-14 · v1.16.0 RELEASED 2026-07-23 — Istio ambient mesh · PR #106 merged `4c5d3556` · **v1.17.0 RELEASED 2026-07-24** — real login verification in health smoke · PR #107 merged `b5d401b6` · tag `v1.17.0` + GitHub release published (Latest) · next branch `k3d-manager-v1.18.0` open.
+v1.15.0 RELEASED 2026-07-14 · v1.16.0 RELEASED 2026-07-23 — Istio ambient mesh · PR #106 merged `4c5d3556` · **v1.17.0 RELEASED 2026-07-24** — real login verification in health smoke · PR #107 merged `b5d401b6` · tag `v1.17.0` + GitHub release published (Latest) · **v1.18.0 PR #108 OPEN (2026-07-28)** — first-mile CVE gap closure, head `f5597796`, Copilot tagged, CI running, NOT merged (awaiting CI green + Copilot + Gemini live smoke + user go).
+
+## v1.18.0 — PR #108 OPEN (2026-07-28)
+- [x] CHANGELOG `[1.18.0]`, README releases table (v1.15.0→`<details>`), `docs/releases.md` row — committed `f5597796`.
+- [x] 8 BATS suites pass locally, 0 failures (`app_cve_scan`, `argocd_values_branch_drift`, `argocd_platform_ops_bootstrap`, `grafana_dashboard_appsets`, `trivy_operator_observability`, `argocd_metrics_servicemonitor`, `cluster_status_values_branch`, `webhook`).
+- [x] Scope check — 50 files, all on-theme; no stray secrets, no `default`-ns.
+- [x] PR #108 created, base `main`, Copilot requested. `mergeable:true` / state `blocked` (checks pending).
+- [ ] CI green on PR
+- [ ] Copilot review comments addressed
+- [ ] Gemini live smoke (manual)
+- [ ] User go → merge (never auto-merge) → `/post-merge` (tag v1.18.0, restore enforce_admins, cut v1.19.0)
 
 > Full per-item detail (gate dumps, live-verify logs) archived 2026-07-19 → `memory-bank/archive/progress-v1.16.0-detail-thru-2026-07-19.md`. Older: `progress-v1.6.5-v1.15.0.md`, `-v1.6.x-v1.6.4.md`, `-v1.4.2-v1.4.8.md`.
 
