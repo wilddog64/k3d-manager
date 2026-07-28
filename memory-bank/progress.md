@@ -1,7 +1,7 @@
 # Progress — k3d-manager
 
 ## Status
-v1.15.0 RELEASED 2026-07-14 · v1.16.0 RELEASED 2026-07-23 — Istio ambient mesh · PR #106 merged `4c5d3556` · **v1.17.0 RELEASED 2026-07-24** — real login verification in health smoke · PR #107 merged `b5d401b6` · tag `v1.17.0` + GitHub release published (Latest) · **v1.18.0 PR #108 OPEN (2026-07-28)** — first-mile CVE gap closure, head `f5597796`, Copilot tagged, CI running, NOT merged (awaiting CI green + Copilot + Gemini live smoke + user go).
+v1.15.0 RELEASED 2026-07-14 · v1.16.0 RELEASED 2026-07-23 — Istio ambient mesh · PR #106 merged `4c5d3556` · **v1.17.0 RELEASED 2026-07-24** — real login verification in health smoke · PR #107 merged `b5d401b6` · tag `v1.17.0` + GitHub release published (Latest) · **v1.18.0 RELEASED 2026-07-28** — first-mile CVE gap closure · PR #108 merged `85742ef7` · tag + GitHub release published (Latest) · enforce_admins restored on main (verified `true`) · k3d-manager-v1.19.0 branch cut.
 
 ## v1.18.0 — PR #108 OPEN (2026-07-28)
 - [x] CHANGELOG `[1.18.0]`, README releases table (v1.15.0→`<details>`), `docs/releases.md` row — committed `f5597796`.
@@ -12,7 +12,7 @@ v1.15.0 RELEASED 2026-07-14 · v1.16.0 RELEASED 2026-07-23 — Istio ambient mes
 - [x] Copilot review addressed — 2 fixed (`bb294f6e`: prometheusrule alert text, webhook.bats redundant `||`), 1 declined (Makefile dev-cred print, dev-only helper); 3 threads replied + resolved
 - [x] **Live smoke PASS (2026-07-28, Claude-run `make status`)** — all credentialed logins green (Keycloak token minted, Frontend `/api/cart` 200, ArgoCD/Grafana login 200), ESO 18/18, data layer 4/4; values-branch drift detector reports `k3d-manager-v1.18.0` correctly (v1.18.0 feature verified live). Pre-existing non-blockers: keycloak-realm-reconcile Error (login still works), argocd-cve-scan Error (infra scan), ubuntu-k3s Unknown (dead ACG ctx).
 - [x] **GitGuardian check GREEN** — incident 35165473 (LDAP `bindCredential:["$LDAP_BIND"]` var, not a literal) resolved as false_positive by user; `.gitguardian.yaml` also carries the match SHA `d519…` for local pre-commit hygiene (commit `4143a72e`). Note: GitGuardian **App** check reads workspace incident state — `.gitguardian.yaml` alone does NOT clear it (confirms PR #107 finding); re-triggered via empty commit `7d079d76`.
-- [ ] **User go → merge** (never auto-merge). ALL gates green. On go: Claude `enforce_admins` DELETE → user merges → `/post-merge` (tag v1.18.0, restore enforce_admins, cut k3d-manager-v1.19.0 from merge SHA, drop drafted auto-merge spec).
+- [x] **User go → merge** (never auto-merge). ALL gates green. PR #108 merged `85742ef7` (2026-07-28). Post-merge complete: tag v1.18.0 created, enforce_admins restored, k3d-manager-v1.19.0 branch cut, retrospective written.
 
 > Full per-item detail (gate dumps, live-verify logs) archived 2026-07-19 → `memory-bank/archive/progress-v1.16.0-detail-thru-2026-07-19.md`. Older: `progress-v1.6.5-v1.15.0.md`, `-v1.6.x-v1.6.4.md`, `-v1.4.2-v1.4.8.md`.
 

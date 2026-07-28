@@ -1,9 +1,9 @@
 # Active Context — k3d-manager
 
 ## Status
-v1.15.0 RELEASED 2026-07-14 · v1.16.0 RELEASED 2026-07-23 — Istio ambient mesh · PR #106 merged `4c5d3556` · **v1.17.0 RELEASED 2026-07-24** — real login verification in health smoke · PR #107 merged `b5d401b6` · tag + GitHub release published (Latest) · enforce_admins restored on main (verified `true`) · **v1.18.0 PR #108 OPEN (2026-07-28)** — first-mile CVE gap closure; branch `k3d-manager-v1.18.0` (87 commits), Copilot tagged, CI running; NOT merged (awaiting CI green + Copilot + Gemini live smoke, then user go). Head `f5597796`. Merging clears Dependabot alert #3 (brace-expansion) on main.
+v1.15.0 RELEASED 2026-07-14 · v1.16.0 RELEASED 2026-07-23 — Istio ambient mesh · PR #106 merged `4c5d3556` · **v1.17.0 RELEASED 2026-07-24** — real login verification in health smoke · PR #107 merged `b5d401b6` · tag + GitHub release published (Latest) · **v1.18.0 RELEASED 2026-07-28** — first-mile CVE gap closure (event-driven CVE auto-patch + Dependabot on 5 shopping-cart repos) · PR #108 merged `85742ef7` to main · tag v1.18.0 + GitHub release (Latest) · enforce_admins restored on main (verified `true`) · k3d-manager-v1.19.0 branch cut · retrospective written. Current focus: v1.19.0 preparation.
 
-- **v1.18.0 wrap-up (2026-07-28):** CHANGELOG `[1.18.0]` written, README releases table promoted (v1.15.0 → `<details>`), `docs/releases.md` full-history row added — committed `f5597796`. 8 BATS suites pass locally (0 failures). Scope check: 50 files, all on-theme; no stray secrets, no `default`-ns. PR gate remaining before merge: CI green, Copilot addressed, **Gemini live smoke (manual)**. Do NOT auto-merge — prepare-and-stop, wait for user go.
+- **v1.18.0 SHIPPED (2026-07-28):** PR #108 merged `85742ef7` to main · tag v1.18.0 created + GitHub release published (Latest) · enforce_admins restored to `true` · retrospective written `docs/retro/2026-07-28-v1.18.0-retrospective.md` · k3d-manager-v1.19.0 branch cut from merge SHA. All post-merge housekeeping complete.
 
 > Verbose per-item narrative (full gate dumps, live-verify logs, retracted-diagnosis trails) archived 2026-07-19 → `memory-bank/archive/activeContext-v1.16.0-detail-thru-2026-07-19.md`. Earlier windows: `activeContext-v1.8.0-v1.15.0.md`, `-v1.6.x-v1.7.1.md`, `-v1.4.2-v1.4.8.md`.
 
