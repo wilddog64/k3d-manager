@@ -54,6 +54,33 @@ The wrapper convention is guidance, not an executable rigor rule. Existing
 violations also predate any future staged-diff check, so they would remain
 invisible until their file was edited.
 
+## Parser-Derived Baseline
+
+On 2026-07-30, `shfmt --to-json` parsed every shell file found by
+`shfmt -f scripts bin`, excluding the vendored foundation subtree and
+third-party Playwright `node_modules`. There were no parser errors. The scan
+counted raw `CallExpr` nodes for tools with a dedicated wrapper or that should
+otherwise flow through `_run_command`: `kubectl`, `helm`, `curl`, `k3d`,
+`docker`, `ssh`, and `wget`.
+
+| Source class | Raw calls |
+| --- | ---: |
+| Host manager (`scripts/plugins`, `scripts/lib`, `bin`) | 410 |
+| Tests | 27 |
+| Container shell (`scripts/etc/argocd/platform-ops`) | 14 |
+| Other standalone shell | 6 |
+| **Total** | **457** |
+
+The 410 host-manager candidates are `kubectl`=311, `curl`=73, `ssh`=15,
+`docker`=6, `k3d`=4, and `helm`=1. The largest raw-`kubectl` concentrations
+are `scripts/plugins/shopping_cart.sh`=66, `bin/cluster-up`=65,
+`bin/cluster-status`=29, and `scripts/lib/providers/k3s-hostinger.sh`=24.
+
+This is the actionable migration baseline, not a claim that all 457 calls are
+defects. Tests and self-contained container scripts need explicit exceptions
+or local adapters; the 410 host-manager calls are the candidates that violate
+the proposed host wrapper convention.
+
 Not every raw process call is a violation. Host-side manager shell code can
 use `_kubectl`/`_run_command`; embedded CronJob scripts need a self-contained
 adapter such as `_hub_kubectl`; and the Python webhook correctly uses its
