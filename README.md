@@ -249,6 +249,7 @@ docs/
 - **[ArgoCD](docs/howto/argocd.md)** — Deploy, register app cluster, configure deploy keys
 - **[ArgoCD Alerts](docs/howto/argocd-alerts.md)** — ArgoCD Degraded/OutOfSync alert wiring, visibility, and test steps
 - **[Trivy Operator Observability](docs/howto/trivy-operator-observability.md)** — Trivy Operator reconcile-error logs, scan-job failure alerts, and metrics scraping
+- **[CVE Detection and Remediation Pipeline](docs/howto/cve-remediation-pipeline.md)** — Trivy alert to webhook to immutable-image promotion/rebuild, plus Dependabot escalation
 - **[cert-manager](docs/howto/cert-manager.md)** — Deploy, Vault + ACME issuers, certificate lifecycle
 
 **Cloud Sandbox**
