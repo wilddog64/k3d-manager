@@ -112,6 +112,10 @@ case "${_url}" in
     ;;
   https://ghcr.io/v2/*/tags/list)
     [ "${_out_mode}" = "file" ] || exit 1
+    if [ "${TEST_NO_CANDIDATE:-0}" = "1" ]; then
+      printf '{"name":"repo","tags":["latest"]}\n' >"${_out_file}"
+      exit 0
+    fi
     printf '{"name":"repo","tags":["latest","%s","sha-old"]}\n' "${TEST_SHA_TAG:-sha-new}" >"${_out_file}"
     exit 0
     ;;
@@ -403,6 +407,33 @@ EOF
   run ! grep -q 'actions/workflows' "${WGET_LOG}"
 }
 
+@test "missing immutable candidate notifies without failing the batch" {
+  export APP_SERVICES="shopping-cart-payment"
+  export TEST_NO_CANDIDATE=1
+  export TEST_REPORT_ROWS="shopping-cart-apps payment-report ghcr.io/wilddog64/shopping-cart-payment sha-old 1 0"
+  export TEST_REPORT_DETAILS_payment_report="CRITICAL|CVE-1|2.0.0"
+
+  run env -i \
+    PATH="${PATH}" \
+    TRIVY_LOG="${TRIVY_LOG}" \
+    WGET_LOG="${WGET_LOG}" \
+    NOTIFY_LOG="${NOTIFY_LOG}" \
+    KUBECTL_LOG="${KUBECTL_LOG}" \
+    TEST_SECRET_SERVER_B64="${TEST_SECRET_SERVER_B64}" \
+    TEST_SECRET_CONFIG_B64="${TEST_SECRET_CONFIG_B64}" \
+    APP_SERVICES="${APP_SERVICES}" \
+    TEST_NO_CANDIDATE="${TEST_NO_CANDIDATE}" \
+    TEST_REPORT_ROWS="${TEST_REPORT_ROWS}" \
+    TEST_REPORT_DETAILS_payment_report="${TEST_REPORT_DETAILS_payment_report}" \
+    /bin/sh "${TEST_SCAN_SCRIPT}"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"failed to resolve immutable sha-* candidate for ghcr.io/wilddog64/shopping-cart-payment — promotion skipped"* ]]
+  grep -q 'warning|App CVE Candidate Missing: shopping-cart-payment|' "${NOTIFY_LOG}"
+  run ! grep -q 'actions/workflows' "${WGET_LOG}"
+  run ! grep -q 'patch application shopping-cart-payment' "${KUBECTL_LOG}"
+}
+
 @test "rebuild path without GH token returns non-zero" {
   export APP_SERVICES="shopping-cart-order"
   export TEST_SHA_TAG="sha-order-new"
@@ -431,7 +462,7 @@ EOF
   run ! grep -q 'patch application shopping-cart-order' "${KUBECTL_LOG}"
 }
 
-@test "missing immutable sha candidate skips promotion instead of falling back to latest" {
+@test "missing immutable sha candidate notifies without retrying the batch" {
   export APP_SERVICES="shopping-cart-product-catalog"
   export TEST_SHA_TAG="sha-catalog-new"
   export TEST_LATEST_DIGEST="sha256:feedbeef"
@@ -506,7 +537,8 @@ EOF
     TEST_REPORT_DETAILS_product_catalog_report="${TEST_REPORT_DETAILS_product_catalog_report}" \
     /bin/sh "${TEST_SCAN_SCRIPT}"
 
-  [ "${status}" -eq 1 ]
+  [ "${status}" -eq 0 ]
   [[ "${output}" == *"failed to resolve immutable sha-* candidate"* ]]
+  grep -q 'warning|App CVE Candidate Missing: shopping-cart-product-catalog|' "${NOTIFY_LOG}"
   run ! grep -q 'patch application shopping-cart-product-catalog' "${KUBECTL_LOG}"
 }
