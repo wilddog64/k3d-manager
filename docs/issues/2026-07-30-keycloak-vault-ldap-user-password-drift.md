@@ -46,3 +46,10 @@ It also does not currently verify that each Vault value authenticates after seed
 4. Re-test the frontend authorization-code login after the LDAP reset.
 
 No credentials are included in this record.
+
+## Resolution (2026-07-30)
+
+The three LDAP passwords were reset from their existing Vault values. Direct LDAP binds
+and Keycloak direct grants through the `k3dm-smoke` client then succeeded for all three
+users. The durable source fix is recorded in
+`docs/bugs/2026-07-30-keycloak-vault-ldap-password-drift-guard.md`.

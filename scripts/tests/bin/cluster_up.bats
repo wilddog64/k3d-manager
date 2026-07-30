@@ -100,3 +100,35 @@
   [ "$status" -eq 0 ]
   [[ "$output" == *'_vault_kv_exists "ldap/admin"'* ]]
 }
+
+@test "acg-up verifies every LDAP password before checkpointing the seed" {
+  run grep -nF 'ldapwhoami -x -H ldap://localhost:389' bin/cluster-up
+  [ "$status" -eq 0 ]
+
+  run grep -nF 'LDAP password seed failed verification; checkpoint not written' bin/cluster-up
+  [ "$status" -eq 0 ]
+
+  run bash -c '
+    seed_block=$(sed -n "/Step 10d.5\/14/,/Step 10d.6\/14/p" bin/cluster-up)
+    test "$(printf "%s" "$seed_block" | grep -c "_cp_write \\\"step-10d5-ldap-passwords\\\"")" -eq 1
+    printf "%s" "$seed_block" | grep -q "LDAP password seed failed verification; checkpoint not written"
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "acg-up keeps LDAP user passwords out of command arguments" {
+  run grep -nF 'ldappasswd -x -H ldap://localhost:389' bin/cluster-up
+  [ "$status" -eq 0 ]
+
+  run grep -nF -- "-S \"uid=\$1,ou=users,dc=shopping-cart,dc=local\"" bin/cluster-up
+  [ "$status" -eq 0 ]
+
+  run grep -nF -- '-y "${_ldap_password_file}"' bin/cluster-up
+  [ "$status" -eq 0 ]
+
+  run grep -nF -- '-s "${_ldap_user_pass}"' bin/cluster-up
+  [ "$status" -ne 0 ]
+
+  run grep -nF -- '-w "${_ldap_user_pass}"' bin/cluster-up
+  [ "$status" -ne 0 ]
+}
