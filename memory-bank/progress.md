@@ -3,7 +3,9 @@
 ## Status
 
 - [x] **Payment Dockerfile Go 1.25 build-stage mismatch — MERGED `fe20c36` (PR #44, 2026-07-31).** `go/Dockerfile` `golang:1.21`→`golang:1.25` + CHANGELOG `9d9ec71`. Main's Go image build fixed. enforce_admins RE-ENABLED (`true`).
-- [ ] **Payment open Dependabot backlog (5 PRs) — rebase triggered, awaiting merge go-ahead.** `@dependabot rebase` sent to #31/#30/#29/#26 (GHA majors) + #28 (eclipse-temurin 21→25 JRE). After rebases settle green: merge the 4 GHA majors; #28 flagged as Java-runtime major for a conscious call. Do NOT auto-merge.
+- [ ] **Payment #28 (temurin 21→25) accidentally merged `4074d19`, BROKE main image build — REVERT specced.** JDK 25 + Lombok 1.18.30 (SB 3.2.0-managed) → `mvn package` `cannot find symbol`. Slipped through: required checks compile JDK 21; image build (`Build, Scan & Push`) non-required + skipped on PRs. Spec `docs/bugs/2026-07-31-shopping-cart-payment-revert-temurin25-lombok-break.md`, branch `fix/revert-temurin25-jdk-lombok-break`. Codex handoff pending → then Claude /create-pr.
+- [ ] **Payment 4 GHA majors (#31/#30/#29/#26) OPEN, BEHIND after #28 — re-rebase + merge after revert lands.** User go-ahead given for the 4. #39 (x/crypto 0.51→0.52) MERGED `abb496a` (benign). Do NOT auto-merge.
+- [ ] **Payment CI gap:** image build skipped on PRs + non-required → JDK/base bumps unvalidated pre-merge; main `strict: true`. Follow-up: run image build on PRs / make required.
 
 - [x] **Payment Go CI toolchain mismatch — DONE `69342eb` on `origin/fix/golangci-go125-toolchain` (2026-07-31).** Changed only `shopping-cart-payment/.github/workflows/go-ci.yml`, pinning golangci-lint `v2.5.0` → `v2.7.2`; old-pin grep count is 0 and YAML parses. Pushed `go-ci` run `30662579954` passed both `go` (including golangci-lint) and `integration`.
 - [x] **Payment PR #43 MERGED `6e457b0d` (2026-07-31)** — golangci `v2.5.0`→`v2.7.2` on main. Copilot CHANGELOG nit addressed (`315bd1a`), thread resolved. **enforce_admins RE-ENABLED on payment main (verified `true`).**
